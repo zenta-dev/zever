@@ -1,0 +1,72 @@
+version: "2"
+
+run:
+  timeout: 5m
+  modules-download-mode: readonly
+
+formatters:
+  enable:
+    - gofmt
+    - goimports
+  settings:
+    gofmt:
+      simplify: true
+    goimports:
+      local-prefixes:
+        - github.com/zenta-dev/zever
+
+linters:
+  default: standard
+  enable:
+    - bidichk
+    - bodyclose
+    - containedctx
+    - depguard
+    - dogsled
+    - dupl
+    - errname
+    - errorlint
+    - forcetypeassert
+    - gocritic
+    - godot
+    - gosec
+    - makezero
+    - misspell
+    - nakedret
+    - nilerr
+    - nilnil
+    - noctx
+    - perfsprint
+    - prealloc
+    - predeclared
+    - recvcheck
+    - revive
+    - testifylint
+    - usetesting
+    - thelper
+    - tparallel
+    - unconvert
+    - unparam
+    - usestdlibvars
+    - wastedassign
+    - whitespace
+  settings:
+    depguard:
+      rules:
+        main:
+          deny:
+            - pkg: "github.com/pkg/errors"
+              desc: "Use the standard library errors and fmt.Errorf(%w) instead of pkg/errors"
+            - pkg: "io/ioutil"
+              desc: "Deprecated since Go 1.16: use io or os instead"
+    errorlint:
+      errorf: true
+    govet:
+      enable:
+        - shadow
+  exclusions:
+    presets:
+      - comments
+      - common-false-positives
+      - legacy
+      - std-error-handling
