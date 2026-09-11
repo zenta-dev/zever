@@ -1,0 +1,73 @@
+name: Performance issue
+description: Report a performance problem, such as high latency, memory, or allocations
+labels: ["performance"]
+body:
+  - type: markdown
+    attributes:
+      value: |
+        Please provide measurements when possible. Vague reports like "this is slow" without reproduction or benchmark data are hard to act on.
+        A good report reproduces the problem and shows before/after (or expected/actual) numbers, e.g. from `go test -bench=. -benchmem ./...`.
+
+        **Remove any secrets, API keys, credentials, tokens, or private information from the report.**
+
+  - type: input
+    id: version
+    attributes:
+      label: zever version
+      description: The version or commit where the problem is observed.
+      placeholder: v0.1.0
+    validations:
+      required: true
+
+  - type: input
+    id: go-version
+    attributes:
+      label: Go version
+      description: Output of `go version`.
+      placeholder: go version go1.27.0 linux/amd64
+    validations:
+      required: true
+
+  - type: input
+    id: environment
+    attributes:
+      label: Environment
+      description: Hardware and how zever is used, e.g. CPU, memory, kernel, containerized.
+      placeholder: 4-core VM, Linux 6.x
+
+  - type: textarea
+    id: workload
+    attributes:
+      label: Workload
+      description: What the workload looks like, e.g. data volume, concurrency, throughput, or input size.
+    validations:
+      required: true
+
+  - type: textarea
+    id: benchmark
+    attributes:
+      label: Benchmark / reproduction
+      description: |
+        A self-contained benchmark or program that reproduces the issue. Include the command you ran.
+      render: go
+    validations:
+      required: true
+
+  - type: textarea
+    id: expected
+    attributes:
+      label: Expected performance
+      description: What performance did you expect? If you have a target or comparison, state it.
+
+  - type: textarea
+    id: actual
+    attributes:
+      label: Actual performance
+      description: What actual numbers were observed? Include CPU time, memory, allocations, or latency as appropriate.
+      render: shell
+
+  - type: textarea
+    id: context
+    attributes:
+      label: Additional context
+      description: Anything else that may be relevant, such as profiling output (`pprof`), GC settings (GOGC/GOMAXPROCS), or environment differences.

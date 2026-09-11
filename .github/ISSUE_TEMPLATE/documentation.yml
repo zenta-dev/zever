@@ -1,0 +1,33 @@
+name: Documentation
+description: Report a problem or gap in the documentation
+labels: ["documentation"]
+body:
+  - type: textarea
+    id: location
+    attributes:
+      label: Documentation location
+      description: Where did you find the problem? Add a link, file path, or section name.
+      placeholder: README.md, section "Overview"
+    validations:
+      required: true
+
+  - type: textarea
+    id: problem
+    attributes:
+      label: Problem
+      description: What is wrong, unclear, missing, or outdated?
+    validations:
+      required: true
+
+  - type: textarea
+    id: suggestion
+    attributes:
+      label: Suggested improvement
+      description: How should it be fixed? A proposed wording or example is welcome.
+
+  - type: textarea
+    id: context
+    attributes:
+      label: Additional context
+      description: Anything else that helps, such as the version the docs referred to.
+

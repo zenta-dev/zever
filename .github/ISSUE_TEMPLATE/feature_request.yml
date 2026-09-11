@@ -1,0 +1,52 @@
+name: Feature request
+description: Propose a new feature or capability for zever
+labels: ["enhancement"]
+body:
+  - type: markdown
+    attributes:
+      value: |
+        Thanks for proposing a feature. Please describe the problem you are solving first, before jumping to a specific implementation.
+        For significant architectural changes, discuss the idea before implementing it; a short issue first saves wasted work.
+
+  - type: textarea
+    id: problem
+    attributes:
+      label: Problem
+      description: What problem are you trying to solve? What cannot be done with the current API?
+    validations:
+      required: true
+
+  - type: textarea
+    id: solution
+    attributes:
+      label: Proposed solution
+      description: How should the problem be solved?
+    validations:
+      required: true
+
+  - type: textarea
+    id: alternatives
+    attributes:
+      label: Alternatives considered
+      description: What other approaches were considered and why were they rejected? Include workarounds using the current API.
+
+  - type: textarea
+    id: api
+    attributes:
+      label: API proposal
+      description: |
+        Sketch of the proposed public API, e.g. function or type signatures. This is a framework, so compatibility matters.
+      render: go
+
+  - type: textarea
+    id: compatibility
+    attributes:
+      label: Compatibility implications
+      description: Would this be backward-compatible? Could it change existing behavior, defaults, or public contracts? Does it affect anyone relying on `go 1.27.0` or the current API?
+
+  - type: textarea
+    id: context
+    attributes:
+      label: Additional context
+      description: Anything else relevant, such as links, prior discussions, or examples from other frameworks.
+
