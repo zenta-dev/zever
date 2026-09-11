@@ -1,0 +1,25 @@
+cff-version: 1.2.0
+message: "If you use zever in your work, please cite it as below."
+title: zever
+type: software
+authors:
+  - family-names: Hidayatullah
+    given-names: Rahmat
+    alias: erhahahaa
+    website: "https://github.com/erhahahaa"
+repository-code: "https://github.com/zenta-dev/zever"
+url: "https://github.com/zenta-dev/zever"
+abstract: >-
+  zever is a schema-driven scaffolding compiler for Go, built around a custom
+  DSL with proto-inspired syntax. It compiles service schemas into the backend
+  infrastructure an application needs, while leaving business logic to the user.
+keywords:
+  - go
+  - golang
+  - codegen
+  - schema
+  - dsl
+  - framework
+  - orm
+license: Apache-2.0
+version: 0.0.0
