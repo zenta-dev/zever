@@ -14,3 +14,6 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Generic `codec` package: `Encoder[V]` / `Decoder[V]` / `Codec[V]` interfaces
   with a `JSONCodec[V]` implementation backed by `encoding/json/v2` and
   sentinel `ErrEncode` / `ErrDecode` errors.
+- Generic `log` package: `Logger` / `Event` / `Context` facade with a
+  registration-based adapter system and `noop`, stdlib `slog`, and `zerolog`
+  backends.
