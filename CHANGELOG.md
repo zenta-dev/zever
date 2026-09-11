@@ -11,3 +11,6 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 - Initial project scaffolding: Go module, CI, lint configuration, Makefile, and
   open source project files.
+- Generic `codec` package: `Encoder[V]` / `Decoder[V]` / `Codec[V]` interfaces
+  with a `JSONCodec[V]` implementation backed by `encoding/json/v2` and
+  sentinel `ErrEncode` / `ErrDecode` errors.
