@@ -1,8 +1,5 @@
 <p align="center">
-  <picture>
-    <source media="(prefers-color-scheme: dark)" srcset=".github/zever-dark.svg">
-    <img alt="zever" src=".github/zever.svg" width="320">
-  </picture>
+  <img alt="zever" src=".github/zever.jpg" width="320">
 </p>
 
 # zever
