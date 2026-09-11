@@ -1,0 +1,15 @@
+# Normalize line endings to LF in the repository.
+* text=auto eol=lf
+
+# Explicit language hints
+*.go text eol=lf
+go.mod text eol=lf
+go.sum text eol=lf
+Makefile text eol=lf
+*.md text eol=lf
+*.yml text eol=lf
+*.yaml text eol=lf
+
+# Generated artifacts
+coverage.out linguist-generated=true
+sbom.json linguist-generated=true
