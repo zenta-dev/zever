@@ -17,3 +17,5 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Generic `log` package: `Logger` / `Event` / `Context` facade with a
   registration-based adapter system and `noop`, stdlib `slog`, and `zerolog`
   backends.
+- Generic `cache` package: `Cache` facade with `Typed[K, V]` codec helpers and
+  in-memory LRU plus Redis-backed adapters.
