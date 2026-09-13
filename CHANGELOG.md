@@ -19,3 +19,5 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   backends.
 - Generic `cache` package: `Cache` facade with `Typed[K, V]` codec helpers and
   in-memory LRU plus Redis-backed adapters.
+- Generic `queue` package: `Queue` facade with in-memory and Redis-backed
+  adapters for topic-based messaging.
