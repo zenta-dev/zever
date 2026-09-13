@@ -21,3 +21,6 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   in-memory LRU plus Redis-backed adapters.
 - Generic `queue` package: `Queue` facade with in-memory and Redis-backed
   adapters for topic-based messaging.
+- Generic `job` package: job-queue orchestration with typed registration,
+  dispatch (delay, scheduling, uniqueness), worker execution with retry and
+  dead-letter handling, batch progress, and cron scheduling.
