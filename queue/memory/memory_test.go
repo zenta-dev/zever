@@ -22,16 +22,16 @@ func newQueue(t *testing.T, opts queue.Options) queue.Queue {
 	return c
 }
 
-func waitFor(t *testing.T, d time.Duration, cond func() bool, msg string) {
+func waitFor(t *testing.T, cond func() bool, msg string) {
 	t.Helper()
-	deadline := time.Now().Add(d)
+	deadline := time.Now().Add(3 * time.Second)
 	for time.Now().Before(deadline) {
 		if cond() {
 			return
 		}
 		time.Sleep(5 * time.Millisecond)
 	}
-	t.Fatalf("waitFor timeout %s: %s", d, msg)
+	t.Fatalf("waitFor timeout %s: %s", 3*time.Second, msg)
 }
 
 // TestMemory_PushPop_Ack_roundTrip verifies push/pop/ack cycle, deep-copy and EmptyError.
@@ -82,8 +82,8 @@ func TestMemory_PushPop_Ack_roundTrip(t *testing.T) {
 		t.Fatalf("IsEmpty = false want true (inflight not counted)")
 	}
 
-	if err := q.Ack(context.Background(), msg); err != nil {
-		t.Fatalf("Ack: %v", err)
+	if ackErr := q.Ack(context.Background(), msg); ackErr != nil {
+		t.Fatalf("Ack: %v", ackErr)
 	}
 
 	n, _ = q.Length(context.Background(), topic)
@@ -110,8 +110,8 @@ func TestMemory_PushPop_Ack_roundTrip(t *testing.T) {
 	}
 
 	payload2 := queue.Payload([]byte("hi2"))
-	if err := q.Push(context.Background(), topic, payload2, nil); err != nil {
-		t.Fatalf("Push2: %v", err)
+	if pushErr := q.Push(context.Background(), topic, payload2, nil); pushErr != nil {
+		t.Fatalf("Push2: %v", pushErr)
 	}
 	msg2, err := q.Pop(context.Background(), topic)
 	if err != nil {
@@ -141,8 +141,8 @@ func TestMemory_PushDelayed(t *testing.T) {
 	}
 	_ = q.Ack(context.Background(), msg)
 
-	if err := q.PushDelayed(context.Background(), topic, queue.Payload([]byte("immediate2")), nil, -5*time.Millisecond); err != nil {
-		t.Fatalf("PushDelayed -5ms: %v", err)
+	if pushDelayErr := q.PushDelayed(context.Background(), topic, queue.Payload([]byte("immediate2")), nil, -5*time.Millisecond); pushDelayErr != nil {
+		t.Fatalf("PushDelayed -5ms: %v", pushDelayErr)
 	}
 	msg, err = q.Pop(context.Background(), topic)
 	if err != nil {
@@ -153,10 +153,10 @@ func TestMemory_PushDelayed(t *testing.T) {
 	}
 	_ = q.Ack(context.Background(), msg)
 
-	if err := q.PushDelayed(context.Background(), topic, queue.Payload([]byte("later")), nil, 40*time.Millisecond); err != nil {
-		t.Fatalf("PushDelayed 40ms: %v", err)
+	if pushLaterErr := q.PushDelayed(context.Background(), topic, queue.Payload([]byte("later")), nil, 40*time.Millisecond); pushLaterErr != nil {
+		t.Fatalf("PushDelayed 40ms: %v", pushLaterErr)
 	}
-	if err := q.Push(context.Background(), topic, queue.Payload([]byte("now")), nil); err != nil {
+	if pushNowErr := q.Push(context.Background(), topic, queue.Payload([]byte("now")), nil); pushNowErr != nil {
 		t.Fatalf("Push now: %v", err)
 	}
 	msg, err = q.Pop(context.Background(), topic)
@@ -176,7 +176,7 @@ func TestMemory_PushDelayed(t *testing.T) {
 		t.Fatalf("Pop delayed err = %v want ErrEmpty", err)
 	}
 
-	waitFor(t, 3*time.Second, func() bool {
+	waitFor(t, func() bool {
 		n, _ := q.Length(context.Background(), topic)
 		return n == 1
 	}, "delayed entry not promoted")
@@ -200,7 +200,7 @@ func TestMemory_PushDelayed(t *testing.T) {
 	if err := q.PushDelayed(context.Background(), topic2, queue.Payload([]byte("d60")), nil, 60*time.Millisecond); err != nil {
 		t.Fatalf("PushDelayed d60: %v", err)
 	}
-	waitFor(t, 3*time.Second, func() bool {
+	waitFor(t, func() bool {
 		n, _ := q.Length(context.Background(), topic2)
 		return n == 3
 	}, "all delayed entries not promoted")
@@ -234,8 +234,8 @@ func TestMemory_Nack(t *testing.T) {
 	if msg.Attempt != 1 {
 		t.Fatalf("Attempt = %d want 1", msg.Attempt)
 	}
-	if err := q.Nack(context.Background(), msg, true); err != nil {
-		t.Fatalf("Nack requeue true: %v", err)
+	if nackErr := q.Nack(context.Background(), msg, true); nackErr != nil {
+		t.Fatalf("Nack requeue true: %v", nackErr)
 	}
 	n, _ := q.Length(context.Background(), topic)
 	if n != 1 {
@@ -252,15 +252,15 @@ func TestMemory_Nack(t *testing.T) {
 		t.Fatalf("Attempt after requeue = %d want 2", msg2.Attempt)
 	}
 
-	if err := q.Nack(context.Background(), msg, true); err != nil {
-		t.Fatalf("Nack stale: %v", err)
+	if nackStaleErr := q.Nack(context.Background(), msg, true); nackStaleErr != nil {
+		t.Fatalf("Nack stale: %v", nackStaleErr)
 	}
 	n, _ = q.Length(context.Background(), topic)
 	if n != 0 {
 		t.Fatalf("Length after stale Nack = %d want 0", n)
 	}
-	if err := q.Nack(context.Background(), msg2, false); err != nil {
-		t.Fatalf("Nack requeue false: %v", err)
+	if nackErr2 := q.Nack(context.Background(), msg2, false); nackErr2 != nil {
+		t.Fatalf("Nack requeue false: %v", nackErr2)
 	}
 	n, _ = q.Length(context.Background(), topic)
 	if n != 0 {
@@ -275,14 +275,14 @@ func TestMemory_Nack(t *testing.T) {
 		t.Fatalf("Pop after drop err = %v want ErrEmpty", err)
 	}
 
-	if err := q.Push(context.Background(), topic, queue.Payload([]byte("msg2")), nil); err != nil {
-		t.Fatalf("Push msg2: %v", err)
+	if pushMsg2Err := q.Push(context.Background(), topic, queue.Payload([]byte("msg2")), nil); pushMsg2Err != nil {
+		t.Fatalf("Push msg2: %v", pushMsg2Err)
 	}
 	m, err := q.Pop(context.Background(), topic)
 	if err != nil {
 		t.Fatalf("Pop msg2: %v", err)
 	}
-	if err := q.Nack(context.Background(), m, false); err != nil {
+	if nackMErr := q.Nack(context.Background(), m, false); nackMErr != nil {
 		t.Fatalf("Nack false: %v", err)
 	}
 	n, _ = q.Length(context.Background(), topic)
@@ -290,19 +290,19 @@ func TestMemory_Nack(t *testing.T) {
 		t.Fatalf("Length after Nack false = %d want 0", n)
 	}
 
-	if err := q.Push(context.Background(), topic, queue.Payload([]byte("msg3")), nil); err != nil {
-		t.Fatalf("Push msg3: %v", err)
+	if pushMsg3Err := q.Push(context.Background(), topic, queue.Payload([]byte("msg3")), nil); pushMsg3Err != nil {
+		t.Fatalf("Push msg3: %v", pushMsg3Err)
 	}
 	m, err = q.Pop(context.Background(), topic)
 	if err != nil {
 		t.Fatalf("Pop msg3: %v", err)
 	}
 	stale := m
-	if err := q.Nack(context.Background(), m, true); err != nil {
+	if nackMsg3Err := q.Nack(context.Background(), m, true); nackMsg3Err != nil {
 		t.Fatalf("Nack requeue msg3: %v", err)
 	}
-	if err := q.Ack(context.Background(), stale); err != nil {
-		t.Fatalf("Ack stale: %v", err)
+	if ackStaleErr := q.Ack(context.Background(), stale); ackStaleErr != nil {
+		t.Fatalf("Ack stale: %v", ackStaleErr)
 	}
 	n, _ = q.Length(context.Background(), topic)
 	if n != 1 {
@@ -321,7 +321,10 @@ func TestMemory_Nack(t *testing.T) {
 func TestMemory_VisibilityTimeout_reclaim(t *testing.T) {
 	t.Parallel()
 	q := newQueue(t, queue.Options{Buffer: 10, PollTimeout: 20 * time.Millisecond, VisibilityTimeout: 40 * time.Millisecond})
-	ma := q.(*memoryAdapter) //nolint:forcetypeassert
+	ma, ok := q.(*memoryAdapter)
+	if !ok {
+		t.Fatalf("type assert memoryAdapter failed")
+	}
 
 	topic := "visTopic"
 	if err := q.Push(context.Background(), topic, queue.Payload([]byte("vis")), nil); err != nil {
@@ -352,10 +355,10 @@ func TestMemory_VisibilityTimeout_reclaim(t *testing.T) {
 	}
 	_ = q.Ack(context.Background(), msg2)
 
-	if err := q.Push(context.Background(), topic, queue.Payload([]byte("vis2")), nil); err != nil {
-		t.Fatalf("Push vis2: %v", err)
+	if pushVis2Err := q.Push(context.Background(), topic, queue.Payload([]byte("vis2")), nil); pushVis2Err != nil {
+		t.Fatalf("Push vis2: %v", pushVis2Err)
 	}
-	msg, err = q.Pop(context.Background(), topic)
+	_, err = q.Pop(context.Background(), topic)
 	if err != nil {
 		t.Fatalf("Pop vis2: %v", err)
 	}
@@ -369,28 +372,28 @@ func TestMemory_VisibilityTimeout_reclaim(t *testing.T) {
 
 	time.Sleep(80 * time.Millisecond)
 
-	waitFor(t, 3*time.Second, func() bool {
-		n, _ := q.Length(context.Background(), topic)
-		if n == 1 {
+	waitFor(t, func() bool {
+		innerN, _ := q.Length(context.Background(), topic)
+		if innerN == 1 {
 			return true
 		}
-		m, err := q.Pop(context.Background(), topic)
-		if err == nil {
-			if m.Attempt == 2 {
-				_ = q.Ack(context.Background(), m)
+		m2, popErr := q.Pop(context.Background(), topic)
+		if popErr == nil {
+			if m2.Attempt == 2 {
+				_ = q.Ack(context.Background(), m2)
 				return true
 			}
-			_ = q.Ack(context.Background(), m)
+			_ = q.Ack(context.Background(), m2)
 			return true
 		}
 		return false
 	}, "reclaimFromMap not triggered")
 
-	n, _ = q.Length(context.Background(), topic)
-	if n == 1 {
-		m, err := q.Pop(context.Background(), topic)
-		if err != nil {
-			t.Fatalf("Pop after reclaimFromMap: %v", err)
+	n2, _ := q.Length(context.Background(), topic)
+	if n2 == 1 {
+		m, popErr2 := q.Pop(context.Background(), topic)
+		if popErr2 != nil {
+			t.Fatalf("Pop after reclaimFromMap: %v", popErr2)
 		}
 		if m.Attempt != 2 {
 			t.Fatalf("reclaimFromMap Attempt = %d want 2", m.Attempt)
@@ -398,7 +401,7 @@ func TestMemory_VisibilityTimeout_reclaim(t *testing.T) {
 		_ = q.Ack(context.Background(), m)
 	}
 
-	if err := q.Push(context.Background(), topic, queue.Payload([]byte("vis3")), nil); err != nil {
+	if pushVis3Err := q.Push(context.Background(), topic, queue.Payload([]byte("vis3")), nil); pushVis3Err != nil {
 		t.Fatalf("Push vis3: %v", err)
 	}
 	msg, err = q.Pop(context.Background(), topic)
@@ -471,21 +474,21 @@ func TestMemory_Buffer_backpressure(t *testing.T) {
 		t.Fatalf("Pop: %v", err)
 	}
 	_ = q.Ack(context.Background(), msg)
-	if err := q.Push(context.Background(), topic, queue.Payload([]byte("3")), nil); err != nil {
-		t.Fatalf("Push after free: %v", err)
+	if pushAfterFreeErr := q.Push(context.Background(), topic, queue.Payload([]byte("3")), nil); pushAfterFreeErr != nil {
+		t.Fatalf("Push after free: %v", pushAfterFreeErr)
 	}
 	for {
-		m, err := q.Pop(context.Background(), topic)
-		if err != nil {
+		m2, popErr3 := q.Pop(context.Background(), topic)
+		if popErr3 != nil {
 			break
 		}
-		_ = q.Ack(context.Background(), m)
+		_ = q.Ack(context.Background(), m2)
 	}
 
-	if err := q.Push(context.Background(), topic, queue.Payload([]byte("a")), nil); err != nil {
-		t.Fatalf("Push a: %v", err)
+	if pushAErr := q.Push(context.Background(), topic, queue.Payload([]byte("a")), nil); pushAErr != nil {
+		t.Fatalf("Push a: %v", pushAErr)
 	}
-	if err := q.PushDelayed(context.Background(), topic, queue.Payload([]byte("b")), nil, 200*time.Millisecond); err != nil {
+	if pushBErr := q.PushDelayed(context.Background(), topic, queue.Payload([]byte("b")), nil, 200*time.Millisecond); pushBErr != nil {
 		t.Fatalf("PushDelayed b: %v", err)
 	}
 	ctx2, cancel2 := context.WithTimeout(context.Background(), 80*time.Millisecond)
@@ -499,10 +502,10 @@ func TestMemory_Buffer_backpressure(t *testing.T) {
 	}
 
 	topic3 := "bufferTopic2"
-	if err := q.Push(context.Background(), topic3, queue.Payload([]byte("x")), nil); err != nil {
-		t.Fatalf("Push x: %v", err)
+	if pushXErr := q.Push(context.Background(), topic3, queue.Payload([]byte("x")), nil); pushXErr != nil {
+		t.Fatalf("Push x: %v", pushXErr)
 	}
-	if err := q.Push(context.Background(), topic3, queue.Payload([]byte("y")), nil); err != nil {
+	if pushYErr := q.Push(context.Background(), topic3, queue.Payload([]byte("y")), nil); pushYErr != nil {
 		t.Fatalf("Push y: %v", err)
 	}
 	ctx3, cancel3 := context.WithTimeout(context.Background(), 80*time.Millisecond)
@@ -563,8 +566,8 @@ func TestMemory_PopEmpty_and_Cancelled(t *testing.T) {
 		t.Fatalf("Pop empty err = %v want ErrEmpty", err)
 	}
 	topic := "emptyExisting"
-	if err := q.Push(context.Background(), topic, queue.Payload([]byte("one")), nil); err != nil {
-		t.Fatalf("Push: %v", err)
+	if pushOneErr := q.Push(context.Background(), topic, queue.Payload([]byte("one")), nil); pushOneErr != nil {
+		t.Fatalf("Push: %v", pushOneErr)
 	}
 	m, err := q.Pop(context.Background(), topic)
 	if err != nil {
@@ -572,7 +575,7 @@ func TestMemory_PopEmpty_and_Cancelled(t *testing.T) {
 	}
 	_ = q.Ack(context.Background(), m)
 	topic2 := "emptyPoll"
-	if err := q.Push(context.Background(), topic2, queue.Payload([]byte("tmp")), nil); err != nil {
+	if pushTmpErr := q.Push(context.Background(), topic2, queue.Payload([]byte("tmp")), nil); pushTmpErr != nil {
 		t.Fatalf("Push tmp: %v", err)
 	}
 	m, err = q.Pop(context.Background(), topic2)
@@ -580,7 +583,10 @@ func TestMemory_PopEmpty_and_Cancelled(t *testing.T) {
 		t.Fatalf("Pop tmp: %v", err)
 	}
 	_ = q.Ack(context.Background(), m)
-	ma := q.(*memoryAdapter) //nolint:forcetypeassert
+	ma, ok := q.(*memoryAdapter)
+	if !ok {
+		t.Fatalf("type assert memoryAdapter failed")
+	}
 	tq, _ := ma.topic(topic2)
 	_ = tq
 	_, err = q.Pop(context.Background(), topic2)
@@ -595,10 +601,8 @@ func TestMemory_PopEmpty_and_Cancelled(t *testing.T) {
 		if !errors.Is(err, queue.ErrEmpty) {
 			t.Fatalf("EmptyError not Is ErrEmpty")
 		}
-	} else {
-		if !errors.Is(err, queue.ErrEmpty) {
-			t.Fatalf("Pop empty err = %v", err)
-		}
+	} else if !errors.Is(err, queue.ErrEmpty) {
+		t.Fatalf("Pop empty err = %v", err)
 	}
 
 	ctx, cancel := context.WithCancel(context.Background())
@@ -645,7 +649,10 @@ func TestMemory_PopEmpty_and_Cancelled(t *testing.T) {
 func TestMemory_Close(t *testing.T) {
 	t.Parallel()
 	q := newQueue(t, queue.Options{Buffer: 10, PollTimeout: 20 * time.Millisecond})
-	ma := q.(*memoryAdapter) //nolint:forcetypeassert
+	ma, ok := q.(*memoryAdapter)
+	if !ok {
+		t.Fatalf("type assert memoryAdapter failed")
+	}
 
 	if err := q.Push(context.Background(), "closeTopic", queue.Payload([]byte("hi")), nil); err != nil {
 		t.Fatalf("Push before Close: %v", err)
@@ -715,8 +722,8 @@ func TestMemory_CloneIsolation(t *testing.T) {
 	origID := msg.ID
 	msg.Payload[0] = 'Y'
 	msg.Headers["k"] = "mutated"
-	if err := q.Nack(context.Background(), msg, true); err != nil {
-		t.Fatalf("Nack: %v", err)
+	if nackErr := q.Nack(context.Background(), msg, true); nackErr != nil {
+		t.Fatalf("Nack: %v", nackErr)
 	}
 	msg2, err := q.Pop(context.Background(), topic)
 	if err != nil {
@@ -734,14 +741,14 @@ func TestMemory_CloneIsolation(t *testing.T) {
 	msg2.Payload[0] = 'Z'
 	_ = q.Ack(context.Background(), msg2)
 
-	if err := q.Push(context.Background(), topic, nil, nil); err != nil {
-		t.Fatalf("Push nil: %v", err)
+	if pushNilErr := q.Push(context.Background(), topic, nil, nil); pushNilErr != nil {
+		t.Fatalf("Push nil: %v", pushNilErr)
 	}
 	m3, err := q.Pop(context.Background(), topic)
 	if err != nil {
 		t.Fatalf("Pop nil: %v", err)
 	}
-	if m3.Payload != nil && len(m3.Payload) != 0 {
+	if len(m3.Payload) != 0 {
 		t.Fatalf("Payload nil clone = %v", m3.Payload)
 	}
 	_ = q.Ack(context.Background(), m3)
@@ -871,7 +878,10 @@ func TestMemory_ConcurrentMixed(t *testing.T) {
 func TestMemoryPromoter_lifecycle(t *testing.T) {
 	t.Parallel()
 	q := newQueue(t, queue.Options{Buffer: 10, PollTimeout: 20 * time.Millisecond, VisibilityTimeout: time.Second})
-	ma := q.(*memoryAdapter) //nolint:forcetypeassert
+	ma, ok := q.(*memoryAdapter)
+	if !ok {
+		t.Fatalf("type assert memoryAdapter failed")
+	}
 
 	topic := "promoterTopic"
 
@@ -900,12 +910,12 @@ func TestMemoryPromoter_lifecycle(t *testing.T) {
 		t.Fatalf("promoter done channel changed on idempotent call")
 	}
 
-	waitFor(t, 3*time.Second, func() bool {
+	waitFor(t, func() bool {
 		n, _ := q.Length(context.Background(), topic)
 		return n == 1
 	}, "promoter not promoted first")
 
-	waitFor(t, 3*time.Second, func() bool {
+	waitFor(t, func() bool {
 		tq.mu.Lock()
 		on := tq.promoterOn
 		rem := len(tq.delayed)
@@ -916,7 +926,7 @@ func TestMemoryPromoter_lifecycle(t *testing.T) {
 	if err := q.PushDelayed(context.Background(), topic, queue.Payload([]byte("second")), nil, 20*time.Millisecond); err != nil {
 		t.Fatalf("PushDelayed second: %v", err)
 	}
-	waitFor(t, 3*time.Second, func() bool {
+	waitFor(t, func() bool {
 		n, _ := q.Length(context.Background(), topic)
 		return n == 2
 	}, "promoter not restarted")
@@ -932,7 +942,7 @@ func TestMemoryPromoter_lifecycle(t *testing.T) {
 	}
 	_ = q.Ack(context.Background(), m)
 
-	waitFor(t, 3*time.Second, func() bool {
+	waitFor(t, func() bool {
 		tq2 := ma.getTopic(topic)
 		if tq2 == nil {
 			return true
@@ -945,14 +955,14 @@ func TestMemoryPromoter_lifecycle(t *testing.T) {
 	}, "promoter not off after drain")
 
 	topic2 := "promoterWake"
-	if err := q.PushDelayed(context.Background(), topic2, queue.Payload([]byte("later60")), nil, 60*time.Millisecond); err != nil {
-		t.Fatalf("PushDelayed later60: %v", err)
+	if pushLater60Err := q.PushDelayed(context.Background(), topic2, queue.Payload([]byte("later60")), nil, 60*time.Millisecond); pushLater60Err != nil {
+		t.Fatalf("PushDelayed later60: %v", pushLater60Err)
 	}
 	time.Sleep(5 * time.Millisecond)
-	if err := q.PushDelayed(context.Background(), topic2, queue.Payload([]byte("earlier20")), nil, 20*time.Millisecond); err != nil {
+	if pushEarlier20Err := q.PushDelayed(context.Background(), topic2, queue.Payload([]byte("earlier20")), nil, 20*time.Millisecond); pushEarlier20Err != nil {
 		t.Fatalf("PushDelayed earlier20: %v", err)
 	}
-	waitFor(t, 3*time.Second, func() bool {
+	waitFor(t, func() bool {
 		n, _ := q.Length(context.Background(), topic2)
 		return n == 2
 	}, "promoter wake not promoted both")
@@ -987,6 +997,7 @@ func testHeap(t *testing.T) {
 		t.Fatalf("heap Len %d want 2", h.Len())
 	}
 	if !h.Less(1, 0) {
+		t.Fatalf("Less(1, 0) = false, want true")
 	}
 	h.Swap(0, 1)
 	if h[0].deadline.After(h[1].deadline) {
@@ -1006,7 +1017,10 @@ func TestMemory_NewDefaults(t *testing.T) {
 		t.Fatalf("New defaults: %v", err)
 	}
 	defer q.Close()
-	ma := q.(*memoryAdapter) //nolint:forcetypeassert
+	ma, ok := q.(*memoryAdapter)
+	if !ok {
+		t.Fatalf("type assert memoryAdapter failed")
+	}
 	if ma.visibilityTimeout != 30*time.Second {
 		t.Fatalf("visibilityTimeout default %v", ma.visibilityTimeout)
 	}
@@ -1021,7 +1035,10 @@ func TestMemory_NewDefaults(t *testing.T) {
 func TestMemory_SignalSpace(t *testing.T) {
 	t.Parallel()
 	q := newQueue(t, queue.Options{Buffer: 2, PollTimeout: 20 * time.Millisecond})
-	ma := q.(*memoryAdapter) //nolint:forcetypeassert
+	ma, ok := q.(*memoryAdapter)
+	if !ok {
+		t.Fatalf("type assert memoryAdapter failed")
+	}
 	tq, _ := ma.topic("sigSpace")
 	done := make(chan struct{})
 	go func() {
@@ -1041,7 +1058,10 @@ func TestMemory_SignalSpace(t *testing.T) {
 func TestMemory_ReclaimExpired_direct(t *testing.T) {
 	t.Parallel()
 	q := newQueue(t, queue.Options{Buffer: 10, PollTimeout: 20 * time.Millisecond, VisibilityTimeout: 40 * time.Millisecond})
-	ma := q.(*memoryAdapter) //nolint:forcetypeassert
+	ma, ok := q.(*memoryAdapter)
+	if !ok {
+		t.Fatalf("type assert memoryAdapter failed")
+	}
 	_ = ma
 	topic := "reclaimDirect"
 	if err := q.Push(context.Background(), topic, queue.Payload([]byte("a")), nil); err != nil {

@@ -9,6 +9,7 @@ import (
 	"time"
 
 	goredis "github.com/redis/go-redis/v9"
+
 	"github.com/zenta-dev/zever/queue"
 )
 
@@ -26,14 +27,14 @@ type fakeClient struct {
 	pipeErr  error
 }
 
-func (f *fakeClient) RPush(ctx context.Context, key string, values ...any) *goredis.IntCmd {
+func (f *fakeClient) RPush(ctx context.Context, key string, _ ...any) *goredis.IntCmd {
 	cmd := goredis.NewIntCmd(ctx, "rpush", key)
 	if f.rPushErr != nil {
 		cmd.SetErr(f.rPushErr)
 	}
 	return cmd
 }
-func (f *fakeClient) ZAdd(ctx context.Context, key string, members ...goredis.Z) *goredis.IntCmd {
+func (f *fakeClient) ZAdd(ctx context.Context, key string, _ ...goredis.Z) *goredis.IntCmd {
 	cmd := goredis.NewIntCmd(ctx, "zadd", key)
 	if f.zAddErr != nil {
 		cmd.SetErr(f.zAddErr)
@@ -54,7 +55,7 @@ func (f *fakeClient) ZCard(ctx context.Context, key string) *goredis.IntCmd {
 	}
 	return cmd
 }
-func (f *fakeClient) BLPop(ctx context.Context, timeout time.Duration, keys ...string) *goredis.StringSliceCmd {
+func (f *fakeClient) BLPop(ctx context.Context, _ time.Duration, _ ...string) *goredis.StringSliceCmd {
 	cmd := goredis.NewStringSliceCmd(ctx, "blpop")
 	if f.blPopErr != nil {
 		cmd.SetErr(f.blPopErr)
@@ -63,14 +64,14 @@ func (f *fakeClient) BLPop(ctx context.Context, timeout time.Duration, keys ...s
 	}
 	return cmd
 }
-func (f *fakeClient) HSet(ctx context.Context, key string, values ...any) *goredis.IntCmd {
+func (f *fakeClient) HSet(ctx context.Context, key string, _ ...any) *goredis.IntCmd {
 	cmd := goredis.NewIntCmd(ctx, "hset", key)
 	if f.hSetErr != nil {
 		cmd.SetErr(f.hSetErr)
 	}
 	return cmd
 }
-func (f *fakeClient) HDel(ctx context.Context, key string, fields ...string) *goredis.IntCmd {
+func (f *fakeClient) HDel(ctx context.Context, key string, _ ...string) *goredis.IntCmd {
 	cmd := goredis.NewIntCmd(ctx, "hdel", key)
 	if f.hDelErr != nil {
 		cmd.SetErr(f.hDelErr)
@@ -78,8 +79,8 @@ func (f *fakeClient) HDel(ctx context.Context, key string, fields ...string) *go
 	return cmd
 }
 func (f *fakeClient) Pipeline() goredis.Pipeliner {
-	real := goredis.NewClient(&goredis.Options{Addr: "localhost:0"}).Pipeline()
-	return &fakePipe{Pipeliner: real, err: f.pipeErr, client: f}
+	realPipe := goredis.NewClient(&goredis.Options{Addr: "localhost:0"}).Pipeline()
+	return &fakePipe{Pipeliner: realPipe, err: f.pipeErr, client: f}
 }
 
 type fakePipe struct {
@@ -94,7 +95,7 @@ func (p *fakePipe) HSet(ctx context.Context, key string, values ...any) *goredis
 func (p *fakePipe) ZAdd(ctx context.Context, key string, members ...goredis.Z) *goredis.IntCmd {
 	return p.client.ZAdd(ctx, key, members...)
 }
-func (p *fakePipe) Exec(ctx context.Context) ([]goredis.Cmder, error) {
+func (p *fakePipe) Exec(_ context.Context) ([]goredis.Cmder, error) {
 	if p.err != nil {
 		return nil, p.err
 	}
@@ -108,40 +109,40 @@ func (f *fakeClient) HLen(ctx context.Context, key string) *goredis.IntCmd {
 	}
 	return cmd
 }
-func (f *fakeClient) Eval(ctx context.Context, script string, keys []string, args ...any) *goredis.Cmd {
+func (f *fakeClient) Eval(ctx context.Context, _ string, _ []string, _ ...any) *goredis.Cmd {
 	cmd := goredis.NewCmd(ctx, "eval")
 	if f.evalErr != nil {
 		cmd.SetErr(f.evalErr)
 	}
 	return cmd
 }
-func (f *fakeClient) EvalSha(ctx context.Context, sha1 string, keys []string, args ...any) *goredis.Cmd {
+func (f *fakeClient) EvalSha(ctx context.Context, _ string, _ []string, _ ...any) *goredis.Cmd {
 	cmd := goredis.NewCmd(ctx, "evalsha")
 	if f.evalErr != nil {
 		cmd.SetErr(f.evalErr)
 	}
 	return cmd
 }
-func (f *fakeClient) EvalRO(ctx context.Context, script string, keys []string, args ...any) *goredis.Cmd {
+func (f *fakeClient) EvalRO(ctx context.Context, _ string, _ []string, _ ...any) *goredis.Cmd {
 	cmd := goredis.NewCmd(ctx, "evalro")
 	if f.evalErr != nil {
 		cmd.SetErr(f.evalErr)
 	}
 	return cmd
 }
-func (f *fakeClient) EvalShaRO(ctx context.Context, sha1 string, keys []string, args ...any) *goredis.Cmd {
+func (f *fakeClient) EvalShaRO(ctx context.Context, _ string, _ []string, _ ...any) *goredis.Cmd {
 	cmd := goredis.NewCmd(ctx, "evalsharo")
 	if f.evalErr != nil {
 		cmd.SetErr(f.evalErr)
 	}
 	return cmd
 }
-func (f *fakeClient) ScriptExists(ctx context.Context, hashes ...string) *goredis.BoolSliceCmd {
+func (f *fakeClient) ScriptExists(ctx context.Context, _ ...string) *goredis.BoolSliceCmd {
 	cmd := goredis.NewBoolSliceCmd(ctx, "script", "exists")
 	cmd.SetVal([]bool{true})
 	return cmd
 }
-func (f *fakeClient) ScriptLoad(ctx context.Context, script string) *goredis.StringCmd {
+func (f *fakeClient) ScriptLoad(ctx context.Context, _ string) *goredis.StringCmd {
 	cmd := goredis.NewStringCmd(ctx, "script", "load")
 	cmd.SetVal("sha")
 	return cmd
@@ -150,7 +151,7 @@ func (f *fakeClient) ScriptLoad(ctx context.Context, script string) *goredis.Str
 func TestRedisCover_MarshalError(t *testing.T) {
 	origMarshal := jsonMarshal
 	defer func() { jsonMarshal = origMarshal }()
-	jsonMarshal = func(v any, opts ...json.Options) ([]byte, error) {
+	jsonMarshal = func(_ any, _ ...json.Options) ([]byte, error) {
 		return nil, errors.New("marshal boom")
 	}
 	a := &redisAdapter{client: &fakeClient{}}
@@ -165,7 +166,7 @@ func TestRedisCover_MarshalError(t *testing.T) {
 	}
 	// cover blockingClaim marshal
 	a2 := &redisAdapter{client: &fakeClient{blPopVal: []string{"k", `{"id":"` + queue.NewMessage("t", nil, nil).ID.String() + `","payload":null,"headers":null,"attempt":1}`}}}
-	jsonMarshal = func(v any, opts ...json.Options) ([]byte, error) {
+	jsonMarshal = func(_ any, _ ...json.Options) ([]byte, error) {
 		return nil, errors.New("marshal boom2")
 	}
 	_, _, err := a2.blockingClaim(context.Background(), "rk", "pk", "dk", "123", time.NewTimer(time.Second), time.Millisecond)
@@ -177,7 +178,7 @@ func TestRedisCover_MarshalError(t *testing.T) {
 func TestRedisCover_UnmarshalError(t *testing.T) {
 	origUnmarshal := jsonUnmarshal
 	defer func() { jsonUnmarshal = origUnmarshal }()
-	jsonUnmarshal = func(data []byte, v any, opts ...json.Options) error {
+	jsonUnmarshal = func(_ []byte, _ any, _ ...json.Options) error {
 		return errors.New("unmarshal boom")
 	}
 	_, err := decodeMessage(`{"id":"`+queue.NewMessage("t", nil, nil).ID.String()+`","payload":null}`, "t")
@@ -285,25 +286,25 @@ func TestRedisCover_ClientErrors(t *testing.T) {
 	// IsEmpty when closed
 	a14 := &redisAdapter{}
 	a14.closed.Store(true)
-	if _, err := a14.IsEmpty(ctx, "t"); err != queue.ErrClosed {
+	if _, err := a14.IsEmpty(ctx, "t"); !errors.Is(err, queue.ErrClosed) {
 		t.Errorf("IsEmpty closed = %v, want ErrClosed", err)
 	}
-	if err := a14.Ack(ctx, queue.Message{Topic: "t"}); err != queue.ErrClosed {
+	if err := a14.Ack(ctx, queue.Message{Topic: "t"}); !errors.Is(err, queue.ErrClosed) {
 		t.Errorf("Ack closed = %v", err)
 	}
-	if err := a14.Nack(ctx, queue.Message{Topic: "t"}, false); err != queue.ErrClosed {
+	if err := a14.Nack(ctx, queue.Message{Topic: "t"}, false); !errors.Is(err, queue.ErrClosed) {
 		t.Errorf("Nack closed = %v", err)
 	}
-	if _, err := a14.Length(ctx, "t"); err != queue.ErrClosed {
+	if _, err := a14.Length(ctx, "t"); !errors.Is(err, queue.ErrClosed) {
 		t.Errorf("Length closed = %v", err)
 	}
-	if err := a14.Push(ctx, "t", nil, nil); err != queue.ErrClosed {
+	if err := a14.Push(ctx, "t", nil, nil); !errors.Is(err, queue.ErrClosed) {
 		t.Errorf("Push closed = %v", err)
 	}
-	if err := a14.PushDelayed(ctx, "t", nil, nil, 0); err != queue.ErrClosed {
+	if err := a14.PushDelayed(ctx, "t", nil, nil, 0); !errors.Is(err, queue.ErrClosed) {
 		t.Errorf("PushDelayed closed = %v", err)
 	}
-	if _, err := a14.Pop(ctx, "t"); err != queue.ErrClosed {
+	if _, err := a14.Pop(ctx, "t"); !errors.Is(err, queue.ErrClosed) {
 		t.Errorf("Pop closed = %v", err)
 	}
 	_ = io.EOF
@@ -325,12 +326,11 @@ func TestRedisCover_JitterAndPromote(t *testing.T) {
 	if got := nextBackoff(time.Millisecond, time.Second); got <= 0 {
 		t.Errorf("nextBackoff = %v", got)
 	}
-
 }
 
 type failingReader struct{}
 
-func (f *failingReader) Read(p []byte) (int, error) { return 0, errors.New("read boom") }
+func (f *failingReader) Read(_ []byte) (int, error) { return 0, errors.New("read boom") }
 
 func TestRedisCover_ScriptErrors(t *testing.T) {
 	ctx := context.Background()
@@ -413,7 +413,7 @@ func TestRedisCover_RemainingBranches(t *testing.T) {
 	a6 := &redisAdapter{buffer: 1, client: &fakeClient{}}
 
 	calls := 0
-	count2 := func(ctx context.Context) (int64, error) {
+	count2 := func(_ context.Context) (int64, error) {
 		calls++
 		if calls == 1 {
 			return 1, nil // full
@@ -431,14 +431,14 @@ func TestRedisCover_RemainingBranches(t *testing.T) {
 	fake8 := &fakeClient{lLenErr: errors.New("llen boom for delayed")}
 	a8 := &redisAdapter{buffer: 1, client: fake8}
 
-	if err := a8.waitForDelayedSpace(ctx, "t"); err == nil {
+	if err2 := a8.waitForDelayedSpace(ctx, "t"); err2 == nil {
 		t.Logf("waitForDelayedSpace LLen error not hit")
 	}
 	// reclaimStale with moved == reclaimBatch loop
 
 	a9 := &redisAdapter{client: &fakeClient{}}
-	if err := a9.reclaimStale(ctx, "t"); err != nil {
-		t.Logf("reclaimStale no stale = %v", err)
+	if err2 := a9.reclaimStale(ctx, "t"); err2 != nil {
+		t.Logf("reclaimStale no stale = %v", err2)
 	}
 	// reclaimFallback with n !=0 (570) and hlen ==0
 	fake10 := &fakeClient{}
@@ -447,23 +447,23 @@ func TestRedisCover_RemainingBranches(t *testing.T) {
 
 	fake10Custom := &fakeClientCustomZCard{val: 1}
 	a10 := &redisAdapter{client: fake10Custom}
-	if err := a10.reclaimFallbackIfNeeded(ctx, "t", "0"); err != nil {
-		t.Fatalf("reclaimFallback n!=0 should return nil, got %v", err)
+	if err2 := a10.reclaimFallbackIfNeeded(ctx, "t", "0"); err2 != nil {
+		t.Fatalf("reclaimFallback n!=0 should return nil, got %v", err2)
 	}
 	// reclaimFallback with n==0, hlen==0 => return nil (552)
 	fake11 := &fakeClientCustomZCard{val: 0}
 	fake11.hLenVal = 0
 	a11 := &redisAdapter{client: fake11}
-	if err := a11.reclaimFallbackIfNeeded(ctx, "t", "0"); err != nil {
-		t.Fatalf("reclaimFallback hlen 0 should return nil, got %v", err)
+	if err2 := a11.reclaimFallbackIfNeeded(ctx, "t", "0"); err2 != nil {
+		t.Fatalf("reclaimFallback hlen 0 should return nil, got %v", err2)
 	}
 	// reclaimFallback with eval success (590)
 	fake12 := &fakeClientCustomZCard{val: 0}
 	fake12.hLenVal = 1
 	fake12.evalVal = 1
 	a12 := &redisAdapter{client: fake12}
-	if err := a12.reclaimFallbackIfNeeded(ctx, "t", "0"); err != nil {
-		t.Fatalf("reclaimFallback eval success should return nil, got %v", err)
+	if err2 := a12.reclaimFallbackIfNeeded(ctx, "t", "0"); err2 != nil {
+		t.Fatalf("reclaimFallback eval success should return nil, got %v", err2)
 	}
 	// tryClaim with non-string Val (not claimed)
 	fake13 := &fakeClientCustomEval{val: 123}
@@ -491,12 +491,12 @@ func (f *fakeClientCustomZCard) HLen(ctx context.Context, key string) *goredis.I
 	cmd.SetVal(f.hLenVal)
 	return cmd
 }
-func (f *fakeClientCustomZCard) Eval(ctx context.Context, script string, keys []string, args ...any) *goredis.Cmd {
+func (f *fakeClientCustomZCard) Eval(ctx context.Context, _ string, _ []string, _ ...any) *goredis.Cmd {
 	cmd := goredis.NewCmd(ctx, "eval")
 	cmd.SetVal(f.evalVal)
 	return cmd
 }
-func (f *fakeClientCustomZCard) EvalSha(ctx context.Context, sha1 string, keys []string, args ...any) *goredis.Cmd {
+func (f *fakeClientCustomZCard) EvalSha(ctx context.Context, _ string, _ []string, _ ...any) *goredis.Cmd {
 	cmd := goredis.NewCmd(ctx, "evalsha")
 	cmd.SetVal(f.evalVal)
 	return cmd
@@ -507,12 +507,12 @@ type fakeClientCustomEval struct {
 	val any
 }
 
-func (f *fakeClientCustomEval) Eval(ctx context.Context, script string, keys []string, args ...any) *goredis.Cmd {
+func (f *fakeClientCustomEval) Eval(ctx context.Context, _ string, _ []string, _ ...any) *goredis.Cmd {
 	cmd := goredis.NewCmd(ctx, "eval")
 	cmd.SetVal(f.val)
 	return cmd
 }
-func (f *fakeClientCustomEval) EvalSha(ctx context.Context, sha1 string, keys []string, args ...any) *goredis.Cmd {
+func (f *fakeClientCustomEval) EvalSha(ctx context.Context, _ string, _ []string, _ ...any) *goredis.Cmd {
 	cmd := goredis.NewCmd(ctx, "evalsha")
 	cmd.SetVal(f.val)
 	return cmd
@@ -541,7 +541,7 @@ func TestRedisCover_FinalEight(t *testing.T) {
 	{
 		a := &redisAdapter{buffer: 1, client: &fakeClient{}}
 		calls := 0
-		count := func(ctx context.Context) (int64, error) {
+		count := func(_ context.Context) (int64, error) {
 			calls++
 			if calls <= 2 {
 				return 1, nil
@@ -601,14 +601,15 @@ type fakeClientTryClaimFail struct {
 	calls int
 }
 
-func (f *fakeClientTryClaimFail) Eval(ctx context.Context, script string, keys []string, args ...any) *goredis.Cmd {
+func (f *fakeClientTryClaimFail) Eval(ctx context.Context, _ string, _ []string, _ ...any) *goredis.Cmd {
 	f.calls++
 	cmd := goredis.NewCmd(ctx, "eval")
-	if f.calls == 1 {
+	switch f.calls {
+	case 1:
 		cmd.SetVal(int64(0)) // cover promoteDue
-	} else if f.calls == 2 {
+	case 2:
 		cmd.SetVal(int64(0)) // cover reclaimStale
-	} else {
+	default:
 		cmd.SetErr(errors.New("tryClaim boom")) // cover tryClaim fail
 	}
 	return cmd
@@ -616,7 +617,7 @@ func (f *fakeClientTryClaimFail) Eval(ctx context.Context, script string, keys [
 func (f *fakeClientTryClaimFail) EvalSha(ctx context.Context, sha1 string, keys []string, args ...any) *goredis.Cmd {
 	return f.Eval(ctx, sha1, keys, args...)
 }
-func (f *fakeClientTryClaimFail) ScriptExists(ctx context.Context, hashes ...string) *goredis.BoolSliceCmd {
+func (f *fakeClientTryClaimFail) ScriptExists(ctx context.Context, _ ...string) *goredis.BoolSliceCmd {
 	cmd := goredis.NewBoolSliceCmd(ctx, "script", "exists")
 	cmd.SetVal([]bool{true})
 	return cmd
@@ -660,7 +661,7 @@ type fakeClientPopLoopReclaimFail struct {
 	calls int
 }
 
-func (f *fakeClientPopLoopReclaimFail) Eval(ctx context.Context, script string, keys []string, args ...any) *goredis.Cmd {
+func (f *fakeClientPopLoopReclaimFail) Eval(ctx context.Context, _ string, _ []string, _ ...any) *goredis.Cmd {
 	f.calls++
 	cmd := goredis.NewCmd(ctx, "eval")
 	if f.calls == 1 {
@@ -673,7 +674,7 @@ func (f *fakeClientPopLoopReclaimFail) Eval(ctx context.Context, script string, 
 func (f *fakeClientPopLoopReclaimFail) EvalSha(ctx context.Context, sha1 string, keys []string, args ...any) *goredis.Cmd {
 	return f.Eval(ctx, sha1, keys, args...)
 }
-func (f *fakeClientPopLoopReclaimFail) ScriptExists(ctx context.Context, hashes ...string) *goredis.BoolSliceCmd {
+func (f *fakeClientPopLoopReclaimFail) ScriptExists(ctx context.Context, _ ...string) *goredis.BoolSliceCmd {
 	cmd := goredis.NewBoolSliceCmd(ctx, "script", "exists")
 	cmd.SetVal([]bool{true})
 	return cmd
@@ -684,7 +685,7 @@ type fakeClientReclaimSecondFail struct {
 	calls int
 }
 
-func (f *fakeClientReclaimSecondFail) Eval(ctx context.Context, script string, keys []string, args ...any) *goredis.Cmd {
+func (f *fakeClientReclaimSecondFail) Eval(ctx context.Context, _ string, _ []string, _ ...any) *goredis.Cmd {
 	f.calls++
 	cmd := goredis.NewCmd(ctx, "eval")
 	if f.calls == 1 {
@@ -697,7 +698,7 @@ func (f *fakeClientReclaimSecondFail) Eval(ctx context.Context, script string, k
 func (f *fakeClientReclaimSecondFail) EvalSha(ctx context.Context, sha1 string, keys []string, args ...any) *goredis.Cmd {
 	return f.Eval(ctx, sha1, keys, args...)
 }
-func (f *fakeClientReclaimSecondFail) ScriptExists(ctx context.Context, hashes ...string) *goredis.BoolSliceCmd {
+func (f *fakeClientReclaimSecondFail) ScriptExists(ctx context.Context, _ ...string) *goredis.BoolSliceCmd {
 	cmd := goredis.NewBoolSliceCmd(ctx, "script", "exists")
 	cmd.SetVal([]bool{true})
 	return cmd
@@ -717,7 +718,7 @@ func (f *fakeClientReclaimFallbackFail) HLen(ctx context.Context, key string) *g
 	cmd.SetVal(1)
 	return cmd
 }
-func (f *fakeClientReclaimFallbackFail) Eval(ctx context.Context, script string, keys []string, args ...any) *goredis.Cmd {
+func (f *fakeClientReclaimFallbackFail) Eval(ctx context.Context, _ string, _ []string, _ ...any) *goredis.Cmd {
 	cmd := goredis.NewCmd(ctx, "eval")
 	cmd.SetErr(errors.New("fallback boom"))
 	return cmd
@@ -725,7 +726,7 @@ func (f *fakeClientReclaimFallbackFail) Eval(ctx context.Context, script string,
 func (f *fakeClientReclaimFallbackFail) EvalSha(ctx context.Context, sha1 string, keys []string, args ...any) *goredis.Cmd {
 	return f.Eval(ctx, sha1, keys, args...)
 }
-func (f *fakeClientReclaimFallbackFail) ScriptExists(ctx context.Context, hashes ...string) *goredis.BoolSliceCmd {
+func (f *fakeClientReclaimFallbackFail) ScriptExists(ctx context.Context, _ ...string) *goredis.BoolSliceCmd {
 	cmd := goredis.NewBoolSliceCmd(ctx, "script", "exists")
 	cmd.SetVal([]bool{true})
 	return cmd
@@ -760,7 +761,7 @@ func TestRedisCover_FinalRemaining(t *testing.T) {
 	// cover waitForBuffer timer fired
 	a4 := &redisAdapter{buffer: 1, client: &fakeClient{}}
 	calls := 0
-	count := func(ctx context.Context) (int64, error) {
+	count := func(_ context.Context) (int64, error) {
 		calls++
 		if calls == 1 {
 			return 1, nil
@@ -832,7 +833,7 @@ type fakeClientReclaimBatch struct {
 	calls int
 }
 
-func (f *fakeClientReclaimBatch) Eval(ctx context.Context, script string, keys []string, args ...any) *goredis.Cmd {
+func (f *fakeClientReclaimBatch) Eval(ctx context.Context, _ string, _ []string, _ ...any) *goredis.Cmd {
 	f.calls++
 	cmd := goredis.NewCmd(ctx, "eval")
 	if f.calls == 1 {
@@ -842,7 +843,7 @@ func (f *fakeClientReclaimBatch) Eval(ctx context.Context, script string, keys [
 	}
 	return cmd
 }
-func (f *fakeClientReclaimBatch) EvalSha(ctx context.Context, sha1 string, keys []string, args ...any) *goredis.Cmd {
+func (f *fakeClientReclaimBatch) EvalSha(ctx context.Context, _ string, _ []string, _ ...any) *goredis.Cmd {
 	f.calls++
 	cmd := goredis.NewCmd(ctx, "evalsha")
 	if f.calls == 1 {

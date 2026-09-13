@@ -51,8 +51,8 @@ func TestRedisLive_PushPopAck(t *testing.T) {
 		t.Errorf("Attempt = %d, want 1", msg.Attempt)
 	}
 
-	if err := q.Ack(ctx, msg); err != nil {
-		t.Fatalf("Ack() error = %v", err)
+	if err2 := q.Ack(ctx, msg); err2 != nil {
+		t.Fatalf("Ack() error = %v", err2)
 	}
 
 	n, err := q.Length(ctx, topic)
@@ -98,8 +98,8 @@ func TestRedisLive_PushDelayed(t *testing.T) {
 	payload := queue.Payload([]byte("delayed"))
 	headers := queue.Headers{"h": "v"}
 
-	if err := q.PushDelayed(ctx, topic, payload, headers, 80*time.Millisecond); err != nil {
-		t.Fatalf("PushDelayed() error = %v", err)
+	if err2 := q.PushDelayed(ctx, topic, payload, headers, 80*time.Millisecond); err2 != nil {
+		t.Fatalf("PushDelayed() error = %v", err2)
 	}
 
 	_, err = q.Pop(ctx, topic)
@@ -120,11 +120,11 @@ func TestRedisLive_PushDelayed(t *testing.T) {
 	if string(msg.Payload) != "delayed" {
 		t.Errorf("Payload = %q, want delayed", string(msg.Payload))
 	}
-	if err := q.Ack(ctx, msg); err != nil {
-		t.Fatalf("Ack error = %v", err)
+	if err2 := q.Ack(ctx, msg); err2 != nil {
+		t.Fatalf("Ack error = %v", err2)
 	}
 
-	if err := q.PushDelayed(ctx, topic, queue.Payload([]byte("now")), queue.Headers{"h": "v"}, 0); err != nil {
+	if err2 := q.PushDelayed(ctx, topic, queue.Payload([]byte("now")), queue.Headers{"h": "v"}, 0); err2 != nil {
 		t.Fatalf("PushDelayed(0) error = %v", err)
 	}
 	msg2, err := q.Pop(ctx, topic)
@@ -153,8 +153,8 @@ func TestRedisLive_Nack(t *testing.T) {
 	if msg.Attempt != 1 {
 		t.Errorf("Attempt = %d, want 1", msg.Attempt)
 	}
-	if err := q.Nack(ctx, msg, true); err != nil {
-		t.Fatalf("Nack requeue true error = %v", err)
+	if err2 := q.Nack(ctx, msg, true); err2 != nil {
+		t.Fatalf("Nack requeue true error = %v", err2)
 	}
 	msg2, err := q.Pop(ctx, topic)
 	if err != nil {
@@ -168,15 +168,15 @@ func TestRedisLive_Nack(t *testing.T) {
 	}
 	_ = q.Ack(ctx, msg2)
 
-	if err := q.Push(ctx, topic, queue.Payload([]byte("nack-false")), queue.Headers{"h": "v"}); err != nil {
-		t.Fatalf("Push error = %v", err)
+	if err2 := q.Push(ctx, topic, queue.Payload([]byte("nack-false")), queue.Headers{"h": "v"}); err2 != nil {
+		t.Fatalf("Push error = %v", err2)
 	}
 	msg3, err := q.Pop(ctx, topic)
 	if err != nil {
 		t.Fatalf("Pop error = %v", err)
 	}
-	if err := q.Nack(ctx, msg3, false); err != nil {
-		t.Fatalf("Nack requeue false error = %v", err)
+	if err2 := q.Nack(ctx, msg3, false); err2 != nil {
+		t.Fatalf("Nack requeue false error = %v", err2)
 	}
 	_, err = q.Pop(ctx, topic)
 	if !errors.Is(err, queue.ErrEmpty) {
@@ -195,8 +195,8 @@ func TestRedisLive_VisibilityReclaim(t *testing.T) {
 	t.Cleanup(func() { _ = q.Close() })
 
 	topic := "t-reclaim"
-	if err := q.Push(ctx, topic, queue.Payload([]byte("reclaim")), queue.Headers{"h": "v"}); err != nil {
-		t.Fatalf("Push error = %v", err)
+	if err2 := q.Push(ctx, topic, queue.Payload([]byte("reclaim")), queue.Headers{"h": "v"}); err2 != nil {
+		t.Fatalf("Push error = %v", err2)
 	}
 	msg, err := q.Pop(ctx, topic)
 	if err != nil {
@@ -234,8 +234,8 @@ func TestRedisLive_BufferBlocks(t *testing.T) {
 	t.Cleanup(func() { _ = q.Close() })
 
 	topic := "t-buffer"
-	if err := q.Push(ctx, topic, queue.Payload([]byte("one")), queue.Headers{"h": "v"}); err != nil {
-		t.Fatalf("Push1 error = %v", err)
+	if err2 := q.Push(ctx, topic, queue.Payload([]byte("one")), queue.Headers{"h": "v"}); err2 != nil {
+		t.Fatalf("Push1 error = %v", err2)
 	}
 
 	ctx2, cancel := context.WithTimeout(context.Background(), 120*time.Millisecond)
@@ -270,10 +270,10 @@ func TestRedisLive_LengthIsEmpty(t *testing.T) {
 		t.Errorf("IsEmpty empty = false, want true")
 	}
 
-	if err := q.Push(ctx, topic, queue.Payload([]byte("a")), queue.Headers{"h": "v"}); err != nil {
-		t.Fatalf("Push error = %v", err)
+	if err2 := q.Push(ctx, topic, queue.Payload([]byte("a")), queue.Headers{"h": "v"}); err2 != nil {
+		t.Fatalf("Push error = %v", err2)
 	}
-	if err := q.Push(ctx, topic, queue.Payload([]byte("b")), queue.Headers{"h": "v"}); err != nil {
+	if err2 := q.Push(ctx, topic, queue.Payload([]byte("b")), queue.Headers{"h": "v"}); err2 != nil {
 		t.Fatalf("Push error = %v", err)
 	}
 
@@ -322,8 +322,8 @@ func TestRedisLive_BufferDelayedBlocks(t *testing.T) {
 	}
 	t.Cleanup(func() { _ = q.Close() })
 	topic := "t-buffer-delayed"
-	if err := q.PushDelayed(ctx, topic, queue.Payload([]byte("one")), queue.Headers{"h": "v"}, 80*time.Millisecond); err != nil {
-		t.Fatalf("PushDelayed1 error = %v", err)
+	if err2 := q.PushDelayed(ctx, topic, queue.Payload([]byte("one")), queue.Headers{"h": "v"}, 80*time.Millisecond); err2 != nil {
+		t.Fatalf("PushDelayed1 error = %v", err2)
 	}
 	ctx2, cancel := context.WithTimeout(context.Background(), 120*time.Millisecond)
 	defer cancel()

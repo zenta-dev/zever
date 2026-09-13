@@ -2,13 +2,14 @@ package memory
 
 import (
 	"context"
+	"errors"
 	"testing"
 	"time"
 
 	"github.com/zenta-dev/zever/queue"
 )
 
-// cover Push/PushDelayed closed race (65,73,109,116) via hammer
+// cover Push/PushDelayed closed race (65,73,109,116) via hammer.
 func TestMemory_CoverPushClosedRaceHammer(t *testing.T) {
 	t.Parallel()
 	for i := 0; i < 200; i++ {
@@ -39,9 +40,8 @@ func TestMemory_CoverPushClosedRaceHammer(t *testing.T) {
 		}
 		select {
 		case err := <-errCh:
-			if err != nil && err != queue.ErrClosed {
-				if err.Error() != queue.ErrClosed.Error() {
-				}
+			if err != nil && !errors.Is(err, queue.ErrClosed) {
+				t.Errorf("Push after close = %v, want ErrClosed", err)
 			}
 		case <-time.After(500 * time.Millisecond):
 			if ma, ok := q.(*memoryAdapter); ok {
@@ -57,7 +57,7 @@ func TestMemory_CoverPushClosedRaceHammer(t *testing.T) {
 	}
 }
 
-// cover Push closed after wait (65)
+// cover Push closed after wait (65).
 func TestMemory_CoverPushClosedAfterWait(t *testing.T) {
 	t.Parallel()
 	q := newQueue(t, queue.Options{Buffer: 1})
@@ -95,11 +95,14 @@ func TestMemory_CoverPushClosedAfterWait(t *testing.T) {
 	}
 }
 
-// cover Push closed at lock (73) and PushDelayed variants
+// cover Push closed at lock (73) and PushDelayed variants.
 func TestMemory_CoverPushClosedAtLock(t *testing.T) {
 	t.Parallel()
 	maIfc := newQueue(t, queue.Options{Buffer: 0})
-	ma := maIfc.(*memoryAdapter)
+	ma, ok := maIfc.(*memoryAdapter)
+	if !ok {
+		t.Fatalf("type assert memoryAdapter failed")
+	}
 	topic := "cover-push-lock"
 	if _, err := ma.topic(topic); err != nil {
 		t.Fatalf("topic: %v", err)
@@ -107,29 +110,35 @@ func TestMemory_CoverPushClosedAtLock(t *testing.T) {
 	ma.mu.Lock()
 	ma.closed = true
 	ma.mu.Unlock()
-	if err := maIfc.Push(context.Background(), topic, queue.Payload([]byte("x")), nil); err != queue.ErrClosed {
+	if err := maIfc.Push(context.Background(), topic, queue.Payload([]byte("x")), nil); !errors.Is(err, queue.ErrClosed) {
 		t.Errorf("Push after closed at lock = %v, want ErrClosed", err)
 	}
 	ma2Ifc := newQueue(t, queue.Options{Buffer: 0})
-	ma2 := ma2Ifc.(*memoryAdapter)
+	ma2, ok := ma2Ifc.(*memoryAdapter)
+	if !ok {
+		t.Fatalf("type assert memoryAdapter failed")
+	}
 	if _, err := ma2.topic(topic); err != nil {
 		t.Fatalf("topic: %v", err)
 	}
 	ma2.mu.Lock()
 	ma2.closed = true
 	ma2.mu.Unlock()
-	if err := ma2Ifc.PushDelayed(context.Background(), topic, queue.Payload([]byte("x")), nil, 0); err != queue.ErrClosed {
+	if err := ma2Ifc.PushDelayed(context.Background(), topic, queue.Payload([]byte("x")), nil, 0); !errors.Is(err, queue.ErrClosed) {
 		t.Errorf("PushDelayed immediate after closed = %v, want ErrClosed", err)
 	}
 	ma3Ifc := newQueue(t, queue.Options{Buffer: 0})
-	ma3 := ma3Ifc.(*memoryAdapter)
+	ma3, ok := ma3Ifc.(*memoryAdapter)
+	if !ok {
+		t.Fatalf("type assert memoryAdapter failed")
+	}
 	if _, err := ma3.topic(topic); err != nil {
 		t.Fatalf("topic: %v", err)
 	}
 	ma3.mu.Lock()
 	ma3.closed = true
 	ma3.mu.Unlock()
-	if err := ma3Ifc.PushDelayed(context.Background(), topic, queue.Payload([]byte("x")), nil, 10*time.Millisecond); err != queue.ErrClosed {
+	if err := ma3Ifc.PushDelayed(context.Background(), topic, queue.Payload([]byte("x")), nil, 10*time.Millisecond); !errors.Is(err, queue.ErrClosed) {
 		t.Errorf("PushDelayed delayed after closed = %v, want ErrClosed", err)
 	}
 }
@@ -149,10 +158,10 @@ func TestMemory_CoverAckNackNilTopic(t *testing.T) {
 		t.Errorf("Nack requeue unknown = %v, want nil", err)
 	}
 	_ = q.Close()
-	if err := q.Ack(context.Background(), msg); err != queue.ErrClosed {
+	if err := q.Ack(context.Background(), msg); !errors.Is(err, queue.ErrClosed) {
 		t.Errorf("Ack closed unknown = %v, want ErrClosed", err)
 	}
-	if err := q.Nack(context.Background(), msg, false); err != queue.ErrClosed {
+	if err := q.Nack(context.Background(), msg, false); !errors.Is(err, queue.ErrClosed) {
 		t.Errorf("Nack closed unknown = %v, want ErrClosed", err)
 	}
 }
@@ -160,7 +169,10 @@ func TestMemory_CoverAckNackNilTopic(t *testing.T) {
 func TestMemory_CoverSweepTopicPromoterOn(t *testing.T) {
 	t.Parallel()
 	maIfc := newQueue(t, queue.Options{})
-	ma := maIfc.(*memoryAdapter)
+	ma, ok := maIfc.(*memoryAdapter)
+	if !ok {
+		t.Fatalf("type assert memoryAdapter failed")
+	}
 	tq := newTopicQueue()
 	tq.promoterOn = true
 	ma.mu.Lock()
@@ -180,7 +192,10 @@ func TestMemory_CoverSweepTopicPromoterOn(t *testing.T) {
 func TestMemory_CoverMountTopicLockedVariants(t *testing.T) {
 	t.Parallel()
 	maIfc := newQueue(t, queue.Options{})
-	ma := maIfc.(*memoryAdapter)
+	ma, ok := maIfc.(*memoryAdapter)
+	if !ok {
+		t.Fatalf("type assert memoryAdapter failed")
+	}
 	t1 := newTopicQueue()
 	t2 := newTopicQueue()
 	if got := ma.mountTopicLocked("m1", t1); got != t1 {
@@ -199,7 +214,10 @@ func TestMemory_CoverMountTopicLockedVariants(t *testing.T) {
 func TestMemory_CoverPopWithTopicNotifyAndPoll(t *testing.T) {
 	t.Parallel()
 	maIfc := newQueue(t, queue.Options{PollTimeout: 50 * time.Millisecond})
-	ma := maIfc.(*memoryAdapter)
+	ma, ok := maIfc.(*memoryAdapter)
+	if !ok {
+		t.Fatalf("type assert memoryAdapter failed")
+	}
 	topic := "pop-notify"
 	tq, _ := ma.topic(topic)
 	ctx := context.Background()
@@ -237,7 +255,8 @@ func TestMemory_CoverPopWithTopicNotifyAndPoll(t *testing.T) {
 	if err == nil || err.Error() == "" {
 		t.Fatalf("pop poll = nil, want EmptyError")
 	}
-	if _, ok := err.(*queue.EmptyError); !ok {
+	var emptyErr *queue.EmptyError
+	if !errors.As(err, &emptyErr) {
 		t.Errorf("pop poll err = %T %v, want *EmptyError", err, err)
 	}
 	// cover cancelled context branch
@@ -303,7 +322,10 @@ func TestMemory_CoverTopicPromoteAndReclaim(t *testing.T) {
 func TestMemory_CoverWaitForCapacityBranches(t *testing.T) {
 	t.Parallel()
 	maIfc := newQueue(t, queue.Options{Buffer: 1})
-	ma := maIfc.(*memoryAdapter)
+	ma, ok := maIfc.(*memoryAdapter)
+	if !ok {
+		t.Fatalf("type assert memoryAdapter failed")
+	}
 	tq, _ := ma.topic("waitcap")
 	if err := maIfc.Push(context.Background(), "waitcap", queue.Payload([]byte("one")), nil); err != nil {
 		t.Fatalf("Push fill: %v", err)
@@ -322,8 +344,8 @@ func TestMemory_CoverWaitForCapacityBranches(t *testing.T) {
 	}()
 	ctx2, cancel2 := context.WithTimeout(context.Background(), 500*time.Millisecond)
 	defer cancel2()
-	if err := ma.waitForSpace(ctx2, tq); err != nil {
-		t.Fatalf("waitForSpace after free = %v, want nil", err)
+	if err2 := ma.waitForSpace(ctx2, tq); err2 != nil {
+		t.Fatalf("waitForSpace after free = %v, want nil", err2)
 	}
 	// cover timer Stop false drain (324,335)
 	countCalls := 0
@@ -415,13 +437,13 @@ func TestMemory_CoverNewTopicAfterClose(t *testing.T) {
 	q := newQueue(t, queue.Options{})
 	_ = q.Close()
 	// cover new topic after close ErrClosed (52,83)
-	if err := q.Push(context.Background(), "brand-new-topic-push", queue.Payload([]byte("x")), nil); err != queue.ErrClosed {
+	if err := q.Push(context.Background(), "brand-new-topic-push", queue.Payload([]byte("x")), nil); !errors.Is(err, queue.ErrClosed) {
 		t.Errorf("Push new topic after close = %v, want ErrClosed", err)
 	}
-	if err := q.PushDelayed(context.Background(), "brand-new-topic-pushdelayed", queue.Payload([]byte("x")), nil, 0); err != queue.ErrClosed {
+	if err := q.PushDelayed(context.Background(), "brand-new-topic-pushdelayed", queue.Payload([]byte("x")), nil, 0); !errors.Is(err, queue.ErrClosed) {
 		t.Errorf("PushDelayed new topic after close = %v, want ErrClosed", err)
 	}
-	if err := q.PushDelayed(context.Background(), "brand-new-topic-pushdelayed2", queue.Payload([]byte("x")), nil, 10*time.Millisecond); err != queue.ErrClosed {
+	if err := q.PushDelayed(context.Background(), "brand-new-topic-pushdelayed2", queue.Payload([]byte("x")), nil, 10*time.Millisecond); !errors.Is(err, queue.ErrClosed) {
 		t.Errorf("PushDelayed delayed new topic after close = %v, want ErrClosed", err)
 	}
 }

@@ -165,7 +165,11 @@ func (t *topicQueue) reclaimFromHeap(now time.Time) bool {
 			break
 		}
 
-		entry := heap.Pop(&t.visHeap).(*visibilityEntry)
+		raw := heap.Pop(&t.visHeap)
+		entry, ok := raw.(*visibilityEntry)
+		if !ok {
+			continue
+		}
 
 		inf, ok := t.inflight[entry.id]
 		if !ok {
