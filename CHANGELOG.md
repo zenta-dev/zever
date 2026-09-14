@@ -28,3 +28,5 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   downloads with local filesystem, S3, and R2 backends plus bucket policies.
 - Generic `observability` package: telemetry facade with `noop`, `stdout`,
   and OTLP adapters for traces and metrics.
+- Generic `permission` package: fail-closed authorization facade with
+  `noop`, RBAC, and Casbin adapters.
