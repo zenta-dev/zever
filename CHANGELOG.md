@@ -37,6 +37,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   with in-memory and Redis backends.
 - Generic `scheduler` package: cron `Scheduler` facade with an in-process
   embedded adapter dispatching registered jobs.
+- Generic `ratelimit` package: token-bucket limiter with in-memory
+  and Redis (Lua) backends.
 
 ### Changed
 
