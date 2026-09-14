@@ -32,6 +32,10 @@ var ErrPayloadTooLarge = errors.New("eventbus: payload too large")
 // ErrInvalidMessageID is returned for an invalid message ID.
 var ErrInvalidMessageID = errors.New("eventbus: invalid message id")
 
+// ErrNotSubscribed is returned when unsubscribing a topic that has no
+// matching pull subscription.
+var ErrNotSubscribed = errors.New("eventbus: not subscribed")
+
 // DuplicateError reports a duplicate adapter registration.
 type DuplicateError struct {
 	// Adapter is the already-registered adapter.
