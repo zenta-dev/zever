@@ -24,3 +24,5 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Generic `job` package: job-queue orchestration with typed registration,
   dispatch (delay, scheduling, uniqueness), worker execution with retry and
   dead-letter handling, batch progress, and cron scheduling.
+- Generic `storage` package: `Storage` facade for presigned uploads and
+  downloads with local filesystem, S3, and R2 backends plus bucket policies.
