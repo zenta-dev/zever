@@ -39,9 +39,17 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   embedded adapter dispatching registered jobs.
 - Generic `ratelimit` package: token-bucket limiter with in-memory
   and Redis (Lua) backends.
+- `eventbus` gains a pull API: `SubscribeChan` returns a buffered Go
+  channel per subscriber (slow subscribers drop newest, others
+  unaffected), `Unsubscribe` detaches and closes it with
+  `ErrNotSubscribed` for unknown topics, and `Message.ReceivedAt`
+  records the publish timestamp. The Redis wire envelope
+  (`id`/`payload`/`headers`) is unchanged.
 
 ### Changed
 
 - `job.Scheduler.Every` now returns the cron entry ID
   (`(job.EntryID, error)`); use `Remove`/`Entries` to manage schedules.
   A nil `Locker` means single-instance mode without slot locks.
+- `eventbus` memory `Close` abandons in-flight handlers on timeout and
+  returns nil instead of `DeadlineExceeded`, matching the redis adapter.

@@ -141,15 +141,18 @@ func TestOrderingPerSub(t *testing.T) {
 func TestDropIsolation(t *testing.T) {
 	t.Parallel()
 
-	b, err := New(eventbus.Options{
+	mb, err := newBus(eventbus.Options{
 		BufferSize:     1,
 		MaxHandlers:    4,
 		HandlerTimeout: 2 * time.Second,
 		CloseTimeout:   5 * time.Second,
 	})
 	if err != nil {
-		t.Fatalf("New: %v", err)
+		t.Fatalf("newBus: %v", err)
 	}
+
+	b := mb
+
 	defer b.Close()
 
 	ctx := context.Background()
@@ -182,10 +185,6 @@ func TestDropIsolation(t *testing.T) {
 		t.Fatal("fast subscriber starved by slow subscriber")
 	}
 
-	mb, ok := b.(*bus)
-	if !ok {
-		t.Fatalf("bus type = %T, want *bus", b)
-	}
 	mb.mu.RLock()
 	subs := append([]*subscription(nil), mb.topics["t"]...)
 	mb.mu.RUnlock()

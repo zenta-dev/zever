@@ -89,11 +89,7 @@ func TestSubscribe_receiveError(t *testing.T) {
 func TestSubscribe_closedAfterLock(t *testing.T) {
 	t.Parallel()
 
-	b := newTestBus(t, nil)
-	a, ok := b.(*adapter)
-	if !ok {
-		t.Fatal("test bus is not *adapter")
-	}
+	a := newTestAdapter(t, nil)
 	topic := freshTopic()
 
 	a.mu.Lock()
@@ -124,10 +120,7 @@ func TestDeliver_skipsBadFrames(t *testing.T) {
 	t.Parallel()
 
 	b := newTestBus(t, nil)
-	a, ok := b.(*adapter)
-	if !ok {
-		t.Fatal("test bus is not *adapter")
-	}
+	a := newTestAdapter(t, nil)
 	topic := freshTopic()
 
 	got := make(chan eventbus.Message, 16)
@@ -172,11 +165,7 @@ func TestDeliver_skipsBadFrames(t *testing.T) {
 func TestDeliver_pubsubClosed(t *testing.T) {
 	t.Parallel()
 
-	b := newTestBus(t, nil)
-	a, ok := b.(*adapter)
-	if !ok {
-		t.Fatal("test bus is not *adapter")
-	}
+	a := newTestAdapter(t, nil)
 	topic := freshTopic()
 
 	ps := a.client.Subscribe(context.Background(), a.channel(topic))

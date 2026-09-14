@@ -14,4 +14,7 @@
 //
 // The Redis client itself is shared via the internal/redis Pool singleton and
 // is never closed by this adapter; Close only stops deliveries.
+//
+// Pull API (SubscribeChan/Unsubscribe) is provided via eventbus.Wrap with
+// drop-newest-on-full per subscriber.
 package redis

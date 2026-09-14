@@ -75,6 +75,28 @@ func newTestBus(t *testing.T, mutate func(*eventbus.Options)) eventbus.Eventbus 
 	return b
 }
 
+func newTestAdapter(t *testing.T, mutate func(*eventbus.Options)) *adapter {
+	t.Helper()
+
+	opts := testOptions()
+	if mutate != nil {
+		mutate(&opts)
+	}
+
+	a, err := newAdapter(opts)
+	if err != nil {
+		t.Fatalf("newAdapter err = %v, want nil", err)
+	}
+
+	t.Cleanup(func() {
+		if err := a.Close(); err != nil {
+			t.Errorf("Close err = %v, want nil", err)
+		}
+	})
+
+	return a
+}
+
 func waitMsg(t *testing.T, ch <-chan eventbus.Message) eventbus.Message {
 	t.Helper()
 

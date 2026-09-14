@@ -16,14 +16,6 @@ import (
 	zredis "github.com/zenta-dev/zever/internal/redis"
 )
 
-// wireMessage is the JSON envelope stored on the Redis channel.
-// Payload marshals as base64 automatically via encoding/json.
-type wireMessage struct {
-	ID      string            `json:"id"`
-	Payload []byte            `json:"payload"`
-	Headers map[string]string `json:"headers"`
-}
-
 type subscription struct {
 	ps      *goredis.PubSub
 	topic   string
@@ -35,6 +27,8 @@ type subscription struct {
 func (s *subscription) shutdown() {
 	s.once.Do(func() { close(s.stop) })
 }
+
+var _ eventbus.Pusher = (*adapter)(nil)
 
 type adapter struct {
 	client         *goredis.Client
@@ -53,7 +47,17 @@ type adapter struct {
 // defaults (prefix "eventbus", buffer 1024, handler timeout 30s, close
 // timeout 5s), reuses the shared internal/redis Pool client, and verifies
 // connectivity with a 3s ping.
+// The returned bus supports both the push and pull APIs.
 func New(opts eventbus.Options) (eventbus.Eventbus, error) {
+	a, err := newAdapter(opts)
+	if err != nil {
+		return nil, err
+	}
+
+	return eventbus.Wrap(a), nil
+}
+
+func newAdapter(opts eventbus.Options) (*adapter, error) {
 	if err := opts.Validate(); err != nil {
 		return nil, fmt.Errorf("redis: %w", err)
 	}
@@ -129,20 +133,24 @@ func (a *adapter) channel(topic string) string {
 }
 
 func validateTopic(topic string) error {
-	if topic == "" || len(topic) > eventbus.MaxTopicLen {
-		return &eventbus.InvalidOptionsError{Reason: fmt.Sprintf("topic must be 1-%d characters", eventbus.MaxTopicLen)}
+	if topic == "" {
+		return &eventbus.InvalidOptionsError{Reason: "topic must be non-empty"}
+	}
+
+	if len(topic) > eventbus.MaxTopicLen {
+		return &eventbus.InvalidOptionsError{Reason: "topic too long"}
 	}
 
 	return nil
 }
 
 func (a *adapter) Publish(ctx context.Context, topic string, payload eventbus.Payload, headers eventbus.Headers) error {
-	if a.closed.Load() {
-		return eventbus.ErrClosed
-	}
-
 	if err := ctx.Err(); err != nil {
 		return fmt.Errorf("redis: publish %q: %w", topic, err)
+	}
+
+	if a.closed.Load() {
+		return eventbus.ErrClosed
 	}
 
 	if err := validateTopic(topic); err != nil {
@@ -241,75 +249,6 @@ func (a *adapter) Subscribe(ctx context.Context, topic string, handler eventbus.
 	go a.deliver(ctx, sub, handler)
 
 	return func() { a.unsubscribe(sub) }, nil
-}
-
-func (a *adapter) deliver(ctx context.Context, sub *subscription, handler eventbus.Handler) {
-	defer a.wg.Done()
-
-	ch := sub.ps.Channel(goredis.WithChannelSize(a.buffer))
-
-	for {
-		select {
-		case <-sub.stop:
-			return
-		case m, ok := <-ch:
-			if !ok {
-				return
-			}
-
-			// Single-channel invariant: sub.ps comes only from
-			// a.client.Subscribe(ctx, channel) below (no pattern-subscribe
-			// path exists in this file), so m.Channel always equals
-			// sub.channel and no skip check is needed.
-
-			if len(m.Payload) > eventbus.MaxMessageSize {
-				continue
-			}
-
-			msg, err := decodeMessage(sub.topic, []byte(m.Payload))
-			if err != nil {
-				continue
-			}
-
-			a.invoke(ctx, sub.topic, msg, handler)
-		}
-	}
-}
-
-func (a *adapter) invoke(ctx context.Context, topic string, msg eventbus.Message, handler eventbus.Handler) {
-	hctx, cancel := context.WithTimeout(context.WithoutCancel(ctx), a.handlerTimeout)
-	defer cancel()
-
-	defer func() {
-		if r := recover(); r != nil && a.onPanic != nil {
-			a.onPanic(topic, msg, r)
-		}
-	}()
-
-	handler(hctx, msg)
-}
-
-func decodeMessage(topic string, raw []byte) (eventbus.Message, error) {
-	if len(raw) > eventbus.MaxMessageSize {
-		return eventbus.Message{}, fmt.Errorf("%w: %d > %d", eventbus.ErrPayloadTooLarge, len(raw), eventbus.MaxMessageSize)
-	}
-
-	var wm wireMessage
-	if err := json.Unmarshal(raw, &wm); err != nil {
-		return eventbus.Message{}, fmt.Errorf("redis: decode message: %w", err)
-	}
-
-	id, err := eventbus.ParseMessageID(wm.ID)
-	if err != nil {
-		return eventbus.Message{}, err
-	}
-
-	return eventbus.Message{
-		ID:      id,
-		Topic:   topic,
-		Payload: wm.Payload,
-		Headers: wm.Headers,
-	}, nil
 }
 
 func (a *adapter) unsubscribe(sub *subscription) {
