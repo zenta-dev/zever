@@ -247,38 +247,17 @@ func (a *memoryAdapter) Exists(_ context.Context, key string) (bool, error) {
 	return true, nil
 }
 
+// sweep removes expired entries in a single write-locked pass. The janitor
+// runs rarely, and one pass keeps scan-and-delete atomic, so no rechecking
+// (and its timing-dependent branches) is needed.
 func (a *memoryAdapter) sweep() {
 	now := time.Now()
 
-	a.mu.RLock()
-
-	var expired []string
+	a.mu.Lock()
+	defer a.mu.Unlock()
 
 	for k, it := range a.items {
-		if a.isExpired(it, now) {
-			expired = append(expired, k)
-		}
-	}
-
-	a.mu.RUnlock()
-
-	if len(expired) == 0 {
-		return
-	}
-
-	for _, k := range expired {
-		a.mu.Lock()
-
-		cur, ok := a.items[k]
-		if !ok {
-			a.mu.Unlock()
-
-			continue
-		}
-
-		if !a.isExpired(cur, now) {
-			a.mu.Unlock()
-
+		if !a.isExpired(it, now) {
 			continue
 		}
 
@@ -291,8 +270,6 @@ func (a *memoryAdapter) sweep() {
 
 			delete(a.index, k)
 		}
-
-		a.mu.Unlock()
 	}
 }
 
