@@ -32,3 +32,4 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   `noop`, RBAC, and Casbin adapters.
 - Generic `eventbus` package: publish/subscribe facade with in-memory
   fan-out and Redis PubSub adapters.
+- Generic `mailer` package: mail facade with JSON log and SMTP adapters.
