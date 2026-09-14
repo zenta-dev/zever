@@ -2,6 +2,7 @@ package job
 
 import (
 	"context"
+	"errors"
 	"fmt"
 	"strconv"
 	"sync"
@@ -14,8 +15,14 @@ import (
 	"github.com/zenta-dev/zever/log/noop"
 )
 
+// EntryID wraps cron.EntryID identifying a registered schedule.
+type EntryID uint64
+
 // Scheduler fires registered jobs on cron specs using Dispatcher.
 // Dispatcher enqueues due jobs, Locker suppresses duplicate slots, and Logger reports schedule errors.
+//
+// A nil Locker means no cross-instance dedup: fireWithSchedule dispatches
+// directly without acquiring a schedule-slot lock (single-instance mode).
 type Scheduler struct {
 	// Dispatcher enqueues jobs when a cron tick fires.
 	Dispatcher *Dispatcher
@@ -43,22 +50,46 @@ func NewScheduler(d *Dispatcher, locker *UniqueLocker) *Scheduler {
 	}
 }
 
-// Every registers jobName with args on cron spec.
-// It returns an error for invalid specs or scheduler registration failures.
-func (s *Scheduler) Every(spec, jobName string, args any) error {
-	sched, err := s.cachedSchedule(spec)
-	if err != nil {
-		return fmt.Errorf("job: schedule spec %q: %w", spec, err)
+// Every registers jobName with args on cron spec and returns its entry ID.
+// It returns an error for a nil Dispatcher, invalid specs, or scheduler registration failures.
+func (s *Scheduler) Every(spec, jobName string, args any) (EntryID, error) {
+	if s.Dispatcher == nil {
+		return 0, errors.New("job: scheduler dispatcher is nil")
 	}
 
-	_, err = s.cron.AddFunc(spec, func() {
+	sched, err := s.cachedSchedule(spec)
+	if err != nil {
+		return 0, fmt.Errorf("job: schedule spec %q: %w", spec, err)
+	}
+
+	id, err := s.cron.AddFunc(spec, func() {
 		s.fireWithSchedule(jobName, args, spec, sched)
 	})
 	if err != nil {
-		return fmt.Errorf("job: schedule add %q: %w", spec, err)
+		return 0, fmt.Errorf("job: schedule add %q: %w", spec, err)
 	}
 
-	return nil
+	//nolint:gosec // cron EntryIDs are a small positive sequence starting at 1.
+	return EntryID(id), nil
+}
+
+// Remove unregisters the schedule with the given ID.
+// An unknown ID is a no-op returning nothing, per cron.Cron.Remove semantics.
+func (s *Scheduler) Remove(id EntryID) {
+	//nolint:gosec // IDs originate from Every, a small positive cron sequence.
+	s.cron.Remove(cron.EntryID(id))
+}
+
+// Entries returns a snapshot of the live cron entry IDs.
+func (s *Scheduler) Entries() []EntryID {
+	entries := s.cron.Entries()
+	ids := make([]EntryID, 0, len(entries))
+	for _, e := range entries {
+		//nolint:gosec // cron EntryIDs are a small positive sequence starting at 1.
+		ids = append(ids, EntryID(e.ID))
+	}
+
+	return ids
 }
 
 func (s *Scheduler) cachedSchedule(spec string) (cron.Schedule, error) {
@@ -102,20 +133,28 @@ func (s *Scheduler) storeSchedule(spec string, sched cron.Schedule) cron.Schedul
 func (s *Scheduler) fireWithSchedule(jobName string, args any, spec string, sched cron.Schedule) {
 	ctx := s.loadCtx()
 
-	now := s.now()
-	next := sched.Next(now)
-	slot := next.Unix()
-	interval := sched.Next(next).Sub(next)
-	lockKey := ":schedule" + spec + ":" + jobName + ":" + strconv.FormatInt(slot, 10)
-	ttl := interval + interval/2
+	// Nil Locker = no cross-instance dedup; dispatch directly in single-instance mode.
+	if s.Locker != nil {
+		now := s.now()
+		next := sched.Next(now)
+		slot := next.Unix()
+		interval := sched.Next(next).Sub(next)
+		lockKey := ":schedule" + spec + ":" + jobName + ":" + strconv.FormatInt(slot, 10)
+		ttl := interval + interval/2
 
-	acquired, err := s.Locker.Acquire(ctx, lockKey, ttl)
-	if err != nil {
-		s.log().Warn().Str("job", jobName).Err(err).Msg("job: schedule locker error")
-		return
+		acquired, err := s.Locker.Acquire(ctx, lockKey, ttl)
+		if err != nil {
+			s.log().Warn().Str("job", jobName).Err(err).Msg("job: schedule locker error")
+			return
+		}
+
+		if !acquired {
+			return
+		}
 	}
 
-	if !acquired {
+	if s.Dispatcher == nil {
+		s.log().Warn().Str("job", jobName).Msg("job: scheduler dispatcher is nil")
 		return
 	}
 
