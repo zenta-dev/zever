@@ -35,3 +35,11 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Generic `mailer` package: mail facade with JSON log and SMTP adapters.
 - Generic `idempotency` package: reserve-then-complete execution store
   with in-memory and Redis backends.
+- Generic `scheduler` package: cron `Scheduler` facade with an in-process
+  embedded adapter dispatching registered jobs.
+
+### Changed
+
+- `job.Scheduler.Every` now returns the cron entry ID
+  (`(job.EntryID, error)`); use `Remove`/`Entries` to manage schedules.
+  A nil `Locker` means single-instance mode without slot locks.
