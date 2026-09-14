@@ -49,7 +49,7 @@ func TestSchedulerEveryValid(t *testing.T) {
 	Reset()
 	sq := &stubQueue{}
 	s := NewScheduler(&Dispatcher{Q: sq}, NewUniqueLocker(&fakeCache{}))
-	if err := s.Every("0 * * * *", "some-job", nil); err != nil {
+	if _, err := s.Every("0 * * * *", "some-job", nil); err != nil {
 		t.Fatalf("Every valid: %v", err)
 	}
 	if got := len(s.cron.Entries()); got != 1 {
@@ -66,7 +66,7 @@ func TestSchedulerEveryValid(t *testing.T) {
 func TestSchedulerEveryInvalidSpec(t *testing.T) {
 	Reset()
 	s := NewScheduler(&Dispatcher{Q: &stubQueue{}}, NewUniqueLocker(&fakeCache{}))
-	err := s.Every("not-a-spec", "some-job", nil)
+	_, err := s.Every("not-a-spec", "some-job", nil)
 	if err == nil {
 		t.Fatal("Every invalid spec want error")
 	}
@@ -84,7 +84,7 @@ func TestSchedulerEveryAddFuncError(t *testing.T) {
 	// Minute-only parser rejects 5-field standard specs, while
 	// cachedSchedule (ParseStandard) still accepts them.
 	s.cron = cron.New(cron.WithParser(cron.NewParser(cron.Minute)))
-	err := s.Every("0 0 * * *", "some-job", nil)
+	_, err := s.Every("0 0 * * *", "some-job", nil)
 	if err == nil {
 		t.Fatal("Every AddFunc reject want error")
 	}
@@ -364,7 +364,7 @@ func TestSchedulerLoadCtx(t *testing.T) {
 func TestSchedulerRunCancel(t *testing.T) {
 	Reset()
 	s := NewScheduler(&Dispatcher{Q: &stubQueue{}}, NewUniqueLocker(&fakeCache{}))
-	if err := s.Every("@every 1s", "some-job", nil); err != nil {
+	if _, err := s.Every("@every 1s", "some-job", nil); err != nil {
 		t.Fatalf("Every: %v", err)
 	}
 	ctx, cancel := context.WithCancel(context.Background())
@@ -418,4 +418,129 @@ func TestErrorStringsUnknownJob(t *testing.T) {
 	if !errors.Is(ptr, ErrUnknownJob) {
 		t.Fatalf("errors.Is ptr %v want ErrUnknownJob", ptr)
 	}
+}
+
+func TestEvery_returnsEntryID(t *testing.T) {
+	t.Parallel()
+	s := NewScheduler(&Dispatcher{Q: &stubQueue{}}, NewUniqueLocker(&fakeCache{}))
+	id, err := s.Every("0 * * * *", "some-job", nil)
+	if err != nil {
+		t.Fatalf("Every: %v", err)
+	}
+	if id == 0 {
+		t.Fatal("Every id=0 want nonzero")
+	}
+	found := false
+	for _, got := range s.Entries() {
+		if got == id {
+			found = true
+			break
+		}
+	}
+	if !found {
+		t.Fatalf("Entries %v missing id %v", s.Entries(), id)
+	}
+}
+
+func TestRemove_unknownID_nilError(t *testing.T) {
+	t.Parallel()
+	s := NewScheduler(&Dispatcher{Q: &stubQueue{}}, NewUniqueLocker(&fakeCache{}))
+	s.Remove(EntryID(999999))
+	if got := len(s.Entries()); got != 0 {
+		t.Fatalf("Entries=%d want 0 after unknown Remove", got)
+	}
+}
+
+func TestRemove_registeredID_removedFromEntries(t *testing.T) {
+	t.Parallel()
+	s := NewScheduler(&Dispatcher{Q: &stubQueue{}}, NewUniqueLocker(&fakeCache{}))
+	id1, err := s.Every("0 * * * *", "job-a", nil)
+	if err != nil {
+		t.Fatalf("Every job-a: %v", err)
+	}
+	id2, err := s.Every("30 * * * *", "job-b", nil)
+	if err != nil {
+		t.Fatalf("Every job-b: %v", err)
+	}
+	s.Remove(id1)
+	entries := s.Entries()
+	if len(entries) != 1 {
+		t.Fatalf("Entries=%d want 1 after Remove", len(entries))
+	}
+	if entries[0] != id2 {
+		t.Fatalf("Entries=%v want [%v]", entries, id2)
+	}
+}
+
+func TestEntries_listsAdded(t *testing.T) {
+	t.Parallel()
+	s := NewScheduler(&Dispatcher{Q: &stubQueue{}}, NewUniqueLocker(&fakeCache{}))
+	id1, err := s.Every("0 * * * *", "job-a", nil)
+	if err != nil {
+		t.Fatalf("Every job-a: %v", err)
+	}
+	id2, err := s.Every("30 * * * *", "job-b", nil)
+	if err != nil {
+		t.Fatalf("Every job-b: %v", err)
+	}
+	entries := s.Entries()
+	if len(entries) != 2 {
+		t.Fatalf("Entries=%d want 2", len(entries))
+	}
+	seen := map[EntryID]bool{}
+	for _, e := range entries {
+		seen[e] = true
+	}
+	if !seen[id1] || !seen[id2] {
+		t.Fatalf("Entries=%v missing ids %v %v", entries, id1, id2)
+	}
+}
+
+func TestFireWithSchedule_nilLocker_dispatches(t *testing.T) {
+	fixed := time.Date(2026, time.January, 1, 0, 7, 0, 0, time.UTC)
+	sq := &stubQueue{}
+	s := newScheduleTestCtx(t, sq, &fakeCache{}, fixed)
+	s.Locker = nil
+	sched, err := s.cachedSchedule("0 * * * *")
+	if err != nil {
+		t.Fatalf("cachedSchedule: %v", err)
+	}
+	s.fireWithSchedule("sched-job", "arg", "0 * * * *", sched)
+	if sq.pushes != 1 {
+		t.Fatalf("pushes=%d want 1 with nil Locker", sq.pushes)
+	}
+}
+
+func TestNewScheduler_nilDispatcher_EveryFails(t *testing.T) {
+	t.Parallel()
+	c, err := cachememory.New(cache.Options{})
+	if err != nil {
+		t.Fatalf("cachememory.New: %v", err)
+	}
+	defer c.Close(context.Background())
+	s := NewScheduler(nil, NewUniqueLocker(c))
+	id, err := s.Every("0 * * * *", "some-job", nil)
+	if err == nil {
+		t.Fatal("Every with nil Dispatcher want error")
+	}
+	if !strings.Contains(err.Error(), "dispatcher is nil") {
+		t.Fatalf("err %q missing dispatcher is nil", err.Error())
+	}
+	if id != 0 {
+		t.Fatalf("id=%v want 0 on error", id)
+	}
+	if got := len(s.Entries()); got != 0 {
+		t.Fatalf("Entries=%d want 0 after failed Every", got)
+	}
+}
+
+func TestScheduleFireNilDispatcherWarns(t *testing.T) {
+	t.Parallel()
+	s := &Scheduler{}
+	sched, err := cron.ParseStandard("0 * * * *")
+	if err != nil {
+		t.Fatalf("ParseStandard: %v", err)
+	}
+	// Nil Locker skips the lock; nil Dispatcher must warn and return, not panic.
+	s.fireWithSchedule("sched-job", nil, "0 * * * *", sched)
 }
