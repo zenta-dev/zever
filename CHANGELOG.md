@@ -45,6 +45,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   `ErrNotSubscribed` for unknown topics, and `Message.ReceivedAt`
   records the publish timestamp. The Redis wire envelope
   (`id`/`payload`/`headers`) is unchanged.
+- Generic `notification` package: notifier facade with JSON log,
+  Twilio SMS, and FCM push adapters.
 
 ### Changed
 
