@@ -366,13 +366,17 @@ func TestMemory_CoverStartPromoterQuitReset(t *testing.T) {
 	// cover quit closed reset (174)
 	tq := newTopicQueue()
 	close(tq.quit)
+	tq.mu.Lock()
 	tq.promoterOn = false
 	tq.startPromoterLocked()
-	if tq.quit == nil {
+	quitNil := tq.quit == nil
+	done := tq.done
+	quit := tq.quit
+	tq.mu.Unlock()
+	if quitNil {
 		t.Errorf("quit nil after reset")
 	}
-	done := tq.done
-	close(tq.quit)
+	close(quit)
 	select {
 	case <-done:
 	case <-time.After(500 * time.Millisecond):
@@ -380,16 +384,23 @@ func TestMemory_CoverStartPromoterQuitReset(t *testing.T) {
 	}
 	// cover early return when promoterOn (165)
 	tq2 := newTopicQueue()
+	tq2.mu.Lock()
 	tq2.startPromoterLocked()
-	if !tq2.promoterOn {
+	on := tq2.promoterOn
+	done2 := tq2.done
+	tq2.mu.Unlock()
+	if !on {
 		t.Errorf("promoterOn = false, want true")
 	}
-	done2 := tq2.done
+	tq2.mu.Lock()
 	tq2.startPromoterLocked()
-	if !tq2.promoterOn {
+	on2 := tq2.promoterOn
+	quit2 := tq2.quit
+	tq2.mu.Unlock()
+	if !on2 {
 		t.Errorf("promoterOn = false after second start, want true")
 	}
-	close(tq2.quit)
+	close(quit2)
 	select {
 	case <-done2:
 	case <-time.After(500 * time.Millisecond):
