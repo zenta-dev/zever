@@ -13,14 +13,9 @@ import (
 func coverMustBus(t *testing.T, opts eventbus.Options) *bus {
 	t.Helper()
 
-	b, err := New(opts)
+	mb, err := newBus(opts)
 	if err != nil {
-		t.Fatalf("New: %v", err)
-	}
-
-	mb, ok := b.(*bus)
-	if !ok {
-		t.Fatalf("bus type = %T, want *bus", b)
+		t.Fatalf("newBus: %v", err)
 	}
 
 	return mb
@@ -375,8 +370,8 @@ func TestCoverCloseTimeout(t *testing.T) {
 	closeErr := mb.Close()
 	elapsed := time.Since(start)
 
-	if !errors.Is(closeErr, context.DeadlineExceeded) {
-		t.Fatalf("Close err = %v want DeadlineExceeded", closeErr)
+	if closeErr != nil {
+		t.Fatalf("Close err = %v want nil (timeout abandons, like redis)", closeErr)
 	}
 
 	if elapsed >= 2*time.Second {

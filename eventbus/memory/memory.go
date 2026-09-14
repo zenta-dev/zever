@@ -10,7 +10,7 @@ import (
 	"github.com/zenta-dev/zever/eventbus"
 )
 
-var _ eventbus.Eventbus = (*bus)(nil)
+var _ eventbus.Pusher = (*bus)(nil)
 
 // subscription is a single handler registration.
 type subscription struct {
@@ -37,7 +37,17 @@ type bus struct {
 }
 
 // New creates an in-memory eventbus from opts.
+// The returned bus supports both the push and pull APIs.
 func New(opts eventbus.Options) (eventbus.Eventbus, error) {
+	b, err := newBus(opts)
+	if err != nil {
+		return nil, err
+	}
+
+	return eventbus.Wrap(b), nil
+}
+
+func newBus(opts eventbus.Options) (*bus, error) {
 	if err := opts.Validate(); err != nil {
 		return nil, fmt.Errorf("memory: %w", err)
 	}
@@ -245,7 +255,9 @@ func (b *bus) forward(parent context.Context, topic string, sub *subscription, h
 	}
 }
 
-// Close shuts down the eventbus.
+// Close shuts down the eventbus. It is idempotent and always reports nil:
+// a close timeout abandons in-flight handlers the same way the redis
+// adapter does rather than surfacing DeadlineExceeded.
 func (b *bus) Close() error {
 	if !b.closed.CompareAndSwap(false, true) {
 		return nil
@@ -271,8 +283,8 @@ func (b *bus) Close() error {
 
 	select {
 	case <-done:
-		return nil
 	case <-time.After(b.closeTimeout):
-		return fmt.Errorf("memory: close timeout: %w", context.DeadlineExceeded)
 	}
+
+	return nil
 }

@@ -28,6 +28,12 @@ func (stubBus) Close() error { return nil }
 
 func (stubBus) Name() string { return "stub" }
 
+func (stubBus) SubscribeChan(_ context.Context, _ string, _ int) (<-chan Message, error) {
+	return nil, ErrNotSubscribed
+}
+
+func (stubBus) Unsubscribe(_ string, _ <-chan Message) error { return ErrNotSubscribed }
+
 func TestRegister_nilFactory_returnsErrNilFactory(t *testing.T) {
 	a := freshAdapter()
 	if err := Register(a, nil); !errors.Is(err, ErrNilFactory) {

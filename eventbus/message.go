@@ -3,6 +3,7 @@ package eventbus
 import (
 	"maps"
 	"slices"
+	"time"
 	"uuid"
 )
 
@@ -68,20 +69,25 @@ type Message struct {
 	Payload Payload
 	// Headers holds metadata attached to the message.
 	Headers Headers
+	// ReceivedAt is the publish timestamp stamped by NewMessage.
+	// Messages decoded from the Redis wire envelope (which carries only
+	// id/payload/headers) stamp it at decode time instead.
+	ReceivedAt time.Time
 }
 
 // NewMessage creates a new Message for topic with payload and headers.
-// It assigns a fresh MessageID.
+// It assigns a fresh MessageID and stamps ReceivedAt with the current time.
 func NewMessage(
 	topic string,
 	payload Payload,
 	headers Headers,
 ) Message {
 	return Message{
-		ID:      newMessageID(),
-		Topic:   topic,
-		Payload: payload,
-		Headers: headers,
+		ID:         newMessageID(),
+		Topic:      topic,
+		Payload:    payload,
+		Headers:    headers,
+		ReceivedAt: time.Now(),
 	}
 }
 
