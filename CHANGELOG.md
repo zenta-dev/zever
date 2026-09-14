@@ -30,3 +30,5 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   and OTLP adapters for traces and metrics.
 - Generic `permission` package: fail-closed authorization facade with
   `noop`, RBAC, and Casbin adapters.
+- Generic `eventbus` package: publish/subscribe facade with in-memory
+  fan-out and Redis PubSub adapters.
