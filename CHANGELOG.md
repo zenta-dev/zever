@@ -61,6 +61,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   and PostHog adapters.
 - Generic `payment` package: payment-processing facade with in-memory
   stub, Stripe, and Paddle backends.
+- Generic `billing` package: subscription and invoice facade with
+  in-memory stub, Stripe, and Paddle backends.
 
 ### Changed
 
