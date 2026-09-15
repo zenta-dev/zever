@@ -69,6 +69,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   and S3 backends plus an ffmpeg probe/transform helper.
 - Generic `tenant` package: multi-tenant resolution facade with
   single fixed-ID and header-based backends.
+- Generic `search` package: full-text search facade with SQLite,
+  Postgres, and Meilisearch backends.
 
 ### Changed
 
