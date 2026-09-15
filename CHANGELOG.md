@@ -75,6 +75,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   pgvector, and Qdrant backends.
 - Generic `webhook` package: webhook-delivery facade with HTTPS,
   queue fan-out, and durable SQLite backends.
+- Generic `workflow` package: run-lifecycle facade with an in-memory
+  step engine.
 
 ### Changed
 
