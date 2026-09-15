@@ -49,6 +49,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   Twilio SMS, and FCM push adapters.
 - Generic `i18n` package: internationalization facade with embedded
   catalog and remote service adapters.
+- Generic `flag` package: feature-flag facade with static file-backed
+  and Firebase Remote Config adapters.
 
 ### Changed
 
