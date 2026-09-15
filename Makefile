@@ -18,9 +18,18 @@ help: ## Show this help
 	@awk 'BEGIN {FS = ":.*##"; printf "Usage:\n  make \033[36m<target>\033[0m\n"} /^[a-zA-Z_-]+:.*##/ {printf "  \033[36m%-14s\033[0m %s\n", $$1, $$2}' $(MAKEFILE_LIST)
 
 .PHONY: setup
-setup: ## Install required development tools
+setup: setup-golangci-lint setup-govulncheck setup-cyclonedx-gomod ## Install required development tools
+
+.PHONY: setup-golangci-lint
+setup-golangci-lint: ## Install golangci-lint
 	$(GO) install github.com/golangci/golangci-lint/v2/cmd/golangci-lint@$(GOLANGCI_LINT_VERSION)
+
+.PHONY: setup-govulncheck
+setup-govulncheck: ## Install govulncheck
 	$(GO) install golang.org/x/vuln/cmd/govulncheck@$(GOVULNCHECK_VERSION)
+
+.PHONY: setup-cyclonedx-gomod
+setup-cyclonedx-gomod: ## Install cyclonedx-gomod
 	$(GO) install github.com/CycloneDX/cyclonedx-gomod/cmd/cyclonedx-gomod@$(CYCLONEDX_GOMOD_VERSION)
 
 .PHONY: require-tools
