@@ -59,6 +59,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   to `permission` decisions with HTTP middleware and a gRPC interceptor.
 - Generic `analytics` package: event-tracking facade with JSON-lines log
   and PostHog adapters.
+- Generic `payment` package: payment-processing facade with in-memory
+  stub, Stripe, and Paddle backends.
 
 ### Changed
 
