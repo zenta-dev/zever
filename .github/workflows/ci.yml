@@ -66,9 +66,14 @@ jobs:
       - name: go vet
         run: go vet ./...
       - name: go test -race
-        run: go test -race ./...
+        run: go test -race -covermode=atomic -coverprofile=coverage.out ./...
       - name: go build
         run: go build ./...
+      - name: Upload coverage to Codecov
+        uses: codecov/codecov-action@046562be8d17331600874a09d2c2062c27752c20 # v7.1.0
+        with:
+          files: coverage.out
+          fail_ci_if_error: false
 
   vulnerability:
     name: govulncheck
