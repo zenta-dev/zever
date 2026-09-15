@@ -53,6 +53,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   and Firebase Remote Config adapters.
 - Generic `session` package: server-side session store facade with
   in-memory and Redis adapters.
+- Generic `auth` package: authentication facade with HS256 JWT, OIDC,
+  and session-backed adapters.
 
 ### Changed
 
