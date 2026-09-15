@@ -67,6 +67,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   headless-Chrome, remote, and LaTeX backends.
 - Generic `media` package: media-asset facade with local filesystem
   and S3 backends plus an ffmpeg probe/transform helper.
+- Generic `tenant` package: multi-tenant resolution facade with
+  single fixed-ID and header-based backends.
 
 ### Changed
 
