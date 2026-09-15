@@ -47,6 +47,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   (`id`/`payload`/`headers`) is unchanged.
 - Generic `notification` package: notifier facade with JSON log,
   Twilio SMS, and FCM push adapters.
+- Generic `i18n` package: internationalization facade with embedded
+  catalog and remote service adapters.
 
 ### Changed
 
