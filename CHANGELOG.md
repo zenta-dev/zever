@@ -51,6 +51,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   catalog and remote service adapters.
 - Generic `flag` package: feature-flag facade with static file-backed
   and Firebase Remote Config adapters.
+- Generic `session` package: server-side session store facade with
+  in-memory and Redis adapters.
 
 ### Changed
 
