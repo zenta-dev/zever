@@ -1,0 +1,272 @@
+package postgres
+
+import (
+	"context"
+	"encoding/json"
+	"fmt"
+	"strings"
+	"time"
+
+	"github.com/jackc/pgx/v5"
+	"github.com/jackc/pgx/v5/pgconn"
+	"github.com/jackc/pgx/v5/pgxpool"
+
+	"github.com/zenta-dev/zever/search"
+)
+
+const createTable = `CREATE TABLE IF NOT EXISTS search_documents (
+	id TEXT NOT NULL,
+	idx TEXT NOT NULL,
+	content TEXT NOT NULL,
+	metadata JSONB,
+	PRIMARY KEY (id, idx)
+)`
+
+const createIndex = `CREATE INDEX IF NOT EXISTS search_documents_content_idx
+	ON search_documents USING GIN (to_tsvector('english', content))`
+
+// dbpool is the narrow pool seam used by postgres. *pgxpool.Pool satisfies it;
+// tests substitute scripted fakes so no live database is required.
+type dbpool interface {
+	Exec(ctx context.Context, sql string, args ...any) (pgconn.CommandTag, error)
+	Query(ctx context.Context, sql string, args ...any) (pgx.Rows, error)
+	Close()
+}
+
+var _ dbpool = (*pgxpool.Pool)(nil)
+
+type postgres struct {
+	db dbpool
+}
+
+// newPool constructs the connection pool. It is a variable (rather than a
+// direct pgxpool.New call) so tests can stub the seam without a live database.
+var newPool = func(ctx context.Context, dsn string) (dbpool, error) {
+	return pgxpool.New(ctx, dsn)
+}
+
+// Open creates a postgres-backed search.Search.
+// An empty DSN returns a dev no-op instance (nil pool) so container
+// construction succeeds in dev; every operation on it reports ErrNotConfigured.
+// Otherwise a single 5s budget covers connect plus DDL.
+func Open(o search.Options) (search.Search, error) {
+	if err := o.Validate(); err != nil {
+		return nil, fmt.Errorf("postgres: %w", err)
+	}
+
+	if o.DSN == "" {
+		return &postgres{db: nil}, nil
+	}
+
+	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
+	defer cancel()
+
+	pool, err := newPool(ctx, o.DSN)
+	if err != nil {
+		return nil, fmt.Errorf("postgres: open: %w", err)
+	}
+
+	if _, err := pool.Exec(ctx, createTable); err != nil {
+		pool.Close()
+
+		return nil, fmt.Errorf("postgres: create table: %w", err)
+	}
+
+	if _, err := pool.Exec(ctx, createIndex); err != nil {
+		pool.Close()
+
+		return nil, fmt.Errorf("postgres: create index: %w", err)
+	}
+
+	return &postgres{db: pool}, nil
+}
+
+// Index adds or replaces doc in its index.
+func (p *postgres) Index(ctx context.Context, doc search.Document) error {
+	if p.db == nil {
+		return ErrNotConfigured
+	}
+
+	// Clone the caller map and inject content without mutating the original.
+	meta := make(map[string]any, len(doc.Metadata)+1)
+	for k, v := range doc.Metadata {
+		meta[k] = v
+	}
+
+	meta["content"] = doc.Content
+
+	metaJSON, err := json.Marshal(meta)
+	if err != nil {
+		return fmt.Errorf("postgres: index: %w", err)
+	}
+
+	_, err = p.db.Exec(ctx,
+		`INSERT INTO search_documents (id, idx, content, metadata)
+		 VALUES ($1, $2, $3, $4)
+		 ON CONFLICT (id, idx) DO UPDATE SET content = $5, metadata = $6`,
+		doc.ID, doc.Index, doc.Content, metaJSON, doc.Content, metaJSON)
+	if err != nil {
+		return fmt.Errorf("postgres: index: %w", err)
+	}
+
+	return nil
+}
+
+// Delete removes the document with id.
+func (p *postgres) Delete(ctx context.Context, id string) error {
+	if p.db == nil {
+		return ErrNotConfigured
+	}
+
+	// RowsAffected replaces the RETURNING round trip with identical behavior:
+	// zero affected rows means the document does not exist.
+	tag, err := p.db.Exec(ctx, `DELETE FROM search_documents WHERE id = $1`, id)
+	if err != nil {
+		return fmt.Errorf("postgres: delete: %w", err)
+	}
+
+	if tag.RowsAffected() == 0 {
+		// notFound is typed as error first: go vet's printf check rejects
+		// %w with *NotFoundError directly (value-receiver Error method);
+		// same pattern as search/meilisearch.
+		notFound := error(&search.NotFoundError{ID: id})
+
+		return fmt.Errorf("postgres: delete: %w", notFound)
+	}
+
+	return nil
+}
+
+func matchWhere(query string, filters map[string]string) (string, []any) {
+	args := make([]any, 0, 2)
+	args = append(args, query)
+
+	var sb strings.Builder
+
+	sb.WriteString(" WHERE to_tsvector('english', content)")
+	sb.WriteString(" @@ plainto_tsquery('english', $1)")
+
+	if idx, ok := filters["index"]; ok && idx != "" {
+		sb.WriteString(" AND idx = $2")
+
+		args = append(args, idx)
+	}
+
+	return sb.String(), args
+}
+
+func buildSearchQueries(
+	query string, filters map[string]string, limit, offset int,
+) (hitsSQL, countSQL string, hitsArgs, countArgs []any) {
+	where, whereArgs := matchWhere(query, filters)
+	countSQL = `SELECT COUNT(*) FROM search_documents` + where
+	countArgs = whereArgs
+
+	// The rank expression reuses the $1 query binding, so hits args are the
+	// where args plus limit/offset numbered from len(whereArgs)+1.
+	hitsArgs = make([]any, 0, len(whereArgs)+2)
+	hitsArgs = append(hitsArgs, whereArgs...)
+	hitsArgs = append(hitsArgs, limit, offset)
+
+	var sb strings.Builder
+
+	sb.WriteString(
+		`SELECT id, metadata, ` +
+			`ts_rank(to_tsvector('english', content),` +
+			` plainto_tsquery('english', $1)) AS score` +
+			` FROM search_documents`,
+	)
+	sb.WriteString(where)
+	fmt.Fprintf(&sb, ` ORDER BY score DESC LIMIT $%d OFFSET $%d`, len(whereArgs)+1, len(whereArgs)+2)
+
+	return sb.String(), countSQL, hitsArgs, countArgs
+}
+
+// Search runs query with opts and returns ranked hits.
+func (p *postgres) Search(ctx context.Context, query string, opts search.QueryOptions) (search.Result, error) {
+	if p.db == nil {
+		return search.Result{}, ErrNotConfigured
+	}
+
+	limit := opts.Limit
+	if limit <= 0 {
+		limit = search.DefaultLimit
+	}
+
+	offset := opts.Offset
+	if offset < 0 {
+		offset = 0
+	}
+
+	hitsSQL, countSQL, hitsArgs, countArgs := buildSearchQueries(query, opts.Filters, limit, offset)
+
+	rows, err := p.db.Query(ctx, hitsSQL, hitsArgs...)
+	if err != nil {
+		return search.Result{}, fmt.Errorf("postgres: search: %w", err)
+	}
+
+	defer rows.Close()
+
+	var hits []search.Hit
+
+	for rows.Next() {
+		var id string
+
+		var metaJSON []byte
+
+		var score float64
+
+		if err = rows.Scan(&id, &metaJSON, &score); err != nil {
+			return search.Result{}, fmt.Errorf("postgres: search scan: %w", err)
+		}
+
+		var meta map[string]any
+
+		if metaJSON != nil {
+			if err = json.Unmarshal(metaJSON, &meta); err != nil {
+				return search.Result{}, fmt.Errorf("postgres: search scan: %w", err)
+			}
+		}
+
+		hits = append(hits, search.Hit{ID: id, Score: score, Metadata: meta})
+	}
+
+	if err = rows.Err(); err != nil {
+		return search.Result{}, fmt.Errorf("postgres: search: %w", err)
+	}
+
+	countRows, err := p.db.Query(ctx, countSQL, countArgs...)
+	if err != nil {
+		return search.Result{}, fmt.Errorf("postgres: search count: %w", err)
+	}
+
+	defer countRows.Close()
+
+	if !countRows.Next() {
+		if err := countRows.Err(); err != nil {
+			return search.Result{}, fmt.Errorf("postgres: search count: %w", err)
+		}
+
+		// Defensive: COUNT(*) always returns exactly one row.
+		return search.Result{}, fmt.Errorf("postgres: search count: no rows") //nolint:perfsprint // spec-mandated error form
+	}
+
+	var total int64
+	if err := countRows.Scan(&total); err != nil {
+		return search.Result{}, fmt.Errorf("postgres: search count: %w", err)
+	}
+
+	return search.Result{Hits: hits, Total: total}, nil
+}
+
+// Close releases backend resources. Unlike pgx rows, pool Close is void, so
+// there are no close-error branches.
+func (p *postgres) Close() error {
+	if p.db == nil {
+		return nil
+	}
+
+	p.db.Close()
+
+	return nil
+}

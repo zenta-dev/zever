@@ -18,6 +18,7 @@ require (
 	github.com/coreos/go-oidc/v3 v3.21.0
 	github.com/golang-jwt/jwt/v5 v5.3.1
 	github.com/jackc/pgx/v5 v5.10.0
+	github.com/meilisearch/meilisearch-go v0.36.3
 	github.com/oklog/ulid/v2 v2.1.2
 	github.com/posthog/posthog-go v1.25.2
 	github.com/qdrant/go-client v1.19.0
