@@ -73,6 +73,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   Postgres, and Meilisearch backends.
 - Generic `vectorstore` package: vector-similarity facade with SQLite,
   pgvector, and Qdrant backends.
+- Generic `webhook` package: webhook-delivery facade with HTTPS,
+  queue fan-out, and durable SQLite backends.
 
 ### Changed
 
