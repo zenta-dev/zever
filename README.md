@@ -10,7 +10,7 @@ One framework. Every backend concern. Zero rewiring.
 [![codecov](https://codecov.io/gh/zenta-dev/zever/branch/main/graph/badge.svg)](https://codecov.io/gh/zenta-dev/zever)
 [![Go Reference](https://pkg.go.dev/badge/github.com/zenta-dev/zever.svg)](https://pkg.go.dev/github.com/zenta-dev/zever)
 ![Go Version](https://img.shields.io/badge/go-1.27%2B-00ADD8)
-[![Go Report Card](https://goreportcard.com/badge/github.com/zenta-dev/zever)](https://goreportcard.com/report/github.com/zenta-dev/zever)
+[![golangci-lint](https://img.shields.io/badge/golangci--lint-enabled-brightgreen)](.golangci.yml)
 [![License](https://img.shields.io/badge/license-Apache--2.0-blue)](LICENSE)
 
 ## Overview
