@@ -57,6 +57,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   and session-backed adapters.
 - Generic `authz` package: authorization bridge wiring `auth` verification
   to `permission` decisions with HTTP middleware and a gRPC interceptor.
+- Generic `analytics` package: event-tracking facade with JSON-lines log
+  and PostHog adapters.
 
 ### Changed
 
