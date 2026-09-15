@@ -71,6 +71,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   single fixed-ID and header-based backends.
 - Generic `search` package: full-text search facade with SQLite,
   Postgres, and Meilisearch backends.
+- Generic `vectorstore` package: vector-similarity facade with SQLite,
+  pgvector, and Qdrant backends.
 
 ### Changed
 
