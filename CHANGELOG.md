@@ -65,6 +65,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   in-memory stub, Stripe, and Paddle backends.
 - Generic `document` package: document-rendering facade with local
   headless-Chrome, remote, and LaTeX backends.
+- Generic `media` package: media-asset facade with local filesystem
+  and S3 backends plus an ffmpeg probe/transform helper.
 
 ### Changed
 
