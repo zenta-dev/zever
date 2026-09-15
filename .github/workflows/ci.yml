@@ -53,6 +53,10 @@ jobs:
   test:
     name: test (go 1.27)
     runs-on: ubuntu-latest
+    env:
+      # CI runners ship Chrome but its sandbox is unusable in the container;
+      # the document/local render tests need --no-sandbox to execute.
+      ZEVER_CHROMEDP_NO_SANDBOX: "1"
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
       - uses: actions/setup-go@b7ad1dad31e06c5925ef5d2fc7ad053ef454303e # v7.0.0
