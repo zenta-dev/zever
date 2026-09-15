@@ -55,6 +55,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   in-memory and Redis adapters.
 - Generic `auth` package: authentication facade with HS256 JWT, OIDC,
   and session-backed adapters.
+- Generic `authz` package: authorization bridge wiring `auth` verification
+  to `permission` decisions with HTTP middleware and a gRPC interceptor.
 
 ### Changed
 
