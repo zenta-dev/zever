@@ -13,6 +13,7 @@ require (
 	github.com/casbin/casbin/v2 v2.135.0
 	github.com/coreos/go-oidc/v3 v3.21.0
 	github.com/golang-jwt/jwt/v5 v5.3.1
+	github.com/oklog/ulid/v2 v2.1.2
 	github.com/posthog/posthog-go v1.25.2
 	github.com/redis/go-redis/v9 v9.22.0
 	github.com/robfig/cron/v3 v3.0.1
