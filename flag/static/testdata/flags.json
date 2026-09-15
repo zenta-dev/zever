@@ -1,0 +1,16 @@
+{
+  "debug": true,
+  "env": "prod",
+  "max_retries": 3,
+  "enabled_str": "TRUE",
+  "off_str": "false",
+  "one_str": "1",
+  "yes_str": "yes",
+  "timeout_str": "30",
+  "pi_str": "3.14",
+  "count_num": 1234,
+  "big_num": 1000000,
+  "float_val": 3.5,
+  "config": {"host": "db.local", "port": 5432},
+  "raw_json": "{\"host\":\"x\",\"port\":1}"
+}
