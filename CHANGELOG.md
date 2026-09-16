@@ -85,6 +85,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   backends.
 - Generic `geo` package: geocoding facade with Google Maps, static
   JSON, and OSM Nominatim backends.
+- Generic `apperror` package: typed error vocabulary with gRPC codes
+  and HTTP mappings.
 
 ### Changed
 
