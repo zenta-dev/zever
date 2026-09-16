@@ -97,6 +97,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   defaults, files, environment, and redaction.
 - Generic `container` package: lazy service container with ordered
   shutdown.
+- Generic `orm` package: typed SQL query builder with dialect-gated
+  rendering for Postgres and SQLite.
 
 ### Changed
 
