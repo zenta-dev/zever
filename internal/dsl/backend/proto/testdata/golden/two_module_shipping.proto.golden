@@ -1,0 +1,24 @@
+syntax = "proto3";
+
+package zengo.shipping.v1;
+
+import "google/api/annotations.proto";
+import "zengo/annotations.proto";
+
+option go_package = "github.com/zenta-dev/zen-go/gen/zengo/shipping;shippingv1";
+
+message Shipment {
+  string id = 1;
+  string tracking_code = 2;
+}
+
+message GetShipmentRequest {
+  string id = 1;
+}
+
+service ShippingService {
+  rpc GetShipment(GetShipmentRequest) returns (Shipment) {
+    option (google.api.http) = { get: "/v1/shipments/{id}" };
+    option (zengo.annotations.v1.auth) = { required: true };
+  }
+}
