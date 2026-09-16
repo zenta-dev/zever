@@ -28,15 +28,16 @@ func newClient(opts ai.Options) *http.Client {
 	timeout := opts.Timeout
 	var transport *http.Transport
 	if dt, ok := http.DefaultTransport.(*http.Transport); ok && dt != nil {
-		switch {
-		case dt.TLSClientConfig == nil:
-			transport = dt.Clone()
+		// Clone before inspecting: reading the shared global's fields
+		// directly races with another goroutine's Clone/use, whose
+		// once-guarded lazy initialization writes to it. The clone is
+		// ours alone (including its TLSClientConfig copy), so every
+		// read and write below is race-free.
+		transport = dt.Clone()
+		if transport.TLSClientConfig == nil {
 			transport.TLSClientConfig = &tls.Config{MinVersion: tls.VersionTLS12}
-		case dt.TLSClientConfig.MinVersion < tls.VersionTLS12:
-			transport = dt.Clone()
+		} else if transport.TLSClientConfig.MinVersion < tls.VersionTLS12 {
 			transport.TLSClientConfig.MinVersion = tls.VersionTLS12
-		default:
-			transport = dt.Clone()
 		}
 	} else {
 		transport = &http.Transport{TLSClientConfig: &tls.Config{MinVersion: tls.VersionTLS12}}
