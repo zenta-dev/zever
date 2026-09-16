@@ -77,6 +77,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   queue fan-out, and durable SQLite backends.
 - Generic `workflow` package: run-lifecycle facade with an in-memory
   step engine.
+- Generic `crypto` package: encryption and signing facade with a local
+  AES-256-GCM backend.
 
 ### Changed
 
