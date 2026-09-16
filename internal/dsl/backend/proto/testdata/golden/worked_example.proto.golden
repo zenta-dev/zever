@@ -1,0 +1,63 @@
+syntax = "proto3";
+
+package zengo.v1;
+
+import "google/protobuf/timestamp.proto";
+import "google/api/annotations.proto";
+import "zengo/annotations.proto";
+
+option go_package = "github.com/zenta-dev/zen-go/gen/zengov1;zengov1";
+
+message User {
+  string id = 1;
+  string email = 2;
+  google.protobuf.Timestamp created_at = 3;
+}
+
+message Order {
+  string id = 1;
+  string user_id = 2;
+  int64 total_cents = 3;
+  StatusEnum status = 4;
+
+  enum StatusEnum {
+    STATUS_UNSPECIFIED = 0;
+    STATUS_PENDING = 1;
+    STATUS_PAID = 2;
+    STATUS_SHIPPED = 3;
+    STATUS_CANCELLED = 4;
+  }
+}
+
+message OrderItem {
+  string id = 1;
+  string order_id = 2;
+  string sku = 3;
+}
+
+message Tag {
+  string id = 1;
+  string name = 2;
+}
+
+message GetOrderRequest {
+  string id = 1;
+}
+
+message CreateOrderRequest {
+  string user_id = 1;
+  int64 total_cents = 2;
+}
+
+service OrderService {
+  rpc GetOrder(GetOrderRequest) returns (Order) {
+    option (google.api.http) = { get: "/orders/{id}" };
+    option (zengo.annotations.v1.auth) = { required: true, roles: ["owner", "admin"] };
+  }
+
+  rpc CreateOrder(CreateOrderRequest) returns (Order) {
+    option (google.api.http) = { post: "/orders" body: "*" };
+    option (zengo.annotations.v1.auth) = { required: true, roles: ["owner"] };
+    option (zengo.annotations.v1.permission) = { check: "owns_order", resource: "Order", owner_field: "user_id" };
+  }
+}
