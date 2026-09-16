@@ -93,6 +93,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   Postgres backends.
 - Generic `middleware` package: HTTP middleware and gRPC interceptors
   for logging, recovery, rate limiting, and tracing.
+- Generic `config` package: layered service configuration with
+  defaults, files, environment, and redaction.
 
 ### Changed
 
