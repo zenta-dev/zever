@@ -87,6 +87,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   JSON, and OSM Nominatim backends.
 - Generic `router` package: HTTP router facade with Fiber and
   stdhttp backends.
+- Generic `db` package: SQL database facade with SQLite and
+  Postgres backends.
 
 ### Changed
 
