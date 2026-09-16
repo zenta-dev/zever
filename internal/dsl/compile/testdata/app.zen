@@ -1,0 +1,79 @@
+// Source schema for the committed gogen/app and gen/zengo/app packages.
+//
+// Regenerate gogen/app with:
+//   go test ./internal/dsl/compile/ -run TestGogenGeneratesCommittedAppPackage -update
+// Regenerate gen/zengo/app with:
+//   go test ./internal/dsl/compile/ -run TestProtogogenGeneratesCommittedAppPackage -update
+//
+// Both entities are compiled here under the virtual path "schema/app/app.zen"
+// (see appSchemaPath's callers in internal/dsl/compile), so the resolver
+// derives the module name "app" from the immediate subdirectory -- the same
+// dir-derived rule every other schema in this repo uses. That is what makes
+// the relation declared on BOTH sides (User has_many orders / Order
+// belongs_to user) expressible at all: the two types reference each other by
+// bare in-package name, with no import between them and therefore no Go
+// import cycle. The repository's own `go build ./...` type-checks the result
+// for real.
+//
+// The dir-derived module is named "app" (rather than "" / implicit) so the
+// proto/protogogen backends -- which hardcode the implicit module to the
+// fixed "zengo.v1"/"gen/zengov1" namespace already used by protogogen's own
+// fixture.zen (see internal/dsl/backend/protogogen/testdata/fixture.zen and
+// its committed gen/zengov1 output) -- generate this schema's real protobuf
+// messages into a separate, non-colliding "zengo.app.v1"/"gen/zengo/app"
+// namespace instead (see gen/zengo/app), which gogen/app's generated code
+// imports.
+entity User {
+  id: uuid @primary
+  email: string @unique
+  created_at: timestamp @default(now())
+
+  has_many orders: Order @foreign_key(user_id)
+}
+
+entity Order {
+  id: uuid @primary
+  user_id: uuid
+  amount_cents: int64
+
+  belongs_to user: User @foreign_key(user_id)
+}
+
+// UserService/OrderService exist so gogen/app (see
+// internal/dsl/backend/gogen and its committed-package integration test)
+// has a real service to generate the application layer from, sharing this
+// same schema. Adding services here does not affect the zenorm output: the
+// zenorm backend only reads schema.Modules[*].Entities.
+service UserService {
+  rpc GetUser(id: uuid) -> User {
+    http: GET "/v1/users/{id}"
+    auth: required
+  }
+
+  rpc CreateUser(email: string @validate(format: "email")) -> User {
+    http: POST "/v1/users"
+    auth: required
+    errors: { already_exists }
+  }
+}
+
+service OrderService {
+  rpc GetOrder(id: uuid) -> Order {
+    http: GET "/v1/orders/{id}"
+    auth: required
+  }
+
+  rpc CreateOrder(user_id: uuid, amount_cents: int64) -> Order {
+    http: POST "/v1/orders"
+    auth: required
+  }
+
+  // ListOrders exists so gogen/app has a real paginated operation to
+  // generate the application layer from (see internal/dsl/backend/gogen's
+  // `paginated: true` support), sharing this same schema.
+  rpc ListOrders(user_id: uuid) -> Order {
+    http: GET "/v1/orders"
+    auth: required
+    paginated: true
+  }
+}
