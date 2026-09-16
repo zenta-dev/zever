@@ -95,6 +95,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   for logging, recovery, rate limiting, and tracing.
 - Generic `config` package: layered service configuration with
   defaults, files, environment, and redaction.
+- Generic `container` package: lazy service container with ordered
+  shutdown.
 
 ### Changed
 
