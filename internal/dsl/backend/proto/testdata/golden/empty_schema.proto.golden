@@ -1,0 +1,5 @@
+syntax = "proto3";
+
+package zengo.v1;
+
+option go_package = "github.com/zenta-dev/zen-go/gen/zengov1;zengov1";

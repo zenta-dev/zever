@@ -1,0 +1,24 @@
+syntax = "proto3";
+
+package zengo.billing.v1;
+
+import "google/api/annotations.proto";
+import "zengo/annotations.proto";
+
+option go_package = "github.com/zenta-dev/zen-go/gen/zengo/billing;billingv1";
+
+message Invoice {
+  string id = 1;
+  int64 amount_cents = 2;
+}
+
+message GetInvoiceRequest {
+  string id = 1;
+}
+
+service BillingService {
+  rpc GetInvoice(GetInvoiceRequest) returns (Invoice) {
+    option (google.api.http) = { get: "/v1/invoices/{id}" };
+    option (zengo.annotations.v1.auth) = { required: true };
+  }
+}

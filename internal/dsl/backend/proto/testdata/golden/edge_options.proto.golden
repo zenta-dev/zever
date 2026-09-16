@@ -1,0 +1,30 @@
+syntax = "proto3";
+
+package zengo.v1;
+
+import "google/api/annotations.proto";
+import "zengo/annotations.proto";
+
+option go_package = "github.com/zenta-dev/zen-go/gen/zengov1;zengov1";
+
+message Order {
+  string id = 1;
+  string user_id = 2;
+}
+
+message GetOrderRequest {
+  string id = 1;
+}
+
+message CheckOrderRequest {
+  string id = 1;
+}
+
+service Svc {
+  rpc GetOrder(GetOrderRequest) returns (Order);
+
+  rpc CheckOrder(CheckOrderRequest) returns (Order) {
+    option (google.api.http) = { get: "/v1/orders/{id}" };
+    option (zengo.annotations.v1.permission) = { check: "owns_order", resource: "Order", owner_field: "user_id" };
+  }
+}

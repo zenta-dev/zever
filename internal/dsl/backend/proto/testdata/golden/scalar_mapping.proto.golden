@@ -1,0 +1,40 @@
+syntax = "proto3";
+
+package zengo.v1;
+
+import "google/protobuf/timestamp.proto";
+import "google/protobuf/struct.proto";
+
+option go_package = "github.com/zenta-dev/zen-go/gen/zengov1;zengov1";
+
+message Owner {
+  string id = 1;
+}
+
+message Part {
+  string id = 1;
+  string widget_id = 2;
+}
+
+message Widget {
+  string id = 1;
+  string owner_id = 2;
+  string name = 3;
+  int32 quantity = 4;
+  int64 views = 5;
+  float ratio = 6;
+  double price = 7;
+  bool active = 8;
+  google.protobuf.Timestamp created_at = 9;
+  string valid_on = 10;
+  bytes payload = 11;
+  google.protobuf.Struct metadata = 12;
+  StatusEnum status = 13;
+
+  enum StatusEnum {
+    STATUS_UNSPECIFIED = 0;
+    STATUS_PENDING = 1;
+    STATUS_ACTIVE = 2;
+    STATUS_ARCHIVED = 3;
+  }
+}
