@@ -83,6 +83,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   AES-256-GCM backend.
 - Generic `ai` package: LLM facade with Anthropic, OpenAI, and Gemini
   backends.
+- Generic `geo` package: geocoding facade with Google Maps, static
+  JSON, and OSM Nominatim backends.
 - Generic `router` package: HTTP router facade with Fiber and
   stdhttp backends.
 
