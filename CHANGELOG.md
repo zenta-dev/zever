@@ -99,6 +99,9 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   shutdown.
 - Generic `orm` package: typed SQL query builder with dialect-gated
   rendering for Postgres and SQLite.
+- Internal `dsl` schema compiler frontend: lexer, parser, resolver, IR,
+  formatter, breaking-change checker, and deterministic compile harness
+  with golden fixtures.
 
 ### Changed
 

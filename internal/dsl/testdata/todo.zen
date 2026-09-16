@@ -1,0 +1,61 @@
+// todo.zen — the single source of truth for the example todo app.
+//
+// Regenerate everything derived from this file with the commands in
+// ../README.md ("Regenerating code from the schema").
+
+entity User {
+  id: uuid @primary
+  email: string @unique @validate(format: "email")
+  password_hash: string
+  created_at: timestamp @default(now())
+
+  has_many tasks: Task @foreign_key(user_id)
+}
+
+entity Task {
+  id: uuid @primary
+  user_id: uuid
+  title: string @validate(min_len: 1, max_len: 200)
+  // NOTE: `@default(false)` is not expressible today — see README
+  // "Known framework limitations". The application sets done=false on
+  // create instead.
+  done: bool
+  due_at: timestamp
+  created_at: timestamp @default(now())
+
+  belongs_to user: User @foreign_key(user_id) @on_delete(cascade)
+
+  index(user_id, due_at)
+}
+
+service TaskService {
+  rpc ListTasks(user_id: uuid) -> Task {
+    http: GET "/tasks"
+    auth: required
+  }
+
+  rpc CreateTask(title: string, due_at: timestamp) -> Task {
+    http: POST "/tasks"
+    auth: required
+  }
+
+  rpc CompleteTask(id: uuid) -> Task {
+    http: PATCH "/tasks/{id}"
+    auth: required
+  }
+
+  rpc DeleteTask(id: uuid) -> Task {
+    http: DELETE "/tasks/{id}"
+    auth: required
+  }
+}
+
+job SendOverdueDigest() {
+  queue: low
+  retry: max_attempts(3), backoff(exponential, base: 30s)
+}
+
+schedule OverdueDigest {
+  cron: "* * * * *"
+  dispatch: SendOverdueDigest()
+}
