@@ -1,0 +1,30 @@
+syntax = "proto3";
+
+package zengo.v1;
+
+option go_package = "github.com/zenta-dev/zen-go/gen/zengov1;zengov1";
+
+enum Status {
+  STATUS_UNSPECIFIED = 0;
+  STATUS_ACTIVE = 1;
+  STATUS_INACTIVE = 2;
+}
+
+enum Priority {
+  PRIORITY_UNSPECIFIED = 0;
+  PRIORITY_LOW = 1;
+  PRIORITY_HIGH = 2;
+}
+
+message Task {
+  string id = 1;
+  Status status = 2;
+  Priority priority = 3;
+  InlineEnum inline = 4;
+
+  enum InlineEnum {
+    INLINE_UNSPECIFIED = 0;
+    INLINE_X = 1;
+    INLINE_Y = 2;
+  }
+}
