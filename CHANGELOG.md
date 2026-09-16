@@ -79,6 +79,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   step engine.
 - Generic `password` package: password-hashing facade with an Argon2id
   backend.
+- Generic `crypto` package: encryption and signing facade with a local
+  AES-256-GCM backend.
 
 ### Changed
 
