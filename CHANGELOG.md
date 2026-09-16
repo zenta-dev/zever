@@ -89,6 +89,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   stdhttp backends.
 - Generic `apperror` package: typed error vocabulary with gRPC codes
   and HTTP mappings.
+- Generic `middleware` package: HTTP middleware and gRPC interceptors
+  for logging, recovery, rate limiting, and tracing.
 
 ### Changed
 
