@@ -6,7 +6,9 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
+	"net"
 	"net/http"
+	"net/url"
 	"strings"
 	"time"
 
@@ -38,11 +40,11 @@ func Open(opts ai.Options) (ai.AI, error) {
 
 	httpClient := newHTTPClient(opts.Timeout)
 
-	// For httptest TLS servers (127.0.0.1 / localhost) allow insecure certs.
-	if strings.Contains(opts.BaseURL, "127.0.0.1") || strings.Contains(opts.BaseURL, "localhost") {
-		if tr, ok := httpClient.Transport.(*http.Transport); ok {
-			tr.TLSClientConfig.InsecureSkipVerify = true //nolint:gosec
-		}
+	// For httptest TLS servers on loopback, allow insecure certs.
+	// Only exact loopback hosts match: a substring check would wrongly
+	// trust hosts like 127.0.0.1.evil.com.
+	if tr, ok := httpClient.Transport.(*http.Transport); ok && tr.TLSClientConfig != nil {
+		tr.TLSClientConfig.InsecureSkipVerify = loopbackBaseURL(opts.BaseURL)
 	}
 
 	cc := &genai.ClientConfig{
@@ -60,6 +62,21 @@ func Open(opts ai.Options) (ai.AI, error) {
 	}
 
 	return &adapter{client: client, apiKey: opts.APIKey}, nil
+}
+
+// loopbackBaseURL reports whether rawURL parses to a loopback host
+// ("localhost" or a loopback IP such as 127.0.0.1 or ::1).
+func loopbackBaseURL(rawURL string) bool {
+	u, err := url.Parse(rawURL)
+	if err != nil {
+		return false
+	}
+	host := u.Hostname()
+	if host == "localhost" {
+		return true
+	}
+	ip := net.ParseIP(host)
+	return ip != nil && ip.IsLoopback()
 }
 
 func newHTTPClient(timeout time.Duration) *http.Client {

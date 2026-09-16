@@ -1259,6 +1259,29 @@ func TestOpen_InsecureLocalhost(t *testing.T) {
 	}
 }
 
+func TestOpen_SpoofedLoopbackStaysSecure(t *testing.T) {
+	t.Parallel()
+	for _, raw := range []string{
+		"https://127.0.0.1.evil.com",
+		"https://evil-localhost.com",
+		"https://example.com/?x=localhost",
+	} {
+		a, err := Open(ai.Options{APIKey: "k", BaseURL: raw})
+		if err != nil {
+			t.Fatalf("Open(%q) err %v", raw, err)
+		}
+		ad, _ := a.(*adapter) //nolint:forcetypeassert
+		if tr, ok := ad.client.ClientConfig().HTTPClient.Transport.(*http.Transport); ok {
+			if tr.TLSClientConfig.InsecureSkipVerify {
+				t.Errorf("insecure set for %q", raw)
+			}
+		}
+		if err := a.Close(); err != nil {
+			t.Fatalf("Close err %v", err)
+		}
+	}
+}
+
 func TestOpen_NewClientError(t *testing.T) {
 	orig := newGenaiClient
 	defer func() { newGenaiClient = orig }()
