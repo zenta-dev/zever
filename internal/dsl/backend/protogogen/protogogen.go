@@ -51,7 +51,7 @@ func New() *Backend {
 // via protocompile, so its emitted zengo/annotations.pb.go's own package
 // declaration -- and therefore every other generated file's import of it --
 // otherwise always carries proto.New()'s default go_package
-// (zen-go's own module), the same bug NewWithPBImportRoot on the gogen
+// (zever's own module), the same bug NewWithPBImportRoot on the gogen
 // backend exists to fix for gogen's generated code; this is protogogen's
 // side of that same fix, since Generate below drives its own independent
 // proto.Backend instance rather than sharing one with the CLI's separately

@@ -141,3 +141,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   `github.com/zenta-dev/zever/orm/migrate`), matching this repo's `orm/`
   query builder package name; `zen/` no longer exists. Update imports
   accordingly.
+- DSL codegen backends retargeted from `github.com/zenta-dev/zen-go`
+  to `github.com/zenta-dev/zever`: the proto backend's `go_package`
+  options, the `zengo/annotations.proto` companion file, protogogen's
+  generated Go imports, the atlas header, and the OpenAPI title
+  (`zever API`).

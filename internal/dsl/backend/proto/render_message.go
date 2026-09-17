@@ -77,12 +77,12 @@ func moduleNaming(m *ir.Module) (pkg, goPackage, path string) {
 
 	if m.Name == "" {
 		return "zengo." + version,
-			fmt.Sprintf("github.com/zenta-dev/zen-go/gen/zengo%s;zengo%s", version, version),
+			fmt.Sprintf("github.com/zenta-dev/zever/gen/zengo%s;zengo%s", version, version),
 			"schema.proto"
 	}
 
 	pkg = fmt.Sprintf("zengo.%s.%s", m.Name, version)
-	goPackage = fmt.Sprintf("github.com/zenta-dev/zen-go/gen/zengo/%s;%s%s", m.Name, m.Name, version)
+	goPackage = fmt.Sprintf("github.com/zenta-dev/zever/gen/zengo/%s;%s%s", m.Name, m.Name, version)
 	path = m.Name + "/schema.proto"
 
 	return pkg, goPackage, path
