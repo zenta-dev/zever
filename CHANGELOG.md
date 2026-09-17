@@ -134,3 +134,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   A nil `Locker` means single-instance mode without slot locks.
 - `eventbus` memory `Close` abandons in-flight handlers on timeout and
   returns nil instead of `DeadlineExceeded`, matching the redis adapter.
+- **Breaking:** the live-schema-diff migration engine moved from
+  `zen/migrate` to `orm/migrate` (import path
+  `github.com/zenta-dev/zever/orm/migrate`), matching this repo's `orm/`
+  query builder package name; `zen/` no longer exists. Update imports
+  accordingly.

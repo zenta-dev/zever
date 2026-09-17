@@ -427,7 +427,7 @@ func sqliteColumnType(f *ir.Field) string {
 //
 // A primary-key integer column additionally gets AUTO_INCREMENT, MySQL's
 // per-table auto-incrementing-key idiom (there is no sequence type). The
-// type-affinity normalizer in zen/migrate strips the AUTO_INCREMENT modifier
+// type-affinity normalizer in orm/migrate strips the AUTO_INCREMENT modifier
 // before comparing, since MySQL reports only the bare type in
 // information_schema.COLUMN_TYPE and the modifier in the EXTRA column.
 //
