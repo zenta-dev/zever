@@ -2,12 +2,14 @@ package google
 
 import (
 	"context"
+	"errors"
 	"fmt"
-	"net/url"
 
 	gmaps "googlemaps.github.io/maps"
 
 	"github.com/zenta-dev/zever/geo"
+	"github.com/zenta-dev/zever/internal/endpoint"
+	"github.com/zenta-dev/zever/internal/httpclient"
 )
 
 type adapter struct {
@@ -31,6 +33,7 @@ func New(opts geo.Options) (geo.Geo, error) {
 	var clientOpts []gmaps.ClientOption
 
 	clientOpts = append(clientOpts, gmaps.WithAPIKey(opts.APIKey))
+	clientOpts = append(clientOpts, gmaps.WithHTTPClient(httpclient.NewClient(opts.Timeout)))
 
 	if opts.BaseURL != "" {
 		clientOpts = append(clientOpts, gmaps.WithBaseURL(opts.BaseURL))
@@ -45,24 +48,19 @@ func New(opts geo.Options) (geo.Geo, error) {
 }
 
 func validateBaseURL(raw string, allowInsecure bool) error {
-	u, err := url.Parse(raw)
-	if err != nil {
-		return fmt.Errorf("geo: google: invalid base_url %q: %w: %w", raw, err, geo.ErrInvalidOptions)
+	if _, err := endpoint.ValidateURL(raw, endpoint.WithAllowInsecure(allowInsecure)); err != nil {
+		switch {
+		case errors.Is(err, endpoint.ErrParse),
+			errors.Is(err, endpoint.ErrEmpty),
+			errors.Is(err, endpoint.ErrNoScheme),
+			errors.Is(err, endpoint.ErrNoHost):
+			return fmt.Errorf("geo: google: invalid base_url %q: missing scheme or host: %w", raw, geo.ErrInvalidOptions)
+		default:
+			return fmt.Errorf("geo: google: base_url must use https (got %q): %w", raw, geo.ErrInvalidOptions)
+		}
 	}
 
-	if u.Scheme == "" || u.Host == "" {
-		return fmt.Errorf("geo: google: invalid base_url %q: missing scheme or host: %w", raw, geo.ErrInvalidOptions)
-	}
-
-	if u.Scheme == "https" {
-		return nil
-	}
-
-	if u.Scheme == "http" && allowInsecure {
-		return nil
-	}
-
-	return fmt.Errorf("geo: google: base_url must use https (got %q): %w", raw, geo.ErrInvalidOptions)
+	return nil
 }
 
 func (a *adapter) Geocode(ctx context.Context, address string) ([]geo.Location, error) {

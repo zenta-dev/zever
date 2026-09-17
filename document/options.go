@@ -2,8 +2,9 @@ package document
 
 import (
 	"errors"
-	"net/url"
 	"time"
+
+	"github.com/zenta-dev/zever/internal/endpoint"
 )
 
 const (
@@ -72,15 +73,13 @@ func (o Options) Validate() error {
 	}
 
 	if o.Endpoint != "" {
-		u, err := url.Parse(o.Endpoint)
-		if err != nil {
-			errs = append(errs, &InvalidOptionsError{Reason: "endpoint must be a valid URL"})
-		} else {
-			if u.Scheme == "" {
+		if _, err := endpoint.ValidateURL(o.Endpoint, endpoint.WithAllowAnyScheme()); err != nil {
+			switch {
+			case errors.Is(err, endpoint.ErrParse):
+				errs = append(errs, &InvalidOptionsError{Reason: "endpoint must be a valid URL"})
+			case errors.Is(err, endpoint.ErrNoScheme):
 				errs = append(errs, &InvalidOptionsError{Reason: "endpoint must include scheme"})
-			}
-
-			if u.Host == "" {
+			default:
 				errs = append(errs, &InvalidOptionsError{Reason: "endpoint must include host"})
 			}
 		}

@@ -2,7 +2,6 @@ package anthropic
 
 import (
 	"context"
-	"crypto/tls"
 	"encoding/json"
 	"errors"
 	"fmt"
@@ -17,6 +16,7 @@ import (
 	"github.com/anthropics/anthropic-sdk-go/option"
 
 	"github.com/zenta-dev/zever/ai"
+	"github.com/zenta-dev/zever/internal/httpclient"
 )
 
 type adapter struct {
@@ -25,24 +25,7 @@ type adapter struct {
 }
 
 func newClient(opts ai.Options) *http.Client {
-	timeout := opts.Timeout
-	var transport *http.Transport
-	if dt, ok := http.DefaultTransport.(*http.Transport); ok && dt != nil {
-		// Clone before inspecting: reading the shared global's fields
-		// directly races with another goroutine's Clone/use, whose
-		// once-guarded lazy initialization writes to it. The clone is
-		// ours alone (including its TLSClientConfig copy), so every
-		// read and write below is race-free.
-		transport = dt.Clone()
-		if transport.TLSClientConfig == nil {
-			transport.TLSClientConfig = &tls.Config{MinVersion: tls.VersionTLS12}
-		} else if transport.TLSClientConfig.MinVersion < tls.VersionTLS12 {
-			transport.TLSClientConfig.MinVersion = tls.VersionTLS12
-		}
-	} else {
-		transport = &http.Transport{TLSClientConfig: &tls.Config{MinVersion: tls.VersionTLS12}}
-	}
-	return &http.Client{Timeout: timeout, Transport: transport}
+	return httpclient.NewClient(opts.Timeout)
 }
 
 // Open creates an Anthropic AI backend.

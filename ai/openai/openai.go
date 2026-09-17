@@ -3,12 +3,10 @@ package openai
 
 import (
 	"context"
-	"crypto/tls"
 	"errors"
 	"fmt"
 	"math"
 	"net/http"
-	"net/url"
 	"strconv"
 	"strings"
 	"time"
@@ -18,6 +16,8 @@ import (
 	"github.com/openai/openai-go/v3/shared"
 
 	"github.com/zenta-dev/zever/ai"
+	"github.com/zenta-dev/zever/internal/endpoint"
+	"github.com/zenta-dev/zever/internal/httpclient"
 )
 
 type adapter struct {
@@ -54,17 +54,10 @@ func Open(opts ai.Options) (ai.AI, error) {
 
 func newHTTPClientFromTransport(tr *http.Transport) *http.Client {
 	if tr == nil {
-		return &http.Client{
-			Transport: &http.Transport{
-				TLSClientConfig: &tls.Config{MinVersion: tls.VersionTLS12},
-			},
-		}
+		return httpclient.NewClient(0)
 	}
 
-	clone := tr.Clone()
-	clone.TLSClientConfig.MinVersion = tls.VersionTLS12
-
-	return &http.Client{Transport: clone}
+	return httpclient.NewClient(0, httpclient.WithTransport(tr.Clone()))
 }
 
 //go:noinline
@@ -518,28 +511,26 @@ func validateOptions(opts ai.Options) error {
 	}
 
 	if opts.BaseURL != "" {
-		u, err := url.Parse(opts.BaseURL)
-		if err != nil {
-			errs = append(errs, &ai.InvalidOptionsError{Reason: "base_url must be a valid URL"})
-		} else {
-			if u.Scheme == "" {
-				errs = append(errs, &ai.InvalidOptionsError{Reason: "base_url must include scheme"})
-			}
-
-			if u.Host == "" {
-				errs = append(errs, &ai.InvalidOptionsError{Reason: "base_url must include host"})
-			}
-
-			if u.Scheme != "" && u.Scheme != "https" {
-				// Allow http for loopback in tests.
-				host := u.Host
-				isLoopback := strings.HasPrefix(host, "127.0.0.1") || strings.HasPrefix(host, "localhost") || strings.HasPrefix(host, "[::1]")
-				if !isLoopback {
-					errs = append(errs, &ai.InvalidOptionsError{Reason: "base_url must use https scheme"})
-				}
-			}
+		// Allow http for loopback in tests.
+		if _, err := endpoint.ValidateURL(opts.BaseURL, endpoint.WithAllowLoopbackHTTP()); err != nil {
+			errs = append(errs, &ai.InvalidOptionsError{Reason: baseURLReason(err)})
 		}
 	}
 
 	return errors.Join(errs...)
+}
+
+// baseURLReason maps endpoint validation failures to the historical
+// base_url reason strings.
+func baseURLReason(err error) string {
+	switch {
+	case errors.Is(err, endpoint.ErrParse):
+		return "base_url must be a valid URL"
+	case errors.Is(err, endpoint.ErrNoScheme):
+		return "base_url must include scheme"
+	case errors.Is(err, endpoint.ErrNoHost):
+		return "base_url must include host"
+	default:
+		return "base_url must use https scheme"
+	}
 }

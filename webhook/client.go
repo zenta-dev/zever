@@ -2,11 +2,12 @@ package webhook
 
 import (
 	"context"
-	"crypto/tls"
 	"fmt"
 	"net"
 	"net/http"
 	"time"
+
+	"github.com/zenta-dev/zever/internal/httpclient"
 )
 
 // SafeDialContext returns a DialContext function for http.Transport that
@@ -51,14 +52,12 @@ func SafeDialContext(allowPrivate bool) func(ctx context.Context, network, addr 
 // redirects (CheckRedirect returns http.ErrUseLastResponse so callers see the
 // 3xx response), and applies timeout to the whole request.
 func NewSafeClient(timeout time.Duration, allowPrivate bool) *http.Client {
-	transport := http.DefaultTransport.(*http.Transport).Clone() //nolint:forcetypeassert // http.DefaultTransport is always *http.Transport in the standard library.
-	transport.DialContext = SafeDialContext(allowPrivate)
-	transport.TLSClientConfig = &tls.Config{MinVersion: tls.VersionTLS12}
-	return &http.Client{
-		Timeout:   timeout,
-		Transport: transport,
-		CheckRedirect: func(_ *http.Request, _ []*http.Request) error {
-			return http.ErrUseLastResponse
-		},
+	c := httpclient.NewClient(timeout)
+	if tr, ok := c.Transport.(*http.Transport); ok {
+		tr.DialContext = SafeDialContext(allowPrivate)
 	}
+	c.CheckRedirect = func(_ *http.Request, _ []*http.Request) error {
+		return http.ErrUseLastResponse
+	}
+	return c
 }

@@ -2,8 +2,9 @@ package geo
 
 import (
 	"errors"
-	"net/url"
 	"time"
+
+	"github.com/zenta-dev/zever/internal/endpoint"
 )
 
 // Options holds typed configuration for geo adapters.
@@ -36,26 +37,29 @@ func (o Options) Validate() error {
 		errs = append(errs, &InvalidOptionsError{Reason: "max response body must be >= 0"})
 	}
 	if o.BaseURL != "" {
-		u, err := url.Parse(o.BaseURL)
-		switch {
-		case err != nil || u.Scheme == "" || u.Host == "":
-			errs = append(errs, &InvalidOptionsError{Reason: "base_url must be a valid URL"})
-		case u.Scheme == "http" && !o.AllowInsecure:
-			errs = append(errs, &InvalidOptionsError{Reason: "base_url must use https"})
-		case u.Scheme != "https" && u.Scheme != "http":
-			errs = append(errs, &InvalidOptionsError{Reason: "base_url must use https"})
+		if _, err := endpoint.ValidateURL(o.BaseURL, endpoint.WithAllowInsecure(o.AllowInsecure)); err != nil {
+			errs = append(errs, &InvalidOptionsError{Reason: httpsReason("base_url", err)})
 		}
 	}
 	if o.Endpoint != "" {
-		u, err := url.Parse(o.Endpoint)
-		switch {
-		case err != nil || u.Scheme == "" || u.Host == "":
-			errs = append(errs, &InvalidOptionsError{Reason: "endpoint must be a valid URL"})
-		case u.Scheme == "http" && !o.AllowInsecure:
-			errs = append(errs, &InvalidOptionsError{Reason: "endpoint must use https"})
-		case u.Scheme != "https" && u.Scheme != "http":
-			errs = append(errs, &InvalidOptionsError{Reason: "endpoint must use https"})
+		if _, err := endpoint.ValidateURL(o.Endpoint, endpoint.WithAllowInsecure(o.AllowInsecure)); err != nil {
+			errs = append(errs, &InvalidOptionsError{Reason: httpsReason("endpoint", err)})
 		}
 	}
 	return errors.Join(errs...)
+}
+
+// httpsReason maps endpoint validation failures to the historical geo
+// reason strings for field: shape problems report a valid URL, scheme
+// problems report the https requirement.
+func httpsReason(field string, err error) string {
+	switch {
+	case errors.Is(err, endpoint.ErrParse),
+		errors.Is(err, endpoint.ErrEmpty),
+		errors.Is(err, endpoint.ErrNoScheme),
+		errors.Is(err, endpoint.ErrNoHost):
+		return field + " must be a valid URL"
+	default:
+		return field + " must use https"
+	}
 }
