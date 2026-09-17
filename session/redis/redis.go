@@ -14,8 +14,6 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
-	"net/url"
-	"strings"
 	"sync/atomic"
 	"time"
 
@@ -94,16 +92,7 @@ func New(opts session.Options) (session.Store, error) {
 // redactAddr masks any embedded userinfo credentials, suitable for error
 // messages. The password from options is never included.
 func redactAddr(addr string) string {
-	raw := strings.TrimSpace(addr)
-
-	u, err := url.Parse(raw)
-	if err != nil || u.User == nil {
-		return raw
-	}
-
-	u.User = url.UserPassword(u.User.Username(), "xxxxx")
-
-	return u.String()
+	return zredis.RedactAddr(addr)
 }
 
 func (s *store) key(id string) string {

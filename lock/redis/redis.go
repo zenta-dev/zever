@@ -5,7 +5,6 @@ import (
 	"crypto/rand"
 	"encoding/hex"
 	"fmt"
-	"net/url"
 	"strings"
 	"sync/atomic"
 	"time"
@@ -63,6 +62,22 @@ type handle struct {
 	holder string
 }
 
+// connOptions maps lock options onto the shared client options. A set URL
+// takes precedence over Addr; both spellings connect.
+func connOptions(opts lock.Options) zredis.Options {
+	addr := strings.TrimSpace(opts.URL)
+	if addr == "" {
+		addr = opts.Addr
+	}
+
+	return zredis.Options{
+		Addr:     addr,
+		Password: opts.Password,
+		DB:       opts.DB,
+		TLS:      opts.TLS,
+	}
+}
+
 // New creates a Redis-backed lock.Locker. Empty prefix, non-positive TTL
 // and retry intervals fall back to "lock:", lock.DefaultTTL and
 // lock.DefaultRetryInterval. It verifies connectivity with a 3s ping check.
@@ -82,18 +97,7 @@ func New(opts lock.Options) (lock.Locker, error) {
 		retry = lock.DefaultRetryInterval
 	}
 
-	// zredis dials Addr only (its URL field is reserved); a lock URL takes
-	// precedence when set so both spellings connect.
-	addr := strings.TrimSpace(opts.URL)
-	if addr == "" {
-		addr = opts.Addr
-	}
-
-	client, err := zredis.New(zredis.Options{
-		Addr:     addr,
-		Password: opts.Password,
-		DB:       opts.DB,
-	})
+	client, err := zredis.New(connOptions(opts))
 	if err != nil {
 		return nil, fmt.Errorf("[lock] connect %q error: %w", redactURL(opts), err)
 	}
@@ -122,19 +126,7 @@ func New(opts lock.Options) (lock.Locker, error) {
 // embedded userinfo credentials masked, suitable for inclusion in error
 // messages and safe to log: secrets never appear in errors.
 func redactURL(opts lock.Options) string {
-	raw := strings.TrimSpace(opts.URL)
-	if raw == "" {
-		raw = strings.TrimSpace(opts.Addr)
-	}
-
-	u, err := url.Parse(raw)
-	if err != nil || u.User == nil {
-		return raw
-	}
-
-	u.User = url.UserPassword(u.User.Username(), "xxxxx")
-
-	return u.String()
+	return zredis.RedactEndpoint(opts.URL, opts.Addr)
 }
 
 // randRead is a seam for newHolderID, stubbed in tests to force failure.

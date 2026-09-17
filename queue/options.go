@@ -1,17 +1,18 @@
 package queue
 
-import "time"
+import (
+	"time"
+
+	zredis "github.com/zenta-dev/zever/internal/redis"
+)
 
 // RedisOptions holds connection settings for the Redis adapter.
 type RedisOptions struct {
+	// ConnectOptions holds the shared Redis connection settings.
+	zredis.ConnectOptions
 	// URL is the Redis connection URL.
+	// When set it takes precedence over Addr.
 	URL string
-	// Addr is the Redis server address.
-	Addr string
-	// Password is the Redis authentication password.
-	Password string
-	// DB is the Redis database index.
-	DB int
 	// Prefix is the key prefix for Redis queue data.
 	Prefix string
 }

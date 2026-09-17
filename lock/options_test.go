@@ -135,6 +135,23 @@ func TestParseOptions_intTypes(t *testing.T) {
 	}
 }
 
+func TestParseOptions_tls(t *testing.T) {
+	t.Parallel()
+
+	o, err := ParseOptions(map[string]any{"tls": true})
+	if err != nil {
+		t.Fatalf("ParseOptions(tls) error = %v", err)
+	}
+
+	if !o.TLS {
+		t.Error("TLS = false, want true")
+	}
+
+	if _, err := ParseOptions(map[string]any{"tls": "yes"}); err == nil {
+		t.Error("ParseOptions(tls=string) = nil, want error")
+	}
+}
+
 func TestParseOptions_unknownKey_returnsError(t *testing.T) {
 	t.Parallel()
 

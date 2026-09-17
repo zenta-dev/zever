@@ -4,7 +4,6 @@ import (
 	"context"
 	"encoding/json"
 	"fmt"
-	"net/url"
 	"strings"
 	"sync"
 	"sync/atomic"
@@ -115,16 +114,7 @@ func newAdapter(opts eventbus.Options) (*adapter, error) {
 
 // redactAddr masks any embedded userinfo credentials, suitable for errors.
 func redactAddr(addr string) string {
-	raw := strings.TrimSpace(addr)
-
-	u, err := url.Parse(raw)
-	if err != nil || u.User == nil {
-		return raw
-	}
-
-	u.User = url.UserPassword(u.User.Username(), "xxxxx")
-
-	return u.String()
+	return zredis.RedactAddr(addr)
 }
 
 // channel maps a topic to its Redis channel.

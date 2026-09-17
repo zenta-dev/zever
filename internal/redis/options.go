@@ -15,14 +15,8 @@ import (
 type Options struct {
 	// URL is reserved and currently ignored.
 	URL string
-	// Addr is the Redis address as host:port or redis:// and rediss:// URL.
-	Addr string
-	// Password is the password used for Redis authentication.
-	Password string
-	// DB is the Redis database number selected on connect.
-	DB int
-	// TLS enables TLS with a TLS 1.2 version floor for plain addresses.
-	TLS bool
+	// ConnectOptions holds the shared connection settings.
+	ConnectOptions
 
 	// PoolSize is the base number of socket connections. <= 0 uses go-redis's
 	// own default (10 * GOMAXPROCS).

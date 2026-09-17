@@ -1,6 +1,10 @@
 package cache
 
-import "time"
+import (
+	"time"
+
+	zredis "github.com/zenta-dev/zever/internal/redis"
+)
 
 // MemoryOptions configures the in-memory cache backend.
 type MemoryOptions struct {
@@ -12,14 +16,11 @@ type MemoryOptions struct {
 
 // RedisOptions configures the Redis-backed cache backend.
 type RedisOptions struct {
+	// ConnectOptions holds the shared Redis connection settings.
+	zredis.ConnectOptions
 	// URL holds the Redis connection URL.
+	// When set it takes precedence over Addr.
 	URL string
-	// Addr holds the Redis server address.
-	Addr string
-	// Password holds the Redis authentication password.
-	Password string
-	// DB selects the Redis logical database.
-	DB int
 
 	// PoolSize limits the Redis connection pool size.
 	PoolSize int
