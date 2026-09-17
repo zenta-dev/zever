@@ -9,10 +9,10 @@ import (
 	"io"
 	"mime"
 	"net/http"
-	"net/url"
 	"strings"
 
 	"github.com/zenta-dev/zever/document"
+	"github.com/zenta-dev/zever/internal/endpoint"
 	"github.com/zenta-dev/zever/internal/httpclient"
 )
 
@@ -42,13 +42,16 @@ func Open(o document.Options) (document.Document, error) {
 		return nil, document.ErrMissingEndpoint
 	}
 
-	u, err := url.Parse(strings.TrimRight(o.Endpoint, "/"))
-	if err != nil || (u.Scheme != "http" && u.Scheme != "https") || u.Host == "" {
+	trimmed := strings.TrimRight(o.Endpoint, "/")
+	normalized, err := endpoint.ValidateURL(trimmed,
+		endpoint.WithAllowInsecure(true),
+		endpoint.WithRejectQueryFragment(),
+	)
+	if err != nil {
+		if errors.Is(err, endpoint.ErrQueryFragment) {
+			return nil, fmt.Errorf("remote: endpoint %q must not contain a query string or fragment", o.Endpoint)
+		}
 		return nil, fmt.Errorf("remote: endpoint %q must be a valid http(s) URL", o.Endpoint)
-	}
-
-	if u.RawQuery != "" || u.Fragment != "" {
-		return nil, fmt.Errorf("remote: endpoint %q must not contain a query string or fragment", o.Endpoint)
 	}
 
 	timeout := o.Timeout
@@ -62,7 +65,7 @@ func Open(o document.Options) (document.Document, error) {
 	}
 
 	return &driver{
-		endpoint:  u.String(),
+		endpoint:  normalized,
 		apiKey:    o.APIKey,
 		maxOutput: maxOutput,
 		client:    httpclient.NewClient(timeout),

@@ -6,6 +6,8 @@ import (
 	"fmt"
 	"net"
 	"net/url"
+
+	"github.com/zenta-dev/zever/internal/endpoint"
 )
 
 // ValidateTarget validates target as an HTTPS webhook URL whose host does not
@@ -24,12 +26,13 @@ func ValidateTargetContext(ctx context.Context, target string) error {
 	if target == "" {
 		return errors.New("webhook: target is empty")
 	}
-	u, err := url.Parse(target)
+	raw, err := endpoint.ValidateURL(target)
+	if err != nil {
+		return mapShapeError(target, err)
+	}
+	u, err := url.Parse(raw)
 	if err != nil {
 		return fmt.Errorf("webhook: target %q is not a valid URL: %w", target, err)
-	}
-	if u.Scheme != "https" {
-		return errors.New("webhook: target must use https scheme")
 	}
 	host := u.Hostname()
 	if host == "" {
@@ -62,17 +65,38 @@ func ValidateTargetSyntax(target string) error {
 	if target == "" {
 		return errors.New("webhook: target is empty")
 	}
-	u, err := url.Parse(target)
+	normalized, err := endpoint.ValidateURL(target, endpoint.WithAllowInsecure(true))
+	if err != nil {
+		switch {
+		case errors.Is(err, endpoint.ErrParse):
+			return fmt.Errorf("webhook: target %q is not a valid URL: %w", target, err)
+		case errors.Is(err, endpoint.ErrNoHost):
+			return errors.New("webhook: target has no host")
+		default:
+			return errors.New("webhook: target must use http or https scheme")
+		}
+	}
+	u, err := url.Parse(normalized)
 	if err != nil {
 		return fmt.Errorf("webhook: target %q is not a valid URL: %w", target, err)
-	}
-	if u.Scheme != "http" && u.Scheme != "https" {
-		return errors.New("webhook: target must use http or https scheme")
 	}
 	if u.Hostname() == "" {
 		return errors.New("webhook: target has no host")
 	}
 	return nil
+}
+
+// mapShapeError maps endpoint shape failures to the historical
+// ValidateTarget messages for the https-only target policy.
+func mapShapeError(target string, err error) error {
+	switch {
+	case errors.Is(err, endpoint.ErrParse):
+		return fmt.Errorf("webhook: target %q is not a valid URL: %w", target, err)
+	case errors.Is(err, endpoint.ErrNoHost):
+		return errors.New("webhook: target has no host")
+	default:
+		return errors.New("webhook: target must use https scheme")
+	}
 }
 
 // IsPrivateIP reports whether ip falls in a private or otherwise non-routable
