@@ -102,6 +102,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Internal `dsl` schema compiler frontend: lexer, parser, resolver, IR,
   formatter, breaking-change checker, and deterministic compile harness
   with golden fixtures.
+- `zever-lsp` tool: stdio LSP server for the schema DSL (separate
+  `tools/zever-lsp` module).
 
 ### Changed
 
