@@ -117,6 +117,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   with filetype detection and syntax highlighting.
 - Editor support for the schema DSL: VS Code extension
   (`editors/vscode`) with syntax highlighting and LSP client.
+- `zever config show`: prints the resolved, redacted service configuration,
+  with a matching TUI dashboard screen.
 
 ### Changed
 
