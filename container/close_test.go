@@ -18,6 +18,7 @@ import (
 	"github.com/zenta-dev/zever/queue"
 	queuememory "github.com/zenta-dev/zever/queue/memory"
 	"github.com/zenta-dev/zever/scheduler"
+	schedulerembedded "github.com/zenta-dev/zever/scheduler/embedded"
 )
 
 // errFakeUnimplemented marks fakeCtx methods that tests never invoke.
@@ -32,7 +33,7 @@ func registerTestAdapters() {
 		_ = cache.Register(cache.Memory, cachememory.New)
 		_ = db.Register(db.SQLite, sqlite.New)
 		_ = queue.Register(queue.Memory, queuememory.New)
-		_ = scheduler.Register(scheduler.Embedded, scheduler.NewEmbedded)
+		_ = scheduler.Register(scheduler.Embedded, schedulerembedded.New)
 	})
 }
 
