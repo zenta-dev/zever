@@ -17,6 +17,14 @@ import (
 // separate install step.
 const grpcGoToolName = "protoc-gen-go-grpc"
 
+// protoMarshal is a test seam for proto.Marshal: CodeGeneratorRequest is a
+// proto2 message with no required fields, so proto.Marshal on the valid
+// request generateGRPCGo builds never fails via the public API (UTF-8
+// enforcement applies to proto3 only, and FileToGenerate/Parameter accept
+// arbitrary bytes). Swapping this seam is the only way to cover the marshal
+// error branch.
+var protoMarshal = proto.Marshal
+
 // generateGRPCGo runs the real protoc-gen-go-grpc plugin as a pinned
 // Go-tool subprocess. Unlike protoc-gen-go, protoc-gen-go-grpc's generator
 // function is unexported inside package main
@@ -27,7 +35,7 @@ const grpcGoToolName = "protoc-gen-go-grpc"
 // req is the exact same request generatePBGo consumes: one descriptor-
 // building path feeds both plugin invocations.
 func generateGRPCGo(ctx context.Context, req *pluginpb.CodeGeneratorRequest) (map[string][]byte, error) {
-	reqBytes, err := proto.Marshal(req)
+	reqBytes, err := protoMarshal(req)
 	if err != nil {
 		return nil, fmt.Errorf("[protogogen] marshal CodeGeneratorRequest: %w", err)
 	}

@@ -3,6 +3,7 @@ package compile
 import (
 	"testing"
 
+	"github.com/zenta-dev/zever/internal/dsl/backend/proto"
 	"github.com/zenta-dev/zever/internal/dsl/ir"
 )
 
@@ -137,9 +138,62 @@ func TestCompileBrokenFilePlusCleanFile(t *testing.T) {
 	}
 }
 
-// NOTE: TestCompileValidMultiFileWithProtoBackend from the source is
-// skipped: it requires internal/dsl/backend/proto, which lands in a later
-// phase.
+func TestCompileValidMultiFileWithProtoBackend(t *testing.T) {
+	t.Parallel()
+
+	userSrc := `entity User {
+		id: uuid @primary
+		email: string @unique
+	}`
+
+	serviceSrc := `service UserService {
+		rpc GetUser(id: uuid) -> User {
+			http: GET "/v1/users/{id}"
+			auth: required
+		}
+	}`
+
+	files := map[string]string{
+		"a_user.zen":    userSrc,
+		"b_service.zen": serviceSrc,
+	}
+
+	result, diags := Compile(files, proto.New())
+
+	if diags.HasErrors() {
+		t.Fatalf("unexpected diagnostics: %v", diags)
+	}
+
+	// Filter warnings (secureEverything currently emits warning) – expect zero errors/warnings for this clean case with auth.
+	if len(diags) != 0 {
+		hasError := false
+		for _, d := range diags {
+			if d.Severity == 0 {
+				hasError = true
+			}
+		}
+		if hasError {
+			t.Fatalf("expected zero error diagnostics, got %d: %v", len(diags), diags)
+		}
+	}
+
+	if result.Outputs == nil {
+		t.Fatalf("Outputs is nil, want non-nil")
+	}
+
+	protoOut, ok := result.Outputs["proto"]
+	if !ok {
+		t.Fatalf("Outputs missing %q key, got keys %v", "proto", keysOf(result.Outputs))
+	}
+
+	if len(protoOut) == 0 {
+		t.Fatalf("Outputs[%q] is empty, want at least one file", "proto")
+	}
+
+	if _, ok := protoOut["schema.proto"]; !ok {
+		t.Fatalf("Outputs[%q] missing schema.proto, got keys %v", "proto", keysOf(protoOut))
+	}
+}
 
 func TestCompileModuleSplitAcrossFiles(t *testing.T) {
 	entitySrc := `entity Order {
