@@ -1,6 +1,8 @@
 package resolver
 
 import (
+	"sort"
+
 	"github.com/zenta-dev/zever/internal/dsl/ast"
 	"github.com/zenta-dev/zever/internal/dsl/diag"
 	"github.com/zenta-dev/zever/internal/dsl/ir"
@@ -14,6 +16,25 @@ var scalarTypes = map[string]ir.ScalarType{
 	"uuid": ir.TUUID, "string": ir.TString, "int32": ir.TInt32, "int64": ir.TInt64,
 	"float32": ir.TFloat32, "float64": ir.TFloat64, "bool": ir.TBool,
 	"timestamp": ir.TTimestamp, "date": ir.TDate, "bytes": ir.TBytes, "json": ir.TJSON,
+}
+
+// ScalarTypeNames returns the canonical, sorted list of builtin scalar type
+// names recognized by resolveFieldType (the keys of scalarTypes). "enum" is
+// deliberately excluded: it resolves through a separate arg-list path
+// rather than the scalarTypes table.
+//
+// This is the single source of truth for the DSL's scalar type names; it is
+// exported so codegen tooling (see internal/dsl/gengrammar) can derive
+// editor grammars from it instead of duplicating the list.
+func ScalarTypeNames() []string {
+	names := make([]string, 0, len(scalarTypes))
+	for name := range scalarTypes {
+		names = append(names, name)
+	}
+
+	sort.Strings(names)
+
+	return names
 }
 
 // resolveEntities is Pass 1's entry point: it resolves every entity decl
