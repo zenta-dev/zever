@@ -95,6 +95,7 @@ import (
 	searchsqlite "github.com/zenta-dev/zever/search/sqlite"
 	"github.com/zenta-dev/zever/session"
 	sessionmemory "github.com/zenta-dev/zever/session/memory"
+	sessionredis "github.com/zenta-dev/zever/session/redis"
 	"github.com/zenta-dev/zever/storage"
 	storagelocal "github.com/zenta-dev/zever/storage/local"
 	storager2 "github.com/zenta-dev/zever/storage/r2"
@@ -218,6 +219,7 @@ func registerAdapters() {
 	_ = search.Register(search.SQLite, searchsqlite.Open)
 
 	_ = session.Register(session.Memory, sessionmemory.New)
+	_ = session.Register(session.Redis, sessionredis.New)
 
 	_ = storage.Register(storage.AdapterLocal, storagelocal.New)
 	_ = storage.Register(storage.AdapterS3, storages3.New)
