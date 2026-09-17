@@ -88,6 +88,7 @@ import (
 	routerfiber "github.com/zenta-dev/zever/router/fiber"
 	routerstdhttp "github.com/zenta-dev/zever/router/stdhttp"
 	"github.com/zenta-dev/zever/scheduler"
+	schedulerembedded "github.com/zenta-dev/zever/scheduler/embedded"
 	"github.com/zenta-dev/zever/search"
 	searchmeilisearch "github.com/zenta-dev/zever/search/meilisearch"
 	searchpostgres "github.com/zenta-dev/zever/search/postgres"
@@ -210,7 +211,7 @@ func registerAdapters() {
 	_ = router.Register(router.AdapterFiber, routerfiber.New)
 	_ = router.Register(router.AdapterStdHTTP, routerstdhttp.New)
 
-	_ = scheduler.Register(scheduler.Embedded, scheduler.NewEmbedded)
+	_ = scheduler.Register(scheduler.Embedded, schedulerembedded.New)
 
 	_ = search.Register(search.Postgres, searchpostgres.Open)
 	_ = search.Register(search.Meilisearch, searchmeilisearch.Open)
