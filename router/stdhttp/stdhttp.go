@@ -2,11 +2,12 @@ package stdhttp
 
 import (
 	"fmt"
-	"log"
 	"net/http"
 	"strings"
 	"sync"
 
+	"github.com/zenta-dev/zever/log"
+	"github.com/zenta-dev/zever/log/noop"
 	"github.com/zenta-dev/zever/router"
 )
 
@@ -14,8 +15,8 @@ import (
 //
 // AppName is ignored; opts are accepted for registry compatibility.
 // Use appends router-wide middleware affecting only later registrations.
-func New(_ router.Options) (router.Router, error) {
-	return &driver{mux: http.NewServeMux(), routes: make(map[string]bool)}, nil
+func New(opts router.Options) (router.Router, error) {
+	return &driver{mux: http.NewServeMux(), routes: make(map[string]bool), logger: opts.Logger}, nil
 }
 
 type driver struct {
@@ -23,15 +24,24 @@ type driver struct {
 	mu     sync.Mutex
 	routes map[string]bool
 	mws    []func(http.Handler) http.Handler
+	logger log.Logger
+}
+
+func (d *driver) log() log.Logger {
+	if d != nil && d.logger != nil {
+		return d.logger
+	}
+
+	return noop.New()
 }
 
 func (d *driver) Handle(method, pattern string, handler http.HandlerFunc) {
-	m, ok := validateMethod(method, pattern)
+	m, ok := d.validateMethod(method, pattern)
 	if !ok {
 		return
 	}
 
-	p, ok := checkPattern(pattern)
+	p, ok := d.checkPattern(pattern)
 	if !ok {
 		return
 	}
@@ -50,13 +60,13 @@ func (d *driver) add(m, p string, mws []func(http.Handler) http.Handler, handler
 	defer d.mu.Unlock()
 
 	if d.routes[key] {
-		routerLogf("[router] stdhttp: skipping duplicate route %s %s", m, p)
+		d.routerLogf("[router] stdhttp: skipping duplicate route %s %s", m, p)
 
 		return
 	}
 
 	if err := d.safeAdd(m+" "+p, buildHandler(p, mws, handler)); err != nil {
-		routerLogf("[router] stdhttp: failed to register route %s %s: %v", m, p, err)
+		d.routerLogf("[router] stdhttp: failed to register route %s %s: %v", m, p, err)
 		delete(d.routes, key)
 
 		return
@@ -99,20 +109,20 @@ type stdGroup struct {
 }
 
 func (g *stdGroup) Handle(method, pattern string, handler http.HandlerFunc) {
-	m, ok := validateMethod(method, pattern)
+	m, ok := g.d.validateMethod(method, pattern)
 	if !ok {
 		return
 	}
 
 	if strings.TrimSpace(pattern) == "" {
-		routerLogf("[router] stdhttp: skipping route with empty pattern")
+		g.d.routerLogf("[router] stdhttp: skipping route with empty pattern")
 
 		return
 	}
 
 	full := joinPath(g.prefix, pattern)
 
-	if _, ok := checkPattern(full); !ok {
+	if _, ok := g.d.checkPattern(full); !ok {
 		return
 	}
 
@@ -143,10 +153,10 @@ func (g *stdGroup) Use(middlewares ...func(http.Handler) http.Handler) {
 	g.mws = append(g.mws, middlewares...)
 }
 
-func validateMethod(method, pattern string) (string, bool) {
+func (d *driver) validateMethod(method, pattern string) (string, bool) {
 	m := strings.ToUpper(strings.TrimSpace(method))
 	if !router.ValidMethod(m) {
-		routerLogf("[router] stdhttp: skipping route with unsupported method %q (%s)", method, pattern)
+		d.routerLogf("[router] stdhttp: skipping route with unsupported method %q (%s)", method, pattern)
 
 		return "", false
 	}
@@ -154,10 +164,10 @@ func validateMethod(method, pattern string) (string, bool) {
 	return m, true
 }
 
-func checkPattern(pattern string) (string, bool) {
+func (d *driver) checkPattern(pattern string) (string, bool) {
 	p := strings.TrimSpace(pattern)
 	if p == "" {
-		routerLogf("[router] stdhttp: skipping route with empty pattern")
+		d.routerLogf("[router] stdhttp: skipping route with empty pattern")
 
 		return "", false
 	}
@@ -167,19 +177,19 @@ func checkPattern(pattern string) (string, bool) {
 	}
 
 	if hasBraceColon(p) {
-		routerLogf("[router] stdhttp: skipping regex-constraint pattern %q (use plain {name} wildcards)", pattern)
+		d.routerLogf("[router] stdhttp: skipping regex-constraint pattern %q (use plain {name} wildcards)", pattern)
 
 		return "", false
 	}
 
 	if hasColonSegment(p) {
-		routerLogf("[router] stdhttp: skipping colon-style pattern %q (use {name} wildcards)", pattern)
+		d.routerLogf("[router] stdhttp: skipping colon-style pattern %q (use {name} wildcards)", pattern)
 
 		return "", false
 	}
 
 	if strings.Contains(p, "<") || strings.Contains(p, ">") {
-		routerLogf("[router] stdhttp: skipping regex-constraint pattern %q (use plain {name} wildcards)", pattern)
+		d.routerLogf("[router] stdhttp: skipping regex-constraint pattern %q (use plain {name} wildcards)", pattern)
 
 		return "", false
 	}
@@ -288,6 +298,6 @@ func joinPath(prefix, pattern string) string {
 	return strings.TrimRight(prefix, "/") + "/" + strings.TrimLeft(strings.TrimSpace(pattern), "/")
 }
 
-func routerLogf(format string, args ...any) {
-	log.Printf(format, args...) //nolint:forbidigo
+func (d *driver) routerLogf(format string, args ...any) {
+	d.log().Warn().Msgf(format, args...)
 }

@@ -1,5 +1,9 @@
 package storage
 
+import (
+	"github.com/zenta-dev/zever/log"
+)
+
 // LocalOptions configures the local-filesystem backend.
 type LocalOptions struct {
 	// Root is the directory objects are stored under.
@@ -45,6 +49,8 @@ type Options struct {
 	S3Options
 	// R2Options holds R2-backend settings.
 	R2Options
+	// Logger emits backend warnings. Defaults to a no-op logger when nil.
+	Logger log.Logger
 }
 
 // Validate checks the backend-agnostic fields of Options.
