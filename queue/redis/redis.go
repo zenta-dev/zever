@@ -7,7 +7,6 @@ import (
 	"errors"
 	"fmt"
 	"math/big"
-	"net/url"
 	"strconv"
 	"strings"
 	"sync/atomic"
@@ -52,6 +51,22 @@ type redisAdapter struct {
 	closed            atomic.Bool
 }
 
+// connOptions maps queue options onto the shared client options. A set URL
+// takes precedence over Addr; both spellings connect.
+func connOptions(opts queue.Options) zredis.Options {
+	addr := strings.TrimSpace(opts.URL)
+	if addr == "" {
+		addr = opts.Addr
+	}
+
+	return zredis.Options{
+		Addr:     addr,
+		Password: opts.Password,
+		DB:       opts.DB,
+		TLS:      opts.TLS,
+	}
+}
+
 // New creates a Redis-backed queue adapter delegated via internal/redis with defaults of prefix "queue", VisibilityTimeout 30s, and PollTimeout 5s when unset. It verifies connectivity with a 3s ping check.
 func New(opts queue.Options) (queue.Queue, error) {
 	prefix := strings.TrimSpace(opts.Prefix)
@@ -71,12 +86,7 @@ func New(opts queue.Options) (queue.Queue, error) {
 
 	buf := opts.Buffer
 
-	client, err := zredis.New(zredis.Options{
-		URL:      opts.URL,
-		Addr:     opts.Addr,
-		Password: opts.Password,
-		DB:       opts.DB,
-	})
+	client, err := zredis.New(connOptions(opts))
 	if err != nil {
 		return nil, fmt.Errorf("queue: connect %q: %w", redactURL(opts), err)
 	}
@@ -103,19 +113,7 @@ func New(opts queue.Options) (queue.Queue, error) {
 // embedded userinfo credentials masked, suitable for inclusion in error
 // messages.
 func redactURL(opts queue.Options) string {
-	raw := strings.TrimSpace(opts.URL)
-	if raw == "" {
-		raw = strings.TrimSpace(opts.Addr)
-	}
-
-	u, err := url.Parse(raw)
-	if err != nil || u.User == nil {
-		return raw
-	}
-
-	u.User = url.UserPassword(u.User.Username(), "xxxxx")
-
-	return u.String()
+	return zredis.RedactEndpoint(opts.URL, opts.Addr)
 }
 
 func (a *redisAdapter) Push(ctx context.Context, topic string, payload queue.Payload, headers queue.Headers) error {

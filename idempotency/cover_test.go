@@ -4,6 +4,8 @@ import (
 	"errors"
 	"testing"
 	"time"
+
+	zredis "github.com/zenta-dev/zever/internal/redis"
 )
 
 func TestCoverDuplicateErrorString(t *testing.T) {
@@ -47,18 +49,18 @@ func TestCoverOptionsTTLSet(t *testing.T) {
 func TestCoverIsTokenCharTable(t *testing.T) {
 	t.Parallel()
 	for _, c := range []byte("abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789") {
-		if !isTokenChar(c) {
-			t.Fatalf("isTokenChar(%q) = false, want true", c)
+		if !zredis.IsTokenChar(c) {
+			t.Fatalf("IsTokenChar(%q) = false, want true", c)
 		}
 	}
 	for _, c := range []byte{'!', '#', '$', '%', '&', '\'', '*', '+', '-', '.', '^', '_', '`', '|', '~'} {
-		if !isTokenChar(c) {
-			t.Fatalf("isTokenChar(%q) = false, want true", c)
+		if !zredis.IsTokenChar(c) {
+			t.Fatalf("IsTokenChar(%q) = false, want true", c)
 		}
 	}
 	for _, c := range []byte{'(', ')', '<', '>', '@', ',', ';', ':', '\\', '"', '/', '[', ']', '?', '=', '{', '}', ' ', '\t', 0x00, 0x1f, 0x7f, 0x80} {
-		if isTokenChar(c) {
-			t.Fatalf("isTokenChar(%q) = true, want false", c)
+		if zredis.IsTokenChar(c) {
+			t.Fatalf("IsTokenChar(%q) = true, want false", c)
 		}
 	}
 }

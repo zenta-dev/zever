@@ -4,7 +4,6 @@ import (
 	"context"
 	"errors"
 	"fmt"
-	"net/url"
 	"strings"
 	"sync/atomic"
 	"time"
@@ -20,19 +19,30 @@ type redisAdapter struct {
 	closed atomic.Bool
 }
 
-// New creates a Redis-backed cache.Cache using a shared client from internal/redis, verifies connectivity with a 3s ping check, and reports failures with the redacted address in errors.
-func New(opts cache.Options) (cache.Cache, error) {
-	client, err := zredis.New(zredis.Options{
-		URL:             opts.URL,
-		Addr:            opts.Addr,
+// connOptions maps cache options onto the shared client options. A set URL
+// takes precedence over Addr; both spellings connect.
+func connOptions(opts cache.Options) zredis.Options {
+	addr := strings.TrimSpace(opts.URL)
+	if addr == "" {
+		addr = opts.Addr
+	}
+
+	return zredis.Options{
+		Addr:            addr,
 		Password:        opts.Password,
 		DB:              opts.DB,
+		TLS:             opts.TLS,
 		PoolSize:        opts.PoolSize,
 		MinIdleConns:    opts.MinIdleConns,
 		PoolTimeout:     opts.PoolTimeout,
 		ConnMaxIdleTime: opts.ConnMaxIdleTime,
 		ConnMaxLifetime: opts.ConnMaxLifetime,
-	})
+	}
+}
+
+// New creates a Redis-backed cache.Cache using a shared client from internal/redis, verifies connectivity with a 3s ping check, and reports failures with the redacted address in errors.
+func New(opts cache.Options) (cache.Cache, error) {
+	client, err := zredis.New(connOptions(opts))
 	if err != nil {
 		return nil, fmt.Errorf("cache: connect %q error: %w", redactURL(opts), err)
 	}
@@ -53,19 +63,7 @@ func New(opts cache.Options) (cache.Cache, error) {
 // embedded userinfo credentials masked, suitable for inclusion in error
 // messages.
 func redactURL(opts cache.Options) string {
-	raw := strings.TrimSpace(opts.URL)
-	if raw == "" {
-		raw = strings.TrimSpace(opts.Addr)
-	}
-
-	u, err := url.Parse(raw)
-	if err != nil || u.User == nil {
-		return raw
-	}
-
-	u.User = url.UserPassword(u.User.Username(), "xxxxx")
-
-	return u.String()
+	return zredis.RedactEndpoint(opts.URL, opts.Addr)
 }
 
 func (a *redisAdapter) Get(ctx context.Context, key string) ([]byte, error) {
