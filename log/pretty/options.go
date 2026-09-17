@@ -3,6 +3,7 @@ package pretty
 import (
 	"errors"
 
+	"github.com/zenta-dev/zever/internal/opts"
 	"github.com/zenta-dev/zever/log"
 )
 
@@ -36,8 +37,8 @@ func ParseOptions(m map[string]any) (Options, error) {
 	var o Options
 
 	if v, ok := m["level"]; ok {
-		s, ok := v.(string)
-		if !ok {
+		s, err := opts.StrictString("pretty", "level", v)
+		if err != nil {
 			return Options{}, &InvalidOptionError{Option: "level"}
 		}
 
@@ -47,8 +48,8 @@ func ParseOptions(m map[string]any) (Options, error) {
 	}
 
 	if v, ok := m["color"]; ok {
-		b, ok := v.(bool)
-		if !ok {
+		b, err := opts.StrictBool("pretty", "color", v)
+		if err != nil {
 			return Options{}, &InvalidOptionError{Option: "color"}
 		}
 

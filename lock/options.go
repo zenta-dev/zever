@@ -4,6 +4,7 @@ import (
 	"fmt"
 	"time"
 
+	"github.com/zenta-dev/zever/internal/opts"
 	zredis "github.com/zenta-dev/zever/internal/redis"
 )
 
@@ -60,21 +61,21 @@ func ParseOptions(m map[string]any) (Options, error) {
 
 		switch k {
 		case "url":
-			o.URL, err = strictString(k, v)
+			o.URL, err = opts.StrictString("lock", k, v)
 		case "addr":
-			o.Addr, err = strictString(k, v)
+			o.Addr, err = opts.StrictString("lock", k, v)
 		case "password":
-			o.Password, err = strictString(k, v)
+			o.Password, err = opts.StrictString("lock", k, v)
 		case "db":
-			o.DB, err = strictInt("lock", k, v)
+			o.DB, err = opts.StrictInt("lock", k, v)
 		case "tls":
-			o.TLS, err = strictBool("lock", k, v)
+			o.TLS, err = opts.StrictBool("lock", k, v)
 		case "prefix":
-			o.Prefix, err = strictString(k, v)
+			o.Prefix, err = opts.StrictString("lock", k, v)
 		case "ttl":
-			o.TTL, err = strictDuration("lock", k, v)
+			o.TTL, err = opts.StrictDuration("lock", k, v)
 		case "retry_interval":
-			o.RetryInterval, err = strictDuration("lock", k, v)
+			o.RetryInterval, err = opts.StrictDuration("lock", k, v)
 		}
 
 		if err != nil {
@@ -90,62 +91,4 @@ func ParseOptions(m map[string]any) (Options, error) {
 // so this is a no-op; each adapter's factory validates its own fields.
 func (o Options) Validate() error {
 	return nil
-}
-
-// strictBool type-checks v as a boolean.
-func strictBool(pkgTag, key string, v any) (bool, error) {
-	b, ok := v.(bool)
-	if !ok {
-		return false, fmt.Errorf("[%s] option %q must be a boolean, got %T", pkgTag, key, v)
-	}
-
-	return b, nil
-}
-
-// strictString type-checks v as a string.
-func strictString(key string, v any) (string, error) {
-	s, ok := v.(string)
-	if !ok {
-		return "", fmt.Errorf("[lock] option %q must be a string, got %T", key, v)
-	}
-
-	return s, nil
-}
-
-// strictInt type-checks v as an integer, accepting int, int64, and float64.
-func strictInt(pkgTag, key string, v any) (int, error) {
-	switch n := v.(type) {
-	case int:
-		return n, nil
-	case int64:
-		return int(n), nil
-	case float64:
-		return int(n), nil
-	default:
-		return 0, fmt.Errorf("[%s] option %q must be an integer, got %T", pkgTag, key, v)
-	}
-}
-
-// strictDuration type-checks v as a duration, accepting time.Duration,
-// numeric types interpreted as seconds, and strings parsed via time.ParseDuration.
-func strictDuration(pkgTag, key string, v any) (time.Duration, error) {
-	switch d := v.(type) {
-	case time.Duration:
-		return d, nil
-	case int:
-		return time.Duration(d) * time.Second, nil
-	case int64:
-		return time.Duration(d) * time.Second, nil
-	case float64:
-		return time.Duration(d * float64(time.Second)), nil
-	case string:
-		parsed, err := time.ParseDuration(d)
-		if err != nil {
-			return 0, fmt.Errorf("[%s] option %q must be a duration: %w", pkgTag, key, err)
-		}
-
-		return parsed, nil
-	default:
-		return 0, fmt.Errorf("[%s] option %q must be a duration, got %T", pkgTag, key, v)
-	}
 }
