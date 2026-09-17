@@ -108,6 +108,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   and Redis backends.
 - Generic `secrets` package: secret-management facade with an
   environment-variable backend.
+- `zen` migration engine: live-schema-diff Plan/Apply with rollback
+  for Postgres, SQLite, and MySQL.
 
 ### Changed
 
