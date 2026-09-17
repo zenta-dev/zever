@@ -84,6 +84,80 @@ func (m DoctorScreen) View() tea.View {
 	return tea.NewView(b.String())
 }
 
+// ---- Config ----
+// NOTE: ConfigConfig has no output-file field, so this screen renders config
+// output in the result view only — no save-to-file option is invented.
+
+type configVals struct{ configPath string }
+
+// ConfigScreen wraps runConfigShowWith: optional config path (empty =
+// config.Default()).
+type ConfigScreen struct {
+	form  *huh.Form
+	vals  *configVals
+	stage inspectStage
+	exec  tui.ExecModel
+	theme tui.Theme
+	keys  tui.Keymap
+}
+
+// NewConfigScreen returns the config form.
+func NewConfigScreen() ConfigScreen {
+	vals := &configVals{}
+	form := huh.NewForm(huh.NewGroup(
+		huh.NewInput().Title("Config path").Description("optional; empty verifies config.Default()").Placeholder("zever.yaml").Value(&vals.configPath),
+	))
+	return ConfigScreen{form: form, vals: vals, theme: tui.NewTheme(), keys: tui.DefaultKeymap()}
+}
+
+// CLI returns the exact equivalent CLI string. Pure.
+func (m ConfigScreen) CLI() string { return buildConfigCLI(m.vals.configPath) }
+
+func (m ConfigScreen) buildExec() tui.ExecModel {
+	cfg := strings.TrimSpace(m.vals.configPath)
+	cli := buildConfigCLI(cfg)
+	return tui.NewExec("config show", cli, makeConfigExecFn(cfg))
+}
+
+// makeConfigExecFn runs runConfigShowWith into a buffer.
+// Runs in a tea.Cmd: no I/O in Update.
+func makeConfigExecFn(configPath string) tui.ExecFunc {
+	return func(ctx context.Context) (string, error) {
+		if err := inspectCtxErr(ctx); err != nil {
+			return "", err
+		}
+		var buf bytes.Buffer
+		err := runConfigShowWith(ConfigConfig{ConfigPath: configPath, Out: &buf})
+		return buf.String(), err
+	}
+}
+
+// Init implements tea.Model.
+func (m ConfigScreen) Init() tea.Cmd { return m.form.Init() }
+
+// Update implements tea.Model. No I/O.
+func (m ConfigScreen) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
+	form, cmd := updateInspectFormScreen(msg, &m.stage, &m.exec, m.keys, m.form, m.buildExec)
+	m.form = form
+	return m, cmd
+}
+
+// View implements tea.Model. Pure.
+func (m ConfigScreen) View() tea.View {
+	if m.stage == inspectStageExec {
+		return m.exec.View()
+	}
+	var b strings.Builder
+	b.WriteString(m.theme.Title.Render("config show"))
+	b.WriteString("\n\n")
+	b.WriteString(m.form.View())
+	b.WriteString("\n\n")
+	b.WriteString(m.theme.Hint.Render("equivalent CLI: " + m.CLI()))
+	b.WriteString("\n")
+	b.WriteString(m.theme.Hint.Render("enter continue · esc back"))
+	return tea.NewView(b.String())
+}
+
 // ---- Routes ----
 
 type routesVals struct{ files string }

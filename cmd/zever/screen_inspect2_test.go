@@ -6,6 +6,7 @@ import (
 
 	tea "charm.land/bubbletea/v2"
 	"charm.land/huh/v2"
+	teatest "github.com/charmbracelet/x/exp/teatest/v2"
 
 	"github.com/zenta-dev/zever/cmd/zever/tui"
 )
@@ -31,6 +32,136 @@ func TestDoctorScreenSubmit(t *testing.T) {
 	}
 	if !strings.Contains(ds.CLI(), "zever doctor") {
 		t.Fatalf("CLI = %q", ds.CLI())
+	}
+}
+
+func TestConfigScreenSubmit(t *testing.T) {
+	m := NewConfigScreen()
+	if !strings.Contains(m.View().Content, "config show") {
+		t.Fatalf("config view:\n%s", m.View().Content)
+	}
+	_, cmd := m.Update(inspectKeyPress("esc"))
+	if cmd == nil {
+		t.Fatal("esc must yield back cmd")
+	}
+	m2 := NewConfigScreen()
+	m2.form.State = huh.StateCompleted
+	got, _ := m2.Update(tea.WindowSizeMsg{Width: 80, Height: 24})
+	cs, ok := got.(ConfigScreen)
+	if !ok {
+		t.Fatalf("Update = %T, want ConfigScreen", got)
+	}
+	if cs.stage != inspectStageExec {
+		t.Fatal("config must transition to exec")
+	}
+	if !strings.Contains(cs.CLI(), "zever config show") {
+		t.Fatalf("CLI = %q", cs.CLI())
+	}
+}
+
+// TestConfigScreenNormalFlow submits the (empty) form, then simulates the
+// exec's ExecDoneMsg the same way TestGraphScreenSubmitAndLog simulates
+// graph's exec completion: deterministic, no goroutine timing, no real
+// config.Default() I/O needed to prove the state machine and view wiring.
+func TestConfigScreenNormalFlow(t *testing.T) {
+	m := NewConfigScreen()
+	m.form.State = huh.StateCompleted
+	got, _ := m.Update(tea.WindowSizeMsg{Width: 80, Height: 24})
+	cs, ok := got.(ConfigScreen)
+	if !ok {
+		t.Fatalf("Update = %T, want ConfigScreen", got)
+	}
+	if cs.stage != inspectStageExec {
+		t.Fatal("config must transition to exec")
+	}
+	done, _ := cs.Update(tui.ExecDoneMsg{Output: "ai  adapter=anthropic"})
+	cs2, ok := done.(ConfigScreen)
+	if !ok {
+		t.Fatalf("Update = %T, want ConfigScreen", done)
+	}
+	if cs2.exec.State() != tui.ExecDone {
+		t.Fatalf("state = %v, want ExecDone", cs2.exec.State())
+	}
+	if !strings.Contains(cs2.View().Content, "adapter=") {
+		t.Fatalf("done view missing config rows:\n%s", cs2.View().Content)
+	}
+}
+
+// TestConfigScreenErrorFlow points the config path at a file that cannot be
+// loaded and runs the real exec func synchronously (deterministic: no
+// network, a plain missing-file stat), then feeds its ExecErrMsg through
+// Update to drive the screen to ExecFailed instead of ExecDone.
+func TestConfigScreenErrorFlow(t *testing.T) {
+	m := NewConfigScreen()
+	m.vals.configPath = "nope.yaml"
+	m.form.State = huh.StateCompleted
+	got, _ := m.Update(tea.WindowSizeMsg{Width: 80, Height: 24})
+	cs, ok := got.(ConfigScreen)
+	if !ok {
+		t.Fatalf("Update = %T, want ConfigScreen", got)
+	}
+	if cs.stage != inspectStageExec {
+		t.Fatal("config must transition to exec")
+	}
+
+	_, err := makeConfigExecFn("nope.yaml")(t.Context())
+	if err == nil {
+		t.Fatal("expected error for missing config file, got nil")
+	}
+
+	failed, _ := cs.Update(tui.ExecErrMsg{Err: err})
+	cs2, ok := failed.(ConfigScreen)
+	if !ok {
+		t.Fatalf("Update = %T, want ConfigScreen", failed)
+	}
+	if cs2.exec.State() != tui.ExecFailed {
+		t.Fatalf("state = %v, want ExecFailed", cs2.exec.State())
+	}
+	if !strings.Contains(cs2.View().Content, "load config") {
+		t.Fatalf("error view missing load failure:\n%s", cs2.View().Content)
+	}
+}
+
+// TestConfigScreenCancel asserts esc while the exec is running cancels it
+// (ExecCanceled) and emits tui.CanceledMsg, the same esc-back contract every
+// other Inspect screen uses.
+func TestConfigScreenCancel(t *testing.T) {
+	cs := NewConfigScreen()
+	cs.form.State = huh.StateCompleted
+	got, _ := cs.Update(tea.WindowSizeMsg{Width: 80, Height: 24})
+	running, ok := got.(ConfigScreen)
+	if !ok {
+		t.Fatalf("Update = %T, want ConfigScreen", got)
+	}
+	if running.exec.State() != tui.ExecRunning {
+		t.Fatalf("state = %v, want ExecRunning", running.exec.State())
+	}
+	got2, cmd := running.Update(inspectKeyPress("esc"))
+	canceled, ok := got2.(ConfigScreen)
+	if !ok {
+		t.Fatalf("Update = %T, want ConfigScreen", got2)
+	}
+	if canceled.exec.State() != tui.ExecCanceled {
+		t.Fatalf("state = %v, want ExecCanceled", canceled.exec.State())
+	}
+	if cmd == nil {
+		t.Fatal("cancel must emit cmd")
+	}
+	if _, ok := cmd().(tui.CanceledMsg); !ok {
+		t.Fatalf("cmd = %T, want CanceledMsg", cmd())
+	}
+}
+
+func TestConfigScreenTeatest(t *testing.T) {
+	m := NewConfigScreen()
+	tm := teatest.NewTestModel(t, m)
+	tm.Send(tea.WindowSizeMsg{Width: 80, Height: 24})
+	if err := tm.Quit(); err != nil {
+		t.Fatalf("quit: %v", err)
+	}
+	tm.WaitFinished(t)
+	if _, ok := tm.FinalModel(t).(ConfigScreen); !ok {
+		t.Fatalf("final = %T, want ConfigScreen", tm.FinalModel(t))
 	}
 }
 
@@ -148,6 +279,12 @@ func TestBuildCLIs(t *testing.T) {
 	}
 	if got := buildDoctorCLI("z.yaml"); !strings.Contains(got, "--config") {
 		t.Fatalf("doctor cli = %q", got)
+	}
+	if got := buildConfigCLI(""); got != "zever config show" {
+		t.Fatalf("config cli = %q", got)
+	}
+	if got := buildConfigCLI("z.yaml"); !strings.Contains(got, "--config") {
+		t.Fatalf("config cli = %q", got)
 	}
 	if got := buildBreakingCLI([]string{"o.zen"}, []string{"n.zen"}); !strings.Contains(got, "--") {
 		t.Fatalf("breaking cli = %q", got)
