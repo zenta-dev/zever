@@ -5,7 +5,7 @@ package zengo.v1;
 import "google/api/annotations.proto";
 import "zengo/annotations.proto";
 
-option go_package = "github.com/zenta-dev/zen-go/gen/zengov1;zengov1";
+option go_package = "github.com/zenta-dev/zever/gen/zengov1;zengov1";
 
 message Order {
   string id = 1;

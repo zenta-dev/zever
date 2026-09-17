@@ -5,7 +5,7 @@ package zengo.billing.v1;
 import "google/api/annotations.proto";
 import "zengo/annotations.proto";
 
-option go_package = "github.com/zenta-dev/zen-go/gen/zengo/billing;billingv1";
+option go_package = "github.com/zenta-dev/zever/gen/zengo/billing;billingv1";
 
 message Invoice {
   string id = 1;

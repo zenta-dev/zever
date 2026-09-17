@@ -42,7 +42,7 @@ func (b *Backend) Generate(schema *ir.Schema) (map[string][]byte, error) {
 
 	enums := collectEnums(schema)
 
-	merged := newDocBuilder("zen-go API", mergedQualify, enums)
+	merged := newDocBuilder("zever API", mergedQualify, enums)
 
 	for _, m := range schema.Modules {
 		moduleDoc := newDocBuilder(moduleLabel(m), bareQualify, enums)

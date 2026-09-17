@@ -291,7 +291,7 @@ const file_zengo_annotations_proto_rawDesc = "" +
 	"\n" +
 	"permission\x12\x1e.google.protobuf.MethodOptions\x18\xaa\x8b\x03 \x01(\v2 .zengo.annotations.v1.PermissionR\n" +
 	"permission:Z\n" +
-	"\x06errors\x12\x1e.google.protobuf.MethodOptions\x18\xab\x8b\x03 \x01(\v2 .zengo.annotations.v1.ErrorCasesR\x06errorsBAZ?github.com/zenta-dev/zen-go/gen/zengo/annotations;annotationsv1b\x06proto3"
+	"\x06errors\x12\x1e.google.protobuf.MethodOptions\x18\xab\x8b\x03 \x01(\v2 .zengo.annotations.v1.ErrorCasesR\x06errorsB@Z>github.com/zenta-dev/zever/gen/zengo/annotations;annotationsv1b\x06proto3"
 
 var (
 	file_zengo_annotations_proto_rawDescOnce sync.Once

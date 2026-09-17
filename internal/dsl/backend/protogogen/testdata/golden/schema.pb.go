@@ -7,7 +7,7 @@
 package zengov1
 
 import (
-	_ "github.com/zenta-dev/zen-go/gen/zengo/annotations"
+	_ "github.com/zenta-dev/zever/gen/zengo/annotations"
 	_ "google.golang.org/genproto/googleapis/api/annotations"
 	protoreflect "google.golang.org/protobuf/reflect/protoreflect"
 	protoimpl "google.golang.org/protobuf/runtime/protoimpl"
@@ -133,7 +133,7 @@ const file_schema_proto_rawDesc = "" +
 	"\bSendPing\x12\x19.zengo.v1.SendPingRequest\x1a\x0e.zengo.v1.Ping\"'\xca\xda\x18\x02\b\x01\xda\xda\x18\r\n" +
 	"\v\n" +
 	"\tNOT_FOUND\x82\xd3\xe4\x93\x02\n" +
-	":\x01*\"\x05/pingB1Z/github.com/zenta-dev/zen-go/gen/zengov1;zengov1b\x06proto3"
+	":\x01*\"\x05/pingB0Z.github.com/zenta-dev/zever/gen/zengov1;zengov1b\x06proto3"
 
 var (
 	file_schema_proto_rawDescOnce sync.Once
