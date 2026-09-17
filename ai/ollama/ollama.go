@@ -13,6 +13,7 @@ import (
 	"time"
 
 	"github.com/zenta-dev/zever/ai"
+	"github.com/zenta-dev/zever/internal/endpoint"
 	"github.com/zenta-dev/zever/internal/httpclient"
 )
 
@@ -387,16 +388,11 @@ func postRequest(ctx context.Context, addr, path string, body []byte) (*http.Req
 
 // checkEndpoint enforces the http(s)+host+no-userinfo policy on a parsed URL.
 func checkEndpoint(u *url.URL) error {
-	if u.Scheme != "http" && u.Scheme != "https" {
-		return fmt.Errorf("ollama: url %q must have http or https scheme", u.String())
-	}
-
-	if u.Host == "" {
-		return fmt.Errorf("ollama: url %q must have a host", u.String())
-	}
-
-	if u.User != nil {
-		return fmt.Errorf("ollama: url %q must not contain user info", u.String())
+	if _, err := endpoint.ValidateURL(u.String(),
+		endpoint.WithAllowInsecure(true),
+		endpoint.WithRejectUserinfo(),
+	); err != nil {
+		return fmt.Errorf("ollama: url %q %s", u.String(), addrReason(err))
 	}
 
 	return nil

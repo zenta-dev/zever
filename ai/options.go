@@ -2,8 +2,9 @@ package ai
 
 import (
 	"errors"
-	"net/url"
 	"time"
+
+	"github.com/zenta-dev/zever/internal/endpoint"
 )
 
 // Options configures the AI backend.
@@ -23,21 +24,25 @@ func (o Options) Validate() error {
 	}
 
 	if o.BaseURL != "" {
-		u, err := url.Parse(o.BaseURL)
-		if err != nil {
-			errs = append(errs, &InvalidOptionsError{Reason: "base_url must be a valid URL"})
-		} else {
-			if u.Scheme == "" {
-				errs = append(errs, &InvalidOptionsError{Reason: "base_url must include scheme"})
-			}
-			if u.Host == "" {
-				errs = append(errs, &InvalidOptionsError{Reason: "base_url must include host"})
-			}
-			if u.Scheme != "" && u.Scheme != "https" {
-				errs = append(errs, &InvalidOptionsError{Reason: "base_url must use https scheme"})
-			}
+		if _, err := endpoint.ValidateURL(o.BaseURL); err != nil {
+			errs = append(errs, &InvalidOptionsError{Reason: baseURLReason(err)})
 		}
 	}
 
 	return errors.Join(errs...)
+}
+
+// baseURLReason maps endpoint validation failures to the historical
+// base_url reason strings.
+func baseURLReason(err error) string {
+	switch {
+	case errors.Is(err, endpoint.ErrParse):
+		return "base_url must be a valid URL"
+	case errors.Is(err, endpoint.ErrNoScheme):
+		return "base_url must include scheme"
+	case errors.Is(err, endpoint.ErrNoHost):
+		return "base_url must include host"
+	default:
+		return "base_url must use https scheme"
+	}
 }

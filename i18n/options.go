@@ -1,9 +1,11 @@
 package i18n
 
 import (
+	"errors"
 	"io/fs"
-	"net/url"
 	"time"
+
+	"github.com/zenta-dev/zever/internal/endpoint"
 )
 
 // DefaultTimeout is the default i18n operation timeout applied by adapters.
@@ -57,21 +59,19 @@ func (o Options) Validate() error {
 	if o.Remote.Endpoint == "" {
 		return nil
 	}
-	u, err := url.Parse(o.Remote.Endpoint)
-	if err != nil {
-		return &InvalidOptionsError{Reason: "endpoint must be a valid URL"}
-	}
-	if u.Scheme == "" || u.Host == "" {
-		return &InvalidOptionsError{Reason: "endpoint must have scheme and host"}
-	}
-	switch u.Scheme {
-	case "https":
-	case "http":
-		if !o.Remote.AllowInsecure {
+	if _, err := endpoint.ValidateURL(o.Remote.Endpoint, endpoint.WithAllowInsecure(o.Remote.AllowInsecure)); err != nil {
+		switch {
+		case errors.Is(err, endpoint.ErrParse):
+			return &InvalidOptionsError{Reason: "endpoint must be a valid URL"}
+		case errors.Is(err, endpoint.ErrNoScheme),
+			errors.Is(err, endpoint.ErrNoHost),
+			errors.Is(err, endpoint.ErrEmpty):
+			return &InvalidOptionsError{Reason: "endpoint must have scheme and host"}
+		case errors.Is(err, endpoint.ErrInsecureScheme):
 			return &InvalidOptionsError{Reason: "http endpoint requires allowinsecure"}
+		default:
+			return &InvalidOptionsError{Reason: "endpoint scheme must be https"}
 		}
-	default:
-		return &InvalidOptionsError{Reason: "endpoint scheme must be https"}
 	}
 	return nil
 }

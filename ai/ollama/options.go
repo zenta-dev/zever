@@ -3,9 +3,9 @@ package ollama
 import (
 	"errors"
 	"net/http"
-	"net/url"
-	"strings"
 	"time"
+
+	"github.com/zenta-dev/zever/internal/endpoint"
 )
 
 // DefaultAddr is the Ollama server address used when Options.Addr is empty.
@@ -48,28 +48,30 @@ func (o Options) Validate() error {
 // validateAddr rejects addresses that are not plain http(s) URLs
 // without user info or whitespace.
 func validateAddr(addr string) error {
-	if strings.Contains(addr, " ") || strings.Contains(addr, "\n") ||
-		strings.Contains(addr, "\t") || strings.Contains(addr, "\r") ||
-		strings.Contains(addr, "\v") {
-		return errors.New("ollama: addr must not contain whitespace")
-	}
-
-	u, err := url.Parse(addr)
-	if err != nil {
-		return errors.New("ollama: addr must be a valid URL")
-	}
-
-	if u.Scheme != "http" && u.Scheme != "https" {
-		return errors.New("ollama: addr must have http or https scheme")
-	}
-
-	if u.Host == "" {
-		return errors.New("ollama: addr must have a host")
-	}
-
-	if u.User != nil {
-		return errors.New("ollama: addr must not contain user info")
+	if _, err := endpoint.ValidateURL(addr,
+		endpoint.WithAllowInsecure(true),
+		endpoint.WithRejectUserinfo(),
+		endpoint.WithRejectWhitespace(),
+	); err != nil {
+		return errors.New("ollama: addr " + addrReason(err))
 	}
 
 	return nil
+}
+
+// addrReason maps endpoint validation failures to the historical addr
+// shape fragments.
+func addrReason(err error) string {
+	switch {
+	case errors.Is(err, endpoint.ErrWhitespace):
+		return "must not contain whitespace"
+	case errors.Is(err, endpoint.ErrParse):
+		return "must be a valid URL"
+	case errors.Is(err, endpoint.ErrNoHost):
+		return "must have a host"
+	case errors.Is(err, endpoint.ErrUserinfo):
+		return "must not contain user info"
+	default:
+		return "must have http or https scheme"
+	}
 }

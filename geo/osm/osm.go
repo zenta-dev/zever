@@ -13,6 +13,7 @@ import (
 	"time"
 
 	"github.com/zenta-dev/zever/geo"
+	endpointpkg "github.com/zenta-dev/zever/internal/endpoint"
 	"github.com/zenta-dev/zever/internal/httpclient"
 )
 
@@ -70,15 +71,16 @@ func New(opts geo.Options) (geo.Geo, error) {
 }
 
 func validateEndpoint(endpoint string, allowInsecure bool) error {
-	u, err := url.Parse(endpoint)
-	if err != nil || u.Scheme == "" || u.Host == "" {
-		return fmt.Errorf("geo: osm: %w: endpoint must be a valid URL", geo.ErrInvalidOptions)
-	}
-	if u.Scheme == "http" && !allowInsecure {
-		return fmt.Errorf("geo: osm: %w: endpoint must use https", geo.ErrInvalidOptions)
-	}
-	if u.Scheme != "https" && u.Scheme != "http" {
-		return fmt.Errorf("geo: osm: %w: endpoint must use https", geo.ErrInvalidOptions)
+	if _, err := endpointpkg.ValidateURL(endpoint, endpointpkg.WithAllowInsecure(allowInsecure)); err != nil {
+		switch {
+		case errors.Is(err, endpointpkg.ErrParse),
+			errors.Is(err, endpointpkg.ErrEmpty),
+			errors.Is(err, endpointpkg.ErrNoScheme),
+			errors.Is(err, endpointpkg.ErrNoHost):
+			return fmt.Errorf("geo: osm: %w: endpoint must be a valid URL", geo.ErrInvalidOptions)
+		default:
+			return fmt.Errorf("geo: osm: %w: endpoint must use https", geo.ErrInvalidOptions)
+		}
 	}
 	return nil
 }
