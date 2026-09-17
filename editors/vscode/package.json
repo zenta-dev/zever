@@ -1,0 +1,60 @@
+{
+  "name": "zever-dsl",
+  "displayName": "Zever DSL",
+  "description": "Syntax highlighting and language server client integration for the zever schema DSL (.zen files)",
+  "version": "0.1.0",
+  "publisher": "zenta-dev",
+  "license": "MIT",
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/zenta-dev/zever.git"
+  },
+  "engines": {
+    "vscode": "^1.91.0"
+  },
+  "categories": [
+    "Programming Languages"
+  ],
+  "activationEvents": [
+    "onLanguage:zen"
+  ],
+  "main": "./out/extension.js",
+  "contributes": {
+    "languages": [
+      {
+        "id": "zen",
+        "aliases": [
+          "Zen",
+          "zen"
+        ],
+        "extensions": [
+          ".zen"
+        ],
+        "configuration": "./language-configuration.json"
+      }
+    ],
+    "grammars": [
+      {
+        "language": "zen",
+        "scopeName": "source.zen",
+        "path": "./syntaxes/zen.tmLanguage.json"
+      }
+    ]
+  },
+  "scripts": {
+    "compile": "tsc -p ./",
+    "watch": "tsc -watch -p ./",
+    "test": "tsc -p ./ && node --test out/extension.test.js",
+    "test:grammar": "textmate-grammar-snap --grammar ./syntaxes/zen.tmLanguage.json --scope source.zen \"test/grammar/**/*.zen\"",
+    "package": "vsce package"
+  },
+  "dependencies": {
+    "vscode-languageclient": "^10.1.1"
+  },
+  "devDependencies": {
+    "typescript": "^5.4.0",
+    "@types/vscode": "^1.91.0",
+    "@types/node": "^20.11.0",
+    "textmate-grammar-test": "^0.7.0"
+  }
+}

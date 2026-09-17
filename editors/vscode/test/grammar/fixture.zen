@@ -1,0 +1,50 @@
+// Fixture exercising every TextMate rule in zen.tmLanguage.json:
+// comments, strings (+escapes), durations, numbers, keywords, booleans,
+// scalar types, block labels, HTTP verbs, @attributes, ->, punctuation.
+// Modules are dir-derived (no module blocks in the language).
+entity User {
+  id uuid @primary
+  email string @unique @validate(email)
+  age int32 @default(30)
+  score float64 @default(1.5)
+  active bool @default(true)
+  archived bool @default(false)
+  created timestamp @default(now())
+  birthday date
+  avatar bytes
+  prefs json
+  big int64
+  ratio float32
+  attempts int32 @validate(min(1))
+  ttl 30s
+  budget 2500
+  pi 3.14
+  note "quoted \"escaped\" string"
+  status enum(active, archived)
+}
+
+has_many User -> Order
+has_one User -> Profile
+belongs_to Order -> User
+many_to_many Student -> Course join_table(enrollments)
+
+index User(email)
+
+enum Role { admin member }
+
+message UserCreated {
+  user uuid @primary
+}
+
+service Users {
+  rpc GetUser(User) -> User http(GET "/users")
+  rpc CreateUser(User) -> User http(POST "/users") auth permission("users.write") required(id, email)
+  rpc UpdateUser(User) -> User http(PUT "/users") validate(id)
+  rpc PatchUser(User) -> User http(PATCH "/users")
+  rpc DeleteUser(User) -> User http(DELETE "/users") on_delete(cascade) foreign_key(user_id) unique(email) default(role)
+}
+
+job Backfill {
+  queue(emails) retry(max_attempts(3)) dispatch(worker) cron("0 * * * *")
+  schedule nightly cron("0 2 * * *")
+}
