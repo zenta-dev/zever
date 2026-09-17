@@ -1,13 +1,10 @@
 package fiber
 
 import (
-	"bytes"
 	"context"
 	"fmt"
-	"log"
 	"net/http"
 	"net/http/httptest"
-	"os"
 	"strings"
 	"testing"
 
@@ -56,14 +53,10 @@ func serveCases(t *testing.T, r router.Router, cases []serveCase) {
 	}
 }
 
-func captureLog(t *testing.T) *bytes.Buffer {
+func captureLog(t *testing.T) *captureLogger {
 	t.Helper()
 
-	var buf bytes.Buffer
-	log.SetOutput(&buf)
-	t.Cleanup(func() { log.SetOutput(os.Stderr) })
-
-	return &buf
+	return &captureLogger{}
 }
 
 func TestNew_defaultAppName(t *testing.T) {
@@ -175,7 +168,7 @@ func TestFiberCaseDistinctRoutes(t *testing.T) {
 
 func TestFiberUnknownMethodSkipped(t *testing.T) {
 	buf := captureLog(t)
-	r := newRouter(t, router.Options{})
+	r := newRouter(t, router.Options{Logger: buf})
 	r.Handle("BREW", "/brew", func(w http.ResponseWriter, _ *http.Request) {
 		_, _ = w.Write([]byte("never"))
 	})
@@ -192,7 +185,7 @@ func TestFiberUnknownMethodSkipped(t *testing.T) {
 
 func TestFiberMalformedPatternSkipped(t *testing.T) {
 	buf := captureLog(t)
-	r := newRouter(t, router.Options{})
+	r := newRouter(t, router.Options{Logger: buf})
 	r.Handle("GET", "/items/:id<", func(w http.ResponseWriter, _ *http.Request) {
 		_, _ = w.Write([]byte("never"))
 	})
@@ -314,7 +307,7 @@ func TestFiberNativeRegexWrapperMatches(t *testing.T) {
 
 func TestFiberDuplicateRouteNotRegisteredTwice(t *testing.T) {
 	buf := captureLog(t)
-	r := newRouter(t, router.Options{})
+	r := newRouter(t, router.Options{Logger: buf})
 	r.Handle("GET", "/dup", func(w http.ResponseWriter, _ *http.Request) {
 		_, _ = w.Write([]byte("first"))
 	})
@@ -401,7 +394,7 @@ func TestFiberGroupColonPrefix(t *testing.T) {
 
 func TestFiberGroupColonPrefixDedup(t *testing.T) {
 	buf := captureLog(t)
-	r := newRouter(t, router.Options{})
+	r := newRouter(t, router.Options{Logger: buf})
 
 	g := r.Group("/orgs/:org")
 	g.Handle("GET", "/items/:id", func(w http.ResponseWriter, _ *http.Request) {
@@ -423,7 +416,7 @@ func TestFiberGroupColonPrefixDedup(t *testing.T) {
 
 func TestFiberGroupMalformedHandleSkipped(t *testing.T) {
 	buf := captureLog(t)
-	r := newRouter(t, router.Options{})
+	r := newRouter(t, router.Options{Logger: buf})
 
 	g := r.Group("/api")
 	g.Handle("GET", "/items/:id<", func(w http.ResponseWriter, _ *http.Request) {
@@ -442,7 +435,7 @@ func TestFiberGroupMalformedHandleSkipped(t *testing.T) {
 
 func TestFiberGroupMalformedPrefixFallback(t *testing.T) {
 	buf := captureLog(t)
-	r := newRouter(t, router.Options{})
+	r := newRouter(t, router.Options{Logger: buf})
 
 	g := r.Group("/bad/:id<")
 	if g == nil {
@@ -515,7 +508,7 @@ func TestFiberColonRegexConstraintEnforced(t *testing.T) {
 
 func TestFiberColonBraceRegexDedup(t *testing.T) {
 	buf := captureLog(t)
-	r := newRouter(t, router.Options{})
+	r := newRouter(t, router.Options{Logger: buf})
 	r.Handle("GET", "/items/{id:[0-9]+}", func(w http.ResponseWriter, req *http.Request) {
 		_, _ = w.Write([]byte("brace:" + router.Param(req, "id")))
 	})
@@ -560,7 +553,7 @@ func TestFiberNestedGroupMiddleware(t *testing.T) {
 
 func TestFiberGroupFailedAddNotMarked(t *testing.T) {
 	buf := captureLog(t)
-	r := newRouter(t, router.Options{})
+	r := newRouter(t, router.Options{Logger: buf})
 
 	g := r.Group("/g")
 
@@ -614,7 +607,7 @@ func TestFiberGroupColonRegexPrefix(t *testing.T) {
 
 func TestFiberFailedAddNotMarkedAndRetryWorks(t *testing.T) {
 	buf := captureLog(t)
-	r := newRouter(t, router.Options{})
+	r := newRouter(t, router.Options{Logger: buf})
 
 	var brokenBuilder strings.Builder
 	brokenBuilder.WriteString("/deep")

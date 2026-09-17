@@ -2,7 +2,6 @@ package fiber
 
 import (
 	"fmt"
-	"log"
 	"net/http"
 	"runtime/debug"
 	"strings"
@@ -12,6 +11,8 @@ import (
 	"github.com/gofiber/fiber/v2"
 	recovermw "github.com/gofiber/fiber/v2/middleware/recover"
 
+	"github.com/zenta-dev/zever/log"
+	"github.com/zenta-dev/zever/log/noop"
 	"github.com/zenta-dev/zever/router"
 )
 
@@ -31,13 +32,22 @@ func New(opts router.Options) (router.Router, error) {
 	app := fiber.New(fiber.Config{AppName: appName, CaseSensitive: true})
 	app.Use(recovermw.New())
 
-	return &fiberDriver{app: app, routes: make(map[string]bool)}, nil
+	return &fiberDriver{app: app, routes: make(map[string]bool), logger: opts.Logger}, nil
 }
 
 type fiberDriver struct {
 	app    *fiber.App
 	mu     sync.Mutex
 	routes map[string]bool
+	logger log.Logger
+}
+
+func (d *fiberDriver) log() log.Logger {
+	if d != nil && d.logger != nil {
+		return d.logger
+	}
+
+	return noop.New()
 }
 
 func (d *fiberDriver) Handle(method, pattern string, handler http.HandlerFunc) {
@@ -47,7 +57,7 @@ func (d *fiberDriver) Handle(method, pattern string, handler http.HandlerFunc) {
 	}
 
 	if err := safeAdd(d.app, m, p, wrapHandler(handler)); err != nil {
-		routerLogf("[router] fiber: failed to register route %s %s: %v", m, p, err)
+		d.routerLogf("[router] fiber: failed to register route %s %s: %v", m, p, err)
 
 		return
 	}
@@ -58,12 +68,12 @@ func (d *fiberDriver) Handle(method, pattern string, handler http.HandlerFunc) {
 func (d *fiberDriver) checkRoute(method, pattern string) (string, string, bool) {
 	method = strings.ToUpper(strings.TrimSpace(method))
 	if !router.ValidMethod(method) {
-		routerLogf("[router] fiber: skipping route with unsupported method %q (%s)", method, pattern)
+		d.routerLogf("[router] fiber: skipping route with unsupported method %q (%s)", method, pattern)
 
 		return "", "", false
 	}
 
-	norm, err := convertAndNormalize(pattern)
+	norm, err := d.convertAndNormalize(pattern)
 	if err != nil {
 		return "", "", false
 	}
@@ -79,7 +89,7 @@ func (d *fiberDriver) checkRoute(method, pattern string) (string, string, bool) 
 	defer d.mu.Unlock()
 
 	if d.routes[key] {
-		routerLogf("[router] fiber: skipping duplicate route %s %s", method, pattern)
+		d.routerLogf("[router] fiber: skipping duplicate route %s %s", method, pattern)
 
 		return "", "", false
 	}
@@ -95,7 +105,7 @@ func (d *fiberDriver) markRoute(method, pattern string) {
 }
 
 func (d *fiberDriver) Group(prefix string, middlewares ...func(http.Handler) http.Handler) router.Group {
-	norm, err := convertAndNormalize(prefix)
+	norm, err := d.convertAndNormalize(prefix)
 	if err != nil {
 		// convertAndNormalize already logged; fallback to normalized raw prefix
 		norm = router.NormalizePattern(prefix)
@@ -128,7 +138,7 @@ type fiberGroup struct {
 }
 
 func (g *fiberGroup) Handle(method, pattern string, handler http.HandlerFunc) {
-	norm, err := convertAndNormalize(pattern)
+	norm, err := g.d.convertAndNormalize(pattern)
 	if err != nil {
 		return
 	}
@@ -136,7 +146,7 @@ func (g *fiberGroup) Handle(method, pattern string, handler http.HandlerFunc) {
 	p := router.NormalizePattern(norm)
 	if m, _, ok := g.d.checkRoute(method, g.fullPath(p)); ok {
 		if err := safeAdd(g.group, m, p, wrapHandler(handler)); err != nil {
-			routerLogf("[router] fiber: failed to register route %s %s: %v", m, p, err)
+			g.d.routerLogf("[router] fiber: failed to register route %s %s: %v", m, p, err)
 
 			return
 		}
@@ -146,7 +156,7 @@ func (g *fiberGroup) Handle(method, pattern string, handler http.HandlerFunc) {
 }
 
 func (g *fiberGroup) Group(prefix string, middlewares ...func(http.Handler) http.Handler) router.Group {
-	norm, err := convertAndNormalize(prefix)
+	norm, err := g.d.convertAndNormalize(prefix)
 	if err != nil {
 		// convertAndNormalize already logged; fallback to normalized raw prefix
 		norm = router.NormalizePattern(prefix)
@@ -172,10 +182,10 @@ func (g *fiberGroup) Use(middlewares ...func(http.Handler) http.Handler) {
 	}
 }
 
-func convertAndNormalize(pattern string) (string, error) {
+func (d *fiberDriver) convertAndNormalize(pattern string) (string, error) {
 	converted, err := router.ConvertColonRegex(pattern)
 	if err != nil {
-		routerLogf("[router] fiber: malformed pattern %q: %v", pattern, err)
+		d.routerLogf("[router] fiber: malformed pattern %q: %v", pattern, err)
 
 		return "", err
 	}
@@ -200,8 +210,8 @@ func safeAdd(r fiber.Router, method, pattern string, handler fiber.Handler) (err
 	return nil
 }
 
-func routerLogf(format string, args ...any) {
-	log.Printf(format, args...) //nolint:forbidigo
+func (d *fiberDriver) routerLogf(format string, args ...any) {
+	d.log().Warn().Msgf(format, args...)
 }
 
 func wrapHandler(handler http.HandlerFunc) fiber.Handler {
