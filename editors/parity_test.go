@@ -1,6 +1,8 @@
 // Package editors guards parity between the editor grammars shipped under
 // editors/nvim and editors/vscode and the DSL compiler's source of truth
-// (token.Keywords and the resolver scalar table).
+// (token.Keywords and the resolver scalar table), both funneled through
+// internal/dsl/gengrammar — the generator that owns the canonical word
+// lists and can regenerate the two grammar files outright.
 //
 // The package contains only tests — there is no runtime code — so the
 // package comment lives here instead of a doc.go.
@@ -18,7 +20,7 @@ import (
 	"strings"
 	"testing"
 
-	"github.com/zenta-dev/zever/internal/dsl/token"
+	"github.com/zenta-dev/zever/internal/dsl/gengrammar"
 )
 
 // Grammar file locations, relative to the editors package directory (the
@@ -35,33 +37,24 @@ var (
 // Sources of truth named in failure messages.
 const (
 	truthKeywords = "token.Keywords"
-	truthScalars  = "resolver scalarTypes (internal/dsl/resolver/resolver_entity.go)"
+	truthScalars  = "resolver.ScalarTypeNames (internal/dsl/resolver/resolver_entity.go)"
 )
 
-// expectedScalarTypes is the fixed v1 scalar set. It intentionally
-// duplicates — rather than imports — the unexported scalarTypes table in
-// internal/dsl/resolver/resolver_entity.go, so this test fails loudly if
-// that table gains or loses a type without a matching grammar update.
-var expectedScalarTypes = []string{
-	"uuid", "string", "int32", "int64",
-	"float32", "float64", "bool",
-	"timestamp", "date", "bytes", "json",
-}
-
-// expectedBooleans lists the boolean literals, which are keywords to the
-// lexer (token.TRUE/token.FALSE) but highlighted as a separate group.
-var expectedBooleans = []string{"true", "false"}
-
-// canonicalLabels and canonicalVerbs are the contextual block labels and
-// HTTP verbs shared by both grammars. The lexer sees plain identifiers
-// here, so no compiler table pins them down — parity between the two
-// grammars IS the contract, enforced by runCrossParity.
-var canonicalLabels = []string{
-	"auth", "cron", "dispatch", "http",
-	"join_table", "permission", "queue", "retry",
-}
-
-var canonicalVerbs = []string{"GET", "POST", "PUT", "PATCH", "DELETE"}
+// expectedScalarTypes, expectedBooleans, canonicalLabels, and canonicalVerbs
+// are read from internal/dsl/gengrammar instead of being hardcoded here a
+// second time. gengrammar.Keywords()/ScalarTypes() derive from
+// token.Keywords / resolver.ScalarTypeNames directly; Booleans/Labels/Verbs
+// are gengrammar's own canonical lists (no compiler table backs contextual
+// labels or HTTP verbs — see gengrammar's package doc). This leaves exactly
+// two copies of the DSL's word lists in the repo: the compiler tables
+// themselves, and gengrammar, which both generates the grammar files from
+// them and is the sole source these tests compare against.
+var (
+	expectedScalarTypes = gengrammar.ScalarTypes()
+	expectedBooleans    = gengrammar.Booleans
+	canonicalLabels     = gengrammar.Labels
+	canonicalVerbs      = gengrammar.Verbs
+)
 
 // reporter is the subset of testing.TB used by the parity helpers. Real
 // tests pass *testing.T; negative-case tests pass *fakeReporter so every
@@ -357,20 +350,11 @@ func diffSets(got, want map[string]struct{}) (missing, extra []string) {
 	return missing, extra
 }
 
-// expectedKeywords derives the reserved-word set from token.Keywords,
-// minus the true/false literals highlighted as booleans.
+// expectedKeywords derives the reserved-word set from gengrammar.Keywords
+// (itself token.Keywords minus the true/false literals highlighted as
+// booleans).
 func expectedKeywords() map[string]struct{} {
-	out := make(map[string]struct{}, len(token.Keywords))
-
-	for w := range token.Keywords {
-		if w == "true" || w == "false" {
-			continue
-		}
-
-		out[w] = struct{}{}
-	}
-
-	return out
+	return toSet(gengrammar.Keywords())
 }
 
 // checkWordSet reports one line per drifted word naming the exact file,
@@ -604,6 +588,29 @@ func TestParityTmGrammar_skipsWhenAbsent(t *testing.T) {
 // between the two grammars, skipping unless both are present.
 func TestParityLabelsVerbsCross_skipsWhenAbsent(t *testing.T) {
 	runCrossParity(t)
+}
+
+// TestGeneratedGrammarsMatchCheckedIn is the primary drift detector: it
+// regenerates both grammar files with internal/dsl/gengrammar and diffs the
+// result byte-for-byte against the checked-in files. Any hand-edit of a
+// grammar file that isn't backed by a matching `make generate` run fails
+// here, which is a clearer and more direct signal than the word-set cross
+// checks above (those catch the compiler tables and the two grammars
+// disagreeing; this one catches a grammar file disagreeing with its own
+// generator).
+func TestGeneratedGrammarsMatchCheckedIn(t *testing.T) {
+	for path, want := range gengrammar.Files() {
+		checkedIn := filepath.Join("..", path)
+
+		got, err := os.ReadFile(checkedIn)
+		if err != nil {
+			t.Fatalf("read checked-in %s: %v", path, err)
+		}
+
+		if string(got) != string(want) {
+			t.Errorf("%s is out of date with internal/dsl/gengrammar; run `make generate` and commit the result\n--- want (generated) ---\n%s\n--- got (checked in) ---\n%s", path, want, got)
+		}
+	}
 }
 
 // TestParseVimKeywordGroup_synthetic unit-tests the vim keyword parser.
