@@ -12,7 +12,7 @@ import (
 
 // This file implements undoing the most recent DDL statements Apply applied,
 // by SYNTHESIZING an inverse for each from the metadata recorded in
-// schema_migrations. Moved from cmd/zengo/migrate_rollback.go.
+// schema_migrations. Moved from orm/migrate/rollback.go.
 //
 // WHY IT WORKS THIS WAY. This tool has no migration files, so there is no
 // "down()" to run: every forward statement is derived fresh from the current

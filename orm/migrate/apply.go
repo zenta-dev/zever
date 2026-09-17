@@ -12,7 +12,7 @@ import (
 )
 
 // This file implements statement execution and checksum bookkeeping, moved
-// from cmd/zengo/migrate.go and cmd/zengo/migrate_diff.go: Apply executes a
+// from orm/migrate/apply.go and orm/migrate/diff.go: Apply executes a
 // previously-computed MigrationPlan, skipping any statement already recorded
 // as applied and recording every newly-applied one.
 
@@ -45,7 +45,7 @@ var migrationTrackingColumns = []struct{ Name, Type string }{
 // already there is to look.
 //
 // Apply calls this itself before executing a plan; a caller that needs the
-// bookkeeping table ready before doing anything else (e.g. `zengo db
+// bookkeeping table ready before doing anything else (e.g. `zever db
 // rollback` reading rows before Apply ever runs) may call it directly too --
 // it is idempotent.
 func EnsureMigrationsTable(ctx context.Context, conn db.DB, dialect string) error {

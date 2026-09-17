@@ -6,15 +6,15 @@
 // separately -- executes a previously-computed plan while recording a
 // checksum of every statement it applies so a re-run is a no-op.
 //
-// This is adapted, not rebuilt, from cmd/zengo's original
-// migrate/migrate_diff/migrate_constraints/migrate_typeaffinity/
-// migrate_rollback implementation: the diffing rules, statement rendering,
+// This is adapted, not rebuilt, from orm/migrate's original
+// apply/diff/constraints/typeaffinity/
+// rollback implementation: the diffing rules, statement rendering,
 // and rollback-inversion logic are unchanged, only moved into this
 // importable package and split into an explicit compute-a-plan (Plan) /
-// execute-a-plan (Apply) pair. cmd/zengo's `zengo db migrate` and
-// `zengo db rollback` commands are now thin wrappers over this package's
+// execute-a-plan (Apply) pair. cmd/zever's `zever db migrate` and
+// `zever db rollback` commands are now thin wrappers over this package's
 // public API: flag parsing, prompts, and user-facing output formatting stay
-// in cmd/zengo; the actual diff/apply/rollback computation lives here.
+// in cmd/zever; the actual diff/apply/rollback computation lives here.
 //
 // # Scope
 //

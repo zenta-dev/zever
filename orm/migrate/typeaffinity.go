@@ -11,7 +11,7 @@ import (
 // This file holds the type-comparison half of the diffing engine: turning a
 // dialect-native type spelling (either the one atlas renders from the
 // schema, or the one introspected from a live database) into a form the two
-// can be compared in. Moved from cmd/zengo/migrate_typeaffinity.go.
+// can be compared in. Moved from orm/migrate/typeaffinity.go.
 //
 // The guiding rule throughout is: PREFER FALSE NEGATIVES. A type change this
 // code fails to notice leaves the database as it was, which is recoverable.
