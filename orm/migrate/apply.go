@@ -74,11 +74,11 @@ func EnsureMigrationsTable(ctx context.Context, conn db.DB, dialect string) erro
   applied_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP
 );`
 	default:
-		return fmt.Errorf("[zen/migrate] unsupported dialect %q", dialect)
+		return fmt.Errorf("[orm/migrate] unsupported dialect %q", dialect)
 	}
 
 	if _, err := conn.Exec(ctx, stmt); err != nil {
-		return fmt.Errorf("[zen/migrate] create %s: %w", schemaMigrationsTable, err)
+		return fmt.Errorf("[orm/migrate] create %s: %w", schemaMigrationsTable, err)
 	}
 
 	return addMigrationTrackingColumns(ctx, conn, dialect)
@@ -135,11 +135,11 @@ func addMigrationTrackingColumns(ctx context.Context, conn db.DB, dialect string
 			stmt = fmt.Sprintf("ALTER TABLE %s ADD COLUMN %s %s;",
 				schemaMigrationsTable, quoteIdent(dialect, col.Name), col.Type)
 		default:
-			return fmt.Errorf("[zen/migrate] unsupported dialect %q", dialect)
+			return fmt.Errorf("[orm/migrate] unsupported dialect %q", dialect)
 		}
 
 		if _, err := conn.Exec(ctx, stmt); err != nil {
-			return fmt.Errorf("[zen/migrate] add %s.%s: %w", schemaMigrationsTable, col.Name, err)
+			return fmt.Errorf("[orm/migrate] add %s.%s: %w", schemaMigrationsTable, col.Name, err)
 		}
 	}
 
@@ -159,7 +159,7 @@ func ChecksumOf(stmt string) string {
 func migrationApplied(ctx context.Context, conn db.DB, checksum string) (bool, error) {
 	rows, err := conn.Query(ctx, "SELECT 1 FROM schema_migrations WHERE checksum = ? LIMIT 1", checksum)
 	if err != nil {
-		return false, fmt.Errorf("[zen/migrate] query %s: %w", schemaMigrationsTable, err)
+		return false, fmt.Errorf("[orm/migrate] query %s: %w", schemaMigrationsTable, err)
 	}
 
 	defer func() {
@@ -180,7 +180,7 @@ func recordMigration(ctx context.Context, conn db.DB, checksum string, meta migr
 		checksum, meta.Kind, meta.Table, meta.Column, meta.Statement, meta.PriorType, meta.PriorName,
 		meta.ObjectName, meta.PriorSQL,
 	); err != nil {
-		return fmt.Errorf("[zen/migrate] record %s: %w", schemaMigrationsTable, err)
+		return fmt.Errorf("[orm/migrate] record %s: %w", schemaMigrationsTable, err)
 	}
 
 	return nil
@@ -193,7 +193,7 @@ func recordMigration(ctx context.Context, conn db.DB, checksum string, meta migr
 // an already-applied plan returns 0 with a nil error.
 func Apply(ctx context.Context, exec db.DB, plan *MigrationPlan) (int, error) {
 	if plan == nil {
-		return 0, errors.New("[zen/migrate] Apply called with a nil plan")
+		return 0, errors.New("[orm/migrate] Apply called with a nil plan")
 	}
 
 	if err := EnsureMigrationsTable(ctx, exec, plan.Dialect); err != nil {
@@ -295,7 +295,7 @@ func dialectOf(conn db.DB) string {
 func applyStatementInTx(ctx context.Context, conn db.DB, stmt plannedStatement, sum string) error {
 	err := db.WithTx(ctx, conn, nil, func(txCtx context.Context, tx db.Tx) error {
 		if _, err := tx.Exec(txCtx, stmt.SQL); err != nil {
-			return fmt.Errorf("[zen/migrate] exec %q: %w", firstLine(stmt.SQL), err)
+			return fmt.Errorf("[orm/migrate] exec %q: %w", firstLine(stmt.SQL), err)
 		}
 
 		if err := recordMigration(txCtx, tx, sum, stmt.Meta); err != nil {
@@ -316,7 +316,7 @@ func applyStatementInTx(ctx context.Context, conn db.DB, stmt plannedStatement, 
 // any executor that does not implement db.Transactor.
 func applyStatementUnguarded(ctx context.Context, conn db.DB, stmt plannedStatement, sum string) error {
 	if _, err := conn.Exec(ctx, stmt.SQL); err != nil {
-		return fmt.Errorf("[zen/migrate] exec %q: %w", firstLine(stmt.SQL), err)
+		return fmt.Errorf("[orm/migrate] exec %q: %w", firstLine(stmt.SQL), err)
 	}
 
 	if err := recordMigration(ctx, conn, sum, stmt.Meta); err != nil {
