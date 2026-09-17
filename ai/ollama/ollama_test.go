@@ -962,10 +962,14 @@ func openStreamBlocked(t *testing.T, body string) (<-chan ai.StreamChunk, contex
 }
 
 // drainClosed drains ch until close, asserting no error chunks arrive.
-func drainClosed(t *testing.T, ch <-chan ai.StreamChunk) {
+func drainClosed(t *testing.T, ch <-chan ai.StreamChunk, allowErr bool) {
 	t.Helper()
 
-	const wantChunks = 32
+	// At least the 32 buffered chunks must arrive: after cancel the
+	// writer may still win a send-vs-Done select and deliver trailing
+	// chunks before noticing cancellation, so an exact count is racy by
+	// construction. Closure (no leak, no stall) is what is asserted.
+	const minChunks = 32
 
 	var n int
 
@@ -974,14 +978,14 @@ func drainClosed(t *testing.T, ch <-chan ai.StreamChunk) {
 		select {
 		case c, ok := <-ch:
 			if !ok {
-				if n != wantChunks {
-					t.Fatalf("chunks = %d, want %d", n, wantChunks)
+				if n < minChunks {
+					t.Fatalf("chunks = %d, want at least %d", n, minChunks)
 				}
 
 				return
 			}
 
-			if c.Err != nil {
+			if c.Err != nil && !allowErr {
 				t.Fatalf("chunk err: %v", c.Err)
 			}
 
@@ -997,7 +1001,7 @@ func TestStream_cancelWhileBlocked_plain(t *testing.T) {
 	ch, cancel := openStreamBlocked(t, strings.Repeat(line, 40))
 
 	cancel()
-	drainClosed(t, ch)
+	drainClosed(t, ch, false)
 }
 
 func TestStream_cancelWhileBlocked_toolContent(t *testing.T) {
@@ -1005,7 +1009,7 @@ func TestStream_cancelWhileBlocked_toolContent(t *testing.T) {
 	ch, cancel := openStreamBlocked(t, strings.Repeat(line, 40))
 
 	cancel()
-	drainClosed(t, ch)
+	drainClosed(t, ch, false)
 }
 
 func TestStream_cancelWhileBlocked_toolOnly(t *testing.T) {
@@ -1013,7 +1017,7 @@ func TestStream_cancelWhileBlocked_toolOnly(t *testing.T) {
 	ch, cancel := openStreamBlocked(t, strings.Repeat(line, 40))
 
 	cancel()
-	drainClosed(t, ch)
+	drainClosed(t, ch, false)
 }
 
 func TestStream_cancelWhileBlocked_finalDone(t *testing.T) {
@@ -1022,7 +1026,7 @@ func TestStream_cancelWhileBlocked_finalDone(t *testing.T) {
 	ch, cancel := openStreamBlocked(t, strings.Repeat(tool, 31)+last)
 
 	cancel()
-	drainClosed(t, ch)
+	drainClosed(t, ch, false)
 }
 
 func TestStream_cancelWhileBlocked_decodeError(t *testing.T) {
@@ -1030,7 +1034,7 @@ func TestStream_cancelWhileBlocked_decodeError(t *testing.T) {
 	ch, cancel := openStreamBlocked(t, strings.Repeat(line, 32)+"{bad\n")
 
 	cancel()
-	drainClosed(t, ch)
+	drainClosed(t, ch, true)
 }
 
 func TestStream_cancelWhileBlocked_serverError(t *testing.T) {
@@ -1038,7 +1042,7 @@ func TestStream_cancelWhileBlocked_serverError(t *testing.T) {
 	ch, cancel := openStreamBlocked(t, strings.Repeat(line, 32)+"{\"error\":\"gone\"}\n")
 
 	cancel()
-	drainClosed(t, ch)
+	drainClosed(t, ch, true)
 }
 
 func TestTruncateForError(t *testing.T) {
