@@ -29,7 +29,7 @@ var AnnotationsProtoSource string
 // go_package pointing back inside this framework's own module into that
 // project's generated code, rather than into the project's own locally
 // compiled copy of the same file.
-const defaultAnnotationsGoPackageRoot = "github.com/zenta-dev/zen-go/gen/zengo/annotations"
+const defaultAnnotationsGoPackageRoot = "github.com/zenta-dev/zever/gen/zengo/annotations"
 
 // annotationsGoPackageLine is the exact "option go_package = ...;" line
 // AnnotationsProtoSource declares, targeted by annotationsProtoSource for a

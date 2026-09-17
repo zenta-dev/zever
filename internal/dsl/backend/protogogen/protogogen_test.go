@@ -108,7 +108,7 @@ func TestGenerateIsDeterministic(t *testing.T) {
 }
 
 // TestNewDefaultAnnotationsImportUnchanged locks in New()'s zero-config
-// output: schema.pb.go must still import zen-go's own default annotations
+// output: schema.pb.go must still import zever's own default annotations
 // package path, exactly as before NewWithAnnotationsGoPackageRoot existed.
 func TestNewDefaultAnnotationsImportUnchanged(t *testing.T) {
 	file := compileSchema(t, pingFixture)
@@ -123,7 +123,7 @@ func TestNewDefaultAnnotationsImportUnchanged(t *testing.T) {
 		t.Fatalf("Generate: %v", err)
 	}
 
-	if !strings.Contains(string(out["schema.pb.go"]), "github.com/zenta-dev/zen-go/gen/zengo/annotations") {
+	if !strings.Contains(string(out["schema.pb.go"]), "github.com/zenta-dev/zever/gen/zengo/annotations") {
 		t.Fatalf("New()'s schema.pb.go no longer imports the default annotations package:\n%s", out["schema.pb.go"])
 	}
 }
@@ -152,7 +152,7 @@ func TestNewWithAnnotationsGoPackageRootAppliesToGeneratedGo(t *testing.T) {
 
 	got := string(out["schema.pb.go"])
 
-	if strings.Contains(got, "github.com/zenta-dev/zen-go/gen/zengo/annotations") {
+	if strings.Contains(got, "github.com/zenta-dev/zever/gen/zengo/annotations") {
 		t.Fatalf("schema.pb.go still imports the default annotations package despite the override:\n%s", got)
 	}
 

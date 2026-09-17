@@ -1,7 +1,7 @@
 syntax = "proto3";
 
 // zengo.annotations.v1 defines rpc-level auth/permission metadata for
-// generated zen-go services. google.api.http (see google/api/annotations.proto
+// generated zever services. google.api.http (see google/api/annotations.proto
 // and google/api/http.proto) already standardizes HTTP routing, but there is
 // no equivalent standard for auth/permission, so this small custom extension
 // follows the same pattern many internal proto APIs use for the same gap.
@@ -12,7 +12,7 @@ package zengo.annotations.v1;
 
 import "google/protobuf/descriptor.proto";
 
-option go_package = "github.com/zenta-dev/zen-go/gen/zengo/annotations;annotationsv1";
+option go_package = "github.com/zenta-dev/zever/gen/zengo/annotations;annotationsv1";
 
 extend google.protobuf.MethodOptions {
   Auth auth = 50601;
