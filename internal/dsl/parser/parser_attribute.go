@@ -107,16 +107,11 @@ func (p *Parser) parseArg() *ast.Arg {
 	name := ""
 
 	if isIdentLike(p.cur.Kind) && p.peek.Kind == token.COLON {
-		text, _, ok := p.expectIdentText()
-		if !ok {
-			return nil
-		}
-
-		name = text
-
-		if !p.expect(token.COLON) {
-			return nil
-		}
+		// Proof: isIdentLike(cur) guarantees expectIdentText succeeds (fails only on non-ident-like).
+		name = p.cur.Lit
+		p.advance() // consume ident; cur lands on the peeked COLON.
+		// Proof: peek was COLON so cur is COLON here; expect(COLON) cannot fail.
+		p.advance() // consume ':'.
 	}
 
 	val := p.parseValue()
