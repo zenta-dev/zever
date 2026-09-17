@@ -1,0 +1,5 @@
+# Build / packaging outputs — never commit these.
+out/
+*.vsix
+package-lock.json
+node_modules/
