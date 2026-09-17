@@ -10,13 +10,13 @@ import (
 
 	"github.com/zenta-dev/zever/db"
 	"github.com/zenta-dev/zever/internal/dsl/backend/atlas"
-	"github.com/zenta-dev/zever/zen/migrate"
+	"github.com/zenta-dev/zever/orm/migrate"
 )
 
 // This file implements `zever db rollback`: flag parsing, prompts, and
 // output formatting only. The actual rollback computation (reading recorded
 // migrations, synthesizing an inverse for each, and applying the result)
-// lives in zen/migrate's ComputeRollback/ApplyRollback -- see that
+// lives in orm/migrate's ComputeRollback/ApplyRollback -- see that
 // package's rollback.go for the full "why it works this way" / "what is and
 // is not recoverable" explanation this file used to carry inline.
 

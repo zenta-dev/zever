@@ -252,7 +252,7 @@ func introspectIndexes(
 	case atlas.DialectMySQL:
 		return introspectMySQLIndexes(ctx, conn, table)
 	default:
-		return nil, fmt.Errorf("[zen/migrate] unsupported dialect %q", dialect)
+		return nil, fmt.Errorf("[orm/migrate] unsupported dialect %q", dialect)
 	}
 }
 
@@ -284,7 +284,7 @@ JOIN pg_attribute a ON a.attrelid = t.oid AND a.attnum = ANY(i.indkey)
 WHERE t.relname = ANY(?) AND n.nspname = ? AND NOT i.indisprimary
 ORDER BY t.relname, ix.relname, array_position(i.indkey, a.attnum)`, tables, schema)
 	if err != nil {
-		return nil, fmt.Errorf("[zen/migrate] introspect indexes of schema %q: %w", schema, err)
+		return nil, fmt.Errorf("[orm/migrate] introspect indexes of schema %q: %w", schema, err)
 	}
 
 	defer func() {
@@ -303,7 +303,7 @@ ORDER BY t.relname, ix.relname, array_position(i.indkey, a.attnum)`, tables, sch
 		)
 
 		if err := rows.Scan(&table, &name, &column, &unique); err != nil {
-			return nil, fmt.Errorf("[zen/migrate] scan index of schema %q: %w", schema, err)
+			return nil, fmt.Errorf("[orm/migrate] scan index of schema %q: %w", schema, err)
 		}
 
 		byName, ok := byTableAndName[table]
@@ -324,7 +324,7 @@ ORDER BY t.relname, ix.relname, array_position(i.indkey, a.attnum)`, tables, sch
 	}
 
 	if err := rows.Err(); err != nil {
-		return nil, fmt.Errorf("[zen/migrate] iterate indexes of schema %q: %w", schema, err)
+		return nil, fmt.Errorf("[orm/migrate] iterate indexes of schema %q: %w", schema, err)
 	}
 
 	for table, order := range orderByTable {
@@ -353,7 +353,7 @@ func introspectSQLiteIndexes(ctx context.Context, conn db.DB, table string) ([]l
 	//lint:allow-unsafesql identifier is schema-introspected, not user input
 	rows, err := conn.Query(ctx, fmt.Sprintf("PRAGMA index_list(%s)", atlas.QuoteIdent(table)))
 	if err != nil {
-		return nil, fmt.Errorf("[zen/migrate] introspect indexes of %q: %w", table, err)
+		return nil, fmt.Errorf("[orm/migrate] introspect indexes of %q: %w", table, err)
 	}
 
 	type rawIndex struct {
@@ -375,7 +375,7 @@ func introspectSQLiteIndexes(ctx context.Context, conn db.DB, table string) ([]l
 
 		if err := rows.Scan(&seq, &name, &unique, &origin, &partial); err != nil {
 			_ = rows.Close()
-			return nil, fmt.Errorf("[zen/migrate] scan index_list of %q: %w", table, err)
+			return nil, fmt.Errorf("[orm/migrate] scan index_list of %q: %w", table, err)
 		}
 
 		if origin == "pk" {
@@ -386,7 +386,7 @@ func introspectSQLiteIndexes(ctx context.Context, conn db.DB, table string) ([]l
 	}
 
 	if err := rows.Close(); err != nil {
-		return nil, fmt.Errorf("[zen/migrate] close index_list of %q: %w", table, err)
+		return nil, fmt.Errorf("[orm/migrate] close index_list of %q: %w", table, err)
 	}
 
 	out := make([]liveIndex, 0, len(raw))
@@ -426,7 +426,7 @@ func introspectSQLiteIndexColumns(ctx context.Context, conn db.DB, indexName str
 	//lint:allow-unsafesql identifier is schema-introspected, not user input
 	rows, err := conn.Query(ctx, fmt.Sprintf("PRAGMA index_info(%s)", atlas.QuoteIdent(indexName)))
 	if err != nil {
-		return nil, fmt.Errorf("[zen/migrate] introspect index_info of %q: %w", indexName, err)
+		return nil, fmt.Errorf("[orm/migrate] introspect index_info of %q: %w", indexName, err)
 	}
 
 	defer func() {
@@ -444,7 +444,7 @@ func introspectSQLiteIndexColumns(ctx context.Context, conn db.DB, indexName str
 		)
 
 		if err := rows.Scan(&seqno, &cid, &name); err != nil {
-			return nil, fmt.Errorf("[zen/migrate] scan index_info of %q: %w", indexName, err)
+			return nil, fmt.Errorf("[orm/migrate] scan index_info of %q: %w", indexName, err)
 		}
 
 		if s, ok := name.(string); ok {
@@ -686,7 +686,7 @@ func onDeleteClause(v string) string {
 func renderAddForeignKey(dialect string, e *ir.Entity, fk atlas.ForeignKey) (plannedStatement, error) {
 	if dialect != atlas.DialectPostgres && dialect != atlas.DialectMySQL {
 		return plannedStatement{}, fmt.Errorf(
-			"[zen/migrate] dialect %q cannot add a foreign key constraint to an existing table", dialect)
+			"[orm/migrate] dialect %q cannot add a foreign key constraint to an existing table", dialect)
 	}
 
 	table, err := atlas.QualifiedTableName(dialect, e)
@@ -740,7 +740,7 @@ func introspectForeignKeys(
 	case atlas.DialectMySQL:
 		return introspectMySQLForeignKeys(ctx, conn, table)
 	default:
-		return nil, fmt.Errorf("[zen/migrate] unsupported dialect %q", dialect)
+		return nil, fmt.Errorf("[orm/migrate] unsupported dialect %q", dialect)
 	}
 }
 
@@ -771,7 +771,7 @@ JOIN information_schema.constraint_column_usage ccu
   ON tc.constraint_name = ccu.constraint_name AND tc.table_schema = ccu.table_schema
 WHERE tc.constraint_type = 'FOREIGN KEY' AND tc.table_schema = ? AND tc.table_name = ANY(?)`, schema, tables)
 	if err != nil {
-		return nil, fmt.Errorf("[zen/migrate] introspect foreign keys of schema %q: %w", schema, err)
+		return nil, fmt.Errorf("[orm/migrate] introspect foreign keys of schema %q: %w", schema, err)
 	}
 
 	defer func() {
@@ -783,7 +783,7 @@ WHERE tc.constraint_type = 'FOREIGN KEY' AND tc.table_schema = ? AND tc.table_na
 
 		var fk liveForeignKey
 		if err := rows.Scan(&table, &fk.Column, &fk.RefTable, &fk.RefColumn); err != nil {
-			return nil, fmt.Errorf("[zen/migrate] scan foreign key of schema %q: %w", schema, err)
+			return nil, fmt.Errorf("[orm/migrate] scan foreign key of schema %q: %w", schema, err)
 		}
 
 		out[table] = append(out[table], fk)
@@ -801,7 +801,7 @@ func introspectSQLiteForeignKeys(ctx context.Context, conn db.DB, table string) 
 	//lint:allow-unsafesql identifier is schema-introspected, not user input
 	rows, err := conn.Query(ctx, fmt.Sprintf("PRAGMA foreign_key_list(%s)", atlas.QuoteIdent(table)))
 	if err != nil {
-		return nil, fmt.Errorf("[zen/migrate] introspect foreign keys of %q: %w", table, err)
+		return nil, fmt.Errorf("[orm/migrate] introspect foreign keys of %q: %w", table, err)
 	}
 
 	defer func() {
@@ -820,7 +820,7 @@ func introspectSQLiteForeignKeys(ctx context.Context, conn db.DB, table string) 
 		)
 
 		if err := rows.Scan(&id, &seq, &refTable, &from, &to, &onUpdate, &onDelete, &matchType); err != nil {
-			return nil, fmt.Errorf("[zen/migrate] scan foreign_key_list of %q: %w", table, err)
+			return nil, fmt.Errorf("[orm/migrate] scan foreign_key_list of %q: %w", table, err)
 		}
 
 		out = append(out, liveForeignKey{Column: from, RefTable: refTable, RefColumn: to})

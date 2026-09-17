@@ -41,6 +41,10 @@ require-tools: ## Fail fast if required development tools are missing
 build: ## Build all packages
 	$(GO) build ./...
 
+.PHONY: generate
+generate: ## Regenerate editor grammar files from internal/dsl/gengrammar
+	$(GO) run ./tools/gengrammar
+
 .PHONY: fmt
 fmt: ## Check formatting, fail on unformatted files
 	@test -z "$$($(GOFMT) -l .)" || ($(GOFMT) -l . && exit 1)

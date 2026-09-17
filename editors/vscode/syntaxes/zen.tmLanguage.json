@@ -48,7 +48,7 @@
     },
     "keywords": {
       "name": "keyword.control.zen",
-      "match": "\\b(entity|service|job|schedule|rpc|index|enum|has_many|has_one|belongs_to|many_to_many|message)\\b"
+      "match": "\\b(belongs_to|entity|enum|has_many|has_one|index|job|many_to_many|message|rpc|schedule|service)\\b"
     },
     "booleans": {
       "name": "constant.language.boolean.zen",
@@ -56,11 +56,11 @@
     },
     "types": {
       "name": "support.type.zen",
-      "match": "\\b(uuid|string|int32|int64|float32|float64|bool|timestamp|date|bytes|json)\\b"
+      "match": "\\b(bool|bytes|date|float32|float64|int32|int64|json|string|timestamp|uuid)\\b"
     },
     "labels": {
       "name": "variable.parameter.zen",
-      "match": "\\b(http|auth|queue|retry|cron|dispatch|permission|join_table|foreign_key|on_delete|validate|default|primary|unique|required|GET|POST|PATCH|DELETE|PUT)\\b"
+      "match": "\\b(http|auth|permission|queue|retry|cron|dispatch|join_table|foreign_key|on_delete|validate|default|primary|unique|required|GET|POST|PUT|PATCH|DELETE)\\b"
     },
     "attributes": {
       "name": "entity.other.attribute-name.zen",

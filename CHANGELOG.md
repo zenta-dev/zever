@@ -117,6 +117,12 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   with filetype detection and syntax highlighting.
 - Editor support for the schema DSL: VS Code extension
   (`editors/vscode`) with syntax highlighting and LSP client.
+- Internal `dsl/gengrammar` generator (run via `make generate`,
+  `tools/gengrammar`): derives the Neovim and VS Code grammar files'
+  keyword/boolean/scalar-type word lists from `token.Keywords` and
+  `resolver.ScalarTypeNames` instead of three independently
+  hand-maintained copies; `editors/parity_test.go` now diffs the
+  generator's output against the checked-in grammar files.
 - `zever config show`: prints the resolved, redacted service configuration,
   with a matching TUI dashboard screen.
 
@@ -130,3 +136,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   A nil `Locker` means single-instance mode without slot locks.
 - `eventbus` memory `Close` abandons in-flight handlers on timeout and
   returns nil instead of `DeadlineExceeded`, matching the redis adapter.
+- **Breaking:** the live-schema-diff migration engine moved from
+  `zen/migrate` to `orm/migrate` (import path
+  `github.com/zenta-dev/zever/orm/migrate`), matching this repo's `orm/`
+  query builder package name; `zen/` no longer exists. Update imports
+  accordingly.
