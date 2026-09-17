@@ -1,0 +1,4 @@
+job Ship() {
+	queue: shipping
+	retry: max_attempts(3), backoff(exponential, base: 30s)
+}

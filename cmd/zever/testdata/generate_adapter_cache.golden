@@ -1,0 +1,87 @@
+// Package memcached provides a memcached adapter for the cache battery.
+//
+// SCAFFOLD: every method below is a stub, and this file is meant to be
+// edited. `zever generate adapter cache memcached` wrote the
+// interface/factory boilerplate and nothing else — it cannot know how to
+// talk to whatever memcached is. Replace each "TODO: implement" body (and
+// New) with the real integration; `make lint` will keep reporting the
+// TODOs until you do. Delete this paragraph when the adapter is real.
+//
+// WIRING: zever registers adapters explicitly in
+// container/services.go's registerAdapters, not via init(). After filling
+// in the TODOs, add a Memcached constant to the cache Adapter enum
+// (plus its ParseAdapter case), register the constructor
+// (_ = cache.Register(cache.Memcached, New)), and
+// select it in zever.yaml. Until then this package builds but is
+// unreachable.
+package memcached
+
+import (
+	"context"
+	"errors"
+	"time"
+
+	"github.com/zenta-dev/zever/cache"
+)
+
+// errNotImplemented is returned by every stub method that has not been
+// implemented yet. Delete it once none are left.
+var errNotImplemented = errors.New("[cache] memcached: not implemented")
+
+type adapter struct{}
+
+func (a *adapter) Get(ctx context.Context, key string) ([]byte, error) {
+	// TODO: implement Get.
+	var zero []byte
+
+	return zero, errNotImplemented
+}
+
+func (a *adapter) Set(ctx context.Context, key string, value []byte, ttl time.Duration) error {
+	// TODO: implement Set.
+	return errNotImplemented
+}
+
+func (a *adapter) SetIfAbsent(ctx context.Context, key string, value []byte, ttl time.Duration) (bool, error) {
+	// TODO: implement SetIfAbsent.
+	var zero bool
+
+	return zero, errNotImplemented
+}
+
+func (a *adapter) Delete(ctx context.Context, key string) error {
+	// TODO: implement Delete.
+	return errNotImplemented
+}
+
+func (a *adapter) Increment(ctx context.Context, key string) error {
+	// TODO: implement Increment.
+	return errNotImplemented
+}
+
+func (a *adapter) Decrement(ctx context.Context, key string) error {
+	// TODO: implement Decrement.
+	return errNotImplemented
+}
+
+func (a *adapter) Exists(ctx context.Context, key string) (bool, error) {
+	// TODO: implement Exists.
+	var zero bool
+
+	return zero, errNotImplemented
+}
+
+func (a *adapter) Close(ctx context.Context) error {
+	// TODO: implement Close.
+	return errNotImplemented
+}
+
+// New builds the adapter from the battery-level options.
+//
+// TODO: implement. Map cache.Options onto the connection or client
+// the adapter needs, and fail here rather than at first use if it cannot be
+// established. Register the result by hand (see the package comment): there
+// is no init() here on purpose.
+func New(_ cache.Options) (cache.Cache, error) {
+	return &adapter{}, nil
+}
