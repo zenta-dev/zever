@@ -106,6 +106,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   `tools/zever-lsp` module).
 - Generic `lock` package: distributed lease facade with in-memory
   and Redis backends.
+- Editor support for the schema DSL: VS Code extension
+  (`editors/vscode`) with syntax highlighting and LSP client.
 
 ### Changed
 
