@@ -7,8 +7,20 @@ import (
 	tea "charm.land/bubbletea/v2"
 )
 
+func testEntries() []Entry {
+	return []Entry{
+		{Group: GroupScaffold, Name: "new", Desc: "scaffold a new service", CLI: "zever new", Screen: "NewScaffoldScreen"},
+		{Group: GroupScaffold, Name: "generate", Desc: "generate code from schema", CLI: "zever generate", Screen: "NewGenerateScreen"},
+		{Group: GroupInspect, Name: "check", Desc: "validate schemas", CLI: "zever check", Screen: "NewCheckScreen"},
+		{Group: GroupRuntime, Name: "serve", Desc: "run the HTTP server", CLI: "zever serve", Screen: "NewServeScreen"},
+		{Group: GroupRuntime, Name: "dev", Desc: "run with live reload", CLI: "zever dev", Screen: "NewDevScreen"},
+		{Group: GroupDatabase, Name: "migrate", Desc: "run pending migrations", CLI: "zever db migrate", Screen: "NewMigrateScreen"},
+		{Group: GroupDatabase, Name: "seed", Desc: "seed development data", CLI: "zever db seed", Screen: "NewSeedScreen"},
+	}
+}
+
 func testDashboard() *DashboardModel {
-	m := NewDashboard(nil)
+	m := NewDashboard(testEntries())
 	m.width, m.height = 80, 24
 	return &m
 }
@@ -22,10 +34,10 @@ func updateKey(m *DashboardModel, key tea.KeyPressMsg) (*DashboardModel, tea.Cmd
 	return dm, cmd
 }
 
-func TestDashboardDefaults(t *testing.T) {
+func TestDashboardExplicitEntries(t *testing.T) {
 	m := testDashboard()
-	if len(m.Entries()) != 9 {
-		t.Fatalf("default entries = %d, want 9", len(m.Entries()))
+	if len(m.Entries()) != len(testEntries()) {
+		t.Fatalf("entries = %d, want %d", len(m.Entries()), len(testEntries()))
 	}
 	if m.Cursor() != 0 || m.Filtering() || m.HelpVisible() {
 		t.Fatalf("bad initial state: %+v", m)
@@ -43,6 +55,18 @@ func TestDashboardDefaults(t *testing.T) {
 	for _, g := range GroupOrder {
 		if !seen[g] {
 			t.Fatalf("group %q missing from entries", g)
+		}
+	}
+}
+
+func TestDashboardNilIsEmpty(t *testing.T) {
+	for _, entries := range [][]Entry{nil, {}} {
+		m := NewDashboard(entries)
+		if len(m.Entries()) != 0 {
+			t.Fatalf("NewDashboard(%v) entries = %d, want 0 (no fallback)", entries, len(m.Entries()))
+		}
+		if len(m.Filtered()) != 0 {
+			t.Fatalf("NewDashboard(%v) filtered = %d, want 0", entries, len(m.Filtered()))
 		}
 	}
 }
@@ -277,13 +301,11 @@ Scaffold
   generate  generate code from schema
 
 Inspect
-  doctor  check environment health
-  config  inspect resolved config
+  check  validate schemas
 
 Runtime
   serve  run the HTTP server
   dev  run with live reload
-  tinker  open an interactive REPL
 
 Database
   migrate  run pending migrations
