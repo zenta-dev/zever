@@ -1,0 +1,12 @@
+entity Ping {
+  id: uuid @primary
+  message: string
+}
+
+service PingService {
+  rpc SendPing(message: string) -> Ping {
+    http: POST "/ping"
+    auth: required
+    errors: { not_found }
+  }
+}
