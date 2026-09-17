@@ -4,6 +4,7 @@ import (
 	"bytes"
 	"context"
 	"encoding/json"
+	"errors"
 	"fmt"
 	"io"
 	"net/http"
@@ -12,6 +13,8 @@ import (
 	"time"
 
 	"github.com/zenta-dev/zever/ai"
+	"github.com/zenta-dev/zever/internal/endpoint"
+	"github.com/zenta-dev/zever/internal/httpclient"
 )
 
 const (
@@ -44,7 +47,11 @@ func Open(opts Options) (ai.AI, error) {
 
 	transport := opts.Transport
 	if transport == nil {
-		transport = http.DefaultTransport
+		return &adapter{
+			addr:         addr,
+			defaultModel: opts.Model,
+			client:       httpclient.NewClient(timeout),
+		}, nil
 	}
 
 	return &adapter{
@@ -381,16 +388,11 @@ func postRequest(ctx context.Context, addr, path string, body []byte) (*http.Req
 
 // checkEndpoint enforces the http(s)+host+no-userinfo policy on a parsed URL.
 func checkEndpoint(u *url.URL) error {
-	if u.Scheme != "http" && u.Scheme != "https" {
-		return fmt.Errorf("ollama: url %q must have http or https scheme", u.String())
-	}
-
-	if u.Host == "" {
-		return fmt.Errorf("ollama: url %q must have a host", u.String())
-	}
-
-	if u.User != nil {
-		return fmt.Errorf("ollama: url %q must not contain user info", u.String())
+	if _, err := endpoint.ValidateURL(u.String(),
+		endpoint.WithAllowInsecure(true),
+		endpoint.WithRejectUserinfo(),
+	); err != nil {
+		return fmt.Errorf("ollama: url %q %s", u.String(), addrReason(err))
 	}
 
 	return nil
@@ -410,13 +412,12 @@ func (a *adapter) doPost(ctx context.Context, path string, body []byte) ([]byte,
 
 	defer func() { _ = resp.Body.Close() }()
 
-	respBody, err := io.ReadAll(io.LimitReader(resp.Body, maxResponseBytes+1))
+	respBody, err := httpclient.ReadLimited(resp.Body, maxResponseBytes)
 	if err != nil {
+		if errors.Is(err, httpclient.ErrTooLarge) {
+			return nil, fmt.Errorf("ollama: response exceeds %d bytes", maxResponseBytes)
+		}
 		return nil, fmt.Errorf("ollama: read response: %w", err)
-	}
-
-	if len(respBody) > maxResponseBytes {
-		return nil, fmt.Errorf("ollama: response exceeds %d bytes", maxResponseBytes)
 	}
 
 	if resp.StatusCode != http.StatusOK {

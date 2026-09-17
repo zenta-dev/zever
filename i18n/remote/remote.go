@@ -15,6 +15,7 @@ import (
 	"time"
 
 	"github.com/zenta-dev/zever/i18n"
+	"github.com/zenta-dev/zever/internal/httpclient"
 )
 
 const (
@@ -83,10 +84,6 @@ func New(opts i18n.Options) (i18n.I18n, error) {
 	if maxFlight <= 0 {
 		maxFlight = maxInFlightDef
 	}
-	transport := http.DefaultTransport
-	if tr, ok := http.DefaultTransport.(*http.Transport); ok {
-		transport = tr.Clone()
-	}
 	return &adapter{
 		quit:      make(chan struct{}),
 		lru:       list.New(),
@@ -97,7 +94,7 @@ func New(opts i18n.Options) (i18n.I18n, error) {
 		maxFlight: maxFlight,
 		endpoint:  endpoint,
 		apiKey:    opts.Remote.APIKey,
-		client:    &http.Client{Timeout: timeout, Transport: transport},
+		client:    httpclient.NewClient(timeout),
 	}, nil
 }
 
@@ -367,12 +364,12 @@ func (a *adapter) do(ctx context.Context, op, method, url string, body any) ([]b
 		eb, _ := io.ReadAll(io.LimitReader(resp.Body, maxErrBody))
 		return nil, fmt.Errorf("%w: %s: %d: %s", i18n.ErrRemoteError, op, resp.StatusCode, strings.TrimSpace(string(eb)))
 	}
-	data, err := io.ReadAll(io.LimitReader(resp.Body, maxRespBody+1))
+	data, err := httpclient.ReadLimited(resp.Body, maxRespBody)
 	if err != nil {
+		if errors.Is(err, httpclient.ErrTooLarge) {
+			return nil, fmt.Errorf("%w: %s: response body exceeds %d bytes", i18n.ErrRemoteError, op, maxRespBody)
+		}
 		return nil, fmt.Errorf("remote: %s: %w", op, err)
-	}
-	if len(data) > maxRespBody {
-		return nil, fmt.Errorf("%w: %s: response body exceeds %d bytes", i18n.ErrRemoteError, op, maxRespBody)
 	}
 	return data, nil
 }

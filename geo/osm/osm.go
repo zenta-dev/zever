@@ -5,7 +5,6 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
-	"io"
 	"math"
 	"net/http"
 	"net/url"
@@ -14,6 +13,8 @@ import (
 	"time"
 
 	"github.com/zenta-dev/zever/geo"
+	endpointpkg "github.com/zenta-dev/zever/internal/endpoint"
+	"github.com/zenta-dev/zever/internal/httpclient"
 )
 
 const defaultEndpoint = "https://nominatim.openstreetmap.org"
@@ -63,22 +64,23 @@ func New(opts geo.Options) (geo.Geo, error) {
 	return &osmGeo{
 		endpoint:  endpoint,
 		baseURL:   u,
-		client:    &http.Client{Timeout: timeout},
+		client:    httpclient.NewClient(timeout),
 		userAgent: opts.UserAgent,
 		maxBody:   maxBody,
 	}, nil
 }
 
 func validateEndpoint(endpoint string, allowInsecure bool) error {
-	u, err := url.Parse(endpoint)
-	if err != nil || u.Scheme == "" || u.Host == "" {
-		return fmt.Errorf("geo: osm: %w: endpoint must be a valid URL", geo.ErrInvalidOptions)
-	}
-	if u.Scheme == "http" && !allowInsecure {
-		return fmt.Errorf("geo: osm: %w: endpoint must use https", geo.ErrInvalidOptions)
-	}
-	if u.Scheme != "https" && u.Scheme != "http" {
-		return fmt.Errorf("geo: osm: %w: endpoint must use https", geo.ErrInvalidOptions)
+	if _, err := endpointpkg.ValidateURL(endpoint, endpointpkg.WithAllowInsecure(allowInsecure)); err != nil {
+		switch {
+		case errors.Is(err, endpointpkg.ErrParse),
+			errors.Is(err, endpointpkg.ErrEmpty),
+			errors.Is(err, endpointpkg.ErrNoScheme),
+			errors.Is(err, endpointpkg.ErrNoHost):
+			return fmt.Errorf("geo: osm: %w: endpoint must be a valid URL", geo.ErrInvalidOptions)
+		default:
+			return fmt.Errorf("geo: osm: %w: endpoint must use https", geo.ErrInvalidOptions)
+		}
 	}
 	return nil
 }
@@ -273,13 +275,12 @@ func redactURLError(err error) error {
 }
 
 func readLimitedBody(resp *http.Response, limit int64) ([]byte, error) {
-	r := io.LimitReader(resp.Body, limit+1)
-	data, err := io.ReadAll(r)
+	data, err := httpclient.ReadLimited(resp.Body, limit)
 	if err != nil {
+		if errors.Is(err, httpclient.ErrTooLarge) {
+			return nil, fmt.Errorf("geo: osm: %w", geo.ErrTooLarge)
+		}
 		return nil, fmt.Errorf("geo: osm: read: %w", err)
-	}
-	if int64(len(data)) > limit {
-		return nil, fmt.Errorf("geo: osm: %w", geo.ErrTooLarge)
 	}
 	return data, nil
 }
