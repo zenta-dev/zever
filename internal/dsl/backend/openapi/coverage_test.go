@@ -3,10 +3,16 @@
 //
 // Reachability notes:
 //   - Generate's two json.MarshalIndent error branches (openapi.go) are
-//     provably unreachable via the public API: openAPIDoc is a plain struct
-//     of strings, maps, slices, and pointers with no MarshalJSON methods and
-//     no interface fields that could hold an unmarshalable value, so
-//     marshaling cannot fail. They are documented here instead of covered.
+//     unreachable via the public API with real inputs: openAPIDoc is a plain
+//     struct of strings, maps, slices, and pointers with no MarshalJSON
+//     methods and no interface fields that could hold an unmarshalable
+//     value, so marshaling cannot fail. They are covered via the
+//     jsonMarshalIndent test seam in marshal_error_test.go instead.
+//     (Caller-controlled any-typed Validation.Args values only flow through
+//     toInt64/toFloat64 into concrete numeric fields, so no fault-injectable
+//     input reaches the marshaler; a seam is required. The merged branch in
+//     particular cannot be triggered by input alone, since any value failing
+//     the merged marshal would already fail its own module marshal first.)
 //   - Every other branch below is covered, either via Generate or by direct
 //     unit calls into the same package.
 package openapi
