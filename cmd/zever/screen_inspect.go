@@ -168,6 +168,13 @@ func buildDoctorCLI(configPath string) string {
 	return "zever doctor --config " + strings.TrimSpace(configPath)
 }
 
+func buildConfigCLI(configPath string) string {
+	if strings.TrimSpace(configPath) == "" {
+		return "zever config show"
+	}
+	return "zever config show --config " + strings.TrimSpace(configPath)
+}
+
 func buildRoutesCLI(files []string) string {
 	return joinCLI("zever routes", filesOrEmpty(files))
 }
@@ -193,6 +200,7 @@ func RegisterInspectScreens() []tui.Entry {
 		{Group: tui.GroupInspect, Name: "breaking", Desc: "report API-breaking changes", CLI: "zever breaking", Screen: "NewBreakingScreen"},
 		{Group: tui.GroupInspect, Name: "fmt", Desc: "format .zen schemas", CLI: "zever fmt", Screen: "NewFmtScreen"},
 		{Group: tui.GroupInspect, Name: "doctor", Desc: "verify batteries", CLI: "zever doctor", Screen: "NewDoctorScreen"},
+		{Group: tui.GroupInspect, Name: "config", Desc: "inspect resolved config", CLI: "zever config show", Screen: "NewConfigScreen"},
 		{Group: tui.GroupInspect, Name: "routes", Desc: "list HTTP routes", CLI: "zever routes", Screen: "NewRoutesScreen"},
 		{Group: tui.GroupInspect, Name: "explain", Desc: "print an operation summary", CLI: "zever explain", Screen: "NewExplainScreen"},
 		{Group: tui.GroupInspect, Name: "check-boundaries", Desc: "report cross-module violations", CLI: "zever check-boundaries", Screen: "NewBoundariesScreen"},

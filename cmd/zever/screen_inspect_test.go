@@ -41,8 +41,8 @@ func TestSplitFileList(t *testing.T) {
 
 func TestRegisterInspectScreens(t *testing.T) {
 	entries := RegisterInspectScreens()
-	if len(entries) != 9 {
-		t.Fatalf("entries = %d, want 9", len(entries))
+	if len(entries) != 10 {
+		t.Fatalf("entries = %d, want 10", len(entries))
 	}
 	seen := map[string]bool{}
 	for _, e := range entries {

@@ -57,6 +57,8 @@ func screenFor(entry tui.Entry) (tea.Model, error) {
 		return NewFmtScreen(), nil
 	case "NewDoctorScreen":
 		return NewDoctorScreen(), nil
+	case "NewConfigScreen":
+		return NewConfigScreen(), nil
 	case "NewRoutesScreen":
 		return NewRoutesScreen(), nil
 	case "NewExplainScreen":

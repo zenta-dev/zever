@@ -84,6 +84,7 @@ var subcommandHandlers = map[string]func([]string) error{
 	"new":              runNew,
 	"compile":          runCompile,
 	"doctor":           runDoctor,
+	"config":           runConfig,
 	"routes":           runRoutes,
 	"check":            runCheck,
 	"breaking":         runBreaking,
@@ -178,6 +179,9 @@ func run(args []string) error {
 			case "doctor":
 				printDoctorUsage(flag.NewFlagSet("doctor", flag.ContinueOnError))
 				return nil
+			case "config":
+				printConfigUsage(flag.NewFlagSet("config", flag.ContinueOnError))
+				return nil
 			case "generate":
 				printGenerateUsage()
 				return nil
@@ -249,6 +253,7 @@ func printUsage() {
 		line("breaking", "Report API-breaking changes between two schema versions"),
 		line("fmt", "Format .zen schemas (gofmt-style: -l list, --write rewrite)"),
 		line("doctor", "Resolve every battery from config and report "+successMark()+"/"+failMark()),
+		line("config show", "Print the resolved config, redacted"),
 		line("routes", "List HTTP routes declared by RPCs"),
 		line("explain", "Print an operation's declaration location and summary"),
 		line("check-boundaries", "Report cross-module reference violations"),

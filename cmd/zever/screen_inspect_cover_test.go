@@ -375,6 +375,12 @@ func TestMakeExecFnsRunCores(t *testing.T) {
 		t.Fatalf("doctor output missing config row:\n%s", out)
 	}
 
+	if out, err := makeConfigExecFn("")(ctx); err != nil {
+		t.Fatalf("config: %v", err)
+	} else if !strings.Contains(out, "adapter=") {
+		t.Fatalf("config output missing adapter rows:\n%s", out)
+	}
+
 	if out, err := makeRoutesExecFn([]string{schema})(ctx); err != nil {
 		t.Fatalf("routes: %v", err)
 	} else if !strings.Contains(out, "GET") {
@@ -408,6 +414,7 @@ func TestMakeExecFnsCanceled(t *testing.T) {
 		"breaking":   makeBreakingExecFn(nil, nil),
 		"fmt":        makeFmtExecFn(nil, false),
 		"doctor":     makeDoctorExecFn(""),
+		"config":     makeConfigExecFn(""),
 		"routes":     makeRoutesExecFn(nil),
 		"explain":    makeExplainExecFn("S.Op", nil),
 		"boundaries": makeBoundariesExecFn(nil),

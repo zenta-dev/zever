@@ -39,7 +39,13 @@ func DefaultEntries() []Entry {
 		// TODO(screen agents): wire to NewScaffoldScreen.
 		{Group: GroupScaffold, Name: "new", Desc: "scaffold a new service", CLI: "zever new", Screen: "NewScaffoldScreen"},
 		{Group: GroupScaffold, Name: "generate", Desc: "generate code from schema", CLI: "zever generate", Screen: "NewGenerateScreen"},
-		// TODO(screen agents): wire to NewInspectScreen.
+		// Doctor and config screens (NewDoctorScreen, NewConfigScreen) are
+		// real: they live in package main (cmd/zever/screen_inspect2.go)
+		// and are resolved by cmd/zever/dashboard.go's screenFor, which
+		// this tui package cannot import without a cycle. This entry list
+		// is kept in sync with cmd/zever's RegisterInspectScreens by hand;
+		// DefaultEntries itself is only a nil-entries fallback (tests),
+		// never the live dashboard's entry source.
 		{Group: GroupInspect, Name: "doctor", Desc: "check environment health", CLI: "zever doctor", Screen: "NewDoctorScreen"},
 		{Group: GroupInspect, Name: "config", Desc: "inspect resolved config", CLI: "zever config show", Screen: "NewConfigScreen"},
 		// TODO(screen agents): wire to NewRuntimeScreen.
