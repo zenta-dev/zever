@@ -16,16 +16,16 @@ import (
 	"github.com/zenta-dev/zever/internal/dsl/backend/atlas"
 	"github.com/zenta-dev/zever/internal/dsl/compile"
 	"github.com/zenta-dev/zever/internal/dsl/ir"
-	"github.com/zenta-dev/zever/zen/migrate"
+	"github.com/zenta-dev/zever/orm/migrate"
 )
 
 // migrateHelp is appended to the flag usage of `zever db migrate`. It
 // states the command's scope plainly: a create-only bootstrap plus a
 // column-level diff — not Atlas-style migration planning.
 //
-// The actual diffing/apply engine lives in zen/migrate; this file is a thin
+// The actual diffing/apply engine lives in orm/migrate; this file is a thin
 // CLI wrapper over its Plan/Apply API -- flag parsing, prompts, and output
-// formatting only. See zen/migrate's package doc for the engine's own scope
+// formatting only. See orm/migrate's package doc for the engine's own scope
 // statement (dialect support, FTS5 status, etc).
 const migrateHelp = `Compiles the given .zen files with the atlas backend, creates any tables
 that don't exist yet in the target database, and diffs an already-existing
@@ -280,7 +280,7 @@ func runDBMigrate(args []string) error {
 		if trimmedDSN == "" {
 			// No database to introspect: fall back to the full bootstrap
 			// render, exactly as before diffing existed. This path never
-			// touches zen/migrate at all.
+			// touches orm/migrate at all.
 			stmts, err := atlas.RenderSchemaDDL(dialect, result.Schema)
 			if err != nil {
 				return fmt.Errorf("zever db migrate: %w", err)
@@ -311,7 +311,7 @@ func flagWasSet(fs *flag.FlagSet, name string) bool {
 }
 
 // dryRunDiff opens a read-only connection to introspect the live database,
-// asks zen/migrate.Plan for the same statement plan applyDiff would apply,
+// asks orm/migrate.Plan for the same statement plan applyDiff would apply,
 // and prints it without executing or recording anything.
 func dryRunDiff(adapter, dsn string, result *compile.Result, planOpts migrate.PlanOptions) error {
 	conn, err := openZeverDB(adapter, dsn)
@@ -340,8 +340,8 @@ func dryRunDiff(adapter, dsn string, result *compile.Result, planOpts migrate.Pl
 }
 
 // applyDiff opens the named db adapter, computes the migration plan against
-// live database state via zen/migrate.Plan, and applies it via
-// zen/migrate.Apply, which ensures the schema_migrations bookkeeping table
+// live database state via orm/migrate.Plan, and applies it via
+// orm/migrate.Apply, which ensures the schema_migrations bookkeeping table
 // exists and records each newly-applied statement's checksum.
 func applyDiff(adapter, dsn string, schema *ir.Schema, planOpts migrate.PlanOptions) error {
 	conn, err := openZeverDB(adapter, dsn)
@@ -517,7 +517,7 @@ func migrateOptions(adapter, dsn string) (db.Options, error) {
 }
 
 // warnMigrate reports a non-fatal diffing decision (from a
-// zen/migrate.MigrationPlan or zen/migrate.RollbackPlan's Warnings) to the
+// orm/migrate.MigrationPlan or orm/migrate.RollbackPlan's Warnings) to the
 // user on stdout, the same stream applyDiff reports "applied N statement(s)"
 // on.
 func warnMigrate(format string, args ...any) {

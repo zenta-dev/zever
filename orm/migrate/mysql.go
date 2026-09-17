@@ -44,7 +44,7 @@ func mysqlTableExists(ctx context.Context, conn db.DB, table string) (bool, erro
 		"SELECT 1 FROM information_schema.tables WHERE table_schema = DATABASE() AND table_name = ? LIMIT 1",
 		table)
 	if err != nil {
-		return false, fmt.Errorf("[zen/migrate] check table %q exists: %w", table, err)
+		return false, fmt.Errorf("[orm/migrate] check table %q exists: %w", table, err)
 	}
 
 	defer func() {
@@ -67,7 +67,7 @@ func introspectMySQLColumns(ctx context.Context, conn db.DB, table string) ([]li
 			"ORDER BY ordinal_position",
 		table)
 	if err != nil {
-		return nil, fmt.Errorf("[zen/migrate] introspect columns of %q: %w", table, err)
+		return nil, fmt.Errorf("[orm/migrate] introspect columns of %q: %w", table, err)
 	}
 
 	defer func() {
@@ -85,7 +85,7 @@ func introspectMySQLColumns(ctx context.Context, conn db.DB, table string) ([]li
 		)
 
 		if err := rows.Scan(&name, &rawType, &isNullable, &colDefault); err != nil {
-			return nil, fmt.Errorf("[zen/migrate] scan column of %q: %w", table, err)
+			return nil, fmt.Errorf("[orm/migrate] scan column of %q: %w", table, err)
 		}
 
 		cols = append(cols, liveColumn{
@@ -97,7 +97,7 @@ func introspectMySQLColumns(ctx context.Context, conn db.DB, table string) ([]li
 	}
 
 	if err := rows.Err(); err != nil {
-		return nil, fmt.Errorf("[zen/migrate] iterate columns of %q: %w", table, err)
+		return nil, fmt.Errorf("[orm/migrate] iterate columns of %q: %w", table, err)
 	}
 
 	return cols, nil
@@ -116,7 +116,7 @@ func introspectMySQLIndexes(ctx context.Context, conn db.DB, table string) ([]li
 			"ORDER BY index_name, seq_in_index",
 		table)
 	if err != nil {
-		return nil, fmt.Errorf("[zen/migrate] introspect indexes of %q: %w", table, err)
+		return nil, fmt.Errorf("[orm/migrate] introspect indexes of %q: %w", table, err)
 	}
 
 	defer func() {
@@ -135,7 +135,7 @@ func introspectMySQLIndexes(ctx context.Context, conn db.DB, table string) ([]li
 		)
 
 		if err := rows.Scan(&name, &column, &nonUnique); err != nil {
-			return nil, fmt.Errorf("[zen/migrate] scan index of %q: %w", table, err)
+			return nil, fmt.Errorf("[orm/migrate] scan index of %q: %w", table, err)
 		}
 
 		idx, ok := byName[name]
@@ -149,7 +149,7 @@ func introspectMySQLIndexes(ctx context.Context, conn db.DB, table string) ([]li
 	}
 
 	if err := rows.Err(); err != nil {
-		return nil, fmt.Errorf("[zen/migrate] iterate indexes of %q: %w", table, err)
+		return nil, fmt.Errorf("[orm/migrate] iterate indexes of %q: %w", table, err)
 	}
 
 	out := make([]liveIndex, 0, len(order))
@@ -173,7 +173,7 @@ func introspectMySQLForeignKeys(ctx context.Context, conn db.DB, table string) (
 			"ORDER BY constraint_name, ordinal_position",
 		table)
 	if err != nil {
-		return nil, fmt.Errorf("[zen/migrate] introspect foreign keys of %q: %w", table, err)
+		return nil, fmt.Errorf("[orm/migrate] introspect foreign keys of %q: %w", table, err)
 	}
 
 	defer func() {
@@ -185,14 +185,14 @@ func introspectMySQLForeignKeys(ctx context.Context, conn db.DB, table string) (
 	for rows.Next() {
 		var fk liveForeignKey
 		if err := rows.Scan(&fk.Column, &fk.RefTable, &fk.RefColumn); err != nil {
-			return nil, fmt.Errorf("[zen/migrate] scan foreign key of %q: %w", table, err)
+			return nil, fmt.Errorf("[orm/migrate] scan foreign key of %q: %w", table, err)
 		}
 
 		out = append(out, fk)
 	}
 
 	if err := rows.Err(); err != nil {
-		return nil, fmt.Errorf("[zen/migrate] iterate foreign keys of %q: %w", table, err)
+		return nil, fmt.Errorf("[orm/migrate] iterate foreign keys of %q: %w", table, err)
 	}
 
 	return out, nil

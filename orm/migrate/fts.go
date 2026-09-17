@@ -48,7 +48,7 @@ func CreateFTS5VirtualTable(tableName string, columns []string) (string, error) 
 	}
 
 	if len(columns) == 0 {
-		return "", fmt.Errorf("[zen/migrate] CreateFTS5VirtualTable %q: at least one column is required", tableName)
+		return "", fmt.Errorf("[orm/migrate] CreateFTS5VirtualTable %q: at least one column is required", tableName)
 	}
 
 	quoted := make([]string, len(columns))

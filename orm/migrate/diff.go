@@ -61,7 +61,7 @@ import (
 // and mysql -- most notably the Oracle/SQL Server family, which gets neither
 // DDL rendering here nor bootstrap support. See doc.go for the full policy
 // statement.
-var ErrUnsupportedDialect = errors.New("[zen/migrate] dialect not supported for live schema diffing (postgres, sqlite, and mysql only)")
+var ErrUnsupportedDialect = errors.New("[orm/migrate] dialect not supported for live schema diffing (postgres, sqlite, and mysql only)")
 
 // schemaMigrationsTable is the bookkeeping table name. It records the
 // checksum of every DDL statement this tool has successfully executed, so a
@@ -81,7 +81,7 @@ var identPattern = regexp.MustCompile(`^[a-zA-Z_][a-zA-Z0-9_]*$`)
 // a query that cannot bind it as a parameter.
 func validateIdent(name string) error {
 	if !identPattern.MatchString(name) {
-		return fmt.Errorf("[zen/migrate] refusing to use identifier %q (must match %s)", name, identPattern.String())
+		return fmt.Errorf("[orm/migrate] refusing to use identifier %q (must match %s)", name, identPattern.String())
 	}
 
 	return nil
@@ -209,7 +209,7 @@ func Plan(ctx context.Context, exec db.DB, schema *ir.Schema, opts PlanOptions) 
 	switch dialect {
 	case atlas.DialectPostgres, atlas.DialectSQLite, atlas.DialectMySQL:
 	default:
-		return nil, fmt.Errorf("[zen/migrate] dialect %q: %w", dialect, ErrUnsupportedDialect)
+		return nil, fmt.Errorf("[orm/migrate] dialect %q: %w", dialect, ErrUnsupportedDialect)
 	}
 
 	w := &warnings{}
@@ -262,11 +262,11 @@ func tableExists(ctx context.Context, conn db.DB, dialect string, e *ir.Entity) 
 	case atlas.DialectMySQL:
 		return mysqlTableExists(ctx, conn, table)
 	default:
-		return false, fmt.Errorf("[zen/migrate] unsupported dialect %q", dialect)
+		return false, fmt.Errorf("[orm/migrate] unsupported dialect %q", dialect)
 	}
 
 	if err != nil {
-		return false, fmt.Errorf("[zen/migrate] check table %q exists: %w", table, err)
+		return false, fmt.Errorf("[orm/migrate] check table %q exists: %w", table, err)
 	}
 
 	defer func() {
@@ -307,7 +307,7 @@ func introspectColumns(
 	case atlas.DialectMySQL:
 		return introspectMySQLColumns(ctx, conn, table)
 	default:
-		return nil, fmt.Errorf("[zen/migrate] unsupported dialect %q", dialect)
+		return nil, fmt.Errorf("[orm/migrate] unsupported dialect %q", dialect)
 	}
 }
 
@@ -334,7 +334,7 @@ func introspectPostgresColumns(
 			"FROM information_schema.columns WHERE table_schema = ? AND table_name = ANY(?)",
 		schema, tables)
 	if err != nil {
-		return nil, fmt.Errorf("[zen/migrate] introspect columns of schema %q: %w", schema, err)
+		return nil, fmt.Errorf("[orm/migrate] introspect columns of schema %q: %w", schema, err)
 	}
 
 	defer func() {
@@ -351,7 +351,7 @@ func introspectPostgresColumns(
 		)
 
 		if err := rows.Scan(&table, &name, &dataType, &isNullable, &colDefault); err != nil {
-			return nil, fmt.Errorf("[zen/migrate] scan column of schema %q: %w", schema, err)
+			return nil, fmt.Errorf("[orm/migrate] scan column of schema %q: %w", schema, err)
 		}
 
 		out[table] = append(out[table], liveColumn{
@@ -363,7 +363,7 @@ func introspectPostgresColumns(
 	}
 
 	if err := rows.Err(); err != nil {
-		return nil, fmt.Errorf("[zen/migrate] iterate columns of schema %q: %w", schema, err)
+		return nil, fmt.Errorf("[orm/migrate] iterate columns of schema %q: %w", schema, err)
 	}
 
 	return out, nil
@@ -382,7 +382,7 @@ func introspectSQLiteColumns(ctx context.Context, conn db.DB, table string) ([]l
 	//lint:allow-unsafesql identifier is schema-introspected, not user input
 	rows, err := conn.Query(ctx, fmt.Sprintf("PRAGMA table_info(%s)", atlas.QuoteIdent(table)))
 	if err != nil {
-		return nil, fmt.Errorf("[zen/migrate] introspect columns of %q: %w", table, err)
+		return nil, fmt.Errorf("[orm/migrate] introspect columns of %q: %w", table, err)
 	}
 
 	defer func() {
@@ -403,7 +403,7 @@ func introspectSQLiteColumns(ctx context.Context, conn db.DB, table string) ([]l
 		)
 
 		if err := rows.Scan(&cid, &name, &colType, &notNull, &dfltValue, &pk); err != nil {
-			return nil, fmt.Errorf("[zen/migrate] scan column of %q: %w", table, err)
+			return nil, fmt.Errorf("[orm/migrate] scan column of %q: %w", table, err)
 		}
 
 		cols = append(cols, liveColumn{

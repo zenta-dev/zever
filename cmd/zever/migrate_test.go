@@ -10,7 +10,7 @@ import (
 
 	"github.com/zenta-dev/zever/db"
 	"github.com/zenta-dev/zever/internal/dsl/compile"
-	"github.com/zenta-dev/zever/zen/migrate"
+	"github.com/zenta-dev/zever/orm/migrate"
 )
 
 // migrateSchema is a small two-entity schema with a primary key, a unique

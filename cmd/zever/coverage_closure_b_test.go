@@ -22,7 +22,7 @@ import (
 
 	"github.com/zenta-dev/zever/internal/dsl/backend/atlas"
 	"github.com/zenta-dev/zever/internal/dsl/compile"
-	"github.com/zenta-dev/zever/zen/migrate"
+	"github.com/zenta-dev/zever/orm/migrate"
 )
 
 // stubMigratePrompts swaps the migrate prompt seams for the test duration.

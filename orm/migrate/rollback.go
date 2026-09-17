@@ -115,7 +115,7 @@ func ComputeRollback(ctx context.Context, exec db.DB, n int) (*RollbackPlan, err
 	switch dialect {
 	case atlas.DialectPostgres, atlas.DialectSQLite, atlas.DialectMySQL:
 	default:
-		return nil, fmt.Errorf("[zen/migrate] dialect %q: %w", dialect, ErrUnsupportedDialect)
+		return nil, fmt.Errorf("[orm/migrate] dialect %q: %w", dialect, ErrUnsupportedDialect)
 	}
 
 	rows, err := readRecentMigrations(ctx, exec, n)
@@ -381,14 +381,14 @@ func inverseStatement(dialect string, row migrationRow) (string, bool) {
 // actually executed.
 func ApplyRollback(ctx context.Context, exec db.DB, plan *RollbackPlan) (int, error) {
 	if plan == nil {
-		return 0, errors.New("[zen/migrate] ApplyRollback called with a nil plan")
+		return 0, errors.New("[orm/migrate] ApplyRollback called with a nil plan")
 	}
 
 	executed := 0
 
 	for _, stmt := range plan.Statements {
 		if _, err := exec.Exec(ctx, stmt); err != nil {
-			return executed, fmt.Errorf("[zen/migrate] exec %q: %w", firstLine(stmt), err)
+			return executed, fmt.Errorf("[orm/migrate] exec %q: %w", firstLine(stmt), err)
 		}
 
 		executed++
@@ -406,7 +406,7 @@ func readRecentMigrations(ctx context.Context, conn db.DB, n int) ([]migrationRo
 
 	rows, err := conn.Query(ctx, q, n)
 	if err != nil {
-		return nil, fmt.Errorf("[zen/migrate] query %s: %w", schemaMigrationsTable, err)
+		return nil, fmt.Errorf("[orm/migrate] query %s: %w", schemaMigrationsTable, err)
 	}
 
 	defer func() {
@@ -424,7 +424,7 @@ func readRecentMigrations(ctx context.Context, conn db.DB, n int) ([]migrationRo
 		if err := rows.Scan(
 			&id, &checksum, &kind, &table, &column, &statement, &priorType, &priorName, &objectName, &priorSQL,
 		); err != nil {
-			return nil, fmt.Errorf("[zen/migrate] scan %s: %w", schemaMigrationsTable, err)
+			return nil, fmt.Errorf("[orm/migrate] scan %s: %w", schemaMigrationsTable, err)
 		}
 
 		out = append(out, migrationRow{
@@ -442,7 +442,7 @@ func readRecentMigrations(ctx context.Context, conn db.DB, n int) ([]migrationRo
 	}
 
 	if err := rows.Err(); err != nil {
-		return nil, fmt.Errorf("[zen/migrate] iterate %s: %w", schemaMigrationsTable, err)
+		return nil, fmt.Errorf("[orm/migrate] iterate %s: %w", schemaMigrationsTable, err)
 	}
 
 	return out, nil

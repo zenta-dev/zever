@@ -265,7 +265,7 @@ func typeChanged(dialect string, f *ir.Field, live liveColumn) (bool, error) {
 // not something this implementation could fix.
 func renderAlterColumnType(dialect string, e *ir.Entity, f *ir.Field, priorType string) (plannedStatement, error) {
 	if dialect != atlas.DialectPostgres {
-		return plannedStatement{}, fmt.Errorf("[zen/migrate] dialect %q has no ALTER COLUMN TYPE support", dialect)
+		return plannedStatement{}, fmt.Errorf("[orm/migrate] dialect %q has no ALTER COLUMN TYPE support", dialect)
 	}
 
 	table, err := atlas.QualifiedTableName(dialect, e)
@@ -328,7 +328,7 @@ func renderModifyColumn(
 	dialect string, e *ir.Entity, f *ir.Field, nullable bool, kind, priorDef string,
 ) (plannedStatement, error) {
 	if dialect != atlas.DialectMySQL {
-		return plannedStatement{}, fmt.Errorf("[zen/migrate] dialect %q has no MODIFY COLUMN support", dialect)
+		return plannedStatement{}, fmt.Errorf("[orm/migrate] dialect %q has no MODIFY COLUMN support", dialect)
 	}
 
 	table, err := atlas.QualifiedTableName(dialect, e)
