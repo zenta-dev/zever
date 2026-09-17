@@ -398,11 +398,7 @@ func parseVimGrammar(r reporter, file string, data []byte) (labels, verbs map[st
 	r.Helper()
 
 	src := string(data)
-	good := true
-
-	if !checkWordSet(r, file, "zenKeyword", parseVimKeywordGroup(src, "zenKeyword"), expectedKeywords(), truthKeywords) {
-		good = false
-	}
+	good := checkWordSet(r, file, "zenKeyword", parseVimKeywordGroup(src, "zenKeyword"), expectedKeywords(), truthKeywords)
 
 	if !checkWordSet(r, file, "zenBoolean", parseVimKeywordGroup(src, "zenBoolean"), toSet(expectedBooleans), truthKeywords) {
 		good = false
@@ -971,15 +967,13 @@ func canonicalTmGrammar() []byte {
 	return tmGrammarJSON(sortedKeys(expectedKeywords()), expectedBooleans, expectedScalarTypes, canonicalLabels, canonicalVerbs)
 }
 
-func writeFixture(t *testing.T, dir, name string, data []byte) string {
+func writeFixture(t *testing.T, dir, name string, data []byte) {
 	t.Helper()
 
 	p := filepath.Join(dir, name)
 	if err := os.WriteFile(p, data, 0o600); err != nil {
 		t.Fatalf("write fixture %s: %v", p, err)
 	}
-
-	return p
 }
 
 // withSeamPaths retargets the grammar path seam at dir for one test.
@@ -1019,7 +1013,7 @@ func TestParityHelpers_failRed(t *testing.T) {
 	noMessageVim := vimSyntaxFrom(without(kw, "message"), expectedBooleans, expectedScalarTypes, canonicalLabels, canonicalVerbs)
 	moduleVim := canonicalVimSyntax() + "syntax keyword zenKeyword module\n"
 	noVerbsVim := vimSyntaxFrom(kw, expectedBooleans, expectedScalarTypes, canonicalLabels, nil)
-	noJsonTm := string(tmGrammarJSON(kw, expectedBooleans, without(expectedScalarTypes, "json"), canonicalLabels, canonicalVerbs))
+	noJSONTm := string(tmGrammarJSON(kw, expectedBooleans, without(expectedScalarTypes, "json"), canonicalLabels, canonicalVerbs))
 	noCronTm := string(tmGrammarJSON(kw, expectedBooleans, expectedScalarTypes, without(canonicalLabels, "cron"), canonicalVerbs))
 	noDeleteTm := string(tmGrammarJSON(kw, expectedBooleans, expectedScalarTypes, canonicalLabels, without(canonicalVerbs, "DELETE")))
 
@@ -1059,11 +1053,11 @@ func TestParityHelpers_failRed(t *testing.T) {
 		{name: "vim extra word bites", vim: strPtr(moduleVim), run: "vim", wantSub: []string{`has extra "module"`, truthKeywords}},
 		{name: "tm malformed json fails", tm: strPtr("{not json"), run: "tm", wantSub: []string{"malformed tmLanguage JSON", "must fail, not skip"}},
 		{name: "tm missing types fails", tm: strPtr(`{"repository":{"keywords":{"match":"\\b(entity|service)\\b"},"booleans":{"match":"\\b(true|false)\\b"}}}`), run: "tm", wantSub: []string{`"types" not found`, "must fail, not skip"}},
-		{name: "tm dropped type bites", tm: strPtr(noJsonTm), run: "tm", wantSub: []string{`missing "json"`, truthScalars}},
+		{name: "tm dropped type bites", tm: strPtr(noJSONTm), run: "tm", wantSub: []string{`missing "json"`, truthScalars}},
 		{name: "cross label drift bites", vim: strPtr(canonicalVimSyntax()), tm: strPtr(noCronTm), run: "cross", wantSub: []string{"labels", `missing "cron"`, "zenLabel"}},
 		{name: "cross verb drift bites", vim: strPtr(canonicalVimSyntax()), tm: strPtr(noDeleteTm), run: "cross", wantSub: []string{"verbs", `missing "DELETE"`, "zenHTTPVerb"}},
 		{name: "cross vim drift stops early", vim: strPtr(noMessageVim), tm: strPtr(string(canonicalTmGrammar())), run: "cross", wantSub: []string{`missing "message"`}},
-		{name: "cross tm drift stops early", vim: strPtr(canonicalVimSyntax()), tm: strPtr(noJsonTm), run: "cross", wantSub: []string{`missing "json"`}},
+		{name: "cross tm drift stops early", vim: strPtr(canonicalVimSyntax()), tm: strPtr(noJSONTm), run: "cross", wantSub: []string{`missing "json"`}},
 		{name: "cross verbs embedded in labels pass", vim: strPtr(canonicalVimSyntax()), tm: strPtr(string(embeddedVerbsTm())), run: "cross"},
 		{name: "cross labels without verbs fail", vim: strPtr(canonicalVimSyntax()), tm: strPtr(string(canonicalTmGrammarWithoutVerbs())), run: "cross", wantSub: []string{"no HTTP verbs found"}},
 	}
