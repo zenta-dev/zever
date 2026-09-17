@@ -113,6 +113,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Internal `opts` helpers: typed readers for adapter option maps.
 - `zever` CLI (`cmd/zever`): TUI-first toolkit shell with dashboard
   and schema/scaffold commands.
+- Editor support for the schema DSL: Neovim plugin (`editors/nvim`)
+  with filetype detection and syntax highlighting.
 
 ### Changed
 
