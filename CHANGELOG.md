@@ -106,6 +106,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   `tools/zever-lsp` module).
 - Generic `lock` package: distributed lease facade with in-memory
   and Redis backends.
+- Editor support for the schema DSL: Neovim plugin (`editors/nvim`)
+  with filetype detection and syntax highlighting.
 
 ### Changed
 
