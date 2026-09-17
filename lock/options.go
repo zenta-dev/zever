@@ -1,0 +1,140 @@
+package lock
+
+import (
+	"fmt"
+	"time"
+)
+
+const (
+	// DefaultTTL is the lease lifetime used when neither the caller nor the
+	// configuration supplies one.
+	DefaultTTL = 30 * time.Second
+	// DefaultRetryInterval is how long Acquire waits between attempts.
+	DefaultRetryInterval = 50 * time.Millisecond
+)
+
+// Options holds typed configuration for the lock battery.
+// Fields are a union of all adapter options; each adapter uses only what it needs.
+type Options struct {
+	// URL is the Redis connection URL.
+	URL string `json:"url" toml:"url" yaml:"url"`
+	// Addr is the Redis server address.
+	Addr string `json:"addr" toml:"addr" yaml:"addr"`
+	// Password is the Redis authentication password.
+	Password string `json:"password" toml:"password" yaml:"password"`
+	// DB is the Redis database index.
+	DB int `json:"db" toml:"db" yaml:"db"`
+	// Prefix scopes lock keys to one namespace.
+	Prefix string `json:"prefix" toml:"prefix" yaml:"prefix"`
+	// TTL is the default lease lifetime.
+	TTL time.Duration `json:"ttl" toml:"ttl" yaml:"ttl"`
+	// RetryInterval is how long Acquire waits between attempts.
+	RetryInterval time.Duration `json:"retry_interval" toml:"retry_interval" yaml:"retry_interval"`
+}
+
+var lockOptionKeys = map[string]struct{}{
+	"url": {}, "addr": {}, "password": {}, "db": {}, "prefix": {}, "ttl": {}, "retry_interval": {},
+}
+
+// ParseOptions extracts a typed Options from the raw option map.
+// Unknown keys and wrong-typed values return an error.
+func ParseOptions(m map[string]any) (Options, error) {
+	if m == nil {
+		m = map[string]any{}
+	}
+
+	for k := range m {
+		if _, ok := lockOptionKeys[k]; !ok {
+			return Options{}, fmt.Errorf("lock: unknown option %q", k)
+		}
+	}
+
+	var o Options
+
+	o.Addr = "localhost:6379"
+	o.Prefix = "lock:"
+	o.TTL = DefaultTTL
+	o.RetryInterval = DefaultRetryInterval
+
+	for k, v := range m {
+		var err error
+
+		switch k {
+		case "url":
+			o.URL, err = strictString(k, v)
+		case "addr":
+			o.Addr, err = strictString(k, v)
+		case "password":
+			o.Password, err = strictString(k, v)
+		case "db":
+			o.DB, err = strictInt("lock", k, v)
+		case "prefix":
+			o.Prefix, err = strictString(k, v)
+		case "ttl":
+			o.TTL, err = strictDuration("lock", k, v)
+		case "retry_interval":
+			o.RetryInterval, err = strictDuration("lock", k, v)
+		}
+
+		if err != nil {
+			return Options{}, err
+		}
+	}
+
+	return o, nil
+}
+
+// Validate performs battery-level checks that hold across every adapter.
+// There are currently no checks that hold universally across all adapters,
+// so this is a no-op; each adapter's factory validates its own fields.
+func (o Options) Validate() error {
+	return nil
+}
+
+// strictString type-checks v as a string.
+func strictString(key string, v any) (string, error) {
+	s, ok := v.(string)
+	if !ok {
+		return "", fmt.Errorf("[lock] option %q must be a string, got %T", key, v)
+	}
+
+	return s, nil
+}
+
+// strictInt type-checks v as an integer, accepting int, int64, and float64.
+func strictInt(pkgTag, key string, v any) (int, error) {
+	switch n := v.(type) {
+	case int:
+		return n, nil
+	case int64:
+		return int(n), nil
+	case float64:
+		return int(n), nil
+	default:
+		return 0, fmt.Errorf("[%s] option %q must be an integer, got %T", pkgTag, key, v)
+	}
+}
+
+// strictDuration type-checks v as a duration, accepting time.Duration,
+// numeric types interpreted as seconds, and strings parsed via time.ParseDuration.
+func strictDuration(pkgTag, key string, v any) (time.Duration, error) {
+	switch d := v.(type) {
+	case time.Duration:
+		return d, nil
+	case int:
+		return time.Duration(d) * time.Second, nil
+	case int64:
+		return time.Duration(d) * time.Second, nil
+	case float64:
+		return time.Duration(d * float64(time.Second)), nil
+	case string:
+		parsed, err := time.ParseDuration(d)
+		if err != nil {
+			return 0, fmt.Errorf("[%s] option %q must be a duration: %w", pkgTag, key, err)
+		}
+
+		return parsed, nil
+	default:
+		return 0, fmt.Errorf("[%s] option %q must be a duration, got %T", pkgTag, key, v)
+	}
+}
