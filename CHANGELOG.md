@@ -15,8 +15,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   with a `JSONCodec[V]` implementation backed by `encoding/json/v2` and
   sentinel `ErrEncode` / `ErrDecode` errors.
 - Generic `log` package: `Logger` / `Event` / `Context` facade with a
-  registration-based adapter system and `noop`, stdlib `slog`, and `zerolog`
-  backends.
+  registration-based adapter system and `noop`, stdlib `slog`, `zerolog`,
+  and human-readable `pretty` backends.
 - Generic `cache` package: `Cache` facade with `Typed[K, V]` codec helpers and
   in-memory LRU plus Redis-backed adapters.
 - Generic `queue` package: `Queue` facade with in-memory and Redis-backed
@@ -81,8 +81,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   backend.
 - Generic `crypto` package: encryption and signing facade with a local
   AES-256-GCM backend.
-- Generic `ai` package: LLM facade with Anthropic, OpenAI, and Gemini
-  backends.
+- Generic `ai` package: LLM facade with Anthropic, OpenAI, Gemini,
+  and local Ollama backends.
 - Generic `geo` package: geocoding facade with Google Maps, static
   JSON, and OSM Nominatim backends.
 - Generic `router` package: HTTP router facade with Fiber and
@@ -106,6 +106,13 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   `tools/zever-lsp` module).
 - Generic `lock` package: distributed lease facade with in-memory
   and Redis backends.
+- Generic `secrets` package: secret-management facade with an
+  environment-variable backend.
+- `zen` migration engine: live-schema-diff Plan/Apply with rollback
+  for Postgres, SQLite, and MySQL.
+- Internal `opts` helpers: typed readers for adapter option maps.
+- `zever` CLI (`cmd/zever`): TUI-first toolkit shell with dashboard
+  and schema/scaffold commands.
 - Editor support for the schema DSL: Neovim plugin (`editors/nvim`)
   with filetype detection and syntax highlighting.
 
