@@ -107,6 +107,9 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Changed
 
+- `scheduler.NewEmbedded` moved to `scheduler/embedded.New`; register
+  via `schedulerembedded.New`. No behavior change.
+
 - `job.Scheduler.Every` now returns the cron entry ID
   (`(job.EntryID, error)`); use `Remove`/`Entries` to manage schedules.
   A nil `Locker` means single-instance mode without slot locks.
