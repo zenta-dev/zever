@@ -1,0 +1,6 @@
+auth:
+    adapter: jwt
+cache:
+    adapter: memory
+db:
+    adapter: postgres
