@@ -110,6 +110,9 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   environment-variable backend.
 - `zen` migration engine: live-schema-diff Plan/Apply with rollback
   for Postgres, SQLite, and MySQL.
+- Internal `opts` helpers: typed readers for adapter option maps.
+- `zever` CLI (`cmd/zever`): TUI-first toolkit shell with dashboard
+  and schema/scaffold commands.
 
 ### Changed
 
