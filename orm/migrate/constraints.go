@@ -14,7 +14,7 @@ import (
 
 // This file extends diff.go's diffing past columns to indexes, unique
 // constraints, foreign keys, and nullability. Moved from
-// cmd/zengo/migrate_constraints.go.
+// orm/migrate/constraints.go.
 //
 // WHAT IS DIFFED AND APPLIED, PER DIALECT:
 //

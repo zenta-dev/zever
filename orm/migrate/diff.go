@@ -13,10 +13,10 @@ import (
 )
 
 // This file implements the schema-diffing core moved from
-// cmd/zengo/migrate_diff.go: column add/drop/type-change detection against a
+// orm/migrate/diff.go: column add/drop/type-change detection against a
 // live database, plus a schema_migrations bookkeeping table for
 // idempotency-by-content. See doc.go for the package-level scope statement
-// and cmd/zengo's `zengo db migrate -h` for the user-facing description.
+// and cmd/zever's `zever db migrate -h` for the user-facing description.
 //
 // WHAT IS DIFFED:
 //
@@ -178,7 +178,7 @@ type MigrationPlan struct {
 	// change that was detected but cannot be applied, a foreign key or
 	// unique constraint no longer declared but never dropped automatically,
 	// etc.), in the order they were noticed. A caller that wants
-	// `zengo db migrate`'s exact user-facing behavior should print each one
+	// `zever db migrate`'s exact user-facing behavior should print each one
 	// prefixed however it likes -- these strings carry no prefix of their
 	// own.
 	Warnings []string
@@ -225,7 +225,7 @@ func Plan(ctx context.Context, exec db.DB, schema *ir.Schema, opts PlanOptions) 
 // warnings collects non-fatal diffing messages produced while computing a
 // Plan, in the order they were noticed, instead of printing them directly --
 // this package has no business deciding how a caller formats or displays
-// them (cmd/zengo prefixes each one with its own "zengo db migrate: warning:"
+// them (cmd/zever prefixes each one with its own "zever db migrate: warning:"
 // convention).
 type warnings struct {
 	msgs []string
