@@ -82,11 +82,12 @@ type DashboardModel struct {
 	height     int
 }
 
-// NewDashboard returns a dashboard over entries (nil → DefaultEntries).
-// Pure: no I/O.
+// NewDashboard returns a dashboard over entries. The caller must pass
+// explicit entries (normally dashboardEntries in cmd/zever); nil is treated
+// as empty with no fallback. Pure: no I/O.
 func NewDashboard(entries []Entry) DashboardModel {
 	if entries == nil {
-		entries = DefaultEntries()
+		entries = []Entry{}
 	}
 	keys := DefaultKeymap()
 	return DashboardModel{

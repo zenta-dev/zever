@@ -54,7 +54,7 @@ func TestShell_selectPushesAndBackPops(t *testing.T) {
 }
 
 func TestShell_unknownScreenQuitsWithErr(t *testing.T) {
-	sh := newShell(nil)
+	sh := newShell([]tui.Entry{{Group: tui.GroupInspect, Name: "check", CLI: "zever check", Screen: "NewCheckScreen"}})
 	updated, cmd := sh.Update(tui.SelectedMsg{Entry: tui.Entry{Name: "bogus", Screen: "NewNopeScreen"}})
 	sm, ok := updated.(shellModel)
 	if !ok {
@@ -108,7 +108,7 @@ func stubShellProgram(t *testing.T, fn func([]tui.Entry) (tea.Model, error)) {
 }
 
 func TestShell_Init_delegatesToDash(t *testing.T) {
-	sh := newShell(nil)
+	sh := newShell([]tui.Entry{{Group: tui.GroupInspect, Name: "check", CLI: "zever check", Screen: "NewCheckScreen"}})
 	if cmd := sh.Init(); cmd != nil {
 		t.Fatalf("shell Init = non-nil cmd, want nil (dash Init is nil)")
 	}
@@ -128,7 +128,7 @@ func TestShell_View_dashboard(t *testing.T) {
 }
 
 func TestShell_View_active(t *testing.T) {
-	sh := newShell(nil)
+	sh := newShell([]tui.Entry{{Group: tui.GroupInspect, Name: "check", CLI: "zever check", Screen: "NewCheckScreen"}})
 	sh.active = &fakeShellScreen{view: "canned-screen"}
 
 	if got := sh.View().Content; got != "canned-screen" {
@@ -137,7 +137,7 @@ func TestShell_View_active(t *testing.T) {
 }
 
 func TestShell_selectedWhileActive_ignored(t *testing.T) {
-	sh := newShell(nil)
+	sh := newShell([]tui.Entry{{Group: tui.GroupInspect, Name: "check", CLI: "zever check", Screen: "NewCheckScreen"}})
 	first := &fakeShellScreen{view: "first"}
 	sh.active = first
 
@@ -168,7 +168,7 @@ func TestShell_backVariants_atRootQuit(t *testing.T) {
 
 	for _, tc := range cases {
 		t.Run(tc.name, func(t *testing.T) {
-			sh := newShell(nil)
+			sh := newShell([]tui.Entry{{Group: tui.GroupInspect, Name: "check", CLI: "zever check", Screen: "NewCheckScreen"}})
 
 			_, cmd := sh.Update(tc.msg)
 			if cmd == nil {
@@ -194,7 +194,7 @@ func TestShell_backVariants_popActive(t *testing.T) {
 
 	for _, tc := range cases {
 		t.Run(tc.name, func(t *testing.T) {
-			sh := newShell(nil)
+			sh := newShell([]tui.Entry{{Group: tui.GroupInspect, Name: "check", CLI: "zever check", Screen: "NewCheckScreen"}})
 			sh.active = &fakeShellScreen{}
 
 			updated, _ := sh.Update(tc.msg)
@@ -213,7 +213,7 @@ func TestShell_backVariants_popActive(t *testing.T) {
 func TestShell_windowSize_activeAndDash(t *testing.T) {
 	t.Run("forwards to active, keeps it", func(t *testing.T) {
 		fake := &fakeShellScreen{}
-		sh := newShell(nil)
+		sh := newShell([]tui.Entry{{Group: tui.GroupInspect, Name: "check", CLI: "zever check", Screen: "NewCheckScreen"}})
 		sh.active = fake
 
 		updated, _ := sh.Update(tea.WindowSizeMsg{Width: 100, Height: 30})
@@ -259,7 +259,7 @@ func TestShell_windowSize_activeAndDash(t *testing.T) {
 func TestShell_defaultForward_activeAndDash(t *testing.T) {
 	t.Run("forwards to active, keeps it", func(t *testing.T) {
 		fake := &fakeShellScreen{}
-		sh := newShell(nil)
+		sh := newShell([]tui.Entry{{Group: tui.GroupInspect, Name: "check", CLI: "zever check", Screen: "NewCheckScreen"}})
 		sh.active = fake
 
 		updated, _ := sh.Update(tea.KeyPressMsg{Code: 'x', Text: "x"})
