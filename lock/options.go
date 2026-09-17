@@ -3,6 +3,8 @@ package lock
 import (
 	"fmt"
 	"time"
+
+	zredis "github.com/zenta-dev/zever/internal/redis"
 )
 
 const (
@@ -16,14 +18,11 @@ const (
 // Options holds typed configuration for the lock battery.
 // Fields are a union of all adapter options; each adapter uses only what it needs.
 type Options struct {
+	// ConnectOptions holds the shared Redis connection settings.
+	zredis.ConnectOptions
 	// URL is the Redis connection URL.
+	// When set it takes precedence over Addr.
 	URL string `json:"url" toml:"url" yaml:"url"`
-	// Addr is the Redis server address.
-	Addr string `json:"addr" toml:"addr" yaml:"addr"`
-	// Password is the Redis authentication password.
-	Password string `json:"password" toml:"password" yaml:"password"`
-	// DB is the Redis database index.
-	DB int `json:"db" toml:"db" yaml:"db"`
 	// Prefix scopes lock keys to one namespace.
 	Prefix string `json:"prefix" toml:"prefix" yaml:"prefix"`
 	// TTL is the default lease lifetime.
@@ -33,7 +32,7 @@ type Options struct {
 }
 
 var lockOptionKeys = map[string]struct{}{
-	"url": {}, "addr": {}, "password": {}, "db": {}, "prefix": {}, "ttl": {}, "retry_interval": {},
+	"url": {}, "addr": {}, "password": {}, "db": {}, "tls": {}, "prefix": {}, "ttl": {}, "retry_interval": {},
 }
 
 // ParseOptions extracts a typed Options from the raw option map.
@@ -68,6 +67,8 @@ func ParseOptions(m map[string]any) (Options, error) {
 			o.Password, err = strictString(k, v)
 		case "db":
 			o.DB, err = strictInt("lock", k, v)
+		case "tls":
+			o.TLS, err = strictBool("lock", k, v)
 		case "prefix":
 			o.Prefix, err = strictString(k, v)
 		case "ttl":
@@ -89,6 +90,16 @@ func ParseOptions(m map[string]any) (Options, error) {
 // so this is a no-op; each adapter's factory validates its own fields.
 func (o Options) Validate() error {
 	return nil
+}
+
+// strictBool type-checks v as a boolean.
+func strictBool(pkgTag, key string, v any) (bool, error) {
+	b, ok := v.(bool)
+	if !ok {
+		return false, fmt.Errorf("[%s] option %q must be a boolean, got %T", pkgTag, key, v)
+	}
+
+	return b, nil
 }
 
 // strictString type-checks v as a string.
