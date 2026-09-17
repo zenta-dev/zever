@@ -1,0 +1,11 @@
+module example.com/acme
+
+go 1.24
+
+require github.com/zenta-dev/zever v1.2.3
+
+// protogogen's grpc codegen shells out to this pinned tool dependency
+// ("go tool protoc-gen-go-grpc") instead of requiring a protoc-gen-go-grpc
+// binary on PATH; `go mod tidy` resolves its version and go.sum entries
+// automatically.
+tool google.golang.org/grpc/cmd/protoc-gen-go-grpc
