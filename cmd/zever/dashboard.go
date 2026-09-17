@@ -95,7 +95,7 @@ type shellModel struct {
 	err    error
 }
 
-// newShell returns the dashboard shell over entries (nil → defaults).
+// newShell returns the dashboard shell over explicit entries.
 // Pure: no I/O.
 func newShell(entries []tui.Entry) shellModel {
 	return shellModel{dash: tui.NewDashboard(entries)}

@@ -10,7 +10,11 @@ import (
 // TestDashboardProgramNavigateQuit runs the dashboard as a real program:
 // navigate down twice, then quit. Proves wiring beyond unit Update calls.
 func TestDashboardProgramNavigateQuit(t *testing.T) {
-	m := NewDashboard(nil)
+	m := NewDashboard([]Entry{
+		{Group: GroupScaffold, Name: "new", Desc: "scaffold a new service", CLI: "zever new", Screen: "NewScaffoldScreen"},
+		{Group: GroupScaffold, Name: "generate", Desc: "generate code from schema", CLI: "zever generate", Screen: "NewGenerateScreen"},
+		{Group: GroupInspect, Name: "check", Desc: "validate schemas", CLI: "zever check", Screen: "NewCheckScreen"},
+	})
 	tm := teatest.NewTestModel(t, &m)
 	tm.Send(specialKey(tea.KeyDown))
 	tm.Send(runeKey('j'))
