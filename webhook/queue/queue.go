@@ -9,7 +9,6 @@ import (
 	"errors"
 	"fmt"
 	"io"
-	"log"
 	"math/rand"
 	"net/http"
 	"strconv"
@@ -17,6 +16,8 @@ import (
 	"sync"
 	"time"
 
+	"github.com/zenta-dev/zever/log"
+	"github.com/zenta-dev/zever/log/noop"
 	"github.com/zenta-dev/zever/queue"
 	"github.com/zenta-dev/zever/webhook"
 )
@@ -52,6 +53,15 @@ type adapter struct {
 	jitter       *rand.Rand
 	jitterMu     sync.Mutex
 	allowPrivate bool
+	logger       log.Logger
+}
+
+func (a *adapter) log() log.Logger {
+	if a != nil && a.logger != nil {
+		return a.logger
+	}
+
+	return noop.New()
 }
 
 func (a *adapter) Register(_ context.Context, event, target, secret string) error {
@@ -153,7 +163,7 @@ func (a *adapter) waitForConsumerDone(c *consumer, event string) {
 	select {
 	case <-c.done:
 	case <-time.After(a.timeout + 6*time.Second):
-		log.Printf("[webhook] consumer for event %q did not stop in time", event)
+		a.log().Warn().Str("event", event).Msg("webhook: consumer did not stop in time")
 	}
 }
 
@@ -216,14 +226,10 @@ func (a *adapter) handleConsumeError(event string, err error, consecutive *int, 
 
 	*consecutive++
 
-	log.Printf("[webhook] consumer for event %q: pop failed: %v", event, err)
+	a.log().Warn().Str("event", event).Err(err).Msg("webhook: consumer pop failed")
 
 	if *consecutive >= maxTransportErrors {
-		log.Printf(
-			"[webhook] consumer for event %q stopped after %d consecutive "+
-				"queue transport errors; close and re-open the webhook to resume",
-			event, *consecutive,
-		)
+		a.log().Warn().Str("event", event).Int("consecutive", *consecutive).Msg("webhook: consumer stopped after consecutive queue transport errors; close and re-open the webhook to resume")
 
 		return true
 	}
@@ -243,7 +249,7 @@ func (a *adapter) sleepWithStop(stop <-chan struct{}, d time.Duration) {
 func (a *adapter) safeProcess(event string, msg queue.Message) {
 	defer func() {
 		if r := recover(); r != nil {
-			log.Printf("[webhook] consumer panic for event %q: %v", event, r)
+			a.log().Warn().Str("event", event).Any("panic", r).Msg("webhook: consumer panic")
 
 			attempt := a.attemptFromHeader(msg)
 			reason := fmt.Sprintf("panic: %v", r)
@@ -475,7 +481,7 @@ func (a *adapter) requeue(event string, msg queue.Message, attempt int) {
 	headers["X-Webhook-Attempt"] = strconv.Itoa(attempt)
 
 	if err := a.queue.PushDelayed(ctx, msg.Topic, msg.Payload, headers, a.retryDelay(attempt)); err != nil {
-		log.Printf("[webhook] requeue push failed for event %q: %v", event, err)
+		a.log().Warn().Str("event", event).Err(err).Msg("webhook: requeue push failed")
 		a.delayedRequeue(event, msg, headers)
 
 		return
@@ -495,10 +501,7 @@ func (a *adapter) delayedRequeue(event string, msg queue.Message, headers map[st
 		defer cancel()
 
 		_ = a.queue.Nack(ctx, msg, false)
-		log.Printf(
-			"[webhook] delayed requeue for event %q at attempt %d (max %d) dropped: DLQ unreachable",
-			event, attempt, a.maxRetries,
-		)
+		a.log().Warn().Str("event", event).Int("attempt", attempt).Int("max_retries", a.maxRetries).Msg("webhook: delayed requeue dropped: DLQ unreachable")
 
 		return
 	}
@@ -510,10 +513,7 @@ func (a *adapter) delayedRequeue(event string, msg queue.Message, headers map[st
 	defer cancel()
 
 	if err := a.queue.PushDelayed(ctx, msg.Topic, msg.Payload, headers, a.dlqRetryDelay()); err != nil {
-		log.Printf(
-			"[webhook] delayed requeue push failed for event %q: %v; leaving message in-flight for visibility redelivery",
-			event, err,
-		)
+		a.log().Warn().Str("event", event).Err(err).Msg("webhook: delayed requeue push failed; leaving message in-flight for visibility redelivery")
 
 		return
 	}
@@ -529,7 +529,7 @@ func (a *adapter) deadLetter(event string, msg queue.Message, reason string) {
 	defer cancel()
 
 	if err := a.queue.Push(ctx, a.dlqTopic, msg.Payload, headers); err != nil {
-		log.Printf("[webhook] dead-letter push failed for event %q: %v", event, err)
+		a.log().Warn().Str("event", event).Err(err).Msg("webhook: dead-letter push failed")
 		a.retryDeadLetter(event, msg, headers)
 
 		return
@@ -552,11 +552,7 @@ func (a *adapter) retryDeadLetter(event string, msg queue.Message, headers map[s
 
 		_ = a.queue.Nack(ctx, msg, false)
 
-		log.Printf(
-			"[webhook] dropped message for event %q after %d consecutive "+
-				"dead-letter push failures (DLQ unreachable): %s",
-			event, failures, headers["X-Webhook-Error"],
-		)
+		a.log().Warn().Str("event", event).Int("failures", failures).Str("reason", headers["X-Webhook-Error"]).Msg("webhook: dropped message after consecutive dead-letter push failures (DLQ unreachable)")
 
 		return
 	}
@@ -565,10 +561,7 @@ func (a *adapter) retryDeadLetter(event string, msg queue.Message, headers map[s
 	defer cancel()
 
 	if err := a.queue.PushDelayed(ctx, msg.Topic, msg.Payload, headers, a.dlqRetryDelay()); err != nil {
-		log.Printf(
-			"[webhook] dead-letter retry push failed for event %q: %v; leaving message in-flight for visibility redelivery",
-			event, err,
-		)
+		a.log().Warn().Str("event", event).Err(err).Msg("webhook: dead-letter retry push failed; leaving message in-flight for visibility redelivery")
 
 		return
 	}
@@ -660,7 +653,7 @@ func (a *adapter) Close() error {
 		select {
 		case <-c.done:
 		case <-deadline:
-			log.Printf("[webhook] consumer for event %q did not stop in time; closing queue anyway", event)
+			a.log().Warn().Str("event", event).Msg("webhook: consumer did not stop in time; closing queue anyway")
 		}
 	}
 
@@ -764,5 +757,6 @@ func Open(o webhook.Options) (webhook.Webhook, error) {
 		client:       newSafeClient(timeout, o.AllowPrivateTargets),
 		jitter:       newJitter(),
 		allowPrivate: o.AllowPrivateTargets,
+		logger:       o.Logger,
 	}, nil
 }

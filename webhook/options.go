@@ -4,6 +4,7 @@ import (
 	"errors"
 	"time"
 
+	"github.com/zenta-dev/zever/log"
 	"github.com/zenta-dev/zever/queue"
 )
 
@@ -33,6 +34,8 @@ type Options struct {
 	// DSN is the SQLite database path for the sqlite adapter.
 	// Empty means a unique private in-memory-style database.
 	DSN string
+	// Logger emits background delivery warnings. Defaults to a no-op logger when nil.
+	Logger log.Logger
 }
 
 // Validate checks options for consistency.

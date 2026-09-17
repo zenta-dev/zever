@@ -6,7 +6,6 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
-	"log"
 	"math"
 	"os"
 	"path/filepath"
@@ -16,6 +15,8 @@ import (
 	"time"
 
 	"github.com/zenta-dev/zever/flag"
+	"github.com/zenta-dev/zever/log"
+	"github.com/zenta-dev/zever/log/noop"
 )
 
 // logInterval caps reload-failure log spam to one line per interval.
@@ -47,7 +48,7 @@ func New(opts flag.Options) (flag.Flag, error) {
 
 	path := opts.Static.Path
 	if path == "" {
-		return &driver{flags: map[string]any{}}, nil
+		return &driver{flags: map[string]any{}, logger: opts.Logger}, nil
 	}
 
 	if filepath.Clean(path) != path {
@@ -88,6 +89,7 @@ func New(opts flag.Options) (flag.Flag, error) {
 		flags:    flags,
 		lastMod:  fi.ModTime(),
 		lastHash: sha256.Sum256(data),
+		logger:   opts.Logger,
 	}, nil
 }
 
@@ -101,6 +103,15 @@ type driver struct {
 	lastMod  time.Time
 	lastHash [32]byte
 	lastLog  time.Time
+	logger   log.Logger
+}
+
+func (d *driver) log() log.Logger {
+	if d != nil && d.logger != nil {
+		return d.logger
+	}
+
+	return noop.New()
 }
 
 // lookup returns the raw value for key. A nil stored value counts as
@@ -186,7 +197,7 @@ func (d *driver) rateLimitedLog(format string, args ...any) {
 	d.lastLog = now
 	d.mu.Unlock()
 
-	log.Printf(format, args...)
+	d.log().Warn().Msgf(format, args...)
 }
 
 // Bool evaluates key as a bool. Strings "true"/"false" (any case)

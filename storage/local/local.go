@@ -11,7 +11,6 @@ import (
 	"errors"
 	"fmt"
 	"io"
-	"log"
 	"net/http"
 	"net/url"
 	"os"
@@ -21,6 +20,8 @@ import (
 	"sync"
 	"time"
 
+	"github.com/zenta-dev/zever/log"
+	"github.com/zenta-dev/zever/log/noop"
 	"github.com/zenta-dev/zever/storage"
 )
 
@@ -30,10 +31,19 @@ type localAdapter struct {
 	base    url.URL
 	secret  []byte
 	storage.PolicyStore
+	logger log.Logger
 
 	rootReal     string
 	rootRealOnce sync.Once
 	rootRealErr  error
+}
+
+func (a *localAdapter) log() log.Logger {
+	if a != nil && a.logger != nil {
+		return a.logger
+	}
+
+	return noop.New()
 }
 
 // randRead is crypto/rand.Read as a var so tests can inject failures.
@@ -88,10 +98,11 @@ func New(opts storage.Options) (storage.Storage, error) {
 			return nil, fmt.Errorf("[local] option %q is required in production (secret must be explicit)", "secret")
 		}
 
-		log.Printf( //nolint:forbidigo // ephemeral warning to stderr, allowlisted
-			"[storage/local] WARNING: no secret provided; using ephemeral key. " +
-				"Presigned URLs will be invalidated on restart.",
-		)
+		logger := opts.Logger
+		if logger == nil {
+			logger = noop.New()
+		}
+		logger.Warn().Msg("[storage/local] WARNING: no secret provided; using ephemeral key. Presigned URLs will be invalidated on restart.")
 
 		key := make([]byte, 32)
 		if _, err := randRead(key); err != nil {
@@ -107,6 +118,7 @@ func New(opts storage.Options) (storage.Storage, error) {
 		base:        base,
 		secret:      []byte(secret),
 		PolicyStore: store,
+		logger:      opts.Logger,
 	}, nil
 }
 

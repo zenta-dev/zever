@@ -2,6 +2,8 @@ package flag
 
 import (
 	"time"
+
+	"github.com/zenta-dev/zever/log"
 )
 
 // DefaultTimeout is the default flag operation timeout applied by adapters.
@@ -31,6 +33,8 @@ type Options struct {
 	Static StaticOptions
 	// Firebase carries the Firebase adapter settings.
 	Firebase FirebaseOptions
+	// Logger emits reload warnings. Defaults to a no-op logger when nil.
+	Logger log.Logger
 }
 
 // Validate checks options for consistency.
