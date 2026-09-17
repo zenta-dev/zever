@@ -1,0 +1,82 @@
+{
+  "$schema": "https://raw.githubusercontent.com/martinring/tmlanguage/master/tmlanguage.json",
+  "name": "Zen",
+  "scopeName": "source.zen",
+  "patterns": [
+    { "include": "#comments" },
+    { "include": "#strings" },
+    { "include": "#numbers" },
+    { "include": "#keywords" },
+    { "include": "#booleans" },
+    { "include": "#types" },
+    { "include": "#labels" },
+    { "include": "#attributes" },
+    { "include": "#operators" },
+    { "include": "#punctuation" }
+  ],
+  "repository": {
+    "comments": {
+      "patterns": [
+        {
+          "name": "comment.line.double-slash.zen",
+          "match": "//.*$"
+        }
+      ]
+    },
+    "strings": {
+      "name": "string.quoted.double.zen",
+      "begin": "\"",
+      "end": "\"",
+      "patterns": [
+        {
+          "name": "constant.character.escape.zen",
+          "match": "\\\\."
+        }
+      ]
+    },
+    "numbers": {
+      "patterns": [
+        {
+          "name": "constant.numeric.duration.zen",
+          "match": "\\b\\d+(ns|us|µs|ms|s|m|h)\\b"
+        },
+        {
+          "name": "constant.numeric.zen",
+          "match": "\\b\\d+(\\.\\d+)?\\b"
+        }
+      ]
+    },
+    "keywords": {
+      "name": "keyword.control.zen",
+      "match": "\\b(entity|service|job|schedule|rpc|index|enum|has_many|has_one|belongs_to|many_to_many|message)\\b"
+    },
+    "booleans": {
+      "name": "constant.language.boolean.zen",
+      "match": "\\b(true|false)\\b"
+    },
+    "types": {
+      "name": "support.type.zen",
+      "match": "\\b(uuid|string|int32|int64|float32|float64|bool|timestamp|date|bytes|json)\\b"
+    },
+    "labels": {
+      "name": "variable.parameter.zen",
+      "match": "\\b(http|auth|queue|retry|cron|dispatch|permission|join_table|foreign_key|on_delete|validate|default|primary|unique|required|GET|POST|PATCH|DELETE|PUT)\\b"
+    },
+    "attributes": {
+      "name": "entity.other.attribute-name.zen",
+      "match": "@\\w+"
+    },
+    "operators": {
+      "name": "keyword.operator.zen",
+      "match": "->"
+    },
+    "punctuation": {
+      "patterns": [
+        {
+          "name": "punctuation.definition.tag.zen",
+          "match": "[{}()]"
+        }
+      ]
+    }
+  }
+}
