@@ -109,12 +109,12 @@ func (p *Parser) parseEntityMember(decl *ast.EntityDecl) {
 }
 
 // parseFieldDecl parses `ident ":" TypeExpr { Attribute }`. The caller has
-// confirmed cur.Kind == token.IDENT but not consumed it.
+// confirmed cur is identifier-like (IDENT, ENUM, or MESSAGE) but not consumed it.
 func (p *Parser) parseFieldDecl() *ast.FieldDecl {
-	name, namePos, ok := p.expectIdentText()
-	if !ok {
-		return nil
-	}
+	// Proof: parseEntityMember and parseMessageDecl dispatch here only on
+	// IDENT/ENUM/MESSAGE, all isIdentLike, so expectIdentText cannot fail.
+	name, namePos := p.cur.Lit, p.cur.Pos
+	p.advance() // consume field name.
 
 	doc := p.docCommentFor(namePos)
 

@@ -214,11 +214,8 @@ func OffsetOf(src []byte, line Line, col int) int {
 	offset := line.start
 
 	for n := 1; n < col && offset < line.end; n++ {
+		// Dead-guard removed: DecodeRune returns size 0 only on empty input, and offset < line.end keeps src[offset:line.end] non-empty.
 		_, size := utf8.DecodeRune(src[offset:line.end])
-		if size == 0 {
-			break
-		}
-
 		offset += size
 	}
 

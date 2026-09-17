@@ -2,6 +2,7 @@ package protogogen
 
 import (
 	"context"
+	"errors"
 	"os"
 	"path/filepath"
 	"strings"
@@ -204,6 +205,26 @@ func TestGeneratePBGoResponseError(t *testing.T) {
 
 	if !strings.Contains(err.Error(), "protoc-gen-go") {
 		t.Errorf("generatePBGo error = %v, want it to mention protoc-gen-go", err)
+	}
+}
+
+func TestGenerateGRPCGoMarshalError(t *testing.T) {
+	// No t.Parallel here: this test swaps the package-level protoMarshal
+	// test seam, and the package has no parallel tests, so a plain
+	// save/restore with t.Cleanup is race-safe without a mutex.
+	orig := protoMarshal
+	protoMarshal = func(proto.Message) ([]byte, error) {
+		return nil, errors.New("boom")
+	}
+	t.Cleanup(func() { protoMarshal = orig })
+
+	_, err := generateGRPCGo(context.Background(), pingRequest(t))
+	if err == nil {
+		t.Fatal("generateGRPCGo succeeded, want marshal error")
+	}
+
+	if !strings.Contains(err.Error(), "marshal CodeGeneratorRequest") {
+		t.Errorf("generateGRPCGo error = %v, want it to mention marshal CodeGeneratorRequest", err)
 	}
 }
 
