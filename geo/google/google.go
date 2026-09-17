@@ -8,6 +8,7 @@ import (
 	gmaps "googlemaps.github.io/maps"
 
 	"github.com/zenta-dev/zever/geo"
+	"github.com/zenta-dev/zever/internal/httpclient"
 )
 
 type adapter struct {
@@ -31,6 +32,7 @@ func New(opts geo.Options) (geo.Geo, error) {
 	var clientOpts []gmaps.ClientOption
 
 	clientOpts = append(clientOpts, gmaps.WithAPIKey(opts.APIKey))
+	clientOpts = append(clientOpts, gmaps.WithHTTPClient(httpclient.NewClient(opts.Timeout)))
 
 	if opts.BaseURL != "" {
 		clientOpts = append(clientOpts, gmaps.WithBaseURL(opts.BaseURL))

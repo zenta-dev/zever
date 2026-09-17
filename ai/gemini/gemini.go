@@ -2,7 +2,6 @@ package gemini
 
 import (
 	"context"
-	"crypto/tls"
 	"encoding/json"
 	"errors"
 	"fmt"
@@ -15,6 +14,7 @@ import (
 	"google.golang.org/genai"
 
 	"github.com/zenta-dev/zever/ai"
+	"github.com/zenta-dev/zever/internal/httpclient"
 )
 
 // adapter implements ai.AI via Google Generative AI.
@@ -80,25 +80,7 @@ func loopbackBaseURL(rawURL string) bool {
 }
 
 func newHTTPClient(timeout time.Duration) *http.Client {
-	var tr *http.Transport
-	if dt, ok := http.DefaultTransport.(*http.Transport); ok {
-		tr = dt.Clone()
-	} else {
-		tr = &http.Transport{}
-	}
-
-	if tr.TLSClientConfig == nil {
-		tr.TLSClientConfig = &tls.Config{MinVersion: tls.VersionTLS12}
-	} else if tr.TLSClientConfig.MinVersion < tls.VersionTLS12 {
-		tr.TLSClientConfig.MinVersion = tls.VersionTLS12
-	}
-
-	c := &http.Client{Transport: tr}
-	if timeout > 0 {
-		c.Timeout = timeout
-	}
-
-	return c
+	return httpclient.NewClient(timeout)
 }
 
 // Generate implements ai.AI.

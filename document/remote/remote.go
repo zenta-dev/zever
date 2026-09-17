@@ -3,7 +3,6 @@ package remote
 import (
 	"bytes"
 	"context"
-	"crypto/tls"
 	"encoding/json"
 	"errors"
 	"fmt"
@@ -14,6 +13,7 @@ import (
 	"strings"
 
 	"github.com/zenta-dev/zever/document"
+	"github.com/zenta-dev/zever/internal/httpclient"
 )
 
 type driver struct {
@@ -61,20 +61,11 @@ func Open(o document.Options) (document.Document, error) {
 		maxOutput = document.DefaultMaxOutputBytes
 	}
 
-	transport := &http.Transport{TLSClientConfig: &tls.Config{MinVersion: tls.VersionTLS12}}
-	if dt, ok := http.DefaultTransport.(*http.Transport); ok {
-		transport = dt.Clone()
-		// Clone never returns a nil TLSClientConfig, so no nil check is needed.
-		if transport.TLSClientConfig.MinVersion < tls.VersionTLS12 {
-			transport.TLSClientConfig.MinVersion = tls.VersionTLS12
-		}
-	}
-
 	return &driver{
 		endpoint:  u.String(),
 		apiKey:    o.APIKey,
 		maxOutput: maxOutput,
-		client:    &http.Client{Timeout: timeout, Transport: transport},
+		client:    httpclient.NewClient(timeout),
 	}, nil
 }
 
@@ -120,14 +111,13 @@ func (d *driver) Render(ctx context.Context, source []byte, format document.Outp
 		return nil, fmt.Errorf("remote: render status %d: %q", resp.StatusCode, errBody)
 	}
 
-	body, err := io.ReadAll(io.LimitReader(resp.Body, d.maxOutput+1))
+	body, err := httpclient.ReadLimited(resp.Body, d.maxOutput)
 	if err != nil {
+		if errors.Is(err, httpclient.ErrTooLarge) {
+			var serr error = &document.SizeLimitError{Size: int(d.maxOutput) + 1, Limit: int(d.maxOutput)}
+			return nil, fmt.Errorf("remote: %w", serr)
+		}
 		return nil, fmt.Errorf("remote: read: %w", err)
-	}
-
-	if int64(len(body)) > d.maxOutput {
-		var serr error = &document.SizeLimitError{Size: len(body), Limit: int(d.maxOutput)}
-		return nil, fmt.Errorf("remote: %w", serr)
 	}
 
 	if len(body) == 0 {

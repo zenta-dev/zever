@@ -3,7 +3,6 @@ package openai
 
 import (
 	"context"
-	"crypto/tls"
 	"errors"
 	"fmt"
 	"math"
@@ -18,6 +17,7 @@ import (
 	"github.com/openai/openai-go/v3/shared"
 
 	"github.com/zenta-dev/zever/ai"
+	"github.com/zenta-dev/zever/internal/httpclient"
 )
 
 type adapter struct {
@@ -54,17 +54,10 @@ func Open(opts ai.Options) (ai.AI, error) {
 
 func newHTTPClientFromTransport(tr *http.Transport) *http.Client {
 	if tr == nil {
-		return &http.Client{
-			Transport: &http.Transport{
-				TLSClientConfig: &tls.Config{MinVersion: tls.VersionTLS12},
-			},
-		}
+		return httpclient.NewClient(0)
 	}
 
-	clone := tr.Clone()
-	clone.TLSClientConfig.MinVersion = tls.VersionTLS12
-
-	return &http.Client{Transport: clone}
+	return httpclient.NewClient(0, httpclient.WithTransport(tr.Clone()))
 }
 
 //go:noinline

@@ -5,7 +5,6 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
-	"io"
 	"math"
 	"net/http"
 	"net/url"
@@ -14,6 +13,7 @@ import (
 	"time"
 
 	"github.com/zenta-dev/zever/geo"
+	"github.com/zenta-dev/zever/internal/httpclient"
 )
 
 const defaultEndpoint = "https://nominatim.openstreetmap.org"
@@ -63,7 +63,7 @@ func New(opts geo.Options) (geo.Geo, error) {
 	return &osmGeo{
 		endpoint:  endpoint,
 		baseURL:   u,
-		client:    &http.Client{Timeout: timeout},
+		client:    httpclient.NewClient(timeout),
 		userAgent: opts.UserAgent,
 		maxBody:   maxBody,
 	}, nil
@@ -273,13 +273,12 @@ func redactURLError(err error) error {
 }
 
 func readLimitedBody(resp *http.Response, limit int64) ([]byte, error) {
-	r := io.LimitReader(resp.Body, limit+1)
-	data, err := io.ReadAll(r)
+	data, err := httpclient.ReadLimited(resp.Body, limit)
 	if err != nil {
+		if errors.Is(err, httpclient.ErrTooLarge) {
+			return nil, fmt.Errorf("geo: osm: %w", geo.ErrTooLarge)
+		}
 		return nil, fmt.Errorf("geo: osm: read: %w", err)
-	}
-	if int64(len(data)) > limit {
-		return nil, fmt.Errorf("geo: osm: %w", geo.ErrTooLarge)
 	}
 	return data, nil
 }

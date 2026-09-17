@@ -11,6 +11,7 @@ import (
 	twilioclient "github.com/twilio/twilio-go/client"
 	openapi "github.com/twilio/twilio-go/rest/api/v2010"
 
+	"github.com/zenta-dev/zever/internal/httpclient"
 	"github.com/zenta-dev/zever/notification"
 )
 
@@ -81,7 +82,7 @@ func New(opts notification.Options) (notification.Notifier, error) {
 		Credentials: twilioclient.NewCredentials(tw.AccountSID, tw.AuthToken),
 		HTTPClient: &http.Client{
 			Timeout:   timeout,
-			Transport: &limitedTransport{base: http.DefaultTransport},
+			Transport: &limitedTransport{base: httpclient.NewClient(timeout).Transport},
 		},
 	}
 	base.SetAccountSid(tw.AccountSID)
