@@ -104,6 +104,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   with golden fixtures.
 - `zever-lsp` tool: stdio LSP server for the schema DSL (separate
   `tools/zever-lsp` module).
+- Generic `lock` package: distributed lease facade with in-memory
+  and Redis backends.
 
 ### Changed
 
