@@ -58,21 +58,21 @@ func TestParseAdapter_invalid_empty_fails(t *testing.T) {
 
 func TestParseAdapter_invalid_unknown_fails(t *testing.T) {
 	t.Parallel()
-	a, err := ParseAdapter("redis")
+	a, err := ParseAdapter("postgres")
 	if err == nil {
-		t.Fatal("ParseAdapter(redis) expected error, got nil")
+		t.Fatal("ParseAdapter(postgres) expected error, got nil")
 	}
 	var iae *InvalidAdapterError
 	if !errors.As(err, &iae) {
-		t.Fatalf("ParseAdapter(redis) err type = %T, want *InvalidAdapterError", err)
+		t.Fatalf("ParseAdapter(postgres) err type = %T, want *InvalidAdapterError", err)
 	}
-	if iae.Adapter != "redis" {
-		t.Fatalf("InvalidAdapterError.Adapter = %q, want %q", iae.Adapter, "redis")
+	if iae.Adapter != "postgres" {
+		t.Fatalf("InvalidAdapterError.Adapter = %q, want %q", iae.Adapter, "postgres")
 	}
 	if a != Memory {
-		t.Fatalf("ParseAdapter(redis) adapter = %v, want Memory zero value", a)
+		t.Fatalf("ParseAdapter(postgres) adapter = %v, want Memory zero value", a)
 	}
-	if !strings.Contains(err.Error(), "redis") {
+	if !strings.Contains(err.Error(), "postgres") {
 		t.Fatalf("error message should carry adapter name, got %q", err.Error())
 	}
 }
