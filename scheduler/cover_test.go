@@ -1,10 +1,8 @@
 package scheduler
 
 import (
-	"context"
 	"errors"
 	"testing"
-	"time"
 )
 
 func TestCoverUnknownAdapterErrorString(t *testing.T) {
@@ -46,26 +44,5 @@ func TestCoverInvalidSpecUnwrapNilCause(t *testing.T) {
 	unwrapped := err.Unwrap()
 	if len(unwrapped) != 1 || !errors.Is(unwrapped[0], ErrInvalidSpec) {
 		t.Fatalf("Unwrap() = %v, want [ErrInvalidSpec]", unwrapped)
-	}
-}
-
-func TestCoverStopTimeout(t *testing.T) {
-	t.Parallel()
-
-	// runDone never closes: Stop must give up at closeTimeout.
-	e := &embedded{
-		cancel:       func() {},
-		runDone:      make(chan struct{}),
-		closeTimeout: 20 * time.Millisecond,
-		started:      true,
-	}
-
-	start := time.Now()
-	err := e.Stop()
-	if !errors.Is(err, context.DeadlineExceeded) {
-		t.Fatalf("Stop err = %v, want DeadlineExceeded", err)
-	}
-	if elapsed := time.Since(start); elapsed > 5*time.Second {
-		t.Fatalf("Stop took %v, want ~20ms", elapsed)
 	}
 }

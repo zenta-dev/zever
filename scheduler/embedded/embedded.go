@@ -1,4 +1,4 @@
-package scheduler
+package embedded
 
 import (
 	"context"
@@ -13,6 +13,7 @@ import (
 	"github.com/zenta-dev/zever/job"
 	"github.com/zenta-dev/zever/log"
 	"github.com/zenta-dev/zever/log/noop"
+	"github.com/zenta-dev/zever/scheduler"
 )
 
 // embedded is the in-process cron Scheduler implementation.
@@ -26,9 +27,9 @@ type embedded struct {
 	started      bool
 }
 
-// NewEmbedded returns a Scheduler dispatching through opts.Dispatcher with
+// New returns a scheduler.Scheduler dispatching through opts.Dispatcher with
 // dedup via opts.Locker. The scheduler is idle until Start begins it.
-func NewEmbedded(opts Options) (Scheduler, error) {
+func New(opts scheduler.Options) (scheduler.Scheduler, error) {
 	if err := opts.Validate(); err != nil {
 		return nil, fmt.Errorf("embedded: %w", err)
 	}
@@ -40,7 +41,7 @@ func NewEmbedded(opts Options) (Scheduler, error) {
 
 	closeTimeout := opts.CloseTimeout
 	if closeTimeout == 0 {
-		closeTimeout = DefaultCloseTimeout
+		closeTimeout = scheduler.DefaultCloseTimeout
 	}
 
 	sched := job.NewScheduler(opts.Dispatcher, opts.Locker)
@@ -55,17 +56,17 @@ func NewEmbedded(opts Options) (Scheduler, error) {
 
 // Schedule validates spec, jobName, and args, then registers the schedule.
 // Unknown job names wrap job.ErrUnknownJob.
-func (e *embedded) Schedule(ctx context.Context, spec, jobName string, args any) (EntryID, error) {
+func (e *embedded) Schedule(ctx context.Context, spec, jobName string, args any) (scheduler.EntryID, error) {
 	if err := ctx.Err(); err != nil {
 		return 0, fmt.Errorf("scheduler: schedule %q: %w", spec, err)
 	}
 
-	if len(spec) == 0 || len(spec) > MaxSpecLen {
-		return 0, &InvalidSpecError{Spec: spec, Err: errors.New("spec length must be 1-256")}
+	if len(spec) == 0 || len(spec) > scheduler.MaxSpecLen {
+		return 0, &scheduler.InvalidSpecError{Spec: spec, Err: errors.New("spec length must be 1-256")}
 	}
 
 	if _, err := cron.ParseStandard(spec); err != nil {
-		return 0, &InvalidSpecError{Spec: spec, Err: err}
+		return 0, &scheduler.InvalidSpecError{Spec: spec, Err: err}
 	}
 
 	if _, ok := job.Lookup(jobName); !ok {
@@ -79,14 +80,14 @@ func (e *embedded) Schedule(ctx context.Context, spec, jobName string, args any)
 	// The spec parsed above, so Every (re-parse + AddFunc) cannot fail.
 	id, _ := e.sched.Every(spec, jobName, args)
 
-	return EntryID(id), nil
+	return scheduler.EntryID(id), nil
 }
 
 // Remove unregisters the schedule with the given ID.
 // Zero is invalid and fails; an unknown ID is a no-op returning nil.
-func (e *embedded) Remove(id EntryID) error {
+func (e *embedded) Remove(id scheduler.EntryID) error {
 	if id == 0 {
-		return &InvalidOptionsError{Reason: "invalid entry id"}
+		return &scheduler.InvalidOptionsError{Reason: "invalid entry id"}
 	}
 
 	e.sched.Remove(job.EntryID(id))
@@ -95,12 +96,12 @@ func (e *embedded) Remove(id EntryID) error {
 }
 
 // Entries returns a snapshot of the live entry IDs.
-func (e *embedded) Entries() []EntryID {
+func (e *embedded) Entries() []scheduler.EntryID {
 	ids := e.sched.Entries()
-	out := make([]EntryID, 0, len(ids))
+	out := make([]scheduler.EntryID, 0, len(ids))
 
 	for _, id := range ids {
-		out = append(out, EntryID(id))
+		out = append(out, scheduler.EntryID(id))
 	}
 
 	return out
