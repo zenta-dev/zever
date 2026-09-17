@@ -123,6 +123,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   `resolver.ScalarTypeNames` instead of three independently
   hand-maintained copies; `editors/parity_test.go` now diffs the
   generator's output against the checked-in grammar files.
+- `zever config show`: prints the resolved, redacted service configuration,
+  with a matching TUI dashboard screen.
 
 ### Changed
 
