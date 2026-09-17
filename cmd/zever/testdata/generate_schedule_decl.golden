@@ -1,0 +1,4 @@
+schedule Nightly {
+	cron: "*/5 * * * *"
+	dispatch: Ship()
+}
