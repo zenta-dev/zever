@@ -1,0 +1,153 @@
+package gogen
+
+import (
+	"sort"
+	"testing"
+
+	"github.com/zenta-dev/zever/internal/dsl/ast"
+	"github.com/zenta-dev/zever/internal/dsl/ir"
+	"github.com/zenta-dev/zever/internal/dsl/resolver"
+)
+
+// determinismFixture mirrors zenorm's own determinism fixture: a
+// three-module, multi-service, multi-operation schema wide enough to
+// exercise every map-shaped intermediate this backend might range over
+// (imports, param sets) without sorting first.
+const determinismFixture = `
+	entity Invoice {
+		id: uuid @primary
+		number: string @unique
+		amount_cents: int64
+		status: enum(draft, sent, paid, void) @default(draft)
+		created_at: timestamp @default(now())
+	}
+
+	service BillingService {
+		rpc GetInvoice(id: uuid) -> Invoice {
+			http: GET "/v1/invoices/{id}"
+			auth: required(roles: {owner, admin})
+		}
+
+		rpc CreateInvoice(number: string, amount_cents: int64) -> Invoice {
+			http: POST "/v1/invoices"
+			auth: required(roles: {admin})
+			errors: { not_found, invalid_argument("amount must be positive") }
+		}
+
+		rpc VoidInvoice(id: uuid) -> Invoice {
+			http: DELETE "/v1/invoices/{id}"
+			auth: required
+			errors: { not_found }
+		}
+	}
+
+
+
+	entity Shipment {
+		id: uuid @primary
+		tracking_code: string @unique
+		carrier: string
+		delivered: bool
+	}
+
+	service ShippingService {
+		rpc GetShipment(id: uuid) -> Shipment {
+			http: GET "/v1/shipments/{id}"
+			auth: required
+		}
+
+		rpc CreateShipment(tracking_code: string, carrier: string) -> Shipment {
+			http: POST "/v1/shipments"
+			auth: required(roles: {owner})
+		}
+	}
+
+
+
+	entity Warehouse {
+		id: uuid @primary
+		name: string
+		region: string
+	}
+
+	service InventoryService {
+		rpc GetWarehouse(id: uuid) -> Warehouse {
+			http: GET "/v1/warehouses/{id}"
+			auth: required(roles: {owner, admin})
+		}
+
+		rpc AdjustStock(id: uuid, quantity: int32) -> Warehouse {
+			http: POST "/v1/warehouses/{id}/adjust"
+			auth: required
+			errors: { not_found, invalid_argument("quantity delta invalid") }
+		}
+	}
+`
+
+// TestGenerateIsDeterministic re-resolves determinismFixture from scratch
+// twice and runs Generate over each resulting schema, asserting the two
+// outputs share the same set of filenames and byte-identical content per
+// file.
+func TestGenerateIsDeterministic(t *testing.T) {
+	schemaA := mustResolve(t, determinismFixture)
+	schemaB := mustResolve(t, determinismFixture)
+
+	outA, err := New().Generate(schemaA)
+	if err != nil {
+		t.Fatalf("Generate (first run): %v", err)
+	}
+
+	outB, err := New().Generate(schemaB)
+	if err != nil {
+		t.Fatalf("Generate (second run): %v", err)
+	}
+
+	assertOutputsIdentical(t, outA, outB)
+}
+
+func mustResolve(t *testing.T, src string) *ir.Schema {
+	t.Helper()
+
+	file := compileSchema(t, src)
+
+	schema, diags := resolver.Resolve([]*ast.File{file})
+	if diags.HasErrors() {
+		t.Fatalf("resolve errors: %v", diags)
+	}
+
+	return schema
+}
+
+func assertOutputsIdentical(t *testing.T, a, b map[string][]byte) {
+	t.Helper()
+
+	keysA := sortedKeysOf(a)
+	keysB := sortedKeysOf(b)
+
+	if len(keysA) != len(keysB) {
+		t.Fatalf("output key sets differ in size: run1=%v run2=%v", keysA, keysB)
+	}
+
+	for i, k := range keysA {
+		if keysB[i] != k {
+			t.Fatalf("output key sets differ: run1=%v run2=%v", keysA, keysB)
+		}
+	}
+
+	for _, k := range keysA {
+		if string(a[k]) != string(b[k]) {
+			t.Fatalf("output for %q differs between runs:\n--- run1 ---\n%s\n--- run2 ---\n%s", k, a[k], b[k])
+		}
+	}
+}
+
+func sortedKeysOf(m map[string][]byte) []string {
+	out := make([]string, 0, len(m))
+	for k := range m {
+		out = append(out, k)
+	}
+
+	sort.Strings(out)
+
+	return out
+}
