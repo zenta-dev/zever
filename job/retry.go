@@ -1,6 +1,10 @@
 package job
 
-import "time"
+import (
+	"time"
+
+	"github.com/zenta-dev/zever/internal/retry"
+)
 
 // RetryPolicy controls how many attempts a job gets and the base delay between them.
 type RetryPolicy struct {
@@ -18,18 +22,25 @@ func DefaultRetryPolicy() RetryPolicy {
 	}
 }
 
+// maxBackoffShiftAttempt is the attempt at which Backoff's growth freezes:
+// the original hand-rolled implementation capped its doubling exponent
+// (shift) at 20 rather than capping the resulting duration itself, so an
+// attempt beyond this point keeps producing the same delay as attempt 21
+// even when that delay is still well under the 24h ceiling. Clamping the
+// attempt passed to retry.Policy.NextDelay here reproduces that exact
+// quirk instead of only capping at 24h (which would change results for a
+// small BaseDelay at a high attempt count).
+const maxBackoffShiftAttempt = 21
+
 // Backoff returns the exponential delay for the given attempt, capped at 24h. It caps the shift at 20 and returns BaseDelay for attempts below 1.
 func (p RetryPolicy) Backoff(attempt int) time.Duration {
 	if attempt < 1 {
-		return p.BaseDelay
+		attempt = 1
 	}
 
-	const maxDelay = 24 * time.Hour
-
-	shift := uint(min(attempt-1, 20))
-	if p.BaseDelay > maxDelay>>shift {
-		return maxDelay
+	if attempt > maxBackoffShiftAttempt {
+		attempt = maxBackoffShiftAttempt
 	}
 
-	return p.BaseDelay * time.Duration(1<<shift)
+	return retry.Policy{BaseDelay: p.BaseDelay, Multiplier: 2, MaxDelay: 24 * time.Hour}.NextDelay(attempt)
 }
