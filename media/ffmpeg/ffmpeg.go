@@ -15,8 +15,15 @@ import (
 	"syscall"
 	"time"
 
+	"github.com/zenta-dev/zever/codec"
 	"github.com/zenta-dev/zever/media"
 )
+
+// probeCodec decodes ffprobe JSON output into ProbeResult. ProbeResult's
+// custom UnmarshalJSON is invoked identically under encoding/json/v2 (used
+// by codec.JSONCodec) and encoding/json v1, verified by decoding sample
+// ffprobe output through both and comparing the results.
+var probeCodec = codec.JSONCodec[ProbeResult]{}
 
 const (
 	// maxProbeOutput caps ffprobe stdout at 1 MiB.
@@ -361,7 +368,8 @@ func Probe(ctx context.Context, ffprobe, path string) (ProbeResult, error) {
 		return res, fmt.Errorf("%w (%s): %q", ErrProbeFailed, err, errSnippet(&stderr)) //nolint:errorlint // spec format keeps sentinel via %w with exit text and capped stderr.
 	}
 
-	if err := json.Unmarshal(data, &res); err != nil {
+	res, err = probeCodec.Decode(data)
+	if err != nil {
 		return res, fmt.Errorf("%w (%s): %q", ErrProbeFailed, err, errSnippet(&stderr)) //nolint:errorlint // spec format keeps sentinel via %w with exit text and capped stderr.
 	}
 
