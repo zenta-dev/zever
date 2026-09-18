@@ -207,13 +207,18 @@ func TestCoverGetError(t *testing.T) {
 	}
 }
 
-func TestCoverSaveGetError(t *testing.T) {
+// TestCoverSaveTransportError drives Save against a dead server: the
+// WATCH that opens the transaction fails before the read inside it ever
+// runs, so only the outer "redis: save" wrap is guaranteed here (the
+// inner "redis: save get" and "redis: save set" wraps are covered by the
+// RESP-scripted tests below, which reach saveTx's body).
+func TestCoverSaveTransportError(t *testing.T) {
 	t.Parallel()
 
 	st := coverStore(t, false)
 
-	if err := st.Save(context.Background(), session.Session{ID: session.NewID()}); err == nil || !strings.Contains(err.Error(), "redis: save get") {
-		t.Fatalf("Save over dead server err = %v, want wrap \"redis: save get\"", err)
+	if err := st.Save(context.Background(), session.Session{ID: session.NewID()}); err == nil || !strings.Contains(err.Error(), "redis: save") {
+		t.Fatalf("Save over dead server err = %v, want wrap \"redis: save\"", err)
 	}
 }
 
@@ -227,13 +232,39 @@ func TestCoverDeleteError(t *testing.T) {
 	}
 }
 
+// TestCoverSaveGetError drives Save's WATCH/GET step against a RESP fake
+// that opens the transaction fine but fails the read: the error branch
+// surfaces as "redis: save get".
+func TestCoverSaveGetError(t *testing.T) {
+	t.Parallel()
+
+	st := &store{
+		client: coverRESPClient(t, "+OK\r\n" /* WATCH */, "-ERR boom\r\n" /* GET */),
+		prefix: "cov-", ttl: time.Minute,
+	}
+
+	if err := st.Save(context.Background(), session.Session{ID: session.NewID()}); err == nil || !strings.Contains(err.Error(), "redis: save get") {
+		t.Fatalf("Save GET err = %v, want wrap \"redis: save get\"", err)
+	}
+}
+
 // TestCoverSaveSetError drives Save's write path against a RESP fake that
-// reports a missing record (null GET) then fails the SET: the walkthrough
-// error branch surfaces as "redis: save set".
+// opens the transaction, reports a missing record (null GET), then fails
+// the MULTI/EXEC write: the walkthrough error branch surfaces as
+// "redis: save set".
 func TestCoverSaveSetError(t *testing.T) {
 	t.Parallel()
 
-	st := &store{client: coverRESPClient(t, "$-1\r\n", "-ERR boom\r\n"), prefix: "cov-", ttl: time.Minute}
+	st := &store{
+		client: coverRESPClient(t,
+			"+OK\r\n",             // WATCH
+			"$-1\r\n",             // GET (missing)
+			"+OK\r\n",             // MULTI
+			"+QUEUED\r\n",         // SET (queued)
+			"*1\r\n-ERR boom\r\n", // EXEC (SET failed inside the transaction)
+		),
+		prefix: "cov-", ttl: time.Minute,
+	}
 
 	if err := st.Save(context.Background(), session.Session{ID: session.NewID()}); err == nil || !strings.Contains(err.Error(), "redis: save set") {
 		t.Fatalf("Save SET err = %v, want wrap \"redis: save set\"", err)
