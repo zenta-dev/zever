@@ -193,15 +193,15 @@ func TestTracing_serverErrorRecordsSpanError(t *testing.T) {
 	t.Parallel()
 
 	tests := []struct {
-		name      string
-		status    int
-		wantError bool
+		name    string
+		status  int
+		wantErr bool
 	}{
-		{name: "500 records", status: http.StatusInternalServerError, wantError: true},
-		{name: "503 records", status: http.StatusServiceUnavailable, wantError: true},
-		{name: "499 silent", status: 499, wantError: false},
-		{name: "400 silent", status: http.StatusBadRequest, wantError: false},
-		{name: "200 silent", status: http.StatusOK, wantError: false},
+		{name: "500 records", status: http.StatusInternalServerError, wantErr: true},
+		{name: "503 records", status: http.StatusServiceUnavailable, wantErr: true},
+		{name: "499 silent", status: 499, wantErr: false},
+		{name: "400 silent", status: http.StatusBadRequest, wantErr: false},
+		{name: "200 silent", status: http.StatusOK, wantErr: false},
 	}
 
 	for _, tt := range tests {
@@ -217,15 +217,15 @@ func TestTracing_serverErrorRecordsSpanError(t *testing.T) {
 			handler.ServeHTTP(httptest.NewRecorder(), httptest.NewRequestWithContext(context.Background(), http.MethodGet, "/", nil))
 
 			got := len(tracer.spans[0].errors)
-			if tt.wantError && got != 1 {
+			if tt.wantErr && got != 1 {
 				t.Fatalf("expected 1 recorded error for status %d, got %d", tt.status, got)
 			}
 
-			if !tt.wantError && got != 0 {
+			if !tt.wantErr && got != 0 {
 				t.Fatalf("expected no recorded error for status %d, got %v", tt.status, tracer.spans[0].errors)
 			}
 
-			if tt.wantError {
+			if tt.wantErr {
 				var se statusError
 				if !errors.As(tracer.spans[0].errors[0], &se) || se.status != tt.status {
 					t.Fatalf("recorded error = %v, want statusError{%d}", tracer.spans[0].errors[0], tt.status)
