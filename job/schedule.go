@@ -51,7 +51,9 @@ func NewScheduler(d *Dispatcher, locker *UniqueLocker) *Scheduler {
 }
 
 // Every registers jobName with args on cron spec and returns its entry ID.
-// It returns an error for a nil Dispatcher, invalid specs, or scheduler registration failures.
+// It parses spec once via cachedSchedule and registers with cron.Schedule,
+// so the cached schedule drives both firing and dedup. It returns an error
+// for a nil Dispatcher or invalid specs.
 func (s *Scheduler) Every(spec, jobName string, args any) (EntryID, error) {
 	if s.Dispatcher == nil {
 		return 0, errors.New("job: scheduler dispatcher is nil")
@@ -62,15 +64,36 @@ func (s *Scheduler) Every(spec, jobName string, args any) (EntryID, error) {
 		return 0, fmt.Errorf("job: schedule spec %q: %w", spec, err)
 	}
 
-	id, err := s.cron.AddFunc(spec, func() {
-		s.fireWithSchedule(jobName, args, spec, sched)
-	})
-	if err != nil {
-		return 0, fmt.Errorf("job: schedule add %q: %w", spec, err)
+	return s.addSchedule(spec, jobName, args, sched), nil
+}
+
+// EveryWithSchedule registers jobName with args on spec using the already
+// parsed sched, caching it and registering with cron.Schedule without
+// re-parsing. A concurrently cached schedule wins over sched. It returns an
+// error for a nil Dispatcher or nil sched.
+func (s *Scheduler) EveryWithSchedule(spec, jobName string, args any, sched cron.Schedule) (EntryID, error) {
+	if s.Dispatcher == nil {
+		return 0, errors.New("job: scheduler dispatcher is nil")
 	}
 
+	if sched == nil {
+		return 0, fmt.Errorf("job: schedule spec %q: nil schedule", spec)
+	}
+
+	sched = s.storeSchedule(spec, sched)
+
+	return s.addSchedule(spec, jobName, args, sched), nil
+}
+
+// addSchedule registers the firing closure on the given parsed schedule
+// without parsing. Callers must have cached sched already.
+func (s *Scheduler) addSchedule(spec, jobName string, args any, sched cron.Schedule) EntryID {
+	id := s.cron.Schedule(sched, cron.FuncJob(func() {
+		s.fireWithSchedule(jobName, args, spec, sched)
+	}))
+
 	//nolint:gosec // cron EntryIDs are a small positive sequence starting at 1.
-	return EntryID(id), nil
+	return EntryID(id)
 }
 
 // Remove unregisters the schedule with the given ID.

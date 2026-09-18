@@ -78,21 +78,18 @@ func TestSchedulerEveryInvalidSpec(t *testing.T) {
 	}
 }
 
-func TestSchedulerEveryAddFuncError(t *testing.T) {
+func TestSchedulerEveryIgnoresCronParserDivergence(t *testing.T) {
 	Reset()
 	s := NewScheduler(&Dispatcher{Q: &stubQueue{}}, NewUniqueLocker(&fakeCache{}))
-	// Minute-only parser rejects 5-field standard specs, while
-	// cachedSchedule (ParseStandard) still accepts them.
+	// Single-parse path: Every uses cachedSchedule (ParseStandard) and
+	// cron.Schedule, so a divergent cron parser no longer rejects the spec.
 	s.cron = cron.New(cron.WithParser(cron.NewParser(cron.Minute)))
-	_, err := s.Every("0 0 * * *", "some-job", nil)
-	if err == nil {
-		t.Fatal("Every AddFunc reject want error")
+	id, err := s.Every("0 0 * * *", "some-job", nil)
+	if err != nil {
+		t.Fatalf("Every with divergent parser: %v", err)
 	}
-	if !strings.Contains(err.Error(), "schedule add") {
-		t.Fatalf("err %q missing schedule add", err.Error())
-	}
-	if !strings.Contains(err.Error(), "0 0 * * *") {
-		t.Fatalf("err %q missing spec", err.Error())
+	if id == 0 {
+		t.Fatal("Every id=0 want nonzero")
 	}
 }
 

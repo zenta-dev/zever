@@ -65,7 +65,8 @@ func (e *embedded) Schedule(ctx context.Context, spec, jobName string, args any)
 		return 0, &scheduler.InvalidSpecError{Spec: spec, Err: errors.New("spec length must be 1-256")}
 	}
 
-	if _, err := cron.ParseStandard(spec); err != nil {
+	parsed, err := cron.ParseStandard(spec)
+	if err != nil {
 		return 0, &scheduler.InvalidSpecError{Spec: spec, Err: err}
 	}
 
@@ -73,12 +74,15 @@ func (e *embedded) Schedule(ctx context.Context, spec, jobName string, args any)
 		return 0, fmt.Errorf("scheduler: unknown job %q: %w", jobName, job.ErrUnknownJob)
 	}
 
-	if _, err := json.Marshal(args); err != nil {
+	if _, err = json.Marshal(args); err != nil {
 		return 0, fmt.Errorf("scheduler: args: %w", err)
 	}
 
-	// The spec parsed above, so Every (re-parse + AddFunc) cannot fail.
-	id, _ := e.sched.Every(spec, jobName, args)
+	// parsed above is passed through so job reuses it without re-parsing.
+	id, err := e.sched.EveryWithSchedule(spec, jobName, args, parsed)
+	if err != nil {
+		return 0, fmt.Errorf("scheduler: schedule %q: %w", spec, err)
+	}
 
 	return id, nil
 }
