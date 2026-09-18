@@ -2,7 +2,6 @@ package pgvector
 
 import (
 	"context"
-	"encoding/json"
 	"fmt"
 	"strconv"
 	"strings"
@@ -12,12 +11,16 @@ import (
 	"github.com/jackc/pgx/v5/pgconn"
 	"github.com/jackc/pgx/v5/pgxpool"
 
+	"github.com/zenta-dev/zever/codec"
 	"github.com/zenta-dev/zever/vectorstore"
 )
 
 var (
 	_ vectorstore.VectorStore = (*Store)(nil)
 	_ dbpool                  = (*pgxpool.Pool)(nil)
+
+	metadataCodec  = codec.JSONCodec[map[string]any]{}
+	embeddingCodec = codec.JSONCodec[[]float32]{}
 )
 
 // dbpool is the narrow query surface Store needs. *pgxpool.Pool satisfies it;
@@ -205,12 +208,12 @@ func (s *Store) Upsert(ctx context.Context, vec vectorstore.Vector) error {
 		return fmt.Errorf("pgvector: upsert: %w (set the dimension option or recreate the vectors table)", mismatch)
 	}
 
-	metaJSON, err := json.Marshal(vec.Metadata)
+	metaJSON, err := metadataCodec.Encode(vec.Metadata)
 	if err != nil {
 		return fmt.Errorf("pgvector: marshal metadata: %w", err)
 	}
 
-	vecJSON, err := json.Marshal(vec.Embedding)
+	vecJSON, err := embeddingCodec.Encode(vec.Embedding)
 	if err != nil {
 		return fmt.Errorf("pgvector: marshal embedding: %w", err)
 	}
@@ -264,7 +267,7 @@ func (s *Store) Query(ctx context.Context, embedding []float32, topK int) ([]vec
 		return nil, fmt.Errorf("pgvector: query: %w (set the dimension option or recreate the vectors table)", mismatch)
 	}
 
-	vecJSON, err := json.Marshal(embedding)
+	vecJSON, err := embeddingCodec.Encode(embedding)
 	if err != nil {
 		return nil, fmt.Errorf("pgvector: marshal embedding: %w", err)
 	}
@@ -301,9 +304,12 @@ func (s *Store) Query(ctx context.Context, embedding []float32, topK int) ([]vec
 		m.Score = float32(score)
 
 		if metaJSON != nil {
-			if err := json.Unmarshal(metaJSON, &m.Metadata); err != nil {
+			var decodeErr error
+
+			m.Metadata, decodeErr = metadataCodec.Decode(metaJSON)
+			if decodeErr != nil {
 				rows.Close()
-				return nil, fmt.Errorf("pgvector: metadata decode: %w", err)
+				return nil, fmt.Errorf("pgvector: metadata decode: %w", decodeErr)
 			}
 		}
 
@@ -329,7 +335,7 @@ func formatVector(e []float32) string {
 		return "[]"
 	}
 
-	b, _ := json.Marshal(e)
+	b, _ := embeddingCodec.Encode(e)
 
 	return string(b)
 }
