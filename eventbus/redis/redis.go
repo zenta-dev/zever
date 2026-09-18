@@ -81,16 +81,16 @@ func newAdapter(opts eventbus.Options) (*adapter, error) {
 		closeTimeout = eventbus.DefaultCloseTimeout
 	}
 
-	client, _ := zredis.New(zredis.Options{
-		Addr:     opts.Redis.Addr,
-		Password: opts.Redis.Password,
-		DB:       opts.Redis.DB,
-		TLS:      opts.Redis.TLS,
+	client, err := zredis.New(zredis.Options{
+		Addr:       opts.Redis.Addr,
+		Password:   opts.Redis.Password,
+		DB:         opts.Redis.DB,
+		TLS:        opts.Redis.TLS,
+		RequireTLS: opts.Redis.RequireTLS,
 	})
-	// Unreachable post-Validate: Validate rejects scheme/"/ ? #" addrs so
-	// toRedisOptions takes its infallible plain host:port branch, and the
-	// old pooled client Close cannot fail for a healthy client. The ping
-	// check right below preserves fail-closed behavior.
+	if err != nil {
+		return nil, fmt.Errorf("redis: connect %q: %w", redactAddr(opts.Redis.Addr), err)
+	}
 
 	ctx, cancel := context.WithTimeout(context.Background(), 3*time.Second)
 	defer cancel()

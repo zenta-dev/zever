@@ -65,17 +65,16 @@ func New(opts session.Options) (session.Store, error) {
 		ttl = session.DefaultTTL
 	}
 
-	// Validated options cannot fail Pool construction: toRedisOptions
-	// errors only on redis:///rediss:// URLs (bad parse or missing host),
-	// and Options.Validate rejects any address containing "://". The
-	// client is built without I/O; the 3s Ping check below still verifies
-	// connectivity, so a silent-nil client cannot slip through.
-	client, _ := zredis.New(zredis.Options{
-		Addr:     opts.Redis.Addr,
-		Password: opts.Redis.Password,
-		DB:       opts.Redis.DB,
-		TLS:      opts.Redis.TLS,
+	client, err := zredis.New(zredis.Options{
+		Addr:       opts.Redis.Addr,
+		Password:   opts.Redis.Password,
+		DB:         opts.Redis.DB,
+		TLS:        opts.Redis.TLS,
+		RequireTLS: opts.Redis.RequireTLS,
 	})
+	if err != nil {
+		return nil, fmt.Errorf("redis: connect %q: %w", redactAddr(opts.Redis.Addr), err)
+	}
 
 	ctx, cancel := context.WithTimeout(context.Background(), 3*time.Second)
 	defer cancel()

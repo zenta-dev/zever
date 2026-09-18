@@ -87,6 +87,8 @@ func (o Options) toRedisOptions() (*goredis.Options, error) {
 			redisOpt.TLSConfig = &tls.Config{
 				MinVersion: tls.VersionTLS12,
 			}
+		} else if o.RequireTLS {
+			return nil, &PlaintextRejectedError{Addr: addr}
 		}
 
 		return redisOpt, nil
@@ -107,6 +109,8 @@ func (o Options) toRedisOptions() (*goredis.Options, error) {
 		opt.TLSConfig = &tls.Config{
 			MinVersion: tls.VersionTLS12,
 		}
+	} else if o.RequireTLS {
+		return nil, &PlaintextRejectedError{Addr: addr}
 	}
 
 	return opt, nil
@@ -118,6 +122,7 @@ func (o Options) Compare(other Options) bool {
 		strings.TrimSpace(o.Password) == strings.TrimSpace(other.Password) &&
 		o.DB == other.DB &&
 		o.TLS == other.TLS &&
+		o.RequireTLS == other.RequireTLS &&
 		o.PoolSize == other.PoolSize &&
 		o.MinIdleConns == other.MinIdleConns &&
 		o.PoolTimeout == other.PoolTimeout &&

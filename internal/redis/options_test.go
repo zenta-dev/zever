@@ -263,3 +263,81 @@ func TestOptions_toRedisOptions_invalidAddr_typedError(t *testing.T) {
 		}
 	})
 }
+
+func TestOptions_toRedisOptions_requireTLS(t *testing.T) {
+	t.Parallel()
+
+	t.Run("default allows plaintext", func(t *testing.T) {
+		t.Parallel()
+
+		got, err := (Options{Addr: "localhost:6379"}).toRedisOptions()
+		if err != nil {
+			t.Fatalf("toRedisOptions() error = %v, want nil", err)
+		}
+
+		if got.TLSConfig != nil {
+			t.Errorf("TLSConfig = %v, want nil", got.TLSConfig)
+		}
+	})
+
+	t.Run("requireTLS with plaintext addr fails", func(t *testing.T) {
+		t.Parallel()
+
+		_, err := (Options{Addr: "localhost:6379", RequireTLS: true}).toRedisOptions()
+		if err == nil {
+			t.Fatal("toRedisOptions() = nil error, want PlaintextRejectedError")
+		}
+
+		if !errors.Is(err, ErrPlaintextRejected) {
+			t.Errorf("errors.Is(err, ErrPlaintextRejected) = false (err = %v)", err)
+		}
+
+		var plaintextErr *PlaintextRejectedError
+		if !errors.As(err, &plaintextErr) {
+			t.Fatalf("errors.As(err, PlaintextRejectedError) = false (err = %T %v)", err, err)
+		}
+	})
+
+	t.Run("requireTLS with redis url addr fails", func(t *testing.T) {
+		t.Parallel()
+
+		_, err := (Options{Addr: "redis://h:6379", RequireTLS: true}).toRedisOptions()
+		if err == nil {
+			t.Fatal("toRedisOptions() = nil error, want PlaintextRejectedError")
+		}
+
+		if !errors.Is(err, ErrPlaintextRejected) {
+			t.Errorf("errors.Is(err, ErrPlaintextRejected) = false (err = %v)", err)
+		}
+	})
+
+	t.Run("requireTLS with rediss url addr succeeds", func(t *testing.T) {
+		t.Parallel()
+
+		got, err := (Options{Addr: "rediss://h:6379", RequireTLS: true}).toRedisOptions()
+		if err != nil {
+			t.Fatalf("toRedisOptions() error = %v, want nil", err)
+		}
+
+		if got.TLSConfig == nil {
+			t.Fatal("TLSConfig = nil, want set")
+		}
+
+		if got.TLSConfig.MinVersion != tls.VersionTLS12 {
+			t.Errorf("TLSConfig.MinVersion = %v, want %v", got.TLSConfig.MinVersion, tls.VersionTLS12)
+		}
+	})
+
+	t.Run("requireTLS with explicit TLS true on plain addr succeeds", func(t *testing.T) {
+		t.Parallel()
+
+		got, err := (Options{Addr: "plain:6379", TLS: true, RequireTLS: true}).toRedisOptions()
+		if err != nil {
+			t.Fatalf("toRedisOptions() error = %v, want nil", err)
+		}
+
+		if got.TLSConfig == nil {
+			t.Fatal("TLSConfig = nil, want set")
+		}
+	})
+}

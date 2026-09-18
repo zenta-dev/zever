@@ -7,9 +7,10 @@ import (
 
 // Sentinel errors returned and wrapped by the redis package.
 var (
-	ErrInvalidAddress = errors.New("redis: invalid address")
-	ErrParseAddress   = errors.New("redis: parse address failed")
-	ErrCloseClient    = errors.New("redis: close client failed")
+	ErrInvalidAddress    = errors.New("redis: invalid address")
+	ErrParseAddress      = errors.New("redis: parse address failed")
+	ErrCloseClient       = errors.New("redis: close client failed")
+	ErrPlaintextRejected = errors.New("redis: RequireTLS is set but the connection would be plaintext")
 )
 
 // InvalidAddressError describes a failure to validate or parse a Redis address.
@@ -34,4 +35,21 @@ func (e *InvalidAddressError) Unwrap() []error {
 		return []error{ErrInvalidAddress, e.Err}
 	}
 	return []error{ErrInvalidAddress}
+}
+
+// PlaintextRejectedError reports that RequireTLS is set on Options but the
+// resolved address would connect without TLS.
+type PlaintextRejectedError struct {
+	// Addr holds the address that would have connected in plaintext.
+	Addr string
+}
+
+// Error returns a formatted description of the rejected plaintext connection.
+func (e *PlaintextRejectedError) Error() string {
+	return fmt.Sprintf("%s %q", ErrPlaintextRejected.Error(), e.Addr)
+}
+
+// Unwrap returns the sentinel error for error inspection.
+func (e *PlaintextRejectedError) Unwrap() error {
+	return ErrPlaintextRejected
 }

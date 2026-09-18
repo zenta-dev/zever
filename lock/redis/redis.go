@@ -66,10 +66,11 @@ func connOptions(opts lock.Options) zredis.Options {
 	}
 
 	return zredis.Options{
-		Addr:     addr,
-		Password: opts.Password,
-		DB:       opts.DB,
-		TLS:      opts.TLS,
+		Addr:       addr,
+		Password:   opts.Password,
+		DB:         opts.DB,
+		TLS:        opts.TLS,
+		RequireTLS: opts.RequireTLS,
 	}
 }
 
