@@ -14,7 +14,7 @@
 //
 // Security: never log secrets or raw option maps, use config.RedactedServices. APIKey is never logged and Host must be a valid URL with scheme and host.
 //
-// Performance: paged queries with Total ignoring Limit and Offset and backend-defined scores. Bounded pools and timeouts via backend defaults.
+// Performance: paged queries with Total ignoring Limit and Offset and backend-defined scores. IndexBatch indexes many documents in one call instead of one round trip per document; adapters implement it as a single multi-row statement, a native bulk API, or a transaction wrapping the single-item path. Bounded pools and timeouts via backend defaults.
 //
 // Concurrency: safe for concurrent use unless noted. No globals, no init wiring.
 //

@@ -10,6 +10,7 @@ import (
 	"sync"
 	"time"
 
+	"github.com/zenta-dev/zever/internal/retry"
 	"github.com/zenta-dev/zever/log"
 	"github.com/zenta-dev/zever/log/noop"
 	"github.com/zenta-dev/zever/queue"
@@ -105,7 +106,7 @@ func (w *Worker) sweepLoop(ctx context.Context, sweep *time.Ticker) {
 }
 
 func (w *Worker) runLoop(ctx context.Context, sem chan struct{}, inflight *sync.WaitGroup) error {
-	pollWait := time.Duration(0)
+	pollAttempt := 0
 
 	const maxPollWait = 5 * time.Second
 
@@ -122,7 +123,7 @@ func (w *Worker) runLoop(ctx context.Context, sem chan struct{}, inflight *sync.
 		if errors.Is(err, queue.ErrEmpty) {
 			<-sem
 
-			if w.handleEmpty(ctx, inflight, &pollWait, maxPollWait) {
+			if w.handleEmpty(ctx, inflight, &pollAttempt, maxPollWait) {
 				return nil
 			}
 
@@ -140,7 +141,7 @@ func (w *Worker) runLoop(ctx context.Context, sem chan struct{}, inflight *sync.
 			return err
 		}
 
-		pollWait = 0
+		pollAttempt = 0
 
 		w.launchHandler(ctx, msg, topic, sem, inflight)
 	}
@@ -155,37 +156,36 @@ func (w *Worker) sweepBatches(ctx context.Context) {
 	settleDueBatches(sweepCtx)
 }
 
-func (w *Worker) handleEmpty(ctx context.Context, inflight *sync.WaitGroup, pollWait *time.Duration, maxPollWait time.Duration) bool {
-	capped := min(*pollWait, maxPollWait)
+// handleEmpty waits before the next poll after an empty queue, using an
+// increasing attempt counter (consecutive empty polls) rather than a
+// mutated duration: the first call in a run of empty polls waits 0 (poll
+// immediately), and every subsequent call waits nextPollWait(*attempt,
+// maxPollWait), matching the doubling sequence the previous
+// mutated-duration implementation produced (0, 1ms, 2ms, 4ms, ..., capped
+// at maxPollWait).
+func (w *Worker) handleEmpty(ctx context.Context, inflight *sync.WaitGroup, attempt *int, maxPollWait time.Duration) bool {
+	wait := time.Duration(0)
+	if *attempt > 0 {
+		wait = nextPollWait(*attempt, maxPollWait)
+	}
 
 	select {
-	case <-time.After(capped):
+	case <-time.After(wait):
 	case <-ctx.Done():
 		w.waitDrain(inflight)
 
 		return true
 	}
 
-	*pollWait = nextPollWait(*pollWait, maxPollWait)
+	*attempt++
 
 	return false
 }
 
-func nextPollWait(cur, maxPollWait time.Duration) time.Duration {
-	if cur == 0 {
-		return time.Millisecond
-	}
-
-	if cur >= maxPollWait {
-		return maxPollWait
-	}
-
-	next := cur * 2
-	if next > maxPollWait || next < cur {
-		return maxPollWait
-	}
-
-	return next
+// nextPollWait returns the poll-wait delay for the given (1-based) attempt:
+// BaseDelay doubled per attempt, capped at maxPollWait.
+func nextPollWait(attempt int, maxPollWait time.Duration) time.Duration {
+	return retry.Policy{BaseDelay: time.Millisecond, Multiplier: 2, MaxDelay: maxPollWait}.NextDelay(attempt)
 }
 
 func (w *Worker) launchHandler(ctx context.Context, msg queue.Message, topic string, sem chan struct{}, inflight *sync.WaitGroup) {

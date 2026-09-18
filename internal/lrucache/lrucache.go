@@ -156,3 +156,97 @@ func (c *Cache[K, V]) Len() int {
 
 	return c.ll.Len()
 }
+
+// GetOrCompute returns the current value for k if present (moving it to the
+// front of the recency list), without calling compute. If k is absent,
+// compute is called and its result is stored under k (subject to the same
+// capacity eviction as Put, invoking OnEvict if something else is evicted as
+// a result), and the newly computed value is returned. The second return
+// value reports whether k was already present (true) or freshly computed
+// (false).
+//
+// The presence check and the store are one atomic operation performed under
+// the cache's own internal lock, including the compute call itself: two
+// goroutines racing GetOrCompute on the same absent key can never both
+// observe "absent" and both call compute, so a caller can use this to avoid
+// duplicating an expensive computation (e.g. preparing a resource) on a
+// concurrent cache miss. Because compute runs while the lock is held, it
+// must not call back into this Cache (Get/Put/Delete/GetOrCompute/Clear
+// would deadlock) and should be reasonably fast, since it blocks every other
+// goroutine contending for the cache for its duration.
+func (c *Cache[K, V]) GetOrCompute(k K, compute func() V) (V, bool) {
+	c.mu.Lock()
+
+	if el, ok := c.items[k]; ok {
+		c.ll.MoveToFront(el)
+		v := el.Value.(*entry[K, V]).val //nolint:forcetypeassert // list elements are only ever pushed as *entry[K, V]
+		c.mu.Unlock()
+		return v, true
+	}
+
+	v := compute()
+
+	var (
+		evictKey K
+		evictVal V
+		evicted  bool
+	)
+
+	el := c.ll.PushFront(&entry[K, V]{key: k, val: v})
+	c.items[k] = el
+
+	if c.ll.Len() > c.capacity {
+		back := c.ll.Back()
+		if back != nil {
+			be := back.Value.(*entry[K, V]) //nolint:forcetypeassert // list elements are only ever pushed as *entry[K, V]
+			c.ll.Remove(back)
+			delete(c.items, be.key)
+			evictKey, evictVal, evicted = be.key, be.val, true
+		}
+	}
+	c.mu.Unlock()
+
+	if evicted && c.onEvict != nil {
+		c.onEvict(evictKey, evictVal)
+	}
+
+	return v, false
+}
+
+// Clear removes every entry from the cache. If fn is non-nil, it is called
+// once per removed entry, after the internal lock has been released (same
+// timing guarantee as WithOnEvict), so callers can release resources held by
+// cached values (e.g. closing a cached file handle or connection) on full
+// teardown. Order of calls is not deterministic.
+//
+// Clear does NOT invoke the OnEvict callback registered via WithOnEvict, for
+// the same reason an explicit Delete does not (see Cache.Delete): OnEvict
+// exists for capacity-driven eviction, while Clear is the caller
+// deliberately discarding everything and given its own dedicated callback
+// parameter to do so with, so firing OnEvict as well would risk a
+// double-close/double-free for callers that use both.
+//
+// If fn is nil, Clear is a fast bulk-clear that does not walk the existing
+// entries at all.
+func (c *Cache[K, V]) Clear(fn func(K, V)) {
+	c.mu.Lock()
+
+	if fn == nil {
+		c.ll = list.New()
+		c.items = make(map[K]*list.Element, c.capacity)
+		c.mu.Unlock()
+		return
+	}
+
+	removed := make([]entry[K, V], 0, len(c.items))
+	for _, el := range c.items {
+		removed = append(removed, *el.Value.(*entry[K, V])) //nolint:forcetypeassert // list elements are only ever pushed as *entry[K, V]
+	}
+	c.ll = list.New()
+	c.items = make(map[K]*list.Element, c.capacity)
+	c.mu.Unlock()
+
+	for _, e := range removed {
+		fn(e.key, e.val)
+	}
+}

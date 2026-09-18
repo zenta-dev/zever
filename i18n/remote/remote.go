@@ -17,6 +17,7 @@ import (
 	"github.com/zenta-dev/zever/codec"
 	"github.com/zenta-dev/zever/i18n"
 	"github.com/zenta-dev/zever/internal/httpclient"
+	"github.com/zenta-dev/zever/internal/lrucache"
 )
 
 var (
@@ -36,11 +37,14 @@ const (
 
 var _ i18n.I18n = (*adapter)(nil)
 
-type entry struct {
-	key       string // full cache key
-	val       string
-	miss      bool // negative miss: key absent server-side
-	expiresAt time.Time
+// cacheValue is the payload stored in a.cache, keyed by the full cache key.
+// Expiry is no longer tracked here (expiresAt) since it's owned by
+// lrucache.TTLCache, which is given the entry's ttl explicitly on each store
+// via PutTTL (posTTL for a positive hit, negTTL for a negative "key not
+// found" miss).
+type cacheValue struct {
+	val  string
+	miss bool // negative miss: key absent server-side
 }
 
 type call struct {
@@ -55,8 +59,7 @@ type adapter struct {
 	closed    bool
 	quit      chan struct{}
 	wg        sync.WaitGroup
-	lru       *list.List // front = most recent; values are entry
-	cache     map[string]*list.Element
+	cache     *lrucache.TTLCache[string, cacheValue]
 	flights   map[string]*call
 	order     *list.List // FIFO of in-flight keys; front = newest
 	orderElem map[string]*list.Element
@@ -93,8 +96,7 @@ func New(opts i18n.Options) (i18n.I18n, error) {
 	}
 	return &adapter{
 		quit:      make(chan struct{}),
-		lru:       list.New(),
-		cache:     make(map[string]*list.Element),
+		cache:     lrucache.NewTTL[string, cacheValue](maxCacheEntries, posTTL),
 		flights:   make(map[string]*call),
 		order:     list.New(),
 		orderElem: make(map[string]*list.Element),
@@ -137,44 +139,20 @@ func cacheKey(locale, key string, args map[string]string) string {
 	return b.String()
 }
 
-// lookup returns the cached entry and moves it to front. Call with mu held.
-func (a *adapter) lookup(key string, now time.Time) (entry, bool) {
-	el, ok := a.cache[key]
-	if !ok {
-		return entry{}, false
-	}
-	e, ok := el.Value.(entry) // cache values only ever entry (all PushFront sites store entry)
-	if !ok {
-		return entry{}, false
-	}
-	if !e.expiresAt.After(now) {
-		a.lru.Remove(el)
-		delete(a.cache, key)
-		return entry{}, false
-	}
-	a.lru.MoveToFront(el)
-	return e, true
+// lookup returns the cached value for key, moving it to front of recency
+// order (and lazily purging it if past its TTL) via the underlying
+// TTLCache. Call with mu held, so the cache lookup and the caller's
+// subsequent flights check happen atomically with respect to a concurrent
+// store/Translate.
+func (a *adapter) lookup(key string) (cacheValue, bool) {
+	return a.cache.Get(key)
 }
 
-// store inserts e, evicting the LRU tail past maxCacheEntries. Call with mu held.
-func (a *adapter) store(e entry) {
-	if el, ok := a.cache[e.key]; ok {
-		e2 := e
-		el.Value = e2
-		a.lru.MoveToFront(el)
-		return
-	}
-	a.cache[e.key] = a.lru.PushFront(e)
-	if a.lru.Len() <= maxCacheEntries {
-		return
-	}
-	back := a.lru.Back() // never nil: PushFront above made len >= 1
-	be, ok := back.Value.(entry)
-	if !ok {
-		return
-	}
-	a.lru.Remove(back)
-	delete(a.cache, be.key)
+// store inserts v for key with the given ttl (posTTL for a positive hit,
+// negTTL for a negative "key not found" miss), evicting the LRU tail past
+// maxCacheEntries via the underlying TTLCache. Call with mu held.
+func (a *adapter) store(key string, v cacheValue, ttl time.Duration) {
+	a.cache.PutTTL(key, v, ttl)
 }
 
 func (a *adapter) Translate(ctx context.Context, locale, key string, args map[string]string) (string, error) {
@@ -182,14 +160,13 @@ func (a *adapter) Translate(ctx context.Context, locale, key string, args map[st
 		return "", &i18n.LocaleNotFoundError{Locale: locale}
 	}
 	ck := cacheKey(locale, key, args)
-	now := time.Now()
 
 	a.mu.Lock()
 	if a.closed {
 		a.mu.Unlock()
 		return "", fmt.Errorf("remote: translate: %w", i18n.ErrClosed)
 	}
-	if e, ok := a.lookup(ck, now); ok {
+	if e, ok := a.lookup(ck); ok {
 		a.mu.Unlock()
 		if e.miss {
 			return "", &i18n.KeyNotFoundError{Locale: locale, Key: key}
@@ -241,9 +218,9 @@ func (a *adapter) Translate(ctx context.Context, locale, key string, args map[st
 		delete(a.orderElem, ck)
 	}
 	if err == nil {
-		a.store(entry{key: ck, val: val, expiresAt: now.Add(posTTL)})
+		a.store(ck, cacheValue{val: val}, posTTL)
 	} else if errors.Is(err, i18n.ErrKeyNotFound) {
-		a.store(entry{key: ck, miss: true, expiresAt: now.Add(negTTL)})
+		a.store(ck, cacheValue{miss: true}, negTTL)
 	}
 	a.wg.Done()
 	a.mu.Unlock()
@@ -334,7 +311,6 @@ func (a *adapter) Close() error {
 
 	a.mu.Lock()
 	a.cache = nil
-	a.lru = nil
 	a.flights = nil
 	a.order = nil
 	a.orderElem = nil

@@ -9,6 +9,7 @@ import (
 	"github.com/jackc/pgx/v5/pgconn"
 
 	"github.com/zenta-dev/zever/db"
+	"github.com/zenta-dev/zever/internal/retry"
 )
 
 // ErrRetryable marks an error as a transient transaction failure worth
@@ -83,6 +84,14 @@ type RetryOptions struct {
 // A non-retryable error is returned unwrapped after exactly one attempt.
 // When attempts are exhausted, the last retryable error is returned wrapped
 // in an "orm: RetryTx" tag, still testable with errors.Is.
+//
+// The outer attempt loop and error shaping here are intentionally
+// hand-rolled rather than built on retry.Do: retry.Do retries any non-nil
+// error unconditionally and has no way to short-circuit on a non-retryable
+// error without the exhaustion wrap, which this function's contract
+// requires (see IsRetryable above). Only the per-attempt delay is delegated
+// to retry.Policy (Linear: true), reproducing the original
+// backoff*time.Duration(attempt+1) linear formula value-for-value.
 func RetryTx(ctx context.Context, exec db.DB, opts RetryOptions, fn func(ctx context.Context, tx db.Tx) error) error {
 	attempts := opts.MaxAttempts
 	if attempts <= 0 {
@@ -113,7 +122,8 @@ func RetryTx(ctx context.Context, exec db.DB, opts RetryOptions, fn func(ctx con
 				opts.OnRetry(attempt, err)
 			}
 
-			if err := sleepCtx(ctx, backoff*time.Duration(attempt+1)); err != nil {
+			delay := retry.Policy{BaseDelay: backoff, Linear: true}.NextDelay(attempt + 1)
+			if err := sleepCtx(ctx, delay); err != nil {
 				return fmt.Errorf("orm: RetryTx: %w", err)
 			}
 		}

@@ -9,14 +9,25 @@ import (
 	"errors"
 	"fmt"
 	"io"
-	"math/rand"
 	"net/http"
 	"strconv"
 	"sync"
 	"time"
 
+	"github.com/zenta-dev/zever/internal/retry"
 	"github.com/zenta-dev/zever/webhook"
 )
+
+// deliveryBackoffPolicy computes the delay before retrying a failed
+// delivery: linear growth from 500ms, capped at 72h, plus up to 250ms of
+// flat additive jitter.
+var deliveryBackoffPolicy = retry.Policy{
+	BaseDelay:  500 * time.Millisecond,
+	Linear:     true,
+	MaxDelay:   72 * time.Hour,
+	JitterMode: retry.JitterFlat,
+	JitterMax:  250 * time.Millisecond,
+}
 
 type registration struct {
 	target string
@@ -29,8 +40,6 @@ type adapter struct {
 	client       *http.Client
 	timeout      time.Duration
 	maxRetries   int
-	jitter       *rand.Rand
-	jitterMu     sync.Mutex
 	allowPrivate bool
 }
 
@@ -216,23 +225,10 @@ func (a *adapter) sleepWithContext(ctx context.Context, d time.Duration) error {
 func (a *adapter) backoff(attempt int) time.Duration {
 	const maxDelay = 72 * time.Hour
 
-	if attempt <= 0 {
-		attempt = 1
-	}
-
-	// No upper clamp: absurd attempts overflow base below, and the guards
-	// below cap correctly. (A clamp would render the maxDelay branches
-	// unreachable and untestable.)
-	base := time.Duration(attempt) * 500 * time.Millisecond
-	if base > maxDelay || base <= 0 {
-		base = maxDelay
-	}
-
-	a.jitterMu.Lock()
-	n := a.jitter.Int63n(251)
-	a.jitterMu.Unlock()
-
-	d := base + time.Duration(n)*time.Millisecond
+	// NextDelay caps the delay at MaxDelay before jitter, so a flat jitter
+	// draw on top of an already-capped delay can push the result slightly
+	// past MaxDelay; re-clamp so the cap is exact regardless of jitter.
+	d := deliveryBackoffPolicy.NextDelay(attempt)
 	if d > maxDelay {
 		d = maxDelay
 	}
@@ -263,11 +259,6 @@ func signAt(secret string, payload []byte, ts int64) string {
 	return fmt.Sprintf("t=%d,v1=%s", ts, hex.EncodeToString(mac.Sum(nil)))
 }
 
-func newJitter() *rand.Rand {
-	//nolint:gosec // G404: math/rand suffices for retry jitter, which is not security-sensitive.
-	return rand.New(rand.NewSource(time.Now().UnixNano()))
-}
-
 func newSafeClient(timeout time.Duration, allowPrivate bool) *http.Client {
 	return webhook.NewSafeClient(timeout, allowPrivate)
 }
@@ -294,7 +285,6 @@ func New(o webhook.Options) (webhook.Webhook, error) {
 		timeout:      timeout,
 		maxRetries:   maxRetries,
 		allowPrivate: o.AllowPrivateTargets,
-		jitter:       newJitter(),
 		client:       newSafeClient(timeout, o.AllowPrivateTargets),
 	}, nil
 }

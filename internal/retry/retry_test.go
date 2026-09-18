@@ -3,6 +3,7 @@ package retry
 import (
 	"context"
 	"errors"
+	"fmt"
 	"testing"
 	"time"
 )
@@ -96,6 +97,43 @@ func TestPolicyNextDelayZeroJitterIsDeterministic(t *testing.T) {
 		if got := p.NextDelay(1); got != time.Second {
 			t.Fatalf("NextDelay with zero jitter = %v, want exactly %v", got, time.Second)
 		}
+	}
+}
+
+func TestPolicyNextDelayLinearGrowth(t *testing.T) {
+	p := Policy{BaseDelay: 10 * time.Millisecond, Linear: true, MaxDelay: time.Hour}
+
+	want := []time.Duration{
+		10 * time.Millisecond,
+		20 * time.Millisecond,
+		30 * time.Millisecond,
+		40 * time.Millisecond,
+	}
+
+	for i, w := range want {
+		attempt := i + 1
+		got := p.NextDelay(attempt)
+		if got != w {
+			t.Errorf("NextDelay(%d) = %v, want %v", attempt, got, w)
+		}
+	}
+}
+
+func TestPolicyNextDelayLinearCapsAtMaxDelay(t *testing.T) {
+	p := Policy{BaseDelay: time.Second, Linear: true, MaxDelay: 5 * time.Second}
+
+	got := p.NextDelay(10)
+	if got != 5*time.Second {
+		t.Errorf("NextDelay(10) = %v, want capped %v", got, 5*time.Second)
+	}
+}
+
+func TestPolicyNextDelayLinearIgnoresMultiplier(t *testing.T) {
+	p := Policy{BaseDelay: time.Second, Linear: true, Multiplier: 10}
+
+	got := p.NextDelay(2)
+	if got != 2*time.Second {
+		t.Errorf("NextDelay(2) = %v, want 2s (Multiplier ignored under Linear)", got)
 	}
 }
 
@@ -207,6 +245,201 @@ func TestDoReturnsCtxErrIfAlreadyCancelled(t *testing.T) {
 
 	if calls != 0 {
 		t.Errorf("calls = %d, want 0", calls)
+	}
+}
+
+func TestPolicyNextDelayExponentialUnaffectedByNewFields(t *testing.T) {
+	// A Policy using only the pre-existing fields must behave identically
+	// regardless of the new fields' zero values (Linear=false,
+	// JitterMode=JitterSymmetric, JitterMax=0).
+	p := Policy{BaseDelay: 100 * time.Millisecond, Multiplier: 2, MaxDelay: time.Hour}
+
+	want := []time.Duration{
+		100 * time.Millisecond,
+		200 * time.Millisecond,
+		400 * time.Millisecond,
+		800 * time.Millisecond,
+	}
+
+	for i, w := range want {
+		attempt := i + 1
+		got := p.NextDelay(attempt)
+		if got != w {
+			t.Errorf("NextDelay(%d) = %v, want %v", attempt, got, w)
+		}
+	}
+}
+
+func TestPolicyNextDelayJitterAdditiveWithinBounds(t *testing.T) {
+	p := Policy{BaseDelay: time.Second, Multiplier: 1, Jitter: 0.25, JitterMode: JitterAdditive}
+
+	const (
+		iterations = 500
+		lowerBound = time.Second
+		upperBound = 1250 * time.Millisecond
+	)
+
+	sawAboveBase := false
+
+	for i := 0; i < iterations; i++ {
+		got := p.NextDelay(1)
+		if got < lowerBound || got > upperBound {
+			t.Fatalf("NextDelay with JitterAdditive = %v, want within [%v, %v]", got, lowerBound, upperBound)
+		}
+
+		if got > time.Second {
+			sawAboveBase = true
+		}
+	}
+
+	if !sawAboveBase {
+		t.Error("expected additive jitter to produce values above base delay across many draws")
+	}
+}
+
+func TestPolicyNextDelayJitterFlatWithinBounds(t *testing.T) {
+	p := Policy{BaseDelay: time.Second, Multiplier: 1, JitterMode: JitterFlat, JitterMax: 250 * time.Millisecond}
+
+	const (
+		iterations = 500
+		lowerBound = time.Second
+		upperBound = time.Second + 250*time.Millisecond
+	)
+
+	sawAboveBase := false
+
+	for i := 0; i < iterations; i++ {
+		got := p.NextDelay(1)
+		if got < lowerBound || got > upperBound {
+			t.Fatalf("NextDelay with JitterFlat = %v, want within [%v, %v]", got, lowerBound, upperBound)
+		}
+
+		if got > time.Second {
+			sawAboveBase = true
+		}
+	}
+
+	if !sawAboveBase {
+		t.Error("expected flat jitter to produce values above base delay across many draws")
+	}
+}
+
+func TestPolicyNextDelayJitterFlatIndependentOfDelayMagnitude(t *testing.T) {
+	// A large base delay must not change the flat jitter's bound: the
+	// result must never exceed base+JitterMax regardless of how large base
+	// is, unlike JitterSymmetric/JitterAdditive whose spans scale with it.
+	p := Policy{BaseDelay: time.Hour, Multiplier: 1, JitterMode: JitterFlat, JitterMax: 250 * time.Millisecond}
+
+	upperBound := time.Hour + 250*time.Millisecond
+
+	for i := 0; i < 200; i++ {
+		got := p.NextDelay(1)
+		if got < time.Hour || got > upperBound {
+			t.Fatalf("NextDelay with JitterFlat on large base = %v, want within [%v, %v]", got, time.Hour, upperBound)
+		}
+	}
+}
+
+func TestDoOnRetryFiresBetweenFailuresOnly(t *testing.T) {
+	type call struct {
+		attempt int
+		err     error
+	}
+
+	var got []call
+
+	calls := 0
+
+	err := Do(context.Background(), Policy{
+		MaxAttempts: 5,
+		BaseDelay:   time.Millisecond,
+		OnRetry: func(attempt int, err error) {
+			got = append(got, call{attempt, err})
+		},
+	}, func(_ context.Context) error {
+		calls++
+		if calls < 3 {
+			return fmt.Errorf("transient %d", calls)
+		}
+
+		return nil
+	})
+
+	if err != nil {
+		t.Fatalf("Do() error = %v, want nil", err)
+	}
+
+	if calls != 3 {
+		t.Fatalf("calls = %d, want 3", calls)
+	}
+
+	want := []call{
+		{1, errors.New("transient 1")},
+		{2, errors.New("transient 2")},
+	}
+
+	if len(got) != len(want) {
+		t.Fatalf("OnRetry called %d times, want %d: %+v", len(got), len(want), got)
+	}
+
+	for i, w := range want {
+		if got[i].attempt != w.attempt || got[i].err.Error() != w.err.Error() {
+			t.Errorf("OnRetry call %d = %+v, want %+v", i, got[i], w)
+		}
+	}
+}
+
+func TestDoOnRetryNotCalledOnImmediateSuccess(t *testing.T) {
+	calls := 0
+
+	err := Do(context.Background(), Policy{
+		MaxAttempts: 3,
+		BaseDelay:   time.Millisecond,
+		OnRetry: func(_ int, _ error) {
+			calls++
+		},
+	}, func(_ context.Context) error {
+		return nil
+	})
+
+	if err != nil {
+		t.Fatalf("Do() error = %v, want nil", err)
+	}
+
+	if calls != 0 {
+		t.Errorf("OnRetry called %d times, want 0 on immediate success", calls)
+	}
+}
+
+func TestDoOnRetryNotCalledAfterFinalAttempt(t *testing.T) {
+	onRetryCalls := 0
+	fnCalls := 0
+
+	wantErr := errors.New("permanent")
+
+	err := Do(context.Background(), Policy{
+		MaxAttempts: 4,
+		BaseDelay:   time.Millisecond,
+		OnRetry: func(_ int, _ error) {
+			onRetryCalls++
+		},
+	}, func(_ context.Context) error {
+		fnCalls++
+		return wantErr
+	})
+
+	if err == nil {
+		t.Fatal("Do() error = nil, want non-nil")
+	}
+
+	if fnCalls != 4 {
+		t.Fatalf("fnCalls = %d, want 4", fnCalls)
+	}
+
+	// OnRetry fires before each of the 3 inter-attempt sleeps (between
+	// attempts 1-2, 2-3, 3-4), not after the 4th and final failed attempt.
+	if onRetryCalls != 3 {
+		t.Errorf("OnRetry called %d times, want 3", onRetryCalls)
 	}
 }
 

@@ -15,6 +15,8 @@ import (
 	"github.com/zenta-dev/zever/config"
 	"github.com/zenta-dev/zever/db"
 	"github.com/zenta-dev/zever/db/sqlite"
+	"github.com/zenta-dev/zever/observability"
+	observabilitynoop "github.com/zenta-dev/zever/observability/noop"
 	"github.com/zenta-dev/zever/queue"
 	queuememory "github.com/zenta-dev/zever/queue/memory"
 	"github.com/zenta-dev/zever/scheduler"
@@ -531,6 +533,22 @@ type closeAndStop struct{ noCtxErr error }
 func (s *closeAndStop) Close() error { return s.noCtxErr }
 func (s *closeAndStop) Stop() error  { return errors.New("stop must not win over Close()") }
 
+// shutdownShape implements ONLY Shutdown(context.Context) error, matching the
+// shape observability.Provider (and its Tracer/Metrics sub-interfaces) has:
+// no Close, no Stop.
+type shutdownShape struct{ err error }
+
+func (s *shutdownShape) Shutdown(context.Context) error { return s.err }
+
+// closeAndShutdown has both Close() error and Shutdown(ctx) error to assert
+// Close() still wins over the newer Shutdown probe.
+type closeAndShutdown struct{ closeErr error }
+
+func (s *closeAndShutdown) Close() error { return s.closeErr }
+func (s *closeAndShutdown) Shutdown(context.Context) error {
+	return errors.New("shutdown must not win over Close()")
+}
+
 func TestContainer_CloseAny_Shapes(t *testing.T) {
 	ctx := context.Background()
 	sentinel := errors.New("sentinel")
@@ -545,6 +563,8 @@ func TestContainer_CloseAny_Shapes(t *testing.T) {
 		{"close no ctx err", &noCtxShape{err: sentinel}, true},
 		{"stop nil", &stopShape{}, false},
 		{"stop err", &stopShape{err: sentinel}, true},
+		{"shutdown nil", &shutdownShape{}, false},
+		{"shutdown err", &shutdownShape{err: sentinel}, true},
 		{"none", &noCloser{}, false},
 		{"nil", nil, false},
 		{"string", "not a closer", false},
@@ -571,6 +591,90 @@ func TestContainer_CloseAny_Precedence(t *testing.T) {
 	cs := &closeAndStop{noCtxErr: sentinel}
 	if err := closeAny(ctx, cs); !errors.Is(err, sentinel) {
 		t.Fatalf("Close() should win over Stop(), got %v", err)
+	}
+}
+
+func TestContainer_CloseAny_ClosePrecedenceOverShutdown(t *testing.T) {
+	ctx := context.Background()
+	sentinel := errors.New("close wins over shutdown")
+	cs := &closeAndShutdown{closeErr: sentinel}
+	if err := closeAny(ctx, cs); !errors.Is(err, sentinel) {
+		t.Fatalf("Close() should win over Shutdown(ctx), got %v", err)
+	}
+}
+
+// TestContainer_Close_ShutdownOnlyServiceInvoked is the regression test for
+// the bug where closeAny silently no-oped for any service whose only
+// shutdown shape is Shutdown(context.Context) error (observability.Provider
+// and its Tracer/Metrics sub-interfaces never implement Close or Stop).
+// It seeds a synthetic fake implementing ONLY Shutdown into the
+// observability lazy slot (whose field type is observability.Provider, so it
+// still must satisfy Tracer/Meter, but deliberately has no Close/Stop) and
+// asserts Container.Close actually invokes it.
+func TestContainer_Close_ShutdownOnlyServiceInvoked(t *testing.T) {
+	c := New(config.Default())
+	fake := &shutdownOnlyProvider{}
+	c.observability.val = fake
+	c.observability.done = true
+	c.observability.ready.Store(true)
+
+	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
+	defer cancel()
+	if err := c.Close(ctx); err != nil {
+		t.Fatalf("Close: %v", err)
+	}
+	if got := fake.shutdownCalls.Load(); got != 1 {
+		t.Fatalf("Shutdown-only service closed %d times via Container.Close, want 1", got)
+	}
+}
+
+// shutdownOnlyProvider implements observability.Provider (Tracer/Meter are
+// required by the field's static type) but exposes no Close or Stop method
+// anywhere in its method set, matching the real bug shape.
+type shutdownOnlyProvider struct {
+	shutdownCalls atomic.Int32
+}
+
+func (p *shutdownOnlyProvider) Tracer(string) observability.Tracer { return nil }
+func (p *shutdownOnlyProvider) Meter(string) observability.Metrics { return nil }
+func (p *shutdownOnlyProvider) Shutdown(context.Context) error {
+	p.shutdownCalls.Add(1)
+	return nil
+}
+
+// trackedNoopProvider wraps the real observability/noop.Provider, delegating
+// Tracer/Meter and Shutdown to it while counting Shutdown invocations, so
+// the test can observe whether Container.Close actually reached the
+// underlying real service's Shutdown method (the noop provider itself has no
+// externally observable side effect to assert against).
+type trackedNoopProvider struct {
+	observability.Provider
+	shutdownCalls atomic.Int32
+}
+
+func (p *trackedNoopProvider) Shutdown(ctx context.Context) error {
+	p.shutdownCalls.Add(1)
+	return p.Provider.Shutdown(ctx)
+}
+
+// TestContainer_Close_ObservabilityProviderShutdownFlushed exercises the
+// actual affected service (observability.Provider, backed by the real
+// observability/noop adapter) through the real Container.Close path, not
+// just a synthetic fake, confirming the fix closes the real bug end-to-end.
+func TestContainer_Close_ObservabilityProviderShutdownFlushed(t *testing.T) {
+	c := New(config.Default())
+	tracked := &trackedNoopProvider{Provider: observabilitynoop.New()}
+	c.observability.val = tracked
+	c.observability.done = true
+	c.observability.ready.Store(true)
+
+	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
+	defer cancel()
+	if err := c.Close(ctx); err != nil {
+		t.Fatalf("Close: %v", err)
+	}
+	if got := tracked.shutdownCalls.Load(); got != 1 {
+		t.Fatalf("observability provider Shutdown called %d times via Container.Close, want 1", got)
 	}
 }
 

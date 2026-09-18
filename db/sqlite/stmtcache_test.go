@@ -41,14 +41,29 @@ func prepare(t *testing.T, db *sql.DB, query string) *sql.Stmt {
 func TestNewStmtCache_InvalidCapacityDefaults(t *testing.T) {
 	t.Parallel()
 
+	db := openTestDB(t)
+
 	for _, capacity := range []int{0, -1, -256} {
 		c := newStmtCache(capacity)
-		if c.capacity != defaultStmtCacheSize {
-			t.Errorf("newStmtCache(%d).capacity = %d, want %d", capacity, c.capacity, defaultStmtCacheSize)
-		}
 
 		if got := c.Len(); got != 0 {
 			t.Errorf("newStmtCache(%d).Len() = %d, want 0", capacity, got)
+		}
+
+		// Fill past what a small explicit capacity would allow; only the
+		// defaultStmtCacheSize ceiling should apply, observable via Len
+		// never exceeding it (the cache's capacity field itself is no
+		// longer directly reachable now that it's a plain lrucache.Cache).
+		for i := 0; i < defaultStmtCacheSize+10; i++ {
+			c.Put(fmt.Sprintf("SELECT %d", i), prepare(t, db, "SELECT 1"))
+		}
+
+		if got := c.Len(); got != defaultStmtCacheSize {
+			t.Errorf("newStmtCache(%d) after overfill: Len() = %d, want %d", capacity, got, defaultStmtCacheSize)
+		}
+
+		if err := closeAllStmts(c); err != nil {
+			t.Errorf("closeAllStmts: %v", err)
 		}
 	}
 }
@@ -70,10 +85,7 @@ func TestStmtCache_HitAfterPut(t *testing.T) {
 	c := newStmtCache(4)
 
 	stmt := prepare(t, db, "SELECT 1")
-	kept := c.Put("SELECT 1", stmt)
-	if kept != stmt {
-		t.Fatal("Put should keep caller's stmt on first insert")
-	}
+	c.Put("SELECT 1", stmt)
 
 	got, ok := c.Get("SELECT 1")
 	if !ok {
@@ -89,7 +101,13 @@ func TestStmtCache_HitAfterPut(t *testing.T) {
 	}
 }
 
-func TestStmtCache_PutDuplicateRaceClosesLoser(t *testing.T) {
+// TestStmtCache_GetOrComputeDuplicateRaceClosesLoser exercises the same
+// "duplicate insert race" contract the old hand-rolled stmtCache.Put used to
+// own directly: when two goroutines race to prepare+cache the same query,
+// only one stmt ends up cached, and the caller of the losing GetOrCompute
+// call is told (via loaded == true) to close its own redundant stmt. This is
+// exactly the pattern sqlite.go's adapter.Prepare uses.
+func TestStmtCache_GetOrComputeDuplicateRaceClosesLoser(t *testing.T) {
 	t.Parallel()
 
 	db := openTestDB(t)
@@ -98,24 +116,27 @@ func TestStmtCache_PutDuplicateRaceClosesLoser(t *testing.T) {
 	first := prepare(t, db, "SELECT 1")
 	second := prepare(t, db, "SELECT 1")
 
-	keptFirst := c.Put("SELECT 1", first)
-	if keptFirst != first {
-		t.Fatal("first Put should win")
+	keptFirst, loadedFirst := c.GetOrCompute("SELECT 1", func() *sql.Stmt { return first })
+	if loadedFirst || keptFirst != first {
+		t.Fatal("first GetOrCompute should win and store its own stmt")
 	}
 
-	keptSecond := c.Put("SELECT 1", second)
-	if keptSecond != first {
-		t.Fatal("duplicate Put should keep existing stmt")
+	keptSecond, loadedSecond := c.GetOrCompute("SELECT 1", func() *sql.Stmt { return second })
+	if !loadedSecond || keptSecond != first {
+		t.Fatal("duplicate GetOrCompute should report loaded=true and keep existing stmt")
 	}
+
+	// Per adapter.Prepare's pattern, the loser must close its own stmt.
+	_ = second.Close()
 
 	// Loser must be closed: any use errors.
 	if _, err := second.ExecContext(context.Background()); err == nil {
-		t.Fatal("loser stmt use after duplicate Put should error (closed)")
+		t.Fatal("loser stmt use after duplicate GetOrCompute should error (closed)")
 	}
 
 	got, ok := c.Get("SELECT 1")
 	if !ok || got != first {
-		t.Fatal("cache should still hold first stmt after duplicate Put")
+		t.Fatal("cache should still hold first stmt after duplicate GetOrCompute")
 	}
 
 	if got := c.Len(); got != 1 {
@@ -146,7 +167,8 @@ func TestStmtCache_EvictionClosesEvicted(t *testing.T) {
 		t.Fatal("q2 should have been evicted")
 	}
 
-	// Evicted stmt must be closed: use errors.
+	// Evicted stmt must be closed via the OnEvict callback registered by
+	// newStmtCache: use errors.
 	if _, err := s2.ExecContext(context.Background()); err == nil {
 		t.Fatal("evicted stmt use should error (closed)")
 	}
@@ -168,30 +190,49 @@ func TestStmtCache_CloseAll(t *testing.T) {
 	c.Put("q1", s1)
 	c.Put("q2", s2)
 
-	if err := c.CloseAll(); err != nil {
-		t.Fatalf("CloseAll: %v", err)
+	if err := closeAllStmts(c); err != nil {
+		t.Fatalf("closeAllStmts: %v", err)
 	}
 
 	if got := c.Len(); got != 0 {
-		t.Fatalf("Len() after CloseAll = %d, want 0", got)
+		t.Fatalf("Len() after closeAllStmts = %d, want 0", got)
 	}
 
 	if _, ok := c.Get("q1"); ok {
-		t.Fatal("Get after CloseAll = hit, want miss")
+		t.Fatal("Get after closeAllStmts = hit, want miss")
 	}
 
 	// Cached stmts closed: use errors.
 	if _, err := s1.ExecContext(context.Background()); err == nil {
-		t.Fatal("s1 use after CloseAll should error (closed)")
+		t.Fatal("s1 use after closeAllStmts should error (closed)")
 	}
 
 	if _, err := s2.ExecContext(context.Background()); err == nil {
-		t.Fatal("s2 use after CloseAll should error (closed)")
+		t.Fatal("s2 use after closeAllStmts should error (closed)")
 	}
 
-	// Second CloseAll on empty cache is nil-safe.
-	if err := c.CloseAll(); err != nil {
-		t.Fatalf("second CloseAll: %v", err)
+	// Second closeAllStmts on empty cache is nil-safe.
+	if err := closeAllStmts(c); err != nil {
+		t.Fatalf("second closeAllStmts: %v", err)
+	}
+}
+
+// TestStmtCache_CloseAllNoDoubleClose confirms that closeAllStmts (via
+// Cache.Clear's own callback) does not also trigger the OnEvict callback
+// registered by newStmtCache -- otherwise every cached stmt would be closed
+// twice, and a *sql.Stmt double-Close would surface as a spurious error from
+// closeAllStmts's errors.Join.
+func TestStmtCache_CloseAllNoDoubleClose(t *testing.T) {
+	t.Parallel()
+
+	db := openTestDB(t)
+	c := newStmtCache(4)
+
+	c.Put("q1", prepare(t, db, "SELECT 1"))
+	c.Put("q2", prepare(t, db, "SELECT 2"))
+
+	if err := closeAllStmts(c); err != nil {
+		t.Fatalf("closeAllStmts: %v, want nil (a double-close would report an error here)", err)
 	}
 }
 
@@ -228,26 +269,4 @@ func TestStmtCache_ConcurrentGetPut(t *testing.T) {
 	if got := c.Len(); got > 16 {
 		t.Fatalf("Len() = %d, want <= 16", got)
 	}
-}
-
-func TestStmtCache_corruptEntryDefensive(t *testing.T) {
-	t.Parallel()
-
-	db := openTestDB(t)
-	c := newStmtCache(4)
-
-	// Poison the internals with a non-*entry element: the comma-ok
-	// assertions must degrade gracefully instead of panicking.
-	c.ll.PushFront("not-an-entry")
-	c.items["bogus"] = c.ll.Front()
-
-	if _, ok := c.Get("bogus"); ok {
-		t.Fatal("Get on corrupt entry = hit, want miss")
-	}
-
-	stmt := prepare(t, db, "SELECT 1")
-	if got := c.Put("bogus", stmt); got != stmt {
-		t.Fatal("Put on corrupt entry must return caller's stmt")
-	}
-	_ = stmt.Close()
 }

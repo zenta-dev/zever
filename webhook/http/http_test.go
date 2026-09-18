@@ -303,9 +303,6 @@ func TestDeliver_retryThenSuccess(t *testing.T) {
 		t.Fatalf("Register err = %v", err)
 	}
 
-	a := mustAdapter(t, w)
-	a.jitter = newJitter()
-
 	// Speed up backoff for the test by shrinking? backoff is ~500ms; accept it.
 	if err := w.Deliver(ctx, "e", []byte(`{}`)); err != nil {
 		t.Fatalf("Deliver err = %v", err)
@@ -685,8 +682,8 @@ func TestOpen_customValues(t *testing.T) {
 		t.Error("allowPrivate = false, want true")
 	}
 
-	if a.client == nil || a.jitter == nil {
-		t.Error("client/jitter should be non-nil")
+	if a.client == nil {
+		t.Error("client should be non-nil")
 	}
 }
 

@@ -7,7 +7,6 @@ import (
 	"math"
 	"net/http"
 	"net/url"
-	"strconv"
 	"strings"
 	"time"
 
@@ -17,6 +16,7 @@ import (
 	"github.com/zenta-dev/zever/ai"
 	"github.com/zenta-dev/zever/codec"
 	"github.com/zenta-dev/zever/internal/httpclient"
+	"github.com/zenta-dev/zever/internal/retry"
 )
 
 var toolArgsCodec = codec.JSONCodec[map[string]any]{}
@@ -116,31 +116,15 @@ func parseRetryAfter(resp *http.Response) time.Duration {
 	if resp == nil {
 		return 0
 	}
-	ra := resp.Header.Get("Retry-After")
-	if ra != "" {
-		if secs, err := strconv.Atoi(ra); err == nil {
-			return time.Duration(secs) * time.Second
-		}
-		if f, err := strconv.ParseFloat(ra, 64); err == nil {
-			return time.Duration(f * float64(time.Second))
-		}
-		if t, err := http.ParseTime(ra); err == nil {
-			d := time.Until(t)
-			if d < 0 {
-				return 0
-			}
-			return d
-		}
+
+	if d, ok := retry.ParseRetryAfter(resp.Header.Get("Retry-After"), time.Now()); ok {
+		return d
 	}
-	raMs := resp.Header.Get("Retry-After-Ms")
-	if raMs != "" {
-		if ms, err := strconv.Atoi(raMs); err == nil {
-			return time.Duration(ms) * time.Millisecond
-		}
-		if f, err := strconv.ParseFloat(raMs, 64); err == nil {
-			return time.Duration(f * float64(time.Millisecond))
-		}
+
+	if d, ok := retry.ParseRetryAfterMs(resp.Header.Get("Retry-After-Ms")); ok {
+		return d
 	}
+
 	return 0
 }
 

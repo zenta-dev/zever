@@ -8,7 +8,6 @@ import (
 	"errors"
 	"fmt"
 	"io"
-	"math/rand"
 	"net/http"
 	"net/http/httptest"
 	"os"
@@ -218,11 +217,6 @@ func (s *stubQueue) nackCount() int {
 	return len(s.nacks)
 }
 
-//nolint:gosec // G404: deterministic seed keeps jitter assertions reproducible.
-func newTestJitter() *rand.Rand {
-	return rand.New(rand.NewSource(1))
-}
-
 func newTestAdapter(q corequeue.Queue) *adapter {
 	timeout := 5 * time.Second
 
@@ -234,7 +228,6 @@ func newTestAdapter(q corequeue.Queue) *adapter {
 		dlqTopic:        "webhook:dead-letter",
 		consumers:       make(map[string]*consumer),
 		client:          newSafeClient(timeout, true),
-		jitter:          newTestJitter(),
 		allowPrivate:    true,
 		replayTolerance: defaultReplayTolerance,
 	}
@@ -436,8 +429,8 @@ func TestOpen_Defaults(t *testing.T) {
 		t.Errorf("dlqTopic = %q", a.dlqTopic)
 	}
 
-	if a.jitter == nil || a.client == nil {
-		t.Error("jitter/client must be set")
+	if a.client == nil {
+		t.Error("client must be set")
 	}
 
 	if a.replayTolerance != defaultReplayTolerance {
@@ -2003,7 +1996,6 @@ func TestEndToEnd_MemoryQueue(t *testing.T) {
 		dlqTopic:     "webhook:dead-letter",
 		consumers:    make(map[string]*consumer),
 		client:       newSafeClient(timeout, true),
-		jitter:       newTestJitter(),
 		allowPrivate: true,
 	}
 

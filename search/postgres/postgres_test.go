@@ -392,6 +392,50 @@ func TestIndexBatch_ok(t *testing.T) {
 	}
 }
 
+// TestIndexBatch_Chunked proves a batch larger than maxIndexBatchRows is
+// split into multiple sequential INSERT statements instead of one unbounded
+// statement that could overflow Postgres's bind-parameter limit.
+func TestIndexBatch_Chunked(t *testing.T) {
+	t.Parallel()
+
+	fp := &fakePool{execTag: pgconn.NewCommandTag("INSERT 0 1")}
+	p := &postgres{db: fp}
+
+	const total = maxIndexBatchRows + 250
+
+	docs := make([]search.Document, total)
+	for i := range docs {
+		docs[i] = search.Document{ID: fmt.Sprintf("d-%d", i), Index: "docs", Content: "hello"}
+	}
+
+	if err := p.IndexBatch(t.Context(), docs); err != nil {
+		t.Fatalf("IndexBatch() err = %v", err)
+	}
+
+	wantChunks := 2
+	if len(fp.execSQLs) != wantChunks {
+		t.Fatalf("IndexBatch() issued %d exec calls, want %d", len(fp.execSQLs), wantChunks)
+	}
+
+	if len(fp.execArgs[0]) != maxIndexBatchRows*indexRowCols {
+		t.Fatalf("first chunk args = %d, want %d", len(fp.execArgs[0]), maxIndexBatchRows*indexRowCols)
+	}
+
+	if len(fp.execArgs[1]) != 250*indexRowCols {
+		t.Fatalf("second chunk args = %d, want %d", len(fp.execArgs[1]), 250*indexRowCols)
+	}
+
+	// Rows are split in order: the first chunk's last id is d-(maxIndexBatchRows-1),
+	// the second chunk starts at d-maxIndexBatchRows.
+	if fp.execArgs[0][0] != "d-0" {
+		t.Fatalf("first chunk first id = %v, want d-0", fp.execArgs[0][0])
+	}
+
+	if fp.execArgs[1][0] != fmt.Sprintf("d-%d", maxIndexBatchRows) {
+		t.Fatalf("second chunk first id = %v, want d-%d", fp.execArgs[1][0], maxIndexBatchRows)
+	}
+}
+
 func TestIndexBatch_empty(t *testing.T) {
 	t.Parallel()
 

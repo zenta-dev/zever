@@ -14,6 +14,7 @@ import (
 	_ "modernc.org/sqlite" // register sqlite driver
 
 	"github.com/zenta-dev/zever/db"
+	"github.com/zenta-dev/zever/internal/lrucache"
 )
 
 // pragmaFK enforces foreign keys on every connection opened from the DSN.
@@ -39,7 +40,7 @@ var (
 // adapter is a db.DB backed by database/sql over modernc.org/sqlite.
 type adapter struct {
 	conn      *sql.DB
-	stmtCache *stmtCache
+	stmtCache *lrucache.Cache[string, *sql.Stmt]
 }
 
 // New creates a db.DB backed by SQLite at opts.Path.
@@ -162,7 +163,7 @@ func (a *adapter) Dialect() string { return db.SQLite.String() }
 // Each stage is distinctly wrapped so callers can tell which failed.
 func (a *adapter) Close(ctx context.Context) error {
 	ctxErr := ctx.Err()
-	stmtCloseErr := a.stmtCache.CloseAll()
+	stmtCloseErr := closeAllStmts(a.stmtCache)
 	closeErr := a.conn.Close()
 
 	if ctxErr != nil {
@@ -190,19 +191,25 @@ func (a *adapter) Prepare(ctx context.Context, query string) (db.Stmt, error) {
 		return &sqliteStmt{stmt: stmt}, nil
 	}
 
-	stmt, err := a.conn.PrepareContext(ctx, query)
+	newStmt, err := a.conn.PrepareContext(ctx, query)
 	if err != nil {
 		return nil, fmt.Errorf("sqlite: prepare: %w", err)
 	}
 
-	// Put returns whichever statement the cache actually kept: our own if we
-	// won the slot, or the previously-cached one if a concurrent Prepare of
-	// the same query text won the race and closed ours as a redundant
-	// duplicate. Returning the kept statement is what stops a race-loser
-	// from wrapping an already-closed *sql.Stmt.
-	stmt = a.stmtCache.Put(query, stmt)
+	// GetOrCompute returns whichever statement the cache actually kept: our
+	// own (loaded == false) if we won the slot, or the previously-cached one
+	// (loaded == true) if a concurrent Prepare of the same query text won
+	// the race and inserted first. On loaded == true our freshly prepared
+	// newStmt is a redundant duplicate and must be closed here -- the cache
+	// never saw it, so nothing else will close it -- which is what stops a
+	// race-loser from wrapping an already-closed *sql.Stmt while also
+	// avoiding a leak of the discarded one.
+	kept, loaded := a.stmtCache.GetOrCompute(query, func() *sql.Stmt { return newStmt })
+	if loaded {
+		_ = newStmt.Close()
+	}
 
-	return &sqliteStmt{stmt: stmt}, nil
+	return &sqliteStmt{stmt: kept}, nil
 }
 
 // BeginTx starts a transaction with the given options. A nil opts selects

@@ -151,6 +151,74 @@ func TestTTLCache_Len(t *testing.T) {
 	}
 }
 
+func TestTTLCache_PutTTL(t *testing.T) {
+	t.Run("varying TTLs on same cache expire independently", func(t *testing.T) {
+		tc := NewTTL[string, int](4, time.Hour) // long default TTL
+
+		tc.PutTTL("short", 1, 5*time.Millisecond)
+		tc.PutTTL("long", 2, time.Hour)
+
+		time.Sleep(15 * time.Millisecond)
+
+		if v, ok := tc.Get("short"); ok || v != 0 {
+			t.Fatalf("Get(short) = (%v, %v), want (0, false) after its short TTL elapsed", v, ok)
+		}
+		if v, ok := tc.Get("long"); !ok || v != 2 {
+			t.Fatalf("Get(long) = (%v, %v), want (2, true); its own longer TTL should still hold", v, ok)
+		}
+	})
+
+	t.Run("PutTTL overrides an existing entry's expiry", func(t *testing.T) {
+		tc := NewTTL[string, int](4, 5*time.Millisecond) // short default TTL
+		tc.Put("a", 1)                                   // uses default (short) TTL
+
+		tc.PutTTL("a", 2, time.Hour) // override with a long TTL
+
+		time.Sleep(15 * time.Millisecond)
+
+		if v, ok := tc.Get("a"); !ok || v != 2 {
+			t.Fatalf("Get(a) = (%v, %v), want (2, true); PutTTL's longer TTL should override the default", v, ok)
+		}
+	})
+
+	t.Run("Put still uses the cache's default TTL", func(t *testing.T) {
+		tc := NewTTL[string, int](4, 5*time.Millisecond)
+		tc.Put("a", 1)
+
+		time.Sleep(15 * time.Millisecond)
+
+		if v, ok := tc.Get("a"); ok || v != 0 {
+			t.Fatalf("Get(a) = (%v, %v), want (0, false); Put should still expire after the default TTL", v, ok)
+		}
+	})
+
+	t.Run("PutTTL marks entry most-recently-used and respects capacity", func(t *testing.T) {
+		var mu sync.Mutex
+		var evicted []string
+
+		tc := NewTTL[string, int](2, time.Hour, WithOnEvict[string, int](func(k string, _ int) {
+			mu.Lock()
+			evicted = append(evicted, k)
+			mu.Unlock()
+		}))
+
+		tc.PutTTL("a", 1, time.Hour)
+		tc.PutTTL("b", 2, time.Minute)
+		tc.Get("a")                    // a is now most-recently-used
+		tc.PutTTL("c", 3, time.Second) // should evict b, the LRU entry
+
+		if _, ok := tc.Get("b"); ok {
+			t.Fatalf("expected b to be evicted by capacity")
+		}
+
+		mu.Lock()
+		defer mu.Unlock()
+		if len(evicted) != 1 || evicted[0] != "b" {
+			t.Fatalf("evicted = %v, want [b]", evicted)
+		}
+	})
+}
+
 func TestTTLCache_ConcurrentAccess(_ *testing.T) {
 	tc := NewTTL[int, int](64, 50*time.Millisecond, WithOnEvict[int, int](func(_, _ int) {}))
 
