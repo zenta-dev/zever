@@ -349,7 +349,11 @@ func Probe(ctx context.Context, ffprobe, path string) (ProbeResult, error) {
 			break
 		}
 
-		time.Sleep(execRetryBackoff)
+		if sleepErr := sleepCtx(ctx, execRetryBackoff); sleepErr != nil {
+			err = sleepErr
+
+			break
+		}
 	}
 
 	if err != nil {
@@ -398,7 +402,11 @@ func RunTranscode(ctx context.Context, ffmpegBin string, argv []string) error {
 			break
 		}
 
-		time.Sleep(execRetryBackoff)
+		if sleepErr := sleepCtx(ctx, execRetryBackoff); sleepErr != nil {
+			err = sleepErr
+
+			break
+		}
 	}
 
 	if err != nil {
@@ -415,6 +423,18 @@ func RunTranscode(ctx context.Context, ffmpegBin string, argv []string) error {
 // isTextBusy reports whether err is a transient text-file-busy exec failure.
 func isTextBusy(err error) bool {
 	return errors.Is(err, syscall.ETXTBSY)
+}
+
+// sleepCtx waits d or until ctx is done, whichever comes first, so a
+// text-file-busy retry backoff can be cancelled mid-wait instead of
+// blocking past the caller's deadline.
+func sleepCtx(ctx context.Context, d time.Duration) error {
+	select {
+	case <-ctx.Done():
+		return ctx.Err()
+	case <-time.After(d):
+		return nil
+	}
 }
 
 // isToolMissing reports whether err means the binary was not found.
