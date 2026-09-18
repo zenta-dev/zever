@@ -52,8 +52,8 @@ func writeServiceAccountJSON(t *testing.T, projectID string) string {
 func TestNew_garbageServiceAccount_messagingError(t *testing.T) {
 	t.Parallel()
 
-	// Passes validateServiceAccountPath (clean .json path, not a directory)
-	// but fails SDK load in app.Messaging.
+	// Fails shared early JSON validation with InvalidOptions (fail fast)
+	// instead of reaching SDK load in app.Messaging.
 	p := filepath.Join(t.TempDir(), "garbage.json")
 	if err := os.WriteFile(p, []byte("{not json"), 0o600); err != nil {
 		t.Fatalf("write garbage key = %v", err)
@@ -63,8 +63,11 @@ func TestNew_garbageServiceAccount_messagingError(t *testing.T) {
 	if err == nil {
 		t.Fatal("New(garbage key) = nil, want load error")
 	}
-	if !strings.Contains(err.Error(), "fcm: init messaging") {
-		t.Errorf("New(garbage key) = %v, want wrap mentioning %q", err, "fcm: init messaging")
+	if !errors.Is(err, notification.ErrInvalidOptions) {
+		t.Errorf("New(garbage key) = %v, want ErrInvalidOptions", err)
+	}
+	if !strings.Contains(err.Error(), "JSON") {
+		t.Errorf("New(garbage key) = %v, want wrap mentioning %q", err, "JSON")
 	}
 }
 
@@ -119,8 +122,8 @@ func TestValidateServiceAccountPath_directoryJSON(t *testing.T) {
 	if !errors.Is(err, notification.ErrInvalidOptions) {
 		t.Errorf("validateServiceAccountPath(d.json dir) = %v, want ErrInvalidOptions", err)
 	}
-	if !strings.Contains(err.Error(), "path is a directory") {
-		t.Errorf("validateServiceAccountPath(d.json dir) = %v, want %q", err, "path is a directory")
+	if !strings.Contains(err.Error(), "is a directory") {
+		t.Errorf("validateServiceAccountPath(d.json dir) = %v, want %q", err, "is a directory")
 	}
 }
 
