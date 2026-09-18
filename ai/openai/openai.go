@@ -7,7 +7,6 @@ import (
 	"fmt"
 	"math"
 	"net/http"
-	"strconv"
 	"strings"
 	"time"
 
@@ -18,6 +17,7 @@ import (
 	"github.com/zenta-dev/zever/ai"
 	"github.com/zenta-dev/zever/internal/endpoint"
 	"github.com/zenta-dev/zever/internal/httpclient"
+	"github.com/zenta-dev/zever/internal/retry"
 )
 
 type adapter struct {
@@ -482,25 +482,12 @@ func parseRetryAfter(resp *http.Response) time.Duration {
 		return 0
 	}
 
-	v := resp.Header.Get("Retry-After")
-	if v == "" {
+	d, ok := retry.ParseRetryAfter(resp.Header.Get("Retry-After"), time.Now())
+	if !ok {
 		return 0
 	}
 
-	if secs, err := strconv.Atoi(v); err == nil {
-		return time.Duration(secs) * time.Second
-	}
-
-	if t, err := http.ParseTime(v); err == nil {
-		d := time.Until(t)
-		if d < 0 {
-			return 0
-		}
-
-		return d
-	}
-
-	return 0
+	return d
 }
 
 func validateOptions(opts ai.Options) error {
