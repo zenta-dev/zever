@@ -2,7 +2,6 @@ package log
 
 import (
 	"context"
-	"encoding/json"
 	"fmt"
 	"io"
 	"os"
@@ -10,6 +9,7 @@ import (
 	"sync/atomic"
 	"time"
 
+	"github.com/zenta-dev/zever/codec"
 	"github.com/zenta-dev/zever/notification"
 )
 
@@ -17,7 +17,8 @@ import (
 // It echoes the full notification including target: disable in production.
 type checker struct {
 	mu     sync.Mutex
-	enc    *json.Encoder
+	w      io.Writer
+	codec  codec.Codec[logNotification]
 	now    func() time.Time
 	closed atomic.Bool
 }
@@ -38,7 +39,7 @@ func NewWithWriter(opts notification.Options, w io.Writer) (notification.Notifie
 	if w == nil {
 		w = os.Stdout
 	}
-	return &checker{enc: json.NewEncoder(w), now: time.Now}, nil
+	return &checker{w: w, codec: codec.JSONCodec[logNotification]{}, now: time.Now}, nil
 }
 
 type logNotification struct {
@@ -82,7 +83,11 @@ func (c *checker) Notify(ctx context.Context, n *notification.Notification) erro
 	if c.closed.Load() {
 		return notification.ErrClosed
 	}
-	if err := c.enc.Encode(out); err != nil {
+	data, err := c.codec.Encode(out)
+	if err != nil {
+		return fmt.Errorf("log: %w", err)
+	}
+	if _, err := c.w.Write(append(data, '\n')); err != nil {
 		return fmt.Errorf("log: %w", err)
 	}
 	return nil
