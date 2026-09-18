@@ -178,7 +178,7 @@ func TestIndexBatch_sendsSingleRequestPerIndex(t *testing.T) {
 		mu.Unlock()
 
 		w.Header().Set("Content-Type", "application/json")
-		w.WriteHeader(202)
+		w.WriteHeader(http.StatusAccepted)
 		_, _ = w.Write([]byte(testTaskResponse))
 	}))
 	defer srv.Close()

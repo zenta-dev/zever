@@ -932,8 +932,8 @@ func TestLive_indexBatchMatchesLoopedIndex(t *testing.T) {
 		}
 	})
 
-	if err := s.IndexBatch(ctx, docs); err != nil {
-		t.Fatalf("IndexBatch err = %v", err)
+	if batchErr := s.IndexBatch(ctx, docs); batchErr != nil {
+		t.Fatalf("IndexBatch err = %v", batchErr)
 	}
 
 	res, err := s.Search(ctx, "running", search.QueryOptions{Filters: map[string]string{"index": idx}})

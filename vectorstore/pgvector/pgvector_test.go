@@ -902,8 +902,8 @@ func TestLiveUpsertBatch_MatchesLoopedUpsert(t *testing.T) {
 	}
 
 	for _, v := range vecs {
-		if err := loopStore.Upsert(ctx, v); err != nil {
-			t.Fatalf("loop Upsert(%s) error: %v", v.ID, err)
+		if upsertErr := loopStore.Upsert(ctx, v); upsertErr != nil {
+			t.Fatalf("loop Upsert(%s) error: %v", v.ID, upsertErr)
 		}
 	}
 
@@ -920,8 +920,8 @@ func TestLiveUpsertBatch_MatchesLoopedUpsert(t *testing.T) {
 
 	t.Cleanup(func() { _ = batchStore.Close() })
 
-	if err := batchStore.UpsertBatch(ctx, vecs); err != nil {
-		t.Fatalf("UpsertBatch() error: %v", err)
+	if batchErr := batchStore.UpsertBatch(ctx, vecs); batchErr != nil {
+		t.Fatalf("UpsertBatch() error: %v", batchErr)
 	}
 
 	loopGot, err := loopStore.Query(ctx, []float32{1, 0, 0}, 3)
