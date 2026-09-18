@@ -2,7 +2,6 @@ package postgres
 
 import (
 	"context"
-	"encoding/json"
 	"fmt"
 	"strings"
 	"time"
@@ -11,8 +10,11 @@ import (
 	"github.com/jackc/pgx/v5/pgconn"
 	"github.com/jackc/pgx/v5/pgxpool"
 
+	"github.com/zenta-dev/zever/codec"
 	"github.com/zenta-dev/zever/search"
 )
+
+var metadataCodec = codec.JSONCodec[map[string]any]{}
 
 const createTable = `CREATE TABLE IF NOT EXISTS search_documents (
 	id TEXT NOT NULL,
@@ -108,7 +110,7 @@ func (p *postgres) Index(ctx context.Context, doc search.Document) error {
 
 	meta["content"] = doc.Content
 
-	metaJSON, err := json.Marshal(meta)
+	metaJSON, err := metadataCodec.Encode(meta)
 	if err != nil {
 		return fmt.Errorf("postgres: index: %w", err)
 	}
@@ -236,7 +238,7 @@ func (p *postgres) Search(ctx context.Context, query string, opts search.QueryOp
 		var meta map[string]any
 
 		if metaJSON != nil {
-			if err = json.Unmarshal(metaJSON, &meta); err != nil {
+			if meta, err = metadataCodec.Decode(metaJSON); err != nil {
 				return search.Result{}, fmt.Errorf("postgres: search scan: %w", err)
 			}
 		}
