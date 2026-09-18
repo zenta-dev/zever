@@ -913,7 +913,7 @@ func TestLive_indexBatchMatchesLoopedIndex(t *testing.T) {
 
 	ctx := context.Background()
 
-	s, err := Open(search.Options{DSN: dsn})
+	s, err := New(search.Options{DSN: dsn})
 	if err != nil {
 		t.Fatalf("Open err = %v", err)
 	}
