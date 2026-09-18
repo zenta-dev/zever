@@ -80,7 +80,7 @@ func (e *embedded) Schedule(ctx context.Context, spec, jobName string, args any)
 	// The spec parsed above, so Every (re-parse + AddFunc) cannot fail.
 	id, _ := e.sched.Every(spec, jobName, args)
 
-	return scheduler.EntryID(id), nil
+	return id, nil
 }
 
 // Remove unregisters the schedule with the given ID.
@@ -90,21 +90,14 @@ func (e *embedded) Remove(id scheduler.EntryID) error {
 		return &scheduler.InvalidOptionsError{Reason: "invalid entry id"}
 	}
 
-	e.sched.Remove(job.EntryID(id))
+	e.sched.Remove(id)
 
 	return nil
 }
 
 // Entries returns a snapshot of the live entry IDs.
 func (e *embedded) Entries() []scheduler.EntryID {
-	ids := e.sched.Entries()
-	out := make([]scheduler.EntryID, 0, len(ids))
-
-	for _, id := range ids {
-		out = append(out, scheduler.EntryID(id))
-	}
-
-	return out
+	return e.sched.Entries()
 }
 
 // Start begins cron ticks. It is idempotent and non-blocking.

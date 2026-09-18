@@ -4,10 +4,14 @@ import (
 	"context"
 	"fmt"
 	"sync"
+
+	"github.com/zenta-dev/zever/job"
 )
 
 // EntryID identifies a registered schedule. Zero is invalid.
-type EntryID uint64
+// It aliases job.EntryID: the scheduler package is a thin facade and
+// shares the same cron entry ID space as job.Scheduler.
+type EntryID = job.EntryID
 
 // Scheduler registers jobs on cron specs and fires them through a dispatcher.
 type Scheduler interface {
