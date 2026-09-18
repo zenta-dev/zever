@@ -153,6 +153,67 @@ func (s *Store) Upsert(ctx context.Context, vec vectorstore.Vector) error {
 	return nil
 }
 
+// UpsertBatch inserts or replaces all of vecs using Qdrant's native batch
+// upsert (a single UpsertPoints call carrying every point), one round trip
+// regardless of len(vecs). An empty vecs is a no-op.
+func (s *Store) UpsertBatch(ctx context.Context, vecs []vectorstore.Vector) error {
+	if len(vecs) == 0 {
+		return nil
+	}
+
+	for _, vec := range vecs {
+		if err := requireEmbedding(vec.Embedding); err != nil {
+			return fmt.Errorf("qdrant: upsert batch: %w", err)
+		}
+	}
+
+	s.mu.Lock()
+
+	dim := s.dim
+
+	s.mu.Unlock()
+
+	if dim > 0 {
+		for _, vec := range vecs {
+			if len(vec.Embedding) != dim {
+				// Pointer chain required for *DimensionMismatchError targets.
+				mismatch := error(&vectorstore.DimensionMismatchError{Got: len(vec.Embedding), Want: dim})
+				return fmt.Errorf("qdrant: upsert batch: %w", mismatch)
+			}
+		}
+	}
+
+	if err := s.ensureCollection(ctx, len(vecs[0].Embedding)); err != nil {
+		return err
+	}
+
+	points := make([]*qdrant.PointStruct, len(vecs))
+
+	for i, vec := range vecs {
+		point, err := newPoint(vec)
+		if err != nil {
+			return fmt.Errorf("qdrant: upsert batch: %w", err)
+		}
+
+		points[i] = point
+	}
+
+	wait := true
+
+	// Collection name is intentionally hardcoded: the store manages a
+	// single "vectors" collection (see Upsert).
+	_, err := s.client.Upsert(ctx, &qdrant.UpsertPoints{
+		CollectionName: "vectors",
+		Wait:           &wait,
+		Points:         points,
+	})
+	if err != nil {
+		return fmt.Errorf("qdrant: upsert batch: %w", err)
+	}
+
+	return nil
+}
+
 func newPoint(vec vectorstore.Vector) (*qdrant.PointStruct, error) {
 	// TryValueMap always returns a non-nil map on success (verified against
 	// go-client v1.19.0 source), so no nil guard is needed before assignment.

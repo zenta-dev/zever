@@ -1116,3 +1116,84 @@ func TestDecodeRow_ScanTypeMismatch(t *testing.T) {
 		t.Fatal("expected scan error for integer embedding")
 	}
 }
+
+func TestUpsertBatch_MatchesLoopedUpsert(t *testing.T) {
+	t.Parallel()
+
+	vecs := []vectorstore.Vector{
+		{ID: "v1", Embedding: []float32{1, 0, 0}, Metadata: map[string]any{"name": "alpha"}},
+		{ID: "v2", Embedding: []float32{0, 1, 0}, Metadata: map[string]any{"name": "beta"}},
+		{ID: "v3", Embedding: []float32{0, 0, 1}, Metadata: map[string]any{"name": "gamma"}},
+	}
+
+	loopStore := newMemoryStore(t)
+	ctx := context.Background()
+
+	for _, v := range vecs {
+		if err := loopStore.Upsert(ctx, v); err != nil {
+			t.Fatalf("loop upsert: %v", err)
+		}
+	}
+
+	batchStore := newMemoryStore(t)
+
+	if err := batchStore.UpsertBatch(ctx, vecs); err != nil {
+		t.Fatalf("upsert batch: %v", err)
+	}
+
+	loopResults, err := loopStore.Query(ctx, []float32{1, 0, 0}, 3)
+	if err != nil {
+		t.Fatalf("loop query: %v", err)
+	}
+
+	batchResults, err := batchStore.Query(ctx, []float32{1, 0, 0}, 3)
+	if err != nil {
+		t.Fatalf("batch query: %v", err)
+	}
+
+	if len(loopResults) != len(batchResults) {
+		t.Fatalf("result count mismatch: loop=%d batch=%d", len(loopResults), len(batchResults))
+	}
+
+	for i := range loopResults {
+		if loopResults[i].ID != batchResults[i].ID {
+			t.Fatalf("id mismatch at %d: loop=%s batch=%s", i, loopResults[i].ID, batchResults[i].ID)
+		}
+
+		if loopResults[i].Score != batchResults[i].Score {
+			t.Fatalf("score mismatch at %d: loop=%f batch=%f", i, loopResults[i].Score, batchResults[i].Score)
+		}
+
+		if loopResults[i].Metadata["name"] != batchResults[i].Metadata["name"] {
+			t.Fatalf("metadata mismatch at %d", i)
+		}
+	}
+}
+
+func TestUpsertBatch_EmptyEmbeddingRollsBack(t *testing.T) {
+	t.Parallel()
+
+	s := newMemoryStore(t)
+	ctx := context.Background()
+
+	err := s.UpsertBatch(ctx, []vectorstore.Vector{
+		{ID: "v1", Embedding: []float32{1, 0, 0}},
+		{ID: "v2", Embedding: nil},
+	})
+	if err == nil {
+		t.Fatal("expected error for empty embedding")
+	}
+
+	if !errors.Is(err, vectorstore.ErrEmptyEmbedding) {
+		t.Fatalf("expected ErrEmptyEmbedding, got %v", err)
+	}
+
+	results, err := s.Query(ctx, []float32{1, 0, 0}, 10)
+	if err != nil {
+		t.Fatalf("query: %v", err)
+	}
+
+	if len(results) != 0 {
+		t.Fatalf("expected rollback to leave no rows, got %d", len(results))
+	}
+}

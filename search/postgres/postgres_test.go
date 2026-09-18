@@ -355,6 +355,80 @@ func TestIndex_metadataMarshalError(t *testing.T) {
 	}
 }
 
+func TestIndexBatch_ok(t *testing.T) {
+	t.Parallel()
+
+	ctx := t.Context()
+	fp := &fakePool{execTag: pgconn.NewCommandTag("INSERT 0 2")}
+	p := &postgres{db: fp}
+
+	docs := []search.Document{
+		{ID: "d1", Index: "docs", Content: "hello world", Metadata: map[string]any{"k": "v"}},
+		{ID: "d2", Index: "docs", Content: "goodbye world"},
+	}
+
+	if err := p.IndexBatch(ctx, docs); err != nil {
+		t.Fatalf("IndexBatch err = %v", err)
+	}
+
+	if len(fp.execSQLs) != 1 {
+		t.Fatalf("execs = %d, want 1", len(fp.execSQLs))
+	}
+
+	sql := fp.execSQLs[0]
+	for _, sub := range []string{"INSERT INTO search_documents", "$1", "$8", "ON CONFLICT (id, idx)"} {
+		if !strings.Contains(sql, sub) {
+			t.Fatalf("index batch SQL = %q, want substring %q", sql, sub)
+		}
+	}
+
+	args := fp.execArgs[0]
+	if len(args) != 8 {
+		t.Fatalf("args = %d, want 8", len(args))
+	}
+
+	if args[0] != "d1" || args[4] != "d2" {
+		t.Fatalf("args = %v", args)
+	}
+}
+
+func TestIndexBatch_empty(t *testing.T) {
+	t.Parallel()
+
+	fp := &fakePool{}
+	p := &postgres{db: fp}
+
+	if err := p.IndexBatch(t.Context(), nil); err != nil {
+		t.Fatalf("IndexBatch(nil) err = %v, want nil", err)
+	}
+
+	if len(fp.execSQLs) != 0 {
+		t.Fatalf("IndexBatch(nil) issued %d execs, want 0", len(fp.execSQLs))
+	}
+}
+
+func TestIndexBatch_notConfigured(t *testing.T) {
+	t.Parallel()
+
+	p := &postgres{db: nil}
+
+	if err := p.IndexBatch(t.Context(), []search.Document{{ID: "d"}}); !errors.Is(err, ErrNotConfigured) {
+		t.Fatalf("IndexBatch err = %v, want ErrNotConfigured", err)
+	}
+}
+
+func TestIndexBatch_execError(t *testing.T) {
+	t.Parallel()
+
+	fp := &fakePool{execErr: errors.New("exec boom")}
+	p := &postgres{db: fp}
+
+	err := p.IndexBatch(t.Context(), []search.Document{{ID: "d", Index: "i", Content: "c"}})
+	if err == nil || !strings.Contains(err.Error(), "postgres: index batch") {
+		t.Fatalf("IndexBatch err = %v, want postgres index batch error", err)
+	}
+}
+
 func TestDelete_found(t *testing.T) {
 	t.Parallel()
 
@@ -825,6 +899,54 @@ func TestLive_roundtrip(t *testing.T) {
 
 	if err := s.Delete(ctx, "e2e-run-once"); err == nil {
 		t.Fatal("second Delete err = nil, want NotFoundError")
+	}
+}
+
+// TestLive_indexBatchMatchesLoopedIndex proves IndexBatch produces the same
+// end-state as calling Index N times in a loop, against a live postgres
+// instance. Skipped when SEARCH_PG_DSN is unset, matching TestLive_roundtrip.
+func TestLive_indexBatchMatchesLoopedIndex(t *testing.T) {
+	dsn := os.Getenv("SEARCH_PG_DSN")
+	if dsn == "" {
+		t.Skip("SEARCH_PG_DSN not set")
+	}
+
+	ctx := context.Background()
+
+	s, err := Open(search.Options{DSN: dsn})
+	if err != nil {
+		t.Fatalf("Open err = %v", err)
+	}
+
+	t.Cleanup(func() { _ = s.Close() })
+
+	idx := "e2e-postgres-batch"
+	docs := []search.Document{
+		{ID: "e2e-batch-run-once", Index: idx, Content: "going for a run in the park", Metadata: map[string]any{"n": 1}},
+		{ID: "e2e-batch-run-many", Index: idx, Content: "run run run running fast every morning", Metadata: map[string]any{"n": 2}},
+	}
+
+	t.Cleanup(func() {
+		for _, d := range docs {
+			_ = s.Delete(ctx, d.ID)
+		}
+	})
+
+	if err := s.IndexBatch(ctx, docs); err != nil {
+		t.Fatalf("IndexBatch err = %v", err)
+	}
+
+	res, err := s.Search(ctx, "running", search.QueryOptions{Filters: map[string]string{"index": idx}})
+	if err != nil {
+		t.Fatalf("Search err = %v", err)
+	}
+
+	if res.Total != 2 {
+		t.Fatalf("total = %d, want 2", res.Total)
+	}
+
+	if len(res.Hits) != 2 || res.Hits[0].ID != "e2e-batch-run-many" {
+		t.Fatalf("hits = %+v, want e2e-batch-run-many first", res.Hits)
 	}
 }
 

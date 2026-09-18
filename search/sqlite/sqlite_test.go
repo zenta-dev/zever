@@ -1197,3 +1197,55 @@ func TestValidateDSN(t *testing.T) {
 		}
 	}
 }
+
+func TestIndexBatch_MatchesLoopedIndex(t *testing.T) {
+	t.Parallel()
+
+	docs := []search.Document{
+		{ID: "d1", Index: "docs", Content: "alpha bravo", Metadata: map[string]any{"n": "one"}},
+		{ID: "d2", Index: "docs", Content: "bravo charlie", Metadata: map[string]any{"n": "two"}},
+		{ID: "d3", Index: "docs", Content: "charlie delta", Metadata: map[string]any{"n": "three"}},
+	}
+
+	loopStore := newMemoryStore(t)
+	for _, d := range docs {
+		mustIndex(t, loopStore, d)
+	}
+
+	batchStore := newMemoryStore(t)
+
+	if err := batchStore.IndexBatch(context.Background(), docs); err != nil {
+		t.Fatalf("IndexBatch: %v", err)
+	}
+
+	loopRes := mustSearch(t, loopStore, "bravo", search.QueryOptions{})
+	batchRes := mustSearch(t, batchStore, "bravo", search.QueryOptions{})
+
+	if loopRes.Total != batchRes.Total {
+		t.Fatalf("total mismatch: loop=%d batch=%d", loopRes.Total, batchRes.Total)
+	}
+
+	if len(loopRes.Hits) != len(batchRes.Hits) {
+		t.Fatalf("hit count mismatch: loop=%d batch=%d", len(loopRes.Hits), len(batchRes.Hits))
+	}
+
+	for i := range loopRes.Hits {
+		if loopRes.Hits[i].ID != batchRes.Hits[i].ID {
+			t.Fatalf("id mismatch at %d: loop=%s batch=%s", i, loopRes.Hits[i].ID, batchRes.Hits[i].ID)
+		}
+
+		if loopRes.Hits[i].Score != batchRes.Hits[i].Score {
+			t.Fatalf("score mismatch at %d: loop=%f batch=%f", i, loopRes.Hits[i].Score, batchRes.Hits[i].Score)
+		}
+	}
+}
+
+func TestIndexBatch_Empty(t *testing.T) {
+	t.Parallel()
+
+	s := newMemoryStore(t)
+
+	if err := s.IndexBatch(context.Background(), nil); err != nil {
+		t.Fatalf("IndexBatch(nil): %v", err)
+	}
+}
