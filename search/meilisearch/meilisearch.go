@@ -178,7 +178,7 @@ func (m *meilisearchClient) Index(ctx context.Context, doc search.Document) erro
 		},
 	}, nil)
 	if err != nil {
-		return fmt.Errorf("[search] meilisearch: index: %w", err)
+		return fmt.Errorf("meilisearch: index: %w", err)
 	}
 
 	m.trackIndex(doc.ID, doc.Index)
@@ -252,7 +252,7 @@ func (m *meilisearchClient) Delete(ctx context.Context, id string) error {
 	for _, name := range indexes {
 		_, err := m.client.Index(name).DeleteDocumentWithContext(ctx, id, nil)
 		if err != nil {
-			return fmt.Errorf("[search] meilisearch: delete: %w", err)
+			return fmt.Errorf("meilisearch: delete: %w", err)
 		}
 	}
 
@@ -294,7 +294,7 @@ func (m *meilisearchClient) Search(ctx context.Context, query string, opts searc
 
 	result, err := idx.SearchWithContext(ctx, query, searchReq)
 	if err != nil {
-		return search.Result{}, fmt.Errorf("[search] meilisearch: search: %w", err)
+		return search.Result{}, fmt.Errorf("meilisearch: search: %w", err)
 	}
 
 	hits := toHits(result.Hits)

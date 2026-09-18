@@ -407,7 +407,7 @@ func (a *redisAdapter) blockingClaim(
 			return "", false, fmt.Errorf("queue: pop cancelled: %w", ctxErr)
 		}
 
-		return "", false, fmt.Errorf("queue: pop error %w", err)
+		return "", false, fmt.Errorf("queue: pop: %w", err)
 	}
 
 	if len(val) < 2 {
