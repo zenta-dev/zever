@@ -21,9 +21,14 @@ import (
 func newMemoryStore(t *testing.T) *Store {
 	t.Helper()
 
-	s, err := New(":memory:")
+	vs, err := New(vectorstore.Options{DSN: ":memory:"})
 	if err != nil {
 		t.Fatal(err)
+	}
+
+	s, ok := vs.(*Store)
+	if !ok {
+		t.Fatalf("New() returned %T, want *Store", vs)
 	}
 
 	t.Cleanup(func() { _ = s.Close() })
@@ -94,7 +99,7 @@ func TestSQLiteFileBacked(t *testing.T) {
 	path := filepath.Join(t.TempDir(), "vec.db")
 	ctx := context.Background()
 
-	s, err := New(path)
+	s, err := New(vectorstore.Options{DSN: path})
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -108,7 +113,7 @@ func TestSQLiteFileBacked(t *testing.T) {
 		t.Fatal(closeErr)
 	}
 
-	s2, err := New(path)
+	s2, err := New(vectorstore.Options{DSN: path})
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -604,10 +609,10 @@ func TestSQLiteConcurrent(t *testing.T) {
 	}
 }
 
-func TestOpenDefaults(t *testing.T) {
+func TestNewDefaults(t *testing.T) {
 	t.Parallel()
 
-	vs, err := Open(vectorstore.Options{})
+	vs, err := New(vectorstore.Options{})
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -630,10 +635,10 @@ func TestOpenDefaults(t *testing.T) {
 	}
 }
 
-func TestOpenInvalidOptions(t *testing.T) {
+func TestNewInvalidOptions(t *testing.T) {
 	t.Parallel()
 
-	vs, err := Open(vectorstore.Options{Dimension: -1})
+	vs, err := New(vectorstore.Options{Dimension: -1})
 	if err == nil {
 		t.Fatal("expected invalid options error, got nil")
 	}
@@ -647,10 +652,10 @@ func TestOpenInvalidOptions(t *testing.T) {
 	}
 }
 
-func TestOpenBadDirDSN(t *testing.T) {
+func TestNewBadDirDSN(t *testing.T) {
 	t.Parallel()
 
-	vs, err := Open(vectorstore.Options{DSN: filepath.Join(t.TempDir(), "no-such-dir", "vec.db")})
+	vs, err := New(vectorstore.Options{DSN: filepath.Join(t.TempDir(), "no-such-dir", "vec.db")})
 	if err == nil {
 		t.Fatal("expected error for bad-dir DSN, got nil")
 	}
@@ -660,11 +665,11 @@ func TestOpenBadDirDSN(t *testing.T) {
 	}
 }
 
-func TestOpenBadDSNControlChars(t *testing.T) {
+func TestNewBadDSNControlChars(t *testing.T) {
 	t.Parallel()
 
 	for _, dsn := range []string{"a\x00b", "a\nb", "a\rb", "a;b"} {
-		vs, err := Open(vectorstore.Options{DSN: dsn})
+		vs, err := New(vectorstore.Options{DSN: dsn})
 		if err == nil {
 			t.Fatalf("expected error for DSN %q, got nil", dsn)
 		}
@@ -698,7 +703,7 @@ func TestSQLiteDeleteExecError(t *testing.T) {
 func TestSQLiteClose(t *testing.T) {
 	t.Parallel()
 
-	s, err := New(":memory:")
+	s, err := New(vectorstore.Options{DSN: ":memory:"})
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -951,7 +956,7 @@ func TestSQLiteScanRowsCancelledContext(t *testing.T) {
 func TestNewInvalidDSN(t *testing.T) {
 	t.Parallel()
 
-	s, err := New("bad;dsn")
+	s, err := New(vectorstore.Options{DSN: "bad;dsn"})
 	if err == nil {
 		t.Fatal("expected error for invalid DSN")
 	}

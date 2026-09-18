@@ -255,33 +255,33 @@ func TestCheckDimension(t *testing.T) {
 	}
 }
 
-func TestOpen(t *testing.T) {
+func TestNew(t *testing.T) {
 	t.Parallel()
 
 	t.Run("missing dsn", func(t *testing.T) {
 		t.Parallel()
 
-		_, err := Open(vectorstore.Options{})
+		_, err := New(vectorstore.Options{})
 		if !errors.Is(err, ErrMissingDSN) {
-			t.Fatalf("Open() error = %v, want ErrMissingDSN", err)
+			t.Fatalf("New() error = %v, want ErrMissingDSN", err)
 		}
 	})
 
 	t.Run("invalid options", func(t *testing.T) {
 		t.Parallel()
 
-		_, err := Open(vectorstore.Options{DSN: "postgres://localhost/db", Dimension: -1})
+		_, err := New(vectorstore.Options{DSN: "postgres://localhost/db", Dimension: -1})
 		if !errors.Is(err, vectorstore.ErrInvalidOptions) {
-			t.Fatalf("Open() error = %v, want ErrInvalidOptions", err)
+			t.Fatalf("New() error = %v, want ErrInvalidOptions", err)
 		}
 	})
 
 	t.Run("default dimension no database", func(t *testing.T) {
 		t.Parallel()
 
-		_, err := Open(vectorstore.Options{DSN: "postgres://127.0.0.1:1/zever_test"})
+		_, err := New(vectorstore.Options{DSN: "postgres://127.0.0.1:1/zever_test"})
 		if err == nil {
-			t.Fatal("Open() with unreachable DSN = nil, want error")
+			t.Fatal("New() with unreachable DSN = nil, want error")
 		}
 	})
 }
@@ -289,11 +289,11 @@ func TestOpen(t *testing.T) {
 func TestNewFailure(t *testing.T) {
 	t.Parallel()
 
-	if _, err := New("://bad", 0); err == nil {
+	if _, err := New(vectorstore.Options{DSN: "://bad"}); err == nil {
 		t.Fatal("New(bad DSN) = nil, want connect error")
 	}
 
-	if _, err := New("postgres://127.0.0.1:1/zever_test", 3); err == nil {
+	if _, err := New(vectorstore.Options{DSN: "postgres://127.0.0.1:1/zever_test", Dimension: 3}); err == nil {
 		t.Fatal("New(unreachable DSN) = nil, want error")
 	}
 }
@@ -826,9 +826,9 @@ func TestLiveRoundTrip(t *testing.T) {
 
 	ctx := t.Context()
 
-	vs, err := Open(vectorstore.Options{DSN: dsn, Dimension: 3})
+	vs, err := New(vectorstore.Options{DSN: dsn, Dimension: 3})
 	if err != nil {
-		t.Fatalf("Open() error: %v", err)
+		t.Fatalf("New() error: %v", err)
 	}
 
 	t.Cleanup(func() {

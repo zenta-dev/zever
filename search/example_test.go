@@ -7,7 +7,7 @@ import (
 
 // ExampleOpen opens the sqlite search backend on a private in-memory database.
 func ExampleOpen() {
-	_ = search.Register(search.SQLite, searchsqlite.Open)
+	_ = search.Register(search.SQLite, searchsqlite.New)
 
 	s, err := search.Open(search.SQLite, search.Options{DSN: ":memory:"})
 	if err != nil {

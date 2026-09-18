@@ -25,9 +25,14 @@ const (
 
 var memoryCounter uint64
 
-// Open creates a SQLite-backed Search from Options. An empty DSN selects an
+// Store implements search.Search backed by SQLite FTS5.
+type Store struct {
+	db *sql.DB
+}
+
+// New creates a SQLite-backed Search from Options. An empty DSN selects an
 // isolated in-memory database.
-func Open(o search.Options) (search.Search, error) {
+func New(o search.Options) (search.Search, error) {
 	if err := o.Validate(); err != nil {
 		return nil, fmt.Errorf("sqlite: %w", err)
 	}
@@ -37,24 +42,6 @@ func Open(o search.Options) (search.Search, error) {
 		dsn = ":memory:"
 	}
 
-	// Separate return keeps a New failure as a nil interface; returning
-	// New(dsn) directly would wrap its typed-nil *Store in a non-nil
-	// search.Search.
-	store, err := New(dsn)
-	if err != nil {
-		return nil, err
-	}
-
-	return store, nil
-}
-
-// Store implements search.Search backed by SQLite FTS5.
-type Store struct {
-	db *sql.DB
-}
-
-// New creates a SQLite search store connected to the given DSN.
-func New(dsn string) (*Store, error) {
 	if dsn == ":memory:" {
 		n := atomic.AddUint64(&memoryCounter, 1)
 		dsn = fmt.Sprintf("file:zen-search-%d?mode=memory&cache=shared", n)

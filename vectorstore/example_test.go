@@ -7,7 +7,7 @@ import (
 
 // ExampleOpen opens the sqlite vector store on a private in-memory database.
 func ExampleOpen() {
-	_ = vectorstore.Register(vectorstore.SQLite, vectorstoresqlite.Open)
+	_ = vectorstore.Register(vectorstore.SQLite, vectorstoresqlite.New)
 
 	vs, err := vectorstore.Open(vectorstore.SQLite, vectorstore.Options{DSN: ":memory:"})
 	if err != nil {

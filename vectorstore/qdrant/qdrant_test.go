@@ -917,13 +917,13 @@ func TestExtractValue(t *testing.T) {
 	}
 }
 
-func TestOpen(t *testing.T) {
+func TestNew(t *testing.T) {
 	t.Parallel()
 
 	t.Run("missing url", func(t *testing.T) {
 		t.Parallel()
 
-		if _, err := Open(vectorstore.Options{}); !errors.Is(err, ErrMissingURL) {
+		if _, err := New(vectorstore.Options{}); !errors.Is(err, ErrMissingURL) {
 			t.Fatalf("expected ErrMissingURL, got %v", err)
 		}
 	})
@@ -931,7 +931,7 @@ func TestOpen(t *testing.T) {
 	t.Run("invalid options", func(t *testing.T) {
 		t.Parallel()
 
-		_, err := Open(vectorstore.Options{URL: "http://localhost:6334", Dimension: -1})
+		_, err := New(vectorstore.Options{URL: "http://localhost:6334", Dimension: -1})
 		if err == nil {
 			t.Fatalf("expected validation error")
 		}
@@ -940,7 +940,7 @@ func TestOpen(t *testing.T) {
 	t.Run("ok lazy", func(t *testing.T) {
 		t.Parallel()
 
-		vs, err := Open(vectorstore.Options{URL: "http://localhost:6334", APIKey: "secret"})
+		vs, err := New(vectorstore.Options{URL: "http://localhost:6334", APIKey: "secret"})
 		if err != nil {
 			t.Fatalf("open: %v", err)
 		}
@@ -949,15 +949,11 @@ func TestOpen(t *testing.T) {
 			t.Fatalf("close: %v", err)
 		}
 	})
-}
-
-func TestNew(t *testing.T) {
-	t.Parallel()
 
 	t.Run("lazy no dim", func(t *testing.T) {
 		t.Parallel()
 
-		s, err := New("http://localhost:6334", "", 0)
+		s, err := New(vectorstore.Options{URL: "http://localhost:6334"})
 		if err != nil {
 			t.Fatalf("new: %v", err)
 		}
@@ -970,7 +966,7 @@ func TestNew(t *testing.T) {
 	t.Run("ensure failure closes", func(t *testing.T) {
 		t.Parallel()
 
-		if _, err := New("http://localhost:1", "", 2); err == nil {
+		if _, err := New(vectorstore.Options{URL: "http://localhost:1", Dimension: 2}); err == nil {
 			t.Fatalf("expected ensure error")
 		}
 	})
@@ -978,7 +974,7 @@ func TestNew(t *testing.T) {
 	t.Run("client error", func(t *testing.T) {
 		t.Parallel()
 
-		if _, err := New("\x7f", "", 0); err == nil {
+		if _, err := New(vectorstore.Options{URL: "\x7f"}); err == nil {
 			t.Fatalf("expected client error")
 		}
 	})

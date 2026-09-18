@@ -195,7 +195,7 @@ func registerAdapters() {
 
 	_ = password.Register(password.AdapterArgon2ID, argon2.New)
 
-	_ = payment.Register(payment.Stub, paymentstub.Open)
+	_ = payment.Register(payment.Stub, paymentstub.New)
 	_ = payment.Register(payment.Stripe, paymentstripe.New)
 	_ = payment.Register(payment.Paddle, paymentpaddle.New)
 
@@ -216,7 +216,7 @@ func registerAdapters() {
 
 	_ = search.Register(search.Postgres, searchpostgres.New)
 	_ = search.Register(search.Meilisearch, searchmeilisearch.New)
-	_ = search.Register(search.SQLite, searchsqlite.Open)
+	_ = search.Register(search.SQLite, searchsqlite.New)
 
 	_ = session.Register(session.Memory, sessionmemory.New)
 	_ = session.Register(session.Redis, sessionredis.New)
@@ -228,9 +228,9 @@ func registerAdapters() {
 	_ = tenant.Register(tenant.Single, tenantsingle.New)
 	_ = tenant.Register(tenant.Header, tenantheader.New)
 
-	_ = vectorstore.Register(vectorstore.SQLite, vectorstoresqlite.Open)
-	_ = vectorstore.Register(vectorstore.PGVector, vectorstorepgvector.Open)
-	_ = vectorstore.Register(vectorstore.Qdrant, vectorstoreqdrant.Open)
+	_ = vectorstore.Register(vectorstore.SQLite, vectorstoresqlite.New)
+	_ = vectorstore.Register(vectorstore.PGVector, vectorstorepgvector.New)
+	_ = vectorstore.Register(vectorstore.Qdrant, vectorstoreqdrant.New)
 
 	_ = webhook.Register(webhook.AdapterHTTP, webhookhttp.New)
 	_ = webhook.Register(webhook.AdapterQueue, webhookqueue.New)
