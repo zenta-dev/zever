@@ -81,12 +81,27 @@ func (t *TTLCache[K, V]) Get(k K) (V, bool) {
 	return tv.val, true
 }
 
-// Put inserts or updates the value for k, resetting its expiry to now+ttl,
-// and marks it most-recently-used. If the cache is over capacity afterward,
-// the least-recently-used entry is evicted (see Cache.Put); the OnEvict
-// callback, if registered, fires with the evicted entry's unwrapped value.
+// Put inserts or updates the value for k, resetting its expiry to now+ttl
+// (the cache's default, constructor-time TTL), and marks it
+// most-recently-used. It is a convenience wrapper around PutTTL using the
+// cache's default ttl; see PutTTL to store an entry with a different TTL.
 func (t *TTLCache[K, V]) Put(k K, v V) {
-	t.c.Put(k, ttlValue[V]{val: v, expiresAt: time.Now().Add(t.ttl)})
+	t.PutTTL(k, v, t.ttl)
+}
+
+// PutTTL inserts or updates the value for k, resetting its expiry to
+// now+ttl using the ttl given here rather than the cache's default, and
+// marks it most-recently-used. If the cache is over capacity afterward, the
+// least-recently-used entry is evicted (see Cache.Put); the OnEvict
+// callback, if registered, fires with the evicted entry's unwrapped value.
+//
+// This lets a single TTLCache instance serve entries with different TTLs,
+// e.g. a longer TTL for confirmed-present entries and a shorter TTL for
+// negative/not-found caching, matching the negative-caching need already
+// present in i18n/remote/remote.go, the hand-rolled cache this package is
+// designed to eventually replace.
+func (t *TTLCache[K, V]) PutTTL(k K, v V, ttl time.Duration) {
+	t.c.Put(k, ttlValue[V]{val: v, expiresAt: time.Now().Add(ttl)})
 }
 
 // Delete removes k from the cache and returns its value, if present and not
