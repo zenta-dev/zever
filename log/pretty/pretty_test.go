@@ -37,15 +37,25 @@ type failWriter struct{}
 
 func (failWriter) Write([]byte) (int, error) { return 0, errors.New("write failed") }
 
-func newTestLogger(out *buffer, opts Options) log.Logger {
-	return NewWithWriter(opts, out)
+// newTestLogger builds a logger directly, bypassing New/NewWithWriter, so
+// tests can force color on or off deterministically without depending on a
+// real terminal. Production code always goes through NewWithWriter, whose
+// own auto-detection (no forcing) is covered separately below.
+func newTestLogger(out *buffer, minLevel log.Level, forceColor bool) log.Logger {
+	return &logger{
+		mu:         &sync.Mutex{},
+		out:        out,
+		minLevel:   resolveMinLevel(minLevel),
+		useColor:   forceColor,
+		timeFormat: defaultTimeFormat,
+	}
 }
 
 func TestPretty_infoLine(t *testing.T) {
 	t.Parallel()
 
 	var out buffer
-	l := newTestLogger(&out, Options{Level: "debug", Color: boolPtr(false)})
+	l := newTestLogger(&out, log.LevelDebug, false)
 	l.Info().Str("key", "value").Msg("hello")
 
 	got := out.String()
@@ -80,7 +90,7 @@ func TestPretty_levelsRender(t *testing.T) {
 			t.Parallel()
 
 			var out buffer
-			l := newTestLogger(&out, Options{Level: "debug", Color: boolPtr(false)})
+			l := newTestLogger(&out, log.LevelDebug, false)
 			tt.emit(l).Msg("m")
 
 			if !strings.Contains(out.String(), tt.label) {
@@ -94,7 +104,7 @@ func TestPretty_minLevelFilters(t *testing.T) {
 	t.Parallel()
 
 	var out buffer
-	l := newTestLogger(&out, Options{Level: "error", Color: boolPtr(false)})
+	l := newTestLogger(&out, log.LevelError, false)
 	l.Info().Msg("should-not-appear")
 
 	if got := out.String(); got != "" {
@@ -102,15 +112,34 @@ func TestPretty_minLevelFilters(t *testing.T) {
 	}
 }
 
-func TestPretty_defaultLevelFiltersDebug(t *testing.T) {
+func TestPretty_zeroOptionsDefaultsToDebug(t *testing.T) {
 	t.Parallel()
 
 	var out buffer
-	l := newTestLogger(&out, Options{Color: boolPtr(false)})
-	l.Debug().Msg("should-not-appear")
+	l := NewWithWriter(log.Options{}, &out)
+	l.Debug().Msg("should-appear")
 
-	if got := out.String(); got != "" {
-		t.Fatalf("output = %q, want empty (debug below default info)", got)
+	if got := out.String(); !strings.Contains(got, "should-appear") {
+		t.Fatalf("output = %q, want debug message at zero-value MinLevel", got)
+	}
+}
+
+func TestPretty_unknownMinLevelFallsBackToInfo(t *testing.T) {
+	t.Parallel()
+
+	var out buffer
+	l := NewWithWriter(log.Options{MinLevel: log.Level(99)}, &out)
+
+	l.Debug().Msg("suppressed")
+	l.Info().Msg("shown")
+
+	got := out.String()
+	if strings.Contains(got, "suppressed") {
+		t.Fatalf("output = %q, want debug suppressed at fallback info level", got)
+	}
+
+	if !strings.Contains(got, "shown") {
+		t.Fatalf("output = %q, want info message at fallback info level", got)
 	}
 }
 
@@ -118,7 +147,7 @@ func TestPretty_sortedFields(t *testing.T) {
 	t.Parallel()
 
 	var out buffer
-	l := newTestLogger(&out, Options{Level: "debug", Color: boolPtr(false)})
+	l := newTestLogger(&out, log.LevelDebug, false)
 	l.Info().Int("zebra", 1).Int("apple", 2).Msg("sort")
 
 	got := out.String()
@@ -138,7 +167,7 @@ func TestPretty_allFieldTypes(t *testing.T) {
 	t.Parallel()
 
 	var out buffer
-	l := newTestLogger(&out, Options{Level: "debug", Color: boolPtr(false)})
+	l := newTestLogger(&out, log.LevelDebug, false)
 	l.Info().
 		Str("s", "v").
 		Int("i", -3).
@@ -167,7 +196,7 @@ func TestPretty_valueWithSpacesIsQuoted(t *testing.T) {
 	t.Parallel()
 
 	var out buffer
-	l := newTestLogger(&out, Options{Level: "debug", Color: boolPtr(false)})
+	l := newTestLogger(&out, log.LevelDebug, false)
 	l.Info().Str("msg", "hello world").Msg("q")
 
 	if got := out.String(); !strings.Contains(got, `msg="hello world"`) {
@@ -179,7 +208,7 @@ func TestPretty_msgfAndSend(t *testing.T) {
 	t.Parallel()
 
 	var out buffer
-	l := newTestLogger(&out, Options{Level: "debug", Color: boolPtr(false)})
+	l := newTestLogger(&out, log.LevelDebug, false)
 	l.Info().Int("n", 7).Msgf("count %d", 7)
 
 	if got := out.String(); !strings.Contains(got, "count 7") {
@@ -198,7 +227,7 @@ func TestPretty_withChildLogger(t *testing.T) {
 	t.Parallel()
 
 	var out buffer
-	l := newTestLogger(&out, Options{Level: "debug", Color: boolPtr(false)})
+	l := newTestLogger(&out, log.LevelDebug, false)
 	child := l.With().Str("service", "api").Logger()
 	child.Info().Msg("child")
 
@@ -216,7 +245,7 @@ func TestPretty_withContextCarriesRequestID(t *testing.T) {
 	t.Parallel()
 
 	var out buffer
-	l := newTestLogger(&out, Options{Level: "debug", Color: boolPtr(false)})
+	l := newTestLogger(&out, log.LevelDebug, false)
 	ctx := observability.WithRequestID(context.Background(), "req1234")
 	l.WithContext(ctx).Info().Msg("got request")
 
@@ -234,7 +263,7 @@ func TestPretty_colorEnabledEmitsANSI(t *testing.T) {
 	t.Parallel()
 
 	var out buffer
-	l := newTestLogger(&out, Options{Level: "debug", Color: boolPtr(true)})
+	l := newTestLogger(&out, log.LevelDebug, true)
 	l.Info().Str("error", "x").Msg("colored")
 
 	if got := out.String(); !strings.Contains(got, "\x1b[") {
@@ -248,7 +277,7 @@ func TestPretty_noColorEnvDisablesAutoColor(t *testing.T) {
 	t.Setenv("TERM", "xterm")
 
 	var out buffer
-	l := NewWithWriter(Options{Level: "debug"}, &out)
+	l := NewWithWriter(log.Options{MinLevel: log.LevelDebug}, &out)
 	l.Info().Msg("plain")
 
 	if got := out.String(); strings.Contains(got, "\x1b[") {
@@ -262,7 +291,7 @@ func TestPretty_dumbTermDisablesAutoColor(t *testing.T) {
 	t.Setenv("TERM", "dumb")
 
 	var out buffer
-	l := NewWithWriter(Options{Level: "debug"}, &out)
+	l := NewWithWriter(log.Options{MinLevel: log.LevelDebug}, &out)
 	l.Info().Msg("plain")
 
 	if got := out.String(); strings.Contains(got, "\x1b[") {
@@ -276,35 +305,11 @@ func TestPretty_nonFileWriterNeverColors(t *testing.T) {
 	t.Setenv("TERM", "xterm")
 
 	var out buffer
-	l := NewWithWriter(Options{Level: "debug"}, &out)
+	l := NewWithWriter(log.Options{MinLevel: log.LevelDebug}, &out)
 	l.Info().Msg("plain")
 
 	if got := out.String(); strings.Contains(got, "\x1b[") {
 		t.Fatalf("output = %q, want no ANSI for non-file writer", got)
-	}
-}
-
-func TestPretty_explicitColorWinsOverEnv(t *testing.T) {
-	t.Setenv("NO_COLOR", "1")
-
-	var out buffer
-	l := newTestLogger(&out, Options{Level: "debug", Color: boolPtr(true)})
-	l.Info().Msg("colored")
-
-	if got := out.String(); !strings.Contains(got, "\x1b[") {
-		t.Fatalf("output = %q, want ANSI with explicit color=true", got)
-	}
-}
-
-func TestPretty_explicitNoColorWinsOverEnv(t *testing.T) {
-	t.Setenv("FORCE_COLOR", "1")
-
-	var out buffer
-	l := newTestLogger(&out, Options{Level: "debug", Color: boolPtr(false)})
-	l.Info().Msg("plain")
-
-	if got := out.String(); strings.Contains(got, "\x1b[") {
-		t.Fatalf("output = %q, want no ANSI with explicit color=false", got)
 	}
 }
 
@@ -327,7 +332,7 @@ func TestPretty_nilWriterFallsBackToStdout(t *testing.T) {
 		close(done)
 	}()
 
-	l := NewWithWriter(Options{Level: "debug", Color: boolPtr(false)}, nil)
+	l := NewWithWriter(log.Options{MinLevel: log.LevelDebug}, nil)
 	if l.Name() != "pretty" {
 		t.Fatalf("Name() = %q, want pretty", l.Name())
 	}
@@ -349,7 +354,7 @@ func TestPretty_ciDisablesAutoColor(t *testing.T) {
 	t.Setenv("TERM", "xterm")
 
 	var out buffer
-	l := NewWithWriter(Options{Level: "debug"}, &out)
+	l := NewWithWriter(log.Options{MinLevel: log.LevelDebug}, &out)
 	l.Info().Msg("plain")
 
 	if got := out.String(); strings.Contains(got, "\x1b[") {
@@ -369,7 +374,7 @@ func TestPretty_statErrorDisablesColor(t *testing.T) {
 
 	_ = f.Close() // Stat on a closed file fails.
 
-	l := NewWithWriter(Options{Level: "debug"}, f)
+	l := NewWithWriter(log.Options{MinLevel: log.LevelDebug}, f)
 	l.Info().Msg("plain") // Must not panic; output discarded.
 }
 
@@ -377,7 +382,7 @@ func TestPretty_unknownLevelRendersUnknown(t *testing.T) {
 	t.Parallel()
 
 	var out buffer
-	gotLogger := newTestLogger(&out, Options{Level: "debug", Color: boolPtr(false)})
+	gotLogger := newTestLogger(&out, log.LevelDebug, false)
 	l, ok := gotLogger.(*logger)
 	if !ok {
 		t.Fatalf("logger = %T, want *logger", gotLogger)
@@ -393,7 +398,7 @@ func TestPretty_coloredWarnAndRequestID(t *testing.T) {
 	t.Parallel()
 
 	var out buffer
-	l := newTestLogger(&out, Options{Level: "debug", Color: boolPtr(true)})
+	l := newTestLogger(&out, log.LevelDebug, true)
 	ctx := observability.WithRequestID(context.Background(), "req9")
 	l.WithContext(ctx).Warn().Msg("watch out")
 
@@ -405,7 +410,7 @@ func TestPretty_coloredWarnAndRequestID(t *testing.T) {
 	}
 }
 func TestPretty_writeErrorFallsBackToStderr(_ *testing.T) {
-	l := NewWithWriter(Options{Level: "debug", Color: boolPtr(false)}, failWriter{})
+	l := NewWithWriter(log.Options{MinLevel: log.LevelDebug}, failWriter{})
 	// Must not panic; the failure note goes to stderr.
 	l.Info().Msg("broken")
 }
@@ -414,7 +419,7 @@ func TestPretty_concurrentWritesNotCorrupted(t *testing.T) {
 	t.Parallel()
 
 	var out buffer
-	l := newTestLogger(&out, Options{Level: "debug", Color: boolPtr(false)})
+	l := newTestLogger(&out, log.LevelDebug, false)
 
 	const n = 50
 
@@ -446,7 +451,7 @@ func TestPretty_contextChainers(t *testing.T) {
 	t.Parallel()
 
 	var out buffer
-	l := newTestLogger(&out, Options{Level: "debug", Color: boolPtr(false)})
+	l := newTestLogger(&out, log.LevelDebug, false)
 	l.With().
 		Str("s", "v").
 		Int("i", 1).
@@ -473,12 +478,10 @@ func TestPretty_nilErrorField(t *testing.T) {
 	t.Parallel()
 
 	var out buffer
-	l := newTestLogger(&out, Options{Level: "debug", Color: boolPtr(false)})
+	l := newTestLogger(&out, log.LevelDebug, false)
 	l.Info().Err(nil).Msg("nilerr")
 
 	if got := out.String(); !strings.Contains(got, "error=<nil>") {
 		t.Fatalf("output = %q, want nil error rendered", got)
 	}
 }
-
-func boolPtr(b bool) *bool { return &b }
