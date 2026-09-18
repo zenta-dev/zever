@@ -3,10 +3,12 @@
 // Sessions are stored as a single JSON value per key (prefix + ":" + id).
 // Redis enforces absolute expiry at write time via SET EX: unlike the memory
 // adapter's background sweeper, no access is needed for a session to expire.
-// Save preserves the original absolute ExpiresAt with a read-then-write
-// (GET + SET) that is NOT atomic: concurrent saves are last-write-wins, the
-// same as the memory adapter. Corrupt records fail closed and are never
-// replayed; Save overwrites them with a fresh expiry.
+// Save preserves the original absolute ExpiresAt with a WATCH/MULTI/EXEC
+// optimistic transaction: the read that decides whether to preserve or
+// reset metadata and the write that commits it are atomic as a pair, so a
+// concurrent change to the same key forces a retry against a fresh read
+// instead of silently committing on stale state. Corrupt records fail
+// closed and are never replayed; Save overwrites them with a fresh expiry.
 package redis
 
 import (
@@ -210,11 +212,20 @@ func (s *store) Get(ctx context.Context, id string) (session.Session, error) {
 	return sess, nil
 }
 
+// maxSaveAttempts bounds the WATCH/MULTI/EXEC retry loop in Save. Each retry
+// only happens when a concurrent write actually touched the same key
+// between the read and the commit, so this is a defense against unbounded
+// looping under pathological contention, not an expected path.
+const maxSaveAttempts = 100
+
 // Save upserts sess, touches UpdatedAt, and preserves the original absolute
 // ExpiresAt for live records (never extends it). A missing, expired, or
 // corrupt record is written fresh under the store default TTL, ignoring any
-// caller-provided ExpiresAt. Read-modify-write is NOT atomic:
-// last-write-wins under concurrency.
+// caller-provided ExpiresAt. The read that decides this and the write that
+// commits it run inside a WATCH/MULTI/EXEC transaction: if another writer
+// touches the same key in between, the transaction fails and Save retries
+// against a fresh read, so a stale read can never silently commit over a
+// concurrent update.
 func (s *store) Save(ctx context.Context, sess session.Session) error {
 	if err := ctx.Err(); err != nil {
 		return err
@@ -228,12 +239,37 @@ func (s *store) Save(ctx context.Context, sess session.Session) error {
 		return session.ErrClosed
 	}
 
+	key := s.key(sess.ID)
+
+	var err error
+
+	for attempt := 0; attempt < maxSaveAttempts; attempt++ {
+		err = s.client.Watch(ctx, func(tx *goredis.Tx) error {
+			return s.saveTx(ctx, tx, key, sess)
+		}, key)
+		if !errors.Is(err, goredis.TxFailedErr) {
+			break
+		}
+	}
+
+	if err != nil {
+		return fmt.Errorf("redis: save: %w", err)
+	}
+
+	return nil
+}
+
+// saveTx reads the current record for key (if any) and commits the merged
+// wireSession inside tx's transaction. Called from within Watch, so a
+// concurrent write to key between the read below and EXEC aborts the whole
+// transaction with goredis.TxFailedErr instead of applying stale metadata.
+func (s *store) saveTx(ctx context.Context, tx *goredis.Tx, key string, sess session.Session) error {
 	now := time.Now()
 	createdAt := now
 	ttl := s.ttl
 	expiresAt := now.Add(ttl)
 
-	raw, err := s.client.Get(ctx, s.key(sess.ID)).Bytes()
+	raw, err := tx.Get(ctx, key).Bytes()
 	switch {
 	case errors.Is(err, goredis.Nil):
 		// Missing: fresh write under the store default; defaults stand.
@@ -275,7 +311,11 @@ func (s *store) Save(ctx context.Context, sess session.Session) error {
 		return fmt.Errorf("redis: encode: %w", err)
 	}
 
-	if err := s.client.Set(ctx, s.key(sess.ID), buf, ttl).Err(); err != nil {
+	_, err = tx.TxPipelined(ctx, func(pipe goredis.Pipeliner) error {
+		pipe.Set(ctx, key, buf, ttl)
+		return nil
+	})
+	if err != nil {
 		return fmt.Errorf("redis: save set: %w", err)
 	}
 
