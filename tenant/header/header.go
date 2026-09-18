@@ -83,8 +83,8 @@ func (a *adapter) Close() error {
 	return nil
 }
 
-// Open creates a header-based Tenant, defaulting empty header to DefaultHeader.
-func Open(o tenant.Options) (tenant.Tenant, error) {
+// New creates a header-based Tenant, defaulting empty header to DefaultHeader.
+func New(o tenant.Options) (tenant.Tenant, error) {
 	if err := o.Validate(); err != nil {
 		return nil, fmt.Errorf("header: %w", err)
 	}

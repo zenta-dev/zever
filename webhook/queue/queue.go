@@ -772,9 +772,9 @@ func newSafeClient(timeout time.Duration, allowPrivate bool) *http.Client {
 	return webhook.NewSafeClient(timeout, allowPrivate)
 }
 
-// Open builds a queue-backed Webhook from o.
+// New builds a queue-backed Webhook from o.
 // QueueAdapter names a registered queue backend and QueueOpts carries its settings.
-func Open(o webhook.Options) (webhook.Webhook, error) {
+func New(o webhook.Options) (webhook.Webhook, error) {
 	if err := o.Validate(); err != nil {
 		return nil, err
 	}

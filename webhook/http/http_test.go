@@ -64,9 +64,9 @@ func assertValidSignature(t *testing.T, secret string, payload []byte, got strin
 func openPrivate(t *testing.T, maxRetries int) webhook.Webhook {
 	t.Helper()
 
-	w, err := Open(webhook.Options{AllowPrivateTargets: true, MaxRetries: maxRetries})
+	w, err := New(webhook.Options{AllowPrivateTargets: true, MaxRetries: maxRetries})
 	if err != nil {
-		t.Fatalf("Open() err = %v", err)
+		t.Fatalf("New() err = %v", err)
 	}
 
 	return w
@@ -101,9 +101,9 @@ func TestRegister_empty(t *testing.T) {
 func TestRegister_rejectPrivate(t *testing.T) {
 	t.Parallel()
 
-	w, err := Open(webhook.Options{})
+	w, err := New(webhook.Options{})
 	if err != nil {
-		t.Fatalf("Open() err = %v", err)
+		t.Fatalf("New() err = %v", err)
 	}
 
 	srv := httptest.NewServer(http.HandlerFunc(func(_ http.ResponseWriter, _ *http.Request) {}))
@@ -117,9 +117,9 @@ func TestRegister_rejectPrivate(t *testing.T) {
 func TestRegister_rejectPrivateHTTPS(t *testing.T) {
 	t.Parallel()
 
-	w, err := Open(webhook.Options{})
+	w, err := New(webhook.Options{})
 	if err != nil {
-		t.Fatalf("Open() err = %v", err)
+		t.Fatalf("New() err = %v", err)
 	}
 
 	if err := w.Register(t.Context(), "e", "https://127.0.0.1/hook", "s"); err == nil {
@@ -324,9 +324,9 @@ func TestDeliver_exhausted(t *testing.T) {
 	}))
 	t.Cleanup(srv.Close)
 
-	w, err := Open(webhook.Options{AllowPrivateTargets: true, MaxRetries: 3})
+	w, err := New(webhook.Options{AllowPrivateTargets: true, MaxRetries: 3})
 	if err != nil {
-		t.Fatalf("Open() err = %v", err)
+		t.Fatalf("New() err = %v", err)
 	}
 
 	// Shrink backoff sleeps by... backoff fixed ~500ms; use maxRetries 1? No,
@@ -410,9 +410,9 @@ func TestDeliver_ctxCancelDuringBackoff(t *testing.T) {
 	}))
 	t.Cleanup(srv.Close)
 
-	w, err := Open(webhook.Options{AllowPrivateTargets: true, MaxRetries: 3})
+	w, err := New(webhook.Options{AllowPrivateTargets: true, MaxRetries: 3})
 	if err != nil {
-		t.Fatalf("Open() err = %v", err)
+		t.Fatalf("New() err = %v", err)
 	}
 
 	ctx := t.Context()
@@ -433,9 +433,9 @@ func TestDeliver_ctxCancelDuringBackoff(t *testing.T) {
 func TestValidateIfNeeded_blocked(t *testing.T) {
 	t.Parallel()
 
-	w, err := Open(webhook.Options{})
+	w, err := New(webhook.Options{})
 	if err != nil {
-		t.Fatalf("Open() err = %v", err)
+		t.Fatalf("New() err = %v", err)
 	}
 
 	a := mustAdapter(t, w)
@@ -460,9 +460,9 @@ func TestValidateIfNeeded_allowPrivate(t *testing.T) {
 func TestValidateIfNeeded_publicOK(t *testing.T) {
 	t.Parallel()
 
-	w, err := Open(webhook.Options{})
+	w, err := New(webhook.Options{})
 	if err != nil {
-		t.Fatalf("Open() err = %v", err)
+		t.Fatalf("New() err = %v", err)
 	}
 
 	a := mustAdapter(t, w)
@@ -633,9 +633,9 @@ func TestSleepWithContext(t *testing.T) {
 func TestOpen_defaultsAndInvalid(t *testing.T) {
 	t.Parallel()
 
-	w, err := Open(webhook.Options{})
+	w, err := New(webhook.Options{})
 	if err != nil {
-		t.Fatalf("Open() err = %v", err)
+		t.Fatalf("New() err = %v", err)
 	}
 
 	a := mustAdapter(t, w)
@@ -651,13 +651,13 @@ func TestOpen_defaultsAndInvalid(t *testing.T) {
 		t.Error("allowPrivate = true, want false")
 	}
 
-	if _, err := Open(webhook.Options{Timeout: -1}); err == nil {
+	if _, err := New(webhook.Options{Timeout: -1}); err == nil {
 		t.Error("Open negative timeout expected error, got nil")
 	} else if !errors.Is(err, webhook.ErrInvalidOptions) {
 		t.Errorf("Open err = %v, want ErrInvalidOptions", err)
 	}
 
-	if _, err := Open(webhook.Options{MaxRetries: -2}); err == nil {
+	if _, err := New(webhook.Options{MaxRetries: -2}); err == nil {
 		t.Error("Open negative retries expected error, got nil")
 	} else if !errors.Is(err, webhook.ErrInvalidOptions) {
 		t.Errorf("Open err = %v, want ErrInvalidOptions", err)
@@ -667,9 +667,9 @@ func TestOpen_defaultsAndInvalid(t *testing.T) {
 func TestOpen_customValues(t *testing.T) {
 	t.Parallel()
 
-	w, err := Open(webhook.Options{Timeout: 2 * time.Second, MaxRetries: 5, AllowPrivateTargets: true})
+	w, err := New(webhook.Options{Timeout: 2 * time.Second, MaxRetries: 5, AllowPrivateTargets: true})
 	if err != nil {
-		t.Fatalf("Open() err = %v", err)
+		t.Fatalf("New() err = %v", err)
 	}
 
 	a := mustAdapter(t, w)

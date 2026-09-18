@@ -49,7 +49,7 @@ func serveJSON(t *testing.T, status int, body string, capt *capturedRequest) htt
 func openTest(t *testing.T, srv *httptest.Server, key string) search.Search {
 	t.Helper()
 
-	s, err := Open(search.Options{Host: srv.URL, APIKey: key})
+	s, err := New(search.Options{Host: srv.URL, APIKey: key})
 	if err != nil {
 		t.Fatalf("Open err = %v", err)
 	}
@@ -60,7 +60,7 @@ func openTest(t *testing.T, srv *httptest.Server, key string) search.Search {
 func TestOpen_missingHost_returnsErrMissingHost(t *testing.T) {
 	t.Parallel()
 
-	if _, err := Open(search.Options{}); !errors.Is(err, ErrMissingHost) {
+	if _, err := New(search.Options{}); !errors.Is(err, ErrMissingHost) {
 		t.Fatalf("Open err = %v, want ErrMissingHost", err)
 	}
 }
@@ -68,7 +68,7 @@ func TestOpen_missingHost_returnsErrMissingHost(t *testing.T) {
 func TestOpen_invalidOptions_wrapsErrInvalidOptions(t *testing.T) {
 	t.Parallel()
 
-	_, err := Open(search.Options{Host: "localhost:7700"})
+	_, err := New(search.Options{Host: "localhost:7700"})
 	if !errors.Is(err, search.ErrInvalidOptions) {
 		t.Fatalf("Open err = %v, want wrap of ErrInvalidOptions", err)
 	}

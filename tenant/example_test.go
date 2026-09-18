@@ -7,7 +7,7 @@ import (
 
 // ExampleOpen opens the single-tenant backend with a fixed ID.
 func ExampleOpen() {
-	_ = tenant.Register(tenant.Single, tenantsingle.Open)
+	_ = tenant.Register(tenant.Single, tenantsingle.New)
 
 	t, err := tenant.Open(tenant.Single, tenant.Options{ID: "default"})
 	if err != nil {

@@ -44,8 +44,8 @@ func localErr(err error) error {
 	return fmt.Errorf("local: %w", err)
 }
 
-// Open creates a local media backend from the given Options.
-func Open(o media.Options) (media.Media, error) {
+// New creates a local media backend from the given Options.
+func New(o media.Options) (media.Media, error) {
 	if err := o.Validate(); err != nil {
 		return nil, fmt.Errorf("local: %w", err)
 	}

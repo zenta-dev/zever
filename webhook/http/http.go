@@ -272,9 +272,9 @@ func newSafeClient(timeout time.Duration, allowPrivate bool) *http.Client {
 	return webhook.NewSafeClient(timeout, allowPrivate)
 }
 
-// Open creates an HTTP webhook adapter from o.
+// New creates an HTTP webhook adapter from o.
 // A zero Timeout defaults to 10 seconds; MaxRetries below 1 defaults to 3.
-func Open(o webhook.Options) (webhook.Webhook, error) {
+func New(o webhook.Options) (webhook.Webhook, error) {
 	if err := o.Validate(); err != nil {
 		return nil, fmt.Errorf("http: %w", err)
 	}

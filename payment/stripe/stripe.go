@@ -24,8 +24,8 @@ type driver struct {
 	maxWebhookBytes int
 }
 
-// Open validates o then returns a Stripe backend matching Factory.
-func Open(o payment.Options) (payment.Payment, error) {
+// New validates o then returns a Stripe backend matching Factory.
+func New(o payment.Options) (payment.Payment, error) {
 	if err := o.Validate(); err != nil {
 		return nil, fmt.Errorf("stripe: %w", err)
 	}

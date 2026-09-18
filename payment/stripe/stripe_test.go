@@ -152,9 +152,9 @@ func mustOpen(t *testing.T, srv *httptest.Server, mutate func(*payment.Options))
 		mutate(&opts)
 	}
 
-	p, err := Open(opts)
+	p, err := New(opts)
 	if err != nil {
-		t.Fatalf("Open() err = %v", err)
+		t.Fatalf("New() err = %v", err)
 	}
 
 	return p
@@ -231,8 +231,8 @@ func TestStripe_Open_guards(t *testing.T) {
 		t.Run(tc.name, func(t *testing.T) {
 			t.Parallel()
 
-			if _, err := Open(tc.opts); !errors.Is(err, tc.wantErr) {
-				t.Fatalf("Open() err = %v, want %v", err, tc.wantErr)
+			if _, err := New(tc.opts); !errors.Is(err, tc.wantErr) {
+				t.Fatalf("New() err = %v, want %v", err, tc.wantErr)
 			}
 		})
 	}
@@ -835,9 +835,9 @@ func TestStripe_Close(t *testing.T) {
 func TestStripe_Open_defaultEndpoint(t *testing.T) {
 	t.Parallel()
 
-	p, err := Open(payment.Options{SecretKey: "sk_test_x", WebhookSecret: "whsec_test"})
+	p, err := New(payment.Options{SecretKey: "sk_test_x", WebhookSecret: "whsec_test"})
 	if err != nil {
-		t.Fatalf("Open() err = %v", err)
+		t.Fatalf("New() err = %v", err)
 	}
 
 	if err := p.Close(); err != nil {

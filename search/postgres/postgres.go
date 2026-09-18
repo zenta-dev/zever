@@ -54,17 +54,17 @@ var newPool = func(ctx context.Context, dsn string) (dbpool, error) {
 	return pgxpool.NewWithConfig(ctx, cfg)
 }
 
-// Open creates a postgres-backed search.Search.
+// New creates a postgres-backed search.Search.
 // An empty DSN returns a dev no-op instance (nil pool) so container
 // construction succeeds in dev; every operation on it reports ErrNotConfigured.
 // Otherwise a single 5s budget covers connect plus DDL.
 //
-// Pool guidance: search opens its own pool per Open call. When search,
+// Pool guidance: search opens its own pool per New call. When search,
 // vectorstore, and db share one Postgres DSN, keep the sum of per-adapter
-// MaxConns below the server's max_connections. Open uses DefaultMaxConns;
+// MaxConns below the server's max_connections. New uses DefaultMaxConns;
 // for a custom cap, build a config with PoolConfig and open the pool beside
 // this adapter without changing this signature.
-func Open(o search.Options) (search.Search, error) {
+func New(o search.Options) (search.Search, error) {
 	if err := o.Validate(); err != nil {
 		return nil, fmt.Errorf("postgres: %w", err)
 	}

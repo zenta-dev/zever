@@ -28,8 +28,8 @@ func (a *adapter) Close() error {
 	return nil
 }
 
-// Open creates a fixed-ID Tenant, defaulting empty ID to DefaultSingleID.
-func Open(o tenant.Options) (tenant.Tenant, error) {
+// New creates a fixed-ID Tenant, defaulting empty ID to DefaultSingleID.
+func New(o tenant.Options) (tenant.Tenant, error) {
 	if err := o.Validate(); err != nil {
 		return nil, fmt.Errorf("single: %w", err)
 	}

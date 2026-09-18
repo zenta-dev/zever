@@ -49,14 +49,14 @@ var (
 	writeFile = os.WriteFile
 )
 
-// Open validates opts and returns a Media backed by S3.
+// New validates opts and returns a Media backed by S3.
 //
 // Access keys are always required, even for S3-compatible backends like MinIO:
 // anonymous SDK clients cannot sign requests. BaseURL only shapes the Asset
 // URLs returned to callers and is never used as the SDK endpoint; use Endpoint
 // for custom backends. Uploads use a single PUT, so individual assets are
 // limited to 5GB.
-func Open(o media.Options) (media.Media, error) {
+func New(o media.Options) (media.Media, error) {
 	if err := o.Validate(); err != nil {
 		return nil, fmt.Errorf("s3: %w", err)
 	}

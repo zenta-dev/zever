@@ -20,7 +20,7 @@ import (
 func TestOpen_APIKeyRequired(t *testing.T) {
 	t.Parallel()
 
-	_, err := Open(ai.Options{})
+	_, err := New(ai.Options{})
 	if !errors.Is(err, ai.ErrInvalidOptions) {
 		t.Fatalf("err = %v, want ErrInvalidOptions", err)
 	}
@@ -34,7 +34,7 @@ func TestOpen_APIKeyRequired(t *testing.T) {
 		t.Errorf("msg %q missing api_key", err.Error())
 	}
 
-	_, err = Open(ai.Options{APIKey: "   "})
+	_, err = New(ai.Options{APIKey: "   "})
 	if !errors.Is(err, ai.ErrInvalidOptions) {
 		t.Fatalf("empty api key err = %v", err)
 	}
@@ -43,12 +43,12 @@ func TestOpen_APIKeyRequired(t *testing.T) {
 func TestOpen_BaseURLValidation(t *testing.T) {
 	t.Parallel()
 
-	_, err := Open(ai.Options{APIKey: "key", BaseURL: "http://example.com"})
+	_, err := New(ai.Options{APIKey: "key", BaseURL: "http://example.com"})
 	if !errors.Is(err, ai.ErrInvalidOptions) {
 		t.Fatalf("err = %v want ErrInvalidOptions", err)
 	}
 
-	_, err = Open(ai.Options{APIKey: "key", BaseURL: "https://example.com"})
+	_, err = New(ai.Options{APIKey: "key", BaseURL: "https://example.com"})
 	if err != nil {
 		// BaseURL https should be allowed but NewClient may try to use it; if it fails due to not reachable, should not be validation error
 		// However NewClient with custom BaseURL and APIKey should succeed to create client without dialing.
@@ -64,7 +64,7 @@ func TestOpen_BaseURLValidation(t *testing.T) {
 func TestOpen_TimeoutValidation(t *testing.T) {
 	t.Parallel()
 
-	_, err := Open(ai.Options{APIKey: "key", Timeout: -1})
+	_, err := New(ai.Options{APIKey: "key", Timeout: -1})
 	if !errors.Is(err, ai.ErrInvalidOptions) {
 		t.Fatalf("timeout err = %v", err)
 	}
@@ -73,7 +73,7 @@ func TestOpen_TimeoutValidation(t *testing.T) {
 func TestOpen_SuccessAndTLS(t *testing.T) {
 	t.Parallel()
 
-	a, err := Open(ai.Options{APIKey: "test-key", Timeout: time.Second})
+	a, err := New(ai.Options{APIKey: "test-key", Timeout: time.Second})
 	if err != nil {
 		t.Fatalf("Open err = %v", err)
 	}
@@ -135,7 +135,7 @@ func (f *fakeTransport) RoundTrip(_ *http.Request) (*http.Response, error) {
 
 func openWithServer(t *testing.T, srv *httptest.Server) ai.AI { //nolint:unused
 	t.Helper()
-	a, err := Open(ai.Options{APIKey: "test-key", BaseURL: srv.URL})
+	a, err := New(ai.Options{APIKey: "test-key", BaseURL: srv.URL})
 	if err == nil {
 		ad0, ok := a.(*adapter) //nolint:forcetypeassert
 		if !ok {
@@ -161,7 +161,7 @@ func openWithServer(t *testing.T, srv *httptest.Server) ai.AI { //nolint:unused
 
 func openWithKeyAndServer(t *testing.T, key string, srv *httptest.Server) ai.AI {
 	t.Helper()
-	a, err := Open(ai.Options{APIKey: key, BaseURL: srv.URL})
+	a, err := New(ai.Options{APIKey: key, BaseURL: srv.URL})
 	if err != nil {
 		t.Fatalf("Open err = %v", err)
 	}
@@ -222,7 +222,7 @@ func TestGenerate_SuccessMocked(t *testing.T) {
 	srv := httptest.NewTLSServer(http.HandlerFunc(handler))
 	defer srv.Close()
 
-	a, err := Open(ai.Options{APIKey: "test-key", BaseURL: srv.URL})
+	a, err := New(ai.Options{APIKey: "test-key", BaseURL: srv.URL})
 	if err == nil {
 		ad0, ok := a.(*adapter) //nolint:forcetypeassert
 		if !ok {
@@ -288,7 +288,7 @@ func TestGenerate_EmptyCandidates(t *testing.T) {
 func TestGenerate_ModelRequired(t *testing.T) {
 	t.Parallel()
 
-	a, _ := Open(ai.Options{APIKey: "k", BaseURL: "https://example.com"})
+	a, _ := New(ai.Options{APIKey: "k", BaseURL: "https://example.com"})
 	_, err := a.Generate(context.Background(), "", nil, ai.GenerateOptions{})
 	if !errors.Is(err, ai.ErrInvalidRequest) {
 		t.Fatalf("err = %v want ErrInvalidRequest", err)
@@ -329,7 +329,7 @@ func TestGenerate_ErrorMapping(t *testing.T) {
 			}))
 			defer srv.Close()
 
-			a, _ := Open(ai.Options{APIKey: "k", BaseURL: srv.URL})
+			a, _ := New(ai.Options{APIKey: "k", BaseURL: srv.URL})
 			_, err := a.Generate(context.Background(), "models/gemini-1.5-flash", []ai.Message{{Role: ai.RoleUser, Content: "hi"}}, ai.GenerateOptions{})
 			if err == nil {
 				t.Fatalf("want error")
@@ -364,7 +364,7 @@ func TestGenerate_Redaction(t *testing.T) {
 	}))
 	defer srv.Close()
 
-	a, _ := Open(ai.Options{APIKey: apiKey, BaseURL: srv.URL})
+	a, _ := New(ai.Options{APIKey: apiKey, BaseURL: srv.URL})
 	_, err := a.Generate(context.Background(), "models/gemini-1.5-flash", []ai.Message{{Role: ai.RoleUser, Content: "hi"}}, ai.GenerateOptions{})
 	if err == nil {
 		t.Fatal("want error")
@@ -402,7 +402,7 @@ func TestGenerate_WithFunctionCall(t *testing.T) {
 	}))
 	defer srv.Close()
 
-	a, _ := Open(ai.Options{APIKey: "k", BaseURL: srv.URL})
+	a, _ := New(ai.Options{APIKey: "k", BaseURL: srv.URL})
 	gen, err := a.Generate(context.Background(), "models/gemini-1.5-flash", []ai.Message{{Role: ai.RoleUser, Content: "hi"}}, ai.GenerateOptions{})
 	if err != nil {
 		t.Fatalf("err = %v", err)
@@ -492,7 +492,7 @@ func TestStream_Ordering(t *testing.T) {
 func TestStream_ModelRequired(t *testing.T) {
 	t.Parallel()
 
-	a, _ := Open(ai.Options{APIKey: "k", BaseURL: "https://example.com"})
+	a, _ := New(ai.Options{APIKey: "k", BaseURL: "https://example.com"})
 	_, err := a.Stream(context.Background(), "", nil, ai.GenerateOptions{})
 	if !errors.Is(err, ai.ErrInvalidRequest) {
 		t.Fatalf("err = %v want ErrInvalidRequest", err)
@@ -635,7 +635,7 @@ func TestEmbed_Dimensions(t *testing.T) {
 func TestEmbed_Errors(t *testing.T) {
 	t.Parallel()
 
-	a, _ := Open(ai.Options{APIKey: "k", BaseURL: "https://example.com"})
+	a, _ := New(ai.Options{APIKey: "k", BaseURL: "https://example.com"})
 
 	_, err := a.Embed(context.Background(), "", []string{"hi"}, ai.EmbedOptions{})
 	if !errors.Is(err, ai.ErrInvalidRequest) {
@@ -690,7 +690,7 @@ func TestEmbed_Errors(t *testing.T) {
 func TestClose(t *testing.T) {
 	t.Parallel()
 
-	a, _ := Open(ai.Options{APIKey: "k", BaseURL: "https://example.com"})
+	a, _ := New(ai.Options{APIKey: "k", BaseURL: "https://example.com"})
 	if err := a.Close(); err != nil {
 		t.Errorf("Close err %v", err)
 	}
@@ -1155,7 +1155,7 @@ func TestOpen_RedactOnNewClientError(t *testing.T) {
 	// So we test that Open returns InvalidOptions for bad baseUrl, which already covers.
 	// To cover mapAndRedact for NewClient, we can use APIKey with newline that may cause error?
 	// Simpler: ensure Open with valid params succeeds even with custom baseURL that is httptest.
-	_, err := Open(ai.Options{APIKey: "k", BaseURL: "https://example.com"})
+	_, err := New(ai.Options{APIKey: "k", BaseURL: "https://example.com"})
 	if err != nil {
 		t.Fatalf("open with https example should succeed, got %v", err)
 	}
@@ -1242,7 +1242,7 @@ func TestOpen_InsecureLocalhost(t *testing.T) {
 	}))
 	defer srv.Close()
 	// Use helper which ensures insecure; also test direct Open with localhost sets insecure internally
-	a, err := Open(ai.Options{APIKey: "k", BaseURL: srv.URL})
+	a, err := New(ai.Options{APIKey: "k", BaseURL: srv.URL})
 	if err != nil {
 		t.Fatalf("Open err %v", err)
 	}
@@ -1266,9 +1266,9 @@ func TestOpen_SpoofedLoopbackStaysSecure(t *testing.T) {
 		"https://evil-localhost.com",
 		"https://example.com/?x=localhost",
 	} {
-		a, err := Open(ai.Options{APIKey: "k", BaseURL: raw})
+		a, err := New(ai.Options{APIKey: "k", BaseURL: raw})
 		if err != nil {
-			t.Fatalf("Open(%q) err %v", raw, err)
+			t.Fatalf("New(%q) err %v", raw, err)
 		}
 		ad, _ := a.(*adapter) //nolint:forcetypeassert
 		if tr, ok := ad.client.ClientConfig().HTTPClient.Transport.(*http.Transport); ok {
@@ -1288,7 +1288,7 @@ func TestOpen_NewClientError(t *testing.T) {
 	newGenaiClient = func(_ context.Context, _ *genai.ClientConfig) (*genai.Client, error) {
 		return nil, errors.New("boom super-secret-key-123 x-goog-api-key: super-secret-key-123")
 	}
-	_, err := Open(ai.Options{APIKey: "super-secret-key-123", BaseURL: "https://example.com"})
+	_, err := New(ai.Options{APIKey: "super-secret-key-123", BaseURL: "https://example.com"})
 	if err == nil {
 		t.Fatal("want error")
 	}
