@@ -1,150 +1,57 @@
 package sqlite
 
 import (
-	"container/list"
 	"database/sql"
 	"errors"
-	"sync"
+
+	"github.com/zenta-dev/zever/internal/lrucache"
 )
 
-// defaultStmtCacheSize bounds the stmtCache when newStmtCache gets a
-// non-positive capacity.
+// defaultStmtCacheSize bounds the stmt cache when newStmtCache gets a
+// non-positive capacity. It intentionally differs from (and overrides)
+// lrucache.New's own generic default, matching this package's previous
+// hand-rolled stmtCache default.
 const defaultStmtCacheSize = 256
 
-// entry pairs a query text with its prepared statement.
-type entry struct {
-	query string
-	stmt  *sql.Stmt
-}
-
-// stmtCache is a bounded, concurrency-safe LRU cache of prepared statements,
-// keyed by SQL text.
+// newStmtCache returns a bounded, concurrency-safe LRU cache of prepared
+// statements keyed by SQL text, backed by internal/lrucache. A non-positive
+// capacity means defaultStmtCacheSize.
 //
 // A *sql.Stmt from DB.PrepareContext is not bound to one connection:
 // database/sql re-prepares it on whichever pooled connection serves a call,
 // so one adapter-level cache is correct with no connection-affinity logic.
-// Statements are safe for concurrent use by multiple goroutines; the mutex
-// below guards only the LRU bookkeeping.
-type stmtCache struct {
-	mu       sync.Mutex
-	capacity int
-	ll       *list.List
-	items    map[string]*list.Element
-}
-
-// newStmtCache returns a stmtCache holding at most capacity statements.
-// A non-positive capacity means defaultStmtCacheSize. Eviction policy: true
-// LRU — Get refreshes recency, Put evicts the least-recently-used entry past
-// capacity and closes it, so memory stays bounded.
-func newStmtCache(capacity int) *stmtCache {
+// Statements are safe for concurrent use by multiple goroutines; the cache's
+// own internal lock guards only the LRU bookkeeping.
+//
+// Eviction policy: true LRU -- Get refreshes recency, Put/GetOrCompute evict
+// the least-recently-used entry past capacity, and the registered OnEvict
+// callback closes it so statement handles don't leak as memory stays
+// bounded.
+func newStmtCache(capacity int) *lrucache.Cache[string, *sql.Stmt] {
 	if capacity <= 0 {
 		capacity = defaultStmtCacheSize
 	}
 
-	return &stmtCache{
-		capacity: capacity,
-		ll:       list.New(),
-		items:    make(map[string]*list.Element, capacity),
-	}
-}
-
-// Get returns the cached statement for query, moving it to the front of the
-// LRU order, or (nil, false) on a miss.
-func (c *stmtCache) Get(query string) (*sql.Stmt, bool) {
-	c.mu.Lock()
-	defer c.mu.Unlock()
-
-	el, ok := c.items[query]
-	if !ok {
-		return nil, false
-	}
-
-	c.ll.MoveToFront(el)
-
-	e, ok := el.Value.(*entry)
-	if !ok {
-		return nil, false
-	}
-
-	return e.stmt, true
-}
-
-// Put inserts stmt for query, evicting and closing the least-recently-used
-// entry past capacity. On a duplicate query (two concurrent misses both
-// prepared the same text) the new stmt is closed and the cached one kept.
-// Returns the kept stmt; callers must use it, not the passed-in pointer.
-func (c *stmtCache) Put(query string, stmt *sql.Stmt) *sql.Stmt {
-	c.mu.Lock()
-
-	if el, ok := c.items[query]; ok {
-		c.ll.MoveToFront(el)
-		c.mu.Unlock()
-
+	return lrucache.New[string, *sql.Stmt](capacity, lrucache.WithOnEvict(func(_ string, stmt *sql.Stmt) {
 		_ = stmt.Close()
-
-		if kept, ok := el.Value.(*entry); ok {
-			return kept.stmt
-		}
-
-		return stmt
-	}
-
-	el := c.ll.PushFront(&entry{query: query, stmt: stmt})
-	c.items[query] = el
-
-	var evicted *entry
-
-	if c.ll.Len() > c.capacity {
-		if oldest := c.ll.Back(); oldest != nil {
-			c.ll.Remove(oldest)
-
-			if e, ok := oldest.Value.(*entry); ok {
-				evicted = e
-				delete(c.items, e.query)
-			}
-		}
-	}
-
-	c.mu.Unlock()
-
-	if evicted != nil {
-		_ = evicted.stmt.Close()
-	}
-
-	return stmt
+	}))
 }
 
-// CloseAll closes every cached statement and empties the cache. Errors join
-// via errors.Join so one bad Close never skips the rest.
-func (c *stmtCache) CloseAll() error {
-	c.mu.Lock()
-	entries := make([]*entry, 0, len(c.items))
+// closeAllStmts closes every statement currently cached in c and empties it.
+// Errors join via errors.Join so one bad Close never skips the rest.
+//
+// This uses Cache.Clear's own callback parameter, not the OnEvict callback
+// registered by newStmtCache, to perform the close: per lrucache's
+// documented contract, Clear does NOT also invoke OnEvict for the entries it
+// removes, so each cached statement is closed exactly once here, not twice.
+func closeAllStmts(c *lrucache.Cache[string, *sql.Stmt]) error {
+	var errs []error
 
-	for el := c.ll.Front(); el != nil; el = el.Next() {
-		if e, ok := el.Value.(*entry); ok {
-			entries = append(entries, e)
-		}
-	}
-
-	c.ll.Init()
-	c.items = make(map[string]*list.Element)
-	c.mu.Unlock()
-
-	errs := make([]error, 0, len(entries))
-
-	for _, e := range entries {
+	c.Clear(func(_ string, stmt *sql.Stmt) {
 		// errors.Join discards nils, so append unconditionally: one bad
 		// Close never prevents the rest from being closed.
-		errs = append(errs, e.stmt.Close())
-	}
+		errs = append(errs, stmt.Close())
+	})
 
 	return errors.Join(errs...)
-}
-
-// Len reports how many statements are cached.
-func (c *stmtCache) Len() int {
-	c.mu.Lock()
-	defer c.mu.Unlock()
-
-	return c.ll.Len()
 }

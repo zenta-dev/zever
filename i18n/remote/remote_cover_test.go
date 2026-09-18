@@ -1,7 +1,6 @@
 package remote
 
 import (
-	"container/list"
 	"context"
 	"encoding/json"
 	"errors"
@@ -14,10 +13,11 @@ import (
 	"time"
 
 	"github.com/zenta-dev/zever/i18n"
+	"github.com/zenta-dev/zever/internal/lrucache"
 )
 
 // newTestAdapter builds a real adapter against endpoint. White-box: tests
-// below poke a.cache/a.lru/a.flights/a.order directly.
+// below poke a.cache/a.flights/a.order directly.
 func newTestAdapter(t *testing.T, endpoint string) *adapter {
 	t.Helper()
 	ii, err := New(i18n.Options{Remote: i18n.RemoteOptions{Endpoint: endpoint, AllowInsecure: true}})
@@ -71,84 +71,68 @@ func jstr(s string) string {
 	return string(b)
 }
 
+func newLookupTestAdapter() *adapter {
+	return &adapter{cache: lrucache.NewTTL[string, cacheValue](maxCacheEntries, posTTL)}
+}
+
 func TestLookup(t *testing.T) {
 	t.Parallel()
 
-	now := time.Now()
-	a := &adapter{lru: list.New(), cache: make(map[string]*list.Element)}
-	a.cache["a"] = a.lru.PushFront(entry{key: "a", val: "A", expiresAt: now.Add(posTTL)})
-	a.cache["b"] = a.lru.PushFront(entry{key: "b", val: "B", expiresAt: now.Add(posTTL)})
+	a := newLookupTestAdapter()
+	a.store("a", cacheValue{val: "A"}, posTTL)
+	a.store("b", cacheValue{val: "B"}, posTTL)
 
-	// Hit, regardless of exact "now" position relative to cache insertion.
-	for _, n := range []time.Time{now, now.Add(posTTL / 2)} {
-		e, ok := a.lookup("b", n)
-		if !ok || e.val != "B" {
-			t.Fatalf("hit at %v: got (%v,%v)", n, e, ok)
-		}
-	}
-	front, _ := a.lru.Front().Value.(entry)
-	if front.key != "b" {
-		t.Fatalf("front after hit = %q, want b (moved to front)", front.key)
+	// Hit.
+	e, ok := a.lookup("b")
+	if !ok || e.val != "B" {
+		t.Fatalf("hit: got (%v,%v)", e, ok)
 	}
 
 	// Miss: absent key.
-	if _, ok := a.lookup("absent", now); ok {
+	if _, ok := a.lookup("absent"); ok {
 		t.Fatal("miss: want not ok")
 	}
 
-	// Expiry: now beyond expiresAt removes the entry from cache and LRU.
-	if _, ok := a.lookup("a", now.Add(2*posTTL)); ok {
+	// Expiry: a short-TTL entry is lazily purged from the cache once past
+	// its expiry, on the next lookup.
+	a.store("short", cacheValue{val: "S"}, time.Millisecond)
+	time.Sleep(5 * time.Millisecond)
+	if _, ok := a.lookup("short"); ok {
 		t.Fatal("expired: want not ok")
-	}
-	if _, ok := a.cache["a"]; ok || a.lru.Len() != 1 {
-		t.Fatalf("expired entry must be removed: cache %v len %d", ok, a.lru.Len())
 	}
 }
 
 func TestStoreOverwrite(t *testing.T) {
 	t.Parallel()
 
-	a := &adapter{lru: list.New(), cache: make(map[string]*list.Element)}
-	a.store(entry{key: "k", val: "v1"})
-	a.store(entry{key: "m", val: "m"})
-	a.store(entry{key: "k", val: "v2"}) // overwrite must move k to front
+	a := newLookupTestAdapter()
+	a.store("k", cacheValue{val: "v1"}, posTTL)
+	a.store("m", cacheValue{val: "m"}, posTTL)
+	a.store("k", cacheValue{val: "v2"}, posTTL) // overwrite
 
-	front, _ := a.lru.Front().Value.(entry)
-	if front.key != "k" || front.val != "v2" {
-		t.Fatalf("front = %q/%q, want k/v2", front.key, front.val)
+	got, ok := a.lookup("k")
+	if !ok || got.val != "v2" {
+		t.Fatalf("lookup(k) = %v,%v, want v2,true", got, ok)
 	}
-	if a.lru.Len() != 2 {
-		t.Fatalf("len = %d, want 2", a.lru.Len())
-	}
-	ev, _ := a.cache["k"].Value.(entry)
-	if ev.val != "v2" {
-		t.Fatalf("cache[k] = %q, want v2", ev.val)
+	if a.cache.Len() != 2 {
+		t.Fatalf("len = %d, want 2", a.cache.Len())
 	}
 }
 
 func TestStoreEviction(t *testing.T) {
 	t.Parallel()
 
-	a := &adapter{lru: list.New(), cache: make(map[string]*list.Element)}
+	a := newLookupTestAdapter()
 	for i := 0; i <= maxCacheEntries; i++ {
-		a.store(entry{key: fmt.Sprintf("k%d", i), val: "v"})
+		a.store(fmt.Sprintf("k%d", i), cacheValue{val: "v"}, posTTL)
 	}
-	if a.lru.Len() != maxCacheEntries {
-		t.Fatalf("len = %d, want %d", a.lru.Len(), maxCacheEntries)
+	if a.cache.Len() != maxCacheEntries {
+		t.Fatalf("len = %d, want %d", a.cache.Len(), maxCacheEntries)
 	}
-	if _, ok := a.cache["k0"]; ok {
+	if _, ok := a.lookup("k0"); ok {
 		t.Fatal("oldest (k0) must be evicted")
 	}
-	front, _ := a.lru.Front().Value.(entry)
-	if front.key != fmt.Sprintf("k%d", maxCacheEntries) {
-		t.Fatalf("front = %q, want newest k%d", front.key, maxCacheEntries)
-	}
-	back := a.lru.Back()
-	be, _ := back.Value.(entry)
-	if be.key != "k1" {
-		t.Fatalf("back = %q, want k1 (LRU tail)", be.key)
-	}
-	if _, ok := a.cache[fmt.Sprintf("k%d", maxCacheEntries)]; !ok {
+	if _, ok := a.lookup(fmt.Sprintf("k%d", maxCacheEntries)); !ok {
 		t.Fatal("newest must be present")
 	}
 }
