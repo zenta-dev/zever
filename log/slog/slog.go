@@ -2,6 +2,7 @@ package slog
 
 import (
 	"context"
+	"io"
 	"os"
 
 	stdslog "log/slog"
@@ -15,7 +16,17 @@ type slogLogger struct {
 
 // New creates a Logger writing JSON events to stdout at the configured minimum level.
 func New(opts log.Options) log.Logger {
-	handler := stdslog.NewJSONHandler(os.Stdout, &stdslog.HandlerOptions{
+	return NewWithWriter(opts, os.Stdout)
+}
+
+// NewWithWriter creates a Logger writing JSON events to w at the configured
+// minimum level. A nil w falls back to stdout.
+func NewWithWriter(opts log.Options, w io.Writer) log.Logger {
+	if w == nil {
+		w = os.Stdout
+	}
+
+	handler := stdslog.NewJSONHandler(w, &stdslog.HandlerOptions{
 		Level: toSlogLevel(opts.MinLevel),
 	})
 

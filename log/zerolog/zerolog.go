@@ -2,6 +2,7 @@ package zerolog
 
 import (
 	"context"
+	"io"
 	"os"
 
 	zl "github.com/rs/zerolog"
@@ -15,7 +16,17 @@ type zerologAdapter struct {
 
 // New creates a Logger writing JSON events to stdout at the configured minimum level.
 func New(opts log.Options) log.Logger {
-	l := zl.New(os.Stdout).With().Timestamp().Logger().Level(toZeroLogLevel(opts.MinLevel))
+	return NewWithWriter(opts, os.Stdout)
+}
+
+// NewWithWriter creates a Logger writing JSON events to w at the configured
+// minimum level. A nil w falls back to stdout.
+func NewWithWriter(opts log.Options, w io.Writer) log.Logger {
+	if w == nil {
+		w = os.Stdout
+	}
+
+	l := zl.New(w).With().Timestamp().Logger().Level(toZeroLogLevel(opts.MinLevel))
 
 	return &zerologAdapter{log: l}
 }
