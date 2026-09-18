@@ -50,9 +50,15 @@ jobs:
           version: v2.13.2
           args: ./...
 
+  # Fast gate: runs on every push and PR. No -race, no coverage, no
+  # instrumentation — just enough to catch build breaks, vet issues, and
+  # go.mod drift quickly. This is what most pushes (including dependency
+  # bumps that touch no Go code) should pay for.
   test:
     name: test (go 1.27)
     runs-on: ubuntu-latest
+    permissions:
+      contents: read
     env:
       # CI runners ship Chrome but its sandbox is unusable in the container;
       # the document/local render tests need --no-sandbox to execute.
@@ -69,16 +75,46 @@ jobs:
         run: go mod tidy -diff
       - name: go vet
         run: go vet ./...
-      - name: go test -race
-        run: go test -race -covermode=atomic -coverprofile=coverage.out ./...
+      - name: go test
+        # -vet=off: go vet already ran as its own step above, so skip the
+        # implicit vet pass go test does before compiling — avoids
+        # re-running the same analysis twice.
+        run: go test -vet=off -count=1 ./...
       - name: go build
         run: go build ./...
+
+  # Full gate: race detector + atomic coverage + Codecov upload. This is
+  # the expensive pass (typically 2-10x slower than a plain `go test`
+  # because of race instrumentation, plus more overhead from atomic
+  # coverage counters). It only needs to run on commits that actually land
+  # on main or get tagged for release — every PR still gets full vet/build/
+  # test coverage from the fast job above, it just doesn't pay the race
+  # detector's cost on every push.
+  test-race:
+    name: test (race + coverage)
+    if: github.event_name == 'push'
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      id-token: write
+    env:
+      # Same Chrome sandbox limitation as the fast gate above.
+      ZEVER_CHROMEDP_NO_SANDBOX: "1"
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+      - uses: actions/setup-go@b7ad1dad31e06c5925ef5d2fc7ad053ef454303e # v7.0.0
+        with:
+          go-version-file: go.mod
+          cache-dependency-path: go.sum
+      - name: Download dependencies
+        run: go mod download
+      - name: go test -race
+        run: go test -race -covermode=atomic -coverprofile=coverage.out ./...
       - name: Upload coverage to Codecov
         uses: codecov/codecov-action@046562be8d17331600874a09d2c2062c27752c20 # v7.1.0
         with:
           files: coverage.out
           fail_ci_if_error: false
-          token: ${{ secrets.CODECOV_TOKEN }}
 
   vulnerability:
     name: govulncheck
