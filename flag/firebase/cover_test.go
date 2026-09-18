@@ -131,7 +131,11 @@ func TestCoverNewLoaderFail(t *testing.T) {
 		return nil, errors.New("boom")
 	}
 
-	opts := flag.Options{Firebase: flag.FirebaseOptions{ProjectID: "p", ServiceAccount: "svc.json"}}
+	p := filepath.Join(t.TempDir(), "sa.json")
+	if err := os.WriteFile(p, []byte(`{"type":"service_account"}`), 0o600); err != nil {
+		t.Fatalf("seed SA: %v", err)
+	}
+	opts := flag.Options{Firebase: flag.FirebaseOptions{ProjectID: "p", ServiceAccount: p}}
 	if _, err := New(opts); err == nil || !strings.Contains(err.Error(), "boom") {
 		t.Fatalf("New(loader fail) = %v, want boom", err)
 	}
@@ -149,7 +153,7 @@ func TestCoverNewLoaderSuccess(t *testing.T) {
 		return tpl, nil
 	}
 
-	opts := flag.Options{Firebase: flag.FirebaseOptions{ProjectID: "p", ServiceAccount: "svc.json"}}
+	opts := flag.Options{Firebase: flag.FirebaseOptions{ProjectID: "p", ServiceAccount: dummySA(t)}}
 	c, err := New(opts)
 	if err != nil {
 		t.Fatalf("New(loader ok) = %v, want nil", err)
