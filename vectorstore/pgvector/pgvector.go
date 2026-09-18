@@ -55,6 +55,11 @@ func Open(o vectorstore.Options) (vectorstore.VectorStore, error) {
 }
 
 // New connects to the DSN and prepares the vectors table and index.
+// It caps the pool with PoolConfig at DefaultMaxConns. When search,
+// vectorstore, and db share one Postgres DSN, keep the sum of per-adapter
+// MaxConns below the server's max_connections; for a custom cap, build a
+// config with PoolConfig and wire the pool beside this constructor without
+// changing this signature.
 func New(dsn string, dimension int) (*Store, error) {
 	if dimension <= 0 {
 		dimension = vectorstore.DefaultDimension
@@ -63,7 +68,12 @@ func New(dsn string, dimension int) (*Store, error) {
 	ddlCtx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
 	defer cancel()
 
-	pool, err := pgxpool.New(ddlCtx, dsn)
+	cfg, err := PoolConfig(dsn, DefaultMaxConns)
+	if err != nil {
+		return nil, err
+	}
+
+	pool, err := pgxpool.NewWithConfig(ddlCtx, cfg)
 	if err != nil {
 		return nil, fmt.Errorf("pgvector: connect: %w", err)
 	}

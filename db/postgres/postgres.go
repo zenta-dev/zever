@@ -321,6 +321,11 @@ func (r *rowsAdapter) Columns() ([]string, error) {
 // New creates a db.DB backed by PostgreSQL via pgxpool. The caller registers
 // it via db.Register(db.Postgres, New). DSN is required; pool knobs from
 // opts pass through to the pgxpool config. It never logs the DSN.
+//
+// Pool guidance: each adapter (db, search/postgres, vectorstore/pgvector)
+// opens its own pool. When they share one Postgres DSN, keep the sum of
+// per-adapter MaxConns below the server's max_connections; search and
+// vectorstore default to 4 each (see their PoolConfig helpers).
 func New(opts db.Options) (db.DB, error) {
 	if strings.TrimSpace(opts.DSN) == "" {
 		return nil, fmt.Errorf("postgres: option %q is required", "dsn")

@@ -3,6 +3,7 @@ package log
 import (
 	"context"
 	"fmt"
+	"io"
 	"log/slog"
 	"os"
 
@@ -23,7 +24,15 @@ type adapter struct {
 
 // Open returns an adapter using o. The default logger writes JSON lines to
 // stdout; there is no PII redaction, so use it for debug output only.
+// For tests, prefer NewWithWriter with a buffer.
 func Open(o analytics.Options) (analytics.Analytics, error) {
+	return NewWithWriter(o, os.Stdout)
+}
+
+// NewWithWriter returns an adapter using o that writes JSON lines to w.
+// A nil w falls back to stdout, mirroring log/pretty and
+// observability/stdout. The slog JSON handler is safe for concurrent use.
+func NewWithWriter(o analytics.Options, w io.Writer) (analytics.Analytics, error) {
 	if err := o.Validate(); err != nil {
 		return nil, fmt.Errorf("log: %w", err)
 	}
@@ -38,8 +47,12 @@ func Open(o analytics.Options) (analytics.Analytics, error) {
 		maxBytes = analytics.DefaultMaxPropertiesBytes
 	}
 
+	if w == nil {
+		w = os.Stdout
+	}
+
 	return &adapter{
-		logger:             slog.New(slog.NewJSONHandler(os.Stdout, nil)),
+		logger:             slog.New(slog.NewJSONHandler(w, nil)),
 		anonymousID:        anonymousID,
 		maxPropertiesBytes: maxBytes,
 		maxProperties:      o.MaxProperties,
