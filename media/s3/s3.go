@@ -22,8 +22,8 @@ import (
 	s3sdk "github.com/aws/aws-sdk-go-v2/service/s3"
 	"github.com/aws/smithy-go"
 
+	"github.com/zenta-dev/zever/internal/s3opts"
 	"github.com/zenta-dev/zever/media"
-	"github.com/zenta-dev/zever/storage/s3core"
 )
 
 // driver stores media assets in an S3-compatible bucket.
@@ -61,17 +61,20 @@ func Open(o media.Options) (media.Media, error) {
 		return nil, fmt.Errorf("s3: %w", err)
 	}
 
-	if o.Bucket == "" {
-		return nil, ErrMissingBucket
+	cfg := s3opts.Config{
+		Endpoint:        o.Endpoint,
+		Region:          o.Region,
+		Bucket:          o.Bucket,
+		AccessKeyID:     o.AccessKeyID,
+		SecretAccessKey: o.SecretAccessKey,
+	}.WithDefaults(media.DefaultS3Region)
+
+	if err := cfg.ValidateBucket(); err != nil {
+		return nil, fmt.Errorf("s3: %w", err)
 	}
 
-	if o.AccessKeyID == "" || o.SecretAccessKey == "" {
-		return nil, ErrMissingCredentials
-	}
-
-	region := o.Region
-	if region == "" {
-		region = media.DefaultS3Region
+	if err := cfg.ValidateCredentials(); err != nil {
+		return nil, fmt.Errorf("s3: %w", err)
 	}
 
 	maxDownload := o.MaxDownloadBytes
@@ -99,7 +102,7 @@ func Open(o media.Options) (media.Media, error) {
 		ffprobe = media.DefaultFFProbe
 	}
 
-	client, presigner, err := s3core.NewClient(context.Background(), "s3", region, o.Endpoint, "", o.AccessKeyID, o.SecretAccessKey)
+	client, presigner, err := s3opts.NewClient(context.Background(), "s3", cfg, "")
 	if err != nil {
 		return nil, fmt.Errorf("s3: %w", err)
 	}
@@ -107,7 +110,7 @@ func Open(o media.Options) (media.Media, error) {
 	return &driver{
 		client:      client,
 		presigner:   presigner,
-		bucket:      o.Bucket,
+		bucket:      cfg.Bucket,
 		baseURL:     strings.TrimRight(o.BaseURL, "/"),
 		maxDownload: maxDownload,
 		maxPixels:   maxPixels,

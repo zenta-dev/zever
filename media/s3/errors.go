@@ -1,9 +1,11 @@
 package s3
 
-import "errors"
+import (
+	"github.com/zenta-dev/zever/internal/s3opts"
+)
 
 // ErrMissingBucket is returned when the S3 bucket name is empty.
-var ErrMissingBucket = errors.New("s3: bucket is required")
+var ErrMissingBucket = s3opts.ErrMissingBucket
 
 // ErrMissingCredentials is returned when the access key or secret is empty.
-var ErrMissingCredentials = errors.New("s3: access key and secret are required")
+var ErrMissingCredentials = s3opts.ErrMissingCredentials
