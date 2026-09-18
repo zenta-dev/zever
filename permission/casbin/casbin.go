@@ -172,6 +172,65 @@ func (c *checker) Can(ctx context.Context, subject permission.Subject, action st
 // prepareGroupings adds transient groupings for the subject's allowlisted
 // roles. Claimed roles outside the Options.Roles allowlist are skipped, so a
 // subject cannot escalate privilege by asserting arbitrary roles.
+//
+// Lock-across-I/O tradeoff: c.mu is held for the whole body, including the
+// c.e.HasGroupingPolicy/AddGroupingPolicy calls below, which can synchronously
+// hit the enforcer's adapter (e.g. a DB write) when autosave is enabled. That
+// serializes every Can() call in the process behind whatever grouping
+// mutation is currently doing I/O, which is unfortunate on a path meant to be
+// a hot authorization check. This is deliberate, not an oversight:
+//
+//   - c.e is a *casbinlib.SyncedEnforcer, which already has its own internal
+//     sync.RWMutex (see enforcer_synced.go in github.com/casbin/casbin/v2,
+//     module version pinned in go.mod) guarding every policy read and write,
+//     including HasGroupingPolicy/AddGroupingPolicy/RemoveGroupingPolicy and
+//     Enforce/EnforceEx. So c.mu is *not* needed to make casbin's own state
+//     safe for concurrent mutation; that guarantee is casbin's, independent
+//     of this file.
+//   - c.mu is needed here because this checker keeps its own shadow
+//     bookkeeping on top of casbin (groupRefs, persistent, pending) to track
+//     how many in-flight Can() calls rely on each transient grouping so
+//     cleanupGroupings knows when it's safe to remove one. That bookkeeping
+//     decision ("do we still need this grouping in casbin, or can we remove
+//     it") has to be atomic with the casbin mutation itself, or the two can
+//     disagree about the resulting state.
+//   - Releasing c.mu around just the Has/Add calls looks safe in isolation
+//     (AddGroupingPolicy is idempotent: casbin checks e.model.HasPolicy
+//     first and only reaches the adapter when the rule is actually new, see
+//     internal_api.go addPolicyWithoutNotify), but it reopens a race against
+//     cleanupGroupings, which is called after every Can() and, unlike Add,
+//     RemoveGroupingPolicy always calls the adapter's RemovePolicy when
+//     persistence is on (removePolicyWithoutNotify checks shouldPersist, not
+//     existence, before touching the adapter) — so cleanup is the larger
+//     source of lock-held I/O here, not prepareGroupings alone. If
+//     prepareGroupings's Has/Add ran unlocked while cleanupGroupings's
+//     decrement-to-zero-and-remove also ran unlocked, this interleave is
+//     possible for the same (subject, role) key: cleanup decides ref count
+//     hit zero and starts an unlocked RemoveGroupingPolicy, while a fresh
+//     caller concurrently calls HasGroupingPolicy, observes the grouping
+//     still present, skips its own Add, and only afterwards increments
+//     groupRefs — all before cleanup's Remove actually lands. Depending on
+//     which of the two unlocked casbin calls (fresh caller's would-be Add,
+//     which it skipped, vs. cleanup's Remove) genuinely executes last, the
+//     grouping can end up physically removed from casbin even though the
+//     fresh caller now holds a ref count claiming it is present, so that
+//     caller's own EnforceEx runs without the grouping and can wrongly deny
+//     a request that should have been allowed. That is a new correctness bug
+//     that does not exist today only because c.mu fully serializes
+//     prepareGroupings against cleanupGroupings/retryPending.
+//   - Fixing this properly needs the ref-count decision and the casbin
+//     mutation for a given key to stay coupled without serializing unrelated
+//     keys behind one process-wide mutex — e.g. per-(subject,role) locks or
+//     a singleflight keyed on subject+role, so concurrent Can() calls for
+//     different subjects/roles stop blocking on each other's I/O while
+//     same-key calls stay correctly ordered. That is a real design change
+//     (new synchronization primitive, more surface to test under -race),
+//     not a small narrowing of this critical section, so it was not made
+//     here without dedicated review. Until then this lock intentionally
+//     favors correctness (no spurious allow/deny flips under concurrency)
+//     over hot-path contention; if contention here is ever measured to be a
+//     real bottleneck, look at per-key locking/singleflight rather than
+//     simply shrinking this critical section.
 func (c *checker) prepareGroupings(subject permission.Subject) ([][]string, error) {
 	c.mu.Lock()
 	defer c.mu.Unlock()
@@ -226,6 +285,15 @@ func (c *checker) prepareGroupings(subject permission.Subject) ([][]string, erro
 // cleanupGroupings removes transient groupings added by prepareGroupings.
 // Removal failures are queued in pending (capped at 1000) for a later retry
 // and returned joined.
+//
+// Like prepareGroupings, this holds c.mu across c.e.RemoveGroupingPolicy,
+// which can hit the adapter (RemoveGroupingPolicy always calls the adapter
+// when persistence is on, unlike the existence-checked AddGroupingPolicy).
+// See the lock-across-I/O comment on prepareGroupings for why this is not
+// narrowed independently: this function's ref-count-to-zero decision and its
+// actual removal call must stay atomic with prepareGroupings's own
+// check-then-add, or the two can race and leave a caller relying on a
+// grouping that was concurrently removed out from under it.
 func (c *checker) cleanupGroupings(added [][]string) error {
 	if len(added) == 0 {
 		return nil
