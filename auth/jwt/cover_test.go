@@ -5,14 +5,14 @@ package jwt
 //     JSON-serializable claims is infallible by construction.
 //   - claims type assertion (verify + revoke): pruned — ParseWithClaims
 //     into &MapClaims{} guarantees concrete type; nil error implies Valid.
-//   - ticker-loop pruneOnce arm: covered via newTicker seam (see
-//     TestCoverPrunerTickFiresPruneOnce).
+//   - revocation cap/prune/ticker coverage lives in
+//     auth/jwt/revocation/memory now that the adapter delegates to a
+//     revocation.Store instead of holding the map itself.
 
 import (
 	"context"
 	"encoding/base64"
 	"errors"
-	"fmt"
 	"strings"
 	"testing"
 	"time"
@@ -25,6 +25,54 @@ import (
 type brokenReader struct{}
 
 func (brokenReader) Read([]byte) (int, error) { return 0, errors.New("CSPRNG broken") }
+
+// erroringRevocationStore fails every call, exercising the store-error
+// pass-through branches in Verify and Revoke.
+type erroringRevocationStore struct{}
+
+func (erroringRevocationStore) Revoke(context.Context, string, time.Time) error {
+	return errors.New("revocation backend down")
+}
+
+func (erroringRevocationStore) IsRevoked(context.Context, string) (bool, error) {
+	return false, errors.New("revocation backend down")
+}
+
+func (erroringRevocationStore) Close() error { return nil }
+
+func TestCoverVerifyRevocationStoreError(t *testing.T) {
+	t.Parallel()
+
+	opts := baseOpts()
+	opts.JWT.RevocationStore = erroringRevocationStore{}
+	a := newTestAuth(t, opts)
+	ctx := context.Background()
+
+	tok, err := a.Issue(ctx, "alice", nil, time.Minute)
+	if err != nil {
+		t.Fatalf("Issue: %v", err)
+	}
+	if _, err := a.Verify(ctx, tok.Value); err == nil {
+		t.Fatal("Verify() with failing revocation store succeeded, want error")
+	}
+}
+
+func TestCoverRevokeRevocationStoreError(t *testing.T) {
+	t.Parallel()
+
+	opts := baseOpts()
+	opts.JWT.RevocationStore = erroringRevocationStore{}
+	a := newTestAuth(t, opts)
+	ctx := context.Background()
+
+	tok, err := a.Issue(ctx, "alice", nil, time.Minute)
+	if err != nil {
+		t.Fatalf("Issue: %v", err)
+	}
+	if err := a.Revoke(ctx, tok.Value); err == nil {
+		t.Fatal("Revoke() with failing revocation store succeeded, want error")
+	}
+}
 
 func TestCoverVerifyNoneAlgRejected(t *testing.T) {
 	t.Parallel()
@@ -109,148 +157,41 @@ func TestCoverRevokeGarbage(t *testing.T) {
 	}
 }
 
-func fillRevoked(ad *adapter, n int, until time.Time) {
-	for i := 0; i < n; i++ {
-		tok := fmt.Sprintf("tok-%08d-padpadpadpad", i)
-		ad.revoked[tok] = until
-		ad.order = append(ad.order, tok)
-	}
-}
-
-func TestCoverCapacityEvictsOldest(t *testing.T) {
+func TestCoverRevokeNoJTI(t *testing.T) {
 	t.Parallel()
 
-	ai, err := New(baseOpts())
+	a := newTestAuth(t, baseOpts())
+	tok := jwtv5.NewWithClaims(jwtv5.SigningMethodHS256, jwtv5.MapClaims{
+		"sub": "x",
+		"iss": "test-iss",
+		"aud": "test-aud",
+		"exp": time.Now().Add(time.Hour).Unix(),
+	})
+	raw, err := tok.SignedString([]byte(testSecret))
 	if err != nil {
-		t.Fatalf("New: %v", err)
+		t.Fatalf("SignedString: %v", err)
 	}
-	ad, ok := ai.(*adapter)
-	if !ok {
-		t.Fatalf("New returned %T, want *adapter", ai)
-	}
-	t.Cleanup(func() { _ = ai.Close() })
-
-	future := time.Now().Add(time.Hour)
-	fillRevoked(ad, maxRevoked, future)
-
-	tok, err := ai.Issue(context.Background(), "fresh", nil, time.Minute)
-	if err != nil {
-		t.Fatalf("Issue: %v", err)
-	}
-	if err := ai.Revoke(context.Background(), tok.Value); err != nil {
-		t.Fatalf("Revoke at capacity: %v", err)
-	}
-	if len(ad.revoked) != maxRevoked {
-		t.Fatalf("revoked len = %d, want %d (evicted oldest)", len(ad.revoked), maxRevoked)
-	}
-	if _, ok := ad.revoked["tok-00000000-padpadpadpad"]; ok {
-		t.Error("oldest entry survived capacity eviction")
+	if err := a.Revoke(context.Background(), raw); !errors.Is(err, auth.ErrInvalidToken) {
+		t.Fatalf("Revoke(no jti) = %v, want ErrInvalidToken", err)
 	}
 }
 
-func TestCoverPruneExpiredDirect(t *testing.T) {
+func TestCoverVerifyNoJTINeverRevoked(t *testing.T) {
 	t.Parallel()
 
-	ai, err := New(baseOpts())
+	a := newTestAuth(t, baseOpts())
+	raw := signManual(t, jwtv5.MapClaims{
+		"sub": "alice",
+		"iss": "test-iss",
+		"aud": "test-aud",
+		"exp": time.Now().Add(time.Hour).Unix(),
+		"iat": time.Now().Unix(),
+	})
+	got, err := a.Verify(context.Background(), raw)
 	if err != nil {
-		t.Fatalf("New: %v", err)
+		t.Fatalf("Verify(no jti) error = %v, want nil", err)
 	}
-	ad, ok := ai.(*adapter)
-	if !ok {
-		t.Fatalf("New returned %T, want *adapter", ai)
-	}
-	t.Cleanup(func() { _ = ai.Close() })
-
-	past := time.Now().Add(-time.Minute)
-	ad.revoked["old"] = past
-	ad.revoked["live"] = time.Now().Add(time.Hour)
-
-	ad.pruneOnce(time.Now())
-
-	if _, ok := ad.revoked["old"]; ok {
-		t.Error("pruneOnce kept expired entry")
-	}
-	if _, ok := ad.revoked["live"]; !ok {
-		t.Error("pruneOnce dropped live entry")
-	}
-}
-
-func TestCoverEvictOldestCompacts(t *testing.T) {
-	t.Parallel()
-
-	ai, err := New(baseOpts())
-	if err != nil {
-		t.Fatalf("New: %v", err)
-	}
-	ad, ok := ai.(*adapter)
-	if !ok {
-		t.Fatalf("New returned %T, want *adapter", ai)
-	}
-	t.Cleanup(func() { _ = ai.Close() })
-
-	// 2000 stale order entries, none in the map: the loop runs to the
-	// end, then the compact branch (head>1024 && head>len/2) fires.
-	for i := 0; i < 2000; i++ {
-		ad.order = append(ad.order, strings.Repeat("z", 8)+string(rune('a'+i%26)))
-	}
-	ad.evictOldestLocked()
-
-	if ad.head != 0 {
-		t.Errorf("head = %d, want 0 after compact", ad.head)
-	}
-	if len(ad.order) != 0 {
-		t.Errorf("order len = %d, want 0 after compact", len(ad.order))
-	}
-}
-
-func TestCoverPrunerTickFiresPruneOnce(t *testing.T) {
-	// Not parallel: swaps global newTicker seam.
-
-	fired := make(chan time.Time, 1)
-	old := newTicker
-	newTicker = func(time.Duration) *time.Ticker { return &time.Ticker{C: fired} }
-	defer func() { newTicker = old }()
-
-	ai, err := New(baseOpts())
-	if err != nil {
-		t.Fatalf("New: %v", err)
-	}
-	ad, ok := ai.(*adapter)
-	if !ok {
-		t.Fatalf("New returned %T, want *adapter", ai)
-	}
-	t.Cleanup(func() { _ = ai.Close() })
-
-	// Plant an expired entry that pruneOnce should remove.
-	ad.mu.Lock()
-	ad.revoked["old-tok"] = time.Now().Add(-time.Minute)
-	// Plant a live entry that should survive.
-	ad.revoked["live"] = time.Now().Add(time.Hour)
-	ad.mu.Unlock()
-
-	// Fire the ticker once.
-	fired <- time.Now()
-
-	// Poll until the expired entry is pruned (or timeout).
-	deadline := time.After(time.Second)
-	var live bool
-	for {
-		ad.mu.RLock()
-		_, gone := ad.revoked["old-tok"]
-		_, live = ad.revoked["live"]
-		ad.mu.RUnlock()
-		if !gone {
-			break
-		}
-		select {
-		case <-deadline:
-			t.Fatalf("pruneOnce did not remove expired entry within 1s")
-		default:
-			time.Sleep(10 * time.Millisecond)
-		}
-	}
-
-	if !live {
-		t.Error("pruneOnce dropped live entry")
+	if got.Subject != "alice" {
+		t.Fatalf("Verify(no jti) subject = %q, want alice", got.Subject)
 	}
 }

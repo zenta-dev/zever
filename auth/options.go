@@ -3,6 +3,7 @@ package auth
 import (
 	"time"
 
+	"github.com/zenta-dev/zever/auth/jwt/revocation"
 	"github.com/zenta-dev/zever/session"
 )
 
@@ -24,6 +25,9 @@ type JWTOptions struct {
 	Audience string
 	// MaxTTL caps token lifetimes. Negative fails Validate; zero means no cap.
 	MaxTTL time.Duration
+	// RevocationStore tracks revoked token jtis. Nil means the adapter
+	// builds an in-process memory store with its own defaults.
+	RevocationStore revocation.Store
 }
 
 // SessionOptions configures the session-backed adapter.

@@ -21,24 +21,18 @@ import (
 	"errors"
 	"fmt"
 	"io"
-	mrand "math/rand"
-	"sync"
 	"time"
 
 	jwtv5 "github.com/golang-jwt/jwt/v5"
 
 	"github.com/zenta-dev/zever/auth"
+	"github.com/zenta-dev/zever/auth/jwt/revocation"
+	revocationmemory "github.com/zenta-dev/zever/auth/jwt/revocation/memory"
 )
 
 // randReader is the CSPRNG source for JTIs, swappable in tests to
 // simulate host failure. Production always uses crypto/rand.
 var randReader = rand.Reader
-
-// newTicker constructs the pruner ticker, swappable in tests.
-var newTicker = time.NewTicker
-
-// maxRevoked caps revocation-map memory (~5 MB at ~500 B/token).
-const maxRevoked = 10000
 
 // registeredKeys are claim names owned by the adapter and rejected as
 // custom claim keys at Issue time.
@@ -54,14 +48,7 @@ type adapter struct {
 	audience string
 	maxTTL   time.Duration
 
-	mu      sync.RWMutex
-	revoked map[string]time.Time
-	order   []string
-	head    int
-
-	done      chan struct{}
-	closeOnce sync.Once
-	wg        sync.WaitGroup
+	revocation revocation.Store
 }
 
 // New builds an HS256 JWT Auth from opts.
@@ -83,15 +70,20 @@ func New(opts auth.Options) (auth.Auth, error) {
 		}
 	}
 
-	a := &adapter{
-		secret:   append([]byte(nil), []byte(secret)...),
-		issuer:   opts.JWT.Issuer,
-		audience: opts.JWT.Audience,
-		maxTTL:   opts.JWT.MaxTTL,
-		revoked:  make(map[string]time.Time),
-		done:     make(chan struct{}),
+	store := opts.JWT.RevocationStore
+	if store == nil {
+		// memory.New with zero Options performs no I/O and cannot fail:
+		// the store allocates no external resources.
+		store, _ = revocationmemory.New(revocationmemory.Options{})
 	}
-	a.startPruner()
+
+	a := &adapter{
+		secret:     append([]byte(nil), []byte(secret)...),
+		issuer:     opts.JWT.Issuer,
+		audience:   opts.JWT.Audience,
+		maxTTL:     opts.JWT.MaxTTL,
+		revocation: store,
+	}
 	return a, nil
 }
 
@@ -163,7 +155,7 @@ func (a *adapter) Issue(_ context.Context, subject string, custom map[string]any
 }
 
 // Verify authenticates token and returns its claims.
-func (a *adapter) Verify(_ context.Context, token string) (auth.Claims, error) {
+func (a *adapter) Verify(ctx context.Context, token string) (auth.Claims, error) {
 	if token == "" {
 		return auth.Claims{}, auth.ErrInvalidToken
 	}
@@ -197,11 +189,14 @@ func (a *adapter) Verify(_ context.Context, token string) (auth.Claims, error) {
 		expiresAt = exp.Time
 	}
 
-	a.mu.RLock()
-	_, revoked := a.revoked[token]
-	a.mu.RUnlock()
-	if revoked {
-		return auth.Claims{}, auth.ErrTokenRevoked
+	if jti, _ := claims["jti"].(string); jti != "" {
+		revoked, err := a.revocation.IsRevoked(ctx, jti)
+		if err != nil {
+			return auth.Claims{}, fmt.Errorf("jwt: verify: %w", err)
+		}
+		if revoked {
+			return auth.Claims{}, auth.ErrTokenRevoked
+		}
 	}
 
 	custom := make(map[string]any, len(claims))
@@ -219,8 +214,11 @@ func (a *adapter) Verify(_ context.Context, token string) (auth.Claims, error) {
 }
 
 // Revoke invalidates token after verifying its signature. Idempotent:
-// revoking an already-revoked token returns nil.
-func (a *adapter) Revoke(_ context.Context, token string) error {
+// revoking an already-revoked token returns nil. A token carrying no jti
+// claim cannot be revoked individually and is rejected with ErrInvalidToken
+// wrapping revocation.ErrNoJTI: adapter-issued tokens always carry a jti
+// (see Issue), so this only rejects hand-crafted or foreign tokens.
+func (a *adapter) Revoke(ctx context.Context, token string) error {
 	if token == "" {
 		return fmt.Errorf("jwt: revoke: %w: empty token", auth.ErrInvalidToken)
 	}
@@ -238,92 +236,24 @@ func (a *adapter) Revoke(_ context.Context, token string) error {
 	// ensures concrete type; nil error + parsed.Valid already checked above.
 	claims, _ := parsed.Claims.(jwtv5.MapClaims)
 
+	jti, _ := claims["jti"].(string)
+	if jti == "" {
+		return fmt.Errorf("jwt: revoke: %w: %w", auth.ErrInvalidToken, revocation.ErrNoJTI)
+	}
+
 	now := time.Now()
 	until := now.Add(time.Second)
 	if exp, _ := claims.GetExpirationTime(); exp != nil && exp.After(now) {
 		until = exp.Time
 	}
 
-	a.mu.Lock()
-	defer a.mu.Unlock()
-	if _, dup := a.revoked[token]; dup {
-		return nil
+	if err := a.revocation.Revoke(ctx, jti, until); err != nil {
+		return fmt.Errorf("jwt: revoke: %w", err)
 	}
-	a.ensureCapacityLocked(now)
-	a.revoked[token] = until
-	a.order = append(a.order, token)
 	return nil
 }
 
-// Close stops the background pruner and releases resources. Idempotent.
+// Close releases the revocation store's resources. Idempotent.
 func (a *adapter) Close() error {
-	a.closeOnce.Do(func() { close(a.done) })
-	a.wg.Wait()
-	a.mu.Lock()
-	defer a.mu.Unlock()
-	clear(a.revoked)
-	return nil
-}
-
-func (a *adapter) ensureCapacityLocked(now time.Time) {
-	if len(a.revoked) < maxRevoked {
-		return
-	}
-	a.pruneExpiredLocked(now)
-	if len(a.revoked) >= maxRevoked {
-		a.evictOldestLocked()
-	}
-}
-
-func (a *adapter) pruneExpiredLocked(now time.Time) {
-	for tok, until := range a.revoked {
-		if !now.Before(until) {
-			delete(a.revoked, tok)
-		}
-	}
-}
-
-func (a *adapter) evictOldestLocked() {
-	for a.head < len(a.order) {
-		tok := a.order[a.head]
-		a.head++
-		if _, ok := a.revoked[tok]; ok {
-			delete(a.revoked, tok)
-			break
-		}
-	}
-	if a.head > 1024 && a.head > len(a.order)/2 {
-		a.order = append([]string(nil), a.order[a.head:]...)
-		a.head = 0
-	}
-}
-
-func (a *adapter) startPruner() {
-	a.wg.Add(1)
-	go func() {
-		defer a.wg.Done()
-		defer func() { _ = recover() }()
-		// Jitter the 1m interval to avoid thundering herd when many
-		// adapters start together (e.g. rolling deploy).
-		//nolint:gosec // math/rand suffices for non-security jitter; crypto/rand would also read the test-swappable randReader global.
-		jitter := time.Duration(mrand.Int63n(int64(10*time.Second))) - 5*time.Second
-		ticker := newTicker(time.Minute + jitter)
-		defer ticker.Stop()
-		for {
-			select {
-			case <-a.done:
-				return
-			case now := <-ticker.C:
-				a.pruneOnce(now)
-			}
-		}
-	}()
-}
-
-// pruneOnce drops expired revocations under lock. Split from the loop
-// for direct unit testing.
-func (a *adapter) pruneOnce(now time.Time) {
-	a.mu.Lock()
-	defer a.mu.Unlock()
-	a.pruneExpiredLocked(now)
+	return a.revocation.Close()
 }
