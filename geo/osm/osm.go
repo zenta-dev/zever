@@ -126,8 +126,8 @@ func (m *osmGeo) Geocode(ctx context.Context, address string) ([]geo.Location, e
 	if err != nil {
 		return nil, err
 	}
-	if err := checkStatus(resp, body); err != nil {
-		return nil, err
+	if statusErr := checkStatus(resp, body); statusErr != nil {
+		return nil, statusErr
 	}
 
 	results, err := nominatimSearchCodec.Decode(body)
@@ -189,8 +189,8 @@ func (m *osmGeo) ReverseGeocode(ctx context.Context, lat, lng float64) ([]geo.Ad
 	if err != nil {
 		return nil, err
 	}
-	if err := checkStatus(resp, body); err != nil {
-		return nil, err
+	if statusErr := checkStatus(resp, body); statusErr != nil {
+		return nil, statusErr
 	}
 
 	// Trim space to detect empty body.

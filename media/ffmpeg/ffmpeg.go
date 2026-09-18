@@ -364,8 +364,8 @@ func Probe(ctx context.Context, ffprobe, path string) (ProbeResult, error) {
 		return res, fmt.Errorf("%w: output exceeds %d bytes: %q", ErrProbeFailed, maxProbeOutput, errSnippet(&stderr))
 	}
 
-	if err := cmd.Wait(); err != nil {
-		return res, fmt.Errorf("%w (%s): %q", ErrProbeFailed, err, errSnippet(&stderr)) //nolint:errorlint // spec format keeps sentinel via %w with exit text and capped stderr.
+	if waitErr := cmd.Wait(); waitErr != nil {
+		return res, fmt.Errorf("%w (%s): %q", ErrProbeFailed, waitErr, errSnippet(&stderr)) //nolint:errorlint // spec format keeps sentinel via %w with exit text and capped stderr.
 	}
 
 	res, err = probeCodec.Decode(data)
