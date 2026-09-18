@@ -231,8 +231,6 @@ func TestRenderRunError(t *testing.T) {
 }
 
 func TestRenderPDF(t *testing.T) {
-	t.Parallel()
-
 	if !hasChrome() {
 		t.Skip("no Chrome binary found, skipping render test")
 	}
@@ -257,8 +255,6 @@ func TestRenderPDF(t *testing.T) {
 }
 
 func TestRenderPNG(t *testing.T) {
-	t.Parallel()
-
 	if !hasChrome() {
 		t.Skip("no Chrome binary found, skipping render test")
 	}
@@ -283,8 +279,6 @@ func TestRenderPNG(t *testing.T) {
 }
 
 func TestRenderJPG(t *testing.T) {
-	t.Parallel()
-
 	if !hasChrome() {
 		t.Skip("no Chrome binary found, skipping render test")
 	}
@@ -309,8 +303,6 @@ func TestRenderJPG(t *testing.T) {
 }
 
 func TestRenderJPGHighQuality(t *testing.T) {
-	t.Parallel()
-
 	if !hasChrome() {
 		t.Skip("no Chrome binary found, skipping render test")
 	}
@@ -335,8 +327,6 @@ func TestRenderJPGHighQuality(t *testing.T) {
 }
 
 func TestRenderPNGWithTmpDir(t *testing.T) {
-	t.Parallel()
-
 	if !hasChrome() {
 		t.Skip("no Chrome binary found, skipping render test")
 	}

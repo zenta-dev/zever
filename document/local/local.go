@@ -53,6 +53,11 @@ func Open(o document.Options) (document.Document, error) {
 
 	allocOpts = append(allocOpts, chromedp.DefaultExecAllocatorOptions[:]...)
 	allocOpts = append(allocOpts, chromedp.Headless)
+	// chromedp's own default wsURLReadTimeout (20s) is independent of
+	// d.timeout and can't be raised via document.Options otherwise, so a
+	// slow browser launch on a loaded CI runner fails even when the
+	// caller configured a longer render timeout.
+	allocOpts = append(allocOpts, chromedp.WSURLReadTimeout(d.timeout))
 
 	// Some CI/container runners have unprivileged user namespaces disabled
 	// (e.g. AppArmor-restricted Ubuntu images), which makes Chrome's own

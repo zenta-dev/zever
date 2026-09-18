@@ -139,6 +139,9 @@ func (f *fakeClient) Close() error {
 }
 
 func (f *fakeClient) CollectionExists(_ context.Context, _ string) (bool, error) {
+	f.mu.Lock()
+	defer f.mu.Unlock()
+
 	if f.recheckSet {
 		f.recheckSet = false
 		return f.exists, f.recheckErr
@@ -168,6 +171,9 @@ func (f *fakeClient) CreateCollection(_ context.Context, req *qdrant.CreateColle
 }
 
 func (f *fakeClient) GetCollectionInfo(_ context.Context, _ string) (*qdrant.CollectionInfo, error) {
+	f.mu.Lock()
+	defer f.mu.Unlock()
+
 	if f.infoErr != nil {
 		return nil, f.infoErr
 	}
