@@ -22,7 +22,17 @@ type ConnectOptions struct {
 	// DB is the Redis database index.
 	DB int `json:"db" toml:"db" yaml:"db"`
 	// TLS enables TLS with a TLS 1.2 version floor for plain addresses.
+	//
+	// TLS is opt-in; the zero value connects in plaintext, meaning session
+	// data, cache data, and the Redis password itself are sent unencrypted
+	// unless TLS is explicitly enabled here or via a rediss:// address. Set
+	// RequireTLS to fail fast instead of silently connecting in plaintext.
 	TLS bool `json:"tls" toml:"tls" yaml:"tls"`
+	// RequireTLS fails connection setup instead of silently connecting in
+	// plaintext when the resolved address would not use TLS (TLS is false
+	// and the address isn't rediss://). It defaults to false, preserving
+	// the historical plaintext-allowed behavior.
+	RequireTLS bool `json:"require_tls" toml:"require_tls" yaml:"require_tls"`
 }
 
 // ValidateAddr checks a Redis host:port address.

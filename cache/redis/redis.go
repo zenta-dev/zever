@@ -35,6 +35,7 @@ func connOptions(opts cache.Options) zredis.Options {
 		Password:        opts.Password,
 		DB:              opts.DB,
 		TLS:             opts.TLS,
+		RequireTLS:      opts.RequireTLS,
 		PoolSize:        opts.PoolSize,
 		MinIdleConns:    opts.MinIdleConns,
 		PoolTimeout:     opts.PoolTimeout,
