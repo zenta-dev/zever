@@ -146,6 +146,50 @@ func TestRateLimit_failsOpenOnLimiterError(t *testing.T) {
 	}
 }
 
+func TestRateLimit_failOpenExplicitOnLimiterError(t *testing.T) {
+	limiter := &fakeLimiter{err: errors.New("redis down")}
+
+	ran := false
+	handler := RateLimit(limiter, RemoteAddrKey, WithFailMode(FailOpen))(http.HandlerFunc(func(w http.ResponseWriter, _ *http.Request) {
+		ran = true
+		w.WriteHeader(http.StatusOK)
+	}))
+
+	req := httptest.NewRequestWithContext(context.Background(), http.MethodGet, "/", nil)
+	req.RemoteAddr = "1.2.3.4:5555"
+
+	rec := httptest.NewRecorder()
+	handler.ServeHTTP(rec, req)
+
+	if !ran {
+		t.Fatalf("explicit FailOpen must pass the request through on a limiter error")
+	}
+	if rec.Code != http.StatusOK {
+		t.Fatalf("status = %d, want 200", rec.Code)
+	}
+}
+
+func TestRateLimit_failClosedOnLimiterError(t *testing.T) {
+	limiter := &fakeLimiter{err: errors.New("redis down")}
+
+	handler := RateLimit(limiter, RemoteAddrKey, WithFailMode(FailClosed))(http.HandlerFunc(func(http.ResponseWriter, *http.Request) {
+		t.Error("handler must not run when FailClosed and the limiter errors")
+	}))
+
+	req := httptest.NewRequestWithContext(context.Background(), http.MethodGet, "/", nil)
+	req.RemoteAddr = "1.2.3.4:5555"
+
+	rec := httptest.NewRecorder()
+	handler.ServeHTTP(rec, req)
+
+	if rec.Code != http.StatusTooManyRequests {
+		t.Fatalf("status = %d, want 429", rec.Code)
+	}
+	if got := rec.Body.String(); got != "{\"error\":\"rate limit exceeded\"}\n" {
+		t.Fatalf("body = %q, want exact deny JSON", got)
+	}
+}
+
 func TestRemoteAddrKey(t *testing.T) {
 	tests := []struct {
 		name       string
@@ -247,5 +291,37 @@ func TestRateLimitUnaryServerInterceptor_failsOpenOnLimiterError(t *testing.T) {
 	resp, err := interceptor(context.Background(), "ok", &grpc.UnaryServerInfo{FullMethod: "/svc/Method"}, handler)
 	if err != nil || resp != "ok" {
 		t.Fatalf("resp, err = %v, %v, want %q, nil", resp, err, "ok")
+	}
+}
+
+func TestRateLimitUnaryServerInterceptor_failOpenExplicitOnLimiterError(t *testing.T) {
+	limiter := &fakeLimiter{err: errors.New("redis down")}
+	interceptor := RateLimitUnaryServerInterceptor(limiter, func(context.Context) string { return "key" }, WithFailMode(FailOpen))
+
+	handler := func(_ context.Context, req any) (any, error) { return req, nil }
+
+	resp, err := interceptor(context.Background(), "ok", &grpc.UnaryServerInfo{FullMethod: "/svc/Method"}, handler)
+	if err != nil || resp != "ok" {
+		t.Fatalf("resp, err = %v, %v, want %q, nil", resp, err, "ok")
+	}
+}
+
+func TestRateLimitUnaryServerInterceptor_failClosedOnLimiterError(t *testing.T) {
+	limiter := &fakeLimiter{err: errors.New("redis down")}
+	interceptor := RateLimitUnaryServerInterceptor(limiter, func(context.Context) string { return "key" }, WithFailMode(FailClosed))
+
+	handler := func(context.Context, any) (any, error) {
+		t.Error("handler must not run when FailClosed and the limiter errors")
+		return nil, errHandlerRan
+	}
+
+	_, err := interceptor(context.Background(), "req", &grpc.UnaryServerInfo{FullMethod: "/svc/Method"}, handler)
+
+	st, ok := status.FromError(err)
+	if !ok {
+		t.Fatalf("err = %v, want a gRPC status error", err)
+	}
+	if st.Code() != codes.ResourceExhausted {
+		t.Fatalf("code = %v, want codes.ResourceExhausted", st.Code())
 	}
 }
