@@ -32,6 +32,7 @@ config file, overlaid by environment variables. Later layers win:
 | geo           | google, static, osm                 |
 | i18n          | embed, remote                       |
 | idempotency   | memory, redis                       |
+| lock          | memory, redis                       |
 | log           | noop, zerolog, slog                 |
 | mailer        | log, smtp                           |
 | media         | local, s3                           |
@@ -45,6 +46,7 @@ config file, overlaid by environment variables. Later layers win:
 | router        | fiber, stdhttp                      |
 | scheduler     | embedded                            |
 | search        | postgres, meilisearch, sqlite       |
+| secrets       | env                                  |
 | session       | memory                              |
 | storage       | local, s3, r2                       |
 | tenant        | single, header                      |
@@ -55,7 +57,8 @@ config file, overlaid by environment variables. Later layers win:
 Defaults pick the zero-infra adapter per service (ai has none — all backends
 need keys — so it defaults to `anthropic` and requires an API key via
 file/env; mailer defaults to `log` with a dummy localhost SMTP host/port
-because its `Validate` requires them).
+because its `Validate` requires them; secrets defaults to `env` with a
+`ZEVER` prefix because its `Validate` requires a non-empty prefix).
 
 ## File example (YAML)
 
