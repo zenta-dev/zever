@@ -3,6 +3,7 @@ package lrucache
 import (
 	"fmt"
 	"sync"
+	"sync/atomic"
 	"testing"
 )
 
@@ -190,6 +191,222 @@ func TestNew_NonPositiveCapacityUsesDefault(t *testing.T) {
 			t.Fatalf("capacity %d: Len() = %d, want %d", capacity, c.Len(), defaultCapacity)
 		}
 	}
+}
+
+func TestCache_GetOrCompute(t *testing.T) {
+	t.Run("absent key computes and stores", func(t *testing.T) {
+		c := New[string, int](4)
+		calls := 0
+		v, ok := c.GetOrCompute("a", func() int {
+			calls++
+			return 42
+		})
+		if ok {
+			t.Fatalf("GetOrCompute(a) ok = true, want false for absent key")
+		}
+		if v != 42 {
+			t.Fatalf("GetOrCompute(a) = %v, want 42", v)
+		}
+		if calls != 1 {
+			t.Fatalf("compute called %d times, want 1", calls)
+		}
+		if got, ok := c.Get("a"); !ok || got != 42 {
+			t.Fatalf("Get(a) after GetOrCompute = (%v, %v), want (42, true)", got, ok)
+		}
+	})
+
+	t.Run("present key returns existing value without computing", func(t *testing.T) {
+		c := New[string, int](4)
+		c.Put("a", 1)
+
+		called := false
+		v, ok := c.GetOrCompute("a", func() int {
+			called = true
+			return 999
+		})
+		if !ok {
+			t.Fatalf("GetOrCompute(a) ok = false, want true for present key")
+		}
+		if v != 1 {
+			t.Fatalf("GetOrCompute(a) = %v, want 1 (existing value)", v)
+		}
+		if called {
+			t.Fatalf("compute must not be called when key is present")
+		}
+	})
+
+	t.Run("subject to capacity eviction and fires OnEvict", func(t *testing.T) {
+		var mu sync.Mutex
+		var evicted []string
+
+		c := New[string, int](2, WithOnEvict[string, int](func(k string, v int) {
+			mu.Lock()
+			evicted = append(evicted, fmt.Sprintf("%s=%d", k, v))
+			mu.Unlock()
+		}))
+
+		c.Put("a", 1)
+		c.Put("b", 2)
+		c.GetOrCompute("c", func() int { return 3 }) // should evict a (LRU)
+
+		mu.Lock()
+		defer mu.Unlock()
+		if len(evicted) != 1 || evicted[0] != "a=1" {
+			t.Fatalf("evicted = %v, want [a=1]", evicted)
+		}
+	})
+
+	t.Run("moves existing key to front of recency list", func(t *testing.T) {
+		c := New[string, int](2)
+		c.Put("a", 1)
+		c.Put("b", 2)
+		c.GetOrCompute("a", func() int { return 999 }) // touches a, b becomes LRU
+		c.Put("c", 3)                                  // should evict b, not a
+
+		if _, ok := c.Get("b"); ok {
+			t.Fatalf("expected b to be evicted")
+		}
+		if v, ok := c.Get("a"); !ok || v != 1 {
+			t.Fatalf("expected a to survive, got (%v, %v)", v, ok)
+		}
+	})
+}
+
+// TestCache_GetOrCompute_ConcurrentSingleCompute races many goroutines
+// through GetOrCompute on the same absent key and asserts compute was
+// called exactly once and every goroutine observed the same resulting
+// value, proving the check-and-insert is atomic under concurrent access.
+// Run with -race to exercise the actual data race the atomicity guarantee
+// protects against.
+func TestCache_GetOrCompute_ConcurrentSingleCompute(t *testing.T) {
+	c := New[string, int](4)
+
+	var computeCalls int32
+	var wg sync.WaitGroup
+
+	const goroutines = 64
+	results := make([]int, goroutines)
+
+	wg.Add(goroutines)
+	for g := 0; g < goroutines; g++ {
+		go func(g int) {
+			defer wg.Done()
+			v, _ := c.GetOrCompute("shared", func() int {
+				atomic.AddInt32(&computeCalls, 1)
+				return 1234
+			})
+			results[g] = v
+		}(g)
+	}
+	wg.Wait()
+
+	if got := atomic.LoadInt32(&computeCalls); got != 1 {
+		t.Fatalf("compute called %d times, want exactly 1", got)
+	}
+	for i, v := range results {
+		if v != 1234 {
+			t.Fatalf("goroutine %d observed value %v, want 1234", i, v)
+		}
+	}
+	if c.Len() != 1 {
+		t.Fatalf("Len() = %d, want 1", c.Len())
+	}
+}
+
+func TestCache_Clear(t *testing.T) {
+	t.Run("clear with nil callback empties the cache", func(t *testing.T) {
+		c := New[string, int](4)
+		c.Put("a", 1)
+		c.Put("b", 2)
+
+		c.Clear(nil)
+
+		if c.Len() != 0 {
+			t.Fatalf("Len() = %d, want 0 after Clear", c.Len())
+		}
+		if _, ok := c.Get("a"); ok {
+			t.Fatalf("expected a to be gone after Clear")
+		}
+		if _, ok := c.Get("b"); ok {
+			t.Fatalf("expected b to be gone after Clear")
+		}
+	})
+
+	t.Run("clear with callback invokes it once per entry", func(t *testing.T) {
+		c := New[string, int](4)
+		c.Put("a", 1)
+		c.Put("b", 2)
+		c.Put("c", 3)
+
+		var mu sync.Mutex
+		got := map[string]int{}
+		c.Clear(func(k string, v int) {
+			mu.Lock()
+			got[k] = v
+			mu.Unlock()
+		})
+
+		want := map[string]int{"a": 1, "b": 2, "c": 3}
+		if len(got) != len(want) {
+			t.Fatalf("Clear callback fired for %v, want %v", got, want)
+		}
+		for k, v := range want {
+			if got[k] != v {
+				t.Fatalf("Clear callback got %s=%v, want %s=%v", k, got[k], k, v)
+			}
+		}
+		if c.Len() != 0 {
+			t.Fatalf("Len() = %d, want 0 after Clear", c.Len())
+		}
+	})
+
+	t.Run("clear on empty cache with callback fires nothing", func(t *testing.T) {
+		c := New[string, int](4)
+		fired := false
+		c.Clear(func(_ string, _ int) { fired = true })
+		if fired {
+			t.Fatalf("Clear callback must not fire on an empty cache")
+		}
+	})
+
+	t.Run("clear does not invoke OnEvict", func(t *testing.T) {
+		onEvictFired := false
+		c := New[string, int](4, WithOnEvict[string, int](func(_ string, _ int) {
+			onEvictFired = true
+		}))
+		c.Put("a", 1)
+		c.Put("b", 2)
+
+		clearFired := 0
+		c.Clear(func(_ string, _ int) { clearFired++ })
+
+		if onEvictFired {
+			t.Fatalf("Clear must not invoke OnEvict")
+		}
+		if clearFired != 2 {
+			t.Fatalf("Clear callback fired %d times, want 2", clearFired)
+		}
+	})
+
+	t.Run("cache is usable after Clear", func(t *testing.T) {
+		c := New[string, int](2)
+		c.Put("a", 1)
+		c.Clear(nil)
+
+		c.Put("x", 10)
+		c.Put("y", 20)
+		c.Put("z", 30) // over capacity, should evict x
+
+		if _, ok := c.Get("x"); ok {
+			t.Fatalf("expected x to be evicted after refill past capacity")
+		}
+		if v, ok := c.Get("y"); !ok || v != 20 {
+			t.Fatalf("Get(y) = (%v, %v), want (20, true)", v, ok)
+		}
+		if v, ok := c.Get("z"); !ok || v != 30 {
+			t.Fatalf("Get(z) = (%v, %v), want (30, true)", v, ok)
+		}
+	})
 }
 
 func TestCache_ConcurrentAccess(_ *testing.T) {
