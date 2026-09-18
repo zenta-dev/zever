@@ -3,6 +3,7 @@ package pgvector
 import (
 	"context"
 	"errors"
+	"fmt"
 	"math"
 	"os"
 	"strings"
@@ -815,6 +816,45 @@ func TestUpsertBatch_DimensionMismatch(t *testing.T) {
 
 	if len(pool.execSQL) != 0 {
 		t.Fatalf("UpsertBatch() issued exec on bad dimension, want none")
+	}
+}
+
+// TestUpsertBatch_Chunked proves a batch larger than maxUpsertBatchRows is
+// split into multiple sequential INSERT statements instead of one unbounded
+// statement that could overflow Postgres's bind-parameter limit.
+func TestUpsertBatch_Chunked(t *testing.T) {
+	t.Parallel()
+
+	pool := &fakePool{}
+	s := &Store{db: pool, dim: 3}
+
+	const total = maxUpsertBatchRows + 500
+
+	vecs := make([]vectorstore.Vector, total)
+	for i := range vecs {
+		vecs[i] = vectorstore.Vector{ID: fmt.Sprintf("id-%d", i), Embedding: []float32{1, 0, 0}}
+	}
+
+	if err := s.UpsertBatch(context.Background(), vecs); err != nil {
+		t.Fatalf("UpsertBatch() = %v, want nil", err)
+	}
+
+	wantChunks := 2
+	if len(pool.execSQL) != wantChunks {
+		t.Fatalf("UpsertBatch() issued %d exec calls, want %d", len(pool.execSQL), wantChunks)
+	}
+
+	// First chunk carries maxUpsertBatchRows rows (upsertRowCols placeholders
+	// each), the second carries the 500-row remainder.
+	firstArgsWant := maxUpsertBatchRows * upsertRowCols
+	secondArgsWant := 500 * upsertRowCols
+
+	if !strings.Contains(pool.execSQL[0], fmt.Sprintf("$%d", firstArgsWant)) {
+		t.Fatalf("first chunk SQL missing final placeholder $%d", firstArgsWant)
+	}
+
+	if !strings.Contains(pool.execSQL[1], fmt.Sprintf("$%d", secondArgsWant)) {
+		t.Fatalf("second chunk SQL missing final placeholder $%d", secondArgsWant)
 	}
 }
 
