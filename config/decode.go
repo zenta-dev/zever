@@ -32,6 +32,8 @@ type ServiceConfig struct {
 // Keys inside a service block are strict: anything besides adapter and
 // options fails with a DecodeError naming the service. A null or empty
 // block decodes to the zero ServiceConfig.
+// decodeFile intentionally stays on raw encoding/json (not codec.Codec[V])
+// because it needs DisallowUnknownFields, which codec.Codec[V] cannot express.
 func decodeFile(path string) (map[string]ServiceConfig, error) {
 	data, err := os.ReadFile(path)
 	if err != nil {
@@ -68,6 +70,9 @@ func decodeFile(path string) (map[string]ServiceConfig, error) {
 // unknown keys inside the block are rejected, and YAML scalars keep their
 // types (ints stay ints, duration strings stay strings) until the typed
 // decode reports them.
+// decodeServiceEntry intentionally stays on raw encoding/json (not
+// codec.Codec[V]) because it needs DisallowUnknownFields, which
+// codec.Codec[V] cannot express.
 func decodeServiceEntry(name string, entry any) (ServiceConfig, error) {
 	var sc ServiceConfig
 	if entry == nil {
@@ -95,6 +100,8 @@ func decodeServiceEntry(name string, entry any) (ServiceConfig, error) {
 // ignores case only, so "maxconns" matches MaxConns but "max_conns" does
 // not (underscores are significant). Duplicate keys are last-wins for
 // JSON input but a syntax error for YAML input.
+// decodeOptions intentionally stays on raw encoding/json (not codec.Codec[V])
+// because it needs DisallowUnknownFields, which codec.Codec[V] cannot express.
 func decodeOptions[T any](service string, m map[string]any) (T, error) {
 	var zero T
 	if len(m) == 0 {

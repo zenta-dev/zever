@@ -2,7 +2,6 @@ package redis
 
 import (
 	"context"
-	"encoding/json"
 	"fmt"
 	"strings"
 	"sync"
@@ -162,7 +161,7 @@ func (a *adapter) Publish(ctx context.Context, topic string, payload eventbus.Pa
 	// wireMessage is {string, []byte, map[string]string}: encoding/json
 	// cannot fail on it (base64 []byte, string map keys), so the error is
 	// provably infallible and discarded.
-	b, _ := json.Marshal(wm)
+	b, _ := wireCodec.Encode(wm)
 
 	if len(b) > eventbus.MaxMessageSize {
 		return fmt.Errorf("%w: envelope %d > %d", eventbus.ErrPayloadTooLarge, len(b), eventbus.MaxMessageSize)

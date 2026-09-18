@@ -13,7 +13,6 @@ package redis
 
 import (
 	"context"
-	"encoding/json"
 	"errors"
 	"fmt"
 	"sync/atomic"
@@ -21,6 +20,7 @@ import (
 
 	goredis "github.com/redis/go-redis/v9"
 
+	"github.com/zenta-dev/zever/codec"
 	zredis "github.com/zenta-dev/zever/internal/redis"
 	"github.com/zenta-dev/zever/session"
 )
@@ -30,6 +30,9 @@ const defaultPrefix = "sess"
 
 // Compile-time check that store implements session.Store.
 var _ session.Store = (*store)(nil)
+
+// sessionCodec (de)serializes wireSession records stored per key.
+var sessionCodec = codec.JSONCodec[wireSession]{}
 
 // wireSession is the JSON value stored per key. Times are Unix nanoseconds
 // (0 means zero time); Data round-trips through JSON, so numbers decode as
@@ -154,8 +157,9 @@ func (s *store) Create(ctx context.Context, ttl time.Duration) (session.Session,
 
 	// wireSession is {map, int64 x3}: encoding/json cannot fail on it
 	// (nil maps, integers), so the error is provably infallible and
-	// discarded.
-	buf, _ := json.Marshal(toWire(sess))
+	// discarded. codec.JSONCodec only wraps the same underlying error,
+	// so that reasoning still holds.
+	buf, _ := sessionCodec.Encode(toWire(sess))
 
 	if err := s.client.Set(ctx, s.key(sess.ID), buf, ttl).Err(); err != nil {
 		return session.Session{}, fmt.Errorf("redis: create set: %w", err)
@@ -190,8 +194,8 @@ func (s *store) Get(ctx context.Context, id string) (session.Session, error) {
 		return session.Session{}, fmt.Errorf("redis: get: %w", err)
 	}
 
-	var w wireSession
-	if err := json.Unmarshal(raw, &w); err != nil {
+	w, err := sessionCodec.Decode(raw)
+	if err != nil {
 		// Best-effort cleanup like the expired path below; the error
 		// itself stays generic-shaped (wrapped decode) without payload.
 		_ = s.client.Del(ctx, s.key(id)).Err()
@@ -276,8 +280,8 @@ func (s *store) saveTx(ctx context.Context, tx *goredis.Tx, key string, sess ses
 	case err != nil:
 		return fmt.Errorf("redis: save get: %w", err)
 	default:
-		var existing wireSession
-		if derr := json.Unmarshal(raw, &existing); derr != nil {
+		existing, derr := sessionCodec.Decode(raw)
+		if derr != nil {
 			// Corrupt existing record: overwrite fresh (fail-closed
 			// forward); defaults stand.
 			break
@@ -301,7 +305,7 @@ func (s *store) saveTx(ctx context.Context, tx *goredis.Tx, key string, sess ses
 		expiresAt = cur.ExpiresAt
 	}
 
-	buf, err := json.Marshal(wireSession{
+	buf, err := sessionCodec.Encode(wireSession{
 		Data:      sess.Data,
 		CreatedAt: unixNano(createdAt),
 		UpdatedAt: unixNano(now),
