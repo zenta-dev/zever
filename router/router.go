@@ -4,7 +4,8 @@ import (
 	"fmt"
 	"net/http"
 	"strings"
-	"sync"
+
+	"github.com/zenta-dev/zever/internal/registry"
 )
 
 // Router is the interface that HTTP router adapters must implement.
@@ -31,9 +32,10 @@ type Group interface {
 // Factory creates a Router from typed options.
 type Factory func(opts Options) (Router, error)
 
-var (
-	mu        sync.RWMutex
-	factories = make(map[Adapter]Factory)
+var factories = registry.New[Adapter, Factory](
+	ErrNilFactory,
+	func(a Adapter) error { return &DuplicateAdapterError{Adapter: a} },
+	func(a Adapter) error { return &UnknownAdapterError{Adapter: a} },
 )
 
 // standardMethods lists the recognized HTTP methods.
@@ -60,16 +62,7 @@ func Register(a Adapter, f Factory) error {
 		return fmt.Errorf("%w for adapter %s", ErrNilFactory, a)
 	}
 
-	mu.Lock()
-	defer mu.Unlock()
-
-	if _, dup := factories[a]; dup {
-		return &DuplicateAdapterError{Adapter: a}
-	}
-
-	factories[a] = f
-
-	return nil
+	return factories.Register(a, f)
 }
 
 // Open creates a Router for adapter using the registered Factory and opts.
@@ -79,12 +72,9 @@ func Open(a Adapter, opts Options) (Router, error) {
 		return nil, err
 	}
 
-	mu.RLock()
-	factory, ok := factories[a]
-	mu.RUnlock()
-
-	if !ok {
-		return nil, &UnknownAdapterError{Adapter: a}
+	factory, err := factories.Lookup(a)
+	if err != nil {
+		return nil, err
 	}
 
 	r, err := factory(opts)
