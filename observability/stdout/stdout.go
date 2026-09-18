@@ -5,13 +5,13 @@ import (
 	"crypto/rand"
 	"encoding/binary"
 	"encoding/hex"
-	"encoding/json"
 	"io"
 	"os"
 	"sync"
 	"sync/atomic"
 	"time"
 
+	"github.com/zenta-dev/zever/codec"
 	"github.com/zenta-dev/zever/observability"
 )
 
@@ -33,7 +33,8 @@ type line struct {
 
 type shared struct {
 	mu      sync.Mutex
-	enc     *json.Encoder
+	w       io.Writer
+	codec   codec.Codec[line]
 	verbose bool
 	limit   int
 }
@@ -41,7 +42,11 @@ type shared struct {
 func (s *shared) emit(l line) {
 	s.mu.Lock()
 	defer s.mu.Unlock()
-	_ = s.enc.Encode(l)
+	data, err := s.codec.Encode(l)
+	if err != nil {
+		return
+	}
+	_, _ = s.w.Write(append(data, '\n'))
 }
 
 type provider struct {
@@ -83,7 +88,7 @@ func NewWithWriter(opts observability.Options, w io.Writer) (observability.Provi
 		limit = observability.MaxValueLen
 	}
 
-	sh := &shared{enc: json.NewEncoder(w), verbose: opts.Verbose, limit: limit}
+	sh := &shared{w: w, codec: codec.JSONCodec[line]{}, verbose: opts.Verbose, limit: limit}
 
 	return &provider{tracer: &tracer{sh: sh}, metrics: &metrics{sh: sh}}, nil
 }

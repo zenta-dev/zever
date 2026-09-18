@@ -2,7 +2,6 @@ package gemini
 
 import (
 	"context"
-	"encoding/json"
 	"errors"
 	"fmt"
 	"net/http"
@@ -12,9 +11,13 @@ import (
 	"google.golang.org/genai"
 
 	"github.com/zenta-dev/zever/ai"
+	"github.com/zenta-dev/zever/codec"
 	"github.com/zenta-dev/zever/internal/endpoint"
 	"github.com/zenta-dev/zever/internal/httpclient"
 )
+
+// funcArgsCodec handles JSON encoding/decoding of function-call argument maps.
+var funcArgsCodec = codec.JSONCodec[map[string]any]{}
 
 // adapter implements ai.AI via Google Generative AI.
 type adapter struct {
@@ -149,7 +152,7 @@ func (a *adapter) Stream(ctx context.Context, model string, messages []ai.Messag
 					}
 
 					if p.FunctionCall != nil {
-						args, _ := json.Marshal(p.FunctionCall.Args) //nolint:errcheck
+						args, _ := funcArgsCodec.Encode(p.FunctionCall.Args) //nolint:errcheck
 
 						ch <- ai.StreamChunk{
 							ToolCallID:    "",
@@ -331,7 +334,7 @@ func toGenaiContents(messages []ai.Message) ([]*genai.Content, *genai.Content) {
 			for _, tc := range m.ToolCalls {
 				var args map[string]any
 				if tc.Arguments != "" {
-					_ = json.Unmarshal([]byte(tc.Arguments), &args)
+					args, _ = funcArgsCodec.Decode([]byte(tc.Arguments))
 				}
 
 				if args == nil {
@@ -351,8 +354,11 @@ func toGenaiContents(messages []ai.Message) ([]*genai.Content, *genai.Content) {
 		case ai.RoleTool:
 			resp := map[string]any{}
 			if m.Content != "" {
-				if err := json.Unmarshal([]byte(m.Content), &resp); err != nil {
+				decoded, err := funcArgsCodec.Decode([]byte(m.Content))
+				if err != nil {
 					resp = map[string]any{"result": m.Content}
+				} else {
+					resp = decoded
 				}
 			}
 
@@ -403,7 +409,7 @@ func extractGeneration(resp *genai.GenerateContentResponse) (string, []ai.ToolCa
 			}
 
 			if p.FunctionCall != nil {
-				argsJSON, err := json.Marshal(p.FunctionCall.Args)
+				argsJSON, err := funcArgsCodec.Encode(p.FunctionCall.Args)
 				if err != nil || p.FunctionCall.Args == nil {
 					argsJSON = []byte("{}")
 				}
@@ -596,5 +602,4 @@ func mapAPIError(e genai.APIError) error {
 	}
 }
 
-var _ = json.Marshal
 var _ = errors.Is

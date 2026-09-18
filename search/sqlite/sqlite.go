@@ -3,7 +3,6 @@ package sqlite
 import (
 	"context"
 	"database/sql"
-	"encoding/json"
 	"errors"
 	"fmt"
 	"strings"
@@ -12,8 +11,11 @@ import (
 
 	"modernc.org/sqlite"
 
+	"github.com/zenta-dev/zever/codec"
 	"github.com/zenta-dev/zever/search"
 )
+
+var metadataCodec = codec.JSONCodec[map[string]any]{}
 
 // DDL statements, one Exec each.
 const (
@@ -103,7 +105,7 @@ func (s *Store) Index(ctx context.Context, doc search.Document) error {
 
 	meta["content"] = doc.Content
 
-	metaBlob, err := json.Marshal(meta)
+	metaBlob, err := metadataCodec.Encode(meta)
 	if err != nil {
 		return fmt.Errorf("sqlite: index: %w", err)
 	}
@@ -245,7 +247,10 @@ func (s *Store) Search(ctx context.Context, query string, opts search.QueryOptio
 		var meta map[string]any
 
 		if metaJSON != nil {
-			if unmarshalErr := json.Unmarshal(metaJSON, &meta); unmarshalErr != nil {
+			var unmarshalErr error
+
+			meta, unmarshalErr = metadataCodec.Decode(metaJSON)
+			if unmarshalErr != nil {
 				return search.Result{}, fmt.Errorf("sqlite: search: scan: %w", unmarshalErr)
 			}
 		}

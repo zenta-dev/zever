@@ -2,7 +2,6 @@ package anthropic
 
 import (
 	"context"
-	"encoding/json"
 	"errors"
 	"fmt"
 	"math"
@@ -16,8 +15,11 @@ import (
 	"github.com/anthropics/anthropic-sdk-go/option"
 
 	"github.com/zenta-dev/zever/ai"
+	"github.com/zenta-dev/zever/codec"
 	"github.com/zenta-dev/zever/internal/httpclient"
 )
+
+var toolArgsCodec = codec.JSONCodec[map[string]any]{}
 
 type adapter struct {
 	client *anthropic.Client
@@ -210,8 +212,8 @@ func (a *adapter) Generate(ctx context.Context, model string, messages []ai.Mess
 				for _, tc := range m.ToolCalls {
 					var input any = map[string]any{}
 					if tc.Arguments != "" {
-						var obj map[string]any
-						if err := json.Unmarshal([]byte(tc.Arguments), &obj); err == nil && obj != nil {
+						obj, err := toolArgsCodec.Decode([]byte(tc.Arguments))
+						if err == nil && obj != nil {
 							input = obj
 						} else {
 							input = map[string]any{}

@@ -2,13 +2,13 @@ package static
 
 import (
 	"context"
-	"encoding/json"
 	"fmt"
 	"math"
 	"os"
 	"path/filepath"
 	"strings"
 
+	"github.com/zenta-dev/zever/codec"
 	"github.com/zenta-dev/zever/geo"
 )
 
@@ -21,6 +21,8 @@ type city struct {
 type staticGeo struct {
 	cities []city
 }
+
+var citiesCodec = codec.JSONCodec[[]city]{}
 
 // New creates a static geo adapter from typed options.
 func New(opts geo.Options) (geo.Geo, error) {
@@ -39,8 +41,8 @@ func New(opts geo.Options) (geo.Geo, error) {
 		return nil, fmt.Errorf("geo: static: read cities: %w", err)
 	}
 
-	var cities []city
-	if err := json.Unmarshal(data, &cities); err != nil {
+	cities, err := citiesCodec.Decode(data)
+	if err != nil {
 		return nil, fmt.Errorf("geo: static: parse cities: %w", err)
 	}
 

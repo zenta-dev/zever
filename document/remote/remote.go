@@ -3,7 +3,6 @@ package remote
 import (
 	"bytes"
 	"context"
-	"encoding/json"
 	"errors"
 	"fmt"
 	"io"
@@ -11,6 +10,7 @@ import (
 	"net/http"
 	"strings"
 
+	"github.com/zenta-dev/zever/codec"
 	"github.com/zenta-dev/zever/document"
 	"github.com/zenta-dev/zever/internal/endpoint"
 	"github.com/zenta-dev/zever/internal/httpclient"
@@ -31,6 +31,11 @@ type renderRequest struct {
 type renderResponse struct {
 	Data []byte `json:"data"`
 }
+
+var (
+	renderRequestCodec  = codec.JSONCodec[renderRequest]{}
+	renderResponseCodec = codec.JSONCodec[renderResponse]{}
+)
 
 // Open creates a remote document renderer from the given Options.
 func Open(o document.Options) (document.Document, error) {
@@ -81,7 +86,7 @@ func (d *driver) Render(ctx context.Context, source []byte, format document.Outp
 	}
 
 	// renderRequest holds only []byte and string fields, so Marshal cannot fail.
-	reqBody, _ := json.Marshal(renderRequest{Source: source, Format: format})
+	reqBody, _ := renderRequestCodec.Encode(renderRequest{Source: source, Format: format})
 
 	req, err := http.NewRequestWithContext(ctx, http.MethodPost, d.endpoint+"/render", bytes.NewReader(reqBody))
 	if err != nil {
@@ -148,8 +153,8 @@ func (d *driver) Render(ctx context.Context, source []byte, format document.Outp
 	}
 
 	if isJSON {
-		var result renderResponse
-		if err := json.Unmarshal(body, &result); err != nil {
+		result, err := renderResponseCodec.Decode(body)
+		if err != nil {
 			return nil, fmt.Errorf("remote: decode: %w", err)
 		}
 
