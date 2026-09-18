@@ -18,6 +18,7 @@ import (
 	"github.com/zenta-dev/zever/i18n"
 	"github.com/zenta-dev/zever/idempotency"
 	"github.com/zenta-dev/zever/job"
+	"github.com/zenta-dev/zever/lock"
 	"github.com/zenta-dev/zever/log"
 	"github.com/zenta-dev/zever/mailer"
 	"github.com/zenta-dev/zever/media"
@@ -31,6 +32,7 @@ import (
 	"github.com/zenta-dev/zever/router"
 	"github.com/zenta-dev/zever/scheduler"
 	"github.com/zenta-dev/zever/search"
+	"github.com/zenta-dev/zever/secrets"
 	"github.com/zenta-dev/zever/session"
 	"github.com/zenta-dev/zever/storage"
 	"github.com/zenta-dev/zever/tenant"
@@ -42,9 +44,6 @@ import (
 // Container holds one lazily resolved instance per service.
 // Nothing opens at construction; each accessor builds its service on first
 // use and shares that instance (and its connections) process-wide.
-//
-// Absent by design: zever has no lock, realtime, or secrets counterparts,
-// so there are no accessors for them here, and no DB-plus-cache decorator.
 type Container struct {
 	cfg *config.Config
 
@@ -63,6 +62,7 @@ type Container struct {
 	i18n          lazy[i18n.I18n]
 	idempotency   lazy[idempotency.Store]
 	job           lazy[*job.Dispatcher]
+	lock          lazy[lock.Locker]
 	log           lazy[log.Logger]
 	mailer        lazy[mailer.Mailer]
 	media         lazy[media.Media]
@@ -76,6 +76,7 @@ type Container struct {
 	router        lazy[router.Router]
 	scheduler     lazy[scheduler.Scheduler]
 	search        lazy[search.Search]
+	secrets       lazy[secrets.Secrets]
 	session       lazy[session.Store]
 	storage       lazy[storage.Storage]
 	tenant        lazy[tenant.Tenant]

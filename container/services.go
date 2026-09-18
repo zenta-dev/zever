@@ -50,6 +50,9 @@ import (
 	idempotencymemory "github.com/zenta-dev/zever/idempotency/memory"
 	idempotencyredis "github.com/zenta-dev/zever/idempotency/redis"
 	"github.com/zenta-dev/zever/job"
+	"github.com/zenta-dev/zever/lock"
+	lockmemory "github.com/zenta-dev/zever/lock/memory"
+	lockredis "github.com/zenta-dev/zever/lock/redis"
 	"github.com/zenta-dev/zever/log"
 	lognoop "github.com/zenta-dev/zever/log/noop"
 	"github.com/zenta-dev/zever/log/slog"
@@ -93,6 +96,8 @@ import (
 	searchmeilisearch "github.com/zenta-dev/zever/search/meilisearch"
 	searchpostgres "github.com/zenta-dev/zever/search/postgres"
 	searchsqlite "github.com/zenta-dev/zever/search/sqlite"
+	"github.com/zenta-dev/zever/secrets"
+	secretsenv "github.com/zenta-dev/zever/secrets/env"
 	"github.com/zenta-dev/zever/session"
 	sessionmemory "github.com/zenta-dev/zever/session/memory"
 	sessionredis "github.com/zenta-dev/zever/session/redis"
@@ -173,6 +178,9 @@ func registerAdapters() {
 	_ = idempotency.Register(idempotency.Memory, idempotencymemory.New)
 	_ = idempotency.Register(idempotency.Redis, idempotencyredis.New)
 
+	_ = lock.Register(lock.Memory, lockmemory.New)
+	_ = lock.Register(lock.Redis, lockredis.New)
+
 	_ = log.Register(log.Noop, func(log.Options) (log.Logger, error) { return lognoop.New(), nil })
 	_ = log.Register(log.ZeroLog, func(o log.Options) (log.Logger, error) { return zerolog.New(o), nil })
 	_ = log.Register(log.Slog, func(o log.Options) (log.Logger, error) { return slog.New(o), nil })
@@ -217,6 +225,10 @@ func registerAdapters() {
 	_ = search.Register(search.Postgres, searchpostgres.Open)
 	_ = search.Register(search.Meilisearch, searchmeilisearch.Open)
 	_ = search.Register(search.SQLite, searchsqlite.Open)
+
+	_ = secrets.Register(secrets.Env, func(o secrets.Options) (secrets.Secrets, error) {
+		return secretsenv.New(secretsenv.Options{Prefix: o.Prefix})
+	})
 
 	_ = session.Register(session.Memory, sessionmemory.New)
 	_ = session.Register(session.Redis, sessionredis.New)
@@ -396,6 +408,13 @@ func (c *Container) Job() (*job.Dispatcher, error) {
 	})
 }
 
+// Lock resolves and returns the lock service instance.
+func (c *Container) Lock() (lock.Locker, error) {
+	return c.lock.get(func() (lock.Locker, error) {
+		return openService("lock", c.cfg.Lock.Adapter, lock.ParseAdapter, lock.Open, c.cfg.Lock.Options)
+	})
+}
+
 // Log resolves and returns the log service instance.
 func (c *Container) Log() (log.Logger, error) {
 	return c.log.get(func() (log.Logger, error) {
@@ -497,6 +516,13 @@ func (c *Container) Scheduler() (scheduler.Scheduler, error) {
 func (c *Container) Search() (search.Search, error) {
 	return c.search.get(func() (search.Search, error) {
 		return openService("search", c.cfg.Search.Adapter, search.ParseAdapter, search.Open, c.cfg.Search.Options)
+	})
+}
+
+// Secrets resolves and returns the secrets service instance.
+func (c *Container) Secrets() (secrets.Secrets, error) {
+	return c.secrets.get(func() (secrets.Secrets, error) {
+		return openService("secrets", c.cfg.Secrets.Adapter, secrets.ParseAdapter, secrets.Open, c.cfg.Secrets.Options)
 	})
 }
 
