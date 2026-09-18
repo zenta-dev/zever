@@ -262,28 +262,67 @@ func TestWorkerLog(t *testing.T) {
 	}
 }
 
+// oldNextPollWait is the original mutated-duration doubling implementation
+// kept here only so TestWorkerNextPollWait can prove the new attempt-based
+// nextPollWait produces byte-identical values across the natural sequence a
+// consecutive run of empty polls would generate.
+func oldNextPollWait(cur, maxPollWait time.Duration) time.Duration {
+	if cur == 0 {
+		return time.Millisecond
+	}
+
+	if cur >= maxPollWait {
+		return maxPollWait
+	}
+
+	next := cur * 2
+	if next > maxPollWait || next < cur {
+		return maxPollWait
+	}
+
+	return next
+}
+
 func TestWorkerNextPollWait(t *testing.T) {
 	Reset()
 	const maxPollWait = 5 * time.Second
+
+	// Walk both implementations through the exact sequence a run of
+	// consecutive empty polls produces: old starts at cur=0 and repeatedly
+	// feeds its own output back in; new starts at attempt=1 (the first
+	// non-zero wait; attempt=0/immediate-poll is handled directly by
+	// handleEmpty, not by this function) and increments. old's step N
+	// output (1-based, i.e. oldNextPollWait(0) is step 1) must equal new's
+	// nextPollWait(N, maxPollWait).
+	cur := time.Duration(0)
+	for attempt := 1; attempt <= 20; attempt++ {
+		oldWant := oldNextPollWait(cur, maxPollWait)
+		got := nextPollWait(attempt, maxPollWait)
+		if got != oldWant {
+			t.Errorf("step %d: nextPollWait(%d,%v)=%v want %v (old sequence value)", attempt, attempt, maxPollWait, got, oldWant)
+		}
+		cur = oldWant
+	}
+
+	// Explicit pinned checks for the load-bearing transitions, matching the
+	// original table (translated from cur-based to attempt-based inputs):
+	// attempt 1 is the "cur 0 -> 1ms" first-step special case, and later
+	// attempts must hit and stay at the maxPollWait cap.
 	cases := []struct {
-		name string
-		cur  time.Duration
-		max  time.Duration
-		want time.Duration
+		name    string
+		attempt int
+		want    time.Duration
 	}{
-		{"cur 0 -> 1ms", 0, maxPollWait, time.Millisecond},
-		{"cur >= max -> max", maxPollWait, maxPollWait, maxPollWait},
-		{"cur > max -> max", 10 * time.Second, maxPollWait, maxPollWait},
-		{"next > max -> max", 3 * time.Second, maxPollWait, maxPollWait},
-		{"normal double 1ms->2ms", time.Millisecond, maxPollWait, 2 * time.Millisecond},
-		{"normal double 2ms->4ms", 2 * time.Millisecond, maxPollWait, 4 * time.Millisecond},
-		{"overflow cur*2 < cur -> max", time.Duration(1 << 62), maxPollWait, maxPollWait},
-		{"cur 2.5s double hits max exactly", 2500 * time.Millisecond, maxPollWait, maxPollWait},
+		{"attempt 1 -> 1ms (0 -> 1ms first-step case)", 1, time.Millisecond},
+		{"attempt 2 -> 2ms", 2, 2 * time.Millisecond},
+		{"attempt 3 -> 4ms", 3, 4 * time.Millisecond},
+		{"attempt reaching cap -> maxPollWait", 14, maxPollWait},
+		{"attempt well past cap -> maxPollWait", 62, maxPollWait},
 	}
 	for _, c := range cases {
-		got := nextPollWait(c.cur, c.max)
+		got := nextPollWait(c.attempt, maxPollWait)
 		if got != c.want {
-			t.Errorf("%s: nextPollWait(%v,%v)=%v want %v", c.name, c.cur, c.max, got, c.want)
+			t.Errorf("%s: nextPollWait(%v,%v)=%v want %v", c.name, c.attempt, maxPollWait, got, c.want)
 		}
 	}
 }
@@ -388,34 +427,35 @@ func TestWorkerHandleEmpty(t *testing.T) {
 	Reset()
 	w := &Worker{DrainTimeout: 10 * time.Millisecond}
 	var wg sync.WaitGroup
-	pollWait := time.Duration(0)
+	attempt := 0
 	maxPollWait := 5 * time.Second
 
-	// capped 0 -> time.After(0) fast returns false and updates pollWait
+	// attempt 0 -> wait 0, time.After(0) fast returns false and increments attempt
 	ctx := context.Background()
-	got := w.handleEmpty(ctx, &wg, &pollWait, maxPollWait)
+	got := w.handleEmpty(ctx, &wg, &attempt, maxPollWait)
 	if got {
-		t.Fatal("handleEmpty with 0 pollWait and bg ctx = true want false")
+		t.Fatal("handleEmpty with attempt 0 and bg ctx = true want false")
 	}
-	if pollWait != time.Millisecond {
-		t.Fatalf("pollWait after handleEmpty 0 = %v want 1ms", pollWait)
+	if attempt != 1 {
+		t.Fatalf("attempt after handleEmpty 0 = %v want 1", attempt)
 	}
 
 	// already canceled ctx -> returns true
-	// NOTE: pollWait must be >0 so time.After is not ready; otherwise the
-	// select between time.After(0) and ctx.Done() is racy.
+	// NOTE: attempt must be >0 so the wait is not immediately ready; otherwise
+	// the select between time.After(0) and ctx.Done() is racy.
 	ctx2, cancel := context.WithCancel(context.Background())
 	cancel()
-	pollWait2 := 50 * time.Millisecond
-	got = w.handleEmpty(ctx2, &wg, &pollWait2, maxPollWait)
+	attempt2 := 5
+	got = w.handleEmpty(ctx2, &wg, &attempt2, maxPollWait)
 	if !got {
 		t.Fatal("handleEmpty canceled ctx = false want true")
 	}
 
-	// capped min test: pollWait large, max small, ensure time.After(min) used
-	// use canceled ctx to avoid waiting max time: should still return true fast
-	pollWait3 := 10 * time.Second
-	got = w.handleEmpty(ctx2, &wg, &pollWait3, 2*time.Second)
+	// capped min test: attempt far past the cap, small max, ensure the
+	// capped wait is used; use canceled ctx to avoid waiting max time: should
+	// still return true fast
+	attempt3 := 20
+	got = w.handleEmpty(ctx2, &wg, &attempt3, 2*time.Second)
 	if !got {
 		t.Fatal("handleEmpty capped canceled = false want true")
 	}
@@ -1059,15 +1099,15 @@ func TestWorkerHandleEmptyPollWaitUpdate(t *testing.T) {
 	Reset()
 	w := &Worker{DrainTimeout: 10 * time.Millisecond}
 	var wg sync.WaitGroup
-	// pollWait 5ms -> next is 10ms? Actually cur 1ms ->2ms etc; use cur=1ms max 5s -> next 2ms
-	pollWait := time.Millisecond
+	// attempt 1 -> handleEmpty waits nextPollWait(1, max) = 1ms, then increments to 2
+	attempt := 1
 	maxPollWait := 5 * time.Second
-	err := w.handleEmpty(context.Background(), &wg, &pollWait, maxPollWait)
+	err := w.handleEmpty(context.Background(), &wg, &attempt, maxPollWait)
 	if err {
 		t.Fatal("handleEmpty bg ctx should be false")
 	}
-	if pollWait != 2*time.Millisecond {
-		t.Fatalf("pollWait after 1ms = %v want 2ms", pollWait)
+	if attempt != 2 {
+		t.Fatalf("attempt after handleEmpty from 1 = %v want 2", attempt)
 	}
 }
 

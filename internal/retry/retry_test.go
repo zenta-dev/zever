@@ -100,6 +100,43 @@ func TestPolicyNextDelayZeroJitterIsDeterministic(t *testing.T) {
 	}
 }
 
+func TestPolicyNextDelayLinearGrowth(t *testing.T) {
+	p := Policy{BaseDelay: 10 * time.Millisecond, Linear: true, MaxDelay: time.Hour}
+
+	want := []time.Duration{
+		10 * time.Millisecond,
+		20 * time.Millisecond,
+		30 * time.Millisecond,
+		40 * time.Millisecond,
+	}
+
+	for i, w := range want {
+		attempt := i + 1
+		got := p.NextDelay(attempt)
+		if got != w {
+			t.Errorf("NextDelay(%d) = %v, want %v", attempt, got, w)
+		}
+	}
+}
+
+func TestPolicyNextDelayLinearCapsAtMaxDelay(t *testing.T) {
+	p := Policy{BaseDelay: time.Second, Linear: true, MaxDelay: 5 * time.Second}
+
+	got := p.NextDelay(10)
+	if got != 5*time.Second {
+		t.Errorf("NextDelay(10) = %v, want capped %v", got, 5*time.Second)
+	}
+}
+
+func TestPolicyNextDelayLinearIgnoresMultiplier(t *testing.T) {
+	p := Policy{BaseDelay: time.Second, Linear: true, Multiplier: 10}
+
+	got := p.NextDelay(2)
+	if got != 2*time.Second {
+		t.Errorf("NextDelay(2) = %v, want 2s (Multiplier ignored under Linear)", got)
+	}
+}
+
 func TestDoSucceedsOnFirstTry(t *testing.T) {
 	calls := 0
 
