@@ -47,7 +47,7 @@ config file, overlaid by environment variables. Later layers win:
 | scheduler     | embedded                            |
 | search        | postgres, meilisearch, sqlite       |
 | secrets       | env                                  |
-| session       | memory                              |
+| session       | memory, redis                       |
 | storage       | local, s3, r2                       |
 | tenant        | single, header                      |
 | vectorstore   | sqlite, pgvector, qdrant            |

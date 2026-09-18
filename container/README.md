@@ -30,7 +30,7 @@ cached state clears so the next call retries.
 | billing | `Billing()` | |
 | cache | `Cache()` | leaf dependency, closed last |
 | crypto | `Crypto()` | |
-| db | `DB()` | plus `Transactor()`, `CachedDB()` helpers |
+| db | `DB()` | plus `Transactor()` helper |
 | document | `Document()` | |
 | eventbus | `Eventbus()` | |
 | flag | `Flag()` | |
@@ -51,7 +51,7 @@ cached state clears so the next call retries.
 | queue | `Queue()` | leaf dependency, closed last |
 | ratelimit | `Ratelimit()` | |
 | router | `Router()` | |
-| scheduler | `Scheduler()` | shares `Cache`/`Queue`, closed first |
+| scheduler | `Scheduler()` | shares `Queue` (via `Job()`), closed first |
 | search | `Search()` | |
 | secrets | `Secrets()` | |
 | session | `Session()` | |
@@ -72,10 +72,10 @@ _ = q
 d, err := c.Job() // d.Q is the shared queue instance
 ```
 
-`Scheduler()` injects the already-resolved `Cache` and `Queue` into the
-scheduler options so the scheduler shares connections instead of opening
-redundant ones. Resolving `Scheduler()` therefore resolves `Cache` and
-`Queue` as a side effect. `Job()` resolves `Queue` the same way.
+`Scheduler()` injects the already-resolved job dispatcher (via `Job()`)
+into the scheduler options, so the scheduler shares the same `Queue`
+connection instead of opening a redundant one. Resolving `Scheduler()`
+therefore resolves `Job()` and, transitively, `Queue` as a side effect.
 
 ## Close order
 
@@ -84,7 +84,7 @@ untouched services stay untouched, so a failing factory on an unused
 service cannot fail shutdown.
 
 ```
-scheduler, job        dependents holding cache/queue refs, first
+scheduler, job        dependents holding a queue ref, first
 snapshots             everything without explicit ordering
 cache, queue          leaf dependencies, last
 grpcServer            independent GracefulStop/Stop, bounded by ctx

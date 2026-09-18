@@ -220,7 +220,7 @@ func (m *meilisearchClient) IndexBatch(ctx context.Context, docs []search.Docume
 		idx := m.client.Index(idxName)
 
 		if _, err := idx.AddDocumentsWithContext(ctx, byIndex[idxName], nil); err != nil {
-			return fmt.Errorf("[search] meilisearch: index batch: %w", err)
+			return fmt.Errorf("meilisearch: index batch: %w", err)
 		}
 	}
 

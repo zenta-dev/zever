@@ -104,7 +104,7 @@ type closeSnapshot struct {
 // snapshots returns close snapshots for every lazy service that has no
 // explicit dependency ordering. Intentionally excluded (handled in Close's
 // ordered section): cache, queue (dependencies, closed last), scheduler, job
-// (dependents that hold cache/queue references, closed first), grpcServer
+// (dependents that hold a queue reference, closed first), grpcServer
 // (separate GracefulStop handling). This list must cover all remaining lazy
 // fields; currently 31 entries + 5 ordered = 36 lazy fields. When adding a
 // new service, add it here unless it depends on cache/queue (then add to
@@ -167,16 +167,16 @@ func snapshotServiceNames() []string {
 //
 // Dependency-aware ordering derived from explicit dependency map:
 //
-//	scheduler -> cache, queue
+//	scheduler -> queue (via job)
 //	job       -> queue
 //	*         -> (no dep, via snapshots)
 //	cache, queue -> (leaf dependencies, closed last)
 //	grpcServer -> (independent)
 //
 // Scheduler and job are closed first since they may hold a live reference
-// to the shared cache/queue instances injected by Scheduler/Job above;
-// closing cache/queue while scheduler could still be ticking would be a
-// use-after-close. When adding a new service that depends on cache/queue,
+// to the shared queue instance injected by Job (which Scheduler resolves
+// transitively); closing queue while scheduler could still be ticking would
+// be a use-after-close. When adding a new service that depends on cache/queue,
 // add it to the ordered section below (before snapshots or near scheduler/job)
 // and keep it excluded from snapshots(); otherwise add it to snapshots().
 func (c *Container) Close(ctx context.Context) error {
