@@ -55,17 +55,16 @@ func New(opts idempotency.Options) (idempotency.Store, error) {
 		ttl = idempotency.DefaultTTL
 	}
 
-	// zredis.New is infallible for validated options: Validate rejects
-	// addresses with a scheme, so toRedisOptions takes the plain
-	// host:port branch (which has no error source), and pool replacement
-	// Close returns nil for these clients. Connectivity is still verified
-	// by the ping check below, preserving fail-closed behavior.
-	client, _ := zredis.New(zredis.Options{
-		Addr:     opts.Redis.Addr,
-		Password: opts.Redis.Password,
-		DB:       opts.Redis.DB,
-		TLS:      opts.Redis.TLS,
+	client, err := zredis.New(zredis.Options{
+		Addr:       opts.Redis.Addr,
+		Password:   opts.Redis.Password,
+		DB:         opts.Redis.DB,
+		TLS:        opts.Redis.TLS,
+		RequireTLS: opts.Redis.RequireTLS,
 	})
+	if err != nil {
+		return nil, fmt.Errorf("redis: connect %q: %w", redactAddr(opts.Redis.Addr), err)
+	}
 
 	ctx, cancel := context.WithTimeout(context.Background(), 3*time.Second)
 	defer cancel()

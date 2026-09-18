@@ -33,7 +33,7 @@ type Options struct {
 }
 
 var lockOptionKeys = map[string]struct{}{
-	"url": {}, "addr": {}, "password": {}, "db": {}, "tls": {}, "prefix": {}, "ttl": {}, "retry_interval": {},
+	"url": {}, "addr": {}, "password": {}, "db": {}, "tls": {}, "require_tls": {}, "prefix": {}, "ttl": {}, "retry_interval": {},
 }
 
 // ParseOptions extracts a typed Options from the raw option map.
@@ -70,6 +70,8 @@ func ParseOptions(m map[string]any) (Options, error) {
 			o.DB, err = opts.StrictInt("lock", k, v)
 		case "tls":
 			o.TLS, err = opts.StrictBool("lock", k, v)
+		case "require_tls":
+			o.RequireTLS, err = opts.StrictBool("lock", k, v)
 		case "prefix":
 			o.Prefix, err = opts.StrictString("lock", k, v)
 		case "ttl":
