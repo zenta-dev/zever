@@ -1,13 +1,20 @@
 package authz
 
 import (
-	"encoding/json"
 	"errors"
 	"net/http"
 
 	"github.com/zenta-dev/zever/auth"
+	"github.com/zenta-dev/zever/codec"
 	"github.com/zenta-dev/zever/permission"
 )
+
+// authzErrorBody is the JSON error body written by writeAuthzError.
+type authzErrorBody struct {
+	Error string `json:"error"`
+}
+
+var authzErrorCodec = codec.JSONCodec[authzErrorBody]{}
 
 func BearerToken(r *http.Request) string {
 	if r == nil {
@@ -76,8 +83,6 @@ func writeAuthzError(w http.ResponseWriter, err error, noCredentials bool) {
 	w.Header().Set("Content-Type", "application/json")
 	w.WriteHeader(status)
 
-	body, _ := json.Marshal(struct {
-		Error string `json:"error"`
-	}{Error: message})
+	body, _ := authzErrorCodec.Encode(authzErrorBody{Error: message})
 	_, _ = w.Write(body)
 }
