@@ -62,7 +62,7 @@ func newHolderID() (string, error) {
 	var b [16]byte
 
 	if _, err := randRead(b[:]); err != nil {
-		return "", fmt.Errorf("[lock] holder id error: %w", err)
+		return "", fmt.Errorf("lock: holder id: %w", err)
 	}
 
 	return hex.EncodeToString(b[:]), nil
@@ -73,7 +73,7 @@ func newHolderID() (string, error) {
 // the adapter default.
 func (a *adapter) TryAcquire(_ context.Context, key string, ttl time.Duration) (lock.Lock, bool, error) {
 	if key == "" {
-		return nil, false, fmt.Errorf("[lock] TryAcquire %q error: key is empty", key)
+		return nil, false, fmt.Errorf("lock: try acquire %q: key is empty", key)
 	}
 
 	if ttl <= 0 {
@@ -120,7 +120,7 @@ func (a *adapter) Acquire(ctx context.Context, key string, ttl time.Duration) (l
 
 		select {
 		case <-ctx.Done():
-			return nil, fmt.Errorf("[lock] Acquire %q error: %w", key, ctx.Err())
+			return nil, fmt.Errorf("lock: acquire %q: %w", key, ctx.Err())
 		case <-t.C:
 		}
 	}
@@ -155,7 +155,7 @@ func (h *handle) Extend(_ context.Context, ttl time.Duration) error {
 
 	l, ok := h.a.leases[k]
 	if !ok || l.holder != h.holder || !now.Before(l.expires) {
-		return fmt.Errorf("[lock] Extend %q error: %w", h.key, lock.ErrNotHeld)
+		return fmt.Errorf("lock: extend %q: %w", h.key, lock.ErrNotHeld)
 	}
 
 	l.expires = now.Add(ttl)
@@ -175,7 +175,7 @@ func (h *handle) Unlock(_ context.Context) error {
 
 	l, ok := h.a.leases[k]
 	if !ok || l.holder != h.holder || !now.Before(l.expires) {
-		return fmt.Errorf("[lock] Unlock %q error: %w", h.key, lock.ErrNotHeld)
+		return fmt.Errorf("lock: unlock %q: %w", h.key, lock.ErrNotHeld)
 	}
 
 	delete(h.a.leases, k)

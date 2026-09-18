@@ -211,11 +211,11 @@ func validateSubjects(entries []Subject, perm string, field string) error {
 
 	for _, e := range entries {
 		if e == "" {
-			return fmt.Errorf("[storage] policy %s.%s contains empty entry", perm, field)
+			return fmt.Errorf("storage: policy %s.%s contains empty entry", perm, field)
 		}
 
 		if _, dup := seen[e]; dup {
-			return fmt.Errorf("[storage] policy %s.%s contains duplicate %q", perm, field, string(e))
+			return fmt.Errorf("storage: policy %s.%s contains duplicate %q", perm, field, string(e))
 		}
 
 		seen[e] = struct{}{}
@@ -248,7 +248,7 @@ func (c *PolicyConfig) Resolve() (map[BucketName]Policy, Policy, bool, error) {
 	if c.Default != nil {
 		p := *c.Default
 		if err := p.Validate(); err != nil {
-			return nil, Policy{}, false, fmt.Errorf("[storage] policy default: %w", err)
+			return nil, Policy{}, false, fmt.Errorf("storage: policy default: %w", err)
 		}
 
 		def = p
@@ -267,7 +267,7 @@ func (c *PolicyConfig) Resolve() (map[BucketName]Policy, Policy, bool, error) {
 
 			cp := p
 			if err := cp.Validate(); err != nil {
-				return nil, Policy{}, false, fmt.Errorf("[storage] policy for bucket %q: %w", string(name), err)
+				return nil, Policy{}, false, fmt.Errorf("storage: policy for bucket %q: %w", string(name), err)
 			}
 
 			buckets[name] = cp
@@ -299,7 +299,7 @@ func (c *PolicyConfig) UnmarshalJSON(b []byte) error {
 
 		var p Policy
 		if err := json.Unmarshal([]byte(msg), &p, json.RejectUnknownMembers(true)); err != nil {
-			return fmt.Errorf("[storage] policy %q: %w", name, err)
+			return fmt.Errorf("storage: policy %q: %w", name, err)
 		}
 
 		if name == "default" {

@@ -11,7 +11,7 @@ func ValidatePolicyCoherence(prefix string, policies map[storage.BucketName]stor
 	errFor := func(scope string, p storage.Policy) error {
 		if p.Public(storage.PermWrite) && !p.Public(storage.PermUpdate) {
 			return fmt.Errorf(
-				"[%s] policy %s has public write but restricted update; "+
+				"%s: policy %s has public write but restricted update; "+
 					"a static unsigned PUT URL also allows anonymous overwrites of existing keys, "+
 					"so update must be public too",
 				prefix, scope,
@@ -20,7 +20,7 @@ func ValidatePolicyCoherence(prefix string, policies map[storage.BucketName]stor
 
 		if p.Public(storage.PermUpdate) && !p.Public(storage.PermWrite) {
 			return fmt.Errorf(
-				"[%s] policy %s has public update but restricted write; "+
+				"%s: policy %s has public update but restricted write; "+
 					"a static unsigned PUT URL also allows anonymous creation of new keys, "+
 					"so write must be public too",
 				prefix, scope,

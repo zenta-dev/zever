@@ -27,17 +27,17 @@ func New(opts storage.Options) (storage.Storage, error) {
 
 	accountID := strings.TrimSpace(opts.AccountID)
 	if accountID == "" {
-		return nil, fmt.Errorf("[r2] option %q is required", "account_id")
+		return nil, fmt.Errorf("r2: option %q is required", "account_id")
 	}
 
 	accessKey := strings.TrimSpace(opts.AccessKeyID)
 	if accessKey == "" {
-		return nil, fmt.Errorf("[r2] option %q is required", "access_key_id")
+		return nil, fmt.Errorf("r2: option %q is required", "access_key_id")
 	}
 
 	secretKey := strings.TrimSpace(opts.SecretAccessKey)
 	if secretKey == "" {
-		return nil, fmt.Errorf("[r2] option %q is required", "secret_access_key")
+		return nil, fmt.Errorf("r2: option %q is required", "secret_access_key")
 	}
 
 	region := opts.Region
@@ -122,7 +122,7 @@ func isValidAccountID(s string) bool {
 
 func r2Endpoint(accountID, endpoint string) (string, error) {
 	if !isValidAccountID(accountID) {
-		return "", fmt.Errorf("[r2] option %q must be alphanumeric, hyphen or underscore", "account_id")
+		return "", fmt.Errorf("r2: option %q must be alphanumeric, hyphen or underscore", "account_id")
 	}
 
 	if endpoint != "" {
@@ -144,7 +144,7 @@ func checkR2PublicPolicy(policies map[storage.BucketName]storage.Policy, def sto
 	for bucket, p := range policies {
 		if hasPublicPerm(p) {
 			return fmt.Errorf(
-				"[r2] policy for bucket %q has public permissions, requiring option %q "+
+				"r2: policy for bucket %q has public permissions, requiring option %q "+
 					"(R2 public bucket custom domain)",
 				bucket, "public_url_base",
 			)
@@ -153,7 +153,7 @@ func checkR2PublicPolicy(policies map[storage.BucketName]storage.Policy, def sto
 
 	if hasPublicPerm(def) {
 		return fmt.Errorf(
-			"[r2] default policy has public permissions, requiring option %q "+
+			"r2: default policy has public permissions, requiring option %q "+
 				"(R2 public bucket custom domain)",
 			"public_url_base",
 		)
