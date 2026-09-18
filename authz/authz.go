@@ -8,13 +8,19 @@ import (
 	"github.com/zenta-dev/zever/permission"
 )
 
+// Policy declares the authentication and permission requirements for a route.
 type Policy struct {
-	AuthRequired    bool
-	Roles           []string
+	// AuthRequired enforces bearer token verification when true.
+	AuthRequired bool
+	// Roles carries the candidate roles evaluated by the permission checker.
+	Roles []string
+	// PermissionCheck names the action passed to the checker; empty skips checks.
 	PermissionCheck string
-	ResourceType    string
+	// ResourceType names the resource type passed to the checker.
+	ResourceType string
 }
 
+// Authorize verifies the token with a and enforces pol with p, returning the verified claims.
 func Authorize(ctx context.Context, a auth.Auth, p permission.Checker, pol Policy, token, resourceID string) (auth.Claims, error) {
 	var claims auth.Claims
 
@@ -108,6 +114,7 @@ func withClaims(ctx context.Context, claims auth.Claims) context.Context {
 	return context.WithValue(ctx, claimsKey{}, claims)
 }
 
+// ClaimsFromContext returns the claims stored by Middleware or UnaryServerInterceptor.
 func ClaimsFromContext(ctx context.Context) (auth.Claims, bool) {
 	claims, ok := ctx.Value(claimsKey{}).(auth.Claims)
 	return claims, ok

@@ -7,7 +7,9 @@ import (
 
 // Address is a mail address with an optional display name.
 type Address struct {
-	Name    string
+	// Name is the optional display name.
+	Name string
+	// Address is the addr-spec in local@domain form.
 	Address string
 }
 

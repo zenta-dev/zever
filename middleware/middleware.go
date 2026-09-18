@@ -17,7 +17,7 @@ type statusRecorder struct {
 }
 
 // newStatusRecorder wraps w to capture its status code, unless w is already
-// a *statusRecorder — in that case it returns w unchanged instead of
+// a *statusRecorder - in that case it returns w unchanged instead of
 // double-wrapping. Chained status-reading middleware reuses one recorder per
 // request: a single alloc, no stacked wrappers.
 func newStatusRecorder(w http.ResponseWriter) *statusRecorder {
@@ -28,6 +28,7 @@ func newStatusRecorder(w http.ResponseWriter) *statusRecorder {
 	return &statusRecorder{ResponseWriter: w, status: http.StatusOK}
 }
 
+// WriteHeader records status on first call and forwards every call to the wrapped writer.
 func (r *statusRecorder) WriteHeader(status int) {
 	if !r.wroteHeader {
 		r.status = status
@@ -37,6 +38,7 @@ func (r *statusRecorder) WriteHeader(status int) {
 	r.ResponseWriter.WriteHeader(status)
 }
 
+// Write marks the header as written and forwards the bytes to the wrapped writer.
 func (r *statusRecorder) Write(b []byte) (int, error) {
 	r.wroteHeader = true
 

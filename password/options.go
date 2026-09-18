@@ -1,21 +1,31 @@
 package password
 
-// Default password-hashing parameters. Memory is in KiB.
+// Default argon2id parameters with units noted per constant.
 const (
-	DefaultTime    uint32 = 3
-	DefaultMemory  uint32 = 64 * 1024 // 64 MiB
-	DefaultThreads uint8  = 4
+	// DefaultTime is the default Argon2id iteration count.
+	DefaultTime uint32 = 3
+	// DefaultMemory is the default Argon2id memory cost in KiB (65536 KiB equals 64 MiB).
+	DefaultMemory uint32 = 64 * 1024 // 64 MiB
+	// DefaultThreads is the default Argon2id parallelism degree.
+	DefaultThreads uint8 = 4
+	// DefaultSaltLen is the default salt length in bytes.
 	DefaultSaltLen uint32 = 16
-	DefaultKeyLen  uint32 = 32
+	// DefaultKeyLen is the default derived key length in bytes.
+	DefaultKeyLen uint32 = 32
 )
 
 // Options holds typed configuration for password hashing.
 type Options struct {
-	Time    uint32 `json:"time"        toml:"time"        yaml:"time"`
-	Memory  uint32 `json:"memory"      toml:"memory"      yaml:"memory"`
-	Threads uint8  `json:"threads"     toml:"threads"     yaml:"threads"`
+	// Time is the Argon2id iteration count in the range 1-10.
+	Time uint32 `json:"time"        toml:"time"        yaml:"time"`
+	// Memory is the Argon2id memory cost in KiB in the range 8192-1048576.
+	Memory uint32 `json:"memory"      toml:"memory"      yaml:"memory"`
+	// Threads is the Argon2id parallelism degree in the range 1-16.
+	Threads uint8 `json:"threads"     toml:"threads"     yaml:"threads"`
+	// SaltLen is the salt length in bytes in the range 8-64.
 	SaltLen uint32 `json:"salt_length" toml:"salt_length" yaml:"salt_length"`
-	KeyLen  uint32 `json:"key_length"  toml:"key_length"  yaml:"key_length"`
+	// KeyLen is the derived key length in bytes in the range 16-128.
+	KeyLen uint32 `json:"key_length"  toml:"key_length"  yaml:"key_length"`
 }
 
 // Validate checks parameter ranges.

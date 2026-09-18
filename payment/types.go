@@ -42,22 +42,32 @@ type EventType string
 // fields: "price_id" and "customer_id" (paddle), "idempotency_key"
 // (stripe), "transit_id" (paddle request linking).
 type Request struct {
-	Amount   int64
+	// Amount is the payment amount in minor units and must be positive.
+	Amount int64
+	// Currency is the ISO currency code and must be non-empty.
 	Currency string
-	Method   PaymentMethod
-	Meta     map[string]string
+	// Method is the payment method; empty selects the backend default.
+	Method PaymentMethod
+	// Meta carries provider-specific fields for the request.
+	Meta map[string]string
 }
 
 // Result represents the result of a payment operation.
 type Result struct {
-	ID       string
-	Status   PaymentStatus
-	Amount   int64
+	// ID is the backend-assigned payment identifier.
+	ID string
+	// Status is the current payment status.
+	Status PaymentStatus
+	// Amount is the payment amount in minor units.
+	Amount int64
+	// Currency is the ISO currency code of the payment.
 	Currency string
 }
 
 // Event represents an incoming webhook event.
 type Event struct {
-	Type   EventType
+	// Type is the provider-defined webhook event type.
+	Type EventType
+	// Object is the payment the webhook event describes.
 	Object Result
 }

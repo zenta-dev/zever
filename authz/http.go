@@ -16,6 +16,7 @@ type authzErrorBody struct {
 
 var authzErrorCodec = codec.JSONCodec[authzErrorBody]{}
 
+// BearerToken extracts the bearer token from r, returning empty on any malformed input.
 func BearerToken(r *http.Request) string {
 	if r == nil {
 		return ""

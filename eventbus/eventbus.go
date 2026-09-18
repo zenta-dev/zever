@@ -39,6 +39,7 @@ type Pusher interface {
 // Eventbus defines the unified operations for publishing and subscribing to
 // topics, push (Subscribe) and pull (SubscribeChan) alike.
 type Eventbus interface {
+	// Pusher is the push core promoted into Eventbus.
 	Pusher
 
 	// SubscribeChan registers a buffered pull channel for topic.

@@ -4,10 +4,14 @@ package ai
 type Role string
 
 const (
-	RoleSystem    Role = "system"
-	RoleUser      Role = "user"
+	// RoleSystem marks a system prompt turn.
+	RoleSystem Role = "system"
+	// RoleUser marks a user turn.
+	RoleUser Role = "user"
+	// RoleAssistant marks an assistant turn.
 	RoleAssistant Role = "assistant"
-	RoleTool      Role = "tool"
+	// RoleTool marks a tool result turn.
+	RoleTool Role = "tool"
 )
 
 // Message is a single turn in a conversation.
@@ -36,9 +40,12 @@ type ToolCall struct {
 type ToolChoice string
 
 const (
-	ToolChoiceAuto     ToolChoice = "auto"
+	// ToolChoiceAuto lets the model decide tool use.
+	ToolChoiceAuto ToolChoice = "auto"
+	// ToolChoiceRequired forces the model to call a tool.
 	ToolChoiceRequired ToolChoice = "required"
-	ToolChoiceNone     ToolChoice = "none"
+	// ToolChoiceNone forbids the model from calling tools.
+	ToolChoiceNone ToolChoice = "none"
 )
 
 // ResponseFormat constrains model output formatting.

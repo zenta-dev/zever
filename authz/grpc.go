@@ -13,6 +13,7 @@ import (
 	"github.com/zenta-dev/zever/permission"
 )
 
+// BearerTokenFromMD extracts the bearer token from gRPC metadata, returning empty on any malformed input.
 func BearerTokenFromMD(ctx context.Context) string {
 	md, ok := metadata.FromIncomingContext(ctx)
 	if !ok {
@@ -27,6 +28,7 @@ func BearerTokenFromMD(ctx context.Context) string {
 	return parseBearerToken(values[0])
 }
 
+// UnaryServerInterceptor enforces per-method policies, passing requests without a policy straight to the handler.
 func UnaryServerInterceptor(a auth.Auth, p permission.Checker, policies map[string]Policy) grpc.UnaryServerInterceptor {
 	return func(
 		ctx context.Context,

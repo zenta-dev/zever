@@ -18,8 +18,8 @@ const scopeName = "middleware"
 // path) around each request, records the handler's status on the span, and
 // emits an "http.request" counter tagged by method/status.
 //
-// Only r.URL.Path is used for the span name and path attribute — never the
-// query string or raw URI — so high-cardinality/sensitive query values stay
+// Only r.URL.Path is used for the span name and path attribute - never the
+// query string or raw URI - so high-cardinality/sensitive query values stay
 // out of traces and metrics.
 //
 // Tracing does not recover panics: the deferred span.End still runs on panic,
@@ -90,6 +90,7 @@ func TracingUnaryServerInterceptor(provider observability.Provider) grpc.UnarySe
 // handler error would use. Unknown codes have no StatusText and yield "".
 type statusError struct{ status int }
 
+// Error returns the status text for the recorded HTTP status code.
 func (e statusError) Error() string {
 	return http.StatusText(e.status)
 }

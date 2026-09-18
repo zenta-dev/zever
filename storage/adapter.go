@@ -7,8 +7,11 @@ type Adapter uint8
 
 // Adapter backend identifiers.
 const (
+	// AdapterLocal selects the local-filesystem backend.
 	AdapterLocal Adapter = iota
+	// AdapterS3 selects the Amazon S3 backend.
 	AdapterS3
+	// AdapterR2 selects the Cloudflare R2 backend.
 	AdapterR2
 )
 

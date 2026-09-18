@@ -2,9 +2,9 @@ package cache
 
 import "fmt"
 
+// Adapter identifies the cache backend selected in Options and the factory registry.
 type Adapter int
 
-// Adapter identifies the cache backend selected in Options and the factory registry.
 const (
 	// Memory selects the in-memory cache backend.
 	Memory Adapter = iota
