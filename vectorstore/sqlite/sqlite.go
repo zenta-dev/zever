@@ -33,9 +33,16 @@ const maxScanRows = 10000
 
 var memoryCounter uint64
 
-// Open creates a SQLite-backed VectorStore from Options.
+// Store implements vectorstore.VectorStore backed by SQLite.
+type Store struct {
+	db  *sql.DB
+	mu  sync.RWMutex
+	dim int
+}
+
+// New creates a SQLite-backed VectorStore from Options.
 // An empty DSN defaults to vectorstore.DefaultSQLiteDSN.
-func Open(o vectorstore.Options) (vectorstore.VectorStore, error) {
+func New(o vectorstore.Options) (vectorstore.VectorStore, error) {
 	if err := o.Validate(); err != nil {
 		return nil, fmt.Errorf("sqlite: %w", err)
 	}
@@ -45,23 +52,6 @@ func Open(o vectorstore.Options) (vectorstore.VectorStore, error) {
 		dsn = vectorstore.DefaultSQLiteDSN
 	}
 
-	s, err := New(dsn)
-	if err != nil {
-		return nil, err
-	}
-
-	return s, nil
-}
-
-// Store implements vectorstore.VectorStore backed by SQLite.
-type Store struct {
-	db  *sql.DB
-	mu  sync.RWMutex
-	dim int
-}
-
-// New creates a SQLite vector store connected to the given DSN.
-func New(dsn string) (*Store, error) {
 	if dsn == ":memory:" {
 		n := atomic.AddUint64(&memoryCounter, 1)
 		dsn = fmt.Sprintf("file:zen-vectorstore-%d?mode=memory&cache=shared", n)

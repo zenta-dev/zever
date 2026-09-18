@@ -16,21 +16,6 @@ import (
 	"github.com/zenta-dev/zever/vectorstore"
 )
 
-// Open creates a Qdrant vector store from Options.
-// It validates Options first, requires a URL, and connects lazily
-// unless a dimension is configured.
-func Open(o vectorstore.Options) (vectorstore.VectorStore, error) {
-	if err := o.Validate(); err != nil {
-		return nil, fmt.Errorf("qdrant: %w", err)
-	}
-
-	if o.URL == "" {
-		return nil, ErrMissingURL
-	}
-
-	return New(o.URL, o.APIKey, o.Dimension)
-}
-
 var uuidPattern = regexp.MustCompile(`^[0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{12}$`)
 
 type pointClient interface {
@@ -73,23 +58,35 @@ func pointID(id string) *qdrant.PointId {
 	))
 }
 
-// New creates a Qdrant vector store connected to the given address.
-func New(addr, apiKey string, dim int) (*Store, error) {
-	host, port, useTLS := parseAddr(addr)
+// New creates a Qdrant vector store from Options. It validates Options
+// first, requires a URL, and connects lazily unless a dimension is
+// configured.
+func New(o vectorstore.Options) (vectorstore.VectorStore, error) {
+	if err := o.Validate(); err != nil {
+		return nil, fmt.Errorf("qdrant: %w", err)
+	}
+
+	if o.URL == "" {
+		return nil, ErrMissingURL
+	}
+
+	host, port, useTLS := parseAddr(o.URL)
 
 	cfg := &qdrant.Config{
 		Host:   host,
 		Port:   port,
 		UseTLS: useTLS,
 	}
-	if apiKey != "" {
-		cfg.APIKey = apiKey
+	if o.APIKey != "" {
+		cfg.APIKey = o.APIKey
 	}
 
 	client, err := qdrant.NewClient(cfg)
 	if err != nil {
 		return nil, fmt.Errorf("qdrant: client: %w", err)
 	}
+
+	dim := o.Dimension
 
 	s := &Store{client: client, dim: dim}
 	if dim > 0 {
