@@ -6,7 +6,7 @@
 //
 // DX: Open with Open, custom backends with Register. Options are typed with zero-infra defaults for tests. Env backend reads prefixed variables directly (no prefix, e.g. PREFIX_NAME). See config/README.md.
 //
-// Container: not managed by container; there is no c.Secrets accessor. Call Open directly with typed Options. See container/README.md.
+// Container: container.New(cfg) then c.Secrets(). Lazy per-service singleton, retry on error. See container/README.md.
 //
 // Lifecycle: ctx is first arg for IO, never stored. Close releases resources; only resolved services close. Close shape is Close(ctx context.Context) error.
 //
