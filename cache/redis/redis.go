@@ -11,6 +11,7 @@ import (
 	goredis "github.com/redis/go-redis/v9"
 
 	"github.com/zenta-dev/zever/cache"
+	"github.com/zenta-dev/zever/internal/cas"
 	zredis "github.com/zenta-dev/zever/internal/redis"
 )
 
@@ -18,6 +19,8 @@ type redisAdapter struct {
 	client *goredis.Client
 	closed atomic.Bool
 }
+
+var _ cache.CompareAndSwapCache = (*redisAdapter)(nil)
 
 // connOptions maps cache options onto the shared client options. A set URL
 // takes precedence over Addr; both spellings connect.
@@ -118,6 +121,46 @@ func (a *redisAdapter) Delete(ctx context.Context, key string) error {
 	}
 
 	return nil
+}
+
+// CompareAndDelete removes key only when its value equals expected, using one
+// Eval round trip. It reports deleted=false with nil error when the key is
+// missing or holds another value, so callers never steal a successor entry.
+func (a *redisAdapter) CompareAndDelete(ctx context.Context, key string, expected []byte) (bool, error) {
+	if a.closed.Load() {
+		return false, cache.ErrClosed
+	}
+
+	n, err := a.client.Eval(ctx, cas.CompareAndDeleteScript, []string{key}, expected).Int()
+	if err != nil {
+		return false, fmt.Errorf("cache: compare and delete %q error: %w", key, err)
+	}
+
+	return n == 1, nil
+}
+
+// CompareAndExtend renews the TTL on key only when its value equals expected,
+// using one Eval round trip. A non-positive ttl clears the expiry via
+// PERSIST. Missing or mismatched keys report extended=false with nil error.
+func (a *redisAdapter) CompareAndExtend(ctx context.Context, key string, expected []byte, ttl time.Duration) (bool, error) {
+	if a.closed.Load() {
+		return false, cache.ErrClosed
+	}
+
+	var n int
+	var err error
+
+	if ttl > 0 {
+		n, err = a.client.Eval(ctx, cas.CompareAndExpireScript, []string{key}, expected, ttl.Milliseconds()).Int()
+	} else {
+		n, err = a.client.Eval(ctx, cas.CompareAndPersistScript, []string{key}, expected).Int()
+	}
+
+	if err != nil {
+		return false, fmt.Errorf("cache: compare and extend %q error: %w", key, err)
+	}
+
+	return n == 1, nil
 }
 
 func (a *redisAdapter) Increment(ctx context.Context, key string) error {
