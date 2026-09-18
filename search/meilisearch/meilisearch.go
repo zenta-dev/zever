@@ -124,8 +124,8 @@ type meilisearchClient struct {
 	idIndexes *idIndexTracker
 }
 
-// Open creates a Meilisearch-backed search.Search from options.
-func Open(o search.Options) (search.Search, error) {
+// New creates a Meilisearch-backed search.Search from options.
+func New(o search.Options) (search.Search, error) {
 	if err := o.Validate(); err != nil {
 		return nil, fmt.Errorf("meilisearch: %w", err)
 	}

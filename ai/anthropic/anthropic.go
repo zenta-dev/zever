@@ -30,8 +30,8 @@ func newClient(opts ai.Options) *http.Client {
 	return httpclient.NewClient(opts.Timeout)
 }
 
-// Open creates an Anthropic AI backend.
-func Open(opts ai.Options) (ai.AI, error) {
+// New creates an Anthropic AI backend.
+func New(opts ai.Options) (ai.AI, error) {
 	if opts.APIKey == "" {
 		return nil, fmt.Errorf("ai: open anthropic: %w", &ai.InvalidOptionsError{Reason: "api_key is required"})
 	}

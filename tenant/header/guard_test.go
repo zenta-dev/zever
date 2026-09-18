@@ -16,7 +16,7 @@ func TestResolveReDoSSafe(t *testing.T) {
 	// Valid-but-slow-ish pattern that passes the guard: single quantified
 	// group anchored with a trailing literal. Must resolve a 1KB host fast.
 	pattern := `^([a-z]+)b$`
-	tt, err := Open(tenant.Options{Header: "X-Tenant-ID", SubdomainRegex: pattern})
+	tt, err := New(tenant.Options{Header: "X-Tenant-ID", SubdomainRegex: pattern})
 	if err != nil {
 		t.Fatalf("open: %v", err)
 	}
@@ -48,7 +48,7 @@ func TestOpenLongPatternRejected(t *testing.T) {
 		t.Fatalf("isCatastrophicPattern(%d chars) = false, want true", len(long))
 	}
 
-	_, err := Open(tenant.Options{Header: "X-Tenant-ID", SubdomainRegex: long})
+	_, err := New(tenant.Options{Header: "X-Tenant-ID", SubdomainRegex: long})
 	if err == nil {
 		t.Fatal("want error for 501-char pattern, got nil")
 	}
@@ -119,7 +119,7 @@ func TestIsCatastrophicPatternValid(t *testing.T) {
 func TestResolveHostLengthLimit(t *testing.T) {
 	t.Parallel()
 
-	tt, err := Open(tenant.Options{
+	tt, err := New(tenant.Options{
 		Header:         "X-Tenant-ID",
 		SubdomainRegex: `^([a-z0-9-]+)\.example\.com$`,
 	})
@@ -158,7 +158,7 @@ func TestOpenCatastrophicPatternsRejected(t *testing.T) {
 		t.Run(pat, func(t *testing.T) {
 			t.Parallel()
 
-			_, err := Open(tenant.Options{Header: "X-Tenant-ID", SubdomainRegex: pat})
+			_, err := New(tenant.Options{Header: "X-Tenant-ID", SubdomainRegex: pat})
 			if err == nil {
 				t.Errorf("want error for catastrophic pattern %q, got nil", pat)
 			} else if !errors.Is(err, ErrInvalidPattern) {

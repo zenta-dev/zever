@@ -25,8 +25,8 @@ type adapter struct {
 	model  string
 }
 
-// Open creates an AI backed by OpenAI.
-func Open(opts ai.Options) (ai.AI, error) {
+// New creates an AI backed by OpenAI.
+func New(opts ai.Options) (ai.AI, error) {
 	if err := validateOptions(opts); err != nil {
 		return nil, err
 	}

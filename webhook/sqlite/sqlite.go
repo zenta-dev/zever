@@ -34,22 +34,22 @@ type adapter struct {
 	dsn   string
 }
 
-// Open builds a durable Webhook from o.
+// New builds a durable Webhook from o.
 //
 // It validates o, builds the http delivery engine first (so timeout/retry
 // misconfiguration fails before any storage is touched), then opens the
 // SQLite store and reloads every persisted registration into the engine.
 // A stored row that no longer validates (for example a private target under
-// changed options) fails Open loudly instead of being silently dropped.
-func Open(o webhook.Options) (webhook.Webhook, error) {
+// changed options) fails New loudly instead of being silently dropped.
+func New(o webhook.Options) (webhook.Webhook, error) {
 	if err := o.Validate(); err != nil {
 		return nil, fmt.Errorf("sqlite: %w", err)
 	}
 
-	// whttp.Open runs the identical core Validate already passed above, so
+	// whttp.New runs the identical core Validate already passed above, so
 	// its failure branch is unreachable in practice and intentionally left
 	// without a dedicated test.
-	inner, err := whttp.Open(o)
+	inner, err := whttp.New(o)
 	if err != nil {
 		return nil, fmt.Errorf("sqlite: open http: %w", err)
 	}

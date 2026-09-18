@@ -16,8 +16,8 @@ type driver struct {
 	client *stripe.Client
 }
 
-// Open creates a Stripe billing adapter from the given options.
-func Open(o billing.Options) (billing.Billing, error) {
+// New creates a Stripe billing adapter from the given options.
+func New(o billing.Options) (billing.Billing, error) {
 	if err := o.Validate(); err != nil {
 		return nil, fmt.Errorf("stripe: %w", err)
 	}

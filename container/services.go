@@ -130,20 +130,20 @@ func ensureAdapters() {
 }
 
 func registerAdapters() {
-	_ = ai.Register(ai.Anthropic, anthropic.Open)
-	_ = ai.Register(ai.OpenAI, openai.Open)
-	_ = ai.Register(ai.Gemini, gemini.Open)
+	_ = ai.Register(ai.Anthropic, anthropic.New)
+	_ = ai.Register(ai.OpenAI, openai.New)
+	_ = ai.Register(ai.Gemini, gemini.New)
 
-	_ = analytics.Register(analytics.Log, analyticslog.Open)
-	_ = analytics.Register(analytics.PostHog, posthog.Open)
+	_ = analytics.Register(analytics.Log, analyticslog.New)
+	_ = analytics.Register(analytics.PostHog, posthog.New)
 
 	_ = auth.Register(auth.JWT, jwt.New)
 	_ = auth.Register(auth.Session, authsession.New)
 	_ = auth.Register(auth.OIDC, oidc.New)
 
 	_ = billing.Register(billing.Stub, billingstub.Open)
-	_ = billing.Register(billing.Stripe, billingstripe.Open)
-	_ = billing.Register(billing.Paddle, billingpaddle.Open)
+	_ = billing.Register(billing.Stripe, billingstripe.New)
+	_ = billing.Register(billing.Paddle, billingpaddle.New)
 
 	_ = cache.Register(cache.Memory, cachememory.New)
 	_ = cache.Register(cache.Redis, cacheredis.New)
@@ -153,9 +153,9 @@ func registerAdapters() {
 	_ = db.Register(db.SQLite, dbsqlite.New)
 	_ = db.Register(db.Postgres, dbpostgres.New)
 
-	_ = document.Register(document.Local, documentlocal.Open)
-	_ = document.Register(document.Remote, documentremote.Open)
-	_ = document.Register(document.Latex, documentlatex.Open)
+	_ = document.Register(document.Local, documentlocal.New)
+	_ = document.Register(document.Remote, documentremote.New)
+	_ = document.Register(document.Latex, documentlatex.New)
 
 	_ = eventbus.Register(eventbus.Memory, eventbusmemory.New)
 	_ = eventbus.Register(eventbus.Redis, eventbusredis.New)
@@ -180,8 +180,8 @@ func registerAdapters() {
 	_ = mailer.Register(mailer.Log, mailerlog.New)
 	_ = mailer.Register(mailer.SMTP, smtp.New)
 
-	_ = media.Register(media.Local, medialocal.Open)
-	_ = media.Register(media.S3, medias3.Open)
+	_ = media.Register(media.Local, medialocal.New)
+	_ = media.Register(media.S3, medias3.New)
 
 	_ = notification.Register(notification.Log, notificationlog.New)
 	_ = notification.Register(notification.Twilio, notificationtwilio.New)
@@ -196,8 +196,8 @@ func registerAdapters() {
 	_ = password.Register(password.AdapterArgon2ID, argon2.New)
 
 	_ = payment.Register(payment.Stub, paymentstub.Open)
-	_ = payment.Register(payment.Stripe, paymentstripe.Open)
-	_ = payment.Register(payment.Paddle, paymentpaddle.Open)
+	_ = payment.Register(payment.Stripe, paymentstripe.New)
+	_ = payment.Register(payment.Paddle, paymentpaddle.New)
 
 	_ = permission.Register(permission.Noop, permissionnoop.New)
 	_ = permission.Register(permission.RBAC, permissionrbac.New)
@@ -214,8 +214,8 @@ func registerAdapters() {
 
 	_ = scheduler.Register(scheduler.Embedded, schedulerembedded.New)
 
-	_ = search.Register(search.Postgres, searchpostgres.Open)
-	_ = search.Register(search.Meilisearch, searchmeilisearch.Open)
+	_ = search.Register(search.Postgres, searchpostgres.New)
+	_ = search.Register(search.Meilisearch, searchmeilisearch.New)
 	_ = search.Register(search.SQLite, searchsqlite.Open)
 
 	_ = session.Register(session.Memory, sessionmemory.New)
@@ -225,16 +225,16 @@ func registerAdapters() {
 	_ = storage.Register(storage.AdapterS3, storages3.New)
 	_ = storage.Register(storage.AdapterR2, storager2.New)
 
-	_ = tenant.Register(tenant.Single, tenantsingle.Open)
-	_ = tenant.Register(tenant.Header, tenantheader.Open)
+	_ = tenant.Register(tenant.Single, tenantsingle.New)
+	_ = tenant.Register(tenant.Header, tenantheader.New)
 
 	_ = vectorstore.Register(vectorstore.SQLite, vectorstoresqlite.Open)
 	_ = vectorstore.Register(vectorstore.PGVector, vectorstorepgvector.Open)
 	_ = vectorstore.Register(vectorstore.Qdrant, vectorstoreqdrant.Open)
 
-	_ = webhook.Register(webhook.AdapterHTTP, webhookhttp.Open)
-	_ = webhook.Register(webhook.AdapterQueue, webhookqueue.Open)
-	_ = webhook.Register(webhook.AdapterSQLite, webhooksqlite.Open)
+	_ = webhook.Register(webhook.AdapterHTTP, webhookhttp.New)
+	_ = webhook.Register(webhook.AdapterQueue, webhookqueue.New)
+	_ = webhook.Register(webhook.AdapterSQLite, webhooksqlite.New)
 
 	_ = workflow.Register(workflow.Memory, workflowmemory.New)
 }

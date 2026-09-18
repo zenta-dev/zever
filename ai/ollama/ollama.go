@@ -29,8 +29,8 @@ type adapter struct {
 	client       *http.Client
 }
 
-// Open creates an AI backed by the Ollama server at opts.Addr.
-func Open(opts Options) (ai.AI, error) {
+// New creates an AI backed by the Ollama server at opts.Addr.
+func New(opts Options) (ai.AI, error) {
 	if err := opts.Validate(); err != nil {
 		return nil, err
 	}

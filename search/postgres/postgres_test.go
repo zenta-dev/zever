@@ -178,7 +178,7 @@ func TestErrors_messages(t *testing.T) {
 func TestOpen_invalidOptions(t *testing.T) {
 	t.Parallel()
 
-	_, err := Open(search.Options{Host: "http://"})
+	_, err := New(search.Options{Host: "http://"})
 	if !errors.Is(err, search.ErrInvalidOptions) {
 		t.Fatalf("Open invalid opts err = %v, want ErrInvalidOptions", err)
 	}
@@ -189,7 +189,7 @@ func TestOpen_devNoop(t *testing.T) {
 
 	ctx := t.Context()
 
-	s, err := Open(search.Options{})
+	s, err := New(search.Options{})
 	if err != nil {
 		t.Fatalf("Open empty DSN err = %v", err)
 	}
@@ -218,7 +218,7 @@ func TestOpen_poolError(t *testing.T) {
 	newPool = func(context.Context, string) (dbpool, error) { return nil, errors.New("dial boom") }
 	t.Cleanup(func() { newPool = orig })
 
-	if _, err := Open(search.Options{DSN: "postgres://db"}); err == nil || !strings.Contains(err.Error(), "postgres:") {
+	if _, err := New(search.Options{DSN: "postgres://db"}); err == nil || !strings.Contains(err.Error(), "postgres:") {
 		t.Fatalf("Open pool err = %v, want postgres-wrapped error", err)
 	}
 }
@@ -227,7 +227,7 @@ func TestOpen_createTableError(t *testing.T) {
 	fp := &fakePool{execErr: errors.New("table boom"), execFail: "CREATE TABLE"}
 	stubPool(t, fp)
 
-	if _, err := Open(search.Options{DSN: "postgres://db"}); err == nil || !strings.Contains(err.Error(), "create table") {
+	if _, err := New(search.Options{DSN: "postgres://db"}); err == nil || !strings.Contains(err.Error(), "create table") {
 		t.Fatalf("Open table err = %v, want create-table error", err)
 	}
 
@@ -240,7 +240,7 @@ func TestOpen_createIndexError(t *testing.T) {
 	fp := &fakePool{execErr: errors.New("index boom"), execFail: "CREATE INDEX"}
 	stubPool(t, fp)
 
-	if _, err := Open(search.Options{DSN: "postgres://db"}); err == nil || !strings.Contains(err.Error(), "create index") {
+	if _, err := New(search.Options{DSN: "postgres://db"}); err == nil || !strings.Contains(err.Error(), "create index") {
 		t.Fatalf("Open index err = %v, want create-index error", err)
 	}
 
@@ -253,7 +253,7 @@ func TestOpen_successRunsDDL(t *testing.T) {
 	fp := &fakePool{execTag: pgconn.NewCommandTag("CREATE TABLE")}
 	stubPool(t, fp)
 
-	s, err := Open(search.Options{DSN: "postgres://db"})
+	s, err := New(search.Options{DSN: "postgres://db"})
 	if err != nil {
 		t.Fatalf("Open err = %v", err)
 	}
@@ -768,7 +768,7 @@ func TestLive_roundtrip(t *testing.T) {
 
 	ctx := context.Background()
 
-	s, err := Open(search.Options{DSN: dsn})
+	s, err := New(search.Options{DSN: dsn})
 	if err != nil {
 		t.Fatalf("Open err = %v", err)
 	}

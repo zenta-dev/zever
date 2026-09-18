@@ -316,27 +316,27 @@ func TestSentinels(t *testing.T) {
 func TestOpen_MissingAdapter(t *testing.T) {
 	t.Parallel()
 
-	_, err := Open(webhook.Options{})
+	_, err := New(webhook.Options{})
 	if !errors.Is(err, ErrMissingQueueAdapter) {
-		t.Fatalf("Open() err = %v, want ErrMissingQueueAdapter", err)
+		t.Fatalf("New() err = %v, want ErrMissingQueueAdapter", err)
 	}
 }
 
 func TestOpen_WhitespaceAdapter(t *testing.T) {
 	t.Parallel()
 
-	_, err := Open(webhook.Options{QueueAdapter: "   "})
+	_, err := New(webhook.Options{QueueAdapter: "   "})
 	if !errors.Is(err, ErrMissingQueueAdapter) {
-		t.Fatalf("Open() err = %v, want ErrMissingQueueAdapter", err)
+		t.Fatalf("New() err = %v, want ErrMissingQueueAdapter", err)
 	}
 }
 
 func TestOpen_InvalidOptions(t *testing.T) {
 	t.Parallel()
 
-	_, err := Open(webhook.Options{Timeout: -time.Second, QueueAdapter: "memory"})
+	_, err := New(webhook.Options{Timeout: -time.Second, QueueAdapter: "memory"})
 	if !errors.Is(err, webhook.ErrInvalidOptions) {
-		t.Fatalf("Open() err = %v, want ErrInvalidOptions", err)
+		t.Fatalf("New() err = %v, want ErrInvalidOptions", err)
 	}
 }
 
@@ -348,9 +348,9 @@ func TestOpen_BadVisibility(t *testing.T) {
 		QueueOpts:    corequeue.Options{VisibilityTimeout: -time.Second},
 	}
 
-	_, err := Open(o)
+	_, err := New(o)
 	if !errors.Is(err, ErrVisibilityTimeout) {
-		t.Fatalf("Open() err = %v, want ErrVisibilityTimeout", err)
+		t.Fatalf("New() err = %v, want ErrVisibilityTimeout", err)
 	}
 }
 
@@ -363,44 +363,44 @@ func TestOpen_TimeoutGTEVisibility(t *testing.T) {
 		QueueOpts:    corequeue.Options{VisibilityTimeout: 30 * time.Second},
 	}
 
-	_, err := Open(o)
+	_, err := New(o)
 	if err == nil || !strings.Contains(err.Error(), "must be less than queue visibility timeout") {
-		t.Fatalf("Open() err = %v, want visibility complaint", err)
+		t.Fatalf("New() err = %v, want visibility complaint", err)
 	}
 }
 
 func TestOpen_UnknownQueueAdapter(t *testing.T) {
 	t.Parallel()
 
-	_, err := Open(webhook.Options{QueueAdapter: "bogus"})
+	_, err := New(webhook.Options{QueueAdapter: "bogus"})
 	if !errors.Is(err, corequeue.ErrInvalidAdapter) {
-		t.Fatalf("Open() err = %v, want ErrInvalidAdapter", err)
+		t.Fatalf("New() err = %v, want ErrInvalidAdapter", err)
 	}
 
 	if !strings.Contains(err.Error(), "queue: ") {
-		t.Fatalf("Open() err = %v, want queue prefix", err)
+		t.Fatalf("New() err = %v, want queue prefix", err)
 	}
 }
 
 func TestOpen_QueueOpenError(t *testing.T) {
 	t.Parallel()
 
-	_, err := Open(webhook.Options{QueueAdapter: "redis"})
+	_, err := New(webhook.Options{QueueAdapter: "redis"})
 	if !errors.Is(err, errTestTransport) {
-		t.Fatalf("Open() err = %v, want test transport error", err)
+		t.Fatalf("New() err = %v, want test transport error", err)
 	}
 
 	if !strings.Contains(err.Error(), "queue: open queue") {
-		t.Fatalf("Open() err = %v, want open queue prefix", err)
+		t.Fatalf("New() err = %v, want open queue prefix", err)
 	}
 }
 
 func TestOpen_Defaults(t *testing.T) {
 	t.Parallel()
 
-	w, err := Open(webhook.Options{QueueAdapter: "memory"})
+	w, err := New(webhook.Options{QueueAdapter: "memory"})
 	if err != nil {
-		t.Fatalf("Open() err = %v", err)
+		t.Fatalf("New() err = %v", err)
 	}
 
 	defer func() { _ = w.Close() }()
@@ -435,9 +435,9 @@ func TestOpen_CustomOptions(t *testing.T) {
 		DeadLetterTopic:     " custom-dlq ",
 	}
 
-	w, err := Open(o)
+	w, err := New(o)
 	if err != nil {
-		t.Fatalf("Open() err = %v", err)
+		t.Fatalf("New() err = %v", err)
 	}
 
 	defer func() { _ = w.Close() }()

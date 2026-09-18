@@ -110,7 +110,7 @@ func TestOpenWiresOptionsLogger(t *testing.T) {
 	t.Parallel()
 
 	caplog := &captureLogger{}
-	got, err := Open(webhook.Options{
+	got, err := New(webhook.Options{
 		QueueAdapter: "memory",
 		Timeout:      time.Second,
 		Logger:       caplog,

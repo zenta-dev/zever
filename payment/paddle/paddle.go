@@ -25,8 +25,8 @@ type driver struct {
 	maxWebhookBytes int
 }
 
-// Open creates a Payment backed by Paddle.
-func Open(o payment.Options) (payment.Payment, error) {
+// New creates a Payment backed by Paddle.
+func New(o payment.Options) (payment.Payment, error) {
 	if err := o.Validate(); err != nil {
 		return nil, fmt.Errorf("paddle: %w", err)
 	}
