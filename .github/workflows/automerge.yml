@@ -1,0 +1,97 @@
+name: automerge
+
+# Self-merge for the owner's PRs once the full green gate holds.
+#
+# Triggers: check_suite completion re-evaluates the gate after every CI
+# run; pull_request_target catches ordering races (opened/sync/reopened
+# ready before any suite completes). Both are idempotent: enabling
+# auto-merge twice is a no-op, and the job exits quietly unless every
+# condition below holds.
+#
+# Gate (all must report success on the PR head SHA):
+#   FMT ............ gofmt
+#   LINT ........... golangci-lint
+#   TEST ........... test (go 1.27)  (test (race + coverage) is push-only)
+#   SECURE ......... govulncheck, dependency-review (+ sbom artifact job)
+#   NO MALICIOUS ... CodeQL findings check, Analyze (go)
+#
+# Notes:
+# - pull_request_target (not pull_request) runs in the base-repo context,
+#   so GITHUB_TOKEN has write scope. Forks are excluded by the author gate.
+# - Branch protection requires 7 checks but not the CodeQL findings check,
+#   so this job verifies check-runs explicitly instead of trusting
+#   mergeStateStatus alone. A missing CodeQL run fails closed (do nothing).
+# - This workflow only becomes live after it merges to main
+#   (pull_request_target executes the base branch's file).
+
+on:
+  check_suite:
+    types: [completed]
+  pull_request_target:
+    types: [opened, synchronize, reopened, ready_for_review]
+
+permissions: {}
+
+jobs:
+  automerge:
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+      pull-requests: write
+    env:
+      GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+      OWNER_LOGIN: erhahahaa
+    steps:
+      - name: Enable auto-merge on green owner PRs
+        run: |
+          set -euo pipefail
+          REPO="${{ github.repository }}"
+          EVENT="${{ github.event_name }}"
+
+          pr_numbers() {
+            if [ "$EVENT" = "pull_request_target" ]; then
+              jq -r '.pull_request.number' "$GITHUB_EVENT_PATH"
+            else
+              jq -r '.check_suite.pull_requests[]?.number // empty' "$GITHUB_EVENT_PATH" | sort -u
+            fi
+          }
+
+          # Gate: every named check must conclude success on the head SHA.
+          # Missing runs fail closed (do nothing, wait for the next event).
+          # Sorted oldest-first so add keeps the latest rerun per name.
+          gate_green() {
+            local nr="$1" sha="$2" name got
+            local checks
+            checks=$(gh api "repos/$REPO/commits/$sha/check-runs?per_page=100" \
+              --jq '[.check_runs[] | select(.status == "completed")] | sort_by(.completed_at) | map({(.name): .conclusion}) | add // {}')
+            for name in gofmt "golangci-lint" "test (go 1.27)" govulncheck sbom dependency-review "Analyze (go)" CodeQL; do
+              got=$(jq -r --arg n "$name" '.[$n] // "MISSING"' <<<"$checks")
+              if [ "$got" != "success" ]; then
+                echo "PR #$nr: gate not green ($name: $got)"
+                return 1
+              fi
+            done
+            return 0
+          }
+
+          enable_for_pr() {
+            local nr="$1"
+            local info state draft author sha automerge
+            info=$(gh pr view "$nr" --repo "$REPO" --json number,state,isDraft,author,headRefOid,autoMergeRequest)
+            state=$(jq -r '.state' <<<"$info")
+            [ "$state" = "OPEN" ] || { echo "PR #$nr: state $state, skip"; return 0; }
+            [ "$(jq -r '.isDraft' <<<"$info")" = "false" ] || { echo "PR #$nr: draft, skip"; return 0; }
+            author=$(jq -r '.author.login' <<<"$info")
+            [ "$author" = "$OWNER_LOGIN" ] || { echo "PR #$nr: author $author, skip"; return 0; }
+            automerge=$(jq -r '.autoMergeRequest // empty' <<<"$info")
+            [ -z "$automerge" ] || { echo "PR #$nr: auto-merge already enabled"; return 0; }
+            sha=$(jq -r '.headRefOid' <<<"$info")
+            gate_green "$nr" "$sha" || return 0
+            echo "PR #$nr: gate green, enabling squash auto-merge"
+            gh pr merge --auto --squash "$nr" --repo "$REPO"
+          }
+
+          NRS=$(pr_numbers)
+          [ -n "$NRS" ] || { echo "no PRs for this event"; exit 0; }
+          # shellcheck disable=SC2086
+          for nr in $NRS; do enable_for_pr "$nr"; done
