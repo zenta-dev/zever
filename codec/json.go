@@ -12,7 +12,7 @@ type JSONCodec[V any] struct{}
 
 // Encode marshals v into JSON.
 func (JSONCodec[V]) Encode(v V) ([]byte, error) {
-	data, err := json.Marshal(v)
+	data, err := json.Marshal(v, json.Deterministic(true))
 	if err != nil {
 		return nil, fmt.Errorf("%w: %w", ErrEncode, err)
 	}
