@@ -11,6 +11,7 @@ import (
 
 	"github.com/PaddleHQ/paddle-go-sdk/v5"
 
+	"github.com/zenta-dev/zever/internal/httpclient"
 	"github.com/zenta-dev/zever/payment"
 )
 
@@ -44,7 +45,7 @@ func Open(o payment.Options) (payment.Payment, error) {
 		}
 	}
 
-	client, err := newSDK(o.APIKey, paddle.WithBaseURL(endpoint), paddle.WithClient(&http.Client{Timeout: payment.DefaultHTTPTimeout * time.Second}))
+	client, err := newSDK(o.APIKey, paddle.WithBaseURL(endpoint), paddle.WithClient(httpclient.NewClient(payment.DefaultHTTPTimeout)))
 	if err != nil {
 		return nil, fmt.Errorf("paddle: %w", err)
 	}

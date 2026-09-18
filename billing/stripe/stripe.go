@@ -3,11 +3,11 @@ package stripe
 import (
 	"context"
 	"fmt"
-	"net/http"
 
 	"github.com/stripe/stripe-go/v82"
 
 	"github.com/zenta-dev/zever/billing"
+	"github.com/zenta-dev/zever/internal/httpclient"
 )
 
 var _ billing.Billing = (*driver)(nil)
@@ -26,7 +26,7 @@ func Open(o billing.Options) (billing.Billing, error) {
 		return nil, ErrMissingSecretKey
 	}
 
-	cfg := &stripe.BackendConfig{HTTPClient: &http.Client{Timeout: billing.DefaultHTTPTimeout}}
+	cfg := &stripe.BackendConfig{HTTPClient: httpclient.NewClient(billing.DefaultHTTPTimeout)}
 	if o.Endpoint != "" {
 		cfg.URL = stripe.String(o.Endpoint)
 	}
