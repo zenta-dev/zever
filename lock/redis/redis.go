@@ -11,27 +11,22 @@ import (
 
 	goredis "github.com/redis/go-redis/v9"
 
+	"github.com/zenta-dev/zever/internal/cas"
 	zredis "github.com/zenta-dev/zever/internal/redis"
 	"github.com/zenta-dev/zever/lock"
 )
 
 // releaseScript deletes the key only when it still holds holder.
 // It returns 1 on release, 0 when the key is missing or owned by another
-// holder, so Unlock never steals someone else's lock.
-const releaseScript = `if redis.call("GET", KEYS[1]) == ARGV[1] then
-  return redis.call("DEL", KEYS[1])
-else
-  return 0
-end`
+// holder, so Unlock never steals someone else's lock. Shared with cache CAS
+// via internal/cas to keep owner-check semantics identical.
+const releaseScript = cas.CompareAndDeleteScript
 
 // extendScript renews the key TTL only when it still holds holder.
 // It returns 1 on renewal, 0 when the key is missing or owned by another
-// holder. GET and PEXPIRE run atomically inside the script.
-const extendScript = `if redis.call("GET", KEYS[1]) == ARGV[1] then
-  return redis.call("PEXPIRE", KEYS[1], ARGV[2])
-else
-  return 0
-end`
+// holder. GET and PEXPIRE run atomically inside the script. Shared with
+// cache CAS via internal/cas.
+const extendScript = cas.CompareAndExpireScript
 
 // redisClient is the subset of go-redis used by the adapter, faked in
 // tests to drive client errors without a server.
