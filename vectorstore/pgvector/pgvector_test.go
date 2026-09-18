@@ -888,7 +888,7 @@ func TestLiveUpsertBatch_MatchesLoopedUpsert(t *testing.T) {
 
 	ctx := t.Context()
 
-	loopStore, err := Open(vectorstore.Options{DSN: dsn, Dimension: 3})
+	loopStore, err := New(vectorstore.Options{DSN: dsn, Dimension: 3})
 	if err != nil {
 		t.Fatalf("Open() loop store error: %v", err)
 	}
@@ -913,7 +913,7 @@ func TestLiveUpsertBatch_MatchesLoopedUpsert(t *testing.T) {
 		}
 	})
 
-	batchStore, err := New(dsn, 3)
+	batchStore, err := New(vectorstore.Options{DSN: dsn, Dimension: 3})
 	if err != nil {
 		t.Fatalf("New() batch store error: %v", err)
 	}
