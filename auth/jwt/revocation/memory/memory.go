@@ -5,6 +5,7 @@
 package memory
 
 import (
+	"container/heap"
 	"context"
 	"errors"
 	mrand "math/rand"
@@ -30,13 +31,57 @@ type Options struct {
 
 var _ revocation.Store = (*store)(nil)
 
+// expiryItem is one revoked jti tracked in the byExpiry min-heap, alongside
+// its slice position (maintained by expiryHeap.Swap for container/heap).
+type expiryItem struct {
+	jti    string
+	expiry time.Time
+	index  int
+}
+
+// expiryHeap is a container/heap min-heap ordered by expiry time, so the
+// soonest-to-expire entry always sits at index 0. It backs both:
+//   - eviction at capacity: evict the entry closest to expiry first, instead
+//     of the oldest-inserted one, so a mass-revocation burst can't push out
+//     a revocation that still has most of its life left.
+//   - pruning: since the root is always the soonest-to-expire *live* entry,
+//     popping while the root is expired visits exactly the expired entries
+//     and stops as soon as it finds one that hasn't expired yet.
+type expiryHeap []*expiryItem
+
+func (h expiryHeap) Len() int { return len(h) }
+
+func (h expiryHeap) Less(i, j int) bool { return h[i].expiry.Before(h[j].expiry) }
+
+func (h expiryHeap) Swap(i, j int) {
+	h[i], h[j] = h[j], h[i]
+	h[i].index = i
+	h[j].index = j
+}
+
+func (h *expiryHeap) Push(x any) {
+	item, _ := x.(*expiryItem)
+	item.index = len(*h)
+	*h = append(*h, item)
+}
+
+func (h *expiryHeap) Pop() any {
+	old := *h
+	n := len(old)
+	item := old[n-1]
+	old[n-1] = nil
+	item.index = -1
+	*h = old[:n-1]
+
+	return item
+}
+
 type store struct {
 	max int
 
-	mu      sync.Mutex
-	revoked map[string]time.Time
-	order   []string
-	head    int
+	mu       sync.Mutex
+	revoked  map[string]time.Time
+	byExpiry expiryHeap
 
 	closed atomic.Bool
 	stop   chan struct{}
@@ -82,7 +127,7 @@ func (s *store) Revoke(_ context.Context, jti string, until time.Time) error {
 
 	s.ensureCapacityLocked(now)
 	s.revoked[jti] = until
-	s.order = append(s.order, jti)
+	heap.Push(&s.byExpiry, &expiryItem{jti: jti, expiry: until})
 
 	return nil
 }
@@ -119,6 +164,7 @@ func (s *store) Close() error {
 
 	s.mu.Lock()
 	clear(s.revoked)
+	s.byExpiry = nil
 	s.mu.Unlock()
 
 	return nil
@@ -131,33 +177,33 @@ func (s *store) ensureCapacityLocked(now time.Time) {
 
 	s.pruneExpiredLocked(now)
 	if len(s.revoked) >= s.max {
-		s.evictOldestLocked()
+		s.evictSoonestToExpireLocked()
 	}
 }
 
+// pruneExpiredLocked drops every already-expired entry. Because byExpiry is
+// a min-heap keyed by expiry, its root is always the soonest-to-expire live
+// entry: once the root isn't expired, nothing behind it is either, so the
+// loop can stop at the first live entry instead of scanning the whole map.
 func (s *store) pruneExpiredLocked(now time.Time) {
-	for jti, until := range s.revoked {
-		if !now.Before(until) {
-			delete(s.revoked, jti)
-		}
+	for len(s.byExpiry) > 0 && !now.Before(s.byExpiry[0].expiry) {
+		item, _ := heap.Pop(&s.byExpiry).(*expiryItem)
+		delete(s.revoked, item.jti)
 	}
 }
 
-func (s *store) evictOldestLocked() {
-	for s.head < len(s.order) {
-		jti := s.order[s.head]
-		s.head++
-
-		if _, ok := s.revoked[jti]; ok {
-			delete(s.revoked, jti)
-			break
-		}
+// evictSoonestToExpireLocked evicts the entry closest to its natural expiry,
+// rather than the oldest-inserted one. Under a mass-revocation burst this
+// minimizes the window in which an evicted-but-still-revoked jti becomes
+// silently valid again: whatever gets evicted would have expired soonest
+// anyway.
+func (s *store) evictSoonestToExpireLocked() {
+	if len(s.byExpiry) == 0 {
+		return
 	}
 
-	if s.head > 1024 && s.head > len(s.order)/2 {
-		s.order = append([]string(nil), s.order[s.head:]...)
-		s.head = 0
-	}
+	item, _ := heap.Pop(&s.byExpiry).(*expiryItem)
+	delete(s.revoked, item.jti)
 }
 
 func (s *store) startPruner() {

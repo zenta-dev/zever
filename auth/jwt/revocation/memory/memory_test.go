@@ -93,7 +93,15 @@ func TestIsRevoked_AfterClose(t *testing.T) {
 	}
 }
 
-func TestCapacity_EvictsOldest(t *testing.T) {
+// TestCapacity_EvictsSoonestToExpire is the regression test for the
+// eviction-policy bug: at capacity, the store must evict the entry closest
+// to its natural expiry, not the oldest-inserted one. It inserts entries
+// with a deliberate mismatch between insertion order and expiry order (the
+// first-inserted entry has the *furthest* expiry, a middle entry has the
+// *soonest*), forces an eviction, and asserts the soonest-to-expire entry
+// is the one that's gone while the oldest-inserted (but far-from-expiry)
+// entry survives.
+func TestCapacity_EvictsSoonestToExpire(t *testing.T) {
 	t.Parallel()
 
 	si, err := New(Options{MaxEntries: 4})
@@ -107,28 +115,116 @@ func TestCapacity_EvictsOldest(t *testing.T) {
 		t.Fatalf("New() returned %T, want *store", si)
 	}
 
-	future := time.Now().Add(time.Hour)
-	if err := s.Revoke(context.Background(), "oldest", future); err != nil {
+	now := time.Now()
+
+	// Inserted first, but far from expiry: under the old (oldest-inserted)
+	// policy this would be evicted first even though it's the safest entry
+	// to keep.
+	if err := s.Revoke(context.Background(), "oldest-but-far-from-expiry", now.Add(24*time.Hour)); err != nil {
 		t.Fatalf("Revoke() error = %v", err)
 	}
-	for i := 0; i < 3; i++ {
-		if err := s.Revoke(context.Background(), "filler-"+string(rune('a'+i)), future); err != nil {
-			t.Fatalf("Revoke() error = %v", err)
-		}
+	// Inserted second, and closest to expiry: this is the entry the fixed
+	// policy must evict.
+	if err := s.Revoke(context.Background(), "newer-but-soonest-to-expire", now.Add(time.Second)); err != nil {
+		t.Fatalf("Revoke() error = %v", err)
+	}
+	if err := s.Revoke(context.Background(), "filler-1", now.Add(12*time.Hour)); err != nil {
+		t.Fatalf("Revoke() error = %v", err)
+	}
+	if err := s.Revoke(context.Background(), "filler-2", now.Add(6*time.Hour)); err != nil {
+		t.Fatalf("Revoke() error = %v", err)
 	}
 
-	if err := s.Revoke(context.Background(), "fresh", future); err != nil {
+	// Store is now at MaxEntries (4). One more revoke forces an eviction.
+	if err := s.Revoke(context.Background(), "fresh", now.Add(time.Hour)); err != nil {
 		t.Fatalf("Revoke() at capacity error = %v", err)
 	}
 
 	if len(s.revoked) != 4 {
-		t.Fatalf("revoked len = %d, want 4 (evicted oldest)", len(s.revoked))
+		t.Fatalf("revoked len = %d, want 4", len(s.revoked))
 	}
-	if _, ok := s.revoked["oldest"]; ok {
-		t.Error("oldest entry survived capacity eviction")
+	if _, ok := s.revoked["newer-but-soonest-to-expire"]; ok {
+		t.Error("entry closest to expiry survived capacity eviction, want it evicted")
+	}
+	if _, ok := s.revoked["oldest-but-far-from-expiry"]; !ok {
+		t.Error("oldest-inserted entry was evicted even though it was far from expiry")
+	}
+	if _, ok := s.revoked["filler-1"]; !ok {
+		t.Error("filler-1 was unexpectedly evicted")
+	}
+	if _, ok := s.revoked["filler-2"]; !ok {
+		t.Error("filler-2 was unexpectedly evicted")
 	}
 	if revoked, err := s.IsRevoked(context.Background(), "fresh"); err != nil || !revoked {
 		t.Errorf("IsRevoked(fresh) = %v, %v, want true, nil", revoked, err)
+	}
+}
+
+// TestMassRevocationBurst hammers Revoke well past MaxEntries in a tight
+// loop (simulating a bulk logout / token rotation event) and asserts the
+// store doesn't panic or corrupt its internal state: the map and the
+// expiry heap must stay the same size, and every entry that IsRevoked
+// reports as present must actually still be tracked and correctly reported
+// as revoked.
+func TestMassRevocationBurst(t *testing.T) {
+	t.Parallel()
+
+	const maxEntries = 64
+	const burst = 5000
+
+	si, err := New(Options{MaxEntries: maxEntries})
+	if err != nil {
+		t.Fatalf("New() error = %v", err)
+	}
+	t.Cleanup(func() { _ = si.Close() })
+
+	s, ok := si.(*store)
+	if !ok {
+		t.Fatalf("New() returned %T, want *store", si)
+	}
+
+	now := time.Now()
+	ctx := context.Background()
+	jtis := make([]string, burst)
+	for i := 0; i < burst; i++ {
+		jti := "burst-" + string(rune('a'+i%26)) + string(rune('a'+(i/26)%26)) + string(rune('a'+(i/676)%26))
+		jtis[i] = jti
+		// Vary expiry so eviction has real choices to make, mixing
+		// near-expiry and far-from-expiry entries.
+		until := now.Add(time.Duration(i%1000+1) * time.Second)
+		if err := s.Revoke(ctx, jti, until); err != nil {
+			t.Fatalf("Revoke(%d) error = %v", i, err)
+		}
+	}
+
+	s.mu.Lock()
+	mapLen := len(s.revoked)
+	heapLen := len(s.byExpiry)
+	s.mu.Unlock()
+
+	if mapLen > maxEntries {
+		t.Fatalf("revoked map len = %d, want <= %d", mapLen, maxEntries)
+	}
+	if heapLen != mapLen {
+		t.Fatalf("byExpiry heap len = %d, want == revoked map len %d (state corrupted)", heapLen, mapLen)
+	}
+
+	// Every jti still tracked in the map must be correctly reported as
+	// revoked by IsRevoked; every evicted jti must correctly report false.
+	for _, jti := range jtis {
+		s.mu.Lock()
+		until, present := s.revoked[jti]
+		s.mu.Unlock()
+
+		revoked, err := s.IsRevoked(ctx, jti)
+		if err != nil {
+			t.Fatalf("IsRevoked(%q) error = %v", jti, err)
+		}
+
+		want := present && now.Before(until)
+		if revoked != want {
+			t.Errorf("IsRevoked(%q) = %v, want %v (present=%v)", jti, revoked, want, present)
+		}
 	}
 }
 
@@ -147,8 +243,12 @@ func TestPruneExpiredDirect(t *testing.T) {
 	}
 
 	past := time.Now().Add(-time.Minute)
-	s.revoked["old"] = past
-	s.revoked["live"] = time.Now().Add(time.Hour)
+	if err := s.Revoke(context.Background(), "old", past); err != nil {
+		t.Fatalf("Revoke() error = %v", err)
+	}
+	if err := s.Revoke(context.Background(), "live", time.Now().Add(time.Hour)); err != nil {
+		t.Fatalf("Revoke() error = %v", err)
+	}
 
 	s.pruneOnce(time.Now())
 
@@ -157,35 +257,6 @@ func TestPruneExpiredDirect(t *testing.T) {
 	}
 	if _, ok := s.revoked["live"]; !ok {
 		t.Error("pruneOnce dropped live entry")
-	}
-}
-
-func TestEvictOldestCompacts(t *testing.T) {
-	t.Parallel()
-
-	si, err := New(Options{})
-	if err != nil {
-		t.Fatalf("New() error = %v", err)
-	}
-	t.Cleanup(func() { _ = si.Close() })
-
-	s, ok := si.(*store)
-	if !ok {
-		t.Fatalf("New() returned %T, want *store", si)
-	}
-
-	// 2000 stale order entries, none in the map: the loop runs to the end,
-	// then the compact branch (head>1024 && head>len/2) fires.
-	for i := 0; i < 2000; i++ {
-		s.order = append(s.order, "stale")
-	}
-	s.evictOldestLocked()
-
-	if s.head != 0 {
-		t.Errorf("head = %d, want 0 after compact", s.head)
-	}
-	if len(s.order) != 0 {
-		t.Errorf("order len = %d, want 0 after compact", len(s.order))
 	}
 }
 
@@ -208,10 +279,12 @@ func TestPrunerTickFiresPruneOnce(t *testing.T) {
 		t.Fatalf("New() returned %T, want *store", si)
 	}
 
-	s.mu.Lock()
-	s.revoked["old-jti"] = time.Now().Add(-time.Minute)
-	s.revoked["live"] = time.Now().Add(time.Hour)
-	s.mu.Unlock()
+	if err := s.Revoke(context.Background(), "old-jti", time.Now().Add(-time.Minute)); err != nil {
+		t.Fatalf("Revoke() error = %v", err)
+	}
+	if err := s.Revoke(context.Background(), "live", time.Now().Add(time.Hour)); err != nil {
+		t.Fatalf("Revoke() error = %v", err)
+	}
 
 	fired <- time.Now()
 
