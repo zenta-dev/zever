@@ -14,7 +14,7 @@
 //
 // Security: never log secrets or raw option maps, use config.RedactedServices. APIKey is never logged and empty embeddings are rejected before IO.
 //
-// Performance: queries return up to topK ordered by descending score with topK <= 0 meaning 10. Bounded pools and timeouts via backend defaults.
+// Performance: queries return up to topK ordered by descending score with topK <= 0 meaning 10. UpsertBatch writes many vectors in one call instead of one round trip per vector; adapters implement it as a single multi-row statement, a native batch API, or a transaction wrapping the single-item path. Bounded pools and timeouts via backend defaults.
 //
 // Concurrency: safe for concurrent use unless noted. No globals, no init wiring.
 //

@@ -10,13 +10,11 @@
 //
 // DX: Open with Open, custom backends with Register. Options are typed with
 // zero-infra defaults for tests: empty Options falls back to DefaultTTL and
-// DefaultRetryInterval, and the memory adapter needs no server. There is no
-// dedicated lock section in config files; pass Options directly. See
-// config/README.md.
+// DefaultRetryInterval, and the memory adapter needs no server. Config file
+// plus env LOCK_<FIELD> (no prefix, e.g. LOCK_ADAPTER). See config/README.md.
 //
-// Container: no dedicated accessor, use Open directly after container.New(cfg)
-// for the surrounding services. Lazy per-service singleton, retry on error
-// applies to container-resolved services. See container/README.md.
+// Container: container.New(cfg) then c.Lock(). Lazy per-service singleton,
+// retry on error. See container/README.md.
 //
 // Lifecycle: ctx is first arg for IO, never stored. TryAcquire and Acquire take
 // ctx plus key plus ttl, Extend and Unlock take ctx, and Close takes ctx.

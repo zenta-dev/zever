@@ -1,14 +1,13 @@
 package meilisearch
 
 import (
-	"container/list"
 	"context"
 	"fmt"
-	"sync"
 
 	"github.com/meilisearch/meilisearch-go"
 
 	"github.com/zenta-dev/zever/codec"
+	"github.com/zenta-dev/zever/internal/lrucache"
 	"github.com/zenta-dev/zever/search"
 )
 
@@ -20,95 +19,14 @@ var (
 	metadataCodec = codec.JSONCodec[map[string]any]{}
 )
 
-type idIndexTracker struct {
-	mu       sync.Mutex
-	maxCap   int
-	entries  map[string][]string
-	order    *list.List
-	elements map[string]*list.Element
-}
-
-func newIDIndexTracker(maxCap int) *idIndexTracker {
-	return &idIndexTracker{
-		maxCap:   maxCap,
-		entries:  make(map[string][]string),
-		order:    list.New(),
-		elements: make(map[string]*list.Element),
-	}
-}
-
-func (t *idIndexTracker) add(id string, indexes []string) {
-	t.mu.Lock()
-	defer t.mu.Unlock()
-
-	cloned := append([]string(nil), indexes...)
-
-	if _, ok := t.entries[id]; ok {
-		t.entries[id] = cloned
-
-		if el, ok := t.elements[id]; ok {
-			t.order.MoveToBack(el)
-		}
-
-		return
-	}
-
-	t.entries[id] = cloned
-	el := t.order.PushBack(id)
-	t.elements[id] = el
-
-	for len(t.entries) > t.maxCap {
-		front := t.order.Front()
-		if front == nil {
-			break
-		}
-
-		oldest, ok := front.Value.(string)
-		if !ok {
-			t.order.Remove(front)
-
-			continue
-		}
-
-		delete(t.entries, oldest)
-		delete(t.elements, oldest)
-		t.order.Remove(front)
-	}
-}
-
-func (t *idIndexTracker) get(id string) ([]string, bool) {
-	t.mu.Lock()
-	defer t.mu.Unlock()
-
-	indexes, ok := t.entries[id]
-	if !ok {
-		return nil, false
-	}
-
-	return append([]string(nil), indexes...), true
-}
-
-func (t *idIndexTracker) delete(id string) {
-	t.mu.Lock()
-	defer t.mu.Unlock()
-
-	if _, ok := t.entries[id]; !ok {
-		return
-	}
-
-	delete(t.entries, id)
-
-	if el, ok := t.elements[id]; ok {
-		delete(t.elements, id)
-		t.order.Remove(el)
-	}
-}
-
-func (t *idIndexTracker) len() int {
-	t.mu.Lock()
-	defer t.mu.Unlock()
-
-	return len(t.entries)
+// cloneIndexes returns an independent copy of indexes, so neither the
+// caller nor the idIndexes cache can mutate the other's backing array
+// through an aliased slice. lrucache.Cache stores and returns values as-is
+// (no cloning), so this defensive copy, previously done inside
+// idIndexTracker's add/get, now has to happen at each call site that reads
+// from or writes to the cache.
+func cloneIndexes(indexes []string) []string {
+	return append([]string(nil), indexes...)
 }
 
 func resolveIndex(filters map[string]string) (string, error) {
@@ -121,7 +39,7 @@ func resolveIndex(filters map[string]string) (string, error) {
 
 type meilisearchClient struct {
 	client    meilisearch.ServiceManager
-	idIndexes *idIndexTracker
+	idIndexes *lrucache.Cache[string, []string]
 }
 
 // New creates a Meilisearch-backed search.Search from options.
@@ -141,7 +59,7 @@ func New(o search.Options) (search.Search, error) {
 		client = meilisearch.New(o.Host)
 	}
 
-	return &meilisearchClient{client: client, idIndexes: newIDIndexTracker(maxIDIndexes)}, nil
+	return &meilisearchClient{client: client, idIndexes: lrucache.New[string, []string](maxIDIndexes)}, nil
 }
 
 func recordIndex(indexes []string, idx string) []string {
@@ -155,8 +73,12 @@ func recordIndex(indexes []string, idx string) []string {
 }
 
 func (m *meilisearchClient) trackIndex(id, idx string) {
-	cur, _ := m.idIndexes.get(id)
-	m.idIndexes.add(id, recordIndex(cur, idx))
+	cur, ok := m.idIndexes.Get(id)
+	if ok {
+		cur = cloneIndexes(cur)
+	}
+
+	m.idIndexes.Put(id, cloneIndexes(recordIndex(cur, idx)))
 }
 
 // Index adds or replaces doc in its index.
@@ -220,7 +142,7 @@ func (m *meilisearchClient) IndexBatch(ctx context.Context, docs []search.Docume
 		idx := m.client.Index(idxName)
 
 		if _, err := idx.AddDocumentsWithContext(ctx, byIndex[idxName], nil); err != nil {
-			return fmt.Errorf("[search] meilisearch: index batch: %w", err)
+			return fmt.Errorf("meilisearch: index batch: %w", err)
 		}
 	}
 
@@ -233,7 +155,10 @@ func (m *meilisearchClient) IndexBatch(ctx context.Context, docs []search.Docume
 
 // Delete removes the document with id from every tracked index.
 func (m *meilisearchClient) Delete(ctx context.Context, id string) error {
-	indexes, _ := m.idIndexes.get(id)
+	indexes, ok := m.idIndexes.Get(id)
+	if ok {
+		indexes = cloneIndexes(indexes)
+	}
 
 	if len(indexes) == 0 {
 		// notFound is typed as error first: go vet's printf check rejects
@@ -256,7 +181,7 @@ func (m *meilisearchClient) Delete(ctx context.Context, id string) error {
 		}
 	}
 
-	m.idIndexes.delete(id)
+	m.idIndexes.Delete(id)
 
 	return nil
 }

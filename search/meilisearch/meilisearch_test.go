@@ -11,6 +11,7 @@ import (
 	"sync/atomic"
 	"testing"
 
+	"github.com/zenta-dev/zever/internal/lrucache"
 	"github.com/zenta-dev/zever/search"
 )
 
@@ -339,7 +340,7 @@ func TestIndex_error_returnsErrorWithoutPhantomTrack(t *testing.T) {
 func TestDelete_untracked_returnsNotFoundWithHint(t *testing.T) {
 	t.Parallel()
 
-	s := &meilisearchClient{client: nil, idIndexes: newIDIndexTracker(maxIDIndexes)}
+	s := &meilisearchClient{client: nil, idIndexes: lrucache.New[string, []string](maxIDIndexes)}
 	defer func() { _ = s.Close() }()
 
 	err := s.Delete(t.Context(), "ghost")
@@ -689,106 +690,76 @@ func TestToHits_missingKeys_yieldsZeroHit(t *testing.T) {
 	}
 }
 
+// TestTracker_addGetCloneDedupMoveBackEvict exercises the idIndexes cache
+// (now a plain lrucache.Cache[string, []string]) through the same observable
+// contract the old hand-rolled idIndexTracker had: reads are independent
+// copies (no aliasing), recordIndex dedups an already-tracked index, and
+// capacity overflow evicts the least-recently-used id while a Get-based
+// touch keeps an id alive.
 func TestTracker_addGetCloneDedupMoveBackEvict(t *testing.T) {
 	t.Parallel()
 
-	tr := newIDIndexTracker(2)
-	tr.add("a", []string{"i1"})
-	tr.add("b", []string{"i2"})
+	tr := lrucache.New[string, []string](2)
+	tr.Put("a", cloneIndexes([]string{"i1"}))
+	tr.Put("b", cloneIndexes([]string{"i2"}))
 
-	got, ok := tr.get("a")
+	got, ok := tr.Get("a")
 	if !ok || len(got) != 1 || got[0] != "i1" {
-		t.Fatalf("get(a) = %v,%v, want [i1],true", got, ok)
+		t.Fatalf("Get(a) = %v,%v, want [i1],true", got, ok)
 	}
 
+	got = cloneIndexes(got)
 	got[0] = "mutated"
-	again, _ := tr.get("a")
+	again, _ := tr.Get("a")
 	if again[0] != "i1" {
-		t.Fatalf("clone broken: get(a) = %v after mutate", again)
+		t.Fatalf("clone broken: Get(a) = %v after mutate", again)
 	}
 
-	tr.add("a", recordIndex([]string{"i1"}, "i1"))
-	if got, _ := tr.get("a"); len(got) != 1 {
-		t.Fatalf("dedup failed: get(a) = %v, want [i1]", got)
+	tr.Put("a", cloneIndexes(recordIndex([]string{"i1"}, "i1")))
+	if got, _ := tr.Get("a"); len(got) != 1 {
+		t.Fatalf("dedup failed: Get(a) = %v, want [i1]", got)
 	}
 
-	tr.add("a", recordIndex([]string{"i1"}, "i3"))
-	if got, _ := tr.get("a"); len(got) != 2 {
-		t.Fatalf("record failed: get(a) = %v, want [i1 i3]", got)
+	tr.Put("a", cloneIndexes(recordIndex([]string{"i1"}, "i3")))
+	if got, _ := tr.Get("a"); len(got) != 2 {
+		t.Fatalf("record failed: Get(a) = %v, want [i1 i3]", got)
 	}
 
-	tr.add("c", []string{"i4"})
-	if _, ok := tr.get("b"); ok {
+	// Touch "a" to make it most-recently-used before overflowing capacity.
+	tr.Get("a")
+	tr.Put("c", cloneIndexes([]string{"i4"}))
+	if _, ok := tr.Get("b"); ok {
 		t.Fatal("evict failed: b still present after cap overflow")
 	}
 
-	if _, ok := tr.get("a"); !ok {
+	if _, ok := tr.Get("a"); !ok {
 		t.Fatal("move-back failed: a evicted instead of b")
 	}
 
-	if _, ok := tr.get("c"); !ok {
+	if _, ok := tr.Get("c"); !ok {
 		t.Fatal("c missing after add")
 	}
 
-	if tr.len() != 2 {
-		t.Fatalf("len = %d, want 2", tr.len())
+	if tr.Len() != 2 {
+		t.Fatalf("Len = %d, want 2", tr.Len())
 	}
 }
 
-func TestTracker_evictSkipsCorruptOrderEntry(t *testing.T) {
+func TestTracker_delete_missing(t *testing.T) {
 	t.Parallel()
 
-	tr := newIDIndexTracker(1)
-	tr.order.PushFront(123)
-	tr.add("a", []string{"i1"})
-	tr.add("b", []string{"i2"})
+	tr := lrucache.New[string, []string](10)
+	tr.Delete("ghost") // must not panic on a missing key
 
-	if _, ok := tr.get("a"); ok {
-		t.Fatal("a should have been evicted")
+	tr.Put("b", cloneIndexes([]string{"i1"}))
+	tr.Delete("b")
+
+	if _, ok := tr.Get("b"); ok {
+		t.Fatal("b should be deleted")
 	}
 
-	if _, ok := tr.get("b"); !ok {
-		t.Fatal("b missing after evict")
-	}
-}
-
-func TestTracker_evictWithDrainedOrder_breaksCleanly(t *testing.T) {
-	t.Parallel()
-
-	tr := newIDIndexTracker(1)
-	tr.entries["x"] = []string{"i1"}
-	tr.entries["y"] = []string{"i2"}
-	tr.order.PushFront(123)
-	tr.add("z", []string{"i3"})
-
-	if tr.len() != 2 {
-		t.Fatalf("len = %d, want 2", tr.len())
-	}
-
-	if _, ok := tr.get("z"); ok {
-		t.Fatal("z should have been evicted as oldest after corrupt skip")
-	}
-}
-
-func TestTracker_delete_missingAndOrphanEntry(t *testing.T) {
-	t.Parallel()
-
-	tr := newIDIndexTracker(10)
-	tr.delete("ghost")
-
-	tr.add("a", []string{"i1"})
-	delete(tr.elements, "a")
-	tr.delete("a")
-
-	if _, ok := tr.get("a"); ok {
-		t.Fatal("a should be deleted")
-	}
-
-	tr.add("b", []string{"i1"})
-	tr.delete("b")
-
-	if tr.len() != 0 {
-		t.Fatalf("len = %d, want 0", tr.len())
+	if tr.Len() != 0 {
+		t.Fatalf("Len = %d, want 0", tr.Len())
 	}
 }
 
@@ -820,7 +791,7 @@ func TestResolveIndex_table(t *testing.T) {
 func TestClose_returnsNil(t *testing.T) {
 	t.Parallel()
 
-	s := &meilisearchClient{client: nil, idIndexes: newIDIndexTracker(1)}
+	s := &meilisearchClient{client: nil, idIndexes: lrucache.New[string, []string](1)}
 	if err := s.Close(); err != nil {
 		t.Fatalf("Close err = %v, want nil", err)
 	}

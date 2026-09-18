@@ -151,9 +151,25 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   required `IndexBatch(ctx, []Document) error` method, so callers indexing
   many documents/vectors no longer need N separate round-trips. All
   adapters implement the new methods: `pgvector` and `search/postgres` use
-  a single multi-row `INSERT ... ON CONFLICT`, `qdrant` uses its native
-  batch `Upsert` points API, `search/meilisearch` uses its native bulk
-  `AddDocuments` API grouped by index, and `vectorstore/sqlite` and
-  `search/sqlite` wrap the existing single-item logic in one transaction.
-  Any external implementation of `VectorStore` or `Search` must add the
-  new method.
+  multi-row `INSERT ... ON CONFLICT` statements chunked to stay under
+  Postgres's bind-parameter limit, `qdrant` uses its native batch `Upsert`
+  points API, `search/meilisearch` uses its native bulk `AddDocuments` API
+  grouped by index, and `vectorstore/sqlite` and `search/sqlite` wrap the
+  existing single-item logic in one transaction. Any external
+  implementation of `VectorStore` or `Search` must add the new method.
+
+### Fixed
+
+- `container.Container.Close` now flushes the `observability` service on
+  shutdown: `closeAny` probes for a fourth shutdown shape,
+  `Shutdown(context.Context) error`, which `observability.Provider` (and its
+  `Tracer`/`Metrics` sub-interfaces) implement instead of `Close`/`Stop`.
+  Previously `closeAny` silently no-oped for observability, so `otlp`'s
+  buffered spans and metrics were never flushed on `Container.Close`.
+- `vectorstore/pgvector`'s `UpsertBatch` and `search/postgres`'s
+  `IndexBatch` built one unbounded multi-row `INSERT` sized to the full
+  input slice, which could exceed Postgres's 65535 bind-parameter limit on
+  large batches and fail with an opaque driver error. Both now chunk the
+  input into multiple sequential `INSERT` statements (at most 20000 rows
+  per statement for `pgvector`, 15000 for `search/postgres`), still far
+  fewer round trips than one-by-one calls.

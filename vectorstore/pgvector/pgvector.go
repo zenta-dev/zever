@@ -189,30 +189,54 @@ func tableDDL(dimension int) string {
 	)`, dimension)
 }
 
-// Upsert inserts or replaces a vector in the store.
-func (s *Store) Upsert(ctx context.Context, vec vectorstore.Vector) error {
+// upsertRowCols is the number of bind parameters UpsertBatch's per-row
+// placeholder ($n, $n::vector, $n::jsonb) consumes.
+const upsertRowCols = 3
+
+// maxUpsertBatchRows caps rows per INSERT statement in UpsertBatch. Postgres's
+// extended-protocol wire format allows at most 65535 bind parameters per
+// statement; at upsertRowCols (3) params/row that's a hard ceiling around
+// 21845 rows. maxUpsertBatchRows keeps 3*20000 = 60000 params per statement,
+// a generous margin under the 65535 limit rather than cutting it at the
+// boundary.
+const maxUpsertBatchRows = 20000
+
+// encodeVectorRow validates vec's embedding dimension and encodes its
+// embedding and metadata for storage. Upsert and UpsertBatch both call it so
+// a validation-rule change only needs to happen once.
+func (s *Store) encodeVectorRow(vec vectorstore.Vector) (vecJSON string, metaJSON []byte, err error) {
 	if len(vec.Embedding) != s.dim {
 		// Pointer chain required: callers match with a *DimensionMismatchError
 		// target. The error-typed intermediate keeps that chain while
 		// satisfying govet's printf check.
 		mismatch := error(&vectorstore.DimensionMismatchError{Got: len(vec.Embedding), Want: s.dim})
-		return fmt.Errorf("pgvector: upsert: %w (set the dimension option or recreate the vectors table)", mismatch)
+		return "", nil, fmt.Errorf("%w (set the dimension option or recreate the vectors table)", mismatch)
 	}
 
-	metaJSON, err := metadataCodec.Encode(vec.Metadata)
+	metaJSON, err = metadataCodec.Encode(vec.Metadata)
 	if err != nil {
-		return fmt.Errorf("pgvector: marshal metadata: %w", err)
+		return "", nil, fmt.Errorf("marshal metadata: %w", err)
 	}
 
-	vecJSON, err := embeddingCodec.Encode(vec.Embedding)
+	vecJSONBytes, err := embeddingCodec.Encode(vec.Embedding)
 	if err != nil {
-		return fmt.Errorf("pgvector: marshal embedding: %w", err)
+		return "", nil, fmt.Errorf("marshal embedding: %w", err)
+	}
+
+	return string(vecJSONBytes), metaJSON, nil
+}
+
+// Upsert inserts or replaces a vector in the store.
+func (s *Store) Upsert(ctx context.Context, vec vectorstore.Vector) error {
+	vecJSON, metaJSON, err := s.encodeVectorRow(vec)
+	if err != nil {
+		return fmt.Errorf("pgvector: upsert: %w", err)
 	}
 
 	_, err = s.db.Exec(ctx,
 		`INSERT INTO vectors (id, embedding, metadata) VALUES ($1, $2::vector, $3::jsonb)
 		 ON CONFLICT (id) DO UPDATE SET embedding = EXCLUDED.embedding, metadata = EXCLUDED.metadata`,
-		vec.ID, string(vecJSON), metaJSON,
+		vec.ID, vecJSON, metaJSON,
 	)
 	if err != nil {
 		return fmt.Errorf("pgvector: upsert: %w", err)
@@ -221,38 +245,44 @@ func (s *Store) Upsert(ctx context.Context, vec vectorstore.Vector) error {
 	return nil
 }
 
-// UpsertBatch inserts or replaces all of vecs in a single multi-row INSERT
-// statement, one round trip regardless of len(vecs). An empty vecs is a no-op.
+// UpsertBatch inserts or replaces all of vecs, chunked into multi-row INSERT
+// statements of at most maxUpsertBatchRows rows each to stay under Postgres's
+// bind-parameter limit, still far fewer round trips than one-by-one calls. An
+// empty vecs is a no-op.
 func (s *Store) UpsertBatch(ctx context.Context, vecs []vectorstore.Vector) error {
 	if len(vecs) == 0 {
 		return nil
 	}
 
-	const cols = 3
-
-	placeholders := make([]string, 0, len(vecs))
-	args := make([]any, 0, len(vecs)*cols)
-
-	for i, vec := range vecs {
-		if len(vec.Embedding) != s.dim {
-			// See Upsert: pointer chain required for *DimensionMismatchError targets.
-			mismatch := error(&vectorstore.DimensionMismatchError{Got: len(vec.Embedding), Want: s.dim})
-			return fmt.Errorf("pgvector: upsert batch: %w (set the dimension option or recreate the vectors table)", mismatch)
+	for start := 0; start < len(vecs); start += maxUpsertBatchRows {
+		end := start + maxUpsertBatchRows
+		if end > len(vecs) {
+			end = len(vecs)
 		}
 
-		metaJSON, err := metadataCodec.Encode(vec.Metadata)
+		if err := s.upsertBatchChunk(ctx, vecs[start:end]); err != nil {
+			return err
+		}
+	}
+
+	return nil
+}
+
+// upsertBatchChunk executes a single multi-row INSERT for chunk, which must
+// be small enough to stay under Postgres's bind-parameter limit.
+func (s *Store) upsertBatchChunk(ctx context.Context, chunk []vectorstore.Vector) error {
+	placeholders := make([]string, 0, len(chunk))
+	args := make([]any, 0, len(chunk)*upsertRowCols)
+
+	for i, vec := range chunk {
+		vecJSON, metaJSON, err := s.encodeVectorRow(vec)
 		if err != nil {
-			return fmt.Errorf("pgvector: upsert batch: marshal metadata: %w", err)
+			return fmt.Errorf("pgvector: upsert batch: %w", err)
 		}
 
-		vecJSON, err := embeddingCodec.Encode(vec.Embedding)
-		if err != nil {
-			return fmt.Errorf("pgvector: upsert batch: marshal embedding: %w", err)
-		}
-
-		base := i * cols
+		base := i * upsertRowCols
 		placeholders = append(placeholders, fmt.Sprintf("($%d, $%d::vector, $%d::jsonb)", base+1, base+2, base+3))
-		args = append(args, vec.ID, string(vecJSON), metaJSON)
+		args = append(args, vec.ID, vecJSON, metaJSON)
 	}
 
 	query := fmt.Sprintf(

@@ -104,7 +104,7 @@ type closeSnapshot struct {
 // snapshots returns close snapshots for every lazy service that has no
 // explicit dependency ordering. Intentionally excluded (handled in Close's
 // ordered section): cache, queue (dependencies, closed last), scheduler, job
-// (dependents that hold cache/queue references, closed first), grpcServer
+// (dependents that hold a queue reference, closed first), grpcServer
 // (separate GracefulStop handling). This list must cover all remaining lazy
 // fields; currently 31 entries + 5 ordered = 36 lazy fields. When adding a
 // new service, add it here unless it depends on cache/queue (then add to
@@ -162,20 +162,21 @@ func snapshotServiceNames() []string {
 // Close closes every service this Container has already resolved. Services
 // never touched are left alone — Close never opens anything. Not every
 // service interface declares a Close method, so closeAny probes for whichever
-// shape the resolved instance actually has.
+// shape the resolved instance actually has: Close(ctx), Close(), Stop(), or
+// Shutdown(ctx).
 //
 // Dependency-aware ordering derived from explicit dependency map:
 //
-//	scheduler -> cache, queue
+//	scheduler -> queue (via job)
 //	job       -> queue
 //	*         -> (no dep, via snapshots)
 //	cache, queue -> (leaf dependencies, closed last)
 //	grpcServer -> (independent)
 //
 // Scheduler and job are closed first since they may hold a live reference
-// to the shared cache/queue instances injected by Scheduler/Job above;
-// closing cache/queue while scheduler could still be ticking would be a
-// use-after-close. When adding a new service that depends on cache/queue,
+// to the shared queue instance injected by Job (which Scheduler resolves
+// transitively); closing queue while scheduler could still be ticking would
+// be a use-after-close. When adding a new service that depends on cache/queue,
 // add it to the ordered section below (before snapshots or near scheduler/job)
 // and keep it excluded from snapshots(); otherwise add it to snapshots().
 func (c *Container) Close(ctx context.Context) error {
@@ -306,9 +307,13 @@ func (c *Container) Close(ctx context.Context) error {
 
 // closeAny probes the resolved instance for a shutdown shape, in order:
 // Close(context.Context) error, then Close() error, then Stop() error,
-// then nil. The Stop() error probe exists for the scheduler service, whose
-// interface declares Stop() error instead of Close. Anything else (for
-// example *job.Dispatcher, which has no shutdown method) is a no-op nil.
+// then Shutdown(context.Context) error, then nil. The Stop() error probe
+// exists for the scheduler service, whose interface declares Stop() error
+// instead of Close. The Shutdown(context.Context) error probe exists for
+// the observability service, whose Provider (and Tracer/Metrics) interfaces
+// declare Shutdown instead of Close, so buffered spans/metrics are flushed
+// on Container.Close. Anything else (for example *job.Dispatcher, which has
+// no shutdown method) is a no-op nil.
 func closeAny(ctx context.Context, v any) error {
 	switch closer := v.(type) {
 	case interface{ Close(context.Context) error }:
@@ -317,6 +322,8 @@ func closeAny(ctx context.Context, v any) error {
 		return closer.Close()
 	case interface{ Stop() error }:
 		return closer.Stop()
+	case interface{ Shutdown(context.Context) error }:
+		return closer.Shutdown(ctx)
 	default:
 		return nil
 	}
