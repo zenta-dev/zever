@@ -25,6 +25,10 @@ const (
 	maxErrSnippet = 4096
 	// maxExecAttempts bounds retries of transient text-file-busy exec failures.
 	maxExecAttempts = 5
+	// execRetryBackoff is the delay between text-file-busy retries, giving
+	// the kernel time to release the exec-in-progress lock under CI load
+	// instead of re-attempting immediately into the same busy window.
+	execRetryBackoff = 5 * time.Millisecond
 )
 
 // Spec describes an ffmpeg transcode or thumbnail extraction.
@@ -337,6 +341,8 @@ func Probe(ctx context.Context, ffprobe, path string) (ProbeResult, error) {
 		if err == nil || !isTextBusy(err) {
 			break
 		}
+
+		time.Sleep(execRetryBackoff)
 	}
 
 	if err != nil {
@@ -383,6 +389,8 @@ func RunTranscode(ctx context.Context, ffmpegBin string, argv []string) error {
 		if err == nil || !isTextBusy(err) {
 			break
 		}
+
+		time.Sleep(execRetryBackoff)
 	}
 
 	if err != nil {
