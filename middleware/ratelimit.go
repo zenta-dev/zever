@@ -2,7 +2,6 @@ package middleware
 
 import (
 	"context"
-	"encoding/json"
 	"math"
 	"net"
 	"net/http"
@@ -103,7 +102,9 @@ func RateLimit(limiter ratelimit.Limiter, keyFunc func(*http.Request) string, op
 				if o.failMode == FailClosed {
 					w.Header().Set("Content-Type", "application/json")
 					w.WriteHeader(http.StatusTooManyRequests)
-					_ = json.NewEncoder(w).Encode(errorBody{Error: "rate limit exceeded"})
+					if data, encErr := errorBodyCodec.Encode(errorBody{Error: "rate limit exceeded"}); encErr == nil {
+						_, _ = w.Write(append(data, '\n'))
+					}
 
 					return
 				}
@@ -120,7 +121,9 @@ func RateLimit(limiter ratelimit.Limiter, keyFunc func(*http.Request) string, op
 				w.Header().Set("Retry-After", strconv.Itoa(int(math.Ceil(decision.RetryAfter.Seconds()))))
 				w.Header().Set("Content-Type", "application/json")
 				w.WriteHeader(http.StatusTooManyRequests)
-				_ = json.NewEncoder(w).Encode(errorBody{Error: "rate limit exceeded"})
+				if data, encErr := errorBodyCodec.Encode(errorBody{Error: "rate limit exceeded"}); encErr == nil {
+					_, _ = w.Write(append(data, '\n'))
+				}
 
 				return
 			}

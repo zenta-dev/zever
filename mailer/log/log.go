@@ -2,20 +2,21 @@ package log
 
 import (
 	"context"
-	"encoding/json"
 	"fmt"
 	"io"
 	"os"
 	"sync"
 	"sync/atomic"
 
+	"github.com/zenta-dev/zever/codec"
 	"github.com/zenta-dev/zever/mailer"
 )
 
 // checker renders messages as JSON lines without sending.
 type checker struct {
 	mu     sync.Mutex
-	enc    *json.Encoder
+	w      io.Writer
+	codec  codec.Codec[logMessage]
 	closed atomic.Bool
 }
 
@@ -35,7 +36,7 @@ func NewWithWriter(opts mailer.Options, w io.Writer) (mailer.Mailer, error) {
 	if w == nil {
 		w = os.Stdout
 	}
-	return &checker{enc: json.NewEncoder(w)}, nil
+	return &checker{w: w, codec: codec.JSONCodec[logMessage]{}}, nil
 }
 
 type logAddress struct {
@@ -131,7 +132,14 @@ func (c *checker) Send(ctx context.Context, msg *mailer.Mail) error {
 	if c.closed.Load() {
 		return mailer.ErrClosed
 	}
-	return c.enc.Encode(out)
+	data, err := c.codec.Encode(out)
+	if err != nil {
+		return err
+	}
+	if _, err := c.w.Write(append(data, '\n')); err != nil {
+		return err
+	}
+	return nil
 }
 
 // Close shuts down the checker. It is idempotent and always returns nil.

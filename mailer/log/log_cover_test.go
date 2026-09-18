@@ -10,6 +10,7 @@ import (
 	"strings"
 	"testing"
 
+	"github.com/zenta-dev/zever/codec"
 	"github.com/zenta-dev/zever/mailer"
 )
 
@@ -99,7 +100,7 @@ func TestCoverSendClosedAfterLock(t *testing.T) {
 	oldMax := runtime.GOMAXPROCS(1)
 	defer runtime.GOMAXPROCS(oldMax)
 	for range 3 {
-		c := &checker{enc: json.NewEncoder(io.Discard)}
+		c := &checker{w: io.Discard, codec: codec.JSONCodec[logMessage]{}}
 		c.mu.Lock()
 		done := make(chan error, 1)
 		go func() {
