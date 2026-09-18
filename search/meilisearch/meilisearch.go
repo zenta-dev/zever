@@ -186,6 +186,51 @@ func (m *meilisearchClient) Index(ctx context.Context, doc search.Document) erro
 	return nil
 }
 
+// IndexBatch adds or replaces all of docs using meilisearch's native bulk
+// AddDocuments API. Documents are grouped by Index, since meilisearch's batch
+// endpoint targets one index per call, so this issues one HTTP call per
+// distinct index among docs rather than one call per document. An empty docs
+// is a no-op.
+func (m *meilisearchClient) IndexBatch(ctx context.Context, docs []search.Document) error {
+	if len(docs) == 0 {
+		return nil
+	}
+
+	byIndex := make(map[string][]map[string]any)
+	order := make([]string, 0)
+
+	for _, doc := range docs {
+		metadata := make(map[string]any, len(doc.Metadata))
+		for k, v := range doc.Metadata {
+			metadata[k] = v
+		}
+
+		if _, ok := byIndex[doc.Index]; !ok {
+			order = append(order, doc.Index)
+		}
+
+		byIndex[doc.Index] = append(byIndex[doc.Index], map[string]any{
+			"id":       doc.ID,
+			"content":  doc.Content,
+			"metadata": metadata,
+		})
+	}
+
+	for _, idxName := range order {
+		idx := m.client.Index(idxName)
+
+		if _, err := idx.AddDocumentsWithContext(ctx, byIndex[idxName], nil); err != nil {
+			return fmt.Errorf("[search] meilisearch: index batch: %w", err)
+		}
+	}
+
+	for _, doc := range docs {
+		m.trackIndex(doc.ID, doc.Index)
+	}
+
+	return nil
+}
+
 // Delete removes the document with id from every tracked index.
 func (m *meilisearchClient) Delete(ctx context.Context, id string) error {
 	indexes, _ := m.idIndexes.get(id)

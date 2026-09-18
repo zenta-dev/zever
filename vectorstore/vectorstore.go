@@ -12,6 +12,8 @@ import (
 type VectorStore interface {
 	// Upsert inserts or replaces vec. It returns ErrEmptyEmbedding for an empty embedding.
 	Upsert(ctx context.Context, vec Vector) error
+	// UpsertBatch inserts or replaces all of vecs. It returns ErrEmptyEmbedding for any empty embedding.
+	UpsertBatch(ctx context.Context, vecs []Vector) error
 	// Delete removes the vector with id.
 	// The sqlite and pgvector backends report NotFound for a missing id,
 	// while the qdrant backend delete is idempotent and reports no error.

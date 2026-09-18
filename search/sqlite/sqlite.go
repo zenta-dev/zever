@@ -98,6 +98,50 @@ func New(dsn string) (*Store, error) {
 // clone. The document row and its FTS row are dual-written inside one
 // transaction keyed on the documents rowid.
 func (s *Store) Index(ctx context.Context, doc search.Document) error {
+	tx, err := s.db.BeginTx(ctx, nil)
+	if err != nil {
+		return fmt.Errorf("sqlite: index: %w", err)
+	}
+
+	defer func() { _ = tx.Rollback() }()
+
+	if err := indexOne(ctx, tx, doc); err != nil {
+		return err
+	}
+
+	if err := tx.Commit(); err != nil {
+		return fmt.Errorf("sqlite: index: %w", err)
+	}
+
+	return nil
+}
+
+// IndexBatch adds or replaces all of docs in a single transaction.
+func (s *Store) IndexBatch(ctx context.Context, docs []search.Document) error {
+	tx, err := s.db.BeginTx(ctx, nil)
+	if err != nil {
+		return fmt.Errorf("sqlite: index batch: %w", err)
+	}
+
+	defer func() { _ = tx.Rollback() }()
+
+	for _, doc := range docs {
+		if err := indexOne(ctx, tx, doc); err != nil {
+			return err
+		}
+	}
+
+	if err := tx.Commit(); err != nil {
+		return fmt.Errorf("sqlite: index batch: %w", err)
+	}
+
+	return nil
+}
+
+// indexOne writes doc's document and FTS rows using tx, so Index and
+// IndexBatch share identical per-document logic under either a single- or
+// multi-document transaction.
+func indexOne(ctx context.Context, tx *sql.Tx, doc search.Document) error {
 	meta := make(map[string]any, len(doc.Metadata)+1)
 	for k, v := range doc.Metadata {
 		meta[k] = v
@@ -119,21 +163,10 @@ func (s *Store) Index(ctx context.Context, doc search.Document) error {
 		{`INSERT INTO search_fts(rowid, content, id, idx) SELECT rowid, ?, ?, ? FROM search_documents WHERE id = ? AND idx = ?`, []any{doc.Content, doc.ID, doc.Index, doc.ID, doc.Index}},
 	}
 
-	tx, err := s.db.BeginTx(ctx, nil)
-	if err != nil {
-		return fmt.Errorf("sqlite: index: %w", err)
-	}
-
-	defer func() { _ = tx.Rollback() }()
-
 	for _, st := range stmts {
 		if _, err := tx.ExecContext(ctx, st.query, st.args...); err != nil {
 			return fmt.Errorf("sqlite: index: %w", err)
 		}
-	}
-
-	if err := tx.Commit(); err != nil {
-		return fmt.Errorf("sqlite: index: %w", err)
 	}
 
 	return nil

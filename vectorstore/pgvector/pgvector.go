@@ -230,6 +230,53 @@ func (s *Store) Upsert(ctx context.Context, vec vectorstore.Vector) error {
 	return nil
 }
 
+// UpsertBatch inserts or replaces all of vecs in a single multi-row INSERT
+// statement, one round trip regardless of len(vecs). An empty vecs is a no-op.
+func (s *Store) UpsertBatch(ctx context.Context, vecs []vectorstore.Vector) error {
+	if len(vecs) == 0 {
+		return nil
+	}
+
+	const cols = 3
+
+	placeholders := make([]string, 0, len(vecs))
+	args := make([]any, 0, len(vecs)*cols)
+
+	for i, vec := range vecs {
+		if len(vec.Embedding) != s.dim {
+			// See Upsert: pointer chain required for *DimensionMismatchError targets.
+			mismatch := error(&vectorstore.DimensionMismatchError{Got: len(vec.Embedding), Want: s.dim})
+			return fmt.Errorf("pgvector: upsert batch: %w (set the dimension option or recreate the vectors table)", mismatch)
+		}
+
+		metaJSON, err := metadataCodec.Encode(vec.Metadata)
+		if err != nil {
+			return fmt.Errorf("pgvector: upsert batch: marshal metadata: %w", err)
+		}
+
+		vecJSON, err := embeddingCodec.Encode(vec.Embedding)
+		if err != nil {
+			return fmt.Errorf("pgvector: upsert batch: marshal embedding: %w", err)
+		}
+
+		base := i * cols
+		placeholders = append(placeholders, fmt.Sprintf("($%d, $%d::vector, $%d::jsonb)", base+1, base+2, base+3))
+		args = append(args, vec.ID, string(vecJSON), metaJSON)
+	}
+
+	query := fmt.Sprintf(
+		`INSERT INTO vectors (id, embedding, metadata) VALUES %s
+		 ON CONFLICT (id) DO UPDATE SET embedding = EXCLUDED.embedding, metadata = EXCLUDED.metadata`,
+		strings.Join(placeholders, ", "),
+	)
+
+	if _, err := s.db.Exec(ctx, query, args...); err != nil {
+		return fmt.Errorf("pgvector: upsert batch: %w", err)
+	}
+
+	return nil
+}
+
 // Delete removes a vector by ID from the store.
 func (s *Store) Delete(ctx context.Context, id string) error {
 	rows, err := s.db.Query(ctx, `SELECT 1 FROM vectors WHERE id = $1`, id)

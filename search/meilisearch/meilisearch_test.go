@@ -158,6 +158,164 @@ func TestIndex_sendsDocumentStructure(t *testing.T) {
 	}
 }
 
+func TestIndexBatch_sendsSingleRequestPerIndex(t *testing.T) {
+	t.Parallel()
+
+	var mu sync.Mutex
+
+	var paths []string
+
+	var bodies [][]byte
+
+	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		mu.Lock()
+
+		paths = append(paths, r.URL.Path)
+
+		b, _ := io.ReadAll(r.Body)
+		bodies = append(bodies, b)
+
+		mu.Unlock()
+
+		w.Header().Set("Content-Type", "application/json")
+		w.WriteHeader(202)
+		_, _ = w.Write([]byte(testTaskResponse))
+	}))
+	defer srv.Close()
+
+	s := openTest(t, srv, "")
+	defer func() { _ = s.Close() }()
+
+	docs := []search.Document{
+		{ID: "d1", Index: "idx-a", Content: "hello"},
+		{ID: "d2", Index: "idx-a", Content: "world"},
+		{ID: "d3", Index: "idx-b", Content: "goodbye"},
+	}
+
+	mc, ok := s.(*meilisearchClient)
+	if !ok {
+		t.Fatal("openTest did not return *meilisearchClient")
+	}
+
+	if err := mc.IndexBatch(t.Context(), docs); err != nil {
+		t.Fatalf("IndexBatch err = %v", err)
+	}
+
+	// Two distinct indexes among 3 docs, so exactly 2 HTTP calls (one bulk
+	// call per index), not 3 (one per document).
+	if len(paths) != 2 {
+		t.Fatalf("HTTP calls = %d, want 2", len(paths))
+	}
+
+	if paths[0] != "/indexes/idx-a/documents" || paths[1] != "/indexes/idx-b/documents" {
+		t.Fatalf("paths = %v", paths)
+	}
+
+	var idxADocs []map[string]any
+	if err := json.Unmarshal(bodies[0], &idxADocs); err != nil {
+		t.Fatalf("idx-a body unmarshal err = %v", err)
+	}
+
+	if len(idxADocs) != 2 {
+		t.Fatalf("idx-a docs = %d, want 2", len(idxADocs))
+	}
+}
+
+func TestIndexBatch_empty(t *testing.T) {
+	t.Parallel()
+
+	srv := httptest.NewServer(serveJSON(t, 202, testTaskResponse, nil))
+	defer srv.Close()
+
+	s := openTest(t, srv, "")
+	defer func() { _ = s.Close() }()
+
+	mc, ok := s.(*meilisearchClient)
+	if !ok {
+		t.Fatal("openTest did not return *meilisearchClient")
+	}
+
+	if err := mc.IndexBatch(t.Context(), nil); err != nil {
+		t.Fatalf("IndexBatch(nil) err = %v, want nil", err)
+	}
+}
+
+func TestIndexBatch_error_returnsErrorWithoutPhantomTrack(t *testing.T) {
+	t.Parallel()
+
+	srv := httptest.NewServer(serveJSON(t, 500, testErrorResponse, nil))
+	defer srv.Close()
+
+	s := openTest(t, srv, "")
+	defer func() { _ = s.Close() }()
+
+	docs := []search.Document{{ID: "d1", Index: "idx", Content: "hi"}}
+
+	mc, ok := s.(*meilisearchClient)
+	if !ok {
+		t.Fatal("openTest did not return *meilisearchClient")
+	}
+
+	if err := mc.IndexBatch(t.Context(), docs); err == nil {
+		t.Fatal("IndexBatch err = nil, want error")
+	}
+
+	err := s.Delete(t.Context(), "d1")
+
+	var nf *search.NotFoundError
+	if !errors.As(err, &nf) {
+		t.Fatalf("Delete err = %v, want NotFoundError (no phantom track)", err)
+	}
+}
+
+func TestIndexBatch_matchesLoopedIndex_tracking(t *testing.T) {
+	t.Parallel()
+
+	docs := []search.Document{
+		{ID: "loop-d1", Index: "idx", Content: "hello"},
+		{ID: "loop-d2", Index: "idx", Content: "world"},
+	}
+
+	loopSrv := httptest.NewServer(serveJSON(t, 202, testTaskResponse, nil))
+	defer loopSrv.Close()
+
+	loopS := openTest(t, loopSrv, "")
+	defer func() { _ = loopS.Close() }()
+
+	for _, d := range docs {
+		if err := loopS.Index(t.Context(), d); err != nil {
+			t.Fatalf("loop Index err = %v", err)
+		}
+	}
+
+	batchSrv := httptest.NewServer(serveJSON(t, 202, testTaskResponse, nil))
+	defer batchSrv.Close()
+
+	batchS := openTest(t, batchSrv, "")
+	defer func() { _ = batchS.Close() }()
+
+	mc, ok := batchS.(*meilisearchClient)
+	if !ok {
+		t.Fatal("openTest did not return *meilisearchClient")
+	}
+
+	if err := mc.IndexBatch(t.Context(), docs); err != nil {
+		t.Fatalf("IndexBatch err = %v", err)
+	}
+
+	// Both paths must leave every document tracked for Delete, proving
+	// IndexBatch reaches the same end-state as the looped Index calls.
+	for _, d := range docs {
+		if err := loopS.Delete(t.Context(), d.ID); err != nil {
+			t.Fatalf("loop Delete(%s) err = %v", d.ID, err)
+		}
+
+		if err := batchS.Delete(t.Context(), d.ID); err != nil {
+			t.Fatalf("batch Delete(%s) err = %v", d.ID, err)
+		}
+	}
+}
+
 func TestIndex_error_returnsErrorWithoutPhantomTrack(t *testing.T) {
 	t.Parallel()
 
