@@ -162,7 +162,8 @@ func snapshotServiceNames() []string {
 // Close closes every service this Container has already resolved. Services
 // never touched are left alone — Close never opens anything. Not every
 // service interface declares a Close method, so closeAny probes for whichever
-// shape the resolved instance actually has.
+// shape the resolved instance actually has: Close(ctx), Close(), Stop(), or
+// Shutdown(ctx).
 //
 // Dependency-aware ordering derived from explicit dependency map:
 //
@@ -306,9 +307,13 @@ func (c *Container) Close(ctx context.Context) error {
 
 // closeAny probes the resolved instance for a shutdown shape, in order:
 // Close(context.Context) error, then Close() error, then Stop() error,
-// then nil. The Stop() error probe exists for the scheduler service, whose
-// interface declares Stop() error instead of Close. Anything else (for
-// example *job.Dispatcher, which has no shutdown method) is a no-op nil.
+// then Shutdown(context.Context) error, then nil. The Stop() error probe
+// exists for the scheduler service, whose interface declares Stop() error
+// instead of Close. The Shutdown(context.Context) error probe exists for
+// the observability service, whose Provider (and Tracer/Metrics) interfaces
+// declare Shutdown instead of Close, so buffered spans/metrics are flushed
+// on Container.Close. Anything else (for example *job.Dispatcher, which has
+// no shutdown method) is a no-op nil.
 func closeAny(ctx context.Context, v any) error {
 	switch closer := v.(type) {
 	case interface{ Close(context.Context) error }:
@@ -317,6 +322,8 @@ func closeAny(ctx context.Context, v any) error {
 		return closer.Close()
 	case interface{ Stop() error }:
 		return closer.Stop()
+	case interface{ Shutdown(context.Context) error }:
+		return closer.Shutdown(ctx)
 	default:
 		return nil
 	}
