@@ -3,7 +3,6 @@ package ollama
 import (
 	"bytes"
 	"context"
-	"encoding/json"
 	"errors"
 	"fmt"
 	"io"
@@ -13,6 +12,7 @@ import (
 	"time"
 
 	"github.com/zenta-dev/zever/ai"
+	"github.com/zenta-dev/zever/codec"
 	"github.com/zenta-dev/zever/internal/endpoint"
 	"github.com/zenta-dev/zever/internal/httpclient"
 )
@@ -117,9 +117,21 @@ type embedResponse struct {
 	Embeddings [][]float32 `json:"embeddings"`
 }
 
+var (
+	// requestCodec encodes outgoing Ollama request bodies. It is kept generic
+	// over any (rather than a per-request-type codec) because encode below
+	// must accept arbitrary values, including ones that are not valid JSON,
+	// to preserve its existing error-mapping behavior.
+	requestCodec        = codec.JSONCodec[any]{}
+	chatResponseCodec   = codec.JSONCodec[chatResponse]{}
+	streamResponseCodec = codec.JSONCodec[streamResponse]{}
+	embedResponseCodec  = codec.JSONCodec[embedResponse]{}
+	toolArgsCodec       = codec.JSONCodec[map[string]any]{}
+)
+
 // encode marshals v for an Ollama request.
 func encode(v any) ([]byte, error) {
-	body, err := json.Marshal(v)
+	body, err := requestCodec.Encode(v)
 	if err != nil {
 		return nil, fmt.Errorf("ollama: marshal request: %w", err)
 	}
@@ -156,8 +168,8 @@ func (a *adapter) Generate(ctx context.Context, model string, messages []ai.Mess
 		return ai.Generation{}, err
 	}
 
-	var chatResp chatResponse
-	if unmarshalErr := json.Unmarshal(respBody, &chatResp); unmarshalErr != nil {
+	chatResp, unmarshalErr := chatResponseCodec.Decode(respBody)
+	if unmarshalErr != nil {
 		return ai.Generation{}, fmt.Errorf("ollama: unmarshal response: %w", unmarshalErr)
 	}
 
@@ -235,15 +247,31 @@ func (a *adapter) Stream(ctx context.Context, model string, messages []ai.Messag
 		defer close(ch)
 		defer func() { _ = resp.Body.Close() }()
 
-		dec := json.NewDecoder(resp.Body)
+		// codec.Codec[V] has no streaming form (only Decode([]byte) (V, error)),
+		// so the full response is buffered up front and then split into its
+		// newline-delimited JSON records. This trades incremental decoding as
+		// bytes arrive for a single buffered read; acceptable for the response
+		// sizes these single API calls produce.
+		respBody, readErr := io.ReadAll(resp.Body)
+		if readErr != nil {
+			select {
+			case ch <- ai.StreamChunk{Err: fmt.Errorf("ollama: read stream: %w", readErr)}:
+			case <-ctx.Done():
+			}
 
-		for {
-			var sr streamResponse
-			if err := dec.Decode(&sr); err != nil {
-				if err == io.EOF {
-					return
-				}
+			return
+		}
 
+		lines := bytes.Split(respBody, []byte("\n"))
+
+		for _, line := range lines {
+			line = bytes.TrimSpace(line)
+			if len(line) == 0 {
+				continue
+			}
+
+			sr, err := streamResponseCodec.Decode(line)
+			if err != nil {
 				select {
 				case ch <- ai.StreamChunk{Err: fmt.Errorf("ollama: decode stream: %w", err)}:
 				case <-ctx.Done():
@@ -271,7 +299,7 @@ func (a *adapter) Stream(ctx context.Context, model string, messages []ai.Messag
 				}
 
 				for i, tc := range sr.Message.ToolCalls {
-					argsBytes, err := json.Marshal(tc.Function.Arguments)
+					argsBytes, err := toolArgsCodec.Encode(tc.Function.Arguments)
 					if err != nil {
 						select {
 						case ch <- ai.StreamChunk{Err: fmt.Errorf("ollama: marshal tool arguments: %w", err)}:
@@ -352,8 +380,8 @@ func (a *adapter) Embed(ctx context.Context, model string, inputs []string, opts
 		return nil, fmt.Errorf("ollama: embed %w", err)
 	}
 
-	var embedResp embedResponse
-	if err := json.Unmarshal(respBody, &embedResp); err != nil {
+	embedResp, err := embedResponseCodec.Decode(respBody)
+	if err != nil {
 		return nil, fmt.Errorf("ollama: unmarshal embed response: %w", err)
 	}
 
@@ -502,7 +530,7 @@ func responseFormat(rf *ai.ResponseFormat) any {
 func toolCalls(calls []ollamaToolCall) ([]ai.ToolCall, error) {
 	out := make([]ai.ToolCall, 0, len(calls))
 	for i, tc := range calls {
-		argsBytes, err := json.Marshal(tc.Function.Arguments)
+		argsBytes, err := toolArgsCodec.Encode(tc.Function.Arguments)
 		if err != nil {
 			return nil, fmt.Errorf("ollama: marshal tool arguments: %w", err)
 		}
