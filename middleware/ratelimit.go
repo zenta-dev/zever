@@ -46,15 +46,68 @@ func PeerAddrKey(ctx context.Context) string {
 	return host
 }
 
+// FailMode controls what RateLimit and RateLimitUnaryServerInterceptor do
+// when the underlying ratelimit.Limiter itself returns an error (as opposed
+// to a normal allow/deny decision).
+type FailMode int
+
+const (
+	// FailOpen passes the request through when the limiter errors. It is the
+	// zero value so existing callers keep their current behavior: a broken
+	// limiter must never itself take the API down.
+	FailOpen FailMode = iota
+
+	// FailClosed rejects the request when the limiter errors, for endpoints
+	// where an unenforced limit is more dangerous than reduced availability.
+	FailClosed
+)
+
+// options holds the configuration shared by RateLimit and
+// RateLimitUnaryServerInterceptor.
+type options struct {
+	failMode FailMode
+}
+
+// Option configures RateLimit or RateLimitUnaryServerInterceptor.
+type Option func(*options)
+
+// WithFailMode sets the behavior used when the limiter itself errors.
+// The default, FailOpen, is unchanged from before this option existed.
+func WithFailMode(mode FailMode) Option {
+	return func(o *options) { o.failMode = mode }
+}
+
+func buildOptions(opts []Option) options {
+	var o options
+	for _, opt := range opts {
+		opt(&o)
+	}
+
+	return o
+}
+
 // RateLimit returns HTTP middleware that calls limiter.Allow(ctx, keyFunc(r),
-// 1) per request, responding 429 with a Retry-After header when denied. A
-// limiter failure fails OPEN (the request passes through): a broken limiter
-// must never itself take the API down.
-func RateLimit(limiter ratelimit.Limiter, keyFunc func(*http.Request) string) func(http.Handler) http.Handler {
+// 1) per request, responding 429 with a Retry-After header when denied. By
+// default, a limiter failure fails OPEN (the request passes through): a
+// broken limiter must never itself take the API down. Pass
+// WithFailMode(FailClosed) to instead respond 429 on a limiter error, for
+// high-sensitivity endpoints where an unenforced limit is worse than reduced
+// availability.
+func RateLimit(limiter ratelimit.Limiter, keyFunc func(*http.Request) string, opts ...Option) func(http.Handler) http.Handler {
+	o := buildOptions(opts)
+
 	return func(next http.Handler) http.Handler {
 		return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 			decision, err := limiter.Allow(r.Context(), keyFunc(r), 1)
 			if err != nil {
+				if o.failMode == FailClosed {
+					w.Header().Set("Content-Type", "application/json")
+					w.WriteHeader(http.StatusTooManyRequests)
+					_ = json.NewEncoder(w).Encode(errorBody{Error: "rate limit exceeded"})
+
+					return
+				}
+
 				// Fail open, matching RateLimitUnaryServerInterceptor.
 				next.ServeHTTP(w, r)
 
@@ -78,12 +131,22 @@ func RateLimit(limiter ratelimit.Limiter, keyFunc func(*http.Request) string) fu
 }
 
 // RateLimitUnaryServerInterceptor is RateLimit's gRPC counterpart, returning
-// codes.ResourceExhausted when the limiter denies the call and failing open
-// (delegating to the handler) on limiter errors.
-func RateLimitUnaryServerInterceptor(limiter ratelimit.Limiter, keyFunc func(context.Context) string) grpc.UnaryServerInterceptor {
+// codes.ResourceExhausted when the limiter denies the call. By default, a
+// limiter failure fails open (delegating to the handler): a broken limiter
+// must never itself take the API down. Pass WithFailMode(FailClosed) to
+// instead return codes.ResourceExhausted on a limiter error, for
+// high-sensitivity endpoints where an unenforced limit is worse than reduced
+// availability.
+func RateLimitUnaryServerInterceptor(limiter ratelimit.Limiter, keyFunc func(context.Context) string, opts ...Option) grpc.UnaryServerInterceptor {
+	o := buildOptions(opts)
+
 	return func(ctx context.Context, req any, _ *grpc.UnaryServerInfo, handler grpc.UnaryHandler) (any, error) {
 		decision, err := limiter.Allow(ctx, keyFunc(ctx), 1)
 		if err != nil {
+			if o.failMode == FailClosed {
+				return nil, status.Error(codes.ResourceExhausted, "rate limit exceeded")
+			}
+
 			// Fail open, matching RateLimit's HTTP behavior.
 			return handler(ctx, req)
 		}
