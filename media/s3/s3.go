@@ -3,7 +3,6 @@ package s3
 import (
 	"bytes"
 	"context"
-	"encoding/json"
 	"errors"
 	"fmt"
 	"image"
@@ -22,6 +21,7 @@ import (
 	s3sdk "github.com/aws/aws-sdk-go-v2/service/s3"
 	"github.com/aws/smithy-go"
 
+	"github.com/zenta-dev/zever/codec"
 	"github.com/zenta-dev/zever/internal/s3opts"
 	"github.com/zenta-dev/zever/media"
 )
@@ -405,6 +405,11 @@ type ffStream struct {
 	Height    int    `json:"height"`
 }
 
+// ffprobeCodec decodes ffprobe JSON output into ffprobeOutput. ffprobeOutput
+// has no custom marshaler, so migrating it to codec.JSONCodec (encoding/json/v2)
+// carries no interop risk.
+var ffprobeCodec = codec.JSONCodec[ffprobeOutput]{}
+
 // stageTemp writes data to a private temp file for external tools.
 func stageTemp(ext string, data []byte) (string, string, error) {
 	dir, err := mkdirTemp("", "medias3-")
@@ -434,7 +439,8 @@ func runFFProbe(ctx context.Context, bin, file string) (ffprobeOutput, error) {
 		return parsed, fmt.Errorf("s3: probe: %w", media.ErrProbeFailed)
 	}
 
-	if err := json.Unmarshal(raw, &parsed); err != nil {
+	parsed, err = ffprobeCodec.Decode(raw)
+	if err != nil {
 		return parsed, fmt.Errorf("s3: probe: %w", media.ErrProbeFailed)
 	}
 

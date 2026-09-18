@@ -3,16 +3,22 @@ package meilisearch
 import (
 	"container/list"
 	"context"
-	"encoding/json"
 	"fmt"
 	"sync"
 
 	"github.com/meilisearch/meilisearch-go"
 
+	"github.com/zenta-dev/zever/codec"
 	"github.com/zenta-dev/zever/search"
 )
 
 const maxIDIndexes = 10000
+
+var (
+	idCodec       = codec.JSONCodec[string]{}
+	scoreCodec    = codec.JSONCodec[float64]{}
+	metadataCodec = codec.JSONCodec[map[string]any]{}
+)
 
 type idIndexTracker struct {
 	mu       sync.Mutex
@@ -267,22 +273,19 @@ func toHits(raw meilisearch.Hits) []search.Hit {
 		hit := search.Hit{}
 
 		if idRaw, ok := r["id"]; ok {
-			var id string
-			if err := json.Unmarshal(idRaw, &id); err == nil {
+			if id, err := idCodec.Decode(idRaw); err == nil {
 				hit.ID = id
 			}
 		}
 
 		if scoreRaw, ok := r["_rankingScore"]; ok {
-			var score float64
-			if err := json.Unmarshal(scoreRaw, &score); err == nil {
+			if score, err := scoreCodec.Decode(scoreRaw); err == nil {
 				hit.Score = score
 			}
 		}
 
 		if metaRaw, ok := r["metadata"]; ok {
-			var meta map[string]any
-			if err := json.Unmarshal(metaRaw, &meta); err == nil {
+			if meta, err := metadataCodec.Decode(metaRaw); err == nil {
 				hit.Metadata = meta
 			}
 		}

@@ -2,7 +2,6 @@ package embedded
 
 import (
 	"context"
-	"encoding/json"
 	"errors"
 	"fmt"
 	"sync"
@@ -10,11 +9,14 @@ import (
 
 	"github.com/robfig/cron/v3"
 
+	"github.com/zenta-dev/zever/codec"
 	"github.com/zenta-dev/zever/job"
 	"github.com/zenta-dev/zever/log"
 	"github.com/zenta-dev/zever/log/noop"
 	"github.com/zenta-dev/zever/scheduler"
 )
+
+var argsCodec = codec.JSONCodec[any]{}
 
 // embedded is the in-process cron Scheduler implementation.
 type embedded struct {
@@ -74,7 +76,7 @@ func (e *embedded) Schedule(ctx context.Context, spec, jobName string, args any)
 		return 0, fmt.Errorf("scheduler: unknown job %q: %w", jobName, job.ErrUnknownJob)
 	}
 
-	if _, err = json.Marshal(args); err != nil {
+	if _, err = argsCodec.Encode(args); err != nil {
 		return 0, fmt.Errorf("scheduler: args: %w", err)
 	}
 

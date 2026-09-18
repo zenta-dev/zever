@@ -1,7 +1,6 @@
 package config
 
 import (
-	"encoding/json"
 	"os"
 
 	"github.com/zenta-dev/zever/ai"
@@ -9,6 +8,7 @@ import (
 	"github.com/zenta-dev/zever/auth"
 	"github.com/zenta-dev/zever/billing"
 	"github.com/zenta-dev/zever/cache"
+	"github.com/zenta-dev/zever/codec"
 	"github.com/zenta-dev/zever/crypto"
 	"github.com/zenta-dev/zever/db"
 	"github.com/zenta-dev/zever/document"
@@ -95,17 +95,28 @@ func knownServiceNames() []string {
 	}
 }
 
+// mapCodec decodes freshly marshaled JSON into a plain map[string]any; see
+// serviceToMap.
+var mapCodec = codec.JSONCodec[map[string]any]{}
+
 // serviceToMap converts one service's typed options to a plain map via a
 // JSON round-trip, preserving each package's json-tag semantics. It is the
 // shared bridge for redaction and env field discovery. The file path stays
 // marshal-based too (decodeOptions), so reflection is confined to env.go.
 func serviceToMap[T any](o T) map[string]any {
-	m := map[string]any{}
-	if b, err := json.Marshal(o); err == nil {
-		// Unmarshal cannot fail here: b is freshly marshaled JSON, and m
-		// starts as an empty map, so even a (impossible) failure would
-		// leave a valid empty result.
-		_ = json.Unmarshal(b, &m)
+	b, err := codec.JSONCodec[T]{}.Encode(o)
+	if err != nil {
+		return map[string]any{}
+	}
+
+	// Decode cannot fail here: b is freshly marshaled JSON produced by the
+	// Encode above, so the paired Decode (same underlying encoding/json/v2
+	// codec) round-trips it cleanly. We still fall back to an empty map on
+	// the (impossible) error path rather than propagate a zero-value nil
+	// map, matching the previous json.Marshal/json.Unmarshal behavior.
+	m, err := mapCodec.Decode(b)
+	if err != nil {
+		return map[string]any{}
 	}
 	return m
 }

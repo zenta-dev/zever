@@ -14,8 +14,15 @@ import (
 	"sync"
 	"time"
 
+	"github.com/zenta-dev/zever/codec"
 	"github.com/zenta-dev/zever/i18n"
 	"github.com/zenta-dev/zever/internal/httpclient"
+)
+
+var (
+	requestCodec       = codec.JSONCodec[any]{}
+	translateRespCodec = codec.JSONCodec[translateResponse]{}
+	localesRespCodec   = codec.JSONCodec[localesResponse]{}
 )
 
 const (
@@ -263,8 +270,8 @@ func (a *adapter) fetch(ctx context.Context, locale, key string, args map[string
 	if err != nil {
 		return "", err
 	}
-	var resp translateResponse
-	if err := json.Unmarshal(data, &resp); err != nil {
+	resp, err := translateRespCodec.Decode(data)
+	if err != nil {
 		return "", fmt.Errorf("remote: translate: decode: %w", err)
 	}
 	if v, ok := resp.Translations[key]; ok {
@@ -295,8 +302,8 @@ func (a *adapter) Locales(ctx context.Context) ([]string, error) {
 	if err != nil {
 		return nil, err
 	}
-	var resp localesResponse
-	if err := json.Unmarshal(data, &resp); err != nil {
+	resp, err := localesRespCodec.Decode(data)
+	if err != nil {
 		return nil, fmt.Errorf("remote: locales: decode: %w", err)
 	}
 	out := append([]string(nil), resp.Locales...)
@@ -339,7 +346,7 @@ func (a *adapter) Close() error {
 func (a *adapter) do(ctx context.Context, op, method, url string, body any) ([]byte, error) {
 	var rdr io.Reader
 	if body != nil {
-		payload, err := json.Marshal(body)
+		payload, err := requestCodec.Encode(body)
 		if err != nil {
 			return nil, fmt.Errorf("remote: encode: %w", err)
 		}

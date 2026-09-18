@@ -2,7 +2,6 @@ package osm
 
 import (
 	"context"
-	"encoding/json"
 	"errors"
 	"fmt"
 	"math"
@@ -12,6 +11,7 @@ import (
 	"strings"
 	"time"
 
+	"github.com/zenta-dev/zever/codec"
 	"github.com/zenta-dev/zever/geo"
 	endpointpkg "github.com/zenta-dev/zever/internal/endpoint"
 	"github.com/zenta-dev/zever/internal/httpclient"
@@ -95,6 +95,12 @@ type nominatimResult struct {
 
 type nominatimSearch []nominatimResult
 
+var (
+	nominatimSearchCodec = codec.JSONCodec[nominatimSearch]{}
+	nominatimArrayCodec  = codec.JSONCodec[[]nominatimResult]{}
+	nominatimResultCodec = codec.JSONCodec[nominatimResult]{}
+)
+
 // Geocode resolves address to locations via Nominatim search.
 func (m *osmGeo) Geocode(ctx context.Context, address string) ([]geo.Location, error) {
 	reqURL := m.buildURL("/search", url.Values{
@@ -120,12 +126,12 @@ func (m *osmGeo) Geocode(ctx context.Context, address string) ([]geo.Location, e
 	if err != nil {
 		return nil, err
 	}
-	if err := checkStatus(resp, body); err != nil {
-		return nil, err
+	if statusErr := checkStatus(resp, body); statusErr != nil {
+		return nil, statusErr
 	}
 
-	var results nominatimSearch
-	if err := json.Unmarshal(body, &results); err != nil {
+	results, err := nominatimSearchCodec.Decode(body)
+	if err != nil {
 		return nil, fmt.Errorf("geo: osm: decode: %w", err)
 	}
 	if len(results) == 0 {
@@ -183,8 +189,8 @@ func (m *osmGeo) ReverseGeocode(ctx context.Context, lat, lng float64) ([]geo.Ad
 	if err != nil {
 		return nil, err
 	}
-	if err := checkStatus(resp, body); err != nil {
-		return nil, err
+	if statusErr := checkStatus(resp, body); statusErr != nil {
+		return nil, statusErr
 	}
 
 	// Trim space to detect empty body.
@@ -194,8 +200,8 @@ func (m *osmGeo) ReverseGeocode(ctx context.Context, lat, lng float64) ([]geo.Ad
 	}
 
 	// Try decode as array first.
-	var arr []nominatimResult
-	if err := json.Unmarshal(body, &arr); err == nil {
+	arr, decodeErr := nominatimArrayCodec.Decode(body)
+	if decodeErr == nil {
 		if len(arr) == 0 {
 			return nil, fmt.Errorf("geo: osm: no results for (%.6f,%.6f): %w", lat, lng, geo.ErrNotFound)
 		}
@@ -221,8 +227,8 @@ func (m *osmGeo) ReverseGeocode(ctx context.Context, lat, lng float64) ([]geo.Ad
 	}
 
 	// Fallback: single object.
-	var single nominatimResult
-	if err := json.Unmarshal(body, &single); err != nil {
+	single, err := nominatimResultCodec.Decode(body)
+	if err != nil {
 		return nil, fmt.Errorf("geo: osm: decode: %w", err)
 	}
 	if strings.TrimSpace(single.DisplayName) == "" {

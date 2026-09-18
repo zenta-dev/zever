@@ -1,10 +1,10 @@
 package redis
 
 import (
-	"encoding/json"
 	"fmt"
 	"time"
 
+	"github.com/zenta-dev/zever/codec"
 	"github.com/zenta-dev/zever/eventbus"
 )
 
@@ -16,13 +16,16 @@ type wireMessage struct {
 	Headers map[string]string `json:"headers"`
 }
 
+// wireCodec (de)serializes wireMessage envelopes for the Redis channel.
+var wireCodec = codec.JSONCodec[wireMessage]{}
+
 func decodeMessage(topic string, raw []byte) (eventbus.Message, error) {
 	if len(raw) > eventbus.MaxMessageSize {
 		return eventbus.Message{}, fmt.Errorf("%w: %d > %d", eventbus.ErrPayloadTooLarge, len(raw), eventbus.MaxMessageSize)
 	}
 
-	var wm wireMessage
-	if err := json.Unmarshal(raw, &wm); err != nil {
+	wm, err := wireCodec.Decode(raw)
+	if err != nil {
 		return eventbus.Message{}, fmt.Errorf("redis: decode message: %w", err)
 	}
 

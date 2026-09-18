@@ -2,7 +2,6 @@ package middleware
 
 import (
 	"context"
-	"encoding/json"
 	"fmt"
 	"net/http"
 	"runtime/debug"
@@ -11,6 +10,7 @@ import (
 	"google.golang.org/grpc/codes"
 	"google.golang.org/grpc/status"
 
+	"github.com/zenta-dev/zever/codec"
 	"github.com/zenta-dev/zever/log"
 )
 
@@ -20,6 +20,10 @@ import (
 type errorBody struct {
 	Error string `json:"error"`
 }
+
+// errorBodyCodec encodes errorBody for HTTP error responses. Shared by
+// Recover and RateLimit (both in package middleware).
+var errorBodyCodec = codec.JSONCodec[errorBody]{}
 
 // Recover returns HTTP middleware that recovers a panicking handler, logs the
 // panic value with a stack trace via logger, and responds 500 with the fixed
@@ -46,7 +50,9 @@ func Recover(logger log.Logger) func(http.Handler) http.Handler {
 						// Best-effort: headers + status are already on the
 						// wire, so a failed body encode still leaves a
 						// valid empty 500 instead of crashing recovery.
-						_ = json.NewEncoder(rec).Encode(errorBody{Error: "internal error"})
+						if data, encErr := errorBodyCodec.Encode(errorBody{Error: "internal error"}); encErr == nil {
+							_, _ = rec.Write(append(data, '\n'))
+						}
 					}
 					// Else the handler already committed the response:
 					// another WriteHeader would be superfluous and a fresh

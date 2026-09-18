@@ -16,7 +16,13 @@ import (
 
 	_ "modernc.org/sqlite" // register sqlite driver
 
+	"github.com/zenta-dev/zever/codec"
 	"github.com/zenta-dev/zever/vectorstore"
+)
+
+var (
+	embeddingCodec = codec.JSONCodec[[]float32]{}
+	metadataCodec  = codec.JSONCodec[map[string]any]{}
 )
 
 // maxScanRows caps the number of rows sqlite Query will scan brute-force.
@@ -342,8 +348,7 @@ func decodeEmbedding(b []byte) ([]float32, error) {
 	// may coincidentally start with '[' (0x5b), so only try JSON if the blob
 	// is valid JSON. This avoids mis-decoding binary as JSON.
 	if len(b) > 0 && b[0] == '[' && json.Valid(b) {
-		var e []float32
-		if err := json.Unmarshal(b, &e); err == nil {
+		if e, err := embeddingCodec.Decode(b); err == nil {
 			return e, nil
 		}
 	}
@@ -365,7 +370,7 @@ func encodeMetadata(m map[string]any) ([]byte, error) {
 		return nil, nil
 	}
 
-	return json.Marshal(m)
+	return metadataCodec.Encode(m)
 }
 
 func decodeMetadata(b []byte) (map[string]any, error) {
@@ -373,8 +378,8 @@ func decodeMetadata(b []byte) (map[string]any, error) {
 		return nil, nil //nolint:nilnil // verbatim port: nil metadata with nil error is the contract
 	}
 
-	var m map[string]any
-	if err := json.Unmarshal(b, &m); err != nil {
+	m, err := metadataCodec.Decode(b)
+	if err != nil {
 		return nil, err
 	}
 

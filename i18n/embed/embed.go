@@ -3,7 +3,6 @@ package embed
 import (
 	"bytes"
 	"context"
-	"encoding/json"
 	"fmt"
 	"io/fs"
 	"path"
@@ -13,8 +12,13 @@ import (
 	"sync/atomic"
 	"text/template"
 
+	"github.com/zenta-dev/zever/codec"
 	"github.com/zenta-dev/zever/i18n"
 )
+
+// localeCodec decodes a single locale's JSON catalog file (key -> message
+// template string).
+var localeCodec = codec.JSONCodec[map[string]string]{}
 
 // backend is an embedded-catalog i18n backend.
 type backend struct {
@@ -57,8 +61,8 @@ func New(opts i18n.Options) (i18n.I18n, error) {
 		if err != nil {
 			return nil, fmt.Errorf("embed: read %q: %w", entry.Name(), err)
 		}
-		var raw map[string]string
-		if err := json.Unmarshal(data, &raw); err != nil {
+		raw, err := localeCodec.Decode(data)
+		if err != nil {
 			return nil, fmt.Errorf("embed: decode %q: %w", entry.Name(), err)
 		}
 		cat := make(map[string]*template.Template, len(raw))
