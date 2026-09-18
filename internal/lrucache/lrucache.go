@@ -156,3 +156,102 @@ func (c *Cache[K, V]) Len() int {
 
 	return c.ll.Len()
 }
+
+// GetOrCompute returns the existing value for k, marking it
+// most-recently-used, without calling compute, if k is already present. If k
+// is absent, compute is invoked to produce a value, which is then inserted
+// (subject to the same capacity-eviction and OnEvict behavior as Put) unless
+// another goroutine concurrently won the race to insert k first, in which
+// case the winner's value is returned instead and compute's result is
+// discarded.
+//
+// The second return value reports whether an existing entry was found: true
+// if a value was already present for k (either before compute ran, or
+// inserted by a racing goroutine while compute was running) and compute's
+// result was therefore not the one stored; false if compute's result was the
+// one stored. This mirrors sync.Map.LoadOrStore's "loaded" convention and
+// lets a caller whose compute has a side effect needing disposal (e.g. a
+// freshly prepared *sql.Stmt) know to dispose of its own result when true is
+// returned.
+//
+// compute is never called while holding the cache's internal lock, so it may
+// safely call back into the same Cache (e.g. Get/Put/Delete/GetOrCompute)
+// without deadlocking.
+func (c *Cache[K, V]) GetOrCompute(k K, compute func() V) (V, bool) {
+	c.mu.Lock()
+	if el, ok := c.items[k]; ok {
+		c.ll.MoveToFront(el)
+		v := el.Value.(*entry[K, V]).val //nolint:forcetypeassert // list elements are only ever pushed as *entry[K, V]
+		c.mu.Unlock()
+		return v, true
+	}
+	c.mu.Unlock()
+
+	computed := compute()
+
+	var (
+		evictKey K
+		evictVal V
+		evicted  bool
+		result   V
+		loaded   bool
+	)
+
+	c.mu.Lock()
+	if el, ok := c.items[k]; ok {
+		// Another goroutine inserted k while we were computing; keep its
+		// value and discard ours.
+		c.ll.MoveToFront(el)
+		result = el.Value.(*entry[K, V]).val //nolint:forcetypeassert // list elements are only ever pushed as *entry[K, V]
+		loaded = true
+	} else {
+		el := c.ll.PushFront(&entry[K, V]{key: k, val: computed})
+		c.items[k] = el
+		result = computed
+
+		if c.ll.Len() > c.capacity {
+			back := c.ll.Back()
+			if back != nil {
+				be := back.Value.(*entry[K, V]) //nolint:forcetypeassert // list elements are only ever pushed as *entry[K, V]
+				c.ll.Remove(back)
+				delete(c.items, be.key)
+				evictKey, evictVal, evicted = be.key, be.val, true
+			}
+		}
+	}
+	c.mu.Unlock()
+
+	if evicted && c.onEvict != nil {
+		c.onEvict(evictKey, evictVal)
+	}
+
+	return result, loaded
+}
+
+// Clear removes all entries from the cache. If fn is non-nil, it is invoked
+// once for every removed key/value pair, after the internal lock has been
+// released (so fn may safely call back into the same Cache).
+//
+// Clear does NOT invoke the OnEvict callback registered via WithOnEvict for
+// any of the removed entries, by design: fn is the caller's chosen disposal
+// logic for a full clear (mirroring Delete, which also never fires OnEvict),
+// keeping the two mechanisms mutually exclusive so a caller that registers
+// both WithOnEvict and a Clear callback for the same disposal (e.g. closing a
+// pooled *sql.Stmt) never double-disposes an entry.
+func (c *Cache[K, V]) Clear(fn func(K, V)) {
+	c.mu.Lock()
+	removed := make([]*entry[K, V], 0, len(c.items))
+	for _, el := range c.items {
+		removed = append(removed, el.Value.(*entry[K, V])) //nolint:forcetypeassert // list elements are only ever pushed as *entry[K, V]
+	}
+	c.ll.Init()
+	c.items = make(map[K]*list.Element)
+	c.mu.Unlock()
+
+	if fn == nil {
+		return
+	}
+	for _, e := range removed {
+		fn(e.key, e.val)
+	}
+}

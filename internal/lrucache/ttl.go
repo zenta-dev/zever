@@ -86,7 +86,18 @@ func (t *TTLCache[K, V]) Get(k K) (V, bool) {
 // the least-recently-used entry is evicted (see Cache.Put); the OnEvict
 // callback, if registered, fires with the evicted entry's unwrapped value.
 func (t *TTLCache[K, V]) Put(k K, v V) {
-	t.c.Put(k, ttlValue[V]{val: v, expiresAt: time.Now().Add(t.ttl)})
+	t.PutTTL(k, v, t.ttl)
+}
+
+// PutTTL inserts or updates the value for k with a caller-supplied ttl
+// instead of the TTLCache's default, resetting its expiry to now+ttl and
+// marking it most-recently-used. This lets a single TTLCache serve callers
+// that need a different lifetime per entry (e.g. a shorter negative-cache
+// TTL for "not found" results versus a longer TTL for positive hits) without
+// constructing a second cache. Otherwise behaves exactly like Put, including
+// capacity eviction and the OnEvict callback.
+func (t *TTLCache[K, V]) PutTTL(k K, v V, ttl time.Duration) {
+	t.c.Put(k, ttlValue[V]{val: v, expiresAt: time.Now().Add(ttl)})
 }
 
 // Delete removes k from the cache and returns its value, if present and not

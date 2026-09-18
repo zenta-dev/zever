@@ -151,6 +151,30 @@ func TestTTLCache_Len(t *testing.T) {
 	}
 }
 
+func TestTTLCache_PutTTL(t *testing.T) {
+	t.Run("uses supplied ttl instead of default", func(t *testing.T) {
+		tc := NewTTL[string, int](4, time.Hour)
+		tc.PutTTL("a", 1, time.Millisecond)
+
+		time.Sleep(5 * time.Millisecond)
+
+		if v, ok := tc.Get("a"); ok || v != 0 {
+			t.Fatalf("Get(a) after short PutTTL expiry = (%v, %v), want (0, false)", v, ok)
+		}
+	})
+
+	t.Run("long custom ttl survives beyond default ttl window", func(t *testing.T) {
+		tc := NewTTL[string, int](4, time.Millisecond)
+		tc.PutTTL("a", 1, time.Hour)
+
+		time.Sleep(5 * time.Millisecond)
+
+		if v, ok := tc.Get("a"); !ok || v != 1 {
+			t.Fatalf("Get(a) with long PutTTL = (%v, %v), want (1, true)", v, ok)
+		}
+	})
+}
+
 func TestTTLCache_ConcurrentAccess(_ *testing.T) {
 	tc := NewTTL[int, int](64, 50*time.Millisecond, WithOnEvict[int, int](func(_, _ int) {}))
 
