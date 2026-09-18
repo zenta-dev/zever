@@ -96,13 +96,23 @@ func New(o search.Options) (search.Search, error) {
 	return &postgres{db: pool}, nil
 }
 
-// Index adds or replaces doc in its index.
-func (p *postgres) Index(ctx context.Context, doc search.Document) error {
-	if p.db == nil {
-		return ErrNotConfigured
-	}
+// indexRowCols is the number of bind parameters IndexBatch's per-row
+// placeholder ($n, $n, $n, $n) consumes.
+const indexRowCols = 4
 
-	// Clone the caller map and inject content without mutating the original.
+// maxIndexBatchRows caps rows per INSERT statement in IndexBatch. Postgres's
+// extended-protocol wire format allows at most 65535 bind parameters per
+// statement; at indexRowCols (4) params/row that's a hard ceiling around
+// 16383 rows. maxIndexBatchRows keeps 4*15000 = 60000 params per statement, a
+// generous margin under the 65535 limit rather than cutting it at the
+// boundary.
+const maxIndexBatchRows = 15000
+
+// encodeDocumentMetadata clones doc's metadata with its content injected
+// under the "content" key (without mutating the caller's map) and encodes
+// it. Index and IndexBatch both call it so a validation/encoding-rule change
+// only needs to happen once.
+func encodeDocumentMetadata(doc search.Document) ([]byte, error) {
 	meta := make(map[string]any, len(doc.Metadata)+1)
 	for k, v := range doc.Metadata {
 		meta[k] = v
@@ -110,7 +120,16 @@ func (p *postgres) Index(ctx context.Context, doc search.Document) error {
 
 	meta["content"] = doc.Content
 
-	metaJSON, err := metadataCodec.Encode(meta)
+	return metadataCodec.Encode(meta)
+}
+
+// Index adds or replaces doc in its index.
+func (p *postgres) Index(ctx context.Context, doc search.Document) error {
+	if p.db == nil {
+		return ErrNotConfigured
+	}
+
+	metaJSON, err := encodeDocumentMetadata(doc)
 	if err != nil {
 		return fmt.Errorf("postgres: index: %w", err)
 	}
@@ -127,8 +146,10 @@ func (p *postgres) Index(ctx context.Context, doc search.Document) error {
 	return nil
 }
 
-// IndexBatch adds or replaces all of docs in a single multi-row INSERT
-// statement, one round trip regardless of len(docs). An empty docs is a no-op.
+// IndexBatch adds or replaces all of docs, chunked into multi-row INSERT
+// statements of at most maxIndexBatchRows rows each to stay under Postgres's
+// bind-parameter limit, still far fewer round trips than one-by-one calls. An
+// empty docs is a no-op.
 func (p *postgres) IndexBatch(ctx context.Context, docs []search.Document) error {
 	if p.db == nil {
 		return ErrNotConfigured
@@ -138,25 +159,33 @@ func (p *postgres) IndexBatch(ctx context.Context, docs []search.Document) error
 		return nil
 	}
 
-	const cols = 4
-
-	placeholders := make([]string, 0, len(docs))
-	args := make([]any, 0, len(docs)*cols)
-
-	for i, doc := range docs {
-		meta := make(map[string]any, len(doc.Metadata)+1)
-		for k, v := range doc.Metadata {
-			meta[k] = v
+	for start := 0; start < len(docs); start += maxIndexBatchRows {
+		end := start + maxIndexBatchRows
+		if end > len(docs) {
+			end = len(docs)
 		}
 
-		meta["content"] = doc.Content
+		if err := p.indexBatchChunk(ctx, docs[start:end]); err != nil {
+			return err
+		}
+	}
 
-		metaJSON, err := metadataCodec.Encode(meta)
+	return nil
+}
+
+// indexBatchChunk executes a single multi-row INSERT for chunk, which must
+// be small enough to stay under Postgres's bind-parameter limit.
+func (p *postgres) indexBatchChunk(ctx context.Context, chunk []search.Document) error {
+	placeholders := make([]string, 0, len(chunk))
+	args := make([]any, 0, len(chunk)*indexRowCols)
+
+	for i, doc := range chunk {
+		metaJSON, err := encodeDocumentMetadata(doc)
 		if err != nil {
 			return fmt.Errorf("postgres: index batch: %w", err)
 		}
 
-		base := i * cols
+		base := i * indexRowCols
 		placeholders = append(placeholders, fmt.Sprintf("($%d, $%d, $%d, $%d)", base+1, base+2, base+3, base+4))
 		args = append(args, doc.ID, doc.Index, doc.Content, metaJSON)
 	}
