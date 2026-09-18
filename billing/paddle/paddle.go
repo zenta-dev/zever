@@ -3,13 +3,13 @@ package paddle
 import (
 	"context"
 	"fmt"
-	"net/http"
 	"strconv"
 	"strings"
 
 	"github.com/PaddleHQ/paddle-go-sdk/v5"
 
 	"github.com/zenta-dev/zever/billing"
+	"github.com/zenta-dev/zever/internal/httpclient"
 )
 
 // newSDK creates the underlying Paddle SDK client. It is a seam for tests.
@@ -38,7 +38,7 @@ func New(o billing.Options) (billing.Billing, error) {
 		}
 	}
 
-	client, err := newSDK(o.APIKey, paddle.WithBaseURL(endpoint), paddle.WithClient(&http.Client{Timeout: billing.DefaultHTTPTimeout}))
+	client, err := newSDK(o.APIKey, paddle.WithBaseURL(endpoint), paddle.WithClient(httpclient.NewClient(billing.DefaultHTTPTimeout)))
 	if err != nil {
 		return nil, fmt.Errorf("paddle: %w", err)
 	}

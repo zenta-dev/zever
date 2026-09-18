@@ -5,10 +5,10 @@ import (
 	"fmt"
 	"net/http"
 	"strings"
-	"time"
 
 	"github.com/stripe/stripe-go/v82"
 
+	"github.com/zenta-dev/zever/internal/httpclient"
 	"github.com/zenta-dev/zever/payment"
 )
 
@@ -38,7 +38,7 @@ func New(o payment.Options) (payment.Payment, error) {
 		return nil, ErrMissingWebhookSecret
 	}
 
-	httpClient := &http.Client{Timeout: time.Duration(payment.DefaultHTTPTimeout) * time.Second}
+	httpClient := httpclient.NewClient(payment.DefaultHTTPTimeout)
 
 	cfg := &stripe.BackendConfig{HTTPClient: httpClient}
 	if o.Endpoint != "" {
