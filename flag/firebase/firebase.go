@@ -6,17 +6,14 @@ import (
 	"errors"
 	"fmt"
 	"math"
-	"os"
-	"path/filepath"
 	"strconv"
 	"strings"
 	"time"
 
-	firebase "firebase.google.com/go/v4"
 	"firebase.google.com/go/v4/remoteconfig"
-	"google.golang.org/api/option"
 
 	"github.com/zenta-dev/zever/flag"
+	sharedfirebase "github.com/zenta-dev/zever/internal/firebase"
 )
 
 var _ flag.Flag = (*client)(nil)
@@ -35,14 +32,9 @@ func New(opts flag.Options) (flag.Flag, error) {
 		return nil, fmt.Errorf("firebase: %w", err)
 	}
 	fb := opts.Firebase
-	if fb.ProjectID == "" {
-		return nil, invalidOptions("firebase project id is required")
-	}
-	if fb.ServiceAccount == "" {
-		return nil, invalidOptions("firebase service account is required")
-	}
-	if err := validateServiceAccountPath(fb.ServiceAccount); err != nil {
-		return nil, err
+	creds := sharedfirebase.Credentials{ProjectID: fb.ProjectID, ServiceAccount: fb.ServiceAccount}
+	if err := creds.Validate(); err != nil {
+		return nil, invalidOptions(err.Error())
 	}
 
 	timeout := fb.Timeout
@@ -71,10 +63,13 @@ var loadServerTemplate = func(ctx context.Context, tpl *remoteconfig.ServerTempl
 }
 
 var loadTemplate = func(ctx context.Context, projectID, serviceAccount string) (*remoteconfig.ServerTemplate, error) {
-	// NewApp with a non-nil Config never returns an error; all failure
-	// paths sit behind config == nil (firebase-admin-go v4.21).
-	app, _ := firebase.NewApp(ctx, &firebase.Config{ProjectID: projectID},
-		option.WithAuthCredentialsFile(option.ServiceAccount, serviceAccount))
+	app, err := sharedfirebase.NewApp(ctx, sharedfirebase.Credentials{
+		ProjectID:      projectID,
+		ServiceAccount: serviceAccount,
+	})
+	if err != nil {
+		return nil, fmt.Errorf("firebase: init remote config: %w", err)
+	}
 
 	rc, err := app.RemoteConfig(ctx)
 	if err != nil {
@@ -91,34 +86,9 @@ var loadTemplate = func(ctx context.Context, projectID, serviceAccount string) (
 }
 
 func validateServiceAccountPath(p string) error {
-	if p == "" {
-		return invalidOptions("firebase service account is required")
+	if err := sharedfirebase.ValidateServiceAccountPath(p); err != nil {
+		return fmt.Errorf("firebase: %w", err)
 	}
-
-	cleaned := filepath.Clean(p)
-	if cleaned != p {
-		return fmt.Errorf("firebase: service_account path %q is not clean", p)
-	}
-
-	// Element-wise traversal check: a ".." path element escapes the
-	// directory. Substring matching would overmatch names like
-	// "foo..bar". Clean paths cannot hide ".." elsewhere: Clean
-	// resolves interior dot-dot, so equality above already rejected
-	// "a/../b".
-	for _, part := range strings.Split(cleaned, string(filepath.Separator)) {
-		if part == ".." {
-			return fmt.Errorf("firebase: service_account path %q contains traversal", p)
-		}
-	}
-
-	if filepath.Ext(cleaned) != ".json" {
-		return fmt.Errorf("firebase: service_account path %q must have .json extension", p)
-	}
-
-	if info, err := os.Stat(cleaned); err == nil && info.IsDir() {
-		return fmt.Errorf("firebase: service_account path %q is a directory", p)
-	}
-
 	return nil
 }
 

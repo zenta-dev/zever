@@ -3,16 +3,12 @@ package fcm
 import (
 	"context"
 	"fmt"
-	"os"
-	"path/filepath"
 	"strconv"
-	"strings"
 	"time"
 
-	firebase "firebase.google.com/go/v4"
 	"firebase.google.com/go/v4/messaging"
-	"google.golang.org/api/option"
 
+	sharedfirebase "github.com/zenta-dev/zever/internal/firebase"
 	"github.com/zenta-dev/zever/notification"
 )
 
@@ -33,26 +29,16 @@ func New(opts notification.Options) (notification.Notifier, error) {
 	if err := opts.Validate(); err != nil {
 		return nil, fmt.Errorf("fcm: %w", err)
 	}
-	if opts.FCM.ProjectID == "" {
-		return nil, fmt.Errorf("fcm: %w: project id is required",
-			notification.InvalidOptionsError{Reason: "fcm project id is required"})
-	}
-	if opts.FCM.ServiceAccount == "" {
-		return nil, fmt.Errorf("fcm: %w: service account is required",
-			notification.InvalidOptionsError{Reason: "fcm service account is required"})
-	}
-	if err := validateServiceAccountPath(opts.FCM.ServiceAccount); err != nil {
-		return nil, err
+	creds := sharedfirebase.Credentials{ProjectID: opts.FCM.ProjectID, ServiceAccount: opts.FCM.ServiceAccount}
+	if err := creds.Validate(); err != nil {
+		return nil, invalidOptions(err.Error())
 	}
 
 	ctx := context.Background()
-	// NewApp is lazy and never loads the key file here: with a non-nil
-	// Config it always returns a nil error (SDK-verified), so the error
-	// branch is pruned. Load failures surface in Messaging below, and the
-	// constructor stays fail-closed.
-	app, _ := firebase.NewApp(ctx,
-		&firebase.Config{ProjectID: opts.FCM.ProjectID},
-		option.WithAuthCredentialsFile(option.ServiceAccount, opts.FCM.ServiceAccount))
+	app, err := sharedfirebase.NewApp(ctx, creds)
+	if err != nil {
+		return nil, fmt.Errorf("fcm: init messaging: %w", err)
+	}
 	client, err := app.Messaging(ctx)
 	if err != nil {
 		return nil, fmt.Errorf("fcm: init messaging: %w", err)
@@ -117,31 +103,18 @@ func (f *notifier) Close() error {
 	return nil
 }
 
-// validateServiceAccountPath enforces a strict key-file path policy:
-// non-empty, clean (Clean is a no-op), no ".." element, .json extension,
-// and must not resolve to a directory. Missing files pass: readability
-// is checked later by the SDK in New.
+// validateServiceAccountPath enforces the shared key-file path policy.
+// Missing files pass: readability and JSON are checked in New via
+// Credentials.Validate. Kept for hermetic unit tests of the path guard.
 func validateServiceAccountPath(p string) error {
-	invalid := func(reason string) error {
-		return fmt.Errorf("fcm: %w: service account %q: %s",
-			notification.InvalidOptionsError{Reason: reason}, p, reason)
-	}
-	if p == "" {
-		return invalid("path is required")
-	}
-	if filepath.Clean(p) != p {
-		return invalid("path is not clean")
-	}
-	for _, el := range strings.Split(p, string(filepath.Separator)) {
-		if el == ".." {
-			return invalid("path contains traversal")
-		}
-	}
-	if !strings.EqualFold(filepath.Ext(p), ".json") {
-		return invalid("path must have .json extension")
-	}
-	if info, err := os.Stat(p); err == nil && info.IsDir() {
-		return invalid("path is a directory")
+	if err := sharedfirebase.ValidateServiceAccountPath(p); err != nil {
+		return invalidOptions(err.Error())
 	}
 	return nil
+}
+
+// invalidOptions wraps reason as notification.InvalidOptionsError with fcm
+// context, preserving errors.Is/As through the chain.
+func invalidOptions(reason string) error {
+	return fmt.Errorf("fcm: %w", notification.InvalidOptionsError{Reason: reason})
 }
