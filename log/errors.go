@@ -5,14 +5,20 @@ import (
 	"fmt"
 )
 
-// Sentinel errors for log operations.
-var (
-	ErrNilFactory     = errors.New("log: nil factory")
-	ErrDuplicate      = errors.New("log: duplicate registration")
-	ErrUnknownAdapter = errors.New("log: unknown adapter")
-	ErrInvalidLevel   = errors.New("log: invalid level")
-	ErrInvalidAdapter = errors.New("log: invalid adapter")
-)
+// ErrNilFactory is returned when an adapter factory is nil.
+var ErrNilFactory = errors.New("log: nil factory")
+
+// ErrDuplicate is returned on duplicate adapter registration.
+var ErrDuplicate = errors.New("log: duplicate registration")
+
+// ErrUnknownAdapter is returned for an unregistered adapter.
+var ErrUnknownAdapter = errors.New("log: unknown adapter")
+
+// ErrInvalidLevel is returned for an invalid level name.
+var ErrInvalidLevel = errors.New("log: invalid level")
+
+// ErrInvalidAdapter is returned for an invalid adapter name.
+var ErrInvalidAdapter = errors.New("log: invalid adapter")
 
 // DuplicateError reports a repeated Register for the same adapter.
 type DuplicateError struct {

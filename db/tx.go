@@ -44,6 +44,7 @@ type TxOptions struct {
 // Tx is a transaction. It embeds DB for queries within the transaction
 // and adds commit, rollback, and savepoint support.
 type Tx interface {
+	// DB runs queries inside the transaction.
 	DB
 	// Commit commits the transaction.
 	Commit(ctx context.Context) error

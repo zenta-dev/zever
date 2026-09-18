@@ -44,16 +44,20 @@ func Wrap(inner Pusher) Eventbus {
 	}
 }
 
+// Publish delivers payload with headers to all subscribers of topic.
 func (b *pullBus) Publish(ctx context.Context, topic string, payload Payload, headers Headers) error {
 	return b.inner.Publish(ctx, topic, payload, headers)
 }
 
+// Subscribe registers handler for topic and returns an unsubscribe function.
 func (b *pullBus) Subscribe(ctx context.Context, topic string, handler Handler) (func(), error) {
 	return b.inner.Subscribe(ctx, topic, handler)
 }
 
+// Name returns the inner adapter name.
 func (b *pullBus) Name() string { return b.inner.Name() }
 
+// SubscribeChan registers a buffered pull channel for topic.
 func (b *pullBus) SubscribeChan(ctx context.Context, topic string, buffer int) (<-chan Message, error) {
 	if b.closed.Load() {
 		return nil, ErrClosed
@@ -106,6 +110,7 @@ func (b *pullBus) SubscribeChan(ctx context.Context, topic string, buffer int) (
 	return sub.ch, nil
 }
 
+// Unsubscribe detaches a pull channel created by SubscribeChan and closes it.
 func (b *pullBus) Unsubscribe(topic string, ch <-chan Message) error {
 	if b.closed.Load() {
 		return ErrClosed
