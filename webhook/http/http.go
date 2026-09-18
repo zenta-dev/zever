@@ -11,6 +11,7 @@ import (
 	"io"
 	"math/rand"
 	"net/http"
+	"strconv"
 	"sync"
 	"time"
 
@@ -243,11 +244,23 @@ func (a *adapter) Close() error {
 	return nil
 }
 
+// sign returns the current envelope for payload: "t=<unix-timestamp>,v1=<hex-hmac>"
+// where the hex-hmac is HMAC-SHA256 over "<unix-timestamp>.<payload>". The
+// timestamp lets a verifier (see webhook/queue's verifySignatureHeader) reject
+// stale or replayed deliveries in addition to checking the MAC.
 func sign(secret string, payload []byte) string {
+	return signAt(secret, payload, time.Now().Unix())
+}
+
+// signAt is sign with an explicit timestamp, split out so tests can produce
+// deterministic envelopes instead of racing time.Now().
+func signAt(secret string, payload []byte, ts int64) string {
 	mac := hmac.New(sha256.New, []byte(secret))
+	mac.Write([]byte(strconv.FormatInt(ts, 10)))
+	mac.Write([]byte{'.'})
 	mac.Write(payload)
 
-	return "sha256=" + hex.EncodeToString(mac.Sum(nil))
+	return fmt.Sprintf("t=%d,v1=%s", ts, hex.EncodeToString(mac.Sum(nil)))
 }
 
 func newJitter() *rand.Rand {

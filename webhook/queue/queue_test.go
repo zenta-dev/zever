@@ -6,11 +6,13 @@ import (
 	"crypto/sha256"
 	"encoding/hex"
 	"errors"
+	"fmt"
 	"io"
 	"math/rand"
 	"net/http"
 	"net/http/httptest"
 	"os"
+	"strconv"
 	"strings"
 	"sync"
 	"testing"
@@ -225,23 +227,39 @@ func newTestAdapter(q corequeue.Queue) *adapter {
 	timeout := 5 * time.Second
 
 	return &adapter{
-		regs:         make(map[string]map[string]registration),
-		queue:        q,
-		timeout:      timeout,
-		maxRetries:   3,
-		dlqTopic:     "webhook:dead-letter",
-		consumers:    make(map[string]*consumer),
-		client:       newSafeClient(timeout, true),
-		jitter:       newTestJitter(),
-		allowPrivate: true,
+		regs:            make(map[string]map[string]registration),
+		queue:           q,
+		timeout:         timeout,
+		maxRetries:      3,
+		dlqTopic:        "webhook:dead-letter",
+		consumers:       make(map[string]*consumer),
+		client:          newSafeClient(timeout, true),
+		jitter:          newTestJitter(),
+		allowPrivate:    true,
+		replayTolerance: defaultReplayTolerance,
 	}
 }
 
+// signPayload builds the "t=<ts>,v1=<hex>" envelope tests use to sign
+// requests, mirroring buildSignatureHeader with the current time.
 func signPayload(secret string, payload []byte) string {
+	return signPayloadAt(secret, payload, time.Now().Unix())
+}
+
+// signPayloadAt is signPayload with an explicit timestamp, for replay-window tests.
+func signPayloadAt(secret string, payload []byte, ts int64) string {
 	mac := hmac.New(sha256.New, []byte(secret))
+	mac.Write([]byte(strconv.FormatInt(ts, 10)))
+	mac.Write([]byte{'.'})
 	mac.Write(payload)
 
-	return "sha256=" + hex.EncodeToString(mac.Sum(nil))
+	return fmt.Sprintf("t=%d,v1=%s", ts, hex.EncodeToString(mac.Sum(nil)))
+}
+
+// verifyHMAC is a test convenience wrapping verifySignatureHeader with the
+// package default tolerance, for callers that only care about pass/fail.
+func verifyHMAC(secret string, payload []byte, signature string) bool {
+	return verifySignatureHeader(secret, payload, signature, defaultReplayTolerance, time.Now()) == nil
 }
 
 func testMessage(topic string, payload []byte, headers map[string]string, attempt int) corequeue.Message {
@@ -421,6 +439,10 @@ func TestOpen_Defaults(t *testing.T) {
 	if a.jitter == nil || a.client == nil {
 		t.Error("jitter/client must be set")
 	}
+
+	if a.replayTolerance != defaultReplayTolerance {
+		t.Errorf("replayTolerance = %v, want default %v", a.replayTolerance, defaultReplayTolerance)
+	}
 }
 
 func TestOpen_CustomOptions(t *testing.T) {
@@ -433,6 +455,7 @@ func TestOpen_CustomOptions(t *testing.T) {
 		QueueAdapter:        " memory ",
 		QueueOpts:           corequeue.Options{VisibilityTimeout: 30 * time.Second},
 		DeadLetterTopic:     " custom-dlq ",
+		ReplayTolerance:     30 * time.Second,
 	}
 
 	w, err := Open(o)
@@ -457,6 +480,10 @@ func TestOpen_CustomOptions(t *testing.T) {
 
 	if !a.allowPrivate {
 		t.Error("allowPrivate = false, want true")
+	}
+
+	if a.replayTolerance != 30*time.Second {
+		t.Errorf("replayTolerance = %v, want 30s", a.replayTolerance)
 	}
 }
 
@@ -788,7 +815,7 @@ func TestProcessMessage_SignatureMismatchDLQ(t *testing.T) {
 
 	a.processMessage("e", msg)
 
-	assertDeadLetter(t, sq, "signature mismatch (tampered or replayed)")
+	assertDeadLetter(t, sq, ErrSignatureMismatch.Error())
 }
 
 func assertDeadLetter(t *testing.T, sq *stubQueue, reason string) {
@@ -1286,6 +1313,15 @@ func TestCheckSignatureUnit(t *testing.T) {
 	if got := a.checkSignature(reg, payload, signPayload("s", payload)); got != "" {
 		t.Fatalf("checkSignature good = %q", got)
 	}
+
+	if got := a.checkSignature(reg, payload, "nope"); got != ErrSignatureMismatch.Error() {
+		t.Fatalf("checkSignature malformed = %q, want %q", got, ErrSignatureMismatch.Error())
+	}
+
+	stale := signPayloadAt("s", payload, time.Now().Add(-defaultReplayTolerance-time.Minute).Unix())
+	if got := a.checkSignature(reg, payload, stale); got != ErrSignatureExpired.Error() {
+		t.Fatalf("checkSignature stale = %q, want %q", got, ErrSignatureExpired.Error())
+	}
 }
 
 func TestCheckPrivateTargetUnit(t *testing.T) {
@@ -1313,7 +1349,6 @@ func TestVerifyHMAC_Table(t *testing.T) {
 
 	payload := []byte(`{"a":1}`)
 	good := signPayload("s", payload)
-	raw := strings.TrimPrefix(good, "sha256=")
 
 	cases := []struct {
 		name   string
@@ -1322,10 +1357,12 @@ func TestVerifyHMAC_Table(t *testing.T) {
 		want   bool
 	}{
 		{"empty secret", "", good, false},
-		{"valid prefixed", "s", good, true},
-		{"valid raw", "s", raw, true},
-		{"wrong value", "s", "sha256=deadbeef", false},
-		{"bad hex", "s", "sha256=!!!", false},
+		{"valid envelope", "s", good, true},
+		{"wrong value", "s", "t=1,v1=deadbeef", false},
+		{"bad hex", "s", "t=1,v1=!!!", false},
+		{"missing v1", "s", "t=1", false},
+		{"missing t", "s", "v1=deadbeef", false},
+		{"legacy bare hex unsupported", "s", "sha256=deadbeef", false},
 		{"empty sig", "s", "", false},
 		{"wrong secret", "other", good, false},
 	}
@@ -1334,6 +1371,46 @@ func TestVerifyHMAC_Table(t *testing.T) {
 		if got := verifyHMAC(c.secret, payload, c.sig); got != c.want {
 			t.Errorf("%s: verifyHMAC = %v, want %v", c.name, got, c.want)
 		}
+	}
+}
+
+func TestVerifySignatureHeader_ReplayWindow(t *testing.T) {
+	t.Parallel()
+
+	secret := "s"
+	payload := []byte(`{"a":1}`)
+	now := time.Unix(1_700_000_000, 0)
+	tolerance := 5 * time.Minute
+
+	// Valid signature within tolerance passes.
+	within := signPayloadAt(secret, payload, now.Add(-2*time.Minute).Unix())
+	if err := verifySignatureHeader(secret, payload, within, tolerance, now); err != nil {
+		t.Errorf("within tolerance: err = %v, want nil", err)
+	}
+
+	// Valid signature outside the tolerance window fails with the
+	// timestamp-specific error, not the generic mismatch error.
+	stale := signPayloadAt(secret, payload, now.Add(-10*time.Minute).Unix())
+	if err := verifySignatureHeader(secret, payload, stale, tolerance, now); !errors.Is(err, ErrSignatureExpired) {
+		t.Errorf("outside tolerance: err = %v, want ErrSignatureExpired", err)
+	}
+
+	future := signPayloadAt(secret, payload, now.Add(10*time.Minute).Unix())
+	if err := verifySignatureHeader(secret, payload, future, tolerance, now); !errors.Is(err, ErrSignatureExpired) {
+		t.Errorf("future outside tolerance: err = %v, want ErrSignatureExpired", err)
+	}
+
+	// A tampered payload fails with the signature-mismatch error even when
+	// the timestamp is fresh.
+	tamperedSig := signPayloadAt(secret, []byte(`{"a":2}`), now.Unix())
+	if err := verifySignatureHeader(secret, payload, tamperedSig, tolerance, now); !errors.Is(err, ErrSignatureMismatch) {
+		t.Errorf("tampered payload: err = %v, want ErrSignatureMismatch", err)
+	}
+
+	// Round trip: sign then verify end to end.
+	roundTrip := buildSignatureHeader(secret, payload, now.Unix())
+	if err := verifySignatureHeader(secret, payload, roundTrip, tolerance, now); err != nil {
+		t.Errorf("round trip: err = %v, want nil", err)
 	}
 }
 

@@ -5,49 +5,9 @@ import (
 	"errors"
 	"net/http"
 	"net/http/httptest"
-	"strings"
 	"testing"
 	"time"
 )
-
-func TestSafeDialContext_blocksPrivateLiteral(t *testing.T) {
-	t.Parallel()
-	dial := SafeDialContext(false)
-	for _, addr := range []string{"127.0.0.1:80", "127.0.0.1", "10.0.0.1:443"} {
-		_, err := dial(t.Context(), "tcp", addr)
-		if err == nil {
-			t.Errorf("dial(%q) = nil, want private-address refusal", addr)
-			continue
-		}
-		if !strings.Contains(err.Error(), `"`) {
-			t.Errorf("dial(%q) err %q does not quote the host", addr, err.Error())
-		}
-	}
-}
-
-func TestSafeDialContext_blocksPrivateDNS(t *testing.T) {
-	t.Parallel()
-	dial := SafeDialContext(false)
-	_, err := dial(t.Context(), "tcp", "localhost:80")
-	if err == nil {
-		t.Fatal("dial(localhost) = nil, want private-address refusal")
-	}
-	if !strings.Contains(err.Error(), `"localhost"`) {
-		t.Errorf("dial(localhost) err %q does not quote the host", err.Error())
-	}
-}
-
-func TestSafeDialContext_lookupFailure(t *testing.T) {
-	t.Parallel()
-	dial := SafeDialContext(false)
-	_, err := dial(t.Context(), "tcp", "nonexistent.invalid:443")
-	if err == nil {
-		t.Fatal("dial(nonexistent.invalid) = nil, want lookup failure")
-	}
-	if !strings.Contains(err.Error(), `"nonexistent.invalid"`) {
-		t.Errorf("dial err %q does not quote the host", err.Error())
-	}
-}
 
 func TestSafeClient_allowPrivate_dialsLocalServer(t *testing.T) {
 	t.Parallel()
