@@ -1,6 +1,10 @@
 package secrets
 
-import "fmt"
+import (
+	"fmt"
+
+	"github.com/zenta-dev/zever/internal/opts"
+)
 
 // Options holds typed configuration for secrets adapters.
 // Fields are a union of all adapter options; each adapter uses only what it needs.
@@ -30,43 +34,43 @@ func ParseOptions(m map[string]any) (Options, error) {
 	for k, v := range m {
 		switch k {
 		case "addr":
-			s, ok := v.(string)
-			if !ok {
+			s, err := opts.StrictString("secrets", k, v)
+			if err != nil {
 				return o, fmt.Errorf("secrets: option %q must be a string, got %T", k, v)
 			}
 
 			o.Addr = s
 		case "token":
-			s, ok := v.(string)
-			if !ok {
+			s, err := opts.StrictString("secrets", k, v)
+			if err != nil {
 				return o, fmt.Errorf("secrets: option %q must be a string, got %T", k, v)
 			}
 
 			o.Token = s
 		case "mount":
-			s, ok := v.(string)
-			if !ok {
+			s, err := opts.StrictString("secrets", k, v)
+			if err != nil {
 				return o, fmt.Errorf("secrets: option %q must be a string, got %T", k, v)
 			}
 
 			o.Mount = s
 		case "project_id":
-			s, ok := v.(string)
-			if !ok {
+			s, err := opts.StrictString("secrets", k, v)
+			if err != nil {
 				return o, fmt.Errorf("secrets: option %q must be a string, got %T", k, v)
 			}
 
 			o.ProjectID = s
 		case "prefix":
-			s, ok := v.(string)
-			if !ok {
+			s, err := opts.StrictString("secrets", k, v)
+			if err != nil {
 				return o, fmt.Errorf("secrets: option %q must be a string, got %T", k, v)
 			}
 
 			o.Prefix = s
 		case "region":
-			s, ok := v.(string)
-			if !ok {
+			s, err := opts.StrictString("secrets", k, v)
+			if err != nil {
 				return o, fmt.Errorf("secrets: option %q must be a string, got %T", k, v)
 			}
 
