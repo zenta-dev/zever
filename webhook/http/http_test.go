@@ -10,6 +10,7 @@ import (
 	"io"
 	"net/http"
 	"net/http/httptest"
+	"strconv"
 	"strings"
 	"sync"
 	"sync/atomic"
@@ -18,6 +19,47 @@ import (
 
 	"github.com/zenta-dev/zever/webhook"
 )
+
+// assertValidSignature checks that got is a well-formed "t=<ts>,v1=<hex>"
+// envelope whose HMAC matches secret and payload, and whose timestamp is
+// recent (sanity check that sign used time.Now, not a stale/zero value).
+func assertValidSignature(t *testing.T, secret string, payload []byte, got string) {
+	t.Helper()
+
+	tsPart, macPart, ok := strings.Cut(got, ",")
+	if !ok {
+		t.Fatalf("signature %q has no ',' separator", got)
+	}
+
+	tsStr, ok := strings.CutPrefix(tsPart, "t=")
+	if !ok {
+		t.Fatalf("signature %q missing t= field", got)
+	}
+
+	macHex, ok := strings.CutPrefix(macPart, "v1=")
+	if !ok {
+		t.Fatalf("signature %q missing v1= field", got)
+	}
+
+	ts, err := strconv.ParseInt(tsStr, 10, 64)
+	if err != nil {
+		t.Fatalf("signature %q has non-numeric timestamp: %v", got, err)
+	}
+
+	if age := time.Since(time.Unix(ts, 0)); age < -time.Minute || age > time.Minute {
+		t.Errorf("signature timestamp %d is not close to now (age %v)", ts, age)
+	}
+
+	mac := hmac.New(sha256.New, []byte(secret))
+	mac.Write([]byte(tsStr))
+	mac.Write([]byte{'.'})
+	mac.Write(payload)
+
+	want := hex.EncodeToString(mac.Sum(nil))
+	if macHex != want {
+		t.Errorf("signature mac = %q, want %q", macHex, want)
+	}
+}
 
 func openPrivate(t *testing.T, maxRetries int) webhook.Webhook {
 	t.Helper()
@@ -196,13 +238,7 @@ func TestDeliver_successHeaders(t *testing.T) {
 		t.Errorf("Content-Type = %q, want application/json", gotCT)
 	}
 
-	mac := hmac.New(sha256.New, []byte("secret"))
-	mac.Write(payload)
-
-	wantSig := "sha256=" + hex.EncodeToString(mac.Sum(nil))
-	if gotSig != wantSig {
-		t.Errorf("signature = %q, want %q", gotSig, wantSig)
-	}
+	assertValidSignature(t, "secret", payload, gotSig)
 
 	if string(gotBody) != string(payload) {
 		t.Errorf("body = %q, want %q", gotBody, payload)
@@ -524,19 +560,24 @@ func TestSign_determinism(t *testing.T) {
 	t.Parallel()
 
 	payload := []byte(`{"x":1}`)
-	a, b := sign("s", payload), sign("s", payload)
+	// signAt pins the timestamp so two calls with the same inputs are
+	// byte-identical; sign() alone would legitimately vary across the
+	// second boundary since it stamps time.Now().
+	a, b := signAt("s", payload, 1_700_000_000), signAt("s", payload, 1_700_000_000)
 
 	if a != b {
-		t.Errorf("sign not deterministic: %q vs %q", a, b)
+		t.Errorf("signAt not deterministic: %q vs %q", a, b)
 	}
 
-	if !strings.HasPrefix(a, "sha256=") {
-		t.Errorf("sign = %q, want sha256= prefix", a)
+	if !strings.HasPrefix(a, "t=1700000000,v1=") {
+		t.Errorf("signAt = %q, want t=1700000000,v1= prefix", a)
 	}
 
-	if c := sign("other", payload); a == c {
+	if c := signAt("other", payload, 1_700_000_000); a == c {
 		t.Error("sign with different secret should differ")
 	}
+
+	assertValidSignature(t, "s", payload, sign("s", payload))
 }
 
 func TestBuildRequest_errorsAndHeaders(t *testing.T) {

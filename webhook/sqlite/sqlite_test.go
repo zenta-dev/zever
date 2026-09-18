@@ -50,15 +50,35 @@ func openTest(t *testing.T, o webhook.Options) webhook.Webhook {
 	return w
 }
 
+// checkSignature validates that got is a well-formed "t=<ts>,v1=<hex>"
+// signature envelope (see webhook/http.sign) whose HMAC matches secret and
+// payload.
 func checkSignature(t *testing.T, secret string, payload []byte, got string) {
 	t.Helper()
 
-	mac := hmac.New(sha256.New, []byte(secret))
-	mac.Write(payload)
-	want := "sha256=" + hex.EncodeToString(mac.Sum(nil))
+	tsPart, macPart, ok := strings.Cut(got, ",")
+	if !ok {
+		t.Fatalf("signature %q has no ',' separator", got)
+	}
 
-	if got != want {
-		t.Errorf("signature = %q want %q", got, want)
+	tsStr, ok := strings.CutPrefix(tsPart, "t=")
+	if !ok {
+		t.Fatalf("signature %q missing t= field", got)
+	}
+
+	macHex, ok := strings.CutPrefix(macPart, "v1=")
+	if !ok {
+		t.Fatalf("signature %q missing v1= field", got)
+	}
+
+	mac := hmac.New(sha256.New, []byte(secret))
+	mac.Write([]byte(tsStr))
+	mac.Write([]byte{'.'})
+	mac.Write(payload)
+	want := hex.EncodeToString(mac.Sum(nil))
+
+	if macHex != want {
+		t.Errorf("signature mac = %q want %q (full signature %q)", macHex, want, got)
 	}
 }
 
