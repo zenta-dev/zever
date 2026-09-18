@@ -74,7 +74,7 @@ func (e *embedded) Schedule(ctx context.Context, spec, jobName string, args any)
 		return 0, fmt.Errorf("scheduler: unknown job %q: %w", jobName, job.ErrUnknownJob)
 	}
 
-	if _, err := json.Marshal(args); err != nil {
+	if _, err = json.Marshal(args); err != nil {
 		return 0, fmt.Errorf("scheduler: args: %w", err)
 	}
 
