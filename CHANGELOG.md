@@ -126,15 +126,6 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - `zever config show`: prints the resolved, redacted service configuration,
   with a matching TUI dashboard screen.
 
-### Fixed
-
-- `container.Container.Close` now flushes the `observability` service on
-  shutdown: `closeAny` probes for a fourth shutdown shape,
-  `Shutdown(context.Context) error`, which `observability.Provider` (and its
-  `Tracer`/`Metrics` sub-interfaces) implement instead of `Close`/`Stop`.
-  Previously `closeAny` silently no-oped for observability, so `otlp`'s
-  buffered spans and metrics were never flushed on `Container.Close`.
-
 ### Changed
 
 - `scheduler.NewEmbedded` moved to `scheduler/embedded.New`; register
@@ -169,6 +160,12 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Fixed
 
+- `container.Container.Close` now flushes the `observability` service on
+  shutdown: `closeAny` probes for a fourth shutdown shape,
+  `Shutdown(context.Context) error`, which `observability.Provider` (and its
+  `Tracer`/`Metrics` sub-interfaces) implement instead of `Close`/`Stop`.
+  Previously `closeAny` silently no-oped for observability, so `otlp`'s
+  buffered spans and metrics were never flushed on `Container.Close`.
 - `vectorstore/pgvector`'s `UpsertBatch` and `search/postgres`'s
   `IndexBatch` built one unbounded multi-row `INSERT` sized to the full
   input slice, which could exceed Postgres's 65535 bind-parameter limit on
