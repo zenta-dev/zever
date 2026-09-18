@@ -163,7 +163,7 @@ func StripBraceRegexWrapper(pattern string) (string, error) {
 			// StripRegexWrapper returns inner without prefix for malformed, so detect
 			// original malformed by checking anchored validity
 			if stripped == innerRe {
-				// No stripping happened, but prefix exists — check if unclosed
+				// No stripping happened, but prefix exists - check if unclosed
 				// Re-run validation: if depth never 0 or not anchored, it's malformed
 				// For strictness, return error
 				if !isValidRegexWrapper(innerRe) {

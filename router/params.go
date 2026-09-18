@@ -1,4 +1,3 @@
-// Package router provides router functionality.
 package router
 
 import (

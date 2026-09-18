@@ -28,16 +28,26 @@ const (
 
 // Field is a single structured key-value pair attached to an event or context.
 type Field struct {
-	Key      string
-	Type     FieldType
-	String   string
-	Int64    int64
-	Float64  float64
-	Bool     bool
+	// Key is the field name.
+	Key string
+	// Type identifies the kind of value carried.
+	Type FieldType
+	// String holds the string value when Type is StringType.
+	String string
+	// Int64 holds the int or int64 value when Type is IntType or Int64Type.
+	Int64 int64
+	// Float64 holds the float64 value when Type is Float64Type.
+	Float64 float64
+	// Bool holds the bool value when Type is BoolType.
+	Bool bool
+	// Duration holds the duration value when Type is DurationType.
 	Duration time.Duration
-	Time     time.Time
-	Err      error
-	Any      any
+	// Time holds the time value when Type is TimeType.
+	Time time.Time
+	// Err holds the error value when Type is ErrorType.
+	Err error
+	// Any holds the arbitrary value when Type is AnyType.
+	Any any
 }
 
 // String returns a string-valued field.

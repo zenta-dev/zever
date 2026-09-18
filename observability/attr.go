@@ -59,7 +59,9 @@ func BoolAttr(val bool) BoolValue { return BoolValue{Value: val} }
 
 // Attr is a single key-value pair attached to spans and metrics.
 type Attr struct {
-	Key   string
+	// Key is the attribute name, truncated to MaxKeyLen.
+	Key string
+	// Value is the attribute value, a sealed AttributeValue.
 	Value AttributeValue
 }
 
