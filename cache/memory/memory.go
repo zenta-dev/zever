@@ -1,6 +1,7 @@
 package memory
 
 import (
+	"bytes"
 	"container/list"
 	"context"
 	"math/rand/v2"
@@ -12,6 +13,8 @@ import (
 )
 
 const defaultMaxEntries = 1000
+
+var _ cache.CompareAndSwapCache = (*memoryAdapter)(nil)
 
 type item struct {
 	value     []byte
@@ -158,6 +161,82 @@ func (a *memoryAdapter) Delete(_ context.Context, key string) error {
 	}
 
 	return nil
+}
+
+// CompareAndDelete removes key only when its live value equals expected.
+// Missing, expired, or mismatched entries report deleted=false with nil
+// error, so a stale holder never steals a successor entry.
+func (a *memoryAdapter) CompareAndDelete(_ context.Context, key string, expected []byte) (bool, error) {
+	a.mu.Lock()
+	defer a.mu.Unlock()
+
+	if a.closed {
+		return false, cache.ErrClosed
+	}
+
+	it, ok := a.items[key]
+	if !ok {
+		return false, nil
+	}
+
+	now := time.Now()
+
+	if a.isExpired(it, now) {
+		delete(a.items, key)
+		a.removeFromOrder(key)
+
+		return false, nil
+	}
+
+	if !bytes.Equal(it.value, expected) {
+		return false, nil
+	}
+
+	delete(a.items, key)
+	a.removeFromOrder(key)
+
+	return true, nil
+}
+
+// CompareAndExtend renews the TTL on key only when its live value equals
+// expected. A non-positive ttl clears the expiry. Missing, expired, or
+// mismatched entries report extended=false with nil error.
+func (a *memoryAdapter) CompareAndExtend(_ context.Context, key string, expected []byte, ttl time.Duration) (bool, error) {
+	a.mu.Lock()
+	defer a.mu.Unlock()
+
+	if a.closed {
+		return false, cache.ErrClosed
+	}
+
+	it, ok := a.items[key]
+	if !ok {
+		return false, nil
+	}
+
+	now := time.Now()
+
+	if a.isExpired(it, now) {
+		delete(a.items, key)
+		a.removeFromOrder(key)
+
+		return false, nil
+	}
+
+	if !bytes.Equal(it.value, expected) {
+		return false, nil
+	}
+
+	if ttl > 0 {
+		it.expiresAt = now.Add(ttl)
+	} else {
+		it.expiresAt = time.Time{}
+	}
+
+	a.items[key] = it
+	a.promote(key)
+
+	return true, nil
 }
 
 func (a *memoryAdapter) Increment(_ context.Context, key string) error {
