@@ -83,7 +83,7 @@ func TestTTLCache_Delete(t *testing.T) {
 
 	t.Run("delete does not invoke OnEvict", func(t *testing.T) {
 		fired := false
-		tc := NewTTL[string, int](4, time.Hour, WithOnEvict[string, int](func(k string, v int) {
+		tc := NewTTL[string, int](4, time.Hour, WithOnEvict[string, int](func(_ string, _ int) {
 			fired = true
 		}))
 		tc.Put("a", 1)
@@ -98,7 +98,7 @@ func TestTTLCache_CapacityEviction(t *testing.T) {
 	var mu sync.Mutex
 	var evicted []string
 
-	tc := NewTTL[string, int](2, time.Hour, WithOnEvict[string, int](func(k string, v int) {
+	tc := NewTTL[string, int](2, time.Hour, WithOnEvict[string, int](func(k string, _ int) {
 		mu.Lock()
 		evicted = append(evicted, k)
 		mu.Unlock()
@@ -151,8 +151,8 @@ func TestTTLCache_Len(t *testing.T) {
 	}
 }
 
-func TestTTLCache_ConcurrentAccess(t *testing.T) {
-	tc := NewTTL[int, int](64, 50*time.Millisecond, WithOnEvict[int, int](func(k, v int) {}))
+func TestTTLCache_ConcurrentAccess(_ *testing.T) {
+	tc := NewTTL[int, int](64, 50*time.Millisecond, WithOnEvict[int, int](func(_, _ int) {}))
 
 	const goroutines = 16
 	const opsPerGoroutine = 200

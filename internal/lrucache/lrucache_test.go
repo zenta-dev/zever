@@ -14,6 +14,7 @@ func TestCache_GetPut(t *testing.T) {
 		{
 			name: "get on empty cache misses",
 			run: func(t *testing.T, c *Cache[string, int]) {
+				t.Helper()
 				v, ok := c.Get("missing")
 				if ok || v != 0 {
 					t.Fatalf("Get(missing) = (%v, %v), want (0, false)", v, ok)
@@ -23,6 +24,7 @@ func TestCache_GetPut(t *testing.T) {
 		{
 			name: "put then get hits",
 			run: func(t *testing.T, c *Cache[string, int]) {
+				t.Helper()
 				c.Put("a", 1)
 				v, ok := c.Get("a")
 				if !ok || v != 1 {
@@ -33,6 +35,7 @@ func TestCache_GetPut(t *testing.T) {
 		{
 			name: "put updates existing key without growing len",
 			run: func(t *testing.T, c *Cache[string, int]) {
+				t.Helper()
 				c.Put("a", 1)
 				c.Put("a", 2)
 				if c.Len() != 1 {
@@ -127,7 +130,7 @@ func TestCache_OnEvict(t *testing.T) {
 
 func TestCache_OnEvict_NotFiredWithinCapacity(t *testing.T) {
 	fired := false
-	c := New[string, int](4, WithOnEvict[string, int](func(k string, v int) {
+	c := New[string, int](4, WithOnEvict[string, int](func(_ string, _ int) {
 		fired = true
 	}))
 
@@ -166,7 +169,7 @@ func TestCache_Delete(t *testing.T) {
 
 	t.Run("delete does not invoke OnEvict", func(t *testing.T) {
 		fired := false
-		c := New[string, int](4, WithOnEvict[string, int](func(k string, v int) {
+		c := New[string, int](4, WithOnEvict[string, int](func(_ string, _ int) {
 			fired = true
 		}))
 		c.Put("a", 1)
@@ -189,8 +192,8 @@ func TestNew_NonPositiveCapacityUsesDefault(t *testing.T) {
 	}
 }
 
-func TestCache_ConcurrentAccess(t *testing.T) {
-	c := New[int, int](64, WithOnEvict[int, int](func(k, v int) {}))
+func TestCache_ConcurrentAccess(_ *testing.T) {
+	c := New[int, int](64, WithOnEvict[int, int](func(_, _ int) {}))
 
 	const goroutines = 16
 	const opsPerGoroutine = 200

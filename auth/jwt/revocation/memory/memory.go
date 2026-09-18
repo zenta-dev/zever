@@ -49,14 +49,14 @@ type expiryItem struct {
 //     and stops as soon as it finds one that hasn't expired yet.
 type expiryHeap []*expiryItem
 
-func (h expiryHeap) Len() int { return len(h) }
+func (h *expiryHeap) Len() int { return len(*h) }
 
-func (h expiryHeap) Less(i, j int) bool { return h[i].expiry.Before(h[j].expiry) }
+func (h *expiryHeap) Less(i, j int) bool { return (*h)[i].expiry.Before((*h)[j].expiry) }
 
-func (h expiryHeap) Swap(i, j int) {
-	h[i], h[j] = h[j], h[i]
-	h[i].index = i
-	h[j].index = j
+func (h *expiryHeap) Swap(i, j int) {
+	(*h)[i], (*h)[j] = (*h)[j], (*h)[i]
+	(*h)[i].index = i
+	(*h)[j].index = j
 }
 
 func (h *expiryHeap) Push(x any) {
