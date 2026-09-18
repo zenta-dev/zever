@@ -3,7 +3,8 @@ package password
 import (
 	"context"
 	"fmt"
-	"sync"
+
+	"github.com/zenta-dev/zever/internal/registry"
 )
 
 // Hasher is the interface that password-hashing adapters must implement.
@@ -20,9 +21,10 @@ type Hasher interface {
 // Factory creates a Hasher from typed options.
 type Factory func(opts Options) (Hasher, error)
 
-var (
-	mu        sync.RWMutex
-	factories = make(map[Adapter]Factory)
+var factories = registry.New[Adapter, Factory](
+	ErrNilFactory,
+	func(a Adapter) error { return &DuplicateError{Adapter: a} },
+	func(a Adapter) error { return &UnknownAdapterError{Adapter: a} },
 )
 
 // Register makes an adapter available for Open.
@@ -31,16 +33,7 @@ func Register(a Adapter, f Factory) error {
 		return fmt.Errorf("%w for adapter %s", ErrNilFactory, a)
 	}
 
-	mu.Lock()
-	defer mu.Unlock()
-
-	if _, dup := factories[a]; dup {
-		return &DuplicateError{Adapter: a}
-	}
-
-	factories[a] = f
-
-	return nil
+	return factories.Register(a, f)
 }
 
 // Open opens a Hasher using an already-registered adapter.
@@ -48,12 +41,9 @@ func Register(a Adapter, f Factory) error {
 // Options are passed through untouched: the adapter fills zero values with
 // defaults before validating.
 func Open(a Adapter, opts Options) (Hasher, error) {
-	mu.RLock()
-	factory, ok := factories[a]
-	mu.RUnlock()
-
-	if !ok {
-		return nil, &UnknownAdapterError{Adapter: a}
+	factory, err := factories.Lookup(a)
+	if err != nil {
+		return nil, err
 	}
 
 	h, err := factory(opts)

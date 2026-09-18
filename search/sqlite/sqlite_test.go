@@ -18,9 +18,14 @@ import (
 func newMemoryStore(t *testing.T) *Store {
 	t.Helper()
 
-	s, err := New(":memory:")
+	sr, err := New(search.Options{DSN: ":memory:"})
 	if err != nil {
 		t.Fatal(err)
+	}
+
+	s, ok := sr.(*Store)
+	if !ok {
+		t.Fatalf("New() returned %T, want *Store", sr)
 	}
 
 	t.Cleanup(func() { _ = s.Close() })
@@ -47,10 +52,10 @@ func mustSearch(t *testing.T, s *Store, query string, opts search.QueryOptions) 
 	return res
 }
 
-func TestOpenDefaults(t *testing.T) {
+func TestNewDefaults(t *testing.T) {
 	t.Parallel()
 
-	s, err := Open(search.Options{})
+	s, err := New(search.Options{})
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -73,12 +78,12 @@ func TestOpenDefaults(t *testing.T) {
 	}
 }
 
-func TestOpenInvalidOptions(t *testing.T) {
+func TestNewInvalidOptions(t *testing.T) {
 	t.Parallel()
 
-	s, err := Open(search.Options{Host: "localhost:7700"})
+	s, err := New(search.Options{Host: "localhost:7700"})
 	if !errors.Is(err, search.ErrInvalidOptions) {
-		t.Fatalf("Open err = %v, want ErrInvalidOptions", err)
+		t.Fatalf("New err = %v, want ErrInvalidOptions", err)
 	}
 
 	if s != nil {
@@ -86,10 +91,10 @@ func TestOpenInvalidOptions(t *testing.T) {
 	}
 }
 
-func TestOpenBadDirDSN(t *testing.T) {
+func TestNewBadDirDSN(t *testing.T) {
 	t.Parallel()
 
-	s, err := Open(search.Options{DSN: filepath.Join(t.TempDir(), "no-such-dir", "search.db")})
+	s, err := New(search.Options{DSN: filepath.Join(t.TempDir(), "no-such-dir", "search.db")})
 	if err == nil {
 		t.Fatal("expected error for bad-dir DSN, got nil")
 	}
@@ -102,7 +107,7 @@ func TestOpenBadDirDSN(t *testing.T) {
 func TestNewInvalidDSN(t *testing.T) {
 	t.Parallel()
 
-	s, err := New("bad;dsn")
+	s, err := New(search.Options{DSN: "bad;dsn"})
 	if err == nil {
 		t.Fatal("expected error for invalid DSN, got nil")
 	}
@@ -115,7 +120,7 @@ func TestNewInvalidDSN(t *testing.T) {
 func TestNewOpenError(t *testing.T) {
 	t.Parallel()
 
-	s, err := New("file:x?%zz")
+	s, err := New(search.Options{DSN: "file:x?%zz"})
 	if err == nil {
 		t.Fatal("expected open error for malformed DSN, got nil")
 	}
@@ -508,7 +513,7 @@ func TestFileBackedPersistence(t *testing.T) {
 	path := filepath.Join(t.TempDir(), "search.db")
 	ctx := context.Background()
 
-	s, err := New(path)
+	s, err := New(search.Options{DSN: path})
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -522,7 +527,7 @@ func TestFileBackedPersistence(t *testing.T) {
 		t.Fatal(closeErr)
 	}
 
-	s2, err := New(path)
+	s2, err := New(search.Options{DSN: path})
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -561,7 +566,7 @@ func TestMemoryIsolation(t *testing.T) {
 func TestClose(t *testing.T) {
 	t.Parallel()
 
-	s, err := New(":memory:")
+	s, err := New(search.Options{DSN: ":memory:"})
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -658,7 +663,7 @@ func TestIndexUnserializableMetadata(t *testing.T) {
 func TestIndexClosedDB(t *testing.T) {
 	t.Parallel()
 
-	s, err := New(":memory:")
+	s, err := New(search.Options{DSN: ":memory:"})
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -753,7 +758,7 @@ func TestDeleteCancelledContext(t *testing.T) {
 func TestSearchClosedDB(t *testing.T) {
 	t.Parallel()
 
-	s, err := New(":memory:")
+	s, err := New(search.Options{DSN: ":memory:"})
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -1195,5 +1200,57 @@ func TestValidateDSN(t *testing.T) {
 		if err := validateDSN(tc.dsn); (err != nil) != tc.wantErr {
 			t.Errorf("validateDSN(%q) err = %v, wantErr %v", tc.dsn, err, tc.wantErr)
 		}
+	}
+}
+
+func TestIndexBatch_MatchesLoopedIndex(t *testing.T) {
+	t.Parallel()
+
+	docs := []search.Document{
+		{ID: "d1", Index: "docs", Content: "alpha bravo", Metadata: map[string]any{"n": "one"}},
+		{ID: "d2", Index: "docs", Content: "bravo charlie", Metadata: map[string]any{"n": "two"}},
+		{ID: "d3", Index: "docs", Content: "charlie delta", Metadata: map[string]any{"n": "three"}},
+	}
+
+	loopStore := newMemoryStore(t)
+	for _, d := range docs {
+		mustIndex(t, loopStore, d)
+	}
+
+	batchStore := newMemoryStore(t)
+
+	if err := batchStore.IndexBatch(context.Background(), docs); err != nil {
+		t.Fatalf("IndexBatch: %v", err)
+	}
+
+	loopRes := mustSearch(t, loopStore, "bravo", search.QueryOptions{})
+	batchRes := mustSearch(t, batchStore, "bravo", search.QueryOptions{})
+
+	if loopRes.Total != batchRes.Total {
+		t.Fatalf("total mismatch: loop=%d batch=%d", loopRes.Total, batchRes.Total)
+	}
+
+	if len(loopRes.Hits) != len(batchRes.Hits) {
+		t.Fatalf("hit count mismatch: loop=%d batch=%d", len(loopRes.Hits), len(batchRes.Hits))
+	}
+
+	for i := range loopRes.Hits {
+		if loopRes.Hits[i].ID != batchRes.Hits[i].ID {
+			t.Fatalf("id mismatch at %d: loop=%s batch=%s", i, loopRes.Hits[i].ID, batchRes.Hits[i].ID)
+		}
+
+		if loopRes.Hits[i].Score != batchRes.Hits[i].Score {
+			t.Fatalf("score mismatch at %d: loop=%f batch=%f", i, loopRes.Hits[i].Score, batchRes.Hits[i].Score)
+		}
+	}
+}
+
+func TestIndexBatch_Empty(t *testing.T) {
+	t.Parallel()
+
+	s := newMemoryStore(t)
+
+	if err := s.IndexBatch(context.Background(), nil); err != nil {
+		t.Fatalf("IndexBatch(nil): %v", err)
 	}
 }

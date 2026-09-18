@@ -22,10 +22,10 @@ type adapter struct {
 	maxProperties int
 }
 
-// Open returns an adapter using o. The default logger writes JSON lines to
+// New returns an adapter using o. The default logger writes JSON lines to
 // stdout; there is no PII redaction, so use it for debug output only.
 // For tests, prefer NewWithWriter with a buffer.
-func Open(o analytics.Options) (analytics.Analytics, error) {
+func New(o analytics.Options) (analytics.Analytics, error) {
 	return NewWithWriter(o, os.Stdout)
 }
 

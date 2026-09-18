@@ -7,7 +7,7 @@ import (
 
 // ExampleOpen opens the http webhook backend with default options.
 func ExampleOpen() {
-	_ = webhook.Register(webhook.AdapterHTTP, webhookhttp.Open)
+	_ = webhook.Register(webhook.AdapterHTTP, webhookhttp.New)
 
 	w, err := webhook.Open(webhook.AdapterHTTP, webhook.Options{})
 	if err != nil {

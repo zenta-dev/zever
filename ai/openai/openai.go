@@ -25,8 +25,8 @@ type adapter struct {
 	model  string
 }
 
-// Open creates an AI backed by OpenAI.
-func Open(opts ai.Options) (ai.AI, error) {
+// New creates an AI backed by OpenAI.
+func New(opts ai.Options) (ai.AI, error) {
 	if err := validateOptions(opts); err != nil {
 		return nil, err
 	}
@@ -78,11 +78,11 @@ func (a *adapter) Generate(ctx context.Context, model string, messages []ai.Mess
 	}
 
 	if model == "" {
-		return ai.Generation{}, errors.New("[openai] model is required")
+		return ai.Generation{}, errors.New("openai: model is required")
 	}
 
 	if len(opts.Tools) > 0 && opts.ResponseFormat != nil {
-		return ai.Generation{}, fmt.Errorf("[openai] cannot set both response_format and tools: %w", ai.ErrNotSupported)
+		return ai.Generation{}, fmt.Errorf("openai: cannot set both response_format and tools: %w", ai.ErrNotSupported)
 	}
 
 	msgs := buildMessages(messages)
@@ -122,21 +122,21 @@ func (a *adapter) Generate(ctx context.Context, model string, messages []ai.Mess
 
 	resp, err := a.client.Chat.Completions.New(ctx, params)
 	if err != nil {
-		return ai.Generation{}, fmt.Errorf("[openai] generate: %w", mapError(err))
+		return ai.Generation{}, fmt.Errorf("openai: generate: %w", mapError(err))
 	}
 
 	if resp == nil || len(resp.Choices) == 0 {
-		return ai.Generation{}, errors.New("[openai] no choices returned")
+		return ai.Generation{}, errors.New("openai: no choices returned")
 	}
 
 	promptTokens, err := safeInt64ToInt(resp.Usage.PromptTokens)
 	if err != nil {
-		return ai.Generation{}, fmt.Errorf("[openai] prompt_tokens overflow: %w", err)
+		return ai.Generation{}, fmt.Errorf("openai: prompt_tokens overflow: %w", err)
 	}
 
 	completionTokens, err := safeInt64ToInt(resp.Usage.CompletionTokens)
 	if err != nil {
-		return ai.Generation{}, fmt.Errorf("[openai] completion_tokens overflow: %w", err)
+		return ai.Generation{}, fmt.Errorf("openai: completion_tokens overflow: %w", err)
 	}
 
 	var toolCalls []ai.ToolCall
@@ -168,7 +168,7 @@ func (a *adapter) Embed(ctx context.Context, model string, inputs []string, opts
 	}
 
 	if model == "" {
-		return nil, errors.New("[openai] model is required")
+		return nil, errors.New("openai: model is required")
 	}
 
 	params := openai.EmbeddingNewParams{
@@ -184,7 +184,7 @@ func (a *adapter) Embed(ctx context.Context, model string, inputs []string, opts
 
 	resp, err := a.client.Embeddings.New(ctx, params)
 	if err != nil {
-		return nil, fmt.Errorf("[openai] embed: %w", mapError(err))
+		return nil, fmt.Errorf("openai: embed: %w", mapError(err))
 	}
 
 	result := make([][]float32, len(resp.Data))
@@ -207,11 +207,11 @@ func (a *adapter) Stream(ctx context.Context, model string, messages []ai.Messag
 	}
 
 	if model == "" {
-		return nil, errors.New("[openai] model is required")
+		return nil, errors.New("openai: model is required")
 	}
 
 	if len(opts.Tools) > 0 && opts.ResponseFormat != nil {
-		return nil, fmt.Errorf("[openai] cannot set both response_format and tools: %w", ai.ErrNotSupported)
+		return nil, fmt.Errorf("openai: cannot set both response_format and tools: %w", ai.ErrNotSupported)
 	}
 
 	msgs := buildMessages(messages)
@@ -295,7 +295,7 @@ func (a *adapter) Stream(ctx context.Context, model string, messages []ai.Messag
 		}
 
 		if err := stream.Err(); err != nil {
-			ch <- ai.StreamChunk{Err: fmt.Errorf("[openai] stream: %w", mapError(err))}
+			ch <- ai.StreamChunk{Err: fmt.Errorf("openai: stream: %w", mapError(err))}
 
 			return
 		}

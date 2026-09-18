@@ -19,7 +19,7 @@ import (
 func openTest(t *testing.T, url string) billing.Billing {
 	t.Helper()
 
-	b, err := Open(billing.Options{APIKey: "pdl_test_123", Endpoint: url})
+	b, err := New(billing.Options{APIKey: "pdl_test_123", Endpoint: url})
 	if err != nil {
 		t.Fatalf("Open: %v", err)
 	}
@@ -30,7 +30,7 @@ func openTest(t *testing.T, url string) billing.Billing {
 func TestOpen_missingAPIKey_returnsErrMissingAPIKey(t *testing.T) {
 	t.Parallel()
 
-	_, err := Open(billing.Options{})
+	_, err := New(billing.Options{})
 	if !errors.Is(err, ErrMissingAPIKey) {
 		t.Fatalf("Open err = %v, want ErrMissingAPIKey", err)
 	}
@@ -39,7 +39,7 @@ func TestOpen_missingAPIKey_returnsErrMissingAPIKey(t *testing.T) {
 func TestOpen_invalidOptions_wrapsErrInvalidOptions(t *testing.T) {
 	t.Parallel()
 
-	_, err := Open(billing.Options{APIKey: "k", Endpoint: "example.com/hook"})
+	_, err := New(billing.Options{APIKey: "k", Endpoint: "example.com/hook"})
 	if !errors.Is(err, billing.ErrInvalidOptions) {
 		t.Fatalf("Open err = %v, want ErrInvalidOptions", err)
 	}
@@ -62,7 +62,7 @@ func TestOpen_defaults_makeNoCall(t *testing.T) {
 		t.Run(tc.name, func(t *testing.T) {
 			t.Parallel()
 
-			b, err := Open(billing.Options{APIKey: "pdl_test_123", Sandbox: tc.sandbox})
+			b, err := New(billing.Options{APIKey: "pdl_test_123", Sandbox: tc.sandbox})
 			if err != nil {
 				t.Fatalf("Open: %v", err)
 			}
@@ -83,7 +83,7 @@ func TestOpen_newSDKError_wrapped(t *testing.T) {
 		return nil, sentinel
 	}
 
-	_, err := Open(billing.Options{APIKey: "k"})
+	_, err := New(billing.Options{APIKey: "k"})
 	if !errors.Is(err, sentinel) {
 		t.Fatalf("Open err = %v, want wrap of sentinel", err)
 	}

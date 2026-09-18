@@ -56,6 +56,7 @@ func TestQuoteIdent_double_quotes(t *testing.T) {
 		{name: "empty", in: "", want: `""`},
 		{name: "space", in: "weird name", want: `"weird name"`},
 		{name: "dotted", in: "u.id", want: `"u.id"`},
+		{name: "embedded_quote", in: `foo"bar`, want: `"foo""bar"`},
 	}
 
 	for _, tt := range tests {

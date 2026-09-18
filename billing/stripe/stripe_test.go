@@ -114,16 +114,16 @@ func newDefaultMux(invoiceHandler http.HandlerFunc) *http.ServeMux {
 
 func openWithServer(t *testing.T, srv *httptest.Server) billing.Billing {
 	t.Helper()
-	b, err := Open(billing.Options{SecretKey: "sk_test_123", Endpoint: srv.URL})
+	b, err := New(billing.Options{SecretKey: "sk_test_123", Endpoint: srv.URL})
 	if err != nil {
-		t.Fatalf("Open() error = %v", err)
+		t.Fatalf("New() error = %v", err)
 	}
 	return b
 }
 
 func TestOpenMissingSecretKey(t *testing.T) {
 	t.Parallel()
-	_, err := Open(billing.Options{})
+	_, err := New(billing.Options{})
 	if !errors.Is(err, ErrMissingSecretKey) {
 		t.Fatalf("expected ErrMissingSecretKey, got %v", err)
 	}
@@ -131,7 +131,7 @@ func TestOpenMissingSecretKey(t *testing.T) {
 
 func TestOpenInvalidOptions(t *testing.T) {
 	t.Parallel()
-	_, err := Open(billing.Options{SecretKey: "sk_test_123", Endpoint: "://bad"})
+	_, err := New(billing.Options{SecretKey: "sk_test_123", Endpoint: "://bad"})
 	if !errors.Is(err, billing.ErrInvalidOptions) {
 		t.Fatalf("expected ErrInvalidOptions, got %v", err)
 	}
@@ -139,9 +139,9 @@ func TestOpenInvalidOptions(t *testing.T) {
 
 func TestOpenNoEndpoint(t *testing.T) {
 	t.Parallel()
-	b, err := Open(billing.Options{SecretKey: "sk_test_123"})
+	b, err := New(billing.Options{SecretKey: "sk_test_123"})
 	if err != nil {
-		t.Fatalf("Open() error = %v", err)
+		t.Fatalf("New() error = %v", err)
 	}
 	if b == nil {
 		t.Fatal("expected non-nil Billing")

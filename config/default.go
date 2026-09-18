@@ -15,6 +15,7 @@ import (
 	"github.com/zenta-dev/zever/i18n"
 	"github.com/zenta-dev/zever/idempotency"
 	"github.com/zenta-dev/zever/job"
+	"github.com/zenta-dev/zever/lock"
 	"github.com/zenta-dev/zever/log"
 	"github.com/zenta-dev/zever/mailer"
 	"github.com/zenta-dev/zever/media"
@@ -28,6 +29,7 @@ import (
 	"github.com/zenta-dev/zever/router"
 	"github.com/zenta-dev/zever/scheduler"
 	"github.com/zenta-dev/zever/search"
+	"github.com/zenta-dev/zever/secrets"
 	"github.com/zenta-dev/zever/session"
 	"github.com/zenta-dev/zever/storage"
 	"github.com/zenta-dev/zever/tenant"
@@ -57,6 +59,7 @@ func Default() *Config {
 	cfg.Geo = Service[geo.Options]{Adapter: "static"}
 	cfg.I18n = Service[i18n.Options]{Adapter: "embed"}
 	cfg.Idempotency = Service[idempotency.Options]{Adapter: "memory"}
+	cfg.Lock = Service[lock.Options]{Adapter: "memory"}
 	cfg.Log = Service[log.Options]{Adapter: "slog"}
 	cfg.Mailer = Service[mailer.Options]{Adapter: "log", Options: mailer.Options{Host: "localhost", Port: 25}}
 	cfg.Media = Service[media.Options]{Adapter: "local"}
@@ -70,6 +73,7 @@ func Default() *Config {
 	cfg.Router = Service[router.Options]{Adapter: "stdhttp"}
 	cfg.Scheduler = Service[scheduler.Options]{Adapter: "embedded", Options: scheduler.Options{Dispatcher: &job.Dispatcher{}}}
 	cfg.Search = Service[search.Options]{Adapter: "sqlite"}
+	cfg.Secrets = Service[secrets.Options]{Adapter: "env", Options: secrets.Options{Prefix: "ZEVER"}}
 	cfg.Session = Service[session.Options]{Adapter: "memory"}
 	cfg.Storage = Service[storage.Options]{Adapter: "local"}
 	cfg.Tenant = Service[tenant.Options]{Adapter: "single"}

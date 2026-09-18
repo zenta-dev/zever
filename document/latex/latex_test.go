@@ -40,26 +40,26 @@ func fakeBin(t *testing.T, name, body string) {
 
 func mustOpen(t *testing.T, o document.Options) document.Document {
 	t.Helper()
-	d, err := Open(o)
+	d, err := New(o)
 	if err != nil {
-		t.Fatalf("Open() err = %v", err)
+		t.Fatalf("New() err = %v", err)
 	}
 	return d
 }
 
 func TestOpenMissingCommand(t *testing.T) {
 	t.Setenv("PATH", t.TempDir())
-	_, err := Open(document.Options{})
+	_, err := New(document.Options{})
 	if !errors.Is(err, exec.ErrNotFound) {
-		t.Fatalf("Open() err = %v, want exec.ErrNotFound", err)
+		t.Fatalf("New() err = %v, want exec.ErrNotFound", err)
 	}
 }
 
 func TestOpenInvalidOptions(t *testing.T) {
 	t.Parallel()
-	_, err := Open(document.Options{Quality: 101})
+	_, err := New(document.Options{Quality: 101})
 	if !errors.Is(err, document.ErrInvalidOptions) {
-		t.Fatalf("Open() err = %v, want ErrInvalidOptions", err)
+		t.Fatalf("New() err = %v, want ErrInvalidOptions", err)
 	}
 }
 
@@ -69,7 +69,7 @@ func TestOpenDefaults(t *testing.T) {
 	d := mustOpen(t, document.Options{})
 	drv, ok := d.(*driver)
 	if !ok {
-		t.Fatalf("Open() type = %T, want *driver", d)
+		t.Fatalf("New() type = %T, want *driver", d)
 	}
 	if drv.command == "" || !strings.HasSuffix(drv.command, "pdflatex") {
 		t.Errorf("command = %q, want resolved pdflatex", drv.command)
@@ -113,7 +113,7 @@ func TestOpenCustom(t *testing.T) {
 	})
 	drv, ok := d.(*driver)
 	if !ok {
-		t.Fatalf("Open() type = %T, want *driver", d)
+		t.Fatalf("New() type = %T, want *driver", d)
 	}
 	if !strings.HasSuffix(drv.command, "my-tex") {
 		t.Errorf("command = %q, want suffix my-tex", drv.command)

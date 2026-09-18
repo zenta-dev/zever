@@ -4,5 +4,5 @@
 //
 // Color is emitted only when the destination is a terminal and neither
 // NO_COLOR nor TERM=dumb disables it, so piped or redirected output never
-// leaks ANSI escapes. An explicit Options.Color always wins over detection.
+// leaks ANSI escapes.
 package pretty

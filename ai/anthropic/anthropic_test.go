@@ -23,7 +23,7 @@ import (
 
 func TestOpen_APIKeyRequired(t *testing.T) {
 	t.Parallel()
-	_, err := Open(ai.Options{})
+	_, err := New(ai.Options{})
 	if !errors.Is(err, ai.ErrInvalidOptions) {
 		t.Fatalf("err = %v, want ErrInvalidOptions", err)
 	}
@@ -41,7 +41,7 @@ func TestOpen_APIKeyRequired(t *testing.T) {
 
 func TestOpen_BaseURLHttpsValidation(t *testing.T) {
 	t.Parallel()
-	_, err := Open(ai.Options{APIKey: "k", BaseURL: "http://example.com"})
+	_, err := New(ai.Options{APIKey: "k", BaseURL: "http://example.com"})
 	if !errors.Is(err, ai.ErrInvalidOptions) {
 		t.Fatalf("err = %v want ErrInvalidOptions", err)
 	}
@@ -52,7 +52,7 @@ func TestOpen_BaseURLHttpsValidation(t *testing.T) {
 
 func TestOpen_SuccessAndClose(t *testing.T) {
 	t.Parallel()
-	a, err := Open(ai.Options{APIKey: "test", Model: "claude-3", Timeout: time.Second})
+	a, err := New(ai.Options{APIKey: "test", Model: "claude-3", Timeout: time.Second})
 	if err != nil {
 		t.Fatalf("Open err = %v", err)
 	}
@@ -74,7 +74,7 @@ func TestOpen_WithBaseURL(t *testing.T) {
 	// Use httptest server via direct client to bypass https validation for generate test
 	// But Open with https validation should fail for http - test redaction via direct adapter instead
 	// Instead test Open with https BaseURL succeeds
-	a, err := Open(ai.Options{APIKey: "k", BaseURL: "https://example.com"})
+	a, err := New(ai.Options{APIKey: "k", BaseURL: "https://example.com"})
 	if err != nil {
 		t.Fatalf("Open https err = %v", err)
 	}
@@ -185,7 +185,7 @@ func TestRedactURLError(t *testing.T) {
 
 func TestEmbed_ErrNotSupported(t *testing.T) {
 	t.Parallel()
-	a, err := Open(ai.Options{APIKey: "k"})
+	a, err := New(ai.Options{APIKey: "k"})
 	if err != nil {
 		t.Fatalf("Open err %v", err)
 	}
@@ -736,7 +736,7 @@ func TestRedactionHidesKey(t *testing.T) {
 
 func TestClose(t *testing.T) {
 	t.Parallel()
-	a, _ := Open(ai.Options{APIKey: "k"})
+	a, _ := New(ai.Options{APIKey: "k"})
 	if err := a.Close(); err != nil {
 		t.Fatalf("Close err %v", err)
 	}

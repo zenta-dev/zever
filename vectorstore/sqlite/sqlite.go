@@ -33,9 +33,16 @@ const maxScanRows = 10000
 
 var memoryCounter uint64
 
-// Open creates a SQLite-backed VectorStore from Options.
+// Store implements vectorstore.VectorStore backed by SQLite.
+type Store struct {
+	db  *sql.DB
+	mu  sync.RWMutex
+	dim int
+}
+
+// New creates a SQLite-backed VectorStore from Options.
 // An empty DSN defaults to vectorstore.DefaultSQLiteDSN.
-func Open(o vectorstore.Options) (vectorstore.VectorStore, error) {
+func New(o vectorstore.Options) (vectorstore.VectorStore, error) {
 	if err := o.Validate(); err != nil {
 		return nil, fmt.Errorf("sqlite: %w", err)
 	}
@@ -45,23 +52,6 @@ func Open(o vectorstore.Options) (vectorstore.VectorStore, error) {
 		dsn = vectorstore.DefaultSQLiteDSN
 	}
 
-	s, err := New(dsn)
-	if err != nil {
-		return nil, err
-	}
-
-	return s, nil
-}
-
-// Store implements vectorstore.VectorStore backed by SQLite.
-type Store struct {
-	db  *sql.DB
-	mu  sync.RWMutex
-	dim int
-}
-
-// New creates a SQLite vector store connected to the given DSN.
-func New(dsn string) (*Store, error) {
 	if dsn == ":memory:" {
 		n := atomic.AddUint64(&memoryCounter, 1)
 		dsn = fmt.Sprintf("file:zen-vectorstore-%d?mode=memory&cache=shared", n)
@@ -101,8 +91,46 @@ func New(dsn string) (*Store, error) {
 	return &Store{db: d}, nil
 }
 
+// execer abstracts *sql.DB and *sql.Tx so upsert logic can run against either
+// a bare connection or an in-flight transaction.
+type execer interface {
+	ExecContext(ctx context.Context, query string, args ...any) (sql.Result, error)
+}
+
 // Upsert inserts or replaces a vector in the store.
 func (s *Store) Upsert(ctx context.Context, vec vectorstore.Vector) error {
+	if err := s.upsertOne(ctx, s.db, vec); err != nil {
+		return err
+	}
+
+	return nil
+}
+
+// UpsertBatch inserts or replaces all of vecs in a single transaction.
+func (s *Store) UpsertBatch(ctx context.Context, vecs []vectorstore.Vector) error {
+	tx, err := s.db.BeginTx(ctx, nil)
+	if err != nil {
+		return fmt.Errorf("sqlite: upsert batch: begin: %w", err)
+	}
+
+	for _, vec := range vecs {
+		if err := s.upsertOne(ctx, tx, vec); err != nil {
+			_ = tx.Rollback() //nolint:gosec // G104: best-effort rollback on error path
+
+			return err
+		}
+	}
+
+	if err := tx.Commit(); err != nil {
+		return fmt.Errorf("sqlite: upsert batch: commit: %w", err)
+	}
+
+	return nil
+}
+
+// upsertOne inserts or replaces vec using exec, which may be s.db or an
+// in-flight *sql.Tx, so Upsert and UpsertBatch share identical per-item logic.
+func (s *Store) upsertOne(ctx context.Context, exec execer, vec vectorstore.Vector) error {
 	if len(vec.Embedding) == 0 {
 		return fmt.Errorf("sqlite: upsert: %w", vectorstore.ErrEmptyEmbedding)
 	}
@@ -118,7 +146,7 @@ func (s *Store) Upsert(ctx context.Context, vec vectorstore.Vector) error {
 		return fmt.Errorf("sqlite: encode metadata: %w", err)
 	}
 
-	if _, err := s.db.ExecContext(
+	if _, err := exec.ExecContext(
 		ctx,
 		`INSERT OR REPLACE INTO vectors (id, embedding, metadata) VALUES (?, ?, ?)`,
 		vec.ID, blob, metaBlob,

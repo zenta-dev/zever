@@ -28,7 +28,7 @@ func openTest(t *testing.T, opts media.Options) media.Media {
 		opts.Root = t.TempDir()
 	}
 
-	m, err := Open(opts)
+	m, err := New(opts)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -121,7 +121,7 @@ func breakAsset(t *testing.T, root, id string) {
 func TestOpen_defaults(t *testing.T) {
 	t.Parallel()
 
-	m, err := Open(media.Options{Root: "", BaseURL: ""})
+	m, err := New(media.Options{Root: "", BaseURL: ""})
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -172,7 +172,7 @@ func TestOpen_trimsBaseURLSlash(t *testing.T) {
 func TestOpen_invalidOptions(t *testing.T) {
 	t.Parallel()
 
-	if _, err := Open(media.Options{MaxDownloadBytes: -1}); !errors.Is(err, media.ErrInvalidOptions) {
+	if _, err := New(media.Options{MaxDownloadBytes: -1}); !errors.Is(err, media.ErrInvalidOptions) {
 		t.Fatalf("err = %v, want ErrInvalidOptions", err)
 	}
 }
@@ -185,7 +185,7 @@ func TestOpen_badRoot(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	if _, err := Open(media.Options{Root: f}); err == nil {
+	if _, err := New(media.Options{Root: f}); err == nil {
 		t.Fatal("want error for file root, got nil")
 	}
 }
@@ -198,7 +198,7 @@ func TestOpen_blockedDerived(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	if _, err := Open(media.Options{Root: root}); err == nil {
+	if _, err := New(media.Options{Root: root}); err == nil {
 		t.Fatal("want error for blocked derived dir, got nil")
 	}
 }

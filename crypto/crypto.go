@@ -3,7 +3,8 @@ package crypto
 import (
 	"context"
 	"fmt"
-	"sync"
+
+	"github.com/zenta-dev/zever/internal/registry"
 )
 
 // Encryptor is the interface for encryption operations.
@@ -37,9 +38,10 @@ type Crypto interface {
 // Factory creates a Crypto from typed options.
 type Factory func(opts Options) (Crypto, error)
 
-var (
-	mu        sync.RWMutex
-	factories = make(map[Adapter]Factory)
+var factories = registry.New[Adapter, Factory](
+	ErrNilFactory,
+	func(a Adapter) error { return &DuplicateError{Adapter: a} },
+	func(a Adapter) error { return &UnknownAdapterError{Adapter: a} },
 )
 
 // Register associates an Adapter with a Factory for later use by Open.
@@ -48,16 +50,7 @@ func Register(a Adapter, f Factory) error {
 		return fmt.Errorf("%w for adapter %s", ErrNilFactory, a)
 	}
 
-	mu.Lock()
-	defer mu.Unlock()
-
-	if _, dup := factories[a]; dup {
-		return &DuplicateError{Adapter: a}
-	}
-
-	factories[a] = f
-
-	return nil
+	return factories.Register(a, f)
 }
 
 // Open creates a Crypto for adapter using the registered Factory and opts.
@@ -67,12 +60,9 @@ func Open(a Adapter, opts Options) (Crypto, error) {
 		return nil, err
 	}
 
-	mu.RLock()
-	factory, ok := factories[a]
-	mu.RUnlock()
-
-	if !ok {
-		return nil, &UnknownAdapterError{Adapter: a}
+	factory, err := factories.Lookup(a)
+	if err != nil {
+		return nil, err
 	}
 
 	c, err := factory(opts)

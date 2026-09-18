@@ -44,7 +44,7 @@ func chatOK(content string, prompt, eval int) map[string]any {
 func openFake(t *testing.T, tr fakeTransport, model string) ai.AI {
 	t.Helper()
 
-	a, err := Open(Options{Addr: "http://localhost:11434", Model: model, Transport: tr})
+	a, err := New(Options{Addr: "http://localhost:11434", Model: model, Transport: tr})
 	if err != nil {
 		t.Fatalf("Open: %v", err)
 	}
@@ -55,7 +55,7 @@ func openFake(t *testing.T, tr fakeTransport, model string) ai.AI {
 func TestOpen_defaults(t *testing.T) {
 	t.Parallel()
 
-	a, err := Open(Options{})
+	a, err := New(Options{})
 	if err != nil {
 		t.Fatalf("Open: %v", err)
 	}
@@ -77,7 +77,7 @@ func TestOpen_defaults(t *testing.T) {
 func TestOpen_custom(t *testing.T) {
 	t.Parallel()
 
-	a, err := Open(Options{Addr: "http://ollama:11434", Model: "llama3", Timeout: 5 * time.Second})
+	a, err := New(Options{Addr: "http://ollama:11434", Model: "llama3", Timeout: 5 * time.Second})
 	if err != nil {
 		t.Fatalf("Open: %v", err)
 	}
@@ -102,11 +102,11 @@ func TestOpen_custom(t *testing.T) {
 func TestOpen_invalid(t *testing.T) {
 	t.Parallel()
 
-	if _, err := Open(Options{Timeout: -time.Second}); err == nil {
+	if _, err := New(Options{Timeout: -time.Second}); err == nil {
 		t.Fatal("expected error, got nil")
 	}
 
-	if _, err := Open(Options{Addr: "ftp://example.com"}); err == nil {
+	if _, err := New(Options{Addr: "ftp://example.com"}); err == nil {
 		t.Fatal("expected error, got nil")
 	}
 }

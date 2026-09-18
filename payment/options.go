@@ -3,13 +3,14 @@ package payment
 import (
 	"errors"
 	"net/url"
+	"time"
 )
 
 const (
 	// DefaultMaxWebhookBytes is the default byte limit for webhook payloads.
 	DefaultMaxWebhookBytes = 1 << 20
-	// DefaultHTTPTimeout is the default HTTP timeout in seconds for provider calls.
-	DefaultHTTPTimeout = 30
+	// DefaultHTTPTimeout is the default HTTP timeout for provider calls.
+	DefaultHTTPTimeout = 30 * time.Second
 )
 
 // Options configures payment backend selection and limits.

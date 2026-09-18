@@ -3,7 +3,8 @@ package geo
 import (
 	"context"
 	"fmt"
-	"sync"
+
+	"github.com/zenta-dev/zever/internal/registry"
 )
 
 // Geo is the interface that geo adapters must implement.
@@ -21,9 +22,12 @@ type Geo interface {
 // Factory creates a Geo from typed options.
 type Factory func(opts Options) (Geo, error)
 
-var (
-	mu        sync.RWMutex
-	factories = make(map[Adapter]Factory)
+var factories = registry.New[Adapter, Factory](
+	ErrNilFactory,
+	func(adapter Adapter) error { return &DuplicateAdapterError{Adapter: adapter} },
+	func(adapter Adapter) error {
+		return fmt.Errorf("geo: unknown adapter %q (forgotten import?): %w", adapter, &UnknownAdapterError{Adapter: adapter})
+	},
 )
 
 // Register makes an adapter available.
@@ -31,13 +35,7 @@ func Register(adapter Adapter, factory Factory) error {
 	if factory == nil {
 		return fmt.Errorf("%w for adapter %s", ErrNilFactory, adapter)
 	}
-	mu.Lock()
-	defer mu.Unlock()
-	if _, dup := factories[adapter]; dup {
-		return &DuplicateAdapterError{Adapter: adapter}
-	}
-	factories[adapter] = factory
-	return nil
+	return factories.Register(adapter, factory)
 }
 
 // Open opens a Geo using the named, already-registered adapter.
@@ -45,11 +43,9 @@ func Open(adapter Adapter, opts Options) (Geo, error) {
 	if err := opts.Validate(); err != nil {
 		return nil, err
 	}
-	mu.RLock()
-	factory, ok := factories[adapter]
-	mu.RUnlock()
-	if !ok {
-		return nil, fmt.Errorf("geo: unknown adapter %q (forgotten import?): %w", adapter, &UnknownAdapterError{Adapter: adapter})
+	factory, err := factories.Lookup(adapter)
+	if err != nil {
+		return nil, err
 	}
 	c, err := factory(opts)
 	if err != nil {

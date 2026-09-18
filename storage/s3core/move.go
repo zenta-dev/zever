@@ -15,11 +15,11 @@ import (
 // It requires read plus delete on the source and write or update on the destination, copies the object then deletes the source, and fires allow decisions on success.
 func (c *Core) Move(ctx context.Context, srcBucket, srcKey, dstBucket, dstKey string) error {
 	if err := storage.ValidateBucketKey(srcBucket, srcKey); err != nil {
-		return fmt.Errorf("[%s] %w", c.prefix, err)
+		return fmt.Errorf("%s: %w", c.prefix, err)
 	}
 
 	if err := storage.ValidateBucketKey(dstBucket, dstKey); err != nil {
-		return fmt.Errorf("[%s] %w", c.prefix, err)
+		return fmt.Errorf("%s: %w", c.prefix, err)
 	}
 
 	if srcBucket == dstBucket && srcKey == dstKey {
@@ -32,7 +32,7 @@ func (c *Core) Move(ctx context.Context, srcBucket, srcKey, dstBucket, dstKey st
 	}
 
 	if !exists {
-		return fmt.Errorf("[%s] %w", c.prefix, storage.ErrNotFound)
+		return fmt.Errorf("%s: %w", c.prefix, storage.ErrNotFound)
 	}
 
 	var (
@@ -49,13 +49,13 @@ func (c *Core) Move(ctx context.Context, srcBucket, srcKey, dstBucket, dstKey st
 		if !srcPol.Allow(storage.PermRead, subject, sok) {
 			storage.FireDeny(ctx, storage.PermRead, srcBucket, subject, storage.DenyReason(srcPol, storage.PermRead, subject, sok), srcPol.Version)
 
-			return fmt.Errorf("[%s] %w", c.prefix, storage.ErrForbidden)
+			return fmt.Errorf("%s: %w", c.prefix, storage.ErrForbidden)
 		}
 
 		if !srcPol.Allow(storage.PermDelete, subject, sok) {
 			storage.FireDeny(ctx, storage.PermDelete, srcBucket, subject, storage.DenyReason(srcPol, storage.PermDelete, subject, sok), srcPol.Version)
 
-			return fmt.Errorf("[%s] %w", c.prefix, storage.ErrForbidden)
+			return fmt.Errorf("%s: %w", c.prefix, storage.ErrForbidden)
 		}
 
 		dstPol = c.PolicyFor(dstBucket)
@@ -76,7 +76,7 @@ func (c *Core) Move(ctx context.Context, srcBucket, srcKey, dstBucket, dstKey st
 		if !dstPol.Allow(dstPerm, subject, sok) {
 			storage.FireDeny(ctx, dstPerm, dstBucket, subject, storage.DenyReason(dstPol, dstPerm, subject, sok), dstPol.Version)
 
-			return fmt.Errorf("[%s] %w", c.prefix, storage.ErrForbidden)
+			return fmt.Errorf("%s: %w", c.prefix, storage.ErrForbidden)
 		}
 	}
 
@@ -86,7 +86,7 @@ func (c *Core) Move(ctx context.Context, srcBucket, srcKey, dstBucket, dstKey st
 		CopySource: aws.String(url.PathEscape(srcBucket) + "/" + EscapeKey(srcKey)),
 	})
 	if err != nil {
-		return fmt.Errorf("[%s] copy object: %w", c.prefix, err)
+		return fmt.Errorf("%s: copy object: %w", c.prefix, err)
 	}
 
 	_, err = c.Client.DeleteObject(ctx, &s3.DeleteObjectInput{
@@ -94,7 +94,7 @@ func (c *Core) Move(ctx context.Context, srcBucket, srcKey, dstBucket, dstKey st
 		Key:    aws.String(srcKey),
 	})
 	if err != nil {
-		return fmt.Errorf("[%s] move copied but delete source failed: %w", c.prefix, err)
+		return fmt.Errorf("%s: move copied but delete source failed: %w", c.prefix, err)
 	}
 
 	if c.Configured() {

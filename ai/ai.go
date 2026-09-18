@@ -3,7 +3,8 @@ package ai
 import (
 	"context"
 	"fmt"
-	"sync"
+
+	"github.com/zenta-dev/zever/internal/registry"
 )
 
 // AI defines the LLM facade contract for generation, streaming and embeddings.
@@ -17,9 +18,10 @@ type AI interface {
 // Factory creates an AI from the given Options.
 type Factory func(opts Options) (AI, error)
 
-var (
-	mu        sync.RWMutex
-	factories = make(map[Adapter]Factory)
+var factories = registry.New[Adapter, Factory](
+	ErrNilFactory,
+	func(adapter Adapter) error { return &DuplicateAdapterError{Adapter: adapter} },
+	func(adapter Adapter) error { return &UnknownAdapterError{Adapter: adapter} },
 )
 
 // Register associates an Adapter with a Factory for later use by Open.
@@ -28,16 +30,7 @@ func Register(adapter Adapter, factory Factory) error {
 		return fmt.Errorf("%w for adapter %s", ErrNilFactory, adapter)
 	}
 
-	mu.Lock()
-	defer mu.Unlock()
-
-	if _, dup := factories[adapter]; dup {
-		return &DuplicateAdapterError{Adapter: adapter}
-	}
-
-	factories[adapter] = factory
-
-	return nil
+	return factories.Register(adapter, factory)
 }
 
 // Open creates an AI for adapter using the registered Factory and opts.
@@ -46,12 +39,9 @@ func Open(adapter Adapter, opts Options) (AI, error) {
 		return nil, err
 	}
 
-	mu.RLock()
-	factory, ok := factories[adapter]
-	mu.RUnlock()
-
-	if !ok {
-		return nil, &UnknownAdapterError{Adapter: adapter}
+	factory, err := factories.Lookup(adapter)
+	if err != nil {
+		return nil, err
 	}
 
 	a, err := factory(opts)

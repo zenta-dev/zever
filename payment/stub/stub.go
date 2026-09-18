@@ -24,22 +24,18 @@ type driver struct {
 	seq atomic.Int64
 }
 
-// New creates an in-memory stub payment backend.
-func New(autoApprove bool) payment.Payment {
-	return &driver{
-		ledger:      make(map[string]payment.Result),
-		refunded:    make(map[string]int64),
-		autoApprove: autoApprove,
-	}
-}
-
-// Open validates o then returns a stub backend honoring AutoApprove.
-func Open(o payment.Options) (payment.Payment, error) {
+// New validates o then returns an in-memory stub backend honoring
+// AutoApprove.
+func New(o payment.Options) (payment.Payment, error) {
 	if err := o.Validate(); err != nil {
 		return nil, fmt.Errorf("stub: %w", err)
 	}
 
-	return New(o.AutoApprove), nil
+	return &driver{
+		ledger:      make(map[string]payment.Result),
+		refunded:    make(map[string]int64),
+		autoApprove: o.AutoApprove,
+	}, nil
 }
 
 // CreatePayment stores a new stub payment and returns it.

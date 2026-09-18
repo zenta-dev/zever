@@ -469,7 +469,7 @@ func TestGroup_enqueueError_wrapsCause(t *testing.T) {
 func TestOpen_missingKey_returnsErrMissingAPIKey(t *testing.T) {
 	t.Parallel()
 
-	if _, err := Open(analytics.Options{}); !errors.Is(err, ErrMissingAPIKey) {
+	if _, err := New(analytics.Options{}); !errors.Is(err, ErrMissingAPIKey) {
 		t.Fatalf("want ErrMissingAPIKey, got %v", err)
 	}
 }
@@ -478,7 +478,7 @@ func TestOpen_invalidOptions_returnsErrInvalidOptions(t *testing.T) {
 	t.Parallel()
 
 	opts := analytics.Options{APIKey: "test-key", MaxPropertiesBytes: -1}
-	if _, err := Open(opts); !errors.Is(err, analytics.ErrInvalidOptions) {
+	if _, err := New(opts); !errors.Is(err, analytics.ErrInvalidOptions) {
 		t.Fatalf("want ErrInvalidOptions, got %v", err)
 	}
 }
@@ -487,7 +487,7 @@ func TestOpen_plainHTTP_rejectsNonLocalhost(t *testing.T) {
 	t.Parallel()
 
 	opts := analytics.Options{APIKey: "test-key", Endpoint: "http://example.com"}
-	_, err := Open(opts)
+	_, err := New(opts)
 
 	var invalid *analytics.InvalidOptionsError
 	if !errors.As(err, &invalid) {
@@ -498,7 +498,7 @@ func TestOpen_plainHTTP_rejectsNonLocalhost(t *testing.T) {
 func TestOpen_httpsEndpoint_acceptsSecureURL(t *testing.T) {
 	t.Parallel()
 
-	a, err := Open(analytics.Options{APIKey: "test-key", Endpoint: "https://example.com"})
+	a, err := New(analytics.Options{APIKey: "test-key", Endpoint: "https://example.com"})
 	if err != nil {
 		t.Fatalf("open: %v", err)
 	}
@@ -511,7 +511,7 @@ func TestOpen_httpsEndpoint_acceptsSecureURL(t *testing.T) {
 func TestOpen_defaults_appliesAnonymousAndGroup(t *testing.T) {
 	t.Parallel()
 
-	a, err := Open(analytics.Options{APIKey: "test-key"})
+	a, err := New(analytics.Options{APIKey: "test-key"})
 	if err != nil {
 		t.Fatalf("open: %v", err)
 	}
@@ -541,7 +541,7 @@ func TestOpen_options_appliesCustomAnonymousAndGroup(t *testing.T) {
 
 	opts := analytics.Options{APIKey: "test-key", AnonymousID: "guest", GroupType: "workspace"}
 
-	a, err := Open(opts)
+	a, err := New(opts)
 	if err != nil {
 		t.Fatalf("open: %v", err)
 	}
@@ -733,7 +733,7 @@ func TestOpen_clientError_wrapsCause(t *testing.T) {
 	}
 	t.Cleanup(func() { newClient = old })
 
-	if _, err := Open(analytics.Options{APIKey: "test-key"}); !errors.Is(err, errFakeClient) {
+	if _, err := New(analytics.Options{APIKey: "test-key"}); !errors.Is(err, errFakeClient) {
 		t.Fatalf("want wrapped client error, got %v", err)
 	}
 }
@@ -754,7 +754,7 @@ func TestCheckEndpoint_malformedURL_rejectsOptions(t *testing.T) {
 func TestOpen_localhostHTTP_acceptsLocalURL(t *testing.T) {
 	t.Parallel()
 
-	a, err := Open(analytics.Options{APIKey: "test-key", Endpoint: "http://localhost:9"})
+	a, err := New(analytics.Options{APIKey: "test-key", Endpoint: "http://localhost:9"})
 	if err != nil {
 		t.Fatalf("open: %v", err)
 	}
@@ -799,7 +799,7 @@ func TestOpen_endpoint_wiresLocalServer(t *testing.T) {
 	}))
 	t.Cleanup(srv.Close)
 
-	a, err := Open(analytics.Options{APIKey: "test-key", Endpoint: srv.URL})
+	a, err := New(analytics.Options{APIKey: "test-key", Endpoint: srv.URL})
 	if err != nil {
 		t.Fatalf("open: %v", err)
 	}
@@ -842,7 +842,7 @@ func TestOpen_endpoint_deliversTrackPayload(t *testing.T) {
 	}))
 	t.Cleanup(srv.Close)
 
-	a, err := Open(analytics.Options{APIKey: "test-key", Endpoint: srv.URL})
+	a, err := New(analytics.Options{APIKey: "test-key", Endpoint: srv.URL})
 	if err != nil {
 		t.Fatalf("open: %v", err)
 	}

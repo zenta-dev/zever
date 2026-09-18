@@ -32,8 +32,8 @@ type driver struct {
 	maxOutput int64
 }
 
-// Open creates a LaTeX document backend from the given options.
-func Open(o document.Options) (document.Document, error) {
+// New creates a LaTeX document backend from the given options.
+func New(o document.Options) (document.Document, error) {
 	if err := o.Validate(); err != nil {
 		return nil, fmt.Errorf("latex: %w", err)
 	}

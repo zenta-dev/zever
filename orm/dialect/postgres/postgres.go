@@ -1,7 +1,10 @@
 // Package postgres implements dialect.Dialect for Postgres.
 package postgres
 
-import "strconv"
+import (
+	"strconv"
+	"strings"
+)
 
 // Dialect renders numbered placeholders ($1, $2, ...) and double-quoted
 // identifiers, matching Postgres's syntax. It also records the server
@@ -29,12 +32,12 @@ func (Dialect) Placeholder(n int) string {
 	return "$" + strconv.Itoa(n)
 }
 
-// QuoteIdent double-quotes an identifier for Postgres. It does not escape
-// embedded quote characters; callers never pass caller-controlled strings
-// through this path, so this is a known, accepted limitation rather than
-// an oversight.
+// QuoteIdent double-quotes an identifier for Postgres, doubling any
+// embedded double-quote characters per standard SQL identifier-quoting
+// rules. Callers never pass caller-controlled strings through this path
+// today; the escaping is defense-in-depth against a future one that does.
 func (Dialect) QuoteIdent(s string) string {
-	return `"` + s + `"`
+	return `"` + strings.ReplaceAll(s, `"`, `""`) + `"`
 }
 
 // SupportsCTE reports that Postgres supports common table expressions.

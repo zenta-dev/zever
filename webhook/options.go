@@ -36,6 +36,11 @@ type Options struct {
 	DSN string
 	// Logger emits background delivery warnings. Defaults to a no-op logger when nil.
 	Logger log.Logger
+	// ReplayTolerance bounds how far a signature's embedded timestamp may
+	// drift from the verifier's clock before verification rejects it as
+	// expired or replayed, on top of the HMAC check itself. Zero means the
+	// adapter default (5 minutes).
+	ReplayTolerance time.Duration
 }
 
 // Validate checks options for consistency.
@@ -51,6 +56,9 @@ func (o Options) Validate() error {
 	}
 	if o.MaxRetries < 0 {
 		errs = append(errs, &InvalidOptionsError{Reason: "max retries must be >= 0"})
+	}
+	if o.ReplayTolerance < 0 {
+		errs = append(errs, &InvalidOptionsError{Reason: "replay tolerance must be >= 0"})
 	}
 	return errors.Join(errs...)
 }

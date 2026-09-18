@@ -88,14 +88,14 @@ func New(opts storage.Options) (storage.Storage, error) {
 	}
 
 	if err := os.MkdirAll(root, rootPerm); err != nil {
-		return nil, fmt.Errorf("[local] mkdir root: %w", err)
+		return nil, fmt.Errorf("local: mkdir root: %w", err)
 	}
 	// Ensure existing root has correct perms (MkdirAll doesn't chmod existing).
 	_ = os.Chmod(root, rootPerm)
 
 	if secret == "" {
 		if env := os.Getenv("ZENGO_ENV"); env == "production" || env == "prod" {
-			return nil, fmt.Errorf("[local] option %q is required in production (secret must be explicit)", "secret")
+			return nil, fmt.Errorf("local: option %q is required in production (secret must be explicit)", "secret")
 		}
 
 		logger := opts.Logger
@@ -106,7 +106,7 @@ func New(opts storage.Options) (storage.Storage, error) {
 
 		key := make([]byte, 32)
 		if _, err := randRead(key); err != nil {
-			return nil, fmt.Errorf("[local] generate secret: %w", err)
+			return nil, fmt.Errorf("local: generate secret: %w", err)
 		}
 
 		secret = hex.EncodeToString(key)
@@ -145,12 +145,12 @@ func (a *localAdapter) PresignUpload(
 	ttl time.Duration,
 ) (storage.PresignedURL, error) {
 	if err := storage.ValidateBucketKey(bucket, key); err != nil {
-		return storage.PresignedURL{}, fmt.Errorf("[local] %w", err)
+		return storage.PresignedURL{}, fmt.Errorf("local: %w", err)
 	}
 
 	expires, err := storage.PresignExpiry(ttl)
 	if err != nil {
-		return storage.PresignedURL{}, fmt.Errorf("[local] %w", err)
+		return storage.PresignedURL{}, fmt.Errorf("local: %w", err)
 	}
 
 	if !a.Configured() {
@@ -174,20 +174,20 @@ func (a *localAdapter) PresignUpload(
 
 	perm, err := a.uploadPerm(bucket, key, pol)
 	if err != nil {
-		return storage.PresignedURL{}, fmt.Errorf("[local] stat %q: %w", key, err)
+		return storage.PresignedURL{}, fmt.Errorf("local: stat %q: %w", key, err)
 	}
 
 	subject, sok := storage.SubjectFrom(ctx)
 	if !sok {
 		storage.FireDeny(ctx, perm, bucket, "", storage.ReasonAnonymousForbidden, pol.Version)
 
-		return storage.PresignedURL{}, fmt.Errorf("[local] %w", storage.ErrForbidden)
+		return storage.PresignedURL{}, fmt.Errorf("local: %w", storage.ErrForbidden)
 	}
 
 	if !pol.Allow(perm, subject, sok) {
 		storage.FireDeny(ctx, perm, bucket, subject, storage.ReasonNotInAllow, pol.Version)
 
-		return storage.PresignedURL{}, fmt.Errorf("[local] %w", storage.ErrForbidden)
+		return storage.PresignedURL{}, fmt.Errorf("local: %w", storage.ErrForbidden)
 	}
 
 	storage.FireAllow(ctx, perm, bucket, subject, storage.ReasonOk, pol.Version)
@@ -207,12 +207,12 @@ func (a *localAdapter) PresignDownload(
 	ttl time.Duration,
 ) (storage.PresignedURL, error) {
 	if err := storage.ValidateBucketKey(bucket, key); err != nil {
-		return storage.PresignedURL{}, fmt.Errorf("[local] %w", err)
+		return storage.PresignedURL{}, fmt.Errorf("local: %w", err)
 	}
 
 	expires, err := storage.PresignExpiry(ttl)
 	if err != nil {
-		return storage.PresignedURL{}, fmt.Errorf("[local] %w", err)
+		return storage.PresignedURL{}, fmt.Errorf("local: %w", err)
 	}
 
 	if a.Configured() {
@@ -229,13 +229,13 @@ func (a *localAdapter) PresignDownload(
 		if !sok {
 			storage.FireDeny(ctx, perm, bucket, "", storage.ReasonAnonymousForbidden, pol.Version)
 
-			return storage.PresignedURL{}, fmt.Errorf("[local] %w", storage.ErrForbidden)
+			return storage.PresignedURL{}, fmt.Errorf("local: %w", storage.ErrForbidden)
 		}
 
 		if !pol.Allow(perm, subject, sok) {
 			storage.FireDeny(ctx, perm, bucket, subject, storage.ReasonNotInAllow, pol.Version)
 
-			return storage.PresignedURL{}, fmt.Errorf("[local] %w", storage.ErrForbidden)
+			return storage.PresignedURL{}, fmt.Errorf("local: %w", storage.ErrForbidden)
 		}
 
 		storage.FireAllow(ctx, perm, bucket, subject, storage.ReasonOk, pol.Version)
@@ -259,7 +259,7 @@ func (a *localAdapter) PresignDownload(
 
 func (a *localAdapter) Exists(_ context.Context, bucket string, key string) (bool, error) {
 	if err := storage.ValidateBucketKey(bucket, key); err != nil {
-		return false, fmt.Errorf("[local] %w", err)
+		return false, fmt.Errorf("local: %w", err)
 	}
 
 	return a.exists(bucket, key)
@@ -267,14 +267,14 @@ func (a *localAdapter) Exists(_ context.Context, bucket string, key string) (boo
 
 func (a *localAdapter) Delete(ctx context.Context, bucket string, key string) error {
 	if err := storage.ValidateBucketKey(bucket, key); err != nil {
-		return fmt.Errorf("[local] %w", err)
+		return fmt.Errorf("local: %w", err)
 	}
 
 	// Validated above, so resolve cannot fail; containment is rechecked below.
 	full, _ := a.resolve(bucket, key)
 
 	if !a.lexicallyContained(full) {
-		return fmt.Errorf("[local] %w", storage.ErrForbidden)
+		return fmt.Errorf("local: %w", storage.ErrForbidden)
 	}
 
 	if a.Configured() {
@@ -284,12 +284,12 @@ func (a *localAdapter) Delete(ctx context.Context, bucket string, key string) er
 		if !pol.Allow(storage.PermDelete, subject, sok) {
 			storage.FireDeny(ctx, storage.PermDelete, bucket, subject, storage.ReasonNotInAllow, pol.Version)
 
-			return fmt.Errorf("[local] %w", storage.ErrForbidden)
+			return fmt.Errorf("local: %w", storage.ErrForbidden)
 		}
 	}
 
 	if err := os.Remove(full); err != nil && !os.IsNotExist(err) {
-		return fmt.Errorf("[local] delete %q: %w", key, err)
+		return fmt.Errorf("local: delete %q: %w", key, err)
 	}
 
 	_ = os.Remove(full + metaSuffix)
@@ -299,11 +299,11 @@ func (a *localAdapter) Delete(ctx context.Context, bucket string, key string) er
 
 func (a *localAdapter) Move(ctx context.Context, srcBucket, srcKey, dstBucket, dstKey string) error {
 	if err := storage.ValidateBucketKey(srcBucket, srcKey); err != nil {
-		return fmt.Errorf("[local] %w", err)
+		return fmt.Errorf("local: %w", err)
 	}
 
 	if err := storage.ValidateBucketKey(dstBucket, dstKey); err != nil {
-		return fmt.Errorf("[local] %w", err)
+		return fmt.Errorf("local: %w", err)
 	}
 
 	if srcBucket == dstBucket && srcKey == dstKey {
@@ -315,7 +315,7 @@ func (a *localAdapter) Move(ctx context.Context, srcBucket, srcKey, dstBucket, d
 	dstFull, _ := a.resolve(dstBucket, dstKey)
 
 	if !a.lexicallyContained(srcFull) || !a.lexicallyContained(dstFull) {
-		return fmt.Errorf("[local] %w", storage.ErrForbidden)
+		return fmt.Errorf("local: %w", storage.ErrForbidden)
 	}
 
 	if a.Configured() {
@@ -325,13 +325,13 @@ func (a *localAdapter) Move(ctx context.Context, srcBucket, srcKey, dstBucket, d
 		if !polSrc.Allow(storage.PermRead, subject, sok) {
 			storage.FireDeny(ctx, storage.PermRead, srcBucket, subject, storage.DenyReason(polSrc, storage.PermRead, subject, sok), polSrc.Version)
 
-			return fmt.Errorf("[local] %w", storage.ErrForbidden)
+			return fmt.Errorf("local: %w", storage.ErrForbidden)
 		}
 
 		if !polSrc.Allow(storage.PermDelete, subject, sok) {
 			storage.FireDeny(ctx, storage.PermDelete, srcBucket, subject, storage.DenyReason(polSrc, storage.PermDelete, subject, sok), polSrc.Version)
 
-			return fmt.Errorf("[local] %w", storage.ErrForbidden)
+			return fmt.Errorf("local: %w", storage.ErrForbidden)
 		}
 
 		polDst := a.PolicyFor(dstBucket)
@@ -343,7 +343,7 @@ func (a *localAdapter) Move(ctx context.Context, srcBucket, srcKey, dstBucket, d
 
 			exists, err = a.exists(dstBucket, dstKey)
 			if err != nil {
-				return fmt.Errorf("[local] stat %q: %w", dstKey, err)
+				return fmt.Errorf("local: stat %q: %w", dstKey, err)
 			}
 		}
 
@@ -352,7 +352,7 @@ func (a *localAdapter) Move(ctx context.Context, srcBucket, srcKey, dstBucket, d
 		if !polDst.Allow(dstPerm, subject, sok) {
 			storage.FireDeny(ctx, dstPerm, dstBucket, subject, storage.DenyReason(polDst, dstPerm, subject, sok), polDst.Version)
 
-			return fmt.Errorf("[local] %w", storage.ErrForbidden)
+			return fmt.Errorf("local: %w", storage.ErrForbidden)
 		}
 
 		storage.FireAllow(ctx, storage.PermRead, srcBucket, subject, storage.ReasonOk, polSrc.Version)
@@ -362,25 +362,25 @@ func (a *localAdapter) Move(ctx context.Context, srcBucket, srcKey, dstBucket, d
 
 	if fi, err := os.Lstat(srcFull); err != nil {
 		if os.IsNotExist(err) {
-			return fmt.Errorf("[local] %w", storage.ErrNotFound)
+			return fmt.Errorf("local: %w", storage.ErrNotFound)
 		}
 
-		return fmt.Errorf("[local] stat %q: %w", srcKey, err)
+		return fmt.Errorf("local: stat %q: %w", srcKey, err)
 	} else if fi.Mode()&os.ModeSymlink != 0 {
-		return fmt.Errorf("[local] %w", storage.ErrForbidden)
+		return fmt.Errorf("local: %w", storage.ErrForbidden)
 	}
 
 	// ensurePutDir's forbidden case is unreachable here: lexicallyContained
 	// above already rejected symlink escapes, and MkdirAll failures keep
 	// their wrapped form below (%w preserves errors.Is).
 	if _, err := a.ensurePutDir(dstFull); err != nil {
-		return fmt.Errorf("[local] mkdir %q: %w", dstKey, err)
+		return fmt.Errorf("local: mkdir %q: %w", dstKey, err)
 	}
 
 	// src and dst live under the same root, so a cross-device rename cannot
 	// happen (a symlinked dst dir is rejected by ensurePutDir above).
 	if err := os.Rename(srcFull, dstFull); err != nil {
-		return fmt.Errorf("[local] move %q: %w", srcKey, err)
+		return fmt.Errorf("local: move %q: %w", srcKey, err)
 	}
 
 	moveMetaSidecar(srcFull, dstFull)
@@ -403,7 +403,7 @@ func moveMetaSidecar(srcFull, dstFull string) {
 func (a *localAdapter) exists(bucket, key string) (bool, error) {
 	full, ok := a.resolve(bucket, key)
 	if !ok {
-		return false, fmt.Errorf("[local] invalid key %q", key)
+		return false, fmt.Errorf("local: invalid key %q", key)
 	}
 
 	if _, err := os.Stat(full); err != nil {
@@ -411,7 +411,7 @@ func (a *localAdapter) exists(bucket, key string) (bool, error) {
 			return false, nil
 		}
 
-		return false, fmt.Errorf("[local] stat %q: %w", key, err)
+		return false, fmt.Errorf("local: stat %q: %w", key, err)
 	}
 
 	return true, nil

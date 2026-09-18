@@ -28,15 +28,15 @@ func seedHostileEnv(t *testing.T) {
 
 func TestKnownServiceNames(t *testing.T) {
 	names := knownServiceNames()
-	if len(names) != 32 {
-		t.Fatalf("got %d names, want 32", len(names))
+	if len(names) != 34 {
+		t.Fatalf("got %d names, want 34", len(names))
 	}
 	for i := 1; i < len(names); i++ {
 		if names[i-1] >= names[i] {
 			t.Fatalf("names not sorted: %q >= %q", names[i-1], names[i])
 		}
 	}
-	for _, want := range []string{"ai", "db", "vectorstore", "workflow"} {
+	for _, want := range []string{"ai", "db", "lock", "secrets", "vectorstore", "workflow"} {
 		found := false
 		for _, n := range names {
 			if n == want {
@@ -229,8 +229,8 @@ func TestLoadPrecedence(t *testing.T) {
 func TestRedactedServices(t *testing.T) {
 	cfg := Default()
 	got := cfg.RedactedServices()
-	if len(got) != 32 {
-		t.Fatalf("got %d services, want 32", len(got))
+	if len(got) != 34 {
+		t.Fatalf("got %d services, want 34", len(got))
 	}
 	cryptoSvc := got["crypto"]
 	if cryptoSvc.Adapter != "local" {

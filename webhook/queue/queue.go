@@ -27,6 +27,12 @@ const (
 	dlqRetryJitter      = 30 * time.Second
 	maxDLQFailures      = 3
 	maxTransportErrors  = 5
+
+	// defaultReplayTolerance is the window either side of "now" that a
+	// signature's embedded timestamp may fall in before verification treats
+	// it as expired or replayed. Options.ReplayTolerance overrides it; zero
+	// or negative there falls back to this default.
+	defaultReplayTolerance = 5 * time.Minute
 )
 
 type registration struct {
@@ -41,19 +47,20 @@ type consumer struct {
 }
 
 type adapter struct {
-	mu           sync.RWMutex
-	regs         map[string]map[string]registration
-	queue        queue.Queue
-	timeout      time.Duration
-	maxRetries   int
-	dlqTopic     string
-	consumers    map[string]*consumer
-	closed       bool
-	client       *http.Client
-	jitter       *rand.Rand
-	jitterMu     sync.Mutex
-	allowPrivate bool
-	logger       log.Logger
+	mu              sync.RWMutex
+	regs            map[string]map[string]registration
+	queue           queue.Queue
+	timeout         time.Duration
+	maxRetries      int
+	dlqTopic        string
+	consumers       map[string]*consumer
+	closed          bool
+	client          *http.Client
+	jitter          *rand.Rand
+	jitterMu        sync.Mutex
+	allowPrivate    bool
+	logger          log.Logger
+	replayTolerance time.Duration
 }
 
 func (a *adapter) log() log.Logger {
@@ -341,8 +348,13 @@ func (a *adapter) lookupRegistration(event, targetURL string) (registration, str
 }
 
 func (a *adapter) checkSignature(reg registration, payload []byte, sig string) string {
-	if !verifyHMAC(reg.secret, payload, sig) {
-		return "signature mismatch (tampered or replayed)"
+	tolerance := a.replayTolerance
+	if tolerance <= 0 {
+		tolerance = defaultReplayTolerance
+	}
+
+	if err := verifySignatureHeader(reg.secret, payload, sig, tolerance, time.Now()); err != nil {
+		return err.Error()
 	}
 
 	return ""
@@ -611,9 +623,7 @@ func (a *adapter) Deliver(ctx context.Context, event string, payload []byte) err
 	var errs []error
 
 	for _, r := range regsCopy {
-		mac := hmac.New(sha256.New, []byte(r.secret))
-		mac.Write(payload)
-		sig := "sha256=" + hex.EncodeToString(mac.Sum(nil))
+		sig := buildSignatureHeader(r.secret, payload, time.Now().Unix())
 
 		headers := map[string]string{
 			"X-Webhook-Event":     event,
@@ -664,23 +674,91 @@ func (a *adapter) Close() error {
 	return nil
 }
 
-func verifyHMAC(secret string, payload []byte, signature string) bool {
-	if secret == "" {
-		return false
+// buildSignatureHeader returns the envelope for payload signed at ts:
+// "t=<unix-timestamp>,v1=<hex-hmac>", where the hex-hmac is HMAC-SHA256 over
+// "<unix-timestamp>.<payload>". webhook/http builds the same envelope
+// independently (it has no reason to import this package); the two must stay
+// byte-for-byte consistent.
+func buildSignatureHeader(secret string, payload []byte, ts int64) string {
+	mac := hmac.New(sha256.New, []byte(secret))
+	mac.Write([]byte(strconv.FormatInt(ts, 10)))
+	mac.Write([]byte{'.'})
+	mac.Write(payload)
+
+	return fmt.Sprintf("t=%d,v1=%s", ts, hex.EncodeToString(mac.Sum(nil)))
+}
+
+// parseSignatureHeader splits a "t=<ts>,v1=<hex>" envelope into its
+// timestamp and hex-encoded MAC. ok is false when either field is missing or
+// the timestamp does not parse.
+func parseSignatureHeader(header string) (ts int64, macHex string, ok bool) {
+	for _, part := range strings.Split(header, ",") {
+		key, val, found := strings.Cut(part, "=")
+		if !found {
+			continue
+		}
+
+		switch key {
+		case "t":
+			v, err := strconv.ParseInt(val, 10, 64)
+			if err != nil {
+				return 0, "", false
+			}
+
+			ts = v
+		case "v1":
+			macHex = val
+		}
 	}
 
-	sigHex := strings.TrimPrefix(signature, "sha256=")
+	if macHex == "" {
+		return 0, "", false
+	}
 
-	sigBytes, err := hex.DecodeString(sigHex)
+	return ts, macHex, true
+}
+
+// verifySignatureHeader verifies header against payload under secret.
+// It recomputes the HMAC over "<timestamp-from-header>.<payload>" and
+// compares with hmac.Equal, then separately checks that timestamp falls
+// within tolerance of now. The two checks are reported through distinct
+// sentinel errors so callers can tell a tampered payload (ErrSignatureMismatch)
+// from an expired or replayed one (ErrSignatureExpired).
+func verifySignatureHeader(secret string, payload []byte, header string, tolerance time.Duration, now time.Time) error {
+	if secret == "" {
+		return ErrSignatureMismatch
+	}
+
+	ts, macHex, ok := parseSignatureHeader(header)
+	if !ok {
+		return ErrSignatureMismatch
+	}
+
+	sigBytes, err := hex.DecodeString(macHex)
 	if err != nil {
-		return false
+		return ErrSignatureMismatch
 	}
 
 	mac := hmac.New(sha256.New, []byte(secret))
+	mac.Write([]byte(strconv.FormatInt(ts, 10)))
+	mac.Write([]byte{'.'})
 	mac.Write(payload)
 	expected := mac.Sum(nil)
 
-	return hmac.Equal(expected, sigBytes)
+	if !hmac.Equal(expected, sigBytes) {
+		return ErrSignatureMismatch
+	}
+
+	age := now.Sub(time.Unix(ts, 0))
+	if age < 0 {
+		age = -age
+	}
+
+	if age > tolerance {
+		return ErrSignatureExpired
+	}
+
+	return nil
 }
 
 // newJitter returns a dedicated random source for retry backoff jitter.
@@ -694,9 +772,9 @@ func newSafeClient(timeout time.Duration, allowPrivate bool) *http.Client {
 	return webhook.NewSafeClient(timeout, allowPrivate)
 }
 
-// Open builds a queue-backed Webhook from o.
+// New builds a queue-backed Webhook from o.
 // QueueAdapter names a registered queue backend and QueueOpts carries its settings.
-func Open(o webhook.Options) (webhook.Webhook, error) {
+func New(o webhook.Options) (webhook.Webhook, error) {
 	if err := o.Validate(); err != nil {
 		return nil, err
 	}
@@ -747,16 +825,22 @@ func Open(o webhook.Options) (webhook.Webhook, error) {
 		return nil, fmt.Errorf("queue: open queue: %w", err)
 	}
 
+	replayTolerance := o.ReplayTolerance
+	if replayTolerance <= 0 {
+		replayTolerance = defaultReplayTolerance
+	}
+
 	return &adapter{
-		regs:         make(map[string]map[string]registration),
-		queue:        q,
-		timeout:      timeout,
-		maxRetries:   maxRetries,
-		dlqTopic:     dlqTopic,
-		consumers:    make(map[string]*consumer),
-		client:       newSafeClient(timeout, o.AllowPrivateTargets),
-		jitter:       newJitter(),
-		allowPrivate: o.AllowPrivateTargets,
-		logger:       o.Logger,
+		regs:            make(map[string]map[string]registration),
+		queue:           q,
+		timeout:         timeout,
+		maxRetries:      maxRetries,
+		dlqTopic:        dlqTopic,
+		consumers:       make(map[string]*consumer),
+		client:          newSafeClient(timeout, o.AllowPrivateTargets),
+		jitter:          newJitter(),
+		allowPrivate:    o.AllowPrivateTargets,
+		logger:          o.Logger,
+		replayTolerance: replayTolerance,
 	}, nil
 }

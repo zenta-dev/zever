@@ -37,8 +37,8 @@ var (
 	renderResponseCodec = codec.JSONCodec[renderResponse]{}
 )
 
-// Open creates a remote document renderer from the given Options.
-func Open(o document.Options) (document.Document, error) {
+// New creates a remote document renderer from the given Options.
+func New(o document.Options) (document.Document, error) {
 	if err := o.Validate(); err != nil {
 		return nil, fmt.Errorf("remote: %w", err)
 	}

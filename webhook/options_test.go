@@ -40,6 +40,24 @@ func TestOptions_Validate_negativeMaxRetries_invalid(t *testing.T) {
 	}
 }
 
+func TestOptions_Validate_negativeReplayTolerance_invalid(t *testing.T) {
+	t.Parallel()
+	err := Options{ReplayTolerance: -time.Second}.Validate()
+	if !errors.Is(err, ErrInvalidOptions) {
+		t.Fatalf("negative replay tolerance err = %v, want ErrInvalidOptions", err)
+	}
+	if !strings.Contains(err.Error(), "replay tolerance") {
+		t.Errorf("err %q missing replay tolerance reason", err.Error())
+	}
+}
+
+func TestOptions_Validate_zeroReplayTolerance_valid(t *testing.T) {
+	t.Parallel()
+	if err := (Options{ReplayTolerance: 0}).Validate(); err != nil {
+		t.Fatalf("zero replay tolerance Validate() = %v, want nil", err)
+	}
+}
+
 func TestOptions_Validate_bothNegative_joined(t *testing.T) {
 	t.Parallel()
 	err := Options{Timeout: -time.Second, MaxRetries: -1}.Validate()

@@ -14,6 +14,7 @@ import (
 	"github.com/zenta-dev/zever/geo"
 	"github.com/zenta-dev/zever/i18n"
 	"github.com/zenta-dev/zever/idempotency"
+	"github.com/zenta-dev/zever/lock"
 	"github.com/zenta-dev/zever/log"
 	"github.com/zenta-dev/zever/mailer"
 	"github.com/zenta-dev/zever/media"
@@ -27,6 +28,7 @@ import (
 	"github.com/zenta-dev/zever/router"
 	"github.com/zenta-dev/zever/scheduler"
 	"github.com/zenta-dev/zever/search"
+	"github.com/zenta-dev/zever/secrets"
 	"github.com/zenta-dev/zever/session"
 	"github.com/zenta-dev/zever/storage"
 	"github.com/zenta-dev/zever/tenant"
@@ -112,6 +114,9 @@ var serviceMergers = map[string]func(*Config, ServiceConfig) error{
 	"idempotency": func(cfg *Config, sc ServiceConfig) error {
 		return mergeInto[idempotency.Options]("idempotency", &cfg.Idempotency.Adapter, &cfg.Idempotency.Options, sc)
 	},
+	"lock": func(cfg *Config, sc ServiceConfig) error {
+		return mergeInto[lock.Options]("lock", &cfg.Lock.Adapter, &cfg.Lock.Options, sc)
+	},
 	"log": func(cfg *Config, sc ServiceConfig) error {
 		return mergeInto[log.Options]("log", &cfg.Log.Adapter, &cfg.Log.Options, sc)
 	},
@@ -150,6 +155,9 @@ var serviceMergers = map[string]func(*Config, ServiceConfig) error{
 	},
 	"search": func(cfg *Config, sc ServiceConfig) error {
 		return mergeInto[search.Options]("search", &cfg.Search.Adapter, &cfg.Search.Options, sc)
+	},
+	"secrets": func(cfg *Config, sc ServiceConfig) error {
+		return mergeInto[secrets.Options]("secrets", &cfg.Secrets.Adapter, &cfg.Secrets.Options, sc)
 	},
 	"session": func(cfg *Config, sc ServiceConfig) error {
 		return mergeInto[session.Options]("session", &cfg.Session.Adapter, &cfg.Session.Options, sc)

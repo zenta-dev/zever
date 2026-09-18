@@ -43,11 +43,11 @@ func (c *Core) PresignUpload(
 	ttl time.Duration,
 ) (storage.PresignedURL, error) {
 	if err := storage.ValidateBucketKey(bucket, key); err != nil {
-		return storage.PresignedURL{}, fmt.Errorf("[%s] %w", c.prefix, err)
+		return storage.PresignedURL{}, fmt.Errorf("%s: %w", c.prefix, err)
 	}
 
 	if _, err := storage.PresignExpiry(ttl); err != nil {
-		return storage.PresignedURL{}, fmt.Errorf("[%s] %w", c.prefix, err)
+		return storage.PresignedURL{}, fmt.Errorf("%s: %w", c.prefix, err)
 	}
 
 	if c.Configured() {
@@ -84,7 +84,7 @@ func (c *Core) PresignUpload(
 
 	p, err := c.Presigner.PresignPutObject(ctx, po, s3.WithPresignExpires(ttl))
 	if err != nil {
-		return storage.PresignedURL{}, fmt.Errorf("[%s] presign upload: %w", c.prefix, err)
+		return storage.PresignedURL{}, fmt.Errorf("%s: presign upload: %w", c.prefix, err)
 	}
 
 	return storage.PresignedURL{Method: "PUT", URL: p.URL}, nil
@@ -95,11 +95,11 @@ func (c *Core) PresignUpload(
 // The presigned URL is issued via PresignGetObject.
 func (c *Core) PresignDownload(ctx context.Context, bucket string, key string, ttl time.Duration) (storage.PresignedURL, error) {
 	if err := storage.ValidateBucketKey(bucket, key); err != nil {
-		return storage.PresignedURL{}, fmt.Errorf("[%s] %w", c.prefix, err)
+		return storage.PresignedURL{}, fmt.Errorf("%s: %w", c.prefix, err)
 	}
 
 	if _, err := storage.PresignExpiry(ttl); err != nil {
-		return storage.PresignedURL{}, fmt.Errorf("[%s] %w", c.prefix, err)
+		return storage.PresignedURL{}, fmt.Errorf("%s: %w", c.prefix, err)
 	}
 
 	perm := storage.PermRead
@@ -134,7 +134,7 @@ func (c *Core) PresignDownload(ctx context.Context, bucket string, key string, t
 
 	p, err := c.Presigner.PresignGetObject(ctx, goo, s3.WithPresignExpires(ttl))
 	if err != nil {
-		return storage.PresignedURL{}, fmt.Errorf("[%s] presign download: %w", c.prefix, err)
+		return storage.PresignedURL{}, fmt.Errorf("%s: presign download: %w", c.prefix, err)
 	}
 
 	return storage.PresignedURL{Method: "GET", URL: p.URL}, nil
@@ -145,7 +145,7 @@ func (c *Core) PresignDownload(ctx context.Context, bucket string, key string, t
 // Delete failures from S3 are returned wrapped.
 func (c *Core) Delete(ctx context.Context, bucket string, key string) error {
 	if err := storage.ValidateBucketKey(bucket, key); err != nil {
-		return fmt.Errorf("[%s] %w", c.prefix, err)
+		return fmt.Errorf("%s: %w", c.prefix, err)
 	}
 
 	if c.Configured() {
@@ -155,7 +155,7 @@ func (c *Core) Delete(ctx context.Context, bucket string, key string) error {
 		if !pol.Allow(storage.PermDelete, subject, sok) {
 			storage.FireDeny(ctx, storage.PermDelete, bucket, subject, storage.DenyReason(pol, storage.PermDelete, subject, sok), pol.Version)
 
-			return fmt.Errorf("[%s] %w", c.prefix, storage.ErrForbidden)
+			return fmt.Errorf("%s: %w", c.prefix, storage.ErrForbidden)
 		}
 	}
 
@@ -164,7 +164,7 @@ func (c *Core) Delete(ctx context.Context, bucket string, key string) error {
 		Key:    aws.String(key),
 	})
 	if err != nil {
-		return fmt.Errorf("[%s] delete object: %w", c.prefix, err)
+		return fmt.Errorf("%s: delete object: %w", c.prefix, err)
 	}
 
 	return nil
@@ -174,7 +174,7 @@ func (c *Core) Delete(ctx context.Context, bucket string, key string) error {
 // It delegates to ExistsUnrestricted.
 func (c *Core) Exists(ctx context.Context, bucket string, key string) (bool, error) {
 	if err := storage.ValidateBucketKey(bucket, key); err != nil {
-		return false, fmt.Errorf("[%s] %w", c.prefix, err)
+		return false, fmt.Errorf("%s: %w", c.prefix, err)
 	}
 
 	return c.ExistsUnrestricted(ctx, bucket, key)
@@ -196,5 +196,5 @@ func (c *Core) ExistsUnrestricted(ctx context.Context, bucket, key string) (bool
 		return false, nil
 	}
 
-	return false, fmt.Errorf("[%s] head object: %w", c.prefix, err)
+	return false, fmt.Errorf("%s: head object: %w", c.prefix, err)
 }

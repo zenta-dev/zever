@@ -32,6 +32,16 @@ func (s *stubStore) Upsert(_ context.Context, vec Vector) error {
 	return nil
 }
 
+func (s *stubStore) UpsertBatch(ctx context.Context, vecs []Vector) error {
+	for _, vec := range vecs {
+		if err := s.Upsert(ctx, vec); err != nil {
+			return err
+		}
+	}
+
+	return nil
+}
+
 func (s *stubStore) Delete(_ context.Context, id string) error {
 	if _, ok := s.vecs[id]; !ok {
 		return &NotFoundError{ID: id}

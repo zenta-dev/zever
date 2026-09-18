@@ -36,7 +36,7 @@ func testOptions(dsn string) webhook.Options {
 func openTest(t *testing.T, o webhook.Options) webhook.Webhook {
 	t.Helper()
 
-	w, err := Open(o)
+	w, err := New(o)
 	if err != nil {
 		t.Fatalf("Open err = %v", err)
 	}
@@ -50,22 +50,42 @@ func openTest(t *testing.T, o webhook.Options) webhook.Webhook {
 	return w
 }
 
+// checkSignature validates that got is a well-formed "t=<ts>,v1=<hex>"
+// signature envelope (see webhook/http.sign) whose HMAC matches secret and
+// payload.
 func checkSignature(t *testing.T, secret string, payload []byte, got string) {
 	t.Helper()
 
-	mac := hmac.New(sha256.New, []byte(secret))
-	mac.Write(payload)
-	want := "sha256=" + hex.EncodeToString(mac.Sum(nil))
+	tsPart, macPart, ok := strings.Cut(got, ",")
+	if !ok {
+		t.Fatalf("signature %q has no ',' separator", got)
+	}
 
-	if got != want {
-		t.Errorf("signature = %q want %q", got, want)
+	tsStr, ok := strings.CutPrefix(tsPart, "t=")
+	if !ok {
+		t.Fatalf("signature %q missing t= field", got)
+	}
+
+	macHex, ok := strings.CutPrefix(macPart, "v1=")
+	if !ok {
+		t.Fatalf("signature %q missing v1= field", got)
+	}
+
+	mac := hmac.New(sha256.New, []byte(secret))
+	mac.Write([]byte(tsStr))
+	mac.Write([]byte{'.'})
+	mac.Write(payload)
+	want := hex.EncodeToString(mac.Sum(nil))
+
+	if macHex != want {
+		t.Errorf("signature mac = %q want %q (full signature %q)", macHex, want, got)
 	}
 }
 
 func TestOpen_invalidOptions(t *testing.T) {
 	t.Parallel()
 
-	w, err := Open(webhook.Options{Timeout: -time.Second})
+	w, err := New(webhook.Options{Timeout: -time.Second})
 	if !errors.Is(err, webhook.ErrInvalidOptions) {
 		t.Fatalf("Open err = %v, want ErrInvalidOptions", err)
 	}
@@ -86,14 +106,14 @@ func TestOpen_badDSN(t *testing.T) {
 		t.Run("dsn:"+strings.ReplaceAll(dsn, "\x00", "<nul>"), func(t *testing.T) {
 			t.Parallel()
 
-			w, err := Open(testOptions(dsn))
+			w, err := New(testOptions(dsn))
 			if err == nil {
 				_ = w.Close()
-				t.Fatalf("Open(%q) = nil, want error", dsn)
+				t.Fatalf("New(%q) = nil, want error", dsn)
 			}
 
 			if w != nil {
-				t.Fatalf("Open(%q) webhook = %v, want nil", dsn, w)
+				t.Fatalf("New(%q) webhook = %v, want nil", dsn, w)
 			}
 		})
 	}
@@ -103,14 +123,14 @@ func TestOpen_malformedDSN(t *testing.T) {
 	t.Parallel()
 
 	// Passes validateDSN but fails eager NewConnector parsing.
-	w, err := Open(testOptions("file:x?%zz"))
+	w, err := New(testOptions("file:x?%zz"))
 	if err == nil {
 		_ = w.Close()
-		t.Fatal("Open(malformed) = nil, want error")
+		t.Fatal("New(malformed) = nil, want error")
 	}
 
 	if w != nil {
-		t.Fatalf("Open(malformed) webhook = %v, want nil", w)
+		t.Fatalf("New(malformed) webhook = %v, want nil", w)
 	}
 }
 
@@ -119,10 +139,10 @@ func TestOpen_unwritablePath(t *testing.T) {
 
 	dsn := filepath.Join(t.TempDir(), "no-such-dir", "w.db")
 
-	w, err := Open(testOptions(dsn))
+	w, err := New(testOptions(dsn))
 	if err == nil {
 		_ = w.Close()
-		t.Fatalf("Open(%q) = nil, want error", dsn)
+		t.Fatalf("New(%q) = nil, want error", dsn)
 	}
 
 	if w != nil {
@@ -138,14 +158,14 @@ func TestOpen_corruptDBFile(t *testing.T) {
 		t.Fatalf("WriteFile err = %v", err)
 	}
 
-	w, err := Open(testOptions(path))
+	w, err := New(testOptions(path))
 	if err == nil {
 		_ = w.Close()
-		t.Fatal("Open(corrupt) = nil, want error")
+		t.Fatal("New(corrupt) = nil, want error")
 	}
 
 	if w != nil {
-		t.Fatalf("Open(corrupt) webhook = %v, want nil", w)
+		t.Fatalf("New(corrupt) webhook = %v, want nil", w)
 	}
 }
 
@@ -173,14 +193,14 @@ func TestOpen_readOnlyDB(t *testing.T) {
 		t.Fatalf("Chmod err = %v", err)
 	}
 
-	w, err := Open(testOptions(path))
+	w, err := New(testOptions(path))
 	if err == nil {
 		_ = w.Close()
-		t.Fatal("Open(readonly) = nil, want DDL failure")
+		t.Fatal("New(readonly) = nil, want DDL failure")
 	}
 
 	if w != nil {
-		t.Fatalf("Open(readonly) webhook = %v, want nil", w)
+		t.Fatalf("New(readonly) webhook = %v, want nil", w)
 	}
 }
 
@@ -226,7 +246,7 @@ func TestOpen_rejectsStalePrivateRow(t *testing.T) {
 		t.Fatalf("raw Close err = %v", err)
 	}
 
-	w, err := Open(webhook.Options{Timeout: 5 * time.Second, DSN: path})
+	w, err := New(webhook.Options{Timeout: 5 * time.Second, DSN: path})
 	if err == nil {
 		_ = w.Close()
 		t.Fatal("Open with stale private row = nil, want loud failure")
@@ -314,7 +334,7 @@ func TestRegister_dbFailureRollsBackInner(t *testing.T) {
 	}))
 	t.Cleanup(srv.Close)
 
-	w, err := Open(testOptions(""))
+	w, err := New(testOptions(""))
 	if err != nil {
 		t.Fatalf("Open err = %v", err)
 	}
@@ -599,7 +619,7 @@ func TestPersistence_reopenDelivers(t *testing.T) {
 	path := filepath.Join(t.TempDir(), "w.db")
 	o := testOptions(path)
 
-	w, err := Open(o)
+	w, err := New(o)
 	if err != nil {
 		t.Fatalf("Open err = %v", err)
 	}
@@ -612,7 +632,7 @@ func TestPersistence_reopenDelivers(t *testing.T) {
 		t.Fatalf("Close err = %v", err)
 	}
 
-	reopened, err := Open(o)
+	reopened, err := New(o)
 	if err != nil {
 		t.Fatalf("reopen err = %v", err)
 	}
@@ -645,7 +665,7 @@ func TestUnregister_dbFailure(t *testing.T) {
 	}))
 	t.Cleanup(srv.Close)
 
-	w, err := Open(testOptions(""))
+	w, err := New(testOptions(""))
 	if err != nil {
 		t.Fatalf("Open err = %v", err)
 	}
@@ -675,7 +695,7 @@ func TestUnregister_dbFailure(t *testing.T) {
 func TestLoad_queryFailure(t *testing.T) {
 	t.Parallel()
 
-	w, err := Open(testOptions(""))
+	w, err := New(testOptions(""))
 	if err != nil {
 		t.Fatalf("Open err = %v", err)
 	}
@@ -699,7 +719,7 @@ func TestLoad_queryFailure(t *testing.T) {
 func TestClose_double(t *testing.T) {
 	t.Parallel()
 
-	w, err := Open(testOptions(""))
+	w, err := New(testOptions(""))
 	if err != nil {
 		t.Fatalf("Open err = %v", err)
 	}

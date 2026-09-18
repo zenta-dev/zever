@@ -4,6 +4,7 @@ import (
 	"errors"
 	"strings"
 	"testing"
+	"time"
 )
 
 func TestOptions_Validate_zero_valid(t *testing.T) {
@@ -120,7 +121,7 @@ func TestOptions_defaults_values(t *testing.T) {
 		t.Errorf("DefaultMaxWebhookBytes = %d, want %d", DefaultMaxWebhookBytes, 1<<20)
 	}
 
-	if DefaultHTTPTimeout != 30 {
-		t.Errorf("DefaultHTTPTimeout = %d, want 30", DefaultHTTPTimeout)
+	if DefaultHTTPTimeout != 30*time.Second {
+		t.Errorf("DefaultHTTPTimeout = %v, want %v", DefaultHTTPTimeout, 30*time.Second)
 	}
 }

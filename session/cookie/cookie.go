@@ -18,7 +18,7 @@ const DefaultPath = "/"
 // Secure and HTTPOnly are *bool (nil means "use the secure default")
 // rather than bool, because a plain bool cannot distinguish "unset" from
 // an explicit false: the framework default is true, so an explicit
-// opt-out must be expressible. This mirrors log/pretty.Options.Color.
+// opt-out must be expressible.
 type Config struct {
 	// Name is the cookie name. Empty defaults to DefaultName.
 	Name string

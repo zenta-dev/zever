@@ -45,7 +45,7 @@ func TestRenderRoundtripJSON(t *testing.T) {
 	}))
 	defer srv.Close()
 
-	doc, err := Open(document.Options{Endpoint: srv.URL})
+	doc, err := New(document.Options{Endpoint: srv.URL})
 	if err != nil {
 		t.Fatalf("Open: %v", err)
 	}
@@ -73,7 +73,7 @@ func TestRenderPDFBytes(t *testing.T) {
 	}))
 	defer srv.Close()
 
-	doc, err := Open(document.Options{Endpoint: srv.URL})
+	doc, err := New(document.Options{Endpoint: srv.URL})
 	if err != nil {
 		t.Fatalf("Open: %v", err)
 	}
@@ -100,7 +100,7 @@ func TestRenderEmptyDataErrors(t *testing.T) {
 			_, _ = w.Write([]byte(body))
 		}))
 
-		doc, err := Open(document.Options{Endpoint: srv.URL})
+		doc, err := New(document.Options{Endpoint: srv.URL})
 		if err != nil {
 			srv.Close()
 			t.Fatalf("Open: %v", err)
@@ -167,7 +167,7 @@ func TestRenderBinarySniffPassThrough(t *testing.T) {
 			}))
 			defer srv.Close()
 
-			doc, err := Open(document.Options{Endpoint: srv.URL})
+			doc, err := New(document.Options{Endpoint: srv.URL})
 			if err != nil {
 				t.Fatalf("Open: %v", err)
 			}
@@ -195,7 +195,7 @@ func renderWithContentType(t *testing.T, contentType string, body []byte) error 
 	}))
 	defer srv.Close()
 
-	doc, err := Open(document.Options{Endpoint: srv.URL})
+	doc, err := New(document.Options{Endpoint: srv.URL})
 	if err != nil {
 		t.Fatalf("Open: %v", err)
 	}
@@ -240,7 +240,7 @@ func TestRenderNoContentTypeBinarySniffPassThrough(t *testing.T) {
 	srv := serveRawHijack(t, rawResp)
 	defer srv.Close()
 
-	doc, err := Open(document.Options{Endpoint: srv.URL})
+	doc, err := New(document.Options{Endpoint: srv.URL})
 	if err != nil {
 		t.Fatalf("Open: %v", err)
 	}
@@ -266,7 +266,7 @@ func TestRenderNoContentTypeNoMagicErrors(t *testing.T) {
 	srv := serveRawHijack(t, rawResp)
 	defer srv.Close()
 
-	doc, err := Open(document.Options{Endpoint: srv.URL})
+	doc, err := New(document.Options{Endpoint: srv.URL})
 	if err != nil {
 		t.Fatalf("Open: %v", err)
 	}
@@ -293,7 +293,7 @@ func TestRenderBinaryContentTypePassThrough(t *testing.T) {
 			_, _ = w.Write(want)
 		}))
 
-		doc, err := Open(document.Options{Endpoint: srv.URL})
+		doc, err := New(document.Options{Endpoint: srv.URL})
 		if err != nil {
 			srv.Close()
 			t.Fatalf("Open: %v", err)
@@ -324,7 +324,7 @@ func TestRenderOctetStreamWithMagicPassThrough(t *testing.T) {
 	}))
 	defer srv.Close()
 
-	doc, err := Open(document.Options{Endpoint: srv.URL})
+	doc, err := New(document.Options{Endpoint: srv.URL})
 	if err != nil {
 		t.Fatalf("Open: %v", err)
 	}
@@ -352,7 +352,7 @@ func TestRenderJSONContentTypeEnvelope(t *testing.T) {
 			_ = json.NewEncoder(w).Encode(renderResponse{Data: want})
 		}))
 
-		doc, err := Open(document.Options{Endpoint: srv.URL})
+		doc, err := New(document.Options{Endpoint: srv.URL})
 		if err != nil {
 			srv.Close()
 			t.Fatalf("Open: %v", err)
@@ -392,7 +392,7 @@ func TestRenderBinaryEmptyBodyErrors(t *testing.T) {
 	}))
 	defer srv.Close()
 
-	doc, err := Open(document.Options{Endpoint: srv.URL})
+	doc, err := New(document.Options{Endpoint: srv.URL})
 	if err != nil {
 		t.Fatalf("Open: %v", err)
 	}
@@ -428,7 +428,7 @@ func TestRenderRejectsUnsupportedFormat(t *testing.T) {
 	}))
 	defer srv.Close()
 
-	doc, err := Open(document.Options{Endpoint: srv.URL})
+	doc, err := New(document.Options{Endpoint: srv.URL})
 	if err != nil {
 		t.Fatalf("Open: %v", err)
 	}
@@ -453,7 +453,7 @@ func TestRenderRejectsUnsupportedFormat(t *testing.T) {
 func TestMissingEndpoint(t *testing.T) {
 	t.Parallel()
 
-	_, err := Open(document.Options{})
+	_, err := New(document.Options{})
 	if err == nil {
 		t.Fatal("expected error for missing endpoint")
 	}
@@ -474,7 +474,7 @@ func TestInvalidEndpoint(t *testing.T) {
 		{Endpoint: "://bad-url"},
 	}
 	for _, opts := range cases {
-		if _, err := Open(opts); err == nil {
+		if _, err := New(opts); err == nil {
 			t.Fatalf("expected error for %v", opts)
 		}
 	}
@@ -483,7 +483,7 @@ func TestInvalidEndpoint(t *testing.T) {
 func TestInvalidOptionsRejected(t *testing.T) {
 	t.Parallel()
 
-	_, err := Open(document.Options{Endpoint: "https://example.com", Timeout: -time.Second})
+	_, err := New(document.Options{Endpoint: "https://example.com", Timeout: -time.Second})
 	if err == nil {
 		t.Fatal("expected error for negative timeout")
 	}
@@ -501,7 +501,7 @@ func TestQueryFragmentEndpointRejected(t *testing.T) {
 		"https://example.com/path?token=1#frag",
 		"https://example.com/#frag",
 	} {
-		if _, err := Open(document.Options{Endpoint: ep}); err == nil {
+		if _, err := New(document.Options{Endpoint: ep}); err == nil {
 			t.Fatalf("expected error for endpoint %q", ep)
 		}
 	}
@@ -520,7 +520,7 @@ func TestTrailingSlashEndpoint(t *testing.T) {
 	}))
 	defer srv.Close()
 
-	doc, err := Open(document.Options{Endpoint: srv.URL + "/base/"})
+	doc, err := New(document.Options{Endpoint: srv.URL + "/base/"})
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -541,7 +541,7 @@ func TestRenderOversizedBodyRejected(t *testing.T) {
 	}))
 	defer srv.Close()
 
-	doc, err := Open(document.Options{
+	doc, err := New(document.Options{
 		Endpoint:       srv.URL,
 		MaxOutputBytes: 1024,
 	})
@@ -573,7 +573,7 @@ func TestRenderMaxOutputBytesBoundary(t *testing.T) {
 	}))
 	defer srv.Close()
 
-	doc, err := Open(document.Options{
+	doc, err := New(document.Options{
 		Endpoint:       srv.URL,
 		MaxOutputBytes: 1024,
 	})
@@ -604,7 +604,7 @@ func TestRenderCapPlusOneRejected(t *testing.T) {
 	}))
 	defer srv.Close()
 
-	doc, err := Open(document.Options{
+	doc, err := New(document.Options{
 		Endpoint:       srv.URL,
 		MaxOutputBytes: 1024,
 	})
@@ -629,7 +629,7 @@ func TestErrorBodyTruncated(t *testing.T) {
 	}))
 	defer srv.Close()
 
-	doc, err := Open(document.Options{Endpoint: srv.URL})
+	doc, err := New(document.Options{Endpoint: srv.URL})
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -664,7 +664,7 @@ func TestBearerHeaderAuthed(t *testing.T) {
 	}))
 	defer srv.Close()
 
-	doc, err := Open(document.Options{Endpoint: srv.URL, APIKey: "secret-key"})
+	doc, err := New(document.Options{Endpoint: srv.URL, APIKey: "secret-key"})
 	if err != nil {
 		t.Fatalf("Open: %v", err)
 	}
@@ -689,7 +689,7 @@ func TestBearerHeaderAnonymous(t *testing.T) {
 	}))
 	defer srv.Close()
 
-	doc, err := Open(document.Options{Endpoint: srv.URL})
+	doc, err := New(document.Options{Endpoint: srv.URL})
 	if err != nil {
 		t.Fatalf("Open: %v", err)
 	}
@@ -713,7 +713,7 @@ func TestTLSMinVersionEnforced(t *testing.T) {
 	}))
 	defer srv.Close()
 
-	doc, err := Open(document.Options{Endpoint: srv.URL})
+	doc, err := New(document.Options{Endpoint: srv.URL})
 	if err != nil {
 		t.Fatalf("Open: %v", err)
 	}
@@ -758,7 +758,7 @@ func TestTransportNonStandardDefault(t *testing.T) {
 	})
 	defer func() { http.DefaultTransport = prev }()
 
-	doc, err := Open(document.Options{Endpoint: "https://example.com"})
+	doc, err := New(document.Options{Endpoint: "https://example.com"})
 	if err != nil {
 		t.Fatalf("Open: %v", err)
 	}
@@ -787,7 +787,7 @@ func TestTransportUpgradesLegacyTLS(t *testing.T) {
 	http.DefaultTransport = &http.Transport{TLSClientConfig: &tls.Config{MinVersion: tls.VersionTLS10}}
 	defer func() { http.DefaultTransport = prev }()
 
-	doc, err := Open(document.Options{Endpoint: "https://example.com"})
+	doc, err := New(document.Options{Endpoint: "https://example.com"})
 	if err != nil {
 		t.Fatalf("Open: %v", err)
 	}
@@ -818,7 +818,7 @@ func TestTimeoutDefaultAndCustom(t *testing.T) {
 	}))
 	defer srv.Close()
 
-	doc, err := Open(document.Options{Endpoint: srv.URL})
+	doc, err := New(document.Options{Endpoint: srv.URL})
 	if err != nil {
 		t.Fatalf("Open: %v", err)
 	}
@@ -838,7 +838,7 @@ func TestTimeoutDefaultAndCustom(t *testing.T) {
 		t.Fatalf("maxOutput = %d, want %d", d.maxOutput, document.DefaultMaxOutputBytes)
 	}
 
-	custom, err := Open(document.Options{Endpoint: srv.URL, Timeout: 7 * time.Second, MaxOutputBytes: 1 << 20})
+	custom, err := New(document.Options{Endpoint: srv.URL, Timeout: 7 * time.Second, MaxOutputBytes: 1 << 20})
 	if err != nil {
 		t.Fatalf("Open custom: %v", err)
 	}
@@ -869,7 +869,7 @@ func TestRenderTimeout(t *testing.T) {
 	}))
 	defer srv.Close()
 
-	doc, err := Open(document.Options{Endpoint: srv.URL, Timeout: 50 * time.Millisecond})
+	doc, err := New(document.Options{Endpoint: srv.URL, Timeout: 50 * time.Millisecond})
 	if err != nil {
 		t.Fatalf("Open: %v", err)
 	}
@@ -889,7 +889,7 @@ func TestRenderNonOKStatus(t *testing.T) {
 	}))
 	defer srv.Close()
 
-	doc, err := Open(document.Options{Endpoint: srv.URL})
+	doc, err := New(document.Options{Endpoint: srv.URL})
 	if err != nil {
 		t.Fatalf("Open: %v", err)
 	}
@@ -931,7 +931,7 @@ func TestRenderErrorBodyReadError(t *testing.T) {
 	srv := serveRawHijack(t, rawResp)
 	defer srv.Close()
 
-	doc, err := Open(document.Options{Endpoint: srv.URL})
+	doc, err := New(document.Options{Endpoint: srv.URL})
 	if err != nil {
 		t.Fatalf("Open: %v", err)
 	}
@@ -951,7 +951,7 @@ func TestRenderBodyReadError(t *testing.T) {
 	srv := serveRawHijack(t, rawResp)
 	defer srv.Close()
 
-	doc, err := Open(document.Options{Endpoint: srv.URL})
+	doc, err := New(document.Options{Endpoint: srv.URL})
 	if err != nil {
 		t.Fatalf("Open: %v", err)
 	}
@@ -969,7 +969,7 @@ func TestCloseNil(t *testing.T) {
 	srv := httptest.NewServer(http.HandlerFunc(func(_ http.ResponseWriter, _ *http.Request) {}))
 	defer srv.Close()
 
-	doc, err := Open(document.Options{Endpoint: srv.URL})
+	doc, err := New(document.Options{Endpoint: srv.URL})
 	if err != nil {
 		t.Fatalf("Open: %v", err)
 	}

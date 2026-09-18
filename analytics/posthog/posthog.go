@@ -29,10 +29,10 @@ type adapter struct {
 	maxProperties      int
 }
 
-// Open creates an Analytics backed by PostHog.
+// New creates an Analytics backed by PostHog.
 // Only Endpoint overrides the SDK config; BatchSize, Interval and
 // MaxQueueSize keep the SDK smart defaults for batched background delivery.
-func Open(o analytics.Options) (analytics.Analytics, error) {
+func New(o analytics.Options) (analytics.Analytics, error) {
 	if err := o.Validate(); err != nil {
 		return nil, fmt.Errorf("posthog: %w", err)
 	}

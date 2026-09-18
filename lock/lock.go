@@ -3,8 +3,9 @@ package lock
 import (
 	"context"
 	"fmt"
-	"sync"
 	"time"
+
+	"github.com/zenta-dev/zever/internal/registry"
 )
 
 // Locker is the interface that lock adapters must implement.
@@ -40,9 +41,10 @@ type Lock interface {
 // Factory creates a Locker from the given Options.
 type Factory func(opts Options) (Locker, error)
 
-var (
-	mu        sync.RWMutex
-	factories = make(map[Adapter]Factory)
+var factories = registry.New[Adapter, Factory](
+	ErrNilFactory,
+	func(adapter Adapter) error { return &DuplicateError{Adapter: adapter} },
+	func(adapter Adapter) error { return &UnknownAdapterError{Adapter: adapter} },
 )
 
 // Register associates an Adapter with a Factory for later use by Open.
@@ -51,26 +53,14 @@ func Register(adapter Adapter, factory Factory) error {
 		return fmt.Errorf("%w for adapter %s", ErrNilFactory, adapter)
 	}
 
-	mu.Lock()
-	defer mu.Unlock()
-
-	if _, dup := factories[adapter]; dup {
-		return &DuplicateError{Adapter: adapter}
-	}
-
-	factories[adapter] = factory
-
-	return nil
+	return factories.Register(adapter, factory)
 }
 
 // Open creates a Locker for adapter using the registered Factory and opts.
 func Open(adapter Adapter, opts Options) (Locker, error) {
-	mu.RLock()
-	factory, ok := factories[adapter]
-	mu.RUnlock()
-
-	if !ok {
-		return nil, &UnknownAdapterError{Adapter: adapter}
+	factory, err := factories.Lookup(adapter)
+	if err != nil {
+		return nil, err
 	}
 
 	l, err := factory(opts)

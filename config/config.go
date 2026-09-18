@@ -17,6 +17,7 @@ import (
 	"github.com/zenta-dev/zever/geo"
 	"github.com/zenta-dev/zever/i18n"
 	"github.com/zenta-dev/zever/idempotency"
+	"github.com/zenta-dev/zever/lock"
 	"github.com/zenta-dev/zever/log"
 	"github.com/zenta-dev/zever/mailer"
 	"github.com/zenta-dev/zever/media"
@@ -30,6 +31,7 @@ import (
 	"github.com/zenta-dev/zever/router"
 	"github.com/zenta-dev/zever/scheduler"
 	"github.com/zenta-dev/zever/search"
+	"github.com/zenta-dev/zever/secrets"
 	"github.com/zenta-dev/zever/session"
 	"github.com/zenta-dev/zever/storage"
 	"github.com/zenta-dev/zever/tenant"
@@ -61,6 +63,7 @@ type Config struct {
 	Geo           Service[geo.Options]           `json:"geo" yaml:"geo"`
 	I18n          Service[i18n.Options]          `json:"i18n" yaml:"i18n"`
 	Idempotency   Service[idempotency.Options]   `json:"idempotency" yaml:"idempotency"`
+	Lock          Service[lock.Options]          `json:"lock" yaml:"lock"`
 	Log           Service[log.Options]           `json:"log" yaml:"log"`
 	Mailer        Service[mailer.Options]        `json:"mailer" yaml:"mailer"`
 	Media         Service[media.Options]         `json:"media" yaml:"media"`
@@ -74,6 +77,7 @@ type Config struct {
 	Router        Service[router.Options]        `json:"router" yaml:"router"`
 	Scheduler     Service[scheduler.Options]     `json:"scheduler" yaml:"scheduler"`
 	Search        Service[search.Options]        `json:"search" yaml:"search"`
+	Secrets       Service[secrets.Options]       `json:"secrets" yaml:"secrets"`
 	Session       Service[session.Options]       `json:"session" yaml:"session"`
 	Storage       Service[storage.Options]       `json:"storage" yaml:"storage"`
 	Tenant        Service[tenant.Options]        `json:"tenant" yaml:"tenant"`
@@ -82,16 +86,16 @@ type Config struct {
 	Workflow      Service[workflow.Options]      `json:"workflow" yaml:"workflow"`
 }
 
-// knownServiceNames returns the 32 lowercase service names in sorted order.
+// knownServiceNames returns the 34 lowercase service names in sorted order.
 // It is the single source of truth for env matching and error paths.
 func knownServiceNames() []string {
 	return []string{
 		"ai", "analytics", "auth", "billing", "cache", "crypto", "db",
 		"document", "eventbus", "flag", "geo", "i18n", "idempotency",
-		"log", "mailer", "media", "notification", "observability",
+		"lock", "log", "mailer", "media", "notification", "observability",
 		"password", "payment", "permission", "queue", "ratelimit",
-		"router", "scheduler", "search", "session", "storage", "tenant",
-		"vectorstore", "webhook", "workflow",
+		"router", "scheduler", "search", "secrets", "session", "storage",
+		"tenant", "vectorstore", "webhook", "workflow",
 	}
 }
 
@@ -126,7 +130,7 @@ func serviceToMap[T any](o T) map[string]any {
 // never log raw option maps directly. The returned maps are fresh copies;
 // mutating them does not affect the Config.
 func (c *Config) RedactedServices() map[string]ServiceConfig {
-	out := make(map[string]ServiceConfig, 32)
+	out := make(map[string]ServiceConfig, 34)
 	put := func(name, adapter string, opts any) {
 		out[name] = ServiceConfig{Adapter: adapter, Options: Redact(serviceToMap(opts))}
 	}
@@ -143,6 +147,7 @@ func (c *Config) RedactedServices() map[string]ServiceConfig {
 	put("geo", c.Geo.Adapter, c.Geo.Options)
 	put("i18n", c.I18n.Adapter, c.I18n.Options)
 	put("idempotency", c.Idempotency.Adapter, c.Idempotency.Options)
+	put("lock", c.Lock.Adapter, c.Lock.Options)
 	put("log", c.Log.Adapter, c.Log.Options)
 	put("mailer", c.Mailer.Adapter, c.Mailer.Options)
 	put("media", c.Media.Adapter, c.Media.Options)
@@ -156,6 +161,7 @@ func (c *Config) RedactedServices() map[string]ServiceConfig {
 	put("router", c.Router.Adapter, c.Router.Options)
 	put("scheduler", c.Scheduler.Adapter, c.Scheduler.Options)
 	put("search", c.Search.Adapter, c.Search.Options)
+	put("secrets", c.Secrets.Adapter, c.Secrets.Options)
 	put("session", c.Session.Adapter, c.Session.Options)
 	put("storage", c.Storage.Adapter, c.Storage.Options)
 	put("tenant", c.Tenant.Adapter, c.Tenant.Options)

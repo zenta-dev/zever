@@ -201,7 +201,7 @@ func safeAdd(r fiber.Router, method, pattern string, handler fiber.Handler) (err
 	defer func() {
 		if rec := recover(); rec != nil {
 			stack := debug.Stack()
-			err = fmt.Errorf("[router] fiber: route registration panicked for %s %s: %v\n%s", method, pattern, rec, stack)
+			err = fmt.Errorf("fiber: route registration panicked for %s %s: %v\n%s", method, pattern, rec, stack)
 		}
 	}()
 

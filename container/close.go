@@ -106,7 +106,7 @@ type closeSnapshot struct {
 // ordered section): cache, queue (dependencies, closed last), scheduler, job
 // (dependents that hold cache/queue references, closed first), grpcServer
 // (separate GracefulStop handling). This list must cover all remaining lazy
-// fields; currently 29 entries + 5 ordered = 34 lazy fields. When adding a
+// fields; currently 31 entries + 5 ordered = 36 lazy fields. When adding a
 // new service, add it here unless it depends on cache/queue (then add to
 // Close's ordered section and keep excluded here). Drift is pinned by
 // TestContainer_Snapshots_CoversAllServices via reflection.
@@ -124,6 +124,7 @@ func (c *Container) snapshots() []closeSnapshot {
 		func() closeSnapshot { v, ok := c.geo.getIfResolved(); return closeSnapshot{v, ok} }(),
 		func() closeSnapshot { v, ok := c.i18n.getIfResolved(); return closeSnapshot{v, ok} }(),
 		func() closeSnapshot { v, ok := c.idempotency.getIfResolved(); return closeSnapshot{v, ok} }(),
+		func() closeSnapshot { v, ok := c.lock.getIfResolved(); return closeSnapshot{v, ok} }(),
 		func() closeSnapshot { v, ok := c.log.getIfResolved(); return closeSnapshot{v, ok} }(),
 		func() closeSnapshot { v, ok := c.mailer.getIfResolved(); return closeSnapshot{v, ok} }(),
 		func() closeSnapshot { v, ok := c.media.getIfResolved(); return closeSnapshot{v, ok} }(),
@@ -135,6 +136,7 @@ func (c *Container) snapshots() []closeSnapshot {
 		func() closeSnapshot { v, ok := c.ratelimit.getIfResolved(); return closeSnapshot{v, ok} }(),
 		func() closeSnapshot { v, ok := c.router.getIfResolved(); return closeSnapshot{v, ok} }(),
 		func() closeSnapshot { v, ok := c.search.getIfResolved(); return closeSnapshot{v, ok} }(),
+		func() closeSnapshot { v, ok := c.secrets.getIfResolved(); return closeSnapshot{v, ok} }(),
 		func() closeSnapshot { v, ok := c.session.getIfResolved(); return closeSnapshot{v, ok} }(),
 		func() closeSnapshot { v, ok := c.storage.getIfResolved(); return closeSnapshot{v, ok} }(),
 		func() closeSnapshot { v, ok := c.tenant.getIfResolved(); return closeSnapshot{v, ok} }(),
@@ -150,9 +152,9 @@ func (c *Container) snapshots() []closeSnapshot {
 func snapshotServiceNames() []string {
 	return []string{
 		"ai", "analytics", "auth", "billing", "crypto", "db", "document",
-		"eventbus", "flag", "geo", "i18n", "idempotency", "log", "mailer",
+		"eventbus", "flag", "geo", "i18n", "idempotency", "lock", "log", "mailer",
 		"media", "notification", "observability", "password", "payment",
-		"permission", "ratelimit", "router", "search", "session", "storage",
+		"permission", "ratelimit", "router", "search", "secrets", "session", "storage",
 		"tenant", "vectorstore", "webhook", "workflow",
 	}
 }

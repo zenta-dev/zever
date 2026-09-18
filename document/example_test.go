@@ -7,7 +7,7 @@ import (
 
 // ExampleOpen opens the local renderer and releases it without rendering.
 func ExampleOpen() {
-	if err := document.Register(document.Local, local.Open); err != nil {
+	if err := document.Register(document.Local, local.New); err != nil {
 		return
 	}
 

@@ -225,6 +225,106 @@ func TestUpsertQueryRoundtrip(t *testing.T) {
 	}
 }
 
+func TestUpsertBatch_MatchesLoopedUpsert(t *testing.T) {
+	t.Parallel()
+
+	vecs := []vectorstore.Vector{
+		{ID: "a", Embedding: []float32{1, 0}, Metadata: map[string]any{"n": "one"}},
+		{ID: "b", Embedding: []float32{0, 1}, Metadata: map[string]any{"n": "two"}},
+		{ID: "c", Embedding: []float32{1, 1}, Metadata: map[string]any{"n": "three"}},
+	}
+
+	loopFake := newFake()
+	loopStore := newStore(loopFake, 0)
+	ctx := context.Background()
+
+	for _, v := range vecs {
+		if err := loopStore.Upsert(ctx, v); err != nil {
+			t.Fatalf("loop upsert %s: %v", v.ID, err)
+		}
+	}
+
+	batchFake := newFake()
+	batchStore := newStore(batchFake, 0)
+
+	if err := batchStore.UpsertBatch(ctx, vecs); err != nil {
+		t.Fatalf("upsert batch: %v", err)
+	}
+
+	loopGot, err := loopStore.Query(ctx, []float32{1, 0}, 3)
+	if err != nil {
+		t.Fatalf("loop query: %v", err)
+	}
+
+	batchGot, err := batchStore.Query(ctx, []float32{1, 0}, 3)
+	if err != nil {
+		t.Fatalf("batch query: %v", err)
+	}
+
+	if len(loopGot) != len(batchGot) {
+		t.Fatalf("result count mismatch: loop=%d batch=%d", len(loopGot), len(batchGot))
+	}
+
+	for i := range loopGot {
+		if loopGot[i].ID != batchGot[i].ID {
+			t.Fatalf("id mismatch at %d: loop=%s batch=%s", i, loopGot[i].ID, batchGot[i].ID)
+		}
+
+		if loopGot[i].Metadata["n"] != batchGot[i].Metadata["n"] {
+			t.Fatalf("metadata mismatch at %d", i)
+		}
+	}
+
+	// UpsertBatch is a single native batch call: exactly one Upsert RPC
+	// carrying all points, unlike the loop's N separate calls.
+	if batchFake.creates != loopFake.creates {
+		t.Fatalf("collection create count mismatch: loop=%d batch=%d", loopFake.creates, batchFake.creates)
+	}
+}
+
+func TestUpsertBatch_Empty(t *testing.T) {
+	t.Parallel()
+
+	f := newFake()
+	s := newStore(f, 3)
+
+	if err := s.UpsertBatch(context.Background(), nil); err != nil {
+		t.Fatalf("UpsertBatch(nil) = %v, want nil", err)
+	}
+}
+
+func TestUpsertBatch_EmptyEmbedding(t *testing.T) {
+	t.Parallel()
+
+	f := newFake()
+	s := newStore(f, 0)
+
+	err := s.UpsertBatch(context.Background(), []vectorstore.Vector{
+		{ID: "a", Embedding: []float32{1, 0}},
+		{ID: "b", Embedding: nil},
+	})
+	if !errors.Is(err, vectorstore.ErrEmptyEmbedding) {
+		t.Fatalf("UpsertBatch() = %v, want ErrEmptyEmbedding", err)
+	}
+}
+
+func TestUpsertBatch_DimensionMismatch(t *testing.T) {
+	t.Parallel()
+
+	f := newFake()
+	s := newStore(f, 2)
+
+	err := s.UpsertBatch(context.Background(), []vectorstore.Vector{
+		{ID: "a", Embedding: []float32{1, 0}},
+		{ID: "b", Embedding: []float32{1, 0, 0}},
+	})
+
+	var mismatch *vectorstore.DimensionMismatchError
+	if !errors.As(err, &mismatch) {
+		t.Fatalf("UpsertBatch() = %v, want DimensionMismatchError", err)
+	}
+}
+
 func TestDeleteIdempotent(t *testing.T) {
 	t.Parallel()
 
@@ -817,13 +917,13 @@ func TestExtractValue(t *testing.T) {
 	}
 }
 
-func TestOpen(t *testing.T) {
+func TestNew(t *testing.T) {
 	t.Parallel()
 
 	t.Run("missing url", func(t *testing.T) {
 		t.Parallel()
 
-		if _, err := Open(vectorstore.Options{}); !errors.Is(err, ErrMissingURL) {
+		if _, err := New(vectorstore.Options{}); !errors.Is(err, ErrMissingURL) {
 			t.Fatalf("expected ErrMissingURL, got %v", err)
 		}
 	})
@@ -831,7 +931,7 @@ func TestOpen(t *testing.T) {
 	t.Run("invalid options", func(t *testing.T) {
 		t.Parallel()
 
-		_, err := Open(vectorstore.Options{URL: "http://localhost:6334", Dimension: -1})
+		_, err := New(vectorstore.Options{URL: "http://localhost:6334", Dimension: -1})
 		if err == nil {
 			t.Fatalf("expected validation error")
 		}
@@ -840,7 +940,7 @@ func TestOpen(t *testing.T) {
 	t.Run("ok lazy", func(t *testing.T) {
 		t.Parallel()
 
-		vs, err := Open(vectorstore.Options{URL: "http://localhost:6334", APIKey: "secret"})
+		vs, err := New(vectorstore.Options{URL: "http://localhost:6334", APIKey: "secret"})
 		if err != nil {
 			t.Fatalf("open: %v", err)
 		}
@@ -849,15 +949,11 @@ func TestOpen(t *testing.T) {
 			t.Fatalf("close: %v", err)
 		}
 	})
-}
-
-func TestNew(t *testing.T) {
-	t.Parallel()
 
 	t.Run("lazy no dim", func(t *testing.T) {
 		t.Parallel()
 
-		s, err := New("http://localhost:6334", "", 0)
+		s, err := New(vectorstore.Options{URL: "http://localhost:6334"})
 		if err != nil {
 			t.Fatalf("new: %v", err)
 		}
@@ -870,7 +966,7 @@ func TestNew(t *testing.T) {
 	t.Run("ensure failure closes", func(t *testing.T) {
 		t.Parallel()
 
-		if _, err := New("http://localhost:1", "", 2); err == nil {
+		if _, err := New(vectorstore.Options{URL: "http://localhost:1", Dimension: 2}); err == nil {
 			t.Fatalf("expected ensure error")
 		}
 	})
@@ -878,7 +974,7 @@ func TestNew(t *testing.T) {
 	t.Run("client error", func(t *testing.T) {
 		t.Parallel()
 
-		if _, err := New("\x7f", "", 0); err == nil {
+		if _, err := New(vectorstore.Options{URL: "\x7f"}); err == nil {
 			t.Fatalf("expected client error")
 		}
 	})

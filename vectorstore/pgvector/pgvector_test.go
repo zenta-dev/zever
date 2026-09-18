@@ -255,33 +255,33 @@ func TestCheckDimension(t *testing.T) {
 	}
 }
 
-func TestOpen(t *testing.T) {
+func TestNew(t *testing.T) {
 	t.Parallel()
 
 	t.Run("missing dsn", func(t *testing.T) {
 		t.Parallel()
 
-		_, err := Open(vectorstore.Options{})
+		_, err := New(vectorstore.Options{})
 		if !errors.Is(err, ErrMissingDSN) {
-			t.Fatalf("Open() error = %v, want ErrMissingDSN", err)
+			t.Fatalf("New() error = %v, want ErrMissingDSN", err)
 		}
 	})
 
 	t.Run("invalid options", func(t *testing.T) {
 		t.Parallel()
 
-		_, err := Open(vectorstore.Options{DSN: "postgres://localhost/db", Dimension: -1})
+		_, err := New(vectorstore.Options{DSN: "postgres://localhost/db", Dimension: -1})
 		if !errors.Is(err, vectorstore.ErrInvalidOptions) {
-			t.Fatalf("Open() error = %v, want ErrInvalidOptions", err)
+			t.Fatalf("New() error = %v, want ErrInvalidOptions", err)
 		}
 	})
 
 	t.Run("default dimension no database", func(t *testing.T) {
 		t.Parallel()
 
-		_, err := Open(vectorstore.Options{DSN: "postgres://127.0.0.1:1/zever_test"})
+		_, err := New(vectorstore.Options{DSN: "postgres://127.0.0.1:1/zever_test"})
 		if err == nil {
-			t.Fatal("Open() with unreachable DSN = nil, want error")
+			t.Fatal("New() with unreachable DSN = nil, want error")
 		}
 	})
 }
@@ -289,11 +289,11 @@ func TestOpen(t *testing.T) {
 func TestNewFailure(t *testing.T) {
 	t.Parallel()
 
-	if _, err := New("://bad", 0); err == nil {
+	if _, err := New(vectorstore.Options{DSN: "://bad"}); err == nil {
 		t.Fatal("New(bad DSN) = nil, want connect error")
 	}
 
-	if _, err := New("postgres://127.0.0.1:1/zever_test", 3); err == nil {
+	if _, err := New(vectorstore.Options{DSN: "postgres://127.0.0.1:1/zever_test", Dimension: 3}); err == nil {
 		t.Fatal("New(unreachable DSN) = nil, want error")
 	}
 }
@@ -760,6 +760,64 @@ func TestClose(t *testing.T) {
 	}
 }
 
+func TestUpsertBatch_Empty(t *testing.T) {
+	t.Parallel()
+
+	pool := &fakePool{}
+	s := &Store{db: pool, dim: 3}
+
+	if err := s.UpsertBatch(context.Background(), nil); err != nil {
+		t.Fatalf("UpsertBatch(nil) = %v, want nil", err)
+	}
+
+	if len(pool.execSQL) != 0 {
+		t.Fatalf("UpsertBatch(nil) issued %d exec calls, want 0", len(pool.execSQL))
+	}
+}
+
+func TestUpsertBatch_SingleStatement(t *testing.T) {
+	t.Parallel()
+
+	pool := &fakePool{}
+	s := &Store{db: pool, dim: 3}
+
+	err := s.UpsertBatch(context.Background(), []vectorstore.Vector{
+		{ID: "a", Embedding: []float32{1, 0, 0}},
+		{ID: "b", Embedding: []float32{0, 1, 0}},
+	})
+	if err != nil {
+		t.Fatalf("UpsertBatch() = %v, want nil", err)
+	}
+
+	if len(pool.execSQL) != 1 {
+		t.Fatalf("UpsertBatch() issued %d exec calls, want 1", len(pool.execSQL))
+	}
+
+	if !strings.Contains(pool.execSQL[0], "$4") {
+		t.Fatalf("UpsertBatch() sql = %q, want multi-row placeholders", pool.execSQL[0])
+	}
+}
+
+func TestUpsertBatch_DimensionMismatch(t *testing.T) {
+	t.Parallel()
+
+	pool := &fakePool{}
+	s := &Store{db: pool, dim: 3}
+
+	err := s.UpsertBatch(context.Background(), []vectorstore.Vector{
+		{ID: "a", Embedding: []float32{1, 0}},
+	})
+
+	var mismatch *vectorstore.DimensionMismatchError
+	if !errors.As(err, &mismatch) {
+		t.Fatalf("UpsertBatch() = %v, want DimensionMismatchError", err)
+	}
+
+	if len(pool.execSQL) != 0 {
+		t.Fatalf("UpsertBatch() issued exec on bad dimension, want none")
+	}
+}
+
 func TestLiveRoundTrip(t *testing.T) {
 	dsn := os.Getenv("PGVECTOR_TEST_DSN")
 	if dsn == "" {
@@ -768,9 +826,9 @@ func TestLiveRoundTrip(t *testing.T) {
 
 	ctx := t.Context()
 
-	vs, err := Open(vectorstore.Options{DSN: dsn, Dimension: 3})
+	vs, err := New(vectorstore.Options{DSN: dsn, Dimension: 3})
 	if err != nil {
-		t.Fatalf("Open() error: %v", err)
+		t.Fatalf("New() error: %v", err)
 	}
 
 	t.Cleanup(func() {
@@ -816,5 +874,73 @@ func TestLiveRoundTrip(t *testing.T) {
 	var mismatch *vectorstore.DimensionMismatchError
 	if err := vs.Upsert(ctx, vectorstore.Vector{ID: "c", Embedding: []float32{1, 0}}); !errors.As(err, &mismatch) {
 		t.Fatalf("Upsert wrong dim = %v, want DimensionMismatchError", err)
+	}
+}
+
+// TestLiveUpsertBatch_MatchesLoopedUpsert proves UpsertBatch produces the same
+// end-state as calling Upsert N times in a loop, against a live pgvector
+// instance. Skipped when PGVECTOR_TEST_DSN is unset, matching TestLiveRoundTrip.
+func TestLiveUpsertBatch_MatchesLoopedUpsert(t *testing.T) {
+	dsn := os.Getenv("PGVECTOR_TEST_DSN")
+	if dsn == "" {
+		t.Skip("PGVECTOR_TEST_DSN unset")
+	}
+
+	ctx := t.Context()
+
+	loopStore, err := New(vectorstore.Options{DSN: dsn, Dimension: 3})
+	if err != nil {
+		t.Fatalf("Open() loop store error: %v", err)
+	}
+
+	t.Cleanup(func() { _ = loopStore.Close() })
+
+	vecs := []vectorstore.Vector{
+		{ID: "batch-a", Embedding: []float32{1, 0, 0}, Metadata: map[string]any{"n": "one"}},
+		{ID: "batch-b", Embedding: []float32{0, 1, 0}, Metadata: map[string]any{"n": "two"}},
+		{ID: "batch-c", Embedding: []float32{0, 0, 1}, Metadata: map[string]any{"n": "three"}},
+	}
+
+	for _, v := range vecs {
+		if upsertErr := loopStore.Upsert(ctx, v); upsertErr != nil {
+			t.Fatalf("loop Upsert(%s) error: %v", v.ID, upsertErr)
+		}
+	}
+
+	t.Cleanup(func() {
+		for _, v := range vecs {
+			_ = loopStore.Delete(ctx, v.ID)
+		}
+	})
+
+	batchStore, err := New(vectorstore.Options{DSN: dsn, Dimension: 3})
+	if err != nil {
+		t.Fatalf("New() batch store error: %v", err)
+	}
+
+	t.Cleanup(func() { _ = batchStore.Close() })
+
+	if batchErr := batchStore.UpsertBatch(ctx, vecs); batchErr != nil {
+		t.Fatalf("UpsertBatch() error: %v", batchErr)
+	}
+
+	loopGot, err := loopStore.Query(ctx, []float32{1, 0, 0}, 3)
+	if err != nil {
+		t.Fatalf("loop Query() error: %v", err)
+	}
+
+	batchGot, err := batchStore.Query(ctx, []float32{1, 0, 0}, 3)
+	if err != nil {
+		t.Fatalf("batch Query() error: %v", err)
+	}
+
+	if len(loopGot) != len(batchGot) {
+		t.Fatalf("result count mismatch: loop=%d batch=%d", len(loopGot), len(batchGot))
+	}
+
+	for i := range loopGot {
+		if loopGot[i].ID != batchGot[i].ID {
+			t.Fatalf("id mismatch at %d: loop=%s batch=%s", i, loopGot[i].ID, batchGot[i].ID)
+		}
 	}
 }

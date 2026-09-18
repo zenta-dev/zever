@@ -68,7 +68,7 @@ func NewClient(ctx context.Context, prefix, region, endpoint, urlBase, accessKey
 		config.WithCredentialsProvider(credentials.NewStaticCredentialsProvider(accessKey, secretKey, "")),
 	)
 	if err != nil {
-		return nil, nil, fmt.Errorf("[%s] load config: %w", prefix, err)
+		return nil, nil, fmt.Errorf("%s: load config: %w", prefix, err)
 	}
 
 	base := urlBase

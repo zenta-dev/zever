@@ -17,6 +17,7 @@ import (
 	"github.com/zenta-dev/zever/geo"
 	"github.com/zenta-dev/zever/i18n"
 	"github.com/zenta-dev/zever/idempotency"
+	"github.com/zenta-dev/zever/lock"
 	"github.com/zenta-dev/zever/log"
 	"github.com/zenta-dev/zever/mailer"
 	"github.com/zenta-dev/zever/media"
@@ -30,6 +31,7 @@ import (
 	"github.com/zenta-dev/zever/router"
 	"github.com/zenta-dev/zever/scheduler"
 	"github.com/zenta-dev/zever/search"
+	"github.com/zenta-dev/zever/secrets"
 	"github.com/zenta-dev/zever/session"
 	"github.com/zenta-dev/zever/storage"
 	"github.com/zenta-dev/zever/tenant"
@@ -83,6 +85,7 @@ func (c *Config) Validate() error {
 	check("geo", c.Geo.Adapter, parseAsAny(geo.ParseAdapter), c.Geo.Options.Validate)
 	check("i18n", c.I18n.Adapter, parseAsAny(i18n.ParseAdapter), c.I18n.Options.Validate)
 	check("idempotency", c.Idempotency.Adapter, parseAsAny(idempotency.ParseAdapter), c.Idempotency.Options.Validate)
+	check("lock", c.Lock.Adapter, parseAsAny(lock.ParseAdapter), c.Lock.Options.Validate)
 	check("log", c.Log.Adapter, parseAsAny(log.ParseAdapter), nil)
 	check("mailer", c.Mailer.Adapter, parseAsAny(mailer.ParseAdapter), c.Mailer.Options.Validate)
 	check("media", c.Media.Adapter, parseAsAny(media.ParseAdapter), c.Media.Options.Validate)
@@ -96,6 +99,7 @@ func (c *Config) Validate() error {
 	check("router", c.Router.Adapter, parseAsAny(router.ParseAdapter), c.Router.Options.Validate)
 	check("scheduler", c.Scheduler.Adapter, parseAsAny(scheduler.ParseAdapter), c.Scheduler.Options.Validate)
 	check("search", c.Search.Adapter, parseAsAny(search.ParseAdapter), c.Search.Options.Validate)
+	check("secrets", c.Secrets.Adapter, parseAsAny(secrets.ParseAdapter), c.Secrets.Options.Validate)
 	check("session", c.Session.Adapter, parseAsAny(session.ParseAdapter), c.Session.Options.Validate)
 	check("storage", c.Storage.Adapter, parseAsAny(storage.ParseAdapter), c.Storage.Options.Validate)
 	check("tenant", c.Tenant.Adapter, parseAsAny(tenant.ParseAdapter), c.Tenant.Options.Validate)

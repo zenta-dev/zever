@@ -28,10 +28,10 @@ type adapter struct {
 // newGenaiClient is overridden in tests to simulate NewClient failures.
 var newGenaiClient = genai.NewClient //nolint:gochecknoglobals
 
-// Open creates an AI backed by Gemini.
+// New creates an AI backed by Gemini.
 //
 // It validates opts via ai.Options.Validate and requires a non-empty APIKey.
-func Open(opts ai.Options) (ai.AI, error) {
+func New(opts ai.Options) (ai.AI, error) {
 	if err := opts.Validate(); err != nil {
 		return nil, err
 	}

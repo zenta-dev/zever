@@ -61,7 +61,7 @@ func TestResolveHeaderNonCanonicalMetaKey(t *testing.T) {
 func TestOpenCaseInsensitiveHeaderOpt(t *testing.T) {
 	t.Parallel()
 
-	tt, err := Open(tenant.Options{Header: "x-tenant-id"})
+	tt, err := New(tenant.Options{Header: "x-tenant-id"})
 	if err != nil {
 		t.Fatalf("open: %v", err)
 	}
@@ -289,7 +289,7 @@ func TestResolveSubdomainEmptyCapture(t *testing.T) {
 func TestResolveBadHost(t *testing.T) {
 	t.Parallel()
 
-	tt, err := Open(tenant.Options{
+	tt, err := New(tenant.Options{
 		Header:         "X-Tenant-ID",
 		SubdomainRegex: `^([a-z0-9-]+)\.example\.com$`,
 	})
@@ -310,7 +310,7 @@ func TestResolveBadHost(t *testing.T) {
 func TestResolveHostTooLong(t *testing.T) {
 	t.Parallel()
 
-	tt, err := Open(tenant.Options{
+	tt, err := New(tenant.Options{
 		Header:         "X-Tenant-ID",
 		SubdomainRegex: `^([a-z0-9-]+)\.example\.com$`,
 	})
@@ -332,7 +332,7 @@ func TestResolveHostTooLong(t *testing.T) {
 func TestOpenCatastrophicPattern(t *testing.T) {
 	t.Parallel()
 
-	_, err := Open(tenant.Options{Header: "X-Tenant-ID", SubdomainRegex: `^(a+)+$`})
+	_, err := New(tenant.Options{Header: "X-Tenant-ID", SubdomainRegex: `^(a+)+$`})
 	if err == nil {
 		t.Fatal("want error, got nil")
 	}
@@ -345,7 +345,7 @@ func TestOpenCatastrophicPattern(t *testing.T) {
 func TestOpenUncompilablePattern(t *testing.T) {
 	t.Parallel()
 
-	_, err := Open(tenant.Options{Header: "X-Tenant-ID", SubdomainRegex: `(unclosed`})
+	_, err := New(tenant.Options{Header: "X-Tenant-ID", SubdomainRegex: `(unclosed`})
 	if err == nil {
 		t.Fatal("want error, got nil")
 	}
@@ -358,7 +358,7 @@ func TestOpenUncompilablePattern(t *testing.T) {
 func TestOpenInvalidOptions(t *testing.T) {
 	t.Parallel()
 
-	_, err := Open(tenant.Options{Header: "X Bad"})
+	_, err := New(tenant.Options{Header: "X Bad"})
 	if err == nil {
 		t.Fatal("want error, got nil")
 	}
@@ -400,7 +400,7 @@ func TestCloseNoop(t *testing.T) {
 func TestDefaultHeaderName(t *testing.T) {
 	t.Parallel()
 
-	tt, err := Open(tenant.Options{})
+	tt, err := New(tenant.Options{})
 	if err != nil {
 		t.Fatalf("open: %v", err)
 	}

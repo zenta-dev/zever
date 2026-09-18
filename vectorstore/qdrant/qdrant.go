@@ -16,21 +16,6 @@ import (
 	"github.com/zenta-dev/zever/vectorstore"
 )
 
-// Open creates a Qdrant vector store from Options.
-// It validates Options first, requires a URL, and connects lazily
-// unless a dimension is configured.
-func Open(o vectorstore.Options) (vectorstore.VectorStore, error) {
-	if err := o.Validate(); err != nil {
-		return nil, fmt.Errorf("qdrant: %w", err)
-	}
-
-	if o.URL == "" {
-		return nil, ErrMissingURL
-	}
-
-	return New(o.URL, o.APIKey, o.Dimension)
-}
-
 var uuidPattern = regexp.MustCompile(`^[0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{12}$`)
 
 type pointClient interface {
@@ -73,23 +58,35 @@ func pointID(id string) *qdrant.PointId {
 	))
 }
 
-// New creates a Qdrant vector store connected to the given address.
-func New(addr, apiKey string, dim int) (*Store, error) {
-	host, port, useTLS := parseAddr(addr)
+// New creates a Qdrant vector store from Options. It validates Options
+// first, requires a URL, and connects lazily unless a dimension is
+// configured.
+func New(o vectorstore.Options) (vectorstore.VectorStore, error) {
+	if err := o.Validate(); err != nil {
+		return nil, fmt.Errorf("qdrant: %w", err)
+	}
+
+	if o.URL == "" {
+		return nil, ErrMissingURL
+	}
+
+	host, port, useTLS := parseAddr(o.URL)
 
 	cfg := &qdrant.Config{
 		Host:   host,
 		Port:   port,
 		UseTLS: useTLS,
 	}
-	if apiKey != "" {
-		cfg.APIKey = apiKey
+	if o.APIKey != "" {
+		cfg.APIKey = o.APIKey
 	}
 
 	client, err := qdrant.NewClient(cfg)
 	if err != nil {
 		return nil, fmt.Errorf("qdrant: client: %w", err)
 	}
+
+	dim := o.Dimension
 
 	s := &Store{client: client, dim: dim}
 	if dim > 0 {
@@ -148,6 +145,67 @@ func (s *Store) Upsert(ctx context.Context, vec vectorstore.Vector) error {
 	})
 	if err != nil {
 		return fmt.Errorf("qdrant: upsert: %w", err)
+	}
+
+	return nil
+}
+
+// UpsertBatch inserts or replaces all of vecs using Qdrant's native batch
+// upsert (a single UpsertPoints call carrying every point), one round trip
+// regardless of len(vecs). An empty vecs is a no-op.
+func (s *Store) UpsertBatch(ctx context.Context, vecs []vectorstore.Vector) error {
+	if len(vecs) == 0 {
+		return nil
+	}
+
+	for _, vec := range vecs {
+		if err := requireEmbedding(vec.Embedding); err != nil {
+			return fmt.Errorf("qdrant: upsert batch: %w", err)
+		}
+	}
+
+	s.mu.Lock()
+
+	dim := s.dim
+
+	s.mu.Unlock()
+
+	if dim > 0 {
+		for _, vec := range vecs {
+			if len(vec.Embedding) != dim {
+				// Pointer chain required for *DimensionMismatchError targets.
+				mismatch := error(&vectorstore.DimensionMismatchError{Got: len(vec.Embedding), Want: dim})
+				return fmt.Errorf("qdrant: upsert batch: %w", mismatch)
+			}
+		}
+	}
+
+	if err := s.ensureCollection(ctx, len(vecs[0].Embedding)); err != nil {
+		return err
+	}
+
+	points := make([]*qdrant.PointStruct, len(vecs))
+
+	for i, vec := range vecs {
+		point, err := newPoint(vec)
+		if err != nil {
+			return fmt.Errorf("qdrant: upsert batch: %w", err)
+		}
+
+		points[i] = point
+	}
+
+	wait := true
+
+	// Collection name is intentionally hardcoded: the store manages a
+	// single "vectors" collection (see Upsert).
+	_, err := s.client.Upsert(ctx, &qdrant.UpsertPoints{
+		CollectionName: "vectors",
+		Wait:           &wait,
+		Points:         points,
+	})
+	if err != nil {
+		return fmt.Errorf("qdrant: upsert batch: %w", err)
 	}
 
 	return nil

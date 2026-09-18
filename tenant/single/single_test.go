@@ -11,7 +11,7 @@ import (
 func TestResolveReturnsDefault(t *testing.T) {
 	t.Parallel()
 
-	tn, err := Open(tenant.Options{})
+	tn, err := New(tenant.Options{})
 	if err != nil {
 		t.Fatalf("Open err = %v, want nil", err)
 	}
@@ -29,7 +29,7 @@ func TestResolveReturnsDefault(t *testing.T) {
 func TestOpenCustomID(t *testing.T) {
 	t.Parallel()
 
-	tn, err := Open(tenant.Options{ID: "acme"})
+	tn, err := New(tenant.Options{ID: "acme"})
 	if err != nil {
 		t.Fatalf("Open err = %v, want nil", err)
 	}
@@ -47,7 +47,7 @@ func TestOpenCustomID(t *testing.T) {
 func TestScopedSetsContext(t *testing.T) {
 	t.Parallel()
 
-	tn, err := Open(tenant.Options{})
+	tn, err := New(tenant.Options{})
 	if err != nil {
 		t.Fatalf("Open err = %v, want nil", err)
 	}
@@ -70,7 +70,7 @@ func TestScopedSetsContext(t *testing.T) {
 func TestCloseNoop(t *testing.T) {
 	t.Parallel()
 
-	tn, err := Open(tenant.Options{})
+	tn, err := New(tenant.Options{})
 	if err != nil {
 		t.Fatalf("Open err = %v, want nil", err)
 	}
@@ -83,7 +83,7 @@ func TestCloseNoop(t *testing.T) {
 func TestOpenInvalidOptions(t *testing.T) {
 	t.Parallel()
 
-	_, err := Open(tenant.Options{Header: "bad header"})
+	_, err := New(tenant.Options{Header: "bad header"})
 	if !errors.Is(err, tenant.ErrInvalidOptions) {
 		t.Fatalf("Open err = %v, want ErrInvalidOptions", err)
 	}
@@ -92,7 +92,7 @@ func TestOpenInvalidOptions(t *testing.T) {
 func TestOpenZeroOptsDefault(t *testing.T) {
 	t.Parallel()
 
-	tn, err := Open(tenant.Options{})
+	tn, err := New(tenant.Options{})
 	if err != nil {
 		t.Fatalf("Open err = %v, want nil", err)
 	}

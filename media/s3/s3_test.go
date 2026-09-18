@@ -234,9 +234,9 @@ func TestOpenMissingBucket(t *testing.T) {
 	t.Parallel()
 	o := validOpts()
 	o.Bucket = ""
-	_, err := Open(o)
+	_, err := New(o)
 	if !errors.Is(err, ErrMissingBucket) {
-		t.Fatalf("Open() err = %v, want ErrMissingBucket", err)
+		t.Fatalf("New() err = %v, want ErrMissingBucket", err)
 	}
 }
 
@@ -253,9 +253,9 @@ func TestOpenMissingCredentials(t *testing.T) {
 			t.Parallel()
 			o := validOpts()
 			tc.mut(&o)
-			_, err := Open(o)
+			_, err := New(o)
 			if !errors.Is(err, ErrMissingCredentials) {
-				t.Fatalf("Open() err = %v, want ErrMissingCredentials", err)
+				t.Fatalf("New() err = %v, want ErrMissingCredentials", err)
 			}
 		})
 	}
@@ -265,9 +265,9 @@ func TestOpenInvalidOptions(t *testing.T) {
 	t.Parallel()
 	o := validOpts()
 	o.Endpoint = "://bad"
-	_, err := Open(o)
+	_, err := New(o)
 	if !errors.Is(err, media.ErrInvalidOptions) {
-		t.Fatalf("Open() err = %v, want invalid options", err)
+		t.Fatalf("New() err = %v, want invalid options", err)
 	}
 }
 
@@ -275,21 +275,21 @@ func TestOpenClientError(t *testing.T) {
 	t.Parallel()
 	o := validOpts()
 	o.Endpoint = "ftp://invalid.example.com"
-	_, err := Open(o)
+	_, err := New(o)
 	if err == nil {
-		t.Fatal("Open() = nil, want NewClient error")
+		t.Fatal("New() = nil, want NewClient error")
 	}
 }
 
 func TestOpenDefaults(t *testing.T) {
 	t.Parallel()
-	m, err := Open(validOpts())
+	m, err := New(validOpts())
 	if err != nil {
 		t.Fatal(err)
 	}
 	d, ok := m.(*driver)
 	if !ok {
-		t.Fatal("Open() did not return *driver")
+		t.Fatal("New() did not return *driver")
 	}
 	if got := d.client.Options().Region; got != "us-east-1" {
 		t.Fatalf("Region = %q, want us-east-1", got)
@@ -315,13 +315,13 @@ func TestOpenEndpointCustom(t *testing.T) {
 	t.Parallel()
 	o := validOpts()
 	o.Endpoint = "http://localhost:9000"
-	m, err := Open(o)
+	m, err := New(o)
 	if err != nil {
 		t.Fatal(err)
 	}
 	d, ok := m.(*driver)
 	if !ok {
-		t.Fatal("Open() did not return *driver")
+		t.Fatal("New() did not return *driver")
 	}
 	ep := d.client.Options().BaseEndpoint
 	if ep == nil || *ep != "http://localhost:9000" {
@@ -333,13 +333,13 @@ func TestOpenBaseURLTrim(t *testing.T) {
 	t.Parallel()
 	o := validOpts()
 	o.BaseURL = "https://cdn.example.com///"
-	m, err := Open(o)
+	m, err := New(o)
 	if err != nil {
 		t.Fatal(err)
 	}
 	d, ok := m.(*driver)
 	if !ok {
-		t.Fatal("Open() did not return *driver")
+		t.Fatal("New() did not return *driver")
 	}
 	if got := d.baseURL; got != "https://cdn.example.com" {
 		t.Fatalf("baseURL = %q, want trimmed", got)

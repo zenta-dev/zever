@@ -35,23 +35,23 @@ func ValidateBaseURL(prefix, name, value string) error {
 
 	u, err := url.Parse(value)
 	if err != nil {
-		return fmt.Errorf("[%s] option %q must be a valid URL: %w", prefix, name, err)
+		return fmt.Errorf("%s: option %q must be a valid URL: %w", prefix, name, err)
 	}
 
 	if u.Scheme != "http" && u.Scheme != "https" {
-		return fmt.Errorf("[%s] option %q must have http or https scheme, got %q", prefix, name, u.Scheme)
+		return fmt.Errorf("%s: option %q must have http or https scheme, got %q", prefix, name, u.Scheme)
 	}
 
 	if u.Host == "" {
-		return fmt.Errorf("[%s] option %q must have a host", prefix, name)
+		return fmt.Errorf("%s: option %q must have a host", prefix, name)
 	}
 
 	if u.User != nil {
-		return fmt.Errorf("[%s] option %q must not contain user info", prefix, name)
+		return fmt.Errorf("%s: option %q must not contain user info", prefix, name)
 	}
 
 	if strings.Contains(value, " ") || strings.Contains(value, "\n") || strings.Contains(value, "\t") {
-		return fmt.Errorf("[%s] option %q must not contain whitespace", prefix, name)
+		return fmt.Errorf("%s: option %q must not contain whitespace", prefix, name)
 	}
 
 	return nil

@@ -40,7 +40,7 @@ func openTest(t *testing.T, srv *httptest.Server, mutate func(*payment.Options))
 		mutate(&opts)
 	}
 
-	p, err := Open(opts)
+	p, err := New(opts)
 	if err != nil {
 		t.Fatalf("Open: %v", err)
 	}
@@ -73,7 +73,7 @@ func writeJSON(t *testing.T, w http.ResponseWriter, v any) {
 func TestOpenMissingAPIKey(t *testing.T) {
 	t.Parallel()
 
-	if _, err := Open(payment.Options{}); !errors.Is(err, ErrMissingAPIKey) {
+	if _, err := New(payment.Options{}); !errors.Is(err, ErrMissingAPIKey) {
 		t.Fatalf("expected ErrMissingAPIKey, got %v", err)
 	}
 }
@@ -81,7 +81,7 @@ func TestOpenMissingAPIKey(t *testing.T) {
 func TestOpenInvalidOptions(t *testing.T) {
 	t.Parallel()
 
-	_, err := Open(payment.Options{APIKey: "x", MaxWebhookBytes: -1})
+	_, err := New(payment.Options{APIKey: "x", MaxWebhookBytes: -1})
 	if !errors.Is(err, payment.ErrInvalidOptions) {
 		t.Fatalf("expected ErrInvalidOptions, got %v", err)
 	}
@@ -90,7 +90,7 @@ func TestOpenInvalidOptions(t *testing.T) {
 func TestOpenSandboxAndDefault(t *testing.T) {
 	t.Parallel()
 
-	sandbox, err := Open(payment.Options{APIKey: "x", Sandbox: true})
+	sandbox, err := New(payment.Options{APIKey: "x", Sandbox: true})
 	if err != nil {
 		t.Fatalf("sandbox Open: %v", err)
 	}
@@ -99,7 +99,7 @@ func TestOpenSandboxAndDefault(t *testing.T) {
 		t.Fatal("expected non-nil sandbox driver")
 	}
 
-	prod, err := Open(payment.Options{APIKey: "x"})
+	prod, err := New(payment.Options{APIKey: "x"})
 	if err != nil {
 		t.Fatalf("default Open: %v", err)
 	}
@@ -116,7 +116,7 @@ func TestOpenNewSDKError(t *testing.T) {
 	}
 	defer func() { newSDK = old }()
 
-	if _, err := Open(payment.Options{APIKey: "x"}); err == nil || !strings.Contains(err.Error(), "paddle:") {
+	if _, err := New(payment.Options{APIKey: "x"}); err == nil || !strings.Contains(err.Error(), "paddle:") {
 		t.Fatalf("expected wrapped constructor error, got %v", err)
 	}
 }
@@ -210,7 +210,7 @@ func TestCreatePaymentValidation(t *testing.T) {
 		t.Run(tc.name, func(t *testing.T) {
 			t.Parallel()
 
-			p, oerr := Open(payment.Options{APIKey: "x", Endpoint: "http://127.0.0.1:1"})
+			p, oerr := New(payment.Options{APIKey: "x", Endpoint: "http://127.0.0.1:1"})
 			if oerr != nil {
 				t.Fatalf("Open: %v", oerr)
 			}

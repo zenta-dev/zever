@@ -95,7 +95,7 @@ func New(opts lock.Options) (lock.Locker, error) {
 
 	client, err := zredis.New(connOptions(opts))
 	if err != nil {
-		return nil, fmt.Errorf("[lock] connect %q error: %w", redactURL(opts), err)
+		return nil, fmt.Errorf("lock: connect %q: %w", redactURL(opts), err)
 	}
 
 	ctx, cancel := context.WithTimeout(context.Background(), 3*time.Second)
@@ -107,7 +107,7 @@ func New(opts lock.Options) (lock.Locker, error) {
 		// poison the next New with different options.
 		_ = closeShared()
 
-		return nil, fmt.Errorf("[lock] ping %q error: %w", redactURL(opts), err)
+		return nil, fmt.Errorf("lock: ping %q: %w", redactURL(opts), err)
 	}
 
 	return &adapter{
@@ -133,7 +133,7 @@ func newHolderID() (string, error) {
 	var b [16]byte
 
 	if _, err := randRead(b[:]); err != nil {
-		return "", fmt.Errorf("[lock] holder id error: %w", err)
+		return "", fmt.Errorf("lock: holder id: %w", err)
 	}
 
 	return hex.EncodeToString(b[:]), nil
@@ -144,7 +144,7 @@ func newHolderID() (string, error) {
 // ttl selects the adapter default.
 func (a *adapter) TryAcquire(ctx context.Context, key string, ttl time.Duration) (lock.Lock, bool, error) {
 	if key == "" {
-		return nil, false, fmt.Errorf("[lock] TryAcquire %q error: key is empty", key)
+		return nil, false, fmt.Errorf("lock: try acquire %q: key is empty", key)
 	}
 
 	if ttl <= 0 {
@@ -158,7 +158,7 @@ func (a *adapter) TryAcquire(ctx context.Context, key string, ttl time.Duration)
 
 	ok, err := a.client.SetNX(ctx, a.prefix+key, holder, ttl).Result()
 	if err != nil {
-		return nil, false, fmt.Errorf("[lock] TryAcquire %q error: %w", key, err)
+		return nil, false, fmt.Errorf("lock: try acquire %q: %w", key, err)
 	}
 
 	if !ok {
@@ -188,7 +188,7 @@ func (a *adapter) Acquire(ctx context.Context, key string, ttl time.Duration) (l
 
 		select {
 		case <-ctx.Done():
-			return nil, fmt.Errorf("[lock] Acquire %q error: %w", key, ctx.Err())
+			return nil, fmt.Errorf("lock: acquire %q: %w", key, ctx.Err())
 		case <-t.C:
 		}
 	}
@@ -218,11 +218,11 @@ func (h *handle) Extend(ctx context.Context, ttl time.Duration) error {
 
 	n, err := h.client.Eval(ctx, extendScript, []string{h.a.prefix + h.key}, h.holder, ttl.Milliseconds()).Int()
 	if err != nil {
-		return fmt.Errorf("[lock] Extend %q error: %w", h.key, err)
+		return fmt.Errorf("lock: extend %q: %w", h.key, err)
 	}
 
 	if n == 0 {
-		return fmt.Errorf("[lock] Extend %q error: %w", h.key, lock.ErrNotHeld)
+		return fmt.Errorf("lock: extend %q: %w", h.key, lock.ErrNotHeld)
 	}
 
 	return nil
@@ -233,11 +233,11 @@ func (h *handle) Extend(ctx context.Context, ttl time.Duration) error {
 func (h *handle) Unlock(ctx context.Context) error {
 	n, err := h.client.Eval(ctx, releaseScript, []string{h.a.prefix + h.key}, h.holder).Int()
 	if err != nil {
-		return fmt.Errorf("[lock] Unlock %q error: %w", h.key, err)
+		return fmt.Errorf("lock: unlock %q: %w", h.key, err)
 	}
 
 	if n == 0 {
-		return fmt.Errorf("[lock] Unlock %q error: %w", h.key, lock.ErrNotHeld)
+		return fmt.Errorf("lock: unlock %q: %w", h.key, lock.ErrNotHeld)
 	}
 
 	return nil

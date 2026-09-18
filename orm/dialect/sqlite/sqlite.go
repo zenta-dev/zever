@@ -1,6 +1,8 @@
 // Package sqlite implements dialect.Dialect for SQLite.
 package sqlite
 
+import "strings"
+
 // Dialect renders a single "?" placeholder for every argument and
 // double-quoted identifiers, matching SQLite's syntax. It also records the
 // SQLite library version it was constructed for (see version.go) so
@@ -37,8 +39,11 @@ func (Dialect) Name() string { return "sqlite" }
 // same "?" token regardless of position.
 func (Dialect) Placeholder(int) string { return "?" }
 
-// QuoteIdent double-quotes an identifier for SQLite.
-func (Dialect) QuoteIdent(s string) string { return `"` + s + `"` }
+// QuoteIdent double-quotes an identifier for SQLite, doubling any embedded
+// double-quote characters per standard SQL identifier-quoting rules.
+func (Dialect) QuoteIdent(s string) string {
+	return `"` + strings.ReplaceAll(s, `"`, `""`) + `"`
+}
 
 // SupportsCTE reports that SQLite supports common table expressions.
 func (Dialect) SupportsCTE() bool { return true }
