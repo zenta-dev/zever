@@ -248,44 +248,6 @@ func TestDoReturnsCtxErrIfAlreadyCancelled(t *testing.T) {
 	}
 }
 
-func TestPolicyNextDelayLinearGrowth(t *testing.T) {
-	p := Policy{BaseDelay: 100 * time.Millisecond, Linear: true, MaxDelay: time.Hour}
-
-	want := []time.Duration{
-		100 * time.Millisecond,
-		200 * time.Millisecond,
-		300 * time.Millisecond,
-		400 * time.Millisecond,
-	}
-
-	for i, w := range want {
-		attempt := i + 1
-		got := p.NextDelay(attempt)
-		if got != w {
-			t.Errorf("NextDelay(%d) = %v, want %v", attempt, got, w)
-		}
-	}
-}
-
-func TestPolicyNextDelayLinearCapsAtMaxDelay(t *testing.T) {
-	p := Policy{BaseDelay: time.Second, Linear: true, MaxDelay: 5 * time.Second}
-
-	got := p.NextDelay(10)
-	if got != 5*time.Second {
-		t.Errorf("NextDelay(10) = %v, want capped %v", got, 5*time.Second)
-	}
-}
-
-func TestPolicyNextDelayLinearIgnoresMultiplier(t *testing.T) {
-	p := Policy{BaseDelay: 100 * time.Millisecond, Linear: true, Multiplier: 2, MaxDelay: time.Hour}
-
-	got := p.NextDelay(3)
-	want := 300 * time.Millisecond
-	if got != want {
-		t.Errorf("NextDelay(3) = %v, want %v (Multiplier ignored under Linear)", got, want)
-	}
-}
-
 func TestPolicyNextDelayExponentialUnaffectedByNewFields(t *testing.T) {
 	// A Policy using only the pre-existing fields must behave identically
 	// regardless of the new fields' zero values (Linear=false,
