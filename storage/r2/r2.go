@@ -6,6 +6,7 @@ import (
 	"net/url"
 	"strings"
 
+	"github.com/zenta-dev/zever/internal/s3opts"
 	"github.com/zenta-dev/zever/storage"
 	"github.com/zenta-dev/zever/storage/s3core"
 )
@@ -49,6 +50,15 @@ func New(opts storage.Options) (storage.Storage, error) {
 		return nil, err
 	}
 
+	cfg := s3opts.Config{
+		Endpoint:        endpoint,
+		Region:          region,
+		AccessKeyID:     accessKey,
+		SecretAccessKey: secretKey,
+	}.WithDefaults(defaultRegion)
+
+	region = cfg.Region
+
 	urlBase := opts.URLBase
 	pubBase := opts.PublicURL
 
@@ -72,7 +82,7 @@ func New(opts storage.Options) (storage.Storage, error) {
 		}
 	}
 
-	client, presigner, err := s3core.NewClient(context.Background(), prefix, region, endpoint, urlBase, accessKey, secretKey)
+	client, presigner, err := s3opts.NewClient(context.Background(), prefix, cfg, urlBase)
 	if err != nil {
 		return nil, err
 	}

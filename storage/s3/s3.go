@@ -4,6 +4,7 @@ import (
 	"context"
 	"fmt"
 
+	"github.com/zenta-dev/zever/internal/s3opts"
 	"github.com/zenta-dev/zever/storage"
 	"github.com/zenta-dev/zever/storage/s3core"
 )
@@ -15,7 +16,7 @@ type s3Adapter struct {
 }
 
 // New validates opts, defaults empty region to us-east-1, requires url_base when endpoint is set, resolves policy_sync (manual or auto, default manual) and sync_fail (warn or require, default warn), and checks policy coherence.
-// New builds the client via s3core.NewClient and returns the storage.Storage adapter.
+// New builds the client via s3opts.NewClient (shared helper over s3core) and returns the storage.Storage adapter.
 // New returns an error for invalid options, incoherent policy, or client creation failure.
 func New(opts storage.Options) (storage.Storage, error) {
 	const prefix = "s3"
@@ -24,14 +25,15 @@ func New(opts storage.Options) (storage.Storage, error) {
 		return nil, fmt.Errorf("s3: %w", err)
 	}
 
-	region := opts.Region
-	if region == "" {
-		region = "us-east-1"
-	}
+	cfg := s3opts.Config{
+		Endpoint:        opts.Endpoint,
+		Region:          opts.Region,
+		AccessKeyID:     opts.AccessKeyID,
+		SecretAccessKey: opts.SecretAccessKey,
+	}.WithDefaults(s3opts.DefaultRegion)
 
-	endpoint := opts.Endpoint
-	accessKey := opts.AccessKeyID
-	secretKey := opts.SecretAccessKey
+	region := cfg.Region
+	endpoint := cfg.Endpoint
 	urlBase := opts.URLBase
 
 	if endpoint != "" && urlBase == "" {
@@ -70,7 +72,7 @@ func New(opts storage.Options) (storage.Storage, error) {
 		}
 	}
 
-	client, presigner, err := s3core.NewClient(context.Background(), prefix, region, endpoint, urlBase, accessKey, secretKey)
+	client, presigner, err := s3opts.NewClient(context.Background(), prefix, cfg, urlBase)
 	if err != nil {
 		return nil, fmt.Errorf("s3: %w", err)
 	}
