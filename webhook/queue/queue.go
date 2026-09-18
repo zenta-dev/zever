@@ -9,13 +9,13 @@ import (
 	"errors"
 	"fmt"
 	"io"
-	"math/rand"
 	"net/http"
 	"strconv"
 	"strings"
 	"sync"
 	"time"
 
+	"github.com/zenta-dev/zever/internal/retry"
 	"github.com/zenta-dev/zever/log"
 	"github.com/zenta-dev/zever/log/noop"
 	"github.com/zenta-dev/zever/queue"
@@ -34,6 +34,24 @@ const (
 	// or negative there falls back to this default.
 	defaultReplayTolerance = 5 * time.Minute
 )
+
+// retryPolicy computes the delay before redelivering a failed webhook:
+// exponential backoff from 500ms, capped at 72h, jittered +/-25%.
+var retryPolicy = retry.Policy{
+	BaseDelay:  500 * time.Millisecond,
+	Multiplier: 2,
+	MaxDelay:   72 * time.Hour,
+	Jitter:     0.25,
+	JitterMode: retry.JitterSymmetric,
+}
+
+// dlqRetryPolicy computes the delay before retrying a dead-lettered
+// delivery: a flat minimum plus up to dlqRetryJitter of additive jitter.
+var dlqRetryPolicy = retry.Policy{
+	BaseDelay:  dlqRetryMinDuration,
+	JitterMode: retry.JitterFlat,
+	JitterMax:  dlqRetryJitter,
+}
 
 type registration struct {
 	target string
@@ -56,8 +74,6 @@ type adapter struct {
 	consumers       map[string]*consumer
 	closed          bool
 	client          *http.Client
-	jitter          *rand.Rand
-	jitterMu        sync.Mutex
 	allowPrivate    bool
 	logger          log.Logger
 	replayTolerance time.Duration
@@ -419,46 +435,23 @@ func (a *adapter) handleDeliveryError(event string, msg queue.Message, attempt i
 }
 
 func (a *adapter) retryDelay(attempt int) time.Duration {
-	const (
-		base     = 500 * time.Millisecond
-		maxDelay = 72 * time.Hour
-	)
-
-	if attempt <= 0 {
-		attempt = 1
+	// NextDelay's symmetric jitter can dip below BaseDelay (e.g. attempt 1
+	// jittered down by up to 25%); re-floor so the delay never drops below
+	// the configured base, matching the original unjittered floor.
+	d := retryPolicy.NextDelay(attempt)
+	if d < retryPolicy.BaseDelay {
+		d = retryPolicy.BaseDelay
 	}
 
-	shift := attempt - 1
-	if shift > 20 {
-		shift = 20
+	if d > retryPolicy.MaxDelay {
+		d = retryPolicy.MaxDelay
 	}
 
-	d := base * time.Duration(1<<uint(shift))
-	if d > maxDelay || d <= 0 {
-		d = maxDelay
-	}
-
-	a.jitterMu.Lock()
-	n := a.jitter.Int63n(int64(d/2) + 1)
-	a.jitterMu.Unlock()
-
-	jittered := d - d/4 + time.Duration(n)
-	if jittered > maxDelay {
-		jittered = maxDelay
-	}
-
-	if jittered < base {
-		jittered = base
-	}
-
-	return jittered
+	return d
 }
 
 func (a *adapter) dlqRetryDelay() time.Duration {
-	a.jitterMu.Lock()
-	defer a.jitterMu.Unlock()
-
-	return dlqRetryMinDuration + time.Duration(a.jitter.Int63n(int64(dlqRetryJitter)+1))
+	return dlqRetryPolicy.NextDelay(1)
 }
 
 func (a *adapter) cloneHeaders(src map[string]string) map[string]string {
@@ -761,13 +754,6 @@ func verifySignatureHeader(secret string, payload []byte, header string, toleran
 	return nil
 }
 
-// newJitter returns a dedicated random source for retry backoff jitter.
-// A dedicated source keeps webhook retries from perturbing the shared generator.
-func newJitter() *rand.Rand {
-	//nolint:gosec // G404: math/rand suffices for retry jitter, which is not security-sensitive.
-	return rand.New(rand.NewSource(time.Now().UnixNano()))
-}
-
 func newSafeClient(timeout time.Duration, allowPrivate bool) *http.Client {
 	return webhook.NewSafeClient(timeout, allowPrivate)
 }
@@ -838,7 +824,6 @@ func New(o webhook.Options) (webhook.Webhook, error) {
 		dlqTopic:        dlqTopic,
 		consumers:       make(map[string]*consumer),
 		client:          newSafeClient(timeout, o.AllowPrivateTargets),
-		jitter:          newJitter(),
 		allowPrivate:    o.AllowPrivateTargets,
 		logger:          o.Logger,
 		replayTolerance: replayTolerance,
