@@ -20,7 +20,12 @@ type Policy struct {
 	// Multiplier scales BaseDelay per attempt: delay = BaseDelay *
 	// Multiplier^(attempt-1). Values <= 1 disable growth (delay stays at
 	// BaseDelay every attempt, still capped by MaxDelay and still jittered).
+	// Ignored when Linear is true.
 	Multiplier float64
+	// Linear switches the growth model from exponential (Multiplier) to
+	// linear: delay = BaseDelay * attempt. Multiplier is ignored when this
+	// is true.
+	Linear bool
 	// Jitter is the +/- fraction of the computed delay to randomize, e.g. 0.2
 	// means the returned delay is within [delay*0.8, delay*1.2]. Zero
 	// disables jitter. Values are clamped to [0, 1].
@@ -52,28 +57,40 @@ func (p Policy) NextDelay(attempt int) time.Duration {
 		base = 0
 	}
 
-	mult := p.Multiplier
-	if mult <= 1 {
-		mult = 1
-	}
-
 	delay := base
-	if mult > 1 && base > 0 {
-		// Cap the exponent so the multiplication below cannot overflow
-		// time.Duration (int64 nanoseconds); anything past this shift is
-		// already far beyond any realistic MaxDelay.
-		const maxShift = 62
 
-		shift := attempt - 1
-		if shift > maxShift {
-			shift = maxShift
+	if p.Linear {
+		if base > 0 {
+			scaled := float64(base) * float64(attempt)
+			if scaled > float64(maxDuration) {
+				delay = maxDuration
+			} else {
+				delay = time.Duration(scaled)
+			}
+		}
+	} else {
+		mult := p.Multiplier
+		if mult <= 1 {
+			mult = 1
 		}
 
-		scaled := float64(base) * pow(mult, shift)
-		if scaled > float64(maxDuration) {
-			delay = maxDuration
-		} else {
-			delay = time.Duration(scaled)
+		if mult > 1 && base > 0 {
+			// Cap the exponent so the multiplication below cannot overflow
+			// time.Duration (int64 nanoseconds); anything past this shift is
+			// already far beyond any realistic MaxDelay.
+			const maxShift = 62
+
+			shift := attempt - 1
+			if shift > maxShift {
+				shift = maxShift
+			}
+
+			scaled := float64(base) * pow(mult, shift)
+			if scaled > float64(maxDuration) {
+				delay = maxDuration
+			} else {
+				delay = time.Duration(scaled)
+			}
 		}
 	}
 
