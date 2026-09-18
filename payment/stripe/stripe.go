@@ -5,10 +5,10 @@ import (
 	"fmt"
 	"net/http"
 	"strings"
-	"time"
 
 	"github.com/stripe/stripe-go/v82"
 
+	"github.com/zenta-dev/zever/internal/httpclient"
 	"github.com/zenta-dev/zever/payment"
 )
 
@@ -24,8 +24,8 @@ type driver struct {
 	maxWebhookBytes int
 }
 
-// Open validates o then returns a Stripe backend matching Factory.
-func Open(o payment.Options) (payment.Payment, error) {
+// New validates o then returns a Stripe backend matching Factory.
+func New(o payment.Options) (payment.Payment, error) {
 	if err := o.Validate(); err != nil {
 		return nil, fmt.Errorf("stripe: %w", err)
 	}
@@ -38,7 +38,7 @@ func Open(o payment.Options) (payment.Payment, error) {
 		return nil, ErrMissingWebhookSecret
 	}
 
-	httpClient := &http.Client{Timeout: time.Duration(payment.DefaultHTTPTimeout) * time.Second}
+	httpClient := httpclient.NewClient(payment.DefaultHTTPTimeout)
 
 	cfg := &stripe.BackendConfig{HTTPClient: httpClient}
 	if o.Endpoint != "" {

@@ -27,8 +27,8 @@ type driver struct {
 	closeOnce   sync.Once
 }
 
-// Open creates a local document renderer from the given Options.
-func Open(o document.Options) (document.Document, error) {
+// New creates a local document renderer from the given Options.
+func New(o document.Options) (document.Document, error) {
 	if err := o.Validate(); err != nil {
 		return nil, fmt.Errorf("local: %w", err)
 	}

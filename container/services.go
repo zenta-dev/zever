@@ -50,6 +50,9 @@ import (
 	idempotencymemory "github.com/zenta-dev/zever/idempotency/memory"
 	idempotencyredis "github.com/zenta-dev/zever/idempotency/redis"
 	"github.com/zenta-dev/zever/job"
+	"github.com/zenta-dev/zever/lock"
+	lockmemory "github.com/zenta-dev/zever/lock/memory"
+	lockredis "github.com/zenta-dev/zever/lock/redis"
 	"github.com/zenta-dev/zever/log"
 	lognoop "github.com/zenta-dev/zever/log/noop"
 	"github.com/zenta-dev/zever/log/slog"
@@ -93,6 +96,8 @@ import (
 	searchmeilisearch "github.com/zenta-dev/zever/search/meilisearch"
 	searchpostgres "github.com/zenta-dev/zever/search/postgres"
 	searchsqlite "github.com/zenta-dev/zever/search/sqlite"
+	"github.com/zenta-dev/zever/secrets"
+	secretsenv "github.com/zenta-dev/zever/secrets/env"
 	"github.com/zenta-dev/zever/session"
 	sessionmemory "github.com/zenta-dev/zever/session/memory"
 	sessionredis "github.com/zenta-dev/zever/session/redis"
@@ -130,20 +135,20 @@ func ensureAdapters() {
 }
 
 func registerAdapters() {
-	_ = ai.Register(ai.Anthropic, anthropic.Open)
-	_ = ai.Register(ai.OpenAI, openai.Open)
-	_ = ai.Register(ai.Gemini, gemini.Open)
+	_ = ai.Register(ai.Anthropic, anthropic.New)
+	_ = ai.Register(ai.OpenAI, openai.New)
+	_ = ai.Register(ai.Gemini, gemini.New)
 
-	_ = analytics.Register(analytics.Log, analyticslog.Open)
-	_ = analytics.Register(analytics.PostHog, posthog.Open)
+	_ = analytics.Register(analytics.Log, analyticslog.New)
+	_ = analytics.Register(analytics.PostHog, posthog.New)
 
 	_ = auth.Register(auth.JWT, jwt.New)
 	_ = auth.Register(auth.Session, authsession.New)
 	_ = auth.Register(auth.OIDC, oidc.New)
 
 	_ = billing.Register(billing.Stub, billingstub.Open)
-	_ = billing.Register(billing.Stripe, billingstripe.Open)
-	_ = billing.Register(billing.Paddle, billingpaddle.Open)
+	_ = billing.Register(billing.Stripe, billingstripe.New)
+	_ = billing.Register(billing.Paddle, billingpaddle.New)
 
 	_ = cache.Register(cache.Memory, cachememory.New)
 	_ = cache.Register(cache.Redis, cacheredis.New)
@@ -153,9 +158,9 @@ func registerAdapters() {
 	_ = db.Register(db.SQLite, dbsqlite.New)
 	_ = db.Register(db.Postgres, dbpostgres.New)
 
-	_ = document.Register(document.Local, documentlocal.Open)
-	_ = document.Register(document.Remote, documentremote.Open)
-	_ = document.Register(document.Latex, documentlatex.Open)
+	_ = document.Register(document.Local, documentlocal.New)
+	_ = document.Register(document.Remote, documentremote.New)
+	_ = document.Register(document.Latex, documentlatex.New)
 
 	_ = eventbus.Register(eventbus.Memory, eventbusmemory.New)
 	_ = eventbus.Register(eventbus.Redis, eventbusredis.New)
@@ -173,6 +178,9 @@ func registerAdapters() {
 	_ = idempotency.Register(idempotency.Memory, idempotencymemory.New)
 	_ = idempotency.Register(idempotency.Redis, idempotencyredis.New)
 
+	_ = lock.Register(lock.Memory, lockmemory.New)
+	_ = lock.Register(lock.Redis, lockredis.New)
+
 	_ = log.Register(log.Noop, func(log.Options) (log.Logger, error) { return lognoop.New(), nil })
 	_ = log.Register(log.ZeroLog, func(o log.Options) (log.Logger, error) { return zerolog.New(o), nil })
 	_ = log.Register(log.Slog, func(o log.Options) (log.Logger, error) { return slog.New(o), nil })
@@ -180,8 +188,8 @@ func registerAdapters() {
 	_ = mailer.Register(mailer.Log, mailerlog.New)
 	_ = mailer.Register(mailer.SMTP, smtp.New)
 
-	_ = media.Register(media.Local, medialocal.Open)
-	_ = media.Register(media.S3, medias3.Open)
+	_ = media.Register(media.Local, medialocal.New)
+	_ = media.Register(media.S3, medias3.New)
 
 	_ = notification.Register(notification.Log, notificationlog.New)
 	_ = notification.Register(notification.Twilio, notificationtwilio.New)
@@ -195,9 +203,9 @@ func registerAdapters() {
 
 	_ = password.Register(password.AdapterArgon2ID, argon2.New)
 
-	_ = payment.Register(payment.Stub, paymentstub.Open)
-	_ = payment.Register(payment.Stripe, paymentstripe.Open)
-	_ = payment.Register(payment.Paddle, paymentpaddle.Open)
+	_ = payment.Register(payment.Stub, paymentstub.New)
+	_ = payment.Register(payment.Stripe, paymentstripe.New)
+	_ = payment.Register(payment.Paddle, paymentpaddle.New)
 
 	_ = permission.Register(permission.Noop, permissionnoop.New)
 	_ = permission.Register(permission.RBAC, permissionrbac.New)
@@ -214,9 +222,13 @@ func registerAdapters() {
 
 	_ = scheduler.Register(scheduler.Embedded, schedulerembedded.New)
 
-	_ = search.Register(search.Postgres, searchpostgres.Open)
-	_ = search.Register(search.Meilisearch, searchmeilisearch.Open)
-	_ = search.Register(search.SQLite, searchsqlite.Open)
+	_ = search.Register(search.Postgres, searchpostgres.New)
+	_ = search.Register(search.Meilisearch, searchmeilisearch.New)
+	_ = search.Register(search.SQLite, searchsqlite.New)
+
+	_ = secrets.Register(secrets.Env, func(o secrets.Options) (secrets.Secrets, error) {
+		return secretsenv.New(secretsenv.Options{Prefix: o.Prefix})
+	})
 
 	_ = session.Register(session.Memory, sessionmemory.New)
 	_ = session.Register(session.Redis, sessionredis.New)
@@ -225,16 +237,16 @@ func registerAdapters() {
 	_ = storage.Register(storage.AdapterS3, storages3.New)
 	_ = storage.Register(storage.AdapterR2, storager2.New)
 
-	_ = tenant.Register(tenant.Single, tenantsingle.Open)
-	_ = tenant.Register(tenant.Header, tenantheader.Open)
+	_ = tenant.Register(tenant.Single, tenantsingle.New)
+	_ = tenant.Register(tenant.Header, tenantheader.New)
 
-	_ = vectorstore.Register(vectorstore.SQLite, vectorstoresqlite.Open)
-	_ = vectorstore.Register(vectorstore.PGVector, vectorstorepgvector.Open)
-	_ = vectorstore.Register(vectorstore.Qdrant, vectorstoreqdrant.Open)
+	_ = vectorstore.Register(vectorstore.SQLite, vectorstoresqlite.New)
+	_ = vectorstore.Register(vectorstore.PGVector, vectorstorepgvector.New)
+	_ = vectorstore.Register(vectorstore.Qdrant, vectorstoreqdrant.New)
 
-	_ = webhook.Register(webhook.AdapterHTTP, webhookhttp.Open)
-	_ = webhook.Register(webhook.AdapterQueue, webhookqueue.Open)
-	_ = webhook.Register(webhook.AdapterSQLite, webhooksqlite.Open)
+	_ = webhook.Register(webhook.AdapterHTTP, webhookhttp.New)
+	_ = webhook.Register(webhook.AdapterQueue, webhookqueue.New)
+	_ = webhook.Register(webhook.AdapterSQLite, webhooksqlite.New)
 
 	_ = workflow.Register(workflow.Memory, workflowmemory.New)
 }
@@ -396,6 +408,13 @@ func (c *Container) Job() (*job.Dispatcher, error) {
 	})
 }
 
+// Lock resolves and returns the lock service instance.
+func (c *Container) Lock() (lock.Locker, error) {
+	return c.lock.get(func() (lock.Locker, error) {
+		return openService("lock", c.cfg.Lock.Adapter, lock.ParseAdapter, lock.Open, c.cfg.Lock.Options)
+	})
+}
+
 // Log resolves and returns the log service instance.
 func (c *Container) Log() (log.Logger, error) {
 	return c.log.get(func() (log.Logger, error) {
@@ -497,6 +516,13 @@ func (c *Container) Scheduler() (scheduler.Scheduler, error) {
 func (c *Container) Search() (search.Search, error) {
 	return c.search.get(func() (search.Search, error) {
 		return openService("search", c.cfg.Search.Adapter, search.ParseAdapter, search.Open, c.cfg.Search.Options)
+	})
+}
+
+// Secrets resolves and returns the secrets service instance.
+func (c *Container) Secrets() (secrets.Secrets, error) {
+	return c.secrets.get(func() (secrets.Secrets, error) {
+		return openService("secrets", c.cfg.Secrets.Adapter, secrets.ParseAdapter, secrets.Open, c.cfg.Secrets.Options)
 	})
 }
 

@@ -39,6 +39,7 @@ cached state clears so the next call retries.
 | i18n | `I18n()` | |
 | idempotency | `Idempotency()` | |
 | job | `Job()` | `*job.Dispatcher` over resolved `Queue` |
+| lock | `Lock()` | |
 | log | `Log()` | |
 | mailer | `Mailer()` | |
 | media | `Media()` | |
@@ -52,6 +53,7 @@ cached state clears so the next call retries.
 | router | `Router()` | |
 | scheduler | `Scheduler()` | shares `Cache`/`Queue`, closed first |
 | search | `Search()` | |
+| secrets | `Secrets()` | |
 | session | `Session()` | |
 | storage | `Storage()` | |
 | tenant | `Tenant()` | |

@@ -8,14 +8,16 @@ import (
 	"net/url"
 
 	"github.com/zenta-dev/zever/internal/endpoint"
+	"github.com/zenta-dev/zever/internal/httpclient"
 )
 
 // ValidateTarget validates target as an HTTPS webhook URL whose host does not
 // resolve to a private address.
 //
 // Callers must re-validate the resolved address at dial time (see
-// SafeDialContext): DNS records can change between validation and delivery, so
-// a target that is public now may resolve to a private address later.
+// httpclient.SafeDialContext, wired in via NewSafeClient): DNS records can
+// change between validation and delivery, so a target that is public now may
+// resolve to a private address later.
 // This is the classic DNS-rebinding gap; validation narrows but never closes it.
 func ValidateTarget(target string) error {
 	return ValidateTargetContext(context.Background(), target)
@@ -51,7 +53,7 @@ func ValidateTargetContext(ctx context.Context, target string) error {
 		}
 	}
 	for _, ip := range ips {
-		if isPrivateIP(ip) {
+		if httpclient.IsPrivateIP(ip) {
 			return errors.New("webhook: target resolves to private address")
 		}
 	}
@@ -104,30 +106,5 @@ func mapShapeError(target string, err error) error {
 // 192.168.0.0/16, 169.254.0.0/16 and fe80::/10 (link-local), ::/0 and 0.0.0.0
 // (unspecified), and fc00::/7 (IPv6 unique local). Nil returns false.
 func IsPrivateIP(ip net.IP) bool {
-	return isPrivateIP(ip)
-}
-
-// isPrivateIP implements IsPrivateIP.
-func isPrivateIP(ip net.IP) bool {
-	if ip == nil {
-		return false
-	}
-	if ip.IsLoopback() || ip.IsUnspecified() || ip.IsLinkLocalUnicast() || ip.IsLinkLocalMulticast() {
-		return true
-	}
-	if ip4 := ip.To4(); ip4 != nil {
-		switch {
-		case ip4[0] == 10:
-			return true
-		case ip4[0] == 172 && ip4[1] >= 16 && ip4[1] <= 31:
-			return true
-		case ip4[0] == 192 && ip4[1] == 168:
-			return true
-		}
-		return false
-	}
-	if len(ip) == net.IPv6len && ip[0]&0xfe == 0xfc {
-		return true
-	}
-	return false
+	return httpclient.IsPrivateIP(ip)
 }

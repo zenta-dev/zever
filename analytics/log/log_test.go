@@ -68,7 +68,7 @@ func decodeEntry(t *testing.T, buf *bytes.Buffer) map[string]any {
 func TestOpen_zeroOptions_succeeds(t *testing.T) {
 	t.Parallel()
 
-	a, err := Open(analytics.Options{})
+	a, err := New(analytics.Options{})
 	if err != nil {
 		t.Fatalf("open: %v", err)
 	}
@@ -90,7 +90,7 @@ func TestOpen_invalidOptions_returnsInvalidOptions(t *testing.T) {
 		t.Run(name, func(t *testing.T) {
 			t.Parallel()
 
-			_, err := Open(opts)
+			_, err := New(opts)
 			if err == nil {
 				t.Fatal("expected error, got nil")
 			}

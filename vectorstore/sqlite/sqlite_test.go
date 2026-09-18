@@ -21,9 +21,14 @@ import (
 func newMemoryStore(t *testing.T) *Store {
 	t.Helper()
 
-	s, err := New(":memory:")
+	vs, err := New(vectorstore.Options{DSN: ":memory:"})
 	if err != nil {
 		t.Fatal(err)
+	}
+
+	s, ok := vs.(*Store)
+	if !ok {
+		t.Fatalf("New() returned %T, want *Store", vs)
 	}
 
 	t.Cleanup(func() { _ = s.Close() })
@@ -94,7 +99,7 @@ func TestSQLiteFileBacked(t *testing.T) {
 	path := filepath.Join(t.TempDir(), "vec.db")
 	ctx := context.Background()
 
-	s, err := New(path)
+	s, err := New(vectorstore.Options{DSN: path})
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -108,7 +113,7 @@ func TestSQLiteFileBacked(t *testing.T) {
 		t.Fatal(closeErr)
 	}
 
-	s2, err := New(path)
+	s2, err := New(vectorstore.Options{DSN: path})
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -604,10 +609,10 @@ func TestSQLiteConcurrent(t *testing.T) {
 	}
 }
 
-func TestOpenDefaults(t *testing.T) {
+func TestNewDefaults(t *testing.T) {
 	t.Parallel()
 
-	vs, err := Open(vectorstore.Options{})
+	vs, err := New(vectorstore.Options{})
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -630,10 +635,10 @@ func TestOpenDefaults(t *testing.T) {
 	}
 }
 
-func TestOpenInvalidOptions(t *testing.T) {
+func TestNewInvalidOptions(t *testing.T) {
 	t.Parallel()
 
-	vs, err := Open(vectorstore.Options{Dimension: -1})
+	vs, err := New(vectorstore.Options{Dimension: -1})
 	if err == nil {
 		t.Fatal("expected invalid options error, got nil")
 	}
@@ -647,10 +652,10 @@ func TestOpenInvalidOptions(t *testing.T) {
 	}
 }
 
-func TestOpenBadDirDSN(t *testing.T) {
+func TestNewBadDirDSN(t *testing.T) {
 	t.Parallel()
 
-	vs, err := Open(vectorstore.Options{DSN: filepath.Join(t.TempDir(), "no-such-dir", "vec.db")})
+	vs, err := New(vectorstore.Options{DSN: filepath.Join(t.TempDir(), "no-such-dir", "vec.db")})
 	if err == nil {
 		t.Fatal("expected error for bad-dir DSN, got nil")
 	}
@@ -660,11 +665,11 @@ func TestOpenBadDirDSN(t *testing.T) {
 	}
 }
 
-func TestOpenBadDSNControlChars(t *testing.T) {
+func TestNewBadDSNControlChars(t *testing.T) {
 	t.Parallel()
 
 	for _, dsn := range []string{"a\x00b", "a\nb", "a\rb", "a;b"} {
-		vs, err := Open(vectorstore.Options{DSN: dsn})
+		vs, err := New(vectorstore.Options{DSN: dsn})
 		if err == nil {
 			t.Fatalf("expected error for DSN %q, got nil", dsn)
 		}
@@ -698,7 +703,7 @@ func TestSQLiteDeleteExecError(t *testing.T) {
 func TestSQLiteClose(t *testing.T) {
 	t.Parallel()
 
-	s, err := New(":memory:")
+	s, err := New(vectorstore.Options{DSN: ":memory:"})
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -951,7 +956,7 @@ func TestSQLiteScanRowsCancelledContext(t *testing.T) {
 func TestNewInvalidDSN(t *testing.T) {
 	t.Parallel()
 
-	s, err := New("bad;dsn")
+	s, err := New(vectorstore.Options{DSN: "bad;dsn"})
 	if err == nil {
 		t.Fatal("expected error for invalid DSN")
 	}
@@ -1114,5 +1119,86 @@ func TestDecodeRow_ScanTypeMismatch(t *testing.T) {
 
 	if _, err := s.Query(ctx, []float32{1}, 1); err == nil {
 		t.Fatal("expected scan error for integer embedding")
+	}
+}
+
+func TestUpsertBatch_MatchesLoopedUpsert(t *testing.T) {
+	t.Parallel()
+
+	vecs := []vectorstore.Vector{
+		{ID: "v1", Embedding: []float32{1, 0, 0}, Metadata: map[string]any{"name": "alpha"}},
+		{ID: "v2", Embedding: []float32{0, 1, 0}, Metadata: map[string]any{"name": "beta"}},
+		{ID: "v3", Embedding: []float32{0, 0, 1}, Metadata: map[string]any{"name": "gamma"}},
+	}
+
+	loopStore := newMemoryStore(t)
+	ctx := context.Background()
+
+	for _, v := range vecs {
+		if err := loopStore.Upsert(ctx, v); err != nil {
+			t.Fatalf("loop upsert: %v", err)
+		}
+	}
+
+	batchStore := newMemoryStore(t)
+
+	if err := batchStore.UpsertBatch(ctx, vecs); err != nil {
+		t.Fatalf("upsert batch: %v", err)
+	}
+
+	loopResults, err := loopStore.Query(ctx, []float32{1, 0, 0}, 3)
+	if err != nil {
+		t.Fatalf("loop query: %v", err)
+	}
+
+	batchResults, err := batchStore.Query(ctx, []float32{1, 0, 0}, 3)
+	if err != nil {
+		t.Fatalf("batch query: %v", err)
+	}
+
+	if len(loopResults) != len(batchResults) {
+		t.Fatalf("result count mismatch: loop=%d batch=%d", len(loopResults), len(batchResults))
+	}
+
+	for i := range loopResults {
+		if loopResults[i].ID != batchResults[i].ID {
+			t.Fatalf("id mismatch at %d: loop=%s batch=%s", i, loopResults[i].ID, batchResults[i].ID)
+		}
+
+		if loopResults[i].Score != batchResults[i].Score {
+			t.Fatalf("score mismatch at %d: loop=%f batch=%f", i, loopResults[i].Score, batchResults[i].Score)
+		}
+
+		if loopResults[i].Metadata["name"] != batchResults[i].Metadata["name"] {
+			t.Fatalf("metadata mismatch at %d", i)
+		}
+	}
+}
+
+func TestUpsertBatch_EmptyEmbeddingRollsBack(t *testing.T) {
+	t.Parallel()
+
+	s := newMemoryStore(t)
+	ctx := context.Background()
+
+	err := s.UpsertBatch(ctx, []vectorstore.Vector{
+		{ID: "v1", Embedding: []float32{1, 0, 0}},
+		{ID: "v2", Embedding: nil},
+	})
+	if err == nil {
+		t.Fatal("expected error for empty embedding")
+	}
+
+	if !errors.Is(err, vectorstore.ErrEmptyEmbedding) {
+		t.Fatalf("expected ErrEmptyEmbedding, got %v", err)
+	}
+
+	results, err := s.Query(ctx, []float32{1, 0, 0}, 10)
+	if err != nil {
+		t.Fatalf("query: %v", err)
+	}
+
+	if len(results) != 0 {
+		t.Fatalf("expected rollback to leave no rows, got %d", len(results))
 	}
 }

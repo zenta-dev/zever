@@ -54,17 +54,17 @@ var newPool = func(ctx context.Context, dsn string) (dbpool, error) {
 	return pgxpool.NewWithConfig(ctx, cfg)
 }
 
-// Open creates a postgres-backed search.Search.
+// New creates a postgres-backed search.Search.
 // An empty DSN returns a dev no-op instance (nil pool) so container
 // construction succeeds in dev; every operation on it reports ErrNotConfigured.
 // Otherwise a single 5s budget covers connect plus DDL.
 //
-// Pool guidance: search opens its own pool per Open call. When search,
+// Pool guidance: search opens its own pool per New call. When search,
 // vectorstore, and db share one Postgres DSN, keep the sum of per-adapter
-// MaxConns below the server's max_connections. Open uses DefaultMaxConns;
+// MaxConns below the server's max_connections. New uses DefaultMaxConns;
 // for a custom cap, build a config with PoolConfig and open the pool beside
 // this adapter without changing this signature.
-func Open(o search.Options) (search.Search, error) {
+func New(o search.Options) (search.Search, error) {
 	if err := o.Validate(); err != nil {
 		return nil, fmt.Errorf("postgres: %w", err)
 	}
@@ -122,6 +122,53 @@ func (p *postgres) Index(ctx context.Context, doc search.Document) error {
 		doc.ID, doc.Index, doc.Content, metaJSON, doc.Content, metaJSON)
 	if err != nil {
 		return fmt.Errorf("postgres: index: %w", err)
+	}
+
+	return nil
+}
+
+// IndexBatch adds or replaces all of docs in a single multi-row INSERT
+// statement, one round trip regardless of len(docs). An empty docs is a no-op.
+func (p *postgres) IndexBatch(ctx context.Context, docs []search.Document) error {
+	if p.db == nil {
+		return ErrNotConfigured
+	}
+
+	if len(docs) == 0 {
+		return nil
+	}
+
+	const cols = 4
+
+	placeholders := make([]string, 0, len(docs))
+	args := make([]any, 0, len(docs)*cols)
+
+	for i, doc := range docs {
+		meta := make(map[string]any, len(doc.Metadata)+1)
+		for k, v := range doc.Metadata {
+			meta[k] = v
+		}
+
+		meta["content"] = doc.Content
+
+		metaJSON, err := metadataCodec.Encode(meta)
+		if err != nil {
+			return fmt.Errorf("postgres: index batch: %w", err)
+		}
+
+		base := i * cols
+		placeholders = append(placeholders, fmt.Sprintf("($%d, $%d, $%d, $%d)", base+1, base+2, base+3, base+4))
+		args = append(args, doc.ID, doc.Index, doc.Content, metaJSON)
+	}
+
+	query := fmt.Sprintf(
+		`INSERT INTO search_documents (id, idx, content, metadata) VALUES %s
+		 ON CONFLICT (id, idx) DO UPDATE SET content = EXCLUDED.content, metadata = EXCLUDED.metadata`,
+		strings.Join(placeholders, ", "),
+	)
+
+	if _, err := p.db.Exec(ctx, query, args...); err != nil {
+		return fmt.Errorf("postgres: index batch: %w", err)
 	}
 
 	return nil

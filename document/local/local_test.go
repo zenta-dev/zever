@@ -24,16 +24,16 @@ func hasChrome() bool {
 func TestOpenDefaults(t *testing.T) {
 	t.Parallel()
 
-	d, err := Open(document.Options{})
+	d, err := New(document.Options{})
 	if err != nil {
-		t.Fatalf("Open() error = %v", err)
+		t.Fatalf("New() error = %v", err)
 	}
 
 	t.Cleanup(func() { _ = d.Close() })
 
 	drv, ok := d.(*driver)
 	if !ok {
-		t.Fatalf("Open() type = %T, want *driver", d)
+		t.Fatalf("New() type = %T, want *driver", d)
 	}
 
 	if drv.tmpDir != "/tmp" {
@@ -56,14 +56,14 @@ func TestOpenDefaults(t *testing.T) {
 func TestOpenInvalidOptions(t *testing.T) {
 	t.Parallel()
 
-	_, err := Open(document.Options{Quality: 101})
+	_, err := New(document.Options{Quality: 101})
 	if !errors.Is(err, document.ErrInvalidOptions) {
-		t.Fatalf("Open() error = %v, want errors.Is ErrInvalidOptions", err)
+		t.Fatalf("New() error = %v, want errors.Is ErrInvalidOptions", err)
 	}
 
-	_, err = Open(document.Options{Timeout: -time.Second})
+	_, err = New(document.Options{Timeout: -time.Second})
 	if !errors.Is(err, document.ErrInvalidOptions) {
-		t.Fatalf("Open() error = %v, want errors.Is ErrInvalidOptions", err)
+		t.Fatalf("New() error = %v, want errors.Is ErrInvalidOptions", err)
 	}
 }
 
@@ -72,16 +72,16 @@ func TestOpenWiring(t *testing.T) {
 
 	opts := document.Options{TmpDir: "/tmp", Timeout: 5 * time.Second, Quality: 75}
 
-	d, err := Open(opts)
+	d, err := New(opts)
 	if err != nil {
-		t.Fatalf("Open() error = %v", err)
+		t.Fatalf("New() error = %v", err)
 	}
 
 	t.Cleanup(func() { _ = d.Close() })
 
 	drv, ok := d.(*driver)
 	if !ok {
-		t.Fatalf("Open() type = %T, want *driver", d)
+		t.Fatalf("New() type = %T, want *driver", d)
 	}
 
 	if drv.tmpDir != "/tmp" {
@@ -104,9 +104,9 @@ func TestOpenWiring(t *testing.T) {
 func TestRenderUnsupportedFormat(t *testing.T) {
 	t.Parallel()
 
-	d, err := Open(document.Options{})
+	d, err := New(document.Options{})
 	if err != nil {
-		t.Fatalf("Open() error = %v", err)
+		t.Fatalf("New() error = %v", err)
 	}
 
 	t.Cleanup(func() { _ = d.Close() })
@@ -126,9 +126,9 @@ func TestRenderUnsupportedFormat(t *testing.T) {
 func TestRenderCanceledContext(t *testing.T) {
 	t.Parallel()
 
-	d, err := Open(document.Options{})
+	d, err := New(document.Options{})
 	if err != nil {
-		t.Fatalf("Open() error = %v", err)
+		t.Fatalf("New() error = %v", err)
 	}
 
 	t.Cleanup(func() { _ = d.Close() })
@@ -145,9 +145,9 @@ func TestRenderCanceledContext(t *testing.T) {
 func TestRenderOversizedSource(t *testing.T) {
 	t.Parallel()
 
-	d, err := Open(document.Options{})
+	d, err := New(document.Options{})
 	if err != nil {
-		t.Fatalf("Open() error = %v", err)
+		t.Fatalf("New() error = %v", err)
 	}
 
 	t.Cleanup(func() { _ = d.Close() })
@@ -173,9 +173,9 @@ func TestRenderOversizedSource(t *testing.T) {
 func TestOpenNoSandboxEnv(t *testing.T) {
 	t.Setenv("ZEVER_CHROMEDP_NO_SANDBOX", "1")
 
-	d, err := Open(document.Options{})
+	d, err := New(document.Options{})
 	if err != nil {
-		t.Fatalf("Open() error = %v", err)
+		t.Fatalf("New() error = %v", err)
 	}
 
 	t.Cleanup(func() { _ = d.Close() })
@@ -184,9 +184,9 @@ func TestOpenNoSandboxEnv(t *testing.T) {
 func TestCloseIdempotent(t *testing.T) {
 	t.Parallel()
 
-	d, err := Open(document.Options{})
+	d, err := New(document.Options{})
 	if err != nil {
-		t.Fatalf("Open() error = %v", err)
+		t.Fatalf("New() error = %v", err)
 	}
 
 	if err := d.Close(); err != nil {
@@ -201,9 +201,9 @@ func TestCloseIdempotent(t *testing.T) {
 func TestRenderBadTmpDir(t *testing.T) {
 	t.Parallel()
 
-	d, err := Open(document.Options{TmpDir: "/nonexistent-zever-local-test"})
+	d, err := New(document.Options{TmpDir: "/nonexistent-zever-local-test"})
 	if err != nil {
-		t.Fatalf("Open() error = %v", err)
+		t.Fatalf("New() error = %v", err)
 	}
 
 	t.Cleanup(func() { _ = d.Close() })
@@ -217,9 +217,9 @@ func TestRenderBadTmpDir(t *testing.T) {
 func TestRenderRunError(t *testing.T) {
 	t.Parallel()
 
-	d, err := Open(document.Options{Timeout: time.Nanosecond})
+	d, err := New(document.Options{Timeout: time.Nanosecond})
 	if err != nil {
-		t.Fatalf("Open() error = %v", err)
+		t.Fatalf("New() error = %v", err)
 	}
 
 	t.Cleanup(func() { _ = d.Close() })
@@ -235,9 +235,9 @@ func TestRenderPDF(t *testing.T) {
 		t.Skip("no Chrome binary found, skipping render test")
 	}
 
-	d, err := Open(document.Options{})
+	d, err := New(document.Options{})
 	if err != nil {
-		t.Fatalf("Open() error = %v", err)
+		t.Fatalf("New() error = %v", err)
 	}
 
 	t.Cleanup(func() { _ = d.Close() })
@@ -259,9 +259,9 @@ func TestRenderPNG(t *testing.T) {
 		t.Skip("no Chrome binary found, skipping render test")
 	}
 
-	d, err := Open(document.Options{})
+	d, err := New(document.Options{})
 	if err != nil {
-		t.Fatalf("Open() error = %v", err)
+		t.Fatalf("New() error = %v", err)
 	}
 
 	t.Cleanup(func() { _ = d.Close() })
@@ -283,9 +283,9 @@ func TestRenderJPG(t *testing.T) {
 		t.Skip("no Chrome binary found, skipping render test")
 	}
 
-	d, err := Open(document.Options{})
+	d, err := New(document.Options{})
 	if err != nil {
-		t.Fatalf("Open() error = %v", err)
+		t.Fatalf("New() error = %v", err)
 	}
 
 	t.Cleanup(func() { _ = d.Close() })
@@ -307,9 +307,9 @@ func TestRenderJPGHighQuality(t *testing.T) {
 		t.Skip("no Chrome binary found, skipping render test")
 	}
 
-	d, err := Open(document.Options{Quality: 100})
+	d, err := New(document.Options{Quality: 100})
 	if err != nil {
-		t.Fatalf("Open() error = %v", err)
+		t.Fatalf("New() error = %v", err)
 	}
 
 	t.Cleanup(func() { _ = d.Close() })
@@ -331,9 +331,9 @@ func TestRenderPNGWithTmpDir(t *testing.T) {
 		t.Skip("no Chrome binary found, skipping render test")
 	}
 
-	d, err := Open(document.Options{TmpDir: t.TempDir()})
+	d, err := New(document.Options{TmpDir: t.TempDir()})
 	if err != nil {
-		t.Fatalf("Open() error = %v", err)
+		t.Fatalf("New() error = %v", err)
 	}
 
 	t.Cleanup(func() { _ = d.Close() })

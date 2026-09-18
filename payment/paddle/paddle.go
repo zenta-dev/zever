@@ -11,6 +11,7 @@ import (
 
 	"github.com/PaddleHQ/paddle-go-sdk/v5"
 
+	"github.com/zenta-dev/zever/internal/httpclient"
 	"github.com/zenta-dev/zever/payment"
 )
 
@@ -25,8 +26,8 @@ type driver struct {
 	maxWebhookBytes int
 }
 
-// Open creates a Payment backed by Paddle.
-func Open(o payment.Options) (payment.Payment, error) {
+// New creates a Payment backed by Paddle.
+func New(o payment.Options) (payment.Payment, error) {
 	if err := o.Validate(); err != nil {
 		return nil, fmt.Errorf("paddle: %w", err)
 	}
@@ -44,7 +45,7 @@ func Open(o payment.Options) (payment.Payment, error) {
 		}
 	}
 
-	client, err := newSDK(o.APIKey, paddle.WithBaseURL(endpoint), paddle.WithClient(&http.Client{Timeout: payment.DefaultHTTPTimeout * time.Second}))
+	client, err := newSDK(o.APIKey, paddle.WithBaseURL(endpoint), paddle.WithClient(httpclient.NewClient(payment.DefaultHTTPTimeout)))
 	if err != nil {
 		return nil, fmt.Errorf("paddle: %w", err)
 	}

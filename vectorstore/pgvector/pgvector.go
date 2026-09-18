@@ -38,9 +38,14 @@ type Store struct {
 	dim int
 }
 
-// Open creates a pgvector Store from Options. It validates Options first, then
-// requires a DSN and defaults a non-positive dimension.
-func Open(o vectorstore.Options) (vectorstore.VectorStore, error) {
+// New creates a pgvector Store from Options. It validates Options first, then
+// requires a DSN and defaults a non-positive dimension. It connects to the
+// DSN and prepares the vectors table and index, capping the pool with
+// PoolConfig at DefaultMaxConns. When search, vectorstore, and db share one
+// Postgres DSN, keep the sum of per-adapter MaxConns below the server's
+// max_connections; for a custom cap, build a config with PoolConfig and wire
+// the pool beside this constructor without changing this signature.
+func New(o vectorstore.Options) (vectorstore.VectorStore, error) {
 	if err := o.Validate(); err != nil {
 		return nil, fmt.Errorf("pgvector: %w", err)
 	}
@@ -54,24 +59,10 @@ func Open(o vectorstore.Options) (vectorstore.VectorStore, error) {
 		dimension = vectorstore.DefaultDimension
 	}
 
-	return New(o.DSN, dimension)
-}
-
-// New connects to the DSN and prepares the vectors table and index.
-// It caps the pool with PoolConfig at DefaultMaxConns. When search,
-// vectorstore, and db share one Postgres DSN, keep the sum of per-adapter
-// MaxConns below the server's max_connections; for a custom cap, build a
-// config with PoolConfig and wire the pool beside this constructor without
-// changing this signature.
-func New(dsn string, dimension int) (*Store, error) {
-	if dimension <= 0 {
-		dimension = vectorstore.DefaultDimension
-	}
-
 	ddlCtx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
 	defer cancel()
 
-	cfg, err := PoolConfig(dsn, DefaultMaxConns)
+	cfg, err := PoolConfig(o.DSN, DefaultMaxConns)
 	if err != nil {
 		return nil, err
 	}
@@ -225,6 +216,53 @@ func (s *Store) Upsert(ctx context.Context, vec vectorstore.Vector) error {
 	)
 	if err != nil {
 		return fmt.Errorf("pgvector: upsert: %w", err)
+	}
+
+	return nil
+}
+
+// UpsertBatch inserts or replaces all of vecs in a single multi-row INSERT
+// statement, one round trip regardless of len(vecs). An empty vecs is a no-op.
+func (s *Store) UpsertBatch(ctx context.Context, vecs []vectorstore.Vector) error {
+	if len(vecs) == 0 {
+		return nil
+	}
+
+	const cols = 3
+
+	placeholders := make([]string, 0, len(vecs))
+	args := make([]any, 0, len(vecs)*cols)
+
+	for i, vec := range vecs {
+		if len(vec.Embedding) != s.dim {
+			// See Upsert: pointer chain required for *DimensionMismatchError targets.
+			mismatch := error(&vectorstore.DimensionMismatchError{Got: len(vec.Embedding), Want: s.dim})
+			return fmt.Errorf("pgvector: upsert batch: %w (set the dimension option or recreate the vectors table)", mismatch)
+		}
+
+		metaJSON, err := metadataCodec.Encode(vec.Metadata)
+		if err != nil {
+			return fmt.Errorf("pgvector: upsert batch: marshal metadata: %w", err)
+		}
+
+		vecJSON, err := embeddingCodec.Encode(vec.Embedding)
+		if err != nil {
+			return fmt.Errorf("pgvector: upsert batch: marshal embedding: %w", err)
+		}
+
+		base := i * cols
+		placeholders = append(placeholders, fmt.Sprintf("($%d, $%d::vector, $%d::jsonb)", base+1, base+2, base+3))
+		args = append(args, vec.ID, string(vecJSON), metaJSON)
+	}
+
+	query := fmt.Sprintf(
+		`INSERT INTO vectors (id, embedding, metadata) VALUES %s
+		 ON CONFLICT (id) DO UPDATE SET embedding = EXCLUDED.embedding, metadata = EXCLUDED.metadata`,
+		strings.Join(placeholders, ", "),
+	)
+
+	if _, err := s.db.Exec(ctx, query, args...); err != nil {
+		return fmt.Errorf("pgvector: upsert batch: %w", err)
 	}
 
 	return nil

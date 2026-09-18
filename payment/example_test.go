@@ -9,7 +9,7 @@ import (
 
 // ExampleOpen opens the stub backend and creates a payment.
 func ExampleOpen() {
-	_ = payment.Register(payment.Stub, stub.Open)
+	_ = payment.Register(payment.Stub, stub.New)
 
 	p, err := payment.Open(payment.Stub, payment.Options{AutoApprove: true})
 	if err != nil {

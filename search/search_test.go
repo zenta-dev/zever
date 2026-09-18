@@ -20,6 +20,10 @@ func (s *stubSearch) Index(_ context.Context, _ Document) error {
 	return nil
 }
 
+func (s *stubSearch) IndexBatch(_ context.Context, _ []Document) error {
+	return nil
+}
+
 func (s *stubSearch) Delete(_ context.Context, _ string) error {
 	return nil
 }

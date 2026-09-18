@@ -42,47 +42,45 @@ type logger struct {
 }
 
 // New creates a Logger writing human-readable lines to stdout at the
-// configured minimum level. An unparseable level falls back to info.
-func New(opts Options) log.Logger {
+// configured minimum level. An unrecognized level falls back to info.
+func New(opts log.Options) log.Logger {
 	return NewWithWriter(opts, os.Stdout)
 }
 
 // NewWithWriter creates a Logger writing human-readable lines to out at
 // the configured minimum level. A nil out falls back to stdout. Color is
-// forced by opts.Color when set, otherwise auto-detected from out and the
-// NO_COLOR/FORCE_COLOR/TERM environment.
-func NewWithWriter(opts Options, out io.Writer) log.Logger {
+// auto-detected from out and the NO_COLOR/FORCE_COLOR/TERM environment.
+func NewWithWriter(opts log.Options, out io.Writer) log.Logger {
 	if out == nil {
 		out = os.Stdout
-	}
-
-	minLevel := log.LevelInfo
-
-	if opts.Level != "" {
-		if parsed, err := log.ParseLevel(opts.Level); err == nil {
-			minLevel = parsed
-		}
 	}
 
 	return &logger{
 		mu:         &sync.Mutex{},
 		out:        out,
-		minLevel:   minLevel,
-		useColor:   autoColor(out, opts.Color),
+		minLevel:   resolveMinLevel(opts.MinLevel),
+		useColor:   autoColor(out),
 		timeFormat: defaultTimeFormat,
 	}
 }
 
-// autoColor decides whether ANSI escapes may be emitted. An explicit force
-// always wins. Otherwise color requires all of: NO_COLOR unset (a
+// resolveMinLevel validates a configured minimum level, falling back to info
+// for any value outside the known level set, mirroring log/slog and
+// log/zerolog's own toXLevel fallback.
+func resolveMinLevel(level log.Level) log.Level {
+	switch level {
+	case log.LevelDebug, log.LevelInfo, log.LevelWarn, log.LevelError, log.LevelFatal:
+		return level
+	default:
+		return log.LevelInfo
+	}
+}
+
+// autoColor decides whether ANSI escapes may be emitted: NO_COLOR unset (a
 // NO_COLOR of "0" counts as unset, permitting explicit enabling),
 // TERM not "dumb", no CI marker unless FORCE_COLOR opts in, and out being
 // a character-device file (pipes, redirects, and buffers never color).
-func autoColor(out io.Writer, force *bool) bool {
-	if force != nil {
-		return *force
-	}
-
+func autoColor(out io.Writer) bool {
 	if noColor := os.Getenv("NO_COLOR"); noColor != "" && noColor != "0" {
 		return false
 	}

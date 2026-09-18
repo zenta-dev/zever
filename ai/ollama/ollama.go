@@ -29,8 +29,8 @@ type adapter struct {
 	client       *http.Client
 }
 
-// Open creates an AI backed by the Ollama server at opts.Addr.
-func Open(opts Options) (ai.AI, error) {
+// New creates an AI backed by the Ollama server at opts.Addr.
+func New(opts Options) (ai.AI, error) {
 	if err := opts.Validate(); err != nil {
 		return nil, err
 	}
@@ -252,10 +252,16 @@ func (a *adapter) Stream(ctx context.Context, model string, messages []ai.Messag
 		// newline-delimited JSON records. This trades incremental decoding as
 		// bytes arrive for a single buffered read; acceptable for the response
 		// sizes these single API calls produce.
-		respBody, readErr := io.ReadAll(resp.Body)
+		respBody, readErr := httpclient.ReadLimited(resp.Body, maxResponseBytes)
 		if readErr != nil {
+			if errors.Is(readErr, httpclient.ErrTooLarge) {
+				readErr = fmt.Errorf("ollama: stream response exceeds %d bytes", maxResponseBytes)
+			} else {
+				readErr = fmt.Errorf("ollama: read stream: %w", readErr)
+			}
+
 			select {
-			case ch <- ai.StreamChunk{Err: fmt.Errorf("ollama: read stream: %w", readErr)}:
+			case ch <- ai.StreamChunk{Err: readErr}:
 			case <-ctx.Done():
 			}
 

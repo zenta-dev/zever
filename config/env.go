@@ -105,6 +105,8 @@ func serviceRefs(cfg *Config, svc string) (adapter *string, opts any, ok bool) {
 		return &cfg.I18n.Adapter, &cfg.I18n.Options, true
 	case "idempotency":
 		return &cfg.Idempotency.Adapter, &cfg.Idempotency.Options, true
+	case "lock":
+		return &cfg.Lock.Adapter, &cfg.Lock.Options, true
 	case "log":
 		return &cfg.Log.Adapter, &cfg.Log.Options, true
 	case "mailer":
@@ -131,6 +133,8 @@ func serviceRefs(cfg *Config, svc string) (adapter *string, opts any, ok bool) {
 		return &cfg.Scheduler.Adapter, &cfg.Scheduler.Options, true
 	case "search":
 		return &cfg.Search.Adapter, &cfg.Search.Options, true
+	case "secrets":
+		return &cfg.Secrets.Adapter, &cfg.Secrets.Options, true
 	case "session":
 		return &cfg.Session.Adapter, &cfg.Session.Options, true
 	case "storage":

@@ -9,11 +9,22 @@ import (
 	"github.com/zenta-dev/zever/payment"
 )
 
+func newStub(t *testing.T, autoApprove bool) payment.Payment {
+	t.Helper()
+
+	p, err := New(payment.Options{AutoApprove: autoApprove})
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	return p
+}
+
 func TestCreateGetRefund_roundtrip(t *testing.T) {
 	t.Parallel()
 
 	ctx := context.Background()
-	p := New(true)
+	p := newStub(t, true)
 
 	res, err := p.CreatePayment(ctx, payment.Request{Amount: 100, Currency: "USD", Method: payment.MethodCard})
 	if err != nil {
@@ -59,7 +70,7 @@ func TestRefund_partialThenFull_statuses(t *testing.T) {
 	t.Parallel()
 
 	ctx := context.Background()
-	p := New(true)
+	p := newStub(t, true)
 
 	res, err := p.CreatePayment(ctx, payment.Request{Amount: 100, Currency: "USD"})
 	if err != nil {
@@ -97,7 +108,7 @@ func TestCreate_pendingWhenAutoApproveFalse(t *testing.T) {
 	t.Parallel()
 
 	ctx := context.Background()
-	p := New(false)
+	p := newStub(t, false)
 
 	res, err := p.CreatePayment(ctx, payment.Request{Amount: 50, Currency: "EUR", Method: payment.MethodBankTransfer})
 	if err != nil {
@@ -112,7 +123,7 @@ func TestCreate_pendingWhenAutoApproveFalse(t *testing.T) {
 func TestGet_notFound(t *testing.T) {
 	t.Parallel()
 
-	p := New(true)
+	p := newStub(t, true)
 
 	_, err := p.GetPayment(context.Background(), "stub_999999")
 	if !errors.Is(err, payment.ErrNotFound) {
@@ -132,7 +143,7 @@ func TestGet_notFound(t *testing.T) {
 func TestRefund_notFound(t *testing.T) {
 	t.Parallel()
 
-	p := New(true)
+	p := newStub(t, true)
 
 	err := p.Refund(context.Background(), "stub_nope", 10)
 	if !errors.Is(err, payment.ErrNotFound) {
@@ -153,7 +164,7 @@ func TestRefund_overflowTotal(t *testing.T) {
 	t.Parallel()
 
 	ctx := context.Background()
-	p := New(true)
+	p := newStub(t, true)
 
 	res, err := p.CreatePayment(ctx, payment.Request{Amount: 100, Currency: "USD"})
 	if err != nil {
@@ -179,7 +190,7 @@ func TestRefund_overflowRemaining(t *testing.T) {
 	t.Parallel()
 
 	ctx := context.Background()
-	p := New(true)
+	p := newStub(t, true)
 
 	res, err := p.CreatePayment(ctx, payment.Request{Amount: 100, Currency: "USD"})
 	if err != nil {
@@ -209,7 +220,7 @@ func TestCreate_invalid(t *testing.T) {
 	t.Parallel()
 
 	ctx := context.Background()
-	p := New(true)
+	p := newStub(t, true)
 
 	if _, err := p.CreatePayment(ctx, payment.Request{Amount: 0, Currency: "USD"}); !errors.Is(err, payment.ErrInvalidAmount) {
 		t.Fatalf("zero amount err = %v, want ErrInvalidAmount", err)
@@ -239,7 +250,7 @@ func TestRefund_invalidAmount(t *testing.T) {
 	t.Parallel()
 
 	ctx := context.Background()
-	p := New(true)
+	p := newStub(t, true)
 
 	res, err := p.CreatePayment(ctx, payment.Request{Amount: 100, Currency: "USD"})
 	if err != nil {
@@ -255,12 +266,12 @@ func TestRefund_invalidAmount(t *testing.T) {
 	}
 }
 
-func TestOpen_zeroOpts(t *testing.T) {
+func TestNew_zeroOpts(t *testing.T) {
 	t.Parallel()
 
-	p, err := Open(payment.Options{})
+	p, err := New(payment.Options{})
 	if err != nil {
-		t.Fatalf("Open err = %v", err)
+		t.Fatalf("New err = %v", err)
 	}
 
 	res, err := p.CreatePayment(context.Background(), payment.Request{Amount: 10, Currency: "USD"})
@@ -277,12 +288,12 @@ func TestOpen_zeroOpts(t *testing.T) {
 	}
 }
 
-func TestOpen_autoApprove(t *testing.T) {
+func TestNew_autoApprove(t *testing.T) {
 	t.Parallel()
 
-	p, err := Open(payment.Options{AutoApprove: true})
+	p, err := New(payment.Options{AutoApprove: true})
 	if err != nil {
-		t.Fatalf("Open err = %v", err)
+		t.Fatalf("New err = %v", err)
 	}
 
 	res, err := p.CreatePayment(context.Background(), payment.Request{Amount: 10, Currency: "USD"})
@@ -299,19 +310,19 @@ func TestOpen_autoApprove(t *testing.T) {
 	}
 }
 
-func TestOpen_invalidOpts(t *testing.T) {
+func TestNew_invalidOpts(t *testing.T) {
 	t.Parallel()
 
-	_, err := Open(payment.Options{MaxWebhookBytes: -1})
+	_, err := New(payment.Options{MaxWebhookBytes: -1})
 	if !errors.Is(err, payment.ErrInvalidOptions) {
-		t.Fatalf("Open err = %v, want ErrInvalidOptions", err)
+		t.Fatalf("New err = %v, want ErrInvalidOptions", err)
 	}
 }
 
 func TestWebhookEvent_static(t *testing.T) {
 	t.Parallel()
 
-	p := New(true)
+	p := newStub(t, true)
 
 	ev, err := p.WebhookEvent(context.Background(), []byte(`{}`), "sig")
 	if err != nil {
@@ -326,7 +337,7 @@ func TestWebhookEvent_static(t *testing.T) {
 func TestClose_nil(t *testing.T) {
 	t.Parallel()
 
-	if err := New(true).Close(); err != nil {
+	if err := newStub(t, true).Close(); err != nil {
 		t.Fatalf("Close err = %v", err)
 	}
 }
@@ -335,7 +346,7 @@ func TestConcurrent_createRefund(t *testing.T) {
 	t.Parallel()
 
 	ctx := context.Background()
-	p := New(true)
+	p := newStub(t, true)
 
 	var wg sync.WaitGroup
 

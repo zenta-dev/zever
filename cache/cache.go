@@ -3,8 +3,9 @@ package cache
 import (
 	"context"
 	"fmt"
-	"sync"
 	"time"
+
+	"github.com/zenta-dev/zever/internal/registry"
 )
 
 // Cache defines the backend contract for byte-slice cache entries with TTL and atomic counters.
@@ -30,9 +31,10 @@ type Cache interface {
 // Factory creates a Cache from the given Options.
 type Factory func(opts Options) (Cache, error)
 
-var (
-	mu        sync.RWMutex
-	factories = make(map[Adapter]Factory)
+var factories = registry.New[Adapter, Factory](
+	ErrNilFactory,
+	func(adapter Adapter) error { return &DuplicateError{Adapter: adapter} },
+	func(adapter Adapter) error { return &UnknownAdapterError{Adapter: adapter} },
 )
 
 // Register associates an Adapter with a Factory for later use by Open.
@@ -41,26 +43,14 @@ func Register(adapter Adapter, factory Factory) error {
 		return fmt.Errorf("%w for adapter %s", ErrNilFactory, adapter)
 	}
 
-	mu.Lock()
-	defer mu.Unlock()
-
-	if _, dup := factories[adapter]; dup {
-		return &DuplicateError{Adapter: adapter}
-	}
-
-	factories[adapter] = factory
-
-	return nil
+	return factories.Register(adapter, factory)
 }
 
 // Open creates a Cache for adapter using the registered Factory and opts.
 func Open(adapter Adapter, opts Options) (Cache, error) {
-	mu.RLock()
-	factory, ok := factories[adapter]
-	mu.RUnlock()
-
-	if !ok {
-		return nil, &UnknownAdapterError{Adapter: adapter}
+	factory, err := factories.Lookup(adapter)
+	if err != nil {
+		return nil, err
 	}
 
 	c, err := factory(opts)
