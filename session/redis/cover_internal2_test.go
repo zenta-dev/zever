@@ -18,7 +18,10 @@ import (
 
 // failSetHook fails only SET commands against a live server: GET
 // succeeds, so Save reaches its write and exercises the save-set
-// error branch hermetically.
+// error branch hermetically. Save's SET now runs inside a MULTI/EXEC
+// pipeline (see saveTx), so the pipeline hook is the one that actually
+// sees it; the plain ProcessHook override stays as a safety net in case
+// a SET ever reaches Save outside a pipeline.
 type failSetHook struct{}
 
 func (failSetHook) DialHook(next goredis.DialHook) goredis.DialHook { return next }
@@ -33,7 +36,15 @@ func (failSetHook) ProcessHook(next goredis.ProcessHook) goredis.ProcessHook {
 }
 
 func (failSetHook) ProcessPipelineHook(next goredis.ProcessPipelineHook) goredis.ProcessPipelineHook {
-	return next
+	return func(ctx context.Context, cmds []goredis.Cmder) error {
+		for _, cmd := range cmds {
+			if cmd.Name() == "set" {
+				return errors.New("hook: set refused")
+			}
+		}
+
+		return next(ctx, cmds)
+	}
 }
 
 func TestCoverSaveSetFails(t *testing.T) {
