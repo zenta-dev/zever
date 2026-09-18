@@ -3,7 +3,8 @@ package i18n
 import (
 	"context"
 	"fmt"
-	"sync"
+
+	"github.com/zenta-dev/zever/internal/registry"
 )
 
 // I18n defines the core operations for internationalized message lookup.
@@ -19,9 +20,10 @@ type I18n interface {
 // Factory creates an I18n from the given Options.
 type Factory func(opts Options) (I18n, error)
 
-var (
-	mu        sync.RWMutex
-	factories = make(map[Adapter]Factory)
+var factories = registry.New[Adapter, Factory](
+	ErrNilFactory,
+	func(adapter Adapter) error { return &DuplicateError{Adapter: adapter} },
+	func(adapter Adapter) error { return &UnknownAdapterError{Adapter: adapter} },
 )
 
 // Register associates an Adapter with a Factory for later use by Open.
@@ -30,26 +32,14 @@ func Register(adapter Adapter, factory Factory) error {
 		return fmt.Errorf("%w for adapter %s", ErrNilFactory, adapter)
 	}
 
-	mu.Lock()
-	defer mu.Unlock()
-
-	if _, dup := factories[adapter]; dup {
-		return &DuplicateError{Adapter: adapter}
-	}
-
-	factories[adapter] = factory
-
-	return nil
+	return factories.Register(adapter, factory)
 }
 
 // Open creates an I18n for adapter using the registered Factory and opts.
 func Open(adapter Adapter, opts Options) (I18n, error) {
-	mu.RLock()
-	factory, ok := factories[adapter]
-	mu.RUnlock()
-
-	if !ok {
-		return nil, &UnknownAdapterError{Adapter: adapter}
+	factory, err := factories.Lookup(adapter)
+	if err != nil {
+		return nil, err
 	}
 
 	n, err := factory(opts)

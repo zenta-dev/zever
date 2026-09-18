@@ -5,7 +5,8 @@ import (
 	"fmt"
 	"regexp"
 	"strings"
-	"sync"
+
+	"github.com/zenta-dev/zever/internal/registry"
 )
 
 // Secrets is the interface that secret-management adapters must implement.
@@ -29,9 +30,10 @@ type Secrets interface {
 // Factory creates a Secrets from the given Options.
 type Factory func(opts Options) (Secrets, error)
 
-var (
-	mu        sync.RWMutex
-	factories = make(map[Adapter]Factory)
+var factories = registry.New[Adapter, Factory](
+	ErrNilFactory,
+	func(adapter Adapter) error { return &DuplicateError{Adapter: adapter} },
+	func(adapter Adapter) error { return &UnknownAdapterError{Adapter: adapter} },
 )
 
 // Register associates an Adapter with a Factory for later use by Open.
@@ -40,26 +42,14 @@ func Register(adapter Adapter, factory Factory) error {
 		return fmt.Errorf("%w for adapter %s", ErrNilFactory, adapter)
 	}
 
-	mu.Lock()
-	defer mu.Unlock()
-
-	if _, dup := factories[adapter]; dup {
-		return &DuplicateError{Adapter: adapter}
-	}
-
-	factories[adapter] = factory
-
-	return nil
+	return factories.Register(adapter, factory)
 }
 
 // Open creates a Secrets for adapter using the registered Factory and opts.
 func Open(adapter Adapter, opts Options) (Secrets, error) {
-	mu.RLock()
-	factory, ok := factories[adapter]
-	mu.RUnlock()
-
-	if !ok {
-		return nil, &UnknownAdapterError{Adapter: adapter}
+	factory, err := factories.Lookup(adapter)
+	if err != nil {
+		return nil, err
 	}
 
 	s, err := factory(opts)
