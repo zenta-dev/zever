@@ -235,3 +235,9 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   `texmf.cnf` defaults. Source is caller-supplied LaTeX (e.g. an invoice
   template with interpolated data), which had no legitimate need for
   shell-escape-dependent packages.
+- `notification/fcm`'s `Notify` now retries a transient send failure
+  (network blip, FCM 5xx) up to 3 times with short backoff, matching every
+  other outbound-network adapter in the codebase
+  (`webhook/http`/`webhook/queue`/`ai/anthropic`/`ai/openai`/`queue/redis`).
+  A duplicate push notification on a spurious retry is a low-severity
+  nuisance, so this is safe unconditionally.

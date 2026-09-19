@@ -7,7 +7,11 @@ import (
 
 // Options holds typed configuration for crypto adapters.
 type Options struct {
-	// Key is the base64-encoded 32-byte encryption key.
+	// Key is the base64-encoded 32-byte encryption key. Rotating Key makes
+	// every value previously encrypted under the old key permanently
+	// undecryptable: adapters (e.g. crypto/local) embed no key-id/version
+	// in their output. Plan key rotation accordingly (see crypto/local's
+	// Encrypt doc comment).
 	Key string `json:"key" toml:"key" yaml:"key"`
 	// SignKey is the base64-encoded 64-byte signing key.
 	SignKey string `json:"sign_key" toml:"sign_key" yaml:"sign_key"`
