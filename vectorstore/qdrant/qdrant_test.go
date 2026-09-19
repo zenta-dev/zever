@@ -9,7 +9,9 @@ import (
 	"sort"
 	"strings"
 	"sync"
+	"sync/atomic"
 	"testing"
+	"time"
 
 	"github.com/qdrant/go-client/qdrant"
 
@@ -787,6 +789,76 @@ func TestEnsureCollection(t *testing.T) {
 			t.Fatalf("expected params error for zero dim")
 		}
 	})
+
+	t.Run("concurrent cold start calls CreateCollection once", func(t *testing.T) {
+		t.Parallel()
+
+		f := newDelayedFake()
+		s := &Store{client: f, dim: 0}
+
+		const workers = 20
+
+		start := make(chan struct{})
+
+		var wg sync.WaitGroup
+
+		errs := make([]error, workers)
+
+		for i := range workers {
+			wg.Add(1)
+
+			go func() {
+				defer wg.Done()
+
+				<-start
+
+				errs[i] = s.ensureCollection(ctx, 2)
+			}()
+		}
+
+		close(start)
+		wg.Wait()
+
+		for i, err := range errs {
+			if err != nil {
+				t.Fatalf("worker %d: ensureCollection: %v", i, err)
+			}
+		}
+
+		if f.creates != 1 {
+			t.Errorf("CreateCollection calls = %d, want 1 (thundering herd not suppressed)", f.creates)
+		}
+
+		if got := f.existsCalls.Load(); got != 1 {
+			t.Errorf("CollectionExists calls = %d, want 1 (thundering herd not suppressed)", got)
+		}
+	})
+}
+
+// delayedFakeClient wraps fakeClient with a small artificial delay in
+// CollectionExists/CreateCollection and counts CollectionExists calls, so a
+// concurrency test has a wide-enough window to prove concurrent
+// ensureCollection callers are serialized instead of racing.
+type delayedFakeClient struct {
+	*fakeClient
+	existsCalls atomic.Int64
+}
+
+func newDelayedFake() *delayedFakeClient {
+	return &delayedFakeClient{fakeClient: newFake()}
+}
+
+func (f *delayedFakeClient) CollectionExists(ctx context.Context, name string) (bool, error) {
+	f.existsCalls.Add(1)
+	time.Sleep(5 * time.Millisecond)
+
+	return f.fakeClient.CollectionExists(ctx, name)
+}
+
+func (f *delayedFakeClient) CreateCollection(ctx context.Context, req *qdrant.CreateCollection) error {
+	time.Sleep(5 * time.Millisecond)
+
+	return f.fakeClient.CreateCollection(ctx, req)
 }
 
 func TestParseAddr(t *testing.T) {

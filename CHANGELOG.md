@@ -196,3 +196,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   when the subject had an empty ID and the resource was missing (or had an
   empty) owner attribute, since both sides of the comparison were the empty
   string. The check now explicitly rejects an empty subject ID.
+- `vectorstore/qdrant`'s `ensureCollection` no longer lets every concurrent
+  caller during cold start race its own `CollectionExists`/
+  `CreateCollection` round trip: the first caller now leads while others
+  wait, and a failed attempt is still retried by the next caller.
