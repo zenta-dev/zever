@@ -32,23 +32,23 @@ func NewWithWriter(opts log.Options, w io.Writer) log.Logger {
 }
 
 func (a *zerologAdapter) Debug() log.Event {
-	return wrapZerologEvent(a.log.Debug())
+	return wrapZerologEvent(a.log.Debug()) //nolint:zerologlint // wrapped event is dispatched via Msg/Send by the log.Event caller, not here
 }
 
 func (a *zerologAdapter) Info() log.Event {
-	return wrapZerologEvent(a.log.Info())
+	return wrapZerologEvent(a.log.Info()) //nolint:zerologlint // wrapped event is dispatched via Msg/Send by the log.Event caller, not here
 }
 
 func (a *zerologAdapter) Warn() log.Event {
-	return wrapZerologEvent(a.log.Warn())
+	return wrapZerologEvent(a.log.Warn()) //nolint:zerologlint // wrapped event is dispatched via Msg/Send by the log.Event caller, not here
 }
 
 func (a *zerologAdapter) Error() log.Event {
-	return wrapZerologEvent(a.log.Error())
+	return wrapZerologEvent(a.log.Error()) //nolint:zerologlint // wrapped event is dispatched via Msg/Send by the log.Event caller, not here
 }
 
 func (a *zerologAdapter) Fatal() log.Event {
-	return wrapZerologEvent(a.log.Fatal())
+	return wrapZerologEvent(a.log.Fatal()) //nolint:zerologlint // wrapped event is dispatched via Msg/Send by the log.Event caller, not here
 }
 
 func (a *zerologAdapter) With() log.Context {

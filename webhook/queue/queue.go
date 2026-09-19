@@ -100,7 +100,7 @@ func (a *adapter) Register(_ context.Context, event, target, secret string) erro
 	if a.allowPrivate {
 		err = webhook.ValidateTargetSyntax(target)
 	} else {
-		err = webhook.ValidateTarget(target)
+		err = webhook.ValidateTarget(target) //nolint:contextcheck // validation has no context dependency, matching webhook/http's Register
 	}
 
 	if err != nil {
@@ -120,7 +120,7 @@ func (a *adapter) Register(_ context.Context, event, target, secret string) erro
 	a.mu.Unlock()
 
 	if newEvent {
-		a.startConsumer(event)
+		a.startConsumer(event) //nolint:contextcheck // spawns a long-running background consumer that must outlive this Register call, so it deliberately takes no context
 	}
 
 	return nil

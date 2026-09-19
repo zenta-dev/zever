@@ -176,6 +176,12 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   every poll tick (~every 100ms), cutting idle Redis round trips at the cost
   of up to 250ms of added latency before a due or stale message is
   recovered.
+- Enable `contextcheck`, `sqlclosecheck`, `rowserrcheck`, `zerologlint`,
+  and `spancheck` linters, matching this repo's use of `database/sql`/pgx,
+  zerolog, and OpenTelemetry spans; `contextcheck` also runs on test files.
+  Related fallout: `tenant/header` documents its required trust boundary
+  (deploy only behind a gateway that authenticates callers and owns the
+  tenant header).
 
 ### Fixed
 

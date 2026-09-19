@@ -21,6 +21,7 @@ linters:
     - bidichk
     - bodyclose
     - containedctx
+    - contextcheck
     - depguard
     - dogsled
     - dupl
@@ -42,6 +43,9 @@ linters:
     - predeclared
     - recvcheck
     - revive
+    - rowserrcheck
+    - spancheck
+    - sqlclosecheck
     - testifylint
     - usetesting
     - thelper
@@ -51,6 +55,7 @@ linters:
     - usestdlibvars
     - wastedassign
     - whitespace
+    - zerologlint
   settings:
     depguard:
       rules:
@@ -74,3 +79,7 @@ linters:
       - common-false-positives
       - legacy
       - std-error-handling
+    rules:
+      - path: _test\.go
+        linters:
+          - contextcheck

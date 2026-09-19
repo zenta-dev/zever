@@ -410,7 +410,7 @@ func TestClose_StmtError(t *testing.T) {
 
 	//nolint:forcetypeassert // test-only access to concrete tx for Stmt poisoning
 	poisoned := tx.(*sqliteTx).tx.StmtContext(ctx, raw)
-	_ = raw.Close()
+	_ = raw.Close() //nolint:sqlclosecheck // deliberate immediate close to poison `poisoned` before Close(ctx) runs below, not end-of-test cleanup
 	a.stmtCache.Put("poison", poisoned)
 
 	if err := d.Close(ctx); err == nil {

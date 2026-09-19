@@ -237,7 +237,7 @@ func (a *adapter) Subscribe(ctx context.Context, topic string, handler eventbus.
 
 	go a.deliver(ctx, sub, handler)
 
-	return func() { a.unsubscribe(sub) }, nil
+	return func() { a.unsubscribe(sub) }, nil //nolint:contextcheck // unsubscribe is a teardown callback that must work even after the Subscribe call's ctx has expired; it deliberately takes no context
 }
 
 func (a *adapter) unsubscribe(sub *subscription) {
