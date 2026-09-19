@@ -128,6 +128,12 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Changed
 
+- `authz.Authorize` no longer asserts `Policy.Roles` for an unauthenticated
+  caller: `AuthRequired: false` skipped token verification but the
+  permission check still ran with the policy's static `Roles` list, so a
+  `Policy` meant as "public route, still gated" (`AuthRequired: false`,
+  `PermissionCheck` set, `Roles` non-empty) silently granted every anonymous
+  caller those roles. Roles now only apply when `AuthRequired` is true.
 - `scheduler.NewEmbedded` moved to `scheduler/embedded.New`; register
   via `schedulerembedded.New`. No behavior change.
 
