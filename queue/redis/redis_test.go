@@ -5,6 +5,7 @@ import (
 	"errors"
 	"strings"
 	"testing"
+	"time"
 
 	"github.com/zenta-dev/zever/queue"
 )
@@ -148,24 +149,11 @@ func TestName(t *testing.T) {
 
 func TestNextBackoff(t *testing.T) {
 	t.Parallel()
-	if got := nextBackoff(10, 200); got <= 10 || got > 200 {
-		t.Errorf("nextBackoff = %v out of range", got)
+	if got := nextBackoff(1); got < 10*time.Millisecond || got > 200*time.Millisecond {
+		t.Errorf("nextBackoff(1) = %v out of range", got)
 	}
-	if got := nextBackoff(300, 200); got != 200 && got > 200 {
-		t.Errorf("nextBackoff clamp failed got %v", got)
-	}
-}
-
-func TestJitter(t *testing.T) {
-	t.Parallel()
-	if got := jitter(0); got != 0 {
-		t.Errorf("jitter(0) = %v want 0", got)
-	}
-	if got := jitter(1); got != 0 {
-		t.Errorf("jitter(1) = %v want 0", got)
-	}
-	if got := jitter(100); got < 0 || got > 20 {
-		t.Errorf("jitter(100) = %v out of range", got)
+	if got := nextBackoff(20); got != 200*time.Millisecond {
+		t.Errorf("nextBackoff clamp failed got %v, want 200ms", got)
 	}
 }
 
