@@ -44,6 +44,14 @@ type checker struct {
 // New builds a permission.Checker from opts. When ModelPath and PolicyPath
 // are both set the enforcer loads them; otherwise an embedded deny-override
 // model is used and Rules/Roles are seeded into it.
+//
+// Roles is applied in both cases either way, just via different
+// mechanisms: the embedded-model branch seeds it as permanent groupings at
+// construction time, while the file-loaded branch (newChecker) applies it
+// per-request as transient groupings via prepareGroupings, so it never
+// collides with groupings the external policy file already defines. This
+// is a caching-strategy difference, not a gap -- do not "fix" the
+// file-loaded branch to also eagerly seed Roles.
 func New(opts permission.Options) (permission.Checker, error) {
 	if err := opts.Validate(); err != nil {
 		return nil, fmt.Errorf("casbin: invalid options: %w", err)
