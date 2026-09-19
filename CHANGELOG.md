@@ -133,6 +133,17 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Changed
 
+- **Breaking:** `billing.Billing.CreateCustomer` and `CreateSubscription`
+  gain a required `idempotencyKey string` parameter. Neither method
+  previously had any way to prevent a client-side retry (timeout,
+  transient network error) from creating a second, separately-billed
+  subscription or a duplicate customer -- `payment/stripe` already
+  supported this via `Meta["idempotency_key"]`, but `billing/stripe` had
+  no equivalent. Pass `""` for the previous (non-idempotent) behavior.
+  `billing/stripe` wires it to Stripe's `Idempotency-Key` header;
+  `billing/paddle` and `billing/stub` accept and ignore it (no equivalent
+  mechanism). Any external implementation of `billing.Billing` must add
+  the new parameter.
 - `authz.Authorize` no longer asserts `Policy.Roles` for an unauthenticated
   caller: `AuthRequired: false` skipped token verification but the
   permission check still ran with the policy's static `Roles` list, so a

@@ -159,7 +159,7 @@ func TestFullFlow(t *testing.T) {
 	}()
 	ctx := context.Background()
 
-	cus, err := b.CreateCustomer(ctx, "Ada", "ada@example.com")
+	cus, err := b.CreateCustomer(ctx, "Ada", "ada@example.com", "")
 	if err != nil {
 		t.Fatalf("CreateCustomer() error = %v", err)
 	}
@@ -167,7 +167,7 @@ func TestFullFlow(t *testing.T) {
 		t.Fatalf("unexpected customer %+v", cus)
 	}
 
-	sub, err := b.CreateSubscription(ctx, cus.ID, "price_123")
+	sub, err := b.CreateSubscription(ctx, cus.ID, "price_123", "")
 	if err != nil {
 		t.Fatalf("CreateSubscription() error = %v", err)
 	}
@@ -191,6 +191,80 @@ func TestFullFlow(t *testing.T) {
 	}
 }
 
+func TestIdempotencyKeySentOnCustomerAndSubscription(t *testing.T) {
+	t.Parallel()
+
+	var (
+		customerKey     string
+		subscriptionKey string
+	)
+
+	mux := http.NewServeMux()
+	mux.HandleFunc("/v1/customers", func(w http.ResponseWriter, r *http.Request) {
+		customerKey = r.Header.Get("Idempotency-Key")
+		customerHandler(w, r)
+	})
+	mux.HandleFunc("/v1/subscriptions", func(w http.ResponseWriter, r *http.Request) {
+		subscriptionKey = r.Header.Get("Idempotency-Key")
+		subscriptionCreateHandler(w, r)
+	})
+
+	srv := httptest.NewServer(mux)
+	defer srv.Close()
+	b := openWithServer(t, srv)
+	defer func() { _ = b.Close() }()
+	ctx := context.Background()
+
+	cus, err := b.CreateCustomer(ctx, "Ada", "ada@example.com", "create-cus-key-1")
+	if err != nil {
+		t.Fatalf("CreateCustomer() error = %v", err)
+	}
+	if customerKey != "create-cus-key-1" {
+		t.Fatalf("Idempotency-Key on customer create = %q, want %q", customerKey, "create-cus-key-1")
+	}
+
+	if _, err := b.CreateSubscription(ctx, cus.ID, "price_123", "create-sub-key-1"); err != nil {
+		t.Fatalf("CreateSubscription() error = %v", err)
+	}
+	if subscriptionKey != "create-sub-key-1" {
+		t.Fatalf("Idempotency-Key on subscription create = %q, want %q", subscriptionKey, "create-sub-key-1")
+	}
+}
+
+func TestEmptyIdempotencyKeyDoesNotForceOurs(t *testing.T) {
+	t.Parallel()
+
+	// stripe-go itself auto-generates a random Idempotency-Key per call
+	// when none is set (see stripe.go's NewIdempotencyKey fallback), so a
+	// header is always present regardless. What must NOT happen is us
+	// forcing a fixed/empty key that would make the SDK reuse the same
+	// auto-generated value across genuinely distinct calls; assert two
+	// back-to-back calls with idempotencyKey="" get different keys (the
+	// SDK's own per-call randomness), proving we aren't overriding it.
+	var keys []string
+
+	mux := http.NewServeMux()
+	mux.HandleFunc("/v1/customers", func(w http.ResponseWriter, r *http.Request) {
+		keys = append(keys, r.Header.Get("Idempotency-Key"))
+		customerHandler(w, r)
+	})
+
+	srv := httptest.NewServer(mux)
+	defer srv.Close()
+	b := openWithServer(t, srv)
+	defer func() { _ = b.Close() }()
+
+	for range 2 {
+		if _, err := b.CreateCustomer(context.Background(), "Ada", "ada@example.com", ""); err != nil {
+			t.Fatalf("CreateCustomer() error = %v", err)
+		}
+	}
+
+	if len(keys) != 2 || keys[0] == "" || keys[1] == "" || keys[0] == keys[1] {
+		t.Fatalf("Idempotency-Key headers = %v, want two distinct non-empty values", keys)
+	}
+}
+
 func TestCreateSubscriptionGuards(t *testing.T) {
 	t.Parallel()
 	srv := httptest.NewServer(newDefaultMux(nil))
@@ -201,10 +275,10 @@ func TestCreateSubscriptionGuards(t *testing.T) {
 	}()
 	ctx := context.Background()
 
-	if _, err := b.CreateSubscription(ctx, "", "price_1"); !errors.Is(err, billing.ErrMissingCustomerID) {
+	if _, err := b.CreateSubscription(ctx, "", "price_1", ""); !errors.Is(err, billing.ErrMissingCustomerID) {
 		t.Errorf("expected ErrMissingCustomerID, got %v", err)
 	}
-	if _, err := b.CreateSubscription(ctx, "cus_1", ""); !errors.Is(err, billing.ErrMissingPlanID) {
+	if _, err := b.CreateSubscription(ctx, "cus_1", "", ""); !errors.Is(err, billing.ErrMissingPlanID) {
 		t.Errorf("expected ErrMissingPlanID, got %v", err)
 	}
 }
@@ -247,7 +321,7 @@ func TestCreateCustomerSDKError(t *testing.T) {
 	defer func() {
 		_ = b.Close()
 	}()
-	got, err := b.CreateCustomer(context.Background(), "Ada", "ada@example.com")
+	got, err := b.CreateCustomer(context.Background(), "Ada", "ada@example.com", "")
 	if err == nil {
 		t.Fatal("expected error, got nil")
 	}
@@ -269,7 +343,7 @@ func TestCreateSubscriptionSDKError(t *testing.T) {
 	defer func() {
 		_ = b.Close()
 	}()
-	got, err := b.CreateSubscription(context.Background(), "cus_1", "price_1")
+	got, err := b.CreateSubscription(context.Background(), "cus_1", "price_1", "")
 	if err == nil {
 		t.Fatal("expected error, got nil")
 	}

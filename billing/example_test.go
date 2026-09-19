@@ -19,7 +19,7 @@ func ExampleOpen() {
 	}
 	defer backend.Close()
 
-	customer, err := backend.CreateCustomer(context.Background(), "Ada", "ada@example.com")
+	customer, err := backend.CreateCustomer(context.Background(), "Ada", "ada@example.com", "")
 	if err != nil {
 		fmt.Println("create error")
 		return

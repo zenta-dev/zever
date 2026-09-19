@@ -20,7 +20,7 @@ type stubBilling struct {
 	invoice      Invoice
 }
 
-func (s *stubBilling) CreateCustomer(_ context.Context, name string, email string) (Customer, error) {
+func (s *stubBilling) CreateCustomer(_ context.Context, name, email, _ string) (Customer, error) {
 	c := s.customer
 	c.Name = name
 	c.Email = email
@@ -28,7 +28,7 @@ func (s *stubBilling) CreateCustomer(_ context.Context, name string, email strin
 	return c, nil
 }
 
-func (s *stubBilling) CreateSubscription(_ context.Context, customerID string, planID string) (Subscription, error) {
+func (s *stubBilling) CreateSubscription(_ context.Context, customerID, planID, _ string) (Subscription, error) {
 	sub := s.subscription
 	sub.CustomerID = customerID
 	sub.PlanID = planID
@@ -137,7 +137,7 @@ func TestOpen_success_smoke(t *testing.T) {
 
 	ctx := context.Background()
 
-	cus, err := got.CreateCustomer(ctx, "Ada", "ada@example.com")
+	cus, err := got.CreateCustomer(ctx, "Ada", "ada@example.com", "")
 	if err != nil {
 		t.Fatalf("CreateCustomer err = %v", err)
 	}
@@ -146,7 +146,7 @@ func TestOpen_success_smoke(t *testing.T) {
 		t.Fatalf("CreateCustomer = %+v, want ID %q", cus, wantCustomer.ID)
 	}
 
-	sub, err := got.CreateSubscription(ctx, cus.ID, "plan_pro")
+	sub, err := got.CreateSubscription(ctx, cus.ID, "plan_pro", "")
 	if err != nil {
 		t.Fatalf("CreateSubscription err = %v", err)
 	}

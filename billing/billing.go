@@ -10,10 +10,24 @@ import (
 // Billing defines the subscription and invoice contract for billing backends.
 // Implementations return the zero Customer, Subscription, or Invoice on error.
 type Billing interface {
-	// CreateCustomer creates a customer from name and email. It returns the zero Customer on error.
-	CreateCustomer(ctx context.Context, name string, email string) (Customer, error)
-	// CreateSubscription creates a subscription for customerID on planID. It returns the zero Subscription on error.
-	CreateSubscription(ctx context.Context, customerID string, planID string) (Subscription, error)
+	// CreateCustomer creates a customer from name and email. idempotencyKey,
+	// when non-empty, is passed to the backend's own idempotency mechanism
+	// (e.g. Stripe's Idempotency-Key header) so a caller-side retry of the
+	// same logical attempt (same key) does not create a second customer.
+	// Generate the key once per logical attempt and reuse it across
+	// retries of that attempt, never derive it from name/email alone: two
+	// distinct customers can legitimately share those. Backends without an
+	// equivalent mechanism ignore it. It returns the zero Customer on error.
+	CreateCustomer(ctx context.Context, name, email, idempotencyKey string) (Customer, error)
+	// CreateSubscription creates a subscription for customerID on planID.
+	// idempotencyKey has the same contract as CreateCustomer's: non-empty
+	// and reused across retries of one logical attempt, it prevents a
+	// retried request from creating a second, separately-billed
+	// subscription. Do not derive it from customerID/planID alone: a
+	// customer legitimately resubscribing to the same plan after
+	// cancellation must not be deduped against their prior subscription.
+	// It returns the zero Subscription on error.
+	CreateSubscription(ctx context.Context, customerID, planID, idempotencyKey string) (Subscription, error)
 	// CancelSubscription cancels subscription id.
 	CancelSubscription(ctx context.Context, id string) error
 	// GetInvoice fetches the invoice for customerID. It returns the zero Invoice on error.

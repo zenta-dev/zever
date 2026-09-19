@@ -183,7 +183,7 @@ func TestBillingFlow_full(t *testing.T) {
 	b := openTest(t, srv.URL)
 	ctx := context.Background()
 
-	c, err := b.CreateCustomer(ctx, "Bob & Co", "bob+co@example.com")
+	c, err := b.CreateCustomer(ctx, "Bob & Co", "bob+co@example.com", "")
 	if err != nil {
 		t.Fatalf("CreateCustomer: %v", err)
 	}
@@ -192,7 +192,7 @@ func TestBillingFlow_full(t *testing.T) {
 		t.Fatalf("unexpected customer: %+v", c)
 	}
 
-	nameless, err := b.CreateCustomer(ctx, "", "anon@example.com")
+	nameless, err := b.CreateCustomer(ctx, "", "anon@example.com", "")
 	if err != nil {
 		t.Fatalf("CreateCustomer nameless: %v", err)
 	}
@@ -201,7 +201,7 @@ func TestBillingFlow_full(t *testing.T) {
 		t.Fatalf("nameless customer name = %q, want empty", nameless.Name)
 	}
 
-	s, err := b.CreateSubscription(ctx, c.ID, "pri_1")
+	s, err := b.CreateSubscription(ctx, c.ID, "pri_1", "")
 	if err != nil {
 		t.Fatalf("CreateSubscription: %v", err)
 	}
@@ -262,7 +262,7 @@ func TestGuards(t *testing.T) {
 	t.Run("create subscription missing customer", func(t *testing.T) {
 		t.Parallel()
 
-		if _, err := b.CreateSubscription(ctx, "", "pri_1"); !errors.Is(err, billing.ErrMissingCustomerID) {
+		if _, err := b.CreateSubscription(ctx, "", "pri_1", ""); !errors.Is(err, billing.ErrMissingCustomerID) {
 			t.Fatalf("err = %v, want ErrMissingCustomerID", err)
 		}
 	})
@@ -270,7 +270,7 @@ func TestGuards(t *testing.T) {
 	t.Run("create subscription missing plan", func(t *testing.T) {
 		t.Parallel()
 
-		if _, err := b.CreateSubscription(ctx, "ctm_1", ""); !errors.Is(err, billing.ErrMissingPlanID) {
+		if _, err := b.CreateSubscription(ctx, "ctm_1", "", ""); !errors.Is(err, billing.ErrMissingPlanID) {
 			t.Fatalf("err = %v, want ErrMissingPlanID", err)
 		}
 	})
@@ -300,7 +300,7 @@ func TestCreateCustomer_sdkError_returnsZero(t *testing.T) {
 	}))
 	defer srv.Close()
 
-	got, err := openTest(t, srv.URL).CreateCustomer(context.Background(), "A", "a@example.com")
+	got, err := openTest(t, srv.URL).CreateCustomer(context.Background(), "A", "a@example.com", "")
 	if err == nil {
 		t.Fatal("expected error")
 	}
@@ -322,7 +322,7 @@ func TestCreateSubscription_sdkError_returnsZero(t *testing.T) {
 	}))
 	defer srv.Close()
 
-	got, err := openTest(t, srv.URL).CreateSubscription(context.Background(), "ctm_1", "pri_1")
+	got, err := openTest(t, srv.URL).CreateSubscription(context.Background(), "ctm_1", "pri_1", "")
 	if err == nil {
 		t.Fatal("expected error")
 	}
@@ -530,7 +530,7 @@ func TestConcurrent_20(t *testing.T) {
 		go func() {
 			defer wg.Done()
 
-			_, err := b.CreateCustomer(context.Background(), "C", "c@example.com")
+			_, err := b.CreateCustomer(context.Background(), "C", "c@example.com", "")
 			errs <- err
 		}()
 	}
