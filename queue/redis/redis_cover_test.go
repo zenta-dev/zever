@@ -840,3 +840,96 @@ func (f *fakeClientReclaimBatch) EvalSha(ctx context.Context, _ string, _ []stri
 	}
 	return cmd
 }
+
+// fakeClientSweepCounter counts promoteDue/reclaimStale script calls
+// (distinguished from tryClaim by key shape: promote uses 2 keys, claim's
+// first key is readyKey, reclaim's first key is processingKey) separately
+// from claim attempts, so popLoop's sweep-throttling can be verified
+// without conflating it with the unthrottled claim attempts.
+type fakeClientSweepCounter struct {
+	fakeClient
+	readyKey      string
+	processingKey string
+	sweepCalls    int
+	claimCalls    int
+}
+
+func (f *fakeClientSweepCounter) countKeys(keys []string) {
+	switch {
+	case len(keys) == 2:
+		f.sweepCalls++ // promoteDue
+	case len(keys) == 3 && keys[0] == f.processingKey:
+		f.sweepCalls++ // reclaimStale
+	case len(keys) == 3 && keys[0] == f.readyKey:
+		f.claimCalls++ // tryClaim
+	}
+}
+
+func (f *fakeClientSweepCounter) Eval(ctx context.Context, _ string, keys []string, _ ...any) *goredis.Cmd {
+	f.countKeys(keys)
+	cmd := goredis.NewCmd(ctx, "eval")
+	cmd.SetVal(int64(0))
+	return cmd
+}
+
+func (f *fakeClientSweepCounter) EvalSha(ctx context.Context, _ string, keys []string, _ ...any) *goredis.Cmd {
+	f.countKeys(keys)
+	cmd := goredis.NewCmd(ctx, "evalsha")
+	cmd.SetVal(int64(0))
+	return cmd
+}
+
+// TestRedisCover_PopLoopThrottlesSweep verifies that popLoop only runs the
+// promoteDue/reclaimStale sweep once per sweepInterval, not on every
+// iteration of its internal claim loop.
+func TestRedisCover_PopLoopThrottlesSweep(t *testing.T) {
+	ctx := context.Background()
+
+	a := &redisAdapter{
+		client:            &fakeClient{}, // placeholder, replaced below
+		visibilityTimeout: time.Second,
+	}
+	fake := &fakeClientSweepCounter{
+		readyKey:      a.readyKey("t"),
+		processingKey: a.processingKey("t"),
+	}
+	fake.blPopErr = goredis.Nil
+	a.client = fake
+
+	// A short poll timeout bounds how long the tight non-blocking claim
+	// loop spins (BLPop returns immediately via the fake), while staying
+	// well under sweepInterval so only the first iteration's sweep runs.
+	poll := time.NewTimer(20 * time.Millisecond)
+	defer poll.Stop()
+
+	_, err := a.popLoop(ctx, "t", a.readyKey("t"), a.processingKey("t"), a.deadlineKey("t"), poll, time.Millisecond)
+	var emptyErr *queue.EmptyError
+	if err != nil && !errors.As(err, &emptyErr) {
+		t.Fatalf("popLoop() error = %v, want nil or EmptyError", err)
+	}
+
+	if fake.claimCalls == 0 {
+		t.Fatal("claimCalls = 0, want tryClaim attempted at least once")
+	}
+
+	// One sweep window runs both promoteDue and reclaimStale exactly once,
+	// so sweepCalls counts 2 regardless of how many claim attempts happen.
+	if fake.sweepCalls != 2 {
+		t.Errorf("sweepCalls = %d, want exactly 2 (1 promoteDue + 1 reclaimStale, throttled across %d claim attempts)", fake.sweepCalls, fake.claimCalls)
+	}
+
+	// After sweepInterval elapses, a fresh popLoop call must sweep again.
+	time.Sleep(sweepInterval + 20*time.Millisecond)
+
+	poll2 := time.NewTimer(20 * time.Millisecond)
+	defer poll2.Stop()
+
+	_, err = a.popLoop(ctx, "t", a.readyKey("t"), a.processingKey("t"), a.deadlineKey("t"), poll2, time.Millisecond)
+	if err != nil && !errors.As(err, &emptyErr) {
+		t.Fatalf("second popLoop() error = %v, want nil or EmptyError", err)
+	}
+
+	if fake.sweepCalls != 4 {
+		t.Errorf("sweepCalls after sweepInterval = %d, want 4 (2 more: 1 promoteDue + 1 reclaimStale)", fake.sweepCalls)
+	}
+}

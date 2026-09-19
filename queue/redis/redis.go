@@ -51,6 +51,14 @@ type redisClient interface {
 	ScriptLoad(ctx context.Context, script string) *goredis.StringCmd
 }
 
+// sweepInterval bounds how often popLoop runs promoteDue/reclaimStale: an
+// idle Pop otherwise sends both Lua scripts to Redis on every poll tick
+// (every blockTimeout, ~100ms), which is unnecessary overhead when nothing
+// is due or stale. Gating the sweep to this cadence trades up to
+// sweepInterval of extra recovery latency for a due/stale message for far
+// fewer idle round trips.
+const sweepInterval = 250 * time.Millisecond
+
 type redisAdapter struct {
 	client            redisClient
 	rawClient         *goredis.Client
@@ -58,6 +66,7 @@ type redisAdapter struct {
 	visibilityTimeout time.Duration
 	pollTimeout       time.Duration
 	buffer            int
+	lastSweep         atomic.Int64
 	closed            atomic.Bool
 }
 
@@ -347,14 +356,19 @@ func (a *redisAdapter) popLoop(
 	blockTimeout time.Duration,
 ) (string, error) {
 	for {
-		now := strconv.FormatInt(time.Now().UnixMilli(), 10)
+		nowMillis := time.Now().UnixMilli()
+		now := strconv.FormatInt(nowMillis, 10)
 
-		if err := a.promoteDue(ctx, topic); err != nil {
-			return "", err
-		}
+		if last := a.lastSweep.Load(); nowMillis-last >= sweepInterval.Milliseconds() {
+			if a.lastSweep.CompareAndSwap(last, nowMillis) {
+				if err := a.promoteDue(ctx, topic); err != nil {
+					return "", err
+				}
 
-		if err := a.reclaimStale(ctx, topic); err != nil {
-			return "", err
+				if err := a.reclaimStale(ctx, topic); err != nil {
+					return "", err
+				}
+			}
 		}
 
 		raw, claimed, err := a.tryClaim(ctx, readyKey, processingKey, deadlineKey, now)
