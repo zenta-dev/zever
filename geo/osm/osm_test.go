@@ -9,6 +9,7 @@ import (
 	"net/http/httptest"
 	"net/url"
 	"strings"
+	"sync"
 	"testing"
 	"time"
 
@@ -988,5 +989,100 @@ func TestReverse_NullArray(t *testing.T) {
 	_, err := g.ReverseGeocode(context.Background(), 0, 0)
 	if !errors.Is(err, geo.ErrNotFound) {
 		t.Fatalf("expected ErrNotFound for null, got %v", err)
+	}
+}
+
+func TestPace_SpacesOutRequests(t *testing.T) {
+	t.Parallel()
+
+	var mu sync.Mutex
+
+	var times []time.Time
+
+	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, _ *http.Request) {
+		mu.Lock()
+		times = append(times, time.Now())
+		mu.Unlock()
+		w.Header().Set("Content-Type", "application/json")
+		fmt.Fprint(w, `[{"place_id":1,"lat":"1","lon":"1","display_name":"x"}]`)
+	}))
+	defer srv.Close()
+
+	g, err := New(geo.Options{Endpoint: srv.URL, UserAgent: "app/1.0", AllowInsecure: true})
+	if err != nil {
+		t.Fatalf("New: %v", err)
+	}
+
+	m, ok := g.(*osmGeo)
+	if !ok {
+		t.Fatalf("New() type = %T, want *osmGeo", g)
+	}
+
+	const interval = 50 * time.Millisecond
+	m.minInterval = interval
+
+	for range 3 {
+		if _, err := m.Geocode(context.Background(), "x"); err != nil {
+			t.Fatalf("Geocode: %v", err)
+		}
+	}
+
+	mu.Lock()
+	defer mu.Unlock()
+
+	if len(times) != 3 {
+		t.Fatalf("got %d requests, want 3", len(times))
+	}
+
+	const tolerance = 5 * time.Millisecond
+
+	for i := 1; i < len(times); i++ {
+		gap := times[i].Sub(times[i-1])
+		if gap < interval-tolerance {
+			t.Errorf("request %d gap = %v, want >= ~%v", i, gap, interval)
+		}
+	}
+}
+
+func TestPace_ContextCanceledDuringWait(t *testing.T) {
+	t.Parallel()
+
+	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, _ *http.Request) {
+		w.Header().Set("Content-Type", "application/json")
+		fmt.Fprint(w, `[{"place_id":1,"lat":"1","lon":"1","display_name":"x"}]`)
+	}))
+	defer srv.Close()
+
+	g, err := New(geo.Options{Endpoint: srv.URL, UserAgent: "app/1.0", AllowInsecure: true})
+	if err != nil {
+		t.Fatalf("New: %v", err)
+	}
+
+	m, ok := g.(*osmGeo)
+	if !ok {
+		t.Fatalf("New() type = %T, want *osmGeo", g)
+	}
+
+	m.minInterval = time.Hour
+	if _, gerr := m.Geocode(context.Background(), "x"); gerr != nil {
+		t.Fatalf("first Geocode: %v", gerr)
+	}
+
+	ctx, cancel := context.WithTimeout(context.Background(), 20*time.Millisecond)
+	defer cancel()
+
+	_, err = m.Geocode(ctx, "x")
+	if !errors.Is(err, context.DeadlineExceeded) {
+		t.Fatalf("Geocode during pace wait err = %v, want context.DeadlineExceeded", err)
+	}
+}
+
+func TestPace_ZeroIntervalDisabled(t *testing.T) {
+	t.Parallel()
+
+	m := &osmGeo{endpoint: "https://example.com"}
+
+	if err := m.pace(context.Background()); err != nil {
+		t.Fatalf("pace() with zero minInterval err = %v, want nil", err)
 	}
 }
