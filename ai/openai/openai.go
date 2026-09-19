@@ -254,6 +254,7 @@ func (a *adapter) Stream(ctx context.Context, model string, messages []ai.Messag
 	ch := make(chan ai.StreamChunk)
 	go func() {
 		defer close(ch)
+		defer stream.Close()
 
 		var finishReason string
 

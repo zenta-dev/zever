@@ -132,7 +132,11 @@ func (a *adapter) Stream(ctx context.Context, model string, messages []ai.Messag
 
 		for resp, err := range iter {
 			if err != nil {
-				ch <- ai.StreamChunk{Err: mapAndRedact(err, a.apiKey)}
+				select {
+				case ch <- ai.StreamChunk{Err: mapAndRedact(err, a.apiKey)}:
+				case <-ctx.Done():
+				}
+
 				return
 			}
 
@@ -154,21 +158,33 @@ func (a *adapter) Stream(ctx context.Context, model string, messages []ai.Messag
 					if p.FunctionCall != nil {
 						args, _ := funcArgsCodec.Encode(p.FunctionCall.Args) //nolint:errcheck
 
-						ch <- ai.StreamChunk{
+						select {
+						case ch <- ai.StreamChunk{
 							ToolCallID:    "",
 							ToolName:      p.FunctionCall.Name,
 							ToolArgsDelta: string(args),
+						}:
+						case <-ctx.Done():
+							return
 						}
 					}
 				}
 
 				delta := sbDelta.String()
 				if delta != "" {
-					ch <- ai.StreamChunk{Delta: delta}
+					select {
+					case ch <- ai.StreamChunk{Delta: delta}:
+					case <-ctx.Done():
+						return
+					}
 				}
 
 				if cand.FinishReason != "" {
-					ch <- ai.StreamChunk{Done: true, FinishReason: string(cand.FinishReason)}
+					select {
+					case ch <- ai.StreamChunk{Done: true, FinishReason: string(cand.FinishReason)}:
+					case <-ctx.Done():
+						return
+					}
 				}
 
 				if resp.UsageMetadata != nil {
@@ -176,12 +192,20 @@ func (a *adapter) Stream(ctx context.Context, model string, messages []ai.Messag
 						PromptTokens:     int(resp.UsageMetadata.PromptTokenCount),
 						CompletionTokens: int(resp.UsageMetadata.CandidatesTokenCount),
 					}
-					ch <- ai.StreamChunk{Usage: &u}
+
+					select {
+					case ch <- ai.StreamChunk{Usage: &u}:
+					case <-ctx.Done():
+						return
+					}
 				}
 			}
 		}
 
-		ch <- ai.StreamChunk{Done: true}
+		select {
+		case ch <- ai.StreamChunk{Done: true}:
+		case <-ctx.Done():
+		}
 	}()
 
 	return ch, nil

@@ -588,11 +588,44 @@ func TestGenerate_ToolCallInvalidJSON(t *testing.T) {
 	}
 }
 
+// anthropicSSEBody is the real Anthropic Messages streaming wire format:
+// message_start, one text content block (start/delta/stop), one tool_use
+// content block (start/delta/stop), message_delta (stop_reason/usage),
+// message_stop.
+const anthropicSSEBody = `event: message_start
+data: {"type":"message_start","message":{"id":"m","type":"message","role":"assistant","content":[],"model":"c","stop_reason":null,"usage":{"input_tokens":1,"output_tokens":0}}}
+
+event: content_block_start
+data: {"type":"content_block_start","index":0,"content_block":{"type":"text","text":""}}
+
+event: content_block_delta
+data: {"type":"content_block_delta","index":0,"delta":{"type":"text_delta","text":"hello"}}
+
+event: content_block_stop
+data: {"type":"content_block_stop","index":0}
+
+event: content_block_start
+data: {"type":"content_block_start","index":1,"content_block":{"type":"tool_use","id":"tid","name":"mytool","input":{}}}
+
+event: content_block_delta
+data: {"type":"content_block_delta","index":1,"delta":{"type":"input_json_delta","partial_json":"{\"a\":1}"}}
+
+event: content_block_stop
+data: {"type":"content_block_stop","index":1}
+
+event: message_delta
+data: {"type":"message_delta","delta":{"stop_reason":"end_turn"},"usage":{"output_tokens":2}}
+
+event: message_stop
+data: {"type":"message_stop"}
+
+`
+
 func TestStream_ChunkOrdering(t *testing.T) {
 	t.Parallel()
 	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		w.Header().Set("Content-Type", "application/json")
-		_, _ = w.Write([]byte(`{"id":"m","type":"message","role":"assistant","content":[{"type":"text","text":"hello"},{"type":"tool_use","id":"tid","name":"mytool","input":{"a":1}}],"model":"c","stop_reason":"end_turn","usage":{"input_tokens":1,"output_tokens":2}}`))
+		w.Header().Set("Content-Type", "text/event-stream")
+		_, _ = fmt.Fprint(w, anthropicSSEBody)
 	}))
 	defer srv.Close()
 	client := anthropic.NewClient(option.WithBaseURL(srv.URL), option.WithAPIKey("k"))
@@ -635,12 +668,69 @@ func TestStream_ChunkOrdering(t *testing.T) {
 	}
 }
 
+// TestStream_DeliversChunksIncrementally is the regression test for the
+// fixed fake-streaming bug: Stream used to call Generate synchronously
+// (blocking for the complete response) and only then trickle it out as one
+// lump chunk, so the first chunk could never arrive before the server
+// finished sending. With real SSE streaming, the first content_block_delta
+// must reach the client while the server is still blocked mid-response,
+// before it has sent the tool-call event or later chunks.
+func TestStream_DeliversChunksIncrementally(t *testing.T) {
+	t.Parallel()
+
+	serverContinue := make(chan struct{})
+
+	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		w.Header().Set("Content-Type", "text/event-stream")
+
+		_, _ = fmt.Fprint(w, "event: message_start\ndata: {\"type\":\"message_start\",\"message\":{\"id\":\"m\",\"type\":\"message\",\"role\":\"assistant\",\"content\":[],\"model\":\"c\",\"stop_reason\":null,\"usage\":{\"input_tokens\":1,\"output_tokens\":0}}}\n\n")
+		_, _ = fmt.Fprint(w, "event: content_block_start\ndata: {\"type\":\"content_block_start\",\"index\":0,\"content_block\":{\"type\":\"text\",\"text\":\"\"}}\n\n")
+		_, _ = fmt.Fprint(w, "event: content_block_delta\ndata: {\"type\":\"content_block_delta\",\"index\":0,\"delta\":{\"type\":\"text_delta\",\"text\":\"first\"}}\n\n")
+		if f, ok := w.(http.Flusher); ok {
+			f.Flush()
+		}
+
+		// Block here: the client must be able to read "first" now, before
+		// this handler is allowed to send the rest of the response.
+		<-serverContinue
+
+		_, _ = fmt.Fprint(w, "event: content_block_stop\ndata: {\"type\":\"content_block_stop\",\"index\":0}\n\n")
+		_, _ = fmt.Fprint(w, "event: message_delta\ndata: {\"type\":\"message_delta\",\"delta\":{\"stop_reason\":\"end_turn\"},\"usage\":{\"output_tokens\":1}}\n\n")
+		_, _ = fmt.Fprint(w, "event: message_stop\ndata: {\"type\":\"message_stop\"}\n\n")
+	}))
+	defer srv.Close()
+
+	client := anthropic.NewClient(option.WithBaseURL(srv.URL), option.WithAPIKey("k"))
+	a := &adapter{client: &client, model: "m"}
+
+	ch, err := a.Stream(context.Background(), "", []ai.Message{{Role: ai.RoleUser, Content: "hi"}}, ai.GenerateOptions{})
+	if err != nil {
+		t.Fatalf("Stream err = %v", err)
+	}
+
+	select {
+	case chunk, ok := <-ch:
+		if !ok {
+			t.Fatal("channel closed before first chunk arrived")
+		}
+		if chunk.Delta != "first" {
+			t.Fatalf("first chunk = %q, want %q", chunk.Delta, "first")
+		}
+	case <-time.After(2 * time.Second):
+		t.Fatal("timed out waiting for first chunk: streaming is not incremental")
+	}
+
+	close(serverContinue)
+
+	for range ch { //nolint:revive // drain until closed
+	}
+}
+
 func TestStream_ContextCancel(t *testing.T) {
 	t.Parallel()
 	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		// delay to allow cancel before stream starts? But fallback Generate returns immediately
-		w.Header().Set("Content-Type", "application/json")
-		_, _ = w.Write([]byte(`{"id":"m","type":"message","role":"assistant","content":[{"type":"text","text":"long content"}],"model":"c","stop_reason":"end_turn","usage":{"input_tokens":1,"output_tokens":1}}`))
+		w.Header().Set("Content-Type", "text/event-stream")
+		_, _ = fmt.Fprint(w, anthropicSSEBody)
 	}))
 	defer srv.Close()
 	client := anthropic.NewClient(option.WithBaseURL(srv.URL), option.WithAPIKey("k"))
@@ -678,10 +768,26 @@ func TestStream_ErrorMapping(t *testing.T) {
 	defer srv.Close()
 	client := anthropic.NewClient(option.WithBaseURL(srv.URL), option.WithAPIKey("k"), option.WithMaxRetries(0))
 	a := &adapter{client: &client, model: "m"}
-	_, err := a.Stream(context.Background(), "", []ai.Message{{Role: ai.RoleUser, Content: "hi"}}, ai.GenerateOptions{})
-	if !errors.Is(err, ai.ErrAuth) {
-		t.Fatalf("stream err %v want ErrAuth", err)
+
+	// With real SSE streaming, Stream itself returns (ch, nil) immediately;
+	// a header-level error surfaces asynchronously as a StreamChunk.Err,
+	// matching ai/openai's TestStream_ErrorMapping convention.
+	ch, err := a.Stream(context.Background(), "", []ai.Message{{Role: ai.RoleUser, Content: "hi"}}, ai.GenerateOptions{})
+	if err != nil {
+		t.Fatalf("Stream err %v, want nil", err)
 	}
+
+	for chunk := range ch {
+		if chunk.Err != nil {
+			if !errors.Is(chunk.Err, ai.ErrAuth) {
+				t.Fatalf("chunk err = %v, want ErrAuth", chunk.Err)
+			}
+
+			return
+		}
+	}
+
+	t.Fatal("want error chunk")
 }
 
 func TestGenerate_ContextCancel(t *testing.T) {
@@ -829,8 +935,8 @@ func TestGenerate_ToolUseNullInput(t *testing.T) {
 func TestStream_CancelMidStream(t *testing.T) {
 	t.Parallel()
 	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		w.Header().Set("Content-Type", "application/json")
-		_, _ = w.Write([]byte(`{"id":"m","type":"message","role":"assistant","content":[{"type":"text","text":"hello"},{"type":"tool_use","id":"tid","name":"t","input":{"a":1}}],"model":"c","stop_reason":"end_turn","usage":{"input_tokens":1,"output_tokens":1}}`))
+		w.Header().Set("Content-Type", "text/event-stream")
+		_, _ = fmt.Fprint(w, anthropicSSEBody)
 	}))
 	defer srv.Close()
 	client := anthropic.NewClient(option.WithBaseURL(srv.URL), option.WithAPIKey("k"))
@@ -860,8 +966,8 @@ func TestStream_CancelMidStream(t *testing.T) {
 func TestStream_CancelBeforeDone(t *testing.T) {
 	t.Parallel()
 	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		w.Header().Set("Content-Type", "application/json")
-		_, _ = w.Write([]byte(`{"id":"m","type":"message","role":"assistant","content":[{"type":"text","text":"hello"}],"model":"c","stop_reason":"end_turn","usage":{"input_tokens":1,"output_tokens":1}}`))
+		w.Header().Set("Content-Type", "text/event-stream")
+		_, _ = fmt.Fprint(w, anthropicSSEBody)
 	}))
 	defer srv.Close()
 	client := anthropic.NewClient(option.WithBaseURL(srv.URL), option.WithAPIKey("k"))
@@ -898,8 +1004,8 @@ func TestStream_CancelBeforeDone(t *testing.T) {
 func TestStream_CancelDuringToolCalls(t *testing.T) {
 	t.Parallel()
 	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		w.Header().Set("Content-Type", "application/json")
-		_, _ = w.Write([]byte(`{"id":"m","type":"message","role":"assistant","content":[{"type":"text","text":"hi"},{"type":"tool_use","id":"id1","name":"tool1","input":{"a":1}},{"type":"tool_use","id":"id2","name":"tool2","input":{"b":2}}],"model":"c","stop_reason":"tool_use","usage":{"input_tokens":1,"output_tokens":1}}`))
+		w.Header().Set("Content-Type", "text/event-stream")
+		_, _ = fmt.Fprint(w, anthropicSSEBody)
 	}))
 	defer srv.Close()
 	client := anthropic.NewClient(option.WithBaseURL(srv.URL), option.WithAPIKey("k"))
