@@ -13,6 +13,10 @@ type Policy struct {
 	// AuthRequired enforces bearer token verification when true.
 	AuthRequired bool
 	// Roles carries the candidate roles evaluated by the permission checker.
+	// Ignored when AuthRequired is false: an unauthenticated caller has no
+	// verified identity, so it is never evaluated as holding any role --
+	// only rules that apply regardless of role (e.g. a public wildcard
+	// rule) can allow an anonymous PermissionCheck.
 	Roles []string
 	// PermissionCheck names the action passed to the checker; empty skips checks.
 	PermissionCheck string
@@ -45,9 +49,14 @@ func Authorize(ctx context.Context, a auth.Auth, p permission.Checker, pol Polic
 		return claims, nil
 	}
 
+	var roles []string
+	if pol.AuthRequired {
+		roles = pol.Roles
+	}
+
 	subject := permission.Subject{
 		ID:         claims.Subject,
-		Roles:      pol.Roles,
+		Roles:      roles,
 		Attributes: stringAttrs(claims.Custom),
 	}
 
