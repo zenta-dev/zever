@@ -102,6 +102,24 @@ func TestCan_matrix(t *testing.T) {
 			reason:   "implicit_deny",
 		},
 		{
+			name:     "owned only empty subject ID missing attr denied",
+			rules:    []permission.Rule{{Role: "editor", Action: "write", OwnedOnly: true, OwnedAttr: "owner"}},
+			subject:  permission.Subject{ID: "", Roles: []string{"editor"}},
+			action:   "write",
+			resource: permission.Resource{Type: "doc", ID: "d1"},
+			allowed:  false,
+			reason:   "implicit_deny",
+		},
+		{
+			name:     "owned only empty subject ID empty attr denied",
+			rules:    []permission.Rule{{Role: "editor", Action: "write", OwnedOnly: true, OwnedAttr: "owner"}},
+			subject:  permission.Subject{ID: "", Roles: []string{"editor"}},
+			action:   "write",
+			resource: permission.Resource{Type: "doc", ID: "d1", Attributes: map[string]string{"owner": ""}},
+			allowed:  false,
+			reason:   "implicit_deny",
+		},
+		{
 			name: "explicit deny wins over allow",
 			rules: []permission.Rule{
 				{Role: "admin", Action: "delete"},

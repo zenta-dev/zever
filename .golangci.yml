@@ -26,6 +26,7 @@ linters:
     - dupl
     - errname
     - errorlint
+    - exhaustive
     - forcetypeassert
     - gocritic
     - godot
@@ -61,6 +62,9 @@ linters:
               desc: "Deprecated since Go 1.16: use io or os instead"
     errorlint:
       errorf: true
+    exhaustive:
+      default-signifies-exhaustive: false
+      package-scope-only: false
     govet:
       enable:
         - shadow

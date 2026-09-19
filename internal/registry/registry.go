@@ -83,7 +83,7 @@ func isNilFactory[F any](factory F) bool {
 	}
 
 	v := reflect.ValueOf(factory)
-	switch v.Kind() {
+	switch v.Kind() { //nolint:exhaustive // default is false: only kinds that can hold a typed nil are checked
 	case reflect.Chan,
 		reflect.Func,
 		reflect.Interface,

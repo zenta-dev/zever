@@ -15,7 +15,6 @@ import (
 	goredis "github.com/redis/go-redis/v9"
 
 	"github.com/zenta-dev/zever/idempotency"
-	zredis "github.com/zenta-dev/zever/internal/redis"
 )
 
 // discardRespCommand reads one RESP array (command) from r and drops it.
@@ -206,18 +205,8 @@ func TestCover_NewExplicit(t *testing.T) {
 	}
 }
 
-// Sequential on purpose: the dead address replaces the shared pool
-// client, so it must not run alongside other tests. It restores the
-// shared client afterwards for file-order independence.
 func TestCover_NewPingFail(t *testing.T) {
-	defer func() {
-		_ = zredis.Close()
-
-		_, rerr := New(testOptions())
-		if rerr != nil {
-			t.Errorf("restore New err = %v, want nil", rerr)
-		}
-	}()
+	t.Parallel()
 
 	opts := testOptions()
 	opts.Redis.Addr = "127.0.0.1:1"

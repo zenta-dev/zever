@@ -39,9 +39,21 @@ type Rows interface {
 	Err() error
 }
 
-// Preparer is implemented by adapters that support server-side prepared statements.
+// Preparer is implemented by adapters that support server-side prepared
+// statements.
+//
+// Callers that prepare a statement per query text and Close it immediately
+// after use (see orm/prepared.go) rely on repeated Prepare(ctx, sameQuery)
+// followed by Close being cheap -- typically because the adapter caches
+// statements internally (e.g. db/sqlite keeps an LRU keyed by SQL text and
+// makes Stmt.Close a no-op). Callers are not required to hold a Stmt open
+// across calls, so an adapter that cannot offer cheap reuse this way should
+// document that deviation clearly on its own Prepare/Close implementations.
 type Preparer interface {
-	// Prepare creates a reusable statement for query.
+	// Prepare creates a reusable statement for query. Implementations
+	// should make repeated Prepare(ctx, sameQuery) + Close cheap (e.g. via
+	// an internal cache), since callers may not hold statements open
+	// across calls.
 	Prepare(ctx context.Context, query string) (Stmt, error)
 }
 
@@ -51,7 +63,8 @@ type Stmt interface {
 	Query(ctx context.Context, args ...any) (Rows, error)
 	// Exec runs the statement and returns the number of rows it affected.
 	Exec(ctx context.Context, args ...any) (int64, error)
-	// Close releases the prepared statement.
+	// Close releases the prepared statement. See Preparer for the
+	// cheap-repeated-use contract callers rely on.
 	Close() error
 }
 
