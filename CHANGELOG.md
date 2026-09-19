@@ -237,6 +237,24 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   caller during cold start race its own `CollectionExists`/
   `CreateCollection` round trip: the first caller now leads while others
   wait, and a failed attempt is still retried by the next caller.
+- `ai/gemini` adapter's `Stream` sent chunks to its output channel with a
+  bare `ch <- ...` at every yield point (text delta, tool call, finish
+  reason, usage, and the final done marker). If the caller cancelled its
+  context and stopped draining the channel — the expected behavior on
+  cancellation — the goroutine blocked forever on the next send, leaking
+  it along with the underlying SSE response. Every send now uses
+  `select { case ch <- ...: case <-ctx.Done(): return }`, matching the
+  guard already used by the `ai/anthropic` and `ai/openai` adapters.
+- `ai/openai`'s `Stream` never closed the underlying SSE stream on any
+  exit path (early return on context cancellation, error, or normal
+  completion), leaking the HTTP response body every time a caller aborted
+  generation or a stream errored mid-flight.
+- `ai/anthropic`'s `Stream` silently degraded to full-buffering: it called
+  the synchronous `Generate` and trickled the already-complete response out
+  as one chunk, unlike `ai/openai`/`ai/gemini`/`ai/ollama`, which all
+  stream incrementally. Now uses the SDK's real SSE streaming
+  (`Messages.NewStreaming`) with its official event accumulator, so
+  content arrives token-by-token as the model generates it.
 - `document/latex` now compiles with `-no-shell-escape`, disabling LaTeX's
   `\write18` arbitrary-shell-command primitive regardless of the host's
   `texmf.cnf` defaults. Source is caller-supplied LaTeX (e.g. an invoice

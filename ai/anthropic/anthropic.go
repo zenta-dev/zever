@@ -182,7 +182,27 @@ func (a *adapter) Generate(ctx context.Context, model string, messages []ai.Mess
 	if model == "" {
 		return ai.Generation{}, errors.New("anthropic: generate: model is required") //nolint:perfsprint
 	}
-	// system blocks
+
+	params := buildMessageParams(model, messages, opts)
+
+	resp, err := a.client.Messages.New(ctx, params)
+	if err != nil {
+		return ai.Generation{}, mapGenerateError(err)
+	}
+
+	return messageToGeneration(*resp)
+}
+
+// Embed not supported.
+func (a *adapter) Embed(_ context.Context, _ string, _ []string, _ ai.EmbedOptions) ([][]float32, error) {
+	return nil, fmt.Errorf("anthropic: embed: %w", ai.ErrNotSupported)
+}
+
+// buildMessageParams builds the shared MessageNewParams both Generate and
+// Stream send: system/message blocks, tools, and tool-choice, from the
+// same ai.Message/ai.GenerateOptions inputs. model must already be
+// resolved (non-empty).
+func buildMessageParams(model string, messages []ai.Message, opts ai.GenerateOptions) anthropic.MessageNewParams {
 	var system []anthropic.TextBlockParam
 	msgs := make([]anthropic.MessageParam, 0, len(messages))
 	for _, m := range messages {
@@ -304,15 +324,18 @@ func (a *adapter) Generate(ctx context.Context, model string, messages []ai.Mess
 		}
 	}
 
-	resp, err := a.client.Messages.New(ctx, params)
-	if err != nil {
-		return ai.Generation{}, mapGenerateError(err)
-	}
+	return params
+}
+
+// messageToGeneration converts a complete anthropic.Message -- whether
+// returned directly by Messages.New or built incrementally by Stream's
+// event accumulator -- into an ai.Generation.
+func messageToGeneration(msg anthropic.Message) (ai.Generation, error) {
 	var (
 		content   string
 		toolCalls []ai.ToolCall
 	)
-	for _, block := range resp.Content {
+	for _, block := range msg.Content {
 		switch block.Type {
 		case "text":
 			content += block.Text
@@ -328,18 +351,18 @@ func (a *adapter) Generate(ctx context.Context, model string, messages []ai.Mess
 			})
 		}
 	}
-	promptTokens, err := safeInt64ToInt(resp.Usage.InputTokens)
+	promptTokens, err := safeInt64ToInt(msg.Usage.InputTokens)
 	if err != nil {
 		return ai.Generation{}, fmt.Errorf("anthropic: input_tokens overflow: %w", err)
 	}
-	completionTokens, err := safeInt64ToInt(resp.Usage.OutputTokens)
+	completionTokens, err := safeInt64ToInt(msg.Usage.OutputTokens)
 	if err != nil {
 		return ai.Generation{}, fmt.Errorf("anthropic: output_tokens overflow: %w", err)
 	}
 	return ai.Generation{
 		Content:      content,
 		ToolCalls:    toolCalls,
-		FinishReason: string(resp.StopReason),
+		FinishReason: string(msg.StopReason),
 		Usage: ai.Usage{
 			PromptTokens:     promptTokens,
 			CompletionTokens: completionTokens,
@@ -347,41 +370,108 @@ func (a *adapter) Generate(ctx context.Context, model string, messages []ai.Mess
 	}, nil
 }
 
-// Embed not supported.
-func (a *adapter) Embed(_ context.Context, _ string, _ []string, _ ai.EmbedOptions) ([][]float32, error) {
-	return nil, fmt.Errorf("anthropic: embed: %w", ai.ErrNotSupported)
+// toolBlockMeta tracks the id/name a tool_use content block was announced
+// with (content_block_start), so later content_block_delta partial_json
+// fragments for the same block index can be emitted with the right
+// ToolCallID/ToolName.
+type toolBlockMeta struct {
+	id   string
+	name string
 }
 
-// Stream returns a channel that emits content deltas then done, respecting context cancel.
+// Stream returns a channel that emits content deltas incrementally as they
+// arrive over SSE, then a final Done chunk with usage/finish reason.
+// Respects context cancellation. The accumulator (acc.Accumulate) builds
+// the complete anthropic.Message alongside the incremental emission so the
+// final chunk's usage/finish-reason/tool-call data comes from the same
+// conversion Generate uses (messageToGeneration), not hand-reconstructed
+// from raw deltas.
 func (a *adapter) Stream(ctx context.Context, model string, messages []ai.Message, opts ai.GenerateOptions) (<-chan ai.StreamChunk, error) {
-	gen, err := a.Generate(ctx, model, messages, opts)
-	if err != nil {
-		return nil, err
+	if model == "" {
+		model = a.model
 	}
+	if model == "" {
+		return nil, errors.New("anthropic: stream: model is required") //nolint:perfsprint
+	}
+
+	params := buildMessageParams(model, messages, opts)
+
+	stream := a.client.Messages.NewStreaming(ctx, params)
+
 	ch := make(chan ai.StreamChunk)
 	go func() {
 		defer close(ch)
-		if gen.Content != "" {
-			select {
-			case ch <- ai.StreamChunk{Delta: gen.Content}:
-			case <-ctx.Done():
+		defer stream.Close()
+
+		var (
+			acc   anthropic.Message
+			tools = map[int64]toolBlockMeta{}
+		)
+
+		for stream.Next() {
+			event := stream.Current()
+
+			if err := acc.Accumulate(event); err != nil {
+				select {
+				case ch <- ai.StreamChunk{Err: fmt.Errorf("anthropic: stream: accumulate: %w", err)}:
+				case <-ctx.Done():
+				}
+
 				return
 			}
-		}
-		// emit tool calls as deltas if any
-		for _, tc := range gen.ToolCalls {
-			select {
-			case ch <- ai.StreamChunk{ToolCallID: tc.ID, ToolName: tc.Name, ToolArgsDelta: tc.Arguments}:
-			case <-ctx.Done():
-				return
+
+			switch event.Type {
+			case "content_block_start":
+				if event.ContentBlock.Type == "tool_use" {
+					tools[event.Index] = toolBlockMeta{id: event.ContentBlock.ID, name: event.ContentBlock.Name}
+				}
+			case "content_block_delta":
+				if event.Delta.Text != "" {
+					select {
+					case ch <- ai.StreamChunk{Delta: event.Delta.Text}:
+					case <-ctx.Done():
+						return
+					}
+				}
+
+				if event.Delta.PartialJSON != "" {
+					meta := tools[event.Index]
+
+					select {
+					case ch <- ai.StreamChunk{ToolCallID: meta.id, ToolName: meta.name, ToolArgsDelta: event.Delta.PartialJSON}:
+					case <-ctx.Done():
+						return
+					}
+				}
 			}
 		}
+
+		if err := stream.Err(); err != nil {
+			select {
+			case ch <- ai.StreamChunk{Err: mapGenerateError(err)}:
+			case <-ctx.Done():
+			}
+
+			return
+		}
+
+		gen, err := messageToGeneration(acc)
+		if err != nil {
+			select {
+			case ch <- ai.StreamChunk{Err: err}:
+			case <-ctx.Done():
+			}
+
+			return
+		}
+
 		usage := gen.Usage
 		select {
 		case ch <- ai.StreamChunk{Done: true, FinishReason: gen.FinishReason, Usage: &usage}:
 		case <-ctx.Done():
 		}
 	}()
+
 	return ch, nil
 }
 
