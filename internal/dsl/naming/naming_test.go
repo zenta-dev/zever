@@ -111,6 +111,27 @@ func TestScreamingSnake(t *testing.T) {
 			in:   "",
 			want: "",
 		},
+		// acronym runs treated as one word, not split before every capital
+		{
+			name: "leading acronym",
+			in:   "APIKey",
+			want: "API_KEY",
+		},
+		{
+			name: "leading acronym longer",
+			in:   "HTTPServer",
+			want: "HTTP_SERVER",
+		},
+		{
+			name: "trailing acronym",
+			in:   "AuthorID",
+			want: "AUTHOR_ID",
+		},
+		{
+			name: "bare acronym",
+			in:   "ISBN",
+			want: "ISBN",
+		},
 	}
 
 	for _, tt := range tests {
@@ -153,6 +174,36 @@ func TestSnakeCase(t *testing.T) {
 			name: "empty string",
 			in:   "",
 			want: "",
+		},
+		{
+			name: "leading acronym",
+			in:   "APIKey",
+			want: "api_key",
+		},
+		{
+			name: "longer leading acronym",
+			in:   "HTTPServer",
+			want: "http_server",
+		},
+		{
+			name: "url acronym",
+			in:   "URLConfig",
+			want: "url_config",
+		},
+		{
+			name: "trailing acronym",
+			in:   "AuthorID",
+			want: "author_id",
+		},
+		{
+			name: "bare acronym",
+			in:   "ISBN",
+			want: "isbn",
+		},
+		{
+			name: "non-acronym regression",
+			in:   "BookAuthor",
+			want: "book_author",
 		},
 	}
 
