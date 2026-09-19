@@ -125,6 +125,11 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   generator's output against the checked-in grammar files.
 - `zever config show`: prints the resolved, redacted service configuration,
   with a matching TUI dashboard screen.
+- `middleware.Timeout` / `middleware.TimeoutUnaryServerInterceptor`: bound a
+  handler's execution to a fixed duration, responding with the fixed error
+  envelope (504 HTTP, `codes.DeadlineExceeded` gRPC) if it hasn't finished
+  in time. The handler's context carries the deadline, so downstream calls
+  using it are canceled too.
 
 ### Changed
 
