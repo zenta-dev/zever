@@ -310,27 +310,14 @@ func TestRedisCover_ClientErrors(t *testing.T) {
 	_ = io.EOF
 }
 
-func TestRedisCover_JitterAndPromote(t *testing.T) {
-	if got := jitter(0); got != 0 {
-		t.Errorf("jitter 0 = %v", got)
+func TestRedisCover_Backoff(t *testing.T) {
+	if got := nextBackoff(1); got <= 0 {
+		t.Errorf("nextBackoff(1) = %v", got)
 	}
-	if got := jitter(-time.Second); got != 0 {
-		t.Errorf("jitter negative = %v", got)
-	}
-	origReader := randReader
-	randReader = &failingReader{}
-	if got := jitter(time.Second); got != 0 {
-		t.Errorf("jitter failing reader = %v, want 0", got)
-	}
-	randReader = origReader
-	if got := nextBackoff(time.Millisecond, time.Second); got <= 0 {
-		t.Errorf("nextBackoff = %v", got)
+	if got := nextBackoff(20); got != bufferBackoffPolicy.MaxDelay {
+		t.Errorf("nextBackoff(20) = %v, want %v", got, bufferBackoffPolicy.MaxDelay)
 	}
 }
-
-type failingReader struct{}
-
-func (f *failingReader) Read(_ []byte) (int, error) { return 0, errors.New("read boom") }
 
 func TestRedisCover_ScriptErrors(t *testing.T) {
 	ctx := context.Background()

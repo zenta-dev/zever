@@ -2,11 +2,9 @@ package redis
 
 import (
 	"context"
-	"crypto/rand"
 	"encoding/json/v2"
 	"errors"
 	"fmt"
-	"math/big"
 	"strconv"
 	"strings"
 	"sync/atomic"
@@ -15,14 +13,25 @@ import (
 	goredis "github.com/redis/go-redis/v9"
 
 	zredis "github.com/zenta-dev/zever/internal/redis"
+	"github.com/zenta-dev/zever/internal/retry"
 	"github.com/zenta-dev/zever/queue"
 )
 
 var (
 	jsonMarshal   = json.Marshal
 	jsonUnmarshal = json.Unmarshal
-	randReader    = rand.Reader
 )
+
+// bufferBackoffPolicy computes the poll delay while waitForBuffer waits for
+// buffer capacity to free up: exponential backoff from 10ms, doubling each
+// attempt, capped at 200ms, with up to 10% one-sided additive jitter.
+var bufferBackoffPolicy = retry.Policy{
+	BaseDelay:  10 * time.Millisecond,
+	Multiplier: 2,
+	MaxDelay:   200 * time.Millisecond,
+	Jitter:     0.1,
+	JitterMode: retry.JitterAdditive,
+}
 
 type redisClient interface {
 	RPush(ctx context.Context, key string, values ...any) *goredis.IntCmd
@@ -283,13 +292,11 @@ func (a *redisAdapter) waitForSpace(ctx context.Context, topic string) error {
 }
 
 func (a *redisAdapter) waitForBuffer(ctx context.Context, count func(context.Context) (int64, error)) error {
-	backoff := 10 * time.Millisecond
-
-	const maxBackOff = 200 * time.Millisecond
-
-	timer := time.NewTimer(backoff)
+	timer := time.NewTimer(bufferBackoffPolicy.BaseDelay)
 	defer timer.Stop()
 	timer.Stop()
+
+	attempt := 0
 
 	for {
 		n, err := count(ctx)
@@ -300,51 +307,35 @@ func (a *redisAdapter) waitForBuffer(ctx context.Context, count func(context.Con
 			return nil
 		}
 
+		attempt++
+
 		timer.Stop()
 
-		timer.Reset(backoff)
+		timer.Reset(nextBackoff(attempt))
 
 		select {
 		case <-ctx.Done():
 			return fmt.Errorf("queue: failed to wait buffer space: %w", ctx.Err())
 		case <-timer.C:
 		}
-
-		backoff = nextBackoff(backoff, maxBackOff)
 	}
 }
 
-func nextBackoff(cur, limit time.Duration) time.Duration {
-	cur *= 2
-	if cur > limit {
-		cur = limit
+// nextBackoff returns the poll delay before the given attempt (1-based),
+// per bufferBackoffPolicy. NextDelay's additive jitter is applied after its
+// own internal cap, so it can push the result above MaxDelay; re-clamp to
+// preserve the exact floor/cap guarantees the poll loop depends on.
+func nextBackoff(attempt int) time.Duration {
+	d := bufferBackoffPolicy.NextDelay(attempt)
+	if d < bufferBackoffPolicy.BaseDelay {
+		d = bufferBackoffPolicy.BaseDelay
 	}
 
-	cur += jitter(cur)
-
-	if cur > limit {
-		cur = limit
+	if d > bufferBackoffPolicy.MaxDelay {
+		d = bufferBackoffPolicy.MaxDelay
 	}
 
-	return cur
-}
-
-func jitter(base time.Duration) time.Duration {
-	if base <= 0 {
-		return 0
-	}
-
-	maxJitter := int64(base) / 10
-	if maxJitter <= 0 {
-		return 0
-	}
-
-	n, err := rand.Int(randReader, big.NewInt(maxJitter+1))
-	if err != nil {
-		return 0
-	}
-
-	return time.Duration(n.Int64())
+	return d
 }
 
 func (a *redisAdapter) popLoop(
