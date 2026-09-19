@@ -230,6 +230,11 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   caller during cold start race its own `CollectionExists`/
   `CreateCollection` round trip: the first caller now leads while others
   wait, and a failed attempt is still retried by the next caller.
+- `document/latex` now compiles with `-no-shell-escape`, disabling LaTeX's
+  `\write18` arbitrary-shell-command primitive regardless of the host's
+  `texmf.cnf` defaults. Source is caller-supplied LaTeX (e.g. an invoice
+  template with interpolated data), which had no legitimate need for
+  shell-escape-dependent packages.
 - `notification/fcm`'s `Notify` now retries a transient send failure
   (network blip, FCM 5xx) up to 3 times with short backoff, matching every
   other outbound-network adapter in the codebase

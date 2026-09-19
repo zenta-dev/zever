@@ -132,7 +132,13 @@ func (d *driver) Render(ctx context.Context, source []byte, format document.Outp
 }
 
 func (d *driver) compile(ctx context.Context, dir string, source []byte) ([]byte, error) {
-	argv := []string{"-interaction=nonstopmode", "-halt-on-error", "-jobname=" + jobName}
+	// -no-shell-escape is defense-in-depth against \write18/\immediate\write18
+	// (arbitrary shell command execution from within the document) regardless
+	// of what the host's texmf.cnf otherwise allows: source is caller-supplied
+	// LaTeX (e.g. an invoice/report template with interpolated data), and this
+	// package's generated documents have no legitimate need for shell-escape-
+	// dependent packages (minted, epstopdf, svg, ...).
+	argv := []string{"-interaction=nonstopmode", "-halt-on-error", "-no-shell-escape", "-jobname=" + jobName}
 	for i := 0; i < d.runs; i++ {
 		//nolint:gosec // binary from validated config resolved at Open; no shell; fixed argv.
 		cmd := exec.CommandContext(ctx, d.command, argv...)

@@ -23,6 +23,7 @@ const (
 	fakePPMOK      = "#!/bin/sh\nroot=\"\"\nfor a in \"$@\"; do root=\"$a\"; done\nprintf '\\211PNG\\r\\n\\032\\n fake' > \"$root.png\"\nprintf '\\377\\330\\377 fake' > \"$root.jpg\"\nexit 0\n"
 	fakePPMFail    = "#!/bin/sh\necho 'converter boom' >&2\nexit 1\n"
 	fakePPMNowrite = "#!/bin/sh\nexit 0\n"
+	fakeTexArgs    = "#!/bin/sh\nprintf '%%PDF-1.4 fake\\n' > doc.pdf\necho \"$@\" >> \"$ARGSLOG\"\nexit 0\n"
 )
 
 func fakeBin(t *testing.T, name, body string) {
@@ -181,6 +182,25 @@ func TestRunsHonored(t *testing.T) {
 		if got := count() - before; got != tc.want {
 			t.Errorf("Render(runs=%d) passes = %d, want %d", tc.runs, got, tc.want)
 		}
+	}
+}
+
+func TestCompileArgsIncludeNoShellEscape(t *testing.T) {
+	fakeBin(t, "pdflatex-args", fakeTexArgs)
+	argsLog := filepath.Join(t.TempDir(), "args.log")
+	t.Setenv("ARGSLOG", argsLog)
+
+	d := mustOpen(t, document.Options{LatexCommand: "pdflatex-args"})
+	if _, err := d.Render(t.Context(), []byte("src"), document.FormatPDF); err != nil {
+		t.Fatalf("Render() err = %v", err)
+	}
+
+	b, err := os.ReadFile(argsLog)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if !strings.Contains(string(b), "-no-shell-escape") {
+		t.Fatalf("compile argv = %q, want it to contain -no-shell-escape", string(b))
 	}
 }
 
