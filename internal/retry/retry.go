@@ -3,7 +3,7 @@ package retry
 import (
 	"context"
 	"fmt"
-	"math/rand"
+	"math/rand/v2"
 	"time"
 )
 
@@ -230,13 +230,15 @@ func randDuration(span float64) time.Duration {
 	return time.Duration(randFloat64() * span)
 }
 
-// randFloat64 returns a uniform random float64 in [0, 1) from a freshly
-// seeded source, matching the package's existing per-call seeding approach.
+// randFloat64 returns a uniform random float64 in [0, 1). math/rand/v2's
+// top-level functions are safe for concurrent use without manual seeding --
+// unlike a fresh rand.New(rand.NewSource(time.Now().UnixNano())) per call,
+// which both allocates a PRNG on every jitter computation and can hand
+// concurrent callers landing in the same nanosecond identical seeds (and
+// therefore identical "random" delays), defeating the point of jitter.
 func randFloat64() float64 {
-	//nolint:gosec // G404: math/rand suffices for retry jitter, which is not security-sensitive.
-	r := rand.New(rand.NewSource(time.Now().UnixNano()))
-
-	return r.Float64()
+	//nolint:gosec // G404: math/rand/v2 suffices for retry jitter, which is not security-sensitive.
+	return rand.Float64()
 }
 
 // Do calls fn, retrying on error up to p.MaxAttempts times total (including

@@ -136,6 +136,11 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   A nil `Locker` means single-instance mode without slot locks.
 - `eventbus` memory `Close` abandons in-flight handlers on timeout and
   returns nil instead of `DeadlineExceeded`, matching the redis adapter.
+- `internal/retry`'s jitter reseeded a fresh `math/rand` source from
+  `time.Now().UnixNano()` on every call; concurrent callers landing in the
+  same nanosecond could get identical seeds and therefore identical
+  "random" delays, defeating the point of jitter. Now uses `math/rand/v2`'s
+  concurrency-safe top-level functions.
 - **Breaking:** the live-schema-diff migration engine moved from
   `zen/migrate` to `orm/migrate` (import path
   `github.com/zenta-dev/zever/orm/migrate`), matching this repo's `orm/`
