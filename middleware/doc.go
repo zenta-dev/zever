@@ -1,8 +1,9 @@
 // Package middleware provides HTTP handling with swappable resolved backends.
 //
-// It ships recovery, structured access logging, rate limiting, and tracing as
-// HTTP plus unary-gRPC pairs with matching semantics. It does not own an
-// adapter registry or config section, it wraps already-resolved instances.
+// It ships recovery, structured access logging, rate limiting, timeouts, and
+// tracing as HTTP plus unary-gRPC pairs with matching semantics. It does not
+// own an adapter registry or config section, it wraps already-resolved
+// instances.
 //
 // Type safety: plain constructor functions over resolved log, ratelimit, and
 // observability instances plus FailMode enum plus Option. There is no Adapter
@@ -10,10 +11,16 @@
 // closed with fixed error envelopes.
 //
 // DX: plain constructors over resolved instances instead of a registry:
-// RequestLogger, Recover, RateLimit, and Tracing plus their
+// RequestLogger, Recover, RateLimit, Timeout, and Tracing plus their
 // UnaryServerInterceptor counterparts, with RemoteAddrKey and PeerAddrKey for
 // keying. No adapter name to parse and no middleware section in config files.
 // See config/README.md.
+//
+// Chain order: Recover outermost, so it catches panics from every other
+// middleware and from a Timeout-abandoned handler still running in the
+// background; Timeout next, so it bounds everything inside it (including
+// RateLimit's own limiter call); RateLimit inside that, so a denied request
+// never starts the timeout clock's downstream work.
 //
 // Container: no dedicated accessor, construct over container-resolved
 // instances after container.New(cfg) such as c.Log() and c.Ratelimit(). Lazy
