@@ -176,6 +176,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   every poll tick (~every 100ms), cutting idle Redis round trips at the cost
   of up to 250ms of added latency before a due or stale message is
   recovered.
+- `router/fiber`'s `ServeHTTP` and route handlers built a fresh
+  `net/http` adaptor closure on every request instead of once at
+  construction/route-registration time; both are now hoisted, cutting two
+  redundant closure allocations per request.
 
 ### Fixed
 
