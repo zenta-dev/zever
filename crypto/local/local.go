@@ -50,6 +50,20 @@ func New(opts crypto.Options) (crypto.Crypto, error) {
 	return &localCrypto{aesKey: key, gcm: gcm, macKey: macKey, signPriv: signPriv}, nil
 }
 
+// Encrypt seals plaintext with AES-256-GCM, returning nonce||ciphertext.
+//
+// No key-id/version is embedded in the output: rotating crypto.Options.Key
+// makes every previously-encrypted value permanently undecryptable, with
+// no built-in multi-key keyring or versioned envelope to fall back to
+// (unlike password/argon2's PHC-format hashes, which embed their own
+// algorithm/params and support NeedsRehash-driven migration). This is a
+// deliberate scope decision, not an oversight: a rotation-capable envelope
+// format is a real feature with no concrete second use case yet in this
+// codebase (CLAUDE.md: no unnecessary abstractions until there's a
+// concrete second use case). Callers that need key rotation for
+// long-lived encrypted-at-rest data must build it themselves (e.g. decrypt
+// with the old key, re-encrypt with the new one, migrate at rest) or wait
+// for a future versioned-envelope addition to this package.
 func (l *localCrypto) Encrypt(_ context.Context, plaintext []byte) ([]byte, error) {
 	nonce := make([]byte, l.gcm.NonceSize())
 	if _, err := randRead(nonce); err != nil {
@@ -58,6 +72,10 @@ func (l *localCrypto) Encrypt(_ context.Context, plaintext []byte) ([]byte, erro
 	return l.gcm.Seal(nonce, nonce, plaintext, nil), nil
 }
 
+// Decrypt opens a nonce||ciphertext value sealed by Encrypt with the
+// current crypto.Options.Key. See Encrypt's doc comment for why a key
+// rotation has no fallback path: ciphertext sealed under a since-rotated
+// key can no longer be opened.
 func (l *localCrypto) Decrypt(_ context.Context, ciphertext []byte) ([]byte, error) {
 	if len(ciphertext) < l.gcm.NonceSize() {
 		return nil, crypto.ErrIntegrity

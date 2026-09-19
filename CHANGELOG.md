@@ -237,3 +237,9 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   generated Postgres/SQLite table names, Go/zenorm file and type names, and
   proto enum value prefixes for any schema using an acronym in an
   entity/field/enum name.
+- `notification/fcm`'s `Notify` now retries a transient send failure
+  (network blip, FCM 5xx) up to 3 times with short backoff, matching every
+  other outbound-network adapter in the codebase
+  (`webhook/http`/`webhook/queue`/`ai/anthropic`/`ai/openai`/`queue/redis`).
+  A duplicate push notification on a spurious retry is a low-severity
+  nuisance, so this is safe unconditionally.
