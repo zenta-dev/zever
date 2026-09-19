@@ -34,6 +34,14 @@ type Store struct {
 	dim     int
 	mu      sync.Mutex
 	created bool
+	// wait is non-nil while one caller is in doEnsureCollection, so
+	// concurrent callers park on it instead of each racing their own
+	// CollectionExists/CreateCollection round trip. A failed attempt
+	// leaves created false and wait nil, so the next caller retries
+	// (mirrors container/lazy.go's retry-after-failure singleflight,
+	// which this package can't import since lazy is unexported and
+	// sealed to container).
+	wait chan struct{}
 }
 
 func pointID(id string) *qdrant.PointId {
@@ -327,6 +335,13 @@ func (s *Store) Close() error {
 	return nil
 }
 
+// ensureCollection makes sure the "vectors" collection exists, running the
+// exists/create round trip at most once across concurrent callers: the
+// first caller becomes the leader and runs doEnsureCollection while later
+// concurrent callers park on s.wait instead of each issuing their own
+// CollectionExists/CreateCollection request. A failed attempt is retried
+// by the next caller (s.created stays false), not cached as a permanent
+// failure.
 func (s *Store) ensureCollection(ctx context.Context, n int) error {
 	s.mu.Lock()
 
@@ -336,9 +351,43 @@ func (s *Store) ensureCollection(ctx context.Context, n int) error {
 		return nil
 	}
 
+	for s.wait != nil {
+		ch := s.wait
+		s.mu.Unlock()
+
+		select {
+		case <-ch:
+		case <-ctx.Done():
+			return ctx.Err()
+		}
+
+		s.mu.Lock()
+
+		if s.created {
+			s.mu.Unlock()
+
+			return nil
+		}
+	}
+
+	s.wait = make(chan struct{})
 	dim := collectionDim(s.dim, n)
 	s.mu.Unlock()
 
+	err := s.doEnsureCollection(ctx, dim)
+
+	s.mu.Lock()
+	ch := s.wait
+	s.wait = nil
+	s.mu.Unlock()
+	close(ch)
+
+	return err
+}
+
+// doEnsureCollection performs the actual exists/create round trip. Callers
+// must go through ensureCollection, which serializes access via s.wait.
+func (s *Store) doEnsureCollection(ctx context.Context, dim int) error {
 	// Collection name is intentionally hardcoded: the store manages a
 	// single "vectors" collection (see Upsert).
 	exists, err := s.client.CollectionExists(ctx, "vectors")
