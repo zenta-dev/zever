@@ -9,6 +9,7 @@ import (
 	"net/url"
 	"strconv"
 	"strings"
+	"sync"
 	"time"
 
 	"github.com/zenta-dev/zever/codec"
@@ -21,12 +22,25 @@ const defaultEndpoint = "https://nominatim.openstreetmap.org"
 const defaultMaxBody = 1 << 20
 const defaultTimeout = 10 * time.Second
 
+// defaultMinRequestInterval paces outbound requests to Nominatim's public
+// instance at no more than 1 request/second, per its usage policy
+// (https://operations.osmfoundation.org/policies/nominatim/): "An absolute
+// maximum of 1 request per second." Exceeding it risks the caller's IP
+// being blocked, taking down geocoding for everyone sharing that address.
+const defaultMinRequestInterval = time.Second
+
 type osmGeo struct {
 	endpoint  string
 	baseURL   *url.URL
 	client    *http.Client
 	userAgent string
 	maxBody   int64
+
+	// minInterval paces requests (see defaultMinRequestInterval); zero
+	// (the osmGeo{} literal some tests construct directly) disables pacing.
+	minInterval time.Duration
+	paceMu      sync.Mutex
+	nextAllowed time.Time
 }
 
 // New creates an OSM Nominatim-backed geo.Geo.
@@ -62,11 +76,12 @@ func New(opts geo.Options) (geo.Geo, error) {
 	}
 
 	return &osmGeo{
-		endpoint:  endpoint,
-		baseURL:   u,
-		client:    httpclient.NewClient(timeout),
-		userAgent: opts.UserAgent,
-		maxBody:   maxBody,
+		endpoint:    endpoint,
+		baseURL:     u,
+		client:      httpclient.NewClient(timeout),
+		userAgent:   opts.UserAgent,
+		maxBody:     maxBody,
+		minInterval: defaultMinRequestInterval,
 	}, nil
 }
 
@@ -256,11 +271,48 @@ func (m *osmGeo) Distance(_ context.Context, from, to geo.Point) (float64, error
 func (m *osmGeo) Close() error { return nil }
 
 func (m *osmGeo) do(req *http.Request) (*http.Response, error) {
+	if err := m.pace(req.Context()); err != nil {
+		return nil, fmt.Errorf("geo: osm: %w", err)
+	}
+
 	resp, err := m.client.Do(req)
 	if err != nil {
 		return nil, fmt.Errorf("geo: osm: do: %w", redactURLError(err))
 	}
 	return resp, nil
+}
+
+// pace blocks until minInterval has elapsed since the last request this
+// adapter sent, so as not to exceed Nominatim's usage policy (see
+// defaultMinRequestInterval). minInterval == 0 (an osmGeo{} literal built
+// directly rather than via New) disables pacing.
+func (m *osmGeo) pace(ctx context.Context) error {
+	if m.minInterval <= 0 {
+		return nil
+	}
+
+	m.paceMu.Lock()
+	now := time.Now()
+	wait := m.nextAllowed.Sub(now)
+	if wait < 0 {
+		wait = 0
+	}
+	m.nextAllowed = now.Add(wait).Add(m.minInterval)
+	m.paceMu.Unlock()
+
+	if wait <= 0 {
+		return nil
+	}
+
+	timer := time.NewTimer(wait)
+	defer timer.Stop()
+
+	select {
+	case <-timer.C:
+		return nil
+	case <-ctx.Done():
+		return ctx.Err()
+	}
 }
 
 func redactURLError(err error) error {
