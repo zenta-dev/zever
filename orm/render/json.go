@@ -252,7 +252,7 @@ func jsonExprText(d dialect.Dialect, n Node) string {
 
 	col := quoteColumn(d, n.Column)
 
-	switch n.JSON.Op {
+	switch n.JSON.Op { //nolint:exhaustive // JSONType/JSONArrayContains/JSONLength are rendered by renderJSON before ever reaching this helper
 	case JSONExtract, JSONExtractText, JSONContains, JSONKeyExists,
 		JSONPathExists, JSONPathMatch, JSONPathExistsFunc, JSONPathMatchFunc,
 		JSONPathQueryFirst, JSONKeyExistsAny, JSONKeyExistsAll:

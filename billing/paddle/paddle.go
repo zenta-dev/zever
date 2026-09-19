@@ -100,7 +100,7 @@ func (d *driver) CreateSubscription(ctx context.Context, customerID string, plan
 }
 
 func subscriptionStatus(s paddle.TransactionStatus) billing.SubscriptionStatus {
-	switch s {
+	switch s { //nolint:exhaustive // default passes unmapped statuses (e.g. Draft) through as-is
 	case paddle.TransactionStatusReady, paddle.TransactionStatusBilled,
 		paddle.TransactionStatusPaid, paddle.TransactionStatusCompleted:
 		return billing.SubscriptionActive

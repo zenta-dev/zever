@@ -454,7 +454,7 @@ func (m GraphScreen) Init() tea.Cmd { return m.form.Init() }
 
 // Update implements tea.Model. No I/O: pager content arrives via ExecDoneMsg.
 func (m GraphScreen) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
-	switch m.stage {
+	switch m.stage { //nolint:exhaustive // default forwards to the form, covering inspectStageForm and future stages
 	case inspectStageExec:
 		if km, ok := msg.(tea.KeyPressMsg); ok && m.keys.Back.Matches(km.String()) {
 			if m.exec.State() != tui.ExecRunning {
@@ -525,7 +525,7 @@ func (m GraphScreen) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 
 // View implements tea.Model. Pure.
 func (m GraphScreen) View() tea.View {
-	switch m.stage {
+	switch m.stage { //nolint:exhaustive // default forwards to the form, covering inspectStageForm and future stages
 	case inspectStageExec:
 		return m.exec.View()
 	case inspectStageLog:

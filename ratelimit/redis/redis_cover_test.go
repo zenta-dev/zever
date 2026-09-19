@@ -10,7 +10,6 @@ import (
 
 	goredis "github.com/redis/go-redis/v9"
 
-	"github.com/zenta-dev/zever/internal/redis"
 	"github.com/zenta-dev/zever/ratelimit"
 )
 
@@ -94,9 +93,9 @@ func TestRedisCover_newDefaults(t *testing.T) {
 	}
 }
 
-func TestRedisCover_newPingFailRestores(t *testing.T) {
-	// Sequential: New with a dead addr thrashes the shared singleton, so
-	// reset it and re-New the test addr before returning.
+func TestRedisCover_newPingFail(t *testing.T) {
+	t.Parallel()
+
 	opts := testOptions()
 	opts.Redis.Addr = "127.0.0.1:1"
 
@@ -109,24 +108,11 @@ func TestRedisCover_newPingFailRestores(t *testing.T) {
 		t.Errorf("New(dead addr) err = %v, want ping failure", err)
 	}
 
-	// The failed New closed the dead client in place; switching back to
-	// the test addr forces the singleton to close it again, which fails
-	// and covers the zredis.New error branch.
-	_, err = New(testOptions())
-	if err == nil {
-		t.Fatal("New(thrash closed client) err = nil, want connect error")
-	}
-
-	if !strings.Contains(err.Error(), "connect") {
-		t.Errorf("New(thrash closed client) err = %v, want connect failure", err)
-	}
-
-	// Self-restore: drop the poisoned singleton, then re-New healthy.
-	_ = redis.Close()
-
+	// New with a distinct client is unaffected by the failed New above:
+	// no shared singleton to poison.
 	l, err := New(testOptions())
 	if err != nil {
-		t.Fatalf("New(restore) err = %v, want nil", err)
+		t.Fatalf("New(healthy) err = %v, want nil", err)
 	}
 
 	t.Cleanup(func() {

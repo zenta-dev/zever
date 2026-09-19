@@ -38,7 +38,7 @@ type limiter struct {
 	closed atomic.Bool
 }
 
-// New creates a Redis-backed ratelimit.Limiter using a shared client from
+// New creates a Redis-backed ratelimit.Limiter with its own client from
 // internal/redis. IdleTTL/SweepInterval are meaningless for Redis and are
 // ignored. It verifies connectivity with a 3s ping check.
 func New(opts ratelimit.Options) (ratelimit.Limiter, error) {
@@ -179,12 +179,14 @@ func (l *limiter) Reset(ctx context.Context, key string) error {
 	return nil
 }
 
-// Close marks the limiter closed; it is idempotent and never closes the
-// shared pool.
+// Close marks the limiter closed and closes its underlying client; it is
+// idempotent.
 func (l *limiter) Close() error {
-	l.closed.Store(true)
+	if !l.closed.CompareAndSwap(false, true) {
+		return nil
+	}
 
-	return nil
+	return zredis.Close(l.client)
 }
 
 // Name returns the adapter name.

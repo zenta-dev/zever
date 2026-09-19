@@ -60,7 +60,7 @@ func connOptions(opts Options) zredis.Options {
 	}
 }
 
-// New creates a Redis-backed revocation.Store using the shared internal/redis
+// New creates a Redis-backed revocation.Store with its own internal/redis
 // client. Empty prefix falls back to defaultPrefix. It verifies connectivity
 // with a 3s ping check.
 func New(opts Options) (revocation.Store, error) {
@@ -78,10 +78,7 @@ func New(opts Options) (revocation.Store, error) {
 	defer cancel()
 
 	if err := client.Ping(ctx).Err(); err != nil {
-		// Reset the singleton instead of closing the client directly: the
-		// instance would otherwise keep pointing at a dead client and
-		// poison the next New with different options.
-		_ = zredis.Close()
+		_ = zredis.Close(client)
 
 		return nil, fmt.Errorf("revocation/redis: ping %q: %w", redactURL(opts), err)
 	}
@@ -142,12 +139,11 @@ func (s *store) IsRevoked(ctx context.Context, jti string) (bool, error) {
 	return n > 0, nil
 }
 
-// Close releases the Redis connection via the shared-client reset. It is
-// idempotent.
+// Close releases the store's own Redis connection. It is idempotent.
 func (s *store) Close() error {
 	if !s.closed.CompareAndSwap(false, true) {
 		return nil
 	}
 
-	return zredis.Close()
+	return zredis.Close(s.client)
 }

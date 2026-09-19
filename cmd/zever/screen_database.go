@@ -445,7 +445,7 @@ func (m *MigrateScreen) submitPreview(cmd tea.Cmd) (tea.Model, tea.Cmd) {
 // completion. Aborting the form cancels the screen.
 func (m *MigrateScreen) updateForm(msg tea.Msg) (tea.Model, tea.Cmd) {
 	_, cmd := m.form.Update(msg)
-	switch m.form.State {
+	switch m.form.State { //nolint:exhaustive // default returns unchanged while the form is still in progress
 	case huh.StateCompleted:
 		return m.submitPreview(cmd)
 	case huh.StateAborted:
@@ -570,7 +570,7 @@ func (m *MigrateScreen) View() tea.View {
 
 	b.WriteString(m.theme.Title.Render("migrate"))
 	b.WriteString("\n\n")
-	switch m.stage {
+	switch m.stage { //nolint:exhaustive // default renders the form view, covering databaseStageForm and future stages
 	case databaseStagePreview, databaseStageExec:
 		b.WriteString(stripScreenANSI(m.exec.View().Content))
 	case databaseStageConfirm:
@@ -734,7 +734,7 @@ func (m *RollbackScreen) submitExec(cmd tea.Cmd) (tea.Model, tea.Cmd) {
 // Aborting the form cancels the screen.
 func (m *RollbackScreen) updateForm(msg tea.Msg) (tea.Model, tea.Cmd) {
 	_, cmd := m.form.Update(msg)
-	switch m.form.State {
+	switch m.form.State { //nolint:exhaustive // default returns unchanged while the form is still in progress
 	case huh.StateCompleted:
 		return m.submitExec(cmd)
 	case huh.StateAborted:
@@ -841,7 +841,7 @@ func (m *SeedScreen) Init() tea.Cmd { return m.form.Init() }
 // completion. Aborting the form cancels the screen.
 func (m *SeedScreen) updateForm(msg tea.Msg) (tea.Model, tea.Cmd) {
 	_, cmd := m.form.Update(msg)
-	switch m.form.State {
+	switch m.form.State { //nolint:exhaustive // default returns unchanged while the form is still in progress
 	case huh.StateCompleted:
 		entry := m.resolvedEntry()
 		args := splitDatabaseArgs(m.argsRaw)

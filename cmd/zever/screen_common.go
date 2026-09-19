@@ -186,7 +186,7 @@ func (f *scaffoldFlow) view() string {
 	b.WriteString(f.theme.Title.Render(f.title))
 	b.WriteString("\n\n")
 
-	switch f.stage {
+	switch f.stage { //nolint:exhaustive // default renders the form view, covering stageForm and future stages
 	case stagePreview:
 		for _, line := range f.preview {
 			b.WriteString(line)

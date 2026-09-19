@@ -280,7 +280,7 @@ func (s *runtimeLauncher) startRunning() tea.Cmd {
 // returns s itself, so callers never needed the model.
 func (s *runtimeLauncher) updateForm(msg tea.Msg) tea.Cmd {
 	_, cmd := s.form.Update(msg)
-	switch s.form.State {
+	switch s.form.State { //nolint:exhaustive // default returns unchanged while the form is still in progress
 	case huh.StateCompleted:
 		return s.startRunning()
 	case huh.StateAborted:
@@ -567,7 +567,7 @@ func (s *DevScreen) stopDev() {
 // updateForm forwards msg to the huh form and advances on completion.
 func (s *DevScreen) updateForm(msg tea.Msg) (tea.Model, tea.Cmd) {
 	_, cmd := s.form.Update(msg)
-	switch s.form.State {
+	switch s.form.State { //nolint:exhaustive // default returns unchanged while the form is still in progress
 	case huh.StateCompleted:
 		return s, s.startRunning()
 	case huh.StateAborted:
@@ -858,7 +858,7 @@ func (s *TinkerScreen) submitLine() {
 // updateForm forwards msg to the huh form and advances on completion.
 func (s *TinkerScreen) updateForm(msg tea.Msg) (tea.Model, tea.Cmd) {
 	_, cmd := s.form.Update(msg)
-	switch s.form.State {
+	switch s.form.State { //nolint:exhaustive // default returns unchanged while the form is still in progress
 	case huh.StateCompleted:
 		return s, s.startRunning()
 	case huh.StateAborted:

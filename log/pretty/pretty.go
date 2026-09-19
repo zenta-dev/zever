@@ -311,7 +311,7 @@ func writeFields(b *strings.Builder, fields []log.Field, useColor bool) {
 func formatField(f log.Field) string {
 	var s string
 
-	switch f.Type {
+	switch f.Type { //nolint:exhaustive // default formats AnyType (and any future type) via %v
 	case log.StringType:
 		s = f.String
 	case log.IntType, log.Int64Type:

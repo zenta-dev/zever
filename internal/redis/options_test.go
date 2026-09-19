@@ -53,62 +53,6 @@ func assertRedisOptionsEqual(t *testing.T, got, want *goredis.Options) {
 	}
 }
 
-func TestOptions_Compare_matches(t *testing.T) {
-	t.Parallel()
-
-	base := Options{Addr: "localhost:6379", Password: "pw", DB: 1, TLS: true, PoolSize: 10, MinIdleConns: 3, PoolTimeout: time.Second, ConnMaxIdleTime: time.Minute, ConnMaxLifetime: time.Hour}
-
-	with := func(mut func(*Options)) Options {
-		o := base
-		mut(&o)
-		return o
-	}
-
-	tests := []struct {
-		name  string
-		other Options
-		want  bool
-	}{
-		{name: "identical", other: base, want: true},
-		{name: "addr whitespace trimmed", other: with(func(o *Options) { o.Addr = "  localhost:6379 " }), want: true},
-		{name: "password whitespace trimmed", other: with(func(o *Options) { o.Password = " pw " }), want: true},
-		{name: "different addr", other: with(func(o *Options) { o.Addr = "other:6379" }), want: false},
-		{name: "different password", other: with(func(o *Options) { o.Password = "other" }), want: false},
-		{name: "different db", other: with(func(o *Options) { o.DB = 2 }), want: false},
-		{name: "different tls", other: with(func(o *Options) { o.TLS = false }), want: false},
-		{name: "different poolsize", other: with(func(o *Options) { o.PoolSize = 11 }), want: false},
-		{name: "different minidle", other: with(func(o *Options) { o.MinIdleConns = 4 }), want: false},
-		{name: "different pooltimeout", other: with(func(o *Options) { o.PoolTimeout = 2 * time.Second }), want: false},
-		{name: "different maxidletime", other: with(func(o *Options) { o.ConnMaxIdleTime = 2 * time.Minute }), want: false},
-		{name: "different maxlifetime", other: with(func(o *Options) { o.ConnMaxLifetime = 2 * time.Hour }), want: false},
-		{name: "url field ignored", other: with(func(o *Options) { o.URL = "redis://other:6379" }), want: true},
-	}
-
-	for _, tt := range tests {
-		t.Run(tt.name, func(t *testing.T) {
-			t.Parallel()
-
-			if got := base.Compare(tt.other); got != tt.want {
-				t.Errorf("Compare() = %v, want %v", got, tt.want)
-			}
-
-			if tt.want {
-				if got := tt.other.Compare(base); got != tt.want {
-					t.Errorf("Compare() symmetric = %v, want %v", got, tt.want)
-				}
-			}
-		})
-	}
-}
-
-func TestOptions_Compare_zeroValues_equal(t *testing.T) {
-	t.Parallel()
-
-	if !(Options{}).Compare(Options{}) {
-		t.Error("Compare() = false for two zero Options, want true")
-	}
-}
-
 func TestOptions_toRedisOptions_plainAddr(t *testing.T) {
 	t.Parallel()
 

@@ -39,14 +39,15 @@ type redisClient interface {
 // each acquired lock carries its own holder id.
 type adapter struct {
 	client        redisClient
+	rawClient     *goredis.Client
 	prefix        string
 	ttl           time.Duration
 	retryInterval time.Duration
 	closed        atomic.Bool
 }
 
-// closeShared releases the shared zredis client. It is a seam so tests can
-// inject a close failure; production always resets the singleton.
+// closeShared releases the adapter's own zredis client. It is a seam so
+// tests can inject a close failure.
 var closeShared = zredis.Close
 
 // handle is one acquired lock.Lock.
@@ -102,16 +103,14 @@ func New(opts lock.Options) (lock.Locker, error) {
 	defer cancel()
 
 	if err := client.Ping(ctx).Err(); err != nil {
-		// Reset the singleton instead of closing the client directly: the
-		// instance would otherwise keep pointing at a dead client and
-		// poison the next New with different options.
-		_ = closeShared()
+		_ = closeShared(client)
 
 		return nil, fmt.Errorf("lock: ping %q: %w", redactURL(opts), err)
 	}
 
 	return &adapter{
 		client:        client,
+		rawClient:     client,
 		prefix:        prefix,
 		ttl:           ttl,
 		retryInterval: retry,
@@ -194,15 +193,15 @@ func (a *adapter) Acquire(ctx context.Context, key string, ttl time.Duration) (l
 	}
 }
 
-// Close releases the Redis connection via the shared-client reset. It is
-// idempotent. Leases still held by callers are not released individually;
-// they expire on their own TTL.
+// Close releases the adapter's own Redis connection. It is idempotent.
+// Leases still held by callers are not released individually; they expire
+// on their own TTL.
 func (a *adapter) Close(_ context.Context) error {
 	if !a.closed.CompareAndSwap(false, true) {
 		return nil
 	}
 
-	return closeShared()
+	return closeShared(a.rawClient)
 }
 
 // Key returns the locked key.

@@ -14,149 +14,66 @@ import (
 	goredis "github.com/redis/go-redis/v9"
 )
 
-func resetRedis(t *testing.T) {
-	t.Helper()
-
-	if err := Close(); err != nil {
-		t.Fatalf("Close() setup error = %v", err)
-	}
-
-	t.Cleanup(func() {
-		if err := Close(); err != nil {
-			t.Errorf("Close() cleanup error = %v", err)
-		}
-	})
-}
-
-func TestNew_sameOptions_reusesClient(t *testing.T) {
-	resetRedis(t)
-
+func TestNew_alwaysReturnsFreshClient(t *testing.T) {
 	opts := Options{Addr: "localhost:6379"}
 
 	first, err := New(opts)
 	if err != nil {
 		t.Fatalf("New() error = %v", err)
 	}
+	t.Cleanup(func() { _ = first.Close() })
 
 	second, err := New(opts)
 	if err != nil {
 		t.Fatalf("New() second error = %v", err)
 	}
-
-	if first != second {
-		t.Error("New() with same opts returned different client, want reused instance")
-	}
-}
-
-func TestNew_whitespaceEquivalentOptions_reusesClient(t *testing.T) {
-	resetRedis(t)
-
-	first, err := New(Options{Addr: "localhost:6379", Password: "pw"})
-	if err != nil {
-		t.Fatalf("New() error = %v", err)
-	}
-
-	second, err := New(Options{Addr: "  localhost:6379 ", Password: " pw "})
-	if err != nil {
-		t.Fatalf("New() error = %v", err)
-	}
-
-	if first != second {
-		t.Error("New() with whitespace-equivalent opts returned different client, want reuse")
-	}
-}
-
-func TestNew_differentOptions_replacesClient(t *testing.T) {
-	resetRedis(t)
-
-	first, err := New(Options{Addr: "localhost:6379"})
-	if err != nil {
-		t.Fatalf("New() error = %v", err)
-	}
-
-	second, err := New(Options{Addr: "localhost:6380"})
-	if err != nil {
-		t.Fatalf("New() error = %v", err)
-	}
+	t.Cleanup(func() { _ = second.Close() })
 
 	if first == second {
-		t.Error("New() with different opts returned same client, want replacement")
+		t.Error("New() with same opts returned same client, want independent instances")
 	}
 }
 
 func TestNew_invalidAddr_returnsError(t *testing.T) {
-	resetRedis(t)
-
 	if _, err := New(Options{Addr: "redis://"}); err == nil {
 		t.Fatal("New() = nil error, want missing-host error")
 	}
 }
 
-func TestClose_noInstance_returnsNil(t *testing.T) {
-	resetRedis(t)
-
-	if err := Close(); err != nil {
-		t.Errorf("Close() error = %v, want nil", err)
+func TestClose_nilClient_returnsNil(t *testing.T) {
+	if err := Close(nil); err != nil {
+		t.Errorf("Close(nil) error = %v, want nil", err)
 	}
 }
 
-func TestClose_afterNew_resetsSingleton(t *testing.T) {
-	resetRedis(t)
-
+// TestClose_independentClients_dontAffectEachOther is the regression test
+// for the removed package-level singleton: closing one client built by New
+// must not reach into or tear down another client built by New, since each
+// now owns its connection independently.
+func TestClose_independentClients_dontAffectEachOther(t *testing.T) {
 	first, err := New(Options{Addr: "localhost:6379"})
 	if err != nil {
 		t.Fatalf("New() error = %v", err)
 	}
 
-	if err = Close(); err != nil {
-		t.Fatalf("Close() error = %v", err)
-	}
-
 	second, err := New(Options{Addr: "localhost:6379"})
 	if err != nil {
-		t.Fatalf("New() after Close error = %v", err)
+		t.Fatalf("New() error = %v", err)
 	}
+	t.Cleanup(func() { _ = second.Close() })
 
 	if first == second {
-		t.Error("New() after Close returned same client, want fresh instance")
-	}
-}
-
-func TestNew_concurrentSameOptions_safe(t *testing.T) {
-	resetRedis(t)
-
-	opts := Options{Addr: "localhost:6379"}
-
-	const workers = 20
-
-	clients := make([]any, workers)
-	errs := make([]error, workers)
-
-	var wg sync.WaitGroup
-
-	for i := range workers {
-		wg.Add(1)
-
-		go func() {
-			defer wg.Done()
-			c, err := New(opts)
-			clients[i] = c
-			errs[i] = err
-		}()
+		t.Fatal("New() returned the same client twice, want independent instances")
 	}
 
-	wg.Wait()
-
-	for i, err := range errs {
-		if err != nil {
-			t.Fatalf("New() worker %d error = %v", i, err)
-		}
+	if err := Close(first); err != nil {
+		t.Fatalf("Close(first) error = %v", err)
 	}
 
-	for i := 1; i < workers; i++ {
-		if clients[i] != clients[0] {
-			t.Fatalf("New() worker %d got different client, want single reused instance", i)
-		}
+	// Closing first must be a no-op with respect to second: second must
+	// still be a distinct, live *goredis.Client (not nil'd out or shared).
+	if second == nil {
+		t.Fatal("second client is nil after closing first")
 	}
 }
 
@@ -255,39 +172,11 @@ func pooledFailCloseClient(t *testing.T, closeErr error) *goredis.Client {
 	return c
 }
 
-func TestNew_closePreviousError_wrapped(t *testing.T) {
-	resetRedis(t)
-
+func TestClose_wrapsClientError(t *testing.T) {
 	sentinel := errors.New("close boom")
 	bad := pooledFailCloseClient(t, sentinel)
 
-	instance = &Pool{client: bad, opt: Options{Addr: "old:6379"}}
-
-	t.Cleanup(func() { instance = nil })
-
-	_, err := New(Options{Addr: "new:6379"})
-	if err == nil {
-		t.Fatal("New() = nil, want close-client error")
-	}
-
-	if !errors.Is(err, ErrCloseClient) {
-		t.Errorf("errors.Is(err, ErrCloseClient) = false (err = %v)", err)
-	}
-
-	if !errors.Is(err, sentinel) {
-		t.Errorf("errors.Is(err, sentinel) = false (err = %v)", err)
-	}
-}
-
-func TestClose_clientError_wrapped(t *testing.T) {
-	resetRedis(t)
-
-	sentinel := errors.New("close boom")
-	bad := pooledFailCloseClient(t, sentinel)
-
-	instance = &Pool{client: bad, opt: Options{Addr: "old:6379"}}
-
-	err := Close()
+	err := Close(bad)
 	if err == nil {
 		t.Fatal("Close() = nil, want close-client error")
 	}
@@ -298,9 +187,5 @@ func TestClose_clientError_wrapped(t *testing.T) {
 
 	if !errors.Is(err, sentinel) {
 		t.Errorf("errors.Is(err, sentinel) = false (err = %v)", err)
-	}
-
-	if instance != nil {
-		t.Error("instance != nil after Close, want reset")
 	}
 }

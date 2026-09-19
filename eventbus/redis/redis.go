@@ -43,7 +43,7 @@ type adapter struct {
 
 // New creates a Redis-backed eventbus. It validates opts first, applies
 // defaults (prefix "eventbus", buffer 1024, handler timeout 30s, close
-// timeout 5s), reuses the shared internal/redis Pool client, and verifies
+// timeout 5s), builds its own internal/redis client, and verifies
 // connectivity with a 3s ping.
 // The returned bus supports both the push and pull APIs.
 func New(opts eventbus.Options) (eventbus.Eventbus, error) {
@@ -95,7 +95,7 @@ func newAdapter(opts eventbus.Options) (*adapter, error) {
 	defer cancel()
 
 	if err := client.Ping(ctx).Err(); err != nil {
-		_ = zredis.Close()
+		_ = zredis.Close(client)
 
 		return nil, fmt.Errorf("redis: ping %q: %w", redactAddr(opts.Redis.Addr), err)
 	}
@@ -256,9 +256,8 @@ func (a *adapter) unsubscribe(sub *subscription) {
 	_ = sub.ps.Close()
 }
 
-// Close stops all deliveries and waits up to closeTimeout for in-flight
-// handlers. It is idempotent and returns nil. It never closes the shared
-// internal/redis Pool client, which is owned by internal/redis.
+// Close stops all deliveries, waits up to closeTimeout for in-flight
+// handlers, and closes the adapter's own client. It is idempotent.
 func (a *adapter) Close() error {
 	if !a.closed.CompareAndSwap(false, true) {
 		return nil
@@ -291,7 +290,7 @@ func (a *adapter) Close() error {
 	case <-timer.C:
 	}
 
-	return nil
+	return zredis.Close(a.client)
 }
 
 func (a *adapter) Name() string { return "redis" }

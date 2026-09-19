@@ -115,17 +115,3 @@ func (o Options) toRedisOptions() (*goredis.Options, error) {
 
 	return opt, nil
 }
-
-// Compare reports whether two Options values are equivalent for connection purposes.
-func (o Options) Compare(other Options) bool {
-	return strings.TrimSpace(o.Addr) == strings.TrimSpace(other.Addr) &&
-		strings.TrimSpace(o.Password) == strings.TrimSpace(other.Password) &&
-		o.DB == other.DB &&
-		o.TLS == other.TLS &&
-		o.RequireTLS == other.RequireTLS &&
-		o.PoolSize == other.PoolSize &&
-		o.MinIdleConns == other.MinIdleConns &&
-		o.PoolTimeout == other.PoolTimeout &&
-		o.ConnMaxIdleTime == other.ConnMaxIdleTime &&
-		o.ConnMaxLifetime == other.ConnMaxLifetime
-}
