@@ -157,6 +157,20 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   grouped by index, and `vectorstore/sqlite` and `search/sqlite` wrap the
   existing single-item logic in one transaction. Any external
   implementation of `VectorStore` or `Search` must add the new method.
+- `internal/redis` no longer holds a shared package-level client singleton:
+  every `New` call returns an independently owned `*goredis.Client`, and
+  `Close` now takes the client to close. Previously `cache/redis` and
+  `queue/redis` (and other redis-backed adapters) reused or replaced one
+  global client keyed by connection options, so constructing a second
+  adapter with different options would silently close the first adapter's
+  live connection, and closing either adapter tore down the shared client
+  for all of them. `cache/redis`, `queue/redis`, `idempotency/redis`,
+  `ratelimit/redis`, `session/redis`, `eventbus/redis`,
+  `auth/jwt/revocation/redis`, and `lock/redis` now each own and close an
+  independent client.
+- Enable the `exhaustive` linter for switches over closed enum types (e.g.
+  `internal/dsl/ir.ScalarType`/`ErrorCode`), so a missing case on a future
+  enum member is caught at lint time instead of at runtime.
 - `queue/redis`'s poll loop throttles its due/stale message sweep
   (`promoteDue`/`reclaimStale`) to once per 250ms instead of running both on
   every poll tick (~every 100ms), cutting idle Redis round trips at the cost
@@ -178,3 +192,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   input into multiple sequential `INSERT` statements (at most 20000 rows
   per statement for `pgvector`, 15000 for `search/postgres`), still far
   fewer round trips than one-by-one calls.
+- `permission/rbac`'s owned-only check incorrectly allowed a request through
+  when the subject had an empty ID and the resource was missing (or had an
+  empty) owner attribute, since both sides of the comparison were the empty
+  string. The check now explicitly rejects an empty subject ID.

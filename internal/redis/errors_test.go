@@ -108,8 +108,4 @@ func TestNew_invalidAddr_wrapsInvalidAddress(t *testing.T) {
 	} else if !errors.Is(err, ErrInvalidAddress) {
 		t.Errorf("errors.Is(err, ErrInvalidAddress) = false (err = %v)", err)
 	}
-
-	if err := Close(); err != nil {
-		t.Errorf("Close() cleanup error = %v, want nil", err)
-	}
 }

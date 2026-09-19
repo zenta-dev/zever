@@ -9,14 +9,12 @@ import (
 
 	"github.com/alicebob/miniredis/v2"
 
-	zredis "github.com/zenta-dev/zever/internal/redis"
 	"github.com/zenta-dev/zever/queue"
 )
 
 // newLiveQueue starts miniredis and opens a queue.
 func newLiveQueue(t *testing.T) (queue.Queue, *miniredis.Miniredis) {
 	t.Helper()
-	_ = zredis.Close()
 	s := miniredis.RunT(t)
 	q, err := New(queue.Options{Addr: s.Addr(), PollTimeout: 200 * time.Millisecond})
 	if err != nil {
@@ -86,7 +84,6 @@ func TestRedisLive_PushPopAck(t *testing.T) {
 
 func TestRedisLive_PushDelayed(t *testing.T) {
 	ctx := context.Background()
-	_ = zredis.Close()
 	s := miniredis.RunT(t)
 	q, err := New(queue.Options{Addr: s.Addr(), PollTimeout: 200 * time.Millisecond})
 	if err != nil {
@@ -186,7 +183,6 @@ func TestRedisLive_Nack(t *testing.T) {
 
 func TestRedisLive_VisibilityReclaim(t *testing.T) {
 	ctx := context.Background()
-	_ = zredis.Close()
 	s := miniredis.RunT(t)
 	q, err := New(queue.Options{Addr: s.Addr(), VisibilityTimeout: 120 * time.Millisecond, PollTimeout: 200 * time.Millisecond})
 	if err != nil {
@@ -227,7 +223,6 @@ func TestRedisLive_VisibilityReclaim(t *testing.T) {
 
 func TestRedisLive_BufferBlocks(t *testing.T) {
 	ctx := context.Background()
-	_ = zredis.Close()
 	s := miniredis.RunT(t)
 	q, err := New(queue.Options{Addr: s.Addr(), Buffer: 1, PollTimeout: 200 * time.Millisecond})
 	if err != nil {
@@ -296,7 +291,6 @@ func TestRedisLive_LengthIsEmpty(t *testing.T) {
 }
 
 func TestRedisLive_PingFailure_redactsPassword(t *testing.T) {
-	_ = zredis.Close()
 	s := miniredis.RunT(t)
 	dead := s.Addr()
 	s.Close()
@@ -311,12 +305,10 @@ func TestRedisLive_PingFailure_redactsPassword(t *testing.T) {
 	if !strings.Contains(err.Error(), "xxxxx") {
 		t.Errorf("error missing redacted password: %v", err)
 	}
-	_ = zredis.Close()
 }
 
 func TestRedisLive_BufferDelayedBlocks(t *testing.T) {
 	ctx := context.Background()
-	_ = zredis.Close()
 	s := miniredis.RunT(t)
 	q, err := New(queue.Options{Addr: s.Addr(), Buffer: 1, PollTimeout: 200 * time.Millisecond})
 	if err != nil {

@@ -242,7 +242,7 @@ func setScalar(service, field string, f reflect.Value, value string) error {
 		f.SetInt(int64(d))
 		return nil
 	}
-	switch f.Kind() {
+	switch f.Kind() { //nolint:exhaustive // default rejects every kind this env parser doesn't support
 	case reflect.String:
 		f.SetString(value)
 		return nil

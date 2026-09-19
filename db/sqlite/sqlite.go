@@ -251,6 +251,7 @@ func (a *adapter) BeginTx(ctx context.Context, opts *db.TxOptions) (db.Tx, error
 // only when evicted or when the adapter itself closes, so a caller done
 // with one Prepare/Query-or-Exec round trip can Close it without
 // invalidating it for the next caller that reuses the same query text.
+// This is the cheap-repeated-use contract db.Preparer documents.
 type sqliteStmt struct {
 	stmt *sql.Stmt
 }

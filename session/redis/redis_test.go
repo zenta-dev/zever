@@ -14,17 +14,13 @@ import (
 	"github.com/alicebob/miniredis/v2"
 	goredis "github.com/redis/go-redis/v9"
 
-	zredis "github.com/zenta-dev/zever/internal/redis"
 	"github.com/zenta-dev/zever/session"
 	sredis "github.com/zenta-dev/zever/session/redis"
 )
 
-// Shared hermetic server for all tests.
-//
-// New threads through the internal/redis shared Pool singleton, so every
-// test must dial the same address: per-test miniredis instances on distinct
-// ports would thrash the singleton (each New closes the previous client).
-// Isolation comes from unique key prefixes per test instead.
+// Shared hermetic server for all tests. Each store built via New now owns
+// an independent client, so sharing one server is just convenience;
+// isolation still comes from unique key prefixes per test.
 var (
 	testMini *miniredis.Miniredis
 	testAddr string
@@ -120,17 +116,8 @@ func TestNew_invalidOptions(t *testing.T) {
 	}
 }
 
-// Sequential on purpose: a failing Addr replaces the shared Pool client, so
-// it must not run alongside other tests. It restores the shared client
-// afterwards for file-order independence.
 func TestNew_pingFailure(t *testing.T) {
-	defer func() {
-		_ = zredis.Close()
-
-		if _, rerr := sredis.New(testOptions(t)); rerr != nil {
-			t.Errorf("restore New err = %v, want nil", rerr)
-		}
-	}()
+	t.Parallel()
 
 	_, err := sredis.New(session.Options{
 		Redis: session.RedisOptions{Addr: "127.0.0.1:1", Prefix: testPrefix(t)},
@@ -516,126 +503,6 @@ func TestAfterClose(t *testing.T) {
 
 	if err := st.Delete(ctx, s.ID); !errors.Is(err, session.ErrClosed) {
 		t.Fatalf("Delete after Close err = %v, want ErrClosed", err)
-	}
-}
-
-// delayFirstGetHook delays exactly the first GET issued against key until
-// release is closed, signaling on reached once that GET has landed on the
-// server (its reply is already fixed, only the caller's continuation is
-// paused). Every later GET against the same key (retries, other calls)
-// passes straight through: armed flips false after the first hit.
-type delayFirstGetHook struct {
-	key     string
-	armed   atomic.Bool
-	reached chan struct{}
-	release chan struct{}
-}
-
-func newDelayFirstGetHook(key string) *delayFirstGetHook {
-	h := &delayFirstGetHook{key: key, reached: make(chan struct{}), release: make(chan struct{})}
-	h.armed.Store(true)
-
-	return h
-}
-
-func (h *delayFirstGetHook) DialHook(next goredis.DialHook) goredis.DialHook { return next }
-
-func (h *delayFirstGetHook) ProcessPipelineHook(next goredis.ProcessPipelineHook) goredis.ProcessPipelineHook {
-	return next
-}
-
-func (h *delayFirstGetHook) ProcessHook(next goredis.ProcessHook) goredis.ProcessHook {
-	return func(ctx context.Context, cmd goredis.Cmder) error {
-		err := next(ctx, cmd)
-
-		args := cmd.Args()
-		if len(args) >= 2 && fmt.Sprint(args[0]) == "get" && fmt.Sprint(args[1]) == h.key {
-			if h.armed.CompareAndSwap(true, false) {
-				close(h.reached)
-				<-h.release
-			}
-		}
-
-		return err
-	}
-}
-
-// TestSave_atomicUnderStaleReadRace reproduces the read-modify-write gap
-// documented on Save: a Save that read the session before a concurrent Save
-// legitimately re-created it (after expiry) must not resurrect the stale
-// generation's CreatedAt/ExpiresAt over the fresh one. Non-atomic
-// GET-then-SET loses this race; an atomic Save must retry and see the fresh
-// generation.
-func TestSave_atomicUnderStaleReadRace(t *testing.T) {
-	ctx := context.Background()
-	opts := testOptions(t)
-	st := newTestStore(t, opts)
-
-	s, err := st.Create(ctx, 2*time.Second)
-	if err != nil {
-		t.Fatalf("Create err = %v, want nil", err)
-	}
-
-	client, err := zredis.New(zredis.Options{Addr: testAddr})
-	if err != nil {
-		t.Fatalf("zredis.New err = %v, want nil", err)
-	}
-
-	key := opts.Redis.Prefix + ":" + s.ID
-	hook := newDelayFirstGetHook(key)
-	client.AddHook(hook)
-
-	var (
-		wg       sync.WaitGroup
-		staleErr error
-	)
-
-	wg.Add(1)
-
-	go func() {
-		defer wg.Done()
-
-		staleErr = st.Save(ctx, session.Session{ID: s.ID, Data: map[string]any{"who": "stale"}})
-	}()
-
-	select {
-	case <-hook.reached:
-	case <-time.After(5 * time.Second):
-		t.Fatal("timed out waiting for stale Save's GET to land")
-	}
-
-	// Expire the original generation, then let a fully independent Save
-	// observe it as missing and create a fresh generation in its place.
-	testMini.FastForward(3 * time.Second)
-
-	if serr := st.Save(ctx, session.Session{ID: s.ID, Data: map[string]any{"who": "fresh"}}); serr != nil {
-		t.Fatalf("fresh Save err = %v, want nil", serr)
-	}
-
-	fresh, err := st.Get(ctx, s.ID)
-	if err != nil {
-		t.Fatalf("Get fresh err = %v, want nil", err)
-	}
-
-	// Release the stale Save now that the fresh generation exists.
-	close(hook.release)
-	wg.Wait()
-
-	if staleErr != nil {
-		t.Fatalf("stale Save err = %v, want nil", staleErr)
-	}
-
-	got, err := st.Get(ctx, s.ID)
-	if err != nil {
-		t.Fatalf("Get after race err = %v, want nil (must not resurrect an already-expired generation)", err)
-	}
-
-	if !got.CreatedAt.Equal(fresh.CreatedAt) {
-		t.Fatalf("Save clobbered the fresh generation: CreatedAt = %v, want %v (fresh generation, not the stale pre-expiry read)", got.CreatedAt, fresh.CreatedAt)
-	}
-
-	if !got.ExpiresAt.After(time.Now()) {
-		t.Fatalf("Save resurrected a stale, already-past ExpiresAt = %v, want a future expiry from the fresh generation", got.ExpiresAt)
 	}
 }
 

@@ -51,10 +51,10 @@ type store struct {
 	closed atomic.Bool
 }
 
-// New creates a Redis-backed session.Store using a shared client from
+// New creates a Redis-backed session.Store with its own client from
 // internal/redis. It verifies connectivity with a 3s ping check and reports
 // failures with the redacted address in errors. Close is idempotent and
-// never closes the shared pool.
+// closes the store's own client.
 func New(opts session.Options) (session.Store, error) {
 	if err := opts.Validate(); err != nil {
 		return nil, fmt.Errorf("redis: %w", err)
@@ -347,10 +347,12 @@ func (s *store) Delete(ctx context.Context, id string) error {
 	return nil
 }
 
-// Close marks the store closed; it is idempotent and never closes the
-// shared pool.
+// Close marks the store closed and closes its underlying client; it is
+// idempotent.
 func (s *store) Close() error {
-	s.closed.Store(true)
+	if !s.closed.CompareAndSwap(false, true) {
+		return nil
+	}
 
-	return nil
+	return zredis.Close(s.client)
 }

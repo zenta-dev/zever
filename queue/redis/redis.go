@@ -61,6 +61,7 @@ const sweepInterval = 250 * time.Millisecond
 
 type redisAdapter struct {
 	client            redisClient
+	rawClient         *goredis.Client
 	prefix            string
 	visibilityTimeout time.Duration
 	pollTimeout       time.Duration
@@ -121,6 +122,7 @@ func New(opts queue.Options) (queue.Queue, error) {
 
 	return &redisAdapter{
 		client:            client,
+		rawClient:         client,
 		prefix:            prefix,
 		visibilityTimeout: visibility,
 		pollTimeout:       pollTimeout,
@@ -289,7 +291,7 @@ func (a *redisAdapter) Close() error {
 		return nil
 	}
 
-	return zredis.Close()
+	return zredis.Close(a.rawClient)
 }
 
 func (a *redisAdapter) Name() string { return "redis" }

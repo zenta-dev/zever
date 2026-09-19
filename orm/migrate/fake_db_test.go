@@ -83,7 +83,7 @@ func assignValue(dst, v any) error {
 	}
 
 	if vv.CanConvert(dv.Elem().Type()) {
-		switch dv.Elem().Kind() {
+		switch dv.Elem().Kind() { //nolint:exhaustive // only numeric kinds are convertible here; everything else falls through to the error below
 		case reflect.Int, reflect.Int8, reflect.Int16, reflect.Int32, reflect.Int64,
 			reflect.Uint, reflect.Uint8, reflect.Uint16, reflect.Uint32, reflect.Uint64,
 			reflect.Float32, reflect.Float64:
