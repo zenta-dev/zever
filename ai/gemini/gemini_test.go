@@ -9,9 +9,11 @@ import (
 	"net/http"
 	"net/http/httptest"
 	"strings"
+	"sync"
 	"testing"
 	"time"
 
+	"go.uber.org/goleak"
 	"google.golang.org/genai"
 
 	"github.com/zenta-dev/zever/ai"
@@ -487,6 +489,80 @@ func TestStream_Ordering(t *testing.T) {
 	} else if usageSeen.PromptTokens != 1 || usageSeen.CompletionTokens != 2 {
 		t.Errorf("usage %+v want 1/2", usageSeen)
 	}
+}
+
+// streamCancelTestServer starts a TLS test server whose streamGenerateContent
+// handler sends one SSE event, flushes, then blocks on release -- simulating
+// a still-pending network read so a ctx cancellation genuinely has to abort
+// an in-flight read rather than racing an already-fully-buffered response.
+// The caller must arrange for release to be closed (directly or via
+// releaseFn) before the test ends, or the server's own handler goroutine
+// leaks for the rest of the test binary's life.
+func streamCancelTestServer(t *testing.T) (srv *httptest.Server, releaseFn func()) {
+	t.Helper()
+
+	release := make(chan struct{})
+
+	var once sync.Once
+
+	releaseFn = func() { once.Do(func() { close(release) }) }
+	t.Cleanup(releaseFn)
+
+	srv = httptest.NewTLSServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		if strings.Contains(r.URL.Path, "streamGenerateContent") {
+			w.Header().Set("Content-Type", "text/event-stream")
+			_, _ = w.Write([]byte("data: " + `{"candidates":[{"content":{"parts":[{"text":"one"}],"role":"model"},"finishReason":""}]}` + "\n\n"))
+
+			if f, ok := w.(http.Flusher); ok {
+				f.Flush()
+			}
+
+			<-release
+
+			return
+		}
+
+		w.WriteHeader(http.StatusNotFound)
+	}))
+	t.Cleanup(srv.Close)
+
+	return srv, releaseFn
+}
+
+// TestStream_ClosesOnContextCancel is the regression test for the fixed
+// goroutine leak: Stream used to send every chunk with a bare `ch <- ...`,
+// so a caller that cancelled ctx and permanently stopped draining ch (the
+// expected behavior on cancellation) left the goroutine blocked forever on
+// its next send. Deliberately not t.Parallel: goleak.VerifyNone inspects
+// every goroutine in the process, so overlapping with other parallel tests
+// would make it flaky.
+func TestStream_ClosesOnContextCancel(t *testing.T) {
+	srv, release := streamCancelTestServer(t)
+
+	a := openWithKeyAndServer(t, "k", srv)
+
+	ctx, cancel := context.WithCancel(context.Background())
+
+	snapshot := goleak.IgnoreCurrent()
+
+	ch, err := a.Stream(ctx, "models/gemini-1.5-flash", []ai.Message{{Role: ai.RoleUser, Content: "hi"}}, ai.GenerateOptions{})
+	if err != nil {
+		t.Fatalf("Stream err = %v", err)
+	}
+
+	select {
+	case chunk, ok := <-ch:
+		if !ok || chunk.Delta != "one" {
+			t.Fatalf("first chunk = %+v, ok=%v, want Delta=\"one\"", chunk, ok)
+		}
+	case <-time.After(2 * time.Second):
+		t.Fatal("timed out waiting for first chunk")
+	}
+
+	cancel()  // caller abandons the stream: ch is never read again
+	release() // let the server handler (and its transport goroutines) wind down
+
+	goleak.VerifyNone(t, snapshot)
 }
 
 func TestStream_ModelRequired(t *testing.T) {

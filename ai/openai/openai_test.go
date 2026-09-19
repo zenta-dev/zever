@@ -12,10 +12,12 @@ import (
 	"net/http"
 	"net/http/httptest"
 	"strings"
+	"sync/atomic"
 	"testing"
 	"time"
 
 	"github.com/openai/openai-go/v3"
+	"github.com/openai/openai-go/v3/option"
 	"github.com/openai/openai-go/v3/packages/param"
 
 	"github.com/zenta-dev/zever/ai"
@@ -895,6 +897,98 @@ func TestStream_ToolCalls(t *testing.T) {
 
 	if !found {
 		t.Error("tool call not found in stream")
+	}
+}
+
+// closeTrackingBody wraps an io.Reader as an io.ReadCloser that records
+// whether Close was called.
+type closeTrackingBody struct {
+	io.Reader
+	closed *atomic.Bool
+}
+
+func (c *closeTrackingBody) Close() error {
+	c.closed.Store(true)
+	return nil
+}
+
+// newStreamTestAdapter builds an adapter whose HTTP transport is a fake
+// RoundTripper returning body as an SSE response with close tracking,
+// bypassing httptest.NewServer so the exact same io.ReadCloser instance
+// the SDK reads from is the one whose Close() we assert on (a real network
+// round trip would let net/http wrap/replace the body).
+func newStreamTestAdapter(t *testing.T, body string) (*adapter, *atomic.Bool) {
+	t.Helper()
+
+	closed := &atomic.Bool{}
+
+	transport := roundTripFunc(func(r *http.Request) (*http.Response, error) {
+		return &http.Response{
+			StatusCode: http.StatusOK,
+			Header:     http.Header{"Content-Type": []string{"text/event-stream"}},
+			Body:       &closeTrackingBody{Reader: strings.NewReader(body), closed: closed},
+			Request:    r,
+		}, nil
+	})
+
+	client := openai.NewClient(option.WithAPIKey("sk-test"), option.WithHTTPClient(&http.Client{Transport: transport}))
+
+	return &adapter{client: &client, model: "gpt-4"}, closed
+}
+
+// TestStream_ClosesBodyOnNormalCompletion is the regression test for the
+// fixed stream leak: the original code never called stream.Close() on any
+// exit path, including ordinary completion (stream.Next() returning false
+// after [DONE]), not just cancellation.
+func TestStream_ClosesBodyOnNormalCompletion(t *testing.T) {
+	t.Parallel()
+
+	a, closed := newStreamTestAdapter(t, "data: {\"choices\":[{\"delta\":{\"content\":\"hi\"},\"finish_reason\":\"stop\"}]}\n\ndata: [DONE]\n\n")
+
+	ch, err := a.Stream(context.Background(), "", []ai.Message{{Role: ai.RoleUser, Content: "hi"}}, ai.GenerateOptions{})
+	if err != nil {
+		t.Fatalf("Stream err = %v", err)
+	}
+
+	for chunk := range ch {
+		_ = chunk // drain until closed
+	}
+
+	if !closed.Load() {
+		t.Error("response body not closed after normal stream completion")
+	}
+}
+
+// TestStream_ClosesBodyOnCancel covers the early-return-on-ctx.Done() exit
+// paths specifically.
+func TestStream_ClosesBodyOnCancel(t *testing.T) {
+	t.Parallel()
+
+	// Two SSE events: Stream reads the first, we cancel before draining
+	// the second, forcing the ctx.Done() branch inside the send select.
+	a, closed := newStreamTestAdapter(t,
+		"data: {\"choices\":[{\"delta\":{\"content\":\"one\"}}]}\n\n"+
+			"data: {\"choices\":[{\"delta\":{\"content\":\"two\"}}]}\n\n"+
+			"data: [DONE]\n\n")
+
+	ctx, cancel := context.WithCancel(context.Background())
+
+	ch, err := a.Stream(ctx, "", []ai.Message{{Role: ai.RoleUser, Content: "hi"}}, ai.GenerateOptions{})
+	if err != nil {
+		t.Fatalf("Stream err = %v", err)
+	}
+
+	<-ch // first chunk
+	cancel()
+
+	// Drain until the goroutine closes ch (its defers, including
+	// stream.Close(), have then run).
+	for chunk := range ch {
+		_ = chunk // drain until closed
+	}
+
+	if !closed.Load() {
+		t.Error("response body not closed after ctx cancellation mid-stream")
 	}
 }
 
