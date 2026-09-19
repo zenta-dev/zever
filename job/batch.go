@@ -64,6 +64,15 @@ type batchCallback struct {
 	logger       log.Logger
 }
 
+// batchCallbacks is process-global rather than scoped to a *Dispatcher
+// instance: reportBatchFailure/reportBatchSuccess run from the job
+// execution path with only a batch ID and store, no Dispatcher reference,
+// so instance-scoping would require threading *Dispatcher through the
+// entire job-completion call chain. This is safe in practice because keys
+// are BatchID.String() -- a UUIDv7, not an attacker-controlled or
+// low-entropy value -- so two unrelated batches (even across separate
+// Dispatcher instances in the same process) colliding on the same key is a
+// UUID-collision event, not a realistic risk from sharing the map.
 var batchCallbacks = struct {
 	sync.Mutex
 	m map[string]*batchCallback
