@@ -46,7 +46,10 @@ func New(o billing.Options) (billing.Billing, error) {
 	return &driver{client: client}, nil
 }
 
-func (d *driver) CreateCustomer(ctx context.Context, name string, email string) (billing.Customer, error) {
+// CreateCustomer creates a Paddle customer. idempotencyKey is accepted for
+// billing.Billing interface compatibility but ignored: paddle-go-sdk/v5
+// exposes no request-level idempotency mechanism.
+func (d *driver) CreateCustomer(ctx context.Context, name, email, _ string) (billing.Customer, error) {
 	req := &paddle.CreateCustomerRequest{Email: email}
 	if name != "" {
 		req.Name = paddle.PtrTo(name)
@@ -71,8 +74,10 @@ func derefStr(s *string) string {
 // CreateSubscription creates a transaction in automatic collection mode for the
 // given price. Paddle has no server-side subscription creation API — the
 // transaction acts as the subscription record and does not auto-renew for
-// future billing periods.
-func (d *driver) CreateSubscription(ctx context.Context, customerID string, planID string) (billing.Subscription, error) {
+// future billing periods. idempotencyKey is accepted for billing.Billing
+// interface compatibility but ignored: paddle-go-sdk/v5 exposes no
+// request-level idempotency mechanism.
+func (d *driver) CreateSubscription(ctx context.Context, customerID, planID, _ string) (billing.Subscription, error) {
 	if customerID == "" {
 		return billing.Subscription{}, billing.ErrMissingCustomerID
 	}

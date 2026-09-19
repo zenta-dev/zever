@@ -23,12 +23,12 @@ func TestRoundTrip(t *testing.T) {
 	ctx := context.Background()
 	b := New()
 
-	c, err := b.CreateCustomer(ctx, "Ada", "ada@example.com")
+	c, err := b.CreateCustomer(ctx, "Ada", "ada@example.com", "")
 	if err != nil {
 		t.Fatalf("CreateCustomer: %v", err)
 	}
 
-	s, err := b.CreateSubscription(ctx, c.ID, "plan_pro")
+	s, err := b.CreateSubscription(ctx, c.ID, "plan_pro", "")
 	if err != nil {
 		t.Fatalf("CreateSubscription: %v", err)
 	}
@@ -78,7 +78,7 @@ func TestGetInvoiceNotFound(t *testing.T) {
 	ctx := context.Background()
 	b := New()
 
-	c, err := b.CreateCustomer(ctx, "Bob", "bob@example.com")
+	c, err := b.CreateCustomer(ctx, "Bob", "bob@example.com", "")
 	if err != nil {
 		t.Fatalf("CreateCustomer: %v", err)
 	}
@@ -109,7 +109,7 @@ func TestGetInvoiceNotFound(t *testing.T) {
 func TestCreateSubscriptionCustomerMiss(t *testing.T) {
 	t.Parallel()
 
-	_, err := New().CreateSubscription(context.Background(), "cus_missing", "plan_pro")
+	_, err := New().CreateSubscription(context.Background(), "cus_missing", "plan_pro", "")
 	if err == nil {
 		t.Fatal("expected error, got nil")
 	}
@@ -160,16 +160,16 @@ func TestEmptyIDGuards(t *testing.T) {
 	ctx := context.Background()
 	b := New()
 
-	if _, err := b.CreateSubscription(ctx, "", "plan_pro"); !errors.Is(err, billing.ErrMissingCustomerID) {
+	if _, err := b.CreateSubscription(ctx, "", "plan_pro", ""); !errors.Is(err, billing.ErrMissingCustomerID) {
 		t.Fatalf("empty customerID: expected ErrMissingCustomerID, got %v", err)
 	}
 
-	c, err := b.CreateCustomer(ctx, "Eve", "eve@example.com")
+	c, err := b.CreateCustomer(ctx, "Eve", "eve@example.com", "")
 	if err != nil {
 		t.Fatalf("CreateCustomer: %v", err)
 	}
 
-	if _, err := b.CreateSubscription(ctx, c.ID, ""); !errors.Is(err, billing.ErrMissingPlanID) {
+	if _, err := b.CreateSubscription(ctx, c.ID, "", ""); !errors.Is(err, billing.ErrMissingPlanID) {
 		t.Fatalf("empty planID: expected ErrMissingPlanID, got %v", err)
 	}
 
@@ -225,7 +225,7 @@ func TestIDUniqueness(t *testing.T) {
 	seen := make(map[string]struct{}, 100)
 
 	for range 100 {
-		c, err := b.CreateCustomer(ctx, "N", "n@example.com")
+		c, err := b.CreateCustomer(ctx, "N", "n@example.com", "")
 		if err != nil {
 			t.Fatalf("CreateCustomer: %v", err)
 		}
@@ -252,13 +252,13 @@ func TestConcurrent(t *testing.T) {
 		go func() {
 			defer wg.Done()
 
-			c, err := b.CreateCustomer(ctx, "C", "c@example.com")
+			c, err := b.CreateCustomer(ctx, "C", "c@example.com", "")
 			if err != nil {
 				t.Errorf("CreateCustomer: %v", err)
 				return
 			}
 
-			s, err := b.CreateSubscription(ctx, c.ID, "plan_pro")
+			s, err := b.CreateSubscription(ctx, c.ID, "plan_pro", "")
 			if err != nil {
 				t.Errorf("CreateSubscription: %v", err)
 				return

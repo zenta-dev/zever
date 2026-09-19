@@ -36,8 +36,11 @@ func New(o billing.Options) (billing.Billing, error) {
 	return &driver{client: client}, nil
 }
 
-func (d *driver) CreateCustomer(ctx context.Context, name string, email string) (billing.Customer, error) {
+func (d *driver) CreateCustomer(ctx context.Context, name, email, idempotencyKey string) (billing.Customer, error) {
 	params := &stripe.CustomerCreateParams{Name: stripe.String(name), Email: stripe.String(email)}
+	if idempotencyKey != "" {
+		params.SetIdempotencyKey(idempotencyKey)
+	}
 
 	cus, err := d.client.V1Customers.Create(ctx, params)
 	if err != nil {
@@ -47,7 +50,7 @@ func (d *driver) CreateCustomer(ctx context.Context, name string, email string) 
 	return billing.Customer{ID: cus.ID, Name: cus.Name, Email: cus.Email}, nil
 }
 
-func (d *driver) CreateSubscription(ctx context.Context, customerID string, planID string) (billing.Subscription, error) {
+func (d *driver) CreateSubscription(ctx context.Context, customerID, planID, idempotencyKey string) (billing.Subscription, error) {
 	if customerID == "" {
 		return billing.Subscription{}, fmt.Errorf("stripe: create subscription: %w", billing.ErrMissingCustomerID)
 	}
@@ -61,6 +64,9 @@ func (d *driver) CreateSubscription(ctx context.Context, customerID string, plan
 		Items: []*stripe.SubscriptionCreateItemParams{
 			{Price: stripe.String(planID)},
 		},
+	}
+	if idempotencyKey != "" {
+		params.SetIdempotencyKey(idempotencyKey)
 	}
 
 	sub, err := d.client.V1Subscriptions.Create(ctx, params)

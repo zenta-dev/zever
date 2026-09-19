@@ -36,7 +36,10 @@ type driver struct {
 	invoices      map[string][]billing.Invoice
 }
 
-func (d *driver) CreateCustomer(_ context.Context, name string, email string) (billing.Customer, error) {
+// CreateCustomer creates an in-memory customer. idempotencyKey is accepted
+// for billing.Billing interface compatibility but ignored: this stub has no
+// real dedup semantics.
+func (d *driver) CreateCustomer(_ context.Context, name, email, _ string) (billing.Customer, error) {
 	d.mu.Lock()
 	defer d.mu.Unlock()
 
@@ -51,7 +54,10 @@ func (d *driver) CreateCustomer(_ context.Context, name string, email string) (b
 	return c, nil
 }
 
-func (d *driver) CreateSubscription(_ context.Context, customerID string, planID string) (billing.Subscription, error) {
+// CreateSubscription creates an in-memory subscription. idempotencyKey is
+// accepted for billing.Billing interface compatibility but ignored: this
+// stub has no real dedup semantics.
+func (d *driver) CreateSubscription(_ context.Context, customerID, planID, _ string) (billing.Subscription, error) {
 	if customerID == "" {
 		return billing.Subscription{}, fmt.Errorf("stub: create subscription: %w", billing.ErrMissingCustomerID)
 	}
