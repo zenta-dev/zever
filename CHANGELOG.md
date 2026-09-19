@@ -157,6 +157,11 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   grouped by index, and `vectorstore/sqlite` and `search/sqlite` wrap the
   existing single-item logic in one transaction. Any external
   implementation of `VectorStore` or `Search` must add the new method.
+- `queue/redis`'s poll loop throttles its due/stale message sweep
+  (`promoteDue`/`reclaimStale`) to once per 250ms instead of running both on
+  every poll tick (~every 100ms), cutting idle Redis round trips at the cost
+  of up to 250ms of added latency before a due or stale message is
+  recovered.
 
 ### Fixed
 

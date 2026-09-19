@@ -208,7 +208,9 @@ func TestRedisLive_VisibilityReclaim(t *testing.T) {
 	}
 
 	s.FastForward(200 * time.Millisecond)
-	time.Sleep(220 * time.Millisecond)
+	// Sleep past sweepInterval so popLoop's throttled reclaimStale sweep
+	// runs again before the Pop below.
+	time.Sleep(300 * time.Millisecond)
 
 	msg2, err := q.Pop(ctx, topic)
 	if err != nil {
