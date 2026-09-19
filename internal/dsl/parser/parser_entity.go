@@ -92,6 +92,14 @@ func (p *Parser) parseEntityMember(decl *ast.EntityDecl) {
 			return
 		}
 	case token.INDEX:
+		// Known limitation: a field literally named "index" is unreachable
+		// here -- it always dispatches to parseIndexDecl and fails as a
+		// malformed index declaration, with no field-name fallback like
+		// IDENT/ENUM/MESSAGE get below. Widening isIdentLike (parser.go) to
+		// include INDEX would fix this, but isIdentLike is shared by
+		// parser_attribute.go and parser_service.go too, so that's a
+		// separate, deliberate grammar decision (does "index" become legal
+		// there as well?), not a one-line fix -- not done here.
 		if idx := p.parseIndexDecl(); idx != nil {
 			decl.Indexes = append(decl.Indexes, idx)
 			return
