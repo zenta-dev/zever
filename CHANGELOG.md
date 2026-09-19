@@ -230,3 +230,9 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   caller during cold start race its own `CollectionExists`/
   `CreateCollection` round trip: the first caller now leads while others
   wait, and a failed attempt is still retried by the next caller.
+- `notification/fcm`'s `Notify` now retries a transient send failure
+  (network blip, FCM 5xx) up to 3 times with short backoff, matching every
+  other outbound-network adapter in the codebase
+  (`webhook/http`/`webhook/queue`/`ai/anthropic`/`ai/openai`/`queue/redis`).
+  A duplicate push notification on a spurious retry is a low-severity
+  nuisance, so this is safe unconditionally.

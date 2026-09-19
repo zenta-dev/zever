@@ -112,6 +112,49 @@ func TestNotify_sendError_wrapped(t *testing.T) {
 	}
 }
 
+func TestNotify_retriesTransientSendFailure(t *testing.T) {
+	t.Parallel()
+
+	boom := errors.New("boom")
+	calls := 0
+	n := &notifier{send: func(_ context.Context, _ *messaging.Message) (string, error) {
+		calls++
+		if calls < sendRetryPolicy.MaxAttempts {
+			return "", boom
+		}
+		return "projects/p/messages/m", nil
+	}}
+
+	if err := n.Notify(context.Background(), validPush()); err != nil {
+		t.Fatalf("Notify() = %v, want nil after retrying", err)
+	}
+	if calls != sendRetryPolicy.MaxAttempts {
+		t.Errorf("send called %d times, want %d", calls, sendRetryPolicy.MaxAttempts)
+	}
+}
+
+func TestNotify_exhaustsRetriesOnPersistentFailure(t *testing.T) {
+	t.Parallel()
+
+	boom := errors.New("boom")
+	calls := 0
+	n := &notifier{send: func(_ context.Context, _ *messaging.Message) (string, error) {
+		calls++
+		return "", boom
+	}}
+
+	err := n.Notify(context.Background(), validPush())
+	if err == nil {
+		t.Fatal("Notify() = nil, want error after exhausting retries")
+	}
+	if !errors.Is(err, boom) {
+		t.Errorf("Notify() = %v, want wrap of boom", err)
+	}
+	if calls != sendRetryPolicy.MaxAttempts {
+		t.Errorf("send called %d times, want %d (MaxAttempts)", calls, sendRetryPolicy.MaxAttempts)
+	}
+}
+
 func TestNotify_nil_rejects(t *testing.T) {
 	t.Parallel()
 	n := &notifier{send: func(_ context.Context, _ *messaging.Message) (string, error) {
