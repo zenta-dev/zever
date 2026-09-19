@@ -52,6 +52,14 @@ func ScreamingSnake(s string) string {
 }
 
 // toSnakeCase is a helper that converts camelCase/PascalCase to snake_case.
+//
+// Acronym runs are treated as a single word, matching protobuf's own style
+// guide (GetDnsRequest, not GetDNSRequest): a word boundary precedes an
+// uppercase rune only when the previous rune is lowercase (a lower->upper
+// transition), or when an uppercase run ends because the next rune is
+// lowercase (the run's trailing capital starts a new word, e.g. the "S" in
+// "HTTPServer"). So "APIKey" -> "api_key", "HTTPServer" -> "http_server",
+// not "a_p_i_key"/"h_t_t_p_server".
 func toSnakeCase(s string) string {
 	if s == "" {
 		return ""
@@ -63,11 +71,17 @@ func toSnakeCase(s string) string {
 	}
 
 	// Convert camelCase/PascalCase to snake_case
+	runes := []rune(s)
 	var result strings.Builder
 
-	for i, r := range s {
+	for i, r := range runes {
 		if i > 0 && unicode.IsUpper(r) {
-			result.WriteRune('_')
+			prevLower := unicode.IsLower(runes[i-1])
+			prevUpperNextLower := unicode.IsUpper(runes[i-1]) && i+1 < len(runes) && unicode.IsLower(runes[i+1])
+
+			if prevLower || prevUpperNextLower {
+				result.WriteRune('_')
+			}
 		}
 
 		result.WriteRune(unicode.ToLower(r))
