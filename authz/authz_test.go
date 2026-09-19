@@ -210,6 +210,31 @@ func TestAuthorizeAnonymousCanEval(t *testing.T) {
 	}
 }
 
+// TestAuthorizeAnonymousRolesIgnored guards against a fixed, policy-configured
+// Roles list being asserted for an unauthenticated caller: AuthRequired:false
+// means the caller's identity was never verified, so it must never be
+// evaluated as holding any role, however the Policy is configured. Without
+// this, a Policy meant as "public route, still gated" (AuthRequired: false,
+// PermissionCheck set, Roles: [...]) would silently grant every anonymous
+// caller those roles.
+func TestAuthorizeAnonymousRolesIgnored(t *testing.T) {
+	t.Parallel()
+
+	a := &fakeAuth{}
+	p := &fakeChecker{allow: true}
+	pol := authz.Policy{AuthRequired: false, PermissionCheck: "doc.delete", ResourceType: "Doc", Roles: []string{"admin"}}
+	_, err := authz.Authorize(context.Background(), a, p, pol, "", "r1")
+	if err != nil {
+		t.Fatalf("Authorize() err = %v, want nil", err)
+	}
+	if a.called {
+		t.Fatal("AuthRequired=false must not call Verify")
+	}
+	if len(p.gotSubject.Roles) != 0 {
+		t.Fatalf("anonymous subject Roles = %v, want empty (Policy.Roles must not be asserted for an unverified caller)", p.gotSubject.Roles)
+	}
+}
+
 func TestAuthorizeEmptyResourceIDEval(t *testing.T) {
 	t.Parallel()
 
