@@ -209,6 +209,13 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Fixed
 
+- `internal/dsl/naming`'s snake_case conversion inserted an underscore
+  before every capital letter, mangling acronyms in generated identifiers
+  (`APIKey` -> `a_p_i_key` instead of `api_key`). Acronym runs are now
+  treated as a single word, matching protobuf's own style guide. Affects
+  generated Postgres/SQLite table names, Go/zenorm file and type names, and
+  proto enum value prefixes for any schema using an acronym in an
+  entity/field/enum name.
 - `container.Container.Close` now flushes the `observability` service on
   shutdown: `closeAny` probes for a fourth shutdown shape,
   `Shutdown(context.Context) error`, which `observability.Provider` (and its
@@ -230,13 +237,6 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   caller during cold start race its own `CollectionExists`/
   `CreateCollection` round trip: the first caller now leads while others
   wait, and a failed attempt is still retried by the next caller.
-- `internal/dsl/naming`'s snake_case conversion inserted an underscore
-  before every capital letter, mangling acronyms in generated identifiers
-  (`APIKey` -> `a_p_i_key` instead of `api_key`). Acronym runs are now
-  treated as a single word, matching protobuf's own style guide. Affects
-  generated Postgres/SQLite table names, Go/zenorm file and type names, and
-  proto enum value prefixes for any schema using an acronym in an
-  entity/field/enum name.
 - `notification/fcm`'s `Notify` now retries a transient send failure
   (network blip, FCM 5xx) up to 3 times with short backoff, matching every
   other outbound-network adapter in the codebase
