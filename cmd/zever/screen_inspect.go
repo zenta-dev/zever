@@ -285,7 +285,7 @@ func (m CompileScreen) Init() tea.Cmd { return m.form.Init() }
 
 // Update implements tea.Model. No I/O: cores run in ExecModel Cmds.
 func (m CompileScreen) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
-	switch m.stage {
+	switch m.stage { //nolint:exhaustive // default forwards to the form, covering inspectStageForm/Log and future stages
 	case inspectStageExec:
 		if km, ok := msg.(tea.KeyPressMsg); ok && m.keys.Back.Matches(km.String()) {
 			if m.exec.State() != tui.ExecRunning {

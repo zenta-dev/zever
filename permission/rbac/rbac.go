@@ -88,7 +88,8 @@ func matchRule(subject permission.Subject, action string, resource permission.Re
 	}
 
 	if rule.OwnedOnly {
-		if resource.Attributes[rule.OwnedAttr] != subject.ID {
+		v, ok := resource.Attributes[rule.OwnedAttr]
+		if subject.ID == "" || !ok || v != subject.ID {
 			return false
 		}
 	}

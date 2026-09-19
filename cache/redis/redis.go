@@ -206,5 +206,5 @@ func (a *redisAdapter) Close(_ context.Context) error {
 		return nil
 	}
 
-	return zredis.Close()
+	return zredis.Close(a.client)
 }

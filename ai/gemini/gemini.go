@@ -320,7 +320,7 @@ func toGenaiContents(messages []ai.Message) ([]*genai.Content, *genai.Content) {
 	contents := make([]*genai.Content, 0, len(messages))
 
 	for _, m := range messages {
-		switch m.Role {
+		switch m.Role { //nolint:exhaustive // default explicitly maps RoleUser and unknown roles to user content
 		case ai.RoleSystem:
 			if m.Content != "" {
 				systemParts = append(systemParts, genai.NewPartFromText(m.Content))
