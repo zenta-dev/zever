@@ -191,6 +191,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   `net/http` adaptor closure on every request instead of once at
   construction/route-registration time; both are now hoisted, cutting two
   redundant closure allocations per request.
+- `geo/osm` had no rate limiting against Nominatim's usage policy (max 1
+  request/second for unauthenticated use); a caller geocoding in a loop
+  could get the application's IP blocked. `New` now paces requests to at
+  most 1/sec by default.
 
 ### Fixed
 
