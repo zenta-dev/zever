@@ -10,6 +10,7 @@ import (
 	"github.com/gofiber/adaptor/v2"
 	"github.com/gofiber/fiber/v2"
 	recovermw "github.com/gofiber/fiber/v2/middleware/recover"
+	"github.com/valyala/fasthttp/fasthttpadaptor"
 
 	"github.com/zenta-dev/zever/log"
 	"github.com/zenta-dev/zever/log/noop"
@@ -32,14 +33,15 @@ func New(opts router.Options) (router.Router, error) {
 	app := fiber.New(fiber.Config{AppName: appName, CaseSensitive: true})
 	app.Use(recovermw.New())
 
-	return &fiberDriver{app: app, routes: make(map[string]bool), logger: opts.Logger}, nil
+	return &fiberDriver{app: app, httpHandler: adaptor.FiberApp(app), routes: make(map[string]bool), logger: opts.Logger}, nil
 }
 
 type fiberDriver struct {
-	app    *fiber.App
-	mu     sync.Mutex
-	routes map[string]bool
-	logger log.Logger
+	app         *fiber.App
+	httpHandler http.HandlerFunc
+	mu          sync.Mutex
+	routes      map[string]bool
+	logger      log.Logger
 }
 
 func (d *fiberDriver) log() log.Logger {
@@ -128,7 +130,7 @@ func (d *fiberDriver) Use(middlewares ...func(http.Handler) http.Handler) {
 }
 
 func (d *fiberDriver) ServeHTTP(w http.ResponseWriter, r *http.Request) {
-	adaptor.FiberApp(d.app).ServeHTTP(w, r)
+	d.httpHandler(w, r)
 }
 
 type fiberGroup struct {
@@ -216,8 +218,11 @@ func (d *fiberDriver) routerLogf(format string, args ...any) {
 
 func wrapHandler(handler http.HandlerFunc) fiber.Handler {
 	return func(c *fiber.Ctx) error {
-		return adaptor.HTTPHandler(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		h := fasthttpadaptor.NewFastHTTPHandler(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 			handler(w, r.WithContext(router.WithParams(r.Context(), c.AllParams())))
-		}))(c)
+		}))
+		h(c.Context())
+
+		return nil
 	}
 }
