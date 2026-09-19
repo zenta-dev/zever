@@ -150,7 +150,7 @@ func (d *driver) Render(ctx context.Context, source []byte, format document.Outp
 		tasks = append(tasks, chromedp.FullScreenshot(&buf, q))
 	}
 
-	err := chromedp.Run(ctx, tasks...)
+	err := chromedp.Run(ctx, tasks...) //nolint:contextcheck // ctx is rooted in d.allocCtx (the persistent browser allocator) by design, not the caller's ctx directly; the caller's cancellation is bridged in above via context.AfterFunc(ctx, rCancel)
 	if err != nil {
 		return nil, fmt.Errorf("local: render: %w", err)
 	}

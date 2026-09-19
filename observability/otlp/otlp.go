@@ -139,6 +139,7 @@ func toAttribute(key string, value observability.AttributeValue) attribute.KeyVa
 	}
 }
 
+//nolint:spancheck // Start returns the span to the caller, who owns calling End() (see otelSpan.End); this is the standard tracer.Start contract, not a leak
 func (t *tracer) Start(ctx context.Context, name string) (context.Context, observability.Span) {
 	if ctx == nil {
 		ctx = context.Background() //nolint:contextcheck // nil context treated as background for safe propagation

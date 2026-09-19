@@ -124,7 +124,7 @@ func New(opts db.Options) (db.DB, error) {
 
 // Query runs a query and returns matching rows.
 func (a *adapter) Query(ctx context.Context, query string, args ...any) (db.Rows, error) {
-	rows, err := a.conn.QueryContext(ctx, query, args...)
+	rows, err := a.conn.QueryContext(ctx, query, args...) //nolint:rowserrcheck // rows.Err() is exposed via rowsAdapter.Err() for the caller to check after iterating, per db.Rows' contract
 	if err != nil {
 		return nil, fmt.Errorf("sqlite: query: %w", err)
 	}
@@ -258,7 +258,7 @@ type sqliteStmt struct {
 
 // Query runs the statement and returns matching rows.
 func (s *sqliteStmt) Query(ctx context.Context, args ...any) (db.Rows, error) {
-	rows, err := s.stmt.QueryContext(ctx, args...)
+	rows, err := s.stmt.QueryContext(ctx, args...) //nolint:rowserrcheck // rows.Err() is exposed via rowsAdapter.Err() for the caller to check after iterating, per db.Rows' contract
 	if err != nil {
 		return nil, fmt.Errorf("sqlite: stmt query: %w", err)
 	}
@@ -294,7 +294,7 @@ type sqliteTx struct {
 
 // Query runs a query within the transaction and returns matching rows.
 func (t *sqliteTx) Query(ctx context.Context, query string, args ...any) (db.Rows, error) {
-	rows, err := t.tx.QueryContext(ctx, query, args...)
+	rows, err := t.tx.QueryContext(ctx, query, args...) //nolint:rowserrcheck // rows.Err() is exposed via rowsAdapter.Err() for the caller to check after iterating, per db.Rows' contract
 	if err != nil {
 		return nil, fmt.Errorf("sqlite: query: %w", err)
 	}

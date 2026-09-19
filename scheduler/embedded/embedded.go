@@ -81,7 +81,9 @@ func (e *embedded) Schedule(ctx context.Context, spec, jobName string, args any)
 	}
 
 	// parsed above is passed through so job reuses it without re-parsing.
-	id, err := e.sched.EveryWithSchedule(spec, jobName, args, parsed)
+	// EveryWithSchedule registers a recurring cron job that must keep firing
+	// long after this call's ctx is done, so it deliberately does not take ctx.
+	id, err := e.sched.EveryWithSchedule(spec, jobName, args, parsed) //nolint:contextcheck // scheduled firing must outlive the registration request's ctx
 	if err != nil {
 		return 0, fmt.Errorf("scheduler: schedule %q: %w", spec, err)
 	}

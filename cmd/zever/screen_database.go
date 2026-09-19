@@ -288,7 +288,7 @@ func runDatabaseMigrateCapture(cfg MigrateConfig) tui.ExecFunc {
 	args := migrateDatabaseArgs(cfg.Adapter, cfg.DSN, cfg.Files, cfg.DryRun, cfg.DropColumns)
 
 	return func(context.Context) (string, error) {
-		out, err := captureDatabaseOutput(func() error { return runDBMigrate(args) })
+		out, err := captureDatabaseOutput(func() error { return runDBMigrate(args) }) //nolint:contextcheck // runDBMigrate is a CLI command entrypoint; no cmd/zever run* command takes a context, by established convention
 		out = sanitizeDatabaseOutput(out, cfg.DSN)
 		if err != nil {
 			return out, errors.New(sanitizeDatabaseOutput(err.Error(), cfg.DSN))
@@ -304,7 +304,7 @@ func runDatabaseRollbackCapture(cfg RollbackConfig) tui.ExecFunc {
 	args := rollbackDatabaseArgs(cfg.Adapter, cfg.DSN, cfg.Count, cfg.DryRun)
 
 	return func(context.Context) (string, error) {
-		out, err := captureDatabaseOutput(func() error { return runDBRollback(args) })
+		out, err := captureDatabaseOutput(func() error { return runDBRollback(args) }) //nolint:contextcheck // runDBRollback is a CLI command entrypoint; no cmd/zever run* command takes a context, by established convention
 		out = sanitizeDatabaseOutput(out, cfg.DSN)
 		if err != nil {
 			return out, errors.New(sanitizeDatabaseOutput(err.Error(), cfg.DSN))

@@ -20,7 +20,10 @@ type adapter struct {
 	subdomainFmt string
 }
 
-// Resolve returns the tenant ID from the header, falling back to subdomain match.
+// Resolve returns the tenant ID from the header, falling back to subdomain
+// match. meta is trusted as-is; see the package doc for the required
+// trust boundary (authenticate the caller and strip/overwrite the tenant
+// header upstream of this code).
 func (a *adapter) Resolve(_ context.Context, meta map[string]string) (string, error) {
 	if meta == nil {
 		return "", fmt.Errorf("%w: %w", ErrNilMeta, tenant.ErrNotFound)
@@ -84,6 +87,8 @@ func (a *adapter) Close() error {
 }
 
 // New creates a header-based Tenant, defaulting empty header to DefaultHeader.
+// See the package doc for the trust-boundary requirement: only deploy this
+// behind a gateway that authenticates callers and owns the tenant header.
 func New(o tenant.Options) (tenant.Tenant, error) {
 	if err := o.Validate(); err != nil {
 		return nil, fmt.Errorf("header: %w", err)

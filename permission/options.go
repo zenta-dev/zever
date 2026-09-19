@@ -13,7 +13,10 @@ type Options struct {
 	ModelPath string
 	// PolicyPath is the path to the Casbin policy file.
 	PolicyPath string
-	// Roles maps a role to its inherited roles.
+	// Roles is a subject-ID to allowed-roles allowlist gating privilege
+	// escalation: a subject may only be granted a role (asserted via
+	// Subject.Roles at check time) that appears in its list here. It is
+	// not a role-hierarchy or inheritance map.
 	Roles map[string][]string
 }
 

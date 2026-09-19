@@ -208,7 +208,7 @@ func (a *adapter) Translate(ctx context.Context, locale, key string, args map[st
 	a.wg.Add(1)
 	a.mu.Unlock()
 
-	val, err := a.fetch(fctx, locale, key, args)
+	val, err := a.fetch(fctx, locale, key, args) //nolint:contextcheck // fctx is deliberately rooted in context.Background(): this is the shared singleflight fetch multiple callers with different (possibly already-canceled) contexts wait on, so it must not be tied to any one caller's cancellation
 	cancel()
 
 	a.mu.Lock()

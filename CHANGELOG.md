@@ -171,6 +171,12 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Enable the `exhaustive` linter for switches over closed enum types (e.g.
   `internal/dsl/ir.ScalarType`/`ErrorCode`), so a missing case on a future
   enum member is caught at lint time instead of at runtime.
+- Enable `contextcheck`, `sqlclosecheck`, `rowserrcheck`, `zerologlint`,
+  and `spancheck` linters, matching this repo's use of `database/sql`/pgx,
+  zerolog, and OpenTelemetry spans; `contextcheck` also runs on test files.
+  Related fallout: `tenant/header` documents its required trust boundary
+  (deploy only behind a gateway that authenticates callers and owns the
+  tenant header).
 - `queue/redis`'s poll loop throttles its due/stale message sweep
   (`promoteDue`/`reclaimStale`) to once per 250ms instead of running both on
   every poll tick (~every 100ms), cutting idle Redis round trips at the cost

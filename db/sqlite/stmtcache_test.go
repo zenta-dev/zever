@@ -1,3 +1,9 @@
+// Resource ownership in this file lives in the shared prepare()/openTestDB
+// helpers (t.Cleanup) and in test bodies that explicitly close a losing
+// stmt to assert on it, not at each stmtCache.Get/GetOrCompute/prepare call
+// site, so sqlclosecheck cannot see the close and flags every call here.
+//
+//nolint:sqlclosecheck // see file doc above
 package sqlite
 
 import (
@@ -34,6 +40,8 @@ func prepare(t *testing.T, db *sql.DB, query string) *sql.Stmt {
 	if err != nil {
 		t.Fatalf("Prepare(%q): %v", query, err)
 	}
+
+	t.Cleanup(func() { _ = stmt.Close() })
 
 	return stmt
 }

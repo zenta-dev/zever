@@ -166,7 +166,7 @@ func (s *Store) Delete(ctx context.Context, id string) error {
 
 	exists := rows.Next()
 
-	if err := rows.Close(); err != nil {
+	if err := rows.Close(); err != nil { //nolint:sqlclosecheck // closed immediately (not deferred) so its error surfaces before the rows.Err() check below
 		return fmt.Errorf("sqlite: delete: %w", err)
 	}
 
