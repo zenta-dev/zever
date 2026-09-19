@@ -93,6 +93,13 @@ func New(opts notification.Options) (notification.Notifier, error) {
 // Notify sends n as an SMS from the configured FromNumber.
 // Title and Data are rejected by core validation (push-only); Priority and
 // TTL are accepted but ignored because SMS has no such fields.
+//
+// Deliberately not retried on transient failure (unlike notification/fcm's
+// push Notify): this SDK's Messages API has no idempotency-key parameter,
+// so a caller-side retry after an ambiguous failure (the request may have
+// already reached Twilio and been billed/sent before the error surfaced)
+// risks a duplicate paid SMS with no dedup mechanism available -- a
+// materially worse failure mode than a duplicate push notification.
 func (t *twilioNotifier) Notify(ctx context.Context, n *notification.Notification) error {
 	if n == nil {
 		return notification.ErrNilNotification

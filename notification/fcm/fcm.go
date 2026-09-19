@@ -9,8 +9,23 @@ import (
 	"firebase.google.com/go/v4/messaging"
 
 	sharedfirebase "github.com/zenta-dev/zever/internal/firebase"
+	"github.com/zenta-dev/zever/internal/retry"
 	"github.com/zenta-dev/zever/notification"
 )
+
+// sendRetryPolicy bounds retries of a transient FCM send failure (network
+// blip, FCM 5xx): short exponential backoff from 200ms, capped at 2s, up to
+// 3 attempts total. A duplicate push notification on a spurious retry is a
+// low-severity nuisance, unlike e.g. a duplicate paid SMS, so this is safe
+// to retry unconditionally.
+var sendRetryPolicy = retry.Policy{
+	BaseDelay:   200 * time.Millisecond,
+	Multiplier:  2,
+	MaxDelay:    2 * time.Second,
+	MaxAttempts: 3,
+	JitterMode:  retry.JitterFlat,
+	JitterMax:   100 * time.Millisecond,
+}
 
 // notifier delivers push notifications via Firebase Cloud Messaging.
 type notifier struct {
@@ -92,7 +107,10 @@ func (f *notifier) Notify(ctx context.Context, n *notification.Notification) err
 		}
 		send = f.client.Send
 	}
-	if _, err := send(ctx, msg); err != nil {
+	if err := retry.Do(ctx, sendRetryPolicy, func(ctx context.Context) error {
+		_, err := send(ctx, msg)
+		return err
+	}); err != nil {
 		return fmt.Errorf("fcm: send: %w", err)
 	}
 	return nil
