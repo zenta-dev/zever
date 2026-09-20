@@ -83,6 +83,33 @@ jobs:
       - name: go build
         run: go build ./...
 
+  # Nested module gate: tools/zever-lsp is a separate Go module, so the
+  # root jobs above never compile or test it. Mirrors the fast gate.
+  lsp:
+    name: zever-lsp module
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+    defaults:
+      run:
+        working-directory: tools/zever-lsp
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+      - uses: actions/setup-go@b7ad1dad31e06c5925ef5d2fc7ad053ef454303e # v7.0.0
+        with:
+          go-version-file: go.mod
+          cache-dependency-path: go.sum
+      - name: Download dependencies
+        run: go mod download
+      - name: Verify go.mod is tidy
+        run: go mod tidy -diff
+      - name: go vet
+        run: go vet ./...
+      - name: go test
+        run: go test -vet=off -count=1 ./...
+      - name: go build
+        run: go build ./...
+
   # Full gate: race detector + atomic coverage + Codecov upload. This is
   # the expensive pass (typically 2-10x slower than a plain `go test`
   # because of race instrumentation, plus more overhead from atomic
