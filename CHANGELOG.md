@@ -281,7 +281,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   nuisance, so this is safe unconditionally.
 - `geo/osm`'s request pacer anchored the next slot to the intended rather
   than the actual send time, so a timer wakeup that arrived late under load
-  shrank subsequent gaps below `minInterval`, risking violation of
-  Nominatim's 1-request-per-second usage policy. The schedule is now pushed
-  forward after a late wakeup (later slots reserved by concurrent callers
-  preserved).
+  (or any scheduler delay between the wakeup and the request hitting the
+  wire) shrank subsequent gaps below `minInterval`, risking violation of
+  Nominatim's 1-request-per-second usage policy. The schedule is now
+  re-anchored to the observed request time after each round trip.
