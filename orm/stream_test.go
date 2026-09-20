@@ -6,9 +6,7 @@ import (
 	"iter"
 	"runtime"
 	"strings"
-	"sync"
 	"testing"
-	"time"
 
 	"github.com/zenta-dev/zever/db"
 )
@@ -391,91 +389,90 @@ func TestQueryStreamLockingError(t *testing.T) {
 	}
 }
 
-// consumeStream drains a Stream iterator, discarding every row, so the
-// peak-live-heap measurement reflects a stream whose rows are all reclaimed
-// by the GC -- never retained.
-func consumeStream(t *testing.T, seq iter.Seq2[*widget, error]) {
+// sampleLiveHeap forces a full GC and returns the live heap size. The GC
+// is synchronous, so a sample never depends on goroutine scheduling: under
+// CPU contention a background sampler goroutine stalls, letting transient
+// per-row garbage accumulate between collections and inflate HeapAlloc
+// readings by megabytes (observed on CI). Row-count-driven sampling below
+// bounds uncollected garbage by rows-per-sample instead.
+func sampleLiveHeap() uint64 {
+	runtime.GC()
+
+	var m runtime.MemStats
+	runtime.ReadMemStats(&m)
+
+	return m.HeapAlloc
+}
+
+// baseLiveHeap records the live heap before a measurement so peaks report
+// net of pre-existing state (notably the seeded :memory: sqlite database,
+// which lives in the Go heap).
+func baseLiveHeap() uint64 {
+	return sampleLiveHeap()
+}
+
+// peakLiveHeapStream drains seq, discarding every row, and returns the
+// highest live-heap sample net of base. Samples fire every sampleRows
+// rows, so the result reflects retained (not transient) memory at any
+// row count: a discarded-row stream reports a ~flat peak while a
+// retaining consumer would grow with the row count.
+func peakLiveHeapStream(t *testing.T, base uint64, seq iter.Seq2[*widget, error]) uint64 {
 	t.Helper()
 
-	var total int64
+	const sampleRows = 1000
+
+	var (
+		peak uint64
+		n    int64
+	)
+
+	sample := func() {
+		if live := sampleLiveHeap(); live > peak {
+			peak = live
+		}
+	}
 
 	for row, err := range seq {
 		if err != nil {
 			t.Fatalf("Stream: %v", err)
 		}
 
-		total += row.Quantity
+		_ = row.Quantity
+
+		n++
+		if n%sampleRows == 0 {
+			sample()
+		}
 	}
 
-	_ = total
-}
+	sample()
 
-// peakLiveHeapDuring runs fn while a background goroutine repeatedly forces
-// a GC and records the highest post-GC live heap. Measuring *live* (post-GC)
-// heap is what distinguishes a stream from a materializing All: allocations
-// a stream frees before the next sample never contribute to the peak, so a
-// discarded-row stream reports a ~flat peak at any row count, while All's
-// result slice stays live and grows with the row count.
-func peakLiveHeapDuring(fn func()) uint64 {
-	runtime.GC()
-
-	var base runtime.MemStats
-	runtime.ReadMemStats(&base)
-
-	stop := make(chan struct{})
-	ready := make(chan struct{})
-	done := make(chan struct{})
-
-	var (
-		mu   sync.Mutex
-		peak uint64
-	)
-
-	go func() {
-		defer close(done)
-
-		record := func() {
-			runtime.GC()
-
-			var m runtime.MemStats
-			runtime.ReadMemStats(&m)
-
-			mu.Lock()
-			if m.HeapAlloc > peak {
-				peak = m.HeapAlloc
-			}
-			mu.Unlock()
-		}
-
-		record()
-
-		close(ready)
-
-		for {
-			select {
-			case <-stop:
-				return
-			default:
-			}
-
-			time.Sleep(500 * time.Microsecond)
-			record()
-		}
-	}()
-
-	<-ready
-	fn()
-	close(stop)
-	<-done
-
-	mu.Lock()
-	defer mu.Unlock()
-
-	if peak < base.HeapAlloc {
+	if peak < base {
 		return 0
 	}
 
-	return peak - base.HeapAlloc
+	return peak - base
+}
+
+// peakLiveHeapHeld materializes run's result set and returns its live-heap
+// footprint net of base. The result is held live through the sample
+// (KeepAlive), so one synchronous sample suffices -- no sampler involved.
+func peakLiveHeapHeld(t *testing.T, base uint64, run func() (any, error)) uint64 {
+	t.Helper()
+
+	held, err := run()
+	if err != nil {
+		t.Fatalf("All: %v", err)
+	}
+
+	live := sampleLiveHeap()
+	runtime.KeepAlive(held)
+
+	if live < base {
+		return 0
+	}
+
+	return live - base
 }
 
 // TestQueryStreamPeakMemoryFlatVersusAll is the flat-memory proof: Stream's
@@ -490,24 +487,16 @@ func TestQueryStreamPeakMemoryFlatVersusAll(t *testing.T) {
 		t.Fatalf("warmup: %v", err)
 	}
 
-	stream10 := peakLiveHeapDuring(func() {
-		consumeStream(t, From(widgets).Limit(10000).Stream(ctx, conn))
+	stream10 := peakLiveHeapStream(t, baseLiveHeap(), From(widgets).Limit(10000).Stream(ctx, conn))
+
+	stream100 := peakLiveHeapStream(t, baseLiveHeap(), From(widgets).Stream(ctx, conn))
+
+	all10 := peakLiveHeapHeld(t, baseLiveHeap(), func() (any, error) {
+		return From(widgets).Limit(10000).All(ctx, conn)
 	})
 
-	stream100 := peakLiveHeapDuring(func() {
-		consumeStream(t, From(widgets).Stream(ctx, conn))
-	})
-
-	all10 := peakLiveHeapDuring(func() {
-		if _, err := From(widgets).Limit(10000).All(ctx, conn); err != nil {
-			t.Fatalf("All 10k: %v", err)
-		}
-	})
-
-	all100 := peakLiveHeapDuring(func() {
-		if _, err := From(widgets).All(ctx, conn); err != nil {
-			t.Fatalf("All 100k: %v", err)
-		}
+	all100 := peakLiveHeapHeld(t, baseLiveHeap(), func() (any, error) {
+		return From(widgets).All(ctx, conn)
 	})
 
 	t.Logf("stream peak live heap: 10k=%dB 100k=%dB", stream10, stream100)
