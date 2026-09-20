@@ -7,6 +7,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Added
+
+- `tools/zever-lsp` is now an independently versioned Go module: it requires the published `zever` release instead of a local `replace` directive, and is tagged `tools/zever-lsp/v0.1.0`. Install with `go install github.com/zenta-dev/zever/tools/zever-lsp@v0.1.0`.
+
 ## [v0.1.0] - 2026-09-20
 
 ### Added

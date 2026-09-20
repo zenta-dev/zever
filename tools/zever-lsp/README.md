@@ -8,7 +8,7 @@ edits to any LSP-capable editor over stdio.
 ## Install
 
 ```sh
-go install github.com/zenta-dev/zever/tools/zever-lsp@latest
+go install github.com/zenta-dev/zever/tools/zever-lsp@v0.1.0
 ```
 
 Make sure the resulting binary directory (`$(go env GOPATH)/bin` by default)
