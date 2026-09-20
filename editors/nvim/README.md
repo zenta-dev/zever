@@ -139,6 +139,12 @@ go install ./tools/zever-lsp
 Run that from a local clone of the repo so `go install` can resolve the
 module.
 
+Without a local clone, install the published release instead:
+
+```bash
+go install github.com/zenta-dev/zever/tools/zever-lsp@v0.1.0
+```
+
 ## Verifying it worked
 
 1. Open a `.zen` file and run `:set filetype?` — it should print

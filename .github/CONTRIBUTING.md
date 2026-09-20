@@ -189,6 +189,13 @@ MAJOR.MINOR.PATCH
 
 While the project is below `v1.0.0`, treat `0.x` as a pre-1.0 phase: minor releases may contain breaking changes, and they should still be documented as such in the release notes. Releases are tagged with a `v` prefix (for example `v0.1.0`).
 
+Nested modules (`tools/zever-lsp`) are versioned independently with prefixed tags (`tools/zever-lsp/v0.1.0`) and must `require` a published root version — never a committed `replace`. To iterate locally against working-tree root changes, use a temporary replace and revert it before committing:
+
+```bash
+cd tools/zever-lsp && go mod edit -replace github.com/zenta-dev/zever=../.. && go test ./...
+git checkout -- tools/zever-lsp/go.mod tools/zever-lsp/go.sum
+```
+
 ## Commit Convention
 
 Use [Conventional Commits](https://www.conventionalcommits.org/) style messages:
