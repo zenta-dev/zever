@@ -90,6 +90,7 @@ make setup
 | `make build` | Build all packages |
 | `make test` | Run tests |
 | `make test-race` | Run tests with the race detector |
+| `make test-lsp` | Run zever-lsp module tests |
 | `make bench` | Run benchmarks |
 | `make cover` | Run tests with coverage and print the total |
 | `make cover-html` | Open the HTML coverage report |
@@ -98,9 +99,11 @@ make setup
 | `make lint` | Run `golangci-lint` |
 | `make lint-fix` | Run `golangci-lint` with auto-fix |
 | `make vet` | Run `go vet` |
+| `make vet-lsp` | Run `go vet` on zever-lsp module |
 | `make vulncheck` | Scan dependencies for known vulnerabilities |
 | `make sbom` | Generate a CycloneDX SBOM (`sbom.json`) |
 | `make tidy-check` | Verify `go.mod` and `go.sum` are tidy |
+| `make tidy-lsp-check` | Verify zever-lsp `go.mod`/`go.sum` are tidy |
 | `make download` | Download module dependencies |
 | `make clean` | Remove generated artifacts |
 | `make check` | Run all local CI checks |

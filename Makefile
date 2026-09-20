@@ -69,6 +69,10 @@ test: ## Run tests
 test-race: ## Run tests with the race detector
 	$(GO) test -race ./...
 
+.PHONY: test-lsp
+test-lsp: ## Run zever-lsp module tests
+	cd tools/zever-lsp && $(GO) test ./...
+
 .PHONY: bench
 bench: ## Run benchmarks
 	$(GO) test -bench=. -benchmem ./...
@@ -90,6 +94,10 @@ tidy: ## Tidy go.mod
 tidy-check: ## Verify go.mod and go.sum are tidy
 	$(GO) mod tidy -diff
 
+.PHONY: tidy-lsp-check
+tidy-lsp-check: ## Verify zever-lsp go.mod/go.sum are tidy
+	cd tools/zever-lsp && $(GO) mod tidy -diff
+
 .PHONY: download
 download: ## Download module dependencies
 	$(GO) mod download
@@ -97,6 +105,10 @@ download: ## Download module dependencies
 .PHONY: vet
 vet: ## Run go vet
 	$(GO) vet ./...
+
+.PHONY: vet-lsp
+vet-lsp: ## Run go vet on zever-lsp module
+	cd tools/zever-lsp && $(GO) vet ./...
 
 .PHONY: vulncheck
 vulncheck: ## Scan for known vulnerabilities
@@ -113,4 +125,4 @@ clean: ## Remove coverage output and build artifacts
 	rm -f $(COVERAGE) $(SBOM)
 
 .PHONY: check
-check: require-tools download fmt vet tidy-check lint test-race vulncheck build ## Run all local CI checks (run 'make setup' first)
+check: require-tools download fmt vet vet-lsp tidy-check tidy-lsp-check lint test-race test-lsp vulncheck build ## Run all local CI checks (run 'make setup' first)
