@@ -298,7 +298,6 @@ func (m *osmGeo) pace(ctx context.Context) error {
 		wait = 0
 	}
 	m.nextAllowed = now.Add(wait).Add(m.minInterval)
-	reserved := m.nextAllowed
 	interval := m.minInterval
 	m.paceMu.Unlock()
 
@@ -311,16 +310,15 @@ func (m *osmGeo) pace(ctx context.Context) error {
 
 	select {
 	case <-timer.C:
-		// Timers can fire late under load; without correction the next
-		// slot stays anchored to the intended (not actual) send time and
-		// subsequent gaps shrink below minInterval. Push the schedule
-		// forward so the next request waits a full interval after now.
-		// max() preserves later slots reserved by concurrent callers.
+		// Timers can fire late under load; the next slot above is
+		// anchored to the intended (not actual) send time, so a late
+		// wakeup would shrink the following gap below minInterval
+		// (gap = interval + thisLateness - prevLateness). Re-anchor the
+		// schedule to the actual send time. max() preserves later slots
+		// reserved by concurrent callers.
 		m.paceMu.Lock()
-		if actual := time.Now(); actual.After(reserved) {
-			if next := actual.Add(interval); next.After(m.nextAllowed) {
-				m.nextAllowed = next
-			}
+		if next := time.Now().Add(interval); next.After(m.nextAllowed) {
+			m.nextAllowed = next
 		}
 		m.paceMu.Unlock()
 		return nil
