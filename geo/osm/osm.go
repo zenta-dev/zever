@@ -276,6 +276,14 @@ func (m *osmGeo) do(req *http.Request) (*http.Response, error) {
 	}
 
 	resp, err := m.client.Do(req)
+	// Re-anchor the pacing schedule to the observed request time: every
+	// delay between the pace wait and the request hitting the wire
+	// (late timer wakeup, scheduler delay under load) would otherwise
+	// shrink the following gap below minInterval. Anchoring after the
+	// round trip is conservative (gaps grow by the response time) but
+	// keeps sequential gaps at >= minInterval under arbitrary load.
+	// max() preserves later slots reserved by concurrent callers.
+	m.noteSent()
 	if err != nil {
 		return nil, fmt.Errorf("geo: osm: do: %w", redactURLError(err))
 	}
@@ -298,7 +306,6 @@ func (m *osmGeo) pace(ctx context.Context) error {
 		wait = 0
 	}
 	m.nextAllowed = now.Add(wait).Add(m.minInterval)
-	interval := m.minInterval
 	m.paceMu.Unlock()
 
 	if wait <= 0 {
@@ -310,20 +317,22 @@ func (m *osmGeo) pace(ctx context.Context) error {
 
 	select {
 	case <-timer.C:
-		// Timers can fire late under load; the next slot above is
-		// anchored to the intended (not actual) send time, so a late
-		// wakeup would shrink the following gap below minInterval
-		// (gap = interval + thisLateness - prevLateness). Re-anchor the
-		// schedule to the actual send time. max() preserves later slots
-		// reserved by concurrent callers.
-		m.paceMu.Lock()
-		if next := time.Now().Add(interval); next.After(m.nextAllowed) {
-			m.nextAllowed = next
-		}
-		m.paceMu.Unlock()
 		return nil
 	case <-ctx.Done():
 		return ctx.Err()
+	}
+}
+
+// noteSent re-anchors the pacing schedule so the next request waits a
+// full minInterval after the request that just completed.
+func (m *osmGeo) noteSent() {
+	if m.minInterval <= 0 {
+		return
+	}
+	m.paceMu.Lock()
+	defer m.paceMu.Unlock()
+	if next := time.Now().Add(m.minInterval); next.After(m.nextAllowed) {
+		m.nextAllowed = next
 	}
 }
 
