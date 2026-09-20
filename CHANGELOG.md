@@ -7,9 +7,15 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [v0.1.1] - 2026-09-20
+
 ### Added
 
 - `tools/zever-lsp` is now an independently versioned Go module: it requires the published `zever` release instead of a local `replace` directive, and is tagged `tools/zever-lsp/v0.1.0`. Install with `go install github.com/zenta-dev/zever/tools/zever-lsp@v0.1.0`.
+
+### Fixed
+
+- `orm`'s streaming peak-memory test (`TestQueryStreamPeakMemoryFlatVersusAll`) measured the live heap with a background goroutine forcing a GC every 500µs. Under CI CPU contention the sampler stalled, letting transient per-row garbage inflate readings by megabytes and fail the flatness assertion. Sampling is now driven synchronously by row count (every 1000 rows, plus a `KeepAlive`-held single sample for `All`), so the measurement no longer depends on goroutine scheduling. Test-only change; streaming behavior is unchanged.
 
 ## [v0.1.0] - 2026-09-20
 
