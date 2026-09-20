@@ -7,6 +7,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [v0.1.0] - 2026-09-20
+
 ### Added
 
 - Initial project scaffolding: Go module, CI, lint configuration, Makefile, and
@@ -277,3 +279,9 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   (`webhook/http`/`webhook/queue`/`ai/anthropic`/`ai/openai`/`queue/redis`).
   A duplicate push notification on a spurious retry is a low-severity
   nuisance, so this is safe unconditionally.
+- `geo/osm`'s request pacer anchored the next slot to the intended rather
+  than the actual send time, so a timer wakeup that arrived late under load
+  shrank subsequent gaps below `minInterval`, risking violation of
+  Nominatim's 1-request-per-second usage policy. The schedule is now pushed
+  forward after a late wakeup (later slots reserved by concurrent callers
+  preserved).
