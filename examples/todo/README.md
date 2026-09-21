@@ -26,6 +26,21 @@ Fully working todo/note CRUD app skeleton with server and tests.
 
 `go run ./examples/todo/cmd/server -addr :8080`
 
+## Worker
+
+Runs the `SendOverdueDigest` job plus the `OverdueDigest` schedule (every
+minute) in one process over the shared memory queue:
+
+`go run ./examples/todo/cmd/worker`
+
+## Seed
+
+Migrate first, then seed the demo user (`demo@example.com` / `password123`)
+with three notes (idempotent, safe to re-run):
+
+`/tmp/opencode/zever db migrate --adapter=sqlite --dsn=data/app.db schema/todo.zen`
+`go run ./examples/todo/db/seed`
+
 ## Test
 
 `go test -race ./examples/todo/...`

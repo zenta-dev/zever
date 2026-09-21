@@ -47,3 +47,13 @@ service NoteService {
     auth: required
   }
 }
+
+job SendOverdueDigest() {
+  queue: low
+  retry: max_attempts(3), backoff(exponential, base: 30s)
+}
+
+schedule OverdueDigest {
+  cron: "* * * * *"
+  dispatch: SendOverdueDigest()
+}
