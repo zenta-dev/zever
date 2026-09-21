@@ -193,8 +193,11 @@ func TestRunNewNoFrameworkCheckoutFound(t *testing.T) {
 	}
 
 	gomod := readFile(t, filepath.Join(workDir, "delta", "go.mod"))
-	if !strings.Contains(gomod, "replace github.com/zenta-dev/zever => ") {
-		t.Fatalf("expected a cwd-defaulted local replace directive:\n%s", gomod)
+	if strings.Contains(gomod, "replace github.com/zenta-dev/zever => ") {
+		t.Fatalf("did not expect replace for upstream default:\n%s", gomod)
+	}
+	if !strings.Contains(gomod, "require github.com/zenta-dev/zever v0.1.1") {
+		t.Fatalf("want upstream require:\n%s", gomod)
 	}
 }
 

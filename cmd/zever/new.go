@@ -23,14 +23,13 @@ locations project.go's ProjectConfig assumes -- so every other zever
 subcommand (serve, dev, queue:work, db migrate/seed, tinker) works against
 the new project with no zever.yaml/.json needed.
 
-There is no tagged zever release yet, so by default the new project depends
-on zever via a local ` + "`replace`" + ` directive against a checkout on disk:
---framework-path names it explicitly, or it is auto-detected by walking up
-from the working directory looking for a go.mod declaring
-"module github.com/zenta-dev/zever" (the same thing you get for free when
-running this from inside a clone of the framework itself). Pass
---framework-version instead to depend on a real published version with no
-replace directive, once one exists.
+By default the new project depends on the published zever module
+(github.com/zenta-dev/zever v0.1.1) with no replace directive. Use
+--framework-path to replace against a local checkout for framework
+development (auto-detected by walking up from the working directory looking
+for a go.mod declaring "module github.com/zenta-dev/zever" when running
+inside a clone of the framework itself). Pass --framework-version to pin a
+different published version.
 
 What is NOT generated: real HTTP route handlers and real job logic. Every
 entrypoint this command writes has the same TODO-stub ceiling as
@@ -39,13 +38,10 @@ runnable skeleton in one command, not to a finished app.
 
 Flags:`
 
-// Framework wiring shared by `zever new` and `zever extract`: there is no
-// tagged release yet, so scaffolds resolve the framework to a local checkout
-// (replace directive) unless a real version is requested.
+// Framework wiring shared by `zever new` and `zever extract`.
 const (
 	// frameworkModulePath is zever's own module path. Scaffolds depend on
-	// it: generated code imports github.com/zenta-dev/zever/... packages,
-	// resolved by the scaffolded module's replace directive.
+	// it: generated code imports github.com/zenta-dev/zever/... packages.
 	frameworkModulePath = "github.com/zenta-dev/zever"
 
 	// grpcGoToolModulePath is the Go tool dependency a scaffolded go.mod
@@ -55,6 +51,11 @@ const (
 	// defaultGoVersion is used when no go directive can be read from the
 	// framework checkout or an existing project.
 	defaultGoVersion = "1.24"
+
+	// defaultFrameworkVersion is the published zever version a new project
+	// depends on by default when neither --framework-path nor
+	// --framework-version is given and no framework checkout is detected.
+	defaultFrameworkVersion = "v0.1.1"
 
 	// pseudoVersionZero is the placeholder version a require line carries
 	// when the real resolution comes from a local replace directive.
@@ -279,11 +280,11 @@ func isValidAppName(s string) bool {
 }
 
 // resolveFramework decides how the new project depends on zever: a real
-// version (--framework-version, no replace directive) or a local checkout
+// version (--framework-version, or defaultFrameworkVersion when neither
+// --framework-path nor --framework-version is given and no checkout is
+// detected) with no replace directive, or a local checkout
 // (--framework-path, or auto-detected by walking up from the working
-// directory) with a replace directive, mirroring the decision
-// `zever extract`'s readGoMod/resolveFrameworkDir already make for an
-// existing project, adapted to the case where no go.mod exists yet.
+// directory) with a replace directive.
 func resolveFramework(tag string, plan *NewConfig, frameworkPath, frameworkVersion string) error {
 	if frameworkVersion != "" {
 		plan.FrameworkVersion = frameworkVersion
@@ -293,7 +294,6 @@ func resolveFramework(tag string, plan *NewConfig, frameworkPath, frameworkVersi
 	}
 
 	fwDir := frameworkPath
-	explicit := fwDir != ""
 
 	if fwDir == "" {
 		detected, err := detectFrameworkCheckout()
@@ -304,16 +304,14 @@ func resolveFramework(tag string, plan *NewConfig, frameworkPath, frameworkVersi
 		fwDir = detected
 	}
 
-	// Nothing explicit and nothing found by walking up: default to the
-	// working directory itself rather than erroring, so `zever new <name>`
-	// works with zero flags as the easiest onboarding path. This is a best
-	// effort guess, not a validated checkout -- if it's wrong the generated
-	// go.mod's replace directive is a one-line hand edit away from fixed.
-	usingCwdDefault := false
-
 	if fwDir == "" {
-		fwDir = "."
-		usingCwdDefault = true
+		// No explicit path and no checkout detected: default to the
+		// published module version with no replace directive.
+		plan.FrameworkDir = ""
+		plan.FrameworkVersion = defaultFrameworkVersion
+		plan.GoVersion = defaultGoVersion
+
+		return nil
 	}
 
 	abs, err := filepath.Abs(fwDir)
@@ -322,18 +320,6 @@ func resolveFramework(tag string, plan *NewConfig, frameworkPath, frameworkVersi
 	}
 
 	if _, err := os.Stat(filepath.Join(abs, "go.mod")); err != nil {
-		if !explicit && usingCwdDefault {
-			// No go.mod at the default guess either -- still don't block
-			// scaffolding. Point the replace directive at cwd anyway; the
-			// user edits it by hand once they know where zever actually
-			// lives, per --framework-path's own doc comment above.
-			plan.FrameworkDir = abs
-			plan.FrameworkVersion = pseudoVersionZero
-			plan.GoVersion = defaultGoVersion
-
-			return nil
-		}
-
 		return fmt.Errorf("%s: %q does not look like a zever checkout (no go.mod): %w", tag, fwDir, err)
 	}
 
@@ -756,10 +742,10 @@ func writeNewProject(tag string, cfg NewConfig) ([]string, error) {
 	return written, nil
 }
 
-// renderNewGoMod writes the new project's go.mod: a local replace directive
-// against a zever checkout by default (there is no tagged release yet,
-// exactly as zever extract's own output notes), or a plain require of a
-// real version when --framework-version was given.
+// renderNewGoMod writes the new project's go.mod: by default a plain require
+// of the published zever module (defaultFrameworkVersion) with no replace
+// directive; when FrameworkDir is set (explicit --framework-path or
+// auto-detected checkout) it emits a local replace directive instead.
 func renderNewGoMod(tag string, cfg NewConfig) ([]byte, error) {
 	var b strings.Builder
 
@@ -771,9 +757,9 @@ func renderNewGoMod(tag string, cfg NewConfig) ([]byte, error) {
 			return nil, fmt.Errorf("%s: locate the framework from %q: %w", tag, cfg.OutDir, err)
 		}
 
-		_, _ = fmt.Fprintf(&b, "// There is no tagged zever release yet, so `zever new` defaults to a local\n"+
-			"// replace directive against a zever checkout; pass --framework-version to\n"+
-			"// depend on a real published version instead.\nreplace %s => %s\n\n", frameworkModulePath, rel)
+		_, _ = fmt.Fprintf(&b, "// Local zever checkout via replace directive (from --framework-path or\n"+
+			"// auto-detected framework checkout); remove to depend on the published\n"+
+			"// module instead.\nreplace %s => %s\n\n", frameworkModulePath, rel)
 	}
 
 	_, _ = fmt.Fprintf(&b, "require %s %s\n", frameworkModulePath, cfg.FrameworkVersion)
