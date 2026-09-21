@@ -1,0 +1,31 @@
+// todo_grpc.zen — gRPC cross-transport parity proof.
+//
+// Shares the implicit module with todo.zen (both sit directly under
+// schema/), so entity/service names use the GrpcTask prefix to avoid any
+// duplicate-declaration collision. One entity, one service, three RPCs:
+// Create/Get require auth, Delete requires auth plus a permission check.
+entity GrpcTask {
+  id: uuid @primary
+  user_id: uuid
+  title: string @validate(min_len: 1, max_len: 200)
+  body: string
+  created_at: timestamp @default(now())
+}
+
+service GrpcTaskService {
+  rpc CreateTask(title: string, body: string) -> GrpcTask {
+    http: POST "/grpc-tasks"
+    auth: required
+  }
+
+  rpc GetTask(id: uuid) -> GrpcTask {
+    http: GET "/grpc-tasks/{id}"
+    auth: required
+  }
+
+  rpc DeleteTask(id: uuid) -> GrpcTask {
+    http: DELETE "/grpc-tasks/{id}"
+    auth: required
+    permission: check("grpc_task.delete", resource: GrpcTask, owner_field: user_id)
+  }
+}

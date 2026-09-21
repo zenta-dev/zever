@@ -1,0 +1,16 @@
+db:
+  adapter: sqlite
+  options:
+    path: data/app.db
+auth:
+  adapter: jwt
+log:
+  adapter: slog
+router:
+  adapter: stdhttp
+queue:
+  adapter: memory
+cache:
+  adapter: memory
+password:
+  adapter: argon2id

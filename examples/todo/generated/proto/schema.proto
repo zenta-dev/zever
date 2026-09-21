@@ -1,0 +1,48 @@
+syntax = "proto3";
+
+package zengo.v1;
+
+import "google/protobuf/timestamp.proto";
+import "google/api/annotations.proto";
+import "zengo/annotations.proto";
+
+option go_package = "github.com/zenta-dev/zever/gen/zengov1;zengov1";
+
+message GrpcTask {
+  string id = 1;
+  string user_id = 2;
+  string title = 3;
+  string body = 4;
+  google.protobuf.Timestamp created_at = 5;
+}
+
+message CreateTaskRequest {
+  string title = 1;
+  string body = 2;
+}
+
+message GetTaskRequest {
+  string id = 1;
+}
+
+message DeleteTaskRequest {
+  string id = 1;
+}
+
+service GrpcTaskService {
+  rpc CreateTask(CreateTaskRequest) returns (GrpcTask) {
+    option (google.api.http) = { post: "/grpc-tasks" body: "*" };
+    option (zengo.annotations.v1.auth) = { required: true };
+  }
+
+  rpc GetTask(GetTaskRequest) returns (GrpcTask) {
+    option (google.api.http) = { get: "/grpc-tasks/{id}" };
+    option (zengo.annotations.v1.auth) = { required: true };
+  }
+
+  rpc DeleteTask(DeleteTaskRequest) returns (GrpcTask) {
+    option (google.api.http) = { delete: "/grpc-tasks/{id}" };
+    option (zengo.annotations.v1.auth) = { required: true };
+    option (zengo.annotations.v1.permission) = { check: "grpc_task.delete", resource: "GrpcTask", owner_field: "user_id" };
+  }
+}
