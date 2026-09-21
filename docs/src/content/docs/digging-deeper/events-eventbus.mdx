@@ -1,0 +1,66 @@
+---
+title: Events and Event Bus
+description: In-process pub/sub with a Redis transport for multi-instance fan-out.
+---
+
+A user signs up, and three unrelated things need to happen — send a welcome
+email, provision a workspace, notify analytics. Wiring the signup handler to
+call all three directly couples code that has no business knowing about each
+other. `eventbus.Eventbus` lets producers publish a typed message and walk
+away; consumers subscribe to what they care about, and neither side needs to
+know the other exists.
+
+`memory` (the default) is enough for a monolith or a test — delivery happens
+in-process, push or pull. Switch to `redis` the moment you run more than one
+instance and need a publish on one process to reach a subscriber on another.
+
+## Config
+
+```yaml
+eventbus:
+  adapter: memory
+```
+
+```sh
+EVENTBUS_ADAPTER=redis
+```
+
+Message shape lives in `eventbus/message.go`; keep payloads small, versioned,
+and serializable.
+
+## Resolve
+
+```go
+c := container.New(config.Default())
+bus, err := c.Eventbus()
+if err != nil {
+	// handle
+}
+_ = bus
+```
+
+`Eventbus()` resolves lazily on first use; on error the cached state clears so
+the next call retries.
+
+## Adapters
+
+| Adapter | Package | Notes |
+|---|---|---|
+| `memory` | `eventbus/memory` | Default; process-local |
+| `redis` | `eventbus/redis` | Shared fan-out |
+
+## The gotcha: it's not a durable log, and it drops under pressure
+
+`eventbus` is not `queue` or `job` — there's no durability guarantee and no
+redelivery if a handler is offline when a message publishes. Per-topic buffers
+default to 1024 messages with drop-newest backpressure: if a slow or stuck
+subscriber lets its buffer fill, new messages for that topic get dropped
+rather than blocking the publisher. If a piece of work absolutely must
+happen — not just "notify whoever's listening" — enqueue it as a job instead;
+the bus is for notification-style fan-out, not guaranteed execution.
+
+Push `Subscribe` returns an unsubscribe function and pull `SubscribeChan`
+returns a channel that `Unsubscribe` or `Close` closes — every subscription
+needs an explicit exit path, or leak tests will catch it. Never put secrets in
+event payloads; redaction only applies to what gets logged, not to the payload
+itself.

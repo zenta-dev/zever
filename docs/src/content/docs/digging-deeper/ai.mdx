@@ -1,0 +1,73 @@
+---
+title: AI
+description: LLM generation, streaming, and embeddings behind one interface.
+---
+
+Every LLM provider has its own SDK, its own message shape, its own streaming
+protocol — and if you wire a service directly to Anthropic's or OpenAI's client,
+switching providers later (or just adding a fallback) means touching business
+logic. `ai.AI` gives you one facade — `Generate`, `Stream`, `Embed` — with typed
+messages, tools, and usage accounting, so the provider is a config value, not an
+import.
+
+Pick `anthropic` (the default) or `openai`/`gemini` based on which models you
+actually want to call; there's no meaningful "better" adapter here, only "which
+provider's models." What matters more is that switching between them later, or
+routing different services at different providers, costs a config change, never
+a rewrite of the code that calls `Generate`.
+
+## Config
+
+```yaml
+ai:
+  adapter: anthropic
+  options:
+    apikey: sk-...
+    model: claude-opus-4
+    timeout: 30s
+```
+
+```sh
+AI_ADAPTER=openai
+AI_APIKEY=sk-...
+AI_MODEL=gpt-5
+```
+
+`BaseURL` is optional — set it to point at a proxy or self-hosted gateway — but it
+must resolve to an `https` URL; anything else fails validation before a single
+request goes out.
+
+## Resolve
+
+```go
+c := container.New(config.Default())
+ai, err := c.AI()
+if err != nil {
+	// handle
+}
+_ = ai
+```
+
+`AI()` resolves lazily and caches the result; on error the cache clears so the
+next call retries.
+
+## Adapters
+
+| Adapter | Package | Notes |
+|---|---|---|
+| `anthropic` | `ai/anthropic` | Default |
+| `openai` | `ai/openai` | |
+| `gemini` | `ai/gemini` | |
+
+## The gotcha: features fail closed, not silently
+
+Not every provider supports every capability the same way — a tool-call shape or
+streaming mode one adapter handles natively might not exist on another. `ai` never
+papers over that gap by silently downgrading a request: an unsupported feature
+returns `ErrNotSupported` so you find out at the call site, in development,
+instead of discovering a quietly-dropped tool call in production. Streams are
+backed by bounded channels the producer closes, so a stalled consumer can't leak
+a goroutine waiting on an unbounded buffer.
+
+`APIKey` never appears in logs or error values — route any debug output through
+`config.RedactedServices` rather than printing `Options` directly.

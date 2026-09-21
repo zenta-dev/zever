@@ -1,0 +1,61 @@
+---
+title: Observability
+description: Traces, metrics, and structured attributes from noop to an OTLP collector.
+---
+
+You want to know why a request was slow or a job failed without grepping logs
+across three services — that means traces and metrics, and it means them being
+there in every environment, not just production. `observability` gives you one
+`Provider`/`Tracer`/`Metrics`/`Span` facade with typed attributes, and it
+deliberately never wires a global SDK behind your back — what you get is
+exactly what you asked `Open` for.
+
+`noop` keeps tests silent and fast. `stdout` (the default) is what you want
+locally — spans and metrics print where you can actually see them while
+developing. Switch to `otlp` for anything that needs to reach a real collector
+and become a dashboard or an alert; that's a config change away, not a
+different set of `Span`/`Attr` calls in your code.
+
+## Config
+
+```yaml
+observability:
+  adapter: stdout
+  options:
+    servicename: zever
+```
+
+```sh
+OBSERVABILITY_ADAPTER=otlp
+```
+
+## Resolve
+
+```go
+c := container.New(config.Default())
+o, err := c.Observability()
+if err != nil {
+	// handle
+}
+_ = o
+```
+
+## Adapters
+
+| Adapter | Package | Notes |
+|---|---|---|
+| `noop` | `observability/noop` | Silent; use in tests |
+| `stdout` | `observability/stdout` | Default; prints locally |
+| `otlp` | `observability/otlp` | Ships to a production collector |
+
+## Attributes are bounded, and that's a feature
+
+`Attr` values are capped — 256-byte keys, 4096-byte values, 32 attributes per
+span — specifically so a careless `attr.String("payload", hugeBlob)` can't
+balloon your telemetry backend's ingestion bill or blow past a collector's
+limits. Name spans after the operation (`queue.dispatch`), not the adapter
+that happens to be handling it, so switching from `stdout` to `otlp` doesn't
+also mean renaming every span in your dashboards. Keep high-cardinality values
+like user IDs out of metric labels — that's a cardinality explosion waiting to
+happen — and never attach a secret as an attribute; sensitive keys should be
+redacted before the value ever reaches a `Span`, not filtered on the way out.
