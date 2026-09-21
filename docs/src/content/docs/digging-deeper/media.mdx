@@ -1,0 +1,70 @@
+---
+title: Media Processing
+description: Upload, probe, transform, and serve media assets with bounded limits.
+---
+
+This page covers the `media` package specifically — upload, download, probe,
+and transform of media assets, including invoking `ffmpeg`/`ffprobe` for
+transcodes. It's a level above plain blob storage: see
+[Storage & Media](/zever/digging-deeper/storage-media/) for the `storage`
+service that `media`'s `local`/`s3` adapters sit on top of.
+
+Serving user-uploaded images or video means validating IDs, capping decode size,
+probing format before you trust it, and only then transforming — `media.Media`
+bundles that pipeline behind `Upload`, `Download`, `DownloadRange`, `Stat`,
+`Probe`, `Transform`, and `Delete`, so no caller reimplements ID validation or
+size caps by hand.
+
+`local` (the default) writes to a filesystem root — fine for single-instance
+deployments and tests. `s3` is the adapter for anything that needs to survive a
+redeploy or be shared across instances; transforms invoke the configured
+`ffmpeg`/`ffprobe` binaries regardless of which storage adapter you pick.
+
+## Config
+
+```yaml
+media:
+  adapter: local
+  options:
+    root: /var/media
+    maxdownloadbytes: 67108864
+```
+
+```sh
+MEDIA_ADAPTER=s3
+MEDIA_BUCKET=my-assets
+MEDIA_ACCESSKEYID=...
+MEDIA_SECRETACCESSKEY=...
+```
+
+## Resolve
+
+```go
+c := container.New(config.Default())
+m, err := c.Media()
+if err != nil {
+	// handle
+}
+_ = m
+```
+
+## Adapters
+
+| Adapter | Package | Notes |
+|---|---|---|
+| `local` | `media/local` | Default; filesystem-backed |
+| `s3` | `media/s3` | Shared; needs bucket/region/credentials |
+
+## The gotcha: every limit here exists because someone hit it
+
+`ValidID` rejects empty, `.`, and `..` forms specifically to block path
+traversal through an asset ID — never build a filesystem or storage key by
+concatenating a raw caller-supplied ID without going through it. Decoded images
+are capped at 50M pixels (`MaxPixels`) so a crafted image can't blow up memory
+during a transform. Presigned URLs cap at 7 days (`MaxPresignTTL`) no matter
+what `PresignTTL` you configure — asking for longer just gets clamped, not
+rejected, so don't assume your requested TTL is what you actually got back.
+
+`AccessKeyID` and `SecretAccessKey` never appear in logs; downloads are capped
+at 64MB by default (`MaxDownloadBytes`) to keep a single request from exhausting
+memory.

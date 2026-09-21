@@ -1,0 +1,83 @@
+---
+title: Syntax (.zen)
+description: Entities, services, RPCs, and attributes in the zever schema language.
+---
+
+`.zen` files describe your services once with proto-inspired syntax. The compiler turns that shape into database access, routing, and cross-cutting infrastructure — never business logic.
+
+## Entities
+
+```zen
+entity User {
+  id: uuid @primary
+  email: string @unique
+  created_at: timestamp @default(now())
+
+  has_many orders: Order @foreign_key(user_id)
+}
+
+entity Order {
+  id: uuid @primary
+  user_id: uuid
+  amount_cents: int64
+
+  belongs_to user: User @foreign_key(user_id)
+}
+```
+
+Both sides of a relation are declared explicitly (`has_many` / `belongs_to`) with a shared `@foreign_key`. Types reference each other by bare in-package name — no import, so no Go import cycle in generated code.
+
+| Attribute | Meaning |
+|---|---|
+| `@primary` | primary key |
+| `@unique` | unique constraint |
+| `@default(now())` | server-side default expression |
+| `@foreign_key(user_id)` | join column for the relation |
+
+Scalar types include `uuid`, `string`, `int64`, and `timestamp`. The canonical fixture is `internal/dsl/compile/testdata/app.zen` — new syntax must round-trip through it.
+
+## Services and RPCs
+
+```zen
+service UserService {
+  rpc GetUser(id: uuid) -> User {
+    http: GET "/v1/users/{id}"
+    auth: required
+  }
+
+  rpc CreateUser(email: string @validate(format: "email")) -> User {
+    http: POST "/v1/users"
+    auth: required
+    errors: { already_exists }
+  }
+}
+```
+
+Each `rpc` names its inputs, its return entity, its HTTP binding, and its auth posture. Pagination is a flag, not a second endpoint:
+
+```zen
+rpc ListOrders(user_id: uuid) -> Order {
+  http: GET "/v1/orders"
+  auth: required
+  paginated: true
+}
+```
+
+| Block | Contents |
+|---|---|
+| `http:` | method plus `"/path/{param}"` template |
+| `auth:` | `required` (or omitted for public) |
+| `errors:` | `{ already_exists, ... }` gRPC-canonical codes |
+| `paginated:` | `true` emits cursor/page scaffolding |
+
+## Files and modules
+
+The module name derives from the immediate subdirectory: `schema/app/app.zen` compiles as module `app`. Keep related entities and their services in one directory so cross-references stay bare names.
+
+```text
+schema/
+├── app/app.zen        # module app: User, Order + services
+└── billing/billing.zen # module billing: imports app types by path
+```
+
+The parser never panics: malformed input produces best-effort output plus diagnostics with positions. Run `zever fmt` to normalize formatting and `zever check` to surface diagnostics before compiling.

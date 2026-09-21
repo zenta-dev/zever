@@ -1,0 +1,59 @@
+---
+title: Resolver and IR
+description: How the compiler resolves schemas into IR with keep-going diagnostics.
+---
+
+The frontend pipeline turns source text into a resolved schema plus diagnostics:
+
+```text
+source text → lexer → parser → ast → resolver → ir.Schema
+                                    ↘ compile → backend outputs
+```
+
+| Package | Role |
+|---|---|
+| `token` | token vocabulary + keywords |
+| `lexer` | bytes → tokens; never panics; fuzz-tested |
+| `ast` | pure-data syntax tree, positions on every node |
+| `parser` | best-effort parse with per-decl recovery + depth guard |
+| `resolver` | multi-pass `[]*ast.File` → `*ir.Schema`, keep-going diagnostics |
+| `ir` | resolved schema + gRPC-canonical `ErrorCode` table |
+| `format` | token-gap formatter; refuses lex-dirty input; idempotent |
+
+## Entry points
+
+```go
+f := parser.New("schema/app/app.zen", src).ParseFile()
+schema, diags := resolver.Resolve([]*ast.File{f})
+```
+
+Or the full path with deterministic filename-sorted output:
+
+```go
+out, diags := compile.Compile(files, backends...)
+```
+
+`compile/testdata/app.zen` is the canonical fixture: golden backend outputs are committed, and regeneration is explicit (`go test ./internal/dsl/compile/ -run TestName -update`).
+
+## Resolver passes
+
+1. **Collect** — index modules, entities, enums, and services by name; duplicates are diagnostics, not panics.
+2. **Bind types** — resolve field and RPC types against scalars plus declared entities; unknown names diagnose and continue.
+3. **Check relations** — verify both sides of `has_many` / `belongs_to` agree on the foreign key.
+4. **Check RPCs** — validate HTTP templates against params, `@validate` expressions, and the `ErrorCode` table.
+
+The resolver never stops at the first error. It accumulates diagnostics with positions so one run surfaces every problem in the file set.
+
+## IR shape
+
+`ir.Schema` is the compiler's contract with backends: fully resolved modules, entities with bound field types, services with bound RPC signatures, and normalized error codes. Backends read `schema.Modules[*].Entities` (the zenorm backend, for example, ignores services entirely).
+
+After touching `token.Keywords` or `resolver.ScalarTypeNames`, run `make generate` — the Neovim and VS Code grammars derive from those tables via `tools/gengrammar`.
+
+## Breaking changes
+
+`breaking` diffs old-vs-new schemas into a `Change` taxonomy (additive vs. breaking). Wire it into CI so a removed field or renamed RPC fails the build before clients break:
+
+```sh
+zever breaking --old schema/v1 --new schema/v2
+```

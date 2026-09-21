@@ -1,0 +1,89 @@
+---
+title: Query Builder
+description: Typed ORM queries over db.DB with joins, CTEs, windows, and dialect gating.
+---
+
+The ORM is a generics-typed SQL builder over `db.DB` — not raw string SQL. Tables and columns are typed values, SQL text is rendered centrally with bound args and quoted identifiers, and the dialect resolves per call from `conn.Dialect()`.
+
+## Model and reads
+
+```go
+type User struct {
+    ID   int64
+    Name string
+}
+
+func (u *User) Scan(row orm.Row) error {
+    return row.Scan(&u.ID, &u.Name)
+}
+
+var (
+    Users    = orm.NewTable[User]("users", []string{"id", "name"})
+    UserID   = orm.NewColumn[User, int64]("users", "id")
+    UserName = orm.NewColumn[User, string]("users", "name")
+)
+
+users, err := orm.From(Users).
+    Where(UserName.Eq("alice")).
+    OrderBy(UserID.Desc()).
+    Limit(10).
+    All(ctx, conn) // []*User
+```
+
+`From[T, PT]` infers the pointer-scanner type, so call sites never write type arguments. The remaining read shapes:
+
+| Method | Returns |
+|---|---|
+| `First` / `FirstOrErr` | one row (`FirstOrErr` wraps `db.ErrNotFound`) |
+| `Count` | `int64` |
+| `Exists` | `bool` |
+| `Stream` | `iter.Seq2` for constant-memory scans |
+
+## Writes and transactions
+
+```go
+err := orm.Insert(Users).Values(&User{Name: "alice"}).Exec(ctx, conn)
+
+err = db.WithTx(ctx, conn, &db.TxOptions{Isolation: db.Serializable}, func(ctx context.Context, tx db.Tx) error {
+    return orm.Update(Users).Set(UserName.Set("bob")).Where(UserID.Eq(1)).Exec(ctx, tx)
+})
+```
+
+`Insert` / `Update` / `Delete` builders cover writes, plus `Conflict` upserts and `Merge`. `Tx` / `WithNestedTx` run units of work with savepoints, and `RetryTx` retries serialization failures. Statements reuse `db.Preparer` where the adapter offers it (sqlite caches server-side preparation over an internal LRU).
+
+## Advanced queries
+
+| Feature | API |
+|---|---|
+| Joins | `Join2` / `Join3` plus outer variants |
+| CTEs | chained `With` blocks |
+| Windows | window-function helpers |
+| Sets | union / intersect / except |
+| Projections | select subsets into scanners |
+| Cursors | `CursorKey` keyset pagination |
+| Preload | batched association load (no N+1) |
+| Locking | row-lock modes |
+| Inspection | `Explain` |
+
+`orm/json` and `orm/fts` add per-dialect JSON and full-text helpers.
+
+## Dialect gating
+
+There is no silent fallback: placeholders, quoting, and capability gates resolve per call from `conn.Dialect()` (`"sqlite"` / `"postgres"`). Features a dialect lacks fail closed with typed `dialect.ErrUnsupportedByDialect` — `DISTINCT ON` and strong lock modes are postgres-only, for example:
+
+```go
+rows, err := q.All(ctx, conn)
+if errors.Is(err, dialect.ErrUnsupportedByDialect) {
+    // fall back to a portable formulation
+}
+```
+
+All errors carry the `orm:` prefix (`orm/render:`, `orm/dialect:`) and remain `errors.Is`-compatible.
+
+## Testing
+
+Units run on sqlite `:memory:` with no server. Set `POSTGRES_DSN` for a live postgres pass:
+
+```sh
+POSTGRES_DSN='postgres://user:pass@localhost:5432/test?sslmode=disable' go test ./orm/...
+```

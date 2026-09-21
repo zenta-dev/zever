@@ -1,0 +1,51 @@
+---
+title: Backends
+description: Pluggable codegen backends that turn resolved schemas into backend output.
+---
+
+Backends are the codegen extension point. The frontend resolves `*ir.Schema`; each backend turns it into files. The `backend` package holds the interface only — concrete backends land in later phases.
+
+## The interface
+
+```go
+type Backend interface {
+    Name() string
+    Generate(schema *ir.Schema) ([]File, error)
+}
+```
+
+`compile.Compile` parses filename-sorted inputs, resolves once, then calls each backend's `Generate` in order. Output is deterministic: same inputs, same bytes, every run.
+
+## Built-in backends
+
+| Backend | Reads | Emits |
+|---|---|---|
+| `gogen/app` | modules + services | application layer (handlers, wiring) |
+| `zenorm` | `schema.Modules[*].Entities` only | typed table/column bindings |
+| `proto/protogogen` | modules + enums + RPCs | `zengo.app.v1` protobuf + `gen/zengo/app` Go |
+| `openapi` | services + HTTP bindings | `zever API` OpenAPI document |
+
+The canonical `app.zen` fixture exercises all four: both entities compile under the virtual path `schema/app/app.zen` (module `app`), so the two-way `User ↔ Order` relation needs no import, and the `UserService` / `OrderService` RPCs give `gogen` real paginated and validated operations to generate from.
+
+## Running codegen
+
+```sh
+zever compile --out ./generated            # all backends
+zever generate tinker                      # scaffold the tinker shim
+go test ./internal/dsl/compile/ -run TestGogenGeneratesCommittedAppPackage -update
+```
+
+The last line regenerates the committed `gogen/app` golden package. Only use `-update` when the fixture changed deliberately — golden diffs are the review surface for codegen changes.
+
+## Naming and dialects
+
+`internal/dsl/naming` converts schema names for each target: `APIKey` becomes `api_key` in Postgres/SQLite table names (acronym runs stay one word, per protobuf style) and the matching Go/proto spellings elsewhere. SQL text always binds args and quotes identifiers; dialect capability gates live with the ORM, not the backends.
+
+## Writing a backend
+
+1. Implement `Backend` with a stable `Name()`.
+2. Read only `*ir.Schema` — never re-parse source.
+3. Emit `File` values with repo-relative paths; keep rendering deterministic (sort maps, fix timestamps).
+4. Add a golden test under `internal/dsl/compile/` with committed output.
+
+Keep backends pure: no network, no clock reads, no unseeded randomness. Anything environment-specific belongs in adapter options, not generated code.

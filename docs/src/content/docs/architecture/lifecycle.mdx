@@ -1,0 +1,69 @@
+---
+title: Lifecycle
+description: Request lifecycle from config load to container shutdown in a zever process.
+---
+
+A zever process has four phases: load config, build the container, serve requests against lazily resolved services, and close in dependency order. No globals and no `init()` wiring participate anywhere.
+
+## The four phases
+
+```text
+config.Load  →  container.New  →  resolve on first use  →  Close(ctx)
+   file+env       one per          c.DB(), c.Cache()…        dependents
+                  process          retry on error            first, leaves last
+```
+
+### 1. Load config
+
+```go
+cfg, err := config.Load("zever.yaml") // "" probes zever.yaml/.yml/.json
+if err != nil {
+    return err
+}
+```
+
+`defaults < file < env`. Files are strict (typos fail fast); env is best-effort (stray variables ignored). Validation runs at load — an unknown adapter or unparsable value fails here, not mid-request.
+
+### 2. Build the container
+
+```go
+c := container.New(cfg) // container.New(nil) is valid: closes cleanly, opens nothing
+```
+
+Build one container per process. A server and a worker built from the same config each own their connections — nothing is shared through package state.
+
+### 3. Serve with lazy resolution
+
+Handlers resolve services on first use and reuse the cached instance:
+
+```go
+func handleList(w http.ResponseWriter, r *http.Request) {
+    users, err := orm.From(Users).Limit(50).All(r.Context(), mustDB(r))
+    // ... encode response
+}
+```
+
+On error the cached state clears, so the next call retries instead of pinning a broken handle. `Job()` builds a dispatcher over the resolved `Queue`; `Scheduler()` shares that same queue connection rather than opening a second one.
+
+### 4. Close in order
+
+```go
+ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
+defer cancel()
+srv.Shutdown(ctx)
+if err := c.Close(ctx); err != nil {
+    // errors.Join of per-service errors
+}
+```
+
+`Close` never opens anything: untouched services stay untouched. Dependents holding a queue reference (`scheduler`, `job`) close first, unordered snapshots next, leaf dependencies (`cache`, `queue`) last. Each service gets a 5s bound when the parent carries no deadline.
+
+## Failure shapes
+
+| Signal | Type | Meaning |
+|---|---|---|
+| panic during close | `*container.ClosePanicError` | adapter panicked; shutdown continued |
+| per-service timeout | `*container.CloseTimeoutError` | adapter exceeded its bound |
+| multiple failures | `errors.Join` | inspect with `errors.As` per type |
+
+Error values name the service only — never resolved values or secrets. Keep timeout tests short (parent ~100ms, block ~500ms) and let stragglers finish before the test returns, so `goleak.VerifyTestMain` stays green.

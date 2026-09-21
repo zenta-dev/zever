@@ -1,0 +1,76 @@
+---
+title: Sessions
+description: Server-side sessions over memory or Redis with secure cookies.
+---
+
+Sessions are server-side rows behind a cookie: the browser holds an opaque ID, the server holds the data. The facade swaps `memory` and `redis` adapters through configuration.
+
+## Setup
+
+```yaml
+session:
+  adapter: memory   # local dev: no infrastructure
+```
+
+```yaml
+session:
+  adapter: redis    # production: shared across instances
+  options:
+    addr: redis:6379
+```
+
+```go
+sess, err := c.Session()
+if err != nil {
+    return err
+}
+```
+
+`New(nil)` containers and `config.Default()` resolve the memory adapter, so session tests run hermetically with no server.
+
+## Reading and writing
+
+```go
+func login(w http.ResponseWriter, r *http.Request) {
+    s, err := sess.Get(r)
+    if err != nil {
+        writeError(w, http.StatusUnauthorized, "no session")
+        return
+    }
+    s.Set("user_id", "u_123")
+    if err := sess.Save(w, r, s); err != nil {
+        writeError(w, http.StatusInternalServerError, "cannot persist session")
+        return
+    }
+}
+```
+
+| Operation | Purpose |
+|---|---|
+| `Get(r)` | load session by cookie ID; error means missing/expired |
+| `Set(key, value)` | stage values (user ID, CSRF token, flash) |
+| `Save(w, r, s)` | persist and set the cookie |
+| `Destroy(w, r)` | delete server row + clear cookie (logout) |
+
+Keep session payloads small (IDs and flags, not full records) — every request loads the row.
+
+## Cookie security
+
+| Attribute | Setting |
+|---|---|
+| `HttpOnly` | always — JS never reads the ID |
+| `Secure` | always in production (HTTPS only) |
+| `SameSite` | `Lax` by default; `Strict` for high-risk apps |
+| Expiry | short idle timeout; rolling on `Save` |
+
+Rotate the session ID at privilege changes (login, password reset) to block fixation: `Destroy` the old row and `Save` a fresh one.
+
+## Auth vs. session
+
+| Concern | Package | When |
+|---|---|---|
+| stateless tokens | `auth` (`jwt`, `oidc`) | APIs, mobile, service-to-service |
+| server-side rows | `session` (`memory`, `redis`) | browser flows needing revocation |
+| bridge | `authz` | verify via `auth`, decide via `permission` |
+
+Use Redis-backed sessions when more than one app instance serves traffic — memory sessions pin users to a single process. Closing follows the container: session stores shut down with everything else in `c.Close(ctx)`.

@@ -1,0 +1,102 @@
+---
+title: zever
+description: One framework. Every backend concern. Zero rewiring.
+template: splash
+hero:
+  tagline: One framework. Every backend concern. Zero rewiring.
+  image:
+    file: ../../assets/logo.svg
+    alt: zever logo
+  actions:
+    - text: Get started
+      link: /zever/getting-started/installation/
+      icon: right-arrow
+    - text: Configuration
+      link: /zever/getting-started/configuration/
+      icon: setting
+      variant: minimal
+---
+
+import { Card, CardGrid, Code } from '@astrojs/starlight/components';
+
+## Why zever
+
+Every Go backend ends up wiring the same plumbing by hand: a database driver,
+a cache client, a queue connection, routing, auth middleware, config loading —
+all before a single line of business logic runs. Do it enough times across
+enough services and it stops being infrastructure work and starts being
+repetitive, error-prone busywork that has nothing to do with the product
+you're actually building.
+
+zever's answer is to describe a service's shape once, in a small
+proto-inspired schema language, and compile *that* into the plumbing — not
+into your business logic. It never generates or dictates what your handlers
+do; it only generates the infrastructure they run on top of.
+
+```sh
+go get github.com/zenta-dev/zever
+```
+
+## A tiny example
+
+Describe an entity and a service once, in a `.zen` file:
+
+```zen
+entity User {
+  id: uuid @primary
+  email: string @unique
+  created_at: timestamp @default(now())
+}
+
+service UserService {
+  rpc GetUser(id: uuid) -> User {
+    http: GET "/v1/users/{id}"
+    auth: required
+  }
+}
+```
+
+Compile it:
+
+```sh
+zever compile
+```
+
+Then resolve whatever that schema needs through one container — no manual
+driver wiring, no hand-registered routes:
+
+```go
+c := container.New(config.Load(""))
+db, err := c.DB()
+```
+
+Later, swapping `db`'s adapter from `sqlite` to `postgres` is a one-line
+config change — `UserService` never has to know. That's the whole idea: see
+[Syntax (.zen)](/zever/dsl/syntax-zen/) for the full language, and
+[Installation](/zever/getting-started/installation/) for the complete setup.
+
+## What you get
+
+<CardGrid>
+  <Card title="Layered config" icon="setting">
+    Typed defaults, strict YAML/JSON files, and `SERVICE_FIELD` environment overrides with redacted secrets.
+  </Card>
+  <Card title="One container" icon="container">
+    Lazy per-service accessors (`DB`, `Cache`, `Queue`) with dependency-ordered shutdown and leak-checked tests.
+  </Card>
+  <Card title="Schema DSL" icon="document">
+    Lex, parse, resolve, and compile `.zen` schemas into typed backends with diagnostics instead of panics.
+  </Card>
+  <Card title="Typed ORM" icon="database">
+    Generics query builder over `db.DB` with per-call dialects and closed-world errors for unsupported SQL.
+  </Card>
+  <Card title="Swap adapters, not code" icon="rocket">
+    Every backend concern — db, cache, queue, auth, storage, and 25+ more — is a small interface with interchangeable adapters. Changing one is a config edit, never a rewrite.
+  </Card>
+</CardGrid>
+
+### Next steps
+
+- Read the [installation guide](/zever/getting-started/installation/) for Go version, setup, and first run.
+- Read [configuration](/zever/getting-started/configuration/) for layered config, env mapping, and redaction.
+- Read [Syntax (.zen)](/zever/dsl/syntax-zen/) for the full schema language behind the example above.

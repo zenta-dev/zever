@@ -1,0 +1,84 @@
+---
+title: Deployment
+description: Build a static binary, configure via file and env, and shut down the container cleanly.
+---
+
+Deploying zever is standard Go: compile a static binary, configure it with a file plus environment overrides, and let the container close services in dependency order on `SIGTERM`.
+
+## Build
+
+```sh
+make build
+# or directly:
+go build -o myapp ./cmd/myapp
+```
+
+There is no build-time codegen step for normal services. The `.zen` schema compiler runs explicitly via `zever compile` / `zever generate` during development — never at container start.
+
+Cross-compile with plain Go:
+
+```sh
+GOOS=linux GOARCH=amd64 go build -o myapp ./cmd/myapp
+```
+
+## Configure for production
+
+Ship a strict config file and override secrets per environment:
+
+```yaml
+# /etc/myapp/zever.yaml
+db:
+  adapter: postgres
+  options:
+    dsn: postgres://app:secret@db:5432/app
+    maxconns: 20
+cache:
+  adapter: redis
+  options:
+    addr: redis:6379
+log:
+  adapter: slog
+```
+
+```sh
+DB_DSN='postgres://app:${DB_PASSWORD}@db:5432/app'
+AUTH_JWT_SECRET='prod-secret-at-least-32-bytes-long'
+```
+
+Remember the layering: `defaults < file < env`. The zero-infra defaults (`sqlite`, `memory`, deterministic dev crypto key) are for local dev and tests only — never production. `Default()` secrets are public by design.
+
+## Wire startup and shutdown
+
+Build one container per process from the loaded config, and always close it:
+
+```go
+cfg, err := config.Load("/etc/myapp/zever.yaml")
+if err != nil {
+    return err
+}
+c := container.New(cfg)
+
+srv := &http.Server{Addr: ":8080", Handler: routes(c)}
+go srv.ListenAndServe()
+
+<-sigCh // SIGINT / SIGTERM
+ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
+defer cancel()
+srv.Shutdown(ctx)
+return c.Close(ctx)
+```
+
+`Close(ctx)` closes only services already resolved, in dependency order (dependents first, `cache`/`queue` leaves last), joining failures with `errors.Join`. Panics surface as `*ClosePanicError`, timeouts as `*CloseTimeoutError` — match on those types, not strings.
+
+## Production checklist
+
+| Check | Why |
+|---|---|
+| Real crypto/JWT secrets via file or env | defaults are deterministic and public |
+| `log` adapter set to `slog`/`zerolog`, not `log` | structured output for aggregators |
+| `observability` set to `otlp`, not `noop` | traces and metrics actually export |
+| `Close(ctx)` with a timeout parent | buffered spans flush via `Shutdown(ctx)` probing |
+| Never log raw option maps | use `config.RedactedServices`, errors name fields only |
+| Never point `zever tinker` at prod | it evals arbitrary Go against a live container |
+
+`zever dev` is local watch-mode only. Production runs the compiled binary behind your process supervisor — systemd, Kubernetes, or a container runtime.
