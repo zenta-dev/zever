@@ -1,0 +1,58 @@
+---
+title: Storage and Media
+description: File storage with policy-gated access and local-first defaults.
+---
+
+Uploaded files, generated reports, exported backups — anything your app needs
+to persist as a blob shouldn't be tied to one filesystem or one cloud provider
+in the code that writes it. `storage.Storage` gives you a single interface
+gated by policy (`storage/policy.go`, `storage/decision.go`) so access checks
+live in one place instead of scattered across every call site that touches a
+file.
+
+`local` (the default) writes to disk — zero infra, fine for a single instance
+and for tests. Move to `s3` or `r2` the moment more than one instance needs to
+see the same files, since `local` storage is, definitionally, local.
+
+For the `media` package — upload/transform/probe pipelines with `ffmpeg`
+support built on top of storage — see the dedicated
+[Media Processing](/zever/digging-deeper/media/) page.
+
+## Config
+
+```yaml
+storage:
+  adapter: local
+```
+
+```sh
+STORAGE_ADAPTER=s3
+```
+
+## Resolve
+
+```go
+c := container.New(config.Default())
+st, err := c.Storage()
+if err != nil {
+	// handle
+}
+_ = st
+```
+
+## Adapters
+
+| Adapter | Package | Notes |
+|---|---|---|
+| `local` | `storage/local` | Default; filesystem |
+| `s3` | `storage/s3` | S3-compatible; shared core in `storage/s3core` |
+| `r2` | `storage/r2` | Cloudflare R2 |
+
+## The gotcha: gate through policy, don't call the adapter raw
+
+`storage`'s policy layer exists to answer "is this caller allowed to read/write
+this path" before the adapter ever touches disk or a bucket — bypassing it by
+reaching for adapter internals directly reintroduces exactly the per-call-site
+access-control bugs the package exists to prevent. Never log a DSN or
+credential directly; route anything you need to display through
+`config.RedactedServices`.

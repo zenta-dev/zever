@@ -1,0 +1,61 @@
+---
+title: Middleware
+description: Compose logging, recovery, rate limiting, and tracing over HTTP and gRPC.
+---
+
+`middleware` builds plain HTTP middleware and gRPC unary interceptors over resolved `log`, `ratelimit`, and `observability` instances. There is no registry and no adapter — call the constructors once when wiring a server.
+
+## HTTP chain
+
+```go
+handler := middleware.RequestLogger(logger)(
+    middleware.Tracing(provider)(
+        middleware.RateLimit(limiter, middleware.RemoteAddrKey)(
+            middleware.Recover(logger)(mux))))
+```
+
+Order matters: `RequestLogger` outermost so a recovered panic still logs with its 500 status; `Recover` innermost (closest to the handler) so it catches panics from inner middleware too.
+
+| Constructor | Behavior |
+|---|---|
+| `RequestLogger(logger)` | one structured line per request: method, path, status, `duration_ms`, plus `request_id` when present |
+| `Recover(logger)` | recovers panics, logs value + stack, responds 500 `{"error":"internal error"}`; if the handler already committed, logs only |
+| `RateLimit(limiter, keyFunc)` | denies with 429 JSON + `Retry-After` (ceiled seconds); limiter errors fail open; default key `RemoteAddrKey` (client IP) |
+| `Tracing(provider)` | span per request named by path, `http.status_code` attribute, span error on 5xx, `http.request` counter by method/status |
+
+The status recorder reuses a single wrapper through the chain (no double-wrap) and exposes `Unwrap`, so `http.ResponseController` still reaches `Flush` / `Hijack` on the underlying writer.
+
+## Timeouts
+
+```go
+handler := middleware.Timeout(5 * time.Second)(mux)
+```
+
+`Timeout` bounds a handler to a fixed duration with the standard error envelope (504 HTTP). The handler's context carries the deadline, so downstream calls using it cancel too.
+
+## gRPC interceptors
+
+Pair each HTTP middleware with its unary interceptor:
+
+| HTTP | gRPC | Deny mapping |
+|---|---|---|
+| `Recover` | `RecoverUnaryServerInterceptor` | panic → `Internal` |
+| `RateLimit` | `RateLimitUnaryServerInterceptor` | deny → `ResourceExhausted`, errors fail open, key via `PeerAddrKey` |
+| `Tracing` | `TracingUnaryServerInterceptor` | span per `FullMethod`, `rpc.request` counter by method/outcome |
+
+Recovery interceptors go last in the chain so other interceptors observe recovered state.
+
+## Wiring with the container
+
+```go
+log, _ := c.Log()
+limiter, _ := c.Ratelimit()
+obs, _ := c.Observability()
+mux := buildRoutes(c)
+srv := &http.Server{Addr: ":8080", Handler: middleware.RequestLogger(log)(
+    middleware.Recover(log)(mux))}
+_ = limiter
+_ = obs
+```
+
+Resolve once at startup, close via `c.Close(ctx)` — middleware itself holds no state worth shutting down.

@@ -1,0 +1,58 @@
+---
+title: Adapters Matrix
+description: Every service, adapter, package, and container accessor in one table.
+---
+
+## Purpose
+
+One interface per top-level package, self-registering adapters, container as
+sole resolver. This matrix maps service to adapter packages and accessors so
+swaps stay config-only.
+
+## Matrix
+
+| Service | Adapters | Packages | Accessor |
+|---|---|---|---|
+| ai | anthropic, openai, gemini | `ai/*` | `AI()` |
+| analytics | log, posthog | `analytics/*` | `Analytics()` |
+| auth | jwt, session, oidc | `auth/jwt`, `auth/session`, `auth/oidc` | `Auth()` |
+| billing | stub, stripe, paddle | `billing/stub`, `billing/stripe`, `billing/paddle` | `Billing()` |
+| cache | memory, redis | `cache/memory`, `cache/redis` | `Cache()` |
+| crypto | local | `crypto/local` | `Crypto()` |
+| db | sqlite, postgres | `db/*` | `DB()` |
+| document | local, remote, latex | `document/*` | `Document()` |
+| eventbus | memory, redis | `eventbus/memory`, `eventbus/redis` | `Eventbus()` |
+| flag | static, firebase | `flag/static`, `flag/firebase` | `Flag()` |
+| geo | google, static, osm | `geo/*` | `Geo()` |
+| i18n | embed, remote | `i18n/*` | `I18n()` |
+| idempotency | memory, redis | `idempotency/memory`, `idempotency/redis` | `Idempotency()` |
+| lock | memory, redis | `lock/memory`, `lock/redis` | `Lock()` |
+| log | noop, zerolog, slog | `log/*` | `Log()` |
+| mailer | log, smtp | `mailer/log`, `mailer/smtp` | `Mailer()` |
+| media | local, s3 | `media/local`, `media/s3` | `Media()` |
+| notification | log, twilio, fcm | `notification/*` | `Notification()` |
+| observability | noop, stdout, otlp | `observability/*` | `Observability()` |
+| password | argon2id | `password/argon2` | `Password()` |
+| payment | stub, stripe, paddle | `payment/*` | `Payment()` |
+| permission | noop, rbac, casbin | `permission/*` | `Permission()` |
+| queue | memory, redis | `queue/memory`, `queue/redis` | `Queue()` |
+| ratelimit | memory, redis | `ratelimit/memory`, `ratelimit/redis` | `Ratelimit()` |
+| router | fiber, stdhttp | `router/*` | `Router()` |
+| scheduler | embedded | `scheduler/embedded` | `Scheduler()` |
+| search | postgres, meilisearch, sqlite | `search/*` | `Search()` |
+| secrets | env | `secrets/env` | `Secrets()` |
+| session | memory, redis | `session/*` | `Session()` |
+| storage | local, s3, r2 | `storage/local`, `storage/s3`, `storage/r2` | `Storage()` |
+| tenant | single, header | `tenant/single`, `tenant/header` | `Tenant()` |
+| vectorstore | sqlite, pgvector, qdrant | `vectorstore/*` | `VectorStore()` |
+| webhook | http, queue, sqlite | `webhook/*` | `Webhook()` |
+| workflow | memory | `workflow/memory` | `Workflow()` |
+| job | — (dispatcher) | `job` | `Job()` |
+
+## Notes
+
+- `New(nil)` is valid; untouched services close cleanly without opening.
+- Accessors resolve lazily and retry on next call after an error.
+- `Job()` builds over resolved `Queue`; `Scheduler()` shares both.
+- `Close(ctx)` closes only resolved services, dependents first.
+- Don't add methods to public interfaces; prefer new interfaces.

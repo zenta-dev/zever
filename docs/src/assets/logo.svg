@@ -1,0 +1,5 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 160 40" role="img" aria-label="zever logo">
+  <rect x="2" y="4" width="32" height="32" rx="8" fill="#0f172a"/>
+  <path d="M10 12h16v3.4L17.4 28H26v3.4H10V28l8.6-12.6H10z" fill="#38bdf8"/>
+  <text x="40" y="27" font-family="ui-sans-serif, system-ui, sans-serif" font-size="22" font-weight="700" fill="#0f172a">zever</text>
+</svg>

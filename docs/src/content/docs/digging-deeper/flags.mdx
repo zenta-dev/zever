@@ -1,0 +1,59 @@
+---
+title: Feature Flags
+description: Static defaults with Firebase Remote Config for dynamic rollout.
+---
+
+Shipping a risky change behind a flag means the flag check has to be cheap,
+typed, and safe to call from a hot path — and the moment you want to flip it
+without a redeploy, "just read a config file" stops being enough. `flag`
+resolves `Bool`, `String`, `Int`, and `JSON` values against per-request
+targeting context, and it's deliberately *not* a config system: a missing key
+returns your fallback, never an error, so a flag lookup can never be the thing
+that takes your app down.
+
+`static` (the default) reads a JSON file, loaded once with optional reload —
+no network call in the hot path, which is exactly what you want for tests and
+anything offline. Move to `firebase` when product/growth actually needs to flip
+a flag live without waiting on a deploy; that's the whole point of Remote
+Config, but it comes with a real dependency and a 30s default timeout on the
+network round trip.
+
+## Config
+
+```yaml
+flag:
+  adapter: static
+```
+
+```sh
+FLAG_ADAPTER=firebase
+```
+
+## Resolve
+
+```go
+c := container.New(config.Default())
+f, err := c.Flag()
+if err != nil {
+	// handle
+}
+_ = f
+```
+
+## Adapters
+
+| Adapter | Package | Notes |
+|---|---|---|
+| `static` | `flag/static` | Default; file-defined, offline |
+| `firebase` | `flag/firebase` | Dynamic; needs credentials |
+
+## The gotcha: a missing key is not an error, so default safe
+
+Because unresolved flags fall back silently instead of erroring, the fallback
+value you pass *is* your safety net — default every flag to the behavior you'd
+want if the flag system vanished entirely. A flag that defaults to "open" on
+missing/error is a flag that fails open the moment `firebase` has a bad day.
+Name keys hierarchically (`billing.checkout_v2`) so ownership is legible at a
+glance, and audit unexpected flips first when investigating an incident — a
+flag state change is one of the cheapest things to check and one of the easiest
+to overlook.

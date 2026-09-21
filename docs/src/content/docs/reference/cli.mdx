@@ -1,0 +1,58 @@
+---
+title: CLI Reference
+description: TUI-first toolkit shell with exact CLI equivalents for every screen.
+---
+
+## Purpose
+
+`zever` is a TUI-first toolkit shell. On a TTY, bare `zever` opens the
+interactive dashboard; off a TTY it prints usage to stderr and exits 1 so
+scripts never hang. Every dashboard row maps to an exact CLI invocation, and
+each screen shows that CLI line so TUI learning transfers to scripts.
+
+## Bare-command contract
+
+- Bare on TTY: opens the dashboard (`runDashboard`), one `tea.Program`;
+  `esc` pops back, `esc` at root quits with exit 0.
+- Bare off TTY: usage to stderr plus `zever: missing subcommand`, exit 1.
+- All errors go to stderr; stdout stays clean for command output.
+
+## Screen map
+
+| Group | Dashboard item | Equivalent CLI |
+|---|---|---|
+| Scaffold | `new` | `zever new` |
+| Scaffold | `generate` | `zever generate` |
+| Scaffold | `extract` | `zever extract` |
+| Inspect | `compile` | `zever compile` |
+| Inspect | `check` | `zever check` |
+| Inspect | `breaking` | `zever breaking` |
+| Inspect | `fmt` | `zever fmt` |
+| Inspect | `doctor` | `zever doctor` |
+| Inspect | `routes` | `zever routes` |
+| Inspect | `explain` | `zever explain` |
+| Inspect | `check-boundaries` | `zever check-boundaries` |
+| Inspect | `graph` | `zever graph` |
+| Runtime | `serve` | `zever serve` |
+| Runtime | `dev` | `zever dev` |
+| Runtime | `queue:work` | `zever queue:work` |
+| Runtime | `schedule:run` | `zever schedule:run` |
+| Runtime | `tinker` | `zever tinker` |
+| Database | `migrate` | `zever db migrate` |
+| Database | `rollback` | `zever db rollback` |
+| Database | `seed` | `zever db seed` |
+
+## Dev and tinker rules
+
+- `zever dev` is local watch-only: it watches the schema dir and server
+  entrypoint, restarts on change, and stops on Ctrl-C. Never a deployment
+  path.
+- `zever tinker` is dev-only: every start prints the development-only warning
+  to stderr and evaluates arbitrary Go against a live container via the
+  per-project shim (`cmd/tinker-shim`). Never point it at production data.
+
+## Notes
+
+- Keys: `j/k` move, `enter` select, `/` filter, `?` help, `esc` back.
+- `zever <command> -h` always prints flags without running anything.
+- `migrate`/`rollback` mask the DSN (`--dsn ***`) in display and output.

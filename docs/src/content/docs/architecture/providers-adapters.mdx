@@ -1,0 +1,76 @@
+---
+title: Providers and Adapters
+description: Small interfaces, self-registering adapters, and the container as sole resolver.
+---
+
+Every backend concern is a small interface with multiple swappable adapters. Adapters self-register, and the shared container resolves and caches each one lazily. Swapping an adapter means changing configuration, not code.
+
+## The pattern
+
+```go
+// Package db: one small interface.
+type DB interface {
+    Query(ctx context.Context, sql string, args ...any) (Rows, error)
+    Exec(ctx context.Context, sql string, args ...any) (Result, error)
+    Dialect() string
+}
+
+// Adapter sqlite registers itself; postgres registers itself elsewhere.
+func init() { db.Register(db.SQLite, New) } // wiring only, no globals in app code
+```
+
+Application code speaks the interface. The container speaks the registry:
+
+```go
+conn, err := db.Open(db.SQLite, db.Options{Path: ":memory:"})
+```
+
+| Role | Rule |
+|---|---|
+| Interface | stays small; never add methods (breaks implementers) — prefer a new interface |
+| Adapter | self-registers, one subdirectory per backend |
+| Container | sole resolver; owns construction, caching, retry, and close |
+| Config | selects the adapter (`DB_ADAPTER=postgres`) plus options |
+
+## Adapter matrix (excerpt)
+
+| Service | Adapters | Default |
+|---|---|---|
+| `db` | `sqlite`, `postgres` | `sqlite` |
+| `cache` | `memory`, `redis` | `memory` |
+| `queue` | `memory`, `redis` | `memory` |
+| `router` | `fiber`, `stdhttp` | driver per scaffold |
+| `auth` | `jwt`, `session`, `oidc` | `jwt` |
+| `session` | `memory`, `redis` | `memory` |
+| `storage` | `local`, `s3`, `r2` | `local` |
+| `payment` / `billing` | `stub`, `stripe`, `paddle` | `stub` |
+
+The full table lives in `config/README.md` — over thirty services from `ai` to `workflow`, each defaulting to its zero-infra adapter.
+
+## Swapping without rewiring
+
+Change configuration, not code:
+
+```yaml
+# dev: zero infra
+cache:
+  adapter: memory
+```
+
+```yaml
+# prod: same code, real backend
+cache:
+  adapter: redis
+  options:
+    addr: redis:6379
+```
+
+Because placeholders stay `?` on both `db` drivers (the postgres driver rewrites to `$n` before pgx) and route params read uniformly via `router.Param`, most swaps are invisible to handlers. Where backends genuinely differ — `MinConns` means pool-minimum on postgres but `SetMaxIdleConns` on sqlite; regex route constraints exist on fiber but not stdhttp — the adapter fails fast or documents the gap instead of silently degrading.
+
+## Rules for new adapters
+
+1. Implement the existing interface exactly — no extra exported methods on the facade.
+2. Parse options with typed readers; return `InvalidOptionsError` on unparsable values.
+3. Never log raw option maps; expose redaction via `Redact` / `RedactedServices`.
+4. Make shutdown cheap and idempotent: implement `Close(ctx)`, `Close()`, or `Stop()` so `closeAny` probing finds it.
+5. Keep tests hermetic (sqlite `:memory:`, in-memory fakes); gate live tests behind env like `POSTGRES_DSN`.

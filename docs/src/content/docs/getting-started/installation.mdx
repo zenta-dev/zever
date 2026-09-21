@@ -1,0 +1,99 @@
+---
+title: Installation
+description: Install zever on Go 1.27, fetch the module, and run your first build and tests.
+---
+
+zever is a single-module Go framework. There are no nested `go.mod` files to manage: every package, adapter, and tool lives under `github.com/zenta-dev/zever`. Once Go is installed, adding zever to a project is one command.
+
+## Requirements
+
+| Requirement | Version | Notes |
+|---|---|---|
+| Go | 1.27.0+ | `go 1.27.0` in `go.mod` |
+| Git | any recent | needed for `go get` and scaffolding |
+| Node.js | 18+ | docs site only (`docs/`) |
+
+Check your toolchain first:
+
+```sh
+go version
+```
+
+You should see `go1.27` or newer. If not, install from [go.dev](https://go.dev/dl/) before continuing.
+
+## Add zever to your project
+
+Initialize a module if you do not have one, then fetch zever:
+
+```sh
+go mod init example.com/myapp
+go get github.com/zenta-dev/zever
+```
+
+To install the CLI globally at a pinned version:
+
+```sh
+go install github.com/zenta-dev/zever/cmd/zever@v0.1.0
+zever --help
+```
+
+## Install dev tools
+
+Pinned linters and scanners are installed with one target:
+
+```sh
+make setup
+```
+
+This installs `golangci-lint` v2.13.2, `govulncheck` v1.8.0, and `cyclonedx-gomod` v1.12.0. Run it once per machine, then verify the standard workflow:
+
+```sh
+make build
+make test
+```
+
+| Target | What it does |
+|---|---|
+| `make build` | `go build ./...` across the module |
+| `make test` | `go test ./...` |
+| `make test-race` | `go test -race ./...` (part of local `make check`) |
+| `make fmt` / `make fmt-fix` | check / write `gofmt` formatting |
+| `make lint` | `golangci-lint run` with `.golangci.yml` |
+
+## Verify your install
+
+Create a smoke test that resolves the default container without any infrastructure:
+
+```go
+package main
+
+import (
+	"fmt"
+
+	"github.com/zenta-dev/zever/config"
+	"github.com/zenta-dev/zever/container"
+)
+
+func main() {
+	c := container.New(config.Default())
+	db, err := c.DB()
+	if err != nil {
+		panic(err)
+	}
+	fmt.Println("db resolved:", db != nil)
+}
+```
+
+Run it:
+
+```sh
+go run .
+```
+
+If it prints `db resolved: true`, your install works. The default config uses zero-infra adapters (sqlite, memory, log), so no database server is required.
+
+## Next steps
+
+- Configure layers in [Configuration](./configuration.mdx).
+- Learn the layout in [Directory Structure](./directory-structure.mdx).
+- Run `make check` before every push: it mirrors CI (fmt, vet, lint, race, vulncheck, build).

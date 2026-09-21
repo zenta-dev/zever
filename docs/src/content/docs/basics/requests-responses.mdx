@@ -1,0 +1,75 @@
+---
+title: Requests and Responses
+description: Decode JSON bodies, read params and headers, and write consistent JSON responses.
+---
+
+zever handlers stay close to `net/http`: decode the request explicitly, run business logic, and encode a consistent JSON envelope. No magic binding, no global helpers.
+
+## Reading the request
+
+```go
+func createUser(w http.ResponseWriter, r *http.Request) {
+    id := router.Param(r, "id")          // path param, uniform across drivers
+    q := r.URL.Query().Get("verbose")    // query string
+    token := r.Header.Get("Authorization")
+
+    var in struct {
+        Email string `json:"email"`
+        Name  string `json:"name"`
+    }
+    if err := json.NewDecoder(r.Body).Decode(&in); err != nil {
+        writeError(w, http.StatusBadRequest, "invalid body")
+        return
+    }
+    _ = q
+    _ = token
+    _ = in
+}
+```
+
+| Source | How |
+|---|---|
+| Path params | `router.Param(req, name)` / `router.ParamNames(req)` |
+| Query | `r.URL.Query().Get(...)` |
+| Headers | `r.Header.Get(...)` |
+| JSON body | `json.NewDecoder(r.Body).Decode(&v)` |
+| Context values | `router.WithParams` in tests and middleware |
+
+Bound the body on public endpoints (`http.MaxBytesReader`) and always pass `r.Context()` downstream so `middleware.Timeout` deadlines propagate.
+
+## Writing the response
+
+```go
+func writeJSON(w http.ResponseWriter, status int, v any) {
+    w.Header().Set("Content-Type", "application/json")
+    w.WriteHeader(status)
+    _ = json.NewEncoder(w).Encode(v)
+}
+
+func writeError(w http.ResponseWriter, status int, msg string) {
+    writeJSON(w, status, map[string]string{"error": msg})
+}
+```
+
+Conventions:
+
+- Success: the resource (or list) as JSON with the appropriate status (`200`, `201` on create).
+- Errors: `{"error": "<stable message>"}` — the same envelope `middleware.Recover` uses for 500s, and rate limiting uses for 429s (plus `Retry-After`).
+- Always set `Content-Type: application/json` before `WriteHeader`.
+
+## Paginated lists
+
+`.zen` RPCs flagged `paginated: true` generate cursor scaffolding. Expose it as opaque cursors, not offsets:
+
+```sh
+GET /v1/orders?cursor=eyJpZCI6NDJ9&limit=50
+```
+
+```go
+users, err := orm.From(Users).
+    Where(orm.CursorKey(UserID, cursor)).
+    Limit(50).
+    All(ctx, conn)
+```
+
+Return the next cursor alongside the page so clients never construct keyset predicates themselves. Keep stdout clean for command output — all diagnostics and errors belong on stderr.

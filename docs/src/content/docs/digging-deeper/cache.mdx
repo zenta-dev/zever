@@ -1,0 +1,76 @@
+---
+title: Cache
+description: In-process and shared caching with typed helpers and CAS support.
+---
+
+Fetching the same expensive value on every request wastes work the moment your
+app sees real traffic — rendered fragments, computed permissions, rate-budget
+counters. `cache.Cache` gives every service the same small interface for
+stashing that value with a TTL, instead of each package inventing its own map
+and its own bugs.
+
+Reach for `memory` while you're a single process — it's zero-infra, and that's
+exactly what `config.Default()` ships for tests. The moment you run more than
+one instance behind a load balancer, switch to `redis`: a write on instance A
+needs to be visible to a read on instance B, and `memory` can't do that by
+definition.
+
+## Config
+
+```yaml
+cache:
+  adapter: memory
+  options:
+    defaultttl: 5m
+```
+
+```sh
+CACHE_ADAPTER=redis
+CACHE_DEFAULTTTL=5m
+```
+
+Redis shares connection settings with the standard `addr` / `db` style
+options; unknown env vars are ignored per the best-effort env rule.
+
+## Resolve
+
+```go
+import (
+	"github.com/zenta-dev/zever/config"
+	"github.com/zenta-dev/zever/container"
+)
+
+c := container.New(config.Default())
+ch, err := c.Cache()
+if err != nil {
+	// handle
+}
+_ = ch
+```
+
+`Cache()` resolves lazily on first use and caches the result; on error the
+cached state clears so the next call retries. Unlike most services, it closes
+with `Close(ctx)` — it takes a context — and it's a leaf dependency, so it
+closes last.
+
+## Adapters
+
+| Adapter | Package | Notes |
+|---|---|---|
+| `memory` | `cache/memory` | Default; process-local, no infra |
+| `redis` | `cache/redis` | Shared; use for multi-instance deploys |
+
+## The gotcha: cached values can outlive the shape you cached them as
+
+The typed helpers in `cache/typed.go` decode values for you, which is
+convenient — but it also means a cache poisoned by a stale schema (you renamed
+a struct field, redeployed, and old cached JSON is still sitting in Redis)
+fails at *read* time, not write time. If you change a cached type's shape,
+bump the cache key so old entries just miss instead of decode-erroring. `cas.go`
+gives you compare-and-swap for check-then-set flows where two writers racing
+would otherwise clobber each other.
+
+Cached values may hold secrets, so never log a key or a payload directly —
+route anything you need to inspect through `config.RedactedServices`. Errors
+stay `errors.Is`-compatible; wrap with `%w`, never `github.com/pkg/errors`
+(the repo's `depguard` rule blocks it).

@@ -1,0 +1,74 @@
+---
+title: Container
+description: Lazy per-service accessors, retry semantics, Job and Scheduler sharing, and ordered Close.
+---
+
+The container wires every configured service into one lazily resolved instance per process, built once from a `config.Config`. It is the only object that knows how adapters are constructed.
+
+## Construction
+
+```go
+import (
+	"github.com/zenta-dev/zever/config"
+	"github.com/zenta-dev/zever/container"
+)
+
+c := container.New(config.Default())
+db, err := c.DB()
+```
+
+There is no global state and no `init()` wiring. `New(nil)` is valid: an untouched container closes cleanly without opening anything, which makes zero-value tests trivial.
+
+## Lazy accessors with retry
+
+Each service resolves on first use and caches the result. On error the cache clears, so the next call retries:
+
+| Service | Accessor | Notes |
+|---|---|---|
+| `db` | `DB()` | plus `Transactor()` helper |
+| `cache` | `Cache()` | leaf dependency, closed last |
+| `queue` | `Queue()` | leaf dependency, closed last |
+| `job` | `Job()` | `*job.Dispatcher` over resolved `Queue` |
+| `scheduler` | `Scheduler()` | shares `Queue` via `Job()`, closed first |
+| `log` | `Log()` | wire outermost middleware with this |
+| `router` | `Router()` | `fiber` or `stdhttp` driver |
+
+The full table (ai, auth, billing, crypto, document, eventbus, geo, i18n, lock, mailer, media, notification, observability, password, payment, permission, ratelimit, search, secrets, session, storage, tenant, vectorstore, webhook, workflow, grpc) follows the same pattern: one accessor, one cached instance, retry on failure.
+
+## Job and Scheduler share one Queue
+
+`Job()` has no registry of its own — it builds a dispatcher over the already-resolved queue:
+
+```go
+d, err := c.Job() // d.Q is the shared queue instance
+```
+
+`Scheduler()` injects that dispatcher into the scheduler options, so resolving the scheduler transitively resolves `Job()` and `Queue` as a side effect. No redundant connections are opened.
+
+## Ordered shutdown
+
+`Close(ctx)` closes only services already resolved:
+
+```text
+scheduler, job        dependents holding a queue ref, first
+snapshots             everything without explicit ordering
+cache, queue          leaf dependencies, last
+grpcServer            independent GracefulStop/Stop, bounded by ctx
+```
+
+Shutdown probing (`closeAny`) tries shapes in order: `Close(context.Context) error`, then `Close() error`, then `Stop() error` (the scheduler declares `Stop`), then `Shutdown(context.Context) error` for observability flushing, then no-op (e.g. `*job.Dispatcher`).
+
+```go
+if err := c.Close(ctx); err != nil {
+    var te *container.CloseTimeoutError
+    var pe *container.ClosePanicError
+    switch {
+    case errors.As(err, &te):
+        // per-service timeout
+    case errors.As(err, &pe):
+        // adapter panicked
+    }
+}
+```
+
+Shared instances close once via pointer-identity dedup, and failures join with `errors.Join`. Error values name the service only — never values or secrets.

@@ -1,0 +1,70 @@
+---
+title: Authentication
+description: JWT, session, and OIDC login behind one auth interface.
+---
+
+Knowing who's calling is a different problem depending on who's calling — a
+stateless API client wants a bearer token, a browser wants a cookie-backed
+session, and plenty of apps just want to delegate the whole question to an
+external identity provider. `auth` gives you one `Issue`/`Verify`/`Revoke`
+surface over all three, and it stays deliberately narrow: it doesn't hash
+passwords (that's `password`) and it doesn't encrypt anything (that's
+`crypto`) — those are opt-in companions, not auth's job.
+
+`jwt` (the default) is the right call for stateless APIs — no server-side
+session store, just a signed token. Reach for `session` when you're serving a
+browser and want server-revocable state instead of a token that's valid until
+it expires no matter what. `oidc` is for when you don't want to own
+credentials at all — login delegates entirely to an external provider.
+
+## Config
+
+```yaml
+auth:
+  adapter: jwt
+  options:
+    jwt:
+      secret: change-me-to-at-least-32-bytes
+```
+
+```sh
+AUTH_ADAPTER=oidc
+AUTH_JWT_SECRET=prod-secret-at-least-32-bytes-long
+```
+
+One nesting level maps via the first underscore, so `AUTH_JWT_SECRET` sets
+`Options.JWT.Secret` — and that secret has to clear `MinSecretLen` bytes or
+`Open` refuses it outright rather than accepting a weak key silently.
+
+## Resolve
+
+```go
+c := container.New(config.Default())
+a, err := c.Auth()
+if err != nil {
+	// handle
+}
+_ = a
+```
+
+## Adapters
+
+| Adapter | Package | Notes |
+|---|---|---|
+| `jwt` | `auth/jwt` | Default; stateless tokens |
+| `session` | `auth/session` | Cookie-backed, server-revocable |
+| `oidc` | `auth/oidc` | External IdP login |
+
+## Failures are deliberately generic
+
+An invalid token and an expired token return the same generic failure from
+`Verify` — not because the distinction doesn't exist internally, but because
+telling a caller *which* check failed is a free enumeration oracle: an
+attacker probing your login endpoint can tell a real username from a fake one
+just by which error comes back. `auth` fails closed and vague on purpose; if
+you need to log the specific reason for your own debugging, do it server-side,
+never in the response body. Token values, JWT secrets, and OIDC client
+material never appear in an error or a log line, no matter which adapter
+produced the failure — and defaults ship with no production credentials, so
+running `config.Default()` in prod by mistake fails to authenticate anything
+rather than silently accepting a known dev secret.

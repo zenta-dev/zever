@@ -1,0 +1,62 @@
+---
+title: Upgrade Guide
+description: Pre-1.0 breaking-change policy, how to read the changelog, and safe upgrade steps.
+---
+
+zever is pre-1.0. While below `v1.0.0`, `0.x` releases may contain breaking changes. Every break is documented in the release notes — upgrading is a matter of reading the changelog entry and applying the listed codemod.
+
+## Versioning policy
+
+| Range | Guarantee |
+|---|---|
+| `0.x` patch/minor | may break; breaks documented under `Changed` with `**Breaking:**` prefix |
+| `1.0+` (future) | SemVer: majors break, minors add, patches fix |
+
+Public API changes — new exports, config struct or default changes, serialization changes — need explicit maintainer review. Expect them to arrive with migration notes.
+
+## How to upgrade
+
+```sh
+go get github.com/zenta-dev/zever@v0.1.1
+go mod tidy
+make tidy-check
+make check
+```
+
+Then walk this checklist:
+
+1. Read `CHANGELOG.md` `## [Unreleased]` and the target version section.
+2. Search for `**Breaking:**` lines — each names the package, the old signature, and the fix.
+3. Apply import or call-site changes (examples below).
+4. Run `make check` (fmt, vet, lint, race, vulncheck, build) before pushing.
+
+## Recent breaking examples
+
+`billing.Billing` gained a required idempotency key so client retries cannot double-bill:
+
+```go
+// Before
+cust, err := billing.CreateCustomer(ctx, params)
+// After: pass "" for the previous non-idempotent behavior.
+cust, err := billing.CreateCustomer(ctx, params, "")
+```
+
+The migration engine moved from `zen/migrate` to `orm/migrate`:
+
+```go
+// Before
+import "github.com/zenta-dev/zever/zen/migrate"
+// After
+import "github.com/zenta-dev/zever/orm/migrate"
+```
+
+`search.Search` and `vectorstore.VectorStore` gained batch methods (`IndexBatch`, `UpsertBatch`). All bundled adapters implement them; external implementations must add the new method or compilation fails — that failure is the signal, not a runtime surprise.
+
+## Keeping upgrades cheap
+
+- Pin the CLI install (`go install .../cmd/zever@v0.1.0`) so TUI and backend versions match.
+- Keep user-facing changes in `CHANGELOG.md` under `## [Unreleased]` with every PR.
+- Use Conventional Commits (`feat/fix/perf/refactor/test/docs/ci/build:`), one logical change per commit.
+- After touching `token.Keywords` or `resolver.ScalarTypeNames`, run `make generate` — editor grammars derive from those tables.
+
+If an upgrade breaks in a way the changelog does not cover, open an issue: undocumented breaks are treated as bugs.

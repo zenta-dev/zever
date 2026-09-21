@@ -1,0 +1,61 @@
+---
+title: Analytics
+description: Event tracking — Track, Identify, and Group — behind one interface.
+---
+
+Product analytics has the same shape everywhere: track an event, identify a
+user, associate them with a group. What differs is where those events end up —
+a real pipeline like PostHog in production, or just stdout while you're
+building the feature. `analytics.Analytics` keeps your call sites (`Track`,
+`Identify`, `Group`) identical across both.
+
+Use `log` (the default) for local development and tests — it's zero-infra and
+prints what would have been sent. Switch to `posthog` once you actually want
+events to land somewhere durable; that's a config change, not a rewrite of every
+`Track` call you've already written.
+
+## Config
+
+```yaml
+analytics:
+  adapter: log
+```
+
+```sh
+ANALYTICS_ADAPTER=posthog
+ANALYTICS_APIKEY=phc_...
+```
+
+`AnonymousID` (default `"anonymous"`) and `GroupType` (default `"organization"`)
+give every call a sane fallback identity even before you've wired up real user
+IDs.
+
+## Resolve
+
+```go
+c := container.New(config.Default())
+an, err := c.Analytics()
+if err != nil {
+	// handle
+}
+_ = an
+```
+
+## Adapters
+
+| Adapter | Package | Notes |
+|---|---|---|
+| `log` | `analytics/log` | Default; debug output, no PII redaction |
+| `posthog` | `analytics/posthog` | |
+
+## The gotcha: flush on shutdown, and don't debug with `log` in prod
+
+Events sent through `posthog` (or any real backend) are buffered before they go
+over the wire — call `Close()` before process exit or your last batch of events
+never leaves the process. And because the `log` adapter exists purely for
+debugging, it applies no PII redaction to what it prints: treat it as a
+development tool, never a fallback for production traffic.
+
+`MaxPropertiesBytes` (default 64KiB) and `MaxProperties` bound a single call's
+payload before it's sent — a runaway properties map fails fast locally instead
+of getting silently truncated by the backend.

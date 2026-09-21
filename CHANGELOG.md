@@ -7,6 +7,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+- docs: add Astro Starlight site in docs/ with Laravel/RoR-structured guides deployed to GitHub Pages.
+
 ## [v0.1.1] - 2026-09-20
 
 ### Added

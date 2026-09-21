@@ -1,0 +1,79 @@
+---
+title: Locks and Idempotency
+description: Distributed mutual exclusion plus exactly-once handling for jobs and webhooks.
+---
+
+Two problems that look similar but aren't: "make sure only one worker runs
+this migration right now" is mutual exclusion — that's `lock`. "Make sure this
+webhook, retried three times by an impatient provider, only takes effect once"
+is deduplication — that's `idempotency`. Conflating them is a common source of
+bugs, so `zever` keeps them as two small, separately-resolved services rather
+than one that tries to do both.
+
+### Lock
+
+`lock.Locker` gives you `TryAcquire` (single attempt, no retry), blocking
+`Acquire` (polls every `RetryInterval`, default 50ms), `Extend`, and `Unlock`
+— with ownership checks baked in, so releasing a lock you don't hold fails
+instead of stealing it out from under whoever does. `memory` needs no server
+and is fine for a single instance; `redis` is what makes the lock actually
+distributed across replicas.
+
+### Idempotency
+
+`idempotency.Store` reserves a caller-supplied key with `Begin` and records the
+outcome with `Complete`, so a retried request replays the stored result instead
+of re-executing. It fails closed on every error path by design — an
+idempotency store you can't trust to dedupe correctly isn't one you want
+silently letting duplicates through.
+
+## Config
+
+```yaml
+lock:
+  adapter: memory
+idempotency:
+  adapter: memory
+```
+
+```sh
+LOCK_ADAPTER=redis
+IDEMPOTENCY_ADAPTER=redis
+```
+
+## Resolve
+
+```go
+c := container.New(config.Default())
+lk, err := c.Lock()
+if err != nil {
+	// handle
+}
+idem, err := c.Idempotency()
+if err != nil {
+	// handle
+}
+_, _ = lk, idem
+```
+
+## Adapters
+
+| Service | Adapter | Package | Notes |
+|---|---|---|---|
+| lock | `memory` | `lock/memory` | Default |
+| lock | `redis` | `lock/redis` | Distributed |
+| idempotency | `memory` | `idempotency/memory` | Default |
+| idempotency | `redis` | `idempotency/redis` | Shared dedupe |
+
+## The gotcha: `Close` doesn't release your lease
+
+Calling `Close(ctx)` on a resolved `lock.Locker` releases the *adapter's*
+resources (its Redis connection, say) — it does not release any lease your
+code currently holds. A held lock always expires on its own TTL (default 30s);
+plan for that expiry explicitly rather than assuming shutdown cleans it up.
+Idempotency keys cap at 255 bytes and fingerprints at 4096 — key on a stable
+external ID (a webhook's event ID, a job's dedupe key), never on the request
+payload itself, since two semantically-identical payloads can still differ
+byte-for-byte. For anything money-moving, both services should fail closed on
+error: a lock you can't confirm you hold, or a dedupe check you can't complete,
+means don't proceed.

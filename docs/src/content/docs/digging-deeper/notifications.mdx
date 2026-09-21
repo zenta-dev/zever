@@ -1,0 +1,61 @@
+---
+title: Notifications
+description: Multi-channel user notifications with a safe log default.
+---
+
+"Notify the user" shouldn't mean "know whether that's a push notification or
+an SMS today, and rewrite the call site when it changes tomorrow." `notification.Notifier`
+fans a single intent out to whatever channel the adapter targets — code calls
+`Notify` against the interface, and adding FCM push or Twilio SMS later is a
+config change, not a rewrite of every place that sends a notification.
+
+Stay on `log` (the default) until you actually need a real channel wired
+up — it writes instead of sending, so nothing goes out by accident in
+development. Pick `twilio` when the target is SMS and `fcm` when it's push;
+both need real credentials, supplied via file or env, never hardcoded.
+
+## Config
+
+```yaml
+notification:
+  adapter: log
+```
+
+```sh
+NOTIFICATION_ADAPTER=fcm
+```
+
+## Resolve
+
+```go
+c := container.New(config.Default())
+n, err := c.Notification()
+if err != nil {
+	// handle
+}
+_ = n
+```
+
+## Adapters
+
+| Adapter | Package | Notes |
+|---|---|---|
+| `log` | `notification/log` | Default; safe sink |
+| `twilio` | `notification/twilio` | SMS delivery |
+| `fcm` | `notification/fcm` | Push delivery |
+
+## The gotcha: the log adapter echoes the target — don't ship it to prod
+
+Because `log` exists purely for local visibility, it prints the actual
+notification target (phone number, device token) to the log — exactly the
+kind of thing you don't want in production log output. Disable it once you
+deploy for real. Separately, `InvalidTargetError` deliberately carries only a
+reason, never the target itself, to keep PII out of error paths even when
+validation fails; SMS targets must be E.164-formatted before they reach the
+adapter. A channel a given adapter doesn't support fails closed with a
+`ChannelNotSupportedError` rather than silently dropping the notification.
+
+`notification` does not queue or schedule anything itself — for retry and
+backpressure, enqueue notifications as jobs rather than calling `Notify`
+directly from a request path, and make sure a channel failure never fails the
+request that triggered it.

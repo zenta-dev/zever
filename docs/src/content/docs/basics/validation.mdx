@@ -1,0 +1,74 @@
+---
+title: Validation
+description: Validate .zen-declared rules, request input, and fail with precise errors.
+---
+
+Validation lives in two places: declarative rules on `.zen` RPC inputs (checked at the boundary) and explicit Go checks inside handlers. Both fail with precise, field-named errors — never silent coercion.
+
+## Schema-declared rules
+
+```zen
+rpc CreateUser(email: string @validate(format: "email")) -> User {
+  http: POST "/v1/users"
+  auth: required
+  errors: { already_exists }
+}
+```
+
+`@validate` travels with the field into generated code and OpenAPI output, so the docs, the server, and the client agree. The resolver checks the expression at compile time (`zever check` surfaces bad rules with positions).
+
+## Handler-level checks
+
+```go
+func createUser(w http.ResponseWriter, r *http.Request) {
+    var in struct {
+        Email string `json:"email"`
+        Name  string `json:"name"`
+    }
+    if err := json.NewDecoder(r.Body).Decode(&in); err != nil {
+        writeError(w, http.StatusBadRequest, "invalid body")
+        return
+    }
+    if !strings.Contains(in.Email, "@") {
+        writeError(w, http.StatusUnprocessableEntity, "email: must be a valid address")
+        return
+    }
+    if strings.TrimSpace(in.Name) == "" {
+        writeError(w, http.StatusUnprocessableEntity, "name: required")
+        return
+    }
+}
+```
+
+| Status | When |
+|---|---|
+| `400` | malformed body or query (cannot parse) |
+| `422` | well-formed but semantically invalid (bad email, empty name) |
+| `409` | `already_exists` (maps from the `errors:` set) |
+
+## Config and option validation
+
+Adapter options validate the same way at startup: unknown file fields fail `Load`, and unparsable env values return `InvalidOptionsError` (e.g. `DB_MAXCONNS=abc`). Fix the value — the error names the service and field, never the secret.
+
+## Testing validation
+
+Table-drive the boundary:
+
+```go
+tests := []struct {
+    name  string
+    email string
+    want  int
+}{
+    {"ok", "a@example.com", http.StatusCreated},
+    {"no at-sign", "not-an-email", http.StatusUnprocessableEntity},
+    {"empty", "", http.StatusUnprocessableEntity},
+}
+for _, tt := range tests {
+    t.Run(tt.name, func(t *testing.T) {
+        // post to handler, assert status code
+    })
+}
+```
+
+Keep tests deterministic: no network, no unseeded randomness, no timing assertions. Validation failures are pure functions of input — assert exact status and message.

@@ -1,0 +1,65 @@
+---
+title: Billing
+description: Customers, subscriptions, and invoices behind one interface.
+---
+
+Subscription billing means talking to a provider's API for customers,
+subscriptions, and invoices — and every provider represents money slightly
+differently. `billing.Billing` gives you one facade over that, with amounts
+always in minor units (`ParseMinorUnits` handles the currency-specific
+precision) so a stray float never rounds a customer's invoice wrong.
+
+Start with `stub` — it's zero-infra, keeps everything in memory behind a mutex,
+and is exactly what `config.Default()` ships for tests, since you don't want
+real billing calls firing from your test suite. Move to `stripe` or `paddle`
+once you're ready to talk to a real payment provider; `billing` itself settles
+nothing — that's entirely the provider adapter's job.
+
+## Config
+
+```yaml
+billing:
+  adapter: stub
+```
+
+```sh
+BILLING_ADAPTER=stripe
+BILLING_SECRETKEY=sk_live_...
+BILLING_SANDBOX=true
+```
+
+Flip `Sandbox` on while integrating against a provider's test environment —
+it's a boolean the adapter interprets, not a separate credential.
+
+## Resolve
+
+```go
+c := container.New(config.Default())
+b, err := c.Billing()
+if err != nil {
+	// handle
+}
+_ = b
+```
+
+## Adapters
+
+| Adapter | Package | Notes |
+|---|---|---|
+| `stub` | `billing/stub` | Default; in-memory, ULID-identified records |
+| `stripe` | `billing/stripe` | |
+| `paddle` | `billing/paddle` | |
+
+## The gotcha: this isn't a ledger, and amounts are always minor units
+
+`billing` is not the system of record for what a customer was actually charged
+— that lives with the provider. What it gives you is a consistent, typed way to
+create and query customers/subscriptions/invoices without hand-rolling HTTP
+calls per provider. Every amount is an `int64` in minor units (cents, not
+dollars) specifically so currency math never touches floating point; if you're
+formatting an amount for display, go through the currency exponent helpers
+rather than dividing by 100 yourself — not every currency has two decimal
+places.
+
+`SecretKey` and `APIKey` never surface in errors or logs — same redaction
+discipline as every other adapter-backed service.

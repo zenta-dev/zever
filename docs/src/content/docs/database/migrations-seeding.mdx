@@ -1,0 +1,64 @@
+---
+title: Migrations and Seeding
+description: Plan and apply schema migrations with rollback, then seed deterministically.
+---
+
+zever migrations use a live-schema-diff engine: compare the desired schema against the live database, plan the statements, then apply them. Rollbacks reverse the last batch, and seeds load deterministic data afterward.
+
+## Workflow
+
+```sh
+zever db migrate --dsn 'postgres://app:secret@db:5432/app'
+zever db rollback --dsn 'postgres://app:secret@db:5432/app'
+zever db seed --dsn 'postgres://app:secret@db:5432/app'
+```
+
+The dashboard rows (`migrate`, `rollback`, `seed`) mirror these exact invocations. DSNs are always masked in displayed CLI lines (`--dsn ***`), password-masked on input, and scrubbed from output.
+
+## Plan then apply
+
+The engine diffs desired vs. live and emits an ordered plan. Review it before applying in production:
+
+```go
+plan, err := migrate.Plan(ctx, conn, desired)
+if err != nil {
+    return err
+}
+for _, stmt := range plan.Statements {
+    fmt.Println(stmt.SQL)
+}
+if err := migrate.Apply(ctx, conn, plan); err != nil {
+    return err
+}
+```
+
+| Step | Purpose |
+|---|---|
+| `Plan` | pure diff, no side effects; safe to run in CI |
+| `Apply` | runs statements inside a transaction where the driver supports it |
+| `rollback` | reverses the last applied batch |
+
+`WithTx` semantics apply: commit on success, rollback on error or panic (re-panicking after rollback), nesting rejected with `ErrNestedTx`. Savepoint names validate as `[_A-Za-z][_A-Za-z0-9]*` — identifiers, never user values.
+
+## Seeding
+
+Seeds are ordinary Go using the ORM, so they get typed builders and transactions for free:
+
+```go
+err := db.WithTx(ctx, conn, nil, func(ctx context.Context, tx db.Tx) error {
+    for _, u := range seedUsers {
+        if err := orm.Insert(Users).Values(u).Exec(ctx, tx); err != nil {
+            return err
+        }
+    }
+    return nil
+})
+```
+
+Keep seeds idempotent (`Conflict` upserts on a natural key) so re-running `zever db seed` is safe after a rollback.
+
+## Environment notes
+
+- sqlite defaults to `app.db`; `:memory:` forces a single connection even if `MaxConns` is set (extra connections would each get an isolated database).
+- postgres requires `Options.DSN`; `MinConns` is a real pool minimum there but maps to `SetMaxIdleConns` on sqlite.
+- Live postgres tests (migrations included) gate behind `POSTGRES_DSN`; sqlite paths run hermetically in CI.

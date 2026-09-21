@@ -1,0 +1,61 @@
+---
+title: Tenants
+description: Resolve which tenant a request belongs to, from single-tenant to header-based SaaS.
+---
+
+A single-tenant app and a multi-tenant SaaS shouldn't need different code for
+"which customer is this request for" — they need different `tenant` adapters.
+`tenant` resolves a tenant ID from request metadata and scopes a context to
+it; it's deliberately not an auth gate and enforces nothing on its own — it
+answers "who owns this data," not "is this caller allowed to see it."
+
+Start with `single` (the default): every request belongs to one hardcoded
+tenant, which is exactly right until you actually have more than one customer.
+Switch to `header` once you do — it reads the tenant ID from a configured
+request header, which is the common shape for SaaS APIs where a gateway or
+client sets that header per call.
+
+## Config
+
+```yaml
+tenant:
+  adapter: single
+```
+
+```sh
+TENANT_ADAPTER=header
+```
+
+`header`'s `Header` and `SubdomainRegex` options come with defaults
+(`DefaultHeader`); a configured regex is capped at `MaxRegexLength` (500) so a
+malicious or malformed pattern can't become a ReDoS vector.
+
+## Resolve
+
+```go
+c := container.New(config.Default())
+t, err := c.Tenant()
+if err != nil {
+	// handle
+}
+_ = t
+```
+
+## Adapters
+
+| Adapter | Package | Notes |
+|---|---|---|
+| `single` | `tenant/single` | Default; one tenant, constant-time lookup |
+| `header` | `tenant/header` | Multi-tenant via request header |
+
+## Resolve once, propagate everywhere, fail closed on unknown
+
+Resolve the tenant at the middleware edge and carry it through the rest of the
+request via `tenant/context.go`'s helpers — don't re-derive it deeper in the
+call stack, where it's easy to accidentally trust an unvalidated value instead.
+An unrecognized tenant must be rejected outright, never silently mapped to a
+default tenant — that's the difference between a 404 and a cross-tenant data
+leak. Tenant IDs aren't secrets, but they're still not something to log
+carelessly alongside other request data. If you're on `header`, document the
+header name and its validation rule somewhere your API clients can actually
+find it — it's part of your public contract, not an implementation detail.

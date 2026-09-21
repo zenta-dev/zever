@@ -1,0 +1,63 @@
+---
+title: LSP and Tooling
+description: Editor support, CLI inspection commands, and grammar generation for .zen files.
+---
+
+`.zen` tooling covers the full loop: format and inspect from the CLI, get diagnostics inline from the LSP, and keep editor grammars in sync via `make generate`.
+
+## CLI inspection commands
+
+Every dashboard row maps to an exact CLI invocation, and every screen shows that CLI line so TUI learning transfers to scripts:
+
+| Command | Purpose |
+|---|---|
+| `zever compile` | compile schemas (defaults: all backends, `./generated`) |
+| `zever check` | surface resolver diagnostics |
+| `zever breaking` | diff old-vs-new schemas for breaking changes |
+| `zever fmt` | format files (list-only by default) |
+| `zever doctor` | environment and config sanity |
+| `zever routes` / `explain` / `graph` | inspect resolved routes and schema graph |
+| `zever check-boundaries` | enforce runtime-must-not-import-DSL rule |
+
+```sh
+zever fmt --write schema/
+zever check schema/
+zever compile --out ./generated
+```
+
+## LSP server
+
+`tools/zever-lsp` is an independently versioned Go module speaking stdio LSP. It requires the published `zever` release (no local `replace`), tagged as `tools/zever-lsp/vX.Y.Z`:
+
+```sh
+go install github.com/zenta-dev/zever/tools/zever-lsp@v0.1.0
+```
+
+Configure your editor to launch it for `.zen` files. You get diagnostics with positions, keyword completion, and hover over scalar types — the same tables the compiler uses, so editor and build never disagree.
+
+## Editor extensions
+
+| Editor | Path | Provides |
+|---|---|---|
+| Neovim | `editors/nvim` | filetype detection + syntax highlighting |
+| VS Code | `editors/vscode` | highlighting + LSP client |
+
+Both grammars derive from `token.Keywords` and `resolver.ScalarTypeNames` through `tools/gengrammar`. After touching either table:
+
+```sh
+make generate
+```
+
+`editors/parity_test.go` diffs the generator output against the checked-in grammar files, so forgetting the step fails the build.
+
+## Scaffold and runtime tools
+
+| Command | Scope |
+|---|---|
+| `zever new` / `generate` / `extract` | scaffolding |
+| `zever serve` | run the app |
+| `zever dev` | local watch mode only (restarts server entrypoint on change) |
+| `zever queue:work` / `schedule:run` | worker runs the scheduler in-process |
+| `zever tinker` | dev-only arbitrary-Go REPL against a live container |
+
+`tinker` prints a stderr warning on every start and banners the TUI screen: run it against a development database only, never production data.

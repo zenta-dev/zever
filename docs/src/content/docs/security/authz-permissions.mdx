@@ -1,0 +1,65 @@
+---
+title: Authorization and Permissions
+description: Noop by default, with RBAC and Casbin for enforced access control.
+---
+
+Authenticating a caller (`auth`) only tells you who they are — `permission`
+answers the next question, what they're allowed to do. It's a pure `Can(subject,
+action, resource) -> Decision` check: `allow`, `implicit_deny`, or
+`explicit_deny`. Critically, an *error* from `Can` means the permission system
+itself failed (a backend was unreachable, a policy file was malformed) — it is
+not the same thing as a denial, and callers need to treat the two differently.
+
+`noop` (the default) allows everything — fine for local development, and
+deliberately something you have to opt out of before any protected deployment,
+not something that silently ships. `rbac` gives you role-based checks without
+external files; reach for `casbin` when you need policy defined declaratively
+in model/policy files rather than in Go.
+
+Actually wiring `permission` into HTTP or gRPC handlers is a separate package,
+`authz` — it extracts the bearer token, runs the `auth.Auth` verify step, then
+calls into `permission.Checker`, exposed as `Middleware` for HTTP and
+`UnaryServerInterceptor` for gRPC. `authz` has no container accessor of its
+own; it composes the `Auth()` and `Permission()` you've already resolved.
+
+## Config
+
+```yaml
+permission:
+  adapter: noop
+```
+
+```sh
+PERMISSION_ADAPTER=rbac
+```
+
+## Resolve
+
+```go
+c := container.New(config.Default())
+p, err := c.Permission()
+if err != nil {
+	// handle
+}
+_ = p
+```
+
+## Adapters
+
+| Adapter | Package | Notes |
+|---|---|---|
+| `noop` | `permission/noop` | Default; allows everything |
+| `rbac` | `permission/rbac` | In-memory role checks |
+| `casbin` | `permission/casbin` | Model/policy file enforcement |
+
+## Deny by default, and don't touch the public interface
+
+Unknown roles and missing policies fail closed — a `Checker` that can't
+determine an answer denies rather than defaulting to allow, and callers should
+mirror that: treat a `Can` error as a denial for UX purposes, never as
+"probably fine." Model and policy file paths reject `..` traversal and must
+already exist at `Open`, so a bad path fails at startup, not on the first
+request that needs it. If you're extending `permission` yourself: never add a
+method to the public `Checker` interface — every external implementer breaks
+the moment you do. A new capability is a new, smaller interface, same rule as
+everywhere else in this codebase.

@@ -1,0 +1,61 @@
+---
+title: Search
+description: Full-text search — indexing and ranked queries behind one interface.
+---
+
+`LIKE '%term%'` gets you far exactly until a user expects ranked results,
+typo tolerance, or a corpus too big for a table scan. `search.Search` gives you
+one interface — index documents, run ranked queries with filters and paging —
+so the query surface your app exposes doesn't change when the backend behind
+it does.
+
+`sqlite` (the default) is genuinely fine for small corpora and every test suite
+— it's embedded FTS, zero infra. Reach for `postgres` when you already run
+Postgres and don't want a second datastore just for search; reach for
+`meilisearch` when result quality and query latency matter more than operational
+simplicity, since it's a dedicated cluster you now have to run.
+
+## Config
+
+```yaml
+search:
+  adapter: sqlite
+```
+
+```sh
+SEARCH_ADAPTER=meilisearch
+```
+
+## Resolve
+
+```go
+c := container.New(config.Default())
+s, err := c.Search()
+if err != nil {
+	// handle
+}
+_ = s
+```
+
+## Adapters
+
+| Adapter | Package | Notes |
+|---|---|---|
+| `sqlite` | `search/sqlite` | Default; embedded FTS |
+| `postgres` | `search/postgres` | Reuses relational infra |
+| `meilisearch` | `search/meilisearch` | External cluster |
+
+## Not a vector store
+
+`search` ranks by full-text relevance, not embedding similarity — if you want
+semantic "find things like this" search, that's [Vector Store](/zever/digging-deeper/vectorstore/),
+a different package entirely. A query's `Limit <= 0` defaults to 10 results, and
+`Total` in a paged response reflects the full match count independent of
+whatever `Limit`/`Offset` you asked for — don't assume `len(results) == Total`.
+
+One gotcha worth planning around: `IndexBatch` exists so bulk-indexing many
+documents is one round trip instead of one call per document — each adapter
+implements it as a native bulk API, a multi-row statement, or a wrapping
+transaction. Keep index writes on the write path (a job after a save), not
+inline in a request handler, and version your index schema alongside your
+`.zen` schema changes so the two never drift apart silently.

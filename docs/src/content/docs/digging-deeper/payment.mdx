@@ -1,0 +1,66 @@
+---
+title: Payments
+description: Create, refund, fetch, and decode payment webhooks behind one interface.
+---
+
+Where `billing` tracks customers and subscriptions, `payment` handles the
+transaction itself — creating a charge, refunding it, and decoding the
+provider's webhook events so you know when a payment actually settled.
+`payment.Payment` keeps that flow identical whether you're pointed at `stub`,
+`stripe`, or `paddle`.
+
+`stub` (the default) is what you want for tests and local development — no real
+money moves and nothing calls out over the network. Switch to `stripe` or
+`paddle` for a real integration; `AutoApprove` lets `stub` mark payments as
+succeeded immediately instead of pending, which is handy for exercising the
+"payment succeeded" path in a test without waiting on a webhook.
+
+## Config
+
+```yaml
+payment:
+  adapter: stub
+  options:
+    autoapprove: true
+```
+
+```sh
+PAYMENT_ADAPTER=stripe
+PAYMENT_SECRETKEY=sk_live_...
+PAYMENT_WEBHOOKSECRET=whsec_...
+```
+
+`MaxWebhookBytes` (default 1MiB) bounds how large an inbound webhook payload
+`payment` will decode — a provider sending something absurdly large gets
+rejected before it's ever parsed.
+
+## Resolve
+
+```go
+c := container.New(config.Default())
+p, err := c.Payment()
+if err != nil {
+	// handle
+}
+_ = p
+```
+
+## Adapters
+
+| Adapter | Package | Notes |
+|---|---|---|
+| `stub` | `payment/stub` | Default; no network, no real money |
+| `stripe` | `payment/stripe` | |
+| `paddle` | `payment/paddle` | |
+
+## The gotcha: not a ledger, and webhooks are verified before they're trusted
+
+`payment` never stores card data — that's the provider's PCI-scoped
+responsibility, not this package's. And it's not a ledger of record either: it
+gives you a typed way to initiate and react to payments, not the authoritative
+history of what was charged. Webhook decoding verifies the provider's signature
+against `WebhookSecret` before touching the payload, under the `MaxWebhookBytes`
+size bound — a request that fails signature verification or exceeds the bound
+never reaches your handler as a trusted `Event`.
+
+`SecretKey`, `APIKey`, and `WebhookSecret` never appear in logs or errors.

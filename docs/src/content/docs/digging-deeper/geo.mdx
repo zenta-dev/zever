@@ -1,0 +1,58 @@
+---
+title: Geo
+description: Geocoding, reverse geocoding, and distance behind one interface.
+---
+
+"Where is this address" and "how far apart are these two points" are two
+questions almost every app eventually needs answered, and neither one should
+require your test suite to make a real network call. `geo.Geo` covers both —
+geocode an address, reverse-geocode coordinates, measure distance in meters —
+through one interface with three very different backends underneath.
+
+`static` (the default) serves a bundled, file-backed list from memory: no
+network, fully deterministic, exactly what you want in tests. `osm` gets you
+free geocoding against OpenStreetMap data (it requires a `User-Agent`, per
+their usage policy) when you don't need Google-grade accuracy. `google` is the
+adapter to reach for when accuracy actually matters in production and you're
+willing to pay for an API key.
+
+## Config
+
+```yaml
+geo:
+  adapter: static
+```
+
+```sh
+GEO_ADAPTER=osm
+```
+
+## Resolve
+
+```go
+c := container.New(config.Default())
+g, err := c.Geo()
+if err != nil {
+	// handle
+}
+_ = g
+```
+
+## Adapters
+
+| Adapter | Package | Notes |
+|---|---|---|
+| `static` | `geo/static` | Default; bundled, offline |
+| `osm` | `geo/osm` | OpenStreetMap-backed; needs a `User-Agent` |
+| `google` | `geo/google` | Google-backed, needs an API key |
+
+## The gotcha: HTTPS is required, not optional
+
+Both external adapters require `https` for their endpoints — `AllowInsecure`
+exists as an explicit escape hatch for tests only, not a config flag you'd ever
+flip in production. `ValidCoord` checks WGS84 range and finiteness before a
+coordinate goes anywhere, catching a swapped lat/lng or a NaN before it reaches
+a provider. Since real geocoding calls are genuinely slow relative to a request
+handler, put them behind a job or a cache rather than the hot path — coordinates
+for a given address rarely change, so caching a geocode result is almost always
+correct, and keeps tests pinned to `static` for determinism.

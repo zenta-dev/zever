@@ -1,0 +1,40 @@
+---
+title: Contribute
+description: How to run and edit this documentation site.
+---
+
+This site is an [Astro](https://astro.build) + [Starlight](https://starlight.astro.build)
+project living in `docs/`. To preview changes locally:
+
+```sh
+cd docs
+npm install
+npm run dev
+```
+
+`npm run build` produces the static site; `npm run preview` serves that build
+locally.
+
+## Writing conventions
+
+- Every service page under **Digging Deeper** and **Security** follows the
+  same loose shape: a short narrative on *why* the service exists and *when*
+  to reach for each adapter, a `Config` section (YAML + env var form), a
+  `Resolve` section (container accessor snippet), an `Adapters` table, and at
+  least one concrete gotcha. Keep config keys, adapter names, and code
+  snippets accurate to the real Go packages — verify against the package's
+  `doc.go`/`options.go`/`adapter.go` before publishing, never invent a method
+  signature or config key.
+- Code snippets should compile against the current module — copy real
+  imports (`github.com/zenta-dev/zever/...`), don't abbreviate package paths.
+- Cross-link related pages, e.g. a new service page should link back to
+  [Adapters Matrix](/zever/reference/adapters-matrix/) and to
+  [Container](/zever/architecture/container/).
+
+## Everything else
+
+For build/test/lint commands, coding standards, commit conventions, and the
+full contribution process for the `zever` Go module itself, see
+[`.github/CONTRIBUTING.md`](https://github.com/zenta-dev/zever/blob/main/.github/CONTRIBUTING.md)
+and [`CLAUDE.md`](https://github.com/zenta-dev/zever/blob/main/CLAUDE.md) in
+the repository root.

@@ -1,0 +1,69 @@
+---
+title: Documents
+description: Render document sources to PDF, PNG, or JPG behind one interface.
+---
+
+Turning a document source into a viewable PDF or image is a job you'd rather
+not hand-roll per format — invoking a LaTeX toolchain is a different problem
+than calling a remote rendering API, but callers shouldn't have to know that.
+`document.Document` collapses both into one `Render` call with a typed
+`OutputFormat` (`pdf`, `png`, or `jpg`) and a clamped `Quality`.
+
+`local` (the default) renders on the machine running your process. `remote`
+hands the job to a rendering API over HTTP when you don't want LaTeX installed
+next to your app. `latex` is the adapter to reach for when your source really is
+a `.tex` document — it shells out to a fixed, configured LaTeX compiler rather
+than accepting an arbitrary command, which matters for what happens if that
+source is untrusted input.
+
+## Config
+
+```yaml
+document:
+  adapter: local
+  options:
+    quality: 80
+    dpi: 150
+```
+
+```sh
+DOCUMENT_ADAPTER=latex
+DOCUMENT_LATEXCOMMAND=pdflatex
+DOCUMENT_LATEXPDFTOPPM=pdftoppm
+```
+
+`Quality` is silently clamped into 0-100 rather than erroring outside that
+range — pass whatever a user gave you and let `ClampQuality` do the rest if you
+want that behavior explicitly.
+
+## Resolve
+
+```go
+c := container.New(config.Default())
+d, err := c.Document()
+if err != nil {
+	// handle
+}
+_ = d
+```
+
+## Adapters
+
+| Adapter | Package | Notes |
+|---|---|---|
+| `local` | `document/local` | Default |
+| `remote` | `document/remote` | HTTP-based; needs `Endpoint`/`APIKey` |
+| `latex` | `document/latex` | Shells out to `LatexCommand`/`LatexPDFToPPM` |
+
+## The gotcha: bounded everywhere, on purpose
+
+Sources are capped at 10MiB and rendered output at 64MiB (`MaxOutputBytes`) by
+default — a document render is exactly the kind of operation that can otherwise
+balloon memory on a hostile or malformed input. The `latex` adapter never
+interpolates a caller-supplied command; `LatexCommand` and `LatexPDFToPPM` only
+ever come from configuration, so there's no path from document content to
+arbitrary shell execution. `Render` returns nil output on error rather than a
+partial file — don't write output to disk until you've checked the error.
+
+`APIKey` for the `remote` adapter never appears in logs; `Endpoint` URLs are
+validated before the first request.

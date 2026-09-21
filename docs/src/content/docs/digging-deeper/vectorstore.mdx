@@ -1,0 +1,67 @@
+---
+title: Vector Store
+description: Store embeddings and query top matches by cosine similarity.
+---
+
+Semantic search needs somewhere to put embeddings and a way to ask "what's
+closest to this vector" — and that's genuinely a different storage problem than
+your relational data. `vectorstore.VectorStore` gives you `Upsert`,
+`UpsertBatch`, `Delete`, and `Query` over embeddings, ranked by cosine
+similarity, without tying your code to one vector database's client.
+
+`sqlite` (the default, using an in-memory DSN) is enough for tests and small
+local datasets. Move to `pgvector` if you already run Postgres and want vectors
+living next to your relational data, or `qdrant` when you need a
+purpose-built vector database at scale — the interface your code calls against
+doesn't change either way.
+
+## Config
+
+```yaml
+vectorstore:
+  adapter: sqlite
+  options:
+    dimension: 1536
+```
+
+```sh
+VECTORSTORE_ADAPTER=pgvector
+VECTORSTORE_DSN=postgres://user:pass@localhost:5432/db
+```
+
+`Dimension` defaults to 1536 (OpenAI's `text-embedding-3-small` size) — set it
+to match whatever embedding model actually produced your vectors, since a
+mismatched dimension is a query that silently returns nonsense, not an error.
+
+## Resolve
+
+```go
+c := container.New(config.Default())
+vs, err := c.VectorStore()
+if err != nil {
+	// handle
+}
+_ = vs
+```
+
+## Adapters
+
+| Adapter | Package | Notes |
+|---|---|---|
+| `sqlite` | `vectorstore/sqlite` | Default; DSN `:memory:` |
+| `pgvector` | `vectorstore/pgvector` | Postgres extension |
+| `qdrant` | `vectorstore/qdrant` | Dedicated vector database |
+
+## The gotcha: cosine-only, and batch means one round trip
+
+`Query` ranks by cosine similarity only — there's no hybrid full-text-plus-vector
+ranking built in here; if you need that, you're combining `vectorstore` with
+`search` yourself at the application layer. `topK <= 0` defaults to 10, so an
+unset or zero topK isn't "give me everything," it's "give me the default page."
+`UpsertBatch` exists specifically so writing many vectors is one round trip
+instead of one per vector — each adapter implements it as a native batch API, a
+multi-row statement, or a transaction, but the point from the caller's side is
+the same: don't loop calling single-item `Upsert` when you have a batch.
+
+`APIKey` (for `qdrant`) never appears in logs; empty embeddings are rejected
+before any IO happens.

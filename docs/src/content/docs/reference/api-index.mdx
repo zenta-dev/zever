@@ -1,0 +1,61 @@
+---
+title: API Index
+description: Package entry points with pkg.go.dev links for every service.
+---
+
+## Purpose
+
+Single-module repo (`github.com/zenta-dev/zever`, no nested `go.mod`).
+Import any top-level package directly; resolve through `container`.
+
+## Core
+
+- `config` — https://pkg.go.dev/github.com/zenta-dev/zever/config
+- `container` — https://pkg.go.dev/github.com/zenta-dev/zever/container
+- `orm` — https://pkg.go.dev/github.com/zenta-dev/zever/orm
+- `middleware` — https://pkg.go.dev/github.com/zenta-dev/zever/middleware
+- `cmd/zever` — CLI; see `cmd/zever/README.md`
+
+## Services
+
+- `ai` — https://pkg.go.dev/github.com/zenta-dev/zever/ai
+- `analytics` — https://pkg.go.dev/github.com/zenta-dev/zever/analytics
+- `auth` — https://pkg.go.dev/github.com/zenta-dev/zever/auth
+- `billing` — https://pkg.go.dev/github.com/zenta-dev/zever/billing
+- `cache` — https://pkg.go.dev/github.com/zenta-dev/zever/cache
+- `crypto` — https://pkg.go.dev/github.com/zenta-dev/zever/crypto
+- `db` — https://pkg.go.dev/github.com/zenta-dev/zever/db
+- `document` — https://pkg.go.dev/github.com/zenta-dev/zever/document
+- `eventbus` — https://pkg.go.dev/github.com/zenta-dev/zever/eventbus
+- `flag` — https://pkg.go.dev/github.com/zenta-dev/zever/flag
+- `geo` — https://pkg.go.dev/github.com/zenta-dev/zever/geo
+- `i18n` — https://pkg.go.dev/github.com/zenta-dev/zever/i18n
+- `idempotency` — https://pkg.go.dev/github.com/zenta-dev/zever/idempotency
+- `job` — https://pkg.go.dev/github.com/zenta-dev/zever/job
+- `lock` — https://pkg.go.dev/github.com/zenta-dev/zever/lock
+- `log` — https://pkg.go.dev/github.com/zenta-dev/zever/log
+- `mailer` — https://pkg.go.dev/github.com/zenta-dev/zever/mailer
+- `media` — https://pkg.go.dev/github.com/zenta-dev/zever/media
+- `notification` — https://pkg.go.dev/github.com/zenta-dev/zever/notification
+- `observability` — https://pkg.go.dev/github.com/zenta-dev/zever/observability
+- `password` — https://pkg.go.dev/github.com/zenta-dev/zever/password
+- `payment` — https://pkg.go.dev/github.com/zenta-dev/zever/payment
+- `permission` — https://pkg.go.dev/github.com/zenta-dev/zever/permission
+- `queue` — https://pkg.go.dev/github.com/zenta-dev/zever/queue
+- `ratelimit` — https://pkg.go.dev/github.com/zenta-dev/zever/ratelimit
+- `router` — https://pkg.go.dev/github.com/zenta-dev/zever/router
+- `scheduler` — https://pkg.go.dev/github.com/zenta-dev/zever/scheduler
+- `search` — https://pkg.go.dev/github.com/zenta-dev/zever/search
+- `secrets` — https://pkg.go.dev/github.com/zenta-dev/zever/secrets
+- `session` — https://pkg.go.dev/github.com/zenta-dev/zever/session
+- `storage` — https://pkg.go.dev/github.com/zenta-dev/zever/storage
+- `tenant` — https://pkg.go.dev/github.com/zenta-dev/zever/tenant
+- `vectorstore` — https://pkg.go.dev/github.com/zenta-dev/zever/vectorstore
+- `webhook` — https://pkg.go.dev/github.com/zenta-dev/zever/webhook
+- `workflow` — https://pkg.go.dev/github.com/zenta-dev/zever/workflow
+
+## Notes
+
+- Start from `config.Default()` + `container.New`, then per-service accessors.
+- Keep to documented interfaces; new behavior means new interfaces.
+- DSL internals (`internal/dsl`) are internal-only; runtime must not import.

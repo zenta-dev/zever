@@ -1,0 +1,69 @@
+---
+title: Mailer
+description: Outbound email with log-by-default safety and SMTP for production.
+---
+
+The fastest way to accidentally email a real customer during a test run is
+having a mailer adapter that actually sends. `mailer.Mailer` defaults to
+`log` specifically so that never happens by accident — validated messages get
+written to the log instead of delivered, and switching to real delivery is an
+explicit adapter change, not something that falls out of forgetting to mock
+something.
+
+Stay on `log` for development and CI; move to `smtp` for production once you
+have real credentials to supply. There's no in-between adapter here — `mailer`
+handles validated delivery only, it doesn't render templates or manage
+mailing lists, so keep templating in your own code and hand `mailer` the
+finished `Mail` value.
+
+## Config
+
+```yaml
+mailer:
+  adapter: log
+  options:
+    host: localhost
+    port: 25
+```
+
+```sh
+MAILER_ADAPTER=smtp
+MAILER_HOST=mail.example.com
+MAILER_PORT=587
+```
+
+`log` defaults with a dummy localhost host/port because `Validate` requires
+them even though the log adapter never dials anything. Address parsing
+helpers live in `mailer/address.go`.
+
+## Resolve
+
+```go
+c := container.New(config.Default())
+m, err := c.Mailer()
+if err != nil {
+	// handle
+}
+_ = m
+```
+
+## Adapters
+
+| Adapter | Package | Notes |
+|---|---|---|
+| `log` | `mailer/log` | Default; safe, no delivery |
+| `smtp` | `mailer/smtp` | Production delivery |
+
+## The gotcha: STARTTLS is the default for a reason
+
+`Encryption` defaults to STARTTLS, and `EncryptionNone` must not carry
+credentials — sending a password over an unencrypted connection is exactly
+the mistake this constraint exists to block. Address validation also rejects
+header injection and control characters, so a user-supplied "From" or subject
+line can't be used to smuggle extra headers into an outgoing message. Messages
+are capped around 10MB by default (`ErrMessageTooLarge` beyond it), and SMTP
+passwords never appear in logs — they should come from file or environment,
+never a committed default.
+
+Delivery errors stay `errors.Is`-compatible; retry transient failures at the
+job layer rather than blocking the request that triggered the send.

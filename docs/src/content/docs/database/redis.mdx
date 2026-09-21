@@ -1,0 +1,57 @@
+---
+title: Redis
+description: When to switch memory adapters to Redis, and how each service uses it.
+---
+
+Most stateful services default to an in-memory adapter and offer a Redis twin. Development needs no server; production switches configuration — not code — and every adapter owns an independent client.
+
+## Which services use Redis
+
+| Service | Memory adapter | Redis adapter | Redis role |
+|---|---|---|---|
+| `cache` | `memory` (LRU) | `redis` | shared value store |
+| `queue` | `memory` | `redis` | topic messaging + due/stale sweeps |
+| `session` | `memory` | `redis` | server-side session rows |
+| `ratelimit` | `memory` (token bucket) | `redis` (Lua) | distributed counters |
+| `lock` | `memory` | `redis` | distributed leases |
+| `idempotency` | `memory` | `redis` | reserve-then-complete store |
+| `eventbus` | `memory` (fan-out) | `redis` (PubSub) | cross-process publish/subscribe |
+
+Switch per service:
+
+```yaml
+cache:
+  adapter: redis
+  options:
+    addr: redis:6379
+queue:
+  adapter: redis
+  options:
+    addr: redis:6379
+```
+
+```sh
+CACHE_ADAPTER=redis
+CACHE_ADDR=redis:6379
+QUEUE_ADAPTER=redis
+```
+
+## Client ownership
+
+`internal/redis` holds no shared singleton: every `New` returns an independently owned client, and `Close` takes the client to close. Constructing a second adapter with different options never disturbs the first, and closing one never tears down another's connection.
+
+## Behavior notes
+
+- `queue/redis` throttles its due/stale sweep (`promoteDue` / `reclaimStale`) to once per 250ms instead of every poll tick — fewer idle round trips at the cost of up to 250ms of recovery latency.
+- `ratelimit` denials return 429 JSON with a `Retry-After` header (ceiled seconds); limiter errors fail open so a Redis blip does not take down the site.
+- `eventbus` Redis keeps the same wire envelope (`id` / `payload` / `headers`) as memory; `SubscribeChan` gives each subscriber a buffered channel where slow consumers drop newest without affecting others.
+- `cache/redis` and `session/redis` serialize through typed codecs — keys and TTLs behave identically across the memory and Redis twins.
+
+## Local development
+
+```sh
+docker run -p 6379:6379 redis:7
+CACHE_ADAPTER=redis QUEUE_ADAPTER=redis go run ./cmd/myapp
+```
+
+Keep defaults (`memory`) in unit tests: they are hermetic, leak-checked under `goleak.VerifyTestMain`, and need no Docker. Reserve Redis for integration runs and production.

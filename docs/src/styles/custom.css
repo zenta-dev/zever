@@ -1,0 +1,12 @@
+/* zever docs theme tweak: keep Starlight defaults, tighten hero + code readability. */
+:root {
+  --sl-font-system: ui-sans-serif, system-ui, sans-serif;
+}
+
+.hero h1 {
+  letter-spacing: -0.02em;
+}
+
+.sl-markdown-content pre {
+  line-height: 1.55;
+}

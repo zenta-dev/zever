@@ -1,0 +1,70 @@
+---
+title: Internationalization
+description: Translate strings with embedded catalogs locally and remote backends in production.
+---
+
+`i18n` resolves user-facing strings per locale. Development embeds the catalog in the binary; production can pull from a remote service — same interface, configuration-only swap.
+
+## Setup
+
+```yaml
+i18n:
+  adapter: embed   # default: compiled-in catalog
+```
+
+```yaml
+i18n:
+  adapter: remote  # production: shared catalog service
+  options:
+    endpoint: https://i18n.example.com
+```
+
+```go
+t, err := c.I18n()
+if err != nil {
+    return err
+}
+msg := t.Get(ctx, "en", "welcome", map[string]any{"Name": "Ada"})
+```
+
+## Locale resolution
+
+Resolve in this order: explicit user preference (profile setting), then `Accept-Language` header, then the configured default:
+
+```go
+func localeOf(r *http.Request, user *User) string {
+    if user != nil && user.Locale != "" {
+        return user.Locale
+    }
+    if h := r.Header.Get("Accept-Language"); h != "" {
+        return parsePrimary(h) // "fr-CA,fr;q=0.9" -> "fr-CA"
+    }
+    return "en"
+}
+```
+
+Keep locale resolution in one middleware or helper so every handler reads the same value.
+
+## Message patterns
+
+| Pattern | Example |
+|---|---|
+| Simple | `"welcome": "Welcome back!"` |
+| Interpolated | `"hello": "Hello, {Name}!"` |
+| Plural | `"cart.n": "{Count} item / {Count} items"` (CLDR rules per locale) |
+| Fallback | missing key in `fr` falls back to `en`, never an empty string |
+
+Pass structured args (`map[string]any`) rather than pre-formatted strings — word order differs across languages, and translators need the placeholders.
+
+## Testing
+
+Assert the fallback chain, not specific translations (translators change copy without code review):
+
+```go
+tests := []struct{ locale, key, want string }{
+    {"en", "welcome", "Welcome back!"},
+    {"fr", "missing.key", "fallback English text"},
+}
+```
+
+Catalogs are data, not code: version them with the schema, diff them in review, and deploy them alongside the binary (embed) or behind the remote endpoint. Log the resolved locale at debug level when diagnosing mismatches — never log the full catalog or raw option maps.
