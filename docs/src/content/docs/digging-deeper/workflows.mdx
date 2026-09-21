@@ -1,0 +1,56 @@
+---
+title: Workflows
+description: Durable, multi-step runs over swappable orchestration backends.
+---
+
+Onboarding, payouts, provisioning — these aren't single requests, they're
+sequences of steps that need to survive a restart partway through. `workflow`
+starts runs, delivers signals, evaluates queries, and cancels runs, so a crash
+after step 3 resumes at step 3 instead of restarting the whole thing from
+scratch. It isn't a cron scheduler — nothing here fires on a time spec; that's
+what `scheduler` is for.
+
+`memory` (the default) keeps everything in-process, which is fine for local
+dev and tests but means a run's state disappears if the process dies —
+production workflows that must survive a crash need a durable backend behind
+this interface.
+
+## Config
+
+```yaml
+workflow:
+  adapter: memory
+```
+
+```sh
+WORKFLOW_ADAPTER=memory
+```
+
+## Resolve
+
+```go
+c := container.New(config.Default())
+wf, err := c.Workflow()
+if err != nil {
+	// handle
+}
+_ = wf
+```
+
+## Adapters
+
+| Adapter | Package | Notes |
+|---|---|---|
+| `memory` | `workflow/memory` | Default; in-process, bounded pending buffer |
+
+## Design a run around idempotent steps
+
+Because a crashed run resumes rather than restarts, every step has to be safe
+to execute more than once — if step 3 partially completed before the crash,
+resuming means step 3 might run again. Money-moving or side-effecting steps
+should go through `lock` singletons and idempotency keys rather than trusting
+"this only runs once." Emit an observability span per step so a stalled run is
+something you can actually locate, not just infer from a timeout. The `memory`
+backend reports `ErrPendingFull` rather than blocking indefinitely once its
+buffer fills — cap retries per step and route poison inputs to a dead-letter
+path instead of retrying forever against a buffer that's already full.

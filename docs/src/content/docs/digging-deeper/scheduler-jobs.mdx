@@ -1,0 +1,69 @@
+---
+title: Scheduler and Jobs
+description: In-process cron scheduling over the shared queue via the job dispatcher.
+---
+
+"Run this every night at 2am" and "run this once, right now, in the
+background" are related problems but not the same one — the first needs a
+cron spec and dedup so a slow tick doesn't fire twice; the second just needs
+somewhere durable to push work. `scheduler` handles the first by registering
+job names on cron specs and firing them through the job dispatcher with
+per-slot dedup; `job.Dispatcher` handles the second by wrapping the resolved
+`Queue`.
+
+There's only one scheduler adapter (`embedded`, in-process ticks), so the real
+decision isn't which scheduler to pick — it's which queue backs it. `Job()`
+has no registry of its own: it builds a `*job.Dispatcher` directly over the
+resolved queue, and `Scheduler()` injects that same dispatcher, so scheduling
+work and dispatching work share one connection instead of opening a redundant
+one.
+
+## Resolve
+
+```go
+c := container.New(config.Default())
+d, err := c.Job()       // dispatcher over resolved Queue
+s, err := c.Scheduler() // shares Queue via Job(); resolves both as a side effect
+_ = s
+_ = d
+```
+
+`job.Batch` and `job/lock.go` cover batch enqueue and locked dispatch for
+singleton-style jobs — reach for the lock helper when a job must run on
+exactly one instance even though every instance is registered to run it.
+
+## Config
+
+```yaml
+queue:
+  adapter: memory
+scheduler:
+  adapter: embedded
+```
+
+```sh
+QUEUE_ADAPTER=redis
+SCHEDULER_ADAPTER=embedded
+```
+
+Switching the queue to `redis` makes both dispatch and scheduled runs durable
+across processes — the scheduler adapter itself doesn't change.
+
+## Adapters
+
+| Service | Adapter | Package | Notes |
+|---|---|---|---|
+| job | — | `job` | Dispatcher only, no adapter/registry |
+| scheduler | `embedded` | `scheduler/embedded` | In-process ticks |
+
+## The gotcha: `scheduler` doesn't catch up missed ticks
+
+If the process is down when a cron slot fires, that run is simply gone — the
+scheduler is not a durable timeline it replays on restart, it's an in-process
+ticker with per-slot dedup so a slow handler can't double-fire the same slot.
+For anything where a missed run matters, pair the scheduled trigger with
+idempotent job handlers backed by `lock` or `idempotency`, so a late catch-up
+enqueue (if you build one) or an overlapping retry doesn't double-apply.
+`zever queue:work` runs the worker and `zever schedule:run` runs the scheduler
+in-process; `Close` shuts the scheduler down via `Stop() error` probing before
+the queue closes.

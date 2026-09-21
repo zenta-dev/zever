@@ -1,0 +1,61 @@
+---
+title: Webhooks
+description: Signed outbound delivery over HTTP, queue fan-out, or SQLite outbox.
+---
+
+Delivering a webhook sounds like "POST some JSON somewhere," until you need
+retries, per-target secrets, and a way to prove to the receiver that the
+payload actually came from you and hasn't been replayed. `webhook.Webhook`
+handles registration, unregistration, and signed delivery — with the signature
+scheme (`t=<timestamp>,v1=<hex-hmac>` over `<timestamp>.<payload>`, verified
+with `hmac.Equal` and a timestamp window) built in rather than something every
+target implementation reinvents.
+
+`http` (the default) posts directly — simplest option, no durability if your
+process dies mid-delivery. `queue` routes delivery through the job system so
+retries and backoff come from infrastructure you already have. `sqlite` adds a
+durable outbox on top, so an in-flight delivery survives a crash instead of
+just vanishing.
+
+## Config
+
+```yaml
+webhook:
+  adapter: http
+```
+
+```sh
+WEBHOOK_ADAPTER=queue
+```
+
+## Resolve
+
+```go
+c := container.New(config.Default())
+wh, err := c.Webhook()
+if err != nil {
+	// handle
+}
+_ = wh
+```
+
+## Adapters
+
+| Adapter | Package | Notes |
+|---|---|---|
+| `http` | `webhook/http` | Default; direct POST |
+| `queue` | `webhook/queue` | Retryable via jobs |
+| `sqlite` | `webhook/sqlite` | Durable outbox |
+
+## The gotcha: there's no shared API key, by design, and replay defense is a timestamp window
+
+Notice `Options` has no top-level `APIKey` — that's deliberate. Every target
+gets its own secret at `Register` time, so compromising one integration's
+secret never exposes every other target's signature. Verifiers must check both
+halves: the HMAC itself (constant-time, via `hmac.Equal`, never `==`) *and*
+that the embedded timestamp falls inside `ReplayTolerance` (default 5 minutes)
+— checking the HMAC alone doesn't stop someone from replaying a
+still-validly-signed request from an hour ago. `AllowPrivateTargets` should
+stay `false` in production; flipping it opens delivery to internal-network
+URLs, which is exactly the kind of SSRF surface you don't want a webhook
+registration form to hand out.

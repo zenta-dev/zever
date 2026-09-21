@@ -1,0 +1,62 @@
+---
+title: Directory Structure
+description: Single-module layout with top-level services, container, ORM, DSL compiler, and CLI.
+---
+
+zever is one Go module (`github.com/zenta-dev/zever`, `go 1.27.0`) with no nested `go.mod` files. Top-level packages are services, `container/` wires them, and `internal/dsl/` holds the schema compiler.
+
+## Top level
+
+```text
+zever/
+├── auth/ cache/ db/ queue/ session/ payment/ storage/ ...  # one service each
+├── config/        # layered typed config (defaults < file < env)
+├── container/     # lazy resolver + ordered shutdown
+├── router/        # fiber / stdhttp adapters over http.HandlerFunc
+├── middleware/    # HTTP middleware + gRPC interceptors, no registry
+├── orm/           # generics typed SQL builder over db.DB
+├── internal/dsl/  # .zen compiler frontend (lexer→parser→resolver→IR)
+├── cmd/zever/     # Bubble Tea TUI-first CLI
+├── docs/          # this Starlight site (npm, not Go)
+├── tools/         # gengrammar generator, zever-lsp module
+├── config/README.md container/README.md ...  # per-package guides
+└── Makefile .golangci.yml go.mod
+```
+
+## Top-level services
+
+Each service is one small interface plus self-registering adapters. The container is the sole resolver — application code never constructs adapters directly:
+
+```go
+conn, err := db.Open(db.SQLite, db.Options{Path: ":memory:"})
+```
+
+| Area | Packages |
+|---|---|
+| Data | `db`, `orm`, `cache`, `search`, `vectorstore` |
+| Messaging | `queue`, `job`, `eventbus`, `webhook`, `workflow`, `scheduler` |
+| HTTP | `router`, `middleware`, `session`, `ratelimit`, `lock`, `idempotency` |
+| Security | `auth`, `authz`, `permission`, `password`, `crypto`, `secrets`, `tenant` |
+| Product | `mailer`, `notification`, `storage`, `media`, `document`, `payment`, `billing` |
+| Platform | `log`, `observability`, `analytics`, `flag`, `i18n`, `ai`, `geo` |
+
+Do not add methods to a public service interface — it breaks every implementer. Prefer a new interface instead.
+
+## Supporting packages
+
+| Path | Role |
+|---|---|
+| `config/` | `Default()` zero-infra adapters, strict `Load(path)`, best-effort env, `RedactedServices` |
+| `container/` | `New(cfg)` (nil valid), lazy accessors (`c.DB()`, `c.Cache()`), retry-on-error, `Close(ctx)` in dependency order |
+| `orm/` | `NewTable` / `NewColumn` / `From`, dialect per-call from `conn.Dialect()`, fail-closed errors |
+| `internal/dsl/` | `lexer → parser → ast → resolver → ir.Schema`, `compile → backend.Generate`; runtime must not import it |
+| `cmd/zever/` | dashboard on bare TTY, usage-to-stderr off TTY, `dev` watch mode, dev-only `tinker` REPL |
+
+## Conventions that shape the tree
+
+- No globals, no `init()` wiring; `ctx` is the first arg for IO and is never stored in a struct.
+- Exported identifiers need a doc comment starting with the name; unexported ones do not.
+- `goimports` local prefix is `github.com/zenta-dev/zever`; `depguard` denies `github.com/pkg/errors` and `io/ioutil`.
+- Tests are deterministic: no `time.Sleep` sync, no network, no unseeded randomness, no timing assertions.
+
+When you add a service, follow the existing shape: small interface at the package root, one subdirectory per adapter, registration without globals, and a `README.md` with an adapter table.

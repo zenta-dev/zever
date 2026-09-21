@@ -1,0 +1,62 @@
+---
+title: Queue
+description: Durable job transport backing the job dispatcher and scheduler.
+---
+
+`job.Dispatcher` and the scheduler both need somewhere to put work that
+outlives a single request — and they both need to agree on the same
+transport, or you end up with two connections doing the same job worse than
+one. `queue.Queue` is that shared transport: push, delay, pop, ack, nack, all
+through typed `Message`/`Payload`/`Headers` values with UUIDv7 message IDs.
+
+`memory` (the default) is process-local — fine for tests and a single-node
+dev setup, but a message pushed on one process is invisible to a worker on
+another. `redis` is the adapter you want the moment you run more than one
+worker: it's the shared, multi-process transport that makes horizontal
+scaling of consumers actually work.
+
+## Resolve
+
+```go
+c := container.New(config.Default())
+q, err := c.Queue()
+if err != nil {
+	// handle
+}
+d, err := c.Job() // d.Q is the shared queue instance
+_ = d
+```
+
+`Queue()` is a leaf dependency, closed last. `Job()` has no registry of its
+own — it builds a `*job.Dispatcher` directly over the already-resolved queue,
+so it has no separate shutdown method: `Close` treats it as a no-op nil.
+
+## Config
+
+```yaml
+queue:
+  adapter: memory
+```
+
+```sh
+QUEUE_ADAPTER=redis
+```
+
+## Adapters
+
+| Adapter | Package | Notes |
+|---|---|---|
+| `memory` | `queue/memory` | Default; no infra |
+| `redis` | `queue/redis` | Shared; required for multi-worker setups |
+
+## The gotcha: no ordering or exactly-once guarantee beyond the backend
+
+`queue` deliberately promises less than you might assume: no cross-topic
+ordering and no exactly-once delivery beyond whatever the chosen backend
+actually provides — design consumers to handle a redelivered message
+gracefully rather than trusting it arrives exactly once. `Pop` on an empty
+topic isn't an error condition to panic over; it returns `ErrEmpty` (or an
+`EmptyError`) as an expected, checkable result. Message shape lives in
+`queue/message.go` — keep payloads small and explicit, since resolving
+`Scheduler()` resolves `Job()` and transitively `Queue` as a side effect, and
+shutdown closes scheduler/job dependents first, queue last.

@@ -126,3 +126,11 @@ clean: ## Remove coverage output and build artifacts
 
 .PHONY: check
 check: require-tools download fmt vet vet-lsp tidy-check tidy-lsp-check lint test-race test-lsp vulncheck build ## Run all local CI checks (run 'make setup' first)
+
+.PHONY: docs-dev docs-build docs-preview
+docs-dev: ## Run docs dev server
+	cd docs && npm run dev
+docs-build: ## Build docs site
+	cd docs && npm run build
+docs-preview: ## Preview built docs site
+	cd docs && npm run preview

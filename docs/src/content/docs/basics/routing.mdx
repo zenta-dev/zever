@@ -1,0 +1,57 @@
+---
+title: Routing
+description: Register routes on fiber or stdhttp drivers with uniform params, groups, and method validation.
+---
+
+Handlers are plain `http.HandlerFunc`s. The router facade (`fiber` or `stdhttp` driver) normalizes patterns and exposes params uniformly through `router.Param`, so switching drivers is configuration — not a rewrite.
+
+## Registering routes
+
+```go
+r, err := c.Router()
+if err != nil {
+    return err
+}
+r.Handle("GET", "/users/{id}", func(w http.ResponseWriter, req *http.Request) {
+    id := router.Param(req, "id")
+    fmt.Fprintf(w, "user %s", id)
+})
+```
+
+Drivers inject matched params into the request context under a uniform key:
+
+| Helper | Purpose |
+|---|---|
+| `router.Param(req, "id")` | single param by name; empty when absent |
+| `router.ParamNames(req)` | all params as a copy |
+| `router.WithParams(ctx, params)` | context helper for tests and middleware |
+
+## Pattern syntax
+
+`Handle` and `Group.Handle` accept both `:name` and `{name}` on the fiber driver; patterns normalize to the driver-native form. The `stdhttp` driver accepts only `net/http` ServeMux-native syntax:
+
+| Pattern | fiber | stdhttp |
+|---|---|---|
+| `/users/:id` | `:id` | rejected (colon syntax) |
+| `/users/{id}` | `:id` | `{id}` |
+| `/files/{path...}` | `*` wildcard | `{path...}` subtree |
+| `/users/{$}` | literal | `{$}` exact match |
+| `/items/:id<[0-9]+>` | `:id<[0-9]+>` passthrough | rejected (regex constraint) |
+
+Fiber routes match case-sensitively (`/Users/:id` and `/users/:id` differ), and duplicate detection is likewise case-sensitive.
+
+## Groups and middleware
+
+```go
+api := r.Group("/v1", authMiddleware)
+api.Handle("GET", "/users/{id}", getUser)
+api.Handle("POST", "/users", createUser)
+```
+
+`Group(prefix, middlewares...)` applies middleware to the group's routes only, in order, on both drivers. `Use` applies router-wide (or group-wide); on `stdhttp`, `Use` affects only routes registered after the call because middleware snapshots per route.
+
+## Methods
+
+Method strings validate against the standard set (GET, POST, PUT, PATCH, DELETE, HEAD, OPTIONS, CONNECT, TRACE). Invalid or duplicate registrations are skipped with a `[router] <driver>:` log line — fiber leaves the route unregistered, while stdhttp relies on the mux's automatic 405 for registered paths.
+
+Prefer `.zen` RPC bindings (`http: GET "/v1/users/{id}"`) as the source of truth, then mirror them here. `zever routes` prints the resolved table for review.
