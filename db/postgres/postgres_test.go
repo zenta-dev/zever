@@ -11,6 +11,7 @@ import (
 
 	"github.com/jackc/pgx/v5"
 	"github.com/jackc/pgx/v5/pgconn"
+	"github.com/jackc/pgx/v5/pgtype"
 	"github.com/jackc/pgx/v5/pgxpool"
 
 	"github.com/zenta-dev/zever/db"
@@ -445,6 +446,9 @@ func (f *fakeRows) Scan(...any) error { return f.scanErr }
 func (f *fakeRows) Values() ([]any, error) { return nil, nil }
 
 func (f *fakeRows) RawValues() [][]byte { return nil }
+
+// TypeMap returns a fresh type map; the adapter never consults it in tests.
+func (f *fakeRows) TypeMap() *pgtype.Map { return pgtype.NewMap() }
 
 func (f *fakeRows) Conn() *pgx.Conn { return nil }
 

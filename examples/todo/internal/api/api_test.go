@@ -302,7 +302,19 @@ func TestTamperedToken(t *testing.T) {
 		t.Fatalf("decode: %v", err)
 	}
 
-	tampered := out.Token[:len(out.Token)-1] + "x"
+	parts := strings.Split(out.Token, ".")
+	if len(parts) != 3 {
+		t.Fatalf("token has %d parts, want 3", len(parts))
+	}
+	// Flip the first char of the signature segment: its six bits are all
+	// significant, so the decoded signature always changes. (Flipping the
+	// last char is a no-op when only padding bits differ.)
+	sig := parts[2]
+	first := byte('A')
+	if sig[0] == 'A' {
+		first = 'B'
+	}
+	tampered := parts[0] + "." + parts[1] + "." + string(first) + sig[1:]
 	rec = do(t, h, "GET", "/api/notes", tampered, nil)
 	if rec.Code != http.StatusUnauthorized {
 		t.Fatalf("tampered: got %d body %s", rec.Code, rec.Body.String())
