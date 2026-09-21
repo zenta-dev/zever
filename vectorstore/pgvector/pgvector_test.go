@@ -11,6 +11,7 @@ import (
 
 	"github.com/jackc/pgx/v5"
 	"github.com/jackc/pgx/v5/pgconn"
+	"github.com/jackc/pgx/v5/pgtype"
 
 	"github.com/zenta-dev/zever/vectorstore"
 )
@@ -37,6 +38,9 @@ func (r *fakeRows) CommandTag() pgconn.CommandTag { return pgconn.CommandTag{} }
 
 // FieldDescriptions returns nil; fakes carry no column metadata.
 func (r *fakeRows) FieldDescriptions() []pgconn.FieldDescription { return nil }
+
+// TypeMap returns a fresh type map; the adapter never consults it in tests.
+func (r *fakeRows) TypeMap() *pgtype.Map { return pgtype.NewMap() }
 
 // Next advances to the next row.
 func (r *fakeRows) Next() bool {
