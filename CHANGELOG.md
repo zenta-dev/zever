@@ -7,6 +7,16 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [v0.1.2] - 2026-09-21
+
+- docs: add Astro Starlight site in docs/ with Laravel/RoR-structured guides deployed to GitHub Pages.
+
+### Changed
+
+- `zever new` now defaults to `require github.com/zenta-dev/zever v0.1.1` (upstream)
+  when run outside a framework checkout; previously it emitted a local
+  `replace => .` with pseudo-version. Use `--framework-path` for local development.
+
 ## [v0.1.1] - 2026-09-20
 
 ### Added

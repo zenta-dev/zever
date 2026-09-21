@@ -1,0 +1,59 @@
+// todo.zen — todo/note example schema.
+entity User {
+  id: uuid @primary
+  email: string @unique @validate(format: "email")
+  password_hash: string
+  created_at: timestamp @default(now())
+
+  has_many notes: Note @foreign_key(user_id)
+}
+
+entity Note {
+  id: uuid @primary
+  user_id: uuid
+  title: string @validate(min_len: 1, max_len: 200)
+  body: string
+  done: bool
+  created_at: timestamp @default(now())
+
+  belongs_to user: User @foreign_key(user_id) @on_delete(cascade)
+
+  index(user_id, created_at)
+}
+
+service NoteService {
+  rpc ListNotes(user_id: uuid) -> Note {
+    http: GET "/notes"
+    auth: required
+  }
+
+  rpc CreateNote(title: string, body: string) -> Note {
+    http: POST "/notes"
+    auth: required
+  }
+
+  rpc GetNote(id: uuid) -> Note {
+    http: GET "/notes/{id}"
+    auth: required
+  }
+
+  rpc UpdateNote(id: uuid, title: string, body: string, done: bool) -> Note {
+    http: PATCH "/notes/{id}"
+    auth: required
+  }
+
+  rpc DeleteNote(id: uuid) -> Note {
+    http: DELETE "/notes/{id}"
+    auth: required
+  }
+}
+
+job SendOverdueDigest() {
+  queue: low
+  retry: max_attempts(3), backoff(exponential, base: 30s)
+}
+
+schedule OverdueDigest {
+  cron: "* * * * *"
+  dispatch: SendOverdueDigest()
+}

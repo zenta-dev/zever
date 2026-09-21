@@ -1,0 +1,102 @@
+---
+title: Configuration
+description: Layered typed config with defaults, strict files, best-effort env, and secret redaction.
+---
+
+zever configuration layers cleanly: built-in defaults, then a config file, then environment variables. Later layers win:
+
+```text
+defaults < file < env
+```
+
+`config.Default()` always returns a working setup. `config.Load(path)` overlays a file and the process environment on top.
+
+## Defaults: zero infrastructure
+
+`Default()` picks the zero-infra adapter for every service — memory, local, sqlite, log, noop — so tests run with no manual setup:
+
+```go
+cfg := config.Default()
+c := container.New(cfg)
+```
+
+The only exception is secrets the adapter `Validate` requires. The dev crypto key is deterministic and public: convenient for tests, and it must never ship to production.
+
+## Files: strict YAML or JSON
+
+`Load(path)` decodes YAML or JSON strictly. Unknown services and unknown fields are errors — typos fail fast instead of silently falling back:
+
+```yaml
+# zever.yaml
+db:
+  adapter: postgres
+  options:
+    dsn: postgres://app:secret@db:5432/app
+    maxconns: 20
+log:
+  adapter: slog
+```
+
+```go
+cfg, err := config.Load("zever.yaml")
+if err != nil {
+    log.Fatal(err)
+}
+```
+
+Discovery rules:
+
+| Call | Behavior |
+|---|---|
+| `Load("")` | probes `zever.yaml`, `zever.yml`, then `zever.json`; first hit wins, missing files skip silently |
+| `Load(path)` | path must exist and decode; any failure returns `nil` plus the error |
+| Unsupported extension | fails with `ErrUnsupportedFormat` (only `.yaml`, `.yml`, `.json`) |
+| Null / empty block | decodes to zero values |
+
+## Environment: no prefix, best-effort
+
+Variables carry no prefix — just `<SERVICE>_<FIELD>`, uppercased:
+
+```sh
+DB_ADAPTER=postgres
+DB_MAXCONNS=20
+DB_MAXCONNLIFETIME=5m
+AUTH_JWT_SECRET=prod-secret-at-least-32-bytes-long
+RATELIMIT_RATE=100
+```
+
+Field matching is case-insensitive with `_` ignored (`MAX_RETRIES` matches `MaxRetries`). One nesting level splits at the first `_`, so `AUTH_JWT_SECRET` sets `Options.JWT.Secret`. Durations accept `"5s"` style strings, and `_ADAPTER` switches the service adapter.
+
+The asymmetry is deliberate:
+
+| Source | Unknown input | Rationale |
+|---|---|---|
+| File | error | typos fail fast at deploy time |
+| Env | silently ignored | stray process env (`PATH`, `HOME`, `AUTH_TOKEN`) must not break startup |
+
+Only a value that fails to *parse* for a resolved field returns `InvalidOptionsError` — for example `DB_MAXCONNS=abc`.
+
+## Never log raw options
+
+Raw option maps may hold secrets as plain strings. Never log them directly. Use `RedactedServices` (built on `Redact`) as the sole display path:
+
+```go
+fmt.Println(config.RedactedServices(cfg))
+```
+
+Error text names services and fields only — values are never echoed. The CLI follows the same rule: `zever config show` prints the resolved, redacted config, and `migrate` screens mask the DSN as `--dsn ***`.
+
+## Putting it together
+
+```go
+// Development: zero-infra defaults, no file needed.
+cfg := config.Default()
+
+// Production: explicit file + env overrides, validated on load.
+cfg, err := config.Load("/etc/myapp/zever.yaml")
+if err != nil {
+    return err
+}
+```
+
+Supply real secrets via file or environment, and keep `Default()` where it belongs: local dev and tests.

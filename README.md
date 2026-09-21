@@ -112,6 +112,14 @@ make setup
 `cyclonedx-gomod` v1.12.0. `make check` mirrors the CI pipeline and is meant to
 be run before pushing. CodeQL and dependency review run only on GitHub.
 
+## Documentation
+
+Full guides live at <https://zenta-dev.github.io/zever/>. Run locally with:
+
+```bash
+cd docs && npm run dev
+```
+
 ## Contributing
 
 Contributions are welcome. See [`.github/CONTRIBUTING.md`](.github/CONTRIBUTING.md)

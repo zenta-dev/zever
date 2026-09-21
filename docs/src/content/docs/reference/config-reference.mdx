@@ -1,0 +1,81 @@
+---
+title: Config Reference
+description: Full service table with adapters, env scheme, and precedence.
+---
+
+## Purpose
+
+Layered typed config resolves as `defaults < file < env`. Defaults are
+zero-infra so tests run bare; files are strict YAML/JSON; env is best-effort
+`<SERVICE>_<FIELD>` with no prefix.
+
+## Full service table
+
+| Service | Adapters | Default |
+|---|---|---|
+| ai | anthropic, openai, gemini | anthropic (needs key) |
+| analytics | log, posthog | log |
+| auth | jwt, session, oidc | jwt |
+| billing | stub, stripe, paddle | stub |
+| cache | memory, redis | memory |
+| crypto | local | local (dev key) |
+| db | sqlite, postgres | sqlite |
+| document | local, remote, latex | local |
+| eventbus | memory, redis | memory |
+| flag | static, firebase | static |
+| geo | google, static, osm | static |
+| i18n | embed, remote | embed |
+| idempotency | memory, redis | memory |
+| lock | memory, redis | memory |
+| log | noop, zerolog, slog | slog |
+| mailer | log, smtp | log (dummy localhost) |
+| media | local, s3 | local |
+| notification | log, twilio, fcm | log |
+| observability | noop, stdout, otlp | stdout |
+| password | argon2id | argon2id |
+| payment | stub, stripe, paddle | stub |
+| permission | noop, rbac, casbin | noop |
+| queue | memory, redis | memory |
+| ratelimit | memory, redis | memory (10/20) |
+| router | fiber, stdhttp | stdhttp |
+| scheduler | embedded | embedded |
+| search | postgres, meilisearch, sqlite | sqlite |
+| secrets | env | env (prefix ZEVER) |
+| session | memory, redis | memory |
+| storage | local, s3, r2 | local |
+| tenant | single, header | single |
+| vectorstore | sqlite, pgvector, qdrant | sqlite |
+| webhook | http, queue, sqlite | http |
+| workflow | memory | memory |
+
+## File example
+
+```yaml
+db:
+  adapter: postgres
+  options:
+    dsn: postgres://app:secret@db:5432/app
+    maxconns: 20
+log:
+  adapter: slog
+```
+
+`Load("")` probes `zever.yaml`, `zever.yml`, then `zever.json`; first hit
+wins. Unknown services/fields fail fast.
+
+## Env scheme
+
+```sh
+DB_ADAPTER=postgres
+DB_MAXCONNS=20
+AUTH_JWT_SECRET=prod-secret-at-least-32-bytes-long
+```
+
+Best-effort: unknown vars ignored, only unparsable resolved fields error.
+Field matching is case-insensitive with `_` ignored; one nesting level
+splits at the first `_`.
+
+## Notes
+
+- Dev secrets (crypto key) are deterministic and must never reach production.
+- Never log raw option maps; display via `RedactedServices`/`Redact`.
