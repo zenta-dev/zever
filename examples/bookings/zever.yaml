@@ -1,7 +1,7 @@
 db:
   adapter: sqlite
   options:
-    path: data/bookings.db
+    path: data/app.db
 auth:
   adapter: jwt
 log:
@@ -32,16 +32,6 @@ notification:
   adapter: log
 webhook:
   adapter: queue
-  options:
-    # Durations are integer nanoseconds in YAML files ("5s" style works via env only).
-    timeout: 10000000000 # 10s
-    maxretries: 3
-    queueadapter: memory
-    queueopts:
-      visibilitytimeout: 30000000000 # 30s, must exceed timeout
-      polltimeout: 1000000000 # 1s
-      buffer: 100
-    deadlettertopic: webhook.dead
 scheduler:
   adapter: embedded
 idempotency:
