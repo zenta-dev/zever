@@ -1,0 +1,47 @@
+syntax = "proto3";
+
+// zengo.annotations.v1 defines rpc-level auth/permission metadata for
+// generated zever services. google.api.http (see google/api/annotations.proto
+// and google/api/http.proto) already standardizes HTTP routing, but there is
+// no equivalent standard for auth/permission, so this small custom extension
+// follows the same pattern many internal proto APIs use for the same gap.
+//
+// Extension field numbers 50601/50602/50603 come from protobuf's documented
+// 50000-99999 range reserved for internal use without registration.
+package zengo.annotations.v1;
+
+import "google/protobuf/descriptor.proto";
+
+option go_package = "github.com/zenta-dev/zever/examples/bookings/generated/protogogen/zengo;annotationsv1";
+
+extend google.protobuf.MethodOptions {
+  Auth auth = 50601;
+  Permission permission = 50602;
+  ErrorCases errors = 50603;
+}
+
+message Auth {
+  bool required = 1;
+  repeated string roles = 2;
+}
+
+message Permission {
+  string check = 1;
+  string resource = 2;
+  string owner_field = 3;
+}
+
+// ErrorCase is one declared error an rpc may return: a fixed-vocabulary
+// gRPC-canonical code (see ir.ErrorCode) with an optional human-readable
+// message.
+message ErrorCase {
+  string code = 1;
+  string message = 2;
+}
+
+// ErrorCases wraps a repeated ErrorCase — proto2/3 extensions must be
+// singular, the same reason Auth/Permission are single messages rather
+// than bare repeated extension fields.
+message ErrorCases {
+  repeated ErrorCase cases = 1;
+}
