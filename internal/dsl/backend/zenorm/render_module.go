@@ -7,6 +7,7 @@ import (
 	"strings"
 
 	"github.com/zenta-dev/zever/internal/dsl/ir"
+	"github.com/zenta-dev/zever/internal/dsl/naming"
 )
 
 const (
@@ -61,10 +62,13 @@ func writeImports(b *strings.Builder, s *importSet) {
 }
 
 // renderModuleFile renders every entity of one ir.Module into a single Go
-// source file: one package clause, one de-duplicated import block, then
-// each entity's generated Table/Cols/struct/Scan/Columns section in
-// declaration order.
-func renderModuleFile(m *ir.Module) (path string, content []byte, err error) {
+// source file: one package clause, one de-duplicated import block, the
+// named-enum declarations the module's entities reference, then each
+// entity's generated Table/Cols/struct/Scan/Columns section in declaration
+// order. enums carries the schema-wide named-enum index so a field
+// referencing an enum declared in another module still resolves its values
+// (named enums are global).
+func renderModuleFile(m *ir.Module, enums map[string]*ir.Enum) (path string, content []byte, err error) {
 	pkg, path := moduleNaming(m)
 
 	imports := newImportSet()
@@ -93,6 +97,7 @@ func renderModuleFile(m *ir.Module) (path string, content []byte, err error) {
 	fmt.Fprintf(&b, "package %s\n\n", pkg)
 
 	writeImports(&b, imports)
+	renderEnumDecls(&b, m, enums)
 	b.WriteString(body.String())
 
 	formatted, fmtErr := formatSource(b.String())
@@ -101,6 +106,49 @@ func renderModuleFile(m *ir.Module) (path string, content []byte, err error) {
 	}
 
 	return path, formatted, nil
+}
+
+// renderEnumDecls emits one string-kind Go type plus typed constants per
+// named enum the module's entities reference, in first-reference order.
+// Without these, goScalar's PascalCase named-enum mapping would reference
+// Go types no file defines and the generated package would not compile.
+// The definitions are plain string kinds (not database/sql Valuer/Scanner
+// implementations) on purpose: database/sql converts string-kind values
+// and destinations through its standard reflection paths, so the type
+// round-trips through every driver unchanged.
+func renderEnumDecls(b *strings.Builder, m *ir.Module, enums map[string]*ir.Enum) {
+	seen := map[string]bool{}
+
+	for _, e := range m.Entities {
+		for _, f := range e.Fields {
+			if f.Type.Scalar != ir.TEnum || f.Type.EnumName == "" {
+				continue
+			}
+
+			name := f.Type.EnumName
+			if seen[name] {
+				continue
+			}
+
+			seen[name] = true
+
+			enum, ok := enums[name]
+			if !ok || enum == nil {
+				continue
+			}
+
+			goType := naming.PascalCase(name)
+			fmt.Fprintf(b, "// %s is the Go type for the %q enum declared in the schema.\n", goType, name)
+			fmt.Fprintf(b, "type %s string\n\n", goType)
+
+			fmt.Fprintf(b, "// %s values.\n", goType)
+			b.WriteString("const (\n")
+			for _, v := range enum.Values {
+				fmt.Fprintf(b, "\t%s%s %s = %q\n", goType, goName(v), goType, v)
+			}
+			b.WriteString(")\n\n")
+		}
+	}
 }
 
 // moduleLabel names a module for doc comments and error messages,

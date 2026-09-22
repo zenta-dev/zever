@@ -7,6 +7,14 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Fixed
+
+- `zenorm` backend emitted references to named-enum Go types (e.g. `Role`)
+  without ever declaring them, so any schema using `enum Name {}` failed to
+  compile downstream. The backend now emits one string-kind type plus typed
+  constants per referenced enum, resolved through a schema-wide index so
+  cross-module references work too.
+
 ## [v0.1.2] - 2026-09-21
 
 - docs: add Astro Starlight site in docs/ with Laravel/RoR-structured guides deployed to GitHub Pages.
