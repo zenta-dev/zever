@@ -1,0 +1,4 @@
+{
+  "order.confirmed": "Order {{.ID}} confirmed: {{.Total}} cents",
+  "product.created": "Product {{.Name}} listed at {{.Price}} cents"
+}

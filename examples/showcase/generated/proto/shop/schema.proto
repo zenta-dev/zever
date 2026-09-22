@@ -1,0 +1,221 @@
+syntax = "proto3";
+
+package zengo.shop.v1;
+
+import "google/protobuf/timestamp.proto";
+import "google/protobuf/struct.proto";
+import "google/api/annotations.proto";
+import "zengo/annotations.proto";
+
+option go_package = "github.com/zenta-dev/zever/gen/zengo/shop;shopv1";
+
+enum OrderStatus {
+  ORDER_STATUS_UNSPECIFIED = 0;
+  ORDER_STATUS_PENDING = 1;
+  ORDER_STATUS_PAID = 2;
+  ORDER_STATUS_SHIPPED = 3;
+  ORDER_STATUS_CANCELLED = 4;
+}
+
+enum Role {
+  ROLE_UNSPECIFIED = 0;
+  ROLE_ADMIN = 1;
+  ROLE_MEMBER = 2;
+}
+
+message User {
+  string id = 1;
+  string email = 2;
+  string name = 3;
+  optional string nickname = 4;
+  Role role = 5;
+  string password_hash = 6;
+  int32 age = 7;
+  int64 credit_cents = 8;
+  float rating = 9;
+  double score = 10;
+  bool verified = 11;
+  string birthday = 12;
+  bytes avatar = 13;
+  google.protobuf.Struct prefs = 14;
+  google.protobuf.Timestamp created_at = 15;
+}
+
+message Profile {
+  string id = 1;
+  string user_id = 2;
+  string bio = 3;
+  google.protobuf.Timestamp created_at = 4;
+}
+
+message Category {
+  string id = 1;
+  string name = 2;
+  string description = 3;
+  google.protobuf.Timestamp created_at = 4;
+}
+
+message Product {
+  string id = 1;
+  string category_id = 2;
+  string sku = 3;
+  string headline = 4;
+  string description = 5;
+  int64 price_cents = 6;
+  int64 stock = 7;
+  double weight = 8;
+  bool featured = 9;
+  google.protobuf.Timestamp created_at = 10;
+}
+
+message Tag {
+  string id = 1;
+  string name = 2;
+  google.protobuf.Timestamp created_at = 3;
+}
+
+message Order {
+  string id = 1;
+  string user_id = 2;
+  int64 total_cents = 3;
+  OrderStatus status = 4;
+  PriorityEnum priority = 5;
+  optional string note = 6;
+  google.protobuf.Timestamp created_at = 7;
+
+  enum PriorityEnum {
+    PRIORITY_UNSPECIFIED = 0;
+    PRIORITY_LOW = 1;
+    PRIORITY_HIGH = 2;
+  }
+}
+
+message OrderItem {
+  string id = 1;
+  string order_id = 2;
+  string product_id = 3;
+  int32 quantity = 4;
+  int64 price_cents = 5;
+}
+
+message Review {
+  string id = 1;
+  string product_id = 2;
+  string user_id = 3;
+  int32 rating = 4;
+  string body = 5;
+  google.protobuf.Timestamp created_at = 6;
+}
+
+message CreateOrderRequest {
+  string user_id = 1;
+  string coupon = 2;
+  int64 total_cents = 3;
+}
+
+message CheckoutRequest {
+  CreateOrderRequest order = 1;
+  string gift_note = 2;
+}
+
+message OrderReceipt {
+  string order_id = 1;
+  int64 total_cents = 2;
+}
+
+message ListProductsRequest {
+  string category_id = 1;
+}
+
+message ListProductsResponse {
+  repeated Product items = 1;
+  string next_cursor = 2;
+}
+
+message GetProductRequest {
+  string id = 1;
+}
+
+message CreateProductRequest {
+  string name = 1;
+  int64 price_cents = 2;
+}
+
+message UpdateProductRequest {
+  string id = 1;
+  string name = 2;
+}
+
+message PatchProductRequest {
+  string id = 1;
+  int64 stock = 2;
+}
+
+message DeleteProductRequest {
+  string id = 1;
+}
+
+message GetOrderRequest {
+  string id = 1;
+}
+
+message ListOrdersRequest {
+  string user_id = 1;
+}
+
+message ListOrdersResponse {
+  repeated Order items = 1;
+  string next_cursor = 2;
+}
+
+service ShopService {
+  rpc ListProducts(ListProductsRequest) returns (ListProductsResponse) {
+    option (google.api.http) = { get: "/products" };
+    option (zengo.annotations.v1.auth) = { required: true };
+  }
+
+  rpc GetProduct(GetProductRequest) returns (Product) {
+    option (google.api.http) = { get: "/products/{id}" };
+  }
+
+  rpc CreateProduct(CreateProductRequest) returns (Product) {
+    option (google.api.http) = { post: "/products" body: "*" };
+    option (zengo.annotations.v1.auth) = { required: true, roles: ["admin"] };
+    option (zengo.annotations.v1.errors) = { cases: [{ code: "ALREADY_EXISTS", message: "product sku taken" }] };
+  }
+
+  rpc UpdateProduct(UpdateProductRequest) returns (Product) {
+    option (google.api.http) = { put: "/products/{id}" body: "*" };
+    option (zengo.annotations.v1.auth) = { required: true, roles: ["admin"] };
+    option (zengo.annotations.v1.errors) = { cases: [{ code: "NOT_FOUND" }] };
+  }
+
+  rpc PatchProduct(PatchProductRequest) returns (Product) {
+    option (google.api.http) = { patch: "/products/{id}" body: "*" };
+    option (zengo.annotations.v1.auth) = { required: true, roles: ["admin"] };
+    option (zengo.annotations.v1.errors) = { cases: [{ code: "NOT_FOUND" }, { code: "INVALID_ARGUMENT", message: "negative stock" }] };
+  }
+
+  rpc DeleteProduct(DeleteProductRequest) returns (Product) {
+    option (google.api.http) = { delete: "/products/{id}" };
+    option (zengo.annotations.v1.auth) = { required: true, roles: ["admin"] };
+    option (zengo.annotations.v1.permission) = { check: "product.delete", resource: "Product", owner_field: "category_id" };
+    option (zengo.annotations.v1.errors) = { cases: [{ code: "NOT_FOUND" }, { code: "PERMISSION_DENIED", message: "no access" }] };
+  }
+
+  rpc Checkout(CheckoutRequest) returns (OrderReceipt) {
+    option (google.api.http) = { post: "/orders/checkout" body: "*" };
+    option (zengo.annotations.v1.auth) = { required: true };
+    option (zengo.annotations.v1.errors) = { cases: [{ code: "INVALID_ARGUMENT", message: "bad coupon" }, { code: "NOT_FOUND" }, { code: "FAILED_PRECONDITION" }] };
+  }
+
+  rpc GetOrder(GetOrderRequest) returns (Order) {
+    option (google.api.http) = { get: "/orders/{id}" };
+    option (zengo.annotations.v1.auth) = { required: true };
+  }
+
+  rpc ListOrders(ListOrdersRequest) returns (ListOrdersResponse) {
+    option (google.api.http) = { get: "/orders" };
+    option (zengo.annotations.v1.auth) = { required: true };
+  }
+}
