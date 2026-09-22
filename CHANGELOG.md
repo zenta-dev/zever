@@ -7,6 +7,14 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Added
+
+- `examples/showcase`: full-capability shop app exercising every DSL
+  feature in one schema (all scalars, named + inline enums, `?`, all four
+  relations, `@schema`, `@renamed_from`, messages, all verbs/auth shapes,
+  `errors:`, `paginated:`, job params, schedules) with generated output for
+  all six backends, runnable server/worker/seed, and tests.
+
 ### Fixed
 
 - `zenorm` backend emitted references to named-enum Go types (e.g. `Role`)

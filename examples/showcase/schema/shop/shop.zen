@@ -1,0 +1,247 @@
+// shop.zen — showcase schema exercising every DSL capability.
+//
+// Scalars: uuid string int32 int64 float32 float64 bool timestamp date
+// bytes json, inline enum(...) + named enum refs.
+// Relations: has_many has_one belongs_to many_to_many (+reciprocal).
+// Attributes: @primary @unique @validate @default @foreign_key @on_delete
+// @schema @renamed_from, optional `?`, indexes (+unique).
+// Services cover all verbs, auth shapes, permission, errors, paginated,
+// scalar + message params, entity + message returns.
+// Jobs cover params, queues, retry shapes; schedules cover cron+dispatch.
+
+// Named enums referenced as field types below.
+enum OrderStatus {
+  pending, paid, shipped, cancelled
+}
+
+enum Role {
+  admin, member
+}
+
+// Shopper account. Spreads all eleven scalar types across its fields.
+entity User {
+  id: uuid @primary
+  email: string @unique @validate(format: "email")
+  name: string @validate(min_len: 1, max_len: 100)
+  nickname: string? @default("anon")
+  role: Role @default(member)
+  password_hash: string
+  age: int32 @validate(gte: 0, lte: 150)
+  credit_cents: int64 @default(0)
+  rating: float32
+  score: float64 @default(0)
+  verified: bool
+  birthday: date
+  avatar: bytes
+  prefs: json
+  created_at: timestamp @default(now())
+
+  has_many orders: Order @foreign_key(user_id)
+  has_many reviews: Review @foreign_key(user_id)
+  has_one profile: Profile @foreign_key(user_id)
+}
+
+// One profile per user. user_id doubles as FK + @unique (required for has_one).
+entity Profile {
+  id: uuid @primary
+  user_id: uuid @unique
+  bio: string @validate(max_len: 500)
+  created_at: timestamp @default(now())
+
+  belongs_to user: User @foreign_key(user_id) @on_delete(cascade)
+}
+
+entity Category {
+  id: uuid @primary
+  name: string @unique @validate(min_len: 1, max_len: 50)
+  description: string
+  created_at: timestamp @default(now())
+
+  has_many products: Product @foreign_key(category_id)
+}
+
+// Sellable item. sku shows unique index + rename migration marker.
+entity Product {
+  id: uuid @primary
+  category_id: uuid
+  sku: string @unique @validate(min_len: 1, max_len: 40)
+  headline: string @renamed_from("title") @validate(min_len: 1, max_len: 200)
+  description: string
+  price_cents: int64 @validate(gte: 0)
+  stock: int64 @default(0)
+  weight: float64
+  featured: bool
+  created_at: timestamp @default(now())
+
+  belongs_to category: Category @foreign_key(category_id)
+  has_many items: OrderItem @foreign_key(product_id)
+  has_many reviews: Review @foreign_key(product_id)
+  many_to_many tags: Tag {
+    join_table: product_tags
+  }
+
+  index(category_id, created_at)
+  index(sku) @unique
+}
+
+entity Tag {
+  id: uuid @primary
+  name: string @unique @validate(min_len: 1, max_len: 30)
+  created_at: timestamp @default(now())
+
+  many_to_many products: Product {
+    join_table: product_tags
+  }
+}
+
+// Order lives in the billing Postgres schema and shows inline enum,
+// optional field, and renamed column.
+entity Order @schema(billing) {
+  id: uuid @primary
+  user_id: uuid
+  total_cents: int64 @validate(gte: 0)
+  status: OrderStatus @default(pending)
+  priority: enum(low, high) @default(low)
+  note: string?
+  created_at: timestamp @default(now())
+
+  belongs_to user: User @foreign_key(user_id)
+  has_many items: OrderItem @foreign_key(order_id)
+
+  index(user_id, created_at)
+  index(status)
+}
+
+entity OrderItem {
+  id: uuid @primary
+  order_id: uuid
+  product_id: uuid
+  quantity: int32 @validate(gte: 1)
+  price_cents: int64 @validate(gte: 0)
+
+  belongs_to order: Order @foreign_key(order_id) @on_delete(cascade)
+  belongs_to product: Product @foreign_key(product_id)
+
+  index(order_id)
+  index(product_id)
+}
+
+entity Review {
+  id: uuid @primary
+  product_id: uuid
+  user_id: uuid
+  rating: int32 @validate(gte: 1, lte: 5)
+  body: string @validate(min_len: 1, max_len: 500)
+  created_at: timestamp @default(now())
+
+  belongs_to product: Product @foreign_key(product_id) @on_delete(cascade)
+  belongs_to author: User @foreign_key(user_id) @on_delete(cascade)
+
+  index(product_id, created_at)
+  index(user_id, created_at)
+}
+
+// Checkout input DTO. Every string/numeric field carries @validate
+// (required by the validate-everything-in opinion for request types).
+// order embeds CreateOrderRequest, proving nested-message validation.
+message CreateOrderRequest {
+  user_id: uuid
+  coupon: string @validate(min_len: 1, max_len: 40)
+  total_cents: int64 @validate(gte: 0)
+}
+
+message CheckoutRequest {
+  order: CreateOrderRequest
+  gift_note: string @validate(max_len: 500)
+}
+
+// Returns-only DTO: exempt from request validation by design.
+message OrderReceipt {
+  order_id: uuid
+  total_cents: int64
+}
+
+service ShopService {
+  rpc ListProducts(category_id: uuid) -> Product {
+    http: GET "/products"
+    auth: required
+    paginated: true
+  }
+
+  rpc GetProduct(id: uuid) -> Product {
+    http: GET "/products/{id}"
+    auth: none
+  }
+
+  rpc CreateProduct(name: string @validate(min_len: 1, max_len: 200), price_cents: int64 @validate(gte: 0)) -> Product {
+    http: POST "/products"
+    auth: required(roles: { admin })
+    errors: { already_exists("product sku taken") }
+  }
+
+  rpc UpdateProduct(id: uuid, name: string @validate(min_len: 1, max_len: 200)) -> Product {
+    http: PUT "/products/{id}"
+    auth: required(roles: { admin })
+    errors: { not_found }
+  }
+
+  rpc PatchProduct(id: uuid, stock: int64 @validate(gte: 0)) -> Product {
+    http: PATCH "/products/{id}"
+    auth: required(roles: { admin })
+    errors: { not_found, invalid_argument("negative stock") }
+  }
+
+  rpc DeleteProduct(id: uuid) -> Product {
+    http: DELETE "/products/{id}"
+    auth: required(roles: { admin })
+    permission: check("product.delete", resource: Product, owner_field: category_id)
+    errors: { not_found, permission_denied("no access") }
+  }
+
+  rpc Checkout(req: CheckoutRequest) -> OrderReceipt {
+    http: POST "/orders/checkout"
+    auth: required
+    errors: { invalid_argument("bad coupon"), not_found, failed_precondition }
+  }
+
+  rpc GetOrder(id: uuid) -> Order {
+    http: GET "/orders/{id}"
+    auth: required
+  }
+
+  rpc ListOrders(user_id: uuid) -> Order {
+    http: GET "/orders"
+    auth: required
+    paginated: true
+  }
+}
+
+job SendConfirmation(order_id: uuid) {
+  queue: default
+  retry: max_attempts(3), backoff(exponential, base: 30s)
+}
+
+job ProcessOrder(order_id: uuid) {
+  queue: orders
+  retry: max_attempts(5), backoff(exponential, base: 10s)
+}
+
+job ReindexSearch() {
+  queue: low
+  retry: max_attempts(2), backoff(exponential, base: 60s)
+}
+
+job GenerateDailyReport() {
+  queue: low
+  retry: max_attempts(3), backoff(exponential, base: 60s)
+}
+
+schedule DailyReport {
+  cron: "0 9 * * *"
+  dispatch: GenerateDailyReport()
+}
+
+schedule HourlyReindex {
+  cron: "0 * * * *"
+  dispatch: ReindexSearch()
+}
