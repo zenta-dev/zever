@@ -1,0 +1,83 @@
+db:
+  adapter: sqlite
+  options:
+    path: data/showcase.db
+auth:
+  adapter: jwt
+log:
+  adapter: slog
+router:
+  adapter: stdhttp
+queue:
+  adapter: memory
+cache:
+  adapter: memory
+password:
+  adapter: argon2id
+payment:
+  adapter: stub
+billing:
+  adapter: stub
+geo:
+  adapter: static
+  options:
+    path: data/cities.json
+media:
+  adapter: local
+search:
+  adapter: sqlite
+vectorstore:
+  adapter: sqlite
+mailer:
+  adapter: log
+notification:
+  adapter: log
+webhook:
+  adapter: queue
+  options:
+    # Durations are integer nanoseconds in YAML files ("5s" style works via env only).
+    timeout: 10000000000 # 10s
+    maxretries: 3
+    queueadapter: memory
+    queueopts:
+      visibilitytimeout: 30000000000 # 30s, must exceed timeout
+      polltimeout: 1000000000 # 1s
+      buffer: 100
+    deadlettertopic: webhook.dead
+scheduler:
+  adapter: embedded
+idempotency:
+  adapter: memory
+lock:
+  adapter: memory
+session:
+  adapter: memory
+i18n:
+  adapter: embed
+flag:
+  adapter: static
+ratelimit:
+  adapter: memory
+  options:
+    rate: 100
+    burst: 200
+permission:
+  adapter: rbac
+tenant:
+  adapter: single
+storage:
+  adapter: local
+document:
+  adapter: local
+crypto:
+  adapter: local
+secrets:
+  adapter: env
+observability:
+  adapter: stdout
+analytics:
+  adapter: log
+eventbus:
+  adapter: memory
+workflow:
+  adapter: memory

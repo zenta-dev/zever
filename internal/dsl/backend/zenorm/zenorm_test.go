@@ -385,6 +385,111 @@ func TestGenerateSkipsUnresolvedRelationsWithoutError(t *testing.T) {
 	}
 }
 
+// TestGenerateNamedEnumEmitsTypeAndConsts proves a field referencing a
+// named enum generates a string-kind Go type plus typed constants --
+// without these, the Cols struct and entity struct would reference a Go
+// type no file defines and the generated package would not compile.
+func TestGenerateNamedEnumEmitsTypeAndConsts(t *testing.T) {
+	src := `enum Role {
+		admin, member
+	}
+
+	entity User {
+		id: uuid @primary
+		email: string @unique
+		role: Role @default(member)
+	}`
+
+	schema := compileSchema(t, src)
+
+	out, err := New().Generate(schema)
+	if err != nil {
+		t.Fatalf("Generate: %v", err)
+	}
+
+	path := "orm/gen/app/app.go"
+
+	content, ok := out[path]
+	if !ok {
+		t.Fatalf("Generate output missing %q, got keys %v", path, keys(out))
+	}
+
+	checkGolden(t, "named_enum", content)
+	validateGoSyntax(t, path, content)
+
+	got := string(content)
+	for _, want := range []string{
+		"type Role string",
+		`RoleAdmin  Role = "admin"`,
+		`RoleMember Role = "member"`,
+		"Role  orm.Column[User, Role]",
+		"Role  Role   `json:\"role\"`",
+	} {
+		if !strings.Contains(got, want) {
+			t.Fatalf("generated %s missing %q:\n%s", path, want, got)
+		}
+	}
+}
+
+// TestGenerateCrossModuleEnumRefEmitsValues proves a module referencing a
+// named enum declared in another module still gets that enum's type and
+// values (named enums are global): the emitting module resolves through
+// the schema-wide index, not just its own declarations.
+func TestGenerateCrossModuleEnumRefEmitsValues(t *testing.T) {
+	shop := parseNamed(t, "schema/shop/shop.zen", `entity Order {
+		id: uuid @primary
+		status: OrderStatus @default(pending)
+	}`)
+	billing := parseNamed(t, "schema/billing/billing.zen", `enum OrderStatus {
+		pending, paid
+	}`)
+
+	schema, diags := resolver.ResolveWithSchemaDir([]*ast.File{shop, billing}, "schema")
+	if diags.HasErrors() {
+		t.Fatalf("resolve errors: %v", diags)
+	}
+
+	out, err := New().Generate(schema)
+	if err != nil {
+		t.Fatalf("Generate: %v", err)
+	}
+
+	path := "orm/gen/shop/shop.go"
+
+	content, ok := out[path]
+	if !ok {
+		t.Fatalf("Generate output missing %q, got keys %v", path, keys(out))
+	}
+
+	validateGoSyntax(t, path, content)
+
+	got := string(content)
+	for _, want := range []string{
+		"type OrderStatus string",
+		`OrderStatusPending OrderStatus = "pending"`,
+		`OrderStatusPaid    OrderStatus = "paid"`,
+	} {
+		if !strings.Contains(got, want) {
+			t.Fatalf("generated %s missing %q:\n%s", path, want, got)
+		}
+	}
+}
+
+// parseNamed parses one named source string, failing the test on any
+// diagnostic.
+func parseNamed(t *testing.T, name, src string) *ast.File {
+	t.Helper()
+
+	p := dslparser.New(name, []byte(src))
+
+	file, diags := p.ParseFile()
+	if diags.HasErrors() {
+		t.Fatalf("parse errors in %s: %v", name, diags)
+	}
+
+	return file
+}
+
 func keys(m map[string][]byte) []string {
 	out := make([]string, 0, len(m))
 	for k := range m {

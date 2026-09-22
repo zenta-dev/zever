@@ -7,6 +7,22 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Added
+
+- `examples/showcase`: full-capability shop app exercising every DSL
+  feature in one schema (all scalars, named + inline enums, `?`, all four
+  relations, `@schema`, `@renamed_from`, messages, all verbs/auth shapes,
+  `errors:`, `paginated:`, job params, schedules) with generated output for
+  all six backends, runnable server/worker/seed, and tests.
+
+### Fixed
+
+- `zenorm` backend emitted references to named-enum Go types (e.g. `Role`)
+  without ever declaring them, so any schema using `enum Name {}` failed to
+  compile downstream. The backend now emits one string-kind type plus typed
+  constants per referenced enum, resolved through a schema-wide index so
+  cross-module references work too.
+
 ## [v0.1.2] - 2026-09-21
 
 - docs: add Astro Starlight site in docs/ with Laravel/RoR-structured guides deployed to GitHub Pages.
