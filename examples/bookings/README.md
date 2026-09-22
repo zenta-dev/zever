@@ -32,3 +32,37 @@ zero-infra defaults, not framework bugs (do not fix framework code):
 - db: `data/app.db` resolves relative to `examples/bookings/`; run doctor
   from that directory or after migrating.
 - webhook (queue variant): needs its queue reference, wired in a later PR.
+
+## Worker, seed, webhooks (this PR)
+
+Run from `examples/bookings/` so `zever.yaml` and `data/` resolve:
+
+1. Migrate: `zever db migrate --adapter=sqlite --dsn=data/bookings.db schema/bookings.zen`
+2. Seed (idempotent, safe to re-run): `go run ./db/seed`
+   - Creates demo host (`host@example.com`) + guest (`guest@example.com`),
+     two spaces, and one confirmed booking.
+3. Worker (jobs + embedded scheduler, one process over the shared memory
+   queue): `go run ./cmd/worker`
+   - Registers `SendConfirmation` (queue `default`) and `SendReminder`
+     (queue `low`), concurrency 4, graceful shutdown on SIGINT/SIGTERM.
+   - Embedded scheduler fires the `Reminder` cron (`0 9 * * *`) dispatching
+     `SendReminder`.
+   - `SendConfirmation` loads the booking, sends a mail receipt
+     (`mailer/log`) + guest push (`notification/log`), and delivers a
+     `booking.created` webhook event (skipped quietly when nobody
+     subscribes).
+   - `SendReminder` notifies guests of confirmed bookings starting within
+     7 days, notification only.
+
+### Webhook demo targets
+
+Two demo targets, `booking.created` and `booking.cancelled`, with
+per-target secrets from the environment (secrets/env adapter, never stored
+in `zever.yaml`):
+
+- `BOOKINGS_WEBHOOK_CREATED_TARGET` / `BOOKINGS_WEBHOOK_CREATED_SECRET`
+- `BOOKINGS_WEBHOOK_CANCELLED_TARGET` / `BOOKINGS_WEBHOOK_CANCELLED_SECRET`
+
+Empty target URLs are skipped, so the worker runs without them. Targets
+must be public HTTPS by default (`AllowPrivateTargets=false`); tests use
+`httptest` servers with the `AllowPrivateTargets` option.
