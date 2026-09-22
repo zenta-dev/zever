@@ -1,0 +1,106 @@
+// bookings.zen — bookings example schema.
+entity User {
+  id: uuid @primary
+  email: string @unique @validate(format: "email")
+  password_hash: string
+  created_at: timestamp @default(now())
+
+  has_many spaces: Space @foreign_key(host_id)
+  has_many bookings: Booking @foreign_key(guest_id)
+  has_many reviews: Review @foreign_key(guest_id)
+}
+
+entity Space {
+  id: uuid @primary
+  host_id: uuid
+  title: string @validate(min_len: 1, max_len: 200)
+  description: string
+  lat: float64
+  lng: float64
+  price_cents: int64
+  created_at: timestamp @default(now())
+
+  belongs_to host: User @foreign_key(host_id) @on_delete(cascade)
+  has_many bookings: Booking @foreign_key(space_id)
+  has_many reviews: Review @foreign_key(space_id)
+
+  index(host_id, created_at)
+}
+
+entity Booking {
+  id: uuid @primary
+  space_id: uuid
+  guest_id: uuid
+  start_date: string
+  end_date: string
+  status: string
+  created_at: timestamp @default(now())
+
+  belongs_to space: Space @foreign_key(space_id) @on_delete(cascade)
+  belongs_to guest: User @foreign_key(guest_id) @on_delete(cascade)
+
+  index(space_id, created_at)
+  index(guest_id, created_at)
+}
+
+entity Review {
+  id: uuid @primary
+  space_id: uuid
+  guest_id: uuid
+  rating: int64
+  body: string
+  created_at: timestamp @default(now())
+
+  belongs_to space: Space @foreign_key(space_id) @on_delete(cascade)
+  belongs_to guest: User @foreign_key(guest_id) @on_delete(cascade)
+
+  index(space_id, created_at)
+}
+
+service BookingService {
+  rpc CreateSpace(title: string, description: string, lat: float64, lng: float64, price_cents: int64) -> Space {
+    http: POST "/spaces"
+    auth: required
+  }
+
+  rpc ListSpaces() -> Space {
+    http: GET "/spaces"
+    auth: required
+  }
+
+  rpc GetSpace(id: uuid) -> Space {
+    http: GET "/spaces/{id}"
+    auth: required
+  }
+
+  rpc CreateBooking(space_id: uuid, start_date: string, end_date: string) -> Booking {
+    http: POST "/bookings"
+    auth: required
+  }
+
+  rpc CancelBooking(id: uuid) -> Booking {
+    http: DELETE "/bookings/{id}"
+    auth: required
+    permission: check("booking.cancel", resource: Booking, owner_field: guest_id)
+  }
+
+  rpc AddReview(space_id: uuid, rating: int64, body: string) -> Review {
+    http: POST "/reviews"
+    auth: required
+  }
+}
+
+job SendConfirmation() {
+  queue: default
+  retry: max_attempts(3), backoff(exponential, base: 30s)
+}
+
+job SendReminder() {
+  queue: low
+  retry: max_attempts(3), backoff(exponential, base: 30s)
+}
+
+schedule Reminder {
+  cron: "0 9 * * *"
+  dispatch: SendReminder()
+}
