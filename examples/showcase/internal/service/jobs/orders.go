@@ -69,9 +69,9 @@ func RunConfirmation(ctx context.Context, deps Deps, orderID string) error {
 	return nil
 }
 
-// ConfirmationHandler returns the job.Register-compatible handler for
+// HandleSendConfirmation returns the job.Register-compatible handler for
 // SendConfirmation.
-func ConfirmationHandler(deps Deps) func(ctx context.Context, args SendConfirmationArgs) error {
+func HandleSendConfirmation(deps Deps) func(ctx context.Context, args SendConfirmationArgs) error {
 	return func(ctx context.Context, args SendConfirmationArgs) error {
 		return RunConfirmation(ctx, deps, args.OrderID)
 	}
@@ -98,9 +98,9 @@ func RunProcessOrder(ctx context.Context, deps Deps, orderID string) error {
 	return nil
 }
 
-// ProcessOrderHandler returns the job.Register-compatible handler for
+// HandleProcessOrder returns the job.Register-compatible handler for
 // ProcessOrder.
-func ProcessOrderHandler(deps Deps) func(ctx context.Context, args ProcessOrderArgs) error {
+func HandleProcessOrder(deps Deps) func(ctx context.Context, args ProcessOrderArgs) error {
 	return func(ctx context.Context, args ProcessOrderArgs) error {
 		return RunProcessOrder(ctx, deps, args.OrderID)
 	}
@@ -116,9 +116,9 @@ func RunReindex(ctx context.Context, deps Deps) error {
 	return nil
 }
 
-// ReindexHandler returns the job.Register-compatible handler for
+// HandleReindexSearch returns the job.Register-compatible handler for
 // ReindexSearch.
-func ReindexHandler(deps Deps) func(ctx context.Context, args struct{}) error {
+func HandleReindexSearch(deps Deps) func(ctx context.Context, args struct{}) error {
 	return func(ctx context.Context, _ struct{}) error {
 		return RunReindex(ctx, deps)
 	}
@@ -134,9 +134,9 @@ func RunDailyReport(ctx context.Context, deps Deps) error {
 	return nil
 }
 
-// DailyReportHandler returns the job.Register-compatible handler for
+// HandleGenerateDailyReport returns the job.Register-compatible handler for
 // GenerateDailyReport.
-func DailyReportHandler(deps Deps) func(ctx context.Context, args struct{}) error {
+func HandleGenerateDailyReport(deps Deps) func(ctx context.Context, args struct{}) error {
 	return func(ctx context.Context, _ struct{}) error {
 		return RunDailyReport(ctx, deps)
 	}
