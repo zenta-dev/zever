@@ -1,11 +1,44 @@
 # Showcase example
 
-Shop 单体示例, built on the zever framework. Exercises every DSL
+Shop example built on the zever framework. Exercises every DSL
 capability in one schema: all eleven scalars, inline + named enums,
 optional fields, defaults, all four relation kinds, indexes, `@schema`,
 `@renamed_from`, messages (request + nested + returns), all HTTP verbs,
 every auth shape, permission checks, error sets, paginated RPCs, jobs with
 params, and schedules.
+
+## Wiring (CLI owns infra, developer owns logic)
+
+`cmd/server` mirrors `zever generate server`: HTTP (`:8080`) + gRPC
+(`:9090`) from one container, schema routes and services registered via
+generated `RegisterModule`, auth enforced identically on both transports
+(`GRPCPolicies` + `authz`). `cmd/worker` mirrors
+`zever generate worker`: one `job.Register` per declared job, one
+`sched.Schedule` per schedule. Byte-delta vs generator output is limited
+to: module path, the marked `/api` mount block + `q`/`i18n`/`flags`/`hasher`
+resolves, `net.ListenConfig` (repo noctx lint), `svcImpl` Deps construction
+in server; Deps prelude + Logger + queue order in worker.
+
+Business logic lives in exactly one place:
+`internal/service/shop/shop_service.go` (`ShopServiceImpl`, 9 RPCs).
+The `/api/*` routes are thin adapters over the same impl (richer shapes:
+register/login, item lists), and `ContextWithSubject` threads the JWT
+subject into impl context (generated wrappers supply `authz` claims
+instead). Write logic once; both transports share it.
+
+## Regenerating
+
+CLI-owned, regenerate anytime: `generated/` (via `zever compile` from repo
+root), `internal/api/testdata/schema.sql` (via `zever db migrate --dry-run`),
+entrypoint structure (`cmd/server`, `cmd/worker` — regenerate in a scratch
+project with `go.mod` since examples carry none, then copy).
+Hand-owned, never overwritten: `internal/app/app.go` (adapter selection, JWT
+gate, i18n/permission runtime defaults), `internal/service/shop/shop_service.go`
+(9 RPC bodies), `internal/service/jobs/*` bodies (Deps-closure = filled-in stub
+form), `internal/service/seed/seed.go` bodies, `internal/api/*` rich shapes,
+schema, `zever.yaml`, locales/fixtures, tests.
+`db/seed/main.go` intentionally bypasses `app.New()` (`config.Load` directly)
+so seeding needs no JWT secret.
 
 ## Layout
 
@@ -17,10 +50,13 @@ params, and schedules.
   (run from the root so gogen/protogogen import paths resolve).
 - `internal/api/testdata/schema.sql` — DDL extracted from
   `zever db migrate --dry-run --adapter=sqlite`.
-- `internal/api/` — hand-written routes (register/login, products,
-  checkout, reviews) with auth, rbac, ratelimit, queue, i18n, flag.
+- `internal/api/` — `/api/*` adapters over the same impl (register/login,
+  item-list checkout, reviews) with auth, rbac, ratelimit, queue, i18n, flag.
+- `internal/service/shop/` — `ShopServiceImpl`: the single business-logic
+  home all transports share (+ cross-transport parity tests).
 - `internal/service/seed/` — idempotent demo data via the zenorm backend.
-- `internal/service/jobs/` — one handler per declared job.
+- `internal/service/jobs/` — one `Handle*` handler per declared job
+  (`generate worker` naming).
 - `zever.yaml` — explicit zero-infra service adapters.
 - `data/` — local sqlite path (git-kept empty) + static geo fixture.
 
@@ -58,7 +94,7 @@ Run from `examples/showcase/` so `zever.yaml` and `data/` resolve.
 
 1. Migrate: `zever db migrate --adapter=sqlite --dsn=data/showcase.db schema/shop/shop.zen`
 2. Seed (idempotent): `go run ./db/seed`
-3. Serve: `go run ./cmd/server`
+3. Serve (HTTP `:8080` + gRPC `:9090`): `go run ./cmd/server`
 4. Worker (jobs + embedded scheduler): `go run ./cmd/worker`
 
 ## CLI tour (all read-only except compile)

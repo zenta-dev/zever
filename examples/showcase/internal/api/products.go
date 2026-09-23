@@ -10,6 +10,8 @@ import (
 	"github.com/google/uuid"
 
 	"github.com/zenta-dev/zever/permission"
+
+	genshop "github.com/zenta-dev/zever/examples/showcase/generated/gogen/shop"
 )
 
 type productRequest struct {
@@ -94,7 +96,8 @@ func (a *API) handleCreateProduct(w http.ResponseWriter, req *http.Request) {
 	writeJSON(w, http.StatusCreated, map[string]string{"id": id, "message": a.productMessage(ctx, req, in.Headline, in.PriceCents)})
 }
 
-// handleListProducts returns products, rate-limited per caller.
+// handleListProducts returns products, rate-limited per caller. Thin
+// adapter over the shared impl; the JSON shape is unchanged.
 func (a *API) handleListProducts(w http.ResponseWriter, req *http.Request) {
 	ctx := req.Context()
 	if a.Ratelimit != nil {
@@ -105,58 +108,28 @@ func (a *API) handleListProducts(w http.ResponseWriter, req *http.Request) {
 		}
 	}
 
-	rows, err := a.DB.Query(ctx, `SELECT id, category_id, sku, headline, description, price_cents, stock, weight, featured, created_at FROM products ORDER BY created_at LIMIT 50`)
+	resp, err := a.shopService().ListProducts(shopReq(req).Context(), &genshop.ListProductsRequest{}, "", 0) //nolint:contextcheck // subject deliberately derived into the impl context.
 	if err != nil {
-		writeError(w, http.StatusInternalServerError, "lookup failed")
+		writeServiceError(w, err)
 		return
 	}
-	defer func() { _ = rows.Close() }()
-
 	out := []productResponse{}
-	for rows.Next() {
-		var p productResponse
-		var featured int
-		if err := rows.Scan(&p.ID, &p.CategoryID, &p.SKU, &p.Headline, &p.Description, &p.PriceCents, &p.Stock, &p.Weight, &featured, &p.CreatedAt); err != nil {
-			writeError(w, http.StatusInternalServerError, "scan failed")
-			return
-		}
-		p.Featured = featured != 0
-		out = append(out, p)
-	}
-	if err := rows.Err(); err != nil {
-		writeError(w, http.StatusInternalServerError, "lookup failed")
-		return
+	for _, p := range resp.Items {
+		out = append(out, productToResponse(p))
 	}
 	writeJSON(w, http.StatusOK, out)
 }
 
-// handleGetProduct returns one product. Public in the schema (auth: none);
-// the route stays behind withAuth here because this server scopes every
-// /api route to authenticated callers.
+// handleGetProduct returns one product. Thin adapter over the shared impl.
+// Public in the schema (auth: none); the route stays behind withAuth here
+// because this server scopes every /api route to authenticated callers.
 func (a *API) handleGetProduct(w http.ResponseWriter, req *http.Request) {
-	ctx := req.Context()
-	id := req.PathValue("id")
-	rows, err := a.DB.Query(ctx, `SELECT id, category_id, sku, headline, description, price_cents, stock, weight, featured, created_at FROM products WHERE id = ?`, id)
+	p, err := a.shopService().GetProduct(shopReq(req).Context(), &genshop.GetProductRequest{Id: req.PathValue("id")}) //nolint:contextcheck // subject deliberately derived into the impl context.
 	if err != nil {
-		writeError(w, http.StatusInternalServerError, "lookup failed")
+		writeServiceError(w, err)
 		return
 	}
-	var p productResponse
-	var featured int
-	if rows.Next() {
-		if err := rows.Scan(&p.ID, &p.CategoryID, &p.SKU, &p.Headline, &p.Description, &p.PriceCents, &p.Stock, &p.Weight, &featured, &p.CreatedAt); err != nil {
-			_ = rows.Close()
-			writeError(w, http.StatusInternalServerError, "scan failed")
-			return
-		}
-	} else {
-		_ = rows.Close()
-		writeError(w, http.StatusNotFound, "not found")
-		return
-	}
-	_ = rows.Close()
-	p.Featured = featured != 0
-	writeJSON(w, http.StatusOK, p)
+	writeJSON(w, http.StatusOK, productToResponse(p))
 }
 
 type updateProductRequest struct {
@@ -197,7 +170,9 @@ type patchProductRequest struct {
 	Stock *int64 `json:"stock"`
 }
 
-// handlePatchProduct adjusts stock only (PATCH semantics).
+// handlePatchProduct adjusts stock only (PATCH semantics). Thin adapter:
+// admin gate and input validation stay here, the stock write lives in the
+// shared impl.
 func (a *API) handlePatchProduct(w http.ResponseWriter, req *http.Request) {
 	if !a.isAdmin(req) {
 		writeError(w, http.StatusForbidden, "admin only")
@@ -208,19 +183,9 @@ func (a *API) handlePatchProduct(w http.ResponseWriter, req *http.Request) {
 		writeError(w, http.StatusBadRequest, "stock required")
 		return
 	}
-	if *in.Stock < 0 {
-		writeError(w, http.StatusBadRequest, "negative stock")
-		return
-	}
-	ctx := req.Context()
 	id := req.PathValue("id")
-	n, err := a.DB.Exec(ctx, `UPDATE products SET stock = ? WHERE id = ?`, *in.Stock, id)
-	if err != nil {
-		writeError(w, http.StatusInternalServerError, "update failed")
-		return
-	}
-	if n == 0 {
-		writeError(w, http.StatusNotFound, "not found")
+	if _, err := a.shopService().PatchProduct(shopReq(req).Context(), &genshop.PatchProductRequest{Id: id, Stock: *in.Stock}); err != nil { //nolint:contextcheck // subject deliberately derived into the impl context.
+		writeServiceError(w, err)
 		return
 	}
 	writeJSON(w, http.StatusOK, map[string]string{"id": id})
@@ -262,11 +227,30 @@ func (a *API) handleDeleteProduct(w http.ResponseWriter, req *http.Request) {
 		}
 	}
 
-	if _, err := a.DB.Exec(ctx, `DELETE FROM products WHERE id = ?`, id); err != nil {
-		writeError(w, http.StatusInternalServerError, "delete failed")
+	if _, err := a.shopService().DeleteProduct(shopReq(req).Context(), &genshop.DeleteProductRequest{Id: id}); err != nil { //nolint:contextcheck // subject deliberately derived into the impl context.
+		writeServiceError(w, err)
 		return
 	}
 	writeJSON(w, http.StatusOK, map[string]string{"id": id})
+}
+
+// productToResponse maps a wire product onto the /api JSON shape.
+func productToResponse(p *genshop.Product) productResponse {
+	out := productResponse{
+		ID:          p.GetId(),
+		CategoryID:  p.GetCategoryId(),
+		SKU:         p.GetSku(),
+		Headline:    p.GetHeadline(),
+		Description: p.GetDescription(),
+		PriceCents:  p.GetPriceCents(),
+		Stock:       p.GetStock(),
+		Weight:      p.GetWeight(),
+		Featured:    p.GetFeatured(),
+	}
+	if ts := p.GetCreatedAt(); ts != nil {
+		out.CreatedAt = ts.AsTime().UTC().Format(time.RFC3339Nano)
+	}
+	return out
 }
 
 // roleOf returns the caller's users.role, or "" when unknown.

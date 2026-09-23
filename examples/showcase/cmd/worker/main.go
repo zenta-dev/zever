@@ -1,36 +1,27 @@
 // Command worker runs the showcase background job worker and its embedded
 // scheduler in one process.
 //
-// Hand-written to match the `zever generate worker` shape (one
-// job.Register per job declared in schema/shop/shop.zen, one scheduler
-// entry per declared schedule). The scheduler dispatches onto the queue and
-// the worker consumes from it, so both share one queue: with the
-// in-process memory adapter that means one process.
+// Scaffolded to match the `zever generate worker` shape (see the canonical
+// generator output): the scheduler dispatches onto the queue and the worker
+// consumes from it, so both must share one queue: with the in-process memory
+// adapter that means one process. Swapping the queue adapter for redis/nats
+// in zever.yaml is what makes this distributable, with no code change here.
+//
+// Unlike the canonical stubs (which take no deps), the handlers here close
+// over jobs.Deps, which is the filled-in stub form.
 package main
 
 import (
 	"context"
 	"encoding/json"
-	"fmt"
 	"os"
 	"os/signal"
 	"syscall"
 	"time"
 
-	"github.com/zenta-dev/zever/config"
-	"github.com/zenta-dev/zever/container"
+	"github.com/zenta-dev/zever/examples/showcase/internal/app"
 	"github.com/zenta-dev/zever/examples/showcase/internal/service/jobs"
 	"github.com/zenta-dev/zever/job"
-
-	// Blank imports register the adapters selected in zever.yaml.
-	_ "github.com/zenta-dev/zever/cache/memory"
-	_ "github.com/zenta-dev/zever/db/sqlite"
-	_ "github.com/zenta-dev/zever/log/slog"
-	_ "github.com/zenta-dev/zever/mailer/log"
-	_ "github.com/zenta-dev/zever/notification/log"
-	_ "github.com/zenta-dev/zever/password/argon2"
-	_ "github.com/zenta-dev/zever/queue/memory"
-	_ "github.com/zenta-dev/zever/scheduler/embedded"
 )
 
 const (
@@ -46,11 +37,10 @@ func main() {
 }
 
 func run() error {
-	cfg, err := config.Load("")
+	c, err := app.New()
 	if err != nil {
-		return fmt.Errorf("[worker] load config: %w", err)
+		return err
 	}
-	c := container.New(cfg)
 
 	ctx, stop := signal.NotifyContext(context.Background(), os.Interrupt, syscall.SIGTERM)
 	defer stop()
@@ -83,19 +73,19 @@ func run() error {
 
 	deps := jobs.Deps{DB: database, Mailer: mailerSvc, Notifier: notifier, Logger: logger}
 
-	// One handler per job declared in the schema. A job that is not
-	// registered in this process is never executed, so keep this list in
-	// step with the schema.
-	if regErr := job.Register("SendConfirmation", jobs.ConfirmationHandler(deps)); regErr != nil {
+	// One handler per job declared in the schema, implemented in
+	// internal/service/jobs. A job that is not registered in this process is
+	// never executed, so keep this list in step with the schema.
+	if regErr := job.Register("GenerateDailyReport", jobs.HandleGenerateDailyReport(deps)); regErr != nil {
 		return regErr
 	}
-	if regErr := job.Register("ProcessOrder", jobs.ProcessOrderHandler(deps)); regErr != nil {
+	if regErr := job.Register("ProcessOrder", jobs.HandleProcessOrder(deps)); regErr != nil {
 		return regErr
 	}
-	if regErr := job.Register("ReindexSearch", jobs.ReindexHandler(deps)); regErr != nil {
+	if regErr := job.Register("ReindexSearch", jobs.HandleReindexSearch(deps)); regErr != nil {
 		return regErr
 	}
-	if regErr := job.Register("GenerateDailyReport", jobs.DailyReportHandler(deps)); regErr != nil {
+	if regErr := job.Register("SendConfirmation", jobs.HandleSendConfirmation(deps)); regErr != nil {
 		return regErr
 	}
 
@@ -109,11 +99,12 @@ func run() error {
 		return err
 	}
 
-	// Schedule DailyReport: every day at 09:00, dispatch GenerateDailyReport.
+	// schedule DailyReport
 	if _, err := sched.Schedule(ctx, "0 9 * * *", "GenerateDailyReport", json.RawMessage(`{}`)); err != nil {
 		return err
 	}
-	// Schedule HourlyReindex: every hour, dispatch ReindexSearch.
+
+	// schedule HourlyReindex
 	if _, err := sched.Schedule(ctx, "0 * * * *", "ReindexSearch", json.RawMessage(`{}`)); err != nil {
 		return err
 	}
