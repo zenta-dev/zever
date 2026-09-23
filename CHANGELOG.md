@@ -7,6 +7,38 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Fixed
+
+- Naming and consistency pass (breaking where noted): canonical `EventBus`
+  (`Eventbus` alias retained) and `RateLimit` (`Ratelimit` alias retained)
+  accessors; `ErrDuplicateAdapter` canonical sentinel with `ErrDuplicate`
+  compatibility alias in `queue`/`cache`/`log`; `CloseTimeoutError.Unwrap`
+  now joins `ErrCloseTimeout` so `errors.Is` matches; `queue`/`cache`
+  invalid-adapter text built from the sentinel; `log` error text no longer
+  embeds `.Error()` calls; `session/cookie.Config` renamed to `Options`
+  (`Config` alias retained); `internal/s3opts.Config` renamed to `Options`
+  (`Config` alias retained); explicit `json`/`toml`/`yaml` tags on
+  `ai`/`db`/`auth`/`cache`/`queue`/`log` top-level `Options`; unified
+  `Validate` doc phrasing; `secrets` env-prefix exception documented in
+  `config/README.md` and `secrets/doc.go`; CLI separator standard
+  documented with `check:boundaries` alias for `check-boundaries`; DSL
+  `datetime` alias for `timestamp`; predecessor-comparison comments
+  de-branded.
+
+### Changed
+
+- **Breaking:** predecessor `zengo` wire namespace renamed to `zever`
+  across the DSL codegen backends: proto package `zengo.*.v1` →
+  `zever.*.v1`, `go_package` `gen/zengo/...` → `gen/zever/...`, companion
+  import `zengo/annotations.proto` → `zever/annotations.proto`, extension
+  options `zengo.annotations.v1.*` → `zever.annotations.v1.*`, gRPC method
+  prefixes `/zengo.v1/*` → `/zever.v1/*`, and gogen default import paths
+  `<root>/zengov1`, `<root>/zengo/<module>` → `<root>/zeverv1`,
+  `<root>/zever/<module>`. All committed goldens and example outputs
+  regenerated. `storage/local` env switch `ZENGO_ENV` → `ZEVER_ENV`.
+  Historical release notes and absence-guard tests still reference the old
+  name intentionally.
+
 ## [v0.2.0] - 2026-09-23
 
 ### Added

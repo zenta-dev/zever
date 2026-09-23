@@ -32,7 +32,7 @@ cached state clears so the next call retries.
 | crypto | `Crypto()` | |
 | db | `DB()` | plus `Transactor()` helper |
 | document | `Document()` | |
-| eventbus | `Eventbus()` | |
+| eventbus | `EventBus()` (`Eventbus()` alias) | |
 | flag | `Flag()` | |
 | geo | `Geo()` | |
 | grpc | `GRPC(opts...)` | lazy `*grpc.Server` singleton, no registry |
@@ -49,7 +49,7 @@ cached state clears so the next call retries.
 | payment | `Payment()` | |
 | permission | `Permission()` | |
 | queue | `Queue()` | leaf dependency, closed last |
-| ratelimit | `Ratelimit()` | |
+| ratelimit | `RateLimit()` (`Ratelimit()` alias) | |
 | router | `Router()` | |
 | scheduler | `Scheduler()` | shares `Queue` (via `Job()`), closed first |
 | search | `Search()` | |
@@ -98,6 +98,13 @@ Details:
   then `Close() error`, then `Stop() error` (the scheduler declares
   `Stop() error` instead of `Close`), then no-op nil (for example
   `*job.Dispatcher`, which has no shutdown method).
+- Close-shape standard: pooled or network-backed top-level services that
+  may block on shutdown take `Close(ctx)` (`db`, `cache`, `storage`,
+  `lock`, `container` itself); lightweight handles, iterators, statements,
+  and instant-close in-memory adapters take `Close()` (`auth`, `queue`,
+  `session`, `payment`, `eventbus.Pusher`, `ratelimit.Limiter`, `db.Rows`,
+  `db.Stmt`); the scheduler alone uses `Stop()` for its cron lifecycle.
+  `closeAny` probes in that order so callers never guess.
 - Shared instances close once: pointer-identity dedup keeps a `keepAlive`
   set for the duration of `Close` so an address cannot be reclaimed and
   reused mid-shutdown.
@@ -122,4 +129,6 @@ Every `go test ./container/` run ends with `goleak.VerifyTestMain`: no
 goroutine may outlive the package tests. Resolve the in-memory subset and
 `Close` it; per-service timeout goroutines always observe their deadline
 and exit. Keep timeout-test blocks short (parent deadline ~100ms, block
-~500ms) and let the straggler finish before the test returns.
+~500ms) and let the straggler finish before the test returns. Sanctioned
+exception: timeout-path tests using `ignoreCtx` stubs sleep past the
+stub's block in teardown only (never for sync) so goleak stays clean.

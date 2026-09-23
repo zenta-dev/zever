@@ -37,12 +37,12 @@ type RedisOptions struct {
 // Options configures cache backend selection and backend-specific settings.
 type Options struct {
 	// Adapter selects the cache backend to open.
-	Adapter Adapter
+	Adapter Adapter `json:"adapter" toml:"adapter" yaml:"adapter"`
 	// Capacity hints at the expected number of cache entries.
-	Capacity int
+	Capacity int `json:"capacity" toml:"capacity" yaml:"capacity"`
 
 	// Verbose enables additional diagnostic output.
-	Verbose bool
+	Verbose bool `json:"verbose" toml:"verbose" yaml:"verbose"`
 
 	// MemoryOptions holds in-memory backend settings.
 	MemoryOptions

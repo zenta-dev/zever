@@ -50,7 +50,7 @@ func hintFor(cmd string) string {
 		return "next: zever compile schema/*.zen --backend=proto,zenorm"
 	case "fmt":
 		return "next: zever check schema/*.zen"
-	case "check-boundaries":
+	case "check-boundaries", "check:boundaries":
 		return "tip: keep modules isolated — move shared entities to their own module"
 	case "db migrate":
 		return "next: zever db seed  •  or zever serve"

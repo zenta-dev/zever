@@ -8,8 +8,11 @@ import (
 // ErrNilFactory is returned when an adapter factory is nil.
 var ErrNilFactory = errors.New("log: nil factory")
 
-// ErrDuplicate is returned on duplicate adapter registration.
-var ErrDuplicate = errors.New("log: duplicate registration")
+// ErrDuplicateAdapter is returned on duplicate adapter registration.
+var ErrDuplicateAdapter = errors.New("log: duplicate registration")
+
+// ErrDuplicate aliases ErrDuplicateAdapter for compatibility.
+var ErrDuplicate = ErrDuplicateAdapter
 
 // ErrUnknownAdapter is returned for an unregistered adapter.
 var ErrUnknownAdapter = errors.New("log: unknown adapter")
@@ -28,11 +31,11 @@ type DuplicateError struct {
 
 // Error returns a human-readable description of the duplicate registration.
 func (e *DuplicateError) Error() string {
-	return fmt.Sprintf("%s: %s", ErrDuplicate.Error(), e.Adapter.String())
+	return fmt.Sprintf("%s: %s", ErrDuplicateAdapter, e.Adapter.String())
 }
 
-// Unwrap returns ErrDuplicate for errors.Is matching.
-func (e *DuplicateError) Unwrap() error { return ErrDuplicate }
+// Unwrap returns ErrDuplicateAdapter for errors.Is matching.
+func (e *DuplicateError) Unwrap() error { return ErrDuplicateAdapter }
 
 // UnknownAdapterError reports an Open for an unregistered adapter.
 type UnknownAdapterError struct {
@@ -42,7 +45,7 @@ type UnknownAdapterError struct {
 
 // Error returns a human-readable description of the unknown adapter.
 func (e *UnknownAdapterError) Error() string {
-	return fmt.Sprintf("%s: %s", ErrUnknownAdapter.Error(), e.Adapter.String())
+	return fmt.Sprintf("%s: %s", ErrUnknownAdapter, e.Adapter.String())
 }
 
 // Unwrap returns ErrUnknownAdapter for errors.Is matching.
@@ -56,7 +59,7 @@ type InvalidLevelError struct {
 
 // Error returns a human-readable description of the invalid level.
 func (e *InvalidLevelError) Error() string {
-	return fmt.Sprintf("%s: %q", ErrInvalidLevel.Error(), e.Level)
+	return fmt.Sprintf("%s: %q", ErrInvalidLevel, e.Level)
 }
 
 // Unwrap returns ErrInvalidLevel for errors.Is matching.
@@ -70,7 +73,7 @@ type InvalidAdapterError struct {
 
 // Error returns a human-readable description of the invalid adapter.
 func (e *InvalidAdapterError) Error() string {
-	return fmt.Sprintf("%s: %q", ErrInvalidAdapter.Error(), e.Adapter)
+	return fmt.Sprintf("%s: %q", ErrInvalidAdapter, e.Adapter)
 }
 
 // Unwrap returns ErrInvalidAdapter for errors.Is matching.

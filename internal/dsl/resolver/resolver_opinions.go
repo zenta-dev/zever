@@ -126,7 +126,7 @@ func validateFieldsIn(
 // secure" decision (secure-by-default: an operation with no Auth/Permission
 // policy fails to compile). The diagnostic wraps ErrMissingAuth at the
 // default SeverityError, same as every other resolver diagnostic, so
-// diag.List.HasErrors() reports true and zengo compile fails.
+// diag.List.HasErrors() reports true and zever compile fails.
 func secureEverything(schema *ir.Schema) diag.List {
 	var diags diag.List
 

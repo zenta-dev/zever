@@ -94,7 +94,7 @@ func New(opts storage.Options) (storage.Storage, error) {
 	_ = os.Chmod(root, rootPerm)
 
 	if secret == "" {
-		if env := os.Getenv("ZENGO_ENV"); env == "production" || env == "prod" {
+		if env := os.Getenv("ZEVER_ENV"); env == "production" || env == "prod" {
 			return nil, fmt.Errorf("local: option %q is required in production (secret must be explicit)", "secret")
 		}
 

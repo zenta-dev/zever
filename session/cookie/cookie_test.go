@@ -10,7 +10,7 @@ import (
 func TestNew_defaultConfig_isSecureByDefault(t *testing.T) {
 	t.Parallel()
 
-	c := New("sess-id", Config{})
+	c := New("sess-id", Options{})
 
 	if c.Value != "sess-id" {
 		t.Fatalf("Value = %q, want %q", c.Value, "sess-id")
@@ -38,7 +38,7 @@ func TestNew_explicitOverrides_areRespected(t *testing.T) {
 	insecure := false
 	notHTTPOnly := false
 
-	c := New("sess-id", Config{
+	c := New("sess-id", Options{
 		Name:     "sid",
 		Path:     "/app",
 		Domain:   "example.com",
@@ -72,7 +72,7 @@ func TestNew_explicitSecureTrue_isRespected(t *testing.T) {
 
 	secure := true
 
-	c := New("sess-id", Config{Secure: &secure})
+	c := New("sess-id", Options{Secure: &secure})
 	if !c.Secure {
 		t.Fatal("Secure = false, want explicit true to be respected")
 	}
@@ -81,7 +81,7 @@ func TestNew_explicitSecureTrue_isRespected(t *testing.T) {
 func TestNew_zeroMaxAge_isSessionCookie(t *testing.T) {
 	t.Parallel()
 
-	c := New("sess-id", Config{})
+	c := New("sess-id", Options{})
 
 	if c.MaxAge != 0 {
 		t.Fatalf("MaxAge = %d, want 0 (session cookie)", c.MaxAge)
@@ -95,7 +95,7 @@ func TestNew_explicitMaxAge_setsExpires(t *testing.T) {
 	t.Parallel()
 
 	before := time.Now()
-	c := New("sess-id", Config{MaxAge: 3600})
+	c := New("sess-id", Options{MaxAge: 3600})
 	after := time.Now()
 
 	if c.MaxAge != 3600 {
@@ -115,7 +115,7 @@ func TestNew_explicitMaxAge_setsExpires(t *testing.T) {
 func TestNew_negativeMaxAge_deletesImmediately(t *testing.T) {
 	t.Parallel()
 
-	c := New("sess-id", Config{MaxAge: -1})
+	c := New("sess-id", Options{MaxAge: -1})
 
 	if c.MaxAge != -1 {
 		t.Fatalf("MaxAge = %d, want -1", c.MaxAge)
@@ -132,7 +132,7 @@ func TestSet_writesSetCookieHeader(t *testing.T) {
 	t.Parallel()
 
 	rec := httptest.NewRecorder()
-	Set(rec, "sess-id", Config{})
+	Set(rec, "sess-id", Options{})
 
 	res := rec.Result()
 	defer res.Body.Close()

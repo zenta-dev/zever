@@ -1,10 +1,10 @@
 syntax = "proto3";
 
-package zengo.v1;
+package zever.v1;
 
-import "zengo/annotations.proto";
+import "zever/annotations.proto";
 
-option go_package = "github.com/zenta-dev/zever/gen/zengov1;zengov1";
+option go_package = "github.com/zenta-dev/zever/gen/zeverv1;zeverv1";
 
 message Order {
   string id = 1;
@@ -16,7 +16,7 @@ message GetOrderRequest {
 
 service OrderService {
   rpc GetOrder(GetOrderRequest) returns (Order) {
-    option (zengo.annotations.v1.auth) = { required: true };
-    option (zengo.annotations.v1.errors) = { cases: [{ code: "NOT_FOUND" }, { code: "INVALID_ARGUMENT", message: "email is malformed" }] };
+    option (zever.annotations.v1.auth) = { required: true };
+    option (zever.annotations.v1.errors) = { cases: [{ code: "NOT_FOUND" }, { code: "INVALID_ARGUMENT", message: "email is malformed" }] };
   }
 }

@@ -58,7 +58,7 @@ const (
 // the same precedence, searched in the working directory.
 //
 // Adaptation note: TOML is gone. zever's config package decodes YAML and
-// JSON only, so the project pass matches it (zengo supported zengo.toml;
+// JSON only, so the project pass matches it (the predecessor supported a TOML project file;
 // there is no zever.toml).
 var projectDiscoveryOrder = []string{"zever.yaml", "zever.yml", "zever.json"}
 

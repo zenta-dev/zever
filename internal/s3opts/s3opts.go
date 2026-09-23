@@ -25,19 +25,22 @@ var (
 	ErrInvalidRegion      = errors.New("s3opts: invalid region")
 )
 
-type Config struct {
-	Endpoint        string
-	Region          string
-	Bucket          string
-	AccessKeyID     string
-	SecretAccessKey string
+type Options struct {
+	Endpoint        string `json:"endpoint" toml:"endpoint" yaml:"endpoint"`
+	Region          string `json:"region" toml:"region" yaml:"region"`
+	Bucket          string `json:"bucket" toml:"bucket" yaml:"bucket"`
+	AccessKeyID     string `json:"accesskeyid" toml:"accesskeyid" yaml:"accesskeyid"`
+	SecretAccessKey string `json:"secretaccesskey" toml:"secretaccesskey" yaml:"secretaccesskey"`
 }
 
-func (c Config) WithDefaults(defaultRegion string) Config {
+// Config aliases Options for compatibility.
+type Config = Options
+
+func (c Options) WithDefaults(defaultRegion string) Options {
 	if defaultRegion == "" {
 		defaultRegion = DefaultRegion
 	}
-	out := Config{
+	out := Options{
 		Endpoint:        strings.TrimSpace(c.Endpoint),
 		Region:          strings.TrimSpace(c.Region),
 		Bucket:          strings.TrimSpace(c.Bucket),
@@ -50,14 +53,14 @@ func (c Config) WithDefaults(defaultRegion string) Config {
 	return out
 }
 
-func (c Config) ValidateBucket() error {
+func (c Options) ValidateBucket() error {
 	if strings.TrimSpace(c.Bucket) == "" {
 		return ErrMissingBucket
 	}
 	return nil
 }
 
-func (c Config) ValidateCredentials() error {
+func (c Options) ValidateCredentials() error {
 	if strings.TrimSpace(c.AccessKeyID) == "" || strings.TrimSpace(c.SecretAccessKey) == "" {
 		return ErrMissingCredentials
 	}
@@ -90,7 +93,7 @@ func validateURL(value string) error {
 	return nil
 }
 
-func (c Config) ValidateEndpoint() error {
+func (c Options) ValidateEndpoint() error {
 	v := strings.TrimSpace(c.Endpoint)
 	if v == "" {
 		return nil
@@ -98,7 +101,7 @@ func (c Config) ValidateEndpoint() error {
 	return validateURL(v)
 }
 
-func (c Config) ValidateRegion() error {
+func (c Options) ValidateRegion() error {
 	r := strings.TrimSpace(c.Region)
 	if r == "" {
 		return fmt.Errorf("%w: region is required", ErrInvalidRegion)
@@ -109,7 +112,7 @@ func (c Config) ValidateRegion() error {
 	return nil
 }
 
-func (c Config) Validate(requireBucket, requireCredentials bool) error {
+func (c Options) Validate(requireBucket, requireCredentials bool) error {
 	var errs []error
 	if err := c.ValidateEndpoint(); err != nil {
 		errs = append(errs, err)
@@ -132,18 +135,18 @@ func (c Config) Validate(requireBucket, requireCredentials bool) error {
 
 var coreNewClient = s3core.NewClient
 
-func NewClient(ctx context.Context, prefix string, cfg Config, urlBase string) (*s3.Client, *s3.PresignClient, error) {
+func NewClient(ctx context.Context, prefix string, cfg Options, urlBase string) (*s3.Client, *s3.PresignClient, error) {
 	region := cfg.Region
 	if region == "" {
 		region = DefaultRegion
 	}
 	endpoint := strings.TrimSpace(cfg.Endpoint)
 	trimBase := strings.TrimSpace(urlBase)
-	check := Config{Endpoint: endpoint, Region: region}
+	check := Options{Endpoint: endpoint, Region: region}
 	if err := check.ValidateEndpoint(); err != nil {
 		return nil, nil, fmt.Errorf("[%s] endpoint: %w", prefix, err)
 	}
-	regCheck := Config{Region: region}
+	regCheck := Options{Region: region}
 	if err := regCheck.ValidateRegion(); err != nil {
 		return nil, nil, fmt.Errorf("[%s] region: %w", prefix, err)
 	}

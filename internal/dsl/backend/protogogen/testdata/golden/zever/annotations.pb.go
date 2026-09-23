@@ -2,7 +2,7 @@
 // versions:
 // 	protoc-gen-go v1.36.12
 // 	protoc        (unknown)
-// source: zengo/annotations.proto
+// source: zever/annotations.proto
 
 package annotationsv1
 
@@ -32,7 +32,7 @@ type Auth struct {
 
 func (x *Auth) Reset() {
 	*x = Auth{}
-	mi := &file_zengo_annotations_proto_msgTypes[0]
+	mi := &file_zever_annotations_proto_msgTypes[0]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -44,7 +44,7 @@ func (x *Auth) String() string {
 func (*Auth) ProtoMessage() {}
 
 func (x *Auth) ProtoReflect() protoreflect.Message {
-	mi := &file_zengo_annotations_proto_msgTypes[0]
+	mi := &file_zever_annotations_proto_msgTypes[0]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -57,7 +57,7 @@ func (x *Auth) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use Auth.ProtoReflect.Descriptor instead.
 func (*Auth) Descriptor() ([]byte, []int) {
-	return file_zengo_annotations_proto_rawDescGZIP(), []int{0}
+	return file_zever_annotations_proto_rawDescGZIP(), []int{0}
 }
 
 func (x *Auth) GetRequired() bool {
@@ -85,7 +85,7 @@ type Permission struct {
 
 func (x *Permission) Reset() {
 	*x = Permission{}
-	mi := &file_zengo_annotations_proto_msgTypes[1]
+	mi := &file_zever_annotations_proto_msgTypes[1]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -97,7 +97,7 @@ func (x *Permission) String() string {
 func (*Permission) ProtoMessage() {}
 
 func (x *Permission) ProtoReflect() protoreflect.Message {
-	mi := &file_zengo_annotations_proto_msgTypes[1]
+	mi := &file_zever_annotations_proto_msgTypes[1]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -110,7 +110,7 @@ func (x *Permission) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use Permission.ProtoReflect.Descriptor instead.
 func (*Permission) Descriptor() ([]byte, []int) {
-	return file_zengo_annotations_proto_rawDescGZIP(), []int{1}
+	return file_zever_annotations_proto_rawDescGZIP(), []int{1}
 }
 
 func (x *Permission) GetCheck() string {
@@ -144,7 +144,7 @@ type ErrorCase struct {
 
 func (x *ErrorCase) Reset() {
 	*x = ErrorCase{}
-	mi := &file_zengo_annotations_proto_msgTypes[2]
+	mi := &file_zever_annotations_proto_msgTypes[2]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -156,7 +156,7 @@ func (x *ErrorCase) String() string {
 func (*ErrorCase) ProtoMessage() {}
 
 func (x *ErrorCase) ProtoReflect() protoreflect.Message {
-	mi := &file_zengo_annotations_proto_msgTypes[2]
+	mi := &file_zever_annotations_proto_msgTypes[2]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -169,7 +169,7 @@ func (x *ErrorCase) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use ErrorCase.ProtoReflect.Descriptor instead.
 func (*ErrorCase) Descriptor() ([]byte, []int) {
-	return file_zengo_annotations_proto_rawDescGZIP(), []int{2}
+	return file_zever_annotations_proto_rawDescGZIP(), []int{2}
 }
 
 func (x *ErrorCase) GetCode() string {
@@ -195,7 +195,7 @@ type ErrorCases struct {
 
 func (x *ErrorCases) Reset() {
 	*x = ErrorCases{}
-	mi := &file_zengo_annotations_proto_msgTypes[3]
+	mi := &file_zever_annotations_proto_msgTypes[3]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -207,7 +207,7 @@ func (x *ErrorCases) String() string {
 func (*ErrorCases) ProtoMessage() {}
 
 func (x *ErrorCases) ProtoReflect() protoreflect.Message {
-	mi := &file_zengo_annotations_proto_msgTypes[3]
+	mi := &file_zever_annotations_proto_msgTypes[3]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -220,7 +220,7 @@ func (x *ErrorCases) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use ErrorCases.ProtoReflect.Descriptor instead.
 func (*ErrorCases) Descriptor() ([]byte, []int) {
-	return file_zengo_annotations_proto_rawDescGZIP(), []int{3}
+	return file_zever_annotations_proto_rawDescGZIP(), []int{3}
 }
 
 func (x *ErrorCases) GetCases() []*ErrorCase {
@@ -230,48 +230,48 @@ func (x *ErrorCases) GetCases() []*ErrorCase {
 	return nil
 }
 
-var file_zengo_annotations_proto_extTypes = []protoimpl.ExtensionInfo{
+var file_zever_annotations_proto_extTypes = []protoimpl.ExtensionInfo{
 	{
 		ExtendedType:  (*descriptorpb.MethodOptions)(nil),
 		ExtensionType: (*Auth)(nil),
 		Field:         50601,
-		Name:          "zengo.annotations.v1.auth",
+		Name:          "zever.annotations.v1.auth",
 		Tag:           "bytes,50601,opt,name=auth",
-		Filename:      "zengo/annotations.proto",
+		Filename:      "zever/annotations.proto",
 	},
 	{
 		ExtendedType:  (*descriptorpb.MethodOptions)(nil),
 		ExtensionType: (*Permission)(nil),
 		Field:         50602,
-		Name:          "zengo.annotations.v1.permission",
+		Name:          "zever.annotations.v1.permission",
 		Tag:           "bytes,50602,opt,name=permission",
-		Filename:      "zengo/annotations.proto",
+		Filename:      "zever/annotations.proto",
 	},
 	{
 		ExtendedType:  (*descriptorpb.MethodOptions)(nil),
 		ExtensionType: (*ErrorCases)(nil),
 		Field:         50603,
-		Name:          "zengo.annotations.v1.errors",
+		Name:          "zever.annotations.v1.errors",
 		Tag:           "bytes,50603,opt,name=errors",
-		Filename:      "zengo/annotations.proto",
+		Filename:      "zever/annotations.proto",
 	},
 }
 
 // Extension fields to descriptorpb.MethodOptions.
 var (
-	// optional zengo.annotations.v1.Auth auth = 50601;
-	E_Auth = &file_zengo_annotations_proto_extTypes[0]
-	// optional zengo.annotations.v1.Permission permission = 50602;
-	E_Permission = &file_zengo_annotations_proto_extTypes[1]
-	// optional zengo.annotations.v1.ErrorCases errors = 50603;
-	E_Errors = &file_zengo_annotations_proto_extTypes[2]
+	// optional zever.annotations.v1.Auth auth = 50601;
+	E_Auth = &file_zever_annotations_proto_extTypes[0]
+	// optional zever.annotations.v1.Permission permission = 50602;
+	E_Permission = &file_zever_annotations_proto_extTypes[1]
+	// optional zever.annotations.v1.ErrorCases errors = 50603;
+	E_Errors = &file_zever_annotations_proto_extTypes[2]
 )
 
-var File_zengo_annotations_proto protoreflect.FileDescriptor
+var File_zever_annotations_proto protoreflect.FileDescriptor
 
-const file_zengo_annotations_proto_rawDesc = "" +
+const file_zever_annotations_proto_rawDesc = "" +
 	"\n" +
-	"\x17zengo/annotations.proto\x12\x14zengo.annotations.v1\x1a google/protobuf/descriptor.proto\"8\n" +
+	"\x17zever/annotations.proto\x12\x14zever.annotations.v1\x1a google/protobuf/descriptor.proto\"8\n" +
 	"\x04Auth\x12\x1a\n" +
 	"\brequired\x18\x01 \x01(\bR\brequired\x12\x14\n" +
 	"\x05roles\x18\x02 \x03(\tR\x05roles\"_\n" +
@@ -286,41 +286,41 @@ const file_zengo_annotations_proto_rawDesc = "" +
 	"\amessage\x18\x02 \x01(\tR\amessage\"C\n" +
 	"\n" +
 	"ErrorCases\x125\n" +
-	"\x05cases\x18\x01 \x03(\v2\x1f.zengo.annotations.v1.ErrorCaseR\x05cases:P\n" +
-	"\x04auth\x12\x1e.google.protobuf.MethodOptions\x18\xa9\x8b\x03 \x01(\v2\x1a.zengo.annotations.v1.AuthR\x04auth:b\n" +
+	"\x05cases\x18\x01 \x03(\v2\x1f.zever.annotations.v1.ErrorCaseR\x05cases:P\n" +
+	"\x04auth\x12\x1e.google.protobuf.MethodOptions\x18\xa9\x8b\x03 \x01(\v2\x1a.zever.annotations.v1.AuthR\x04auth:b\n" +
 	"\n" +
-	"permission\x12\x1e.google.protobuf.MethodOptions\x18\xaa\x8b\x03 \x01(\v2 .zengo.annotations.v1.PermissionR\n" +
+	"permission\x12\x1e.google.protobuf.MethodOptions\x18\xaa\x8b\x03 \x01(\v2 .zever.annotations.v1.PermissionR\n" +
 	"permission:Z\n" +
-	"\x06errors\x12\x1e.google.protobuf.MethodOptions\x18\xab\x8b\x03 \x01(\v2 .zengo.annotations.v1.ErrorCasesR\x06errorsBWZUgithub.com/zenta-dev/zever/examples/bookings/generated/protogogen/zengo;annotationsv1b\x06proto3"
+	"\x06errors\x12\x1e.google.protobuf.MethodOptions\x18\xab\x8b\x03 \x01(\v2 .zever.annotations.v1.ErrorCasesR\x06errorsB@Z>github.com/zenta-dev/zever/gen/zever/annotations;annotationsv1b\x06proto3"
 
 var (
-	file_zengo_annotations_proto_rawDescOnce sync.Once
-	file_zengo_annotations_proto_rawDescData []byte
+	file_zever_annotations_proto_rawDescOnce sync.Once
+	file_zever_annotations_proto_rawDescData []byte
 )
 
-func file_zengo_annotations_proto_rawDescGZIP() []byte {
-	file_zengo_annotations_proto_rawDescOnce.Do(func() {
-		file_zengo_annotations_proto_rawDescData = protoimpl.X.CompressGZIP(unsafe.Slice(unsafe.StringData(file_zengo_annotations_proto_rawDesc), len(file_zengo_annotations_proto_rawDesc)))
+func file_zever_annotations_proto_rawDescGZIP() []byte {
+	file_zever_annotations_proto_rawDescOnce.Do(func() {
+		file_zever_annotations_proto_rawDescData = protoimpl.X.CompressGZIP(unsafe.Slice(unsafe.StringData(file_zever_annotations_proto_rawDesc), len(file_zever_annotations_proto_rawDesc)))
 	})
-	return file_zengo_annotations_proto_rawDescData
+	return file_zever_annotations_proto_rawDescData
 }
 
-var file_zengo_annotations_proto_msgTypes = make([]protoimpl.MessageInfo, 4)
-var file_zengo_annotations_proto_goTypes = []any{
-	(*Auth)(nil),                       // 0: zengo.annotations.v1.Auth
-	(*Permission)(nil),                 // 1: zengo.annotations.v1.Permission
-	(*ErrorCase)(nil),                  // 2: zengo.annotations.v1.ErrorCase
-	(*ErrorCases)(nil),                 // 3: zengo.annotations.v1.ErrorCases
+var file_zever_annotations_proto_msgTypes = make([]protoimpl.MessageInfo, 4)
+var file_zever_annotations_proto_goTypes = []any{
+	(*Auth)(nil),                       // 0: zever.annotations.v1.Auth
+	(*Permission)(nil),                 // 1: zever.annotations.v1.Permission
+	(*ErrorCase)(nil),                  // 2: zever.annotations.v1.ErrorCase
+	(*ErrorCases)(nil),                 // 3: zever.annotations.v1.ErrorCases
 	(*descriptorpb.MethodOptions)(nil), // 4: google.protobuf.MethodOptions
 }
-var file_zengo_annotations_proto_depIdxs = []int32{
-	2, // 0: zengo.annotations.v1.ErrorCases.cases:type_name -> zengo.annotations.v1.ErrorCase
-	4, // 1: zengo.annotations.v1.auth:extendee -> google.protobuf.MethodOptions
-	4, // 2: zengo.annotations.v1.permission:extendee -> google.protobuf.MethodOptions
-	4, // 3: zengo.annotations.v1.errors:extendee -> google.protobuf.MethodOptions
-	0, // 4: zengo.annotations.v1.auth:type_name -> zengo.annotations.v1.Auth
-	1, // 5: zengo.annotations.v1.permission:type_name -> zengo.annotations.v1.Permission
-	3, // 6: zengo.annotations.v1.errors:type_name -> zengo.annotations.v1.ErrorCases
+var file_zever_annotations_proto_depIdxs = []int32{
+	2, // 0: zever.annotations.v1.ErrorCases.cases:type_name -> zever.annotations.v1.ErrorCase
+	4, // 1: zever.annotations.v1.auth:extendee -> google.protobuf.MethodOptions
+	4, // 2: zever.annotations.v1.permission:extendee -> google.protobuf.MethodOptions
+	4, // 3: zever.annotations.v1.errors:extendee -> google.protobuf.MethodOptions
+	0, // 4: zever.annotations.v1.auth:type_name -> zever.annotations.v1.Auth
+	1, // 5: zever.annotations.v1.permission:type_name -> zever.annotations.v1.Permission
+	3, // 6: zever.annotations.v1.errors:type_name -> zever.annotations.v1.ErrorCases
 	7, // [7:7] is the sub-list for method output_type
 	7, // [7:7] is the sub-list for method input_type
 	4, // [4:7] is the sub-list for extension type_name
@@ -328,27 +328,27 @@ var file_zengo_annotations_proto_depIdxs = []int32{
 	0, // [0:1] is the sub-list for field type_name
 }
 
-func init() { file_zengo_annotations_proto_init() }
-func file_zengo_annotations_proto_init() {
-	if File_zengo_annotations_proto != nil {
+func init() { file_zever_annotations_proto_init() }
+func file_zever_annotations_proto_init() {
+	if File_zever_annotations_proto != nil {
 		return
 	}
 	type x struct{}
 	out := protoimpl.TypeBuilder{
 		File: protoimpl.DescBuilder{
 			GoPackagePath: reflect.TypeOf(x{}).PkgPath(),
-			RawDescriptor: unsafe.Slice(unsafe.StringData(file_zengo_annotations_proto_rawDesc), len(file_zengo_annotations_proto_rawDesc)),
+			RawDescriptor: unsafe.Slice(unsafe.StringData(file_zever_annotations_proto_rawDesc), len(file_zever_annotations_proto_rawDesc)),
 			NumEnums:      0,
 			NumMessages:   4,
 			NumExtensions: 3,
 			NumServices:   0,
 		},
-		GoTypes:           file_zengo_annotations_proto_goTypes,
-		DependencyIndexes: file_zengo_annotations_proto_depIdxs,
-		MessageInfos:      file_zengo_annotations_proto_msgTypes,
-		ExtensionInfos:    file_zengo_annotations_proto_extTypes,
+		GoTypes:           file_zever_annotations_proto_goTypes,
+		DependencyIndexes: file_zever_annotations_proto_depIdxs,
+		MessageInfos:      file_zever_annotations_proto_msgTypes,
+		ExtensionInfos:    file_zever_annotations_proto_extTypes,
 	}.Build()
-	File_zengo_annotations_proto = out.File
-	file_zengo_annotations_proto_goTypes = nil
-	file_zengo_annotations_proto_depIdxs = nil
+	File_zever_annotations_proto = out.File
+	file_zever_annotations_proto_goTypes = nil
+	file_zever_annotations_proto_depIdxs = nil
 }

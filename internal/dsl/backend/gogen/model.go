@@ -305,7 +305,7 @@ type moduleModel struct {
 
 // pbAlias is a fixed import alias for the protogogen-generated message
 // package, used instead of its real package name (e.g. "appv1" or
-// "zengov1", see pbGoPackage) so every gogen-generated file that imports it
+// "zeverv1", see pbGoPackage) so every gogen-generated file that imports it
 // reads unambiguously with one predictable identifier regardless of module
 // name.
 const pbAlias = "pb"
@@ -325,8 +325,8 @@ const defaultPBImportRoot = "github.com/zenta-dev/zever/gen"
 // NewWithPBImportRoot) and flat (Backend.pbImportFlat -- see its doc
 // comment for why the two formulas differ). flat == false mirrors
 // proto.moduleNaming's goPackage formula exactly: the implicit unnamed
-// module maps to "<root>/zengov1", a named module "billing" maps to
-// "<root>/zengo/billing". flat == true maps to protogogen's real
+// module maps to "<root>/zeverv1", a named module "billing" maps to
+// "<root>/zever/billing". flat == true maps to protogogen's real
 // "paths=source_relative" output layout instead: the implicit unnamed
 // module maps to bare "<root>", a named module "billing" maps to
 // "<root>/billing".
@@ -339,9 +339,9 @@ func pbGoPackage(m *ir.Module, root string, flat bool) string {
 	case flat && named:
 		return root + "/" + m.Name
 	case !named:
-		return root + "/zengov1"
+		return root + "/zeverv1"
 	default:
-		return root + "/zengo/" + m.Name
+		return root + "/zever/" + m.Name
 	}
 }
 

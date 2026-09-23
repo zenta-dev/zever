@@ -1,7 +1,7 @@
 // Package breaking compares two resolved .zen schemas and classifies every
 // difference as breaking or non-breaking for API consumers, buf-breaking
 // style. It depends only on internal/dsl/ir and internal/dsl/diag -- no LSP,
-// no CLI, no backend -- so it can be driven from `zengo breaking` or from
+// no CLI, no backend -- so it can be driven from `zever breaking` or from
 // any other caller with two compiled schemas to hand.
 //
 // Scope (the "core structural set"): a removed entity/message/service/

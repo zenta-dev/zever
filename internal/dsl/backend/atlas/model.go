@@ -173,7 +173,7 @@ func schemaOf(e *ir.Entity) string {
 }
 
 // SchemaOf exports schemaOf for callers outside this package (the
-// `zengo db migrate` live-introspection path) that need an entity's
+// `zever db migrate` live-introspection path) that need an entity's
 // Postgres schema without duplicating the "public" default here.
 func SchemaOf(e *ir.Entity) string {
 	return schemaOf(e)
@@ -291,7 +291,7 @@ type indexSpec struct {
 }
 
 // IndexSpec exports indexSpec for callers outside this package (the
-// `zengo db migrate` live-diffing path) that need to compare the DECLARED
+// `zever db migrate` live-diffing path) that need to compare the DECLARED
 // schema side of an index against live database state, using the exact same
 // names the bootstrap DDL renderer already uses -- so a table created by
 // RenderSchemaDDL diffs as already-in-sync against itself.

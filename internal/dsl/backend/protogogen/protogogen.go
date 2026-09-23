@@ -48,7 +48,7 @@ func New() *Backend {
 // sources its ".proto" text from
 // proto.NewWithAnnotationsGoPackageRoot(annotationsGoPackageRoot) instead
 // of a bare proto.New(). protogogen compiles that .proto text into real Go
-// via protocompile, so its emitted zengo/annotations.pb.go's own package
+// via protocompile, so its emitted zever/annotations.pb.go's own package
 // declaration -- and therefore every other generated file's import of it --
 // otherwise always carries proto.New()'s default go_package
 // (zever's own module), the same bug NewWithPBImportRoot on the gogen
@@ -68,7 +68,7 @@ func (b *Backend) Name() string {
 // Generate renders schema to ".proto" text via the proto backend, compiles
 // that text into real descriptors, and generates real "*.pb.go" and
 // "*_grpc.pb.go" Go source for every proto file the proto backend produced
-// (one per ir.Module, plus the shared zengo/annotations.proto). Output paths
+// (one per ir.Module, plus the shared zever/annotations.proto). Output paths
 // mirror their source ".proto" path (protoc's "paths=source_relative"
 // convention), matching the per-module directory layout the proto backend
 // already established.

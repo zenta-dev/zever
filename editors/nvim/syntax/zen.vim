@@ -24,7 +24,7 @@ syntax keyword zenBoolean true false
 
 " Builtin scalar types (plain identifiers at the lexer level, not
 " reserved -- see internal/dsl/resolver.ScalarTypeNames).
-syntax match zenType "\<\%(bool\|bytes\|date\|float32\|float64\|int32\|int64\|json\|string\|timestamp\|uuid\)\>"
+syntax match zenType "\<\%(bool\|bytes\|date\|datetime\|float32\|float64\|int32\|int64\|json\|string\|timestamp\|uuid\)\>"
 
 " Contextual block labels used inside rpc/job/schedule bodies (http, auth,
 " permission, queue, retry, cron, dispatch, join_table -- see

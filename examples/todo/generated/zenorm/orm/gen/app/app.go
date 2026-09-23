@@ -150,3 +150,52 @@ func JoinNoteUser(left orm.Query[Note, *Note], joinType orm.JoinType) orm.Join2[
 func LeftJoinNoteUser(left orm.Query[Note, *Note]) orm.LeftJoin2[Note, *Note, User, *User] {
 	return orm.LeftJoinOn(left, NoteUserRel)
 }
+
+// GrpcTasks is the orm.Table for GrpcTask, generated from the "GrpcTask" entity.
+var GrpcTasks = orm.NewTable[GrpcTask]("grpc_tasks", []string{"id", "user_id", "title", "body", "created_at"})
+
+// GrpcTaskCols holds typed orm.Column/orm.NullableColumn references for GrpcTask,
+// used to build type-safe predicates, order terms and assignments.
+var GrpcTaskCols = struct {
+	ID        orm.Column[GrpcTask, string]
+	UserID    orm.Column[GrpcTask, string]
+	Title     orm.Column[GrpcTask, string]
+	Body      orm.Column[GrpcTask, string]
+	CreatedAt orm.Column[GrpcTask, time.Time]
+}{
+	ID:        orm.NewColumn[GrpcTask, string]("grpc_tasks", "id"),
+	UserID:    orm.NewColumn[GrpcTask, string]("grpc_tasks", "user_id"),
+	Title:     orm.NewColumn[GrpcTask, string]("grpc_tasks", "title"),
+	Body:      orm.NewColumn[GrpcTask, string]("grpc_tasks", "body"),
+	CreatedAt: orm.NewColumn[GrpcTask, time.Time]("grpc_tasks", "created_at"),
+}
+
+// GrpcTask mirrors the "GrpcTask" entity declared in the schema.
+type GrpcTask struct {
+	ID        string    `json:"id"`
+	UserID    string    `json:"user_id"`
+	Title     string    `json:"title"`
+	Body      string    `json:"body"`
+	CreatedAt time.Time `json:"created_at"`
+}
+
+// Scan reads one row, whose columns must be in GrpcTasks.Columns() order, into e.
+func (e *GrpcTask) Scan(row orm.Row) error {
+	var rawCreatedAt string
+	if err := row.Scan(&e.ID, &e.UserID, &e.Title, &e.Body, &rawCreatedAt); err != nil {
+		return fmt.Errorf("[grpc_task] scan error: %w", err)
+	}
+
+	valCreatedAt, errCreatedAt := time.Parse(time.RFC3339Nano, rawCreatedAt)
+	if errCreatedAt != nil {
+		return fmt.Errorf("[grpc_task] parse created_at error: %w", errCreatedAt)
+	}
+
+	e.CreatedAt = valCreatedAt
+
+	return nil
+}
+
+// Columns lists GrpcTask's columns in field-declaration order; Scan reads a
+// row's columns in exactly this order.
+func (GrpcTask) Columns() []string { return []string{"id", "user_id", "title", "body", "created_at"} }

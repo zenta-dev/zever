@@ -221,7 +221,7 @@ func TestLoadProjectConfigYmlBeatsJson(t *testing.T) {
 }
 
 // TestDecodeProjectFileRejectsUnsupportedExtension pins the format boundary:
-// TOML (which zengo supported) is not decoded by the zever project pass,
+// TOML (which the predecessor supported) is not decoded by the zever project pass,
 // matching config.decodeFile's YAML/JSON-only support.
 func TestDecodeProjectFileRejectsUnsupportedExtension(t *testing.T) {
 	dir := t.TempDir()

@@ -50,7 +50,7 @@ func New(opts storage.Options) (storage.Storage, error) {
 		return nil, err
 	}
 
-	cfg := s3opts.Config{
+	cfg := s3opts.Options{
 		Endpoint:        endpoint,
 		Region:          region,
 		AccessKeyID:     accessKey,

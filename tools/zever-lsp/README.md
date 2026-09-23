@@ -84,5 +84,5 @@ the protocol stream.
 ## The DSL itself
 
 The language this server speaks is documented in the repo root:
-[../..](../../). Grammar, resolver rules, and the `zengo` CLI live there;
+[../..](../../). Grammar, resolver rules, and the `zever` CLI live there;
 this directory contains only the LSP transport and feature handlers.

@@ -348,11 +348,16 @@ func (c *Container) Document() (document.Document, error) {
 	})
 }
 
-// Eventbus resolves and returns the eventbus service instance.
-func (c *Container) Eventbus() (eventbus.Eventbus, error) {
-	return c.eventbus.get(func() (eventbus.Eventbus, error) {
+// EventBus resolves and returns the eventbus service instance.
+func (c *Container) EventBus() (eventbus.EventBus, error) {
+	return c.eventbus.get(func() (eventbus.EventBus, error) {
 		return openService("eventbus", c.cfg.Eventbus.Adapter, eventbus.ParseAdapter, eventbus.Open, c.cfg.Eventbus.Options)
 	})
+}
+
+// Eventbus aliases EventBus for compatibility.
+func (c *Container) Eventbus() (eventbus.EventBus, error) {
+	return c.EventBus()
 }
 
 // Flag resolves and returns the flag service instance.
@@ -478,11 +483,16 @@ func (c *Container) Queue() (queue.Queue, error) {
 	})
 }
 
-// Ratelimit resolves and returns the ratelimit service instance.
-func (c *Container) Ratelimit() (ratelimit.Limiter, error) {
+// RateLimit resolves and returns the ratelimit service instance.
+func (c *Container) RateLimit() (ratelimit.Limiter, error) {
 	return c.ratelimit.get(func() (ratelimit.Limiter, error) {
 		return openService("ratelimit", c.cfg.Ratelimit.Adapter, ratelimit.ParseAdapter, ratelimit.Open, c.cfg.Ratelimit.Options)
 	})
+}
+
+// Ratelimit aliases RateLimit for compatibility.
+func (c *Container) Ratelimit() (ratelimit.Limiter, error) {
+	return c.RateLimit()
 }
 
 // Router resolves and returns the router service instance.

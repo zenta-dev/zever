@@ -4,7 +4,7 @@
 //
 // Type safety: Secrets plus typed Options plus Adapter enum plus Factory. Options carry Addr plus Token plus Mount plus ProjectID plus Prefix plus Region; ValidateName enforces safe names. Unsupported features fail closed.
 //
-// DX: Open with Open, custom backends with Register. Options are typed with zero-infra defaults for tests. Env backend reads prefixed variables directly (no prefix, e.g. PREFIX_NAME). See config/README.md.
+// DX: Open with Open, custom backends with Register. Options are typed with zero-infra defaults for tests. Env backend reads prefixed variables directly (prefixed, e.g. PREFIX_NAME). See config/README.md.
 //
 // Container: container.New(cfg) then c.Secrets(). Lazy per-service singleton, retry on error. See container/README.md.
 //

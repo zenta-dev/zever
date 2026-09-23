@@ -4,10 +4,10 @@
 // 	protoc        (unknown)
 // source: schema.proto
 
-package zengov1
+package zeverv1
 
 import (
-	_ "github.com/zenta-dev/zever/examples/demoapp/generated/protogogen/zengo"
+	_ "github.com/zenta-dev/zever/examples/demoapp/generated/protogogen/zever"
 	_ "google.golang.org/genproto/googleapis/api/annotations"
 	protoreflect "google.golang.org/protobuf/reflect/protoreflect"
 	protoimpl "google.golang.org/protobuf/runtime/protoimpl"
@@ -892,7 +892,7 @@ var File_schema_proto protoreflect.FileDescriptor
 
 const file_schema_proto_rawDesc = "" +
 	"\n" +
-	"\fschema.proto\x12\bzengo.v1\x1a\x1fgoogle/protobuf/timestamp.proto\x1a\x1cgoogle/api/annotations.proto\x1a\x17zengo/annotations.proto\"\xb4\x01\n" +
+	"\fschema.proto\x12\bzever.v1\x1a\x1fgoogle/protobuf/timestamp.proto\x1a\x1cgoogle/api/annotations.proto\x1a\x17zever/annotations.proto\"\xb4\x01\n" +
 	"\x04User\x12\x0e\n" +
 	"\x02id\x18\x01 \x01(\tR\x02id\x12\x14\n" +
 	"\x05email\x18\x02 \x01(\tR\x05email\x12\x12\n" +
@@ -967,17 +967,17 @@ const file_schema_proto_rawDesc = "" +
 	"\vproduct_ids\x18\x01 \x01(\tR\n" +
 	"productIds2\xb2\x01\n" +
 	"\vUserService\x12Q\n" +
-	"\aGetUser\x12\x18.zengo.v1.GetUserRequest\x1a\x0e.zengo.v1.User\"\x1c\xca\xda\x18\x02\b\x01\x82\xd3\xe4\x93\x02\x10\x12\x0e/v1/users/{id}\x12P\n" +
-	"\tListUsers\x12\x1a.zengo.v1.ListUsersRequest\x1a\x0e.zengo.v1.User\"\x17\xca\xda\x18\x02\b\x01\x82\xd3\xe4\x93\x02\v\x12\t/v1/users2\xb0\x02\n" +
+	"\aGetUser\x12\x18.zever.v1.GetUserRequest\x1a\x0e.zever.v1.User\"\x1c\xca\xda\x18\x02\b\x01\x82\xd3\xe4\x93\x02\x10\x12\x0e/v1/users/{id}\x12P\n" +
+	"\tListUsers\x12\x1a.zever.v1.ListUsersRequest\x1a\x0e.zever.v1.User\"\x17\xca\xda\x18\x02\b\x01\x82\xd3\xe4\x93\x02\v\x12\t/v1/users2\xb0\x02\n" +
 	"\x0eProductService\x12]\n" +
 	"\n" +
-	"GetProduct\x12\x1b.zengo.v1.GetProductRequest\x1a\x11.zengo.v1.Product\"\x1f\xca\xda\x18\x02\b\x01\x82\xd3\xe4\x93\x02\x13\x12\x11/v1/products/{id}\x12\\\n" +
-	"\fListProducts\x12\x1d.zengo.v1.ListProductsRequest\x1a\x11.zengo.v1.Product\"\x1a\xca\xda\x18\x02\b\x01\x82\xd3\xe4\x93\x02\x0e\x12\f/v1/products\x12a\n" +
-	"\rCreateProduct\x12\x1e.zengo.v1.CreateProductRequest\x1a\x11.zengo.v1.Product\"\x1d\xca\xda\x18\x02\b\x01\x82\xd3\xe4\x93\x02\x11:\x01*\"\f/v1/products2\xc0\x01\n" +
+	"GetProduct\x12\x1b.zever.v1.GetProductRequest\x1a\x11.zever.v1.Product\"\x1f\xca\xda\x18\x02\b\x01\x82\xd3\xe4\x93\x02\x13\x12\x11/v1/products/{id}\x12\\\n" +
+	"\fListProducts\x12\x1d.zever.v1.ListProductsRequest\x1a\x11.zever.v1.Product\"\x1a\xca\xda\x18\x02\b\x01\x82\xd3\xe4\x93\x02\x0e\x12\f/v1/products\x12a\n" +
+	"\rCreateProduct\x12\x1e.zever.v1.CreateProductRequest\x1a\x11.zever.v1.Product\"\x1d\xca\xda\x18\x02\b\x01\x82\xd3\xe4\x93\x02\x11:\x01*\"\f/v1/products2\xc0\x01\n" +
 	"\fOrderService\x12U\n" +
-	"\bGetOrder\x12\x19.zengo.v1.GetOrderRequest\x1a\x0f.zengo.v1.Order\"\x1d\xca\xda\x18\x02\b\x01\x82\xd3\xe4\x93\x02\x11\x12\x0f/v1/orders/{id}\x12Y\n" +
-	"\vCreateOrder\x12\x1c.zengo.v1.CreateOrderRequest\x1a\x0f.zengo.v1.Order\"\x1b\xca\xda\x18\x02\b\x01\x82\xd3\xe4\x93\x02\x0f:\x01*\"\n" +
-	"/v1/ordersB0Z.github.com/zenta-dev/zever/gen/zengov1;zengov1b\x06proto3"
+	"\bGetOrder\x12\x19.zever.v1.GetOrderRequest\x1a\x0f.zever.v1.Order\"\x1d\xca\xda\x18\x02\b\x01\x82\xd3\xe4\x93\x02\x11\x12\x0f/v1/orders/{id}\x12Y\n" +
+	"\vCreateOrder\x12\x1c.zever.v1.CreateOrderRequest\x1a\x0f.zever.v1.Order\"\x1b\xca\xda\x18\x02\b\x01\x82\xd3\xe4\x93\x02\x0f:\x01*\"\n" +
+	"/v1/ordersB0Z.github.com/zenta-dev/zever/gen/zeverv1;zeverv1b\x06proto3"
 
 var (
 	file_schema_proto_rawDescOnce sync.Once
@@ -993,43 +993,43 @@ func file_schema_proto_rawDescGZIP() []byte {
 
 var file_schema_proto_msgTypes = make([]protoimpl.MessageInfo, 14)
 var file_schema_proto_goTypes = []any{
-	(*User)(nil),                  // 0: zengo.v1.User
-	(*Category)(nil),              // 1: zengo.v1.Category
-	(*Product)(nil),               // 2: zengo.v1.Product
-	(*Order)(nil),                 // 3: zengo.v1.Order
-	(*OrderItem)(nil),             // 4: zengo.v1.OrderItem
-	(*Post)(nil),                  // 5: zengo.v1.Post
-	(*Comment)(nil),               // 6: zengo.v1.Comment
-	(*GetUserRequest)(nil),        // 7: zengo.v1.GetUserRequest
-	(*ListUsersRequest)(nil),      // 8: zengo.v1.ListUsersRequest
-	(*GetProductRequest)(nil),     // 9: zengo.v1.GetProductRequest
-	(*ListProductsRequest)(nil),   // 10: zengo.v1.ListProductsRequest
-	(*CreateProductRequest)(nil),  // 11: zengo.v1.CreateProductRequest
-	(*GetOrderRequest)(nil),       // 12: zengo.v1.GetOrderRequest
-	(*CreateOrderRequest)(nil),    // 13: zengo.v1.CreateOrderRequest
+	(*User)(nil),                  // 0: zever.v1.User
+	(*Category)(nil),              // 1: zever.v1.Category
+	(*Product)(nil),               // 2: zever.v1.Product
+	(*Order)(nil),                 // 3: zever.v1.Order
+	(*OrderItem)(nil),             // 4: zever.v1.OrderItem
+	(*Post)(nil),                  // 5: zever.v1.Post
+	(*Comment)(nil),               // 6: zever.v1.Comment
+	(*GetUserRequest)(nil),        // 7: zever.v1.GetUserRequest
+	(*ListUsersRequest)(nil),      // 8: zever.v1.ListUsersRequest
+	(*GetProductRequest)(nil),     // 9: zever.v1.GetProductRequest
+	(*ListProductsRequest)(nil),   // 10: zever.v1.ListProductsRequest
+	(*CreateProductRequest)(nil),  // 11: zever.v1.CreateProductRequest
+	(*GetOrderRequest)(nil),       // 12: zever.v1.GetOrderRequest
+	(*CreateOrderRequest)(nil),    // 13: zever.v1.CreateOrderRequest
 	(*timestamppb.Timestamp)(nil), // 14: google.protobuf.Timestamp
 }
 var file_schema_proto_depIdxs = []int32{
-	14, // 0: zengo.v1.User.created_at:type_name -> google.protobuf.Timestamp
-	14, // 1: zengo.v1.Category.created_at:type_name -> google.protobuf.Timestamp
-	14, // 2: zengo.v1.Product.created_at:type_name -> google.protobuf.Timestamp
-	14, // 3: zengo.v1.Order.created_at:type_name -> google.protobuf.Timestamp
-	14, // 4: zengo.v1.Post.created_at:type_name -> google.protobuf.Timestamp
-	14, // 5: zengo.v1.Comment.created_at:type_name -> google.protobuf.Timestamp
-	7,  // 6: zengo.v1.UserService.GetUser:input_type -> zengo.v1.GetUserRequest
-	8,  // 7: zengo.v1.UserService.ListUsers:input_type -> zengo.v1.ListUsersRequest
-	9,  // 8: zengo.v1.ProductService.GetProduct:input_type -> zengo.v1.GetProductRequest
-	10, // 9: zengo.v1.ProductService.ListProducts:input_type -> zengo.v1.ListProductsRequest
-	11, // 10: zengo.v1.ProductService.CreateProduct:input_type -> zengo.v1.CreateProductRequest
-	12, // 11: zengo.v1.OrderService.GetOrder:input_type -> zengo.v1.GetOrderRequest
-	13, // 12: zengo.v1.OrderService.CreateOrder:input_type -> zengo.v1.CreateOrderRequest
-	0,  // 13: zengo.v1.UserService.GetUser:output_type -> zengo.v1.User
-	0,  // 14: zengo.v1.UserService.ListUsers:output_type -> zengo.v1.User
-	2,  // 15: zengo.v1.ProductService.GetProduct:output_type -> zengo.v1.Product
-	2,  // 16: zengo.v1.ProductService.ListProducts:output_type -> zengo.v1.Product
-	2,  // 17: zengo.v1.ProductService.CreateProduct:output_type -> zengo.v1.Product
-	3,  // 18: zengo.v1.OrderService.GetOrder:output_type -> zengo.v1.Order
-	3,  // 19: zengo.v1.OrderService.CreateOrder:output_type -> zengo.v1.Order
+	14, // 0: zever.v1.User.created_at:type_name -> google.protobuf.Timestamp
+	14, // 1: zever.v1.Category.created_at:type_name -> google.protobuf.Timestamp
+	14, // 2: zever.v1.Product.created_at:type_name -> google.protobuf.Timestamp
+	14, // 3: zever.v1.Order.created_at:type_name -> google.protobuf.Timestamp
+	14, // 4: zever.v1.Post.created_at:type_name -> google.protobuf.Timestamp
+	14, // 5: zever.v1.Comment.created_at:type_name -> google.protobuf.Timestamp
+	7,  // 6: zever.v1.UserService.GetUser:input_type -> zever.v1.GetUserRequest
+	8,  // 7: zever.v1.UserService.ListUsers:input_type -> zever.v1.ListUsersRequest
+	9,  // 8: zever.v1.ProductService.GetProduct:input_type -> zever.v1.GetProductRequest
+	10, // 9: zever.v1.ProductService.ListProducts:input_type -> zever.v1.ListProductsRequest
+	11, // 10: zever.v1.ProductService.CreateProduct:input_type -> zever.v1.CreateProductRequest
+	12, // 11: zever.v1.OrderService.GetOrder:input_type -> zever.v1.GetOrderRequest
+	13, // 12: zever.v1.OrderService.CreateOrder:input_type -> zever.v1.CreateOrderRequest
+	0,  // 13: zever.v1.UserService.GetUser:output_type -> zever.v1.User
+	0,  // 14: zever.v1.UserService.ListUsers:output_type -> zever.v1.User
+	2,  // 15: zever.v1.ProductService.GetProduct:output_type -> zever.v1.Product
+	2,  // 16: zever.v1.ProductService.ListProducts:output_type -> zever.v1.Product
+	2,  // 17: zever.v1.ProductService.CreateProduct:output_type -> zever.v1.Product
+	3,  // 18: zever.v1.OrderService.GetOrder:output_type -> zever.v1.Order
+	3,  // 19: zever.v1.OrderService.CreateOrder:output_type -> zever.v1.Order
 	13, // [13:20] is the sub-list for method output_type
 	6,  // [6:13] is the sub-list for method input_type
 	6,  // [6:6] is the sub-list for extension type_name

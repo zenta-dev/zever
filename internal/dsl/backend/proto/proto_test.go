@@ -96,7 +96,7 @@ func readTestdata(t *testing.T, rel string) string {
 }
 
 // validateProto compiles content (as the file at path) with the protoc
-// toolchain, with zengo/annotations.proto, the two vendored google/api/*.proto
+// toolchain, with zever/annotations.proto, the two vendored google/api/*.proto
 // fixtures, and the well-known types (from /usr/include when present) all
 // available as imports. It fails the test on any compile error, catching
 // "matches a stale golden file but is actually broken proto" bugs that a byte
@@ -116,7 +116,7 @@ func validateProto(t *testing.T, path string, content []byte) {
 
 	files := map[string]string{
 		path:                           string(content),
-		"zengo/annotations.proto":      AnnotationsProtoSource,
+		"zever/annotations.proto":      AnnotationsProtoSource,
 		"google/api/http.proto":        readTestdata(t, filepath.Join("google", "api", "http.proto")),
 		"google/api/annotations.proto": readTestdata(t, filepath.Join("google", "api", "annotations.proto")),
 	}
@@ -371,7 +371,7 @@ func TestGeneratePaginatedOperation(t *testing.T) {
 
 // TestGenerateErrorsOption covers a bare error code and a code with a
 // message on the same rpc, proving the rendered
-// zengo.annotations.v1.errors option string is correct and that it
+// zever.annotations.v1.errors option string is correct and that it
 // validates as real proto against the extension's own message shape.
 func TestGenerateErrorsOption(t *testing.T) {
 	src := `entity Order {
@@ -401,7 +401,7 @@ func TestGenerateErrorsOption(t *testing.T) {
 	validateProto(t, "schema.proto", content)
 
 	rendered := string(content)
-	want := `option (zengo.annotations.v1.errors) = ` +
+	want := `option (zever.annotations.v1.errors) = ` +
 		`{ cases: [{ code: "NOT_FOUND" }, { code: "INVALID_ARGUMENT", message: "email is malformed" }] };`
 
 	if !strings.Contains(rendered, want) {
@@ -410,7 +410,7 @@ func TestGenerateErrorsOption(t *testing.T) {
 }
 
 // TestGenerateErrorsOptionOnlyOptionStillImportsAnnotations proves the
-// zengo/annotations.proto import fires even when errors: is the only
+// zever/annotations.proto import fires even when errors: is the only
 // *option-rendering* declaration on an rpc besides the now-mandatory
 // auth:/permission: (secure-by-default), matching auth/permission's own
 // existing import-triggering behavior. http: is deliberately absent here.
@@ -439,8 +439,8 @@ func TestGenerateErrorsOptionOnlyOptionStillImportsAnnotations(t *testing.T) {
 	}
 
 	rendered := string(content)
-	if !strings.Contains(rendered, `import "zengo/annotations.proto";`) {
-		t.Fatalf("expected zengo/annotations.proto import when errors: is the only option, got:\n%s", rendered)
+	if !strings.Contains(rendered, `import "zever/annotations.proto";`) {
+		t.Fatalf("expected zever/annotations.proto import when errors: is the only option, got:\n%s", rendered)
 	}
 
 	validateProto(t, "schema.proto", content)
@@ -448,7 +448,7 @@ func TestGenerateErrorsOptionOnlyOptionStillImportsAnnotations(t *testing.T) {
 
 // TestGenerateErrorsCombinedWithHTTPAuthPermission is the end-to-end test
 // combining errors: with http:/auth:/permission: on the same rpc, proving
-// the zengo/annotations.proto import line appears exactly once in the
+// the zever/annotations.proto import line appears exactly once in the
 // rendered file regardless of how many of the four options triggered it.
 func TestGenerateErrorsCombinedWithHTTPAuthPermission(t *testing.T) {
 	src := `entity Order {
@@ -482,16 +482,16 @@ func TestGenerateErrorsCombinedWithHTTPAuthPermission(t *testing.T) {
 
 	rendered := string(content)
 
-	n := strings.Count(rendered, `import "zengo/annotations.proto";`)
+	n := strings.Count(rendered, `import "zever/annotations.proto";`)
 	if n != 1 {
-		t.Fatalf("expected exactly 1 zengo/annotations.proto import line, got %d:\n%s", n, rendered)
+		t.Fatalf("expected exactly 1 zever/annotations.proto import line, got %d:\n%s", n, rendered)
 	}
 
 	for _, want := range []string{
 		`option (google.api.http) = { get: "/v1/orders/{id}" };`,
-		`option (zengo.annotations.v1.auth) = { required: true, roles: ["owner", "admin"] };`,
-		`option (zengo.annotations.v1.permission) = { check: "owns_order", resource: "Order", owner_field: "user_id" };`,
-		`option (zengo.annotations.v1.errors) = ` +
+		`option (zever.annotations.v1.auth) = { required: true, roles: ["owner", "admin"] };`,
+		`option (zever.annotations.v1.permission) = { check: "owns_order", resource: "Order", owner_field: "user_id" };`,
+		`option (zever.annotations.v1.errors) = ` +
 			`{ cases: [{ code: "NOT_FOUND" }, { code: "PERMISSION_DENIED", message: "caller does not own this order" }] };`,
 	} {
 		if !strings.Contains(rendered, want) {
@@ -535,7 +535,7 @@ func TestGenerateTwoModules(t *testing.T) {
 		t.Fatalf("Generate: %v", err)
 	}
 
-	wantKeys := []string{"billing/schema.proto", "shipping/schema.proto", "zengo/annotations.proto"}
+	wantKeys := []string{"billing/schema.proto", "shipping/schema.proto", "zever/annotations.proto"}
 
 	if len(out) != len(wantKeys) {
 		t.Fatalf("Generate output keys = %v, want exactly %v", keys(out), wantKeys)
@@ -568,7 +568,7 @@ func TestGenerateTwoModules(t *testing.T) {
 // TestGenerateVersionedModulePackageName is the regression case a dir-derived
 // schema/v1/<module>/*.zen layout used to get wrong: module.Name used to BE
 // the version segment itself ("v1"), producing the doubled-up package
-// "zengo.v1.v1". Now Version is derived separately, so a real module name
+// "zever.v1.v1". Now Version is derived separately, so a real module name
 // survives and the version feeds moduleNaming instead of a hardcoded "v1".
 func TestGenerateVersionedModulePackageName(t *testing.T) {
 	schema := compileMultiModule(t, map[string]string{
@@ -591,11 +591,11 @@ func TestGenerateVersionedModulePackageName(t *testing.T) {
 		t.Fatalf("Generate output missing %q, got keys %v", "iam/schema.proto", keys(out))
 	}
 
-	if !strings.Contains(string(iam), "package zengo.iam.v1;") {
-		t.Fatalf("expected package zengo.iam.v1, got:\n%s", iam)
+	if !strings.Contains(string(iam), "package zever.iam.v1;") {
+		t.Fatalf("expected package zever.iam.v1, got:\n%s", iam)
 	}
 
-	if strings.Contains(string(iam), "zengo.v1.v1") {
+	if strings.Contains(string(iam), "zever.v1.v1") {
 		t.Fatalf("regression: package name doubled up the version:\n%s", iam)
 	}
 }
@@ -620,8 +620,8 @@ func TestGenerateUnversionedModuleDefaultsToV1(t *testing.T) {
 		t.Fatalf("Generate output missing %q, got keys %v", "billing/schema.proto", keys(out))
 	}
 
-	if !strings.Contains(string(billing), "package zengo.billing.v1;") {
-		t.Fatalf("expected package zengo.billing.v1, got:\n%s", billing)
+	if !strings.Contains(string(billing), "package zever.billing.v1;") {
+		t.Fatalf("expected package zever.billing.v1, got:\n%s", billing)
 	}
 }
 
@@ -889,7 +889,7 @@ func TestGenerateMessageFieldRef(t *testing.T) {
 	validateProto(t, "schema.proto", content)
 }
 
-// TestNewAnnotationsProtoUnchanged proves New()'s zengo/annotations.proto
+// TestNewAnnotationsProtoUnchanged proves New()'s zever/annotations.proto
 // output is byte-for-byte identical to the raw embedded
 // AnnotationsProtoSource -- New() must not rewrite anything, since every
 // existing test/golden file compiles against the default go_package root.
@@ -911,13 +911,13 @@ func TestNewAnnotationsProtoUnchanged(t *testing.T) {
 		t.Fatalf("Generate: %v", err)
 	}
 
-	content, ok := out["zengo/annotations.proto"]
+	content, ok := out["zever/annotations.proto"]
 	if !ok {
-		t.Fatalf("Generate output missing zengo/annotations.proto, got keys %v", keys(out))
+		t.Fatalf("Generate output missing zever/annotations.proto, got keys %v", keys(out))
 	}
 
 	if string(content) != AnnotationsProtoSource {
-		t.Fatalf("New().Generate's zengo/annotations.proto differs from the raw embedded source:\n%s", content)
+		t.Fatalf("New().Generate's zever/annotations.proto differs from the raw embedded source:\n%s", content)
 	}
 }
 
@@ -928,7 +928,7 @@ func TestNewAnnotationsProtoUnchanged(t *testing.T) {
 // line of the file (the auth/permission proto extensions it defines)
 // untouched.
 func TestNewWithAnnotationsGoPackageRootRewritesOnlyGoPackageLine(t *testing.T) {
-	const overrideRoot = "github.com/acme/api/generated/protogogen/zengo/annotations"
+	const overrideRoot = "github.com/acme/api/generated/protogogen/zever/annotations"
 
 	src := `entity Order {
 		id: uuid @primary
@@ -947,9 +947,9 @@ func TestNewWithAnnotationsGoPackageRootRewritesOnlyGoPackageLine(t *testing.T) 
 		t.Fatalf("Generate: %v", err)
 	}
 
-	content, ok := out["zengo/annotations.proto"]
+	content, ok := out["zever/annotations.proto"]
 	if !ok {
-		t.Fatalf("Generate output missing zengo/annotations.proto, got keys %v", keys(out))
+		t.Fatalf("Generate output missing zever/annotations.proto, got keys %v", keys(out))
 	}
 
 	rendered := string(content)
@@ -960,7 +960,7 @@ func TestNewWithAnnotationsGoPackageRootRewritesOnlyGoPackageLine(t *testing.T) 
 	}
 
 	if strings.Contains(rendered, defaultAnnotationsGoPackageRoot) {
-		t.Fatalf("rendered zengo/annotations.proto still references the default go_package root:\n%s", rendered)
+		t.Fatalf("rendered zever/annotations.proto still references the default go_package root:\n%s", rendered)
 	}
 
 	// Every other line must be identical to the raw embedded source: diff
@@ -1005,7 +1005,7 @@ func TestNewWithAnnotationsGoPackageRootDoesNotAffectProtoImportLines(t *testing
 
 	schema := compileSchema(t, src)
 
-	out, err := NewWithAnnotationsGoPackageRoot("github.com/acme/api/generated/protogogen/zengo/annotations").
+	out, err := NewWithAnnotationsGoPackageRoot("github.com/acme/api/generated/protogogen/zever/annotations").
 		Generate(schema)
 	if err != nil {
 		t.Fatalf("Generate: %v", err)
@@ -1018,8 +1018,8 @@ func TestNewWithAnnotationsGoPackageRootDoesNotAffectProtoImportLines(t *testing
 
 	rendered := string(moduleContent)
 
-	if !strings.Contains(rendered, `import "zengo/annotations.proto";`) {
-		t.Fatalf("expected schema.proto's own import line to reference zengo/annotations.proto by .proto path unchanged, got:\n%s", rendered)
+	if !strings.Contains(rendered, `import "zever/annotations.proto";`) {
+		t.Fatalf("expected schema.proto's own import line to reference zever/annotations.proto by .proto path unchanged, got:\n%s", rendered)
 	}
 
 	if strings.Contains(rendered, "github.com/acme") {
@@ -1044,9 +1044,9 @@ func TestNewWithAnnotationsGoPackageRootEmptyFallsBackToDefault(t *testing.T) {
 		t.Fatalf("Generate: %v", err)
 	}
 
-	content, ok := out["zengo/annotations.proto"]
+	content, ok := out["zever/annotations.proto"]
 	if !ok {
-		t.Fatalf("Generate output missing zengo/annotations.proto, got keys %v", keys(out))
+		t.Fatalf("Generate output missing zever/annotations.proto, got keys %v", keys(out))
 	}
 
 	if string(content) != AnnotationsProtoSource {

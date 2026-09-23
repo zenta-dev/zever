@@ -22,7 +22,7 @@ type Backend interface {
 |---|---|---|
 | `gogen/app` | modules + services | application layer (handlers, wiring) |
 | `zenorm` | `schema.Modules[*].Entities` only | typed table/column bindings |
-| `proto/protogogen` | modules + enums + RPCs | `zengo.app.v1` protobuf + `gen/zengo/app` Go |
+| `proto/protogogen` | modules + enums + RPCs | `zever.app.v1` protobuf + `gen/zever/app` Go |
 | `openapi` | services + HTTP bindings | `zever API` OpenAPI document |
 
 The canonical `app.zen` fixture exercises all four: both entities compile under the virtual path `schema/app/app.zen` (module `app`), so the two-way `User ↔ Order` relation needs no import, and the `UserService` / `OrderService` RPCs give `gogen` real paginated and validated operations to generate from.

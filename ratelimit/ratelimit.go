@@ -31,6 +31,8 @@ type Limiter interface {
 	Reset(ctx context.Context, key string) error
 
 	// Close shuts down the limiter and releases associated resources.
+	// Instant-close: no context, per the close-shape standard (see
+	// container/README.md).
 	Close() error
 
 	// Name returns the adapter name for the limiter.

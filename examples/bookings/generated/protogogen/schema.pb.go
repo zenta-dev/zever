@@ -4,10 +4,10 @@
 // 	protoc        (unknown)
 // source: schema.proto
 
-package zengov1
+package zeverv1
 
 import (
-	_ "github.com/zenta-dev/zever/examples/bookings/generated/protogogen/zengo"
+	_ "github.com/zenta-dev/zever/examples/bookings/generated/protogogen/zever"
 	_ "google.golang.org/genproto/googleapis/api/annotations"
 	protoreflect "google.golang.org/protobuf/reflect/protoreflect"
 	protoimpl "google.golang.org/protobuf/runtime/protoimpl"
@@ -692,7 +692,7 @@ var File_schema_proto protoreflect.FileDescriptor
 
 const file_schema_proto_rawDesc = "" +
 	"\n" +
-	"\fschema.proto\x12\bzengo.v1\x1a\x1fgoogle/protobuf/timestamp.proto\x1a\x1cgoogle/api/annotations.proto\x1a\x17zengo/annotations.proto\"\x8c\x01\n" +
+	"\fschema.proto\x12\bzever.v1\x1a\x1fgoogle/protobuf/timestamp.proto\x1a\x1cgoogle/api/annotations.proto\x1a\x17zever/annotations.proto\"\x8c\x01\n" +
 	"\x04User\x12\x0e\n" +
 	"\x02id\x18\x01 \x01(\tR\x02id\x12\x14\n" +
 	"\x05email\x18\x02 \x01(\tR\x05email\x12#\n" +
@@ -750,14 +750,14 @@ const file_schema_proto_rawDesc = "" +
 	"\x06rating\x18\x02 \x01(\x03R\x06rating\x12\x12\n" +
 	"\x04body\x18\x03 \x01(\tR\x04body2\xcf\x04\n" +
 	"\x0eBookingService\x12V\n" +
-	"\vCreateSpace\x12\x1c.zengo.v1.CreateSpaceRequest\x1a\x0f.zengo.v1.Space\"\x18\xca\xda\x18\x02\b\x01\x82\xd3\xe4\x93\x02\f:\x01*\"\a/spaces\x12Q\n" +
+	"\vCreateSpace\x12\x1c.zever.v1.CreateSpaceRequest\x1a\x0f.zever.v1.Space\"\x18\xca\xda\x18\x02\b\x01\x82\xd3\xe4\x93\x02\f:\x01*\"\a/spaces\x12Q\n" +
 	"\n" +
-	"ListSpaces\x12\x1b.zengo.v1.ListSpacesRequest\x1a\x0f.zengo.v1.Space\"\x15\xca\xda\x18\x02\b\x01\x82\xd3\xe4\x93\x02\t\x12\a/spaces\x12R\n" +
-	"\bGetSpace\x12\x19.zengo.v1.GetSpaceRequest\x1a\x0f.zengo.v1.Space\"\x1a\xca\xda\x18\x02\b\x01\x82\xd3\xe4\x93\x02\x0e\x12\f/spaces/{id}\x12^\n" +
-	"\rCreateBooking\x12\x1e.zengo.v1.CreateBookingRequest\x1a\x11.zengo.v1.Booking\"\x1a\xca\xda\x18\x02\b\x01\x82\xd3\xe4\x93\x02\x0e:\x01*\"\t/bookings\x12\x87\x01\n" +
-	"\rCancelBooking\x12\x1e.zengo.v1.CancelBookingRequest\x1a\x11.zengo.v1.Booking\"C\xca\xda\x18\x02\b\x01\xd2\xda\x18#\n" +
+	"ListSpaces\x12\x1b.zever.v1.ListSpacesRequest\x1a\x0f.zever.v1.Space\"\x15\xca\xda\x18\x02\b\x01\x82\xd3\xe4\x93\x02\t\x12\a/spaces\x12R\n" +
+	"\bGetSpace\x12\x19.zever.v1.GetSpaceRequest\x1a\x0f.zever.v1.Space\"\x1a\xca\xda\x18\x02\b\x01\x82\xd3\xe4\x93\x02\x0e\x12\f/spaces/{id}\x12^\n" +
+	"\rCreateBooking\x12\x1e.zever.v1.CreateBookingRequest\x1a\x11.zever.v1.Booking\"\x1a\xca\xda\x18\x02\b\x01\x82\xd3\xe4\x93\x02\x0e:\x01*\"\t/bookings\x12\x87\x01\n" +
+	"\rCancelBooking\x12\x1e.zever.v1.CancelBookingRequest\x1a\x11.zever.v1.Booking\"C\xca\xda\x18\x02\b\x01\xd2\xda\x18#\n" +
 	"\x0ebooking.cancel\x12\aBooking\x1a\bguest_id\x82\xd3\xe4\x93\x02\x10*\x0e/bookings/{id}\x12T\n" +
-	"\tAddReview\x12\x1a.zengo.v1.AddReviewRequest\x1a\x10.zengo.v1.Review\"\x19\xca\xda\x18\x02\b\x01\x82\xd3\xe4\x93\x02\r:\x01*\"\b/reviewsB0Z.github.com/zenta-dev/zever/gen/zengov1;zengov1b\x06proto3"
+	"\tAddReview\x12\x1a.zever.v1.AddReviewRequest\x1a\x10.zever.v1.Review\"\x19\xca\xda\x18\x02\b\x01\x82\xd3\xe4\x93\x02\r:\x01*\"\b/reviewsB0Z.github.com/zenta-dev/zever/gen/zeverv1;zeverv1b\x06proto3"
 
 var (
 	file_schema_proto_rawDescOnce sync.Once
@@ -773,35 +773,35 @@ func file_schema_proto_rawDescGZIP() []byte {
 
 var file_schema_proto_msgTypes = make([]protoimpl.MessageInfo, 10)
 var file_schema_proto_goTypes = []any{
-	(*User)(nil),                  // 0: zengo.v1.User
-	(*Space)(nil),                 // 1: zengo.v1.Space
-	(*Booking)(nil),               // 2: zengo.v1.Booking
-	(*Review)(nil),                // 3: zengo.v1.Review
-	(*CreateSpaceRequest)(nil),    // 4: zengo.v1.CreateSpaceRequest
-	(*ListSpacesRequest)(nil),     // 5: zengo.v1.ListSpacesRequest
-	(*GetSpaceRequest)(nil),       // 6: zengo.v1.GetSpaceRequest
-	(*CreateBookingRequest)(nil),  // 7: zengo.v1.CreateBookingRequest
-	(*CancelBookingRequest)(nil),  // 8: zengo.v1.CancelBookingRequest
-	(*AddReviewRequest)(nil),      // 9: zengo.v1.AddReviewRequest
+	(*User)(nil),                  // 0: zever.v1.User
+	(*Space)(nil),                 // 1: zever.v1.Space
+	(*Booking)(nil),               // 2: zever.v1.Booking
+	(*Review)(nil),                // 3: zever.v1.Review
+	(*CreateSpaceRequest)(nil),    // 4: zever.v1.CreateSpaceRequest
+	(*ListSpacesRequest)(nil),     // 5: zever.v1.ListSpacesRequest
+	(*GetSpaceRequest)(nil),       // 6: zever.v1.GetSpaceRequest
+	(*CreateBookingRequest)(nil),  // 7: zever.v1.CreateBookingRequest
+	(*CancelBookingRequest)(nil),  // 8: zever.v1.CancelBookingRequest
+	(*AddReviewRequest)(nil),      // 9: zever.v1.AddReviewRequest
 	(*timestamppb.Timestamp)(nil), // 10: google.protobuf.Timestamp
 }
 var file_schema_proto_depIdxs = []int32{
-	10, // 0: zengo.v1.User.created_at:type_name -> google.protobuf.Timestamp
-	10, // 1: zengo.v1.Space.created_at:type_name -> google.protobuf.Timestamp
-	10, // 2: zengo.v1.Booking.created_at:type_name -> google.protobuf.Timestamp
-	10, // 3: zengo.v1.Review.created_at:type_name -> google.protobuf.Timestamp
-	4,  // 4: zengo.v1.BookingService.CreateSpace:input_type -> zengo.v1.CreateSpaceRequest
-	5,  // 5: zengo.v1.BookingService.ListSpaces:input_type -> zengo.v1.ListSpacesRequest
-	6,  // 6: zengo.v1.BookingService.GetSpace:input_type -> zengo.v1.GetSpaceRequest
-	7,  // 7: zengo.v1.BookingService.CreateBooking:input_type -> zengo.v1.CreateBookingRequest
-	8,  // 8: zengo.v1.BookingService.CancelBooking:input_type -> zengo.v1.CancelBookingRequest
-	9,  // 9: zengo.v1.BookingService.AddReview:input_type -> zengo.v1.AddReviewRequest
-	1,  // 10: zengo.v1.BookingService.CreateSpace:output_type -> zengo.v1.Space
-	1,  // 11: zengo.v1.BookingService.ListSpaces:output_type -> zengo.v1.Space
-	1,  // 12: zengo.v1.BookingService.GetSpace:output_type -> zengo.v1.Space
-	2,  // 13: zengo.v1.BookingService.CreateBooking:output_type -> zengo.v1.Booking
-	2,  // 14: zengo.v1.BookingService.CancelBooking:output_type -> zengo.v1.Booking
-	3,  // 15: zengo.v1.BookingService.AddReview:output_type -> zengo.v1.Review
+	10, // 0: zever.v1.User.created_at:type_name -> google.protobuf.Timestamp
+	10, // 1: zever.v1.Space.created_at:type_name -> google.protobuf.Timestamp
+	10, // 2: zever.v1.Booking.created_at:type_name -> google.protobuf.Timestamp
+	10, // 3: zever.v1.Review.created_at:type_name -> google.protobuf.Timestamp
+	4,  // 4: zever.v1.BookingService.CreateSpace:input_type -> zever.v1.CreateSpaceRequest
+	5,  // 5: zever.v1.BookingService.ListSpaces:input_type -> zever.v1.ListSpacesRequest
+	6,  // 6: zever.v1.BookingService.GetSpace:input_type -> zever.v1.GetSpaceRequest
+	7,  // 7: zever.v1.BookingService.CreateBooking:input_type -> zever.v1.CreateBookingRequest
+	8,  // 8: zever.v1.BookingService.CancelBooking:input_type -> zever.v1.CancelBookingRequest
+	9,  // 9: zever.v1.BookingService.AddReview:input_type -> zever.v1.AddReviewRequest
+	1,  // 10: zever.v1.BookingService.CreateSpace:output_type -> zever.v1.Space
+	1,  // 11: zever.v1.BookingService.ListSpaces:output_type -> zever.v1.Space
+	1,  // 12: zever.v1.BookingService.GetSpace:output_type -> zever.v1.Space
+	2,  // 13: zever.v1.BookingService.CreateBooking:output_type -> zever.v1.Booking
+	2,  // 14: zever.v1.BookingService.CancelBooking:output_type -> zever.v1.Booking
+	3,  // 15: zever.v1.BookingService.AddReview:output_type -> zever.v1.Review
 	10, // [10:16] is the sub-list for method output_type
 	4,  // [4:10] is the sub-list for method input_type
 	4,  // [4:4] is the sub-list for extension type_name

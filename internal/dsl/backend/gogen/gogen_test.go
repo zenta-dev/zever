@@ -508,7 +508,7 @@ func TestGRPCPoliciesMapKeyedByFullMethodName(t *testing.T) {
 }
 
 // TestNewDefaultPBImportPathUnchanged locks in that New()'s zero-config
-// output uses the legacy "/zengo/"-prefixed formula, not the flat one
+// output uses the legacy "/zever/"-prefixed formula, not the flat one
 // NewWithPBImportRoot uses. No zever gen package exists yet, so this
 // default is override-required for real projects (see defaultPBImportRoot).
 func TestNewDefaultPBImportPathUnchanged(t *testing.T) {
@@ -526,15 +526,15 @@ func TestNewDefaultPBImportPathUnchanged(t *testing.T) {
 
 	types := string(out["app/types.go"])
 
-	if !strings.Contains(types, `pb "github.com/zenta-dev/zever/gen/zengov1"`) {
-		t.Fatalf("New()'s default import path changed, want the legacy zengov1 convention:\n%s", types)
+	if !strings.Contains(types, `pb "github.com/zenta-dev/zever/gen/zeverv1"`) {
+		t.Fatalf("New()'s default import path changed, want the legacy zeverv1 convention:\n%s", types)
 	}
 }
 
 // TestNewWithPBImportRootUsesFlatFormula is the regression case a real
 // external project (schema/v1/iam/*.zen) hit: gogen's generated code must
 // import protogogen's actual "paths=source_relative" output layout
-// (<root>/<module>), not the "/zengo/"-prefixed convention that's specific
+// (<root>/<module>), not the "/zever/"-prefixed convention that's specific
 // to this repo's own committed examples.
 func TestNewWithPBImportRootUsesFlatFormula(t *testing.T) {
 	file := compileSchema(t, `entity Task {
@@ -560,8 +560,8 @@ func TestNewWithPBImportRootUsesFlatFormula(t *testing.T) {
 
 	types := string(out["app/types.go"])
 
-	if strings.Contains(types, "/zengo/") || strings.Contains(types, "zengov1") {
-		t.Fatalf("NewWithPBImportRoot must not apply the /zengo/-prefixed formula:\n%s", types)
+	if strings.Contains(types, "/zever/") || strings.Contains(types, "zeverv1") {
+		t.Fatalf("NewWithPBImportRoot must not apply the /zever/-prefixed formula:\n%s", types)
 	}
 
 	if !strings.Contains(types, `pb "api/generated/protogogen"`) {
@@ -570,7 +570,7 @@ func TestNewWithPBImportRootUsesFlatFormula(t *testing.T) {
 }
 
 // TestNewWithPBImportRootNamedModuleIsFlat is the named-module counterpart:
-// "<root>/<module>", no "/zengo/" segment inserted.
+// "<root>/<module>", no "/zever/" segment inserted.
 func TestNewWithPBImportRootNamedModuleIsFlat(t *testing.T) {
 	file := compileSchema(t, `entity User {
 		id: uuid @primary

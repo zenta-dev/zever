@@ -4,7 +4,7 @@
 // - protoc             (unknown)
 // source: schema.proto
 
-package zengov1
+package zeverv1
 
 import (
 	context "context"
@@ -19,12 +19,12 @@ import (
 const _ = grpc.SupportPackageIsVersion9
 
 const (
-	BookingService_CreateSpace_FullMethodName   = "/zengo.v1.BookingService/CreateSpace"
-	BookingService_ListSpaces_FullMethodName    = "/zengo.v1.BookingService/ListSpaces"
-	BookingService_GetSpace_FullMethodName      = "/zengo.v1.BookingService/GetSpace"
-	BookingService_CreateBooking_FullMethodName = "/zengo.v1.BookingService/CreateBooking"
-	BookingService_CancelBooking_FullMethodName = "/zengo.v1.BookingService/CancelBooking"
-	BookingService_AddReview_FullMethodName     = "/zengo.v1.BookingService/AddReview"
+	BookingService_CreateSpace_FullMethodName   = "/zever.v1.BookingService/CreateSpace"
+	BookingService_ListSpaces_FullMethodName    = "/zever.v1.BookingService/ListSpaces"
+	BookingService_GetSpace_FullMethodName      = "/zever.v1.BookingService/GetSpace"
+	BookingService_CreateBooking_FullMethodName = "/zever.v1.BookingService/CreateBooking"
+	BookingService_CancelBooking_FullMethodName = "/zever.v1.BookingService/CancelBooking"
+	BookingService_AddReview_FullMethodName     = "/zever.v1.BookingService/AddReview"
 )
 
 // BookingServiceClient is the client API for BookingService service.
@@ -278,7 +278,7 @@ func _BookingService_AddReview_Handler(srv interface{}, ctx context.Context, dec
 // It's only intended for direct use with grpc.RegisterService,
 // and not to be introspected or modified (even as a copy)
 var BookingService_ServiceDesc = grpc.ServiceDesc{
-	ServiceName: "zengo.v1.BookingService",
+	ServiceName: "zever.v1.BookingService",
 	HandlerType: (*BookingServiceServer)(nil),
 	Methods: []grpc.MethodDesc{
 		{

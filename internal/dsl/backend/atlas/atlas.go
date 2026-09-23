@@ -10,7 +10,7 @@
 //
 // This package also exposes a deliberately simpler sibling renderer
 // (render_ddl.go) that turns the same IR into plain "CREATE TABLE IF NOT
-// EXISTS" DDL for the `zengo db migrate` bootstrap path. That DDL path is
+// EXISTS" DDL for the `zever db migrate` bootstrap path. That DDL path is
 // NOT Atlas-style migration planning: it has no schema diffing, no ALTER,
 // no down migrations, and no drift detection. See RenderSchemaDDL.
 package atlas

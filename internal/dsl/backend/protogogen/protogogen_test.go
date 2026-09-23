@@ -53,7 +53,7 @@ func TestGenerateProducesPBAndGRPCFiles(t *testing.T) {
 	want := []string{
 		"schema.pb.go",
 		"schema_grpc.pb.go",
-		"zengo/annotations.pb.go",
+		"zever/annotations.pb.go",
 	}
 
 	for _, path := range want {
@@ -123,7 +123,7 @@ func TestNewDefaultAnnotationsImportUnchanged(t *testing.T) {
 		t.Fatalf("Generate: %v", err)
 	}
 
-	if !strings.Contains(string(out["schema.pb.go"]), "github.com/zenta-dev/zever/gen/zengo/annotations") {
+	if !strings.Contains(string(out["schema.pb.go"]), "github.com/zenta-dev/zever/gen/zever/annotations") {
 		t.Fatalf("New()'s schema.pb.go no longer imports the default annotations package:\n%s", out["schema.pb.go"])
 	}
 }
@@ -143,7 +143,7 @@ func TestNewWithAnnotationsGoPackageRootAppliesToGeneratedGo(t *testing.T) {
 		t.Fatalf("resolve errors: %v", diags)
 	}
 
-	const overrideRoot = "api/generated/protogogen/zengo/annotations"
+	const overrideRoot = "api/generated/protogogen/zever/annotations"
 
 	out, err := NewWithAnnotationsGoPackageRoot(overrideRoot).Generate(schema)
 	if err != nil {
@@ -152,7 +152,7 @@ func TestNewWithAnnotationsGoPackageRootAppliesToGeneratedGo(t *testing.T) {
 
 	got := string(out["schema.pb.go"])
 
-	if strings.Contains(got, "github.com/zenta-dev/zever/gen/zengo/annotations") {
+	if strings.Contains(got, "github.com/zenta-dev/zever/gen/zever/annotations") {
 		t.Fatalf("schema.pb.go still imports the default annotations package despite the override:\n%s", got)
 	}
 

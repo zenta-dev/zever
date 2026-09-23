@@ -1,12 +1,28 @@
 syntax = "proto3";
 
-package zengo.v1;
+package zever.v1;
 
 import "google/protobuf/timestamp.proto";
 import "google/api/annotations.proto";
-import "zengo/annotations.proto";
+import "zever/annotations.proto";
 
-option go_package = "github.com/zenta-dev/zever/gen/zengov1;zengov1";
+option go_package = "github.com/zenta-dev/zever/gen/zeverv1;zeverv1";
+
+message User {
+  string id = 1;
+  string email = 2;
+  string password_hash = 3;
+  google.protobuf.Timestamp created_at = 4;
+}
+
+message Note {
+  string id = 1;
+  string user_id = 2;
+  string title = 3;
+  string body = 4;
+  bool done = 5;
+  google.protobuf.Timestamp created_at = 6;
+}
 
 message GrpcTask {
   string id = 1;
@@ -14,6 +30,57 @@ message GrpcTask {
   string title = 3;
   string body = 4;
   google.protobuf.Timestamp created_at = 5;
+}
+
+message ListNotesRequest {
+  string user_id = 1;
+}
+
+message CreateNoteRequest {
+  string title = 1;
+  string body = 2;
+}
+
+message GetNoteRequest {
+  string id = 1;
+}
+
+message UpdateNoteRequest {
+  string id = 1;
+  string title = 2;
+  string body = 3;
+  bool done = 4;
+}
+
+message DeleteNoteRequest {
+  string id = 1;
+}
+
+service NoteService {
+  rpc ListNotes(ListNotesRequest) returns (Note) {
+    option (google.api.http) = { get: "/notes" };
+    option (zever.annotations.v1.auth) = { required: true };
+  }
+
+  rpc CreateNote(CreateNoteRequest) returns (Note) {
+    option (google.api.http) = { post: "/notes" body: "*" };
+    option (zever.annotations.v1.auth) = { required: true };
+  }
+
+  rpc GetNote(GetNoteRequest) returns (Note) {
+    option (google.api.http) = { get: "/notes/{id}" };
+    option (zever.annotations.v1.auth) = { required: true };
+  }
+
+  rpc UpdateNote(UpdateNoteRequest) returns (Note) {
+    option (google.api.http) = { patch: "/notes/{id}" body: "*" };
+    option (zever.annotations.v1.auth) = { required: true };
+  }
+
+  rpc DeleteNote(DeleteNoteRequest) returns (Note) {
+    option (google.api.http) = { delete: "/notes/{id}" };
+    option (zever.annotations.v1.auth) = { required: true };
+  }
 }
 
 message CreateTaskRequest {
@@ -32,17 +99,17 @@ message DeleteTaskRequest {
 service GrpcTaskService {
   rpc CreateTask(CreateTaskRequest) returns (GrpcTask) {
     option (google.api.http) = { post: "/grpc-tasks" body: "*" };
-    option (zengo.annotations.v1.auth) = { required: true };
+    option (zever.annotations.v1.auth) = { required: true };
   }
 
   rpc GetTask(GetTaskRequest) returns (GrpcTask) {
     option (google.api.http) = { get: "/grpc-tasks/{id}" };
-    option (zengo.annotations.v1.auth) = { required: true };
+    option (zever.annotations.v1.auth) = { required: true };
   }
 
   rpc DeleteTask(DeleteTaskRequest) returns (GrpcTask) {
     option (google.api.http) = { delete: "/grpc-tasks/{id}" };
-    option (zengo.annotations.v1.auth) = { required: true };
-    option (zengo.annotations.v1.permission) = { check: "grpc_task.delete", resource: "GrpcTask", owner_field: "user_id" };
+    option (zever.annotations.v1.auth) = { required: true };
+    option (zever.annotations.v1.permission) = { check: "grpc_task.delete", resource: "GrpcTask", owner_field: "user_id" };
   }
 }

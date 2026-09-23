@@ -40,9 +40,12 @@ func (e CloseTimeoutError) Error() string {
 	return fmt.Sprintf("container: close %s timed out: %v", e.Service, e.Err)
 }
 
-// Unwrap returns the underlying timeout error.
+// Unwrap returns ErrCloseTimeout joined with the underlying timeout error.
 func (e CloseTimeoutError) Unwrap() error {
-	return e.Err
+	if e.Err != nil {
+		return errors.Join(ErrCloseTimeout, e.Err)
+	}
+	return ErrCloseTimeout
 }
 
 // ClosePanicError reports a service whose Close panicked.

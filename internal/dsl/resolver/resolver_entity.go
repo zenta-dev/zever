@@ -15,7 +15,7 @@ import (
 var scalarTypes = map[string]ir.ScalarType{
 	"uuid": ir.TUUID, "string": ir.TString, "int32": ir.TInt32, "int64": ir.TInt64,
 	"float32": ir.TFloat32, "float64": ir.TFloat64, "bool": ir.TBool,
-	"timestamp": ir.TTimestamp, "date": ir.TDate, "bytes": ir.TBytes, "json": ir.TJSON,
+	"timestamp": ir.TTimestamp, "datetime": ir.TTimestamp, "date": ir.TDate, "bytes": ir.TBytes, "json": ir.TJSON,
 }
 
 // ScalarTypeNames returns the canonical, sorted list of builtin scalar type
@@ -242,7 +242,7 @@ func resolveFieldAttribute(decl *ast.EntityDecl, fd *ast.FieldDecl, attr *ast.At
 
 // resolveRenamedFromAttribute decodes @renamed_from("old_name"), which
 // records that this field's column used to be called something else so that
-// `zengo db migrate` can emit a RENAME COLUMN instead of the drop+add pair a
+// `zever db migrate` can emit a RENAME COLUMN instead of the drop+add pair a
 // names-only diff would otherwise produce.
 //
 // It requires exactly one non-empty string-literal argument naming a column

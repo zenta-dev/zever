@@ -76,7 +76,7 @@ func TestPBGoParamTypeFallback(t *testing.T) {
 }
 
 // TestNewDefaultWithNamedModule covers pbGoPackage's legacy named-module
-// formula under New(): "<root>/zengo/<module>".
+// formula under New(): "<root>/zever/<module>".
 func TestNewDefaultWithNamedModule(t *testing.T) {
 	file := compileSchema(t, `entity User {
 	id: uuid @primary
@@ -100,8 +100,8 @@ service UserService {
 	}
 
 	types := string(out["iam/types.go"])
-	if !strings.Contains(types, `pb "github.com/zenta-dev/zever/gen/zengo/iam"`) {
-		t.Fatalf("New() named module must use the legacy /zengo/ formula, got:\n%s", types)
+	if !strings.Contains(types, `pb "github.com/zenta-dev/zever/gen/zever/iam"`) {
+		t.Fatalf("New() named module must use the legacy /zever/ formula, got:\n%s", types)
 	}
 }
 

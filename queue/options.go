@@ -20,11 +20,11 @@ type RedisOptions struct {
 // Options configures queue behavior and adapter-specific settings.
 type Options struct {
 	// VisibilityTimeout is the duration a popped message remains invisible before reclaim.
-	VisibilityTimeout time.Duration
+	VisibilityTimeout time.Duration `json:"visibilitytimeout" toml:"visibilitytimeout" yaml:"visibilitytimeout"`
 	// PollTimeout is the duration Pop waits for a message before returning empty.
-	PollTimeout time.Duration
+	PollTimeout time.Duration `json:"polltimeout" toml:"polltimeout" yaml:"polltimeout"`
 	// Buffer is the maximum number of buffered ready messages per topic.
-	Buffer int
+	Buffer int `json:"buffer" toml:"buffer" yaml:"buffer"`
 
 	// RedisOptions holds Redis-specific connection configuration.
 	RedisOptions

@@ -68,7 +68,7 @@ var signatureSpecs = map[string]sigSpec{
 		{"value", "the default value: a literal matching the field's scalar type, true/false for bool fields, an enum member for enum fields, or now() for timestamp fields"},
 	}},
 	"renamed_from": {params: []sigParam{
-		{"old_name", "the field's previous column name, so `zengo db migrate` emits a rename instead of a drop+add"},
+		{"old_name", "the field's previous column name, so `zever db migrate` emits a rename instead of a drop+add"},
 	}},
 }
 

@@ -1,7 +1,7 @@
 // app.zen — comprehensive demo schema for demoapp.
 //
-// Run: zengo compile schema/app.zen --backend=zenorm,proto,atlas
-//      zengo db migrate --adapter=sqlite --dsn=data/app.db schema/app.zen
+// Run: zever compile schema/app.zen --backend=zenorm,proto,atlas
+//      zever db migrate --adapter=sqlite --dsn=data/app.db schema/app.zen
 
 entity User {
   id: uuid @primary

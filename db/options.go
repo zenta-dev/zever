@@ -15,18 +15,18 @@ import (
 // Path holds the SQLite database file path.
 type Options struct {
 	// DSN holds the Postgres connection string.
-	DSN string
+	DSN string `json:"dsn" toml:"dsn" yaml:"dsn"`
 	// MaxConns caps the connection pool size.
-	MaxConns int
+	MaxConns int `json:"maxconns" toml:"maxconns" yaml:"maxconns"`
 	// MinConns is the minimum pool size for Postgres and the idle
 	// connection target for SQLite.
-	MinConns int
+	MinConns int `json:"minconns" toml:"minconns" yaml:"minconns"`
 	// MaxConnLifetime bounds how long a pooled connection may be reused.
-	MaxConnLifetime time.Duration
+	MaxConnLifetime time.Duration `json:"maxconnlifetime" toml:"maxconnlifetime" yaml:"maxconnlifetime"`
 	// MaxConnIdleTime bounds how long a pooled connection may stay idle.
-	MaxConnIdleTime time.Duration
+	MaxConnIdleTime time.Duration `json:"maxconnidletime" toml:"maxconnidletime" yaml:"maxconnidletime"`
 	// Path holds the SQLite database file path.
-	Path string
+	Path string `json:"path" toml:"path" yaml:"path"`
 }
 
 // Validate checks options for consistency, joining all violations.

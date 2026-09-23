@@ -4,10 +4,10 @@
 // 	protoc        (unknown)
 // source: schema.proto
 
-package zengov1
+package zeverv1
 
 import (
-	_ "github.com/zenta-dev/zever/gen/zengo/annotations"
+	_ "github.com/zenta-dev/zever/gen/zever/annotations"
 	_ "google.golang.org/genproto/googleapis/api/annotations"
 	protoreflect "google.golang.org/protobuf/reflect/protoreflect"
 	protoimpl "google.golang.org/protobuf/runtime/protoimpl"
@@ -123,17 +123,17 @@ var File_schema_proto protoreflect.FileDescriptor
 
 const file_schema_proto_rawDesc = "" +
 	"\n" +
-	"\fschema.proto\x12\bzengo.v1\x1a\x1cgoogle/api/annotations.proto\x1a\x17zengo/annotations.proto\"0\n" +
+	"\fschema.proto\x12\bzever.v1\x1a\x1cgoogle/api/annotations.proto\x1a\x17zever/annotations.proto\"0\n" +
 	"\x04Ping\x12\x0e\n" +
 	"\x02id\x18\x01 \x01(\tR\x02id\x12\x18\n" +
 	"\amessage\x18\x02 \x01(\tR\amessage\"+\n" +
 	"\x0fSendPingRequest\x12\x18\n" +
 	"\amessage\x18\x01 \x01(\tR\amessage2m\n" +
 	"\vPingService\x12^\n" +
-	"\bSendPing\x12\x19.zengo.v1.SendPingRequest\x1a\x0e.zengo.v1.Ping\"'\xca\xda\x18\x02\b\x01\xda\xda\x18\r\n" +
+	"\bSendPing\x12\x19.zever.v1.SendPingRequest\x1a\x0e.zever.v1.Ping\"'\xca\xda\x18\x02\b\x01\xda\xda\x18\r\n" +
 	"\v\n" +
 	"\tNOT_FOUND\x82\xd3\xe4\x93\x02\n" +
-	":\x01*\"\x05/pingB0Z.github.com/zenta-dev/zever/gen/zengov1;zengov1b\x06proto3"
+	":\x01*\"\x05/pingB0Z.github.com/zenta-dev/zever/gen/zeverv1;zeverv1b\x06proto3"
 
 var (
 	file_schema_proto_rawDescOnce sync.Once
@@ -149,12 +149,12 @@ func file_schema_proto_rawDescGZIP() []byte {
 
 var file_schema_proto_msgTypes = make([]protoimpl.MessageInfo, 2)
 var file_schema_proto_goTypes = []any{
-	(*Ping)(nil),            // 0: zengo.v1.Ping
-	(*SendPingRequest)(nil), // 1: zengo.v1.SendPingRequest
+	(*Ping)(nil),            // 0: zever.v1.Ping
+	(*SendPingRequest)(nil), // 1: zever.v1.SendPingRequest
 }
 var file_schema_proto_depIdxs = []int32{
-	1, // 0: zengo.v1.PingService.SendPing:input_type -> zengo.v1.SendPingRequest
-	0, // 1: zengo.v1.PingService.SendPing:output_type -> zengo.v1.Ping
+	1, // 0: zever.v1.PingService.SendPing:input_type -> zever.v1.SendPingRequest
+	0, // 1: zever.v1.PingService.SendPing:output_type -> zever.v1.Ping
 	1, // [1:2] is the sub-list for method output_type
 	0, // [0:1] is the sub-list for method input_type
 	0, // [0:0] is the sub-list for extension type_name

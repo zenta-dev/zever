@@ -1,11 +1,11 @@
 syntax = "proto3";
 
-package zengo.v1;
+package zever.v1;
 
 import "google/api/annotations.proto";
-import "zengo/annotations.proto";
+import "zever/annotations.proto";
 
-option go_package = "github.com/zenta-dev/zever/gen/zengov1;zengov1";
+option go_package = "github.com/zenta-dev/zever/gen/zeverv1;zeverv1";
 
 message Order {
   string id = 1;
@@ -19,8 +19,8 @@ message GetOrderRequest {
 service OrderService {
   rpc GetOrder(GetOrderRequest) returns (Order) {
     option (google.api.http) = { get: "/v1/orders/{id}" };
-    option (zengo.annotations.v1.auth) = { required: true, roles: ["owner", "admin"] };
-    option (zengo.annotations.v1.permission) = { check: "owns_order", resource: "Order", owner_field: "user_id" };
-    option (zengo.annotations.v1.errors) = { cases: [{ code: "NOT_FOUND" }, { code: "PERMISSION_DENIED", message: "caller does not own this order" }] };
+    option (zever.annotations.v1.auth) = { required: true, roles: ["owner", "admin"] };
+    option (zever.annotations.v1.permission) = { check: "owns_order", resource: "Order", owner_field: "user_id" };
+    option (zever.annotations.v1.errors) = { cases: [{ code: "NOT_FOUND" }, { code: "PERMISSION_DENIED", message: "caller does not own this order" }] };
   }
 }

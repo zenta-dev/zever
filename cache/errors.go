@@ -14,8 +14,11 @@ var ErrClosed = errors.New("cache: closed")
 // ErrNilFactory is returned when an adapter factory is nil.
 var ErrNilFactory = errors.New("cache: nil factory")
 
-// ErrDuplicate is returned on duplicate adapter registration.
-var ErrDuplicate = errors.New("cache: duplicate registration")
+// ErrDuplicateAdapter is returned on duplicate adapter registration.
+var ErrDuplicateAdapter = errors.New("cache: duplicate registration")
+
+// ErrDuplicate aliases ErrDuplicateAdapter for compatibility.
+var ErrDuplicate = ErrDuplicateAdapter
 
 // ErrUnknownAdapter is returned for an unregistered adapter.
 var ErrUnknownAdapter = errors.New("cache: unknown adapter")
@@ -71,7 +74,7 @@ type InvalidAdapterError struct {
 
 // Error returns a human-readable invalid-adapter message.
 func (e InvalidAdapterError) Error() string {
-	return fmt.Sprintf("cache: invalid adapter: %q", e.Adapter)
+	return fmt.Sprintf("%s: %q", ErrInvalidAdapter, e.Adapter)
 }
 
 // Unwrap returns ErrInvalidAdapter.
@@ -87,12 +90,12 @@ type DuplicateError struct {
 
 // Error returns a human-readable duplicate-registration message.
 func (e DuplicateError) Error() string {
-	return fmt.Sprintf("%s: %s", ErrDuplicate, e.Adapter.String())
+	return fmt.Sprintf("%s: %s", ErrDuplicateAdapter, e.Adapter.String())
 }
 
-// Unwrap returns ErrDuplicate.
+// Unwrap returns ErrDuplicateAdapter.
 func (e DuplicateError) Unwrap() error {
-	return ErrDuplicate
+	return ErrDuplicateAdapter
 }
 
 // UnknownAdapterError reports a lookup of an unregistered adapter.

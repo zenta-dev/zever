@@ -96,7 +96,7 @@ func TestErrSentinels_zeverPrefixed(t *testing.T) {
 func TestSubcommandHandlers_coversEverySubcommand(t *testing.T) {
 	want := []string{
 		"new", "compile", "doctor", "config", "routes", "check", "breaking", "fmt",
-		"explain", "check-boundaries", "graph", "generate", "extract",
+		"explain", "check-boundaries", "check:boundaries", "graph", "generate", "extract",
 		"serve", "dev", "queue:work", "schedule:run", "tinker", "db",
 	}
 	for _, name := range want {

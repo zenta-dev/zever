@@ -43,7 +43,7 @@ const codeGeneratorParameter = "paths=source_relative"
 
 // buildCodeGeneratorRequest compiles protoFiles (the proto backend's own
 // Generate output: one file per ir.Module plus the shared
-// zengo/annotations.proto) into real descriptors via protocompile, then
+// zever/annotations.proto) into real descriptors via protocompile, then
 // assembles the single *pluginpb.CodeGeneratorRequest that both the in-process
 // protoc-gen-go path and the protoc-gen-go-grpc subprocess path consume --
 // exactly the struct real protoc builds before invoking any plugin. Shared
