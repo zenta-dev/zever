@@ -4,10 +4,12 @@ import (
 	"context"
 	"embed"
 	"encoding/json"
+	"errors"
 	"net/http"
 	"strconv"
 	"strings"
 
+	"github.com/zenta-dev/zever/apperror"
 	"github.com/zenta-dev/zever/auth"
 	"github.com/zenta-dev/zever/db"
 	"github.com/zenta-dev/zever/flag"
@@ -17,6 +19,8 @@ import (
 	"github.com/zenta-dev/zever/queue"
 	"github.com/zenta-dev/zever/ratelimit"
 	"github.com/zenta-dev/zever/router"
+
+	shopsvc "github.com/zenta-dev/zever/examples/showcase/internal/service/shop"
 )
 
 //go:embed locales/*.json
@@ -147,6 +151,30 @@ func (a *API) checkoutVersion(ctx context.Context) string {
 		return "v1"
 	}
 	return "v2"
+}
+
+// shopService builds the shared shop impl over the API's infra, so /api
+// handlers delegate to the same business logic as the generated wrappers.
+func (a *API) shopService() *shopsvc.ShopServiceImpl {
+	return shopsvc.NewShopServiceImpl(shopsvc.Deps{DB: a.DB, Queue: a.Queue})
+}
+
+// shopReq returns req with a context carrying the authenticated subject in
+// the form the shop impl understands (see shopsvc.ContextWithSubject).
+// Callers pass shopReq(req).Context() to the impl.
+func shopReq(req *http.Request) *http.Request {
+	return req.WithContext(shopsvc.ContextWithSubject(req.Context(), subject(req)))
+}
+
+// writeServiceError maps a service-layer error onto its HTTP status:
+// apperror errors use their code mapping, anything else is a 500.
+func writeServiceError(w http.ResponseWriter, err error) {
+	var appErr *apperror.Error
+	if errors.As(err, &appErr) {
+		writeError(w, appErr.Code().HTTPStatus(), appErr.Message())
+		return
+	}
+	writeError(w, http.StatusInternalServerError, "internal error")
 }
 
 // writeJSON encodes v as JSON with the given status.

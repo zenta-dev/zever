@@ -12,6 +12,9 @@ import (
 
 	"github.com/zenta-dev/zever/config"
 	"github.com/zenta-dev/zever/container"
+	"github.com/zenta-dev/zever/examples/showcase/internal/api"
+	"github.com/zenta-dev/zever/i18n"
+	"github.com/zenta-dev/zever/permission"
 
 	// Blank imports register the adapters this app selects.
 	_ "github.com/zenta-dev/zever/analytics/log"
@@ -57,6 +60,9 @@ const DefaultDBPath = "data/showcase.db"
 // overlaid by any zever.yaml in the working directory and by environment
 // variables, with a sqlite path filled in when nothing supplied one.
 //
+// Runtime defaults live here because internal/app is hand-owned/never
+// regenerated, so entrypoints stay pure CLI shape.
+//
 // The JWT secret (AUTH_JWT_SECRET) comes from the environment only and is
 // never defaulted here. Config fails closed when the secret is missing or
 // shorter than 32 bytes.
@@ -70,6 +76,15 @@ func Config() (*config.Config, error) {
 		dbc := cfg.DB
 		dbc.Options.Path = DefaultDBPath
 		cfg.DB = dbc
+	}
+
+	cfg.I18n.Options.Embed = i18n.EmbedOptions{FS: api.LocalesFS, Dir: "locales", Fallback: "en"}
+
+	if len(cfg.Permission.Options.Rules) == 0 {
+		cfg.Permission.Options.Rules = []permission.Rule{
+			{Role: "admin", Action: "product.delete"},
+			{Role: "user", Action: "product.delete", OwnedOnly: true, OwnedAttr: "owner"},
+		}
 	}
 
 	if len(cfg.Auth.Options.JWT.Secret) < 32 {

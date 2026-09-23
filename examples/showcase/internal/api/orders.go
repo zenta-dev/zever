@@ -10,6 +10,9 @@ import (
 
 	"github.com/zenta-dev/zever/db"
 	"github.com/zenta-dev/zever/queue"
+
+	genshop "github.com/zenta-dev/zever/examples/showcase/generated/gogen/shop"
+	pb "github.com/zenta-dev/zever/examples/showcase/generated/protogogen/shop"
 )
 
 type checkoutItem struct {
@@ -115,61 +118,30 @@ func (a *API) handleCheckout(w http.ResponseWriter, req *http.Request) {
 	})
 }
 
-// handleListOrders returns the caller's orders, newest first.
+// handleListOrders returns the caller's orders, newest first. Thin adapter
+// over the shared impl; the JSON shape is unchanged.
 func (a *API) handleListOrders(w http.ResponseWriter, req *http.Request) {
-	ctx := req.Context()
-	rows, err := a.DB.Query(ctx, `SELECT id, total_cents, status, priority, created_at FROM orders WHERE user_id = ? ORDER BY created_at DESC LIMIT 50`, subject(req))
+	resp, err := a.shopService().ListOrders(shopReq(req).Context(), &genshop.ListOrdersRequest{}, "", 0) //nolint:contextcheck // subject deliberately derived into the impl context.
 	if err != nil {
-		writeError(w, http.StatusInternalServerError, "lookup failed")
+		writeServiceError(w, err)
 		return
 	}
-	defer func() { _ = rows.Close() }()
-
 	out := []map[string]any{}
-	for rows.Next() {
-		var id, status, priority, created string
-		var total int64
-		if err := rows.Scan(&id, &total, &status, &priority, &created); err != nil {
-			writeError(w, http.StatusInternalServerError, "scan failed")
-			return
-		}
-		out = append(out, map[string]any{"id": id, "total_cents": total, "status": status, "priority": priority, "created_at": created})
-	}
-	if err := rows.Err(); err != nil {
-		writeError(w, http.StatusInternalServerError, "lookup failed")
-		return
+	for _, o := range resp.Items {
+		out = append(out, orderToMap(o))
 	}
 	writeJSON(w, http.StatusOK, out)
 }
 
-// handleGetOrder returns one order owned by the caller.
+// handleGetOrder returns one order owned by the caller. Thin adapter over
+// the shared impl, which enforces ownership.
 func (a *API) handleGetOrder(w http.ResponseWriter, req *http.Request) {
-	ctx := req.Context()
-	id := req.PathValue("id")
-	rows, err := a.DB.Query(ctx, `SELECT id, user_id, total_cents, status, priority, created_at FROM orders WHERE id = ?`, id)
+	o, err := a.shopService().GetOrder(shopReq(req).Context(), &genshop.GetOrderRequest{Id: req.PathValue("id")}) //nolint:contextcheck // subject deliberately derived into the impl context.
 	if err != nil {
-		writeError(w, http.StatusInternalServerError, "lookup failed")
+		writeServiceError(w, err)
 		return
 	}
-	var oid, owner, status, priority, created string
-	var total int64
-	if rows.Next() {
-		if err := rows.Scan(&oid, &owner, &total, &status, &priority, &created); err != nil {
-			_ = rows.Close()
-			writeError(w, http.StatusInternalServerError, "scan failed")
-			return
-		}
-	} else {
-		_ = rows.Close()
-		writeError(w, http.StatusNotFound, "not found")
-		return
-	}
-	_ = rows.Close()
-	if owner != subject(req) {
-		writeError(w, http.StatusForbidden, "no access")
-		return
-	}
-	writeJSON(w, http.StatusOK, map[string]any{"id": oid, "total_cents": total, "status": status, "priority": priority, "created_at": created})
+	writeJSON(w, http.StatusOK, orderToMap(o))
 }
 
 type reviewRequest struct {
@@ -253,6 +225,53 @@ func (a *API) handleListReviews(w http.ResponseWriter, req *http.Request) {
 		return
 	}
 	writeJSON(w, http.StatusOK, out)
+}
+
+// orderToMap maps a wire order onto the /api JSON shape.
+func orderToMap(o *genshop.Order) map[string]any {
+	created := ""
+	if ts := o.GetCreatedAt(); ts != nil {
+		created = ts.AsTime().UTC().Format(time.RFC3339Nano)
+	}
+	return map[string]any{
+		"id":          o.GetId(),
+		"total_cents": o.GetTotalCents(),
+		"status":      orderStatusName(o.GetStatus()),
+		"priority":    orderPriorityName(o.GetPriority()),
+		"created_at":  created,
+	}
+}
+
+// orderStatusName maps the wire status enum onto the stored status text.
+func orderStatusName(s pb.OrderStatus) string {
+	switch s {
+	case pb.OrderStatus_ORDER_STATUS_UNSPECIFIED:
+		return "unspecified"
+	case pb.OrderStatus_ORDER_STATUS_PENDING:
+		return "pending"
+	case pb.OrderStatus_ORDER_STATUS_PAID:
+		return "paid"
+	case pb.OrderStatus_ORDER_STATUS_SHIPPED:
+		return "shipped"
+	case pb.OrderStatus_ORDER_STATUS_CANCELLED:
+		return "cancelled"
+	default:
+		return "unspecified"
+	}
+}
+
+// orderPriorityName maps the wire priority enum onto the stored text.
+func orderPriorityName(p pb.Order_PriorityEnum) string {
+	switch p {
+	case pb.Order_PRIORITY_UNSPECIFIED:
+		return "unspecified"
+	case pb.Order_PRIORITY_LOW:
+		return "low"
+	case pb.Order_PRIORITY_HIGH:
+		return "high"
+	default:
+		return "unspecified"
+	}
 }
 
 func nullIfEmpty(s string) any {
