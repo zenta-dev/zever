@@ -7,6 +7,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [v0.2.0] - 2026-09-23
+
 ### Added
 
 - `examples/showcase`: full-capability shop app exercising every DSL
@@ -33,9 +35,6 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 - `examples/showcase/data/cities.json` used `city` keys while `geo/static`
   expects `name`, so geocoding silently matched nothing.
-
-### Fixed
-
 - `zenorm` backend emitted references to named-enum Go types (e.g. `Role`)
   without ever declaring them, so any schema using `enum Name {}` failed to
   compile downstream. The backend now emits one string-kind type plus typed
