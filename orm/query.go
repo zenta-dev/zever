@@ -533,16 +533,18 @@ func resolveDialect(exec db.DB) (dialect.Dialect, error) {
 	return d, nil
 }
 
-// encodeArgs converts a bound time.Time value to RFC3339 UTC text when the
-// dialect is SQLite, before it reaches the driver. The modernc sqlite driver
-// otherwise persists a time.Time using Go's time.Time.String() format
+// encodeArgs converts a bound time.Time value to RFC3339Nano UTC text when
+// the dialect is SQLite, before it reaches the driver. The modernc sqlite
+// driver otherwise persists a time.Time using Go's time.Time.String() format
 // ("2006-01-02 15:04:05 +0000 UTC"), which generated Scan methods --
-// which parse timestamp columns as RFC3339 text -- cannot scan back.
+// which parse timestamp columns as RFC3339Nano text -- cannot scan back.
 // Encoding here, at orm's own execution boundary and only for the sqlite
-// dialect, keeps every orm statement consistent with its documented RFC3339
-// text storage contract without touching the driver (whose default
-// time.Time format other, non-orm consumers still rely on) or the Postgres
-// path (which binds time.Time natively).
+// dialect, keeps every orm statement consistent with its documented
+// RFC3339Nano text storage contract without touching the driver (whose
+// default time.Time format other, non-orm consumers still rely on) or the
+// Postgres path (which binds time.Time natively). Fractional seconds are
+// preserved; second-precision text written by older versions still parses,
+// since RFC3339Nano parsing accepts a missing fraction.
 func encodeArgs(d dialect.Dialect, args []any) []any {
 	if d.Name() != "sqlite" {
 		return args
@@ -566,7 +568,7 @@ func encodeArgs(d dialect.Dialect, args []any) []any {
 
 	for i, a := range args {
 		if t, ok := a.(time.Time); ok {
-			out[i] = t.UTC().Format(time.RFC3339)
+			out[i] = t.UTC().Format(time.RFC3339Nano)
 		} else {
 			out[i] = a
 		}

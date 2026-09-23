@@ -2339,7 +2339,7 @@ func lateralInner[B any, PB ptrScanner[B]](inner Query[B, PB]) (render.Subquery,
 // scanLeftJoinRow scan the joined SELECT's raw values into a flat holder
 // slice with ONE rows.Scan call, then feed each entity's own Scan method
 // the holder values for its half of the row via rowFeed -- so an entity's
-// Scan performs its real value conversion (e.g. the codegen'd RFC3339
+// Scan performs its real value conversion (e.g. the codegen'd RFC3339Nano
 // timestamp parse) against the ACTUAL scanned values. The older
 // collectRow approach could not do that: it only recorded destination
 // pointers, so a Scan that post-processed what it scanned (a timestamp

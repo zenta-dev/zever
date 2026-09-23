@@ -305,11 +305,12 @@ func readCursorString(b []byte) (string, []byte, error) {
 // encodeCursorValue serializes v into its tag byte plus payload. v is one
 // of the CursorKeyValue members; the kind dispatch uses reflection so a
 // defined (enum) type's underlying kind is seen through. Exact time.Time is
-// encoded as RFC3339 UTC text, the same text orm's sqlite path binds
-// timestamps as.
+// encoded as RFC3339Nano UTC text, the same text orm's sqlite path binds
+// timestamps as. Tokens written before the Nano switch (plain RFC3339, no
+// fraction) still decode, since RFC3339Nano parsing accepts them.
 func encodeCursorValue(v any) ([]byte, error) {
 	if t, ok := v.(time.Time); ok {
-		s := t.UTC().Format(time.RFC3339)
+		s := t.UTC().Format(time.RFC3339Nano)
 		b := []byte{cursorTagTime}
 		b = appendCursorString(b, s)
 
@@ -459,7 +460,7 @@ func decodeCursorText(tag byte, payload []byte, vType reflect.Type) (any, error)
 	case cursorTagBytes:
 		return reflect.ValueOf([]byte(s)).Convert(vType).Interface(), nil
 	case cursorTagTime:
-		t, err := time.Parse(time.RFC3339, s)
+		t, err := time.Parse(time.RFC3339Nano, s)
 		if err != nil {
 			return nil, fmt.Errorf("orm: CursorKey.Decode: time value %q: %w", s, err)
 		}

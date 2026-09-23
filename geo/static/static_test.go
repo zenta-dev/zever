@@ -36,7 +36,7 @@ func mustOpenStatic(t *testing.T) geo.Geo {
 
 func TestNew_InvalidPath(t *testing.T) {
 	t.Parallel()
-	cases := []string{".", "./", "a/.."}
+	cases := []string{".", "./", "a/..", "a/../b.json", "../cities.json", "..", "a/../../b.json"}
 	for _, p := range cases {
 		p := p
 		t.Run(p, func(t *testing.T) {

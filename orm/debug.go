@@ -11,7 +11,7 @@ import "sync/atomic"
 // Hooked surfaces: Query[T].All/First/Exists/Stream and Count
 // (orm/stream.go, orm/query.go), plus the join, mutation and preload paths.
 // Values are logged post dialect-encoding (e.g. sqlite timestamps as
-// RFC3339 text), matching what the driver actually receives.
+// RFC3339Nano text), matching what the driver actually receives.
 type QueryLogger func(query string, args []any)
 
 // queryLoggerState boxes the active logger so the atomic slot can hold nil

@@ -21,9 +21,9 @@ import (
 	"github.com/zenta-dev/zever/queue"
 	"github.com/zenta-dev/zever/router"
 	"github.com/zenta-dev/zever/search"
+	"github.com/zenta-dev/zever/session"
 	"github.com/zenta-dev/zever/vectorstore"
 	"github.com/zenta-dev/zever/workflow"
-	workflowmemory "github.com/zenta-dev/zever/workflow/memory"
 )
 
 // cacheGet returns the cached value for key, 404 on miss.
@@ -207,8 +207,8 @@ func (s *Server) sessionCreate(w http.ResponseWriter, req *http.Request) {
 	writeJSON(w, http.StatusCreated, map[string]any{"id": sess.ID})
 }
 
-// sessionGet returns the session data for id. Misses, expiries, and
-// malformed ids all read as 404.
+// sessionGet returns the session data for id. Unknown or expired ids read
+// as 404; malformed ids read as 400.
 func (s *Server) sessionGet(w http.ResponseWriter, req *http.Request) {
 	if s.Session == nil {
 		writeError(w, http.StatusNotImplemented, "session not configured")
@@ -216,6 +216,10 @@ func (s *Server) sessionGet(w http.ResponseWriter, req *http.Request) {
 	}
 	sess, err := s.Session.Get(req.Context(), router.Param(req, "id"))
 	if err != nil {
+		if errors.Is(err, session.ErrInvalidID) {
+			writeError(w, http.StatusBadRequest, "malformed session id")
+			return
+		}
 		writeError(w, http.StatusNotFound, "not found")
 		return
 	}
@@ -609,17 +613,17 @@ type workflowStartRequest struct {
 	Input any    `json:"input"`
 }
 
-// RegisterDemoWorkflow registers the "demo-workflow" echo step when wf is
-// the in-memory adapter, so POST /demo/workflow/start works with zero
-// setup. Other adapters are left untouched. It type-asserts the resolved
-// instance rather than constructing anything: the container stays the sole
-// resolver.
+// RegisterDemoWorkflow registers the "demo-workflow" echo step when wf
+// supports host-registered steps, so POST /demo/workflow/start works with
+// zero setup. Other engines are left untouched. It asserts the
+// workflow.StepRegistrar interface rather than a concrete adapter type;
+// the container stays the sole resolver.
 func RegisterDemoWorkflow(wf workflow.Workflow) {
-	mem, ok := wf.(*workflowmemory.Adapter)
-	if !ok || mem == nil {
+	reg, ok := wf.(workflow.StepRegistrar)
+	if !ok || reg == nil {
 		return
 	}
-	mem.RegisterStep("demo-workflow", func(_ context.Context, input any) (any, error) {
+	reg.RegisterStep("demo-workflow", func(_ context.Context, input any) (any, error) {
 		return input, nil
 	})
 }

@@ -25,6 +25,11 @@ type staticGeo struct {
 var citiesCodec = codec.JSONCodec[[]city]{}
 
 // New creates a static geo adapter from typed options.
+//
+// An empty Path reads cities.json from the working directory. Otherwise the
+// path must contain no ".." element (checked before cleaning, so "a/../b"
+// is rejected even though it cleans to "b"): the path is operator
+// configuration resolved by the process, and traversal is never legitimate.
 func New(opts geo.Options) (geo.Geo, error) {
 	path := opts.Path
 	if path == "" {
@@ -34,6 +39,12 @@ func New(opts geo.Options) (geo.Geo, error) {
 	cleaned := filepath.Clean(path)
 	if cleaned == "." || cleaned == "" {
 		return nil, fmt.Errorf("geo: static: invalid path %q: %w", path, geo.ErrInvalidOptions)
+	}
+
+	for _, el := range strings.Split(path, string(filepath.Separator)) {
+		if el == ".." {
+			return nil, fmt.Errorf("geo: static: path %q contains traversal: %w", path, geo.ErrInvalidOptions)
+		}
 	}
 
 	data, err := os.ReadFile(cleaned) //nolint:gosec // G304: path is configuration value, not user input

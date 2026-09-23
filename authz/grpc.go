@@ -28,7 +28,18 @@ func BearerTokenFromMD(ctx context.Context) string {
 	return parseBearerToken(values[0])
 }
 
+// ResourceIDer is implemented by request messages carrying the target
+// resource id in an Id field -- the protogogen convention for
+// Get/Delete-by-id requests. UnaryServerInterceptor uses it to populate
+// the permission check's resource id; requests without it evaluate with
+// an empty id, exactly as before.
+type ResourceIDer interface {
+	GetId() string
+}
+
 // UnaryServerInterceptor enforces per-method policies, passing requests without a policy straight to the handler.
+// For a method with a PermissionCheck, the resource id is read from the
+// request when it implements ResourceIDer, and is "" otherwise.
 func UnaryServerInterceptor(a auth.Auth, p permission.Checker, policies map[string]Policy) grpc.UnaryServerInterceptor {
 	return func(
 		ctx context.Context,
@@ -43,7 +54,14 @@ func UnaryServerInterceptor(a auth.Auth, p permission.Checker, policies map[stri
 
 		token := BearerTokenFromMD(ctx)
 
-		claims, err := Authorize(ctx, a, p, pol, token, "")
+		var resourceID string
+		if pol.PermissionCheck != "" {
+			if r, ok := req.(ResourceIDer); ok {
+				resourceID = r.GetId()
+			}
+		}
+
+		claims, err := Authorize(ctx, a, p, pol, token, resourceID)
 		if err != nil {
 			return nil, grpcStatusError(err)
 		}

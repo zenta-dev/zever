@@ -190,3 +190,42 @@ func TestBearerTokenFromMD(t *testing.T) {
 		t.Fatalf("BearerTokenFromMD() no-md = %q, want empty", got)
 	}
 }
+
+type idRequest struct{ id string }
+
+// GetId implements authz.ResourceIDer, mirroring protogogen Get-by-id messages.
+//
+//nolint:revive // GetId (not GetID) matches the protobuf getter protoc-gen-go emits for an id field.
+func (r idRequest) GetId() string { return r.id }
+
+// TestGRPCResourceIDFromRequest proves the interceptor populates the
+// permission check's resource id from requests implementing ResourceIDer,
+// and leaves it empty otherwise.
+func TestGRPCResourceIDFromRequest(t *testing.T) {
+	t.Parallel()
+
+	a := &fakeAuth{wantToken: "good", claims: auth.Claims{Subject: "u"}}
+	p := &fakeChecker{allow: true}
+	policies := map[string]authz.Policy{
+		"/test.Test/Echo": {AuthRequired: true, PermissionCheck: "x.y", ResourceType: "T"},
+	}
+	iv := authz.UnaryServerInterceptor(a, p, policies)
+	mdCtx := metadata.NewIncomingContext(context.Background(), metadata.Pairs("authorization", "Bearer good"))
+	info := &grpc.UnaryServerInfo{FullMethod: "/test.Test/Echo"}
+	handler := func(context.Context, any) (any, error) { return struct{}{}, nil }
+
+	if _, err := iv(mdCtx, idRequest{id: "r1"}, info, handler); err != nil {
+		t.Fatalf("Invoke() err = %v, want nil", err)
+	}
+	if !p.called || p.gotResource.ID != "r1" || p.gotResource.Type != "T" {
+		t.Fatalf("resource = %+v, want {Type:T ID:r1}", p.gotResource)
+	}
+
+	p.called = false
+	if _, err := iv(mdCtx, &wrapperspb.StringValue{Value: "hi"}, info, handler); err != nil {
+		t.Fatalf("Invoke() err = %v, want nil", err)
+	}
+	if !p.called || p.gotResource.ID != "" {
+		t.Fatalf("resource = %+v, want empty ID", p.gotResource)
+	}
+}
