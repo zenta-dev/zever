@@ -43,7 +43,7 @@ func (e *Product) Scan(row orm.Row) error {
 		return fmt.Errorf("[product] scan error: %w", err)
 	}
 
-	valCreatedAt, errCreatedAt := time.Parse(time.RFC3339, rawCreatedAt)
+	valCreatedAt, errCreatedAt := time.Parse(time.RFC3339Nano, rawCreatedAt)
 	if errCreatedAt != nil {
 		return fmt.Errorf("[product] parse created_at error: %w", errCreatedAt)
 	}
