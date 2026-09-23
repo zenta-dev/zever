@@ -250,7 +250,10 @@ func goScalar(ft ir.FieldType) (goType, importPath string) {
 	case ir.TBytes:
 		return "[]byte", ""
 	case ir.TJSON:
-		return "json.RawMessage", "encoding/json"
+		// orm.JSONText, not json.RawMessage: database/sql cannot scan
+		// into RawMessage on recent Go toolchains, while JSONText binds
+		// as TEXT, scans from TEXT, and marshals raw -- see orm/jsontext.go.
+		return "orm.JSONText", ""
 	case ir.TEnum:
 		return "string", ""
 	}

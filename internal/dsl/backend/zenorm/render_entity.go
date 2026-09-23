@@ -97,7 +97,8 @@ func renderStruct(b *strings.Builder, m entityModel, schemaName string) {
 // itself. A non-optional timestamp/date column is the one exception --
 // time.Time implements neither sql.Scanner nor one of database/sql's
 // built-in numeric/string dest kinds -- so it is scanned into a raw string
-// first and parsed via time.Parse(time.RFC3339, ...). An OPTIONAL
+// first and parsed via time.Parse(time.RFC3339Nano, ...), matching the
+// RFC3339Nano text orm's sqlite path binds. An OPTIONAL
 // timestamp/date column needs no such special-casing:
 // orm.Option[time.Time] already parses an incoming string/[]byte value
 // itself, so it scans directly like every other nullable column.
@@ -127,7 +128,7 @@ func renderScan(b *strings.Builder, m entityModel) {
 			continue
 		}
 
-		fmt.Fprintf(b, "\n\tval%s, err%s := time.Parse(time.RFC3339, raw%s)\n", f.GoName, f.GoName, f.GoName)
+		fmt.Fprintf(b, "\n\tval%s, err%s := time.Parse(time.RFC3339Nano, raw%s)\n", f.GoName, f.GoName, f.GoName)
 		fmt.Fprintf(b, "\tif err%s != nil {\n", f.GoName)
 		fmt.Fprintf(b, "\t\treturn fmt.Errorf(\"[%s] parse %s error: %%w\", err%s)\n\t}\n", m.Pkg, f.Column, f.GoName)
 		fmt.Fprintf(b, "\n\te.%s = val%s\n", f.GoName, f.GoName)

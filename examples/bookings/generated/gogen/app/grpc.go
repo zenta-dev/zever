@@ -118,6 +118,7 @@ var BookingServiceCancelBookingPolicy = authz.Policy{
 	AuthRequired:    true,
 	PermissionCheck: "booking.cancel",
 	ResourceType:    "Booking",
+	OwnerField:      "guest_id",
 }
 
 // BookingServiceAddReviewPolicy is the compile-time authz.Policy for BookingService.AddReview, generated

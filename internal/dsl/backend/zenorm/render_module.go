@@ -13,7 +13,6 @@ import (
 const (
 	importFmt  = "fmt"
 	importTime = "time"
-	importJSON = "encoding/json"
 	importOrm  = "github.com/zenta-dev/zever/orm"
 )
 

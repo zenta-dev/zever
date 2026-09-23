@@ -344,19 +344,19 @@ func TestQueryForUpdateOfUnknownTableDropped(t *testing.T) {
 }
 
 // TestEncodeArgsSQLiteTime proves the sqlite time-encoding contract: a
-// bound time.Time is converted to RFC3339 UTC text before reaching the
+// bound time.Time is converted to RFC3339Nano UTC text before reaching the
 // driver, while every other value passes through untouched -- and that the
 // Postgres path binds time.Time natively.
 func TestEncodeArgsSQLiteTime(t *testing.T) {
 	ctx, conn := newWidgetsDB(t)
 
-	at := time.Date(2026, 6, 1, 12, 30, 45, 0, time.UTC)
+	at := time.Date(2026, 6, 1, 12, 30, 45, 123456789, time.UTC)
 
 	if _, err := conn.Exec(ctx, `CREATE TABLE events (id text, seen_at text)`); err != nil {
 		t.Fatalf("create table: %v", err)
 	}
 
-	if _, err := conn.Exec(ctx, `INSERT INTO events (id, seen_at) VALUES (?, ?)`, "e1", at.Format(time.RFC3339)); err != nil {
+	if _, err := conn.Exec(ctx, `INSERT INTO events (id, seen_at) VALUES (?, ?)`, "e1", at.Format(time.RFC3339Nano)); err != nil {
 		t.Fatalf("insert: %v", err)
 	}
 
@@ -390,7 +390,7 @@ func (e *eventRow) Scan(row Row) error {
 		return err
 	}
 
-	t, err := time.Parse(time.RFC3339, raw)
+	t, err := time.Parse(time.RFC3339Nano, raw)
 	if err != nil {
 		return err
 	}

@@ -49,7 +49,7 @@ func (e *User) Scan(row orm.Row) error {
 		return fmt.Errorf("[user] scan error: %w", err)
 	}
 
-	valCreatedAt, errCreatedAt := time.Parse(time.RFC3339, rawCreatedAt)
+	valCreatedAt, errCreatedAt := time.Parse(time.RFC3339Nano, rawCreatedAt)
 	if errCreatedAt != nil {
 		return fmt.Errorf("[user] parse created_at error: %w", errCreatedAt)
 	}
@@ -137,7 +137,7 @@ func (e *Category) Scan(row orm.Row) error {
 		return fmt.Errorf("[category] scan error: %w", err)
 	}
 
-	valCreatedAt, errCreatedAt := time.Parse(time.RFC3339, rawCreatedAt)
+	valCreatedAt, errCreatedAt := time.Parse(time.RFC3339Nano, rawCreatedAt)
 	if errCreatedAt != nil {
 		return fmt.Errorf("[category] parse created_at error: %w", errCreatedAt)
 	}
@@ -212,7 +212,7 @@ func (e *Product) Scan(row orm.Row) error {
 		return fmt.Errorf("[product] scan error: %w", err)
 	}
 
-	valCreatedAt, errCreatedAt := time.Parse(time.RFC3339, rawCreatedAt)
+	valCreatedAt, errCreatedAt := time.Parse(time.RFC3339Nano, rawCreatedAt)
 	if errCreatedAt != nil {
 		return fmt.Errorf("[product] parse created_at error: %w", errCreatedAt)
 	}
@@ -283,7 +283,7 @@ func (e *Order) Scan(row orm.Row) error {
 		return fmt.Errorf("[order] scan error: %w", err)
 	}
 
-	valCreatedAt, errCreatedAt := time.Parse(time.RFC3339, rawCreatedAt)
+	valCreatedAt, errCreatedAt := time.Parse(time.RFC3339Nano, rawCreatedAt)
 	if errCreatedAt != nil {
 		return fmt.Errorf("[order] parse created_at error: %w", errCreatedAt)
 	}
@@ -460,7 +460,7 @@ func (e *Post) Scan(row orm.Row) error {
 		return fmt.Errorf("[post] scan error: %w", err)
 	}
 
-	valCreatedAt, errCreatedAt := time.Parse(time.RFC3339, rawCreatedAt)
+	valCreatedAt, errCreatedAt := time.Parse(time.RFC3339Nano, rawCreatedAt)
 	if errCreatedAt != nil {
 		return fmt.Errorf("[post] parse created_at error: %w", errCreatedAt)
 	}
@@ -551,7 +551,7 @@ func (e *Comment) Scan(row orm.Row) error {
 		return fmt.Errorf("[comment] scan error: %w", err)
 	}
 
-	valCreatedAt, errCreatedAt := time.Parse(time.RFC3339, rawCreatedAt)
+	valCreatedAt, errCreatedAt := time.Parse(time.RFC3339Nano, rawCreatedAt)
 	if errCreatedAt != nil {
 		return fmt.Errorf("[comment] parse created_at error: %w", errCreatedAt)
 	}

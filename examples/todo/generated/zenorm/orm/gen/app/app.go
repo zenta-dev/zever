@@ -43,7 +43,7 @@ func (e *User) Scan(row orm.Row) error {
 		return fmt.Errorf("[user] scan error: %w", err)
 	}
 
-	valCreatedAt, errCreatedAt := time.Parse(time.RFC3339, rawCreatedAt)
+	valCreatedAt, errCreatedAt := time.Parse(time.RFC3339Nano, rawCreatedAt)
 	if errCreatedAt != nil {
 		return fmt.Errorf("[user] parse created_at error: %w", errCreatedAt)
 	}
@@ -115,7 +115,7 @@ func (e *Note) Scan(row orm.Row) error {
 		return fmt.Errorf("[note] scan error: %w", err)
 	}
 
-	valCreatedAt, errCreatedAt := time.Parse(time.RFC3339, rawCreatedAt)
+	valCreatedAt, errCreatedAt := time.Parse(time.RFC3339Nano, rawCreatedAt)
 	if errCreatedAt != nil {
 		return fmt.Errorf("[note] parse created_at error: %w", errCreatedAt)
 	}

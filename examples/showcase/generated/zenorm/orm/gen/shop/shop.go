@@ -5,7 +5,6 @@
 package shop
 
 import (
-	"encoding/json"
 	"fmt"
 	"time"
 
@@ -51,7 +50,7 @@ var UserCols = struct {
 	Verified     orm.Column[User, bool]
 	Birthday     orm.Column[User, time.Time]
 	Avatar       orm.Column[User, []byte]
-	Prefs        orm.Column[User, json.RawMessage]
+	Prefs        orm.Column[User, orm.JSONText]
 	CreatedAt    orm.Column[User, time.Time]
 }{
 	ID:           orm.NewColumn[User, string]("users", "id"),
@@ -67,7 +66,7 @@ var UserCols = struct {
 	Verified:     orm.NewColumn[User, bool]("users", "verified"),
 	Birthday:     orm.NewColumn[User, time.Time]("users", "birthday"),
 	Avatar:       orm.NewColumn[User, []byte]("users", "avatar"),
-	Prefs:        orm.NewColumn[User, json.RawMessage]("users", "prefs"),
+	Prefs:        orm.NewColumn[User, orm.JSONText]("users", "prefs"),
 	CreatedAt:    orm.NewColumn[User, time.Time]("users", "created_at"),
 }
 
@@ -86,7 +85,7 @@ type User struct {
 	Verified     bool               `json:"verified"`
 	Birthday     time.Time          `json:"birthday"`
 	Avatar       []byte             `json:"avatar"`
-	Prefs        json.RawMessage    `json:"prefs"`
+	Prefs        orm.JSONText       `json:"prefs"`
 	CreatedAt    time.Time          `json:"created_at"`
 }
 
@@ -98,14 +97,14 @@ func (e *User) Scan(row orm.Row) error {
 		return fmt.Errorf("[user] scan error: %w", err)
 	}
 
-	valBirthday, errBirthday := time.Parse(time.RFC3339, rawBirthday)
+	valBirthday, errBirthday := time.Parse(time.RFC3339Nano, rawBirthday)
 	if errBirthday != nil {
 		return fmt.Errorf("[user] parse birthday error: %w", errBirthday)
 	}
 
 	e.Birthday = valBirthday
 
-	valCreatedAt, errCreatedAt := time.Parse(time.RFC3339, rawCreatedAt)
+	valCreatedAt, errCreatedAt := time.Parse(time.RFC3339Nano, rawCreatedAt)
 	if errCreatedAt != nil {
 		return fmt.Errorf("[user] parse created_at error: %w", errCreatedAt)
 	}
@@ -213,7 +212,7 @@ func (e *Profile) Scan(row orm.Row) error {
 		return fmt.Errorf("[profile] scan error: %w", err)
 	}
 
-	valCreatedAt, errCreatedAt := time.Parse(time.RFC3339, rawCreatedAt)
+	valCreatedAt, errCreatedAt := time.Parse(time.RFC3339Nano, rawCreatedAt)
 	if errCreatedAt != nil {
 		return fmt.Errorf("[profile] parse created_at error: %w", errCreatedAt)
 	}
@@ -279,7 +278,7 @@ func (e *Category) Scan(row orm.Row) error {
 		return fmt.Errorf("[category] scan error: %w", err)
 	}
 
-	valCreatedAt, errCreatedAt := time.Parse(time.RFC3339, rawCreatedAt)
+	valCreatedAt, errCreatedAt := time.Parse(time.RFC3339Nano, rawCreatedAt)
 	if errCreatedAt != nil {
 		return fmt.Errorf("[category] parse created_at error: %w", errCreatedAt)
 	}
@@ -363,7 +362,7 @@ func (e *Product) Scan(row orm.Row) error {
 		return fmt.Errorf("[product] scan error: %w", err)
 	}
 
-	valCreatedAt, errCreatedAt := time.Parse(time.RFC3339, rawCreatedAt)
+	valCreatedAt, errCreatedAt := time.Parse(time.RFC3339Nano, rawCreatedAt)
 	if errCreatedAt != nil {
 		return fmt.Errorf("[product] parse created_at error: %w", errCreatedAt)
 	}
@@ -468,7 +467,7 @@ func (e *Tag) Scan(row orm.Row) error {
 		return fmt.Errorf("[tag] scan error: %w", err)
 	}
 
-	valCreatedAt, errCreatedAt := time.Parse(time.RFC3339, rawCreatedAt)
+	valCreatedAt, errCreatedAt := time.Parse(time.RFC3339Nano, rawCreatedAt)
 	if errCreatedAt != nil {
 		return fmt.Errorf("[tag] parse created_at error: %w", errCreatedAt)
 	}
@@ -523,7 +522,7 @@ func (e *Order) Scan(row orm.Row) error {
 		return fmt.Errorf("[order] scan error: %w", err)
 	}
 
-	valCreatedAt, errCreatedAt := time.Parse(time.RFC3339, rawCreatedAt)
+	valCreatedAt, errCreatedAt := time.Parse(time.RFC3339Nano, rawCreatedAt)
 	if errCreatedAt != nil {
 		return fmt.Errorf("[order] parse created_at error: %w", errCreatedAt)
 	}
@@ -700,7 +699,7 @@ func (e *Review) Scan(row orm.Row) error {
 		return fmt.Errorf("[review] scan error: %w", err)
 	}
 
-	valCreatedAt, errCreatedAt := time.Parse(time.RFC3339, rawCreatedAt)
+	valCreatedAt, errCreatedAt := time.Parse(time.RFC3339Nano, rawCreatedAt)
 	if errCreatedAt != nil {
 		return fmt.Errorf("[review] parse created_at error: %w", errCreatedAt)
 	}

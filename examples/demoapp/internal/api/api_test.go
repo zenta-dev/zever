@@ -57,7 +57,11 @@ func newTestSetup(t *testing.T) testSetup {
 		t.Fatalf("flag path: %v", err)
 	}
 	cfg.Flag.Options.Static.Path = flagPath
-	cfg.Geo.Options.Path = filepath.Join("..", "..", "data", "cities.json")
+	geoPath, err := filepath.Abs(filepath.Join("..", "..", "data", "cities.json"))
+	if err != nil {
+		t.Fatalf("geo path: %v", err)
+	}
+	cfg.Geo.Options.Path = geoPath
 	cfg.Search.Options.DSN = filepath.Join(tmp, "search.db")
 	cfg.VectorStore.Options.DSN = filepath.Join(tmp, "vectors.db")
 	cfg.VectorStore.Options.Dimension = 8
@@ -567,8 +571,11 @@ func TestDemoBatteries(t *testing.T) {
 		if err := json.Unmarshal(rec.Body.Bytes(), &data); err != nil || data["user"] != "ann" {
 			t.Fatalf("get = %s, want user ann", rec.Body.String())
 		}
-		if rec := do(t, h, "GET", "/demo/session/missing", "", nil); rec.Code != http.StatusNotFound {
+		if rec := do(t, h, "GET", "/demo/session/aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa", "", nil); rec.Code != http.StatusNotFound {
 			t.Fatalf("miss: status %d, want 404", rec.Code)
+		}
+		if rec := do(t, h, "GET", "/demo/session/missing", "", nil); rec.Code != http.StatusBadRequest {
+			t.Fatalf("malformed: status %d, want 400", rec.Code)
 		}
 	})
 

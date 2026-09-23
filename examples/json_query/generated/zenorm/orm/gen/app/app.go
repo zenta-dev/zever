@@ -18,18 +18,18 @@ var Docs = orm.NewTable[Doc]("docs", []string{"id", "title", "data"})
 var DocCols = struct {
 	ID    orm.Column[Doc, string]
 	Title orm.Column[Doc, string]
-	Data  orm.Column[Doc, string]
+	Data  orm.Column[Doc, orm.JSONText]
 }{
 	ID:    orm.NewColumn[Doc, string]("docs", "id"),
 	Title: orm.NewColumn[Doc, string]("docs", "title"),
-	Data:  orm.NewColumn[Doc, string]("docs", "data"),
+	Data:  orm.NewColumn[Doc, orm.JSONText]("docs", "data"),
 }
 
 // Doc mirrors the "Doc" entity declared in the schema.
 type Doc struct {
-	ID    string `json:"id"`
-	Title string `json:"title"`
-	Data  string `json:"data"`
+	ID    string       `json:"id"`
+	Title string       `json:"title"`
+	Data  orm.JSONText `json:"data"`
 }
 
 // Scan reads one row, whose columns must be in Docs.Columns() order, into e.

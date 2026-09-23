@@ -45,8 +45,9 @@ func (o Option[T]) GetOr(fallback T) T {
 // conversions database/sql itself performs for common driver value types
 // (string, []byte, the fixed-width integer/float kinds, bool, time.Time) --
 // see convertScan below. T must be one of that closed set of
-// driver-compatible types; anything else is a programmer error caught at
-// scan time with a descriptive error, never a silent zero value.
+// driver-compatible types (plus orm.JSONText for `json` columns); anything
+// else is a programmer error caught at scan time with a descriptive error,
+// never a silent zero value.
 func (o *Option[T]) Scan(src any) error {
 	if src == nil {
 		*o = Option[T]{}
@@ -139,6 +140,13 @@ func convertScan[T any](src any) (T, error) {
 		}
 
 		return any(t).(T), nil //nolint:forcetypeassert // guarded by the outer type switch
+	case JSONText:
+		j, err := scanJSONText(src)
+		if err != nil {
+			return zero, err
+		}
+
+		return any(j).(T), nil //nolint:forcetypeassert // guarded by the outer type switch
 	default:
 		return zero, fmt.Errorf("orm: Option[%T] is not a supported scan type", zero)
 	}
@@ -270,7 +278,7 @@ func scanTime(src any) (time.Time, error) {
 }
 
 func parseTime(s string) (time.Time, error) {
-	t, err := time.Parse(time.RFC3339, s)
+	t, err := time.Parse(time.RFC3339Nano, s)
 	if err != nil {
 		return time.Time{}, fmt.Errorf("cannot scan %q into time.Time: %w", s, err)
 	}

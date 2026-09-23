@@ -22,6 +22,11 @@ type Policy struct {
 	PermissionCheck string
 	// ResourceType names the resource type passed to the checker.
 	ResourceType string
+	// OwnerField names the resource's owner field (declared snake_case schema
+	// name, e.g. "user_id") when the permission check is an ownership check.
+	// Empty for non-ownership checks. Carried for checkers that enforce
+	// ownership themselves; see UnaryServerInterceptor.
+	OwnerField string
 }
 
 // Authorize verifies the token with a and enforces pol with p, returning the verified claims.
