@@ -21,18 +21,12 @@ Every query is an ordinary `orm.From(...).Where(...)` predicate built from
 the typed helpers in `github.com/zenta-dev/zever/orm/json/sqlite` — never a
 hand-written SQL string.
 
-## Why the JSON column is `string`, not `json`
+## Why the JSON column is `orm.JSONText`
 
-The `.zen` DSL does have a native `json` field type, and the `zenorm`
-backend maps it to `json.RawMessage`. Under Go 1.27, though,
-`encoding/json.RawMessage` is an alias for `encoding/jsontext.Value` — a
-named `[]byte` type that implements neither `sql.Scanner` nor one of
-`database/sql`'s built-in dest kinds — so the codegen'd `Scan` (which reads
-`&e.Data`) fails at runtime with "unsupported Scan ... into
-*jsontext.Value". Storing the JSON document in a `string` (TEXT) column
-avoids that, and every json1 function (and the jsonb operators on Postgres)
-operates on JSON text equally well. This is a documented known limitation
-of the current `json` DSL type, not a design choice of the JSON helpers.
+The `.zen` DSL's native `json` field type maps, via the `zenorm` backend,
+to `orm.JSONText` -- a named string type that binds as TEXT, scans from
+TEXT, and marshals as raw JSON (see `orm/jsontext.go`), so every json1
+function (and the jsonb operators on Postgres) operates on it directly.
 
 ## Running it
 

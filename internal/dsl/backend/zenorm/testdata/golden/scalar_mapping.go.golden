@@ -5,7 +5,6 @@
 package app
 
 import (
-	"encoding/json"
 	"fmt"
 	"time"
 
@@ -28,7 +27,7 @@ var WidgetCols = struct {
 	CreatedAt orm.Column[Widget, time.Time]
 	ValidOn   orm.Column[Widget, time.Time]
 	Payload   orm.Column[Widget, []byte]
-	Metadata  orm.Column[Widget, json.RawMessage]
+	Metadata  orm.Column[Widget, orm.JSONText]
 	Status    orm.Column[Widget, string]
 }{
 	ID:        orm.NewColumn[Widget, string]("widgets", "id"),
@@ -41,24 +40,24 @@ var WidgetCols = struct {
 	CreatedAt: orm.NewColumn[Widget, time.Time]("widgets", "created_at"),
 	ValidOn:   orm.NewColumn[Widget, time.Time]("widgets", "valid_on"),
 	Payload:   orm.NewColumn[Widget, []byte]("widgets", "payload"),
-	Metadata:  orm.NewColumn[Widget, json.RawMessage]("widgets", "metadata"),
+	Metadata:  orm.NewColumn[Widget, orm.JSONText]("widgets", "metadata"),
 	Status:    orm.NewColumn[Widget, string]("widgets", "status"),
 }
 
 // Widget mirrors the "Widget" entity declared in the schema.
 type Widget struct {
-	ID        string          `json:"id"`
-	Name      string          `json:"name"`
-	Quantity  int32           `json:"quantity"`
-	Views     int64           `json:"views"`
-	Ratio     float32         `json:"ratio"`
-	Price     float64         `json:"price"`
-	Active    bool            `json:"active"`
-	CreatedAt time.Time       `json:"created_at"`
-	ValidOn   time.Time       `json:"valid_on"`
-	Payload   []byte          `json:"payload"`
-	Metadata  json.RawMessage `json:"metadata"`
-	Status    string          `json:"status"`
+	ID        string       `json:"id"`
+	Name      string       `json:"name"`
+	Quantity  int32        `json:"quantity"`
+	Views     int64        `json:"views"`
+	Ratio     float32      `json:"ratio"`
+	Price     float64      `json:"price"`
+	Active    bool         `json:"active"`
+	CreatedAt time.Time    `json:"created_at"`
+	ValidOn   time.Time    `json:"valid_on"`
+	Payload   []byte       `json:"payload"`
+	Metadata  orm.JSONText `json:"metadata"`
+	Status    string       `json:"status"`
 }
 
 // Scan reads one row, whose columns must be in Widgets.Columns() order, into e.

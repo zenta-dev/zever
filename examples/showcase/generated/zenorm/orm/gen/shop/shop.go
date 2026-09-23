@@ -5,7 +5,6 @@
 package shop
 
 import (
-	"encoding/json"
 	"fmt"
 	"time"
 
@@ -51,7 +50,7 @@ var UserCols = struct {
 	Verified     orm.Column[User, bool]
 	Birthday     orm.Column[User, time.Time]
 	Avatar       orm.Column[User, []byte]
-	Prefs        orm.Column[User, json.RawMessage]
+	Prefs        orm.Column[User, orm.JSONText]
 	CreatedAt    orm.Column[User, time.Time]
 }{
 	ID:           orm.NewColumn[User, string]("users", "id"),
@@ -67,7 +66,7 @@ var UserCols = struct {
 	Verified:     orm.NewColumn[User, bool]("users", "verified"),
 	Birthday:     orm.NewColumn[User, time.Time]("users", "birthday"),
 	Avatar:       orm.NewColumn[User, []byte]("users", "avatar"),
-	Prefs:        orm.NewColumn[User, json.RawMessage]("users", "prefs"),
+	Prefs:        orm.NewColumn[User, orm.JSONText]("users", "prefs"),
 	CreatedAt:    orm.NewColumn[User, time.Time]("users", "created_at"),
 }
 
@@ -86,7 +85,7 @@ type User struct {
 	Verified     bool               `json:"verified"`
 	Birthday     time.Time          `json:"birthday"`
 	Avatar       []byte             `json:"avatar"`
-	Prefs        json.RawMessage    `json:"prefs"`
+	Prefs        orm.JSONText       `json:"prefs"`
 	CreatedAt    time.Time          `json:"created_at"`
 }
 

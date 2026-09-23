@@ -3,7 +3,6 @@ package seed
 
 import (
 	"context"
-	"encoding/json"
 	"fmt"
 	"time"
 
@@ -86,7 +85,7 @@ func ensureUser(ctx context.Context, database db.DB, id, email, name string, rol
 		orm.Set(gen.UserCols.Verified, true),
 		orm.Set(gen.UserCols.Birthday, time.Date(1990, 1, 2, 0, 0, 0, 0, time.UTC)),
 		orm.Set(gen.UserCols.Avatar, []byte{0x89, 0x50}),
-		orm.Set(gen.UserCols.Prefs, json.RawMessage(`{"theme":"dark"}`)),
+		orm.Set(gen.UserCols.Prefs, orm.JSONText(`{"theme":"dark"}`)),
 		orm.Set(gen.UserCols.CreatedAt, time.Now().UTC()),
 	).Exec(ctx, database); err != nil {
 		return fmt.Errorf("[seed] insert user: %w", err)
