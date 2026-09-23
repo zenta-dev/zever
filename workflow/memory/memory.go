@@ -9,8 +9,6 @@ import (
 	"github.com/zenta-dev/zever/workflow"
 )
 
-type stepFn func(ctx context.Context, input any) (any, error)
-
 type run struct {
 	name    string
 	input   any
@@ -23,7 +21,7 @@ type run struct {
 type Adapter struct {
 	mu     sync.RWMutex
 	runs   map[workflow.RunID]*run
-	steps  map[string]stepFn
+	steps  map[string]workflow.StepFunc
 	nextID uint64
 }
 
@@ -35,18 +33,18 @@ func New(o workflow.Options) (workflow.Workflow, error) {
 
 	return &Adapter{
 		runs:   make(map[workflow.RunID]*run),
-		steps:  make(map[string]stepFn),
+		steps:  make(map[string]workflow.StepFunc),
 		nextID: 1,
 	}, nil
 }
 
 // RegisterStep registers a named step function.
-func (m *Adapter) RegisterStep(name string, fn stepFn) {
+func (m *Adapter) RegisterStep(name string, fn workflow.StepFunc) {
 	m.mu.Lock()
 	defer m.mu.Unlock()
 
 	if m.steps == nil {
-		m.steps = make(map[string]stepFn)
+		m.steps = make(map[string]workflow.StepFunc)
 	}
 
 	m.steps[name] = fn
@@ -60,7 +58,7 @@ func (m *Adapter) Start(ctx context.Context, name string, input any, workflowID 
 	}
 
 	if m.steps == nil {
-		m.steps = make(map[string]stepFn)
+		m.steps = make(map[string]workflow.StepFunc)
 	}
 
 	var id workflow.RunID
