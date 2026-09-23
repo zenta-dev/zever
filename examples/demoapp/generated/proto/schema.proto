@@ -1,0 +1,137 @@
+syntax = "proto3";
+
+package zengo.v1;
+
+import "google/protobuf/timestamp.proto";
+import "google/api/annotations.proto";
+import "zengo/annotations.proto";
+
+option go_package = "github.com/zenta-dev/zever/gen/zengov1;zengov1";
+
+message User {
+  string id = 1;
+  string email = 2;
+  string name = 3;
+  string role = 4;
+  string password_hash = 5;
+  google.protobuf.Timestamp created_at = 6;
+}
+
+message Category {
+  string id = 1;
+  string name = 2;
+  string description = 3;
+  google.protobuf.Timestamp created_at = 4;
+}
+
+message Product {
+  string id = 1;
+  string category_id = 2;
+  string name = 3;
+  string description = 4;
+  int64 price_cents = 5;
+  int64 stock = 6;
+  google.protobuf.Timestamp created_at = 7;
+}
+
+message Order {
+  string id = 1;
+  string user_id = 2;
+  int64 total_cents = 3;
+  string status = 4;
+  google.protobuf.Timestamp created_at = 5;
+}
+
+message OrderItem {
+  string id = 1;
+  string order_id = 2;
+  string product_id = 3;
+  int64 quantity = 4;
+  int64 price_cents = 5;
+}
+
+message Post {
+  string id = 1;
+  string user_id = 2;
+  string title = 3;
+  string body = 4;
+  bool published = 5;
+  google.protobuf.Timestamp created_at = 6;
+}
+
+message Comment {
+  string id = 1;
+  string post_id = 2;
+  string user_id = 3;
+  string body = 4;
+  google.protobuf.Timestamp created_at = 5;
+}
+
+message GetUserRequest {
+  string id = 1;
+}
+
+message ListUsersRequest {
+}
+
+service UserService {
+  rpc GetUser(GetUserRequest) returns (User) {
+    option (google.api.http) = { get: "/v1/users/{id}" };
+    option (zengo.annotations.v1.auth) = { required: true };
+  }
+
+  rpc ListUsers(ListUsersRequest) returns (User) {
+    option (google.api.http) = { get: "/v1/users" };
+    option (zengo.annotations.v1.auth) = { required: true };
+  }
+}
+
+message GetProductRequest {
+  string id = 1;
+}
+
+message ListProductsRequest {
+  string category_id = 1;
+}
+
+message CreateProductRequest {
+  string name = 1;
+  int64 price_cents = 2;
+}
+
+service ProductService {
+  rpc GetProduct(GetProductRequest) returns (Product) {
+    option (google.api.http) = { get: "/v1/products/{id}" };
+    option (zengo.annotations.v1.auth) = { required: true };
+  }
+
+  rpc ListProducts(ListProductsRequest) returns (Product) {
+    option (google.api.http) = { get: "/v1/products" };
+    option (zengo.annotations.v1.auth) = { required: true };
+  }
+
+  rpc CreateProduct(CreateProductRequest) returns (Product) {
+    option (google.api.http) = { post: "/v1/products" body: "*" };
+    option (zengo.annotations.v1.auth) = { required: true };
+  }
+}
+
+message GetOrderRequest {
+  string id = 1;
+}
+
+message CreateOrderRequest {
+  string product_ids = 1;
+}
+
+service OrderService {
+  rpc GetOrder(GetOrderRequest) returns (Order) {
+    option (google.api.http) = { get: "/v1/orders/{id}" };
+    option (zengo.annotations.v1.auth) = { required: true };
+  }
+
+  rpc CreateOrder(CreateOrderRequest) returns (Order) {
+    option (google.api.http) = { post: "/v1/orders" body: "*" };
+    option (zengo.annotations.v1.auth) = { required: true };
+  }
+}

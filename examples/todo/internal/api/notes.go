@@ -7,6 +7,8 @@ import (
 
 	"github.com/google/uuid"
 
+	genapp "github.com/zenta-dev/zever/examples/todo/generated/zenorm/orm/gen/app"
+	"github.com/zenta-dev/zever/orm"
 	"github.com/zenta-dev/zever/router"
 )
 
@@ -44,47 +46,50 @@ func (a *API) handleCreateNote(w http.ResponseWriter, req *http.Request) {
 	}
 
 	id := uuid.NewString()
-	now := time.Now().UTC().Format(time.RFC3339Nano)
+	// The orm sqlite path persists timestamps as RFC3339 text
+	// (second precision), so truncate here so the create response
+	// matches what a subsequent get/list reads back.
+	now := time.Now().UTC().Truncate(time.Second)
+	nowText := now.Format(time.RFC3339Nano)
 	userID := subject(req)
-	if _, err := a.DB.Exec(req.Context(),
-		`INSERT INTO notes (id, user_id, title, body, done, created_at) VALUES (?, ?, ?, ?, ?, ?)`,
-		id, userID, in.Title, in.Body, 0, now,
-	); err != nil {
+	if err := orm.InsertInto(genapp.Notes).Values(
+		orm.Set(genapp.NoteCols.ID, id),
+		orm.Set(genapp.NoteCols.UserID, userID),
+		orm.Set(genapp.NoteCols.Title, in.Title),
+		orm.Set(genapp.NoteCols.Body, in.Body),
+		orm.Set(genapp.NoteCols.Done, false),
+		orm.Set(genapp.NoteCols.CreatedAt, now),
+	).Exec(req.Context(), a.DB); err != nil {
 		writeError(w, http.StatusInternalServerError, "create failed")
 		return
 	}
 
 	writeJSON(w, http.StatusCreated, Note{
-		ID: id, UserID: userID, Title: in.Title, Body: in.Body, CreatedAt: now,
+		ID: id, UserID: userID, Title: in.Title, Body: in.Body, CreatedAt: nowText,
 	})
 }
 
 // handleListNotes lists the caller's notes.
 func (a *API) handleListNotes(w http.ResponseWriter, req *http.Request) {
-	rows, err := a.DB.Query(req.Context(),
-		`SELECT id, user_id, title, body, done, created_at FROM notes WHERE user_id = ? ORDER BY created_at ASC`,
-		subject(req),
-	)
+	rows, err := orm.From(genapp.Notes).
+		Where(genapp.NoteCols.UserID.Eq(subject(req))).
+		OrderBy(genapp.NoteCols.CreatedAt.Asc()).
+		All(req.Context(), a.DB)
 	if err != nil {
 		writeError(w, http.StatusInternalServerError, "list failed")
 		return
 	}
-	defer func() { _ = rows.Close() }()
 
 	notes := []Note{}
-	for rows.Next() {
-		var n Note
-		var done int64
-		if scanErr := rows.Scan(&n.ID, &n.UserID, &n.Title, &n.Body, &done, &n.CreatedAt); scanErr != nil {
-			writeError(w, http.StatusInternalServerError, "list failed")
-			return
-		}
-		n.Done = done != 0
-		notes = append(notes, n)
-	}
-	if err := rows.Err(); err != nil {
-		writeError(w, http.StatusInternalServerError, "list failed")
-		return
+	for _, r := range rows {
+		notes = append(notes, Note{
+			ID:        r.ID,
+			UserID:    r.UserID,
+			Title:     r.Title,
+			Body:      r.Body,
+			Done:      r.Done,
+			CreatedAt: r.CreatedAt.Format(time.RFC3339Nano),
+		})
 	}
 
 	writeJSON(w, http.StatusOK, notes)
@@ -92,30 +97,24 @@ func (a *API) handleListNotes(w http.ResponseWriter, req *http.Request) {
 
 // scanNote scans one owned note; ok is false when no row matches id+owner.
 func (a *API) scanOwnedNote(req *http.Request, id string) (Note, bool, error) {
-	rows, err := a.DB.Query(req.Context(),
-		`SELECT id, user_id, title, body, done, created_at FROM notes WHERE id = ? AND user_id = ?`,
-		id, subject(req),
-	)
+	r, ok, err := orm.From(genapp.Notes).Where(orm.And(
+		genapp.NoteCols.ID.Eq(id),
+		genapp.NoteCols.UserID.Eq(subject(req)),
+	)).First(req.Context(), a.DB)
 	if err != nil {
 		return Note{}, false, err
 	}
-	defer func() { _ = rows.Close() }()
-
-	if !rows.Next() {
-		_ = rows.Close()
+	if !ok {
 		return Note{}, false, nil
 	}
-	var n Note
-	var done int64
-	if err := rows.Scan(&n.ID, &n.UserID, &n.Title, &n.Body, &done, &n.CreatedAt); err != nil {
-		return Note{}, false, err
-	}
-	_ = rows.Close()
-	if err := rows.Err(); err != nil {
-		return Note{}, false, err
-	}
-	n.Done = done != 0
-	return n, true, nil
+	return Note{
+		ID:        r.ID,
+		UserID:    r.UserID,
+		Title:     r.Title,
+		Body:      r.Body,
+		Done:      r.Done,
+		CreatedAt: r.CreatedAt.Format(time.RFC3339Nano),
+	}, true, nil
 }
 
 // handleGetNote returns one owned note, 404 for missing or foreign ids.
@@ -164,14 +163,15 @@ func (a *API) handleUpdateNote(w http.ResponseWriter, req *http.Request) {
 		return
 	}
 
-	done := 0
-	if n.Done {
-		done = 1
-	}
-	if _, err := a.DB.Exec(req.Context(),
-		`UPDATE notes SET title = ?, body = ?, done = ? WHERE id = ? AND user_id = ?`,
-		n.Title, n.Body, done, id, subject(req),
-	); err != nil {
+	done := n.Done
+	if _, err := orm.UpdateTable(genapp.Notes).Where(orm.And(
+		genapp.NoteCols.ID.Eq(id),
+		genapp.NoteCols.UserID.Eq(subject(req)),
+	)).Set(
+		orm.Set(genapp.NoteCols.Title, n.Title),
+		orm.Set(genapp.NoteCols.Body, n.Body),
+		orm.Set(genapp.NoteCols.Done, done),
+	).Exec(req.Context(), a.DB); err != nil {
 		writeError(w, http.StatusInternalServerError, "update failed")
 		return
 	}
@@ -181,10 +181,10 @@ func (a *API) handleUpdateNote(w http.ResponseWriter, req *http.Request) {
 
 // handleDeleteNote deletes an owned note, 404 for missing or foreign ids.
 func (a *API) handleDeleteNote(w http.ResponseWriter, req *http.Request) {
-	affected, err := a.DB.Exec(req.Context(),
-		`DELETE FROM notes WHERE id = ? AND user_id = ?`,
-		router.Param(req, "id"), subject(req),
-	)
+	affected, err := orm.DeleteFrom(genapp.Notes).Where(orm.And(
+		genapp.NoteCols.ID.Eq(router.Param(req, "id")),
+		genapp.NoteCols.UserID.Eq(subject(req)),
+	)).Exec(req.Context(), a.DB)
 	if err != nil {
 		writeError(w, http.StatusInternalServerError, "delete failed")
 		return

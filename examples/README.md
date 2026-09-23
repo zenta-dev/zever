@@ -9,7 +9,17 @@ showcase app that wires them together.
 examples/
   README.md          # this file: map, runbook, conventions
   <battery>/         # STAGE 1: one focused Example test per battery
+  transactions/      # STAGE 1b: focused ORM ports (schema + runnable demo + tests)
+  bulk_upsert/       #   (see table below)
+  pagination/
+  recursive_cte/
+  json_query/
+  fts/
+  ormdrill/          # STAGE 1b: no-codegen raw-orm drill as Example tests
   bookings/          # STAGE 2: showcase marketplace app (server + worker)
+  showcase/          # STAGE 2: DSL-depth shop app (all features, one schema)
+  demoapp/           # STAGE 2: battery-breadth HTTP showcase (all batteries)
+  todo/              # STAGE 2: auth-gated notes app (HTTP + gRPC parity)
 ```
 
 There is deliberately **no new Go module** here. Examples live in the main
@@ -58,6 +68,23 @@ Zero-infra adapters used (all from `config.Default()`):
 | vectorstore | sqlite | webhook | http + queue |
 | workflow | memory | orm | sqlite via db |
 
+## Stage 1b: focused ORM ports
+
+Single-purpose ports, each with one `.zen` schema, committed `zenorm`
+output, a runnable `cmd/app` against sqlite `:memory:`, and deterministic
+tests. `ormdrill` is the deliberate no-codegen counterpart (raw `orm`
+builder as per-topic `Example` tests).
+
+| App | Demonstrates |
+| --- | --- |
+| [`transactions`](transactions) | `orm.WithNestedTx` savepoint-nested transfers |
+| [`bulk_upsert`](bulk_upsert) | Multi-row `Insert`, `OnConflict(...).DoUpdate/DoNothing`, `Returning().ExecReturning`, `OnConflict.Where` |
+| [`pagination`](pagination) | Offset (`Limit`/`Offset` + `Count`/`OffsetPage`) and keyset (`AfterTuple`, cursor encode/decode) |
+| [`recursive_cte`](recursive_cte) | `orm.WithRecursive` org chart in one query |
+| [`json_query`](json_query) | `orm/json/sqlite` nested-key, key-exists, array-membership, type filters |
+| [`fts`](fts) | `orm/fts/sqlite` `MATCH` + rank-ordered search (FTS5 DDL via raw SQL, not expressible in `.zen`) |
+| [`ormdrill`](ormdrill) | cursors, preload, joins, subqueries, expressions, mutation gates without codegen |
+
 ## Stage 2: bookings showcase
 
 Domain: bookings marketplace ("stayver"). Hosts list spaces, guests book
@@ -82,6 +109,16 @@ Flows:
 `cmd/server` and `cmd/worker` mirror `zever generate server` / `worker`
 output shapes so the generator stays honest; drift found becomes follow-up
 issues, not drive-by fixes.
+
+## Stage 2: other showcases
+
+- `showcase/`: DSL depth — every schema feature in one shop schema, with
+  all six backends generated and a single service impl served over both
+  HTTP and gRPC.
+- `demoapp/`: battery breadth — every battery behind HTTP (`/demo/*`),
+  jobs + schedules, black-box API tests.
+- `todo/`: auth-gated notes with HTTP + gRPC cross-transport parity tests
+  (including ownership 403 parity).
 
 ## Running
 

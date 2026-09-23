@@ -1,14 +1,32 @@
 package grpcapi
 
 import (
+	"context"
+
 	"google.golang.org/grpc"
 
 	"github.com/zenta-dev/zever/auth"
 	"github.com/zenta-dev/zever/authz"
 	genapp "github.com/zenta-dev/zever/examples/todo/generated/gogen/app"
 	"github.com/zenta-dev/zever/permission"
-	"github.com/zenta-dev/zever/permission/rbac"
 )
+
+// deleteAllowChecker is a permission.Checker for the todo grpc proof: it
+// allows any authenticated subject past the generated
+// "grpc_task.delete" policy gate. Ownership (owner_field user_id) is then
+// enforced by Service.DeleteTask itself, the one place where the request
+// id is available on both transports — the gRPC interceptor carries no
+// resource id, so a store lookup cannot live in the checker and still
+// cover both sides.
+type deleteAllowChecker struct{}
+
+// Can reports whether subject may perform action on resource.
+func (deleteAllowChecker) Can(_ context.Context, subject permission.Subject, action string, _ permission.Resource) (permission.Decision, error) {
+	if action == "grpc_task.delete" && subject.ID != "" {
+		return permission.Decision{Allowed: true, Reason: "allow"}, nil
+	}
+	return permission.Decision{Allowed: false, Reason: "implicit_deny"}, nil
+}
 
 // Wiring bundles one Service with the checker, policies, and interceptor
 // that enforce the generated authz contract on both transports.
@@ -25,16 +43,15 @@ type Wiring struct {
 	Interceptor grpc.UnaryServerInterceptor
 }
 
-// Build wires a shared Service with auth a and an rbac checker, returning
-// the interceptor built from the SAME generated GRPCPolicies the HTTP
-// routes enforce. The checker carries no allow rule for
-// "grpc_task.delete", so DeleteTask is denied on both transports while
-// Create/Get (auth-only policies) succeed for any verified caller.
+// Build wires a shared Service with auth a and an allow-authenticated
+// checker, returning the interceptor built from the SAME generated
+// GRPCPolicies the HTTP routes enforce. The checker lets any authenticated
+// caller past the "grpc_task.delete" gate; Service.DeleteTask then enforces
+// the owner_field (user_id) comparison, so owner deletes succeed while
+// non-owner deletes fail with PermissionDenied on both transports, and
+// unauthenticated callers still fail with Unauthenticated on both.
 func Build(a auth.Auth) (*Wiring, error) {
-	checker, err := rbac.New(permission.Options{})
-	if err != nil {
-		return nil, err
-	}
+	checker := deleteAllowChecker{}
 
 	svc := New()
 	policies := genapp.GRPCPolicies()

@@ -1,0 +1,27 @@
+// transactions.zen — the single source of truth for the transactions example.
+//
+// A tiny double-entry money movement: Wallets hold a balance, Transfers
+// record each movement of funds between two wallets. The example app moves
+// money through orm.WithNestedTx, which is a transparent savepoint wrapper:
+// used at the top level it behaves exactly like db.WithTx, and nested under
+// another WithNestedTx it degrades to a SAVEPOINT instead of failing with
+// "nested transaction not supported".
+//
+// Regenerate everything derived from this file with:
+// `zever compile examples/transactions/schema/transactions.zen --backend=zenorm --out examples/transactions/generated`
+// (run from the repo root so import paths resolve). Never hand-edit
+// `generated/`.
+
+entity Wallet {
+  id: uuid @primary
+  owner: string
+  balance_cents: int64
+}
+
+entity Transfer {
+  id: uuid @primary
+  from_wallet_id: uuid
+  to_wallet_id: uuid
+  amount_cents: int64
+  note: string
+}

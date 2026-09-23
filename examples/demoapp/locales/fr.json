@@ -1,0 +1,5 @@
+{
+  "hello": "Bonjour, {{.Name}} !",
+  "welcome": "Bienvenue sur la démo Zever",
+  "order.created": "Commande {{.ID}} créée"
+}

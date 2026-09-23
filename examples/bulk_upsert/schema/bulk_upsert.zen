@@ -1,0 +1,19 @@
+// bulk_upsert.zen — the single source of truth for the bulk_upsert example.
+//
+// A product inventory table upserted in bulk: orm.Insert...Values(...)
+// chained multiple times builds a single multi-row INSERT, OnConflict pins
+// the conflict target to the unique id column, DoUpdate applies new values
+// to the colliding row, and Returning hands the written rows back through
+// the codegen'd Scan method — all in one statement.
+//
+// Regenerate everything derived from this file with:
+// `zever compile examples/bulk_upsert/schema/bulk_upsert.zen --backend=zenorm --out examples/bulk_upsert/generated`
+// (run from the repo root so import paths resolve). Never hand-edit
+// `generated/`.
+
+entity Widget {
+  id: uuid @primary
+  name: string
+  price_cents: int64
+  stock: int64
+}

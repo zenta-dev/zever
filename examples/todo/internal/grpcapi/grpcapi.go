@@ -81,12 +81,16 @@ func (s *Service) GetTask(ctx context.Context, req *genapp.GetTaskRequest) (*gen
 	return task, nil
 }
 
-// DeleteTask removes one owned task; missing or foreign ids are NotFound.
+// DeleteTask removes one owned task; missing ids are NotFound while tasks
+// owned by someone else are PermissionDenied.
 //
-// The generated DeleteTask policy carries a permission check that the
-// shared rbac checker denies, so through the wired transports this method
-// is unreachable without permission; the owner check here is defense in
-// depth for direct calls.
+// The generated DeleteTask policy carries the permission check
+// ("grpc_task.delete", resource GrpcTask, owner_field user_id) that the
+// shared checker allows past for any authenticated caller; ownership itself
+// is enforced here from the store so both transports see one decision:
+// the gRPC interceptor passes an empty resource id (no path-param
+// equivalent), so only the service — where the request id is available —
+// can compare owner reliably on both sides.
 func (s *Service) DeleteTask(ctx context.Context, req *genapp.DeleteTaskRequest) (*genapp.GrpcTask, error) {
 	sub, err := subject(ctx)
 	if err != nil {
@@ -100,8 +104,11 @@ func (s *Service) DeleteTask(ctx context.Context, req *genapp.DeleteTaskRequest)
 	defer s.mu.Unlock()
 
 	task, ok := s.tasks[req.Id]
-	if !ok || task.UserId != sub {
+	if !ok {
 		return nil, apperror.New(apperror.NotFound, "not found")
+	}
+	if task.UserId != sub {
+		return nil, apperror.New(apperror.PermissionDenied, "no access")
 	}
 	delete(s.tasks, req.Id)
 	return task, nil
