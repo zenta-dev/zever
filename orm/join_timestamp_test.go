@@ -15,12 +15,17 @@ import (
 // exist to regression-test two sqlite-specific behaviors the todo example
 // first exposed after the legacy-ORM cutover:
 //
-// 1. a time.Time bound through orm.Insert/orm.Set is persisted as RFC3339
-// text (encodeArgs at orm's execution boundary), so the codegen'd Scan
-// -- which parses timestamp columns as RFC3339 -- round-trips; and
+// 1. a time.Time bound through orm.Insert/orm.Set is persisted as
+// RFC3339Nano text (encodeArgs at orm's execution boundary), so the
+// codegen'd Scan -- which parses timestamp columns as RFC3339Nano --
+// round-trips sub-second precision; and
 // 2. Join2/LeftJoin2 scan correctly even when either side has a timestamp
-// column (the older collectRow scan ran each entity's Scan against
+// column (the older collectRow-based scan ran each entity's Scan against
 // still-empty values and failed on the eager timestamp parse).
+//
+// Second-precision text written before the Nano switch still parses: the
+// parse side accepts a missing fraction, covered by
+// TestTimestampLegacySecondPrecisionText below.
 type tsUser struct {
 	ID        string
 	Email     string
@@ -33,7 +38,7 @@ func (u *tsUser) Scan(row Row) error {
 		return err
 	}
 
-	t, err := time.Parse(time.RFC3339, raw)
+	t, err := time.Parse(time.RFC3339Nano, raw)
 	if err != nil {
 		return err
 	}
@@ -56,7 +61,7 @@ func (p *tsPost) Scan(row Row) error {
 		return err
 	}
 
-	t, err := time.Parse(time.RFC3339, raw)
+	t, err := time.Parse(time.RFC3339Nano, raw)
 	if err != nil {
 		return err
 	}
@@ -105,7 +110,7 @@ func newTimestampDB(t *testing.T) (db.DB, time.Time) {
 		}
 	}
 
-	at := time.Now().UTC().Truncate(time.Second)
+	at := time.Now().UTC().Truncate(time.Microsecond)
 
 	if err := InsertInto(tsUsers).Values(
 		Set(tsUserID, "u1"),
@@ -128,9 +133,9 @@ func newTimestampDB(t *testing.T) (db.DB, time.Time) {
 }
 
 // TestTimestampRoundTripThroughSQLite proves a time.Time bound through
-// InsertInto is persisted as RFC3339 text that the codegen'd Scan parses
-// back -- the storage format the framework's migration DDL and orm's
-// generated Scan both agree on.
+// InsertInto is persisted as RFC3339Nano text that the codegen'd Scan parses
+// back with sub-second precision intact -- the storage format the
+// framework's migration DDL and orm's generated Scan both agree on.
 func TestTimestampRoundTripThroughSQLite(t *testing.T) {
 	conn, at := newTimestampDB(t)
 
@@ -145,6 +150,33 @@ func TestTimestampRoundTripThroughSQLite(t *testing.T) {
 
 	if !users[0].CreatedAt.Equal(at) {
 		t.Fatalf("CreatedAt = %v, want %v", users[0].CreatedAt, at)
+	}
+}
+
+// TestTimestampLegacySecondPrecisionText proves rows written before the
+// Nano switch (plain RFC3339, no fraction) still scan: the parse side
+// accepts a missing fractional part.
+func TestTimestampLegacySecondPrecisionText(t *testing.T) {
+	conn, _ := newTimestampDB(t)
+	ctx := context.Background()
+
+	if _, err := conn.Exec(ctx, `INSERT INTO ts_users (id, email, created_at) VALUES (?, ?, ?)`,
+		"legacy", "l@example.com", "2026-01-02T15:04:05Z"); err != nil {
+		t.Fatalf("insert legacy row: %v", err)
+	}
+
+	users, err := From(tsUsers).Where(tsUserID.Eq("legacy")).All(ctx, conn)
+	if err != nil {
+		t.Fatalf("All: %v", err)
+	}
+
+	if len(users) != 1 {
+		t.Fatalf("len(users) = %d, want 1", len(users))
+	}
+
+	want := time.Date(2026, 1, 2, 15, 4, 5, 0, time.UTC)
+	if !users[0].CreatedAt.Equal(want) {
+		t.Fatalf("CreatedAt = %v, want %v", users[0].CreatedAt, want)
 	}
 }
 

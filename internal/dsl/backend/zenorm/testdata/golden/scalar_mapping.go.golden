@@ -69,14 +69,14 @@ func (e *Widget) Scan(row orm.Row) error {
 		return fmt.Errorf("[widget] scan error: %w", err)
 	}
 
-	valCreatedAt, errCreatedAt := time.Parse(time.RFC3339, rawCreatedAt)
+	valCreatedAt, errCreatedAt := time.Parse(time.RFC3339Nano, rawCreatedAt)
 	if errCreatedAt != nil {
 		return fmt.Errorf("[widget] parse created_at error: %w", errCreatedAt)
 	}
 
 	e.CreatedAt = valCreatedAt
 
-	valValidOn, errValidOn := time.Parse(time.RFC3339, rawValidOn)
+	valValidOn, errValidOn := time.Parse(time.RFC3339Nano, rawValidOn)
 	if errValidOn != nil {
 		return fmt.Errorf("[widget] parse valid_on error: %w", errValidOn)
 	}

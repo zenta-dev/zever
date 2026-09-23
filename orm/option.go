@@ -270,7 +270,7 @@ func scanTime(src any) (time.Time, error) {
 }
 
 func parseTime(s string) (time.Time, error) {
-	t, err := time.Parse(time.RFC3339, s)
+	t, err := time.Parse(time.RFC3339Nano, s)
 	if err != nil {
 		return time.Time{}, fmt.Errorf("cannot scan %q into time.Time: %w", s, err)
 	}

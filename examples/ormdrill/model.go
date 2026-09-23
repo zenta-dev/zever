@@ -45,7 +45,7 @@ var WidgetCols = struct {
 	Note:       orm.NewNullableColumn[Widget, string]("widgets", "note"),
 }
 
-// Widget is one shop widget. CreatedAt is stored as RFC3339 TEXT and parsed
+// Widget is one shop widget. CreatedAt is stored as RFC3339Nano TEXT and parsed
 // by Scan; Note is NULL for odd-numbered widgets.
 type Widget struct {
 	ID         string
@@ -63,7 +63,7 @@ func (e *Widget) Scan(row orm.Row) error {
 		return err
 	}
 
-	t, err := time.Parse(time.RFC3339, rawCreatedAt)
+	t, err := time.Parse(time.RFC3339Nano, rawCreatedAt)
 	if err != nil {
 		return fmt.Errorf("parse widget created_at %q: %w", rawCreatedAt, err)
 	}
@@ -105,7 +105,7 @@ func (e *Order) Scan(row orm.Row) error {
 		return err
 	}
 
-	t, err := time.Parse(time.RFC3339, rawCreatedAt)
+	t, err := time.Parse(time.RFC3339Nano, rawCreatedAt)
 	if err != nil {
 		return fmt.Errorf("parse order created_at %q: %w", rawCreatedAt, err)
 	}

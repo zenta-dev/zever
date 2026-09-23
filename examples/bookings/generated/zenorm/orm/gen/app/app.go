@@ -43,7 +43,7 @@ func (e *User) Scan(row orm.Row) error {
 		return fmt.Errorf("[user] scan error: %w", err)
 	}
 
-	valCreatedAt, errCreatedAt := time.Parse(time.RFC3339, rawCreatedAt)
+	valCreatedAt, errCreatedAt := time.Parse(time.RFC3339Nano, rawCreatedAt)
 	if errCreatedAt != nil {
 		return fmt.Errorf("[user] parse created_at error: %w", errCreatedAt)
 	}
@@ -161,7 +161,7 @@ func (e *Space) Scan(row orm.Row) error {
 		return fmt.Errorf("[space] scan error: %w", err)
 	}
 
-	valCreatedAt, errCreatedAt := time.Parse(time.RFC3339, rawCreatedAt)
+	valCreatedAt, errCreatedAt := time.Parse(time.RFC3339Nano, rawCreatedAt)
 	if errCreatedAt != nil {
 		return fmt.Errorf("[space] parse created_at error: %w", errCreatedAt)
 	}
@@ -278,7 +278,7 @@ func (e *Booking) Scan(row orm.Row) error {
 		return fmt.Errorf("[booking] scan error: %w", err)
 	}
 
-	valCreatedAt, errCreatedAt := time.Parse(time.RFC3339, rawCreatedAt)
+	valCreatedAt, errCreatedAt := time.Parse(time.RFC3339Nano, rawCreatedAt)
 	if errCreatedAt != nil {
 		return fmt.Errorf("[booking] parse created_at error: %w", errCreatedAt)
 	}
@@ -372,7 +372,7 @@ func (e *Review) Scan(row orm.Row) error {
 		return fmt.Errorf("[review] scan error: %w", err)
 	}
 
-	valCreatedAt, errCreatedAt := time.Parse(time.RFC3339, rawCreatedAt)
+	valCreatedAt, errCreatedAt := time.Parse(time.RFC3339Nano, rawCreatedAt)
 	if errCreatedAt != nil {
 		return fmt.Errorf("[review] parse created_at error: %w", errCreatedAt)
 	}
