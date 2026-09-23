@@ -1055,3 +1055,47 @@ func TestOpenInvalidOptions(t *testing.T) {
 		t.Fatal("expected Open with invalid Options to fail")
 	}
 }
+
+// TestAdapterImplementsStepRegistrar pins the StepRegistrar contract: hosts
+// register steps through the workflow.StepRegistrar interface, never a
+// concrete adapter type.
+func TestAdapterImplementsStepRegistrar(t *testing.T) {
+	t.Parallel()
+
+	var _ workflow.StepRegistrar = (*Adapter)(nil)
+}
+
+// TestRegisterStepThroughInterface registers and runs a step using only the
+// workflow.Workflow + workflow.StepRegistrar interfaces, the way host apps
+// (e.g. examples/demoapp RegisterDemoWorkflow) do.
+func TestRegisterStepThroughInterface(t *testing.T) {
+	t.Parallel()
+
+	ctx := context.Background()
+
+	w, err := New(workflow.Options{})
+	if err != nil {
+		t.Fatalf("New failed: %v", err)
+	}
+
+	reg, ok := w.(workflow.StepRegistrar)
+	if !ok {
+		t.Fatalf("New returned %T, want workflow.StepRegistrar", w)
+	}
+
+	reg.RegisterStep("step1", echoStep)
+
+	runID, err := w.Start(ctx, "step1", "hello", "")
+	if err != nil {
+		t.Fatalf("Start failed: %v", err)
+	}
+
+	var result string
+	if err := w.Query(ctx, runID, "state", &result); err != nil {
+		t.Fatalf("Query failed: %v", err)
+	}
+
+	if result != "hello" {
+		t.Fatalf("state = %q, want %q", result, "hello")
+	}
+}

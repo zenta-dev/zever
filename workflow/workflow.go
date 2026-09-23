@@ -32,6 +32,20 @@ type Workflow interface {
 // Factory creates a Workflow from the given Options.
 type Factory func(opts Options) (Workflow, error)
 
+// StepFunc is a named workflow step: input in, output or error out.
+// Engines that support host-registered steps expose registration through
+// StepRegistrar rather than a concrete adapter type.
+type StepFunc func(ctx context.Context, input any) (any, error)
+
+// StepRegistrar is implemented by workflow engines that allow hosts to
+// register step functions at runtime. It is a separate interface, not part
+// of Workflow, so engines without the concept are unaffected and no
+// existing implementer breaks.
+type StepRegistrar interface {
+	// RegisterStep registers fn under name, replacing any prior step.
+	RegisterStep(name string, fn StepFunc)
+}
+
 var factories = registry.New[Adapter, Factory](
 	ErrNilFactory,
 	func(a Adapter) error { return &DuplicateError{Adapter: a} },
