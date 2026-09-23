@@ -233,6 +233,7 @@ var ShopServiceDeleteProductPolicy = authz.Policy{
 	Roles:           []string{"admin"},
 	PermissionCheck: "product.delete",
 	ResourceType:    "Product",
+	OwnerField:      "category_id",
 }
 
 // ShopServiceCheckoutPolicy is the compile-time authz.Policy for ShopService.Checkout, generated
