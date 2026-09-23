@@ -37,6 +37,7 @@ type fixture struct {
 	http   http.Handler
 	wiring *grpcapi.Wiring
 	token  string
+	tokenB string
 }
 
 func newFixture(t *testing.T) *fixture {
@@ -69,7 +70,12 @@ func newFixture(t *testing.T) *fixture {
 		t.Fatalf("Issue: %v", err)
 	}
 
-	return &fixture{http: r, wiring: w, token: token.Value}
+	tokenB, err := authInst.Issue(context.Background(), "user-b", nil, time.Hour)
+	if err != nil {
+		t.Fatalf("Issue B: %v", err)
+	}
+
+	return &fixture{http: r, wiring: w, token: token.Value, tokenB: tokenB.Value}
 }
 
 // grpcCall invokes the wired interceptor for method with an optional token.
@@ -81,11 +87,11 @@ func (f *fixture) grpcCall(method string, token string, req any, handler grpc.Un
 	return f.wiring.Interceptor(ctx, req, &grpc.UnaryServerInfo{FullMethod: method}, handler)
 }
 
-// httpPost posts JSON to the HTTP transport with an optional token.
-func httpPost(t *testing.T, h http.Handler, path, token, body string) *httptest.ResponseRecorder {
+// httpPost posts JSON to the /grpc-tasks HTTP endpoint with an optional token.
+func httpPost(t *testing.T, h http.Handler, token, body string) *httptest.ResponseRecorder {
 	t.Helper()
 
-	req := httptest.NewRequestWithContext(context.Background(), http.MethodPost, path, strings.NewReader(body))
+	req := httptest.NewRequestWithContext(context.Background(), http.MethodPost, "/grpc-tasks", strings.NewReader(body))
 	req.Header.Set("Content-Type", "application/json")
 	if token != "" {
 		req.Header.Set("Authorization", "Bearer "+token)
@@ -107,7 +113,7 @@ type taskJSON struct {
 func TestCreateIdenticalAcrossTransports(t *testing.T) {
 	f := newFixture(t)
 
-	rec := httpPost(t, f.http, "/grpc-tasks", f.token, `{"title":"buy milk","body":"2%"}`)
+	rec := httpPost(t, f.http, f.token, `{"title":"buy milk","body":"2%"}`)
 	if rec.Code != http.StatusOK {
 		t.Fatalf("http create: got %d body %s", rec.Code, rec.Body.String())
 	}
@@ -147,7 +153,7 @@ func TestCreateIdenticalAcrossTransports(t *testing.T) {
 func TestUnauthenticatedRejectedIdentically(t *testing.T) {
 	f := newFixture(t)
 
-	rec := httpPost(t, f.http, "/grpc-tasks", "", `{"title":"x","body":"y"}`)
+	rec := httpPost(t, f.http, "", `{"title":"x","body":"y"}`)
 	if rec.Code != http.StatusUnauthorized {
 		t.Fatalf("http unauthed: got %d body %s", rec.Code, rec.Body.String())
 	}
@@ -166,14 +172,17 @@ func TestUnauthenticatedRejectedIdentically(t *testing.T) {
 	}
 }
 
-// TestUnauthorizedRejectedIdentically proves an authenticated caller
-// without permission fails the same on both transports: HTTP 403, gRPC
-// PermissionDenied. The shared rbac checker carries no allow rule for
-// "grpc_task.delete", so DeleteTask denies every caller on both sides.
+// TestUnauthorizedRejectedIdentically proves the permission-gated DeleteTask
+// distinguishes owner from non-owner identically on both transports: the
+// owner deletes successfully while another authenticated caller fails with
+// HTTP 403 / gRPC PermissionDenied. The shared checker allows any
+// authenticated caller past the generated policy gate; the shared Service
+// then enforces ownership (user_id) from its store, so both transports see
+// one decision.
 func TestUnauthorizedRejectedIdentically(t *testing.T) {
 	f := newFixture(t)
 
-	rec := httpPost(t, f.http, "/grpc-tasks", f.token, `{"title":"t","body":"b"}`)
+	rec := httpPost(t, f.http, f.token, `{"title":"t","body":"b"}`)
 	if rec.Code != http.StatusOK {
 		t.Fatalf("http create: got %d", rec.Code)
 	}
@@ -182,25 +191,74 @@ func TestUnauthorizedRejectedIdentically(t *testing.T) {
 		t.Fatalf("decode: %v", err)
 	}
 
+	// Owner deletes over HTTP.
 	delPath := "/grpc-tasks/" + created.ID
 	req := httptest.NewRequestWithContext(context.Background(), http.MethodDelete, delPath, nil)
 	req.Header.Set("Authorization", "Bearer "+f.token)
 	rec = httptest.NewRecorder()
 	f.http.ServeHTTP(rec, req)
-	if rec.Code != http.StatusForbidden {
-		t.Fatalf("http delete: got %d body %s", rec.Code, rec.Body.String())
+	if rec.Code != http.StatusOK {
+		t.Fatalf("http owner delete: got %d body %s", rec.Code, rec.Body.String())
 	}
 
-	_, err := f.grpcCall(pb.GrpcTaskService_DeleteTask_FullMethodName, f.token,
+	// Owner deletes over gRPC: create via gRPC, delete via gRPC.
+	grpcCreated, err := f.grpcCall(pb.GrpcTaskService_CreateTask_FullMethodName, f.token,
+		&genapp.CreateTaskRequest{Title: "g", Body: "b"},
+		func(ctx context.Context, req any) (any, error) {
+			typed, ok := req.(*genapp.CreateTaskRequest)
+			if !ok {
+				t.Fatalf("create req type = %T", req)
+			}
+			return f.wiring.Service.CreateTask(ctx, typed)
+		})
+	if err != nil {
+		t.Fatalf("grpc create: %v", err)
+	}
+	grpcTask, ok := grpcCreated.(*genapp.GrpcTask)
+	if !ok {
+		t.Fatalf("grpc create type = %T", grpcCreated)
+	}
+	_, err = f.grpcCall(pb.GrpcTaskService_DeleteTask_FullMethodName, f.token,
+		&genapp.DeleteTaskRequest{Id: grpcTask.Id},
+		func(ctx context.Context, req any) (any, error) {
+			typed, ok := req.(*genapp.DeleteTaskRequest)
+			if !ok {
+				t.Fatalf("delete req type = %T", req)
+			}
+			return genapp.NewGrpcTaskServiceGRPCServer(f.wiring.Service).DeleteTask(ctx, typed)
+		})
+	if err != nil {
+		t.Fatalf("grpc owner delete: got %v", err)
+	}
+
+	// Non-owner denied identically on both transports.
+	rec = httpPost(t, f.http, f.token, `{"title":"owned","body":"b"}`)
+	if rec.Code != http.StatusOK {
+		t.Fatalf("http create: got %d", rec.Code)
+	}
+	if err = json.Unmarshal(rec.Body.Bytes(), &created); err != nil {
+		t.Fatalf("decode: %v", err)
+	}
+
+	delPath = "/grpc-tasks/" + created.ID
+	req = httptest.NewRequestWithContext(context.Background(), http.MethodDelete, delPath, nil)
+	req.Header.Set("Authorization", "Bearer "+f.tokenB)
+	rec = httptest.NewRecorder()
+	f.http.ServeHTTP(rec, req)
+	if rec.Code != http.StatusForbidden {
+		t.Fatalf("http non-owner delete: got %d body %s", rec.Code, rec.Body.String())
+	}
+
+	_, err = f.grpcCall(pb.GrpcTaskService_DeleteTask_FullMethodName, f.tokenB,
 		&genapp.DeleteTaskRequest{Id: created.ID},
 		func(ctx context.Context, req any) (any, error) {
 			typed, ok := req.(*genapp.DeleteTaskRequest)
 			if !ok {
 				t.Fatalf("delete req type = %T", req)
 			}
-			return f.wiring.Service.DeleteTask(ctx, typed)
+			return genapp.NewGrpcTaskServiceGRPCServer(f.wiring.Service).DeleteTask(ctx, typed)
 		})
 	if status.Code(err) != codes.PermissionDenied {
-		t.Fatalf("grpc delete: got %v", err)
+		t.Fatalf("grpc non-owner delete: got %v", err)
 	}
 }

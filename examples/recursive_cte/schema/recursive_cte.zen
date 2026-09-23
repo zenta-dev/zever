@@ -1,0 +1,22 @@
+// recursive_cte.zen — the single source of truth for the recursive-CTE example.
+//
+// A self-referential org chart: every Employee (except the CEO) reports to
+// exactly one manager, itself an Employee. The example app walks the whole
+// tree with a single `WITH RECURSIVE` CTE built through orm.WithRecursive.
+//
+// Regenerate everything derived from this file with:
+// `zever compile examples/recursive_cte/schema/recursive_cte.zen --backend=zenorm --out examples/recursive_cte/generated`
+// (run from the repo root so import paths resolve). Never hand-edit
+// `generated/`.
+
+entity Employee {
+  id: uuid @primary
+  name: string
+  title: string
+  manager_id: uuid?
+
+  belongs_to manager: Employee @foreign_key(manager_id)
+  has_many reports: Employee @foreign_key(manager_id)
+
+  index(manager_id)
+}

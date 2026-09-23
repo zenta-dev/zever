@@ -14,6 +14,25 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   relations, `@schema`, `@renamed_from`, messages, all verbs/auth shapes,
   `errors:`, `paginated:`, job params, schedules) with generated output for
   all six backends, runnable server/worker/seed, and tests.
+- `examples/transactions`, `examples/bulk_upsert`, `examples/pagination`,
+  `examples/recursive_cte`, `examples/json_query`, `examples/fts`: focused
+  ORM ports (nested transactions, upserts with RETURNING, offset + keyset
+  pagination, recursive CTEs, JSON1 queries, FTS5 search), each with schema,
+  runnable demo, committed `zenorm` output, and deterministic tests.
+- `examples/ormdrill`: no-codegen raw-`orm` drill as per-topic `Example`
+  tests (cursors, preload, joins, subqueries, expressions, mutation gates).
+- `examples/demoapp`: batteries-included HTTP showcase (register/login,
+  products/orders/posts, per-battery `/demo/*` endpoints, jobs + schedules)
+  with black-box API tests; `demoapp` is battery breadth, `showcase` is
+  DSL depth.
+- `examples/todo`: cross-transport ownership check — non-owner Delete now
+  returns 403/`PermissionDenied` identically over HTTP and gRPC; notes and
+  digest job converted from raw SQL to the typed `orm` builder.
+
+### Fixed
+
+- `examples/showcase/data/cities.json` used `city` keys while `geo/static`
+  expects `name`, so geocoding silently matched nothing.
 
 ### Fixed
 

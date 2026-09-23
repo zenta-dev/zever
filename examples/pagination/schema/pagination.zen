@@ -1,0 +1,19 @@
+// pagination.zen — the single source of truth for the pagination example.
+//
+// A small product catalog queried two ways: classic offset pagination
+// (OrderBy/Limit/Offset + Count, via orm.OffsetPage) and keyset (cursor)
+// pagination driven by orm/cursor.go (NewCursorKey/AfterTuple plus an opaque
+// Encode/DecodeCursor page token). Keyset ordering uses (price_cents, id) —
+// price is the sort key, id the deterministic tie-breaker.
+//
+// Regenerate everything derived from this file with:
+// `zever compile examples/pagination/schema/pagination.zen --backend=zenorm --out examples/pagination/generated`
+// (run from the repo root so import paths resolve). Never hand-edit
+// `generated/`.
+
+entity Product {
+  id: uuid @primary
+  name: string
+  price_cents: int64
+  created_at: timestamp
+}

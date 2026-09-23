@@ -1,0 +1,18 @@
+// fts.zen — the single source of truth for the full-text-search example.
+//
+// A searchable document: a plain entity with a free-text body column. The
+// FTS5 virtual table that actually indexes the text is NOT expressible in
+// the .zen DSL (the FTS5 table shape is a migration concern);
+// cmd/app/main.go creates it via raw DDL over the same columns and queries
+// it through orm/fts/sqlite's typed helpers.
+//
+// Regenerate everything derived from this file with:
+// `zever compile examples/fts/schema/fts.zen --backend=zenorm --out examples/fts/generated`
+// (run from the repo root so import paths resolve). Never hand-edit
+// `generated/`.
+
+entity Doc {
+  id: uuid @primary
+  title: string
+  body: string
+}
