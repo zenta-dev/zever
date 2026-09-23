@@ -1,0 +1,84 @@
+# Demoapp config — every battery on a zero-infra adapter so the app runs
+# with no external services. File paths and demo-friendly option values
+# live in internal/app/app.go (code), so this file only selects adapters.
+# Swap adapters here (or via env, e.g. DB_MAXCONNS, AUTH_JWT_SECRET) for
+# production.
+db:
+  adapter: sqlite
+  options:
+    path: data/app.db
+auth:
+  adapter: jwt
+  options:
+    jwt:
+      # Dev-only insecure secret so the demo and `zever doctor` run with
+      # zero setup. NEVER use in production: export AUTH_JWT_SECRET with
+      # at least 32 random bytes (env overrides this file).
+      secret: dev-only-insecure-secret-32bytes!!
+log:
+  adapter: slog
+router:
+  adapter: stdhttp
+queue:
+  adapter: memory
+cache:
+  adapter: memory
+password:
+  adapter: argon2id
+flag:
+  adapter: static
+ratelimit:
+  adapter: memory
+  options:
+    rate: 100
+    burst: 200
+lock:
+  adapter: memory
+session:
+  adapter: memory
+idempotency:
+  adapter: memory
+eventbus:
+  adapter: memory
+scheduler:
+  adapter: embedded
+search:
+  adapter: sqlite
+vectorstore:
+  adapter: sqlite
+storage:
+  adapter: local
+media:
+  adapter: local
+geo:
+  adapter: static
+  options:
+    path: data/cities.json
+i18n:
+  adapter: embed
+crypto:
+  adapter: local
+secrets:
+  adapter: env
+mailer:
+  adapter: log
+notification:
+  adapter: log
+webhook:
+  adapter: http
+workflow:
+  adapter: memory
+document:
+  adapter: local
+observability:
+  adapter: stdout
+analytics:
+  adapter: log
+payment:
+  adapter: stub
+billing:
+  adapter: stub
+permission:
+  adapter: rbac
+tenant:
+  adapter: single

@@ -1,0 +1,163 @@
+// app.zen — comprehensive demo schema for demoapp.
+//
+// Run from the repo root:
+//   zever compile examples/demoapp/schema/app.zen --backend=atlas,gogen,openapi,proto,protogogen,zenorm --out examples/demoapp/generated
+//   zever db migrate --adapter=sqlite --dsn=data/app.db schema/app.zen (from examples/demoapp)
+
+entity User {
+  id: uuid @primary
+  email: string @unique @validate(format: "email")
+  name: string @validate(min_len: 1, max_len: 100)
+  role: string @default("member")
+  password_hash: string
+  created_at: timestamp @default(now())
+
+  has_many posts: Post @foreign_key(user_id)
+  has_many orders: Order @foreign_key(user_id)
+}
+
+entity Category {
+  id: uuid @primary
+  name: string @unique @validate(min_len: 1, max_len: 50)
+  description: string
+  created_at: timestamp @default(now())
+
+  has_many products: Product @foreign_key(category_id)
+}
+
+entity Product {
+  id: uuid @primary
+  category_id: uuid
+  name: string @validate(min_len: 1, max_len: 200)
+  description: string
+  price_cents: int64
+  stock: int64 @default(0)
+  created_at: timestamp @default(now())
+
+  belongs_to category: Category @foreign_key(category_id)
+
+  index(category_id)
+}
+
+entity Order {
+  id: uuid @primary
+  user_id: uuid
+  total_cents: int64
+  status: string @default("pending")
+  created_at: timestamp @default(now())
+
+  belongs_to user: User @foreign_key(user_id)
+
+  has_many items: OrderItem @foreign_key(order_id)
+
+  index(user_id, created_at)
+}
+
+entity OrderItem {
+  id: uuid @primary
+  order_id: uuid
+  product_id: uuid
+  quantity: int64
+  price_cents: int64
+
+  belongs_to order: Order @foreign_key(order_id)
+  belongs_to product: Product @foreign_key(product_id)
+
+  index(order_id)
+  index(product_id)
+}
+
+entity Post {
+  id: uuid @primary
+  user_id: uuid
+  title: string @validate(min_len: 1, max_len: 200)
+  body: string
+  published: bool
+  created_at: timestamp @default(now())
+
+  belongs_to author: User @foreign_key(user_id)
+
+  has_many comments: Comment @foreign_key(post_id)
+
+  index(user_id, created_at)
+}
+
+entity Comment {
+  id: uuid @primary
+  post_id: uuid
+  user_id: uuid
+  body: string @validate(min_len: 1, max_len: 500)
+  created_at: timestamp @default(now())
+
+  belongs_to post: Post @foreign_key(post_id)
+  belongs_to user: User @foreign_key(user_id)
+
+  index(post_id, created_at)
+}
+
+service UserService {
+  rpc GetUser(id: uuid) -> User {
+    http: GET "/v1/users/{id}"
+    auth: required
+  }
+  rpc ListUsers() -> User {
+    http: GET "/v1/users"
+    auth: required
+  }
+}
+
+service ProductService {
+  rpc GetProduct(id: uuid) -> Product {
+    http: GET "/v1/products/{id}"
+    auth: required
+  }
+  rpc ListProducts(category_id: uuid) -> Product {
+    http: GET "/v1/products"
+    auth: required
+  }
+  rpc CreateProduct(name: string, price_cents: int64) -> Product {
+    http: POST "/v1/products"
+    auth: required
+  }
+}
+
+service OrderService {
+  rpc GetOrder(id: uuid) -> Order {
+    http: GET "/v1/orders/{id}"
+    auth: required
+  }
+  rpc CreateOrder(product_ids: string) -> Order {
+    http: POST "/v1/orders"
+    auth: required
+  }
+}
+
+job SendWelcomeEmail() {
+  queue: default
+  retry: max_attempts(3), backoff(exponential, base: 30s)
+}
+
+job ProcessOrder(order_id: string) {
+  queue: orders
+  retry: max_attempts(5), backoff(exponential, base: 10s)
+}
+
+job GenerateDailyReport() {
+  queue: low
+  retry: max_attempts(3), backoff(exponential, base: 60s)
+}
+
+job ReindexSearch() {
+  queue: default
+  retry: max_attempts(2), backoff(exponential, base: 30s)
+}
+
+schedule DailyReport {
+  cron: "0 9 * * *"
+  dispatch: GenerateDailyReport()
+}
+
+schedule HourlyReindex {
+  cron: "0 * * * *"
+  dispatch: ReindexSearch()
+}
