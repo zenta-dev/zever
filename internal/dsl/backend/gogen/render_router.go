@@ -374,16 +374,16 @@ func renderRegisterFunc(b *strings.Builder, svcName string, ops []opModel, withA
 // extractor as "always empty resourceID", which is exactly right for an
 // auth-only operation).
 //
-// gRPC has no path-param equivalent to derive a resource id from generically
-// (see authz.UnaryServerInterceptor's own doc comment, which always passes
-// ""), so this HTTP-only heuristic reads the operation's own "{id}" path
-// placeholder when present -- the REST convention every operation in this
-// codebase's own example schemas already follows for a single-resource
-// route (e.g. "/v1/orders/{id}"). An operation whose PermissionCheck needs
-// a resource id from anywhere else (a non-"id" path param, a query
-// parameter, the request body) is not covered by this heuristic and
-// resolves to "": still evaluated by permission.Checker.Can, per
-// authz.Authorize's own documented behavior, not silently skipped.
+// gRPC derives the resource id from the request message itself (see
+// authz.ResourceIDer, used by authz.UnaryServerInterceptor), so this
+// HTTP-only heuristic reads the operation's own "{id}" path placeholder
+// when present -- the REST convention every operation in this codebase's own
+// example schemas already follows for a single-resource route (e.g.
+// "/v1/orders/{id}"). An operation whose PermissionCheck needs a resource
+// id from anywhere else (a non-"id" path param, a query parameter, the
+// request body) is not covered by this heuristic and resolves to "": still
+// evaluated by permission.Checker.Can, per authz.Authorize's own documented
+// behavior, not silently skipped.
 func resourceIDFromRequestExpr(op opModel) string {
 	if op.Permission == nil {
 		return "nil"
