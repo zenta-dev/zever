@@ -127,6 +127,7 @@ var TaskServiceListTasksPolicy = authz.Policy{
 var TaskServiceDeleteTaskPolicy = authz.Policy{
 	PermissionCheck: "task.delete",
 	ResourceType:    "Task",
+	OwnerField:      "user_id",
 }
 
 // GRPCPolicies returns the authz.Policy for every gRPC method this module's

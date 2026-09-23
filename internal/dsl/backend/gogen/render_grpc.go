@@ -195,6 +195,10 @@ func writePolicyFields(b *strings.Builder, op opModel) {
 		if op.Permission.Resource != nil {
 			fmt.Fprintf(b, "\tResourceType: %q,\n", op.Permission.Resource.Name)
 		}
+
+		if op.Permission.OwnerField != nil {
+			fmt.Fprintf(b, "\tOwnerField: %q,\n", op.Permission.OwnerField.Name)
+		}
 	}
 }
 
