@@ -13,7 +13,7 @@ const (
 	importTimestamp   = "google/protobuf/timestamp.proto"
 	importStruct      = "google/protobuf/struct.proto"
 	importHTTP        = "google/api/annotations.proto"
-	importAnnotations = "zengo/annotations.proto"
+	importAnnotations = "zever/annotations.proto"
 )
 
 // fileCtx accumulates the set of imports a single module's rendered file
@@ -65,10 +65,10 @@ func (c *fileCtx) claimMessageName(name, owner string) error {
 // the module's schema dir declared one (schema/v1/iam/*.zen -> Version
 // "v1"), defaulting to "v1" when it didn't -- every unversioned schema
 // (Version == "") therefore keeps generating exactly what it always has.
-// The implicit unnamed module maps to package zengo.<version> /
-// .../gen/zengo<version>;zengo<version> at "schema.proto"; a named module
-// "billing" at version "v1" maps to package zengo.billing.v1 /
-// .../gen/zengo/billing;billingv1 at "billing/schema.proto".
+// The implicit unnamed module maps to package zever.<version> /
+// .../gen/zever<version>;zever<version> at "schema.proto"; a named module
+// "billing" at version "v1" maps to package zever.billing.v1 /
+// .../gen/zever/billing;billingv1 at "billing/schema.proto".
 func moduleNaming(m *ir.Module) (pkg, goPackage, path string) {
 	version := m.Version
 	if version == "" {
@@ -76,13 +76,13 @@ func moduleNaming(m *ir.Module) (pkg, goPackage, path string) {
 	}
 
 	if m.Name == "" {
-		return "zengo." + version,
-			fmt.Sprintf("github.com/zenta-dev/zever/gen/zengo%s;zengo%s", version, version),
+		return "zever." + version,
+			fmt.Sprintf("github.com/zenta-dev/zever/gen/zever%s;zever%s", version, version),
 			"schema.proto"
 	}
 
-	pkg = fmt.Sprintf("zengo.%s.%s", m.Name, version)
-	goPackage = fmt.Sprintf("github.com/zenta-dev/zever/gen/zengo/%s;%s%s", m.Name, m.Name, version)
+	pkg = fmt.Sprintf("zever.%s.%s", m.Name, version)
+	goPackage = fmt.Sprintf("github.com/zenta-dev/zever/gen/zever/%s;%s%s", m.Name, m.Name, version)
 	path = m.Name + "/schema.proto"
 
 	return pkg, goPackage, path
@@ -173,7 +173,7 @@ func renderModuleFile(m *ir.Module) (path string, content []byte, err error) {
 // sortedImports returns imports in a fixed, deterministic order: the two
 // well-known-type imports first (timestamp, then struct), then the two
 // annotation imports (google/api/annotations.proto, then
-// zengo/annotations.proto) — never both a stable sort of arbitrary map keys
+// zever/annotations.proto) — never both a stable sort of arbitrary map keys
 // and never alphabetical, so output stays byte-for-byte reproducible and
 // reads in "standard types before extension types" order.
 func sortedImports(imports map[string]bool) []string {

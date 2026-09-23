@@ -1,5 +1,5 @@
 syntax = "proto3";
 
-package zengo.v1;
+package zever.v1;
 
-option go_package = "github.com/zenta-dev/zever/gen/zengov1;zengov1";
+option go_package = "github.com/zenta-dev/zever/gen/zeverv1;zeverv1";

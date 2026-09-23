@@ -131,9 +131,9 @@ func TestRunCompileProtoBackend(t *testing.T) {
 		t.Fatalf("expected non-empty schema.proto content")
 	}
 
-	// The shared companion file keeps its wire-stable zengo/ path (the
-	// ported proto backend retains "zengo/annotations.proto" verbatim).
-	annotationsFile := filepath.Join(outDir, "proto", "zengo", "annotations.proto")
+	// The shared companion file keeps its wire-stable zever/ path (the
+	// ported proto backend retains "zever/annotations.proto" verbatim).
+	annotationsFile := filepath.Join(outDir, "proto", "zever", "annotations.proto")
 	if _, err := os.Stat(annotationsFile); err != nil {
 		t.Fatalf("expected %q to exist: %v", annotationsFile, err)
 	}
@@ -500,8 +500,8 @@ func TestComputeBackendRootsWithGoMod(t *testing.T) {
 			if roots.pbImportRoot != wantPB {
 				t.Fatalf("pbImportRoot = %q, want %q", roots.pbImportRoot, wantPB)
 			}
-			if roots.annotationsGoPackageRoot != wantPB+"/zengo" {
-				t.Fatalf("annotationsGoPackageRoot = %q, want %q", roots.annotationsGoPackageRoot, wantPB+"/zengo")
+			if roots.annotationsGoPackageRoot != wantPB+"/zever" {
+				t.Fatalf("annotationsGoPackageRoot = %q, want %q", roots.annotationsGoPackageRoot, wantPB+"/zever")
 			}
 		})
 	}

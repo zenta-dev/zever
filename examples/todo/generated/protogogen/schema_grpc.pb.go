@@ -4,7 +4,7 @@
 // - protoc             (unknown)
 // source: schema.proto
 
-package zengov1
+package zeverv1
 
 import (
 	context "context"
@@ -19,9 +19,263 @@ import (
 const _ = grpc.SupportPackageIsVersion9
 
 const (
-	GrpcTaskService_CreateTask_FullMethodName = "/zengo.v1.GrpcTaskService/CreateTask"
-	GrpcTaskService_GetTask_FullMethodName    = "/zengo.v1.GrpcTaskService/GetTask"
-	GrpcTaskService_DeleteTask_FullMethodName = "/zengo.v1.GrpcTaskService/DeleteTask"
+	NoteService_ListNotes_FullMethodName  = "/zever.v1.NoteService/ListNotes"
+	NoteService_CreateNote_FullMethodName = "/zever.v1.NoteService/CreateNote"
+	NoteService_GetNote_FullMethodName    = "/zever.v1.NoteService/GetNote"
+	NoteService_UpdateNote_FullMethodName = "/zever.v1.NoteService/UpdateNote"
+	NoteService_DeleteNote_FullMethodName = "/zever.v1.NoteService/DeleteNote"
+)
+
+// NoteServiceClient is the client API for NoteService service.
+//
+// For semantics around ctx use and closing/ending streaming RPCs, please refer to https://pkg.go.dev/google.golang.org/grpc/?tab=doc#ClientConn.NewStream.
+type NoteServiceClient interface {
+	ListNotes(ctx context.Context, in *ListNotesRequest, opts ...grpc.CallOption) (*Note, error)
+	CreateNote(ctx context.Context, in *CreateNoteRequest, opts ...grpc.CallOption) (*Note, error)
+	GetNote(ctx context.Context, in *GetNoteRequest, opts ...grpc.CallOption) (*Note, error)
+	UpdateNote(ctx context.Context, in *UpdateNoteRequest, opts ...grpc.CallOption) (*Note, error)
+	DeleteNote(ctx context.Context, in *DeleteNoteRequest, opts ...grpc.CallOption) (*Note, error)
+}
+
+type noteServiceClient struct {
+	cc grpc.ClientConnInterface
+}
+
+func NewNoteServiceClient(cc grpc.ClientConnInterface) NoteServiceClient {
+	return &noteServiceClient{cc}
+}
+
+func (c *noteServiceClient) ListNotes(ctx context.Context, in *ListNotesRequest, opts ...grpc.CallOption) (*Note, error) {
+	cOpts := append([]grpc.CallOption{grpc.StaticMethod()}, opts...)
+	out := new(Note)
+	err := c.cc.Invoke(ctx, NoteService_ListNotes_FullMethodName, in, out, cOpts...)
+	if err != nil {
+		return nil, err
+	}
+	return out, nil
+}
+
+func (c *noteServiceClient) CreateNote(ctx context.Context, in *CreateNoteRequest, opts ...grpc.CallOption) (*Note, error) {
+	cOpts := append([]grpc.CallOption{grpc.StaticMethod()}, opts...)
+	out := new(Note)
+	err := c.cc.Invoke(ctx, NoteService_CreateNote_FullMethodName, in, out, cOpts...)
+	if err != nil {
+		return nil, err
+	}
+	return out, nil
+}
+
+func (c *noteServiceClient) GetNote(ctx context.Context, in *GetNoteRequest, opts ...grpc.CallOption) (*Note, error) {
+	cOpts := append([]grpc.CallOption{grpc.StaticMethod()}, opts...)
+	out := new(Note)
+	err := c.cc.Invoke(ctx, NoteService_GetNote_FullMethodName, in, out, cOpts...)
+	if err != nil {
+		return nil, err
+	}
+	return out, nil
+}
+
+func (c *noteServiceClient) UpdateNote(ctx context.Context, in *UpdateNoteRequest, opts ...grpc.CallOption) (*Note, error) {
+	cOpts := append([]grpc.CallOption{grpc.StaticMethod()}, opts...)
+	out := new(Note)
+	err := c.cc.Invoke(ctx, NoteService_UpdateNote_FullMethodName, in, out, cOpts...)
+	if err != nil {
+		return nil, err
+	}
+	return out, nil
+}
+
+func (c *noteServiceClient) DeleteNote(ctx context.Context, in *DeleteNoteRequest, opts ...grpc.CallOption) (*Note, error) {
+	cOpts := append([]grpc.CallOption{grpc.StaticMethod()}, opts...)
+	out := new(Note)
+	err := c.cc.Invoke(ctx, NoteService_DeleteNote_FullMethodName, in, out, cOpts...)
+	if err != nil {
+		return nil, err
+	}
+	return out, nil
+}
+
+// NoteServiceServer is the server API for NoteService service.
+// All implementations must embed UnimplementedNoteServiceServer
+// for forward compatibility.
+type NoteServiceServer interface {
+	ListNotes(context.Context, *ListNotesRequest) (*Note, error)
+	CreateNote(context.Context, *CreateNoteRequest) (*Note, error)
+	GetNote(context.Context, *GetNoteRequest) (*Note, error)
+	UpdateNote(context.Context, *UpdateNoteRequest) (*Note, error)
+	DeleteNote(context.Context, *DeleteNoteRequest) (*Note, error)
+	mustEmbedUnimplementedNoteServiceServer()
+}
+
+// UnimplementedNoteServiceServer must be embedded to have
+// forward compatible implementations.
+//
+// NOTE: this should be embedded by value instead of pointer to avoid a nil
+// pointer dereference when methods are called.
+type UnimplementedNoteServiceServer struct{}
+
+func (UnimplementedNoteServiceServer) ListNotes(context.Context, *ListNotesRequest) (*Note, error) {
+	return nil, status.Error(codes.Unimplemented, "method ListNotes not implemented")
+}
+func (UnimplementedNoteServiceServer) CreateNote(context.Context, *CreateNoteRequest) (*Note, error) {
+	return nil, status.Error(codes.Unimplemented, "method CreateNote not implemented")
+}
+func (UnimplementedNoteServiceServer) GetNote(context.Context, *GetNoteRequest) (*Note, error) {
+	return nil, status.Error(codes.Unimplemented, "method GetNote not implemented")
+}
+func (UnimplementedNoteServiceServer) UpdateNote(context.Context, *UpdateNoteRequest) (*Note, error) {
+	return nil, status.Error(codes.Unimplemented, "method UpdateNote not implemented")
+}
+func (UnimplementedNoteServiceServer) DeleteNote(context.Context, *DeleteNoteRequest) (*Note, error) {
+	return nil, status.Error(codes.Unimplemented, "method DeleteNote not implemented")
+}
+func (UnimplementedNoteServiceServer) mustEmbedUnimplementedNoteServiceServer() {}
+func (UnimplementedNoteServiceServer) testEmbeddedByValue()                     {}
+
+// UnsafeNoteServiceServer may be embedded to opt out of forward compatibility for this service.
+// Use of this interface is not recommended, as added methods to NoteServiceServer will
+// result in compilation errors.
+type UnsafeNoteServiceServer interface {
+	mustEmbedUnimplementedNoteServiceServer()
+}
+
+func RegisterNoteServiceServer(s grpc.ServiceRegistrar, srv NoteServiceServer) {
+	// If the following call panics, it indicates UnimplementedNoteServiceServer was
+	// embedded by pointer and is nil.  This will cause panics if an
+	// unimplemented method is ever invoked, so we test this at initialization
+	// time to prevent it from happening at runtime later due to I/O.
+	if t, ok := srv.(interface{ testEmbeddedByValue() }); ok {
+		t.testEmbeddedByValue()
+	}
+	s.RegisterService(&NoteService_ServiceDesc, srv)
+}
+
+func _NoteService_ListNotes_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
+	in := new(ListNotesRequest)
+	if err := dec(in); err != nil {
+		return nil, err
+	}
+	if interceptor == nil {
+		return srv.(NoteServiceServer).ListNotes(ctx, in)
+	}
+	info := &grpc.UnaryServerInfo{
+		Server:     srv,
+		FullMethod: NoteService_ListNotes_FullMethodName,
+	}
+	handler := func(ctx context.Context, req interface{}) (interface{}, error) {
+		return srv.(NoteServiceServer).ListNotes(ctx, req.(*ListNotesRequest))
+	}
+	return interceptor(ctx, in, info, handler)
+}
+
+func _NoteService_CreateNote_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
+	in := new(CreateNoteRequest)
+	if err := dec(in); err != nil {
+		return nil, err
+	}
+	if interceptor == nil {
+		return srv.(NoteServiceServer).CreateNote(ctx, in)
+	}
+	info := &grpc.UnaryServerInfo{
+		Server:     srv,
+		FullMethod: NoteService_CreateNote_FullMethodName,
+	}
+	handler := func(ctx context.Context, req interface{}) (interface{}, error) {
+		return srv.(NoteServiceServer).CreateNote(ctx, req.(*CreateNoteRequest))
+	}
+	return interceptor(ctx, in, info, handler)
+}
+
+func _NoteService_GetNote_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
+	in := new(GetNoteRequest)
+	if err := dec(in); err != nil {
+		return nil, err
+	}
+	if interceptor == nil {
+		return srv.(NoteServiceServer).GetNote(ctx, in)
+	}
+	info := &grpc.UnaryServerInfo{
+		Server:     srv,
+		FullMethod: NoteService_GetNote_FullMethodName,
+	}
+	handler := func(ctx context.Context, req interface{}) (interface{}, error) {
+		return srv.(NoteServiceServer).GetNote(ctx, req.(*GetNoteRequest))
+	}
+	return interceptor(ctx, in, info, handler)
+}
+
+func _NoteService_UpdateNote_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
+	in := new(UpdateNoteRequest)
+	if err := dec(in); err != nil {
+		return nil, err
+	}
+	if interceptor == nil {
+		return srv.(NoteServiceServer).UpdateNote(ctx, in)
+	}
+	info := &grpc.UnaryServerInfo{
+		Server:     srv,
+		FullMethod: NoteService_UpdateNote_FullMethodName,
+	}
+	handler := func(ctx context.Context, req interface{}) (interface{}, error) {
+		return srv.(NoteServiceServer).UpdateNote(ctx, req.(*UpdateNoteRequest))
+	}
+	return interceptor(ctx, in, info, handler)
+}
+
+func _NoteService_DeleteNote_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
+	in := new(DeleteNoteRequest)
+	if err := dec(in); err != nil {
+		return nil, err
+	}
+	if interceptor == nil {
+		return srv.(NoteServiceServer).DeleteNote(ctx, in)
+	}
+	info := &grpc.UnaryServerInfo{
+		Server:     srv,
+		FullMethod: NoteService_DeleteNote_FullMethodName,
+	}
+	handler := func(ctx context.Context, req interface{}) (interface{}, error) {
+		return srv.(NoteServiceServer).DeleteNote(ctx, req.(*DeleteNoteRequest))
+	}
+	return interceptor(ctx, in, info, handler)
+}
+
+// NoteService_ServiceDesc is the grpc.ServiceDesc for NoteService service.
+// It's only intended for direct use with grpc.RegisterService,
+// and not to be introspected or modified (even as a copy)
+var NoteService_ServiceDesc = grpc.ServiceDesc{
+	ServiceName: "zever.v1.NoteService",
+	HandlerType: (*NoteServiceServer)(nil),
+	Methods: []grpc.MethodDesc{
+		{
+			MethodName: "ListNotes",
+			Handler:    _NoteService_ListNotes_Handler,
+		},
+		{
+			MethodName: "CreateNote",
+			Handler:    _NoteService_CreateNote_Handler,
+		},
+		{
+			MethodName: "GetNote",
+			Handler:    _NoteService_GetNote_Handler,
+		},
+		{
+			MethodName: "UpdateNote",
+			Handler:    _NoteService_UpdateNote_Handler,
+		},
+		{
+			MethodName: "DeleteNote",
+			Handler:    _NoteService_DeleteNote_Handler,
+		},
+	},
+	Streams:  []grpc.StreamDesc{},
+	Metadata: "schema.proto",
+}
+
+const (
+	GrpcTaskService_CreateTask_FullMethodName = "/zever.v1.GrpcTaskService/CreateTask"
+	GrpcTaskService_GetTask_FullMethodName    = "/zever.v1.GrpcTaskService/GetTask"
+	GrpcTaskService_DeleteTask_FullMethodName = "/zever.v1.GrpcTaskService/DeleteTask"
 )
 
 // GrpcTaskServiceClient is the client API for GrpcTaskService service.
@@ -176,7 +430,7 @@ func _GrpcTaskService_DeleteTask_Handler(srv interface{}, ctx context.Context, d
 // It's only intended for direct use with grpc.RegisterService,
 // and not to be introspected or modified (even as a copy)
 var GrpcTaskService_ServiceDesc = grpc.ServiceDesc{
-	ServiceName: "zengo.v1.GrpcTaskService",
+	ServiceName: "zever.v1.GrpcTaskService",
 	HandlerType: (*GrpcTaskServiceServer)(nil),
 	Methods: []grpc.MethodDesc{
 		{

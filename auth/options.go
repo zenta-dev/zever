@@ -18,46 +18,46 @@ const (
 // JWTOptions configures the JWT adapter.
 type JWTOptions struct {
 	// Secret is the HMAC signing secret. Must be at least MinSecretLen bytes (adapter-validated).
-	Secret string
+	Secret string `json:"secret" toml:"secret" yaml:"secret"`
 	// Issuer is the token issuer. Required (adapter-validated).
-	Issuer string
+	Issuer string `json:"issuer" toml:"issuer" yaml:"issuer"`
 	// Audience is the intended token audience.
-	Audience string
+	Audience string `json:"audience" toml:"audience" yaml:"audience"`
 	// MaxTTL caps token lifetimes. Negative fails Validate; zero means no cap.
-	MaxTTL time.Duration
+	MaxTTL time.Duration `json:"maxttl" toml:"maxttl" yaml:"maxttl"`
 	// RevocationStore tracks revoked token jtis. Nil means the adapter
 	// builds an in-process memory store with its own defaults.
-	RevocationStore revocation.Store
+	RevocationStore revocation.Store `json:"-" toml:"-" yaml:"-"`
 }
 
 // SessionOptions configures the session-backed adapter.
 type SessionOptions struct {
 	// Store is the session backend. Nil means the adapter builds a
 	// memory store with session defaults.
-	Store session.Store
+	Store session.Store `json:"-" toml:"-" yaml:"-"`
 }
 
 // OIDCOptions configures the OpenID Connect adapter.
 type OIDCOptions struct {
 	// Issuer is the OIDC issuer URL. Required (adapter-validated).
-	Issuer string
+	Issuer string `json:"issuer" toml:"issuer" yaml:"issuer"`
 	// ClientID is the relying-party client ID. Required (adapter-validated).
-	ClientID string
+	ClientID string `json:"clientid" toml:"clientid" yaml:"clientid"`
 	// Timeout is the operation timeout. Zero means the default; negative fails.
-	Timeout time.Duration
+	Timeout time.Duration `json:"timeout" toml:"timeout" yaml:"timeout"`
 }
 
 // Options configures auth backend construction.
 type Options struct {
 	// JWT carries the JWT adapter settings.
-	JWT JWTOptions
+	JWT JWTOptions `json:"jwt" toml:"jwt" yaml:"jwt"`
 	// Session carries the session adapter settings.
-	Session SessionOptions
+	Session SessionOptions `json:"session" toml:"session" yaml:"session"`
 	// OIDC carries the OIDC adapter settings.
-	OIDC OIDCOptions
+	OIDC OIDCOptions `json:"oidc" toml:"oidc" yaml:"oidc"`
 }
 
-// Validate checks options for consistency.
+// Validate checks options for consistency, joining all violations.
 // Zero values are valid and mean "apply default".
 // Per-adapter required fields (secret length, issuer, client ID)
 // are validated by the adapters themselves.

@@ -1,8 +1,8 @@
-// Source schema for the committed gogen/app and gen/zengo/app packages.
+// Source schema for the committed gogen/app and gen/zever/app packages.
 //
 // Regenerate gogen/app with:
 //   go test ./internal/dsl/compile/ -run TestGogenGeneratesCommittedAppPackage -update
-// Regenerate gen/zengo/app with:
+// Regenerate gen/zever/app with:
 //   go test ./internal/dsl/compile/ -run TestProtogogenGeneratesCommittedAppPackage -update
 //
 // Both entities are compiled here under the virtual path "schema/app/app.zen"
@@ -17,11 +17,11 @@
 //
 // The dir-derived module is named "app" (rather than "" / implicit) so the
 // proto/protogogen backends -- which hardcode the implicit module to the
-// fixed "zengo.v1"/"gen/zengov1" namespace already used by protogogen's own
+// fixed "zever.v1"/"gen/zeverv1" namespace already used by protogogen's own
 // fixture.zen (see internal/dsl/backend/protogogen/testdata/fixture.zen and
-// its committed gen/zengov1 output) -- generate this schema's real protobuf
-// messages into a separate, non-colliding "zengo.app.v1"/"gen/zengo/app"
-// namespace instead (see gen/zengo/app), which gogen/app's generated code
+// its committed gen/zeverv1 output) -- generate this schema's real protobuf
+// messages into a separate, non-colliding "zever.app.v1"/"gen/zever/app"
+// namespace instead (see gen/zever/app), which gogen/app's generated code
 // imports.
 entity User {
   id: uuid @primary

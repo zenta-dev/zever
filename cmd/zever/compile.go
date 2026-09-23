@@ -84,15 +84,15 @@ type backendRoots struct {
 	// output layout.
 	pbImportRoot string
 	// annotationsGoPackageRoot is the Go import path of this project's own
-	// locally-compiled copy of the shared zengo/annotations.proto
-	// companion file. The .proto import path stays "zengo/annotations.proto"
+	// locally-compiled copy of the shared wire-stable annotations.proto
+	// companion file. The .proto import path stays "zever/annotations.proto"
 	// by design (wire-stable: every generated .proto imports it verbatim,
 	// and the ported backends kept that path), so only the Go package root
 	// is project-dependent: protogogen's "paths=source_relative" output
 	// mirrors the .proto file's own path exactly, producing
-	// "zengo/annotations.pb.go" (a file in a directory named "zengo", NOT
-	// a directory named "zengo/annotations" -- Go packages are addressed
-	// by directory, so the import path is "<pbImportRoot>/zengo", one
+	// "zever/annotations.pb.go" (a file in a directory named "zever", NOT
+	// a directory named "zever/annotations" -- Go packages are addressed
+	// by directory, so the import path is "<pbImportRoot>/zever", one
 	// segment shorter than the .proto file's own name would suggest.
 	annotationsGoPackageRoot string
 }
@@ -114,7 +114,7 @@ func computeBackendRoots(outDir string) backendRoots {
 
 	return backendRoots{
 		pbImportRoot:             pbRoot,
-		annotationsGoPackageRoot: pbRoot + "/zengo",
+		annotationsGoPackageRoot: pbRoot + "/zever",
 	}
 }
 

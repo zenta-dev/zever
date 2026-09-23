@@ -80,6 +80,11 @@ func peelInteractive(args []string) []string {
 // handler. Handler bodies (runNew, runCompile, …) are implemented by parallel
 // agents; this table names each one exactly. Keep in sync with allTopLevel
 // (suggest.go) minus the "help" alias, which run handles inline.
+//
+// Separator standard: single words bare (`check`, `graph`); multi-word
+// single commands hyphenated (`check-boundaries`, alias `check:boundaries`);
+// namespaced runtime commands colon-separated (`queue:work`,
+// `schedule:run`); sub-resources space-separated (`config show`, `db migrate`).
 var subcommandHandlers = map[string]func([]string) error{
 	"new":              runNew,
 	"compile":          runCompile,
@@ -91,6 +96,7 @@ var subcommandHandlers = map[string]func([]string) error{
 	"fmt":              runFmt,
 	"explain":          runExplain,
 	"check-boundaries": runCheckBoundaries,
+	"check:boundaries": runCheckBoundaries,
 	"graph":            runGraph,
 	"generate":         runGenerate,
 	"extract":          runExtract,

@@ -61,7 +61,7 @@ func New(o media.Options) (media.Media, error) {
 		return nil, fmt.Errorf("s3: %w", err)
 	}
 
-	cfg := s3opts.Config{
+	cfg := s3opts.Options{
 		Endpoint:        o.Endpoint,
 		Region:          o.Region,
 		Bucket:          o.Bucket,

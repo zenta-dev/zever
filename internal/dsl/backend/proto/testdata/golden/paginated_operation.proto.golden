@@ -1,11 +1,11 @@
 syntax = "proto3";
 
-package zengo.v1;
+package zever.v1;
 
 import "google/api/annotations.proto";
-import "zengo/annotations.proto";
+import "zever/annotations.proto";
 
-option go_package = "github.com/zenta-dev/zever/gen/zengov1;zengov1";
+option go_package = "github.com/zenta-dev/zever/gen/zeverv1;zeverv1";
 
 message Task {
   string id = 1;
@@ -28,11 +28,11 @@ message GetTaskRequest {
 service TaskService {
   rpc ListTasks(ListTasksRequest) returns (ListTasksResponse) {
     option (google.api.http) = { get: "/v1/tasks" };
-    option (zengo.annotations.v1.auth) = { required: true };
+    option (zever.annotations.v1.auth) = { required: true };
   }
 
   rpc GetTask(GetTaskRequest) returns (Task) {
     option (google.api.http) = { get: "/v1/tasks/{id}" };
-    option (zengo.annotations.v1.auth) = { required: true };
+    option (zever.annotations.v1.auth) = { required: true };
   }
 }

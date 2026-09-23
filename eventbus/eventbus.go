@@ -31,16 +31,19 @@ type Pusher interface {
 	) (unsubscribe func(), err error)
 
 	// Close shuts down the pusher and releases associated resources.
+	// Instant-close: no context, per the close-shape standard (see
+	// container/README.md). Pool-backed services use Close(ctx); the
+	// container probes both via closeAny.
 	Close() error
 
 	// Name returns the adapter name for the pusher.
 	Name() string
 }
 
-// Eventbus defines the unified operations for publishing and subscribing to
+// EventBus defines the unified operations for publishing and subscribing to
 // topics, push (Subscribe) and pull (SubscribeChan) alike.
-type Eventbus interface {
-	// Pusher is the push core promoted into Eventbus.
+type EventBus interface {
+	// Pusher is the push core promoted into EventBus.
 	Pusher
 
 	// SubscribeChan registers a buffered pull channel for topic.
@@ -54,8 +57,11 @@ type Eventbus interface {
 	Unsubscribe(topic string, ch <-chan Message) error
 }
 
-// Factory creates an Eventbus from the given Options.
-type Factory func(opts Options) (Eventbus, error)
+// Eventbus aliases EventBus for compatibility.
+type Eventbus = EventBus
+
+// Factory creates an EventBus from the given Options.
+type Factory func(opts Options) (EventBus, error)
 
 var factories = registry.New[Adapter, Factory](
 	ErrNilFactory,

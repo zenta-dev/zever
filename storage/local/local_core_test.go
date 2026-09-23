@@ -205,7 +205,7 @@ func TestLocalNewEphemeralSecretRandError(t *testing.T) {
 }
 
 func TestLocalNewProductionRequiresSecret(t *testing.T) {
-	t.Setenv("ZENGO_ENV", "production")
+	t.Setenv("ZEVER_ENV", "production")
 
 	_, err := New(storage.Options{
 		LocalOptions: storage.LocalOptions{Root: t.TempDir()},

@@ -16,6 +16,69 @@ import (
 	pb "github.com/zenta-dev/zever/examples/todo/generated/protogogen"
 )
 
+// NoteServiceGRPCServer adapts a NoteService implementation to the real pb.NoteServiceServer
+// gRPC interface protogogen generates for this schema, mapping every
+// returned error through gogenGRPCError.
+type NoteServiceGRPCServer struct {
+	pb.UnimplementedNoteServiceServer
+
+	svc NoteService
+}
+
+// NewNoteServiceGRPCServer returns a NoteServiceGRPCServer delegating to svc.
+func NewNoteServiceGRPCServer(svc NoteService) *NoteServiceGRPCServer {
+	return &NoteServiceGRPCServer{svc: svc}
+}
+
+// var _ asserts NoteServiceGRPCServer genuinely implements the real generated
+// pb.NoteServiceServer interface, not just a same-shaped lookalike.
+var _ pb.NoteServiceServer = (*NoteServiceGRPCServer)(nil)
+
+func (g *NoteServiceGRPCServer) ListNotes(ctx context.Context, req *ListNotesRequest) (*Note, error) {
+	resp, err := g.svc.ListNotes(ctx, req)
+	if err != nil {
+		return nil, gogenGRPCError(err)
+	}
+
+	return resp, nil
+}
+
+func (g *NoteServiceGRPCServer) CreateNote(ctx context.Context, req *CreateNoteRequest) (*Note, error) {
+	resp, err := g.svc.CreateNote(ctx, req)
+	if err != nil {
+		return nil, gogenGRPCError(err)
+	}
+
+	return resp, nil
+}
+
+func (g *NoteServiceGRPCServer) GetNote(ctx context.Context, req *GetNoteRequest) (*Note, error) {
+	resp, err := g.svc.GetNote(ctx, req)
+	if err != nil {
+		return nil, gogenGRPCError(err)
+	}
+
+	return resp, nil
+}
+
+func (g *NoteServiceGRPCServer) UpdateNote(ctx context.Context, req *UpdateNoteRequest) (*Note, error) {
+	resp, err := g.svc.UpdateNote(ctx, req)
+	if err != nil {
+		return nil, gogenGRPCError(err)
+	}
+
+	return resp, nil
+}
+
+func (g *NoteServiceGRPCServer) DeleteNote(ctx context.Context, req *DeleteNoteRequest) (*Note, error) {
+	resp, err := g.svc.DeleteNote(ctx, req)
+	if err != nil {
+		return nil, gogenGRPCError(err)
+	}
+
+	return resp, nil
+}
+
 // GrpcTaskServiceGRPCServer adapts a GrpcTaskService implementation to the real pb.GrpcTaskServiceServer
 // gRPC interface protogogen generates for this schema, mapping every
 // returned error through gogenGRPCError.
@@ -61,6 +124,36 @@ func (g *GrpcTaskServiceGRPCServer) DeleteTask(ctx context.Context, req *DeleteT
 	return resp, nil
 }
 
+// NoteServiceListNotesPolicy is the compile-time authz.Policy for NoteService.ListNotes, generated
+// from its auth:/permission: schema declaration.
+var NoteServiceListNotesPolicy = authz.Policy{
+	AuthRequired: true,
+}
+
+// NoteServiceCreateNotePolicy is the compile-time authz.Policy for NoteService.CreateNote, generated
+// from its auth:/permission: schema declaration.
+var NoteServiceCreateNotePolicy = authz.Policy{
+	AuthRequired: true,
+}
+
+// NoteServiceGetNotePolicy is the compile-time authz.Policy for NoteService.GetNote, generated
+// from its auth:/permission: schema declaration.
+var NoteServiceGetNotePolicy = authz.Policy{
+	AuthRequired: true,
+}
+
+// NoteServiceUpdateNotePolicy is the compile-time authz.Policy for NoteService.UpdateNote, generated
+// from its auth:/permission: schema declaration.
+var NoteServiceUpdateNotePolicy = authz.Policy{
+	AuthRequired: true,
+}
+
+// NoteServiceDeleteNotePolicy is the compile-time authz.Policy for NoteService.DeleteNote, generated
+// from its auth:/permission: schema declaration.
+var NoteServiceDeleteNotePolicy = authz.Policy{
+	AuthRequired: true,
+}
+
 // GrpcTaskServiceCreateTaskPolicy is the compile-time authz.Policy for GrpcTaskService.CreateTask, generated
 // from its auth:/permission: schema declaration.
 var GrpcTaskServiceCreateTaskPolicy = authz.Policy{
@@ -79,7 +172,6 @@ var GrpcTaskServiceDeleteTaskPolicy = authz.Policy{
 	AuthRequired:    true,
 	PermissionCheck: "grpc_task.delete",
 	ResourceType:    "GrpcTask",
-	OwnerField:      "user_id",
 }
 
 // GRPCPolicies returns the authz.Policy for every gRPC method this module's
@@ -91,6 +183,11 @@ var GrpcTaskServiceDeleteTaskPolicy = authz.Policy{
 // per grpc.Server, must cover every service registered on it.
 func GRPCPolicies() map[string]authz.Policy {
 	return map[string]authz.Policy{
+		pb.NoteService_ListNotes_FullMethodName:      NoteServiceListNotesPolicy,
+		pb.NoteService_CreateNote_FullMethodName:     NoteServiceCreateNotePolicy,
+		pb.NoteService_GetNote_FullMethodName:        NoteServiceGetNotePolicy,
+		pb.NoteService_UpdateNote_FullMethodName:     NoteServiceUpdateNotePolicy,
+		pb.NoteService_DeleteNote_FullMethodName:     NoteServiceDeleteNotePolicy,
 		pb.GrpcTaskService_CreateTask_FullMethodName: GrpcTaskServiceCreateTaskPolicy,
 		pb.GrpcTaskService_GetTask_FullMethodName:    GrpcTaskServiceGetTaskPolicy,
 		pb.GrpcTaskService_DeleteTask_FullMethodName: GrpcTaskServiceDeleteTaskPolicy,

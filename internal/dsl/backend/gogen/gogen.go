@@ -62,8 +62,8 @@ type Backend struct {
 	pbImportRoot string
 	// pbImportFlat selects which formula pbGoPackage uses to turn
 	// pbImportRoot into a per-module import path. false (New()'s default)
-	// applies the legacy "<root>/zengov1" or "<root>/zengo/<module>"
-	// convention inherited from the zen-go repo this backend was ported
+	// applies the legacy "<root>/zeverv1" or "<root>/zever/<module>"
+	// convention kept from the predecessor repo this backend was ported
 	// from -- no zever gen package exists yet, so the default root is
 	// override-required for any real project (see defaultPBImportRoot).
 	// true (set by NewWithPBImportRoot) applies a flat
@@ -74,7 +74,7 @@ type Backend struct {
 	// internal/dsl/backend/protogogen/request.go's codeGeneratorParameter),
 	// so a module's generated package lands at "<out>/protogogen/<module>/"
 	// -- mirroring its .proto source path exactly, never nested under an
-	// extra "zengo/" segment. The "/zengo/"-prefixed formula is a zen-go
+	// extra "zever/" segment. The "/zever/"-prefixed formula is a legacy
 	// repo-specific naming choice, not a property of how protogogen itself
 	// lays out output, so an external caller's override must not have it
 	// applied on their behalf.
@@ -93,7 +93,7 @@ func New() *Backend {
 // NewWithPBImportRoot returns a new gogen Backend that imports each
 // module's protogogen-generated message package from "<pbImportRoot>/
 // <module>" (a named module) or bare "<pbImportRoot>" (the implicit
-// unnamed module) instead of New()'s default root and "/zengo/"-prefixed
+// unnamed module) instead of New()'s default root and "/zever/"-prefixed
 // formula -- see Backend.pbImportFlat's doc comment for why this formula,
 // not the default one, is the correct one for an override: it matches
 // protogogen's actual "paths=source_relative" output layout, which every

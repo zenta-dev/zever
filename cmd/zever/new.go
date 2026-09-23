@@ -583,7 +583,7 @@ func (c NewConfig) batterySelections() []batterySelection {
 // map -- see NewConfig.Batteries' own doc comment for why the set is
 // minimal by default and developer-composed beyond that).
 //
-// Adaptation note: the "project" table zengo wrote alongside the batteries
+// Adaptation note: the "project" table the predecessor scaffold wrote alongside the batteries
 // is deliberately omitted. zever's config.Load is strict and rejects a
 // "project" key, so a generated file containing one would fail to load in
 // the scaffolded project itself. loadProjectConfig assumes the defaults

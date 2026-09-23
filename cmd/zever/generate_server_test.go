@@ -108,7 +108,7 @@ func TestRunGenerateServer(t *testing.T) {
 
 	// zever's zero-infra defaults ship a real rate limit (rate 10, burst 20),
 	// so rate-limit wiring is on even with no project config -- the inverse
-	// of zen-go's opt-in. See rateLimitConfigured.
+	// of the predecessor's opt-in. See rateLimitConfigured.
 	for _, wanted := range []string{"c.Ratelimit()", "middleware.RateLimit", "RateLimitUnaryServerInterceptor"} {
 		if !strings.Contains(main, wanted) {
 			t.Fatalf("server main.go must wire rate limiting under zever defaults, lacks %q:\n%s", wanted, main)

@@ -9,10 +9,10 @@ import (
 
 // Options configures the AI backend.
 type Options struct {
-	APIKey  string
-	Model   string
-	BaseURL string
-	Timeout time.Duration
+	APIKey  string        `json:"apikey" toml:"apikey" yaml:"apikey"`
+	Model   string        `json:"model" toml:"model" yaml:"model"`
+	BaseURL string        `json:"baseurl" toml:"baseurl" yaml:"baseurl"`
+	Timeout time.Duration `json:"timeout" toml:"timeout" yaml:"timeout"`
 }
 
 // Validate checks options for consistency, joining all violations.

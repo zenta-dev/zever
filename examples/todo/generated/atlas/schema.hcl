@@ -69,3 +69,30 @@ table "notes" {
     on_delete   = CASCADE
   }
 }
+
+table "grpc_tasks" {
+  schema = schema.public
+  column "id" {
+    null = false
+    type = uuid
+  }
+  column "user_id" {
+    null = false
+    type = uuid
+  }
+  column "title" {
+    null = false
+    type = varchar(200)
+  }
+  column "body" {
+    null = false
+    type = text
+  }
+  column "created_at" {
+    null = false
+    type = timestamptz
+  }
+  primary_key {
+    columns = [column.id]
+  }
+}

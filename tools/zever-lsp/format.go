@@ -9,7 +9,7 @@ import (
 
 // The whole-document, protocol-agnostic formatting core (token-stream-based
 // indentation and inter-token spacing) lives in internal/dsl/format, shared
-// with the zengo fmt CLI command. What stays here is genuinely
+// with the zever fmt CLI command. What stays here is genuinely
 // LSP-protocol-specific: converting the shared package's plain-int Edit
 // values into protocol.TextEdit, and range-scoped formatting
 // (filterEditsToRange), which has no meaning outside the LSP protocol.

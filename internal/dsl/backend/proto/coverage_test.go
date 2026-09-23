@@ -199,11 +199,11 @@ func TestGenerateEdgeOptions(t *testing.T) {
 		t.Fatalf("auth:none RPC should render as a bodyless declaration:\n%s", rendered)
 	}
 
-	if strings.Contains(rendered, "zengo.annotations.v1.auth") {
+	if strings.Contains(rendered, "zever.annotations.v1.auth") {
 		t.Fatalf("no RPC here declares auth, yet an auth option was rendered:\n%s", rendered)
 	}
 
-	if !strings.Contains(rendered, `option (zengo.annotations.v1.permission) = { check: "owns_order", resource: "Order", owner_field: "user_id" };`) {
+	if !strings.Contains(rendered, `option (zever.annotations.v1.permission) = { check: "owns_order", resource: "Order", owner_field: "user_id" };`) {
 		t.Fatalf("permission-only RPC missing its permission option:\n%s", rendered)
 	}
 }
@@ -485,17 +485,17 @@ func TestRenderAuthOption_branches(t *testing.T) {
 		{
 			name: "required",
 			auth: &ir.AuthPolicy{Required: true},
-			want: `option (zengo.annotations.v1.auth) = { required: true };`,
+			want: `option (zever.annotations.v1.auth) = { required: true };`,
 		},
 		{
 			name: "not required",
 			auth: &ir.AuthPolicy{Required: false},
-			want: `option (zengo.annotations.v1.auth) = { required: false };`,
+			want: `option (zever.annotations.v1.auth) = { required: false };`,
 		},
 		{
 			name: "roles",
 			auth: &ir.AuthPolicy{Required: true, Roles: []string{"owner", "admin"}},
-			want: `option (zengo.annotations.v1.auth) = { required: true, roles: ["owner", "admin"] };`,
+			want: `option (zever.annotations.v1.auth) = { required: true, roles: ["owner", "admin"] };`,
 		},
 	}
 

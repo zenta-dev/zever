@@ -95,7 +95,7 @@ var fieldAttrCandidates = []candidate{
 	{"unique", "add a unique constraint"},
 	{"validate", "validate(kind: value, ...) constraints"},
 	{"default", "default(value) for new rows"},
-	{"renamed_from", "renamed_from(\"old_name\") — record a column rename for zengo db migrate"},
+	{"renamed_from", "renamed_from(\"old_name\") — record a column rename for zever db migrate"},
 }
 
 // relationAttrCandidates mirrors resolver.resolveRelationAttributes.

@@ -20,6 +20,204 @@ import (
 
 const maxRequestBodyBytes = 10 << 20 // 10MB, matches document/local.maxSourceBytes
 
+// handleNoteServiceListNotes handles GET /notes, calling NoteService.ListNotes.
+func handleNoteServiceListNotes(svc NoteService) http.HandlerFunc {
+	return func(w http.ResponseWriter, r *http.Request) {
+		ctx := r.Context()
+
+		req := &ListNotesRequest{}
+
+		{
+			raw := r.URL.Query().Get("user_id")
+			if raw == "" {
+				writeGogenError(w, apperror.New(apperror.InvalidArgument, "missing required parameter \"user_id\""))
+				return
+			}
+
+			req.UserId = raw
+
+		}
+
+		resp, err := svc.ListNotes(ctx, req)
+		if err != nil {
+			writeGogenError(w, err)
+			return
+		}
+
+		writeGogenProtoJSON(w, http.StatusOK, resp)
+	}
+}
+
+// handleNoteServiceCreateNote handles POST /notes, calling NoteService.CreateNote.
+func handleNoteServiceCreateNote(svc NoteService) http.HandlerFunc {
+	return func(w http.ResponseWriter, r *http.Request) {
+		ctx := r.Context()
+
+		req := &CreateNoteRequest{}
+
+		body, err := io.ReadAll(http.MaxBytesReader(w, r.Body, maxRequestBodyBytes))
+		if err != nil {
+			msg := "invalid JSON body"
+
+			var maxErr *http.MaxBytesError
+			if errors.As(err, &maxErr) {
+				msg = "request body too large"
+			}
+
+			writeGogenError(w, apperror.New(apperror.InvalidArgument, msg))
+			return
+		}
+
+		if err := protojson.Unmarshal(body, req); err != nil {
+			writeGogenError(w, apperror.New(apperror.InvalidArgument, "invalid JSON body"))
+			return
+		}
+
+		if req.Title == "" {
+			writeGogenError(w, apperror.New(apperror.InvalidArgument, "missing required field \"title\""))
+			return
+		}
+
+		if req.Body == "" {
+			writeGogenError(w, apperror.New(apperror.InvalidArgument, "missing required field \"body\""))
+			return
+		}
+
+		resp, err := svc.CreateNote(ctx, req)
+		if err != nil {
+			writeGogenError(w, err)
+			return
+		}
+
+		writeGogenProtoJSON(w, http.StatusOK, resp)
+	}
+}
+
+// handleNoteServiceGetNote handles GET /notes/{id}, calling NoteService.GetNote.
+func handleNoteServiceGetNote(svc NoteService) http.HandlerFunc {
+	return func(w http.ResponseWriter, r *http.Request) {
+		ctx := r.Context()
+
+		req := &GetNoteRequest{}
+
+		{
+			raw := router.Param(r, "id")
+			if raw == "" {
+				writeGogenError(w, apperror.New(apperror.InvalidArgument, "missing required parameter \"id\""))
+				return
+			}
+
+			req.Id = raw
+
+		}
+
+		resp, err := svc.GetNote(ctx, req)
+		if err != nil {
+			writeGogenError(w, err)
+			return
+		}
+
+		writeGogenProtoJSON(w, http.StatusOK, resp)
+	}
+}
+
+// handleNoteServiceUpdateNote handles PATCH /notes/{id}, calling NoteService.UpdateNote.
+func handleNoteServiceUpdateNote(svc NoteService) http.HandlerFunc {
+	return func(w http.ResponseWriter, r *http.Request) {
+		ctx := r.Context()
+
+		req := &UpdateNoteRequest{}
+
+		body, err := io.ReadAll(http.MaxBytesReader(w, r.Body, maxRequestBodyBytes))
+		if err != nil {
+			msg := "invalid JSON body"
+
+			var maxErr *http.MaxBytesError
+			if errors.As(err, &maxErr) {
+				msg = "request body too large"
+			}
+
+			writeGogenError(w, apperror.New(apperror.InvalidArgument, msg))
+			return
+		}
+
+		if err := protojson.Unmarshal(body, req); err != nil {
+			writeGogenError(w, apperror.New(apperror.InvalidArgument, "invalid JSON body"))
+			return
+		}
+
+		if req.Title == "" {
+			writeGogenError(w, apperror.New(apperror.InvalidArgument, "missing required field \"title\""))
+			return
+		}
+
+		if req.Body == "" {
+			writeGogenError(w, apperror.New(apperror.InvalidArgument, "missing required field \"body\""))
+			return
+		}
+
+		{
+			raw := router.Param(r, "id")
+			if raw == "" {
+				writeGogenError(w, apperror.New(apperror.InvalidArgument, "missing required parameter \"id\""))
+				return
+			}
+
+			req.Id = raw
+
+		}
+
+		resp, err := svc.UpdateNote(ctx, req)
+		if err != nil {
+			writeGogenError(w, err)
+			return
+		}
+
+		writeGogenProtoJSON(w, http.StatusOK, resp)
+	}
+}
+
+// handleNoteServiceDeleteNote handles DELETE /notes/{id}, calling NoteService.DeleteNote.
+func handleNoteServiceDeleteNote(svc NoteService) http.HandlerFunc {
+	return func(w http.ResponseWriter, r *http.Request) {
+		ctx := r.Context()
+
+		req := &DeleteNoteRequest{}
+
+		{
+			raw := router.Param(r, "id")
+			if raw == "" {
+				writeGogenError(w, apperror.New(apperror.InvalidArgument, "missing required parameter \"id\""))
+				return
+			}
+
+			req.Id = raw
+
+		}
+
+		resp, err := svc.DeleteNote(ctx, req)
+		if err != nil {
+			writeGogenError(w, err)
+			return
+		}
+
+		writeGogenProtoJSON(w, http.StatusOK, resp)
+	}
+}
+
+// RegisterNoteServiceRoutes wires every HTTP-transport operation of NoteService onto r,
+// calling svc for each request. An operation with an auth:/permission:
+// declaration is wrapped in authz.Middleware, enforcing the identical
+// policy the same operation's gRPC method enforces via GRPCPolicies() --
+// see authz.Authorize, the single implementation both transports call.
+func RegisterNoteServiceRoutes(r router.Router, svc NoteService, a auth.Auth, p permission.Checker) {
+	r.Handle("GET", "/notes", authz.Middleware(a, p, NoteServiceListNotesPolicy, nil)(handleNoteServiceListNotes(svc)).ServeHTTP)
+	r.Handle("POST", "/notes", authz.Middleware(a, p, NoteServiceCreateNotePolicy, nil)(handleNoteServiceCreateNote(svc)).ServeHTTP)
+	r.Handle("GET", "/notes/{id}", authz.Middleware(a, p, NoteServiceGetNotePolicy, nil)(handleNoteServiceGetNote(svc)).ServeHTTP)
+	r.Handle("PATCH", "/notes/{id}", authz.Middleware(a, p, NoteServiceUpdateNotePolicy, nil)(handleNoteServiceUpdateNote(svc)).ServeHTTP)
+	r.Handle("DELETE", "/notes/{id}", authz.Middleware(a, p, NoteServiceDeleteNotePolicy, nil)(handleNoteServiceDeleteNote(svc)).ServeHTTP)
+}
+
 // handleGrpcTaskServiceCreateTask handles POST /grpc-tasks, calling GrpcTaskService.CreateTask.
 func handleGrpcTaskServiceCreateTask(svc GrpcTaskService) http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {

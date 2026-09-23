@@ -4,7 +4,7 @@
 // - protoc             (unknown)
 // source: schema.proto
 
-package zengov1
+package zeverv1
 
 import (
 	context "context"
@@ -19,8 +19,8 @@ import (
 const _ = grpc.SupportPackageIsVersion9
 
 const (
-	UserService_GetUser_FullMethodName   = "/zengo.v1.UserService/GetUser"
-	UserService_ListUsers_FullMethodName = "/zengo.v1.UserService/ListUsers"
+	UserService_GetUser_FullMethodName   = "/zever.v1.UserService/GetUser"
+	UserService_ListUsers_FullMethodName = "/zever.v1.UserService/ListUsers"
 )
 
 // UserServiceClient is the client API for UserService service.
@@ -142,7 +142,7 @@ func _UserService_ListUsers_Handler(srv interface{}, ctx context.Context, dec fu
 // It's only intended for direct use with grpc.RegisterService,
 // and not to be introspected or modified (even as a copy)
 var UserService_ServiceDesc = grpc.ServiceDesc{
-	ServiceName: "zengo.v1.UserService",
+	ServiceName: "zever.v1.UserService",
 	HandlerType: (*UserServiceServer)(nil),
 	Methods: []grpc.MethodDesc{
 		{
@@ -159,9 +159,9 @@ var UserService_ServiceDesc = grpc.ServiceDesc{
 }
 
 const (
-	ProductService_GetProduct_FullMethodName    = "/zengo.v1.ProductService/GetProduct"
-	ProductService_ListProducts_FullMethodName  = "/zengo.v1.ProductService/ListProducts"
-	ProductService_CreateProduct_FullMethodName = "/zengo.v1.ProductService/CreateProduct"
+	ProductService_GetProduct_FullMethodName    = "/zever.v1.ProductService/GetProduct"
+	ProductService_ListProducts_FullMethodName  = "/zever.v1.ProductService/ListProducts"
+	ProductService_CreateProduct_FullMethodName = "/zever.v1.ProductService/CreateProduct"
 )
 
 // ProductServiceClient is the client API for ProductService service.
@@ -316,7 +316,7 @@ func _ProductService_CreateProduct_Handler(srv interface{}, ctx context.Context,
 // It's only intended for direct use with grpc.RegisterService,
 // and not to be introspected or modified (even as a copy)
 var ProductService_ServiceDesc = grpc.ServiceDesc{
-	ServiceName: "zengo.v1.ProductService",
+	ServiceName: "zever.v1.ProductService",
 	HandlerType: (*ProductServiceServer)(nil),
 	Methods: []grpc.MethodDesc{
 		{
@@ -337,8 +337,8 @@ var ProductService_ServiceDesc = grpc.ServiceDesc{
 }
 
 const (
-	OrderService_GetOrder_FullMethodName    = "/zengo.v1.OrderService/GetOrder"
-	OrderService_CreateOrder_FullMethodName = "/zengo.v1.OrderService/CreateOrder"
+	OrderService_GetOrder_FullMethodName    = "/zever.v1.OrderService/GetOrder"
+	OrderService_CreateOrder_FullMethodName = "/zever.v1.OrderService/CreateOrder"
 )
 
 // OrderServiceClient is the client API for OrderService service.
@@ -460,7 +460,7 @@ func _OrderService_CreateOrder_Handler(srv interface{}, ctx context.Context, dec
 // It's only intended for direct use with grpc.RegisterService,
 // and not to be introspected or modified (even as a copy)
 var OrderService_ServiceDesc = grpc.ServiceDesc{
-	ServiceName: "zengo.v1.OrderService",
+	ServiceName: "zever.v1.OrderService",
 	HandlerType: (*OrderServiceServer)(nil),
 	Methods: []grpc.MethodDesc{
 		{

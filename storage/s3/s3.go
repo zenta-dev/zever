@@ -25,7 +25,7 @@ func New(opts storage.Options) (storage.Storage, error) {
 		return nil, fmt.Errorf("s3: %w", err)
 	}
 
-	cfg := s3opts.Config{
+	cfg := s3opts.Options{
 		Endpoint:        opts.Endpoint,
 		Region:          opts.Region,
 		AccessKeyID:     opts.AccessKeyID,

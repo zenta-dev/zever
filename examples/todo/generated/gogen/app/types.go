@@ -9,6 +9,24 @@ import (
 	pb "github.com/zenta-dev/zever/examples/todo/generated/protogogen"
 )
 
+// ListNotesRequest is a type alias for the real protobuf message pb.ListNotesRequest.
+type ListNotesRequest = pb.ListNotesRequest
+
+// Note is a type alias for the real protobuf message pb.Note.
+type Note = pb.Note
+
+// CreateNoteRequest is a type alias for the real protobuf message pb.CreateNoteRequest.
+type CreateNoteRequest = pb.CreateNoteRequest
+
+// GetNoteRequest is a type alias for the real protobuf message pb.GetNoteRequest.
+type GetNoteRequest = pb.GetNoteRequest
+
+// UpdateNoteRequest is a type alias for the real protobuf message pb.UpdateNoteRequest.
+type UpdateNoteRequest = pb.UpdateNoteRequest
+
+// DeleteNoteRequest is a type alias for the real protobuf message pb.DeleteNoteRequest.
+type DeleteNoteRequest = pb.DeleteNoteRequest
+
 // CreateTaskRequest is a type alias for the real protobuf message pb.CreateTaskRequest.
 type CreateTaskRequest = pb.CreateTaskRequest
 

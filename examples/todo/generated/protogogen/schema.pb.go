@@ -4,10 +4,10 @@
 // 	protoc        (unknown)
 // source: schema.proto
 
-package zengov1
+package zeverv1
 
 import (
-	_ "github.com/zenta-dev/zever/examples/todo/generated/protogogen/zengo"
+	_ "github.com/zenta-dev/zever/examples/todo/generated/protogogen/zever"
 	_ "google.golang.org/genproto/googleapis/api/annotations"
 	protoreflect "google.golang.org/protobuf/reflect/protoreflect"
 	protoimpl "google.golang.org/protobuf/runtime/protoimpl"
@@ -24,6 +24,158 @@ const (
 	_ = protoimpl.EnforceVersion(protoimpl.MaxVersion - 20)
 )
 
+type User struct {
+	state         protoimpl.MessageState `protogen:"open.v1"`
+	Id            string                 `protobuf:"bytes,1,opt,name=id,proto3" json:"id,omitempty"`
+	Email         string                 `protobuf:"bytes,2,opt,name=email,proto3" json:"email,omitempty"`
+	PasswordHash  string                 `protobuf:"bytes,3,opt,name=password_hash,json=passwordHash,proto3" json:"password_hash,omitempty"`
+	CreatedAt     *timestamppb.Timestamp `protobuf:"bytes,4,opt,name=created_at,json=createdAt,proto3" json:"created_at,omitempty"`
+	unknownFields protoimpl.UnknownFields
+	sizeCache     protoimpl.SizeCache
+}
+
+func (x *User) Reset() {
+	*x = User{}
+	mi := &file_schema_proto_msgTypes[0]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *User) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*User) ProtoMessage() {}
+
+func (x *User) ProtoReflect() protoreflect.Message {
+	mi := &file_schema_proto_msgTypes[0]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use User.ProtoReflect.Descriptor instead.
+func (*User) Descriptor() ([]byte, []int) {
+	return file_schema_proto_rawDescGZIP(), []int{0}
+}
+
+func (x *User) GetId() string {
+	if x != nil {
+		return x.Id
+	}
+	return ""
+}
+
+func (x *User) GetEmail() string {
+	if x != nil {
+		return x.Email
+	}
+	return ""
+}
+
+func (x *User) GetPasswordHash() string {
+	if x != nil {
+		return x.PasswordHash
+	}
+	return ""
+}
+
+func (x *User) GetCreatedAt() *timestamppb.Timestamp {
+	if x != nil {
+		return x.CreatedAt
+	}
+	return nil
+}
+
+type Note struct {
+	state         protoimpl.MessageState `protogen:"open.v1"`
+	Id            string                 `protobuf:"bytes,1,opt,name=id,proto3" json:"id,omitempty"`
+	UserId        string                 `protobuf:"bytes,2,opt,name=user_id,json=userId,proto3" json:"user_id,omitempty"`
+	Title         string                 `protobuf:"bytes,3,opt,name=title,proto3" json:"title,omitempty"`
+	Body          string                 `protobuf:"bytes,4,opt,name=body,proto3" json:"body,omitempty"`
+	Done          bool                   `protobuf:"varint,5,opt,name=done,proto3" json:"done,omitempty"`
+	CreatedAt     *timestamppb.Timestamp `protobuf:"bytes,6,opt,name=created_at,json=createdAt,proto3" json:"created_at,omitempty"`
+	unknownFields protoimpl.UnknownFields
+	sizeCache     protoimpl.SizeCache
+}
+
+func (x *Note) Reset() {
+	*x = Note{}
+	mi := &file_schema_proto_msgTypes[1]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *Note) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*Note) ProtoMessage() {}
+
+func (x *Note) ProtoReflect() protoreflect.Message {
+	mi := &file_schema_proto_msgTypes[1]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use Note.ProtoReflect.Descriptor instead.
+func (*Note) Descriptor() ([]byte, []int) {
+	return file_schema_proto_rawDescGZIP(), []int{1}
+}
+
+func (x *Note) GetId() string {
+	if x != nil {
+		return x.Id
+	}
+	return ""
+}
+
+func (x *Note) GetUserId() string {
+	if x != nil {
+		return x.UserId
+	}
+	return ""
+}
+
+func (x *Note) GetTitle() string {
+	if x != nil {
+		return x.Title
+	}
+	return ""
+}
+
+func (x *Note) GetBody() string {
+	if x != nil {
+		return x.Body
+	}
+	return ""
+}
+
+func (x *Note) GetDone() bool {
+	if x != nil {
+		return x.Done
+	}
+	return false
+}
+
+func (x *Note) GetCreatedAt() *timestamppb.Timestamp {
+	if x != nil {
+		return x.CreatedAt
+	}
+	return nil
+}
+
 type GrpcTask struct {
 	state         protoimpl.MessageState `protogen:"open.v1"`
 	Id            string                 `protobuf:"bytes,1,opt,name=id,proto3" json:"id,omitempty"`
@@ -37,7 +189,7 @@ type GrpcTask struct {
 
 func (x *GrpcTask) Reset() {
 	*x = GrpcTask{}
-	mi := &file_schema_proto_msgTypes[0]
+	mi := &file_schema_proto_msgTypes[2]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -49,7 +201,7 @@ func (x *GrpcTask) String() string {
 func (*GrpcTask) ProtoMessage() {}
 
 func (x *GrpcTask) ProtoReflect() protoreflect.Message {
-	mi := &file_schema_proto_msgTypes[0]
+	mi := &file_schema_proto_msgTypes[2]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -62,7 +214,7 @@ func (x *GrpcTask) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use GrpcTask.ProtoReflect.Descriptor instead.
 func (*GrpcTask) Descriptor() ([]byte, []int) {
-	return file_schema_proto_rawDescGZIP(), []int{0}
+	return file_schema_proto_rawDescGZIP(), []int{2}
 }
 
 func (x *GrpcTask) GetId() string {
@@ -100,6 +252,258 @@ func (x *GrpcTask) GetCreatedAt() *timestamppb.Timestamp {
 	return nil
 }
 
+type ListNotesRequest struct {
+	state         protoimpl.MessageState `protogen:"open.v1"`
+	UserId        string                 `protobuf:"bytes,1,opt,name=user_id,json=userId,proto3" json:"user_id,omitempty"`
+	unknownFields protoimpl.UnknownFields
+	sizeCache     protoimpl.SizeCache
+}
+
+func (x *ListNotesRequest) Reset() {
+	*x = ListNotesRequest{}
+	mi := &file_schema_proto_msgTypes[3]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *ListNotesRequest) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*ListNotesRequest) ProtoMessage() {}
+
+func (x *ListNotesRequest) ProtoReflect() protoreflect.Message {
+	mi := &file_schema_proto_msgTypes[3]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use ListNotesRequest.ProtoReflect.Descriptor instead.
+func (*ListNotesRequest) Descriptor() ([]byte, []int) {
+	return file_schema_proto_rawDescGZIP(), []int{3}
+}
+
+func (x *ListNotesRequest) GetUserId() string {
+	if x != nil {
+		return x.UserId
+	}
+	return ""
+}
+
+type CreateNoteRequest struct {
+	state         protoimpl.MessageState `protogen:"open.v1"`
+	Title         string                 `protobuf:"bytes,1,opt,name=title,proto3" json:"title,omitempty"`
+	Body          string                 `protobuf:"bytes,2,opt,name=body,proto3" json:"body,omitempty"`
+	unknownFields protoimpl.UnknownFields
+	sizeCache     protoimpl.SizeCache
+}
+
+func (x *CreateNoteRequest) Reset() {
+	*x = CreateNoteRequest{}
+	mi := &file_schema_proto_msgTypes[4]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *CreateNoteRequest) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*CreateNoteRequest) ProtoMessage() {}
+
+func (x *CreateNoteRequest) ProtoReflect() protoreflect.Message {
+	mi := &file_schema_proto_msgTypes[4]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use CreateNoteRequest.ProtoReflect.Descriptor instead.
+func (*CreateNoteRequest) Descriptor() ([]byte, []int) {
+	return file_schema_proto_rawDescGZIP(), []int{4}
+}
+
+func (x *CreateNoteRequest) GetTitle() string {
+	if x != nil {
+		return x.Title
+	}
+	return ""
+}
+
+func (x *CreateNoteRequest) GetBody() string {
+	if x != nil {
+		return x.Body
+	}
+	return ""
+}
+
+type GetNoteRequest struct {
+	state         protoimpl.MessageState `protogen:"open.v1"`
+	Id            string                 `protobuf:"bytes,1,opt,name=id,proto3" json:"id,omitempty"`
+	unknownFields protoimpl.UnknownFields
+	sizeCache     protoimpl.SizeCache
+}
+
+func (x *GetNoteRequest) Reset() {
+	*x = GetNoteRequest{}
+	mi := &file_schema_proto_msgTypes[5]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *GetNoteRequest) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*GetNoteRequest) ProtoMessage() {}
+
+func (x *GetNoteRequest) ProtoReflect() protoreflect.Message {
+	mi := &file_schema_proto_msgTypes[5]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use GetNoteRequest.ProtoReflect.Descriptor instead.
+func (*GetNoteRequest) Descriptor() ([]byte, []int) {
+	return file_schema_proto_rawDescGZIP(), []int{5}
+}
+
+func (x *GetNoteRequest) GetId() string {
+	if x != nil {
+		return x.Id
+	}
+	return ""
+}
+
+type UpdateNoteRequest struct {
+	state         protoimpl.MessageState `protogen:"open.v1"`
+	Id            string                 `protobuf:"bytes,1,opt,name=id,proto3" json:"id,omitempty"`
+	Title         string                 `protobuf:"bytes,2,opt,name=title,proto3" json:"title,omitempty"`
+	Body          string                 `protobuf:"bytes,3,opt,name=body,proto3" json:"body,omitempty"`
+	Done          bool                   `protobuf:"varint,4,opt,name=done,proto3" json:"done,omitempty"`
+	unknownFields protoimpl.UnknownFields
+	sizeCache     protoimpl.SizeCache
+}
+
+func (x *UpdateNoteRequest) Reset() {
+	*x = UpdateNoteRequest{}
+	mi := &file_schema_proto_msgTypes[6]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *UpdateNoteRequest) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*UpdateNoteRequest) ProtoMessage() {}
+
+func (x *UpdateNoteRequest) ProtoReflect() protoreflect.Message {
+	mi := &file_schema_proto_msgTypes[6]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use UpdateNoteRequest.ProtoReflect.Descriptor instead.
+func (*UpdateNoteRequest) Descriptor() ([]byte, []int) {
+	return file_schema_proto_rawDescGZIP(), []int{6}
+}
+
+func (x *UpdateNoteRequest) GetId() string {
+	if x != nil {
+		return x.Id
+	}
+	return ""
+}
+
+func (x *UpdateNoteRequest) GetTitle() string {
+	if x != nil {
+		return x.Title
+	}
+	return ""
+}
+
+func (x *UpdateNoteRequest) GetBody() string {
+	if x != nil {
+		return x.Body
+	}
+	return ""
+}
+
+func (x *UpdateNoteRequest) GetDone() bool {
+	if x != nil {
+		return x.Done
+	}
+	return false
+}
+
+type DeleteNoteRequest struct {
+	state         protoimpl.MessageState `protogen:"open.v1"`
+	Id            string                 `protobuf:"bytes,1,opt,name=id,proto3" json:"id,omitempty"`
+	unknownFields protoimpl.UnknownFields
+	sizeCache     protoimpl.SizeCache
+}
+
+func (x *DeleteNoteRequest) Reset() {
+	*x = DeleteNoteRequest{}
+	mi := &file_schema_proto_msgTypes[7]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *DeleteNoteRequest) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*DeleteNoteRequest) ProtoMessage() {}
+
+func (x *DeleteNoteRequest) ProtoReflect() protoreflect.Message {
+	mi := &file_schema_proto_msgTypes[7]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use DeleteNoteRequest.ProtoReflect.Descriptor instead.
+func (*DeleteNoteRequest) Descriptor() ([]byte, []int) {
+	return file_schema_proto_rawDescGZIP(), []int{7}
+}
+
+func (x *DeleteNoteRequest) GetId() string {
+	if x != nil {
+		return x.Id
+	}
+	return ""
+}
+
 type CreateTaskRequest struct {
 	state         protoimpl.MessageState `protogen:"open.v1"`
 	Title         string                 `protobuf:"bytes,1,opt,name=title,proto3" json:"title,omitempty"`
@@ -110,7 +514,7 @@ type CreateTaskRequest struct {
 
 func (x *CreateTaskRequest) Reset() {
 	*x = CreateTaskRequest{}
-	mi := &file_schema_proto_msgTypes[1]
+	mi := &file_schema_proto_msgTypes[8]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -122,7 +526,7 @@ func (x *CreateTaskRequest) String() string {
 func (*CreateTaskRequest) ProtoMessage() {}
 
 func (x *CreateTaskRequest) ProtoReflect() protoreflect.Message {
-	mi := &file_schema_proto_msgTypes[1]
+	mi := &file_schema_proto_msgTypes[8]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -135,7 +539,7 @@ func (x *CreateTaskRequest) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use CreateTaskRequest.ProtoReflect.Descriptor instead.
 func (*CreateTaskRequest) Descriptor() ([]byte, []int) {
-	return file_schema_proto_rawDescGZIP(), []int{1}
+	return file_schema_proto_rawDescGZIP(), []int{8}
 }
 
 func (x *CreateTaskRequest) GetTitle() string {
@@ -161,7 +565,7 @@ type GetTaskRequest struct {
 
 func (x *GetTaskRequest) Reset() {
 	*x = GetTaskRequest{}
-	mi := &file_schema_proto_msgTypes[2]
+	mi := &file_schema_proto_msgTypes[9]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -173,7 +577,7 @@ func (x *GetTaskRequest) String() string {
 func (*GetTaskRequest) ProtoMessage() {}
 
 func (x *GetTaskRequest) ProtoReflect() protoreflect.Message {
-	mi := &file_schema_proto_msgTypes[2]
+	mi := &file_schema_proto_msgTypes[9]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -186,7 +590,7 @@ func (x *GetTaskRequest) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use GetTaskRequest.ProtoReflect.Descriptor instead.
 func (*GetTaskRequest) Descriptor() ([]byte, []int) {
-	return file_schema_proto_rawDescGZIP(), []int{2}
+	return file_schema_proto_rawDescGZIP(), []int{9}
 }
 
 func (x *GetTaskRequest) GetId() string {
@@ -205,7 +609,7 @@ type DeleteTaskRequest struct {
 
 func (x *DeleteTaskRequest) Reset() {
 	*x = DeleteTaskRequest{}
-	mi := &file_schema_proto_msgTypes[3]
+	mi := &file_schema_proto_msgTypes[10]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -217,7 +621,7 @@ func (x *DeleteTaskRequest) String() string {
 func (*DeleteTaskRequest) ProtoMessage() {}
 
 func (x *DeleteTaskRequest) ProtoReflect() protoreflect.Message {
-	mi := &file_schema_proto_msgTypes[3]
+	mi := &file_schema_proto_msgTypes[10]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -230,7 +634,7 @@ func (x *DeleteTaskRequest) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use DeleteTaskRequest.ProtoReflect.Descriptor instead.
 func (*DeleteTaskRequest) Descriptor() ([]byte, []int) {
-	return file_schema_proto_rawDescGZIP(), []int{3}
+	return file_schema_proto_rawDescGZIP(), []int{10}
 }
 
 func (x *DeleteTaskRequest) GetId() string {
@@ -244,28 +648,65 @@ var File_schema_proto protoreflect.FileDescriptor
 
 const file_schema_proto_rawDesc = "" +
 	"\n" +
-	"\fschema.proto\x12\bzengo.v1\x1a\x1fgoogle/protobuf/timestamp.proto\x1a\x1cgoogle/api/annotations.proto\x1a\x17zengo/annotations.proto\"\x98\x01\n" +
+	"\fschema.proto\x12\bzever.v1\x1a\x1fgoogle/protobuf/timestamp.proto\x1a\x1cgoogle/api/annotations.proto\x1a\x17zever/annotations.proto\"\x8c\x01\n" +
+	"\x04User\x12\x0e\n" +
+	"\x02id\x18\x01 \x01(\tR\x02id\x12\x14\n" +
+	"\x05email\x18\x02 \x01(\tR\x05email\x12#\n" +
+	"\rpassword_hash\x18\x03 \x01(\tR\fpasswordHash\x129\n" +
+	"\n" +
+	"created_at\x18\x04 \x01(\v2\x1a.google.protobuf.TimestampR\tcreatedAt\"\xa8\x01\n" +
+	"\x04Note\x12\x0e\n" +
+	"\x02id\x18\x01 \x01(\tR\x02id\x12\x17\n" +
+	"\auser_id\x18\x02 \x01(\tR\x06userId\x12\x14\n" +
+	"\x05title\x18\x03 \x01(\tR\x05title\x12\x12\n" +
+	"\x04body\x18\x04 \x01(\tR\x04body\x12\x12\n" +
+	"\x04done\x18\x05 \x01(\bR\x04done\x129\n" +
+	"\n" +
+	"created_at\x18\x06 \x01(\v2\x1a.google.protobuf.TimestampR\tcreatedAt\"\x98\x01\n" +
 	"\bGrpcTask\x12\x0e\n" +
 	"\x02id\x18\x01 \x01(\tR\x02id\x12\x17\n" +
 	"\auser_id\x18\x02 \x01(\tR\x06userId\x12\x14\n" +
 	"\x05title\x18\x03 \x01(\tR\x05title\x12\x12\n" +
 	"\x04body\x18\x04 \x01(\tR\x04body\x129\n" +
 	"\n" +
-	"created_at\x18\x05 \x01(\v2\x1a.google.protobuf.TimestampR\tcreatedAt\"=\n" +
+	"created_at\x18\x05 \x01(\v2\x1a.google.protobuf.TimestampR\tcreatedAt\"+\n" +
+	"\x10ListNotesRequest\x12\x17\n" +
+	"\auser_id\x18\x01 \x01(\tR\x06userId\"=\n" +
+	"\x11CreateNoteRequest\x12\x14\n" +
+	"\x05title\x18\x01 \x01(\tR\x05title\x12\x12\n" +
+	"\x04body\x18\x02 \x01(\tR\x04body\" \n" +
+	"\x0eGetNoteRequest\x12\x0e\n" +
+	"\x02id\x18\x01 \x01(\tR\x02id\"a\n" +
+	"\x11UpdateNoteRequest\x12\x0e\n" +
+	"\x02id\x18\x01 \x01(\tR\x02id\x12\x14\n" +
+	"\x05title\x18\x02 \x01(\tR\x05title\x12\x12\n" +
+	"\x04body\x18\x03 \x01(\tR\x04body\x12\x12\n" +
+	"\x04done\x18\x04 \x01(\bR\x04done\"#\n" +
+	"\x11DeleteNoteRequest\x12\x0e\n" +
+	"\x02id\x18\x01 \x01(\tR\x02id\"=\n" +
 	"\x11CreateTaskRequest\x12\x14\n" +
 	"\x05title\x18\x01 \x01(\tR\x05title\x12\x12\n" +
 	"\x04body\x18\x02 \x01(\tR\x04body\" \n" +
 	"\x0eGetTaskRequest\x12\x0e\n" +
 	"\x02id\x18\x01 \x01(\tR\x02id\"#\n" +
 	"\x11DeleteTaskRequest\x12\x0e\n" +
-	"\x02id\x18\x01 \x01(\tR\x02id2\xd0\x02\n" +
+	"\x02id\x18\x01 \x01(\tR\x02id2\xaf\x03\n" +
+	"\vNoteService\x12M\n" +
+	"\tListNotes\x12\x1a.zever.v1.ListNotesRequest\x1a\x0e.zever.v1.Note\"\x14\xca\xda\x18\x02\b\x01\x82\xd3\xe4\x93\x02\b\x12\x06/notes\x12R\n" +
+	"\n" +
+	"CreateNote\x12\x1b.zever.v1.CreateNoteRequest\x1a\x0e.zever.v1.Note\"\x17\xca\xda\x18\x02\b\x01\x82\xd3\xe4\x93\x02\v:\x01*\"\x06/notes\x12N\n" +
+	"\aGetNote\x12\x18.zever.v1.GetNoteRequest\x1a\x0e.zever.v1.Note\"\x19\xca\xda\x18\x02\b\x01\x82\xd3\xe4\x93\x02\r\x12\v/notes/{id}\x12W\n" +
+	"\n" +
+	"UpdateNote\x12\x1b.zever.v1.UpdateNoteRequest\x1a\x0e.zever.v1.Note\"\x1c\xca\xda\x18\x02\b\x01\x82\xd3\xe4\x93\x02\x10:\x01*2\v/notes/{id}\x12T\n" +
+	"\n" +
+	"DeleteNote\x12\x1b.zever.v1.DeleteNoteRequest\x1a\x0e.zever.v1.Note\"\x19\xca\xda\x18\x02\b\x01\x82\xd3\xe4\x93\x02\r*\v/notes/{id}2\xd0\x02\n" +
 	"\x0fGrpcTaskService\x12[\n" +
 	"\n" +
-	"CreateTask\x12\x1b.zengo.v1.CreateTaskRequest\x1a\x12.zengo.v1.GrpcTask\"\x1c\xca\xda\x18\x02\b\x01\x82\xd3\xe4\x93\x02\x10:\x01*\"\v/grpc-tasks\x12W\n" +
-	"\aGetTask\x12\x18.zengo.v1.GetTaskRequest\x1a\x12.zengo.v1.GrpcTask\"\x1e\xca\xda\x18\x02\b\x01\x82\xd3\xe4\x93\x02\x12\x12\x10/grpc-tasks/{id}\x12\x86\x01\n" +
+	"CreateTask\x12\x1b.zever.v1.CreateTaskRequest\x1a\x12.zever.v1.GrpcTask\"\x1c\xca\xda\x18\x02\b\x01\x82\xd3\xe4\x93\x02\x10:\x01*\"\v/grpc-tasks\x12W\n" +
+	"\aGetTask\x12\x18.zever.v1.GetTaskRequest\x1a\x12.zever.v1.GrpcTask\"\x1e\xca\xda\x18\x02\b\x01\x82\xd3\xe4\x93\x02\x12\x12\x10/grpc-tasks/{id}\x12\x86\x01\n" +
 	"\n" +
-	"DeleteTask\x12\x1b.zengo.v1.DeleteTaskRequest\x1a\x12.zengo.v1.GrpcTask\"G\xca\xda\x18\x02\b\x01\xd2\xda\x18%\n" +
-	"\x10grpc_task.delete\x12\bGrpcTask\x1a\auser_id\x82\xd3\xe4\x93\x02\x12*\x10/grpc-tasks/{id}B0Z.github.com/zenta-dev/zever/gen/zengov1;zengov1b\x06proto3"
+	"DeleteTask\x12\x1b.zever.v1.DeleteTaskRequest\x1a\x12.zever.v1.GrpcTask\"G\xca\xda\x18\x02\b\x01\xd2\xda\x18%\n" +
+	"\x10grpc_task.delete\x12\bGrpcTask\x1a\auser_id\x82\xd3\xe4\x93\x02\x12*\x10/grpc-tasks/{id}B0Z.github.com/zenta-dev/zever/gen/zeverv1;zeverv1b\x06proto3"
 
 var (
 	file_schema_proto_rawDescOnce sync.Once
@@ -279,27 +720,46 @@ func file_schema_proto_rawDescGZIP() []byte {
 	return file_schema_proto_rawDescData
 }
 
-var file_schema_proto_msgTypes = make([]protoimpl.MessageInfo, 4)
+var file_schema_proto_msgTypes = make([]protoimpl.MessageInfo, 11)
 var file_schema_proto_goTypes = []any{
-	(*GrpcTask)(nil),              // 0: zengo.v1.GrpcTask
-	(*CreateTaskRequest)(nil),     // 1: zengo.v1.CreateTaskRequest
-	(*GetTaskRequest)(nil),        // 2: zengo.v1.GetTaskRequest
-	(*DeleteTaskRequest)(nil),     // 3: zengo.v1.DeleteTaskRequest
-	(*timestamppb.Timestamp)(nil), // 4: google.protobuf.Timestamp
+	(*User)(nil),                  // 0: zever.v1.User
+	(*Note)(nil),                  // 1: zever.v1.Note
+	(*GrpcTask)(nil),              // 2: zever.v1.GrpcTask
+	(*ListNotesRequest)(nil),      // 3: zever.v1.ListNotesRequest
+	(*CreateNoteRequest)(nil),     // 4: zever.v1.CreateNoteRequest
+	(*GetNoteRequest)(nil),        // 5: zever.v1.GetNoteRequest
+	(*UpdateNoteRequest)(nil),     // 6: zever.v1.UpdateNoteRequest
+	(*DeleteNoteRequest)(nil),     // 7: zever.v1.DeleteNoteRequest
+	(*CreateTaskRequest)(nil),     // 8: zever.v1.CreateTaskRequest
+	(*GetTaskRequest)(nil),        // 9: zever.v1.GetTaskRequest
+	(*DeleteTaskRequest)(nil),     // 10: zever.v1.DeleteTaskRequest
+	(*timestamppb.Timestamp)(nil), // 11: google.protobuf.Timestamp
 }
 var file_schema_proto_depIdxs = []int32{
-	4, // 0: zengo.v1.GrpcTask.created_at:type_name -> google.protobuf.Timestamp
-	1, // 1: zengo.v1.GrpcTaskService.CreateTask:input_type -> zengo.v1.CreateTaskRequest
-	2, // 2: zengo.v1.GrpcTaskService.GetTask:input_type -> zengo.v1.GetTaskRequest
-	3, // 3: zengo.v1.GrpcTaskService.DeleteTask:input_type -> zengo.v1.DeleteTaskRequest
-	0, // 4: zengo.v1.GrpcTaskService.CreateTask:output_type -> zengo.v1.GrpcTask
-	0, // 5: zengo.v1.GrpcTaskService.GetTask:output_type -> zengo.v1.GrpcTask
-	0, // 6: zengo.v1.GrpcTaskService.DeleteTask:output_type -> zengo.v1.GrpcTask
-	4, // [4:7] is the sub-list for method output_type
-	1, // [1:4] is the sub-list for method input_type
-	1, // [1:1] is the sub-list for extension type_name
-	1, // [1:1] is the sub-list for extension extendee
-	0, // [0:1] is the sub-list for field type_name
+	11, // 0: zever.v1.User.created_at:type_name -> google.protobuf.Timestamp
+	11, // 1: zever.v1.Note.created_at:type_name -> google.protobuf.Timestamp
+	11, // 2: zever.v1.GrpcTask.created_at:type_name -> google.protobuf.Timestamp
+	3,  // 3: zever.v1.NoteService.ListNotes:input_type -> zever.v1.ListNotesRequest
+	4,  // 4: zever.v1.NoteService.CreateNote:input_type -> zever.v1.CreateNoteRequest
+	5,  // 5: zever.v1.NoteService.GetNote:input_type -> zever.v1.GetNoteRequest
+	6,  // 6: zever.v1.NoteService.UpdateNote:input_type -> zever.v1.UpdateNoteRequest
+	7,  // 7: zever.v1.NoteService.DeleteNote:input_type -> zever.v1.DeleteNoteRequest
+	8,  // 8: zever.v1.GrpcTaskService.CreateTask:input_type -> zever.v1.CreateTaskRequest
+	9,  // 9: zever.v1.GrpcTaskService.GetTask:input_type -> zever.v1.GetTaskRequest
+	10, // 10: zever.v1.GrpcTaskService.DeleteTask:input_type -> zever.v1.DeleteTaskRequest
+	1,  // 11: zever.v1.NoteService.ListNotes:output_type -> zever.v1.Note
+	1,  // 12: zever.v1.NoteService.CreateNote:output_type -> zever.v1.Note
+	1,  // 13: zever.v1.NoteService.GetNote:output_type -> zever.v1.Note
+	1,  // 14: zever.v1.NoteService.UpdateNote:output_type -> zever.v1.Note
+	1,  // 15: zever.v1.NoteService.DeleteNote:output_type -> zever.v1.Note
+	2,  // 16: zever.v1.GrpcTaskService.CreateTask:output_type -> zever.v1.GrpcTask
+	2,  // 17: zever.v1.GrpcTaskService.GetTask:output_type -> zever.v1.GrpcTask
+	2,  // 18: zever.v1.GrpcTaskService.DeleteTask:output_type -> zever.v1.GrpcTask
+	11, // [11:19] is the sub-list for method output_type
+	3,  // [3:11] is the sub-list for method input_type
+	3,  // [3:3] is the sub-list for extension type_name
+	3,  // [3:3] is the sub-list for extension extendee
+	0,  // [0:3] is the sub-list for field type_name
 }
 
 func init() { file_schema_proto_init() }
@@ -313,9 +773,9 @@ func file_schema_proto_init() {
 			GoPackagePath: reflect.TypeOf(x{}).PkgPath(),
 			RawDescriptor: unsafe.Slice(unsafe.StringData(file_schema_proto_rawDesc), len(file_schema_proto_rawDesc)),
 			NumEnums:      0,
-			NumMessages:   4,
+			NumMessages:   11,
 			NumExtensions: 0,
-			NumServices:   1,
+			NumServices:   2,
 		},
 		GoTypes:           file_schema_proto_goTypes,
 		DependencyIndexes: file_schema_proto_depIdxs,

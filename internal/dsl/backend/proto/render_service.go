@@ -11,7 +11,7 @@ import (
 
 // renderService renders one service's synthesized request messages followed
 // by the service block itself (google.api.http and, when present, the
-// zengo auth/permission options are rendered per RPC).
+// zever auth/permission options are rendered per RPC).
 func renderService(w *strings.Builder, s *ir.Service, ctx *fileCtx) error {
 	for _, r := range s.Operations {
 		if singleRefParam(r) == nil {
@@ -236,7 +236,7 @@ func renderHTTPOption(http *ir.HTTPTransport) string {
 	}
 }
 
-// renderAuthOption renders an rpc's zengo.annotations.v1.auth option. auth
+// renderAuthOption renders an rpc's zever.annotations.v1.auth option. auth
 // == nil (the resolver's representation of "auth: none" or an absent auth:
 // clause) omits the option entirely rather than emitting "required: false"
 // — absence itself reads as unauthenticated.
@@ -246,7 +246,7 @@ func renderAuthOption(auth *ir.AuthPolicy) string {
 	}
 
 	if len(auth.Roles) == 0 {
-		return fmt.Sprintf("option (zengo.annotations.v1.auth) = { required: %t };", auth.Required)
+		return fmt.Sprintf("option (zever.annotations.v1.auth) = { required: %t };", auth.Required)
 	}
 
 	quoted := make([]string, len(auth.Roles))
@@ -254,11 +254,11 @@ func renderAuthOption(auth *ir.AuthPolicy) string {
 		quoted[i] = fmt.Sprintf("%q", role)
 	}
 
-	return fmt.Sprintf("option (zengo.annotations.v1.auth) = { required: %t, roles: [%s] };",
+	return fmt.Sprintf("option (zever.annotations.v1.auth) = { required: %t, roles: [%s] };",
 		auth.Required, strings.Join(quoted, ", "))
 }
 
-// renderPermissionOption renders an rpc's zengo.annotations.v1.permission
+// renderPermissionOption renders an rpc's zever.annotations.v1.permission
 // option. perm == nil (no permission: clause) omits the option entirely.
 // resource is rendered as the resolved resource entity's proto message name
 // and owner_field as the declared (snake_case) field name, so both values
@@ -278,10 +278,10 @@ func renderPermissionOption(perm *ir.PermissionCheck) string {
 		parts = append(parts, fmt.Sprintf("owner_field: %q", perm.OwnerField.Name))
 	}
 
-	return fmt.Sprintf("option (zengo.annotations.v1.permission) = { %s };", strings.Join(parts, ", "))
+	return fmt.Sprintf("option (zever.annotations.v1.permission) = { %s };", strings.Join(parts, ", "))
 }
 
-// renderErrorsOption renders an rpc's zengo.annotations.v1.errors option.
+// renderErrorsOption renders an rpc's zever.annotations.v1.errors option.
 // errs == nil (no errors: clause, or an empty errors: {} set) omits the
 // option entirely. Each case renders its code via ErrorCode.GRPCName() so
 // the wire value is always one of the canonical gRPC names, and its
@@ -301,5 +301,5 @@ func renderErrorsOption(errs []*ir.ErrorCase) string {
 		}
 	}
 
-	return fmt.Sprintf("option (zengo.annotations.v1.errors) = { cases: [%s] };", strings.Join(cases, ", "))
+	return fmt.Sprintf("option (zever.annotations.v1.errors) = { cases: [%s] };", strings.Join(cases, ", "))
 }

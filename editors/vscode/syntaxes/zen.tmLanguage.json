@@ -56,7 +56,7 @@
     },
     "types": {
       "name": "support.type.zen",
-      "match": "\\b(bool|bytes|date|float32|float64|int32|int64|json|string|timestamp|uuid)\\b"
+      "match": "\\b(bool|bytes|date|datetime|float32|float64|int32|int64|json|string|timestamp|uuid)\\b"
     },
     "labels": {
       "name": "variable.parameter.zen",

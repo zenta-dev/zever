@@ -4,7 +4,7 @@
 // - protoc             (unknown)
 // source: schema.proto
 
-package zengov1
+package zeverv1
 
 import (
 	context "context"
@@ -19,7 +19,7 @@ import (
 const _ = grpc.SupportPackageIsVersion9
 
 const (
-	PingService_SendPing_FullMethodName = "/zengo.v1.PingService/SendPing"
+	PingService_SendPing_FullMethodName = "/zever.v1.PingService/SendPing"
 )
 
 // PingServiceClient is the client API for PingService service.
@@ -108,7 +108,7 @@ func _PingService_SendPing_Handler(srv interface{}, ctx context.Context, dec fun
 // It's only intended for direct use with grpc.RegisterService,
 // and not to be introspected or modified (even as a copy)
 var PingService_ServiceDesc = grpc.ServiceDesc{
-	ServiceName: "zengo.v1.PingService",
+	ServiceName: "zever.v1.PingService",
 	HandlerType: (*PingServiceServer)(nil),
 	Methods: []grpc.MethodDesc{
 		{

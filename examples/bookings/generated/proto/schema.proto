@@ -1,12 +1,12 @@
 syntax = "proto3";
 
-package zengo.v1;
+package zever.v1;
 
 import "google/protobuf/timestamp.proto";
 import "google/api/annotations.proto";
-import "zengo/annotations.proto";
+import "zever/annotations.proto";
 
-option go_package = "github.com/zenta-dev/zever/gen/zengov1;zengov1";
+option go_package = "github.com/zenta-dev/zever/gen/zeverv1;zeverv1";
 
 message User {
   string id = 1;
@@ -79,32 +79,32 @@ message AddReviewRequest {
 service BookingService {
   rpc CreateSpace(CreateSpaceRequest) returns (Space) {
     option (google.api.http) = { post: "/spaces" body: "*" };
-    option (zengo.annotations.v1.auth) = { required: true };
+    option (zever.annotations.v1.auth) = { required: true };
   }
 
   rpc ListSpaces(ListSpacesRequest) returns (Space) {
     option (google.api.http) = { get: "/spaces" };
-    option (zengo.annotations.v1.auth) = { required: true };
+    option (zever.annotations.v1.auth) = { required: true };
   }
 
   rpc GetSpace(GetSpaceRequest) returns (Space) {
     option (google.api.http) = { get: "/spaces/{id}" };
-    option (zengo.annotations.v1.auth) = { required: true };
+    option (zever.annotations.v1.auth) = { required: true };
   }
 
   rpc CreateBooking(CreateBookingRequest) returns (Booking) {
     option (google.api.http) = { post: "/bookings" body: "*" };
-    option (zengo.annotations.v1.auth) = { required: true };
+    option (zever.annotations.v1.auth) = { required: true };
   }
 
   rpc CancelBooking(CancelBookingRequest) returns (Booking) {
     option (google.api.http) = { delete: "/bookings/{id}" };
-    option (zengo.annotations.v1.auth) = { required: true };
-    option (zengo.annotations.v1.permission) = { check: "booking.cancel", resource: "Booking", owner_field: "guest_id" };
+    option (zever.annotations.v1.auth) = { required: true };
+    option (zever.annotations.v1.permission) = { check: "booking.cancel", resource: "Booking", owner_field: "guest_id" };
   }
 
   rpc AddReview(AddReviewRequest) returns (Review) {
     option (google.api.http) = { post: "/reviews" body: "*" };
-    option (zengo.annotations.v1.auth) = { required: true };
+    option (zever.annotations.v1.auth) = { required: true };
   }
 }

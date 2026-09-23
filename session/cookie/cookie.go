@@ -5,13 +5,13 @@ import (
 	"time"
 )
 
-// DefaultName is the cookie name used when Config.Name is empty.
+// DefaultName is the cookie name used when Options.Name is empty.
 const DefaultName = "session_id"
 
-// DefaultPath is the cookie Path used when Config.Path is empty.
+// DefaultPath is the cookie Path used when Options.Path is empty.
 const DefaultPath = "/"
 
-// Config configures how New builds a session cookie. The zero Config
+// Options configures how New builds a session cookie. The zero Options
 // produces secure defaults: Secure and HTTPOnly on, SameSite=Lax, a
 // session cookie (no Max-Age/Expires) scoped to DefaultPath.
 //
@@ -19,7 +19,7 @@ const DefaultPath = "/"
 // rather than bool, because a plain bool cannot distinguish "unset" from
 // an explicit false: the framework default is true, so an explicit
 // opt-out must be expressible.
-type Config struct {
+type Options struct {
 	// Name is the cookie name. Empty defaults to DefaultName.
 	Name string
 	// Path is the cookie Path attribute. Empty defaults to DefaultPath.
@@ -48,10 +48,13 @@ type Config struct {
 	MaxAge int
 }
 
+// Config aliases Options for compatibility.
+type Config = Options
+
 // New builds an *http.Cookie carrying sessionID as its value, applying
 // cfg's secure defaults for any zero-valued field. The result is plain
 // net/http and works unchanged with both router/stdhttp and router/fiber.
-func New(sessionID string, cfg Config) *http.Cookie {
+func New(sessionID string, cfg Options) *http.Cookie {
 	name := cfg.Name
 	if name == "" {
 		name = DefaultName
@@ -103,6 +106,6 @@ func New(sessionID string, cfg Config) *http.Cookie {
 
 // Set builds a cookie for sessionID via New and writes it to w as a
 // Set-Cookie header.
-func Set(w http.ResponseWriter, sessionID string, cfg Config) {
+func Set(w http.ResponseWriter, sessionID string, cfg Options) {
 	http.SetCookie(w, New(sessionID, cfg))
 }

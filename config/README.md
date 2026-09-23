@@ -14,6 +14,10 @@ config file, overlaid by environment variables. Later layers win:
    and unknown fields are errors; typos fail fast.
 3. **Env** — variables carry **no prefix**: `DB_ADAPTER=postgres`,
    `DB_MAXCONNS=20`, `AUTH_JWT_SECRET=...`. Unknown variables are ignored.
+   Exception: the `secrets` env adapter requires a non-empty `prefix`
+   (default `ZEVER`, so `ZEVER_FOO` maps to secret `FOO`), and CLI/TUI
+   switches use `ZEVER_INTERACTIVE` / `ZEVER_NO_HINT`. Test-only
+   `ZEVER_CHROMEDP_NO_SANDBOX` follows the same prefixed convention.
 
 ## Service table
 
@@ -77,7 +81,8 @@ Only `.yaml`, `.yml`, and `.json` decode; anything else fails with
 
 ## Env scheme
 
-`<SERVICE>_<FIELD>=value`, uppercased, no prefix:
+`<SERVICE>_<FIELD>=value`, uppercased, no prefix (except `secrets`
+prefix and `ZEVER_*` CLI switches noted above):
 
 ```sh
 DB_ADAPTER=postgres

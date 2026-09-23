@@ -18,6 +18,7 @@ import (
 // ModuleImpls names one business-logic implementation per service this
 // module declares, for RegisterModule to wire onto both transports at once.
 type ModuleImpls struct {
+	NoteService     NoteService
 	GrpcTaskService GrpcTaskService
 }
 
@@ -28,6 +29,8 @@ type ModuleImpls struct {
 // construction first (see grpc.go's GRPCPolicies doc comment); RegisterModule
 // only registers services, it does not touch the interceptor.
 func RegisterModule(r router.Router, grpcServer *grpc.Server, a auth.Auth, p permission.Checker, impls ModuleImpls) {
+	RegisterNoteServiceRoutes(r, impls.NoteService, a, p)
+	pb.RegisterNoteServiceServer(grpcServer, NewNoteServiceGRPCServer(impls.NoteService))
 	RegisterGrpcTaskServiceRoutes(r, impls.GrpcTaskService, a, p)
 	pb.RegisterGrpcTaskServiceServer(grpcServer, NewGrpcTaskServiceGRPCServer(impls.GrpcTaskService))
 }

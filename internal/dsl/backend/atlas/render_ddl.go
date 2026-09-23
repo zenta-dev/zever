@@ -1,7 +1,7 @@
 package atlas
 
 // This file renders the same resolved IR as render_schema.go into plain
-// SQL DDL, for the `zengo db migrate` bootstrap path.
+// SQL DDL, for the `zever db migrate` bootstrap path.
 //
 // IMPORTANT — this is NOT Atlas-style migration planning. It emits only
 // idempotent "CREATE SCHEMA/TABLE/INDEX IF NOT EXISTS" statements that

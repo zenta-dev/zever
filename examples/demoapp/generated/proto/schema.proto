@@ -1,12 +1,12 @@
 syntax = "proto3";
 
-package zengo.v1;
+package zever.v1;
 
 import "google/protobuf/timestamp.proto";
 import "google/api/annotations.proto";
-import "zengo/annotations.proto";
+import "zever/annotations.proto";
 
-option go_package = "github.com/zenta-dev/zever/gen/zengov1;zengov1";
+option go_package = "github.com/zenta-dev/zever/gen/zeverv1;zeverv1";
 
 message User {
   string id = 1;
@@ -77,12 +77,12 @@ message ListUsersRequest {
 service UserService {
   rpc GetUser(GetUserRequest) returns (User) {
     option (google.api.http) = { get: "/v1/users/{id}" };
-    option (zengo.annotations.v1.auth) = { required: true };
+    option (zever.annotations.v1.auth) = { required: true };
   }
 
   rpc ListUsers(ListUsersRequest) returns (User) {
     option (google.api.http) = { get: "/v1/users" };
-    option (zengo.annotations.v1.auth) = { required: true };
+    option (zever.annotations.v1.auth) = { required: true };
   }
 }
 
@@ -102,17 +102,17 @@ message CreateProductRequest {
 service ProductService {
   rpc GetProduct(GetProductRequest) returns (Product) {
     option (google.api.http) = { get: "/v1/products/{id}" };
-    option (zengo.annotations.v1.auth) = { required: true };
+    option (zever.annotations.v1.auth) = { required: true };
   }
 
   rpc ListProducts(ListProductsRequest) returns (Product) {
     option (google.api.http) = { get: "/v1/products" };
-    option (zengo.annotations.v1.auth) = { required: true };
+    option (zever.annotations.v1.auth) = { required: true };
   }
 
   rpc CreateProduct(CreateProductRequest) returns (Product) {
     option (google.api.http) = { post: "/v1/products" body: "*" };
-    option (zengo.annotations.v1.auth) = { required: true };
+    option (zever.annotations.v1.auth) = { required: true };
   }
 }
 
@@ -127,11 +127,11 @@ message CreateOrderRequest {
 service OrderService {
   rpc GetOrder(GetOrderRequest) returns (Order) {
     option (google.api.http) = { get: "/v1/orders/{id}" };
-    option (zengo.annotations.v1.auth) = { required: true };
+    option (zever.annotations.v1.auth) = { required: true };
   }
 
   rpc CreateOrder(CreateOrderRequest) returns (Order) {
     option (google.api.http) = { post: "/v1/orders" body: "*" };
-    option (zengo.annotations.v1.auth) = { required: true };
+    option (zever.annotations.v1.auth) = { required: true };
   }
 }

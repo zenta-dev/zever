@@ -111,7 +111,7 @@ func TestGenerateProtoRenderError(t *testing.T) {
 }
 
 func TestGenerateCompileError(t *testing.T) {
-	// The module name flows raw into `package zengo.<name>.v1`, so a space
+	// The module name flows raw into `package zever.<name>.v1`, so a space
 	// renders fine but fails protocompile.
 	schema := &ir.Schema{Modules: []*ir.Module{{
 		Name: "bad name",
@@ -305,7 +305,7 @@ func TestGenerateGolden(t *testing.T) {
 	wantFiles := []string{
 		"schema.pb.go",
 		"schema_grpc.pb.go",
-		"zengo/annotations.pb.go",
+		"zever/annotations.pb.go",
 	}
 
 	if len(out) != len(wantFiles) {

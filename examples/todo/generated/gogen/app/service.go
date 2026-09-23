@@ -7,6 +7,22 @@ import (
 	"context"
 )
 
+// NoteService is the business-logic extension point generated for the NoteService service
+// declared in the zen schema.
+//
+// Implement this interface in your own package (never in this file -- it is
+// always regenerated and must never contain business logic) and pass your
+// implementation to RegisterNoteServiceRoutes (router.go) for HTTP and
+// NewNoteServiceGRPCServer (grpc.go) for gRPC -- both wire the identical
+// implementation to both transports.
+type NoteService interface {
+	ListNotes(ctx context.Context, req *ListNotesRequest) (*Note, error)
+	CreateNote(ctx context.Context, req *CreateNoteRequest) (*Note, error)
+	GetNote(ctx context.Context, req *GetNoteRequest) (*Note, error)
+	UpdateNote(ctx context.Context, req *UpdateNoteRequest) (*Note, error)
+	DeleteNote(ctx context.Context, req *DeleteNoteRequest) (*Note, error)
+}
+
 // GrpcTaskService is the business-logic extension point generated for the GrpcTaskService service
 // declared in the zen schema.
 //
