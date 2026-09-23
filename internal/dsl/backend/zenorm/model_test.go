@@ -48,7 +48,7 @@ func TestGoScalar(t *testing.T) {
 		{"timestamp", ir.FieldType{Scalar: ir.TTimestamp}, "time.Time", "time"},
 		{"date", ir.FieldType{Scalar: ir.TDate}, "time.Time", "time"},
 		{"bytes", ir.FieldType{Scalar: ir.TBytes}, "[]byte", ""},
-		{"json", ir.FieldType{Scalar: ir.TJSON}, "json.RawMessage", "encoding/json"},
+		{"json", ir.FieldType{Scalar: ir.TJSON}, "orm.JSONText", ""},
 		{"inline enum", ir.FieldType{Scalar: ir.TEnum}, "string", ""},
 		{"named enum", ir.FieldType{Scalar: ir.TEnum, EnumName: "status"}, "Status", ""},
 		{"unknown", ir.FieldType{Scalar: ir.ScalarType(99)}, "any", ""},

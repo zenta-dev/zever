@@ -5,15 +5,11 @@
 // function helpers from github.com/zenta-dev/zever/orm/json/sqlite
 // (json_extract / json_type / json_each).
 //
-// Why `data: string` and not `data: json`: the .zen DSL DOES have a native
-// `json` field type, which the zenorm backend maps to `json.RawMessage`.
-// Under Go 1.27, though, `encoding/json.RawMessage` is an alias for
-// `encoding/jsontext.Value`, a named `[]byte` type that implements neither
-// sql.Scanner nor one of database/sql's built-in dest kinds — so the
-// codegen'd `Scan` (which reads `&e.Data`) fails at runtime with
-// "unsupported Scan ... into *jsontext.Value". Storing the JSON document in
-// a `string` (TEXT) column avoids that, and every json1 function (and the
-// jsonb operators on postgres) operates on JSON text equally well.
+// `data` uses the native `json` field type, which the zenorm backend maps
+// to `orm.JSONText` -- a named string type that binds as TEXT, scans from
+// TEXT, and marshals as raw JSON (see orm/jsontext.go). Every json1
+// function (and the jsonb operators on postgres) operates on JSON text
+// equally well.
 //
 // Regenerate everything derived from this file with:
 // `zever compile examples/json_query/schema/json_query.zen --backend=zenorm --out examples/json_query/generated`
@@ -23,5 +19,5 @@
 entity Doc {
   id: uuid @primary
   title: string
-  data: string
+  data: json
 }

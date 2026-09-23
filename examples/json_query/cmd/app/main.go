@@ -85,7 +85,7 @@ func seed(ctx context.Context, conn db.DB) error {
 		insert := orm.InsertInto(gen.Docs).Values(
 			orm.Set(gen.DocCols.ID, d.id),
 			orm.Set(gen.DocCols.Title, d.title),
-			orm.Set(gen.DocCols.Data, d.data),
+			orm.Set(gen.DocCols.Data, orm.JSONText(d.data)),
 		)
 
 		if err := insert.Exec(ctx, conn); err != nil {
