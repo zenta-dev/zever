@@ -104,7 +104,7 @@ func TestSender_Send_setsFrom(t *testing.T) {
 		Subject: "hi",
 		Body:    "body",
 	}
-	if err := s.Send(context.Background(), stub, mail); err != nil {
+	if err := s.Send(t.Context(), stub, mail); err != nil {
 		t.Fatalf("Send err = %v", err)
 	}
 	if mail.From != from {

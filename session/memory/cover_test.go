@@ -1,7 +1,6 @@
 package memory_test
 
 import (
-	"context"
 	"errors"
 	"testing"
 	"time"
@@ -21,7 +20,7 @@ func TestCoverIntervalMiddleNoClamp(t *testing.T) {
 	}
 	t.Cleanup(func() { _ = st.Close() })
 
-	if _, err := st.Create(context.Background(), 0); err != nil {
+	if _, err := st.Create(t.Context(), 0); err != nil {
 		t.Fatalf("Create: %v", err)
 	}
 }
@@ -35,7 +34,7 @@ func TestCoverSaveOverExpiredUpsertsFresh(t *testing.T) {
 	}
 	t.Cleanup(func() { _ = st.Close() })
 
-	ctx := context.Background()
+	ctx := t.Context()
 	s, err := st.Create(ctx, 0)
 	if err != nil {
 		t.Fatalf("Create: %v", err)
@@ -68,7 +67,7 @@ func TestCoverSaveZeroCreatedAtStamped(t *testing.T) {
 	}
 	t.Cleanup(func() { _ = st.Close() })
 
-	ctx := context.Background()
+	ctx := t.Context()
 	id := session.NewID()
 	before := time.Now()
 	if serr := st.Save(ctx, session.Session{ID: id, Data: map[string]any{"a": 1}}); serr != nil {
@@ -96,7 +95,7 @@ func TestCoverSweepDeletesExpired(t *testing.T) {
 	}
 	t.Cleanup(func() { _ = st.Close() })
 
-	ctx := context.Background()
+	ctx := t.Context()
 	old, err := st.Create(ctx, 0)
 	if err != nil {
 		t.Fatalf("Create: %v", err)
@@ -129,7 +128,7 @@ func TestCoverTickerSweepFires(t *testing.T) {
 	}
 	t.Cleanup(func() { _ = st.Close() })
 
-	ctx := context.Background()
+	ctx := t.Context()
 	short, err := st.Create(ctx, time.Second)
 	if err != nil {
 		t.Fatalf("Create: %v", err)

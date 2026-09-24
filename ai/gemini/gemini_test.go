@@ -238,7 +238,7 @@ func TestGenerate_SuccessMocked(t *testing.T) {
 		t.Fatalf("Open err = %v", err)
 	}
 
-	gen, err := a.Generate(context.Background(), "models/gemini-1.5-flash", []ai.Message{
+	gen, err := a.Generate(t.Context(), "models/gemini-1.5-flash", []ai.Message{
 		{Role: ai.RoleSystem, Content: "you are helpful"},
 		{Role: ai.RoleUser, Content: "hi"},
 	}, ai.GenerateOptions{
@@ -281,7 +281,7 @@ func TestGenerate_EmptyCandidates(t *testing.T) {
 	defer srv.Close()
 
 	a := openWithKeyAndServer(t, "k", srv)
-	_, err := a.Generate(context.Background(), "models/gemini-1.5-flash", []ai.Message{{Role: ai.RoleUser, Content: "hi"}}, ai.GenerateOptions{})
+	_, err := a.Generate(t.Context(), "models/gemini-1.5-flash", []ai.Message{{Role: ai.RoleUser, Content: "hi"}}, ai.GenerateOptions{})
 	if !errors.Is(err, ai.ErrNotSupported) {
 		t.Fatalf("err = %v want ErrNotSupported", err)
 	}
@@ -291,12 +291,12 @@ func TestGenerate_ModelRequired(t *testing.T) {
 	t.Parallel()
 
 	a, _ := New(ai.Options{APIKey: "k", BaseURL: "https://example.com"})
-	_, err := a.Generate(context.Background(), "", nil, ai.GenerateOptions{})
+	_, err := a.Generate(t.Context(), "", nil, ai.GenerateOptions{})
 	if !errors.Is(err, ai.ErrInvalidRequest) {
 		t.Fatalf("err = %v want ErrInvalidRequest", err)
 	}
 
-	_, err = a.Generate(context.Background(), "   ", nil, ai.GenerateOptions{})
+	_, err = a.Generate(t.Context(), "   ", nil, ai.GenerateOptions{})
 	if !errors.Is(err, ai.ErrInvalidRequest) {
 		t.Fatalf("empty model err = %v", err)
 	}
@@ -332,7 +332,7 @@ func TestGenerate_ErrorMapping(t *testing.T) {
 			defer srv.Close()
 
 			a, _ := New(ai.Options{APIKey: "k", BaseURL: srv.URL})
-			_, err := a.Generate(context.Background(), "models/gemini-1.5-flash", []ai.Message{{Role: ai.RoleUser, Content: "hi"}}, ai.GenerateOptions{})
+			_, err := a.Generate(t.Context(), "models/gemini-1.5-flash", []ai.Message{{Role: ai.RoleUser, Content: "hi"}}, ai.GenerateOptions{})
 			if err == nil {
 				t.Fatalf("want error")
 			}
@@ -367,7 +367,7 @@ func TestGenerate_Redaction(t *testing.T) {
 	defer srv.Close()
 
 	a, _ := New(ai.Options{APIKey: apiKey, BaseURL: srv.URL})
-	_, err := a.Generate(context.Background(), "models/gemini-1.5-flash", []ai.Message{{Role: ai.RoleUser, Content: "hi"}}, ai.GenerateOptions{})
+	_, err := a.Generate(t.Context(), "models/gemini-1.5-flash", []ai.Message{{Role: ai.RoleUser, Content: "hi"}}, ai.GenerateOptions{})
 	if err == nil {
 		t.Fatal("want error")
 	}
@@ -405,7 +405,7 @@ func TestGenerate_WithFunctionCall(t *testing.T) {
 	defer srv.Close()
 
 	a, _ := New(ai.Options{APIKey: "k", BaseURL: srv.URL})
-	gen, err := a.Generate(context.Background(), "models/gemini-1.5-flash", []ai.Message{{Role: ai.RoleUser, Content: "hi"}}, ai.GenerateOptions{})
+	gen, err := a.Generate(t.Context(), "models/gemini-1.5-flash", []ai.Message{{Role: ai.RoleUser, Content: "hi"}}, ai.GenerateOptions{})
 	if err != nil {
 		t.Fatalf("err = %v", err)
 	}
@@ -446,7 +446,7 @@ func TestStream_Ordering(t *testing.T) {
 	defer srv.Close()
 
 	a := openWithKeyAndServer(t, "k", srv)
-	ch, err := a.Stream(context.Background(), "models/gemini-1.5-flash", []ai.Message{{Role: ai.RoleUser, Content: "hi"}}, ai.GenerateOptions{})
+	ch, err := a.Stream(t.Context(), "models/gemini-1.5-flash", []ai.Message{{Role: ai.RoleUser, Content: "hi"}}, ai.GenerateOptions{})
 	if err != nil {
 		t.Fatalf("Stream err = %v", err)
 	}
@@ -541,7 +541,7 @@ func TestStream_ClosesOnContextCancel(t *testing.T) {
 
 	a := openWithKeyAndServer(t, "k", srv)
 
-	ctx, cancel := context.WithCancel(context.Background())
+	ctx, cancel := context.WithCancel(t.Context())
 
 	snapshot := goleak.IgnoreCurrent()
 
@@ -569,7 +569,7 @@ func TestStream_ModelRequired(t *testing.T) {
 	t.Parallel()
 
 	a, _ := New(ai.Options{APIKey: "k", BaseURL: "https://example.com"})
-	_, err := a.Stream(context.Background(), "", nil, ai.GenerateOptions{})
+	_, err := a.Stream(t.Context(), "", nil, ai.GenerateOptions{})
 	if !errors.Is(err, ai.ErrInvalidRequest) {
 		t.Fatalf("err = %v want ErrInvalidRequest", err)
 	}
@@ -585,7 +585,7 @@ func TestStream_ErrorMapping(t *testing.T) {
 	defer srv.Close()
 
 	a := openWithKeyAndServer(t, "k", srv)
-	ch, err := a.Stream(context.Background(), "models/gemini-1.5-flash", []ai.Message{{Role: ai.RoleUser, Content: "hi"}}, ai.GenerateOptions{})
+	ch, err := a.Stream(t.Context(), "models/gemini-1.5-flash", []ai.Message{{Role: ai.RoleUser, Content: "hi"}}, ai.GenerateOptions{})
 	if err != nil {
 		t.Fatalf("Stream err %v", err)
 	}
@@ -620,7 +620,7 @@ func TestStream_WithToolCall(t *testing.T) {
 	defer srv.Close()
 
 	a := openWithKeyAndServer(t, "k", srv)
-	ch, _ := a.Stream(context.Background(), "models/gemini-1.5-flash", []ai.Message{{Role: ai.RoleUser, Content: "hi"}}, ai.GenerateOptions{})
+	ch, _ := a.Stream(t.Context(), "models/gemini-1.5-flash", []ai.Message{{Role: ai.RoleUser, Content: "hi"}}, ai.GenerateOptions{})
 
 	var sawTool bool
 
@@ -664,7 +664,7 @@ func TestEmbed_Success(t *testing.T) {
 	defer srv.Close()
 
 	a := openWithKeyAndServer(t, "k", srv)
-	vecs, err := a.Embed(context.Background(), "models/text-embedding-004", []string{"a", "b"}, ai.EmbedOptions{})
+	vecs, err := a.Embed(t.Context(), "models/text-embedding-004", []string{"a", "b"}, ai.EmbedOptions{})
 	if err != nil {
 		t.Fatalf("Embed err = %v", err)
 	}
@@ -694,7 +694,7 @@ func TestEmbed_Dimensions(t *testing.T) {
 	defer srv.Close()
 
 	a := openWithKeyAndServer(t, "k", srv)
-	vecs, err := a.Embed(context.Background(), "models/text-embedding-004", []string{"hello"}, ai.EmbedOptions{Dimensions: 2})
+	vecs, err := a.Embed(t.Context(), "models/text-embedding-004", []string{"hello"}, ai.EmbedOptions{Dimensions: 2})
 	if err != nil {
 		t.Fatalf("err = %v", err)
 	}
@@ -713,12 +713,12 @@ func TestEmbed_Errors(t *testing.T) {
 
 	a, _ := New(ai.Options{APIKey: "k", BaseURL: "https://example.com"})
 
-	_, err := a.Embed(context.Background(), "", []string{"hi"}, ai.EmbedOptions{})
+	_, err := a.Embed(t.Context(), "", []string{"hi"}, ai.EmbedOptions{})
 	if !errors.Is(err, ai.ErrInvalidRequest) {
 		t.Fatalf("model empty err %v", err)
 	}
 
-	_, err = a.Embed(context.Background(), "m", []string{}, ai.EmbedOptions{})
+	_, err = a.Embed(t.Context(), "m", []string{}, ai.EmbedOptions{})
 	if !errors.Is(err, ai.ErrInvalidRequest) {
 		t.Fatalf("inputs empty err %v", err)
 	}
@@ -730,7 +730,7 @@ func TestEmbed_Errors(t *testing.T) {
 	defer srv.Close()
 
 	a2 := openWithKeyAndServer(t, "k", srv)
-	_, err = a2.Embed(context.Background(), "m", []string{"hi"}, ai.EmbedOptions{})
+	_, err = a2.Embed(t.Context(), "m", []string{"hi"}, ai.EmbedOptions{})
 	if !errors.Is(err, ai.ErrNotSupported) {
 		t.Fatalf("empty embeddings err %v", err)
 	}
@@ -743,7 +743,7 @@ func TestEmbed_Errors(t *testing.T) {
 	defer srv3.Close()
 
 	a3 := openWithKeyAndServer(t, "k", srv3)
-	_, err = a3.Embed(context.Background(), "m", []string{"hi"}, ai.EmbedOptions{})
+	_, err = a3.Embed(t.Context(), "m", []string{"hi"}, ai.EmbedOptions{})
 	if !errors.Is(err, ai.ErrRateLimited) {
 		t.Fatalf("429 err %v", err)
 	}
@@ -757,7 +757,7 @@ func TestEmbed_Errors(t *testing.T) {
 	defer srv4.Close()
 
 	a4 := openWithKeyAndServer(t, apiKey, srv4)
-	_, err = a4.Embed(context.Background(), "m", []string{"hi"}, ai.EmbedOptions{})
+	_, err = a4.Embed(t.Context(), "m", []string{"hi"}, ai.EmbedOptions{})
 	if err == nil || strings.Contains(err.Error(), apiKey) {
 		t.Fatalf("redaction failed %v", err)
 	}
@@ -1186,7 +1186,7 @@ func TestEmbed_NilEmbedding(t *testing.T) {
 	defer srv.Close()
 
 	a := openWithKeyAndServer(t, "k", srv)
-	vecs, err := a.Embed(context.Background(), "m", []string{"a", "b"}, ai.EmbedOptions{})
+	vecs, err := a.Embed(t.Context(), "m", []string{"a", "b"}, ai.EmbedOptions{})
 	if err != nil {
 		t.Fatalf("err %v", err)
 	}
@@ -1210,7 +1210,7 @@ func TestGenerate_SystemInstruction(t *testing.T) {
 	defer srv.Close()
 
 	a := openWithKeyAndServer(t, "k", srv)
-	_, err := a.Generate(context.Background(), "models/gemini-1.5-flash", []ai.Message{
+	_, err := a.Generate(t.Context(), "models/gemini-1.5-flash", []ai.Message{
 		{Role: ai.RoleSystem, Content: "sys"},
 		{Role: ai.RoleUser, Content: "hi"},
 	}, ai.GenerateOptions{})
@@ -1251,7 +1251,7 @@ func TestStream_EmptyCandidates(t *testing.T) { //nolint:dupl
 	}))
 	defer srv.Close()
 	a := openWithKeyAndServer(t, "k", srv)
-	ch, _ := a.Stream(context.Background(), "models/gemini-1.5-flash", []ai.Message{{Role: ai.RoleUser, Content: "hi"}}, ai.GenerateOptions{})
+	ch, _ := a.Stream(t.Context(), "models/gemini-1.5-flash", []ai.Message{{Role: ai.RoleUser, Content: "hi"}}, ai.GenerateOptions{})
 	var sawDelta bool
 	for chunk := range ch {
 		if chunk.Delta == "hi" {
@@ -1276,7 +1276,7 @@ func TestStream_NilContent(t *testing.T) { //nolint:dupl
 	}))
 	defer srv.Close()
 	a := openWithKeyAndServer(t, "k", srv)
-	ch, _ := a.Stream(context.Background(), "m", []ai.Message{{Role: ai.RoleUser, Content: "hi"}}, ai.GenerateOptions{})
+	ch, _ := a.Stream(t.Context(), "m", []ai.Message{{Role: ai.RoleUser, Content: "hi"}}, ai.GenerateOptions{})
 	var saw bool
 	for chunk := range ch {
 		if chunk.Delta == "ok" {
@@ -1329,7 +1329,7 @@ func TestOpen_InsecureLocalhost(t *testing.T) {
 		}
 	}
 	// Also ensure Generate works via insecure
-	_, err = a.Generate(context.Background(), "m", []ai.Message{{Role: ai.RoleUser, Content: "hi"}}, ai.GenerateOptions{})
+	_, err = a.Generate(t.Context(), "m", []ai.Message{{Role: ai.RoleUser, Content: "hi"}}, ai.GenerateOptions{})
 	if err != nil {
 		t.Fatalf("Generate err %v", err)
 	}

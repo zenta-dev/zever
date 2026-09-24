@@ -44,7 +44,7 @@ func TestSpan_startEnd_doesNotPanic(t *testing.T) {
 			}
 		}()
 
-		ctx, span := tr.Start(context.Background(), "op")
+		ctx, span := tr.Start(t.Context(), "op")
 		if span == nil {
 			t.Fatal("Start() span = nil, want non-nil span")
 		}
@@ -69,7 +69,7 @@ func TestMetrics_allInstruments_nilError(t *testing.T) {
 
 	p := New()
 	m := p.Meter("scope")
-	ctx := context.Background()
+	ctx := t.Context()
 
 	if err := m.Counter(ctx, "c", 1, observability.String("k", "v")); err != nil {
 		t.Errorf("Counter() error = %v, want nil", err)
@@ -88,7 +88,7 @@ func TestShutdown_all_nilError(t *testing.T) {
 	t.Parallel()
 
 	p := New()
-	ctx := context.Background()
+	ctx := t.Context()
 
 	if err := p.Shutdown(ctx); err != nil {
 		t.Errorf("Provider.Shutdown() error = %v, want nil", err)
@@ -111,7 +111,7 @@ func TestStart_context_roundtripsValues(t *testing.T) {
 	p := New()
 	tr := p.Tracer("scope")
 
-	ctx := context.WithValue(context.Background(), ctxRoundtripKey{}, "v")
+	ctx := context.WithValue(t.Context(), ctxRoundtripKey{}, "v")
 
 	got, span := tr.Start(ctx, "op")
 	defer span.End()

@@ -91,11 +91,11 @@ func TestCoverTracerShutdown(t *testing.T) {
 	t.Parallel()
 
 	tp := sdktrace.NewTracerProvider()
-	t.Cleanup(func() { _ = tp.Shutdown(context.Background()) })
+	t.Cleanup(func() { _ = tp.Shutdown(t.Context()) })
 
 	tr := &tracer{tp: tp, tracer: tp.Tracer("scope")}
 
-	ctx, cancel := context.WithTimeout(context.Background(), 2*time.Second)
+	ctx, cancel := context.WithTimeout(t.Context(), 2*time.Second)
 	defer cancel()
 
 	if err := tr.Shutdown(ctx); err != nil {
@@ -107,11 +107,11 @@ func TestCoverProviderAccessorsAndExtractors(t *testing.T) {
 	t.Parallel()
 
 	tp := sdktrace.NewTracerProvider()
-	t.Cleanup(func() { _ = tp.Shutdown(context.Background()) })
+	t.Cleanup(func() { _ = tp.Shutdown(t.Context()) })
 
 	reader := sdkmetric.NewManualReader()
 	mp := sdkmetric.NewMeterProvider(sdkmetric.WithReader(reader))
-	t.Cleanup(func() { _ = mp.Shutdown(context.Background()) })
+	t.Cleanup(func() { _ = mp.Shutdown(t.Context()) })
 
 	p := &provider{
 		tracer:  &tracer{tp: tp, tracer: tp.Tracer("scope")},
@@ -171,18 +171,18 @@ func TestCoverShutdownJoinErrors(t *testing.T) {
 	metricErr := errors.New("metric-boom")
 
 	tp := sdktrace.NewTracerProvider(sdktrace.WithSyncer(errSpanExporter{err: traceErr}))
-	t.Cleanup(func() { _ = tp.Shutdown(context.Background()) })
+	t.Cleanup(func() { _ = tp.Shutdown(t.Context()) })
 
 	reader := &errReader{shutdownErr: metricErr}
 	mp := sdkmetric.NewMeterProvider(sdkmetric.WithReader(reader))
-	t.Cleanup(func() { _ = mp.Shutdown(context.Background()) })
+	t.Cleanup(func() { _ = mp.Shutdown(t.Context()) })
 
 	p := &provider{
 		tracer:  &tracer{tp: tp, tracer: tp.Tracer("scope")},
 		metrics: &metrics{mp: mp},
 	}
 
-	ctx, cancel := context.WithTimeout(context.Background(), 2*time.Second)
+	ctx, cancel := context.WithTimeout(t.Context(), 2*time.Second)
 	defer cancel()
 
 	err := p.Shutdown(ctx)
@@ -203,13 +203,13 @@ func TestCoverShutdownPartialNils(t *testing.T) {
 	t.Parallel()
 
 	tp := sdktrace.NewTracerProvider()
-	t.Cleanup(func() { _ = tp.Shutdown(context.Background()) })
+	t.Cleanup(func() { _ = tp.Shutdown(t.Context()) })
 
 	reader := sdkmetric.NewManualReader()
 	mp := sdkmetric.NewMeterProvider(sdkmetric.WithReader(reader))
-	t.Cleanup(func() { _ = mp.Shutdown(context.Background()) })
+	t.Cleanup(func() { _ = mp.Shutdown(t.Context()) })
 
-	ctx, cancel := context.WithTimeout(context.Background(), 2*time.Second)
+	ctx, cancel := context.WithTimeout(t.Context(), 2*time.Second)
 	defer cancel()
 
 	tracerOnly := &provider{tracer: &tracer{tp: tp, tracer: tp.Tracer("scope")}}
@@ -219,7 +219,7 @@ func TestCoverShutdownPartialNils(t *testing.T) {
 
 	reader2 := sdkmetric.NewManualReader()
 	mp2 := sdkmetric.NewMeterProvider(sdkmetric.WithReader(reader2))
-	t.Cleanup(func() { _ = mp2.Shutdown(context.Background()) })
+	t.Cleanup(func() { _ = mp2.Shutdown(t.Context()) })
 
 	metricsOnly := &provider{metrics: &metrics{mp: mp2}}
 	if err := metricsOnly.Shutdown(ctx); err != nil {
@@ -228,7 +228,7 @@ func TestCoverShutdownPartialNils(t *testing.T) {
 
 	reader3 := sdkmetric.NewManualReader()
 	mp3 := sdkmetric.NewMeterProvider(sdkmetric.WithReader(reader3))
-	t.Cleanup(func() { _ = mp3.Shutdown(context.Background()) })
+	t.Cleanup(func() { _ = mp3.Shutdown(t.Context()) })
 
 	globalsNoTracer := &provider{metrics: &metrics{mp: mp3}, setGlobals: true}
 	if err := globalsNoTracer.Shutdown(ctx); err != nil {
@@ -241,11 +241,11 @@ func TestCoverTracerStartAndSpan(t *testing.T) {
 
 	sr := tracetest.NewSpanRecorder()
 	tp := sdktrace.NewTracerProvider(sdktrace.WithSpanProcessor(sr))
-	t.Cleanup(func() { _ = tp.Shutdown(context.Background()) })
+	t.Cleanup(func() { _ = tp.Shutdown(t.Context()) })
 
 	tr := &tracer{tp: tp, tracer: tp.Tracer("scope")}
 
-	ctx, sp := tr.Start(context.Background(), "op")
+	ctx, sp := tr.Start(t.Context(), "op")
 	if ctx == nil {
 		t.Error("Start() ctx = nil, want non-nil")
 	}
@@ -437,7 +437,7 @@ func TestCoverMetricsSuccessMismatchShutdown(t *testing.T) {
 	mp := sdkmetric.NewMeterProvider(sdkmetric.WithReader(reader))
 	m := &metrics{mp: mp, scope: "covscope", cache: newTestCache()}
 
-	ctx := context.Background()
+	ctx := t.Context()
 
 	if err := m.Counter(ctx, "cov.counter", 1, observability.String("k", "v")); err != nil {
 		t.Fatalf("Counter() error = %v", err)
@@ -503,7 +503,7 @@ func TestCoverMetricsSuccessMismatchShutdown(t *testing.T) {
 		t.Error("Gauge(taken2) error = nil, want kind mismatch")
 	}
 
-	shutdownCtx, cancel := context.WithTimeout(context.Background(), 2*time.Second)
+	shutdownCtx, cancel := context.WithTimeout(t.Context(), 2*time.Second)
 	defer cancel()
 
 	if err := m.Shutdown(shutdownCtx); err != nil {
@@ -532,7 +532,7 @@ func TestCoverCacheFullMatrix(t *testing.T) {
 			t.Parallel()
 
 			mp := testMeterProvider()
-			t.Cleanup(func() { _ = mp.Shutdown(context.Background()) })
+			t.Cleanup(func() { _ = mp.Shutdown(t.Context()) })
 
 			fast := newTestCache()
 			if err := callKind(tc.name, fast, mp, "scope", "fast"); err != nil {
@@ -638,7 +638,7 @@ func TestCoverNewEndpointDefault(t *testing.T) {
 		t.Fatalf("New() error = %v", err)
 	}
 
-	ctx, cancel := context.WithTimeout(context.Background(), 2*time.Second)
+	ctx, cancel := context.WithTimeout(t.Context(), 2*time.Second)
 	defer cancel()
 
 	_ = p.Shutdown(ctx)
@@ -658,7 +658,7 @@ func TestCoverNewHeadersAndLimit(t *testing.T) {
 		t.Fatalf("New() error = %v", err)
 	}
 
-	ctx, cancel := context.WithTimeout(context.Background(), 2*time.Second)
+	ctx, cancel := context.WithTimeout(t.Context(), 2*time.Second)
 	defer cancel()
 
 	_ = p.Shutdown(ctx)
@@ -676,7 +676,7 @@ func TestCoverNewInsecureLoopback(t *testing.T) {
 		t.Fatalf("New() error = %v", err)
 	}
 
-	ctx, cancel := context.WithTimeout(context.Background(), 2*time.Second)
+	ctx, cancel := context.WithTimeout(t.Context(), 2*time.Second)
 	defer cancel()
 
 	_ = p.Shutdown(ctx)
@@ -714,7 +714,7 @@ func TestCoverNewCertKey(t *testing.T) {
 		t.Fatalf("New(cert+key+ca) error = %v", err)
 	}
 
-	ctx, cancel := context.WithTimeout(context.Background(), 2*time.Second)
+	ctx, cancel := context.WithTimeout(t.Context(), 2*time.Second)
 	defer cancel()
 
 	_ = p.Shutdown(ctx)
@@ -728,7 +728,7 @@ func TestCoverNewCertKey(t *testing.T) {
 		t.Fatalf("New(cert+key) error = %v", err)
 	}
 
-	ctx2, cancel2 := context.WithTimeout(context.Background(), 2*time.Second)
+	ctx2, cancel2 := context.WithTimeout(t.Context(), 2*time.Second)
 	defer cancel2()
 
 	_ = p2.Shutdown(ctx2)
@@ -747,7 +747,7 @@ func TestCoverNewCAOnly(t *testing.T) {
 		t.Fatalf("New(ca) error = %v", err)
 	}
 
-	ctx, cancel := context.WithTimeout(context.Background(), 2*time.Second)
+	ctx, cancel := context.WithTimeout(t.Context(), 2*time.Second)
 	defer cancel()
 
 	_ = p.Shutdown(ctx)
@@ -771,7 +771,7 @@ func TestCoverNewSetGlobalsFalseKeepsGlobals(t *testing.T) {
 		t.Error("New(SetGlobals=false) changed global tracer provider")
 	}
 
-	ctx, cancel := context.WithTimeout(context.Background(), 2*time.Second)
+	ctx, cancel := context.WithTimeout(t.Context(), 2*time.Second)
 	defer cancel()
 
 	_ = p.Shutdown(ctx)
@@ -815,7 +815,7 @@ func TestCoverGlobalsSetAndUnregister(t *testing.T) {
 		t.Error("global provider is not the created tracer provider")
 	}
 
-	ctx, cancel := context.WithTimeout(context.Background(), 2*time.Second)
+	ctx, cancel := context.WithTimeout(t.Context(), 2*time.Second)
 	defer cancel()
 
 	_ = p.Shutdown(ctx)
@@ -836,10 +836,10 @@ func TestCoverUnregisterGlobalsNoop(t *testing.T) {
 	})
 
 	owned := sdktrace.NewTracerProvider()
-	t.Cleanup(func() { _ = owned.Shutdown(context.Background()) })
+	t.Cleanup(func() { _ = owned.Shutdown(t.Context()) })
 
 	other := sdktrace.NewTracerProvider()
-	t.Cleanup(func() { _ = other.Shutdown(context.Background()) })
+	t.Cleanup(func() { _ = other.Shutdown(t.Context()) })
 
 	registerGlobals(owned)
 	unregisterGlobals(other)

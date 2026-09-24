@@ -43,7 +43,7 @@ func TestClaimCompleteReplay(t *testing.T) {
 	t.Parallel()
 
 	s := newStore(t)
-	ctx := context.Background()
+	ctx := t.Context()
 	fp := []byte("fp1")
 
 	out, err := s.Begin(ctx, "key-claim", idempotency.BeginOptions{Fingerprint: fp})
@@ -73,7 +73,7 @@ func TestSecondClaimantInProgress(t *testing.T) {
 	t.Parallel()
 
 	s := newStore(t)
-	ctx := context.Background()
+	ctx := t.Context()
 
 	if _, err := s.Begin(ctx, "key-race", idempotency.BeginOptions{}); err != nil {
 		t.Fatalf("first Begin: %v", err)
@@ -88,7 +88,7 @@ func TestSingleWinner64Goroutines(t *testing.T) {
 	t.Parallel()
 
 	s := newStore(t)
-	ctx := context.Background()
+	ctx := t.Context()
 
 	var winners atomic.Int64
 
@@ -134,7 +134,7 @@ func TestFingerprintMismatchOnDone(t *testing.T) {
 	t.Parallel()
 
 	s := newStore(t)
-	ctx := context.Background()
+	ctx := t.Context()
 
 	if _, err := s.Begin(ctx, "key-fpdone", idempotency.BeginOptions{Fingerprint: []byte("a")}); err != nil {
 		t.Fatalf("Begin: %v", err)
@@ -162,7 +162,7 @@ func TestFingerprintMismatchOnPending(t *testing.T) {
 	t.Parallel()
 
 	s := newStore(t)
-	ctx := context.Background()
+	ctx := t.Context()
 
 	if _, err := s.Begin(ctx, "key-fppend", idempotency.BeginOptions{Fingerprint: []byte("a")}); err != nil {
 		t.Fatalf("Begin: %v", err)
@@ -178,7 +178,7 @@ func TestNilFingerprintBackCompat(t *testing.T) {
 	t.Parallel()
 
 	s := newStore(t)
-	ctx := context.Background()
+	ctx := t.Context()
 
 	if _, err := s.Begin(ctx, "key-nilfp", idempotency.BeginOptions{}); err != nil {
 		t.Fatalf("Begin: %v", err)
@@ -202,7 +202,7 @@ func TestFingerprintVsEmptyMismatch(t *testing.T) {
 	t.Parallel()
 
 	s := newStore(t)
-	ctx := context.Background()
+	ctx := t.Context()
 
 	if _, err := s.Begin(ctx, "key-fpempty", idempotency.BeginOptions{Fingerprint: []byte("a")}); err != nil {
 		t.Fatalf("Begin: %v", err)
@@ -233,7 +233,7 @@ func TestCompleteWithoutBeginUpserts(t *testing.T) {
 	t.Parallel()
 
 	s := newStore(t)
-	ctx := context.Background()
+	ctx := t.Context()
 
 	if err := s.Complete(ctx, "key-fresh", []byte("fp"), []byte("side-effect")); err != nil {
 		t.Fatalf("Complete: %v", err)
@@ -253,7 +253,7 @@ func TestExpiryReclaim(t *testing.T) {
 	t.Parallel()
 
 	s := newStore(t)
-	ctx := context.Background()
+	ctx := t.Context()
 	ttl := 20 * time.Millisecond
 
 	if _, err := s.Begin(ctx, "key-expire", idempotency.BeginOptions{TTL: ttl}); err != nil {
@@ -272,7 +272,7 @@ func TestForget(t *testing.T) {
 	t.Parallel()
 
 	s := newStore(t)
-	ctx := context.Background()
+	ctx := t.Context()
 
 	if err := s.Forget(ctx, "key-unknown"); err != nil {
 		t.Fatalf("Forget unknown = %v, want nil", err)
@@ -306,7 +306,7 @@ func TestCopyIndependence(t *testing.T) {
 	t.Parallel()
 
 	s := newStore(t)
-	ctx := context.Background()
+	ctx := t.Context()
 
 	fp := []byte("fp-copy")
 	res := []byte("result-copy")
@@ -352,7 +352,7 @@ func TestAfterClose(t *testing.T) {
 		t.Fatalf("New: %v", err)
 	}
 
-	ctx := context.Background()
+	ctx := t.Context()
 
 	if _, err := s.Begin(ctx, "k", idempotency.BeginOptions{}); err != nil {
 		t.Fatalf("Begin: %v", err)
@@ -383,7 +383,7 @@ func TestInvalidKeys(t *testing.T) {
 	t.Parallel()
 
 	s := newStore(t)
-	ctx := context.Background()
+	ctx := t.Context()
 
 	keys := []string{
 		"",
@@ -430,7 +430,7 @@ func TestContextCancelled(t *testing.T) {
 
 	s := newStore(t)
 
-	ctx, cancel := context.WithCancel(context.Background())
+	ctx, cancel := context.WithCancel(t.Context())
 	cancel()
 
 	if _, err := s.Begin(ctx, "k", idempotency.BeginOptions{}); !errors.Is(err, context.Canceled) {
@@ -450,7 +450,7 @@ func TestCompleteMismatchPreservesOriginal(t *testing.T) {
 	t.Parallel()
 
 	s := newStore(t)
-	ctx := context.Background()
+	ctx := t.Context()
 
 	if _, err := s.Begin(ctx, "key-nocobber", idempotency.BeginOptions{Fingerprint: []byte("a")}); err != nil {
 		t.Fatalf("Begin: %v", err)
@@ -478,7 +478,7 @@ func TestFingerprintTooLarge_rejected(t *testing.T) {
 	t.Parallel()
 
 	s := newStore(t)
-	ctx := context.Background()
+	ctx := t.Context()
 	big := make([]byte, 5000)
 
 	if _, err := s.Begin(ctx, "key-bigfp", idempotency.BeginOptions{Fingerprint: big}); !errors.Is(err, idempotency.ErrFingerprintTooLarge) {

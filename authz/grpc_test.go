@@ -67,7 +67,7 @@ func serveEcho(t *testing.T, a *fakeAuth, p *fakeChecker, policies map[string]au
 		}},
 	}, srv)
 
-	lis, err := (&net.ListenConfig{}).Listen(context.Background(), "tcp", "127.0.0.1:0")
+	lis, err := (&net.ListenConfig{}).Listen(t.Context(), "tcp", "127.0.0.1:0")
 	if err != nil {
 		t.Fatalf("listen: %v", err)
 	}
@@ -85,7 +85,7 @@ func echoCall(t *testing.T, addr string, md metadata.MD) (*wrapperspb.StringValu
 	}
 	defer func() { _ = conn.Close() }()
 
-	ctx := context.Background()
+	ctx := t.Context()
 	if md != nil {
 		ctx = metadata.NewOutgoingContext(ctx, md)
 	}
@@ -182,11 +182,11 @@ func TestGRPCSuccessClaimsVisible(t *testing.T) {
 func TestBearerTokenFromMD(t *testing.T) {
 	t.Parallel()
 
-	ctx := metadata.NewIncomingContext(context.Background(), metadata.Pairs("authorization", "Bearer abc"))
+	ctx := metadata.NewIncomingContext(t.Context(), metadata.Pairs("authorization", "Bearer abc"))
 	if got := authz.BearerTokenFromMD(ctx); got != "abc" {
 		t.Fatalf("BearerTokenFromMD() = %q, want abc", got)
 	}
-	if got := authz.BearerTokenFromMD(context.Background()); got != "" {
+	if got := authz.BearerTokenFromMD(t.Context()); got != "" {
 		t.Fatalf("BearerTokenFromMD() no-md = %q, want empty", got)
 	}
 }
@@ -210,7 +210,7 @@ func TestGRPCResourceIDFromRequest(t *testing.T) {
 		"/test.Test/Echo": {AuthRequired: true, PermissionCheck: "x.y", ResourceType: "T"},
 	}
 	iv := authz.UnaryServerInterceptor(a, p, policies)
-	mdCtx := metadata.NewIncomingContext(context.Background(), metadata.Pairs("authorization", "Bearer good"))
+	mdCtx := metadata.NewIncomingContext(t.Context(), metadata.Pairs("authorization", "Bearer good"))
 	info := &grpc.UnaryServerInfo{FullMethod: "/test.Test/Echo"}
 	handler := func(context.Context, any) (any, error) { return struct{}{}, nil }
 

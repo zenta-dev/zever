@@ -192,7 +192,7 @@ func TestCoverCreateSetError(t *testing.T) {
 
 	st := coverStore(t, false)
 
-	if _, err := st.Create(context.Background(), 0); err == nil || !strings.Contains(err.Error(), "redis: create set") {
+	if _, err := st.Create(t.Context(), 0); err == nil || !strings.Contains(err.Error(), "redis: create set") {
 		t.Fatalf("Create over dead server err = %v, want wrap \"redis: create set\"", err)
 	}
 }
@@ -202,7 +202,7 @@ func TestCoverGetError(t *testing.T) {
 
 	st := coverStore(t, false)
 
-	if _, err := st.Get(context.Background(), session.NewID()); err == nil || !strings.Contains(err.Error(), "redis: get") {
+	if _, err := st.Get(t.Context(), session.NewID()); err == nil || !strings.Contains(err.Error(), "redis: get") {
 		t.Fatalf("Get over dead server err = %v, want wrap \"redis: get\"", err)
 	}
 }
@@ -217,7 +217,7 @@ func TestCoverSaveTransportError(t *testing.T) {
 
 	st := coverStore(t, false)
 
-	if err := st.Save(context.Background(), session.Session{ID: session.NewID()}); err == nil || !strings.Contains(err.Error(), "redis: save") {
+	if err := st.Save(t.Context(), session.Session{ID: session.NewID()}); err == nil || !strings.Contains(err.Error(), "redis: save") {
 		t.Fatalf("Save over dead server err = %v, want wrap \"redis: save\"", err)
 	}
 }
@@ -227,7 +227,7 @@ func TestCoverDeleteError(t *testing.T) {
 
 	st := coverStore(t, false)
 
-	if err := st.Delete(context.Background(), session.NewID()); err == nil || !strings.Contains(err.Error(), "redis: delete") {
+	if err := st.Delete(t.Context(), session.NewID()); err == nil || !strings.Contains(err.Error(), "redis: delete") {
 		t.Fatalf("Delete over dead server err = %v, want wrap \"redis: delete\"", err)
 	}
 }
@@ -243,7 +243,7 @@ func TestCoverSaveGetError(t *testing.T) {
 		prefix: "cov-", ttl: time.Minute,
 	}
 
-	if err := st.Save(context.Background(), session.Session{ID: session.NewID()}); err == nil || !strings.Contains(err.Error(), "redis: save get") {
+	if err := st.Save(t.Context(), session.Session{ID: session.NewID()}); err == nil || !strings.Contains(err.Error(), "redis: save get") {
 		t.Fatalf("Save GET err = %v, want wrap \"redis: save get\"", err)
 	}
 }
@@ -266,7 +266,7 @@ func TestCoverSaveSetError(t *testing.T) {
 		prefix: "cov-", ttl: time.Minute,
 	}
 
-	if err := st.Save(context.Background(), session.Session{ID: session.NewID()}); err == nil || !strings.Contains(err.Error(), "redis: save set") {
+	if err := st.Save(t.Context(), session.Session{ID: session.NewID()}); err == nil || !strings.Contains(err.Error(), "redis: save set") {
 		t.Fatalf("Save SET err = %v, want wrap \"redis: save set\"", err)
 	}
 }
@@ -278,7 +278,7 @@ func TestCoverSaveSetError(t *testing.T) {
 func TestCoverSaveZeroExpiryExisting(t *testing.T) {
 	t.Parallel()
 
-	ctx := context.Background()
+	ctx := t.Context()
 	st := coverStore(t, true)
 	id := session.NewID()
 

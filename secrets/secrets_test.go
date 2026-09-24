@@ -56,7 +56,7 @@ func TestSecretsOpen_registeredFactory_returnsSecrets(t *testing.T) {
 		t.Errorf("factory opts = %+v, want %+v", gotOpts, wantOpts)
 	}
 
-	val, err := got.Get(context.Background(), "k")
+	val, err := got.Get(t.Context(), "k")
 	if err != nil || string(val) != "v" {
 		t.Fatalf("Get = (%q, %v), want (v, nil)", val, err)
 	}
@@ -164,7 +164,7 @@ func TestSecretsOpen_envAdapter_endToEnd(t *testing.T) {
 		t.Fatalf("Open() error = %v", err)
 	}
 
-	ctx := context.Background()
+	ctx := t.Context()
 	defer func() { _ = s.Close(ctx) }()
 
 	t.Setenv("E2E_S_TOKEN", "abc")

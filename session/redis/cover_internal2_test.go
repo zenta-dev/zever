@@ -61,7 +61,7 @@ func TestCoverSaveSetFails(t *testing.T) {
 	c.AddHook(failSetHook{})
 
 	st := &store{client: c, prefix: "cov", ttl: time.Minute}
-	ctx := context.Background()
+	ctx := t.Context()
 
 	if err := st.Save(ctx, session.Session{ID: session.NewID()}); err == nil {
 		t.Fatal("Save(hook-refused set) = nil, want error")

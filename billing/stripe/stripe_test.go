@@ -1,7 +1,6 @@
 package stripe
 
 import (
-	"context"
 	"encoding/json"
 	"errors"
 	"fmt"
@@ -157,7 +156,7 @@ func TestFullFlow(t *testing.T) {
 	defer func() {
 		_ = b.Close()
 	}()
-	ctx := context.Background()
+	ctx := t.Context()
 
 	cus, err := b.CreateCustomer(ctx, "Ada", "ada@example.com", "")
 	if err != nil {
@@ -213,7 +212,7 @@ func TestIdempotencyKeySentOnCustomerAndSubscription(t *testing.T) {
 	defer srv.Close()
 	b := openWithServer(t, srv)
 	defer func() { _ = b.Close() }()
-	ctx := context.Background()
+	ctx := t.Context()
 
 	cus, err := b.CreateCustomer(ctx, "Ada", "ada@example.com", "create-cus-key-1")
 	if err != nil {
@@ -255,7 +254,7 @@ func TestEmptyIdempotencyKeyDoesNotForceOurs(t *testing.T) {
 	defer func() { _ = b.Close() }()
 
 	for range 2 {
-		if _, err := b.CreateCustomer(context.Background(), "Ada", "ada@example.com", ""); err != nil {
+		if _, err := b.CreateCustomer(t.Context(), "Ada", "ada@example.com", ""); err != nil {
 			t.Fatalf("CreateCustomer() error = %v", err)
 		}
 	}
@@ -273,7 +272,7 @@ func TestCreateSubscriptionGuards(t *testing.T) {
 	defer func() {
 		_ = b.Close()
 	}()
-	ctx := context.Background()
+	ctx := t.Context()
 
 	if _, err := b.CreateSubscription(ctx, "", "price_1", ""); !errors.Is(err, billing.ErrMissingCustomerID) {
 		t.Errorf("expected ErrMissingCustomerID, got %v", err)
@@ -291,7 +290,7 @@ func TestCancelSubscriptionGuard(t *testing.T) {
 	defer func() {
 		_ = b.Close()
 	}()
-	if err := b.CancelSubscription(context.Background(), ""); !errors.Is(err, billing.ErrMissingSubscriptionID) {
+	if err := b.CancelSubscription(t.Context(), ""); !errors.Is(err, billing.ErrMissingSubscriptionID) {
 		t.Errorf("expected ErrMissingSubscriptionID, got %v", err)
 	}
 }
@@ -304,7 +303,7 @@ func TestGetInvoiceGuard(t *testing.T) {
 	defer func() {
 		_ = b.Close()
 	}()
-	if _, err := b.GetInvoice(context.Background(), ""); !errors.Is(err, billing.ErrMissingCustomerID) {
+	if _, err := b.GetInvoice(t.Context(), ""); !errors.Is(err, billing.ErrMissingCustomerID) {
 		t.Errorf("expected ErrMissingCustomerID, got %v", err)
 	}
 }
@@ -321,7 +320,7 @@ func TestCreateCustomerSDKError(t *testing.T) {
 	defer func() {
 		_ = b.Close()
 	}()
-	got, err := b.CreateCustomer(context.Background(), "Ada", "ada@example.com", "")
+	got, err := b.CreateCustomer(t.Context(), "Ada", "ada@example.com", "")
 	if err == nil {
 		t.Fatal("expected error, got nil")
 	}
@@ -343,7 +342,7 @@ func TestCreateSubscriptionSDKError(t *testing.T) {
 	defer func() {
 		_ = b.Close()
 	}()
-	got, err := b.CreateSubscription(context.Background(), "cus_1", "price_1", "")
+	got, err := b.CreateSubscription(t.Context(), "cus_1", "price_1", "")
 	if err == nil {
 		t.Fatal("expected error, got nil")
 	}
@@ -364,7 +363,7 @@ func TestCancelSubscriptionSDKError(t *testing.T) {
 	defer func() {
 		_ = b.Close()
 	}()
-	if err := b.CancelSubscription(context.Background(), "sub_missing"); err == nil {
+	if err := b.CancelSubscription(t.Context(), "sub_missing"); err == nil {
 		t.Fatal("expected error, got nil")
 	}
 }
@@ -384,7 +383,7 @@ func TestGetInvoiceSkipsDraftAndVoid(t *testing.T) {
 	defer func() {
 		_ = b.Close()
 	}()
-	inv, err := b.GetInvoice(context.Background(), "cus_1")
+	inv, err := b.GetInvoice(t.Context(), "cus_1")
 	if err != nil {
 		t.Fatalf("GetInvoice() error = %v", err)
 	}
@@ -410,7 +409,7 @@ func TestGetInvoiceOnlyDraftsNotFound(t *testing.T) {
 	defer func() {
 		_ = b.Close()
 	}()
-	_, err := b.GetInvoice(context.Background(), "cus_1")
+	_, err := b.GetInvoice(t.Context(), "cus_1")
 	if err == nil {
 		t.Fatal("expected error, got nil")
 	}
@@ -457,7 +456,7 @@ func TestGetInvoicePagination(t *testing.T) {
 	defer func() {
 		_ = b.Close()
 	}()
-	inv, err := b.GetInvoice(context.Background(), "cus_1")
+	inv, err := b.GetInvoice(t.Context(), "cus_1")
 	if err != nil {
 		t.Fatalf("GetInvoice() error = %v", err)
 	}
@@ -489,7 +488,7 @@ func TestGetInvoiceIteratorMidPageError(t *testing.T) {
 	defer func() {
 		_ = b.Close()
 	}()
-	got, err := b.GetInvoice(context.Background(), "cus_1")
+	got, err := b.GetInvoice(t.Context(), "cus_1")
 	if err == nil {
 		t.Fatal("expected error, got nil")
 	}

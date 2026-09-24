@@ -74,7 +74,7 @@ func TestCoverValidateServiceAccountPathDir(t *testing.T) {
 func TestCoverEvalContextMap(t *testing.T) {
 	t.Parallel()
 
-	got := evalContextMap(flag.WithEvalContext(context.Background(), flag.EvalContext{
+	got := evalContextMap(flag.WithEvalContext(t.Context(), flag.EvalContext{
 		RandomizationID: "user-1",
 		Signals:         map[string]any{"plan": "pro"},
 	}))
@@ -85,7 +85,7 @@ func TestCoverEvalContextMap(t *testing.T) {
 		t.Errorf("plan = %v, want pro", got["plan"])
 	}
 
-	if got := evalContextMap(context.Background()); len(got) != 0 {
+	if got := evalContextMap(t.Context()); len(got) != 0 {
 		t.Errorf("empty ctx map = %v, want empty", got)
 	}
 }
@@ -96,7 +96,7 @@ func TestCoverJSONFallbackNil(t *testing.T) {
 	c := newTestClient(t)
 
 	var out map[string]any
-	if err := c.JSON(context.Background(), "no-such-key", &out, nil); err != nil {
+	if err := c.JSON(t.Context(), "no-such-key", &out, nil); err != nil {
 		t.Fatalf("JSON missing nil-fallback = %v, want nil", err)
 	}
 }
@@ -107,7 +107,7 @@ func TestCoverJSONFallbackMarshalFail(t *testing.T) {
 	c := newTestClient(t)
 
 	var out map[string]any
-	if err := c.JSON(context.Background(), "no-such-key", &out, func() {}); err == nil {
+	if err := c.JSON(t.Context(), "no-such-key", &out, func() {}); err == nil {
 		t.Fatal("JSON unmarshalable fallback = nil error, want marshal error")
 	}
 }
@@ -118,7 +118,7 @@ func TestCoverJSONFallbackUnmarshalFail(t *testing.T) {
 	c := newTestClient(t)
 
 	var out map[string]any
-	if err := c.JSON(context.Background(), "no-such-key", &out, "xx"); err == nil {
+	if err := c.JSON(t.Context(), "no-such-key", &out, "xx"); err == nil {
 		t.Fatal("JSON string fallback into map = nil error, want unmarshal error")
 	}
 }
@@ -158,7 +158,7 @@ func TestCoverNewLoaderSuccess(t *testing.T) {
 	if err != nil {
 		t.Fatalf("New(loader ok) = %v, want nil", err)
 	}
-	if got, err := c.Bool(context.Background(), "welcome", false); err != nil || got {
+	if got, err := c.Bool(t.Context(), "welcome", false); err != nil || got {
 		t.Fatalf("Bool = %v, %v; template lacks bool, want fallback", got, err)
 	}
 }
@@ -171,7 +171,7 @@ func TestCoverRealLoadTemplateMalformedSA(t *testing.T) {
 		t.Fatalf("seed: %v", err)
 	}
 
-	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
+	ctx, cancel := context.WithTimeout(t.Context(), 5*time.Second)
 	defer cancel()
 
 	if _, err := loadTemplate(ctx, "p", p); err == nil {
@@ -190,7 +190,7 @@ func TestCoverRealLoadTemplateTimeout(t *testing.T) {
 		t.Fatalf("seed: %v", err)
 	}
 
-	ctx, cancel := context.WithTimeout(context.Background(), 300*time.Millisecond)
+	ctx, cancel := context.WithTimeout(t.Context(), 300*time.Millisecond)
 	defer cancel()
 
 	if _, err := loadTemplate(ctx, "p", p); err == nil {
@@ -211,7 +211,7 @@ func TestCoverLoadTemplateSuccess(t *testing.T) {
 	loadServerTemplate = func(context.Context, *remoteconfig.ServerTemplate) error { return nil }
 
 	p := dummySA(t)
-	tpl, err := loadTemplate(context.Background(), "p", p)
+	tpl, err := loadTemplate(t.Context(), "p", p)
 	if err != nil {
 		t.Fatalf("loadTemplate(success seam) = %v, want nil", err)
 	}
@@ -229,7 +229,7 @@ func TestCoverLoadTemplateFailure(t *testing.T) {
 	}
 
 	p := dummySA(t)
-	_, err := loadTemplate(context.Background(), "p", p)
+	_, err := loadTemplate(t.Context(), "p", p)
 	if err == nil {
 		t.Fatal("loadTemplate(failure seam) = nil, want error")
 	}

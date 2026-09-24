@@ -771,7 +771,7 @@ func TestUpsertBatch_Empty(t *testing.T) {
 	pool := &fakePool{}
 	s := &Store{db: pool, dim: 3}
 
-	if err := s.UpsertBatch(context.Background(), nil); err != nil {
+	if err := s.UpsertBatch(t.Context(), nil); err != nil {
 		t.Fatalf("UpsertBatch(nil) = %v, want nil", err)
 	}
 
@@ -786,7 +786,7 @@ func TestUpsertBatch_SingleStatement(t *testing.T) {
 	pool := &fakePool{}
 	s := &Store{db: pool, dim: 3}
 
-	err := s.UpsertBatch(context.Background(), []vectorstore.Vector{
+	err := s.UpsertBatch(t.Context(), []vectorstore.Vector{
 		{ID: "a", Embedding: []float32{1, 0, 0}},
 		{ID: "b", Embedding: []float32{0, 1, 0}},
 	})
@@ -809,7 +809,7 @@ func TestUpsertBatch_DimensionMismatch(t *testing.T) {
 	pool := &fakePool{}
 	s := &Store{db: pool, dim: 3}
 
-	err := s.UpsertBatch(context.Background(), []vectorstore.Vector{
+	err := s.UpsertBatch(t.Context(), []vectorstore.Vector{
 		{ID: "a", Embedding: []float32{1, 0}},
 	})
 
@@ -839,7 +839,7 @@ func TestUpsertBatch_Chunked(t *testing.T) {
 		vecs[i] = vectorstore.Vector{ID: fmt.Sprintf("id-%d", i), Embedding: []float32{1, 0, 0}}
 	}
 
-	if err := s.UpsertBatch(context.Background(), vecs); err != nil {
+	if err := s.UpsertBatch(t.Context(), vecs); err != nil {
 		t.Fatalf("UpsertBatch() = %v, want nil", err)
 	}
 

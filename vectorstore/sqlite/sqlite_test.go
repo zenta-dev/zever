@@ -40,7 +40,7 @@ func TestSQLiteRoundtrip(t *testing.T) {
 	t.Parallel()
 
 	s := newMemoryStore(t)
-	ctx := context.Background()
+	ctx := t.Context()
 
 	if err := s.Upsert(ctx, vectorstore.Vector{
 		ID:        "v1",
@@ -97,7 +97,7 @@ func TestSQLiteFileBacked(t *testing.T) {
 	t.Parallel()
 
 	path := filepath.Join(t.TempDir(), "vec.db")
-	ctx := context.Background()
+	ctx := t.Context()
 
 	s, err := New(vectorstore.Options{DSN: path})
 	if err != nil {
@@ -135,7 +135,7 @@ func TestSQLiteDeleteNotFound(t *testing.T) {
 
 	s := newMemoryStore(t)
 
-	err := s.Delete(context.Background(), "nonexistent")
+	err := s.Delete(t.Context(), "nonexistent")
 	if err == nil {
 		t.Fatal("expected ErrNotFound, got nil")
 	}
@@ -158,7 +158,7 @@ func TestSQLiteUpsertEmptyEmbeddingRejected(t *testing.T) {
 	t.Parallel()
 
 	s := newMemoryStore(t)
-	ctx := context.Background()
+	ctx := t.Context()
 
 	if err := s.Upsert(ctx, vectorstore.Vector{ID: "v1"}); !errors.Is(err, vectorstore.ErrEmptyEmbedding) {
 		t.Fatalf("expected ErrEmptyEmbedding, got %v", err)
@@ -177,7 +177,7 @@ func TestSQLiteQueryEmptyEmbeddingRejected(t *testing.T) {
 	t.Parallel()
 
 	s := newMemoryStore(t)
-	ctx := context.Background()
+	ctx := t.Context()
 
 	if _, err := s.Query(ctx, nil, 5); !errors.Is(err, vectorstore.ErrEmptyEmbedding) {
 		t.Fatalf("expected ErrEmptyEmbedding, got %v", err)
@@ -196,7 +196,7 @@ func TestSQLiteUpsertOverwrite(t *testing.T) {
 	t.Parallel()
 
 	s := newMemoryStore(t)
-	ctx := context.Background()
+	ctx := t.Context()
 
 	if err := s.Upsert(ctx, vectorstore.Vector{ID: "v1", Embedding: []float32{1, 0}}); err != nil {
 		t.Fatal(err)
@@ -225,7 +225,7 @@ func TestSQLiteQueryEmpty(t *testing.T) {
 
 	s := newMemoryStore(t)
 
-	results, err := s.Query(context.Background(), []float32{1, 0, 0}, 10)
+	results, err := s.Query(t.Context(), []float32{1, 0, 0}, 10)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -239,7 +239,7 @@ func TestSQLiteQueryTopKZeroDefaults(t *testing.T) {
 	t.Parallel()
 
 	s := newMemoryStore(t)
-	ctx := context.Background()
+	ctx := t.Context()
 
 	for i := 0; i < 20; i++ {
 		vec := make([]float32, 3)
@@ -268,7 +268,7 @@ func TestSQLiteQueryTopKNegativeDefaults(t *testing.T) {
 	t.Parallel()
 
 	s := newMemoryStore(t)
-	ctx := context.Background()
+	ctx := t.Context()
 
 	for i := 0; i < 20; i++ {
 		vec := make([]float32, 3)
@@ -293,7 +293,7 @@ func TestSQLiteQueryTopK(t *testing.T) {
 	t.Parallel()
 
 	s := newMemoryStore(t)
-	ctx := context.Background()
+	ctx := t.Context()
 
 	for i := 0; i < 20; i++ {
 		vec := make([]float32, 3)
@@ -318,7 +318,7 @@ func TestSQLiteMetadataNil(t *testing.T) {
 	t.Parallel()
 
 	s := newMemoryStore(t)
-	ctx := context.Background()
+	ctx := t.Context()
 
 	if err := s.Upsert(ctx, vectorstore.Vector{ID: "v1", Embedding: []float32{1, 0}}); err != nil {
 		t.Fatal(err)
@@ -338,7 +338,7 @@ func TestSQLiteMetadataRoundtrip(t *testing.T) {
 	t.Parallel()
 
 	s := newMemoryStore(t)
-	ctx := context.Background()
+	ctx := t.Context()
 
 	meta := map[string]any{"name": "alpha", "n": float64(3)}
 
@@ -364,7 +364,7 @@ func TestSQLiteMixedDimensionUpsertRejected(t *testing.T) {
 	t.Parallel()
 
 	s := newMemoryStore(t)
-	ctx := context.Background()
+	ctx := t.Context()
 
 	if err := s.Upsert(ctx, vectorstore.Vector{ID: "v1", Embedding: []float32{1, 0, 0}}); err != nil {
 		t.Fatal(err)
@@ -393,7 +393,7 @@ func TestSQLiteMixedDimensionQueryRejected(t *testing.T) {
 	t.Parallel()
 
 	s := newMemoryStore(t)
-	ctx := context.Background()
+	ctx := t.Context()
 
 	if err := s.Upsert(ctx, vectorstore.Vector{ID: "v1", Embedding: []float32{1, 0, 0}}); err != nil {
 		t.Fatal(err)
@@ -422,7 +422,7 @@ func TestSQLiteCorruptMetadataErrors(t *testing.T) {
 	t.Parallel()
 
 	s := newMemoryStore(t)
-	ctx := context.Background()
+	ctx := t.Context()
 
 	if _, err := s.db.ExecContext(ctx, `INSERT INTO vectors (id, embedding, metadata) VALUES (?, ?, ?)`,
 		"v1", []byte(`[1,0,0]`), []byte(`{oops`)); err != nil {
@@ -438,7 +438,7 @@ func TestSQLiteCorruptEmbeddingErrors(t *testing.T) {
 	t.Parallel()
 
 	s := newMemoryStore(t)
-	ctx := context.Background()
+	ctx := t.Context()
 
 	// Length 3: not valid JSON, not a multiple of 4.
 	if _, err := s.db.ExecContext(ctx, `INSERT INTO vectors (id, embedding, metadata) VALUES (?, ?, ?)`,
@@ -455,7 +455,7 @@ func TestSQLiteEmptyEmbeddingBlobErrors(t *testing.T) {
 	t.Parallel()
 
 	s := newMemoryStore(t)
-	ctx := context.Background()
+	ctx := t.Context()
 
 	if _, err := s.db.ExecContext(ctx, `INSERT INTO vectors (id, embedding, metadata) VALUES (?, ?, ?)`,
 		"empty", []byte{}, nil); err != nil {
@@ -471,7 +471,7 @@ func TestSQLiteQueryTopKBoundedOrdering(t *testing.T) {
 	t.Parallel()
 
 	s := newMemoryStore(t)
-	ctx := context.Background()
+	ctx := t.Context()
 
 	// Insert far more rows than the requested topK. Query vector is the unit
 	// vector along the x-axis, so a stored vector v = [cos, sin] has cosine
@@ -519,7 +519,7 @@ func TestSQLiteScanCapExceeded(t *testing.T) {
 	t.Parallel()
 
 	s := newMemoryStore(t)
-	ctx := context.Background()
+	ctx := t.Context()
 
 	for i := 0; i < maxScanRows+1; i++ {
 		if err := s.Upsert(ctx, vectorstore.Vector{
@@ -544,7 +544,7 @@ func TestSQLiteScanCapBoundary(t *testing.T) {
 	t.Parallel()
 
 	s := newMemoryStore(t)
-	ctx := context.Background()
+	ctx := t.Context()
 
 	for i := 0; i < maxScanRows; i++ {
 		if err := s.Upsert(ctx, vectorstore.Vector{
@@ -570,7 +570,7 @@ func TestSQLiteConcurrent(t *testing.T) {
 	t.Parallel()
 
 	s := newMemoryStore(t)
-	ctx := context.Background()
+	ctx := t.Context()
 
 	const n = 32
 
@@ -619,7 +619,7 @@ func TestNewDefaults(t *testing.T) {
 
 	defer func() { _ = vs.Close() }()
 
-	ctx := context.Background()
+	ctx := t.Context()
 
 	if upErr := vs.Upsert(ctx, vectorstore.Vector{ID: "v1", Embedding: []float32{1, 0}}); upErr != nil {
 		t.Fatal(upErr)
@@ -684,7 +684,7 @@ func TestSQLiteDeleteExecError(t *testing.T) {
 	t.Parallel()
 
 	s := newMemoryStore(t)
-	ctx := context.Background()
+	ctx := t.Context()
 
 	if err := s.Upsert(ctx, vectorstore.Vector{ID: "v1", Embedding: []float32{1, 0}}); err != nil {
 		t.Fatal(err)
@@ -712,15 +712,15 @@ func TestSQLiteClose(t *testing.T) {
 		t.Fatalf("Close: %v", err)
 	}
 
-	if _, err := s.Query(context.Background(), []float32{1, 0}, 1); err == nil {
+	if _, err := s.Query(t.Context(), []float32{1, 0}, 1); err == nil {
 		t.Fatal("expected error querying closed store")
 	}
 
-	if err := s.Upsert(context.Background(), vectorstore.Vector{ID: "v", Embedding: []float32{1, 0}}); err == nil {
+	if err := s.Upsert(t.Context(), vectorstore.Vector{ID: "v", Embedding: []float32{1, 0}}); err == nil {
 		t.Fatal("expected error upserting closed store")
 	}
 
-	if err := s.Delete(context.Background(), "v"); err == nil {
+	if err := s.Delete(t.Context(), "v"); err == nil {
 		t.Fatal("expected error deleting from closed store")
 	}
 }
@@ -730,7 +730,7 @@ func TestSQLiteMemoryIsolation(t *testing.T) {
 
 	a := newMemoryStore(t)
 	b := newMemoryStore(t)
-	ctx := context.Background()
+	ctx := t.Context()
 
 	if err := a.Upsert(ctx, vectorstore.Vector{ID: "only-a", Embedding: []float32{1, 0}}); err != nil {
 		t.Fatal(err)
@@ -854,7 +854,7 @@ func TestSQLiteCosineOrdering(t *testing.T) {
 	t.Parallel()
 
 	s := newMemoryStore(t)
-	ctx := context.Background()
+	ctx := t.Context()
 
 	// Identical vector must score ~1 and come first; orthogonal next; opposite last.
 	if err := s.Upsert(ctx, vectorstore.Vector{ID: "same", Embedding: []float32{1, 0}}); err != nil {
@@ -900,7 +900,7 @@ func TestSQLiteUpsertUnserializableMetadata(t *testing.T) {
 
 	s := newMemoryStore(t)
 
-	err := s.Upsert(context.Background(), vectorstore.Vector{
+	err := s.Upsert(t.Context(), vectorstore.Vector{
 		ID:        "v1",
 		Embedding: []float32{1, 0},
 		Metadata:  map[string]any{"f": func() {}},
@@ -914,7 +914,7 @@ func TestSQLiteQueryCancelledContext(t *testing.T) {
 	t.Parallel()
 
 	s := newMemoryStore(t)
-	ctx := context.Background()
+	ctx := t.Context()
 
 	if err := s.Upsert(ctx, vectorstore.Vector{ID: "v1", Embedding: []float32{1, 0}}); err != nil {
 		t.Fatal(err)
@@ -932,7 +932,7 @@ func TestSQLiteScanRowsCancelledContext(t *testing.T) {
 	t.Parallel()
 
 	s := newMemoryStore(t)
-	ctx := context.Background()
+	ctx := t.Context()
 
 	if err := s.Upsert(ctx, vectorstore.Vector{ID: "v1", Embedding: []float32{1, 0}}); err != nil {
 		t.Fatal(err)
@@ -1051,7 +1051,7 @@ func TestDelete_RowsErr(t *testing.T) {
 	s := newFailStore(errBoom, nil)
 	defer func() { _ = s.Close() }()
 
-	if err := s.Delete(context.Background(), "x"); !errors.Is(err, errBoom) {
+	if err := s.Delete(t.Context(), "x"); !errors.Is(err, errBoom) {
 		t.Fatalf("Delete err = %v, want boom", err)
 	}
 }
@@ -1062,7 +1062,7 @@ func TestDelete_RowsCloseErr(t *testing.T) {
 	s := newFailStore(nil, errBoom)
 	defer func() { _ = s.Close() }()
 
-	if err := s.Delete(context.Background(), "x"); !errors.Is(err, errBoom) {
+	if err := s.Delete(t.Context(), "x"); !errors.Is(err, errBoom) {
 		t.Fatalf("Delete err = %v, want boom", err)
 	}
 }
@@ -1073,7 +1073,7 @@ func TestQuery_ScanRowsErr(t *testing.T) {
 	s := newFailStore(errBoom, nil)
 	defer func() { _ = s.Close() }()
 
-	if _, err := s.Query(context.Background(), []float32{1}, 1); !errors.Is(err, errBoom) {
+	if _, err := s.Query(t.Context(), []float32{1}, 1); !errors.Is(err, errBoom) {
 		t.Fatalf("Query err = %v, want boom", err)
 	}
 }
@@ -1086,7 +1086,7 @@ func TestQuery_AutoCloseErr(t *testing.T) {
 
 	// database/sql auto-closes rows on EOF; the auto-close failure lands in
 	// rows.Err(), so scanRows (not an explicit Close check) reports it.
-	if _, err := s.Query(context.Background(), []float32{1}, 1); !errors.Is(err, errBoom) {
+	if _, err := s.Query(t.Context(), []float32{1}, 1); !errors.Is(err, errBoom) {
 		t.Fatalf("Query err = %v, want boom", err)
 	}
 }
@@ -1100,7 +1100,7 @@ func TestDecodeRow_ScanColumnMismatch(t *testing.T) {
 	s := &Store{db: db}
 	defer func() { _ = s.Close() }()
 
-	_, err := s.Query(context.Background(), []float32{1}, 1)
+	_, err := s.Query(t.Context(), []float32{1}, 1)
 	if err == nil {
 		t.Fatal("expected scan error for column count mismatch")
 	}
@@ -1110,7 +1110,7 @@ func TestDecodeRow_ScanTypeMismatch(t *testing.T) {
 	t.Parallel()
 
 	s := newMemoryStore(t)
-	ctx := context.Background()
+	ctx := t.Context()
 
 	// INTEGER in a BLOB column: convertAssign rejects int64 -> []byte.
 	if _, err := s.db.ExecContext(ctx, `INSERT INTO vectors (id, embedding, metadata) VALUES ('bad', 42, NULL)`); err != nil {
@@ -1132,7 +1132,7 @@ func TestUpsertBatch_MatchesLoopedUpsert(t *testing.T) {
 	}
 
 	loopStore := newMemoryStore(t)
-	ctx := context.Background()
+	ctx := t.Context()
 
 	for _, v := range vecs {
 		if err := loopStore.Upsert(ctx, v); err != nil {
@@ -1179,7 +1179,7 @@ func TestUpsertBatch_EmptyEmbeddingRollsBack(t *testing.T) {
 	t.Parallel()
 
 	s := newMemoryStore(t)
-	ctx := context.Background()
+	ctx := t.Context()
 
 	err := s.UpsertBatch(ctx, []vectorstore.Vector{
 		{ID: "v1", Embedding: []float32{1, 0, 0}},

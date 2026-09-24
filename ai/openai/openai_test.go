@@ -136,7 +136,7 @@ func TestGenerate_ModelRequired(t *testing.T) {
 	}
 	defer func() { _ = a.Close() }()
 
-	_, err = a.Generate(context.Background(), "", []ai.Message{{Role: ai.RoleUser, Content: "hi"}}, ai.GenerateOptions{})
+	_, err = a.Generate(t.Context(), "", []ai.Message{{Role: ai.RoleUser, Content: "hi"}}, ai.GenerateOptions{})
 	if err == nil || !strings.Contains(err.Error(), "model is required") {
 		t.Fatalf("err = %v, want model required", err)
 	}
@@ -157,7 +157,7 @@ func TestGenerate_ToolsAndResponseFormatConflict(t *testing.T) {
 	}
 	defer func() { _ = a.Close() }()
 
-	_, err = a.Generate(context.Background(), "", []ai.Message{{Role: ai.RoleUser, Content: "hi"}}, ai.GenerateOptions{
+	_, err = a.Generate(t.Context(), "", []ai.Message{{Role: ai.RoleUser, Content: "hi"}}, ai.GenerateOptions{
 		Tools:          []ai.Tool{{Name: "tool1"}},
 		ResponseFormat: &ai.ResponseFormat{Type: "json_object"},
 	})
@@ -187,7 +187,7 @@ func TestGenerate_RoundtripSimple(t *testing.T) {
 
 	temp := float32(0.7)
 	topP := float32(0.9)
-	gen, err := a.Generate(context.Background(), "", []ai.Message{{Role: ai.RoleUser, Content: "hi"}}, ai.GenerateOptions{MaxTokens: 50, Temperature: &temp, TopP: &topP})
+	gen, err := a.Generate(t.Context(), "", []ai.Message{{Role: ai.RoleUser, Content: "hi"}}, ai.GenerateOptions{MaxTokens: 50, Temperature: &temp, TopP: &topP})
 	if err != nil {
 		t.Fatalf("Generate err = %v", err)
 	}
@@ -240,7 +240,7 @@ func TestGenerate_ModelOverride(t *testing.T) {
 	}
 	defer func() { _ = a.Close() }()
 
-	_, err = a.Generate(context.Background(), "gpt-4o-mini", []ai.Message{{Role: ai.RoleUser, Content: "hi"}}, ai.GenerateOptions{})
+	_, err = a.Generate(t.Context(), "gpt-4o-mini", []ai.Message{{Role: ai.RoleUser, Content: "hi"}}, ai.GenerateOptions{})
 	if err != nil {
 		t.Fatalf("Generate err = %v", err)
 	}
@@ -269,7 +269,7 @@ func TestGenerate_WithTools(t *testing.T) {
 	}
 	defer func() { _ = a.Close() }()
 
-	gen, err := a.Generate(context.Background(), "", []ai.Message{{Role: ai.RoleUser, Content: "weather"}}, ai.GenerateOptions{
+	gen, err := a.Generate(t.Context(), "", []ai.Message{{Role: ai.RoleUser, Content: "weather"}}, ai.GenerateOptions{
 		Tools:      []ai.Tool{{Name: "get_weather", Description: "get weather", Parameters: map[string]any{"type": "object", "properties": map[string]any{"city": map[string]any{"type": "string"}}}}},
 		ToolChoice: ai.ToolChoiceAuto,
 	})
@@ -313,7 +313,7 @@ func TestGenerate_ToolChoiceRequiredAndNone(t *testing.T) {
 			}
 			defer func() { _ = a.Close() }()
 
-			_, err = a.Generate(context.Background(), "", []ai.Message{{Role: ai.RoleUser, Content: "hi"}}, ai.GenerateOptions{
+			_, err = a.Generate(t.Context(), "", []ai.Message{{Role: ai.RoleUser, Content: "hi"}}, ai.GenerateOptions{
 				Tools:      []ai.Tool{{Name: "t"}},
 				ToolChoice: tc,
 			})
@@ -347,7 +347,7 @@ func TestGenerate_ToolChoiceNamed(t *testing.T) {
 	}
 	defer func() { _ = a.Close() }()
 
-	_, err = a.Generate(context.Background(), "", []ai.Message{{Role: ai.RoleUser, Content: "hi"}}, ai.GenerateOptions{
+	_, err = a.Generate(t.Context(), "", []ai.Message{{Role: ai.RoleUser, Content: "hi"}}, ai.GenerateOptions{
 		Tools:      []ai.Tool{{Name: "mytool"}},
 		ToolChoice: ai.ToolChoice("tool:mytool"),
 	})
@@ -385,7 +385,7 @@ func TestGenerate_ToolChoiceFallback(t *testing.T) {
 	}
 	defer func() { _ = a.Close() }()
 
-	_, err = a.Generate(context.Background(), "", []ai.Message{{Role: ai.RoleUser, Content: "hi"}}, ai.GenerateOptions{
+	_, err = a.Generate(t.Context(), "", []ai.Message{{Role: ai.RoleUser, Content: "hi"}}, ai.GenerateOptions{
 		Tools:      []ai.Tool{{Name: "t"}},
 		ToolChoice: ai.ToolChoice("custom"),
 	})
@@ -417,7 +417,7 @@ func TestGenerate_ResponseFormatJSONObject(t *testing.T) {
 	}
 	defer func() { _ = a.Close() }()
 
-	_, err = a.Generate(context.Background(), "", []ai.Message{{Role: ai.RoleUser, Content: "hi"}}, ai.GenerateOptions{
+	_, err = a.Generate(t.Context(), "", []ai.Message{{Role: ai.RoleUser, Content: "hi"}}, ai.GenerateOptions{
 		ResponseFormat: &ai.ResponseFormat{Type: "json_object"},
 	})
 	if err != nil {
@@ -453,7 +453,7 @@ func TestGenerate_ResponseFormatJSONSchema(t *testing.T) {
 	}
 	defer func() { _ = a.Close() }()
 
-	_, err = a.Generate(context.Background(), "", []ai.Message{{Role: ai.RoleUser, Content: "hi"}}, ai.GenerateOptions{
+	_, err = a.Generate(t.Context(), "", []ai.Message{{Role: ai.RoleUser, Content: "hi"}}, ai.GenerateOptions{
 		ResponseFormat: &ai.ResponseFormat{
 			Type: "json_schema",
 			JSONSchema: map[string]any{
@@ -497,7 +497,7 @@ func TestGenerate_ResponseFormatMapFallback(t *testing.T) {
 	defer func() { _ = a.Close() }()
 
 	// Provide raw schema without wrapper keys
-	_, err = a.Generate(context.Background(), "", []ai.Message{{Role: ai.RoleUser, Content: "hi"}}, ai.GenerateOptions{
+	_, err = a.Generate(t.Context(), "", []ai.Message{{Role: ai.RoleUser, Content: "hi"}}, ai.GenerateOptions{
 		ResponseFormat: &ai.ResponseFormat{
 			Type:       "json_schema",
 			JSONSchema: map[string]any{"type": "object", "properties": map[string]any{}},
@@ -532,7 +532,7 @@ func TestGenerate_ParallelToolCalls(t *testing.T) {
 	defer func() { _ = a.Close() }()
 
 	disable := false
-	_, err = a.Generate(context.Background(), "", []ai.Message{{Role: ai.RoleUser, Content: "hi"}}, ai.GenerateOptions{
+	_, err = a.Generate(t.Context(), "", []ai.Message{{Role: ai.RoleUser, Content: "hi"}}, ai.GenerateOptions{
 		Tools:             []ai.Tool{{Name: "t"}},
 		ParallelToolCalls: &disable,
 	})
@@ -545,7 +545,7 @@ func TestGenerate_ParallelToolCalls(t *testing.T) {
 	}
 
 	enable := true
-	_, err = a.Generate(context.Background(), "", []ai.Message{{Role: ai.RoleUser, Content: "hi"}}, ai.GenerateOptions{
+	_, err = a.Generate(t.Context(), "", []ai.Message{{Role: ai.RoleUser, Content: "hi"}}, ai.GenerateOptions{
 		Tools:             []ai.Tool{{Name: "t"}},
 		ParallelToolCalls: &enable,
 	})
@@ -573,7 +573,7 @@ func TestGenerate_MessageRoles(t *testing.T) {
 	}
 	defer func() { _ = a.Close() }()
 
-	_, err = a.Generate(context.Background(), "", []ai.Message{
+	_, err = a.Generate(t.Context(), "", []ai.Message{
 		{Role: ai.RoleSystem, Content: "sys"},
 		{Role: ai.RoleUser, Content: "user"},
 		{Role: ai.RoleAssistant, Content: "assistant"},
@@ -606,7 +606,7 @@ func TestGenerate_NoChoices(t *testing.T) {
 	}
 	defer func() { _ = a.Close() }()
 
-	_, err = a.Generate(context.Background(), "", []ai.Message{{Role: ai.RoleUser, Content: "hi"}}, ai.GenerateOptions{})
+	_, err = a.Generate(t.Context(), "", []ai.Message{{Role: ai.RoleUser, Content: "hi"}}, ai.GenerateOptions{})
 	if err == nil || !strings.Contains(err.Error(), "no choices") {
 		t.Fatalf("err = %v, want no choices", err)
 	}
@@ -661,7 +661,7 @@ func TestGenerate_ErrorMapping(t *testing.T) {
 			}
 			defer func() { _ = a.Close() }()
 
-			_, err = a.Generate(context.Background(), "", []ai.Message{{Role: ai.RoleUser, Content: "hi"}}, ai.GenerateOptions{})
+			_, err = a.Generate(t.Context(), "", []ai.Message{{Role: ai.RoleUser, Content: "hi"}}, ai.GenerateOptions{})
 			if err == nil {
 				t.Fatalf("want error")
 			}
@@ -694,7 +694,7 @@ func TestGenerate_Redaction(t *testing.T) {
 	}
 	defer func() { _ = a.Close() }()
 
-	_, err = a.Generate(context.Background(), "", []ai.Message{{Role: ai.RoleUser, Content: "hi"}}, ai.GenerateOptions{})
+	_, err = a.Generate(t.Context(), "", []ai.Message{{Role: ai.RoleUser, Content: "hi"}}, ai.GenerateOptions{})
 	if err == nil {
 		t.Fatal("want error")
 	}
@@ -723,7 +723,7 @@ func TestEmbed_Dimensions(t *testing.T) {
 	}
 	defer func() { _ = a.Close() }()
 
-	vecs, err := a.Embed(context.Background(), "", []string{"hello"}, ai.EmbedOptions{Dimensions: 1536})
+	vecs, err := a.Embed(t.Context(), "", []string{"hello"}, ai.EmbedOptions{Dimensions: 1536})
 	if err != nil {
 		t.Fatalf("Embed err = %v", err)
 	}
@@ -756,7 +756,7 @@ func TestEmbed_NoDimensions(t *testing.T) {
 	}
 	defer func() { _ = a.Close() }()
 
-	_, err = a.Embed(context.Background(), "", []string{"a"}, ai.EmbedOptions{})
+	_, err = a.Embed(t.Context(), "", []string{"a"}, ai.EmbedOptions{})
 	if err != nil {
 		t.Fatalf("Embed err = %v", err)
 	}
@@ -781,7 +781,7 @@ func TestEmbed_ModelRequired(t *testing.T) {
 	}
 	defer func() { _ = a.Close() }()
 
-	_, err = a.Embed(context.Background(), "", []string{"a"}, ai.EmbedOptions{})
+	_, err = a.Embed(t.Context(), "", []string{"a"}, ai.EmbedOptions{})
 	if err == nil || !strings.Contains(err.Error(), "model is required") {
 		t.Fatalf("err = %v, want model required", err)
 	}
@@ -803,7 +803,7 @@ func TestEmbed_ErrorMapping(t *testing.T) {
 	}
 	defer func() { _ = a.Close() }()
 
-	_, err = a.Embed(context.Background(), "", []string{"a"}, ai.EmbedOptions{})
+	_, err = a.Embed(t.Context(), "", []string{"a"}, ai.EmbedOptions{})
 	if !errors.Is(err, ai.ErrAuth) {
 		t.Fatalf("err = %v, want ErrAuth", err)
 	}
@@ -827,7 +827,7 @@ func TestStream_Ordering(t *testing.T) {
 	}
 	defer func() { _ = a.Close() }()
 
-	ch, err := a.Stream(context.Background(), "", []ai.Message{{Role: ai.RoleUser, Content: "hi"}}, ai.GenerateOptions{})
+	ch, err := a.Stream(t.Context(), "", []ai.Message{{Role: ai.RoleUser, Content: "hi"}}, ai.GenerateOptions{})
 	if err != nil {
 		t.Fatalf("Stream err = %v", err)
 	}
@@ -883,7 +883,7 @@ func TestStream_ToolCalls(t *testing.T) {
 	}
 	defer func() { _ = a.Close() }()
 
-	ch, err := a.Stream(context.Background(), "", []ai.Message{{Role: ai.RoleUser, Content: "hi"}}, ai.GenerateOptions{})
+	ch, err := a.Stream(t.Context(), "", []ai.Message{{Role: ai.RoleUser, Content: "hi"}}, ai.GenerateOptions{})
 	if err != nil {
 		t.Fatalf("Stream err = %v", err)
 	}
@@ -945,7 +945,7 @@ func TestStream_ClosesBodyOnNormalCompletion(t *testing.T) {
 
 	a, closed := newStreamTestAdapter(t, "data: {\"choices\":[{\"delta\":{\"content\":\"hi\"},\"finish_reason\":\"stop\"}]}\n\ndata: [DONE]\n\n")
 
-	ch, err := a.Stream(context.Background(), "", []ai.Message{{Role: ai.RoleUser, Content: "hi"}}, ai.GenerateOptions{})
+	ch, err := a.Stream(t.Context(), "", []ai.Message{{Role: ai.RoleUser, Content: "hi"}}, ai.GenerateOptions{})
 	if err != nil {
 		t.Fatalf("Stream err = %v", err)
 	}
@@ -971,7 +971,7 @@ func TestStream_ClosesBodyOnCancel(t *testing.T) {
 			"data: {\"choices\":[{\"delta\":{\"content\":\"two\"}}]}\n\n"+
 			"data: [DONE]\n\n")
 
-	ctx, cancel := context.WithCancel(context.Background())
+	ctx, cancel := context.WithCancel(t.Context())
 
 	ch, err := a.Stream(ctx, "", []ai.Message{{Role: ai.RoleUser, Content: "hi"}}, ai.GenerateOptions{})
 	if err != nil {
@@ -1008,7 +1008,7 @@ func TestStream_ErrorMapping(t *testing.T) {
 	}
 	defer func() { _ = a.Close() }()
 
-	ch, err := a.Stream(context.Background(), "", []ai.Message{{Role: ai.RoleUser, Content: "hi"}}, ai.GenerateOptions{})
+	ch, err := a.Stream(t.Context(), "", []ai.Message{{Role: ai.RoleUser, Content: "hi"}}, ai.GenerateOptions{})
 	if err != nil {
 		t.Fatalf("Stream err = %v", err)
 	}
@@ -1039,7 +1039,7 @@ func TestStream_ModelRequired(t *testing.T) {
 	}
 	defer func() { _ = a.Close() }()
 
-	_, err = a.Stream(context.Background(), "", []ai.Message{{Role: ai.RoleUser, Content: "hi"}}, ai.GenerateOptions{})
+	_, err = a.Stream(t.Context(), "", []ai.Message{{Role: ai.RoleUser, Content: "hi"}}, ai.GenerateOptions{})
 	if err == nil || !strings.Contains(err.Error(), "model is required") {
 		t.Fatalf("err = %v", err)
 	}
@@ -1057,7 +1057,7 @@ func TestStream_ToolsConflict(t *testing.T) {
 	}
 	defer func() { _ = a.Close() }()
 
-	_, err = a.Stream(context.Background(), "", nil, ai.GenerateOptions{
+	_, err = a.Stream(t.Context(), "", nil, ai.GenerateOptions{
 		Tools:          []ai.Tool{{Name: "t"}},
 		ResponseFormat: &ai.ResponseFormat{Type: "json_object"},
 	})
@@ -1087,7 +1087,7 @@ func TestStream_WithResponseFormatAndParallel(t *testing.T) {
 	defer func() { _ = a.Close() }()
 
 	disable := false
-	ch, err := a.Stream(context.Background(), "", []ai.Message{{Role: ai.RoleUser, Content: "hi"}}, ai.GenerateOptions{
+	ch, err := a.Stream(t.Context(), "", []ai.Message{{Role: ai.RoleUser, Content: "hi"}}, ai.GenerateOptions{
 		ResponseFormat:    &ai.ResponseFormat{Type: "json_object"},
 		ParallelToolCalls: &disable,
 	})
@@ -1142,7 +1142,7 @@ func TestParseRetryAfter(t *testing.T) {
 		t.Errorf("nil = %v want 0", d)
 	}
 
-	req, _ := http.NewRequestWithContext(context.Background(), http.MethodGet, "http://example.com", nil)
+	req, _ := http.NewRequestWithContext(t.Context(), http.MethodGet, "http://example.com", nil)
 
 	resp := &http.Response{Header: http.Header{}}
 	resp.Header.Set("Retry-After", "10")
@@ -1331,7 +1331,7 @@ func TestGenerate_OverflowPromptTokens(t *testing.T) {
 		t.Fatalf("Open err = %v", err)
 	}
 	defer func() { _ = a.Close() }()
-	_, err = a.Generate(context.Background(), "", []ai.Message{{Role: ai.RoleUser, Content: "hi"}}, ai.GenerateOptions{})
+	_, err = a.Generate(t.Context(), "", []ai.Message{{Role: ai.RoleUser, Content: "hi"}}, ai.GenerateOptions{})
 	if err == nil || !strings.Contains(err.Error(), "prompt_tokens") {
 		t.Fatalf("want prompt_tokens overflow, got %v", err)
 	}
@@ -1349,7 +1349,7 @@ func TestGenerate_OverflowCompletionTokens(t *testing.T) {
 		t.Fatalf("Open err = %v", err)
 	}
 	defer func() { _ = a.Close() }()
-	_, err = a.Generate(context.Background(), "", []ai.Message{{Role: ai.RoleUser, Content: "hi"}}, ai.GenerateOptions{})
+	_, err = a.Generate(t.Context(), "", []ai.Message{{Role: ai.RoleUser, Content: "hi"}}, ai.GenerateOptions{})
 	if err == nil || !strings.Contains(err.Error(), "completion_tokens") {
 		t.Fatalf("want completion overflow, got %v", err)
 	}
@@ -1373,7 +1373,7 @@ func TestGenerate_NilResponse(t *testing.T) {
 		t.Fatalf("Open err = %v", err)
 	}
 	defer func() { _ = a.Close() }()
-	_, err = a.Generate(context.Background(), "", []ai.Message{{Role: ai.RoleUser, Content: "hi"}}, ai.GenerateOptions{})
+	_, err = a.Generate(t.Context(), "", []ai.Message{{Role: ai.RoleUser, Content: "hi"}}, ai.GenerateOptions{})
 	if err == nil {
 		t.Fatalf("want error for nil response")
 	}
@@ -1402,7 +1402,7 @@ func TestStream_AllOptions(t *testing.T) {
 	temp := float32(0.5)
 	topP := float32(0.9)
 	disable := false
-	ch, err := a.Stream(context.Background(), "", []ai.Message{{Role: ai.RoleUser, Content: "hi"}}, ai.GenerateOptions{
+	ch, err := a.Stream(t.Context(), "", []ai.Message{{Role: ai.RoleUser, Content: "hi"}}, ai.GenerateOptions{
 		Temperature:       &temp,
 		MaxTokens:         10,
 		TopP:              &topP,
@@ -1435,7 +1435,7 @@ func TestStream_EmptyChoicesContinue(t *testing.T) {
 		t.Fatalf("Open err = %v", err)
 	}
 	defer func() { _ = a.Close() }()
-	ch, err := a.Stream(context.Background(), "", []ai.Message{{Role: ai.RoleUser, Content: "hi"}}, ai.GenerateOptions{})
+	ch, err := a.Stream(t.Context(), "", []ai.Message{{Role: ai.RoleUser, Content: "hi"}}, ai.GenerateOptions{})
 	if err != nil {
 		t.Fatalf("Stream err = %v", err)
 	}
@@ -1465,7 +1465,7 @@ func TestStream_EmptyToolCallSkipped(t *testing.T) {
 		t.Fatalf("Open err = %v", err)
 	}
 	defer func() { _ = a.Close() }()
-	ch, err := a.Stream(context.Background(), "", []ai.Message{{Role: ai.RoleUser, Content: "hi"}}, ai.GenerateOptions{})
+	ch, err := a.Stream(t.Context(), "", []ai.Message{{Role: ai.RoleUser, Content: "hi"}}, ai.GenerateOptions{})
 	if err != nil {
 		t.Fatalf("Stream err = %v", err)
 	}
@@ -1500,7 +1500,7 @@ func TestStream_ContextCancel(t *testing.T) {
 		t.Fatalf("Open err = %v", err)
 	}
 	defer func() { _ = a.Close() }()
-	ctx, cancel := context.WithCancel(context.Background())
+	ctx, cancel := context.WithCancel(t.Context())
 	ch, err := a.Stream(ctx, "", []ai.Message{{Role: ai.RoleUser, Content: "hi"}}, ai.GenerateOptions{})
 	if err != nil {
 		t.Fatalf("Stream err = %v", err)
@@ -1585,7 +1585,7 @@ func TestStream_CtxDoneDuringDelta(t *testing.T) {
 		t.Fatalf("Open err = %v", err)
 	}
 	defer func() { _ = a.Close() }()
-	ctx, cancel := context.WithCancel(context.Background())
+	ctx, cancel := context.WithCancel(t.Context())
 	ch, err := a.Stream(ctx, "", []ai.Message{{Role: ai.RoleUser, Content: "hi"}}, ai.GenerateOptions{})
 	if err != nil {
 		t.Fatalf("Stream err = %v", err)
@@ -1625,7 +1625,7 @@ func TestStream_CtxDoneDuringToolCall(t *testing.T) {
 		t.Fatalf("Open err = %v", err)
 	}
 	defer func() { _ = a.Close() }()
-	ctx, cancel := context.WithCancel(context.Background())
+	ctx, cancel := context.WithCancel(t.Context())
 	ch, err := a.Stream(ctx, "", []ai.Message{{Role: ai.RoleUser, Content: "hi"}}, ai.GenerateOptions{})
 	if err != nil {
 		t.Fatalf("Stream err = %v", err)

@@ -1,7 +1,6 @@
 package oidc_test
 
 import (
-	"context"
 	"errors"
 	"testing"
 	"time"
@@ -20,7 +19,7 @@ func TestCoverVerifyClaimsExtractFails(t *testing.T) {
 	raw := mintToken(t, idp.key, idp.kid, idp.srv.URL, "test-client",
 		time.Now().Add(time.Hour), map[string]any{"email": 123})
 
-	_, err := a.Verify(context.Background(), raw)
+	_, err := a.Verify(t.Context(), raw)
 	if !errors.Is(err, auth.ErrInvalidToken) {
 		t.Fatalf("Verify err = %v, want ErrInvalidToken", err)
 	}

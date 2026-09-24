@@ -1,7 +1,6 @@
 package embedded
 
 import (
-	"context"
 	"reflect"
 	"testing"
 
@@ -29,7 +28,7 @@ func TestFacadeParityEntryLifecycle(t *testing.T) {
 		t.Fatalf("New: %v", err)
 	}
 
-	ctx := context.Background()
+	ctx := t.Context()
 	spec := "0 * * * *"
 
 	jobID, err := direct.Every(spec, "parity-job", nil)

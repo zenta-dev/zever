@@ -43,7 +43,7 @@ func startFakeSMTP(t *testing.T, cfg serverConfig) *fakeSMTP {
 		cfg.quit = "221 Bye\r\n"
 	}
 	lc := net.ListenConfig{}
-	ln, err := lc.Listen(context.Background(), "tcp", "127.0.0.1:0")
+	ln, err := lc.Listen(t.Context(), "tcp", "127.0.0.1:0")
 	if err != nil {
 		t.Fatalf("listen: %v", err)
 	}
@@ -221,7 +221,7 @@ func TestSendPlaintext(t *testing.T) {
 	s := startFakeSMTP(t, serverConfig{})
 	m := openPlain(t, s)
 
-	if err := m.Send(context.Background(), basicMail()); err != nil {
+	if err := m.Send(t.Context(), basicMail()); err != nil {
 		t.Fatalf("Send: %v", err)
 	}
 
@@ -265,7 +265,7 @@ func TestSendBccEnvelopeOnly(t *testing.T) {
 	msg := basicMail()
 	msg.Cc = nil
 	msg.Bcc = []mailer.Address{{Address: "hidden@example.com"}}
-	if err := m.Send(context.Background(), msg); err != nil {
+	if err := m.Send(t.Context(), msg); err != nil {
 		t.Fatalf("Send: %v", err)
 	}
 
@@ -293,7 +293,7 @@ func TestSendSTARTTLSAbsentFails(t *testing.T) {
 	}
 	defer func() { _ = m.Close() }()
 
-	err = m.Send(context.Background(), basicMail())
+	err = m.Send(t.Context(), basicMail())
 	if err == nil {
 		t.Fatal("expected STARTTLS-mandatory failure, got nil")
 	}
@@ -313,7 +313,7 @@ func TestSendImplicitTLSHandshakeFails(t *testing.T) {
 	}
 	defer func() { _ = m.Close() }()
 
-	if err := m.Send(context.Background(), basicMail()); err == nil {
+	if err := m.Send(t.Context(), basicMail()); err == nil {
 		t.Fatal("expected TLS handshake failure, got nil")
 	}
 }
@@ -322,7 +322,7 @@ func TestSendNilMessage(t *testing.T) {
 	t.Parallel()
 	s := startFakeSMTP(t, serverConfig{})
 	m := openPlain(t, s)
-	if err := m.Send(context.Background(), nil); err == nil {
+	if err := m.Send(t.Context(), nil); err == nil {
 		t.Fatal("expected nil-message error, got nil")
 	}
 }
@@ -334,7 +334,7 @@ func TestSendInvalidAddresses(t *testing.T) {
 
 	badFrom := basicMail()
 	badFrom.From = mailer.Address{Address: "not-an-address"}
-	if err := m.Send(context.Background(), badFrom); err == nil {
+	if err := m.Send(t.Context(), badFrom); err == nil {
 		t.Error("expected invalid-from error, got nil")
 	} else if !errors.Is(err, mailer.ErrInvalidAddress) {
 		t.Errorf("want ErrInvalidAddress, got %v", err)
@@ -342,7 +342,7 @@ func TestSendInvalidAddresses(t *testing.T) {
 
 	badTo := basicMail()
 	badTo.To = []mailer.Address{{Address: "bad\r\n@example.com"}}
-	if err := m.Send(context.Background(), badTo); err == nil {
+	if err := m.Send(t.Context(), badTo); err == nil {
 		t.Error("expected invalid-to error, got nil")
 	} else if !errors.Is(err, mailer.ErrInvalidAddress) {
 		t.Errorf("want ErrInvalidAddress, got %v", err)
@@ -356,7 +356,7 @@ func TestSendNoRecipients(t *testing.T) {
 
 	msg := basicMail()
 	msg.To, msg.Cc, msg.Bcc = nil, nil, nil
-	if err := m.Send(context.Background(), msg); err == nil {
+	if err := m.Send(t.Context(), msg); err == nil {
 		t.Fatal("expected no-recipients error, got nil")
 	} else if !errors.Is(err, mailer.ErrNoRecipients) {
 		t.Errorf("want ErrNoRecipients, got %v", err)
@@ -380,7 +380,7 @@ func TestSendTooLargeBeforeDial(t *testing.T) {
 	defer func() { _ = m.Close() }()
 
 	start := time.Now()
-	err = m.Send(context.Background(), basicMail())
+	err = m.Send(t.Context(), basicMail())
 	if !errors.Is(err, mailer.ErrMessageTooLarge) {
 		t.Fatalf("want ErrMessageTooLarge, got %v", err)
 	}
@@ -402,7 +402,7 @@ func TestSendAfterClose(t *testing.T) {
 	if err := m.Close(); err != nil {
 		t.Fatalf("second Close must be idempotent nil, got %v", err)
 	}
-	if err := m.Send(context.Background(), basicMail()); !errors.Is(err, mailer.ErrClosed) {
+	if err := m.Send(t.Context(), basicMail()); !errors.Is(err, mailer.ErrClosed) {
 		t.Errorf("want ErrClosed, got %v", err)
 	}
 }
@@ -412,7 +412,7 @@ func TestSendQuit421Swallowed(t *testing.T) {
 	s := startFakeSMTP(t, serverConfig{quit: "421 closing\r\n"})
 	m := openPlain(t, s)
 	// Custody already handed off at DATA 250; QUIT failure must not fail Send.
-	if err := m.Send(context.Background(), basicMail()); err != nil {
+	if err := m.Send(t.Context(), basicMail()); err != nil {
 		t.Errorf("QUIT 421 must be swallowed, got %v", err)
 	}
 }
@@ -421,7 +421,7 @@ func TestSendData554Fails(t *testing.T) {
 	t.Parallel()
 	s := startFakeSMTP(t, serverConfig{dataEnd: "554 rejected\r\n"})
 	m := openPlain(t, s)
-	if err := m.Send(context.Background(), basicMail()); err == nil {
+	if err := m.Send(t.Context(), basicMail()); err == nil {
 		t.Fatal("expected DATA-verdict error, got nil")
 	} else if !strings.Contains(strings.ToLower(err.Error()), "data") {
 		t.Errorf("error should mention data: %v", err)
@@ -439,7 +439,7 @@ func TestSendContextTimeoutVsHangingServer(t *testing.T) {
 	}
 	defer func() { _ = m.Close() }()
 
-	ctx, cancel := context.WithTimeout(context.Background(), 500*time.Millisecond)
+	ctx, cancel := context.WithTimeout(t.Context(), 500*time.Millisecond)
 	defer cancel()
 	start := time.Now()
 	if err := m.Send(ctx, basicMail()); err == nil {
@@ -455,10 +455,10 @@ func TestBoundariesDistinct(t *testing.T) {
 	s := startFakeSMTP(t, serverConfig{})
 	m := openPlain(t, s)
 
-	if err := m.Send(context.Background(), basicMail()); err != nil {
+	if err := m.Send(t.Context(), basicMail()); err != nil {
 		t.Fatalf("Send 1: %v", err)
 	}
-	if err := m.Send(context.Background(), basicMail()); err != nil {
+	if err := m.Send(t.Context(), basicMail()); err != nil {
 		t.Fatalf("Send 2: %v", err)
 	}
 	s.mu.Lock()
@@ -496,7 +496,7 @@ func TestHeaderInjectionStripped(t *testing.T) {
 	msg.Cc, msg.Bcc, msg.Attachments = nil, nil, nil
 	msg.Subject = "hi\r\nBcc: evil@example.com"
 	msg.Body = "hello"
-	if err := m.Send(context.Background(), msg); err != nil {
+	if err := m.Send(t.Context(), msg); err != nil {
 		t.Fatalf("Send: %v", err)
 	}
 	raw := s.lastDATA(t)

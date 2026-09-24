@@ -342,12 +342,12 @@ func TestWorkerNextPollWait(t *testing.T) {
 func TestWorkerPopNextAvailableQueuesNil(t *testing.T) {
 	Reset()
 	w := &Worker{Q: &workerStubQueue{}, Queues: nil}
-	_, _, err := w.popNextAvailable(context.Background())
+	_, _, err := w.popNextAvailable(t.Context())
 	if !errors.Is(err, queue.ErrEmpty) {
 		t.Fatalf("popNextAvailable nil Queues err=%v want ErrEmpty", err)
 	}
 	w.Queues = []string{}
-	_, _, err = w.popNextAvailable(context.Background())
+	_, _, err = w.popNextAvailable(t.Context())
 	if !errors.Is(err, queue.ErrEmpty) {
 		t.Fatalf("popNextAvailable empty Queues err=%v want ErrEmpty", err)
 	}
@@ -355,7 +355,7 @@ func TestWorkerPopNextAvailableQueuesNil(t *testing.T) {
 
 func TestWorkerPopNextAvailableCtxDone(t *testing.T) {
 	Reset()
-	ctx, cancel := context.WithCancel(context.Background())
+	ctx, cancel := context.WithCancel(t.Context())
 	cancel()
 	w := &Worker{Q: &workerStubQueue{}, Queues: []string{"a", "b"}}
 	_, _, err := w.popNextAvailable(ctx)
@@ -380,7 +380,7 @@ func TestWorkerPopNextAvailablePerTopic(t *testing.T) {
 		},
 	}
 	w := &Worker{Q: q, Queues: []string{"a", "b"}}
-	msg, topic, err := w.popNextAvailable(context.Background())
+	msg, topic, err := w.popNextAvailable(t.Context())
 	if err != nil {
 		t.Fatalf("popNextAvailable per-topic err=%v", err)
 	}
@@ -404,7 +404,7 @@ func TestWorkerPopNextAvailableNonEmptyError(t *testing.T) {
 		},
 	}
 	w := &Worker{Q: q, Queues: []string{"t"}}
-	_, _, err := w.popNextAvailable(context.Background())
+	_, _, err := w.popNextAvailable(t.Context())
 	if !errors.Is(err, boom) {
 		t.Fatalf("popNextAvailable non-empty err=%v want boom", err)
 	}
@@ -418,7 +418,7 @@ func TestWorkerPopNextAvailableAllEmpty(t *testing.T) {
 		},
 	}
 	w := &Worker{Q: q, Queues: []string{"x", "y"}}
-	_, _, err := w.popNextAvailable(context.Background())
+	_, _, err := w.popNextAvailable(t.Context())
 	if !errors.Is(err, queue.ErrEmpty) {
 		t.Fatalf("all empty err=%v want ErrEmpty", err)
 	}
@@ -429,7 +429,7 @@ func TestWorkerPopNextAvailableAllEmpty(t *testing.T) {
 		},
 	}
 	w.Q = q2
-	_, _, err = w.popNextAvailable(context.Background())
+	_, _, err = w.popNextAvailable(t.Context())
 	if !errors.Is(err, queue.ErrEmpty) {
 		t.Fatalf("EmptyError should be ErrEmpty, got %v", err)
 	}
@@ -443,7 +443,7 @@ func TestWorkerHandleEmpty(t *testing.T) {
 	maxPollWait := 5 * time.Second
 
 	// attempt 0 -> wait 0, time.After(0) fast returns false and increments attempt
-	ctx := context.Background()
+	ctx := t.Context()
 	got := w.handleEmpty(ctx, &wg, &attempt, maxPollWait)
 	if got {
 		t.Fatal("handleEmpty with attempt 0 and bg ctx = true want false")
@@ -455,7 +455,7 @@ func TestWorkerHandleEmpty(t *testing.T) {
 	// already canceled ctx -> returns true
 	// NOTE: attempt must be >0 so the wait is not immediately ready; otherwise
 	// the select between time.After(0) and ctx.Done() is racy.
-	ctx2, cancel := context.WithCancel(context.Background())
+	ctx2, cancel := context.WithCancel(t.Context())
 	cancel()
 	attempt2 := 5
 	got = w.handleEmpty(ctx2, &wg, &attempt2, maxPollWait)
@@ -481,7 +481,7 @@ func TestWorkerSweepBatches(t *testing.T) {
 
 	before := SweepBatchCallbacksCalls()
 	w := &Worker{}
-	w.sweepBatches(context.Background())
+	w.sweepBatches(t.Context())
 	after := SweepBatchCallbacksCalls()
 	if after != before+1 {
 		t.Fatalf("sweepBatches calls before %d after %d want +1", before, after)
@@ -494,7 +494,7 @@ func TestWorkerSweepLoop(t *testing.T) {
 	triggerJitter = func() bool { return false }
 	defer func() { triggerJitter = orig }()
 
-	ctx, cancel := context.WithCancel(context.Background())
+	ctx, cancel := context.WithCancel(t.Context())
 	ticker := time.NewTicker(5 * time.Millisecond)
 	defer ticker.Stop()
 	w := &Worker{}
@@ -524,18 +524,18 @@ func TestWorkerInvokeHandler(t *testing.T) {
 	Reset()
 	w := &Worker{Logger: noop.New()}
 	// normal success
-	err := w.invokeHandler(context.Background(), func(context.Context, Payload) error { return nil }, []byte("x"), "jobA")
+	err := w.invokeHandler(t.Context(), func(context.Context, Payload) error { return nil }, []byte("x"), "jobA")
 	if err != nil {
 		t.Fatalf("invokeHandler success err=%v want nil", err)
 	}
 	// error return
 	sentinel := errors.New("handler fail")
-	err = w.invokeHandler(context.Background(), func(context.Context, Payload) error { return sentinel }, nil, "jobB")
+	err = w.invokeHandler(t.Context(), func(context.Context, Payload) error { return sentinel }, nil, "jobB")
 	if !errors.Is(err, sentinel) {
 		t.Fatalf("invokeHandler err=%v want sentinel", err)
 	}
 	// panic -> ErrHandlerPanic
-	err = w.invokeHandler(context.Background(), func(context.Context, Payload) error { panic("boom") }, nil, "panicky")
+	err = w.invokeHandler(t.Context(), func(context.Context, Payload) error { panic("boom") }, nil, "panicky")
 	if !errors.Is(err, ErrHandlerPanic) {
 		t.Fatalf("invokeHandler panic err=%v want ErrHandlerPanic", err)
 	}
@@ -572,7 +572,7 @@ func TestWorkerWrapHandler(t *testing.T) {
 	}
 	h := w.wrapHandler(base)
 	order = nil
-	if err := h(context.Background(), nil); err != nil {
+	if err := h(t.Context(), nil); err != nil {
 		t.Fatalf("wrapHandler invoke: %v", err)
 	}
 	// slices.Backward means m1 outermost, then m2, then base
@@ -611,7 +611,7 @@ func TestWorkerProcessUnknownJob(t *testing.T) {
 			dlAttempts = attempts
 		},
 	}
-	w.process(context.Background(), msg, "low")
+	w.process(t.Context(), msg, "low")
 	if !ackCalled {
 		t.Fatal("process unknown job did not ack")
 	}
@@ -644,7 +644,7 @@ func TestWorkerProcessUnknownJobWithBatch(t *testing.T) {
 		ackFn: func(context.Context, queue.Message) error { ackCalled = true; return nil },
 	}
 	w := &Worker{Q: q, BatchStore: fb, Logger: noop.New()}
-	w.process(context.Background(), msg, "low")
+	w.process(t.Context(), msg, "low")
 	if !ackCalled {
 		t.Fatal("unknown batch job ack not called")
 	}
@@ -676,7 +676,7 @@ func TestWorkerProcessKnownSuccess(t *testing.T) {
 		ackFn: func(context.Context, queue.Message) error { ackCalled = true; return nil },
 	}
 	w := &Worker{Q: q, Logger: noop.New()}
-	w.process(context.Background(), msg, "low")
+	w.process(t.Context(), msg, "low")
 	if !handlerCalled {
 		t.Fatal("known success handler not called")
 	}
@@ -724,7 +724,7 @@ func TestWorkerProcessMiddlewareOrder(t *testing.T) {
 	}
 	q := &workerStubQueue{ackFn: func(context.Context, queue.Message) error { return nil }}
 	w := &Worker{Q: q, Logger: noop.New()}
-	w.process(context.Background(), msg, "low")
+	w.process(t.Context(), msg, "low")
 	want := []string{"m1-before", "m2-before", "handler", "m2-after", "m1-after"}
 	if len(order) != len(want) {
 		t.Fatalf("middleware order %v want %v", order, want)
@@ -750,7 +750,7 @@ func TestWorkerProcessNilHeaders(t *testing.T) {
 	q := &workerStubQueue{ackFn: func(context.Context, queue.Message) error { return nil }}
 	w := &Worker{Q: q, Logger: noop.New()}
 	// should not panic; jobName will be "" -> unknown job path
-	w.process(context.Background(), msg, "low")
+	w.process(t.Context(), msg, "low")
 	// ack should have been called via deadletter path (unknown job "")
 	// We use separate stub to verify; this just checks no panic
 }
@@ -777,7 +777,7 @@ func TestWorkerProcessPanicHandler(t *testing.T) {
 		ackFn: func(context.Context, queue.Message) error { ackCalled = true; return nil },
 	}
 	w := &Worker{Q: q, Logger: noop.New()}
-	w.process(context.Background(), msg, "low")
+	w.process(t.Context(), msg, "low")
 	if !pushDelayedCalled {
 		t.Fatal("panic handler should trigger retry PushDelayed")
 	}
@@ -793,13 +793,13 @@ func TestWorkerHandleResultBranches(t *testing.T) {
 	w1 := &Worker{Q: q1, Logger: noop.New()}
 	msg := queue.Message{Headers: queue.Headers{}, Payload: queue.Payload([]byte("x"))}
 	def := Definition{policy: RetryPolicy{MaxAttempts: 5, BaseDelay: time.Second}}
-	w1.handleResult(context.Background(), msg, "low", "job1", def, 1, nil)
+	w1.handleResult(t.Context(), msg, "low", "job1", def, 1, nil)
 	// nil + isBatch true -> handleSuccess with batch
 	fb := &fakeBatchStore{getTotal: 1, getCompleted: 1, getFailed: 0}
 	q2 := &workerStubQueue{ackFn: func(context.Context, queue.Message) error { return nil }}
 	w2 := &Worker{Q: q2, BatchStore: fb, Logger: noop.New()}
 	msg2 := queue.Message{Headers: queue.Headers{"batch_id": "bid"}, Payload: queue.Payload([]byte("x"))}
-	w2.handleResult(context.Background(), msg2, "low", "job1", def, 1, nil)
+	w2.handleResult(t.Context(), msg2, "low", "job1", def, 1, nil)
 	if fb.incrementCompleted != 1 {
 		t.Fatalf("handleResult nil err batch incrementCompleted=%d want 1", fb.incrementCompleted)
 	}
@@ -808,7 +808,7 @@ func TestWorkerHandleResultBranches(t *testing.T) {
 	q3 := &workerStubQueue{ackFn: func(context.Context, queue.Message) error { return nil }}
 	w3 := &Worker{Q: q3, Logger: noop.New(), OnDeadLetter: func(context.Context, string, []byte, error, int) { dlCalled = true }}
 	sentinel := errors.New("fail")
-	w3.handleResult(context.Background(), msg, "low", "job1", def, 5, sentinel)
+	w3.handleResult(t.Context(), msg, "low", "job1", def, 5, sentinel)
 	if !dlCalled {
 		t.Fatal("handleResult attempt>=MaxAttempts should deadletter")
 	}
@@ -822,7 +822,7 @@ func TestWorkerHandleResultBranches(t *testing.T) {
 		ackFn: func(context.Context, queue.Message) error { return nil },
 	}
 	w4 := &Worker{Q: q4, Logger: noop.New()}
-	w4.handleResult(context.Background(), msg, "low", "job1", def, 1, sentinel)
+	w4.handleResult(t.Context(), msg, "low", "job1", def, 1, sentinel)
 	if !pushDelayedCalled {
 		t.Fatal("handleResult retry should PushDelayed")
 	}
@@ -836,7 +836,7 @@ func TestWorkerHandleSuccess(t *testing.T) {
 	fb1 := &fakeBatchStore{getTotal: 1}
 	w1 := &Worker{Q: q1, BatchStore: fb1, Logger: noop.New()}
 	msg := queue.Message{Headers: queue.Headers{"batch_id": "bid"}, Payload: queue.Payload([]byte("x"))}
-	w1.handleSuccess(context.Background(), msg, "bid", "job1", true)
+	w1.handleSuccess(t.Context(), msg, "bid", "job1", true)
 	if fb1.incrementCompleted != 0 {
 		t.Fatalf("handleSuccess Ack err should not increment, got %d", fb1.incrementCompleted)
 	}
@@ -844,7 +844,7 @@ func TestWorkerHandleSuccess(t *testing.T) {
 	fb2 := &fakeBatchStore{getTotal: 1, getCompleted: 1}
 	q2 := &workerStubQueue{ackFn: func(context.Context, queue.Message) error { return nil }}
 	w2 := &Worker{Q: q2, BatchStore: fb2, Logger: noop.New()}
-	w2.handleSuccess(context.Background(), msg, "bid", "job1", true)
+	w2.handleSuccess(t.Context(), msg, "bid", "job1", true)
 	if fb2.incrementCompleted != 1 {
 		t.Fatalf("handleSuccess ack ok batch increment=%d want 1", fb2.incrementCompleted)
 	}
@@ -853,12 +853,12 @@ func TestWorkerHandleSuccess(t *testing.T) {
 	q3 := &workerStubQueue{ackFn: func(context.Context, queue.Message) error { return nil }}
 	w3 := &Worker{Q: q3, BatchStore: fb3, Logger: noop.New()}
 	msgNoBatch := queue.Message{Headers: queue.Headers{}, Payload: queue.Payload([]byte("x"))}
-	w3.handleSuccess(context.Background(), msgNoBatch, "", "job1", false)
+	w3.handleSuccess(t.Context(), msgNoBatch, "", "job1", false)
 	if fb3.incrementCompleted != 0 {
 		t.Fatalf("non-batch handleSuccess should not increment, got %d", fb3.incrementCompleted)
 	}
 	// Ack ok + isBatch false but batchID set without store -> also no increment (handled via isBatch false)
-	w3.handleSuccess(context.Background(), msg, "bid", "job1", false)
+	w3.handleSuccess(t.Context(), msg, "bid", "job1", false)
 	if fb3.incrementCompleted != 0 {
 		t.Fatalf("isBatch false should not increment even with batchID")
 	}
@@ -873,7 +873,7 @@ func TestWorkerHandleDeadLetter(t *testing.T) {
 	fb1 := &fakeBatchStore{}
 	w1 := &Worker{Q: q1, BatchStore: fb1, Logger: noop.New(), OnDeadLetter: func(context.Context, string, []byte, error, int) { dlCalled = true }}
 	msg := queue.Message{Headers: queue.Headers{"batch_id": "bid"}, Payload: queue.Payload([]byte("payload"))}
-	w1.handleDeadLetter(context.Background(), msg, "bid", "jobX", errors.New("handler err"), 3, true)
+	w1.handleDeadLetter(t.Context(), msg, "bid", "jobX", errors.New("handler err"), 3, true)
 	if dlCalled {
 		t.Fatal("Ack err should not call OnDeadLetter")
 	}
@@ -884,7 +884,7 @@ func TestWorkerHandleDeadLetter(t *testing.T) {
 	fb2 := &fakeBatchStore{getTotal: 1}
 	q2 := &workerStubQueue{ackFn: func(context.Context, queue.Message) error { return nil }}
 	w2 := &Worker{Q: q2, BatchStore: fb2, Logger: noop.New()}
-	w2.handleDeadLetter(context.Background(), msg, "bid", "jobX", errors.New("herr"), 2, true)
+	w2.handleDeadLetter(t.Context(), msg, "bid", "jobX", errors.New("herr"), 2, true)
 	if fb2.incrementFailed != 1 {
 		t.Fatalf("deadletter batch incrementFailed=%d want 1", fb2.incrementFailed)
 	}
@@ -905,14 +905,14 @@ func TestWorkerHandleDeadLetter(t *testing.T) {
 		},
 	}
 	handlerErr := errors.New("handler boom")
-	w3.handleDeadLetter(context.Background(), queue.Message{Payload: queue.Payload([]byte("mydata"))}, "", "jobY", handlerErr, 4, false)
+	w3.handleDeadLetter(t.Context(), queue.Message{Payload: queue.Payload([]byte("mydata"))}, "", "jobY", handlerErr, 4, false)
 	if gotJob != "jobY" || gotPayload != "mydata" || gotAttempts != 4 || !errors.Is(gotErr, handlerErr) {
 		t.Fatalf("OnDeadLetter args job=%q payload=%q attempts=%d err=%v", gotJob, gotPayload, gotAttempts, gotErr)
 	}
 	// OnDeadLetter nil -> no panic
 	q4 := &workerStubQueue{ackFn: func(context.Context, queue.Message) error { return nil }}
 	w4 := &Worker{Q: q4, Logger: noop.New(), OnDeadLetter: nil}
-	w4.handleDeadLetter(context.Background(), msg, "", "jobZ", errors.New("e"), 1, false)
+	w4.handleDeadLetter(t.Context(), msg, "", "jobZ", errors.New("e"), 1, false)
 }
 
 func TestWorkerHandleRetry(t *testing.T) {
@@ -931,7 +931,7 @@ func TestWorkerHandleRetry(t *testing.T) {
 		ackFn: func(context.Context, queue.Message) error { ackCalled = true; return nil },
 	}
 	w1 := &Worker{Q: q1, Logger: noop.New()}
-	w1.handleRetry(context.Background(), msg, "low", "retryJob", 1, policy)
+	w1.handleRetry(t.Context(), msg, "low", "retryJob", 1, policy)
 	if ackCalled {
 		t.Fatal("PushDelayed err should not Ack")
 	}
@@ -948,7 +948,7 @@ func TestWorkerHandleRetry(t *testing.T) {
 		ackFn: func(context.Context, queue.Message) error { return errors.New("ack fail") },
 	}
 	w2 := &Worker{Q: q2, Logger: noop.New()}
-	w2.handleRetry(context.Background(), msg, "low", "retryJob", 1, policy)
+	w2.handleRetry(t.Context(), msg, "low", "retryJob", 1, policy)
 	if !pushCalled {
 		t.Fatal("retry PushDelayed not called")
 	}
@@ -959,13 +959,13 @@ func TestWorkerHandleRetry(t *testing.T) {
 		ackFn:         func(context.Context, queue.Message) error { ackOk = true; return nil },
 	}
 	w3 := &Worker{Q: q3, Logger: noop.New()}
-	w3.handleRetry(context.Background(), msg, "low", "retryJob", 1, policy)
+	w3.handleRetry(t.Context(), msg, "low", "retryJob", 1, policy)
 	if !ackOk {
 		t.Fatal("retry Ack not called on success")
 	}
 	// verify headers clone not mutating original
 	origAttempt := msg.Headers[headerAttempt]
-	w3.handleRetry(context.Background(), msg, "low", "retryJob", 9, policy)
+	w3.handleRetry(t.Context(), msg, "low", "retryJob", 9, policy)
 	if msg.Headers[headerAttempt] != origAttempt {
 		t.Fatalf("original headers mutated: got %q want %q", msg.Headers[headerAttempt], origAttempt)
 	}
@@ -976,7 +976,7 @@ func TestWorkerRunLoopBranches(t *testing.T) {
 	// Branch: ctx.Done at sem select -> waitDrain -> nil
 	t.Run("CancelAtSemSelect", func(t *testing.T) {
 		Reset()
-		ctx, cancel := context.WithCancel(context.Background())
+		ctx, cancel := context.WithCancel(t.Context())
 		cancel()
 		sem := make(chan struct{}, 1)
 		sem <- struct{}{} // fill so next send blocks
@@ -995,7 +995,7 @@ func TestWorkerRunLoopBranches(t *testing.T) {
 		// First pop returns ErrEmpty, second pop returns ctx.Canceled? But handleEmpty with bg ctx will sleep 0 then return false and continue.
 		// We need to let loop iterate once with empty, then cancel ctx on next sem acquire.
 		// Use context that cancels after short delay, and stub that always returns ErrEmpty.
-		ctx, cancel := context.WithCancel(context.Background())
+		ctx, cancel := context.WithCancel(t.Context())
 		defer cancel()
 		var pops atomic.Int64
 		q := &workerStubQueue{
@@ -1032,7 +1032,7 @@ func TestWorkerRunLoopBranches(t *testing.T) {
 		w := &Worker{Q: q, Queues: []string{"t"}, DrainTimeout: 10 * time.Millisecond, Logger: noop.New()}
 		sem := make(chan struct{}, 1)
 		var wg sync.WaitGroup
-		err := w.runLoop(context.Background(), sem, &wg)
+		err := w.runLoop(t.Context(), sem, &wg)
 		if !errors.Is(err, boom) {
 			t.Fatalf("PopNonEmptyError err=%v want boom", err)
 		}
@@ -1045,7 +1045,7 @@ func TestWorkerRunLoopBranches(t *testing.T) {
 		w := &Worker{Q: q, Queues: []string{"t"}, DrainTimeout: 10 * time.Millisecond, Logger: noop.New()}
 		sem := make(chan struct{}, 1)
 		var wg sync.WaitGroup
-		err := w.runLoop(context.Background(), sem, &wg)
+		err := w.runLoop(t.Context(), sem, &wg)
 		if err != nil {
 			t.Fatalf("PopCanceled err=%v want nil", err)
 		}
@@ -1054,7 +1054,7 @@ func TestWorkerRunLoopBranches(t *testing.T) {
 	// Branch: pop err non-canceled but ctx.Err()!=nil -> return nil
 	t.Run("PopErrorWithCtxErr", func(t *testing.T) {
 		Reset()
-		ctx, cancel := context.WithCancel(context.Background())
+		ctx, cancel := context.WithCancel(t.Context())
 		cancel()
 		boom := errors.New("other")
 		q := &workerStubQueue{popFn: func(context.Context, string) (queue.Message, error) { return queue.Message{}, boom }}
@@ -1096,7 +1096,7 @@ func TestWorkerRunLoopBranches(t *testing.T) {
 		w := &Worker{Q: q, Queues: []string{"t"}, DrainTimeout: 20 * time.Millisecond, Logger: noop.New()}
 		sem := make(chan struct{}, 2)
 		var wg sync.WaitGroup
-		ctx, cancel := context.WithCancel(context.Background())
+		ctx, cancel := context.WithCancel(t.Context())
 		errCh := make(chan error, 1)
 		go func() { errCh <- w.runLoop(ctx, sem, &wg) }()
 		eventually(t, 500*time.Millisecond, func() bool {
@@ -1124,7 +1124,7 @@ func TestWorkerHandleEmptyPollWaitUpdate(t *testing.T) {
 	// attempt 1 -> handleEmpty waits nextPollWait(1, max) = 1ms, then increments to 2
 	attempt := 1
 	maxPollWait := 5 * time.Second
-	err := w.handleEmpty(context.Background(), &wg, &attempt, maxPollWait)
+	err := w.handleEmpty(t.Context(), &wg, &attempt, maxPollWait)
 	if err {
 		t.Fatal("handleEmpty bg ctx should be false")
 	}
@@ -1149,7 +1149,7 @@ func TestWorkerLaunchHandlerDrain(t *testing.T) {
 	sem := make(chan struct{}, 1)
 	sem <- struct{}{}
 	var wg sync.WaitGroup
-	w.launchHandler(context.Background(), msg, "low", sem, &wg)
+	w.launchHandler(t.Context(), msg, "low", sem, &wg)
 	// wait for handler to finish via waitDrain
 	done := make(chan struct{})
 	go func() {
@@ -1191,7 +1191,7 @@ func TestWorkerRunWithMemoryQueue(t *testing.T) {
 	defer q.Close()
 	payload, _ := json.Marshal("hello")
 	headers := queue.Headers{headerJobName: "worker-run-mem"}
-	if err := q.Push(context.Background(), "low", queue.Payload(payload), headers); err != nil {
+	if err := q.Push(t.Context(), "low", queue.Payload(payload), headers); err != nil {
 		t.Fatalf("Push: %v", err)
 	}
 	w := &Worker{
@@ -1201,7 +1201,7 @@ func TestWorkerRunWithMemoryQueue(t *testing.T) {
 		DrainTimeout: 50 * time.Millisecond,
 		Logger:       noop.New(),
 	}
-	ctx, cancel := context.WithCancel(context.Background())
+	ctx, cancel := context.WithCancel(t.Context())
 	errCh := make(chan error, 1)
 	go func() { errCh <- w.Run(ctx) }()
 	// wait for handler
@@ -1244,7 +1244,7 @@ func TestWorkerRunConcurrencyExplicit(t *testing.T) {
 		DrainTimeout: 20 * time.Millisecond,
 		Logger:       noop.New(),
 	}
-	ctx, cancel := context.WithCancel(context.Background())
+	ctx, cancel := context.WithCancel(t.Context())
 	errCh := make(chan error, 1)
 	go func() { errCh <- w.Run(ctx) }()
 	// Idle run has no job completion to observe; cancel directly instead of
@@ -1307,7 +1307,7 @@ func TestWorkerRunPanicHandler(t *testing.T) {
 		DrainTimeout: 30 * time.Millisecond,
 		Logger:       noop.New(),
 	}
-	ctx, cancel := context.WithCancel(context.Background())
+	ctx, cancel := context.WithCancel(t.Context())
 	errCh := make(chan error, 1)
 	go func() { errCh <- w.Run(ctx) }()
 	eventually(t, 2*time.Second, func() bool {
@@ -1340,7 +1340,7 @@ func TestWorkerHandleResultDeadLetterBatch(t *testing.T) {
 	msg := queue.Message{Headers: queue.Headers{"batch_id": "bid2"}, Payload: queue.Payload([]byte("x"))}
 	def := Definition{policy: RetryPolicy{MaxAttempts: 3, BaseDelay: time.Second}}
 	sentinel := errors.New("fail")
-	w.handleResult(context.Background(), msg, "low", "j", def, 3, sentinel)
+	w.handleResult(t.Context(), msg, "low", "j", def, 3, sentinel)
 	if dlJob != "j" {
 		t.Fatalf("deadletter job=%q want j", dlJob)
 	}
@@ -1367,22 +1367,22 @@ func TestWorkerServiceNameAndClose(t *testing.T) {
 func TestWorkerStubQueueBasics(t *testing.T) {
 	Reset()
 	q := &workerStubQueue{}
-	if _, err := q.Length(context.Background(), "t"); err != nil {
+	if _, err := q.Length(t.Context(), "t"); err != nil {
 		t.Fatalf("Length: %v", err)
 	}
-	if _, err := q.IsEmpty(context.Background(), "t"); err != nil {
+	if _, err := q.IsEmpty(t.Context(), "t"); err != nil {
 		t.Fatalf("IsEmpty: %v", err)
 	}
 	if err := q.Close(); err != nil {
 		t.Fatalf("Close: %v", err)
 	}
-	if err := q.Nack(context.Background(), queue.Message{}, true); err != nil {
+	if err := q.Nack(t.Context(), queue.Message{}, true); err != nil {
 		t.Fatalf("Nack: %v", err)
 	}
-	if err := q.Push(context.Background(), "t", nil, nil); err != nil {
+	if err := q.Push(t.Context(), "t", nil, nil); err != nil {
 		t.Fatalf("Push: %v", err)
 	}
-	if err := q.PushDelayed(context.Background(), "t", nil, nil, time.Second); err != nil {
+	if err := q.PushDelayed(t.Context(), "t", nil, nil, time.Second); err != nil {
 		t.Fatalf("PushDelayed: %v", err)
 	}
 	if q.Name() != "stub" {
@@ -1395,7 +1395,7 @@ func TestWorkerInvokeHandlerErrorFormat(t *testing.T) {
 	Reset()
 	_ = fmt.Sprintf("fmt-used-%d", 1)
 	w := &Worker{Logger: noop.New()}
-	err := w.invokeHandler(context.Background(), func(context.Context, Payload) error { panic(errors.New("wrapped panic")) }, nil, "fmtJob")
+	err := w.invokeHandler(t.Context(), func(context.Context, Payload) error { panic(errors.New("wrapped panic")) }, nil, "fmtJob")
 	if !errors.Is(err, ErrHandlerPanic) {
 		t.Fatalf("want ErrHandlerPanic, got %v", err)
 	}
@@ -1415,7 +1415,7 @@ func TestWorkerSweepBatchesAtomic(t *testing.T) {
 		go func() {
 			defer wg.Done()
 			w := &Worker{}
-			w.sweepBatches(context.Background())
+			w.sweepBatches(t.Context())
 			total.Add(1)
 		}()
 	}

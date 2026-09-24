@@ -46,7 +46,7 @@ func TestCoverVerifyRevocationStoreError(t *testing.T) {
 	opts := baseOpts()
 	opts.JWT.RevocationStore = erroringRevocationStore{}
 	a := newTestAuth(t, opts)
-	ctx := context.Background()
+	ctx := t.Context()
 
 	tok, err := a.Issue(ctx, "alice", nil, time.Minute)
 	if err != nil {
@@ -63,7 +63,7 @@ func TestCoverRevokeRevocationStoreError(t *testing.T) {
 	opts := baseOpts()
 	opts.JWT.RevocationStore = erroringRevocationStore{}
 	a := newTestAuth(t, opts)
-	ctx := context.Background()
+	ctx := t.Context()
 
 	tok, err := a.Issue(ctx, "alice", nil, time.Minute)
 	if err != nil {
@@ -78,7 +78,7 @@ func TestCoverVerifyNoneAlgRejected(t *testing.T) {
 	t.Parallel()
 
 	a := newTestAuth(t, baseOpts())
-	ctx := context.Background()
+	ctx := t.Context()
 
 	header := base64.RawURLEncoding.EncodeToString([]byte(`{"alg":"none","typ":"JWT"}`))
 	body := base64.RawURLEncoding.EncodeToString([]byte(`{"sub":"x"}`))
@@ -123,7 +123,7 @@ func TestCoverIssueCSPRNCFailure(t *testing.T) {
 	defer func() { randReader = old }()
 
 	a := newTestAuth(t, baseOpts())
-	_, err := a.Issue(context.Background(), "sub", nil, time.Minute)
+	_, err := a.Issue(t.Context(), "sub", nil, time.Minute)
 	if err == nil || !strings.Contains(err.Error(), "jti") {
 		t.Fatalf("Issue(broken CSPRNG) = %v, want jti error", err)
 	}
@@ -133,7 +133,7 @@ func TestCoverVerifyNoCustomClaimsNil(t *testing.T) {
 	t.Parallel()
 
 	a := newTestAuth(t, baseOpts())
-	ctx := context.Background()
+	ctx := t.Context()
 
 	tok, err := a.Issue(ctx, "sub", nil, time.Minute)
 	if err != nil {
@@ -152,7 +152,7 @@ func TestCoverRevokeGarbage(t *testing.T) {
 	t.Parallel()
 
 	a := newTestAuth(t, baseOpts())
-	if err := a.Revoke(context.Background(), "garbage"); !errors.Is(err, auth.ErrInvalidToken) {
+	if err := a.Revoke(t.Context(), "garbage"); !errors.Is(err, auth.ErrInvalidToken) {
 		t.Fatalf("Revoke(garbage) = %v, want ErrInvalidToken", err)
 	}
 }
@@ -171,7 +171,7 @@ func TestCoverRevokeNoJTI(t *testing.T) {
 	if err != nil {
 		t.Fatalf("SignedString: %v", err)
 	}
-	if err := a.Revoke(context.Background(), raw); !errors.Is(err, auth.ErrInvalidToken) {
+	if err := a.Revoke(t.Context(), raw); !errors.Is(err, auth.ErrInvalidToken) {
 		t.Fatalf("Revoke(no jti) = %v, want ErrInvalidToken", err)
 	}
 }
@@ -187,7 +187,7 @@ func TestCoverVerifyNoJTINeverRevoked(t *testing.T) {
 		"exp": time.Now().Add(time.Hour).Unix(),
 		"iat": time.Now().Unix(),
 	})
-	got, err := a.Verify(context.Background(), raw)
+	got, err := a.Verify(t.Context(), raw)
 	if err != nil {
 		t.Fatalf("Verify(no jti) error = %v, want nil", err)
 	}

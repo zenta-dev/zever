@@ -130,7 +130,7 @@ func TestNew_OK(t *testing.T) {
 func TestIssueVerify_Roundtrip(t *testing.T) {
 	t.Parallel()
 	a := newTestAuth(t, baseOpts())
-	ctx := context.Background()
+	ctx := t.Context()
 
 	custom := map[string]any{"role": "admin", "level": "7"}
 	tok, err := a.Issue(ctx, "alice", custom, time.Minute)
@@ -159,7 +159,7 @@ func TestIssueVerify_Roundtrip(t *testing.T) {
 func TestIssueVerify_CustomCloneIndependence(t *testing.T) {
 	t.Parallel()
 	a := newTestAuth(t, baseOpts())
-	ctx := context.Background()
+	ctx := t.Context()
 
 	custom := map[string]any{"tags": []string{"a", "b"}}
 	tok, err := a.Issue(ctx, "bob", custom, time.Minute)
@@ -200,7 +200,7 @@ func TestIssueVerify_CustomCloneIndependence(t *testing.T) {
 func TestIssue_EmptySubject(t *testing.T) {
 	t.Parallel()
 	a := newTestAuth(t, baseOpts())
-	_, err := a.Issue(context.Background(), "", nil, time.Minute)
+	_, err := a.Issue(t.Context(), "", nil, time.Minute)
 	if !errors.Is(err, auth.ErrInvalidToken) {
 		t.Fatalf("Issue() error = %v, want ErrInvalidToken", err)
 	}
@@ -210,7 +210,7 @@ func TestIssue_NonPositiveTTL(t *testing.T) {
 	t.Parallel()
 	a := newTestAuth(t, baseOpts())
 	for _, ttl := range []time.Duration{0, -time.Second} {
-		if _, err := a.Issue(context.Background(), "x", nil, ttl); !errors.Is(err, auth.ErrInvalidToken) {
+		if _, err := a.Issue(t.Context(), "x", nil, ttl); !errors.Is(err, auth.ErrInvalidToken) {
 			t.Fatalf("Issue(ttl=%v) error = %v, want ErrInvalidToken", ttl, err)
 		}
 	}
@@ -219,7 +219,7 @@ func TestIssue_NonPositiveTTL(t *testing.T) {
 func TestIssue_ExceedsMaxTTL(t *testing.T) {
 	t.Parallel()
 	a := newTestAuth(t, baseOpts())
-	_, err := a.Issue(context.Background(), "x", nil, 2*time.Hour)
+	_, err := a.Issue(t.Context(), "x", nil, 2*time.Hour)
 	if err == nil {
 		t.Fatal("Issue() with ttl > MaxTTL succeeded, want error")
 	}
@@ -229,7 +229,7 @@ func TestIssue_RejectsClaimCollision(t *testing.T) {
 	t.Parallel()
 	a := newTestAuth(t, baseOpts())
 	for _, k := range []string{"sub", "iss", "aud", "exp", "iat", "jti"} {
-		_, err := a.Issue(context.Background(), "x", map[string]any{k: "boom"}, time.Minute)
+		_, err := a.Issue(t.Context(), "x", map[string]any{k: "boom"}, time.Minute)
 		if !errors.Is(err, auth.ErrInvalidToken) {
 			t.Fatalf("Issue(custom[%q]) error = %v, want ErrInvalidToken", k, err)
 		}
@@ -239,7 +239,7 @@ func TestIssue_RejectsClaimCollision(t *testing.T) {
 func TestVerify_EmptyToken(t *testing.T) {
 	t.Parallel()
 	a := newTestAuth(t, baseOpts())
-	_, err := a.Verify(context.Background(), "")
+	_, err := a.Verify(t.Context(), "")
 	if !errors.Is(err, auth.ErrInvalidToken) {
 		t.Fatalf("Verify() error = %v, want ErrInvalidToken", err)
 	}
@@ -248,7 +248,7 @@ func TestVerify_EmptyToken(t *testing.T) {
 func TestVerify_WrongSecret(t *testing.T) {
 	t.Parallel()
 	a := newTestAuth(t, baseOpts())
-	tok, err := a.Issue(context.Background(), "alice", nil, time.Minute)
+	tok, err := a.Issue(t.Context(), "alice", nil, time.Minute)
 	if err != nil {
 		t.Fatalf("Issue() error = %v", err)
 	}
@@ -261,7 +261,7 @@ func TestVerify_WrongSecret(t *testing.T) {
 		t.Fatalf("New() error = %v", err)
 	}
 	t.Cleanup(func() { _ = other.Close() })
-	_, err = other.Verify(context.Background(), tok.Value)
+	_, err = other.Verify(t.Context(), tok.Value)
 	if !errors.Is(err, auth.ErrInvalidToken) {
 		t.Fatalf("Verify() with wrong secret error = %v, want ErrInvalidToken", err)
 	}
@@ -270,7 +270,7 @@ func TestVerify_WrongSecret(t *testing.T) {
 func TestVerify_TamperedPayload(t *testing.T) {
 	t.Parallel()
 	a := newTestAuth(t, baseOpts())
-	tok, err := a.Issue(context.Background(), "alice", nil, time.Minute)
+	tok, err := a.Issue(t.Context(), "alice", nil, time.Minute)
 	if err != nil {
 		t.Fatalf("Issue() error = %v", err)
 	}
@@ -284,7 +284,7 @@ func TestVerify_TamperedPayload(t *testing.T) {
 		flip = 'B'
 	}
 	tampered := parts[0] + "." + payload[:len(payload)/2] + string(flip) + payload[len(payload)/2+1:] + "." + parts[2]
-	_, err = a.Verify(context.Background(), tampered)
+	_, err = a.Verify(t.Context(), tampered)
 	if !errors.Is(err, auth.ErrInvalidToken) {
 		t.Fatalf("Verify(tampered) error = %v, want ErrInvalidToken", err)
 	}
@@ -304,7 +304,7 @@ func TestVerify_NoneAlgRejected(t *testing.T) {
 	if err != nil {
 		t.Fatalf("SignedString(none) error = %v", err)
 	}
-	_, err = a.Verify(context.Background(), raw)
+	_, err = a.Verify(t.Context(), raw)
 	if !errors.Is(err, auth.ErrInvalidToken) {
 		t.Fatalf("Verify(none-alg) error = %v, want ErrInvalidToken", err)
 	}
@@ -330,7 +330,7 @@ func TestVerify_Expired(t *testing.T) {
 		"exp": time.Now().Add(-time.Minute).Unix(),
 		"iat": time.Now().Add(-2 * time.Minute).Unix(),
 	})
-	_, err := a.Verify(context.Background(), raw)
+	_, err := a.Verify(t.Context(), raw)
 	if !errors.Is(err, auth.ErrTokenExpired) {
 		t.Fatalf("Verify(expired) error = %v, want ErrTokenExpired", err)
 	}
@@ -346,7 +346,7 @@ func TestVerify_IssuerMismatch(t *testing.T) {
 		"exp": time.Now().Add(time.Hour).Unix(),
 		"iat": time.Now().Unix(),
 	})
-	_, err := a.Verify(context.Background(), raw)
+	_, err := a.Verify(t.Context(), raw)
 	if !errors.Is(err, auth.ErrInvalidToken) {
 		t.Fatalf("Verify(wrong iss) error = %v, want ErrInvalidToken", err)
 	}
@@ -362,7 +362,7 @@ func TestVerify_StrictEmptyIssuer(t *testing.T) {
 		"exp": time.Now().Add(time.Hour).Unix(),
 		"iat": time.Now().Unix(),
 	})
-	_, err := a.Verify(context.Background(), raw)
+	_, err := a.Verify(t.Context(), raw)
 	if !errors.Is(err, auth.ErrInvalidToken) {
 		t.Fatalf("Verify(iss set, adapter empty) error = %v, want ErrInvalidToken", err)
 	}
@@ -378,7 +378,7 @@ func TestVerify_AudienceMismatch(t *testing.T) {
 		"exp": time.Now().Add(time.Hour).Unix(),
 		"iat": time.Now().Unix(),
 	})
-	_, err := a.Verify(context.Background(), raw)
+	_, err := a.Verify(t.Context(), raw)
 	if !errors.Is(err, auth.ErrInvalidToken) {
 		t.Fatalf("Verify(wrong aud) error = %v, want ErrInvalidToken", err)
 	}
@@ -395,7 +395,7 @@ func TestVerify_StrictEmptyAudience(t *testing.T) {
 		"exp": time.Now().Add(time.Hour).Unix(),
 		"iat": time.Now().Unix(),
 	})
-	_, err := a.Verify(context.Background(), raw)
+	_, err := a.Verify(t.Context(), raw)
 	if !errors.Is(err, auth.ErrInvalidToken) {
 		t.Fatalf("Verify(aud set, adapter empty) error = %v, want ErrInvalidToken", err)
 	}
@@ -404,7 +404,7 @@ func TestVerify_StrictEmptyAudience(t *testing.T) {
 func TestRevoke_VerifyAfterRevoke(t *testing.T) {
 	t.Parallel()
 	a := newTestAuth(t, baseOpts())
-	ctx := context.Background()
+	ctx := t.Context()
 	tok, err := a.Issue(ctx, "alice", nil, time.Minute)
 	if err != nil {
 		t.Fatalf("Issue() error = %v", err)
@@ -421,7 +421,7 @@ func TestRevoke_VerifyAfterRevoke(t *testing.T) {
 func TestRevoke_Idempotent(t *testing.T) {
 	t.Parallel()
 	a := newTestAuth(t, baseOpts())
-	ctx := context.Background()
+	ctx := t.Context()
 	tok, err := a.Issue(ctx, "alice", nil, time.Minute)
 	if err != nil {
 		t.Fatalf("Issue() error = %v", err)
@@ -437,7 +437,7 @@ func TestRevoke_Idempotent(t *testing.T) {
 func TestRevoke_BadInputs(t *testing.T) {
 	t.Parallel()
 	a := newTestAuth(t, baseOpts())
-	ctx := context.Background()
+	ctx := t.Context()
 	if err := a.Revoke(ctx, ""); err == nil {
 		t.Fatal("Revoke(empty) succeeded, want error")
 	}
@@ -461,7 +461,7 @@ func TestNew_UsesInjectedRevocationStore(t *testing.T) {
 	opts := baseOpts()
 	opts.JWT.RevocationStore = store
 	a := newTestAuth(t, opts)
-	ctx := context.Background()
+	ctx := t.Context()
 
 	tok, err := a.Issue(ctx, "alice", nil, time.Minute)
 	if err != nil {

@@ -74,7 +74,7 @@ func TestSave_atomicUnderStaleReadRace(t *testing.T) {
 	}
 	t.Cleanup(mr.Close)
 
-	ctx := context.Background()
+	ctx := t.Context()
 	prefix := "race"
 
 	st := &store{prefix: prefix, ttl: 15 * time.Minute}

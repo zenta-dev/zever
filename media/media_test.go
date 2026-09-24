@@ -130,7 +130,7 @@ func TestOpen_success_smoke(t *testing.T) {
 		t.Fatalf("Open err = %v", err)
 	}
 
-	ctx := context.Background()
+	ctx := t.Context()
 
 	if _, err := got.Upload(ctx, "p/a.jpg", []byte("data"), UploadOptions{ContentType: "image/jpeg"}); err != nil {
 		t.Fatalf("Upload err = %v", err)

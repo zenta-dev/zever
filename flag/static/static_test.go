@@ -46,7 +46,7 @@ func bumpModtime(t *testing.T, path string, add time.Duration) {
 func TestLoadTypedReads(t *testing.T) {
 	t.Parallel()
 	f := openTestdata(t, false)
-	ctx := context.Background()
+	ctx := t.Context()
 
 	b, err := f.Bool(ctx, "debug", false)
 	if err != nil || !b {
@@ -65,7 +65,7 @@ func TestLoadTypedReads(t *testing.T) {
 func TestMissingReturnsFallbackNilErr(t *testing.T) {
 	t.Parallel()
 	f := openTestdata(t, false)
-	ctx := context.Background()
+	ctx := t.Context()
 
 	if b, err := f.Bool(ctx, "nope", true); err != nil || !b {
 		t.Fatalf("Bool(missing) = %v, %v; want true, nil", b, err)
@@ -85,7 +85,7 @@ func TestMissingReturnsFallbackNilErr(t *testing.T) {
 func TestMismatchErrorHasKeyAndType(t *testing.T) {
 	t.Parallel()
 	f := openTestdata(t, false)
-	ctx := context.Background()
+	ctx := t.Context()
 
 	if _, err := f.Bool(ctx, "env", false); err == nil ||
 		!strings.Contains(err.Error(), `"env"`) ||
@@ -107,7 +107,7 @@ func TestMismatchErrorHasKeyAndType(t *testing.T) {
 func TestStrictBool(t *testing.T) {
 	t.Parallel()
 	f := openTestdata(t, false)
-	ctx := context.Background()
+	ctx := t.Context()
 
 	if b, err := f.Bool(ctx, "enabled_str", false); err != nil || !b {
 		t.Fatalf("Bool(enabled_str=TRUE) = %v, %v", b, err)
@@ -125,7 +125,7 @@ func TestStrictBool(t *testing.T) {
 func TestIntFromStringAndFloatReject(t *testing.T) {
 	t.Parallel()
 	f := openTestdata(t, false)
-	ctx := context.Background()
+	ctx := t.Context()
 
 	if n, err := f.Int(ctx, "timeout_str", 0); err != nil || n != 30 {
 		t.Fatalf("Int(timeout_str) = %d, %v; want 30", n, err)
@@ -146,7 +146,7 @@ func TestIntOverflowAndPrecision(t *testing.T) {
 		t.Fatalf("New: %v", err)
 	}
 	t.Cleanup(func() { _ = f.Close() })
-	ctx := context.Background()
+	ctx := t.Context()
 
 	if _, err := f.Int(ctx, "huge", 0); err == nil {
 		t.Fatal("Int(1e19) = nil error; want overflow")
@@ -159,7 +159,7 @@ func TestIntOverflowAndPrecision(t *testing.T) {
 func TestNumberToStringFormatFloat(t *testing.T) {
 	t.Parallel()
 	f := openTestdata(t, false)
-	ctx := context.Background()
+	ctx := t.Context()
 
 	s, err := f.String(ctx, "big_num", "fb")
 	if err != nil || s != "1000000" {
@@ -178,7 +178,7 @@ func TestNumberToStringFormatFloat(t *testing.T) {
 func TestJSONRawStringAndObject(t *testing.T) {
 	t.Parallel()
 	f := openTestdata(t, false)
-	ctx := context.Background()
+	ctx := t.Context()
 
 	var raw struct {
 		Host string `json:"host"`
@@ -206,7 +206,7 @@ func TestJSONRawStringAndObject(t *testing.T) {
 func TestJSONFallbackFill(t *testing.T) {
 	t.Parallel()
 	f := openTestdata(t, false)
-	ctx := context.Background()
+	ctx := t.Context()
 
 	var out struct {
 		Host string `json:"host"`
@@ -224,7 +224,7 @@ func TestJSONFallbackFill(t *testing.T) {
 func TestJSONNilOut(t *testing.T) {
 	t.Parallel()
 	f := openTestdata(t, false)
-	if err := f.JSON(context.Background(), "config", nil, nil); err == nil {
+	if err := f.JSON(t.Context(), "config", nil, nil); err == nil {
 		t.Fatal("JSON(nil out) = nil; want error")
 	}
 }
@@ -241,7 +241,7 @@ func TestReloadPicksUpChange(t *testing.T) {
 		t.Fatalf("New: %v", err)
 	}
 	t.Cleanup(func() { _ = f.Close() })
-	ctx := context.Background()
+	ctx := t.Context()
 
 	if s, _ := f.String(ctx, "env", ""); s != "prod" {
 		t.Fatalf("before reload env = %q", s)
@@ -275,7 +275,7 @@ func TestReloadKeepsLastGoodOnBadJSON(t *testing.T) {
 		t.Fatalf("New: %v", err)
 	}
 	t.Cleanup(func() { _ = f.Close() })
-	ctx := context.Background()
+	ctx := t.Context()
 
 	if err := os.WriteFile(p, []byte("{bad json"), 0o600); err != nil {
 		t.Fatalf("rewrite bad: %v", err)
@@ -294,7 +294,7 @@ func TestEmptyPathDevDefault(t *testing.T) {
 		t.Fatalf("New(empty) = %v; want nil", err)
 	}
 	t.Cleanup(func() { _ = f.Close() })
-	ctx := context.Background()
+	ctx := t.Context()
 
 	if b, err := f.Bool(ctx, "any", true); err != nil || !b {
 		t.Fatalf("empty Bool = %v, %v", b, err)
@@ -366,7 +366,7 @@ func TestBadPathErrors(t *testing.T) {
 func TestInvalidKey(t *testing.T) {
 	t.Parallel()
 	f := openTestdata(t, false)
-	ctx := context.Background()
+	ctx := t.Context()
 
 	if _, err := f.Bool(ctx, "", false); err == nil {
 		t.Fatal("empty key = nil; want error")
@@ -383,7 +383,7 @@ func TestInvalidKey(t *testing.T) {
 func TestCtxCanceled(t *testing.T) {
 	t.Parallel()
 	f := openTestdata(t, false)
-	ctx, cancel := context.WithCancel(context.Background())
+	ctx, cancel := context.WithCancel(t.Context())
 	cancel()
 
 	if _, err := f.Bool(ctx, "debug", false); err == nil {
@@ -407,7 +407,7 @@ func TestCloseNilOp(t *testing.T) {
 	if err := f.Close(); err != nil {
 		t.Fatalf("Close = %v; want nil", err)
 	}
-	if b, err := f.Bool(context.Background(), "debug", false); err != nil || !b {
+	if b, err := f.Bool(t.Context(), "debug", false); err != nil || !b {
 		t.Fatalf("after Close Bool = %v, %v", b, err)
 	}
 	if err := f.Close(); err != nil {
@@ -423,7 +423,7 @@ func TestConcurrentReads(t *testing.T) {
 		wg.Add(1)
 		go func() {
 			defer wg.Done()
-			ctx := context.Background()
+			ctx := t.Context()
 			_, _ = f.Bool(ctx, "debug", false)
 			_, _ = f.String(ctx, "env", "")
 			_, _ = f.Int(ctx, "max_retries", 0)

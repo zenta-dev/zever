@@ -1,7 +1,6 @@
 package fiber
 
 import (
-	"context"
 	"fmt"
 	"net/http"
 	"net/http/httptest"
@@ -25,7 +24,7 @@ func newRouter(t *testing.T, opts router.Options) router.Router {
 func serve(t *testing.T, r router.Router, path string) *httptest.ResponseRecorder {
 	t.Helper()
 
-	req := httptest.NewRequestWithContext(context.Background(), http.MethodGet, path, nil)
+	req := httptest.NewRequestWithContext(t.Context(), http.MethodGet, path, nil)
 	resp := httptest.NewRecorder()
 	r.ServeHTTP(resp, req)
 

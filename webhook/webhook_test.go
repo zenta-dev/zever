@@ -94,8 +94,8 @@ func TestOpen_invalidOptions_validatedFirst(t *testing.T) {
 	if w != nil {
 		t.Fatalf("Open invalid-opts webhook = %v, want nil", w)
 	}
-	if !strings.Contains(err.Error(), "webhook: open") {
-		t.Fatalf("Open err %q missing %q", err.Error(), "webhook: open")
+	if strings.Contains(err.Error(), "webhook: open") {
+		t.Fatalf("Open err %q must not contain %q (validation returns directly)", err.Error(), "webhook: open")
 	}
 }
 
@@ -127,7 +127,7 @@ func TestWebhook_stub_smoke(t *testing.T) {
 	if err != nil {
 		t.Fatalf("Open err = %v", err)
 	}
-	ctx := context.Background()
+	ctx := t.Context()
 	if err := w.Register(ctx, "order.created", "https://example.com/hook", "s3cr3t"); err != nil {
 		t.Fatalf("Register err = %v", err)
 	}
