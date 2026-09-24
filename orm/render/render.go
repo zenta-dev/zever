@@ -461,14 +461,8 @@ func validateSelectModifiers(d dialect.Dialect, mods SelectModifiers) error {
 		return errors.New("orm/render: DISTINCT cannot be combined with a row lock (FOR UPDATE/FOR SHARE)")
 	}
 
-	if mods.DistinctOn != nil {
-		if len(mods.DistinctOn) == 0 {
-			return errors.New("orm/render: DISTINCT ON requires at least one column")
-		}
-
-		if !supportsDistinctOn(d) {
-			return fmt.Errorf("orm/render: %w: dialect %q does not support DISTINCT ON", dialect.ErrUnsupportedByDialect, d.Name())
-		}
+	if err := dialect.CheckDistinctOn(d, mods.DistinctOn); err != nil {
+		return fmt.Errorf("orm/render: %w", err)
 	}
 
 	if err := validateTablesample(d, mods.Tablesample); err != nil {
@@ -492,15 +486,6 @@ func validateSelectModifiers(d dialect.Dialect, mods SelectModifiers) error {
 	}
 
 	return nil
-}
-
-// supportsDistinctOn reports whether d implements dialect.DistinctOnDialect
-// and reports support. A dialect that does not implement the interface is
-// treated as unsupported, matching the repo's capability-gate convention.
-func supportsDistinctOn(d dialect.Dialect) bool {
-	dd, ok := d.(dialect.DistinctOnDialect)
-
-	return ok && dd.SupportsDistinctOn()
 }
 
 // tablesampleMethods is the allowlist of sampling methods render will emit. The
@@ -925,7 +910,15 @@ func renderRaw(d dialect.Dialect, n Node, counter *argCounter) (clause string, a
 		return "", nil, fmt.Errorf("orm/render: raw node value of type %T is not a RawExpr", n.Value)
 	}
 
-	if !strings.Contains(re.Fragment, "?") {
+	markers := strings.Count(re.Fragment, "?")
+	if markers != len(re.Args) {
+		return "", nil, fmt.Errorf(
+			"orm/render: raw fragment has %d %q marker(s) but %d bound arg(s): %q",
+			markers, "?", len(re.Args), re.Fragment,
+		)
+	}
+
+	if markers == 0 {
 		return re.Fragment, nil, nil
 	}
 
@@ -939,10 +932,7 @@ func renderRaw(d dialect.Dialect, n Node, counter *argCounter) (clause string, a
 		}
 
 		b.WriteString(d.Placeholder(counter.next()))
-
-		if len(args) < len(re.Args) {
-			args = append(args, re.Args[len(args)])
-		}
+		args = append(args, re.Args[len(args)])
 	}
 
 	return b.String(), args, nil

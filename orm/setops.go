@@ -9,16 +9,20 @@ import (
 	"github.com/zenta-dev/zever/orm/render"
 )
 
-// setOpKind identifies a set operation over two same-typed queries, mirroring
-// render.SetOpOp's values (same underlying int representation).
-type setOpKind int
+// setOpKind identifies a set operation over two same-typed queries. Alias
+// for render.SetOpOp (orm imports render, never the reverse -- see orm.Op's
+// doc comment for why aliasing beats a separately-kept-in-sync mirror);
+// kept as an unexported name since no public orm API exposes set-op kind
+// directly.
+type setOpKind = render.SetOpOp
 
-// Supported set operators.
+// Supported set operators, re-exporting render's identically-named
+// constants under orm's unexported names.
 const (
-	setOpUnion setOpKind = iota
-	setOpUnionAll
-	setOpIntersect
-	setOpExcept
+	setOpUnion     = render.SetOpUnion
+	setOpUnionAll  = render.SetOpUnionAll
+	setOpIntersect = render.SetOpIntersect
+	setOpExcept    = render.SetOpExcept
 )
 
 // SetOpQuery is an immutable, value-type set-operation builder combining
@@ -130,7 +134,7 @@ func (s SetOpQuery[T, PT]) All(ctx context.Context, exec db.DB) ([]PT, error) {
 
 	query, args, err := render.SetOp(
 		d,
-		render.SetOpOp(s.op),
+		s.op,
 		s.left.table.Name(), s.left.table.Columns(), toRenderNode[T](s.left.where.Render()),
 		s.right.table.Name(), s.right.table.Columns(), toRenderNode[T](s.right.where.Render()),
 		toRenderOrder(s.order), s.limit, s.offset,
@@ -200,7 +204,7 @@ func (s SetOpQuery[T, PT]) Count(ctx context.Context, exec db.DB) (int64, error)
 
 	inner, args, err := render.SetOp(
 		d,
-		render.SetOpOp(s.op),
+		s.op,
 		s.left.table.Name(), s.left.table.Columns(), toRenderNode[T](s.left.where.Render()),
 		s.right.table.Name(), s.right.table.Columns(), toRenderNode[T](s.right.where.Render()),
 		nil, 0, 0,

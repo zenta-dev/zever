@@ -1,61 +1,52 @@
 package orm
 
+import "github.com/zenta-dev/zever/orm/render"
+
 // Op identifies a comparison operator applied to a single column. The zero
 // value Eq is the equality comparison.
-type Op int
+//
+// Op is a type alias for render.Op (not just a mirrored copy): orm imports
+// render (never the other way -- see render's package doc), so aliasing is
+// safe and, unlike a separately-defined mirror kept in sync only by
+// convention, makes a reordering/insertion mistake in either package's
+// constant list a compile error at every call site that converts between
+// them, instead of a silent SQL-rendering bug.
+type Op = render.Op
 
-// Supported comparison operators.
+// Supported comparison operators. These re-export render's OpXxx constants
+// under orm's own builder-facing names; see render.Op's constants for the
+// full per-value documentation (Between's [2]any convention, EqAny/NeqAny/
+// EqAll/NeqAll's Postgres-only ANY/ALL quantifiers, etc.).
 const (
-	Eq Op = iota
-	Neq
-	Gt
-	Gte
-	Lt
-	Lte
-	In
-	Like
-	IsNull
-	IsNotNull
-	// Between is a `column BETWEEN lo AND hi` predicate. Its Node.Value is
-	// always a [2]any{lo, hi} fixed array, never a []any slice -- the same
-	// convention the value-list In avoids, letting the renderer
-	// distinguish a Between node from an In node by a plain type assertion.
-	Between
-	// NotIn is a `column NOT IN (subquery)` predicate -- an NIn node whose
-	// Op is NotIn, built by Column.NotInSub/NullableColumn.NotInSub. The
-	// renderer emits the NOT IN keyword instead of IN for this Op; a
-	// value-list negation is still spelled Not(col.In(vs...)).
-	NotIn
-	// EqAny is a `column = ANY(array)` predicate (Postgres): true when the
-	// column equals at least one element of the bound value list. Its node
-	// is NArray -- never NBinary -- because the ANY/ALL quantifier wraps the
-	// whole right-hand list, which is not expressible as a scalar compare.
-	// Built by Column.EqAny; a non-Postgres dialect returns a typed
-	// dialect.ErrUnsupportedByDialect.
-	EqAny
-	// NeqAny is a `column <> ANY(array)` predicate (Postgres): true when the
-	// column differs from at least one element of the bound value list.
-	// Built by Column.NeqAny.
-	NeqAny
-	// EqAll is a `column = ALL(array)` predicate (Postgres): true when the
-	// column equals every element of the bound value list. Built by
-	// Column.EqAll.
-	EqAll
-	// NeqAll is a `column <> ALL(array)` predicate (Postgres): true when the
-	// column differs from every element of the bound value list -- the
-	// idiomatic NOT IN equivalent that is NULL-safe for the empty list.
-	// Built by Column.NeqAll.
-	NeqAll
+	Eq        = render.OpEq
+	Neq       = render.OpNeq
+	Gt        = render.OpGt
+	Gte       = render.OpGte
+	Lt        = render.OpLt
+	Lte       = render.OpLte
+	In        = render.OpIn
+	Like      = render.OpLike
+	IsNull    = render.OpIsNull
+	IsNotNull = render.OpIsNotNull
+	Between   = render.OpBetween
+	NotIn     = render.OpNotIn
+	EqAny     = render.OpEqAny
+	NeqAny    = render.OpNeqAny
+	EqAll     = render.OpEqAll
+	NeqAll    = render.OpNeqAll
 )
 
 // CompoundOp identifies how child nodes of an NCompound Node are combined.
-type CompoundOp int
+// Alias for render.CompoundOp; see Op's doc comment for why aliasing (not
+// mirroring) is safe here.
+type CompoundOp = render.CompoundOp
 
-// Supported compound operators.
+// Supported compound operators, re-exporting render's CompoundXxx constants
+// under orm's own names.
 const (
-	CAnd CompoundOp = iota
-	COr
-	CNot
+	CAnd = render.CompoundAnd
+	COr  = render.CompoundOr
+	CNot = render.CompoundNot
 )
 
 // NodeKind discriminates the shape of a Node. The zero value, NNone, means
@@ -67,56 +58,31 @@ const (
 // comparison predicate (its Op/Value) or -- nested in another expression's
 // argument list -- as a bare scalar. NUnary is reserved for future use;
 // unused today.
-type NodeKind int
+//
+// NodeKind is a type alias for render.NodeKind; see Op's doc comment for
+// why aliasing (not mirroring) is safe here.
+type NodeKind = render.NodeKind
 
-// Supported node kinds.
+// Supported node kinds, re-exporting render's KindXxx constants under orm's
+// own names; see render.NodeKind's constants for the full per-value
+// documentation (NJSON/NFTS/NTuple/NArray's payload conventions).
 const (
-	NNone NodeKind = iota
-	NLit
-	NColumn
-	// NUnary is reserved for a future phase (e.g. IS DISTINCT FROM-style
-	// unary wrapping); unused today.
-	NUnary
-	NBinary
-	NIn
-	NBetween
-	NLike
-	NCompound
-	// NFunc is a scalar function/conditional expression node (orm/expr.go):
-	// its Func field carries the erased function tree. As a standalone
-	// predicate it applies Op/Value as the comparison against the
-	// expression's result (`COALESCE(bio, ?) = ?`); nested inside another
-	// expression's Args it is rendered as a bare scalar.
-	NFunc
-	// NSubquery is a subquery predicate node whose Value is a subquery --
-	// the erased inner SELECT. It renders as `EXISTS (SELECT ...)` for
-	// Exists/NotExists, and the same subquery value travels inside an
-	// NIn node's Value (In/NotIn-subquery: `col [NOT] IN (SELECT ...)`) and
-	// an NBinary node's Value (scalar comparisons: `col OP (SELECT ...)`).
-	NSubquery
-	NRaw
-	// NJSON is a JSON operator predicate: its LHS is a JSON
-	// expression over the base column (see Node.JSON), rendered per dialect
-	// as jsonb operators (postgres) or json1 functions (sqlite).
-	NJSON
-	// NFTS is a full-text-search expression over the base column,
-	// rendered per dialect as tsvector machinery on postgres
-	// and FTS5 MATCH on sqlite. See Node.FTS and render/fts.go.
-	NFTS
-	// NTuple is a multi-column row-value predicate: a tuple of outer columns
-	// compared against a subquery -- `(a, b) [NOT] IN (SELECT ...)` (Op
-	// In/NotIn) or `(a, b) OP (SELECT ...)` for Op Eq..Lte (row-value
-	// comparison). Node.Tuple carries the LHS column list and Node.Value the
-	// inner subquery. Built by orm/tuple.go's Tuple methods.
-	NTuple
-	// NArray is a Postgres array-quantifier predicate over a single column:
-	// `column = ANY(...)` / `<> ANY(...)` / `= ALL(...)` / `<> ALL(...)`.
-	// Node.Value is always a []any of bound elements (never a scalar), and
-	// Node.Op selects both the comparison (=/ <>) and the quantifier
-	// (ANY/ALL). Built by Column.EqAny/NeqAny/EqAll/NeqAll; a non-Postgres
-	// dialect returns a typed dialect.ErrUnsupportedByDialect at render
-	// time. See render/array.go.
-	NArray
+	NNone     = render.KindNone
+	NLit      = render.KindLit
+	NColumn   = render.KindColumn
+	NUnary    = render.KindUnary
+	NBinary   = render.KindBinary
+	NIn       = render.KindIn
+	NBetween  = render.KindBetween
+	NLike     = render.KindLike
+	NCompound = render.KindCompound
+	NFunc     = render.KindFunc
+	NSubquery = render.KindSubquery
+	NRaw      = render.KindRaw
+	NJSON     = render.KindJSON
+	NFTS      = render.KindFTS
+	NTuple    = render.KindTuple
+	NArray    = render.KindArray
 )
 
 // Node is the erased, dialect-agnostic shape of one predicate tree, walked

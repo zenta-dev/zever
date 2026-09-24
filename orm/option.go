@@ -3,6 +3,7 @@ package orm
 import (
 	"database/sql/driver"
 	"fmt"
+	"strconv"
 	"time"
 )
 
@@ -209,9 +210,7 @@ func scanInt64(src any) (int64, error) {
 }
 
 func parseInt64(s string) (int64, error) {
-	var n int64
-
-	_, err := fmt.Sscanf(s, "%d", &n)
+	n, err := strconv.ParseInt(s, 10, 64)
 	if err != nil {
 		return 0, fmt.Errorf("cannot scan %q into int64: %w", s, err)
 	}
@@ -237,9 +236,7 @@ func scanFloat64(src any) (float64, error) {
 }
 
 func parseFloat64(s string) (float64, error) {
-	var f float64
-
-	_, err := fmt.Sscanf(s, "%g", &f)
+	f, err := strconv.ParseFloat(s, 64)
 	if err != nil {
 		return 0, fmt.Errorf("cannot scan %q into float64: %w", s, err)
 	}
