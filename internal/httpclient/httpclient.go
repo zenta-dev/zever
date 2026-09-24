@@ -17,6 +17,10 @@ import (
 // applied to cloned transports created by NewClient.
 const DefaultMaxIdleConnsPerHost = 32
 
+// maxReadChunk bounds each ReadLimited read call; the context is re-checked
+// between chunks so cancellation aborts promptly.
+const maxReadChunk = 32 << 10
+
 // ErrTooLarge is returned (via TooLargeError) when ReadLimited exceeds limit.
 var ErrTooLarge = errors.New("httpclient: response body too large")
 
@@ -229,16 +233,28 @@ func IsPrivateIP(ip net.IP) bool {
 
 // ReadLimited reads body up to limit bytes. ReadLimited returns the bytes when
 // within limit, or a *TooLargeError (matching ErrTooLarge) when exceeded.
-func ReadLimited(body io.Reader, limit int64) ([]byte, error) {
+// The context bounds the read: a canceled context aborts with its error.
+func ReadLimited(ctx context.Context, body io.Reader, limit int64) ([]byte, error) {
 	if limit < 0 {
 		limit = 0
 	}
-	data, err := io.ReadAll(io.LimitReader(body, limit+1))
-	if err != nil {
-		return nil, err
+	lr := io.LimitReader(body, limit+1)
+	buf := make([]byte, 0, min(limit+1, maxReadChunk))
+	chunk := make([]byte, maxReadChunk)
+	for {
+		if err := ctx.Err(); err != nil {
+			return nil, err
+		}
+		n, rerr := lr.Read(chunk)
+		buf = append(buf, chunk[:n]...)
+		if int64(len(buf)) > limit {
+			return nil, &TooLargeError{Limit: limit, Size: int64(len(buf))}
+		}
+		if rerr == io.EOF {
+			return buf, nil
+		}
+		if rerr != nil {
+			return nil, rerr
+		}
 	}
-	if int64(len(data)) > limit {
-		return nil, &TooLargeError{Limit: limit, Size: int64(len(data))}
-	}
-	return data, nil
 }

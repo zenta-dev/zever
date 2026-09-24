@@ -126,7 +126,13 @@ func waitForZeverFile(t *testing.T, path string, within time.Duration) {
 			return
 		}
 
-		time.Sleep(20 * time.Millisecond)
+		timer := time.NewTimer(20 * time.Millisecond)
+		select {
+		case <-t.Context().Done():
+			timer.Stop()
+			t.Fatalf("aborted waiting for %q: test context done", path)
+		case <-timer.C:
+		}
 	}
 
 	t.Fatalf("timed out after %s waiting for %q", within, path)

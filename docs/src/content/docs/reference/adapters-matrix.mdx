@@ -13,7 +13,7 @@ swaps stay config-only.
 
 | Service | Adapters | Packages | Accessor |
 |---|---|---|---|
-| ai | anthropic, openai, gemini | `ai/*` | `AI()` |
+| ai | anthropic, openai, gemini, ollama | `ai/*` | `AI()` |
 | analytics | log, posthog | `analytics/*` | `Analytics()` |
 | auth | jwt, session, oidc | `auth/jwt`, `auth/session`, `auth/oidc` | `Auth()` |
 | billing | stub, stripe, paddle | `billing/stub`, `billing/stripe`, `billing/paddle` | `Billing()` |
@@ -27,7 +27,7 @@ swaps stay config-only.
 | i18n | embed, remote | `i18n/*` | `I18n()` |
 | idempotency | memory, redis | `idempotency/memory`, `idempotency/redis` | `Idempotency()` |
 | lock | memory, redis | `lock/memory`, `lock/redis` | `Lock()` |
-| log | noop, zerolog, slog | `log/*` | `Log()` |
+| log | noop, zerolog, slog, pretty | `log/*` | `Log()` |
 | mailer | log, smtp | `mailer/log`, `mailer/smtp` | `Mailer()` |
 | media | local, s3 | `media/local`, `media/s3` | `Media()` |
 | notification | log, twilio, fcm | `notification/*` | `Notification()` |

@@ -401,8 +401,8 @@ func TestOpen_QueueOpenError(t *testing.T) {
 		t.Fatalf("New() err = %v, want test transport error", err)
 	}
 
-	if !strings.Contains(err.Error(), "webhook: open queue") {
-		t.Fatalf("New() err = %v, want open queue prefix", err)
+	if strings.Contains(err.Error(), "webhook: open queue") {
+		t.Fatalf("New() err = %v, must not contain open queue prefix (returns directly)", err)
 	}
 }
 

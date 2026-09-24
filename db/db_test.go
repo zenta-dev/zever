@@ -3,8 +3,13 @@ package db
 import (
 	"context"
 	"errors"
+	"sync/atomic"
 	"testing"
 )
+
+var dbAdapterSeq atomic.Int64
+
+func dbFreshAdapter() Adapter { return Adapter(2000 + dbAdapterSeq.Add(1)) }
 
 type stubRows struct{}
 
@@ -51,7 +56,7 @@ func TestRegister(t *testing.T) {
 	t.Run("duplicate", func(t *testing.T) {
 		t.Parallel()
 
-		adapter := Adapter(1002)
+		adapter := dbFreshAdapter()
 		factory := func(Options) (DB, error) { return &stubDB{dialect: "sqlite"}, nil }
 
 		if err := Register(adapter, factory); err != nil {
@@ -80,7 +85,7 @@ func TestRegister(t *testing.T) {
 	t.Run("happy then open dialect", func(t *testing.T) {
 		t.Parallel()
 
-		adapter := Adapter(1003)
+		adapter := dbFreshAdapter()
 		factory := func(Options) (DB, error) { return &stubDB{dialect: "custom"}, nil }
 
 		if err := Register(adapter, factory); err != nil {
@@ -142,7 +147,7 @@ func TestOpen(t *testing.T) {
 	t.Run("factory error wrapped", func(t *testing.T) {
 		t.Parallel()
 
-		adapter := Adapter(1004)
+		adapter := dbFreshAdapter()
 		sentinel := errors.New("backend down")
 
 		if err := Register(adapter, func(Options) (DB, error) { return nil, sentinel }); err != nil {
@@ -162,7 +167,7 @@ func TestOpen(t *testing.T) {
 	t.Run("table validate failures", func(t *testing.T) {
 		t.Parallel()
 
-		adapter := Adapter(1005)
+		adapter := dbFreshAdapter()
 		if err := Register(adapter, func(Options) (DB, error) { return &stubDB{}, nil }); err != nil {
 			t.Fatalf("register failed: %v", err)
 		}

@@ -32,7 +32,7 @@ func String(m map[string]any, key string, def string) string {
 func RequireString(m map[string]any, key string) (string, error) {
 	s := String(m, key, "")
 	if s == "" {
-		return "", fmt.Errorf("option %q is required", key)
+		return "", fmt.Errorf("opts: option %q is required", key)
 	}
 
 	return s, nil
@@ -233,7 +233,7 @@ func Map(m map[string]any, key string) map[string]any {
 func StrictString(pkgTag, key string, v any) (string, error) {
 	s, ok := v.(string)
 	if !ok {
-		return "", fmt.Errorf("[%s] option %q must be a string, got %T", pkgTag, key, v)
+		return "", fmt.Errorf("%s: option %q must be a string, got %T", pkgTag, key, v)
 	}
 
 	return s, nil
@@ -244,7 +244,7 @@ func StrictString(pkgTag, key string, v any) (string, error) {
 func StrictBool(pkgTag, key string, v any) (bool, error) {
 	b, ok := v.(bool)
 	if !ok {
-		return false, fmt.Errorf("[%s] option %q must be a bool, got %T", pkgTag, key, v)
+		return false, fmt.Errorf("%s: option %q must be a bool, got %T", pkgTag, key, v)
 	}
 
 	return b, nil
@@ -261,7 +261,7 @@ func StrictInt(pkgTag, key string, v any) (int, error) {
 	case float64:
 		return int(n), nil
 	default:
-		return 0, fmt.Errorf("[%s] option %q must be an integer, got %T", pkgTag, key, v)
+		return 0, fmt.Errorf("%s: option %q must be an integer, got %T", pkgTag, key, v)
 	}
 }
 
@@ -276,7 +276,7 @@ func StrictInt64(pkgTag, key string, v any) (int64, error) {
 	case float64:
 		return int64(n), nil
 	default:
-		return 0, fmt.Errorf("[%s] option %q must be an integer, got %T", pkgTag, key, v)
+		return 0, fmt.Errorf("%s: option %q must be an integer, got %T", pkgTag, key, v)
 	}
 }
 
@@ -291,7 +291,7 @@ func StrictFloat64(pkgTag, key string, v any) (float64, error) {
 	case int:
 		return float64(n), nil
 	default:
-		return 0, fmt.Errorf("[%s] option %q must be a number, got %T", pkgTag, key, v)
+		return 0, fmt.Errorf("%s: option %q must be a number, got %T", pkgTag, key, v)
 	}
 }
 
@@ -311,12 +311,12 @@ func StrictDuration(pkgTag, key string, v any) (time.Duration, error) {
 	case string:
 		parsed, err := time.ParseDuration(d)
 		if err != nil {
-			return 0, fmt.Errorf("[%s] option %q must be a duration: %w", pkgTag, key, err)
+			return 0, fmt.Errorf("%s: option %q must be a duration: %w", pkgTag, key, err)
 		}
 
 		return parsed, nil
 	default:
-		return 0, fmt.Errorf("[%s] option %q must be a duration, got %T", pkgTag, key, v)
+		return 0, fmt.Errorf("%s: option %q must be a duration, got %T", pkgTag, key, v)
 	}
 }
 
@@ -333,7 +333,7 @@ func StrictStringSlice(pkgTag, key string, v any) ([]string, error) {
 		for _, item := range sl {
 			s, ok := item.(string)
 			if !ok {
-				return nil, fmt.Errorf("[%s] option %q must be a list of strings, got element of type %T", pkgTag, key, item)
+				return nil, fmt.Errorf("%s: option %q must be a list of strings, got element of type %T", pkgTag, key, item)
 			}
 
 			result = append(result, s)
@@ -341,7 +341,7 @@ func StrictStringSlice(pkgTag, key string, v any) ([]string, error) {
 
 		return result, nil
 	default:
-		return nil, fmt.Errorf("[%s] option %q must be a list of strings, got %T", pkgTag, key, v)
+		return nil, fmt.Errorf("%s: option %q must be a list of strings, got %T", pkgTag, key, v)
 	}
 }
 
@@ -350,7 +350,7 @@ func StrictStringSlice(pkgTag, key string, v any) ([]string, error) {
 func StrictMap(pkgTag, key string, v any) (map[string]any, error) {
 	m, ok := v.(map[string]any)
 	if !ok {
-		return nil, fmt.Errorf("[%s] option %q must be a map, got %T", pkgTag, key, v)
+		return nil, fmt.Errorf("%s: option %q must be a map, got %T", pkgTag, key, v)
 	}
 
 	return m, nil

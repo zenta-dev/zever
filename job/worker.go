@@ -41,7 +41,7 @@ type Worker struct {
 
 const defaultDrainTimeout = 30 * time.Second
 
-// DefaultSweepInterval is the batch-settlement sweep cadence.
+// DefaultSweepInterval is the batch-settlement sweep cadence for settling due batches.
 const DefaultSweepInterval = time.Second
 
 // DefaultSweepTimeout bounds one detached batch-settlement sweep.

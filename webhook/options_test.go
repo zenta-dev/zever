@@ -35,8 +35,8 @@ func TestOptions_Validate_negativeMaxRetries_invalid(t *testing.T) {
 	if !errors.Is(err, ErrInvalidOptions) {
 		t.Fatalf("negative maxretries err = %v, want ErrInvalidOptions", err)
 	}
-	if !strings.Contains(err.Error(), "max retries") {
-		t.Errorf("err %q missing max retries reason", err.Error())
+	if !strings.Contains(err.Error(), "max_retries") {
+		t.Errorf("err %q missing max_retries reason", err.Error())
 	}
 }
 
@@ -46,8 +46,8 @@ func TestOptions_Validate_negativeReplayTolerance_invalid(t *testing.T) {
 	if !errors.Is(err, ErrInvalidOptions) {
 		t.Fatalf("negative replay tolerance err = %v, want ErrInvalidOptions", err)
 	}
-	if !strings.Contains(err.Error(), "replay tolerance") {
-		t.Errorf("err %q missing replay tolerance reason", err.Error())
+	if !strings.Contains(err.Error(), "replay_tolerance") {
+		t.Errorf("err %q missing replay_tolerance reason", err.Error())
 	}
 }
 
@@ -64,7 +64,7 @@ func TestOptions_Validate_bothNegative_joined(t *testing.T) {
 	if !errors.Is(err, ErrInvalidOptions) {
 		t.Fatalf("joined err = %v, want ErrInvalidOptions", err)
 	}
-	if !strings.Contains(err.Error(), "timeout") || !strings.Contains(err.Error(), "max retries") {
+	if !strings.Contains(err.Error(), "timeout") || !strings.Contains(err.Error(), "max_retries") {
 		t.Fatalf("joined err %q missing one of the reasons", err.Error())
 	}
 }

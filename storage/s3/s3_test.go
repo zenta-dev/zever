@@ -46,7 +46,7 @@ func newStubClient(t *testing.T, tr *stubTransport) *s3sdk.Client {
 	})
 }
 
-func newTestAdapter(t *testing.T, cfg *storage.PolicyConfig, syncFail string, tr *stubTransport) *s3Adapter {
+func stubAdapter(t *testing.T, cfg *storage.PolicyConfig, syncFail string, tr *stubTransport) *s3Adapter {
 	t.Helper()
 
 	var store storage.PolicyStore
@@ -245,7 +245,7 @@ func TestSyncPolicyGetErrorRequire(t *testing.T) {
 	tr := &stubTransport{do: func(*http.Request) (*http.Response, error) {
 		return nil, errors.New("get boom")
 	}}
-	a := newTestAdapter(t, privatePolicyConfig(), "require", tr)
+	a := stubAdapter(t, privatePolicyConfig(), "require", tr)
 	err := a.SyncPolicy(t.Context(), "b")
 	if err == nil || !strings.Contains(err.Error(), "get bucket policy") {
 		t.Fatalf("SyncPolicy() = %v, want get-bucket-policy error", err)
@@ -256,7 +256,7 @@ func TestSyncPolicyGetErrorWarn(t *testing.T) {
 	tr := &stubTransport{do: func(*http.Request) (*http.Response, error) {
 		return nil, errors.New("get boom")
 	}}
-	a := newTestAdapter(t, privatePolicyConfig(), "warn", tr)
+	a := stubAdapter(t, privatePolicyConfig(), "warn", tr)
 	if err := a.SyncPolicy(t.Context(), "b"); err != nil {
 		t.Fatalf("SyncPolicy() = %v, want nil", err)
 	}
@@ -266,7 +266,7 @@ func TestSyncPolicyMergeError(t *testing.T) {
 	tr := &stubTransport{do: func(r *http.Request) (*http.Response, error) {
 		return xmlResponse(r, 200, policyXML("{invalid-json")), nil
 	}}
-	a := newTestAdapter(t, privatePolicyConfig(), "require", tr)
+	a := stubAdapter(t, privatePolicyConfig(), "require", tr)
 	err := a.SyncPolicy(t.Context(), "b")
 	if err == nil || !strings.Contains(err.Error(), "parse existing") {
 		t.Fatalf("SyncPolicy() = %v, want parse-existing error", err)
@@ -277,7 +277,7 @@ func TestSyncPolicyMergeErrorWarn(t *testing.T) {
 	tr := &stubTransport{do: func(r *http.Request) (*http.Response, error) {
 		return xmlResponse(r, 200, policyXML("{invalid-json")), nil
 	}}
-	a := newTestAdapter(t, privatePolicyConfig(), "warn", tr)
+	a := stubAdapter(t, privatePolicyConfig(), "warn", tr)
 	if err := a.SyncPolicy(t.Context(), "b"); err != nil {
 		t.Fatalf("SyncPolicy() = %v, want nil", err)
 	}
@@ -287,7 +287,7 @@ func TestSyncPolicyNoDriftNoPut(t *testing.T) {
 	tr := &stubTransport{do: func(r *http.Request) (*http.Response, error) {
 		return xmlResponse(r, 404, ""), nil
 	}}
-	a := newTestAdapter(t, privatePolicyConfig(), "require", tr)
+	a := stubAdapter(t, privatePolicyConfig(), "require", tr)
 	if err := a.SyncPolicy(t.Context(), "b"); err != nil {
 		t.Fatalf("SyncPolicy() = %v, want nil", err)
 	}
@@ -312,7 +312,7 @@ func TestSyncPolicyDriftPuts(t *testing.T) {
 	cfg := &storage.PolicyConfig{Buckets: map[storage.BucketName]storage.Policy{
 		"b": {Read: storage.Rule{Public: true}},
 	}}
-	a := newTestAdapter(t, cfg, "require", tr)
+	a := stubAdapter(t, cfg, "require", tr)
 	if err := a.SyncPolicy(t.Context(), "b"); err != nil {
 		t.Fatalf("SyncPolicy() = %v, want nil", err)
 	}
@@ -331,13 +331,13 @@ func TestSyncPolicyPutError(t *testing.T) {
 		}}
 	}
 
-	a := newTestAdapter(t, publicReadPolicyConfig(), "require", newPutFailStub())
+	a := stubAdapter(t, publicReadPolicyConfig(), "require", newPutFailStub())
 	err := a.SyncPolicy(t.Context(), "b")
 	if err == nil || !strings.Contains(err.Error(), "put bucket policy") {
 		t.Fatalf("SyncPolicy() = %v, want put-bucket-policy error", err)
 	}
 
-	a = newTestAdapter(t, publicReadPolicyConfig(), "warn", newPutFailStub())
+	a = stubAdapter(t, publicReadPolicyConfig(), "warn", newPutFailStub())
 	if err := a.SyncPolicy(t.Context(), "b"); err != nil {
 		t.Fatalf("SyncPolicy() = %v, want nil", err)
 	}
@@ -353,7 +353,7 @@ func TestSyncPolicyPutOK(t *testing.T) {
 		}
 		return xmlResponse(r, 404, ""), nil
 	}}
-	a := newTestAdapter(t, publicReadPolicyConfig(), "require", tr)
+	a := stubAdapter(t, publicReadPolicyConfig(), "require", tr)
 	if err := a.SyncPolicy(t.Context(), "b"); err != nil {
 		t.Fatalf("SyncPolicy() = %v, want nil", err)
 	}
@@ -366,7 +366,7 @@ func TestGetBucketPolicyValue(t *testing.T) {
 	tr := &stubTransport{do: func(r *http.Request) (*http.Response, error) {
 		return xmlResponse(r, 200, policyXML("hello-doc")), nil
 	}}
-	a := newTestAdapter(t, privatePolicyConfig(), "warn", tr)
+	a := stubAdapter(t, privatePolicyConfig(), "warn", tr)
 	got, err := a.getBucketPolicy(t.Context(), "b")
 	if err != nil {
 		t.Fatal(err)
@@ -380,7 +380,7 @@ func TestGetBucketPolicyNilPolicy(t *testing.T) {
 	tr := &stubTransport{do: func(r *http.Request) (*http.Response, error) {
 		return xmlResponse(r, 200, emptyPolicyXML()), nil
 	}}
-	a := newTestAdapter(t, privatePolicyConfig(), "warn", tr)
+	a := stubAdapter(t, privatePolicyConfig(), "warn", tr)
 	got, err := a.getBucketPolicy(t.Context(), "b")
 	if err != nil {
 		t.Fatal(err)
@@ -394,7 +394,7 @@ func TestGetBucketPolicyNotFound(t *testing.T) {
 	tr := &stubTransport{do: func(r *http.Request) (*http.Response, error) {
 		return xmlResponse(r, 404, ""), nil
 	}}
-	a := newTestAdapter(t, privatePolicyConfig(), "warn", tr)
+	a := stubAdapter(t, privatePolicyConfig(), "warn", tr)
 	got, err := a.getBucketPolicy(t.Context(), "b")
 	if err != nil {
 		t.Fatal(err)
@@ -408,7 +408,7 @@ func TestGetBucketPolicyError(t *testing.T) {
 	tr := &stubTransport{do: func(*http.Request) (*http.Response, error) {
 		return nil, errors.New("transport boom")
 	}}
-	a := newTestAdapter(t, privatePolicyConfig(), "warn", tr)
+	a := stubAdapter(t, privatePolicyConfig(), "warn", tr)
 	if _, err := a.getBucketPolicy(t.Context(), "b"); err == nil {
 		t.Fatal("getBucketPolicy() = nil, want error")
 	}
@@ -418,7 +418,7 @@ func TestPutBucketPolicyError(t *testing.T) {
 	tr := &stubTransport{do: func(*http.Request) (*http.Response, error) {
 		return nil, errors.New("put boom")
 	}}
-	a := newTestAdapter(t, privatePolicyConfig(), "warn", tr)
+	a := stubAdapter(t, privatePolicyConfig(), "warn", tr)
 	if err := a.putBucketPolicy(t.Context(), "b", "{}"); err == nil {
 		t.Fatal("putBucketPolicy() = nil, want error")
 	}
@@ -428,7 +428,7 @@ func TestPutBucketPolicyOK(t *testing.T) {
 	tr := &stubTransport{do: func(r *http.Request) (*http.Response, error) {
 		return xmlResponse(r, 200, ""), nil
 	}}
-	a := newTestAdapter(t, privatePolicyConfig(), "warn", tr)
+	a := stubAdapter(t, privatePolicyConfig(), "warn", tr)
 	if err := a.putBucketPolicy(t.Context(), "b", "{}"); err != nil {
 		t.Fatalf("putBucketPolicy() = %v, want nil", err)
 	}

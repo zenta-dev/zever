@@ -107,6 +107,10 @@ func connOptions(opts queue.Options) zredis.Options {
 
 // New creates a Redis-backed queue adapter delegated via internal/redis with defaults of prefix "queue", VisibilityTimeout 30s, and PollTimeout 5s when unset. It verifies connectivity with a 3s ping check.
 func New(opts queue.Options) (queue.Queue, error) {
+	if err := opts.Validate(); err != nil {
+		return nil, err
+	}
+
 	prefix := strings.TrimSpace(opts.Prefix)
 	if prefix == "" {
 		prefix = "queue"

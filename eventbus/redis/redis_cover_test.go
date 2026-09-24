@@ -41,7 +41,7 @@ func TestRedactAddr(t *testing.T) {
 func TestPublish_canceledContext(t *testing.T) {
 	t.Parallel()
 
-	b := newTestBus(t, nil)
+	b := freshAdapter(t, nil)
 
 	ctx, cancel := context.WithCancel(t.Context())
 	cancel()
@@ -119,7 +119,7 @@ func TestSubscribe_closedAfterLock(t *testing.T) {
 func TestDeliver_skipsBadFrames(t *testing.T) {
 	t.Parallel()
 
-	b := newTestBus(t, nil)
+	b := freshAdapter(t, nil)
 	a := newTestAdapter(t, nil)
 	topic := freshTopic()
 
@@ -225,7 +225,7 @@ func TestDecodeMessage(t *testing.T) {
 func TestClose_activeSub(t *testing.T) {
 	t.Parallel()
 
-	b := newTestBus(t, nil)
+	b := freshAdapter(t, nil)
 	topic := freshTopic()
 
 	if _, err := b.Subscribe(t.Context(), topic, func(context.Context, eventbus.Message) {}); err != nil {
@@ -248,7 +248,7 @@ func TestClose_activeSub(t *testing.T) {
 func TestClose_timeoutArmed(t *testing.T) {
 	t.Parallel()
 
-	b := newTestBus(t, func(o *eventbus.Options) { o.CloseTimeout = 20 * time.Millisecond })
+	b := freshAdapter(t, func(o *eventbus.Options) { o.CloseTimeout = 20 * time.Millisecond })
 	topic := freshTopic()
 
 	entered := make(chan struct{}, 1)

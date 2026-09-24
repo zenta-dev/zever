@@ -42,6 +42,7 @@ handler := middleware.RequestLogger(logger)(mux)
 | `noop` | default (silent) | nothing |
 | `slog` | `log: {adapter: slog}` | stdlib structured lines |
 | `zerolog` | `log: {adapter: zerolog}` | high-throughput JSON |
+| `pretty` | `log: {adapter: pretty}` | human-readable dev lines |
 
 `RequestLogger` emits one line per request (method, path, status, `duration_ms`, plus `request_id` when present). `Recover` logs panics with value + stack and responds 500 `{"error":"internal error"}`.
 

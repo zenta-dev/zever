@@ -173,6 +173,10 @@ func GenerateEntity(cfg GenerateEntityConfig) (string, error) {
 	return path, nil
 }
 
+// ErrEntityUsage is returned when runGenerateEntity gets the wrong
+// positional count.
+var ErrEntityUsage = errors.New("usage: zever generate entity <module> <name> [--field name:type] (--field is repeatable)")
+
 func runGenerateEntity(args []string) error {
 	const tag = "zever generate entity"
 
@@ -234,7 +238,7 @@ func runGenerateEntity(args []string) error {
 		}
 
 		if len(positional) != 2 {
-			return errors.New(tag + ": usage: zever generate entity <module> <name> [--field name:type] (--field is repeatable)")
+			return fmt.Errorf("%s: %w", tag, ErrEntityUsage)
 		}
 	}
 

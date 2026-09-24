@@ -10,7 +10,7 @@ import (
 const (
 	// DefaultIdleTTL is the default idle entry TTL applied by adapters.
 	DefaultIdleTTL = 10 * time.Minute
-	// DefaultSweepInterval is the default idle-entry sweep interval applied by adapters.
+	// DefaultSweepInterval is the default idle-entry sweep interval applied by adapters for reaping idle entries.
 	DefaultSweepInterval = time.Minute
 	// MaxKeyLen is the maximum allowed rate-limit key length.
 	MaxKeyLen = 256

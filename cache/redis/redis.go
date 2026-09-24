@@ -49,6 +49,10 @@ func connOptions(opts cache.Options) zredis.Options {
 
 // New creates a Redis-backed cache.Cache using a shared client from internal/redis, verifies connectivity with a 3s ping check, and reports failures with the redacted address in errors.
 func New(opts cache.Options) (cache.Cache, error) {
+	if err := opts.Validate(); err != nil {
+		return nil, err
+	}
+
 	client, err := zredis.New(connOptions(opts))
 	if err != nil {
 		return nil, fmt.Errorf("cache: connect %q error: %w", redactURL(opts), err)

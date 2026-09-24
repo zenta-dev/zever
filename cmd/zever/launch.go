@@ -120,6 +120,7 @@ func runLaunch(entryDir string, passthroughArgs []string) error {
 	done := make(chan struct{})
 	defer close(done)
 
+	// Signal forwarder exits when done closes after process end.
 	go func() {
 		for {
 			select {

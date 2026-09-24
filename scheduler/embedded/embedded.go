@@ -95,7 +95,7 @@ func (e *embedded) Schedule(ctx context.Context, spec, jobName string, args any)
 // Zero is invalid and fails; an unknown ID is a no-op returning nil.
 func (e *embedded) Remove(id scheduler.EntryID) error {
 	if id == 0 {
-		return &scheduler.InvalidOptionsError{Reason: "invalid entry_id"}
+		return &scheduler.InvalidOptionsError{Reason: "invalid_entry_id"}
 	}
 
 	e.sched.Remove(id)

@@ -19,8 +19,8 @@ import (
 	"github.com/zenta-dev/zever/log/noop"
 )
 
-// logInterval caps reload-failure log spam to one line per interval.
-const logInterval = time.Second
+// DefaultLogInterval caps reload-failure log spam to one line per interval.
+const DefaultLogInterval = time.Second
 
 // maxInt and minInt bound float-to-int conversion for the host platform.
 const (
@@ -186,11 +186,11 @@ func (d *driver) reloadIfChanged() {
 	d.lastHash = hash
 }
 
-// rateLimitedLog emits at most one line per logInterval.
+// rateLimitedLog emits at most one line per DefaultLogInterval.
 func (d *driver) rateLimitedLog(format string, args ...any) {
 	d.mu.Lock()
 	now := time.Now()
-	if now.Sub(d.lastLog) < logInterval {
+	if now.Sub(d.lastLog) < DefaultLogInterval {
 		d.mu.Unlock()
 		return
 	}
@@ -355,7 +355,7 @@ func parseStrictBool(s string) (bool, error) {
 
 // errStrictBool marks strings outside the true/false pair. Callers wrap
 // it with the key context.
-var errStrictBool = errors.New("strict bool parse failed")
+var errStrictBool = errors.New("flag: static: strict bool parse failed")
 
 // floatToInt converts an exact integer float to int, rejecting
 // fractions, imprecise magnitudes (>= 2^53), and out-of-range values.

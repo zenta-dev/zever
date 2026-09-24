@@ -99,7 +99,7 @@ func TestOpen_invalidOptions_validatedFirst(t *testing.T) {
 	}
 }
 
-func TestOpen_factoryError_wrappedWithAdapter(t *testing.T) {
+func TestOpen_factoryError_returnsDirect(t *testing.T) {
 	a := freshAdapter()
 	sentinel := errors.New("boom")
 	if err := Register(a, func(Options) (Webhook, error) { return nil, sentinel }); err != nil {
@@ -107,13 +107,13 @@ func TestOpen_factoryError_wrappedWithAdapter(t *testing.T) {
 	}
 	w, err := Open(a, Options{})
 	if !errors.Is(err, sentinel) {
-		t.Fatalf("Open err = %v, want wrap of sentinel", err)
+		t.Fatalf("Open err = %v, want direct sentinel", err)
 	}
 	if w != nil {
 		t.Fatalf("Open factory-error webhook = %v, want nil", w)
 	}
-	if !strings.Contains(err.Error(), "webhook: open") {
-		t.Fatalf("Open err %q missing %q", err.Error(), "webhook: open")
+	if strings.Contains(err.Error(), "webhook: open") {
+		t.Fatalf("Open err %q must not contain %q (factory errors return directly)", err.Error(), "webhook: open")
 	}
 }
 

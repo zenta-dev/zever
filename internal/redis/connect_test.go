@@ -41,10 +41,10 @@ func TestValidateAddr_reasons(t *testing.T) {
 		addr string
 		want string
 	}{
-		{"redis://h:6379", "redis addr must be host:port without scheme"},
-		{"h:6379/x", "redis addr must be host:port"},
-		{":6379", "redis addr host must be non-empty"},
-		{"h:99999", "redis addr port must be 1-65535"},
+		{"redis://h:6379", "redis: addr must be host:port without scheme"},
+		{"h:6379/x", "redis: addr must be host:port"},
+		{":6379", "redis: addr host must be non-empty"},
+		{"h:99999", "redis: addr port must be 1-65535"},
 	}
 
 	for _, tc := range cases {
@@ -70,14 +70,14 @@ func TestValidatePrefix(t *testing.T) {
 
 	if err := ValidatePrefix(strings.Repeat("p", 65)); err == nil {
 		t.Error("ValidatePrefix(65 chars) = nil, want error")
-	} else if err.Error() != "redis prefix must be at most 64 characters" {
+	} else if err.Error() != "redis: prefix must be at most 64 characters" {
 		t.Errorf("ValidatePrefix(65 chars) = %q, want length reason", err.Error())
 	}
 
 	for _, p := range []string{"has space", "semi;colon", "colon:prefix", "slash/x"} {
 		if err := ValidatePrefix(p); err == nil {
 			t.Errorf("ValidatePrefix(%q) = nil, want error", p)
-		} else if err.Error() != "redis prefix must contain only token characters" {
+		} else if err.Error() != "redis: prefix must contain only token characters" {
 			t.Errorf("ValidatePrefix(%q) = %q, want token reason", p, err.Error())
 		}
 	}

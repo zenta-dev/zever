@@ -11,12 +11,18 @@ import (
 	"github.com/zenta-dev/zever/internal/dsl/diag"
 )
 
-// errRenameEmptyName rejects a blank new name before any edit is built.
-var errRenameEmptyName = errors.New("zever-lsp: rename requires a non-empty new name")
+// ErrRenameEmptyName rejects a blank new name before any edit is built.
+var ErrRenameEmptyName = errors.New("zever-lsp: rename requires a non-empty new name")
 
-// errRenameInvalidIdent rejects a new name that is not a legal zen
+// errRenameEmptyName aliases ErrRenameEmptyName for existing same-package callers.
+var errRenameEmptyName = ErrRenameEmptyName
+
+// ErrRenameInvalidIdent rejects a new name that is not a legal zen
 // identifier before any edit is built.
-var errRenameInvalidIdent = errors.New("zever-lsp: rename requires a valid identifier for the new name")
+var ErrRenameInvalidIdent = errors.New("zever-lsp: rename requires a valid identifier for the new name")
+
+// errRenameInvalidIdent aliases ErrRenameInvalidIdent for existing same-package callers.
+var errRenameInvalidIdent = ErrRenameInvalidIdent
 
 // isValidZenIdent reports whether name is a legal zen DSL identifier,
 // mirroring internal/dsl/lexer's exact isIdentStart/isIdentContinue rule:
@@ -472,11 +478,11 @@ func renameSymbolEdits(
 	}
 
 	if newName == "" {
-		return nil, errRenameEmptyName
+		return nil, ErrRenameEmptyName
 	}
 
 	if !isValidZenIdent(newName) {
-		return nil, errRenameInvalidIdent
+		return nil, ErrRenameInvalidIdent
 	}
 
 	changes := make(map[uri.URI][]protocol.TextEdit)

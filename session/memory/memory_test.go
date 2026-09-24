@@ -30,7 +30,13 @@ func eventually(t *testing.T, timeout time.Duration, cond func() bool, msg strin
 			t.Fatalf("timed out waiting for %s", msg)
 		}
 
-		time.Sleep(5 * time.Millisecond)
+		timer := time.NewTimer(5 * time.Millisecond)
+		select {
+		case <-t.Context().Done():
+			timer.Stop()
+			t.Fatalf("test context done waiting for %s", msg)
+		case <-timer.C:
+		}
 	}
 }
 

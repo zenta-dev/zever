@@ -45,7 +45,7 @@ type Options struct {
 // Adapters validate their own required fields.
 func (o Options) Validate() error {
 	if o.Firebase.Timeout < 0 {
-		return &InvalidOptionsError{Reason: "firebase timeout must be >= 0"}
+		return &InvalidOptionsError{Reason: "firebase_timeout must be >= 0"}
 	}
 	return nil
 }

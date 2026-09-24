@@ -22,7 +22,7 @@ func newFakeBus() *fakeBus {
 	return &fakeBus{subs: make(map[string][]Handler)}
 }
 
-func (b *fakeBus) Publish(_ context.Context, topic string, payload Payload, headers Headers) error {
+func (b *fakeBus) Publish(ctx context.Context, topic string, payload Payload, headers Headers) error {
 	b.mu.Lock()
 	defer b.mu.Unlock()
 
@@ -32,7 +32,7 @@ func (b *fakeBus) Publish(_ context.Context, topic string, payload Payload, head
 
 	msg := NewMessage(topic, payload, headers)
 	for _, h := range b.subs[topic] {
-		h(context.Background(), msg)
+		h(ctx, msg)
 	}
 
 	return nil

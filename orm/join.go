@@ -2700,7 +2700,7 @@ func assignAny(dest any, src any) error {
 		}
 
 		if v < math.MinInt32 || v > math.MaxInt32 {
-			return fmt.Errorf("cannot scan int64 %d into int32: out of range", v)
+			return fmt.Errorf("orm: cannot scan int64 %d into int32: out of range", v)
 		}
 
 		*d = int32(v)

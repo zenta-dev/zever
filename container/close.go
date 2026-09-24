@@ -242,7 +242,7 @@ func (c *Container) Close(ctx context.Context) error {
 					errs = append(errs, err)
 				} else {
 					// Name the service only, never resolved values.
-					errs = append(errs, fmt.Errorf("[container] close %s: %w", service, err))
+					errs = append(errs, fmt.Errorf("container: close %s: %w", service, err))
 				}
 			}
 		case <-perCtx.Done():

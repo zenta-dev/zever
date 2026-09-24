@@ -398,7 +398,13 @@ func waitForZeverLifecycle(t *testing.T, path string, want []string, within time
 			return
 		}
 
-		time.Sleep(25 * time.Millisecond)
+		timer := time.NewTimer(25 * time.Millisecond)
+		select {
+		case <-t.Context().Done():
+			timer.Stop()
+			t.Fatalf("test context done: lifecycle = %v, want %v", got, want)
+		case <-timer.C:
+		}
 	}
 
 	t.Fatalf("timed out after %s: lifecycle = %v, want %v", within, got, want)
@@ -649,7 +655,13 @@ func pollFor(t *testing.T, within time.Duration, cond func() bool) {
 			return
 		}
 
-		time.Sleep(10 * time.Millisecond)
+		timer := time.NewTimer(10 * time.Millisecond)
+		select {
+		case <-t.Context().Done():
+			timer.Stop()
+			t.Fatalf("test context done waiting for condition")
+		case <-timer.C:
+		}
 	}
 
 	t.Fatalf("timed out after %s waiting for condition", within)

@@ -32,8 +32,6 @@ type Options struct {
 }
 
 // Validate checks options for consistency, joining all violations.
-//
-// Validate checks options for consistency.
 // Zero TTL means DefaultTTL and is valid; only negative TTL fails.
 func (o Options) Validate() error {
 	if o.TTL < 0 {

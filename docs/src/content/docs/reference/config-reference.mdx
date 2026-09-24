@@ -13,7 +13,7 @@ zero-infra so tests run bare; files are strict YAML/JSON; env is best-effort
 
 | Service | Adapters | Default |
 |---|---|---|
-| ai | anthropic, openai, gemini | anthropic (needs key) |
+| ai | anthropic, openai, gemini, ollama | anthropic (needs key) |
 | analytics | log, posthog | log |
 | auth | jwt, session, oidc | jwt |
 | billing | stub, stripe, paddle | stub |
@@ -27,7 +27,7 @@ zero-infra so tests run bare; files are strict YAML/JSON; env is best-effort
 | i18n | embed, remote | embed |
 | idempotency | memory, redis | memory |
 | lock | memory, redis | memory |
-| log | noop, zerolog, slog | slog |
+| log | noop, zerolog, slog, pretty | slog |
 | mailer | log, smtp | log (dummy localhost) |
 | media | local, s3 | local |
 | notification | log, twilio, fcm | log |
@@ -55,7 +55,7 @@ db:
   adapter: postgres
   options:
     dsn: postgres://app:secret@db:5432/app
-    maxconns: 20
+    max_conns: 20
 log:
   adapter: slog
 ```

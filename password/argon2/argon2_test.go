@@ -400,7 +400,13 @@ func TestRegistryIntegration(t *testing.T) {
 	ctx := t.Context()
 
 	if err := password.Register(password.AdapterArgon2ID, New); err != nil {
-		t.Fatalf("Register() = %v, want nil", err)
+		var dup *password.DuplicateError
+		if !errors.As(err, &dup) {
+			t.Fatalf("Register() = %v, want nil", err)
+		}
+		// Duplicate means an earlier run in this process already wired New
+		// (e.g. -count=2); the Open roundtrip below still holds since New is
+		// a process-shared factory.
 	}
 
 	reduced, err := password.Open(password.AdapterArgon2ID, password.Options{

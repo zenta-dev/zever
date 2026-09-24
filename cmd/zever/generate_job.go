@@ -33,6 +33,9 @@ func printJobUsage(fs *flag.FlagSet) {
 	}, "add -i to be prompted step-by-step")
 }
 
+// ErrJobUsage is returned when runGenerateJob gets the wrong positional count.
+var ErrJobUsage = errors.New("usage: zever generate job <module> <name> [--queue name]")
+
 // GenerateJobConfig is the pure input to GenerateJob: the target module, the
 // new job name, and the queue it runs on.
 type GenerateJobConfig struct {
@@ -175,7 +178,7 @@ func runGenerateJob(args []string) error {
 		}
 
 		if len(positional) != 2 {
-			return errors.New(tag + ": usage: zever generate job <module> <name> [--queue name]")
+			return fmt.Errorf("%s: %w", tag, ErrJobUsage)
 		}
 	}
 

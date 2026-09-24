@@ -59,7 +59,7 @@ func Open(adapter Adapter, opts Options) (Webhook, error) {
 
 	w, err := factory(opts)
 	if err != nil {
-		return nil, fmt.Errorf("webhook: open %s: %w", adapter, err)
+		return nil, err
 	}
 
 	return w, nil

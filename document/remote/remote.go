@@ -119,7 +119,7 @@ func (d *driver) Render(ctx context.Context, source []byte, format document.Outp
 		return nil, fmt.Errorf("remote: render status %d: %q", resp.StatusCode, errBody)
 	}
 
-	body, err := httpclient.ReadLimited(resp.Body, d.maxOutput)
+	body, err := httpclient.ReadLimited(ctx, resp.Body, d.maxOutput)
 	if err != nil {
 		if errors.Is(err, httpclient.ErrTooLarge) {
 			var serr error = &document.SizeLimitError{Size: int(d.maxOutput) + 1, Limit: int(d.maxOutput)}

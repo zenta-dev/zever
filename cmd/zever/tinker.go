@@ -530,6 +530,7 @@ func (c *tinkerClient) Close() error {
 func (c *tinkerClient) ping(timeout time.Duration) error {
 	done := make(chan error, 1)
 
+	// Ping probe exits after call completes (buffered, no leak on timeout).
 	go func() {
 		_, err := c.call(verbPing, nil)
 		done <- err

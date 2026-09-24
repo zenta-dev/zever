@@ -74,7 +74,7 @@ func TestOptionsErrorString(t *testing.T) {
 	t.Parallel()
 
 	err := Options{}.Validate()
-	if got, want := err.Error(), "scheduler: invalid options: dispatcher is required"; got != want {
+	if got, want := err.Error(), "scheduler: invalid options: dispatcher_is_required"; got != want {
 		t.Fatalf("Error()=%q want %q", got, want)
 	}
 }
@@ -92,6 +92,10 @@ func TestRegisterNilFactory(t *testing.T) {
 	}
 }
 
+// errOpenFactory is process-shared so repeat runs (-count=2) rewire
+// the same sentinel instance; Register tolerates the resulting duplicate.
+var errOpenFactory = errors.New("boom")
+
 func TestRegisterDuplicate(t *testing.T) {
 	t.Parallel()
 
@@ -101,7 +105,12 @@ func TestRegisterDuplicate(t *testing.T) {
 	if err := Register(a, func(Options) (Scheduler, error) {
 		return stubFactory(stubFactoryOpts(d))
 	}); err != nil {
-		t.Fatalf("Register: %v", err)
+		var dup *DuplicateError
+		if !errors.As(err, &dup) {
+			t.Fatalf("Register: %v", err)
+		}
+		// Duplicate means an earlier run in this process already registered
+		// this adapter (e.g. -count=2); the duplicate assertion below holds.
 	}
 
 	err := Register(a, func(Options) (Scheduler, error) {
@@ -136,12 +145,17 @@ func TestOpenFactoryErrorWrapped(t *testing.T) {
 	t.Parallel()
 
 	a := Adapter(104)
-	sentinel := errors.New("boom")
+	sentinel := errOpenFactory
 
 	if err := Register(a, func(Options) (Scheduler, error) {
 		return nil, sentinel
 	}); err != nil {
-		t.Fatalf("Register: %v", err)
+		var dup *DuplicateError
+		if !errors.As(err, &dup) {
+			t.Fatalf("Register: %v", err)
+		}
+		// Duplicate means an earlier run already wired the same shared
+		// sentinel; the errors.Is check below still holds.
 	}
 
 	_, err := Open(a, Options{Dispatcher: &job.Dispatcher{}})
@@ -159,7 +173,12 @@ func TestOpenOk(t *testing.T) {
 	if err := Register(a, func(Options) (Scheduler, error) {
 		return stubFactory(stubFactoryOpts(d))
 	}); err != nil {
-		t.Fatalf("Register: %v", err)
+		var dup *DuplicateError
+		if !errors.As(err, &dup) {
+			t.Fatalf("Register: %v", err)
+		}
+		// Duplicate means an earlier run in this process already wired an
+		// equivalent factory (e.g. -count=2); the Name check below holds.
 	}
 
 	s, err := Open(a, stubFactoryOpts(d))

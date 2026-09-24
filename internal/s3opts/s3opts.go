@@ -36,16 +36,16 @@ type Options struct {
 // Config aliases Options for compatibility.
 type Config = Options
 
-func (c Options) WithDefaults(defaultRegion string) Options {
+func (o Options) WithDefaults(defaultRegion string) Options {
 	if defaultRegion == "" {
 		defaultRegion = DefaultRegion
 	}
 	out := Options{
-		Endpoint:        strings.TrimSpace(c.Endpoint),
-		Region:          strings.TrimSpace(c.Region),
-		Bucket:          strings.TrimSpace(c.Bucket),
-		AccessKeyID:     strings.TrimSpace(c.AccessKeyID),
-		SecretAccessKey: strings.TrimSpace(c.SecretAccessKey),
+		Endpoint:        strings.TrimSpace(o.Endpoint),
+		Region:          strings.TrimSpace(o.Region),
+		Bucket:          strings.TrimSpace(o.Bucket),
+		AccessKeyID:     strings.TrimSpace(o.AccessKeyID),
+		SecretAccessKey: strings.TrimSpace(o.SecretAccessKey),
 	}
 	if out.Region == "" {
 		out.Region = defaultRegion
@@ -53,15 +53,15 @@ func (c Options) WithDefaults(defaultRegion string) Options {
 	return out
 }
 
-func (c Options) ValidateBucket() error {
-	if strings.TrimSpace(c.Bucket) == "" {
+func (o Options) ValidateBucket() error {
+	if strings.TrimSpace(o.Bucket) == "" {
 		return ErrMissingBucket
 	}
 	return nil
 }
 
-func (c Options) ValidateCredentials() error {
-	if strings.TrimSpace(c.AccessKeyID) == "" || strings.TrimSpace(c.SecretAccessKey) == "" {
+func (o Options) ValidateCredentials() error {
+	if strings.TrimSpace(o.AccessKeyID) == "" || strings.TrimSpace(o.SecretAccessKey) == "" {
 		return ErrMissingCredentials
 	}
 	return nil
@@ -93,16 +93,16 @@ func validateURL(value string) error {
 	return nil
 }
 
-func (c Options) ValidateEndpoint() error {
-	v := strings.TrimSpace(c.Endpoint)
+func (o Options) ValidateEndpoint() error {
+	v := strings.TrimSpace(o.Endpoint)
 	if v == "" {
 		return nil
 	}
 	return validateURL(v)
 }
 
-func (c Options) ValidateRegion() error {
-	r := strings.TrimSpace(c.Region)
+func (o Options) ValidateRegion() error {
+	r := strings.TrimSpace(o.Region)
 	if r == "" {
 		return fmt.Errorf("%w: region is required", ErrInvalidRegion)
 	}
@@ -112,21 +112,21 @@ func (c Options) ValidateRegion() error {
 	return nil
 }
 
-func (c Options) Validate(requireBucket, requireCredentials bool) error {
+func (o Options) Validate(requireBucket, requireCredentials bool) error {
 	var errs []error
-	if err := c.ValidateEndpoint(); err != nil {
+	if err := o.ValidateEndpoint(); err != nil {
 		errs = append(errs, err)
 	}
-	if err := c.ValidateRegion(); err != nil {
+	if err := o.ValidateRegion(); err != nil {
 		errs = append(errs, err)
 	}
 	if requireBucket {
-		if err := c.ValidateBucket(); err != nil {
+		if err := o.ValidateBucket(); err != nil {
 			errs = append(errs, err)
 		}
 	}
 	if requireCredentials {
-		if err := c.ValidateCredentials(); err != nil {
+		if err := o.ValidateCredentials(); err != nil {
 			errs = append(errs, err)
 		}
 	}
@@ -144,15 +144,15 @@ func NewClient(ctx context.Context, prefix string, cfg Options, urlBase string) 
 	trimBase := strings.TrimSpace(urlBase)
 	check := Options{Endpoint: endpoint, Region: region}
 	if err := check.ValidateEndpoint(); err != nil {
-		return nil, nil, fmt.Errorf("[%s] endpoint: %w", prefix, err)
+		return nil, nil, fmt.Errorf("%s: endpoint: %w", prefix, err)
 	}
 	regCheck := Options{Region: region}
 	if err := regCheck.ValidateRegion(); err != nil {
-		return nil, nil, fmt.Errorf("[%s] region: %w", prefix, err)
+		return nil, nil, fmt.Errorf("%s: region: %w", prefix, err)
 	}
 	if trimBase != "" {
 		if err := validateURL(trimBase); err != nil {
-			return nil, nil, fmt.Errorf("[%s] url_base: %w", prefix, err)
+			return nil, nil, fmt.Errorf("%s: url_base: %w", prefix, err)
 		}
 	}
 	client, presigner, err := coreNewClient(ctx, prefix, region, endpoint, trimBase, strings.TrimSpace(cfg.AccessKeyID), strings.TrimSpace(cfg.SecretAccessKey))

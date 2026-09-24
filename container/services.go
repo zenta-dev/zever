@@ -9,6 +9,7 @@ import (
 	"github.com/zenta-dev/zever/ai"
 	"github.com/zenta-dev/zever/ai/anthropic"
 	"github.com/zenta-dev/zever/ai/gemini"
+	aiollama "github.com/zenta-dev/zever/ai/ollama"
 	"github.com/zenta-dev/zever/ai/openai"
 	"github.com/zenta-dev/zever/analytics"
 	analyticslog "github.com/zenta-dev/zever/analytics/log"
@@ -55,6 +56,7 @@ import (
 	lockredis "github.com/zenta-dev/zever/lock/redis"
 	"github.com/zenta-dev/zever/log"
 	lognoop "github.com/zenta-dev/zever/log/noop"
+	logpretty "github.com/zenta-dev/zever/log/pretty"
 	"github.com/zenta-dev/zever/log/slog"
 	"github.com/zenta-dev/zever/log/zerolog"
 	"github.com/zenta-dev/zever/mailer"
@@ -138,6 +140,9 @@ func registerAdapters() {
 	_ = ai.Register(ai.Anthropic, anthropic.New)
 	_ = ai.Register(ai.OpenAI, openai.New)
 	_ = ai.Register(ai.Gemini, gemini.New)
+	_ = ai.Register(ai.Ollama, func(o ai.Options) (ai.AI, error) {
+		return aiollama.New(aiollama.Options{Addr: o.BaseURL, Model: o.Model, Timeout: o.Timeout})
+	})
 
 	_ = analytics.Register(analytics.Log, analyticslog.New)
 	_ = analytics.Register(analytics.PostHog, posthog.New)
@@ -184,6 +189,7 @@ func registerAdapters() {
 	_ = log.Register(log.Noop, func(log.Options) (log.Logger, error) { return lognoop.New(), nil })
 	_ = log.Register(log.ZeroLog, func(o log.Options) (log.Logger, error) { return zerolog.New(o), nil })
 	_ = log.Register(log.Slog, func(o log.Options) (log.Logger, error) { return slog.New(o), nil })
+	_ = log.Register(log.Pretty, func(o log.Options) (log.Logger, error) { return logpretty.New(o), nil })
 
 	_ = mailer.Register(mailer.Log, mailerlog.New)
 	_ = mailer.Register(mailer.SMTP, smtp.New)
@@ -262,14 +268,14 @@ func openService[T any, A any, O any](service string, name string, parse func(st
 	if err != nil {
 		var zero T
 
-		return zero, fmt.Errorf("[container] %s: %w", service, err)
+		return zero, fmt.Errorf("container: %s: %w", service, err)
 	}
 
 	v, err := open(a, opts)
 	if err != nil {
 		var zero T
 
-		return zero, fmt.Errorf("[container] %s: %w", service, err)
+		return zero, fmt.Errorf("container: %s: %w", service, err)
 	}
 
 	return v, nil
@@ -406,7 +412,7 @@ func (c *Container) Job() (*job.Dispatcher, error) {
 	return c.job.get(func() (*job.Dispatcher, error) {
 		q, err := c.Queue()
 		if err != nil {
-			return nil, fmt.Errorf("[container] job: resolve queue: %w", err)
+			return nil, fmt.Errorf("container: job: resolve queue: %w", err)
 		}
 
 		return &job.Dispatcher{Q: q}, nil
@@ -512,7 +518,7 @@ func (c *Container) Scheduler() (scheduler.Scheduler, error) {
 		if opts.Dispatcher == nil {
 			d, err := c.Job()
 			if err != nil {
-				return nil, fmt.Errorf("[container] scheduler: resolve job: %w", err)
+				return nil, fmt.Errorf("container: scheduler: resolve job: %w", err)
 			}
 
 			opts.Dispatcher = d

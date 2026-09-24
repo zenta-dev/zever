@@ -22,7 +22,7 @@ a rewrite of the code that calls `Generate`.
 ai:
   adapter: anthropic
   options:
-    apikey: sk-...
+    api_key: sk-...
     model: claude-opus-4
     timeout: 30s
 ```
@@ -58,6 +58,7 @@ next call retries.
 | `anthropic` | `ai/anthropic` | Default |
 | `openai` | `ai/openai` | |
 | `gemini` | `ai/gemini` | |
+| `ollama` | `ai/ollama` | Self-hosted via `Addr` |
 
 ## The gotcha: features fail closed, not silently
 

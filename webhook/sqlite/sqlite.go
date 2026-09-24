@@ -25,6 +25,9 @@ const schema = `CREATE TABLE IF NOT EXISTS webhook_targets (
 
 var memoryCounter uint64
 
+// DefaultOpenTimeout bounds SQLite ping, schema setup, and registration reload.
+const DefaultOpenTimeout = 5 * time.Second
+
 // adapter is a durable registration store (SQLite) fronting the synchronous
 // delivery engine composed from the http adapter. It holds no delivery logic:
 // Register validation and Deliver behave exactly as the http adapter defines.
@@ -51,7 +54,7 @@ func New(o webhook.Options) (webhook.Webhook, error) {
 	// without a dedicated test.
 	inner, err := whttp.New(o)
 	if err != nil {
-		return nil, fmt.Errorf("webhook: open http: %w", err)
+		return nil, err
 	}
 
 	db, dsn, err := openDB(o.DSN)
@@ -100,7 +103,7 @@ func openDB(dsn string) (*sql.DB, string, error) {
 	// concurrent writes without a busy-timeout pragma.
 	db.SetMaxOpenConns(1)
 
-	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
+	ctx, cancel := context.WithTimeout(context.Background(), DefaultOpenTimeout)
 	defer cancel()
 
 	if err := db.PingContext(ctx); err != nil {
@@ -120,7 +123,7 @@ func openDB(dsn string) (*sql.DB, string, error) {
 // engine re-validates each target, so stale rows fail Open instead of
 // vanishing silently.
 func (a *adapter) load() error {
-	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
+	ctx, cancel := context.WithTimeout(context.Background(), DefaultOpenTimeout)
 	defer cancel()
 
 	rows, err := a.db.QueryContext(ctx, `SELECT event, target, secret FROM webhook_targets`)

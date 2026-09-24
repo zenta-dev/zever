@@ -10,6 +10,8 @@ const (
 	OpenAI
 	// Gemini selects the Gemini backend.
 	Gemini
+	// Ollama selects the Ollama backend.
+	Ollama
 )
 
 // String returns the canonical name of Adapter.
@@ -21,6 +23,8 @@ func (a Adapter) String() string {
 		return "openai"
 	case Gemini:
 		return "gemini"
+	case Ollama:
+		return "ollama"
 	default:
 		return "unknown"
 	}
@@ -36,6 +40,8 @@ func ParseAdapter(s string) (Adapter, error) {
 		return OpenAI, nil
 	case "gemini":
 		return Gemini, nil
+	case "ollama":
+		return Ollama, nil
 	default:
 		return Anthropic, &InvalidAdapterError{Adapter: s}
 	}

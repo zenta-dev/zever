@@ -2,6 +2,7 @@ package ollama
 
 import (
 	"errors"
+	"fmt"
 	"net/http"
 	"time"
 
@@ -26,6 +27,11 @@ type Options struct {
 	// Tests use a hand-fake transport; production leaves it nil.
 	Transport http.RoundTripper `json:"-" toml:"-" yaml:"-"`
 }
+
+// ErrInvalidAddr is returned when Options.Addr fails endpoint validation.
+// The wrapped endpoint error names the failure shape; addrReason preserves
+// the historical fragments callers match on.
+var ErrInvalidAddr = errors.New("ollama: invalid addr")
 
 // Validate checks Options for consistency, joining all violations.
 // Secret values are never echoed: only the address shape is reported.
@@ -53,7 +59,7 @@ func validateAddr(addr string) error {
 		endpoint.WithRejectUserinfo(),
 		endpoint.WithRejectWhitespace(),
 	); err != nil {
-		return errors.New("ollama: addr " + addrReason(err))
+		return fmt.Errorf("%w: %s: %w", ErrInvalidAddr, addrReason(err), err)
 	}
 
 	return nil

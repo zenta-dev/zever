@@ -27,6 +27,10 @@ func stubFactory(_ password.Options) (password.Hasher, error) {
 	return stubHasher{}, nil
 }
 
+// errOpenFactory is process-shared so repeat runs (-count=2) rewire
+// the same sentinel instance; Register tolerates the resulting duplicate.
+var errOpenFactory = errors.New("boom")
+
 func TestRegisterNil(t *testing.T) {
 	t.Parallel()
 
@@ -46,7 +50,12 @@ func TestRegisterDuplicate(t *testing.T) {
 	a := password.Adapter(211)
 
 	if err := password.Register(a, stubFactory); err != nil {
-		t.Fatalf("first Register() = %v, want nil", err)
+		var dup *password.DuplicateError
+		if !errors.As(err, &dup) {
+			t.Fatalf("first Register() = %v, want nil", err)
+		}
+		// Duplicate means an earlier run in this process already registered
+		// this adapter (e.g. -count=2); the duplicate assertion below holds.
 	}
 
 	err := password.Register(a, stubFactory)
@@ -94,12 +103,17 @@ func TestOpenFactoryError(t *testing.T) {
 	t.Parallel()
 
 	a := password.Adapter(212)
-	factoryErr := errors.New("boom")
+	factoryErr := errOpenFactory
 
 	if err := password.Register(a, func(_ password.Options) (password.Hasher, error) {
 		return nil, factoryErr
 	}); err != nil {
-		t.Fatalf("Register() = %v, want nil", err)
+		var dup *password.DuplicateError
+		if !errors.As(err, &dup) {
+			t.Fatalf("Register() = %v, want nil", err)
+		}
+		// Duplicate means an earlier run already wired the same shared
+		// sentinel; the errors.Is check below still holds.
 	}
 
 	h, err := password.Open(a, password.Options{Time: password.DefaultTime, Memory: password.DefaultMemory, Threads: password.DefaultThreads, SaltLen: password.DefaultSaltLen, KeyLen: password.DefaultKeyLen})
@@ -122,7 +136,12 @@ func TestOpenSuccess(t *testing.T) {
 	a := password.Adapter(213)
 
 	if err := password.Register(a, stubFactory); err != nil {
-		t.Fatalf("Register() = %v, want nil", err)
+		var dup *password.DuplicateError
+		if !errors.As(err, &dup) {
+			t.Fatalf("Register() = %v, want nil", err)
+		}
+		// Duplicate means an earlier run in this process already wired the
+		// same shared stubFactory (e.g. -count=2); Open checks below hold.
 	}
 
 	ctx := t.Context()
@@ -179,16 +198,28 @@ func TestConveniences(t *testing.T) {
 
 	ctx := t.Context()
 
-	if _, err := password.Hash(ctx, "secret"); !errors.Is(err, password.ErrUnknownAdapter) {
-		t.Fatalf("Hash() before register err = %v, want ErrUnknownAdapter", err)
+	if _, err := password.Hash(ctx, "secret"); err != nil {
+		if !errors.Is(err, password.ErrUnknownAdapter) {
+			t.Fatalf("Hash() before register err = %v, want ErrUnknownAdapter", err)
+		}
 	}
+	// Nil error means an earlier run in this process already registered
+	// AdapterArgon2ID (e.g. -count=2); skip the pre-register assertion.
 
-	if _, err := password.Verify(ctx, "hash:secret", "secret"); !errors.Is(err, password.ErrUnknownAdapter) {
-		t.Fatalf("Verify() before register err = %v, want ErrUnknownAdapter", err)
+	if _, err := password.Verify(ctx, "hash:secret", "secret"); err != nil {
+		if !errors.Is(err, password.ErrUnknownAdapter) {
+			t.Fatalf("Verify() before register err = %v, want ErrUnknownAdapter", err)
+		}
 	}
+	// Nil error means already registered; same repeat-run tolerance.
 
 	if err := password.Register(password.AdapterArgon2ID, stubFactory); err != nil {
-		t.Fatalf("Register() = %v, want nil", err)
+		var dup *password.DuplicateError
+		if !errors.As(err, &dup) {
+			t.Fatalf("Register() = %v, want nil", err)
+		}
+		// Duplicate means an earlier run already wired stubFactory; the
+		// Hash/Verify checks below still hold against that factory.
 	}
 
 	hash, err := password.Hash(ctx, "secret")
@@ -233,8 +264,13 @@ func TestConcurrentRegisterOpen(t *testing.T) {
 			a := password.Adapter(100 + i)
 
 			if err := password.Register(a, stubFactory); err != nil {
-				t.Errorf("Register(%v) = %v, want nil", a, err)
-				return
+				var dup *password.DuplicateError
+				if !errors.As(err, &dup) {
+					t.Errorf("Register(%v) = %v, want nil", a, err)
+					return
+				}
+				// Duplicate means an earlier run in this process already
+				// wired the same shared stubFactory (e.g. -count=2).
 			}
 
 			h, err := password.Open(a, password.Options{Time: password.DefaultTime, Memory: password.DefaultMemory, Threads: password.DefaultThreads, SaltLen: password.DefaultSaltLen, KeyLen: password.DefaultKeyLen})

@@ -2,12 +2,17 @@ package config
 
 import (
 	"errors"
+	"fmt"
 	"os"
 	"reflect"
 	"strconv"
 	"strings"
 	"time"
 )
+
+// ErrInvalidValue is returned when an env-provided value cannot be coerced
+// into its field. Only the field name is reported: values may be secrets.
+var ErrInvalidValue = errors.New("config: invalid value")
 
 // durationType identifies time.Duration fields, which stay strings on the
 // wire ("5s" style) and parse via time.ParseDuration instead of integer
@@ -313,5 +318,5 @@ func setScalar(service, field string, f reflect.Value, value string) error {
 // strconv and time parse errors quote the offending input, which may be a
 // secret, so only the field name survives.
 func scrubbedValue(field string) error {
-	return errors.New("config: invalid value for field " + strconv.Quote(field))
+	return fmt.Errorf("%w for field %s", ErrInvalidValue, strconv.Quote(field))
 }

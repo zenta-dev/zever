@@ -11,6 +11,9 @@ import (
 // MaxPrefixLen is the maximum allowed Redis key prefix length in bytes.
 const MaxPrefixLen = 64
 
+// MaxPort is the maximum valid TCP port number.
+const MaxPort = 65535
+
 // ConnectOptions holds the shared Redis connection settings embedded by
 // every battery's Redis options type.
 type ConnectOptions struct {
@@ -43,25 +46,25 @@ func ValidateAddr(addr string) error {
 	}
 
 	if strings.Contains(addr, "://") {
-		return errors.New("redis addr must be host:port without scheme")
+		return errors.New("redis: addr must be host:port without scheme")
 	}
 
 	if strings.ContainsAny(addr, "/?#") {
-		return errors.New("redis addr must be host:port")
+		return errors.New("redis: addr must be host:port")
 	}
 
 	host, portStr, err := net.SplitHostPort(addr)
 	if err != nil {
-		return errors.New("redis addr must be host:port")
+		return errors.New("redis: addr must be host:port")
 	}
 
 	if host == "" {
-		return errors.New("redis addr host must be non-empty")
+		return errors.New("redis: addr host must be non-empty")
 	}
 
 	port, err := strconv.Atoi(portStr)
-	if err != nil || port <= 0 || port > 65535 {
-		return errors.New("redis addr port must be 1-65535")
+	if err != nil || port <= 0 || port > MaxPort {
+		return errors.New("redis: addr port must be 1-65535")
 	}
 
 	return nil
@@ -70,12 +73,12 @@ func ValidateAddr(addr string) error {
 // ValidatePrefix checks a Redis key prefix: at most MaxPrefixLen token characters.
 func ValidatePrefix(prefix string) error {
 	if len(prefix) > MaxPrefixLen {
-		return errors.New("redis prefix must be at most 64 characters")
+		return errors.New("redis: prefix must be at most 64 characters")
 	}
 
 	for i := 0; i < len(prefix); i++ {
 		if !IsTokenChar(prefix[i]) {
-			return errors.New("redis prefix must contain only token characters")
+			return errors.New("redis: prefix must contain only token characters")
 		}
 	}
 

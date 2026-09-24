@@ -21,12 +21,12 @@ definition.
 cache:
   adapter: memory
   options:
-    defaultttl: 5m
+    sweep_interval: 1m
 ```
 
 ```sh
 CACHE_ADAPTER=redis
-CACHE_DEFAULTTTL=5m
+CACHE_SWEEPINTERVAL=1m
 ```
 
 Redis shares connection settings with the standard `addr` / `db` style

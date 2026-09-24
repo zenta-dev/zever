@@ -380,6 +380,32 @@ type coverTLSCap struct {
 	data []string
 }
 
+// coverSharedCert caches one CA/server cert per test process. Go caches
+// the system root pool after first TLS verification, so regenerating the
+// CA on every TestCoverImplicitTLS run (e.g. go test -count=2) leaves
+// later runs trusting the stale cached CA. Reusing one CA keeps
+// SSL_CERT_FILE contents stable across repeats in the same process.
+var (
+	coverSharedCertMu    sync.Mutex
+	coverSharedCert      tls.Certificate
+	coverSharedCAPEM     []byte
+	coverSharedCertReady bool
+)
+
+func coverSharedTestCert(t *testing.T) (tls.Certificate, []byte) {
+	t.Helper()
+	coverSharedCertMu.Lock()
+	defer coverSharedCertMu.Unlock()
+	if coverSharedCertReady {
+		return coverSharedCert, coverSharedCAPEM
+	}
+	cert, caPEM := coverTestCert(t)
+	coverSharedCert = cert
+	coverSharedCAPEM = caPEM
+	coverSharedCertReady = true
+	return coverSharedCert, coverSharedCAPEM
+}
+
 func coverTestCert(t *testing.T) (tls.Certificate, []byte) {
 	t.Helper()
 	now := time.Now()
@@ -558,7 +584,7 @@ func coverTrustCA(t *testing.T, caPEM []byte) {
 // Sequential: sets process-wide SSL_CERT_FILE. Both steps share one CA
 // because the process caches the system root pool after first use.
 func TestCoverImplicitTLS(t *testing.T) {
-	srvCert, caPEM := coverTestCert(t)
+	srvCert, caPEM := coverSharedTestCert(t)
 	seen := &coverTLSCap{}
 	port := startCoverTLSServer(t, srvCert, "235 OK\r\n", seen)
 	coverTrustCA(t, caPEM)

@@ -32,7 +32,7 @@ const DefaultPublishTimeout = 5 * time.Second
 const DefaultSubscribeTimeout = 5 * time.Second
 
 // DefaultUnsubscribeTimeout bounds unsubscribe during teardown.
-const DefaultUnsubscribeTimeout = 2 * time.Second
+const DefaultUnsubscribeTimeout = 5 * time.Second
 
 func (s *subscription) shutdown() {
 	s.once.Do(func() { close(s.stop) })

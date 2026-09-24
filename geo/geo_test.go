@@ -4,6 +4,7 @@ import (
 	"context"
 	"errors"
 	"strings"
+	"sync/atomic"
 	"testing"
 )
 
@@ -27,6 +28,10 @@ func (s *stubGeo) Close() error {
 }
 
 // NOTE: no t.Parallel anywhere in this file: registry is a global map.
+
+var geoAdapterSeq atomic.Int64
+
+func geoFreshAdapter() Adapter { return Adapter(1000 + geoAdapterSeq.Add(1)) }
 
 func TestRegister(t *testing.T) {
 	tests := []struct {
@@ -65,14 +70,17 @@ func TestRegister(t *testing.T) {
 				return
 			}
 			if err != nil {
-				t.Fatalf("expected nil, got %v", err)
+				var dupErr *DuplicateAdapterError
+				if !errors.As(err, &dupErr) {
+					t.Fatalf("expected nil, got %v", err)
+				}
 			}
 		})
 	}
 }
 
 func TestRegisterDuplicate(t *testing.T) {
-	const dup = Adapter(99)
+	dup := geoFreshAdapter()
 
 	if err := Register(dup, func(Options) (Geo, error) { return &stubGeo{}, nil }); err != nil {
 		t.Fatalf("setup Register failed: %v", err)
@@ -124,7 +132,7 @@ func TestOpen(t *testing.T) {
 	})
 
 	t.Run("factory error wrapped", func(t *testing.T) {
-		const bad = Adapter(94)
+		bad := geoFreshAdapter()
 		sentinel := errors.New("boom")
 		if err := Register(bad, func(Options) (Geo, error) { return nil, sentinel }); err != nil {
 			t.Fatalf("setup Register failed: %v", err)
@@ -142,7 +150,7 @@ func TestOpen(t *testing.T) {
 	})
 
 	t.Run("success", func(t *testing.T) {
-		const ok = Adapter(95)
+		ok := geoFreshAdapter()
 		if err := Register(ok, func(Options) (Geo, error) { return &stubGeo{}, nil }); err != nil {
 			t.Fatalf("setup Register failed: %v", err)
 		}

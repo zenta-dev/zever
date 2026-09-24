@@ -63,10 +63,10 @@ type Options struct {
 // are validated by the adapters themselves.
 func (o Options) Validate() error {
 	if o.JWT.MaxTTL < 0 {
-		return &InvalidOptionsError{Reason: "jwt max_ttl must be >= 0"}
+		return &InvalidOptionsError{Reason: "jwt_max_ttl must be >= 0"}
 	}
 	if o.OIDC.Timeout < 0 {
-		return &InvalidOptionsError{Reason: "oidc timeout must be >= 0"}
+		return &InvalidOptionsError{Reason: "oidc_timeout must be >= 0"}
 	}
 	return nil
 }

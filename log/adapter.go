@@ -10,6 +10,8 @@ const (
 	ZeroLog
 	// Slog selects the standard library log/slog-backed logging adapter.
 	Slog
+	// Pretty selects the human-readable local-development logging adapter.
+	Pretty
 )
 
 // String returns the canonical lowercase name of the adapter.
@@ -21,6 +23,8 @@ func (a Adapter) String() string {
 		return "zerolog"
 	case Slog:
 		return "slog"
+	case Pretty:
+		return "pretty"
 	default:
 		return "unknown"
 	}
@@ -36,6 +40,8 @@ func ParseAdapter(s string) (Adapter, error) {
 		return ZeroLog, nil
 	case "slog":
 		return Slog, nil
+	case "pretty":
+		return Pretty, nil
 	default:
 		return Noop, &InvalidAdapterError{Adapter: s}
 	}

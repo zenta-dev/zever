@@ -71,8 +71,8 @@ func (f *fakeClient) first() posthog.Message {
 	return f.messages[0]
 }
 
-// newTestAdapter returns an adapter wired to a fake client.
-func newTestAdapter(_ *testing.T) (*adapter, *fakeClient) {
+// stubAdapter returns an adapter wired to a fake client.
+func stubAdapter(_ *testing.T) (*adapter, *fakeClient) {
 	f := &fakeClient{}
 
 	a := &adapter{
@@ -88,7 +88,7 @@ func newTestAdapter(_ *testing.T) (*adapter, *fakeClient) {
 func TestTrack_ctxUserID_usesDistinctID(t *testing.T) {
 	t.Parallel()
 
-	a, f := newTestAdapter(t)
+	a, f := stubAdapter(t)
 
 	if err := a.Track(analytics.WithUserID(t.Context(), "u1"), "signed_up", nil); err != nil {
 		t.Fatal(err)
@@ -111,7 +111,7 @@ func TestTrack_ctxUserID_usesDistinctID(t *testing.T) {
 func TestTrack_anonymous_fallsBackToDefault(t *testing.T) {
 	t.Parallel()
 
-	a, f := newTestAdapter(t)
+	a, f := stubAdapter(t)
 
 	if err := a.Track(t.Context(), "signed_up", nil); err != nil {
 		t.Fatal(err)
@@ -130,7 +130,7 @@ func TestTrack_anonymous_fallsBackToDefault(t *testing.T) {
 func TestTrack_anonymous_fallsBackToCustomID(t *testing.T) {
 	t.Parallel()
 
-	a, f := newTestAdapter(t)
+	a, f := stubAdapter(t)
 	a.anonymousID = "guest"
 
 	if err := a.Track(t.Context(), "signed_up", nil); err != nil {
@@ -150,7 +150,7 @@ func TestTrack_anonymous_fallsBackToCustomID(t *testing.T) {
 func TestTrack_missingIdentity_returnsSentinel(t *testing.T) {
 	t.Parallel()
 
-	a, f := newTestAdapter(t)
+	a, f := stubAdapter(t)
 	a.anonymousID = ""
 
 	if err := a.Track(t.Context(), "signed_up", nil); !errors.Is(err, analytics.ErrMissingIdentity) {
@@ -165,7 +165,7 @@ func TestTrack_missingIdentity_returnsSentinel(t *testing.T) {
 func TestTrack_enqueueError_wrapsCause(t *testing.T) {
 	t.Parallel()
 
-	a, f := newTestAdapter(t)
+	a, f := stubAdapter(t)
 	fakeErr := errors.New("boom")
 	f.enqueueErr = fakeErr
 
@@ -177,7 +177,7 @@ func TestTrack_enqueueError_wrapsCause(t *testing.T) {
 func TestIdentify_traits_notMutatingCallerMap(t *testing.T) {
 	t.Parallel()
 
-	a, f := newTestAdapter(t)
+	a, f := stubAdapter(t)
 
 	traits := map[string]any{"plan": "pro"}
 	if err := a.Identify(t.Context(), "user-1", traits); err != nil {
@@ -205,7 +205,7 @@ func TestIdentify_traits_notMutatingCallerMap(t *testing.T) {
 func TestIdentify_explicitID_sendsIdentifyMessage(t *testing.T) {
 	t.Parallel()
 
-	a, f := newTestAdapter(t)
+	a, f := stubAdapter(t)
 
 	if err := a.Identify(t.Context(), "u1", map[string]any{"email": "a@b.c"}); err != nil {
 		t.Fatal(err)
@@ -228,7 +228,7 @@ func TestIdentify_explicitID_sendsIdentifyMessage(t *testing.T) {
 func TestIdentify_ctxUserID_usesContextIdentity(t *testing.T) {
 	t.Parallel()
 
-	a, f := newTestAdapter(t)
+	a, f := stubAdapter(t)
 
 	ctx := analytics.WithUserID(t.Context(), "u1")
 	if err := a.Identify(ctx, "", map[string]any{"email": "a@b.c"}); err != nil {
@@ -248,7 +248,7 @@ func TestIdentify_ctxUserID_usesContextIdentity(t *testing.T) {
 func TestIdentify_anonymous_fallsBackToDefault(t *testing.T) {
 	t.Parallel()
 
-	a, f := newTestAdapter(t)
+	a, f := stubAdapter(t)
 
 	if err := a.Identify(t.Context(), "", map[string]any{"email": "a@b.c"}); err != nil {
 		t.Fatal(err)
@@ -271,7 +271,7 @@ func TestIdentify_anonymous_fallsBackToDefault(t *testing.T) {
 func TestIdentify_missingIdentity_returnsSentinel(t *testing.T) {
 	t.Parallel()
 
-	a, f := newTestAdapter(t)
+	a, f := stubAdapter(t)
 	a.anonymousID = ""
 
 	if err := a.Identify(t.Context(), "", nil); !errors.Is(err, analytics.ErrMissingIdentity) {
@@ -286,7 +286,7 @@ func TestIdentify_missingIdentity_returnsSentinel(t *testing.T) {
 func TestIdentify_anonymousDisabled_omitsBridgeProperty(t *testing.T) {
 	t.Parallel()
 
-	a, f := newTestAdapter(t)
+	a, f := stubAdapter(t)
 	a.anonymousID = ""
 
 	if err := a.Identify(t.Context(), "u1", nil); err != nil {
@@ -306,7 +306,7 @@ func TestIdentify_anonymousDisabled_omitsBridgeProperty(t *testing.T) {
 func TestIdentify_enqueueError_wrapsCause(t *testing.T) {
 	t.Parallel()
 
-	a, f := newTestAdapter(t)
+	a, f := stubAdapter(t)
 	fakeErr := errors.New("boom")
 	f.enqueueErr = fakeErr
 
@@ -318,7 +318,7 @@ func TestIdentify_enqueueError_wrapsCause(t *testing.T) {
 func TestGroup_sendsGroupIdentifyMessage(t *testing.T) {
 	t.Parallel()
 
-	a, f := newTestAdapter(t)
+	a, f := stubAdapter(t)
 
 	if err := a.Group(t.Context(), "u1", "org-1", map[string]any{"name": "acme"}); err != nil {
 		t.Fatal(err)
@@ -349,7 +349,7 @@ func TestGroup_sendsGroupIdentifyMessage(t *testing.T) {
 func TestGroup_anonymous_fallsBackToDefault(t *testing.T) {
 	t.Parallel()
 
-	a, f := newTestAdapter(t)
+	a, f := stubAdapter(t)
 
 	if err := a.Group(t.Context(), "", "org-1", nil); err != nil {
 		t.Fatal(err)
@@ -368,7 +368,7 @@ func TestGroup_anonymous_fallsBackToDefault(t *testing.T) {
 func TestGroup_ctxUserID_usesContextIdentity(t *testing.T) {
 	t.Parallel()
 
-	a, f := newTestAdapter(t)
+	a, f := stubAdapter(t)
 
 	ctx := analytics.WithUserID(t.Context(), "u1")
 	if err := a.Group(ctx, "", "org-1", nil); err != nil {
@@ -388,7 +388,7 @@ func TestGroup_ctxUserID_usesContextIdentity(t *testing.T) {
 func TestGroup_paramID_takesPrecedenceOverContext(t *testing.T) {
 	t.Parallel()
 
-	a, f := newTestAdapter(t)
+	a, f := stubAdapter(t)
 
 	ctx := analytics.WithUserID(t.Context(), "ctx-user")
 	if err := a.Group(ctx, "param-user", "org-1", nil); err != nil {
@@ -408,7 +408,7 @@ func TestGroup_paramID_takesPrecedenceOverContext(t *testing.T) {
 func TestGroup_missingIdentity_returnsSentinel(t *testing.T) {
 	t.Parallel()
 
-	a, f := newTestAdapter(t)
+	a, f := stubAdapter(t)
 	a.anonymousID = ""
 
 	if err := a.Group(t.Context(), "", "org-1", nil); !errors.Is(err, analytics.ErrMissingIdentity) {
@@ -423,7 +423,7 @@ func TestGroup_missingIdentity_returnsSentinel(t *testing.T) {
 func TestGroup_missingGroupID_returnsSentinel(t *testing.T) {
 	t.Parallel()
 
-	a, f := newTestAdapter(t)
+	a, f := stubAdapter(t)
 
 	if err := a.Group(t.Context(), "u1", "", nil); !errors.Is(err, analytics.ErrMissingGroupID) {
 		t.Fatalf("want ErrMissingGroupID, got %v", err)
@@ -437,7 +437,7 @@ func TestGroup_missingGroupID_returnsSentinel(t *testing.T) {
 func TestGroup_customType_appliesToMessage(t *testing.T) {
 	t.Parallel()
 
-	a, f := newTestAdapter(t)
+	a, f := stubAdapter(t)
 	a.groupType = "workspace"
 
 	if err := a.Group(t.Context(), "u1", "ws-1", nil); err != nil {
@@ -457,7 +457,7 @@ func TestGroup_customType_appliesToMessage(t *testing.T) {
 func TestGroup_enqueueError_wrapsCause(t *testing.T) {
 	t.Parallel()
 
-	a, f := newTestAdapter(t)
+	a, f := stubAdapter(t)
 	fakeErr := errors.New("boom")
 	f.enqueueErr = fakeErr
 
@@ -569,7 +569,7 @@ func TestOpen_options_appliesCustomAnonymousAndGroup(t *testing.T) {
 func TestClose_success_returnsNil(t *testing.T) {
 	t.Parallel()
 
-	a, f := newTestAdapter(t)
+	a, f := stubAdapter(t)
 
 	if err := a.Close(); err != nil {
 		t.Fatalf("close: %v", err)
@@ -583,7 +583,7 @@ func TestClose_success_returnsNil(t *testing.T) {
 func TestClose_error_wrapsCause(t *testing.T) {
 	t.Parallel()
 
-	a, f := newTestAdapter(t)
+	a, f := stubAdapter(t)
 	fakeErr := errors.New("boom")
 	f.closeErr = fakeErr
 
@@ -595,7 +595,7 @@ func TestClose_error_wrapsCause(t *testing.T) {
 func TestOperations_canceledContext_returnsCanceled(t *testing.T) {
 	t.Parallel()
 
-	a, f := newTestAdapter(t)
+	a, f := stubAdapter(t)
 
 	ctx, cancel := context.WithCancel(t.Context())
 	cancel()
@@ -620,7 +620,7 @@ func TestOperations_canceledContext_returnsCanceled(t *testing.T) {
 func TestTrack_tooManyProperties_returnsCountLimit(t *testing.T) {
 	t.Parallel()
 
-	a, f := newTestAdapter(t)
+	a, f := stubAdapter(t)
 	a.maxProperties = 2
 
 	props := map[string]any{"a": "1", "b": "2", "c": "3"}
@@ -641,7 +641,7 @@ func TestTrack_tooManyProperties_returnsCountLimit(t *testing.T) {
 func TestTrack_oversizedProperties_returnsSizeLimit(t *testing.T) {
 	t.Parallel()
 
-	a, f := newTestAdapter(t)
+	a, f := stubAdapter(t)
 
 	props := map[string]any{"big": strings.Repeat("x", 128*1024)}
 	if err := a.Track(t.Context(), "event", props); err == nil {
@@ -661,7 +661,7 @@ func TestTrack_oversizedProperties_returnsSizeLimit(t *testing.T) {
 func TestIdentify_oversizedTraits_returnsSizeLimit(t *testing.T) {
 	t.Parallel()
 
-	a, f := newTestAdapter(t)
+	a, f := stubAdapter(t)
 
 	traits := map[string]any{"big": strings.Repeat("x", 128*1024)}
 	if err := a.Identify(t.Context(), "u1", traits); err == nil {
@@ -681,7 +681,7 @@ func TestIdentify_oversizedTraits_returnsSizeLimit(t *testing.T) {
 func TestGroup_oversizedTraits_returnsSizeLimit(t *testing.T) {
 	t.Parallel()
 
-	a, f := newTestAdapter(t)
+	a, f := stubAdapter(t)
 
 	traits := map[string]any{"big": strings.Repeat("x", 128*1024)}
 	if err := a.Group(t.Context(), "u1", "g1", traits); err == nil {
@@ -701,7 +701,7 @@ func TestGroup_oversizedTraits_returnsSizeLimit(t *testing.T) {
 func TestTrack_concurrent_enqueuesAllMessages(t *testing.T) {
 	t.Parallel()
 
-	a, f := newTestAdapter(t)
+	a, f := stubAdapter(t)
 
 	var wg sync.WaitGroup
 
@@ -767,7 +767,7 @@ func TestOpen_localhostHTTP_acceptsLocalURL(t *testing.T) {
 func TestGroup_emptyType_fallsBackToDefault(t *testing.T) {
 	t.Parallel()
 
-	a, f := newTestAdapter(t)
+	a, f := stubAdapter(t)
 	a.groupType = ""
 
 	if err := a.Group(t.Context(), "u1", "org-1", nil); err != nil {
