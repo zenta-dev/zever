@@ -416,13 +416,22 @@ func writeExtractedORM(tag string, plan extractPlan) ([]string, error) {
 
 	sort.Strings(paths)
 
+	ormRoot := filepath.Join(plan.OutDir, "internal", "orm")
+
 	written := make([]string, 0, len(paths))
 
 	for _, path := range paths {
 		// path is "orm/gen/<pkg>/<pkg>.go"; keep everything after "orm/gen/".
 		rel := strings.TrimPrefix(filepath.ToSlash(path), "orm/gen/")
 
-		dest := filepath.Join(plan.OutDir, "internal", "orm", filepath.FromSlash(rel))
+		dest := filepath.Join(ormRoot, filepath.FromSlash(rel))
+
+		// Defense in depth: moduleNaming already rejects a path-unsafe
+		// module name, but this confirms the write itself never lands
+		// outside ormRoot regardless of how dest was derived.
+		if relCheck, err := filepath.Rel(ormRoot, dest); err != nil || relCheck == ".." || strings.HasPrefix(relCheck, ".."+string(filepath.Separator)) {
+			return nil, fmt.Errorf("%s: %w: %q", tag, ErrPathTraversal, path)
+		}
 
 		if err := writeScaffold(tag, dest, outputs[path], plan.Force); err != nil {
 			return nil, err

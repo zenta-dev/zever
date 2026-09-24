@@ -3,6 +3,8 @@ package orm
 import (
 	"database/sql/driver"
 	"fmt"
+	"math"
+	"strconv"
 	"time"
 )
 
@@ -111,7 +113,11 @@ func convertScan[T any](src any) (T, error) {
 			return zero, err
 		}
 
-		return any(int32(n)).(T), nil //nolint:forcetypeassert,gosec // guarded by the outer type switch; narrowing matches the driver-returned column width
+		if n < math.MinInt32 || n > math.MaxInt32 {
+			return zero, fmt.Errorf("cannot scan int64 %d into int32: out of range", n)
+		}
+
+		return any(int32(n)).(T), nil //nolint:forcetypeassert,gosec // guarded by the outer type switch; range checked above
 	case float64:
 		f, err := scanFloat64(src)
 		if err != nil {
@@ -209,9 +215,7 @@ func scanInt64(src any) (int64, error) {
 }
 
 func parseInt64(s string) (int64, error) {
-	var n int64
-
-	_, err := fmt.Sscanf(s, "%d", &n)
+	n, err := strconv.ParseInt(s, 10, 64)
 	if err != nil {
 		return 0, fmt.Errorf("cannot scan %q into int64: %w", s, err)
 	}
@@ -237,9 +241,7 @@ func scanFloat64(src any) (float64, error) {
 }
 
 func parseFloat64(s string) (float64, error) {
-	var f float64
-
-	_, err := fmt.Sscanf(s, "%g", &f)
+	f, err := strconv.ParseFloat(s, 64)
 	if err != nil {
 		return 0, fmt.Errorf("cannot scan %q into float64: %w", s, err)
 	}

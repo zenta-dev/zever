@@ -469,7 +469,7 @@ func (j Join2[A, PA, B, PB]) cteBody() render.CTEBody {
 		Order:        toRenderOrder(j.left.order),
 		Limit:        j.left.limit,
 		Offset:       j.left.offset,
-		JoinType:     render.JoinType(j.joinType),
+		JoinType:     j.joinType,
 		RightTable:   j.rel.childTable.Name(),
 		RightColumns: j.rel.childTable.Columns(),
 		ParentCol:    j.rel.parentCol,
@@ -609,7 +609,7 @@ func (j CTEJoin[A, PA, B, PB]) renderOuter(d dialect.Dialect) (string, []any, er
 		return "", nil, err
 	}
 
-	if err := requireJoin(d, JoinType(j.body.JoinType)); err != nil {
+	if err := requireJoin(d, j.body.JoinType); err != nil {
 		return "", nil, err
 	}
 

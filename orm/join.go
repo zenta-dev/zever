@@ -4,6 +4,7 @@ import (
 	"context"
 	"fmt"
 	"iter"
+	"math"
 
 	"github.com/zenta-dev/zever/db"
 	"github.com/zenta-dev/zever/orm/dialect"
@@ -79,51 +80,40 @@ type Row3[A any, B any, C any] struct {
 // MySQL supports RIGHT only, and SQLite supports both from 3.39.0.
 // A dialect lacking a keyword returns a typed
 // dialect.ErrUnsupportedByDialect at execution time, never a silent
-// substitution of a weaker join.
-type JoinType int
+// substitution of a weaker join. Type alias for render.JoinType (orm
+// imports render, never the reverse -- see orm.Op's doc comment for why
+// aliasing beats a separately-kept-in-sync mirror); its String() method is
+// defined on render.JoinType since a type alias cannot declare its own
+// methods.
+type JoinType = render.JoinType
 
-// Supported join types.
+// Supported join types. These re-export render's identically-named
+// constants.
 const (
 	// InnerJoin renders "INNER JOIN"; a left row survives only when the
 	// joined table has at least one matching row.
-	InnerJoin JoinType = iota
+	InnerJoin = render.InnerJoin
 	// LeftJoin renders "LEFT JOIN"; left rows without a match survive, with
 	// the right side coming back all-NULL. Join2.All/Stream do NOT
 	// distinguish that from a real all-zero-columns match (they always
 	// return Row2[A, B]) -- use LeftJoinOn/LeftJoin2 for a null-safe result
 	// (see LeftJoin2's doc comment).
-	LeftJoin
+	LeftJoin = render.LeftJoin
 	// RightJoin renders "RIGHT JOIN"; right rows without a match survive,
 	// with the LEFT side coming back all-NULL. Join2.All/Stream do NOT
 	// distinguish that from a real match (they always return Row2[A, B]) --
 	// use RightJoinOn/RightJoin2 for a null-safe result (see RightJoin2's
 	// doc comment). Requires dialect.JoinCapabilities with
 	// SupportsRightJoin reporting true.
-	RightJoin
+	RightJoin = render.RightJoin
 	// FullJoin renders "FULL JOIN"; either side without a match survives,
 	// with the unmatched side coming back all-NULL. Join2.All/Stream do NOT
 	// distinguish those from real matches (they always return Row2[A, B]) --
 	// use FullJoinOn/FullJoin2 for a null-safe result (see FullJoin2's doc
 	// comment). Requires dialect.JoinCapabilities with SupportsFullJoin
 	// reporting true.
-	FullJoin
+	FullJoin = render.FullJoin
 )
-
-// String returns the SQL keyword jt renders, for error messages.
-func (jt JoinType) String() string {
-	switch jt {
-	case InnerJoin:
-		return "INNER JOIN"
-	case LeftJoin:
-		return "LEFT JOIN"
-	case RightJoin:
-		return "RIGHT JOIN"
-	case FullJoin:
-		return "FULL JOIN"
-	default:
-		return "INNER JOIN"
-	}
-}
 
 // Join2 is an immutable, value-type two-table INNER/LEFT/RIGHT/FULL JOIN
 // builder, following the same copy-on-write chain discipline as Query[T, PT].
@@ -254,7 +244,7 @@ func (j Join2[A, PA, B, PB]) render(d dialect.Dialect) (string, []any, error) {
 
 	return render.SelectJoin(
 		d,
-		render.JoinType(j.joinType),
+		j.joinType,
 		j.left.table.Name(), j.left.table.Columns(),
 		j.rel.childTable.Name(), j.rel.childTable.Columns(),
 		j.rel.parentCol, j.rel.childCol,
@@ -1110,7 +1100,7 @@ func renderJoin3Mixed[
 	if nestedBC {
 		return render.SelectJoin3Nested(
 			d,
-			render.JoinType(joinAB), render.JoinType(joinBC),
+			joinAB, joinBC,
 			left.table.Name(), left.table.Columns(),
 			relAB.childTable.Name(), relAB.childTable.Columns(),
 			relBC.childTable.Name(), relBC.childTable.Columns(),
@@ -1128,7 +1118,7 @@ func renderJoin3Mixed[
 
 	return render.SelectJoin3Mixed(
 		d,
-		render.JoinType(joinAB), render.JoinType(joinBC),
+		joinAB, joinBC,
 		left.table.Name(), left.table.Columns(),
 		relAB.childTable.Name(), relAB.childTable.Columns(),
 		relBC.childTable.Name(), relBC.childTable.Columns(),
@@ -2709,7 +2699,11 @@ func assignAny(dest any, src any) error {
 			return err
 		}
 
-		*d = int32(v) //nolint:gosec // narrowing matches the driver-returned column width, mirrors orm.Option's own convertScan
+		if v < math.MinInt32 || v > math.MaxInt32 {
+			return fmt.Errorf("cannot scan int64 %d into int32: out of range", v)
+		}
+
+		*d = int32(v)
 	case *float64:
 		v, err := scanFloat64(src)
 		if err != nil {

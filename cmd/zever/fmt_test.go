@@ -252,10 +252,10 @@ func TestRunFmtInteractiveLongForm(t *testing.T) {
 	prev := interactiveMode
 	t.Cleanup(func() { interactiveMode = prev })
 
-	if err := runFmt([]string{"--interactive=true", path}); err != nil {
-		t.Fatalf("runFmt --interactive=true on clean file: %v", err)
+	if err := runFmt([]string{"--interactive", path}); err != nil {
+		t.Fatalf("runFmt --interactive on clean file: %v", err)
 	}
 	if !interactiveMode {
-		t.Fatalf("expected --interactive=true to set interactiveMode")
+		t.Fatalf("expected --interactive to set interactiveMode")
 	}
 }

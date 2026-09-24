@@ -8,46 +8,52 @@ import (
 	"github.com/zenta-dev/zever/orm/render"
 )
 
-// WindowFunc identifies a scalar window function, mirroring
-// render.WindowFunc's values (same underlying int representation).
-type WindowFunc int
+// WindowFunc identifies a scalar window function. Type alias for
+// render.WindowFunc (orm imports render, never the reverse -- see orm.Op's
+// doc comment for why aliasing beats a separately-kept-in-sync mirror).
+type WindowFunc = render.WindowFunc
 
-// Supported scalar window functions.
+// Supported scalar window functions. These re-export render's
+// identically-named constants.
 const (
-	WinNone WindowFunc = iota
-	WinRowNumber
-	WinRank
-	WinDenseRank
-	WinLead
-	WinLag
-	WinNTile
+	WinNone      = render.WinNone
+	WinRowNumber = render.WinRowNumber
+	WinRank      = render.WinRank
+	WinDenseRank = render.WinDenseRank
+	WinLead      = render.WinLead
+	WinLag       = render.WinLag
+	WinNTile     = render.WinNTile
 )
 
 // FrameMode names a window frame's unit: ROWS, RANGE or GROUPS. FrameNone
 // is the zero value -- a window expression never given a frame method
-// renders no frame clause at all, matching the pre-frames behavior.
-type FrameMode int
+// renders no frame clause at all, matching the pre-frames behavior. Type
+// alias for render.FrameMode; see WindowFunc's doc comment for why aliasing
+// beats mirroring.
+type FrameMode = render.FrameMode
 
-// Supported window frame modes, mirroring render.FrameMode's values (same
-// underlying int representation).
+// Supported window frame modes. These re-export render's identically-named
+// constants.
 const (
-	FrameNone FrameMode = iota
-	FrameRows
-	FrameRange
-	FrameGroups
+	FrameNone   = render.FrameNone
+	FrameRows   = render.FrameRows
+	FrameRange  = render.FrameRange
+	FrameGroups = render.FrameGroups
 )
 
 // FrameBoundKind identifies which of the five SQL frame bounds a FrameBound
-// is, mirroring render.FrameBoundKind's values.
-type FrameBoundKind int
+// is. Type alias for render.FrameBoundKind; see WindowFunc's doc comment
+// for why aliasing beats mirroring.
+type FrameBoundKind = render.FrameBoundKind
 
-// The five SQL frame bounds.
+// The five SQL frame bounds. These re-export render's identically-named
+// constants.
 const (
-	BoundUnboundedPreceding FrameBoundKind = iota
-	BoundPreceding
-	BoundCurrentRow
-	BoundFollowing
-	BoundUnboundedFollowing
+	BoundUnboundedPreceding = render.BoundUnboundedPreceding
+	BoundPreceding          = render.BoundPreceding
+	BoundCurrentRow         = render.BoundCurrentRow
+	BoundFollowing          = render.BoundFollowing
+	BoundUnboundedFollowing = render.BoundUnboundedFollowing
 )
 
 // FrameBound is one endpoint of a window frame. N is the offset for
@@ -267,16 +273,16 @@ func (e WindowExpr[T]) GroupsBetween(start, end FrameBound) WindowExpr[T] {
 
 func toRenderWindowExpr[T any](e WindowExpr[T]) render.WindowExpr {
 	out := render.WindowExpr{
-		Func:   render.WindowFunc(e.fn),
+		Func:   e.fn,
 		Column: e.col,
 		Value:  e.value,
 		Alias:  e.alias,
 		Over: render.OverClause{
 			Partition:  anyColumnNames(e.over.partition),
 			Order:      toRenderOrder(e.over.order),
-			FrameMode:  render.FrameMode(e.over.frameMode),
-			FrameStart: render.FrameBound{Kind: render.FrameBoundKind(e.over.frameStart.Kind), N: e.over.frameStart.N},
-			FrameEnd:   render.FrameBound{Kind: render.FrameBoundKind(e.over.frameEnd.Kind), N: e.over.frameEnd.N},
+			FrameMode:  e.over.frameMode,
+			FrameStart: render.FrameBound{Kind: e.over.frameStart.Kind, N: e.over.frameStart.N},
+			FrameEnd:   render.FrameBound{Kind: e.over.frameEnd.Kind, N: e.over.frameEnd.N},
 		},
 	}
 

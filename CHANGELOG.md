@@ -7,7 +7,116 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Changed
+
+- **Breaking:** `orm`'s dozen-plus mirrored enums (`Op`, `NodeKind`,
+  `CompoundOp`, `LockMode`, `NullsOrder`, `WindowFunc`, `FrameMode`,
+  `FrameBoundKind`, `JoinType`, `AggFunc`, `JSONOp`, `FTSOp`, `FTSMode`, the
+  internal set-op kind) are now type aliases onto their `orm/render`
+  counterparts instead of independently redefined types kept in sync only
+  by comment and matching `iota` order. Every hand-written boundary
+  conversion (`render.Op(n.Op)` and friends) is removed; a future reorder/
+  insert mistake in either package's constant list is now a compile error
+  instead of a silent SQL-mis-rendering bug. Public names/values are
+  unchanged for `orm` package consumers -- `JoinType.String()` moved to
+  `render.JoinType` (a type alias cannot declare its own methods) but
+  behaves identically.
+- `orm/dialect` gained `CheckDistinctOn`, the single DISTINCT ON validation
+  rule now shared by `orm.Query`'s build-time gate and
+  `orm/render`'s render-time gate (previously two independent
+  implementations with two different error-message prefixes that could
+  drift on what "supports DISTINCT ON" means).
+
+- **Breaking:** `orm.CursorKeyValue` no longer accepts defined/enum types
+  via `~` (e.g. a codegen'd `type Status string`) -- only the exact types
+  `string | []byte | int64 | int32 | float64 | float32 | bool | time.Time`.
+  Cursor encode/decode now dispatch with a plain type switch on the boxed
+  dynamic type instead of `reflect`; a cursor over an enum-typed column
+  must build its keyset predicate by hand (`AfterTuple` or a manual
+  `Predicate`) instead.
+- **Breaking:** `gogen.New()`'s zero-config import-path formula now matches
+  `NewWithPBImportRoot`'s flat, protogogen-accurate layout
+  (`<root>/<module>`, bare `<root>` for the implicit module) instead of the
+  legacy `<root>/zeverv1` / `<root>/zever/<module>` convention. `Backend`
+  no longer has two formulas to choose between; all committed goldens and
+  example outputs regenerated.
+
 ### Fixed
+
+- **Security:** `cmd/zever generate tinker --dir` accepted a path-traversal
+  directory (e.g. `../../../../etc/cron.d/x`): the guard checked
+  `isTraversalName(dir) && (dir == ".." || filepath.IsAbs(dir))`, which
+  rejects a literal `..` or an absolute path but not a `../`-relative one.
+  Replaced with `hasParentTraversal`, which accepts legitimate multi-segment
+  dirs (`./tinker/shim`) while rejecting any path that escapes upward.
+- **Security:** a zenorm module name containing `/` or `..` (e.g. from an
+  unusual schema directory layout) could produce a generated output path
+  that escaped the intended `orm/gen/<module>/` tree; `zenorm.moduleNaming`
+  now rejects a path-unsafe name outright, and `cmd/zever generate`'s
+  `writeExtractedORM` adds a defense-in-depth confinement check at the
+  actual write site.
+- **Security:** `orm.UnsafeRaw`/`render`'s raw-fragment renderer silently
+  dropped extra bound args (or left a `?` marker unbound) when a caller's
+  arg count didn't match the fragment's marker count -- e.g.
+  `UnsafeRaw("status = ?", "active", tenantID)` (a typo missing a second
+  `?`) would silently drop `tenantID`, broadening the query. It now errors
+  on any marker/arg count mismatch in either direction.
+- `internal/dsl/resolver`: `validateFieldsIn`'s Ref-chain walk had no depth
+  guard (only a cycle guard), so a deep chain of distinct message/entity
+  declarations could stack-overflow the resolver; added a 200-level depth
+  cap mirroring the parser's `maxValueDepth`.
+- `internal/dsl/resolver`: `dispatch: Job(build_payload(x, y))` silently
+  collapsed the nested call argument to the bare string `"build_payload"`,
+  discarding `x`/`y` with no diagnostic. A nested-call dispatch argument is
+  now rejected with a diagnostic instead.
+- `internal/dsl/breaking`: `Compare` skipped any module present in only one
+  of the two schemas, so a fully deleted module (every entity/service/RPC
+  it declared) produced zero `Change` entries and `HasBreaking` wrongly
+  reported "not breaking". Whole-module removal/addition are now reported
+  as `KindModuleRemoved` (breaking) / `KindModuleAdded` (non-breaking).
+- `internal/dsl/breaking`: field comparison now checks `Optional`
+  (optional -> required is breaking) and consults the resolver-populated
+  `RenamedFrom`, so a schema-author-declared `@renamed_from` rename is
+  reported as a rename (`KindFieldRenamed`) instead of a false-positive
+  remove+add pair.
+- `orm/option.go`'s `parseInt64`/`parseFloat64` used `fmt.Sscanf`
+  (reflection-backed) instead of `strconv.ParseInt`/`ParseFloat` on every
+  nullable-numeric-column row scan, contradicting the package's own
+  "zero-reflection Scan" design goal.
+- `cmd/zever doctor` gained `--strict` (exit non-zero if any battery fails,
+  for CI/pre-deploy gating -- the default stays always-nil, since
+  `config.Default()` legitimately fails some batteries, e.g. auth/jwt with
+  no configured secret) and now closes its `Container` before returning
+  instead of leaking any real connections a battery opened.
+- Removed dead `-i`/`--interactive` flag definitions from 10 more CLI
+  command sites (`doctor`, `generate entity/job/adapter/server/schedule/
+  tinker`, `compile`, `fmt`, the shared entrypoint/module-scaffold flag
+  parsers) that were always `false`: `peelInteractive` already strips
+  `-i`/`--interactive` before `flag.Parse` and sets the global
+  `interactiveMode`, matching the pattern `migrate.go`/`tinker.go` had
+  already adopted. The long `--interactive=value` form is no longer
+  accepted anywhere (it never worked via `peelInteractive` either); use the
+  bare flag.
+- `config.UnknownServiceError`/`UnknownFieldError` now carry a `Suggestion`
+  field and include a "did you mean %q?" hint in their `Error()` text (e.g.
+  a typo'd `evenbus:` service block now suggests `eventbus`), matching the
+  hint every CLI-facing error path already had.
+- `config.Redact`/`RedactedServices` now scan `[]string` values too (e.g. an
+  HTTP header list `["Authorization: Bearer xxx", ...]` nested under a
+  non-sensitive key like `headers`), redacting `"key: value"`-shaped
+  entries whose key half looks sensitive; previously such slices passed
+  through untouched. `[]string` values are also now deep-copied rather than
+  shared with the caller's original map.
+- `auth/jwt`: a token carrying a non-string `jti` claim is now rejected
+  outright instead of silently skipping the revocation-store check.
+- `internal/dsl/backend/gogen`: `numericLiteral` and `writeFormatCheck` now
+  panic on an unexpected argument type instead of silently splicing an
+  unescaped `%v`-stringified value into generated Go source or silently
+  dropping the validation check -- both cases previously depended entirely
+  on an unenforced resolver invariant.
+- `internal/dsl/diag.List.Error()` now sorts diagnostics by
+  `(File, Line, Col)` (matching `Sorted()`) instead of returning them in
+  lexer-then-parser-then-resolver phase order.
 
 - Naming and consistency pass (breaking where noted): canonical `EventBus`
   (`Eventbus` alias retained) and `RateLimit` (`Ratelimit` alias retained)

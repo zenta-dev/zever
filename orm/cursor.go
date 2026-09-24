@@ -6,19 +6,21 @@ import (
 	"errors"
 	"fmt"
 	"math"
-	"reflect"
 	"time"
 )
 
 // CursorKeyValue is the closed set of value types a keyset cursor can pack
 // into an opaque page token: exactly the driver-compatible scalar types
 // orm's own scan machinery (Option.Scan/convertScan in orm/option.go)
-// supports, so encode and decode are always total. The union uses
-// underlying types (`~`), so a codegen'd enum column (a defined string
-// type) and similar named scalar types satisfy it; `time.Time` is exact
-// because a defined struct wrapping it has no stable text encoding here.
+// supports, so encode and decode are always total. The union is exact
+// types only (no `~`): encode/decode dispatch on the boxed dynamic type
+// directly (a plain type switch, never reflect), so a defined/enum column
+// type (e.g. a codegen'd "type Status string") does not satisfy this
+// constraint and cannot be used as a cursor key -- build the keyset
+// predicate by hand (AfterTuple, or a manual Predicate) for those columns
+// instead.
 type CursorKeyValue interface {
-	~string | ~[]byte | ~int64 | ~int32 | ~float64 | ~float32 | ~bool | time.Time
+	string | []byte | int64 | int32 | float64 | float32 | bool | time.Time
 }
 
 // CursorKey is one keyset position: the value of the last row of the
@@ -252,25 +254,30 @@ func DecodeCursor[T any, V CursorKeyValue](token string, col Column[T, V]) (Curs
 		return CursorKey[T, V]{}, false, errors.New("orm: CursorKey.Decode: truncated token (no value)")
 	}
 
-	vType := reflect.TypeOf((*V)(nil)).Elem()
-
-	want, err := cursorTagFor(vType)
+	want, err := cursorTagFor[V]()
 	if err != nil {
 		return CursorKey[T, V]{}, false, err
 	}
 
 	if rest[0] != want {
 		return CursorKey[T, V]{}, false, fmt.Errorf(
-			"orm: CursorKey.Decode: token value type %q does not match %v", rest[0], vType,
+			"orm: CursorKey.Decode: token value type %q does not match %T", rest[0], *new(V),
 		)
 	}
 
-	val, err := decodeCursorValue(rest[0], rest[1:], vType)
+	val, err := decodeCursorValue(rest[0], rest[1:])
 	if err != nil {
 		return CursorKey[T, V]{}, false, err
 	}
 
-	return CursorKey[T, V]{column: col, value: val.(V), desc: raw[1]&1 == 1}, true, nil //nolint:forcetypeassert // value tag was validated against V
+	typed, ok := val.(V)
+	if !ok {
+		return CursorKey[T, V]{}, false, fmt.Errorf(
+			"orm: CursorKey.Decode: decoded value %T does not match column type %T", val, *new(V),
+		)
+	}
+
+	return CursorKey[T, V]{column: col, value: typed, desc: raw[1]&1 == 1}, true, nil
 }
 
 func cursorVersionAt(raw []byte) byte {
@@ -303,142 +310,130 @@ func readCursorString(b []byte) (string, []byte, error) {
 }
 
 // encodeCursorValue serializes v into its tag byte plus payload. v is one
-// of the CursorKeyValue members; the kind dispatch uses reflection so a
-// defined (enum) type's underlying kind is seen through. Exact time.Time is
-// encoded as RFC3339Nano UTC text, the same text orm's sqlite path binds
-// timestamps as. Tokens written before the Nano switch (plain RFC3339, no
-// fraction) still decode, since RFC3339Nano parsing accepts them.
+// of the CursorKeyValue members; the dispatch is a plain type switch on the
+// exact dynamic type (never reflect). Exact time.Time is encoded as
+// RFC3339Nano UTC text, the same text orm's sqlite path binds timestamps
+// as. Tokens written before the Nano switch (plain RFC3339, no fraction)
+// still decode, since RFC3339Nano parsing accepts them.
 func encodeCursorValue(v any) ([]byte, error) {
-	if t, ok := v.(time.Time); ok {
-		s := t.UTC().Format(time.RFC3339Nano)
-		b := []byte{cursorTagTime}
-		b = appendCursorString(b, s)
-
-		return b, nil
-	}
-
-	rv := reflect.ValueOf(v)
-
-	switch rv.Kind() { //nolint:exhaustive // every other kind is rejected in default
-	case reflect.String:
-		s := rv.String()
+	switch x := v.(type) {
+	case string:
 		b := []byte{cursorTagString}
-		b = appendCursorString(b, s)
 
-		return b, nil
-	case reflect.Slice:
-		if rv.Type().Elem().Kind() != reflect.Uint8 {
-			return nil, fmt.Errorf("orm: CursorKey.Encode: unsupported slice value type %T", v)
-		}
-
-		raw := rv.Bytes()
-		cp := make([]byte, len(raw))
-		copy(cp, raw)
+		return appendCursorString(b, x), nil
+	case []byte:
+		cp := make([]byte, len(x))
+		copy(cp, x)
 
 		b := []byte{cursorTagBytes}
-		b = appendCursorString(b, string(cp))
 
-		return b, nil
-	case reflect.Int64:
+		return appendCursorString(b, string(cp)), nil
+	case int64:
 		b := []byte{cursorTagInt64}
 
-		return binary.AppendVarint(b, rv.Int()), nil
-	case reflect.Int32:
+		return binary.AppendVarint(b, x), nil
+	case int32:
 		b := []byte{cursorTagInt32}
 
-		return binary.AppendVarint(b, rv.Int()), nil
-	case reflect.Float64:
+		return binary.AppendVarint(b, int64(x)), nil
+	case float64:
 		b := []byte{cursorTagFloat}
 
-		return binary.AppendUvarint(b, math.Float64bits(rv.Float())), nil
-	case reflect.Float32:
+		return binary.AppendUvarint(b, math.Float64bits(x)), nil
+	case float32:
 		b := []byte{cursorTagF32}
 
-		return binary.AppendUvarint(b, uint64(math.Float32bits(float32(rv.Float())))), nil //nolint:gosec // narrowing matches the type switch's own Float32 case
-	case reflect.Bool:
-		if rv.Bool() {
+		return binary.AppendUvarint(b, uint64(math.Float32bits(x))), nil
+	case bool:
+		if x {
 			return []byte{cursorTagBool, 1}, nil
 		}
 
 		return []byte{cursorTagBool, 0}, nil
+	case time.Time:
+		s := x.UTC().Format(time.RFC3339Nano)
+		b := []byte{cursorTagTime}
+
+		return appendCursorString(b, s), nil
 	default:
 		return nil, fmt.Errorf("orm: CursorKey.Encode: unsupported value type %T", v)
 	}
 }
 
-// cursorTagFor maps V's Go type to the token value tag it encodes with,
-// mirroring encodeCursorValue's kind dispatch. It is what makes the
-// value-tag validation in DecodeCursor total: a caller decoding with the
-// wrong V (e.g. string instead of int64) gets a clear error, never a
-// reflect conversion panic.
-func cursorTagFor(vType reflect.Type) (byte, error) {
-	switch vType.Kind() { //nolint:exhaustive // every other kind is rejected in default
-	case reflect.String:
+// cursorTagFor reports the token value tag V encodes with, by boxing V's
+// zero value and matching it against the same exact types
+// encodeCursorValue switches on. It is what makes the value-tag validation
+// in DecodeCursor total: a caller decoding with the wrong V (e.g. string
+// instead of int64) gets a clear error, never a bad type assertion.
+func cursorTagFor[V CursorKeyValue]() (byte, error) {
+	switch any(*new(V)).(type) {
+	case string:
 		return cursorTagString, nil
-	case reflect.Slice:
-		if vType.Elem().Kind() == reflect.Uint8 {
-			return cursorTagBytes, nil
-		}
-	case reflect.Int64:
+	case []byte:
+		return cursorTagBytes, nil
+	case int64:
 		return cursorTagInt64, nil
-	case reflect.Int32:
+	case int32:
 		return cursorTagInt32, nil
-	case reflect.Float64:
+	case float64:
 		return cursorTagFloat, nil
-	case reflect.Float32:
+	case float32:
 		return cursorTagF32, nil
-	case reflect.Bool:
+	case bool:
 		return cursorTagBool, nil
-	case reflect.Struct:
-		if vType == reflect.TypeOf(time.Time{}) {
-			return cursorTagTime, nil
-		}
+	case time.Time:
+		return cursorTagTime, nil
+	default:
+		return 0, fmt.Errorf("orm: CursorKey.Decode: unsupported value type %T", *new(V))
 	}
-
-	return 0, fmt.Errorf("orm: CursorKey.Decode: unsupported value type %v", vType)
 }
 
-// decodeCursorValue parses tag's payload into a value of vType. vType is
-// guaranteed to match tag by the caller's cursorTagFor check, so the
-// reflect conversions here cannot panic.
-func decodeCursorValue(tag byte, payload []byte, vType reflect.Type) (any, error) {
-	switch tag { //nolint:exhaustive // unknown tags rejected in default
+// decodeCursorValue parses tag's payload into its Go value, boxed as any.
+// The caller (DecodeCursor) asserts the result against V, which is
+// guaranteed to succeed once the tag has been checked against
+// cursorTagFor[V]().
+func decodeCursorValue(tag byte, payload []byte) (any, error) {
+	switch tag {
 	case cursorTagString, cursorTagBytes, cursorTagTime:
-		return decodeCursorText(tag, payload, vType)
+		return decodeCursorText(tag, payload)
 	case cursorTagInt64:
 		n, sz := binary.Varint(payload)
 		if sz <= 0 {
 			return nil, errors.New("orm: CursorKey.Decode: corrupt int64 value")
 		}
 
-		return reflect.ValueOf(n).Convert(vType).Interface(), nil
+		return n, nil
 	case cursorTagInt32:
 		n, sz := binary.Varint(payload)
 		if sz <= 0 {
 			return nil, errors.New("orm: CursorKey.Decode: corrupt int32 value")
 		}
 
-		return reflect.ValueOf(int32(n)).Convert(vType).Interface(), nil //nolint:gosec // tag was validated as int32
+		return int32(n), nil //nolint:gosec // tag was validated as int32
 	case cursorTagFloat:
 		bits, sz := binary.Uvarint(payload)
 		if sz <= 0 {
 			return nil, errors.New("orm: CursorKey.Decode: corrupt float64 value")
 		}
 
-		return reflect.ValueOf(math.Float64frombits(bits)).Convert(vType).Interface(), nil
+		return math.Float64frombits(bits), nil
 	case cursorTagF32:
 		bits, sz := binary.Uvarint(payload)
 		if sz <= 0 {
 			return nil, errors.New("orm: CursorKey.Decode: corrupt float32 value")
 		}
 
-		return reflect.ValueOf(math.Float32frombits(uint32(bits))).Convert(vType).Interface(), nil //nolint:gosec // tag was validated as float32
+		if bits > math.MaxUint32 {
+			return nil, errors.New("orm: CursorKey.Decode: corrupt float32 value")
+		}
+
+		return math.Float32frombits(uint32(bits)), nil
 	case cursorTagBool:
 		if len(payload) != 1 {
 			return nil, errors.New("orm: CursorKey.Decode: corrupt bool value")
 		}
 
-		return reflect.ValueOf(payload[0] == 1).Convert(vType).Interface(), nil
+		return payload[0] == 1, nil
 	default:
 		return nil, fmt.Errorf("orm: CursorKey.Decode: unknown value tag %q", tag)
 	}
@@ -446,7 +441,7 @@ func decodeCursorValue(tag byte, payload []byte, vType reflect.Type) (any, error
 
 // decodeCursorText parses the three text-encoded tags (string, []byte and
 // time.Time), which all share a uvarint-length-prefixed payload.
-func decodeCursorText(tag byte, payload []byte, vType reflect.Type) (any, error) {
+func decodeCursorText(tag byte, payload []byte) (any, error) {
 	s, rest, err := readCursorString(payload)
 	if err != nil {
 		return nil, fmt.Errorf("orm: CursorKey.Decode: %q value: %w", tag, err)
@@ -458,15 +453,15 @@ func decodeCursorText(tag byte, payload []byte, vType reflect.Type) (any, error)
 
 	switch tag {
 	case cursorTagBytes:
-		return reflect.ValueOf([]byte(s)).Convert(vType).Interface(), nil
+		return []byte(s), nil
 	case cursorTagTime:
 		t, err := time.Parse(time.RFC3339Nano, s)
 		if err != nil {
 			return nil, fmt.Errorf("orm: CursorKey.Decode: time value %q: %w", s, err)
 		}
 
-		return reflect.ValueOf(t).Convert(vType).Interface(), nil
+		return t, nil
 	default:
-		return reflect.ValueOf(s).Convert(vType).Interface(), nil
+		return s, nil
 	}
 }

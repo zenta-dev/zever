@@ -156,7 +156,7 @@ func (p ProjectedQuery[T, PT]) Distinct() ProjectedQuery[T, PT] {
 func (p ProjectedQuery[T, PT]) selectModifiers() render.SelectModifiers {
 	return render.SelectModifiers{
 		Distinct:   p.distinct,
-		Lock:       render.LockMode(p.lock),
+		Lock:       p.lock,
 		NoWait:     p.nowait,
 		SkipLocked: p.skipLocked,
 	}

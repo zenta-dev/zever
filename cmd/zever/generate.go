@@ -38,6 +38,23 @@ func isTraversalName(name string) bool {
 	return strings.ContainsAny(name, `/\`)
 }
 
+// hasParentTraversal reports whether dir, once cleaned, escapes upward via a
+// leading ".." segment. Unlike isTraversalName (which rejects any slash at
+// all, for single-element names), this accepts legitimate multi-segment
+// directory paths such as "./tinker/shim" or an absolute path -- it only
+// rejects the one thing that actually escapes the intended tree: a ".."
+// component that survives Clean because it isn't matched by an earlier
+// segment (e.g. "../../../../etc/cron.d/x", or "a/../../b").
+func hasParentTraversal(dir string) bool {
+	if strings.TrimSpace(dir) == "" {
+		return false
+	}
+
+	clean := filepath.Clean(dir)
+
+	return clean == ".." || strings.HasPrefix(clean, ".."+string(filepath.Separator))
+}
+
 // joinUnderRoot joins elem onto root and verifies the cleaned result stays
 // inside root. It is the defense-in-depth gate behind the name validators:
 // even a validated name passes through here before any filesystem call.
@@ -241,8 +258,8 @@ func parseEntrypointFlags(args []string, flagName string, usage func(*flag.FlagS
 	args = peelInteractive(args)
 	fs := flag.NewFlagSet(flagName, flag.ContinueOnError)
 	force := fs.Bool("force", false, "overwrite the entrypoint if it already exists")
-	interactive := fs.Bool("interactive", false, "prompt for missing values")
-	interactiveShort := fs.Bool("i", false, "prompt for missing values (shorthand)")
+	// coverageProof: no local -i/--interactive flags; peelInteractive
+	// strips them before Parse and sets interactiveMode globally.
 
 	fs.Usage = func() {
 		usage(fs)
@@ -250,10 +267,6 @@ func parseEntrypointFlags(args []string, flagName string, usage func(*flag.FlagS
 
 	if err := fs.Parse(args); err != nil {
 		return empty, "", false, err
-	}
-
-	if *interactive || *interactiveShort {
-		interactiveMode = true
 	}
 
 	project, err := loadProjectConfig()
@@ -368,18 +381,14 @@ func runGenerateModule(args []string) error {
 	args = peelInteractive(args)
 	fs := flag.NewFlagSet("generate", flag.ContinueOnError)
 	lang := fs.String("lang", "go", `target language for scaffolding (only "go" is implemented)`)
-	interactive := fs.Bool("interactive", false, "prompt for missing values")
-	interactiveShort := fs.Bool("i", false, "prompt for missing values (shorthand)")
+	// coverageProof: no local -i/--interactive flags; peelInteractive
+	// strips them before Parse and sets interactiveMode globally.
 
 	if err := fs.Parse(args); err != nil {
 		return err
 	}
 
 	rest := fs.Args()
-
-	if *interactive || *interactiveShort {
-		interactiveMode = true
-	}
 
 	if len(rest) < 2 || rest[0] != "module" {
 		if isInteractiveTerminal() {
