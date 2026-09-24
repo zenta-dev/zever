@@ -107,6 +107,14 @@ func resolveDispatch(v ast.Value, jobsByName map[string]*ir.Job) (*ir.Job, []any
 
 	args := make([]any, 0, len(call.Args))
 	for _, a := range call.Args {
+		if nested, ok := a.Value.(*ast.CallValue); ok {
+			diags = append(diags, diag.Wrap("resolve", valuePos(a.Value), ErrInvalidOption,
+				"dispatch to job %s: argument %q is a nested call, which dispatch args cannot express (literal values only)",
+				job.Name, nested.Name))
+
+			continue
+		}
+
 		args = append(args, dispatchArgValue(a.Value))
 	}
 
@@ -122,6 +130,9 @@ func resolveDispatch(v ast.Value, jobsByName map[string]*ir.Job) (*ir.Job, []any
 // ast.Value for ir.Schedule.DispatchArgs. Argument type checking against
 // the target job's declared param types is a v1 non-goal (arity only), so
 // this is a best-effort literal extraction, not a validated decode.
+// resolveDispatch's caller already rejects *ast.CallValue before reaching
+// here (a nested call has no literal-shaped value dispatch args can carry),
+// so this only ever sees the flat literal kinds.
 func dispatchArgValue(v ast.Value) any {
 	switch val := v.(type) {
 	case *ast.StringLit:
@@ -136,8 +147,6 @@ func dispatchArgValue(v ast.Value) any {
 		return val.Name
 	case *ast.SetLit:
 		return val.Items
-	case *ast.CallValue:
-		return val.Name
 	default:
 		return nil
 	}

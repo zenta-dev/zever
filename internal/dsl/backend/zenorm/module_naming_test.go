@@ -8,30 +8,37 @@ import (
 
 func TestModuleNaming(t *testing.T) {
 	t.Run("nil module maps to app", func(t *testing.T) {
-		pkg, path := moduleNaming(nil)
-		if pkg != "app" || path != "orm/gen/app/app.go" {
-			t.Fatalf("moduleNaming(nil) = (%q, %q), want (app, orm/gen/app/app.go)", pkg, path)
+		pkg, path, err := moduleNaming(nil)
+		if err != nil || pkg != "app" || path != "orm/gen/app/app.go" {
+			t.Fatalf("moduleNaming(nil) = (%q, %q, %v), want (app, orm/gen/app/app.go, nil)", pkg, path, err)
 		}
 	})
 
 	t.Run("unnamed module maps to app", func(t *testing.T) {
-		pkg, path := moduleNaming(&ir.Module{})
-		if pkg != "app" || path != "orm/gen/app/app.go" {
-			t.Fatalf("moduleNaming(unnamed) = (%q, %q), want (app, orm/gen/app/app.go)", pkg, path)
+		pkg, path, err := moduleNaming(&ir.Module{})
+		if err != nil || pkg != "app" || path != "orm/gen/app/app.go" {
+			t.Fatalf("moduleNaming(unnamed) = (%q, %q, %v), want (app, orm/gen/app/app.go, nil)", pkg, path, err)
 		}
 	})
 
 	t.Run("named module maps to its snake name", func(t *testing.T) {
-		pkg, path := moduleNaming(&ir.Module{Name: "billing"})
-		if pkg != "billing" || path != "orm/gen/billing/billing.go" {
-			t.Fatalf("moduleNaming(billing) = (%q, %q), want (billing, orm/gen/billing/billing.go)", pkg, path)
+		pkg, path, err := moduleNaming(&ir.Module{Name: "billing"})
+		if err != nil || pkg != "billing" || path != "orm/gen/billing/billing.go" {
+			t.Fatalf("moduleNaming(billing) = (%q, %q, %v), want (billing, orm/gen/billing/billing.go, nil)", pkg, path, err)
 		}
 	})
 
 	t.Run("pascal module name snakes", func(t *testing.T) {
-		pkg, path := moduleNaming(&ir.Module{Name: "Billing"})
-		if pkg != "billing" || path != "orm/gen/billing/billing.go" {
-			t.Fatalf("moduleNaming(Billing) = (%q, %q), want (billing, orm/gen/billing/billing.go)", pkg, path)
+		pkg, path, err := moduleNaming(&ir.Module{Name: "Billing"})
+		if err != nil || pkg != "billing" || path != "orm/gen/billing/billing.go" {
+			t.Fatalf("moduleNaming(Billing) = (%q, %q, %v), want (billing, orm/gen/billing/billing.go, nil)", pkg, path, err)
+		}
+	})
+
+	t.Run("traversal-shaped name is rejected", func(t *testing.T) {
+		_, _, err := moduleNaming(&ir.Module{Name: "../../etc/cron.d"})
+		if err == nil {
+			t.Fatal("moduleNaming(traversal name) succeeded, want an error")
 		}
 	})
 }

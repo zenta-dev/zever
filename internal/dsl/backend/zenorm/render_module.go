@@ -68,7 +68,10 @@ func writeImports(b *strings.Builder, s *importSet) {
 // referencing an enum declared in another module still resolves its values
 // (named enums are global).
 func renderModuleFile(m *ir.Module, enums map[string]*ir.Enum) (path string, content []byte, err error) {
-	pkg, path := moduleNaming(m)
+	pkg, path, err := moduleNaming(m)
+	if err != nil {
+		return "", nil, err
+	}
 
 	imports := newImportSet()
 

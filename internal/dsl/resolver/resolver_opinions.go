@@ -65,8 +65,16 @@ func validateParamFields(svc *ir.Service, op *ir.Operation, p *ir.Param) diag.Li
 		visited[p.Ref.Message] = true
 	}
 
-	return validateFieldsIn(svc, op, p.Name, p.Ref.Name(), fields, visited)
+	return validateFieldsIn(svc, op, p.Name, p.Ref.Name(), fields, visited, 0)
 }
+
+// maxValidateFieldsDepth bounds validateFieldsIn's recursion depth,
+// mirroring parser_attribute.go's maxValueDepth: the visited map only
+// catches a cycle (a message/entity chain that loops back on itself), not a
+// long cycle-free chain of thousands of distinct declared types. A large
+// generated or adversarial schema with a deep Ref chain must fail with a
+// diagnostic here, never a stack-overflow panic.
+const maxValidateFieldsDepth = 200
 
 // validateFieldsIn walks one request-position type's fields (typeName names
 // that type, for diagnostic text): a field with an applicable @validate kind
@@ -83,9 +91,17 @@ func validateParamFields(svc *ir.Service, op *ir.Operation, p *ir.Param) diag.Li
 // self-referential or mutually-referential message chain terminates rather
 // than recursing forever.
 func validateFieldsIn(
-	svc *ir.Service, op *ir.Operation, paramName, typeName string, fields []*ir.Field, visited map[*ir.Message]bool,
+	svc *ir.Service, op *ir.Operation, paramName, typeName string, fields []*ir.Field, visited map[*ir.Message]bool, depth int,
 ) diag.List {
 	var diags diag.List
+
+	if depth > maxValidateFieldsDepth {
+		diags = append(diags, diag.Wrap("resolve", diag.Position{}, ErrMissingValidation,
+			"rpc %s.%s param %s: field reference chain exceeds %d levels (possible runaway Ref chain)",
+			svc.Name, op.Name, paramName, maxValidateFieldsDepth))
+
+		return diags
+	}
 
 	for _, f := range fields {
 		if f.Ref != nil {
@@ -97,9 +113,9 @@ func validateFieldsIn(
 
 				visited[f.Ref.Message] = true
 
-				diags = append(diags, validateFieldsIn(svc, op, paramName, f.Ref.Name(), f.Ref.Message.Fields, visited)...)
+				diags = append(diags, validateFieldsIn(svc, op, paramName, f.Ref.Name(), f.Ref.Message.Fields, visited, depth+1)...)
 			case f.Ref.Entity != nil:
-				diags = append(diags, validateFieldsIn(svc, op, paramName, f.Ref.Name(), f.Ref.Entity.Fields, visited)...)
+				diags = append(diags, validateFieldsIn(svc, op, paramName, f.Ref.Name(), f.Ref.Entity.Fields, visited, depth+1)...)
 			}
 
 			continue
