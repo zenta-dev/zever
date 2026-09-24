@@ -1,8 +1,8 @@
 // Package gogen implements the "gogen" backend.Backend: it renders a
 // resolved *ir.Schema into the Go APPLICATION layer -- a business-logic
 // Service interface, HTTP routing (via the router battery), and gRPC
-// server wiring -- one set of four files per ir.Module that declares at
-// least one service, at "<module_snake>/{types,service,router,grpc}.go"
+// server wiring -- one set of five files per ir.Module that declares at
+// least one service, at "<module_snake>/{types,service,router,grpc,register}.go"
 // (the implicit unnamed module renders to "app/...").
 //
 // # Wire types are the real generated protobuf messages, not plain structs

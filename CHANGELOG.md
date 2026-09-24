@@ -39,6 +39,66 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   Historical release notes and absence-guard tests still reference the old
   name intentionally.
 
+- Naming and consistency pass, round two (breaking where noted): scaffold
+  and citation versions aligned (`defaultGoVersion` 1.27, framework
+  v0.2.0, CITATION 0.2.0, lsp server 0.2.0); `config` fields
+  `Eventbus`/`Ratelimit` renamed to `EventBus`/`RateLimit` (yaml tags
+  unchanged, files keep loading; compat accessor aliases retained);
+  `secrets` enum trimmed to `env` (Vault/GCP/AWS removed) with
+  `ErrDuplicateAdapter` canonicalization; `Adapter.String()` unknown
+  fallback unified to `"unknown"` (was `Adapter(%d)` in
+  cache/lock/queue/storage/workflow); `Register`/`Open`/`ParseAdapter`/
+  `Factory` params unified (`adapter`, `factory`, `s`, `opts`); every
+  service `Open` now calls `opts.Validate()` first (added missing
+  `Validate` to cache/queue/log); file option keys unified to snake_case
+  with a migration table in `config/README.md` (env names unaffected);
+  close-shape `Shutdown` probe and `secrets.Close(ctx)` rationale
+  documented; billing/payment facade boundary, cookie `MaxAge` seconds
+  rationale, and typed-UUID ID rule documented.
+
+- Consistency pass, round three (breaking where noted):
+  `DuplicateError` renamed to `DuplicateAdapterError` in 21 packages
+  (alias retained); `Adapter.String()` unknown fallback unified to
+  `"unknown"`; option keys unified to snake_case across all services
+  (migration table extended); `ParseOptions` removed from lock/secrets
+  (raw maps enter only via strict file decode + env); `Register`/`Open`/
+  `ParseAdapter`/`Factory` doc first-lines unified;
+  `Validate` doc first line unified to
+  "checks options for consistency, joining all violations";
+  mdx/CLI docs switched to canonical accessors; `check:boundaries` help
+  made explicit; `new_gomod.golden` go 1.27; AGENTS probe chain and
+  container no-op notes updated.
+
+- Consistency pass, round four (breaking where noted): `ErrDuplicate` /
+  `DuplicateError` mirror aliases added in all 13 `ErrDuplicateAdapter` /
+  `DuplicateAdapterError` packages so both spellings resolve everywhere;
+  tags completed for s3opts/cookie/revocation; `Factory`/`Open`/
+  `ParseAdapter` doc first-lines unified; `AI` methods documented;
+  `breaking` added to CLI suggestion list; dashboard db-screen CLIs fixed;
+  cli.mdx `config` row added; golden go 1.27; example README prefixes and
+  bookings DSN fixed;   test doubles unified to `stub*` with helper roles
+  (`stub`/`must`/`freshAdapter`) codified in AGENTS.md; `time.Sleep` sync
+  waits converted to event-based waiting across 48 test files (lrucache
+  gains unexported clock injection; remaining sleeps are poll ticks or
+  sanctioned teardown).
+
+- Consistency pass, round six: mirror `ErrDuplicateAdapter` aliases in
+  17 bare-`ErrDuplicate` packages; forgotten-import hint on all
+  `UnknownAdapterError`s; `Reason` strings snake_case + lowercase;
+  webhook wrong-service wraps fixed; `config.Validate` covers all 34
+  (nil skips removed); backend registry + gogen file-count docs fixed;
+  storage gains `ErrInvalidOptions`/`InvalidOptionsError`; dedicated CLI
+  help for routes/explain/graph/check-boundaries; lsp pins to v0.2.0.
+
+- Consistency pass, round five: mirror aliases both directions
+  (`ErrDuplicate` + `DuplicateError` in all 13 canonical packages);
+  tags completed (s3opts, cookie, revocation); `breaking` in CLI
+  suggestions; dashboard db-screen CLIs; cli.mdx `config` row; golden go
+  1.27; example README fixes; qdrant fakes to `stub*`; serialization-tag
+  rule codified (Options + wire types tagged, Go-only structs untagged,
+  backends map storage keys explicitly).
+
+
 ## [v0.2.0] - 2026-09-23
 
 ### Added
