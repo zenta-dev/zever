@@ -11,7 +11,7 @@ func TestCoverTypedErrorStrings(t *testing.T) {
 		want string
 	}{
 		{"duplicate", (&DuplicateError{Adapter: Redis}).Error(), "ratelimit: duplicate registration: redis"},
-		{"unknown", (&UnknownAdapterError{Adapter: Memory}).Error(), "ratelimit: unknown adapter: memory"},
+		{"unknown", (&UnknownAdapterError{Adapter: Memory}).Error(), "ratelimit: unknown adapter: memory (forgotten import?)"},
 		{"invalid_adapter", (&InvalidAdapterError{Adapter: "bogus"}).Error(), `ratelimit: invalid adapter: "bogus"`},
 		{"invalid_options", (&InvalidOptionsError{Reason: "rate must be > 0 and finite"}).Error(), "ratelimit: invalid options: rate must be > 0 and finite"},
 		{"invalid_key", (&InvalidKeyError{KeyLen: 3}).Error(), "ratelimit: invalid key: invalid length 3"},

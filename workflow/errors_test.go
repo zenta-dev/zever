@@ -39,7 +39,7 @@ func TestTypedErrorsUnwrap(t *testing.T) {
 		err  error
 		want error
 	}{
-		{"duplicate", &workflow.DuplicateError{Adapter: workflow.Memory}, workflow.ErrDuplicate},
+		{"duplicate", &workflow.DuplicateAdapterError{Adapter: workflow.Memory}, workflow.ErrDuplicate},
 		{"unknown_adapter", &workflow.UnknownAdapterError{Adapter: workflow.Memory}, workflow.ErrUnknownAdapter},
 		{"invalid_adapter", &workflow.InvalidAdapterError{Adapter: "bogus"}, workflow.ErrInvalidAdapter},
 		{"unknown_run", &workflow.UnknownRunError{RunID: "r1"}, workflow.ErrUnknownRun},
@@ -83,7 +83,7 @@ func TestTypedErrorMessages(t *testing.T) {
 		{"unknown_query", workflow.UnknownQueryError{Query: "q1"}, `workflow: unknown query: "q1"`},
 		{"invalid_options", workflow.InvalidOptionsError{Reason: "bad host"}, "workflow: invalid options: bad host"},
 		{"invalid_adapter", workflow.InvalidAdapterError{Adapter: "bogus"}, `workflow: invalid adapter: "bogus"`},
-		{"duplicate", workflow.DuplicateError{Adapter: workflow.Memory}, "workflow: duplicate registration: memory"},
+		{"duplicate", workflow.DuplicateAdapterError{Adapter: workflow.Memory}, "workflow: duplicate registration: memory"},
 	}
 
 	for _, c := range cases {

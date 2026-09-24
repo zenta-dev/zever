@@ -1,7 +1,5 @@
 package storage
 
-import "fmt"
-
 // Adapter identifies a storage backend.
 type Adapter uint8
 
@@ -25,13 +23,14 @@ func (a Adapter) String() string {
 	case AdapterR2:
 		return "r2"
 	default:
-		return fmt.Sprintf("Adapter(%d)", int(a))
+		return "unknown"
 	}
 }
 
-// ParseAdapter maps a name to its Adapter value.
-func ParseAdapter(adapter string) (Adapter, error) {
-	switch adapter {
+// ParseAdapter parses adapter name into an Adapter.
+// Only exact lowercase names match; anything else fails.
+func ParseAdapter(s string) (Adapter, error) {
+	switch s {
 	case "local":
 		return AdapterLocal, nil
 	case "s3":
@@ -39,6 +38,6 @@ func ParseAdapter(adapter string) (Adapter, error) {
 	case "r2":
 		return AdapterR2, nil
 	default:
-		return AdapterLocal, &InvalidAdapterError{Adapter: adapter}
+		return AdapterLocal, &InvalidAdapterError{Adapter: s}
 	}
 }

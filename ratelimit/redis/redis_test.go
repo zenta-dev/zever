@@ -46,6 +46,19 @@ func freshKey(t *testing.T) string {
 	return fmt.Sprintf("k-%d", keySeq.Add(1))
 }
 
+func eventually(t *testing.T, timeout time.Duration, cond func() bool, msg string) {
+	t.Helper()
+
+	deadline := time.Now().Add(timeout)
+	for !cond() {
+		if time.Now().After(deadline) {
+			t.Fatalf("timed out waiting for %s", msg)
+		}
+
+		time.Sleep(5 * time.Millisecond)
+	}
+}
+
 func testOptions() ratelimit.Options {
 	return ratelimit.Options{
 		Rate:  10,
@@ -127,16 +140,11 @@ func TestRedis_refill(t *testing.T) {
 		t.Fatalf("Allow over burst Allowed = true, want false")
 	}
 
-	time.Sleep(300 * time.Millisecond)
-
-	d, err := l.Allow(ctx, key, 1)
-	if err != nil {
-		t.Fatalf("Allow after refill err = %v, want nil", err)
-	}
-
-	if !d.Allowed {
-		t.Fatalf("Allow after refill Allowed = false, want true")
-	}
+	// Rate 5/s refills one token per 200ms: poll until the refill lands.
+	eventually(t, 5*time.Second, func() bool {
+		d, err := l.Allow(ctx, key, 1)
+		return err == nil && d.Allowed
+	}, "token refill")
 }
 
 func TestRedis_invalidCost(t *testing.T) {

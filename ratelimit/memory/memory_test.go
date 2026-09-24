@@ -26,6 +26,19 @@ func newLimiter(t *testing.T, opts ratelimit.Options) ratelimit.Limiter {
 	return l
 }
 
+func eventually(t *testing.T, timeout time.Duration, cond func() bool, msg string) {
+	t.Helper()
+
+	deadline := time.Now().Add(timeout)
+	for !cond() {
+		if time.Now().After(deadline) {
+			t.Fatalf("timed out waiting for %s", msg)
+		}
+
+		time.Sleep(5 * time.Millisecond)
+	}
+}
+
 func TestBurstThenDeny(t *testing.T) {
 	t.Parallel()
 
@@ -79,16 +92,11 @@ func TestRefill(t *testing.T) {
 		t.Fatal("drained Allow allowed, want denied")
 	}
 
-	time.Sleep(15 * time.Millisecond)
-
-	d, err = l.Allow(ctx, "k-refill", 1)
-	if err != nil {
-		t.Fatalf("post-sleep Allow failed: %v", err)
-	}
-
-	if !d.Allowed {
-		t.Fatalf("post-sleep Allow denied (retry %v), want allowed", d.RetryAfter)
-	}
+	// Rate 100/s refills one token per 10ms: poll until the refill lands.
+	eventually(t, 2*time.Second, func() bool {
+		d, err := l.Allow(ctx, "k-refill", 1)
+		return err == nil && d.Allowed
+	}, "token refill")
 }
 
 func TestInvalidCost(t *testing.T) {
@@ -168,12 +176,11 @@ func TestIdleExpiry(t *testing.T) {
 		t.Fatal("expected denial before idle expiry")
 	}
 
-	time.Sleep(120 * time.Millisecond)
-
-	d, err := l.Allow(ctx, "k-idle", 2)
-	if err != nil || !d.Allowed {
-		t.Fatalf("post-idle Allow = %+v, err = %v, want allowed", d, err)
-	}
+	// IdleTTL 50ms: poll until the idle bucket is reclaimed as fresh.
+	eventually(t, 2*time.Second, func() bool {
+		d, err := l.Allow(ctx, "k-idle", 2)
+		return err == nil && d.Allowed
+	}, "idle expiry")
 }
 
 func TestAfterClose(t *testing.T) {

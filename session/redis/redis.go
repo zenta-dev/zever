@@ -41,7 +41,8 @@ type wireSession struct {
 	Data      map[string]any `json:"data"`
 	CreatedAt int64          `json:"created_at"`
 	UpdatedAt int64          `json:"updated_at"`
-	ExpiresAt int64          `json:"expires_at"`
+	// ExpiresAt is an int64 unixnano wire field.
+	ExpiresAt int64 `json:"expires_at"`
 }
 
 type store struct {

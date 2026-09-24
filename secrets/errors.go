@@ -17,8 +17,11 @@ var ErrInvalidKey = errors.New("secrets: invalid key")
 // ErrNilFactory is returned when an adapter factory is nil.
 var ErrNilFactory = errors.New("secrets: nil factory")
 
-// ErrDuplicate is returned on duplicate adapter registration.
-var ErrDuplicate = errors.New("secrets: duplicate registration")
+// ErrDuplicateAdapter is returned on duplicate adapter registration.
+var ErrDuplicateAdapter = errors.New("secrets: duplicate registration")
+
+// ErrDuplicate aliases ErrDuplicateAdapter for compatibility.
+var ErrDuplicate = ErrDuplicateAdapter
 
 // ErrUnknownAdapter is returned for an unregistered adapter.
 var ErrUnknownAdapter = errors.New("secrets: unknown adapter")
@@ -34,7 +37,7 @@ type InvalidAdapterError struct {
 
 // Error returns a human-readable invalid-adapter message.
 func (e InvalidAdapterError) Error() string {
-	return fmt.Sprintf("secrets: invalid adapter: %q", e.Adapter)
+	return fmt.Sprintf("%s: %q", ErrInvalidAdapter, e.Adapter)
 }
 
 // Unwrap returns ErrInvalidAdapter.
@@ -42,20 +45,23 @@ func (e InvalidAdapterError) Unwrap() error {
 	return ErrInvalidAdapter
 }
 
-// DuplicateError reports a duplicate adapter registration.
-type DuplicateError struct {
+// DuplicateAdapterError reports a duplicate adapter registration.
+type DuplicateAdapterError struct {
 	// Adapter is the already-registered adapter.
 	Adapter Adapter
 }
 
+// DuplicateError aliases DuplicateAdapterError for compatibility.
+type DuplicateError = DuplicateAdapterError
+
 // Error returns a human-readable duplicate-registration message.
-func (e DuplicateError) Error() string {
-	return fmt.Sprintf("%s: %s", ErrDuplicate, e.Adapter.String())
+func (e DuplicateAdapterError) Error() string {
+	return fmt.Sprintf("%s: %s", ErrDuplicateAdapter, e.Adapter.String())
 }
 
-// Unwrap returns ErrDuplicate.
-func (e DuplicateError) Unwrap() error {
-	return ErrDuplicate
+// Unwrap returns ErrDuplicateAdapter.
+func (e DuplicateAdapterError) Unwrap() error {
+	return ErrDuplicateAdapter
 }
 
 // UnknownAdapterError reports a lookup of an unregistered adapter.

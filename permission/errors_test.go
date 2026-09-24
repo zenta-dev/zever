@@ -17,8 +17,8 @@ func TestErrors_sentinels(t *testing.T) {
 
 func TestErrors_typed_unwrap(t *testing.T) {
 	t.Parallel()
-	if !errors.Is(&DuplicateError{Adapter: RBAC}, ErrDuplicate) {
-		t.Error("DuplicateError does not unwrap to ErrDuplicate")
+	if !errors.Is(&DuplicateAdapterError{Adapter: RBAC}, ErrDuplicate) {
+		t.Error("DuplicateAdapterError does not unwrap to ErrDuplicate")
 	}
 	if !errors.Is(&UnknownAdapterError{Adapter: RBAC}, ErrUnknownAdapter) {
 		t.Error("UnknownAdapterError does not unwrap to ErrUnknownAdapter")
@@ -33,9 +33,9 @@ func TestErrors_typed_unwrap(t *testing.T) {
 
 func TestErrors_carried_fields(t *testing.T) {
 	t.Parallel()
-	de := &DuplicateError{Adapter: Casbin}
+	de := &DuplicateAdapterError{Adapter: Casbin}
 	if de.Adapter != Casbin {
-		t.Errorf("DuplicateError adapter = %v", de.Adapter)
+		t.Errorf("DuplicateAdapterError adapter = %v", de.Adapter)
 	}
 	ue := &UnknownAdapterError{Adapter: RBAC}
 	if ue.Adapter != RBAC {

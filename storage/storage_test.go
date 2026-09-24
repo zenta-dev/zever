@@ -49,7 +49,7 @@ func TestAdapterString(t *testing.T) {
 		{AdapterLocal, "local"},
 		{AdapterS3, "s3"},
 		{AdapterR2, "r2"},
-		{Adapter(99), "Adapter(99)"},
+		{Adapter(99), "unknown"},
 	}
 
 	for i := range cases {
@@ -125,7 +125,7 @@ func TestRegistryRegisterAndOpen(t *testing.T) {
 			t.Errorf("Adapter = %v, want Adapter(77)", dup.Adapter)
 		}
 
-		if !strings.Contains(err.Error(), "Adapter(77)") {
+		if !strings.Contains(err.Error(), "unknown") {
 			t.Errorf("Error() = %q", err.Error())
 		}
 	}
@@ -172,11 +172,15 @@ func TestOptionsValidate(t *testing.T) {
 
 	if err := (Options{URLBase: "ftp://example.com"}).Validate(); err == nil {
 		t.Error("bad url_base: expected error")
+	} else if !errors.Is(err, ErrInvalidOptions) {
+		t.Errorf("bad url_base: expected ErrInvalidOptions, got %v", err)
 	}
 
 	badPolicy := Options{Policy: &PolicyConfig{Buckets: map[BucketName]Policy{"bad/name": {}}}}
 	if err := badPolicy.Validate(); err == nil {
 		t.Error("bad policy: expected error")
+	} else if !errors.Is(err, ErrInvalidOptions) {
+		t.Errorf("bad policy: expected ErrInvalidOptions, got %v", err)
 	}
 
 	if err := (Options{}).Validate(); err != nil {
@@ -953,6 +957,24 @@ func TestErrorTypes(t *testing.T) {
 	if !errors.As(unk, &unk2) {
 		t.Errorf("As failed: %T", unk)
 	}
+
+	invOpt := &InvalidOptionsError{Reason: "bad url_base"}
+	if invOpt.Error() != "storage: invalid options: bad url_base" {
+		t.Errorf("Error() = %q", invOpt.Error())
+	}
+
+	if !errors.Is(invOpt, ErrInvalidOptions) {
+		t.Errorf("Is ErrInvalidOptions failed: %v", invOpt)
+	}
+
+	if !errors.Is(invOpt.Unwrap(), ErrInvalidOptions) {
+		t.Error("Unwrap mismatch")
+	}
+
+	var invOpt2 *InvalidOptionsError
+	if !errors.As(invOpt, &invOpt2) {
+		t.Errorf("As failed: %T", invOpt)
+	}
 }
 
 func TestSentinelMessages(t *testing.T) {
@@ -972,6 +994,7 @@ func TestSentinelMessages(t *testing.T) {
 		{ErrDuplicate, "storage: duplicate registration"},
 		{ErrUnknownAdapter, "storage: unknown adapter"},
 		{ErrInvalidAdapter, "storage: invalid adapter"},
+		{ErrInvalidOptions, "storage: invalid options"},
 	}
 
 	for i := range cases {

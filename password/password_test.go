@@ -71,7 +71,7 @@ func TestRegisterDuplicate(t *testing.T) {
 func TestOpenUnknown(t *testing.T) {
 	t.Parallel()
 
-	h, err := password.Open(password.Adapter(998), password.Options{})
+	h, err := password.Open(password.Adapter(998), password.Options{Time: password.DefaultTime, Memory: password.DefaultMemory, Threads: password.DefaultThreads, SaltLen: password.DefaultSaltLen, KeyLen: password.DefaultKeyLen})
 	if err == nil {
 		t.Fatal("expected non-nil error")
 	}
@@ -102,7 +102,7 @@ func TestOpenFactoryError(t *testing.T) {
 		t.Fatalf("Register() = %v, want nil", err)
 	}
 
-	h, err := password.Open(a, password.Options{})
+	h, err := password.Open(a, password.Options{Time: password.DefaultTime, Memory: password.DefaultMemory, Threads: password.DefaultThreads, SaltLen: password.DefaultSaltLen, KeyLen: password.DefaultKeyLen})
 	if err == nil {
 		t.Fatal("expected non-nil error")
 	}
@@ -127,7 +127,7 @@ func TestOpenSuccess(t *testing.T) {
 
 	ctx := context.Background()
 
-	h, err := password.Open(a, password.Options{})
+	h, err := password.Open(a, password.Options{Time: password.DefaultTime, Memory: password.DefaultMemory, Threads: password.DefaultThreads, SaltLen: password.DefaultSaltLen, KeyLen: password.DefaultKeyLen})
 	if err != nil {
 		t.Fatalf("Open() = %v, want nil", err)
 	}
@@ -237,7 +237,7 @@ func TestConcurrentRegisterOpen(t *testing.T) {
 				return
 			}
 
-			h, err := password.Open(a, password.Options{})
+			h, err := password.Open(a, password.Options{Time: password.DefaultTime, Memory: password.DefaultMemory, Threads: password.DefaultThreads, SaltLen: password.DefaultSaltLen, KeyLen: password.DefaultKeyLen})
 			if err != nil {
 				t.Errorf("Open(%v) = %v, want nil", a, err)
 				return

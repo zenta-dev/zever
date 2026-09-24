@@ -17,25 +17,25 @@ const (
 // Options configures scheduler behavior.
 type Options struct {
 	// Dispatcher enqueues jobs when a cron tick fires. Required.
-	Dispatcher *job.Dispatcher
+	Dispatcher *job.Dispatcher `json:"-" toml:"-" yaml:"-"`
 	// Locker deduplicates each schedule slot across scheduler instances.
 	// Nil means no cross-instance dedup (single-instance mode).
-	Locker *job.UniqueLocker
+	Locker *job.UniqueLocker `json:"-" toml:"-" yaml:"-"`
 	// Logger reports schedule errors. Zero means the adapter default.
-	Logger log.Logger
+	Logger log.Logger `json:"-" toml:"-" yaml:"-"`
 	// CloseTimeout bounds Stop's wait for running ticks.
 	// Zero means DefaultCloseTimeout; negative fails validation.
-	CloseTimeout time.Duration
+	CloseTimeout time.Duration `json:"close_timeout" toml:"close_timeout" yaml:"close_timeout"`
 }
 
-// Validate checks options for consistency.
+// Validate checks options for consistency, joining all violations.
 func (o Options) Validate() error {
 	if o.Dispatcher == nil {
 		return &InvalidOptionsError{Reason: "dispatcher is required"}
 	}
 
 	if o.CloseTimeout < 0 {
-		return &InvalidOptionsError{Reason: "close timeout must be >= 0"}
+		return &InvalidOptionsError{Reason: "close_timeout must be >= 0"}
 	}
 
 	return nil

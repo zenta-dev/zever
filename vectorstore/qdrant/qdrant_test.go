@@ -6,12 +6,12 @@ import (
 	"fmt"
 	"math"
 	"net/url"
+	"runtime"
 	"sort"
 	"strings"
 	"sync"
 	"sync/atomic"
 	"testing"
-	"time"
 
 	"github.com/qdrant/go-client/qdrant"
 
@@ -23,7 +23,7 @@ type stored struct {
 	payload map[string]*qdrant.Value
 }
 
-type fakeClient struct {
+type stubClient struct {
 	mu               sync.Mutex
 	points           map[string]stored
 	exists           bool
@@ -44,11 +44,11 @@ type fakeClient struct {
 	creates          int
 }
 
-func newFake() *fakeClient {
-	return &fakeClient{points: make(map[string]stored)}
+func newStub() *stubClient {
+	return &stubClient{points: make(map[string]stored)}
 }
 
-func (f *fakeClient) Upsert(_ context.Context, req *qdrant.UpsertPoints) (*qdrant.UpdateResult, error) {
+func (f *stubClient) Upsert(_ context.Context, req *qdrant.UpsertPoints) (*qdrant.UpdateResult, error) {
 	if f.upsertErr != nil {
 		return nil, f.upsertErr
 	}
@@ -65,7 +65,7 @@ func (f *fakeClient) Upsert(_ context.Context, req *qdrant.UpsertPoints) (*qdran
 	return &qdrant.UpdateResult{}, nil
 }
 
-func (f *fakeClient) Delete(_ context.Context, req *qdrant.DeletePoints) (*qdrant.UpdateResult, error) {
+func (f *stubClient) Delete(_ context.Context, req *qdrant.DeletePoints) (*qdrant.UpdateResult, error) {
 	if f.deleteErr != nil {
 		return nil, f.deleteErr
 	}
@@ -99,7 +99,7 @@ func cosine(a, b []float32) float32 {
 	return float32(dot / (math.Sqrt(na) * math.Sqrt(nb)))
 }
 
-func (f *fakeClient) Query(_ context.Context, req *qdrant.QueryPoints) ([]*qdrant.ScoredPoint, error) {
+func (f *stubClient) Query(_ context.Context, req *qdrant.QueryPoints) ([]*qdrant.ScoredPoint, error) {
 	if f.queryErr != nil {
 		return nil, f.queryErr
 	}
@@ -131,7 +131,7 @@ func (f *fakeClient) Query(_ context.Context, req *qdrant.QueryPoints) ([]*qdran
 	return out, nil
 }
 
-func (f *fakeClient) Close() error {
+func (f *stubClient) Close() error {
 	f.mu.Lock()
 	defer f.mu.Unlock()
 
@@ -140,7 +140,7 @@ func (f *fakeClient) Close() error {
 	return f.closeErr
 }
 
-func (f *fakeClient) CollectionExists(_ context.Context, _ string) (bool, error) {
+func (f *stubClient) CollectionExists(_ context.Context, _ string) (bool, error) {
 	f.mu.Lock()
 	defer f.mu.Unlock()
 
@@ -152,7 +152,7 @@ func (f *fakeClient) CollectionExists(_ context.Context, _ string) (bool, error)
 	return f.exists, f.existsErr
 }
 
-func (f *fakeClient) CreateCollection(_ context.Context, req *qdrant.CreateCollection) error {
+func (f *stubClient) CreateCollection(_ context.Context, req *qdrant.CreateCollection) error {
 	f.mu.Lock()
 	defer f.mu.Unlock()
 
@@ -172,7 +172,7 @@ func (f *fakeClient) CreateCollection(_ context.Context, req *qdrant.CreateColle
 	return nil
 }
 
-func (f *fakeClient) GetCollectionInfo(_ context.Context, _ string) (*qdrant.CollectionInfo, error) {
+func (f *stubClient) GetCollectionInfo(_ context.Context, _ string) (*qdrant.CollectionInfo, error) {
 	f.mu.Lock()
 	defer f.mu.Unlock()
 
@@ -198,14 +198,14 @@ func (f *fakeClient) GetCollectionInfo(_ context.Context, _ string) (*qdrant.Col
 	}, nil
 }
 
-func newStore(f *fakeClient, dim int) *Store {
+func newStore(f *stubClient, dim int) *Store {
 	return &Store{client: f, dim: dim}
 }
 
 func TestUpsertQueryRoundtrip(t *testing.T) {
 	t.Parallel()
 
-	f := newFake()
+	f := newStub()
 	s := newStore(f, 0)
 	ctx := context.Background()
 
@@ -236,8 +236,8 @@ func TestUpsertBatch_MatchesLoopedUpsert(t *testing.T) {
 		{ID: "c", Embedding: []float32{1, 1}, Metadata: map[string]any{"n": "three"}},
 	}
 
-	loopFake := newFake()
-	loopStore := newStore(loopFake, 0)
+	loopStub := newStub()
+	loopStore := newStore(loopStub, 0)
 	ctx := context.Background()
 
 	for _, v := range vecs {
@@ -246,8 +246,8 @@ func TestUpsertBatch_MatchesLoopedUpsert(t *testing.T) {
 		}
 	}
 
-	batchFake := newFake()
-	batchStore := newStore(batchFake, 0)
+	batchStub := newStub()
+	batchStore := newStore(batchStub, 0)
 
 	if err := batchStore.UpsertBatch(ctx, vecs); err != nil {
 		t.Fatalf("upsert batch: %v", err)
@@ -279,15 +279,15 @@ func TestUpsertBatch_MatchesLoopedUpsert(t *testing.T) {
 
 	// UpsertBatch is a single native batch call: exactly one Upsert RPC
 	// carrying all points, unlike the loop's N separate calls.
-	if batchFake.creates != loopFake.creates {
-		t.Fatalf("collection create count mismatch: loop=%d batch=%d", loopFake.creates, batchFake.creates)
+	if batchStub.creates != loopStub.creates {
+		t.Fatalf("collection create count mismatch: loop=%d batch=%d", loopStub.creates, batchStub.creates)
 	}
 }
 
 func TestUpsertBatch_Empty(t *testing.T) {
 	t.Parallel()
 
-	f := newFake()
+	f := newStub()
 	s := newStore(f, 3)
 
 	if err := s.UpsertBatch(context.Background(), nil); err != nil {
@@ -298,7 +298,7 @@ func TestUpsertBatch_Empty(t *testing.T) {
 func TestUpsertBatch_EmptyEmbedding(t *testing.T) {
 	t.Parallel()
 
-	f := newFake()
+	f := newStub()
 	s := newStore(f, 0)
 
 	err := s.UpsertBatch(context.Background(), []vectorstore.Vector{
@@ -313,7 +313,7 @@ func TestUpsertBatch_EmptyEmbedding(t *testing.T) {
 func TestUpsertBatch_DimensionMismatch(t *testing.T) {
 	t.Parallel()
 
-	f := newFake()
+	f := newStub()
 	s := newStore(f, 2)
 
 	err := s.UpsertBatch(context.Background(), []vectorstore.Vector{
@@ -330,7 +330,7 @@ func TestUpsertBatch_DimensionMismatch(t *testing.T) {
 func TestDeleteIdempotent(t *testing.T) {
 	t.Parallel()
 
-	f := newFake()
+	f := newStub()
 	s := newStore(f, 0)
 	ctx := context.Background()
 
@@ -350,7 +350,7 @@ func TestDeleteIdempotent(t *testing.T) {
 func TestNonUUIDHashedAndRestored(t *testing.T) {
 	t.Parallel()
 
-	f := newFake()
+	f := newStub()
 	s := newStore(f, 0)
 	ctx := context.Background()
 
@@ -376,7 +376,7 @@ func TestValidUUIDUnchanged(t *testing.T) {
 	t.Parallel()
 
 	id := "123e4567-e89b-12d3-a456-426614174000"
-	f := newFake()
+	f := newStub()
 	s := newStore(f, 0)
 	ctx := context.Background()
 
@@ -418,7 +418,7 @@ func TestPointIDDeterminism(t *testing.T) {
 func TestMetadataRoundtrip(t *testing.T) {
 	t.Parallel()
 
-	f := newFake()
+	f := newStub()
 	s := newStore(f, 0)
 	ctx := context.Background()
 
@@ -459,7 +459,7 @@ func TestMetadataRoundtrip(t *testing.T) {
 func TestUpsertRejectsBadMetadata(t *testing.T) {
 	t.Parallel()
 
-	f := newFake()
+	f := newStub()
 	s := newStore(f, 0)
 
 	err := s.Upsert(context.Background(), vectorstore.Vector{
@@ -480,7 +480,7 @@ func TestUpsertErrors(t *testing.T) {
 	t.Run("empty embedding", func(t *testing.T) {
 		t.Parallel()
 
-		s := newStore(newFake(), 0)
+		s := newStore(newStub(), 0)
 		if err := s.Upsert(ctx, vectorstore.Vector{ID: "x"}); !errors.Is(err, vectorstore.ErrEmptyEmbedding) {
 			t.Fatalf("expected ErrEmptyEmbedding, got %v", err)
 		}
@@ -489,7 +489,7 @@ func TestUpsertErrors(t *testing.T) {
 	t.Run("dimension mismatch", func(t *testing.T) {
 		t.Parallel()
 
-		s := newStore(newFake(), 3)
+		s := newStore(newStub(), 3)
 		err := s.Upsert(ctx, vectorstore.Vector{ID: "x", Embedding: []float32{1, 2}})
 		var dm *vectorstore.DimensionMismatchError
 
@@ -501,7 +501,7 @@ func TestUpsertErrors(t *testing.T) {
 	t.Run("ensure error", func(t *testing.T) {
 		t.Parallel()
 
-		f := newFake()
+		f := newStub()
 		f.existsErr = errors.New("boom")
 		s := newStore(f, 0)
 
@@ -513,7 +513,7 @@ func TestUpsertErrors(t *testing.T) {
 	t.Run("client error", func(t *testing.T) {
 		t.Parallel()
 
-		f := newFake()
+		f := newStub()
 		f.upsertErr = errors.New("boom")
 		s := newStore(f, 0)
 
@@ -526,7 +526,7 @@ func TestUpsertErrors(t *testing.T) {
 func TestDeleteError(t *testing.T) {
 	t.Parallel()
 
-	f := newFake()
+	f := newStub()
 	f.deleteErr = errors.New("boom")
 	s := newStore(f, 0)
 
@@ -543,7 +543,7 @@ func TestQueryErrors(t *testing.T) {
 	t.Run("empty embedding", func(t *testing.T) {
 		t.Parallel()
 
-		s := newStore(newFake(), 0)
+		s := newStore(newStub(), 0)
 		if _, err := s.Query(ctx, nil, 1); !errors.Is(err, vectorstore.ErrEmptyEmbedding) {
 			t.Fatalf("expected ErrEmptyEmbedding, got %v", err)
 		}
@@ -552,7 +552,7 @@ func TestQueryErrors(t *testing.T) {
 	t.Run("dimension mismatch", func(t *testing.T) {
 		t.Parallel()
 
-		s := newStore(newFake(), 3)
+		s := newStore(newStub(), 3)
 		_, err := s.Query(ctx, []float32{1, 2}, 1)
 		var dm *vectorstore.DimensionMismatchError
 
@@ -564,7 +564,7 @@ func TestQueryErrors(t *testing.T) {
 	t.Run("ensure error", func(t *testing.T) {
 		t.Parallel()
 
-		f := newFake()
+		f := newStub()
 		f.existsErr = errors.New("boom")
 		s := newStore(f, 0)
 
@@ -576,7 +576,7 @@ func TestQueryErrors(t *testing.T) {
 	t.Run("client error", func(t *testing.T) {
 		t.Parallel()
 
-		f := newFake()
+		f := newStub()
 		f.queryErr = errors.New("boom")
 		s := newStore(f, 0)
 
@@ -588,7 +588,7 @@ func TestQueryErrors(t *testing.T) {
 	t.Run("default topK", func(t *testing.T) {
 		t.Parallel()
 
-		f := newFake()
+		f := newStub()
 		s := newStore(f, 0)
 
 		if err := s.Upsert(ctx, vectorstore.Vector{ID: "x", Embedding: []float32{1}}); err != nil {
@@ -603,7 +603,7 @@ func TestQueryErrors(t *testing.T) {
 	t.Run("lazy ensure", func(t *testing.T) {
 		t.Parallel()
 
-		f := newFake()
+		f := newStub()
 		s := newStore(f, 0)
 
 		if _, err := s.Query(ctx, []float32{1, 2}, 1); err != nil {
@@ -618,7 +618,7 @@ func TestQueryErrors(t *testing.T) {
 	t.Run("missing _id falls back to uuid", func(t *testing.T) {
 		t.Parallel()
 
-		f := newFake()
+		f := newStub()
 		key := pointID("raw").GetUuid()
 		f.points[key] = stored{
 			vec:     []float32{1},
@@ -647,7 +647,7 @@ func TestEnsureCollection(t *testing.T) {
 	t.Run("created fast path", func(t *testing.T) {
 		t.Parallel()
 
-		f := newFake()
+		f := newStub()
 		s := newStore(f, 0)
 
 		if err := s.ensureCollection(ctx, 2); err != nil {
@@ -664,7 +664,7 @@ func TestEnsureCollection(t *testing.T) {
 	t.Run("existing dimension match", func(t *testing.T) {
 		t.Parallel()
 
-		f := newFake()
+		f := newStub()
 		f.exists = true
 		f.dim = 2
 		s := newStore(f, 2)
@@ -677,7 +677,7 @@ func TestEnsureCollection(t *testing.T) {
 	t.Run("existing dimension mismatch", func(t *testing.T) {
 		t.Parallel()
 
-		f := newFake()
+		f := newStub()
 		f.exists = true
 		f.dim = 4
 		s := newStore(f, 2)
@@ -690,7 +690,7 @@ func TestEnsureCollection(t *testing.T) {
 	t.Run("exists check error", func(t *testing.T) {
 		t.Parallel()
 
-		f := newFake()
+		f := newStub()
 		f.existsErr = errors.New("boom")
 		s := newStore(f, 0)
 
@@ -702,7 +702,7 @@ func TestEnsureCollection(t *testing.T) {
 	t.Run("info error", func(t *testing.T) {
 		t.Parallel()
 
-		f := newFake()
+		f := newStub()
 		f.exists = true
 		f.infoErr = errors.New("boom")
 		s := newStore(f, 0)
@@ -715,7 +715,7 @@ func TestEnsureCollection(t *testing.T) {
 	t.Run("nil info", func(t *testing.T) {
 		t.Parallel()
 
-		f := newFake()
+		f := newStub()
 		f.exists = true
 		f.nilInfo = true
 		s := newStore(f, 0)
@@ -728,7 +728,7 @@ func TestEnsureCollection(t *testing.T) {
 	t.Run("missing vector params", func(t *testing.T) {
 		t.Parallel()
 
-		f := newFake()
+		f := newStub()
 		f.exists = true
 		f.noParams = true
 		s := newStore(f, 0)
@@ -741,7 +741,7 @@ func TestEnsureCollection(t *testing.T) {
 	t.Run("create race recheck exists", func(t *testing.T) {
 		t.Parallel()
 
-		f := newFake()
+		f := newStub()
 		f.createErr = errors.New("already exists")
 		f.createSetsExists = true
 		s := newStore(f, 0)
@@ -754,7 +754,7 @@ func TestEnsureCollection(t *testing.T) {
 	t.Run("create failure", func(t *testing.T) {
 		t.Parallel()
 
-		f := newFake()
+		f := newStub()
 		f.createErr = errors.New("boom")
 		s := newStore(f, 0)
 
@@ -766,7 +766,7 @@ func TestEnsureCollection(t *testing.T) {
 	t.Run("create recheck error", func(t *testing.T) {
 		t.Parallel()
 
-		f := newFake()
+		f := newStub()
 		f.createErr = errors.New("boom")
 		f.recheckSet = true
 		f.recheckErr = errors.New("recheck boom")
@@ -780,7 +780,7 @@ func TestEnsureCollection(t *testing.T) {
 	t.Run("missing params error", func(t *testing.T) {
 		t.Parallel()
 
-		f := newFake()
+		f := newStub()
 		f.exists = true
 		f.nilInfo = true
 		s := &Store{client: f, dim: 0}
@@ -835,30 +835,35 @@ func TestEnsureCollection(t *testing.T) {
 	})
 }
 
-// delayedFakeClient wraps fakeClient with a small artificial delay in
+// delayedFakeClient wraps stubClient with a small artificial delay in
 // CollectionExists/CreateCollection and counts CollectionExists calls, so a
 // concurrency test has a wide-enough window to prove concurrent
 // ensureCollection callers are serialized instead of racing.
 type delayedFakeClient struct {
-	*fakeClient
+	*stubClient
 	existsCalls atomic.Int64
 }
 
 func newDelayedFake() *delayedFakeClient {
-	return &delayedFakeClient{fakeClient: newFake()}
+	return &delayedFakeClient{stubClient: newStub()}
 }
 
 func (f *delayedFakeClient) CollectionExists(ctx context.Context, name string) (bool, error) {
 	f.existsCalls.Add(1)
-	time.Sleep(5 * time.Millisecond)
+	// Yield so concurrent ensureCollection callers overlap without a fixed sleep.
+	for range 100 {
+		runtime.Gosched()
+	}
 
-	return f.fakeClient.CollectionExists(ctx, name)
+	return f.stubClient.CollectionExists(ctx, name)
 }
 
 func (f *delayedFakeClient) CreateCollection(ctx context.Context, req *qdrant.CreateCollection) error {
-	time.Sleep(5 * time.Millisecond)
+	for range 100 {
+		runtime.Gosched()
+	}
 
-	return f.fakeClient.CreateCollection(ctx, req)
+	return f.stubClient.CreateCollection(ctx, req)
 }
 
 func TestParseAddr(t *testing.T) {
@@ -1055,7 +1060,7 @@ func TestNew(t *testing.T) {
 func TestCloseBestEffort(t *testing.T) {
 	t.Parallel()
 
-	f := newFake()
+	f := newStub()
 	f.closeErr = errors.New("boom")
 	s := newStore(f, 0)
 
@@ -1071,7 +1076,7 @@ func TestCloseBestEffort(t *testing.T) {
 func TestConcurrentUpsertQuery(t *testing.T) {
 	t.Parallel()
 
-	f := newFake()
+	f := newStub()
 	s := newStore(f, 0)
 	ctx := context.Background()
 
