@@ -1,7 +1,6 @@
 package main
 
 import (
-	"context"
 	"strings"
 	"testing"
 
@@ -292,7 +291,7 @@ func TestServerSignatureHelp(t *testing.T) {
 	cursor := cursorOn(t, src, 1, ", )")
 	cursor.Character += uint32(len(", "))
 
-	got, err := s.signatureHelp(context.Background(), &protocol.SignatureHelpParams{
+	got, err := s.signatureHelp(t.Context(), &protocol.SignatureHelpParams{
 		TextDocumentPositionParams: protocol.TextDocumentPositionParams{
 			TextDocument: protocol.TextDocumentIdentifier{URI: uri.URI(rawURI)},
 			Position:     cursor,
@@ -318,7 +317,7 @@ func TestServerSignatureHelp(t *testing.T) {
 func TestServerSignatureHelpUnknownDocument(t *testing.T) {
 	s := NewServer()
 
-	got, err := s.signatureHelp(context.Background(), &protocol.SignatureHelpParams{
+	got, err := s.signatureHelp(t.Context(), &protocol.SignatureHelpParams{
 		TextDocumentPositionParams: protocol.TextDocumentPositionParams{
 			TextDocument: protocol.TextDocumentIdentifier{URI: uri.URI("file:///missing.zen")},
 			Position:     protocol.Position{Line: 0, Character: 0},

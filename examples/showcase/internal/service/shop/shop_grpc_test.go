@@ -106,7 +106,7 @@ func newGRPCFixture(t *testing.T) *grpcParityFixture {
 	genshop.RegisterShopServiceRoutes(r, impl, authInst, checker)
 
 	t.Cleanup(func() {
-		_ = c.Close(context.Background())
+		_ = c.Close(t.Context())
 	})
 
 	return &grpcParityFixture{
@@ -133,7 +133,7 @@ func (f *grpcParityFixture) grpcCall(method string, token string, req any, handl
 func (f *grpcParityFixture) grpcParityToken(t *testing.T, subject string) string {
 	t.Helper()
 
-	tok, err := f.auth.Issue(context.Background(), subject, nil, time.Hour)
+	tok, err := f.auth.Issue(t.Context(), subject, nil, time.Hour)
 	if err != nil {
 		t.Fatalf("issue: %v", err)
 	}
@@ -269,7 +269,7 @@ func grpcParityInsertUser(t *testing.T, f *grpcParityFixture, id, email string) 
 	t.Helper()
 
 	now := time.Now().UTC().Format(time.RFC3339Nano)
-	if _, err := f.database.Exec(context.Background(),
+	if _, err := f.database.Exec(t.Context(),
 		`INSERT INTO users (id, email, name, nickname, role, password_hash, age, credit_cents, rating, score, verified, birthday, avatar, prefs, created_at) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
 		id, email, "Test User", nil, "member", "hash", 30, 0, 0.0, 0.0, 0,
 		"1990-01-01T00:00:00Z", []byte{}, "{}", now); err != nil {
@@ -282,7 +282,7 @@ func grpcParityInsertOrder(t *testing.T, f *grpcParityFixture, id, userID string
 	t.Helper()
 
 	now := time.Now().UTC().Format(time.RFC3339Nano)
-	if _, err := f.database.Exec(context.Background(),
+	if _, err := f.database.Exec(t.Context(),
 		`INSERT INTO orders (id, user_id, total_cents, status, priority, note, created_at) VALUES (?, ?, ?, 'pending', 'low', ?, ?)`,
 		id, userID, total, nil, now); err != nil {
 		t.Fatalf("order: %v", err)
@@ -407,7 +407,7 @@ func TestShopGRPCCheckout(t *testing.T) {
 		t.Fatalf("order user=%q total=%d, want user-1/5000", got.GetUserId(), got.GetTotalCents())
 	}
 
-	msg, err := f.queue.Pop(context.Background(), "orders.confirm")
+	msg, err := f.queue.Pop(t.Context(), "orders.confirm")
 	if err != nil {
 		t.Fatalf("pop: %v", err)
 	}

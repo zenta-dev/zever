@@ -37,7 +37,7 @@ func newTestDB(t *testing.T) (*container.Container, context.Context) {
 	}
 	_ = logger
 
-	ctx := context.Background()
+	ctx := t.Context()
 	raw, err := os.ReadFile(filepath.Join("..", "..", "api", "testdata", "schema.sql"))
 	if err != nil {
 		t.Fatalf("read schema: %v", err)
@@ -52,13 +52,13 @@ func newTestDB(t *testing.T) (*container.Container, context.Context) {
 		}
 	}
 
-	t.Cleanup(func() { _ = c.Close(context.Background()) })
+	t.Cleanup(func() { _ = c.Close(t.Context()) })
 	return c, ctx
 }
 
 func insertNote(t *testing.T, c *container.Container, userID, createdAt string, done int) {
 	t.Helper()
-	ctx := context.Background()
+	ctx := t.Context()
 	database, err := c.DB()
 	if err != nil {
 		t.Fatalf("DB: %v", err)

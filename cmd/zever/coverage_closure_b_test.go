@@ -7,7 +7,6 @@ package main
 // (dev.go drain, migrate/tinker -i flags, tinker help Usage closure).
 
 import (
-	"context"
 	"os"
 	"os/exec"
 	"path/filepath"
@@ -373,7 +372,7 @@ func TestDevChildStopKillsWedged(t *testing.T) {
 	// deterministically.
 	pollFor(t, 10*time.Second, func() bool {
 		//nolint:gosec // fixed ps argv, no shell; pid is our own test child.
-		out, err := exec.CommandContext(context.Background(), "ps", "-o", "comm=", "--ppid", strconv.Itoa(cmd.Process.Pid)).Output()
+		out, err := exec.CommandContext(t.Context(), "ps", "-o", "comm=", "--ppid", strconv.Itoa(cmd.Process.Pid)).Output()
 		if err != nil {
 			return false
 		}
@@ -451,7 +450,7 @@ func openAndExec(t *testing.T, dbPath, stmt string) {
 	t.Helper()
 	ensureZeverDBAdapters()
 
-	ctx := context.Background()
+	ctx := t.Context()
 	conn, err := openZeverDB("sqlite", dbPath)
 	if err != nil {
 		t.Fatalf("open db: %v", err)

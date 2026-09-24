@@ -2,7 +2,6 @@ package api_test
 
 import (
 	"bytes"
-	"context"
 	"encoding/json"
 	"net/http"
 	"net/http/httptest"
@@ -77,7 +76,7 @@ func newTestSetup(t *testing.T) testSetup {
 
 	c := container.New(cfg)
 
-	ctx := context.Background()
+	ctx := t.Context()
 	database, err := c.DB()
 	if err != nil {
 		t.Fatalf("DB: %v", err)
@@ -161,7 +160,7 @@ func newTestSetup(t *testing.T) testSetup {
 	}
 
 	t.Cleanup(func() {
-		_ = c.Close(context.Background())
+		_ = c.Close(t.Context())
 	})
 
 	api.New(database, authInst, hasher, limiter, idem, locker, pay, bill, q, crypt, ten, i18nInst, flags, perm, geoInst).Routes(r)
@@ -178,7 +177,7 @@ func do(t *testing.T, h http.Handler, method, path, token string, body any, head
 			t.Fatalf("encode: %v", err)
 		}
 	}
-	req := httptest.NewRequestWithContext(context.Background(), method, path, &buf)
+	req := httptest.NewRequestWithContext(t.Context(), method, path, &buf)
 	if body != nil {
 		req.Header.Set("Content-Type", "application/json")
 	}
@@ -327,7 +326,7 @@ func TestFullFlow(t *testing.T) {
 	}
 
 	// Confirmation was dispatched.
-	if _, err := ts.queue.Pop(context.Background(), "bookings.confirm"); err != nil {
+	if _, err := ts.queue.Pop(t.Context(), "bookings.confirm"); err != nil {
 		t.Fatalf("confirm dispatch missing: %v", err)
 	}
 
@@ -367,7 +366,7 @@ func TestFullFlow(t *testing.T) {
 	if err := json.Unmarshal(rec.Body.Bytes(), &cancelled); err != nil || cancelled.Status != "cancelled" {
 		t.Fatalf("cancel status: %s err %v", rec.Body.String(), err)
 	}
-	if _, err := ts.queue.Pop(context.Background(), "bookings.cancel"); err != nil {
+	if _, err := ts.queue.Pop(t.Context(), "bookings.cancel"); err != nil {
 		t.Fatalf("cancel dispatch missing: %v", err)
 	}
 

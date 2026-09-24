@@ -1,7 +1,6 @@
 package main
 
 import (
-	"context"
 	"errors"
 	"strings"
 	"testing"
@@ -73,7 +72,7 @@ func openDoc(t *testing.T, s *Server, docURI string, content string) {
 
 	u := uri.URI(docURI)
 
-	if err := s.DidOpen(context.Background(), &protocol.DidOpenTextDocumentParams{
+	if err := s.DidOpen(t.Context(), &protocol.DidOpenTextDocumentParams{
 		TextDocument: protocol.TextDocumentItem{URI: u, Text: content},
 	}); err != nil {
 		t.Fatalf("DidOpen(%s): %v", docURI, err)
@@ -83,7 +82,7 @@ func openDoc(t *testing.T, s *Server, docURI string, content string) {
 func TestInitialize_capabilities(t *testing.T) {
 	s := NewServer()
 
-	res, err := s.Initialize(context.Background(), &protocol.InitializeParams{})
+	res, err := s.Initialize(t.Context(), &protocol.InitializeParams{})
 	if err != nil {
 		t.Fatalf("Initialize: %v", err)
 	}
@@ -241,7 +240,7 @@ func TestInitialize_rootPrecedence(t *testing.T) {
 		t.Run(tt.name, func(t *testing.T) {
 			s := NewServer()
 
-			if _, err := s.Initialize(context.Background(), tt.params); err != nil {
+			if _, err := s.Initialize(t.Context(), tt.params); err != nil {
 				t.Fatalf("Initialize: %v", err)
 			}
 
@@ -255,19 +254,19 @@ func TestInitialize_rootPrecedence(t *testing.T) {
 func TestLifecycle_initializedShutdownExitSetTrace(t *testing.T) {
 	s := NewServer()
 
-	if err := s.Initialized(context.Background(), &protocol.InitializedParams{}); err != nil {
+	if err := s.Initialized(t.Context(), &protocol.InitializedParams{}); err != nil {
 		t.Fatalf("Initialized: %v", err)
 	}
 
-	if err := s.Shutdown(context.Background()); err != nil {
+	if err := s.Shutdown(t.Context()); err != nil {
 		t.Fatalf("Shutdown: %v", err)
 	}
 
-	if err := s.Exit(context.Background()); err != nil {
+	if err := s.Exit(t.Context()); err != nil {
 		t.Fatalf("Exit: %v", err)
 	}
 
-	if err := s.SetTrace(context.Background(), &protocol.SetTraceParams{Value: protocol.TraceValueVerbose}); err != nil {
+	if err := s.SetTrace(t.Context(), &protocol.SetTraceParams{Value: protocol.TraceValueVerbose}); err != nil {
 		t.Fatalf("SetTrace: %v", err)
 	}
 
@@ -279,14 +278,14 @@ func TestLifecycle_initializedShutdownExitSetTrace(t *testing.T) {
 		t.Errorf("trace = %q, want verbose", got)
 	}
 
-	if err := s.SetTrace(context.Background(), nil); err != nil {
+	if err := s.SetTrace(t.Context(), nil); err != nil {
 		t.Fatalf("SetTrace(nil): %v", err)
 	}
 }
 
 func TestDidOpenChangeSaveClose(t *testing.T) {
 	s := NewServer()
-	ctx := context.Background()
+	ctx := t.Context()
 	u := uri.URI(serverDocA)
 
 	if err := s.DidOpen(ctx, &protocol.DidOpenTextDocumentParams{
@@ -355,7 +354,7 @@ func TestDidOpenChangeSaveClose(t *testing.T) {
 func TestDidChangeWatchedFiles(t *testing.T) {
 	s := NewServer()
 
-	if err := s.DidChangeWatchedFiles(context.Background(), &protocol.DidChangeWatchedFilesParams{}); err != nil {
+	if err := s.DidChangeWatchedFiles(t.Context(), &protocol.DidChangeWatchedFilesParams{}); err != nil {
 		t.Fatalf("DidChangeWatchedFiles: %v", err)
 	}
 }
@@ -365,7 +364,7 @@ func TestDocumentSymbol(t *testing.T) {
 		s := NewServer()
 		openDoc(t, s, serverDocA, serverValidDoc)
 
-		res, err := s.DocumentSymbol(context.Background(), &protocol.DocumentSymbolParams{
+		res, err := s.DocumentSymbol(t.Context(), &protocol.DocumentSymbolParams{
 			TextDocument: protocol.TextDocumentIdentifier{URI: uri.URI(serverDocA)},
 		})
 		if err != nil {
@@ -393,7 +392,7 @@ func TestDocumentSymbol(t *testing.T) {
 		s := NewServer()
 		openDoc(t, s, serverDocA, serverBrokenDoc)
 
-		res, err := s.DocumentSymbol(context.Background(), &protocol.DocumentSymbolParams{
+		res, err := s.DocumentSymbol(t.Context(), &protocol.DocumentSymbolParams{
 			TextDocument: protocol.TextDocumentIdentifier{URI: uri.URI(serverDocA)},
 		})
 		if err != nil {
@@ -413,7 +412,7 @@ func TestDocumentSymbol(t *testing.T) {
 	t.Run("unknown document returns empty", func(t *testing.T) {
 		s := NewServer()
 
-		res, err := s.DocumentSymbol(context.Background(), &protocol.DocumentSymbolParams{
+		res, err := s.DocumentSymbol(t.Context(), &protocol.DocumentSymbolParams{
 			TextDocument: protocol.TextDocumentIdentifier{URI: uri.URI(serverUnknown)},
 		})
 		if err != nil {
@@ -436,7 +435,7 @@ func TestSymbols(t *testing.T) {
 	openDoc(t, s, serverDocA, serverValidDoc)
 
 	t.Run("query filters", func(t *testing.T) {
-		res, err := s.Symbols(context.Background(), &protocol.WorkspaceSymbolParams{Query: "User"})
+		res, err := s.Symbols(t.Context(), &protocol.WorkspaceSymbolParams{Query: "User"})
 		if err != nil {
 			t.Fatalf("Symbols: %v", err)
 		}
@@ -464,7 +463,7 @@ func TestSymbols(t *testing.T) {
 	})
 
 	t.Run("empty query returns all", func(t *testing.T) {
-		res, err := s.Symbols(context.Background(), &protocol.WorkspaceSymbolParams{})
+		res, err := s.Symbols(t.Context(), &protocol.WorkspaceSymbolParams{})
 		if err != nil {
 			t.Fatalf("Symbols: %v", err)
 		}
@@ -478,7 +477,7 @@ func TestSymbols(t *testing.T) {
 		broken := NewServer()
 		openDoc(t, broken, serverDocA, serverBrokenDoc)
 
-		if _, err := broken.Symbols(context.Background(), &protocol.WorkspaceSymbolParams{Query: "User"}); err != nil {
+		if _, err := broken.Symbols(t.Context(), &protocol.WorkspaceSymbolParams{Query: "User"}); err != nil {
 			t.Fatalf("Symbols on broken workspace: %v", err)
 		}
 	})
@@ -489,7 +488,7 @@ func TestDefinition(t *testing.T) {
 		s := NewServer()
 		openDoc(t, s, serverDocA, serverValidDoc)
 
-		res, err := s.Definition(context.Background(), &protocol.DefinitionParams{
+		res, err := s.Definition(t.Context(), &protocol.DefinitionParams{
 			TextDocumentPositionParams: protocol.TextDocumentPositionParams{
 				TextDocument: protocol.TextDocumentIdentifier{URI: uri.URI(serverDocA)},
 				Position:     protocol.Position{Line: 10, Character: 19},
@@ -513,7 +512,7 @@ func TestDefinition(t *testing.T) {
 		s := NewServer()
 		openDoc(t, s, serverDocA, serverValidDoc)
 
-		res, err := s.Definition(context.Background(), &protocol.DefinitionParams{
+		res, err := s.Definition(t.Context(), &protocol.DefinitionParams{
 			TextDocumentPositionParams: protocol.TextDocumentPositionParams{
 				TextDocument: protocol.TextDocumentIdentifier{URI: uri.URI(serverDocA)},
 				Position:     protocol.Position{Line: 4, Character: 0},
@@ -531,7 +530,7 @@ func TestDefinition(t *testing.T) {
 	t.Run("unknown document is null", func(t *testing.T) {
 		s := NewServer()
 
-		res, err := s.Definition(context.Background(), &protocol.DefinitionParams{
+		res, err := s.Definition(t.Context(), &protocol.DefinitionParams{
 			TextDocumentPositionParams: protocol.TextDocumentPositionParams{
 				TextDocument: protocol.TextDocumentIdentifier{URI: uri.URI(serverUnknown)},
 				Position:     protocol.Position{Line: 0, Character: 0},
@@ -552,7 +551,7 @@ func TestHover(t *testing.T) {
 		s := NewServer()
 		openDoc(t, s, serverDocA, serverValidDoc)
 
-		res, err := s.Hover(context.Background(), &protocol.HoverParams{
+		res, err := s.Hover(t.Context(), &protocol.HoverParams{
 			TextDocumentPositionParams: protocol.TextDocumentPositionParams{
 				TextDocument: protocol.TextDocumentIdentifier{URI: uri.URI(serverDocA)},
 				Position:     protocol.Position{Line: 0, Character: serverEntityAt},
@@ -571,7 +570,7 @@ func TestHover(t *testing.T) {
 		s := NewServer()
 		openDoc(t, s, serverDocA, serverValidDoc)
 
-		res, err := s.Hover(context.Background(), &protocol.HoverParams{
+		res, err := s.Hover(t.Context(), &protocol.HoverParams{
 			TextDocumentPositionParams: protocol.TextDocumentPositionParams{
 				TextDocument: protocol.TextDocumentIdentifier{URI: uri.URI(serverDocA)},
 				Position:     protocol.Position{Line: 4, Character: 0},
@@ -589,7 +588,7 @@ func TestHover(t *testing.T) {
 	t.Run("unknown document is null", func(t *testing.T) {
 		s := NewServer()
 
-		res, err := s.Hover(context.Background(), &protocol.HoverParams{
+		res, err := s.Hover(t.Context(), &protocol.HoverParams{
 			TextDocumentPositionParams: protocol.TextDocumentPositionParams{
 				TextDocument: protocol.TextDocumentIdentifier{URI: uri.URI(serverUnknown)},
 				Position:     protocol.Position{Line: 0, Character: 0},
@@ -610,7 +609,7 @@ func TestCompletion(t *testing.T) {
 		s := NewServer()
 		openDoc(t, s, serverDocA, "entity User {\n\tid: ")
 
-		res, err := s.Completion(context.Background(), &protocol.CompletionParams{
+		res, err := s.Completion(t.Context(), &protocol.CompletionParams{
 			TextDocumentPositionParams: protocol.TextDocumentPositionParams{
 				TextDocument: protocol.TextDocumentIdentifier{URI: uri.URI(serverDocA)},
 				Position:     protocol.Position{Line: 1, Character: 5},
@@ -629,7 +628,7 @@ func TestCompletion(t *testing.T) {
 	t.Run("unknown document is null", func(t *testing.T) {
 		s := NewServer()
 
-		res, err := s.Completion(context.Background(), &protocol.CompletionParams{
+		res, err := s.Completion(t.Context(), &protocol.CompletionParams{
 			TextDocumentPositionParams: protocol.TextDocumentPositionParams{
 				TextDocument: protocol.TextDocumentIdentifier{URI: uri.URI(serverUnknown)},
 				Position:     protocol.Position{Line: 0, Character: 0},
@@ -648,7 +647,7 @@ func TestCompletion(t *testing.T) {
 		s := NewServer()
 		openDoc(t, s, serverDocA, "service S {\n}\n")
 
-		res, err := s.Completion(context.Background(), &protocol.CompletionParams{
+		res, err := s.Completion(t.Context(), &protocol.CompletionParams{
 			TextDocumentPositionParams: protocol.TextDocumentPositionParams{
 				TextDocument: protocol.TextDocumentIdentifier{URI: uri.URI(serverDocA)},
 				Position:     protocol.Position{Line: 0, Character: 9},
@@ -669,7 +668,7 @@ func TestCompletionResolve(t *testing.T) {
 
 	item := &protocol.CompletionItem{Label: "entity"}
 
-	res, err := s.CompletionResolve(context.Background(), item)
+	res, err := s.CompletionResolve(t.Context(), item)
 	if err != nil {
 		t.Fatalf("CompletionResolve: %v", err)
 	}
@@ -685,7 +684,7 @@ func TestSignatureHelp(t *testing.T) {
 		content := "entity User {\n\tid: string @validate("
 		openDoc(t, s, serverDocA, content)
 
-		res, err := s.SignatureHelp(context.Background(), &protocol.SignatureHelpParams{
+		res, err := s.SignatureHelp(t.Context(), &protocol.SignatureHelpParams{
 			TextDocumentPositionParams: protocol.TextDocumentPositionParams{
 				TextDocument: protocol.TextDocumentIdentifier{URI: uri.URI(serverDocA)},
 				Position:     protocol.Position{Line: 1, Character: 22},
@@ -704,7 +703,7 @@ func TestSignatureHelp(t *testing.T) {
 		s := NewServer()
 		openDoc(t, s, serverDocA, serverValidDoc)
 
-		res, err := s.SignatureHelp(context.Background(), &protocol.SignatureHelpParams{
+		res, err := s.SignatureHelp(t.Context(), &protocol.SignatureHelpParams{
 			TextDocumentPositionParams: protocol.TextDocumentPositionParams{
 				TextDocument: protocol.TextDocumentIdentifier{URI: uri.URI(serverDocA)},
 				Position:     protocol.Position{Line: 0, Character: 0},
@@ -722,7 +721,7 @@ func TestSignatureHelp(t *testing.T) {
 	t.Run("unknown document is null", func(t *testing.T) {
 		s := NewServer()
 
-		res, err := s.SignatureHelp(context.Background(), &protocol.SignatureHelpParams{
+		res, err := s.SignatureHelp(t.Context(), &protocol.SignatureHelpParams{
 			TextDocumentPositionParams: protocol.TextDocumentPositionParams{
 				TextDocument: protocol.TextDocumentIdentifier{URI: uri.URI(serverUnknown)},
 				Position:     protocol.Position{Line: 0, Character: 0},
@@ -745,7 +744,7 @@ func TestFormatting(t *testing.T) {
 		s := NewServer()
 		openDoc(t, s, serverDocA, unformatted)
 
-		edits, err := s.Formatting(context.Background(), &protocol.DocumentFormattingParams{
+		edits, err := s.Formatting(t.Context(), &protocol.DocumentFormattingParams{
 			TextDocument: protocol.TextDocumentIdentifier{URI: uri.URI(serverDocA)},
 		})
 		if err != nil {
@@ -760,7 +759,7 @@ func TestFormatting(t *testing.T) {
 	t.Run("unknown document is null", func(t *testing.T) {
 		s := NewServer()
 
-		edits, err := s.Formatting(context.Background(), &protocol.DocumentFormattingParams{
+		edits, err := s.Formatting(t.Context(), &protocol.DocumentFormattingParams{
 			TextDocument: protocol.TextDocumentIdentifier{URI: uri.URI(serverUnknown)},
 		})
 		if err != nil {
@@ -780,14 +779,14 @@ func TestRangeFormatting(t *testing.T) {
 		s := NewServer()
 		openDoc(t, s, serverDocA, unformatted)
 
-		full, err := s.Formatting(context.Background(), &protocol.DocumentFormattingParams{
+		full, err := s.Formatting(t.Context(), &protocol.DocumentFormattingParams{
 			TextDocument: protocol.TextDocumentIdentifier{URI: uri.URI(serverDocA)},
 		})
 		if err != nil {
 			t.Fatalf("Formatting: %v", err)
 		}
 
-		narrow, err := s.RangeFormatting(context.Background(), &protocol.DocumentRangeFormattingParams{
+		narrow, err := s.RangeFormatting(t.Context(), &protocol.DocumentRangeFormattingParams{
 			TextDocument: protocol.TextDocumentIdentifier{URI: uri.URI(serverDocA)},
 			Range: protocol.Range{
 				Start: protocol.Position{Line: 1, Character: 0},
@@ -810,7 +809,7 @@ func TestRangeFormatting(t *testing.T) {
 	t.Run("unknown document is null", func(t *testing.T) {
 		s := NewServer()
 
-		edits, err := s.RangeFormatting(context.Background(), &protocol.DocumentRangeFormattingParams{
+		edits, err := s.RangeFormatting(t.Context(), &protocol.DocumentRangeFormattingParams{
 			TextDocument: protocol.TextDocumentIdentifier{URI: uri.URI(serverDocA)},
 			Range: protocol.Range{
 				Start: protocol.Position{Line: 0, Character: 0},
@@ -837,7 +836,7 @@ func TestCodeAction(t *testing.T) {
 		s := NewServer()
 		openDoc(t, s, serverDocA, serverBrokenDoc)
 
-		actions, err := s.CodeAction(context.Background(), &protocol.CodeActionParams{
+		actions, err := s.CodeAction(t.Context(), &protocol.CodeActionParams{
 			TextDocument: protocol.TextDocumentIdentifier{URI: uri.URI(serverDocA)},
 			Range:        diagRange,
 			Context: protocol.CodeActionContext{
@@ -860,7 +859,7 @@ func TestCodeAction(t *testing.T) {
 		s := NewServer()
 		openDoc(t, s, serverDocA, serverValidDoc)
 
-		actions, err := s.CodeAction(context.Background(), &protocol.CodeActionParams{
+		actions, err := s.CodeAction(t.Context(), &protocol.CodeActionParams{
 			TextDocument: protocol.TextDocumentIdentifier{URI: uri.URI(serverDocA)},
 			Range:        diagRange,
 			Context:      protocol.CodeActionContext{},
@@ -878,7 +877,7 @@ func TestCodeAction(t *testing.T) {
 		s := NewServer()
 		openDoc(t, s, serverDocA, serverValidDoc)
 
-		actions, err := s.CodeAction(context.Background(), &protocol.CodeActionParams{
+		actions, err := s.CodeAction(t.Context(), &protocol.CodeActionParams{
 			TextDocument: protocol.TextDocumentIdentifier{URI: uri.URI(serverDocA)},
 			Range:        diagRange,
 			Context: protocol.CodeActionContext{
@@ -903,7 +902,7 @@ func TestPrepareRename(t *testing.T) {
 		s := NewServer()
 		openDoc(t, s, serverDocA, serverValidDoc)
 
-		res, err := s.PrepareRename(context.Background(), &protocol.PrepareRenameParams{
+		res, err := s.PrepareRename(t.Context(), &protocol.PrepareRenameParams{
 			TextDocumentPositionParams: protocol.TextDocumentPositionParams{
 				TextDocument: protocol.TextDocumentIdentifier{URI: uri.URI(serverDocA)},
 				Position:     protocol.Position{Line: 0, Character: serverEntityAt},
@@ -927,7 +926,7 @@ func TestPrepareRename(t *testing.T) {
 		s := NewServer()
 		openDoc(t, s, serverDocA, serverValidDoc)
 
-		res, err := s.PrepareRename(context.Background(), &protocol.PrepareRenameParams{
+		res, err := s.PrepareRename(t.Context(), &protocol.PrepareRenameParams{
 			TextDocumentPositionParams: protocol.TextDocumentPositionParams{
 				TextDocument: protocol.TextDocumentIdentifier{URI: uri.URI(serverDocA)},
 				Position:     protocol.Position{Line: 4, Character: 0},
@@ -945,7 +944,7 @@ func TestPrepareRename(t *testing.T) {
 	t.Run("unknown document is null", func(t *testing.T) {
 		s := NewServer()
 
-		res, err := s.PrepareRename(context.Background(), &protocol.PrepareRenameParams{
+		res, err := s.PrepareRename(t.Context(), &protocol.PrepareRenameParams{
 			TextDocumentPositionParams: protocol.TextDocumentPositionParams{
 				TextDocument: protocol.TextDocumentIdentifier{URI: uri.URI(serverUnknown)},
 				Position:     protocol.Position{Line: 0, Character: 0},
@@ -967,7 +966,7 @@ func TestRename(t *testing.T) {
 		openDoc(t, s, serverDocA, serverValidDoc)
 		openDoc(t, s, serverDocB, "entity Audit {\n\tid: uuid @primary\n\n\tbelongs_to owner: User @foreign_key(owner_id)\n}\n")
 
-		edit, err := s.Rename(context.Background(), &protocol.RenameParams{
+		edit, err := s.Rename(t.Context(), &protocol.RenameParams{
 			TextDocumentPositionParams: protocol.TextDocumentPositionParams{
 				TextDocument: protocol.TextDocumentIdentifier{URI: uri.URI(serverDocA)},
 				Position:     protocol.Position{Line: 0, Character: serverEntityAt},
@@ -1001,7 +1000,7 @@ func TestRename(t *testing.T) {
 		s := NewServer()
 		openDoc(t, s, serverDocA, serverValidDoc)
 
-		_, err := s.Rename(context.Background(), &protocol.RenameParams{
+		_, err := s.Rename(t.Context(), &protocol.RenameParams{
 			TextDocumentPositionParams: protocol.TextDocumentPositionParams{
 				TextDocument: protocol.TextDocumentIdentifier{URI: uri.URI(serverDocA)},
 				Position:     protocol.Position{Line: 4, Character: 0},
@@ -1017,7 +1016,7 @@ func TestRename(t *testing.T) {
 		s := NewServer()
 		openDoc(t, s, serverDocA, serverValidDoc)
 
-		_, err := s.Rename(context.Background(), &protocol.RenameParams{
+		_, err := s.Rename(t.Context(), &protocol.RenameParams{
 			TextDocumentPositionParams: protocol.TextDocumentPositionParams{
 				TextDocument: protocol.TextDocumentIdentifier{URI: uri.URI(serverDocA)},
 				Position:     protocol.Position{Line: 0, Character: serverEntityAt},
@@ -1032,7 +1031,7 @@ func TestRename(t *testing.T) {
 		s := NewServer()
 		openDoc(t, s, serverDocA, serverValidDoc)
 
-		_, err := s.Rename(context.Background(), &protocol.RenameParams{
+		_, err := s.Rename(t.Context(), &protocol.RenameParams{
 			TextDocumentPositionParams: protocol.TextDocumentPositionParams{
 				TextDocument: protocol.TextDocumentIdentifier{URI: uri.URI(serverDocA)},
 				Position:     protocol.Position{Line: 0, Character: serverEntityAt},
@@ -1080,7 +1079,7 @@ schedule Nightly {
 				s := NewServer()
 				openDoc(t, s, tt.docURI, tt.content)
 
-				edit, err := s.Rename(context.Background(), &protocol.RenameParams{
+				edit, err := s.Rename(t.Context(), &protocol.RenameParams{
 					TextDocumentPositionParams: protocol.TextDocumentPositionParams{
 						TextDocument: protocol.TextDocumentIdentifier{URI: uri.URI(tt.docURI)},
 						Position:     tt.position,
@@ -1118,7 +1117,7 @@ func TestReferences(t *testing.T) {
 		s := NewServer()
 		openDoc(t, s, serverDocA, serverValidDoc)
 
-		locs, err := s.References(context.Background(), &protocol.ReferenceParams{
+		locs, err := s.References(t.Context(), &protocol.ReferenceParams{
 			TextDocumentPositionParams: protocol.TextDocumentPositionParams{
 				TextDocument: protocol.TextDocumentIdentifier{URI: uri.URI(serverDocA)},
 				Position:     protocol.Position{Line: 0, Character: serverEntityAt},
@@ -1138,7 +1137,7 @@ func TestReferences(t *testing.T) {
 		s := NewServer()
 		openDoc(t, s, serverDocA, serverValidDoc)
 
-		locs, err := s.References(context.Background(), &protocol.ReferenceParams{
+		locs, err := s.References(t.Context(), &protocol.ReferenceParams{
 			TextDocumentPositionParams: protocol.TextDocumentPositionParams{
 				TextDocument: protocol.TextDocumentIdentifier{URI: uri.URI(serverDocA)},
 				Position:     protocol.Position{Line: 4, Character: 0},
@@ -1157,7 +1156,7 @@ func TestReferences(t *testing.T) {
 	t.Run("unknown document is empty", func(t *testing.T) {
 		s := NewServer()
 
-		locs, err := s.References(context.Background(), &protocol.ReferenceParams{
+		locs, err := s.References(t.Context(), &protocol.ReferenceParams{
 			TextDocumentPositionParams: protocol.TextDocumentPositionParams{
 				TextDocument: protocol.TextDocumentIdentifier{URI: uri.URI(serverUnknown)},
 				Position:     protocol.Position{Line: 0, Character: 0},
@@ -1179,7 +1178,7 @@ func TestFoldingRanges(t *testing.T) {
 		s := NewServer()
 		openDoc(t, s, serverDocA, serverValidDoc)
 
-		ranges, err := s.FoldingRanges(context.Background(), &protocol.FoldingRangeParams{
+		ranges, err := s.FoldingRanges(t.Context(), &protocol.FoldingRangeParams{
 			TextDocument: protocol.TextDocumentIdentifier{URI: uri.URI(serverDocA)},
 		})
 		if err != nil {
@@ -1194,7 +1193,7 @@ func TestFoldingRanges(t *testing.T) {
 	t.Run("unknown document is null", func(t *testing.T) {
 		s := NewServer()
 
-		ranges, err := s.FoldingRanges(context.Background(), &protocol.FoldingRangeParams{
+		ranges, err := s.FoldingRanges(t.Context(), &protocol.FoldingRangeParams{
 			TextDocument: protocol.TextDocumentIdentifier{URI: uri.URI(serverUnknown)},
 		})
 		if err != nil {
@@ -1212,7 +1211,7 @@ func TestDocumentHighlight(t *testing.T) {
 		s := NewServer()
 		openDoc(t, s, serverDocA, serverValidDoc)
 
-		highlights, err := s.DocumentHighlight(context.Background(), &protocol.DocumentHighlightParams{
+		highlights, err := s.DocumentHighlight(t.Context(), &protocol.DocumentHighlightParams{
 			TextDocumentPositionParams: protocol.TextDocumentPositionParams{
 				TextDocument: protocol.TextDocumentIdentifier{URI: uri.URI(serverDocA)},
 				Position:     protocol.Position{Line: 0, Character: serverEntityAt},
@@ -1231,7 +1230,7 @@ func TestDocumentHighlight(t *testing.T) {
 		s := NewServer()
 		openDoc(t, s, serverDocA, serverValidDoc)
 
-		_, err := s.DocumentHighlight(context.Background(), &protocol.DocumentHighlightParams{
+		_, err := s.DocumentHighlight(t.Context(), &protocol.DocumentHighlightParams{
 			TextDocumentPositionParams: protocol.TextDocumentPositionParams{
 				TextDocument: protocol.TextDocumentIdentifier{URI: uri.URI(serverDocA)},
 				Position:     protocol.Position{Line: 4, Character: 0},
@@ -1245,7 +1244,7 @@ func TestDocumentHighlight(t *testing.T) {
 	t.Run("unknown document is safe", func(t *testing.T) {
 		s := NewServer()
 
-		_, err := s.DocumentHighlight(context.Background(), &protocol.DocumentHighlightParams{
+		_, err := s.DocumentHighlight(t.Context(), &protocol.DocumentHighlightParams{
 			TextDocumentPositionParams: protocol.TextDocumentPositionParams{
 				TextDocument: protocol.TextDocumentIdentifier{URI: uri.URI(serverUnknown)},
 				Position:     protocol.Position{Line: 0, Character: 0},
@@ -1262,7 +1261,7 @@ func TestSemanticTokensFull(t *testing.T) {
 		s := NewServer()
 		openDoc(t, s, serverDocA, serverValidDoc)
 
-		tokens, err := s.SemanticTokensFull(context.Background(), &protocol.SemanticTokensParams{
+		tokens, err := s.SemanticTokensFull(t.Context(), &protocol.SemanticTokensParams{
 			TextDocument: protocol.TextDocumentIdentifier{URI: uri.URI(serverDocA)},
 		})
 		if err != nil {
@@ -1277,7 +1276,7 @@ func TestSemanticTokensFull(t *testing.T) {
 	t.Run("unknown document is null", func(t *testing.T) {
 		s := NewServer()
 
-		tokens, err := s.SemanticTokensFull(context.Background(), &protocol.SemanticTokensParams{
+		tokens, err := s.SemanticTokensFull(t.Context(), &protocol.SemanticTokensParams{
 			TextDocument: protocol.TextDocumentIdentifier{URI: uri.URI(serverUnknown)},
 		})
 		if err != nil {
@@ -1307,7 +1306,7 @@ func TestInlayHint(t *testing.T) {
 		s := NewServer()
 		openDoc(t, s, serverDocA, serverInlayDoc)
 
-		hints, err := s.InlayHint(context.Background(), &protocol.InlayHintParams{
+		hints, err := s.InlayHint(t.Context(), &protocol.InlayHintParams{
 			TextDocument: protocol.TextDocumentIdentifier{URI: uri.URI(serverDocA)},
 			Range: protocol.Range{
 				Start: protocol.Position{Line: 0, Character: 0},
@@ -1334,7 +1333,7 @@ func TestInlayHint(t *testing.T) {
 	t.Run("unknown document is null", func(t *testing.T) {
 		s := NewServer()
 
-		hints, err := s.InlayHint(context.Background(), &protocol.InlayHintParams{
+		hints, err := s.InlayHint(t.Context(), &protocol.InlayHintParams{
 			TextDocument: protocol.TextDocumentIdentifier{URI: uri.URI(serverUnknown)},
 			Range: protocol.Range{
 				Start: protocol.Position{Line: 0, Character: 0},
@@ -1359,7 +1358,7 @@ func TestInlayHintResolve(t *testing.T) {
 		Label:    protocol.String(" (404 NOT_FOUND)"),
 	}
 
-	res, err := s.InlayHintResolve(context.Background(), hint)
+	res, err := s.InlayHintResolve(t.Context(), hint)
 	if err != nil {
 		t.Fatalf("InlayHintResolve: %v", err)
 	}
@@ -1377,7 +1376,7 @@ func TestClientCapture(t *testing.T) {
 	}
 
 	fake := &fakeClient{}
-	ctx := protocol.WithClient(context.Background(), fake)
+	ctx := protocol.WithClient(t.Context(), fake)
 
 	if err := s.DidSave(ctx, &protocol.DidSaveTextDocumentParams{}); err != nil {
 		t.Fatalf("DidSave: %v", err)
@@ -1389,7 +1388,7 @@ func TestClientCapture(t *testing.T) {
 
 	plain := NewServer()
 
-	if err := plain.DidSave(context.Background(), &protocol.DidSaveTextDocumentParams{}); err != nil {
+	if err := plain.DidSave(t.Context(), &protocol.DidSaveTextDocumentParams{}); err != nil {
 		t.Fatalf("DidSave: %v", err)
 	}
 

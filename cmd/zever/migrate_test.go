@@ -1,7 +1,6 @@
 package main
 
 import (
-	"context"
 	"errors"
 	"flag"
 	"path/filepath"
@@ -284,7 +283,7 @@ func TestRunDBMigrateDryRunWithDBReportsWithoutApplying(t *testing.T) {
 func zeverSQLiteObjects(t *testing.T, path string) map[string]bool {
 	t.Helper()
 
-	ctx := context.Background()
+	ctx := t.Context()
 
 	conn, err := openZeverDB("sqlite", path)
 	if err != nil {
@@ -322,7 +321,7 @@ func zeverSQLiteObjects(t *testing.T, path string) map[string]bool {
 func zeverSQLiteColumns(t *testing.T, path string) map[string]bool {
 	t.Helper()
 
-	ctx := context.Background()
+	ctx := t.Context()
 
 	conn, err := openZeverDB("sqlite", path)
 	if err != nil {

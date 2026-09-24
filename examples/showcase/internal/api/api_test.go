@@ -2,7 +2,6 @@ package api_test
 
 import (
 	"bytes"
-	"context"
 	"encoding/json"
 	"net/http"
 	"net/http/httptest"
@@ -63,7 +62,7 @@ func newTestSetup(t *testing.T) testSetup {
 
 	c := container.New(cfg)
 
-	ctx := context.Background()
+	ctx := t.Context()
 	database, err := c.DB()
 	if err != nil {
 		t.Fatalf("DB: %v", err)
@@ -119,7 +118,7 @@ func newTestSetup(t *testing.T) testSetup {
 	}
 
 	t.Cleanup(func() {
-		_ = c.Close(context.Background())
+		_ = c.Close(t.Context())
 	})
 
 	api.New(database, authInst, hasher, limiter, perm, q, i18nInst, flags).Routes(r)
@@ -136,7 +135,7 @@ func do(t *testing.T, h http.Handler, method, path, token string, body any) *htt
 			t.Fatalf("encode: %v", err)
 		}
 	}
-	req := httptest.NewRequestWithContext(context.Background(), method, path, &buf)
+	req := httptest.NewRequestWithContext(t.Context(), method, path, &buf)
 	if body != nil {
 		req.Header.Set("Content-Type", "application/json")
 	}
@@ -179,7 +178,7 @@ func login(t *testing.T, h http.Handler, email string) string {
 // makeAdmin elevates a user by email to the admin role.
 func makeAdmin(t *testing.T, s testSetup, email string) {
 	t.Helper()
-	n, err := s.db.Exec(context.Background(), `UPDATE users SET role = 'admin' WHERE email = ?`, email)
+	n, err := s.db.Exec(t.Context(), `UPDATE users SET role = 'admin' WHERE email = ?`, email)
 	if err != nil {
 		t.Fatalf("elevate: %v", err)
 	}
@@ -192,7 +191,7 @@ func makeAdmin(t *testing.T, s testSetup, email string) {
 func makeCategory(t *testing.T, s testSetup, id, name string) {
 	t.Helper()
 	now := time.Now().UTC().Format(time.RFC3339Nano)
-	if _, err := s.db.Exec(context.Background(),
+	if _, err := s.db.Exec(t.Context(),
 		`INSERT INTO categories (id, name, description, created_at) VALUES (?, ?, ?, ?)`,
 		id, name, name+" desc", now); err != nil {
 		t.Fatalf("category: %v", err)
