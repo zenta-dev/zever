@@ -15,8 +15,12 @@ const (
 
 // RedisOptions holds connection settings for the Redis adapter.
 type RedisOptions struct {
-	// ConnectOptions holds the shared Redis connection settings.
-	zredis.ConnectOptions
+	// Options holds the shared Redis connection AND pooling settings
+	// (PoolSize, MinIdleConns, PoolTimeout, MaxConnIdleTime,
+	// MaxConnLifetime) -- previously only ConnectOptions was embedded here,
+	// silently dropping every pooling knob to go-redis's defaults with no
+	// way for a caller to tune them for a hot idempotency store.
+	zredis.Options
 	// Prefix is the key prefix for Redis idempotency data.
 	Prefix string `json:"prefix" toml:"prefix" yaml:"prefix"`
 }
