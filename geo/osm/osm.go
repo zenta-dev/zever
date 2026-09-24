@@ -137,7 +137,7 @@ func (s *osmGeo) Geocode(ctx context.Context, address string) ([]geo.Location, e
 	}
 	defer resp.Body.Close()
 
-	body, err := readLimitedBody(resp, s.maxBody)
+	body, err := readLimitedBody(ctx, resp, s.maxBody)
 	if err != nil {
 		return nil, err
 	}
@@ -200,7 +200,7 @@ func (s *osmGeo) ReverseGeocode(ctx context.Context, lat, lng float64) ([]geo.Ad
 	}
 	defer resp.Body.Close()
 
-	body, err := readLimitedBody(resp, s.maxBody)
+	body, err := readLimitedBody(ctx, resp, s.maxBody)
 	if err != nil {
 		return nil, err
 	}
@@ -353,8 +353,8 @@ func redactURLError(err error) error {
 	return &url.Error{Op: ue.Op, URL: uStr, Err: ue.Err}
 }
 
-func readLimitedBody(resp *http.Response, limit int64) ([]byte, error) {
-	data, err := httpclient.ReadLimited(resp.Body, limit)
+func readLimitedBody(ctx context.Context, resp *http.Response, limit int64) ([]byte, error) {
+	data, err := httpclient.ReadLimited(ctx, resp.Body, limit)
 	if err != nil {
 		if errors.Is(err, httpclient.ErrTooLarge) {
 			return nil, fmt.Errorf("geo: osm: %w", geo.ErrTooLarge)
