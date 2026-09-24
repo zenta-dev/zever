@@ -17,7 +17,7 @@ Public API changes — new exports, config struct or default changes, serializat
 ## How to upgrade
 
 ```sh
-go get github.com/zenta-dev/zever@v0.1.1
+go get github.com/zenta-dev/zever@v0.2.0
 go mod tidy
 make tidy-check
 make check
@@ -54,7 +54,7 @@ import "github.com/zenta-dev/zever/orm/migrate"
 
 ## Keeping upgrades cheap
 
-- Pin the CLI install (`go install .../cmd/zever@v0.1.0`) so TUI and backend versions match.
+- Pin the CLI install (`go install .../cmd/zever@v0.2.0`) so TUI and backend versions match.
 - Keep user-facing changes in `CHANGELOG.md` under `## [Unreleased]` with every PR.
 - Use Conventional Commits (`feat/fix/perf/refactor/test/docs/ci/build:`), one logical change per commit.
 - After touching `token.Keywords` or `resolver.ScalarTypeNames`, run `make generate` — editor grammars derive from those tables.
