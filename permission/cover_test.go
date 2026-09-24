@@ -104,10 +104,19 @@ func TestCover_Options_Validate_PolicyMissing(t *testing.T) {
 	}
 }
 
+// errCoverOpenFactory is process-shared so repeat runs (-count=2)
+// rewire the same sentinel instance; Register tolerates the duplicate.
+var errCoverOpenFactory = errors.New("cover boom 9202")
+
 func TestCover_Open_Success9201(t *testing.T) {
 	a := Adapter(9201)
 	if err := Register(a, func(Options) (Checker, error) { return coverStubChecker{}, nil }); err != nil {
-		t.Fatalf("Register err = %v", err)
+		var dup *DuplicateError
+		if !errors.As(err, &dup) {
+			t.Fatalf("Register err = %v", err)
+		}
+		// Duplicate means an earlier run in this process already wired the
+		// same stub (e.g. -count=2); the Open/Can checks below still hold.
 	}
 	c, err := Open(a, Options{})
 	if err != nil {
@@ -127,9 +136,14 @@ func TestCover_Open_Success9201(t *testing.T) {
 
 func TestCover_Open_FactoryError9202(t *testing.T) {
 	a := Adapter(9202)
-	sentinel := errors.New("cover boom 9202")
+	sentinel := errCoverOpenFactory
 	if err := Register(a, func(Options) (Checker, error) { return nil, sentinel }); err != nil {
-		t.Fatalf("Register err = %v", err)
+		var dup *DuplicateError
+		if !errors.As(err, &dup) {
+			t.Fatalf("Register err = %v", err)
+		}
+		// Duplicate means an earlier run already wired the same shared
+		// sentinel; the errors.Is check below still holds.
 	}
 	_, err := Open(a, Options{})
 	if !errors.Is(err, sentinel) {

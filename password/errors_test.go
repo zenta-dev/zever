@@ -43,7 +43,7 @@ func TestSentinels(t *testing.T) {
 		},
 		{
 			name: "invalid adapter via parse",
-			err:  mustParseInvalid("bcrypt"),
+			err:  mustParseInvalid(t, "bcrypt"),
 			want: password.ErrInvalidAdapter,
 		},
 	}
@@ -114,7 +114,12 @@ func mustRegisterDup(t *testing.T, a password.Adapter) error {
 	t.Helper()
 
 	if err := password.Register(a, stubFactory); err != nil {
-		t.Fatalf("first Register() = %v, want nil", err)
+		var dup *password.DuplicateError
+		if !errors.As(err, &dup) {
+			t.Fatalf("first Register() = %v, want nil", err)
+		}
+		// Duplicate means an earlier run in this process already registered
+		// this adapter (e.g. -count=2); the duplicate assertion below holds.
 	}
 
 	err := password.Register(a, stubFactory)
@@ -140,7 +145,9 @@ func mustOpenUnknown(t *testing.T, a password.Adapter) error {
 	return err
 }
 
-func mustParseInvalid(s string) error {
+func mustParseInvalid(t *testing.T, s string) error {
+	t.Helper()
+
 	_, err := password.ParseAdapter(s)
 	return err
 }

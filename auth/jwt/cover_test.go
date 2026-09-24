@@ -45,7 +45,7 @@ func TestCoverVerifyRevocationStoreError(t *testing.T) {
 
 	opts := baseOpts()
 	opts.JWT.RevocationStore = erroringRevocationStore{}
-	a := newTestAuth(t, opts)
+	a := freshAdapter(t, opts)
 	ctx := t.Context()
 
 	tok, err := a.Issue(ctx, "alice", nil, time.Minute)
@@ -62,7 +62,7 @@ func TestCoverRevokeRevocationStoreError(t *testing.T) {
 
 	opts := baseOpts()
 	opts.JWT.RevocationStore = erroringRevocationStore{}
-	a := newTestAuth(t, opts)
+	a := freshAdapter(t, opts)
 	ctx := t.Context()
 
 	tok, err := a.Issue(ctx, "alice", nil, time.Minute)
@@ -77,7 +77,7 @@ func TestCoverRevokeRevocationStoreError(t *testing.T) {
 func TestCoverVerifyNoneAlgRejected(t *testing.T) {
 	t.Parallel()
 
-	a := newTestAuth(t, baseOpts())
+	a := freshAdapter(t, baseOpts())
 	ctx := t.Context()
 
 	header := base64.RawURLEncoding.EncodeToString([]byte(`{"alg":"none","typ":"JWT"}`))
@@ -122,7 +122,7 @@ func TestCoverIssueCSPRNCFailure(t *testing.T) {
 	randReader = brokenReader{}
 	defer func() { randReader = old }()
 
-	a := newTestAuth(t, baseOpts())
+	a := freshAdapter(t, baseOpts())
 	_, err := a.Issue(t.Context(), "sub", nil, time.Minute)
 	if err == nil || !strings.Contains(err.Error(), "jti") {
 		t.Fatalf("Issue(broken CSPRNG) = %v, want jti error", err)
@@ -132,7 +132,7 @@ func TestCoverIssueCSPRNCFailure(t *testing.T) {
 func TestCoverVerifyNoCustomClaimsNil(t *testing.T) {
 	t.Parallel()
 
-	a := newTestAuth(t, baseOpts())
+	a := freshAdapter(t, baseOpts())
 	ctx := t.Context()
 
 	tok, err := a.Issue(ctx, "sub", nil, time.Minute)
@@ -151,7 +151,7 @@ func TestCoverVerifyNoCustomClaimsNil(t *testing.T) {
 func TestCoverRevokeGarbage(t *testing.T) {
 	t.Parallel()
 
-	a := newTestAuth(t, baseOpts())
+	a := freshAdapter(t, baseOpts())
 	if err := a.Revoke(t.Context(), "garbage"); !errors.Is(err, auth.ErrInvalidToken) {
 		t.Fatalf("Revoke(garbage) = %v, want ErrInvalidToken", err)
 	}
@@ -160,7 +160,7 @@ func TestCoverRevokeGarbage(t *testing.T) {
 func TestCoverRevokeNoJTI(t *testing.T) {
 	t.Parallel()
 
-	a := newTestAuth(t, baseOpts())
+	a := freshAdapter(t, baseOpts())
 	tok := jwtv5.NewWithClaims(jwtv5.SigningMethodHS256, jwtv5.MapClaims{
 		"sub": "x",
 		"iss": "test-iss",
@@ -179,7 +179,7 @@ func TestCoverRevokeNoJTI(t *testing.T) {
 func TestCoverVerifyNoJTINeverRevoked(t *testing.T) {
 	t.Parallel()
 
-	a := newTestAuth(t, baseOpts())
+	a := freshAdapter(t, baseOpts())
 	raw := signManual(t, jwtv5.MapClaims{
 		"sub": "alice",
 		"iss": "test-iss",

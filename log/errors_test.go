@@ -84,12 +84,10 @@ func TestOpenWrapsFactoryError(t *testing.T) {
 	t.Parallel()
 
 	sentinel := errors.New("boom")
-	adapter := Adapter(100)
+	adapter := freshAdapter()
 
 	if err := Register(adapter, func(Options) (Logger, error) { return nil, sentinel }); err != nil {
-		if !errors.Is(err, ErrDuplicate) {
-			t.Skipf("adapter %d already registered, skipping wrap test", int(adapter))
-		}
+		t.Fatalf("Register() error = %v", err)
 	}
 
 	_, err := Open(adapter, Options{})

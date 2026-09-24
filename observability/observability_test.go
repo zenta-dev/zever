@@ -54,7 +54,12 @@ func TestRegisterNilAndDuplicate(t *testing.T) {
 
 	stub := func(Options) (Provider, error) { return stubProvider{}, nil }
 	if err := Register(a, stub); err != nil {
-		t.Fatalf("Register() error = %v", err)
+		var dup *DuplicateError
+		if !errors.As(err, &dup) {
+			t.Fatalf("Register() error = %v", err)
+		}
+		// Duplicate means an earlier run in this process already registered
+		// this adapter (e.g. -count=2); the duplicate assertion below holds.
 	}
 
 	if err := Register(a, stub); !errors.Is(err, ErrDuplicate) {

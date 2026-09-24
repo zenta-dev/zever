@@ -21,7 +21,7 @@ func TestMemoryCompareAndDelete_matchDeletes(t *testing.T) {
 	t.Parallel()
 
 	ctx := t.Context()
-	c := newTestCache(t, cache.Options{})
+	c := stubCache(t, cache.Options{})
 	mustSet(t, c, "k", []byte("holder1"), 0)
 
 	cas, ok := c.(cache.CompareAndSwapCache)
@@ -47,7 +47,7 @@ func TestMemoryCompareAndDelete_mismatchKeeps(t *testing.T) {
 	t.Parallel()
 
 	ctx := t.Context()
-	c := newTestCache(t, cache.Options{})
+	c := stubCache(t, cache.Options{})
 	mustSet(t, c, "k", []byte("holder1"), 0)
 
 	cas, ok := c.(cache.CompareAndSwapCache)
@@ -78,7 +78,7 @@ func TestMemoryCompareAndDelete_missingOrExpiredFalse(t *testing.T) {
 	t.Parallel()
 
 	ctx := t.Context()
-	c := newTestCache(t, cache.Options{})
+	c := stubCache(t, cache.Options{})
 
 	cas, ok := c.(cache.CompareAndSwapCache)
 	if !ok {
@@ -104,7 +104,7 @@ func TestMemoryCompareAndExtend_matchRenews(t *testing.T) {
 	t.Parallel()
 
 	ctx := t.Context()
-	c := newTestCache(t, cache.Options{})
+	c := stubCache(t, cache.Options{})
 	mustSet(t, c, "k", []byte("holder1"), 60*time.Millisecond)
 
 	cas, ok := c.(cache.CompareAndSwapCache)
@@ -135,7 +135,7 @@ func TestMemoryCompareAndExtend_nonPositiveTTLClearsExpiry(t *testing.T) {
 	t.Parallel()
 
 	ctx := t.Context()
-	c := newTestCache(t, cache.Options{})
+	c := stubCache(t, cache.Options{})
 	mustSet(t, c, "k", []byte("holder1"), 50*time.Millisecond)
 
 	cas, ok := c.(cache.CompareAndSwapCache)
@@ -161,7 +161,7 @@ func TestMemoryCompareAndExtend_mismatchOrExpiredFalse(t *testing.T) {
 	t.Parallel()
 
 	ctx := t.Context()
-	c := newTestCache(t, cache.Options{})
+	c := stubCache(t, cache.Options{})
 	mustSet(t, c, "k", []byte("holder1"), 0)
 
 	cas, ok := c.(cache.CompareAndSwapCache)
@@ -219,7 +219,7 @@ func TestMemoryCompareAndSwap_concurrentNoSteal(t *testing.T) {
 	t.Parallel()
 
 	ctx := t.Context()
-	c := newTestCache(t, cache.Options{})
+	c := stubCache(t, cache.Options{})
 	mustSet(t, c, "k", []byte("owner"), 0)
 
 	cas, ok := c.(cache.CompareAndSwapCache)

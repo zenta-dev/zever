@@ -62,11 +62,23 @@ func TestTypedErrorMessages(t *testing.T) {
 	}
 }
 
+// coverOpenSuccessStub and errCoverOpenFactory are process-shared so repeat
+// runs (-count=2) rewire the same instances; Register tolerates the resulting
+// duplicate.
+var coverOpenSuccessStub = stubProvider{}
+
+var errCoverOpenFactory = errors.New("boom")
+
 func TestOpenSuccess_returnsProvider(t *testing.T) {
 	a := Adapter(9101)
-	want := stubProvider{}
+	want := coverOpenSuccessStub
 	if err := Register(a, func(Options) (Provider, error) { return want, nil }); err != nil {
-		t.Fatalf("Register() error = %v", err)
+		var dup *DuplicateError
+		if !errors.As(err, &dup) {
+			t.Fatalf("Register() error = %v", err)
+		}
+		// Duplicate means an earlier run in this process already wired the
+		// same shared stub (e.g. -count=2); the identity check below holds.
 	}
 
 	got, err := Open(a, validOptions())
@@ -80,9 +92,14 @@ func TestOpenSuccess_returnsProvider(t *testing.T) {
 
 func TestOpenFactoryError_wrapsOpen(t *testing.T) {
 	a := Adapter(9102)
-	boom := errors.New("boom")
+	boom := errCoverOpenFactory
 	if err := Register(a, func(Options) (Provider, error) { return nil, boom }); err != nil {
-		t.Fatalf("Register() error = %v", err)
+		var dup *DuplicateError
+		if !errors.As(err, &dup) {
+			t.Fatalf("Register() error = %v", err)
+		}
+		// Duplicate means an earlier run already wired the same shared
+		// sentinel; the errors.Is check below still holds.
 	}
 
 	_, err := Open(a, validOptions())

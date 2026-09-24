@@ -56,7 +56,7 @@ func TestInvalidAdapterErrorUnwrap(t *testing.T) {
 func TestInvalidOptionsErrorUnwrap(t *testing.T) {
 	t.Parallel()
 
-	err := &InvalidOptionsError{Reason: "dispatcher is required"}
+	err := &InvalidOptionsError{Reason: "dispatcher_is_required"}
 	if !errors.Is(err, ErrInvalidOptions) {
 		t.Fatalf("err=%v want ErrInvalidOptions", err)
 	}
