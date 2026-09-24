@@ -38,6 +38,9 @@ type Store struct {
 	dim int
 }
 
+// DefaultDDLTimeout bounds connect plus DDL during construction.
+const DefaultDDLTimeout = 10 * time.Second
+
 // New creates a pgvector Store from Options. It validates Options first, then
 // requires a DSN and defaults a non-positive dimension. It connects to the
 // DSN and prepares the vectors table and index, capping the pool with
@@ -59,7 +62,7 @@ func New(o vectorstore.Options) (vectorstore.VectorStore, error) {
 		dimension = vectorstore.DefaultDimension
 	}
 
-	ddlCtx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
+	ddlCtx, cancel := context.WithTimeout(context.Background(), DefaultDDLTimeout)
 	defer cancel()
 
 	cfg, err := PoolConfig(o.DSN, DefaultMaxConns)

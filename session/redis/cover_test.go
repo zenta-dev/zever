@@ -1,7 +1,6 @@
 package redis_test
 
 import (
-	"context"
 	"encoding/json"
 	"errors"
 	"testing"
@@ -15,7 +14,7 @@ import (
 func plantRaw(t *testing.T, prefix, id, raw string) {
 	t.Helper()
 
-	if err := rawClient(t).Set(context.Background(), prefix+":"+id, raw, time.Hour).Err(); err != nil {
+	if err := rawClient(t).Set(t.Context(), prefix+":"+id, raw, time.Hour).Err(); err != nil {
 		t.Fatalf("plant: %v", err)
 	}
 }
@@ -42,7 +41,7 @@ func wireJSON(t *testing.T, expiresAt time.Time) string {
 func TestCoverGetAppExpiredDeletes(t *testing.T) {
 	t.Parallel()
 
-	ctx := context.Background()
+	ctx := t.Context()
 	opts := testOptions(t)
 	st := newTestStore(t, opts)
 	id := session.NewID()
@@ -61,7 +60,7 @@ func TestCoverGetAppExpiredDeletes(t *testing.T) {
 func TestCoverSaveOverCorruptUpsertsFresh(t *testing.T) {
 	t.Parallel()
 
-	ctx := context.Background()
+	ctx := t.Context()
 	opts := testOptions(t)
 	st := newTestStore(t, opts)
 	id := session.NewID()
@@ -85,7 +84,7 @@ func TestCoverSaveOverCorruptUpsertsFresh(t *testing.T) {
 func TestCoverSaveZeroExpiryPersists(t *testing.T) {
 	t.Parallel()
 
-	ctx := context.Background()
+	ctx := t.Context()
 	opts := testOptions(t)
 	st := newTestStore(t, opts)
 	id := session.NewID()
@@ -111,7 +110,7 @@ func TestCoverSaveZeroExpiryPersists(t *testing.T) {
 func TestCoverSaveOverExpiredUpsertsFresh(t *testing.T) {
 	t.Parallel()
 
-	ctx := context.Background()
+	ctx := t.Context()
 	opts := testOptions(t)
 	st := newTestStore(t, opts)
 	id := session.NewID()
@@ -137,7 +136,7 @@ func TestCoverSaveOverExpiredUpsertsFresh(t *testing.T) {
 func TestCoverSaveFreshIDStampsTimes(t *testing.T) {
 	t.Parallel()
 
-	ctx := context.Background()
+	ctx := t.Context()
 	st := newTestStore(t, testOptions(t))
 	id := session.NewID()
 
@@ -164,7 +163,7 @@ func TestCoverSaveEncodeFails(t *testing.T) {
 	st := newTestStore(t, testOptions(t))
 
 	s := session.Session{ID: session.NewID(), Data: map[string]any{"f": func() {}}}
-	if err := st.Save(context.Background(), s); err == nil {
+	if err := st.Save(t.Context(), s); err == nil {
 		t.Fatal("Save(func data) = nil, want encode error")
 	}
 }

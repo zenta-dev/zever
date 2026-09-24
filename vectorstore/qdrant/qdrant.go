@@ -18,6 +18,9 @@ import (
 
 var uuidPattern = regexp.MustCompile(`^[0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{12}$`)
 
+// DefaultEnsureCollectionTimeout bounds lazy collection setup at construction.
+const DefaultEnsureCollectionTimeout = 10 * time.Second
+
 type pointClient interface {
 	Upsert(ctx context.Context, request *qdrant.UpsertPoints) (*qdrant.UpdateResult, error)
 	Delete(ctx context.Context, request *qdrant.DeletePoints) (*qdrant.UpdateResult, error)
@@ -98,7 +101,7 @@ func New(o vectorstore.Options) (vectorstore.VectorStore, error) {
 
 	s := &Store{client: client, dim: dim}
 	if dim > 0 {
-		ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
+		ctx, cancel := context.WithTimeout(context.Background(), DefaultEnsureCollectionTimeout)
 
 		err = s.ensureCollection(ctx, dim)
 

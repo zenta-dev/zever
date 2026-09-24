@@ -110,7 +110,7 @@ func (r *planDB) Dialect() string { return "postgres" }
 // "EXPLAIN " + the exact SELECT Stream/All would run (same WHERE args,
 // same placeholders), and returns the plan lines.
 func TestQueryExplainPassthroughSQL(t *testing.T) {
-	ctx := context.Background()
+	ctx := t.Context()
 
 	rec := &planDB{}
 
@@ -139,7 +139,7 @@ func TestQueryExplainPassthroughSQL(t *testing.T) {
 // TestQueryExplainAnalyzePassthroughSQL proves ExplainAnalyze issues
 // "EXPLAIN ANALYZE " + the rendered SELECT on a dialect that supports it.
 func TestQueryExplainAnalyzePassthroughSQL(t *testing.T) {
-	ctx := context.Background()
+	ctx := t.Context()
 
 	rec := &planDB{}
 
@@ -160,7 +160,7 @@ func TestQueryExplainAnalyzePassthroughSQL(t *testing.T) {
 // TestQueryExplainUnsupportedDialect proves Explain surfaces the
 // resolveDialect error before issuing anything.
 func TestQueryExplainUnsupportedDialect(t *testing.T) {
-	ctx := context.Background()
+	ctx := t.Context()
 
 	_, err := From(widgets).Explain(ctx, fakeDB{})
 	if err == nil {
@@ -202,7 +202,7 @@ func TestExplainRenderErrorWrapped(t *testing.T) {
 // TestExplainExecQueryError proves an EXPLAIN execution failure is wrapped
 // with the Explain tag.
 func TestExplainExecQueryError(t *testing.T) {
-	ctx := context.Background()
+	ctx := t.Context()
 
 	// Force the exec path to fail by handing explainExec a db whose Query
 	// errors.
@@ -219,7 +219,7 @@ func TestExplainExecQueryError(t *testing.T) {
 // TestExplainExecErrorPaths covers every explainExec failure: Columns
 // error, Scan error, rows.Err and Close error -- plus the nil-cell skip.
 func TestExplainExecErrorPaths(t *testing.T) {
-	ctx := context.Background()
+	ctx := t.Context()
 
 	newExec := func(rows *planRows) *planDB { return &planDB{rows: rows} }
 
@@ -264,7 +264,7 @@ func TestExplainExecErrorPaths(t *testing.T) {
 // TestExplainMutatePassthrough proves the shared mutation twin issues
 // EXPLAIN + the rendered statement through the same gate and exec path.
 func TestExplainMutatePassthrough(t *testing.T) {
-	ctx := context.Background()
+	ctx := t.Context()
 
 	rec := &planDB{}
 

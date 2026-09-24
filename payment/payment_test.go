@@ -121,7 +121,7 @@ func TestOpen_success_smoke(t *testing.T) {
 		t.Fatalf("Open err = %v", err)
 	}
 
-	ctx := context.Background()
+	ctx := t.Context()
 
 	res, err := got.CreatePayment(ctx, Request{Amount: 100, Currency: "USD", Method: MethodCard})
 	if err != nil {

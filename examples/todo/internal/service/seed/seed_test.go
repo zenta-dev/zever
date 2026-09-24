@@ -1,7 +1,6 @@
 package seed_test
 
 import (
-	"context"
 	"os"
 	"path/filepath"
 	"strings"
@@ -22,14 +21,14 @@ func TestRunIsIdempotent(t *testing.T) {
 	cfg := config.Default()
 	cfg.DB.Options.Path = filepath.Join(t.TempDir(), "test.db")
 	c := container.New(cfg)
-	t.Cleanup(func() { _ = c.Close(context.Background()) })
+	t.Cleanup(func() { _ = c.Close(t.Context()) })
 
 	database, err := c.DB()
 	if err != nil {
 		t.Fatalf("DB: %v", err)
 	}
 
-	ctx := context.Background()
+	ctx := t.Context()
 	raw, err := os.ReadFile(filepath.Join("..", "..", "api", "testdata", "schema.sql"))
 	if err != nil {
 		t.Fatalf("read schema: %v", err)

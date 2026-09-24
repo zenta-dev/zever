@@ -1,7 +1,6 @@
 package redis
 
 import (
-	"context"
 	"testing"
 
 	"github.com/zenta-dev/zever/eventbus"
@@ -14,7 +13,7 @@ func TestPull_crossInstance(t *testing.T) {
 
 	b1 := newTestBus(t, nil)
 	b2 := newTestBus(t, nil)
-	ctx := context.Background()
+	ctx := t.Context()
 	topic := freshTopic()
 
 	ch, err := b1.SubscribeChan(ctx, topic, 16)

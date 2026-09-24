@@ -1,7 +1,6 @@
 package memory
 
 import (
-	"context"
 	"testing"
 	"time"
 
@@ -22,7 +21,7 @@ func TestCoverBeginExpiredEntryReclaimed(t *testing.T) {
 	s.mu.Lock()
 	s.entries[s.prefix+"key-expired"] = &entry{expires: time.Now().Add(-time.Hour)}
 	s.mu.Unlock()
-	out, err := st.Begin(context.Background(), "key-expired", idempotency.BeginOptions{})
+	out, err := st.Begin(t.Context(), "key-expired", idempotency.BeginOptions{})
 	if err != nil {
 		t.Fatalf("Begin after expiry: %v", err)
 	}

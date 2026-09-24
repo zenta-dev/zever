@@ -45,7 +45,7 @@ func TestSend_nilMessage(t *testing.T) {
 		t.Fatalf("NewWithWriter err = %v", err)
 	}
 	defer m.Close()
-	if err := m.Send(context.Background(), nil); err == nil {
+	if err := m.Send(t.Context(), nil); err == nil {
 		t.Fatal("Send(nil) = nil, want error")
 	}
 }
@@ -62,7 +62,7 @@ func TestSend_noRecipients(t *testing.T) {
 	msg.To = nil
 	msg.Cc = nil
 	msg.Bcc = nil
-	if err := m.Send(context.Background(), msg); !errors.Is(err, mailer.ErrNoRecipients) {
+	if err := m.Send(t.Context(), msg); !errors.Is(err, mailer.ErrNoRecipients) {
 		t.Fatalf("Send err = %v, want ErrNoRecipients", err)
 	}
 }
@@ -78,13 +78,13 @@ func TestSend_invalidAddress(t *testing.T) {
 
 	badFrom := validMail()
 	badFrom.From = mailer.Address{Address: "not-an-address"}
-	if err := m.Send(context.Background(), badFrom); !errors.Is(err, mailer.ErrInvalidAddress) {
+	if err := m.Send(t.Context(), badFrom); !errors.Is(err, mailer.ErrInvalidAddress) {
 		t.Errorf("bad From err = %v, want ErrInvalidAddress", err)
 	}
 
 	badTo := validMail()
 	badTo.To = []mailer.Address{{Address: "bad"}}
-	if err := m.Send(context.Background(), badTo); !errors.Is(err, mailer.ErrInvalidAddress) {
+	if err := m.Send(t.Context(), badTo); !errors.Is(err, mailer.ErrInvalidAddress) {
 		t.Errorf("bad To err = %v, want ErrInvalidAddress", err)
 	}
 }
@@ -97,7 +97,7 @@ func TestSend_contextCanceled(t *testing.T) {
 		t.Fatalf("NewWithWriter err = %v", err)
 	}
 	defer m.Close()
-	ctx, cancel := context.WithCancel(context.Background())
+	ctx, cancel := context.WithCancel(t.Context())
 	cancel()
 	if err := m.Send(ctx, validMail()); !errors.Is(err, context.Canceled) {
 		t.Fatalf("Send err = %v, want context.Canceled", err)
@@ -127,7 +127,7 @@ func TestSend_emitsJSONRedacted(t *testing.T) {
 			{Name: "b.png", Content: []byte("12345"), Inline: true, ContentID: "cid-b"},
 		},
 	}
-	if err := m.Send(context.Background(), msg); err != nil {
+	if err := m.Send(t.Context(), msg); err != nil {
 		t.Fatalf("Send err = %v", err)
 	}
 
@@ -205,7 +205,7 @@ func TestClose_idempotentAndAfterClose(t *testing.T) {
 	if err := m.Close(); err != nil {
 		t.Fatalf("second Close err = %v, want nil", err)
 	}
-	if err := m.Send(context.Background(), validMail()); !errors.Is(err, mailer.ErrClosed) {
+	if err := m.Send(t.Context(), validMail()); !errors.Is(err, mailer.ErrClosed) {
 		t.Fatalf("Send after close err = %v, want ErrClosed", err)
 	}
 }
@@ -226,7 +226,7 @@ func TestConcurrentSends(t *testing.T) {
 		wg.Add(1)
 		go func() {
 			defer wg.Done()
-			errs[i] = m.Send(context.Background(), validMail())
+			errs[i] = m.Send(t.Context(), validMail())
 		}()
 	}
 	wg.Wait()

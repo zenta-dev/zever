@@ -97,10 +97,10 @@ func TestOpen_success_returnsBus(t *testing.T) {
 	if err != nil {
 		t.Fatalf("Open err = %v", err)
 	}
-	if perr := b.Publish(context.Background(), "t", NewPayload([]byte("hi")), NewHeaders(nil)); perr != nil {
+	if perr := b.Publish(t.Context(), "t", NewPayload([]byte("hi")), NewHeaders(nil)); perr != nil {
 		t.Fatalf("Publish err = %v", perr)
 	}
-	unsub, serr := b.Subscribe(context.Background(), "t", func(context.Context, Message) {})
+	unsub, serr := b.Subscribe(t.Context(), "t", func(context.Context, Message) {})
 	if serr != nil {
 		t.Fatalf("Subscribe err = %v", serr)
 	}

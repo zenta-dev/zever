@@ -2,7 +2,6 @@ package local
 
 import (
 	"bytes"
-	"context"
 	"crypto/ed25519"
 	"crypto/rand"
 	"encoding/base64"
@@ -67,7 +66,7 @@ func TestNew_Valid(t *testing.T) {
 func TestEncryptDecrypt_RoundTrip(t *testing.T) {
 	t.Parallel()
 	c := mustNew(t, crypto.Options{Key: genAESKey(t)})
-	ctx := context.Background()
+	ctx := t.Context()
 	lengths := []int{0, 1, 16, 1024}
 	for _, n := range lengths {
 		n := n
@@ -99,7 +98,7 @@ func TestEncryptDecrypt_RoundTrip(t *testing.T) {
 func TestDecrypt_Tampered(t *testing.T) {
 	t.Parallel()
 	c := mustNew(t, crypto.Options{Key: genAESKey(t)})
-	ctx := context.Background()
+	ctx := t.Context()
 	enc, err := c.Encrypt(ctx, []byte("tamper me"))
 	if err != nil {
 		t.Fatal(err)
@@ -114,7 +113,7 @@ func TestDecrypt_Tampered(t *testing.T) {
 func TestDecrypt_Short(t *testing.T) {
 	t.Parallel()
 	c := mustNew(t, crypto.Options{Key: genAESKey(t)})
-	ctx := context.Background()
+	ctx := t.Context()
 	_, err := c.Decrypt(ctx, []byte("short"))
 	if !errors.Is(err, crypto.ErrIntegrity) {
 		t.Fatalf("got err %v, want ErrIntegrity for short ciphertext", err)
@@ -133,7 +132,7 @@ func TestDecrypt_Short(t *testing.T) {
 func TestMac_VerifyMac_RoundTrip(t *testing.T) {
 	t.Parallel()
 	c := mustNew(t, crypto.Options{Key: genAESKey(t)})
-	ctx := context.Background()
+	ctx := t.Context()
 	msg := []byte("mac this")
 	mac, err := c.Mac(ctx, msg)
 	if err != nil {
@@ -151,7 +150,7 @@ func TestMac_VerifyMac_RoundTrip(t *testing.T) {
 func TestMac_EmptyMessage(t *testing.T) {
 	t.Parallel()
 	c := mustNew(t, crypto.Options{Key: genAESKey(t)})
-	ctx := context.Background()
+	ctx := t.Context()
 	mac, err := c.Mac(ctx, []byte{})
 	if err != nil {
 		t.Fatal(err)
@@ -168,7 +167,7 @@ func TestMac_EmptyMessage(t *testing.T) {
 func TestVerifyMac_Tampered(t *testing.T) {
 	t.Parallel()
 	c := mustNew(t, crypto.Options{Key: genAESKey(t)})
-	ctx := context.Background()
+	ctx := t.Context()
 	msg := []byte("mac this")
 	mac, err := c.Mac(ctx, msg)
 	if err != nil {
@@ -201,7 +200,7 @@ func TestMac_Deterministic_And_Separate(t *testing.T) {
 	if bytes.Equal(lc.aesKey, lc.macKey) {
 		t.Fatal("mac key must not equal aes key")
 	}
-	ctx := context.Background()
+	ctx := t.Context()
 	msg := []byte("determinism")
 	mac1, _ := lc.Mac(ctx, msg)
 	c2, err := New(crypto.Options{Key: key})
@@ -227,7 +226,7 @@ func TestMac_Deterministic_And_Separate(t *testing.T) {
 func TestSignVerify_WithKey(t *testing.T) {
 	t.Parallel()
 	c := mustNew(t, crypto.Options{Key: genAESKey(t), SignKey: genSignKey(t)})
-	ctx := context.Background()
+	ctx := t.Context()
 	msg := []byte("sign me")
 	sig, err := c.Sign(ctx, msg)
 	if err != nil {
@@ -248,7 +247,7 @@ func TestSignVerify_WithKey(t *testing.T) {
 func TestSignVerify_TamperedSig(t *testing.T) {
 	t.Parallel()
 	c := mustNew(t, crypto.Options{Key: genAESKey(t), SignKey: genSignKey(t)})
-	ctx := context.Background()
+	ctx := t.Context()
 	msg := []byte("sign me")
 	sig, _ := c.Sign(ctx, msg)
 	sig[0] ^= 0xff
@@ -264,7 +263,7 @@ func TestSignVerify_TamperedSig(t *testing.T) {
 func TestSignVerify_WrongMessage(t *testing.T) {
 	t.Parallel()
 	c := mustNew(t, crypto.Options{Key: genAESKey(t), SignKey: genSignKey(t)})
-	ctx := context.Background()
+	ctx := t.Context()
 	msg := []byte("original")
 	sig, _ := c.Sign(ctx, msg)
 	ok, err := c.Verify(ctx, []byte("different"), sig)
@@ -279,7 +278,7 @@ func TestSignVerify_WrongMessage(t *testing.T) {
 func TestSignVerify_NoKey(t *testing.T) {
 	t.Parallel()
 	c := mustNew(t, crypto.Options{Key: genAESKey(t)})
-	ctx := context.Background()
+	ctx := t.Context()
 	_, err := c.Sign(ctx, []byte("msg"))
 	if !errors.Is(err, crypto.ErrKeyNotFound) {
 		t.Fatalf("Sign got err %v, want ErrKeyNotFound", err)
@@ -293,7 +292,7 @@ func TestSignVerify_NoKey(t *testing.T) {
 func TestMac_VerifyMac_NoSignKeyStillWorks(t *testing.T) {
 	t.Parallel()
 	c := mustNew(t, crypto.Options{Key: genAESKey(t)})
-	ctx := context.Background()
+	ctx := t.Context()
 	mac, err := c.Mac(ctx, []byte("hello"))
 	if err != nil {
 		t.Fatal(err)
@@ -315,7 +314,7 @@ func TestNew_Idempotence(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	ctx := context.Background()
+	ctx := t.Context()
 	msg := []byte("idempotent")
 	m1, _ := c1.Mac(ctx, msg)
 	m2, _ := c2.Mac(ctx, msg)
@@ -333,7 +332,7 @@ func TestNew_Idempotence(t *testing.T) {
 func TestConcurrent_MixedOps(t *testing.T) {
 	t.Parallel()
 	c := mustNew(t, crypto.Options{Key: genAESKey(t), SignKey: genSignKey(t)})
-	ctx := context.Background()
+	ctx := t.Context()
 	var wg sync.WaitGroup
 	errCh := make(chan error, 8)
 	for i := 0; i < 8; i++ {
@@ -393,7 +392,7 @@ func TestConcurrent_MixedOps(t *testing.T) {
 func TestEncrypt_NonceRandomness(t *testing.T) {
 	t.Parallel()
 	c := mustNew(t, crypto.Options{Key: genAESKey(t)})
-	ctx := context.Background()
+	ctx := t.Context()
 	msg := []byte("same message")
 	e1, _ := c.Encrypt(ctx, msg)
 	e2, _ := c.Encrypt(ctx, msg)
@@ -406,7 +405,7 @@ func TestDecrypt_WrongKey_Fails(t *testing.T) {
 	t.Parallel()
 	c1 := mustNew(t, crypto.Options{Key: genAESKey(t)})
 	c2 := mustNew(t, crypto.Options{Key: genAESKey(t)})
-	ctx := context.Background()
+	ctx := t.Context()
 	enc, _ := c1.Encrypt(ctx, []byte("secret"))
 	_, err := c2.Decrypt(ctx, enc)
 	if !errors.Is(err, crypto.ErrIntegrity) {
@@ -430,7 +429,7 @@ func TestRegistry_Integration(t *testing.T) {
 	if c == nil {
 		t.Fatal("expected non-nil crypto from registry")
 	}
-	ctx := context.Background()
+	ctx := t.Context()
 	enc, err := c.Encrypt(ctx, []byte("registry"))
 	if err != nil {
 		t.Fatal(err)
@@ -444,7 +443,7 @@ func TestRegistry_Integration(t *testing.T) {
 func TestVerifyMac_WrongMessage(t *testing.T) {
 	t.Parallel()
 	c := mustNew(t, crypto.Options{Key: genAESKey(t)})
-	ctx := context.Background()
+	ctx := t.Context()
 	mac, _ := c.Mac(ctx, []byte("original"))
 	ok, err := c.VerifyMac(ctx, []byte("different"), mac)
 	if !errors.Is(err, crypto.ErrIntegrity) {
@@ -458,7 +457,7 @@ func TestVerifyMac_WrongMessage(t *testing.T) {
 func TestEncrypt_RandFailure(t *testing.T) {
 	// not parallel: mutates global randRead seam
 	c := mustNew(t, crypto.Options{Key: genAESKey(t)})
-	ctx := context.Background()
+	ctx := t.Context()
 	orig := randRead
 	randRead = func(_ []byte) (int, error) { return 0, errors.New("rand fail") }
 	defer func() { randRead = orig }()

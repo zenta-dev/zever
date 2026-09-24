@@ -95,7 +95,7 @@ func TestLimitedTransport_nilBaseUsesDefault(t *testing.T) {
 	}))
 	defer srv.Close()
 
-	req, err := http.NewRequestWithContext(context.Background(), http.MethodGet, srv.URL, nil)
+	req, err := http.NewRequestWithContext(t.Context(), http.MethodGet, srv.URL, nil)
 	if err != nil {
 		t.Fatalf("NewRequest err = %v", err)
 	}
@@ -119,7 +119,7 @@ func TestLimitedTransport_roundTripError(t *testing.T) {
 	url := srv.URL
 	srv.Close() // refused connection below
 
-	req, err := http.NewRequestWithContext(context.Background(), http.MethodGet, url, nil)
+	req, err := http.NewRequestWithContext(t.Context(), http.MethodGet, url, nil)
 	if err != nil {
 		t.Fatalf("NewRequest err = %v", err)
 	}
@@ -134,7 +134,7 @@ func TestLimitedTransport_roundTripError(t *testing.T) {
 
 func TestLimitedTransport_passthrough(t *testing.T) {
 	t.Parallel()
-	req := httptest.NewRequestWithContext(context.Background(), http.MethodGet, "http://example.com/", nil)
+	req := httptest.NewRequestWithContext(t.Context(), http.MethodGet, "http://example.com/", nil)
 
 	// Synthetic stub responses carry no live body; nothing to close.
 	if resp, err := (stubRoundTripper{}).roundTrip(req); resp != nil || err != nil { //nolint:bodyclose
@@ -168,7 +168,7 @@ func TestLimitedTransport_capsLargeBody(t *testing.T) {
 	}))
 	defer srv.Close()
 
-	req, err := http.NewRequestWithContext(context.Background(), http.MethodGet, srv.URL, nil)
+	req, err := http.NewRequestWithContext(t.Context(), http.MethodGet, srv.URL, nil)
 	if err != nil {
 		t.Fatalf("NewRequest err = %v", err)
 	}
@@ -252,7 +252,7 @@ func TestNotify_invalidNotificationShape(t *testing.T) {
 
 	bad := validSMS()
 	bad.Title = "push-only title"
-	if err := n.Notify(context.Background(), bad); !errors.Is(err, notification.ErrInvalidNotification) {
+	if err := n.Notify(t.Context(), bad); !errors.Is(err, notification.ErrInvalidNotification) {
 		t.Fatalf("Notify(title on sms) err = %v, want ErrInvalidNotification", err)
 	}
 }
@@ -277,7 +277,7 @@ func TestApiForCall_matrix(t *testing.T) {
 
 	t.Run("unclamped shares Api", func(t *testing.T) {
 		t.Parallel()
-		api, err := tn.apiForCall(context.Background())
+		api, err := tn.apiForCall(t.Context())
 		if err != nil {
 			t.Fatalf("apiForCall err = %v", err)
 		}
@@ -293,7 +293,7 @@ func TestApiForCall_matrix(t *testing.T) {
 			t.Fatalf("client is %T, want usable *twilioclient.Client", tn.client.Client)
 		}
 		origTimeout := bc.HTTPClient.Timeout
-		ctx, cancel := context.WithDeadline(context.Background(), time.Now().Add(time.Second))
+		ctx, cancel := context.WithDeadline(t.Context(), time.Now().Add(time.Second))
 		defer cancel()
 		api, err := tn.apiForCall(ctx)
 		if err != nil {
@@ -316,7 +316,7 @@ func TestApiForCall_matrix(t *testing.T) {
 
 	t.Run("expired returns ctx err", func(t *testing.T) {
 		t.Parallel()
-		ctx, cancel := context.WithDeadline(context.Background(), time.Now().Add(-time.Second))
+		ctx, cancel := context.WithDeadline(t.Context(), time.Now().Add(-time.Second))
 		defer cancel()
 		api, err := tn.apiForCall(ctx)
 		if !errors.Is(err, context.DeadlineExceeded) {
@@ -331,7 +331,7 @@ func TestApiForCall_matrix(t *testing.T) {
 		t.Parallel()
 		client := twilio.NewRestClientWithParams(twilio.ClientParams{Client: &fakeBaseClient{sid: testAccountSID}})
 		fb := &twilioNotifier{client: client, fromNumber: testFromNumber, timeout: notification.DefaultTimeout}
-		ctx, cancel := context.WithDeadline(context.Background(), time.Now().Add(time.Second))
+		ctx, cancel := context.WithDeadline(t.Context(), time.Now().Add(time.Second))
 		defer cancel()
 		api, err := fb.apiForCall(ctx)
 		if err != nil {
@@ -347,7 +347,7 @@ func TestApiForCall_matrix(t *testing.T) {
 		base := &twilioclient.Client{Credentials: twilioclient.NewCredentials(testAccountSID, testAuthToken)}
 		client := twilio.NewRestClientWithParams(twilio.ClientParams{Client: base})
 		nb := &twilioNotifier{client: client, fromNumber: testFromNumber, timeout: notification.DefaultTimeout}
-		ctx, cancel := context.WithDeadline(context.Background(), time.Now().Add(time.Second))
+		ctx, cancel := context.WithDeadline(t.Context(), time.Now().Add(time.Second))
 		defer cancel()
 		api, err := nb.apiForCall(ctx)
 		if err != nil {
@@ -363,18 +363,18 @@ func TestDeadlineTimeout_arms(t *testing.T) {
 	t.Parallel()
 	tn := &twilioNotifier{timeout: notification.DefaultTimeout}
 
-	if got, clamped := tn.deadlineTimeout(context.Background()); clamped || got != notification.DefaultTimeout {
+	if got, clamped := tn.deadlineTimeout(t.Context()); clamped || got != notification.DefaultTimeout {
 		t.Errorf("no deadline = (%v, %v), want (%v, false)", got, clamped, notification.DefaultTimeout)
 	}
 
-	ctx, cancel := context.WithTimeout(context.Background(), time.Second)
+	ctx, cancel := context.WithTimeout(t.Context(), time.Second)
 	defer cancel()
 	if got, clamped := tn.deadlineTimeout(ctx); !clamped || got <= 0 || got > time.Second {
 		t.Errorf("nearer deadline = (%v, %v), want (<=1s, true)", got, clamped)
 	}
 
 	short := &twilioNotifier{timeout: 50 * time.Millisecond}
-	far, cancelFar := context.WithTimeout(context.Background(), 5*time.Second)
+	far, cancelFar := context.WithTimeout(t.Context(), 5*time.Second)
 	defer cancelFar()
 	if got, clamped := short.deadlineTimeout(far); clamped || got != 50*time.Millisecond {
 		t.Errorf("farther deadline = (%v, %v), want (50ms, false)", got, clamped)

@@ -53,7 +53,7 @@ func (emptyRows) Err() error                 { return nil }
 func (emptyRows) Columns() ([]string, error) { return nil, nil }
 
 func TestPostgresFTSMatchRendering(t *testing.T) {
-	ctx := context.Background()
+	ctx := t.Context()
 
 	tests := []struct {
 		name     string
@@ -103,7 +103,7 @@ func TestPostgresFTSMatchRendering(t *testing.T) {
 }
 
 func TestPostgresFTSRankOrdering(t *testing.T) {
-	ctx := context.Background()
+	ctx := t.Context()
 
 	capture := &captureExec{}
 
@@ -126,7 +126,7 @@ func TestPostgresFTSRankOrdering(t *testing.T) {
 }
 
 func TestPostgresFTSRankOrderingWithLimit(t *testing.T) {
-	ctx := context.Background()
+	ctx := t.Context()
 
 	capture := &captureExec{}
 
@@ -152,7 +152,7 @@ func TestPostgresFTSRankOrderingWithLimit(t *testing.T) {
 }
 
 func TestPostgresFTSMatchQualifiedInJoin(t *testing.T) {
-	ctx := context.Background()
+	ctx := t.Context()
 
 	capture := &captureExec{}
 

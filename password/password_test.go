@@ -125,7 +125,7 @@ func TestOpenSuccess(t *testing.T) {
 		t.Fatalf("Register() = %v, want nil", err)
 	}
 
-	ctx := context.Background()
+	ctx := t.Context()
 
 	h, err := password.Open(a, password.Options{Time: password.DefaultTime, Memory: password.DefaultMemory, Threads: password.DefaultThreads, SaltLen: password.DefaultSaltLen, KeyLen: password.DefaultKeyLen})
 	if err != nil {
@@ -177,7 +177,7 @@ func TestOpenSuccess(t *testing.T) {
 func TestConveniences(t *testing.T) {
 	t.Parallel()
 
-	ctx := context.Background()
+	ctx := t.Context()
 
 	if _, err := password.Hash(ctx, "secret"); !errors.Is(err, password.ErrUnknownAdapter) {
 		t.Fatalf("Hash() before register err = %v, want ErrUnknownAdapter", err)
@@ -255,7 +255,7 @@ func TestConcurrentRegisterOpen(t *testing.T) {
 func TestStubHasherEmptyInputs(t *testing.T) {
 	t.Parallel()
 
-	ctx := context.Background()
+	ctx := t.Context()
 	h := stubHasher{}
 
 	cases := []struct {

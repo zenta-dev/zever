@@ -1,7 +1,6 @@
 package otlp
 
 import (
-	"context"
 	"errors"
 	"testing"
 
@@ -16,7 +15,7 @@ func TestKindMismatchIsAndAs(t *testing.T) {
 
 	reader := sdkmetric.NewManualReader()
 	mp := sdkmetric.NewMeterProvider(sdkmetric.WithReader(reader))
-	t.Cleanup(func() { _ = mp.Shutdown(context.Background()) })
+	t.Cleanup(func() { _ = mp.Shutdown(t.Context()) })
 
 	c := &instrumentCache{
 		kinds:      make(map[string]instrumentKind),

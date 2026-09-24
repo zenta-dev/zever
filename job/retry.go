@@ -14,11 +14,17 @@ type RetryPolicy struct {
 	BaseDelay time.Duration
 }
 
+// DefaultBaseDelay is the initial retry delay doubled by Backoff.
+const DefaultBaseDelay = 5 * time.Second
+
+// MaxBackoffDelay caps the exponential retry delay.
+const MaxBackoffDelay = 24 * time.Hour
+
 // DefaultRetryPolicy returns the standard RetryPolicy of 25 attempts with a 5s base delay.
 func DefaultRetryPolicy() RetryPolicy {
 	return RetryPolicy{
 		MaxAttempts: 25,
-		BaseDelay:   5 * time.Second,
+		BaseDelay:   DefaultBaseDelay,
 	}
 }
 
@@ -42,5 +48,5 @@ func (p RetryPolicy) Backoff(attempt int) time.Duration {
 		attempt = maxBackoffShiftAttempt
 	}
 
-	return retry.Policy{BaseDelay: p.BaseDelay, Multiplier: 2, MaxDelay: 24 * time.Hour}.NextDelay(attempt)
+	return retry.Policy{BaseDelay: p.BaseDelay, Multiplier: 2, MaxDelay: MaxBackoffDelay}.NextDelay(attempt)
 }

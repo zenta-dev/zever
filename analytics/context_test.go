@@ -7,14 +7,14 @@ import (
 
 func TestUserID_missing_returnsEmpty(t *testing.T) {
 	t.Parallel()
-	if got := UserID(context.Background()); got != "" {
+	if got := UserID(t.Context()); got != "" {
 		t.Errorf("UserID() = %q, want %q", got, "")
 	}
 }
 
 func TestWithUserID_roundtrip_returnsID(t *testing.T) {
 	t.Parallel()
-	ctx := WithUserID(context.Background(), "u1")
+	ctx := WithUserID(t.Context(), "u1")
 	if got := UserID(ctx); got != "u1" {
 		t.Errorf("UserID() = %q, want %q", got, "u1")
 	}
@@ -22,7 +22,7 @@ func TestWithUserID_roundtrip_returnsID(t *testing.T) {
 
 func TestUserID_wrongType_returnsEmpty(t *testing.T) {
 	t.Parallel()
-	ctx := context.WithValue(context.Background(), userIDKey{}, 123)
+	ctx := context.WithValue(t.Context(), userIDKey{}, 123)
 	if got := UserID(ctx); got != "" {
 		t.Errorf("UserID() = %q, want %q", got, "")
 	}
@@ -43,7 +43,7 @@ func TestUserIDWithFallback_branches(t *testing.T) {
 	for _, tc := range cases {
 		t.Run(tc.name, func(t *testing.T) {
 			t.Parallel()
-			ctx := context.Background()
+			ctx := t.Context()
 			if tc.present {
 				ctx = WithUserID(ctx, tc.userID)
 			}

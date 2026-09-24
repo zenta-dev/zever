@@ -218,7 +218,7 @@ func TestGenerateGRPCGoMarshalError(t *testing.T) {
 	}
 	t.Cleanup(func() { protoMarshal = orig })
 
-	_, err := generateGRPCGo(context.Background(), pingRequest(t))
+	_, err := generateGRPCGo(t.Context(), pingRequest(t))
 	if err == nil {
 		t.Fatal("generateGRPCGo succeeded, want marshal error")
 	}
@@ -229,7 +229,7 @@ func TestGenerateGRPCGoMarshalError(t *testing.T) {
 }
 
 func TestGenerateGRPCGoRunError(t *testing.T) {
-	ctx, cancel := context.WithCancel(context.Background())
+	ctx, cancel := context.WithCancel(t.Context())
 	cancel()
 
 	_, err := generateGRPCGo(ctx, pingRequest(t))
@@ -247,7 +247,7 @@ func TestGenerateGRPCGoUnmarshalError(t *testing.T) {
 	// stdout is not a CodeGeneratorResponse.
 	writeFakeGo(t, "#!/bin/sh\nprintf 'not-protobuf-at-all'\n")
 
-	_, err := generateGRPCGo(context.Background(), pingRequest(t))
+	_, err := generateGRPCGo(t.Context(), pingRequest(t))
 	if err == nil {
 		t.Fatal("generateGRPCGo succeeded, want unmarshal error")
 	}
@@ -266,7 +266,7 @@ func TestGenerateGRPCGoResponseError(t *testing.T) {
 	req := pingRequest(t)
 	req.Parameter = proto.String("module=zzz")
 
-	_, err := generateGRPCGo(context.Background(), req)
+	_, err := generateGRPCGo(t.Context(), req)
 	if err == nil {
 		t.Fatal("generateGRPCGo succeeded, want response error")
 	}

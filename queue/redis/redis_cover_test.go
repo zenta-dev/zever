@@ -155,13 +155,13 @@ func TestRedisCover_MarshalError(t *testing.T) {
 		return nil, errors.New("marshal boom")
 	}
 	a := &redisAdapter{client: &fakeClient{}}
-	if err := a.Push(context.Background(), "t", queue.Payload([]byte("x")), nil); err == nil {
+	if err := a.Push(t.Context(), "t", queue.Payload([]byte("x")), nil); err == nil {
 		t.Fatalf("Push marshal error = nil")
 	}
-	if err := a.PushDelayed(context.Background(), "t", queue.Payload([]byte("x")), nil, 0); err == nil {
+	if err := a.PushDelayed(t.Context(), "t", queue.Payload([]byte("x")), nil, 0); err == nil {
 		t.Fatalf("PushDelayed marshal error = nil")
 	}
-	if err := a.PushDelayed(context.Background(), "t", queue.Payload([]byte("x")), nil, time.Second); err == nil {
+	if err := a.PushDelayed(t.Context(), "t", queue.Payload([]byte("x")), nil, time.Second); err == nil {
 		t.Fatalf("PushDelayed delayed marshal error = nil")
 	}
 	// cover blockingClaim marshal
@@ -169,7 +169,7 @@ func TestRedisCover_MarshalError(t *testing.T) {
 	jsonMarshal = func(_ any, _ ...json.Options) ([]byte, error) {
 		return nil, errors.New("marshal boom2")
 	}
-	_, _, err := a2.blockingClaim(context.Background(), "rk", "pk", "dk", "123", time.NewTimer(time.Second), time.Millisecond)
+	_, _, err := a2.blockingClaim(t.Context(), "rk", "pk", "dk", "123", time.NewTimer(time.Second), time.Millisecond)
 	if err == nil {
 		t.Fatalf("blockingClaim marshal error = nil")
 	}
@@ -186,14 +186,14 @@ func TestRedisCover_UnmarshalError(t *testing.T) {
 		t.Fatalf("decodeMessage unmarshal error = nil")
 	}
 	a := &redisAdapter{client: &fakeClient{blPopVal: []string{"k", "not-json"}}}
-	_, _, err = a.blockingClaim(context.Background(), "rk", "pk", "dk", "123", time.NewTimer(time.Second), time.Millisecond)
+	_, _, err = a.blockingClaim(t.Context(), "rk", "pk", "dk", "123", time.NewTimer(time.Second), time.Millisecond)
 	if err == nil {
 		t.Fatalf("blockingClaim unmarshal error = nil")
 	}
 }
 
 func TestRedisCover_ClientErrors(t *testing.T) {
-	ctx := context.Background()
+	ctx := t.Context()
 	// waitForSpace LLen error
 	a := &redisAdapter{buffer: 1, client: &fakeClient{lLenErr: errors.New("llen boom")}}
 	if err := a.waitForSpace(ctx, "t"); err == nil {
@@ -240,7 +240,7 @@ func TestRedisCover_ClientErrors(t *testing.T) {
 		t.Fatalf("blockingClaim BLPop error = nil")
 	}
 	// BLPop Nil with ctx cancelled
-	ctxCancel, cancel := context.WithCancel(context.Background())
+	ctxCancel, cancel := context.WithCancel(t.Context())
 	cancel()
 	a9 := &redisAdapter{client: &fakeClient{blPopErr: goredis.Nil}}
 	_, _, err = a9.blockingClaim(ctxCancel, "rk", "pk", "dk", "123", time.NewTimer(time.Second), time.Millisecond)
@@ -321,13 +321,13 @@ func TestRedisCover_Backoff(t *testing.T) {
 }
 
 func TestRedisCover_ScriptErrors(t *testing.T) {
-	ctx := context.Background()
+	ctx := t.Context()
 	a := &redisAdapter{client: &fakeClient{evalErr: errors.New("eval boom")}}
 	_, _, err := a.tryClaim(ctx, "rk", "pk", "dk", "123")
 	if err == nil {
 		t.Fatalf("tryClaim eval error = nil")
 	}
-	ctxCancel, cancel := context.WithCancel(context.Background())
+	ctxCancel, cancel := context.WithCancel(t.Context())
 	cancel()
 	_, _, err = a.tryClaim(ctxCancel, "rk", "pk", "dk", "123")
 	if err == nil {
@@ -350,7 +350,7 @@ func TestRedisCover_ScriptErrors(t *testing.T) {
 }
 
 func TestRedisCover_RemainingBranches(t *testing.T) {
-	ctx := context.Background()
+	ctx := t.Context()
 	// Push/PushDelayed buffer full with wait error
 	a := &redisAdapter{buffer: 1, client: &fakeClient{lLenErr: errors.New("llen boom for wait")}}
 
@@ -507,7 +507,7 @@ func (f *fakeClientCustomEval) EvalSha(ctx context.Context, _ string, _ []string
 }
 
 func TestRedisCover_FinalEight(t *testing.T) {
-	ctx := context.Background()
+	ctx := t.Context()
 	// cover Pop small pollTimeout
 	{
 		a := &redisAdapter{client: &fakeClient{blPopVal: []string{"k", `{"id":"` + queue.NewMessage("t", nil, nil).ID.String() + `","payload":null,"headers":null,"attempt":1}`}}, pollTimeout: 10 * time.Millisecond, buffer: 0}
@@ -612,7 +612,7 @@ func (f *fakeClientTryClaimFail) ScriptExists(ctx context.Context, _ ...string) 
 }
 
 func TestRedisCover_LastThree(t *testing.T) {
-	ctx := context.Background()
+	ctx := t.Context()
 	// 364: popLoop reclaimStale error
 	{
 		fake := &fakeClientPopLoopReclaimFail{}
@@ -721,7 +721,7 @@ func (f *fakeClientReclaimFallbackFail) ScriptExists(ctx context.Context, _ ...s
 }
 
 func TestRedisCover_FinalRemaining(t *testing.T) {
-	ctx := context.Background()
+	ctx := t.Context()
 	// PushDelayed with buffer full and waitForSpace error (152)
 	a := &redisAdapter{buffer: 1, client: &fakeClient{lLenErr: errors.New("wait boom")}}
 
@@ -763,7 +763,7 @@ func TestRedisCover_FinalRemaining(t *testing.T) {
 	// cover blockingClaim default nil
 
 	a5 := &redisAdapter{client: &fakeClient{blPopErr: errors.New("blpop boom")}}
-	ctxCancel, cancel := context.WithCancel(context.Background())
+	ctxCancel, cancel := context.WithCancel(t.Context())
 	cancel()
 	_, _, err := a5.blockingClaim(ctxCancel, "rk", "pk", "dk", "123", time.NewTimer(time.Second), time.Millisecond)
 	if err == nil {
@@ -884,7 +884,7 @@ func (f *fakeClientSweepCounter) EvalSha(ctx context.Context, _ string, keys []s
 // promoteDue/reclaimStale sweep once per sweepInterval, not on every
 // iteration of its internal claim loop.
 func TestRedisCover_PopLoopThrottlesSweep(t *testing.T) {
-	ctx := context.Background()
+	ctx := t.Context()
 
 	a := &redisAdapter{
 		client:            &fakeClient{}, // placeholder, replaced below

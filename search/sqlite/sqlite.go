@@ -25,6 +25,9 @@ const (
 
 var memoryCounter uint64
 
+// DefaultDDLTimeout bounds DDL during construction.
+const DefaultDDLTimeout = 5 * time.Second
+
 // Store implements search.Search backed by SQLite FTS5.
 type Store struct {
 	db *sql.DB
@@ -66,7 +69,7 @@ func New(o search.Options) (search.Search, error) {
 	// concurrent writes without a busy-timeout pragma.
 	db.SetMaxOpenConns(1)
 
-	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
+	ctx, cancel := context.WithTimeout(context.Background(), DefaultDDLTimeout)
 	defer cancel()
 
 	for _, stmt := range []string{schemaDocuments, schemaFTS} {

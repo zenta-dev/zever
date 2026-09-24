@@ -2,7 +2,6 @@ package memory
 
 import (
 	"container/list"
-	"context"
 	"errors"
 	"fmt"
 	"sync"
@@ -20,7 +19,7 @@ func newTestCache(t *testing.T, opts cache.Options) cache.Cache {
 		t.Fatalf("New() error = %v", err)
 	}
 
-	t.Cleanup(func() { _ = c.Close(context.Background()) })
+	t.Cleanup(func() { _ = c.Close(t.Context()) })
 
 	return c
 }
@@ -43,7 +42,7 @@ func waitFor(t *testing.T, d time.Duration, cond func() bool, msg string) {
 func TestMemorySetGet_roundTrip(t *testing.T) {
 	t.Parallel()
 
-	ctx := context.Background()
+	ctx := t.Context()
 	c := newTestCache(t, cache.Options{})
 
 	if err := c.Set(ctx, "k", []byte("v"), 0); err != nil {
@@ -63,7 +62,7 @@ func TestMemorySetGet_roundTrip(t *testing.T) {
 func TestMemoryGet_copiesValue(t *testing.T) {
 	t.Parallel()
 
-	ctx := context.Background()
+	ctx := t.Context()
 	c := newTestCache(t, cache.Options{})
 
 	val := []byte("v")
@@ -97,7 +96,7 @@ func TestMemoryGet_copiesValue(t *testing.T) {
 func TestMemorySet_overwrites(t *testing.T) {
 	t.Parallel()
 
-	ctx := context.Background()
+	ctx := t.Context()
 	c := newTestCache(t, cache.Options{})
 
 	if err := c.Set(ctx, "k", []byte("v1"), 0); err != nil {
@@ -121,7 +120,7 @@ func TestMemorySet_overwrites(t *testing.T) {
 func TestMemorySetIfAbsent_semantics(t *testing.T) {
 	t.Parallel()
 
-	ctx := context.Background()
+	ctx := t.Context()
 	c := newTestCache(t, cache.Options{})
 
 	ok, err := c.SetIfAbsent(ctx, "k", []byte("v1"), 0)
@@ -165,7 +164,7 @@ func TestMemorySetIfAbsent_semantics(t *testing.T) {
 func TestMemoryDelete_missingOrPresent_nilError(t *testing.T) {
 	t.Parallel()
 
-	ctx := context.Background()
+	ctx := t.Context()
 	c := newTestCache(t, cache.Options{})
 
 	if err := c.Delete(ctx, "missing"); err != nil {
@@ -188,7 +187,7 @@ func TestMemoryDelete_missingOrPresent_nilError(t *testing.T) {
 func TestMemoryTTL_expiry(t *testing.T) {
 	t.Parallel()
 
-	ctx := context.Background()
+	ctx := t.Context()
 	c := newTestCache(t, cache.Options{})
 
 	if err := c.Set(ctx, "k", []byte("v"), 40*time.Millisecond); err != nil {
@@ -219,7 +218,7 @@ func TestMemoryTTL_expiry(t *testing.T) {
 func TestMemoryJanitor_sweepsExpired(t *testing.T) {
 	t.Parallel()
 
-	ctx := context.Background()
+	ctx := t.Context()
 	c := newTestCache(t, cache.Options{SweepInterval: 20 * time.Millisecond})
 
 	if err := c.Set(ctx, "k", []byte("v"), 30*time.Millisecond); err != nil {
@@ -235,7 +234,7 @@ func TestMemoryJanitor_sweepsExpired(t *testing.T) {
 func TestMemoryEviction_lruOldestGoesFirst(t *testing.T) {
 	t.Parallel()
 
-	ctx := context.Background()
+	ctx := t.Context()
 	c := newTestCache(t, cache.Options{MaxEntries: 3})
 
 	for _, k := range []string{"a", "b", "c"} {
@@ -266,7 +265,7 @@ func TestMemoryEviction_lruOldestGoesFirst(t *testing.T) {
 func TestMemoryIncrement_missingStartsAtOne(t *testing.T) {
 	t.Parallel()
 
-	ctx := context.Background()
+	ctx := t.Context()
 	c := newTestCache(t, cache.Options{})
 
 	if err := c.Increment(ctx, "n"); err != nil {
@@ -307,7 +306,7 @@ func TestMemoryIncrement_missingStartsAtOne(t *testing.T) {
 func TestMemoryIncrement_preservesValue(t *testing.T) {
 	t.Parallel()
 
-	ctx := context.Background()
+	ctx := t.Context()
 	c := newTestCache(t, cache.Options{})
 
 	if err := c.Set(ctx, "k", []byte("41"), 5*time.Minute); err != nil {
@@ -331,7 +330,7 @@ func TestMemoryIncrement_preservesValue(t *testing.T) {
 func TestMemoryExists_expiredEntry_removed(t *testing.T) {
 	t.Parallel()
 
-	ctx := context.Background()
+	ctx := t.Context()
 	c := newTestCache(t, cache.Options{})
 
 	if err := c.Set(ctx, "k", []byte("v"), 30*time.Millisecond); err != nil {
@@ -354,7 +353,7 @@ func TestMemoryExists_expiredEntry_removed(t *testing.T) {
 func TestMemoryIncrement_expiredKey_restartsAtOne(t *testing.T) {
 	t.Parallel()
 
-	ctx := context.Background()
+	ctx := t.Context()
 	c := newTestCache(t, cache.Options{})
 
 	if err := c.Set(ctx, "n", []byte("41"), 30*time.Millisecond); err != nil {
@@ -392,7 +391,7 @@ func TestMemoryIncrement_expiredKey_restartsAtOne(t *testing.T) {
 func TestMemorySweep_removesOnlyExpired(t *testing.T) {
 	t.Parallel()
 
-	ctx := context.Background()
+	ctx := t.Context()
 	c := newTestCache(t, cache.Options{})
 
 	a, ok := c.(*memoryAdapter)
@@ -435,7 +434,7 @@ func TestMemoryRemoveFromOrder_nilIndex_safe(t *testing.T) {
 func TestMemorySetIfAbsent_withTTL_expires(t *testing.T) {
 	t.Parallel()
 
-	ctx := context.Background()
+	ctx := t.Context()
 	c := newTestCache(t, cache.Options{})
 
 	ok, err := c.SetIfAbsent(ctx, "k", []byte("v"), 40*time.Millisecond)
@@ -461,7 +460,7 @@ func TestMemorySetIfAbsent_withTTL_expires(t *testing.T) {
 func TestMemoryIncrement_nonInteger_invalidValue(t *testing.T) {
 	t.Parallel()
 
-	ctx := context.Background()
+	ctx := t.Context()
 	c := newTestCache(t, cache.Options{})
 
 	if err := c.Set(ctx, "counter", []byte("abc"), 0); err != nil {
@@ -501,7 +500,7 @@ func TestMemoryClose_presetClosed_returnsNil(t *testing.T) {
 	a.closed = true
 	a.mu.Unlock()
 
-	if err := c.Close(context.Background()); err != nil {
+	if err := c.Close(t.Context()); err != nil {
 		t.Errorf("Close() error = %v, want nil", err)
 	}
 }
@@ -681,7 +680,7 @@ func TestMemoryExistsExpired_direct(t *testing.T) {
 func TestMemorySweep_racyBranches(t *testing.T) {
 	t.Parallel()
 
-	ctx := context.Background()
+	ctx := t.Context()
 	c := newTestCache(t, cache.Options{})
 
 	a, ok := c.(*memoryAdapter)
@@ -712,7 +711,7 @@ func TestMemorySweep_racyBranches(t *testing.T) {
 func TestMemoryEviction_disabledWhenNonPositive(t *testing.T) {
 	t.Parallel()
 
-	ctx := context.Background()
+	ctx := t.Context()
 	c := newTestCache(t, cache.Options{})
 
 	a, ok := c.(*memoryAdapter)
@@ -740,7 +739,7 @@ func TestMemoryEviction_disabledWhenNonPositive(t *testing.T) {
 func TestMemoryClosed_allOpsFail(t *testing.T) {
 	t.Parallel()
 
-	ctx := context.Background()
+	ctx := t.Context()
 	c, err := New(cache.Options{})
 	if err != nil {
 		t.Fatalf("New() error = %v", err)
@@ -786,7 +785,7 @@ func TestMemoryClosed_allOpsFail(t *testing.T) {
 func TestMemoryConcurrent_mixedOps_safe(t *testing.T) {
 	t.Parallel()
 
-	ctx := context.Background()
+	ctx := t.Context()
 	c := newTestCache(t, cache.Options{})
 
 	var wg sync.WaitGroup
@@ -818,7 +817,7 @@ func TestMemoryConcurrent_mixedOps_safe(t *testing.T) {
 func TestMemoryConcurrent_increment_safe(t *testing.T) {
 	t.Parallel()
 
-	ctx := context.Background()
+	ctx := t.Context()
 	c := newTestCache(t, cache.Options{})
 
 	const workers = 10

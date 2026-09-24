@@ -22,7 +22,7 @@ func TestSchedulerNewScheduler(t *testing.T) {
 	if err != nil {
 		t.Fatalf("cachememory.New: %v", err)
 	}
-	defer c.Close(context.Background())
+	defer c.Close(t.Context())
 	l := NewUniqueLocker(c)
 	s := NewScheduler(d, l)
 	if s.Dispatcher != d {
@@ -259,7 +259,7 @@ func TestScheduleFireSuccessAndDedup(t *testing.T) {
 	if err != nil {
 		t.Fatalf("cachememory.New: %v", err)
 	}
-	defer c.Close(context.Background())
+	defer c.Close(t.Context())
 	s := newScheduleTestCtx(t, sq, nil, fixed)
 	s.Locker = NewUniqueLocker(c)
 	sched, err2 := cron.ParseStandard("0 * * * *")
@@ -309,7 +309,7 @@ func TestScheduleFireUnknownJob(t *testing.T) {
 	if err != nil {
 		t.Fatalf("cachememory.New: %v", err)
 	}
-	defer c.Close(context.Background())
+	defer c.Close(t.Context())
 	s := NewScheduler(&Dispatcher{Q: sq}, NewUniqueLocker(c))
 	fixed := time.Date(2026, time.January, 1, 0, 7, 0, 0, time.UTC)
 	s.now = func() time.Time { return fixed }
@@ -350,7 +350,7 @@ func TestSchedulerLoadCtx(t *testing.T) {
 		t.Fatal("loadCtx wrong type want non-nil Background")
 	}
 	type ctxKey string
-	want := context.WithValue(context.Background(), ctxKey("k"), "v")
+	want := context.WithValue(t.Context(), ctxKey("k"), "v")
 	s2 := NewScheduler(&Dispatcher{Q: &stubQueue{}}, NewUniqueLocker(&fakeCache{}))
 	s2.ctx.Store(want)
 	if got := s2.loadCtx(); got != want {
@@ -364,7 +364,7 @@ func TestSchedulerRunCancel(t *testing.T) {
 	if _, err := s.Every("@every 1s", "some-job", nil); err != nil {
 		t.Fatalf("Every: %v", err)
 	}
-	ctx, cancel := context.WithCancel(context.Background())
+	ctx, cancel := context.WithCancel(t.Context())
 	done := make(chan error, 1)
 	go func() {
 		done <- s.Run(ctx)
@@ -518,7 +518,7 @@ func TestNewScheduler_nilDispatcher_EveryFails(t *testing.T) {
 	if err != nil {
 		t.Fatalf("cachememory.New: %v", err)
 	}
-	defer c.Close(context.Background())
+	defer c.Close(t.Context())
 	s := NewScheduler(nil, NewUniqueLocker(c))
 	id, err := s.Every("0 * * * *", "some-job", nil)
 	if err == nil {

@@ -1,7 +1,6 @@
 package orm
 
 import (
-	"context"
 	"errors"
 	"testing"
 
@@ -135,7 +134,7 @@ func TestSetOpQueryOrderByDoesNotShareBackingArray(t *testing.T) {
 // TestSetOpExecutionErrorPaths drives resolve, render-gate, query, scan,
 // iteration and close failures through SetOpQuery All/First/Count.
 func TestSetOpExecutionErrorPaths(t *testing.T) {
-	ctx := context.Background()
+	ctx := t.Context()
 	boom := errors.New("boom")
 
 	left := From(widgets).Where(widgetQty.Lte(20))
@@ -202,7 +201,7 @@ func TestSetOpExecutionErrorPaths(t *testing.T) {
 // TestSetOpCountErrorPaths drives render, scan, iteration and close
 // failures through SetOpQuery.Count, plus the render-gate on All.
 func TestSetOpCountErrorPaths(t *testing.T) {
-	ctx := context.Background()
+	ctx := t.Context()
 	boom := errors.New("boom")
 
 	left := From(widgets).Where(widgetQty.Lte(20))

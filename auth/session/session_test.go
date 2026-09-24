@@ -1,7 +1,6 @@
 package session_test
 
 import (
-	"context"
 	"errors"
 	"testing"
 	"time"
@@ -50,7 +49,7 @@ func plant(t *testing.T, st session.Store, data map[string]any) string {
 	id := session.NewID()
 	sess := session.NewSession(id, time.Hour)
 	sess.Data = data
-	if err := st.Save(context.Background(), sess); err != nil {
+	if err := st.Save(t.Context(), sess); err != nil {
 		t.Fatalf("Save plant err = %v", err)
 	}
 	return id
@@ -59,7 +58,7 @@ func plant(t *testing.T, st session.Store, data map[string]any) string {
 func TestRoundtrip(t *testing.T) {
 	t.Parallel()
 	a := newAdapter(t, newMemoryStore(t))
-	ctx := context.Background()
+	ctx := t.Context()
 
 	custom := map[string]any{"role": "admin", "tags": []string{"a", "b"}}
 	tok, err := a.Issue(ctx, "alice", custom, time.Hour)
@@ -100,7 +99,7 @@ func TestNilStoreDefault(t *testing.T) {
 	}
 	t.Cleanup(func() { _ = a.Close() })
 
-	ctx := context.Background()
+	ctx := t.Context()
 	tok, err := a.Issue(ctx, "bob", nil, time.Minute)
 	if err != nil {
 		t.Fatalf("Issue err = %v", err)
@@ -125,7 +124,7 @@ func TestInvalidOptions(t *testing.T) {
 func TestIssueBadInputs(t *testing.T) {
 	t.Parallel()
 	a := newAdapter(t, newMemoryStore(t))
-	ctx := context.Background()
+	ctx := t.Context()
 
 	if _, err := a.Issue(ctx, "", nil, time.Minute); !errors.Is(err, auth.ErrInvalidToken) {
 		t.Fatalf("Issue(empty subject) err = %v, want ErrInvalidToken", err)
@@ -142,7 +141,7 @@ func TestVerifyUnknown(t *testing.T) {
 	t.Parallel()
 	a := newAdapter(t, newMemoryStore(t))
 
-	if _, err := a.Verify(context.Background(), session.NewID()); !errors.Is(err, auth.ErrInvalidToken) {
+	if _, err := a.Verify(t.Context(), session.NewID()); !errors.Is(err, auth.ErrInvalidToken) {
 		t.Fatalf("Verify(unknown) err = %v, want ErrInvalidToken", err)
 	}
 }
@@ -150,7 +149,7 @@ func TestVerifyUnknown(t *testing.T) {
 func TestVerifyBadInputs(t *testing.T) {
 	t.Parallel()
 	a := newAdapter(t, newMemoryStore(t))
-	ctx := context.Background()
+	ctx := t.Context()
 
 	if _, err := a.Verify(ctx, ""); !errors.Is(err, auth.ErrInvalidToken) {
 		t.Fatalf("Verify(empty) err = %v, want ErrInvalidToken", err)
@@ -167,7 +166,7 @@ func TestVerifyCorruptEnvelope(t *testing.T) {
 	t.Parallel()
 	st := newMemoryStore(t)
 	a := newAdapter(t, st)
-	ctx := context.Background()
+	ctx := t.Context()
 
 	now := time.Now().Unix()
 	cases := map[string]map[string]any{
@@ -194,7 +193,7 @@ func TestVerifyCorruptEnvelope(t *testing.T) {
 func TestVerifyStoreExpired(t *testing.T) {
 	t.Parallel()
 	a := newAdapter(t, newMemoryStore(t))
-	ctx := context.Background()
+	ctx := t.Context()
 
 	tok, err := a.Issue(ctx, "u", nil, 50*time.Millisecond)
 	if err != nil {
@@ -211,7 +210,7 @@ func TestVerifyEnvelopeExpired(t *testing.T) {
 	t.Parallel()
 	st := newMemoryStore(t)
 	a := newAdapter(t, st)
-	ctx := context.Background()
+	ctx := t.Context()
 
 	// Envelope exp past the 1m leeway, session record still live.
 	id := plant(t, st, map[string]any{
@@ -231,7 +230,7 @@ func TestVerifyLeeway(t *testing.T) {
 	t.Parallel()
 	st := newMemoryStore(t)
 	a := newAdapter(t, st)
-	ctx := context.Background()
+	ctx := t.Context()
 
 	// Envelope exp 30s ago: inside the 1m clock-skew leeway, still valid.
 	id := plant(t, st, map[string]any{
@@ -250,7 +249,7 @@ func TestVerifyLeeway(t *testing.T) {
 func TestRevoke(t *testing.T) {
 	t.Parallel()
 	a := newAdapter(t, newMemoryStore(t))
-	ctx := context.Background()
+	ctx := t.Context()
 
 	tok, err := a.Issue(ctx, "u", nil, time.Hour)
 	if err != nil {
@@ -271,7 +270,7 @@ func TestRevoke(t *testing.T) {
 func TestRevokeBadInputs(t *testing.T) {
 	t.Parallel()
 	a := newAdapter(t, newMemoryStore(t))
-	ctx := context.Background()
+	ctx := t.Context()
 
 	if err := a.Revoke(ctx, ""); err == nil {
 		t.Fatal("Revoke(empty) = nil, want error")
@@ -288,7 +287,7 @@ func TestRevokeBadInputs(t *testing.T) {
 func TestCustomCloneIndependence(t *testing.T) {
 	t.Parallel()
 	a := newAdapter(t, newMemoryStore(t))
-	ctx := context.Background()
+	ctx := t.Context()
 
 	custom := map[string]any{
 		"nested": map[string]any{"k": "v"},

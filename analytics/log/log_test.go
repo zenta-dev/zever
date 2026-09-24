@@ -109,7 +109,7 @@ func TestTrack_roundtrip_writesJSONFields(t *testing.T) {
 
 	a := newTestAdapter(&buf)
 
-	if err := a.Track(context.Background(), "page_view", map[string]any{"page": "/home"}); err != nil {
+	if err := a.Track(t.Context(), "page_view", map[string]any{"page": "/home"}); err != nil {
 		t.Fatalf("track: %v", err)
 	}
 
@@ -129,7 +129,7 @@ func TestTrack_ctxUser_fallsBackToContextID(t *testing.T) {
 	var buf bytes.Buffer
 
 	a := newTestAdapter(&buf)
-	ctx := analytics.WithUserID(context.Background(), "u1")
+	ctx := analytics.WithUserID(t.Context(), "u1")
 
 	if err := a.Track(ctx, "page_view", nil); err != nil {
 		t.Fatalf("track: %v", err)
@@ -144,11 +144,11 @@ func TestIdentity_missingIdentity_returnsSentinel(t *testing.T) {
 	t.Parallel()
 
 	cases := map[string]func(*adapter) error{
-		"track": func(a *adapter) error { return a.Track(context.Background(), "page_view", nil) },
+		"track": func(a *adapter) error { return a.Track(t.Context(), "page_view", nil) },
 		"identify": func(a *adapter) error {
-			return a.Identify(context.Background(), "", map[string]any{"email": "a@b.com"})
+			return a.Identify(t.Context(), "", map[string]any{"email": "a@b.com"})
 		},
-		"group": func(a *adapter) error { return a.Group(context.Background(), "", "org-1", nil) },
+		"group": func(a *adapter) error { return a.Group(t.Context(), "", "org-1", nil) },
 	}
 
 	for name, call := range cases {
@@ -171,7 +171,7 @@ func TestGroup_emptyGroupID_returnsSentinel(t *testing.T) {
 		anonymousID: analytics.DefaultAnonymousID,
 	}
 
-	if err := a.Group(context.Background(), "u1", "", nil); !errors.Is(err, analytics.ErrMissingGroupID) {
+	if err := a.Group(t.Context(), "u1", "", nil); !errors.Is(err, analytics.ErrMissingGroupID) {
 		t.Errorf("expected ErrMissingGroupID, got %v", err)
 	}
 }
@@ -183,7 +183,7 @@ func TestIdentify_roundtrip_writesUserID(t *testing.T) {
 
 	a := newTestAdapter(&buf)
 
-	if err := a.Identify(context.Background(), "user-1", map[string]any{"email": "a@b.com"}); err != nil {
+	if err := a.Identify(t.Context(), "user-1", map[string]any{"email": "a@b.com"}); err != nil {
 		t.Fatalf("identify: %v", err)
 	}
 
@@ -210,7 +210,7 @@ func TestIdentify_emptyArg_fallsBackToExpectedID(t *testing.T) {
 			var buf bytes.Buffer
 
 			a := newTestAdapter(&buf)
-			ctx := context.Background()
+			ctx := t.Context()
 			if tc.ctxUser != "" {
 				ctx = analytics.WithUserID(ctx, tc.ctxUser)
 			}
@@ -233,7 +233,7 @@ func TestGroup_roundtrip_writesGroupID(t *testing.T) {
 
 	a := newTestAdapter(&buf)
 
-	if err := a.Group(context.Background(), "user-1", "org-42", map[string]any{"plan": "pro"}); err != nil {
+	if err := a.Group(t.Context(), "user-1", "org-42", map[string]any{"plan": "pro"}); err != nil {
 		t.Fatalf("group: %v", err)
 	}
 
@@ -265,7 +265,7 @@ func TestGroup_emptyArg_fallsBackToExpectedID(t *testing.T) {
 			var buf bytes.Buffer
 
 			a := newTestAdapter(&buf)
-			ctx := context.Background()
+			ctx := t.Context()
 			if tc.ctxUser != "" {
 				ctx = analytics.WithUserID(ctx, tc.ctxUser)
 			}
@@ -292,9 +292,9 @@ func TestCalls_cyclicMap_returnsMarshalError(t *testing.T) {
 	}
 
 	cases := map[string]func(*adapter) error{
-		"track":    func(a *adapter) error { return a.Track(context.Background(), "page_view", cyclic()) },
-		"identify": func(a *adapter) error { return a.Identify(context.Background(), "user-1", cyclic()) },
-		"group":    func(a *adapter) error { return a.Group(context.Background(), "user-1", "org-42", cyclic()) },
+		"track":    func(a *adapter) error { return a.Track(t.Context(), "page_view", cyclic()) },
+		"identify": func(a *adapter) error { return a.Identify(t.Context(), "user-1", cyclic()) },
+		"group":    func(a *adapter) error { return a.Group(t.Context(), "user-1", "org-42", cyclic()) },
 	}
 
 	for name, call := range cases {
@@ -318,13 +318,13 @@ func TestCalls_remarshalFailure_returnsError(t *testing.T) {
 
 	cases := map[string]func(*adapter, map[string]any) error{
 		"track": func(a *adapter, m map[string]any) error {
-			return a.Track(context.Background(), "event", m)
+			return a.Track(t.Context(), "event", m)
 		},
 		"identify": func(a *adapter, m map[string]any) error {
-			return a.Identify(context.Background(), "user-1", m)
+			return a.Identify(t.Context(), "user-1", m)
 		},
 		"group": func(a *adapter, m map[string]any) error {
-			return a.Group(context.Background(), "user-1", "org-42", m)
+			return a.Group(t.Context(), "user-1", "org-42", m)
 		},
 	}
 
@@ -357,7 +357,7 @@ func TestTrack_oversizedProperties_returnsSizeLimitError(t *testing.T) {
 	}
 	props := map[string]any{"big": strings.Repeat("x", 128*1024)}
 
-	err := a.Track(context.Background(), "event", props)
+	err := a.Track(t.Context(), "event", props)
 	if err == nil {
 		t.Fatal("expected error for oversized properties, got nil")
 	}
@@ -379,7 +379,7 @@ func TestTrack_tooManyProperties_returnsCountLimitError(t *testing.T) {
 	}
 	props := map[string]any{"a": "1", "b": "2", "c": "3"}
 
-	err := a.Track(context.Background(), "event", props)
+	err := a.Track(t.Context(), "event", props)
 	if err == nil {
 		t.Fatal("expected error for too many properties, got nil")
 	}
@@ -408,7 +408,7 @@ func TestCalls_cancelledContext_returnsCtxError(t *testing.T) {
 			var buf bytes.Buffer
 
 			a := newTestAdapter(&buf)
-			ctx, cancel := context.WithCancel(analytics.WithUserID(context.Background(), "u1"))
+			ctx, cancel := context.WithCancel(analytics.WithUserID(t.Context(), "u1"))
 			cancel()
 
 			if err := call(a, ctx); !errors.Is(err, context.Canceled) {
@@ -438,7 +438,7 @@ func TestTrack_concurrent_writesWithoutRace(t *testing.T) {
 		go func() {
 			defer wg.Done()
 
-			if err := a.Track(context.Background(), "event", map[string]any{"k": "v"}); err != nil {
+			if err := a.Track(t.Context(), "event", map[string]any{"k": "v"}); err != nil {
 				t.Errorf("track: %v", err)
 			}
 		}()

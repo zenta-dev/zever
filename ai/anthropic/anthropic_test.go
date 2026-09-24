@@ -189,7 +189,7 @@ func TestEmbed_ErrNotSupported(t *testing.T) {
 	if err != nil {
 		t.Fatalf("Open err %v", err)
 	}
-	_, err = a.Embed(context.Background(), "m", []string{"hi"}, ai.EmbedOptions{})
+	_, err = a.Embed(t.Context(), "m", []string{"hi"}, ai.EmbedOptions{})
 	if !errors.Is(err, ai.ErrNotSupported) {
 		t.Fatalf("err = %v want ErrNotSupported", err)
 	}
@@ -233,7 +233,7 @@ func TestGenerate_Roundtrip(t *testing.T) {
 	defer srv.Close()
 	client := anthropic.NewClient(option.WithBaseURL(srv.URL), option.WithAPIKey("test-key"))
 	a := &adapter{client: &client, model: "claude-3"}
-	gen, err := a.Generate(context.Background(), "", []ai.Message{
+	gen, err := a.Generate(t.Context(), "", []ai.Message{
 		{Role: ai.RoleSystem, Content: "be helpful"},
 		{Role: ai.RoleUser, Content: "hi"},
 	}, ai.GenerateOptions{MaxTokens: 100})
@@ -265,7 +265,7 @@ func TestGenerate_DefaultMaxTokens(t *testing.T) {
 	defer srv.Close()
 	client := anthropic.NewClient(option.WithBaseURL(srv.URL), option.WithAPIKey("k"))
 	a := &adapter{client: &client, model: "m"}
-	_, err := a.Generate(context.Background(), "", []ai.Message{{Role: ai.RoleUser, Content: "hi"}}, ai.GenerateOptions{})
+	_, err := a.Generate(t.Context(), "", []ai.Message{{Role: ai.RoleUser, Content: "hi"}}, ai.GenerateOptions{})
 	if err != nil {
 		t.Fatalf("err %v", err)
 	}
@@ -293,7 +293,7 @@ func TestGenerate_ToolHandlingAndMapping(t *testing.T) {
 	client := anthropic.NewClient(option.WithBaseURL(srv.URL), option.WithAPIKey("k"))
 	a := &adapter{client: &client, model: "m"}
 	disable := false
-	gen, err := a.Generate(context.Background(), "override-model", []ai.Message{
+	gen, err := a.Generate(t.Context(), "override-model", []ai.Message{
 		{Role: ai.RoleAssistant, Content: "prev", ToolCalls: []ai.ToolCall{{ID: "id1", Name: "foo", Arguments: `{"a":1}`}}},
 		{Role: ai.RoleAssistant, Content: "alone"},
 		{Role: ai.RoleTool, ToolCallID: "toolu_1", Content: `{"temp":20}`},
@@ -331,7 +331,7 @@ func TestGenerate_ToolChoiceVariants(t *testing.T) {
 		}))
 		client := anthropic.NewClient(option.WithBaseURL(srv.URL), option.WithAPIKey("k"))
 		a := &adapter{client: &client, model: "m"}
-		_, err := a.Generate(context.Background(), "", []ai.Message{{Role: ai.RoleUser, Content: "hi"}}, ai.GenerateOptions{
+		_, err := a.Generate(t.Context(), "", []ai.Message{{Role: ai.RoleUser, Content: "hi"}}, ai.GenerateOptions{
 			Tools:      []ai.Tool{{Name: "t", Parameters: map[string]any{}}},
 			ToolChoice: tc,
 		})
@@ -347,7 +347,7 @@ func TestGenerate_ToolChoiceVariants(t *testing.T) {
 		client2 := anthropic.NewClient(option.WithBaseURL(srv2.URL), option.WithAPIKey("k"))
 		a2 := &adapter{client: &client2, model: "m"}
 		disable := false
-		_, err = a2.Generate(context.Background(), "", []ai.Message{{Role: ai.RoleUser, Content: "hi"}}, ai.GenerateOptions{
+		_, err = a2.Generate(t.Context(), "", []ai.Message{{Role: ai.RoleUser, Content: "hi"}}, ai.GenerateOptions{
 			Tools:             []ai.Tool{{Name: "t"}},
 			ToolChoice:        tc,
 			ParallelToolCalls: &disable,
@@ -371,7 +371,7 @@ func TestGenerate_ToolChoiceVariants(t *testing.T) {
 	client := anthropic.NewClient(option.WithBaseURL(srv.URL), option.WithAPIKey("k"))
 	a := &adapter{client: &client, model: "m"}
 	disable := false
-	_, err := a.Generate(context.Background(), "", []ai.Message{{Role: ai.RoleUser, Content: "hi"}}, ai.GenerateOptions{ParallelToolCalls: &disable})
+	_, err := a.Generate(t.Context(), "", []ai.Message{{Role: ai.RoleUser, Content: "hi"}}, ai.GenerateOptions{ParallelToolCalls: &disable})
 	if err != nil {
 		t.Fatalf("err %v", err)
 	}
@@ -381,7 +381,7 @@ func TestGenerate_ModelRequired(t *testing.T) {
 	t.Parallel()
 	client := anthropic.NewClient(option.WithAPIKey("k"))
 	a := &adapter{client: &client, model: ""}
-	_, err := a.Generate(context.Background(), "", []ai.Message{{Role: ai.RoleUser, Content: "hi"}}, ai.GenerateOptions{})
+	_, err := a.Generate(t.Context(), "", []ai.Message{{Role: ai.RoleUser, Content: "hi"}}, ai.GenerateOptions{})
 	if err == nil || !strings.Contains(err.Error(), "model is required") {
 		t.Fatalf("err %v want model required", err)
 	}
@@ -416,7 +416,7 @@ func TestGenerate_ErrorMapping(t *testing.T) {
 			defer srv.Close()
 			client := anthropic.NewClient(option.WithBaseURL(srv.URL), option.WithAPIKey("k"), option.WithMaxRetries(0))
 			a := &adapter{client: &client, model: "m"}
-			_, err := a.Generate(context.Background(), "", []ai.Message{{Role: ai.RoleUser, Content: "hi"}}, ai.GenerateOptions{})
+			_, err := a.Generate(t.Context(), "", []ai.Message{{Role: ai.RoleUser, Content: "hi"}}, ai.GenerateOptions{})
 			if err == nil {
 				t.Fatalf("want error")
 			}
@@ -458,7 +458,7 @@ func TestGenerate_RetryAfterFloatAndDate(t *testing.T) {
 	}))
 	client := anthropic.NewClient(option.WithBaseURL(srv.URL), option.WithAPIKey("k"), option.WithMaxRetries(0))
 	a := &adapter{client: &client, model: "m"}
-	_, err := a.Generate(context.Background(), "", []ai.Message{{Role: ai.RoleUser, Content: "hi"}}, ai.GenerateOptions{})
+	_, err := a.Generate(t.Context(), "", []ai.Message{{Role: ai.RoleUser, Content: "hi"}}, ai.GenerateOptions{})
 	var rl *ai.RateLimitedError
 	if !errors.As(err, &rl) || rl.RetryAfter != 1500*time.Millisecond {
 		t.Fatalf("float retry failed: %v", err)
@@ -474,7 +474,7 @@ func TestGenerate_RetryAfterFloatAndDate(t *testing.T) {
 	}))
 	client2 := anthropic.NewClient(option.WithBaseURL(srv2.URL), option.WithAPIKey("k"), option.WithMaxRetries(0))
 	a2 := &adapter{client: &client2, model: "m"}
-	_, err = a2.Generate(context.Background(), "", []ai.Message{{Role: ai.RoleUser, Content: "hi"}}, ai.GenerateOptions{})
+	_, err = a2.Generate(t.Context(), "", []ai.Message{{Role: ai.RoleUser, Content: "hi"}}, ai.GenerateOptions{})
 	if !errors.As(err, &rl) {
 		t.Fatalf("date retry not RateLimited: %v", err)
 	}
@@ -491,7 +491,7 @@ func TestGenerate_RetryAfterFloatAndDate(t *testing.T) {
 	}))
 	client3 := anthropic.NewClient(option.WithBaseURL(srv3.URL), option.WithAPIKey("k"), option.WithMaxRetries(0))
 	a3 := &adapter{client: &client3, model: "m"}
-	_, err = a3.Generate(context.Background(), "", []ai.Message{{Role: ai.RoleUser, Content: "hi"}}, ai.GenerateOptions{})
+	_, err = a3.Generate(t.Context(), "", []ai.Message{{Role: ai.RoleUser, Content: "hi"}}, ai.GenerateOptions{})
 	if !errors.As(err, &rl) {
 		t.Fatalf("ms float not RateLimited: %v", err)
 	}
@@ -566,21 +566,21 @@ func TestGenerate_ToolCallInvalidJSON(t *testing.T) {
 	client := anthropic.NewClient(option.WithBaseURL(srv.URL), option.WithAPIKey("k"))
 	a := &adapter{client: &client, model: "m"}
 	// ToolCall with invalid JSON args should be converted to {}
-	_, err := a.Generate(context.Background(), "", []ai.Message{
+	_, err := a.Generate(t.Context(), "", []ai.Message{
 		{Role: ai.RoleAssistant, Content: "x", ToolCalls: []ai.ToolCall{{ID: "1", Name: "t", Arguments: `{"invalid":`}}},
 	}, ai.GenerateOptions{})
 	if err != nil {
 		t.Fatalf("err %v", err)
 	}
 	// empty args
-	_, err = a.Generate(context.Background(), "", []ai.Message{
+	_, err = a.Generate(t.Context(), "", []ai.Message{
 		{Role: ai.RoleAssistant, Content: "", ToolCalls: []ai.ToolCall{{ID: "1", Name: "t", Arguments: ""}}},
 	}, ai.GenerateOptions{})
 	if err != nil {
 		t.Fatalf("err %v", err)
 	}
 	// null args -> hits input == nil branch
-	_, err = a.Generate(context.Background(), "", []ai.Message{
+	_, err = a.Generate(t.Context(), "", []ai.Message{
 		{Role: ai.RoleAssistant, Content: "x", ToolCalls: []ai.ToolCall{{ID: "1", Name: "t", Arguments: `null`}}},
 	}, ai.GenerateOptions{})
 	if err != nil {
@@ -630,7 +630,7 @@ func TestStream_ChunkOrdering(t *testing.T) {
 	defer srv.Close()
 	client := anthropic.NewClient(option.WithBaseURL(srv.URL), option.WithAPIKey("k"))
 	a := &adapter{client: &client, model: "m"}
-	ch, err := a.Stream(context.Background(), "", []ai.Message{{Role: ai.RoleUser, Content: "hi"}}, ai.GenerateOptions{})
+	ch, err := a.Stream(t.Context(), "", []ai.Message{{Role: ai.RoleUser, Content: "hi"}}, ai.GenerateOptions{})
 	if err != nil {
 		t.Fatalf("Stream err %v", err)
 	}
@@ -703,7 +703,7 @@ func TestStream_DeliversChunksIncrementally(t *testing.T) {
 	client := anthropic.NewClient(option.WithBaseURL(srv.URL), option.WithAPIKey("k"))
 	a := &adapter{client: &client, model: "m"}
 
-	ch, err := a.Stream(context.Background(), "", []ai.Message{{Role: ai.RoleUser, Content: "hi"}}, ai.GenerateOptions{})
+	ch, err := a.Stream(t.Context(), "", []ai.Message{{Role: ai.RoleUser, Content: "hi"}}, ai.GenerateOptions{})
 	if err != nil {
 		t.Fatalf("Stream err = %v", err)
 	}
@@ -735,7 +735,7 @@ func TestStream_ContextCancel(t *testing.T) {
 	defer srv.Close()
 	client := anthropic.NewClient(option.WithBaseURL(srv.URL), option.WithAPIKey("k"))
 	a := &adapter{client: &client, model: "m"}
-	ctx, cancel := context.WithCancel(context.Background())
+	ctx, cancel := context.WithCancel(t.Context())
 	cancel()
 	ch, err := a.Stream(ctx, "", []ai.Message{{Role: ai.RoleUser, Content: "hi"}}, ai.GenerateOptions{})
 	if err != nil {
@@ -772,7 +772,7 @@ func TestStream_ErrorMapping(t *testing.T) {
 	// With real SSE streaming, Stream itself returns (ch, nil) immediately;
 	// a header-level error surfaces asynchronously as a StreamChunk.Err,
 	// matching ai/openai's TestStream_ErrorMapping convention.
-	ch, err := a.Stream(context.Background(), "", []ai.Message{{Role: ai.RoleUser, Content: "hi"}}, ai.GenerateOptions{})
+	ch, err := a.Stream(t.Context(), "", []ai.Message{{Role: ai.RoleUser, Content: "hi"}}, ai.GenerateOptions{})
 	if err != nil {
 		t.Fatalf("Stream err %v, want nil", err)
 	}
@@ -813,7 +813,7 @@ func TestGenerate_ContextCancel(t *testing.T) {
 	defer srv.Close()
 	client := anthropic.NewClient(option.WithBaseURL(srv.URL), option.WithAPIKey("k"))
 	a := &adapter{client: &client, model: "m"}
-	ctx, cancel := context.WithCancel(context.Background())
+	ctx, cancel := context.WithCancel(t.Context())
 	defer cancel()
 	go func() {
 		select {
@@ -843,7 +843,7 @@ func TestRedactionHidesKey(t *testing.T) {
 	defer srv.Close()
 	client := anthropic.NewClient(option.WithBaseURL(srv.URL), option.WithAPIKey(secret), option.WithMaxRetries(0))
 	a := &adapter{client: &client, model: "m"}
-	_, err := a.Generate(context.Background(), "", []ai.Message{{Role: ai.RoleUser, Content: "hi"}}, ai.GenerateOptions{})
+	_, err := a.Generate(t.Context(), "", []ai.Message{{Role: ai.RoleUser, Content: "hi"}}, ai.GenerateOptions{})
 	if err == nil {
 		t.Fatalf("want error")
 	}
@@ -918,7 +918,7 @@ func TestGenerate_OverflowViaSafeInt(t *testing.T) {
 	defer srv.Close()
 	client := anthropic.NewClient(option.WithBaseURL(srv.URL), option.WithAPIKey("k"))
 	a := &adapter{client: &client, model: "m"}
-	_, err := a.Generate(context.Background(), "", []ai.Message{{Role: ai.RoleUser, Content: "hi"}}, ai.GenerateOptions{})
+	_, err := a.Generate(t.Context(), "", []ai.Message{{Role: ai.RoleUser, Content: "hi"}}, ai.GenerateOptions{})
 	if err == nil || !strings.Contains(err.Error(), "input_tokens overflow") {
 		t.Fatalf("want input_tokens overflow, got %v", err)
 	}
@@ -929,7 +929,7 @@ func TestGenerate_OverflowViaSafeInt(t *testing.T) {
 	defer srv2.Close()
 	client2 := anthropic.NewClient(option.WithBaseURL(srv2.URL), option.WithAPIKey("k"))
 	a2 := &adapter{client: &client2, model: "m"}
-	_, err = a2.Generate(context.Background(), "", []ai.Message{{Role: ai.RoleUser, Content: "hi"}}, ai.GenerateOptions{})
+	_, err = a2.Generate(t.Context(), "", []ai.Message{{Role: ai.RoleUser, Content: "hi"}}, ai.GenerateOptions{})
 	if err == nil || !strings.Contains(err.Error(), "output_tokens overflow") {
 		t.Fatalf("want output_tokens overflow, got %v", err)
 	}
@@ -944,7 +944,7 @@ func TestGenerate_ToolUseNullInput(t *testing.T) {
 	defer srv.Close()
 	client := anthropic.NewClient(option.WithBaseURL(srv.URL), option.WithAPIKey("k"))
 	a := &adapter{client: &client, model: "m"}
-	gen, err := a.Generate(context.Background(), "", []ai.Message{{Role: ai.RoleUser, Content: "hi"}}, ai.GenerateOptions{})
+	gen, err := a.Generate(t.Context(), "", []ai.Message{{Role: ai.RoleUser, Content: "hi"}}, ai.GenerateOptions{})
 	if err != nil {
 		t.Fatalf("err %v", err)
 	}
@@ -962,7 +962,7 @@ func TestStream_CancelMidStream(t *testing.T) {
 	defer srv.Close()
 	client := anthropic.NewClient(option.WithBaseURL(srv.URL), option.WithAPIKey("k"))
 	a := &adapter{client: &client, model: "m"}
-	ctx, cancel := context.WithCancel(context.Background())
+	ctx, cancel := context.WithCancel(t.Context())
 	ch, err := a.Stream(ctx, "", []ai.Message{{Role: ai.RoleUser, Content: "hi"}}, ai.GenerateOptions{})
 	if err != nil {
 		t.Fatalf("Stream err %v", err)
@@ -993,7 +993,7 @@ func TestStream_CancelBeforeDone(t *testing.T) {
 	defer srv.Close()
 	client := anthropic.NewClient(option.WithBaseURL(srv.URL), option.WithAPIKey("k"))
 	a := &adapter{client: &client, model: "m"}
-	ctx, cancel := context.WithCancel(context.Background())
+	ctx, cancel := context.WithCancel(t.Context())
 	ch, err := a.Stream(ctx, "", []ai.Message{{Role: ai.RoleUser, Content: "hi"}}, ai.GenerateOptions{})
 	if err != nil {
 		t.Fatalf("Stream err %v", err)
@@ -1031,7 +1031,7 @@ func TestStream_CancelDuringToolCalls(t *testing.T) {
 	defer srv.Close()
 	client := anthropic.NewClient(option.WithBaseURL(srv.URL), option.WithAPIKey("k"))
 	a := &adapter{client: &client, model: "m"}
-	ctx, cancel := context.WithCancel(context.Background())
+	ctx, cancel := context.WithCancel(t.Context())
 	ch, err := a.Stream(ctx, "", []ai.Message{{Role: ai.RoleUser, Content: "hi"}}, ai.GenerateOptions{})
 	if err != nil {
 		t.Fatalf("Stream err %v", err)
@@ -1064,7 +1064,7 @@ func TestGenerate_EmptyContentToolUse(t *testing.T) {
 	defer srv.Close()
 	client := anthropic.NewClient(option.WithBaseURL(srv.URL), option.WithAPIKey("k"))
 	a := &adapter{client: &client, model: "m"}
-	gen, err := a.Generate(context.Background(), "", []ai.Message{{Role: ai.RoleUser, Content: "hi"}}, ai.GenerateOptions{})
+	gen, err := a.Generate(t.Context(), "", []ai.Message{{Role: ai.RoleUser, Content: "hi"}}, ai.GenerateOptions{})
 	if err != nil {
 		t.Fatalf("err %v", err)
 	}

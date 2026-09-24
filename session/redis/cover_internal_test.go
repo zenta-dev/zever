@@ -1,7 +1,6 @@
 package redis
 
 import (
-	"context"
 	"strings"
 	"testing"
 	"time"
@@ -25,7 +24,7 @@ func deadStore() *store {
 func TestCoverTransportFailures(t *testing.T) {
 	t.Parallel()
 
-	ctx := context.Background()
+	ctx := t.Context()
 	st := deadStore()
 	id := session.NewID()
 

@@ -55,7 +55,7 @@ func assertIDs(t *testing.T, what string, got []*gen.Doc, want ...string) {
 }
 
 func TestFilterByNestedKey(t *testing.T) {
-	ctx := context.Background()
+	ctx := t.Context()
 	conn := newTestDB(ctx, t)
 
 	got, err := orm.From(gen.Docs).
@@ -68,7 +68,7 @@ func TestFilterByNestedKey(t *testing.T) {
 }
 
 func TestFilterByKeyExistence(t *testing.T) {
-	ctx := context.Background()
+	ctx := t.Context()
 	conn := newTestDB(ctx, t)
 
 	got, err := orm.From(gen.Docs).
@@ -81,7 +81,7 @@ func TestFilterByKeyExistence(t *testing.T) {
 }
 
 func TestFilterByArrayMembership(t *testing.T) {
-	ctx := context.Background()
+	ctx := t.Context()
 	conn := newTestDB(ctx, t)
 
 	got, err := orm.From(gen.Docs).
@@ -94,7 +94,7 @@ func TestFilterByArrayMembership(t *testing.T) {
 }
 
 func TestCheckValueType(t *testing.T) {
-	ctx := context.Background()
+	ctx := t.Context()
 	conn := newTestDB(ctx, t)
 
 	got, err := orm.From(gen.Docs).
@@ -107,7 +107,7 @@ func TestCheckValueType(t *testing.T) {
 }
 
 func TestComposeJSONPredicates(t *testing.T) {
-	ctx := context.Background()
+	ctx := t.Context()
 	conn := newTestDB(ctx, t)
 
 	got, err := orm.From(gen.Docs).

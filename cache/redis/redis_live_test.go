@@ -1,7 +1,6 @@
 package redis
 
 import (
-	"context"
 	"errors"
 	"strings"
 	"testing"
@@ -27,14 +26,14 @@ func newLiveAdapter(t *testing.T) (cache.Cache, *miniredis.Miniredis) {
 	}
 
 	t.Cleanup(func() {
-		_ = a.Close(context.Background())
+		_ = a.Close(t.Context())
 	})
 
 	return a, s
 }
 
 func TestRedisLive_roundTrip(t *testing.T) {
-	ctx := context.Background()
+	ctx := t.Context()
 	a, _ := newLiveAdapter(t)
 
 	if err := a.Set(ctx, "k", []byte("v"), 0); err != nil {
@@ -81,7 +80,7 @@ func TestRedisLive_roundTrip(t *testing.T) {
 }
 
 func TestRedisLive_ttlExpiry(t *testing.T) {
-	ctx := context.Background()
+	ctx := t.Context()
 	a, s := newLiveAdapter(t)
 
 	if err := a.Set(ctx, "k", []byte("v"), time.Minute); err != nil {
@@ -96,7 +95,7 @@ func TestRedisLive_ttlExpiry(t *testing.T) {
 }
 
 func TestRedisLive_setIfAbsent(t *testing.T) {
-	ctx := context.Background()
+	ctx := t.Context()
 	a, _ := newLiveAdapter(t)
 
 	ok, err := a.SetIfAbsent(ctx, "k", []byte("v1"), 0)
@@ -120,7 +119,7 @@ func TestRedisLive_setIfAbsent(t *testing.T) {
 }
 
 func TestRedisLive_counters(t *testing.T) {
-	ctx := context.Background()
+	ctx := t.Context()
 	a, _ := newLiveAdapter(t)
 
 	if err := a.Increment(ctx, "n"); err != nil {
@@ -154,7 +153,7 @@ func TestRedisLive_counters(t *testing.T) {
 }
 
 func TestRedisLive_passwordAuth(t *testing.T) {
-	ctx := context.Background()
+	ctx := t.Context()
 
 	s := miniredis.RunT(t)
 	s.RequireAuth("pw")
@@ -164,7 +163,7 @@ func TestRedisLive_passwordAuth(t *testing.T) {
 		t.Fatalf("New() error = %v", err)
 	}
 
-	t.Cleanup(func() { _ = a.Close(context.Background()) })
+	t.Cleanup(func() { _ = a.Close(t.Context()) })
 
 	if err := a.Set(ctx, "k", []byte("v"), 0); err != nil {
 		t.Fatalf("Set() error = %v", err)
@@ -176,7 +175,7 @@ func TestRedisLive_passwordAuth(t *testing.T) {
 }
 
 func TestRedisLive_closeDelegatesAndIdempotent(t *testing.T) {
-	ctx := context.Background()
+	ctx := t.Context()
 	a, _ := newLiveAdapter(t)
 
 	if err := a.Close(ctx); err != nil {
@@ -193,7 +192,7 @@ func TestRedisLive_closeDelegatesAndIdempotent(t *testing.T) {
 }
 
 func TestRedisLive_serverDown_opsWrapErrors(t *testing.T) {
-	ctx := context.Background()
+	ctx := t.Context()
 	a, s := newLiveAdapter(t)
 
 	s.Close()

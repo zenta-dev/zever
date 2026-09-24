@@ -1,7 +1,6 @@
 package orm
 
 import (
-	"context"
 	"reflect"
 	"testing"
 )
@@ -283,7 +282,7 @@ func TestExprComposesInAndOrNot(t *testing.T) {
 // the SQL text order -- both on the fluent Postgres path and against real
 // SQLite.
 func TestExprBoundFallbackPlaceholderOrder(t *testing.T) {
-	ctx := context.Background()
+	ctx := t.Context()
 
 	rec := &recordingExec{dialectName: "postgres"}
 
@@ -314,7 +313,7 @@ func TestExprBoundFallbackPlaceholderOrder(t *testing.T) {
 }
 
 func TestExprOrderByPostgresRender(t *testing.T) {
-	ctx := context.Background()
+	ctx := t.Context()
 
 	rec := &recordingExec{dialectName: "postgres"}
 

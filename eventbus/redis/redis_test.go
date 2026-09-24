@@ -169,7 +169,7 @@ func TestPublishSubscribe_roundtrip(t *testing.T) {
 	topic := freshTopic()
 
 	got := make(chan eventbus.Message, 16)
-	unsub, err := b.Subscribe(context.Background(), topic, func(_ context.Context, msg eventbus.Message) {
+	unsub, err := b.Subscribe(t.Context(), topic, func(_ context.Context, msg eventbus.Message) {
 		got <- msg
 	})
 	if err != nil {
@@ -180,7 +180,7 @@ func TestPublishSubscribe_roundtrip(t *testing.T) {
 	headers := eventbus.NewHeaders(map[string]string{"k": "v"})
 	payload := eventbus.NewPayload([]byte("hello"))
 
-	if err := b.Publish(context.Background(), topic, payload, headers); err != nil {
+	if err := b.Publish(t.Context(), topic, payload, headers); err != nil {
 		t.Fatalf("Publish err = %v, want nil", err)
 	}
 
@@ -210,7 +210,7 @@ func TestPublishSubscribe_ordered(t *testing.T) {
 	topic := freshTopic()
 
 	got := make(chan eventbus.Message, 64)
-	unsub, err := b.Subscribe(context.Background(), topic, func(_ context.Context, msg eventbus.Message) {
+	unsub, err := b.Subscribe(t.Context(), topic, func(_ context.Context, msg eventbus.Message) {
 		got <- msg
 	})
 	if err != nil {
@@ -222,7 +222,7 @@ func TestPublishSubscribe_ordered(t *testing.T) {
 
 	for i := range n {
 		p := eventbus.NewPayload([]byte(fmt.Sprintf("msg-%02d", i)))
-		if err := b.Publish(context.Background(), topic, p, nil); err != nil {
+		if err := b.Publish(t.Context(), topic, p, nil); err != nil {
 			t.Fatalf("Publish %d err = %v, want nil", i, err)
 		}
 	}
@@ -244,7 +244,7 @@ func TestPublish_fanout(t *testing.T) {
 	ch1 := make(chan eventbus.Message, 4)
 	ch2 := make(chan eventbus.Message, 4)
 
-	unsub1, err := b.Subscribe(context.Background(), topic, func(_ context.Context, msg eventbus.Message) {
+	unsub1, err := b.Subscribe(t.Context(), topic, func(_ context.Context, msg eventbus.Message) {
 		ch1 <- msg
 	})
 	if err != nil {
@@ -252,7 +252,7 @@ func TestPublish_fanout(t *testing.T) {
 	}
 	defer unsub1()
 
-	unsub2, err := b.Subscribe(context.Background(), topic, func(_ context.Context, msg eventbus.Message) {
+	unsub2, err := b.Subscribe(t.Context(), topic, func(_ context.Context, msg eventbus.Message) {
 		ch2 <- msg
 	})
 	if err != nil {
@@ -260,7 +260,7 @@ func TestPublish_fanout(t *testing.T) {
 	}
 	defer unsub2()
 
-	if err := b.Publish(context.Background(), topic, eventbus.NewPayload([]byte("fan")), nil); err != nil {
+	if err := b.Publish(t.Context(), topic, eventbus.NewPayload([]byte("fan")), nil); err != nil {
 		t.Fatalf("Publish err = %v, want nil", err)
 	}
 
@@ -277,7 +277,7 @@ func TestPublish_noSubscribers_dropsSilently(t *testing.T) {
 
 	b := newTestBus(t, nil)
 
-	if err := b.Publish(context.Background(), freshTopic(), eventbus.NewPayload([]byte("drop")), nil); err != nil {
+	if err := b.Publish(t.Context(), freshTopic(), eventbus.NewPayload([]byte("drop")), nil); err != nil {
 		t.Fatalf("Publish with no subscribers err = %v, want nil", err)
 	}
 }
@@ -289,21 +289,21 @@ func TestUnsubscribe_stopsDelivery(t *testing.T) {
 	topic := freshTopic()
 
 	got := make(chan eventbus.Message, 16)
-	unsub, err := b.Subscribe(context.Background(), topic, func(_ context.Context, msg eventbus.Message) {
+	unsub, err := b.Subscribe(t.Context(), topic, func(_ context.Context, msg eventbus.Message) {
 		got <- msg
 	})
 	if err != nil {
 		t.Fatalf("Subscribe err = %v, want nil", err)
 	}
 
-	if err := b.Publish(context.Background(), topic, eventbus.NewPayload([]byte("one")), nil); err != nil {
+	if err := b.Publish(t.Context(), topic, eventbus.NewPayload([]byte("one")), nil); err != nil {
 		t.Fatalf("Publish err = %v, want nil", err)
 	}
 
 	waitMsg(t, got)
 	unsub()
 
-	if err := b.Publish(context.Background(), topic, eventbus.NewPayload([]byte("two")), nil); err != nil {
+	if err := b.Publish(t.Context(), topic, eventbus.NewPayload([]byte("two")), nil); err != nil {
 		t.Fatalf("Publish after unsubscribe err = %v, want nil", err)
 	}
 
@@ -321,14 +321,14 @@ func TestPublish_oversizePayload(t *testing.T) {
 	topic := freshTopic()
 
 	huge := eventbus.NewPayload(make([]byte, eventbus.MaxMessageSize+1))
-	if err := b.Publish(context.Background(), topic, huge, nil); !errors.Is(err, eventbus.ErrPayloadTooLarge) {
+	if err := b.Publish(t.Context(), topic, huge, nil); !errors.Is(err, eventbus.ErrPayloadTooLarge) {
 		t.Errorf("raw oversize err = %v, want ErrPayloadTooLarge", err)
 	}
 
 	// Raw payload at exactly the limit still exceeds it once wrapped in
 	// the JSON envelope (id + headers + base64 overhead).
 	edge := eventbus.NewPayload(make([]byte, eventbus.MaxMessageSize))
-	if err := b.Publish(context.Background(), topic, edge, nil); !errors.Is(err, eventbus.ErrPayloadTooLarge) {
+	if err := b.Publish(t.Context(), topic, edge, nil); !errors.Is(err, eventbus.ErrPayloadTooLarge) {
 		t.Errorf("envelope oversize err = %v, want ErrPayloadTooLarge", err)
 	}
 }
@@ -338,7 +338,7 @@ func TestSubscribe_nilHandler(t *testing.T) {
 
 	b := newTestBus(t, nil)
 
-	if _, err := b.Subscribe(context.Background(), freshTopic(), nil); !errors.Is(err, eventbus.ErrNilHandler) {
+	if _, err := b.Subscribe(t.Context(), freshTopic(), nil); !errors.Is(err, eventbus.ErrNilHandler) {
 		t.Fatalf("Subscribe nil handler err = %v, want ErrNilHandler", err)
 	}
 }
@@ -348,16 +348,16 @@ func TestSubscribe_invalidTopic(t *testing.T) {
 
 	b := newTestBus(t, nil)
 
-	if _, err := b.Subscribe(context.Background(), "", func(context.Context, eventbus.Message) {}); !errors.Is(err, eventbus.ErrInvalidOptions) {
+	if _, err := b.Subscribe(t.Context(), "", func(context.Context, eventbus.Message) {}); !errors.Is(err, eventbus.ErrInvalidOptions) {
 		t.Errorf("empty topic err = %v, want ErrInvalidOptions", err)
 	}
 
 	long := strings.Repeat("a", eventbus.MaxTopicLen+1)
-	if _, err := b.Subscribe(context.Background(), long, func(context.Context, eventbus.Message) {}); !errors.Is(err, eventbus.ErrInvalidOptions) {
+	if _, err := b.Subscribe(t.Context(), long, func(context.Context, eventbus.Message) {}); !errors.Is(err, eventbus.ErrInvalidOptions) {
 		t.Errorf("oversize topic err = %v, want ErrInvalidOptions", err)
 	}
 
-	if err := b.Publish(context.Background(), "", eventbus.NewPayload([]byte("x")), nil); !errors.Is(err, eventbus.ErrInvalidOptions) {
+	if err := b.Publish(t.Context(), "", eventbus.NewPayload([]byte("x")), nil); !errors.Is(err, eventbus.ErrInvalidOptions) {
 		t.Errorf("publish empty topic err = %v, want ErrInvalidOptions", err)
 	}
 }
@@ -369,7 +369,7 @@ func TestClose_behavior(t *testing.T) {
 	topic := freshTopic()
 
 	got := make(chan eventbus.Message, 4)
-	unsub, err := b.Subscribe(context.Background(), topic, func(_ context.Context, msg eventbus.Message) {
+	unsub, err := b.Subscribe(t.Context(), topic, func(_ context.Context, msg eventbus.Message) {
 		got <- msg
 	})
 	if err != nil {
@@ -381,11 +381,11 @@ func TestClose_behavior(t *testing.T) {
 		t.Fatalf("Close err = %v, want nil", err)
 	}
 
-	if err := b.Publish(context.Background(), topic, eventbus.NewPayload([]byte("x")), nil); !errors.Is(err, eventbus.ErrClosed) {
+	if err := b.Publish(t.Context(), topic, eventbus.NewPayload([]byte("x")), nil); !errors.Is(err, eventbus.ErrClosed) {
 		t.Errorf("Publish after Close err = %v, want ErrClosed", err)
 	}
 
-	if _, err := b.Subscribe(context.Background(), topic, func(context.Context, eventbus.Message) {}); !errors.Is(err, eventbus.ErrClosed) {
+	if _, err := b.Subscribe(t.Context(), topic, func(context.Context, eventbus.Message) {}); !errors.Is(err, eventbus.ErrClosed) {
 		t.Errorf("Subscribe after Close err = %v, want ErrClosed", err)
 	}
 
@@ -406,7 +406,7 @@ func TestSubscribe_onPanic_survives(t *testing.T) {
 
 	got := make(chan eventbus.Message, 16)
 
-	unsub1, err := b.Subscribe(context.Background(), topic, func(context.Context, eventbus.Message) {
+	unsub1, err := b.Subscribe(t.Context(), topic, func(context.Context, eventbus.Message) {
 		panic("boom")
 	})
 	if err != nil {
@@ -414,7 +414,7 @@ func TestSubscribe_onPanic_survives(t *testing.T) {
 	}
 	defer unsub1()
 
-	unsub2, err := b.Subscribe(context.Background(), topic, func(_ context.Context, msg eventbus.Message) {
+	unsub2, err := b.Subscribe(t.Context(), topic, func(_ context.Context, msg eventbus.Message) {
 		got <- msg
 	})
 	if err != nil {
@@ -422,7 +422,7 @@ func TestSubscribe_onPanic_survives(t *testing.T) {
 	}
 	defer unsub2()
 
-	if err := b.Publish(context.Background(), topic, eventbus.NewPayload([]byte("x")), nil); err != nil {
+	if err := b.Publish(t.Context(), topic, eventbus.NewPayload([]byte("x")), nil); err != nil {
 		t.Fatalf("Publish err = %v, want nil", err)
 	}
 
@@ -442,7 +442,7 @@ func TestPublishSubscribe_concurrent(t *testing.T) {
 
 	var received atomic.Int64
 
-	unsub, err := b.Subscribe(context.Background(), topic, func(context.Context, eventbus.Message) {
+	unsub, err := b.Subscribe(t.Context(), topic, func(context.Context, eventbus.Message) {
 		received.Add(1)
 	})
 	if err != nil {
@@ -460,7 +460,7 @@ func TestPublishSubscribe_concurrent(t *testing.T) {
 
 			for i := range perPub {
 				payload := eventbus.NewPayload([]byte(fmt.Sprintf("p%d-%d", p, i)))
-				if err := b.Publish(context.Background(), topic, payload, nil); err != nil {
+				if err := b.Publish(t.Context(), topic, payload, nil); err != nil {
 					t.Errorf("Publish err = %v, want nil", err)
 					return
 				}
@@ -482,7 +482,7 @@ func TestPrefix_isolation(t *testing.T) {
 	busB := newTestBus(t, func(o *eventbus.Options) { o.Redis.Prefix = "pb" })
 
 	gotB := make(chan eventbus.Message, 4)
-	unsubB, err := busB.Subscribe(context.Background(), topic, func(_ context.Context, msg eventbus.Message) {
+	unsubB, err := busB.Subscribe(t.Context(), topic, func(_ context.Context, msg eventbus.Message) {
 		gotB <- msg
 	})
 	if err != nil {
@@ -491,7 +491,7 @@ func TestPrefix_isolation(t *testing.T) {
 	defer unsubB()
 
 	gotA := make(chan eventbus.Message, 4)
-	unsubA, err := busA.Subscribe(context.Background(), topic, func(_ context.Context, msg eventbus.Message) {
+	unsubA, err := busA.Subscribe(t.Context(), topic, func(_ context.Context, msg eventbus.Message) {
 		gotA <- msg
 	})
 	if err != nil {
@@ -499,7 +499,7 @@ func TestPrefix_isolation(t *testing.T) {
 	}
 	defer unsubA()
 
-	if err := busA.Publish(context.Background(), topic, eventbus.NewPayload([]byte("a")), nil); err != nil {
+	if err := busA.Publish(t.Context(), topic, eventbus.NewPayload([]byte("a")), nil); err != nil {
 		t.Fatalf("Publish A err = %v, want nil", err)
 	}
 

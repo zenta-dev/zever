@@ -99,6 +99,12 @@ type Batch struct {
 
 const defaultSettleTimeout = 5 * time.Minute
 
+// DefaultSettleStepTimeout bounds one batch-settlement pass without a deadline.
+const DefaultSettleStepTimeout = 5 * time.Second
+
+// DefaultSettleJitter caps the anti-herd sleep before settling due batches.
+const DefaultSettleJitter = 50 * time.Millisecond
+
 // NewBatch creates a batch bound to dispatcher d and store.
 // Settle timeout defaults to 5m when dispatcher timeout is non-positive.
 func NewBatch(d *Dispatcher, store BatchStore) *Batch {
@@ -389,14 +395,14 @@ func settleDueBatches(ctx context.Context) {
 	if _, ok := ctx.Deadline(); !ok {
 		var cancel context.CancelFunc
 
-		ctx, cancel = context.WithTimeout(ctx, 5*time.Second)
+		ctx, cancel = context.WithTimeout(ctx, DefaultSettleStepTimeout)
 		defer cancel()
 	}
 
 	// Jitter up to 50ms to avoid thundering herd when multiple workers sweep
 	// at the same tick.
 	if triggerJitter() {
-		if !sleepWithContext(ctx, jitterDuration(50*time.Millisecond)) {
+		if !sleepWithContext(ctx, jitterDuration(DefaultSettleJitter)) {
 			return
 		}
 	}

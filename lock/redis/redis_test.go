@@ -101,7 +101,7 @@ func TestTryAcquire_emptyKey(t *testing.T) {
 
 	a := &adapter{client: &fakeClient{}, prefix: "lock:", ttl: time.Second}
 
-	if _, ok, err := a.TryAcquire(context.Background(), "", time.Second); err == nil || ok {
+	if _, ok, err := a.TryAcquire(t.Context(), "", time.Second); err == nil || ok {
 		t.Errorf("TryAcquire empty = %v, %v, want error", ok, err)
 	}
 }
@@ -113,7 +113,7 @@ func TestTryAcquire_holderError(t *testing.T) {
 
 	a := &adapter{client: &fakeClient{}, prefix: "lock:", ttl: time.Second}
 
-	if _, _, err := a.TryAcquire(context.Background(), "k", time.Second); err == nil {
+	if _, _, err := a.TryAcquire(t.Context(), "k", time.Second); err == nil {
 		t.Fatal("TryAcquire succeeded, want holder id error")
 	}
 }
@@ -131,7 +131,7 @@ func TestTryAcquire_setNXError(t *testing.T) {
 		ttl:    time.Second,
 	}
 
-	if _, _, err := a.TryAcquire(context.Background(), "k", time.Second); err == nil {
+	if _, _, err := a.TryAcquire(t.Context(), "k", time.Second); err == nil {
 		t.Fatal("TryAcquire succeeded, want SetNX error")
 	}
 }
@@ -150,7 +150,7 @@ func TestAcquire_propagatesTryError(t *testing.T) {
 		retryInterval: time.Millisecond,
 	}
 
-	if _, err := a.Acquire(context.Background(), "k", time.Second); err == nil {
+	if _, err := a.Acquire(t.Context(), "k", time.Second); err == nil {
 		t.Fatal("Acquire succeeded, want SetNX error")
 	}
 }
@@ -169,7 +169,7 @@ func TestAcquire_ctxCancel(t *testing.T) {
 		retryInterval: time.Millisecond,
 	}
 
-	ctx, cancel := context.WithCancel(context.Background())
+	ctx, cancel := context.WithCancel(t.Context())
 	cancel()
 
 	_, err := a.Acquire(ctx, "k", time.Second)
@@ -191,7 +191,7 @@ func TestExtend_evalError(t *testing.T) {
 		key:    "k",
 	}
 
-	if err := h.Extend(context.Background(), time.Second); err == nil {
+	if err := h.Extend(t.Context(), time.Second); err == nil {
 		t.Fatal("Extend succeeded, want Eval error")
 	}
 }
@@ -205,7 +205,7 @@ func TestUnlock_evalError(t *testing.T) {
 		key:    "k",
 	}
 
-	if err := h.Unlock(context.Background()); err == nil {
+	if err := h.Unlock(t.Context()); err == nil {
 		t.Fatal("Unlock succeeded, want Eval error")
 	}
 }
@@ -217,7 +217,7 @@ func TestClose_error(t *testing.T) {
 
 	a := &adapter{client: &fakeClient{}}
 
-	if err := a.Close(context.Background()); err == nil {
+	if err := a.Close(t.Context()); err == nil {
 		t.Fatal("Close succeeded, want shared-close error")
 	}
 }
@@ -230,11 +230,11 @@ func TestClose_idempotent(t *testing.T) {
 
 	a := &adapter{client: &fakeClient{}}
 
-	if err := a.Close(context.Background()); err != nil {
+	if err := a.Close(t.Context()); err != nil {
 		t.Fatalf("first Close: %v", err)
 	}
 
-	if err := a.Close(context.Background()); err != nil {
+	if err := a.Close(t.Context()); err != nil {
 		t.Fatalf("second Close: %v", err)
 	}
 

@@ -112,7 +112,7 @@ var _ codec.Codec[string] = prefixCodec{}
 func TestTyped_keyTypes_mapToStrings(t *testing.T) {
 	t.Parallel()
 
-	ctx := context.Background()
+	ctx := t.Context()
 	b := newMapBackend()
 
 	ts := cache.NewTyped[string, string](b, prefixCodec{})
@@ -146,7 +146,7 @@ func TestTyped_keyTypes_mapToStrings(t *testing.T) {
 func TestTyped_roundTrip_memoryBackend(t *testing.T) {
 	t.Parallel()
 
-	ctx := context.Background()
+	ctx := t.Context()
 	backend, err := memory.New(cache.Options{})
 	if err != nil {
 		t.Fatalf("memory.New() error = %v", err)
@@ -200,7 +200,7 @@ func TestTyped_roundTrip_memoryBackend(t *testing.T) {
 func TestTyped_errors_wrapped(t *testing.T) {
 	t.Parallel()
 
-	ctx := context.Background()
+	ctx := t.Context()
 
 	t.Run("backend get notfound preserved", func(t *testing.T) {
 		t.Parallel()

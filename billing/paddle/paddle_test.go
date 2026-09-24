@@ -1,7 +1,6 @@
 package paddle
 
 import (
-	"context"
 	"encoding/json"
 	"errors"
 	"net/http"
@@ -181,7 +180,7 @@ func TestBillingFlow_full(t *testing.T) {
 	defer srv.Close()
 
 	b := openTest(t, srv.URL)
-	ctx := context.Background()
+	ctx := t.Context()
 
 	c, err := b.CreateCustomer(ctx, "Bob & Co", "bob+co@example.com", "")
 	if err != nil {
@@ -257,7 +256,7 @@ func TestGuards(t *testing.T) {
 	t.Parallel()
 
 	b := openTest(t, "http://127.0.0.1:9")
-	ctx := context.Background()
+	ctx := t.Context()
 
 	t.Run("create subscription missing customer", func(t *testing.T) {
 		t.Parallel()
@@ -300,7 +299,7 @@ func TestCreateCustomer_sdkError_returnsZero(t *testing.T) {
 	}))
 	defer srv.Close()
 
-	got, err := openTest(t, srv.URL).CreateCustomer(context.Background(), "A", "a@example.com", "")
+	got, err := openTest(t, srv.URL).CreateCustomer(t.Context(), "A", "a@example.com", "")
 	if err == nil {
 		t.Fatal("expected error")
 	}
@@ -322,7 +321,7 @@ func TestCreateSubscription_sdkError_returnsZero(t *testing.T) {
 	}))
 	defer srv.Close()
 
-	got, err := openTest(t, srv.URL).CreateSubscription(context.Background(), "ctm_1", "pri_1", "")
+	got, err := openTest(t, srv.URL).CreateSubscription(t.Context(), "ctm_1", "pri_1", "")
 	if err == nil {
 		t.Fatal("expected error")
 	}
@@ -344,7 +343,7 @@ func TestCancelSubscription_sdkError(t *testing.T) {
 	}))
 	defer srv.Close()
 
-	err := openTest(t, srv.URL).CancelSubscription(context.Background(), "txn_1")
+	err := openTest(t, srv.URL).CancelSubscription(t.Context(), "txn_1")
 	if err == nil {
 		t.Fatal("expected error")
 	}
@@ -362,7 +361,7 @@ func TestGetInvoice_listError_returnsZero(t *testing.T) {
 	}))
 	defer srv.Close()
 
-	got, err := openTest(t, srv.URL).GetInvoice(context.Background(), "ctm_1")
+	got, err := openTest(t, srv.URL).GetInvoice(t.Context(), "ctm_1")
 	if err == nil {
 		t.Fatal("expected error")
 	}
@@ -397,7 +396,7 @@ func TestGetInvoice_iterError_returnsZero(t *testing.T) {
 	}))
 	defer srv.Close()
 
-	_, err := openTest(t, srv.URL).GetInvoice(context.Background(), "ctm_1")
+	_, err := openTest(t, srv.URL).GetInvoice(t.Context(), "ctm_1")
 	if err == nil {
 		t.Fatal("expected error")
 	}
@@ -422,7 +421,7 @@ func TestGetInvoice_parseTotalError_returnsZero(t *testing.T) {
 	}))
 	defer srv.Close()
 
-	got, err := openTest(t, srv.URL).GetInvoice(context.Background(), "ctm_1")
+	got, err := openTest(t, srv.URL).GetInvoice(t.Context(), "ctm_1")
 	if err == nil {
 		t.Fatal("expected error")
 	}
@@ -451,7 +450,7 @@ func TestGetInvoice_noInvoices_returnsNotFound(t *testing.T) {
 	}))
 	defer srv.Close()
 
-	_, err := openTest(t, srv.URL).GetInvoice(context.Background(), "ctm_none")
+	_, err := openTest(t, srv.URL).GetInvoice(t.Context(), "ctm_none")
 	if err == nil {
 		t.Fatal("expected error")
 	}
@@ -530,7 +529,7 @@ func TestConcurrent_20(t *testing.T) {
 		go func() {
 			defer wg.Done()
 
-			_, err := b.CreateCustomer(context.Background(), "C", "c@example.com", "")
+			_, err := b.CreateCustomer(t.Context(), "C", "c@example.com", "")
 			errs <- err
 		}()
 	}

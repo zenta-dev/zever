@@ -20,6 +20,9 @@ type redisAdapter struct {
 	closed atomic.Bool
 }
 
+// DefaultPingTimeout bounds the startup connectivity check.
+const DefaultPingTimeout = 3 * time.Second
+
 var _ cache.CompareAndSwapCache = (*redisAdapter)(nil)
 
 // connOptions maps cache options onto the shared client options. A set URL
@@ -39,8 +42,8 @@ func connOptions(opts cache.Options) zredis.Options {
 		PoolSize:        opts.PoolSize,
 		MinIdleConns:    opts.MinIdleConns,
 		PoolTimeout:     opts.PoolTimeout,
-		ConnMaxIdleTime: opts.ConnMaxIdleTime,
-		ConnMaxLifetime: opts.ConnMaxLifetime,
+		MaxConnIdleTime: opts.MaxConnIdleTime,
+		MaxConnLifetime: opts.MaxConnLifetime,
 	}
 }
 
@@ -51,7 +54,7 @@ func New(opts cache.Options) (cache.Cache, error) {
 		return nil, fmt.Errorf("cache: connect %q error: %w", redactURL(opts), err)
 	}
 
-	ctx, cancel := context.WithTimeout(context.Background(), 3*time.Second)
+	ctx, cancel := context.WithTimeout(context.Background(), DefaultPingTimeout)
 	defer cancel()
 
 	if err := client.Ping(ctx).Err(); err != nil {

@@ -1,7 +1,6 @@
 package stub
 
 import (
-	"context"
 	"errors"
 	"sync"
 	"testing"
@@ -23,7 +22,7 @@ func newStub(t *testing.T, autoApprove bool) payment.Payment {
 func TestCreateGetRefund_roundtrip(t *testing.T) {
 	t.Parallel()
 
-	ctx := context.Background()
+	ctx := t.Context()
 	p := newStub(t, true)
 
 	res, err := p.CreatePayment(ctx, payment.Request{Amount: 100, Currency: "USD", Method: payment.MethodCard})
@@ -69,7 +68,7 @@ func TestCreateGetRefund_roundtrip(t *testing.T) {
 func TestRefund_partialThenFull_statuses(t *testing.T) {
 	t.Parallel()
 
-	ctx := context.Background()
+	ctx := t.Context()
 	p := newStub(t, true)
 
 	res, err := p.CreatePayment(ctx, payment.Request{Amount: 100, Currency: "USD"})
@@ -107,7 +106,7 @@ func TestRefund_partialThenFull_statuses(t *testing.T) {
 func TestCreate_pendingWhenAutoApproveFalse(t *testing.T) {
 	t.Parallel()
 
-	ctx := context.Background()
+	ctx := t.Context()
 	p := newStub(t, false)
 
 	res, err := p.CreatePayment(ctx, payment.Request{Amount: 50, Currency: "EUR", Method: payment.MethodBankTransfer})
@@ -125,7 +124,7 @@ func TestGet_notFound(t *testing.T) {
 
 	p := newStub(t, true)
 
-	_, err := p.GetPayment(context.Background(), "stub_999999")
+	_, err := p.GetPayment(t.Context(), "stub_999999")
 	if !errors.Is(err, payment.ErrNotFound) {
 		t.Fatalf("GetPayment err = %v, want ErrNotFound", err)
 	}
@@ -145,7 +144,7 @@ func TestRefund_notFound(t *testing.T) {
 
 	p := newStub(t, true)
 
-	err := p.Refund(context.Background(), "stub_nope", 10)
+	err := p.Refund(t.Context(), "stub_nope", 10)
 	if !errors.Is(err, payment.ErrNotFound) {
 		t.Fatalf("Refund err = %v, want ErrNotFound", err)
 	}
@@ -163,7 +162,7 @@ func TestRefund_notFound(t *testing.T) {
 func TestRefund_overflowTotal(t *testing.T) {
 	t.Parallel()
 
-	ctx := context.Background()
+	ctx := t.Context()
 	p := newStub(t, true)
 
 	res, err := p.CreatePayment(ctx, payment.Request{Amount: 100, Currency: "USD"})
@@ -189,7 +188,7 @@ func TestRefund_overflowTotal(t *testing.T) {
 func TestRefund_overflowRemaining(t *testing.T) {
 	t.Parallel()
 
-	ctx := context.Background()
+	ctx := t.Context()
 	p := newStub(t, true)
 
 	res, err := p.CreatePayment(ctx, payment.Request{Amount: 100, Currency: "USD"})
@@ -219,7 +218,7 @@ func TestRefund_overflowRemaining(t *testing.T) {
 func TestCreate_invalid(t *testing.T) {
 	t.Parallel()
 
-	ctx := context.Background()
+	ctx := t.Context()
 	p := newStub(t, true)
 
 	if _, err := p.CreatePayment(ctx, payment.Request{Amount: 0, Currency: "USD"}); !errors.Is(err, payment.ErrInvalidAmount) {
@@ -249,7 +248,7 @@ func TestCreate_invalid(t *testing.T) {
 func TestRefund_invalidAmount(t *testing.T) {
 	t.Parallel()
 
-	ctx := context.Background()
+	ctx := t.Context()
 	p := newStub(t, true)
 
 	res, err := p.CreatePayment(ctx, payment.Request{Amount: 100, Currency: "USD"})
@@ -274,7 +273,7 @@ func TestNew_zeroOpts(t *testing.T) {
 		t.Fatalf("New err = %v", err)
 	}
 
-	res, err := p.CreatePayment(context.Background(), payment.Request{Amount: 10, Currency: "USD"})
+	res, err := p.CreatePayment(t.Context(), payment.Request{Amount: 10, Currency: "USD"})
 	if err != nil {
 		t.Fatalf("CreatePayment err = %v", err)
 	}
@@ -296,7 +295,7 @@ func TestNew_autoApprove(t *testing.T) {
 		t.Fatalf("New err = %v", err)
 	}
 
-	res, err := p.CreatePayment(context.Background(), payment.Request{Amount: 10, Currency: "USD"})
+	res, err := p.CreatePayment(t.Context(), payment.Request{Amount: 10, Currency: "USD"})
 	if err != nil {
 		t.Fatalf("CreatePayment err = %v", err)
 	}
@@ -324,7 +323,7 @@ func TestWebhookEvent_static(t *testing.T) {
 
 	p := newStub(t, true)
 
-	ev, err := p.WebhookEvent(context.Background(), []byte(`{}`), "sig")
+	ev, err := p.WebhookEvent(t.Context(), []byte(`{}`), "sig")
 	if err != nil {
 		t.Fatalf("WebhookEvent err = %v", err)
 	}
@@ -345,7 +344,7 @@ func TestClose_nil(t *testing.T) {
 func TestConcurrent_createRefund(t *testing.T) {
 	t.Parallel()
 
-	ctx := context.Background()
+	ctx := t.Context()
 	p := newStub(t, true)
 
 	var wg sync.WaitGroup

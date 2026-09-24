@@ -2,7 +2,6 @@ package stdout
 
 import (
 	"bytes"
-	"context"
 	"encoding/json"
 	"errors"
 	"strings"
@@ -156,7 +155,7 @@ func TestCoverNewWithWriter_defaultLimit_truncatesLongAttr(t *testing.T) {
 		t.Fatalf("NewWithWriter() error = %v", err)
 	}
 
-	_, s := p.Tracer("scope").Start(context.Background(), "op")
+	_, s := p.Tracer("scope").Start(t.Context(), "op")
 	s.SetAttributes(observability.String("k", strings.Repeat("x", observability.MaxValueLen+100)))
 	s.End()
 
@@ -186,7 +185,7 @@ func TestCoverNewWithWriter_customLimit_respected(t *testing.T) {
 		t.Fatalf("NewWithWriter() error = %v", err)
 	}
 
-	_, s := p.Tracer("scope").Start(context.Background(), "op")
+	_, s := p.Tracer("scope").Start(t.Context(), "op")
 	s.SetAttributes(observability.String("k", strings.Repeat("y", 300)))
 	s.End()
 

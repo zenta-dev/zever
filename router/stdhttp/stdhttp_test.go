@@ -1,7 +1,6 @@
 package stdhttp
 
 import (
-	"context"
 	"net/http"
 	"net/http/httptest"
 	"strings"
@@ -29,7 +28,7 @@ func newTestRouter(t *testing.T) router.Router {
 func serve(t *testing.T, h http.Handler, method, target string) *httptest.ResponseRecorder {
 	t.Helper()
 
-	req := httptest.NewRequestWithContext(context.Background(), method, target, nil)
+	req := httptest.NewRequestWithContext(t.Context(), method, target, nil)
 	rec := httptest.NewRecorder()
 	h.ServeHTTP(rec, req)
 

@@ -2,7 +2,6 @@ package log
 
 import (
 	"bytes"
-	"context"
 	"errors"
 	"testing"
 
@@ -18,7 +17,7 @@ func TestSendNilMessage(t *testing.T) {
 		t.Fatalf("NewWithWriter() error = %v", err)
 	}
 
-	if err := m.Send(context.Background(), nil); !errors.Is(err, mailer.ErrNilMessage) {
+	if err := m.Send(t.Context(), nil); !errors.Is(err, mailer.ErrNilMessage) {
 		t.Errorf("Send(nil) err = %v, want ErrNilMessage", err)
 	}
 }

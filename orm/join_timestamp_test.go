@@ -1,7 +1,6 @@
 package orm
 
 import (
-	"context"
 	"testing"
 	"time"
 
@@ -97,9 +96,9 @@ func newTimestampDB(t *testing.T) (db.DB, time.Time) {
 		t.Fatalf("open sqlite: %v", err)
 	}
 
-	t.Cleanup(func() { _ = conn.Close(context.Background()) })
+	t.Cleanup(func() { _ = conn.Close(t.Context()) })
 
-	ctx := context.Background()
+	ctx := t.Context()
 
 	for _, stmt := range []string{
 		`CREATE TABLE ts_users (id TEXT, email TEXT, created_at TEXT)`,
@@ -139,7 +138,7 @@ func newTimestampDB(t *testing.T) (db.DB, time.Time) {
 func TestTimestampRoundTripThroughSQLite(t *testing.T) {
 	conn, at := newTimestampDB(t)
 
-	users, err := From(tsUsers).All(context.Background(), conn)
+	users, err := From(tsUsers).All(t.Context(), conn)
 	if err != nil {
 		t.Fatalf("All: %v", err)
 	}
@@ -158,7 +157,7 @@ func TestTimestampRoundTripThroughSQLite(t *testing.T) {
 // accepts a missing fractional part.
 func TestTimestampLegacySecondPrecisionText(t *testing.T) {
 	conn, _ := newTimestampDB(t)
-	ctx := context.Background()
+	ctx := t.Context()
 
 	if _, err := conn.Exec(ctx, `INSERT INTO ts_users (id, email, created_at) VALUES (?, ?, ?)`,
 		"legacy", "l@example.com", "2026-01-02T15:04:05Z"); err != nil {
@@ -186,7 +185,7 @@ func TestTimestampLegacySecondPrecisionText(t *testing.T) {
 // entity Scan against empty values, so the eager timestamp parse failed).
 func TestJoinWithTimestampColumnScans(t *testing.T) {
 	conn, _ := newTimestampDB(t)
-	ctx := context.Background()
+	ctx := t.Context()
 
 	inner, err := JoinOn(From(tsUsers), tsUserPostsRel, InnerJoin).All(ctx, conn)
 	if err != nil {

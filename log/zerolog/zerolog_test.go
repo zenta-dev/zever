@@ -1,7 +1,6 @@
 package zerolog
 
 import (
-	"context"
 	"testing"
 	"time"
 
@@ -117,5 +116,5 @@ func TestContext_chain_buildsLogger(t *testing.T) {
 		t.Fatal("Logger() = nil, want logger")
 	}
 
-	_ = l.WithContext(context.Background())
+	_ = l.WithContext(t.Context())
 }

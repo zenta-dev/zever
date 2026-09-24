@@ -78,7 +78,7 @@ func TestOptions_toRedisOptions_plainAddr(t *testing.T) {
 		},
 		{
 			name: "pool tuning passthrough",
-			in:   Options{DB: 2, PoolSize: 20, MinIdleConns: 4, PoolTimeout: time.Second, ConnMaxIdleTime: time.Minute, ConnMaxLifetime: time.Hour},
+			in:   Options{DB: 2, PoolSize: 20, MinIdleConns: 4, PoolTimeout: time.Second, MaxConnIdleTime: time.Minute, MaxConnLifetime: time.Hour},
 			want: goredis.Options{Addr: "localhost:6379", DB: 2, PoolSize: 20, MinIdleConns: 4, PoolTimeout: time.Second, ConnMaxIdleTime: time.Minute, ConnMaxLifetime: time.Hour},
 		},
 		{

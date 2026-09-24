@@ -1,7 +1,6 @@
 package orm
 
 import (
-	"context"
 	"errors"
 	"strings"
 	"testing"
@@ -83,7 +82,7 @@ func TestTVFJoinRender(t *testing.T) {
 // TestTVFJoinUnsupportedDialect proves the source's own gate surfaces as a
 // typed dialect.ErrUnsupportedByDialect through the public All path.
 func TestTVFJoinUnsupportedDialect(t *testing.T) {
-	ctx := context.Background()
+	ctx := t.Context()
 
 	src := fakeTVFSource{
 		alias: "x",
@@ -100,7 +99,7 @@ func TestTVFJoinUnsupportedDialect(t *testing.T) {
 // TestTVFJoinValidation rejects a source with no alias or no output columns
 // with a construction-time typed error, never invalid SQL.
 func TestTVFJoinValidation(t *testing.T) {
-	ctx := context.Background()
+	ctx := t.Context()
 
 	for _, tc := range []struct {
 		name string
@@ -154,7 +153,7 @@ func TestTVFJoinChainModifiers(t *testing.T) {
 // modifier chain renders, All scans matched and unmatched source rows into
 // Some/None, Stream drains, and Explain runs.
 func TestLeftJoinTVFSurface(t *testing.T) {
-	ctx := context.Background()
+	ctx := t.Context()
 
 	src := fakeTVFSource{alias: "x", cols: []string{"a", "b"}, sql: "fn(\"widgets\".\"bio\")"}
 
@@ -253,7 +252,7 @@ func TestLeftJoinTVFSurface(t *testing.T) {
 // TestTVFJoinScanErrorPaths drives rows, entity and source scan failures
 // through both TVF join scans.
 func TestTVFJoinScanErrorPaths(t *testing.T) {
-	ctx := context.Background()
+	ctx := t.Context()
 	boom := errors.New("boom")
 
 	src := fakeTVFSource{alias: "x", cols: []string{"a", "b"}, sql: "fn(\"widgets\".\"bio\")"}
