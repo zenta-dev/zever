@@ -55,7 +55,7 @@ type Container struct {
 	crypto        lazy[crypto.Crypto]
 	db            lazy[db.DB]
 	document      lazy[document.Document]
-	eventbus      lazy[eventbus.Eventbus]
+	eventbus      lazy[eventbus.EventBus]
 	flag          lazy[flag.Flag]
 	geo           lazy[geo.Geo]
 	grpcServer    lazy[*grpc.Server]

@@ -45,8 +45,8 @@ func TestEnvFieldTypes(t *testing.T) {
 	if !cfg.Billing.Options.Sandbox {
 		t.Fatal("want sandbox true")
 	}
-	if cfg.Ratelimit.Options.Rate != 2.5 {
-		t.Fatalf("got %v", cfg.Ratelimit.Options.Rate)
+	if cfg.RateLimit.Options.Rate != 2.5 {
+		t.Fatalf("got %v", cfg.RateLimit.Options.Rate)
 	}
 	if cfg.DB.Options.MaxConnLifetime != 5*time.Minute {
 		t.Fatalf("got %v", cfg.DB.Options.MaxConnLifetime)
