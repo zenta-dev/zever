@@ -53,7 +53,7 @@ after the failed top-level transfer (unchanged):
 From the repo root:
 
 ```bash
-go run ./cmd/zever compile examples/transactions/schema/transactions.zen --backend=zenorm --out examples/transactions/generated
+zever compile examples/transactions/schema/transactions.zen --backend=zenorm --out examples/transactions/generated
 ```
 
 `generated/` is committed CLI output — never hand-edit it.

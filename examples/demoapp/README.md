@@ -52,7 +52,7 @@ for production.
 | **mailer** (log) | `log` | wired; the worker's welcome-email job sends through it |
 
 Not showcased: **realtime** — zever has no realtime battery (no such service
-in the container), so there is nothing to wire. The reference zen-go
+in the container), so there is nothing to wire. The predecessor
 demoapp's `/demo/realtime/publish` has no equivalent here.
 
 Schema-first DSL: [`schema/app.zen`](schema/app.zen) defines 7 entities

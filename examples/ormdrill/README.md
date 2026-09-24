@@ -51,7 +51,7 @@ combinations return the typed `orm.ErrLocking*` errors.
 
 ## Not yet in zever/orm
 
-Nothing skipped: every topic of the reference drill
+Nothing skipped: every topic of the reference predecessor drill
 (`Personal/zen-go/examples/enhancements`, rounds 1–8) maps to an existing
 `zever/orm` API, including the `JoinOn3` variants, `Tuple.In`,
 `NullsFirst`/`Last`, `OnConflict.Where`, `Returning`, `Insert.Select`,

@@ -7,7 +7,7 @@
 package shopv1
 
 import (
-	_ "github.com/zenta-dev/zever/examples/showcase/generated/protogogen/zengo"
+	_ "github.com/zenta-dev/zever/examples/showcase/generated/protogogen/zever"
 	_ "google.golang.org/genproto/googleapis/api/annotations"
 	protoreflect "google.golang.org/protobuf/reflect/protoreflect"
 	protoimpl "google.golang.org/protobuf/runtime/protoimpl"
@@ -184,7 +184,7 @@ type User struct {
 	Email         string                 `protobuf:"bytes,2,opt,name=email,proto3" json:"email,omitempty"`
 	Name          string                 `protobuf:"bytes,3,opt,name=name,proto3" json:"name,omitempty"`
 	Nickname      *string                `protobuf:"bytes,4,opt,name=nickname,proto3,oneof" json:"nickname,omitempty"`
-	Role          Role                   `protobuf:"varint,5,opt,name=role,proto3,enum=zengo.shop.v1.Role" json:"role,omitempty"`
+	Role          Role                   `protobuf:"varint,5,opt,name=role,proto3,enum=zever.shop.v1.Role" json:"role,omitempty"`
 	PasswordHash  string                 `protobuf:"bytes,6,opt,name=password_hash,json=passwordHash,proto3" json:"password_hash,omitempty"`
 	Age           int32                  `protobuf:"varint,7,opt,name=age,proto3" json:"age,omitempty"`
 	CreditCents   int64                  `protobuf:"varint,8,opt,name=credit_cents,json=creditCents,proto3" json:"credit_cents,omitempty"`
@@ -651,8 +651,8 @@ type Order struct {
 	Id            string                 `protobuf:"bytes,1,opt,name=id,proto3" json:"id,omitempty"`
 	UserId        string                 `protobuf:"bytes,2,opt,name=user_id,json=userId,proto3" json:"user_id,omitempty"`
 	TotalCents    int64                  `protobuf:"varint,3,opt,name=total_cents,json=totalCents,proto3" json:"total_cents,omitempty"`
-	Status        OrderStatus            `protobuf:"varint,4,opt,name=status,proto3,enum=zengo.shop.v1.OrderStatus" json:"status,omitempty"`
-	Priority      Order_PriorityEnum     `protobuf:"varint,5,opt,name=priority,proto3,enum=zengo.shop.v1.Order_PriorityEnum" json:"priority,omitempty"`
+	Status        OrderStatus            `protobuf:"varint,4,opt,name=status,proto3,enum=zever.shop.v1.OrderStatus" json:"status,omitempty"`
+	Priority      Order_PriorityEnum     `protobuf:"varint,5,opt,name=priority,proto3,enum=zever.shop.v1.Order_PriorityEnum" json:"priority,omitempty"`
 	Note          *string                `protobuf:"bytes,6,opt,name=note,proto3,oneof" json:"note,omitempty"`
 	CreatedAt     *timestamppb.Timestamp `protobuf:"bytes,7,opt,name=created_at,json=createdAt,proto3" json:"created_at,omitempty"`
 	unknownFields protoimpl.UnknownFields
@@ -1546,13 +1546,13 @@ var File_shop_schema_proto protoreflect.FileDescriptor
 
 const file_shop_schema_proto_rawDesc = "" +
 	"\n" +
-	"\x11shop/schema.proto\x12\rzengo.shop.v1\x1a\x1fgoogle/protobuf/timestamp.proto\x1a\x1cgoogle/protobuf/struct.proto\x1a\x1cgoogle/api/annotations.proto\x1a\x17zengo/annotations.proto\"\xd9\x03\n" +
+	"\x11shop/schema.proto\x12\rzever.shop.v1\x1a\x1fgoogle/protobuf/timestamp.proto\x1a\x1cgoogle/protobuf/struct.proto\x1a\x1cgoogle/api/annotations.proto\x1a\x17zever/annotations.proto\"\xd9\x03\n" +
 	"\x04User\x12\x0e\n" +
 	"\x02id\x18\x01 \x01(\tR\x02id\x12\x14\n" +
 	"\x05email\x18\x02 \x01(\tR\x05email\x12\x12\n" +
 	"\x04name\x18\x03 \x01(\tR\x04name\x12\x1f\n" +
 	"\bnickname\x18\x04 \x01(\tH\x00R\bnickname\x88\x01\x01\x12'\n" +
-	"\x04role\x18\x05 \x01(\x0e2\x13.zengo.shop.v1.RoleR\x04role\x12#\n" +
+	"\x04role\x18\x05 \x01(\x0e2\x13.zever.shop.v1.RoleR\x04role\x12#\n" +
 	"\rpassword_hash\x18\x06 \x01(\tR\fpasswordHash\x12\x10\n" +
 	"\x03age\x18\a \x01(\x05R\x03age\x12!\n" +
 	"\fcredit_cents\x18\b \x01(\x03R\vcreditCents\x12\x16\n" +
@@ -1603,8 +1603,8 @@ const file_shop_schema_proto_rawDesc = "" +
 	"\auser_id\x18\x02 \x01(\tR\x06userId\x12\x1f\n" +
 	"\vtotal_cents\x18\x03 \x01(\x03R\n" +
 	"totalCents\x122\n" +
-	"\x06status\x18\x04 \x01(\x0e2\x1a.zengo.shop.v1.OrderStatusR\x06status\x12=\n" +
-	"\bpriority\x18\x05 \x01(\x0e2!.zengo.shop.v1.Order.PriorityEnumR\bpriority\x12\x17\n" +
+	"\x06status\x18\x04 \x01(\x0e2\x1a.zever.shop.v1.OrderStatusR\x06status\x12=\n" +
+	"\bpriority\x18\x05 \x01(\x0e2!.zever.shop.v1.Order.PriorityEnumR\bpriority\x12\x17\n" +
 	"\x04note\x18\x06 \x01(\tH\x00R\x04note\x88\x01\x01\x129\n" +
 	"\n" +
 	"created_at\x18\a \x01(\v2\x1a.google.protobuf.TimestampR\tcreatedAt\"M\n" +
@@ -1636,7 +1636,7 @@ const file_shop_schema_proto_rawDesc = "" +
 	"\vtotal_cents\x18\x03 \x01(\x03R\n" +
 	"totalCents\"g\n" +
 	"\x0fCheckoutRequest\x127\n" +
-	"\x05order\x18\x01 \x01(\v2!.zengo.shop.v1.CreateOrderRequestR\x05order\x12\x1b\n" +
+	"\x05order\x18\x01 \x01(\v2!.zever.shop.v1.CreateOrderRequestR\x05order\x12\x1b\n" +
 	"\tgift_note\x18\x02 \x01(\tR\bgiftNote\"J\n" +
 	"\fOrderReceipt\x12\x19\n" +
 	"\border_id\x18\x01 \x01(\tR\aorderId\x12\x1f\n" +
@@ -1646,7 +1646,7 @@ const file_shop_schema_proto_rawDesc = "" +
 	"\vcategory_id\x18\x01 \x01(\tR\n" +
 	"categoryId\"e\n" +
 	"\x14ListProductsResponse\x12,\n" +
-	"\x05items\x18\x01 \x03(\v2\x16.zengo.shop.v1.ProductR\x05items\x12\x1f\n" +
+	"\x05items\x18\x01 \x03(\v2\x16.zever.shop.v1.ProductR\x05items\x12\x1f\n" +
 	"\vnext_cursor\x18\x02 \x01(\tR\n" +
 	"nextCursor\"#\n" +
 	"\x11GetProductRequest\x12\x0e\n" +
@@ -1668,7 +1668,7 @@ const file_shop_schema_proto_rawDesc = "" +
 	"\x11ListOrdersRequest\x12\x17\n" +
 	"\auser_id\x18\x01 \x01(\tR\x06userId\"a\n" +
 	"\x12ListOrdersResponse\x12*\n" +
-	"\x05items\x18\x01 \x03(\v2\x14.zengo.shop.v1.OrderR\x05items\x12\x1f\n" +
+	"\x05items\x18\x01 \x03(\v2\x14.zever.shop.v1.OrderR\x05items\x12\x1f\n" +
 	"\vnext_cursor\x18\x02 \x01(\tR\n" +
 	"nextCursor*\x92\x01\n" +
 	"\vOrderStatus\x12\x1c\n" +
@@ -1683,27 +1683,27 @@ const file_shop_schema_proto_rawDesc = "" +
 	"ROLE_ADMIN\x10\x01\x12\x0f\n" +
 	"\vROLE_MEMBER\x10\x022\xf8\t\n" +
 	"\vShopService\x12p\n" +
-	"\fListProducts\x12\".zengo.shop.v1.ListProductsRequest\x1a#.zengo.shop.v1.ListProductsResponse\"\x17\xca\xda\x18\x02\b\x01\x82\xd3\xe4\x93\x02\v\x12\t/products\x12^\n" +
+	"\fListProducts\x12\".zever.shop.v1.ListProductsRequest\x1a#.zever.shop.v1.ListProductsResponse\"\x17\xca\xda\x18\x02\b\x01\x82\xd3\xe4\x93\x02\v\x12\t/products\x12^\n" +
 	"\n" +
-	"GetProduct\x12 .zengo.shop.v1.GetProductRequest\x1a\x16.zengo.shop.v1.Product\"\x16\x82\xd3\xe4\x93\x02\x10\x12\x0e/products/{id}\x12\x98\x01\n" +
-	"\rCreateProduct\x12#.zengo.shop.v1.CreateProductRequest\x1a\x16.zengo.shop.v1.Product\"J\xca\xda\x18\t\b\x01\x12\x05admin\xda\xda\x18%\n" +
+	"GetProduct\x12 .zever.shop.v1.GetProductRequest\x1a\x16.zever.shop.v1.Product\"\x16\x82\xd3\xe4\x93\x02\x10\x12\x0e/products/{id}\x12\x98\x01\n" +
+	"\rCreateProduct\x12#.zever.shop.v1.CreateProductRequest\x1a\x16.zever.shop.v1.Product\"J\xca\xda\x18\t\b\x01\x12\x05admin\xda\xda\x18%\n" +
 	"#\n" +
 	"\x0eALREADY_EXISTS\x12\x11product sku taken\x82\xd3\xe4\x93\x02\x0e:\x01*\"\t/products\x12\x85\x01\n" +
-	"\rUpdateProduct\x12#.zengo.shop.v1.UpdateProductRequest\x1a\x16.zengo.shop.v1.Product\"7\xca\xda\x18\t\b\x01\x12\x05admin\xda\xda\x18\r\n" +
+	"\rUpdateProduct\x12#.zever.shop.v1.UpdateProductRequest\x1a\x16.zever.shop.v1.Product\"7\xca\xda\x18\t\b\x01\x12\x05admin\xda\xda\x18\r\n" +
 	"\v\n" +
 	"\tNOT_FOUND\x82\xd3\xe4\x93\x02\x13:\x01*\x1a\x0e/products/{id}\x12\xa7\x01\n" +
-	"\fPatchProduct\x12\".zengo.shop.v1.PatchProductRequest\x1a\x16.zengo.shop.v1.Product\"[\xca\xda\x18\t\b\x01\x12\x05admin\xda\xda\x181\n" +
+	"\fPatchProduct\x12\".zever.shop.v1.PatchProductRequest\x1a\x16.zever.shop.v1.Product\"[\xca\xda\x18\t\b\x01\x12\x05admin\xda\xda\x181\n" +
 	"\v\n" +
 	"\tNOT_FOUND\n" +
 	"\"\n" +
 	"\x10INVALID_ARGUMENT\x12\x0enegative stock\x82\xd3\xe4\x93\x02\x13:\x01*2\x0e/products/{id}\x12\xcc\x01\n" +
-	"\rDeleteProduct\x12#.zengo.shop.v1.DeleteProductRequest\x1a\x16.zengo.shop.v1.Product\"~\xca\xda\x18\t\b\x01\x12\x05admin\xd2\xda\x18&\n" +
+	"\rDeleteProduct\x12#.zever.shop.v1.DeleteProductRequest\x1a\x16.zever.shop.v1.Product\"~\xca\xda\x18\t\b\x01\x12\x05admin\xd2\xda\x18&\n" +
 	"\x0eproduct.delete\x12\aProduct\x1a\vcategory_id\xda\xda\x18-\n" +
 	"\v\n" +
 	"\tNOT_FOUND\n" +
 	"\x1e\n" +
 	"\x11PERMISSION_DENIED\x12\tno access\x82\xd3\xe4\x93\x02\x10*\x0e/products/{id}\x12\xb2\x01\n" +
-	"\bCheckout\x12\x1e.zengo.shop.v1.CheckoutRequest\x1a\x1b.zengo.shop.v1.OrderReceipt\"i\xca\xda\x18\x02\b\x01\xda\xda\x18D\n" +
+	"\bCheckout\x12\x1e.zever.shop.v1.CheckoutRequest\x1a\x1b.zever.shop.v1.OrderReceipt\"i\xca\xda\x18\x02\b\x01\xda\xda\x18D\n" +
 	"\x1e\n" +
 	"\x10INVALID_ARGUMENT\x12\n" +
 	"bad coupon\n" +
@@ -1711,9 +1711,9 @@ const file_shop_schema_proto_rawDesc = "" +
 	"\tNOT_FOUND\n" +
 	"\x15\n" +
 	"\x13FAILED_PRECONDITION\x82\xd3\xe4\x93\x02\x15:\x01*\"\x10/orders/checkout\x12\\\n" +
-	"\bGetOrder\x12\x1e.zengo.shop.v1.GetOrderRequest\x1a\x14.zengo.shop.v1.Order\"\x1a\xca\xda\x18\x02\b\x01\x82\xd3\xe4\x93\x02\x0e\x12\f/orders/{id}\x12h\n" +
+	"\bGetOrder\x12\x1e.zever.shop.v1.GetOrderRequest\x1a\x14.zever.shop.v1.Order\"\x1a\xca\xda\x18\x02\b\x01\x82\xd3\xe4\x93\x02\x0e\x12\f/orders/{id}\x12h\n" +
 	"\n" +
-	"ListOrders\x12 .zengo.shop.v1.ListOrdersRequest\x1a!.zengo.shop.v1.ListOrdersResponse\"\x15\xca\xda\x18\x02\b\x01\x82\xd3\xe4\x93\x02\t\x12\a/ordersB2Z0github.com/zenta-dev/zever/gen/zengo/shop;shopv1b\x06proto3"
+	"ListOrders\x12 .zever.shop.v1.ListOrdersRequest\x1a!.zever.shop.v1.ListOrdersResponse\"\x15\xca\xda\x18\x02\b\x01\x82\xd3\xe4\x93\x02\t\x12\a/ordersB2Z0github.com/zenta-dev/zever/gen/zever/shop;shopv1b\x06proto3"
 
 var (
 	file_shop_schema_proto_rawDescOnce sync.Once
@@ -1730,66 +1730,66 @@ func file_shop_schema_proto_rawDescGZIP() []byte {
 var file_shop_schema_proto_enumTypes = make([]protoimpl.EnumInfo, 3)
 var file_shop_schema_proto_msgTypes = make([]protoimpl.MessageInfo, 21)
 var file_shop_schema_proto_goTypes = []any{
-	(OrderStatus)(0),              // 0: zengo.shop.v1.OrderStatus
-	(Role)(0),                     // 1: zengo.shop.v1.Role
-	(Order_PriorityEnum)(0),       // 2: zengo.shop.v1.Order.PriorityEnum
-	(*User)(nil),                  // 3: zengo.shop.v1.User
-	(*Profile)(nil),               // 4: zengo.shop.v1.Profile
-	(*Category)(nil),              // 5: zengo.shop.v1.Category
-	(*Product)(nil),               // 6: zengo.shop.v1.Product
-	(*Tag)(nil),                   // 7: zengo.shop.v1.Tag
-	(*Order)(nil),                 // 8: zengo.shop.v1.Order
-	(*OrderItem)(nil),             // 9: zengo.shop.v1.OrderItem
-	(*Review)(nil),                // 10: zengo.shop.v1.Review
-	(*CreateOrderRequest)(nil),    // 11: zengo.shop.v1.CreateOrderRequest
-	(*CheckoutRequest)(nil),       // 12: zengo.shop.v1.CheckoutRequest
-	(*OrderReceipt)(nil),          // 13: zengo.shop.v1.OrderReceipt
-	(*ListProductsRequest)(nil),   // 14: zengo.shop.v1.ListProductsRequest
-	(*ListProductsResponse)(nil),  // 15: zengo.shop.v1.ListProductsResponse
-	(*GetProductRequest)(nil),     // 16: zengo.shop.v1.GetProductRequest
-	(*CreateProductRequest)(nil),  // 17: zengo.shop.v1.CreateProductRequest
-	(*UpdateProductRequest)(nil),  // 18: zengo.shop.v1.UpdateProductRequest
-	(*PatchProductRequest)(nil),   // 19: zengo.shop.v1.PatchProductRequest
-	(*DeleteProductRequest)(nil),  // 20: zengo.shop.v1.DeleteProductRequest
-	(*GetOrderRequest)(nil),       // 21: zengo.shop.v1.GetOrderRequest
-	(*ListOrdersRequest)(nil),     // 22: zengo.shop.v1.ListOrdersRequest
-	(*ListOrdersResponse)(nil),    // 23: zengo.shop.v1.ListOrdersResponse
+	(OrderStatus)(0),              // 0: zever.shop.v1.OrderStatus
+	(Role)(0),                     // 1: zever.shop.v1.Role
+	(Order_PriorityEnum)(0),       // 2: zever.shop.v1.Order.PriorityEnum
+	(*User)(nil),                  // 3: zever.shop.v1.User
+	(*Profile)(nil),               // 4: zever.shop.v1.Profile
+	(*Category)(nil),              // 5: zever.shop.v1.Category
+	(*Product)(nil),               // 6: zever.shop.v1.Product
+	(*Tag)(nil),                   // 7: zever.shop.v1.Tag
+	(*Order)(nil),                 // 8: zever.shop.v1.Order
+	(*OrderItem)(nil),             // 9: zever.shop.v1.OrderItem
+	(*Review)(nil),                // 10: zever.shop.v1.Review
+	(*CreateOrderRequest)(nil),    // 11: zever.shop.v1.CreateOrderRequest
+	(*CheckoutRequest)(nil),       // 12: zever.shop.v1.CheckoutRequest
+	(*OrderReceipt)(nil),          // 13: zever.shop.v1.OrderReceipt
+	(*ListProductsRequest)(nil),   // 14: zever.shop.v1.ListProductsRequest
+	(*ListProductsResponse)(nil),  // 15: zever.shop.v1.ListProductsResponse
+	(*GetProductRequest)(nil),     // 16: zever.shop.v1.GetProductRequest
+	(*CreateProductRequest)(nil),  // 17: zever.shop.v1.CreateProductRequest
+	(*UpdateProductRequest)(nil),  // 18: zever.shop.v1.UpdateProductRequest
+	(*PatchProductRequest)(nil),   // 19: zever.shop.v1.PatchProductRequest
+	(*DeleteProductRequest)(nil),  // 20: zever.shop.v1.DeleteProductRequest
+	(*GetOrderRequest)(nil),       // 21: zever.shop.v1.GetOrderRequest
+	(*ListOrdersRequest)(nil),     // 22: zever.shop.v1.ListOrdersRequest
+	(*ListOrdersResponse)(nil),    // 23: zever.shop.v1.ListOrdersResponse
 	(*structpb.Struct)(nil),       // 24: google.protobuf.Struct
 	(*timestamppb.Timestamp)(nil), // 25: google.protobuf.Timestamp
 }
 var file_shop_schema_proto_depIdxs = []int32{
-	1,  // 0: zengo.shop.v1.User.role:type_name -> zengo.shop.v1.Role
-	24, // 1: zengo.shop.v1.User.prefs:type_name -> google.protobuf.Struct
-	25, // 2: zengo.shop.v1.User.created_at:type_name -> google.protobuf.Timestamp
-	25, // 3: zengo.shop.v1.Profile.created_at:type_name -> google.protobuf.Timestamp
-	25, // 4: zengo.shop.v1.Category.created_at:type_name -> google.protobuf.Timestamp
-	25, // 5: zengo.shop.v1.Product.created_at:type_name -> google.protobuf.Timestamp
-	25, // 6: zengo.shop.v1.Tag.created_at:type_name -> google.protobuf.Timestamp
-	0,  // 7: zengo.shop.v1.Order.status:type_name -> zengo.shop.v1.OrderStatus
-	2,  // 8: zengo.shop.v1.Order.priority:type_name -> zengo.shop.v1.Order.PriorityEnum
-	25, // 9: zengo.shop.v1.Order.created_at:type_name -> google.protobuf.Timestamp
-	25, // 10: zengo.shop.v1.Review.created_at:type_name -> google.protobuf.Timestamp
-	11, // 11: zengo.shop.v1.CheckoutRequest.order:type_name -> zengo.shop.v1.CreateOrderRequest
-	6,  // 12: zengo.shop.v1.ListProductsResponse.items:type_name -> zengo.shop.v1.Product
-	8,  // 13: zengo.shop.v1.ListOrdersResponse.items:type_name -> zengo.shop.v1.Order
-	14, // 14: zengo.shop.v1.ShopService.ListProducts:input_type -> zengo.shop.v1.ListProductsRequest
-	16, // 15: zengo.shop.v1.ShopService.GetProduct:input_type -> zengo.shop.v1.GetProductRequest
-	17, // 16: zengo.shop.v1.ShopService.CreateProduct:input_type -> zengo.shop.v1.CreateProductRequest
-	18, // 17: zengo.shop.v1.ShopService.UpdateProduct:input_type -> zengo.shop.v1.UpdateProductRequest
-	19, // 18: zengo.shop.v1.ShopService.PatchProduct:input_type -> zengo.shop.v1.PatchProductRequest
-	20, // 19: zengo.shop.v1.ShopService.DeleteProduct:input_type -> zengo.shop.v1.DeleteProductRequest
-	12, // 20: zengo.shop.v1.ShopService.Checkout:input_type -> zengo.shop.v1.CheckoutRequest
-	21, // 21: zengo.shop.v1.ShopService.GetOrder:input_type -> zengo.shop.v1.GetOrderRequest
-	22, // 22: zengo.shop.v1.ShopService.ListOrders:input_type -> zengo.shop.v1.ListOrdersRequest
-	15, // 23: zengo.shop.v1.ShopService.ListProducts:output_type -> zengo.shop.v1.ListProductsResponse
-	6,  // 24: zengo.shop.v1.ShopService.GetProduct:output_type -> zengo.shop.v1.Product
-	6,  // 25: zengo.shop.v1.ShopService.CreateProduct:output_type -> zengo.shop.v1.Product
-	6,  // 26: zengo.shop.v1.ShopService.UpdateProduct:output_type -> zengo.shop.v1.Product
-	6,  // 27: zengo.shop.v1.ShopService.PatchProduct:output_type -> zengo.shop.v1.Product
-	6,  // 28: zengo.shop.v1.ShopService.DeleteProduct:output_type -> zengo.shop.v1.Product
-	13, // 29: zengo.shop.v1.ShopService.Checkout:output_type -> zengo.shop.v1.OrderReceipt
-	8,  // 30: zengo.shop.v1.ShopService.GetOrder:output_type -> zengo.shop.v1.Order
-	23, // 31: zengo.shop.v1.ShopService.ListOrders:output_type -> zengo.shop.v1.ListOrdersResponse
+	1,  // 0: zever.shop.v1.User.role:type_name -> zever.shop.v1.Role
+	24, // 1: zever.shop.v1.User.prefs:type_name -> google.protobuf.Struct
+	25, // 2: zever.shop.v1.User.created_at:type_name -> google.protobuf.Timestamp
+	25, // 3: zever.shop.v1.Profile.created_at:type_name -> google.protobuf.Timestamp
+	25, // 4: zever.shop.v1.Category.created_at:type_name -> google.protobuf.Timestamp
+	25, // 5: zever.shop.v1.Product.created_at:type_name -> google.protobuf.Timestamp
+	25, // 6: zever.shop.v1.Tag.created_at:type_name -> google.protobuf.Timestamp
+	0,  // 7: zever.shop.v1.Order.status:type_name -> zever.shop.v1.OrderStatus
+	2,  // 8: zever.shop.v1.Order.priority:type_name -> zever.shop.v1.Order.PriorityEnum
+	25, // 9: zever.shop.v1.Order.created_at:type_name -> google.protobuf.Timestamp
+	25, // 10: zever.shop.v1.Review.created_at:type_name -> google.protobuf.Timestamp
+	11, // 11: zever.shop.v1.CheckoutRequest.order:type_name -> zever.shop.v1.CreateOrderRequest
+	6,  // 12: zever.shop.v1.ListProductsResponse.items:type_name -> zever.shop.v1.Product
+	8,  // 13: zever.shop.v1.ListOrdersResponse.items:type_name -> zever.shop.v1.Order
+	14, // 14: zever.shop.v1.ShopService.ListProducts:input_type -> zever.shop.v1.ListProductsRequest
+	16, // 15: zever.shop.v1.ShopService.GetProduct:input_type -> zever.shop.v1.GetProductRequest
+	17, // 16: zever.shop.v1.ShopService.CreateProduct:input_type -> zever.shop.v1.CreateProductRequest
+	18, // 17: zever.shop.v1.ShopService.UpdateProduct:input_type -> zever.shop.v1.UpdateProductRequest
+	19, // 18: zever.shop.v1.ShopService.PatchProduct:input_type -> zever.shop.v1.PatchProductRequest
+	20, // 19: zever.shop.v1.ShopService.DeleteProduct:input_type -> zever.shop.v1.DeleteProductRequest
+	12, // 20: zever.shop.v1.ShopService.Checkout:input_type -> zever.shop.v1.CheckoutRequest
+	21, // 21: zever.shop.v1.ShopService.GetOrder:input_type -> zever.shop.v1.GetOrderRequest
+	22, // 22: zever.shop.v1.ShopService.ListOrders:input_type -> zever.shop.v1.ListOrdersRequest
+	15, // 23: zever.shop.v1.ShopService.ListProducts:output_type -> zever.shop.v1.ListProductsResponse
+	6,  // 24: zever.shop.v1.ShopService.GetProduct:output_type -> zever.shop.v1.Product
+	6,  // 25: zever.shop.v1.ShopService.CreateProduct:output_type -> zever.shop.v1.Product
+	6,  // 26: zever.shop.v1.ShopService.UpdateProduct:output_type -> zever.shop.v1.Product
+	6,  // 27: zever.shop.v1.ShopService.PatchProduct:output_type -> zever.shop.v1.Product
+	6,  // 28: zever.shop.v1.ShopService.DeleteProduct:output_type -> zever.shop.v1.Product
+	13, // 29: zever.shop.v1.ShopService.Checkout:output_type -> zever.shop.v1.OrderReceipt
+	8,  // 30: zever.shop.v1.ShopService.GetOrder:output_type -> zever.shop.v1.Order
+	23, // 31: zever.shop.v1.ShopService.ListOrders:output_type -> zever.shop.v1.ListOrdersResponse
 	23, // [23:32] is the sub-list for method output_type
 	14, // [14:23] is the sub-list for method input_type
 	14, // [14:14] is the sub-list for extension type_name

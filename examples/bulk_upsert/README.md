@@ -77,7 +77,7 @@ final inventory (10 widgets):
 From the repo root:
 
 ```bash
-go run ./cmd/zever compile examples/bulk_upsert/schema/bulk_upsert.zen --backend=zenorm --out examples/bulk_upsert/generated
+zever compile examples/bulk_upsert/schema/bulk_upsert.zen --backend=zenorm --out examples/bulk_upsert/generated
 ```
 
 `generated/` is committed CLI output — never hand-edit it.

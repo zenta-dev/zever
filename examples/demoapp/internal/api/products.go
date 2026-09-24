@@ -79,8 +79,8 @@ func (s *Server) createProduct(w http.ResponseWriter, req *http.Request) {
 	}
 
 	ctx := req.Context()
-	if s.Ratelimit != nil {
-		decision, err := s.Ratelimit.Allow(ctx, "create_product", 1)
+	if s.RateLimit != nil {
+		decision, err := s.RateLimit.Allow(ctx, "create_product", 1)
 		if err == nil && !decision.Allowed {
 			writeError(w, http.StatusTooManyRequests, "rate limited")
 			return
@@ -119,8 +119,8 @@ func (s *Server) createProduct(w http.ResponseWriter, req *http.Request) {
 		return
 	}
 
-	if s.Eventbus != nil {
-		_ = s.Eventbus.Publish(ctx, "product.created", []byte(p.ID), nil)
+	if s.EventBus != nil {
+		_ = s.EventBus.Publish(ctx, "product.created", []byte(p.ID), nil)
 	}
 	if s.Search != nil {
 		_ = s.Search.Index(ctx, search.Document{ID: p.ID, Content: p.Name + " " + p.Description})

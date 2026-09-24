@@ -49,7 +49,7 @@ Recovery interceptors go last in the chain so other interceptors observe recover
 
 ```go
 log, _ := c.Log()
-limiter, _ := c.Ratelimit()
+limiter, _ := c.RateLimit()
 obs, _ := c.Observability()
 mux := buildRoutes(c)
 srv := &http.Server{Addr: ":8080", Handler: middleware.RequestLogger(log)(
