@@ -37,7 +37,7 @@ func New(opts ai.Options) (ai.AI, error) {
 
 	clientOpts := []option.RequestOption{
 		option.WithAPIKey(opts.APIKey),
-		option.WithHTTPClient(newHTTPClient()),
+		option.WithHTTPClient(newHTTPClient(opts.Timeout)),
 	}
 
 	if opts.BaseURL != "" {
@@ -52,23 +52,28 @@ func New(opts ai.Options) (ai.AI, error) {
 	}, nil
 }
 
-func newHTTPClientFromTransport(tr *http.Transport) *http.Client {
+func newHTTPClientFromTransport(timeout time.Duration, tr *http.Transport) *http.Client {
 	if tr == nil {
-		return httpclient.NewClient(0)
+		return httpclient.NewClient(timeout)
 	}
 
-	return httpclient.NewClient(0, httpclient.WithTransport(tr.Clone()))
+	return httpclient.NewClient(timeout, httpclient.WithTransport(tr.Clone()))
 }
 
 //go:noinline
-func newHTTPClientImpl() *http.Client {
+func newHTTPClientImpl(timeout time.Duration) *http.Client {
 	if tr, ok := http.DefaultTransport.(*http.Transport); ok {
-		return newHTTPClientFromTransport(tr)
+		return newHTTPClientFromTransport(timeout, tr)
 	}
 
-	return newHTTPClientFromTransport(nil)
+	return newHTTPClientFromTransport(timeout, nil)
 }
 
+// newHTTPClient builds the HTTP client the OpenAI SDK issues requests
+// through, honoring opts.Timeout the same way every sibling ai/* adapter
+// does (anthropic.newClient, gemini.newHTTPClient, ollama's client) --
+// previously this always passed 0 (no client-side timeout) regardless of
+// what the caller configured.
 var newHTTPClient = newHTTPClientImpl
 
 //nolint:gocyclo
