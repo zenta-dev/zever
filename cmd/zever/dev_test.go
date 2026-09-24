@@ -296,7 +296,13 @@ func TestDevLoopEndToEnd(t *testing.T) {
 
 	writeZeverFixture(t, schemaDir, "user.zen", devBrokenSchema)
 
-	time.Sleep(3 * time.Second)
+	// Poll for the rebuild outcome instead of a fixed 3s sleep: the failed
+	// compile is reported on out, which proves the debounced rebuild ran
+	// and rejected the edit. The lifecycle must then still show exactly
+	// [start term start] (server left untouched).
+	pollFor(t, 30*time.Second, func() bool {
+		return strings.Contains(out.String(), "compile FAILED, server unchanged")
+	})
 
 	if got := readZeverLifecycle(t, logPath); len(got) != 3 {
 		t.Fatalf("lifecycle after a broken edit = %v, want the server left untouched at [start term start]", got)
@@ -951,10 +957,11 @@ func TestDevLoopDrainsFiredTimer(t *testing.T) {
 
 	origTimer := devNewTimer
 	devNewTimer = func(_ time.Duration) *time.Timer {
-		// Return an already-fired timer with its tick still pending:
-		// Stop reports false and the drain in devLoop finds the value.
+		// Return an already-fired timer: block on its channel so the
+		// stubbed clock is guaranteed expired without a fixed sleep.
+		// devLoop discards Stop's result, so the consumed tick is fine.
 		tm := time.NewTimer(time.Nanosecond)
-		time.Sleep(50 * time.Millisecond)
+		<-tm.C
 		return tm
 	}
 	t.Cleanup(func() { devNewTimer = origTimer })

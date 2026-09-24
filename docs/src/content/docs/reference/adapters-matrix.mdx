@@ -21,7 +21,7 @@ swaps stay config-only.
 | crypto | local | `crypto/local` | `Crypto()` |
 | db | sqlite, postgres | `db/*` | `DB()` |
 | document | local, remote, latex | `document/*` | `Document()` |
-| eventbus | memory, redis | `eventbus/memory`, `eventbus/redis` | `Eventbus()` |
+| eventbus | memory, redis | `eventbus/memory`, `eventbus/redis` | `EventBus()` |
 | flag | static, firebase | `flag/static`, `flag/firebase` | `Flag()` |
 | geo | google, static, osm | `geo/*` | `Geo()` |
 | i18n | embed, remote | `i18n/*` | `I18n()` |
@@ -36,7 +36,7 @@ swaps stay config-only.
 | payment | stub, stripe, paddle | `payment/*` | `Payment()` |
 | permission | noop, rbac, casbin | `permission/*` | `Permission()` |
 | queue | memory, redis | `queue/memory`, `queue/redis` | `Queue()` |
-| ratelimit | memory, redis | `ratelimit/memory`, `ratelimit/redis` | `Ratelimit()` |
+| ratelimit | memory, redis | `ratelimit/memory`, `ratelimit/redis` | `RateLimit()` |
 | router | fiber, stdhttp | `router/*` | `Router()` |
 | scheduler | embedded | `scheduler/embedded` | `Scheduler()` |
 | search | postgres, meilisearch, sqlite | `search/*` | `Search()` |

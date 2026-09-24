@@ -7,6 +7,7 @@ import (
 	"io"
 	"os"
 	"os/exec"
+	"strconv"
 	"strings"
 	"testing"
 	"time"
@@ -290,13 +291,9 @@ func TestServeRunningEscStopsChild(t *testing.T) {
 	if _, ok := cmd().(tui.LogBackMsg); !ok {
 		t.Fatalf("cmd = %T, want tui.LogBackMsg", cmd())
 	}
-	deadline := time.Now().Add(5 * time.Second)
-	for child.alive() && time.Now().Before(deadline) {
-		time.Sleep(10 * time.Millisecond)
-	}
-	if child.alive() {
-		t.Fatal("child survived esc stop: orphan")
-	}
+	// Poll for reaping instead of a fixed sleep loop: esc stops the stub
+	// child and closure proves no orphan.
+	pollFor(t, 5*time.Second, func() bool { return !child.alive() })
 }
 
 func TestChildLifecycleNoOrphanBounded(t *testing.T) {
@@ -507,9 +504,18 @@ func TestStopGraceKillWedgedChild(t *testing.T) {
 		t.Skipf("sh unavailable: %v", err)
 	}
 	c := newRuntimeChild(cmd)
-	// Let the shell install its SIGTERM trap before signalling; otherwise
+	// Wait until the shell has installed its SIGTERM trap instead of a
+	// fixed sleep: the trap runs before the respawn loop's first sleep,
+	// so a visible sleep descendant proves setup completed. Otherwise
 	// the signal lands on default disposition and the fast path wins.
-	time.Sleep(300 * time.Millisecond)
+	pollFor(t, 10*time.Second, func() bool {
+		//nolint:gosec // fixed ps argv, no shell; pid is our own test child.
+		out, err := exec.CommandContext(context.Background(), "ps", "-o", "comm=", "--ppid", strconv.Itoa(cmd.Process.Pid)).Output()
+		if err != nil {
+			return false
+		}
+		return strings.Contains(string(out), "sleep")
+	})
 	if !c.alive() {
 		t.Fatal("wedged child must survive until stopped")
 	}

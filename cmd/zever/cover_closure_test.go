@@ -315,7 +315,7 @@ func TestClosureDeclNameTakenKinds(t *testing.T) {
 	}
 
 	// Message branch via hand-built file.
-	msgFile := &irModuleFileForTest
+	msgFile := &stubIRModuleFile
 	_ = msgFile
 }
 
@@ -1704,9 +1704,9 @@ func TestClosureGenerateEntityJobScheduleSeedErrors(t *testing.T) {
 	}
 }
 
-// irModuleFileForTest is a placeholder to keep the message-kind test honest:
+// stubIRModuleFile is a placeholder to keep the message-kind test honest:
 // declNameTaken's MessageDecl branch is exercised through a real parse below.
-var irModuleFileForTest = struct{}{}
+var stubIRModuleFile = struct{}{}
 
 func TestClosureDeclNameTakenMessage(t *testing.T) {
 	dir := t.TempDir()
