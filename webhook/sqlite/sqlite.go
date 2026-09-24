@@ -51,7 +51,7 @@ func New(o webhook.Options) (webhook.Webhook, error) {
 	// without a dedicated test.
 	inner, err := whttp.New(o)
 	if err != nil {
-		return nil, fmt.Errorf("sqlite: open http: %w", err)
+		return nil, fmt.Errorf("webhook: open http: %w", err)
 	}
 
 	db, dsn, err := openDB(o.DSN)

@@ -66,7 +66,7 @@ func New(opts notification.Options) (notification.Notifier, error) {
 	}
 	tw := opts.Twilio
 	if tw.AccountSID == "" {
-		return nil, fmt.Errorf("twilio: %w", notification.InvalidOptionsError{Reason: "twilio account SID must be non-empty"})
+		return nil, fmt.Errorf("twilio: %w", notification.InvalidOptionsError{Reason: "twilio account sid must be non-empty"})
 	}
 	if tw.AuthToken == "" {
 		return nil, fmt.Errorf("twilio: %w", notification.InvalidOptionsError{Reason: "twilio auth token must be non-empty"})

@@ -247,14 +247,15 @@ func TestRedisCover_ClientErrors(t *testing.T) {
 	if err == nil {
 		t.Fatalf("blockingClaim cancelled = nil")
 	}
-	// cover BLPop poll timeout EmptyError
+	// cover BLPop poll timeout EmptyError: retry until the 20ms poll
+	// timer fires instead of sleeping past it.
 	a10 := &redisAdapter{client: &fakeClient{blPopErr: goredis.Nil}}
 	poll := time.NewTimer(20 * time.Millisecond)
-	time.Sleep(25 * time.Millisecond)
-	_, _, err = a10.blockingClaim(ctx, "rk", "pk", "dk", "123", poll, time.Millisecond)
-	if err == nil {
-		t.Fatalf("blockingClaim poll timeout = nil")
-	}
+	defer poll.Stop()
+	eventually(t, 3*time.Second, func() bool {
+		_, _, err = a10.blockingClaim(ctx, "rk", "pk", "dk", "123", poll, time.Millisecond)
+		return err != nil
+	}, "blockingClaim poll timeout")
 	var emptyErr *queue.EmptyError
 	if !errors.As(err, &emptyErr) {
 		t.Fatalf("want EmptyError, got %T %v", err, err)
@@ -919,7 +920,9 @@ func TestRedisCover_PopLoopThrottlesSweep(t *testing.T) {
 	}
 
 	// After sweepInterval elapses, a fresh popLoop call must sweep again.
-	time.Sleep(sweepInterval + 20*time.Millisecond)
+	// Backdate lastSweep past the throttle window instead of sleeping past
+	// sweepInterval in wall-clock time.
+	a.lastSweep.Store(time.Now().Add(-2 * sweepInterval).UnixMilli())
 
 	poll2 := time.NewTimer(20 * time.Millisecond)
 	defer poll2.Stop()

@@ -11,6 +11,9 @@ var ErrNilFactory = errors.New("workflow: nil factory")
 // ErrDuplicate is returned on duplicate adapter registration.
 var ErrDuplicate = errors.New("workflow: duplicate registration")
 
+// ErrDuplicateAdapter aliases ErrDuplicate for compatibility.
+var ErrDuplicateAdapter = ErrDuplicate
+
 // ErrUnknownAdapter is returned for an unregistered adapter.
 var ErrUnknownAdapter = errors.New("workflow: unknown adapter")
 
@@ -38,19 +41,22 @@ var ErrDuplicateRun = errors.New("workflow: duplicate run")
 // ErrUnknownQuery is returned for an unknown workflow query.
 var ErrUnknownQuery = errors.New("workflow: unknown query")
 
-// DuplicateError reports a duplicate adapter registration.
-type DuplicateError struct {
+// DuplicateAdapterError reports a duplicate adapter registration.
+type DuplicateAdapterError struct {
 	// Adapter is the already-registered adapter.
 	Adapter Adapter
 }
 
+// DuplicateError aliases DuplicateAdapterError for compatibility.
+type DuplicateError = DuplicateAdapterError
+
 // Error returns a human-readable duplicate-registration message.
-func (e DuplicateError) Error() string {
+func (e DuplicateAdapterError) Error() string {
 	return fmt.Sprintf("%s: %s", ErrDuplicate, e.Adapter.String())
 }
 
 // Unwrap returns ErrDuplicate.
-func (e DuplicateError) Unwrap() error {
+func (e DuplicateAdapterError) Unwrap() error {
 	return ErrDuplicate
 }
 

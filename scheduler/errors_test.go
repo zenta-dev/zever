@@ -22,10 +22,10 @@ func TestSentinels(t *testing.T) {
 	}
 }
 
-func TestDuplicateErrorUnwrap(t *testing.T) {
+func TestDuplicateAdapterErrorUnwrap(t *testing.T) {
 	t.Parallel()
 
-	err := &DuplicateError{Adapter: Embedded}
+	err := &DuplicateAdapterError{Adapter: Embedded}
 	if !errors.Is(err, ErrDuplicate) {
 		t.Fatalf("err=%v want ErrDuplicate", err)
 	}

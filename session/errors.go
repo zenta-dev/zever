@@ -18,6 +18,9 @@ var ErrNilFactory = errors.New("session: nil factory")
 // ErrDuplicate is returned on duplicate adapter registration.
 var ErrDuplicate = errors.New("session: duplicate registration")
 
+// ErrDuplicateAdapter aliases ErrDuplicate for compatibility.
+var ErrDuplicateAdapter = ErrDuplicate
+
 // ErrUnknownAdapter is returned for an unregistered adapter.
 var ErrUnknownAdapter = errors.New("session: unknown adapter")
 
@@ -30,19 +33,22 @@ var ErrInvalidOptions = errors.New("session: invalid options")
 // ErrInvalidID is returned for an invalid session ID.
 var ErrInvalidID = errors.New("session: invalid id")
 
-// DuplicateError reports a duplicate adapter registration.
-type DuplicateError struct {
+// DuplicateAdapterError reports a duplicate adapter registration.
+type DuplicateAdapterError struct {
 	// Adapter is the already-registered adapter.
 	Adapter Adapter
 }
 
+// DuplicateError aliases DuplicateAdapterError for compatibility.
+type DuplicateError = DuplicateAdapterError
+
 // Error returns a human-readable duplicate-registration message.
-func (e DuplicateError) Error() string {
+func (e DuplicateAdapterError) Error() string {
 	return fmt.Sprintf("%s: %s", ErrDuplicate, e.Adapter.String())
 }
 
 // Unwrap returns ErrDuplicate.
-func (e DuplicateError) Unwrap() error { return ErrDuplicate }
+func (e DuplicateAdapterError) Unwrap() error { return ErrDuplicate }
 
 // UnknownAdapterError reports a lookup of an unregistered adapter.
 type UnknownAdapterError struct {
@@ -52,7 +58,7 @@ type UnknownAdapterError struct {
 
 // Error returns a human-readable unknown-adapter message.
 func (e UnknownAdapterError) Error() string {
-	return fmt.Sprintf("%s: %s", ErrUnknownAdapter, e.Adapter.String())
+	return fmt.Sprintf("%s: %s (forgotten import?)", ErrUnknownAdapter, e.Adapter.String())
 }
 
 // Unwrap returns ErrUnknownAdapter.

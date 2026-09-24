@@ -16,7 +16,7 @@ func TestAdapterString(t *testing.T) {
 		want    string
 	}{
 		{"memory", workflow.Memory, "memory"},
-		{"unknown", workflow.Adapter(99), "Adapter(99)"},
+		{"unknown", workflow.Adapter(99), "unknown"},
 	}
 
 	for _, c := range cases {

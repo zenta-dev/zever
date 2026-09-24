@@ -23,7 +23,7 @@ type Search interface {
 }
 
 // Factory creates a Search from the given Options.
-type Factory func(o Options) (Search, error)
+type Factory func(opts Options) (Search, error)
 
 var factories = registry.New[Adapter, Factory](
 	ErrNilFactory,

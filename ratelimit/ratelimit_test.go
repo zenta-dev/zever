@@ -54,7 +54,7 @@ func TestRegister_duplicate_returnsDuplicateError(t *testing.T) {
 
 func TestOpen_unknownAdapter_returnsUnknownError(t *testing.T) {
 	a := Adapter(9999)
-	_, err := Open(a, Options{})
+	_, err := Open(a, Options{Rate: 1, Burst: 1})
 	if !errors.Is(err, ErrUnknownAdapter) {
 		t.Fatalf("Open unknown err = %v, want ErrUnknownAdapter", err)
 	}
@@ -73,7 +73,7 @@ func TestOpen_factoryError_wrappedWithAdapter(t *testing.T) {
 	if err := Register(a, func(Options) (Limiter, error) { return nil, sentinel }); err != nil {
 		t.Fatalf("Register err = %v", err)
 	}
-	_, err := Open(a, Options{})
+	_, err := Open(a, Options{Rate: 1, Burst: 1})
 	if !errors.Is(err, sentinel) {
 		t.Fatalf("Open err = %v, want wrap of sentinel", err)
 	}
@@ -87,7 +87,7 @@ func TestOpen_success_returnsLimiter(t *testing.T) {
 	if err := Register(a, func(Options) (Limiter, error) { return stubLimiter{}, nil }); err != nil {
 		t.Fatalf("Register err = %v", err)
 	}
-	l, err := Open(a, Options{})
+	l, err := Open(a, Options{Rate: 1, Burst: 1})
 	if err != nil {
 		t.Fatalf("Open err = %v", err)
 	}

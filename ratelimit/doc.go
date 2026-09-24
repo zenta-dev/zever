@@ -10,7 +10,7 @@
 //
 // DX: Open with Open, custom backends with Register. Options are typed with zero-infra defaults for tests. Config file plus env RATELIMIT_<FIELD> (no prefix, e.g. RATELIMIT_ADAPTER). See config/README.md.
 //
-// Container: container.New(cfg) then c.Ratelimit(). Lazy per-service singleton, retry on error. See container/README.md.
+// Container: container.New(cfg) then c.RateLimit(). Lazy per-service singleton, retry on error. See container/README.md.
 //
 // Lifecycle: ctx is first arg for IO, never stored. Close releases resources; only resolved services close. Limiter exposes Close() error which also stops the idle-entry sweeper.
 //
