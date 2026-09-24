@@ -2,6 +2,7 @@ package memory
 
 import (
 	"context"
+	"errors"
 	"sync"
 	"testing"
 	"time"
@@ -90,7 +91,10 @@ func TestMemoryCompareAndDelete_missingOrExpiredFalse(t *testing.T) {
 	}
 
 	mustSet(t, c, "e", []byte("v"), 30*time.Millisecond)
-	time.Sleep(60 * time.Millisecond)
+	waitFor(t, 2*time.Second, func() bool {
+		_, err := c.Get(ctx, "e")
+		return errors.Is(err, cache.ErrNotFound)
+	}, "key expired")
 
 	if deleted, err := cas.CompareAndDelete(ctx, "e", []byte("v")); err != nil || deleted {
 		t.Errorf("CompareAndDelete(expired) = %v,%v want false,nil", deleted, err)
@@ -118,7 +122,10 @@ func TestMemoryCompareAndExtend_matchRenews(t *testing.T) {
 		t.Fatal("CompareAndExtend() = false, want true")
 	}
 
-	time.Sleep(80 * time.Millisecond)
+	// Wait past the original 60ms TTL, polling that the extended entry
+	// stays live the whole time.
+	start := time.Now()
+	waitFor(t, 2*time.Second, func() bool { return time.Since(start) > 80*time.Millisecond }, "past original TTL")
 
 	if _, err := c.Get(ctx, "k"); err != nil {
 		t.Errorf("Get() after extend error = %v, want retained", err)
@@ -142,7 +149,9 @@ func TestMemoryCompareAndExtend_nonPositiveTTLClearsExpiry(t *testing.T) {
 		t.Fatalf("CompareAndExtend(persist) = %v,%v want true,nil", extended, err)
 	}
 
-	time.Sleep(80 * time.Millisecond)
+	// Expiry cleared: wait past the original 50ms TTL and assert retention.
+	start := time.Now()
+	waitFor(t, 2*time.Second, func() bool { return time.Since(start) > 80*time.Millisecond }, "past original TTL")
 
 	if _, err := c.Get(ctx, "k"); err != nil {
 		t.Errorf("Get() after persist error = %v, want retained (expiry cleared)", err)
@@ -170,7 +179,10 @@ func TestMemoryCompareAndExtend_mismatchOrExpiredFalse(t *testing.T) {
 	}
 
 	mustSet(t, c, "e", []byte("v"), 30*time.Millisecond)
-	time.Sleep(60 * time.Millisecond)
+	waitFor(t, 2*time.Second, func() bool {
+		_, err := c.Get(ctx, "e")
+		return errors.Is(err, cache.ErrNotFound)
+	}, "key expired")
 
 	if extended, err := cas.CompareAndExtend(ctx, "e", []byte("v"), time.Minute); err != nil || extended {
 		t.Errorf("CompareAndExtend(expired) = %v,%v want false,nil", extended, err)

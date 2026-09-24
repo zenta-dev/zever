@@ -18,7 +18,7 @@ func (a Adapter) String() string {
 	}
 }
 
-// ParseAdapter parses an adapter name into an Adapter.
+// ParseAdapter parses adapter name into an Adapter.
 // Only exact lowercase names match; anything else fails.
 func ParseAdapter(s string) (Adapter, error) {
 	switch s {

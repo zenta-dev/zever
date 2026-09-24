@@ -9,9 +9,9 @@ import (
 
 // Options configures the AI backend.
 type Options struct {
-	APIKey  string        `json:"apikey" toml:"apikey" yaml:"apikey"`
+	APIKey  string        `json:"api_key" toml:"api_key" yaml:"api_key"`
 	Model   string        `json:"model" toml:"model" yaml:"model"`
-	BaseURL string        `json:"baseurl" toml:"baseurl" yaml:"baseurl"`
+	BaseURL string        `json:"base_url" toml:"base_url" yaml:"base_url"`
 	Timeout time.Duration `json:"timeout" toml:"timeout" yaml:"timeout"`
 }
 
@@ -37,7 +37,7 @@ func (o Options) Validate() error {
 func baseURLReason(err error) string {
 	switch {
 	case errors.Is(err, endpoint.ErrParse):
-		return "base_url must be a valid URL"
+		return "base_url must be a valid url"
 	case errors.Is(err, endpoint.ErrNoScheme):
 		return "base_url must include scheme"
 	case errors.Is(err, endpoint.ErrNoHost):

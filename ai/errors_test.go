@@ -74,6 +74,24 @@ func TestDuplicateAdapterError(t *testing.T) {
 	}
 }
 
+func TestDuplicateError_alias_compat(t *testing.T) {
+	t.Parallel()
+	err := &DuplicateAdapterError{Adapter: OpenAI}
+	if !errors.Is(err, ErrDuplicate) {
+		t.Fatalf("Is = false, want true for ErrDuplicate alias")
+	}
+	var target *DuplicateError
+	if !errors.As(err, &target) {
+		t.Fatalf("As failed for DuplicateError alias")
+	}
+	if target.Adapter != OpenAI {
+		t.Errorf("Adapter = %v, want %v", target.Adapter, OpenAI)
+	}
+	if !errors.Is(ErrDuplicateAdapter, ErrDuplicate) {
+		t.Errorf("alias ErrDuplicate does not match ErrDuplicateAdapter")
+	}
+}
+
 func TestUnknownAdapterError(t *testing.T) {
 	t.Parallel()
 	err := &UnknownAdapterError{Adapter: Adapter(123)}

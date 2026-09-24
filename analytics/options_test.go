@@ -20,11 +20,11 @@ func TestOptions_Validate_violations_table(t *testing.T) {
 		opts    Options
 		reasons []string
 	}{
-		{"negative bytes", Options{MaxPropertiesBytes: -1}, []string{"max properties bytes"}},
-		{"negative count", Options{MaxProperties: -1}, []string{"max properties must"}},
+		{"negative bytes", Options{MaxPropertiesBytes: -1}, []string{"max_properties_bytes"}},
+		{"negative count", Options{MaxProperties: -1}, []string{"max_properties must"}},
 		{"no scheme", Options{Endpoint: "example.com/track"}, []string{"scheme"}},
 		{"no host", Options{Endpoint: "https:///path"}, []string{"host"}},
-		{"garbage", Options{Endpoint: "http://[::1"}, []string{"valid URL"}},
+		{"garbage", Options{Endpoint: "http://[::1"}, []string{"valid url"}},
 	}
 	for _, tc := range cases {
 		t.Run(tc.name, func(t *testing.T) {
@@ -52,10 +52,10 @@ func TestOptions_Validate_multiple_joined(t *testing.T) {
 	if !errors.Is(err, ErrInvalidOptions) {
 		t.Fatalf("Validate err = %v, want ErrInvalidOptions", err)
 	}
-	if !strings.Contains(err.Error(), "max properties bytes") {
+	if !strings.Contains(err.Error(), "max_properties_bytes") {
 		t.Errorf("err %q missing bytes reason", err.Error())
 	}
-	if !strings.Contains(err.Error(), "max properties must") {
+	if !strings.Contains(err.Error(), "max_properties must") {
 		t.Errorf("err %q missing count reason", err.Error())
 	}
 }

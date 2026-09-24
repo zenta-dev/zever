@@ -45,7 +45,7 @@ func TestErrors_unwrap_carries_sentinel(t *testing.T) {
 		err  error
 		want error
 	}{
-		{name: "duplicate", err: &crypto.DuplicateError{Adapter: crypto.AdapterLocal}, want: crypto.ErrDuplicate},
+		{name: "duplicate", err: &crypto.DuplicateAdapterError{Adapter: crypto.AdapterLocal}, want: crypto.ErrDuplicate},
 		{name: "unknown", err: &crypto.UnknownAdapterError{Adapter: crypto.AdapterLocal}, want: crypto.ErrUnknownAdapter},
 		{name: "invalid_adapter", err: &crypto.InvalidAdapterError{Adapter: "x"}, want: crypto.ErrInvalidAdapter},
 		{name: "invalid_options", err: &crypto.InvalidOptionsError{Reason: "x"}, want: crypto.ErrInvalidOptions},
@@ -79,10 +79,10 @@ func TestErrors_typed_As(t *testing.T) {
 	})
 	t.Run("duplicate", func(t *testing.T) {
 		t.Parallel()
-		e := &crypto.DuplicateError{Adapter: crypto.AdapterLocal}
-		var de *crypto.DuplicateError
+		e := &crypto.DuplicateAdapterError{Adapter: crypto.AdapterLocal}
+		var de *crypto.DuplicateAdapterError
 		if !errors.As(e, &de) {
-			t.Fatalf("err type = %T, want *DuplicateError", e)
+			t.Fatalf("err type = %T, want *DuplicateAdapterError", e)
 		}
 		if de.Adapter != crypto.AdapterLocal {
 			t.Fatalf("Adapter = %v, want %v", de.Adapter, crypto.AdapterLocal)
@@ -129,9 +129,9 @@ func TestErrors_typed_As(t *testing.T) {
 
 func TestErrors_carried_fields(t *testing.T) {
 	t.Parallel()
-	de := &crypto.DuplicateError{Adapter: crypto.AdapterLocal}
+	de := &crypto.DuplicateAdapterError{Adapter: crypto.AdapterLocal}
 	if de.Adapter != crypto.AdapterLocal {
-		t.Fatalf("DuplicateError.Adapter = %v", de.Adapter)
+		t.Fatalf("DuplicateAdapterError.Adapter = %v", de.Adapter)
 	}
 	ue := &crypto.UnknownAdapterError{Adapter: crypto.Adapter(5)}
 	if ue.Adapter != crypto.Adapter(5) {

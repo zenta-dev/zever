@@ -513,7 +513,7 @@ func validateOptions(opts ai.Options) error {
 func baseURLReason(err error) string {
 	switch {
 	case errors.Is(err, endpoint.ErrParse):
-		return "base_url must be a valid URL"
+		return "base_url must be a valid url"
 	case errors.Is(err, endpoint.ErrNoScheme):
 		return "base_url must include scheme"
 	case errors.Is(err, endpoint.ErrNoHost):

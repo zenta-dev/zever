@@ -68,6 +68,24 @@ func TestErrorMessages(t *testing.T) {
 	}
 }
 
+func TestDuplicateAliases_compat(t *testing.T) {
+	t.Parallel()
+
+	err := &DuplicateAdapterError{Adapter: SQLite}
+	if !errors.Is(err, ErrDuplicate) {
+		t.Error("does not unwrap to ErrDuplicate alias")
+	}
+
+	var target *DuplicateError
+	if !errors.As(err, &target) {
+		t.Error("errors.As failed for DuplicateError alias")
+	}
+
+	if !errors.Is(ErrDuplicateAdapter, ErrDuplicate) {
+		t.Errorf("alias ErrDuplicate does not match ErrDuplicateAdapter")
+	}
+}
+
 func TestErrorUnwrap(t *testing.T) {
 	t.Parallel()
 

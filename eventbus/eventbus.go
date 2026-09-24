@@ -12,7 +12,7 @@ type Handler func(ctx context.Context, msg Message)
 
 // Pusher is the push-only transport core implemented by adapters.
 // Use Wrap (or Open, which wraps automatically) to upgrade a Pusher to a
-// full Eventbus with pull support.
+// full EventBus with pull support.
 type Pusher interface {
 	// Publish delivers payload with headers to all subscribers of topic.
 	Publish(
@@ -78,10 +78,15 @@ func Register(adapter Adapter, factory Factory) error {
 	return factories.Register(adapter, factory)
 }
 
-// Open creates an Eventbus for adapter using the registered Factory and opts.
+// Open creates an EventBus for adapter using the registered Factory and opts.
+// Validate is called before factory lookup so invalid options fail-closed.
 // The returned bus always supports the pull API: factory output is wrapped
 // unless it already carries pull support.
-func Open(adapter Adapter, opts Options) (Eventbus, error) {
+func Open(adapter Adapter, opts Options) (EventBus, error) {
+	if err := opts.Validate(); err != nil {
+		return nil, err
+	}
+
 	factory, err := factories.Lookup(adapter)
 	if err != nil {
 		return nil, err

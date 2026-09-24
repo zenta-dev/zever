@@ -31,8 +31,8 @@ func TestErrors_sentinel_messages(t *testing.T) {
 
 func TestErrors_typed_unwrap(t *testing.T) {
 	t.Parallel()
-	if !errors.Is(&DuplicateError{Adapter: Embed}, ErrDuplicate) {
-		t.Error("DuplicateError does not unwrap to ErrDuplicate")
+	if !errors.Is(&DuplicateAdapterError{Adapter: Embed}, ErrDuplicate) {
+		t.Error("DuplicateAdapterError does not unwrap to ErrDuplicate")
 	}
 	if !errors.Is(&UnknownAdapterError{Adapter: Embed}, ErrUnknownAdapter) {
 		t.Error("UnknownAdapterError does not unwrap to ErrUnknownAdapter")
@@ -53,8 +53,8 @@ func TestErrors_typed_unwrap(t *testing.T) {
 
 func TestErrors_carried_fields(t *testing.T) {
 	t.Parallel()
-	if de := (&DuplicateError{Adapter: Embed}); de.Adapter != Embed {
-		t.Errorf("DuplicateError adapter = %v", de.Adapter)
+	if de := (&DuplicateAdapterError{Adapter: Embed}); de.Adapter != Embed {
+		t.Errorf("DuplicateAdapterError adapter = %v", de.Adapter)
 	}
 	if ue := (&UnknownAdapterError{Adapter: Remote}); ue.Adapter != Remote {
 		t.Errorf("UnknownAdapterError adapter = %v", ue.Adapter)

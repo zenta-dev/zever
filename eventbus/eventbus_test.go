@@ -43,7 +43,7 @@ func TestRegister_nilFactory_returnsErrNilFactory(t *testing.T) {
 
 func TestRegister_duplicate_returnsDuplicateError(t *testing.T) {
 	a := freshAdapter()
-	ok := func(Options) (Eventbus, error) { return stubBus{}, nil }
+	ok := func(Options) (EventBus, error) { return stubBus{}, nil }
 	if err := Register(a, ok); err != nil {
 		t.Fatalf("first Register err = %v", err)
 	}
@@ -76,7 +76,7 @@ func TestOpen_unknownAdapter_returnsUnknownError(t *testing.T) {
 func TestOpen_factoryError_wrappedWithAdapter(t *testing.T) {
 	a := freshAdapter()
 	sentinel := errors.New("boom")
-	if err := Register(a, func(Options) (Eventbus, error) { return nil, sentinel }); err != nil {
+	if err := Register(a, func(Options) (EventBus, error) { return nil, sentinel }); err != nil {
 		t.Fatalf("Register err = %v", err)
 	}
 	_, err := Open(a, Options{})
@@ -90,7 +90,7 @@ func TestOpen_factoryError_wrappedWithAdapter(t *testing.T) {
 
 func TestOpen_success_returnsBus(t *testing.T) {
 	a := freshAdapter()
-	if err := Register(a, func(Options) (Eventbus, error) { return stubBus{}, nil }); err != nil {
+	if err := Register(a, func(Options) (EventBus, error) { return stubBus{}, nil }); err != nil {
 		t.Fatalf("Register err = %v", err)
 	}
 	b, err := Open(a, Options{})

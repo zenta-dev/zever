@@ -18,17 +18,19 @@ type RedisOptions struct {
 	// ConnectOptions holds the shared Redis connection settings.
 	zredis.ConnectOptions
 	// Prefix is the key prefix for Redis idempotency data.
-	Prefix string
+	Prefix string `json:"prefix" toml:"prefix" yaml:"prefix"`
 }
 
 // Options configures idempotency store construction.
 type Options struct {
 	// TTL is the default reservation lifetime. Zero means DefaultTTL.
-	TTL time.Duration
+	TTL time.Duration `json:"ttl" toml:"ttl" yaml:"ttl"`
 	// Redis holds Redis-specific connection configuration.
-	Redis RedisOptions
+	Redis RedisOptions `json:"redis" toml:"redis" yaml:"redis"`
 }
 
+// Validate checks options for consistency, joining all violations.
+//
 // Validate checks options for consistency.
 // Zero TTL means DefaultTTL and is valid; only negative TTL fails.
 func (o Options) Validate() error {

@@ -16,6 +16,7 @@ import (
 )
 
 // EntryID wraps cron.EntryID identifying a registered schedule.
+// It is a uint64 scheduler handle, not a uuid BatchID.
 type EntryID uint64
 
 // Scheduler fires registered jobs on cron specs using Dispatcher.

@@ -17,14 +17,14 @@ const DefaultTimeout = 60 * time.Second
 // Options configures the Ollama adapter.
 type Options struct {
 	// Addr is the Ollama server base URL. Empty means DefaultAddr.
-	Addr string
+	Addr string `json:"addr" toml:"addr" yaml:"addr"`
 	// Model is the default model when callers pass an empty model.
-	Model string
+	Model string `json:"model" toml:"model" yaml:"model"`
 	// Timeout bounds each HTTP exchange. Non-positive means DefaultTimeout.
-	Timeout time.Duration
+	Timeout time.Duration `json:"timeout" toml:"timeout" yaml:"timeout"`
 	// Transport overrides the HTTP round tripper. Nil means http.DefaultTransport.
 	// Tests use a hand-fake transport; production leaves it nil.
-	Transport http.RoundTripper
+	Transport http.RoundTripper `json:"-" toml:"-" yaml:"-"`
 }
 
 // Validate checks Options for consistency, joining all violations.

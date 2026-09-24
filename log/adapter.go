@@ -26,9 +26,10 @@ func (a Adapter) String() string {
 	}
 }
 
-// ParseAdapter converts a canonical adapter name into an Adapter.
-func ParseAdapter(adapter string) (Adapter, error) {
-	switch adapter {
+// ParseAdapter parses adapter name into an Adapter.
+// Only exact lowercase names match; anything else fails.
+func ParseAdapter(s string) (Adapter, error) {
+	switch s {
 	case "noop":
 		return Noop, nil
 	case "zerolog":
@@ -36,6 +37,6 @@ func ParseAdapter(adapter string) (Adapter, error) {
 	case "slog":
 		return Slog, nil
 	default:
-		return Noop, &InvalidAdapterError{Adapter: adapter}
+		return Noop, &InvalidAdapterError{Adapter: s}
 	}
 }

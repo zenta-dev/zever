@@ -26,11 +26,11 @@ func TestOptions_Validate_violations_table(t *testing.T) {
 		{"negative quality", Options{Quality: -1}, []string{"quality"}},
 		{"quality too high", Options{Quality: 101}, []string{"quality"}},
 		{"negative dpi", Options{DPI: -1}, []string{"dpi"}},
-		{"negative output bytes", Options{MaxOutputBytes: -1}, []string{"max output bytes"}},
-		{"negative runs", Options{LatexRuns: -1}, []string{"latex runs"}},
+		{"negative output bytes", Options{MaxOutputBytes: -1}, []string{"max_output_bytes"}},
+		{"negative runs", Options{LatexRuns: -1}, []string{"latex_runs"}},
 		{"no scheme", Options{Endpoint: "example.com/render"}, []string{"scheme"}},
 		{"no host", Options{Endpoint: "https:///path"}, []string{"host"}},
-		{"garbage", Options{Endpoint: "http://[::1"}, []string{"valid URL"}},
+		{"garbage", Options{Endpoint: "http://[::1"}, []string{"valid url"}},
 	}
 	for _, tc := range cases {
 		t.Run(tc.name, func(t *testing.T) {

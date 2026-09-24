@@ -209,8 +209,8 @@ func TestMemoryTTL_expiry(t *testing.T) {
 		t.Fatalf("Set() error = %v", err)
 	}
 
-	time.Sleep(60 * time.Millisecond)
-
+	// keep has no TTL: expiry of "k" above already proves time passed,
+	// so it must still be present without any further wait.
 	if _, err := c.Get(ctx, "keep"); err != nil {
 		t.Errorf("Get(keep) error = %v, want retained (no ttl)", err)
 	}
@@ -370,7 +370,10 @@ func TestMemoryIncrement_expiredKey_restartsAtOne(t *testing.T) {
 		t.Fatalf("Set() error = %v", err)
 	}
 
-	time.Sleep(60 * time.Millisecond)
+	waitFor(t, 2*time.Second, func() bool {
+		_, err := c.Get(ctx, "n")
+		return errors.Is(err, cache.ErrNotFound)
+	}, "re-set key expired")
 
 	if err := c.Increment(ctx, "n"); err != nil {
 		t.Fatalf("Increment() error = %v", err)
@@ -405,7 +408,10 @@ func TestMemorySweep_removesOnlyExpired(t *testing.T) {
 		t.Fatalf("Set() error = %v", err)
 	}
 
-	time.Sleep(60 * time.Millisecond)
+	// Wait past the 30ms TTL without touching "old" (Get/Exists would
+	// lazily purge it and hide the sweep path), then sweep explicitly.
+	start := time.Now()
+	waitFor(t, 2*time.Second, func() bool { return time.Since(start) > 50*time.Millisecond }, "past TTL")
 	a.sweep()
 
 	if _, err := c.Get(ctx, "old"); !errors.Is(err, cache.ErrNotFound) {

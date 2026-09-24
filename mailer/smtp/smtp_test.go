@@ -74,7 +74,10 @@ func (s *fakeSMTP) handle(c net.Conn) {
 	defer func() { _ = c.Close() }()
 	_ = c.SetDeadline(time.Now().Add(20 * time.Second))
 	if s.cfg.hang {
-		time.Sleep(20 * time.Second)
+		// Hang semantics without fixed sleep: block until client disconnects
+		// (returns on close/deadline), never responding.
+		r := bufio.NewReader(c)
+		_, _ = r.ReadString('\n')
 		return
 	}
 	r := bufio.NewReader(c)

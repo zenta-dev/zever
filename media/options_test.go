@@ -22,15 +22,15 @@ func TestOptions_Validate_violations_table(t *testing.T) {
 		opts    Options
 		reasons []string
 	}{
-		{"negative download bytes", Options{MaxDownloadBytes: -1}, []string{"max download bytes"}},
-		{"negative pixels", Options{MaxPixels: -1}, []string{"max pixels"}},
-		{"negative derived ttl", Options{DerivedTTL: -time.Second}, []string{"derived ttl"}},
-		{"negative max duration", Options{MaxDuration: -time.Second}, []string{"max duration"}},
-		{"negative presign ttl", Options{PresignTTL: -time.Second}, []string{"presign ttl"}},
-		{"presign ttl 8d", Options{PresignTTL: 8 * 24 * time.Hour}, []string{"presign ttl"}},
+		{"negative download bytes", Options{MaxDownloadBytes: -1}, []string{"max_download_bytes"}},
+		{"negative pixels", Options{MaxPixels: -1}, []string{"max_pixels"}},
+		{"negative derived_ttl", Options{DerivedTTL: -time.Second}, []string{"derived_ttl"}},
+		{"negative max_duration", Options{MaxDuration: -time.Second}, []string{"max_duration"}},
+		{"negative presign_ttl", Options{PresignTTL: -time.Second}, []string{"presign_ttl"}},
+		{"presign_ttl 8d", Options{PresignTTL: 8 * 24 * time.Hour}, []string{"presign_ttl"}},
 		{"no scheme", Options{Endpoint: "example.com/x"}, []string{"scheme"}},
 		{"no host", Options{Endpoint: "https:///path"}, []string{"host"}},
-		{"garbage", Options{Endpoint: "http://[::1"}, []string{"valid URL"}},
+		{"garbage", Options{Endpoint: "http://[::1"}, []string{"valid url"}},
 	}
 	for _, tc := range cases {
 		t.Run(tc.name, func(t *testing.T) {
@@ -63,12 +63,12 @@ func TestOptions_Validate_multiple_joined(t *testing.T) {
 		t.Fatalf("Validate err = %v, want ErrInvalidOptions", err)
 	}
 
-	if !strings.Contains(err.Error(), "max download bytes") {
+	if !strings.Contains(err.Error(), "max_download_bytes") {
 		t.Errorf("err %q missing download bytes reason", err.Error())
 	}
 
-	if !strings.Contains(err.Error(), "max pixels") {
-		t.Errorf("err %q missing max pixels reason", err.Error())
+	if !strings.Contains(err.Error(), "max_pixels") {
+		t.Errorf("err %q missing max_pixels reason", err.Error())
 	}
 
 	if !strings.Contains(err.Error(), "scheme") {
