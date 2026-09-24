@@ -201,7 +201,7 @@ func makeRoutesExecFn(files []string) tui.ExecFunc {
 			files = discoverZenFiles()
 		}
 		var buf bytes.Buffer
-		err := runRoutesWith(RoutesConfig{Files: files, Out: &buf})
+		err := runRoutesWith(RoutesConfig{Files: files, Out: &buf}) //nolint:contextcheck // CLI entrypoint helpers take no ctx by convention; threading ctx through the CLI layer is out of scope
 		return buf.String(), err
 	}
 }
@@ -282,7 +282,7 @@ func makeExplainExecFn(op string, files []string) tui.ExecFunc {
 			files = discoverZenFiles()
 		}
 		var buf bytes.Buffer
-		err := runExplainWith(ExplainConfig{OpPath: op, Files: files, Out: &buf})
+		err := runExplainWith(ExplainConfig{OpPath: op, Files: files, Out: &buf}) //nolint:contextcheck // CLI entrypoint helpers take no ctx by convention; threading ctx through the CLI layer is out of scope
 		return buf.String(), err
 	}
 }
@@ -364,7 +364,7 @@ func makeBoundariesExecFn(files []string) tui.ExecFunc {
 			files = discoverZenFiles()
 		}
 		var buf bytes.Buffer
-		err := runCheckBoundariesWith(BoundariesConfig{Files: files, Out: &buf})
+		err := runCheckBoundariesWith(BoundariesConfig{Files: files, Out: &buf}) //nolint:contextcheck // CLI entrypoint helpers take no ctx by convention; threading ctx through the CLI layer is out of scope
 		return buf.String(), err
 	}
 }
@@ -444,7 +444,7 @@ func makeGraphExecFn(files []string) tui.ExecFunc {
 			files = discoverZenFiles()
 		}
 		var buf bytes.Buffer
-		err := runGraphWith(GraphConfig{Files: files, Out: &buf})
+		err := runGraphWith(GraphConfig{Files: files, Out: &buf}) //nolint:contextcheck // CLI entrypoint helpers take no ctx by convention; threading ctx through the CLI layer is out of scope
 		return buf.String(), err
 	}
 }

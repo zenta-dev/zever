@@ -27,6 +27,7 @@ import (
 	"context"
 	"fmt"
 
+	"github.com/zenta-dev/zever/internal/dsl/backend"
 	"github.com/zenta-dev/zever/internal/dsl/backend/proto"
 	"github.com/zenta-dev/zever/internal/dsl/ir"
 )
@@ -36,6 +37,8 @@ import (
 type Backend struct {
 	proto *proto.Backend
 }
+
+var _ backend.ContextBackend = (*Backend)(nil)
 
 // New returns a new protogogen Backend that sources its ".proto" text from
 // a bare proto.New() -- see NewWithAnnotationsGoPackageRoot's doc comment
@@ -65,20 +68,33 @@ func (b *Backend) Name() string {
 	return "protogogen"
 }
 
-// Generate renders schema to ".proto" text via the proto backend, compiles
-// that text into real descriptors, and generates real "*.pb.go" and
-// "*_grpc.pb.go" Go source for every proto file the proto backend produced
-// (one per ir.Module, plus the shared zever/annotations.proto). Output paths
-// mirror their source ".proto" path (protoc's "paths=source_relative"
-// convention), matching the per-module directory layout the proto backend
-// already established.
+// Generate is GenerateContext with context.Background() -- see
+// GenerateContext's doc comment for why GenerateContext should be
+// preferred when the caller has a real deadline/cancellation source.
 func (b *Backend) Generate(schema *ir.Schema) (map[string][]byte, error) {
+	return b.GenerateContext(context.Background(), schema)
+}
+
+// GenerateContext renders schema to ".proto" text via the proto backend,
+// compiles that text into real descriptors, and generates real "*.pb.go"
+// and "*_grpc.pb.go" Go source for every proto file the proto backend
+// produced (one per ir.Module, plus the shared zever/annotations.proto).
+// Output paths mirror their source ".proto" path (protoc's
+// "paths=source_relative" convention), matching the per-module directory
+// layout the proto backend already established.
+//
+// protogogen is the one backend that does real I/O (grpcgen.go shells out
+// to `go tool protoc-gen-go-grpc`), so it implements backend.ContextBackend:
+// ctx bounds/cancels that subprocess call, unlike Generate's fixed
+// context.Background(). Prefer compile.CompileContext over compile.Compile
+// when driving this backend from a caller that has a real deadline.
+func (b *Backend) GenerateContext(ctx context.Context, schema *ir.Schema) (map[string][]byte, error) {
 	protoFiles, err := b.proto.Generate(schema)
 	if err != nil {
 		return nil, fmt.Errorf("[protogogen] render proto: %w", err)
 	}
 
-	req, err := buildCodeGeneratorRequest(protoFiles)
+	req, err := buildCodeGeneratorRequest(protoFiles) //nolint:contextcheck // pure request constructor: takes no ctx and performs no I/O (generateGRPCGo below already receives ctx)
 	if err != nil {
 		return nil, err
 	}
@@ -88,7 +104,7 @@ func (b *Backend) Generate(schema *ir.Schema) (map[string][]byte, error) {
 		return nil, err
 	}
 
-	grpcOut, err := generateGRPCGo(context.Background(), req)
+	grpcOut, err := generateGRPCGo(ctx, req)
 	if err != nil {
 		return nil, err
 	}
