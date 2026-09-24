@@ -296,3 +296,41 @@ func TestGenerateTableNameCollision(t *testing.T) {
 		t.Fatalf("Generate: want table-name collision error, got nil")
 	}
 }
+
+// TestGenerateRejectsNonIdentifierSchemaName covers the fix for renderTable
+// splicing an @schema(...) value unquoted into "schema = schema.<name>":
+// resolveSchemaAttribute accepts any string literal, not just identifiers,
+// so a value containing HCL-structural characters (or even just a space)
+// previously produced malformed or structurally-injected HCL with no
+// diagnostic. It must now be rejected with a clear error instead.
+func TestGenerateRejectsNonIdentifierSchemaName(t *testing.T) {
+	schema := &ir.Schema{Modules: []*ir.Module{{
+		Entities: []*ir.Entity{
+			{Name: "Widget", Schema: `evil") }\ntable "x" {`, Fields: []*ir.Field{{Name: "id", Primary: true}}},
+		},
+	}}}
+
+	_, err := New().Generate(schema)
+	if err == nil {
+		t.Fatal("Generate: want an error for a non-identifier @schema value, got nil")
+	}
+
+	if !strings.Contains(err.Error(), "not a valid HCL identifier") {
+		t.Fatalf("Generate err = %v, want it to mention the identifier requirement", err)
+	}
+}
+
+// TestGenerateRejectsSchemaNameWithSpace covers the same fix for the
+// simplest non-identifier case: a schema name that is otherwise
+// unremarkable text, just not identifier-shaped.
+func TestGenerateRejectsSchemaNameWithSpace(t *testing.T) {
+	schema := &ir.Schema{Modules: []*ir.Module{{
+		Entities: []*ir.Entity{
+			{Name: "Widget", Schema: "my schema", Fields: []*ir.Field{{Name: "id", Primary: true}}},
+		},
+	}}}
+
+	if _, err := New().Generate(schema); err == nil {
+		t.Fatal("Generate: want an error for a space-containing @schema value, got nil")
+	}
+}

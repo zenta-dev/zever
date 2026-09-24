@@ -73,7 +73,7 @@
           "content": {
             "application/json": {
               "schema": {
-                "$ref": "#/components/schemas/CheckoutRequest"
+                "$ref": "#/components/schemas/ShopServiceCheckoutRequest"
               }
             }
           }
@@ -202,7 +202,7 @@
           "content": {
             "application/json": {
               "schema": {
-                "$ref": "#/components/schemas/CreateProductRequest"
+                "$ref": "#/components/schemas/ShopServiceCreateProductRequest"
               }
             }
           }
@@ -321,7 +321,7 @@
           "content": {
             "application/json": {
               "schema": {
-                "$ref": "#/components/schemas/PatchProductRequest"
+                "$ref": "#/components/schemas/ShopServicePatchProductRequest"
               }
             }
           }
@@ -370,7 +370,7 @@
           "content": {
             "application/json": {
               "schema": {
-                "$ref": "#/components/schemas/UpdateProductRequest"
+                "$ref": "#/components/schemas/ShopServiceUpdateProductRequest"
               }
             }
           }
@@ -430,8 +430,12 @@
       "CheckoutRequest": {
         "type": "object",
         "properties": {
-          "req": {
-            "$ref": "#/components/schemas/CheckoutRequest"
+          "gift_note": {
+            "type": "string",
+            "maxLength": 500
+          },
+          "order": {
+            "$ref": "#/components/schemas/CreateOrderRequest"
           }
         }
       },
@@ -451,21 +455,6 @@
           "user_id": {
             "type": "string",
             "format": "uuid"
-          }
-        }
-      },
-      "CreateProductRequest": {
-        "type": "object",
-        "properties": {
-          "name": {
-            "type": "string",
-            "minLength": 1,
-            "maxLength": 200
-          },
-          "price_cents": {
-            "type": "integer",
-            "format": "int64",
-            "minimum": 0
           }
         }
       },
@@ -559,16 +548,6 @@
           "shipped",
           "cancelled"
         ]
-      },
-      "PatchProductRequest": {
-        "type": "object",
-        "properties": {
-          "stock": {
-            "type": "integer",
-            "format": "int64",
-            "minimum": 0
-          }
-        }
       },
       "Product": {
         "type": "object",
@@ -685,6 +664,49 @@
           "member"
         ]
       },
+      "ShopServiceCheckoutRequest": {
+        "type": "object",
+        "properties": {
+          "req": {
+            "$ref": "#/components/schemas/CheckoutRequest"
+          }
+        }
+      },
+      "ShopServiceCreateProductRequest": {
+        "type": "object",
+        "properties": {
+          "name": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 200
+          },
+          "price_cents": {
+            "type": "integer",
+            "format": "int64",
+            "minimum": 0
+          }
+        }
+      },
+      "ShopServicePatchProductRequest": {
+        "type": "object",
+        "properties": {
+          "stock": {
+            "type": "integer",
+            "format": "int64",
+            "minimum": 0
+          }
+        }
+      },
+      "ShopServiceUpdateProductRequest": {
+        "type": "object",
+        "properties": {
+          "name": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 200
+          }
+        }
+      },
       "Tag": {
         "type": "object",
         "properties": {
@@ -705,16 +727,6 @@
         "required": [
           "id"
         ]
-      },
-      "UpdateProductRequest": {
-        "type": "object",
-        "properties": {
-          "name": {
-            "type": "string",
-            "minLength": 1,
-            "maxLength": 200
-          }
-        }
       },
       "User": {
         "type": "object",

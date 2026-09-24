@@ -416,16 +416,6 @@ func TestApplyValidation_table(t *testing.T) {
 			},
 		},
 		{
-			name:  "max_len non-numeric",
-			rules: []ir.Validation{{Kind: "max_len", Args: map[string]any{"value": "many"}}},
-			check: func(t *testing.T, s *schemaObject) {
-				t.Helper()
-				if s.MaxLength == nil || *s.MaxLength != 0 {
-					t.Fatalf("MaxLength = %v, want 0 (defensive default)", s.MaxLength)
-				}
-			},
-		},
-		{
 			name:  "gt int64",
 			rules: []ir.Validation{{Kind: "gt", Args: map[string]any{"value": int64(2)}}},
 			check: func(t *testing.T, s *schemaObject) {
@@ -442,16 +432,6 @@ func TestApplyValidation_table(t *testing.T) {
 				t.Helper()
 				if s.Minimum == nil || *s.Minimum != 1.5 || s.ExclusiveMinimum {
 					t.Fatalf("gte schema = %+v, want minimum=1.5 inclusive", s)
-				}
-			},
-		},
-		{
-			name:  "lt string default",
-			rules: []ir.Validation{{Kind: "lt", Args: map[string]any{"value": "x"}}},
-			check: func(t *testing.T, s *schemaObject) {
-				t.Helper()
-				if s.Maximum == nil || *s.Maximum != 0 || !s.ExclusiveMaximum {
-					t.Fatalf("lt schema = %+v, want maximum=0 exclusive", s)
 				}
 			},
 		},
@@ -474,6 +454,29 @@ func TestApplyValidation_table(t *testing.T) {
 			s := &schemaObject{Type: "string"}
 			applyValidation(s, tt.rules)
 			tt.check(t, s)
+		})
+	}
+}
+
+// TestApplyValidation_nonNumericPanics covers the fix for max_len/lt (and
+// every other numeric @validate kind) silently defaulting to a 0 bound when
+// given a non-numeric Args["value"] -- a resolver-invariant violation must
+// now panic instead of emitting a bogus minLength:0/maximum:0 constraint
+// into generated OpenAPI with no diagnostic.
+func TestApplyValidation_nonNumericPanics(t *testing.T) {
+	t.Parallel()
+
+	for _, kind := range []string{"min_len", "max_len", "gt", "gte", "lt", "lte"} {
+		t.Run(kind, func(t *testing.T) {
+			t.Parallel()
+			defer func() {
+				if recover() == nil {
+					t.Fatalf("applyValidation(%s) with a string value did not panic", kind)
+				}
+			}()
+
+			s := &schemaObject{Type: "string"}
+			applyValidation(s, []ir.Validation{{Kind: kind, Args: map[string]any{"value": "not-numeric"}}})
 		})
 	}
 }
@@ -503,56 +506,58 @@ func TestOpenAPIFormatName_table(t *testing.T) {
 	}
 }
 
-// TestToInt64_table covers int64, float64, and the defensive default.
-func TestToInt64_table(t *testing.T) {
+// TestToNumber_table covers toInt64/toFloat64 conversion, and that an
+// unexpected dynamic type panics instead of silently emitting a bogus 0
+// constraint into generated OpenAPI (a resolver-invariant violation must
+// fail loudly, matching gogen's numericLiteral).
+func TestToNumber_table(t *testing.T) {
 	t.Parallel()
 
-	tests := []struct {
-		name  string
-		value any
-		want  int64
-	}{
-		{name: "int64", value: int64(7), want: 7},
-		{name: "float64", value: float64(7.9), want: 7},
-		{name: "other", value: "7", want: 0},
-		{name: "nil", value: nil, want: 0},
-	}
+	t.Run("conversions", func(t *testing.T) {
+		t.Parallel()
 
-	for _, tt := range tests {
-		t.Run(tt.name, func(t *testing.T) {
-			t.Parallel()
+		if got := toInt64(int64(7)); got != 7 {
+			t.Fatalf("toInt64(int64(7)) = %d, want 7", got)
+		}
 
-			if got := toInt64(tt.value); got != tt.want {
-				t.Fatalf("toInt64(%v) = %d, want %d", tt.value, got, tt.want)
-			}
-		})
-	}
-}
+		if got := toInt64(float64(7.9)); got != 7 {
+			t.Fatalf("toInt64(float64(7.9)) = %d, want 7", got)
+		}
 
-// TestToFloat64_table covers int64, float64, and the defensive default.
-func TestToFloat64_table(t *testing.T) {
-	t.Parallel()
+		if got := toFloat64(int64(7)); got != 7 {
+			t.Fatalf("toFloat64(int64(7)) = %v, want 7", got)
+		}
 
-	tests := []struct {
-		name  string
-		value any
-		want  float64
-	}{
-		{name: "int64", value: int64(7), want: 7},
-		{name: "float64", value: float64(7.5), want: 7.5},
-		{name: "other", value: "7", want: 0},
-		{name: "nil", value: nil, want: 0},
-	}
+		if got := toFloat64(float64(7.5)); got != 7.5 {
+			t.Fatalf("toFloat64(float64(7.5)) = %v, want 7.5", got)
+		}
+	})
 
-	for _, tt := range tests {
-		t.Run(tt.name, func(t *testing.T) {
-			t.Parallel()
+	t.Run("unexpected panics", func(t *testing.T) {
+		t.Parallel()
 
-			if got := toFloat64(tt.value); got != tt.want {
-				t.Fatalf("toFloat64(%v) = %v, want %v", tt.value, got, tt.want)
-			}
-		})
-	}
+		cases := []struct {
+			name string
+			fn   func()
+		}{
+			{"toInt64 string", func() { toInt64("7") }},
+			{"toInt64 nil", func() { toInt64(nil) }},
+			{"toFloat64 string", func() { toFloat64("7") }},
+			{"toFloat64 nil", func() { toFloat64(nil) }},
+		}
+
+		for _, tc := range cases {
+			t.Run(tc.name, func(t *testing.T) {
+				t.Parallel()
+				defer func() {
+					if recover() == nil {
+						t.Fatalf("%s did not panic on unexpected type", tc.name)
+					}
+				}()
+				tc.fn()
+			})
+		}
+	})
 }
 
 // TestScalarOpenAPI_invalid proves the trailing defensive return for values
