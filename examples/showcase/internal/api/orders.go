@@ -1,7 +1,9 @@
 package api
 
 import (
+	"context"
 	"encoding/json"
+	"errors"
 	"net/http"
 	"strings"
 	"time"
@@ -14,6 +16,14 @@ import (
 	genshop "github.com/zenta-dev/zever/examples/showcase/generated/gogen/shop"
 	pb "github.com/zenta-dev/zever/examples/showcase/generated/protogogen/shop"
 )
+
+// errInsufficientStock signals a stock guard failure inside the checkout
+// transaction (see handleCheckout): the UPDATE's own `WHERE stock >= ?`
+// clause is the actual race guard (RowsAffected == 0 means another
+// concurrent checkout already consumed the stock between our read and our
+// write); this sentinel just carries that outcome back out of db.WithTx's
+// fn so the HTTP handler can map it to 409 instead of 500.
+var errInsufficientStock = errors.New("insufficient stock")
 
 type checkoutItem struct {
 	ProductID string `json:"product_id"`
@@ -84,25 +94,53 @@ func (a *API) handleCheckout(w http.ResponseWriter, req *http.Request) {
 	orderID := uuid.NewString()
 	now := time.Now().UTC().Format(time.RFC3339Nano)
 	note := strings.TrimSpace(in.GiftNote)
-	if _, err := a.DB.Exec(ctx,
-		`INSERT INTO orders (id, user_id, total_cents, status, priority, note, created_at) VALUES (?, ?, ?, 'pending', 'low', ?, ?)`,
-		orderID, sub, total, nullIfEmpty(note), now,
-	); err != nil {
+
+	// The whole order is one atomic unit: order + every line item + every
+	// stock decrement commit together or not at all. The stock decrement's
+	// own `WHERE stock >= ?` guard (checked via RowsAffected, not the
+	// earlier read) is what actually closes the race: two concurrent
+	// checkouts for the same product can both pass the informational read
+	// above, but only one of their guarded UPDATEs can succeed once the
+	// other has committed its decrement first.
+	err := db.WithTx(ctx, a.DB, nil, func(txCtx context.Context, tx db.Tx) error {
+		if _, err := tx.Exec(txCtx,
+			`INSERT INTO orders (id, user_id, total_cents, status, priority, note, created_at) VALUES (?, ?, ?, 'pending', 'low', ?, ?)`,
+			orderID, sub, total, nullIfEmpty(note), now,
+		); err != nil {
+			return err
+		}
+
+		for _, l := range lines {
+			if _, err := tx.Exec(txCtx,
+				`INSERT INTO order_items (id, order_id, product_id, quantity, price_cents) VALUES (?, ?, ?, ?, ?)`,
+				uuid.NewString(), orderID, l.productID, l.quantity, l.price,
+			); err != nil {
+				return err
+			}
+
+			affected, err := tx.Exec(txCtx,
+				`UPDATE products SET stock = stock - ? WHERE id = ? AND stock >= ?`,
+				l.quantity, l.productID, l.quantity,
+			)
+			if err != nil {
+				return err
+			}
+
+			if affected == 0 {
+				return errInsufficientStock
+			}
+		}
+
+		return nil
+	})
+
+	switch {
+	case errors.Is(err, errInsufficientStock):
+		writeError(w, http.StatusConflict, "insufficient stock")
+		return
+	case err != nil:
 		writeError(w, http.StatusInternalServerError, "create failed")
 		return
-	}
-	for _, l := range lines {
-		if _, err := a.DB.Exec(ctx,
-			`INSERT INTO order_items (id, order_id, product_id, quantity, price_cents) VALUES (?, ?, ?, ?, ?)`,
-			uuid.NewString(), orderID, l.productID, l.quantity, l.price,
-		); err != nil {
-			writeError(w, http.StatusInternalServerError, "create failed")
-			return
-		}
-		if _, err := a.DB.Exec(ctx, `UPDATE products SET stock = stock - ? WHERE id = ?`, l.quantity, l.productID); err != nil {
-			writeError(w, http.StatusInternalServerError, "stock update failed")
-			return
-		}
 	}
 
 	if a.Queue != nil {

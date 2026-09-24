@@ -274,7 +274,7 @@ func (a *API) handleListBookings(w http.ResponseWriter, req *http.Request) {
 		writeError(w, http.StatusInternalServerError, "list failed")
 		return
 	}
-	defer func() { _ = rows.Close }()
+	defer func() { _ = rows.Close() }()
 	out := []Booking{}
 	for rows.Next() {
 		var b Booking
@@ -348,7 +348,7 @@ func (a *API) handleCancelBooking(w http.ResponseWriter, req *http.Request) {
 			var amt int64
 			if prows.Next() {
 				if serr := prows.Scan(&pid, &amt); serr == nil && pid != "" && amt > 0 {
-					_ = a.Payment.Refund(ctx, pid, amt)
+					_ = a.Payment.Refund(ctx, pid, amt, "")
 				}
 			}
 			_ = prows.Close()
