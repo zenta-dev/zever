@@ -380,7 +380,7 @@ func TestPreloadEmptyParentsSkipsChildQuery(t *testing.T) {
 // TestPreloadErrorPaths proves parent-query and child-query failures
 // surface instead of partial results.
 func TestPreloadErrorPaths(t *testing.T) {
-	ctx := context.Background()
+	ctx := t.Context()
 	boom := errors.New("boom")
 
 	parents := From(preloadAuthors)

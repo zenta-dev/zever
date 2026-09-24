@@ -262,12 +262,12 @@ func (t *releaseFailTx) Exec(ctx context.Context, query string, args ...any) (in
 // TestNextSavepointNameIsPerDepth proves distinct nesting depths get
 // distinct savepoint names.
 func TestNextSavepointNameIsPerDepth(t *testing.T) {
-	name1, depth1 := nextSavepointName(context.Background())
+	name1, depth1 := nextSavepointName(t.Context())
 	if name1 != "sp_1" || depth1 != 1 {
 		t.Fatalf("nextSavepointName(no depth) = (%q, %d), want (sp_1, 1)", name1, depth1)
 	}
 
-	ctxDepth1 := context.WithValue(context.Background(), spDepthKey{}, depth1)
+	ctxDepth1 := context.WithValue(t.Context(), spDepthKey{}, depth1)
 
 	name2, depth2 := nextSavepointName(ctxDepth1)
 	if name2 != "sp_2" || depth2 != 2 {

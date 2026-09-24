@@ -20,7 +20,7 @@ var joinOrderNote = NewNullableColumn[joinOrder, string]("join_orders", "note")
 func newNullsJoinDB(t *testing.T) (context.Context, db.DB) {
 	t.Helper()
 
-	ctx := context.Background()
+	ctx := t.Context()
 
 	conn := openORMTestDB(ctx, t)
 

@@ -1,7 +1,6 @@
 package orm
 
 import (
-	"context"
 	"errors"
 	"testing"
 
@@ -56,7 +55,7 @@ func TestLockingCapabilityTruthTable(t *testing.T) {
 // Postgres must pass the gate and (with mockExec's empty result set) return
 // no rows rather than an error.
 func TestLockingCapabilityGate(t *testing.T) {
-	ctx := context.Background()
+	ctx := t.Context()
 
 	for _, tc := range lockingForms {
 		for _, d := range []string{"sqlite", "mock-nocap"} {

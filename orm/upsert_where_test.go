@@ -76,7 +76,7 @@ func partialTargetWhere() Predicate[partialWidget] {
 func newPartialUpsertDB(t *testing.T) (context.Context, db.DB) {
 	t.Helper()
 
-	ctx := context.Background()
+	ctx := t.Context()
 
 	conn := openORMTestDB(ctx, t)
 
@@ -140,7 +140,7 @@ func TestUpsertWhereCapabilityTruthTable(t *testing.T) {
 // it fails with a typed dialect.ErrUnsupportedByDialect, for
 // both the target predicate and the update predicate.
 func TestUpsertWhereCapabilityGate(t *testing.T) {
-	ctx := context.Background()
+	ctx := t.Context()
 
 	targeted := InsertInto(partialWidgets).
 		Values(Set(pwID, "w1"), Set(pwName, "Alpha"), Set(pwQty, int64(10)), Set(pwActive, int64(1))).
@@ -304,7 +304,7 @@ func TestUpsertWherePostgresPlaceholders(t *testing.T) {
 		Where(pwActive.Eq(int64(1))).
 		DoUpdate(Set(pwName, "Beta")).
 		Where(pwQty.Lt(int64(1000))).
-		Exec(context.Background(), captured)
+		Exec(t.Context(), captured)
 	if err != nil {
 		t.Fatalf("Exec: %v", err)
 	}
@@ -327,7 +327,7 @@ func TestUpsertWhereInsertSelectPostgresPlaceholders(t *testing.T) {
 		DoUpdate(Set(pwName, "Merged")).
 		Where(pwQty.Lt(int64(1000))).
 		Select(From(partialSrc).Where(pwQty.Gt(int64(100)))).
-		Exec(context.Background(), captured)
+		Exec(t.Context(), captured)
 	if err != nil {
 		t.Fatalf("Exec: %v", err)
 	}

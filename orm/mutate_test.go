@@ -1,7 +1,6 @@
 package orm
 
 import (
-	"context"
 	"errors"
 	"testing"
 
@@ -219,15 +218,15 @@ func TestDeleteWithoutWhereDeletesEverything(t *testing.T) {
 func TestMutationUnsupportedDialect(t *testing.T) {
 	var fake fakeDB
 
-	if err := InsertInto(widgets).Values(Set(widgetID, "x")).Exec(context.Background(), fake); err == nil {
+	if err := InsertInto(widgets).Values(Set(widgetID, "x")).Exec(t.Context(), fake); err == nil {
 		t.Fatalf("Insert.Exec with an unsupported dialect succeeded, want an error")
 	}
 
-	if _, err := UpdateTable(widgets).Set(Set(widgetName, "x")).Exec(context.Background(), fake); err == nil {
+	if _, err := UpdateTable(widgets).Set(Set(widgetName, "x")).Exec(t.Context(), fake); err == nil {
 		t.Fatalf("Update.Exec with an unsupported dialect succeeded, want an error")
 	}
 
-	if _, err := DeleteFrom(widgets).Exec(context.Background(), fake); err == nil {
+	if _, err := DeleteFrom(widgets).Exec(t.Context(), fake); err == nil {
 		t.Fatalf("Delete.Exec with an unsupported dialect succeeded, want an error")
 	}
 }
@@ -354,7 +353,7 @@ func TestUpdateJoinLeftUnsupportedOnSQLite(t *testing.T) {
 // fallback. Postgres is exercised as the positive path: a joined UPDATE
 // renders and runs.
 func TestMutateJoinCapabilityGate(t *testing.T) {
-	ctx := context.Background()
+	ctx := t.Context()
 
 	rel := NewRelation[widget, widgetOrder]("id", "widget_id", widgetOrders)
 
@@ -408,7 +407,7 @@ func TestMutateWhereDoubleCombines(t *testing.T) {
 // no-assignment failures through Insert/Update/Delete Exec and
 // ExecReturning.
 func TestMutateExecErrorPaths(t *testing.T) {
-	ctx := context.Background()
+	ctx := t.Context()
 	boom := errors.New("boom")
 
 	full := mockExec{dialectName: "mock-mutatefull"}

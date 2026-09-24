@@ -16,7 +16,7 @@ import (
 func newUpsertDB(t *testing.T) (context.Context, db.DB) {
 	t.Helper()
 
-	ctx := context.Background()
+	ctx := t.Context()
 
 	conn := openORMTestDB(ctx, t)
 
@@ -325,7 +325,7 @@ func TestUpsertReturningDoesNotShareBackingArray(t *testing.T) {
 // -- asserting the typed dialect.ErrUnsupportedByDialect, never a panic or a
 // silent wrong-SQL fallback.
 func TestUpsertReturningCapabilityGate(t *testing.T) {
-	ctx := context.Background()
+	ctx := t.Context()
 
 	up := upsertWidget("w1", "Alpha", int64(10), nil).
 		OnConflict(widgetID.Col()).
@@ -442,7 +442,7 @@ func TestInsertReturningPlainManyRow(t *testing.T) {
 // without RETURNING -- the new plain-path rendering never bypasses the
 // RETURNING capability gate.
 func TestInsertReturningPlainCapabilityGate(t *testing.T) {
-	ctx := context.Background()
+	ctx := t.Context()
 
 	_, err := InsertInto(widgets).
 		Values(Set(widgetID, "w9"), Set(widgetName, "Niner"), Set(widgetQty, int64(90)), widgetBio.SetNull()).
@@ -494,7 +494,7 @@ func TestUpsertRenderErrorPaths(t *testing.T) {
 // TestExecReturningTailErrorPaths drives query, scan, iteration and close
 // failures through the shared RETURNING execution tail.
 func TestExecReturningTailErrorPaths(t *testing.T) {
-	ctx := context.Background()
+	ctx := t.Context()
 	boom := errors.New("boom")
 
 	base := upsertWidget("w1", "Alpha", int64(10), nil).

@@ -223,7 +223,7 @@ var widgetCategory = NewColumn[widget, string]("widgets", "category")
 func newCategorizedWidgetsDB(t *testing.T) (context.Context, db.DB) {
 	t.Helper()
 
-	ctx := context.Background()
+	ctx := t.Context()
 
 	conn := openORMTestDB(ctx, t)
 
@@ -359,7 +359,7 @@ func TestHavingCombinators(t *testing.T) {
 // TestGroupedQueryScanErrorPaths drives resolve, query, row-callback,
 // iteration and close failures through GroupedQuery.Scan.
 func TestGroupedQueryScanErrorPaths(t *testing.T) {
-	ctx := context.Background()
+	ctx := t.Context()
 	boom := errors.New("boom")
 
 	q := From(widgets).GroupBy(widgetCategory.Col()).Agg(Count())
@@ -397,7 +397,7 @@ func TestGroupedQueryScanErrorPaths(t *testing.T) {
 // a preset-bad aggregate passes through, an empty column and an expression
 // term fail closed at render time.
 func TestOrderedAggregateOrderByRejectsBadTerms(t *testing.T) {
-	ctx := context.Background()
+	ctx := t.Context()
 
 	bad := GroupConcat(widgetName, ",", ";").OrderBy(widgetQty.Asc())
 	if bad.bad == "" {

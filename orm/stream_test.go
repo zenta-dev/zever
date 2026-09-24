@@ -217,7 +217,7 @@ func (s *stubDB) Dialect() string                                        { retur
 // the iterator as an error (wrapped with the scan tag) and that the cursor
 // is still closed exactly once.
 func TestQueryStreamScanError(t *testing.T) {
-	ctx := context.Background()
+	ctx := t.Context()
 
 	rows := &stubRows{
 		cols:    []string{"id", "name", "quantity", "bio"},
@@ -256,7 +256,7 @@ func TestQueryStreamScanError(t *testing.T) {
 // TestQueryStreamRowsErr proves a rows-iteration error surfaces through the
 // iterator wrapped with the Stream tag.
 func TestQueryStreamRowsErr(t *testing.T) {
-	ctx := context.Background()
+	ctx := t.Context()
 
 	rows := &stubRows{
 		cols:    []string{"id", "name", "quantity", "bio"},
@@ -284,7 +284,7 @@ func TestQueryStreamRowsErr(t *testing.T) {
 // TestQueryStreamCloseErr proves a close-time error surfaces through the
 // iterator on the full-consumption path.
 func TestQueryStreamCloseErr(t *testing.T) {
-	ctx := context.Background()
+	ctx := t.Context()
 
 	rows := &stubRows{
 		cols:     []string{"id", "name", "quantity", "bio"},
@@ -337,7 +337,7 @@ func TestQueryStreamRenderError(t *testing.T) {
 // TestQueryStreamQueryError proves a rows-acquisition failure surfaces on
 // the first yield wrapped with the Stream tag.
 func TestQueryStreamQueryError(t *testing.T) {
-	ctx := context.Background()
+	ctx := t.Context()
 
 	var gotErr error
 

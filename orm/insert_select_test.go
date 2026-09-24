@@ -26,7 +26,7 @@ var (
 func newInsertSelectDB(t *testing.T) (context.Context, db.DB) {
 	t.Helper()
 
-	ctx := context.Background()
+	ctx := t.Context()
 
 	conn := openORMTestDB(ctx, t)
 
@@ -331,7 +331,7 @@ func TestInsertSelectReturningGate(t *testing.T) {
 	_, err := InsertInto(widgetArchive).
 		Select(From(widgets).Where(widgetQty.Gt(int64(15)))).
 		Returning().
-		ExecReturning(context.Background(), mockExec{dialectName: "mock-nocap"})
+		ExecReturning(t.Context(), mockExec{dialectName: "mock-nocap"})
 	if !errors.Is(err, dialect.ErrUnsupportedByDialect) {
 		t.Fatalf("err = %v, want errors.Is(err, dialect.ErrUnsupportedByDialect)", err)
 	}
@@ -358,7 +358,7 @@ func TestInsertSelectColumnsCopyOnWrite(t *testing.T) {
 // fails closed: DO UPDATE without sets, an unsupported conflict WHERE, and
 // a gated dialect each surface before any SQL is issued.
 func TestInsertSelectRenderErrorPaths(t *testing.T) {
-	ctx := context.Background()
+	ctx := t.Context()
 
 	noSets := InsertInto(widgetArchive).
 		OnConflict(widgetID.Col()).
@@ -387,7 +387,7 @@ func TestInsertSelectSourceRenderError(t *testing.T) {
 
 	err := InsertInto(widgetArchive).
 		Select(From(widgets).Where(widgetID.InSub(multi))).
-		Exec(context.Background(), mockExec{dialectName: "sqlite"})
+		Exec(t.Context(), mockExec{dialectName: "sqlite"})
 	if err == nil {
 		t.Fatal("Exec with a multi-column IN subquery source succeeded, want a render error")
 	}
