@@ -52,6 +52,13 @@ type GenerateScheduleConfig struct {
 	Stderr   io.Writer
 }
 
+// ErrScheduleMissingCron is returned when GenerateSchedule gets no cron spec.
+var ErrScheduleMissingCron = errors.New("--cron is required")
+
+// ErrScheduleUsage is returned when runGenerateSchedule gets the wrong
+// positional count.
+var ErrScheduleUsage = errors.New(`usage: zever generate schedule <module> <name> --cron "<spec>" --dispatch <Job>`)
+
 // GenerateSchedule validates the cron and dispatch preconditions, appends the
 // rendered schedule declaration to the module's .zen file, and returns the
 // file path. It performs no flag parsing and no prompting: callers fill every
@@ -77,7 +84,7 @@ func GenerateSchedule(cfg GenerateScheduleConfig) (string, error) {
 	}
 
 	if strings.TrimSpace(cfg.Cron) == "" {
-		return "", errors.New(tag + ": --cron is required")
+		return "", fmt.Errorf("%s: %w", tag, ErrScheduleMissingCron)
 	}
 
 	if strings.ContainsAny(cfg.Cron, "\"\\\n") {
@@ -192,7 +199,7 @@ func runGenerateSchedule(args []string) error {
 		}
 
 		if len(positional) != 2 {
-			return errors.New(tag + `: usage: zever generate schedule <module> <name> --cron "<spec>" --dispatch <Job>`)
+			return fmt.Errorf("%s: %w", tag, ErrScheduleUsage)
 		}
 	}
 

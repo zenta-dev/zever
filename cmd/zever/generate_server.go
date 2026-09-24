@@ -771,10 +771,10 @@ const (
 
 	// gRPC hardening defaults: bound idle connections, detect dead peers,
 	// and cap message size so one client can't exhaust server memory.
-	grpcMaxConnectionIdle = 5 * time.Minute
-	grpcKeepaliveTime     = 2 * time.Minute
-	grpcKeepaliveTimeout  = 20 * time.Second
-	grpcMaxMessageBytes   = 4 << 20 // 4 MiB, grpc-go's own default made explicit.
+	DefaultGRPCMaxConnectionIdle = 5 * time.Minute
+	DefaultGRPCKeepaliveTime     = 2 * time.Minute
+	DefaultGRPCKeepaliveTimeout  = 20 * time.Second
+	DefaultGRPCMaxMessageBytes   = 4 << 20 // 4 MiB, grpc-go's own default made explicit.
 )
 
 func main() {
@@ -855,12 +855,12 @@ func run(addr, grpcAddr string) error {
 {{end}}			authz.UnaryServerInterceptor(authInst, permInst, policies),
 		),
 		grpc.KeepaliveParams(keepalive.ServerParameters{
-			MaxConnectionIdle: grpcMaxConnectionIdle,
-			Time:              grpcKeepaliveTime,
-			Timeout:           grpcKeepaliveTimeout,
+			MaxConnectionIdle: DefaultGRPCMaxConnectionIdle,
+			Time:              DefaultGRPCKeepaliveTime,
+			Timeout:           DefaultGRPCKeepaliveTimeout,
 		}),
-		grpc.MaxRecvMsgSize(grpcMaxMessageBytes),
-		grpc.MaxSendMsgSize(grpcMaxMessageBytes),
+		grpc.MaxRecvMsgSize(DefaultGRPCMaxMessageBytes),
+		grpc.MaxSendMsgSize(DefaultGRPCMaxMessageBytes),
 	)
 	if err != nil {
 		return err
