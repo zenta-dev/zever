@@ -41,7 +41,7 @@ import (
 // ErrDirty is returned by Format when src has lexical errors and is
 // therefore left unformatted, mirroring gofmt's refusal to format broken
 // source.
-var ErrDirty = errors.New("[format] source has lexical errors, refusing to format")
+var ErrDirty = errors.New("format: source has lexical errors, refusing to format")
 
 // indentUnit is one level of indentation. The DSL's own schemas use two
 // spaces; this is a fixed-style formatter, not a configurable one.

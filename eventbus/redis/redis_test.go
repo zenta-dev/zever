@@ -53,7 +53,7 @@ func testOptions() eventbus.Options {
 	return eventbus.Options{Redis: eventbus.RedisOptions{Addr: testAddr}}
 }
 
-func newTestBus(t *testing.T, mutate func(*eventbus.Options)) eventbus.EventBus {
+func freshAdapter(t *testing.T, mutate func(*eventbus.Options)) eventbus.EventBus {
 	t.Helper()
 
 	opts := testOptions()
@@ -118,7 +118,13 @@ func eventually(t *testing.T, timeout time.Duration, cond func() bool, msg strin
 			t.Fatalf("timed out waiting for %s", msg)
 		}
 
-		time.Sleep(5 * time.Millisecond)
+		timer := time.NewTimer(5 * time.Millisecond)
+		select {
+		case <-t.Context().Done():
+			timer.Stop()
+			t.Fatalf("test context done waiting for %s", msg)
+		case <-timer.C:
+		}
 	}
 }
 
@@ -156,7 +162,7 @@ func TestNew_invalidOptions(t *testing.T) {
 func TestNew_nameIsRedis(t *testing.T) {
 	t.Parallel()
 
-	b := newTestBus(t, nil)
+	b := freshAdapter(t, nil)
 	if got := b.Name(); got != "redis" {
 		t.Fatalf("Name() = %q, want %q", got, "redis")
 	}
@@ -165,7 +171,7 @@ func TestNew_nameIsRedis(t *testing.T) {
 func TestPublishSubscribe_roundtrip(t *testing.T) {
 	t.Parallel()
 
-	b := newTestBus(t, nil)
+	b := freshAdapter(t, nil)
 	topic := freshTopic()
 
 	got := make(chan eventbus.Message, 16)
@@ -206,7 +212,7 @@ func TestPublishSubscribe_roundtrip(t *testing.T) {
 func TestPublishSubscribe_ordered(t *testing.T) {
 	t.Parallel()
 
-	b := newTestBus(t, nil)
+	b := freshAdapter(t, nil)
 	topic := freshTopic()
 
 	got := make(chan eventbus.Message, 64)
@@ -238,7 +244,7 @@ func TestPublishSubscribe_ordered(t *testing.T) {
 func TestPublish_fanout(t *testing.T) {
 	t.Parallel()
 
-	b := newTestBus(t, nil)
+	b := freshAdapter(t, nil)
 	topic := freshTopic()
 
 	ch1 := make(chan eventbus.Message, 4)
@@ -275,7 +281,7 @@ func TestPublish_fanout(t *testing.T) {
 func TestPublish_noSubscribers_dropsSilently(t *testing.T) {
 	t.Parallel()
 
-	b := newTestBus(t, nil)
+	b := freshAdapter(t, nil)
 
 	if err := b.Publish(t.Context(), freshTopic(), eventbus.NewPayload([]byte("drop")), nil); err != nil {
 		t.Fatalf("Publish with no subscribers err = %v, want nil", err)
@@ -285,7 +291,7 @@ func TestPublish_noSubscribers_dropsSilently(t *testing.T) {
 func TestUnsubscribe_stopsDelivery(t *testing.T) {
 	t.Parallel()
 
-	b := newTestBus(t, nil)
+	b := freshAdapter(t, nil)
 	topic := freshTopic()
 
 	got := make(chan eventbus.Message, 16)
@@ -317,7 +323,7 @@ func TestUnsubscribe_stopsDelivery(t *testing.T) {
 func TestPublish_oversizePayload(t *testing.T) {
 	t.Parallel()
 
-	b := newTestBus(t, nil)
+	b := freshAdapter(t, nil)
 	topic := freshTopic()
 
 	huge := eventbus.NewPayload(make([]byte, eventbus.MaxMessageSize+1))
@@ -336,7 +342,7 @@ func TestPublish_oversizePayload(t *testing.T) {
 func TestSubscribe_nilHandler(t *testing.T) {
 	t.Parallel()
 
-	b := newTestBus(t, nil)
+	b := freshAdapter(t, nil)
 
 	if _, err := b.Subscribe(t.Context(), freshTopic(), nil); !errors.Is(err, eventbus.ErrNilHandler) {
 		t.Fatalf("Subscribe nil handler err = %v, want ErrNilHandler", err)
@@ -346,7 +352,7 @@ func TestSubscribe_nilHandler(t *testing.T) {
 func TestSubscribe_invalidTopic(t *testing.T) {
 	t.Parallel()
 
-	b := newTestBus(t, nil)
+	b := freshAdapter(t, nil)
 
 	if _, err := b.Subscribe(t.Context(), "", func(context.Context, eventbus.Message) {}); !errors.Is(err, eventbus.ErrInvalidOptions) {
 		t.Errorf("empty topic err = %v, want ErrInvalidOptions", err)
@@ -365,7 +371,7 @@ func TestSubscribe_invalidTopic(t *testing.T) {
 func TestClose_behavior(t *testing.T) {
 	t.Parallel()
 
-	b := newTestBus(t, nil)
+	b := freshAdapter(t, nil)
 	topic := freshTopic()
 
 	got := make(chan eventbus.Message, 4)
@@ -399,7 +405,7 @@ func TestSubscribe_onPanic_survives(t *testing.T) {
 
 	var panicked atomic.Int64
 
-	b := newTestBus(t, func(o *eventbus.Options) {
+	b := freshAdapter(t, func(o *eventbus.Options) {
 		o.OnPanic = func(_ string, _ eventbus.Message, _ any) { panicked.Add(1) }
 	})
 	topic := freshTopic()
@@ -434,7 +440,7 @@ func TestSubscribe_onPanic_survives(t *testing.T) {
 func TestPublishSubscribe_concurrent(t *testing.T) {
 	t.Parallel()
 
-	b := newTestBus(t, nil)
+	b := freshAdapter(t, nil)
 	topic := freshTopic()
 
 	const publishers = 4
@@ -478,8 +484,8 @@ func TestPrefix_isolation(t *testing.T) {
 
 	topic := freshTopic()
 
-	busA := newTestBus(t, func(o *eventbus.Options) { o.Redis.Prefix = "pa" })
-	busB := newTestBus(t, func(o *eventbus.Options) { o.Redis.Prefix = "pb" })
+	busA := freshAdapter(t, func(o *eventbus.Options) { o.Redis.Prefix = "pa" })
+	busB := freshAdapter(t, func(o *eventbus.Options) { o.Redis.Prefix = "pb" })
 
 	gotB := make(chan eventbus.Message, 4)
 	unsubB, err := busB.Subscribe(t.Context(), topic, func(_ context.Context, msg eventbus.Message) {

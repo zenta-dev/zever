@@ -40,7 +40,7 @@ var _ dbpool = (*pgxpool.Pool)(nil)
 // DefaultDDLTimeout bounds connect plus DDL during construction. Shared 10s
 // floor with vectorstore/pgvector: pgvector ivfflat index build slower than
 // plain B-tree/GIN; single budget for connect+DDL during construction so they
-// don't drift.
+// don't drift. Server backend; local embedded DB uses 5s.
 const DefaultDDLTimeout = 10 * time.Second
 
 type postgres struct {

@@ -33,21 +33,21 @@ type Credentials struct {
 // Errors carry paths and reasons only, never credential bytes.
 func (c Credentials) Validate() error {
 	if c.ProjectID == "" {
-		return errors.New("project id is required")
+		return errors.New("firebase: project id is required")
 	}
 	if c.ServiceAccount == "" {
-		return errors.New("service_account is required")
+		return errors.New("firebase: service_account is required")
 	}
 	if err := ValidateServiceAccountPath(c.ServiceAccount); err != nil {
 		return err
 	}
 	raw, err := os.ReadFile(c.ServiceAccount)
 	if err != nil {
-		return fmt.Errorf("service_account path %q cannot be read: %w", c.ServiceAccount, err)
+		return fmt.Errorf("firebase: service_account path %q cannot be read: %w", c.ServiceAccount, err)
 	}
 	var doc map[string]any
 	if err := json.Unmarshal(raw, &doc); err != nil {
-		return fmt.Errorf("service_account path %q is not valid JSON: %w", c.ServiceAccount, err)
+		return fmt.Errorf("firebase: service_account path %q is not valid JSON: %w", c.ServiceAccount, err)
 	}
 	return nil
 }
@@ -58,21 +58,21 @@ func (c Credentials) Validate() error {
 // and JSON are checked in Validate or later by the SDK.
 func ValidateServiceAccountPath(p string) error {
 	if p == "" {
-		return errors.New("service_account is required")
+		return errors.New("firebase: service_account is required")
 	}
 	if filepath.Clean(p) != p {
-		return fmt.Errorf("service_account path %q is not clean", p)
+		return fmt.Errorf("firebase: service_account path %q is not clean", p)
 	}
 	for _, part := range strings.Split(p, string(filepath.Separator)) {
 		if part == ".." {
-			return fmt.Errorf("service_account path %q contains traversal", p)
+			return fmt.Errorf("firebase: service_account path %q contains traversal", p)
 		}
 	}
 	if !strings.EqualFold(filepath.Ext(p), ".json") {
-		return fmt.Errorf("service_account path %q must have .json extension", p)
+		return fmt.Errorf("firebase: service_account path %q must have .json extension", p)
 	}
 	if info, err := os.Stat(p); err == nil && info.IsDir() {
-		return fmt.Errorf("service_account path %q is a directory", p)
+		return fmt.Errorf("firebase: service_account path %q is a directory", p)
 	}
 	return nil
 }

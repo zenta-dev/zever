@@ -61,6 +61,10 @@ var (
 	promptConfirmForAdapter = promptConfirm
 )
 
+// ErrAdapterUsage is returned when runGenerateAdapter gets the wrong
+// positional count.
+var ErrAdapterUsage = errors.New("usage: zever generate adapter <battery> <name> [--field name:type] [--force]")
+
 func printAdapterUsage(fs *flag.FlagSet) {
 	header := title("zever generate adapter") + dim(" — stub an adapter")
 	//nolint:lll
@@ -1412,7 +1416,7 @@ func runGenerateAdapter(args []string) error {
 	}
 
 	if len(positional) != 2 {
-		return errors.New(tag + ": usage: zever generate adapter <battery> <name> [--field name:type] [--force]")
+		return fmt.Errorf("%s: %w", tag, ErrAdapterUsage)
 	}
 
 	battery, name := positional[0], positional[1]

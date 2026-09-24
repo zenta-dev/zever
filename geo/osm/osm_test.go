@@ -752,7 +752,7 @@ func TestReadLimitedBody_Errors(t *testing.T) {
 		t.Fatalf("Do: %v", err)
 	}
 	defer resp.Body.Close()
-	body, err := readLimitedBody(resp, 100)
+	body, err := readLimitedBody(t.Context(), resp, 100)
 	if err != nil {
 		t.Fatalf("readLimitedBody: %v", err)
 	}
@@ -774,14 +774,14 @@ func TestReadLimitedBody_Errors(t *testing.T) {
 		t.Fatalf("Do: %v", err)
 	}
 	defer resp2.Body.Close()
-	_, err = readLimitedBody(resp2, 10)
+	_, err = readLimitedBody(t.Context(), resp2, 10)
 	if !errors.Is(err, geo.ErrTooLarge) {
 		t.Fatalf("expected ErrTooLarge, got %v", err)
 	}
 
 	// read error via broken body
 	resp3 := &http.Response{Body: io.NopCloser(brokenReader{})}
-	_, err = readLimitedBody(resp3, 100)
+	_, err = readLimitedBody(t.Context(), resp3, 100)
 	if err == nil || !strings.Contains(err.Error(), "read") {
 		t.Fatalf("expected read error, got %v", err)
 	}

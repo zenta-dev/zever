@@ -35,12 +35,31 @@ const (
 	defaultReplayTolerance = 5 * time.Minute
 )
 
+// DefaultConsumerStopSlack is the grace period beyond the operation timeout for consumer shutdown.
+// DefaultPopTimeout bounds each queue pop operation.
+// DefaultIdlePollInterval is the pause between empty queue polls.
+// DefaultTransportBackoff is the pause between queue transport failures.
+// DefaultRetryBaseDelay is the initial redelivery backoff delay.
+// DefaultRetryMaxDelay caps the redelivery backoff delay.
+// DefaultTimeout is the per-operation timeout used when Options.Timeout is zero.
+// DefaultVisibilityTimeout is the queue visibility timeout used when QueueOpts leaves it zero.
+const (
+	DefaultConsumerStopSlack = 6 * time.Second
+	DefaultPopTimeout        = 5 * time.Second
+	DefaultIdlePollInterval  = 100 * time.Millisecond
+	DefaultTransportBackoff  = 200 * time.Millisecond
+	DefaultRetryBaseDelay    = 500 * time.Millisecond
+	DefaultRetryMaxDelay     = 72 * time.Hour
+	DefaultTimeout           = 10 * time.Second
+	DefaultVisibilityTimeout = 30 * time.Second
+)
+
 // retryPolicy computes the delay before redelivering a failed webhook:
 // exponential backoff from 500ms, capped at 72h, jittered +/-25%.
 var retryPolicy = retry.Policy{
-	BaseDelay:  500 * time.Millisecond,
+	BaseDelay:  DefaultRetryBaseDelay,
 	Multiplier: 2,
-	MaxDelay:   72 * time.Hour,
+	MaxDelay:   DefaultRetryMaxDelay,
 	Jitter:     0.25,
 	JitterMode: retry.JitterSymmetric,
 }
@@ -185,7 +204,7 @@ func (a *adapter) startConsumer(event string) {
 func (a *adapter) waitForConsumerDone(c *consumer, event string) {
 	select {
 	case <-c.done:
-	case <-time.After(a.timeout + 6*time.Second):
+	case <-time.After(a.timeout + DefaultConsumerStopSlack):
 		a.log().Warn().Str("event", event).Msg("webhook: consumer did not stop in time")
 	}
 }
@@ -216,7 +235,7 @@ func (a *adapter) consume(event string, c *consumer) {
 		default:
 		}
 
-		ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
+		ctx, cancel := context.WithTimeout(context.Background(), DefaultPopTimeout)
 		msg, err := a.queue.Pop(ctx, topic)
 
 		cancel()
@@ -242,7 +261,7 @@ func (a *adapter) handleConsumeError(event string, err error, consecutive *int, 
 	if errors.Is(err, queue.ErrEmpty) {
 		*consecutive = 0
 
-		a.sleepWithStop(c.stop, 100*time.Millisecond)
+		a.sleepWithStop(c.stop, DefaultIdlePollInterval)
 
 		return false
 	}
@@ -257,7 +276,7 @@ func (a *adapter) handleConsumeError(event string, err error, consecutive *int, 
 		return true
 	}
 
-	a.sleepWithStop(c.stop, 200*time.Millisecond)
+	a.sleepWithStop(c.stop, DefaultTransportBackoff)
 
 	return false
 }
@@ -650,7 +669,7 @@ func (a *adapter) Close() error {
 	a.consumers = make(map[string]*consumer)
 	a.mu.Unlock()
 
-	deadline := time.After(a.timeout + 6*time.Second)
+	deadline := time.After(a.timeout + DefaultConsumerStopSlack)
 
 	for event, c := range consumers {
 		select {
@@ -772,7 +791,7 @@ func New(o webhook.Options) (webhook.Webhook, error) {
 
 	timeout := o.Timeout
 	if timeout <= 0 {
-		timeout = 10 * time.Second
+		timeout = DefaultTimeout
 	}
 
 	maxRetries := o.MaxRetries
@@ -787,7 +806,7 @@ func New(o webhook.Options) (webhook.Webhook, error) {
 
 	visibility := o.QueueOpts.VisibilityTimeout
 	if visibility == 0 {
-		visibility = 30 * time.Second
+		visibility = DefaultVisibilityTimeout
 	}
 
 	if visibility <= 0 {
@@ -808,7 +827,7 @@ func New(o webhook.Options) (webhook.Webhook, error) {
 
 	q, err := queue.Open(qa, o.QueueOpts)
 	if err != nil {
-		return nil, fmt.Errorf("webhook: open queue: %w", err)
+		return nil, err
 	}
 
 	replayTolerance := o.ReplayTolerance

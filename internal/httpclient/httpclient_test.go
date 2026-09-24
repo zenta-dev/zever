@@ -27,7 +27,7 @@ func TestNewClientTLSFloor(t *testing.T) {
 
 func TestReadLimitedOverLimit(t *testing.T) {
 	body := bytes.NewReader(bytes.Repeat([]byte("x"), 10))
-	_, err := ReadLimited(body, 5)
+	_, err := ReadLimited(t.Context(), body, 5)
 	if err == nil {
 		t.Fatalf("expected over-limit error")
 	}
@@ -42,7 +42,7 @@ func TestReadLimitedOverLimit(t *testing.T) {
 
 func TestReadLimitedWithinLimit(t *testing.T) {
 	body := bytes.NewReader([]byte("hello"))
-	got, err := ReadLimited(body, 10)
+	got, err := ReadLimited(t.Context(), body, 10)
 	if err != nil {
 		t.Fatalf("ReadLimited: %v", err)
 	}
@@ -98,7 +98,7 @@ func TestNoRedirectPolicy(t *testing.T) {
 }
 
 func TestReadLimitedReadError(t *testing.T) {
-	_, err := ReadLimited(errReader{}, 10)
+	_, err := ReadLimited(t.Context(), errReader{}, 10)
 	if err == nil || errors.Is(err, ErrTooLarge) {
 		t.Fatalf("expected non-TooLarge read error, got %v", err)
 	}

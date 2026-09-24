@@ -24,17 +24,20 @@ func main() {
 	}
 }
 
+// dirPerms is the permission mode for created grammar directories.
+const dirPerms = 0o755
+
 // run writes every generated file returned by gengrammar.Files() to its
 // path relative to the current working directory, which must be the
 // repository root.
 func run() error {
 	for path, content := range gengrammar.Files() {
-		if err := os.MkdirAll(filepath.Dir(path), 0o755); err != nil {
-			return fmt.Errorf("create directory for %s: %w", path, err)
+		if err := os.MkdirAll(filepath.Dir(path), dirPerms); err != nil {
+			return fmt.Errorf("gengrammar: create directory for %s: %w", path, err)
 		}
 
 		if err := os.WriteFile(path, content, 0o600); err != nil {
-			return fmt.Errorf("write %s: %w", path, err)
+			return fmt.Errorf("gengrammar: write %s: %w", path, err)
 		}
 	}
 

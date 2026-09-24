@@ -33,7 +33,7 @@ const maxScanRows = 10000
 
 var memoryCounter uint64
 
-// DefaultDDLTimeout bounds DDL during construction.
+// DefaultDDLTimeout bounds DDL during construction on the local embedded DB; server backends use 10s.
 const DefaultDDLTimeout = 5 * time.Second
 
 // Store implements vectorstore.VectorStore backed by SQLite.
@@ -382,7 +382,7 @@ func encodeEmbedding(e []float32) []byte {
 
 func decodeEmbedding(b []byte) ([]float32, error) {
 	if len(b) == 0 {
-		return nil, errors.New("empty embedding blob")
+		return nil, errors.New("sqlite: empty embedding blob")
 	}
 
 	// Backwards compat: old rows were stored as JSON numbers. Binary blobs
@@ -395,7 +395,7 @@ func decodeEmbedding(b []byte) ([]float32, error) {
 	}
 
 	if len(b)%4 != 0 {
-		return nil, fmt.Errorf("invalid embedding blob length %d", len(b))
+		return nil, fmt.Errorf("sqlite: invalid embedding blob length %d", len(b))
 	}
 
 	out := make([]float32, len(b)/4)

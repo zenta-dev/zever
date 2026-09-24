@@ -252,7 +252,7 @@ func (a *adapter) Stream(ctx context.Context, model string, messages []ai.Messag
 		// newline-delimited JSON records. This trades incremental decoding as
 		// bytes arrive for a single buffered read; acceptable for the response
 		// sizes these single API calls produce.
-		respBody, readErr := httpclient.ReadLimited(resp.Body, maxResponseBytes)
+		respBody, readErr := httpclient.ReadLimited(ctx, resp.Body, maxResponseBytes)
 		if readErr != nil {
 			if errors.Is(readErr, httpclient.ErrTooLarge) {
 				readErr = fmt.Errorf("ollama: stream response exceeds %d bytes", maxResponseBytes)
@@ -446,7 +446,7 @@ func (a *adapter) doPost(ctx context.Context, path string, body []byte) ([]byte,
 
 	defer func() { _ = resp.Body.Close() }()
 
-	respBody, err := httpclient.ReadLimited(resp.Body, maxResponseBytes)
+	respBody, err := httpclient.ReadLimited(ctx, resp.Body, maxResponseBytes)
 	if err != nil {
 		if errors.Is(err, httpclient.ErrTooLarge) {
 			return nil, fmt.Errorf("ollama: response exceeds %d bytes", maxResponseBytes)

@@ -110,7 +110,10 @@ func TestRegistryRegisterAndOpen(t *testing.T) {
 
 	stub := func(_ Options) (Storage, error) { return stubStorage{}, nil }
 	if err := Register(Adapter(77), stub); err != nil {
-		t.Fatalf("Register: %v", err)
+		var dup *DuplicateError
+		if !errors.As(err, &dup) {
+			t.Fatalf("Register: %v", err)
+		}
 	}
 
 	if err := Register(Adapter(77), stub); !errors.Is(err, ErrDuplicate) {
@@ -148,7 +151,10 @@ func TestRegistryRegisterAndOpen(t *testing.T) {
 	}
 
 	if err := Register(Adapter(78), func(_ Options) (Storage, error) { return nil, ErrExpired }); err != nil {
-		t.Fatalf("Register: %v", err)
+		var dup *DuplicateError
+		if !errors.As(err, &dup) {
+			t.Fatalf("Register: %v", err)
+		}
 	}
 
 	if _, err := Open(Adapter(78), Options{}); !errors.Is(err, ErrExpired) {

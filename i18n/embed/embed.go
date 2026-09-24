@@ -20,15 +20,15 @@ import (
 // template string).
 var localeCodec = codec.JSONCodec[map[string]string]{}
 
-// backend is an embedded-catalog i18n backend.
-type backend struct {
+// driver is an embedded-catalog i18n driver.
+type driver struct {
 	mu       sync.RWMutex
 	catalogs map[string]map[string]*template.Template
 	fallback string
 	closed   atomic.Bool
 }
 
-var _ i18n.I18n = (*backend)(nil)
+var _ i18n.I18n = (*driver)(nil)
 
 // New builds an i18n.I18n from JSON catalogs in an fs.FS directory.
 func New(opts i18n.Options) (i18n.I18n, error) {
@@ -55,7 +55,7 @@ func New(opts i18n.Options) (i18n.I18n, error) {
 		}
 		locale := strings.TrimSuffix(entry.Name(), ".json")
 		if !validLocaleName(locale) {
-			return nil, &i18n.InvalidOptionsError{Reason: fmt.Sprintf("embed: invalid locale file name %q", entry.Name())}
+			return nil, &i18n.InvalidOptionsError{Reason: fmt.Sprintf("invalid locale file name %q", entry.Name())}
 		}
 		data, err := fs.ReadFile(opts.Embed.FS, path.Join(dir, entry.Name()))
 		if err != nil {
@@ -76,28 +76,28 @@ func New(opts i18n.Options) (i18n.I18n, error) {
 		catalogs[locale] = cat
 	}
 
-	return &backend{catalogs: catalogs, fallback: opts.Embed.Fallback}, nil
+	return &driver{catalogs: catalogs, fallback: opts.Embed.Fallback}, nil
 }
 
 // Translate returns the message for locale and key, interpolating args.
 // The locale chain (locale, base language, fallback) is probed per key:
 // the first catalog containing the key wins.
-func (b *backend) Translate(ctx context.Context, locale, key string, args map[string]string) (string, error) {
+func (d *driver) Translate(ctx context.Context, locale, key string, args map[string]string) (string, error) {
 	if err := ctx.Err(); err != nil {
 		return "", err
 	}
-	if b.closed.Load() {
+	if d.closed.Load() {
 		return "", i18n.ErrClosed
 	}
 	if strings.TrimSpace(locale) == "" {
 		return "", &i18n.LocaleNotFoundError{Locale: locale}
 	}
 
-	b.mu.RLock()
-	defer b.mu.RUnlock()
+	d.mu.RLock()
+	defer d.mu.RUnlock()
 
-	for _, loc := range i18n.LocaleChain(locale, b.fallback) {
-		cat, ok := b.catalogs[loc]
+	for _, loc := range i18n.LocaleChain(locale, d.fallback) {
+		cat, ok := d.catalogs[loc]
 		if !ok {
 			continue
 		}
@@ -115,33 +115,33 @@ func (b *backend) Translate(ctx context.Context, locale, key string, args map[st
 }
 
 // Locales lists the available locales in sorted order.
-func (b *backend) Locales(ctx context.Context) ([]string, error) {
+func (d *driver) Locales(ctx context.Context) ([]string, error) {
 	if err := ctx.Err(); err != nil {
 		return nil, err
 	}
-	if b.closed.Load() {
+	if d.closed.Load() {
 		return nil, i18n.ErrClosed
 	}
 
-	b.mu.RLock()
-	defer b.mu.RUnlock()
+	d.mu.RLock()
+	defer d.mu.RUnlock()
 
-	out := make([]string, 0, len(b.catalogs))
-	for loc := range b.catalogs {
+	out := make([]string, 0, len(d.catalogs))
+	for loc := range d.catalogs {
 		out = append(out, loc)
 	}
 	sort.Strings(out)
 	return out, nil
 }
 
-// Close releases backend resources. It is idempotent.
-func (b *backend) Close() error {
-	if b.closed.Swap(true) {
+// Close releases driver resources. It is idempotent.
+func (d *driver) Close() error {
+	if d.closed.Swap(true) {
 		return nil
 	}
-	b.mu.Lock()
-	defer b.mu.Unlock()
-	b.catalogs = nil
+	d.mu.Lock()
+	defer d.mu.Unlock()
+	d.catalogs = nil
 	return nil
 }
 

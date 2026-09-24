@@ -83,6 +83,13 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - `workflow.Workflow`/`StepFunc` docs now state the JSON-marshalable
   contract: non-marshalable input/signal values fail lazily at `Query`
   time, not at `Start`/`Signal` time.
+- `workflow.StepFunc` and the `StepRegistrar` interface are now exported
+  so hosts register steps through the interface (the memory adapter
+  implements it) instead of reaching into a concrete adapter type.
+- `authz.Policy` now carries `OwnerField` from the resolved
+  `permission: check(..., owner_field: ...)` through to the `gogen`
+  output (`OwnerField: "user_id"`), with the proto and OpenAPI backends
+  rendering the same `owner_field` value.
 
 ### Fixed
 
@@ -217,9 +224,22 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   `ai`/`db`/`auth`/`cache`/`queue`/`log` top-level `Options`; unified
   `Validate` doc phrasing; `secrets` env-prefix exception documented in
   `config/README.md` and `secrets/doc.go`; CLI separator standard
-  documented with `check:boundaries` alias for `check-boundaries`; DSL
+  documented with `check:boundaries` alias for `check-boundaries`;    DSL
   `datetime` alias for `timestamp`; predecessor-comparison comments
   de-branded.
+- **Security:** `geo/static` rejected no path traversal: a `..` element
+  in the dataset path could escape the configured directory. Paths are
+  now checked for `..` elements before cleaning and rejected with
+  `ErrInvalidOptions`.
+- `examples/demoapp` maps malformed session ids to 400 (`malformed
+  session id`); unknown-but-well-formed ids stay 404.
+- `orm` on sqlite now binds `time.Time` as RFC3339Nano UTC text and
+  scans timestamps back with sub-second precision intact; previously
+  fractional seconds were silently dropped. Second-precision text
+  written by older versions still parses.
+- `zenorm` maps `json` columns to `orm.JSONText` (which implements
+  `sql.Scanner`/`driver.Valuer`) instead of `json.RawMessage`, which
+  `database/sql` cannot scan into on recent Go toolchains.
 
 ### Changed
 
@@ -299,6 +319,14 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   `ConnMax*` → `MaxConn*` prefix order; named duration consts per package;
   `t.Context()` in all tests (`b.Context()` in benchmarks, t-taking
   helpers elsewhere); test-style + time rules codified in AGENTS.md.
+
+- Consistency pass, round seven: every Redis-backed `Open` validates options
+  first (fail fast before dialing); webhook `Open` validate errors returned
+  directly with named duration consts; receiver/acronym/adapter-name sweep
+  completed; `ErrDuplicate` mirror aliases completed in the remaining
+  packages; scaffold/docs versions aligned to framework `v0.2.0` (go `1.27`,
+  lsp `0.2.0`, CITATION `0.2.0`); remaining `time.Sleep` test sync converted
+  to event-based waiting.
 
 
 ## [v0.2.0] - 2026-09-23
