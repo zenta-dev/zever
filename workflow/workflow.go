@@ -14,12 +14,26 @@ type RunID string
 // It handles run lifecycle, signaling, querying, and shutdown.
 type Workflow interface {
 	// Start begins a new run of the named workflow with input and workflowID.
+	//
+	// Start input must be JSON-marshalable. The value is stored as-is without
+	// marshaling, so a non-marshalable input does not fail at Start time; it
+	// fails lazily at Query time when the stored state is marshaled with
+	// json.Marshal.
 	Start(ctx context.Context, name string, input any, workflowID string) (RunID, error)
 
 	// Signal delivers a signal with value to the named channel of runID.
+	//
+	// Signal value must be JSON-marshalable. The value is stored as-is without
+	// marshaling, so a non-marshalable value does not fail at Signal time; it
+	// fails lazily at Query time when the stored state is marshaled with
+	// json.Marshal.
 	Signal(ctx context.Context, runID RunID, name string, value any) error
 
 	// Query evaluates the named query against runID and decodes into out.
+	//
+	// Query state and out must be JSON-marshalable. Query marshals the stored
+	// state with json.Marshal, so a non-marshalable input, signal value, or
+	// step result stored earlier fails here, not at Start or Signal time.
 	Query(ctx context.Context, runID RunID, name string, out any) error
 
 	// Cancel requests cancellation of runID.
@@ -33,6 +47,11 @@ type Workflow interface {
 type Factory func(opts Options) (Workflow, error)
 
 // StepFunc is a named workflow step: input in, output or error out.
+//
+// StepFunc input and output must be JSON-marshalable. The output becomes
+// queryable state, so a non-marshalable result does not fail when the step
+// returns; it fails lazily at Query time when the state is marshaled with
+// json.Marshal.
 // Engines that support host-registered steps expose registration through
 // StepRegistrar rather than a concrete adapter type.
 type StepFunc func(ctx context.Context, input any) (any, error)
