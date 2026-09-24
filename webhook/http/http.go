@@ -18,15 +18,26 @@ import (
 	"github.com/zenta-dev/zever/webhook"
 )
 
+// DefaultBaseDelay is the initial delivery retry delay.
+// DefaultMaxDelay caps the delivery retry delay.
+// DefaultJitterMax bounds flat additive retry jitter.
+// DefaultTimeout is the per-delivery operation timeout used when Options.Timeout is zero.
+const (
+	DefaultBaseDelay = 500 * time.Millisecond
+	DefaultMaxDelay  = 72 * time.Hour
+	DefaultJitterMax = 250 * time.Millisecond
+	DefaultTimeout   = 10 * time.Second
+)
+
 // deliveryBackoffPolicy computes the delay before retrying a failed
 // delivery: linear growth from 500ms, capped at 72h, plus up to 250ms of
 // flat additive jitter.
 var deliveryBackoffPolicy = retry.Policy{
-	BaseDelay:  500 * time.Millisecond,
+	BaseDelay:  DefaultBaseDelay,
 	Linear:     true,
-	MaxDelay:   72 * time.Hour,
+	MaxDelay:   DefaultMaxDelay,
 	JitterMode: retry.JitterFlat,
-	JitterMax:  250 * time.Millisecond,
+	JitterMax:  DefaultJitterMax,
 }
 
 type registration struct {
@@ -244,14 +255,12 @@ func (a *adapter) sleepWithContext(ctx context.Context, d time.Duration) error {
 }
 
 func (a *adapter) backoff(attempt int) time.Duration {
-	const maxDelay = 72 * time.Hour
-
 	// NextDelay caps the delay at MaxDelay before jitter, so a flat jitter
 	// draw on top of an already-capped delay can push the result slightly
 	// past MaxDelay; re-clamp so the cap is exact regardless of jitter.
 	d := deliveryBackoffPolicy.NextDelay(attempt)
-	if d > maxDelay {
-		d = maxDelay
+	if d > DefaultMaxDelay {
+		d = DefaultMaxDelay
 	}
 
 	return d
@@ -293,7 +302,7 @@ func New(o webhook.Options) (webhook.Webhook, error) {
 
 	timeout := o.Timeout
 	if timeout <= 0 {
-		timeout = 10 * time.Second
+		timeout = DefaultTimeout
 	}
 
 	maxRetries := o.MaxRetries

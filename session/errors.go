@@ -31,7 +31,7 @@ var ErrInvalidAdapter = errors.New("session: invalid adapter")
 var ErrInvalidOptions = errors.New("session: invalid options")
 
 // ErrInvalidID is returned for an invalid session ID.
-var ErrInvalidID = errors.New("session: invalid id")
+var ErrInvalidID = errors.New("session: invalid ID")
 
 // DuplicateAdapterError reports a duplicate adapter registration.
 type DuplicateAdapterError struct {
@@ -102,7 +102,7 @@ type InvalidIDError struct {
 
 // Error returns a human-readable invalid-id message with the ID length only.
 func (e InvalidIDError) Error() string {
-	return fmt.Sprintf("%s: invalid id length %d", ErrInvalidID, e.IDLen)
+	return fmt.Sprintf("%s: invalid ID length %d", ErrInvalidID, e.IDLen)
 }
 
 // Unwrap returns ErrInvalidID.

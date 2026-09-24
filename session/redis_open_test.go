@@ -1,6 +1,13 @@
 package session
 
-import "testing"
+import (
+	"errors"
+	"testing"
+)
+
+// redisOpenStub is process-shared so repeat runs (-count=2) rewire the same
+// factory instance; Register tolerates the resulting duplicate.
+var redisOpenStub = newStubStore()
 
 // TestParseAdapter_redis_reachesOpen pins the redis adapter wiring:
 // ParseAdapter("redis") must resolve to Redis and Open must dispatch to
@@ -19,9 +26,14 @@ func TestParseAdapter_redis_reachesOpen(t *testing.T) {
 		t.Fatalf("Redis.String() = %q, want %q", got, "redis")
 	}
 
-	want := newStubStore()
+	want := redisOpenStub
 	if regErr := Register(a, func(Options) (Store, error) { return want, nil }); regErr != nil {
-		t.Fatalf("Register(Redis) err = %v, want nil", regErr)
+		var dup *DuplicateError
+		if !errors.As(regErr, &dup) {
+			t.Fatalf("Register(Redis) err = %v, want nil", regErr)
+		}
+		// Duplicate means an earlier run in this process already wired the
+		// same shared stub (e.g. -count=2); the identity check below holds.
 	}
 
 	got, err := Open(a, Options{})

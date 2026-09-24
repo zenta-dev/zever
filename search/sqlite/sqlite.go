@@ -25,7 +25,7 @@ const (
 
 var memoryCounter uint64
 
-// DefaultDDLTimeout bounds DDL during construction.
+// DefaultDDLTimeout bounds DDL during construction on the local embedded DB; server backends use 10s.
 const DefaultDDLTimeout = 5 * time.Second
 
 // Store implements search.Search backed by SQLite FTS5.
