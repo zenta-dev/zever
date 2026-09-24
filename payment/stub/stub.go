@@ -75,7 +75,8 @@ func (d *driver) CreatePayment(_ context.Context, req payment.Request) (payment.
 }
 
 // Refund applies amount against payment id up to the cumulative total.
-func (d *driver) Refund(_ context.Context, id string, amount int64) error {
+// key is accepted for interface compatibility and ignored by the stub.
+func (d *driver) Refund(_ context.Context, id string, amount int64, _ string) error {
 	d.mu.Lock()
 	defer d.mu.Unlock()
 

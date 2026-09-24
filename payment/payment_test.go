@@ -22,7 +22,7 @@ func (s *stubPayment) CreatePayment(_ context.Context, _ Request) (Result, error
 	return s.result, nil
 }
 
-func (s *stubPayment) Refund(_ context.Context, _ string, _ int64) error {
+func (s *stubPayment) Refund(_ context.Context, _ string, _ int64, _ string) error {
 	return nil
 }
 
@@ -132,7 +132,7 @@ func TestOpen_success_smoke(t *testing.T) {
 		t.Fatalf("CreatePayment = %+v, want %+v", res, want)
 	}
 
-	if err := got.Refund(ctx, "pay_1", 100); err != nil {
+	if err := got.Refund(ctx, "pay_1", 100, ""); err != nil {
 		t.Fatalf("Refund err = %v", err)
 	}
 
