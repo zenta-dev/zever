@@ -23,7 +23,7 @@ config file, overlaid by environment variables. Later layers win:
 
 | Service       | Adapters                            |
 |---------------|-------------------------------------|
-| ai            | anthropic, openai, gemini           |
+| ai            | anthropic, openai, gemini, ollama    |
 | analytics     | log, posthog                        |
 | auth          | jwt, session, oidc                  |
 | billing       | stub, stripe, paddle                |
@@ -37,7 +37,7 @@ config file, overlaid by environment variables. Later layers win:
 | i18n          | embed, remote                       |
 | idempotency   | memory, redis                       |
 | lock          | memory, redis                       |
-| log           | noop, zerolog, slog                 |
+| log           | noop, zerolog, slog, pretty         |
 | mailer        | log, smtp                           |
 | media         | local, s3                           |
 | notification  | log, twilio, fcm                    |
@@ -93,8 +93,7 @@ rejected as unknown fields. Migration:
 | `visibilitytimeout` / `polltimeout` | `visibility_timeout` / `poll_timeout` |
 | `minlevel` | `min_level` |
 | `sweepinterval` / `maxentries` | `sweep_interval` / `max_entries` |
-| `poolsize` / `minidleconns` / `pooltimeout` / `connmaxidletime` / `connmaxlifetime` | `pool_size` / `min_idle_conns` / `pool_timeout` / `conn_max_idle_time` / `conn_max_lifetime` |
-| `conn_max_idle_time` / `conn_max_lifetime` | `max_conn_idle_time` / `max_conn_lifetime` |
+| `poolsize` / `minidleconns` / `pooltimeout` / `connmaxidletime` / `connmaxlifetime` | `pool_size` / `min_idle_conns` / `pool_timeout` / `max_conn_idle_time` / `max_conn_lifetime` |
 | `secretkey` / `webhooksecret` | `secret_key` / `webhook_secret` |
 | `autoapprove` / `maxwebhookbytes` | `auto_approve` / `max_webhook_bytes` |
 | `anonymousid` / `grouptype` | `anonymous_id` / `group_type` |
