@@ -58,7 +58,7 @@ type Config struct {
 	Crypto        Service[crypto.Options]        `json:"crypto" yaml:"crypto"`
 	DB            Service[db.Options]            `json:"db" yaml:"db"`
 	Document      Service[document.Options]      `json:"document" yaml:"document"`
-	Eventbus      Service[eventbus.Options]      `json:"eventbus" yaml:"eventbus"`
+	EventBus      Service[eventbus.Options]      `json:"eventbus" yaml:"eventbus"`
 	Flag          Service[flag.Options]          `json:"flag" yaml:"flag"`
 	Geo           Service[geo.Options]           `json:"geo" yaml:"geo"`
 	I18n          Service[i18n.Options]          `json:"i18n" yaml:"i18n"`
@@ -73,7 +73,7 @@ type Config struct {
 	Payment       Service[payment.Options]       `json:"payment" yaml:"payment"`
 	Permission    Service[permission.Options]    `json:"permission" yaml:"permission"`
 	Queue         Service[queue.Options]         `json:"queue" yaml:"queue"`
-	Ratelimit     Service[ratelimit.Options]     `json:"ratelimit" yaml:"ratelimit"`
+	RateLimit     Service[ratelimit.Options]     `json:"ratelimit" yaml:"ratelimit"`
 	Router        Service[router.Options]        `json:"router" yaml:"router"`
 	Scheduler     Service[scheduler.Options]     `json:"scheduler" yaml:"scheduler"`
 	Search        Service[search.Options]        `json:"search" yaml:"search"`
@@ -142,7 +142,7 @@ func (c *Config) RedactedServices() map[string]ServiceConfig {
 	put("crypto", c.Crypto.Adapter, c.Crypto.Options)
 	put("db", c.DB.Adapter, c.DB.Options)
 	put("document", c.Document.Adapter, c.Document.Options)
-	put("eventbus", c.Eventbus.Adapter, c.Eventbus.Options)
+	put("eventbus", c.EventBus.Adapter, c.EventBus.Options)
 	put("flag", c.Flag.Adapter, c.Flag.Options)
 	put("geo", c.Geo.Adapter, c.Geo.Options)
 	put("i18n", c.I18n.Adapter, c.I18n.Options)
@@ -157,7 +157,7 @@ func (c *Config) RedactedServices() map[string]ServiceConfig {
 	put("payment", c.Payment.Adapter, c.Payment.Options)
 	put("permission", c.Permission.Adapter, c.Permission.Options)
 	put("queue", c.Queue.Adapter, c.Queue.Options)
-	put("ratelimit", c.Ratelimit.Adapter, c.Ratelimit.Options)
+	put("ratelimit", c.RateLimit.Adapter, c.RateLimit.Options)
 	put("router", c.Router.Adapter, c.Router.Options)
 	put("scheduler", c.Scheduler.Adapter, c.Scheduler.Options)
 	put("search", c.Search.Adapter, c.Search.Options)

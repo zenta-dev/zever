@@ -29,8 +29,8 @@ type Options struct {
 	Endpoint        string `json:"endpoint" toml:"endpoint" yaml:"endpoint"`
 	Region          string `json:"region" toml:"region" yaml:"region"`
 	Bucket          string `json:"bucket" toml:"bucket" yaml:"bucket"`
-	AccessKeyID     string `json:"accesskeyid" toml:"accesskeyid" yaml:"accesskeyid"`
-	SecretAccessKey string `json:"secretaccesskey" toml:"secretaccesskey" yaml:"secretaccesskey"`
+	AccessKeyID     string `json:"access_key_id" toml:"access_key_id" yaml:"access_key_id"`
+	SecretAccessKey string `json:"secret_access_key" toml:"secret_access_key" yaml:"secret_access_key"`
 }
 
 // Config aliases Options for compatibility.

@@ -7,8 +7,28 @@ import (
 	"strings"
 	"testing"
 
+	"github.com/zenta-dev/zever/analytics"
+	"github.com/zenta-dev/zever/billing"
 	"github.com/zenta-dev/zever/crypto"
 	"github.com/zenta-dev/zever/db"
+	"github.com/zenta-dev/zever/document"
+	"github.com/zenta-dev/zever/eventbus"
+	"github.com/zenta-dev/zever/flag"
+	"github.com/zenta-dev/zever/i18n"
+	zredis "github.com/zenta-dev/zever/internal/redis"
+	"github.com/zenta-dev/zever/mailer"
+	"github.com/zenta-dev/zever/media"
+	"github.com/zenta-dev/zever/notification"
+	"github.com/zenta-dev/zever/observability"
+	"github.com/zenta-dev/zever/payment"
+	"github.com/zenta-dev/zever/permission"
+	"github.com/zenta-dev/zever/ratelimit"
+	"github.com/zenta-dev/zever/scheduler"
+	"github.com/zenta-dev/zever/search"
+	"github.com/zenta-dev/zever/storage"
+	"github.com/zenta-dev/zever/tenant"
+	"github.com/zenta-dev/zever/vectorstore"
+	"github.com/zenta-dev/zever/webhook"
 )
 
 func writeTempConfig(t *testing.T, name, content string) string {
@@ -263,11 +283,11 @@ func TestDecodeServiceEntry_marshalFailure(t *testing.T) {
 func TestDecodeOptions_dbHappy(t *testing.T) {
 	t.Parallel()
 	got, err := decodeOptions[db.Options]("db", map[string]any{
-		"DSN":             "postgres://u@h/d",
-		"MaxConns":        10,
-		"MinConns":        2,
-		"MaxConnLifetime": 5_000_000_000,
-		"Path":            "/tmp/a.db",
+		"dsn":               "postgres://u@h/d",
+		"max_conns":         10,
+		"min_conns":         2,
+		"max_conn_lifetime": 5_000_000_000,
+		"path":              "/tmp/a.db",
 	})
 	if err != nil {
 		t.Fatalf("decodeOptions() error = %v", err)
@@ -282,7 +302,7 @@ func TestDecodeOptions_dbHappy(t *testing.T) {
 
 func TestDecodeOptions_caseInsensitiveMatch(t *testing.T) {
 	t.Parallel()
-	got, err := decodeOptions[db.Options]("db", map[string]any{"maxconns": 7})
+	got, err := decodeOptions[db.Options]("db", map[string]any{"max_conns": 7})
 	if err != nil {
 		t.Fatalf("decodeOptions() error = %v", err)
 	}
@@ -291,11 +311,11 @@ func TestDecodeOptions_caseInsensitiveMatch(t *testing.T) {
 	}
 }
 
-func TestDecodeOptions_underscoreKeyRejected(t *testing.T) {
+func TestDecodeOptions_oldFlatKeyRejected(t *testing.T) {
 	t.Parallel()
-	// encoding/json folds case but treats underscores as significant, so
-	// snake_case keys never match untagged Go fields like MaxConns.
-	_, err := decodeOptions[db.Options]("db", map[string]any{"max_conns": 7})
+	// Tags are snake_case and strict: the pre-rename flat key "maxconns"
+	// no longer matches "max_conns".
+	_, err := decodeOptions[db.Options]("db", map[string]any{"maxconns": 7})
 	if err == nil {
 		t.Fatal("decodeOptions() = nil, want unknown-field error")
 	}
@@ -444,7 +464,7 @@ func TestDecodeOptions_unmarshalerFailurePassthrough(t *testing.T) {
 
 func TestDecodeOptions_yamlNumbersDecodeAsInts(t *testing.T) {
 	t.Parallel()
-	path := writeTempConfig(t, "zever.yaml", "db:\n  adapter: sqlite\n  options:\n    MaxConns: 10\n")
+	path := writeTempConfig(t, "zever.yaml", "db:\n  adapter: sqlite\n  options:\n    max_conns: 10\n")
 	raw, err := decodeFile(path)
 	if err != nil {
 		t.Fatalf("decodeFile() error = %v", err)
@@ -455,5 +475,109 @@ func TestDecodeOptions_yamlNumbersDecodeAsInts(t *testing.T) {
 	}
 	if got.MaxConns != 10 {
 		t.Errorf("decodeOptions() MaxConns = %d, want 10", got.MaxConns)
+	}
+}
+
+func TestDecodeOptions_ownedOldFlatKeysRejected(t *testing.T) {
+	t.Parallel()
+	// Every snake_case rename rejects its pre-rename flat spelling as an
+	// unknown field. One representative old key per owned options type.
+	tests := []struct {
+		name    string
+		service string
+		decode  func() error
+	}{
+		{"analytics anonymousid", "analytics", func() error {
+			_, err := decodeOptions[analytics.Options]("analytics", map[string]any{"anonymousid": "x"})
+			return err
+		}},
+		{"billing secretkey", "billing", func() error {
+			_, err := decodeOptions[billing.Options]("billing", map[string]any{"secretkey": "x"})
+			return err
+		}},
+		{"document tmpdir", "document", func() error {
+			_, err := decodeOptions[document.Options]("document", map[string]any{"tmpdir": "/tmp"})
+			return err
+		}},
+		{"eventbus buffersize", "eventbus", func() error {
+			_, err := decodeOptions[eventbus.Options]("eventbus", map[string]any{"buffersize": 1})
+			return err
+		}},
+		{"flag firebase projectid", "flag", func() error {
+			_, err := decodeOptions[flag.Options]("flag", map[string]any{"firebase": map[string]any{"projectid": "x"}})
+			return err
+		}},
+		{"i18n remote apikey", "i18n", func() error {
+			_, err := decodeOptions[i18n.Options]("i18n", map[string]any{"remote": map[string]any{"apikey": "x"}})
+			return err
+		}},
+		{"mailer maxmessagesize", "mailer", func() error {
+			_, err := decodeOptions[mailer.Options]("mailer", map[string]any{"maxmessagesize": 1})
+			return err
+		}},
+		{"media maxdownloadbytes", "media", func() error {
+			_, err := decodeOptions[media.Options]("media", map[string]any{"maxdownloadbytes": 1})
+			return err
+		}},
+		{"notification twilio accountsid", "notification", func() error {
+			_, err := decodeOptions[notification.Options]("notification", map[string]any{"twilio": map[string]any{"accountsid": "x"}})
+			return err
+		}},
+		{"observability servicename", "observability", func() error {
+			_, err := decodeOptions[observability.Options]("observability", map[string]any{"servicename": "x"})
+			return err
+		}},
+		{"payment secretkey", "payment", func() error {
+			_, err := decodeOptions[payment.Options]("payment", map[string]any{"secretkey": "x"})
+			return err
+		}},
+		{"permission modelpath", "permission", func() error {
+			_, err := decodeOptions[permission.Options]("permission", map[string]any{"modelpath": "x"})
+			return err
+		}},
+		{"ratelimit idlettl", "ratelimit", func() error {
+			_, err := decodeOptions[ratelimit.Options]("ratelimit", map[string]any{"rate": 1.0, "burst": 1, "idlettl": 1})
+			return err
+		}},
+		{"scheduler closetimeout", "scheduler", func() error {
+			_, err := decodeOptions[scheduler.Options]("scheduler", map[string]any{"closetimeout": 1})
+			return err
+		}},
+		{"search apikey", "search", func() error {
+			_, err := decodeOptions[search.Options]("search", map[string]any{"apikey": "x"})
+			return err
+		}},
+		{"storage urlbase", "storage", func() error {
+			_, err := decodeOptions[storage.Options]("storage", map[string]any{"urlbase": "x"})
+			return err
+		}},
+		{"tenant subdomainregex", "tenant", func() error {
+			_, err := decodeOptions[tenant.Options]("tenant", map[string]any{"subdomainregex": "x"})
+			return err
+		}},
+		{"vectorstore apikey", "vectorstore", func() error {
+			_, err := decodeOptions[vectorstore.Options]("vectorstore", map[string]any{"apikey": "x"})
+			return err
+		}},
+		{"webhook maxretries", "webhook", func() error {
+			_, err := decodeOptions[webhook.Options]("webhook", map[string]any{"maxretries": 1})
+			return err
+		}},
+		{"redis poolsize", "redis", func() error {
+			_, err := decodeOptions[zredis.Options]("redis", map[string]any{"poolsize": 1})
+			return err
+		}},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			t.Parallel()
+			err := tt.decode()
+			if err == nil {
+				t.Fatalf("decodeOptions(%q) = nil, want unknown-field error", tt.service)
+			}
+			if !errors.Is(err, ErrUnknownField) {
+				t.Errorf("decodeOptions(%q) error = %v, want errors.Is ErrUnknownField", tt.service, err)
+			}
+		})
 	}
 }
