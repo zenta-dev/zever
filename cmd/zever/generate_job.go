@@ -98,8 +98,8 @@ func runGenerateJob(args []string) error {
 	args = peelInteractive(args)
 	fs := flag.NewFlagSet("generate job", flag.ContinueOnError)
 	queue := fs.String("queue", "default", "name of the queue the job runs on")
-	interactive := fs.Bool("interactive", false, "prompt for missing values")
-	interactiveShort := fs.Bool("i", false, "prompt for missing values (shorthand)")
+	// coverageProof: no local -i/--interactive flags; peelInteractive
+	// strips them before Parse and sets interactiveMode globally.
 
 	fs.Usage = func() {
 		printJobUsage(fs)
@@ -109,10 +109,6 @@ func runGenerateJob(args []string) error {
 
 	if err := fs.Parse(rest); err != nil {
 		return err
-	}
-
-	if *interactive || *interactiveShort {
-		interactiveMode = true
 	}
 
 	positional = append(positional, fs.Args()...)

@@ -515,11 +515,11 @@ func TestRunCompileInteractiveLongForm(t *testing.T) {
 	prev := interactiveMode
 	t.Cleanup(func() { interactiveMode = prev })
 
-	if err := runCompile([]string{"--interactive=true", "--backend=proto", "--out=" + outDir, schemaPath}); err != nil {
-		t.Fatalf("runCompile --interactive=true: %v", err)
+	if err := runCompile([]string{"--interactive", "--backend=proto", "--out=" + outDir, schemaPath}); err != nil {
+		t.Fatalf("runCompile --interactive: %v", err)
 	}
 	if !interactiveMode {
-		t.Fatalf("expected --interactive=true to set interactiveMode")
+		t.Fatalf("expected --interactive to set interactiveMode")
 	}
 }
 

@@ -372,8 +372,8 @@ func runGenerateServer(args []string) error { //nolint:gocyclo
 	fs := flag.NewFlagSet("generate server", flag.ContinueOnError)
 	force := fs.Bool("force", false, "overwrite the entrypoint if it already exists")
 	outDir := fs.String("out", "./generated", "output directory the schema was compiled into (must match `zever compile --out`)")
-	interactive := fs.Bool("interactive", false, "prompt for missing values")
-	interactiveShort := fs.Bool("i", false, "prompt for missing values (shorthand)")
+	// coverageProof: no local -i/--interactive flags; peelInteractive
+	// strips them before Parse and sets interactiveMode globally.
 
 	fs.Usage = func() {
 		printServerUsage(fs)
@@ -382,10 +382,6 @@ func runGenerateServer(args []string) error { //nolint:gocyclo
 	posArgs, err := flexibleParse(fs, args)
 	if err != nil {
 		return err
-	}
-
-	if *interactive || *interactiveShort {
-		interactiveMode = true
 	}
 
 	project, err := loadProjectConfig()
