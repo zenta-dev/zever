@@ -112,6 +112,10 @@ type fakePool struct {
 	execErrs  []error
 	execCalls int
 	execSQL   []string
+	// execTag is returned by every Exec call whose index has no injected
+	// error; the zero value's RowsAffected() is 0, matching pgconn's own
+	// zero-value CommandTag{}.
+	execTag   pgconn.CommandTag
 	queryRows pgx.Rows
 	queryErr  error
 	querySQL  []string
@@ -119,7 +123,7 @@ type fakePool struct {
 	closed    bool
 }
 
-// Exec records the SQL and returns the next injected error.
+// Exec records the SQL and returns the next injected error, or execTag.
 func (p *fakePool) Exec(_ context.Context, sql string, _ ...any) (pgconn.CommandTag, error) {
 	p.execSQL = append(p.execSQL, sql)
 
@@ -130,7 +134,7 @@ func (p *fakePool) Exec(_ context.Context, sql string, _ ...any) (pgconn.Command
 
 	p.execCalls++
 
-	return pgconn.CommandTag{}, err
+	return p.execTag, err
 }
 
 // Query records the SQL and returns the stubbed rows or error.
@@ -151,29 +155,6 @@ func (p *fakePool) Query(_ context.Context, sql string, args ...any) (pgx.Rows, 
 
 // Close marks the pool closed.
 func (p *fakePool) Close() { p.closed = true }
-
-func TestFormatVector(t *testing.T) {
-	t.Parallel()
-
-	tests := []struct {
-		name string
-		in   []float32
-		want string
-	}{
-		{name: "empty", in: nil, want: "[]"},
-		{name: "values", in: []float32{1, 2.5}, want: "[1,2.5]"},
-	}
-
-	for _, tt := range tests {
-		t.Run(tt.name, func(t *testing.T) {
-			t.Parallel()
-
-			if got := formatVector(tt.in); got != tt.want {
-				t.Fatalf("formatVector(%v) = %q, want %q", tt.in, got, tt.want)
-			}
-		})
-	}
-}
 
 func TestTableDDL(t *testing.T) {
 	t.Parallel()
@@ -545,21 +526,21 @@ func TestDelete(t *testing.T) {
 	t.Run("ok", func(t *testing.T) {
 		t.Parallel()
 
-		pool := &fakePool{queryRows: &fakeRows{rows: [][]any{{1}}}}
+		pool := &fakePool{execTag: pgconn.NewCommandTag("DELETE 1")}
 		s := &Store{db: pool, dim: 3}
 		if err := s.Delete(t.Context(), "a"); err != nil {
 			t.Fatalf("Delete error: %v", err)
 		}
 
-		if !strings.Contains(pool.querySQL[0], "$1") {
-			t.Fatalf("Delete select SQL = %q, want $1", pool.querySQL[0])
+		if !strings.Contains(pool.execSQL[0], "$1") {
+			t.Fatalf("Delete SQL = %q, want $1", pool.execSQL[0])
 		}
 	})
 
 	t.Run("missing", func(t *testing.T) {
 		t.Parallel()
 
-		pool := &fakePool{queryRows: &fakeRows{}}
+		pool := &fakePool{execTag: pgconn.NewCommandTag("DELETE 0")}
 		s := &Store{db: pool, dim: 3}
 		err := s.Delete(t.Context(), "missing")
 		var notFound *vectorstore.NotFoundError
@@ -572,30 +553,10 @@ func TestDelete(t *testing.T) {
 		}
 	})
 
-	t.Run("query error", func(t *testing.T) {
-		t.Parallel()
-
-		pool := &fakePool{queryErr: errors.New("boom")}
-		s := &Store{db: pool, dim: 3}
-		if err := s.Delete(t.Context(), "a"); err == nil {
-			t.Fatal("Delete query error = nil, want error")
-		}
-	})
-
-	t.Run("rows error", func(t *testing.T) {
-		t.Parallel()
-
-		pool := &fakePool{queryRows: &fakeRows{err: errors.New("boom")}}
-		s := &Store{db: pool, dim: 3}
-		if err := s.Delete(t.Context(), "a"); err == nil {
-			t.Fatal("Delete rows error = nil, want error")
-		}
-	})
-
 	t.Run("exec error", func(t *testing.T) {
 		t.Parallel()
 
-		pool := &fakePool{queryRows: &fakeRows{rows: [][]any{{1}}}, execErrs: []error{errors.New("boom")}}
+		pool := &fakePool{execErrs: []error{errors.New("boom")}}
 		s := &Store{db: pool, dim: 3}
 		if err := s.Delete(t.Context(), "a"); err == nil {
 			t.Fatal("Delete exec error = nil, want error")

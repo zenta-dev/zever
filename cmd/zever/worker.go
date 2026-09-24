@@ -20,7 +20,7 @@ func resolveWorkerConfig(project ProjectConfig, args []string) WorkerConfig {
 // why this shells out instead of running a worker in-process.
 func runQueueWork(args []string) error {
 	if hasHelpFlag(args) {
-		printLauncherHelp(flag.CommandLine.Output(), "zever queue:work", "Starts this project's background worker by running its worker entrypoint package (project.worker_entry, default cmd/worker). Every argument is passed through.", "zever queue:work --once")
+		printLauncherHelp(flag.CommandLine.Output(), "zever queue:work", "Starts this project's background worker by running its worker entrypoint package (project.worker_entry, default cmd/worker). Every argument is passed through to that package -- the scaffolded worker entrypoint itself accepts none by default.", "zever queue:work")
 		return nil
 	}
 

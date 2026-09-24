@@ -3,6 +3,7 @@ package paddle
 import (
 	"bytes"
 	"context"
+	"crypto/sha256"
 	"fmt"
 	"net/http"
 	"strconv"
@@ -11,6 +12,7 @@ import (
 
 	"github.com/PaddleHQ/paddle-go-sdk/v5"
 
+	"github.com/zenta-dev/zever/idempotency"
 	"github.com/zenta-dev/zever/internal/httpclient"
 	"github.com/zenta-dev/zever/payment"
 )
@@ -27,6 +29,32 @@ type driver struct {
 	verifier        *paddle.WebhookVerifier
 	webhookSecret   string
 	maxWebhookBytes int
+	idempotency     idempotency.Store
+}
+
+// refundFingerprint scopes an idempotency key to a specific refund request.
+func refundFingerprint(id string, amount int64) []byte {
+	sum := sha256.Sum256([]byte(id + "|" + strconv.FormatInt(amount, 10)))
+
+	return sum[:]
+}
+
+// beginRefundGuard reserves key in store; ok=false means replay, skip execution.
+func beginRefundGuard(ctx context.Context, store idempotency.Store, key string, fingerprint []byte) (ok bool, err error) {
+	if store == nil || key == "" {
+		return true, nil
+	}
+
+	outcome, err := store.Begin(ctx, key, idempotency.BeginOptions{Fingerprint: fingerprint, TTL: payment.DefaultRefundIdempotencyTTL})
+	if err != nil {
+		return false, err
+	}
+
+	if outcome.Replay {
+		return false, nil
+	}
+
+	return true, nil
 }
 
 // New creates a Payment backed by Paddle.
@@ -65,6 +93,7 @@ func New(o payment.Options) (payment.Payment, error) {
 		),
 		webhookSecret:   o.WebhookSecret,
 		maxWebhookBytes: maxWebhookBytes,
+		idempotency:     o.Idempotency,
 	}, nil
 }
 
@@ -202,7 +231,8 @@ func parsePaddleAmount(s string) (int64, error) {
 }
 
 // Refund refunds amount (in minor units) against a Paddle transaction.
-func (d *driver) Refund(ctx context.Context, id string, amount int64) error {
+// key is the idempotency key; empty skips the idempotency guard.
+func (d *driver) Refund(ctx context.Context, id string, amount int64, key string) error {
 	if amount <= 0 {
 		return fmt.Errorf("paddle: refund: %w", payment.ErrInvalidAmount)
 	}
@@ -211,6 +241,35 @@ func (d *driver) Refund(ctx context.Context, id string, amount int64) error {
 		return fmt.Errorf("paddle: refund: %w", payment.ErrMissingPaymentID)
 	}
 
+	fingerprint := refundFingerprint(id, amount)
+
+	execute, err := beginRefundGuard(ctx, d.idempotency, key, fingerprint)
+	if err != nil {
+		return fmt.Errorf("paddle: refund: %w", err)
+	}
+
+	if !execute {
+		return nil
+	}
+
+	if err := d.refund(ctx, id, amount); err != nil {
+		if d.idempotency != nil && key != "" {
+			_ = d.idempotency.Forget(ctx, key)
+		}
+
+		return err
+	}
+
+	if d.idempotency != nil && key != "" {
+		if err := d.idempotency.Complete(ctx, key, fingerprint, []byte{1}); err != nil {
+			return fmt.Errorf("paddle: refund: %w", err)
+		}
+	}
+
+	return nil
+}
+
+func (d *driver) refund(ctx context.Context, id string, amount int64) error {
 	txn, err := d.client.GetTransaction(ctx, &paddle.GetTransactionRequest{TransactionID: id})
 	if err != nil {
 		return fmt.Errorf("paddle: refund: get transaction: %w", err)

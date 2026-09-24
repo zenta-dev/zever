@@ -211,7 +211,14 @@ func writeError(w http.ResponseWriter, status int, msg string) {
 }
 
 // decodeJSON decodes a JSON request body into v.
+// maxRequestBodyBytes bounds every JSON request body this API decodes,
+// closing off an unbounded-body DoS vector: without it, a client can send
+// an arbitrarily large body and force full buffering before any validation
+// runs.
+const maxRequestBodyBytes = 1 << 20 // 1 MiB
+
 func decodeJSON(req *http.Request, v any) error {
 	defer func() { _ = req.Body.Close() }()
-	return json.NewDecoder(req.Body).Decode(v)
+	body := http.MaxBytesReader(nil, req.Body, maxRequestBodyBytes)
+	return json.NewDecoder(body).Decode(v)
 }

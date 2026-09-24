@@ -453,7 +453,7 @@ func TestRefund(t *testing.T) {
 	p := openTest(t, srv, nil)
 	ctx := t.Context()
 
-	if err := p.Refund(ctx, "txn_full", 2500); err != nil {
+	if err := p.Refund(ctx, "txn_full", 2500, ""); err != nil {
 		t.Fatalf("full Refund: %v", err)
 	}
 
@@ -464,7 +464,7 @@ func TestRefund(t *testing.T) {
 	}
 	mu.Unlock()
 
-	if err := p.Refund(ctx, "txn_partial", 1000); err != nil {
+	if err := p.Refund(ctx, "txn_partial", 1000, ""); err != nil {
 		t.Fatalf("partial Refund: %v", err)
 	}
 
@@ -475,46 +475,46 @@ func TestRefund(t *testing.T) {
 	}
 	mu.Unlock()
 
-	if err := p.Refund(ctx, "txn_x", 0); !errors.Is(err, payment.ErrInvalidAmount) {
+	if err := p.Refund(ctx, "txn_x", 0, ""); !errors.Is(err, payment.ErrInvalidAmount) {
 		t.Fatalf("expected ErrInvalidAmount, got %v", err)
 	}
 
-	if err := p.Refund(ctx, "", 100); !errors.Is(err, payment.ErrMissingPaymentID) {
+	if err := p.Refund(ctx, "", 100, ""); !errors.Is(err, payment.ErrMissingPaymentID) {
 		t.Fatalf("expected ErrMissingPaymentID, got %v", err)
 	}
 
-	if err := p.Refund(ctx, "txn_nope", 100); err == nil || !strings.Contains(err.Error(), "get transaction") {
+	if err := p.Refund(ctx, "txn_nope", 100, ""); err == nil || !strings.Contains(err.Error(), "get transaction") {
 		t.Fatalf("expected get error, got %v", err)
 	}
 
-	if err := p.Refund(ctx, "txn_badtotal", 100); err == nil || !strings.Contains(err.Error(), "parse total") {
+	if err := p.Refund(ctx, "txn_badtotal", 100, ""); err == nil || !strings.Contains(err.Error(), "parse total") {
 		t.Fatalf("expected total parse error, got %v", err)
 	}
 
-	overErr := p.Refund(ctx, "txn_full", 99999)
+	overErr := p.Refund(ctx, "txn_full", 99999, "")
 	var over payment.AmountMismatchError
 	if !errors.As(overErr, &over) || over.Expected != 2500 || over.Actual != 99999 {
 		t.Fatalf("expected over-total mismatch, got %v", overErr)
 	}
 
-	if err := p.Refund(ctx, "txn_baditem", 100); err == nil || !strings.Contains(err.Error(), "parse line item") {
+	if err := p.Refund(ctx, "txn_baditem", 100, ""); err == nil || !strings.Contains(err.Error(), "parse line item") {
 		t.Fatalf("expected item parse error, got %v", err)
 	}
 
-	itemErr := p.Refund(ctx, "txn_small", 1000)
+	itemErr := p.Refund(ctx, "txn_small", 1000, "")
 	var itemOver payment.AmountMismatchError
 	if !errors.As(itemErr, &itemOver) || itemOver.Expected != 500 || itemOver.Actual != 1000 {
 		t.Fatalf("expected over-item mismatch, got %v", itemErr)
 	}
 
-	if err := p.Refund(ctx, "txn_multi", 1000); !errors.Is(err, ErrMultiItemPartial) {
+	if err := p.Refund(ctx, "txn_multi", 1000, ""); !errors.Is(err, ErrMultiItemPartial) {
 		t.Fatalf("expected ErrMultiItemPartial, got %v", err)
 	}
 
 	mu.Lock()
 	adjustFail = true
 	mu.Unlock()
-	if err := p.Refund(ctx, "txn_full", 2500); err == nil || !strings.Contains(err.Error(), "paddle: refund") {
+	if err := p.Refund(ctx, "txn_full", 2500, ""); err == nil || !strings.Contains(err.Error(), "paddle: refund") {
 		t.Fatalf("expected adjustment error, got %v", err)
 	}
 }

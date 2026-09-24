@@ -4,6 +4,8 @@ import (
 	"errors"
 	"net/url"
 	"time"
+
+	"github.com/zenta-dev/zever/idempotency"
 )
 
 const (
@@ -11,6 +13,8 @@ const (
 	DefaultMaxWebhookBytes = 1 << 20
 	// DefaultHTTPTimeout is the default HTTP timeout for provider calls.
 	DefaultHTTPTimeout = 30 * time.Second
+	// DefaultRefundIdempotencyTTL bounds refund idempotency reservations.
+	DefaultRefundIdempotencyTTL = 24 * time.Hour
 )
 
 // Options configures payment backend selection and limits.
@@ -29,6 +33,8 @@ type Options struct {
 	AutoApprove bool `json:"auto_approve" toml:"auto_approve" yaml:"auto_approve"`
 	// MaxWebhookBytes bounds the webhook payload size.
 	MaxWebhookBytes int `json:"max_webhook_bytes" toml:"max_webhook_bytes" yaml:"max_webhook_bytes"`
+	// Idempotency holds the optional refund idempotency store. Nil skips the guard.
+	Idempotency idempotency.Store
 }
 
 // Validate checks options for consistency, joining all violations.
