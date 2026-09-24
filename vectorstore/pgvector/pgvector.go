@@ -41,7 +41,7 @@ type Store struct {
 // DefaultDDLTimeout bounds connect plus DDL during construction. Shared 10s
 // floor with search/postgres: pgvector ivfflat index build slower than plain
 // B-tree/GIN; single budget for connect+DDL during construction so they don't
-// drift.
+// drift. Server backend; local embedded DB uses 5s.
 const DefaultDDLTimeout = 10 * time.Second
 
 // New creates a pgvector Store from Options. It validates Options first, then
@@ -98,7 +98,7 @@ func setupStore(ctx context.Context, conn dbpool, dimension int) (*Store, error)
 	if exists {
 		if err := checkDimension(existingDim, dimension); err != nil {
 			conn.Close()
-			return nil, fmt.Errorf("pgvector: %w", err)
+			return nil, err
 		}
 	}
 
@@ -163,7 +163,7 @@ func embeddingColumnDim(ctx context.Context, conn dbpool) (int, bool, error) {
 // both numbers greppably, so no typed error wraps it here.
 func checkDimension(existing, configured int) error {
 	if existing != configured {
-		return fmt.Errorf("existing vectors.embedding dimension %d does not match configured dimension %d", existing, configured)
+		return fmt.Errorf("pgvector: existing vectors.embedding dimension %d does not match configured dimension %d", existing, configured)
 	}
 
 	return nil
@@ -172,12 +172,12 @@ func checkDimension(existing, configured int) error {
 func parseVectorType(typ string) (int, error) {
 	const prefix = "vector("
 	if !strings.HasPrefix(typ, prefix) || !strings.HasSuffix(typ, ")") {
-		return 0, fmt.Errorf("unexpected embedding column type %q", typ)
+		return 0, fmt.Errorf("pgvector: unexpected embedding column type %q", typ)
 	}
 
 	dim, err := strconv.Atoi(strings.TrimSuffix(strings.TrimPrefix(typ, prefix), ")"))
 	if err != nil || dim <= 0 {
-		return 0, fmt.Errorf("unexpected embedding column type %q", typ)
+		return 0, fmt.Errorf("pgvector: unexpected embedding column type %q", typ)
 	}
 
 	return dim, nil

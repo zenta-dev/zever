@@ -114,7 +114,7 @@ func convertScan[T any](src any) (T, error) {
 		}
 
 		if n < math.MinInt32 || n > math.MaxInt32 {
-			return zero, fmt.Errorf("cannot scan int64 %d into int32: out of range", n)
+			return zero, fmt.Errorf("orm: cannot scan int64 %d into int32: out of range", n)
 		}
 
 		return any(int32(n)).(T), nil //nolint:forcetypeassert,gosec // guarded by the outer type switch; range checked above
@@ -173,7 +173,7 @@ func scanString(src any) (string, error) {
 		// text a plain rows.Scan into *string would have produced.
 		return v.Format(time.RFC3339Nano), nil
 	default:
-		return "", fmt.Errorf("cannot scan %T into string", src)
+		return "", fmt.Errorf("orm: cannot scan %T into string", src)
 	}
 }
 
@@ -191,7 +191,7 @@ func scanBytes(src any) ([]byte, error) {
 		// time.Time source: its RFC3339Nano bytes.
 		return v.AppendFormat(make([]byte, 0, len(time.RFC3339Nano)), time.RFC3339Nano), nil
 	default:
-		return nil, fmt.Errorf("cannot scan %T into []byte", src)
+		return nil, fmt.Errorf("orm: cannot scan %T into []byte", src)
 	}
 }
 
@@ -210,14 +210,14 @@ func scanInt64(src any) (int64, error) {
 	case string:
 		return parseInt64(v)
 	default:
-		return 0, fmt.Errorf("cannot scan %T into int64", src)
+		return 0, fmt.Errorf("orm: cannot scan %T into int64", src)
 	}
 }
 
 func parseInt64(s string) (int64, error) {
 	n, err := strconv.ParseInt(s, 10, 64)
 	if err != nil {
-		return 0, fmt.Errorf("cannot scan %q into int64: %w", s, err)
+		return 0, fmt.Errorf("orm: cannot scan %q into int64: %w", s, err)
 	}
 
 	return n, nil
@@ -236,14 +236,14 @@ func scanFloat64(src any) (float64, error) {
 	case string:
 		return parseFloat64(v)
 	default:
-		return 0, fmt.Errorf("cannot scan %T into float64", src)
+		return 0, fmt.Errorf("orm: cannot scan %T into float64", src)
 	}
 }
 
 func parseFloat64(s string) (float64, error) {
 	f, err := strconv.ParseFloat(s, 64)
 	if err != nil {
-		return 0, fmt.Errorf("cannot scan %q into float64: %w", s, err)
+		return 0, fmt.Errorf("orm: cannot scan %q into float64: %w", s, err)
 	}
 
 	return f, nil
@@ -262,7 +262,7 @@ func scanBool(src any) (bool, error) {
 
 		return s != "" && s != "false" && s != "0", nil
 	default:
-		return false, fmt.Errorf("cannot scan %T into bool", src)
+		return false, fmt.Errorf("orm: cannot scan %T into bool", src)
 	}
 }
 
@@ -275,14 +275,14 @@ func scanTime(src any) (time.Time, error) {
 	case []byte:
 		return parseTime(string(v))
 	default:
-		return time.Time{}, fmt.Errorf("cannot scan %T into time.Time", src)
+		return time.Time{}, fmt.Errorf("orm: cannot scan %T into time.Time", src)
 	}
 }
 
 func parseTime(s string) (time.Time, error) {
 	t, err := time.Parse(time.RFC3339Nano, s)
 	if err != nil {
-		return time.Time{}, fmt.Errorf("cannot scan %q into time.Time: %w", s, err)
+		return time.Time{}, fmt.Errorf("orm: cannot scan %q into time.Time: %w", s, err)
 	}
 
 	return t, nil
