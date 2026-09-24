@@ -280,6 +280,7 @@ func startDevChild(entryDir string, args []string, out io.Writer) (*devChild, er
 
 	child := &devChild{cmd: cmd, done: make(chan struct{})}
 
+	// Reaper exits when child process ends (closes done).
 	go func() {
 		// A non-zero exit is the child's business (a compile error in the
 		// project's own Go source, a port already bound); `go run` has already

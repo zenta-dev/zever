@@ -46,6 +46,7 @@ type fakeCtx struct {
 	order        *[]string
 	mu           *sync.Mutex
 	calls        atomic.Int32
+	started      atomic.Bool
 	block        time.Duration
 	panicOnClose bool
 	closeErr     error
@@ -53,6 +54,7 @@ type fakeCtx struct {
 }
 
 func (m *fakeCtx) Close(ctx context.Context) error {
+	m.started.Store(true)
 	if m.panicOnClose {
 		panic("fakeCtx: simulated panic in service Close")
 	}
@@ -162,6 +164,45 @@ func (m *fakeSched) Stop() error {
 	return nil
 }
 func (m *fakeSched) Name() string { return "fake" }
+
+// waitForCloseStarted polls until a fakeCtx Close has been entered, so tests
+// cancel only once Close is in flight instead of sleeping a fixed delay.
+func waitForCloseStarted(t *testing.T, m *fakeCtx, within time.Duration) {
+	t.Helper()
+	deadline := time.Now().Add(within)
+	for !m.started.Load() {
+		if time.Now().After(deadline) {
+			t.Fatalf("timed out waiting for %s Close to start", m.name)
+		}
+		timer := time.NewTimer(5 * time.Millisecond)
+		select {
+		case <-t.Context().Done():
+			timer.Stop()
+			t.Fatalf("test context done waiting for %s Close to start", m.name)
+		case <-timer.C:
+		}
+	}
+}
+
+// waitForCloseCalls polls until the ignored-ctx goroutine finishes its block
+// (calls incremented at the end of fakeCtx.Close), replacing the fixed
+// leak-drain sleep so goleak sees no leftover goroutine without wall-clock waits.
+func waitForCloseCalls(t *testing.T, m *fakeCtx, within time.Duration) {
+	t.Helper()
+	deadline := time.Now().Add(within)
+	for m.calls.Load() < 1 {
+		if time.Now().After(deadline) {
+			t.Fatalf("timed out waiting for %s goroutine to finish", m.name)
+		}
+		timer := time.NewTimer(5 * time.Millisecond)
+		select {
+		case <-t.Context().Done():
+			timer.Stop()
+			t.Fatalf("test context done waiting for %s goroutine to finish", m.name)
+		case <-timer.C:
+		}
+	}
+}
 
 type noCloser struct{}
 
@@ -698,13 +739,18 @@ func TestContainer_Close_TimeoutError(t *testing.T) {
 	if timeoutErr.Service != "db" {
 		t.Fatalf("Service = %q, want db", timeoutErr.Service)
 	}
-	// Let the ignored-ctx goroutine finish so no goroutine leaks past the test.
-	time.Sleep(700 * time.Millisecond)
+	// Wait for the ignored-ctx goroutine to finish its block so no
+	// goroutine leaks past the test (goleak): poll the completion event
+	// instead of sleeping past the 500ms block.
+	waitForCloseCalls(t, slow, 2*time.Second)
 }
 
 func TestContainer_Close_DerivedTimeoutCancel(t *testing.T) {
 	c := New(config.Default())
-	slow := &fakeCtx{name: "slow-derived", block: 2 * time.Second, ignoreCtx: true}
+	// Shrunk from 2s to 500ms: the block only needs to outlive the
+	// wait-for-start + cancel below so Close is still in flight when the
+	// parent is canceled; the timeout branch under test is unchanged.
+	slow := &fakeCtx{name: "slow-derived", block: 500 * time.Millisecond, ignoreCtx: true}
 	c.db.val = slow
 	c.db.done = true
 	c.db.ready.Store(true)
@@ -715,7 +761,8 @@ func TestContainer_Close_DerivedTimeoutCancel(t *testing.T) {
 	ctx, cancel := context.WithCancel(t.Context())
 	done := make(chan error, 1)
 	go func() { done <- c.Close(ctx) }()
-	time.Sleep(100 * time.Millisecond)
+	// Event wait: cancel only once Close is provably in flight.
+	waitForCloseStarted(t, slow, 2*time.Second)
 	cancel()
 	select {
 	case err := <-done:
@@ -732,8 +779,10 @@ func TestContainer_Close_DerivedTimeoutCancel(t *testing.T) {
 	case <-time.After(10 * time.Second):
 		t.Fatal("Close hung after parent cancel")
 	}
-	// Let the ignored-ctx goroutine finish so no goroutine leaks past the test.
-	time.Sleep(2500 * time.Millisecond)
+	// Wait for the ignored-ctx goroutine to finish its block so no
+	// goroutine leaks past the test (goleak): poll the completion event
+	// instead of sleeping past the 500ms block.
+	waitForCloseCalls(t, slow, 2*time.Second)
 }
 
 func TestContainer_Close_PanicError(t *testing.T) {
