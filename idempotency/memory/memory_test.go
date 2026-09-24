@@ -26,6 +26,19 @@ func newStore(t *testing.T) idempotency.Store {
 	return s
 }
 
+func eventually(t *testing.T, timeout time.Duration, cond func() bool, msg string) {
+	t.Helper()
+
+	deadline := time.Now().Add(timeout)
+	for !cond() {
+		if time.Now().After(deadline) {
+			t.Fatalf("timed out waiting for %s", msg)
+		}
+
+		time.Sleep(5 * time.Millisecond)
+	}
+}
+
 func TestClaimCompleteReplay(t *testing.T) {
 	t.Parallel()
 
@@ -247,16 +260,12 @@ func TestExpiryReclaim(t *testing.T) {
 		t.Fatalf("Begin: %v", err)
 	}
 
-	time.Sleep(50 * time.Millisecond)
-
-	out, err := s.Begin(ctx, "key-expire", idempotency.BeginOptions{TTL: ttl})
-	if err != nil {
-		t.Fatalf("re-claim after expiry: %v", err)
-	}
-
-	if out.Replay {
-		t.Fatal("expired record must not replay")
-	}
+	// Poll re-claim until the 20ms record expires; a live record reports
+	// ErrInProgress, an expired one re-claims cleanly without replay.
+	eventually(t, 2*time.Second, func() bool {
+		out, err := s.Begin(ctx, "key-expire", idempotency.BeginOptions{TTL: ttl})
+		return err == nil && !out.Replay
+	}, "idempotency record expiry")
 }
 
 func TestForget(t *testing.T) {

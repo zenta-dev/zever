@@ -1483,13 +1483,14 @@ func TestStream_EmptyToolCallSkipped(t *testing.T) {
 func TestStream_ContextCancel(t *testing.T) {
 	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, _ *http.Request) {
 		w.Header().Set("Content-Type", "text/event-stream")
-		// slow stream
+		// paced stream without fixed sleeps: the chunks are flushed
+		// back-to-back and the test cancels immediately below, so the
+		// ctx.Done branches are hit regardless of pacing.
 		for i := 0; i < 5; i++ {
 			_, _ = fmt.Fprintf(w, "data: {\"choices\":[{\"delta\":{\"content\":\"x\"}}]}\n\n")
 			if f, ok := w.(http.Flusher); ok {
 				f.Flush()
 			}
-			time.Sleep(50 * time.Millisecond)
 		}
 		_, _ = fmt.Fprint(w, "data: [DONE]\n\n")
 	}))
@@ -1591,15 +1592,20 @@ func TestStream_CtxDoneDuringDelta(t *testing.T) {
 	}
 	// cancel before draining to trigger ctx.Done branch
 	cancel()
-	// Give goroutine time to hit select
-	time.Sleep(100 * time.Millisecond)
-	// Drain remaining to avoid goroutine leak
+	// Drain until the goroutine closes the channel (bounded by timeout);
+	// no fixed settle sleep: closure itself proves the ctx.Done path ran.
+	done := make(chan struct{})
 	go func() {
+		defer close(done)
 		for range ch {
 			_ = struct{}{}
 		}
 	}()
-	time.Sleep(100 * time.Millisecond)
+	select {
+	case <-done:
+	case <-time.After(5 * time.Second):
+		t.Fatal("stream channel did not close after cancel")
+	}
 }
 
 func TestStream_CtxDoneDuringToolCall(t *testing.T) {
@@ -1625,11 +1631,18 @@ func TestStream_CtxDoneDuringToolCall(t *testing.T) {
 		t.Fatalf("Stream err = %v", err)
 	}
 	cancel()
-	time.Sleep(100 * time.Millisecond)
+	// Drain until the goroutine closes the channel (bounded by timeout);
+	// no fixed settle sleep: closure itself proves the ctx.Done path ran.
+	done := make(chan struct{})
 	go func() {
+		defer close(done)
 		for range ch {
 			_ = struct{}{}
 		}
 	}()
-	time.Sleep(100 * time.Millisecond)
+	select {
+	case <-done:
+	case <-time.After(5 * time.Second):
+		t.Fatal("stream channel did not close after cancel")
+	}
 }

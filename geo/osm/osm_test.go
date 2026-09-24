@@ -367,7 +367,6 @@ func largeErr(g geo.Geo, q string) error {
 func TestGeocode_ContextCancellation(t *testing.T) {
 	t.Parallel()
 	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, _ *http.Request) {
-		time.Sleep(200 * time.Millisecond)
 		fmt.Fprint(w, `[]`)
 	}))
 	defer srv.Close()

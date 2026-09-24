@@ -36,6 +36,21 @@ func TestSentinels(t *testing.T) {
 	}
 }
 
+func TestDuplicateAliases_compat(t *testing.T) {
+	t.Parallel()
+	err := &DuplicateAdapterError{Adapter: Google}
+	if !errors.Is(err, ErrDuplicate) {
+		t.Fatalf("expected errors.Is ErrDuplicate alias, got %v", err)
+	}
+	var target *DuplicateError
+	if !errors.As(err, &target) {
+		t.Fatalf("expected errors.As DuplicateError alias, got %T", err)
+	}
+	if !errors.Is(ErrDuplicateAdapter, ErrDuplicate) {
+		t.Errorf("alias ErrDuplicate does not match ErrDuplicateAdapter")
+	}
+}
+
 func TestTypedErrors(t *testing.T) {
 	t.Parallel()
 	t.Run("InvalidAdapterError", func(t *testing.T) {

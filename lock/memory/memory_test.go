@@ -24,6 +24,21 @@ func newLocker(t *testing.T, o lock.Options) lock.Locker {
 	return l
 }
 
+func eventually(t *testing.T, cond func() bool, msg string) {
+	t.Helper()
+
+	const timeout = 2 * time.Second
+
+	deadline := time.Now().Add(timeout)
+	for !cond() {
+		if time.Now().After(deadline) {
+			t.Fatalf("timed out waiting for %s", msg)
+		}
+
+		time.Sleep(time.Millisecond)
+	}
+}
+
 func TestNew_appliesOptions(t *testing.T) {
 	t.Parallel()
 
@@ -175,7 +190,17 @@ func TestLease_autoExpires(t *testing.T) {
 		t.Fatalf("acquire = (%v, %v), want (true, nil)", ok, err)
 	}
 
-	time.Sleep(40 * time.Millisecond)
+	// Poll re-acquire until the 20ms lease lapses; a live lease reports
+	// ok=false, an expired one re-acquires. Unlock the probe so the final
+	// assertion starts unheld.
+	eventually(t, func() bool {
+		probe, ok, err := l.TryAcquire(ctx, "k", time.Minute)
+		if err != nil || !ok {
+			return false
+		}
+		_ = probe.Unlock(ctx)
+		return true
+	}, "lease expiry")
 
 	if _, ok, err := l.TryAcquire(ctx, "k", time.Minute); err != nil || !ok {
 		t.Fatalf("acquire after expiry = (%v, %v), want (true, nil)", ok, err)
@@ -193,13 +218,20 @@ func TestExtend_keepsLockHeld(t *testing.T) {
 		t.Fatalf("acquire = (%v, %v), want (true, nil)", ok, err)
 	}
 
-	time.Sleep(20 * time.Millisecond)
-
+	// Extend immediately, well before the 40ms lease lapses.
 	if err := held.Extend(ctx, time.Minute); err != nil {
 		t.Fatalf("extend: %v", err)
 	}
 
-	time.Sleep(40 * time.Millisecond)
+	// Wait past the original 40ms TTL, polling that the lock stays held.
+	start := time.Now()
+	eventually(t, func() bool {
+		if time.Since(start) <= 60*time.Millisecond {
+			return false
+		}
+		_, ok, _ := l.TryAcquire(ctx, "k", time.Minute)
+		return !ok
+	}, "extended lease to stay held")
 
 	if _, ok, err := l.TryAcquire(ctx, "k", time.Minute); err != nil || ok {
 		t.Fatalf("acquire after extend = (%v, %v), want (false, nil)", ok, err)
@@ -217,7 +249,17 @@ func TestExtend_afterExpiryFails(t *testing.T) {
 		t.Fatalf("acquire: %v", err)
 	}
 
-	time.Sleep(40 * time.Millisecond)
+	// Poll takeover until the 20ms lease lapses (live lease reports
+	// ok=false without side effects), then release the probe so the
+	// stale Extend observes a free key.
+	eventually(t, func() bool {
+		probe, ok, err := l.TryAcquire(ctx, "k", time.Minute)
+		if err != nil || !ok {
+			return false
+		}
+		_ = probe.Unlock(ctx)
+		return true
+	}, "lease expiry")
 
 	if err := held.Extend(ctx, time.Minute); !errors.Is(err, lock.ErrNotHeld) {
 		t.Fatalf("extend after expiry = %v, want ErrNotHeld", err)
@@ -271,11 +313,19 @@ func TestUnlock_afterTakeoverDoesNotStealLock(t *testing.T) {
 		t.Fatalf("acquire: %v", err)
 	}
 
-	time.Sleep(40 * time.Millisecond)
+	// Poll takeover until the 20ms lease lapses.
+	var newHolder lock.Lock
+	eventually(t, func() bool {
+		got, ok, err := l.TryAcquire(ctx, "k", time.Minute)
+		if err != nil || !ok {
+			return false
+		}
+		newHolder = got
+		return true
+	}, "takeover acquire")
 
-	newHolder, ok, err := l.TryAcquire(ctx, "k", time.Minute)
-	if err != nil || !ok {
-		t.Fatalf("takeover acquire = (%v, %v), want (true, nil)", ok, err)
+	if newHolder == nil {
+		t.Fatal("takeover acquire never succeeded")
 	}
 
 	if err := stale.Unlock(ctx); !errors.Is(err, lock.ErrNotHeld) {

@@ -39,8 +39,8 @@ func TestErrors_sentinels_match(t *testing.T) {
 
 func TestErrors_unwrap_carries_sentinel(t *testing.T) {
 	t.Parallel()
-	if !errors.Is(&DuplicateError{Adapter: JWT}, ErrDuplicate) {
-		t.Fatal("DuplicateError does not unwrap to ErrDuplicate")
+	if !errors.Is(&DuplicateAdapterError{Adapter: JWT}, ErrDuplicate) {
+		t.Fatal("DuplicateAdapterError does not unwrap to ErrDuplicate")
 	}
 	if !errors.Is(&UnknownAdapterError{Adapter: JWT}, ErrUnknownAdapter) {
 		t.Fatal("UnknownAdapterError does not unwrap to ErrUnknownAdapter")
@@ -55,9 +55,9 @@ func TestErrors_unwrap_carries_sentinel(t *testing.T) {
 
 func TestErrors_carried_fields(t *testing.T) {
 	t.Parallel()
-	de := &DuplicateError{Adapter: Session}
+	de := &DuplicateAdapterError{Adapter: Session}
 	if de.Adapter != Session {
-		t.Fatalf("DuplicateError.Adapter = %v", de.Adapter)
+		t.Fatalf("DuplicateAdapterError.Adapter = %v", de.Adapter)
 	}
 	ue := &UnknownAdapterError{Adapter: OIDC}
 	if ue.Adapter != OIDC {

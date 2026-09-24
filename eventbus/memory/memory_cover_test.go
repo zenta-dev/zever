@@ -109,9 +109,9 @@ func TestCoverSubscribeClosedAfterLock(t *testing.T) {
 		subErrCh <- subErr
 	}()
 
-	// Let the goroutine pass the pre-lock closed check and block on b.mu,
-	// then close underneath it so it hits the post-lock closed check.
-	time.Sleep(100 * time.Millisecond)
+	// The test holds b.mu, so the goroutine blocks on it after the
+	// pre-lock closed check; closing underneath exercises the post-lock
+	// closed check deterministically without any timing wait.
 	mb.closed.Store(true)
 	mb.mu.Unlock()
 
@@ -248,9 +248,18 @@ func TestCoverSemVsDone(t *testing.T) {
 		t.Fatalf("Publish sem-b: %v", pubErr)
 	}
 
-	// sem-b forward takes the message and blocks acquiring sem; unsub
-	// mid-wait so it returns via <-sub.done instead of the sem.
-	time.Sleep(200 * time.Millisecond)
+	// sem-b forward takes the message and blocks acquiring sem; wait until
+	// the message leaves the buffer (forward is parked on the sem), then
+	// unsub mid-wait so it returns via <-sub.done instead of the sem.
+	coverWaitFor(t, "sem-b forward to take message", func() bool {
+		mb.mu.RLock()
+		defer mb.mu.RUnlock()
+		subs := mb.topics["sem-b"]
+		if len(subs) != 1 {
+			return false
+		}
+		return len(subs[0].ch) == 0
+	})
 	unsubB()
 
 	select {

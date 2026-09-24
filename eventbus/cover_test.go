@@ -20,7 +20,7 @@ func TestCoverTypedErrorStrings(t *testing.T) {
 		want string
 	}{
 		{"DuplicateError", dup.Error(), "eventbus: duplicate registration: memory"},
-		{"UnknownAdapterError", unknown.Error(), "eventbus: unknown adapter: redis"},
+		{"UnknownAdapterError", unknown.Error(), "eventbus: unknown adapter: redis (forgotten import?)"},
 		{"InvalidAdapterError", invalidAdapter.Error(), `eventbus: invalid adapter: "bogus"`},
 		{"InvalidOptionsError", invalidOpts.Error(), "eventbus: invalid options: bad"},
 		{"InvalidMessageIDErrorWithCause", withCause.Error(), `eventbus: invalid message id "x": boom`},
@@ -58,7 +58,7 @@ func TestCoverInvalidMessageIDUnwrapBothArms(t *testing.T) {
 
 func TestCoverOpenSuccess(t *testing.T) {
 	a := freshAdapter()
-	if regErr := Register(a, func(Options) (Eventbus, error) { return stubBus{}, nil }); regErr != nil {
+	if regErr := Register(a, func(Options) (EventBus, error) { return stubBus{}, nil }); regErr != nil {
 		t.Fatalf("Register: %v", regErr)
 	}
 
@@ -80,7 +80,7 @@ func TestCoverOpenFactoryErrorWrap(t *testing.T) {
 	a := freshAdapter()
 	sentinel := errors.New("cover boom")
 
-	if regErr := Register(a, func(Options) (Eventbus, error) { return nil, sentinel }); regErr != nil {
+	if regErr := Register(a, func(Options) (EventBus, error) { return nil, sentinel }); regErr != nil {
 		t.Fatalf("Register: %v", regErr)
 	}
 

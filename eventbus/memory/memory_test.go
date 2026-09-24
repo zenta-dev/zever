@@ -194,14 +194,7 @@ func TestDropIsolation(t *testing.T) {
 	}
 
 	// subs[0] is the slow subscriber registered first.
-	deadline := time.Now().Add(3 * time.Second)
-	for subs[0].Dropped() == 0 {
-		if time.Now().After(deadline) {
-			t.Fatal("slow subscriber Dropped()==0, want >0")
-		}
-
-		time.Sleep(5 * time.Millisecond)
-	}
+	coverWaitFor(t, "slow subscriber drop", func() bool { return subs[0].Dropped() > 0 })
 
 	close(release)
 }
@@ -380,14 +373,7 @@ func TestPanicRecovered(t *testing.T) {
 		t.Fatalf("got %q want %q", m.Payload, "2")
 	}
 
-	deadline := time.Now().Add(3 * time.Second)
-	for panics.Load() == 0 {
-		if time.Now().After(deadline) {
-			t.Fatal("OnPanic not called")
-		}
-
-		time.Sleep(5 * time.Millisecond)
-	}
+	coverWaitFor(t, "OnPanic called", func() bool { return panics.Load() != 0 })
 }
 
 func TestConcurrentPublishSubscribe(t *testing.T) {
@@ -425,7 +411,6 @@ func TestConcurrentPublishSubscribe(t *testing.T) {
 				return
 			}
 
-			time.Sleep(time.Millisecond)
 			unsub()
 		}()
 	}

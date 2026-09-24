@@ -113,7 +113,7 @@ func TestAdapterString_returnsName(t *testing.T) {
 	}{
 		{name: "memory", in: cache.Memory, want: "memory"},
 		{name: "redis", in: cache.Redis, want: "redis"},
-		{name: "unknown formats", in: cache.Adapter(99), want: "Adapter(99)"},
+		{name: "unknown formats", in: cache.Adapter(99), want: "unknown"},
 	}
 
 	for _, tt := range tests {
@@ -235,7 +235,7 @@ func TestTypedErrorMessages_unwrap(t *testing.T) {
 	t.Run("duplicate", func(t *testing.T) {
 		t.Parallel()
 
-		err := &cache.DuplicateError{Adapter: cache.Memory}
+		err := &cache.DuplicateAdapterError{Adapter: cache.Memory}
 		if got, want := err.Error(), `cache: duplicate registration: memory`; got != want {
 			t.Errorf("Error() = %q, want %q", got, want)
 		}
@@ -249,7 +249,7 @@ func TestTypedErrorMessages_unwrap(t *testing.T) {
 		t.Parallel()
 
 		err := &cache.UnknownAdapterError{Adapter: cache.Adapter(99)}
-		if got, want := err.Error(), `cache: unknown adapter: Adapter(99) (forgotten import?)`; got != want {
+		if got, want := err.Error(), `cache: unknown adapter: unknown (forgotten import?)`; got != want {
 			t.Errorf("Error() = %q, want %q", got, want)
 		}
 
