@@ -83,6 +83,10 @@ func (c *meilisearchClient) trackIndex(id, idx string) {
 
 // Index adds or replaces doc in its index.
 func (c *meilisearchClient) Index(ctx context.Context, doc search.Document) error {
+	if err := doc.Validate(); err != nil {
+		return fmt.Errorf("meilisearch: index: %w", err)
+	}
+
 	// Uses AddDocumentsWithContext (available since meilisearch-go v0.28):
 	// context-aware variant avoids the noctx lint hit from AddDocuments.
 	metadata := make(map[string]any, len(doc.Metadata))
@@ -116,6 +120,12 @@ func (c *meilisearchClient) Index(ctx context.Context, doc search.Document) erro
 func (c *meilisearchClient) IndexBatch(ctx context.Context, docs []search.Document) error {
 	if len(docs) == 0 {
 		return nil
+	}
+
+	for i, doc := range docs {
+		if err := doc.Validate(); err != nil {
+			return fmt.Errorf("meilisearch: index batch: index %d: %w", i, err)
+		}
 	}
 
 	byIndex := make(map[string][]map[string]any)

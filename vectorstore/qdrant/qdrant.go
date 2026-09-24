@@ -119,6 +119,10 @@ func New(o vectorstore.Options) (vectorstore.VectorStore, error) {
 
 // Upsert inserts or replaces a vector in the store.
 func (s *Store) Upsert(ctx context.Context, vec vectorstore.Vector) error {
+	if err := vec.Validate(); err != nil {
+		return fmt.Errorf("qdrant: upsert: %w", err)
+	}
+
 	if err := requireEmbedding(vec.Embedding); err != nil {
 		return fmt.Errorf("qdrant: upsert: %w", err)
 	}
@@ -167,6 +171,12 @@ func (s *Store) Upsert(ctx context.Context, vec vectorstore.Vector) error {
 func (s *Store) UpsertBatch(ctx context.Context, vecs []vectorstore.Vector) error {
 	if len(vecs) == 0 {
 		return nil
+	}
+
+	for i, vec := range vecs {
+		if err := vec.Validate(); err != nil {
+			return fmt.Errorf("qdrant: upsert batch: index %d: %w", i, err)
+		}
 	}
 
 	for _, vec := range vecs {
