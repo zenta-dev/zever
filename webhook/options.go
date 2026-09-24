@@ -25,7 +25,7 @@ type Options struct {
 	// AllowPrivateTargets permits http(s) targets resolving to private addresses.
 	// It exists for tests and controlled networks; leave false in production.
 	AllowPrivateTargets bool `json:"allow_private_targets" toml:"allow_private_targets" yaml:"allow_private_targets"`
-	// QueueAdapter names the queue backend backing the queue adapter.
+	// QueueAdapter names the queue adapter backing the queue adapter.
 	QueueAdapter string `json:"queue_adapter" toml:"queue_adapter" yaml:"queue_adapter"`
 	// QueueOpts carries the queue backend settings for the queue adapter.
 	QueueOpts queue.Options `json:"queue_opts" toml:"queue_opts" yaml:"queue_opts"`
@@ -35,7 +35,7 @@ type Options struct {
 	// Empty means a unique private in-memory-style database.
 	DSN string `json:"dsn" toml:"dsn" yaml:"dsn"`
 	// Logger emits background delivery warnings. Defaults to a no-op logger when nil.
-	Logger log.Logger `json:"-" toml:"-" yaml:"-"`
+	Logger log.Logger
 	// ReplayTolerance bounds how far a signature's embedded timestamp may
 	// drift from the verifier's clock before verification rejects it as
 	// expired or replayed, on top of the HMAC check itself. Zero means the
@@ -57,10 +57,10 @@ func (o Options) Validate() error {
 		errs = append(errs, &InvalidOptionsError{Reason: "timeout must be >= 0"})
 	}
 	if o.MaxRetries < 0 {
-		errs = append(errs, &InvalidOptionsError{Reason: "max retries must be >= 0"})
+		errs = append(errs, &InvalidOptionsError{Reason: "max_retries must be >= 0"})
 	}
 	if o.ReplayTolerance < 0 {
-		errs = append(errs, &InvalidOptionsError{Reason: "replay tolerance must be >= 0"})
+		errs = append(errs, &InvalidOptionsError{Reason: "replay_tolerance must be >= 0"})
 	}
 	return errors.Join(errs...)
 }

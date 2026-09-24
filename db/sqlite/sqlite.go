@@ -24,7 +24,7 @@ const pragmaFK = "foreign_keys(1)"
 const pragmaBusy = "busy_timeout(5000)"
 
 // DefaultPingTimeout bounds the startup ping during construction.
-const DefaultPingTimeout = 5 * time.Second
+const DefaultPingTimeout = 3 * time.Second
 
 // sqlOpen opens a *sql.DB. It is a variable rather than a direct sql.Open
 // call so tests can force the open-error branch, which is unreachable with
