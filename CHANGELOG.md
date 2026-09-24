@@ -9,6 +9,24 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Changed
 
+- `session.RedisOptions`/`ratelimit.RedisOptions`/`idempotency.RedisOptions`/
+  `eventbus.RedisOptions` now embed `zredis.Options` (connection AND
+  pooling: `PoolSize`, `MinIdleConns`, `PoolTimeout`, `MaxConnIdleTime`,
+  `MaxConnLifetime`) instead of just `zredis.ConnectOptions`. Previously
+  every Redis-backed adapter silently dropped pooling configuration to
+  go-redis's defaults with no way to tune a hot ratelimiter/idempotency
+  store/session backend/eventbus under load. Existing field access
+  (`opts.Redis.Addr`, etc.) is unaffected since `Options` still embeds
+  `ConnectOptions`.
+- `orm/dialect.JSONTableDialect` removed: implemented by neither in-tree
+  dialect and asserted nowhere in the repo -- dead interface surface.
+- `vectorstore/pgvector.Delete` now does one round trip (`Exec` +
+  `RowsAffected`) instead of a SELECT-then-DELETE pair, matching
+  `search/postgres.Delete`'s existing pattern.
+- Removed `vectorstore/pgvector.formatVector`: dead code exercised only by
+  its own test, duplicating (and at risk of drifting from) the real
+  `embeddingCodec.Encode` path `Upsert`/`Query` actually use.
+
 - **Breaking:** `orm`'s dozen-plus mirrored enums (`Op`, `NodeKind`,
   `CompoundOp`, `LockMode`, `NullsOrder`, `WindowFunc`, `FrameMode`,
   `FrameBoundKind`, `JoinType`, `AggFunc`, `JSONOp`, `FTSOp`, `FTSMode`, the
@@ -40,9 +58,78 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   legacy `<root>/zeverv1` / `<root>/zever/<module>` convention. `Backend`
   no longer has two formulas to choose between; all committed goldens and
   example outputs regenerated.
+- **Breaking:** `payment.Payment.Refund` now takes an idempotency key
+  (`Refund(ctx, id, amount, key)`); `payment.Options` gained an
+  `Idempotency idempotency.Store` field (nil skips the guard). Paddle has
+  no native idempotency mechanism, so the guard lives at the adapter
+  layer: `Begin` (fingerprint `sha256(id|amount)`, 24h TTL), replay
+  returns nil without re-calling the provider, failure calls `Forget` so
+  genuine retries aren't blocked. Stripe `Refund` additionally sets the
+  native `Idempotency-Key`. Empty key preserves the old behavior.
+- `vectorstore.Vector`/`search.Document` gained `Validate()` rejecting
+  non-JSON-marshalable `Metadata` at the package boundary
+  (`ErrInvalidMetadata`), wired into every adapter write path
+  (pgvector/qdrant/sqlite `Upsert`/`UpsertBatch`,
+  postgres/sqlite/meilisearch `Index`/`IndexBatch`) before any DB/network
+  call.
+- `internal/httpclient.NewClient` now sets `MaxIdleConnsPerHost: 32`
+  (new `DefaultMaxIdleConnsPerHost`) on both cloned transports instead of
+  Go's default of 2, so repeated calls to one provider host reuse
+  connections.
+- `search/postgres.DefaultDDLTimeout` raised 5s to 10s to match
+  `vectorstore/pgvector` (shared 10s floor: pgvector ivfflat index builds
+  are slower than plain B-tree/GIN; single connect-plus-DDL budget so the
+  two can't drift).
+- `workflow.Workflow`/`StepFunc` docs now state the JSON-marshalable
+  contract: non-marshalable input/signal values fail lazily at `Query`
+  time, not at `Start`/`Signal` time.
 
 ### Fixed
 
+- **Bug:** `examples/bookings` `handleListBookings` did `defer func() { _ =
+  rows.Close }()` -- taking the *method value* of `rows.Close` and never
+  calling it -- leaking the `db.Rows`/statement handle on every call. Every
+  other `rows.Close()` in the same file was already correct.
+- **Security/correctness:** `examples/showcase`'s checkout read stock,
+  validated in Go, then decremented later with no transaction and no
+  `WHERE stock >= ?` guard: two concurrent checkouts for the same product
+  could both pass validation and both decrement, overselling inventory.
+  `handleCheckout` now wraps order + line items + stock decrements in
+  `db.WithTx`, and the decrement itself carries `WHERE stock >= ?`, checked
+  via `RowsAffected`, so only one of two racing requests can win. Added a
+  concurrency regression test.
+- **Correctness:** `examples/demoapp`'s `createOrder` inserted the order and
+  its line items as separate, non-transactional statements, explicitly
+  discarding each line-item insert's error -- a failed insert silently
+  produced an order with missing line items and no visible error anywhere.
+  Now wrapped in `db.WithTx`; a failed insert rolls back the whole order.
+- **Security:** none of the 4 example apps' `decodeJSON` bounded the
+  request body size, letting a client force unbounded buffering before any
+  validation ran. All four now wrap the body in `http.MaxBytesReader`
+  (1 MiB).
+- `webhook/http`'s delivery-failure error included only the numeric status
+  code; sibling adapters (`document/remote`, `geo/osm`) already include a
+  truncated response body. `webhook/http` now does too (512 bytes), making
+  "why didn't my webhook fire" debuggable from the error text alone.
+- `vectorstore/pgvector.Query` converted the same embedding bytes to
+  `string` twice; now converts once and reuses the value.
+- `orm/capability_test.go` gained compile-time `var _ dialect.XDialect =
+  New()` assertions for the 6 capability interfaces
+  (`ExplainDialect`/`DistinctOnDialect`/`ExtendedLockingDialect`/
+  `TablesampleDialect`, plus the 2 already covered by other test files)
+  that previously had none, closing the only real gap behind the "25
+  capability interfaces" structural concern raised in an earlier review
+  round -- both in-tree dialects already implement the full capability
+  surface identically, so a full `Capabilities`-struct rewrite (evaluated
+  and rejected this round; see the design note in `orm/dialect/dialect.go`
+  history) would have touched ~20 files for no measurable safety gain over
+  this 6-line fix.
+- `cmd/zever new -h`'s help text hardcoded a stale framework version
+  (`v0.1.1`); it now interpolates `defaultFrameworkVersion` (currently
+  `v0.2.0`).
+- `cmd/zever queue:work -h`/`db seed -h` printed a `--once` example flag
+  that has never existed (scaffolded worker/seed entrypoints never call
+  `flag.Parse()`); the misleading example is removed.
 - **Security:** `cmd/zever generate tinker --dir` accepted a path-traversal
   directory (e.g. `../../../../etc/cron.d/x`): the guard checked
   `isTraversalName(dir) && (dir == ".." || filepath.IsAbs(dir))`, which

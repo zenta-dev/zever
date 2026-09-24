@@ -1,11 +1,13 @@
 package api
 
 import (
+	"context"
 	"net/http"
 	"time"
 
 	"github.com/google/uuid"
 
+	"github.com/zenta-dev/zever/db"
 	gen "github.com/zenta-dev/zever/examples/demoapp/generated/zenorm/orm/gen/app"
 	"github.com/zenta-dev/zever/orm"
 	"github.com/zenta-dev/zever/router"
@@ -92,24 +94,37 @@ func (s *Server) createOrder(w http.ResponseWriter, req *http.Request) {
 		Status:     "pending",
 		CreatedAt:  time.Now().UTC(),
 	}
-	if err := orm.InsertInto(gen.Orders).Values(
-		orm.Set(gen.OrderCols.ID, order.ID),
-		orm.Set(gen.OrderCols.UserID, order.UserID),
-		orm.Set(gen.OrderCols.TotalCents, order.TotalCents),
-		orm.Set(gen.OrderCols.Status, order.Status),
-		orm.Set(gen.OrderCols.CreatedAt, order.CreatedAt),
-	).Exec(ctx, s.DB); err != nil {
+	// The order and every one of its line items commit as one atomic unit:
+	// a mid-loop insert failure must never leave an order with missing line
+	// items visible to anyone.
+	err := db.WithTx(ctx, s.DB, nil, func(txCtx context.Context, tx db.Tx) error {
+		if err := orm.InsertInto(gen.Orders).Values(
+			orm.Set(gen.OrderCols.ID, order.ID),
+			orm.Set(gen.OrderCols.UserID, order.UserID),
+			orm.Set(gen.OrderCols.TotalCents, order.TotalCents),
+			orm.Set(gen.OrderCols.Status, order.Status),
+			orm.Set(gen.OrderCols.CreatedAt, order.CreatedAt),
+		).Exec(txCtx, tx); err != nil {
+			return err
+		}
+
+		for _, l := range lines {
+			if err := orm.InsertInto(gen.OrderItems).Values(
+				orm.Set(gen.OrderItemCols.ID, uuid.NewString()),
+				orm.Set(gen.OrderItemCols.OrderID, order.ID),
+				orm.Set(gen.OrderItemCols.ProductID, l.id),
+				orm.Set(gen.OrderItemCols.Quantity, int64(1)),
+				orm.Set(gen.OrderItemCols.PriceCents, l.price),
+			).Exec(txCtx, tx); err != nil {
+				return err
+			}
+		}
+
+		return nil
+	})
+	if err != nil {
 		writeError(w, http.StatusInternalServerError, "could not create order")
 		return
-	}
-	for _, l := range lines {
-		_ = orm.InsertInto(gen.OrderItems).Values(
-			orm.Set(gen.OrderItemCols.ID, uuid.NewString()),
-			orm.Set(gen.OrderItemCols.OrderID, order.ID),
-			orm.Set(gen.OrderItemCols.ProductID, l.id),
-			orm.Set(gen.OrderItemCols.Quantity, int64(1)),
-			orm.Set(gen.OrderItemCols.PriceCents, l.price),
-		).Exec(ctx, s.DB)
 	}
 
 	if s.Job != nil {

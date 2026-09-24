@@ -65,16 +65,6 @@ type JSONDialect interface {
 	SupportsJSONArrowText() bool
 }
 
-// JSONTableDialect is implemented by dialects that support a table-valued
-// JSON source function usable in a FROM clause. SupportsJSONTable is an
-// explicit method, not bare interface presence, so a dialect can implement
-// the set and report false below its version floor. An unsupported dialect
-// is rejected with a typed ErrUnsupportedByDialect, never invalid SQL.
-type JSONTableDialect interface {
-	Dialect
-	SupportsJSONTable() bool
-}
-
 // JSONEachDialect is implemented by dialects that support SQLite's json1
 // table-valued functions `json_each(doc[, path])` and
 // `json_tree(doc[, path])` as a FROM/JOIN source. SupportsJSONEach is an

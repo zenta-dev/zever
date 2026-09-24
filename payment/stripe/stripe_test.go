@@ -349,7 +349,7 @@ func TestStripe_Refund_roundtrip(t *testing.T) {
 	srv := newFake(t, f)
 	p := mustOpen(t, srv, nil)
 
-	if err := p.Refund(t.Context(), "pi_test_123", 500); err != nil {
+	if err := p.Refund(t.Context(), "pi_test_123", 500, ""); err != nil {
 		t.Fatalf("Refund() err = %v", err)
 	}
 
@@ -368,11 +368,11 @@ func TestStripe_Refund_guards(t *testing.T) {
 	srv := newFake(t, f)
 	p := mustOpen(t, srv, nil)
 
-	if err := p.Refund(t.Context(), "pi_test_123", 0); !errors.Is(err, payment.ErrInvalidAmount) {
+	if err := p.Refund(t.Context(), "pi_test_123", 0, ""); !errors.Is(err, payment.ErrInvalidAmount) {
 		t.Fatalf("Refund() err = %v, want ErrInvalidAmount", err)
 	}
 
-	if err := p.Refund(t.Context(), "", 500); !errors.Is(err, payment.ErrMissingPaymentID) {
+	if err := p.Refund(t.Context(), "", 500, ""); !errors.Is(err, payment.ErrMissingPaymentID) {
 		t.Fatalf("Refund() err = %v, want ErrMissingPaymentID", err)
 	}
 }
@@ -385,7 +385,7 @@ func TestStripe_Refund_sdkError(t *testing.T) {
 	srv := newFake(t, f)
 	p := mustOpen(t, srv, nil)
 
-	err := p.Refund(t.Context(), "pi_test_123", 500)
+	err := p.Refund(t.Context(), "pi_test_123", 500, "")
 	if err == nil {
 		t.Fatal("Refund() err = nil, want SDK error")
 	}

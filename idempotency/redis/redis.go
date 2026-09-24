@@ -58,13 +58,7 @@ func New(opts idempotency.Options) (idempotency.Store, error) {
 		ttl = idempotency.DefaultTTL
 	}
 
-	client, err := zredis.New(zredis.Options{
-		Addr:       opts.Redis.Addr,
-		Password:   opts.Redis.Password,
-		DB:         opts.Redis.DB,
-		TLS:        opts.Redis.TLS,
-		RequireTLS: opts.Redis.RequireTLS,
-	})
+	client, err := zredis.New(opts.Redis.Options)
 	if err != nil {
 		return nil, fmt.Errorf("redis: connect %q: %w", redactAddr(opts.Redis.Addr), err)
 	}

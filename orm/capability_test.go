@@ -104,6 +104,25 @@ func TestCapabilityInterfacesCompile(t *testing.T) {
 
 		_ dialect.OrderedAggregateDialect = sqlite.New()
 		_ dialect.OrderedAggregateDialect = postgres.New()
+
+		// These interfaces previously had no compile-time assertion
+		// anywhere, unlike every other capability interface above: a
+		// signature drift in either dialect's methods for
+		// ExplainDialect/DistinctOnDialect/ExtendedLockingDialect/
+		// TablesampleDialect would have silently stopped compiling only at
+		// whichever call site first asserted the interface at runtime, not
+		// here at compile time. (dialect.JSONDialect is deliberately
+		// excluded: neither in-tree dialect implements SupportsJSONArrowText
+		// -- see its doc comment in dialect.go -- so asserting it here would
+		// fail to compile.)
+		_ dialect.ExplainDialect         = sqlite.New()
+		_ dialect.DistinctOnDialect      = sqlite.New()
+		_ dialect.ExtendedLockingDialect = sqlite.New()
+		_ dialect.TablesampleDialect     = sqlite.New()
+		_ dialect.ExplainDialect         = postgres.New()
+		_ dialect.DistinctOnDialect      = postgres.New()
+		_ dialect.ExtendedLockingDialect = postgres.New()
+		_ dialect.TablesampleDialect     = postgres.New()
 	)
 
 	s := sqlite.New()

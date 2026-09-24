@@ -174,13 +174,19 @@ func (a *adapter) singleAttempt(ctx context.Context, r registration, payload []b
 		return err
 	}
 
-	defer a.drain(resp)
-
 	if resp.StatusCode >= 200 && resp.StatusCode < 300 {
+		a.drain(resp)
+
 		return nil
 	}
 
-	return fmt.Errorf("http: target returned status %d", resp.StatusCode)
+	body := a.drainForError(resp)
+
+	if len(body) == 0 {
+		return fmt.Errorf("http: target returned status %d", resp.StatusCode)
+	}
+
+	return fmt.Errorf("http: target returned status %d: %s", resp.StatusCode, body)
 }
 
 func (a *adapter) buildRequest(
@@ -211,6 +217,21 @@ func (a *adapter) drain(resp *http.Response) {
 	_, _ = io.Copy(io.Discard, io.LimitReader(resp.Body, 1<<20))
 	// Close explicitly; drain is best-effort.
 	_ = resp.Body.Close()
+}
+
+// drainForError reads and closes resp.Body, returning up to 512 bytes of it
+// for inclusion in a delivery-failure error -- matching geo/osm's and
+// document/remote's checkStatus pattern, so "why didn't my webhook fire" is
+// answerable from the error text alone instead of just a bare status code.
+func (a *adapter) drainForError(resp *http.Response) string {
+	if resp == nil || resp.Body == nil {
+		return ""
+	}
+
+	body, _ := io.ReadAll(io.LimitReader(resp.Body, 512))
+	_ = resp.Body.Close()
+
+	return string(body)
 }
 
 func (a *adapter) sleepWithContext(ctx context.Context, d time.Duration) error {

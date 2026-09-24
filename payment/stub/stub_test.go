@@ -47,7 +47,7 @@ func TestCreateGetRefund_roundtrip(t *testing.T) {
 		t.Fatalf("GetPayment = %+v, want %+v", got, res)
 	}
 
-	if err = p.Refund(ctx, res.ID, 100); err != nil {
+	if err = p.Refund(ctx, res.ID, 100, ""); err != nil {
 		t.Fatalf("Refund err = %v", err)
 	}
 
@@ -76,7 +76,7 @@ func TestRefund_partialThenFull_statuses(t *testing.T) {
 		t.Fatalf("CreatePayment err = %v", err)
 	}
 
-	if err = p.Refund(ctx, res.ID, 40); err != nil {
+	if err = p.Refund(ctx, res.ID, 40, ""); err != nil {
 		t.Fatalf("partial Refund err = %v", err)
 	}
 
@@ -89,7 +89,7 @@ func TestRefund_partialThenFull_statuses(t *testing.T) {
 		t.Fatalf("status after partial = %v, want %v", got.Status, payment.PaymentPartiallyRefunded)
 	}
 
-	if err = p.Refund(ctx, res.ID, 60); err != nil {
+	if err = p.Refund(ctx, res.ID, 60, ""); err != nil {
 		t.Fatalf("full Refund err = %v", err)
 	}
 
@@ -144,7 +144,7 @@ func TestRefund_notFound(t *testing.T) {
 
 	p := newStub(t, true)
 
-	err := p.Refund(t.Context(), "stub_nope", 10)
+	err := p.Refund(t.Context(), "stub_nope", 10, "")
 	if !errors.Is(err, payment.ErrNotFound) {
 		t.Fatalf("Refund err = %v, want ErrNotFound", err)
 	}
@@ -170,7 +170,7 @@ func TestRefund_overflowTotal(t *testing.T) {
 		t.Fatalf("CreatePayment err = %v", err)
 	}
 
-	err = p.Refund(ctx, res.ID, 150)
+	err = p.Refund(ctx, res.ID, 150, "")
 	if !errors.Is(err, payment.ErrAmountMismatch) {
 		t.Fatalf("Refund err = %v, want ErrAmountMismatch", err)
 	}
@@ -196,11 +196,11 @@ func TestRefund_overflowRemaining(t *testing.T) {
 		t.Fatalf("CreatePayment err = %v", err)
 	}
 
-	if err = p.Refund(ctx, res.ID, 60); err != nil {
+	if err = p.Refund(ctx, res.ID, 60, ""); err != nil {
 		t.Fatalf("first Refund err = %v", err)
 	}
 
-	err = p.Refund(ctx, res.ID, 50)
+	err = p.Refund(ctx, res.ID, 50, "")
 	if !errors.Is(err, payment.ErrAmountMismatch) {
 		t.Fatalf("Refund err = %v, want ErrAmountMismatch", err)
 	}
@@ -256,11 +256,11 @@ func TestRefund_invalidAmount(t *testing.T) {
 		t.Fatalf("CreatePayment err = %v", err)
 	}
 
-	if err := p.Refund(ctx, res.ID, 0); !errors.Is(err, payment.ErrInvalidAmount) {
+	if err := p.Refund(ctx, res.ID, 0, ""); !errors.Is(err, payment.ErrInvalidAmount) {
 		t.Fatalf("zero refund err = %v, want ErrInvalidAmount", err)
 	}
 
-	if err := p.Refund(ctx, res.ID, -1); !errors.Is(err, payment.ErrInvalidAmount) {
+	if err := p.Refund(ctx, res.ID, -1, ""); !errors.Is(err, payment.ErrInvalidAmount) {
 		t.Fatalf("negative refund err = %v, want ErrInvalidAmount", err)
 	}
 }
@@ -361,7 +361,7 @@ func TestConcurrent_createRefund(t *testing.T) {
 				return
 			}
 
-			if err := p.Refund(ctx, res.ID, 100); err != nil {
+			if err := p.Refund(ctx, res.ID, 100, ""); err != nil {
 				t.Errorf("Refund err = %v", err)
 			}
 		}()

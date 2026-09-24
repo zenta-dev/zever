@@ -1,5 +1,10 @@
 package vectorstore
 
+import (
+	"encoding/json"
+	"fmt"
+)
+
 // Vector is a single stored embedding with its identifier and metadata.
 type Vector struct {
 	// ID is the unique identifier of the vector.
@@ -8,6 +13,20 @@ type Vector struct {
 	Embedding []float32
 	// Metadata carries caller-defined attributes.
 	Metadata map[string]any
+}
+
+// Validate reports whether v's metadata can be JSON-encoded.
+// Nil metadata is valid.
+func (v Vector) Validate() error {
+	if v.Metadata == nil {
+		return nil
+	}
+
+	if _, err := json.Marshal(v.Metadata); err != nil {
+		return fmt.Errorf("%w: %w", ErrInvalidMetadata, err)
+	}
+
+	return nil
 }
 
 // ScoreMatch is a single query result pairing an identifier with its score.

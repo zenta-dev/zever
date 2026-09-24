@@ -24,7 +24,7 @@ subcommand (serve, dev, queue:work, db migrate/seed, tinker) works against
 the new project with no zever.yaml/.json needed.
 
 By default the new project depends on the published zever module
-(github.com/zenta-dev/zever v0.1.1) with no replace directive. Use
+(github.com/zenta-dev/zever %s) with no replace directive. Use
 --framework-path to replace against a local checkout for framework
 development (auto-detected by walking up from the working directory looking
 for a go.mod declaring "module github.com/zenta-dev/zever" when running
@@ -146,7 +146,7 @@ func runNew(args []string) error {
 	force := fs.Bool("force", false, "scaffold into a non-empty directory anyway")
 
 	fs.Usage = func() {
-		_, _ = fmt.Fprintln(fs.Output(), newUsage)
+		_, _ = fmt.Fprintf(fs.Output(), newUsage+"\n", defaultFrameworkVersion)
 		fs.PrintDefaults()
 	}
 

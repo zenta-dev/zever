@@ -8,6 +8,7 @@ import (
 	"os"
 	"path/filepath"
 	"strings"
+	"sync"
 	"testing"
 	"time"
 
@@ -443,5 +444,80 @@ func TestCheckoutAndReviews(t *testing.T) {
 	}
 	if len(reviews) != 1 {
 		t.Fatalf("reviews len = %d, want 1", len(reviews))
+	}
+}
+
+// TestCheckoutConcurrentOversellGuarded proves the checkout race fix: N
+// concurrent checkouts against a product with stock for exactly one of them
+// must never let more than one succeed, and stock must never go negative.
+// Before the fix, handleCheckout read stock, validated in Go, then
+// decremented later with no transaction and no `WHERE stock >= ?` guard --
+// two concurrent requests could both pass the read-time check and both
+// decrement.
+func TestCheckoutConcurrentOversellGuarded(t *testing.T) {
+	s := newTestSetup(t)
+
+	register(t, s.handler, "admin@example.com", "Admin")
+	register(t, s.handler, "shop@example.com", "Shop")
+	makeAdmin(t, s, "admin@example.com")
+	makeCategory(t, s, "cat-race", "Gadgets")
+	admin := login(t, s.handler, "admin@example.com")
+	token := login(t, s.handler, "shop@example.com")
+	pid := makeProduct(t, s, admin, "cat-race", "RACE-1")
+
+	// Stock down to exactly 1 unit: only one concurrent 1-unit checkout can
+	// legitimately succeed.
+	rec := do(t, s.handler, "POST", "/api/orders/checkout", token, map[string]any{
+		"items": []any{map[string]any{"product_id": pid, "quantity": 9}},
+	})
+	if rec.Code != http.StatusCreated {
+		t.Fatalf("prime checkout: status %d: %s", rec.Code, rec.Body.String())
+	}
+
+	const concurrency = 8
+
+	codes := make([]int, concurrency)
+
+	var wg sync.WaitGroup
+	for i := range concurrency {
+		wg.Add(1)
+		go func(i int) {
+			defer wg.Done()
+			got := do(t, s.handler, "POST", "/api/orders/checkout", token, map[string]any{
+				"items": []any{map[string]any{"product_id": pid, "quantity": 1}},
+			})
+			codes[i] = got.Code
+		}(i)
+	}
+	wg.Wait()
+
+	successes := 0
+	for idx, code := range codes {
+		switch code {
+		case http.StatusCreated:
+			successes++
+		case http.StatusConflict, http.StatusInternalServerError:
+			// StatusInternalServerError is tolerated here only for sqlite
+			// lock-contention errors under concurrent writers, not for a
+			// logic bug -- the invariant this test actually guards is
+			// "successes never exceeds available stock", checked below
+			// regardless of how the losing requests failed.
+		default:
+			t.Fatalf("checkout[%d] unexpected status %d", idx, code)
+		}
+	}
+
+	if successes != 1 {
+		t.Fatalf("successes = %d, want exactly 1 (oversold if > 1)", successes)
+	}
+
+	rec = do(t, s.handler, "GET", "/api/products/"+pid, admin, nil)
+	var prod map[string]any
+	if err := json.Unmarshal(rec.Body.Bytes(), &prod); err != nil {
+		t.Fatalf("decode product: %v", err)
+	}
+
+	if prod["stock"] != float64(0) {
+		t.Fatalf("stock = %v, want 0 (never negative, never under-decremented)", prod["stock"])
 	}
 }

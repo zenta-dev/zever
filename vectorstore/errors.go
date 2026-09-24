@@ -32,6 +32,9 @@ var ErrEmptyEmbedding = errors.New("vectorstore: empty embedding")
 // ErrDimensionMismatch is returned when an embedding has the wrong dimension.
 var ErrDimensionMismatch = errors.New("vectorstore: dimension mismatch")
 
+// ErrInvalidMetadata is returned when vector metadata cannot be JSON-encoded.
+var ErrInvalidMetadata = errors.New("vectorstore: invalid metadata")
+
 // DuplicateAdapterError reports a duplicate adapter registration.
 type DuplicateAdapterError struct {
 	// Adapter is the already-registered adapter.

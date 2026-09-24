@@ -13,6 +13,10 @@ import (
 	"time"
 )
 
+// DefaultMaxIdleConnsPerHost is the default maximum idle connections per host
+// applied to cloned transports created by NewClient.
+const DefaultMaxIdleConnsPerHost = 32
+
 // ErrTooLarge is returned (via TooLargeError) when ReadLimited exceeds limit.
 var ErrTooLarge = errors.New("httpclient: response body too large")
 
@@ -108,6 +112,7 @@ func NewClient(timeout time.Duration, opts ...Option) *http.Client {
 			if cfg.safeDialSet {
 				clone.DialContext = SafeDialContext(cfg.allowPrivate)
 			}
+			clone.MaxIdleConnsPerHost = DefaultMaxIdleConnsPerHost
 			c := &http.Client{Timeout: timeout, Transport: clone}
 			if cfg.noRedirect {
 				c.CheckRedirect = func(_ *http.Request, _ []*http.Request) error {
@@ -145,6 +150,7 @@ func NewClient(timeout time.Duration, opts ...Option) *http.Client {
 	if cfg.safeDialSet {
 		tr.DialContext = SafeDialContext(cfg.allowPrivate)
 	}
+	tr.MaxIdleConnsPerHost = DefaultMaxIdleConnsPerHost
 	c := &http.Client{Timeout: timeout, Transport: tr}
 	if cfg.noRedirect {
 		c.CheckRedirect = func(_ *http.Request, _ []*http.Request) error {

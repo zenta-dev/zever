@@ -88,6 +88,10 @@ func New(o search.Options) (search.Search, error) {
 // clone. The document row and its FTS row are dual-written inside one
 // transaction keyed on the documents rowid.
 func (s *Store) Index(ctx context.Context, doc search.Document) error {
+	if err := doc.Validate(); err != nil {
+		return fmt.Errorf("sqlite: index: %w", err)
+	}
+
 	tx, err := s.db.BeginTx(ctx, nil)
 	if err != nil {
 		return fmt.Errorf("sqlite: index: %w", err)
@@ -108,6 +112,12 @@ func (s *Store) Index(ctx context.Context, doc search.Document) error {
 
 // IndexBatch adds or replaces all of docs in a single transaction.
 func (s *Store) IndexBatch(ctx context.Context, docs []search.Document) error {
+	for i, doc := range docs {
+		if err := doc.Validate(); err != nil {
+			return fmt.Errorf("sqlite: index batch: index %d: %w", i, err)
+		}
+	}
+
 	tx, err := s.db.BeginTx(ctx, nil)
 	if err != nil {
 		return fmt.Errorf("sqlite: index batch: %w", err)

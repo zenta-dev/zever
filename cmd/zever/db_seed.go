@@ -20,7 +20,7 @@ func resolveSeedConfig(project ProjectConfig, args []string) SeedConfig {
 // this shells out instead of seeding in-process.
 func runDBSeed(args []string) error {
 	if hasHelpFlag(args) {
-		printLauncherHelp(flag.CommandLine.Output(), "zever db seed", "Seeds this project's database by running its seed entrypoint package (project.seed_entry, default db/seed). Every argument is passed through.", "zever db seed --once")
+		printLauncherHelp(flag.CommandLine.Output(), "zever db seed", "Seeds this project's database by running its seed entrypoint package (project.seed_entry, default db/seed). Every argument is passed through to that package -- the scaffolded seed entrypoint itself accepts none by default.", "zever db seed")
 		return nil
 	}
 

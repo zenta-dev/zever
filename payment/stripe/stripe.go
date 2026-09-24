@@ -2,12 +2,15 @@ package stripe
 
 import (
 	"context"
+	"crypto/sha256"
 	"fmt"
 	"net/http"
+	"strconv"
 	"strings"
 
 	"github.com/stripe/stripe-go/v82"
 
+	"github.com/zenta-dev/zever/idempotency"
 	"github.com/zenta-dev/zever/internal/httpclient"
 	"github.com/zenta-dev/zever/payment"
 )
@@ -22,6 +25,8 @@ type driver struct {
 	webhookSecret string
 	// maxWebhookBytes bounds webhook payloads.
 	maxWebhookBytes int
+	// idempotency holds the optional refund idempotency store.
+	idempotency idempotency.Store
 }
 
 // New validates o then returns a Stripe backend matching Factory.
@@ -52,7 +57,7 @@ func New(o payment.Options) (payment.Payment, error) {
 		maxBytes = payment.DefaultMaxWebhookBytes
 	}
 
-	return &driver{client: client, httpClient: httpClient, webhookSecret: o.WebhookSecret, maxWebhookBytes: maxBytes}, nil
+	return &driver{client: client, httpClient: httpClient, webhookSecret: o.WebhookSecret, maxWebhookBytes: maxBytes, idempotency: o.Idempotency}, nil
 }
 
 // CreatePayment creates a Stripe PaymentIntent from req.
@@ -94,8 +99,16 @@ func (d *driver) CreatePayment(ctx context.Context, req payment.Request) (paymen
 	}, nil
 }
 
+// refundFingerprint scopes an idempotency key to a specific refund request.
+func refundFingerprint(id string, amount int64) []byte {
+	sum := sha256.Sum256([]byte(id + "|" + strconv.FormatInt(amount, 10)))
+
+	return sum[:]
+}
+
 // Refund creates a Stripe refund of amount against payment id.
-func (d *driver) Refund(ctx context.Context, id string, amount int64) error {
+// key is the idempotency key; empty skips the idempotency guard.
+func (d *driver) Refund(ctx context.Context, id string, amount int64, key string) error {
 	if amount <= 0 {
 		return fmt.Errorf("stripe: refund: %w", payment.ErrInvalidAmount)
 	}
@@ -104,13 +117,40 @@ func (d *driver) Refund(ctx context.Context, id string, amount int64) error {
 		return fmt.Errorf("stripe: refund: %w", payment.ErrMissingPaymentID)
 	}
 
+	var fingerprint []byte
+	if d.idempotency != nil && key != "" {
+		fingerprint = refundFingerprint(id, amount)
+
+		outcome, err := d.idempotency.Begin(ctx, key, idempotency.BeginOptions{Fingerprint: fingerprint, TTL: payment.DefaultRefundIdempotencyTTL})
+		if err != nil {
+			return fmt.Errorf("stripe: refund: %w", err)
+		}
+
+		if outcome.Replay {
+			return nil
+		}
+	}
+
 	params := &stripe.RefundCreateParams{
 		PaymentIntent: stripe.String(id),
 		Amount:        stripe.Int64(amount),
 	}
+	if key != "" {
+		params.SetIdempotencyKey(key)
+	}
 
 	if _, err := d.client.V1Refunds.Create(ctx, params); err != nil {
+		if d.idempotency != nil && key != "" {
+			_ = d.idempotency.Forget(ctx, key)
+		}
+
 		return fmt.Errorf("stripe: refund: %w", err)
+	}
+
+	if d.idempotency != nil && key != "" {
+		if err := d.idempotency.Complete(ctx, key, fingerprint, []byte{1}); err != nil {
+			return fmt.Errorf("stripe: refund: %w", err)
+		}
 	}
 
 	return nil

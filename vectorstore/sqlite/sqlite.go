@@ -102,6 +102,10 @@ type execer interface {
 
 // Upsert inserts or replaces a vector in the store.
 func (s *Store) Upsert(ctx context.Context, vec vectorstore.Vector) error {
+	if err := vec.Validate(); err != nil {
+		return fmt.Errorf("sqlite: upsert: %w", err)
+	}
+
 	if err := s.upsertOne(ctx, s.db, vec); err != nil {
 		return err
 	}
@@ -111,6 +115,12 @@ func (s *Store) Upsert(ctx context.Context, vec vectorstore.Vector) error {
 
 // UpsertBatch inserts or replaces all of vecs in a single transaction.
 func (s *Store) UpsertBatch(ctx context.Context, vecs []vectorstore.Vector) error {
+	for i, vec := range vecs {
+		if err := vec.Validate(); err != nil {
+			return fmt.Errorf("sqlite: upsert batch: index %d: %w", i, err)
+		}
+	}
+
 	tx, err := s.db.BeginTx(ctx, nil)
 	if err != nil {
 		return fmt.Errorf("sqlite: upsert batch: begin: %w", err)
