@@ -28,12 +28,12 @@ type Options struct {
 	// PoolTimeout is how long a caller waits for a connection when the pool
 	// is exhausted. <= 0 uses go-redis's own default.
 	PoolTimeout time.Duration `json:"pool_timeout" toml:"pool_timeout" yaml:"pool_timeout"`
-	// ConnMaxIdleTime is the maximum time a connection may sit idle before
+	// MaxConnIdleTime is the maximum time a connection may sit idle before
 	// it's eligible for closing. <= 0 uses go-redis's own default.
-	ConnMaxIdleTime time.Duration `json:"conn_max_idle_time" toml:"conn_max_idle_time" yaml:"conn_max_idle_time"`
-	// ConnMaxLifetime is the maximum time a connection may be reused before
+	MaxConnIdleTime time.Duration `json:"max_conn_idle_time" toml:"max_conn_idle_time" yaml:"max_conn_idle_time"`
+	// MaxConnLifetime is the maximum time a connection may be reused before
 	// it's eligible for closing. <= 0 uses go-redis's own default (unbounded).
-	ConnMaxLifetime time.Duration `json:"conn_max_lifetime" toml:"conn_max_lifetime" yaml:"conn_max_lifetime"`
+	MaxConnLifetime time.Duration `json:"max_conn_lifetime" toml:"max_conn_lifetime" yaml:"max_conn_lifetime"`
 }
 
 func (o Options) toRedisOptions() (*goredis.Options, error) {
@@ -68,8 +68,8 @@ func (o Options) toRedisOptions() (*goredis.Options, error) {
 			PoolSize:        o.PoolSize,
 			MinIdleConns:    minIdleConns,
 			PoolTimeout:     o.PoolTimeout,
-			ConnMaxIdleTime: o.ConnMaxIdleTime,
-			ConnMaxLifetime: o.ConnMaxLifetime,
+			ConnMaxIdleTime: o.MaxConnIdleTime,
+			ConnMaxLifetime: o.MaxConnLifetime,
 		}
 
 		// Password from the URL is used only when Options.Password
@@ -101,8 +101,8 @@ func (o Options) toRedisOptions() (*goredis.Options, error) {
 		PoolSize:        o.PoolSize,
 		MinIdleConns:    minIdleConns,
 		PoolTimeout:     o.PoolTimeout,
-		ConnMaxIdleTime: o.ConnMaxIdleTime,
-		ConnMaxLifetime: o.ConnMaxLifetime,
+		ConnMaxIdleTime: o.MaxConnIdleTime,
+		ConnMaxLifetime: o.MaxConnLifetime,
 	}
 
 	if o.TLS {

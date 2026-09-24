@@ -41,6 +41,18 @@ type Worker struct {
 
 const defaultDrainTimeout = 30 * time.Second
 
+// DefaultSweepInterval is the batch-settlement sweep cadence.
+const DefaultSweepInterval = time.Second
+
+// DefaultSweepTimeout bounds one detached batch-settlement sweep.
+const DefaultSweepTimeout = 5 * time.Second
+
+// DefaultMaxPollWait caps the empty-poll backoff.
+const DefaultMaxPollWait = 5 * time.Second
+
+// DefaultPollBaseDelay is the initial empty-poll backoff.
+const DefaultPollBaseDelay = time.Millisecond
+
 func (w *Worker) drainTimeout() time.Duration {
 	if w.DrainTimeout > 0 {
 		return w.DrainTimeout
@@ -86,7 +98,7 @@ func (w *Worker) Run(ctx context.Context) error {
 
 	var inflight sync.WaitGroup
 
-	sweep := time.NewTicker(time.Second)
+	sweep := time.NewTicker(DefaultSweepInterval)
 	defer sweep.Stop()
 
 	go w.sweepLoop(ctx, sweep)
@@ -108,7 +120,7 @@ func (w *Worker) sweepLoop(ctx context.Context, sweep *time.Ticker) {
 func (w *Worker) runLoop(ctx context.Context, sem chan struct{}, inflight *sync.WaitGroup) error {
 	pollAttempt := 0
 
-	const maxPollWait = 5 * time.Second
+	maxPollWait := DefaultMaxPollWait
 
 	for {
 		select {
@@ -150,7 +162,7 @@ func (w *Worker) runLoop(ctx context.Context, sem chan struct{}, inflight *sync.
 func (w *Worker) sweepBatches(ctx context.Context) {
 	detached := context.WithoutCancel(ctx)
 
-	sweepCtx, cancel := context.WithTimeout(detached, 5*time.Second) //nolint:contextcheck // detached timeout for sweep
+	sweepCtx, cancel := context.WithTimeout(detached, DefaultSweepTimeout) //nolint:contextcheck // detached timeout for sweep
 	defer cancel()
 
 	settleDueBatches(sweepCtx)
@@ -185,7 +197,7 @@ func (w *Worker) handleEmpty(ctx context.Context, inflight *sync.WaitGroup, atte
 // nextPollWait returns the poll-wait delay for the given (1-based) attempt:
 // BaseDelay doubled per attempt, capped at maxPollWait.
 func nextPollWait(attempt int, maxPollWait time.Duration) time.Duration {
-	return retry.Policy{BaseDelay: time.Millisecond, Multiplier: 2, MaxDelay: maxPollWait}.NextDelay(attempt)
+	return retry.Policy{BaseDelay: DefaultPollBaseDelay, Multiplier: 2, MaxDelay: maxPollWait}.NextDelay(attempt)
 }
 
 func (w *Worker) launchHandler(ctx context.Context, msg queue.Message, topic string, sem chan struct{}, inflight *sync.WaitGroup) {

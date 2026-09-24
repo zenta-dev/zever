@@ -33,6 +33,9 @@ const maxScanRows = 10000
 
 var memoryCounter uint64
 
+// DefaultDDLTimeout bounds DDL during construction.
+const DefaultDDLTimeout = 5 * time.Second
+
 // Store implements vectorstore.VectorStore backed by SQLite.
 type Store struct {
 	db  *sql.DB
@@ -76,7 +79,7 @@ func New(o vectorstore.Options) (vectorstore.VectorStore, error) {
 	// concurrent writes without a busy-timeout pragma.
 	d.SetMaxOpenConns(1)
 
-	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
+	ctx, cancel := context.WithTimeout(context.Background(), DefaultDDLTimeout)
 	defer cancel()
 
 	if _, err := d.ExecContext(ctx, `CREATE TABLE IF NOT EXISTS vectors (

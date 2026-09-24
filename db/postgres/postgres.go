@@ -29,6 +29,9 @@ type pgPool interface {
 
 var _ pgPool = (*pgxpool.Pool)(nil)
 
+// DefaultConnectTimeout bounds pool connect during construction.
+const DefaultConnectTimeout = 5 * time.Second
+
 // pgConn is the narrow connection surface pgTx pings. *pgx.Conn satisfies
 // it; capturing it as an interface keeps pgTx.Ping unit-testable.
 type pgConn interface {
@@ -364,7 +367,7 @@ func New(opts db.Options) (db.DB, error) {
 		config.MaxConnIdleTime = opts.MaxConnIdleTime
 	}
 
-	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
+	ctx, cancel := context.WithTimeout(context.Background(), DefaultConnectTimeout)
 	defer cancel()
 
 	pool, err := pgxpool.NewWithConfig(ctx, config)

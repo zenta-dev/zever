@@ -18,6 +18,9 @@ import (
 // newSDK constructs the Paddle SDK. It is a variable so tests can stub construction.
 var newSDK = paddle.New
 
+// DefaultTimestampTolerance bounds webhook timestamp skew accepted by the verifier.
+const DefaultTimestampTolerance = 5 * time.Minute
+
 // driver is a payment.Payment backed by Paddle transactions and adjustments.
 type driver struct {
 	client          *paddle.SDK
@@ -58,7 +61,7 @@ func New(o payment.Options) (payment.Payment, error) {
 	return &driver{
 		client: client,
 		verifier: paddle.NewWebhookVerifier(
-			o.WebhookSecret, paddle.VerifierWithTimestampTolerance(5*time.Minute),
+			o.WebhookSecret, paddle.VerifierWithTimestampTolerance(DefaultTimestampTolerance),
 		),
 		webhookSecret:   o.WebhookSecret,
 		maxWebhookBytes: maxWebhookBytes,

@@ -28,6 +28,9 @@ const releaseScript = cas.CompareAndDeleteScript
 // cache CAS via internal/cas.
 const extendScript = cas.CompareAndExpireScript
 
+// DefaultPingTimeout bounds the startup connectivity check.
+const DefaultPingTimeout = 3 * time.Second
+
 // redisClient is the subset of go-redis used by the adapter, faked in
 // tests to drive client errors without a server.
 type redisClient interface {
@@ -99,7 +102,7 @@ func New(opts lock.Options) (lock.Locker, error) {
 		return nil, fmt.Errorf("lock: connect %q: %w", redactURL(opts), err)
 	}
 
-	ctx, cancel := context.WithTimeout(context.Background(), 3*time.Second)
+	ctx, cancel := context.WithTimeout(context.Background(), DefaultPingTimeout)
 	defer cancel()
 
 	if err := client.Ping(ctx).Err(); err != nil {

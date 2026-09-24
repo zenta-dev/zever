@@ -22,6 +22,9 @@ import (
 // defaultPrefix namespaces revocation keys when no prefix is set.
 const defaultPrefix = "jwtrevoke:"
 
+// DefaultPingTimeout bounds the startup connectivity check.
+const DefaultPingTimeout = 3 * time.Second
+
 // revokedValue is the value stored for a revoked key; only key existence is
 // consulted, so the value itself carries no meaning.
 const revokedValue = "1"
@@ -74,7 +77,7 @@ func New(opts Options) (revocation.Store, error) {
 		return nil, fmt.Errorf("revocation/redis: connect %q: %w", redactURL(opts), err)
 	}
 
-	ctx, cancel := context.WithTimeout(context.Background(), 3*time.Second)
+	ctx, cancel := context.WithTimeout(context.Background(), DefaultPingTimeout)
 	defer cancel()
 
 	if err := client.Ping(ctx).Err(); err != nil {
