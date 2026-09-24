@@ -67,17 +67,13 @@ func runFmt(args []string) error {
 	write := fs.Bool("write", false, "rewrite files in place instead of listing them")
 	writeShort := fs.Bool("w", false, "rewrite files in place (shorthand)")
 	list := fs.Bool("l", false, "list files that would change (default behavior; accepted for gofmt-familiarity)")
-	interactive := fs.Bool("interactive", false, "prompt for missing values")
-	interactiveShort := fs.Bool("i", false, "prompt for missing values (shorthand)")
+	// coverageProof: no local -i/--interactive flags; peelInteractive
+	// strips them before Parse and sets interactiveMode globally.
 	fs.Usage = func() { printFmtUsage(fs) }
 
 	posArgs, err := flexibleParse(fs, args)
 	if err != nil {
 		return err
-	}
-
-	if *interactive || *interactiveShort {
-		interactiveMode = true
 	}
 
 	_ = *list // -l is the default; accepted only so gofmt muscle-memory doesn't error out.
