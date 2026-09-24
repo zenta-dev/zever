@@ -82,19 +82,22 @@ func (e InvalidAdapterError) Unwrap() error {
 	return ErrInvalidAdapter
 }
 
-// DuplicateError reports a duplicate adapter registration.
-type DuplicateError struct {
+// DuplicateAdapterError reports a duplicate adapter registration.
+type DuplicateAdapterError struct {
 	// Adapter is the already-registered adapter.
 	Adapter Adapter
 }
 
+// DuplicateError aliases DuplicateAdapterError for compatibility.
+type DuplicateError = DuplicateAdapterError
+
 // Error returns a human-readable duplicate-registration message.
-func (e DuplicateError) Error() string {
+func (e DuplicateAdapterError) Error() string {
 	return fmt.Sprintf("%s: %s", ErrDuplicateAdapter, e.Adapter.String())
 }
 
 // Unwrap returns ErrDuplicateAdapter.
-func (e DuplicateError) Unwrap() error {
+func (e DuplicateAdapterError) Unwrap() error {
 	return ErrDuplicateAdapter
 }
 

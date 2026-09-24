@@ -36,7 +36,7 @@ type API struct {
 	DB          db.DB
 	Auth        auth.Auth
 	Password    password.Hasher
-	Ratelimit   ratelimit.Limiter
+	RateLimit   ratelimit.Limiter
 	Idempotency idempotency.Store
 	Lock        lock.Locker
 	Payment     payment.Payment
@@ -70,7 +70,7 @@ func New(
 ) *API {
 	return &API{
 		DB: database, Auth: authInst, Password: hasher,
-		Ratelimit: limiter, Idempotency: idem, Lock: locker,
+		RateLimit: limiter, Idempotency: idem, Lock: locker,
 		Payment: pay, Billing: bill, Queue: q, Crypto: crypt,
 		Tenant: ten, I18n: i18nInst, Flag: flags,
 		Permission: perm, Geo: geoInst,

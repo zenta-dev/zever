@@ -792,17 +792,38 @@ func TestStream_ErrorMapping(t *testing.T) {
 
 func TestGenerate_ContextCancel(t *testing.T) {
 	t.Parallel()
+	started := make(chan struct{}, 1)
+	release := make(chan struct{})
 	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		time.Sleep(50 * time.Millisecond)
-		w.Header().Set("Content-Type", "application/json")
-		_, _ = w.Write([]byte(`{"id":"m","type":"message","role":"assistant","content":[{"type":"text","text":"ok"}],"model":"c","stop_reason":"end_turn","usage":{"input_tokens":1,"output_tokens":1}}`))
+		// Signal request arrival (non-blocking: retries reuse this handler).
+		select {
+		case started <- struct{}{}:
+		default:
+		}
+		// Deterministic slow server with no fixed sleep: block until the
+		// client goes away or the test releases us after Generate
+		// returns. release is required because the client's keep-alive
+		// pool can hold the connection open past cancellation, which
+		// would wedge srv.Close on this handler forever.
+		select {
+		case <-r.Context().Done():
+		case <-release:
+		}
 	}))
 	defer srv.Close()
 	client := anthropic.NewClient(option.WithBaseURL(srv.URL), option.WithAPIKey("k"))
 	a := &adapter{client: &client, model: "m"}
 	ctx, cancel := context.WithCancel(context.Background())
-	go func() { time.Sleep(10 * time.Millisecond); cancel() }()
+	defer cancel()
+	go func() {
+		select {
+		case <-started:
+		case <-time.After(5 * time.Second):
+		}
+		cancel()
+	}()
 	_, err := a.Generate(ctx, "", []ai.Message{{Role: ai.RoleUser, Content: "hi"}}, ai.GenerateOptions{})
+	close(release)
 	if err == nil {
 		t.Fatalf("want cancel error")
 	}
@@ -946,9 +967,9 @@ func TestStream_CancelMidStream(t *testing.T) {
 	if err != nil {
 		t.Fatalf("Stream err %v", err)
 	}
-	// cancel immediately, before reading - should cause goroutine to exit via Done branch
+	// cancel immediately, before reading - the drain below already waits
+	// with a timeout, so no fixed settle sleep is needed.
 	cancel()
-	time.Sleep(10 * time.Millisecond)
 	// drain with timeout, should close quickly
 	done := make(chan struct{})
 	go func() {
@@ -985,9 +1006,9 @@ func TestStream_CancelBeforeDone(t *testing.T) {
 	if first.Delta != "hello" {
 		t.Fatalf("delta %q", first.Delta)
 	}
-	// cancel before Done is sent
+	// cancel before Done is sent; the read below already waits with a
+	// timeout, so no fixed settle sleep is needed.
 	cancel()
-	time.Sleep(10 * time.Millisecond)
 	// next read should be closed (goroutine exited via <-ctx.Done for final Done)
 	select {
 	case _, ok := <-ch:
@@ -1017,9 +1038,9 @@ func TestStream_CancelDuringToolCalls(t *testing.T) {
 	}
 	// read Delta
 	<-ch
-	// cancel before tool calls are sent
+	// cancel before tool calls are sent; the drain below already waits
+	// with a timeout, so no fixed settle sleep is needed.
 	cancel()
-	time.Sleep(10 * time.Millisecond)
 	// drain
 	done := make(chan struct{})
 	go func() {

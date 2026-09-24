@@ -29,19 +29,25 @@ var (
 	ErrInvalidOptions = errors.New("auth: invalid options")
 )
 
-// DuplicateError reports a duplicate adapter registration.
-type DuplicateError struct {
+// ErrDuplicateAdapter aliases ErrDuplicate for compatibility.
+var ErrDuplicateAdapter = ErrDuplicate
+
+// DuplicateAdapterError reports a duplicate adapter registration.
+type DuplicateAdapterError struct {
 	// Adapter is the already-registered adapter.
 	Adapter Adapter
 }
 
+// DuplicateError aliases DuplicateAdapterError for compatibility.
+type DuplicateError = DuplicateAdapterError
+
 // Error returns a human-readable duplicate-registration message.
-func (e DuplicateError) Error() string {
+func (e DuplicateAdapterError) Error() string {
 	return fmt.Sprintf("%s: %s", ErrDuplicate, e.Adapter.String())
 }
 
 // Unwrap returns ErrDuplicate.
-func (e DuplicateError) Unwrap() error { return ErrDuplicate }
+func (e DuplicateAdapterError) Unwrap() error { return ErrDuplicate }
 
 // UnknownAdapterError reports a lookup of an unregistered adapter.
 type UnknownAdapterError struct {
@@ -51,7 +57,7 @@ type UnknownAdapterError struct {
 
 // Error returns a human-readable unknown-adapter message.
 func (e UnknownAdapterError) Error() string {
-	return fmt.Sprintf("%s: %s", ErrUnknownAdapter, e.Adapter.String())
+	return fmt.Sprintf("%s: %s (forgotten import?)", ErrUnknownAdapter, e.Adapter.String())
 }
 
 // Unwrap returns ErrUnknownAdapter.

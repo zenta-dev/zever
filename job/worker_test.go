@@ -15,6 +15,18 @@ import (
 	"github.com/zenta-dev/zever/queue/memory"
 )
 
+// eventually polls cond until true or timeout, failing the test on expiry.
+func eventually(t *testing.T, timeout time.Duration, cond func() bool, msg string) {
+	t.Helper()
+	deadline := time.Now().Add(timeout)
+	for !cond() {
+		if time.Now().After(deadline) {
+			t.Fatalf("eventually timed out after %v: %s", timeout, msg)
+		}
+		time.Sleep(5 * time.Millisecond)
+	}
+}
+
 // workerStubQueue implements queue.Queue with injectable funcs.
 type workerStubQueue struct {
 	pushFn        func(context.Context, string, queue.Payload, queue.Headers) error
@@ -492,8 +504,10 @@ func TestWorkerSweepLoop(t *testing.T) {
 		w.sweepLoop(ctx, ticker)
 		close(done)
 	}()
-	// let at least one tick fire
-	time.Sleep(20 * time.Millisecond)
+	// Poll for at least one tick to fire instead of a fixed sleep.
+	eventually(t, 500*time.Millisecond, func() bool {
+		return SweepBatchCallbacksCalls() > before
+	}, "sweepLoop did not tick")
 	cancel()
 	select {
 	case <-done:
@@ -983,16 +997,22 @@ func TestWorkerRunLoopBranches(t *testing.T) {
 		// Use context that cancels after short delay, and stub that always returns ErrEmpty.
 		ctx, cancel := context.WithCancel(context.Background())
 		defer cancel()
+		var pops atomic.Int64
 		q := &workerStubQueue{
-			popFn: func(context.Context, string) (queue.Message, error) { return queue.Message{}, queue.ErrEmpty },
+			popFn: func(context.Context, string) (queue.Message, error) {
+				pops.Add(1)
+				return queue.Message{}, queue.ErrEmpty
+			},
 		}
 		w := &Worker{Q: q, Queues: []string{"t"}, DrainTimeout: 10 * time.Millisecond, Logger: noop.New()}
 		sem := make(chan struct{}, 1)
 		var wg sync.WaitGroup
-		// run runLoop in goroutine and cancel after 30ms
+		// run runLoop in goroutine and cancel once it has polled
 		errCh := make(chan error, 1)
 		go func() { errCh <- w.runLoop(ctx, sem, &wg) }()
-		time.Sleep(15 * time.Millisecond)
+		eventually(t, 500*time.Millisecond, func() bool {
+			return pops.Load() >= 2
+		}, "runLoop did not poll empty queue")
 		cancel()
 		select {
 		case err := <-errCh:
@@ -1060,18 +1080,18 @@ func TestWorkerRunLoopBranches(t *testing.T) {
 			Attempt: 1,
 			Topic:   "t",
 		}
-		callCount := 0
+		var pops atomic.Int64
+		var acks atomic.Int64
 		q := &workerStubQueue{
 			popFn: func(_ context.Context, _ string) (queue.Message, error) {
-				callCount++
-				if callCount == 1 {
+				if pops.Add(1) == 1 {
 					return msg, nil
 				}
 				// second call: context canceled to exit loop while waiting for sem or handleEmpty
 				// return ErrEmpty to trigger handleEmpty; context will be canceled externally
 				return queue.Message{}, queue.ErrEmpty
 			},
-			ackFn: func(context.Context, queue.Message) error { return nil },
+			ackFn: func(context.Context, queue.Message) error { acks.Add(1); return nil },
 		}
 		w := &Worker{Q: q, Queues: []string{"t"}, DrainTimeout: 20 * time.Millisecond, Logger: noop.New()}
 		sem := make(chan struct{}, 2)
@@ -1079,7 +1099,9 @@ func TestWorkerRunLoopBranches(t *testing.T) {
 		ctx, cancel := context.WithCancel(context.Background())
 		errCh := make(chan error, 1)
 		go func() { errCh <- w.runLoop(ctx, sem, &wg) }()
-		time.Sleep(50 * time.Millisecond)
+		eventually(t, 500*time.Millisecond, func() bool {
+			return acks.Load() >= 1
+		}, "runLoop did not process popped message")
 		cancel()
 		select {
 		case err := <-errCh:
@@ -1089,7 +1111,7 @@ func TestWorkerRunLoopBranches(t *testing.T) {
 		case <-time.After(300 * time.Millisecond):
 			t.Fatal("PopSuccessLaunch timed out")
 		}
-		if callCount < 1 {
+		if pops.Load() < 1 {
 			t.Fatal("pop not called")
 		}
 	})
@@ -1225,7 +1247,9 @@ func TestWorkerRunConcurrencyExplicit(t *testing.T) {
 	ctx, cancel := context.WithCancel(context.Background())
 	errCh := make(chan error, 1)
 	go func() { errCh <- w.Run(ctx) }()
-	time.Sleep(30 * time.Millisecond)
+	// Idle run has no job completion to observe; cancel directly instead of
+	// a fixed sleep. Run blocks on ctx.Done so an immediate cancel is
+	// deterministic and still covers start/stop.
 	cancel()
 	select {
 	case err := <-errCh:
@@ -1239,8 +1263,8 @@ func TestWorkerRunConcurrencyExplicit(t *testing.T) {
 
 func TestWorkerRunPanicHandler(t *testing.T) {
 	Reset()
-	var ackMu sync.Mutex
-	ackCount := 0
+	var ackCount atomic.Int64
+	var delayedCount atomic.Int64
 	// Use stub queue instead of memory to track retry PushDelayed + Ack
 	// But also test panic via process that goes to handleRetry
 	if err := Register("worker-panic", func(context.Context, string) error { panic("panic in run") }); err != nil {
@@ -1249,7 +1273,7 @@ func TestWorkerRunPanicHandler(t *testing.T) {
 	payload, _ := json.Marshal("x")
 	headers := queue.Headers{headerJobName: "worker-panic"}
 	// stub that returns message once then empty
-	popped := false
+	var popped atomic.Bool
 	q := &workerStubQueue{
 		popFn: func(ctx context.Context, _ string) (queue.Message, error) {
 			select {
@@ -1257,8 +1281,7 @@ func TestWorkerRunPanicHandler(t *testing.T) {
 				return queue.Message{}, ctx.Err()
 			default:
 			}
-			if !popped {
-				popped = true
+			if popped.CompareAndSwap(false, true) {
 				return queue.Message{
 					Payload: queue.Payload(payload),
 					Headers: headers,
@@ -1269,12 +1292,13 @@ func TestWorkerRunPanicHandler(t *testing.T) {
 			return queue.Message{}, queue.ErrEmpty
 		},
 		ackFn: func(context.Context, queue.Message) error {
-			ackMu.Lock()
-			ackCount++
-			ackMu.Unlock()
+			ackCount.Add(1)
 			return nil
 		},
-		pushDelayedFn: func(context.Context, string, queue.Payload, queue.Headers, time.Duration) error { return nil },
+		pushDelayedFn: func(context.Context, string, queue.Payload, queue.Headers, time.Duration) error {
+			delayedCount.Add(1)
+			return nil
+		},
 	}
 	w := &Worker{
 		Q:            q,
@@ -1286,7 +1310,9 @@ func TestWorkerRunPanicHandler(t *testing.T) {
 	ctx, cancel := context.WithCancel(context.Background())
 	errCh := make(chan error, 1)
 	go func() { errCh <- w.Run(ctx) }()
-	time.Sleep(80 * time.Millisecond)
+	eventually(t, 2*time.Second, func() bool {
+		return delayedCount.Load() >= 1 && ackCount.Load() >= 1
+	}, "panic handler did not retry via PushDelayed+Ack")
 	cancel()
 	select {
 	case err := <-errCh:
@@ -1296,10 +1322,6 @@ func TestWorkerRunPanicHandler(t *testing.T) {
 	case <-time.After(400 * time.Millisecond):
 		t.Fatal("Run panic handler timeout")
 	}
-	// At least ack or pushDelayed should have happened via retry
-	ackMu.Lock()
-	_ = ackCount
-	ackMu.Unlock()
 }
 
 func TestWorkerHandleResultDeadLetterBatch(t *testing.T) {

@@ -14,35 +14,37 @@ const DefaultTimeout = 30 * time.Second
 // EmbedOptions configures the embedded-catalog adapter.
 type EmbedOptions struct {
 	// FS is the file system holding message catalogs.
-	FS fs.FS
+	FS fs.FS `json:"-" toml:"-" yaml:"-"`
 	// Dir is the catalog directory. Empty means the adapter default (".").
-	Dir string
+	Dir string `json:"dir" toml:"dir" yaml:"dir"`
 	// Fallback is the fallback locale. Empty means none.
-	Fallback string
+	Fallback string `json:"fallback" toml:"fallback" yaml:"fallback"`
 }
 
 // RemoteOptions configures the remote-service adapter.
 type RemoteOptions struct {
 	// Endpoint is the remote service base URL. Empty means unconfigured.
-	Endpoint string
+	Endpoint string `json:"endpoint" toml:"endpoint" yaml:"endpoint"`
 	// APIKey is the remote service credential.
-	APIKey string
+	APIKey string `json:"api_key" toml:"api_key" yaml:"api_key"`
 	// Timeout is the operation timeout. Zero means the default.
-	Timeout time.Duration
+	Timeout time.Duration `json:"timeout" toml:"timeout" yaml:"timeout"`
 	// MaxInFlight caps concurrent requests. Zero means adapter default (1000).
-	MaxInFlight int
+	MaxInFlight int `json:"max_in_flight" toml:"max_in_flight" yaml:"max_in_flight"`
 	// AllowInsecure permits http:// endpoints. Default false (https only).
-	AllowInsecure bool
+	AllowInsecure bool `json:"allow_insecure" toml:"allow_insecure" yaml:"allow_insecure"`
 }
 
 // Options configures backend construction.
 type Options struct {
 	// Embed carries the embedded-catalog adapter settings.
-	Embed EmbedOptions
+	Embed EmbedOptions `json:"embed" toml:"embed" yaml:"embed"`
 	// Remote carries the remote-service adapter settings.
-	Remote RemoteOptions
+	Remote RemoteOptions `json:"remote" toml:"remote" yaml:"remote"`
 }
 
+// Validate checks options for consistency, joining all violations.
+//
 // Validate checks options for consistency.
 // Empty Remote.Endpoint is valid; otherwise it must be a URL with scheme
 // and host, http allowed only when AllowInsecure is set.
@@ -54,7 +56,7 @@ func (o Options) Validate() error {
 		return &InvalidOptionsError{Reason: "timeout must be >= 0"}
 	}
 	if o.Remote.MaxInFlight < 0 {
-		return &InvalidOptionsError{Reason: "maxinflight must be >= 0"}
+		return &InvalidOptionsError{Reason: "max_in_flight must be >= 0"}
 	}
 	if o.Remote.Endpoint == "" {
 		return nil
@@ -62,13 +64,13 @@ func (o Options) Validate() error {
 	if _, err := endpoint.ValidateURL(o.Remote.Endpoint, endpoint.WithAllowInsecure(o.Remote.AllowInsecure)); err != nil {
 		switch {
 		case errors.Is(err, endpoint.ErrParse):
-			return &InvalidOptionsError{Reason: "endpoint must be a valid URL"}
+			return &InvalidOptionsError{Reason: "endpoint must be a valid url"}
 		case errors.Is(err, endpoint.ErrNoScheme),
 			errors.Is(err, endpoint.ErrNoHost),
 			errors.Is(err, endpoint.ErrEmpty):
 			return &InvalidOptionsError{Reason: "endpoint must have scheme and host"}
 		case errors.Is(err, endpoint.ErrInsecureScheme):
-			return &InvalidOptionsError{Reason: "http endpoint requires allowinsecure"}
+			return &InvalidOptionsError{Reason: "http endpoint requires allow_insecure"}
 		default:
 			return &InvalidOptionsError{Reason: "endpoint scheme must be https"}
 		}

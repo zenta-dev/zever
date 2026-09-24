@@ -31,6 +31,19 @@ func newMemoryStore(t *testing.T) session.Store {
 	return st
 }
 
+func eventually(t *testing.T, timeout time.Duration, cond func() bool, msg string) {
+	t.Helper()
+
+	deadline := time.Now().Add(timeout)
+	for !cond() {
+		if time.Now().After(deadline) {
+			t.Fatalf("timed out waiting for %s", msg)
+		}
+
+		time.Sleep(5 * time.Millisecond)
+	}
+}
+
 // plant hand-writes a session record with raw Data, bypassing Issue.
 func plant(t *testing.T, st session.Store, data map[string]any) string {
 	t.Helper()
@@ -187,11 +200,11 @@ func TestVerifyStoreExpired(t *testing.T) {
 	if err != nil {
 		t.Fatalf("Issue err = %v", err)
 	}
-	time.Sleep(200 * time.Millisecond)
-	// Session record itself expired: indistinguishable from unknown.
-	if _, err := a.Verify(ctx, tok.Value); !errors.Is(err, auth.ErrInvalidToken) {
-		t.Fatalf("Verify(store-expired) err = %v, want ErrInvalidToken", err)
-	}
+	// Session record itself expires: poll until Verify reports unknown.
+	eventually(t, 2*time.Second, func() bool {
+		_, err := a.Verify(ctx, tok.Value)
+		return errors.Is(err, auth.ErrInvalidToken)
+	}, "session record expiry")
 }
 
 func TestVerifyEnvelopeExpired(t *testing.T) {

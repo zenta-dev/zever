@@ -65,7 +65,7 @@ func TestRegisterNilAndDuplicate(t *testing.T) {
 func TestOpenUnknown(t *testing.T) {
 	t.Parallel()
 
-	if _, err := Open(Adapter(9999), Options{}); !errors.Is(err, ErrUnknownAdapter) {
+	if _, err := Open(Adapter(9999), Options{ServiceName: "test"}); !errors.Is(err, ErrUnknownAdapter) {
 		t.Fatalf("Open unknown err = %v, want ErrUnknownAdapter", err)
 	}
 }

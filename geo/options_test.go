@@ -31,7 +31,7 @@ func TestOptionsValidate(t *testing.T) {
 			AllowInsecure: true,
 		}},
 		{name: "negative timeout", opts: Options{Timeout: -1}, wantErr: true, wantIs: ErrInvalidOptions, contains: []string{"timeout"}},
-		{name: "negative max body", opts: Options{MaxResponseBody: -1}, wantErr: true, wantIs: ErrInvalidOptions, contains: []string{"max response body"}},
+		{name: "negative max body", opts: Options{MaxResponseBody: -1}, wantErr: true, wantIs: ErrInvalidOptions, contains: []string{"max_response_body"}},
 		{name: "baseurl no scheme", opts: Options{BaseURL: "example.com/api"}, wantErr: true, wantIs: ErrInvalidOptions, contains: []string{"base_url"}},
 		{name: "baseurl no host", opts: Options{BaseURL: "https://"}, wantErr: true, wantIs: ErrInvalidOptions, contains: []string{"base_url"}},
 		{name: "baseurl http locked", opts: Options{BaseURL: "http://example.com"}, wantErr: true, wantIs: ErrInvalidOptions, contains: []string{"base_url must use https"}},

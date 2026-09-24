@@ -27,21 +27,23 @@ const (
 // Options configures mailer construction.
 type Options struct {
 	// Host is the SMTP server hostname.
-	Host string
+	Host string `json:"host" toml:"host" yaml:"host"`
 	// Port is the SMTP server port (1-65535).
-	Port int
+	Port int `json:"port" toml:"port" yaml:"port"`
 	// Username is the SMTP auth username.
-	Username string
+	Username string `json:"username" toml:"username" yaml:"username"`
 	// Password is the SMTP auth password.
-	Password string
+	Password string `json:"password" toml:"password" yaml:"password"`
 	// Encryption is the transport encryption mode. Empty means STARTTLS.
-	Encryption Encryption
+	Encryption Encryption `json:"encryption" toml:"encryption" yaml:"encryption"`
 	// Timeout is the operation timeout. Zero means the default.
-	Timeout time.Duration
+	Timeout time.Duration `json:"timeout" toml:"timeout" yaml:"timeout"`
 	// MaxMessageSize is the maximum message size in bytes. Zero means the default.
-	MaxMessageSize int
+	MaxMessageSize int `json:"max_message_size" toml:"max_message_size" yaml:"max_message_size"`
 }
 
+// Validate checks options for consistency, joining all violations.
+//
 // Validate checks options for consistency.
 // Zero Timeout and MaxMessageSize mean "apply defaults" and are valid;
 // only negative values fail.
@@ -76,7 +78,7 @@ func (o Options) Validate() error {
 	}
 
 	if o.MaxMessageSize < 0 {
-		return &InvalidOptionsError{Reason: "max message size must be >= 0"}
+		return &InvalidOptionsError{Reason: "max_message_size must be >= 0"}
 	}
 
 	return nil

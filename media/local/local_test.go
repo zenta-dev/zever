@@ -93,6 +93,18 @@ func craftPNG(w, h uint32) []byte {
 	return buf.Bytes()
 }
 
+// eventually polls cond until true or timeout, failing the test on expiry.
+func eventually(t *testing.T, timeout, interval time.Duration, cond func() bool, msg string) {
+	t.Helper()
+	deadline := time.Now().Add(timeout)
+	for !cond() {
+		if time.Now().After(deadline) {
+			t.Fatalf("condition not met within %v: %s", timeout, msg)
+		}
+		time.Sleep(interval)
+	}
+}
+
 func destPath(t *testing.T, root, id string) string {
 	t.Helper()
 
@@ -1434,24 +1446,13 @@ func TestJanitorCleansDerived(t *testing.T) {
 	}
 
 	derivedDir := filepath.Join(root, "derived")
-	deadline := time.Now().Add(5 * time.Second)
-
-	for {
+	eventually(t, 5*time.Second, 5*time.Millisecond, func() bool {
 		entries, err := os.ReadDir(derivedDir)
 		if err != nil {
-			t.Fatal(err)
+			return false
 		}
-
-		if len(entries) == 0 {
-			break
-		}
-
-		if time.Now().After(deadline) {
-			t.Fatalf("%d derived files not cleaned up", len(entries))
-		}
-
-		time.Sleep(20 * time.Millisecond)
-	}
+		return len(entries) == 0
+	}, "derived files not cleaned up")
 
 	if _, err := os.Stat(destPath(t, root, asset.ID)); err != nil {
 		t.Fatalf("original removed by janitor: %v", err)

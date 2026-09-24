@@ -59,6 +59,21 @@ func TestErrors_unwrap_carries_sentinel(t *testing.T) {
 	}
 }
 
+func TestErrors_duplicate_aliases_compat(t *testing.T) {
+	t.Parallel()
+	e := &DuplicateAdapterError{Adapter: AdapterFiber}
+	if !errors.Is(e, ErrDuplicate) {
+		t.Fatal("Is ErrDuplicate alias = false")
+	}
+	var de *DuplicateError
+	if !errors.As(e, &de) {
+		t.Fatalf("err type = %T, want *DuplicateError alias", e)
+	}
+	if !errors.Is(ErrDuplicateAdapter, ErrDuplicate) {
+		t.Errorf("alias ErrDuplicate does not match ErrDuplicateAdapter")
+	}
+}
+
 func TestErrors_typed_As(t *testing.T) {
 	t.Parallel()
 	t.Run("invalid_adapter", func(t *testing.T) {

@@ -69,6 +69,10 @@ func Register(adapter Adapter, factory Factory) error {
 
 // Open creates a Flag for adapter using the registered Factory and opts.
 func Open(adapter Adapter, opts Options) (Flag, error) {
+	if err := opts.Validate(); err != nil {
+		return nil, err
+	}
+
 	factory, err := factories.Lookup(adapter)
 	if err != nil {
 		return nil, err

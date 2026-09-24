@@ -11,6 +11,9 @@ var ErrNilFactory = errors.New("observability: nil factory")
 // ErrDuplicate is returned on duplicate adapter registration.
 var ErrDuplicate = errors.New("observability: duplicate registration")
 
+// ErrDuplicateAdapter aliases ErrDuplicate for compatibility.
+var ErrDuplicateAdapter = ErrDuplicate
+
 // ErrUnknownAdapter is returned for an unregistered adapter.
 var ErrUnknownAdapter = errors.New("observability: unknown adapter")
 
@@ -26,19 +29,22 @@ var ErrTooManyInstruments = errors.New("observability: too many instruments")
 // ErrInstrumentConflict is returned when an instrument name is reused for a different kind.
 var ErrInstrumentConflict = errors.New("observability: instrument conflict")
 
-// DuplicateError reports a repeated Register for the same adapter.
-type DuplicateError struct {
+// DuplicateAdapterError reports a repeated Register for the same adapter.
+type DuplicateAdapterError struct {
 	// Adapter is the already-registered adapter.
 	Adapter Adapter
 }
 
+// DuplicateError aliases DuplicateAdapterError for compatibility.
+type DuplicateError = DuplicateAdapterError
+
 // Error returns a human-readable description of the duplicate registration.
-func (e DuplicateError) Error() string {
+func (e DuplicateAdapterError) Error() string {
 	return fmt.Sprintf("%s: %s", ErrDuplicate, e.Adapter.String())
 }
 
 // Unwrap returns ErrDuplicate for errors.Is matching.
-func (e DuplicateError) Unwrap() error { return ErrDuplicate }
+func (e DuplicateAdapterError) Unwrap() error { return ErrDuplicate }
 
 // UnknownAdapterError reports an Open for an unregistered adapter.
 type UnknownAdapterError struct {
@@ -48,7 +54,7 @@ type UnknownAdapterError struct {
 
 // Error returns a human-readable description of the unknown adapter.
 func (e UnknownAdapterError) Error() string {
-	return fmt.Sprintf("%s: %s", ErrUnknownAdapter, e.Adapter.String())
+	return fmt.Sprintf("%s: %s (forgotten import?)", ErrUnknownAdapter, e.Adapter.String())
 }
 
 // Unwrap returns ErrUnknownAdapter for errors.Is matching.

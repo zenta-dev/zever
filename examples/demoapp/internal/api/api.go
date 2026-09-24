@@ -64,13 +64,13 @@ type Deps struct {
 	Cache         cache.Cache
 	Flag          flag.Flag
 	Permission    permission.Checker
-	Ratelimit     ratelimit.Limiter
+	RateLimit     ratelimit.Limiter
 	Lock          lock.Locker
 	Idempotency   idempotency.Store
 	Session       session.Store
 	Queue         queue.Queue
 	Job           *job.Dispatcher
-	Eventbus      eventbus.Eventbus
+	EventBus      eventbus.EventBus
 	Search        search.Search
 	VectorStore   vectorstore.VectorStore
 	Storage       storage.Storage

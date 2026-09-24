@@ -44,7 +44,7 @@ func TestTypedErrorMessages_unwrap(t *testing.T) {
 	t.Run("duplicate", func(t *testing.T) {
 		t.Parallel()
 
-		err := &lock.DuplicateError{Adapter: lock.Memory}
+		err := &lock.DuplicateAdapterError{Adapter: lock.Memory}
 		if got, want := err.Error(), `lock: duplicate registration: memory`; got != want {
 			t.Errorf("Error() = %q, want %q", got, want)
 		}
@@ -58,7 +58,7 @@ func TestTypedErrorMessages_unwrap(t *testing.T) {
 		t.Parallel()
 
 		err := &lock.UnknownAdapterError{Adapter: lock.Adapter(99)}
-		if got, want := err.Error(), `lock: unknown adapter: Adapter(99) (forgotten import?)`; got != want {
+		if got, want := err.Error(), `lock: unknown adapter: unknown (forgotten import?)`; got != want {
 			t.Errorf("Error() = %q, want %q", got, want)
 		}
 

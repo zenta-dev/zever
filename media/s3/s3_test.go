@@ -166,7 +166,7 @@ func gifBytes(t *testing.T) []byte {
 	return buf.Bytes()
 }
 
-func fakeBin(t *testing.T, body string) string {
+func stubBin(t *testing.T, body string) string {
 	t.Helper()
 	p := filepath.Join(t.TempDir(), "fakebin")
 	if err := os.WriteFile(p, []byte(body), 0o600); err != nil {
@@ -196,11 +196,11 @@ const ffprobeFull = `{"format":{"duration":"1.5"},"streams":[` +
 	`{"codec_type":"video","codec_name":"h264","width":640,"height":480},` +
 	`{"codec_type":"audio","codec_name":"aac"}]}`
 
-func ffprobeFake(json string) string {
+func ffprobeStub(json string) string {
 	return "#!/bin/sh\necho '" + json + "'\n"
 }
 
-const ffmpegCopyFake = `#!/bin/sh
+const ffmpegCopyStub = `#!/bin/sh
 in=""
 prev=""
 for a in "$@"; do
@@ -1032,7 +1032,7 @@ func TestProbeAV(t *testing.T) {
 	t.Parallel()
 	tr := &stubTransport{do: listGetRouter(t, testID+".mp4", []byte("fake-av"), "video/mp4")}
 	d := testDriver(t, tr)
-	d.ffprobe = fakeBin(t, ffprobeFake(ffprobeFull))
+	d.ffprobe = stubBin(t, ffprobeStub(ffprobeFull))
 	p, err := d.Probe(t.Context(), testID)
 	if err != nil {
 		t.Fatal(err)
@@ -1052,7 +1052,7 @@ func TestProbeAVEmptyDuration(t *testing.T) {
 	t.Parallel()
 	tr := &stubTransport{do: listGetRouter(t, testID+".mp3", []byte("fake-av"), "audio/mpeg")}
 	d := testDriver(t, tr)
-	d.ffprobe = fakeBin(t, ffprobeFake(`{}`))
+	d.ffprobe = stubBin(t, ffprobeStub(`{}`))
 	p, err := d.Probe(t.Context(), testID)
 	if err != nil {
 		t.Fatal(err)
@@ -1066,7 +1066,7 @@ func TestProbeAVBadDuration(t *testing.T) {
 	t.Parallel()
 	tr := &stubTransport{do: listGetRouter(t, testID+".mp4", []byte("fake-av"), "video/mp4")}
 	d := testDriver(t, tr)
-	d.ffprobe = fakeBin(t, ffprobeFake(`{"format":{"duration":"abc"}}`))
+	d.ffprobe = stubBin(t, ffprobeStub(`{"format":{"duration":"abc"}}`))
 	_, err := d.Probe(t.Context(), testID)
 	if !errors.Is(err, media.ErrProbeFailed) {
 		t.Fatalf("Probe() err = %v, want probe failed", err)
@@ -1088,7 +1088,7 @@ func TestProbeAVProbeFailed(t *testing.T) {
 	t.Parallel()
 	tr := &stubTransport{do: listGetRouter(t, testID+".mp4", []byte("fake-av"), "video/mp4")}
 	d := testDriver(t, tr)
-	d.ffprobe = fakeBin(t, "#!/bin/sh\nexit 1\n")
+	d.ffprobe = stubBin(t, "#!/bin/sh\nexit 1\n")
 	_, err := d.Probe(t.Context(), testID)
 	if !errors.Is(err, media.ErrProbeFailed) {
 		t.Fatalf("Probe() err = %v, want probe failed", err)
@@ -1099,7 +1099,7 @@ func TestProbeAVBadJSON(t *testing.T) {
 	t.Parallel()
 	tr := &stubTransport{do: listGetRouter(t, testID+".mp4", []byte("fake-av"), "video/mp4")}
 	d := testDriver(t, tr)
-	d.ffprobe = fakeBin(t, "#!/bin/sh\necho 'not json'\n")
+	d.ffprobe = stubBin(t, "#!/bin/sh\necho 'not json'\n")
 	_, err := d.Probe(t.Context(), testID)
 	if !errors.Is(err, media.ErrProbeFailed) {
 		t.Fatalf("Probe() err = %v, want probe failed", err)
@@ -1110,7 +1110,7 @@ func TestProbeAVDurationExceeded(t *testing.T) {
 	t.Parallel()
 	tr := &stubTransport{do: listGetRouter(t, testID+".mp4", []byte("fake-av"), "video/mp4")}
 	d := testDriver(t, tr)
-	d.ffprobe = fakeBin(t, ffprobeFake(`{"format":{"duration":"10"}}`))
+	d.ffprobe = stubBin(t, ffprobeStub(`{"format":{"duration":"10"}}`))
 	d.maxDuration = time.Second
 	_, err := d.Probe(t.Context(), testID)
 	if !errors.Is(err, media.ErrDurationExceeded) {
@@ -1499,7 +1499,7 @@ func TestTransformAV(t *testing.T) {
 			return http.StatusOK, "", nil, nil
 		})}
 	d := testDriver(t, tr)
-	d.ffmpeg = fakeBin(t, ffmpegCopyFake)
+	d.ffmpeg = stubBin(t, ffmpegCopyStub)
 	u, err := d.Transform(t.Context(), testID, media.TransformOps{Format: "mp3"})
 	if err != nil {
 		t.Fatal(err)
@@ -1528,7 +1528,7 @@ func TestTransformAVFullOps(t *testing.T) {
 			return http.StatusOK, "", nil, nil
 		})}
 	d := testDriver(t, tr)
-	d.ffmpeg = fakeBin(t, ffmpegCopyFake)
+	d.ffmpeg = stubBin(t, ffmpegCopyStub)
 	ops := media.TransformOps{Bitrate: 128, CRF: 23, Offset: 1500 * time.Millisecond}
 	if _, err := d.Transform(t.Context(), testID, ops); err != nil {
 		t.Fatal(err)
@@ -1625,7 +1625,7 @@ func TestTransformAVTranscodeFailed(t *testing.T) {
 	tr := &stubTransport{do: transformRouter(t, testID+".wav", []byte("fake-wav"), "audio/wav",
 		okPut())}
 	d := testDriver(t, tr)
-	d.ffmpeg = fakeBin(t, "#!/bin/sh\nexit 1\n")
+	d.ffmpeg = stubBin(t, "#!/bin/sh\nexit 1\n")
 	_, err := d.Transform(t.Context(), testID, media.TransformOps{Bitrate: 64})
 	if !errors.Is(err, media.ErrTranscodeFailed) {
 		t.Fatalf("Transform() err = %v, want transcode failed", err)
@@ -1637,7 +1637,7 @@ func TestTransformAVNoOutput(t *testing.T) {
 	tr := &stubTransport{do: transformRouter(t, testID+".wav", []byte("fake-wav"), "audio/wav",
 		okPut())}
 	d := testDriver(t, tr)
-	d.ffmpeg = fakeBin(t, "#!/bin/sh\nexit 0\n")
+	d.ffmpeg = stubBin(t, "#!/bin/sh\nexit 0\n")
 	_, err := d.Transform(t.Context(), testID, media.TransformOps{Bitrate: 64})
 	if err == nil {
 		t.Fatal("Transform() = nil, want missing-output error")
@@ -1653,7 +1653,7 @@ func TestTransformAVFetchError(t *testing.T) {
 		"get": func(_ *http.Request) (int, string, http.Header, error) { return 0, "", nil, errors.New("get boom") },
 	})}
 	d := testDriver(t, tr)
-	d.ffmpeg = fakeBin(t, ffmpegCopyFake)
+	d.ffmpeg = stubBin(t, ffmpegCopyStub)
 	_, err := d.Transform(t.Context(), testID, media.TransformOps{Bitrate: 64})
 	if err == nil || !strings.Contains(err.Error(), "s3: get") {
 		t.Fatalf("Transform() err = %v, want get error", err)
@@ -1672,7 +1672,7 @@ func TestTransformAVPutError(t *testing.T) {
 		"put": func(_ *http.Request) (int, string, http.Header, error) { return 0, "", nil, errors.New("put boom") },
 	})}
 	d := testDriver(t, tr)
-	d.ffmpeg = fakeBin(t, ffmpegCopyFake)
+	d.ffmpeg = stubBin(t, ffmpegCopyStub)
 	_, err := d.Transform(t.Context(), testID, media.TransformOps{Bitrate: 64})
 	if err == nil || !strings.Contains(err.Error(), "s3: put") {
 		t.Fatalf("Transform() err = %v, want put error", err)
@@ -1684,8 +1684,8 @@ func TestTransformAVDurationExceeded(t *testing.T) {
 	tr := &stubTransport{do: transformRouter(t, testID+".wav", []byte("fake-wav"), "audio/wav",
 		okPut())}
 	d := testDriver(t, tr)
-	d.ffmpeg = fakeBin(t, ffmpegCopyFake)
-	d.ffprobe = fakeBin(t, ffprobeFake(`{"format":{"duration":"10"}}`))
+	d.ffmpeg = stubBin(t, ffmpegCopyStub)
+	d.ffprobe = stubBin(t, ffprobeStub(`{"format":{"duration":"10"}}`))
 	d.maxDuration = time.Second
 	_, err := d.Transform(t.Context(), testID, media.TransformOps{Bitrate: 64})
 	if !errors.Is(err, media.ErrDurationExceeded) {
@@ -1698,8 +1698,8 @@ func TestTransformAVGateProbeError(t *testing.T) {
 	tr := &stubTransport{do: transformRouter(t, testID+".wav", []byte("fake-wav"), "audio/wav",
 		okPut())}
 	d := testDriver(t, tr)
-	d.ffmpeg = fakeBin(t, ffmpegCopyFake)
-	d.ffprobe = fakeBin(t, "#!/bin/sh\nexit 1\n")
+	d.ffmpeg = stubBin(t, ffmpegCopyStub)
+	d.ffprobe = stubBin(t, "#!/bin/sh\nexit 1\n")
 	d.maxDuration = time.Second
 	_, err := d.Transform(t.Context(), testID, media.TransformOps{Bitrate: 64})
 	if !errors.Is(err, media.ErrProbeFailed) {
@@ -1712,8 +1712,8 @@ func TestTransformAVGateBadDuration(t *testing.T) {
 	tr := &stubTransport{do: transformRouter(t, testID+".wav", []byte("fake-wav"), "audio/wav",
 		okPut())}
 	d := testDriver(t, tr)
-	d.ffmpeg = fakeBin(t, ffmpegCopyFake)
-	d.ffprobe = fakeBin(t, ffprobeFake(`{"format":{"duration":"abc"}}`))
+	d.ffmpeg = stubBin(t, ffmpegCopyStub)
+	d.ffprobe = stubBin(t, ffprobeStub(`{"format":{"duration":"abc"}}`))
 	d.maxDuration = time.Second
 	_, err := d.Transform(t.Context(), testID, media.TransformOps{Bitrate: 64})
 	if !errors.Is(err, media.ErrProbeFailed) {
@@ -1729,7 +1729,7 @@ func TestTransformTempError(t *testing.T) {
 	tr := &stubTransport{do: transformRouter(t, testID+".wav", []byte("fake-wav"), "audio/wav",
 		okPut())}
 	d := testDriver(t, tr)
-	d.ffmpeg = fakeBin(t, ffmpegCopyFake)
+	d.ffmpeg = stubBin(t, ffmpegCopyStub)
 	if _, err := d.Transform(t.Context(), testID, media.TransformOps{Bitrate: 64}); err == nil {
 		t.Fatal("Transform() = nil, want temp error")
 	}

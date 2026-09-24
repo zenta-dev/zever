@@ -121,7 +121,7 @@ func TestRegisterDuplicate(t *testing.T) {
 func TestOpenUnknown(t *testing.T) {
 	t.Parallel()
 
-	_, err := Open(Adapter(103), Options{})
+	_, err := Open(Adapter(103), Options{Dispatcher: &job.Dispatcher{}})
 	if !errors.Is(err, ErrUnknownAdapter) {
 		t.Fatalf("err=%v want ErrUnknownAdapter", err)
 	}
@@ -144,7 +144,7 @@ func TestOpenFactoryErrorWrapped(t *testing.T) {
 		t.Fatalf("Register: %v", err)
 	}
 
-	_, err := Open(a, Options{})
+	_, err := Open(a, Options{Dispatcher: &job.Dispatcher{}})
 	if !errors.Is(err, sentinel) {
 		t.Fatalf("err=%v want wrapped sentinel", err)
 	}

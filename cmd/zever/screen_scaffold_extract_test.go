@@ -8,10 +8,12 @@ import (
 	"errors"
 	"os"
 	"strings"
+	"sync"
 	"testing"
 	"time"
 
 	tea "charm.land/bubbletea/v2"
+	huh "charm.land/huh/v2"
 	teatest "github.com/charmbracelet/x/exp/teatest/v2"
 
 	"github.com/zenta-dev/zever/cmd/zever/tui"
@@ -177,43 +179,124 @@ func TestRunExtractScreenWritesService(t *testing.T) {
 	}
 }
 
+// extractProbe wraps an ExtractScreen for the teatest run below,
+// snapshotting race-safe observations after every Update so Sends can be
+// paced on real outcomes (typed value, focus handoffs, stage) instead of
+// fixed sleeps: teatest Sends are consumed asynchronously and huh
+// completes focus handoffs via commands, so burst Sends overrun the
+// focused field (the run stalls in form with an empty CLI).
+type extractProbe struct {
+	mu        sync.Mutex
+	inner     *ExtractScreen
+	module    string
+	stage     scaffoldStage
+	cli       string
+	focused   any
+	formState huh.FormState
+}
+
+func (p *extractProbe) Init() tea.Cmd { return p.inner.Init() }
+
+func (p *extractProbe) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
+	m, cmd := p.inner.Update(msg)
+	es, _ := m.(*ExtractScreen)
+	if es == nil {
+		return p, cmd
+	}
+	p.mu.Lock()
+	p.inner = es
+	p.module = es.module
+	p.stage = es.flow.stage
+	p.cli = es.flow.cli
+	if es.flow.form != nil {
+		p.focused = es.flow.form.GetFocusedField()
+		p.formState = es.flow.form.State
+	}
+	p.mu.Unlock()
+	return p, cmd
+}
+
+func (p *extractProbe) View() tea.View {
+	p.mu.Lock()
+	defer p.mu.Unlock()
+	return p.inner.View()
+}
+
+// snapshot returns the latest observed wizard state.
+func (p *extractProbe) snapshot() (module string, stage scaffoldStage, focused any, formState huh.FormState) {
+	p.mu.Lock()
+	defer p.mu.Unlock()
+	return p.module, p.stage, p.focused, p.formState
+}
+
+// finalState returns the terminal stage and CLI for assertions,
+// falling back to the exec model's CLI exactly like the unwrapped check.
+func (p *extractProbe) finalState() (scaffoldStage, string) {
+	p.mu.Lock()
+	defer p.mu.Unlock()
+	cli := p.cli
+	if cli == "" && p.inner.flow.hasExec {
+		cli = p.inner.flow.exec.CLI()
+	}
+	return p.stage, cli
+}
+
 // TestExtractScreenTeatestEndToEnd is the group's single full-program run:
 // boot the screen, type a module name, and walk the form with synthetic
 // keys. It lands on preview (or exec if a confirm key overruns); either way
 // the frozen CLI proves end-to-end wiring. Confirming here is write-free:
 // with no schema workspace around, the extract plan fails before any write.
 func TestExtractScreenTeatestEndToEnd(t *testing.T) {
-	s := NewExtractScreen()
+	probe := &extractProbe{inner: NewExtractScreen()}
 
-	tm := teatest.NewTestModel(t, s, teatest.WithInitialTermSize(80, 24))
-	time.Sleep(300 * time.Millisecond)
+	tm := teatest.NewTestModel(t, probe, teatest.WithInitialTermSize(80, 24))
+	// Wait for huh's Init commands to settle (focus established) before
+	// typing: Init follow-ups are async, so early keys can land ahead of
+	// them and leave the form in a state where Enter no-ops.
+	pollFor(t, 15*time.Second, func() bool {
+		_, _, focused, _ := probe.snapshot()
+		return focused != nil
+	})
 	for _, r := range "billing" {
 		tm.Send(scaffoldKey(string(r)))
-		time.Sleep(50 * time.Millisecond)
 	}
-	for i := 0; i < 6; i++ {
+	// Wait for the typed value to land in the bound field.
+	pollFor(t, 15*time.Second, func() bool {
+		module, _, _, _ := probe.snapshot()
+		return module == "billing"
+	})
+	// Walk the form: each enter's async handoff (focus move, group
+	// submit, or the trailing key that flips a completed form to
+	// preview) must land before the next enter is sent, otherwise keys
+	// hit the wrong field or the completion is never observed.
+	for i := 0; i < 12; i++ {
+		_, stage, _, _ := probe.snapshot()
+		if stage != stageForm {
+			break
+		}
+		_, _, before, beforeState := probe.snapshot()
 		tm.Send(scaffoldKey("enter"))
-		time.Sleep(200 * time.Millisecond)
+		pollFor(t, 15*time.Second, func() bool {
+			_, stage, focused, formState := probe.snapshot()
+			return stage != stageForm || focused != before || formState != beforeState
+		})
 	}
 	if err := tm.Quit(); err != nil {
 		t.Fatalf("quit: %v", err)
 	}
 	tm.WaitFinished(t, teatest.WithFinalTimeout(5*time.Second))
 
-	final, ok := tm.FinalModel(t).(*ExtractScreen)
+	final, ok := tm.FinalModel(t).(*extractProbe)
 	if !ok {
-		t.Fatalf("final model = %T, want *ExtractScreen", tm.FinalModel(t))
+		t.Fatalf("final model = %T, want *extractProbe", tm.FinalModel(t))
 	}
 
-	cli := final.flow.cli
-	if cli == "" && final.flow.hasExec {
-		cli = final.flow.exec.CLI()
-	}
+	stage, cli := final.finalState()
 	if cli != "zever extract billing" {
-		t.Fatalf("stage = %d CLI = %q, want preview/exec with CLI %q", final.flow.stage, cli, "zever extract billing")
+		t.Fatalf("stage = %d CLI = %q, want preview/exec with CLI %q", stage, cli, "zever extract billing")
 	}
-	if final.flow.stage != stagePreview && final.flow.stage != stageExec {
-		t.Fatalf("stage = %d, want preview or exec", final.flow.stage)
+	if stage != stagePreview && stage != stageExec {
+		t.Fatalf("stage = %d, want preview or exec", stage)
 	}
 }
 

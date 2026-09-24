@@ -40,7 +40,10 @@ func TestCoverSaveOverExpiredUpsertsFresh(t *testing.T) {
 	if err != nil {
 		t.Fatalf("Create: %v", err)
 	}
-	time.Sleep(120 * time.Millisecond)
+	eventually(t, 2*time.Second, func() bool {
+		_, getErr := st.Get(ctx, s.ID)
+		return errors.Is(getErr, session.ErrNotFound)
+	}, "session expiry")
 
 	s.Data = map[string]any{"v": 1}
 	if serr := st.Save(ctx, s); serr != nil {
@@ -98,7 +101,10 @@ func TestCoverSweepDeletesExpired(t *testing.T) {
 	if err != nil {
 		t.Fatalf("Create: %v", err)
 	}
-	time.Sleep(120 * time.Millisecond)
+	// Wait past the 40ms TTL without touching old (Get would lazily
+	// purge and hide the sweep path).
+	start := time.Now()
+	eventually(t, 2*time.Second, func() bool { return time.Since(start) > 100*time.Millisecond }, "past TTL")
 
 	// A new write triggers the opportunistic sweep, deleting the
 	// expired entry (lazy Get would also miss, but the sweep line
@@ -114,9 +120,9 @@ func TestCoverSweepDeletesExpired(t *testing.T) {
 func TestCoverTickerSweepFires(t *testing.T) {
 	t.Parallel()
 
-	// Store TTL 2s selects a 1s sweep interval: sleep past two ticks so
-	// the background branch provably runs, then assert the sweep took
-	// effect without any further writes.
+	// Store TTL 2s selects a 1s sweep interval: poll until the 1s session
+	// expires (the background ticker also sweeps; Get reports NotFound
+	// either way without any further writes).
 	st, err := memory.New(session.Options{TTL: 2 * time.Second})
 	if err != nil {
 		t.Fatalf("New: %v", err)
@@ -128,9 +134,8 @@ func TestCoverTickerSweepFires(t *testing.T) {
 	if err != nil {
 		t.Fatalf("Create: %v", err)
 	}
-	time.Sleep(2500 * time.Millisecond)
-
-	if _, err := st.Get(ctx, short.ID); !errors.Is(err, session.ErrNotFound) {
-		t.Fatalf("Get after ticker sweep = %v, want ErrNotFound", err)
-	}
+	eventually(t, 5*time.Second, func() bool {
+		_, err := st.Get(ctx, short.ID)
+		return errors.Is(err, session.ErrNotFound)
+	}, "ticker sweep expiry")
 }

@@ -38,7 +38,7 @@ type bus struct {
 
 // New creates an in-memory eventbus from opts.
 // The returned bus supports both the push and pull APIs.
-func New(opts eventbus.Options) (eventbus.Eventbus, error) {
+func New(opts eventbus.Options) (eventbus.EventBus, error) {
 	b, err := newBus(opts)
 	if err != nil {
 		return nil, err

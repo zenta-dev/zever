@@ -16,6 +16,31 @@ import (
 	"github.com/zenta-dev/zever/internal/lrucache"
 )
 
+// eventually polls cond until it holds or timeout elapses, failing the
+// test on expiry. Fixed sleeps are banned here; all async waits go
+// through this helper.
+func eventually(t *testing.T, cond func() bool, msg string) {
+	t.Helper()
+
+	const timeout = 5 * time.Second
+	deadline := time.Now().Add(timeout)
+	for time.Now().Before(deadline) {
+		if cond() {
+			return
+		}
+		time.Sleep(5 * time.Millisecond)
+	}
+	t.Fatalf("timed out waiting for %s", msg)
+}
+
+// flightPresent reports whether key currently occupies a.flights.
+func flightPresent(a *adapter, key string) bool {
+	a.mu.Lock()
+	defer a.mu.Unlock()
+	_, ok := a.flights[key]
+	return ok
+}
+
 // newTestAdapter builds a real adapter against endpoint. White-box: tests
 // below poke a.cache/a.flights/a.order directly.
 func newTestAdapter(t *testing.T, endpoint string) *adapter {
@@ -94,12 +119,13 @@ func TestLookup(t *testing.T) {
 	}
 
 	// Expiry: a short-TTL entry is lazily purged from the cache once past
-	// its expiry, on the next lookup.
+	// its expiry, on the next lookup. Poll for the miss instead of a
+	// fixed sleep: expiry is clock-driven and must surface promptly.
 	a.store("short", cacheValue{val: "S"}, time.Millisecond)
-	time.Sleep(5 * time.Millisecond)
-	if _, ok := a.lookup("short"); ok {
-		t.Fatal("expired: want not ok")
-	}
+	eventually(t, func() bool {
+		_, ok := a.lookup("short")
+		return !ok
+	}, "short-TTL entry to expire")
 }
 
 func TestStoreOverwrite(t *testing.T) {
@@ -294,7 +320,9 @@ func TestTranslateFlightErrWaiter(t *testing.T) {
 		_, err := a.Translate(context.Background(), "en", "k", nil)
 		leaderDone <- err
 	}()
-	time.Sleep(100 * time.Millisecond) // leader occupies the flight
+	// Poll for the leader's flight registration instead of a fixed sleep:
+	// the entry proves the waiter below will join (not lead) the flight.
+	eventually(t, func() bool { return flightPresent(a, cacheKey("en", "k", nil)) }, "leader to occupy the flight")
 
 	waiterDone := make(chan error, 1)
 	go func() {
@@ -325,14 +353,16 @@ func TestTranslateQuitWaiter(t *testing.T) {
 		defer close(leaderDone)
 		_, _ = a.Translate(context.Background(), "en", "k", nil)
 	}()
-	time.Sleep(100 * time.Millisecond) // leader in flight
+	eventually(t, func() bool { return flightPresent(a, cacheKey("en", "k", nil)) }, "leader to occupy the flight")
 
 	waiterDone := make(chan error, 1)
 	go func() {
 		_, err := a.Translate(context.Background(), "en", "k", nil)
 		waiterDone <- err
 	}()
-	time.Sleep(300 * time.Millisecond) // waiter parks on the flight
+	// No fixed sleep for the waiter to park: Close delivers ErrClosed on
+	// the quit channel whether the waiter has joined the flight or still
+	// observes closed, so either interleaving asserts the same outcome.
 
 	if err := a.Close(); err != nil {
 		t.Fatalf("Close: %v", err)
@@ -357,7 +387,7 @@ func TestCloseCancelsFlight(t *testing.T) {
 		_, err := a.Translate(context.Background(), "en", "k", nil)
 		leaderDone <- err
 	}()
-	time.Sleep(100 * time.Millisecond) // leader in flight
+	eventually(t, func() bool { return flightPresent(a, cacheKey("en", "k", nil)) }, "leader to occupy the flight")
 
 	if err := a.Close(); err != nil {
 		t.Fatalf("Close: %v", err)

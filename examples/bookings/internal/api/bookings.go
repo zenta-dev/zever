@@ -77,8 +77,8 @@ func (a *API) handleCreateBooking(w http.ResponseWriter, req *http.Request) {
 	guest := subject(req)
 	tenant := a.tenantID(ctx, req)
 
-	if a.Ratelimit != nil {
-		dec, err := a.Ratelimit.Allow(ctx, "book:"+guest, 1)
+	if a.RateLimit != nil {
+		dec, err := a.RateLimit.Allow(ctx, "book:"+guest, 1)
 		if err != nil {
 			writeError(w, http.StatusInternalServerError, "ratelimit failed")
 			return

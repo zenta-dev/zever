@@ -13,6 +13,7 @@ import (
 	"path/filepath"
 	"reflect"
 	"runtime"
+	"strconv"
 	"strings"
 	"testing"
 	"time"
@@ -363,11 +364,21 @@ func TestDevChildStopKillsWedged(t *testing.T) {
 		close(child.done)
 	}()
 
-	// Settle past the shell's trap setup: a TERM landing before `trap`
-	// executes would kill the shell outright (graceful path), making the
-	// kill-fallback branch flaky. With the trap armed, TERM only kills the
-	// first sleep and the shell outlives the grace period deterministically.
-	time.Sleep(300 * time.Millisecond)
+	// Wait until the shell has armed its TERM trap instead of a fixed
+	// sleep: the trap command runs before the first sleep, so a visible
+	// sleep descendant proves setup completed. A TERM landing before
+	// `trap` executes would kill the shell outright (graceful path),
+	// making the kill-fallback branch flaky; with the trap armed, TERM
+	// only kills the first sleep and the shell outlives the grace period
+	// deterministically.
+	pollFor(t, 10*time.Second, func() bool {
+		//nolint:gosec // fixed ps argv, no shell; pid is our own test child.
+		out, err := exec.CommandContext(context.Background(), "ps", "-o", "comm=", "--ppid", strconv.Itoa(cmd.Process.Pid)).Output()
+		if err != nil {
+			return false
+		}
+		return strings.Contains(string(out), "sleep")
+	})
 
 	start := time.Now()
 	child.stop(100 * time.Millisecond)

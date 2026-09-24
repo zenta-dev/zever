@@ -14,10 +14,7 @@ func TestAdapterString_returnsName(t *testing.T) {
 		want string
 	}{
 		{name: "env", in: Env, want: "env"},
-		{name: "vault", in: Vault, want: "vault"},
-		{name: "gcp", in: GCP, want: "gcp"},
-		{name: "aws", in: AWS, want: "aws"},
-		{name: "unknown formats", in: Adapter(99), want: "Adapter(99)"},
+		{name: "unknown formats", in: Adapter(99), want: "unknown"},
 	}
 
 	for _, tt := range tests {
@@ -39,9 +36,6 @@ func TestParseAdapter_valid_returnsAdapter(t *testing.T) {
 		want Adapter
 	}{
 		{in: "env", want: Env},
-		{in: "vault", want: Vault},
-		{in: "gcp", want: GCP},
-		{in: "aws", want: AWS},
 	}
 
 	for _, tt := range tests {
@@ -66,6 +60,9 @@ func TestParseAdapter_invalid_returnsInvalidAdapterError(t *testing.T) {
 		{name: "bogus", in: "bogus"},
 		{name: "empty", in: ""},
 		{name: "case sensitive", in: "Env"},
+		{name: "vault unimplemented", in: "vault"},
+		{name: "gcp unimplemented", in: "gcp"},
+		{name: "aws unimplemented", in: "aws"},
 	}
 
 	for _, tt := range tests {

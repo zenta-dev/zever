@@ -76,9 +76,9 @@ func newTestSetup(t *testing.T) testSetup {
 	if err != nil {
 		t.Fatalf("Password: %v", err)
 	}
-	limiter, err := c.Ratelimit()
+	limiter, err := c.RateLimit()
 	if err != nil {
-		t.Fatalf("Ratelimit: %v", err)
+		t.Fatalf("RateLimit: %v", err)
 	}
 	perm, err := c.Permission()
 	if err != nil {

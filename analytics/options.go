@@ -17,17 +17,17 @@ const (
 // Options configures analytics backend selection and limits.
 type Options struct {
 	// APIKey holds the backend write key. It is never logged.
-	APIKey string
+	APIKey string `json:"api_key" toml:"api_key" yaml:"api_key"`
 	// Endpoint holds the optional custom backend endpoint URL.
-	Endpoint string
+	Endpoint string `json:"endpoint" toml:"endpoint" yaml:"endpoint"`
 	// AnonymousID holds the fallback identity for anonymous tracking.
-	AnonymousID string
+	AnonymousID string `json:"anonymous_id" toml:"anonymous_id" yaml:"anonymous_id"`
 	// GroupType holds the group type for group calls.
-	GroupType string
+	GroupType string `json:"group_type" toml:"group_type" yaml:"group_type"`
 	// MaxPropertiesBytes bounds the JSON-encoded properties payload size.
-	MaxPropertiesBytes int
+	MaxPropertiesBytes int `json:"max_properties_bytes" toml:"max_properties_bytes" yaml:"max_properties_bytes"`
 	// MaxProperties bounds the number of properties per call.
-	MaxProperties int
+	MaxProperties int `json:"max_properties" toml:"max_properties" yaml:"max_properties"`
 }
 
 // Validate checks options for consistency, joining all violations.
@@ -35,17 +35,17 @@ func (o Options) Validate() error {
 	var errs []error
 
 	if o.MaxPropertiesBytes < 0 {
-		errs = append(errs, &InvalidOptionsError{Reason: "max properties bytes must be >= 0"})
+		errs = append(errs, &InvalidOptionsError{Reason: "max_properties_bytes must be >= 0"})
 	}
 
 	if o.MaxProperties < 0 {
-		errs = append(errs, &InvalidOptionsError{Reason: "max properties must be >= 0"})
+		errs = append(errs, &InvalidOptionsError{Reason: "max_properties must be >= 0"})
 	}
 
 	if o.Endpoint != "" {
 		u, err := url.Parse(o.Endpoint)
 		if err != nil {
-			errs = append(errs, &InvalidOptionsError{Reason: "endpoint must be a valid URL"})
+			errs = append(errs, &InvalidOptionsError{Reason: "endpoint must be a valid url"})
 		} else {
 			if u.Scheme == "" {
 				errs = append(errs, &InvalidOptionsError{Reason: "endpoint must include scheme"})

@@ -71,13 +71,57 @@ db:
   adapter: postgres
   options:
     dsn: postgres://app:secret@db:5432/app
-    maxconns: 20
+    max_conns: 20
 log:
   adapter: slog
 ```
 
 Only `.yaml`, `.yml`, and `.json` decode; anything else fails with
 `ErrUnsupportedFormat`. Null or empty service blocks decode to zero values.
+
+File keys are snake_case and strict: the pre-rename flat spellings are
+rejected as unknown fields. Migration:
+
+| Old key | New key |
+|---|---|
+| `apikey` | `api_key` |
+| `baseurl` | `base_url` |
+| `maxconns` / `minconns` | `max_conns` / `min_conns` |
+| `maxconnlifetime` / `maxconnidletime` | `max_conn_lifetime` / `max_conn_idle_time` |
+| `maxttl` | `max_ttl` |
+| `clientid` | `client_id` |
+| `visibilitytimeout` / `polltimeout` | `visibility_timeout` / `poll_timeout` |
+| `minlevel` | `min_level` |
+| `sweepinterval` / `maxentries` | `sweep_interval` / `max_entries` |
+| `poolsize` / `minidleconns` / `pooltimeout` / `connmaxidletime` / `connmaxlifetime` | `pool_size` / `min_idle_conns` / `pool_timeout` / `conn_max_idle_time` / `conn_max_lifetime` |
+| `secretkey` / `webhooksecret` | `secret_key` / `webhook_secret` |
+| `autoapprove` / `maxwebhookbytes` | `auto_approve` / `max_webhook_bytes` |
+| `anonymousid` / `grouptype` | `anonymous_id` / `group_type` |
+| `maxpropertiesbytes` / `maxproperties` | `max_properties_bytes` / `max_properties` |
+| `tmpdir` / `maxoutputbytes` | `tmp_dir` / `max_output_bytes` |
+| `latexcommand` / `latexpdftoppm` / `latexruns` | `latex_command` / `latex_pdf_to_ppm` / `latex_runs` |
+| `buffersize` / `maxhandlers` | `buffer_size` / `max_handlers` |
+| `handlertimeout` / `closetimeout` | `handler_timeout` / `close_timeout` |
+| `projectid` / `serviceaccount` | `project_id` / `service_account` |
+| `maxinflight` / `allowinsecure` | `max_in_flight` / `allow_insecure` |
+| `maxmessagesize` | `max_message_size` |
+| `maxdownloadbytes` / `maxpixels` | `max_download_bytes` / `max_pixels` |
+| `derivedttl` / `presignttl` / `maxduration` | `derived_ttl` / `presign_ttl` / `max_duration` |
+| `accesskeyid` / `secretaccesskey` | `access_key_id` / `secret_access_key` |
+| `accountsid` / `authtoken` / `fromnumber` | `account_sid` / `auth_token` / `from_number` |
+| `servicename` / `setglobals` | `service_name` / `set_globals` |
+| `cafile` / `certfile` / `keyfile` | `ca_file` / `cert_file` / `key_file` |
+| `sampleratio` / `attrvaluelimit` | `sample_ratio` / `attr_value_limit` |
+| `modelpath` / `policypath` | `model_path` / `policy_path` |
+| `idlettl` | `idle_ttl` |
+| `maxretries` / `replaytolerance` | `max_retries` / `replay_tolerance` |
+| `allowprivatetargets` / `queueadapter` / `queueopts` / `deadlettertopic` | `allow_private_targets` / `queue_adapter` / `queue_opts` / `dead_letter_topic` |
+| `subdomainregex` | `subdomain_regex` |
+| `publicurl` / `policysync` / `syncfail` | `public_url` / `policy_sync` / `sync_fail` |
+| `accountid` / `urlbase` | `account_id` / `url_base` |
+
+Env names are unaffected: env matching ignores `_` and case, so
+`DB_MAXCONNS` keeps working.
 
 ## Env scheme
 

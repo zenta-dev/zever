@@ -1,3 +1,3 @@
 package queue
 
-func NewMessageIDForTest() MessageID { return newMessageID() }
+func stubMessageID() MessageID { return newMessageID() }

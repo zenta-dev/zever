@@ -24,6 +24,11 @@ type ttlValue[V any] struct {
 type TTLCache[K comparable, V any] struct {
 	ttl time.Duration
 	c   *Cache[K, ttlValue[V]]
+	// now returns the current time. Defaults to time.Now; tests in the
+	// same package may replace it with a fake clock to advance time
+	// deterministically instead of sleeping. Kept unexported so NewTTL's
+	// signature stays unchanged and no clock leaks into the public API.
+	now func() time.Time
 }
 
 // NewTTL creates a TTLCache with the given capacity and time-to-live.
@@ -52,7 +57,17 @@ func NewTTL[K comparable, V any](capacity int, ttl time.Duration, opts ...Option
 	return &TTLCache[K, V]{
 		ttl: ttl,
 		c:   New[K, ttlValue[V]](capacity, innerOpts...),
+		now: time.Now,
 	}
+}
+
+// nowTime returns t.now(), falling back to time.Now if the field is nil
+// (e.g. a zero-value TTLCache built without NewTTL).
+func (t *TTLCache[K, V]) nowTime() time.Time {
+	if t.now != nil {
+		return t.now()
+	}
+	return time.Now()
 }
 
 // expired reports whether tv's expiry is at or before now, matching
@@ -72,7 +87,7 @@ func (t *TTLCache[K, V]) Get(k K) (V, bool) {
 		return zero, false
 	}
 
-	if expired(tv, time.Now()) {
+	if expired(tv, t.nowTime()) {
 		t.c.Delete(k)
 		var zero V
 		return zero, false
@@ -101,7 +116,7 @@ func (t *TTLCache[K, V]) Put(k K, v V) {
 // present in i18n/remote/remote.go, the hand-rolled cache this package is
 // designed to eventually replace.
 func (t *TTLCache[K, V]) PutTTL(k K, v V, ttl time.Duration) {
-	t.c.Put(k, ttlValue[V]{val: v, expiresAt: time.Now().Add(ttl)})
+	t.c.Put(k, ttlValue[V]{val: v, expiresAt: t.nowTime().Add(ttl)})
 }
 
 // Delete removes k from the cache and returns its value, if present and not
@@ -115,7 +130,7 @@ func (t *TTLCache[K, V]) Delete(k K) (V, bool) {
 		return zero, false
 	}
 
-	if expired(tv, time.Now()) {
+	if expired(tv, t.nowTime()) {
 		var zero V
 		return zero, false
 	}

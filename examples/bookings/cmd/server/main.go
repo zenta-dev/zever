@@ -94,7 +94,7 @@ func run(addr string) error {
 	if err != nil {
 		return err
 	}
-	limiter, err := c.Ratelimit()
+	limiter, err := c.RateLimit()
 	if err != nil {
 		return err
 	}
@@ -170,7 +170,7 @@ func run(addr string) error {
 	var handler http.Handler = r
 	handler = middleware.RequestLogger(logger)(handler)
 	handler = middleware.Tracing(provider)(handler)
-	if cfg.Ratelimit.Options.Rate > 0 {
+	if cfg.RateLimit.Options.Rate > 0 {
 		handler = middleware.RateLimit(limiter, middleware.RemoteAddrKey)(handler)
 	}
 	handler = middleware.Recover(logger)(handler)

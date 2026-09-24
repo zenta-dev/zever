@@ -1,6 +1,7 @@
 // Package payment payment-processing facade with swappable adapters.
 //
-// It creates, refunds, fetches, and webhook-decodes payments through Payment
+// Payment is the charge/refund/webhook facade; billing is the separate
+// subscription/invoice facade. It creates, refunds, fetches, and webhook-decodes payments through Payment
 // with minor-unit amounts and typed Request, Result, and Event values. It is
 // not a ledger of record and it never stores card data; backends own that.
 //

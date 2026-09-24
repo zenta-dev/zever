@@ -27,14 +27,14 @@ type Options struct {
 	UserAgent string `json:"user_agent" toml:"user_agent" yaml:"user_agent"`
 }
 
-// Validate checks Options for logical correctness.
+// Validate checks options for consistency, joining all violations.
 func (o Options) Validate() error {
 	var errs []error
 	if o.Timeout < 0 {
 		errs = append(errs, &InvalidOptionsError{Reason: "timeout must be >= 0"})
 	}
 	if o.MaxResponseBody < 0 {
-		errs = append(errs, &InvalidOptionsError{Reason: "max response body must be >= 0"})
+		errs = append(errs, &InvalidOptionsError{Reason: "max_response_body must be >= 0"})
 	}
 	if o.BaseURL != "" {
 		if _, err := endpoint.ValidateURL(o.BaseURL, endpoint.WithAllowInsecure(o.AllowInsecure)); err != nil {
@@ -58,7 +58,7 @@ func httpsReason(field string, err error) string {
 		errors.Is(err, endpoint.ErrEmpty),
 		errors.Is(err, endpoint.ErrNoScheme),
 		errors.Is(err, endpoint.ErrNoHost):
-		return field + " must be a valid URL"
+		return field + " must be a valid url"
 	default:
 		return field + " must use https"
 	}

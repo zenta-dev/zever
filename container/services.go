@@ -351,7 +351,7 @@ func (c *Container) Document() (document.Document, error) {
 // EventBus resolves and returns the eventbus service instance.
 func (c *Container) EventBus() (eventbus.EventBus, error) {
 	return c.eventbus.get(func() (eventbus.EventBus, error) {
-		return openService("eventbus", c.cfg.Eventbus.Adapter, eventbus.ParseAdapter, eventbus.Open, c.cfg.Eventbus.Options)
+		return openService("eventbus", c.cfg.EventBus.Adapter, eventbus.ParseAdapter, eventbus.Open, c.cfg.EventBus.Options)
 	})
 }
 
@@ -486,7 +486,7 @@ func (c *Container) Queue() (queue.Queue, error) {
 // RateLimit resolves and returns the ratelimit service instance.
 func (c *Container) RateLimit() (ratelimit.Limiter, error) {
 	return c.ratelimit.get(func() (ratelimit.Limiter, error) {
-		return openService("ratelimit", c.cfg.Ratelimit.Adapter, ratelimit.ParseAdapter, ratelimit.Open, c.cfg.Ratelimit.Options)
+		return openService("ratelimit", c.cfg.RateLimit.Adapter, ratelimit.ParseAdapter, ratelimit.Open, c.cfg.RateLimit.Options)
 	})
 }
 

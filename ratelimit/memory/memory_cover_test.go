@@ -27,6 +27,19 @@ func newCoverStore(t *testing.T, opts ratelimit.Options) *store {
 	return s
 }
 
+func eventually(t *testing.T, timeout time.Duration, cond func() bool, msg string) {
+	t.Helper()
+
+	deadline := time.Now().Add(timeout)
+	for !cond() {
+		if time.Now().After(deadline) {
+			t.Fatalf("timed out waiting for %s", msg)
+		}
+
+		time.Sleep(5 * time.Millisecond)
+	}
+}
+
 func TestCoverNewDefaults(t *testing.T) {
 	s := newCoverStore(t, ratelimit.Options{Rate: 10, Burst: 5})
 	if s.idle != ratelimit.DefaultIdleTTL {
@@ -119,7 +132,9 @@ func TestCoverAllowPostLockClosed(t *testing.T) {
 		done <- result{err: err}
 	}()
 
-	time.Sleep(100 * time.Millisecond)
+	// The test holds s.mu, so the goroutine blocks on it after the
+	// pre-lock checks; closing underneath exercises the post-lock path
+	// deterministically without any timing wait.
 	s.closed.Store(true)
 	s.mu.Unlock()
 
@@ -177,7 +192,11 @@ func TestCoverAllowRefillCapped(t *testing.T) {
 		t.Fatalf("Allow failed: %v", err)
 	}
 
-	time.Sleep(300 * time.Millisecond)
+	// Simulate ~300ms of refill at 5/s without sleeping: backdate last so
+	// the next Allow accrues and caps at burst.
+	s.mu.Lock()
+	s.buckets["k-cap"].last = time.Now().Add(-300 * time.Millisecond)
+	s.mu.Unlock()
 
 	d, err := s.Allow(ctx, "k-cap", 1)
 	if err != nil || !d.Allowed {
@@ -312,7 +331,8 @@ func TestCoverResetPostLockClosed(t *testing.T) {
 		done <- s.Reset(context.Background(), "k-postlock")
 	}()
 
-	time.Sleep(100 * time.Millisecond)
+	// Same as Allow post-lock: the goroutine parks on s.mu, which this
+	// test holds, so close underneath without any timing wait.
 	s.closed.Store(true)
 	s.mu.Unlock()
 
@@ -377,23 +397,12 @@ func TestCoverRunTickerSweepsAndStops(t *testing.T) {
 	s.buckets["k-sweep"].last = time.Now().Add(-time.Second)
 	s.mu.Unlock()
 
-	deadline := time.Now().Add(2 * time.Second)
-
-	for {
+	eventually(t, 2*time.Second, func() bool {
 		s.mu.RLock()
+		defer s.mu.RUnlock()
 		_, ok := s.buckets["k-sweep"]
-		s.mu.RUnlock()
-
-		if !ok {
-			break
-		}
-
-		if time.Now().After(deadline) {
-			t.Fatal("background sweeper did not remove expired bucket")
-		}
-
-		time.Sleep(10 * time.Millisecond)
-	}
+		return !ok
+	}, "background sweeper to remove expired bucket")
 
 	if closeErr := l.Close(); closeErr != nil {
 		t.Fatalf("Close failed: %v", closeErr)

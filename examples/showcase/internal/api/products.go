@@ -100,8 +100,8 @@ func (a *API) handleCreateProduct(w http.ResponseWriter, req *http.Request) {
 // adapter over the shared impl; the JSON shape is unchanged.
 func (a *API) handleListProducts(w http.ResponseWriter, req *http.Request) {
 	ctx := req.Context()
-	if a.Ratelimit != nil {
-		dec, err := a.Ratelimit.Allow(ctx, "products:list:"+subject(req), 1)
+	if a.RateLimit != nil {
+		dec, err := a.RateLimit.Allow(ctx, "products:list:"+subject(req), 1)
 		if err != nil || !dec.Allowed {
 			writeError(w, http.StatusTooManyRequests, "rate limited")
 			return

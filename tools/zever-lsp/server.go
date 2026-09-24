@@ -16,7 +16,8 @@ import (
 const serverName = "zever-lsp"
 
 // serverVersion is reported in the initialize result's serverInfo.
-const serverVersion = "0.1.0"
+// It tracks the framework release version.
+const serverVersion = "0.2.0"
 
 // Compile-time proof that Server satisfies the protocol.Server interface,
 // so a renamed or mis-signed handler fails here instead of at runtime.

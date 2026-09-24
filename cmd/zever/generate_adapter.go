@@ -104,7 +104,7 @@ type batterySpec struct {
 // does not match its package (notification.Notifier, permission.Checker,
 // ratelimit.Limiter, idempotency.Store, session.Store) and an embedded
 // interface from another package (router.Router embeds http.Handler,
-// crypto.Crypto embeds Encryptor+Signer, eventbus.Eventbus embeds Pusher).
+// crypto.Crypto embeds Encryptor+Signer, eventbus.EventBus embeds Pusher).
 //
 // MAINTENANCE COST, stated plainly: changing a battery interface means
 // updating its entry here in the same commit, or `zever generate adapter`
@@ -368,7 +368,7 @@ var batterySpecs = map[string]batterySpec{
 	},
 	"eventbus": {
 		Package:   "eventbus",
-		Interface: "Eventbus",
+		Interface: "EventBus",
 		Imports:   []string{"context"},
 		// Publish/Subscribe/Close/Name are flattened from the embedded
 		// Pusher interface.

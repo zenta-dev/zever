@@ -84,7 +84,7 @@ func New(opts i18n.Options) (i18n.I18n, error) {
 	}
 	endpoint := strings.TrimRight(opts.Remote.Endpoint, "/")
 	if endpoint == "" {
-		return nil, &i18n.InvalidOptionsError{Reason: "endpoint required"}
+		return nil, &i18n.InvalidOptionsError{Reason: "endpoint is required"}
 	}
 	timeout := opts.Remote.Timeout
 	if timeout <= 0 {

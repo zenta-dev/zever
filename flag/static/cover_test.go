@@ -5,6 +5,7 @@ import (
 	"errors"
 	"math"
 	"os"
+	"runtime"
 	"sync"
 	"testing"
 	"time"
@@ -237,7 +238,10 @@ func TestCoverReloadLostUpdateGuard(t *testing.T) {
 			}
 			bumpModtime(t, p, time.Duration(bump)*time.Second)
 			bump++
-			time.Sleep(30 * time.Millisecond)
+			// Yield so lookup rushes interleave without a fixed sleep.
+			for range 100 {
+				runtime.Gosched()
+			}
 		}
 	}()
 	wwg.Wait()

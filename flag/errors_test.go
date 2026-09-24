@@ -29,8 +29,8 @@ func TestErrors_sentinel_messages(t *testing.T) {
 
 func TestErrors_typed_unwrap(t *testing.T) {
 	t.Parallel()
-	if !errors.Is(&DuplicateError{Adapter: Static}, ErrDuplicate) {
-		t.Error("DuplicateError does not unwrap to ErrDuplicate")
+	if !errors.Is(&DuplicateAdapterError{Adapter: Static}, ErrDuplicate) {
+		t.Error("DuplicateAdapterError does not unwrap to ErrDuplicate")
 	}
 	if !errors.Is(&UnknownAdapterError{Adapter: Static}, ErrUnknownAdapter) {
 		t.Error("UnknownAdapterError does not unwrap to ErrUnknownAdapter")
@@ -48,8 +48,8 @@ func TestErrors_typed_unwrap(t *testing.T) {
 
 func TestErrors_carried_fields(t *testing.T) {
 	t.Parallel()
-	if de := (&DuplicateError{Adapter: Static}); de.Adapter != Static {
-		t.Errorf("DuplicateError adapter = %v", de.Adapter)
+	if de := (&DuplicateAdapterError{Adapter: Static}); de.Adapter != Static {
+		t.Errorf("DuplicateAdapterError adapter = %v", de.Adapter)
 	}
 	if ue := (&UnknownAdapterError{Adapter: Static}); ue.Adapter != Static {
 		t.Errorf("UnknownAdapterError adapter = %v", ue.Adapter)

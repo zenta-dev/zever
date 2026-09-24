@@ -22,9 +22,9 @@ func TestOptions_Validate_violations_table(t *testing.T) {
 		opts    Options
 		reasons []string
 	}{
-		{"no scheme", Options{Endpoint: "example.com/hook"}, []string{"valid URL"}},
-		{"no host", Options{Endpoint: "https:///path"}, []string{"valid URL"}},
-		{"garbage", Options{Endpoint: "http://[::1"}, []string{"valid URL"}},
+		{"no scheme", Options{Endpoint: "example.com/hook"}, []string{"valid url"}},
+		{"no host", Options{Endpoint: "https:///path"}, []string{"valid url"}},
+		{"garbage", Options{Endpoint: "http://[::1"}, []string{"valid url"}},
 	}
 	for _, tc := range cases {
 		t.Run(tc.name, func(t *testing.T) {
@@ -57,7 +57,7 @@ func TestOptions_Validate_multiple_joined(t *testing.T) {
 		t.Fatalf("Validate err = %v, want ErrInvalidOptions", err)
 	}
 
-	if !strings.Contains(err.Error(), "valid URL") {
+	if !strings.Contains(err.Error(), "valid url") {
 		t.Errorf("err %q missing endpoint reason", err.Error())
 	}
 }

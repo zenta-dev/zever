@@ -23,7 +23,9 @@ type Secrets interface {
 	// List returns the names of all stored secrets.
 	List(ctx context.Context) ([]string, error)
 
-	// Close releases backend resources.
+	// Close releases backend resources. It takes a context because
+	// backends may hold leased or watched resources (rotation handles,
+	// watch streams) whose release can block.
 	Close(ctx context.Context) error
 }
 
@@ -47,6 +49,10 @@ func Register(adapter Adapter, factory Factory) error {
 
 // Open creates a Secrets for adapter using the registered Factory and opts.
 func Open(adapter Adapter, opts Options) (Secrets, error) {
+	if err := opts.Validate(); err != nil {
+		return nil, err
+	}
+
 	factory, err := factories.Lookup(adapter)
 	if err != nil {
 		return nil, err

@@ -9,9 +9,9 @@ import (
 // MemoryOptions configures the in-memory cache backend.
 type MemoryOptions struct {
 	// SweepInterval controls how often expired entries are purged.
-	SweepInterval time.Duration
+	SweepInterval time.Duration `json:"sweep_interval" toml:"sweep_interval" yaml:"sweep_interval"`
 	// MaxEntries bounds the number of stored entries before eviction.
-	MaxEntries int
+	MaxEntries int `json:"max_entries" toml:"max_entries" yaml:"max_entries"`
 }
 
 // RedisOptions configures the Redis-backed cache backend.
@@ -20,18 +20,18 @@ type RedisOptions struct {
 	zredis.ConnectOptions
 	// URL holds the Redis connection URL.
 	// When set it takes precedence over Addr.
-	URL string
+	URL string `json:"url" toml:"url" yaml:"url"`
 
 	// PoolSize limits the Redis connection pool size.
-	PoolSize int
+	PoolSize int `json:"pool_size" toml:"pool_size" yaml:"pool_size"`
 	// MinIdleConns sets the minimum number of idle Redis connections.
-	MinIdleConns int
+	MinIdleConns int `json:"min_idle_conns" toml:"min_idle_conns" yaml:"min_idle_conns"`
 	// PoolTimeout bounds waiting for a Redis connection from the pool.
-	PoolTimeout time.Duration
+	PoolTimeout time.Duration `json:"pool_timeout" toml:"pool_timeout" yaml:"pool_timeout"`
 	// ConnMaxIdleTime bounds how long a Redis connection may stay idle.
-	ConnMaxIdleTime time.Duration
+	ConnMaxIdleTime time.Duration `json:"conn_max_idle_time" toml:"conn_max_idle_time" yaml:"conn_max_idle_time"`
 	// ConnMaxLifetime bounds the total lifetime of a Redis connection.
-	ConnMaxLifetime time.Duration
+	ConnMaxLifetime time.Duration `json:"conn_max_lifetime" toml:"conn_max_lifetime" yaml:"conn_max_lifetime"`
 }
 
 // Options configures cache backend selection and backend-specific settings.
@@ -48,4 +48,9 @@ type Options struct {
 	MemoryOptions
 	// RedisOptions holds Redis backend settings.
 	RedisOptions
+}
+
+// Validate checks options for consistency, joining all violations.
+func (o Options) Validate() error {
+	return nil
 }

@@ -26,7 +26,7 @@ type Webhook interface {
 }
 
 // Factory creates a Webhook from the given Options.
-type Factory func(o Options) (Webhook, error)
+type Factory func(opts Options) (Webhook, error)
 
 var factories = registry.New[Adapter, Factory](
 	ErrNilFactory,

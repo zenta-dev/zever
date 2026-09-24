@@ -26,7 +26,7 @@ const (
 	fakeTexArgs    = "#!/bin/sh\nprintf '%%PDF-1.4 fake\\n' > doc.pdf\necho \"$@\" >> \"$ARGSLOG\"\nexit 0\n"
 )
 
-func fakeBin(t *testing.T, name, body string) {
+func stubBin(t *testing.T, name, body string) {
 	t.Helper()
 	dir := t.TempDir()
 	path := filepath.Join(dir, name)
@@ -65,7 +65,7 @@ func TestOpenInvalidOptions(t *testing.T) {
 }
 
 func TestOpenDefaults(t *testing.T) {
-	fakeBin(t, "pdflatex", fakeTexOK)
+	stubBin(t, "pdflatex", fakeTexOK)
 
 	d := mustOpen(t, document.Options{})
 	drv, ok := d.(*driver)
@@ -99,7 +99,7 @@ func TestOpenDefaults(t *testing.T) {
 }
 
 func TestOpenCustom(t *testing.T) {
-	fakeBin(t, "my-tex", fakeTexOK)
+	stubBin(t, "my-tex", fakeTexOK)
 
 	tmp := t.TempDir()
 	d := mustOpen(t, document.Options{
@@ -143,7 +143,7 @@ func TestOpenCustom(t *testing.T) {
 }
 
 func TestRenderPDF(t *testing.T) {
-	fakeBin(t, "pdflatex", fakeTexOK)
+	stubBin(t, "pdflatex", fakeTexOK)
 
 	d := mustOpen(t, document.Options{})
 	out, err := d.Render(t.Context(), []byte(`\documentclass{article}\begin{document}hi\end{document}`), document.FormatPDF)
@@ -156,7 +156,7 @@ func TestRenderPDF(t *testing.T) {
 }
 
 func TestRunsHonored(t *testing.T) {
-	fakeBin(t, "pdflatex-count", fakeTexCount)
+	stubBin(t, "pdflatex-count", fakeTexCount)
 	runsLog := filepath.Join(t.TempDir(), "runs.log")
 	t.Setenv("RUNSLOG", runsLog)
 
@@ -186,7 +186,7 @@ func TestRunsHonored(t *testing.T) {
 }
 
 func TestCompileArgsIncludeNoShellEscape(t *testing.T) {
-	fakeBin(t, "pdflatex-args", fakeTexArgs)
+	stubBin(t, "pdflatex-args", fakeTexArgs)
 	argsLog := filepath.Join(t.TempDir(), "args.log")
 	t.Setenv("ARGSLOG", argsLog)
 
@@ -205,7 +205,7 @@ func TestCompileArgsIncludeNoShellEscape(t *testing.T) {
 }
 
 func TestRenderFailure(t *testing.T) {
-	fakeBin(t, "pdflatex-fail", fakeTexFail)
+	stubBin(t, "pdflatex-fail", fakeTexFail)
 
 	d := mustOpen(t, document.Options{LatexCommand: "pdflatex-fail"})
 	out, err := d.Render(t.Context(), []byte("src"), document.FormatPDF)
@@ -221,7 +221,7 @@ func TestRenderFailure(t *testing.T) {
 }
 
 func TestMissingOutput(t *testing.T) {
-	fakeBin(t, "pdflatex-silent", fakeTexSilent)
+	stubBin(t, "pdflatex-silent", fakeTexSilent)
 
 	d := mustOpen(t, document.Options{LatexCommand: "pdflatex-silent"})
 	_, err := d.Render(t.Context(), []byte("src"), document.FormatPDF)
@@ -231,7 +231,7 @@ func TestMissingOutput(t *testing.T) {
 }
 
 func TestOversizedOutput(t *testing.T) {
-	fakeBin(t, "pdflatex", fakeTexOK)
+	stubBin(t, "pdflatex", fakeTexOK)
 
 	d := mustOpen(t, document.Options{MaxOutputBytes: 1})
 	_, err := d.Render(t.Context(), []byte("src"), document.FormatPDF)
@@ -242,8 +242,8 @@ func TestOversizedOutput(t *testing.T) {
 }
 
 func TestRenderPNG(t *testing.T) {
-	fakeBin(t, "pdflatex", fakeTexOK)
-	fakeBin(t, "pdftoppm", fakePPMOK)
+	stubBin(t, "pdflatex", fakeTexOK)
+	stubBin(t, "pdftoppm", fakePPMOK)
 
 	d := mustOpen(t, document.Options{})
 	out, err := d.Render(t.Context(), []byte("src"), document.FormatPNG)
@@ -256,8 +256,8 @@ func TestRenderPNG(t *testing.T) {
 }
 
 func TestRenderJPG(t *testing.T) {
-	fakeBin(t, "pdflatex", fakeTexOK)
-	fakeBin(t, "pdftoppm", fakePPMOK)
+	stubBin(t, "pdflatex", fakeTexOK)
+	stubBin(t, "pdftoppm", fakePPMOK)
 
 	d := mustOpen(t, document.Options{})
 	out, err := d.Render(t.Context(), []byte("src"), document.FormatJPG)
@@ -270,7 +270,7 @@ func TestRenderJPG(t *testing.T) {
 }
 
 func TestMissingConverter(t *testing.T) {
-	fakeBin(t, "pdflatex", fakeTexOK)
+	stubBin(t, "pdflatex", fakeTexOK)
 
 	d := mustOpen(t, document.Options{LatexPDFToPPM: "no-such-bin-xyz"})
 	_, err := d.Render(t.Context(), []byte("src"), document.FormatPNG)
@@ -280,8 +280,8 @@ func TestMissingConverter(t *testing.T) {
 }
 
 func TestConverterFailure(t *testing.T) {
-	fakeBin(t, "pdflatex", fakeTexOK)
-	fakeBin(t, "pdftoppm-fail", fakePPMFail)
+	stubBin(t, "pdflatex", fakeTexOK)
+	stubBin(t, "pdftoppm-fail", fakePPMFail)
 
 	d := mustOpen(t, document.Options{LatexPDFToPPM: "pdftoppm-fail"})
 	_, err := d.Render(t.Context(), []byte("src"), document.FormatPNG)
@@ -291,8 +291,8 @@ func TestConverterFailure(t *testing.T) {
 }
 
 func TestConvertReadImageFailure(t *testing.T) {
-	fakeBin(t, "pdflatex", fakeTexOK)
-	fakeBin(t, "pdftoppm-nowrite", fakePPMNowrite)
+	stubBin(t, "pdflatex", fakeTexOK)
+	stubBin(t, "pdftoppm-nowrite", fakePPMNowrite)
 
 	d := mustOpen(t, document.Options{LatexPDFToPPM: "pdftoppm-nowrite"})
 	_, err := d.Render(t.Context(), []byte("src"), document.FormatPNG)
@@ -302,7 +302,7 @@ func TestConvertReadImageFailure(t *testing.T) {
 }
 
 func TestConvertWritePDFFailure(t *testing.T) {
-	fakeBin(t, "pdftoppm", fakePPMOK)
+	stubBin(t, "pdftoppm", fakePPMOK)
 
 	d := &driver{command: "pdflatex", converter: "pdftoppm", runs: 1, dpi: 150, quality: 80, timeout: time.Minute, maxOutput: 1 << 20}
 	_, err := d.convert(t.Context(), filepath.Join(t.TempDir(), "no-such-dir"), []byte("%PDF-1.4 fake"), document.FormatPNG)
@@ -312,7 +312,7 @@ func TestConvertWritePDFFailure(t *testing.T) {
 }
 
 func TestBadFormat(t *testing.T) {
-	fakeBin(t, "pdflatex", fakeTexOK)
+	stubBin(t, "pdflatex", fakeTexOK)
 
 	d := mustOpen(t, document.Options{})
 	_, err := d.Render(t.Context(), []byte("src"), document.OutputFormat("gif"))
@@ -326,7 +326,7 @@ func TestBadFormat(t *testing.T) {
 }
 
 func TestOversizedSource(t *testing.T) {
-	fakeBin(t, "pdflatex", fakeTexOK)
+	stubBin(t, "pdflatex", fakeTexOK)
 
 	d := mustOpen(t, document.Options{})
 	src := make([]byte, document.DefaultMaxSourceBytes+1)
@@ -341,7 +341,7 @@ func TestOversizedSource(t *testing.T) {
 }
 
 func TestCanceledContext(t *testing.T) {
-	fakeBin(t, "pdflatex", fakeTexOK)
+	stubBin(t, "pdflatex", fakeTexOK)
 
 	d := mustOpen(t, document.Options{})
 	ctx, cancel := context.WithCancel(t.Context())
@@ -353,7 +353,7 @@ func TestCanceledContext(t *testing.T) {
 }
 
 func TestTempDirFailure(t *testing.T) {
-	fakeBin(t, "pdflatex", fakeTexOK)
+	stubBin(t, "pdflatex", fakeTexOK)
 
 	blocker := filepath.Join(t.TempDir(), "file")
 	if err := os.WriteFile(blocker, []byte("x"), 0o600); err != nil {
@@ -367,7 +367,7 @@ func TestTempDirFailure(t *testing.T) {
 }
 
 func TestClose(t *testing.T) {
-	fakeBin(t, "pdflatex", fakeTexOK)
+	stubBin(t, "pdflatex", fakeTexOK)
 
 	d := mustOpen(t, document.Options{})
 	if err := d.Close(); err != nil {
@@ -376,8 +376,8 @@ func TestClose(t *testing.T) {
 }
 
 func TestConcurrent(t *testing.T) {
-	fakeBin(t, "pdflatex", fakeTexOK)
-	fakeBin(t, "pdftoppm", fakePPMOK)
+	stubBin(t, "pdflatex", fakeTexOK)
+	stubBin(t, "pdftoppm", fakePPMOK)
 
 	d := mustOpen(t, document.Options{})
 	var wg sync.WaitGroup

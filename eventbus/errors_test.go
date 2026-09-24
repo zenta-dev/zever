@@ -31,8 +31,8 @@ func TestErrors_sentinel_messages(t *testing.T) {
 
 func TestErrors_typed_unwrap(t *testing.T) {
 	t.Parallel()
-	if !errors.Is(&DuplicateError{Adapter: Redis}, ErrDuplicate) {
-		t.Error("DuplicateError does not unwrap to ErrDuplicate")
+	if !errors.Is(&DuplicateAdapterError{Adapter: Redis}, ErrDuplicate) {
+		t.Error("DuplicateAdapterError does not unwrap to ErrDuplicate")
 	}
 	if !errors.Is(&UnknownAdapterError{Adapter: Redis}, ErrUnknownAdapter) {
 		t.Error("UnknownAdapterError does not unwrap to ErrUnknownAdapter")
@@ -54,8 +54,8 @@ func TestErrors_typed_unwrap(t *testing.T) {
 
 func TestErrors_carried_fields(t *testing.T) {
 	t.Parallel()
-	if de := (&DuplicateError{Adapter: Redis}); de.Adapter != Redis {
-		t.Errorf("DuplicateError adapter = %v", de.Adapter)
+	if de := (&DuplicateAdapterError{Adapter: Redis}); de.Adapter != Redis {
+		t.Errorf("DuplicateAdapterError adapter = %v", de.Adapter)
 	}
 	if ue := (&UnknownAdapterError{Adapter: Memory}); ue.Adapter != Memory {
 		t.Errorf("UnknownAdapterError adapter = %v", ue.Adapter)

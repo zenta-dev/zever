@@ -15,7 +15,7 @@ import (
 	"github.com/zenta-dev/zever/i18n/remote"
 )
 
-type fake struct {
+type stubServer struct {
 	translateHits atomic.Int64
 	localesHits   atomic.Int64
 	authSeen      atomic.Value // string
@@ -26,7 +26,7 @@ type fake struct {
 	locales         []string
 }
 
-func (f *fake) serve(t *testing.T) *httptest.Server {
+func (f *stubServer) serve(t *testing.T) *httptest.Server {
 	t.Helper()
 	mux := http.NewServeMux()
 	mux.HandleFunc("/translate", func(w http.ResponseWriter, r *http.Request) {
@@ -71,9 +71,26 @@ func optsFor(url string) i18n.Options {
 	return i18n.Options{Remote: i18n.RemoteOptions{Endpoint: url, AllowInsecure: true}}
 }
 
+// eventually polls cond until it holds or timeout elapses, failing the
+// test on expiry. Fixed sleeps are banned here; all async waits go
+// through this helper.
+func eventually(t *testing.T, cond func() bool, msg string) {
+	t.Helper()
+
+	const timeout = 5 * time.Second
+	deadline := time.Now().Add(timeout)
+	for time.Now().Before(deadline) {
+		if cond() {
+			return
+		}
+		time.Sleep(5 * time.Millisecond)
+	}
+	t.Fatalf("timed out waiting for %s", msg)
+}
+
 func TestTranslateRoundtrip(t *testing.T) {
 	t.Parallel()
-	f := &fake{values: map[string]string{"en\x00hello": "Hello"}}
+	f := &stubServer{values: map[string]string{"en\x00hello": "Hello"}}
 	srv := f.serve(t)
 	defer srv.Close()
 
@@ -94,7 +111,7 @@ func TestTranslateRoundtrip(t *testing.T) {
 
 func TestTranslateMissCached(t *testing.T) {
 	t.Parallel()
-	f := &fake{values: map[string]string{}}
+	f := &stubServer{values: map[string]string{}}
 	srv := f.serve(t)
 	defer srv.Close()
 
@@ -118,7 +135,7 @@ func TestTranslateMissCached(t *testing.T) {
 
 func TestTranslateHitCached(t *testing.T) {
 	t.Parallel()
-	f := &fake{values: map[string]string{"en\x00hi": "Hi"}}
+	f := &stubServer{values: map[string]string{"en\x00hi": "Hi"}}
 	srv := f.serve(t)
 	defer srv.Close()
 
@@ -142,7 +159,7 @@ func TestTranslateHitCached(t *testing.T) {
 
 func TestTranslateSingleflight(t *testing.T) {
 	t.Parallel()
-	f := &fake{values: map[string]string{"en\x00slow": "Slow"}, delay: 150 * time.Millisecond}
+	f := &stubServer{values: map[string]string{"en\x00slow": "Slow"}, delay: 150 * time.Millisecond}
 	srv := f.serve(t)
 	defer srv.Close()
 
@@ -179,7 +196,7 @@ func TestTranslateSingleflight(t *testing.T) {
 
 func TestTranslateTimeout(t *testing.T) {
 	t.Parallel()
-	f := &fake{values: map[string]string{"en\x00slow": "Slow"}, delay: 500 * time.Millisecond}
+	f := &stubServer{values: map[string]string{"en\x00slow": "Slow"}, delay: 500 * time.Millisecond}
 	srv := f.serve(t)
 	defer srv.Close()
 
@@ -198,7 +215,7 @@ func TestTranslateTimeout(t *testing.T) {
 
 func TestTranslateNon200(t *testing.T) {
 	t.Parallel()
-	f := &fake{translateStatus: http.StatusInternalServerError}
+	f := &stubServer{translateStatus: http.StatusInternalServerError}
 	srv := f.serve(t)
 	defer srv.Close()
 
@@ -216,7 +233,7 @@ func TestTranslateNon200(t *testing.T) {
 
 func TestTranslateEmptyLocale(t *testing.T) {
 	t.Parallel()
-	f := &fake{}
+	f := &stubServer{}
 	srv := f.serve(t)
 	defer srv.Close()
 
@@ -233,7 +250,7 @@ func TestTranslateEmptyLocale(t *testing.T) {
 
 func TestLocales(t *testing.T) {
 	t.Parallel()
-	f := &fake{locales: []string{"en", "de"}}
+	f := &stubServer{locales: []string{"en", "de"}}
 	srv := f.serve(t)
 	defer srv.Close()
 
@@ -266,7 +283,7 @@ func TestLocales(t *testing.T) {
 
 func TestBearerAuth(t *testing.T) {
 	t.Parallel()
-	f := &fake{values: map[string]string{"en\x00hi": "Hi"}}
+	f := &stubServer{values: map[string]string{"en\x00hi": "Hi"}}
 	srv := f.serve(t)
 	defer srv.Close()
 
@@ -312,7 +329,7 @@ func TestNewBadOptions(t *testing.T) {
 
 func TestNewTrimsSlash(t *testing.T) {
 	t.Parallel()
-	f := &fake{values: map[string]string{"en\x00hi": "Hi"}}
+	f := &stubServer{values: map[string]string{"en\x00hi": "Hi"}}
 	srv := f.serve(t)
 	defer srv.Close()
 
@@ -330,7 +347,7 @@ func TestNewTrimsSlash(t *testing.T) {
 
 func TestAfterClose(t *testing.T) {
 	t.Parallel()
-	f := &fake{
+	f := &stubServer{
 		values:  map[string]string{"en\x00hi": "Hi"},
 		locales: []string{"en"},
 	}
@@ -357,7 +374,7 @@ func TestAfterClose(t *testing.T) {
 
 func TestWaiterCtxCancel(t *testing.T) {
 	t.Parallel()
-	f := &fake{values: map[string]string{"en\x00slow": "Slow"}, delay: 300 * time.Millisecond}
+	f := &stubServer{values: map[string]string{"en\x00slow": "Slow"}, delay: 300 * time.Millisecond}
 	srv := f.serve(t)
 	defer srv.Close()
 
@@ -373,7 +390,9 @@ func TestWaiterCtxCancel(t *testing.T) {
 		defer close(leaderDone)
 		_, _ = ad.Translate(context.Background(), "en", "slow", nil)
 	}()
-	time.Sleep(50 * time.Millisecond) // let leader start fetching
+	// Poll for the leader's arrival at the stubServer server instead of a fixed
+	// sleep: one translate hit proves the flight is occupied.
+	eventually(t, func() bool { return f.translateHits.Load() == 1 }, "leader to reach stubServer server")
 
 	ctx, cancel := context.WithCancel(context.Background())
 	cancel()

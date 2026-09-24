@@ -8,7 +8,8 @@ import (
 
 type (
 	// MessageID uniquely identifies a queue message.
-	// It is backed by a UUIDv7 value.
+	// It is backed by a UUIDv7 value. Cross-service IDs are typed UUIDs;
+	// adapter-local resource IDs stay strings.
 	MessageID uuid.UUID
 )
 

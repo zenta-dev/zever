@@ -1,7 +1,5 @@
 package workflow
 
-import "fmt"
-
 // Adapter identifies the workflow backend implementation.
 type Adapter int
 
@@ -16,7 +14,7 @@ func (a Adapter) String() string {
 	case Memory:
 		return "memory"
 	default:
-		return fmt.Sprintf("Adapter(%d)", int(a))
+		return "unknown"
 	}
 }
 

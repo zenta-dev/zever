@@ -19,7 +19,7 @@ func TestCoverDuplicateErrorString(t *testing.T) {
 func TestCoverUnknownAdapterErrorString(t *testing.T) {
 	t.Parallel()
 	err := &UnknownAdapterError{Adapter: Redis}
-	if got, want := err.Error(), "idempotency: unknown adapter: redis"; got != want {
+	if got, want := err.Error(), "idempotency: unknown adapter: redis (forgotten import?)"; got != want {
 		t.Fatalf("UnknownAdapterError.Error() = %q, want %q", got, want)
 	}
 }

@@ -165,7 +165,7 @@ func coreBatterySelections() []batterySelection {
 		"observability": cfg.Observability.Adapter,
 		"permission":    cfg.Permission.Adapter,
 		"queue":         cfg.Queue.Adapter,
-		"ratelimit":     cfg.Ratelimit.Adapter,
+		"ratelimit":     cfg.RateLimit.Adapter,
 		"router":        cfg.Router.Adapter,
 		"scheduler":     cfg.Scheduler.Adapter,
 	}
@@ -475,7 +475,7 @@ type serverData struct {
 	// RateLimitEnabled is true only when the project's own zever.yaml (or
 	// equivalent) configures a real rate/burst for the "ratelimit" battery
 	// -- see rateLimitConfigured's doc comment for why this can't simply be
-	// "always resolve c.Ratelimit()".
+	// "always resolve c.RateLimit()".
 	RateLimitEnabled bool
 }
 
@@ -483,7 +483,7 @@ type serverData struct {
 // real rate limit for the "ratelimit" battery. Unlike most batteries,
 // ratelimit/memory's zero-infra adapter still requires an explicit
 // rate/burst and errors without one, so unconditionally resolving
-// c.Ratelimit() in the generated main.go would break every project that
+// c.RateLimit() in the generated main.go would break every project that
 // hasn't configured a limit. Rate-limit wiring is instead emitted only when
 // the config says a limit is actually set -- add
 // `ratelimit: {options: {rate: ..., burst: ...}}` to zever.yaml and
@@ -491,7 +491,7 @@ type serverData struct {
 // needed.
 //
 // Adaptation note: zever's config is typed, so this reads
-// cfg.Ratelimit.Options.Rate directly instead of zen-go's
+// cfg.RateLimit.Options.Rate directly instead of zen-go's
 // cfg.Get("ratelimit").Options["rate"] JSON-round-tripped map lookup.
 // A second zever difference: zever.yaml may carry a "project" table that
 // config.Load's strict merge rejects (see project.go), so an unreadable
@@ -504,7 +504,7 @@ func rateLimitConfigured() bool {
 		cfg = config.Default()
 	}
 
-	return cfg.Ratelimit.Options.Rate > 0
+	return cfg.RateLimit.Options.Rate > 0
 }
 
 // serverStubRoot is the fixed directory service-implementation stubs are
@@ -832,7 +832,7 @@ func run(addr, grpcAddr string) error {
 		return err
 	}
 {{if .RateLimitEnabled}}
-	limiter, err := c.Ratelimit()
+	limiter, err := c.RateLimit()
 	if err != nil {
 		return err
 	}

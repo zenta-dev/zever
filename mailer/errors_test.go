@@ -32,8 +32,8 @@ func TestErrors_sentinel_messages(t *testing.T) {
 
 func TestErrors_typed_unwrap(t *testing.T) {
 	t.Parallel()
-	if !errors.Is(&DuplicateError{Adapter: SMTP}, ErrDuplicate) {
-		t.Error("DuplicateError does not unwrap to ErrDuplicate")
+	if !errors.Is(&DuplicateAdapterError{Adapter: SMTP}, ErrDuplicate) {
+		t.Error("DuplicateAdapterError does not unwrap to ErrDuplicate")
 	}
 	if !errors.Is(&UnknownAdapterError{Adapter: SMTP}, ErrUnknownAdapter) {
 		t.Error("UnknownAdapterError does not unwrap to ErrUnknownAdapter")
@@ -51,8 +51,8 @@ func TestErrors_typed_unwrap(t *testing.T) {
 
 func TestErrors_carried_fields(t *testing.T) {
 	t.Parallel()
-	if de := (&DuplicateError{Adapter: SMTP}); de.Adapter != SMTP {
-		t.Errorf("DuplicateError adapter = %v", de.Adapter)
+	if de := (&DuplicateAdapterError{Adapter: SMTP}); de.Adapter != SMTP {
+		t.Errorf("DuplicateAdapterError adapter = %v", de.Adapter)
 	}
 	if ue := (&UnknownAdapterError{Adapter: Log}); ue.Adapter != Log {
 		t.Errorf("UnknownAdapterError adapter = %v", ue.Adapter)

@@ -57,9 +57,8 @@ func parseAsAny[T any](parse func(string) (T, error)) func(string) (any, error) 
 // preserves errors.Is/As into the original typed errors while still
 // naming the service for DX.
 //
-// Adapter names go through each package's ParseAdapter (all 31 services
-// provide one). Options.Validate runs everywhere it exists; cache, log,
-// and queue define no Validate and are skipped for options.
+// Adapter names go through each package's ParseAdapter (all 34 services
+// provide one). Options.Validate runs everywhere it exists.
 func (c *Config) Validate() error {
 	var errs []error
 	check := func(svc, adapter string, parse func(string) (any, error), validate func() error) {
@@ -76,17 +75,17 @@ func (c *Config) Validate() error {
 	check("analytics", c.Analytics.Adapter, parseAsAny(analytics.ParseAdapter), c.Analytics.Options.Validate)
 	check("auth", c.Auth.Adapter, parseAsAny(auth.ParseAdapter), c.Auth.Options.Validate)
 	check("billing", c.Billing.Adapter, parseAsAny(billing.ParseAdapter), c.Billing.Options.Validate)
-	check("cache", c.Cache.Adapter, parseAsAny(cache.ParseAdapter), nil)
+	check("cache", c.Cache.Adapter, parseAsAny(cache.ParseAdapter), c.Cache.Options.Validate)
 	check("crypto", c.Crypto.Adapter, parseAsAny(crypto.ParseAdapter), c.Crypto.Options.Validate)
 	check("db", c.DB.Adapter, parseAsAny(db.ParseAdapter), c.DB.Options.Validate)
 	check("document", c.Document.Adapter, parseAsAny(document.ParseAdapter), c.Document.Options.Validate)
-	check("eventbus", c.Eventbus.Adapter, parseAsAny(eventbus.ParseAdapter), c.Eventbus.Options.Validate)
+	check("eventbus", c.EventBus.Adapter, parseAsAny(eventbus.ParseAdapter), c.EventBus.Options.Validate)
 	check("flag", c.Flag.Adapter, parseAsAny(flag.ParseAdapter), c.Flag.Options.Validate)
 	check("geo", c.Geo.Adapter, parseAsAny(geo.ParseAdapter), c.Geo.Options.Validate)
 	check("i18n", c.I18n.Adapter, parseAsAny(i18n.ParseAdapter), c.I18n.Options.Validate)
 	check("idempotency", c.Idempotency.Adapter, parseAsAny(idempotency.ParseAdapter), c.Idempotency.Options.Validate)
 	check("lock", c.Lock.Adapter, parseAsAny(lock.ParseAdapter), c.Lock.Options.Validate)
-	check("log", c.Log.Adapter, parseAsAny(log.ParseAdapter), nil)
+	check("log", c.Log.Adapter, parseAsAny(log.ParseAdapter), c.Log.Options.Validate)
 	check("mailer", c.Mailer.Adapter, parseAsAny(mailer.ParseAdapter), c.Mailer.Options.Validate)
 	check("media", c.Media.Adapter, parseAsAny(media.ParseAdapter), c.Media.Options.Validate)
 	check("notification", c.Notification.Adapter, parseAsAny(notification.ParseAdapter), c.Notification.Options.Validate)
@@ -94,8 +93,8 @@ func (c *Config) Validate() error {
 	check("password", c.Password.Adapter, parseAsAny(password.ParseAdapter), c.Password.Options.Validate)
 	check("payment", c.Payment.Adapter, parseAsAny(payment.ParseAdapter), c.Payment.Options.Validate)
 	check("permission", c.Permission.Adapter, parseAsAny(permission.ParseAdapter), c.Permission.Options.Validate)
-	check("queue", c.Queue.Adapter, parseAsAny(queue.ParseAdapter), nil)
-	check("ratelimit", c.Ratelimit.Adapter, parseAsAny(ratelimit.ParseAdapter), c.Ratelimit.Options.Validate)
+	check("queue", c.Queue.Adapter, parseAsAny(queue.ParseAdapter), c.Queue.Options.Validate)
+	check("ratelimit", c.RateLimit.Adapter, parseAsAny(ratelimit.ParseAdapter), c.RateLimit.Options.Validate)
 	check("router", c.Router.Adapter, parseAsAny(router.ParseAdapter), c.Router.Options.Validate)
 	check("scheduler", c.Scheduler.Adapter, parseAsAny(scheduler.ParseAdapter), c.Scheduler.Options.Validate)
 	check("search", c.Search.Adapter, parseAsAny(search.ParseAdapter), c.Search.Options.Validate)

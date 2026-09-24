@@ -19,7 +19,7 @@ type Geo interface {
 	Close() error
 }
 
-// Factory creates a Geo from typed options.
+// Factory creates a Geo from the given Options.
 type Factory func(opts Options) (Geo, error)
 
 var factories = registry.New[Adapter, Factory](
@@ -30,7 +30,7 @@ var factories = registry.New[Adapter, Factory](
 	},
 )
 
-// Register makes an adapter available.
+// Register associates an Adapter with a Factory for later use by Open.
 func Register(adapter Adapter, factory Factory) error {
 	if factory == nil {
 		return fmt.Errorf("%w for adapter %s", ErrNilFactory, adapter)
@@ -38,7 +38,7 @@ func Register(adapter Adapter, factory Factory) error {
 	return factories.Register(adapter, factory)
 }
 
-// Open opens a Geo using the named, already-registered adapter.
+// Open creates a Geo for adapter using the registered Factory and opts.
 func Open(adapter Adapter, opts Options) (Geo, error) {
 	if err := opts.Validate(); err != nil {
 		return nil, err

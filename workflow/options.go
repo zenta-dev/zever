@@ -14,7 +14,7 @@ type Options struct {
 	Namespace string `json:"namespace" toml:"namespace" yaml:"namespace"`
 }
 
-// Validate checks Options for adapter-independent errors.
+// Validate checks options for consistency, joining all violations.
 func (o Options) Validate() error {
 	var errs []error
 

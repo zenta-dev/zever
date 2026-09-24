@@ -96,7 +96,7 @@ func serviceRefs(cfg *Config, svc string) (adapter *string, opts any, ok bool) {
 	case "document":
 		return &cfg.Document.Adapter, &cfg.Document.Options, true
 	case "eventbus":
-		return &cfg.Eventbus.Adapter, &cfg.Eventbus.Options, true
+		return &cfg.EventBus.Adapter, &cfg.EventBus.Options, true
 	case "flag":
 		return &cfg.Flag.Adapter, &cfg.Flag.Options, true
 	case "geo":
@@ -126,7 +126,7 @@ func serviceRefs(cfg *Config, svc string) (adapter *string, opts any, ok bool) {
 	case "queue":
 		return &cfg.Queue.Adapter, &cfg.Queue.Options, true
 	case "ratelimit":
-		return &cfg.Ratelimit.Adapter, &cfg.Ratelimit.Options, true
+		return &cfg.RateLimit.Adapter, &cfg.RateLimit.Options, true
 	case "router":
 		return &cfg.Router.Adapter, &cfg.Router.Options, true
 	case "scheduler":

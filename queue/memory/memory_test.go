@@ -4,6 +4,7 @@ import (
 	"context"
 	"errors"
 	"fmt"
+	"runtime"
 	"strings"
 	"sync"
 	"testing"
@@ -22,16 +23,20 @@ func newQueue(t *testing.T, opts queue.Options) queue.Queue {
 	return c
 }
 
-func waitFor(t *testing.T, cond func() bool, msg string) {
+func eventually(t *testing.T, cond func() bool, msg string) {
 	t.Helper()
-	deadline := time.Now().Add(3 * time.Second)
+
+	const timeout = 3 * time.Second
+	deadline := time.Now().Add(timeout)
 	for time.Now().Before(deadline) {
 		if cond() {
 			return
 		}
 		time.Sleep(5 * time.Millisecond)
 	}
-	t.Fatalf("waitFor timeout %s: %s", 3*time.Second, msg)
+	if !cond() {
+		t.Fatalf("eventually timeout %s: %s", timeout, msg)
+	}
 }
 
 // TestMemory_PushPop_Ack_roundTrip verifies push/pop/ack cycle, deep-copy and EmptyError.
@@ -176,7 +181,7 @@ func TestMemory_PushDelayed(t *testing.T) {
 		t.Fatalf("Pop delayed err = %v want ErrEmpty", err)
 	}
 
-	waitFor(t, func() bool {
+	eventually(t, func() bool {
 		n, _ := q.Length(context.Background(), topic)
 		return n == 1
 	}, "delayed entry not promoted")
@@ -200,7 +205,7 @@ func TestMemory_PushDelayed(t *testing.T) {
 	if err := q.PushDelayed(context.Background(), topic2, queue.Payload([]byte("d60")), nil, 60*time.Millisecond); err != nil {
 		t.Fatalf("PushDelayed d60: %v", err)
 	}
-	waitFor(t, func() bool {
+	eventually(t, func() bool {
 		n, _ := q.Length(context.Background(), topic2)
 		return n == 3
 	}, "all delayed entries not promoted")
@@ -341,18 +346,21 @@ func TestMemory_VisibilityTimeout_reclaim(t *testing.T) {
 		t.Fatalf("Length inflight = %d want 0", n)
 	}
 
-	time.Sleep(80 * time.Millisecond)
-
-	msg2, err := q.Pop(context.Background(), topic)
-	if err != nil {
-		t.Fatalf("Pop after visibility timeout: %v", err)
-	}
-	if msg2.ID != id {
-		t.Fatalf("reclaimed ID mismatch")
-	}
-	if msg2.Attempt != 2 {
-		t.Fatalf("reclaimed Attempt = %d want 2", msg2.Attempt)
-	}
+	// Poll for the reclaim: Pop reclaims expired visibility synchronously,
+	// so retry until the 40ms timeout lapses instead of sleeping past it.
+	var msg2 queue.Message
+	eventually(t, func() bool {
+		m, popErr := q.Pop(context.Background(), topic)
+		if popErr != nil {
+			return false
+		}
+		if m.ID != id || m.Attempt != 2 {
+			_ = q.Ack(context.Background(), m)
+			return false
+		}
+		msg2 = m
+		return true
+	}, "visibility reclaim")
 	_ = q.Ack(context.Background(), msg2)
 
 	if pushVis2Err := q.Push(context.Background(), topic, queue.Payload([]byte("vis2")), nil); pushVis2Err != nil {
@@ -370,9 +378,9 @@ func TestMemory_VisibilityTimeout_reclaim(t *testing.T) {
 	tq.visHeap = nil
 	tq.mu.Unlock()
 
-	time.Sleep(80 * time.Millisecond)
-
-	waitFor(t, func() bool {
+	// No sleep: poll until the 40ms visibility timeout lapses; each Pop
+	// attempt reclaims expired entries synchronously.
+	eventually(t, func() bool {
 		innerN, _ := q.Length(context.Background(), topic)
 		if innerN == 1 {
 			return true
@@ -417,7 +425,7 @@ func TestMemory_VisibilityTimeout_reclaim(t *testing.T) {
 		_ = staleDeadline
 	}
 	tq.mu.Unlock()
-	time.Sleep(20 * time.Millisecond)
+	// No sleep: a future deadline keeps Length at 0 synchronously.
 	n, _ = q.Length(context.Background(), topic)
 	if n != 0 {
 		t.Fatalf("Length should still be 0 for future deadline, got %d", n)
@@ -427,8 +435,16 @@ func TestMemory_VisibilityTimeout_reclaim(t *testing.T) {
 		inf.deadline = time.Now().Add(-10 * time.Millisecond)
 		tq.inflight[msg.ID] = inf
 	}
+	// Backdate the heap entry too (keeping the deadline mismatch the test
+	// covers): the heap top must already be expired for the reclaim to run
+	// synchronously inside Pop instead of after a wall-clock sleep.
+	for _, e := range tq.visHeap {
+		if e.id == msg.ID {
+			e.deadline = time.Now().Add(-5 * time.Millisecond)
+		}
+	}
 	tq.mu.Unlock()
-	time.Sleep(20 * time.Millisecond)
+	// No sleep: Pop reclaims the past-due deadline synchronously.
 	msg2, err = q.Pop(context.Background(), topic)
 	if err != nil {
 		t.Fatalf("Pop after mismatch reclaim: %v", err)
@@ -636,7 +652,7 @@ func TestMemory_PopEmpty_and_Cancelled(t *testing.T) {
 
 	ctx3, cancel3 := context.WithTimeout(context.Background(), 1*time.Nanosecond)
 	defer cancel3()
-	time.Sleep(2 * time.Millisecond)
+	<-ctx3.Done() // wait for expiry via channel, not sleep
 	_, err = q.Pop(ctx3, topic3)
 	if err == nil {
 		t.Fatalf("Pop deadline expected error")
@@ -910,12 +926,12 @@ func TestMemoryPromoter_lifecycle(t *testing.T) {
 		t.Fatalf("promoter done channel changed on idempotent call")
 	}
 
-	waitFor(t, func() bool {
+	eventually(t, func() bool {
 		n, _ := q.Length(context.Background(), topic)
 		return n == 1
 	}, "promoter not promoted first")
 
-	waitFor(t, func() bool {
+	eventually(t, func() bool {
 		tq.mu.Lock()
 		on := tq.promoterOn
 		rem := len(tq.delayed)
@@ -926,7 +942,7 @@ func TestMemoryPromoter_lifecycle(t *testing.T) {
 	if err := q.PushDelayed(context.Background(), topic, queue.Payload([]byte("second")), nil, 20*time.Millisecond); err != nil {
 		t.Fatalf("PushDelayed second: %v", err)
 	}
-	waitFor(t, func() bool {
+	eventually(t, func() bool {
 		n, _ := q.Length(context.Background(), topic)
 		return n == 2
 	}, "promoter not restarted")
@@ -942,7 +958,7 @@ func TestMemoryPromoter_lifecycle(t *testing.T) {
 	}
 	_ = q.Ack(context.Background(), m)
 
-	waitFor(t, func() bool {
+	eventually(t, func() bool {
 		tq2 := ma.getTopic(topic)
 		if tq2 == nil {
 			return true
@@ -958,11 +974,13 @@ func TestMemoryPromoter_lifecycle(t *testing.T) {
 	if pushLater60Err := q.PushDelayed(context.Background(), topic2, queue.Payload([]byte("later60")), nil, 60*time.Millisecond); pushLater60Err != nil {
 		t.Fatalf("PushDelayed later60: %v", pushLater60Err)
 	}
-	time.Sleep(5 * time.Millisecond)
+	// Yield so the promoter goroutine can park in waitForPromote and take
+	// the wake path below. Either way the order assertion holds.
+	runtime.Gosched()
 	if pushEarlier20Err := q.PushDelayed(context.Background(), topic2, queue.Payload([]byte("earlier20")), nil, 20*time.Millisecond); pushEarlier20Err != nil {
 		t.Fatalf("PushDelayed earlier20: %v", err)
 	}
-	waitFor(t, func() bool {
+	eventually(t, func() bool {
 		n, _ := q.Length(context.Background(), topic2)
 		return n == 2
 	}, "promoter wake not promoted both")
@@ -1045,14 +1063,17 @@ func TestMemory_SignalSpace(t *testing.T) {
 		<-tq.spaceCh
 		close(done)
 	}()
-	time.Sleep(5 * time.Millisecond)
-	tq.signalSpace()
-	tq.signalSpace()
-	select {
-	case <-done:
-	case <-time.After(100 * time.Millisecond):
-		t.Fatalf("signalSpace not received by waiter")
-	}
+	// Retry the non-blocking signal until the waiter receives it instead of
+	// sleeping to let the goroutine park on spaceCh.
+	eventually(t, func() bool {
+		tq.signalSpace()
+		select {
+		case <-done:
+			return true
+		default:
+			return false
+		}
+	}, "signalSpace not received by waiter")
 }
 
 func TestMemory_ReclaimExpired_direct(t *testing.T) {

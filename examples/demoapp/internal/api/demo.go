@@ -112,11 +112,11 @@ func (s *Server) permissionCheck(w http.ResponseWriter, req *http.Request) {
 
 // ratelimitCheck consumes one token for key.
 func (s *Server) ratelimitCheck(w http.ResponseWriter, req *http.Request) {
-	if s.Ratelimit == nil {
+	if s.RateLimit == nil {
 		writeError(w, http.StatusNotImplemented, "ratelimit not configured")
 		return
 	}
-	decision, err := s.Ratelimit.Allow(req.Context(), router.Param(req, "key"), 1)
+	decision, err := s.RateLimit.Allow(req.Context(), router.Param(req, "key"), 1)
 	if err != nil {
 		writeError(w, http.StatusInternalServerError, "ratelimit error")
 		return
@@ -253,11 +253,11 @@ func (s *Server) eventbusPublish(w http.ResponseWriter, req *http.Request) {
 		writeError(w, http.StatusBadRequest, "invalid JSON")
 		return
 	}
-	if s.Eventbus == nil {
+	if s.EventBus == nil {
 		writeError(w, http.StatusNotImplemented, "eventbus not configured")
 		return
 	}
-	if err := s.Eventbus.Publish(req.Context(), body.Topic, eventbus.Payload(body.Payload), nil); err != nil {
+	if err := s.EventBus.Publish(req.Context(), body.Topic, eventbus.Payload(body.Payload), nil); err != nil {
 		writeError(w, http.StatusInternalServerError, "eventbus error")
 		return
 	}

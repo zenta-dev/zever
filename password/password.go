@@ -18,7 +18,7 @@ type Hasher interface {
 	NeedsRehash(ctx context.Context, hash string) (bool, error)
 }
 
-// Factory creates a Hasher from typed options.
+// Factory creates a Hasher from the given Options.
 type Factory func(opts Options) (Hasher, error)
 
 var factories = registry.New[Adapter, Factory](
@@ -27,28 +27,32 @@ var factories = registry.New[Adapter, Factory](
 	func(a Adapter) error { return &UnknownAdapterError{Adapter: a} },
 )
 
-// Register makes an adapter available for Open.
-func Register(a Adapter, f Factory) error {
-	if f == nil {
-		return fmt.Errorf("%w for adapter %s", ErrNilFactory, a)
+// Register associates an Adapter with a Factory for later use by Open.
+func Register(adapter Adapter, factory Factory) error {
+	if factory == nil {
+		return fmt.Errorf("%w for adapter %s", ErrNilFactory, adapter)
 	}
 
-	return factories.Register(a, f)
+	return factories.Register(adapter, factory)
 }
 
-// Open opens a Hasher using an already-registered adapter.
+// Open creates a Hasher for adapter using the registered Factory and opts.
 //
-// Options are passed through untouched: the adapter fills zero values with
-// defaults before validating.
-func Open(a Adapter, opts Options) (Hasher, error) {
-	factory, err := factories.Lookup(a)
+// Options are validated before factory lookup so misconfiguration fails
+// fast; use the Default* constants for standard parameters.
+func Open(adapter Adapter, opts Options) (Hasher, error) {
+	if err := opts.Validate(); err != nil {
+		return nil, err
+	}
+
+	factory, err := factories.Lookup(adapter)
 	if err != nil {
 		return nil, err
 	}
 
 	h, err := factory(opts)
 	if err != nil {
-		return nil, fmt.Errorf("password: open %s: %w", a, err)
+		return nil, fmt.Errorf("password: open %s: %w", adapter, err)
 	}
 
 	return h, nil
@@ -57,7 +61,7 @@ func Open(a Adapter, opts Options) (Hasher, error) {
 // Hash is a convenience that hashes with the default argon2id adapter.
 // The caller must have registered the adapter first.
 func Hash(ctx context.Context, password string) (string, error) {
-	h, err := Open(AdapterArgon2ID, Options{})
+	h, err := Open(AdapterArgon2ID, Options{Time: DefaultTime, Memory: DefaultMemory, Threads: DefaultThreads, SaltLen: DefaultSaltLen, KeyLen: DefaultKeyLen})
 	if err != nil {
 		return "", err
 	}
@@ -68,7 +72,7 @@ func Hash(ctx context.Context, password string) (string, error) {
 // Verify is a convenience that verifies against the default argon2id adapter.
 // The caller must have registered the adapter first.
 func Verify(ctx context.Context, hash, password string) (bool, error) {
-	h, err := Open(AdapterArgon2ID, Options{})
+	h, err := Open(AdapterArgon2ID, Options{Time: DefaultTime, Memory: DefaultMemory, Threads: DefaultThreads, SaltLen: DefaultSaltLen, KeyLen: DefaultKeyLen})
 	if err != nil {
 		return false, err
 	}

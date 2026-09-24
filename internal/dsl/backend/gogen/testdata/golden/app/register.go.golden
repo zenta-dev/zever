@@ -12,7 +12,7 @@ import (
 
 	"github.com/zenta-dev/zever/router"
 
-	pb "github.com/zenta-dev/zever/gen/zengov1"
+	pb "github.com/zenta-dev/zever/gen/zeverv1"
 )
 
 // ModuleImpls names one business-logic implementation per service this

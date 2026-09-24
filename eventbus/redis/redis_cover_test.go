@@ -101,8 +101,8 @@ func TestSubscribe_closedAfterLock(t *testing.T) {
 	}()
 
 	// The goroutine finishes the broker handshake then parks on a.mu,
-	// which this test holds the whole time.
-	time.Sleep(500 * time.Millisecond)
+	// which this test holds the whole time. Closing underneath exercises
+	// the post-lock path deterministically without any timing wait.
 	a.closed.Store(true)
 	a.mu.Unlock()
 
@@ -181,9 +181,7 @@ func TestDeliver_pubsubClosed(t *testing.T) {
 
 	// Whether deliver is already parked on select or not, ps.Close settles
 	// the Go channel closed while stop stays open, so the !ok path is the
-	// only ready case.
-	time.Sleep(300 * time.Millisecond)
-
+	// only ready case. No wait needed: deliver observes the close either way.
 	_ = ps.Close()
 
 	select {

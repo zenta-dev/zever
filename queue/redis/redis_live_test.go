@@ -3,6 +3,7 @@ package redis
 import (
 	"context"
 	"errors"
+	"runtime"
 	"strings"
 	"testing"
 	"time"
@@ -11,6 +12,22 @@ import (
 
 	"github.com/zenta-dev/zever/queue"
 )
+
+// eventually polls cond until timeout, for async delivery/visibility-timeout
+// reclaim/polling. Defined once per package; cover tests share it.
+func eventually(t *testing.T, timeout time.Duration, cond func() bool, msg string) {
+	t.Helper()
+	deadline := time.Now().Add(timeout)
+	for time.Now().Before(deadline) {
+		if cond() {
+			return
+		}
+		time.Sleep(5 * time.Millisecond)
+	}
+	if !cond() {
+		t.Fatalf("eventually timeout %s: %s", timeout, msg)
+	}
+}
 
 // newLiveQueue starts miniredis and opens a queue.
 func newLiveQueue(t *testing.T) (queue.Queue, *miniredis.Miniredis) {
@@ -108,12 +125,17 @@ func TestRedisLive_PushDelayed(t *testing.T) {
 	}
 
 	s.FastForward(100 * time.Millisecond)
-	time.Sleep(120 * time.Millisecond)
-
-	msg, err := q.Pop(ctx, topic)
-	if err != nil {
-		t.Fatalf("Pop after delay error = %v", err)
-	}
+	// Poll for promotion: each Pop runs the throttled promoteDue sweep once
+	// sweepInterval has elapsed, instead of sleeping a fixed 120ms.
+	var msg queue.Message
+	eventually(t, 5*time.Second, func() bool {
+		m, popErr := q.Pop(ctx, topic)
+		if popErr != nil {
+			return false
+		}
+		msg = m
+		return true
+	}, "delayed message not promoted")
 	if string(msg.Payload) != "delayed" {
 		t.Errorf("Payload = %q, want delayed", string(msg.Payload))
 	}
@@ -204,14 +226,21 @@ func TestRedisLive_VisibilityReclaim(t *testing.T) {
 	}
 
 	s.FastForward(200 * time.Millisecond)
-	// Sleep past sweepInterval so popLoop's throttled reclaimStale sweep
-	// runs again before the Pop below.
-	time.Sleep(300 * time.Millisecond)
-
-	msg2, err := q.Pop(ctx, topic)
-	if err != nil {
-		t.Fatalf("Pop after reclaim error = %v", err)
-	}
+	// Poll for the reclaim with the tight 120ms VisibilityTimeout: each Pop
+	// runs the throttled reclaimStale sweep once sweepInterval has elapsed,
+	// instead of sleeping a fixed 300ms past it.
+	var msg2 queue.Message
+	eventually(t, 5*time.Second, func() bool {
+		m, err := q.Pop(ctx, topic)
+		if err != nil {
+			return false
+		}
+		if m.ID != firstID || m.Attempt != 2 {
+			return false
+		}
+		msg2 = m
+		return true
+	}, "reclaimed message not visible")
 	if msg2.ID != firstID {
 		t.Errorf("ID after reclaim = %v, want %v", msg2.ID, firstID)
 	}
@@ -345,7 +374,10 @@ func TestRedisLive_BlockingPop_claimsConcurrentPush(t *testing.T) {
 		ch <- popRes{msg: m, err: err}
 	}()
 
-	time.Sleep(50 * time.Millisecond)
+	// No sleep: order does not matter here. If Push lands first, Pop's
+	// tryClaim takes it; if Pop blocks first, BLPop wakes on the Push.
+	// Yield only so the Pop goroutine gets a chance to block first.
+	runtime.Gosched()
 
 	if err := q.Push(ctx, topic, queue.Payload([]byte("concurrent")), queue.Headers{"h": "v"}); err != nil {
 		t.Fatalf("Push concurrent error = %v", err)

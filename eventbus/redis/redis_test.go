@@ -53,7 +53,7 @@ func testOptions() eventbus.Options {
 	return eventbus.Options{Redis: eventbus.RedisOptions{Addr: testAddr}}
 }
 
-func newTestBus(t *testing.T, mutate func(*eventbus.Options)) eventbus.Eventbus {
+func newTestBus(t *testing.T, mutate func(*eventbus.Options)) eventbus.EventBus {
 	t.Helper()
 
 	opts := testOptions()
@@ -106,6 +106,19 @@ func waitMsg(t *testing.T, ch <-chan eventbus.Message) eventbus.Message {
 	case <-time.After(5 * time.Second):
 		t.Fatal("timeout waiting for message")
 		return eventbus.Message{}
+	}
+}
+
+func eventually(t *testing.T, timeout time.Duration, cond func() bool, msg string) {
+	t.Helper()
+
+	deadline := time.Now().Add(timeout)
+	for !cond() {
+		if time.Now().After(deadline) {
+			t.Fatalf("timed out waiting for %s", msg)
+		}
+
+		time.Sleep(5 * time.Millisecond)
 	}
 }
 
@@ -415,14 +428,7 @@ func TestSubscribe_onPanic_survives(t *testing.T) {
 
 	waitMsg(t, got)
 
-	deadline := time.Now().Add(5 * time.Second)
-	for panicked.Load() == 0 && time.Now().Before(deadline) {
-		time.Sleep(10 * time.Millisecond)
-	}
-
-	if panicked.Load() == 0 {
-		t.Fatal("OnPanic not called after handler panic")
-	}
+	eventually(t, 5*time.Second, func() bool { return panicked.Load() != 0 }, "OnPanic after handler panic")
 }
 
 func TestPublishSubscribe_concurrent(t *testing.T) {
@@ -464,14 +470,7 @@ func TestPublishSubscribe_concurrent(t *testing.T) {
 
 	wg.Wait()
 
-	deadline := time.Now().Add(10 * time.Second)
-	for received.Load() < publishers*perPub && time.Now().Before(deadline) {
-		time.Sleep(10 * time.Millisecond)
-	}
-
-	if got := received.Load(); got != publishers*perPub {
-		t.Fatalf("received %d, want %d", got, publishers*perPub)
-	}
+	eventually(t, 10*time.Second, func() bool { return received.Load() == publishers*perPub }, "concurrent deliveries")
 }
 
 func TestPrefix_isolation(t *testing.T) {

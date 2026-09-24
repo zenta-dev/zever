@@ -212,7 +212,7 @@ func TestLoadEnvBadAdapterFails(t *testing.T) {
 
 func TestLoadPrecedence(t *testing.T) {
 	seedHostileEnv(t)
-	p := writeFile(t, t.TempDir(), "zever.yaml", "db:\n  adapter: postgres\n  options:\n    maxconns: 10\n")
+	p := writeFile(t, t.TempDir(), "zever.yaml", "db:\n  adapter: postgres\n  options:\n    max_conns: 10\n")
 	t.Setenv("DB_MAXCONNS", "20")
 	cfg, err := Load(p)
 	if err != nil {

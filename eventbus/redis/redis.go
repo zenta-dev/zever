@@ -46,7 +46,7 @@ type adapter struct {
 // timeout 5s), builds its own internal/redis client, and verifies
 // connectivity with a 3s ping.
 // The returned bus supports both the push and pull APIs.
-func New(opts eventbus.Options) (eventbus.Eventbus, error) {
+func New(opts eventbus.Options) (eventbus.EventBus, error) {
 	a, err := newAdapter(opts)
 	if err != nil {
 		return nil, err

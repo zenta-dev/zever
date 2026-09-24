@@ -24,7 +24,7 @@ type JWTOptions struct {
 	// Audience is the intended token audience.
 	Audience string `json:"audience" toml:"audience" yaml:"audience"`
 	// MaxTTL caps token lifetimes. Negative fails Validate; zero means no cap.
-	MaxTTL time.Duration `json:"maxttl" toml:"maxttl" yaml:"maxttl"`
+	MaxTTL time.Duration `json:"max_ttl" toml:"max_ttl" yaml:"max_ttl"`
 	// RevocationStore tracks revoked token jtis. Nil means the adapter
 	// builds an in-process memory store with its own defaults.
 	RevocationStore revocation.Store `json:"-" toml:"-" yaml:"-"`
@@ -42,7 +42,7 @@ type OIDCOptions struct {
 	// Issuer is the OIDC issuer URL. Required (adapter-validated).
 	Issuer string `json:"issuer" toml:"issuer" yaml:"issuer"`
 	// ClientID is the relying-party client ID. Required (adapter-validated).
-	ClientID string `json:"clientid" toml:"clientid" yaml:"clientid"`
+	ClientID string `json:"client_id" toml:"client_id" yaml:"client_id"`
 	// Timeout is the operation timeout. Zero means the default; negative fails.
 	Timeout time.Duration `json:"timeout" toml:"timeout" yaml:"timeout"`
 }
@@ -63,7 +63,7 @@ type Options struct {
 // are validated by the adapters themselves.
 func (o Options) Validate() error {
 	if o.JWT.MaxTTL < 0 {
-		return &InvalidOptionsError{Reason: "jwt maxttl must be >= 0"}
+		return &InvalidOptionsError{Reason: "jwt max_ttl must be >= 0"}
 	}
 	if o.OIDC.Timeout < 0 {
 		return &InvalidOptionsError{Reason: "oidc timeout must be >= 0"}

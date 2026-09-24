@@ -17,13 +17,13 @@ const (
 // Options configures vectorstore backend selection and connection.
 type Options struct {
 	// DSN holds the sqlite path or postgres URL.
-	DSN string
+	DSN string `json:"dsn" toml:"dsn" yaml:"dsn"`
 	// URL holds the Qdrant address.
-	URL string
+	URL string `json:"url" toml:"url" yaml:"url"`
 	// APIKey holds the backend credential and is never logged.
-	APIKey string
+	APIKey string `json:"api_key" toml:"api_key" yaml:"api_key"`
 	// Dimension holds the expected embedding dimension.
-	Dimension int
+	Dimension int `json:"dimension" toml:"dimension" yaml:"dimension"`
 }
 
 // Validate checks options for consistency, joining all violations.
@@ -37,7 +37,7 @@ func (o Options) Validate() error {
 	if o.URL != "" {
 		u, err := url.Parse(o.URL)
 		if err != nil {
-			errs = append(errs, &InvalidOptionsError{Reason: "url must be a valid URL"})
+			errs = append(errs, &InvalidOptionsError{Reason: "url must be a valid url"})
 		} else if u.Scheme == "" || u.Host == "" {
 			errs = append(errs, &InvalidOptionsError{Reason: "url must have scheme and host"})
 		}

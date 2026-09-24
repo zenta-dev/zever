@@ -75,7 +75,7 @@ func TestMergeAdapterOverrideAndEmptyKeeps(t *testing.T) {
 	if cfg.Crypto.Options.Key != before {
 		t.Fatal("empty options must keep")
 	}
-	if err := merge(cfg, map[string]ServiceConfig{"db": {Options: map[string]any{"maxconns": 5}}}); err != nil {
+	if err := merge(cfg, map[string]ServiceConfig{"db": {Options: map[string]any{"max_conns": 5}}}); err != nil {
 		t.Fatal(err)
 	}
 	if cfg.DB.Options.MaxConns != 5 {

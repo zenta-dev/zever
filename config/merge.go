@@ -100,7 +100,7 @@ var serviceMergers = map[string]func(*Config, ServiceConfig) error{
 		return mergeInto[document.Options]("document", &cfg.Document.Adapter, &cfg.Document.Options, sc)
 	},
 	"eventbus": func(cfg *Config, sc ServiceConfig) error {
-		return mergeInto[eventbus.Options]("eventbus", &cfg.Eventbus.Adapter, &cfg.Eventbus.Options, sc)
+		return mergeInto[eventbus.Options]("eventbus", &cfg.EventBus.Adapter, &cfg.EventBus.Options, sc)
 	},
 	"flag": func(cfg *Config, sc ServiceConfig) error {
 		return mergeInto[flag.Options]("flag", &cfg.Flag.Adapter, &cfg.Flag.Options, sc)
@@ -145,7 +145,7 @@ var serviceMergers = map[string]func(*Config, ServiceConfig) error{
 		return mergeInto[queue.Options]("queue", &cfg.Queue.Adapter, &cfg.Queue.Options, sc)
 	},
 	"ratelimit": func(cfg *Config, sc ServiceConfig) error {
-		return mergeInto[ratelimit.Options]("ratelimit", &cfg.Ratelimit.Adapter, &cfg.Ratelimit.Options, sc)
+		return mergeInto[ratelimit.Options]("ratelimit", &cfg.RateLimit.Adapter, &cfg.RateLimit.Options, sc)
 	},
 	"router": func(cfg *Config, sc ServiceConfig) error {
 		return mergeInto[router.Options]("router", &cfg.Router.Adapter, &cfg.Router.Options, sc)

@@ -19,15 +19,15 @@ import (
 const _ = grpc.SupportPackageIsVersion9
 
 const (
-	ShopService_ListProducts_FullMethodName  = "/zengo.shop.v1.ShopService/ListProducts"
-	ShopService_GetProduct_FullMethodName    = "/zengo.shop.v1.ShopService/GetProduct"
-	ShopService_CreateProduct_FullMethodName = "/zengo.shop.v1.ShopService/CreateProduct"
-	ShopService_UpdateProduct_FullMethodName = "/zengo.shop.v1.ShopService/UpdateProduct"
-	ShopService_PatchProduct_FullMethodName  = "/zengo.shop.v1.ShopService/PatchProduct"
-	ShopService_DeleteProduct_FullMethodName = "/zengo.shop.v1.ShopService/DeleteProduct"
-	ShopService_Checkout_FullMethodName      = "/zengo.shop.v1.ShopService/Checkout"
-	ShopService_GetOrder_FullMethodName      = "/zengo.shop.v1.ShopService/GetOrder"
-	ShopService_ListOrders_FullMethodName    = "/zengo.shop.v1.ShopService/ListOrders"
+	ShopService_ListProducts_FullMethodName  = "/zever.shop.v1.ShopService/ListProducts"
+	ShopService_GetProduct_FullMethodName    = "/zever.shop.v1.ShopService/GetProduct"
+	ShopService_CreateProduct_FullMethodName = "/zever.shop.v1.ShopService/CreateProduct"
+	ShopService_UpdateProduct_FullMethodName = "/zever.shop.v1.ShopService/UpdateProduct"
+	ShopService_PatchProduct_FullMethodName  = "/zever.shop.v1.ShopService/PatchProduct"
+	ShopService_DeleteProduct_FullMethodName = "/zever.shop.v1.ShopService/DeleteProduct"
+	ShopService_Checkout_FullMethodName      = "/zever.shop.v1.ShopService/Checkout"
+	ShopService_GetOrder_FullMethodName      = "/zever.shop.v1.ShopService/GetOrder"
+	ShopService_ListOrders_FullMethodName    = "/zever.shop.v1.ShopService/ListOrders"
 )
 
 // ShopServiceClient is the client API for ShopService service.
@@ -380,7 +380,7 @@ func _ShopService_ListOrders_Handler(srv interface{}, ctx context.Context, dec f
 // It's only intended for direct use with grpc.RegisterService,
 // and not to be introspected or modified (even as a copy)
 var ShopService_ServiceDesc = grpc.ServiceDesc{
-	ServiceName: "zengo.shop.v1.ShopService",
+	ServiceName: "zever.shop.v1.ShopService",
 	HandlerType: (*ShopServiceServer)(nil),
 	Methods: []grpc.MethodDesc{
 		{

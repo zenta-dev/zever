@@ -44,7 +44,7 @@ type Checker interface {
 	Can(ctx context.Context, subject Subject, action string, resource Resource) (Decision, error)
 }
 
-// Factory creates a Checker from the given options.
+// Factory creates a Checker from the given Options.
 type Factory func(opts Options) (Checker, error)
 
 var factories = registry.New[Adapter, Factory](
@@ -53,7 +53,7 @@ var factories = registry.New[Adapter, Factory](
 	func(adapter Adapter) error { return &UnknownAdapterError{Adapter: adapter} },
 )
 
-// Register associates an adapter with its factory for later use by Open.
+// Register associates an Adapter with a Factory for later use by Open.
 func Register(adapter Adapter, factory Factory) error {
 	if factory == nil {
 		return fmt.Errorf("%w for adapter %s", ErrNilFactory, adapter)
@@ -62,8 +62,12 @@ func Register(adapter Adapter, factory Factory) error {
 	return factories.Register(adapter, factory)
 }
 
-// Open creates a Checker for a registered adapter using the given options.
+// Open creates a Checker for adapter using the registered Factory and opts.
 func Open(adapter Adapter, opts Options) (Checker, error) {
+	if err := opts.Validate(); err != nil {
+		return nil, err
+	}
+
 	factory, err := factories.Lookup(adapter)
 	if err != nil {
 		return nil, err

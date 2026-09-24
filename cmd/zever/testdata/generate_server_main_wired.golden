@@ -95,7 +95,7 @@ func run(addr, grpcAddr string) error {
 		return err
 	}
 
-	limiter, err := c.Ratelimit()
+	limiter, err := c.RateLimit()
 	if err != nil {
 		return err
 	}

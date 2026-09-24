@@ -80,7 +80,7 @@ func TestQueueAdapterString_returnsName(t *testing.T) {
 	}{
 		{"memory", Memory, "memory"},
 		{"redis", Redis, "redis"},
-		{"unknown", Adapter(99), "Adapter(99)"},
+		{"unknown", Adapter(99), "unknown"},
 	}
 
 	for _, c := range cases {
@@ -255,27 +255,27 @@ func TestQueueTypedErrorMessages_unwrap(t *testing.T) {
 
 	t.Run("duplicate", func(t *testing.T) {
 		t.Parallel()
-		err := &DuplicateError{Adapter: Memory}
+		err := &DuplicateAdapterError{Adapter: Memory}
 		if got := err.Error(); got != "queue: duplicate registration: memory" {
-			t.Errorf("DuplicateError.Error() = %q, want %q", got, "queue: duplicate registration: memory")
+			t.Errorf("DuplicateAdapterError.Error() = %q, want %q", got, "queue: duplicate registration: memory")
 		}
 		if !errors.Is(err, ErrDuplicate) {
-			t.Errorf("errors.Is(DuplicateError, ErrDuplicate) = false")
+			t.Errorf("errors.Is(DuplicateAdapterError, ErrDuplicate) = false")
 		}
-		var target *DuplicateError
+		var target *DuplicateAdapterError
 		if !errors.As(err, &target) {
-			t.Errorf("errors.As(err, *DuplicateError) = false")
+			t.Errorf("errors.As(err, *DuplicateAdapterError) = false")
 		}
 		if target != nil && target.Adapter != Memory {
-			t.Errorf("DuplicateError.Adapter = %v, want %v", target.Adapter, Memory)
+			t.Errorf("DuplicateAdapterError.Adapter = %v, want %v", target.Adapter, Memory)
 		}
 	})
 
 	t.Run("unknown", func(t *testing.T) {
 		t.Parallel()
 		err := &UnknownAdapterError{Adapter: Adapter(99)}
-		if got := err.Error(); got != "queue: unknown adapter: Adapter(99) (forgotten import?)" {
-			t.Errorf("UnknownAdapterError.Error() = %q, want %q", got, "queue: unknown adapter: Adapter(99) (forgotten import?)")
+		if got := err.Error(); got != "queue: unknown adapter: unknown (forgotten import?)" {
+			t.Errorf("UnknownAdapterError.Error() = %q, want %q", got, "queue: unknown adapter: unknown (forgotten import?)")
 		}
 		if !errors.Is(err, ErrUnknownAdapter) {
 			t.Errorf("errors.Is(UnknownAdapterError, ErrUnknownAdapter) = false")
@@ -295,7 +295,7 @@ func TestQueueMessage_helpers(t *testing.T) {
 
 	t.Run("message_id/roundtrip", func(t *testing.T) {
 		t.Parallel()
-		id := NewMessageIDForTest()
+		id := stubMessageID()
 		s := id.String()
 		parsed, err := ParseMessageID(s)
 		if err != nil {

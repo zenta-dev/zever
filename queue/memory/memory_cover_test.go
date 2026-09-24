@@ -3,6 +3,7 @@ package memory
 import (
 	"context"
 	"errors"
+	"runtime"
 	"testing"
 	"time"
 
@@ -23,7 +24,9 @@ func TestMemory_CoverPushClosedRaceHammer(t *testing.T) {
 		go func() {
 			errCh <- q.Push(ctx, topic, queue.Payload([]byte("two")), nil)
 		}()
-		time.Sleep(time.Millisecond)
+		// Yield so the blocked Push parks before Close races it; either
+		// order is a valid race outcome asserted below.
+		runtime.Gosched()
 		_ = q.Close()
 		if ma, ok := q.(*memoryAdapter); ok {
 			if tq := ma.getTopic(topic); tq != nil {
@@ -70,7 +73,9 @@ func TestMemory_CoverPushClosedAfterWait(t *testing.T) {
 	go func() {
 		errCh <- q.Push(ctx, topic, queue.Payload([]byte("two")), nil)
 	}()
-	time.Sleep(20 * time.Millisecond)
+	// Yield so the second Push parks before Close races it; Push sees
+	// closed at the lock in either order and reports ErrClosed.
+	runtime.Gosched()
 	_ = q.Close()
 	if ma, ok := q.(*memoryAdapter); ok {
 		if tq := ma.getTopic(topic); tq != nil {
@@ -231,7 +236,13 @@ func TestMemory_CoverPopWithTopicNotifyAndPoll(t *testing.T) {
 		}
 		resCh <- m
 	}()
-	time.Sleep(20 * time.Millisecond)
+	// Wait until the pop parks (penders tracks waiters) before Push wakes
+	// it via notify, instead of sleeping a fixed 20ms.
+	eventually(t, func() bool {
+		tq.mu.Lock()
+		defer tq.mu.Unlock()
+		return tq.penders == 1
+	}, "pop waiter not parked")
 	// cover notify wake branch (409)
 	if err := maIfc.Push(ctx, topic, queue.Payload([]byte("wake")), nil); err != nil {
 		t.Fatalf("Push wake: %v", err)
@@ -279,7 +290,7 @@ func TestMemory_CoverTopicPromoteAndReclaim(t *testing.T) {
 	// cover waitForPromote timer drain (42,55)
 	tq := newTopicQueue()
 	timer := time.NewTimer(10 * time.Millisecond)
-	time.Sleep(20 * time.Millisecond)
+	<-timer.C // wait for the timer to fire via channel, not sleep
 	tq.waitForPromote(timer, 5*time.Millisecond)
 	timer.Stop()
 	tq2 := newTopicQueue()
@@ -337,8 +348,9 @@ func TestMemory_CoverWaitForCapacityBranches(t *testing.T) {
 	if err == nil {
 		t.Fatalf("waitForSpace timeout = nil, want error")
 	}
+	// Free space right away; the 500ms waitForSpace below unblocks either
+	// way, so no delayed free is needed.
 	go func() {
-		time.Sleep(20 * time.Millisecond)
 		m, _ := ma.popWithTopic(context.Background(), "waitcap", tq)
 		_ = ma.Ack(context.Background(), m)
 	}()

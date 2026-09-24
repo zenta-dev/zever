@@ -36,7 +36,7 @@ func New(opts i18n.Options) (i18n.I18n, error) {
 		return nil, fmt.Errorf("embed: %w", err)
 	}
 	if opts.Embed.FS == nil {
-		return nil, &i18n.InvalidOptionsError{Reason: "embed FS is required"}
+		return nil, &i18n.InvalidOptionsError{Reason: "embed fs is required"}
 	}
 	dir := opts.Embed.Dir
 	if dir == "" {

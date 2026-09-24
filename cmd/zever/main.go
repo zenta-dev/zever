@@ -205,6 +205,30 @@ func run(args []string) error {
 			case "tinker":
 				printTinkerUsage(flag.NewFlagSet("tinker", flag.ContinueOnError))
 				return nil
+			case "routes":
+				printRoutesUsage(flag.NewFlagSet("routes", flag.ContinueOnError))
+				return nil
+			case "explain":
+				printExplainUsage(flag.NewFlagSet("explain", flag.ContinueOnError))
+				return nil
+			case "check-boundaries", "check:boundaries":
+				printBoundariesUsage(flag.NewFlagSet("check-boundaries", flag.ContinueOnError))
+				return nil
+			case "graph":
+				printGraphUsage(flag.NewFlagSet("graph", flag.ContinueOnError))
+				return nil
+			case "queue:work":
+				printUsage()
+
+				_, _ = fmt.Fprintln(os.Stderr, formatHint("try 'zever queue:work -h' for full flags")) //nolint:wsl_v5
+
+				return nil
+			case "schedule:run":
+				printUsage()
+
+				_, _ = fmt.Fprintln(os.Stderr, formatHint("try 'zever schedule:run -h' for full flags")) //nolint:wsl_v5
+
+				return nil
 			}
 		}
 
@@ -226,6 +250,96 @@ func run(args []string) error {
 		}
 
 		return fmt.Errorf("zever: unknown subcommand %q", sub)
+	}
+}
+
+// printRoutesUsage prints styled help for `zever routes`.
+func printRoutesUsage(fs *flag.FlagSet) {
+	header := title("zever routes") + dim(" — list HTTP routes declared by RPCs")
+	usage := bold("Usage:") + "  " + cmd("zever routes") + dim("  ") + cyan("<files...>")
+	body := joinLines(
+		header,
+		"",
+		usage,
+		"",
+		bold("Flags:"),
+	)
+	_, _ = fmt.Fprintln(fs.Output(), body)
+	fs.PrintDefaults()
+	_, _ = fmt.Fprintln(fs.Output(), "")
+	_, _ = fmt.Fprintln(fs.Output(), dim("Examples:"))
+	_, _ = fmt.Fprintln(fs.Output(), dim("  ")+cmd("zever routes schema/app.zen"))
+	_, _ = fmt.Fprintln(fs.Output(), dim("  ")+cmd("zever routes schema/*.zen"))
+
+	if shouldShowHint() {
+		_, _ = fmt.Fprintln(fs.Output(), formatHint("run 'zever explain Service.Operation' for one operation's details"))
+	}
+}
+
+// printExplainUsage prints styled help for `zever explain`.
+func printExplainUsage(fs *flag.FlagSet) {
+	header := title("zever explain") + dim(" — print an operation's declaration location and summary")
+	usage := bold("Usage:") + "  " + cmd("zever explain") + dim("  ") + cyan("<Service.Operation|Module.Service.Operation> <files...>")
+	body := joinLines(
+		header,
+		"",
+		usage,
+		"",
+		bold("Flags:"),
+	)
+	_, _ = fmt.Fprintln(fs.Output(), body)
+	fs.PrintDefaults()
+	_, _ = fmt.Fprintln(fs.Output(), "")
+	_, _ = fmt.Fprintln(fs.Output(), dim("Examples:"))
+	_, _ = fmt.Fprintln(fs.Output(), dim("  ")+cmd("zever explain UserService.GetUser schema/app.zen"))
+	_, _ = fmt.Fprintln(fs.Output(), dim("  ")+cmd("zever explain billing.OrderService.GetOrder schema/*.zen"))
+
+	if shouldShowHint() {
+		_, _ = fmt.Fprintln(fs.Output(), formatHint("run 'zever routes' to list every HTTP route first"))
+	}
+}
+
+// printBoundariesUsage prints styled help for `zever check-boundaries`.
+func printBoundariesUsage(fs *flag.FlagSet) {
+	header := title("zever check-boundaries") + dim(" — report cross-module reference violations")
+	usage := bold("Usage:") + "  " + cmd("zever check-boundaries") + dim("  ") + cyan("<files...>")
+	body := joinLines(
+		header,
+		"",
+		usage,
+		"",
+		bold("Flags:"),
+	)
+	_, _ = fmt.Fprintln(fs.Output(), body)
+	fs.PrintDefaults()
+	_, _ = fmt.Fprintln(fs.Output(), "")
+	_, _ = fmt.Fprintln(fs.Output(), dim("Examples:"))
+	_, _ = fmt.Fprintln(fs.Output(), dim("  ")+cmd("zever check-boundaries schema/*.zen"))
+
+	if shouldShowHint() {
+		_, _ = fmt.Fprintln(fs.Output(), formatHint("run 'zever compile' once boundaries are clean"))
+	}
+}
+
+// printGraphUsage prints styled help for `zever graph`.
+func printGraphUsage(fs *flag.FlagSet) {
+	header := title("zever graph") + dim(" — print Mermaid entity-relation and module diagrams")
+	usage := bold("Usage:") + "  " + cmd("zever graph") + dim("  ") + cyan("<files...>")
+	body := joinLines(
+		header,
+		"",
+		usage,
+		"",
+		bold("Flags:"),
+	)
+	_, _ = fmt.Fprintln(fs.Output(), body)
+	fs.PrintDefaults()
+	_, _ = fmt.Fprintln(fs.Output(), "")
+	_, _ = fmt.Fprintln(fs.Output(), dim("Examples:"))
+	_, _ = fmt.Fprintln(fs.Output(), dim("  ")+cmd("zever graph schema/*.zen"))
+
+	if shouldShowHint() {
+		_, _ = fmt.Fprintln(fs.Output(), formatHint("pipe graph output into a markdown file to render it"))
 	}
 }
 

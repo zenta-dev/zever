@@ -89,8 +89,8 @@ func newTestNotifier(t *testing.T, srv *httptest.Server) notification.Notifier {
 	return n
 }
 
-// fakeTwilio serves canned Twilio Messages responses and records requests.
-func fakeTwilio(t *testing.T, got *capturedRequest, status int, respBody string, delay time.Duration) *httptest.Server {
+// stubTwilio serves canned Twilio Messages responses and records requests.
+func stubTwilio(t *testing.T, got *capturedRequest, status int, respBody string, delay time.Duration) *httptest.Server {
 	t.Helper()
 	return httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		if delay > 0 {
@@ -145,7 +145,7 @@ func TestNew_invalidOptions(t *testing.T) {
 func TestNotify_sendsFormWithBasicAuth(t *testing.T) {
 	t.Parallel()
 	got := &capturedRequest{}
-	srv := fakeTwilio(t, got, http.StatusCreated, `{"sid":"SM123","status":"queued"}`, 0)
+	srv := stubTwilio(t, got, http.StatusCreated, `{"sid":"SM123","status":"queued"}`, 0)
 	defer srv.Close()
 	n := newTestNotifier(t, srv)
 	defer n.Close()
@@ -185,7 +185,7 @@ func TestNotify_nilNotification(t *testing.T) {
 func TestNotify_invalidTarget(t *testing.T) {
 	t.Parallel()
 	got := &capturedRequest{}
-	srv := fakeTwilio(t, got, http.StatusCreated, `{"sid":"SM123"}`, 0)
+	srv := stubTwilio(t, got, http.StatusCreated, `{"sid":"SM123"}`, 0)
 	defer srv.Close()
 	n := newTestNotifier(t, srv)
 	defer n.Close()
@@ -199,7 +199,7 @@ func TestNotify_invalidTarget(t *testing.T) {
 func TestNotify_wrongChannel(t *testing.T) {
 	t.Parallel()
 	got := &capturedRequest{}
-	srv := fakeTwilio(t, got, http.StatusCreated, `{"sid":"SM123"}`, 0)
+	srv := stubTwilio(t, got, http.StatusCreated, `{"sid":"SM123"}`, 0)
 	defer srv.Close()
 	n := newTestNotifier(t, srv)
 	defer n.Close()
@@ -213,7 +213,7 @@ func TestNotify_wrongChannel(t *testing.T) {
 func TestNotify_serverError(t *testing.T) {
 	t.Parallel()
 	got := &capturedRequest{}
-	srv := fakeTwilio(t, got, http.StatusBadRequest, `{"code":21211,"message":"invalid to","status":400,"more_info":"https://www.twilio.com/docs/errors/21211"}`, 0)
+	srv := stubTwilio(t, got, http.StatusBadRequest, `{"code":21211,"message":"invalid to","status":400,"more_info":"https://www.twilio.com/docs/errors/21211"}`, 0)
 	defer srv.Close()
 	n := newTestNotifier(t, srv)
 	defer n.Close()
@@ -230,7 +230,7 @@ func TestNotify_serverError(t *testing.T) {
 func TestNotify_contextCanceled(t *testing.T) {
 	t.Parallel()
 	got := &capturedRequest{}
-	srv := fakeTwilio(t, got, http.StatusCreated, `{"sid":"SM123"}`, 0)
+	srv := stubTwilio(t, got, http.StatusCreated, `{"sid":"SM123"}`, 0)
 	defer srv.Close()
 	n := newTestNotifier(t, srv)
 	defer n.Close()
@@ -245,7 +245,7 @@ func TestNotify_contextCanceled(t *testing.T) {
 func TestNotify_contextTimeout(t *testing.T) {
 	t.Parallel()
 	got := &capturedRequest{}
-	srv := fakeTwilio(t, got, http.StatusCreated, `{"sid":"SM123"}`, 500*time.Millisecond)
+	srv := stubTwilio(t, got, http.StatusCreated, `{"sid":"SM123"}`, 500*time.Millisecond)
 	defer srv.Close()
 	n := newTestNotifier(t, srv)
 	defer n.Close()

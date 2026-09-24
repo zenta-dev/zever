@@ -21,31 +21,33 @@ const DefaultPath = "/"
 // opt-out must be expressible.
 type Options struct {
 	// Name is the cookie name. Empty defaults to DefaultName.
-	Name string
+	Name string `json:"name" toml:"name" yaml:"name"`
 	// Path is the cookie Path attribute. Empty defaults to DefaultPath.
-	Path string
+	Path string `json:"path" toml:"path" yaml:"path"`
 	// Domain is the cookie Domain attribute. Empty means no Domain
 	// attribute is sent (host-only cookie).
-	Domain string
+	Domain string `json:"domain" toml:"domain" yaml:"domain"`
 	// Secure controls the Secure attribute. Nil defaults to true
 	// (HTTPS-only); set to a false pointer to explicitly allow the
 	// cookie over plain HTTP, e.g. for local development.
-	Secure *bool
+	Secure *bool `json:"secure" toml:"secure" yaml:"secure"`
 	// HTTPOnly controls the http.Cookie HttpOnly attribute. Nil defaults
 	// to true (inaccessible to JavaScript); set to a false pointer to
 	// explicitly expose the cookie to scripts.
-	HTTPOnly *bool
+	HTTPOnly *bool `json:"http_only" toml:"http_only" yaml:"http_only"`
 	// SameSite controls the SameSite attribute. The zero value defaults
 	// to http.SameSiteLaxMode; set explicitly to
 	// http.SameSiteDefaultMode, http.SameSiteStrictMode, or
 	// http.SameSiteNoneMode to override.
-	SameSite http.SameSite
+	SameSite http.SameSite `json:"same_site" toml:"same_site" yaml:"same_site"`
 	// MaxAge is the cookie lifetime in seconds. Zero means a session
 	// cookie: no Max-Age or Expires attribute is sent, and the browser
 	// discards the cookie when it closes. A negative value deletes the
 	// cookie immediately (Expires set in the past). A positive value
-	// sets both Max-Age and Expires.
-	MaxAge int
+	// sets both Max-Age and Expires. int seconds (not time.Duration) is
+	// required by net/http; every other duration in the repo is
+	// time.Duration.
+	MaxAge int `json:"max_age" toml:"max_age" yaml:"max_age"`
 }
 
 // Config aliases Options for compatibility.

@@ -6,6 +6,21 @@ import (
 	"time"
 )
 
+// fakeClock is a manually-advanced clock for deterministic TTL tests.
+type fakeClock struct {
+	now time.Time
+}
+
+// Now returns the clock's current time.
+func (f *fakeClock) Now() time.Time { return f.now }
+
+// Advance moves the clock forward by d.
+func (f *fakeClock) Advance(d time.Duration) { f.now = f.now.Add(d) }
+
+func newFakeClock() *fakeClock {
+	return &fakeClock{now: time.Unix(1_700_000_000, 0)}
+}
+
 func TestTTLCache_GetPut(t *testing.T) {
 	tc := NewTTL[string, int](4, time.Hour)
 
@@ -20,10 +35,12 @@ func TestTTLCache_GetPut(t *testing.T) {
 }
 
 func TestTTLCache_ExpiryOnGet(t *testing.T) {
+	fc := newFakeClock()
 	tc := NewTTL[string, int](4, time.Millisecond)
+	tc.now = fc.Now
 	tc.Put("a", 1)
 
-	time.Sleep(5 * time.Millisecond)
+	fc.Advance(5 * time.Millisecond)
 
 	v, ok := tc.Get("a")
 	if ok || v != 0 {
@@ -36,13 +53,15 @@ func TestTTLCache_ExpiryOnGet(t *testing.T) {
 }
 
 func TestTTLCache_PutRefreshesExpiry(t *testing.T) {
+	fc := newFakeClock()
 	tc := NewTTL[string, int](4, 20*time.Millisecond)
+	tc.now = fc.Now
 	tc.Put("a", 1)
 
-	time.Sleep(10 * time.Millisecond)
+	fc.Advance(10 * time.Millisecond)
 	tc.Put("a", 2) // refresh expiry
 
-	time.Sleep(15 * time.Millisecond) // 25ms since first Put, 15ms since refresh
+	fc.Advance(15 * time.Millisecond) // 25ms since first Put, 15ms since refresh
 
 	v, ok := tc.Get("a")
 	if !ok || v != 2 {
@@ -72,9 +91,11 @@ func TestTTLCache_Delete(t *testing.T) {
 	})
 
 	t.Run("delete expired key reports absent", func(t *testing.T) {
+		fc := newFakeClock()
 		tc := NewTTL[string, int](4, time.Millisecond)
+		tc.now = fc.Now
 		tc.Put("a", 1)
-		time.Sleep(5 * time.Millisecond)
+		fc.Advance(5 * time.Millisecond)
 		v, ok := tc.Delete("a")
 		if ok || v != 0 {
 			t.Fatalf("Delete(expired a) = (%v, %v), want (0, false)", v, ok)
@@ -153,12 +174,14 @@ func TestTTLCache_Len(t *testing.T) {
 
 func TestTTLCache_PutTTL(t *testing.T) {
 	t.Run("varying TTLs on same cache expire independently", func(t *testing.T) {
+		fc := newFakeClock()
 		tc := NewTTL[string, int](4, time.Hour) // long default TTL
+		tc.now = fc.Now
 
 		tc.PutTTL("short", 1, 5*time.Millisecond)
 		tc.PutTTL("long", 2, time.Hour)
 
-		time.Sleep(15 * time.Millisecond)
+		fc.Advance(15 * time.Millisecond)
 
 		if v, ok := tc.Get("short"); ok || v != 0 {
 			t.Fatalf("Get(short) = (%v, %v), want (0, false) after its short TTL elapsed", v, ok)
@@ -169,12 +192,14 @@ func TestTTLCache_PutTTL(t *testing.T) {
 	})
 
 	t.Run("PutTTL overrides an existing entry's expiry", func(t *testing.T) {
+		fc := newFakeClock()
 		tc := NewTTL[string, int](4, 5*time.Millisecond) // short default TTL
-		tc.Put("a", 1)                                   // uses default (short) TTL
+		tc.now = fc.Now
+		tc.Put("a", 1) // uses default (short) TTL
 
 		tc.PutTTL("a", 2, time.Hour) // override with a long TTL
 
-		time.Sleep(15 * time.Millisecond)
+		fc.Advance(15 * time.Millisecond)
 
 		if v, ok := tc.Get("a"); !ok || v != 2 {
 			t.Fatalf("Get(a) = (%v, %v), want (2, true); PutTTL's longer TTL should override the default", v, ok)
@@ -182,10 +207,12 @@ func TestTTLCache_PutTTL(t *testing.T) {
 	})
 
 	t.Run("Put still uses the cache's default TTL", func(t *testing.T) {
+		fc := newFakeClock()
 		tc := NewTTL[string, int](4, 5*time.Millisecond)
+		tc.now = fc.Now
 		tc.Put("a", 1)
 
-		time.Sleep(15 * time.Millisecond)
+		fc.Advance(15 * time.Millisecond)
 
 		if v, ok := tc.Get("a"); ok || v != 0 {
 			t.Fatalf("Get(a) = (%v, %v), want (0, false); Put should still expire after the default TTL", v, ok)

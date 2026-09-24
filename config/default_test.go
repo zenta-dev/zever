@@ -23,13 +23,13 @@ func TestDefaultSnapshot(t *testing.T) {
 	got := map[string]string{
 		"ai": cfg.AI.Adapter, "analytics": cfg.Analytics.Adapter, "auth": cfg.Auth.Adapter,
 		"billing": cfg.Billing.Adapter, "cache": cfg.Cache.Adapter, "crypto": cfg.Crypto.Adapter,
-		"db": cfg.DB.Adapter, "document": cfg.Document.Adapter, "eventbus": cfg.Eventbus.Adapter,
+		"db": cfg.DB.Adapter, "document": cfg.Document.Adapter, "eventbus": cfg.EventBus.Adapter,
 		"flag": cfg.Flag.Adapter, "geo": cfg.Geo.Adapter, "i18n": cfg.I18n.Adapter,
 		"idempotency": cfg.Idempotency.Adapter, "lock": cfg.Lock.Adapter, "log": cfg.Log.Adapter, "mailer": cfg.Mailer.Adapter,
 		"media": cfg.Media.Adapter, "notification": cfg.Notification.Adapter,
 		"observability": cfg.Observability.Adapter, "password": cfg.Password.Adapter,
 		"payment": cfg.Payment.Adapter, "permission": cfg.Permission.Adapter,
-		"queue": cfg.Queue.Adapter, "ratelimit": cfg.Ratelimit.Adapter, "router": cfg.Router.Adapter,
+		"queue": cfg.Queue.Adapter, "ratelimit": cfg.RateLimit.Adapter, "router": cfg.Router.Adapter,
 		"scheduler": cfg.Scheduler.Adapter, "search": cfg.Search.Adapter, "secrets": cfg.Secrets.Adapter,
 		"session": cfg.Session.Adapter, "storage": cfg.Storage.Adapter, "tenant": cfg.Tenant.Adapter,
 		"vectorstore": cfg.VectorStore.Adapter, "webhook": cfg.Webhook.Adapter,
@@ -56,7 +56,7 @@ func TestDefaultSnapshot(t *testing.T) {
 		cfg.Password.Options.KeyLen != password.DefaultKeyLen {
 		t.Error("password defaults mismatch")
 	}
-	if cfg.Ratelimit.Options.Rate <= 0 || cfg.Ratelimit.Options.Burst <= 0 {
+	if cfg.RateLimit.Options.Rate <= 0 || cfg.RateLimit.Options.Burst <= 0 {
 		t.Error("ratelimit defaults must be positive")
 	}
 	if cfg.Scheduler.Options.Dispatcher == nil {

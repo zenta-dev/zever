@@ -18,33 +18,35 @@ import (
 // single event target instead of sharing one key across all deliveries.
 type Options struct {
 	// Timeout is the per-delivery operation timeout. Zero means the adapter default.
-	Timeout time.Duration
+	Timeout time.Duration `json:"timeout" toml:"timeout" yaml:"timeout"`
 	// MaxRetries is the number of delivery retries after the initial attempt.
 	// Zero means no retries.
-	MaxRetries int
+	MaxRetries int `json:"max_retries" toml:"max_retries" yaml:"max_retries"`
 	// AllowPrivateTargets permits http(s) targets resolving to private addresses.
 	// It exists for tests and controlled networks; leave false in production.
-	AllowPrivateTargets bool
+	AllowPrivateTargets bool `json:"allow_private_targets" toml:"allow_private_targets" yaml:"allow_private_targets"`
 	// QueueAdapter names the queue backend backing the queue adapter.
-	QueueAdapter string
+	QueueAdapter string `json:"queue_adapter" toml:"queue_adapter" yaml:"queue_adapter"`
 	// QueueOpts carries the queue backend settings for the queue adapter.
-	QueueOpts queue.Options
+	QueueOpts queue.Options `json:"queue_opts" toml:"queue_opts" yaml:"queue_opts"`
 	// DeadLetterTopic is the queue topic for deliveries that exhaust retries.
-	DeadLetterTopic string
+	DeadLetterTopic string `json:"dead_letter_topic" toml:"dead_letter_topic" yaml:"dead_letter_topic"`
 	// DSN is the SQLite database path for the sqlite adapter.
 	// Empty means a unique private in-memory-style database.
-	DSN string
+	DSN string `json:"dsn" toml:"dsn" yaml:"dsn"`
 	// Logger emits background delivery warnings. Defaults to a no-op logger when nil.
-	Logger log.Logger
+	Logger log.Logger `json:"-" toml:"-" yaml:"-"`
 	// ReplayTolerance bounds how far a signature's embedded timestamp may
 	// drift from the verifier's clock before verification rejects it as
 	// expired or replayed, on top of the HMAC check itself. Zero means the
 	// adapter default (5 minutes).
-	ReplayTolerance time.Duration
+	ReplayTolerance time.Duration `json:"replay_tolerance" toml:"replay_tolerance" yaml:"replay_tolerance"`
 }
 
-// Validate checks options for consistency.
+// Validate checks options for consistency, joining all violations.
 // Zero Timeout and zero MaxRetries are valid; only negative values fail.
+//
+// Validate checks options for consistency, joining all violations.
 //
 // Queue-specific rules (QueueAdapter required, QueueOpts visibility exceeding
 // Timeout) are enforced by the queue adapter, not here: core stays

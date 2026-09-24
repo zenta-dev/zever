@@ -52,7 +52,7 @@ keyset walk (page size 5, ascending price then id):
 From the repo root:
 
 ```bash
-go run ./cmd/zever compile examples/pagination/schema/pagination.zen --backend=zenorm --out examples/pagination/generated
+zever compile examples/pagination/schema/pagination.zen --backend=zenorm --out examples/pagination/generated
 ```
 
 `generated/` is committed CLI output — never hand-edit it.

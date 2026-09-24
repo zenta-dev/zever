@@ -1,5 +1,9 @@
 // Package billing provides customers, subscriptions and invoices with swappable adapters.
 //
+// Billing is the subscription/invoice facade; payment is the separate
+// charge/refund/webhook facade. Billing settles no real charges; provider
+// adapters own transport.
+//
 // It owns the Billing facade plus minor-unit amount parsing and currency
 // exponents. It settles no real charges; provider adapters own transport.
 //

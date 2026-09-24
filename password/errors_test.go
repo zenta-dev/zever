@@ -78,13 +78,13 @@ func TestTypedErrorStrings(t *testing.T) {
 		},
 		{
 			name: "duplicate",
-			err:  &password.DuplicateError{Adapter: password.AdapterArgon2ID},
+			err:  &password.DuplicateAdapterError{Adapter: password.AdapterArgon2ID},
 			want: "password: duplicate registration: argon2id",
 		},
 		{
 			name: "unknown adapter",
 			err:  &password.UnknownAdapterError{Adapter: password.Adapter(999)},
-			want: "password: unknown adapter: unknown",
+			want: "password: unknown adapter: unknown (forgotten import?)",
 		},
 	}
 
@@ -128,7 +128,7 @@ func mustRegisterDup(t *testing.T, a password.Adapter) error {
 func mustOpenUnknown(t *testing.T, a password.Adapter) error {
 	t.Helper()
 
-	h, err := password.Open(a, password.Options{})
+	h, err := password.Open(a, password.Options{Time: password.DefaultTime, Memory: password.DefaultMemory, Threads: password.DefaultThreads, SaltLen: password.DefaultSaltLen, KeyLen: password.DefaultKeyLen})
 	if err == nil {
 		t.Fatal("expected non-nil error from unknown open")
 	}

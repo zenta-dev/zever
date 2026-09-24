@@ -46,7 +46,7 @@ func TestTypedErrorMessages_unwrap(t *testing.T) {
 	t.Run("duplicate", func(t *testing.T) {
 		t.Parallel()
 
-		err := &secrets.DuplicateError{Adapter: secrets.Env}
+		err := &secrets.DuplicateAdapterError{Adapter: secrets.Env}
 		if got, want := err.Error(), `secrets: duplicate registration: env`; got != want {
 			t.Errorf("Error() = %q, want %q", got, want)
 		}
@@ -60,7 +60,7 @@ func TestTypedErrorMessages_unwrap(t *testing.T) {
 		t.Parallel()
 
 		err := &secrets.UnknownAdapterError{Adapter: secrets.Adapter(99)}
-		if got, want := err.Error(), `secrets: unknown adapter: Adapter(99) (forgotten import?)`; got != want {
+		if got, want := err.Error(), `secrets: unknown adapter: unknown (forgotten import?)`; got != want {
 			t.Errorf("Error() = %q, want %q", got, want)
 		}
 

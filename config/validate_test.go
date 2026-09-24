@@ -73,7 +73,7 @@ func TestValidateSkipsCacheLogQueue(t *testing.T) {
 func TestValidateWrapsTypedErrors(t *testing.T) {
 	t.Parallel()
 	cfg := Default()
-	cfg.Ratelimit.Options.Rate = -1
+	cfg.RateLimit.Options.Rate = -1
 	err := cfg.Validate()
 	if err == nil {
 		t.Fatal("want error")

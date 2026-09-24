@@ -25,6 +25,19 @@ func newTestStore(t *testing.T) revocation.Store {
 	return s
 }
 
+func eventually(t *testing.T, timeout time.Duration, cond func() bool, msg string) {
+	t.Helper()
+
+	deadline := time.Now().Add(timeout)
+	for !cond() {
+		if time.Now().After(deadline) {
+			t.Fatalf("timed out waiting for %s", msg)
+		}
+
+		time.Sleep(5 * time.Millisecond)
+	}
+}
+
 func TestStoreContract(t *testing.T) {
 	t.Parallel()
 	revocationtest.Run(t, newTestStore)
@@ -288,23 +301,16 @@ func TestPrunerTickFiresPruneOnce(t *testing.T) {
 
 	fired <- time.Now()
 
-	deadline := time.After(time.Second)
-	var live bool
-	for {
+	eventually(t, time.Second, func() bool {
 		s.mu.Lock()
+		defer s.mu.Unlock()
 		_, gone := s.revoked["old-jti"]
-		_, live = s.revoked["live"]
-		s.mu.Unlock()
-		if !gone {
-			break
-		}
-		select {
-		case <-deadline:
-			t.Fatalf("pruneOnce did not remove expired entry within 1s")
-		default:
-			time.Sleep(10 * time.Millisecond)
-		}
-	}
+		return !gone
+	}, "pruneOnce to remove expired entry")
+
+	s.mu.Lock()
+	_, live := s.revoked["live"]
+	s.mu.Unlock()
 
 	if !live {
 		t.Error("pruneOnce dropped live entry")

@@ -13,7 +13,7 @@ Single-module repo (no nested `go.mod` under `cmd/zever`), so install from
 the module root path:
 
 ```sh
-go install github.com/zenta-dev/zever/cmd/zever@v0.1.0
+go install github.com/zenta-dev/zever/cmd/zever@v0.2.0
 ```
 
 Then `zever --help` prints the grouped command map (Scaffolding /
@@ -69,9 +69,10 @@ a panic.
 | Inspect  | `breaking`      | `zever breaking`        |
 | Inspect  | `fmt`           | `zever fmt`             |
 | Inspect  | `doctor`        | `zever doctor`          |
+| Inspect  | `config show`   | `zever config show`     |
 | Inspect  | `routes`        | `zever routes`          |
 | Inspect  | `explain`       | `zever explain`         |
-| Inspect  | `check-boundaries` | `zever check-boundaries` |
+| Inspect  | `check-boundaries` | `zever check-boundaries` (`check:boundaries` alias) |
 | Inspect  | `graph`         | `zever graph`           |
 | Runtime  | `serve`         | `zever serve`           |
 | Runtime  | `dev`           | `zever dev`             |

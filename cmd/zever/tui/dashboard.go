@@ -53,8 +53,8 @@ func DefaultEntries() []Entry {
 		{Group: GroupRuntime, Name: "dev", Desc: "run with live reload", CLI: "zever dev", Screen: "NewDevScreen"},
 		{Group: GroupRuntime, Name: "tinker", Desc: "open an interactive REPL", CLI: "zever tinker", Screen: "NewTinkerScreen"},
 		// TODO(screen agents): wire to NewDatabaseScreen.
-		{Group: GroupDatabase, Name: "migrate", Desc: "run pending migrations", CLI: "zever migrate", Screen: "NewMigrateScreen"},
-		{Group: GroupDatabase, Name: "seed", Desc: "seed development data", CLI: "zever seed", Screen: "NewSeedScreen"},
+		{Group: GroupDatabase, Name: "migrate", Desc: "run pending migrations", CLI: "zever db migrate", Screen: "NewMigrateScreen"},
+		{Group: GroupDatabase, Name: "seed", Desc: "seed development data", CLI: "zever db seed", Screen: "NewSeedScreen"},
 	}
 }
 

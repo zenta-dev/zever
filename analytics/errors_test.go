@@ -26,6 +26,21 @@ func TestDuplicateAdapterError_message_unwrap(t *testing.T) {
 	}
 }
 
+func TestDuplicateAliases_compat(t *testing.T) {
+	t.Parallel()
+	err := &DuplicateAdapterError{Adapter: Log}
+	if !errors.Is(err, ErrDuplicate) {
+		t.Errorf("errors.Is(%v, ErrDuplicate) = false, want true", err)
+	}
+	var target *DuplicateError
+	if !errors.As(fmtWrap(err), &target) {
+		t.Errorf("errors.As failed for %T alias", err)
+	}
+	if !errors.Is(ErrDuplicateAdapter, ErrDuplicate) {
+		t.Errorf("alias ErrDuplicate does not match ErrDuplicateAdapter")
+	}
+}
+
 func TestUnknownAdapterError_message_unwrap(t *testing.T) {
 	t.Parallel()
 	err := &UnknownAdapterError{Adapter: PostHog}

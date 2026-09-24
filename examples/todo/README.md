@@ -12,15 +12,15 @@ Fully working todo/note CRUD app skeleton with server and tests.
 ## Schema
 
 - Source: `schema/todo.zen`
-- Validate: `/tmp/opencode/zever check schema/todo.zen`
-- Format check: `/tmp/opencode/zever fmt -l schema/todo.zen`
-- Regenerate: `/tmp/opencode/zever compile schema/todo.zen --backend=zenorm,openapi,atlas --out generated`
-- Preview DDL: `/tmp/opencode/zever db migrate --dry-run --adapter=sqlite schema/todo.zen`
-- Routes: `/tmp/opencode/zever routes schema/todo.zen`
+- Validate: `zever check schema/todo.zen`
+- Format check: `zever fmt -l schema/todo.zen`
+- Regenerate: `zever compile schema/todo.zen --backend=zenorm,openapi,atlas --out generated`
+- Preview DDL: `zever db migrate --dry-run --adapter=sqlite schema/todo.zen`
+- Routes: `zever routes schema/todo.zen`
 
 ## Migrate
 
-`/tmp/opencode/zever db migrate --adapter=sqlite --dsn=data/app.db schema/todo.zen`
+`zever db migrate --adapter=sqlite --dsn=data/app.db schema/todo.zen`
 
 ## Serve
 
@@ -38,7 +38,7 @@ minute) in one process over the shared memory queue:
 Migrate first, then seed the demo user (`demo@example.com` / `password123`)
 with three notes (idempotent, safe to re-run):
 
-`/tmp/opencode/zever db migrate --adapter=sqlite --dsn=data/app.db schema/todo.zen`
+`zever db migrate --adapter=sqlite --dsn=data/app.db schema/todo.zen`
 `go run ./examples/todo/db/seed`
 
 ## Test

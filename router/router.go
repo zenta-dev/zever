@@ -29,7 +29,7 @@ type Group interface {
 	Use(middlewares ...func(http.Handler) http.Handler)
 }
 
-// Factory creates a Router from typed options.
+// Factory creates a Router from the given Options.
 type Factory func(opts Options) (Router, error)
 
 var factories = registry.New[Adapter, Factory](
@@ -57,29 +57,29 @@ func ValidMethod(method string) bool {
 }
 
 // Register associates an Adapter with a Factory for later use by Open.
-func Register(a Adapter, f Factory) error {
-	if f == nil {
-		return fmt.Errorf("%w for adapter %s", ErrNilFactory, a)
+func Register(adapter Adapter, factory Factory) error {
+	if factory == nil {
+		return fmt.Errorf("%w for adapter %s", ErrNilFactory, adapter)
 	}
 
-	return factories.Register(a, f)
+	return factories.Register(adapter, factory)
 }
 
 // Open creates a Router for adapter using the registered Factory and opts.
 // Validate is called before factory lookup so invalid options fail-closed.
-func Open(a Adapter, opts Options) (Router, error) {
+func Open(adapter Adapter, opts Options) (Router, error) {
 	if err := opts.Validate(); err != nil {
 		return nil, err
 	}
 
-	factory, err := factories.Lookup(a)
+	factory, err := factories.Lookup(adapter)
 	if err != nil {
 		return nil, err
 	}
 
 	r, err := factory(opts)
 	if err != nil {
-		return nil, fmt.Errorf("router: open %s: %w", a, err)
+		return nil, fmt.Errorf("router: open %s: %w", adapter, err)
 	}
 
 	return r, nil

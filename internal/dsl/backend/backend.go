@@ -1,6 +1,7 @@
 // Package backend defines the single extension point every DSL code
-// generation target (proto, zenorm, and atlas now; typescript and
-// flatbuffers later) implements against the resolved *ir.Schema.
+// generation target (proto, zenorm, atlas, gogen, openapi, and protogogen;
+// no typescript or flatbuffers backends exist) implements against the
+// resolved *ir.Schema.
 package backend
 
 import "github.com/zenta-dev/zever/internal/dsl/ir"

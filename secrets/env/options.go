@@ -2,10 +2,7 @@ package env
 
 import (
 	"errors"
-	"fmt"
 	"strings"
-
-	"github.com/zenta-dev/zever/internal/opts"
 )
 
 // Options holds typed configuration for the env secrets adapter.
@@ -31,26 +28,4 @@ func (o Options) Validate() error {
 	}
 
 	return errors.Join(errs...)
-}
-
-// ParseOptions extracts Options from a raw option map.
-func ParseOptions(m map[string]any) (Options, error) {
-	var prefix string
-
-	if v, ok := m["prefix"]; ok && v != nil {
-		s, err := opts.StrictString("env", "prefix", v)
-		if err != nil {
-			return Options{}, fmt.Errorf("env: option %q must be a string, got %T", "prefix", v)
-		}
-
-		prefix = s
-	}
-
-	opts := Options{Prefix: prefix}
-
-	if err := opts.Validate(); err != nil {
-		return Options{}, err
-	}
-
-	return opts, nil
 }

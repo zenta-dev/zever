@@ -36,8 +36,8 @@ type pullBus struct {
 	closed atomic.Bool
 }
 
-// Wrap upgrades inner to a full Eventbus with pull support.
-func Wrap(inner Pusher) Eventbus {
+// Wrap upgrades inner to a full EventBus with pull support.
+func Wrap(inner Pusher) EventBus {
 	return &pullBus{
 		inner: inner,
 		subs:  make(map[<-chan Message]*pullEntry),

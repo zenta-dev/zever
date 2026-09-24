@@ -52,7 +52,7 @@ func TestRegister_duplicate_returnsDuplicateError(t *testing.T) {
 
 func TestOpen_unknownAdapter_returnsUnknownError(t *testing.T) {
 	a := Adapter(9999)
-	_, err := Open(a, Options{})
+	_, err := Open(a, Options{Host: "h.example.com", Port: 587})
 	if !errors.Is(err, ErrUnknownAdapter) {
 		t.Fatalf("Open unknown err = %v, want ErrUnknownAdapter", err)
 	}
@@ -71,7 +71,7 @@ func TestOpen_factoryError_wrappedWithAdapter(t *testing.T) {
 	if err := Register(a, func(Options) (Mailer, error) { return nil, sentinel }); err != nil {
 		t.Fatalf("Register err = %v", err)
 	}
-	_, err := Open(a, Options{})
+	_, err := Open(a, Options{Host: "h.example.com", Port: 587})
 	if !errors.Is(err, sentinel) {
 		t.Fatalf("Open err = %v, want wrap of sentinel", err)
 	}
@@ -85,7 +85,7 @@ func TestOpen_success_returnsMailer(t *testing.T) {
 	if err := Register(a, func(Options) (Mailer, error) { return &stubMailer{}, nil }); err != nil {
 		t.Fatalf("Register err = %v", err)
 	}
-	m, err := Open(a, Options{})
+	m, err := Open(a, Options{Host: "h.example.com", Port: 587})
 	if err != nil {
 		t.Fatalf("Open err = %v", err)
 	}

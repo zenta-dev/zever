@@ -20,11 +20,19 @@ func TestExtend_afterTakeoverDoesNotStealLock(t *testing.T) {
 		t.Fatalf("acquire: %v", err)
 	}
 
-	time.Sleep(40 * time.Millisecond)
+	// Poll takeover until the 20ms lease lapses.
+	var newHolder lock.Lock
+	eventually(t, func() bool {
+		got, ok, err := l.TryAcquire(ctx, "k", time.Minute)
+		if err != nil || !ok {
+			return false
+		}
+		newHolder = got
+		return true
+	}, "takeover acquire")
 
-	newHolder, ok, err := l.TryAcquire(ctx, "k", time.Minute)
-	if err != nil || !ok {
-		t.Fatalf("takeover acquire = (%v, %v), want (true, nil)", ok, err)
+	if newHolder == nil {
+		t.Fatal("takeover acquire never succeeded")
 	}
 
 	if err := stale.Extend(ctx, time.Minute); !errors.Is(err, lock.ErrNotHeld) {

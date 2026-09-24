@@ -96,9 +96,9 @@ func decodeServiceEntry(name string, entry any) (ServiceConfig, error) {
 // without echoing the offending value (see scrubTypeError).
 //
 // Matching follows encoding/json with DisallowUnknownFields: an exact key
-// match wins, otherwise a case-insensitive match applies. Case folding
-// ignores case only, so "maxconns" matches MaxConns but "max_conns" does
-// not (underscores are significant). Duplicate keys are last-wins for
+// match wins, otherwise a case-insensitive match applies. Option tags are
+// snake_case ("max_conns"), so the old flat spelling "maxconns" no longer
+// matches and is rejected as unknown. Duplicate keys are last-wins for
 // JSON input but a syntax error for YAML input.
 // decodeOptions intentionally stays on raw encoding/json (not codec.Codec[V])
 // because it needs DisallowUnknownFields, which codec.Codec[V] cannot express.

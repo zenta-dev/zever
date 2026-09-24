@@ -5,6 +5,7 @@ import (
 	"errors"
 	"io"
 	"os"
+	"runtime"
 	"strings"
 	"testing"
 	"time"
@@ -61,16 +62,22 @@ func TestCover_Notify_ClosedAfterLock(t *testing.T) {
 	}
 	c.mu.Lock()
 	done := make(chan error, 1)
+	started := make(chan struct{})
 	go func() {
+		close(started)
 		done <- c.Notify(context.Background(), &notification.Notification{
 			Target:  "tok",
 			Channel: notification.ChannelPush,
 			Body:    "hi",
 		})
 	}()
-	// Let the goroutine pass the pre-lock closed check and park on c.mu,
-	// so the post-lock closed check is the one that fires.
-	time.Sleep(200 * time.Millisecond)
+	// Yield so the goroutine passes the pre-lock closed check and parks on
+	// c.mu, so the post-lock closed check is the one that fires (either
+	// branch returns ErrClosed; no fixed sleep).
+	<-started
+	for range 100 {
+		runtime.Gosched()
+	}
 	c.closed.Store(true)
 	c.mu.Unlock()
 	select {

@@ -102,7 +102,7 @@ func TestOpenWrapsFactoryError(t *testing.T) {
 	}
 }
 
-func TestRegisterDuplicate_returnsDuplicateError(t *testing.T) {
+func TestRegisterDuplicate_returnsDuplicateAdapterError(t *testing.T) {
 	adapter := freshAdapter()
 
 	stub := func(Options) (Logger, error) { return stubLogger{}, nil }
@@ -119,13 +119,13 @@ func TestRegisterDuplicate_returnsDuplicateError(t *testing.T) {
 		t.Errorf("errors.Is(err, ErrDuplicate) = false (err = %v)", err)
 	}
 
-	var dupErr *DuplicateError
+	var dupErr *DuplicateAdapterError
 	if !errors.As(err, &dupErr) {
-		t.Fatalf("errors.As(err, DuplicateError) = false (err = %T %v)", err, err)
+		t.Fatalf("errors.As(err, DuplicateAdapterError) = false (err = %T %v)", err, err)
 	}
 
 	if dupErr.Adapter != adapter {
-		t.Errorf("DuplicateError.Adapter = %v, want %v", dupErr.Adapter, adapter)
+		t.Errorf("DuplicateAdapterError.Adapter = %v, want %v", dupErr.Adapter, adapter)
 	}
 }
 
@@ -135,7 +135,7 @@ func TestTypedErrors_messageAndUnwrap(t *testing.T) {
 	t.Run("duplicate", func(t *testing.T) {
 		t.Parallel()
 
-		err := &DuplicateError{Adapter: Noop}
+		err := &DuplicateAdapterError{Adapter: Noop}
 		if got, want := err.Error(), `log: duplicate registration: noop`; got != want {
 			t.Errorf("Error() = %q, want %q", got, want)
 		}
@@ -149,7 +149,7 @@ func TestTypedErrors_messageAndUnwrap(t *testing.T) {
 		t.Parallel()
 
 		err := &UnknownAdapterError{Adapter: Adapter(99)}
-		if got, want := err.Error(), `log: unknown adapter: unknown`; got != want {
+		if got, want := err.Error(), `log: unknown adapter: unknown (forgotten import?)`; got != want {
 			t.Errorf("Error() = %q, want %q", got, want)
 		}
 

@@ -29,6 +29,9 @@ var (
 	ErrRateLimited = errors.New("ai: rate limited")
 )
 
+// ErrDuplicate aliases ErrDuplicateAdapter for compatibility.
+var ErrDuplicate = ErrDuplicateAdapter
+
 // InvalidAdapterError reports an invalid adapter name.
 type InvalidAdapterError struct {
 	Adapter string
@@ -49,6 +52,9 @@ type DuplicateAdapterError struct {
 	Adapter Adapter
 }
 
+// DuplicateError aliases DuplicateAdapterError for compatibility.
+type DuplicateError = DuplicateAdapterError
+
 // Error returns a human-readable duplicate-registration message.
 func (e *DuplicateAdapterError) Error() string {
 	return fmt.Sprintf("%s: %s", ErrDuplicateAdapter, e.Adapter)
@@ -66,7 +72,7 @@ type UnknownAdapterError struct {
 
 // Error returns a human-readable unknown-adapter message.
 func (e *UnknownAdapterError) Error() string {
-	return fmt.Sprintf("%s: %s", ErrUnknownAdapter, e.Adapter)
+	return fmt.Sprintf("%s: %s (forgotten import?)", ErrUnknownAdapter, e.Adapter)
 }
 
 // Unwrap returns ErrUnknownAdapter.

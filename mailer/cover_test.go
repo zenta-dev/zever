@@ -9,10 +9,10 @@ import (
 	"time"
 )
 
-var coverFreshSeq atomic.Int64
+var stubAdapterSeq atomic.Int64
 
-func coverFreshAdapter() Adapter {
-	return Adapter(20000 + int(coverFreshSeq.Add(1)))
+func stubAdapter() Adapter {
+	return Adapter(20000 + int(stubAdapterSeq.Add(1)))
 }
 
 func TestCoverTypedErrorStrings(t *testing.T) {
@@ -23,7 +23,7 @@ func TestCoverTypedErrorStrings(t *testing.T) {
 		want string
 	}{
 		{"Duplicate", DuplicateError{Adapter: SMTP}, "mailer: duplicate registration: smtp"},
-		{"Unknown", UnknownAdapterError{Adapter: Log}, "mailer: unknown adapter: log"},
+		{"Unknown", UnknownAdapterError{Adapter: Log}, "mailer: unknown adapter: log (forgotten import?)"},
 		{"InvalidAdapter", InvalidAdapterError{Adapter: "bogus"}, `mailer: invalid adapter: "bogus"`},
 		{"InvalidOptions", InvalidOptionsError{Reason: "host must be non-empty"}, "mailer: invalid options: host must be non-empty"},
 		{"InvalidAddress", InvalidAddressError{Field: "From", Value: "bad"}, `mailer: invalid address: From "bad"`},
@@ -70,7 +70,7 @@ func TestCoverTypedErrorUnwrap(t *testing.T) {
 }
 
 func TestCoverRegisterNilFactoryMessage(t *testing.T) {
-	a := coverFreshAdapter()
+	a := stubAdapter()
 	err := Register(a, nil)
 	if !errors.Is(err, ErrNilFactory) {
 		t.Fatalf("Register nil err = %v, want ErrNilFactory", err)
@@ -82,7 +82,7 @@ func TestCoverRegisterNilFactoryMessage(t *testing.T) {
 }
 
 func TestCoverRegisterDuplicateMessage(t *testing.T) {
-	a := coverFreshAdapter()
+	a := stubAdapter()
 	ok := func(Options) (Mailer, error) { return &stubMailer{}, nil }
 	if err := Register(a, ok); err != nil {
 		t.Fatalf("first Register err = %v", err)
@@ -98,7 +98,7 @@ func TestCoverRegisterDuplicateMessage(t *testing.T) {
 }
 
 func TestCoverOpenSuccess(t *testing.T) {
-	a := coverFreshAdapter()
+	a := stubAdapter()
 	stub := &stubMailer{}
 	if err := Register(a, func(Options) (Mailer, error) { return stub, nil }); err != nil {
 		t.Fatalf("Register err = %v", err)
@@ -120,12 +120,12 @@ func TestCoverOpenSuccess(t *testing.T) {
 }
 
 func TestCoverOpenFactoryErrorWrap(t *testing.T) {
-	a := coverFreshAdapter()
+	a := stubAdapter()
 	sentinel := errors.New("cover-boom")
 	if err := Register(a, func(Options) (Mailer, error) { return nil, sentinel }); err != nil {
 		t.Fatalf("Register err = %v", err)
 	}
-	_, err := Open(a, Options{})
+	_, err := Open(a, Options{Host: "h.example.com", Port: 587})
 	if !errors.Is(err, sentinel) {
 		t.Fatalf("Open err = %v, want wrap of sentinel", err)
 	}
@@ -136,12 +136,12 @@ func TestCoverOpenFactoryErrorWrap(t *testing.T) {
 }
 
 func TestCoverOpenUnknownMessage(t *testing.T) {
-	a := coverFreshAdapter()
-	_, err := Open(a, Options{})
+	a := stubAdapter()
+	_, err := Open(a, Options{Host: "h.example.com", Port: 587})
 	if !errors.Is(err, ErrUnknownAdapter) {
 		t.Fatalf("Open unknown err = %v, want ErrUnknownAdapter", err)
 	}
-	want := "mailer: unknown adapter: " + a.String()
+	want := "mailer: unknown adapter: " + a.String() + " (forgotten import?)"
 	if err.Error() != want {
 		t.Fatalf("Open unknown err = %q want %q", err.Error(), want)
 	}
@@ -282,7 +282,7 @@ func TestCoverOptionsValidateMatrix(t *testing.T) {
 		{"noneUser", Options{Host: "h.example.com", Port: 25, Username: "u", Password: "p", Encryption: EncryptionNone}, "encryption none must not carry credentials"},
 		{"nonePassOnly", Options{Host: "h.example.com", Port: 25, Password: "p", Encryption: EncryptionNone}, "username and password must be set together"},
 		{"negTimeout", Options{Host: "h.example.com", Port: 587, Timeout: -time.Nanosecond}, "timeout must be >= 0"},
-		{"negSize", Options{Host: "h.example.com", Port: 587, MaxMessageSize: -1}, "max message size must be >= 0"},
+		{"negSize", Options{Host: "h.example.com", Port: 587, MaxMessageSize: -1}, "max_message_size must be >= 0"},
 	}
 	for _, c := range cases {
 		err := c.opts.Validate()

@@ -14,6 +14,19 @@ func freshAdapter() Adapter {
 	return Adapter(1000 + atomic.AddInt64(&freshAdapterCounter, 1))
 }
 
+func eventually(t *testing.T, timeout time.Duration, cond func() bool, msg string) {
+	t.Helper()
+
+	deadline := time.Now().Add(timeout)
+	for !cond() {
+		if time.Now().After(deadline) {
+			t.Fatalf("timed out waiting for %s", msg)
+		}
+
+		time.Sleep(time.Millisecond)
+	}
+}
+
 func TestNewSession_fields_ttl_applied(t *testing.T) {
 	t.Parallel()
 	before := time.Now()
@@ -243,11 +256,10 @@ func TestStore_Get_expired_fails(t *testing.T) {
 	if err != nil {
 		t.Fatalf("Create err = %v", err)
 	}
-	time.Sleep(5 * time.Millisecond)
-	_, err = st.Get(ctx, created.ID)
-	if !errors.Is(err, ErrNotFound) {
-		t.Fatalf("Get expired err = %v, want ErrNotFound", err)
-	}
+	eventually(t, 2*time.Second, func() bool {
+		_, err := st.Get(ctx, created.ID)
+		return errors.Is(err, ErrNotFound)
+	}, "session expiry")
 }
 
 func TestStore_Save_upsert_touches_updated(t *testing.T) {
@@ -257,7 +269,8 @@ func TestStore_Save_upsert_touches_updated(t *testing.T) {
 	s := NewSession(NewID(), time.Hour)
 	s.Data["k"] = "v"
 	before := s.UpdatedAt
-	time.Sleep(time.Millisecond)
+	// Ensure the clock advances past UpdatedAt so Save visibly touches it.
+	eventually(t, 2*time.Second, func() bool { return time.Now().After(before) }, "clock advance")
 	if serr := st.Save(ctx, s); serr != nil {
 		t.Fatalf("Save err = %v", serr)
 	}

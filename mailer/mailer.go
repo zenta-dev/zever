@@ -35,6 +35,10 @@ func Register(adapter Adapter, factory Factory) error {
 
 // Open creates a Mailer for adapter using the registered Factory and opts.
 func Open(adapter Adapter, opts Options) (Mailer, error) {
+	if err := opts.Validate(); err != nil {
+		return nil, err
+	}
+
 	factory, err := factories.Lookup(adapter)
 	if err != nil {
 		return nil, err
