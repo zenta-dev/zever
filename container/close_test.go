@@ -208,7 +208,7 @@ func TestContainer_Close_OnlyResolvedClosed(t *testing.T) {
 		t.Fatalf("Job: %v", err)
 	}
 
-	ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
+	ctx, cancel := context.WithTimeout(t.Context(), 10*time.Second)
 	defer cancel()
 	if err := c.Close(ctx); err != nil {
 		t.Fatalf("Close: %v", err)
@@ -228,7 +228,7 @@ func TestContainer_Close_NeverOpensUntouched(t *testing.T) {
 	if _, err := c.DB(); err != nil {
 		t.Fatalf("DB: %v", err)
 	}
-	ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
+	ctx, cancel := context.WithTimeout(t.Context(), 10*time.Second)
 	defer cancel()
 	if err := c.Close(ctx); err != nil {
 		t.Fatalf("Close must not open untouched services, got: %v", err)
@@ -240,7 +240,7 @@ func TestContainer_Close_NeverOpensUntouched(t *testing.T) {
 
 func TestContainer_Close_EmptyContainer(t *testing.T) {
 	c := New(config.Default())
-	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
+	ctx, cancel := context.WithTimeout(t.Context(), 5*time.Second)
 	defer cancel()
 	if err := c.Close(ctx); err != nil {
 		t.Fatalf("Close on untouched container: %v", err)
@@ -249,7 +249,7 @@ func TestContainer_Close_EmptyContainer(t *testing.T) {
 
 func TestContainer_Close_NilConfigEmpty(t *testing.T) {
 	c := New(nil)
-	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
+	ctx, cancel := context.WithTimeout(t.Context(), 5*time.Second)
 	defer cancel()
 	if err := c.Close(ctx); err != nil {
 		t.Fatalf("Close on nil-config container: %v", err)
@@ -278,7 +278,7 @@ func TestContainer_Close_Ordering(t *testing.T) {
 	c.db.done = true
 	c.db.ready.Store(true)
 
-	ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
+	ctx, cancel := context.WithTimeout(t.Context(), 10*time.Second)
 	defer cancel()
 	if err := c.Close(ctx); err != nil {
 		t.Fatalf("Close: %v", err)
@@ -411,7 +411,7 @@ func TestContainer_Close_NilValueSkipped(t *testing.T) {
 	c.db.val = nil
 	c.db.done = true
 	c.db.ready.Store(true)
-	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
+	ctx, cancel := context.WithTimeout(t.Context(), 5*time.Second)
 	defer cancel()
 	if err := c.Close(ctx); err != nil {
 		t.Fatalf("nil resolved value must be skipped, got: %v", err)
@@ -428,7 +428,7 @@ func TestContainer_Close_DedupSharedPointer(t *testing.T) {
 	c.db.done = true
 	c.db.ready.Store(true)
 
-	ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
+	ctx, cancel := context.WithTimeout(t.Context(), 10*time.Second)
 	defer cancel()
 	if err := c.Close(ctx); err != nil {
 		t.Fatalf("Close: %v", err)
@@ -550,7 +550,7 @@ func (s *closeAndShutdown) Shutdown(context.Context) error {
 }
 
 func TestContainer_CloseAny_Shapes(t *testing.T) {
-	ctx := context.Background()
+	ctx := t.Context()
 	sentinel := errors.New("sentinel")
 	tests := []struct {
 		name    string
@@ -586,7 +586,7 @@ func TestContainer_CloseAny_Shapes(t *testing.T) {
 }
 
 func TestContainer_CloseAny_Precedence(t *testing.T) {
-	ctx := context.Background()
+	ctx := t.Context()
 	sentinel := errors.New("close wins")
 	cs := &closeAndStop{noCtxErr: sentinel}
 	if err := closeAny(ctx, cs); !errors.Is(err, sentinel) {
@@ -595,7 +595,7 @@ func TestContainer_CloseAny_Precedence(t *testing.T) {
 }
 
 func TestContainer_CloseAny_ClosePrecedenceOverShutdown(t *testing.T) {
-	ctx := context.Background()
+	ctx := t.Context()
 	sentinel := errors.New("close wins over shutdown")
 	cs := &closeAndShutdown{closeErr: sentinel}
 	if err := closeAny(ctx, cs); !errors.Is(err, sentinel) {
@@ -618,7 +618,7 @@ func TestContainer_Close_ShutdownOnlyServiceInvoked(t *testing.T) {
 	c.observability.done = true
 	c.observability.ready.Store(true)
 
-	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
+	ctx, cancel := context.WithTimeout(t.Context(), 5*time.Second)
 	defer cancel()
 	if err := c.Close(ctx); err != nil {
 		t.Fatalf("Close: %v", err)
@@ -668,7 +668,7 @@ func TestContainer_Close_ObservabilityProviderShutdownFlushed(t *testing.T) {
 	c.observability.done = true
 	c.observability.ready.Store(true)
 
-	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
+	ctx, cancel := context.WithTimeout(t.Context(), 5*time.Second)
 	defer cancel()
 	if err := c.Close(ctx); err != nil {
 		t.Fatalf("Close: %v", err)
@@ -685,7 +685,7 @@ func TestContainer_Close_TimeoutError(t *testing.T) {
 	c.db.done = true
 	c.db.ready.Store(true)
 
-	ctx, cancel := context.WithTimeout(context.Background(), 100*time.Millisecond)
+	ctx, cancel := context.WithTimeout(t.Context(), 100*time.Millisecond)
 	defer cancel()
 	err := c.Close(ctx)
 	if err == nil {
@@ -712,7 +712,7 @@ func TestContainer_Close_DerivedTimeoutCancel(t *testing.T) {
 	// No parent deadline, so Close derives a 5s per-service timeout
 	// (cancel != nil). Canceling the parent aborts the derived context
 	// through the timeout branch with a non-nil cancel.
-	ctx, cancel := context.WithCancel(context.Background())
+	ctx, cancel := context.WithCancel(t.Context())
 	done := make(chan error, 1)
 	go func() { done <- c.Close(ctx) }()
 	time.Sleep(100 * time.Millisecond)
@@ -743,7 +743,7 @@ func TestContainer_Close_PanicError(t *testing.T) {
 	c.db.done = true
 	c.db.ready.Store(true)
 
-	err := c.Close(context.Background())
+	err := c.Close(t.Context())
 	if err == nil {
 		t.Fatal("expected panic error, got nil")
 	}
@@ -780,7 +780,7 @@ func TestContainer_Close_ErrorsJoinServices(t *testing.T) {
 	c.cache.done = true
 	c.cache.ready.Store(true)
 
-	ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
+	ctx, cancel := context.WithTimeout(t.Context(), 10*time.Second)
 	defer cancel()
 	err := c.Close(ctx)
 	if err == nil {
@@ -799,7 +799,7 @@ func TestContainer_Close_GRPCGracefulStop(t *testing.T) {
 	if _, err := c.GRPC(); err != nil {
 		t.Fatalf("GRPC: %v", err)
 	}
-	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
+	ctx, cancel := context.WithTimeout(t.Context(), 5*time.Second)
 	defer cancel()
 	if err := c.Close(ctx); err != nil {
 		t.Fatalf("Close with fresh gRPC server: %v", err)
@@ -811,7 +811,7 @@ func TestContainer_Close_GRPCCanceledCtx(t *testing.T) {
 	if _, err := c.GRPC(); err != nil {
 		t.Fatalf("GRPC: %v", err)
 	}
-	ctx, cancel := context.WithCancel(context.Background())
+	ctx, cancel := context.WithCancel(t.Context())
 	cancel()
 	done := make(chan error, 1)
 	go func() { done <- c.Close(ctx) }()

@@ -153,7 +153,7 @@ func TestDevLoopStopsOnCancel(t *testing.T) {
 
 	starts := stubDevSeams(t, watcher)
 
-	ctx, cancel := context.WithCancel(context.Background())
+	ctx, cancel := context.WithCancel(t.Context())
 	cancel()
 
 	out := &syncBuffer{}
@@ -191,7 +191,7 @@ func TestDevLoopDebounceUsesTimerSeam(t *testing.T) {
 	}
 	t.Cleanup(func() { devNewTimer = origTimer })
 
-	ctx, cancel := context.WithCancel(context.Background())
+	ctx, cancel := context.WithCancel(t.Context())
 	cancel()
 
 	project := ProjectConfig{SchemaDir: "schema", ServerEntry: "cmd/server"}.withDefaults()
@@ -270,7 +270,7 @@ func TestDevLoopEndToEnd(t *testing.T) {
 	project := ProjectConfig{}.withDefaults()
 
 	out := &syncBuffer{}
-	ctx, cancel := context.WithCancel(context.Background())
+	ctx, cancel := context.WithCancel(t.Context())
 
 	errs := make(chan error, 1)
 
@@ -491,7 +491,7 @@ func TestDevLoopClosedWatcher(t *testing.T) {
 	devDebounce = time.Hour
 	t.Cleanup(func() { devDebounce = origDebounce })
 
-	ctx := context.Background()
+	ctx := t.Context()
 	project := ProjectConfig{SchemaDir: "schema", ServerEntry: "cmd/server"}.withDefaults()
 
 	if err := devLoop(ctx, project, nil, &syncBuffer{}); err != nil {
@@ -544,7 +544,7 @@ func TestDevLoopReportsWatchError(t *testing.T) {
 	devDebounce = time.Hour
 	t.Cleanup(func() { devDebounce = origDebounce })
 
-	ctx, cancel := context.WithCancel(context.Background())
+	ctx, cancel := context.WithCancel(t.Context())
 
 	errs := make(chan error, 1)
 	out := &syncBuffer{}
@@ -600,7 +600,7 @@ func TestDevLoopRebuildsOnCreate(t *testing.T) {
 	devDebounce = 5 * time.Millisecond
 	t.Cleanup(func() { devDebounce = origDebounce })
 
-	ctx, cancel := context.WithCancel(context.Background())
+	ctx, cancel := context.WithCancel(t.Context())
 	defer cancel()
 
 	errs := make(chan error, 1)
@@ -814,7 +814,7 @@ func TestDevLoopClosedWatcherRepeatedly(t *testing.T) {
 		func() {
 			defer func() { devDebounce = origDebounce }()
 
-			ctx := context.Background()
+			ctx := t.Context()
 			project := ProjectConfig{SchemaDir: "schema", ServerEntry: "cmd/server"}.withDefaults()
 
 			if err := devLoop(ctx, project, nil, &syncBuffer{}); err != nil {
@@ -839,7 +839,7 @@ func TestDevLoopSkipsIrrelevantEvent(t *testing.T) {
 	devDebounce = time.Hour
 	t.Cleanup(func() { devDebounce = origDebounce })
 
-	ctx, cancel := context.WithCancel(context.Background())
+	ctx, cancel := context.WithCancel(t.Context())
 
 	errs := make(chan error, 1)
 	out := &syncBuffer{}
@@ -873,7 +873,7 @@ func TestDevLoopWatcherError(t *testing.T) {
 	}
 	t.Cleanup(func() { devNewWatcher = orig })
 
-	ctx := context.Background()
+	ctx := t.Context()
 	project := ProjectConfig{SchemaDir: "schema", ServerEntry: "cmd/server"}.withDefaults()
 
 	if err := devLoop(ctx, project, nil, &syncBuffer{}); err == nil {
@@ -897,7 +897,7 @@ func TestDevLoopStartError(t *testing.T) {
 	devCompileFunc = func(string, io.Writer) error { return nil }
 	t.Cleanup(func() { devNewWatcher = origWatch; devStartChild = origStart; devCompileFunc = origCompile })
 
-	ctx := context.Background()
+	ctx := t.Context()
 	project := ProjectConfig{SchemaDir: "schema", ServerEntry: "cmd/server"}.withDefaults()
 
 	if err := devLoop(ctx, project, nil, &syncBuffer{}); err == nil {
@@ -924,7 +924,7 @@ func TestDevLoopInitialCompileFailure(t *testing.T) {
 	devDebounce = time.Hour
 	t.Cleanup(func() { devDebounce = origDebounce })
 
-	ctx, cancel := context.WithCancel(context.Background())
+	ctx, cancel := context.WithCancel(t.Context())
 	cancel()
 
 	out := &syncBuffer{}
@@ -966,7 +966,7 @@ func TestDevLoopDrainsFiredTimer(t *testing.T) {
 	}
 	t.Cleanup(func() { devNewTimer = origTimer })
 
-	ctx, cancel := context.WithCancel(context.Background())
+	ctx, cancel := context.WithCancel(t.Context())
 	cancel()
 
 	project := ProjectConfig{SchemaDir: "schema", ServerEntry: "cmd/server"}.withDefaults()

@@ -46,7 +46,7 @@ func TestContainer_Close_NoGoroutineLeak(t *testing.T) {
 		}
 	}
 
-	ctx, cancel := context.WithTimeout(context.Background(), 30*time.Second)
+	ctx, cancel := context.WithTimeout(t.Context(), 30*time.Second)
 	defer cancel()
 
 	if err := c.Close(ctx); err != nil {
@@ -68,7 +68,7 @@ func TestContainer_Close_NoGoroutineLeak_Idempotent(t *testing.T) {
 		t.Fatalf("Queue: %v", err)
 	}
 
-	ctx, cancel := context.WithTimeout(context.Background(), 30*time.Second)
+	ctx, cancel := context.WithTimeout(t.Context(), 30*time.Second)
 	defer cancel()
 
 	if err := c.Close(ctx); err != nil {
@@ -86,7 +86,7 @@ func TestContainer_Close_NoGoroutineLeak_Empty(t *testing.T) {
 
 	c := New(config.Default())
 
-	ctx, cancel := context.WithTimeout(context.Background(), 30*time.Second)
+	ctx, cancel := context.WithTimeout(t.Context(), 30*time.Second)
 	defer cancel()
 
 	if err := c.Close(ctx); err != nil {

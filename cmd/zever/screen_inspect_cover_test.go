@@ -48,17 +48,18 @@ func mustBackMsg(t *testing.T, cmd tea.Cmd) {
 	}
 }
 
-func canceledCtx() context.Context {
-	ctx, cancel := context.WithCancel(context.Background())
+func canceledCtx(t *testing.T) context.Context {
+	t.Helper()
+	ctx, cancel := context.WithCancel(t.Context())
 	cancel()
 	return ctx
 }
 
 func TestInspectCtxErr(t *testing.T) {
-	if err := inspectCtxErr(context.Background()); err != nil {
+	if err := inspectCtxErr(t.Context()); err != nil {
 		t.Fatalf("background ctx: %v", err)
 	}
-	if err := inspectCtxErr(canceledCtx()); err == nil {
+	if err := inspectCtxErr(canceledCtx(t)); err == nil {
 		t.Fatal("canceled ctx must yield error")
 	}
 }
@@ -345,7 +346,7 @@ func TestExecStageRunningEscCancels(t *testing.T) {
 func TestMakeExecFnsRunCores(t *testing.T) {
 	dir := t.TempDir()
 	schema := writeInspectScreenFixture(t, dir, "user.zen", inspectScreenUserSchema)
-	ctx := context.Background()
+	ctx := t.Context()
 
 	if out, err := makeCompileExecFn([]string{schema}, "proto", filepath.Join(dir, "out"))(ctx); err != nil {
 		t.Fatalf("compile: %v", err)
@@ -407,7 +408,7 @@ func TestMakeExecFnsRunCores(t *testing.T) {
 }
 
 func TestMakeExecFnsCanceled(t *testing.T) {
-	ctx := canceledCtx()
+	ctx := canceledCtx(t)
 	fns := map[string]tui.ExecFunc{
 		"compile":    makeCompileExecFn(nil, "", ""),
 		"check":      makeCheckExecFn(nil),

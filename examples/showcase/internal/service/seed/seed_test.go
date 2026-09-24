@@ -27,7 +27,7 @@ func migrate(t *testing.T, database interface {
 	if err != nil {
 		t.Fatalf("read schema: %v", err)
 	}
-	ctx := context.Background()
+	ctx := t.Context()
 	for _, stmt := range strings.Split(string(raw), ";") {
 		stmt = strings.TrimSpace(stmt)
 		if stmt == "" {
@@ -43,9 +43,9 @@ func TestRunSeedsAllEntities(t *testing.T) {
 	cfg := config.Default()
 	cfg.DB.Options.Path = filepath.Join(t.TempDir(), "seed.db")
 	c := container.New(cfg)
-	t.Cleanup(func() { _ = c.Close(context.Background()) })
+	t.Cleanup(func() { _ = c.Close(t.Context()) })
 
-	ctx := context.Background()
+	ctx := t.Context()
 	database, err := c.DB()
 	if err != nil {
 		t.Fatalf("DB: %v", err)

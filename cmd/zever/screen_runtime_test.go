@@ -238,7 +238,7 @@ func TestTinkerAllowlistInherited(t *testing.T) {
 	if err != nil {
 		t.Fatalf("newTinkerInterp(nil): %v", err)
 	}
-	ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
+	ctx, cancel := context.WithTimeout(t.Context(), 10*time.Second)
 	defer cancel()
 	if _, err := i.EvalWithContext(ctx, `import "unsafe"`); err == nil {
 		t.Fatal("unsafe import must fail under the screen allowlist")
@@ -510,7 +510,7 @@ func TestStopGraceKillWedgedChild(t *testing.T) {
 	// the signal lands on default disposition and the fast path wins.
 	pollFor(t, 10*time.Second, func() bool {
 		//nolint:gosec // fixed ps argv, no shell; pid is our own test child.
-		out, err := exec.CommandContext(context.Background(), "ps", "-o", "comm=", "--ppid", strconv.Itoa(cmd.Process.Pid)).Output()
+		out, err := exec.CommandContext(t.Context(), "ps", "-o", "comm=", "--ppid", strconv.Itoa(cmd.Process.Pid)).Output()
 		if err != nil {
 			return false
 		}

@@ -48,7 +48,7 @@ func fetchTree(ctx context.Context, t *testing.T, conn db.DB) []*gen.Employee {
 }
 
 func TestTreeOrder(t *testing.T) {
-	ctx := context.Background()
+	ctx := t.Context()
 	conn := newTestDB(ctx, t)
 
 	got := fetchTree(ctx, t, conn)
@@ -88,7 +88,7 @@ func TestTreeOrder(t *testing.T) {
 }
 
 func TestHeadcount(t *testing.T) {
-	ctx := context.Background()
+	ctx := t.Context()
 	conn := newTestDB(ctx, t)
 
 	name, err := orm.NewCTEName("org_tree")
@@ -111,7 +111,7 @@ func TestHeadcount(t *testing.T) {
 }
 
 func TestSubtree(t *testing.T) {
-	ctx := context.Background()
+	ctx := t.Context()
 	conn := newTestDB(ctx, t)
 
 	name, err := orm.NewCTEName("vp_subtree")

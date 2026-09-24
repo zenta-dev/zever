@@ -206,7 +206,7 @@ func TestNoSecretLogging(t *testing.T) {
 
 func TestNewClientSuccess(t *testing.T) {
 	t.Parallel()
-	ctx := context.Background()
+	ctx := t.Context()
 	cfg := Config{Region: "", AccessKeyID: "ak", SecretAccessKey: "sk"}.WithDefaults("")
 	client, presigner, err := NewClient(ctx, "s3", cfg, "")
 	if err != nil {
@@ -222,7 +222,7 @@ func TestNewClientSuccess(t *testing.T) {
 
 func TestNewClientCustomEndpoint(t *testing.T) {
 	t.Parallel()
-	ctx := context.Background()
+	ctx := t.Context()
 	cfg := Config{Endpoint: "http://localhost:9000", Region: "us-east-1", AccessKeyID: "ak", SecretAccessKey: "sk"}
 	client, _, err := NewClient(ctx, "s3", cfg, "")
 	if err != nil {
@@ -236,7 +236,7 @@ func TestNewClientCustomEndpoint(t *testing.T) {
 
 func TestNewClientURLBasePreferred(t *testing.T) {
 	t.Parallel()
-	ctx := context.Background()
+	ctx := t.Context()
 	cfg := Config{Endpoint: "http://localhost:9000", Region: "us-east-1", AccessKeyID: "ak", SecretAccessKey: "sk"}
 	client, _, err := NewClient(ctx, "s3", cfg, "https://cdn.example.com")
 	if err != nil {
@@ -250,7 +250,7 @@ func TestNewClientURLBasePreferred(t *testing.T) {
 
 func TestNewClientValidationErrors(t *testing.T) {
 	t.Parallel()
-	ctx := context.Background()
+	ctx := t.Context()
 	cases := []struct {
 		name    string
 		cfg     Config
@@ -274,7 +274,7 @@ func TestNewClientValidationErrors(t *testing.T) {
 
 func TestNewClientEmptyRegionDefaults(t *testing.T) {
 	t.Parallel()
-	ctx := context.Background()
+	ctx := t.Context()
 	cfg := Config{Endpoint: "", Region: "", AccessKeyID: "ak", SecretAccessKey: "sk"}
 	client, _, err := NewClient(ctx, "s3", cfg, "")
 	if err != nil {
@@ -302,7 +302,7 @@ func TestNewClientCoreError(t *testing.T) {
 	coreNewClient = func(context.Context, string, string, string, string, string, string) (*s3.Client, *s3.PresignClient, error) {
 		return nil, nil, want
 	}
-	_, _, err := NewClient(context.Background(), "s3", Config{Region: "us-east-1"}, "")
+	_, _, err := NewClient(t.Context(), "s3", Config{Region: "us-east-1"}, "")
 	if !errors.Is(err, want) {
 		t.Fatalf("NewClient err = %v, want core error", err)
 	}
@@ -310,7 +310,7 @@ func TestNewClientCoreError(t *testing.T) {
 
 func TestNewClientNoSecretInError(t *testing.T) {
 	t.Parallel()
-	_, _, err := NewClient(context.Background(), "s3", Config{Endpoint: "ftp://x.example.com", Region: "us-east-1"}, "")
+	_, _, err := NewClient(t.Context(), "s3", Config{Endpoint: "ftp://x.example.com", Region: "us-east-1"}, "")
 	if err == nil {
 		t.Fatal("want error")
 	}

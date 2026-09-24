@@ -47,7 +47,7 @@ func newFixture(t *testing.T) *fixture {
 	cfg.Auth.Options.JWT.Secret = testJWTSecret
 
 	c := container.New(cfg)
-	t.Cleanup(func() { _ = c.Close(context.Background()) })
+	t.Cleanup(func() { _ = c.Close(t.Context()) })
 
 	authInst, err := c.Auth()
 	if err != nil {
@@ -65,12 +65,12 @@ func newFixture(t *testing.T) *fixture {
 
 	genapp.RegisterGrpcTaskServiceRoutes(r, w.Service, authInst, w.Checker)
 
-	token, err := authInst.Issue(context.Background(), "user-a", nil, time.Hour)
+	token, err := authInst.Issue(t.Context(), "user-a", nil, time.Hour)
 	if err != nil {
 		t.Fatalf("Issue: %v", err)
 	}
 
-	tokenB, err := authInst.Issue(context.Background(), "user-b", nil, time.Hour)
+	tokenB, err := authInst.Issue(t.Context(), "user-b", nil, time.Hour)
 	if err != nil {
 		t.Fatalf("Issue B: %v", err)
 	}
@@ -91,7 +91,7 @@ func (f *fixture) grpcCall(method string, token string, req any, handler grpc.Un
 func httpPost(t *testing.T, h http.Handler, token, body string) *httptest.ResponseRecorder {
 	t.Helper()
 
-	req := httptest.NewRequestWithContext(context.Background(), http.MethodPost, "/grpc-tasks", strings.NewReader(body))
+	req := httptest.NewRequestWithContext(t.Context(), http.MethodPost, "/grpc-tasks", strings.NewReader(body))
 	req.Header.Set("Content-Type", "application/json")
 	if token != "" {
 		req.Header.Set("Authorization", "Bearer "+token)
@@ -193,7 +193,7 @@ func TestUnauthorizedRejectedIdentically(t *testing.T) {
 
 	// Owner deletes over HTTP.
 	delPath := "/grpc-tasks/" + created.ID
-	req := httptest.NewRequestWithContext(context.Background(), http.MethodDelete, delPath, nil)
+	req := httptest.NewRequestWithContext(t.Context(), http.MethodDelete, delPath, nil)
 	req.Header.Set("Authorization", "Bearer "+f.token)
 	rec = httptest.NewRecorder()
 	f.http.ServeHTTP(rec, req)
@@ -241,7 +241,7 @@ func TestUnauthorizedRejectedIdentically(t *testing.T) {
 	}
 
 	delPath = "/grpc-tasks/" + created.ID
-	req = httptest.NewRequestWithContext(context.Background(), http.MethodDelete, delPath, nil)
+	req = httptest.NewRequestWithContext(t.Context(), http.MethodDelete, delPath, nil)
 	req.Header.Set("Authorization", "Bearer "+f.tokenB)
 	rec = httptest.NewRecorder()
 	f.http.ServeHTTP(rec, req)
