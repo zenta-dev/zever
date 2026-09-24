@@ -37,8 +37,11 @@ type dbpool interface {
 
 var _ dbpool = (*pgxpool.Pool)(nil)
 
-// DefaultDDLTimeout bounds connect plus DDL during construction.
-const DefaultDDLTimeout = 5 * time.Second
+// DefaultDDLTimeout bounds connect plus DDL during construction. Shared 10s
+// floor with vectorstore/pgvector: pgvector ivfflat index build slower than
+// plain B-tree/GIN; single budget for connect+DDL during construction so they
+// don't drift.
+const DefaultDDLTimeout = 10 * time.Second
 
 type postgres struct {
 	db dbpool
@@ -60,7 +63,7 @@ var newPool = func(ctx context.Context, dsn string) (dbpool, error) {
 // New creates a postgres-backed search.Search.
 // An empty DSN returns a dev no-op instance (nil pool) so container
 // construction succeeds in dev; every operation on it reports ErrNotConfigured.
-// Otherwise a single 5s budget covers connect plus DDL.
+// Otherwise a single 10s budget covers connect plus DDL.
 //
 // Pool guidance: search opens its own pool per New call. When search,
 // vectorstore, and db share one Postgres DSN, keep the sum of per-adapter
@@ -132,6 +135,10 @@ func (p *postgres) Index(ctx context.Context, doc search.Document) error {
 		return ErrNotConfigured
 	}
 
+	if err := doc.Validate(); err != nil {
+		return fmt.Errorf("postgres: index: %w", err)
+	}
+
 	metaJSON, err := encodeDocumentMetadata(doc)
 	if err != nil {
 		return fmt.Errorf("postgres: index: %w", err)
@@ -160,6 +167,12 @@ func (p *postgres) IndexBatch(ctx context.Context, docs []search.Document) error
 
 	if len(docs) == 0 {
 		return nil
+	}
+
+	for i, doc := range docs {
+		if err := doc.Validate(); err != nil {
+			return fmt.Errorf("postgres: index batch: index %d: %w", i, err)
+		}
 	}
 
 	for start := 0; start < len(docs); start += maxIndexBatchRows {

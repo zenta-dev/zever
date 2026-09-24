@@ -1,5 +1,10 @@
 package search
 
+import (
+	"encoding/json"
+	"fmt"
+)
+
 // DefaultLimit is the default search limit applied by all adapters for Limit<=0.
 const DefaultLimit = 10
 
@@ -13,6 +18,20 @@ type Document struct {
 	Content string
 	// Metadata carries backend-specific document attributes.
 	Metadata map[string]any
+}
+
+// Validate reports whether d's metadata can be JSON-encoded.
+// Nil metadata is valid.
+func (d Document) Validate() error {
+	if d.Metadata == nil {
+		return nil
+	}
+
+	if _, err := json.Marshal(d.Metadata); err != nil {
+		return fmt.Errorf("%w: %w", ErrInvalidMetadata, err)
+	}
+
+	return nil
 }
 
 // QueryOptions configures a search query.

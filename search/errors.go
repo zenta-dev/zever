@@ -26,6 +26,9 @@ var ErrInvalidOptions = errors.New("search: invalid options")
 // ErrNotFound is returned when a search document cannot be found.
 var ErrNotFound = errors.New("search: not found")
 
+// ErrInvalidMetadata is returned when document metadata cannot be JSON-encoded.
+var ErrInvalidMetadata = errors.New("search: invalid metadata")
+
 // DuplicateAdapterError reports a duplicate adapter registration.
 type DuplicateAdapterError struct {
 	// Adapter is the already-registered adapter.

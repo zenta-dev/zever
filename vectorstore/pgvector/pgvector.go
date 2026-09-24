@@ -38,7 +38,10 @@ type Store struct {
 	dim int
 }
 
-// DefaultDDLTimeout bounds connect plus DDL during construction.
+// DefaultDDLTimeout bounds connect plus DDL during construction. Shared 10s
+// floor with search/postgres: pgvector ivfflat index build slower than plain
+// B-tree/GIN; single budget for connect+DDL during construction so they don't
+// drift.
 const DefaultDDLTimeout = 10 * time.Second
 
 // New creates a pgvector Store from Options. It validates Options first, then
@@ -231,6 +234,10 @@ func (s *Store) encodeVectorRow(vec vectorstore.Vector) (vecJSON string, metaJSO
 
 // Upsert inserts or replaces a vector in the store.
 func (s *Store) Upsert(ctx context.Context, vec vectorstore.Vector) error {
+	if err := vec.Validate(); err != nil {
+		return fmt.Errorf("pgvector: upsert: %w", err)
+	}
+
 	vecJSON, metaJSON, err := s.encodeVectorRow(vec)
 	if err != nil {
 		return fmt.Errorf("pgvector: upsert: %w", err)
@@ -255,6 +262,12 @@ func (s *Store) Upsert(ctx context.Context, vec vectorstore.Vector) error {
 func (s *Store) UpsertBatch(ctx context.Context, vecs []vectorstore.Vector) error {
 	if len(vecs) == 0 {
 		return nil
+	}
+
+	for i, vec := range vecs {
+		if err := vec.Validate(); err != nil {
+			return fmt.Errorf("pgvector: upsert batch: index %d: %w", i, err)
+		}
 	}
 
 	for start := 0; start < len(vecs); start += maxUpsertBatchRows {
@@ -303,28 +316,18 @@ func (s *Store) upsertBatchChunk(ctx context.Context, chunk []vectorstore.Vector
 
 // Delete removes a vector by ID from the store.
 func (s *Store) Delete(ctx context.Context, id string) error {
-	rows, err := s.db.Query(ctx, `SELECT 1 FROM vectors WHERE id = $1`, id)
+	// RowsAffected replaces the earlier SELECT-then-DELETE two-round-trip
+	// shape with a single Exec, mirroring search/postgres.Delete: zero
+	// affected rows means the vector does not exist.
+	tag, err := s.db.Exec(ctx, `DELETE FROM vectors WHERE id = $1`, id)
 	if err != nil {
 		return fmt.Errorf("pgvector: delete: %w", err)
 	}
 
-	if !rows.Next() {
-		if err := rows.Err(); err != nil {
-			rows.Close()
-			return fmt.Errorf("pgvector: delete: %w", err)
-		}
-
-		rows.Close()
-
+	if tag.RowsAffected() == 0 {
 		// See Upsert: pointer chain required for *NotFoundError targets.
 		notFound := error(&vectorstore.NotFoundError{ID: id})
 		return fmt.Errorf("pgvector: delete: %w", notFound)
-	}
-
-	rows.Close()
-
-	if _, err := s.db.Exec(ctx, `DELETE FROM vectors WHERE id = $1`, id); err != nil {
-		return fmt.Errorf("pgvector: delete: %w", err)
 	}
 
 	return nil
@@ -347,12 +350,14 @@ func (s *Store) Query(ctx context.Context, embedding []float32, topK int) ([]vec
 		topK = vectorstore.DefaultTopK
 	}
 
+	vecText := string(vecJSON)
+
 	rows, err := s.db.Query(ctx,
 		`SELECT id, 1 - (embedding <=> $1::vector) AS score, metadata
 		 FROM vectors
 		 ORDER BY embedding <=> $2::vector
 		 LIMIT $3`,
-		string(vecJSON), string(vecJSON), topK,
+		vecText, vecText, topK,
 	)
 	if err != nil {
 		return nil, fmt.Errorf("pgvector: query: %w", err)
@@ -399,16 +404,6 @@ func (s *Store) Close() error {
 	s.db.Close()
 
 	return nil
-}
-
-func formatVector(e []float32) string {
-	if len(e) == 0 {
-		return "[]"
-	}
-
-	b, _ := embeddingCodec.Encode(e)
-
-	return string(b)
 }
 
 func rowsCloseErr(rows pgx.Rows) error {
