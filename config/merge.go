@@ -45,7 +45,7 @@ func merge(cfg *Config, raw map[string]ServiceConfig) error {
 	for name, sc := range raw {
 		apply, ok := serviceMergers[name]
 		if !ok {
-			return &UnknownServiceError{Service: name}
+			return &UnknownServiceError{Service: name, Suggestion: closest(name, knownServiceNames())}
 		}
 		if err := apply(cfg, sc); err != nil {
 			return err
