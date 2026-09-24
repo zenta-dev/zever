@@ -36,7 +36,7 @@ func TestSignalAfterCompletionRejected(t *testing.T) {
 
 	a := newTestAdapter(t)
 	a.RegisterStep("step1", echoStep)
-	ctx := context.Background()
+	ctx := t.Context()
 
 	runID, err := a.Start(ctx, "step1", "hello", "")
 	if err != nil {
@@ -81,7 +81,7 @@ func TestCancel(t *testing.T) {
 		return "data", nil
 	})
 
-	ctx := context.Background()
+	ctx := t.Context()
 
 	done := make(chan workflow.RunID, 1)
 
@@ -134,7 +134,7 @@ func TestSignalUnknownRun(t *testing.T) {
 	t.Parallel()
 
 	a := newTestAdapter(t)
-	ctx := context.Background()
+	ctx := t.Context()
 
 	err := a.Signal(ctx, workflow.RunID("nonexistent"), "ev", nil)
 	if !errors.Is(err, workflow.ErrUnknownRun) {
@@ -151,7 +151,7 @@ func TestQueryUnknownRun(t *testing.T) {
 	t.Parallel()
 
 	a := newTestAdapter(t)
-	ctx := context.Background()
+	ctx := t.Context()
 
 	var out string
 
@@ -165,7 +165,7 @@ func TestCancelUnknownRun(t *testing.T) {
 	t.Parallel()
 
 	a := newTestAdapter(t)
-	ctx := context.Background()
+	ctx := t.Context()
 
 	err := a.Cancel(ctx, workflow.RunID("nonexistent"))
 	if !errors.Is(err, workflow.ErrUnknownRun) {
@@ -196,7 +196,7 @@ func TestSignalDoesNotBlockOnRunningStep(t *testing.T) {
 	t.Parallel()
 
 	a := newTestAdapter(t)
-	ctx := context.Background()
+	ctx := t.Context()
 
 	started := make(chan struct{})
 	release := make(chan struct{})
@@ -258,7 +258,7 @@ func TestStartUnknownStepErrors(t *testing.T) {
 	t.Parallel()
 
 	a := newTestAdapter(t)
-	ctx := context.Background()
+	ctx := t.Context()
 
 	runID, err := a.Start(ctx, "nosuchstep", "data", "")
 	if !errors.Is(err, workflow.ErrUnknownStep) {
@@ -280,7 +280,7 @@ func TestStartAfterClose(t *testing.T) {
 
 	a := newTestAdapter(t)
 	a.RegisterStep("step1", echoStep)
-	ctx := context.Background()
+	ctx := t.Context()
 
 	id1, err := a.Start(ctx, "step1", "a", "")
 	if err != nil {
@@ -317,7 +317,7 @@ func TestStartAfterCloseWithoutReregister(t *testing.T) {
 
 	a := newTestAdapter(t)
 	a.RegisterStep("step1", echoStep)
-	ctx := context.Background()
+	ctx := t.Context()
 
 	if _, err := a.Start(ctx, "step1", "a", ""); err != nil {
 		t.Fatalf("first Start failed: %v", err)
@@ -358,7 +358,7 @@ func TestStartStepFailureRemovesRun(t *testing.T) {
 		return nil, boom
 	})
 
-	ctx := context.Background()
+	ctx := t.Context()
 
 	id, err := a.Start(ctx, "failing", "data", "fail-id")
 	if err == nil {
@@ -405,7 +405,7 @@ func TestStartAutoSkipsUserSuppliedID(t *testing.T) {
 
 	a := newTestAdapter(t)
 	a.RegisterStep("step1", echoStep)
-	ctx := context.Background()
+	ctx := t.Context()
 
 	userID, err := a.Start(ctx, "step1", "user-run", "run-5")
 	if err != nil {
@@ -459,7 +459,7 @@ func TestQueryTypeMismatch(t *testing.T) {
 		return 42, nil
 	})
 
-	ctx := context.Background()
+	ctx := t.Context()
 
 	runID, err := a.Start(ctx, "intstep", 42, "")
 	if err != nil {
@@ -480,7 +480,7 @@ func TestQueryMarshalError(t *testing.T) {
 		return func() {}, nil
 	})
 
-	ctx := context.Background()
+	ctx := t.Context()
 
 	runID, err := a.Start(ctx, "funcstep", "input", "")
 	if err != nil {
@@ -498,7 +498,7 @@ func TestQueryUnknownName(t *testing.T) {
 
 	a := newTestAdapter(t)
 	a.RegisterStep("step1", echoStep)
-	ctx := context.Background()
+	ctx := t.Context()
 
 	runID, err := a.Start(ctx, "step1", "data", "")
 	if err != nil {
@@ -516,7 +516,7 @@ func TestStartDuplicateWorkflowIDRejected(t *testing.T) {
 
 	a := newTestAdapter(t)
 	a.RegisterStep("step1", echoStep)
-	ctx := context.Background()
+	ctx := t.Context()
 
 	id, err := a.Start(ctx, "step1", "first", "dup-id")
 	if err != nil {
@@ -556,7 +556,7 @@ func TestStartUnknownStepPreservesExistingRun(t *testing.T) {
 
 	a := newTestAdapter(t)
 	a.RegisterStep("step1", echoStep)
-	ctx := context.Background()
+	ctx := t.Context()
 
 	id, err := a.Start(ctx, "step1", "original", "keep-id")
 	if err != nil {
@@ -585,7 +585,7 @@ func TestStartUnknownStepDeletesOnlyOwnRun(t *testing.T) {
 	t.Parallel()
 
 	a := newTestAdapter(t)
-	ctx := context.Background()
+	ctx := t.Context()
 
 	id, err := a.Start(ctx, "nosuchstep", "data", "fresh-id")
 	if !errors.Is(err, workflow.ErrUnknownStep) {
@@ -606,7 +606,7 @@ func TestSignalDuringStepQueuedAndAppliedInOrder(t *testing.T) {
 	t.Parallel()
 
 	a := newTestAdapter(t)
-	ctx := context.Background()
+	ctx := t.Context()
 
 	started := make(chan struct{})
 	release := make(chan struct{})
@@ -686,7 +686,7 @@ func TestCancelRemovesRunAndAllowsRestart(t *testing.T) {
 		return "data", nil
 	})
 
-	ctx := context.Background()
+	ctx := t.Context()
 
 	done := make(chan struct{})
 
@@ -743,7 +743,7 @@ func TestCancelMidStepDoesNotClobberRestartedRun(t *testing.T) {
 	t.Parallel()
 
 	a := newTestAdapter(t)
-	ctx := context.Background()
+	ctx := t.Context()
 
 	started := make(chan struct{})
 	release := make(chan struct{})
@@ -809,7 +809,7 @@ func TestSignalBufferedNotLost(t *testing.T) {
 	t.Parallel()
 
 	a := newTestAdapter(t)
-	ctx := context.Background()
+	ctx := t.Context()
 
 	started := make(chan struct{})
 	release := make(chan struct{})
@@ -874,7 +874,7 @@ func TestSignalPendingBounded(t *testing.T) {
 	t.Parallel()
 
 	a := newTestAdapter(t)
-	ctx := context.Background()
+	ctx := t.Context()
 
 	started := make(chan struct{})
 	release := make(chan struct{})
@@ -932,7 +932,7 @@ func TestRegisterStepOverwrite(t *testing.T) {
 	t.Parallel()
 
 	a := newTestAdapter(t)
-	ctx := context.Background()
+	ctx := t.Context()
 
 	a.RegisterStep("step", func(_ context.Context, _ any) (any, error) {
 		return "first", nil
@@ -975,7 +975,7 @@ func TestConcurrentMixedOps(t *testing.T) {
 
 	a := newTestAdapter(t)
 	a.RegisterStep("step", echoStep)
-	ctx := context.Background()
+	ctx := t.Context()
 
 	var wg sync.WaitGroup
 	for i := 0; i < 8; i++ {
@@ -1071,7 +1071,7 @@ func TestAdapterImplementsStepRegistrar(t *testing.T) {
 func TestRegisterStepThroughInterface(t *testing.T) {
 	t.Parallel()
 
-	ctx := context.Background()
+	ctx := t.Context()
 
 	w, err := New(workflow.Options{})
 	if err != nil {

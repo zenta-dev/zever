@@ -36,7 +36,7 @@ func newMemoryStore(t *testing.T) *Store {
 func mustIndex(t *testing.T, s *Store, doc search.Document) {
 	t.Helper()
 
-	if err := s.Index(context.Background(), doc); err != nil {
+	if err := s.Index(t.Context(), doc); err != nil {
 		t.Fatalf("Index(%q): %v", doc.ID, err)
 	}
 }
@@ -44,7 +44,7 @@ func mustIndex(t *testing.T, s *Store, doc search.Document) {
 func mustSearch(t *testing.T, s *Store, query string, opts search.QueryOptions) search.Result {
 	t.Helper()
 
-	res, err := s.Search(context.Background(), query, opts)
+	res, err := s.Search(t.Context(), query, opts)
 	if err != nil {
 		t.Fatalf("Search(%q): %v", query, err)
 	}
@@ -62,7 +62,7 @@ func TestNewDefaults(t *testing.T) {
 
 	defer func() { _ = s.Close() }()
 
-	ctx := context.Background()
+	ctx := t.Context()
 
 	if indexErr := s.Index(ctx, search.Document{ID: "d1", Index: "main", Content: "hello world"}); indexErr != nil {
 		t.Fatal(indexErr)
@@ -138,7 +138,7 @@ func TestRoundtrip(t *testing.T) {
 	t.Parallel()
 
 	s := newMemoryStore(t)
-	ctx := context.Background()
+	ctx := t.Context()
 
 	mustIndex(t, s, search.Document{
 		ID:       "doc-1",
@@ -182,7 +182,7 @@ func TestExactTokenNoStemming(t *testing.T) {
 	t.Parallel()
 
 	s := newMemoryStore(t)
-	ctx := context.Background()
+	ctx := t.Context()
 
 	mustIndex(t, s, search.Document{ID: "d1", Index: "main", Content: "running fast"})
 
@@ -262,7 +262,7 @@ func TestEmptyQuery(t *testing.T) {
 	mustIndex(t, s, search.Document{ID: "d1", Index: "main", Content: "hello world"})
 
 	for _, q := range []string{"", "   ", `"`} {
-		res, err := s.Search(context.Background(), q, search.QueryOptions{Limit: 10})
+		res, err := s.Search(t.Context(), q, search.QueryOptions{Limit: 10})
 		if err != nil {
 			t.Fatalf("Search(%q) err = %v", q, err)
 		}
@@ -327,7 +327,7 @@ func TestDelete(t *testing.T) {
 	t.Parallel()
 
 	s := newMemoryStore(t)
-	ctx := context.Background()
+	ctx := t.Context()
 
 	mustIndex(t, s, search.Document{ID: "d1", Index: "main", Content: "goodbye world"})
 
@@ -368,7 +368,7 @@ func TestDeleteMissing(t *testing.T) {
 
 	s := newMemoryStore(t)
 
-	err := s.Delete(context.Background(), "nope")
+	err := s.Delete(t.Context(), "nope")
 	if !errors.Is(err, search.ErrNotFound) {
 		t.Fatalf("err = %v, want ErrNotFound", err)
 	}
@@ -382,7 +382,7 @@ func TestDeleteCrossIndex(t *testing.T) {
 	mustIndex(t, s, search.Document{ID: "dup", Index: "a", Content: "duplicated entry"})
 	mustIndex(t, s, search.Document{ID: "dup", Index: "b", Content: "duplicated entry"})
 
-	if err := s.Delete(context.Background(), "dup"); err != nil {
+	if err := s.Delete(t.Context(), "dup"); err != nil {
 		t.Fatal(err)
 	}
 
@@ -465,7 +465,7 @@ func TestOperatorsNeutralized(t *testing.T) {
 	t.Parallel()
 
 	s := newMemoryStore(t)
-	ctx := context.Background()
+	ctx := t.Context()
 
 	mustIndex(t, s, search.Document{ID: "p1", Index: "main", Content: "plain text here"})
 
@@ -511,7 +511,7 @@ func TestFileBackedPersistence(t *testing.T) {
 	t.Parallel()
 
 	path := filepath.Join(t.TempDir(), "search.db")
-	ctx := context.Background()
+	ctx := t.Context()
 
 	s, err := New(search.Options{DSN: path})
 	if err != nil {
@@ -549,7 +549,7 @@ func TestMemoryIsolation(t *testing.T) {
 
 	a := newMemoryStore(t)
 	b := newMemoryStore(t)
-	ctx := context.Background()
+	ctx := t.Context()
 
 	mustIndex(t, a, search.Document{ID: "only-a", Index: "main", Content: "solitary words"})
 
@@ -575,7 +575,7 @@ func TestClose(t *testing.T) {
 		t.Fatalf("Close: %v", closeErr)
 	}
 
-	ctx := context.Background()
+	ctx := t.Context()
 
 	if indexErr := s.Index(ctx, search.Document{ID: "x", Index: "main", Content: "y"}); indexErr == nil {
 		t.Fatal("expected error indexing closed store")
@@ -599,7 +599,7 @@ func TestConcurrent(t *testing.T) {
 	t.Parallel()
 
 	s := newMemoryStore(t)
-	ctx := context.Background()
+	ctx := t.Context()
 
 	const n = 20
 
@@ -645,7 +645,7 @@ func TestIndexUnserializableMetadata(t *testing.T) {
 
 	s := newMemoryStore(t)
 
-	err := s.Index(context.Background(), search.Document{
+	err := s.Index(t.Context(), search.Document{
 		ID:       "bad",
 		Index:    "main",
 		Content:  "content",
@@ -672,7 +672,7 @@ func TestIndexClosedDB(t *testing.T) {
 		t.Fatal(closeErr)
 	}
 
-	err = s.Index(context.Background(), search.Document{ID: "x", Index: "main", Content: "y"})
+	err = s.Index(t.Context(), search.Document{ID: "x", Index: "main", Content: "y"})
 	if err == nil {
 		t.Fatal("expected error indexing closed store")
 	}
@@ -686,7 +686,7 @@ func TestIndexExecError(t *testing.T) {
 	t.Parallel()
 
 	s := newMemoryStore(t)
-	ctx := context.Background()
+	ctx := t.Context()
 
 	if _, err := s.db.ExecContext(ctx, `CREATE TRIGGER block_docs BEFORE INSERT ON search_documents BEGIN SELECT RAISE(ABORT, 'blocked'); END`); err != nil {
 		t.Fatal(err)
@@ -706,7 +706,7 @@ func TestIndexCancelledContext(t *testing.T) {
 	t.Parallel()
 
 	s := newMemoryStore(t)
-	ctx := context.Background()
+	ctx := t.Context()
 
 	cancelCtx, cancel := context.WithCancel(ctx)
 	cancel()
@@ -721,7 +721,7 @@ func TestDeleteExecError(t *testing.T) {
 	t.Parallel()
 
 	s := newMemoryStore(t)
-	ctx := context.Background()
+	ctx := t.Context()
 
 	mustIndex(t, s, search.Document{ID: "d1", Index: "main", Content: "doomed words"})
 
@@ -743,7 +743,7 @@ func TestDeleteCancelledContext(t *testing.T) {
 	t.Parallel()
 
 	s := newMemoryStore(t)
-	ctx := context.Background()
+	ctx := t.Context()
 
 	mustIndex(t, s, search.Document{ID: "d1", Index: "main", Content: "doomed words"})
 
@@ -767,7 +767,7 @@ func TestSearchClosedDB(t *testing.T) {
 		t.Fatal(closeErr)
 	}
 
-	res, err := s.Search(context.Background(), "hello", search.QueryOptions{Limit: 10})
+	res, err := s.Search(t.Context(), "hello", search.QueryOptions{Limit: 10})
 	if err == nil {
 		t.Fatal("expected error searching closed store")
 	}
@@ -785,7 +785,7 @@ func TestSearchCancelledContext(t *testing.T) {
 	t.Parallel()
 
 	s := newMemoryStore(t)
-	ctx := context.Background()
+	ctx := t.Context()
 
 	mustIndex(t, s, search.Document{ID: "d1", Index: "main", Content: "hello world"})
 
@@ -801,7 +801,7 @@ func TestSearchCorruptMetadata(t *testing.T) {
 	t.Parallel()
 
 	s := newMemoryStore(t)
-	ctx := context.Background()
+	ctx := t.Context()
 
 	if _, err := s.db.ExecContext(ctx, `INSERT INTO search_documents (id, idx, content, metadata) VALUES ('bad', 'main', 'broken meta words', X'7B6F6F7073')`); err != nil {
 		t.Fatal(err)
@@ -840,7 +840,7 @@ func TestSearchCountNoRows(t *testing.T) {
 
 	defer func() { _ = s.Close() }()
 
-	_, err := s.Search(context.Background(), "hello", search.QueryOptions{Limit: 10})
+	_, err := s.Search(t.Context(), "hello", search.QueryOptions{Limit: 10})
 	if err == nil {
 		t.Fatal("expected no-rows error for empty count")
 	}
@@ -872,7 +872,7 @@ func TestSearchHitsScanError(t *testing.T) {
 
 	defer func() { _ = s.Close() }()
 
-	_, err := s.Search(context.Background(), "hello", search.QueryOptions{Limit: 10})
+	_, err := s.Search(t.Context(), "hello", search.QueryOptions{Limit: 10})
 	if err == nil {
 		t.Fatal("expected scan error for bool score")
 	}
@@ -886,7 +886,7 @@ func TestSearchNilMetadata(t *testing.T) {
 	t.Parallel()
 
 	s := newMemoryStore(t)
-	ctx := context.Background()
+	ctx := t.Context()
 
 	if _, err := s.db.ExecContext(ctx, `INSERT INTO search_documents (id, idx, content, metadata) VALUES ('nul', 'main', 'null meta words', NULL)`); err != nil {
 		t.Fatal(err)
@@ -1006,7 +1006,7 @@ func TestIndexCommitError(t *testing.T) {
 
 	defer func() { _ = s.Close() }()
 
-	err := s.Index(context.Background(), search.Document{ID: "x", Index: "main", Content: "y"})
+	err := s.Index(t.Context(), search.Document{ID: "x", Index: "main", Content: "y"})
 	if !errors.Is(err, errBoom) {
 		t.Fatalf("Index err = %v, want boom", err)
 	}
@@ -1027,7 +1027,7 @@ func TestDeleteRowsAffectedError(t *testing.T) {
 
 	defer func() { _ = s.Close() }()
 
-	err := s.Delete(context.Background(), "x")
+	err := s.Delete(t.Context(), "x")
 	if !errors.Is(err, errBoom) {
 		t.Fatalf("Delete err = %v, want boom", err)
 	}
@@ -1045,7 +1045,7 @@ func TestDeleteCommitError(t *testing.T) {
 
 	defer func() { _ = s.Close() }()
 
-	err := s.Delete(context.Background(), "x")
+	err := s.Delete(t.Context(), "x")
 	if !errors.Is(err, errBoom) {
 		t.Fatalf("Delete err = %v, want boom", err)
 	}
@@ -1068,7 +1068,7 @@ func TestSearchCountQueryError(t *testing.T) {
 
 	defer func() { _ = s.Close() }()
 
-	_, err := s.Search(context.Background(), "hello", search.QueryOptions{Limit: 10})
+	_, err := s.Search(t.Context(), "hello", search.QueryOptions{Limit: 10})
 	if !errors.Is(err, errBoom) {
 		t.Fatalf("Search err = %v, want boom", err)
 	}
@@ -1095,7 +1095,7 @@ func TestSearchCountScanError(t *testing.T) {
 
 	defer func() { _ = s.Close() }()
 
-	_, err := s.Search(context.Background(), "hello", search.QueryOptions{Limit: 10})
+	_, err := s.Search(t.Context(), "hello", search.QueryOptions{Limit: 10})
 	if err == nil {
 		t.Fatal("expected scan error for junk count value")
 	}
@@ -1122,7 +1122,7 @@ func TestSearchCountRowsError(t *testing.T) {
 
 	defer func() { _ = s.Close() }()
 
-	if _, err := s.Search(context.Background(), "hello", search.QueryOptions{Limit: 10}); !errors.Is(err, errBoom) {
+	if _, err := s.Search(t.Context(), "hello", search.QueryOptions{Limit: 10}); !errors.Is(err, errBoom) {
 		t.Fatalf("Search err = %v, want boom", err)
 	}
 }
@@ -1140,7 +1140,7 @@ func TestSearchHitsRowsError(t *testing.T) {
 
 	defer func() { _ = s.Close() }()
 
-	if _, err := s.Search(context.Background(), "hello", search.QueryOptions{Limit: 10}); !errors.Is(err, errBoom) {
+	if _, err := s.Search(t.Context(), "hello", search.QueryOptions{Limit: 10}); !errors.Is(err, errBoom) {
 		t.Fatalf("Search err = %v, want boom", err)
 	}
 }
@@ -1219,7 +1219,7 @@ func TestIndexBatch_MatchesLoopedIndex(t *testing.T) {
 
 	batchStore := newMemoryStore(t)
 
-	if err := batchStore.IndexBatch(context.Background(), docs); err != nil {
+	if err := batchStore.IndexBatch(t.Context(), docs); err != nil {
 		t.Fatalf("IndexBatch: %v", err)
 	}
 
@@ -1250,7 +1250,7 @@ func TestIndexBatch_Empty(t *testing.T) {
 
 	s := newMemoryStore(t)
 
-	if err := s.IndexBatch(context.Background(), nil); err != nil {
+	if err := s.IndexBatch(t.Context(), nil); err != nil {
 		t.Fatalf("IndexBatch(nil): %v", err)
 	}
 }

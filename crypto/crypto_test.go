@@ -197,7 +197,7 @@ func TestOpen_registered_success(t *testing.T) {
 		t.Fatal("Open returned nil")
 	}
 	// Exercise mockCrypto to cover methods and ensure behavior
-	ctx := context.Background()
+	ctx := t.Context()
 	enc, err := got.Encrypt(ctx, []byte{1, 2, 3})
 	if err != nil {
 		t.Fatalf("Encrypt err = %v", err)
@@ -260,7 +260,7 @@ func TestOpen_concurrent_Register_Open(t *testing.T) {
 func TestCrypto_mock_increment_and_mac(t *testing.T) {
 	t.Parallel()
 	m := &mockCrypto{}
-	ctx := context.Background()
+	ctx := t.Context()
 	in := []byte{0, 255, 10}
 	enc, _ := m.Encrypt(ctx, in)
 	if enc[0] != 1 || enc[1] != 0 || enc[2] != 11 {

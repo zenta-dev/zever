@@ -1,7 +1,6 @@
 package rbac_test
 
 import (
-	"context"
 	"testing"
 
 	"github.com/zenta-dev/zever/permission"
@@ -187,7 +186,7 @@ func TestCan_matrix(t *testing.T) {
 				t.Fatalf("New() error = %v", err)
 			}
 
-			got, err := c.Can(context.Background(), tt.subject, tt.action, tt.resource)
+			got, err := c.Can(t.Context(), tt.subject, tt.action, tt.resource)
 			if err != nil {
 				t.Fatalf("Can() error = %v", err)
 			}
@@ -254,7 +253,7 @@ func BenchmarkCan_allow(b *testing.B) {
 
 	sub := permission.Subject{ID: "u1", Roles: []string{"admin"}}
 	res := permission.Resource{Type: "doc", ID: "d1"}
-	ctx := context.Background()
+	ctx := b.Context()
 
 	b.ResetTimer()
 	for i := 0; i < b.N; i++ {

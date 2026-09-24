@@ -1,7 +1,6 @@
 package header
 
 import (
-	"context"
 	"errors"
 	"strings"
 	"testing"
@@ -25,7 +24,7 @@ func TestResolveReDoSSafe(t *testing.T) {
 	meta := map[string]string{"Host": host}
 
 	start := time.Now()
-	_, resolveErr := tt.Resolve(context.Background(), meta)
+	_, resolveErr := tt.Resolve(t.Context(), meta)
 	elapsed := time.Since(start)
 
 	if elapsed > 2*time.Second {
@@ -131,7 +130,7 @@ func TestResolveHostLengthLimit(t *testing.T) {
 	meta := map[string]string{"Host": host}
 
 	start := time.Now()
-	_, resolveErr := tt.Resolve(context.Background(), meta)
+	_, resolveErr := tt.Resolve(t.Context(), meta)
 	elapsed := time.Since(start)
 
 	if elapsed > 2*time.Second {

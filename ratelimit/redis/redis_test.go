@@ -1,7 +1,6 @@
 package redis
 
 import (
-	"context"
 	"errors"
 	"fmt"
 	"os"
@@ -87,7 +86,7 @@ func newTestLimiter(t *testing.T, opts ratelimit.Options) ratelimit.Limiter {
 func TestRedis_allowBurstThenDeny(t *testing.T) {
 	t.Parallel()
 
-	ctx := context.Background()
+	ctx := t.Context()
 	l := newTestLimiter(t, testOptions())
 	key := freshKey(t)
 
@@ -123,7 +122,7 @@ func TestRedis_allowBurstThenDeny(t *testing.T) {
 func TestRedis_refill(t *testing.T) {
 	t.Parallel()
 
-	ctx := context.Background()
+	ctx := t.Context()
 	opts := testOptions()
 	opts.Rate = 5
 	opts.Burst = 2
@@ -150,7 +149,7 @@ func TestRedis_refill(t *testing.T) {
 func TestRedis_invalidCost(t *testing.T) {
 	t.Parallel()
 
-	ctx := context.Background()
+	ctx := t.Context()
 	l := newTestLimiter(t, testOptions())
 	key := freshKey(t)
 
@@ -164,7 +163,7 @@ func TestRedis_invalidCost(t *testing.T) {
 func TestRedis_invalidKey(t *testing.T) {
 	t.Parallel()
 
-	ctx := context.Background()
+	ctx := t.Context()
 	l := newTestLimiter(t, testOptions())
 
 	long := make([]byte, ratelimit.MaxKeyLen+1)
@@ -193,7 +192,7 @@ func TestRedis_invalidKey(t *testing.T) {
 func TestRedis_resetRestores(t *testing.T) {
 	t.Parallel()
 
-	ctx := context.Background()
+	ctx := t.Context()
 	l := newTestLimiter(t, testOptions())
 	key := freshKey(t)
 
@@ -228,7 +227,7 @@ func TestRedis_resetRestores(t *testing.T) {
 func TestRedis_prefixIsolation(t *testing.T) {
 	t.Parallel()
 
-	ctx := context.Background()
+	ctx := t.Context()
 
 	optsA := testOptions()
 	optsA.Redis.Prefix = "pfxA"
@@ -264,7 +263,7 @@ func TestRedis_prefixIsolation(t *testing.T) {
 func TestRedis_afterClose(t *testing.T) {
 	t.Parallel()
 
-	ctx := context.Background()
+	ctx := t.Context()
 	l := newTestLimiter(t, testOptions())
 	key := freshKey(t)
 
@@ -288,7 +287,7 @@ func TestRedis_afterClose(t *testing.T) {
 func TestRedis_concurrentSingleBucketBounded(t *testing.T) {
 	t.Parallel()
 
-	ctx := context.Background()
+	ctx := t.Context()
 	opts := testOptions()
 	opts.Rate = 1
 	opts.Burst = 5

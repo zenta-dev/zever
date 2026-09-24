@@ -108,7 +108,7 @@ func TestJobCoreUseOrderPreserved(t *testing.T) {
 	// Here test that mids[0] is m1 and mids[1] is m2 by checking tags via separate invocation.
 	order = nil
 	h0 := mids[0](base)
-	if err := h0(context.Background(), nil); err != nil {
+	if err := h0(t.Context(), nil); err != nil {
 		t.Fatalf("mids[0] invoke: %v", err)
 	}
 	if len(order) != 2 || order[0] != 1 || order[1] != 99 {
@@ -116,7 +116,7 @@ func TestJobCoreUseOrderPreserved(t *testing.T) {
 	}
 	order = nil
 	h1 := mids[1](base)
-	if err := h1(context.Background(), nil); err != nil {
+	if err := h1(t.Context(), nil); err != nil {
 		t.Fatalf("mids[1] invoke: %v", err)
 	}
 	if len(order) != 2 || order[0] != 2 || order[1] != 99 {
@@ -213,7 +213,7 @@ func TestJobCoreRegisterHandlerDecodeError(t *testing.T) {
 	if !ok {
 		t.Fatal("Lookup decode-err: miss")
 	}
-	err := def.handler(context.Background(), Payload([]byte(`{invalid`)))
+	err := def.handler(t.Context(), Payload([]byte(`{invalid`)))
 	if err == nil {
 		t.Fatal("handler with bad JSON: want error")
 	}
@@ -252,7 +252,7 @@ func TestJobCoreRegisterHandlerSuccess(t *testing.T) {
 	if err != nil {
 		t.Fatalf("Marshal: %v", err)
 	}
-	if err := def.handler(context.Background(), Payload(payload)); err != nil {
+	if err := def.handler(t.Context(), Payload(payload)); err != nil {
 		t.Fatalf("handler success: %v", err)
 	}
 	if !handlerCalled {
@@ -280,7 +280,7 @@ func TestJobCoreRegisterHandlerPropagatesError(t *testing.T) {
 	if err != nil {
 		t.Fatalf("Marshal: %v", err)
 	}
-	err = def.handler(context.Background(), Payload(payload))
+	err = def.handler(t.Context(), Payload(payload))
 	if !errors.Is(err, sentinel) {
 		t.Fatalf("handler err=%v want sentinel", err)
 	}

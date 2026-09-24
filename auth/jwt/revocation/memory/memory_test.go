@@ -1,7 +1,6 @@
 package memory
 
 import (
-	"context"
 	"testing"
 	"time"
 
@@ -86,7 +85,7 @@ func TestRevoke_AfterClose(t *testing.T) {
 	if err := s.Close(); err != nil {
 		t.Fatalf("Close() error = %v", err)
 	}
-	if err := s.Revoke(context.Background(), "jti", time.Now().Add(time.Hour)); err == nil {
+	if err := s.Revoke(t.Context(), "jti", time.Now().Add(time.Hour)); err == nil {
 		t.Fatal("Revoke() after Close succeeded, want error")
 	}
 }
@@ -101,7 +100,7 @@ func TestIsRevoked_AfterClose(t *testing.T) {
 	if err := s.Close(); err != nil {
 		t.Fatalf("Close() error = %v", err)
 	}
-	if _, err := s.IsRevoked(context.Background(), "jti"); err == nil {
+	if _, err := s.IsRevoked(t.Context(), "jti"); err == nil {
 		t.Fatal("IsRevoked() after Close succeeded, want error")
 	}
 }
@@ -133,23 +132,23 @@ func TestCapacity_EvictsSoonestToExpire(t *testing.T) {
 	// Inserted first, but far from expiry: under the old (oldest-inserted)
 	// policy this would be evicted first even though it's the safest entry
 	// to keep.
-	if err := s.Revoke(context.Background(), "oldest-but-far-from-expiry", now.Add(24*time.Hour)); err != nil {
+	if err := s.Revoke(t.Context(), "oldest-but-far-from-expiry", now.Add(24*time.Hour)); err != nil {
 		t.Fatalf("Revoke() error = %v", err)
 	}
 	// Inserted second, and closest to expiry: this is the entry the fixed
 	// policy must evict.
-	if err := s.Revoke(context.Background(), "newer-but-soonest-to-expire", now.Add(time.Second)); err != nil {
+	if err := s.Revoke(t.Context(), "newer-but-soonest-to-expire", now.Add(time.Second)); err != nil {
 		t.Fatalf("Revoke() error = %v", err)
 	}
-	if err := s.Revoke(context.Background(), "filler-1", now.Add(12*time.Hour)); err != nil {
+	if err := s.Revoke(t.Context(), "filler-1", now.Add(12*time.Hour)); err != nil {
 		t.Fatalf("Revoke() error = %v", err)
 	}
-	if err := s.Revoke(context.Background(), "filler-2", now.Add(6*time.Hour)); err != nil {
+	if err := s.Revoke(t.Context(), "filler-2", now.Add(6*time.Hour)); err != nil {
 		t.Fatalf("Revoke() error = %v", err)
 	}
 
 	// Store is now at MaxEntries (4). One more revoke forces an eviction.
-	if err := s.Revoke(context.Background(), "fresh", now.Add(time.Hour)); err != nil {
+	if err := s.Revoke(t.Context(), "fresh", now.Add(time.Hour)); err != nil {
 		t.Fatalf("Revoke() at capacity error = %v", err)
 	}
 
@@ -168,7 +167,7 @@ func TestCapacity_EvictsSoonestToExpire(t *testing.T) {
 	if _, ok := s.revoked["filler-2"]; !ok {
 		t.Error("filler-2 was unexpectedly evicted")
 	}
-	if revoked, err := s.IsRevoked(context.Background(), "fresh"); err != nil || !revoked {
+	if revoked, err := s.IsRevoked(t.Context(), "fresh"); err != nil || !revoked {
 		t.Errorf("IsRevoked(fresh) = %v, %v, want true, nil", revoked, err)
 	}
 }
@@ -197,7 +196,7 @@ func TestMassRevocationBurst(t *testing.T) {
 	}
 
 	now := time.Now()
-	ctx := context.Background()
+	ctx := t.Context()
 	jtis := make([]string, burst)
 	for i := 0; i < burst; i++ {
 		jti := "burst-" + string(rune('a'+i%26)) + string(rune('a'+(i/26)%26)) + string(rune('a'+(i/676)%26))
@@ -256,10 +255,10 @@ func TestPruneExpiredDirect(t *testing.T) {
 	}
 
 	past := time.Now().Add(-time.Minute)
-	if err := s.Revoke(context.Background(), "old", past); err != nil {
+	if err := s.Revoke(t.Context(), "old", past); err != nil {
 		t.Fatalf("Revoke() error = %v", err)
 	}
-	if err := s.Revoke(context.Background(), "live", time.Now().Add(time.Hour)); err != nil {
+	if err := s.Revoke(t.Context(), "live", time.Now().Add(time.Hour)); err != nil {
 		t.Fatalf("Revoke() error = %v", err)
 	}
 
@@ -292,10 +291,10 @@ func TestPrunerTickFiresPruneOnce(t *testing.T) {
 		t.Fatalf("New() returned %T, want *store", si)
 	}
 
-	if err := s.Revoke(context.Background(), "old-jti", time.Now().Add(-time.Minute)); err != nil {
+	if err := s.Revoke(t.Context(), "old-jti", time.Now().Add(-time.Minute)); err != nil {
 		t.Fatalf("Revoke() error = %v", err)
 	}
-	if err := s.Revoke(context.Background(), "live", time.Now().Add(time.Hour)); err != nil {
+	if err := s.Revoke(t.Context(), "live", time.Now().Add(time.Hour)); err != nil {
 		t.Fatalf("Revoke() error = %v", err)
 	}
 

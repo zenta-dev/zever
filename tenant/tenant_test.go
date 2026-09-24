@@ -112,7 +112,7 @@ func TestOpen_success_smoke(t *testing.T) {
 		t.Fatalf("Open err = %v", err)
 	}
 
-	ctx := context.Background()
+	ctx := t.Context()
 
 	id, err := got.Resolve(ctx, map[string]string{})
 	if err != nil {

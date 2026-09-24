@@ -1,7 +1,6 @@
 package router
 
 import (
-	"context"
 	"net/http"
 	"net/http/httptest"
 	"sync"
@@ -11,7 +10,7 @@ import (
 func TestParam_missing_returnsEmpty(t *testing.T) {
 	t.Parallel()
 
-	r := httptest.NewRequestWithContext(context.Background(), http.MethodGet, "/", nil)
+	r := httptest.NewRequestWithContext(t.Context(), http.MethodGet, "/", nil)
 	if got := Param(r, "id"); got != "" {
 		t.Fatalf("want empty, got %q", got)
 	}
@@ -37,7 +36,7 @@ func TestParam_roundTrip(t *testing.T) {
 		t.Run(tt.name, func(t *testing.T) {
 			t.Parallel()
 
-			r := httptest.NewRequestWithContext(context.Background(), http.MethodGet, "/", nil)
+			r := httptest.NewRequestWithContext(t.Context(), http.MethodGet, "/", nil)
 			r = r.WithContext(WithParams(r.Context(), tt.params))
 
 			if got := Param(r, tt.key); got != tt.want {
@@ -50,7 +49,7 @@ func TestParam_roundTrip(t *testing.T) {
 func TestWithParams_nilSafe(t *testing.T) {
 	t.Parallel()
 
-	r := httptest.NewRequestWithContext(context.Background(), http.MethodGet, "/", nil)
+	r := httptest.NewRequestWithContext(t.Context(), http.MethodGet, "/", nil)
 	r = r.WithContext(WithParams(r.Context(), nil))
 
 	if got := Param(r, "id"); got != "" {
@@ -65,7 +64,7 @@ func TestWithParams_nilSafe(t *testing.T) {
 func TestWithParams_inputIsolation(t *testing.T) {
 	t.Parallel()
 
-	r := httptest.NewRequestWithContext(context.Background(), http.MethodGet, "/", nil)
+	r := httptest.NewRequestWithContext(t.Context(), http.MethodGet, "/", nil)
 	in := map[string]string{"id": "42"}
 	r = r.WithContext(WithParams(r.Context(), in))
 
@@ -84,7 +83,7 @@ func TestWithParams_inputIsolation(t *testing.T) {
 func TestWithParams_emptyMap(t *testing.T) {
 	t.Parallel()
 
-	r := httptest.NewRequestWithContext(context.Background(), http.MethodGet, "/", nil)
+	r := httptest.NewRequestWithContext(t.Context(), http.MethodGet, "/", nil)
 	r = r.WithContext(WithParams(r.Context(), map[string]string{}))
 
 	if got := Param(r, "id"); got != "" {
@@ -99,7 +98,7 @@ func TestWithParams_emptyMap(t *testing.T) {
 func TestParamNames_copy(t *testing.T) {
 	t.Parallel()
 
-	r := httptest.NewRequestWithContext(context.Background(), http.MethodGet, "/", nil)
+	r := httptest.NewRequestWithContext(t.Context(), http.MethodGet, "/", nil)
 	r = r.WithContext(WithParams(r.Context(), map[string]string{"id": "42"}))
 
 	names := ParamNames(r)
@@ -118,7 +117,7 @@ func TestParamNames_copy(t *testing.T) {
 func TestParamNames_missing_returnsNil(t *testing.T) {
 	t.Parallel()
 
-	r := httptest.NewRequestWithContext(context.Background(), http.MethodGet, "/", nil)
+	r := httptest.NewRequestWithContext(t.Context(), http.MethodGet, "/", nil)
 	if got := ParamNames(r); got != nil {
 		t.Fatalf("want nil, got %v", got)
 	}
@@ -127,7 +126,7 @@ func TestParamNames_missing_returnsNil(t *testing.T) {
 func TestWithParams_concurrent(t *testing.T) {
 	t.Parallel()
 
-	r := httptest.NewRequestWithContext(context.Background(), http.MethodGet, "/", nil)
+	r := httptest.NewRequestWithContext(t.Context(), http.MethodGet, "/", nil)
 	r = r.WithContext(WithParams(r.Context(), map[string]string{"id": "42", "slug": "a-b"}))
 
 	var wg sync.WaitGroup

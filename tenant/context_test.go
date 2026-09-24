@@ -8,7 +8,7 @@ import (
 func TestContext_roundtrip(t *testing.T) {
 	t.Parallel()
 
-	ctx := ContextWithTenant(context.Background(), "acme")
+	ctx := ContextWithTenant(t.Context(), "acme")
 	got, ok := FromContext(ctx)
 	if !ok {
 		t.Fatalf("FromContext ok = false, want true")
@@ -22,7 +22,7 @@ func TestContext_roundtrip(t *testing.T) {
 func TestContext_missing_returnsEmptyFalse(t *testing.T) {
 	t.Parallel()
 
-	got, ok := FromContext(context.Background())
+	got, ok := FromContext(t.Context())
 	if ok {
 		t.Errorf("FromContext ok = true, want false")
 	}
@@ -35,7 +35,7 @@ func TestContext_missing_returnsEmptyFalse(t *testing.T) {
 func TestContext_wrongType_returnsEmptyFalse(t *testing.T) {
 	t.Parallel()
 
-	ctx := context.WithValue(context.Background(), tenantKey{}, 123)
+	ctx := context.WithValue(t.Context(), tenantKey{}, 123)
 	got, ok := FromContext(ctx)
 	if ok {
 		t.Errorf("FromContext ok = true, want false")
@@ -49,7 +49,7 @@ func TestContext_wrongType_returnsEmptyFalse(t *testing.T) {
 func TestContext_emptyID_present(t *testing.T) {
 	t.Parallel()
 
-	ctx := ContextWithTenant(context.Background(), "")
+	ctx := ContextWithTenant(t.Context(), "")
 	got, ok := FromContext(ctx)
 	if !ok {
 		t.Fatalf("FromContext ok = false, want true for empty ID")

@@ -105,7 +105,7 @@ func TestCoverSubscribeClosedAfterLock(t *testing.T) {
 	subErrCh := make(chan error, 1)
 
 	go func() {
-		_, subErr := mb.Subscribe(context.Background(), "t", func(context.Context, eventbus.Message) {})
+		_, subErr := mb.Subscribe(t.Context(), "t", func(context.Context, eventbus.Message) {})
 		subErrCh <- subErr
 	}()
 
@@ -134,7 +134,7 @@ func TestCoverUnsubDrainBuffered(t *testing.T) {
 	})
 	defer mb.Close()
 
-	ctx := context.Background()
+	ctx := t.Context()
 	release := make(chan struct{})
 
 	var entered atomic.Bool
@@ -176,7 +176,7 @@ func TestCoverCloseDrainsInflight(t *testing.T) {
 	release := make(chan struct{})
 	defer close(release)
 
-	ctx := context.Background()
+	ctx := t.Context()
 
 	var entered atomic.Bool
 
@@ -215,7 +215,7 @@ func TestCoverSemVsDone(t *testing.T) {
 	})
 	defer mb.Close()
 
-	ctx := context.Background()
+	ctx := t.Context()
 	release := make(chan struct{})
 	defer close(release)
 
@@ -278,7 +278,7 @@ func TestCoverHandlerTimeout(t *testing.T) {
 	})
 	defer mb.Close()
 
-	ctx := context.Background()
+	ctx := t.Context()
 
 	var cancelled atomic.Bool
 
@@ -308,7 +308,7 @@ func TestCoverPanicNilOnPanic(t *testing.T) {
 	})
 	defer mb.Close()
 
-	ctx := context.Background()
+	ctx := t.Context()
 	next := make(chan eventbus.Message, 4)
 
 	var once atomic.Bool
@@ -352,7 +352,7 @@ func TestCoverCloseTimeout(t *testing.T) {
 	release := make(chan struct{})
 	defer close(release)
 
-	ctx := context.Background()
+	ctx := t.Context()
 
 	var entered atomic.Bool
 
@@ -401,7 +401,7 @@ func TestCoverDroppedCounter(t *testing.T) {
 	})
 	defer mb.Close()
 
-	ctx := context.Background()
+	ctx := t.Context()
 	release := make(chan struct{})
 	defer close(release)
 

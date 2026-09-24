@@ -107,13 +107,13 @@ func TestOpen_success_tracksAndCloses(t *testing.T) {
 	if err != nil {
 		t.Fatalf("Open err = %v", err)
 	}
-	if err := got.Track(context.Background(), "evt", map[string]any{"k": "v"}); err != nil {
+	if err := got.Track(t.Context(), "evt", map[string]any{"k": "v"}); err != nil {
 		t.Fatalf("Track err = %v", err)
 	}
-	if err := got.Identify(context.Background(), "u1", nil); err != nil {
+	if err := got.Identify(t.Context(), "u1", nil); err != nil {
 		t.Fatalf("Identify err = %v", err)
 	}
-	if err := got.Group(context.Background(), "u1", "g1", nil); err != nil {
+	if err := got.Group(t.Context(), "u1", "g1", nil); err != nil {
 		t.Fatalf("Group err = %v", err)
 	}
 	if err := got.Close(); err != nil {

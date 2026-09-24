@@ -130,7 +130,7 @@ func TestSchedule_badSpec(t *testing.T) {
 			t.Parallel()
 
 			s := newTestScheduler(t)
-			_, err := s.Schedule(context.Background(), spec, "no-such-job-ever", nil)
+			_, err := s.Schedule(t.Context(), spec, "no-such-job-ever", nil)
 
 			if !errors.Is(err, scheduler.ErrInvalidSpec) {
 				t.Fatalf("spec %q err = %v, want ErrInvalidSpec", spec, err)
@@ -155,7 +155,7 @@ func TestScheduleBadSpec(t *testing.T) {
 			t.Parallel()
 
 			s := stubEmbedded(t, &stubQueue{})
-			_, err := s.Schedule(context.Background(), spec, "no-such-job-ever", nil)
+			_, err := s.Schedule(t.Context(), spec, "no-such-job-ever", nil)
 
 			if !errors.Is(err, scheduler.ErrInvalidSpec) {
 				t.Fatalf("spec %q err=%v want ErrInvalidSpec", spec, err)
@@ -170,7 +170,7 @@ func TestSchedule_specTooLong(t *testing.T) {
 	s := newTestScheduler(t)
 	spec := strings.Repeat("*", scheduler.MaxSpecLen+1)
 
-	_, err := s.Schedule(context.Background(), spec, "no-such-job-ever", nil)
+	_, err := s.Schedule(t.Context(), spec, "no-such-job-ever", nil)
 	if !errors.Is(err, scheduler.ErrInvalidSpec) {
 		t.Fatalf("err = %v, want ErrInvalidSpec", err)
 	}
@@ -182,7 +182,7 @@ func TestScheduleSpecTooLong(t *testing.T) {
 	s := stubEmbedded(t, &stubQueue{})
 	spec := strings.Repeat("*", scheduler.MaxSpecLen+1)
 
-	_, err := s.Schedule(context.Background(), spec, "no-such-job-ever", nil)
+	_, err := s.Schedule(t.Context(), spec, "no-such-job-ever", nil)
 	if !errors.Is(err, scheduler.ErrInvalidSpec) {
 		t.Fatalf("err=%v want ErrInvalidSpec", err)
 	}
@@ -193,7 +193,7 @@ func TestSchedule_unknownJob(t *testing.T) {
 
 	s := newTestScheduler(t)
 
-	_, err := s.Schedule(context.Background(), "0 * * * *", "emb-test-no-such-job", nil)
+	_, err := s.Schedule(t.Context(), "0 * * * *", "emb-test-no-such-job", nil)
 	if !errors.Is(err, job.ErrUnknownJob) {
 		t.Fatalf("err = %v, want job.ErrUnknownJob", err)
 	}
@@ -202,7 +202,7 @@ func TestSchedule_unknownJob(t *testing.T) {
 func TestScheduleUnknownJob(t *testing.T) {
 	s := stubEmbedded(t, &stubQueue{})
 
-	_, err := s.Schedule(context.Background(), "0 * * * *", "sched-test-no-such-job", nil)
+	_, err := s.Schedule(t.Context(), "0 * * * *", "sched-test-no-such-job", nil)
 	if !errors.Is(err, job.ErrUnknownJob) {
 		t.Fatalf("err=%v want job.ErrUnknownJob", err)
 	}
@@ -213,7 +213,7 @@ func TestSchedule_badArgs(t *testing.T) {
 
 	s := newTestScheduler(t)
 
-	_, err := s.Schedule(context.Background(), "0 * * * *", "emb-test-badargs", func() {})
+	_, err := s.Schedule(t.Context(), "0 * * * *", "emb-test-badargs", func() {})
 	if err == nil {
 		t.Fatal("expected error, got nil")
 	}
@@ -224,7 +224,7 @@ func TestScheduleBadArgs(t *testing.T) {
 
 	s := stubEmbedded(t, &stubQueue{})
 
-	_, err := s.Schedule(context.Background(), "0 * * * *", "sched-test-badargs", func() {})
+	_, err := s.Schedule(t.Context(), "0 * * * *", "sched-test-badargs", func() {})
 	if err == nil {
 		t.Fatal("unmarshalable args want error")
 	}
@@ -235,7 +235,7 @@ func TestSchedule_ok_entries(t *testing.T) {
 
 	s := newTestScheduler(t)
 
-	id, err := s.Schedule(context.Background(), "0 * * * *", "emb-test-ok", nil)
+	id, err := s.Schedule(t.Context(), "0 * * * *", "emb-test-ok", nil)
 	if err != nil {
 		t.Fatalf("Schedule: %v", err)
 	}
@@ -263,7 +263,7 @@ func TestScheduleOkEntries(t *testing.T) {
 
 	s := stubEmbedded(t, &stubQueue{})
 
-	id, err := s.Schedule(context.Background(), "0 * * * *", "sched-test-ok", nil)
+	id, err := s.Schedule(t.Context(), "0 * * * *", "sched-test-ok", nil)
 	if err != nil {
 		t.Fatalf("Schedule: %v", err)
 	}
@@ -291,7 +291,7 @@ func TestSchedule_cancelledCtx(t *testing.T) {
 
 	s := newTestScheduler(t)
 
-	ctx, cancel := context.WithCancel(context.Background())
+	ctx, cancel := context.WithCancel(t.Context())
 	cancel()
 
 	_, err := s.Schedule(ctx, "0 * * * *", "emb-test-ctx", nil)
@@ -305,7 +305,7 @@ func TestScheduleCancelledCtx(t *testing.T) {
 
 	s := stubEmbedded(t, &stubQueue{})
 
-	ctx, cancel := context.WithCancel(context.Background())
+	ctx, cancel := context.WithCancel(t.Context())
 	cancel()
 
 	_, err := s.Schedule(ctx, "0 * * * *", "sched-test-ctx", nil)
@@ -367,7 +367,7 @@ func TestRemove_added(t *testing.T) {
 
 	s := newTestScheduler(t)
 
-	id, err := s.Schedule(context.Background(), "0 * * * *", "emb-test-remove", nil)
+	id, err := s.Schedule(t.Context(), "0 * * * *", "emb-test-remove", nil)
 	if err != nil {
 		t.Fatalf("Schedule: %v", err)
 	}
@@ -388,7 +388,7 @@ func TestRemoveAdded(t *testing.T) {
 
 	s := stubEmbedded(t, &stubQueue{})
 
-	id, err := s.Schedule(context.Background(), "0 * * * *", "sched-test-remove", nil)
+	id, err := s.Schedule(t.Context(), "0 * * * *", "sched-test-remove", nil)
 	if err != nil {
 		t.Fatalf("Schedule: %v", err)
 	}
@@ -472,7 +472,7 @@ func TestFireEndToEnd(t *testing.T) {
 
 	s := stubEmbedded(t, q)
 
-	if _, err := s.Schedule(context.Background(), "@every 1s", "sched-test-e2e", "ping"); err != nil {
+	if _, err := s.Schedule(t.Context(), "@every 1s", "sched-test-e2e", "ping"); err != nil {
 		t.Fatalf("Schedule: %v", err)
 	}
 
@@ -487,7 +487,7 @@ func TestFireEndToEnd(t *testing.T) {
 	// sleeping full cron periods; the in-memory queue is the observable state.
 	eventually(t, 10*time.Second, func() bool {
 		// Dispatcher pushes onto the job priority topic ("low" default).
-		msg, err := q.Pop(context.Background(), "low")
+		msg, err := q.Pop(t.Context(), "low")
 		if err == nil {
 			if msg.Headers["job_name"] != "sched-test-e2e" {
 				t.Errorf("job_name=%q want sched-test-e2e", msg.Headers["job_name"])

@@ -1,7 +1,6 @@
 package log
 
 import (
-	"context"
 	"encoding/json"
 	"errors"
 	"io"
@@ -46,7 +45,7 @@ func TestCoverNewWithWriterNilWriterUsesStdout(t *testing.T) {
 		t.Fatalf("NewWithWriter err = %v", newErr)
 	}
 	defer m.Close()
-	if sendErr := m.Send(context.Background(), coverMail()); sendErr != nil {
+	if sendErr := m.Send(t.Context(), coverMail()); sendErr != nil {
 		t.Fatalf("Send err = %v", sendErr)
 	}
 	if closeErr := w.Close(); closeErr != nil {
@@ -81,7 +80,7 @@ func TestCoverSendCCBCCInvalid(t *testing.T) {
 
 	ccBad := coverMail()
 	ccBad.Cc = []mailer.Address{{Address: "bad-cc"}}
-	if err := m.Send(context.Background(), ccBad); !errors.Is(err, mailer.ErrInvalidAddress) {
+	if err := m.Send(t.Context(), ccBad); !errors.Is(err, mailer.ErrInvalidAddress) {
 		t.Errorf("bad Cc err = %v, want ErrInvalidAddress", err)
 	} else if !strings.Contains(err.Error(), "cc[0]") {
 		t.Errorf("bad Cc err = %q want cc[0] context", err.Error())
@@ -89,7 +88,7 @@ func TestCoverSendCCBCCInvalid(t *testing.T) {
 
 	bccBad := coverMail()
 	bccBad.Bcc = []mailer.Address{{Address: "bad-bcc"}}
-	if err := m.Send(context.Background(), bccBad); !errors.Is(err, mailer.ErrInvalidAddress) {
+	if err := m.Send(t.Context(), bccBad); !errors.Is(err, mailer.ErrInvalidAddress) {
 		t.Errorf("bad Bcc err = %v, want ErrInvalidAddress", err)
 	} else if !strings.Contains(err.Error(), "bcc[0]") {
 		t.Errorf("bad Bcc err = %q want bcc[0] context", err.Error())
@@ -104,7 +103,7 @@ func TestCoverSendClosedAfterLock(t *testing.T) {
 		c.mu.Lock()
 		done := make(chan error, 1)
 		go func() {
-			done <- c.Send(context.Background(), coverMail())
+			done <- c.Send(t.Context(), coverMail())
 		}()
 		runtime.Gosched()
 		c.closed.Store(true)

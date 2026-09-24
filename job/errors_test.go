@@ -65,7 +65,7 @@ func TestUnknownJobErrorIsAs(t *testing.T) {
 		t.Fatalf("Register(known) = %v, want nil", err)
 	}
 
-	err := (&Dispatcher{}).Dispatch(context.Background(), "nope", "anything")
+	err := (&Dispatcher{}).Dispatch(t.Context(), "nope", "anything")
 	if err == nil {
 		t.Fatal("Dispatch(nope) = nil, want UnknownJobError")
 	}
@@ -93,7 +93,7 @@ func TestNilUniqueLocker(t *testing.T) {
 		t.Fatalf("Register(t) = %v, want nil", err)
 	}
 
-	err := (&Dispatcher{}).Dispatch(context.Background(), "t", "arg", UniqueBy("k"))
+	err := (&Dispatcher{}).Dispatch(t.Context(), "t", "arg", UniqueBy("k"))
 	if !errors.Is(err, ErrUniqueLockerNil) {
 		t.Errorf("errors.Is(err, ErrUniqueLockerNil) = false (err = %T %v)", err, err)
 	}
@@ -102,7 +102,7 @@ func TestNilUniqueLocker(t *testing.T) {
 func TestInvalidLockTTL(t *testing.T) {
 	l := NewUniqueLocker(nil)
 
-	ok, err := l.Acquire(context.Background(), "k", 0)
+	ok, err := l.Acquire(t.Context(), "k", 0)
 	if ok {
 		t.Errorf("Acquire(k, 0) ok = true, want false")
 	}
@@ -115,7 +115,7 @@ func TestInvalidLockTTL(t *testing.T) {
 func TestHandlerPanicSentinel(t *testing.T) {
 	w := &Worker{}
 
-	err := w.invokeHandler(context.Background(), func(context.Context, Payload) error { panic("boom") }, nil, "panicky")
+	err := w.invokeHandler(t.Context(), func(context.Context, Payload) error { panic("boom") }, nil, "panicky")
 	if !errors.Is(err, ErrHandlerPanic) {
 		t.Errorf("errors.Is(err, ErrHandlerPanic) = false (err = %T %v)", err, err)
 	}
@@ -132,7 +132,7 @@ var _ queue.Queue = popEmptyQueue{}
 func TestPopEmptyErrorIsEmpty(t *testing.T) {
 	w := &Worker{Q: popEmptyQueue{}, Queues: []string{"t"}}
 
-	_, _, err := w.popNextAvailable(context.Background())
+	_, _, err := w.popNextAvailable(t.Context())
 	if !errors.Is(err, queue.ErrEmpty) {
 		t.Errorf("errors.Is(err, queue.ErrEmpty) = false (err = %T %v)", err, err)
 	}

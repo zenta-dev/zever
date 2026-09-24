@@ -100,7 +100,7 @@ func TestTranslateRoundtrip(t *testing.T) {
 	}
 	defer ad.Close()
 
-	got, err := ad.Translate(context.Background(), "en", "hello", nil)
+	got, err := ad.Translate(t.Context(), "en", "hello", nil)
 	if err != nil {
 		t.Fatalf("Translate: %v", err)
 	}
@@ -121,7 +121,7 @@ func TestTranslateMissCached(t *testing.T) {
 	}
 	defer ad.Close()
 
-	ctx := context.Background()
+	ctx := t.Context()
 	if _, err := ad.Translate(ctx, "en", "missing", nil); !errors.Is(err, i18n.ErrKeyNotFound) {
 		t.Fatalf("first: got %v want ErrKeyNotFound", err)
 	}
@@ -145,7 +145,7 @@ func TestTranslateHitCached(t *testing.T) {
 	}
 	defer ad.Close()
 
-	ctx := context.Background()
+	ctx := t.Context()
 	for range 2 {
 		got, err := ad.Translate(ctx, "en", "hi", nil)
 		if err != nil || got != "Hi" {
@@ -179,7 +179,7 @@ func TestTranslateSingleflight(t *testing.T) {
 		go func(i int) {
 			defer wg.Done()
 			<-start
-			vals[i], errs[i] = ad.Translate(context.Background(), "en", "slow", nil)
+			vals[i], errs[i] = ad.Translate(t.Context(), "en", "slow", nil)
 		}(i)
 	}
 	close(start)
@@ -208,7 +208,7 @@ func TestTranslateTimeout(t *testing.T) {
 	}
 	defer ad.Close()
 
-	if _, err := ad.Translate(context.Background(), "en", "slow", nil); err == nil {
+	if _, err := ad.Translate(t.Context(), "en", "slow", nil); err == nil {
 		t.Fatal("want timeout error, got nil")
 	}
 }
@@ -225,7 +225,7 @@ func TestTranslateNon200(t *testing.T) {
 	}
 	defer ad.Close()
 
-	_, err = ad.Translate(context.Background(), "en", "k", nil)
+	_, err = ad.Translate(t.Context(), "en", "k", nil)
 	if err == nil {
 		t.Fatal("want non-200 error, got nil")
 	}
@@ -243,7 +243,7 @@ func TestTranslateEmptyLocale(t *testing.T) {
 	}
 	defer ad.Close()
 
-	if _, err := ad.Translate(context.Background(), "", "k", nil); !errors.Is(err, i18n.ErrLocaleNotFound) {
+	if _, err := ad.Translate(t.Context(), "", "k", nil); !errors.Is(err, i18n.ErrLocaleNotFound) {
 		t.Fatalf("got %v want ErrLocaleNotFound", err)
 	}
 }
@@ -260,7 +260,7 @@ func TestLocales(t *testing.T) {
 	}
 	defer ad.Close()
 
-	ctx := context.Background()
+	ctx := t.Context()
 	got, err := ad.Locales(ctx)
 	if err != nil {
 		t.Fatalf("Locales: %v", err)
@@ -295,7 +295,7 @@ func TestBearerAuth(t *testing.T) {
 	}
 	defer ad.Close()
 
-	if _, err := ad.Translate(context.Background(), "en", "hi", nil); err != nil {
+	if _, err := ad.Translate(t.Context(), "en", "hi", nil); err != nil {
 		t.Fatalf("Translate: %v", err)
 	}
 	if got, _ := f.authSeen.Load().(string); got != "Bearer secret" {
@@ -340,7 +340,7 @@ func TestNewTrimsSlash(t *testing.T) {
 	}
 	defer ad.Close()
 
-	if _, err := ad.Translate(context.Background(), "en", "hi", nil); err != nil {
+	if _, err := ad.Translate(t.Context(), "en", "hi", nil); err != nil {
 		t.Fatalf("Translate: %v", err)
 	}
 }
@@ -364,10 +364,10 @@ func TestAfterClose(t *testing.T) {
 	if err := ad.Close(); err != nil {
 		t.Fatalf("Close 2: %v", err)
 	}
-	if _, err := ad.Translate(context.Background(), "en", "hi", nil); !errors.Is(err, i18n.ErrClosed) {
+	if _, err := ad.Translate(t.Context(), "en", "hi", nil); !errors.Is(err, i18n.ErrClosed) {
 		t.Fatalf("Translate: got %v want ErrClosed", err)
 	}
-	if _, err := ad.Locales(context.Background()); !errors.Is(err, i18n.ErrClosed) {
+	if _, err := ad.Locales(t.Context()); !errors.Is(err, i18n.ErrClosed) {
 		t.Fatalf("Locales: got %v want ErrClosed", err)
 	}
 }
@@ -388,13 +388,13 @@ func TestWaiterCtxCancel(t *testing.T) {
 	leaderDone := make(chan struct{})
 	go func() {
 		defer close(leaderDone)
-		_, _ = ad.Translate(context.Background(), "en", "slow", nil)
+		_, _ = ad.Translate(t.Context(), "en", "slow", nil)
 	}()
 	// Poll for the leader's arrival at the stubServer server instead of a fixed
 	// sleep: one translate hit proves the flight is occupied.
 	eventually(t, func() bool { return f.translateHits.Load() == 1 }, "leader to reach stubServer server")
 
-	ctx, cancel := context.WithCancel(context.Background())
+	ctx, cancel := context.WithCancel(t.Context())
 	cancel()
 	if _, err := ad.Translate(ctx, "en", "slow", nil); !errors.Is(err, context.Canceled) {
 		t.Fatalf("got %v want context.Canceled", err)

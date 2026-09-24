@@ -1,7 +1,6 @@
 package rbac
 
 import (
-	"context"
 	"errors"
 	"strings"
 	"testing"
@@ -202,7 +201,7 @@ func TestCover_Can_Reasons(t *testing.T) {
 			if err != nil {
 				t.Fatalf("New() error = %v", err)
 			}
-			got, err := gotChecker.Can(context.Background(), tt.subject, tt.action, tt.resource)
+			got, err := gotChecker.Can(t.Context(), tt.subject, tt.action, tt.resource)
 			if err != nil {
 				t.Fatalf("Can() error = %v", err)
 			}

@@ -5,7 +5,6 @@ package smtp_test
 
 import (
 	"bufio"
-	"context"
 	"errors"
 	"fmt"
 	"net"
@@ -61,7 +60,7 @@ func startCoverScript(t *testing.T, cfg coverScript) (int, *coverCap) {
 		cfg.dataEnd = "250 OK\r\n"
 	}
 	lc := net.ListenConfig{}
-	ln, err := lc.Listen(context.Background(), "tcp", "127.0.0.1:0")
+	ln, err := lc.Listen(t.Context(), "tcp", "127.0.0.1:0")
 	if err != nil {
 		t.Fatalf("listen: %v", err)
 	}
@@ -217,7 +216,7 @@ func coverOpen(t *testing.T, port int, enc mailer.Encryption) mailer.Mailer {
 func startCoverDead(t *testing.T) int {
 	t.Helper()
 	lc := net.ListenConfig{}
-	ln, err := lc.Listen(context.Background(), "tcp", "127.0.0.1:0")
+	ln, err := lc.Listen(t.Context(), "tcp", "127.0.0.1:0")
 	if err != nil {
 		t.Fatalf("listen: %v", err)
 	}
@@ -241,7 +240,7 @@ func startCoverDead(t *testing.T) int {
 func TestCoverDialRefused(t *testing.T) {
 	t.Parallel()
 	lc := net.ListenConfig{}
-	ln, err := lc.Listen(context.Background(), "tcp", "127.0.0.1:0")
+	ln, err := lc.Listen(t.Context(), "tcp", "127.0.0.1:0")
 	if err != nil {
 		t.Fatalf("listen: %v", err)
 	}
@@ -252,7 +251,7 @@ func TestCoverDialRefused(t *testing.T) {
 	_ = ln.Close()
 
 	m := coverOpen(t, addr.Port, mailer.EncryptionNone)
-	err = m.Send(context.Background(), basicMail())
+	err = m.Send(t.Context(), basicMail())
 	if err == nil || !strings.Contains(err.Error(), "dial") {
 		t.Errorf("Send err = %v, want dial failure", err)
 	}
@@ -261,7 +260,7 @@ func TestCoverDialRefused(t *testing.T) {
 func TestCoverNewClientFails(t *testing.T) {
 	t.Parallel()
 	m := coverOpen(t, startCoverDead(t), mailer.EncryptionNone)
-	err := m.Send(context.Background(), basicMail())
+	err := m.Send(t.Context(), basicMail())
 	if err == nil || !strings.Contains(err.Error(), "new client") {
 		t.Errorf("Send err = %v, want new-client failure", err)
 	}
@@ -274,7 +273,7 @@ func TestCoverHelloFails(t *testing.T) {
 		heloResp: "500 no HELO\r\n",
 	})
 	m := coverOpen(t, port, mailer.EncryptionNone)
-	err := m.Send(context.Background(), basicMail())
+	err := m.Send(t.Context(), basicMail())
 	if err == nil || !strings.Contains(err.Error(), "hello") {
 		t.Errorf("Send err = %v, want hello failure", err)
 	}
@@ -287,7 +286,7 @@ func TestCoverSTARTTLSCommandFails(t *testing.T) {
 		starttlsResp: "502 no TLS here\r\n",
 	})
 	m := coverOpen(t, port, mailer.EncryptionSTARTTLS)
-	err := m.Send(context.Background(), basicMail())
+	err := m.Send(t.Context(), basicMail())
 	if err == nil || !strings.Contains(err.Error(), "STARTTLS") {
 		t.Errorf("Send err = %v, want STARTTLS failure", err)
 	}
@@ -297,7 +296,7 @@ func TestCoverMailFails(t *testing.T) {
 	t.Parallel()
 	port, _ := startCoverScript(t, coverScript{mailResp: "550 no such sender\r\n"})
 	m := coverOpen(t, port, mailer.EncryptionNone)
-	err := m.Send(context.Background(), basicMail())
+	err := m.Send(t.Context(), basicMail())
 	if err == nil || !strings.Contains(err.Error(), "mail from") {
 		t.Errorf("Send err = %v, want mail-from failure", err)
 	}
@@ -307,7 +306,7 @@ func TestCoverRcptFails(t *testing.T) {
 	t.Parallel()
 	port, _ := startCoverScript(t, coverScript{rcptResp: "550 no such user\r\n"})
 	m := coverOpen(t, port, mailer.EncryptionNone)
-	err := m.Send(context.Background(), basicMail())
+	err := m.Send(t.Context(), basicMail())
 	if err == nil || !strings.Contains(err.Error(), "rcpt to") {
 		t.Errorf("Send err = %v, want rcpt-to failure", err)
 	}
@@ -317,7 +316,7 @@ func TestCoverDataFails(t *testing.T) {
 	t.Parallel()
 	port, _ := startCoverScript(t, coverScript{dataResp: "503 bad sequence\r\n"})
 	m := coverOpen(t, port, mailer.EncryptionNone)
-	err := m.Send(context.Background(), basicMail())
+	err := m.Send(t.Context(), basicMail())
 	if err == nil || !strings.Contains(err.Error(), "smtp: data:") {
 		t.Errorf("Send err = %v, want DATA failure", err)
 	}
@@ -332,7 +331,7 @@ func TestCoverWriteFails(t *testing.T) {
 		Name:    "big.bin",
 		Content: make([]byte, 1<<16),
 	})
-	err := m.Send(context.Background(), msg)
+	err := m.Send(t.Context(), msg)
 	if err == nil || !strings.Contains(err.Error(), "write data") {
 		t.Errorf("Send err = %v, want write-data failure", err)
 	}
@@ -344,7 +343,7 @@ func TestCoverCcInvalid(t *testing.T) {
 	m := openPlain(t, s)
 	msg := basicMail()
 	msg.Cc = []mailer.Address{{Address: "bad\r\n@example.com"}}
-	err := m.Send(context.Background(), msg)
+	err := m.Send(t.Context(), msg)
 	if err == nil || !strings.Contains(err.Error(), "cc") {
 		t.Errorf("Send err = %v, want cc failure", err)
 	} else if !errors.Is(err, mailer.ErrInvalidAddress) {
@@ -358,7 +357,7 @@ func TestCoverBccInvalid(t *testing.T) {
 	m := openPlain(t, s)
 	msg := basicMail()
 	msg.Bcc = []mailer.Address{{Address: "no-at-sign"}}
-	err := m.Send(context.Background(), msg)
+	err := m.Send(t.Context(), msg)
 	if err == nil || !strings.Contains(err.Error(), "bcc") {
 		t.Errorf("Send err = %v, want bcc failure", err)
 	} else if !errors.Is(err, mailer.ErrInvalidAddress) {
@@ -372,7 +371,7 @@ func TestCoverAuthCapture(t *testing.T) {
 	m := coverOpen(t, port, mailer.EncryptionNone)
 	msg := basicMail()
 	msg.Cc, msg.Bcc, msg.Attachments = nil, nil, nil
-	if err := m.Send(context.Background(), msg); err != nil {
+	if err := m.Send(t.Context(), msg); err != nil {
 		t.Fatalf("Send: %v", err)
 	}
 	seen.mu.Lock()

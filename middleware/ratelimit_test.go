@@ -59,7 +59,7 @@ func TestRateLimit_allowsWhenLimiterAllows(t *testing.T) {
 		w.WriteHeader(http.StatusOK)
 	}))
 
-	req := httptest.NewRequestWithContext(context.Background(), http.MethodGet, "/", nil)
+	req := httptest.NewRequestWithContext(t.Context(), http.MethodGet, "/", nil)
 	req.RemoteAddr = "1.2.3.4:5555"
 
 	rec := httptest.NewRecorder()
@@ -83,7 +83,7 @@ func TestRateLimit_deniesWith429RetryAfterAndBody(t *testing.T) {
 		t.Error("handler must not run when the limiter denies the request")
 	}))
 
-	req := httptest.NewRequestWithContext(context.Background(), http.MethodGet, "/", nil)
+	req := httptest.NewRequestWithContext(t.Context(), http.MethodGet, "/", nil)
 	req.RemoteAddr = "1.2.3.4:5555"
 
 	rec := httptest.NewRecorder()
@@ -109,7 +109,7 @@ func TestRateLimit_denyRetryAfterCeilsSubSecond(t *testing.T) {
 		t.Error("handler must not run when the limiter denies the request")
 	}))
 
-	req := httptest.NewRequestWithContext(context.Background(), http.MethodGet, "/", nil)
+	req := httptest.NewRequestWithContext(t.Context(), http.MethodGet, "/", nil)
 	req.RemoteAddr = "1.2.3.4:5555"
 
 	rec := httptest.NewRecorder()
@@ -132,7 +132,7 @@ func TestRateLimit_failsOpenOnLimiterError(t *testing.T) {
 		w.WriteHeader(http.StatusOK)
 	}))
 
-	req := httptest.NewRequestWithContext(context.Background(), http.MethodGet, "/", nil)
+	req := httptest.NewRequestWithContext(t.Context(), http.MethodGet, "/", nil)
 	req.RemoteAddr = "1.2.3.4:5555"
 
 	rec := httptest.NewRecorder()
@@ -155,7 +155,7 @@ func TestRateLimit_failOpenExplicitOnLimiterError(t *testing.T) {
 		w.WriteHeader(http.StatusOK)
 	}))
 
-	req := httptest.NewRequestWithContext(context.Background(), http.MethodGet, "/", nil)
+	req := httptest.NewRequestWithContext(t.Context(), http.MethodGet, "/", nil)
 	req.RemoteAddr = "1.2.3.4:5555"
 
 	rec := httptest.NewRecorder()
@@ -176,7 +176,7 @@ func TestRateLimit_failClosedOnLimiterError(t *testing.T) {
 		t.Error("handler must not run when FailClosed and the limiter errors")
 	}))
 
-	req := httptest.NewRequestWithContext(context.Background(), http.MethodGet, "/", nil)
+	req := httptest.NewRequestWithContext(t.Context(), http.MethodGet, "/", nil)
 	req.RemoteAddr = "1.2.3.4:5555"
 
 	rec := httptest.NewRecorder()
@@ -204,7 +204,7 @@ func TestRemoteAddrKey(t *testing.T) {
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			r := httptest.NewRequestWithContext(context.Background(), http.MethodGet, "/", nil)
+			r := httptest.NewRequestWithContext(t.Context(), http.MethodGet, "/", nil)
 			r.RemoteAddr = tt.remoteAddr
 			if got := RemoteAddrKey(r); got != tt.want {
 				t.Fatalf("RemoteAddrKey(%q) = %q, want %q", tt.remoteAddr, got, tt.want)
@@ -233,7 +233,7 @@ func TestPeerAddrKey(t *testing.T) {
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			ctx := context.Background()
+			ctx := t.Context()
 			if tt.peer != nil {
 				ctx = peer.NewContext(ctx, tt.peer)
 			}
@@ -253,7 +253,7 @@ func TestRateLimitUnaryServerInterceptor_deniesWithResourceExhausted(t *testing.
 		return nil, errHandlerRan
 	}
 
-	_, err := interceptor(context.Background(), nil, &grpc.UnaryServerInfo{FullMethod: "/svc/Method"}, handler)
+	_, err := interceptor(t.Context(), nil, &grpc.UnaryServerInfo{FullMethod: "/svc/Method"}, handler)
 
 	st, ok := status.FromError(err)
 	if !ok {
@@ -276,7 +276,7 @@ func TestRateLimitUnaryServerInterceptor_allowsThrough(t *testing.T) {
 
 	handler := func(_ context.Context, req any) (any, error) { return req, nil }
 
-	resp, err := interceptor(context.Background(), "ok", &grpc.UnaryServerInfo{FullMethod: "/svc/Method"}, handler)
+	resp, err := interceptor(t.Context(), "ok", &grpc.UnaryServerInfo{FullMethod: "/svc/Method"}, handler)
 	if err != nil || resp != "ok" {
 		t.Fatalf("resp, err = %v, %v, want %q, nil", resp, err, "ok")
 	}
@@ -288,7 +288,7 @@ func TestRateLimitUnaryServerInterceptor_failsOpenOnLimiterError(t *testing.T) {
 
 	handler := func(_ context.Context, req any) (any, error) { return req, nil }
 
-	resp, err := interceptor(context.Background(), "ok", &grpc.UnaryServerInfo{FullMethod: "/svc/Method"}, handler)
+	resp, err := interceptor(t.Context(), "ok", &grpc.UnaryServerInfo{FullMethod: "/svc/Method"}, handler)
 	if err != nil || resp != "ok" {
 		t.Fatalf("resp, err = %v, %v, want %q, nil", resp, err, "ok")
 	}
@@ -300,7 +300,7 @@ func TestRateLimitUnaryServerInterceptor_failOpenExplicitOnLimiterError(t *testi
 
 	handler := func(_ context.Context, req any) (any, error) { return req, nil }
 
-	resp, err := interceptor(context.Background(), "ok", &grpc.UnaryServerInfo{FullMethod: "/svc/Method"}, handler)
+	resp, err := interceptor(t.Context(), "ok", &grpc.UnaryServerInfo{FullMethod: "/svc/Method"}, handler)
 	if err != nil || resp != "ok" {
 		t.Fatalf("resp, err = %v, %v, want %q, nil", resp, err, "ok")
 	}
@@ -315,7 +315,7 @@ func TestRateLimitUnaryServerInterceptor_failClosedOnLimiterError(t *testing.T) 
 		return nil, errHandlerRan
 	}
 
-	_, err := interceptor(context.Background(), "req", &grpc.UnaryServerInfo{FullMethod: "/svc/Method"}, handler)
+	_, err := interceptor(t.Context(), "req", &grpc.UnaryServerInfo{FullMethod: "/svc/Method"}, handler)
 
 	st, ok := status.FromError(err)
 	if !ok {

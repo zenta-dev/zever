@@ -888,7 +888,7 @@ func TestLive_roundtrip(t *testing.T) {
 		t.Skip("SEARCH_PG_DSN not set")
 	}
 
-	ctx := context.Background()
+	ctx := t.Context()
 
 	s, err := New(search.Options{DSN: dsn})
 	if err != nil {
@@ -959,7 +959,7 @@ func TestLive_indexBatchMatchesLoopedIndex(t *testing.T) {
 		t.Skip("SEARCH_PG_DSN not set")
 	}
 
-	ctx := context.Background()
+	ctx := t.Context()
 
 	s, err := New(search.Options{DSN: dsn})
 	if err != nil {
@@ -1003,7 +1003,7 @@ func TestNewPoolLazyNoConnect(t *testing.T) {
 
 	// pgxpool.New parses the DSN without connecting, so a closed port still
 	// yields a usable pool value. Covers newPool's success path with no DB.
-	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
+	ctx, cancel := context.WithTimeout(t.Context(), 5*time.Second)
 	defer cancel()
 
 	p, err := newPool(ctx, "postgres://127.0.0.1:1/db?sslmode=disable")

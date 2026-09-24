@@ -43,7 +43,7 @@ func TestPublish_canceledContext(t *testing.T) {
 
 	b := newTestBus(t, nil)
 
-	ctx, cancel := context.WithCancel(context.Background())
+	ctx, cancel := context.WithCancel(t.Context())
 	cancel()
 
 	err := b.Publish(ctx, freshTopic(), eventbus.NewPayload([]byte("x")), nil)
@@ -68,7 +68,7 @@ func TestPublish_brokerError(t *testing.T) {
 	a := deadPortAdapter()
 	t.Cleanup(func() { _ = a.client.Close() })
 
-	err := a.Publish(context.Background(), freshTopic(), eventbus.NewPayload([]byte("x")), nil)
+	err := a.Publish(t.Context(), freshTopic(), eventbus.NewPayload([]byte("x")), nil)
 	if err == nil || !strings.Contains(err.Error(), "redis: publish") {
 		t.Fatalf("Publish dead broker err = %v, want redis: publish wrap", err)
 	}
@@ -80,7 +80,7 @@ func TestSubscribe_receiveError(t *testing.T) {
 	a := deadPortAdapter()
 	t.Cleanup(func() { _ = a.client.Close() })
 
-	_, err := a.Subscribe(context.Background(), freshTopic(), func(context.Context, eventbus.Message) {})
+	_, err := a.Subscribe(t.Context(), freshTopic(), func(context.Context, eventbus.Message) {})
 	if err == nil || !strings.Contains(err.Error(), "redis: subscribe") {
 		t.Fatalf("Subscribe dead broker err = %v, want redis: subscribe wrap", err)
 	}
@@ -96,7 +96,7 @@ func TestSubscribe_closedAfterLock(t *testing.T) {
 	errCh := make(chan error, 1)
 
 	go func() {
-		_, err := a.Subscribe(context.Background(), topic, func(context.Context, eventbus.Message) {})
+		_, err := a.Subscribe(t.Context(), topic, func(context.Context, eventbus.Message) {})
 		errCh <- err
 	}()
 
@@ -124,7 +124,7 @@ func TestDeliver_skipsBadFrames(t *testing.T) {
 	topic := freshTopic()
 
 	got := make(chan eventbus.Message, 16)
-	unsub, err := b.Subscribe(context.Background(), topic, func(_ context.Context, msg eventbus.Message) {
+	unsub, err := b.Subscribe(t.Context(), topic, func(_ context.Context, msg eventbus.Message) {
 		got <- msg
 	})
 	if err != nil {
@@ -135,7 +135,7 @@ func TestDeliver_skipsBadFrames(t *testing.T) {
 	raw := goredis.NewClient(&goredis.Options{Addr: testAddr})
 	t.Cleanup(func() { _ = raw.Close() })
 
-	ctx := context.Background()
+	ctx := t.Context()
 	channel := a.channel(topic)
 
 	oversize := make([]byte, eventbus.MaxMessageSize+1)
@@ -168,7 +168,7 @@ func TestDeliver_pubsubClosed(t *testing.T) {
 	a := newTestAdapter(t, nil)
 	topic := freshTopic()
 
-	ps := a.client.Subscribe(context.Background(), a.channel(topic))
+	ps := a.client.Subscribe(t.Context(), a.channel(topic))
 	sub := &subscription{ps: ps, topic: topic, channel: a.channel(topic), stop: make(chan struct{})}
 
 	a.wg.Add(1)
@@ -176,7 +176,7 @@ func TestDeliver_pubsubClosed(t *testing.T) {
 
 	go func() {
 		defer close(done)
-		a.deliver(context.Background(), sub, func(context.Context, eventbus.Message) {})
+		a.deliver(t.Context(), sub, func(context.Context, eventbus.Message) {})
 	}()
 
 	// Whether deliver is already parked on select or not, ps.Close settles
@@ -228,7 +228,7 @@ func TestClose_activeSub(t *testing.T) {
 	b := newTestBus(t, nil)
 	topic := freshTopic()
 
-	if _, err := b.Subscribe(context.Background(), topic, func(context.Context, eventbus.Message) {}); err != nil {
+	if _, err := b.Subscribe(t.Context(), topic, func(context.Context, eventbus.Message) {}); err != nil {
 		t.Fatalf("Subscribe err = %v, want nil", err)
 	}
 
@@ -236,7 +236,7 @@ func TestClose_activeSub(t *testing.T) {
 		t.Fatalf("Close with active sub err = %v, want nil", err)
 	}
 
-	if err := b.Publish(context.Background(), topic, eventbus.NewPayload([]byte("x")), nil); !errors.Is(err, eventbus.ErrClosed) {
+	if err := b.Publish(t.Context(), topic, eventbus.NewPayload([]byte("x")), nil); !errors.Is(err, eventbus.ErrClosed) {
 		t.Errorf("Publish after Close err = %v, want ErrClosed", err)
 	}
 
@@ -254,7 +254,7 @@ func TestClose_timeoutArmed(t *testing.T) {
 	entered := make(chan struct{}, 1)
 	release := make(chan struct{})
 
-	if _, err := b.Subscribe(context.Background(), topic, func(context.Context, eventbus.Message) {
+	if _, err := b.Subscribe(t.Context(), topic, func(context.Context, eventbus.Message) {
 		select {
 		case entered <- struct{}{}:
 		default:
@@ -264,7 +264,7 @@ func TestClose_timeoutArmed(t *testing.T) {
 		t.Fatalf("Subscribe err = %v, want nil", err)
 	}
 
-	if err := b.Publish(context.Background(), topic, eventbus.NewPayload([]byte("block")), nil); err != nil {
+	if err := b.Publish(t.Context(), topic, eventbus.NewPayload([]byte("block")), nil); err != nil {
 		t.Fatalf("Publish err = %v, want nil", err)
 	}
 
@@ -293,10 +293,10 @@ func TestInvoke_panicNilOnPanic(t *testing.T) {
 	msg := eventbus.NewMessage("t", nil, nil)
 
 	// Must recover silently instead of propagating when OnPanic is nil.
-	a.invoke(context.Background(), "t", msg, func(context.Context, eventbus.Message) { panic("boom") })
+	a.invoke(t.Context(), "t", msg, func(context.Context, eventbus.Message) { panic("boom") })
 
 	called := false
-	a.invoke(context.Background(), "t", msg, func(context.Context, eventbus.Message) { called = true })
+	a.invoke(t.Context(), "t", msg, func(context.Context, eventbus.Message) { called = true })
 
 	if !called {
 		t.Fatal("handler not called")

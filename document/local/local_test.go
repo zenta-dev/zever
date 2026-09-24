@@ -111,7 +111,7 @@ func TestRenderUnsupportedFormat(t *testing.T) {
 
 	t.Cleanup(func() { _ = d.Close() })
 
-	_, err = d.Render(context.Background(), []byte("<h1>hi</h1>"), document.OutputFormat("docx"))
+	_, err = d.Render(t.Context(), []byte("<h1>hi</h1>"), document.OutputFormat("docx"))
 
 	var ufe *document.UnsupportedFormatError
 	if !errors.As(err, &ufe) {
@@ -133,7 +133,7 @@ func TestRenderCanceledContext(t *testing.T) {
 
 	t.Cleanup(func() { _ = d.Close() })
 
-	ctx, cancel := context.WithCancel(context.Background())
+	ctx, cancel := context.WithCancel(t.Context())
 	cancel()
 
 	_, err = d.Render(ctx, []byte("<h1>hi</h1>"), document.FormatPDF)
@@ -154,7 +154,7 @@ func TestRenderOversizedSource(t *testing.T) {
 
 	big := make([]byte, document.DefaultMaxSourceBytes+1)
 
-	_, err = d.Render(context.Background(), big, document.FormatPDF)
+	_, err = d.Render(t.Context(), big, document.FormatPDF)
 
 	var sle *document.SizeLimitError
 	if !errors.As(err, &sle) {
@@ -208,7 +208,7 @@ func TestRenderBadTmpDir(t *testing.T) {
 
 	t.Cleanup(func() { _ = d.Close() })
 
-	_, err = d.Render(context.Background(), []byte("<h1>hi</h1>"), document.FormatPDF)
+	_, err = d.Render(t.Context(), []byte("<h1>hi</h1>"), document.FormatPDF)
 	if err == nil {
 		t.Fatalf("Render() error = nil, want user data dir error")
 	}
@@ -224,7 +224,7 @@ func TestRenderRunError(t *testing.T) {
 
 	t.Cleanup(func() { _ = d.Close() })
 
-	_, err = d.Render(context.Background(), []byte("<html><body><h1>hi</h1></body></html>"), document.FormatPDF)
+	_, err = d.Render(t.Context(), []byte("<html><body><h1>hi</h1></body></html>"), document.FormatPDF)
 	if err == nil {
 		t.Fatalf("Render() error = nil, want render timeout error")
 	}
@@ -244,7 +244,7 @@ func TestRenderPDF(t *testing.T) {
 
 	src := []byte("<html><body><h1>hi</h1></body></html>")
 
-	out, err := d.Render(context.Background(), src, document.FormatPDF)
+	out, err := d.Render(t.Context(), src, document.FormatPDF)
 	if err != nil {
 		t.Fatalf("Render() error = %v", err)
 	}
@@ -268,7 +268,7 @@ func TestRenderPNG(t *testing.T) {
 
 	src := []byte("<html><body><h1>hi</h1></body></html>")
 
-	out, err := d.Render(context.Background(), src, document.FormatPNG)
+	out, err := d.Render(t.Context(), src, document.FormatPNG)
 	if err != nil {
 		t.Fatalf("Render() error = %v", err)
 	}
@@ -292,7 +292,7 @@ func TestRenderJPG(t *testing.T) {
 
 	src := []byte("<html><body><h1>hi</h1></body></html>")
 
-	out, err := d.Render(context.Background(), src, document.FormatJPG)
+	out, err := d.Render(t.Context(), src, document.FormatJPG)
 	if err != nil {
 		t.Fatalf("Render() error = %v", err)
 	}
@@ -316,7 +316,7 @@ func TestRenderJPGHighQuality(t *testing.T) {
 
 	src := []byte("<html><body><h1>hi</h1></body></html>")
 
-	out, err := d.Render(context.Background(), src, document.FormatJPG)
+	out, err := d.Render(t.Context(), src, document.FormatJPG)
 	if err != nil {
 		t.Fatalf("Render() error = %v", err)
 	}
@@ -340,7 +340,7 @@ func TestRenderPNGWithTmpDir(t *testing.T) {
 
 	src := []byte("<html><body><h1>hi</h1></body></html>")
 
-	out, err := d.Render(context.Background(), src, document.FormatPNG)
+	out, err := d.Render(t.Context(), src, document.FormatPNG)
 	if err != nil {
 		t.Fatalf("Render() error = %v", err)
 	}

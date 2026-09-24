@@ -19,8 +19,8 @@ func TestConnOptions_mapping(t *testing.T) {
 	opts.PoolSize = 20
 	opts.MinIdleConns = 4
 	opts.PoolTimeout = time.Second
-	opts.ConnMaxIdleTime = time.Minute
-	opts.ConnMaxLifetime = time.Hour
+	opts.MaxConnIdleTime = time.Minute
+	opts.MaxConnLifetime = time.Hour
 
 	got := connOptions(opts)
 
@@ -37,7 +37,7 @@ func TestConnOptions_mapping(t *testing.T) {
 	}
 
 	if got.PoolSize != 20 || got.MinIdleConns != 4 || got.PoolTimeout != time.Second ||
-		got.ConnMaxIdleTime != time.Minute || got.ConnMaxLifetime != time.Hour {
+		got.MaxConnIdleTime != time.Minute || got.MaxConnLifetime != time.Hour {
 		t.Errorf("pool tuning not forwarded: %+v", got)
 	}
 }

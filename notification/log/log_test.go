@@ -45,7 +45,7 @@ func TestNotify_nilNotification(t *testing.T) {
 		t.Fatalf("NewWithWriter err = %v", err)
 	}
 	defer n.Close()
-	if err := n.Notify(context.Background(), nil); !errors.Is(err, notification.ErrNilNotification) {
+	if err := n.Notify(t.Context(), nil); !errors.Is(err, notification.ErrNilNotification) {
 		t.Fatalf("Notify(nil) err = %v, want ErrNilNotification", err)
 	}
 }
@@ -63,7 +63,7 @@ func TestNotify_invalidNotification(t *testing.T) {
 		Channel: notification.ChannelSMS,
 		Body:    "hi",
 	}
-	if err := n.Notify(context.Background(), bad); !errors.Is(err, notification.ErrInvalidTarget) {
+	if err := n.Notify(t.Context(), bad); !errors.Is(err, notification.ErrInvalidTarget) {
 		t.Fatalf("Notify(bad E.164) err = %v, want ErrInvalidTarget", err)
 	}
 }
@@ -76,7 +76,7 @@ func TestNotify_contextCanceled(t *testing.T) {
 		t.Fatalf("NewWithWriter err = %v", err)
 	}
 	defer n.Close()
-	ctx, cancel := context.WithCancel(context.Background())
+	ctx, cancel := context.WithCancel(t.Context())
 	cancel()
 	if err := n.Notify(ctx, validNotification()); !errors.Is(err, context.Canceled) {
 		t.Fatalf("Notify err = %v, want context.Canceled", err)
@@ -92,7 +92,7 @@ func TestNotify_emitsValidJSON(t *testing.T) {
 	}
 	defer n.Close()
 	want := validNotification()
-	if err := n.Notify(context.Background(), want); err != nil {
+	if err := n.Notify(t.Context(), want); err != nil {
 		t.Fatalf("Notify err = %v", err)
 	}
 	line := strings.TrimSpace(buf.String())
@@ -145,7 +145,7 @@ func TestClose_idempotentAndAfterClose(t *testing.T) {
 	if err := n.Close(); err != nil {
 		t.Fatalf("second Close err = %v, want nil", err)
 	}
-	if err := n.Notify(context.Background(), validNotification()); !errors.Is(err, notification.ErrClosed) {
+	if err := n.Notify(t.Context(), validNotification()); !errors.Is(err, notification.ErrClosed) {
 		t.Fatalf("Notify after close err = %v, want ErrClosed", err)
 	}
 }
@@ -165,7 +165,7 @@ func TestConcurrentSends(t *testing.T) {
 		wg.Add(1)
 		go func() {
 			defer wg.Done()
-			errs[i] = n.Notify(context.Background(), validNotification())
+			errs[i] = n.Notify(t.Context(), validNotification())
 		}()
 	}
 	wg.Wait()
