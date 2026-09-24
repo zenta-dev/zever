@@ -48,7 +48,7 @@ _ = s
 ## Not a vector store
 
 `search` ranks by full-text relevance, not embedding similarity — if you want
-semantic "find things like this" search, that's [Vector Store](/zever/digging-deeper/vectorstore/),
+semantic "find things like this" search, that's [Vector Store](vectorstore/),
 a different package entirely. A query's `Limit <= 0` defaults to 10 results, and
 `Total` in a paged response reflects the full match count independent of
 whatever `Limit`/`Offset` you asked for — don't assume `len(results) == Total`.

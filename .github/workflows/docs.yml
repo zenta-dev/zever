@@ -62,4 +62,8 @@ jobs:
       - name: Check links
         uses: lycheeverse/lychee-action@v2
         with:
-          args: --verbose --no-progress 'docs/**/*.md*'
+          # Astro resolves extensionless routed links (e.g. storage-media/
+          # for digging-deeper/storage-media.mdx) at build time; lychee
+          # checks raw files and cannot map them, so exclude local-file
+          # URIs and let lychee guard http(s) links only.
+          args: --verbose --no-progress --exclude '^file://' 'docs/**/*.md*'
