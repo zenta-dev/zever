@@ -11,7 +11,7 @@ func TestClaimsRoundtrip(t *testing.T) {
 	t.Parallel()
 
 	want := auth.Claims{Subject: "u1", Custom: map[string]any{"k": "v"}}
-	ctx := withClaims(context.Background(), want)
+	ctx := withClaims(t.Context(), want)
 	got, ok := ClaimsFromContext(ctx)
 	if !ok {
 		t.Fatal("ClaimsFromContext() ok = false, want true")
@@ -24,7 +24,7 @@ func TestClaimsRoundtrip(t *testing.T) {
 func TestClaimsMissing(t *testing.T) {
 	t.Parallel()
 
-	if _, ok := ClaimsFromContext(context.Background()); ok {
+	if _, ok := ClaimsFromContext(t.Context()); ok {
 		t.Fatal("ClaimsFromContext() ok = true, want false")
 	}
 }
@@ -32,7 +32,7 @@ func TestClaimsMissing(t *testing.T) {
 func TestClaimsWrongType(t *testing.T) {
 	t.Parallel()
 
-	ctx := context.WithValue(context.Background(), claimsKey{}, "not-claims")
+	ctx := context.WithValue(t.Context(), claimsKey{}, "not-claims")
 	if _, ok := ClaimsFromContext(ctx); ok {
 		t.Fatal("ClaimsFromContext() ok = true for wrong type, want false")
 	}

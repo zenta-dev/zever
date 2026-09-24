@@ -116,7 +116,7 @@ func TestTracing_spanNameIsRequestPath(t *testing.T) {
 		w.WriteHeader(http.StatusOK)
 	}))
 
-	req := httptest.NewRequestWithContext(context.Background(), http.MethodGet, "/widgets?verbose=true", nil)
+	req := httptest.NewRequestWithContext(t.Context(), http.MethodGet, "/widgets?verbose=true", nil)
 	handler.ServeHTTP(httptest.NewRecorder(), req)
 
 	if len(tracer.names) != 1 || tracer.names[0] != "/widgets" {
@@ -133,7 +133,7 @@ func TestTracing_methodAndPathAttributes(t *testing.T) {
 		w.WriteHeader(http.StatusOK)
 	}))
 
-	handler.ServeHTTP(httptest.NewRecorder(), httptest.NewRequestWithContext(context.Background(), http.MethodPost, "/orders", nil))
+	handler.ServeHTTP(httptest.NewRecorder(), httptest.NewRequestWithContext(t.Context(), http.MethodPost, "/orders", nil))
 
 	if len(tracer.spans) != 1 {
 		t.Fatalf("expected one span, got %d", len(tracer.spans))
@@ -179,7 +179,7 @@ func TestTracing_statusAttributeAfterHandler(t *testing.T) {
 				w.WriteHeader(tt.status)
 			}))
 
-			handler.ServeHTTP(httptest.NewRecorder(), httptest.NewRequestWithContext(context.Background(), http.MethodGet, "/", nil))
+			handler.ServeHTTP(httptest.NewRecorder(), httptest.NewRequestWithContext(t.Context(), http.MethodGet, "/", nil))
 
 			v, ok := findTraceAttr(tracer.spans[0].attrs, "http.status_code")
 			if !ok || v != observability.IntAttr(tt.status) {
@@ -214,7 +214,7 @@ func TestTracing_serverErrorRecordsSpanError(t *testing.T) {
 				w.WriteHeader(tt.status)
 			}))
 
-			handler.ServeHTTP(httptest.NewRecorder(), httptest.NewRequestWithContext(context.Background(), http.MethodGet, "/", nil))
+			handler.ServeHTTP(httptest.NewRecorder(), httptest.NewRequestWithContext(t.Context(), http.MethodGet, "/", nil))
 
 			got := len(tracer.spans[0].errors)
 			if tt.wantErr && got != 1 {
@@ -245,7 +245,7 @@ func TestTracing_requestCounter(t *testing.T) {
 	}))
 
 	rec := httptest.NewRecorder()
-	handler.ServeHTTP(rec, httptest.NewRequestWithContext(context.Background(), http.MethodDelete, "/cups", nil))
+	handler.ServeHTTP(rec, httptest.NewRequestWithContext(t.Context(), http.MethodDelete, "/cups", nil))
 
 	if rec.Code != http.StatusTeapot {
 		t.Fatalf("handler status = %d, want 418", rec.Code)
@@ -294,7 +294,7 @@ func TestTracing_meterErrorTolerated(t *testing.T) {
 	}))
 
 	rec := httptest.NewRecorder()
-	handler.ServeHTTP(rec, httptest.NewRequestWithContext(context.Background(), http.MethodGet, "/", nil))
+	handler.ServeHTTP(rec, httptest.NewRequestWithContext(t.Context(), http.MethodGet, "/", nil))
 
 	if rec.Code != http.StatusOK {
 		t.Fatalf("handler status = %d, want 200 despite meter error", rec.Code)
@@ -313,7 +313,7 @@ func TestTracing_propagatesSpanContext(t *testing.T) {
 		w.WriteHeader(http.StatusOK)
 	}))
 
-	handler.ServeHTTP(httptest.NewRecorder(), httptest.NewRequestWithContext(context.Background(), http.MethodGet, "/", nil))
+	handler.ServeHTTP(httptest.NewRecorder(), httptest.NewRequestWithContext(t.Context(), http.MethodGet, "/", nil))
 
 	if handlerCtx == nil {
 		t.Fatal("handler never ran")
@@ -344,7 +344,7 @@ func TestTracing_panicPropagates(t *testing.T) {
 		}
 	}()
 
-	handler.ServeHTTP(httptest.NewRecorder(), httptest.NewRequestWithContext(context.Background(), http.MethodGet, "/", nil))
+	handler.ServeHTTP(httptest.NewRecorder(), httptest.NewRequestWithContext(t.Context(), http.MethodGet, "/", nil))
 }
 
 func TestTracingUnaryServerInterceptor_ok(t *testing.T) {
@@ -361,7 +361,7 @@ func TestTracingUnaryServerInterceptor_ok(t *testing.T) {
 		return req, nil
 	}
 
-	resp, err := interceptor(context.Background(), "payload", &grpc.UnaryServerInfo{FullMethod: "/svc/Method"}, handler)
+	resp, err := interceptor(t.Context(), "payload", &grpc.UnaryServerInfo{FullMethod: "/svc/Method"}, handler)
 	if err != nil {
 		t.Fatalf("err = %v, want nil", err)
 	}
@@ -407,7 +407,7 @@ func TestTracingUnaryServerInterceptor_error(t *testing.T) {
 
 	handler := func(context.Context, any) (any, error) { return nil, sentinel }
 
-	resp, err := interceptor(context.Background(), "req", &grpc.UnaryServerInfo{FullMethod: "/svc/Fail"}, handler)
+	resp, err := interceptor(t.Context(), "req", &grpc.UnaryServerInfo{FullMethod: "/svc/Fail"}, handler)
 	if !errors.Is(err, sentinel) {
 		t.Fatalf("err = %v, want %v", err, sentinel)
 	}

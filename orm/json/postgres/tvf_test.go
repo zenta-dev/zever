@@ -1,7 +1,6 @@
 package postgres
 
 import (
-	"context"
 	"errors"
 	"strings"
 	"testing"
@@ -58,7 +57,7 @@ func TestArrayElementsSourceCapabilityGate(t *testing.T) {
 // the source's typed `value` handle becomes a bound predicate qualified to the
 // derived-table alias.
 func TestArrayElementsJoinRender(t *testing.T) {
-	ctx := context.Background()
+	ctx := t.Context()
 
 	src := ArrayElements[ElemRow](docData, "e")
 
@@ -87,7 +86,7 @@ func TestArrayElementsJoinRender(t *testing.T) {
 // TestArrayElementsLeftJoinRender pins the null-safe LEFT JOIN ... ON TRUE
 // shape.
 func TestArrayElementsLeftJoinRender(t *testing.T) {
-	ctx := context.Background()
+	ctx := t.Context()
 
 	src := ArrayElements[ElemRow](docData, "e")
 

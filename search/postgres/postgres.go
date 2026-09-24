@@ -37,6 +37,9 @@ type dbpool interface {
 
 var _ dbpool = (*pgxpool.Pool)(nil)
 
+// DefaultDDLTimeout bounds connect plus DDL during construction.
+const DefaultDDLTimeout = 5 * time.Second
+
 type postgres struct {
 	db dbpool
 }
@@ -73,7 +76,7 @@ func New(o search.Options) (search.Search, error) {
 		return &postgres{db: nil}, nil
 	}
 
-	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
+	ctx, cancel := context.WithTimeout(context.Background(), DefaultDDLTimeout)
 	defer cancel()
 
 	pool, err := newPool(ctx, o.DSN)

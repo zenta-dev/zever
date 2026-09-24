@@ -22,6 +22,18 @@ type subscription struct {
 	once    sync.Once
 }
 
+// DefaultPingTimeout bounds the startup connectivity check.
+const DefaultPingTimeout = 3 * time.Second
+
+// DefaultPublishTimeout bounds publish when the caller sets no deadline.
+const DefaultPublishTimeout = 5 * time.Second
+
+// DefaultSubscribeTimeout bounds the subscribe handshake without a deadline.
+const DefaultSubscribeTimeout = 5 * time.Second
+
+// DefaultUnsubscribeTimeout bounds unsubscribe during teardown.
+const DefaultUnsubscribeTimeout = 2 * time.Second
+
 func (s *subscription) shutdown() {
 	s.once.Do(func() { close(s.stop) })
 }
@@ -91,7 +103,7 @@ func newAdapter(opts eventbus.Options) (*adapter, error) {
 		return nil, fmt.Errorf("redis: connect %q: %w", redactAddr(opts.Redis.Addr), err)
 	}
 
-	ctx, cancel := context.WithTimeout(context.Background(), 3*time.Second)
+	ctx, cancel := context.WithTimeout(context.Background(), DefaultPingTimeout)
 	defer cancel()
 
 	if err := client.Ping(ctx).Err(); err != nil {
@@ -170,7 +182,7 @@ func (a *adapter) Publish(ctx context.Context, topic string, payload eventbus.Pa
 	if _, ok := ctx.Deadline(); !ok {
 		var cancel context.CancelFunc
 
-		ctx, cancel = context.WithTimeout(ctx, 5*time.Second)
+		ctx, cancel = context.WithTimeout(ctx, DefaultPublishTimeout)
 		defer cancel()
 	}
 
@@ -204,7 +216,7 @@ func (a *adapter) Subscribe(ctx context.Context, topic string, handler eventbus.
 	if _, ok := subCtx.Deadline(); !ok {
 		var cancel context.CancelFunc
 
-		subCtx, cancel = context.WithTimeout(subCtx, 5*time.Second)
+		subCtx, cancel = context.WithTimeout(subCtx, DefaultSubscribeTimeout)
 		defer cancel()
 	}
 
@@ -247,7 +259,7 @@ func (a *adapter) unsubscribe(sub *subscription) {
 	delete(a.subs, sub)
 	a.mu.Unlock()
 
-	ctx, cancel := context.WithTimeout(context.Background(), 2*time.Second)
+	ctx, cancel := context.WithTimeout(context.Background(), DefaultUnsubscribeTimeout)
 	defer cancel()
 
 	_ = sub.ps.Unsubscribe(ctx, sub.channel)

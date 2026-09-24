@@ -23,6 +23,9 @@ const pragmaFK = "foreign_keys(1)"
 // pragmaBusy sets the busy timeout to 5s on every connection opened from the DSN.
 const pragmaBusy = "busy_timeout(5000)"
 
+// DefaultPingTimeout bounds the startup ping during construction.
+const DefaultPingTimeout = 5 * time.Second
+
 // sqlOpen opens a *sql.DB. It is a variable rather than a direct sql.Open
 // call so tests can force the open-error branch, which is unreachable with
 // the registered driver since sql.Open only fails for an unknown driver name.
@@ -106,7 +109,7 @@ func New(opts db.Options) (db.DB, error) {
 		}
 	}
 
-	pingCtx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
+	pingCtx, cancel := context.WithTimeout(context.Background(), DefaultPingTimeout)
 	defer cancel()
 
 	if err := conn.PingContext(pingCtx); err != nil {

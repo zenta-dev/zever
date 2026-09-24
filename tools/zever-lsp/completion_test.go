@@ -1,7 +1,6 @@
 package main
 
 import (
-	"context"
 	"encoding/json"
 	"strings"
 	"testing"
@@ -344,7 +343,7 @@ func TestCompletionResolveFillsDetailFromRoundTrippedData(t *testing.T) {
 
 	server := NewServer()
 
-	resolved, err := server.completionResolve(context.Background(), &roundTripped)
+	resolved, err := server.completionResolve(t.Context(), &roundTripped)
 	if err != nil {
 		t.Fatalf("completionResolve() error = %v, want nil", err)
 	}
@@ -414,7 +413,7 @@ func TestCompletionResolvePassthroughWithoutData(t *testing.T) {
 
 	item := &protocol.CompletionItem{Label: "entity", Kind: protocol.CompletionItemKindKeyword}
 
-	resolved, err := server.completionResolve(context.Background(), item)
+	resolved, err := server.completionResolve(t.Context(), item)
 	if err != nil {
 		t.Fatalf("completionResolve() error = %v, want nil", err)
 	}

@@ -1,7 +1,6 @@
 package redis
 
 import (
-	"context"
 	"errors"
 	"testing"
 	"time"
@@ -12,13 +11,13 @@ import (
 func mustSetLive(t *testing.T, c cache.Cache, key string, value []byte, ttl time.Duration) {
 	t.Helper()
 
-	if err := c.Set(context.Background(), key, value, ttl); err != nil {
+	if err := c.Set(t.Context(), key, value, ttl); err != nil {
 		t.Fatalf("Set() error = %v", err)
 	}
 }
 
 func TestRedisLive_compareAndDelete(t *testing.T) {
-	ctx := context.Background()
+	ctx := t.Context()
 	a, _ := newLiveAdapter(t)
 	cas, ok := a.(cache.CompareAndSwapCache)
 	if !ok {
@@ -52,7 +51,7 @@ func TestRedisLive_compareAndDelete(t *testing.T) {
 }
 
 func TestRedisLive_compareAndExtend(t *testing.T) {
-	ctx := context.Background()
+	ctx := t.Context()
 	a, s := newLiveAdapter(t)
 	cas, ok := a.(cache.CompareAndSwapCache)
 	if !ok {
@@ -93,7 +92,7 @@ func TestRedisLive_compareAndExtend(t *testing.T) {
 }
 
 func TestRedisLive_compareAndExtend_expiryWithoutRenewal(t *testing.T) {
-	ctx := context.Background()
+	ctx := t.Context()
 	a, s := newLiveAdapter(t)
 	cas, ok := a.(cache.CompareAndSwapCache)
 	if !ok {
@@ -115,7 +114,7 @@ func TestRedisLive_compareAndExtend_expiryWithoutRenewal(t *testing.T) {
 }
 
 func TestRedisLive_casClosed_errors(t *testing.T) {
-	ctx := context.Background()
+	ctx := t.Context()
 	a, _ := newLiveAdapter(t)
 
 	if err := a.Close(ctx); err != nil {
@@ -137,7 +136,7 @@ func TestRedisLive_casClosed_errors(t *testing.T) {
 }
 
 func TestRedisLive_casServerDown_wrapsErrors(t *testing.T) {
-	ctx := context.Background()
+	ctx := t.Context()
 	a, s := newLiveAdapter(t)
 	cas, ok := a.(cache.CompareAndSwapCache)
 	if !ok {
@@ -160,7 +159,7 @@ func TestRedisLive_casServerDown_wrapsErrors(t *testing.T) {
 }
 
 func TestRedisLive_casNeverStealsSuccessor(t *testing.T) {
-	ctx := context.Background()
+	ctx := t.Context()
 	a, _ := newLiveAdapter(t)
 	cas, ok := a.(cache.CompareAndSwapCache)
 	if !ok {

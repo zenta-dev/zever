@@ -1,7 +1,6 @@
 package argon2
 
 import (
-	"context"
 	"errors"
 	"strings"
 	"testing"
@@ -41,7 +40,7 @@ func TestHashVerifyRoundtrip(t *testing.T) {
 		t.Run(tc.name, func(t *testing.T) {
 			t.Parallel()
 
-			ctx := context.Background()
+			ctx := t.Context()
 			h := testHasher(t)
 
 			hash, err := h.Hash(ctx, tc.pw)
@@ -68,7 +67,7 @@ func TestHashVerifyRoundtrip(t *testing.T) {
 func TestPasswordLengthLimits(t *testing.T) {
 	t.Parallel()
 
-	ctx := context.Background()
+	ctx := t.Context()
 	h := testHasher(t)
 
 	pw1024 := strings.Repeat("a", 1024)
@@ -115,7 +114,7 @@ func TestPasswordLengthLimits(t *testing.T) {
 func TestVerifyMismatch(t *testing.T) {
 	t.Parallel()
 
-	ctx := context.Background()
+	ctx := t.Context()
 	h := testHasher(t)
 
 	hash, err := h.Hash(ctx, "secret")
@@ -136,7 +135,7 @@ func TestVerifyMismatch(t *testing.T) {
 func TestVerifyInvalidHash(t *testing.T) {
 	t.Parallel()
 
-	ctx := context.Background()
+	ctx := t.Context()
 	h := testHasher(t)
 
 	_, err := h.Verify(ctx, "not-a-hash", "secret")
@@ -152,7 +151,7 @@ func TestVerifyInvalidHash(t *testing.T) {
 func TestVerifyWrongPassword(t *testing.T) {
 	t.Parallel()
 
-	ctx := context.Background()
+	ctx := t.Context()
 	h := testHasher(t)
 
 	hash, err := h.Hash(ctx, "correct")
@@ -173,7 +172,7 @@ func TestVerifyWrongPassword(t *testing.T) {
 func TestVerifyTamperedHash(t *testing.T) {
 	t.Parallel()
 
-	ctx := context.Background()
+	ctx := t.Context()
 	h := testHasher(t)
 
 	hash, err := h.Hash(ctx, "secret")
@@ -215,7 +214,7 @@ func TestHashRandFailure(t *testing.T) {
 
 	defer func() { randRead = old }()
 
-	ctx := context.Background()
+	ctx := t.Context()
 	h := testHasher(t)
 
 	_, err := h.Hash(ctx, "secret")
@@ -231,7 +230,7 @@ func TestHashRandFailure(t *testing.T) {
 func TestCrossParamsVerify(t *testing.T) {
 	t.Parallel()
 
-	ctx := context.Background()
+	ctx := t.Context()
 	reduced := testHasher(t)
 
 	hash, err := reduced.Hash(ctx, "secret")
@@ -257,7 +256,7 @@ func TestCrossParamsVerify(t *testing.T) {
 func TestNeedsRehash(t *testing.T) {
 	t.Parallel()
 
-	ctx := context.Background()
+	ctx := t.Context()
 	h := testHasher(t)
 
 	hash, err := h.Hash(ctx, "secret")
@@ -308,7 +307,7 @@ func TestNeedsRehash(t *testing.T) {
 func TestNeedsRehashInvalid(t *testing.T) {
 	t.Parallel()
 
-	ctx := context.Background()
+	ctx := t.Context()
 	h := testHasher(t)
 
 	_, err := h.NeedsRehash(ctx, "not-a-hash")
@@ -398,7 +397,7 @@ func TestDecodeHashTable(t *testing.T) {
 // TestRegistryIntegration is the sole serial test: it mutates the global
 // registry and performs the single full-default roundtrip.
 func TestRegistryIntegration(t *testing.T) {
-	ctx := context.Background()
+	ctx := t.Context()
 
 	if err := password.Register(password.AdapterArgon2ID, New); err != nil {
 		t.Fatalf("Register() = %v, want nil", err)

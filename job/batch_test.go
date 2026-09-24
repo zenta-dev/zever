@@ -118,7 +118,7 @@ func TestBatchDispatchMarshalError(t *testing.T) {
 	d := &Dispatcher{Q: &stubQueue{}, Logger: noop.New()}
 	b := NewBatch(d, store)
 	b.Add("anything", make(chan int))
-	err := b.Dispatch(context.Background())
+	err := b.Dispatch(t.Context())
 	if err == nil {
 		t.Fatal("Dispatch chan args want error")
 	}
@@ -133,7 +133,7 @@ func TestBatchDispatchUnknownJob(t *testing.T) {
 	d := &Dispatcher{Q: &stubQueue{}, Logger: noop.New()}
 	b := NewBatch(d, store)
 	b.Add("no-such-job", "arg")
-	err := b.Dispatch(context.Background())
+	err := b.Dispatch(t.Context())
 	if err == nil {
 		t.Fatal("Dispatch unknown want error")
 	}
@@ -154,7 +154,7 @@ func TestBatchDispatchCreateError(t *testing.T) {
 	d := &Dispatcher{Q: &stubQueue{}, Logger: noop.New()}
 	b := NewBatch(d, store)
 	b.Add("batch-create", "arg")
-	err := b.Dispatch(context.Background())
+	err := b.Dispatch(t.Context())
 	if err == nil {
 		t.Fatal("Dispatch create err want error")
 	}
@@ -182,7 +182,7 @@ func TestBatchDispatchPushFailureOnFailure(t *testing.T) {
 		gotNames = append(gotNames, name)
 		mu.Unlock()
 	})
-	err := b.Dispatch(context.Background())
+	err := b.Dispatch(t.Context())
 	if err == nil {
 		t.Fatal("Dispatch push failure want error")
 	}
@@ -221,7 +221,7 @@ func TestBatchDispatchPushFailureIncrementError(t *testing.T) {
 	b := NewBatch(d, store)
 	called := 0
 	b.Add("batch-pushfail2", "a").Catch(func(context.Context, string, error) { called++ })
-	err := b.Dispatch(context.Background())
+	err := b.Dispatch(t.Context())
 	if err == nil {
 		t.Fatal("Dispatch want error")
 	}
@@ -243,7 +243,7 @@ func TestBatchDispatchAllPushesOK(t *testing.T) {
 	d := &Dispatcher{Q: sq, Logger: noop.New()}
 	b := NewBatch(d, store)
 	b.Add("batch-ok", "a").Add("batch-ok", "b")
-	if err := b.Dispatch(context.Background()); err != nil {
+	if err := b.Dispatch(t.Context()); err != nil {
 		t.Fatalf("Dispatch ok err=%v", err)
 	}
 	if sq.pushes != 2 {
@@ -267,7 +267,7 @@ func TestBatchDispatchEmptyGetError(t *testing.T) {
 	b := NewBatch(d, store)
 	completed := false
 	b.Then(func(context.Context) { completed = true })
-	if err := b.Dispatch(context.Background()); err != nil {
+	if err := b.Dispatch(t.Context()); err != nil {
 		t.Fatalf("empty Dispatch err=%v", err)
 	}
 	if completed {
@@ -288,7 +288,7 @@ func TestBatchDispatchEmptyFailedPositive(t *testing.T) {
 	b := NewBatch(d, store)
 	completed := false
 	b.Then(func(context.Context) { completed = true })
-	if err := b.Dispatch(context.Background()); err != nil {
+	if err := b.Dispatch(t.Context()); err != nil {
 		t.Fatalf("empty Dispatch err=%v", err)
 	}
 	if completed {
@@ -309,7 +309,7 @@ func TestBatchDispatchEmptyComplete(t *testing.T) {
 	b := NewBatch(d, store)
 	calls := 0
 	b.Then(func(context.Context) { calls++ })
-	if err := b.Dispatch(context.Background()); err != nil {
+	if err := b.Dispatch(t.Context()); err != nil {
 		t.Fatalf("empty Dispatch err=%v", err)
 	}
 	if calls != 1 {
@@ -326,13 +326,13 @@ func TestBatchDispatchEmptyComplete(t *testing.T) {
 func TestBatchReportResult(t *testing.T) {
 	Reset()
 	fb := &fakeBatchStore{getTotal: 5}
-	reportBatchResult(context.Background(), fb, "bid-nil", "j", nil)
+	reportBatchResult(t.Context(), fb, "bid-nil", "j", nil)
 	if fb.incrementCompleted != 1 {
 		t.Fatalf("nil err incrementCompleted=%d want 1", fb.incrementCompleted)
 	}
 	fb2 := &fakeBatchStore{getTotal: 5}
 	sentinel := errors.New("job fail")
-	reportBatchResult(context.Background(), fb2, "bid-err", "j", sentinel)
+	reportBatchResult(t.Context(), fb2, "bid-err", "j", sentinel)
 	if fb2.incrementFailed != 1 {
 		t.Fatalf("non-nil err incrementFailed=%d want 1", fb2.incrementFailed)
 	}
@@ -341,7 +341,7 @@ func TestBatchReportResult(t *testing.T) {
 func TestBatchReportFailureIncrementError(t *testing.T) {
 	Reset()
 	fb := &fakeBatchStore{incrementFailedErr: errors.New("inc boom")}
-	reportBatchFailure(context.Background(), fb, "bid-inc", "j", errors.New("x"))
+	reportBatchFailure(t.Context(), fb, "bid-inc", "j", errors.New("x"))
 	if fb.incrementFailed != 1 {
 		t.Fatalf("incrementFailed=%d want 1", fb.incrementFailed)
 	}
@@ -357,7 +357,7 @@ func TestBatchReportFailureSettlingDefers(t *testing.T) {
 	batchCallbacks.Unlock()
 	called := false
 	cb.onFailure = func(context.Context, string, error) { called = true }
-	reportBatchFailure(context.Background(), fb, "bid-settling", "j", errors.New("x"))
+	reportBatchFailure(t.Context(), fb, "bid-settling", "j", errors.New("x"))
 	if called {
 		t.Fatal("onFailure should not run while settling")
 	}
@@ -383,7 +383,7 @@ func TestBatchReportFailureInvokesAndDeletes(t *testing.T) {
 	batchCallbacks.Lock()
 	batchCallbacks.m["bid-del"] = cb
 	batchCallbacks.Unlock()
-	reportBatchFailure(context.Background(), fb, "bid-del", "myjob", sentinel)
+	reportBatchFailure(t.Context(), fb, "bid-del", "myjob", sentinel)
 	if gotName != "myjob" || !errors.Is(gotErr, sentinel) {
 		t.Fatalf("onFailure name=%q err=%v want myjob/sentinel", gotName, gotErr)
 	}
@@ -402,7 +402,7 @@ func TestBatchReportFailureNotSettledKeeps(t *testing.T) {
 	batchCallbacks.Lock()
 	batchCallbacks.m["bid-keep"] = cb
 	batchCallbacks.Unlock()
-	reportBatchFailure(context.Background(), fb, "bid-keep", "j", errors.New("x"))
+	reportBatchFailure(t.Context(), fb, "bid-keep", "j", errors.New("x"))
 	batchCallbacks.Lock()
 	_, ok := batchCallbacks.m["bid-keep"]
 	batchCallbacks.Unlock()
@@ -414,7 +414,7 @@ func TestBatchReportFailureNotSettledKeeps(t *testing.T) {
 func TestBatchReportFailureNoEntry(t *testing.T) {
 	Reset()
 	fb := &fakeBatchStore{getFailed: 1, getTotal: 1}
-	reportBatchFailure(context.Background(), fb, "bid-missing", "j", errors.New("x"))
+	reportBatchFailure(t.Context(), fb, "bid-missing", "j", errors.New("x"))
 	if fb.incrementFailed != 1 {
 		t.Fatalf("incrementFailed=%d want 1", fb.incrementFailed)
 	}
@@ -423,7 +423,7 @@ func TestBatchReportFailureNoEntry(t *testing.T) {
 func TestBatchReportSuccessIncrementError(t *testing.T) {
 	Reset()
 	fb := &fakeBatchStore{incrementCompletedErr: errors.New("inc boom")}
-	reportBatchSuccess(context.Background(), fb, "bid-ok-err")
+	reportBatchSuccess(t.Context(), fb, "bid-ok-err")
 	if fb.incrementCompleted != 1 {
 		t.Fatalf("incrementCompleted=%d want 1", fb.incrementCompleted)
 	}
@@ -437,7 +437,7 @@ func TestBatchReportSuccessSettlingDefers(t *testing.T) {
 	batchCallbacks.Lock()
 	batchCallbacks.m["bid-ssettle"] = cb
 	batchCallbacks.Unlock()
-	reportBatchSuccess(context.Background(), fb, "bid-ssettle")
+	reportBatchSuccess(t.Context(), fb, "bid-ssettle")
 	batchCallbacks.Lock()
 	_, ok := batchCallbacks.m["bid-ssettle"]
 	batchCallbacks.Unlock()
@@ -453,7 +453,7 @@ func TestBatchReportSuccessNotSettled(t *testing.T) {
 	batchCallbacks.Lock()
 	batchCallbacks.m["bid-nset"] = cb
 	batchCallbacks.Unlock()
-	reportBatchSuccess(context.Background(), fb, "bid-nset")
+	reportBatchSuccess(t.Context(), fb, "bid-nset")
 	batchCallbacks.Lock()
 	_, ok := batchCallbacks.m["bid-nset"]
 	batchCallbacks.Unlock()
@@ -471,8 +471,8 @@ func TestBatchReportSuccessCompletes(t *testing.T) {
 	batchCallbacks.Lock()
 	batchCallbacks.m["bid-done"] = cb
 	batchCallbacks.Unlock()
-	reportBatchSuccess(context.Background(), fb, "bid-done")
-	reportBatchSuccess(context.Background(), fb, "bid-done")
+	reportBatchSuccess(t.Context(), fb, "bid-done")
+	reportBatchSuccess(t.Context(), fb, "bid-done")
 	if calls != 1 {
 		t.Fatalf("onComplete calls=%d want 1 (once)", calls)
 	}
@@ -487,7 +487,7 @@ func TestBatchReportSuccessFailedPositive(t *testing.T) {
 	batchCallbacks.Lock()
 	batchCallbacks.m["bid-fail"] = cb
 	batchCallbacks.Unlock()
-	reportBatchSuccess(context.Background(), fb, "bid-fail")
+	reportBatchSuccess(t.Context(), fb, "bid-fail")
 	if called {
 		t.Fatal("onComplete should not run when failed>0")
 	}
@@ -502,7 +502,7 @@ func TestBatchReportSuccessFailedPositive(t *testing.T) {
 func TestBatchReportSuccessNoEntry(t *testing.T) {
 	Reset()
 	fb := &fakeBatchStore{getCompleted: 1, getFailed: 0, getTotal: 1}
-	reportBatchSuccess(context.Background(), fb, "bid-absent")
+	reportBatchSuccess(t.Context(), fb, "bid-absent")
 	if fb.incrementCompleted != 1 {
 		t.Fatalf("incrementCompleted=%d want 1", fb.incrementCompleted)
 	}
@@ -515,7 +515,7 @@ func TestBatchReportSuccessNilComplete(t *testing.T) {
 	batchCallbacks.Lock()
 	batchCallbacks.m["bid-nilcb"] = cb
 	batchCallbacks.Unlock()
-	reportBatchSuccess(context.Background(), fb, "bid-nilcb")
+	reportBatchSuccess(t.Context(), fb, "bid-nilcb")
 	batchCallbacks.Lock()
 	_, ok := batchCallbacks.m["bid-nilcb"]
 	batchCallbacks.Unlock()
@@ -544,17 +544,17 @@ func TestBatchLogger(t *testing.T) {
 func TestBatchSettle(t *testing.T) {
 	Reset()
 	fb := &fakeBatchStore{getErr: errors.New("get boom")}
-	failed, settled := batchSettle(context.Background(), fb, "x")
+	failed, settled := batchSettle(t.Context(), fb, "x")
 	if settled || failed != 0 {
 		t.Fatalf("Get error got (%d,%v) want (0,false)", failed, settled)
 	}
 	fb2 := &fakeBatchStore{getCompleted: 2, getFailed: 1, getTotal: 3}
-	failed, settled = batchSettle(context.Background(), fb2, "x")
+	failed, settled = batchSettle(t.Context(), fb2, "x")
 	if !settled || failed != 1 {
 		t.Fatalf("settled got (%d,%v) want (1,true)", failed, settled)
 	}
 	fb3 := &fakeBatchStore{getCompleted: 1, getFailed: 0, getTotal: 5}
-	failed, settled = batchSettle(context.Background(), fb3, "x")
+	failed, settled = batchSettle(t.Context(), fb3, "x")
 	if settled || failed != 0 {
 		t.Fatalf("unsettled got (%d,%v) want (0,false)", failed, settled)
 	}
@@ -599,18 +599,18 @@ func TestBatchJitterDuration(t *testing.T) {
 
 func TestBatchSleepWithContext(t *testing.T) {
 	Reset()
-	if !sleepWithContext(context.Background(), 0) {
+	if !sleepWithContext(t.Context(), 0) {
 		t.Fatal("d<=0 live ctx want true")
 	}
-	canceled, cancel := context.WithCancel(context.Background())
+	canceled, cancel := context.WithCancel(t.Context())
 	cancel()
 	if sleepWithContext(canceled, 0) {
 		t.Fatal("d<=0 canceled ctx want false")
 	}
-	if !sleepWithContext(context.Background(), 5*time.Millisecond) {
+	if !sleepWithContext(t.Context(), 5*time.Millisecond) {
 		t.Fatal("d>0 live ctx want true")
 	}
-	canceled2, cancel2 := context.WithCancel(context.Background())
+	canceled2, cancel2 := context.WithCancel(t.Context())
 	cancel2()
 	if sleepWithContext(canceled2, 50*time.Millisecond) {
 		t.Fatal("d>0 canceled ctx want false")
@@ -623,7 +623,7 @@ func TestBatchSettleDueBatchesNoJitter(t *testing.T) {
 	triggerJitter = func() bool { return false }
 	defer func() { triggerJitter = old }()
 	before := SweepBatchCallbacksCalls()
-	settleDueBatches(context.Background())
+	settleDueBatches(t.Context())
 	after := SweepBatchCallbacksCalls()
 	if after != before+1 {
 		t.Fatalf("calls before %d after %d want +1", before, after)
@@ -642,7 +642,7 @@ func TestBatchSettleDueBatchesWithDeadline(t *testing.T) {
 	batchCallbacks.m["zero"] = zeroCb
 	batchCallbacks.m["nilcb"] = nil
 	batchCallbacks.Unlock()
-	ctx, cancel := context.WithDeadline(context.Background(), time.Now().Add(time.Minute))
+	ctx, cancel := context.WithDeadline(t.Context(), time.Now().Add(time.Minute))
 	defer cancel()
 	before := SweepBatchCallbacksCalls()
 	settleDueBatches(ctx)
@@ -672,7 +672,7 @@ func TestBatchSettleDueBatchesJitterExpired(t *testing.T) {
 	batchCallbacks.m["expired-j"] = cb
 	batchCallbacks.Unlock()
 	before := SweepBatchCallbacksCalls()
-	settleDueBatches(context.Background())
+	settleDueBatches(t.Context())
 	after := SweepBatchCallbacksCalls()
 	if after != before+1 {
 		t.Fatalf("calls before %d after %d want +1", before, after)
@@ -698,7 +698,7 @@ func TestBatchSettleDueBatchesJitterCanceled(t *testing.T) {
 	batchCallbacks.Lock()
 	batchCallbacks.m["expired-c"] = cb
 	batchCallbacks.Unlock()
-	ctx, cancel := context.WithCancel(context.Background())
+	ctx, cancel := context.WithCancel(t.Context())
 	cancel()
 	before := SweepBatchCallbacksCalls()
 	settleDueBatches(ctx)
@@ -716,7 +716,7 @@ func TestBatchSettleDueBatchesJitterCanceled(t *testing.T) {
 
 func TestBatchSettleExpiredBranches(t *testing.T) {
 	Reset()
-	ctx := context.Background()
+	ctx := t.Context()
 	settleExpired(ctx, "x", nil)
 	settleExpired(ctx, "x", &batchCallback{store: nil, completeOnce: new(sync.Once), logger: noop.New()})
 	other := &batchCallback{store: &fakeBatchStore{}, completeOnce: new(sync.Once), logger: noop.New()}
@@ -781,7 +781,7 @@ func TestBatchAcquireSettling(t *testing.T) {
 
 func TestBatchLoadAndFailLost(t *testing.T) {
 	Reset()
-	ctx := context.Background()
+	ctx := t.Context()
 	errStore := &fakeBatchStore{getErr: errors.New("get boom")}
 	errCb := &batchCallback{store: errStore, completeOnce: new(sync.Once), logger: noop.New()}
 	if loadAndFailLost(ctx, "x", errCb) {
@@ -830,7 +830,7 @@ func TestBatchLoadAndFailLost(t *testing.T) {
 
 func TestBatchFinalizeExpired(t *testing.T) {
 	Reset()
-	ctx := context.Background()
+	ctx := t.Context()
 	errStore := &fakeBatchStore{getErr: errors.New("get boom")}
 	errCb := &batchCallback{store: errStore, completeOnce: new(sync.Once), logger: noop.New()}
 	batchCallbacks.Lock()
@@ -911,7 +911,7 @@ func TestBatchSweepDelegates(t *testing.T) {
 	triggerJitter = func() bool { return false }
 	defer func() { triggerJitter = old }()
 	before := SweepBatchCallbacksCalls()
-	SweepBatchCallbacks(context.Background())
+	SweepBatchCallbacks(t.Context())
 	after := SweepBatchCallbacksCalls()
 	if after != before+1 {
 		t.Fatalf("Sweep calls before %d after %d want +1", before, after)

@@ -1,7 +1,6 @@
 package remote
 
 import (
-	"context"
 	"errors"
 	"net/http"
 	"net/http/httptest"
@@ -40,7 +39,7 @@ func TestRemoteStatusIs(t *testing.T) {
 	}
 	t.Cleanup(func() { _ = a.Close() })
 
-	if _, err := a.Translate(context.Background(), "en", "hi", nil); !errors.Is(err, i18n.ErrRemoteError) {
+	if _, err := a.Translate(t.Context(), "en", "hi", nil); !errors.Is(err, i18n.ErrRemoteError) {
 		t.Errorf("Translate err = %v, want ErrRemoteError", err)
 	}
 }

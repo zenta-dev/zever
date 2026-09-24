@@ -43,7 +43,7 @@ func TestNew_negative_TTL_fails(t *testing.T) {
 
 func TestCRUD_roundtrip(t *testing.T) {
 	t.Parallel()
-	ctx := context.Background()
+	ctx := t.Context()
 	st := openDefault(t)
 	created, err := st.Create(ctx, time.Hour)
 	if err != nil {
@@ -64,14 +64,14 @@ func TestCRUD_roundtrip(t *testing.T) {
 func TestGet_miss_ErrNotFound(t *testing.T) {
 	t.Parallel()
 	st := openDefault(t)
-	if _, err := st.Get(context.Background(), session.NewID()); !errors.Is(err, session.ErrNotFound) {
+	if _, err := st.Get(t.Context(), session.NewID()); !errors.Is(err, session.ErrNotFound) {
 		t.Fatalf("Get miss err = %v, want ErrNotFound", err)
 	}
 }
 
 func TestInvalidIDs(t *testing.T) {
 	t.Parallel()
-	ctx := context.Background()
+	ctx := t.Context()
 	st := openDefault(t)
 	for _, id := range []string{"", "short", "ZZZZ"} {
 		if _, err := st.Get(ctx, id); !errors.Is(err, session.ErrInvalidID) {
@@ -88,7 +88,7 @@ func TestInvalidIDs(t *testing.T) {
 
 func TestCopyIndependence_get_mutation(t *testing.T) {
 	t.Parallel()
-	ctx := context.Background()
+	ctx := t.Context()
 	st := openDefault(t)
 	s, err := st.Create(ctx, time.Hour)
 	if err != nil {
@@ -118,7 +118,7 @@ func TestCopyIndependence_get_mutation(t *testing.T) {
 
 func TestCopyIndependence_save_mutation(t *testing.T) {
 	t.Parallel()
-	ctx := context.Background()
+	ctx := t.Context()
 	st := openDefault(t)
 	s, err := st.Create(ctx, time.Hour)
 	if err != nil {
@@ -140,7 +140,7 @@ func TestCopyIndependence_save_mutation(t *testing.T) {
 
 func TestSave_keeps_expiry(t *testing.T) {
 	t.Parallel()
-	ctx := context.Background()
+	ctx := t.Context()
 	st := openDefault(t)
 	s, err := st.Create(ctx, time.Hour)
 	if err != nil {
@@ -165,7 +165,7 @@ func TestSave_keeps_expiry(t *testing.T) {
 
 func TestSave_missing_creates_with_defaultTTL(t *testing.T) {
 	t.Parallel()
-	ctx := context.Background()
+	ctx := t.Context()
 	ttl := 30 * time.Minute
 	st, err := memory.New(session.Options{TTL: ttl})
 	if err != nil {
@@ -191,7 +191,7 @@ func TestSave_missing_creates_with_defaultTTL(t *testing.T) {
 
 func TestExpiry_lazy(t *testing.T) {
 	t.Parallel()
-	ctx := context.Background()
+	ctx := t.Context()
 	st := openDefault(t)
 	s, err := st.Create(ctx, 30*time.Millisecond)
 	if err != nil {
@@ -209,7 +209,7 @@ func TestExpiry_lazy(t *testing.T) {
 
 func TestSweeper_purges(t *testing.T) {
 	t.Parallel()
-	ctx := context.Background()
+	ctx := t.Context()
 	st, err := memory.New(session.Options{TTL: 40 * time.Millisecond})
 	if err != nil {
 		t.Fatalf("New err = %v", err)
@@ -227,7 +227,7 @@ func TestSweeper_purges(t *testing.T) {
 
 func TestDelete_idempotent(t *testing.T) {
 	t.Parallel()
-	ctx := context.Background()
+	ctx := t.Context()
 	st := openDefault(t)
 	s, err := st.Create(ctx, time.Hour)
 	if err != nil {
@@ -249,7 +249,7 @@ func TestDelete_idempotent(t *testing.T) {
 
 func TestConcurrent_access(t *testing.T) {
 	t.Parallel()
-	ctx := context.Background()
+	ctx := t.Context()
 	st := openDefault(t)
 	s, err := st.Create(ctx, time.Hour)
 	if err != nil {
@@ -275,7 +275,7 @@ func TestConcurrent_access(t *testing.T) {
 
 func TestAfterClose_errors(t *testing.T) {
 	t.Parallel()
-	ctx := context.Background()
+	ctx := t.Context()
 	st, err := memory.New(session.Options{})
 	if err != nil {
 		t.Fatalf("New err = %v", err)
@@ -307,7 +307,7 @@ func TestAfterClose_errors(t *testing.T) {
 func TestContext_canceled(t *testing.T) {
 	t.Parallel()
 	st := openDefault(t)
-	ctx, cancel := context.WithCancel(context.Background())
+	ctx, cancel := context.WithCancel(t.Context())
 	cancel()
 	if _, err := st.Create(ctx, time.Hour); err == nil {
 		t.Fatal("Create canceled ctx expected error, got nil")

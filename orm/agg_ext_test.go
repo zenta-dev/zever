@@ -1,7 +1,6 @@
 package orm
 
 import (
-	"context"
 	"errors"
 	"testing"
 
@@ -235,7 +234,7 @@ func TestHavingAggregateAndExpressionCombine(t *testing.T) {
 // TestGroupingConstructsSQLiteGate proves ROLLUP/CUBE/GROUPING SETS are
 // rejected on SQLite with the typed dialect.ErrUnsupportedByDialect.
 func TestGroupingConstructsSQLiteGate(t *testing.T) {
-	ctx := context.Background()
+	ctx := t.Context()
 
 	for _, tc := range []struct {
 		name string
@@ -288,7 +287,7 @@ func TestGroupByExpressionArgSQLiteRoundTrip(t *testing.T) {
 // uses an expression or grouping-set GROUP BY in a CTE is a typed error
 // rather than a silently-dropped grouping.
 func TestWithGroupedRejectsAdvancedGroups(t *testing.T) {
-	ctx := context.Background()
+	ctx := t.Context()
 
 	name, err := NewCTEName("w")
 	if err != nil {

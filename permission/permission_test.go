@@ -83,7 +83,7 @@ func TestOpen_success(t *testing.T) {
 	if err != nil {
 		t.Fatalf("Open err = %v", err)
 	}
-	d, err := c.Can(context.Background(), Subject{}, "read", Resource{})
+	d, err := c.Can(t.Context(), Subject{}, "read", Resource{})
 	if err != nil {
 		t.Fatalf("Can err = %v", err)
 	}

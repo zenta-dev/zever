@@ -127,7 +127,7 @@ func TestSubscribeChan_fanoutBothReceive(t *testing.T) {
 
 	inner := newFakeBus()
 	b := openPullBus(t, inner)
-	ctx := context.Background()
+	ctx := t.Context()
 
 	c1, err := b.SubscribeChan(ctx, "orders", 16)
 	if err != nil {
@@ -164,7 +164,7 @@ func TestSubscribeChan_slowChanDropIsolation(t *testing.T) {
 
 	inner := newFakeBus()
 	b := openPullBus(t, inner)
-	ctx := context.Background()
+	ctx := t.Context()
 
 	slow, err := b.SubscribeChan(ctx, "orders", 1)
 	if err != nil {
@@ -202,7 +202,7 @@ func TestSubscribeChan_invalidTopic(t *testing.T) {
 	t.Parallel()
 
 	b := openPullBus(t, newFakeBus())
-	ctx := context.Background()
+	ctx := t.Context()
 
 	if _, err := b.SubscribeChan(ctx, "", 8); err == nil {
 		t.Fatal("SubscribeChan empty topic err = nil, want validation error")
@@ -213,7 +213,7 @@ func TestSubscribeChan_defaultBuffer(t *testing.T) {
 	t.Parallel()
 
 	b := openPullBus(t, newFakeBus())
-	ctx := context.Background()
+	ctx := t.Context()
 
 	for _, buf := range []int{0, -1} {
 		ch, err := b.SubscribeChan(ctx, "orders", buf)
@@ -249,7 +249,7 @@ func TestUnsubscribe_wrongTopic(t *testing.T) {
 	t.Parallel()
 
 	b := openPullBus(t, newFakeBus())
-	ctx := context.Background()
+	ctx := t.Context()
 
 	ch, err := b.SubscribeChan(ctx, "orders", 4)
 	if err != nil {
@@ -270,7 +270,7 @@ func TestUnsubscribe_twice(t *testing.T) {
 
 	inner := newFakeBus()
 	b := openPullBus(t, inner)
-	ctx := context.Background()
+	ctx := t.Context()
 
 	ch, err := b.SubscribeChan(ctx, "orders", 4)
 	if err != nil {
@@ -304,7 +304,7 @@ func TestPull_afterClose(t *testing.T) {
 
 	inner := newFakeBus()
 	b := openPullBus(t, inner)
-	ctx := context.Background()
+	ctx := t.Context()
 
 	ch, err := b.SubscribeChan(ctx, "orders", 4)
 	if err != nil {

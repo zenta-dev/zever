@@ -49,7 +49,7 @@ func Register(adapter Adapter, factory Factory) error {
 // result when err is non-nil.
 func Open(adapter Adapter, opts Options) (Webhook, error) {
 	if err := opts.Validate(); err != nil {
-		return nil, fmt.Errorf("webhook: open %s: %w", adapter, err)
+		return nil, err
 	}
 
 	factory, err := factories.Lookup(adapter)

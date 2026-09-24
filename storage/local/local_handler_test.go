@@ -1,7 +1,6 @@
 package local
 
 import (
-	"context"
 	"encoding/json"
 	"errors"
 	"io"
@@ -47,8 +46,9 @@ func newTestAdapter(t *testing.T, opts storage.Options) *localAdapter {
 	return a
 }
 
-func doServe(a *localAdapter, method, target string, body io.Reader, hdr map[string]string) *httptest.ResponseRecorder {
-	req := httptest.NewRequestWithContext(context.Background(), method, target, body)
+func doServe(t *testing.T, a *localAdapter, method, target string, body io.Reader, hdr map[string]string) *httptest.ResponseRecorder {
+	t.Helper()
+	req := httptest.NewRequestWithContext(t.Context(), method, target, body)
 	for k, v := range hdr {
 		req.Header.Set(k, v)
 	}
@@ -70,8 +70,9 @@ func signedTarget(t *testing.T, fullURL string) string {
 	return u.RequestURI()
 }
 
-func queryRequest(method, path string, q url.Values) *http.Request {
-	req := httptest.NewRequestWithContext(context.Background(), method, path, nil)
+func queryRequest(t *testing.T, method, path string, q url.Values) *http.Request {
+	t.Helper()
+	req := httptest.NewRequestWithContext(t.Context(), method, path, nil)
 	req.URL.RawQuery = q.Encode()
 
 	return req
@@ -155,15 +156,15 @@ func TestStripBase(t *testing.T) {
 func TestServeRejects(t *testing.T) {
 	a := newTestAdapter(t, storage.Options{})
 
-	if rec := doServe(a, http.MethodGet, "/onlybucket", nil, nil); rec.Code != http.StatusForbidden {
+	if rec := doServe(t, a, http.MethodGet, "/onlybucket", nil, nil); rec.Code != http.StatusForbidden {
 		t.Errorf("GET no-slash = %d, want 403", rec.Code)
 	}
 
-	if rec := doServe(a, http.MethodGet, "/bad_bucket!/k", nil, nil); rec.Code != http.StatusForbidden {
+	if rec := doServe(t, a, http.MethodGet, "/bad_bucket!/k", nil, nil); rec.Code != http.StatusForbidden {
 		t.Errorf("GET bad bucket = %d, want 403", rec.Code)
 	}
 
-	if rec := doServe(a, http.MethodPost, "/bkt/k", nil, nil); rec.Code != http.StatusMethodNotAllowed {
+	if rec := doServe(t, a, http.MethodPost, "/bkt/k", nil, nil); rec.Code != http.StatusMethodNotAllowed {
 		t.Errorf("POST = %d, want 405", rec.Code)
 	}
 
@@ -172,7 +173,7 @@ func TestServeRejects(t *testing.T) {
 	q.Set("expires", itoa(expires))
 	q.Set("sig", "short")
 
-	req := queryRequest(http.MethodGet, "/bkt/k", q)
+	req := queryRequest(t, http.MethodGet, "/bkt/k", q)
 	rec := httptest.NewRecorder()
 	a.Handler().ServeHTTP(rec, req)
 
@@ -182,7 +183,7 @@ func TestServeRejects(t *testing.T) {
 }
 
 func TestServeSignedPutGet(t *testing.T) {
-	ctx := context.Background()
+	ctx := t.Context()
 	a := newTestAdapter(t, storage.Options{})
 
 	pu, err := a.PresignUpload(ctx, "bkt", "obj.txt", "text/plain", time.Hour)
@@ -190,7 +191,7 @@ func TestServeSignedPutGet(t *testing.T) {
 		t.Fatalf("PresignUpload: %v", err)
 	}
 
-	rec := doServe(a, http.MethodPut, signedTarget(t, pu.URL), strings.NewReader("hello"), nil)
+	rec := doServe(t, a, http.MethodPut, signedTarget(t, pu.URL), strings.NewReader("hello"), nil)
 	if rec.Code != http.StatusNoContent {
 		t.Fatalf("PUT signed = %d, want 204", rec.Code)
 	}
@@ -205,7 +206,7 @@ func TestServeSignedPutGet(t *testing.T) {
 		t.Fatalf("PresignDownload: %v", err3)
 	}
 
-	rec2 := doServe(a, http.MethodGet, signedTarget(t, pd.URL), nil, nil)
+	rec2 := doServe(t, a, http.MethodGet, signedTarget(t, pd.URL), nil, nil)
 	if rec2.Code != http.StatusOK || rec2.Body.String() != "hello" {
 		t.Errorf("GET signed = %d body %q, want 200 hello", rec2.Code, rec2.Body.String())
 	}
@@ -216,7 +217,7 @@ func TestServeSignedPutGet(t *testing.T) {
 }
 
 func TestServeSignedWithURLBase(t *testing.T) {
-	ctx := context.Background()
+	ctx := t.Context()
 	a := newTestAdapter(t, storage.Options{URLBase: "https://cdn.example.com/base"})
 
 	pu, err := a.PresignUpload(ctx, "bkt", "a/b.bin", "", time.Hour)
@@ -229,7 +230,7 @@ func TestServeSignedWithURLBase(t *testing.T) {
 		t.Fatalf("target = %q, want /base/ prefix", target)
 	}
 
-	if rec := doServe(a, http.MethodPut, target, strings.NewReader("based"), nil); rec.Code != http.StatusNoContent {
+	if rec := doServe(t, a, http.MethodPut, target, strings.NewReader("based"), nil); rec.Code != http.StatusNoContent {
 		t.Fatalf("PUT base = %d, want 204", rec.Code)
 	}
 
@@ -238,7 +239,7 @@ func TestServeSignedWithURLBase(t *testing.T) {
 		t.Fatalf("PresignDownload: %v", err2)
 	}
 
-	rec := doServe(a, http.MethodGet, signedTarget(t, pd.URL), nil, nil)
+	rec := doServe(t, a, http.MethodGet, signedTarget(t, pd.URL), nil, nil)
 	if rec.Code != http.StatusOK || rec.Body.String() != "based" {
 		t.Errorf("GET base = %d body %q, want 200 based", rec.Code, rec.Body.String())
 	}
@@ -265,22 +266,22 @@ func TestServeUnsigned(t *testing.T) {
 		t.Fatalf("write: %v", err)
 	}
 
-	rec := doServe(a, http.MethodGet, "/pub/obj", nil, nil)
+	rec := doServe(t, a, http.MethodGet, "/pub/obj", nil, nil)
 	if rec.Code != http.StatusOK || rec.Body.String() != "pubdata" {
 		t.Errorf("GET public = %d body %q, want 200 pubdata", rec.Code, rec.Body.String())
 	}
 
-	if rec := doServe(a, http.MethodGet, "/pub/missing", nil, nil); rec.Code != http.StatusNotFound {
+	if rec := doServe(t, a, http.MethodGet, "/pub/missing", nil, nil); rec.Code != http.StatusNotFound {
 		t.Errorf("GET public missing = %d, want 404", rec.Code)
 	}
 
-	rec2 := doServe(a, http.MethodPut, "/pub/new.txt", strings.NewReader("hello"),
+	rec2 := doServe(t, a, http.MethodPut, "/pub/new.txt", strings.NewReader("hello"),
 		map[string]string{"Content-Type": "text/plain"})
 	if rec2.Code != http.StatusNoContent {
 		t.Fatalf("PUT public = %d, want 204", rec2.Code)
 	}
 
-	rec3 := doServe(a, http.MethodGet, "/pub/new.txt", nil, nil)
+	rec3 := doServe(t, a, http.MethodGet, "/pub/new.txt", nil, nil)
 	if rec3.Code != http.StatusOK || rec3.Body.String() != "hello" {
 		t.Errorf("GET after PUT = %d body %q, want 200 hello", rec3.Code, rec3.Body.String())
 	}
@@ -295,20 +296,20 @@ func TestServeUnsigned(t *testing.T) {
 		},
 	})
 
-	if rec := doServe(priv, http.MethodGet, "/bkt/k", nil, nil); rec.Code != http.StatusForbidden {
+	if rec := doServe(t, priv, http.MethodGet, "/bkt/k", nil, nil); rec.Code != http.StatusForbidden {
 		t.Errorf("GET private = %d, want 403", rec.Code)
 	}
 
-	if rec := doServe(priv, http.MethodPut, "/bkt/k", strings.NewReader("x"), nil); rec.Code != http.StatusForbidden {
+	if rec := doServe(t, priv, http.MethodPut, "/bkt/k", strings.NewReader("x"), nil); rec.Code != http.StatusForbidden {
 		t.Errorf("PUT private = %d, want 403", rec.Code)
 	}
 
 	legacy := newTestAdapter(t, storage.Options{})
-	if rec := doServe(legacy, http.MethodGet, "/bkt/k", nil, nil); rec.Code != http.StatusForbidden {
+	if rec := doServe(t, legacy, http.MethodGet, "/bkt/k", nil, nil); rec.Code != http.StatusForbidden {
 		t.Errorf("GET unconfigured = %d, want 403", rec.Code)
 	}
 
-	if rec := doServe(legacy, http.MethodPut, "/bkt/k", strings.NewReader("x"), nil); rec.Code != http.StatusForbidden {
+	if rec := doServe(t, legacy, http.MethodPut, "/bkt/k", strings.NewReader("x"), nil); rec.Code != http.StatusForbidden {
 		t.Errorf("PUT unconfigured = %d, want 403", rec.Code)
 	}
 }
@@ -333,7 +334,7 @@ func TestServeUnsignedUploadPermError(t *testing.T) {
 
 	defer func() { _ = os.Chmod(bdir, 0o700) }()
 
-	if rec := doServe(a, http.MethodPut, "/bkt/k", strings.NewReader("x"), nil); rec.Code != http.StatusInternalServerError {
+	if rec := doServe(t, a, http.MethodPut, "/bkt/k", strings.NewReader("x"), nil); rec.Code != http.StatusInternalServerError {
 		t.Errorf("PUT stat-error = %d, want 500", rec.Code)
 	}
 }
@@ -357,7 +358,7 @@ func TestValidRequest(t *testing.T) {
 	q.Set("expires", "abc")
 	q.Set("sig", "x")
 
-	if open.validRequest(queryRequest(http.MethodGet, "/b/k", q), "b", "k") {
+	if open.validRequest(queryRequest(t, http.MethodGet, "/b/k", q), "b", "k") {
 		t.Errorf("bad expires accepted")
 	}
 
@@ -366,7 +367,7 @@ func TestValidRequest(t *testing.T) {
 	q2.Set("expires", itoa(past))
 	q2.Set("sig", pastSig)
 
-	if open.validRequest(queryRequest(http.MethodGet, "/b/k", q2), "b", "k") {
+	if open.validRequest(queryRequest(t, http.MethodGet, "/b/k", q2), "b", "k") {
 		t.Errorf("expired accepted")
 	}
 
@@ -375,7 +376,7 @@ func TestValidRequest(t *testing.T) {
 	q3.Set("expires", itoa(future))
 	q3.Set("sig", privSig)
 
-	if a.validRequest(queryRequest(http.MethodGet, "/any/k", q3), "any", "k") {
+	if a.validRequest(queryRequest(t, http.MethodGet, "/any/k", q3), "any", "k") {
 		t.Errorf("absent-sub private GET accepted")
 	}
 
@@ -384,7 +385,7 @@ func TestValidRequest(t *testing.T) {
 	q4.Set("expires", itoa(future))
 	q4.Set("sig", pubSig)
 
-	if !a.validRequest(queryRequest(http.MethodGet, "/pub/k", q4), "pub", "k") {
+	if !a.validRequest(queryRequest(t, http.MethodGet, "/pub/k", q4), "pub", "k") {
 		t.Errorf("absent-sub public GET rejected")
 	}
 
@@ -393,7 +394,7 @@ func TestValidRequest(t *testing.T) {
 	q5.Set("expires", itoa(future))
 	q5.Set("sig", putSig)
 
-	if a.validRequest(queryRequest(http.MethodPut, "/wpub/k", q5), "wpub", "k") {
+	if a.validRequest(queryRequest(t, http.MethodPut, "/wpub/k", q5), "wpub", "k") {
 		t.Errorf("write-only-public PUT without sub accepted")
 	}
 
@@ -402,7 +403,7 @@ func TestValidRequest(t *testing.T) {
 	q6.Set("expires", itoa(future))
 	q6.Set("sig", wuSig)
 
-	if !a.validRequest(queryRequest(http.MethodPut, "/wu/k", q6), "wu", "k") {
+	if !a.validRequest(queryRequest(t, http.MethodPut, "/wu/k", q6), "wu", "k") {
 		t.Errorf("write+update-public PUT without sub rejected")
 	}
 
@@ -412,7 +413,7 @@ func TestValidRequest(t *testing.T) {
 	q7.Set("expires", itoa(future))
 	q7.Set("sig", openSig)
 
-	if !open.validRequest(queryRequest(http.MethodPut, "/b/k", q7), "b", "k") {
+	if !open.validRequest(queryRequest(t, http.MethodPut, "/b/k", q7), "b", "k") {
 		t.Errorf("unconfigured PUT rejected")
 	}
 
@@ -420,7 +421,7 @@ func TestValidRequest(t *testing.T) {
 	q8.Set("expires", itoa(future))
 	q8.Set("sig", "deadbeef")
 
-	if open.validRequest(queryRequest(http.MethodGet, "/b/k", q8), "b", "k") {
+	if open.validRequest(queryRequest(t, http.MethodGet, "/b/k", q8), "b", "k") {
 		t.Errorf("short sig accepted")
 	}
 
@@ -435,7 +436,7 @@ func TestValidRequest(t *testing.T) {
 	q9.Set("expires", itoa(future))
 	q9.Set("sig", good[:len(good)-1]+string(flip))
 
-	if open.validRequest(queryRequest(http.MethodGet, "/b/k", q9), "b", "k") {
+	if open.validRequest(queryRequest(t, http.MethodGet, "/b/k", q9), "b", "k") {
 		t.Errorf("wrong sig accepted")
 	}
 
@@ -443,7 +444,7 @@ func TestValidRequest(t *testing.T) {
 	q10.Set("expires", itoa(future))
 	q10.Set("sig", good)
 
-	if !open.validRequest(queryRequest(http.MethodGet, "/b/k", q10), "b", "k") {
+	if !open.validRequest(queryRequest(t, http.MethodGet, "/b/k", q10), "b", "k") {
 		t.Errorf("correct sig rejected")
 	}
 
@@ -453,7 +454,7 @@ func TestValidRequest(t *testing.T) {
 	q11.Set("sig", aliceSig)
 	q11.Set("sub", "alice")
 
-	if !a.validRequest(queryRequest(http.MethodGet, "/any/k", q11), "any", "k") {
+	if !a.validRequest(queryRequest(t, http.MethodGet, "/any/k", q11), "any", "k") {
 		t.Errorf("private GET with sub rejected")
 	}
 }
@@ -598,16 +599,18 @@ func TestWriteMetaTemp(t *testing.T) {
 	}
 }
 
-func putDirect(a *localAdapter, full, body, ct string) *httptest.ResponseRecorder {
-	req := httptest.NewRequestWithContext(context.Background(), http.MethodPut, "/x", strings.NewReader(body))
+func putDirect(t *testing.T, a *localAdapter, full, body, ct string) *httptest.ResponseRecorder {
+	t.Helper()
+	req := httptest.NewRequestWithContext(t.Context(), http.MethodPut, "/x", strings.NewReader(body))
 	rec := httptest.NewRecorder()
 	a.put(rec, req, full, 0o600, ct)
 
 	return rec
 }
 
-func putDirectReader(a *localAdapter, full string, body io.Reader, ct string) *httptest.ResponseRecorder {
-	req := httptest.NewRequestWithContext(context.Background(), http.MethodPut, "/x", body)
+func putDirectReader(t *testing.T, a *localAdapter, full string, body io.Reader, ct string) *httptest.ResponseRecorder {
+	t.Helper()
+	req := httptest.NewRequestWithContext(t.Context(), http.MethodPut, "/x", body)
 	rec := httptest.NewRecorder()
 	a.put(rec, req, full, 0o600, ct)
 
@@ -617,7 +620,7 @@ func putDirectReader(a *localAdapter, full string, body io.Reader, ct string) *h
 func TestPutBranches(t *testing.T) {
 	a := newTestAdapter(t, storage.Options{})
 
-	if rec := putDirect(a, filepath.Join(a.root, "..", "evil"), "x", ""); rec.Code != http.StatusForbidden {
+	if rec := putDirect(t, a, filepath.Join(a.root, "..", "evil"), "x", ""); rec.Code != http.StatusForbidden {
 		t.Errorf("outside root = %d, want 403", rec.Code)
 	}
 
@@ -628,19 +631,19 @@ func TestPutBranches(t *testing.T) {
 
 	defer func() { _ = os.Chmod(locked, 0o700) }()
 
-	if rec := putDirect(a, filepath.Join(locked, "child", "f"), "x", ""); rec.Code != http.StatusInternalServerError {
+	if rec := putDirect(t, a, filepath.Join(locked, "child", "f"), "x", ""); rec.Code != http.StatusInternalServerError {
 		t.Errorf("mkdir fail = %d, want 500", rec.Code)
 	}
 
 	full := filepath.Join(a.root, "bkt", "f")
-	if rec := putDirectReader(a, full, handlerErrReader{}, ""); rec.Code != http.StatusInternalServerError {
+	if rec := putDirectReader(t, a, full, handlerErrReader{}, ""); rec.Code != http.StatusInternalServerError {
 		t.Errorf("body err = %d, want 500", rec.Code)
 	}
 
 	old := maxBody
 	maxBody = 4
 
-	if rec := putDirect(a, filepath.Join(a.root, "bkt", "big"), "toolarge", ""); rec.Code != http.StatusRequestEntityTooLarge {
+	if rec := putDirect(t, a, filepath.Join(a.root, "bkt", "big"), "toolarge", ""); rec.Code != http.StatusRequestEntityTooLarge {
 		t.Errorf("oversize = %d, want 413", rec.Code)
 	}
 
@@ -655,7 +658,7 @@ func TestPutBranches(t *testing.T) {
 		t.Fatalf("write: %v", err)
 	}
 
-	if rec := putDirect(a, dirTarget, "x", ""); rec.Code != http.StatusInternalServerError {
+	if rec := putDirect(t, a, dirTarget, "x", ""); rec.Code != http.StatusInternalServerError {
 		t.Errorf("rename onto dir = %d, want 500", rec.Code)
 	}
 
@@ -668,7 +671,7 @@ func TestPutBranches(t *testing.T) {
 		t.Fatalf("write: %v", err)
 	}
 
-	if rec := putDirect(a, metaBlock, "x", "text/plain"); rec.Code != http.StatusInternalServerError {
+	if rec := putDirect(t, a, metaBlock, "x", "text/plain"); rec.Code != http.StatusInternalServerError {
 		t.Errorf("meta rename fail = %d, want 500", rec.Code)
 	}
 
@@ -689,7 +692,7 @@ func TestPutBranches(t *testing.T) {
 		t.Fatalf("write: %v", err)
 	}
 
-	if rec := putDirect(a, stale, "new", ""); rec.Code != http.StatusNoContent {
+	if rec := putDirect(t, a, stale, "new", ""); rec.Code != http.StatusNoContent {
 		t.Fatalf("stale-meta put = %d, want 204", rec.Code)
 	}
 
@@ -703,7 +706,7 @@ func TestPutBranches(t *testing.T) {
 	}
 
 	typed := filepath.Join(a.root, "bkt", "typed.bin")
-	if rec := putDirect(a, typed, "pix", "image/png"); rec.Code != http.StatusNoContent {
+	if rec := putDirect(t, a, typed, "pix", "image/png"); rec.Code != http.StatusNoContent {
 		t.Fatalf("typed put = %d, want 204", rec.Code)
 	}
 

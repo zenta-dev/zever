@@ -6,7 +6,6 @@ package smtp
 import (
 	"bufio"
 	"bytes"
-	"context"
 	"crypto/ecdsa"
 	"crypto/elliptic"
 	"crypto/rand"
@@ -149,7 +148,7 @@ func TestCoverRandomSeam(t *testing.T) {
 		t.Fatalf("New: %v", err)
 	}
 	defer func() { _ = m.Close() }()
-	err = m.Send(context.Background(), coverInternalMail())
+	err = m.Send(t.Context(), coverInternalMail())
 	if err == nil || !strings.Contains(err.Error(), "build message") {
 		t.Errorf("Send err = %v, want build-message wrap", err)
 	}
@@ -332,7 +331,7 @@ func TestCoverContentType(t *testing.T) {
 func startCoverBlackhole(t *testing.T) int {
 	t.Helper()
 	lc := net.ListenConfig{}
-	ln, err := lc.Listen(context.Background(), "tcp", "127.0.0.1:0")
+	ln, err := lc.Listen(t.Context(), "tcp", "127.0.0.1:0")
 	if err != nil {
 		t.Fatalf("listen: %v", err)
 	}
@@ -367,7 +366,7 @@ func TestCoverDialSetDeadlineFail(t *testing.T) {
 		t.Fatalf("New: %v", err)
 	}
 	defer func() { _ = m.Close() }()
-	err = m.Send(context.Background(), coverInternalMail())
+	err = m.Send(t.Context(), coverInternalMail())
 	if err == nil || !strings.Contains(err.Error(), "set deadline") {
 		t.Errorf("Send err = %v, want set-deadline failure", err)
 	}
@@ -573,7 +572,7 @@ func TestCoverImplicitTLS(t *testing.T) {
 			t.Fatalf("New: %v", err)
 		}
 		defer func() { _ = m.Close() }()
-		if err := m.Send(context.Background(), coverInternalMail()); err != nil {
+		if err := m.Send(t.Context(), coverInternalMail()); err != nil {
 			t.Fatalf("Send: %v", err)
 		}
 		seen.mu.Lock()
@@ -596,7 +595,7 @@ func TestCoverImplicitTLS(t *testing.T) {
 			t.Fatalf("New: %v", err)
 		}
 		defer func() { _ = m.Close() }()
-		err = m.Send(context.Background(), coverInternalMail())
+		err = m.Send(t.Context(), coverInternalMail())
 		if err == nil || !strings.Contains(err.Error(), "auth") {
 			t.Errorf("Send err = %v, want auth failure", err)
 		}
@@ -620,7 +619,7 @@ func TestCoverImplicitTLS(t *testing.T) {
 			t.Fatalf("New: %v", err)
 		}
 		defer func() { _ = m.Close() }()
-		err = m.Send(context.Background(), coverInternalMail())
+		err = m.Send(t.Context(), coverInternalMail())
 		if err == nil || !strings.Contains(err.Error(), "set deadline") {
 			t.Errorf("Send err = %v, want set-deadline failure", err)
 		}

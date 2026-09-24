@@ -70,7 +70,7 @@ func newTestSetup(t *testing.T) testSetup {
 
 	c := container.New(cfg)
 
-	ctx := context.Background()
+	ctx := t.Context()
 	database, err := c.DB()
 	if err != nil {
 		t.Fatalf("DB: %v", err)
@@ -170,7 +170,7 @@ func newTestSetup(t *testing.T) testSetup {
 	}
 
 	t.Cleanup(func() {
-		_ = c.Close(context.Background())
+		_ = c.Close(t.Context())
 	})
 
 	api.New(d).Routes(r)
@@ -194,7 +194,7 @@ func do(t *testing.T, h http.Handler, method, path, token string, body any) *htt
 			t.Fatalf("encode: %v", err)
 		}
 	}
-	req := httptest.NewRequestWithContext(context.Background(), method, path, &buf)
+	req := httptest.NewRequestWithContext(t.Context(), method, path, &buf)
 	if contentType != "" {
 		req.Header.Set("Content-Type", contentType)
 	}
@@ -238,7 +238,7 @@ func login(t *testing.T, h http.Handler, email string) string {
 // makeCategory inserts one category directly.
 func makeCategory(t *testing.T, s testSetup, id, name string) {
 	t.Helper()
-	if _, err := s.db.Exec(context.Background(),
+	if _, err := s.db.Exec(t.Context(),
 		`INSERT INTO categories (id, name, description, created_at) VALUES (?, ?, ?, ?)`,
 		id, name, name+" desc", "2026-01-02T03:04:05Z"); err != nil {
 		t.Fatalf("category: %v", err)

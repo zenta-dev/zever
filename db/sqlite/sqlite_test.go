@@ -36,7 +36,7 @@ func newTempDB(t *testing.T, opts db.Options) db.DB {
 	}
 
 	t.Cleanup(func() {
-		_ = d.Close(context.Background())
+		_ = d.Close(t.Context())
 	})
 
 	return d
@@ -52,7 +52,7 @@ func newMemoryDB(t *testing.T) db.DB {
 	}
 
 	t.Cleanup(func() {
-		_ = d.Close(context.Background())
+		_ = d.Close(t.Context())
 	})
 
 	return d
@@ -62,7 +62,7 @@ func newMemoryDB(t *testing.T) db.DB {
 func mustExec(t *testing.T, d db.DB, query string, args ...any) int64 {
 	t.Helper()
 
-	n, err := d.Exec(context.Background(), query, args...)
+	n, err := d.Exec(t.Context(), query, args...)
 	if err != nil {
 		t.Fatalf("Exec(%q): %v", query, err)
 	}
@@ -113,9 +113,9 @@ func TestNew_DefaultPath(t *testing.T) {
 	if err != nil {
 		t.Fatalf("New: %v", err)
 	}
-	defer func() { _ = d.Close(context.Background()) }()
+	defer func() { _ = d.Close(t.Context()) }()
 
-	if err := d.Ping(context.Background()); err != nil {
+	if err := d.Ping(t.Context()); err != nil {
 		t.Fatalf("Ping: %v", err)
 	}
 
@@ -171,7 +171,7 @@ func TestNew_MemoryOverridesMaxConns(t *testing.T) {
 		t.Fatalf("New: %v", err)
 	}
 
-	t.Cleanup(func() { _ = d.Close(context.Background()) })
+	t.Cleanup(func() { _ = d.Close(t.Context()) })
 
 	a, ok := d.(*adapter)
 	if !ok {
@@ -225,12 +225,12 @@ func TestExec_RowsAffected(t *testing.T) {
 }
 
 func TestExec_BadSQL(t *testing.T) {
-	_, err := newMemoryDB(t).Exec(context.Background(), `INSERT INTO nope (x) VALUES (1)`)
+	_, err := newMemoryDB(t).Exec(t.Context(), `INSERT INTO nope (x) VALUES (1)`)
 	assertWrapped(t, "Exec", err)
 }
 
 func TestExec_CanceledContext(t *testing.T) {
-	ctx, cancel := context.WithCancel(context.Background())
+	ctx, cancel := context.WithCancel(t.Context())
 	cancel()
 
 	_, err := newMemoryDB(t).Exec(ctx, `SELECT 1`)
@@ -239,7 +239,7 @@ func TestExec_CanceledContext(t *testing.T) {
 
 func TestQuery_ScanColumnsErr(t *testing.T) {
 	d := newTempDB(t, db.Options{})
-	ctx := context.Background()
+	ctx := t.Context()
 
 	mustExec(t, d, `CREATE TABLE users (id INTEGER PRIMARY KEY, name TEXT)`)
 	mustExec(t, d, `INSERT INTO users (name) VALUES (?), (?)`, "alice", "bob")
@@ -289,7 +289,7 @@ func TestQuery_ScanColumnsErr(t *testing.T) {
 
 func TestQuery_NoRows(t *testing.T) {
 	d := newTempDB(t, db.Options{})
-	ctx := context.Background()
+	ctx := t.Context()
 
 	mustExec(t, d, `CREATE TABLE users (id INTEGER PRIMARY KEY, name TEXT)`)
 
@@ -313,12 +313,12 @@ func TestQuery_NoRows(t *testing.T) {
 }
 
 func TestQuery_BadSQL(t *testing.T) {
-	_, err := newMemoryDB(t).Query(context.Background(), `SELECT * FROM nope`)
+	_, err := newMemoryDB(t).Query(t.Context(), `SELECT * FROM nope`)
 	assertWrapped(t, "Query", err)
 }
 
 func TestQuery_CanceledContext(t *testing.T) {
-	ctx, cancel := context.WithCancel(context.Background())
+	ctx, cancel := context.WithCancel(t.Context())
 	cancel()
 
 	_, err := newMemoryDB(t).Query(ctx, `SELECT 1`)
@@ -327,7 +327,7 @@ func TestQuery_CanceledContext(t *testing.T) {
 
 func TestColumns_ClosedRows(t *testing.T) {
 	d := newMemoryDB(t)
-	ctx := context.Background()
+	ctx := t.Context()
 
 	mustExec(t, d, `CREATE TABLE t (id INTEGER PRIMARY KEY)`)
 
@@ -348,14 +348,14 @@ func TestColumns_ClosedRows(t *testing.T) {
 }
 
 func TestPing(t *testing.T) {
-	if err := newMemoryDB(t).Ping(context.Background()); err != nil {
+	if err := newMemoryDB(t).Ping(t.Context()); err != nil {
 		t.Fatalf("Ping: %v", err)
 	}
 }
 
 func TestClose_PingAfterClose(t *testing.T) {
 	d := newTempDB(t, db.Options{})
-	ctx := context.Background()
+	ctx := t.Context()
 
 	if err := d.Close(ctx); err != nil {
 		t.Fatalf("Close: %v", err)
@@ -367,7 +367,7 @@ func TestClose_PingAfterClose(t *testing.T) {
 func TestClose_CanceledContext(t *testing.T) {
 	d := newTempDB(t, db.Options{})
 
-	ctx, cancel := context.WithCancel(context.Background())
+	ctx, cancel := context.WithCancel(t.Context())
 	cancel()
 
 	err := d.Close(ctx)
@@ -378,7 +378,7 @@ func TestClose_CanceledContext(t *testing.T) {
 
 func TestClose_StmtError(t *testing.T) {
 	d := newMemoryDB(t)
-	ctx := context.Background()
+	ctx := t.Context()
 
 	a, ok := d.(*adapter)
 	if !ok {
@@ -422,7 +422,7 @@ func TestClose_StmtError(t *testing.T) {
 
 func TestAdapter_OnClosedPool(t *testing.T) {
 	d := newMemoryDB(t)
-	ctx := context.Background()
+	ctx := t.Context()
 
 	if err := d.Close(ctx); err != nil {
 		t.Fatalf("Close: %v", err)
@@ -465,7 +465,7 @@ func TestAdapter_OnClosedPool(t *testing.T) {
 
 func TestBeginTx_NilOptsAndLevels(t *testing.T) {
 	d := newTempDB(t, db.Options{})
-	ctx := context.Background()
+	ctx := t.Context()
 
 	mustExec(t, d, `CREATE TABLE t (id INTEGER PRIMARY KEY, v TEXT)`)
 
@@ -527,7 +527,7 @@ func TestBeginTx_NilOptsAndLevels(t *testing.T) {
 
 func TestTx_CommitRollback(t *testing.T) {
 	d := newTempDB(t, db.Options{})
-	ctx := context.Background()
+	ctx := t.Context()
 
 	mustExec(t, d, `CREATE TABLE users (id INTEGER PRIMARY KEY, name TEXT)`)
 
@@ -587,7 +587,7 @@ func TestTx_CommitRollback(t *testing.T) {
 
 func TestTx_DoubleCommit(t *testing.T) {
 	d := newTempDB(t, db.Options{})
-	ctx := context.Background()
+	ctx := t.Context()
 
 	mustExec(t, d, `CREATE TABLE t (id INTEGER PRIMARY KEY)`)
 
@@ -623,7 +623,7 @@ func TestTx_DoubleCommit(t *testing.T) {
 
 func TestTx_RollbackIdempotent(t *testing.T) {
 	d := newTempDB(t, db.Options{})
-	ctx := context.Background()
+	ctx := t.Context()
 
 	mustExec(t, d, `CREATE TABLE t (id INTEGER PRIMARY KEY)`)
 
@@ -652,7 +652,7 @@ func TestTx_RollbackIdempotent(t *testing.T) {
 
 func TestTx_CommitDriverError(t *testing.T) {
 	d := newMemoryDB(t)
-	ctx := context.Background()
+	ctx := t.Context()
 
 	tr, ok := d.(db.Transactor)
 	if !ok {
@@ -684,7 +684,7 @@ func TestTx_CommitDriverError(t *testing.T) {
 
 func TestTx_RollbackDriverError(t *testing.T) {
 	d := newMemoryDB(t)
-	ctx := context.Background()
+	ctx := t.Context()
 
 	tr, ok := d.(db.Transactor)
 	if !ok {
@@ -707,7 +707,7 @@ func TestTx_RollbackDriverError(t *testing.T) {
 
 func TestTx_ClosePropagatesRollbackError(t *testing.T) {
 	d := newMemoryDB(t)
-	ctx := context.Background()
+	ctx := t.Context()
 
 	tr, ok := d.(db.Transactor)
 	if !ok {
@@ -731,7 +731,7 @@ func TestTx_ClosePropagatesRollbackError(t *testing.T) {
 
 func TestTx_CloseRollsBack(t *testing.T) {
 	d := newTempDB(t, db.Options{})
-	ctx := context.Background()
+	ctx := t.Context()
 
 	mustExec(t, d, `CREATE TABLE users (id INTEGER PRIMARY KEY, name TEXT)`)
 
@@ -772,7 +772,7 @@ func TestTx_CloseRollsBack(t *testing.T) {
 
 func TestTx_BadQueryExec(t *testing.T) {
 	d := newTempDB(t, db.Options{})
-	ctx := context.Background()
+	ctx := t.Context()
 
 	mustExec(t, d, `CREATE TABLE t (id INTEGER PRIMARY KEY)`)
 
@@ -802,7 +802,7 @@ func TestTx_BadQueryExec(t *testing.T) {
 
 func TestWithTx_SuccessAndRollback(t *testing.T) {
 	d := newTempDB(t, db.Options{})
-	ctx := context.Background()
+	ctx := t.Context()
 
 	mustExec(t, d, `CREATE TABLE users (id INTEGER PRIMARY KEY, name TEXT)`)
 
@@ -861,7 +861,7 @@ func TestWithTx_SuccessAndRollback(t *testing.T) {
 
 func TestSavepoint_RollbackTo(t *testing.T) {
 	d := newTempDB(t, db.Options{})
-	ctx := context.Background()
+	ctx := t.Context()
 
 	mustExec(t, d, `CREATE TABLE users (id INTEGER PRIMARY KEY, name TEXT)`)
 
@@ -928,7 +928,7 @@ func TestSavepoint_RollbackTo(t *testing.T) {
 
 func TestSavepoint_InvalidNames(t *testing.T) {
 	d := newTempDB(t, db.Options{})
-	ctx := context.Background()
+	ctx := t.Context()
 
 	mustExec(t, d, `CREATE TABLE t (id INTEGER PRIMARY KEY)`)
 
@@ -963,7 +963,7 @@ func TestSavepoint_InvalidNames(t *testing.T) {
 
 func TestSavepoint_AfterCommit(t *testing.T) {
 	d := newTempDB(t, db.Options{})
-	ctx := context.Background()
+	ctx := t.Context()
 
 	mustExec(t, d, `CREATE TABLE t (id INTEGER PRIMARY KEY)`)
 
@@ -987,7 +987,7 @@ func TestSavepoint_AfterCommit(t *testing.T) {
 
 func TestPrepare_CacheHit(t *testing.T) {
 	d := newMemoryDB(t)
-	ctx := context.Background()
+	ctx := t.Context()
 
 	mustExec(t, d, `CREATE TABLE t (id INTEGER PRIMARY KEY, v TEXT)`)
 
@@ -1064,13 +1064,13 @@ func TestPrepare_BadSQL(t *testing.T) {
 		t.Fatal("adapter does not implement db.Preparer")
 	}
 
-	_, err := p.Prepare(context.Background(), `SELECT * FROM nope WHERE (`)
+	_, err := p.Prepare(t.Context(), `SELECT * FROM nope WHERE (`)
 	assertWrapped(t, "Prepare", err)
 }
 
 func TestPrepare_ConcurrentSameQuery(t *testing.T) {
 	d := newMemoryDB(t)
-	ctx := context.Background()
+	ctx := t.Context()
 
 	mustExec(t, d, `CREATE TABLE t (id INTEGER PRIMARY KEY, v TEXT)`)
 	mustExec(t, d, `INSERT INTO t (v) VALUES (?), (?)`, "a", "b")
@@ -1145,7 +1145,7 @@ func TestPrepare_ConcurrentSameQuery(t *testing.T) {
 
 func TestStmt_QueryExecAfterDrop(t *testing.T) {
 	d := newMemoryDB(t)
-	ctx := context.Background()
+	ctx := t.Context()
 
 	mustExec(t, d, `CREATE TABLE t (id INTEGER PRIMARY KEY, v TEXT)`)
 
@@ -1456,7 +1456,7 @@ func TestBuildDSN_HashFileCreated(t *testing.T) {
 			t.Fatalf("New %q: %v", name+suffix, err)
 		}
 
-		t.Cleanup(func() { _ = d.Close(context.Background()) })
+		t.Cleanup(func() { _ = d.Close(t.Context()) })
 
 		if _, err := os.Stat(filepath.Join(dir, name)); err != nil {
 			t.Fatalf("want file %q, got %v", name, err)
@@ -1477,7 +1477,7 @@ func TestBuildDSN_PercentFileCreated(t *testing.T) {
 			t.Fatalf("New %q: %v", name, err)
 		}
 
-		t.Cleanup(func() { _ = d.Close(context.Background()) })
+		t.Cleanup(func() { _ = d.Close(t.Context()) })
 
 		if _, err := os.Stat(filepath.Join(dir, name)); err != nil {
 			t.Fatalf("want file %q, got %v", name, err)
@@ -1497,7 +1497,7 @@ func TestPragmas_OnConnection(t *testing.T) {
 
 	var fk, timeout int
 
-	if err := a.conn.QueryRowContext(context.Background(), `PRAGMA foreign_keys`).Scan(&fk); err != nil {
+	if err := a.conn.QueryRowContext(t.Context(), `PRAGMA foreign_keys`).Scan(&fk); err != nil {
 		t.Fatalf("foreign_keys pragma: %v", err)
 	}
 
@@ -1505,7 +1505,7 @@ func TestPragmas_OnConnection(t *testing.T) {
 		t.Fatalf("foreign_keys = %d, want 1", fk)
 	}
 
-	if err := a.conn.QueryRowContext(context.Background(), `PRAGMA busy_timeout`).Scan(&timeout); err != nil {
+	if err := a.conn.QueryRowContext(t.Context(), `PRAGMA busy_timeout`).Scan(&timeout); err != nil {
 		t.Fatalf("busy_timeout pragma: %v", err)
 	}
 
@@ -1516,7 +1516,7 @@ func TestPragmas_OnConnection(t *testing.T) {
 
 func TestFKEnforced(t *testing.T) {
 	d := newTempDB(t, db.Options{})
-	ctx := context.Background()
+	ctx := t.Context()
 
 	mustExec(t, d, `CREATE TABLE parent (id INTEGER PRIMARY KEY)`)
 	mustExec(t, d, `CREATE TABLE child (id INTEGER PRIMARY KEY, parent_id INTEGER REFERENCES parent(id))`)
@@ -1530,7 +1530,7 @@ func TestFKEnforced(t *testing.T) {
 
 func TestMemoryDB_ConcurrentUse(t *testing.T) {
 	d := newMemoryDB(t)
-	ctx := context.Background()
+	ctx := t.Context()
 
 	const n = 16
 
@@ -1647,7 +1647,7 @@ func TestStubAdapter_ExecRowsAffectedError(t *testing.T) {
 	a := newStubAdapter()
 	t.Cleanup(func() { _ = a.conn.Close() })
 
-	_, err := a.Exec(context.Background(), `INSERT INTO t (v) VALUES (?)`, "x")
+	_, err := a.Exec(t.Context(), `INSERT INTO t (v) VALUES (?)`, "x")
 	if !errors.Is(err, errStubRows) {
 		t.Fatalf("Exec = %v, want %v", err, errStubRows)
 	}
@@ -1657,7 +1657,7 @@ func TestStubAdapter_StmtRowsAffectedError(t *testing.T) {
 	a := newStubAdapter()
 	t.Cleanup(func() { _ = a.conn.Close() })
 
-	ctx := context.Background()
+	ctx := t.Context()
 
 	stmt, err := a.Prepare(ctx, `INSERT INTO t (v) VALUES (?)`)
 	if err != nil {
@@ -1674,7 +1674,7 @@ func TestStubAdapter_TxRowsAffectedError(t *testing.T) {
 	a := newStubAdapter()
 	t.Cleanup(func() { _ = a.conn.Close() })
 
-	ctx := context.Background()
+	ctx := t.Context()
 
 	tx, err := a.BeginTx(ctx, nil)
 	if err != nil {
@@ -1690,7 +1690,7 @@ func TestStubAdapter_TxRowsAffectedError(t *testing.T) {
 func TestStubAdapter_CloseConnError(t *testing.T) {
 	a := &adapter{conn: sql.OpenDB(stubConnector{closeErr: errStubConnClose}), stmtCache: newStmtCache(4)}
 
-	if err := a.Close(context.Background()); !errors.Is(err, errStubConnClose) {
+	if err := a.Close(t.Context()); !errors.Is(err, errStubConnClose) {
 		t.Fatalf("Close = %v, want %v", err, errStubConnClose)
 	}
 }

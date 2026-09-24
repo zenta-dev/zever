@@ -1,7 +1,6 @@
 package memory
 
 import (
-	"context"
 	"errors"
 	"sync"
 	"testing"
@@ -13,7 +12,7 @@ import (
 func mustSet(t *testing.T, c cache.Cache, key string, value []byte, ttl time.Duration) {
 	t.Helper()
 
-	if err := c.Set(context.Background(), key, value, ttl); err != nil {
+	if err := c.Set(t.Context(), key, value, ttl); err != nil {
 		t.Fatalf("Set() error = %v", err)
 	}
 }
@@ -21,7 +20,7 @@ func mustSet(t *testing.T, c cache.Cache, key string, value []byte, ttl time.Dur
 func TestMemoryCompareAndDelete_matchDeletes(t *testing.T) {
 	t.Parallel()
 
-	ctx := context.Background()
+	ctx := t.Context()
 	c := newTestCache(t, cache.Options{})
 	mustSet(t, c, "k", []byte("holder1"), 0)
 
@@ -47,7 +46,7 @@ func TestMemoryCompareAndDelete_matchDeletes(t *testing.T) {
 func TestMemoryCompareAndDelete_mismatchKeeps(t *testing.T) {
 	t.Parallel()
 
-	ctx := context.Background()
+	ctx := t.Context()
 	c := newTestCache(t, cache.Options{})
 	mustSet(t, c, "k", []byte("holder1"), 0)
 
@@ -78,7 +77,7 @@ func TestMemoryCompareAndDelete_mismatchKeeps(t *testing.T) {
 func TestMemoryCompareAndDelete_missingOrExpiredFalse(t *testing.T) {
 	t.Parallel()
 
-	ctx := context.Background()
+	ctx := t.Context()
 	c := newTestCache(t, cache.Options{})
 
 	cas, ok := c.(cache.CompareAndSwapCache)
@@ -104,7 +103,7 @@ func TestMemoryCompareAndDelete_missingOrExpiredFalse(t *testing.T) {
 func TestMemoryCompareAndExtend_matchRenews(t *testing.T) {
 	t.Parallel()
 
-	ctx := context.Background()
+	ctx := t.Context()
 	c := newTestCache(t, cache.Options{})
 	mustSet(t, c, "k", []byte("holder1"), 60*time.Millisecond)
 
@@ -135,7 +134,7 @@ func TestMemoryCompareAndExtend_matchRenews(t *testing.T) {
 func TestMemoryCompareAndExtend_nonPositiveTTLClearsExpiry(t *testing.T) {
 	t.Parallel()
 
-	ctx := context.Background()
+	ctx := t.Context()
 	c := newTestCache(t, cache.Options{})
 	mustSet(t, c, "k", []byte("holder1"), 50*time.Millisecond)
 
@@ -161,7 +160,7 @@ func TestMemoryCompareAndExtend_nonPositiveTTLClearsExpiry(t *testing.T) {
 func TestMemoryCompareAndExtend_mismatchOrExpiredFalse(t *testing.T) {
 	t.Parallel()
 
-	ctx := context.Background()
+	ctx := t.Context()
 	c := newTestCache(t, cache.Options{})
 	mustSet(t, c, "k", []byte("holder1"), 0)
 
@@ -192,7 +191,7 @@ func TestMemoryCompareAndExtend_mismatchOrExpiredFalse(t *testing.T) {
 func TestMemoryCompareAndSwap_closedErrors(t *testing.T) {
 	t.Parallel()
 
-	ctx := context.Background()
+	ctx := t.Context()
 	c, err := New(cache.Options{})
 	if err != nil {
 		t.Fatalf("New() error = %v", err)
@@ -219,7 +218,7 @@ func TestMemoryCompareAndSwap_closedErrors(t *testing.T) {
 func TestMemoryCompareAndSwap_concurrentNoSteal(t *testing.T) {
 	t.Parallel()
 
-	ctx := context.Background()
+	ctx := t.Context()
 	c := newTestCache(t, cache.Options{})
 	mustSet(t, c, "k", []byte("owner"), 0)
 

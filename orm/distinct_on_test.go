@@ -1,7 +1,6 @@
 package orm
 
 import (
-	"context"
 	"errors"
 	"strings"
 	"testing"
@@ -13,7 +12,7 @@ import (
 // `SELECT DISTINCT ON (cols)` prefix and keeps ORDER BY for the deterministic
 // first-row-per-group semantics.
 func TestQueryDistinctOnRenders(t *testing.T) {
-	ctx := context.Background()
+	ctx := t.Context()
 
 	rec := &ormRecordingExec{dialectName: "postgres"}
 
@@ -39,7 +38,7 @@ func TestQueryDistinctOnRenders(t *testing.T) {
 // dialect.ErrUnsupportedByDialect on every dialect without the capability --
 // including a base-only dialect with no capability sub-interfaces at all.
 func TestQueryDistinctOnCapabilityGate(t *testing.T) {
-	ctx := context.Background()
+	ctx := t.Context()
 
 	for _, name := range []string{"sqlite", "mock-nocap"} {
 		t.Run(name, func(t *testing.T) {
@@ -54,7 +53,7 @@ func TestQueryDistinctOnCapabilityGate(t *testing.T) {
 // TestQueryDistinctOnWithLockRejected proves DISTINCT ON participates in the
 // existing DISTINCT + row-lock guard.
 func TestQueryDistinctOnWithLockRejected(t *testing.T) {
-	ctx := context.Background()
+	ctx := t.Context()
 
 	_, err := From(widgets).DistinctOn(widgetName.Col()).ForUpdate().All(ctx, mockExec{dialectName: "postgres"})
 	if !errors.Is(err, ErrLockingWithDistinct) {
@@ -65,7 +64,7 @@ func TestQueryDistinctOnWithLockRejected(t *testing.T) {
 // TestQueryDistinctOnEmptyRejected proves a zero-column DISTINCT ON is a
 // typed caller error rather than an invalid `DISTINCT ON ()`.
 func TestQueryDistinctOnEmptyRejected(t *testing.T) {
-	ctx := context.Background()
+	ctx := t.Context()
 
 	_, err := From(widgets).DistinctOn().All(ctx, mockExec{dialectName: "postgres"})
 	if err == nil {

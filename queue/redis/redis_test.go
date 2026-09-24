@@ -1,7 +1,6 @@
 package redis
 
 import (
-	"context"
 	"errors"
 	"strings"
 	"testing"
@@ -97,7 +96,7 @@ func TestRedisClosed_fastPaths(t *testing.T) {
 	t.Parallel()
 	a := &redisAdapter{}
 	a.closed.Store(true)
-	ctx := context.Background()
+	ctx := t.Context()
 	topic := "jobs"
 	payload := queue.Payload([]byte("p"))
 	headers := queue.Headers{"h": "v"}

@@ -61,8 +61,9 @@ func newConfigured(t *testing.T, def *storage.Policy, buckets map[storage.Bucket
 	return mustAdapter(t, s)
 }
 
-func ctxWithSubject(name string) context.Context {
-	return storage.WithSubject(context.Background(), storage.Subject(name))
+func ctxWithSubject(t *testing.T, name string) context.Context {
+	t.Helper()
+	return storage.WithSubject(t.Context(), storage.Subject(name))
 }
 
 func writeObject(t *testing.T, a *localAdapter, bucket, key, body string) string {
@@ -186,7 +187,7 @@ func TestLocalNewEphemeralSecret(t *testing.T) {
 	}
 
 	// Generated secret must be usable for presigning.
-	if _, err := s.PresignDownload(context.Background(), "bkt", "k", time.Hour); err != nil {
+	if _, err := s.PresignDownload(t.Context(), "bkt", "k", time.Hour); err != nil {
 		t.Fatal(err)
 	}
 }
@@ -367,19 +368,19 @@ func TestLocalCoreUploadPermStatError(t *testing.T) {
 func TestLocalCorePresignUploadValidate(t *testing.T) {
 	a := newUnconfigured(t, "")
 
-	if _, err := a.PresignUpload(context.Background(), "", "k", "", time.Hour); !errors.Is(err, storage.ErrInvalidBucket) {
+	if _, err := a.PresignUpload(t.Context(), "", "k", "", time.Hour); !errors.Is(err, storage.ErrInvalidBucket) {
 		t.Fatalf("expected ErrInvalidBucket, got %v", err)
 	}
 
-	if _, err := a.PresignUpload(context.Background(), "bkt", "../x", "", time.Hour); !errors.Is(err, storage.ErrInvalidKey) {
+	if _, err := a.PresignUpload(t.Context(), "bkt", "../x", "", time.Hour); !errors.Is(err, storage.ErrInvalidKey) {
 		t.Fatalf("expected ErrInvalidKey, got %v", err)
 	}
 
-	if _, err := a.PresignUpload(context.Background(), "bkt", "k", "", 0); err == nil {
+	if _, err := a.PresignUpload(t.Context(), "bkt", "k", "", 0); err == nil {
 		t.Fatal("expected expiry error for zero ttl")
 	}
 
-	if _, err := a.PresignUpload(context.Background(), "bkt", "k", "", 8*24*time.Hour); err == nil {
+	if _, err := a.PresignUpload(t.Context(), "bkt", "k", "", 8*24*time.Hour); err == nil {
 		t.Fatal("expected expiry error for oversize ttl")
 	}
 }
@@ -388,7 +389,7 @@ func TestLocalCorePresignUploadUnconfigured(t *testing.T) {
 	a := newUnconfigured(t, "https://cdn.example.com/base")
 
 	// Anonymous: no sub param, still signed.
-	got, err := a.PresignUpload(context.Background(), "bkt", "k", "text/plain", time.Hour)
+	got, err := a.PresignUpload(t.Context(), "bkt", "k", "text/plain", time.Hour)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -408,7 +409,7 @@ func TestLocalCorePresignUploadUnconfigured(t *testing.T) {
 	}
 
 	// With subject: sub param is bound into the URL.
-	got, err = a.PresignUpload(ctxWithSubject("alice"), "bkt", "k", "", time.Hour)
+	got, err = a.PresignUpload(ctxWithSubject(t, "alice"), "bkt", "k", "", time.Hour)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -424,7 +425,7 @@ func TestLocalCorePresignUploadPublicStatic(t *testing.T) {
 		Update: storage.Rule{Public: true},
 	}, nil)
 
-	got, err := a.PresignUpload(context.Background(), "bkt", "k", "text/plain", time.Hour)
+	got, err := a.PresignUpload(t.Context(), "bkt", "k", "text/plain", time.Hour)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -446,7 +447,7 @@ func TestLocalCorePresignUploadStatError(t *testing.T) {
 	a := newConfigured(t, needsCheckPolicy(), nil)
 	fileAsBucket(t, a, "bkt")
 
-	if _, err := a.PresignUpload(ctxWithSubject("alice"), "bkt", "k", "", time.Hour); err == nil {
+	if _, err := a.PresignUpload(ctxWithSubject(t, "alice"), "bkt", "k", "", time.Hour); err == nil {
 		t.Fatal("expected stat error")
 	}
 }
@@ -455,17 +456,17 @@ func TestLocalCorePresignUploadPolicyDecisions(t *testing.T) {
 	a := newConfigured(t, needsCheckPolicy(), nil)
 
 	// Anonymous is forbidden on a private bucket.
-	if _, err := a.PresignUpload(context.Background(), "bkt", "k", "", time.Hour); !errors.Is(err, storage.ErrForbidden) {
+	if _, err := a.PresignUpload(t.Context(), "bkt", "k", "", time.Hour); !errors.Is(err, storage.ErrForbidden) {
 		t.Fatalf("expected ErrForbidden, got %v", err)
 	}
 
 	// Subject without allow entry is forbidden.
-	if _, err := a.PresignUpload(ctxWithSubject("mallory"), "bkt", "k", "", time.Hour); !errors.Is(err, storage.ErrForbidden) {
+	if _, err := a.PresignUpload(ctxWithSubject(t, "mallory"), "bkt", "k", "", time.Hour); !errors.Is(err, storage.ErrForbidden) {
 		t.Fatalf("expected ErrForbidden, got %v", err)
 	}
 
 	// Allowed subject gets a signed URL.
-	got, err := a.PresignUpload(ctxWithSubject("alice"), "bkt", "k", "text/plain", time.Hour)
+	got, err := a.PresignUpload(ctxWithSubject(t, "alice"), "bkt", "k", "text/plain", time.Hour)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -485,19 +486,19 @@ func TestLocalCorePresignUploadWriteVsUpdate(t *testing.T) {
 	a := newConfigured(t, needsCheckPolicy(), nil)
 
 	// Missing object: write perm, alice allowed.
-	if _, err := a.PresignUpload(ctxWithSubject("alice"), "bkt", "new", "", time.Hour); err != nil {
+	if _, err := a.PresignUpload(ctxWithSubject(t, "alice"), "bkt", "new", "", time.Hour); err != nil {
 		t.Fatal(err)
 	}
 
 	writeObject(t, a, "bkt", "old", "data")
 
 	// Existing object: update perm, alice is not in update allow.
-	if _, err := a.PresignUpload(ctxWithSubject("alice"), "bkt", "old", "", time.Hour); !errors.Is(err, storage.ErrForbidden) {
+	if _, err := a.PresignUpload(ctxWithSubject(t, "alice"), "bkt", "old", "", time.Hour); !errors.Is(err, storage.ErrForbidden) {
 		t.Fatalf("expected ErrForbidden, got %v", err)
 	}
 
 	// Bob holds the update perm.
-	if _, err := a.PresignUpload(ctxWithSubject("bob"), "bkt", "old", "", time.Hour); err != nil {
+	if _, err := a.PresignUpload(ctxWithSubject(t, "bob"), "bkt", "old", "", time.Hour); err != nil {
 		t.Fatal(err)
 	}
 }
@@ -509,19 +510,19 @@ func TestLocalCorePresignUploadWriteVsUpdate(t *testing.T) {
 func TestLocalCorePresignDownloadValidate(t *testing.T) {
 	a := newUnconfigured(t, "")
 
-	if _, err := a.PresignDownload(context.Background(), "", "k", time.Hour); !errors.Is(err, storage.ErrInvalidBucket) {
+	if _, err := a.PresignDownload(t.Context(), "", "k", time.Hour); !errors.Is(err, storage.ErrInvalidBucket) {
 		t.Fatalf("expected ErrInvalidBucket, got %v", err)
 	}
 
-	if _, err := a.PresignDownload(context.Background(), "bkt", "../x", time.Hour); !errors.Is(err, storage.ErrInvalidKey) {
+	if _, err := a.PresignDownload(t.Context(), "bkt", "../x", time.Hour); !errors.Is(err, storage.ErrInvalidKey) {
 		t.Fatalf("expected ErrInvalidKey, got %v", err)
 	}
 
-	if _, err := a.PresignDownload(context.Background(), "bkt", "k", -time.Second); err == nil {
+	if _, err := a.PresignDownload(t.Context(), "bkt", "k", -time.Second); err == nil {
 		t.Fatal("expected expiry error for negative ttl")
 	}
 
-	if _, err := a.PresignDownload(context.Background(), "bkt", "k", 30*24*time.Hour); err == nil {
+	if _, err := a.PresignDownload(t.Context(), "bkt", "k", 30*24*time.Hour); err == nil {
 		t.Fatal("expected expiry error for oversize ttl")
 	}
 }
@@ -529,7 +530,7 @@ func TestLocalCorePresignDownloadValidate(t *testing.T) {
 func TestLocalCorePresignDownloadUnconfigured(t *testing.T) {
 	a := newUnconfigured(t, "https://cdn.example.com")
 
-	got, err := a.PresignDownload(ctxWithSubject("alice"), "bkt", "a/b", time.Hour)
+	got, err := a.PresignDownload(ctxWithSubject(t, "alice"), "bkt", "a/b", time.Hour)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -548,7 +549,7 @@ func TestLocalCorePresignDownloadUnconfigured(t *testing.T) {
 func TestLocalCorePresignDownloadPublicStatic(t *testing.T) {
 	a := newConfigured(t, &storage.Policy{Read: storage.Rule{Public: true}}, nil)
 
-	got, err := a.PresignDownload(context.Background(), "bkt", "k", time.Hour)
+	got, err := a.PresignDownload(t.Context(), "bkt", "k", time.Hour)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -565,15 +566,15 @@ func TestLocalCorePresignDownloadPublicStatic(t *testing.T) {
 func TestLocalCorePresignDownloadPolicyDecisions(t *testing.T) {
 	a := newConfigured(t, &storage.Policy{Read: storage.Rule{Allow: []storage.Subject{"alice"}}}, nil)
 
-	if _, err := a.PresignDownload(context.Background(), "bkt", "k", time.Hour); !errors.Is(err, storage.ErrForbidden) {
+	if _, err := a.PresignDownload(t.Context(), "bkt", "k", time.Hour); !errors.Is(err, storage.ErrForbidden) {
 		t.Fatalf("expected ErrForbidden, got %v", err)
 	}
 
-	if _, err := a.PresignDownload(ctxWithSubject("mallory"), "bkt", "k", time.Hour); !errors.Is(err, storage.ErrForbidden) {
+	if _, err := a.PresignDownload(ctxWithSubject(t, "mallory"), "bkt", "k", time.Hour); !errors.Is(err, storage.ErrForbidden) {
 		t.Fatalf("expected ErrForbidden, got %v", err)
 	}
 
-	got, err := a.PresignDownload(ctxWithSubject("alice"), "bkt", "k", time.Hour)
+	got, err := a.PresignDownload(ctxWithSubject(t, "alice"), "bkt", "k", time.Hour)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -590,11 +591,11 @@ func TestLocalCorePresignDownloadPolicyDecisions(t *testing.T) {
 func TestLocalCoreExists(t *testing.T) {
 	a := newUnconfigured(t, "")
 
-	if _, err := a.Exists(context.Background(), "", "k"); !errors.Is(err, storage.ErrInvalidBucket) {
+	if _, err := a.Exists(t.Context(), "", "k"); !errors.Is(err, storage.ErrInvalidBucket) {
 		t.Fatalf("expected ErrInvalidBucket, got %v", err)
 	}
 
-	found, err := a.Exists(context.Background(), "bkt", "missing")
+	found, err := a.Exists(t.Context(), "bkt", "missing")
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -605,7 +606,7 @@ func TestLocalCoreExists(t *testing.T) {
 
 	writeObject(t, a, "bkt", "present", "data")
 
-	found, err = a.Exists(context.Background(), "bkt", "present")
+	found, err = a.Exists(t.Context(), "bkt", "present")
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -617,7 +618,7 @@ func TestLocalCoreExists(t *testing.T) {
 	// Non-NotExist stat errors propagate.
 	fileAsBucket(t, a, "blocked")
 
-	if _, err := a.Exists(context.Background(), "blocked", "k"); err == nil {
+	if _, err := a.Exists(t.Context(), "blocked", "k"); err == nil {
 		t.Fatal("expected stat error")
 	}
 }
@@ -638,11 +639,11 @@ func TestLocalCoreExistsHelper(t *testing.T) {
 func TestLocalCoreDeleteValidate(t *testing.T) {
 	a := newUnconfigured(t, "")
 
-	if err := a.Delete(context.Background(), "", "k"); !errors.Is(err, storage.ErrInvalidBucket) {
+	if err := a.Delete(t.Context(), "", "k"); !errors.Is(err, storage.ErrInvalidBucket) {
 		t.Fatalf("expected ErrInvalidBucket, got %v", err)
 	}
 
-	if err := a.Delete(context.Background(), "bkt", "../x"); !errors.Is(err, storage.ErrInvalidKey) {
+	if err := a.Delete(t.Context(), "bkt", "../x"); !errors.Is(err, storage.ErrInvalidKey) {
 		t.Fatalf("expected ErrInvalidKey, got %v", err)
 	}
 }
@@ -651,7 +652,7 @@ func TestLocalCoreDeleteMissingIsNil(t *testing.T) {
 	a := newUnconfigured(t, "")
 
 	// Missing object and missing bucket both succeed (idempotent delete).
-	if err := a.Delete(context.Background(), "nobucket", "nokey"); err != nil {
+	if err := a.Delete(t.Context(), "nobucket", "nokey"); err != nil {
 		t.Fatal(err)
 	}
 }
@@ -665,7 +666,7 @@ func TestLocalCoreDeleteSuccessRemovesMeta(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	if err := a.Delete(context.Background(), "bkt", "k"); err != nil {
+	if err := a.Delete(t.Context(), "bkt", "k"); err != nil {
 		t.Fatal(err)
 	}
 
@@ -682,7 +683,7 @@ func TestLocalCoreDeletePolicyDeny(t *testing.T) {
 	a := newConfigured(t, &storage.Policy{}, nil)
 	writeObject(t, a, "bkt", "k", "data")
 
-	if err := a.Delete(ctxWithSubject("alice"), "bkt", "k"); !errors.Is(err, storage.ErrForbidden) {
+	if err := a.Delete(ctxWithSubject(t, "alice"), "bkt", "k"); !errors.Is(err, storage.ErrForbidden) {
 		t.Fatalf("expected ErrForbidden, got %v", err)
 	}
 
@@ -690,7 +691,7 @@ func TestLocalCoreDeletePolicyDeny(t *testing.T) {
 	ok := newConfigured(t, &storage.Policy{Delete: storage.Rule{Allow: []storage.Subject{"alice"}}}, nil)
 	writeObject(t, ok, "bkt", "k", "data")
 
-	if err := ok.Delete(ctxWithSubject("alice"), "bkt", "k"); err != nil {
+	if err := ok.Delete(ctxWithSubject(t, "alice"), "bkt", "k"); err != nil {
 		t.Fatal(err)
 	}
 }
@@ -703,7 +704,7 @@ func TestLocalCoreDeleteSymlinkEscape(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	if err := a.Delete(context.Background(), "link", "k"); !errors.Is(err, storage.ErrForbidden) {
+	if err := a.Delete(t.Context(), "link", "k"); !errors.Is(err, storage.ErrForbidden) {
 		t.Fatalf("expected ErrForbidden, got %v", err)
 	}
 }
@@ -712,7 +713,7 @@ func TestLocalCoreDeleteNonEmptyDir(t *testing.T) {
 	a := newUnconfigured(t, "")
 	writeObject(t, a, "bkt", "dir/file", "data")
 
-	err := a.Delete(context.Background(), "bkt", "dir")
+	err := a.Delete(t.Context(), "bkt", "dir")
 	if err == nil || !strings.Contains(err.Error(), "delete") {
 		t.Fatalf("expected delete error, got %v", err)
 	}
@@ -725,11 +726,11 @@ func TestLocalCoreDeleteNonEmptyDir(t *testing.T) {
 func TestLocalCoreMoveValidate(t *testing.T) {
 	a := newUnconfigured(t, "")
 
-	if err := a.Move(context.Background(), "", "k", "b", "k"); !errors.Is(err, storage.ErrInvalidBucket) {
+	if err := a.Move(t.Context(), "", "k", "b", "k"); !errors.Is(err, storage.ErrInvalidBucket) {
 		t.Fatalf("expected ErrInvalidBucket, got %v", err)
 	}
 
-	if err := a.Move(context.Background(), "b", "k", "b", "../x"); !errors.Is(err, storage.ErrInvalidKey) {
+	if err := a.Move(t.Context(), "b", "k", "b", "../x"); !errors.Is(err, storage.ErrInvalidKey) {
 		t.Fatalf("expected ErrInvalidKey, got %v", err)
 	}
 }
@@ -738,17 +739,17 @@ func TestLocalCoreMoveSelfNoop(t *testing.T) {
 	a := newUnconfigured(t, "")
 
 	// Self-move is a no-op even when the source does not exist.
-	if err := a.Move(context.Background(), "bkt", "k", "bkt", "k"); err != nil {
+	if err := a.Move(t.Context(), "bkt", "k", "bkt", "k"); err != nil {
 		t.Fatal(err)
 	}
 
 	writeObject(t, a, "bkt", "k", "data")
 
-	if err := a.Move(context.Background(), "bkt", "k", "bkt", "k"); err != nil {
+	if err := a.Move(t.Context(), "bkt", "k", "bkt", "k"); err != nil {
 		t.Fatal(err)
 	}
 
-	if _, err := a.Exists(context.Background(), "bkt", "k"); err != nil {
+	if _, err := a.Exists(t.Context(), "bkt", "k"); err != nil {
 		t.Fatal(err)
 	}
 }
@@ -756,7 +757,7 @@ func TestLocalCoreMoveSelfNoop(t *testing.T) {
 func TestLocalCoreMoveMissingSource(t *testing.T) {
 	a := newUnconfigured(t, "")
 
-	if err := a.Move(context.Background(), "bkt", "missing", "bkt", "dst"); !errors.Is(err, storage.ErrNotFound) {
+	if err := a.Move(t.Context(), "bkt", "missing", "bkt", "dst"); !errors.Is(err, storage.ErrNotFound) {
 		t.Fatalf("expected ErrNotFound, got %v", err)
 	}
 }
@@ -776,7 +777,7 @@ func TestLocalCoreMoveSymlinkSource(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	if err := a.Move(context.Background(), "bkt", "link", "bkt", "dst"); !errors.Is(err, storage.ErrForbidden) {
+	if err := a.Move(t.Context(), "bkt", "link", "bkt", "dst"); !errors.Is(err, storage.ErrForbidden) {
 		t.Fatalf("expected ErrForbidden, got %v", err)
 	}
 }
@@ -785,7 +786,7 @@ func TestLocalCoreMoveLstatError(t *testing.T) {
 	a := newUnconfigured(t, "")
 	fileAsBucket(t, a, "bkt")
 
-	err := a.Move(context.Background(), "bkt", "k", "bkt", "dst")
+	err := a.Move(t.Context(), "bkt", "k", "bkt", "dst")
 	if err == nil || !strings.Contains(err.Error(), "stat") {
 		t.Fatalf("expected stat error, got %v", err)
 	}
@@ -800,7 +801,7 @@ func TestLocalCoreMoveLexicalEscape(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	if err := a.Move(context.Background(), "bkt", "k", "link", "dst"); !errors.Is(err, storage.ErrForbidden) {
+	if err := a.Move(t.Context(), "bkt", "k", "link", "dst"); !errors.Is(err, storage.ErrForbidden) {
 		t.Fatalf("expected ErrForbidden, got %v", err)
 	}
 }
@@ -816,7 +817,7 @@ func TestLocalCoreMovePolicyDecisions(t *testing.T) {
 	a := mkdeny(t, storage.Policy{})
 	writeObject(t, a, "src", "k", "data")
 
-	if err := a.Move(ctxWithSubject("alice"), "src", "k", "dst", "k"); !errors.Is(err, storage.ErrForbidden) {
+	if err := a.Move(ctxWithSubject(t, "alice"), "src", "k", "dst", "k"); !errors.Is(err, storage.ErrForbidden) {
 		t.Fatalf("expected ErrForbidden on read, got %v", err)
 	}
 
@@ -824,7 +825,7 @@ func TestLocalCoreMovePolicyDecisions(t *testing.T) {
 	a = mkdeny(t, storage.Policy{Read: storage.Rule{Allow: []storage.Subject{"alice"}}})
 	writeObject(t, a, "src", "k", "data")
 
-	if err := a.Move(ctxWithSubject("alice"), "src", "k", "dst", "k"); !errors.Is(err, storage.ErrForbidden) {
+	if err := a.Move(ctxWithSubject(t, "alice"), "src", "k", "dst", "k"); !errors.Is(err, storage.ErrForbidden) {
 		t.Fatalf("expected ErrForbidden on delete, got %v", err)
 	}
 
@@ -835,7 +836,7 @@ func TestLocalCoreMovePolicyDecisions(t *testing.T) {
 	})
 	writeObject(t, a, "src", "k", "data")
 
-	if err := a.Move(ctxWithSubject("alice"), "src", "k", "dst", "k"); !errors.Is(err, storage.ErrForbidden) {
+	if err := a.Move(ctxWithSubject(t, "alice"), "src", "k", "dst", "k"); !errors.Is(err, storage.ErrForbidden) {
 		t.Fatalf("expected ErrForbidden on dst write, got %v", err)
 	}
 
@@ -848,11 +849,11 @@ func TestLocalCoreMovePolicyDecisions(t *testing.T) {
 	})
 	writeObject(t, a, "src", "k", "data")
 
-	if err := a.Move(ctxWithSubject("alice"), "src", "k", "dst", "k"); err != nil {
+	if err := a.Move(ctxWithSubject(t, "alice"), "src", "k", "dst", "k"); err != nil {
 		t.Fatal(err)
 	}
 
-	found, err := a.Exists(ctxWithSubject("alice"), "dst", "k")
+	found, err := a.Exists(ctxWithSubject(t, "alice"), "dst", "k")
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -873,7 +874,7 @@ func TestLocalCoreMoveDstExistCheck(t *testing.T) {
 	writeObject(t, a, "src", "k", "data")
 
 	// Dst missing: write perm, alice allowed.
-	if err := a.Move(ctxWithSubject("alice"), "src", "k", "dst", "fresh"); err != nil {
+	if err := a.Move(ctxWithSubject(t, "alice"), "src", "k", "dst", "fresh"); err != nil {
 		t.Fatal(err)
 	}
 
@@ -881,12 +882,12 @@ func TestLocalCoreMoveDstExistCheck(t *testing.T) {
 	writeObject(t, a, "dst", "taken", "old")
 
 	// Dst present: update perm, alice is not in update allow.
-	if err := a.Move(ctxWithSubject("alice"), "src", "k2", "dst", "taken"); !errors.Is(err, storage.ErrForbidden) {
+	if err := a.Move(ctxWithSubject(t, "alice"), "src", "k2", "dst", "taken"); !errors.Is(err, storage.ErrForbidden) {
 		t.Fatalf("expected ErrForbidden, got %v", err)
 	}
 
 	// Bob holds the update perm.
-	if err := a.Move(ctxWithSubject("bob"), "src", "k2", "dst", "taken"); err != nil {
+	if err := a.Move(ctxWithSubject(t, "bob"), "src", "k2", "dst", "taken"); err != nil {
 		t.Fatal(err)
 	}
 }
@@ -902,7 +903,7 @@ func TestLocalCoreMoveDstStatError(t *testing.T) {
 	writeObject(t, a, "src", "k", "data")
 	fileAsBucket(t, a, "dst")
 
-	err := a.Move(ctxWithSubject("alice"), "src", "k", "dst", "k")
+	err := a.Move(ctxWithSubject(t, "alice"), "src", "k", "dst", "k")
 	if err == nil || !strings.Contains(err.Error(), "stat") {
 		t.Fatalf("expected stat error, got %v", err)
 	}
@@ -927,7 +928,7 @@ func TestLocalCoreMoveMkdirError(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	err := a.Move(context.Background(), "src", "k", "dst", "sub/k")
+	err := a.Move(t.Context(), "src", "k", "dst", "sub/k")
 	if err == nil || !strings.Contains(err.Error(), "mkdir") {
 		t.Fatalf("expected mkdir error, got %v", err)
 	}
@@ -947,7 +948,7 @@ func TestLocalCoreMoveRenameError(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	err := a.Move(context.Background(), "src", "k", "dst", "dir")
+	err := a.Move(t.Context(), "src", "k", "dst", "dir")
 	if err == nil || !strings.Contains(err.Error(), "move") {
 		t.Fatalf("expected move error, got %v", err)
 	}
@@ -962,7 +963,7 @@ func TestLocalCoreMoveSuccessWithMeta(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	if err := a.Move(context.Background(), "src", "k", "dst", "sub/k"); err != nil {
+	if err := a.Move(t.Context(), "src", "k", "dst", "sub/k"); err != nil {
 		t.Fatal(err)
 	}
 
@@ -1005,7 +1006,7 @@ func TestLocalCoreMoveClearsStaleDstMeta(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	if err := a.Move(context.Background(), "src", "k", "dst", "k"); err != nil {
+	if err := a.Move(t.Context(), "src", "k", "dst", "k"); err != nil {
 		t.Fatal(err)
 	}
 
@@ -1646,7 +1647,7 @@ func TestLocalCoreWriteMetaTemp(t *testing.T) {
 func TestLocalCoreCloseAndName(t *testing.T) {
 	a := newUnconfigured(t, "")
 
-	if err := a.Close(context.Background()); err != nil {
+	if err := a.Close(t.Context()); err != nil {
 		t.Fatal(err)
 	}
 

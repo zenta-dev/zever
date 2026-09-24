@@ -5,7 +5,6 @@ package redis
 // the shared internal/redis singleton, cannot reach.
 
 import (
-	"context"
 	"testing"
 	"time"
 
@@ -24,7 +23,7 @@ func deadStore() *store {
 func TestCoverTransportFailures(t *testing.T) {
 	t.Parallel()
 
-	ctx := context.Background()
+	ctx := t.Context()
 	st := deadStore()
 
 	if err := st.Revoke(ctx, "jti", time.Now().Add(time.Minute)); err == nil {

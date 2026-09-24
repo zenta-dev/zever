@@ -43,7 +43,9 @@ go test ./internal/dsl/compile/ -run TestName -update  # regen committed backend
 - No globals / no `init()` wiring; `ctx` first arg for IO, never stored in struct; goroutine-safe types documented + explicit exit path.
 - Tests deterministic: no `time.Sleep` sync, no network, no unseeded randomness, no timing assertions.
 - Test helper roles: `stub*` = test doubles/fakes, `must*` = do-or-`t.Fatal` assertion helpers, `freshAdapter` = registry fixture adapter. Test-file suffix encodes purpose (`cover`/`live`/`bench`/`internal`/`race`/`closure`); plain `*_test.go` otherwise.
+- Test style: `t.Fatal` aborts setup, `t.Error` continues table assertions (no testify); table vars `tests`/`cases` both accepted; `t.Helper` required on helpers; `t.Context()` in tests (`b.Context()` in benchmarks); error assertions via `errors.Is`/`As`, `strings.Contains` for CLI output; `t.Parallel` except example/live/determinism/close tests.
 - Serialization tags: `json`/`toml`/`yaml` (snake_case) required on file-decoded Options and JSON-serialized wire types; Go-API-only structs stay untagged; backends map storage keys explicitly.
+- Time: durations are `time.Duration` (cookie `MaxAge` int-seconds excepted for `net/http`); no magic durations — package-level `Default*Timeout/Interval/Delay` consts; pool options use `MaxConn*` prefix order.
 - Conventional Commits (`feat/fix/perf/refactor/test/docs/ci/build:`), one logical change/commit; user-facing change → `CHANGELOG.md` `## [Unreleased]` before PR.
 - Public API changes (exports, config structs, defaults, serialization) need explicit maintainer review; pre-1.0 `0.x` may break with release-note docs.
 - CI note: `ZEVER_CHROMEDP_NO_SANDBOX=1` set in CI for document/local render tests; `go test` runs with `-vet=off -count=1` (vet is separate step); race+coverage gate runs only on `push` to main/tags, not PRs.

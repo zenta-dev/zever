@@ -1,7 +1,6 @@
 package redis
 
 import (
-	"context"
 	"errors"
 	"testing"
 	"time"
@@ -83,7 +82,7 @@ func TestRevoke_ExpiresWithTTL(t *testing.T) {
 	}
 	t.Cleanup(func() { _ = si.Close() })
 
-	ctx := context.Background()
+	ctx := t.Context()
 	until := time.Now().Add(time.Minute)
 	if rerr := si.Revoke(ctx, "jti-ttl", until); rerr != nil {
 		t.Fatalf("Revoke() error = %v", rerr)
@@ -130,7 +129,7 @@ func TestRevoke_AfterClose(t *testing.T) {
 	if err := si.Close(); err != nil {
 		t.Fatalf("Close() error = %v", err)
 	}
-	if err := si.Revoke(context.Background(), "jti", time.Now().Add(time.Hour)); !errors.Is(err, revocation.ErrClosed) {
+	if err := si.Revoke(t.Context(), "jti", time.Now().Add(time.Hour)); !errors.Is(err, revocation.ErrClosed) {
 		t.Fatalf("Revoke() after Close error = %v, want ErrClosed", err)
 	}
 }
@@ -145,7 +144,7 @@ func TestIsRevoked_AfterClose(t *testing.T) {
 	if err := si.Close(); err != nil {
 		t.Fatalf("Close() error = %v", err)
 	}
-	if _, err := si.IsRevoked(context.Background(), "jti"); !errors.Is(err, revocation.ErrClosed) {
+	if _, err := si.IsRevoked(t.Context(), "jti"); !errors.Is(err, revocation.ErrClosed) {
 		t.Fatalf("IsRevoked() after Close error = %v, want ErrClosed", err)
 	}
 }
@@ -159,7 +158,7 @@ func TestRevoke_EmptyJTI(t *testing.T) {
 	}
 	t.Cleanup(func() { _ = si.Close() })
 
-	if err := si.Revoke(context.Background(), "", time.Now().Add(time.Hour)); err == nil {
+	if err := si.Revoke(t.Context(), "", time.Now().Add(time.Hour)); err == nil {
 		t.Fatal("Revoke(empty jti) succeeded, want error")
 	}
 }

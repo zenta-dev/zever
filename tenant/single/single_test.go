@@ -1,7 +1,6 @@
 package single
 
 import (
-	"context"
 	"errors"
 	"testing"
 
@@ -16,7 +15,7 @@ func TestResolveReturnsDefault(t *testing.T) {
 		t.Fatalf("Open err = %v, want nil", err)
 	}
 
-	got, err := tn.Resolve(context.Background(), nil)
+	got, err := tn.Resolve(t.Context(), nil)
 	if err != nil {
 		t.Fatalf("Resolve err = %v, want nil", err)
 	}
@@ -34,7 +33,7 @@ func TestOpenCustomID(t *testing.T) {
 		t.Fatalf("Open err = %v, want nil", err)
 	}
 
-	got, err := tn.Resolve(context.Background(), map[string]string{"x": "y"})
+	got, err := tn.Resolve(t.Context(), map[string]string{"x": "y"})
 	if err != nil {
 		t.Fatalf("Resolve err = %v, want nil", err)
 	}
@@ -52,7 +51,7 @@ func TestScopedSetsContext(t *testing.T) {
 		t.Fatalf("Open err = %v, want nil", err)
 	}
 
-	ctx, err := tn.Scoped(context.Background(), "acme")
+	ctx, err := tn.Scoped(t.Context(), "acme")
 	if err != nil {
 		t.Fatalf("Scoped err = %v, want nil", err)
 	}
@@ -97,7 +96,7 @@ func TestOpenZeroOptsDefault(t *testing.T) {
 		t.Fatalf("Open err = %v, want nil", err)
 	}
 
-	got, err := tn.Resolve(context.Background(), nil)
+	got, err := tn.Resolve(t.Context(), nil)
 	if err != nil {
 		t.Fatalf("Resolve err = %v, want nil", err)
 	}

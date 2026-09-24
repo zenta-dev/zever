@@ -15,6 +15,9 @@ type dedupEntry struct {
 	typ reflect.Type
 }
 
+// DefaultCloseTimeout bounds per-service shutdown without a parent deadline.
+const DefaultCloseTimeout = 5 * time.Second
+
 func dedupKey(v any) (dedupEntry, bool) {
 	if v == nil {
 		return dedupEntry{}, false
@@ -211,7 +214,7 @@ func (c *Container) Close(ctx context.Context) error {
 
 		var cancel context.CancelFunc
 		if _, hasDeadline := ctx.Deadline(); !hasDeadline {
-			perCtx, cancel = context.WithTimeout(ctx, 5*time.Second)
+			perCtx, cancel = context.WithTimeout(ctx, DefaultCloseTimeout)
 		}
 
 		done := make(chan error, 1)

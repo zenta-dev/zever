@@ -46,7 +46,7 @@ func eventually(t *testing.T, timeout time.Duration, cond func() bool, msg strin
 
 func migrate(t *testing.T, database db.DB) {
 	t.Helper()
-	ctx := context.Background()
+	ctx := t.Context()
 	raw, err := os.ReadFile(filepath.Join("..", "..", "api", "testdata", "schema.sql"))
 	if err != nil {
 		t.Fatalf("read schema: %v", err)
@@ -67,7 +67,7 @@ func newTestDB(t *testing.T) (db.DB, log.Logger, context.Context) {
 	cfg := config.Default()
 	cfg.DB.Options.Path = filepath.Join(t.TempDir(), "test.db")
 	c := container.New(cfg)
-	t.Cleanup(func() { _ = c.Close(context.Background()) })
+	t.Cleanup(func() { _ = c.Close(t.Context()) })
 	database, err := c.DB()
 	if err != nil {
 		t.Fatalf("DB: %v", err)
@@ -76,14 +76,14 @@ func newTestDB(t *testing.T) (db.DB, log.Logger, context.Context) {
 	if err != nil {
 		t.Fatalf("Log: %v", err)
 	}
-	ctx := context.Background()
+	ctx := t.Context()
 	migrate(t, database)
 	return database, logger, ctx
 }
 
 func seedBooking(t *testing.T, database db.DB) {
 	t.Helper()
-	ctx := context.Background()
+	ctx := t.Context()
 	now := time.Now().UTC().Format(time.RFC3339)
 	for _, q := range []struct {
 		query string
@@ -213,7 +213,7 @@ func TestReminderCountsDueSoonBookings(t *testing.T) {
 func TestRegisterDemoTargetsFanout(t *testing.T) {
 	database, logger, _ := newTestDB(t)
 	deps, _, _ := testDeps(t, database, logger)
-	ctx := context.Background()
+	ctx := t.Context()
 
 	var created, cancelled atomic.Int32
 	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {

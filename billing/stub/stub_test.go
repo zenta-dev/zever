@@ -1,7 +1,6 @@
 package stub
 
 import (
-	"context"
 	"errors"
 	"sync"
 	"testing"
@@ -20,7 +19,7 @@ func (errReader) Read(_ []byte) (int, error) {
 func TestRoundTrip(t *testing.T) {
 	t.Parallel()
 
-	ctx := context.Background()
+	ctx := t.Context()
 	b := New()
 
 	c, err := b.CreateCustomer(ctx, "Ada", "ada@example.com", "")
@@ -75,7 +74,7 @@ func TestRoundTrip(t *testing.T) {
 func TestGetInvoiceNotFound(t *testing.T) {
 	t.Parallel()
 
-	ctx := context.Background()
+	ctx := t.Context()
 	b := New()
 
 	c, err := b.CreateCustomer(ctx, "Bob", "bob@example.com", "")
@@ -109,7 +108,7 @@ func TestGetInvoiceNotFound(t *testing.T) {
 func TestCreateSubscriptionCustomerMiss(t *testing.T) {
 	t.Parallel()
 
-	_, err := New().CreateSubscription(context.Background(), "cus_missing", "plan_pro", "")
+	_, err := New().CreateSubscription(t.Context(), "cus_missing", "plan_pro", "")
 	if err == nil {
 		t.Fatal("expected error, got nil")
 	}
@@ -135,7 +134,7 @@ func TestCreateSubscriptionCustomerMiss(t *testing.T) {
 func TestCancelSubscriptionNotFound(t *testing.T) {
 	t.Parallel()
 
-	err := New().CancelSubscription(context.Background(), "sub_missing")
+	err := New().CancelSubscription(t.Context(), "sub_missing")
 	if err == nil {
 		t.Fatal("expected error, got nil")
 	}
@@ -157,7 +156,7 @@ func TestCancelSubscriptionNotFound(t *testing.T) {
 func TestEmptyIDGuards(t *testing.T) {
 	t.Parallel()
 
-	ctx := context.Background()
+	ctx := t.Context()
 	b := New()
 
 	if _, err := b.CreateSubscription(ctx, "", "plan_pro", ""); !errors.Is(err, billing.ErrMissingCustomerID) {
@@ -220,7 +219,7 @@ func TestNewULIDFallback(t *testing.T) {
 func TestIDUniqueness(t *testing.T) {
 	t.Parallel()
 
-	ctx := context.Background()
+	ctx := t.Context()
 	b := New()
 	seen := make(map[string]struct{}, 100)
 
@@ -241,7 +240,7 @@ func TestIDUniqueness(t *testing.T) {
 func TestConcurrent(t *testing.T) {
 	t.Parallel()
 
-	ctx := context.Background()
+	ctx := t.Context()
 	b := New()
 
 	var wg sync.WaitGroup

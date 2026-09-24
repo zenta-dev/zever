@@ -39,77 +39,77 @@ func New(o workflow.Options) (workflow.Workflow, error) {
 }
 
 // RegisterStep registers a named step function.
-func (m *Adapter) RegisterStep(name string, fn workflow.StepFunc) {
-	m.mu.Lock()
-	defer m.mu.Unlock()
+func (a *Adapter) RegisterStep(name string, fn workflow.StepFunc) {
+	a.mu.Lock()
+	defer a.mu.Unlock()
 
-	if m.steps == nil {
-		m.steps = make(map[string]workflow.StepFunc)
+	if a.steps == nil {
+		a.steps = make(map[string]workflow.StepFunc)
 	}
 
-	m.steps[name] = fn
+	a.steps[name] = fn
 }
 
 // Start begins a new workflow run.
-func (m *Adapter) Start(ctx context.Context, name string, input any, workflowID string) (workflow.RunID, error) {
-	m.mu.Lock()
-	if m.runs == nil {
-		m.runs = make(map[workflow.RunID]*run)
+func (a *Adapter) Start(ctx context.Context, name string, input any, workflowID string) (workflow.RunID, error) {
+	a.mu.Lock()
+	if a.runs == nil {
+		a.runs = make(map[workflow.RunID]*run)
 	}
 
-	if m.steps == nil {
-		m.steps = make(map[string]workflow.StepFunc)
+	if a.steps == nil {
+		a.steps = make(map[string]workflow.StepFunc)
 	}
 
 	var id workflow.RunID
 	if workflowID != "" {
 		id = workflow.RunID(workflowID)
-		if _, exists := m.runs[id]; exists {
-			m.mu.Unlock()
+		if _, exists := a.runs[id]; exists {
+			a.mu.Unlock()
 
 			return "", &workflow.DuplicateRunError{RunID: workflowID}
 		}
 	} else {
 		for {
-			id = workflow.RunID(fmt.Sprintf("run-%d", m.nextID))
-			if _, exists := m.runs[id]; !exists {
+			id = workflow.RunID(fmt.Sprintf("run-%d", a.nextID))
+			if _, exists := a.runs[id]; !exists {
 				break
 			}
 
-			m.nextID++
+			a.nextID++
 		}
 
-		m.nextID++
+		a.nextID++
 	}
 
 	r := &run{name: name, input: input, state: input, running: true}
-	m.runs[id] = r
-	fn, ok := m.steps[name]
-	m.mu.Unlock()
+	a.runs[id] = r
+	fn, ok := a.steps[name]
+	a.mu.Unlock()
 
 	if !ok {
-		m.mu.Lock()
-		if cur, self := m.runs[id]; self && cur == r {
-			delete(m.runs, id)
+		a.mu.Lock()
+		if cur, self := a.runs[id]; self && cur == r {
+			delete(a.runs, id)
 		}
-		m.mu.Unlock()
+		a.mu.Unlock()
 
 		return "", &workflow.UnknownStepError{Step: name}
 	}
 
 	result, err := fn(ctx, input)
 	if err != nil {
-		m.mu.Lock()
-		if cur, self := m.runs[id]; self && cur == r {
-			delete(m.runs, id)
+		a.mu.Lock()
+		if cur, self := a.runs[id]; self && cur == r {
+			delete(a.runs, id)
 		}
-		m.mu.Unlock()
+		a.mu.Unlock()
 
 		return "", fmt.Errorf("workflow: step %q failed: %w", name, err)
 	}
 
-	m.mu.Lock()
-	if cur, ok := m.runs[id]; ok && cur == r {
+	a.mu.Lock()
+	if cur, ok := a.runs[id]; ok && cur == r {
 		cur.state = result
 		for _, v := range cur.pending {
 			cur.state = v
@@ -118,17 +118,17 @@ func (m *Adapter) Start(ctx context.Context, name string, input any, workflowID 
 		cur.pending = nil
 		cur.running = false
 	}
-	m.mu.Unlock()
+	a.mu.Unlock()
 
 	return id, nil
 }
 
 // Signal sends a signal to a running workflow.
-func (m *Adapter) Signal(_ context.Context, runID workflow.RunID, _ string, value any) error {
-	m.mu.Lock()
-	defer m.mu.Unlock()
+func (a *Adapter) Signal(_ context.Context, runID workflow.RunID, _ string, value any) error {
+	a.mu.Lock()
+	defer a.mu.Unlock()
 
-	r, ok := m.runs[runID]
+	r, ok := a.runs[runID]
 	if !ok {
 		return &workflow.UnknownRunError{RunID: runID}
 	}
@@ -147,23 +147,23 @@ func (m *Adapter) Signal(_ context.Context, runID workflow.RunID, _ string, valu
 }
 
 // Query returns the state of a running workflow.
-func (m *Adapter) Query(_ context.Context, runID workflow.RunID, name string, out any) error {
-	m.mu.RLock()
+func (a *Adapter) Query(_ context.Context, runID workflow.RunID, name string, out any) error {
+	a.mu.RLock()
 
-	r, ok := m.runs[runID]
+	r, ok := a.runs[runID]
 	if !ok {
-		m.mu.RUnlock()
+		a.mu.RUnlock()
 		return &workflow.UnknownRunError{RunID: runID}
 	}
 
 	if name != "state" {
-		m.mu.RUnlock()
+		a.mu.RUnlock()
 		return &workflow.UnknownQueryError{Query: name}
 	}
 
 	state := r.state
 
-	m.mu.RUnlock()
+	a.mu.RUnlock()
 
 	b, err := json.Marshal(state)
 	if err != nil {
@@ -178,11 +178,11 @@ func (m *Adapter) Query(_ context.Context, runID workflow.RunID, name string, ou
 }
 
 // Cancel stops a running workflow.
-func (m *Adapter) Cancel(_ context.Context, runID workflow.RunID) error {
-	m.mu.Lock()
-	defer m.mu.Unlock()
+func (a *Adapter) Cancel(_ context.Context, runID workflow.RunID) error {
+	a.mu.Lock()
+	defer a.mu.Unlock()
 
-	r, ok := m.runs[runID]
+	r, ok := a.runs[runID]
 	if !ok {
 		return &workflow.UnknownRunError{RunID: runID}
 	}
@@ -191,18 +191,18 @@ func (m *Adapter) Cancel(_ context.Context, runID workflow.RunID) error {
 		return &workflow.RunCompletedError{RunID: runID}
 	}
 
-	delete(m.runs, runID)
+	delete(a.runs, runID)
 
 	return nil
 }
 
 // Close releases all resources held by the in-memory workflow engine.
-func (m *Adapter) Close() error {
-	m.mu.Lock()
-	defer m.mu.Unlock()
+func (a *Adapter) Close() error {
+	a.mu.Lock()
+	defer a.mu.Unlock()
 
-	m.runs = nil
-	m.steps = nil
+	a.runs = nil
+	a.steps = nil
 
 	return nil
 }

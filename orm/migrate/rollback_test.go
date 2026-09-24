@@ -1,7 +1,6 @@
 package migrate
 
 import (
-	"context"
 	"errors"
 	"strings"
 	"testing"
@@ -15,7 +14,7 @@ func TestComputeRollback_unsupportedDialect(t *testing.T) {
 
 	conn := &fakeDB{dialect: "oracle"}
 
-	if _, err := ComputeRollback(context.Background(), conn, 1); !errors.Is(err, ErrUnsupportedDialect) {
+	if _, err := ComputeRollback(t.Context(), conn, 1); !errors.Is(err, ErrUnsupportedDialect) {
 		t.Fatalf("ComputeRollback = %v, want ErrUnsupportedDialect", err)
 	}
 }
@@ -30,7 +29,7 @@ func TestComputeRollback_readError(t *testing.T) {
 		},
 	}
 
-	if _, err := ComputeRollback(context.Background(), conn, 1); err == nil {
+	if _, err := ComputeRollback(t.Context(), conn, 1); err == nil {
 		t.Fatal("ComputeRollback: want error, got nil")
 	}
 }
@@ -45,7 +44,7 @@ func TestComputeRollback_empty(t *testing.T) {
 		},
 	}
 
-	plan, err := ComputeRollback(context.Background(), conn, 5)
+	plan, err := ComputeRollback(t.Context(), conn, 5)
 	if err != nil {
 		t.Fatalf("ComputeRollback: %v", err)
 	}
@@ -72,7 +71,7 @@ func TestComputeRollback_invertsAndSkips(t *testing.T) {
 		},
 	}
 
-	plan, err := ComputeRollback(context.Background(), conn, 2)
+	plan, err := ComputeRollback(t.Context(), conn, 2)
 	if err != nil {
 		t.Fatalf("ComputeRollback: %v", err)
 	}
@@ -450,7 +449,7 @@ func TestInverseStatement_constraints(t *testing.T) {
 func TestReadRecentMigrations(t *testing.T) {
 	t.Parallel()
 
-	ctx := context.Background()
+	ctx := t.Context()
 
 	t.Run("rowsAndNulls", func(t *testing.T) {
 		t.Parallel()
@@ -556,7 +555,7 @@ func TestNullableText(t *testing.T) {
 func TestApplyRollback(t *testing.T) {
 	t.Parallel()
 
-	ctx := context.Background()
+	ctx := t.Context()
 
 	t.Run("nilPlan", func(t *testing.T) {
 		t.Parallel()

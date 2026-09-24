@@ -117,8 +117,8 @@ var (
 )
 
 // Geocode resolves address to locations via Nominatim search.
-func (m *osmGeo) Geocode(ctx context.Context, address string) ([]geo.Location, error) {
-	reqURL := m.buildURL("/search", url.Values{
+func (s *osmGeo) Geocode(ctx context.Context, address string) ([]geo.Location, error) {
+	reqURL := s.buildURL("/search", url.Values{
 		"q":              {address},
 		"format":         {"jsonv2"},
 		"addressdetails": {"1"},
@@ -129,15 +129,15 @@ func (m *osmGeo) Geocode(ctx context.Context, address string) ([]geo.Location, e
 	if err != nil {
 		return nil, fmt.Errorf("geo: osm: create request: %w", err)
 	}
-	req.Header.Set("User-Agent", m.userAgent)
+	req.Header.Set("User-Agent", s.userAgent)
 
-	resp, err := m.do(req)
+	resp, err := s.do(req)
 	if err != nil {
 		return nil, err
 	}
 	defer resp.Body.Close()
 
-	body, err := readLimitedBody(resp, m.maxBody)
+	body, err := readLimitedBody(resp, s.maxBody)
 	if err != nil {
 		return nil, err
 	}
@@ -176,12 +176,12 @@ func (m *osmGeo) Geocode(ctx context.Context, address string) ([]geo.Location, e
 }
 
 // ReverseGeocode resolves coordinates to addresses via Nominatim reverse.
-func (m *osmGeo) ReverseGeocode(ctx context.Context, lat, lng float64) ([]geo.Address, error) {
+func (s *osmGeo) ReverseGeocode(ctx context.Context, lat, lng float64) ([]geo.Address, error) {
 	if !geo.ValidCoord(lat, lng) {
 		return nil, fmt.Errorf("geo: osm: invalid coordinates: %w", geo.ErrInvalidCoordinate)
 	}
 
-	reqURL := m.buildURL("/reverse", url.Values{
+	reqURL := s.buildURL("/reverse", url.Values{
 		"lat":            {strconv.FormatFloat(lat, 'f', -1, 64)},
 		"lon":            {strconv.FormatFloat(lng, 'f', -1, 64)},
 		"format":         {"jsonv2"},
@@ -192,15 +192,15 @@ func (m *osmGeo) ReverseGeocode(ctx context.Context, lat, lng float64) ([]geo.Ad
 	if err != nil {
 		return nil, fmt.Errorf("geo: osm: create request: %w", err)
 	}
-	req.Header.Set("User-Agent", m.userAgent)
+	req.Header.Set("User-Agent", s.userAgent)
 
-	resp, err := m.do(req)
+	resp, err := s.do(req)
 	if err != nil {
 		return nil, err
 	}
 	defer resp.Body.Close()
 
-	body, err := readLimitedBody(resp, m.maxBody)
+	body, err := readLimitedBody(resp, s.maxBody)
 	if err != nil {
 		return nil, err
 	}
@@ -260,7 +260,7 @@ func (m *osmGeo) ReverseGeocode(ctx context.Context, lat, lng float64) ([]geo.Ad
 
 // Distance returns great-circle distance in meters using haversine.
 // Routing via external service is a future enhancement; current MVP uses haversine only.
-func (m *osmGeo) Distance(_ context.Context, from, to geo.Point) (float64, error) {
+func (s *osmGeo) Distance(_ context.Context, from, to geo.Point) (float64, error) {
 	if !geo.ValidCoord(from.Lat, from.Lng) || !geo.ValidCoord(to.Lat, to.Lng) {
 		return 0, fmt.Errorf("geo: osm: invalid coordinates: %w", geo.ErrInvalidCoordinate)
 	}
@@ -268,14 +268,14 @@ func (m *osmGeo) Distance(_ context.Context, from, to geo.Point) (float64, error
 }
 
 // Close releases resources.
-func (m *osmGeo) Close() error { return nil }
+func (s *osmGeo) Close() error { return nil }
 
-func (m *osmGeo) do(req *http.Request) (*http.Response, error) {
-	if err := m.pace(req.Context()); err != nil {
+func (s *osmGeo) do(req *http.Request) (*http.Response, error) {
+	if err := s.pace(req.Context()); err != nil {
 		return nil, fmt.Errorf("geo: osm: %w", err)
 	}
 
-	resp, err := m.client.Do(req)
+	resp, err := s.client.Do(req)
 	// Re-anchor the pacing schedule to the observed request time: every
 	// delay between the pace wait and the request hitting the wire
 	// (late timer wakeup, scheduler delay under load) would otherwise
@@ -283,7 +283,7 @@ func (m *osmGeo) do(req *http.Request) (*http.Response, error) {
 	// round trip is conservative (gaps grow by the response time) but
 	// keeps sequential gaps at >= minInterval under arbitrary load.
 	// max() preserves later slots reserved by concurrent callers.
-	m.noteSent()
+	s.noteSent()
 	if err != nil {
 		return nil, fmt.Errorf("geo: osm: do: %w", redactURLError(err))
 	}
@@ -294,19 +294,19 @@ func (m *osmGeo) do(req *http.Request) (*http.Response, error) {
 // adapter sent, so as not to exceed Nominatim's usage policy (see
 // defaultMinRequestInterval). minInterval == 0 (an osmGeo{} literal built
 // directly rather than via New) disables pacing.
-func (m *osmGeo) pace(ctx context.Context) error {
-	if m.minInterval <= 0 {
+func (s *osmGeo) pace(ctx context.Context) error {
+	if s.minInterval <= 0 {
 		return nil
 	}
 
-	m.paceMu.Lock()
+	s.paceMu.Lock()
 	now := time.Now()
-	wait := m.nextAllowed.Sub(now)
+	wait := s.nextAllowed.Sub(now)
 	if wait < 0 {
 		wait = 0
 	}
-	m.nextAllowed = now.Add(wait).Add(m.minInterval)
-	m.paceMu.Unlock()
+	s.nextAllowed = now.Add(wait).Add(s.minInterval)
+	s.paceMu.Unlock()
 
 	if wait <= 0 {
 		return nil
@@ -325,14 +325,14 @@ func (m *osmGeo) pace(ctx context.Context) error {
 
 // noteSent re-anchors the pacing schedule so the next request waits a
 // full minInterval after the request that just completed.
-func (m *osmGeo) noteSent() {
-	if m.minInterval <= 0 {
+func (s *osmGeo) noteSent() {
+	if s.minInterval <= 0 {
 		return
 	}
-	m.paceMu.Lock()
-	defer m.paceMu.Unlock()
-	if next := time.Now().Add(m.minInterval); next.After(m.nextAllowed) {
-		m.nextAllowed = next
+	s.paceMu.Lock()
+	defer s.paceMu.Unlock()
+	if next := time.Now().Add(s.minInterval); next.After(s.nextAllowed) {
+		s.nextAllowed = next
 	}
 }
 
@@ -375,9 +375,9 @@ func checkStatus(resp *http.Response, body []byte) error {
 	return fmt.Errorf("geo: osm: status %d: %s", resp.StatusCode, msg)
 }
 
-func (m *osmGeo) buildURL(path string, params url.Values) string {
+func (s *osmGeo) buildURL(path string, params url.Values) string {
 	// endpoint already trimmed of trailing slash
-	u := m.endpoint + path
+	u := s.endpoint + path
 	if len(params) > 0 {
 		u += "?" + params.Encode()
 	}

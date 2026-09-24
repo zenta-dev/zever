@@ -99,7 +99,7 @@ func TestNotify_realClientSend_canceledContext(t *testing.T) {
 	if err != nil {
 		t.Fatalf("New(valid key) = %v, want nil", err)
 	}
-	ctx, cancel := context.WithCancel(context.Background())
+	ctx, cancel := context.WithCancel(t.Context())
 	cancel()
 	if err := n.Notify(ctx, validPush()); err == nil {
 		t.Error("Notify(canceled ctx, real client) = nil, want error")

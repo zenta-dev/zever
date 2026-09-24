@@ -25,7 +25,7 @@ import (
 func newOuterJoin3DB(t *testing.T) (context.Context, db.DB) {
 	t.Helper()
 
-	ctx := context.Background()
+	ctx := t.Context()
 
 	conn := openORMTestDB(ctx, t)
 
@@ -499,7 +499,7 @@ func TestJoin3OuterLimit(t *testing.T) {
 // postgres and the default sqlite dialect (both supported) asserting
 // success. LEFT is universal SQL and is never gated.
 func TestJoin3OuterCapabilityGates(t *testing.T) {
-	ctx := context.Background()
+	ctx := t.Context()
 
 	left := From[joinUser](joinUsers)
 

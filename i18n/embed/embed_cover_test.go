@@ -1,7 +1,6 @@
 package embed
 
 import (
-	"context"
 	"errors"
 	"io/fs"
 	"testing"
@@ -40,7 +39,7 @@ func TestNew_defaultDir(t *testing.T) {
 		t.Fatalf("New() error = %v", err)
 	}
 	t.Cleanup(func() { _ = be.Close() })
-	got, err := be.Locales(context.Background())
+	got, err := be.Locales(t.Context())
 	if err != nil {
 		t.Fatalf("Locales() error = %v", err)
 	}
@@ -70,7 +69,7 @@ func TestNew_skipNonJSON(t *testing.T) {
 		t.Fatalf("New() error = %v", err)
 	}
 	t.Cleanup(func() { _ = be.Close() })
-	got, err := be.Locales(context.Background())
+	got, err := be.Locales(t.Context())
 	if err != nil {
 		t.Fatalf("Locales() error = %v", err)
 	}

@@ -2,7 +2,6 @@ package stdout_test
 
 import (
 	"bytes"
-	"context"
 	"encoding/json"
 	"errors"
 	"sync"
@@ -61,7 +60,7 @@ func TestSpan_end_emitsJSONLine(t *testing.T) {
 
 	p, buf := openBuffered(t, nil)
 
-	ctx, span := p.Tracer("scope").Start(context.Background(), "op")
+	ctx, span := p.Tracer("scope").Start(t.Context(), "op")
 	span.SetAttributes(observability.String("k", "v"))
 	span.End()
 	_ = ctx
@@ -90,7 +89,7 @@ func TestSpan_childInheritsTraceID(t *testing.T) {
 		t.Fatalf("NewWithWriter() error = %v", err)
 	}
 
-	pc, ps := p.Tracer("s").Start(context.Background(), "parent")
+	pc, ps := p.Tracer("s").Start(t.Context(), "parent")
 	cc, cs := p.Tracer("s").Start(pc, "child")
 	cs.End()
 	ps.End()
@@ -121,7 +120,7 @@ func TestSpan_recordError_included(t *testing.T) {
 
 	p, buf := openBuffered(t, nil)
 
-	_, span := p.Tracer("s").Start(context.Background(), "op")
+	_, span := p.Tracer("s").Start(t.Context(), "op")
 	span.RecordError(errors.New("boom"))
 	span.RecordError(nil)
 	span.End()
@@ -137,13 +136,13 @@ func TestMetrics_quietByDefault_verboseEmits(t *testing.T) {
 	p, buf := openBuffered(t, nil)
 	m := p.Meter("s")
 
-	if err := m.Counter(context.Background(), "c", 1); err != nil {
+	if err := m.Counter(t.Context(), "c", 1); err != nil {
 		t.Fatalf("Counter() error = %v", err)
 	}
-	if err := m.Gauge(context.Background(), "g", 2); err != nil {
+	if err := m.Gauge(t.Context(), "g", 2); err != nil {
 		t.Fatalf("Gauge() error = %v", err)
 	}
-	if err := m.Histogram(context.Background(), "h", 3); err != nil {
+	if err := m.Histogram(t.Context(), "h", 3); err != nil {
 		t.Fatalf("Histogram() error = %v", err)
 	}
 	if buf.Len() != 0 {
@@ -152,7 +151,7 @@ func TestMetrics_quietByDefault_verboseEmits(t *testing.T) {
 
 	pv, pbuf := openBuffered(t, func(o *observability.Options) { o.Verbose = true })
 	mv := pv.Meter("s")
-	if err := mv.Counter(context.Background(), "c", 1, observability.Int("n", 2)); err != nil {
+	if err := mv.Counter(t.Context(), "c", 1, observability.Int("n", 2)); err != nil {
 		t.Fatalf("Counter() error = %v", err)
 	}
 	if pbuf.Len() == 0 {
@@ -165,7 +164,7 @@ func TestProvider_shutdown_nilError(t *testing.T) {
 
 	p, _ := openBuffered(t, nil)
 
-	ctx := context.Background()
+	ctx := t.Context()
 	if err := p.Tracer("s").Shutdown(ctx); err != nil {
 		t.Errorf("Tracer.Shutdown() = %v, want nil", err)
 	}
@@ -188,7 +187,7 @@ func TestSpan_concurrentSafe(t *testing.T) {
 		wg.Add(1)
 		go func() {
 			defer wg.Done()
-			_, s := tr.Start(context.Background(), "op")
+			_, s := tr.Start(t.Context(), "op")
 			s.SetAttributes(observability.Bool("b", true))
 			s.End()
 		}()

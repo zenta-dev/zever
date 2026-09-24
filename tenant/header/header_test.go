@@ -1,7 +1,6 @@
 package header
 
 import (
-	"context"
 	"errors"
 	"regexp"
 	"strings"
@@ -16,7 +15,7 @@ func TestResolveFromHeader(t *testing.T) {
 	a := &adapter{header: "X-Tenant-ID"}
 	meta := map[string]string{"X-Tenant-ID": "acme"}
 
-	id, err := a.Resolve(context.Background(), meta)
+	id, err := a.Resolve(t.Context(), meta)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -32,7 +31,7 @@ func TestResolveHeaderCaseInsensitive(t *testing.T) {
 	a := &adapter{header: "X-Tenant-ID"}
 	meta := map[string]string{"x-tenant-id": "acme"}
 
-	id, err := a.Resolve(context.Background(), meta)
+	id, err := a.Resolve(t.Context(), meta)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -48,7 +47,7 @@ func TestResolveHeaderNonCanonicalMetaKey(t *testing.T) {
 	a := &adapter{header: "X-Tenant-ID"}
 	meta := map[string]string{"X-TENANT-ID": "acme"}
 
-	id, err := a.Resolve(context.Background(), meta)
+	id, err := a.Resolve(t.Context(), meta)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -68,7 +67,7 @@ func TestOpenCaseInsensitiveHeaderOpt(t *testing.T) {
 
 	meta := map[string]string{"X-Tenant-ID": "acme"}
 
-	id, err := tt.Resolve(context.Background(), meta)
+	id, err := tt.Resolve(t.Context(), meta)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -84,7 +83,7 @@ func TestResolveMissingHeader(t *testing.T) {
 	a := &adapter{header: "X-Tenant-ID"}
 	meta := map[string]string{"Other": "val"}
 
-	_, err := a.Resolve(context.Background(), meta)
+	_, err := a.Resolve(t.Context(), meta)
 	if err == nil {
 		t.Fatal("want error, got nil")
 	}
@@ -99,7 +98,7 @@ func TestResolveNilMeta(t *testing.T) {
 
 	a := &adapter{header: "X-Tenant-ID"}
 
-	_, err := a.Resolve(context.Background(), nil)
+	_, err := a.Resolve(t.Context(), nil)
 	if err == nil {
 		t.Fatal("want error, got nil")
 	}
@@ -120,7 +119,7 @@ func TestResolveFromSubdomain(t *testing.T) {
 	a := &adapter{header: "X-Tenant-ID", subdomainRe: re}
 	meta := map[string]string{"Host": "acme.example.com"}
 
-	id, err := a.Resolve(context.Background(), meta)
+	id, err := a.Resolve(t.Context(), meta)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -137,7 +136,7 @@ func TestResolveFromSubdomainWithPort(t *testing.T) {
 	a := &adapter{header: "X-Tenant-ID", subdomainRe: re}
 	meta := map[string]string{"Host": "acme.example.com:8080"}
 
-	id, err := a.Resolve(context.Background(), meta)
+	id, err := a.Resolve(t.Context(), meta)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -154,7 +153,7 @@ func TestResolveSubdomainLowercaseHostKey(t *testing.T) {
 	a := &adapter{header: "X-Tenant-ID", subdomainRe: re}
 	meta := map[string]string{"host": "acme.example.com"}
 
-	id, err := a.Resolve(context.Background(), meta)
+	id, err := a.Resolve(t.Context(), meta)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -171,7 +170,7 @@ func TestResolveSubdomainMixedCaseHostKey(t *testing.T) {
 	a := &adapter{header: "X-Tenant-ID", subdomainRe: re}
 	meta := map[string]string{"HoSt": "acme.example.com"}
 
-	id, err := a.Resolve(context.Background(), meta)
+	id, err := a.Resolve(t.Context(), meta)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -191,7 +190,7 @@ func TestResolveHeaderTakesPrecedence(t *testing.T) {
 		"Host":        "from-sub.example.com",
 	}
 
-	id, err := a.Resolve(context.Background(), meta)
+	id, err := a.Resolve(t.Context(), meta)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -208,7 +207,7 @@ func TestResolveSubdomainMixedCaseHostValue(t *testing.T) {
 	a := &adapter{header: "X-Tenant-ID", subdomainRe: re}
 	meta := map[string]string{"Host": "Acme.Example.Com"}
 
-	id, err := a.Resolve(context.Background(), meta)
+	id, err := a.Resolve(t.Context(), meta)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -225,7 +224,7 @@ func TestResolveSubdomainMixedCaseHostValueWithPort(t *testing.T) {
 	a := &adapter{header: "X-Tenant-ID", subdomainRe: re}
 	meta := map[string]string{"Host": "Acme.Example.Com:8080"}
 
-	id, err := a.Resolve(context.Background(), meta)
+	id, err := a.Resolve(t.Context(), meta)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -242,7 +241,7 @@ func TestResolveSubdomainUpperCaseApex(t *testing.T) {
 	a := &adapter{header: "X-Tenant-ID", subdomainRe: re}
 	meta := map[string]string{"Host": "acme.example.COM"}
 
-	id, err := a.Resolve(context.Background(), meta)
+	id, err := a.Resolve(t.Context(), meta)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -259,7 +258,7 @@ func TestResolveSubdomainNoMatch(t *testing.T) {
 	a := &adapter{header: "X-Tenant-ID", subdomainRe: re, subdomainFmt: `^([a-z0-9-]+)\.example\.com$`}
 	meta := map[string]string{"Host": "www.other.com"}
 
-	_, err := a.Resolve(context.Background(), meta)
+	_, err := a.Resolve(t.Context(), meta)
 	if err == nil {
 		t.Fatal("want error, got nil")
 	}
@@ -276,7 +275,7 @@ func TestResolveSubdomainEmptyCapture(t *testing.T) {
 	a := &adapter{header: "X-Tenant-ID", subdomainRe: re}
 	meta := map[string]string{"Host": "example.com"}
 
-	id, err := a.Resolve(context.Background(), meta)
+	id, err := a.Resolve(t.Context(), meta)
 	if err == nil {
 		t.Fatalf("want error for empty subdomain capture, got %q", id)
 	}
@@ -297,7 +296,7 @@ func TestResolveBadHost(t *testing.T) {
 		t.Fatalf("open: %v", err)
 	}
 
-	_, err = tt.Resolve(context.Background(), map[string]string{"Host": "a:b:c"})
+	_, err = tt.Resolve(t.Context(), map[string]string{"Host": "a:b:c"})
 	if err == nil {
 		t.Fatal("want error, got nil")
 	}
@@ -319,7 +318,7 @@ func TestResolveHostTooLong(t *testing.T) {
 	}
 
 	host := strings.Repeat("a", 254)
-	_, err = tt.Resolve(context.Background(), map[string]string{"Host": host})
+	_, err = tt.Resolve(t.Context(), map[string]string{"Host": host})
 	if err == nil {
 		t.Fatal("want error, got nil")
 	}
@@ -373,7 +372,7 @@ func TestScopedSetsContext(t *testing.T) {
 
 	a := &adapter{header: "X-Tenant-ID"}
 
-	ctx, err := a.Scoped(context.Background(), "t-99")
+	ctx, err := a.Scoped(t.Context(), "t-99")
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -407,7 +406,7 @@ func TestDefaultHeaderName(t *testing.T) {
 
 	meta := map[string]string{"X-Tenant-ID": "default-hdr"}
 
-	id, err := tt.Resolve(context.Background(), meta)
+	id, err := tt.Resolve(t.Context(), meta)
 	if err != nil {
 		t.Fatal(err)
 	}

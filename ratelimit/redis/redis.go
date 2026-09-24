@@ -30,6 +30,9 @@ var (
 // Compile-time check that limiter implements ratelimit.Limiter.
 var _ ratelimit.Limiter = (*limiter)(nil)
 
+// DefaultPingTimeout bounds the startup connectivity check.
+const DefaultPingTimeout = 3 * time.Second
+
 type limiter struct {
 	client *goredis.Client
 	prefix string
@@ -62,7 +65,7 @@ func New(opts ratelimit.Options) (ratelimit.Limiter, error) {
 		return nil, fmt.Errorf("redis: connect %q: %w", redactAddr(opts.Redis.Addr), err)
 	}
 
-	ctx, cancel := context.WithTimeout(context.Background(), 3*time.Second)
+	ctx, cancel := context.WithTimeout(context.Background(), DefaultPingTimeout)
 	defer cancel()
 
 	if err := client.Ping(ctx).Err(); err != nil {

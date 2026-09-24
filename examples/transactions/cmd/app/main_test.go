@@ -14,7 +14,7 @@ import (
 func openTestDB(t *testing.T) (context.Context, db.DB) {
 	t.Helper()
 
-	ctx := context.Background()
+	ctx := t.Context()
 
 	conn, err := sqlite.New(db.Options{Path: ":memory:"})
 	if err != nil {

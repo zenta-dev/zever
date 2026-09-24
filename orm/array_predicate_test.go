@@ -1,7 +1,6 @@
 package orm
 
 import (
-	"context"
 	"errors"
 	"reflect"
 	"testing"
@@ -13,7 +12,7 @@ import (
 // the array list is bound as one placeholder per element, with Postgres
 // $N numbering, and the quantifier renders `= ANY(ARRAY[...])`.
 func TestColumnEqAnyRendering(t *testing.T) {
-	ctx := context.Background()
+	ctx := t.Context()
 
 	rec := &ormRecordingExec{dialectName: "postgres"}
 
@@ -36,7 +35,7 @@ func TestColumnEqAnyRendering(t *testing.T) {
 // TestNullableColumnNeqAllRendering covers the NullableColumn variant and
 // the `<> ALL(ARRAY[...])` quantifier.
 func TestNullableColumnNeqAllRendering(t *testing.T) {
-	ctx := context.Background()
+	ctx := t.Context()
 
 	rec := &ormRecordingExec{dialectName: "postgres"}
 
@@ -59,7 +58,7 @@ func TestNullableColumnNeqAllRendering(t *testing.T) {
 // TestArrayPredicateEmptyListRendering proves an empty value list renders a
 // constant boolean, never the invalid ARRAY[] literal.
 func TestArrayPredicateEmptyListRendering(t *testing.T) {
-	ctx := context.Background()
+	ctx := t.Context()
 
 	tests := []struct {
 		name string
@@ -96,7 +95,7 @@ func TestArrayPredicateEmptyListRendering(t *testing.T) {
 // asserting the typed dialect.ErrUnsupportedByDialect rather than
 // silently-wrong SQL.
 func TestArrayPredicateCapabilityGate(t *testing.T) {
-	ctx := context.Background()
+	ctx := t.Context()
 
 	rec := &ormRecordingExec{dialectName: "sqlite"}
 

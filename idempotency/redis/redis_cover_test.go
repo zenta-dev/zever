@@ -246,7 +246,7 @@ func TestCover_BeginCtxErr(t *testing.T) {
 
 	s := &store{prefix: "t:", ttl: time.Second}
 
-	ctx, cancel := context.WithCancel(context.Background())
+	ctx, cancel := context.WithCancel(t.Context())
 	cancel()
 
 	if _, err := s.Begin(ctx, "k", idempotency.BeginOptions{}); err == nil {
@@ -259,7 +259,7 @@ func TestCover_BeginSetNXErr(t *testing.T) {
 
 	s := whiteStore(t, dialErrClient(t))
 
-	if _, err := s.Begin(context.Background(), freshKey(t), idempotency.BeginOptions{}); err == nil {
+	if _, err := s.Begin(t.Context(), freshKey(t), idempotency.BeginOptions{}); err == nil {
 		t.Fatal("Begin dial err = nil error, want error")
 	}
 }
@@ -269,7 +269,7 @@ func TestCover_BeginSetNXProtoErr(t *testing.T) {
 
 	s := whiteStore(t, pipeClient(t, []string{"-ERR boom\r\n"}))
 
-	if _, err := s.Begin(context.Background(), freshKey(t), idempotency.BeginOptions{}); err == nil {
+	if _, err := s.Begin(t.Context(), freshKey(t), idempotency.BeginOptions{}); err == nil {
 		t.Fatal("Begin SetNX err = nil error, want error")
 	}
 }
@@ -279,7 +279,7 @@ func TestCover_BeginNilRetry(t *testing.T) {
 
 	s := whiteStore(t, pipeClient(t, []string{":0\r\n", "$-1\r\n", ":1\r\n"}))
 
-	out, err := s.Begin(context.Background(), freshKey(t), idempotency.BeginOptions{Fingerprint: []byte("fp")})
+	out, err := s.Begin(t.Context(), freshKey(t), idempotency.BeginOptions{Fingerprint: []byte("fp")})
 	if err != nil {
 		t.Fatalf("Begin err = %v, want nil", err)
 	}
@@ -294,7 +294,7 @@ func TestCover_BeginLoopExhaustion(t *testing.T) {
 
 	s := whiteStore(t, pipeClient(t, []string{":0\r\n", "$-1\r\n", ":0\r\n", "$-1\r\n", ":0\r\n", "$-1\r\n"}))
 
-	_, err := s.Begin(context.Background(), freshKey(t), idempotency.BeginOptions{Fingerprint: []byte("fp")})
+	_, err := s.Begin(t.Context(), freshKey(t), idempotency.BeginOptions{Fingerprint: []byte("fp")})
 	if !errors.Is(err, idempotency.ErrInProgress) {
 		t.Fatalf("Begin exhausted err = %v, want ErrInProgress", err)
 	}
@@ -305,7 +305,7 @@ func TestCover_BeginGetErr(t *testing.T) {
 
 	s := whiteStore(t, pipeClient(t, []string{":0\r\n", "-ERR boom\r\n"}))
 
-	if _, err := s.Begin(context.Background(), freshKey(t), idempotency.BeginOptions{}); err == nil {
+	if _, err := s.Begin(t.Context(), freshKey(t), idempotency.BeginOptions{}); err == nil {
 		t.Fatal("Begin Get err = nil error, want error")
 	}
 }
@@ -313,7 +313,7 @@ func TestCover_BeginGetErr(t *testing.T) {
 func TestCover_BeginDecodeErr(t *testing.T) {
 	t.Parallel()
 
-	ctx := context.Background()
+	ctx := t.Context()
 	s := newTestStore(t)
 	key := freshKey(t)
 
@@ -336,7 +336,7 @@ func TestCover_CompleteCtxErr(t *testing.T) {
 
 	s := &store{prefix: "t:", ttl: time.Second}
 
-	ctx, cancel := context.WithCancel(context.Background())
+	ctx, cancel := context.WithCancel(t.Context())
 	cancel()
 
 	if err := s.Complete(ctx, "k", nil, []byte("r")); err == nil {
@@ -349,7 +349,7 @@ func TestCover_CompleteGetErr(t *testing.T) {
 
 	s := whiteStore(t, pipeClient(t, []string{"-ERR boom\r\n"}))
 
-	if err := s.Complete(context.Background(), freshKey(t), nil, []byte("r")); err == nil {
+	if err := s.Complete(t.Context(), freshKey(t), nil, []byte("r")); err == nil {
 		t.Fatal("Complete Get err = nil error, want error")
 	}
 }
@@ -357,7 +357,7 @@ func TestCover_CompleteGetErr(t *testing.T) {
 func TestCover_CompleteDecodeErr(t *testing.T) {
 	t.Parallel()
 
-	ctx := context.Background()
+	ctx := t.Context()
 	s := newTestStore(t)
 	key := freshKey(t)
 
@@ -380,7 +380,7 @@ func TestCover_CompleteSetErrOnMissing(t *testing.T) {
 
 	s := whiteStore(t, pipeClient(t, []string{"$-1\r\n", "-ERR boom\r\n"}))
 
-	if err := s.Complete(context.Background(), freshKey(t), nil, []byte("r")); err == nil {
+	if err := s.Complete(t.Context(), freshKey(t), nil, []byte("r")); err == nil {
 		t.Fatal("Complete Set err = nil error, want error")
 	}
 }
@@ -392,7 +392,7 @@ func TestCover_CompleteFallbackSuccess(t *testing.T) {
 	done := bulkReply(encodeDone(fp, []byte("old")))
 	s := whiteStore(t, pipeClient(t, []string{done, "$-1\r\n", "+OK\r\n"}))
 
-	if err := s.Complete(context.Background(), freshKey(t), fp, []byte("new")); err != nil {
+	if err := s.Complete(t.Context(), freshKey(t), fp, []byte("new")); err != nil {
 		t.Fatalf("Complete fallback err = %v, want nil", err)
 	}
 }
@@ -404,7 +404,7 @@ func TestCover_CompleteFallbackSetErr(t *testing.T) {
 	done := bulkReply(encodeDone(fp, []byte("old")))
 	s := whiteStore(t, pipeClient(t, []string{done, "$-1\r\n", "-ERR boom\r\n"}))
 
-	if err := s.Complete(context.Background(), freshKey(t), fp, []byte("new")); err == nil {
+	if err := s.Complete(t.Context(), freshKey(t), fp, []byte("new")); err == nil {
 		t.Fatal("Complete fallback Set err = nil error, want error")
 	}
 }
@@ -416,7 +416,7 @@ func TestCover_CompleteSetArgsErr(t *testing.T) {
 	done := bulkReply(encodeDone(fp, []byte("old")))
 	s := whiteStore(t, pipeClient(t, []string{done, "-ERR boom\r\n"}))
 
-	if err := s.Complete(context.Background(), freshKey(t), fp, []byte("new")); err == nil {
+	if err := s.Complete(t.Context(), freshKey(t), fp, []byte("new")); err == nil {
 		t.Fatal("Complete SetArgs err = nil error, want error")
 	}
 }
@@ -426,7 +426,7 @@ func TestCover_ForgetCtxErr(t *testing.T) {
 
 	s := &store{prefix: "t:", ttl: time.Second}
 
-	ctx, cancel := context.WithCancel(context.Background())
+	ctx, cancel := context.WithCancel(t.Context())
 	cancel()
 
 	if err := s.Forget(ctx, "k"); err == nil {
@@ -439,7 +439,7 @@ func TestCover_ForgetDelErr(t *testing.T) {
 
 	s := whiteStore(t, pipeClient(t, []string{"-ERR boom\r\n"}))
 
-	if err := s.Forget(context.Background(), freshKey(t)); err == nil {
+	if err := s.Forget(t.Context(), freshKey(t)); err == nil {
 		t.Fatal("Forget Del err = nil error, want error")
 	}
 }

@@ -1,7 +1,6 @@
 package redis
 
 import (
-	"context"
 	"errors"
 	"testing"
 
@@ -47,7 +46,7 @@ func closedAdapter() *redisAdapter {
 func TestRedisClosed_allOpsReturnErrClosed(t *testing.T) {
 	t.Parallel()
 
-	ctx := context.Background()
+	ctx := t.Context()
 	a := closedAdapter()
 
 	if _, err := a.Get(ctx, "k"); !errors.Is(err, cache.ErrClosed) {

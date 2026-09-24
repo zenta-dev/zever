@@ -1,7 +1,6 @@
 package orm
 
 import (
-	"context"
 	"errors"
 	"reflect"
 	"testing"
@@ -412,7 +411,7 @@ func TestWindowFrameRoundTrip(t *testing.T) {
 // dialect.ErrUnsupportedByDialect, while default sqlite ROWS passes (the
 // mock's empty result set yields no error).
 func TestWindowFrameScanCapabilityGate(t *testing.T) {
-	ctx := context.Background()
+	ctx := t.Context()
 
 	groups := SumOver[widget](widgetQty).Over(nil, []OrderTerm[widget]{widgetQty.Asc()}).GroupsBetween(CurrentRow(), UnboundedFollowing())
 	rows := SumOver[widget](widgetQty).Over(nil, nil).RowsBetween(UnboundedPreceding(), CurrentRow())
@@ -433,7 +432,7 @@ func TestWindowFrameScanCapabilityGate(t *testing.T) {
 // TestWindowQueryScanErrorPaths drives resolve, query, row-callback,
 // iteration and close failures through WindowQuery.Scan.
 func TestWindowQueryScanErrorPaths(t *testing.T) {
-	ctx := context.Background()
+	ctx := t.Context()
 	boom := errors.New("boom")
 
 	q := From(widgets).Select(RowNumber[widget]().Over(nil, nil))

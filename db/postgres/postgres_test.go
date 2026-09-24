@@ -44,7 +44,7 @@ func openDead(t *testing.T) db.DB {
 	}
 
 	t.Cleanup(func() {
-		_ = d.Close(context.Background())
+		_ = d.Close(t.Context())
 	})
 
 	return d
@@ -53,7 +53,7 @@ func openDead(t *testing.T) db.DB {
 func shortCtx(t *testing.T) (context.Context, context.CancelFunc) {
 	t.Helper()
 
-	return context.WithTimeout(context.Background(), 2*time.Second)
+	return context.WithTimeout(t.Context(), 2*time.Second)
 }
 
 func TestNew_missingDSN(t *testing.T) {
@@ -93,7 +93,7 @@ func TestNew_poolKnobs(t *testing.T) {
 	if err != nil {
 		t.Fatalf("New: %v", err)
 	}
-	defer func() { _ = d.Close(context.Background()) }()
+	defer func() { _ = d.Close(t.Context()) }()
 
 	a, ok := d.(*adapter)
 	if !ok {
@@ -134,7 +134,7 @@ func TestNew_poolKnobsZeroLeavesDefaults(t *testing.T) {
 	if err != nil {
 		t.Fatalf("New: %v", err)
 	}
-	defer func() { _ = d.Close(context.Background()) }()
+	defer func() { _ = d.Close(t.Context()) }()
 
 	a, ok := d.(*adapter)
 	if !ok {
@@ -167,7 +167,7 @@ func TestTLS_defaultFloor(t *testing.T) {
 	if err != nil {
 		t.Fatalf("New: %v", err)
 	}
-	defer func() { _ = d.Close(context.Background()) }()
+	defer func() { _ = d.Close(t.Context()) }()
 
 	cfg := concretePool(t, d).Config()
 	if cfg.ConnConfig.TLSConfig == nil {
@@ -186,7 +186,7 @@ func TestTLS_disableNil(t *testing.T) {
 	if err != nil {
 		t.Fatalf("New: %v", err)
 	}
-	defer func() { _ = d.Close(context.Background()) }()
+	defer func() { _ = d.Close(t.Context()) }()
 
 	if cfg := concretePool(t, d).Config(); cfg.ConnConfig.TLSConfig != nil {
 		t.Fatalf("want nil TLSConfig for sslmode=disable, got %+v", cfg.ConnConfig.TLSConfig)
@@ -200,7 +200,7 @@ func TestTLS_requireFloor(t *testing.T) {
 	if err != nil {
 		t.Fatalf("New: %v", err)
 	}
-	defer func() { _ = d.Close(context.Background()) }()
+	defer func() { _ = d.Close(t.Context()) }()
 
 	cfg := concretePool(t, d).Config()
 	if cfg.ConnConfig.TLSConfig == nil {
@@ -219,7 +219,7 @@ func TestTLS_envDisableNil(t *testing.T) {
 	if err != nil {
 		t.Fatalf("New: %v", err)
 	}
-	defer func() { _ = d.Close(context.Background()) }()
+	defer func() { _ = d.Close(t.Context()) }()
 
 	if cfg := concretePool(t, d).Config(); cfg.ConnConfig.TLSConfig != nil {
 		t.Fatalf("want nil TLSConfig for PGSSLMODE=disable, got %+v", cfg.ConnConfig.TLSConfig)
@@ -233,7 +233,7 @@ func TestTLS_envRequireFloor(t *testing.T) {
 	if err != nil {
 		t.Fatalf("New: %v", err)
 	}
-	defer func() { _ = d.Close(context.Background()) }()
+	defer func() { _ = d.Close(t.Context()) }()
 
 	cfg := concretePool(t, d).Config()
 	if cfg.ConnConfig.TLSConfig == nil {
@@ -368,7 +368,7 @@ func TestClose_canceledCtx(t *testing.T) {
 		t.Fatalf("New: %v", err)
 	}
 
-	ctx, cancel := context.WithCancel(context.Background())
+	ctx, cancel := context.WithCancel(t.Context())
 	cancel()
 
 	if err := d.Close(ctx); err == nil {
@@ -382,7 +382,7 @@ func TestClose_ok(t *testing.T) {
 	t.Parallel()
 
 	d := openDead(t)
-	if err := d.Close(context.Background()); err != nil {
+	if err := d.Close(t.Context()); err != nil {
 		t.Fatalf("Close: %v", err)
 	}
 }
@@ -559,11 +559,11 @@ func TestPgTx_commitOnce(t *testing.T) {
 	t.Parallel()
 
 	tx := &pgTx{tx: &fakeTx{}}
-	if err := tx.Commit(context.Background()); err != nil {
+	if err := tx.Commit(t.Context()); err != nil {
 		t.Fatalf("Commit: %v", err)
 	}
 
-	if err := tx.Commit(context.Background()); err == nil {
+	if err := tx.Commit(t.Context()); err == nil {
 		t.Fatal("want error on double commit, got nil")
 	}
 }
@@ -572,12 +572,12 @@ func TestPgTx_commitError(t *testing.T) {
 	t.Parallel()
 
 	tx := &pgTx{tx: &fakeTx{commitErr: errors.New("commit down")}}
-	if err := tx.Commit(context.Background()); err == nil {
+	if err := tx.Commit(t.Context()); err == nil {
 		t.Fatal("want commit error, got nil")
 	}
 
 	// Failed commit leaves tx open, second attempt surfaces same error.
-	if err := tx.Commit(context.Background()); err == nil {
+	if err := tx.Commit(t.Context()); err == nil {
 		t.Fatal("want second commit error, got nil")
 	}
 }
@@ -586,11 +586,11 @@ func TestPgTx_rollbackIdempotent(t *testing.T) {
 	t.Parallel()
 
 	tx := &pgTx{tx: &fakeTx{}}
-	if err := tx.Rollback(context.Background()); err != nil {
+	if err := tx.Rollback(t.Context()); err != nil {
 		t.Fatalf("Rollback: %v", err)
 	}
 
-	if err := tx.Rollback(context.Background()); err != nil {
+	if err := tx.Rollback(t.Context()); err != nil {
 		t.Fatalf("second Rollback: %v", err)
 	}
 }
@@ -599,7 +599,7 @@ func TestPgTx_rollbackError(t *testing.T) {
 	t.Parallel()
 
 	tx := &pgTx{tx: &fakeTx{rollbackErr: errors.New("rollback down")}}
-	if err := tx.Rollback(context.Background()); err == nil {
+	if err := tx.Rollback(t.Context()); err == nil {
 		t.Fatal("want rollback error, got nil")
 	}
 }
@@ -610,15 +610,15 @@ func TestPgTx_closeRollsBackOnce(t *testing.T) {
 	fake := &fakeTx{}
 	tx := &pgTx{tx: fake}
 
-	if err := tx.Close(context.Background()); err != nil {
+	if err := tx.Close(t.Context()); err != nil {
 		t.Fatalf("Close: %v", err)
 	}
 
-	if err := tx.Close(context.Background()); err != nil {
+	if err := tx.Close(t.Context()); err != nil {
 		t.Fatalf("second Close: %v", err)
 	}
 
-	if err := tx.Commit(context.Background()); err == nil {
+	if err := tx.Commit(t.Context()); err == nil {
 		t.Fatal("want commit-after-close error, got nil")
 	}
 }
@@ -627,11 +627,11 @@ func TestPgTx_closeAfterCommit(t *testing.T) {
 	t.Parallel()
 
 	tx := &pgTx{tx: &fakeTx{}}
-	if err := tx.Commit(context.Background()); err != nil {
+	if err := tx.Commit(t.Context()); err != nil {
 		t.Fatalf("Commit: %v", err)
 	}
 
-	if err := tx.Close(context.Background()); err != nil {
+	if err := tx.Close(t.Context()); err != nil {
 		t.Fatalf("Close after commit: %v", err)
 	}
 }
@@ -640,7 +640,7 @@ func TestPgTx_closeRollbackError(t *testing.T) {
 	t.Parallel()
 
 	tx := &pgTx{tx: &fakeTx{rollbackErr: errors.New("rb down")}}
-	if err := tx.Close(context.Background()); err == nil {
+	if err := tx.Close(t.Context()); err == nil {
 		t.Fatal("want close error, got nil")
 	}
 }
@@ -653,14 +653,14 @@ func TestPgTx_queryExec(t *testing.T) {
 		execTag:   pgconn.NewCommandTag("UPDATE 2"),
 	}}
 
-	rows, err := tx.Query(context.Background(), "SELECT 1 WHERE 1 = ?", 1)
+	rows, err := tx.Query(t.Context(), "SELECT 1 WHERE 1 = ?", 1)
 	if err != nil {
 		t.Fatalf("Query: %v", err)
 	}
 
 	_ = rows.Close()
 
-	n, err := tx.Exec(context.Background(), "UPDATE t SET a = ? WHERE b = ?", 1, 2)
+	n, err := tx.Exec(t.Context(), "UPDATE t SET a = ? WHERE b = ?", 1, 2)
 	if err != nil {
 		t.Fatalf("Exec: %v", err)
 	}
@@ -674,7 +674,7 @@ func TestPgTx_queryError(t *testing.T) {
 	t.Parallel()
 
 	tx := &pgTx{tx: &fakeTx{queryErr: errors.New("query down")}}
-	if _, err := tx.Query(context.Background(), "SELECT 1"); err == nil {
+	if _, err := tx.Query(t.Context(), "SELECT 1"); err == nil {
 		t.Fatal("want query error, got nil")
 	}
 }
@@ -683,7 +683,7 @@ func TestPgTx_execError(t *testing.T) {
 	t.Parallel()
 
 	tx := &pgTx{tx: &fakeTx{execErr: errors.New("exec down")}}
-	if _, err := tx.Exec(context.Background(), "SELECT 1"); err == nil {
+	if _, err := tx.Exec(t.Context(), "SELECT 1"); err == nil {
 		t.Fatal("want exec error, got nil")
 	}
 }
@@ -692,11 +692,11 @@ func TestPgTx_pingDone(t *testing.T) {
 	t.Parallel()
 
 	tx := &pgTx{tx: &fakeTx{}}
-	if err := tx.Commit(context.Background()); err != nil {
+	if err := tx.Commit(t.Context()); err != nil {
 		t.Fatalf("Commit: %v", err)
 	}
 
-	if err := tx.Ping(context.Background()); err == nil {
+	if err := tx.Ping(t.Context()); err == nil {
 		t.Fatal("want ping-after-close error, got nil")
 	}
 }
@@ -707,7 +707,7 @@ func TestPgTx_savepoint(t *testing.T) {
 	fake := &fakeTx{}
 	tx := &pgTx{tx: fake}
 
-	if err := tx.Savepoint(context.Background(), "sp1"); err != nil {
+	if err := tx.Savepoint(t.Context(), "sp1"); err != nil {
 		t.Fatalf("Savepoint: %v", err)
 	}
 
@@ -715,7 +715,7 @@ func TestPgTx_savepoint(t *testing.T) {
 		t.Fatalf("execCalls = %v, want SAVEPOINT quoted", fake.execCalls)
 	}
 
-	if err := tx.RollbackTo(context.Background(), "sp1"); err != nil {
+	if err := tx.RollbackTo(t.Context(), "sp1"); err != nil {
 		t.Fatalf("RollbackTo: %v", err)
 	}
 
@@ -730,22 +730,22 @@ func TestPgTx_savepointErrors(t *testing.T) {
 	bad := []string{"", "1abc", "a-b", "a b", "a.b"}
 	for _, name := range bad {
 		tx := &pgTx{tx: &fakeTx{}}
-		if err := tx.Savepoint(context.Background(), name); err == nil {
+		if err := tx.Savepoint(t.Context(), name); err == nil {
 			t.Fatalf("Savepoint(%q): want error, got nil", name)
 		}
 
-		if err := tx.RollbackTo(context.Background(), name); err == nil {
+		if err := tx.RollbackTo(t.Context(), name); err == nil {
 			t.Fatalf("RollbackTo(%q): want error, got nil", name)
 		}
 	}
 
 	tx := &pgTx{tx: &fakeTx{execErr: errors.New("down")}}
-	if err := tx.Savepoint(context.Background(), "ok"); err == nil {
+	if err := tx.Savepoint(t.Context(), "ok"); err == nil {
 		t.Fatal("want savepoint exec error, got nil")
 	}
 
 	tx2 := &pgTx{tx: &fakeTx{execErr: errors.New("down")}}
-	if err := tx2.RollbackTo(context.Background(), "ok"); err == nil {
+	if err := tx2.RollbackTo(t.Context(), "ok"); err == nil {
 		t.Fatal("want rollback-to exec error, got nil")
 	}
 }
@@ -776,7 +776,7 @@ func TestIntegrationCRUD(t *testing.T) {
 		t.Skip("set POSTGRES_DSN to run postgres integration tests")
 	}
 
-	ctx := context.Background()
+	ctx := t.Context()
 
 	d, err := New(db.Options{DSN: dsn})
 	if err != nil {
@@ -958,7 +958,7 @@ func TestAdapterQuery_success(t *testing.T) {
 	}}
 	a := &adapter{pool: fp}
 
-	rows, err := a.Query(context.Background(), "SELECT id FROM t WHERE id = ?", "42")
+	rows, err := a.Query(t.Context(), "SELECT id FROM t WHERE id = ?", "42")
 	if err != nil {
 		t.Fatalf("Query: %v", err)
 	}
@@ -993,7 +993,7 @@ func TestAdapterExec_success(t *testing.T) {
 	fp := &fakePool{tag: pgconn.NewCommandTag("INSERT 0 2")}
 	a := &adapter{pool: fp}
 
-	n, err := a.Exec(context.Background(), "INSERT INTO t VALUES (?)", "x")
+	n, err := a.Exec(t.Context(), "INSERT INTO t VALUES (?)", "x")
 	if err != nil {
 		t.Fatalf("Exec: %v", err)
 	}
@@ -1009,7 +1009,7 @@ func TestAdapterPing_success(t *testing.T) {
 	t.Parallel()
 
 	a := &adapter{pool: &fakePool{}}
-	if err := a.Ping(context.Background()); err != nil {
+	if err := a.Ping(t.Context()); err != nil {
 		t.Fatalf("Ping: %v", err)
 	}
 }
@@ -1020,7 +1020,7 @@ func TestAdapterClose_closesPool(t *testing.T) {
 	fp := &fakePool{}
 	a := &adapter{pool: fp}
 
-	if err := a.Close(context.Background()); err != nil {
+	if err := a.Close(t.Context()); err != nil {
 		t.Fatalf("Close: %v", err)
 	}
 	if !fp.closed {
@@ -1038,12 +1038,12 @@ func TestAdapterBeginTx_successPaths(t *testing.T) {
 	fp := &fakePool{tx: ft}
 	a := &adapter{pool: fp}
 
-	tx, err := a.BeginTx(context.Background(), nil)
+	tx, err := a.BeginTx(t.Context(), nil)
 	if err != nil {
 		t.Fatalf("BeginTx: %v", err)
 	}
 
-	rows, err := tx.Query(context.Background(), "SELECT ?", "7")
+	rows, err := tx.Query(t.Context(), "SELECT ?", "7")
 	if err != nil {
 		t.Fatalf("tx Query: %v", err)
 	}
@@ -1051,7 +1051,7 @@ func TestAdapterBeginTx_successPaths(t *testing.T) {
 		t.Fatal("want one row")
 	}
 
-	n, err := tx.Exec(context.Background(), "DELETE FROM t WHERE id = ?", 1)
+	n, err := tx.Exec(t.Context(), "DELETE FROM t WHERE id = ?", 1)
 	if err != nil {
 		t.Fatalf("tx Exec: %v", err)
 	}
@@ -1059,10 +1059,10 @@ func TestAdapterBeginTx_successPaths(t *testing.T) {
 		t.Fatalf("n = %d, want 1", n)
 	}
 
-	if err := tx.Savepoint(context.Background(), "sp1"); err != nil {
+	if err := tx.Savepoint(t.Context(), "sp1"); err != nil {
 		t.Fatalf("Savepoint: %v", err)
 	}
-	if err := tx.RollbackTo(context.Background(), "sp1"); err != nil {
+	if err := tx.RollbackTo(t.Context(), "sp1"); err != nil {
 		t.Fatalf("RollbackTo: %v", err)
 	}
 
@@ -1071,11 +1071,11 @@ func TestAdapterBeginTx_successPaths(t *testing.T) {
 		t.Fatalf("want *pgTx, got %T", tx)
 	}
 	wired.conn = &fakeConn{}
-	if err := tx.Ping(context.Background()); err != nil {
+	if err := tx.Ping(t.Context()); err != nil {
 		t.Fatalf("tx Ping healthy: %v", err)
 	}
 
-	if err := tx.Commit(context.Background()); err != nil {
+	if err := tx.Commit(t.Context()); err != nil {
 		t.Fatalf("Commit: %v", err)
 	}
 }
@@ -1084,7 +1084,7 @@ func TestPgTxPing_connFailure(t *testing.T) {
 	t.Parallel()
 
 	bad := &pgTx{tx: &fakeTx{}, conn: &fakeConn{err: errors.New("conn down")}}
-	if err := bad.Ping(context.Background()); err == nil {
+	if err := bad.Ping(t.Context()); err == nil {
 		t.Fatal("want error for failed conn ping")
 	}
 }

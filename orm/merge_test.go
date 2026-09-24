@@ -1,7 +1,6 @@
 package orm
 
 import (
-	"context"
 	"errors"
 	"reflect"
 	"strings"
@@ -28,7 +27,7 @@ var (
 // SQL-standard MERGE and executes it on Postgres, binding only literal
 // values (source-column references bind nothing).
 func TestMergeExecPostgresRendersSQL(t *testing.T) {
-	ctx := context.Background()
+	ctx := t.Context()
 
 	rec := &recordingMock{dialectName: "postgres"}
 
@@ -65,7 +64,7 @@ func TestMergeExecPostgresRendersSQL(t *testing.T) {
 // TestMergeExecPostgresMatchedDelete proves a MERGE with a WHEN MATCHED THEN
 // DELETE clause renders and runs.
 func TestMergeExecPostgresMatchedDelete(t *testing.T) {
-	ctx := context.Background()
+	ctx := t.Context()
 
 	rec := &recordingMock{dialectName: "postgres"}
 
@@ -86,7 +85,7 @@ func TestMergeExecPostgresMatchedDelete(t *testing.T) {
 // same copy-on-write discipline as every other orm chain: branching a base
 // Merge and adding a clause on the branch leaves the base untouched.
 func TestMergeBranchSafety(t *testing.T) {
-	ctx := context.Background()
+	ctx := t.Context()
 
 	base := MergeInto(widgets).UsingSource(stagingWidgets).On(widgetID.Col(), stagingID.Col())
 
@@ -117,7 +116,7 @@ func TestMergeBranchSafety(t *testing.T) {
 // dialect.ErrUnsupportedByDialect on every dialect that has no MERGE --
 // SQLite and a base-only dialect -- never rendered as invalid SQL.
 func TestMergeCapabilityGate(t *testing.T) {
-	ctx := context.Background()
+	ctx := t.Context()
 
 	m := MergeInto(widgets).
 		UsingSource(stagingWidgets).
@@ -137,7 +136,7 @@ func TestMergeCapabilityGate(t *testing.T) {
 // TestMergeFailsClosed proves a malformed Merge (no ON, no WHEN) surfaces an
 // error rather than rendering invalid SQL.
 func TestMergeFailsClosed(t *testing.T) {
-	ctx := context.Background()
+	ctx := t.Context()
 
 	rec := &recordingMock{dialectName: "postgres"}
 
@@ -155,7 +154,7 @@ func TestMergeFailsClosed(t *testing.T) {
 // TestMergeExecErrorPaths drives resolve and exec-layer failures through
 // Merge.Exec.
 func TestMergeExecErrorPaths(t *testing.T) {
-	ctx := context.Background()
+	ctx := t.Context()
 	boom := errors.New("boom")
 
 	m := MergeInto(widgets).

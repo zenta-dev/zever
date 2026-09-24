@@ -1,7 +1,6 @@
 package redis
 
 import (
-	"context"
 	"errors"
 	"testing"
 	"time"
@@ -17,9 +16,9 @@ func TestLive_staleExtendDoesNotStealSuccessor(t *testing.T) {
 	if err != nil {
 		t.Fatalf("New() error = %v", err)
 	}
-	defer func() { _ = l.Close(context.Background()) }()
+	defer func() { _ = l.Close(t.Context()) }()
 
-	ctx := context.Background()
+	ctx := t.Context()
 
 	stale, ok, err := l.TryAcquire(ctx, "job", 200*time.Millisecond)
 	if err != nil || !ok {

@@ -3,7 +3,6 @@ package remote
 
 import (
 	"bytes"
-	"context"
 	"crypto/tls"
 	"encoding/json"
 	"errors"
@@ -52,7 +51,7 @@ func TestRenderRoundtripJSON(t *testing.T) {
 
 	defer func() { _ = doc.Close() }()
 
-	got, err := doc.Render(context.Background(), []byte("<html>"), document.FormatPDF)
+	got, err := doc.Render(t.Context(), []byte("<html>"), document.FormatPDF)
 	if err != nil {
 		t.Fatalf("Render: %v", err)
 	}
@@ -80,7 +79,7 @@ func TestRenderPDFBytes(t *testing.T) {
 
 	defer func() { _ = doc.Close() }()
 
-	got, err := doc.Render(context.Background(), []byte("<html>"), document.FormatPDF)
+	got, err := doc.Render(t.Context(), []byte("<html>"), document.FormatPDF)
 	if err != nil {
 		t.Fatalf("Render: %v", err)
 	}
@@ -106,7 +105,7 @@ func TestRenderEmptyDataErrors(t *testing.T) {
 			t.Fatalf("Open: %v", err)
 		}
 
-		_, err = doc.Render(context.Background(), []byte("<html>"), document.FormatPDF)
+		_, err = doc.Render(t.Context(), []byte("<html>"), document.FormatPDF)
 		_ = doc.Close()
 		srv.Close()
 
@@ -174,7 +173,7 @@ func TestRenderBinarySniffPassThrough(t *testing.T) {
 
 			defer func() { _ = doc.Close() }()
 
-			got, err := doc.Render(context.Background(), []byte("<html>"), document.FormatPDF)
+			got, err := doc.Render(t.Context(), []byte("<html>"), document.FormatPDF)
 			if err != nil {
 				t.Fatalf("Render: %v", err)
 			}
@@ -202,7 +201,7 @@ func renderWithContentType(t *testing.T, contentType string, body []byte) error 
 
 	defer func() { _ = doc.Close() }()
 
-	_, err = doc.Render(context.Background(), []byte("<html>"), document.FormatPDF)
+	_, err = doc.Render(t.Context(), []byte("<html>"), document.FormatPDF)
 
 	return err
 }
@@ -247,7 +246,7 @@ func TestRenderNoContentTypeBinarySniffPassThrough(t *testing.T) {
 
 	defer func() { _ = doc.Close() }()
 
-	got, err := doc.Render(context.Background(), []byte("<html>"), document.FormatPDF)
+	got, err := doc.Render(t.Context(), []byte("<html>"), document.FormatPDF)
 	if err != nil {
 		t.Fatalf("Render: %v", err)
 	}
@@ -273,7 +272,7 @@ func TestRenderNoContentTypeNoMagicErrors(t *testing.T) {
 
 	defer func() { _ = doc.Close() }()
 
-	if _, err := doc.Render(context.Background(), []byte("<html>"), document.FormatPDF); err == nil {
+	if _, err := doc.Render(t.Context(), []byte("<html>"), document.FormatPDF); err == nil {
 		t.Fatal("expected error for non-binary body without content-type")
 	}
 }
@@ -299,7 +298,7 @@ func TestRenderBinaryContentTypePassThrough(t *testing.T) {
 			t.Fatalf("Open: %v", err)
 		}
 
-		got, err := doc.Render(context.Background(), []byte("<html>"), document.FormatPDF)
+		got, err := doc.Render(t.Context(), []byte("<html>"), document.FormatPDF)
 		_ = doc.Close()
 		srv.Close()
 
@@ -331,7 +330,7 @@ func TestRenderOctetStreamWithMagicPassThrough(t *testing.T) {
 
 	defer func() { _ = doc.Close() }()
 
-	got, err := doc.Render(context.Background(), []byte("<html>"), document.FormatPDF)
+	got, err := doc.Render(t.Context(), []byte("<html>"), document.FormatPDF)
 	if err != nil {
 		t.Fatalf("Render: %v", err)
 	}
@@ -358,7 +357,7 @@ func TestRenderJSONContentTypeEnvelope(t *testing.T) {
 			t.Fatalf("Open: %v", err)
 		}
 
-		got, err := doc.Render(context.Background(), []byte("<html>"), document.FormatPDF)
+		got, err := doc.Render(t.Context(), []byte("<html>"), document.FormatPDF)
 		_ = doc.Close()
 		srv.Close()
 
@@ -399,7 +398,7 @@ func TestRenderBinaryEmptyBodyErrors(t *testing.T) {
 
 	defer func() { _ = doc.Close() }()
 
-	if _, err := doc.Render(context.Background(), []byte("<html>"), document.FormatPDF); err == nil {
+	if _, err := doc.Render(t.Context(), []byte("<html>"), document.FormatPDF); err == nil {
 		t.Fatal("expected error for empty binary body")
 	}
 }
@@ -435,7 +434,7 @@ func TestRenderRejectsUnsupportedFormat(t *testing.T) {
 
 	defer func() { _ = doc.Close() }()
 
-	_, err = doc.Render(context.Background(), []byte("<html>"), document.OutputFormat("webp"))
+	_, err = doc.Render(t.Context(), []byte("<html>"), document.OutputFormat("webp"))
 	if err == nil {
 		t.Fatal("expected error for unsupported format")
 	}
@@ -527,7 +526,7 @@ func TestTrailingSlashEndpoint(t *testing.T) {
 
 	defer func() { _ = doc.Close() }()
 
-	if _, err := doc.Render(context.Background(), []byte("<html>"), document.FormatPDF); err != nil {
+	if _, err := doc.Render(t.Context(), []byte("<html>"), document.FormatPDF); err != nil {
 		t.Fatal(err)
 	}
 }
@@ -551,7 +550,7 @@ func TestRenderOversizedBodyRejected(t *testing.T) {
 
 	defer func() { _ = doc.Close() }()
 
-	_, err = doc.Render(context.Background(), []byte("<html>"), document.FormatPDF)
+	_, err = doc.Render(t.Context(), []byte("<html>"), document.FormatPDF)
 	if err == nil {
 		t.Fatal("expected error for oversized body")
 	}
@@ -583,7 +582,7 @@ func TestRenderMaxOutputBytesBoundary(t *testing.T) {
 
 	defer func() { _ = doc.Close() }()
 
-	got, err := doc.Render(context.Background(), []byte("<html>"), document.FormatPDF)
+	got, err := doc.Render(t.Context(), []byte("<html>"), document.FormatPDF)
 	if err != nil {
 		t.Fatalf("Render at exact limit: %v", err)
 	}
@@ -614,7 +613,7 @@ func TestRenderCapPlusOneRejected(t *testing.T) {
 
 	defer func() { _ = doc.Close() }()
 
-	if _, err := doc.Render(context.Background(), []byte("<html>"), document.FormatPDF); err == nil {
+	if _, err := doc.Render(t.Context(), []byte("<html>"), document.FormatPDF); err == nil {
 		t.Fatal("expected error for cap+1 body")
 	}
 }
@@ -636,7 +635,7 @@ func TestErrorBodyTruncated(t *testing.T) {
 
 	defer func() { _ = doc.Close() }()
 
-	_, err = doc.Render(context.Background(), []byte("<html>"), document.FormatPDF)
+	_, err = doc.Render(t.Context(), []byte("<html>"), document.FormatPDF)
 	if err == nil {
 		t.Fatal("expected error")
 	}
@@ -671,7 +670,7 @@ func TestBearerHeaderAuthed(t *testing.T) {
 
 	defer func() { _ = doc.Close() }()
 
-	if _, err := doc.Render(context.Background(), []byte("<html>"), document.FormatPDF); err != nil {
+	if _, err := doc.Render(t.Context(), []byte("<html>"), document.FormatPDF); err != nil {
 		t.Fatalf("Render: %v", err)
 	}
 }
@@ -696,7 +695,7 @@ func TestBearerHeaderAnonymous(t *testing.T) {
 
 	defer func() { _ = doc.Close() }()
 
-	if _, err := doc.Render(context.Background(), []byte("<html>"), document.FormatPDF); err != nil {
+	if _, err := doc.Render(t.Context(), []byte("<html>"), document.FormatPDF); err != nil {
 		t.Fatalf("Render: %v", err)
 	}
 }
@@ -737,7 +736,7 @@ func TestTLSMinVersionEnforced(t *testing.T) {
 	// Trust the test server cert for the live handshake.
 	tr.TLSClientConfig.InsecureSkipVerify = true
 
-	if _, err := doc.Render(context.Background(), []byte("<html>"), document.FormatPDF); err != nil {
+	if _, err := doc.Render(t.Context(), []byte("<html>"), document.FormatPDF); err != nil {
 		t.Fatalf("Render: %v", err)
 	}
 
@@ -879,7 +878,7 @@ func TestRenderTimeout(t *testing.T) {
 
 	defer func() { _ = doc.Close() }()
 
-	if _, err := doc.Render(context.Background(), []byte("<html>"), document.FormatPDF); err == nil {
+	if _, err := doc.Render(t.Context(), []byte("<html>"), document.FormatPDF); err == nil {
 		t.Fatal("expected timeout error")
 	}
 }
@@ -899,7 +898,7 @@ func TestRenderNonOKStatus(t *testing.T) {
 
 	defer func() { _ = doc.Close() }()
 
-	_, err = doc.Render(context.Background(), []byte("<html>"), document.FormatPDF)
+	_, err = doc.Render(t.Context(), []byte("<html>"), document.FormatPDF)
 	if err == nil {
 		t.Fatal("expected error for non-200 status")
 	}
@@ -918,7 +917,7 @@ func TestRenderRequestBuildError(t *testing.T) {
 		client:    http.DefaultClient,
 	}
 
-	if _, err := d.Render(context.Background(), []byte("<html>"), document.FormatPDF); err == nil {
+	if _, err := d.Render(t.Context(), []byte("<html>"), document.FormatPDF); err == nil {
 		t.Fatal("expected request-build error")
 	} else if !strings.Contains(err.Error(), "request") {
 		t.Fatalf("error should mention request: %v", err)
@@ -941,7 +940,7 @@ func TestRenderErrorBodyReadError(t *testing.T) {
 
 	defer func() { _ = doc.Close() }()
 
-	if _, err := doc.Render(context.Background(), []byte("<html>"), document.FormatPDF); err == nil {
+	if _, err := doc.Render(t.Context(), []byte("<html>"), document.FormatPDF); err == nil {
 		t.Fatal("expected error for truncated error body")
 	}
 }
@@ -961,7 +960,7 @@ func TestRenderBodyReadError(t *testing.T) {
 
 	defer func() { _ = doc.Close() }()
 
-	if _, err := doc.Render(context.Background(), []byte("<html>"), document.FormatPDF); err == nil {
+	if _, err := doc.Render(t.Context(), []byte("<html>"), document.FormatPDF); err == nil {
 		t.Fatal("expected error for truncated body")
 	}
 }

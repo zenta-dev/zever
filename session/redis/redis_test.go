@@ -134,7 +134,7 @@ func TestNew_pingFailure(t *testing.T) {
 func TestCRUD_roundtrip(t *testing.T) {
 	t.Parallel()
 
-	ctx := context.Background()
+	ctx := t.Context()
 	opts := testOptions(t)
 	st := newTestStore(t, opts)
 
@@ -191,7 +191,7 @@ func TestGet_miss_ErrNotFound(t *testing.T) {
 	t.Parallel()
 
 	st := newTestStore(t, testOptions(t))
-	if _, err := st.Get(context.Background(), session.NewID()); !errors.Is(err, session.ErrNotFound) {
+	if _, err := st.Get(t.Context(), session.NewID()); !errors.Is(err, session.ErrNotFound) {
 		t.Fatalf("Get miss err = %v, want ErrNotFound", err)
 	}
 }
@@ -199,7 +199,7 @@ func TestGet_miss_ErrNotFound(t *testing.T) {
 // Sequential on purpose: FastForward jumps the shared server clock, so it
 // must not run alongside other tests.
 func TestExpiry(t *testing.T) {
-	ctx := context.Background()
+	ctx := t.Context()
 	opts := testOptions(t)
 	st := newTestStore(t, opts)
 	raw := rawClient(t)
@@ -227,7 +227,7 @@ func TestExpiry(t *testing.T) {
 func TestCreate_defaultTTL(t *testing.T) {
 	t.Parallel()
 
-	ctx := context.Background()
+	ctx := t.Context()
 	st := newTestStore(t, testOptions(t)) // TTL zero => DefaultTTL
 
 	before := time.Now()
@@ -245,7 +245,7 @@ func TestCreate_defaultTTL(t *testing.T) {
 func TestCopyIndependence(t *testing.T) {
 	t.Parallel()
 
-	ctx := context.Background()
+	ctx := t.Context()
 	st := newTestStore(t, testOptions(t))
 
 	s, err := st.Create(ctx, time.Hour)
@@ -277,7 +277,7 @@ func TestCopyIndependence(t *testing.T) {
 func TestSave_keepsExpiry(t *testing.T) {
 	t.Parallel()
 
-	ctx := context.Background()
+	ctx := t.Context()
 	opts := testOptions(t)
 	st := newTestStore(t, opts)
 	raw := rawClient(t)
@@ -318,7 +318,7 @@ func TestSave_keepsExpiry(t *testing.T) {
 func TestSave_missingCreates(t *testing.T) {
 	t.Parallel()
 
-	ctx := context.Background()
+	ctx := t.Context()
 	opts := testOptions(t)
 	st := newTestStore(t, opts)
 
@@ -347,7 +347,7 @@ func TestSave_missingCreates(t *testing.T) {
 func TestGet_corruptRecord(t *testing.T) {
 	t.Parallel()
 
-	ctx := context.Background()
+	ctx := t.Context()
 	opts := testOptions(t)
 	st := newTestStore(t, opts)
 	raw := rawClient(t)
@@ -378,7 +378,7 @@ func TestGet_corruptRecord(t *testing.T) {
 func TestSave_corruptOverwrites(t *testing.T) {
 	t.Parallel()
 
-	ctx := context.Background()
+	ctx := t.Context()
 	opts := testOptions(t)
 	st := newTestStore(t, opts)
 	raw := rawClient(t)
@@ -410,7 +410,7 @@ func TestSave_corruptOverwrites(t *testing.T) {
 func TestDefaultPrefix(t *testing.T) {
 	t.Parallel()
 
-	ctx := context.Background()
+	ctx := t.Context()
 	st := newTestStore(t, session.Options{Redis: session.RedisOptions{Addr: testAddr}})
 	raw := rawClient(t)
 
@@ -427,7 +427,7 @@ func TestDefaultPrefix(t *testing.T) {
 func TestInvalidIDs(t *testing.T) {
 	t.Parallel()
 
-	ctx := context.Background()
+	ctx := t.Context()
 	st := newTestStore(t, testOptions(t))
 
 	for _, id := range []string{"", "short", "ZZZZ"} {
@@ -450,7 +450,7 @@ func TestContextCanceled(t *testing.T) {
 
 	st := newTestStore(t, testOptions(t))
 
-	ctx, cancel := context.WithCancel(context.Background())
+	ctx, cancel := context.WithCancel(t.Context())
 	cancel()
 
 	if _, err := st.Create(ctx, time.Hour); !errors.Is(err, context.Canceled) {
@@ -473,7 +473,7 @@ func TestContextCanceled(t *testing.T) {
 func TestAfterClose(t *testing.T) {
 	t.Parallel()
 
-	ctx := context.Background()
+	ctx := t.Context()
 	st := newTestStore(t, testOptions(t))
 
 	s, err := st.Create(ctx, time.Hour)
@@ -509,7 +509,7 @@ func TestAfterClose(t *testing.T) {
 func TestConcurrent(t *testing.T) {
 	t.Parallel()
 
-	ctx := context.Background()
+	ctx := t.Context()
 	st := newTestStore(t, testOptions(t))
 
 	var wg sync.WaitGroup

@@ -1,7 +1,6 @@
 package redis
 
 import (
-	"context"
 	"errors"
 	"testing"
 	"time"
@@ -25,7 +24,7 @@ func newLiveLocker(t *testing.T, opts lock.Options) lock.Locker {
 		t.Fatalf("New() error = %v", err)
 	}
 
-	t.Cleanup(func() { _ = l.Close(context.Background()) })
+	t.Cleanup(func() { _ = l.Close(t.Context()) })
 
 	return l
 }
@@ -37,7 +36,7 @@ func TestNew_defaultsAndPrefix(t *testing.T) {
 	if err != nil {
 		t.Fatalf("New() error = %v", err)
 	}
-	defer func() { _ = l.Close(context.Background()) }()
+	defer func() { _ = l.Close(t.Context()) }()
 
 	a, ok := l.(*adapter)
 	if !ok {
@@ -47,7 +46,7 @@ func TestNew_defaultsAndPrefix(t *testing.T) {
 		t.Errorf("defaults = %q/%v/%v, want lock:/%v/%v", a.prefix, a.ttl, a.retryInterval, lock.DefaultTTL, lock.DefaultRetryInterval)
 	}
 
-	if _, acqOK, acqErr := l.TryAcquire(context.Background(), "k", 0); acqErr != nil || !acqOK {
+	if _, acqOK, acqErr := l.TryAcquire(t.Context(), "k", 0); acqErr != nil || !acqOK {
 		t.Fatalf("TryAcquire = %v, %v, want true, nil", acqOK, acqErr)
 	}
 
@@ -59,9 +58,9 @@ func TestNew_defaultsAndPrefix(t *testing.T) {
 	if err != nil {
 		t.Fatalf("New() error = %v", err)
 	}
-	defer func() { _ = custom.Close(context.Background()) }()
+	defer func() { _ = custom.Close(t.Context()) }()
 
-	if _, ok, err := custom.TryAcquire(context.Background(), "k", 0); err != nil || !ok {
+	if _, ok, err := custom.TryAcquire(t.Context(), "k", 0); err != nil || !ok {
 		t.Fatalf("TryAcquire = %v, %v, want true, nil", ok, err)
 	}
 
@@ -78,7 +77,7 @@ func TestNew_badURL(t *testing.T) {
 
 func TestLive_acquireUnlock(t *testing.T) {
 	l := newLiveLocker(t, lock.Options{})
-	ctx := context.Background()
+	ctx := t.Context()
 
 	h, ok, err := l.TryAcquire(ctx, "job", time.Minute)
 	if err != nil || !ok {
@@ -113,14 +112,14 @@ func TestLive_contention(t *testing.T) {
 			t.Fatalf("New() error = %v", err)
 		}
 
-		t.Cleanup(func() { _ = l.Close(context.Background()) })
+		t.Cleanup(func() { _ = l.Close(t.Context()) })
 
 		return l
 	}
 
 	a := newLocker(lock.Options{})
 	b := newLocker(lock.Options{})
-	ctx := context.Background()
+	ctx := t.Context()
 
 	ha, ok, err := a.TryAcquire(ctx, "job", time.Minute)
 	if err != nil || !ok {
@@ -160,14 +159,14 @@ func TestLive_acquireWaitsForExpiry(t *testing.T) {
 			t.Fatalf("New() error = %v", err)
 		}
 
-		t.Cleanup(func() { _ = l.Close(context.Background()) })
+		t.Cleanup(func() { _ = l.Close(t.Context()) })
 
 		return l
 	}
 
 	a := newLocker()
 	b := newLocker()
-	ctx := context.Background()
+	ctx := t.Context()
 
 	if _, ok, err := a.TryAcquire(ctx, "job", 200*time.Millisecond); err != nil || !ok {
 		t.Fatalf("A TryAcquire = %v, %v, want true, nil", ok, err)
@@ -208,9 +207,9 @@ func TestLive_extend(t *testing.T) {
 	if err != nil {
 		t.Fatalf("New() error = %v", err)
 	}
-	defer func() { _ = l.Close(context.Background()) }()
+	defer func() { _ = l.Close(t.Context()) }()
 
-	ctx := context.Background()
+	ctx := t.Context()
 
 	h, ok, err := l.TryAcquire(ctx, "job", 500*time.Millisecond)
 	if err != nil || !ok {
@@ -230,7 +229,7 @@ func TestLive_extend(t *testing.T) {
 	if err != nil {
 		t.Fatalf("New() error = %v", err)
 	}
-	defer func() { _ = other.Close(context.Background()) }()
+	defer func() { _ = other.Close(t.Context()) }()
 
 	// Same address reuses the shared client; the rival sees the same key.
 	if _, ok, err := other.TryAcquire(ctx, "job", time.Minute); err != nil || ok {
@@ -248,9 +247,9 @@ func TestLive_extendAfterExpiryNotHeld(t *testing.T) {
 	if err != nil {
 		t.Fatalf("New() error = %v", err)
 	}
-	defer func() { _ = l.Close(context.Background()) }()
+	defer func() { _ = l.Close(t.Context()) }()
 
-	ctx := context.Background()
+	ctx := t.Context()
 
 	h, ok, err := l.TryAcquire(ctx, "job", 100*time.Millisecond)
 	if err != nil || !ok {
@@ -270,19 +269,19 @@ func TestLive_extendAfterExpiryNotHeld(t *testing.T) {
 
 func TestLive_prefixIsolation(t *testing.T) {
 	s := miniredis.RunT(t)
-	ctx := context.Background()
+	ctx := t.Context()
 
 	a, err := New(lock.Options{Addr: s.Addr(), Prefix: "a:"})
 	if err != nil {
 		t.Fatalf("New() error = %v", err)
 	}
-	defer func() { _ = a.Close(context.Background()) }()
+	defer func() { _ = a.Close(t.Context()) }()
 
 	b, err := New(lock.Options{Addr: s.Addr(), Prefix: "b:"})
 	if err != nil {
 		t.Fatalf("New() error = %v", err)
 	}
-	defer func() { _ = b.Close(context.Background()) }()
+	defer func() { _ = b.Close(t.Context()) }()
 
 	ha, ok, err := a.TryAcquire(ctx, "job", time.Minute)
 	if err != nil || !ok {

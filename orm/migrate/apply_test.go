@@ -41,7 +41,7 @@ func openTestSQLite(t *testing.T, name string) db.DB {
 		t.Fatalf("db.Open: %v", err)
 	}
 
-	t.Cleanup(func() { _ = conn.Close(context.Background()) })
+	t.Cleanup(func() { _ = conn.Close(t.Context()) })
 
 	return conn
 }
@@ -85,7 +85,7 @@ func TestEnsureMigrationsTable(t *testing.T) {
 		t.Run(tt.name, func(t *testing.T) {
 			t.Parallel()
 
-			ctx := context.Background()
+			ctx := t.Context()
 
 			if tt.dialect == atlas.DialectSQLite {
 				conn := openTestSQLite(t, "ensure.db")
@@ -144,7 +144,7 @@ func TestEnsureMigrationsTable_createError(t *testing.T) {
 		},
 	}
 
-	if err := EnsureMigrationsTable(context.Background(), conn, atlas.DialectPostgres); err == nil {
+	if err := EnsureMigrationsTable(t.Context(), conn, atlas.DialectPostgres); err == nil {
 		t.Fatal("EnsureMigrationsTable: want error, got nil")
 	}
 }
@@ -152,7 +152,7 @@ func TestEnsureMigrationsTable_createError(t *testing.T) {
 func TestAddMigrationTrackingColumns(t *testing.T) {
 	t.Parallel()
 
-	ctx := context.Background()
+	ctx := t.Context()
 
 	t.Run("postgresAddsMissingWithoutIntrospection", func(t *testing.T) {
 		t.Parallel()
@@ -299,7 +299,7 @@ func TestMigrationApplied_queryError(t *testing.T) {
 		},
 	}
 
-	if _, err := migrationApplied(context.Background(), conn, "abc"); err == nil {
+	if _, err := migrationApplied(t.Context(), conn, "abc"); err == nil {
 		t.Fatal("migrationApplied: want error, got nil")
 	}
 }
@@ -314,7 +314,7 @@ func TestRecordMigration_execError(t *testing.T) {
 		},
 	}
 
-	if err := recordMigration(context.Background(), conn, "abc", migrationMeta{}); err == nil {
+	if err := recordMigration(t.Context(), conn, "abc", migrationMeta{}); err == nil {
 		t.Fatal("recordMigration: want error, got nil")
 	}
 }
@@ -322,7 +322,7 @@ func TestRecordMigration_execError(t *testing.T) {
 func TestApply(t *testing.T) {
 	t.Parallel()
 
-	ctx := context.Background()
+	ctx := t.Context()
 
 	t.Run("nilPlan", func(t *testing.T) {
 		t.Parallel()
@@ -520,7 +520,7 @@ func TestApply(t *testing.T) {
 func TestApplyStatementInTx(t *testing.T) {
 	t.Parallel()
 
-	ctx := context.Background()
+	ctx := t.Context()
 	stmt := plannedStatement{SQL: "ALTER TABLE x;", Meta: migrationMeta{Kind: kindAddColumn}}
 
 	t.Run("commits", func(t *testing.T) {
@@ -601,7 +601,7 @@ func TestApplyStatementInTx(t *testing.T) {
 func TestApplyMigrationPlan_skipsApplied(t *testing.T) {
 	t.Parallel()
 
-	ctx := context.Background()
+	ctx := t.Context()
 
 	conn := &fakeDB{
 		dialect: atlas.DialectSQLite,
@@ -663,7 +663,7 @@ func (d *injectingDB) BeginTx(ctx context.Context, opts *db.TxOptions) (db.Tx, e
 }
 
 func TestApply_rollsBackDDLWhenBookkeepingFails(t *testing.T) {
-	ctx := context.Background()
+	ctx := t.Context()
 	realConn := openTestSQLite(t, "rollback.db")
 
 	transactor, ok := realConn.(db.Transactor)
@@ -773,7 +773,7 @@ func TestApplyStatementUnguarded_recordError(t *testing.T) {
 
 	stmt := plannedStatement{SQL: "ALTER TABLE x;", Meta: migrationMeta{Kind: kindAddColumn}}
 
-	if err := applyStatementUnguarded(context.Background(), conn, stmt, "abc"); err == nil {
+	if err := applyStatementUnguarded(t.Context(), conn, stmt, "abc"); err == nil {
 		t.Fatal("applyStatementUnguarded: want record error, got nil")
 	}
 }

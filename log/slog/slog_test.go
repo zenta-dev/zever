@@ -2,7 +2,6 @@ package slog
 
 import (
 	"bytes"
-	"context"
 	"encoding/json"
 	"errors"
 	"testing"
@@ -99,11 +98,11 @@ func TestLogger_WithContext(t *testing.T) {
 
 	l, _ := newBuffered(log.LevelDebug)
 
-	if got := l.WithContext(context.Background()); got == nil {
+	if got := l.WithContext(t.Context()); got == nil {
 		t.Fatal("WithContext() = nil, want logger")
 	}
 
-	ctx := log.ContextWithLogger(context.Background(), l)
+	ctx := log.ContextWithLogger(t.Context(), l)
 	if got := l.WithContext(ctx); got != log.Logger(l) {
 		t.Errorf("WithContext(stored) = %v, want stored logger", got)
 	}

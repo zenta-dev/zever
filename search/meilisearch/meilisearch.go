@@ -72,17 +72,17 @@ func recordIndex(indexes []string, idx string) []string {
 	return append(indexes, idx)
 }
 
-func (m *meilisearchClient) trackIndex(id, idx string) {
-	cur, ok := m.idIndexes.Get(id)
+func (c *meilisearchClient) trackIndex(id, idx string) {
+	cur, ok := c.idIndexes.Get(id)
 	if ok {
 		cur = cloneIndexes(cur)
 	}
 
-	m.idIndexes.Put(id, cloneIndexes(recordIndex(cur, idx)))
+	c.idIndexes.Put(id, cloneIndexes(recordIndex(cur, idx)))
 }
 
 // Index adds or replaces doc in its index.
-func (m *meilisearchClient) Index(ctx context.Context, doc search.Document) error {
+func (c *meilisearchClient) Index(ctx context.Context, doc search.Document) error {
 	// Uses AddDocumentsWithContext (available since meilisearch-go v0.28):
 	// context-aware variant avoids the noctx lint hit from AddDocuments.
 	metadata := make(map[string]any, len(doc.Metadata))
@@ -90,7 +90,7 @@ func (m *meilisearchClient) Index(ctx context.Context, doc search.Document) erro
 		metadata[k] = v
 	}
 
-	idx := m.client.Index(doc.Index)
+	idx := c.client.Index(doc.Index)
 
 	_, err := idx.AddDocumentsWithContext(ctx, []map[string]any{
 		{
@@ -103,7 +103,7 @@ func (m *meilisearchClient) Index(ctx context.Context, doc search.Document) erro
 		return fmt.Errorf("meilisearch: index: %w", err)
 	}
 
-	m.trackIndex(doc.ID, doc.Index)
+	c.trackIndex(doc.ID, doc.Index)
 
 	return nil
 }
@@ -113,7 +113,7 @@ func (m *meilisearchClient) Index(ctx context.Context, doc search.Document) erro
 // endpoint targets one index per call, so this issues one HTTP call per
 // distinct index among docs rather than one call per document. An empty docs
 // is a no-op.
-func (m *meilisearchClient) IndexBatch(ctx context.Context, docs []search.Document) error {
+func (c *meilisearchClient) IndexBatch(ctx context.Context, docs []search.Document) error {
 	if len(docs) == 0 {
 		return nil
 	}
@@ -139,7 +139,7 @@ func (m *meilisearchClient) IndexBatch(ctx context.Context, docs []search.Docume
 	}
 
 	for _, idxName := range order {
-		idx := m.client.Index(idxName)
+		idx := c.client.Index(idxName)
 
 		if _, err := idx.AddDocumentsWithContext(ctx, byIndex[idxName], nil); err != nil {
 			return fmt.Errorf("meilisearch: index batch: %w", err)
@@ -147,15 +147,15 @@ func (m *meilisearchClient) IndexBatch(ctx context.Context, docs []search.Docume
 	}
 
 	for _, doc := range docs {
-		m.trackIndex(doc.ID, doc.Index)
+		c.trackIndex(doc.ID, doc.Index)
 	}
 
 	return nil
 }
 
 // Delete removes the document with id from every tracked index.
-func (m *meilisearchClient) Delete(ctx context.Context, id string) error {
-	indexes, ok := m.idIndexes.Get(id)
+func (c *meilisearchClient) Delete(ctx context.Context, id string) error {
+	indexes, ok := c.idIndexes.Get(id)
 	if ok {
 		indexes = cloneIndexes(indexes)
 	}
@@ -175,20 +175,20 @@ func (m *meilisearchClient) Delete(ctx context.Context, id string) error {
 	}
 
 	for _, name := range indexes {
-		_, err := m.client.Index(name).DeleteDocumentWithContext(ctx, id, nil)
+		_, err := c.client.Index(name).DeleteDocumentWithContext(ctx, id, nil)
 		if err != nil {
 			return fmt.Errorf("meilisearch: delete: %w", err)
 		}
 	}
 
-	m.idIndexes.Delete(id)
+	c.idIndexes.Delete(id)
 
 	return nil
 }
 
 // Search runs query against the explicit index filter and returns ranked hits.
 // An empty query short-circuits to an empty result without any HTTP call.
-func (m *meilisearchClient) Search(ctx context.Context, query string, opts search.QueryOptions) (search.Result, error) {
+func (c *meilisearchClient) Search(ctx context.Context, query string, opts search.QueryOptions) (search.Result, error) {
 	// Uses SearchWithContext (available since meilisearch-go v0.28):
 	// context-aware variant avoids the noctx lint hit from Search.
 	if opts.Limit <= 0 {
@@ -208,7 +208,7 @@ func (m *meilisearchClient) Search(ctx context.Context, query string, opts searc
 		return search.Result{}, err
 	}
 
-	idx := m.client.Index(idxName)
+	idx := c.client.Index(idxName)
 
 	searchReq := &meilisearch.SearchRequest{
 		Query:            query,
@@ -226,7 +226,7 @@ func (m *meilisearchClient) Search(ctx context.Context, query string, opts searc
 
 	for _, h := range hits {
 		if h.ID != "" {
-			m.trackIndex(h.ID, idxName)
+			c.trackIndex(h.ID, idxName)
 		}
 	}
 
@@ -267,6 +267,6 @@ func toHits(raw meilisearch.Hits) []search.Hit {
 }
 
 // Close releases backend resources.
-func (m *meilisearchClient) Close() error {
+func (c *meilisearchClient) Close() error {
 	return nil
 }

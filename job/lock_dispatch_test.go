@@ -183,7 +183,7 @@ func TestLockNewUniqueLocker(t *testing.T) {
 	if err != nil {
 		t.Fatalf("cachememory.New: %v", err)
 	}
-	defer c.Close(context.Background())
+	defer c.Close(t.Context())
 	l := NewUniqueLocker(c)
 	if l == nil {
 		t.Fatal("NewUniqueLocker returned nil")
@@ -211,7 +211,7 @@ func TestLockAcquireInvalidTTL(t *testing.T) {
 	Reset()
 	l := NewUniqueLocker(nil)
 	for _, ttl := range []time.Duration{0, -time.Second, -time.Nanosecond} {
-		ok, err := l.Acquire(context.Background(), "k", ttl)
+		ok, err := l.Acquire(t.Context(), "k", ttl)
 		if ok {
 			t.Errorf("Acquire ttl=%v ok=true want false", ttl)
 		}
@@ -227,9 +227,9 @@ func TestLockAcquireDedupAndReleaseRealCache(t *testing.T) {
 	if err != nil {
 		t.Fatalf("cachememory.New: %v", err)
 	}
-	defer c.Close(context.Background())
+	defer c.Close(t.Context())
 	l := NewUniqueLocker(c)
-	ctx := context.Background()
+	ctx := t.Context()
 	ok, err := l.Acquire(ctx, "dedup", time.Minute)
 	if err != nil || !ok {
 		t.Fatalf("first Acquire ok=%v err=%v want ok=true", ok, err)
@@ -258,7 +258,7 @@ func TestLockAcquireSetIfAbsentError(t *testing.T) {
 		},
 	}
 	l := NewUniqueLocker(fc)
-	ok, err := l.Acquire(context.Background(), "k", time.Minute)
+	ok, err := l.Acquire(t.Context(), "k", time.Minute)
 	if ok {
 		t.Fatalf("Acquire ok=true want false on error")
 	}
@@ -278,7 +278,7 @@ func TestLockReleaseDeletes(t *testing.T) {
 		},
 	}
 	l := NewUniqueLocker(fc)
-	if err := l.Release(context.Background(), "mykey"); err != nil {
+	if err := l.Release(t.Context(), "mykey"); err != nil {
 		t.Fatalf("Release err=%v", err)
 	}
 	if deleted != "job:unique:mykey" {
@@ -289,9 +289,9 @@ func TestLockReleaseDeletes(t *testing.T) {
 	if err != nil {
 		t.Fatalf("cachememory.New: %v", err)
 	}
-	defer c.Close(context.Background())
+	defer c.Close(t.Context())
 	l2 := NewUniqueLocker(c)
-	ctx := context.Background()
+	ctx := t.Context()
 	if ok, _ := l2.Acquire(ctx, "rel", time.Minute); !ok {
 		t.Fatal("Acquire before Release failed")
 	}
@@ -313,9 +313,9 @@ func TestLockAcquirePrefixCheck(t *testing.T) {
 	if err != nil {
 		t.Fatalf("cachememory.New: %v", err)
 	}
-	defer c.Close(context.Background())
+	defer c.Close(t.Context())
 	l := NewUniqueLocker(c)
-	ctx := context.Background()
+	ctx := t.Context()
 	key := "prefixed"
 	ok, err := l.Acquire(ctx, key, time.Minute)
 	if err != nil || !ok {
@@ -386,7 +386,7 @@ func TestDispatchOptionsInAtUniqueBy(t *testing.T) {
 func TestDispatchUnknownJob(t *testing.T) {
 	Reset()
 	d := &Dispatcher{Q: &stubQueue{}}
-	err := d.Dispatch(context.Background(), "unknown", "arg")
+	err := d.Dispatch(t.Context(), "unknown", "arg")
 	if err == nil {
 		t.Fatal("Dispatch unknown want error")
 	}
@@ -408,7 +408,7 @@ func TestDispatchMarshalError(t *testing.T) {
 		t.Fatalf("Register: %v", err)
 	}
 	d := &Dispatcher{Q: &stubQueue{}}
-	err := d.Dispatch(context.Background(), "marshal-job", make(chan int))
+	err := d.Dispatch(t.Context(), "marshal-job", make(chan int))
 	if err == nil {
 		t.Fatal("Dispatch chan want marshal error")
 	}
@@ -423,7 +423,7 @@ func TestDispatchUniqueByNilLocker(t *testing.T) {
 		t.Fatalf("Register: %v", err)
 	}
 	d := &Dispatcher{Q: &stubQueue{}, UniqueLocker: nil}
-	err := d.Dispatch(context.Background(), "uniq-nil", "arg", UniqueBy("k"))
+	err := d.Dispatch(t.Context(), "uniq-nil", "arg", UniqueBy("k"))
 	if err == nil {
 		t.Fatal("Dispatch UniqueBy nil locker want error")
 	}
@@ -446,7 +446,7 @@ func TestDispatchUniqueLockAcquireError(t *testing.T) {
 		},
 	}
 	d := &Dispatcher{Q: &stubQueue{}, UniqueLocker: NewUniqueLocker(fc)}
-	err := d.Dispatch(context.Background(), "uniq-err", "arg", UniqueBy("k"))
+	err := d.Dispatch(t.Context(), "uniq-err", "arg", UniqueBy("k"))
 	if err == nil {
 		t.Fatal("Dispatch want unique lock error")
 	}
@@ -470,7 +470,7 @@ func TestDispatchUniqueLockNotAcquired(t *testing.T) {
 		},
 	}
 	d := &Dispatcher{Q: sq, UniqueLocker: NewUniqueLocker(fc)}
-	err := d.Dispatch(context.Background(), "uniq-not", "arg", UniqueBy("k"))
+	err := d.Dispatch(t.Context(), "uniq-not", "arg", UniqueBy("k"))
 	if err != nil {
 		t.Fatalf("Dispatch not acquired err=%v want nil", err)
 	}
@@ -491,7 +491,7 @@ func TestDispatchUniqueLockAcquiredPush(t *testing.T) {
 		},
 	}
 	d := &Dispatcher{Q: sq, UniqueLocker: NewUniqueLocker(fc)}
-	err := d.Dispatch(context.Background(), "uniq-ok", "arg", UniqueBy("mykey"))
+	err := d.Dispatch(t.Context(), "uniq-ok", "arg", UniqueBy("mykey"))
 	if err != nil {
 		t.Fatalf("Dispatch acquired err=%v", err)
 	}
@@ -519,7 +519,7 @@ func TestDispatchUniqueLockAcquiredPushDelayed(t *testing.T) {
 		},
 	}
 	d := &Dispatcher{Q: sq, UniqueLocker: NewUniqueLocker(fc)}
-	err := d.Dispatch(context.Background(), "uniq-delay", "arg", UniqueBy("k"), In(time.Second))
+	err := d.Dispatch(t.Context(), "uniq-delay", "arg", UniqueBy("k"), In(time.Second))
 	if err != nil {
 		t.Fatalf("Dispatch err=%v", err)
 	}
@@ -543,7 +543,7 @@ func TestDispatchPushPaths(t *testing.T) {
 	// delay>0 → PushDelayed
 	sq := &stubQueue{}
 	d := &Dispatcher{Q: sq}
-	if err := d.Dispatch(context.Background(), "push-path", "arg", In(time.Second)); err != nil {
+	if err := d.Dispatch(t.Context(), "push-path", "arg", In(time.Second)); err != nil {
 		t.Fatalf("Dispatch In 1s err=%v", err)
 	}
 	if sq.delayedPushes != 1 || sq.pushes != 0 {
@@ -555,7 +555,7 @@ func TestDispatchPushPaths(t *testing.T) {
 	// delay<=0 → Push
 	sq2 := &stubQueue{}
 	d2 := &Dispatcher{Q: sq2}
-	if err := d2.Dispatch(context.Background(), "push-path", "arg"); err != nil {
+	if err := d2.Dispatch(t.Context(), "push-path", "arg"); err != nil {
 		t.Fatalf("Dispatch no delay err=%v", err)
 	}
 	if sq2.pushes != 1 || sq2.delayedPushes != 0 {
@@ -564,7 +564,7 @@ func TestDispatchPushPaths(t *testing.T) {
 	// In(0) → Push
 	sq3 := &stubQueue{}
 	d3 := &Dispatcher{Q: sq3}
-	if err := d3.Dispatch(context.Background(), "push-path", "arg", In(0)); err != nil {
+	if err := d3.Dispatch(t.Context(), "push-path", "arg", In(0)); err != nil {
 		t.Fatalf("Dispatch In 0 err=%v", err)
 	}
 	if sq3.pushes != 1 {
@@ -581,7 +581,7 @@ func TestDispatchAtFutureAndPast(t *testing.T) {
 	sq := &stubQueue{}
 	d := &Dispatcher{Q: sq}
 	future := time.Now().Add(5 * time.Second)
-	if err := d.Dispatch(context.Background(), "at-job", "arg", At(future)); err != nil {
+	if err := d.Dispatch(t.Context(), "at-job", "arg", At(future)); err != nil {
 		t.Fatalf("Dispatch At future err=%v", err)
 	}
 	if sq.delayedPushes != 1 {
@@ -591,7 +591,7 @@ func TestDispatchAtFutureAndPast(t *testing.T) {
 	sq2 := &stubQueue{}
 	d2 := &Dispatcher{Q: sq2}
 	past := time.Now().Add(-5 * time.Second)
-	if err := d2.Dispatch(context.Background(), "at-job", "arg", At(past)); err != nil {
+	if err := d2.Dispatch(t.Context(), "at-job", "arg", At(past)); err != nil {
 		t.Fatalf("Dispatch At past err=%v", err)
 	}
 	if sq2.pushes != 1 || sq2.delayedPushes != 0 {
@@ -608,7 +608,7 @@ func TestDispatchAtOverridesIn(t *testing.T) {
 	sq := &stubQueue{}
 	d := &Dispatcher{Q: sq}
 	past := time.Now().Add(-time.Second)
-	if err := d.Dispatch(context.Background(), "at-over", "arg", In(time.Hour), At(past)); err != nil {
+	if err := d.Dispatch(t.Context(), "at-over", "arg", In(time.Hour), At(past)); err != nil {
 		t.Fatalf("Dispatch At+In err=%v", err)
 	}
 	if sq.pushes != 1 {
@@ -618,7 +618,7 @@ func TestDispatchAtOverridesIn(t *testing.T) {
 	sq2 := &stubQueue{}
 	d2 := &Dispatcher{Q: sq2}
 	future := time.Now().Add(time.Hour)
-	if err := d2.Dispatch(context.Background(), "at-over", "arg", In(0), At(future)); err != nil {
+	if err := d2.Dispatch(t.Context(), "at-over", "arg", In(0), At(future)); err != nil {
 		t.Fatalf("Dispatch At future+In0 err=%v", err)
 	}
 	if sq2.delayedPushes != 1 {
@@ -650,7 +650,7 @@ func TestDispatchPushErrorReleasesLock(t *testing.T) {
 		},
 	}
 	d := &Dispatcher{Q: sq, UniqueLocker: NewUniqueLocker(fc)}
-	err := d.Dispatch(context.Background(), "rel-job", "arg", UniqueBy("k"))
+	err := d.Dispatch(t.Context(), "rel-job", "arg", UniqueBy("k"))
 	if !errors.Is(err, pushErr) {
 		t.Fatalf("err=%v want pushErr", err)
 	}
@@ -685,7 +685,7 @@ func TestDispatchPushDelayedErrorReleasesLock(t *testing.T) {
 		},
 	}
 	d := &Dispatcher{Q: sq, UniqueLocker: NewUniqueLocker(fc)}
-	err := d.Dispatch(context.Background(), "rel-delay", "arg", UniqueBy("k"), In(time.Second))
+	err := d.Dispatch(t.Context(), "rel-delay", "arg", UniqueBy("k"), In(time.Second))
 	if !errors.Is(err, pushErr) {
 		t.Fatalf("err=%v want pushErr", err)
 	}
@@ -715,13 +715,13 @@ func TestDispatchPushErrorReleaseWarn(t *testing.T) {
 	}
 	// Logger nil → log() returns noop, Warn should not panic
 	d := &Dispatcher{Q: sq, UniqueLocker: NewUniqueLocker(fc), Logger: nil}
-	err := d.Dispatch(context.Background(), "warn-job", "arg", UniqueBy("k"))
+	err := d.Dispatch(t.Context(), "warn-job", "arg", UniqueBy("k"))
 	if !errors.Is(err, pushErr) {
 		t.Fatalf("err=%v want pushErr", err)
 	}
 	// with custom logger also should not panic and return pushErr
 	d2 := &Dispatcher{Q: sq, UniqueLocker: NewUniqueLocker(fc), Logger: noop.New()}
-	err2 := d2.Dispatch(context.Background(), "warn-job", "arg", UniqueBy("k"))
+	err2 := d2.Dispatch(t.Context(), "warn-job", "arg", UniqueBy("k"))
 	if !errors.Is(err2, pushErr) {
 		t.Fatalf("err2=%v want pushErr", err2)
 	}
@@ -747,7 +747,7 @@ func TestDispatchPushErrorNoReleaseWhenNotAcquired(t *testing.T) {
 		},
 	}
 	d := &Dispatcher{Q: sq, UniqueLocker: NewUniqueLocker(fc)}
-	err := d.Dispatch(context.Background(), "no-rel", "arg")
+	err := d.Dispatch(t.Context(), "no-rel", "arg")
 	if !errors.Is(err, pushErr) {
 		t.Fatalf("err=%v want pushErr", err)
 	}
@@ -767,11 +767,11 @@ func TestDispatchSuccessRealQueue(t *testing.T) {
 	}
 	defer q.Close()
 	d := &Dispatcher{Q: q}
-	if derr := d.Dispatch(context.Background(), "real-q", map[string]string{"x": "1"}); derr != nil {
+	if derr := d.Dispatch(t.Context(), "real-q", map[string]string{"x": "1"}); derr != nil {
 		t.Fatalf("Dispatch real queue err=%v", derr)
 	}
 	// verify message enqueued
-	n, err := q.Length(context.Background(), "low")
+	n, err := q.Length(t.Context(), "low")
 	if err != nil {
 		t.Fatalf("Length: %v", err)
 	}
@@ -843,7 +843,7 @@ func TestDispatchPriorityAndHeaders(t *testing.T) {
 	}
 	sq := &stubQueue{}
 	d := &Dispatcher{Q: sq}
-	if err := d.Dispatch(context.Background(), "prio-job", "arg"); err != nil {
+	if err := d.Dispatch(t.Context(), "prio-job", "arg"); err != nil {
 		t.Fatalf("Dispatch err=%v", err)
 	}
 	if sq.lastTopic != "high" {
@@ -862,7 +862,7 @@ func TestLockReleaseFakeError(t *testing.T) {
 		},
 	}
 	l := NewUniqueLocker(fc)
-	err := l.Release(context.Background(), "k")
+	err := l.Release(t.Context(), "k")
 	if err == nil || err.Error() != "del boom" {
 		t.Fatalf("Release err=%v want del boom", err)
 	}

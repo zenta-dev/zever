@@ -336,7 +336,7 @@ func TestMutateOrderCapabilityTruthTable(t *testing.T) {
 // dialect that has CTE but no recursive support -- asserting the typed
 // error, never a panic.
 func TestCTECapabilityGate(t *testing.T) {
-	ctx := context.Background()
+	ctx := t.Context()
 
 	name, err := NewCTEName("w")
 	if err != nil {
@@ -410,7 +410,7 @@ func TestCTECapabilityGate(t *testing.T) {
 // return the typed ErrUnsupportedByDialect -- never a panic or a silent
 // wrong-SQL fallback.
 func TestSetOpCapabilityGate(t *testing.T) {
-	ctx := context.Background()
+	ctx := t.Context()
 
 	q := From(widgets)
 
@@ -453,7 +453,7 @@ func TestSetOpCapabilityGate(t *testing.T) {
 // The same entry points must pass on postgres and on the default sqlite
 // dialect (both capabilities true), and an INNER JOIN is never gated.
 func TestJoinCapabilityGate(t *testing.T) {
-	ctx := context.Background()
+	ctx := t.Context()
 
 	left := From[joinUser](joinUsers)
 
@@ -623,7 +623,7 @@ func TestOrderedAggregateCapabilityTruthTable(t *testing.T) {
 // gate passes. A SEARCH/CYCLE clause on a plain (non-recursive) CTE is a
 // typed caller error (ErrCTEClauseRequiresRecursive) independent of dialect.
 func TestCTEExtensionCapabilityGate(t *testing.T) {
-	ctx := context.Background()
+	ctx := t.Context()
 
 	name, err := NewCTEName("w")
 	if err != nil {

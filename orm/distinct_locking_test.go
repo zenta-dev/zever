@@ -1,7 +1,6 @@
 package orm
 
 import (
-	"context"
 	"errors"
 	"testing"
 
@@ -101,7 +100,7 @@ func TestQueryLockingUnsupportedOnSQLite(t *testing.T) {
 // combination is a typed, dialect-independent error even on a dialect that
 // supports both features (Postgres) -- the SQL standard forbids the combo.
 func TestQueryLockingDistinctWithLockRejected(t *testing.T) {
-	ctx := context.Background()
+	ctx := t.Context()
 
 	for _, tc := range []struct {
 		name string
@@ -124,7 +123,7 @@ func TestQueryLockingDistinctWithLockRejected(t *testing.T) {
 // without a preceding FOR UPDATE/FOR SHARE is a typed error rather than a
 // silently ignored modifier.
 func TestQueryLockingModifierWithoutModeRejected(t *testing.T) {
-	ctx := context.Background()
+	ctx := t.Context()
 
 	for _, tc := range []struct {
 		name string
@@ -146,7 +145,7 @@ func TestQueryLockingModifierWithoutModeRejected(t *testing.T) {
 // row-lock request: the lock is meaningless for an aggregate and surfaces as
 // a typed error.
 func TestQueryLockingRejectedOnCount(t *testing.T) {
-	ctx := context.Background()
+	ctx := t.Context()
 
 	if _, err := From(widgets).ForUpdate().Count(ctx, mockExec{dialectName: "postgres"}); !errors.Is(err, ErrLockingNotSelect) {
 		t.Fatalf("Count err = %v, want errors.Is(err, ErrLockingNotSelect)", err)

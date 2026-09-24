@@ -103,7 +103,7 @@ func TestOpen_success_returnsFlag(t *testing.T) {
 func TestWithEvalContext_roundtrip_present(t *testing.T) {
 	t.Parallel()
 	ec := EvalContext{RandomizationID: "user-123", Signals: map[string]any{"plan": "pro"}}
-	ctx := WithEvalContext(context.Background(), ec)
+	ctx := WithEvalContext(t.Context(), ec)
 	got, ok := EvalContextFrom(ctx)
 	if !ok {
 		t.Fatal("EvalContextFrom = false, want true")
@@ -118,7 +118,7 @@ func TestWithEvalContext_roundtrip_present(t *testing.T) {
 
 func TestEvalContextFrom_missing_returnsFalse(t *testing.T) {
 	t.Parallel()
-	if _, ok := EvalContextFrom(context.Background()); ok {
+	if _, ok := EvalContextFrom(t.Context()); ok {
 		t.Error("EvalContextFrom = true, want false")
 	}
 }

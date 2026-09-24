@@ -153,7 +153,7 @@ func TestOpen(t *testing.T) {
 		if g == nil {
 			t.Fatal("expected non-nil Geo")
 		}
-		ctx := context.Background()
+		ctx := t.Context()
 		locs, err := g.Geocode(ctx, "x")
 		if err != nil || len(locs) != 1 {
 			t.Fatalf("Geocode = %v, %v; want 1 location", locs, err)

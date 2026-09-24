@@ -1,7 +1,6 @@
 package noop
 
 import (
-	"context"
 	"testing"
 	"time"
 
@@ -40,7 +39,7 @@ func TestLogger_noopBehavior(t *testing.T) {
 		t.Errorf("Sync() error = %v, want nil", err)
 	}
 
-	if got := l.WithContext(context.Background()); got != l {
+	if got := l.WithContext(t.Context()); got != l {
 		t.Errorf("WithContext() = %v, want same logger", got)
 	}
 }

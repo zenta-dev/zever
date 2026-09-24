@@ -340,7 +340,7 @@ func mixedKindSupported(d dialect.Dialect, k JoinType) bool {
 // All is checked before any SQL is issued, and Stream yields the same typed
 // error.
 func TestMixedJoin3CapabilityGates(t *testing.T) {
-	ctx := context.Background()
+	ctx := t.Context()
 
 	dialects := []string{"mock-nocap", "sqlite-3.38", "sqlite", "postgres"}
 

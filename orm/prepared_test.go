@@ -180,7 +180,7 @@ func (e errQueryDB) Dialect() string { return "sqlite" }
 // TestQueryRowsQueryError proves a statement-execution failure surfaces
 // from queryRows.
 func TestQueryRowsQueryError(t *testing.T) {
-	ctx := context.Background()
+	ctx := t.Context()
 
 	_, err := queryRows(ctx, errQueryDB{}, `SELECT id FROM widgets`, nil)
 	if err == nil {
@@ -195,7 +195,7 @@ func TestQueryRowsQueryError(t *testing.T) {
 // TestCountScanError proves a COUNT scan failure is wrapped with the scan
 // tag rather than returned bare.
 func TestCountScanError(t *testing.T) {
-	ctx := context.Background()
+	ctx := t.Context()
 
 	_, err := From(widgets).Count(ctx, &stubDB{rows: &stubRows{
 		cols:    []string{"count"},

@@ -26,6 +26,9 @@ const (
 	beginAttempts = 3
 )
 
+// DefaultPingTimeout bounds the startup connectivity check.
+const DefaultPingTimeout = 3 * time.Second
+
 // Compile-time check that store implements idempotency.Store.
 var _ idempotency.Store = (*store)(nil)
 
@@ -66,7 +69,7 @@ func New(opts idempotency.Options) (idempotency.Store, error) {
 		return nil, fmt.Errorf("redis: connect %q: %w", redactAddr(opts.Redis.Addr), err)
 	}
 
-	ctx, cancel := context.WithTimeout(context.Background(), 3*time.Second)
+	ctx, cancel := context.WithTimeout(context.Background(), DefaultPingTimeout)
 	defer cancel()
 
 	if err := client.Ping(ctx).Err(); err != nil {

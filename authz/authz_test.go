@@ -61,7 +61,7 @@ func TestAuthorizeFastPathNoCalls(t *testing.T) {
 
 	a := &fakeAuth{}
 	p := &fakeChecker{}
-	claims, err := authz.Authorize(context.Background(), a, p, authz.Policy{}, "", "")
+	claims, err := authz.Authorize(t.Context(), a, p, authz.Policy{}, "", "")
 	if err != nil {
 		t.Fatalf("Authorize() err = %v, want nil", err)
 	}
@@ -78,7 +78,7 @@ func TestAuthorizeMissingToken(t *testing.T) {
 
 	a := &fakeAuth{wantToken: "tok"}
 	p := &fakeChecker{}
-	_, err := authz.Authorize(context.Background(), a, p, authz.Policy{AuthRequired: true}, "", "")
+	_, err := authz.Authorize(t.Context(), a, p, authz.Policy{AuthRequired: true}, "", "")
 	if err == nil {
 		t.Fatal("Authorize() err = nil, want unauthenticated")
 	}
@@ -99,7 +99,7 @@ func TestAuthorizeInvalidToken(t *testing.T) {
 
 	a := &fakeAuth{wantToken: "good", err: auth.ErrInvalidToken}
 	p := &fakeChecker{}
-	_, err := authz.Authorize(context.Background(), a, p, authz.Policy{AuthRequired: true}, "bad", "")
+	_, err := authz.Authorize(t.Context(), a, p, authz.Policy{AuthRequired: true}, "bad", "")
 	if err == nil {
 		t.Fatal("Authorize() err = nil, want unauthenticated")
 	}
@@ -121,7 +121,7 @@ func TestAuthorizeSkipIfNoCheck(t *testing.T) {
 	want := auth.Claims{Subject: "u1", Custom: map[string]any{"k": "v"}}
 	a := &fakeAuth{wantToken: "tok", claims: want}
 	p := &fakeChecker{}
-	got, err := authz.Authorize(context.Background(), a, p, authz.Policy{AuthRequired: true}, "tok", "")
+	got, err := authz.Authorize(t.Context(), a, p, authz.Policy{AuthRequired: true}, "tok", "")
 	if err != nil {
 		t.Fatalf("Authorize() err = %v, want nil", err)
 	}
@@ -148,7 +148,7 @@ func TestAuthorizeSubjectActionResourceMapping(t *testing.T) {
 	}
 	p := &fakeChecker{allow: true}
 	pol := authz.Policy{AuthRequired: true, Roles: []string{"admin", "dev"}, PermissionCheck: "order.read", ResourceType: "Order"}
-	_, err := authz.Authorize(context.Background(), a, p, pol, "tok", "res-9")
+	_, err := authz.Authorize(t.Context(), a, p, pol, "tok", "res-9")
 	if err != nil {
 		t.Fatalf("Authorize() err = %v, want nil", err)
 	}
@@ -181,7 +181,7 @@ func TestAuthorizeNonStringCustomDropped(t *testing.T) {
 	}
 	p := &fakeChecker{allow: true}
 	pol := authz.Policy{AuthRequired: true, PermissionCheck: "x.y"}
-	if _, err := authz.Authorize(context.Background(), a, p, pol, "tok", ""); err != nil {
+	if _, err := authz.Authorize(t.Context(), a, p, pol, "tok", ""); err != nil {
 		t.Fatalf("Authorize() err = %v, want nil", err)
 	}
 	if len(p.gotSubject.Attributes) != 0 {
@@ -195,7 +195,7 @@ func TestAuthorizeAnonymousCanEval(t *testing.T) {
 	a := &fakeAuth{}
 	p := &fakeChecker{allow: true}
 	pol := authz.Policy{AuthRequired: false, PermissionCheck: "doc.read", ResourceType: "Doc"}
-	_, err := authz.Authorize(context.Background(), a, p, pol, "", "r1")
+	_, err := authz.Authorize(t.Context(), a, p, pol, "", "r1")
 	if err != nil {
 		t.Fatalf("Authorize() err = %v, want nil", err)
 	}
@@ -223,7 +223,7 @@ func TestAuthorizeAnonymousRolesIgnored(t *testing.T) {
 	a := &fakeAuth{}
 	p := &fakeChecker{allow: true}
 	pol := authz.Policy{AuthRequired: false, PermissionCheck: "doc.delete", ResourceType: "Doc", Roles: []string{"admin"}}
-	_, err := authz.Authorize(context.Background(), a, p, pol, "", "r1")
+	_, err := authz.Authorize(t.Context(), a, p, pol, "", "r1")
 	if err != nil {
 		t.Fatalf("Authorize() err = %v, want nil", err)
 	}
@@ -241,7 +241,7 @@ func TestAuthorizeEmptyResourceIDEval(t *testing.T) {
 	a := &fakeAuth{wantToken: "tok", claims: auth.Claims{Subject: "u"}}
 	p := &fakeChecker{allow: true}
 	pol := authz.Policy{AuthRequired: true, PermissionCheck: "order.list", ResourceType: "Order"}
-	_, err := authz.Authorize(context.Background(), a, p, pol, "tok", "")
+	_, err := authz.Authorize(t.Context(), a, p, pol, "tok", "")
 	if err != nil {
 		t.Fatalf("Authorize() err = %v, want nil", err)
 	}
@@ -259,7 +259,7 @@ func TestAuthorizeCheckerErrMapping(t *testing.T) {
 	a := &fakeAuth{wantToken: "tok", claims: auth.Claims{Subject: "u"}}
 	p := &fakeChecker{err: errors.New("boom")}
 	pol := authz.Policy{AuthRequired: true, PermissionCheck: "x.y", ResourceType: "T"}
-	_, err := authz.Authorize(context.Background(), a, p, pol, "tok", "r")
+	_, err := authz.Authorize(t.Context(), a, p, pol, "tok", "r")
 	if err == nil {
 		t.Fatal("Authorize() err = nil, want permission denied")
 	}
@@ -278,7 +278,7 @@ func TestAuthorizeDeniedMapping(t *testing.T) {
 	a := &fakeAuth{wantToken: "tok", claims: auth.Claims{Subject: "u"}}
 	p := &fakeChecker{allow: false}
 	pol := authz.Policy{AuthRequired: true, PermissionCheck: "x.y", ResourceType: "T"}
-	_, err := authz.Authorize(context.Background(), a, p, pol, "tok", "r")
+	_, err := authz.Authorize(t.Context(), a, p, pol, "tok", "r")
 	if err == nil {
 		t.Fatal("Authorize() err = nil, want permission denied")
 	}

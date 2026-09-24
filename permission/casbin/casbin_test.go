@@ -1,7 +1,6 @@
 package casbin
 
 import (
-	"context"
 	"fmt"
 	"os"
 	"path/filepath"
@@ -59,7 +58,7 @@ func TestCanAllowViaSeededRule(t *testing.T) {
 		t.Fatalf("New: %v", err)
 	}
 
-	d, err := c.Can(context.Background(), permission.Subject{ID: "alice", Roles: []string{"admin"}}, "read", permission.Resource{Type: "doc", ID: "1"})
+	d, err := c.Can(t.Context(), permission.Subject{ID: "alice", Roles: []string{"admin"}}, "read", permission.Resource{Type: "doc", ID: "1"})
 	if err != nil {
 		t.Fatalf("Can: %v", err)
 	}
@@ -87,7 +86,7 @@ func TestCanDenyOverrideWins(t *testing.T) {
 		t.Fatalf("New: %v", err)
 	}
 
-	d, err := c.Can(context.Background(), permission.Subject{ID: "alice", Roles: []string{"admin"}}, "write", permission.Resource{Type: "doc", ID: "1"})
+	d, err := c.Can(t.Context(), permission.Subject{ID: "alice", Roles: []string{"admin"}}, "write", permission.Resource{Type: "doc", ID: "1"})
 	if err != nil {
 		t.Fatalf("Can: %v", err)
 	}
@@ -105,7 +104,7 @@ func TestCanImplicitDenyWithoutRule(t *testing.T) {
 		t.Fatalf("New: %v", err)
 	}
 
-	d, err := c.Can(context.Background(), permission.Subject{ID: "alice", Roles: []string{"admin"}}, "delete", permission.Resource{Type: "doc", ID: "1"})
+	d, err := c.Can(t.Context(), permission.Subject{ID: "alice", Roles: []string{"admin"}}, "delete", permission.Resource{Type: "doc", ID: "1"})
 	if err != nil {
 		t.Fatalf("Can: %v", err)
 	}
@@ -124,7 +123,7 @@ func TestCanPrivEscBlocked(t *testing.T) {
 	}
 
 	// bob claims admin but allowlist only grants alice -> admin.
-	d, err := c.Can(context.Background(), permission.Subject{ID: "bob", Roles: []string{"admin"}}, "read", permission.Resource{Type: "doc", ID: "1"})
+	d, err := c.Can(t.Context(), permission.Subject{ID: "bob", Roles: []string{"admin"}}, "read", permission.Resource{Type: "doc", ID: "1"})
 	if err != nil {
 		t.Fatalf("Can: %v", err)
 	}
@@ -181,7 +180,7 @@ func TestCanConcurrentDistinctSubjects(t *testing.T) {
 			defer wg.Done()
 
 			id := fmt.Sprintf("user-%d", i)
-			d, err := c.Can(context.Background(), permission.Subject{ID: id, Roles: []string{"admin"}}, "read", permission.Resource{Type: "doc", ID: "1"})
+			d, err := c.Can(t.Context(), permission.Subject{ID: id, Roles: []string{"admin"}}, "read", permission.Resource{Type: "doc", ID: "1"})
 
 			if err != nil {
 				errs[i] = err
@@ -246,7 +245,7 @@ func TestNewFromModelPolicyFiles(t *testing.T) {
 
 	// Twice: persistent file grouping must survive cleanup after first Can.
 	for i := range 2 {
-		d, err := c.Can(context.Background(), sub, "read", res)
+		d, err := c.Can(t.Context(), sub, "read", res)
 		if err != nil {
 			t.Fatalf("Can #%d: %v", i, err)
 		}

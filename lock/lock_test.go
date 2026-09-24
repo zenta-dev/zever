@@ -62,7 +62,7 @@ func TestLockOpen_registeredFactory_returnsLocker(t *testing.T) {
 		t.Errorf("factory opts = %+v, want %+v", gotOpts, wantOpts)
 	}
 
-	l, ok, err := got.TryAcquire(context.Background(), "k", time.Minute)
+	l, ok, err := got.TryAcquire(t.Context(), "k", time.Minute)
 	if err != nil || !ok || l == nil {
 		t.Fatalf("TryAcquire = (%v, %v, %v), want (lock, true, nil)", l, ok, err)
 	}
@@ -172,7 +172,7 @@ func TestLockOpen_memoryAdapter_endToEnd(t *testing.T) {
 		t.Fatalf("Open() error = %v", err)
 	}
 
-	ctx := context.Background()
+	ctx := t.Context()
 	defer func() { _ = l.Close(ctx) }()
 
 	held, ok, err := l.TryAcquire(ctx, "e2e", time.Minute)

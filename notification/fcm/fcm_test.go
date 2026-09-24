@@ -35,7 +35,7 @@ func TestNotify_mapsHighPriorityDataAndTTL(t *testing.T) {
 	in.Priority = notification.PriorityHigh
 	in.TTL = time.Hour
 	in.Data = map[string]string{"k": "v"}
-	if err := n.Notify(context.Background(), in); err != nil {
+	if err := n.Notify(t.Context(), in); err != nil {
 		t.Fatalf("Notify() = %v, want nil", err)
 	}
 	if got == nil {
@@ -77,7 +77,7 @@ func TestNotify_mapsDefaultPriorityWithoutTTL(t *testing.T) {
 		got = m
 		return "id", nil
 	}}
-	if err := n.Notify(context.Background(), validPush()); err != nil {
+	if err := n.Notify(t.Context(), validPush()); err != nil {
 		t.Fatalf("Notify() = %v, want nil", err)
 	}
 	if got.Android == nil || got.Android.Priority != "normal" {
@@ -103,7 +103,7 @@ func TestNotify_sendError_wrapped(t *testing.T) {
 	n := &notifier{send: func(_ context.Context, _ *messaging.Message) (string, error) {
 		return "", boom
 	}}
-	err := n.Notify(context.Background(), validPush())
+	err := n.Notify(t.Context(), validPush())
 	if err == nil {
 		t.Fatal("Notify() = nil, want send error")
 	}
@@ -125,7 +125,7 @@ func TestNotify_retriesTransientSendFailure(t *testing.T) {
 		return "projects/p/messages/m", nil
 	}}
 
-	if err := n.Notify(context.Background(), validPush()); err != nil {
+	if err := n.Notify(t.Context(), validPush()); err != nil {
 		t.Fatalf("Notify() = %v, want nil after retrying", err)
 	}
 	if calls != sendRetryPolicy.MaxAttempts {
@@ -143,7 +143,7 @@ func TestNotify_exhaustsRetriesOnPersistentFailure(t *testing.T) {
 		return "", boom
 	}}
 
-	err := n.Notify(context.Background(), validPush())
+	err := n.Notify(t.Context(), validPush())
 	if err == nil {
 		t.Fatal("Notify() = nil, want error after exhausting retries")
 	}
@@ -160,7 +160,7 @@ func TestNotify_nil_rejects(t *testing.T) {
 	n := &notifier{send: func(_ context.Context, _ *messaging.Message) (string, error) {
 		return "id", nil
 	}}
-	if err := n.Notify(context.Background(), nil); !errors.Is(err, notification.ErrNilNotification) {
+	if err := n.Notify(t.Context(), nil); !errors.Is(err, notification.ErrNilNotification) {
 		t.Errorf("Notify(nil) = %v, want ErrNilNotification", err)
 	}
 }
@@ -177,7 +177,7 @@ func TestNotify_wrongChannel_rejects(t *testing.T) {
 		Channel: notification.ChannelSMS,
 		Body:    "hi",
 	}
-	if err := n.Notify(context.Background(), in); !errors.Is(err, notification.ErrChannelNotSupported) {
+	if err := n.Notify(t.Context(), in); !errors.Is(err, notification.ErrChannelNotSupported) {
 		t.Errorf("Notify(sms) = %v, want ErrChannelNotSupported", err)
 	}
 	if called {
@@ -194,7 +194,7 @@ func TestNotify_invalidNotification_rejects(t *testing.T) {
 	}}
 	in := validPush()
 	in.Target = ""
-	if err := n.Notify(context.Background(), in); !errors.Is(err, notification.ErrInvalidTarget) {
+	if err := n.Notify(t.Context(), in); !errors.Is(err, notification.ErrInvalidTarget) {
 		t.Errorf("Notify(empty target) = %v, want ErrInvalidTarget", err)
 	}
 	if called {

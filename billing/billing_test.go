@@ -135,7 +135,7 @@ func TestOpen_success_smoke(t *testing.T) {
 		t.Fatalf("Open err = %v", err)
 	}
 
-	ctx := context.Background()
+	ctx := t.Context()
 
 	cus, err := got.CreateCustomer(ctx, "Ada", "ada@example.com", "")
 	if err != nil {

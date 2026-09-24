@@ -118,7 +118,7 @@ func TestOpen_success_smoke(t *testing.T) {
 		t.Fatalf("Open err = %v", err)
 	}
 
-	ctx := context.Background()
+	ctx := t.Context()
 
 	if err = got.Index(ctx, Document{ID: "doc-1", Index: "main", Content: "hello"}); err != nil {
 		t.Fatalf("Index err = %v", err)

@@ -91,14 +91,14 @@ func TestOpen_success_returnsLimiter(t *testing.T) {
 	if err != nil {
 		t.Fatalf("Open err = %v", err)
 	}
-	d, err := l.Allow(context.Background(), "k", 1)
+	d, err := l.Allow(t.Context(), "k", 1)
 	if err != nil {
 		t.Fatalf("Allow err = %v", err)
 	}
 	if !d.Allowed {
 		t.Fatalf("Allow = %+v, want allowed", d)
 	}
-	if err := l.Reset(context.Background(), "k"); err != nil {
+	if err := l.Reset(t.Context(), "k"); err != nil {
 		t.Fatalf("Reset err = %v", err)
 	}
 	if err := l.Close(); err != nil {

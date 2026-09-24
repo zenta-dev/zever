@@ -1,7 +1,6 @@
 package smtp
 
 import (
-	"context"
 	"errors"
 	"testing"
 
@@ -35,7 +34,7 @@ func TestSendNilMessage(t *testing.T) {
 		t.Fatalf("New: %v", err)
 	}
 	defer func() { _ = m.Close() }()
-	err = m.Send(context.Background(), nil)
+	err = m.Send(t.Context(), nil)
 	if err == nil {
 		t.Fatal("expected nil-message error, got nil")
 	}

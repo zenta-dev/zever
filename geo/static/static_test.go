@@ -1,7 +1,6 @@
 package static
 
 import (
-	"context"
 	"errors"
 	"math"
 	"os"
@@ -131,7 +130,7 @@ func TestGeocode_Empty(t *testing.T) {
 		q := q
 		t.Run(q, func(t *testing.T) {
 			t.Parallel()
-			_, err := g.Geocode(context.Background(), q)
+			_, err := g.Geocode(t.Context(), q)
 			if err == nil {
 				t.Fatalf("want error for empty query %q", q)
 			}
@@ -146,7 +145,7 @@ func TestGeocode_NoMatch(t *testing.T) {
 	t.Parallel()
 	g := mustOpenStatic(t)
 	defer g.Close()
-	_, err := g.Geocode(context.Background(), "Atlantis")
+	_, err := g.Geocode(t.Context(), "Atlantis")
 	if err == nil {
 		t.Fatal("want error for no match")
 	}
@@ -159,7 +158,7 @@ func TestGeocode_Exact(t *testing.T) {
 	t.Parallel()
 	g := mustOpenStatic(t)
 	defer g.Close()
-	locs, err := g.Geocode(context.Background(), "London")
+	locs, err := g.Geocode(t.Context(), "London")
 	if err != nil {
 		t.Fatalf("geocode: %v", err)
 	}
@@ -177,7 +176,7 @@ func TestGeocode_CaseInsensitive(t *testing.T) {
 		q := q
 		t.Run(q, func(t *testing.T) {
 			t.Parallel()
-			locs, err := g.Geocode(context.Background(), q)
+			locs, err := g.Geocode(t.Context(), q)
 			if err != nil {
 				t.Fatalf("geocode %q: %v", q, err)
 			}
@@ -192,7 +191,7 @@ func TestGeocode_Trim(t *testing.T) {
 	t.Parallel()
 	g := mustOpenStatic(t)
 	defer g.Close()
-	locs, err := g.Geocode(context.Background(), "  London ")
+	locs, err := g.Geocode(t.Context(), "  London ")
 	if err != nil {
 		t.Fatalf("geocode: %v", err)
 	}
@@ -205,7 +204,7 @@ func TestGeocode_NoSubstringMiddle(t *testing.T) {
 	t.Parallel()
 	g := mustOpenStatic(t)
 	defer g.Close()
-	_, err := g.Geocode(context.Background(), "york")
+	_, err := g.Geocode(t.Context(), "york")
 	if err == nil {
 		t.Fatal("want error for mid-word query")
 	}
@@ -218,7 +217,7 @@ func TestGeocode_Prefix(t *testing.T) {
 	t.Parallel()
 	g := mustOpenStatic(t)
 	defer g.Close()
-	locs, err := g.Geocode(context.Background(), "New")
+	locs, err := g.Geocode(t.Context(), "New")
 	if err != nil {
 		t.Fatalf("geocode: %v", err)
 	}
@@ -232,7 +231,7 @@ func TestGeocode_PrefixMultiple(t *testing.T) {
 	g := mustOpenStatic(t)
 	defer g.Close()
 	// "P" matches Phoenix and Paris (both start with P)
-	locs, err := g.Geocode(context.Background(), "P")
+	locs, err := g.Geocode(t.Context(), "P")
 	if err != nil {
 		t.Fatalf("geocode P: %v", err)
 	}
@@ -264,7 +263,7 @@ func TestGeocode_ExactPrioritizedOverPrefix(t *testing.T) {
 	defer g.Close()
 
 	// exact should return only New York
-	locs, err := g.Geocode(context.Background(), "New York")
+	locs, err := g.Geocode(t.Context(), "New York")
 	if err != nil {
 		t.Fatalf("geocode: %v", err)
 	}
@@ -272,7 +271,7 @@ func TestGeocode_ExactPrioritizedOverPrefix(t *testing.T) {
 		t.Fatalf("want exact prioritized, got %+v", locs)
 	}
 	// prefix "New" should return both
-	locs, err = g.Geocode(context.Background(), "New")
+	locs, err = g.Geocode(t.Context(), "New")
 	if err != nil {
 		t.Fatalf("geocode New: %v", err)
 	}
@@ -298,7 +297,7 @@ func TestGeocode_PrefixFallback_Table(t *testing.T) {
 		tc := tc
 		t.Run(tc.name, func(t *testing.T) {
 			t.Parallel()
-			locs, err := g.Geocode(context.Background(), tc.q)
+			locs, err := g.Geocode(t.Context(), tc.q)
 			if err != nil {
 				t.Fatalf("geocode %q: %v", tc.q, err)
 			}
@@ -318,7 +317,7 @@ func TestReverseGeocode_ValidWithin(t *testing.T) {
 	g := mustOpenStatic(t)
 	defer g.Close()
 	// exactly at London
-	addrs, err := g.ReverseGeocode(context.Background(), 51.5074, -0.1278)
+	addrs, err := g.ReverseGeocode(t.Context(), 51.5074, -0.1278)
 	if err != nil {
 		t.Fatalf("reverse: %v", err)
 	}
@@ -329,7 +328,7 @@ func TestReverseGeocode_ValidWithin(t *testing.T) {
 		t.Fatalf("want city component London, got %+v", addrs[0].Components)
 	}
 	// ~1km offset still within 1.5km
-	addrs, err = g.ReverseGeocode(context.Background(), 51.515, -0.1278)
+	addrs, err = g.ReverseGeocode(t.Context(), 51.515, -0.1278)
 	if err != nil {
 		t.Fatalf("reverse near: %v", err)
 	}
@@ -342,7 +341,7 @@ func TestReverseGeocode_OutsideNotFound(t *testing.T) {
 	t.Parallel()
 	g := mustOpenStatic(t)
 	defer g.Close()
-	_, err := g.ReverseGeocode(context.Background(), 0, 0)
+	_, err := g.ReverseGeocode(t.Context(), 0, 0)
 	if err == nil {
 		t.Fatal("want not found for 0,0")
 	}
@@ -373,7 +372,7 @@ func TestReverseGeocode_InvalidCoords(t *testing.T) {
 		tc := tc
 		t.Run(tc.name, func(t *testing.T) {
 			t.Parallel()
-			_, err := g.ReverseGeocode(context.Background(), tc.lat, tc.lng)
+			_, err := g.ReverseGeocode(t.Context(), tc.lat, tc.lng)
 			if err == nil {
 				t.Fatal("want error for invalid coords")
 			}
@@ -405,7 +404,7 @@ func TestReverseGeocode_BoundaryValid(t *testing.T) {
 	if !geo.ValidCoord(-90, -180) {
 		t.Fatal("-90,-180 should be valid")
 	}
-	addrs, err := g.ReverseGeocode(context.Background(), 90, 180)
+	addrs, err := g.ReverseGeocode(t.Context(), 90, 180)
 	if err != nil {
 		t.Fatalf("reverse boundary: %v", err)
 	}
@@ -423,7 +422,7 @@ func TestDistance_Valid(t *testing.T) {
 	g := mustOpenStatic(t)
 	defer g.Close()
 	// NYC-London ~5570km → 5.5M meters
-	dist, err := g.Distance(context.Background(), geo.Point{Lat: 40.7128, Lng: -74.0060}, geo.Point{Lat: 51.5074, Lng: -0.1278})
+	dist, err := g.Distance(t.Context(), geo.Point{Lat: 40.7128, Lng: -74.0060}, geo.Point{Lat: 51.5074, Lng: -0.1278})
 	if err != nil {
 		t.Fatalf("distance: %v", err)
 	}
@@ -431,7 +430,7 @@ func TestDistance_Valid(t *testing.T) {
 		t.Fatalf("NYC-London want 5.4M-5.7M, got %.0f", dist)
 	}
 	// London-Paris ~340km
-	dist, err = g.Distance(context.Background(), geo.Point{Lat: 51.5074, Lng: -0.1278}, geo.Point{Lat: 48.8566, Lng: 2.3522})
+	dist, err = g.Distance(t.Context(), geo.Point{Lat: 51.5074, Lng: -0.1278}, geo.Point{Lat: 48.8566, Lng: 2.3522})
 	if err != nil {
 		t.Fatalf("distance: %v", err)
 	}
@@ -439,7 +438,7 @@ func TestDistance_Valid(t *testing.T) {
 		t.Fatalf("London-Paris want 300k-400k, got %.0f", dist)
 	}
 	// 0.01 deg latitude ~1112m
-	dist, err = g.Distance(context.Background(), geo.Point{Lat: 0, Lng: 0}, geo.Point{Lat: 0.01, Lng: 0})
+	dist, err = g.Distance(t.Context(), geo.Point{Lat: 0, Lng: 0}, geo.Point{Lat: 0.01, Lng: 0})
 	if err != nil {
 		t.Fatalf("distance: %v", err)
 	}
@@ -447,7 +446,7 @@ func TestDistance_Valid(t *testing.T) {
 		t.Fatalf("0.01 deg lat want 1100-1125, got %.2f", dist)
 	}
 	// zero distance
-	dist, err = g.Distance(context.Background(), geo.Point{Lat: 0, Lng: 0}, geo.Point{Lat: 0, Lng: 0})
+	dist, err = g.Distance(t.Context(), geo.Point{Lat: 0, Lng: 0}, geo.Point{Lat: 0, Lng: 0})
 	if err != nil {
 		t.Fatalf("distance zero: %v", err)
 	}
@@ -477,7 +476,7 @@ func TestDistance_InvalidCoords(t *testing.T) {
 		tc := tc
 		t.Run(tc.name, func(t *testing.T) {
 			t.Parallel()
-			_, err := g.Distance(context.Background(), tc.from, tc.to)
+			_, err := g.Distance(t.Context(), tc.from, tc.to)
 			if err == nil {
 				t.Fatal("want error for invalid coords")
 			}
@@ -495,7 +494,7 @@ func TestDistance_BoundaryValid(t *testing.T) {
 	if !geo.ValidCoord(90, 180) || !geo.ValidCoord(-90, -180) {
 		t.Fatal("boundary should be valid")
 	}
-	dist, err := g.Distance(context.Background(), geo.Point{Lat: 90, Lng: 180}, geo.Point{Lat: -90, Lng: -180})
+	dist, err := g.Distance(t.Context(), geo.Point{Lat: 90, Lng: 180}, geo.Point{Lat: -90, Lng: -180})
 	if err != nil {
 		t.Fatalf("distance boundary: %v", err)
 	}
@@ -520,7 +519,7 @@ func TestDistance_Antipodal(t *testing.T) {
 		tc := tc
 		t.Run(tc.name, func(t *testing.T) {
 			t.Parallel()
-			dist, err := g.Distance(context.Background(), tc.from, tc.to)
+			dist, err := g.Distance(t.Context(), tc.from, tc.to)
 			if err != nil {
 				t.Fatalf("distance: %v", err)
 			}
@@ -581,7 +580,7 @@ func TestRegisterAndOpen(t *testing.T) {
 		t.Fatalf("Open static: %v", err)
 	}
 	defer g.Close()
-	locs, err := g.Geocode(context.Background(), "Berlin")
+	locs, err := g.Geocode(t.Context(), "Berlin")
 	if err != nil {
 		t.Fatalf("geocode Berlin: %v", err)
 	}

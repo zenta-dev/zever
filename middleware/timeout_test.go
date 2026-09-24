@@ -25,7 +25,7 @@ func TestTimeout_FastHandlerUnaffected(t *testing.T) {
 
 	wrapped := Timeout(time.Second)(handler)
 
-	req := httptest.NewRequestWithContext(context.Background(), http.MethodGet, "/", nil)
+	req := httptest.NewRequestWithContext(t.Context(), http.MethodGet, "/", nil)
 	rec := httptest.NewRecorder()
 
 	wrapped.ServeHTTP(rec, req)
@@ -63,7 +63,7 @@ func TestTimeout_SlowHandlerCutOff(t *testing.T) {
 
 	wrapped := Timeout(20 * time.Millisecond)(handler)
 
-	req := httptest.NewRequestWithContext(context.Background(), http.MethodGet, "/", nil)
+	req := httptest.NewRequestWithContext(t.Context(), http.MethodGet, "/", nil)
 	rec := httptest.NewRecorder()
 
 	wrapped.ServeHTTP(rec, req)
@@ -94,7 +94,7 @@ func TestTimeout_HandlerRespectsCtxDeadline(t *testing.T) {
 
 	wrapped := Timeout(15 * time.Millisecond)(handler)
 
-	req := httptest.NewRequestWithContext(context.Background(), http.MethodGet, "/", nil)
+	req := httptest.NewRequestWithContext(t.Context(), http.MethodGet, "/", nil)
 	rec := httptest.NewRecorder()
 
 	wrapped.ServeHTTP(rec, req)
@@ -113,7 +113,7 @@ func TestTimeoutUnaryServerInterceptor_FastHandlerUnaffected(t *testing.T) {
 		return req, nil
 	}
 
-	resp, err := interceptor(context.Background(), "hello", &grpc.UnaryServerInfo{}, handler)
+	resp, err := interceptor(t.Context(), "hello", &grpc.UnaryServerInfo{}, handler)
 	if err != nil {
 		t.Fatalf("err = %v, want nil", err)
 	}
@@ -136,7 +136,7 @@ func TestTimeoutUnaryServerInterceptor_SlowHandlerCutOff(t *testing.T) {
 		return "too late", nil
 	}
 
-	_, err := interceptor(context.Background(), "req", &grpc.UnaryServerInfo{}, handler)
+	_, err := interceptor(t.Context(), "req", &grpc.UnaryServerInfo{}, handler)
 
 	<-started
 
@@ -159,7 +159,7 @@ func TestTimeoutUnaryServerInterceptor_HandlerErrorPassedThrough(t *testing.T) {
 		return nil, wantErr
 	}
 
-	_, err := interceptor(context.Background(), "req", &grpc.UnaryServerInfo{}, handler)
+	_, err := interceptor(t.Context(), "req", &grpc.UnaryServerInfo{}, handler)
 	if !errors.Is(err, wantErr) {
 		t.Fatalf("err = %v, want %v", err, wantErr)
 	}

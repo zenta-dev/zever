@@ -139,7 +139,7 @@ func TestRequestLoggerLogsFields(t *testing.T) {
 		_, _ = io.WriteString(w, "ok")
 	})
 
-	rec := doLoggedRequest(context.Background(), t, logger, handler)
+	rec := doLoggedRequest(t.Context(), t, logger, handler)
 
 	if rec.Code != http.StatusCreated {
 		t.Fatalf("status = %d, want %d", rec.Code, http.StatusCreated)
@@ -193,7 +193,7 @@ func TestRequestLoggerIncludesRequestID(t *testing.T) {
 		_, _ = io.WriteString(w, "ok")
 	})
 
-	ctx := observability.WithRequestID(context.Background(), "req-123")
+	ctx := observability.WithRequestID(t.Context(), "req-123")
 	doLoggedRequest(ctx, t, logger, handler)
 
 	if got := logger.event.strs["request_id"]; got != "req-123" {
@@ -209,7 +209,7 @@ func TestRequestLoggerImplicit200(t *testing.T) {
 		_, _ = io.WriteString(w, "ok")
 	})
 
-	doLoggedRequest(context.Background(), t, logger, handler)
+	doLoggedRequest(t.Context(), t, logger, handler)
 
 	if got := logger.event.ints["status"]; got != http.StatusOK {
 		t.Errorf("status = %d, want %d", got, http.StatusOK)
@@ -228,7 +228,7 @@ func TestRequestLoggerChainedDedup(t *testing.T) {
 	// Wrap twice: idempotent newStatusRecorder must reuse a single recorder.
 	chained := RequestLogger(logger)(RequestLogger(logger)(inner))
 
-	req := httptest.NewRequestWithContext(context.Background(), http.MethodPost, "/chain", nil)
+	req := httptest.NewRequestWithContext(t.Context(), http.MethodPost, "/chain", nil)
 	rec := httptest.NewRecorder()
 	chained.ServeHTTP(rec, req)
 
@@ -257,7 +257,7 @@ func TestRequestLoggerNoPanicOnHandlerWithoutExplicitHeader(t *testing.T) {
 		// No Write/WriteHeader at all.
 	})
 
-	req := httptest.NewRequestWithContext(context.Background(), http.MethodGet, "/empty", nil)
+	req := httptest.NewRequestWithContext(t.Context(), http.MethodGet, "/empty", nil)
 	rec := httptest.NewRecorder()
 
 	func() {

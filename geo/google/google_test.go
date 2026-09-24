@@ -1,7 +1,6 @@
 package google
 
 import (
-	"context"
 	"encoding/json"
 	"errors"
 	"math"
@@ -146,7 +145,7 @@ func newGeoWithServer(t *testing.T, srv *httptest.Server) geo.Geo {
 func TestGeocode_ZeroResults(t *testing.T) {
 	srv := newTestServer(t, `{"results":[],"status":"ZERO_RESULTS"}`, 200)
 	g := newGeoWithServer(t, srv)
-	_, err := g.Geocode(context.Background(), "nowhere 12345")
+	_, err := g.Geocode(t.Context(), "nowhere 12345")
 	if !errors.Is(err, geo.ErrNotFound) {
 		t.Fatalf("expected ErrNotFound, got %v", err)
 	}
@@ -174,7 +173,7 @@ func TestGeocode_OK(t *testing.T) {
 	srv := newTestServer(t, string(b), 200)
 	g := newGeoWithServer(t, srv)
 
-	locs, err := g.Geocode(context.Background(), "1600 Amphitheatre Parkway")
+	locs, err := g.Geocode(t.Context(), "1600 Amphitheatre Parkway")
 	if err != nil {
 		t.Fatalf("unexpected error: %v", err)
 	}
@@ -195,7 +194,7 @@ func TestGeocode_OK(t *testing.T) {
 func TestGeocode_ClientError(t *testing.T) {
 	srv := newTestServer(t, `{"status":"INVALID_REQUEST","error_message":"bad"}`, 200)
 	g := newGeoWithServer(t, srv)
-	_, err := g.Geocode(context.Background(), "addr")
+	_, err := g.Geocode(t.Context(), "addr")
 	if err == nil {
 		t.Fatal("expected error")
 	}
@@ -222,7 +221,7 @@ func TestReverseGeocode_InvalidCoord(t *testing.T) {
 		{0, math.Inf(-1)},
 	}
 	for _, tc := range cases {
-		_, err := g.ReverseGeocode(context.Background(), tc.lat, tc.lng)
+		_, err := g.ReverseGeocode(t.Context(), tc.lat, tc.lng)
 		if !errors.Is(err, geo.ErrInvalidCoordinate) {
 			t.Fatalf("lat=%v lng=%v expected ErrInvalidCoordinate, got %v", tc.lat, tc.lng, err)
 		}
@@ -232,7 +231,7 @@ func TestReverseGeocode_InvalidCoord(t *testing.T) {
 func TestReverseGeocode_ZeroResults(t *testing.T) {
 	srv := newTestServer(t, `{"results":[],"status":"ZERO_RESULTS"}`, 200)
 	g := newGeoWithServer(t, srv)
-	_, err := g.ReverseGeocode(context.Background(), 37.4, -122.0)
+	_, err := g.ReverseGeocode(t.Context(), 37.4, -122.0)
 	if !errors.Is(err, geo.ErrNotFound) {
 		t.Fatalf("expected ErrNotFound, got %v", err)
 	}
@@ -255,7 +254,7 @@ func TestReverseGeocode_OK(t *testing.T) {
 	srv := newTestServer(t, string(b), 200)
 	g := newGeoWithServer(t, srv)
 
-	addrs, err := g.ReverseGeocode(context.Background(), 37.422, -122.084)
+	addrs, err := g.ReverseGeocode(t.Context(), 37.422, -122.084)
 	if err != nil {
 		t.Fatalf("unexpected error: %v", err)
 	}
@@ -276,7 +275,7 @@ func TestReverseGeocode_OK(t *testing.T) {
 func TestReverseGeocode_ClientError(t *testing.T) {
 	srv := newTestServer(t, `{"status":"REQUEST_DENIED","error_message":"denied"}`, 200)
 	g := newGeoWithServer(t, srv)
-	_, err := g.ReverseGeocode(context.Background(), 0, 0)
+	_, err := g.ReverseGeocode(t.Context(), 0, 0)
 	if err == nil {
 		t.Fatal("expected error")
 	}
@@ -302,7 +301,7 @@ func TestReverseGeocode_EmptyTypes(t *testing.T) {
 	b, _ := json.Marshal(resp)
 	srv := newTestServer(t, string(b), 200)
 	g := newGeoWithServer(t, srv)
-	addrs, err := g.ReverseGeocode(context.Background(), 0, 0)
+	addrs, err := g.ReverseGeocode(t.Context(), 0, 0)
 	if err != nil {
 		t.Fatalf("unexpected error: %v", err)
 	}
@@ -318,15 +317,15 @@ func TestDistance_InvalidCoord(t *testing.T) {
 	srv := newTestServer(t, `{"status":"OK","rows":[]}`, 200)
 	g := newGeoWithServer(t, srv)
 
-	_, err := g.Distance(context.Background(), geo.Point{Lat: 91, Lng: 0}, geo.Point{Lat: 0, Lng: 0})
+	_, err := g.Distance(t.Context(), geo.Point{Lat: 91, Lng: 0}, geo.Point{Lat: 0, Lng: 0})
 	if !errors.Is(err, geo.ErrInvalidCoordinate) {
 		t.Fatalf("expected ErrInvalidCoordinate for from, got %v", err)
 	}
-	_, err = g.Distance(context.Background(), geo.Point{Lat: 0, Lng: 0}, geo.Point{Lat: 0, Lng: 200})
+	_, err = g.Distance(t.Context(), geo.Point{Lat: 0, Lng: 0}, geo.Point{Lat: 0, Lng: 200})
 	if !errors.Is(err, geo.ErrInvalidCoordinate) {
 		t.Fatalf("expected ErrInvalidCoordinate for to, got %v", err)
 	}
-	_, err = g.Distance(context.Background(), geo.Point{Lat: math.NaN(), Lng: 0}, geo.Point{Lat: 0, Lng: 0})
+	_, err = g.Distance(t.Context(), geo.Point{Lat: math.NaN(), Lng: 0}, geo.Point{Lat: 0, Lng: 0})
 	if !errors.Is(err, geo.ErrInvalidCoordinate) {
 		t.Fatalf("expected ErrInvalidCoordinate for NaN, got %v", err)
 	}
@@ -335,7 +334,7 @@ func TestDistance_InvalidCoord(t *testing.T) {
 func TestDistance_NoResults_EmptyRows(t *testing.T) {
 	srv := newTestServer(t, `{"status":"OK","rows":[]}`, 200)
 	g := newGeoWithServer(t, srv)
-	_, err := g.Distance(context.Background(), geo.Point{Lat: 0, Lng: 0}, geo.Point{Lat: 1, Lng: 1})
+	_, err := g.Distance(t.Context(), geo.Point{Lat: 0, Lng: 0}, geo.Point{Lat: 1, Lng: 1})
 	if !errors.Is(err, geo.ErrNotFound) {
 		t.Fatalf("expected ErrNotFound empty rows, got %v", err)
 	}
@@ -344,7 +343,7 @@ func TestDistance_NoResults_EmptyRows(t *testing.T) {
 func TestDistance_NoResults_EmptyElements(t *testing.T) {
 	srv := newTestServer(t, `{"status":"OK","rows":[{"elements":[]}]}`, 200)
 	g := newGeoWithServer(t, srv)
-	_, err := g.Distance(context.Background(), geo.Point{Lat: 0, Lng: 0}, geo.Point{Lat: 1, Lng: 1})
+	_, err := g.Distance(t.Context(), geo.Point{Lat: 0, Lng: 0}, geo.Point{Lat: 1, Lng: 1})
 	if !errors.Is(err, geo.ErrNotFound) {
 		t.Fatalf("expected ErrNotFound empty elements, got %v", err)
 	}
@@ -362,7 +361,7 @@ func TestDistance_StatusNotOK(t *testing.T) {
 	b, _ := json.Marshal(resp)
 	srv := newTestServer(t, string(b), 200)
 	g := newGeoWithServer(t, srv)
-	_, err := g.Distance(context.Background(), geo.Point{Lat: 0, Lng: 0}, geo.Point{Lat: 1, Lng: 1})
+	_, err := g.Distance(t.Context(), geo.Point{Lat: 0, Lng: 0}, geo.Point{Lat: 1, Lng: 1})
 	if !errors.Is(err, geo.ErrNotFound) {
 		t.Fatalf("expected ErrNotFound for status not OK, got %v", err)
 	}
@@ -386,7 +385,7 @@ func TestDistance_OK(t *testing.T) {
 	b, _ := json.Marshal(resp)
 	srv := newTestServer(t, string(b), 200)
 	g := newGeoWithServer(t, srv)
-	d, err := g.Distance(context.Background(), geo.Point{Lat: 1.315125, Lng: 103.764713}, geo.Point{Lat: 1.280776, Lng: 103.8487})
+	d, err := g.Distance(t.Context(), geo.Point{Lat: 1.315125, Lng: 103.764713}, geo.Point{Lat: 1.280776, Lng: 103.8487})
 	if err != nil {
 		t.Fatalf("unexpected error: %v", err)
 	}
@@ -398,7 +397,7 @@ func TestDistance_OK(t *testing.T) {
 func TestDistance_ClientError(t *testing.T) {
 	srv := newTestServer(t, `{"status":"OVER_QUERY_LIMIT","error_message":"limit"}`, 200)
 	g := newGeoWithServer(t, srv)
-	_, err := g.Distance(context.Background(), geo.Point{Lat: 0, Lng: 0}, geo.Point{Lat: 1, Lng: 1})
+	_, err := g.Distance(t.Context(), geo.Point{Lat: 0, Lng: 0}, geo.Point{Lat: 1, Lng: 1})
 	if err == nil {
 		t.Fatal("expected error")
 	}
@@ -429,7 +428,7 @@ func TestGeocode_HTTPError(t *testing.T) {
 		t.Fatalf("New failed: %v", err)
 	}
 	defer g.Close()
-	_, err = g.Geocode(context.Background(), "addr")
+	_, err = g.Geocode(t.Context(), "addr")
 	if err == nil {
 		t.Fatal("expected error on http 500")
 	}

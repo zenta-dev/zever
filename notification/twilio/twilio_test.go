@@ -150,7 +150,7 @@ func TestNotify_sendsFormWithBasicAuth(t *testing.T) {
 	n := newTestNotifier(t, srv)
 	defer n.Close()
 
-	if err := n.Notify(context.Background(), validSMS()); err != nil {
+	if err := n.Notify(t.Context(), validSMS()); err != nil {
 		t.Fatalf("Notify err = %v", err)
 	}
 	if got.to != testToNumber {
@@ -177,7 +177,7 @@ func TestNotify_nilNotification(t *testing.T) {
 		t.Fatalf("New err = %v", err)
 	}
 	defer n.Close()
-	if err := n.Notify(context.Background(), nil); !errors.Is(err, notification.ErrNilNotification) {
+	if err := n.Notify(t.Context(), nil); !errors.Is(err, notification.ErrNilNotification) {
 		t.Fatalf("Notify(nil) err = %v, want ErrNilNotification", err)
 	}
 }
@@ -191,7 +191,7 @@ func TestNotify_invalidTarget(t *testing.T) {
 	defer n.Close()
 
 	bad := &notification.Notification{Target: "not-a-phone", Channel: notification.ChannelSMS, Body: "hi"}
-	if err := n.Notify(context.Background(), bad); !errors.Is(err, notification.ErrInvalidTarget) {
+	if err := n.Notify(t.Context(), bad); !errors.Is(err, notification.ErrInvalidTarget) {
 		t.Fatalf("Notify(bad E.164) err = %v, want ErrInvalidTarget", err)
 	}
 }
@@ -205,7 +205,7 @@ func TestNotify_wrongChannel(t *testing.T) {
 	defer n.Close()
 
 	push := &notification.Notification{Target: "device-token-abc", Channel: notification.ChannelPush, Body: "hi"}
-	if err := n.Notify(context.Background(), push); !errors.Is(err, notification.ErrChannelNotSupported) {
+	if err := n.Notify(t.Context(), push); !errors.Is(err, notification.ErrChannelNotSupported) {
 		t.Fatalf("Notify(push) err = %v, want ErrChannelNotSupported", err)
 	}
 }
@@ -218,7 +218,7 @@ func TestNotify_serverError(t *testing.T) {
 	n := newTestNotifier(t, srv)
 	defer n.Close()
 
-	err := n.Notify(context.Background(), validSMS())
+	err := n.Notify(t.Context(), validSMS())
 	if err == nil {
 		t.Fatal("Notify err = nil, want 400-mapped error")
 	}
@@ -235,7 +235,7 @@ func TestNotify_contextCanceled(t *testing.T) {
 	n := newTestNotifier(t, srv)
 	defer n.Close()
 
-	ctx, cancel := context.WithCancel(context.Background())
+	ctx, cancel := context.WithCancel(t.Context())
 	cancel()
 	if err := n.Notify(ctx, validSMS()); !errors.Is(err, context.Canceled) {
 		t.Fatalf("Notify err = %v, want context.Canceled", err)
@@ -250,7 +250,7 @@ func TestNotify_contextTimeout(t *testing.T) {
 	n := newTestNotifier(t, srv)
 	defer n.Close()
 
-	ctx, cancel := context.WithTimeout(context.Background(), 50*time.Millisecond)
+	ctx, cancel := context.WithTimeout(t.Context(), 50*time.Millisecond)
 	defer cancel()
 	err := n.Notify(ctx, validSMS())
 	if err == nil {

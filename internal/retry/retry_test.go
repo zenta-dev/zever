@@ -140,7 +140,7 @@ func TestPolicyNextDelayLinearIgnoresMultiplier(t *testing.T) {
 func TestDoSucceedsOnFirstTry(t *testing.T) {
 	calls := 0
 
-	err := Do(context.Background(), Policy{MaxAttempts: 3, BaseDelay: time.Millisecond}, func(_ context.Context) error {
+	err := Do(t.Context(), Policy{MaxAttempts: 3, BaseDelay: time.Millisecond}, func(_ context.Context) error {
 		calls++
 		return nil
 	})
@@ -157,7 +157,7 @@ func TestDoSucceedsOnFirstTry(t *testing.T) {
 func TestDoRetriesAndEventuallySucceeds(t *testing.T) {
 	calls := 0
 
-	err := Do(context.Background(), Policy{MaxAttempts: 5, BaseDelay: time.Millisecond}, func(_ context.Context) error {
+	err := Do(t.Context(), Policy{MaxAttempts: 5, BaseDelay: time.Millisecond}, func(_ context.Context) error {
 		calls++
 		if calls < 3 {
 			return errors.New("transient")
@@ -179,7 +179,7 @@ func TestDoExhaustsMaxAttempts(t *testing.T) {
 	wantErr := errors.New("permanent")
 	calls := 0
 
-	err := Do(context.Background(), Policy{MaxAttempts: 4, BaseDelay: time.Millisecond}, func(_ context.Context) error {
+	err := Do(t.Context(), Policy{MaxAttempts: 4, BaseDelay: time.Millisecond}, func(_ context.Context) error {
 		calls++
 		return wantErr
 	})
@@ -198,7 +198,7 @@ func TestDoExhaustsMaxAttempts(t *testing.T) {
 }
 
 func TestDoRespectsContextCancellationMidRetry(t *testing.T) {
-	ctx, cancel := context.WithCancel(context.Background())
+	ctx, cancel := context.WithCancel(t.Context())
 
 	calls := 0
 
@@ -229,7 +229,7 @@ func TestDoRespectsContextCancellationMidRetry(t *testing.T) {
 }
 
 func TestDoReturnsCtxErrIfAlreadyCancelled(t *testing.T) {
-	ctx, cancel := context.WithCancel(context.Background())
+	ctx, cancel := context.WithCancel(t.Context())
 	cancel()
 
 	calls := 0
@@ -350,7 +350,7 @@ func TestDoOnRetryFiresBetweenFailuresOnly(t *testing.T) {
 
 	calls := 0
 
-	err := Do(context.Background(), Policy{
+	err := Do(t.Context(), Policy{
 		MaxAttempts: 5,
 		BaseDelay:   time.Millisecond,
 		OnRetry: func(attempt int, err error) {
@@ -392,7 +392,7 @@ func TestDoOnRetryFiresBetweenFailuresOnly(t *testing.T) {
 func TestDoOnRetryNotCalledOnImmediateSuccess(t *testing.T) {
 	calls := 0
 
-	err := Do(context.Background(), Policy{
+	err := Do(t.Context(), Policy{
 		MaxAttempts: 3,
 		BaseDelay:   time.Millisecond,
 		OnRetry: func(_ int, _ error) {
@@ -417,7 +417,7 @@ func TestDoOnRetryNotCalledAfterFinalAttempt(t *testing.T) {
 
 	wantErr := errors.New("permanent")
 
-	err := Do(context.Background(), Policy{
+	err := Do(t.Context(), Policy{
 		MaxAttempts: 4,
 		BaseDelay:   time.Millisecond,
 		OnRetry: func(_ int, _ error) {
@@ -446,7 +446,7 @@ func TestDoOnRetryNotCalledAfterFinalAttempt(t *testing.T) {
 func TestDoMaxAttemptsBelowOneMeansOne(t *testing.T) {
 	calls := 0
 
-	err := Do(context.Background(), Policy{MaxAttempts: 0}, func(_ context.Context) error {
+	err := Do(t.Context(), Policy{MaxAttempts: 0}, func(_ context.Context) error {
 		calls++
 		return errors.New("fail")
 	})

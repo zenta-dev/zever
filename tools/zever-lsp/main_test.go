@@ -152,10 +152,10 @@ func TestRun_stdioLifecycle(t *testing.T) {
 	runCh := make(chan int, 1)
 
 	go func() {
-		runCh <- run(context.Background(), ends.serverStdin, ends.serverStdout)
+		runCh <- run(t.Context(), ends.serverStdin, ends.serverStdout)
 	}()
 
-	ctx := context.Background()
+	ctx := t.Context()
 	ctx, conn, srv := protocol.NewClient(ctx, fake, ends.clientStream)
 
 	driveHandshake(ctx, t, srv, fake, docURI, serverBrokenDoc)
@@ -181,7 +181,7 @@ func (e errReader) Read([]byte) (int, error) {
 }
 
 func TestRun_transportError(t *testing.T) {
-	if code := run(context.Background(), errReader{err: errors.New("boom")}, io.Discard); code != 1 {
+	if code := run(t.Context(), errReader{err: errors.New("boom")}, io.Discard); code != 1 {
 		t.Errorf("run() with failing stdin = %d, want 1", code)
 	}
 }
@@ -231,7 +231,7 @@ func TestMain_subprocessCover(t *testing.T) {
 	}
 
 	fake := &fakeClient{}
-	ctx := context.Background()
+	ctx := t.Context()
 	ctx, conn, srv := protocol.NewClient(ctx, fake, jsonrpc2.NewStream(rwAdapter{r: tee, w: stdin}))
 
 	driveHandshake(ctx, t, srv, fake, docURI, serverBrokenDoc)

@@ -89,7 +89,7 @@ var (
 func newJoinDB(t *testing.T) (context.Context, db.DB) {
 	t.Helper()
 
-	ctx := context.Background()
+	ctx := t.Context()
 
 	conn := openORMTestDB(ctx, t)
 
@@ -659,7 +659,7 @@ func TestJoinFlavorChains(t *testing.T) {
 // TestJoinFlavorAllStreamHappyPaths runs every flavor's All and Stream
 // against an empty mock result set, covering the no-rows loop exits.
 func TestJoinFlavorAllStreamHappyPaths(t *testing.T) {
-	ctx := context.Background()
+	ctx := t.Context()
 
 	for _, tc := range joinFlavorCases() {
 		t.Run(tc.name, func(t *testing.T) {
@@ -679,7 +679,7 @@ func TestJoinFlavorAllStreamHappyPaths(t *testing.T) {
 // TestJoinFlavorAllResolveErrors proves every flavor's All fails closed
 // when the dialect cannot be resolved.
 func TestJoinFlavorAllResolveErrors(t *testing.T) {
-	ctx := context.Background()
+	ctx := t.Context()
 
 	for _, tc := range joinFlavorCases() {
 		t.Run(tc.name, func(t *testing.T) {
@@ -697,7 +697,7 @@ func TestJoinFlavorAllResolveErrors(t *testing.T) {
 // TestJoinFlavorExecutionErrorPaths drives query, scan, iteration and
 // close failures through every flavor's All.
 func TestJoinFlavorExecutionErrorPaths(t *testing.T) {
-	ctx := context.Background()
+	ctx := t.Context()
 	boom := errors.New("boom")
 
 	for _, tc := range joinFlavorCases() {

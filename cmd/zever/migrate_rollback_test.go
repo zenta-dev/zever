@@ -1,7 +1,6 @@
 package main
 
 import (
-	"context"
 	"errors"
 	"flag"
 	"path/filepath"
@@ -113,7 +112,7 @@ func TestRunDBRollbackSkipsLegacyRows(t *testing.T) {
 		t.Fatalf("runDBMigrate: %v", runErr)
 	}
 
-	ctx := context.Background()
+	ctx := t.Context()
 
 	conn, err := openZeverDB("sqlite", dbPath)
 	if err != nil {
@@ -163,7 +162,7 @@ func TestRunDBRollbackSkipsLegacyRows(t *testing.T) {
 func readZeverMigrationChecksums(t *testing.T, path string) ([]string, error) {
 	t.Helper()
 
-	ctx := context.Background()
+	ctx := t.Context()
 
 	conn, err := openZeverDB("sqlite", path)
 	if err != nil {
@@ -434,7 +433,7 @@ func TestRunDBRollbackComputeFailure(t *testing.T) {
 	dir := t.TempDir()
 	dbPath := filepath.Join(dir, "migrate.db")
 
-	ctx := context.Background()
+	ctx := t.Context()
 
 	conn, err := openZeverDB("sqlite", dbPath)
 	if err != nil {
@@ -476,7 +475,7 @@ func TestRunDBRollbackApplyFailure(t *testing.T) {
 
 	migrateToV2(t, dbPath)
 
-	ctx := context.Background()
+	ctx := t.Context()
 
 	conn, err := openZeverDB("sqlite", dbPath)
 	if err != nil {

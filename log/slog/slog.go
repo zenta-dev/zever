@@ -33,32 +33,32 @@ func NewWithWriter(opts log.Options, w io.Writer) log.Logger {
 	return &slogLogger{logger: stdslog.New(handler)}
 }
 
-func (a *slogLogger) Debug() log.Event { return a.event(stdslog.LevelDebug) }
+func (l *slogLogger) Debug() log.Event { return l.event(stdslog.LevelDebug) }
 
-func (a *slogLogger) Info() log.Event { return a.event(stdslog.LevelInfo) }
+func (l *slogLogger) Info() log.Event { return l.event(stdslog.LevelInfo) }
 
-func (a *slogLogger) Warn() log.Event { return a.event(stdslog.LevelWarn) }
+func (l *slogLogger) Warn() log.Event { return l.event(stdslog.LevelWarn) }
 
-func (a *slogLogger) Error() log.Event { return a.event(stdslog.LevelError) }
+func (l *slogLogger) Error() log.Event { return l.event(stdslog.LevelError) }
 
-func (a *slogLogger) Fatal() log.Event { return a.event(fatalLevel) }
+func (l *slogLogger) Fatal() log.Event { return l.event(fatalLevel) }
 
-func (a *slogLogger) event(level stdslog.Level) log.Event {
-	return &slogEvent{logger: a.logger, level: level}
+func (l *slogLogger) event(level stdslog.Level) log.Event {
+	return &slogEvent{logger: l.logger, level: level}
 }
 
-func (a *slogLogger) With() log.Context {
-	return &slogContext{logger: a.logger}
+func (l *slogLogger) With() log.Context {
+	return &slogContext{logger: l.logger}
 }
 
-func (a *slogLogger) WithContext(ctx context.Context) log.Logger {
-	return log.FromContext(ctx, a)
+func (l *slogLogger) WithContext(ctx context.Context) log.Logger {
+	return log.FromContext(ctx, l)
 }
 
-func (a *slogLogger) Enabled(level log.Level) bool {
-	return a.logger.Enabled(context.Background(), toSlogLevel(level))
+func (l *slogLogger) Enabled(level log.Level) bool {
+	return l.logger.Enabled(context.Background(), toSlogLevel(level))
 }
 
-func (a *slogLogger) Sync() error { return nil }
+func (l *slogLogger) Sync() error { return nil }
 
-func (a *slogLogger) Name() string { return "slog" }
+func (l *slogLogger) Name() string { return "slog" }

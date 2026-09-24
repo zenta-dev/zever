@@ -215,7 +215,7 @@ func TestRetryTxOnRetryCallback(t *testing.T) {
 }
 
 func TestRetryTxStopsOnContextCancel(t *testing.T) {
-	ctx, cancel := context.WithCancel(context.Background())
+	ctx, cancel := context.WithCancel(t.Context())
 	defer cancel()
 
 	_, conn := newWidgetsDB(t)
@@ -284,15 +284,15 @@ func TestRetryTxForwardsTxOptions(t *testing.T) {
 // immediately, a cancelled context aborts the wait, and a normal wait
 // elapses.
 func TestSleepCtx(t *testing.T) {
-	if err := sleepCtx(context.Background(), 0); err != nil {
+	if err := sleepCtx(t.Context(), 0); err != nil {
 		t.Fatalf("sleepCtx(0) = %v, want nil", err)
 	}
 
-	if err := sleepCtx(context.Background(), -time.Second); err != nil {
+	if err := sleepCtx(t.Context(), -time.Second); err != nil {
 		t.Fatalf("sleepCtx(-1s) = %v, want nil", err)
 	}
 
-	ctx, cancel := context.WithCancel(context.Background())
+	ctx, cancel := context.WithCancel(t.Context())
 	cancel()
 
 	if err := sleepCtx(ctx, time.Hour); !errors.Is(err, context.Canceled) {
@@ -300,7 +300,7 @@ func TestSleepCtx(t *testing.T) {
 	}
 
 	start := time.Now()
-	if err := sleepCtx(context.Background(), 5*time.Millisecond); err != nil {
+	if err := sleepCtx(t.Context(), 5*time.Millisecond); err != nil {
 		t.Fatalf("sleepCtx(5ms) = %v, want nil", err)
 	}
 

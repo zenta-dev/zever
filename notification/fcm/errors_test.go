@@ -1,7 +1,6 @@
 package fcm
 
 import (
-	"context"
 	"errors"
 	"testing"
 
@@ -26,7 +25,7 @@ func TestNotConfiguredIs(t *testing.T) {
 		Body:    "hello",
 	}
 
-	if err := (&notifier{}).Notify(context.Background(), n); !errors.Is(err, ErrNotConfigured) {
+	if err := (&notifier{}).Notify(t.Context(), n); !errors.Is(err, ErrNotConfigured) {
 		t.Errorf("Notify err = %v, want ErrNotConfigured", err)
 	}
 }

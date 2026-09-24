@@ -118,7 +118,7 @@ func TestRecover_panicReturns500ExactJSON(t *testing.T) {
 	}))
 
 	rec := httptest.NewRecorder()
-	req := httptest.NewRequestWithContext(context.Background(), http.MethodGet, "/", nil)
+	req := httptest.NewRequestWithContext(t.Context(), http.MethodGet, "/", nil)
 	handler.ServeHTTP(rec, req)
 
 	if rec.Code != http.StatusInternalServerError {
@@ -159,7 +159,7 @@ func TestRecover_noPanicPassthroughKeepsStatusAndBody(t *testing.T) {
 	}))
 
 	rec := httptest.NewRecorder()
-	req := httptest.NewRequestWithContext(context.Background(), http.MethodGet, "/", nil)
+	req := httptest.NewRequestWithContext(t.Context(), http.MethodGet, "/", nil)
 	handler.ServeHTTP(rec, req)
 
 	if rec.Code != http.StatusTeapot {
@@ -183,7 +183,7 @@ func TestRecover_committedResponseLogsOnlyWithoutRewrite(t *testing.T) {
 	}))
 
 	rec := httptest.NewRecorder()
-	req := httptest.NewRequestWithContext(context.Background(), http.MethodGet, "/", nil)
+	req := httptest.NewRequestWithContext(t.Context(), http.MethodGet, "/", nil)
 	handler.ServeHTTP(rec, req)
 
 	// The header is already committed: recovery must not attempt a second
@@ -209,7 +209,7 @@ func TestRecover_nilPanicValueStillHandled(t *testing.T) {
 	}))
 
 	rec := httptest.NewRecorder()
-	req := httptest.NewRequestWithContext(context.Background(), http.MethodGet, "/", nil)
+	req := httptest.NewRequestWithContext(t.Context(), http.MethodGet, "/", nil)
 	handler.ServeHTTP(rec, req)
 
 	if rec.Code != http.StatusInternalServerError {
@@ -231,7 +231,7 @@ func TestRecoverUnaryServerInterceptor_recoversWithInternal(t *testing.T) {
 		panic("boom")
 	}
 
-	_, err := interceptor(context.Background(), nil, &grpc.UnaryServerInfo{FullMethod: "/svc/Method"}, handler)
+	_, err := interceptor(t.Context(), nil, &grpc.UnaryServerInfo{FullMethod: "/svc/Method"}, handler)
 
 	st, ok := status.FromError(err)
 	if !ok {
@@ -265,7 +265,7 @@ func TestRecoverUnaryServerInterceptor_passthrough(t *testing.T) {
 
 	handler := func(_ context.Context, req any) (any, error) { return req, nil }
 
-	resp, err := interceptor(context.Background(), "ok", &grpc.UnaryServerInfo{FullMethod: "/svc/Method"}, handler)
+	resp, err := interceptor(t.Context(), "ok", &grpc.UnaryServerInfo{FullMethod: "/svc/Method"}, handler)
 	if err != nil {
 		t.Fatalf("err = %v, want nil", err)
 	}

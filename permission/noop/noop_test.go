@@ -1,7 +1,6 @@
 package noop_test
 
 import (
-	"context"
 	"testing"
 
 	"github.com/zenta-dev/zever/permission"
@@ -82,7 +81,7 @@ func TestCan_alwaysDenies(t *testing.T) {
 		t.Run(tt.name, func(t *testing.T) {
 			t.Parallel()
 
-			got, err := c.Can(context.Background(), tt.subject, tt.action, tt.resource)
+			got, err := c.Can(t.Context(), tt.subject, tt.action, tt.resource)
 			if err != nil {
 				t.Fatalf("Can() error = %v, want nil", err)
 			}
@@ -104,7 +103,7 @@ func TestCan_errorIsNil(t *testing.T) {
 		t.Fatalf("New() error = %v, want nil", err)
 	}
 
-	d, err := c.Can(context.Background(), permission.Subject{ID: "alice"}, "read", permission.Resource{Type: "doc", ID: "1"})
+	d, err := c.Can(t.Context(), permission.Subject{ID: "alice"}, "read", permission.Resource{Type: "doc", ID: "1"})
 	if err != nil {
 		t.Fatalf("Can() error = %v, want nil", err)
 	}

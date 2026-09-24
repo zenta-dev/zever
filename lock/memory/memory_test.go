@@ -19,7 +19,7 @@ func newLocker(t *testing.T, o lock.Options) lock.Locker {
 		t.Fatalf("New: %v", err)
 	}
 
-	t.Cleanup(func() { _ = l.Close(context.Background()) })
+	t.Cleanup(func() { _ = l.Close(t.Context()) })
 
 	return l
 }
@@ -86,7 +86,7 @@ func TestNew_defaults(t *testing.T) {
 func TestTryAcquire_excludesSecondHolder(t *testing.T) {
 	t.Parallel()
 
-	ctx := context.Background()
+	ctx := t.Context()
 	l := newLocker(t, lock.Options{})
 
 	first, ok, err := l.TryAcquire(ctx, "k", time.Minute)
@@ -119,7 +119,7 @@ func TestTryAcquire_excludesSecondHolder(t *testing.T) {
 func TestTryAcquire_distinctKeysDoNotBlock(t *testing.T) {
 	t.Parallel()
 
-	ctx := context.Background()
+	ctx := t.Context()
 	l := newLocker(t, lock.Options{})
 
 	for _, k := range []string{"a", "b", "c"} {
@@ -134,7 +134,7 @@ func TestTryAcquire_emptyKeyRejected(t *testing.T) {
 
 	l := newLocker(t, lock.Options{})
 
-	if _, _, err := l.TryAcquire(context.Background(), "", time.Minute); err == nil {
+	if _, _, err := l.TryAcquire(t.Context(), "", time.Minute); err == nil {
 		t.Fatal("empty key: want error, got nil")
 	}
 }
@@ -142,7 +142,7 @@ func TestTryAcquire_emptyKeyRejected(t *testing.T) {
 func TestTryAcquire_nonPositiveTTLFallsBackToDefault(t *testing.T) {
 	t.Parallel()
 
-	ctx := context.Background()
+	ctx := t.Context()
 	l := newLocker(t, lock.Options{})
 
 	held, ok, err := l.TryAcquire(ctx, "k", 0)
@@ -175,7 +175,7 @@ func TestTryAcquire_holderIDFailureReturnsError(t *testing.T) {
 
 	l := newLocker(t, lock.Options{})
 
-	if _, _, err := l.TryAcquire(context.Background(), "k", time.Minute); err == nil {
+	if _, _, err := l.TryAcquire(t.Context(), "k", time.Minute); err == nil {
 		t.Fatal("TryAcquire with failing rand: want error, got nil")
 	}
 }
@@ -183,7 +183,7 @@ func TestTryAcquire_holderIDFailureReturnsError(t *testing.T) {
 func TestLease_autoExpires(t *testing.T) {
 	t.Parallel()
 
-	ctx := context.Background()
+	ctx := t.Context()
 	l := newLocker(t, lock.Options{})
 
 	if _, ok, err := l.TryAcquire(ctx, "k", 20*time.Millisecond); err != nil || !ok {
@@ -210,7 +210,7 @@ func TestLease_autoExpires(t *testing.T) {
 func TestExtend_keepsLockHeld(t *testing.T) {
 	t.Parallel()
 
-	ctx := context.Background()
+	ctx := t.Context()
 	l := newLocker(t, lock.Options{})
 
 	held, ok, err := l.TryAcquire(ctx, "k", 40*time.Millisecond)
@@ -241,7 +241,7 @@ func TestExtend_keepsLockHeld(t *testing.T) {
 func TestExtend_afterExpiryFails(t *testing.T) {
 	t.Parallel()
 
-	ctx := context.Background()
+	ctx := t.Context()
 	l := newLocker(t, lock.Options{})
 
 	held, _, err := l.TryAcquire(ctx, "k", 20*time.Millisecond)
@@ -269,7 +269,7 @@ func TestExtend_afterExpiryFails(t *testing.T) {
 func TestExtend_nonPositiveTTLFallsBackToDefault(t *testing.T) {
 	t.Parallel()
 
-	ctx := context.Background()
+	ctx := t.Context()
 	l := newLocker(t, lock.Options{})
 
 	held, _, err := l.TryAcquire(ctx, "k", time.Minute)
@@ -285,7 +285,7 @@ func TestExtend_nonPositiveTTLFallsBackToDefault(t *testing.T) {
 func TestExtend_afterUnlockFails(t *testing.T) {
 	t.Parallel()
 
-	ctx := context.Background()
+	ctx := t.Context()
 	l := newLocker(t, lock.Options{})
 
 	held, _, err := l.TryAcquire(ctx, "k", time.Minute)
@@ -305,7 +305,7 @@ func TestExtend_afterUnlockFails(t *testing.T) {
 func TestUnlock_afterTakeoverDoesNotStealLock(t *testing.T) {
 	t.Parallel()
 
-	ctx := context.Background()
+	ctx := t.Context()
 	l := newLocker(t, lock.Options{})
 
 	stale, _, err := l.TryAcquire(ctx, "k", 20*time.Millisecond)
@@ -344,7 +344,7 @@ func TestUnlock_afterTakeoverDoesNotStealLock(t *testing.T) {
 func TestUnlock_doubleUnlockReportsNotHeld(t *testing.T) {
 	t.Parallel()
 
-	ctx := context.Background()
+	ctx := t.Context()
 	l := newLocker(t, lock.Options{})
 
 	held, _, err := l.TryAcquire(ctx, "k", time.Minute)
@@ -364,7 +364,7 @@ func TestUnlock_doubleUnlockReportsNotHeld(t *testing.T) {
 func TestAcquire_blocksUntilReleased(t *testing.T) {
 	t.Parallel()
 
-	ctx := context.Background()
+	ctx := t.Context()
 	l := newLocker(t, lock.Options{RetryInterval: 5 * time.Millisecond})
 
 	held, _, err := l.TryAcquire(ctx, "k", time.Minute)
@@ -409,11 +409,11 @@ func TestAcquire_honoursContextCancellation(t *testing.T) {
 
 	l := newLocker(t, lock.Options{RetryInterval: 5 * time.Millisecond})
 
-	if _, _, err := l.TryAcquire(context.Background(), "k", time.Minute); err != nil {
+	if _, _, err := l.TryAcquire(t.Context(), "k", time.Minute); err != nil {
 		t.Fatalf("acquire: %v", err)
 	}
 
-	ctx, cancel := context.WithTimeout(context.Background(), 30*time.Millisecond)
+	ctx, cancel := context.WithTimeout(t.Context(), 30*time.Millisecond)
 	defer cancel()
 
 	got, err := l.Acquire(ctx, "k", time.Minute)
@@ -435,7 +435,7 @@ func TestAcquire_emptyKeyReturnsError(t *testing.T) {
 
 	l := newLocker(t, lock.Options{RetryInterval: time.Millisecond})
 
-	if _, err := l.Acquire(context.Background(), "", time.Minute); err == nil {
+	if _, err := l.Acquire(t.Context(), "", time.Minute); err == nil {
 		t.Fatal("Acquire with empty key: want error, got nil")
 	}
 }
@@ -443,7 +443,7 @@ func TestAcquire_emptyKeyReturnsError(t *testing.T) {
 func TestClose_clearsLeases(t *testing.T) {
 	t.Parallel()
 
-	ctx := context.Background()
+	ctx := t.Context()
 	l := newLocker(t, lock.Options{})
 
 	if _, _, err := l.TryAcquire(ctx, "k", time.Minute); err != nil {
@@ -470,7 +470,7 @@ func TestClose_clearsLeases(t *testing.T) {
 func TestConcurrentTryAcquire_singleWinner(t *testing.T) {
 	t.Parallel()
 
-	ctx := context.Background()
+	ctx := t.Context()
 	l := newLocker(t, lock.Options{})
 
 	const goroutines = 64
@@ -517,7 +517,7 @@ func TestConcurrentTryAcquire_singleWinner(t *testing.T) {
 func TestConcurrentAcquire_serialisesCriticalSection(t *testing.T) {
 	t.Parallel()
 
-	ctx := context.Background()
+	ctx := t.Context()
 	l := newLocker(t, lock.Options{RetryInterval: time.Millisecond})
 
 	const goroutines = 32

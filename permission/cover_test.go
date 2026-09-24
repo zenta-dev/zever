@@ -116,7 +116,7 @@ func TestCover_Open_Success9201(t *testing.T) {
 	if c == nil {
 		t.Fatal("Open checker is nil")
 	}
-	d, err := c.Can(context.Background(), Subject{}, "read", Resource{})
+	d, err := c.Can(t.Context(), Subject{}, "read", Resource{})
 	if err != nil {
 		t.Fatalf("Can err = %v", err)
 	}

@@ -57,7 +57,7 @@ func newTestHandler(t *testing.T) http.Handler {
 	if err != nil {
 		t.Fatalf("read schema: %v", err)
 	}
-	ctx := context.Background()
+	ctx := t.Context()
 	for _, stmt := range strings.Split(string(raw), ";") {
 		stmt = strings.TrimSpace(stmt)
 		if stmt == "" {
@@ -69,7 +69,7 @@ func newTestHandler(t *testing.T) http.Handler {
 	}
 
 	t.Cleanup(func() {
-		ctx, cancel := context.WithCancel(context.Background())
+		ctx, cancel := context.WithCancel(t.Context())
 		defer cancel()
 		_ = c.Close(ctx)
 	})
@@ -88,7 +88,7 @@ func do(t *testing.T, h http.Handler, method, path, token string, body any) *htt
 			t.Fatalf("encode: %v", err)
 		}
 	}
-	req := httptest.NewRequestWithContext(context.Background(), method, path, &buf)
+	req := httptest.NewRequestWithContext(t.Context(), method, path, &buf)
 	if body != nil {
 		req.Header.Set("Content-Type", "application/json")
 	}

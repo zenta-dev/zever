@@ -1,7 +1,6 @@
 package orm
 
 import (
-	"context"
 	"database/sql/driver"
 	"encoding/json"
 	"testing"
@@ -98,7 +97,7 @@ func TestJSONTextJSONRoundTrip(t *testing.T) {
 func TestJSONTextOptionAndSQLite(t *testing.T) {
 	t.Parallel()
 
-	ctx := context.Background()
+	ctx := t.Context()
 
 	conn, err := sqlite.New(db.Options{Path: ":memory:"})
 	if err != nil {

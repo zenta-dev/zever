@@ -159,7 +159,7 @@ func TestOpen_success_smoke(t *testing.T) {
 		t.Fatalf("Open err = %v", err)
 	}
 
-	ctx := context.Background()
+	ctx := t.Context()
 
 	if upErr := got.Upsert(ctx, Vector{ID: "v1", Embedding: []float32{1, 0}}); upErr != nil {
 		t.Fatalf("Upsert err = %v", upErr)

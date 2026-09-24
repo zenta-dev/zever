@@ -129,7 +129,7 @@ func TestGenerate_happyPath(t *testing.T) {
 		return jsonResp(http.StatusOK, chatOK("hello", 5, 10)), nil
 	}, "llama3")
 
-	gen, err := a.Generate(context.Background(), "", []ai.Message{{Role: ai.RoleUser, Content: "hi"}}, ai.GenerateOptions{})
+	gen, err := a.Generate(t.Context(), "", []ai.Message{{Role: ai.RoleUser, Content: "hi"}}, ai.GenerateOptions{})
 	if err != nil {
 		t.Fatalf("Generate: %v", err)
 	}
@@ -161,7 +161,7 @@ func TestGenerate_explicitModelWins(t *testing.T) {
 		return jsonResp(http.StatusOK, chatOK("ok", 0, 0)), nil
 	}, "default-model")
 
-	_, err := a.Generate(context.Background(), "explicit", []ai.Message{{Role: ai.RoleUser, Content: "hi"}}, ai.GenerateOptions{})
+	_, err := a.Generate(t.Context(), "explicit", []ai.Message{{Role: ai.RoleUser, Content: "hi"}}, ai.GenerateOptions{})
 	if err != nil {
 		t.Fatalf("Generate: %v", err)
 	}
@@ -178,7 +178,7 @@ func TestGenerate_noModel(t *testing.T) {
 		return jsonResp(http.StatusOK, chatOK("x", 0, 0)), nil
 	}, "")
 
-	_, err := a.Generate(context.Background(), "", nil, ai.GenerateOptions{})
+	_, err := a.Generate(t.Context(), "", nil, ai.GenerateOptions{})
 	if !errors.Is(err, ErrNoModel) {
 		t.Fatalf("err = %v, want ErrNoModel", err)
 	}
@@ -189,7 +189,7 @@ func TestStream_noModel(t *testing.T) {
 
 	a := openFake(t, nil, "")
 
-	_, err := a.Stream(context.Background(), "", nil, ai.GenerateOptions{})
+	_, err := a.Stream(t.Context(), "", nil, ai.GenerateOptions{})
 	if !errors.Is(err, ErrNoModel) {
 		t.Fatalf("err = %v, want ErrNoModel", err)
 	}
@@ -200,7 +200,7 @@ func TestEmbed_noModel(t *testing.T) {
 
 	a := openFake(t, nil, "")
 
-	_, err := a.Embed(context.Background(), "", []string{"hi"}, ai.EmbedOptions{})
+	_, err := a.Embed(t.Context(), "", []string{"hi"}, ai.EmbedOptions{})
 	if !errors.Is(err, ErrNoModel) {
 		t.Fatalf("err = %v, want ErrNoModel", err)
 	}
@@ -216,7 +216,7 @@ func TestGenerate_normalizesRoles(t *testing.T) {
 		return jsonResp(http.StatusOK, chatOK("ok", 0, 0)), nil
 	}, "llama3")
 
-	_, err := a.Generate(context.Background(), "", []ai.Message{
+	_, err := a.Generate(t.Context(), "", []ai.Message{
 		{Role: ai.RoleSystem, Content: "sys"},
 		{Role: ai.RoleAssistant, Content: "a"},
 		{Role: ai.RoleUser, Content: "u"},
@@ -330,7 +330,7 @@ func TestGenerate_optionsMapping(t *testing.T) {
 				return jsonResp(http.StatusOK, chatOK("ok", 0, 0)), nil
 			}, "llama3")
 
-			if _, err := a.Generate(context.Background(), "", []ai.Message{{Role: ai.RoleUser, Content: "hi"}}, tt.opts); err != nil {
+			if _, err := a.Generate(t.Context(), "", []ai.Message{{Role: ai.RoleUser, Content: "hi"}}, tt.opts); err != nil {
 				t.Fatalf("Generate: %v", err)
 			}
 
@@ -358,7 +358,7 @@ func TestGenerate_toolCalls(t *testing.T) {
 		return jsonResp(http.StatusOK, resp), nil
 	}, "llama3")
 
-	gen, err := a.Generate(context.Background(), "", []ai.Message{{Role: ai.RoleUser, Content: "hi"}}, ai.GenerateOptions{})
+	gen, err := a.Generate(t.Context(), "", []ai.Message{{Role: ai.RoleUser, Content: "hi"}}, ai.GenerateOptions{})
 	if err != nil {
 		t.Fatalf("Generate: %v", err)
 	}
@@ -418,7 +418,7 @@ func TestGenerate_errorPaths(t *testing.T) {
 				return tt.handler(), nil
 			}, "llama3")
 
-			_, err := a.Generate(context.Background(), "", []ai.Message{{Role: ai.RoleUser, Content: "hi"}}, ai.GenerateOptions{})
+			_, err := a.Generate(t.Context(), "", []ai.Message{{Role: ai.RoleUser, Content: "hi"}}, ai.GenerateOptions{})
 			if err == nil || !strings.Contains(err.Error(), tt.want) {
 				t.Fatalf("err = %v, want %q", err, tt.want)
 			}
@@ -433,7 +433,7 @@ func TestGenerate_transportError(t *testing.T) {
 		return nil, errors.New("dial boom")
 	}, "llama3")
 
-	_, err := a.Generate(context.Background(), "", []ai.Message{{Role: ai.RoleUser, Content: "hi"}}, ai.GenerateOptions{})
+	_, err := a.Generate(t.Context(), "", []ai.Message{{Role: ai.RoleUser, Content: "hi"}}, ai.GenerateOptions{})
 	if err == nil || !strings.Contains(err.Error(), "request failed") {
 		t.Fatalf("err = %v, want request failed", err)
 	}
@@ -450,7 +450,7 @@ func TestEmbed_happyPath(t *testing.T) {
 		return jsonResp(http.StatusOK, map[string]any{"embeddings": [][]float32{{0.1, 0.2, 0.3}}}), nil
 	}, "llama3")
 
-	vecs, err := a.Embed(context.Background(), "", []string{"hello"}, ai.EmbedOptions{})
+	vecs, err := a.Embed(t.Context(), "", []string{"hello"}, ai.EmbedOptions{})
 	if err != nil {
 		t.Fatalf("Embed: %v", err)
 	}
@@ -465,7 +465,7 @@ func TestEmbed_dimensions_notSupported(t *testing.T) {
 
 	a := openFake(t, nil, "llama3")
 
-	_, err := a.Embed(context.Background(), "", []string{"hello"}, ai.EmbedOptions{Dimensions: 256})
+	_, err := a.Embed(t.Context(), "", []string{"hello"}, ai.EmbedOptions{Dimensions: 256})
 	if !errors.Is(err, ai.ErrNotSupported) {
 		t.Fatalf("err = %v, want ErrNotSupported", err)
 	}
@@ -478,7 +478,7 @@ func TestEmbed_statusError(t *testing.T) {
 		return jsonResp(http.StatusInternalServerError, map[string]any{"error": "boom"}), nil
 	}, "llama3")
 
-	_, err := a.Embed(context.Background(), "", []string{"hi"}, ai.EmbedOptions{})
+	_, err := a.Embed(t.Context(), "", []string{"hi"}, ai.EmbedOptions{})
 	if err == nil || !strings.Contains(err.Error(), "status 500") {
 		t.Fatalf("err = %v, want status 500", err)
 	}
@@ -495,7 +495,7 @@ func TestStream_happyPath(t *testing.T) {
 		return &http.Response{StatusCode: http.StatusOK, Body: io.NopCloser(strings.NewReader(ndjson))}, nil
 	}, "llama3")
 
-	ch, err := a.Stream(context.Background(), "", []ai.Message{{Role: ai.RoleUser, Content: "hi"}}, ai.GenerateOptions{})
+	ch, err := a.Stream(t.Context(), "", []ai.Message{{Role: ai.RoleUser, Content: "hi"}}, ai.GenerateOptions{})
 	if err != nil {
 		t.Fatalf("Stream: %v", err)
 	}
@@ -542,7 +542,7 @@ func TestStream_toolCalls(t *testing.T) {
 		return &http.Response{StatusCode: http.StatusOK, Body: io.NopCloser(strings.NewReader(ndjson))}, nil
 	}, "llama3")
 
-	ch, err := a.Stream(context.Background(), "", []ai.Message{{Role: ai.RoleUser, Content: "hi"}}, ai.GenerateOptions{})
+	ch, err := a.Stream(t.Context(), "", []ai.Message{{Role: ai.RoleUser, Content: "hi"}}, ai.GenerateOptions{})
 	if err != nil {
 		t.Fatalf("Stream: %v", err)
 	}
@@ -585,7 +585,7 @@ func TestStream_serverErrorPayload(t *testing.T) {
 		return &http.Response{StatusCode: http.StatusOK, Body: io.NopCloser(strings.NewReader(ndjson))}, nil
 	}, "llama3")
 
-	ch, err := a.Stream(context.Background(), "", []ai.Message{{Role: ai.RoleUser, Content: "hi"}}, ai.GenerateOptions{})
+	ch, err := a.Stream(t.Context(), "", []ai.Message{{Role: ai.RoleUser, Content: "hi"}}, ai.GenerateOptions{})
 	if err != nil {
 		t.Fatalf("Stream: %v", err)
 	}
@@ -614,7 +614,7 @@ func TestStream_statusError(t *testing.T) {
 		return jsonResp(http.StatusUnauthorized, map[string]any{"error": "nope"}), nil
 	}, "llama3")
 
-	_, err := a.Stream(context.Background(), "", []ai.Message{{Role: ai.RoleUser, Content: "hi"}}, ai.GenerateOptions{})
+	_, err := a.Stream(t.Context(), "", []ai.Message{{Role: ai.RoleUser, Content: "hi"}}, ai.GenerateOptions{})
 	if err == nil || !strings.Contains(err.Error(), "status 401") {
 		t.Fatalf("err = %v, want status 401", err)
 	}
@@ -627,7 +627,7 @@ func TestStream_decodeError(t *testing.T) {
 		return &http.Response{StatusCode: http.StatusOK, Body: io.NopCloser(strings.NewReader("{oops\n"))}, nil
 	}, "llama3")
 
-	ch, err := a.Stream(context.Background(), "", []ai.Message{{Role: ai.RoleUser, Content: "hi"}}, ai.GenerateOptions{})
+	ch, err := a.Stream(t.Context(), "", []ai.Message{{Role: ai.RoleUser, Content: "hi"}}, ai.GenerateOptions{})
 	if err != nil {
 		t.Fatalf("Stream: %v", err)
 	}
@@ -676,7 +676,7 @@ func TestPostRequest(t *testing.T) {
 		t.Run(tt.name, func(t *testing.T) {
 			t.Parallel()
 
-			req, err := postRequest(context.Background(), tt.addr, "/api/chat", []byte("{}"))
+			req, err := postRequest(t.Context(), tt.addr, "/api/chat", []byte("{}"))
 			if tt.wantErr != "" {
 				if err == nil || !strings.Contains(err.Error(), tt.wantErr) {
 					t.Fatalf("err = %v, want %q", err, tt.wantErr)
@@ -765,7 +765,7 @@ func TestGenerate_unmarshalableFormat(t *testing.T) {
 
 	a := openFake(t, nil, "llama3")
 
-	_, err := a.Generate(context.Background(), "", []ai.Message{{Role: ai.RoleUser, Content: "hi"}}, ai.GenerateOptions{
+	_, err := a.Generate(t.Context(), "", []ai.Message{{Role: ai.RoleUser, Content: "hi"}}, ai.GenerateOptions{
 		ResponseFormat: &ai.ResponseFormat{JSONSchema: map[string]any{"schema": map[string]any{"f": func() {}}}},
 	})
 	if err == nil || !strings.Contains(err.Error(), "marshal request") {
@@ -778,7 +778,7 @@ func TestStream_unmarshalableFormat(t *testing.T) {
 
 	a := openFake(t, nil, "llama3")
 
-	_, err := a.Stream(context.Background(), "", []ai.Message{{Role: ai.RoleUser, Content: "hi"}}, ai.GenerateOptions{
+	_, err := a.Stream(t.Context(), "", []ai.Message{{Role: ai.RoleUser, Content: "hi"}}, ai.GenerateOptions{
 		ResponseFormat: &ai.ResponseFormat{JSONSchema: map[string]any{"schema": map[string]any{"f": func() {}}}},
 	})
 	if err == nil || !strings.Contains(err.Error(), "marshal request") {
@@ -796,7 +796,7 @@ func TestGenerate_badAddr(t *testing.T) {
 	}
 	ad.addr = "http://[::1"
 
-	_, err := a.Generate(context.Background(), "", []ai.Message{{Role: ai.RoleUser, Content: "hi"}}, ai.GenerateOptions{})
+	_, err := a.Generate(t.Context(), "", []ai.Message{{Role: ai.RoleUser, Content: "hi"}}, ai.GenerateOptions{})
 	if err == nil || !strings.Contains(err.Error(), "create request") {
 		t.Fatalf("err = %v, want create request", err)
 	}
@@ -812,7 +812,7 @@ func TestStream_badAddr(t *testing.T) {
 	}
 	ad.addr = "http://[::1"
 
-	_, err := a.Stream(context.Background(), "", []ai.Message{{Role: ai.RoleUser, Content: "hi"}}, ai.GenerateOptions{})
+	_, err := a.Stream(t.Context(), "", []ai.Message{{Role: ai.RoleUser, Content: "hi"}}, ai.GenerateOptions{})
 	if err == nil || !strings.Contains(err.Error(), "create request") {
 		t.Fatalf("err = %v, want create request", err)
 	}
@@ -825,7 +825,7 @@ func TestStream_transportError(t *testing.T) {
 		return nil, errors.New("dial boom")
 	}, "llama3")
 
-	_, err := a.Stream(context.Background(), "", []ai.Message{{Role: ai.RoleUser, Content: "hi"}}, ai.GenerateOptions{})
+	_, err := a.Stream(t.Context(), "", []ai.Message{{Role: ai.RoleUser, Content: "hi"}}, ai.GenerateOptions{})
 	if err == nil || !strings.Contains(err.Error(), "request failed") {
 		t.Fatalf("err = %v, want request failed", err)
 	}
@@ -842,7 +842,7 @@ func TestGenerate_readError(t *testing.T) {
 		return &http.Response{StatusCode: http.StatusOK, Body: io.NopCloser(errReader{})}, nil
 	}, "llama3")
 
-	_, err := a.Generate(context.Background(), "", []ai.Message{{Role: ai.RoleUser, Content: "hi"}}, ai.GenerateOptions{})
+	_, err := a.Generate(t.Context(), "", []ai.Message{{Role: ai.RoleUser, Content: "hi"}}, ai.GenerateOptions{})
 	if err == nil || !strings.Contains(err.Error(), "read response") {
 		t.Fatalf("err = %v, want read response", err)
 	}
@@ -855,7 +855,7 @@ func TestEmbed_badJSON(t *testing.T) {
 		return &http.Response{StatusCode: http.StatusOK, Body: io.NopCloser(strings.NewReader("{oops"))}, nil
 	}, "llama3")
 
-	_, err := a.Embed(context.Background(), "", []string{"hi"}, ai.EmbedOptions{})
+	_, err := a.Embed(t.Context(), "", []string{"hi"}, ai.EmbedOptions{})
 	if err == nil || !strings.Contains(err.Error(), "unmarshal embed response") {
 		t.Fatalf("err = %v, want unmarshal embed response", err)
 	}
@@ -868,7 +868,7 @@ func TestEmbed_transportError(t *testing.T) {
 		return nil, errors.New("dial boom")
 	}, "llama3")
 
-	_, err := a.Embed(context.Background(), "", []string{"hi"}, ai.EmbedOptions{})
+	_, err := a.Embed(t.Context(), "", []string{"hi"}, ai.EmbedOptions{})
 	if err == nil || !strings.Contains(err.Error(), "embed") {
 		t.Fatalf("err = %v, want embed", err)
 	}
@@ -900,7 +900,7 @@ func TestStream_eofCloses(t *testing.T) {
 		return &http.Response{StatusCode: http.StatusOK, Body: io.NopCloser(strings.NewReader(ndjson))}, nil
 	}, "llama3")
 
-	ch, err := a.Stream(context.Background(), "", []ai.Message{{Role: ai.RoleUser, Content: "hi"}}, ai.GenerateOptions{})
+	ch, err := a.Stream(t.Context(), "", []ai.Message{{Role: ai.RoleUser, Content: "hi"}}, ai.GenerateOptions{})
 	if err != nil {
 		t.Fatalf("Stream: %v", err)
 	}
@@ -938,7 +938,7 @@ func TestStream_eofCloses(t *testing.T) {
 func openStreamBlocked(t *testing.T, body string) (<-chan ai.StreamChunk, context.CancelFunc) {
 	t.Helper()
 
-	ctx, cancel := context.WithCancel(context.Background())
+	ctx, cancel := context.WithCancel(t.Context())
 
 	a := openFake(t, func(_ *http.Request) (*http.Response, error) {
 		return &http.Response{StatusCode: http.StatusOK, Body: io.NopCloser(strings.NewReader(body))}, nil

@@ -148,7 +148,7 @@ func TestRedisCover_allowCtxCanceled(t *testing.T) {
 
 	l := newTestLimiter(t, testOptions())
 
-	ctx, cancel := context.WithCancel(context.Background())
+	ctx, cancel := context.WithCancel(t.Context())
 	cancel()
 
 	if _, err := l.Allow(ctx, freshKey(t), 1); !errors.Is(err, context.Canceled) {
@@ -163,7 +163,7 @@ func TestRedisCover_allowBadCost(t *testing.T) {
 	key := freshKey(t)
 
 	for _, cost := range []float64{math.NaN(), math.Inf(1), math.Inf(-1)} {
-		if _, err := l.Allow(context.Background(), key, cost); !errors.Is(err, ratelimit.ErrInvalidCost) {
+		if _, err := l.Allow(t.Context(), key, cost); !errors.Is(err, ratelimit.ErrInvalidCost) {
 			t.Errorf("Allow(%v) err = %v, want ErrInvalidCost", cost, err)
 		}
 	}
@@ -172,7 +172,7 @@ func TestRedisCover_allowBadCost(t *testing.T) {
 func TestRedisCover_allowOversizedCostCapped(t *testing.T) {
 	t.Parallel()
 
-	ctx := context.Background()
+	ctx := t.Context()
 	l := newTestLimiter(t, testOptions())
 	key := freshKey(t)
 
@@ -200,7 +200,7 @@ func TestRedisCover_allowTransportError(t *testing.T) {
 
 	l := deadPortLimiter(t, 3)
 
-	if _, err := l.Allow(context.Background(), freshKey(t), 1); err == nil {
+	if _, err := l.Allow(t.Context(), freshKey(t), 1); err == nil {
 		t.Fatal("Allow(dead port) err = nil, want transport error")
 	} else if !strings.Contains(err.Error(), "redis: allow:") {
 		t.Errorf("Allow(dead port) err = %v, want redis: allow: prefix", err)
@@ -210,7 +210,7 @@ func TestRedisCover_allowTransportError(t *testing.T) {
 func TestRedisCover_scriptShapes(t *testing.T) {
 	// Sequential (no t.Parallel): swaps allowScript under the write lock;
 	// parallel Allow tests stay paused until this returns.
-	ctx := context.Background()
+	ctx := t.Context()
 	l := newTestLimiter(t, testOptions())
 
 	for _, tc := range []struct {
@@ -240,7 +240,7 @@ func TestRedisCover_scriptNegativeRetryClamped(t *testing.T) {
 	// Sequential: negative retryMS clamps to 0 with a denial.
 	swapAllowScript(t, `return {0, 0, -5}`)
 
-	d, err := newTestLimiter(t, testOptions()).Allow(context.Background(), freshKey(t), 1)
+	d, err := newTestLimiter(t, testOptions()).Allow(t.Context(), freshKey(t), 1)
 	if err != nil {
 		t.Fatalf("Allow err = %v, want nil", err)
 	}
@@ -263,7 +263,7 @@ func TestRedisCover_resetCtxCanceled(t *testing.T) {
 
 	l := newTestLimiter(t, testOptions())
 
-	ctx, cancel := context.WithCancel(context.Background())
+	ctx, cancel := context.WithCancel(t.Context())
 	cancel()
 
 	if err := l.Reset(ctx, freshKey(t)); !errors.Is(err, context.Canceled) {
@@ -276,7 +276,7 @@ func TestRedisCover_resetDelError(t *testing.T) {
 
 	l := deadPortLimiter(t, 3)
 
-	if err := l.Reset(context.Background(), freshKey(t)); err == nil {
+	if err := l.Reset(t.Context(), freshKey(t)); err == nil {
 		t.Fatal("Reset(dead port) err = nil, want transport error")
 	} else if !strings.Contains(err.Error(), "redis: reset:") {
 		t.Errorf("Reset(dead port) err = %v, want redis: reset: prefix", err)

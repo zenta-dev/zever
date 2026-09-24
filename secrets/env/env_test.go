@@ -1,7 +1,6 @@
 package env
 
 import (
-	"context"
 	"errors"
 	"testing"
 
@@ -37,7 +36,7 @@ func TestGet_existing(t *testing.T) {
 		t.Fatalf("New: %v", err)
 	}
 
-	val, err := a.Get(context.Background(), "GREETING")
+	val, err := a.Get(t.Context(), "GREETING")
 	if err != nil {
 		t.Fatalf("Get: %v", err)
 	}
@@ -53,7 +52,7 @@ func TestGet_missing_errNotFound(t *testing.T) {
 		t.Fatalf("New: %v", err)
 	}
 
-	_, err = a.Get(context.Background(), "NOPE_DEF_MISSING")
+	_, err = a.Get(t.Context(), "NOPE_DEF_MISSING")
 	if !errors.Is(err, secrets.ErrNotFound) {
 		t.Fatalf("err = %v, want ErrNotFound", err)
 	}
@@ -82,7 +81,7 @@ func TestGet_invalidName_errInvalidKey(t *testing.T) {
 				t.Fatalf("New: %v", err)
 			}
 
-			if _, err := a.Get(context.Background(), tt.input); !errors.Is(err, secrets.ErrInvalidKey) {
+			if _, err := a.Get(t.Context(), tt.input); !errors.Is(err, secrets.ErrInvalidKey) {
 				t.Fatalf("err = %v, want ErrInvalidKey", err)
 			}
 		})
@@ -97,7 +96,7 @@ func TestGet_enforcesPrefixBoundary(t *testing.T) {
 		t.Fatalf("New: %v", err)
 	}
 
-	val, err := a.Get(context.Background(), "K")
+	val, err := a.Get(t.Context(), "K")
 	if err != nil {
 		t.Fatalf("Get: %v", err)
 	}
@@ -106,7 +105,7 @@ func TestGet_enforcesPrefixBoundary(t *testing.T) {
 		t.Fatalf("got %q, want %q", val, "v")
 	}
 
-	if _, err := a.Get(context.Background(), "K2"); err == nil {
+	if _, err := a.Get(t.Context(), "K2"); err == nil {
 		t.Fatal("expected boundary error, got nil")
 	}
 }
@@ -119,7 +118,7 @@ func TestSet_notSupported(t *testing.T) {
 		t.Fatalf("New: %v", err)
 	}
 
-	if err := a.Set(context.Background(), "k", []byte("v")); !errors.Is(err, secrets.ErrNotSupported) {
+	if err := a.Set(t.Context(), "k", []byte("v")); !errors.Is(err, secrets.ErrNotSupported) {
 		t.Fatalf("err = %v, want ErrNotSupported", err)
 	}
 }
@@ -132,7 +131,7 @@ func TestDelete_notSupported(t *testing.T) {
 		t.Fatalf("New: %v", err)
 	}
 
-	if err := a.Delete(context.Background(), "k"); !errors.Is(err, secrets.ErrNotSupported) {
+	if err := a.Delete(t.Context(), "k"); !errors.Is(err, secrets.ErrNotSupported) {
 		t.Fatalf("err = %v, want ErrNotSupported", err)
 	}
 }
@@ -146,7 +145,7 @@ func TestList_filtersPrefix(t *testing.T) {
 		t.Fatalf("New: %v", err)
 	}
 
-	keys, err := a.List(context.Background())
+	keys, err := a.List(t.Context())
 	if err != nil {
 		t.Fatalf("List: %v", err)
 	}
@@ -173,7 +172,7 @@ func TestList_enforcesBoundary(t *testing.T) {
 		t.Fatalf("New: %v", err)
 	}
 
-	keys, err := a.List(context.Background())
+	keys, err := a.List(t.Context())
 	if err != nil {
 		t.Fatalf("List: %v", err)
 	}
@@ -200,7 +199,7 @@ func TestClose_nilError(t *testing.T) {
 		t.Fatalf("New: %v", err)
 	}
 
-	if err := a.Close(context.Background()); err != nil {
+	if err := a.Close(t.Context()); err != nil {
 		t.Fatalf("Close: %v", err)
 	}
 }

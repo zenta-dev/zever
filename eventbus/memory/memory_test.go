@@ -71,7 +71,7 @@ func TestFanout(t *testing.T) {
 	}
 	defer b.Close()
 
-	ctx := context.Background()
+	ctx := t.Context()
 
 	const n = 3
 
@@ -113,7 +113,7 @@ func TestOrderingPerSub(t *testing.T) {
 	}
 	defer b.Close()
 
-	ctx := context.Background()
+	ctx := t.Context()
 	got := make(chan eventbus.Message, 32)
 
 	if _, err := b.Subscribe(ctx, "seq", func(_ context.Context, m eventbus.Message) {
@@ -155,7 +155,7 @@ func TestDropIsolation(t *testing.T) {
 
 	defer b.Close()
 
-	ctx := context.Background()
+	ctx := t.Context()
 	release := make(chan struct{})
 
 	// Slow subscriber: blocks until release is closed.
@@ -208,7 +208,7 @@ func TestUnsubscribe(t *testing.T) {
 	}
 	defer b.Close()
 
-	ctx := context.Background()
+	ctx := t.Context()
 	got := make(chan eventbus.Message, 4)
 
 	unsub, err := b.Subscribe(ctx, "u", func(_ context.Context, m eventbus.Message) {
@@ -244,7 +244,7 @@ func TestPublishAfterClose(t *testing.T) {
 		t.Fatalf("Close: %v", err)
 	}
 
-	ctx := context.Background()
+	ctx := t.Context()
 
 	if err := b.Publish(ctx, "t", eventbus.NewPayload([]byte("x")), nil); !errors.Is(err, eventbus.ErrClosed) {
 		t.Fatalf("Publish after close err=%v want ErrClosed", err)
@@ -264,7 +264,7 @@ func TestNilHandler(t *testing.T) {
 	}
 	defer b.Close()
 
-	if _, err := b.Subscribe(context.Background(), "t", nil); !errors.Is(err, eventbus.ErrNilHandler) {
+	if _, err := b.Subscribe(t.Context(), "t", nil); !errors.Is(err, eventbus.ErrNilHandler) {
 		t.Fatalf("err=%v want ErrNilHandler", err)
 	}
 }
@@ -279,7 +279,7 @@ func TestOversizePayload(t *testing.T) {
 	defer b.Close()
 
 	big := make(eventbus.Payload, eventbus.MaxMessageSize+1)
-	err = b.Publish(context.Background(), "t", big, nil)
+	err = b.Publish(t.Context(), "t", big, nil)
 	if !errors.Is(err, eventbus.ErrPayloadTooLarge) {
 		t.Fatalf("err=%v want ErrPayloadTooLarge", err)
 	}
@@ -294,7 +294,7 @@ func TestInvalidTopic(t *testing.T) {
 	}
 	defer b.Close()
 
-	ctx := context.Background()
+	ctx := t.Context()
 
 	if err := b.Publish(ctx, "", eventbus.NewPayload([]byte("x")), nil); !errors.Is(err, eventbus.ErrInvalidOptions) {
 		t.Fatalf("empty topic Publish err=%v want ErrInvalidOptions", err)
@@ -319,7 +319,7 @@ func TestPublishCancelledContext(t *testing.T) {
 	}
 	defer b.Close()
 
-	ctx, cancel := context.WithCancel(context.Background())
+	ctx, cancel := context.WithCancel(t.Context())
 	cancel()
 
 	if err := b.Publish(ctx, "t", eventbus.NewPayload([]byte("x")), nil); !errors.Is(err, context.Canceled) {
@@ -346,7 +346,7 @@ func TestPanicRecovered(t *testing.T) {
 	}
 	defer b.Close()
 
-	ctx := context.Background()
+	ctx := t.Context()
 	next := make(chan eventbus.Message, 4)
 	var once atomic.Bool
 
@@ -385,7 +385,7 @@ func TestConcurrentPublishSubscribe(t *testing.T) {
 	}
 	defer b.Close()
 
-	ctx := context.Background()
+	ctx := t.Context()
 	var wg sync.WaitGroup
 
 	for range 4 {

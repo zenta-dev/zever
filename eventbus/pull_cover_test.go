@@ -14,7 +14,7 @@ func TestPullCoverTopicTooLong(t *testing.T) {
 
 	b := openPullBus(t, newFakeBus())
 
-	_, err := b.SubscribeChan(context.Background(), strings.Repeat("a", MaxTopicLen+1), 1)
+	_, err := b.SubscribeChan(t.Context(), strings.Repeat("a", MaxTopicLen+1), 1)
 	if err == nil {
 		t.Fatal("SubscribeChan overlong topic = nil, want InvalidOptionsError")
 	}
@@ -31,7 +31,7 @@ func TestPullCoverForwarderClosedSkips(t *testing.T) {
 	inner := newFakeBus()
 	b := openPullBus(t, inner)
 
-	ch, err := b.SubscribeChan(context.Background(), "t-closed-skip", 4)
+	ch, err := b.SubscribeChan(t.Context(), "t-closed-skip", 4)
 	if err != nil {
 		t.Fatalf("SubscribeChan: %v", err)
 	}
@@ -53,7 +53,7 @@ func TestPullCoverForwarderClosedSkips(t *testing.T) {
 	entry.sub.closed = true
 	entry.sub.mu.Unlock()
 
-	if err := inner.Publish(context.Background(), "t-closed-skip", NewPayload([]byte("x")), nil); err != nil {
+	if err := inner.Publish(t.Context(), "t-closed-skip", NewPayload([]byte("x")), nil); err != nil {
 		t.Fatalf("Publish: %v", err)
 	}
 
@@ -72,7 +72,7 @@ func TestPullCoverInnerSubscribeError(t *testing.T) {
 
 	b := Wrap(inner)
 
-	_, err := b.SubscribeChan(context.Background(), "t-inner-err", 1)
+	_, err := b.SubscribeChan(t.Context(), "t-inner-err", 1)
 	if !errors.Is(err, ErrClosed) {
 		t.Fatalf("err = %v, want ErrClosed from inner Subscribe", err)
 	}
@@ -124,7 +124,7 @@ func TestPullCoverClosedAfterRegister(t *testing.T) {
 	}
 	done := make(chan result, 1)
 	go func() {
-		ch, err := b.SubscribeChan(context.Background(), "t-race", 1)
+		ch, err := b.SubscribeChan(t.Context(), "t-race", 1)
 		done <- result{ch: ch, err: err}
 	}()
 

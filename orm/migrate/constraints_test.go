@@ -1,7 +1,6 @@
 package migrate
 
 import (
-	"context"
 	"errors"
 	"strings"
 	"testing"
@@ -183,7 +182,7 @@ func TestRenderCreateAndDropIndex(t *testing.T) {
 func TestIntrospectIndexes(t *testing.T) {
 	t.Parallel()
 
-	ctx := context.Background()
+	ctx := t.Context()
 	e := &ir.Entity{Name: "Order"}
 
 	t.Run("postgresFromState", func(t *testing.T) {
@@ -227,7 +226,7 @@ func TestIntrospectIndexes(t *testing.T) {
 func TestIntrospectPostgresIndexes(t *testing.T) {
 	t.Parallel()
 
-	ctx := context.Background()
+	ctx := t.Context()
 
 	t.Run("groupedOrdered", func(t *testing.T) {
 		t.Parallel()
@@ -317,7 +316,7 @@ func TestIntrospectPostgresIndexes(t *testing.T) {
 }
 
 func TestIntrospectSQLiteIndexes_live(t *testing.T) {
-	ctx := context.Background()
+	ctx := t.Context()
 	conn := openTestSQLite(t, "idx.db")
 
 	if _, err := conn.Exec(ctx, `CREATE TABLE "widgets" ("id" TEXT NOT NULL, "size" INTEGER);`); err != nil {
@@ -347,7 +346,7 @@ func TestIntrospectSQLiteIndexes_live(t *testing.T) {
 }
 
 func TestIndexStatementsFor_integration(t *testing.T) {
-	ctx := context.Background()
+	ctx := t.Context()
 	conn := openTestSQLite(t, "indexplan.db")
 
 	v1 := compileSchema(t, applyTestSchema)
@@ -442,7 +441,7 @@ func TestRenderIndexErrors(t *testing.T) {
 func TestIntrospectSQLiteIndexes_errors(t *testing.T) {
 	t.Parallel()
 
-	ctx := context.Background()
+	ctx := t.Context()
 
 	t.Run("queryError", func(t *testing.T) {
 		t.Parallel()
@@ -532,7 +531,7 @@ func TestIntrospectSQLiteIndexes_errors(t *testing.T) {
 func TestIntrospectSQLiteIndexColumns_errors(t *testing.T) {
 	t.Parallel()
 
-	ctx := context.Background()
+	ctx := t.Context()
 
 	t.Run("queryError", func(t *testing.T) {
 		t.Parallel()
@@ -709,7 +708,7 @@ func TestRenderAddForeignKey_badIdents(t *testing.T) {
 func TestIntrospectSQLiteForeignKeys_errors(t *testing.T) {
 	t.Parallel()
 
-	ctx := context.Background()
+	ctx := t.Context()
 
 	t.Run("queryError", func(t *testing.T) {
 		t.Parallel()
@@ -774,7 +773,7 @@ entity Order {
 
 		w := &warnings{}
 		stmts, err := foreignKeyStatementsFor(
-			context.Background(), &fakeDB{dialect: atlas.DialectPostgres},
+			t.Context(), &fakeDB{dialect: atlas.DialectPostgres},
 			atlas.DialectPostgres, order, &liveSchemaState{}, w,
 		)
 		if err != nil {
@@ -808,7 +807,7 @@ entity Order {
 
 		w := &warnings{}
 		_, err := foreignKeyStatementsFor(
-			context.Background(), &fakeDB{dialect: atlas.DialectPostgres},
+			t.Context(), &fakeDB{dialect: atlas.DialectPostgres},
 			atlas.DialectPostgres, order, state, w,
 		)
 		if err != nil {
@@ -836,7 +835,7 @@ entity Order {
 		w := &warnings{}
 
 		if _, err := foreignKeyStatementsFor(
-			context.Background(), &fakeDB{dialect: "oracle"}, "oracle", order, &liveSchemaState{}, w,
+			t.Context(), &fakeDB{dialect: "oracle"}, "oracle", order, &liveSchemaState{}, w,
 		); err == nil {
 			t.Fatal("want introspect error, got nil")
 		}
@@ -844,7 +843,7 @@ entity Order {
 }
 
 func TestCreateUniqueFieldIndexes_integration(t *testing.T) {
-	ctx := context.Background()
+	ctx := t.Context()
 	conn := openTestSQLite(t, "uniqueplan.db")
 
 	// Seed the table WITHOUT the unique index the schema declares.
@@ -873,7 +872,7 @@ func TestCreateUniqueFieldIndexes_integration(t *testing.T) {
 }
 
 func TestIndexStatementsFor_declaredIndexSteady(t *testing.T) {
-	ctx := context.Background()
+	ctx := t.Context()
 	conn := openTestSQLite(t, "declaredsteady.db")
 
 	v := compileSchema(t, `entity User {
@@ -965,7 +964,7 @@ func TestRenderAddForeignKey(t *testing.T) {
 func TestIntrospectForeignKeys(t *testing.T) {
 	t.Parallel()
 
-	ctx := context.Background()
+	ctx := t.Context()
 	e := &ir.Entity{Name: "Order"}
 
 	t.Run("postgresFromState", func(t *testing.T) {
@@ -1009,7 +1008,7 @@ func TestIntrospectForeignKeys(t *testing.T) {
 func TestIntrospectPostgresForeignKeys(t *testing.T) {
 	t.Parallel()
 
-	ctx := context.Background()
+	ctx := t.Context()
 
 	t.Run("rows", func(t *testing.T) {
 		t.Parallel()
@@ -1072,7 +1071,7 @@ func TestIntrospectPostgresForeignKeys(t *testing.T) {
 }
 
 func TestIntrospectSQLiteForeignKeys_live(t *testing.T) {
-	ctx := context.Background()
+	ctx := t.Context()
 	conn := openTestSQLite(t, "fk.db")
 
 	if _, err := conn.Exec(ctx, `CREATE TABLE "users" ("id" TEXT NOT NULL PRIMARY KEY);`); err != nil {
@@ -1098,7 +1097,7 @@ func TestIntrospectSQLiteForeignKeys_live(t *testing.T) {
 }
 
 func TestForeignKeyStatementsFor_sqliteWarns(t *testing.T) {
-	ctx := context.Background()
+	ctx := t.Context()
 	conn := openTestSQLite(t, "fkwarn.db")
 
 	// Seed tables WITHOUT foreign keys so the declared FK is missing live.

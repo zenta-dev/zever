@@ -27,9 +27,9 @@ func testDeps(t *testing.T) (context.Context, jobs.Deps) {
 	cfg := config.Default()
 	cfg.DB.Options.Path = filepath.Join(t.TempDir(), "jobs.db")
 	c := container.New(cfg)
-	t.Cleanup(func() { _ = c.Close(context.Background()) })
+	t.Cleanup(func() { _ = c.Close(t.Context()) })
 
-	ctx := context.Background()
+	ctx := t.Context()
 	database, err := c.DB()
 	if err != nil {
 		t.Fatalf("DB: %v", err)

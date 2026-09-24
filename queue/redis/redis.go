@@ -22,13 +22,31 @@ var (
 	jsonUnmarshal = json.Unmarshal
 )
 
+// DefaultPingTimeout bounds the startup connectivity check.
+const DefaultPingTimeout = 3 * time.Second
+
+// DefaultVisibilityTimeout is the default claim lease when unset.
+const DefaultVisibilityTimeout = 30 * time.Second
+
+// DefaultPollTimeout is the default Pop wait when unset.
+const DefaultPollTimeout = 5 * time.Second
+
+// DefaultBlockTimeout is the BLPop block slice capped by the poll timeout.
+const DefaultBlockTimeout = 100 * time.Millisecond
+
+// DefaultBufferBaseDelay is the initial wait-for-buffer backoff.
+const DefaultBufferBaseDelay = 10 * time.Millisecond
+
+// DefaultBufferMaxDelay caps the wait-for-buffer backoff.
+const DefaultBufferMaxDelay = 200 * time.Millisecond
+
 // bufferBackoffPolicy computes the poll delay while waitForBuffer waits for
 // buffer capacity to free up: exponential backoff from 10ms, doubling each
 // attempt, capped at 200ms, with up to 10% one-sided additive jitter.
 var bufferBackoffPolicy = retry.Policy{
-	BaseDelay:  10 * time.Millisecond,
+	BaseDelay:  DefaultBufferBaseDelay,
 	Multiplier: 2,
-	MaxDelay:   200 * time.Millisecond,
+	MaxDelay:   DefaultBufferMaxDelay,
 	Jitter:     0.1,
 	JitterMode: retry.JitterAdditive,
 }
@@ -96,12 +114,12 @@ func New(opts queue.Options) (queue.Queue, error) {
 
 	visibility := opts.VisibilityTimeout
 	if visibility <= 0 {
-		visibility = 30 * time.Second
+		visibility = DefaultVisibilityTimeout
 	}
 
 	pollTimeout := opts.PollTimeout
 	if pollTimeout <= 0 {
-		pollTimeout = 5 * time.Second
+		pollTimeout = DefaultPollTimeout
 	}
 
 	buf := opts.Buffer
@@ -111,7 +129,7 @@ func New(opts queue.Options) (queue.Queue, error) {
 		return nil, fmt.Errorf("queue: connect %q: %w", redactURL(opts), err)
 	}
 
-	ctx, cancel := context.WithTimeout(context.Background(), 3*time.Second)
+	ctx, cancel := context.WithTimeout(context.Background(), DefaultPingTimeout)
 	defer cancel()
 
 	if err := client.Ping(ctx).Err(); err != nil {
@@ -214,7 +232,7 @@ func (a *redisAdapter) Pop(ctx context.Context, topic string) (queue.Message, er
 	poll := time.NewTimer(a.pollTimeout)
 	defer poll.Stop()
 
-	blockTimeout := 100 * time.Millisecond
+	blockTimeout := DefaultBlockTimeout
 	if blockTimeout > a.pollTimeout {
 		blockTimeout = a.pollTimeout
 	}

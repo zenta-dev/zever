@@ -42,7 +42,7 @@ func newLiveQueue(t *testing.T) (queue.Queue, *miniredis.Miniredis) {
 }
 
 func TestRedisLive_PushPopAck(t *testing.T) {
-	ctx := context.Background()
+	ctx := t.Context()
 	q, _ := newLiveQueue(t)
 	topic := "t-pushpopack"
 	payload := queue.Payload([]byte("hello"))
@@ -86,7 +86,7 @@ func TestRedisLive_PushPopAck(t *testing.T) {
 	}
 
 	// next Pop should be empty (use Background; BLPop truncated to 1s in miniredis, so poll must fire)
-	_, err = q.Pop(context.Background(), topic)
+	_, err = q.Pop(t.Context(), topic)
 	if err == nil {
 		t.Fatal("Pop() = nil, want EmptyError")
 	}
@@ -100,7 +100,7 @@ func TestRedisLive_PushPopAck(t *testing.T) {
 }
 
 func TestRedisLive_PushDelayed(t *testing.T) {
-	ctx := context.Background()
+	ctx := t.Context()
 	s := miniredis.RunT(t)
 	q, err := New(queue.Options{Addr: s.Addr(), PollTimeout: 200 * time.Millisecond})
 	if err != nil {
@@ -157,7 +157,7 @@ func TestRedisLive_PushDelayed(t *testing.T) {
 }
 
 func TestRedisLive_Nack(t *testing.T) {
-	ctx := context.Background()
+	ctx := t.Context()
 	q, _ := newLiveQueue(t)
 	topic := "t-nack"
 
@@ -204,7 +204,7 @@ func TestRedisLive_Nack(t *testing.T) {
 }
 
 func TestRedisLive_VisibilityReclaim(t *testing.T) {
-	ctx := context.Background()
+	ctx := t.Context()
 	s := miniredis.RunT(t)
 	q, err := New(queue.Options{Addr: s.Addr(), VisibilityTimeout: 120 * time.Millisecond, PollTimeout: 200 * time.Millisecond})
 	if err != nil {
@@ -251,7 +251,7 @@ func TestRedisLive_VisibilityReclaim(t *testing.T) {
 }
 
 func TestRedisLive_BufferBlocks(t *testing.T) {
-	ctx := context.Background()
+	ctx := t.Context()
 	s := miniredis.RunT(t)
 	q, err := New(queue.Options{Addr: s.Addr(), Buffer: 1, PollTimeout: 200 * time.Millisecond})
 	if err != nil {
@@ -264,7 +264,7 @@ func TestRedisLive_BufferBlocks(t *testing.T) {
 		t.Fatalf("Push1 error = %v", err2)
 	}
 
-	ctx2, cancel := context.WithTimeout(context.Background(), 120*time.Millisecond)
+	ctx2, cancel := context.WithTimeout(t.Context(), 120*time.Millisecond)
 	defer cancel()
 	err = q.Push(ctx2, topic, queue.Payload([]byte("two")), queue.Headers{"h": "v"})
 	if err == nil {
@@ -277,7 +277,7 @@ func TestRedisLive_BufferBlocks(t *testing.T) {
 }
 
 func TestRedisLive_LengthIsEmpty(t *testing.T) {
-	ctx := context.Background()
+	ctx := t.Context()
 	q, _ := newLiveQueue(t)
 	topic := "t-length"
 
@@ -337,7 +337,7 @@ func TestRedisLive_PingFailure_redactsPassword(t *testing.T) {
 }
 
 func TestRedisLive_BufferDelayedBlocks(t *testing.T) {
-	ctx := context.Background()
+	ctx := t.Context()
 	s := miniredis.RunT(t)
 	q, err := New(queue.Options{Addr: s.Addr(), Buffer: 1, PollTimeout: 200 * time.Millisecond})
 	if err != nil {
@@ -348,7 +348,7 @@ func TestRedisLive_BufferDelayedBlocks(t *testing.T) {
 	if err2 := q.PushDelayed(ctx, topic, queue.Payload([]byte("one")), queue.Headers{"h": "v"}, 80*time.Millisecond); err2 != nil {
 		t.Fatalf("PushDelayed1 error = %v", err2)
 	}
-	ctx2, cancel := context.WithTimeout(context.Background(), 120*time.Millisecond)
+	ctx2, cancel := context.WithTimeout(t.Context(), 120*time.Millisecond)
 	defer cancel()
 	err = q.PushDelayed(ctx2, topic, queue.Payload([]byte("two")), queue.Headers{"h": "v"}, 80*time.Millisecond)
 	if err == nil {
@@ -360,7 +360,7 @@ func TestRedisLive_BufferDelayedBlocks(t *testing.T) {
 }
 
 func TestRedisLive_BlockingPop_claimsConcurrentPush(t *testing.T) {
-	ctx := context.Background()
+	ctx := t.Context()
 	q, _ := newLiveQueue(t)
 	topic := "t-blocking"
 
@@ -401,7 +401,7 @@ func TestRedisLive_BlockingPop_claimsConcurrentPush(t *testing.T) {
 }
 
 func TestRedisLive_ServerDown_opsWrap(t *testing.T) {
-	ctx := context.Background()
+	ctx := t.Context()
 	q, s := newLiveQueue(t)
 	topic := "t-serverdown"
 	s.Close()

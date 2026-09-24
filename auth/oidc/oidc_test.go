@@ -1,7 +1,6 @@
 package oidc_test
 
 import (
-	"context"
 	"crypto"
 	"crypto/rand"
 	"crypto/rsa"
@@ -134,7 +133,7 @@ func TestVerify_ValidRoundtrip(t *testing.T) {
 	raw := mintToken(t, idp.key, idp.kid, idp.srv.URL, "test-client", exp,
 		map[string]any{"email": "u@example.com", "email_verified": true, "name": "U Example"})
 
-	got, err := a.Verify(context.Background(), raw)
+	got, err := a.Verify(t.Context(), raw)
 	if err != nil {
 		t.Fatalf("Verify: %s", err)
 	}
@@ -164,7 +163,7 @@ func TestVerify_Expired(t *testing.T) {
 	raw := mintToken(t, idp.key, idp.kid, idp.srv.URL, "test-client",
 		time.Now().Add(-time.Hour), nil)
 
-	_, err := a.Verify(context.Background(), raw)
+	_, err := a.Verify(t.Context(), raw)
 	if !errors.Is(err, auth.ErrTokenExpired) {
 		t.Fatalf("Verify err = %v, want ErrTokenExpired", err)
 	}
@@ -179,7 +178,7 @@ func TestVerify_WrongAudience(t *testing.T) {
 	raw := mintToken(t, idp.key, idp.kid, idp.srv.URL, "other-client",
 		time.Now().Add(time.Hour), nil)
 
-	_, err := a.Verify(context.Background(), raw)
+	_, err := a.Verify(t.Context(), raw)
 	if !errors.Is(err, auth.ErrInvalidToken) {
 		t.Fatalf("Verify err = %v, want ErrInvalidToken", err)
 	}
@@ -194,7 +193,7 @@ func TestVerify_WrongIssuer(t *testing.T) {
 	raw := mintToken(t, idp.key, idp.kid, "https://evil.example.com", "test-client",
 		time.Now().Add(time.Hour), nil)
 
-	_, err := a.Verify(context.Background(), raw)
+	_, err := a.Verify(t.Context(), raw)
 	if !errors.Is(err, auth.ErrInvalidToken) {
 		t.Fatalf("Verify err = %v, want ErrInvalidToken", err)
 	}
@@ -214,7 +213,7 @@ func TestVerify_BadSignature(t *testing.T) {
 	raw := mintToken(t, other, idp.kid, idp.srv.URL, "test-client",
 		time.Now().Add(time.Hour), nil)
 
-	_, err = a.Verify(context.Background(), raw)
+	_, err = a.Verify(t.Context(), raw)
 	if !errors.Is(err, auth.ErrInvalidToken) {
 		t.Fatalf("Verify err = %v, want ErrInvalidToken", err)
 	}
@@ -227,7 +226,7 @@ func TestVerify_Malformed(t *testing.T) {
 	a := newAdapter(t, idp)
 
 	for _, raw := range []string{"not.a.jwt", "abc", "a.b", strings.Repeat("x", 512)} {
-		_, err := a.Verify(context.Background(), raw)
+		_, err := a.Verify(t.Context(), raw)
 		if !errors.Is(err, auth.ErrInvalidToken) {
 			t.Errorf("Verify(%q) err = %v, want ErrInvalidToken", raw, err)
 		}
@@ -243,7 +242,7 @@ func TestVerify_Empty(t *testing.T) {
 	idp := newFakeIDP(t)
 	a := newAdapter(t, idp)
 
-	_, err := a.Verify(context.Background(), "")
+	_, err := a.Verify(t.Context(), "")
 	if !errors.Is(err, auth.ErrInvalidToken) {
 		t.Fatalf("Verify(\"\") err = %v, want ErrInvalidToken", err)
 	}
@@ -255,7 +254,7 @@ func TestIssue_NotSupported(t *testing.T) {
 	idp := newFakeIDP(t)
 	a := newAdapter(t, idp)
 
-	_, err := a.Issue(context.Background(), "user-123", nil, time.Hour)
+	_, err := a.Issue(t.Context(), "user-123", nil, time.Hour)
 	if !errors.Is(err, auth.ErrNotSupported) {
 		t.Fatalf("Issue err = %v, want ErrNotSupported", err)
 	}
@@ -267,7 +266,7 @@ func TestRevoke_NotSupported(t *testing.T) {
 	idp := newFakeIDP(t)
 	a := newAdapter(t, idp)
 
-	if err := a.Revoke(context.Background(), "sometoken"); !errors.Is(err, auth.ErrNotSupported) {
+	if err := a.Revoke(t.Context(), "sometoken"); !errors.Is(err, auth.ErrNotSupported) {
 		t.Fatalf("Revoke err = %v, want ErrNotSupported", err)
 	}
 }

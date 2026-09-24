@@ -1,7 +1,6 @@
 package remote
 
 import (
-	"context"
 	"encoding/json"
 	"errors"
 	"fmt"
@@ -166,7 +165,7 @@ func TestStoreEviction(t *testing.T) {
 func TestDoEncodeError(t *testing.T) {
 	t.Parallel()
 
-	if _, err := (&adapter{}).do(context.Background(), "x", http.MethodGet, "http://example.com", make(chan int)); err == nil || !strings.Contains(err.Error(), "encode") {
+	if _, err := (&adapter{}).do(t.Context(), "x", http.MethodGet, "http://example.com", make(chan int)); err == nil || !strings.Contains(err.Error(), "encode") {
 		t.Fatalf("err = %v, want encode failure", err)
 	}
 }
@@ -174,7 +173,7 @@ func TestDoEncodeError(t *testing.T) {
 func TestDoRequestError(t *testing.T) {
 	t.Parallel()
 
-	if _, err := (&adapter{}).do(context.Background(), "x", http.MethodGet, "://bad", nil); err == nil || !strings.Contains(err.Error(), "request") {
+	if _, err := (&adapter{}).do(t.Context(), "x", http.MethodGet, "://bad", nil); err == nil || !strings.Contains(err.Error(), "request") {
 		t.Fatalf("err = %v, want request failure", err)
 	}
 }
@@ -190,7 +189,7 @@ func TestDoNon200(t *testing.T) {
 	a := newTestAdapter(t, srv.URL)
 	defer a.Close()
 
-	_, err := a.do(context.Background(), "translate", http.MethodPost, srv.URL+"/translate", nil)
+	_, err := a.do(t.Context(), "translate", http.MethodPost, srv.URL+"/translate", nil)
 	if !errors.Is(err, i18n.ErrRemoteError) {
 		t.Fatalf("err = %v, want ErrRemoteError", err)
 	}
@@ -210,7 +209,7 @@ func TestDoResponseTooLarge(t *testing.T) {
 	a := newTestAdapter(t, srv.URL)
 	defer a.Close()
 
-	_, err := a.do(context.Background(), "translate", http.MethodGet, srv.URL+"/t", nil)
+	_, err := a.do(t.Context(), "translate", http.MethodGet, srv.URL+"/t", nil)
 	if !errors.Is(err, i18n.ErrRemoteError) {
 		t.Fatalf("err = %v, want ErrRemoteError", err)
 	}
@@ -242,7 +241,7 @@ func TestDoBodyReadError(t *testing.T) {
 	a := newTestAdapter(t, srv.URL)
 	defer a.Close()
 
-	if _, err := a.do(context.Background(), "translate", http.MethodGet, srv.URL+"/t", nil); err == nil || !strings.Contains(err.Error(), "remote: translate:") {
+	if _, err := a.do(t.Context(), "translate", http.MethodGet, srv.URL+"/t", nil); err == nil || !strings.Contains(err.Error(), "remote: translate:") {
 		t.Fatalf("err = %v, want body read failure", err)
 	}
 }
@@ -259,7 +258,7 @@ func TestFetchDecodeError(t *testing.T) {
 	a := newTestAdapter(t, srv.URL)
 	defer a.Close()
 
-	if _, err := a.fetch(context.Background(), "en", "k", nil); err == nil || !strings.Contains(err.Error(), "remote: translate: decode") {
+	if _, err := a.fetch(t.Context(), "en", "k", nil); err == nil || !strings.Contains(err.Error(), "remote: translate: decode") {
 		t.Fatalf("err = %v, want translate decode failure", err)
 	}
 }
@@ -276,7 +275,7 @@ func TestLocalesDecodeError(t *testing.T) {
 	a := newTestAdapter(t, srv.URL)
 	defer a.Close()
 
-	if _, err := a.Locales(context.Background()); err == nil || !strings.Contains(err.Error(), "remote: locales: decode") {
+	if _, err := a.Locales(t.Context()); err == nil || !strings.Contains(err.Error(), "remote: locales: decode") {
 		t.Fatalf("err = %v, want locales decode failure", err)
 	}
 }
@@ -289,7 +288,7 @@ func TestLocalesRoundtripError(t *testing.T) {
 	a := newTestAdapter(t, srv.URL)
 	defer a.Close()
 
-	if _, err := a.Locales(context.Background()); err == nil || !strings.Contains(err.Error(), "remote: locales:") {
+	if _, err := a.Locales(t.Context()); err == nil || !strings.Contains(err.Error(), "remote: locales:") {
 		t.Fatalf("err = %v, want client roundtrip failure", err)
 	}
 }
@@ -317,7 +316,7 @@ func TestTranslateFlightErrWaiter(t *testing.T) {
 
 	leaderDone := make(chan error, 1)
 	go func() {
-		_, err := a.Translate(context.Background(), "en", "k", nil)
+		_, err := a.Translate(t.Context(), "en", "k", nil)
 		leaderDone <- err
 	}()
 	// Poll for the leader's flight registration instead of a fixed sleep:
@@ -326,7 +325,7 @@ func TestTranslateFlightErrWaiter(t *testing.T) {
 
 	waiterDone := make(chan error, 1)
 	go func() {
-		_, err := a.Translate(context.Background(), "en", "k", nil)
+		_, err := a.Translate(t.Context(), "en", "k", nil)
 		waiterDone <- err
 	}()
 
@@ -351,13 +350,13 @@ func TestTranslateQuitWaiter(t *testing.T) {
 	leaderDone := make(chan struct{})
 	go func() {
 		defer close(leaderDone)
-		_, _ = a.Translate(context.Background(), "en", "k", nil)
+		_, _ = a.Translate(t.Context(), "en", "k", nil)
 	}()
 	eventually(t, func() bool { return flightPresent(a, cacheKey("en", "k", nil)) }, "leader to occupy the flight")
 
 	waiterDone := make(chan error, 1)
 	go func() {
-		_, err := a.Translate(context.Background(), "en", "k", nil)
+		_, err := a.Translate(t.Context(), "en", "k", nil)
 		waiterDone <- err
 	}()
 	// No fixed sleep for the waiter to park: Close delivers ErrClosed on
@@ -384,7 +383,7 @@ func TestCloseCancelsFlight(t *testing.T) {
 	start := time.Now()
 	leaderDone := make(chan error, 1)
 	go func() {
-		_, err := a.Translate(context.Background(), "en", "k", nil)
+		_, err := a.Translate(t.Context(), "en", "k", nil)
 		leaderDone <- err
 	}()
 	eventually(t, func() bool { return flightPresent(a, cacheKey("en", "k", nil)) }, "leader to occupy the flight")
@@ -422,7 +421,7 @@ func TestTranslateEvictionAtMaxFlight(t *testing.T) {
 	a.orderElem[victimKey] = a.order.PushFront(victimKey)
 	a.mu.Unlock()
 
-	got, err := a.Translate(context.Background(), "en", "new", nil)
+	got, err := a.Translate(t.Context(), "en", "new", nil)
 	if err != nil || got != "N" {
 		t.Fatalf("Translate = %q, %v", got, err)
 	}

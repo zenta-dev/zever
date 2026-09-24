@@ -7,7 +7,6 @@
 package sqlite
 
 import (
-	"context"
 	"database/sql"
 	"fmt"
 	"sync"
@@ -36,7 +35,7 @@ func openTestDB(t *testing.T) *sql.DB {
 func prepare(t *testing.T, db *sql.DB, query string) *sql.Stmt {
 	t.Helper()
 
-	stmt, err := db.PrepareContext(context.Background(), query)
+	stmt, err := db.PrepareContext(t.Context(), query)
 	if err != nil {
 		t.Fatalf("Prepare(%q): %v", query, err)
 	}
@@ -138,7 +137,7 @@ func TestStmtCache_GetOrComputeDuplicateRaceClosesLoser(t *testing.T) {
 	_ = second.Close()
 
 	// Loser must be closed: any use errors.
-	if _, err := second.ExecContext(context.Background()); err == nil {
+	if _, err := second.ExecContext(t.Context()); err == nil {
 		t.Fatal("loser stmt use after duplicate GetOrCompute should error (closed)")
 	}
 
@@ -177,7 +176,7 @@ func TestStmtCache_EvictionClosesEvicted(t *testing.T) {
 
 	// Evicted stmt must be closed via the OnEvict callback registered by
 	// newStmtCache: use errors.
-	if _, err := s2.ExecContext(context.Background()); err == nil {
+	if _, err := s2.ExecContext(t.Context()); err == nil {
 		t.Fatal("evicted stmt use should error (closed)")
 	}
 
@@ -211,11 +210,11 @@ func TestStmtCache_CloseAll(t *testing.T) {
 	}
 
 	// Cached stmts closed: use errors.
-	if _, err := s1.ExecContext(context.Background()); err == nil {
+	if _, err := s1.ExecContext(t.Context()); err == nil {
 		t.Fatal("s1 use after closeAllStmts should error (closed)")
 	}
 
-	if _, err := s2.ExecContext(context.Background()); err == nil {
+	if _, err := s2.ExecContext(t.Context()); err == nil {
 		t.Fatal("s2 use after closeAllStmts should error (closed)")
 	}
 
@@ -260,7 +259,7 @@ func TestStmtCache_ConcurrentGetPut(t *testing.T) {
 
 			for i := 0; i < 25; i++ {
 				if _, ok := c.Get(q); !ok {
-					stmt, err := db.PrepareContext(context.Background(), "SELECT 1")
+					stmt, err := db.PrepareContext(t.Context(), "SELECT 1")
 					if err != nil {
 						t.Errorf("Prepare: %v", err)
 						return

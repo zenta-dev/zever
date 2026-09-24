@@ -1,7 +1,6 @@
 package orm
 
 import (
-	"context"
 	"os"
 	"testing"
 
@@ -31,7 +30,7 @@ func TestPostgresIntegration(t *testing.T) {
 		t.Fatalf("open: %v", err)
 	}
 
-	ctx := context.Background()
+	ctx := t.Context()
 	t.Cleanup(func() { _ = conn.Close(ctx) })
 
 	if d := conn.Dialect(); d != "postgres" {

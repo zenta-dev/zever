@@ -48,7 +48,7 @@ func newTestSetup(t *testing.T) testSetup {
 
 	c := container.New(cfg)
 
-	ctx := context.Background()
+	ctx := t.Context()
 	database, err := c.DB()
 	if err != nil {
 		t.Fatalf("DB: %v", err)
@@ -80,7 +80,7 @@ func newTestSetup(t *testing.T) testSetup {
 	}
 
 	t.Cleanup(func() {
-		_ = c.Close(context.Background())
+		_ = c.Close(t.Context())
 	})
 
 	return testSetup{
@@ -96,7 +96,7 @@ func newTestSetup(t *testing.T) testSetup {
 func ctxFor(t *testing.T, s testSetup, subject string) context.Context {
 	t.Helper()
 
-	tok, err := s.auth.Issue(context.Background(), subject, nil, time.Hour)
+	tok, err := s.auth.Issue(t.Context(), subject, nil, time.Hour)
 	if err != nil {
 		t.Fatalf("issue: %v", err)
 	}
@@ -106,7 +106,7 @@ func ctxFor(t *testing.T, s testSetup, subject string) context.Context {
 		called = true
 		out = r.Context()
 	})
-	req := httptest.NewRequestWithContext(context.Background(), http.MethodGet, "/", nil)
+	req := httptest.NewRequestWithContext(t.Context(), http.MethodGet, "/", nil)
 	req.Header.Set("Authorization", "Bearer "+tok.Value)
 	rec := httptest.NewRecorder()
 	authz.Middleware(s.auth, nil, authz.Policy{AuthRequired: true}, nil)(next).ServeHTTP(rec, req)
@@ -129,7 +129,7 @@ func codeOf(t *testing.T, err error) apperror.ErrorCode {
 func insertCategory(t *testing.T, s testSetup, id, name string) {
 	t.Helper()
 	now := time.Now().UTC().Format(time.RFC3339Nano)
-	if _, err := s.db.Exec(context.Background(),
+	if _, err := s.db.Exec(t.Context(),
 		`INSERT INTO categories (id, name, description, created_at) VALUES (?, ?, ?, ?)`,
 		id, name, name+" desc", now); err != nil {
 		t.Fatalf("category: %v", err)
@@ -139,7 +139,7 @@ func insertCategory(t *testing.T, s testSetup, id, name string) {
 func insertUser(t *testing.T, s testSetup, id, email string) {
 	t.Helper()
 	now := time.Now().UTC().Format(time.RFC3339Nano)
-	if _, err := s.db.Exec(context.Background(),
+	if _, err := s.db.Exec(t.Context(),
 		`INSERT INTO users (id, email, name, nickname, role, password_hash, age, credit_cents, rating, score, verified, birthday, avatar, prefs, created_at) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
 		id, email, "Test User", nil, "member", "hash", 30, 0, 0.0, 0.0, 0,
 		"1990-01-01T00:00:00Z", []byte{}, "{}", now); err != nil {
@@ -149,7 +149,7 @@ func insertUser(t *testing.T, s testSetup, id, email string) {
 
 func insertOrder(t *testing.T, s testSetup, id, userID string, total int64, created string) {
 	t.Helper()
-	if _, err := s.db.Exec(context.Background(),
+	if _, err := s.db.Exec(t.Context(),
 		`INSERT INTO orders (id, user_id, total_cents, status, priority, note, created_at) VALUES (?, ?, ?, 'pending', 'low', ?, ?)`,
 		id, userID, total, nil, created); err != nil {
 		t.Fatalf("order: %v", err)
@@ -158,7 +158,7 @@ func insertOrder(t *testing.T, s testSetup, id, userID string, total int64, crea
 
 func TestCreateGetListProducts(t *testing.T) {
 	s := newTestSetup(t)
-	ctx := context.Background()
+	ctx := t.Context()
 	insertCategory(t, s, "cat-1", "Gadgets")
 
 	created, err := s.svc.CreateProduct(ctx, &genshop.CreateProductRequest{Name: "Widget", PriceCents: 2500})
@@ -205,7 +205,7 @@ func TestCreateGetListProducts(t *testing.T) {
 
 func TestCreateProductValidation(t *testing.T) {
 	s := newTestSetup(t)
-	ctx := context.Background()
+	ctx := t.Context()
 
 	if _, err := s.svc.CreateProduct(ctx, &genshop.CreateProductRequest{Name: "  ", PriceCents: 10}); codeOf(t, err) != apperror.InvalidArgument {
 		t.Fatalf("blank name: err %v, want InvalidArgument", err)
@@ -217,7 +217,7 @@ func TestCreateProductValidation(t *testing.T) {
 
 func TestCreateProductDuplicate(t *testing.T) {
 	s := newTestSetup(t)
-	ctx := context.Background()
+	ctx := t.Context()
 
 	if _, err := s.svc.CreateProduct(ctx, &genshop.CreateProductRequest{Name: "Widget", PriceCents: 100}); err != nil {
 		t.Fatalf("first create: %v", err)
@@ -229,7 +229,7 @@ func TestCreateProductDuplicate(t *testing.T) {
 
 func TestUpdatePatchDeleteProduct(t *testing.T) {
 	s := newTestSetup(t)
-	ctx := context.Background()
+	ctx := t.Context()
 
 	created, err := s.svc.CreateProduct(ctx, &genshop.CreateProductRequest{Name: "Widget", PriceCents: 100})
 	if err != nil {
@@ -281,7 +281,7 @@ func TestUpdatePatchDeleteProduct(t *testing.T) {
 
 func TestCheckout(t *testing.T) {
 	s := newTestSetup(t)
-	ctx := context.Background()
+	ctx := t.Context()
 	insertUser(t, s, "user-1", "shop@example.com")
 
 	receipt, err := s.svc.Checkout(ctx, &genshop.CheckoutRequest{
@@ -363,7 +363,7 @@ func TestGetOrderAccess(t *testing.T) {
 	if _, err := s.svc.GetOrder(ctxFor(t, s, "user-1"), &genshop.GetOrderRequest{Id: "missing"}); codeOf(t, err) != apperror.NotFound {
 		t.Fatalf("missing: err %v, want NotFound", err)
 	}
-	if _, err := s.svc.GetOrder(context.Background(), &genshop.GetOrderRequest{Id: "order-1"}); codeOf(t, err) != apperror.Unauthenticated {
+	if _, err := s.svc.GetOrder(t.Context(), &genshop.GetOrderRequest{Id: "order-1"}); codeOf(t, err) != apperror.Unauthenticated {
 		t.Fatalf("anonymous: err %v, want Unauthenticated", err)
 	}
 }
@@ -418,7 +418,7 @@ func TestListOrders(t *testing.T) {
 	}
 
 	// Anonymous callers are rejected.
-	if _, err := s.svc.ListOrders(context.Background(), &genshop.ListOrdersRequest{}, "", 0); codeOf(t, err) != apperror.Unauthenticated {
+	if _, err := s.svc.ListOrders(t.Context(), &genshop.ListOrdersRequest{}, "", 0); codeOf(t, err) != apperror.Unauthenticated {
 		t.Fatalf("anonymous list: err %v, want Unauthenticated", err)
 	}
 }

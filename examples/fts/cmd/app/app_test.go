@@ -28,7 +28,7 @@ func newTestDB(ctx context.Context, t *testing.T) db.DB {
 }
 
 func TestMatchSet(t *testing.T) {
-	ctx := context.Background()
+	ctx := t.Context()
 	conn := newTestDB(ctx, t)
 
 	got, err := orm.From(gen.Docs).
@@ -44,7 +44,7 @@ func TestMatchSet(t *testing.T) {
 }
 
 func TestRankOrder(t *testing.T) {
-	ctx := context.Background()
+	ctx := t.Context()
 	conn := newTestDB(ctx, t)
 
 	got, err := orm.From(gen.Docs).
@@ -60,7 +60,7 @@ func TestRankOrder(t *testing.T) {
 }
 
 func TestMatchCount(t *testing.T) {
-	ctx := context.Background()
+	ctx := t.Context()
 	conn := newTestDB(ctx, t)
 
 	n, err := orm.From(gen.Docs).Where(ftssqlite.Match(gen.DocCols.Body, "go")).Count(ctx, conn)

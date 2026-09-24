@@ -195,7 +195,7 @@ func TestGeocode_OK(t *testing.T) {
 	if err != nil {
 		t.Fatalf("New: %v", err)
 	}
-	locs, err := g.Geocode(context.Background(), "New York")
+	locs, err := g.Geocode(t.Context(), "New York")
 	if err != nil {
 		t.Fatalf("Geocode: %v", err)
 	}
@@ -236,7 +236,7 @@ func TestGeocode_EmptyResults(t *testing.T) {
 	}))
 	defer srv.Close()
 	g, _ := New(geo.Options{Endpoint: srv.URL, UserAgent: "app/1.0", AllowInsecure: true})
-	_, err := g.Geocode(context.Background(), "nowhere")
+	_, err := g.Geocode(t.Context(), "nowhere")
 	if !errors.Is(err, geo.ErrNotFound) {
 		t.Fatalf("expected ErrNotFound, got %v", err)
 	}
@@ -250,7 +250,7 @@ func TestGeocode_InvalidLatString(t *testing.T) {
 	}))
 	defer srv.Close()
 	g, _ := New(geo.Options{Endpoint: srv.URL, UserAgent: "app/1.0", AllowInsecure: true})
-	_, err := g.Geocode(context.Background(), "bad")
+	_, err := g.Geocode(t.Context(), "bad")
 	if !errors.Is(err, geo.ErrNotFound) {
 		t.Fatalf("expected ErrNotFound for invalid lat, got %v", err)
 	}
@@ -264,7 +264,7 @@ func TestGeocode_InvalidLonString(t *testing.T) {
 	}))
 	defer srv.Close()
 	g, _ := New(geo.Options{Endpoint: srv.URL, UserAgent: "app/1.0", AllowInsecure: true})
-	_, err := g.Geocode(context.Background(), "bad")
+	_, err := g.Geocode(t.Context(), "bad")
 	if !errors.Is(err, geo.ErrNotFound) {
 		t.Fatalf("expected ErrNotFound for invalid lon, got %v", err)
 	}
@@ -279,7 +279,7 @@ func TestGeocode_InvalidCoordinate(t *testing.T) {
 	}))
 	defer srv.Close()
 	g, _ := New(geo.Options{Endpoint: srv.URL, UserAgent: "app/1.0", AllowInsecure: true})
-	_, err := g.Geocode(context.Background(), "bad")
+	_, err := g.Geocode(t.Context(), "bad")
 	if !errors.Is(err, geo.ErrInvalidCoordinate) {
 		t.Fatalf("expected ErrInvalidCoordinate, got %v", err)
 	}
@@ -293,7 +293,7 @@ func TestGeocode_DecodeError(t *testing.T) {
 	}))
 	defer srv.Close()
 	g, _ := New(geo.Options{Endpoint: srv.URL, UserAgent: "app/1.0", AllowInsecure: true})
-	_, err := g.Geocode(context.Background(), "x")
+	_, err := g.Geocode(t.Context(), "x")
 	if err == nil || !strings.Contains(err.Error(), "decode") {
 		t.Fatalf("expected decode error, got %v", err)
 	}
@@ -307,7 +307,7 @@ func TestGeocode_StatusNon200(t *testing.T) {
 	}))
 	defer srv.Close()
 	g, _ := New(geo.Options{Endpoint: srv.URL, UserAgent: "app/1.0", AllowInsecure: true})
-	_, err := g.Geocode(context.Background(), "x")
+	_, err := g.Geocode(t.Context(), "x")
 	if err == nil || !strings.Contains(err.Error(), "status 500") {
 		t.Fatalf("expected status 500, got %v", err)
 	}
@@ -325,7 +325,7 @@ func TestGeocode_StatusTruncate(t *testing.T) {
 	}))
 	defer srv.Close()
 	g, _ := New(geo.Options{Endpoint: srv.URL, UserAgent: "app/1.0", AllowInsecure: true})
-	_, err := g.Geocode(context.Background(), "x")
+	_, err := g.Geocode(t.Context(), "x")
 	if err == nil {
 		t.Fatalf("expected error")
 	}
@@ -349,18 +349,19 @@ func TestGeocode_BodyTooLarge(t *testing.T) {
 	}))
 	defer srv.Close()
 	g, _ := New(geo.Options{Endpoint: srv.URL, UserAgent: "app/1.0", AllowInsecure: true, MaxResponseBody: 1 << 20})
-	_, err := g.Geocode(context.Background(), "x")
+	_, err := g.Geocode(t.Context(), "x")
 	if !errors.Is(err, geo.ErrTooLarge) {
 		t.Fatalf("expected ErrTooLarge, got %v", err)
 	}
 	// also test helper largeErr
-	if !errors.Is(largeErr(g, "x"), geo.ErrTooLarge) {
-		t.Fatalf("expected ErrTooLarge via helper, got %v", largeErr(g, "x"))
+	if !errors.Is(largeErr(t, g, "x"), geo.ErrTooLarge) {
+		t.Fatalf("expected ErrTooLarge via helper, got %v", largeErr(t, g, "x"))
 	}
 }
 
-func largeErr(g geo.Geo, q string) error {
-	_, err := g.Geocode(context.Background(), q)
+func largeErr(t *testing.T, g geo.Geo, q string) error {
+	t.Helper()
+	_, err := g.Geocode(t.Context(), q)
 	return err
 }
 
@@ -371,7 +372,7 @@ func TestGeocode_ContextCancellation(t *testing.T) {
 	}))
 	defer srv.Close()
 	g, _ := New(geo.Options{Endpoint: srv.URL, UserAgent: "app/1.0", AllowInsecure: true})
-	ctx, cancel := context.WithCancel(context.Background())
+	ctx, cancel := context.WithCancel(t.Context())
 	cancel()
 	_, err := g.Geocode(ctx, "x")
 	if err == nil {
@@ -391,7 +392,7 @@ func TestGeocode_BodyTooLarge_CustomLimit(t *testing.T) {
 	}))
 	defer srv.Close()
 	g, _ := New(geo.Options{Endpoint: srv.URL, UserAgent: "app/1.0", AllowInsecure: true, MaxResponseBody: 10})
-	_, err := g.Geocode(context.Background(), "x")
+	_, err := g.Geocode(t.Context(), "x")
 	if !errors.Is(err, geo.ErrTooLarge) {
 		t.Fatalf("expected ErrTooLarge, got %v", err)
 	}
@@ -415,7 +416,7 @@ func TestReverse_OK_SingleObject(t *testing.T) {
 	}))
 	defer srv.Close()
 	g, _ := New(geo.Options{Endpoint: srv.URL, UserAgent: "app/1.0", AllowInsecure: true})
-	addrs, err := g.ReverseGeocode(context.Background(), 40.7, -74)
+	addrs, err := g.ReverseGeocode(t.Context(), 40.7, -74)
 	if err != nil {
 		t.Fatalf("ReverseGeocode: %v", err)
 	}
@@ -438,7 +439,7 @@ func TestReverse_OK_Array(t *testing.T) {
 	}))
 	defer srv.Close()
 	g, _ := New(geo.Options{Endpoint: srv.URL, UserAgent: "app/1.0", AllowInsecure: true})
-	addrs, err := g.ReverseGeocode(context.Background(), 40.7, -74)
+	addrs, err := g.ReverseGeocode(t.Context(), 40.7, -74)
 	if err != nil {
 		t.Fatalf("Reverse: %v", err)
 	}
@@ -455,7 +456,7 @@ func TestReverse_ArrayMultiple(t *testing.T) {
 	}))
 	defer srv.Close()
 	g, _ := New(geo.Options{Endpoint: srv.URL, UserAgent: "app/1.0", AllowInsecure: true})
-	addrs, err := g.ReverseGeocode(context.Background(), 0, 0)
+	addrs, err := g.ReverseGeocode(t.Context(), 0, 0)
 	if err != nil {
 		t.Fatalf("Reverse: %v", err)
 	}
@@ -472,7 +473,7 @@ func TestReverse_Empty_Slice(t *testing.T) {
 	}))
 	defer srv.Close()
 	g, _ := New(geo.Options{Endpoint: srv.URL, UserAgent: "app/1.0", AllowInsecure: true})
-	_, err := g.ReverseGeocode(context.Background(), 0, 0)
+	_, err := g.ReverseGeocode(t.Context(), 0, 0)
 	if !errors.Is(err, geo.ErrNotFound) {
 		t.Fatalf("expected ErrNotFound, got %v", err)
 	}
@@ -486,7 +487,7 @@ func TestReverse_Empty_ObjectNoDisplayName(t *testing.T) {
 	}))
 	defer srv.Close()
 	g, _ := New(geo.Options{Endpoint: srv.URL, UserAgent: "app/1.0", AllowInsecure: true})
-	_, err := g.ReverseGeocode(context.Background(), 0, 0)
+	_, err := g.ReverseGeocode(t.Context(), 0, 0)
 	if !errors.Is(err, geo.ErrNotFound) {
 		t.Fatalf("expected ErrNotFound, got %v", err)
 	}
@@ -500,7 +501,7 @@ func TestReverse_ArrayFilteredEmpty(t *testing.T) {
 	}))
 	defer srv.Close()
 	g, _ := New(geo.Options{Endpoint: srv.URL, UserAgent: "app/1.0", AllowInsecure: true})
-	_, err := g.ReverseGeocode(context.Background(), 0, 0)
+	_, err := g.ReverseGeocode(t.Context(), 0, 0)
 	if !errors.Is(err, geo.ErrNotFound) {
 		t.Fatalf("expected ErrNotFound for filtered empty, got %v", err)
 	}
@@ -513,7 +514,7 @@ func TestReverse_InvalidCoord(t *testing.T) {
 		{100, 0}, {0, 200}, {90.1, 0},
 	}
 	for _, tc := range tests {
-		_, err := g.ReverseGeocode(context.Background(), tc.lat, tc.lng)
+		_, err := g.ReverseGeocode(t.Context(), tc.lat, tc.lng)
 		if !errors.Is(err, geo.ErrInvalidCoordinate) {
 			t.Fatalf("expected ErrInvalidCoordinate for %v, got %v", tc, err)
 		}
@@ -528,7 +529,7 @@ func TestReverse_DecodeError(t *testing.T) {
 	}))
 	defer srv.Close()
 	g, _ := New(geo.Options{Endpoint: srv.URL, UserAgent: "app/1.0", AllowInsecure: true})
-	_, err := g.ReverseGeocode(context.Background(), 0, 0)
+	_, err := g.ReverseGeocode(t.Context(), 0, 0)
 	if err == nil || !strings.Contains(err.Error(), "decode") {
 		t.Fatalf("expected decode error, got %v", err)
 	}
@@ -542,7 +543,7 @@ func TestReverse_EmptyBody(t *testing.T) {
 	}))
 	defer srv.Close()
 	g, _ := New(geo.Options{Endpoint: srv.URL, UserAgent: "app/1.0", AllowInsecure: true})
-	_, err := g.ReverseGeocode(context.Background(), 0, 0)
+	_, err := g.ReverseGeocode(t.Context(), 0, 0)
 	if !errors.Is(err, geo.ErrNotFound) {
 		t.Fatalf("expected ErrNotFound for empty body, got %v", err)
 	}
@@ -556,7 +557,7 @@ func TestReverse_BracesEmpty(t *testing.T) {
 	}))
 	defer srv.Close()
 	g, _ := New(geo.Options{Endpoint: srv.URL, UserAgent: "app/1.0", AllowInsecure: true})
-	_, err := g.ReverseGeocode(context.Background(), 0, 0)
+	_, err := g.ReverseGeocode(t.Context(), 0, 0)
 	if !errors.Is(err, geo.ErrNotFound) {
 		t.Fatalf("expected ErrNotFound for {}, got %v", err)
 	}
@@ -570,7 +571,7 @@ func TestReverse_StatusNon200(t *testing.T) {
 	}))
 	defer srv.Close()
 	g, _ := New(geo.Options{Endpoint: srv.URL, UserAgent: "app/1.0", AllowInsecure: true})
-	_, err := g.ReverseGeocode(context.Background(), 0, 0)
+	_, err := g.ReverseGeocode(t.Context(), 0, 0)
 	if err == nil || !strings.Contains(err.Error(), "status 404") {
 		t.Fatalf("expected status 404, got %v", err)
 	}
@@ -583,7 +584,7 @@ func TestReverse_BodyTooLarge(t *testing.T) {
 	}))
 	defer srv.Close()
 	g, _ := New(geo.Options{Endpoint: srv.URL, UserAgent: "app/1.0", AllowInsecure: true})
-	_, err := g.ReverseGeocode(context.Background(), 0, 0)
+	_, err := g.ReverseGeocode(t.Context(), 0, 0)
 	if !errors.Is(err, geo.ErrTooLarge) {
 		t.Fatalf("expected ErrTooLarge, got %v", err)
 	}
@@ -598,7 +599,7 @@ func TestReverse_NilAddressMap(t *testing.T) {
 	}))
 	defer srv.Close()
 	g, _ := New(geo.Options{Endpoint: srv.URL, UserAgent: "app/1.0", AllowInsecure: true})
-	addrs, err := g.ReverseGeocode(context.Background(), 0, 0)
+	addrs, err := g.ReverseGeocode(t.Context(), 0, 0)
 	if err != nil {
 		t.Fatalf("Reverse: %v", err)
 	}
@@ -610,7 +611,7 @@ func TestReverse_NilAddressMap(t *testing.T) {
 func TestDistance_Valid(t *testing.T) {
 	t.Parallel()
 	g, _ := New(geo.Options{Endpoint: defaultEndpoint, UserAgent: "app/1.0"})
-	d, err := g.Distance(context.Background(), geo.Point{Lat: 40.7128, Lng: -74.0060}, geo.Point{Lat: 34.0522, Lng: -118.2437})
+	d, err := g.Distance(t.Context(), geo.Point{Lat: 40.7128, Lng: -74.0060}, geo.Point{Lat: 34.0522, Lng: -118.2437})
 	if err != nil {
 		t.Fatalf("Distance: %v", err)
 	}
@@ -623,7 +624,7 @@ func TestDistance_Valid(t *testing.T) {
 func TestDistance_Zero(t *testing.T) {
 	t.Parallel()
 	g, _ := New(geo.Options{Endpoint: defaultEndpoint, UserAgent: "app/1.0"})
-	d, err := g.Distance(context.Background(), geo.Point{Lat: 0, Lng: 0}, geo.Point{Lat: 0, Lng: 0})
+	d, err := g.Distance(t.Context(), geo.Point{Lat: 0, Lng: 0}, geo.Point{Lat: 0, Lng: 0})
 	if err != nil {
 		t.Fatalf("Distance: %v", err)
 	}
@@ -635,15 +636,15 @@ func TestDistance_Zero(t *testing.T) {
 func TestDistance_InvalidCoord(t *testing.T) {
 	t.Parallel()
 	g, _ := New(geo.Options{Endpoint: defaultEndpoint, UserAgent: "app/1.0"})
-	_, err := g.Distance(context.Background(), geo.Point{Lat: 100, Lng: 0}, geo.Point{Lat: 0, Lng: 0})
+	_, err := g.Distance(t.Context(), geo.Point{Lat: 100, Lng: 0}, geo.Point{Lat: 0, Lng: 0})
 	if !errors.Is(err, geo.ErrInvalidCoordinate) {
 		t.Fatalf("expected ErrInvalidCoordinate, got %v", err)
 	}
-	_, err = g.Distance(context.Background(), geo.Point{Lat: 0, Lng: 0}, geo.Point{Lat: 0, Lng: 200})
+	_, err = g.Distance(t.Context(), geo.Point{Lat: 0, Lng: 0}, geo.Point{Lat: 0, Lng: 200})
 	if !errors.Is(err, geo.ErrInvalidCoordinate) {
 		t.Fatalf("expected ErrInvalidCoordinate for to, got %v", err)
 	}
-	_, err = g.Distance(context.Background(), geo.Point{Lat: 0, Lng: 0}, geo.Point{Lat: 91, Lng: 0})
+	_, err = g.Distance(t.Context(), geo.Point{Lat: 0, Lng: 0}, geo.Point{Lat: 91, Lng: 0})
 	if !errors.Is(err, geo.ErrInvalidCoordinate) {
 		t.Fatalf("expected ErrInvalidCoordinate, got %v", err)
 	}
@@ -653,7 +654,7 @@ func TestDistance_HaversineRange(t *testing.T) {
 	t.Parallel()
 	g, _ := New(geo.Options{Endpoint: defaultEndpoint, UserAgent: "app/1.0"})
 	// antipodal: 0,0 to 0,180 ~20015 km
-	d, err := g.Distance(context.Background(), geo.Point{Lat: 0, Lng: 0}, geo.Point{Lat: 0, Lng: 180})
+	d, err := g.Distance(t.Context(), geo.Point{Lat: 0, Lng: 0}, geo.Point{Lat: 0, Lng: 180})
 	if err != nil {
 		t.Fatalf("Distance: %v", err)
 	}
@@ -742,7 +743,7 @@ func TestReadLimitedBody_Errors(t *testing.T) {
 		fmt.Fprint(w, "hello")
 	}))
 	defer srv.Close()
-	req, err := http.NewRequestWithContext(context.Background(), http.MethodGet, srv.URL, nil)
+	req, err := http.NewRequestWithContext(t.Context(), http.MethodGet, srv.URL, nil)
 	if err != nil {
 		t.Fatalf("NewRequest: %v", err)
 	}
@@ -764,7 +765,7 @@ func TestReadLimitedBody_Errors(t *testing.T) {
 		fmt.Fprint(w, strings.Repeat("a", 20))
 	}))
 	defer srv2.Close()
-	req2, err := http.NewRequestWithContext(context.Background(), http.MethodGet, srv2.URL, nil)
+	req2, err := http.NewRequestWithContext(t.Context(), http.MethodGet, srv2.URL, nil)
 	if err != nil {
 		t.Fatalf("NewRequest: %v", err)
 	}
@@ -854,7 +855,7 @@ func TestGeocode_UserAgentRequiredOnDo(t *testing.T) {
 	}))
 	defer srv.Close()
 	g, _ := New(geo.Options{Endpoint: srv.URL, UserAgent: "app/1.0", AllowInsecure: true})
-	ctx, cancel := context.WithCancel(context.Background())
+	ctx, cancel := context.WithCancel(t.Context())
 	cancel()
 	_, err := g.Geocode(ctx, "x")
 	if err == nil {
@@ -878,7 +879,7 @@ func TestGeocode_LimitQuery(t *testing.T) {
 	}))
 	defer srv.Close()
 	g, _ := New(geo.Options{Endpoint: srv.URL, UserAgent: "app/1.0", AllowInsecure: true})
-	_, err := g.Geocode(context.Background(), "a & b")
+	_, err := g.Geocode(t.Context(), "a & b")
 	if err != nil {
 		t.Fatalf("Geocode special: %v", err)
 	}
@@ -888,7 +889,7 @@ func TestReverse_NilClientError(t *testing.T) {
 	t.Parallel()
 	// Test do error wrapping with bad endpoint (no server)
 	g, _ := New(geo.Options{Endpoint: "https://127.0.0.1:1", UserAgent: "app/1.0", AllowInsecure: true, Timeout: 100 * time.Millisecond})
-	_, err := g.Geocode(context.Background(), "test")
+	_, err := g.Geocode(t.Context(), "test")
 	if err == nil {
 		t.Fatalf("expected error for unreachable host")
 	}
@@ -906,7 +907,7 @@ func TestGeocode_CreateRequestError(t *testing.T) {
 		userAgent: "app/1.0",
 		maxBody:   1 << 20,
 	}
-	_, err := m.Geocode(context.Background(), "test")
+	_, err := m.Geocode(t.Context(), "test")
 	if err == nil || !strings.Contains(err.Error(), "create request") {
 		t.Fatalf("expected create request error, got %v", err)
 	}
@@ -923,7 +924,7 @@ func TestReverse_CreateRequestError(t *testing.T) {
 		userAgent: "app/1.0",
 		maxBody:   1 << 20,
 	}
-	_, err := m.ReverseGeocode(context.Background(), 0, 0)
+	_, err := m.ReverseGeocode(t.Context(), 0, 0)
 	if err == nil || !strings.Contains(err.Error(), "create request") {
 		t.Fatalf("expected create request error, got %v", err)
 	}
@@ -938,7 +939,7 @@ func TestReverse_Array_NilAddress(t *testing.T) {
 	}))
 	defer srv.Close()
 	g, _ := New(geo.Options{Endpoint: srv.URL, UserAgent: "app/1.0", AllowInsecure: true})
-	addrs, err := g.ReverseGeocode(context.Background(), 0, 0)
+	addrs, err := g.ReverseGeocode(t.Context(), 0, 0)
 	if err != nil {
 		t.Fatalf("Reverse: %v", err)
 	}
@@ -953,7 +954,7 @@ func TestReverse_Array_NilAddress(t *testing.T) {
 func TestReverse_DoError(t *testing.T) {
 	t.Parallel()
 	g, _ := New(geo.Options{Endpoint: "https://127.0.0.1:1", UserAgent: "app/1.0", AllowInsecure: true, Timeout: 50 * time.Millisecond})
-	_, err := g.ReverseGeocode(context.Background(), 0, 0)
+	_, err := g.ReverseGeocode(t.Context(), 0, 0)
 	if err == nil || !strings.Contains(err.Error(), "geo: osm:") {
 		t.Fatalf("expected geo: osm: error, got %v", err)
 	}
@@ -968,7 +969,7 @@ func TestReverse_Array_FilteredWithAddress(t *testing.T) {
 	}))
 	defer srv.Close()
 	g, _ := New(geo.Options{Endpoint: srv.URL, UserAgent: "app/1.0", AllowInsecure: true})
-	addrs, err := g.ReverseGeocode(context.Background(), 0, 0)
+	addrs, err := g.ReverseGeocode(t.Context(), 0, 0)
 	if err != nil {
 		t.Fatalf("Reverse: %v", err)
 	}
@@ -985,7 +986,7 @@ func TestReverse_NullArray(t *testing.T) {
 	}))
 	defer srv.Close()
 	g, _ := New(geo.Options{Endpoint: srv.URL, UserAgent: "app/1.0", AllowInsecure: true})
-	_, err := g.ReverseGeocode(context.Background(), 0, 0)
+	_, err := g.ReverseGeocode(t.Context(), 0, 0)
 	if !errors.Is(err, geo.ErrNotFound) {
 		t.Fatalf("expected ErrNotFound for null, got %v", err)
 	}
@@ -1021,7 +1022,7 @@ func TestPace_SpacesOutRequests(t *testing.T) {
 	m.minInterval = interval
 
 	for range 3 {
-		if _, err := m.Geocode(context.Background(), "x"); err != nil {
+		if _, err := m.Geocode(t.Context(), "x"); err != nil {
 			t.Fatalf("Geocode: %v", err)
 		}
 	}
@@ -1063,11 +1064,11 @@ func TestPace_ContextCanceledDuringWait(t *testing.T) {
 	}
 
 	m.minInterval = time.Hour
-	if _, gerr := m.Geocode(context.Background(), "x"); gerr != nil {
+	if _, gerr := m.Geocode(t.Context(), "x"); gerr != nil {
 		t.Fatalf("first Geocode: %v", gerr)
 	}
 
-	ctx, cancel := context.WithTimeout(context.Background(), 20*time.Millisecond)
+	ctx, cancel := context.WithTimeout(t.Context(), 20*time.Millisecond)
 	defer cancel()
 
 	_, err = m.Geocode(ctx, "x")
@@ -1081,7 +1082,7 @@ func TestPace_ZeroIntervalDisabled(t *testing.T) {
 
 	m := &osmGeo{endpoint: "https://example.com"}
 
-	if err := m.pace(context.Background()); err != nil {
+	if err := m.pace(t.Context()); err != nil {
 		t.Fatalf("pace() with zero minInterval err = %v, want nil", err)
 	}
 }

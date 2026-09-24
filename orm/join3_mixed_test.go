@@ -1,7 +1,6 @@
 package orm
 
 import (
-	"context"
 	"errors"
 	"testing"
 
@@ -476,7 +475,7 @@ func TestLeftInnerJoin3IsSingleScanPerRow(t *testing.T) {
 // dialect.Dialect interface (no JoinCapabilities) All and Stream succeed
 // rather than returning ErrUnsupportedByDialect.
 func TestMixedJoin3UngatedOnBaseDialect(t *testing.T) {
-	ctx := context.Background()
+	ctx := t.Context()
 
 	left := From[joinUser](joinUsers)
 
@@ -504,7 +503,7 @@ func TestMixedJoin3UngatedOnBaseDialect(t *testing.T) {
 // TestMixedJoinStreamErrorPaths drives resolve, query, scan, iteration and
 // close failures through the shared three-table stream tail.
 func TestMixedJoinStreamErrorPaths(t *testing.T) {
-	ctx := context.Background()
+	ctx := t.Context()
 	boom := errors.New("boom")
 
 	newMixed := func() MixedJoin3[joinUser, *joinUser, joinOrder, *joinOrder, joinOrderItem, *joinOrderItem] {
@@ -554,7 +553,7 @@ func TestMixedJoinStreamErrorPaths(t *testing.T) {
 // TestMixedJoinStreamRenderGate proves a gated-kind Stream yields the
 // typed error instead of invalid SQL.
 func TestMixedJoinStreamRenderGate(t *testing.T) {
-	ctx := context.Background()
+	ctx := t.Context()
 
 	j := MixedJoinOn3(From[joinUser](joinUsers), userOrdersRel, orderItemsRel, RightJoin, FullJoin)
 

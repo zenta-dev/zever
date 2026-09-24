@@ -2,7 +2,6 @@ package local
 
 import (
 	"bytes"
-	"context"
 	"encoding/binary"
 	"errors"
 	"hash/crc32"
@@ -171,7 +170,7 @@ func TestOpen_trimsBaseURLSlash(t *testing.T) {
 
 	m := openTest(t, media.Options{BaseURL: "/media/"})
 
-	asset, err := m.Upload(context.Background(), "f.txt", []byte("x"), media.UploadOptions{})
+	asset, err := m.Upload(t.Context(), "f.txt", []byte("x"), media.UploadOptions{})
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -220,7 +219,7 @@ func TestUploadDownloadRoundTrip(t *testing.T) {
 
 	m := openTest(t, media.Options{})
 
-	asset, err := m.Upload(context.Background(), "test.txt", []byte("hello"), media.UploadOptions{ContentType: "text/plain"})
+	asset, err := m.Upload(t.Context(), "test.txt", []byte("hello"), media.UploadOptions{ContentType: "text/plain"})
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -233,7 +232,7 @@ func TestUploadDownloadRoundTrip(t *testing.T) {
 		t.Fatalf("asset = %+v, want size 5 text/plain", asset)
 	}
 
-	got, err := m.Download(context.Background(), asset.ID)
+	got, err := m.Download(t.Context(), asset.ID)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -247,7 +246,7 @@ func TestUpload_extResolution(t *testing.T) {
 	t.Parallel()
 
 	m := openTest(t, media.Options{})
-	ctx := context.Background()
+	ctx := t.Context()
 
 	audio, err := m.Upload(ctx, "noext", []byte("data"), media.UploadOptions{ContentType: "audio/mpeg"})
 	if err != nil {
@@ -285,7 +284,7 @@ func TestUpload_uniqueness(t *testing.T) {
 	t.Parallel()
 
 	m := openTest(t, media.Options{})
-	ctx := context.Background()
+	ctx := t.Context()
 	seen := map[string]struct{}{}
 
 	for range 50 {
@@ -306,7 +305,7 @@ func TestUpload_concurrent(t *testing.T) {
 	t.Parallel()
 
 	m := openTest(t, media.Options{})
-	ctx := context.Background()
+	ctx := t.Context()
 
 	var wg sync.WaitGroup
 
@@ -342,7 +341,7 @@ func TestUpload_seamFailure(t *testing.T) {
 
 	defer func() { generateID = orig }()
 
-	if _, err := m.Upload(context.Background(), "f.txt", []byte("x"), media.UploadOptions{}); err == nil {
+	if _, err := m.Upload(t.Context(), "f.txt", []byte("x"), media.UploadOptions{}); err == nil {
 		t.Fatal("want error when id generation fails, got nil")
 	} else if !strings.Contains(err.Error(), "generate id") {
 		t.Fatalf("err = %v, want generate id context", err)
@@ -359,7 +358,7 @@ func TestUpload_mkdirError(t *testing.T) {
 
 	m := &adapter{root: f, baseURL: "/media"}
 
-	if _, err := m.Upload(context.Background(), "f.txt", []byte("x"), media.UploadOptions{}); err == nil {
+	if _, err := m.Upload(t.Context(), "f.txt", []byte("x"), media.UploadOptions{}); err == nil {
 		t.Fatal("want mkdir error, got nil")
 	}
 }
@@ -380,7 +379,7 @@ func TestUpload_writeError(t *testing.T) {
 
 	m := &adapter{root: root, baseURL: "/media"}
 
-	if _, err := m.Upload(context.Background(), "f.txt", []byte("x"), media.UploadOptions{}); err == nil {
+	if _, err := m.Upload(t.Context(), "f.txt", []byte("x"), media.UploadOptions{}); err == nil {
 		t.Fatal("want write error, got nil")
 	}
 }
@@ -390,12 +389,12 @@ func TestDownload_capped(t *testing.T) {
 
 	m := openTest(t, media.Options{MaxDownloadBytes: 8})
 
-	asset, err := m.Upload(context.Background(), "big.bin", bytes.Repeat([]byte("x"), 100), media.UploadOptions{})
+	asset, err := m.Upload(t.Context(), "big.bin", bytes.Repeat([]byte("x"), 100), media.UploadOptions{})
 	if err != nil {
 		t.Fatal(err)
 	}
 
-	_, err = m.Download(context.Background(), asset.ID)
+	_, err = m.Download(t.Context(), asset.ID)
 	if !errors.Is(err, media.ErrTooLarge) {
 		t.Fatalf("err = %v, want ErrTooLarge", err)
 	}
@@ -416,14 +415,14 @@ func TestDownload_brokenLink(t *testing.T) {
 	root := t.TempDir()
 	m := openTest(t, media.Options{Root: root})
 
-	asset, err := m.Upload(context.Background(), "f.txt", []byte("x"), media.UploadOptions{})
+	asset, err := m.Upload(t.Context(), "f.txt", []byte("x"), media.UploadOptions{})
 	if err != nil {
 		t.Fatal(err)
 	}
 
 	breakAsset(t, root, asset.ID)
 
-	if _, err := m.Download(context.Background(), asset.ID); err == nil {
+	if _, err := m.Download(t.Context(), asset.ID); err == nil {
 		t.Fatal("want open error, got nil")
 	}
 }
@@ -434,7 +433,7 @@ func TestDownload_dirReadError(t *testing.T) {
 	root := t.TempDir()
 	m := openTest(t, media.Options{Root: root})
 
-	asset, err := m.Upload(context.Background(), "f.txt", []byte("x"), media.UploadOptions{})
+	asset, err := m.Upload(t.Context(), "f.txt", []byte("x"), media.UploadOptions{})
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -448,7 +447,7 @@ func TestDownload_dirReadError(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	if _, err := m.Download(context.Background(), asset.ID); err == nil {
+	if _, err := m.Download(t.Context(), asset.ID); err == nil {
 		t.Fatal("want read error, got nil")
 	}
 }
@@ -457,7 +456,7 @@ func TestGlobError(t *testing.T) {
 	t.Parallel()
 
 	m := &adapter{root: filepath.Join(t.TempDir(), "bad[")}
-	ctx := context.Background()
+	ctx := t.Context()
 	id := strings.Repeat("a", 32)
 
 	if _, err := m.Download(ctx, id); err == nil {
@@ -474,20 +473,20 @@ func TestDeleteRemovesAndIdempotent(t *testing.T) {
 
 	m := openTest(t, media.Options{})
 
-	asset, err := m.Upload(context.Background(), "test.txt", []byte("data"), media.UploadOptions{})
+	asset, err := m.Upload(t.Context(), "test.txt", []byte("data"), media.UploadOptions{})
 	if err != nil {
 		t.Fatal(err)
 	}
 
-	if err := m.Delete(context.Background(), asset.ID); err != nil {
+	if err := m.Delete(t.Context(), asset.ID); err != nil {
 		t.Fatal(err)
 	}
 
-	if _, err := m.Download(context.Background(), asset.ID); !errors.Is(err, media.ErrNotFound) {
+	if _, err := m.Download(t.Context(), asset.ID); !errors.Is(err, media.ErrNotFound) {
 		t.Fatalf("post-delete download err = %v, want ErrNotFound", err)
 	}
 
-	if err := m.Delete(context.Background(), asset.ID); err != nil {
+	if err := m.Delete(t.Context(), asset.ID); err != nil {
 		t.Fatalf("second delete err = %v, want nil", err)
 	}
 }
@@ -502,7 +501,7 @@ func TestDelete_removeError(t *testing.T) {
 	root := t.TempDir()
 	m := openTest(t, media.Options{Root: root})
 
-	asset, err := m.Upload(context.Background(), "test.txt", []byte("data"), media.UploadOptions{})
+	asset, err := m.Upload(t.Context(), "test.txt", []byte("data"), media.UploadOptions{})
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -513,7 +512,7 @@ func TestDelete_removeError(t *testing.T) {
 
 	t.Cleanup(func() { _ = os.Chmod(root, 0o700) })
 
-	if err := m.Delete(context.Background(), asset.ID); err == nil {
+	if err := m.Delete(t.Context(), asset.ID); err == nil {
 		t.Fatal("want remove error, got nil")
 	}
 }
@@ -523,12 +522,12 @@ func TestStatRoundTrip(t *testing.T) {
 
 	m := openTest(t, media.Options{})
 
-	asset, err := m.Upload(context.Background(), "img.png", pngBytes(t, 4, 2), media.UploadOptions{ContentType: "image/png"})
+	asset, err := m.Upload(t.Context(), "img.png", pngBytes(t, 4, 2), media.UploadOptions{ContentType: "image/png"})
 	if err != nil {
 		t.Fatal(err)
 	}
 
-	info, err := m.Stat(context.Background(), asset.ID)
+	info, err := m.Stat(t.Context(), asset.ID)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -544,14 +543,14 @@ func TestStat_brokenLink(t *testing.T) {
 	root := t.TempDir()
 	m := openTest(t, media.Options{Root: root})
 
-	asset, err := m.Upload(context.Background(), "f.txt", []byte("x"), media.UploadOptions{})
+	asset, err := m.Upload(t.Context(), "f.txt", []byte("x"), media.UploadOptions{})
 	if err != nil {
 		t.Fatal(err)
 	}
 
 	breakAsset(t, root, asset.ID)
 
-	if _, err := m.Stat(context.Background(), asset.ID); err == nil {
+	if _, err := m.Stat(t.Context(), asset.ID); err == nil {
 		t.Fatal("want stat error, got nil")
 	}
 }
@@ -560,7 +559,7 @@ func TestRejectsBadIDs(t *testing.T) {
 	t.Parallel()
 
 	m := openTest(t, media.Options{})
-	ctx := context.Background()
+	ctx := t.Context()
 
 	for _, id := range []string{"", "..", "../secret.txt", "*", "abc*", strings.Repeat("z", 32), strings.Repeat("a", 31)} {
 		if _, err := m.Download(ctx, id); !errors.Is(err, media.ErrInvalidID) {
@@ -622,7 +621,7 @@ func TestSentinelFileUntouched(t *testing.T) {
 	}
 
 	m := openTest(t, media.Options{Root: filepath.Join(dir, "store")})
-	ctx := context.Background()
+	ctx := t.Context()
 
 	if _, err := m.Download(ctx, "../secret.txt"); err == nil {
 		t.Fatal("want error for traversal id")
@@ -643,7 +642,7 @@ func downloadOut(t *testing.T, m media.Media, url, ext string) []byte {
 
 	outID := strings.TrimSuffix(filepath.Base(url), ext)
 
-	data, err := m.Download(context.Background(), outID)
+	data, err := m.Download(t.Context(), outID)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -656,7 +655,7 @@ func TestTransformImage(t *testing.T) {
 
 	root := t.TempDir()
 	m := &adapter{root: root, baseURL: "/media"}
-	ctx := context.Background()
+	ctx := t.Context()
 
 	src := image.NewRGBA(image.Rect(0, 0, 400, 200))
 	buf := new(bytes.Buffer)
@@ -720,7 +719,7 @@ func TestTransformJPEGQuality(t *testing.T) {
 	t.Parallel()
 
 	m := &adapter{root: t.TempDir(), baseURL: "/media"}
-	ctx := context.Background()
+	ctx := t.Context()
 
 	img := image.NewNRGBA(image.Rect(0, 0, 64, 64))
 	seed := uint32(1)
@@ -784,7 +783,7 @@ func TestTransformRejectsGifOutput(t *testing.T) {
 
 	root := t.TempDir()
 	m := &adapter{root: root, baseURL: "/media"}
-	ctx := context.Background()
+	ctx := t.Context()
 
 	asset, err := m.Upload(ctx, "img.png", pngBytes(t, 2, 2), media.UploadOptions{ContentType: "image/png"})
 	if err != nil {
@@ -810,7 +809,7 @@ func TestTransformGifSource(t *testing.T) {
 
 	root := t.TempDir()
 	m := &adapter{root: root, baseURL: "/media"}
-	ctx := context.Background()
+	ctx := t.Context()
 
 	asset, err := m.Upload(ctx, "anim.gif", gifBytes(t, 2, 2), media.UploadOptions{ContentType: "image/gif"})
 	if err != nil {
@@ -845,7 +844,7 @@ func TestTransformRejectsUnknownSourceExt(t *testing.T) {
 
 	root := t.TempDir()
 	m := &adapter{root: root, baseURL: "/media"}
-	ctx := context.Background()
+	ctx := t.Context()
 
 	asset, err := m.Upload(ctx, "img.xyz", pngBytes(t, 2, 2), media.UploadOptions{ContentType: "image/png"})
 	if err != nil {
@@ -869,7 +868,7 @@ func TestTransformRejectsUnsafeFormat(t *testing.T) {
 	}
 
 	m := &adapter{root: root, baseURL: "/media"}
-	ctx := context.Background()
+	ctx := t.Context()
 
 	asset, err := m.Upload(ctx, "img.png", pngBytes(t, 2, 2), media.UploadOptions{ContentType: "image/png"})
 	if err != nil {
@@ -897,12 +896,12 @@ func TestTransformRejectsOversize(t *testing.T) {
 
 	m := openTest(t, media.Options{MaxDownloadBytes: 8})
 
-	asset, err := m.Upload(context.Background(), "img.png", pngBytes(t, 2, 2), media.UploadOptions{ContentType: "image/png"})
+	asset, err := m.Upload(t.Context(), "img.png", pngBytes(t, 2, 2), media.UploadOptions{ContentType: "image/png"})
 	if err != nil {
 		t.Fatal(err)
 	}
 
-	_, err = m.Transform(context.Background(), asset.ID, media.TransformOps{Width: "10"})
+	_, err = m.Transform(t.Context(), asset.ID, media.TransformOps{Width: "10"})
 	if !errors.Is(err, media.ErrTooLarge) {
 		t.Fatalf("err = %v, want ErrTooLarge", err)
 	}
@@ -912,7 +911,7 @@ func TestTransformRejectsHugeDimensions(t *testing.T) {
 	t.Parallel()
 
 	m := openTest(t, media.Options{MaxPixels: 100})
-	ctx := context.Background()
+	ctx := t.Context()
 
 	asset, err := m.Upload(ctx, "big.png", pngBytes(t, 20, 20), media.UploadOptions{ContentType: "image/png"})
 	if err != nil {
@@ -942,7 +941,7 @@ func TestTransformHandcraftedBomb(t *testing.T) {
 	t.Parallel()
 
 	m := &adapter{root: t.TempDir(), baseURL: "/media"}
-	ctx := context.Background()
+	ctx := t.Context()
 
 	asset, err := m.Upload(ctx, "bomb.png", craftPNG(10000, 10000), media.UploadOptions{ContentType: "image/png"})
 	if err != nil {
@@ -963,7 +962,7 @@ func TestTransformCorruptAndTruncated(t *testing.T) {
 	t.Parallel()
 
 	m := &adapter{root: t.TempDir(), baseURL: "/media"}
-	ctx := context.Background()
+	ctx := t.Context()
 
 	corrupt, err := m.Upload(ctx, "bad.png", []byte("not an image"), media.UploadOptions{ContentType: "image/png"})
 	if err != nil {
@@ -988,7 +987,7 @@ func TestTransformBadDims(t *testing.T) {
 	t.Parallel()
 
 	m := &adapter{root: t.TempDir(), baseURL: "/media"}
-	ctx := context.Background()
+	ctx := t.Context()
 
 	asset, err := m.Upload(ctx, "img.png", pngBytes(t, 2, 2), media.UploadOptions{ContentType: "image/png"})
 	if err != nil {
@@ -1005,7 +1004,7 @@ func TestTransformBadDims(t *testing.T) {
 func TestTransform_seamFailure(t *testing.T) {
 	root := t.TempDir()
 	m := &adapter{root: root, baseURL: "/media"}
-	ctx := context.Background()
+	ctx := t.Context()
 
 	asset, err := m.Upload(ctx, "img.png", pngBytes(t, 2, 2), media.UploadOptions{ContentType: "image/png"})
 	if err != nil {
@@ -1025,7 +1024,7 @@ func TestTransform_seamFailure(t *testing.T) {
 func TestTransform_saveError(t *testing.T) {
 	root := t.TempDir()
 	m := &adapter{root: root, baseURL: "/media"}
-	ctx := context.Background()
+	ctx := t.Context()
 
 	asset, err := m.Upload(ctx, "img.png", pngBytes(t, 2, 2), media.UploadOptions{ContentType: "image/png"})
 	if err != nil {
@@ -1060,12 +1059,12 @@ func TestPrepareOutput_derivedMkdirError(t *testing.T) {
 
 	m := &adapter{root: root, baseURL: "/media", derivedDir: filepath.Join(blocker, "derived")}
 
-	asset, err := m.Upload(context.Background(), "img.png", pngBytes(t, 2, 2), media.UploadOptions{})
+	asset, err := m.Upload(t.Context(), "img.png", pngBytes(t, 2, 2), media.UploadOptions{})
 	if err != nil {
 		t.Fatal(err)
 	}
 
-	if _, err := m.Transform(context.Background(), asset.ID, media.TransformOps{Width: "10"}); err == nil {
+	if _, err := m.Transform(t.Context(), asset.ID, media.TransformOps{Width: "10"}); err == nil {
 		t.Fatal("want derived mkdir error, got nil")
 	}
 }
@@ -1075,7 +1074,7 @@ func TestLoadImage_brokenLink(t *testing.T) {
 
 	root := t.TempDir()
 	m := &adapter{root: root, baseURL: "/media"}
-	ctx := context.Background()
+	ctx := t.Context()
 
 	asset, err := m.Upload(ctx, "img.png", pngBytes(t, 2, 2), media.UploadOptions{ContentType: "image/png"})
 	if err != nil {
@@ -1094,7 +1093,7 @@ func TestLoadImage_dirReadError(t *testing.T) {
 
 	root := t.TempDir()
 	m := &adapter{root: root, baseURL: "/media"}
-	ctx := context.Background()
+	ctx := t.Context()
 
 	asset, err := m.Upload(ctx, "img.png", pngBytes(t, 2, 2), media.UploadOptions{ContentType: "image/png"})
 	if err != nil {
@@ -1119,7 +1118,7 @@ func TestDownloadRange(t *testing.T) {
 	t.Parallel()
 
 	m := openTest(t, media.Options{})
-	ctx := context.Background()
+	ctx := t.Context()
 
 	asset, err := m.Upload(ctx, "f.txt", []byte("0123456789"), media.UploadOptions{ContentType: "text/plain"})
 	if err != nil {
@@ -1156,12 +1155,12 @@ func TestDownloadRange_directAdapter(t *testing.T) {
 
 	m := &adapter{root: t.TempDir(), baseURL: "/media"}
 
-	asset, err := m.Upload(context.Background(), "f.txt", []byte("0123456789"), media.UploadOptions{})
+	asset, err := m.Upload(t.Context(), "f.txt", []byte("0123456789"), media.UploadOptions{})
 	if err != nil {
 		t.Fatal(err)
 	}
 
-	got, err := m.DownloadRange(context.Background(), asset.ID, 1, 3)
+	got, err := m.DownloadRange(t.Context(), asset.ID, 1, 3)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -1175,7 +1174,7 @@ func TestDownloadRange_invalid(t *testing.T) {
 	t.Parallel()
 
 	m := openTest(t, media.Options{})
-	ctx := context.Background()
+	ctx := t.Context()
 
 	asset, err := m.Upload(ctx, "f.txt", []byte("0123456789"), media.UploadOptions{})
 	if err != nil {
@@ -1217,12 +1216,12 @@ func TestDownloadRange_capped(t *testing.T) {
 
 	m := openTest(t, media.Options{MaxDownloadBytes: 4})
 
-	asset, err := m.Upload(context.Background(), "f.txt", []byte("0123456789"), media.UploadOptions{})
+	asset, err := m.Upload(t.Context(), "f.txt", []byte("0123456789"), media.UploadOptions{})
 	if err != nil {
 		t.Fatal(err)
 	}
 
-	if _, err := m.DownloadRange(context.Background(), asset.ID, 0, 0); !errors.Is(err, media.ErrTooLarge) {
+	if _, err := m.DownloadRange(t.Context(), asset.ID, 0, 0); !errors.Is(err, media.ErrTooLarge) {
 		t.Fatalf("err = %v, want ErrTooLarge", err)
 	}
 }
@@ -1233,14 +1232,14 @@ func TestDownloadRange_brokenLink(t *testing.T) {
 	root := t.TempDir()
 	m := openTest(t, media.Options{Root: root})
 
-	asset, err := m.Upload(context.Background(), "f.txt", []byte("x"), media.UploadOptions{})
+	asset, err := m.Upload(t.Context(), "f.txt", []byte("x"), media.UploadOptions{})
 	if err != nil {
 		t.Fatal(err)
 	}
 
 	breakAsset(t, root, asset.ID)
 
-	if _, err := m.DownloadRange(context.Background(), asset.ID, 0, 0); err == nil {
+	if _, err := m.DownloadRange(t.Context(), asset.ID, 0, 0); err == nil {
 		t.Fatal("want read error, got nil")
 	}
 }
@@ -1249,7 +1248,7 @@ func TestProbeImage(t *testing.T) {
 	t.Parallel()
 
 	m := openTest(t, media.Options{})
-	ctx := context.Background()
+	ctx := t.Context()
 
 	asset, err := m.Upload(ctx, "img.png", pngBytes(t, 4, 2), media.UploadOptions{ContentType: "image/png"})
 	if err != nil {
@@ -1284,7 +1283,7 @@ func TestProbe_errors(t *testing.T) {
 	t.Parallel()
 
 	m := openTest(t, media.Options{})
-	ctx := context.Background()
+	ctx := t.Context()
 
 	corrupt, err := m.Upload(ctx, "bad.png", []byte("not an image"), media.UploadOptions{ContentType: "image/png"})
 	if err != nil {
@@ -1311,14 +1310,14 @@ func TestProbe_brokenLink(t *testing.T) {
 	root := t.TempDir()
 	m := openTest(t, media.Options{Root: root})
 
-	asset, err := m.Upload(context.Background(), "img.png", pngBytes(t, 2, 2), media.UploadOptions{})
+	asset, err := m.Upload(t.Context(), "img.png", pngBytes(t, 2, 2), media.UploadOptions{})
 	if err != nil {
 		t.Fatal(err)
 	}
 
 	breakAsset(t, root, asset.ID)
 
-	if _, err := m.Probe(context.Background(), asset.ID); err == nil {
+	if _, err := m.Probe(t.Context(), asset.ID); err == nil {
 		t.Fatal("want open error, got nil")
 	}
 }
@@ -1429,7 +1428,7 @@ func TestJanitorCleansDerived(t *testing.T) {
 
 	root := t.TempDir()
 	m := openTest(t, media.Options{Root: root, DerivedTTL: 200 * time.Millisecond})
-	ctx := context.Background()
+	ctx := t.Context()
 
 	asset, err := m.Upload(ctx, "img.png", pngBytes(t, 2, 2), media.UploadOptions{ContentType: "image/png"})
 	if err != nil {
@@ -1510,7 +1509,7 @@ func TestAVTranscodeAudio(t *testing.T) {
 
 	root := t.TempDir()
 	m := openTest(t, media.Options{Root: root})
-	ctx := context.Background()
+	ctx := t.Context()
 
 	asset, err := m.Upload(ctx, "song.mp3", []byte("ID3fake"), media.UploadOptions{ContentType: "audio/mpeg"})
 	if err != nil {
@@ -1555,7 +1554,7 @@ func TestAVTranscodeVideoArgs(t *testing.T) {
 	writeProbeJSON(t, shortProbe)
 
 	m := openTest(t, media.Options{})
-	ctx := context.Background()
+	ctx := t.Context()
 
 	asset, err := m.Upload(ctx, "clip.mp4", []byte("fake-mp4"), media.UploadOptions{ContentType: "video/mp4"})
 	if err != nil {
@@ -1590,7 +1589,7 @@ func TestAVTranscodeFormatOnly(t *testing.T) {
 
 	root := t.TempDir()
 	m := openTest(t, media.Options{Root: root})
-	ctx := context.Background()
+	ctx := t.Context()
 
 	asset, err := m.Upload(ctx, "sound.wav", []byte("fake-wav"), media.UploadOptions{ContentType: "audio/wav"})
 	if err != nil {
@@ -1613,7 +1612,7 @@ func TestAVThumbnail(t *testing.T) {
 	writeProbeJSON(t, shortProbe)
 
 	m := openTest(t, media.Options{})
-	ctx := context.Background()
+	ctx := t.Context()
 
 	asset, err := m.Upload(ctx, "clip.mp4", []byte("fake-mp4"), media.UploadOptions{ContentType: "video/mp4"})
 	if err != nil {
@@ -1635,7 +1634,7 @@ func TestAVInvalidCombos(t *testing.T) {
 	writeProbeJSON(t, shortProbe)
 
 	m := openTest(t, media.Options{})
-	ctx := context.Background()
+	ctx := t.Context()
 
 	audio, err := m.Upload(ctx, "song.mp3", []byte("ID3fake"), media.UploadOptions{ContentType: "audio/mpeg"})
 	if err != nil {
@@ -1676,7 +1675,7 @@ func TestAVMissingTool(t *testing.T) {
 	t.Setenv("PATH", t.TempDir())
 
 	m := openTest(t, media.Options{})
-	ctx := context.Background()
+	ctx := t.Context()
 
 	asset, err := m.Upload(ctx, "song.mp3", []byte("ID3fake"), media.UploadOptions{ContentType: "audio/mpeg"})
 	if err != nil {
@@ -1697,7 +1696,7 @@ func TestAVDurationGate(t *testing.T) {
 	withFakeBin(t, map[string]string{"ffmpeg": fakeFFmpeg, "ffprobe": fakeFFprobe})
 
 	m := openTest(t, media.Options{MaxDuration: 2 * time.Second})
-	ctx := context.Background()
+	ctx := t.Context()
 
 	asset, err := m.Upload(ctx, "song.mp3", []byte("ID3fake"), media.UploadOptions{ContentType: "audio/mpeg"})
 	if err != nil {
@@ -1722,7 +1721,7 @@ func TestAVTranscodeFFmpegFailure(t *testing.T) {
 	writeProbeJSON(t, shortProbe)
 
 	m := openTest(t, media.Options{})
-	ctx := context.Background()
+	ctx := t.Context()
 
 	asset, err := m.Upload(ctx, "song.mp3", []byte("ID3fake"), media.UploadOptions{ContentType: "audio/mpeg"})
 	if err != nil {
@@ -1738,7 +1737,7 @@ func TestAVProbeFFprobeFailure(t *testing.T) {
 	withFakeBin(t, map[string]string{"ffmpeg": fakeFFmpeg, "ffprobe": fakeFail})
 
 	m := openTest(t, media.Options{MaxDuration: time.Second})
-	ctx := context.Background()
+	ctx := t.Context()
 
 	asset, err := m.Upload(ctx, "song.mp3", []byte("ID3fake"), media.UploadOptions{ContentType: "audio/mpeg"})
 	if err != nil {
@@ -1758,7 +1757,7 @@ func TestProbeAV(t *testing.T) {
 	withFakeBin(t, map[string]string{"ffprobe": fakeFFprobe})
 
 	m := openTest(t, media.Options{})
-	ctx := context.Background()
+	ctx := t.Context()
 
 	asset, err := m.Upload(ctx, "clip.mp4", []byte("fake-mp4"), media.UploadOptions{ContentType: "video/mp4"})
 	if err != nil {
@@ -1793,7 +1792,7 @@ func TestProbeAVAudioOnly(t *testing.T) {
 	withFakeBin(t, map[string]string{"ffprobe": fakeFFprobe})
 
 	m := openTest(t, media.Options{})
-	ctx := context.Background()
+	ctx := t.Context()
 
 	asset, err := m.Upload(ctx, "song.mp3", []byte("ID3fake"), media.UploadOptions{ContentType: "audio/mpeg"})
 	if err != nil {
@@ -1820,7 +1819,7 @@ func TestProbeAVBadJSON(t *testing.T) {
 	withFakeBin(t, map[string]string{"ffprobe": fakeFFprobe})
 
 	m := openTest(t, media.Options{})
-	ctx := context.Background()
+	ctx := t.Context()
 
 	asset, err := m.Upload(ctx, "song.mp3", []byte("ID3fake"), media.UploadOptions{ContentType: "audio/mpeg"})
 	if err != nil {
@@ -1869,7 +1868,7 @@ func TestE2EffmpegWAVtoMP3(t *testing.T) {
 	}
 
 	m := openTest(t, media.Options{})
-	ctx := context.Background()
+	ctx := t.Context()
 
 	wav := filepath.Join(t.TempDir(), "sine.wav")
 

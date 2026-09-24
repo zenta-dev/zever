@@ -2,7 +2,6 @@ package log
 
 import (
 	"bytes"
-	"context"
 	"encoding/json"
 	"testing"
 
@@ -20,7 +19,7 @@ func TestNewWithWriter_track_emitsJSONLine(t *testing.T) {
 		t.Fatalf("NewWithWriter: %v", err)
 	}
 
-	if err := a.Track(context.Background(), "page_view", map[string]any{"page": "/home"}); err != nil {
+	if err := a.Track(t.Context(), "page_view", map[string]any{"page": "/home"}); err != nil {
 		t.Fatalf("track: %v", err)
 	}
 
@@ -44,11 +43,11 @@ func TestNewWithWriter_identifyGroup_emitJSONLines(t *testing.T) {
 		t.Fatalf("NewWithWriter: %v", err)
 	}
 
-	if err := a.Identify(context.Background(), "user-1", map[string]any{"email": "a@b.com"}); err != nil {
+	if err := a.Identify(t.Context(), "user-1", map[string]any{"email": "a@b.com"}); err != nil {
 		t.Fatalf("identify: %v", err)
 	}
 
-	if err := a.Group(context.Background(), "user-1", "org-42", map[string]any{"plan": "pro"}); err != nil {
+	if err := a.Group(t.Context(), "user-1", "org-42", map[string]any{"plan": "pro"}); err != nil {
 		t.Fatalf("group: %v", err)
 	}
 

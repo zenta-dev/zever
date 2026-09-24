@@ -207,7 +207,7 @@ func TestUpsertQueryRoundtrip(t *testing.T) {
 
 	f := newStub()
 	s := newStore(f, 0)
-	ctx := context.Background()
+	ctx := t.Context()
 
 	if err := s.Upsert(ctx, vectorstore.Vector{ID: "a", Embedding: []float32{1, 0}}); err != nil {
 		t.Fatalf("upsert a: %v", err)
@@ -238,7 +238,7 @@ func TestUpsertBatch_MatchesLoopedUpsert(t *testing.T) {
 
 	loopStub := newStub()
 	loopStore := newStore(loopStub, 0)
-	ctx := context.Background()
+	ctx := t.Context()
 
 	for _, v := range vecs {
 		if err := loopStore.Upsert(ctx, v); err != nil {
@@ -290,7 +290,7 @@ func TestUpsertBatch_Empty(t *testing.T) {
 	f := newStub()
 	s := newStore(f, 3)
 
-	if err := s.UpsertBatch(context.Background(), nil); err != nil {
+	if err := s.UpsertBatch(t.Context(), nil); err != nil {
 		t.Fatalf("UpsertBatch(nil) = %v, want nil", err)
 	}
 }
@@ -301,7 +301,7 @@ func TestUpsertBatch_EmptyEmbedding(t *testing.T) {
 	f := newStub()
 	s := newStore(f, 0)
 
-	err := s.UpsertBatch(context.Background(), []vectorstore.Vector{
+	err := s.UpsertBatch(t.Context(), []vectorstore.Vector{
 		{ID: "a", Embedding: []float32{1, 0}},
 		{ID: "b", Embedding: nil},
 	})
@@ -316,7 +316,7 @@ func TestUpsertBatch_DimensionMismatch(t *testing.T) {
 	f := newStub()
 	s := newStore(f, 2)
 
-	err := s.UpsertBatch(context.Background(), []vectorstore.Vector{
+	err := s.UpsertBatch(t.Context(), []vectorstore.Vector{
 		{ID: "a", Embedding: []float32{1, 0}},
 		{ID: "b", Embedding: []float32{1, 0, 0}},
 	})
@@ -332,7 +332,7 @@ func TestDeleteIdempotent(t *testing.T) {
 
 	f := newStub()
 	s := newStore(f, 0)
-	ctx := context.Background()
+	ctx := t.Context()
 
 	if err := s.Upsert(ctx, vectorstore.Vector{ID: "gone", Embedding: []float32{1, 2}}); err != nil {
 		t.Fatalf("upsert: %v", err)
@@ -352,7 +352,7 @@ func TestNonUUIDHashedAndRestored(t *testing.T) {
 
 	f := newStub()
 	s := newStore(f, 0)
-	ctx := context.Background()
+	ctx := t.Context()
 
 	if err := s.Upsert(ctx, vectorstore.Vector{ID: "not-a-uuid", Embedding: []float32{1, 0}}); err != nil {
 		t.Fatalf("upsert: %v", err)
@@ -378,7 +378,7 @@ func TestValidUUIDUnchanged(t *testing.T) {
 	id := "123e4567-e89b-12d3-a456-426614174000"
 	f := newStub()
 	s := newStore(f, 0)
-	ctx := context.Background()
+	ctx := t.Context()
 
 	if err := s.Upsert(ctx, vectorstore.Vector{ID: id, Embedding: []float32{1, 0}}); err != nil {
 		t.Fatalf("upsert: %v", err)
@@ -420,7 +420,7 @@ func TestMetadataRoundtrip(t *testing.T) {
 
 	f := newStub()
 	s := newStore(f, 0)
-	ctx := context.Background()
+	ctx := t.Context()
 
 	md := map[string]any{
 		"str":   "v",
@@ -462,7 +462,7 @@ func TestUpsertRejectsBadMetadata(t *testing.T) {
 	f := newStub()
 	s := newStore(f, 0)
 
-	err := s.Upsert(context.Background(), vectorstore.Vector{
+	err := s.Upsert(t.Context(), vectorstore.Vector{
 		ID:        "bad",
 		Embedding: []float32{1},
 		Metadata:  map[string]any{"fn": func() {}},
@@ -475,7 +475,7 @@ func TestUpsertRejectsBadMetadata(t *testing.T) {
 func TestUpsertErrors(t *testing.T) {
 	t.Parallel()
 
-	ctx := context.Background()
+	ctx := t.Context()
 
 	t.Run("empty embedding", func(t *testing.T) {
 		t.Parallel()
@@ -530,7 +530,7 @@ func TestDeleteError(t *testing.T) {
 	f.deleteErr = errors.New("boom")
 	s := newStore(f, 0)
 
-	if err := s.Delete(context.Background(), "x"); err == nil {
+	if err := s.Delete(t.Context(), "x"); err == nil {
 		t.Fatalf("expected delete error")
 	}
 }
@@ -538,7 +538,7 @@ func TestDeleteError(t *testing.T) {
 func TestQueryErrors(t *testing.T) {
 	t.Parallel()
 
-	ctx := context.Background()
+	ctx := t.Context()
 
 	t.Run("empty embedding", func(t *testing.T) {
 		t.Parallel()
@@ -642,7 +642,7 @@ func TestQueryErrors(t *testing.T) {
 func TestEnsureCollection(t *testing.T) {
 	t.Parallel()
 
-	ctx := context.Background()
+	ctx := t.Context()
 
 	t.Run("created fast path", func(t *testing.T) {
 		t.Parallel()
@@ -1078,7 +1078,7 @@ func TestConcurrentUpsertQuery(t *testing.T) {
 
 	f := newStub()
 	s := newStore(f, 0)
-	ctx := context.Background()
+	ctx := t.Context()
 
 	var wg sync.WaitGroup
 

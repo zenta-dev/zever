@@ -28,6 +28,12 @@ import (
 // defaultPrefix namespaces session keys when no prefix is set.
 const defaultPrefix = "sess"
 
+// DefaultPingTimeout bounds the startup connectivity check.
+const DefaultPingTimeout = 3 * time.Second
+
+// DefaultMinPreserveTTL floors preserved expiries against clock skew.
+const DefaultMinPreserveTTL = time.Second
+
 // Compile-time check that store implements session.Store.
 var _ session.Store = (*store)(nil)
 
@@ -82,7 +88,7 @@ func New(opts session.Options) (session.Store, error) {
 		return nil, fmt.Errorf("redis: connect %q: %w", redactAddr(opts.Redis.Addr), err)
 	}
 
-	ctx, cancel := context.WithTimeout(context.Background(), 3*time.Second)
+	ctx, cancel := context.WithTimeout(context.Background(), DefaultPingTimeout)
 	defer cancel()
 
 	if err := client.Ping(ctx).Err(); err != nil {
@@ -302,7 +308,7 @@ func (s *store) saveTx(ctx context.Context, tx *goredis.Tx, key string, sess ses
 			break
 		}
 
-		ttl = max(cur.ExpiresAt.Sub(now), time.Second)
+		ttl = max(cur.ExpiresAt.Sub(now), DefaultMinPreserveTTL)
 		expiresAt = cur.ExpiresAt
 	}
 

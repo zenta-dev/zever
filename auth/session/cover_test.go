@@ -70,7 +70,7 @@ func TestCoverIssueStoreCreateFails(t *testing.T) {
 	t.Parallel()
 
 	a := newAdapter(t, &failStore{err: errors.New("boom")})
-	_, err := a.Issue(context.Background(), "sub", nil, time.Minute)
+	_, err := a.Issue(t.Context(), "sub", nil, time.Minute)
 	if err == nil {
 		t.Fatal("Issue(store fail) = nil, want wrapped error")
 	}
@@ -80,7 +80,7 @@ func TestCoverIssueStoreSaveFails(t *testing.T) {
 	t.Parallel()
 
 	a := newAdapter(t, &saveFailStore{inner: newMemoryStore(t)})
-	_, err := a.Issue(context.Background(), "sub", nil, time.Minute)
+	_, err := a.Issue(t.Context(), "sub", nil, time.Minute)
 	if err == nil {
 		t.Fatal("Issue(save fail) = nil, want wrapped error")
 	}
@@ -90,7 +90,7 @@ func TestCoverVerifyStoreGetFails(t *testing.T) {
 	t.Parallel()
 
 	a := newAdapter(t, &failStore{err: errors.New("boom")})
-	_, err := a.Verify(context.Background(), session.NewID())
+	_, err := a.Verify(t.Context(), session.NewID())
 	if err == nil {
 		t.Fatal("Verify(store fail) = nil, want wrapped error")
 	}
@@ -103,7 +103,7 @@ func TestCoverRevokeStoreDeleteFails(t *testing.T) {
 	t.Parallel()
 
 	a := newAdapter(t, &failStore{err: errors.New("boom")})
-	if err := a.Revoke(context.Background(), session.NewID()); err == nil {
+	if err := a.Revoke(t.Context(), session.NewID()); err == nil {
 		t.Fatal("Revoke(store fail) = nil, want wrapped error")
 	}
 }
@@ -111,7 +111,7 @@ func TestCoverRevokeStoreDeleteFails(t *testing.T) {
 func plantEnvelope(t *testing.T, st session.Store, id string, data map[string]any) {
 	t.Helper()
 
-	if err := st.Save(context.Background(), session.Session{ID: id, Data: data}); err != nil {
+	if err := st.Save(t.Context(), session.Session{ID: id, Data: data}); err != nil {
 		t.Fatalf("plant: %v", err)
 	}
 }
@@ -125,7 +125,7 @@ func TestCoverVerifyExpInt(t *testing.T) {
 	future := time.Now().Add(time.Hour).Unix()
 	plantEnvelope(t, st, id, map[string]any{"sub": "u", "exp": int(future)})
 
-	got, err := a.Verify(context.Background(), id)
+	got, err := a.Verify(t.Context(), id)
 	if err != nil {
 		t.Fatalf("Verify(int exp) = %v, want nil", err)
 	}
@@ -142,7 +142,7 @@ func TestCoverVerifyExpFloat(t *testing.T) {
 	id := session.NewID()
 	plantEnvelope(t, st, id, map[string]any{"sub": "u", "exp": float64(time.Now().Add(time.Hour).Unix())})
 
-	if _, err := a.Verify(context.Background(), id); err != nil {
+	if _, err := a.Verify(t.Context(), id); err != nil {
 		t.Fatalf("Verify(float exp) = %v, want nil", err)
 	}
 }
@@ -155,7 +155,7 @@ func TestCoverVerifyExpZeroFails(t *testing.T) {
 	id := session.NewID()
 	plantEnvelope(t, st, id, map[string]any{"sub": "u", "exp": int64(0)})
 
-	if _, err := a.Verify(context.Background(), id); err == nil {
+	if _, err := a.Verify(t.Context(), id); err == nil {
 		t.Fatal("Verify(zero exp) = nil, want corrupt-envelope error")
 	}
 }

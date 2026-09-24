@@ -12,6 +12,12 @@ import (
 
 var _ session.Store = (*store)(nil)
 
+// DefaultMinSweepInterval floors the derived background sweep period.
+const DefaultMinSweepInterval = time.Second
+
+// DefaultMaxSweepInterval caps the derived background sweep period.
+const DefaultMaxSweepInterval = 5 * time.Minute
+
 type record struct {
 	sess session.Session
 }
@@ -48,14 +54,14 @@ func New(opts session.Options) (session.Store, error) {
 }
 
 // sweepInterval derives the background sweep period from the store TTL:
-// ttl/2 clamped to [time.Second, 5*time.Minute].
+// ttl/2 clamped to [DefaultMinSweepInterval, DefaultMaxSweepInterval].
 func sweepInterval(ttl time.Duration) time.Duration {
 	iv := ttl / 2
-	if iv < time.Second {
-		return time.Second
+	if iv < DefaultMinSweepInterval {
+		return DefaultMinSweepInterval
 	}
-	if iv > 5*time.Minute {
-		return 5 * time.Minute
+	if iv > DefaultMaxSweepInterval {
+		return DefaultMaxSweepInterval
 	}
 	return iv
 }

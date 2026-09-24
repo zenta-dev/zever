@@ -16,6 +16,7 @@ type Router interface {
 	Group(prefix string, middlewares ...func(http.Handler) http.Handler) Group
 	// Use appends middlewares to the router.
 	Use(middlewares ...func(http.Handler) http.Handler)
+	// ServeHTTP serves HTTP requests directly.
 	http.Handler
 }
 

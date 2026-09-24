@@ -109,7 +109,7 @@ func TestOpen_success_smoke(t *testing.T) {
 		t.Fatalf("Open err = %v", err)
 	}
 
-	ctx := context.Background()
+	ctx := t.Context()
 
 	out, err := got.Render(ctx, []byte("source"), FormatPDF)
 	if err != nil {

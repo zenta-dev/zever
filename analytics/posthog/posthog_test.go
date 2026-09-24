@@ -90,7 +90,7 @@ func TestTrack_ctxUserID_usesDistinctID(t *testing.T) {
 
 	a, f := newTestAdapter(t)
 
-	if err := a.Track(analytics.WithUserID(context.Background(), "u1"), "signed_up", nil); err != nil {
+	if err := a.Track(analytics.WithUserID(t.Context(), "u1"), "signed_up", nil); err != nil {
 		t.Fatal(err)
 	}
 
@@ -113,7 +113,7 @@ func TestTrack_anonymous_fallsBackToDefault(t *testing.T) {
 
 	a, f := newTestAdapter(t)
 
-	if err := a.Track(context.Background(), "signed_up", nil); err != nil {
+	if err := a.Track(t.Context(), "signed_up", nil); err != nil {
 		t.Fatal(err)
 	}
 
@@ -133,7 +133,7 @@ func TestTrack_anonymous_fallsBackToCustomID(t *testing.T) {
 	a, f := newTestAdapter(t)
 	a.anonymousID = "guest"
 
-	if err := a.Track(context.Background(), "signed_up", nil); err != nil {
+	if err := a.Track(t.Context(), "signed_up", nil); err != nil {
 		t.Fatal(err)
 	}
 
@@ -153,7 +153,7 @@ func TestTrack_missingIdentity_returnsSentinel(t *testing.T) {
 	a, f := newTestAdapter(t)
 	a.anonymousID = ""
 
-	if err := a.Track(context.Background(), "signed_up", nil); !errors.Is(err, analytics.ErrMissingIdentity) {
+	if err := a.Track(t.Context(), "signed_up", nil); !errors.Is(err, analytics.ErrMissingIdentity) {
 		t.Fatalf("want ErrMissingIdentity, got %v", err)
 	}
 
@@ -169,7 +169,7 @@ func TestTrack_enqueueError_wrapsCause(t *testing.T) {
 	fakeErr := errors.New("boom")
 	f.enqueueErr = fakeErr
 
-	if err := a.Track(context.Background(), "signed_up", nil); !errors.Is(err, fakeErr) {
+	if err := a.Track(t.Context(), "signed_up", nil); !errors.Is(err, fakeErr) {
 		t.Fatalf("want wrapped boom, got %v", err)
 	}
 }
@@ -180,7 +180,7 @@ func TestIdentify_traits_notMutatingCallerMap(t *testing.T) {
 	a, f := newTestAdapter(t)
 
 	traits := map[string]any{"plan": "pro"}
-	if err := a.Identify(context.Background(), "user-1", traits); err != nil {
+	if err := a.Identify(t.Context(), "user-1", traits); err != nil {
 		t.Fatal(err)
 	}
 
@@ -207,7 +207,7 @@ func TestIdentify_explicitID_sendsIdentifyMessage(t *testing.T) {
 
 	a, f := newTestAdapter(t)
 
-	if err := a.Identify(context.Background(), "u1", map[string]any{"email": "a@b.c"}); err != nil {
+	if err := a.Identify(t.Context(), "u1", map[string]any{"email": "a@b.c"}); err != nil {
 		t.Fatal(err)
 	}
 
@@ -230,7 +230,7 @@ func TestIdentify_ctxUserID_usesContextIdentity(t *testing.T) {
 
 	a, f := newTestAdapter(t)
 
-	ctx := analytics.WithUserID(context.Background(), "u1")
+	ctx := analytics.WithUserID(t.Context(), "u1")
 	if err := a.Identify(ctx, "", map[string]any{"email": "a@b.c"}); err != nil {
 		t.Fatal(err)
 	}
@@ -250,7 +250,7 @@ func TestIdentify_anonymous_fallsBackToDefault(t *testing.T) {
 
 	a, f := newTestAdapter(t)
 
-	if err := a.Identify(context.Background(), "", map[string]any{"email": "a@b.c"}); err != nil {
+	if err := a.Identify(t.Context(), "", map[string]any{"email": "a@b.c"}); err != nil {
 		t.Fatal(err)
 	}
 
@@ -274,7 +274,7 @@ func TestIdentify_missingIdentity_returnsSentinel(t *testing.T) {
 	a, f := newTestAdapter(t)
 	a.anonymousID = ""
 
-	if err := a.Identify(context.Background(), "", nil); !errors.Is(err, analytics.ErrMissingIdentity) {
+	if err := a.Identify(t.Context(), "", nil); !errors.Is(err, analytics.ErrMissingIdentity) {
 		t.Fatalf("want ErrMissingIdentity, got %v", err)
 	}
 
@@ -289,7 +289,7 @@ func TestIdentify_anonymousDisabled_omitsBridgeProperty(t *testing.T) {
 	a, f := newTestAdapter(t)
 	a.anonymousID = ""
 
-	if err := a.Identify(context.Background(), "u1", nil); err != nil {
+	if err := a.Identify(t.Context(), "u1", nil); err != nil {
 		t.Fatal(err)
 	}
 
@@ -310,7 +310,7 @@ func TestIdentify_enqueueError_wrapsCause(t *testing.T) {
 	fakeErr := errors.New("boom")
 	f.enqueueErr = fakeErr
 
-	if err := a.Identify(context.Background(), "u1", nil); !errors.Is(err, fakeErr) {
+	if err := a.Identify(t.Context(), "u1", nil); !errors.Is(err, fakeErr) {
 		t.Fatalf("want wrapped boom, got %v", err)
 	}
 }
@@ -320,7 +320,7 @@ func TestGroup_sendsGroupIdentifyMessage(t *testing.T) {
 
 	a, f := newTestAdapter(t)
 
-	if err := a.Group(context.Background(), "u1", "org-1", map[string]any{"name": "acme"}); err != nil {
+	if err := a.Group(t.Context(), "u1", "org-1", map[string]any{"name": "acme"}); err != nil {
 		t.Fatal(err)
 	}
 
@@ -351,7 +351,7 @@ func TestGroup_anonymous_fallsBackToDefault(t *testing.T) {
 
 	a, f := newTestAdapter(t)
 
-	if err := a.Group(context.Background(), "", "org-1", nil); err != nil {
+	if err := a.Group(t.Context(), "", "org-1", nil); err != nil {
 		t.Fatal(err)
 	}
 
@@ -370,7 +370,7 @@ func TestGroup_ctxUserID_usesContextIdentity(t *testing.T) {
 
 	a, f := newTestAdapter(t)
 
-	ctx := analytics.WithUserID(context.Background(), "u1")
+	ctx := analytics.WithUserID(t.Context(), "u1")
 	if err := a.Group(ctx, "", "org-1", nil); err != nil {
 		t.Fatal(err)
 	}
@@ -390,7 +390,7 @@ func TestGroup_paramID_takesPrecedenceOverContext(t *testing.T) {
 
 	a, f := newTestAdapter(t)
 
-	ctx := analytics.WithUserID(context.Background(), "ctx-user")
+	ctx := analytics.WithUserID(t.Context(), "ctx-user")
 	if err := a.Group(ctx, "param-user", "org-1", nil); err != nil {
 		t.Fatal(err)
 	}
@@ -411,7 +411,7 @@ func TestGroup_missingIdentity_returnsSentinel(t *testing.T) {
 	a, f := newTestAdapter(t)
 	a.anonymousID = ""
 
-	if err := a.Group(context.Background(), "", "org-1", nil); !errors.Is(err, analytics.ErrMissingIdentity) {
+	if err := a.Group(t.Context(), "", "org-1", nil); !errors.Is(err, analytics.ErrMissingIdentity) {
 		t.Fatalf("want ErrMissingIdentity, got %v", err)
 	}
 
@@ -425,7 +425,7 @@ func TestGroup_missingGroupID_returnsSentinel(t *testing.T) {
 
 	a, f := newTestAdapter(t)
 
-	if err := a.Group(context.Background(), "u1", "", nil); !errors.Is(err, analytics.ErrMissingGroupID) {
+	if err := a.Group(t.Context(), "u1", "", nil); !errors.Is(err, analytics.ErrMissingGroupID) {
 		t.Fatalf("want ErrMissingGroupID, got %v", err)
 	}
 
@@ -440,7 +440,7 @@ func TestGroup_customType_appliesToMessage(t *testing.T) {
 	a, f := newTestAdapter(t)
 	a.groupType = "workspace"
 
-	if err := a.Group(context.Background(), "u1", "ws-1", nil); err != nil {
+	if err := a.Group(t.Context(), "u1", "ws-1", nil); err != nil {
 		t.Fatal(err)
 	}
 
@@ -461,7 +461,7 @@ func TestGroup_enqueueError_wrapsCause(t *testing.T) {
 	fakeErr := errors.New("boom")
 	f.enqueueErr = fakeErr
 
-	if err := a.Group(context.Background(), "u1", "org-1", nil); !errors.Is(err, fakeErr) {
+	if err := a.Group(t.Context(), "u1", "org-1", nil); !errors.Is(err, fakeErr) {
 		t.Fatalf("want wrapped boom, got %v", err)
 	}
 }
@@ -597,7 +597,7 @@ func TestOperations_canceledContext_returnsCanceled(t *testing.T) {
 
 	a, f := newTestAdapter(t)
 
-	ctx, cancel := context.WithCancel(context.Background())
+	ctx, cancel := context.WithCancel(t.Context())
 	cancel()
 
 	if err := a.Track(ctx, "event", nil); !errors.Is(err, context.Canceled) {
@@ -624,7 +624,7 @@ func TestTrack_tooManyProperties_returnsCountLimit(t *testing.T) {
 	a.maxProperties = 2
 
 	props := map[string]any{"a": "1", "b": "2", "c": "3"}
-	if err := a.Track(context.Background(), "event", props); err == nil {
+	if err := a.Track(t.Context(), "event", props); err == nil {
 		t.Fatal("want error for too many properties, got nil")
 	} else {
 		var countErr *analytics.CountLimitError
@@ -644,7 +644,7 @@ func TestTrack_oversizedProperties_returnsSizeLimit(t *testing.T) {
 	a, f := newTestAdapter(t)
 
 	props := map[string]any{"big": strings.Repeat("x", 128*1024)}
-	if err := a.Track(context.Background(), "event", props); err == nil {
+	if err := a.Track(t.Context(), "event", props); err == nil {
 		t.Fatal("want error for oversized properties, got nil")
 	} else {
 		var sizeErr *analytics.SizeLimitError
@@ -664,7 +664,7 @@ func TestIdentify_oversizedTraits_returnsSizeLimit(t *testing.T) {
 	a, f := newTestAdapter(t)
 
 	traits := map[string]any{"big": strings.Repeat("x", 128*1024)}
-	if err := a.Identify(context.Background(), "u1", traits); err == nil {
+	if err := a.Identify(t.Context(), "u1", traits); err == nil {
 		t.Fatal("want error for oversized traits, got nil")
 	} else {
 		var sizeErr *analytics.SizeLimitError
@@ -684,7 +684,7 @@ func TestGroup_oversizedTraits_returnsSizeLimit(t *testing.T) {
 	a, f := newTestAdapter(t)
 
 	traits := map[string]any{"big": strings.Repeat("x", 128*1024)}
-	if err := a.Group(context.Background(), "u1", "g1", traits); err == nil {
+	if err := a.Group(t.Context(), "u1", "g1", traits); err == nil {
 		t.Fatal("want error for oversized traits, got nil")
 	} else {
 		var sizeErr *analytics.SizeLimitError
@@ -711,7 +711,7 @@ func TestTrack_concurrent_enqueuesAllMessages(t *testing.T) {
 		go func() {
 			defer wg.Done()
 
-			ctx := analytics.WithUserID(context.Background(), "u1")
+			ctx := analytics.WithUserID(t.Context(), "u1")
 			if err := a.Track(ctx, "event", map[string]any{"i": i}); err != nil {
 				t.Error(err)
 			}
@@ -770,7 +770,7 @@ func TestGroup_emptyType_fallsBackToDefault(t *testing.T) {
 	a, f := newTestAdapter(t)
 	a.groupType = ""
 
-	if err := a.Group(context.Background(), "u1", "org-1", nil); err != nil {
+	if err := a.Group(t.Context(), "u1", "org-1", nil); err != nil {
 		t.Fatal(err)
 	}
 
@@ -804,7 +804,7 @@ func TestOpen_endpoint_wiresLocalServer(t *testing.T) {
 		t.Fatalf("open: %v", err)
 	}
 
-	if err := a.Track(context.Background(), "signed_up", map[string]any{"plan": "free"}); err != nil {
+	if err := a.Track(t.Context(), "signed_up", map[string]any{"plan": "free"}); err != nil {
 		t.Fatalf("track: %v", err)
 	}
 
@@ -847,7 +847,7 @@ func TestOpen_endpoint_deliversTrackPayload(t *testing.T) {
 		t.Fatalf("open: %v", err)
 	}
 
-	if err := a.Track(context.Background(), "signed_up", map[string]any{"plan": "free"}); err != nil {
+	if err := a.Track(t.Context(), "signed_up", map[string]any{"plan": "free"}); err != nil {
 		t.Fatalf("track: %v", err)
 	}
 

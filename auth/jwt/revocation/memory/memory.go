@@ -19,6 +19,12 @@ import (
 // DefaultMaxEntries caps revocation-map memory (~5 MB at ~500 B/entry).
 const DefaultMaxEntries = 10000
 
+// DefaultPruneInterval is the background pruner period before jitter.
+const DefaultPruneInterval = time.Minute
+
+// DefaultPruneJitterWindow bounds the random pruner offset; half is subtracted.
+const DefaultPruneJitterWindow = 10 * time.Second
+
 // newTicker constructs the pruner ticker, swappable in tests.
 var newTicker = time.NewTicker
 
@@ -216,8 +222,8 @@ func (s *store) startPruner() {
 		// Jitter the 1m interval to avoid thundering herd when many stores
 		// start together (e.g. rolling deploy).
 		//nolint:gosec // math/rand suffices for non-security jitter.
-		jitter := time.Duration(mrand.Int63n(int64(10*time.Second))) - 5*time.Second
-		ticker := newTicker(time.Minute + jitter)
+		jitter := time.Duration(mrand.Int63n(int64(DefaultPruneJitterWindow))) - DefaultPruneJitterWindow/2
+		ticker := newTicker(DefaultPruneInterval + jitter)
 		defer ticker.Stop()
 
 		for {

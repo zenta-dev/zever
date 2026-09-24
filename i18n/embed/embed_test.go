@@ -30,7 +30,7 @@ func mustNew(t *testing.T, fs fstest.MapFS, fallback string) i18n.I18n {
 func TestTranslate_exactHit(t *testing.T) {
 	t.Parallel()
 	be := mustNew(t, testFS(), "en")
-	got, err := be.Translate(context.Background(), "en", "hello", map[string]string{"name": "Ada"})
+	got, err := be.Translate(t.Context(), "en", "hello", map[string]string{"name": "Ada"})
 	if err != nil {
 		t.Fatalf("Translate() error = %v", err)
 	}
@@ -42,7 +42,7 @@ func TestTranslate_exactHit(t *testing.T) {
 func TestTranslate_baseLocaleStrip(t *testing.T) {
 	t.Parallel()
 	be := mustNew(t, testFS(), "en")
-	got, err := be.Translate(context.Background(), "en-US", "bye", map[string]string{"name": "x"})
+	got, err := be.Translate(t.Context(), "en-US", "bye", map[string]string{"name": "x"})
 	if err != nil {
 		t.Fatalf("Translate() error = %v", err)
 	}
@@ -54,7 +54,7 @@ func TestTranslate_baseLocaleStrip(t *testing.T) {
 func TestTranslate_fallbackChain(t *testing.T) {
 	t.Parallel()
 	be := mustNew(t, testFS(), "en")
-	got, err := be.Translate(context.Background(), "fr", "bye", map[string]string{"name": "x"})
+	got, err := be.Translate(t.Context(), "fr", "bye", map[string]string{"name": "x"})
 	if err != nil {
 		t.Fatalf("Translate() error = %v", err)
 	}
@@ -66,7 +66,7 @@ func TestTranslate_fallbackChain(t *testing.T) {
 func TestTranslate_missingLocale(t *testing.T) {
 	t.Parallel()
 	be := mustNew(t, testFS(), "")
-	_, err := be.Translate(context.Background(), "de", "hello", map[string]string{"name": "x"})
+	_, err := be.Translate(t.Context(), "de", "hello", map[string]string{"name": "x"})
 	if !errors.Is(err, i18n.ErrLocaleNotFound) && !errors.Is(err, i18n.ErrKeyNotFound) {
 		t.Fatalf("Translate() error = %v, want ErrLocaleNotFound or ErrKeyNotFound", err)
 	}
@@ -83,7 +83,7 @@ func TestTranslate_missingLocale(t *testing.T) {
 func TestTranslate_missingKey(t *testing.T) {
 	t.Parallel()
 	be := mustNew(t, testFS(), "en")
-	_, err := be.Translate(context.Background(), "en", "nope", nil)
+	_, err := be.Translate(t.Context(), "en", "nope", nil)
 	if !errors.Is(err, i18n.ErrKeyNotFound) {
 		t.Fatalf("Translate() error = %v, want ErrKeyNotFound", err)
 	}
@@ -99,7 +99,7 @@ func TestTranslate_missingKey(t *testing.T) {
 func TestTranslate_missingArgExecuteError(t *testing.T) {
 	t.Parallel()
 	be := mustNew(t, testFS(), "en")
-	_, err := be.Translate(context.Background(), "en", "hello", map[string]string{})
+	_, err := be.Translate(t.Context(), "en", "hello", map[string]string{})
 	if err == nil {
 		t.Fatal("Translate() with empty args on action template = nil error, want missingkey error")
 	}
@@ -108,7 +108,7 @@ func TestTranslate_missingArgExecuteError(t *testing.T) {
 func TestTranslate_emptyLocale(t *testing.T) {
 	t.Parallel()
 	be := mustNew(t, testFS(), "en")
-	_, err := be.Translate(context.Background(), "   ", "hello", nil)
+	_, err := be.Translate(t.Context(), "   ", "hello", nil)
 	if !errors.Is(err, i18n.ErrLocaleNotFound) {
 		t.Fatalf("Translate() error = %v, want ErrLocaleNotFound", err)
 	}
@@ -160,7 +160,7 @@ func TestLocales_sorted(t *testing.T) {
 		"en.json": {Data: []byte(`{"a":"b"}`)},
 		"de.json": {Data: []byte(`{"a":"b"}`)},
 	}, "")
-	got, err := be.Locales(context.Background())
+	got, err := be.Locales(t.Context())
 	if err != nil {
 		t.Fatalf("Locales() error = %v", err)
 	}
@@ -187,10 +187,10 @@ func TestAfterClose(t *testing.T) {
 	if err := be.Close(); err != nil {
 		t.Fatalf("second Close() error = %v, want nil (idempotent)", err)
 	}
-	if _, err := be.Translate(context.Background(), "en", "hello", nil); !errors.Is(err, i18n.ErrClosed) {
+	if _, err := be.Translate(t.Context(), "en", "hello", nil); !errors.Is(err, i18n.ErrClosed) {
 		t.Errorf("Translate() after Close error = %v, want ErrClosed", err)
 	}
-	if _, err := be.Locales(context.Background()); !errors.Is(err, i18n.ErrClosed) {
+	if _, err := be.Locales(t.Context()); !errors.Is(err, i18n.ErrClosed) {
 		t.Errorf("Locales() after Close error = %v, want ErrClosed", err)
 	}
 }
@@ -204,11 +204,11 @@ func TestConcurrentTranslate(t *testing.T) {
 		go func() {
 			defer wg.Done()
 			for j := 0; j < 25; j++ {
-				if _, err := be.Translate(context.Background(), "en", "hello", map[string]string{"name": "Ada"}); err != nil {
+				if _, err := be.Translate(t.Context(), "en", "hello", map[string]string{"name": "Ada"}); err != nil {
 					t.Errorf("Translate() error = %v", err)
 					return
 				}
-				if _, err := be.Locales(context.Background()); err != nil {
+				if _, err := be.Locales(t.Context()); err != nil {
 					t.Errorf("Locales() error = %v", err)
 					return
 				}
@@ -221,7 +221,7 @@ func TestConcurrentTranslate(t *testing.T) {
 func TestTranslate_cancelledContext(t *testing.T) {
 	t.Parallel()
 	be := mustNew(t, testFS(), "en")
-	ctx, cancel := context.WithCancel(context.Background())
+	ctx, cancel := context.WithCancel(t.Context())
 	cancel()
 	if _, err := be.Translate(ctx, "en", "hello", nil); err == nil {
 		t.Error("Translate() with cancelled ctx = nil error, want ctx.Err()")

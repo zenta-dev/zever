@@ -1,7 +1,6 @@
 package redis
 
 import (
-	"context"
 	"errors"
 	"fmt"
 	"os"
@@ -76,7 +75,7 @@ func newTestStore(t *testing.T) idempotency.Store {
 func TestRedis_claimCompleteReplay(t *testing.T) {
 	t.Parallel()
 
-	ctx := context.Background()
+	ctx := t.Context()
 	s := newTestStore(t)
 	key := freshKey(t)
 	fp := []byte("fp-1")
@@ -112,7 +111,7 @@ func TestRedis_claimCompleteReplay(t *testing.T) {
 func TestRedis_secondClaimantInProgress(t *testing.T) {
 	t.Parallel()
 
-	ctx := context.Background()
+	ctx := t.Context()
 	s := newTestStore(t)
 	key := freshKey(t)
 	fp := []byte("fp")
@@ -129,7 +128,7 @@ func TestRedis_secondClaimantInProgress(t *testing.T) {
 func TestRedis_mismatchPending(t *testing.T) {
 	t.Parallel()
 
-	ctx := context.Background()
+	ctx := t.Context()
 	s := newTestStore(t)
 	key := freshKey(t)
 
@@ -145,7 +144,7 @@ func TestRedis_mismatchPending(t *testing.T) {
 func TestRedis_mismatchDone(t *testing.T) {
 	t.Parallel()
 
-	ctx := context.Background()
+	ctx := t.Context()
 	s := newTestStore(t)
 	key := freshKey(t)
 
@@ -165,7 +164,7 @@ func TestRedis_mismatchDone(t *testing.T) {
 func TestRedis_nilFingerprintCompat(t *testing.T) {
 	t.Parallel()
 
-	ctx := context.Background()
+	ctx := t.Context()
 	s := newTestStore(t)
 	key := freshKey(t)
 
@@ -190,7 +189,7 @@ func TestRedis_nilFingerprintCompat(t *testing.T) {
 func TestRedis_completeWithoutBegin(t *testing.T) {
 	t.Parallel()
 
-	ctx := context.Background()
+	ctx := t.Context()
 	s := newTestStore(t)
 	key := freshKey(t)
 	fp := []byte("fp")
@@ -212,7 +211,7 @@ func TestRedis_completeWithoutBegin(t *testing.T) {
 func TestRedis_completeMismatchNoOverwrite(t *testing.T) {
 	t.Parallel()
 
-	ctx := context.Background()
+	ctx := t.Context()
 	s := newTestStore(t)
 	key := freshKey(t)
 
@@ -241,7 +240,7 @@ func TestRedis_completeMismatchNoOverwrite(t *testing.T) {
 // Sequential on purpose: FastForward jumps the shared server clock, so it
 // must not run alongside other tests.
 func TestRedis_expiry(t *testing.T) {
-	ctx := context.Background()
+	ctx := t.Context()
 	s := newTestStore(t)
 	key := freshKey(t)
 	fp := []byte("fp")
@@ -265,7 +264,7 @@ func TestRedis_expiry(t *testing.T) {
 func TestRedis_forget(t *testing.T) {
 	t.Parallel()
 
-	ctx := context.Background()
+	ctx := t.Context()
 	s := newTestStore(t)
 	key := freshKey(t)
 	fp := []byte("fp")
@@ -303,7 +302,7 @@ func TestRedis_forget(t *testing.T) {
 func TestRedis_copyIndependence(t *testing.T) {
 	t.Parallel()
 
-	ctx := context.Background()
+	ctx := t.Context()
 	s := newTestStore(t)
 	key := freshKey(t)
 	fp := []byte("fp")
@@ -343,7 +342,7 @@ func TestRedis_copyIndependence(t *testing.T) {
 func TestRedis_afterClose(t *testing.T) {
 	t.Parallel()
 
-	ctx := context.Background()
+	ctx := t.Context()
 	s := newTestStore(t)
 	key := freshKey(t)
 
@@ -371,7 +370,7 @@ func TestRedis_afterClose(t *testing.T) {
 func TestRedis_invalidKeys(t *testing.T) {
 	t.Parallel()
 
-	ctx := context.Background()
+	ctx := t.Context()
 	s := newTestStore(t)
 
 	long := make([]byte, idempotency.MaxKeyLen+1)
@@ -421,7 +420,7 @@ func TestRedis_invalidOptions(t *testing.T) {
 func TestRedis_concurrentSingleWinner(t *testing.T) {
 	t.Parallel()
 
-	ctx := context.Background()
+	ctx := t.Context()
 	s := newTestStore(t)
 	key := freshKey(t)
 	fp := []byte("fp")
@@ -470,7 +469,7 @@ func TestRedis_concurrentSingleWinner(t *testing.T) {
 func TestRedis_fingerprintTooLarge_rejected(t *testing.T) {
 	t.Parallel()
 
-	ctx := context.Background()
+	ctx := t.Context()
 	s := newTestStore(t)
 	key := freshKey(t)
 	big := make([]byte, 5000)

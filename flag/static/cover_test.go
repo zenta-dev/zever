@@ -1,7 +1,6 @@
 package static
 
 import (
-	"context"
 	"errors"
 	"math"
 	"os"
@@ -43,7 +42,7 @@ func TestCoverNewNullJSONGivesEmptySet(t *testing.T) {
 	}
 	t.Cleanup(func() { _ = f.Close() })
 
-	if got, err := f.Bool(context.Background(), "any", true); err != nil || !got {
+	if got, err := f.Bool(t.Context(), "any", true); err != nil || !got {
 		t.Fatalf("Bool after null catalog = %v, %v; want true, nil", got, err)
 	}
 }
@@ -62,7 +61,7 @@ func TestCoverReloadStatFailsKeepsGood(t *testing.T) {
 		t.Fatalf("remove: %v", err)
 	}
 
-	if got, err := f.Bool(context.Background(), "k", false); err != nil || !got {
+	if got, err := f.Bool(t.Context(), "k", false); err != nil || !got {
 		t.Fatalf("Bool after delete = %v, %v; want last-good true, nil", got, err)
 	}
 }
@@ -86,7 +85,7 @@ func TestCoverReloadReadFailsKeepsGood(t *testing.T) {
 	}
 	t.Cleanup(func() { _ = os.Remove(p) })
 
-	if got, err := f.Bool(context.Background(), "k", false); err != nil || !got {
+	if got, err := f.Bool(t.Context(), "k", false); err != nil || !got {
 		t.Fatalf("Bool after dir-swap = %v, %v; want last-good true, nil", got, err)
 	}
 }
@@ -106,7 +105,7 @@ func TestCoverReloadSameContentUpdatesMod(t *testing.T) {
 	}
 	bumpModtime(t, p, 2*time.Second)
 
-	if got, err := f.Bool(context.Background(), "k", false); err != nil || !got {
+	if got, err := f.Bool(t.Context(), "k", false); err != nil || !got {
 		t.Fatalf("Bool after same-content rewrite = %v, %v; want true, nil", got, err)
 	}
 }
@@ -126,7 +125,7 @@ func TestCoverReloadNullBecomesEmpty(t *testing.T) {
 	}
 	bumpModtime(t, p, 2*time.Second)
 
-	if got, err := f.Bool(context.Background(), "k", false); err != nil || got {
+	if got, err := f.Bool(t.Context(), "k", false); err != nil || got {
 		t.Fatalf("Bool after null reload = %v, %v; want false (missing), nil", got, err)
 	}
 }
@@ -155,7 +154,7 @@ func TestCoverReloadConcurrentConverges(t *testing.T) {
 				case <-stop:
 					return
 				default:
-					_, _ = f.Bool(context.Background(), "k", false)
+					_, _ = f.Bool(t.Context(), "k", false)
 				}
 			}
 		}()
@@ -174,7 +173,7 @@ func TestCoverReloadConcurrentConverges(t *testing.T) {
 	close(stop)
 	wg.Wait()
 
-	if got, err := f.Bool(context.Background(), "k", false); err != nil || !got {
+	if got, err := f.Bool(t.Context(), "k", false); err != nil || !got {
 		t.Fatalf("Bool after hammer = %v, %v; want true, nil", got, err)
 	}
 }
@@ -268,7 +267,7 @@ func TestCoverBoolNonScalarMismatch(t *testing.T) {
 	t.Parallel()
 
 	d := &driver{flags: map[string]any{"b": []any{float64(1)}}}
-	if _, err := d.Bool(context.Background(), "b", true); err == nil {
+	if _, err := d.Bool(t.Context(), "b", true); err == nil {
 		t.Fatal("Bool(slice) = nil error, want mismatch")
 	}
 }
@@ -277,7 +276,7 @@ func TestCoverStringIntCase(t *testing.T) {
 	t.Parallel()
 
 	d := &driver{flags: map[string]any{"s": 42}}
-	got, err := d.String(context.Background(), "s", "fb")
+	got, err := d.String(t.Context(), "s", "fb")
 	if err != nil || got != "42" {
 		t.Fatalf("String(int 42) = %q, %v; want %q, nil", got, err, "42")
 	}
@@ -287,7 +286,7 @@ func TestCoverIntIntCase(t *testing.T) {
 	t.Parallel()
 
 	d := &driver{flags: map[string]any{"i": 7}}
-	got, err := d.Int(context.Background(), "i", 9)
+	got, err := d.Int(t.Context(), "i", 9)
 	if err != nil || got != 7 {
 		t.Fatalf("Int(int 7) = %d, %v; want 7, nil", got, err)
 	}
@@ -297,7 +296,7 @@ func TestCoverIntBoolMismatch(t *testing.T) {
 	t.Parallel()
 
 	d := &driver{flags: map[string]any{"i": true}}
-	if _, err := d.Int(context.Background(), "i", 9); err == nil {
+	if _, err := d.Int(t.Context(), "i", 9); err == nil {
 		t.Fatal("Int(bool) = nil error, want mismatch")
 	}
 }
@@ -307,7 +306,7 @@ func TestCoverJSONValidateKey(t *testing.T) {
 
 	d := &driver{flags: map[string]any{}}
 	var out map[string]any
-	if err := d.JSON(context.Background(), "", &out, nil); err == nil {
+	if err := d.JSON(t.Context(), "", &out, nil); err == nil {
 		t.Fatal("JSON(empty key) = nil error, want validation error")
 	}
 }
@@ -317,7 +316,7 @@ func TestCoverJSONFallbackMarshalFail(t *testing.T) {
 
 	d := &driver{flags: map[string]any{}}
 	var out map[string]any
-	if err := d.JSON(context.Background(), "missing", &out, func() {}); err == nil {
+	if err := d.JSON(t.Context(), "missing", &out, func() {}); err == nil {
 		t.Fatal("JSON(unmarshalable fallback) = nil error, want marshal error")
 	}
 }
@@ -327,7 +326,7 @@ func TestCoverJSONFallbackUnmarshalFail(t *testing.T) {
 
 	d := &driver{flags: map[string]any{}}
 	var out map[string]any
-	if err := d.JSON(context.Background(), "missing", &out, "xx"); err == nil {
+	if err := d.JSON(t.Context(), "missing", &out, "xx"); err == nil {
 		t.Fatal("JSON(string fallback into map) = nil error, want unmarshal error")
 	}
 }
@@ -337,7 +336,7 @@ func TestCoverJSONMarshalValueFail(t *testing.T) {
 
 	d := &driver{flags: map[string]any{"k": func() {}}}
 	var out map[string]any
-	if err := d.JSON(context.Background(), "k", &out, nil); err == nil {
+	if err := d.JSON(t.Context(), "k", &out, nil); err == nil {
 		t.Fatal("JSON(func value) = nil error, want marshal error")
 	}
 }
@@ -347,7 +346,7 @@ func TestCoverJSONRawBadString(t *testing.T) {
 
 	d := &driver{flags: map[string]any{"k": "{bad"}}
 	var out map[string]any
-	if err := d.JSON(context.Background(), "k", &out, nil); err == nil {
+	if err := d.JSON(t.Context(), "k", &out, nil); err == nil {
 		t.Fatal("JSON(bad raw string) = nil error, want unmarshal error")
 	}
 }

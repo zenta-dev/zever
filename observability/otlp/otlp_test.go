@@ -132,7 +132,7 @@ func TestShutdown_emptyProvider_nilError(t *testing.T) {
 
 	var p provider
 
-	ctx, cancel := context.WithTimeout(context.Background(), 2*time.Second)
+	ctx, cancel := context.WithTimeout(t.Context(), 2*time.Second)
 	defer cancel()
 
 	if err := p.Shutdown(ctx); err != nil {
@@ -144,15 +144,15 @@ func TestShutdown_joinsErrors(t *testing.T) {
 	t.Parallel()
 
 	tp := sdktrace.NewTracerProvider()
-	t.Cleanup(func() { _ = tp.Shutdown(context.Background()) })
+	t.Cleanup(func() { _ = tp.Shutdown(t.Context()) })
 
 	reader := sdkmetric.NewManualReader()
 	mp := sdkmetric.NewMeterProvider(sdkmetric.WithReader(reader))
-	t.Cleanup(func() { _ = mp.Shutdown(context.Background()) })
+	t.Cleanup(func() { _ = mp.Shutdown(t.Context()) })
 
 	p := &provider{tracer: &tracer{tp: tp, tracer: tp.Tracer("test")}, metrics: &metrics{mp: mp}}
 
-	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
+	ctx, cancel := context.WithTimeout(t.Context(), 5*time.Second)
 	defer cancel()
 
 	if err := p.Shutdown(ctx); err != nil {
@@ -165,7 +165,7 @@ func TestInstrumentCache_kindMismatch_typedError(t *testing.T) {
 
 	reader := sdkmetric.NewManualReader()
 	mp := sdkmetric.NewMeterProvider(sdkmetric.WithReader(reader))
-	t.Cleanup(func() { _ = mp.Shutdown(context.Background()) })
+	t.Cleanup(func() { _ = mp.Shutdown(t.Context()) })
 
 	c := &instrumentCache{
 		kinds:      make(map[string]instrumentKind),
@@ -174,7 +174,7 @@ func TestInstrumentCache_kindMismatch_typedError(t *testing.T) {
 		histograms: make(map[string]metric.Float64Histogram),
 	}
 
-	ctx := context.Background()
+	ctx := t.Context()
 	if _, err := c.counter(mp, "scope", "shared"); err != nil {
 		t.Fatalf("counter() error = %v", err)
 	}
@@ -208,7 +208,7 @@ func TestInstrumentCache_limit_returnsTooMany(t *testing.T) {
 
 	reader := sdkmetric.NewManualReader()
 	mp := sdkmetric.NewMeterProvider(sdkmetric.WithReader(reader))
-	t.Cleanup(func() { _ = mp.Shutdown(context.Background()) })
+	t.Cleanup(func() { _ = mp.Shutdown(t.Context()) })
 
 	c := &instrumentCache{
 		kinds:      make(map[string]instrumentKind),

@@ -1,7 +1,6 @@
 package orm
 
 import (
-	"context"
 	"testing"
 
 	"github.com/zenta-dev/zever/db"
@@ -23,7 +22,7 @@ func TestJSONStepConstructors(t *testing.T) {
 }
 
 func TestJSONIndexArrayQuery(t *testing.T) {
-	ctx := context.Background()
+	ctx := t.Context()
 
 	conn, err := sqlite.New(db.Options{Path: ":memory:"})
 	if err != nil {

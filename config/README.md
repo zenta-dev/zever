@@ -94,6 +94,7 @@ rejected as unknown fields. Migration:
 | `minlevel` | `min_level` |
 | `sweepinterval` / `maxentries` | `sweep_interval` / `max_entries` |
 | `poolsize` / `minidleconns` / `pooltimeout` / `connmaxidletime` / `connmaxlifetime` | `pool_size` / `min_idle_conns` / `pool_timeout` / `conn_max_idle_time` / `conn_max_lifetime` |
+| `conn_max_idle_time` / `conn_max_lifetime` | `max_conn_idle_time` / `max_conn_lifetime` |
 | `secretkey` / `webhooksecret` | `secret_key` / `webhook_secret` |
 | `autoapprove` / `maxwebhookbytes` | `auto_approve` / `max_webhook_bytes` |
 | `anonymousid` / `grouptype` | `anonymous_id` / `group_type` |

@@ -1,7 +1,6 @@
 package memory_test
 
 import (
-	"context"
 	"errors"
 	"math"
 	"strings"
@@ -43,7 +42,7 @@ func TestBurstThenDeny(t *testing.T) {
 	t.Parallel()
 
 	l := newLimiter(t, ratelimit.Options{Rate: 10, Burst: 3})
-	ctx := context.Background()
+	ctx := t.Context()
 
 	for i := 0; i < 3; i++ {
 		d, err := l.Allow(ctx, "k-burst", 1)
@@ -74,7 +73,7 @@ func TestRefill(t *testing.T) {
 	t.Parallel()
 
 	l := newLimiter(t, ratelimit.Options{Rate: 100, Burst: 3})
-	ctx := context.Background()
+	ctx := t.Context()
 
 	for i := 0; i < 3; i++ {
 		d, err := l.Allow(ctx, "k-refill", 1)
@@ -103,7 +102,7 @@ func TestInvalidCost(t *testing.T) {
 	t.Parallel()
 
 	l := newLimiter(t, ratelimit.Options{Rate: 10, Burst: 3})
-	ctx := context.Background()
+	ctx := t.Context()
 
 	for _, cost := range []float64{0, -1, math.NaN(), math.Inf(1), math.Inf(-1)} {
 		if _, err := l.Allow(ctx, "k-cost", cost); !errors.Is(err, ratelimit.ErrInvalidCost) {
@@ -116,7 +115,7 @@ func TestInvalidKey(t *testing.T) {
 	t.Parallel()
 
 	l := newLimiter(t, ratelimit.Options{Rate: 10, Burst: 3})
-	ctx := context.Background()
+	ctx := t.Context()
 
 	for _, key := range []string{"", string(make([]byte, ratelimit.MaxKeyLen+1)), "a\nb", "a\x00b"} {
 		if _, err := l.Allow(ctx, key, 1); !errors.Is(err, ratelimit.ErrInvalidKey) {
@@ -133,7 +132,7 @@ func TestResetRestoresFull(t *testing.T) {
 	t.Parallel()
 
 	l := newLimiter(t, ratelimit.Options{Rate: 1, Burst: 2})
-	ctx := context.Background()
+	ctx := t.Context()
 
 	_, _ = l.Allow(ctx, "k-reset", 1)
 	_, _ = l.Allow(ctx, "k-reset", 1)
@@ -158,7 +157,7 @@ func TestResetUnknownNil(t *testing.T) {
 
 	l := newLimiter(t, ratelimit.Options{Rate: 10, Burst: 3})
 
-	if err := l.Reset(context.Background(), "k-missing"); err != nil {
+	if err := l.Reset(t.Context(), "k-missing"); err != nil {
 		t.Fatalf("Reset unknown = %v, want nil", err)
 	}
 }
@@ -167,7 +166,7 @@ func TestIdleExpiry(t *testing.T) {
 	t.Parallel()
 
 	l := newLimiter(t, ratelimit.Options{Rate: 1, Burst: 2, IdleTTL: 50 * time.Millisecond})
-	ctx := context.Background()
+	ctx := t.Context()
 
 	_, _ = l.Allow(ctx, "k-idle", 2)
 
@@ -195,11 +194,11 @@ func TestAfterClose(t *testing.T) {
 		t.Fatalf("Close failed: %v", err)
 	}
 
-	if _, err := l.Allow(context.Background(), "k", 1); !errors.Is(err, ratelimit.ErrClosed) {
+	if _, err := l.Allow(t.Context(), "k", 1); !errors.Is(err, ratelimit.ErrClosed) {
 		t.Errorf("Allow after close = %v, want ErrClosed", err)
 	}
 
-	if err := l.Reset(context.Background(), "k"); !errors.Is(err, ratelimit.ErrClosed) {
+	if err := l.Reset(t.Context(), "k"); !errors.Is(err, ratelimit.ErrClosed) {
 		t.Errorf("Reset after close = %v, want ErrClosed", err)
 	}
 
@@ -212,7 +211,7 @@ func TestConcurrentSameKey(t *testing.T) {
 	t.Parallel()
 
 	l := newLimiter(t, ratelimit.Options{Rate: 10, Burst: 5})
-	ctx := context.Background()
+	ctx := t.Context()
 
 	const n = 50
 

@@ -85,7 +85,7 @@ func TestCoverNewExplicit(t *testing.T) {
 
 func TestCoverAllowValidation(t *testing.T) {
 	s := newCoverStore(t, ratelimit.Options{Rate: 10, Burst: 5})
-	ctx := context.Background()
+	ctx := t.Context()
 
 	cancelCtx, cancel := context.WithCancel(ctx)
 	cancel()
@@ -128,7 +128,7 @@ func TestCoverAllowPostLockClosed(t *testing.T) {
 	done := make(chan result, 1)
 
 	go func() {
-		_, err := s.Allow(context.Background(), "k-postlock", 1)
+		_, err := s.Allow(t.Context(), "k-postlock", 1)
 		done <- result{err: err}
 	}()
 
@@ -150,7 +150,7 @@ func TestCoverAllowPostLockClosed(t *testing.T) {
 
 func TestCoverAllowBucketMath(t *testing.T) {
 	s := newCoverStore(t, ratelimit.Options{Rate: 10, Burst: 5})
-	ctx := context.Background()
+	ctx := t.Context()
 
 	d, err := s.Allow(ctx, "k-math", 2)
 	if err != nil || !d.Allowed {
@@ -186,7 +186,7 @@ func TestCoverAllowBucketMath(t *testing.T) {
 
 func TestCoverAllowRefillCapped(t *testing.T) {
 	s := newCoverStore(t, ratelimit.Options{Rate: 5, Burst: 3})
-	ctx := context.Background()
+	ctx := t.Context()
 
 	if _, err := s.Allow(ctx, "k-cap", 1); err != nil {
 		t.Fatalf("Allow failed: %v", err)
@@ -214,7 +214,7 @@ func TestCoverAllowRefillCapped(t *testing.T) {
 
 func TestCoverAllowIdleExpiryWhiteBox(t *testing.T) {
 	s := newCoverStore(t, ratelimit.Options{Rate: 1, Burst: 2, IdleTTL: time.Minute})
-	ctx := context.Background()
+	ctx := t.Context()
 
 	if _, err := s.Allow(ctx, "k-idle", 2); err != nil {
 		t.Fatalf("Allow failed: %v", err)
@@ -241,7 +241,7 @@ func TestCoverAllowIdleExpiryWhiteBox(t *testing.T) {
 
 func TestCoverAllowFutureLastClamp(t *testing.T) {
 	s := newCoverStore(t, ratelimit.Options{Rate: 10, Burst: 5})
-	ctx := context.Background()
+	ctx := t.Context()
 
 	d, err := s.Allow(ctx, "k-future", 1)
 	if err != nil || !d.Allowed {
@@ -268,7 +268,7 @@ func TestCoverAllowFutureLastClamp(t *testing.T) {
 
 func TestCoverResetPaths(t *testing.T) {
 	s := newCoverStore(t, ratelimit.Options{Rate: 10, Burst: 5})
-	ctx := context.Background()
+	ctx := t.Context()
 
 	cancelCtx, cancel := context.WithCancel(ctx)
 	cancel()
@@ -328,7 +328,7 @@ func TestCoverResetPostLockClosed(t *testing.T) {
 	done := make(chan error, 1)
 
 	go func() {
-		done <- s.Reset(context.Background(), "k-postlock")
+		done <- s.Reset(t.Context(), "k-postlock")
 	}()
 
 	// Same as Allow post-lock: the goroutine parks on s.mu, which this
@@ -357,7 +357,7 @@ func TestCoverCloseIdempotentWipes(t *testing.T) {
 		t.Fatalf("New returned %T, want *store", l)
 	}
 
-	if _, err := l.Allow(context.Background(), "k", 1); err != nil {
+	if _, err := l.Allow(t.Context(), "k", 1); err != nil {
 		t.Fatalf("Allow failed: %v", err)
 	}
 
@@ -389,7 +389,7 @@ func TestCoverRunTickerSweepsAndStops(t *testing.T) {
 		t.Fatalf("New returned %T, want *store", l)
 	}
 
-	if _, err := l.Allow(context.Background(), "k-sweep", 1); err != nil {
+	if _, err := l.Allow(t.Context(), "k-sweep", 1); err != nil {
 		t.Fatalf("Allow failed: %v", err)
 	}
 

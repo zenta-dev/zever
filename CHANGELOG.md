@@ -207,6 +207,12 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   rule codified (Options + wire types tagged, Go-only structs untagged,
   backends map storage keys explicitly).
 
+- Consistency pass, round six: receivers unified (`a` adapter, `l` logger,
+  `s` store/geo, `c` client); webhook `Open` validate error direct;
+  `ConnMax*` → `MaxConn*` prefix order; named duration consts per package;
+  `t.Context()` in all tests (`b.Context()` in benchmarks, t-taking
+  helpers elsewhere); test-style + time rules codified in AGENTS.md.
+
 
 ## [v0.2.0] - 2026-09-23
 

@@ -1,7 +1,6 @@
 package authz_test
 
 import (
-	"context"
 	"encoding/json"
 	"net/http"
 	"net/http/httptest"
@@ -37,7 +36,7 @@ func TestBearerTokenTable(t *testing.T) {
 		tc := tc
 		t.Run(tc.name, func(t *testing.T) {
 			t.Parallel()
-			r := httptest.NewRequestWithContext(context.Background(), http.MethodGet, "/", nil)
+			r := httptest.NewRequestWithContext(t.Context(), http.MethodGet, "/", nil)
 			if tc.header != "" {
 				r.Header.Set("Authorization", tc.header)
 			}
@@ -65,7 +64,7 @@ func TestMiddleware401AndHandlerNotCalled(t *testing.T) {
 	next := http.HandlerFunc(func(_ http.ResponseWriter, _ *http.Request) { called = true })
 	h := authz.Middleware(a, p, authz.Policy{AuthRequired: true}, nil)(next)
 
-	r := httptest.NewRequestWithContext(context.Background(), http.MethodGet, "/", nil)
+	r := httptest.NewRequestWithContext(t.Context(), http.MethodGet, "/", nil)
 	w := httptest.NewRecorder()
 	h.ServeHTTP(w, r)
 
@@ -96,7 +95,7 @@ func TestMiddleware401BadTokenChallenge(t *testing.T) {
 	next := http.HandlerFunc(func(_ http.ResponseWriter, _ *http.Request) { called = true })
 	h := authz.Middleware(a, p, authz.Policy{AuthRequired: true}, nil)(next)
 
-	r := httptest.NewRequestWithContext(context.Background(), http.MethodGet, "/", nil)
+	r := httptest.NewRequestWithContext(t.Context(), http.MethodGet, "/", nil)
 	r.Header.Set("Authorization", "Bearer bad")
 	w := httptest.NewRecorder()
 	h.ServeHTTP(w, r)
@@ -121,7 +120,7 @@ func TestMiddlewareDuplicateAuthHeaderRejected(t *testing.T) {
 	next := http.HandlerFunc(func(_ http.ResponseWriter, _ *http.Request) { called = true })
 	h := authz.Middleware(a, p, authz.Policy{AuthRequired: true}, nil)(next)
 
-	r := httptest.NewRequestWithContext(context.Background(), http.MethodGet, "/", nil)
+	r := httptest.NewRequestWithContext(t.Context(), http.MethodGet, "/", nil)
 	r.Header.Add("Authorization", "Bearer good")
 	r.Header.Add("Authorization", "Bearer good")
 	w := httptest.NewRecorder()
@@ -145,7 +144,7 @@ func TestMiddleware403(t *testing.T) {
 	pol := authz.Policy{AuthRequired: true, PermissionCheck: "x.y", ResourceType: "T"}
 	h := authz.Middleware(a, p, pol, nil)(next)
 
-	r := httptest.NewRequestWithContext(context.Background(), http.MethodGet, "/", nil)
+	r := httptest.NewRequestWithContext(t.Context(), http.MethodGet, "/", nil)
 	r.Header.Set("Authorization", "Bearer good")
 	w := httptest.NewRecorder()
 	h.ServeHTTP(w, r)
@@ -173,7 +172,7 @@ func TestMiddlewareSuccessClaimsRoundtrip(t *testing.T) {
 	pol := authz.Policy{AuthRequired: true, PermissionCheck: "x.y", ResourceType: "T"}
 	h := authz.Middleware(a, p, pol, func(*http.Request) string { return "res-1" })(next)
 
-	r := httptest.NewRequestWithContext(context.Background(), http.MethodGet, "/", nil)
+	r := httptest.NewRequestWithContext(t.Context(), http.MethodGet, "/", nil)
 	r.Header.Set("Authorization", "Bearer good")
 	w := httptest.NewRecorder()
 	h.ServeHTTP(w, r)
@@ -195,7 +194,7 @@ func TestMiddlewareNilResourceIDFn(t *testing.T) {
 	pol := authz.Policy{AuthRequired: true, PermissionCheck: "x.y", ResourceType: "T"}
 	h := authz.Middleware(a, p, pol, nil)(next)
 
-	r := httptest.NewRequestWithContext(context.Background(), http.MethodGet, "/", nil)
+	r := httptest.NewRequestWithContext(t.Context(), http.MethodGet, "/", nil)
 	r.Header.Set("Authorization", "Bearer good")
 	w := httptest.NewRecorder()
 	h.ServeHTTP(w, r)

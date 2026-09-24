@@ -108,7 +108,7 @@ func TestTxContextHelpers(t *testing.T) {
 	t.Run("missing returns false", func(t *testing.T) {
 		t.Parallel()
 
-		if tx, ok := TxFromContext(context.Background()); ok || tx != nil {
+		if tx, ok := TxFromContext(t.Context()); ok || tx != nil {
 			t.Errorf("got (%v, %v), want (nil, false)", tx, ok)
 		}
 	})
@@ -116,7 +116,7 @@ func TestTxContextHelpers(t *testing.T) {
 	t.Run("wrong type returns false", func(t *testing.T) {
 		t.Parallel()
 
-		ctx := context.WithValue(context.Background(), txContextKey{}, "not-a-tx")
+		ctx := context.WithValue(t.Context(), txContextKey{}, "not-a-tx")
 		if tx, ok := TxFromContext(ctx); ok || tx != nil {
 			t.Errorf("got (%v, %v), want (nil, false)", tx, ok)
 		}
@@ -126,7 +126,7 @@ func TestTxContextHelpers(t *testing.T) {
 		t.Parallel()
 
 		want := &fakeTx{}
-		ctx := WithTxIntoContext(context.Background(), want)
+		ctx := WithTxIntoContext(t.Context(), want)
 
 		got, ok := TxFromContext(ctx)
 		if !ok {
@@ -148,7 +148,7 @@ func TestWithTx(t *testing.T) {
 		tx := &fakeTx{}
 		db := &fakeTransactor{tx: tx}
 
-		err := WithTx(context.Background(), db, nil, func(ctx context.Context, got Tx) error {
+		err := WithTx(t.Context(), db, nil, func(ctx context.Context, got Tx) error {
 			if got != Tx(tx) {
 				t.Error("tx mismatch")
 			}
@@ -179,7 +179,7 @@ func TestWithTx(t *testing.T) {
 		db := &fakeTransactor{tx: tx}
 		fnErr := errors.New("fn failed")
 
-		err := WithTx(context.Background(), db, nil, func(_ context.Context, _ Tx) error {
+		err := WithTx(t.Context(), db, nil, func(_ context.Context, _ Tx) error {
 			return fnErr
 		})
 		if !errors.Is(err, fnErr) {
@@ -202,7 +202,7 @@ func TestWithTx(t *testing.T) {
 		tx := &fakeTx{commitErr: commitErr}
 		db := &fakeTransactor{tx: tx}
 
-		err := WithTx(context.Background(), db, nil, func(_ context.Context, _ Tx) error {
+		err := WithTx(t.Context(), db, nil, func(_ context.Context, _ Tx) error {
 			return nil
 		})
 		if err == nil {
@@ -229,7 +229,7 @@ func TestWithTx(t *testing.T) {
 		beginErr := errors.New("begin down")
 		db := &fakeTransactor{beginErr: beginErr}
 
-		err := WithTx(context.Background(), db, nil, func(_ context.Context, _ Tx) error {
+		err := WithTx(t.Context(), db, nil, func(_ context.Context, _ Tx) error {
 			t.Error("fn should not run")
 
 			return nil
@@ -256,7 +256,7 @@ func TestWithTx(t *testing.T) {
 		t.Parallel()
 
 		db := &fakeTransactor{tx: &fakeTx{}}
-		ctx := WithTxIntoContext(context.Background(), &fakeTx{})
+		ctx := WithTxIntoContext(t.Context(), &fakeTx{})
 
 		err := WithTx(ctx, db, nil, func(_ context.Context, _ Tx) error {
 			t.Error("fn should not run")
@@ -271,7 +271,7 @@ func TestWithTx(t *testing.T) {
 	t.Run("non transactor", func(t *testing.T) {
 		t.Parallel()
 
-		err := WithTx(context.Background(), &fakeDB{}, nil, func(_ context.Context, _ Tx) error {
+		err := WithTx(t.Context(), &fakeDB{}, nil, func(_ context.Context, _ Tx) error {
 			t.Error("fn should not run")
 
 			return nil
@@ -306,7 +306,7 @@ func TestWithTx(t *testing.T) {
 			}
 		}()
 
-		_ = WithTx(context.Background(), db, nil, func(_ context.Context, _ Tx) error {
+		_ = WithTx(t.Context(), db, nil, func(_ context.Context, _ Tx) error {
 			panic("boom")
 		})
 	})
@@ -329,7 +329,7 @@ func TestWithTx(t *testing.T) {
 			}
 		}()
 
-		_ = WithTx(context.Background(), db, nil, func(_ context.Context, _ Tx) error {
+		_ = WithTx(t.Context(), db, nil, func(_ context.Context, _ Tx) error {
 			panic("boom")
 		})
 	})

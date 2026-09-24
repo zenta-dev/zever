@@ -144,7 +144,7 @@ func TestOpen_success_GenerateStreamEmbedClose(t *testing.T) {
 		t.Fatalf("Open err = %v", err)
 	}
 	// Generate
-	gen, err := got.Generate(context.Background(), "model-x", []Message{{Role: RoleUser, Content: "hi"}}, GenerateOptions{})
+	gen, err := got.Generate(t.Context(), "model-x", []Message{{Role: RoleUser, Content: "hi"}}, GenerateOptions{})
 	if err != nil {
 		t.Fatalf("Generate err = %v", err)
 	}
@@ -152,7 +152,7 @@ func TestOpen_success_GenerateStreamEmbedClose(t *testing.T) {
 		t.Errorf("Content = %q, want ok", gen.Content)
 	}
 	// Stream
-	ch, err := got.Stream(context.Background(), "model-x", nil, GenerateOptions{})
+	ch, err := got.Stream(t.Context(), "model-x", nil, GenerateOptions{})
 	if err != nil {
 		t.Fatalf("Stream err = %v", err)
 	}
@@ -164,7 +164,7 @@ func TestOpen_success_GenerateStreamEmbedClose(t *testing.T) {
 		t.Errorf("Delta = %q, want hi", chunk.Delta)
 	}
 	// Embed
-	vecs, err := got.Embed(context.Background(), "embed-model", []string{"a", "b"}, EmbedOptions{Dimensions: 2})
+	vecs, err := got.Embed(t.Context(), "embed-model", []string{"a", "b"}, EmbedOptions{Dimensions: 2})
 	if err != nil {
 		t.Fatalf("Embed err = %v", err)
 	}
@@ -222,7 +222,7 @@ func TestGenerate_propagation(t *testing.T) {
 	if err != nil {
 		t.Fatalf("Open err = %v", err)
 	}
-	_, err = ai.Generate(context.Background(), "m", nil, GenerateOptions{})
+	_, err = ai.Generate(t.Context(), "m", nil, GenerateOptions{})
 	if !errors.Is(err, expErr) {
 		t.Fatalf("Generate err = %v, want expErr", err)
 	}
@@ -236,7 +236,7 @@ func TestGenerate_propagation(t *testing.T) {
 	if err2 != nil {
 		t.Fatalf("Open err = %v", err2)
 	}
-	_, err2 = ai2.Stream(context.Background(), "m", nil, GenerateOptions{})
+	_, err2 = ai2.Stream(t.Context(), "m", nil, GenerateOptions{})
 	if !errors.Is(err2, expErr) {
 		t.Fatalf("Stream err = %v, want expErr", err2)
 	}
@@ -250,7 +250,7 @@ func TestGenerate_propagation(t *testing.T) {
 	if err3 != nil {
 		t.Fatalf("Open err = %v", err3)
 	}
-	_, err3 = ai3.Embed(context.Background(), "m", []string{"x"}, EmbedOptions{})
+	_, err3 = ai3.Embed(t.Context(), "m", []string{"x"}, EmbedOptions{})
 	if !errors.Is(err3, expErr) {
 		t.Fatalf("Embed err = %v, want expErr", err3)
 	}

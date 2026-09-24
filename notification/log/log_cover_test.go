@@ -1,7 +1,6 @@
 package log
 
 import (
-	"context"
 	"errors"
 	"io"
 	"os"
@@ -32,7 +31,7 @@ func TestCover_NewWithWriter_NilWriterDefaultsToStdout(t *testing.T) {
 	}
 	defer n.Close()
 	sent := &notification.Notification{Target: "tok", Channel: notification.ChannelPush, Body: "hi"}
-	if notifyErr := n.Notify(context.Background(), sent); notifyErr != nil {
+	if notifyErr := n.Notify(t.Context(), sent); notifyErr != nil {
 		w.Close()
 		t.Fatalf("Notify err = %v", notifyErr)
 	}
@@ -65,7 +64,7 @@ func TestCover_Notify_ClosedAfterLock(t *testing.T) {
 	started := make(chan struct{})
 	go func() {
 		close(started)
-		done <- c.Notify(context.Background(), &notification.Notification{
+		done <- c.Notify(t.Context(), &notification.Notification{
 			Target:  "tok",
 			Channel: notification.ChannelPush,
 			Body:    "hi",
@@ -97,7 +96,7 @@ func TestCover_Notify_EncodeError(t *testing.T) {
 		t.Fatalf("NewWithWriter err = %v", err)
 	}
 	defer n.Close()
-	err = n.Notify(context.Background(), &notification.Notification{
+	err = n.Notify(t.Context(), &notification.Notification{
 		Target:  "tok",
 		Channel: notification.ChannelPush,
 		Body:    "hi",

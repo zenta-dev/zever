@@ -1,7 +1,6 @@
 package mailer
 
 import (
-	"context"
 	"errors"
 	"strings"
 	"sync/atomic"
@@ -108,7 +107,7 @@ func TestCoverOpenSuccess(t *testing.T) {
 		t.Fatalf("Open err = %v", err)
 	}
 	msg := &Mail{To: []Address{{Address: "to@example.com"}}, Subject: "s", Body: "b"}
-	if err := m.Send(context.Background(), msg); err != nil {
+	if err := m.Send(t.Context(), msg); err != nil {
 		t.Fatalf("Send err = %v", err)
 	}
 	if stub.sent != msg {
@@ -243,7 +242,7 @@ func TestCoverSenderSendErrorPassthrough(t *testing.T) {
 	sentinel := errors.New("cover-send-fail")
 	stub := &stubMailer{err: sentinel}
 	mail := &Mail{To: []Address{{Address: "to@example.com"}}, Subject: "hi", Body: "body"}
-	err := s.Send(context.Background(), stub, mail)
+	err := s.Send(t.Context(), stub, mail)
 	if !errors.Is(err, sentinel) {
 		t.Fatalf("Send err = %v, want sentinel", err)
 	}

@@ -1,7 +1,6 @@
 package migrate
 
 import (
-	"context"
 	"errors"
 	"testing"
 
@@ -49,7 +48,7 @@ func TestRenderMySQLDropIndex(t *testing.T) {
 func TestMysqlTableExists(t *testing.T) {
 	t.Parallel()
 
-	ctx := context.Background()
+	ctx := t.Context()
 
 	t.Run("present", func(t *testing.T) {
 		t.Parallel()
@@ -102,7 +101,7 @@ func TestMysqlTableExists(t *testing.T) {
 func TestIntrospectMySQLColumns(t *testing.T) {
 	t.Parallel()
 
-	ctx := context.Background()
+	ctx := t.Context()
 
 	t.Run("rows", func(t *testing.T) {
 		t.Parallel()
@@ -180,7 +179,7 @@ func TestIntrospectMySQLColumns(t *testing.T) {
 func TestIntrospectMySQLIndexes(t *testing.T) {
 	t.Parallel()
 
-	ctx := context.Background()
+	ctx := t.Context()
 
 	t.Run("grouped", func(t *testing.T) {
 		t.Parallel()
@@ -268,7 +267,7 @@ func TestIntrospectMySQLIndexes(t *testing.T) {
 func TestIntrospectMySQLForeignKeys(t *testing.T) {
 	t.Parallel()
 
-	ctx := context.Background()
+	ctx := t.Context()
 
 	t.Run("rows", func(t *testing.T) {
 		t.Parallel()

@@ -37,7 +37,7 @@ func TestLateralTruthTable(t *testing.T) {
 // dialect.ErrUnsupportedByDialect through the public All API -- never a
 // panic or a silently-degraded join -- for both lateral builders.
 func TestLateralSQLiteGated(t *testing.T) {
-	ctx := context.Background()
+	ctx := t.Context()
 
 	inner := From(widgetOrders).Where(orderWidgetID.EqOuter(Outer(widgetID))).Limit(2)
 
@@ -218,7 +218,7 @@ func TestLateralSelfAlias(t *testing.T) {
 // TestLateralStreamDrainsAndBreaks proves Stream yields scanned rows, stops
 // on consumer break, and surfaces execution failures.
 func TestLateralStreamDrainsAndBreaks(t *testing.T) {
-	ctx := context.Background()
+	ctx := t.Context()
 
 	inner := From(widgetOrders).Where(orderWidgetID.EqOuter(Outer(widgetID))).OrderBy(woAmount.Desc()).Limit(2)
 
@@ -282,7 +282,7 @@ func TestLateralStreamDrainsAndBreaks(t *testing.T) {
 // TestLateralExplainPaths proves Explain/ExplainAnalyze run the lateral
 // statement under EXPLAIN, failing closed on an unresolvable dialect.
 func TestLateralExplainPaths(t *testing.T) {
-	ctx := context.Background()
+	ctx := t.Context()
 
 	inner := From(widgetOrders).Where(orderWidgetID.EqOuter(Outer(widgetID))).Limit(1)
 	e := mockExec{dialectName: "postgres"}
@@ -316,7 +316,7 @@ func TestLateralExplainPaths(t *testing.T) {
 // columns then B's from ONE row per result, in projection order, via the
 // shared scanJoinRow (no per-row second query).
 func TestLateralCrossAllScans(t *testing.T) {
-	ctx := context.Background()
+	ctx := t.Context()
 
 	inner := From(widgetOrders).Where(orderWidgetID.EqOuter(Outer(widgetID))).OrderBy(woAmount.Desc()).Limit(2)
 
@@ -354,7 +354,7 @@ func TestLateralCrossAllScans(t *testing.T) {
 // an all-NULL inner side into Option[B]{}.IsSome() == false, never a
 // same-shaped zero-valued B{}.
 func TestLateralLeftAllScansNone(t *testing.T) {
-	ctx := context.Background()
+	ctx := t.Context()
 
 	inner := From(widgetOrders).Where(orderWidgetID.EqOuter(Outer(widgetID))).Limit(2)
 
@@ -442,7 +442,7 @@ func TestLeftLateralRenderErrorPaths(t *testing.T) {
 // TestLeftLateralStreamDrains proves LeftLateralJoin2.Stream yields scanned
 // rows and surfaces execution failures.
 func TestLeftLateralStreamDrains(t *testing.T) {
-	ctx := context.Background()
+	ctx := t.Context()
 
 	inner := From(widgetOrders).Where(orderWidgetID.EqOuter(Outer(widgetID))).Limit(2)
 
@@ -486,7 +486,7 @@ func TestLeftLateralStreamDrains(t *testing.T) {
 // TestLateralCollectErrorPaths drives scan, iteration and close failures
 // through the shared lateralCollect tail.
 func TestLateralCollectErrorPaths(t *testing.T) {
-	ctx := context.Background()
+	ctx := t.Context()
 	boom := errors.New("boom")
 
 	inner := From(widgetOrders).Where(orderWidgetID.EqOuter(Outer(widgetID))).Limit(2)
@@ -527,7 +527,7 @@ func TestLateralCollectErrorPaths(t *testing.T) {
 // TestLateralStreamErrorPaths drives render, query, scan, iteration and
 // close failures through the shared lateral stream tail.
 func TestLateralStreamErrorPaths(t *testing.T) {
-	ctx := context.Background()
+	ctx := t.Context()
 	boom := errors.New("boom")
 
 	inner := From(widgetOrders).Where(orderWidgetID.EqOuter(Outer(widgetID))).Limit(2)

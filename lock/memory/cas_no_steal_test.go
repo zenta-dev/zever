@@ -1,7 +1,6 @@
 package memory
 
 import (
-	"context"
 	"errors"
 	"testing"
 	"time"
@@ -12,7 +11,7 @@ import (
 func TestExtend_afterTakeoverDoesNotStealLock(t *testing.T) {
 	t.Parallel()
 
-	ctx := context.Background()
+	ctx := t.Context()
 	l := newLocker(t, lock.Options{})
 
 	stale, _, err := l.TryAcquire(ctx, "k", 20*time.Millisecond)

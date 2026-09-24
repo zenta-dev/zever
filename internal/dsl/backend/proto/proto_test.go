@@ -1,7 +1,6 @@
 package proto
 
 import (
-	"context"
 	"flag"
 	"os"
 	"os/exec"
@@ -139,7 +138,7 @@ func validateProto(t *testing.T, path string, content []byte) {
 
 	args = append(args, "--descriptor_set_out="+filepath.Join(dir, "out.pb"), "--include_imports", filepath.FromSlash(path))
 
-	if combined, err := exec.CommandContext(context.Background(), protoc, args...).CombinedOutput(); err != nil {
+	if combined, err := exec.CommandContext(t.Context(), protoc, args...).CombinedOutput(); err != nil {
 		t.Fatalf("protoc validation of %s failed: %v\n%s", path, err, combined)
 	}
 }

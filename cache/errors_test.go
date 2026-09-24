@@ -1,7 +1,6 @@
 package cache_test
 
 import (
-	"context"
 	"errors"
 	"testing"
 	"time"
@@ -45,7 +44,7 @@ func TestParseAdapterInvalid(t *testing.T) {
 
 func TestMemoryNotFound(t *testing.T) {
 	t.Parallel()
-	ctx := context.Background()
+	ctx := t.Context()
 	c, err := memory.New(cache.Options{})
 	if err != nil {
 		t.Fatalf("memory.New() error = %v", err)
@@ -66,7 +65,7 @@ func TestMemoryNotFound(t *testing.T) {
 
 func TestMemoryClosed(t *testing.T) {
 	t.Parallel()
-	ctx := context.Background()
+	ctx := t.Context()
 	c, err := memory.New(cache.Options{})
 	if err != nil {
 		t.Fatalf("memory.New() error = %v", err)
@@ -85,7 +84,7 @@ func TestMemoryClosed(t *testing.T) {
 
 func TestMemoryInvalidInteger(t *testing.T) {
 	t.Parallel()
-	ctx := context.Background()
+	ctx := t.Context()
 	c, err := memory.New(cache.Options{})
 	if err != nil {
 		t.Fatalf("memory.New() error = %v", err)

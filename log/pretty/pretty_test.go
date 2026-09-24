@@ -1,7 +1,6 @@
 package pretty
 
 import (
-	"context"
 	"errors"
 	"io"
 	"os"
@@ -246,7 +245,7 @@ func TestPretty_withContextCarriesRequestID(t *testing.T) {
 
 	var out buffer
 	l := newTestLogger(&out, log.LevelDebug, false)
-	ctx := observability.WithRequestID(context.Background(), "req1234")
+	ctx := observability.WithRequestID(t.Context(), "req1234")
 	l.WithContext(ctx).Info().Msg("got request")
 
 	got := out.String()
@@ -399,7 +398,7 @@ func TestPretty_coloredWarnAndRequestID(t *testing.T) {
 
 	var out buffer
 	l := newTestLogger(&out, log.LevelDebug, true)
-	ctx := observability.WithRequestID(context.Background(), "req9")
+	ctx := observability.WithRequestID(t.Context(), "req9")
 	l.WithContext(ctx).Warn().Msg("watch out")
 
 	got := out.String()

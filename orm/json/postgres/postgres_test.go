@@ -53,7 +53,7 @@ func (emptyRows) Err() error                 { return nil }
 func (emptyRows) Columns() ([]string, error) { return nil, nil }
 
 func TestPostgresJSONRendering(t *testing.T) {
-	ctx := context.Background()
+	ctx := t.Context()
 
 	tests := []struct {
 		name     string
@@ -157,7 +157,7 @@ func TestPostgresJSONRendering(t *testing.T) {
 // TestPostgresJSONCompilesWithAnd proves JSON predicates compose through
 // orm.And like any other predicate.
 func TestPostgresJSONCompilesWithAnd(t *testing.T) {
-	ctx := context.Background()
+	ctx := t.Context()
 
 	capture := &captureExec{}
 
@@ -182,7 +182,7 @@ func TestPostgresJSONCompilesWithAnd(t *testing.T) {
 }
 
 func TestPostgresJSONPathRendering(t *testing.T) {
-	ctx := context.Background()
+	ctx := t.Context()
 
 	tests := []struct {
 		name     string
@@ -269,7 +269,7 @@ func TestPostgresJSONPathRendering(t *testing.T) {
 // composes with a normal extraction predicate through orm.And with
 // placeholder numbering staying clause-ordered.
 func TestPostgresJSONPathPlaceholderOrdering(t *testing.T) {
-	ctx := context.Background()
+	ctx := t.Context()
 
 	capture := &captureExec{}
 
@@ -311,7 +311,7 @@ func equalArgs(a, b []any) bool {
 // through Postgres rendering: each predicate must render without error
 // against the postgres dialect, proving the full fluent surface composes.
 func TestPostgresBuilderCoverage(t *testing.T) {
-	ctx := context.Background()
+	ctx := t.Context()
 
 	builders := []struct {
 		name string

@@ -99,7 +99,7 @@ func TestLoggerReceivesEphemeralSecretWarning(t *testing.T) {
 	if err != nil {
 		t.Fatalf("New: %v", err)
 	}
-	defer func() { _ = got.Close(context.Background()) }()
+	defer func() { _ = got.Close(t.Context()) }()
 
 	if !caplog.contains("ephemeral") {
 		t.Fatalf("expected injected logger to receive ephemeral secret warning, got %v", caplog.msgs)

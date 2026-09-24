@@ -39,14 +39,15 @@ func newTestClient(t *testing.T) *client {
 	return &client{eval: tpl.Evaluate}
 }
 
-func proCtx() context.Context {
-	return flag.WithEvalContext(context.Background(), flag.EvalContext{Signals: map[string]any{"plan": "pro"}})
+func proCtx(t *testing.T) context.Context {
+	t.Helper()
+	return flag.WithEvalContext(t.Context(), flag.EvalContext{Signals: map[string]any{"plan": "pro"}})
 }
 
 func TestBool_defaultValue(t *testing.T) {
 	t.Parallel()
 	c := newTestClient(t)
-	got, err := c.Bool(context.Background(), "new_ui", true)
+	got, err := c.Bool(t.Context(), "new_ui", true)
 	if err != nil {
 		t.Fatalf("Bool err = %v", err)
 	}
@@ -58,7 +59,7 @@ func TestBool_defaultValue(t *testing.T) {
 func TestBool_conditionalViaSignal(t *testing.T) {
 	t.Parallel()
 	c := newTestClient(t)
-	got, err := c.Bool(proCtx(), "new_ui", false)
+	got, err := c.Bool(proCtx(t), "new_ui", false)
 	if err != nil {
 		t.Fatalf("Bool err = %v", err)
 	}
@@ -70,7 +71,7 @@ func TestBool_conditionalViaSignal(t *testing.T) {
 func TestBool_sdkTruthinessSuperset(t *testing.T) {
 	t.Parallel()
 	c := newTestClient(t)
-	ctx := context.Background()
+	ctx := t.Context()
 	if got, err := c.Bool(ctx, "yes_word", false); err != nil || !got {
 		t.Errorf("Bool(yes_word) = %v, %v; want true, nil (SDK truthy set)", got, err)
 	}
@@ -84,7 +85,7 @@ func TestBool_sdkTruthinessSuperset(t *testing.T) {
 func TestMissing_returnsFallbackNilError(t *testing.T) {
 	t.Parallel()
 	c := newTestClient(t)
-	ctx := context.Background()
+	ctx := t.Context()
 	if got, err := c.Bool(ctx, "nope", true); err != nil || !got {
 		t.Errorf("Bool missing = %v, %v; want true, nil", got, err)
 	}
@@ -105,7 +106,7 @@ func TestMissing_returnsFallbackNilError(t *testing.T) {
 func TestString(t *testing.T) {
 	t.Parallel()
 	c := newTestClient(t)
-	got, err := c.String(context.Background(), "welcome", "fb")
+	got, err := c.String(t.Context(), "welcome", "fb")
 	if err != nil {
 		t.Fatalf("String err = %v", err)
 	}
@@ -117,7 +118,7 @@ func TestString(t *testing.T) {
 func TestInt_coerce(t *testing.T) {
 	t.Parallel()
 	c := newTestClient(t)
-	ctx := context.Background()
+	ctx := t.Context()
 	if got, err := c.Int(ctx, "retry_count", 0); err != nil || got != 3 {
 		t.Errorf("Int(retry_count) = %v, %v; want 3, nil", got, err)
 	}
@@ -132,7 +133,7 @@ func TestInt_coerce(t *testing.T) {
 func TestInt_unparseable_returnsFallbackError(t *testing.T) {
 	t.Parallel()
 	c := newTestClient(t)
-	ctx := context.Background()
+	ctx := t.Context()
 	for _, key := range []string{"bad_int", "huge"} {
 		got, err := c.Int(ctx, key, 7)
 		if err == nil {
@@ -150,7 +151,7 @@ func TestJSON_fill(t *testing.T) {
 	t.Parallel()
 	c := newTestClient(t)
 	var out map[string]any
-	if err := c.JSON(context.Background(), "cfg", &out, nil); err != nil {
+	if err := c.JSON(t.Context(), "cfg", &out, nil); err != nil {
 		t.Fatalf("JSON err = %v", err)
 	}
 	if out["a"] != float64(1) {
@@ -162,7 +163,7 @@ func TestJSON_invalid_returnsError(t *testing.T) {
 	t.Parallel()
 	c := newTestClient(t)
 	var out map[string]any
-	if err := c.JSON(context.Background(), "bad_json", &out, nil); err == nil {
+	if err := c.JSON(t.Context(), "bad_json", &out, nil); err == nil {
 		t.Error("JSON(bad_json) err = nil, want non-nil")
 	}
 }
@@ -170,7 +171,7 @@ func TestJSON_invalid_returnsError(t *testing.T) {
 func TestJSON_nilOut_returnsError(t *testing.T) {
 	t.Parallel()
 	c := newTestClient(t)
-	if err := c.JSON(context.Background(), "cfg", nil, nil); err == nil {
+	if err := c.JSON(t.Context(), "cfg", nil, nil); err == nil {
 		t.Error("JSON nil out err = nil, want non-nil")
 	}
 }
@@ -179,7 +180,7 @@ func TestEvalError_wrapped(t *testing.T) {
 	t.Parallel()
 	sentinel := errors.New("boom")
 	c := &client{eval: func(map[string]any) (*remoteconfig.ServerConfig, error) { return nil, sentinel }}
-	_, err := c.Bool(context.Background(), "welcome", false)
+	_, err := c.Bool(t.Context(), "welcome", false)
 	if !errors.Is(err, sentinel) {
 		t.Fatalf("Bool err = %v, want wrap of sentinel", err)
 	}
@@ -191,7 +192,7 @@ func TestEvalError_wrapped(t *testing.T) {
 func TestContextCanceled_returnsFallbackError(t *testing.T) {
 	t.Parallel()
 	c := newTestClient(t)
-	ctx, cancel := context.WithCancel(context.Background())
+	ctx, cancel := context.WithCancel(t.Context())
 	cancel()
 	if _, err := c.Bool(ctx, "welcome", false); !errors.Is(err, context.Canceled) {
 		t.Errorf("Bool canceled err = %v, want context.Canceled", err)
@@ -210,7 +211,7 @@ func TestContextCanceled_returnsFallbackError(t *testing.T) {
 func TestInvalidKey_rejected(t *testing.T) {
 	t.Parallel()
 	c := newTestClient(t)
-	ctx := context.Background()
+	ctx := t.Context()
 	for _, key := range []string{"", "bad\nkey", strings.Repeat("k", 257)} {
 		if _, err := c.Bool(ctx, key, false); !errors.Is(err, flag.ErrInvalidKey) {
 			t.Errorf("Bool(%q) err = %v, want ErrInvalidKey", key, err)

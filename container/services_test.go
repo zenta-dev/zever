@@ -1,7 +1,6 @@
 package container
 
 import (
-	"context"
 	"errors"
 	"os"
 	"path/filepath"
@@ -54,7 +53,7 @@ func closeContainer(t *testing.T, c *Container) {
 	t.Helper()
 
 	t.Cleanup(func() {
-		if err := c.Close(context.Background()); err != nil {
+		if err := c.Close(t.Context()); err != nil {
 			t.Logf("close: %v", err)
 		}
 	})

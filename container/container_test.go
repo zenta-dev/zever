@@ -1,7 +1,6 @@
 package container
 
 import (
-	"context"
 	"testing"
 
 	"github.com/zenta-dev/zever/config"
@@ -18,7 +17,7 @@ func TestNew_nilConfigResolvesDefaults(t *testing.T) {
 	}
 
 	t.Cleanup(func() {
-		_ = c.Close(context.Background())
+		_ = c.Close(t.Context())
 	})
 
 	if _, err := c.Cache(); err != nil {
@@ -36,7 +35,7 @@ func TestNew_storesConfig(t *testing.T) {
 
 	c := New(cfg)
 	t.Cleanup(func() {
-		_ = c.Close(context.Background())
+		_ = c.Close(t.Context())
 	})
 	if _, err := c.Cache(); err == nil {
 		t.Fatal("expected error for bogus cache adapter, got nil")

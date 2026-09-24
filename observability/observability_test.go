@@ -96,12 +96,12 @@ func TestOptionsValidateUnspecifiedEndpoint(t *testing.T) {
 func TestRequestIDRoundtrip(t *testing.T) {
 	t.Parallel()
 
-	ctx := WithRequestID(context.Background(), "req-42")
+	ctx := WithRequestID(t.Context(), "req-42")
 	if got := RequestIDFromContext(ctx); got != "req-42" {
 		t.Fatalf("request id = %q, want req-42", got)
 	}
 
-	if got := RequestIDFromContext(context.Background()); got != "" {
+	if got := RequestIDFromContext(t.Context()); got != "" {
 		t.Fatalf("request id = %q, want empty", got)
 	}
 }

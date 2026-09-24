@@ -365,7 +365,7 @@ func TestPresignUploadExistCheck(t *testing.T) {
 
 func TestPresignUploadPresignError(t *testing.T) {
 	c, _ := newTestCore(t.Context(), t, okStub, storage.PolicyStore{}, nil)
-	canceled, cancel := context.WithCancel(context.Background())
+	canceled, cancel := context.WithCancel(t.Context())
 	cancel()
 	if _, err := c.PresignUpload(canceled, "bkt", "k", "text/plain", time.Minute); err == nil {
 		t.Fatal("PresignUpload(canceled) = nil, want error")
@@ -447,7 +447,7 @@ func TestPresignDownloadPrivate(t *testing.T) {
 
 func TestPresignDownloadPresignError(t *testing.T) {
 	c, _ := newTestCore(t.Context(), t, okStub, storage.PolicyStore{}, nil)
-	canceled, cancel := context.WithCancel(context.Background())
+	canceled, cancel := context.WithCancel(t.Context())
 	cancel()
 	if _, err := c.PresignDownload(canceled, "bkt", "k", time.Minute); err == nil {
 		t.Fatal("PresignDownload(canceled) = nil, want error")

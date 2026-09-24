@@ -28,10 +28,10 @@ type RedisOptions struct {
 	MinIdleConns int `json:"min_idle_conns" toml:"min_idle_conns" yaml:"min_idle_conns"`
 	// PoolTimeout bounds waiting for a Redis connection from the pool.
 	PoolTimeout time.Duration `json:"pool_timeout" toml:"pool_timeout" yaml:"pool_timeout"`
-	// ConnMaxIdleTime bounds how long a Redis connection may stay idle.
-	ConnMaxIdleTime time.Duration `json:"conn_max_idle_time" toml:"conn_max_idle_time" yaml:"conn_max_idle_time"`
-	// ConnMaxLifetime bounds the total lifetime of a Redis connection.
-	ConnMaxLifetime time.Duration `json:"conn_max_lifetime" toml:"conn_max_lifetime" yaml:"conn_max_lifetime"`
+	// MaxConnIdleTime bounds how long a Redis connection may stay idle.
+	MaxConnIdleTime time.Duration `json:"max_conn_idle_time" toml:"max_conn_idle_time" yaml:"max_conn_idle_time"`
+	// MaxConnLifetime bounds the total lifetime of a Redis connection.
+	MaxConnLifetime time.Duration `json:"max_conn_lifetime" toml:"max_conn_lifetime" yaml:"max_conn_lifetime"`
 }
 
 // Options configures cache backend selection and backend-specific settings.

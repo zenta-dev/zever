@@ -270,6 +270,21 @@ const (
 
 const maxInstruments = 1000
 
+// DefaultGRPCTimeout bounds OTLP gRPC exporter dials and calls.
+const DefaultGRPCTimeout = 10 * time.Second
+
+// DefaultBatchTimeout bounds how long spans wait before export.
+const DefaultBatchTimeout = 5 * time.Second
+
+// DefaultExportTimeout bounds a single trace batch export.
+const DefaultExportTimeout = 30 * time.Second
+
+// DefaultMetricInterval is the periodic metric reader collection interval.
+const DefaultMetricInterval = 60 * time.Second
+
+// DefaultMetricTimeout bounds a single metric collection and export.
+const DefaultMetricTimeout = 30 * time.Second
+
 // KindMismatchError reports reuse of an instrument name for a different kind.
 type KindMismatchError struct {
 	// Name is the reused instrument name.
@@ -459,12 +474,12 @@ func New(opts observability.Options) (observability.Provider, error) {
 
 	traceOpts := []otlptracegrpc.Option{
 		otlptracegrpc.WithEndpoint(endpoint),
-		otlptracegrpc.WithTimeout(10 * time.Second),
+		otlptracegrpc.WithTimeout(DefaultGRPCTimeout),
 		otlptracegrpc.WithCompressor("gzip"),
 	}
 	metricOpts := []otlpmetricgrpc.Option{
 		otlpmetricgrpc.WithEndpoint(endpoint),
-		otlpmetricgrpc.WithTimeout(10 * time.Second),
+		otlpmetricgrpc.WithTimeout(DefaultGRPCTimeout),
 		otlpmetricgrpc.WithCompressor("gzip"),
 	}
 
@@ -523,9 +538,9 @@ func New(opts observability.Options) (observability.Provider, error) {
 		sdktrace.WithBatcher(
 			traceExp,
 			sdktrace.WithMaxQueueSize(2048),
-			sdktrace.WithBatchTimeout(5*time.Second),
+			sdktrace.WithBatchTimeout(DefaultBatchTimeout),
 			sdktrace.WithMaxExportBatchSize(512),
-			sdktrace.WithExportTimeout(30*time.Second),
+			sdktrace.WithExportTimeout(DefaultExportTimeout),
 		),
 		sdktrace.WithResource(res),
 		sdktrace.WithSampler(sdktrace.ParentBased(sdktrace.TraceIDRatioBased(opts.SampleRatio))),
@@ -554,8 +569,8 @@ func New(opts observability.Options) (observability.Provider, error) {
 	mp := sdkmetric.NewMeterProvider(
 		sdkmetric.WithReader(sdkmetric.NewPeriodicReader(
 			metricExp,
-			sdkmetric.WithInterval(60*time.Second),
-			sdkmetric.WithTimeout(30*time.Second),
+			sdkmetric.WithInterval(DefaultMetricInterval),
+			sdkmetric.WithTimeout(DefaultMetricTimeout),
 		)),
 		sdkmetric.WithResource(res),
 	)
