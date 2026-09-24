@@ -77,14 +77,19 @@ func Wrap(phase string, pos Position, cause error, format string, args ...any) *
 //nolint:errname // established compiler vocabulary: a diagnostic collection, not an error value
 type List []*Diagnostic
 
-// Error returns a newline-separated string representation of all diagnostics.
+// Error returns a newline-separated string representation of all
+// diagnostics, sorted by (File, Line, Col) -- the same order Sorted
+// produces -- so a bare fmt.Println(err) or %v never surfaces diagnostics
+// in lexer-then-parser-then-resolver phase order instead of source order.
 func (l List) Error() string {
 	if len(l) == 0 {
 		return ""
 	}
 
-	var msgs []string
-	for _, d := range l {
+	sorted := l.Sorted()
+
+	msgs := make([]string, 0, len(sorted))
+	for _, d := range sorted {
 		msgs = append(msgs, d.Error())
 	}
 

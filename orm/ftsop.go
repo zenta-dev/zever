@@ -1,5 +1,7 @@
 package orm
 
+import "github.com/zenta-dev/zever/orm/render"
+
 // FTSOp identifies a full-text-search expression applied to a text column:
 // a MATCH predicate, or a ranking expression used in ORDER BY. The value is
 // abstract -- "does the column match this query", "rank rows by how well
@@ -13,28 +15,15 @@ package orm
 // implementation whose storage/search logic this phase wraps rather than
 // duplicates (search/postgres/postgres.go's matchWhere and
 // buildSearchQueries).
-type FTSOp int
+type FTSOp = render.FTSOp
 
-// Supported full-text-search operators.
+// Supported full-text-search operators. These re-export render's
+// identically-named constants; see render.FTSOp's constants for the full
+// per-value documentation of the exact per-dialect SQL each renders to.
 const (
-	// FTSMatch is a text-match predicate: `to_tsvector('english', col) @@
-	// plainto_tsquery('english', ?)` on Postgres (query text normalized to
-	// ANDed terms), `col MATCH ?` on SQLite (FTS5's own query syntax), and
-	// `MATCH (col, ...) AGAINST (? [mode])` on MySQL (the mode comes from
-	// FTSExpr.Mode; the optional multi-column list from FTSExpr.Columns).
-	FTSMatch FTSOp = iota
-	// FTSMatchTSQuery is the boolean-query variant of FTSMatch:
-	// `to_tsvector('english', col) @@ to_tsquery('english', ?)` on
-	// Postgres, where the bound text is expected to be valid tsquery syntax
-	// (terms joined by & | !, double-quoted phrases). Postgres-only; SQLite
-	// has no equivalent because FTS5's MATCH already accepts boolean query
-	// syntax natively (the sqlite package exposes FTSMatch only).
-	FTSMatchTSQuery
-	// FTSRank is a ranking expression for ORDER BY:
-	// `ts_rank(to_tsvector('english', col), plainto_tsquery('english', ?))`
-	// on Postgres. SQLite's FTS5 ranking needs no expression -- it exposes
-	// the hidden rank column instead (see the orm/fts/sqlite package).
-	FTSRank
+	FTSMatch        = render.FTSMatch
+	FTSMatchTSQuery = render.FTSMatchTSQuery
+	FTSRank         = render.FTSRank
 )
 
 // FTSExpr is the erased FTS expression an NFTS predicate node (or an FTS
@@ -58,16 +47,17 @@ type FTSExpr struct {
 // FTSMode selects the MySQL `AGAINST` mode. It has no meaning on Postgres or
 // SQLite, whose query text carries its own boolean syntax; the field is
 // ignored there. The zero value is natural-language mode.
-type FTSMode int
+type FTSMode = render.FTSMode
 
 // Supported MySQL `AGAINST` modes: natural language (the MySQL default),
 // boolean (`IN BOOLEAN MODE`, the caller's query string uses MySQL's
 // boolean operators), and query expansion (`WITH QUERY EXPANSION`, MySQL
-// widens the search with related words).
+// widens the search with related words). These re-export render's
+// identically-named constants.
 const (
-	FTSNaturalLanguage FTSMode = iota
-	FTSBoolean
-	FTSQueryExpansion
+	FTSNaturalLanguage = render.FTSNaturalLanguage
+	FTSBoolean         = render.FTSBoolean
+	FTSQueryExpansion  = render.FTSQueryExpansion
 )
 
 // NewFTSPredicate wraps an FTS expression over table.column into a typed

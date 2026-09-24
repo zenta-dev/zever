@@ -15,7 +15,7 @@ import (
 	"github.com/zenta-dev/zever/apperror"
 	"github.com/zenta-dev/zever/authz"
 
-	pb "github.com/zenta-dev/zever/gen/zeverv1"
+	pb "github.com/zenta-dev/zever/gen"
 )
 
 // TaskServiceGRPCServer adapts a TaskService implementation to the real pb.TaskServiceServer

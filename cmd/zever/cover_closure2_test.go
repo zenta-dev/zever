@@ -44,39 +44,39 @@ func TestClosure2InteractiveFlag(t *testing.T) {
 	writeSchemaModuleFixture(t, dir, "shop", "entity E {\n\tid: uuid @primary\n}\n")
 	writeSchemaModuleFixture(t, dir, "jobs", "job Real() {\n\tqueue: default\n}\n")
 
-	if err := runGenerateModule([]string{"--interactive=true", "module", "flagmod"}); err != nil {
+	if err := runGenerateModule([]string{"--interactive", "module", "flagmod"}); err != nil {
 		t.Fatalf("module -i: %v", err)
 	}
 
-	if err := runGenerateEntity([]string{"shop", "FlagEnt", "--interactive=true"}); err != nil {
+	if err := runGenerateEntity([]string{"shop", "FlagEnt", "--interactive"}); err != nil {
 		t.Fatalf("entity -i: %v", err)
 	}
 
-	if err := runGenerateJob([]string{"shop", "FlagJob", "--interactive=true"}); err != nil {
+	if err := runGenerateJob([]string{"shop", "FlagJob", "--interactive"}); err != nil {
 		t.Fatalf("job -i: %v", err)
 	}
 
-	if err := runGenerateSchedule([]string{"jobs", "FlagSched", "--interactive=true", "--cron", "* * * * *", "--dispatch", "Real"}); err != nil {
+	if err := runGenerateSchedule([]string{"jobs", "FlagSched", "--interactive", "--cron", "* * * * *", "--dispatch", "Real"}); err != nil {
 		t.Fatalf("schedule -i: %v", err)
 	}
 
-	if err := runGenerateAdapter([]string{"db", "flagadapter", "--interactive=true"}); err != nil {
+	if err := runGenerateAdapter([]string{"db", "flagadapter", "--interactive"}); err != nil {
 		t.Fatalf("adapter -i: %v", err)
 	}
 
-	if err := runGenerateSeed([]string{"--interactive=true"}); err != nil {
+	if err := runGenerateSeed([]string{"--interactive"}); err != nil {
 		t.Fatalf("seed -i: %v", err)
 	}
 
-	if err := runGenerateWorker([]string{"--interactive=true"}); err != nil {
+	if err := runGenerateWorker([]string{"--interactive"}); err != nil {
 		t.Fatalf("worker -i: %v", err)
 	}
 
-	if err := runGenerateServer([]string{"--interactive=true"}); err != nil {
+	if err := runGenerateServer([]string{"--interactive"}); err != nil {
 		t.Fatalf("server -i: %v", err)
 	}
 
-	if err := runGenerateTinker([]string{"--interactive=true", "--app", "example.com/app/internal/app", "--dir", "cmd/tinker-i"}); err != nil {
+	if err := runGenerateTinker([]string{"--interactive", "--app", "example.com/app/internal/app", "--dir", "cmd/tinker-i"}); err != nil {
 		t.Fatalf("tinker -i: %v", err)
 	}
 }

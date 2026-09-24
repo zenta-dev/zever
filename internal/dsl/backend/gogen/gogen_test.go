@@ -508,9 +508,10 @@ func TestGRPCPoliciesMapKeyedByFullMethodName(t *testing.T) {
 }
 
 // TestNewDefaultPBImportPathUnchanged locks in that New()'s zero-config
-// output uses the legacy "/zever/"-prefixed formula, not the flat one
-// NewWithPBImportRoot uses. No zever gen package exists yet, so this
-// default is override-required for real projects (see defaultPBImportRoot).
+// output uses the same flat formula as NewWithPBImportRoot, just rooted at
+// defaultPBImportRoot instead of a caller-supplied root. No zever gen
+// package exists yet, so this default is override-required for real
+// projects (see defaultPBImportRoot).
 func TestNewDefaultPBImportPathUnchanged(t *testing.T) {
 	file := compileSchema(t, taskFixture)
 
@@ -526,8 +527,8 @@ func TestNewDefaultPBImportPathUnchanged(t *testing.T) {
 
 	types := string(out["app/types.go"])
 
-	if !strings.Contains(types, `pb "github.com/zenta-dev/zever/gen/zeverv1"`) {
-		t.Fatalf("New()'s default import path changed, want the legacy zeverv1 convention:\n%s", types)
+	if !strings.Contains(types, `pb "github.com/zenta-dev/zever/gen"`) {
+		t.Fatalf("New()'s default import path changed, want the flat defaultPBImportRoot convention:\n%s", types)
 	}
 }
 

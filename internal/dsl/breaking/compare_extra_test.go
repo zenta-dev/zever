@@ -20,12 +20,21 @@ func TestCompareNilSchemasProduceNoChanges(t *testing.T) {
 		t.Fatalf("Compare(nil, nil) = %+v, want no changes", changes)
 	}
 
-	if changes := Compare(nil, testSchema(testModule("m"))); len(changes) != 0 {
-		t.Fatalf("Compare(nil, schema) = %+v, want no changes", changes)
+	// Compare(nil, schema) is a whole-module addition, not "no changes":
+	// nil behaves as an empty schema, and every module in the new schema is
+	// new relative to it.
+	changes := Compare(nil, testSchema(testModule("m")))
+	if len(changes) != 1 || changes[0].Kind != KindModuleAdded || changes[0].Breaking {
+		t.Fatalf("Compare(nil, schema) = %+v, want one non-breaking KindModuleAdded", changes)
 	}
 }
 
-func TestCompareModuleOnlyOnOneSideIsSkipped(t *testing.T) {
+// TestCompareModuleRemovedIsBreaking covers the fix for a module present
+// only in the old schema: previously Compare silently skipped it (a whole
+// module -- every entity/service/RPC it declared -- deleted with zero
+// reported Change, so HasBreaking wrongly said "not breaking"). It must now
+// report exactly one breaking KindModuleRemoved.
+func TestCompareModuleRemovedIsBreaking(t *testing.T) {
 	t.Parallel()
 
 	oldMod := testModule("gone")
@@ -33,8 +42,43 @@ func TestCompareModuleOnlyOnOneSideIsSkipped(t *testing.T) {
 	newMod := testModule("fresh")
 	newMod.Entities = []*ir.Entity{{Name: "Order", Module: newMod, Pos: pos(1)}}
 
-	if changes := Compare(testSchema(oldMod), testSchema(newMod)); len(changes) != 0 {
-		t.Fatalf("modules on only one side must not be compared, got %+v", changes)
+	changes := Compare(testSchema(oldMod), testSchema(newMod))
+
+	var sawRemoved, sawAdded bool
+
+	for _, c := range changes {
+		switch c.Kind {
+		case KindModuleRemoved:
+			sawRemoved = true
+
+			if !c.Breaking {
+				t.Fatalf("KindModuleRemoved change is not marked Breaking: %+v", c)
+			}
+		case KindModuleAdded:
+			sawAdded = true
+
+			if c.Breaking {
+				t.Fatalf("KindModuleAdded change is marked Breaking: %+v", c)
+			}
+		case KindEntityRemoved, KindEntityAdded, KindFieldRemoved, KindFieldAdded,
+			KindFieldRenamed, KindFieldTypeChanged, KindFieldOptionalityChanged,
+			KindMessageRemoved, KindMessageAdded, KindServiceRemoved, KindServiceAdded,
+			KindOperationRemoved, KindOperationAdded, KindOperationParamsChanged,
+			KindOperationReturnsChanged, KindOperationHTTPChanged, KindValidateAdded:
+			// Other change kinds are not relevant to this test.
+		}
+	}
+
+	if !sawRemoved {
+		t.Fatalf("expected a KindModuleRemoved change, got %+v", changes)
+	}
+
+	if !sawAdded {
+		t.Fatalf("expected a KindModuleAdded change, got %+v", changes)
+	}
+
+	if !HasBreaking(changes) {
+		t.Fatal("HasBreaking(changes) = false, want true (a module was removed)")
 	}
 }
 

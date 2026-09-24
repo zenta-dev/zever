@@ -43,6 +43,12 @@ const (
 // is unset. It is deterministic and public: never use it in production.
 // It exists so `zever doctor` and the demo run with zero setup; production
 // must export AUTH_JWT_SECRET with at least 32 random bytes.
+//
+// This app intentionally defaults rather than fails closed, to keep the
+// zero-setup demo path working. Anything bootstrapped off this example
+// toward a real deployment should instead copy examples/bookings'
+// internal/app/app.go Config, which fails closed when AUTH_JWT_SECRET is
+// missing or shorter than 32 bytes.
 const DevJWTSecret = "dev-only-insecure-secret-32bytes!!" //nolint:gosec
 
 // Config returns the resolved configuration: zever's zero-infra defaults,

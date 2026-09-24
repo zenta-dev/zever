@@ -304,52 +304,35 @@ type moduleModel struct {
 }
 
 // pbAlias is a fixed import alias for the protogogen-generated message
-// package, used instead of its real package name (e.g. "appv1" or
-// "zeverv1", see pbGoPackage) so every gogen-generated file that imports it
-// reads unambiguously with one predictable identifier regardless of module
-// name.
+// package, used instead of its real package name so every gogen-generated
+// file that imports it reads unambiguously with one predictable identifier
+// regardless of module name.
 const pbAlias = "pb"
 
 // defaultPBImportRoot is the root under which protogogen's generated
-// packages are assumed to live, mirroring the proto backend's own hardcoded
-// "github.com/zenta-dev/zever/gen" prefix (see proto.moduleNaming, which
-// this package's pbGoPackage deliberately duplicates the naming formula
-// of -- the same "small deliberately duplicated equivalent" pattern this
-// file already uses for pathParamNames). No zever gen package exists yet,
-// so this default is override-required for any real project: use
+// packages are assumed to live. No zever gen package exists yet, so this
+// default is override-required for any real project: use
 // NewWithPBImportRoot to point at the project's actual protogogen output.
 const defaultPBImportRoot = "github.com/zenta-dev/zever/gen"
 
 // pbGoPackage returns the import path of the protogogen-generated package
 // for module m, given root (defaultPBImportRoot unless overridden by
-// NewWithPBImportRoot) and flat (Backend.pbImportFlat -- see its doc
-// comment for why the two formulas differ). flat == false mirrors
-// proto.moduleNaming's goPackage formula exactly: the implicit unnamed
-// module maps to "<root>/zeverv1", a named module "billing" maps to
-// "<root>/zever/billing". flat == true maps to protogogen's real
-// "paths=source_relative" output layout instead: the implicit unnamed
-// module maps to bare "<root>", a named module "billing" maps to
-// "<root>/billing".
-func pbGoPackage(m *ir.Module, root string, flat bool) string {
-	named := m != nil && m.Name != ""
-
-	switch {
-	case flat && !named:
-		return root
-	case flat && named:
+// NewWithPBImportRoot). This mirrors protogogen's actual
+// "paths=source_relative" output layout: the implicit unnamed module maps
+// to bare root, a named module "billing" maps to "<root>/billing".
+func pbGoPackage(m *ir.Module, root string) string {
+	if m != nil && m.Name != "" {
 		return root + "/" + m.Name
-	case !named:
-		return root + "/zeverv1"
-	default:
-		return root + "/zever/" + m.Name
 	}
+
+	return root
 }
 
 // newModuleModel builds the render model for module m.
-func newModuleModel(m *ir.Module, pkg, pbImportRoot string, pbImportFlat bool) moduleModel {
+func newModuleModel(m *ir.Module, pkg, pbImportRoot string) moduleModel {
 	data := moduleModel{
 		PkgName:      pkg,
-		PBImportPath: pbGoPackage(m, pbImportRoot, pbImportFlat),
+		PBImportPath: pbGoPackage(m, pbImportRoot),
 		PBAlias:      pbAlias,
 	}
 

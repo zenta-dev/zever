@@ -182,8 +182,10 @@ func runGenerateEntity(args []string) error {
 
 	fs := flag.NewFlagSet("generate entity", flag.ContinueOnError)
 	fs.Var(&fields, "field", "a field to declare, as name:type; repeatable")
-	interactive := fs.Bool("interactive", false, "prompt for missing values")
-	interactiveShort := fs.Bool("i", false, "prompt for missing values (shorthand)")
+	// coverageProof: no local -i/--interactive flags (cf. migrate.go's
+	// documented pattern). peelInteractive strips them before Parse and
+	// sets interactiveMode globally, so defining them here would only
+	// shadow dead branches.
 
 	fs.Usage = func() {
 		_, _ = fmt.Fprintln(fs.Output(), entityUsage)
@@ -197,10 +199,6 @@ func runGenerateEntity(args []string) error {
 	}
 
 	positional = append(positional, fs.Args()...)
-
-	if *interactive || *interactiveShort {
-		interactiveMode = true
-	}
 
 	if len(positional) != 2 {
 		if isInteractiveTerminal() {

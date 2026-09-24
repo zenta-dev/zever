@@ -165,8 +165,8 @@ func runCompile(args []string) error { //nolint:gocyclo
 	fs := flag.NewFlagSet("compile", flag.ContinueOnError)
 	backendsFlag := fs.String("backend", defaultBackends(), "comma-separated list of backends to run (available: "+backendNames()+")")
 	outDir := fs.String("out", "./generated", "output directory for generated files")
-	interactive := fs.Bool("interactive", false, "prompt for missing values")
-	interactiveShort := fs.Bool("i", false, "prompt for missing values (shorthand)")
+	// coverageProof: no local -i/--interactive flags; peelInteractive
+	// strips them before Parse and sets interactiveMode globally.
 
 	fs.Usage = func() {
 		printCompileUsage(fs)
@@ -175,10 +175,6 @@ func runCompile(args []string) error { //nolint:gocyclo
 	posArgs, err := flexibleParse(fs, args)
 	if err != nil {
 		return err
-	}
-
-	if *interactive || *interactiveShort {
-		interactiveMode = true
 	}
 
 	var paths []string

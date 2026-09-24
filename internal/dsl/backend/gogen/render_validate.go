@@ -205,6 +205,12 @@ func writeFormatCheck(b *strings.Builder, fieldExpr, errName string, value any, 
 		fmt.Fprintf(b, "\tif _, err := uuid.Parse(%s); err != nil {\n", fieldExpr)
 		fmt.Fprintf(b, "\t\treturn apperror.New(apperror.InvalidArgument, %q)\n", errName+": invalid uuid format")
 		b.WriteString("\t}\n\n")
+	default:
+		// resolver.decodeValidateValue guarantees format is a string in the
+		// fixed {email, url, uuid} set before this backend ever runs; a
+		// mismatch here means that invariant broke upstream, so fail loudly
+		// instead of silently emitting no validation check at all.
+		panic(fmt.Sprintf("gogen: writeFormatCheck: unexpected format value %#v (resolver invariant violated)", value))
 	}
 }
 
@@ -220,6 +226,10 @@ func numericLiteral(v any) string {
 	case float64:
 		return strconv.FormatFloat(n, 'g', -1, 64)
 	default:
-		return fmt.Sprintf("%v", n)
+		// resolver.decodeValidateValue guarantees v is always int64 or
+		// float64 before this backend ever runs; a mismatch here means that
+		// invariant broke upstream. Fail loudly instead of splicing an
+		// arbitrary %v-stringified value into generated Go source.
+		panic(fmt.Sprintf("gogen: numericLiteral: unexpected value type %T (resolver invariant violated)", v))
 	}
 }

@@ -1334,8 +1334,8 @@ func runGenerateAdapter(args []string) error {
 	fs := flag.NewFlagSet("generate adapter", flag.ContinueOnError)
 	fs.Var(&fields, "field", "an Options field to declare, as name:type; repeatable")
 	force := fs.Bool("force", false, "overwrite the adapter files if they already exist")
-	interactive := fs.Bool("interactive", false, "prompt for missing values")
-	interactiveShort := fs.Bool("i", false, "prompt for missing values (shorthand)")
+	// coverageProof: no local -i/--interactive flags; peelInteractive
+	// strips them before Parse and sets interactiveMode globally.
 
 	fs.Usage = func() {
 		printAdapterUsage(fs)
@@ -1345,10 +1345,6 @@ func runGenerateAdapter(args []string) error {
 
 	if err := fs.Parse(rest); err != nil {
 		return err
-	}
-
-	if *interactive || *interactiveShort {
-		interactiveMode = true
 	}
 
 	positional = append(positional, fs.Args()...)

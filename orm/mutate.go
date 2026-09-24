@@ -447,10 +447,10 @@ func (u Update[T]) renderStatement(d dialect.Dialect) (query string, args []any,
 
 	if len(u.joins) > 0 {
 		if len(u.returning) > 0 {
-			return render.UpdateJoinReturning(d, u.table.Name(), sets, u.joins, render.JoinType(u.joinType), where, order, u.limit, u.offset, u.returning)
+			return render.UpdateJoinReturning(d, u.table.Name(), sets, u.joins, u.joinType, where, order, u.limit, u.offset, u.returning)
 		}
 
-		return render.UpdateJoin(d, u.table.Name(), sets, u.joins, render.JoinType(u.joinType), where, order, u.limit, u.offset)
+		return render.UpdateJoin(d, u.table.Name(), sets, u.joins, u.joinType, where, order, u.limit, u.offset)
 	}
 
 	if len(u.returning) > 0 {
@@ -707,10 +707,10 @@ func (del Delete[T]) renderStatement(d dialect.Dialect) (query string, args []an
 
 	if len(del.joins) > 0 {
 		if len(del.returning) > 0 {
-			return render.DeleteJoinReturning(d, del.table.Name(), del.joins, render.JoinType(del.joinType), where, order, del.limit, del.offset, del.returning)
+			return render.DeleteJoinReturning(d, del.table.Name(), del.joins, del.joinType, where, order, del.limit, del.offset, del.returning)
 		}
 
-		return render.DeleteJoin(d, del.table.Name(), del.joins, render.JoinType(del.joinType), where, order, del.limit, del.offset)
+		return render.DeleteJoin(d, del.table.Name(), del.joins, del.joinType, where, order, del.limit, del.offset)
 	}
 
 	if len(del.returning) > 0 {

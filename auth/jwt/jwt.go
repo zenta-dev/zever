@@ -189,13 +189,19 @@ func (a *adapter) Verify(ctx context.Context, token string) (auth.Claims, error)
 		expiresAt = exp.Time
 	}
 
-	if jti, _ := claims["jti"].(string); jti != "" {
-		revoked, err := a.revocation.IsRevoked(ctx, jti)
-		if err != nil {
-			return auth.Claims{}, fmt.Errorf("jwt: verify: %w", err)
+	if rawJTI, present := claims["jti"]; present {
+		jti, ok := rawJTI.(string)
+		if !ok {
+			return auth.Claims{}, fmt.Errorf("jwt: verify: %w: non-string jti claim", auth.ErrInvalidToken)
 		}
-		if revoked {
-			return auth.Claims{}, auth.ErrTokenRevoked
+		if jti != "" {
+			revoked, err := a.revocation.IsRevoked(ctx, jti)
+			if err != nil {
+				return auth.Claims{}, fmt.Errorf("jwt: verify: %w", err)
+			}
+			if revoked {
+				return auth.Claims{}, auth.ErrTokenRevoked
+			}
 		}
 	}
 

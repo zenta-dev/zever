@@ -53,7 +53,7 @@ func makeDoctorExecFn(configPath string) tui.ExecFunc {
 			return "", err
 		}
 		var buf bytes.Buffer
-		err := runDoctorWith(DoctorConfig{ConfigPath: configPath, Out: &buf})
+		err := runDoctorWith(DoctorConfig{ConfigPath: configPath, Out: &buf}) //nolint:contextcheck // runDoctorWith is a CLI command entrypoint; no cmd/zever run* command takes a context, by established convention
 		return buf.String(), err
 	}
 }

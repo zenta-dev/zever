@@ -24,10 +24,19 @@ var ErrDecode = errors.New("config: decode")
 type UnknownServiceError struct {
 	// Service is the unrecognized service name.
 	Service string
+	// Suggestion is the closest known service name, if any is close
+	// enough to be worth suggesting (see closest in suggest.go). Empty
+	// when nothing is close.
+	Suggestion string
 }
 
-// Error describes the unrecognized service.
+// Error describes the unrecognized service, with a "did you mean %q?" hint
+// when Suggestion is set.
 func (e *UnknownServiceError) Error() string {
+	if e.Suggestion != "" {
+		return fmt.Sprintf("config: unknown service %q (did you mean %q?)", e.Service, e.Suggestion)
+	}
+
 	return fmt.Sprintf("config: unknown service %q", e.Service)
 }
 
@@ -42,10 +51,20 @@ type UnknownFieldError struct {
 	Service string
 	// Field is the unrecognized field name.
 	Field string
+	// Suggestion is the closest known field name for this service, if any
+	// is close enough to be worth suggesting (see closest in suggest.go).
+	// Empty when nothing is close, or when no candidate list was known at
+	// the failure site.
+	Suggestion string
 }
 
-// Error describes the unrecognized field and its service.
+// Error describes the unrecognized field and its service, with a "did you
+// mean %q?" hint when Suggestion is set.
 func (e *UnknownFieldError) Error() string {
+	if e.Suggestion != "" {
+		return fmt.Sprintf("config: unknown field %q for service %q (did you mean %q?)", e.Field, e.Service, e.Suggestion)
+	}
+
 	return fmt.Sprintf("config: unknown field %q for service %q", e.Field, e.Service)
 }
 

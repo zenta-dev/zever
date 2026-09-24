@@ -4,14 +4,16 @@
 // no CLI, no backend -- so it can be driven from `zever breaking` or from
 // any other caller with two compiled schemas to hand.
 //
-// Scope (the "core structural set"): a removed entity/message/service/
-// operation/field is breaking; a field's type or an operation's param/
-// return type changing is breaking; an operation's HTTP method or path
-// changing (including its HTTP transport being removed) is breaking.
-// Additions (new entity/message/field/operation) and new @validate rules
-// are reported as non-breaking, informational changes. Comparing module
-// removal/addition, and tightened validation, are explicitly out of scope
-// for this first version.
+// Scope (the "core structural set"): a removed module/entity/message/
+// service/operation/field is breaking; a field's type or optionality
+// (optional -> required) or an operation's param/return type changing is
+// breaking; an operation's HTTP method or path changing (including its
+// HTTP transport being removed) is breaking. A field carrying a resolver-
+// validated @renamed_from is reported as a rename, not a false-positive
+// remove+add pair. Additions (new module/entity/message/field/operation)
+// and new @validate rules are reported as non-breaking, informational
+// changes. Tightened validation is explicitly out of scope for this first
+// version.
 package breaking
 
 import (
@@ -27,11 +29,15 @@ type Kind string
 // Change kinds. The _removed/_changed kinds are always Breaking; the
 // _added kinds are always non-breaking (informational).
 const (
+	KindModuleRemoved           Kind = "module_removed"
+	KindModuleAdded             Kind = "module_added"
 	KindEntityRemoved           Kind = "entity_removed"
 	KindEntityAdded             Kind = "entity_added"
 	KindFieldRemoved            Kind = "field_removed"
 	KindFieldAdded              Kind = "field_added"
+	KindFieldRenamed            Kind = "field_renamed"
 	KindFieldTypeChanged        Kind = "field_type_changed"
+	KindFieldOptionalityChanged Kind = "field_optionality_changed"
 	KindMessageRemoved          Kind = "message_removed"
 	KindMessageAdded            Kind = "message_added"
 	KindServiceRemoved          Kind = "service_removed"
@@ -63,10 +69,14 @@ func HasBreaking(changes []Change) bool {
 	return false
 }
 
-// Compare walks every module common to both old and new (matched by
-// Version+Name -- see moduleKey) and reports every entity/message/service/
-// operation/field difference within it. A module present in only one of the
-// two schemas is not compared further -- see the package doc comment.
+// Compare walks every module in old and new (matched by Version+Name -- see
+// moduleKey). A module present in both is compared entity by entity,
+// message by message, service by service. A module removed entirely is
+// reported as one breaking KindModuleRemoved change -- not silently
+// skipped, since a whole-module deletion (every entity/service/RPC it
+// declared, gone at once) is at least as breaking as any single removal
+// Compare otherwise detects. A module added entirely is KindModuleAdded,
+// non-breaking, mirroring every other _added kind.
 func Compare(old, newSchema *ir.Schema) []Change {
 	var changes []Change
 
@@ -76,6 +86,11 @@ func Compare(old, newSchema *ir.Schema) []Change {
 	for key, oldMod := range oldModules {
 		newMod, ok := newModules[key]
 		if !ok {
+			changes = append(changes, Change{
+				Kind: KindModuleRemoved, Breaking: true, Pos: modulePos(oldMod),
+				Message: fmt.Sprintf("module %q was removed", moduleLabel(oldMod)),
+			})
+
 			continue
 		}
 
@@ -84,7 +99,51 @@ func Compare(old, newSchema *ir.Schema) []Change {
 		changes = append(changes, compareServices(oldMod, newMod)...)
 	}
 
+	for key, newMod := range newModules {
+		if _, ok := oldModules[key]; !ok {
+			changes = append(changes, Change{
+				Kind: KindModuleAdded, Breaking: false, Pos: modulePos(newMod),
+				Message: fmt.Sprintf("module %q was added", moduleLabel(newMod)),
+			})
+		}
+	}
+
 	return changes
+}
+
+// moduleLabel names m for a Change message: its declared name, or
+// "(implicit)" for the unnamed sentinel module (see resolver's Module{Name:
+// ""} convention).
+func moduleLabel(m *ir.Module) string {
+	if m == nil || m.Name == "" {
+		return "(implicit)"
+	}
+
+	return m.Name
+}
+
+// modulePos picks a representative position for a whole-module Change: the
+// first entity/message/service declaration position found, or the zero
+// Position if the module declares nothing (an edge case with no source
+// location to point at).
+func modulePos(m *ir.Module) diag.Position {
+	if m == nil {
+		return diag.Position{}
+	}
+
+	if len(m.Entities) > 0 {
+		return m.Entities[0].Pos
+	}
+
+	if len(m.Messages) > 0 {
+		return m.Messages[0].Pos
+	}
+
+	if len(m.Services) > 0 {
+		return m.Services[0].Pos
+	}
+
+	return diag.Position{}
 }
 
 func modulesByKey(schema *ir.Schema) map[string]*ir.Module {
@@ -166,17 +225,43 @@ func compareMessages(oldMod, newMod *ir.Module) []Change {
 }
 
 // compareFields compares two field lists belonging to the entity/message
-// named owner, reporting removed/added fields and type changes for fields
-// present in both. New @validate rules on an otherwise-unchanged field are
-// reported as non-breaking.
+// named owner, reporting renamed/removed/added fields, type and
+// optionality changes for fields present in both (under their matched
+// name), and new @validate rules. A field whose new-side counterpart
+// carries a resolver-validated @renamed_from(oldName) is compared under
+// that match and reported as a rename, never a false-positive
+// remove-then-add pair.
 func compareFields(owner string, oldFields, newFields []*ir.Field) []Change {
 	var changes []Change
 
 	oldByName := fieldsByName(oldFields)
 	newByName := fieldsByName(newFields)
 
+	// renameTargets maps an old field name to the new field declaring
+	// @renamed_from(oldName), so a renamed field is matched by that intent
+	// instead of by name.
+	renameTargets := map[string]*ir.Field{}
+
+	for _, f := range newFields {
+		if f.RenamedFrom != nil {
+			renameTargets[*f.RenamedFrom] = f
+		}
+	}
+
 	for name, oldField := range oldByName {
 		newField, ok := newByName[name]
+		renamed := false
+
+		if !ok {
+			if target, isRename := renameTargets[name]; isRename {
+				newField, ok, renamed = target, true, true
+				changes = append(changes, Change{
+					Kind: KindFieldRenamed, Breaking: false, Pos: newField.Pos,
+					Message: fmt.Sprintf("%s.%s was renamed to %s.%s", owner, name, owner, newField.Name),
+				})
+			}
+		}
+
 		if !ok {
 			changes = append(changes, Change{
 				Kind: KindFieldRemoved, Breaking: true, Pos: oldField.Pos,
@@ -186,28 +271,50 @@ func compareFields(owner string, oldFields, newFields []*ir.Field) []Change {
 			continue
 		}
 
+		fieldLabel := name
+		if renamed {
+			fieldLabel = newField.Name
+		}
+
 		if !sameFieldType(oldField, newField) {
 			changes = append(changes, Change{
 				Kind: KindFieldTypeChanged, Breaking: true, Pos: newField.Pos,
-				Message: fmt.Sprintf("%s.%s changed type", owner, name),
+				Message: fmt.Sprintf("%s.%s changed type", owner, fieldLabel),
+			})
+		}
+
+		if oldField.Optional && !newField.Optional {
+			changes = append(changes, Change{
+				Kind: KindFieldOptionalityChanged, Breaking: true, Pos: newField.Pos,
+				Message: fmt.Sprintf("%s.%s changed from optional to required", owner, fieldLabel),
 			})
 		}
 
 		if len(newField.Validate) > len(oldField.Validate) {
 			changes = append(changes, Change{
 				Kind: KindValidateAdded, Breaking: false, Pos: newField.Pos,
-				Message: fmt.Sprintf("%s.%s gained a new @validate rule", owner, name),
+				Message: fmt.Sprintf("%s.%s gained a new @validate rule", owner, fieldLabel),
 			})
 		}
 	}
 
 	for name, newField := range newByName {
-		if _, ok := oldByName[name]; !ok {
-			changes = append(changes, Change{
-				Kind: KindFieldAdded, Breaking: false, Pos: newField.Pos,
-				Message: fmt.Sprintf("%s.%s was added", owner, name),
-			})
+		if _, ok := oldByName[name]; ok {
+			continue
 		}
+
+		// Already reported as a rename target above; don't also report it
+		// as a fresh addition.
+		if newField.RenamedFrom != nil {
+			if _, wasOldPresent := oldByName[*newField.RenamedFrom]; wasOldPresent {
+				continue
+			}
+		}
+
+		changes = append(changes, Change{
+			Kind: KindFieldAdded, Breaking: false, Pos: newField.Pos,
+			Message: fmt.Sprintf("%s.%s was added", owner, name),
+		})
 	}
 
 	return changes

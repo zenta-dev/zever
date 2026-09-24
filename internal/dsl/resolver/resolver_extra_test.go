@@ -3,6 +3,7 @@ package resolver
 import (
 	"errors"
 	"reflect"
+	"strings"
 	"testing"
 	"time"
 
@@ -547,8 +548,8 @@ func TestExtraDispatchArgShapes(t *testing.T) {
 	dur := 30 * time.Second
 	strs := []string{"a", "b"}
 
-	params := make([]*ast.ParamDecl, 0, 8)
-	for _, n := range []string{"p1", "p2", "p3", "p4", "p5", "p6", "p7", "p8"} {
+	params := make([]*ast.ParamDecl, 0, 7)
+	for _, n := range []string{"p1", "p2", "p3", "p4", "p5", "p6", "p7"} {
 		params = append(params, &ast.ParamDecl{Name: n, Type: &ast.TypeExpr{Name: "string"}})
 	}
 
@@ -562,7 +563,6 @@ func TestExtraDispatchArgShapes(t *testing.T) {
 			{Value: &ast.DurationLit{Value: dur, Valid: true}},
 			{Value: &ast.IdentValue{Name: "somevar"}},
 			{Value: &ast.SetLit{Items: strs}},
-			{Value: &ast.CallValue{Name: "now"}},
 			{Value: &ast.StringLit{Value: "t2"}},
 		},
 	}}
@@ -584,9 +584,29 @@ func TestExtraDispatchArgShapes(t *testing.T) {
 		t.Fatalf("schedule S not resolved")
 	}
 
-	want := []any{"s", int64(1), 1.5, dur, "somevar", strs, "now", "t2"}
+	want := []any{"s", int64(1), 1.5, dur, "somevar", strs, "t2"}
 	if !reflect.DeepEqual(found.DispatchArgs, want) {
 		t.Fatalf("DispatchArgs = %#v, want %#v", found.DispatchArgs, want)
+	}
+}
+
+// TestExtraDispatchArgRejectsNestedCall covers resolveDispatch's rejection
+// of a nested CallValue dispatch argument: previously dispatchArgValue
+// silently collapsed it to its bare call name, discarding its own
+// arguments with no diagnostic (e.g. dispatch: Job(build_payload(x, y))
+// resolved DispatchArgs to ["build_payload"], quietly losing x and y).
+func TestExtraDispatchArgRejectsNestedCall(t *testing.T) {
+	call := &ast.CallValue{Name: "J", Args: []*ast.Arg{
+		{Value: &ast.CallValue{Name: "build_payload", Args: []*ast.Arg{{Value: &ast.IdentValue{Name: "x"}}}}},
+	}}
+
+	_, _, diags := resolveDispatch(call, map[string]*ir.Job{"J": {Name: "J", Params: []*ir.Param{{Name: "p1"}}}})
+	if len(diags) == 0 {
+		t.Fatal("expected a diagnostic rejecting the nested call argument, got none")
+	}
+
+	if !strings.Contains(diags.Error(), "nested call") {
+		t.Fatalf("diagnostics = %v, want one mentioning the nested call", diags)
 	}
 }
 

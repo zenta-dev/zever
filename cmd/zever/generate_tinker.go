@@ -65,7 +65,7 @@ func GenerateTinker(cfg GenerateTinkerConfig) (string, error) {
 		return "", fmt.Errorf("%s: output directory must not be empty (pass --dir)", tag)
 	}
 
-	if isTraversalName(cfg.OutDir) && (cfg.OutDir == ".." || filepath.IsAbs(cfg.OutDir)) {
+	if hasParentTraversal(cfg.OutDir) {
 		return "", fmt.Errorf("%s: %w: %q", tag, ErrPathTraversal, cfg.OutDir)
 	}
 
@@ -119,17 +119,13 @@ func runGenerateTinker(args []string) error {
 	appPkg := fs.String("app", "", "import path of the project's app package (default: <module>/internal/app)")
 	dir := fs.String("dir", "", "output directory (default: the project config's tinker_entry)")
 	force := fs.Bool("force", false, "overwrite an existing shim")
-	interactive := fs.Bool("interactive", false, "prompt for missing values")
-	interactiveShort := fs.Bool("i", false, "prompt for missing values (shorthand)")
+	// coverageProof: no local -i/--interactive flags; peelInteractive
+	// strips them before Parse and sets interactiveMode globally.
 
 	fs.Usage = func() { printTinkerGenerateUsage(fs) }
 
 	if err := fs.Parse(args); err != nil {
 		return err
-	}
-
-	if *interactive || *interactiveShort {
-		interactiveMode = true
 	}
 
 	pc, err := loadProjectConfig()

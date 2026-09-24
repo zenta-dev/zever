@@ -7,6 +7,7 @@ import (
 	"fmt"
 	"os"
 	"path/filepath"
+	"reflect"
 	"strings"
 
 	"go.yaml.in/yaml/v3"
@@ -85,7 +86,7 @@ func decodeServiceEntry(name string, entry any) (ServiceConfig, error) {
 	dec := json.NewDecoder(bytes.NewReader(data))
 	dec.DisallowUnknownFields()
 	if err := dec.Decode(&sc); err != nil {
-		return sc, &DecodeError{Service: name, Err: classifyDecodeError(name, err)}
+		return sc, &DecodeError{Service: name, Err: classifyDecodeError(name, err, []string{"adapter", "options"})}
 	}
 	return sc, nil
 }
@@ -115,22 +116,24 @@ func decodeOptions[T any](service string, m map[string]any) (T, error) {
 	dec := json.NewDecoder(bytes.NewReader(data))
 	dec.DisallowUnknownFields()
 	if err := dec.Decode(&out); err != nil {
-		return zero, &DecodeError{Service: service, Err: classifyDecodeError(service, err)}
+		return zero, &DecodeError{Service: service, Err: classifyDecodeError(service, err, fieldCandidates(reflect.ValueOf(&zero).Elem()))}
 	}
 	return out, nil
 }
 
 // classifyDecodeError maps a strict-decode failure to a safe error: type
 // mismatches are value-scrubbed, unknown fields become UnknownFieldError
-// so callers can match ErrUnknownField, and anything else passes through
-// (decoder syntax and unknown-field errors never quote input values).
-func classifyDecodeError(service string, err error) error {
+// (with a "did you mean %q?" suggestion drawn from candidates, T's own
+// top-level field names) so callers can match ErrUnknownField, and anything
+// else passes through (decoder syntax and unknown-field errors never quote
+// input values).
+func classifyDecodeError(service string, err error, candidates []string) error {
 	var ute *json.UnmarshalTypeError
 	if errors.As(err, &ute) {
 		return scrubTypeError(ute)
 	}
 	if field, ok := unknownFieldName(err); ok {
-		return &UnknownFieldError{Service: service, Field: field}
+		return &UnknownFieldError{Service: service, Field: field, Suggestion: closest(field, candidates)}
 	}
 	return err
 }

@@ -2,6 +2,7 @@ package main
 
 import (
 	"bytes"
+	"errors"
 	"flag"
 	"strings"
 	"testing"
@@ -117,13 +118,53 @@ func TestRunDoctorInteractiveLongForm(t *testing.T) {
 	prev := interactiveMode
 	t.Cleanup(func() { interactiveMode = prev })
 
-	if err := runDoctor([]string{"--interactive=true"}); err != nil {
-		t.Fatalf("runDoctor --interactive=true: %v", err)
+	if err := runDoctor([]string{"--interactive"}); err != nil {
+		t.Fatalf("runDoctor --interactive: %v", err)
 	}
 	if !interactiveMode {
-		t.Fatalf("expected --interactive=true to set interactiveMode")
+		t.Fatalf("expected --interactive to set interactiveMode")
 	}
 }
+
+// TestRunDoctorStrictFailsOnBatteryFailure covers --strict: unlike the
+// default (always nil -- a FAIL row is an expected outcome, see
+// TestRunDoctorDoesNotPanic), --strict must surface a non-nil error so
+// `zever doctor --strict` can gate a CI/pre-deploy pipeline on exit code.
+func TestRunDoctorStrictFailsOnBatteryFailure(t *testing.T) {
+	prev := doctorChecksFor
+	t.Cleanup(func() { doctorChecksFor = prev })
+	doctorChecksFor = func(_ *container.Container, _ *config.Config) map[string]func() error {
+		return map[string]func() error{
+			"config": func() error { return nil },
+			"db":     func() error { return errFakeBatteryFailure },
+		}
+	}
+
+	var out bytes.Buffer
+	if err := runDoctorWith(DoctorConfig{Out: &out, Strict: true}); err == nil {
+		t.Fatal("runDoctorWith Strict=true with a failing battery: got nil error, want non-nil")
+	}
+}
+
+// TestRunDoctorNotStrictIgnoresBatteryFailure pins the default: a failing
+// battery never fails the command unless --strict is passed.
+func TestRunDoctorNotStrictIgnoresBatteryFailure(t *testing.T) {
+	prev := doctorChecksFor
+	t.Cleanup(func() { doctorChecksFor = prev })
+	doctorChecksFor = func(_ *container.Container, _ *config.Config) map[string]func() error {
+		return map[string]func() error{
+			"config": func() error { return nil },
+			"db":     func() error { return errFakeBatteryFailure },
+		}
+	}
+
+	var out bytes.Buffer
+	if err := runDoctorWith(DoctorConfig{Out: &out}); err != nil {
+		t.Fatalf("runDoctorWith Strict=false with a failing battery: %v, want nil", err)
+	}
+}
+
+var errFakeBatteryFailure = errors.New("fake battery failure")
 
 func TestRunDoctorWithAllOK(t *testing.T) {
 	prev := doctorChecksFor

@@ -8,22 +8,24 @@ import (
 	"github.com/zenta-dev/zever/orm/render"
 )
 
-// AggFunc identifies a SQL aggregate function, mirroring the legacy
-// ORM engine's AggFunc values/ordering (Count/Sum/Avg/Min/Max).
-type AggFunc int
+// AggFunc identifies a SQL aggregate function. Type alias for
+// render.AggFunc (orm imports render, never the reverse -- see orm.Op's
+// doc comment for why aliasing beats a separately-kept-in-sync mirror).
+type AggFunc = render.AggFunc
 
 // Supported aggregate functions. AggArrayAgg/AggStringAgg/AggGroupConcat are
 // the ordered-argument (concatenating/collecting) aggregates; each is gated
-// per dialect (see dialect.OrderedAggregateDialect).
+// per dialect (see dialect.OrderedAggregateDialect). These re-export
+// render's identically-named constants.
 const (
-	AggCount AggFunc = iota
-	AggSum
-	AggAvg
-	AggMin
-	AggMax
-	AggArrayAgg
-	AggStringAgg
-	AggGroupConcat
+	AggCount       = render.AggCount
+	AggSum         = render.AggSum
+	AggAvg         = render.AggAvg
+	AggMin         = render.AggMin
+	AggMax         = render.AggMax
+	AggArrayAgg    = render.AggArrayAgg
+	AggStringAgg   = render.AggStringAgg
+	AggGroupConcat = render.AggGroupConcat
 )
 
 // Aggregate describes one aggregate expression in a GroupedQuery's select
@@ -545,7 +547,7 @@ func combineHaving(op CompoundOp, ps []HavingPredicate) HavingPredicate {
 
 func toRenderAggregate(a Aggregate) render.Aggregate {
 	out := render.Aggregate{
-		Func:         render.AggFunc(a.Func),
+		Func:         a.Func,
 		Column:       a.Column,
 		Alias:        a.Alias,
 		DistinctArg:  a.distinct,
@@ -588,14 +590,14 @@ func toRenderNodeErased(n Node) render.Node { return toRenderNode[struct{}](n) }
 func toRenderHaving(n havingNode) render.HavingNode {
 	switch n.kind {
 	case havingLeaf:
-		return render.HavingNode{Kind: render.HavingLeaf, Agg: toRenderAggregate(n.agg), Op: render.Op(n.op), Value: n.value}
+		return render.HavingNode{Kind: render.HavingLeaf, Agg: toRenderAggregate(n.agg), Op: n.op, Value: n.value}
 	case havingCompound:
 		children := make([]render.HavingNode, len(n.children))
 		for i, c := range n.children {
 			children[i] = toRenderHaving(c)
 		}
 
-		return render.HavingNode{Kind: render.HavingCompound, Compound: render.CompoundOp(n.compound), Children: children}
+		return render.HavingNode{Kind: render.HavingCompound, Compound: n.compound, Children: children}
 	case havingExpr:
 		e := toRenderNodeErased(n.expr)
 

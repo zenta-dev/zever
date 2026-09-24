@@ -1,6 +1,9 @@
 package dialect
 
-import "errors"
+import (
+	"errors"
+	"fmt"
+)
 
 // Dialect abstracts the SQL syntax differences renderers need to know
 // about: how placeholders are written and how identifiers are quoted.
@@ -184,6 +187,30 @@ type NullsOrderDialect interface {
 type DistinctOnDialect interface {
 	Dialect
 	SupportsDistinctOn() bool
+}
+
+// CheckDistinctOn validates a DISTINCT ON column list against d's
+// capability: nil is unset (no check, no error), an explicitly empty slice
+// is a caller error, and a non-empty slice on a dialect that doesn't
+// implement DistinctOnDialect (or reports no support) fails with
+// ErrUnsupportedByDialect. It is the single rule both orm's query-build-time
+// gate and orm/render's render-time gate call, so the two validation sites
+// can never independently drift on what "supports DISTINCT ON" means.
+func CheckDistinctOn(d Dialect, distinctOn []string) error {
+	if distinctOn == nil {
+		return nil
+	}
+
+	if len(distinctOn) == 0 {
+		return errors.New("DISTINCT ON requires at least one column")
+	}
+
+	dd, ok := d.(DistinctOnDialect)
+	if !ok || !dd.SupportsDistinctOn() {
+		return fmt.Errorf("%w: dialect %q does not support DISTINCT ON", ErrUnsupportedByDialect, d.Name())
+	}
+
+	return nil
 }
 
 // ExtendedLockingDialect is implemented by dialects that support the

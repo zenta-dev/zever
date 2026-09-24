@@ -76,7 +76,7 @@ func TestRenderRaw(t *testing.T) {
 	})
 
 	t.Run("fragment without markers binds nothing", func(t *testing.T) {
-		q, args, err := renderExpr(sqlite.New(), Node{Kind: KindRaw, Value: RawExpr{Fragment: "1 = 1", Args: []any{"ignored"}}}, &argCounter{})
+		q, args, err := renderExpr(sqlite.New(), Node{Kind: KindRaw, Value: RawExpr{Fragment: "1 = 1", Args: nil}}, &argCounter{})
 		if err != nil {
 			t.Fatalf("err = %v, want nil", err)
 		}
@@ -90,22 +90,22 @@ func TestRenderRaw(t *testing.T) {
 		}
 	})
 
-	t.Run("more markers than args fails closed without panicking", func(t *testing.T) {
-		// A placeholder whose arg position is missing is still emitted: the
-		// placeholder/arg mismatch surfaces as a driver error at execution,
-		// and renderRaw must never panic or drop the fragment.
-		q, args, err := renderExpr(sqlite.New(), Node{Kind: KindRaw, Value: RawExpr{Fragment: "a = ? AND b = ?", Args: []any{"only-one"}}}, &argCounter{})
-		if err != nil {
-			t.Fatalf("err = %v, want nil", err)
+	t.Run("marker/arg count mismatch fails closed instead of silently dropping or under-binding", func(t *testing.T) {
+		// A caller mistake (typo'd marker count, forgotten arg) must error
+		// loudly rather than silently drop a supplied arg (e.g. a tenant
+		// scope) or emit a placeholder with nothing bound to it -- this is
+		// the one escape hatch explicitly documented as "audited, safe", so
+		// it must fail closed on any arity mismatch, in either direction.
+		if _, _, err := renderExpr(sqlite.New(), Node{Kind: KindRaw, Value: RawExpr{Fragment: "1 = 1", Args: []any{"ignored"}}}, &argCounter{}); err == nil {
+			t.Fatal("0 markers, 1 arg: got nil error, want a mismatch error")
 		}
 
-		want := "a = ? AND b = ?"
-		if q != want {
-			t.Fatalf("clause = %q, want %q", q, want)
+		if _, _, err := renderExpr(sqlite.New(), Node{Kind: KindRaw, Value: RawExpr{Fragment: "a = ? AND b = ?", Args: []any{"only-one"}}}, &argCounter{}); err == nil {
+			t.Fatal("2 markers, 1 arg: got nil error, want a mismatch error")
 		}
 
-		if !reflect.DeepEqual(args, []any{"only-one"}) {
-			t.Fatalf("args = %#v, want the single bound arg", args)
+		if _, _, err := renderExpr(sqlite.New(), Node{Kind: KindRaw, Value: RawExpr{Fragment: "status = ?", Args: []any{"active", "extra-dropped-arg"}}}, &argCounter{}); err == nil {
+			t.Fatal("1 marker, 2 args: got nil error, want a mismatch error")
 		}
 	})
 

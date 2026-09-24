@@ -76,6 +76,8 @@ func redactMap(m map[string]any) {
 			}
 		case []any:
 			redactSlice(val)
+		case []string:
+			redactStringSlice(val)
 		}
 	}
 }
@@ -93,6 +95,27 @@ func redactSlice(s []any) {
 			}
 		case []any:
 			redactSlice(v)
+		case []string:
+			redactStringSlice(v)
+		}
+	}
+}
+
+// redactStringSlice redacts "key: value"-shaped entries in place, such as an
+// HTTP header list (["Authorization: Bearer xxx", "Content-Type: json"])
+// nested under a key isSensitiveKey does not itself match (e.g. "headers").
+// Entries with no ": " separator, or whose key half is not sensitive, are
+// left untouched -- this only closes the header-list-shaped case; a bare
+// secret string with no key prefix is out of scope for key-based redaction.
+func redactStringSlice(s []string) {
+	for i, entry := range s {
+		key, val, ok := strings.Cut(entry, ": ")
+		if !ok || val == "" {
+			continue
+		}
+
+		if isSensitiveKey(strings.TrimSpace(key)) {
+			s[i] = key + ": " + RedactedValue
 		}
 	}
 }
@@ -131,6 +154,11 @@ func deepCopyValue(v any) any {
 		for i, elem := range val {
 			out[i] = deepCopyValue(elem)
 		}
+
+		return out
+	case []string:
+		out := make([]string, len(val))
+		copy(out, val)
 
 		return out
 	default:

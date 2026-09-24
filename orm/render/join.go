@@ -24,6 +24,15 @@ const (
 )
 
 func (jt JoinType) keyword() string {
+	return jt.String()
+}
+
+// String returns the SQL keyword jt renders, for error messages. Exported
+// (not just the private keyword() this file already had) so the orm
+// package's JoinType alias inherits it directly -- a type alias cannot
+// declare its own methods, so this must live wherever JoinType itself is
+// defined.
+func (jt JoinType) String() string {
 	switch jt {
 	case InnerJoin:
 		return "INNER JOIN"

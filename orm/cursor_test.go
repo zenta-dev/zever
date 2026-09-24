@@ -36,12 +36,7 @@ var (
 	cursorRowOK     = NewColumn[cursorRow, bool]("cursor_rows", "ok")
 	cursorRowAt     = NewColumn[cursorRow, time.Time]("cursor_rows", "at")
 	cursorRowBlob   = NewColumn[cursorRow, []byte]("cursor_rows", "blob")
-	enumRowID       = NewColumn[cursorRow, enumID]("cursor_rows", "id")
 )
-
-// enumID is a defined string type, proving the ~underlying union in
-// CursorKeyValue accepts codegen'd enum columns.
-type enumID string
 
 // seedCursorWidgets returns newWidgetsDB plus three extra widgets (w4..w6),
 // giving six ordered rows for pagination walks.
@@ -127,10 +122,6 @@ func TestCursorKeyEncodeDecodeRoundTrip(t *testing.T) {
 	assertCursorRoundTrip(t, cursorRowOK, true)
 	assertCursorRoundTrip(t, cursorRowAt, at)
 	assertCursorRoundTrip(t, cursorRowBlob, []byte{0x00, 0x01, 0xff})
-}
-
-func TestCursorKeyDefinedValueTypeRoundTrip(t *testing.T) {
-	assertCursorRoundTrip(t, enumRowID, enumID("hello"))
 }
 
 func TestCursorKeyDescRoundTrip(t *testing.T) {
@@ -602,13 +593,9 @@ func TestCursorValueHelpersUnit(t *testing.T) {
 		t.Fatal("encodeCursorValue(int) succeeded, want an error")
 	}
 
-	if _, err := cursorTagFor(reflect.TypeOf(struct{}{})); err == nil {
-		t.Fatal("cursorTagFor(struct{}) succeeded, want an error")
-	}
-
-	if _, err := cursorTagFor(reflect.TypeOf([]int32{})); err == nil {
-		t.Fatal("cursorTagFor([]int32) succeeded, want an error")
-	}
+	// cursorTagFor is generic over CursorKeyValue, so an unsupported type
+	// (struct{}, []int32, ...) is now rejected at compile time by the type
+	// constraint itself -- there is no runtime path left to exercise.
 
 	if got := cursorVersionAt(nil); got != 0 {
 		t.Fatalf("cursorVersionAt(nil) = %d, want 0", got)
@@ -622,11 +609,11 @@ func TestCursorValueHelpersUnit(t *testing.T) {
 		t.Fatal("readCursorString(truncated) succeeded, want an error")
 	}
 
-	if _, err := decodeCursorValue('z', nil, reflect.TypeOf(int64(0))); err == nil {
+	if _, err := decodeCursorValue('z', nil); err == nil {
 		t.Fatal("decodeCursorValue(unknown tag) succeeded, want an error")
 	}
 
-	if _, err := decodeCursorText(cursorTagTime, withStrHelper("x"), reflect.TypeOf(time.Time{})); err == nil {
+	if _, err := decodeCursorText(cursorTagTime, withStrHelper("x")); err == nil {
 		t.Fatal("decodeCursorText(bad time) succeeded, want an error")
 	}
 }

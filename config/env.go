@@ -169,6 +169,36 @@ func jsonFieldName(sf reflect.StructField) string {
 	return sf.Name
 }
 
+// fieldCandidates lists v's exported field names (JSON key, embedded
+// structs' fields promoted), for use as closest's candidate list when
+// reporting an UnknownFieldError with a "did you mean %q?" suggestion.
+func fieldCandidates(v reflect.Value) []string {
+	if !v.IsValid() || v.Kind() != reflect.Struct {
+		return nil
+	}
+
+	t := v.Type()
+
+	var names []string
+
+	for i := 0; i < t.NumField(); i++ {
+		sf := t.Field(i)
+		if sf.PkgPath != "" {
+			continue
+		}
+
+		if sf.Anonymous && v.Field(i).Kind() == reflect.Struct {
+			names = append(names, fieldCandidates(v.Field(i))...)
+
+			continue
+		}
+
+		names = append(names, jsonFieldName(sf))
+	}
+
+	return names
+}
+
 // findField locates an exported settable field of struct v by normalized
 // JSON name, descending into embedded structs (encoding/json promotion).
 func findField(v reflect.Value, name string) (reflect.Value, bool) {
@@ -212,7 +242,7 @@ func setOptionField(service string, dst any, path []string, value string) error 
 	for _, name := range path[:len(path)-1] {
 		f, ok := findField(cur, name)
 		if !ok {
-			return &UnknownFieldError{Service: service, Field: field}
+			return &UnknownFieldError{Service: service, Field: field, Suggestion: closest(name, fieldCandidates(cur))}
 		}
 		f = reflect.Indirect(f)
 		if !f.IsValid() || f.Kind() != reflect.Struct {
@@ -222,7 +252,7 @@ func setOptionField(service string, dst any, path []string, value string) error 
 	}
 	leaf, ok := findField(cur, path[len(path)-1])
 	if !ok {
-		return &UnknownFieldError{Service: service, Field: field}
+		return &UnknownFieldError{Service: service, Field: field, Suggestion: closest(path[len(path)-1], fieldCandidates(cur))}
 	}
 	return setScalar(service, field, leaf, value)
 }

@@ -1,11 +1,13 @@
 package main
 
 import (
+	"context"
 	"flag"
 	"fmt"
 	"io"
 	"os"
 	"sort"
+	"time"
 
 	"github.com/zenta-dev/zever/config"
 	"github.com/zenta-dev/zever/container"
@@ -18,12 +20,19 @@ import (
 type DoctorConfig struct {
 	ConfigPath string
 	Out        io.Writer
+	// Strict makes runDoctorWith return a non-nil error when any battery
+	// fails, instead of always returning nil. Off by default because
+	// config.Default() legitimately fails some batteries (e.g. auth/jwt
+	// with no configured secret) -- that is expected, not a command
+	// error. Pass --strict for CI/pre-deploy gating, where any FAIL row
+	// should abort the pipeline via a non-zero exit code.
+	Strict bool
 }
 
 // printDoctorUsage prints styled help for `zever doctor`.
 func printDoctorUsage(fs *flag.FlagSet) {
 	header := title("zever doctor") + dim(" — verify batteries")
-	usage := bold("Usage:") + "  " + cmd("zever doctor") + dim(" [--config PATH]") + dim("  •  -i for guided prompts")
+	usage := bold("Usage:") + "  " + cmd("zever doctor") + dim(" [--config PATH] [--strict]") + dim("  •  -i for guided prompts")
 
 	body := joinLines(
 		header,
@@ -70,19 +79,14 @@ func runDoctor(args []string) error {
 	args = peelInteractive(args)
 	fs := flag.NewFlagSet("doctor", flag.ContinueOnError)
 	configPath := fs.String("config", "", "optional config file path (default: config.Default(), zero-infra)")
-	interactive := fs.Bool("interactive", false, "prompt for missing values")
-	interactiveShort := fs.Bool("i", false, "prompt for missing values (shorthand)")
+	strict := fs.Bool("strict", false, "exit non-zero if any battery fails (for CI/pre-deploy gating)")
 	fs.Usage = func() { printDoctorUsage(fs) }
 
 	if err := fs.Parse(args); err != nil {
 		return err
 	}
 
-	if *interactive || *interactiveShort {
-		interactiveMode = true
-	}
-
-	return runDoctorWith(DoctorConfig{ConfigPath: *configPath})
+	return runDoctorWith(DoctorConfig{ConfigPath: *configPath, Strict: *strict})
 }
 
 // doctorChecksFor builds the battery check table for runDoctorWith.
@@ -133,9 +137,11 @@ var doctorChecksFor = func(c *container.Container, resolved *config.Config) map[
 // ConfigPath is empty, config.Load(ConfigPath) otherwise) and reports one
 // OK/FAIL line per battery to cfg.Out. It validates the config first and
 // reports the result as a "config" row, then resolves each battery against
-// the same Container. It always returns nil: a FAIL row is an expected
-// outcome (e.g. a battery needing a secret), not a command error; only a
-// config file that cannot be loaded is an error.
+// the same Container. By default it always returns nil: a FAIL row is an
+// expected outcome (e.g. a battery needing a secret), not a command error;
+// only a config file that cannot be loaded is an error. Pass cfg.Strict to
+// make any FAIL row return a non-nil error instead, for CI/pre-deploy
+// gating on exit code.
 //
 // No secrets ever reach cfg.Out: only battery resolution errors are
 // printed, and those never echo secret values (see config.Redact, the sole
@@ -155,6 +161,12 @@ func runDoctorWith(cfg DoctorConfig) error {
 	}
 
 	c := container.New(resolved)
+	defer func() {
+		ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
+		defer cancel()
+		_ = c.Close(ctx)
+	}()
+
 	checks := doctorChecksFor(c, resolved)
 
 	names := make([]string, 0, len(checks))
@@ -204,6 +216,10 @@ func runDoctorWith(cfg DoctorConfig) error {
 		if shouldShowHint() {
 			_, _ = fmt.Fprintln(os.Stderr, formatHint(hintFor("compile")))
 		}
+	}
+
+	if failed && cfg.Strict {
+		return fmt.Errorf("zever doctor: %d of %d batteries failed (--strict)", failCount, len(names))
 	}
 
 	return nil
