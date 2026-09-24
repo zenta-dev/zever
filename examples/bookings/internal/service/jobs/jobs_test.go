@@ -32,6 +32,18 @@ import (
 	_ "github.com/zenta-dev/zever/webhook/queue"
 )
 
+// eventually polls cond until true or timeout, failing the test on expiry.
+func eventually(t *testing.T, timeout time.Duration, cond func() bool, msg string) {
+	t.Helper()
+	deadline := time.Now().Add(timeout)
+	for !cond() {
+		if time.Now().After(deadline) {
+			t.Fatalf("eventually timed out after %v: %s", timeout, msg)
+		}
+		time.Sleep(5 * time.Millisecond)
+	}
+}
+
 func migrate(t *testing.T, database db.DB) {
 	t.Helper()
 	ctx := context.Background()
@@ -142,13 +154,9 @@ func TestRunConfirmationSendsReceiptAndFansOutWebhook(t *testing.T) {
 		t.Fatalf("mail output missing guest address: %q", mailBuf.String())
 	}
 
-	deadline := time.Now().Add(5 * time.Second)
-	for got.Load() == 0 && time.Now().Before(deadline) {
-		time.Sleep(10 * time.Millisecond)
-	}
-	if got.Load() == 0 {
-		t.Fatalf("webhook target got no delivery")
-	}
+	eventually(t, 5*time.Second, func() bool {
+		return got.Load() != 0
+	}, "webhook target got no delivery")
 }
 
 // TestConfirmationHandlerShape ensures the job.Register-compatible handler
@@ -235,11 +243,7 @@ func TestRegisterDemoTargetsFanout(t *testing.T) {
 		t.Fatalf("Deliver cancelled: %v", err)
 	}
 
-	deadline := time.Now().Add(5 * time.Second)
-	for (created.Load() == 0 || cancelled.Load() == 0) && time.Now().Before(deadline) {
-		time.Sleep(10 * time.Millisecond)
-	}
-	if created.Load() == 0 || cancelled.Load() == 0 {
-		t.Fatalf("fanout incomplete: created=%d cancelled=%d", created.Load(), cancelled.Load())
-	}
+	eventually(t, 5*time.Second, func() bool {
+		return created.Load() != 0 && cancelled.Load() != 0
+	}, "fanout incomplete")
 }

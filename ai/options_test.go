@@ -64,7 +64,7 @@ func TestOptions_Validate_baseURL_table(t *testing.T) {
 		{"empty", "", false, nil},
 		{"no scheme", "example.com/api", true, []string{"scheme"}},
 		{"no host", "https:///path", true, []string{"host"}},
-		{"garbage", "http://[::1", true, []string{"valid URL"}},
+		{"garbage", "http://[::1", true, []string{"valid url"}},
 		{"http blocked", "http://example.com/v1", true, []string{"https"}},
 		{"http localhost blocked", "http://localhost:8080", true, []string{"https"}},
 		{"ftp blocked", "ftp://example.com/v1", true, []string{"https"}},

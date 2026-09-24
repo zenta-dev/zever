@@ -22,10 +22,10 @@ func TestOptions_Validate_violations_table(t *testing.T) {
 		opts    Options
 		reasons []string
 	}{
-		{"negative bytes", Options{MaxWebhookBytes: -1}, []string{"max webhook bytes"}},
+		{"negative bytes", Options{MaxWebhookBytes: -1}, []string{"max_webhook_bytes"}},
 		{"no scheme", Options{Endpoint: "example.com/hook"}, []string{"scheme"}},
 		{"no host", Options{Endpoint: "https:///path"}, []string{"host"}},
-		{"garbage", Options{Endpoint: "http://[::1"}, []string{"valid URL"}},
+		{"garbage", Options{Endpoint: "http://[::1"}, []string{"valid url"}},
 	}
 	for _, tc := range cases {
 		t.Run(tc.name, func(t *testing.T) {
@@ -58,7 +58,7 @@ func TestOptions_Validate_multiple_joined(t *testing.T) {
 		t.Fatalf("Validate err = %v, want ErrInvalidOptions", err)
 	}
 
-	if !strings.Contains(err.Error(), "max webhook bytes") {
+	if !strings.Contains(err.Error(), "max_webhook_bytes") {
 		t.Errorf("err %q missing bytes reason", err.Error())
 	}
 

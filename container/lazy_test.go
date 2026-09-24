@@ -8,6 +8,18 @@ import (
 	"time"
 )
 
+// eventually polls cond until true or timeout, failing the test on expiry.
+func eventually(t *testing.T, timeout time.Duration, cond func() bool, msg string) {
+	t.Helper()
+	deadline := time.Now().Add(timeout)
+	for !cond() {
+		if time.Now().After(deadline) {
+			t.Fatalf("eventually timed out after %v: %s", timeout, msg)
+		}
+		time.Sleep(5 * time.Millisecond)
+	}
+}
+
 func TestLazy_SuccessCachesValue(t *testing.T) {
 	var l lazy[int]
 	var calls atomic.Int32
@@ -88,6 +100,8 @@ func TestLazy_ConcurrentSingleflight(t *testing.T) {
 	//nolint:unparam // get requires (T, error); the shared-success path is nil by design
 	build := func() (string, error) {
 		calls.Add(1)
+		// Simulated work to widen the singleflight overlap window, not a
+		// sync wait: start-chan + WaitGroup below provide the synchronization.
 		time.Sleep(50 * time.Millisecond)
 		return "shared", nil
 	}
@@ -144,6 +158,7 @@ func TestLazy_WaiterBecomesRetryLeader(t *testing.T) {
 	wg.Add(2)
 	var leaderVal, waiterVal int
 	var leaderErr, waiterErr error
+	var waiterStarted atomic.Bool
 	go func() {
 		defer wg.Done()
 		leaderVal, leaderErr = l.get(leaderBuild)
@@ -151,11 +166,13 @@ func TestLazy_WaiterBecomesRetryLeader(t *testing.T) {
 	<-entered
 	go func() {
 		defer wg.Done()
+		waiterStarted.Store(true)
 		waiterVal, waiterErr = l.get(waiterBuild)
 	}()
-	// Let the waiter park on the leader's wait channel. Even if it arrives
-	// late it becomes the retry leader itself; the assertions hold either way.
-	time.Sleep(100 * time.Millisecond)
+	// Wait until the waiter goroutine has started instead of a fixed sleep.
+	// Even if it arrives late it becomes the retry leader itself; the
+	// assertions hold either way.
+	eventually(t, 2*time.Second, waiterStarted.Load, "waiter goroutine did not start")
 	close(release)
 	wg.Wait()
 
@@ -246,8 +263,10 @@ func TestLazy_WaiterDoneBranch(t *testing.T) {
 		l.mu.Unlock()
 
 		finished := make(chan struct{})
+		started := make(chan struct{})
 		go func() {
 			defer close(finished)
+			close(started)
 			v, err := l.get(func() (int, error) {
 				return -1, errors.New("build must not run")
 			})
@@ -258,7 +277,16 @@ func TestLazy_WaiterDoneBranch(t *testing.T) {
 				t.Errorf("iter %d: got %d, want 7", i, v)
 			}
 		}()
-		time.Sleep(20 * time.Millisecond)
+		// Wait for the waiter goroutine to start (channel sync the lazy
+		// wait-channel already exposes) instead of a fixed sleep. If the
+		// setter wins the race the waiter takes the mutex-guarded done
+		// path; assertions still hold and coverage accumulates across
+		// iterations.
+		select {
+		case <-started:
+		case <-time.After(2 * time.Second):
+			t.Fatalf("iter %d: waiter goroutine did not start", i)
+		}
 		l.mu.Lock()
 		l.val = 7
 		l.done = true

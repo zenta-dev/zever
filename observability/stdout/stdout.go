@@ -23,9 +23,10 @@ type spanInfo struct {
 }
 
 type line struct {
-	TraceID    string         `json:"trace_id"`
-	SpanID     string         `json:"span_id,omitempty"`
-	Name       string         `json:"name"`
+	TraceID string `json:"trace_id"`
+	SpanID  string `json:"span_id,omitempty"`
+	Name    string `json:"name"`
+	// DurationMs is int64 milliseconds on the wire, not a time.Duration — intentional.
 	DurationMs int64          `json:"duration_ms,omitempty"`
 	Attrs      map[string]any `json:"attrs,omitempty"`
 	Error      string         `json:"error,omitempty"`

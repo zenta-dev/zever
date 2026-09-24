@@ -16,7 +16,7 @@ no handlers yet.
 
 ## Runbook outline
 
-1. Migrate: `zever db migrate --adapter=sqlite --dsn=data/app.db schema/bookings.zen`
+1. Migrate: `zever db migrate --adapter=sqlite --dsn=data/bookings.db schema/bookings.zen`
 2. Seed: coming in a later PR.
 3. Serve: coming in a later PR (`zever serve --config zever.yaml`).
 4. Worker: coming in a later PR (queue `default`/`low` consumers for
@@ -29,7 +29,7 @@ zero-infra defaults, not framework bugs (do not fix framework code):
 
 - ai, auth, geo, i18n: same 4 FAILs as bare defaults (missing api key,
   jwt secret, cities.json, embed FS).
-- db: `data/app.db` resolves relative to `examples/bookings/`; run doctor
+- db: `data/bookings.db` resolves relative to `examples/bookings/`; run doctor
   from that directory or after migrating.
 - webhook (queue variant): needs its queue reference, wired in a later PR.
 

@@ -23,7 +23,7 @@
 // never starts the timeout clock's downstream work.
 //
 // Container: no dedicated accessor, construct over container-resolved
-// instances after container.New(cfg) such as c.Log() and c.Ratelimit(). Lazy
+// instances after container.New(cfg) such as c.Log() and c.RateLimit(). Lazy
 // per-service singleton, retry on error applies to those services. See
 // container/README.md.
 //

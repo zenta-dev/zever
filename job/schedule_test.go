@@ -369,7 +369,11 @@ func TestSchedulerRunCancel(t *testing.T) {
 	go func() {
 		done <- s.Run(ctx)
 	}()
-	time.Sleep(50 * time.Millisecond)
+	// Poll until Run has stored ctx (proving cron started) instead of a
+	// fixed sleep, then cancel.
+	eventually(t, 500*time.Millisecond, func() bool {
+		return s.ctx.Load() != nil
+	}, "scheduler Run did not start")
 	cancel()
 	select {
 	case err := <-done:

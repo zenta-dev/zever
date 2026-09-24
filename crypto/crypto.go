@@ -35,7 +35,7 @@ type Crypto interface {
 	Signer
 }
 
-// Factory creates a Crypto from typed options.
+// Factory creates a Crypto from the given Options.
 type Factory func(opts Options) (Crypto, error)
 
 var factories = registry.New[Adapter, Factory](
@@ -45,29 +45,29 @@ var factories = registry.New[Adapter, Factory](
 )
 
 // Register associates an Adapter with a Factory for later use by Open.
-func Register(a Adapter, f Factory) error {
-	if f == nil {
-		return fmt.Errorf("%w for adapter %s", ErrNilFactory, a)
+func Register(adapter Adapter, factory Factory) error {
+	if factory == nil {
+		return fmt.Errorf("%w for adapter %s", ErrNilFactory, adapter)
 	}
 
-	return factories.Register(a, f)
+	return factories.Register(adapter, factory)
 }
 
 // Open creates a Crypto for adapter using the registered Factory and opts.
 // Validate is called before factory lookup so missing/invalid secrets fail-closed.
-func Open(a Adapter, opts Options) (Crypto, error) {
+func Open(adapter Adapter, opts Options) (Crypto, error) {
 	if err := opts.Validate(); err != nil {
 		return nil, err
 	}
 
-	factory, err := factories.Lookup(a)
+	factory, err := factories.Lookup(adapter)
 	if err != nil {
 		return nil, err
 	}
 
 	c, err := factory(opts)
 	if err != nil {
-		return nil, fmt.Errorf("crypto: open %s: %w", a, err)
+		return nil, fmt.Errorf("crypto: open %s: %w", adapter, err)
 	}
 
 	return c, nil

@@ -9,6 +9,7 @@ import (
 	"io"
 	"net/http"
 	"net/url"
+	"runtime"
 	"strings"
 	"testing"
 	"time"
@@ -955,7 +956,7 @@ func openStreamBlocked(t *testing.T, body string) (<-chan ai.StreamChunk, contex
 			t.Fatal("writer did not fill buffer")
 		}
 
-		time.Sleep(time.Millisecond)
+		runtime.Gosched()
 	}
 
 	return ch, cancel

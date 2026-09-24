@@ -78,7 +78,7 @@ func TestGroupedSelect(t *testing.T) {
 		where := Node{Kind: KindBinary, Column: "region", Op: OpEq, Value: "west"}
 		having := HavingNode{Kind: HavingLeaf, Agg: Aggregate{Func: AggSum, Column: "amount"}, Op: OpGte, Value: 100}
 
-		q, args, err := fakePostgresGroupedSelect(where, having)
+		q, args, err := stubPostgresGroupedSelect(where, having)
 		if err != nil {
 			t.Fatalf("err = %v, want nil", err)
 		}
@@ -159,7 +159,7 @@ func TestGroupedSelect(t *testing.T) {
 	})
 }
 
-func fakePostgresGroupedSelect(where Node, having HavingNode) (string, []any, error) {
+func stubPostgresGroupedSelect(where Node, having HavingNode) (string, []any, error) {
 	return GroupedSelect(
 		fakePostgres{},
 		"orders",

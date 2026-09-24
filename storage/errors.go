@@ -29,11 +29,17 @@ var ErrNilFactory = errors.New("storage: nil factory")
 // ErrDuplicate is returned on duplicate adapter registration.
 var ErrDuplicate = errors.New("storage: duplicate registration")
 
+// ErrDuplicateAdapter aliases ErrDuplicate for compatibility.
+var ErrDuplicateAdapter = ErrDuplicate
+
 // ErrUnknownAdapter is returned for an unregistered adapter.
 var ErrUnknownAdapter = errors.New("storage: unknown adapter")
 
 // ErrInvalidAdapter is returned for an invalid adapter name.
 var ErrInvalidAdapter = errors.New("storage: invalid adapter")
+
+// ErrInvalidOptions is returned for invalid storage options.
+var ErrInvalidOptions = errors.New("storage: invalid options")
 
 // InvalidAdapterError reports an invalid adapter name.
 type InvalidAdapterError struct {
@@ -43,7 +49,7 @@ type InvalidAdapterError struct {
 
 // Error returns a human-readable invalid-adapter message.
 func (e InvalidAdapterError) Error() string {
-	return fmt.Sprintf("storage: invalid adapter: %q", e.Adapter)
+	return fmt.Sprintf("%s: %q", ErrInvalidAdapter, e.Adapter)
 }
 
 // Unwrap returns ErrInvalidAdapter.
@@ -51,19 +57,22 @@ func (e InvalidAdapterError) Unwrap() error {
 	return ErrInvalidAdapter
 }
 
-// DuplicateError reports a duplicate adapter registration.
-type DuplicateError struct {
+// DuplicateAdapterError reports a duplicate adapter registration.
+type DuplicateAdapterError struct {
 	// Adapter is the already-registered adapter.
 	Adapter Adapter
 }
 
+// DuplicateError aliases DuplicateAdapterError for compatibility.
+type DuplicateError = DuplicateAdapterError
+
 // Error returns a human-readable duplicate-registration message.
-func (e DuplicateError) Error() string {
+func (e DuplicateAdapterError) Error() string {
 	return fmt.Sprintf("%s: %s", ErrDuplicate, e.Adapter.String())
 }
 
 // Unwrap returns ErrDuplicate.
-func (e DuplicateError) Unwrap() error {
+func (e DuplicateAdapterError) Unwrap() error {
 	return ErrDuplicate
 }
 
@@ -81,4 +90,20 @@ func (e UnknownAdapterError) Error() string {
 // Unwrap returns ErrUnknownAdapter.
 func (e UnknownAdapterError) Unwrap() error {
 	return ErrUnknownAdapter
+}
+
+// InvalidOptionsError reports a storage options validation failure.
+type InvalidOptionsError struct {
+	// Reason describes the validation failure.
+	Reason string
+}
+
+// Error returns a human-readable invalid-options message.
+func (e *InvalidOptionsError) Error() string {
+	return fmt.Sprintf("%s: %s", ErrInvalidOptions, e.Reason)
+}
+
+// Unwrap returns ErrInvalidOptions.
+func (e *InvalidOptionsError) Unwrap() error {
+	return ErrInvalidOptions
 }

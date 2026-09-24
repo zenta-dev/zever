@@ -54,7 +54,7 @@ func Default() *Config {
 	cfg.Crypto = Service[crypto.Options]{Adapter: "local", Options: crypto.Options{Key: "MDEyMzQ1Njc4OTAxMjM0NTY3ODkwMTIzNDU2Nzg5MDE="}} //nolint:gosec // deterministic dev-only secret, never production
 	cfg.DB = Service[db.Options]{Adapter: "sqlite"}
 	cfg.Document = Service[document.Options]{Adapter: "local"}
-	cfg.Eventbus = Service[eventbus.Options]{Adapter: "memory"}
+	cfg.EventBus = Service[eventbus.Options]{Adapter: "memory"}
 	cfg.Flag = Service[flag.Options]{Adapter: "static"}
 	cfg.Geo = Service[geo.Options]{Adapter: "static"}
 	cfg.I18n = Service[i18n.Options]{Adapter: "embed"}
@@ -69,7 +69,7 @@ func Default() *Config {
 	cfg.Payment = Service[payment.Options]{Adapter: "stub"}
 	cfg.Permission = Service[permission.Options]{Adapter: "noop"}
 	cfg.Queue = Service[queue.Options]{Adapter: "memory"}
-	cfg.Ratelimit = Service[ratelimit.Options]{Adapter: "memory", Options: ratelimit.Options{Rate: 10, Burst: 20}}
+	cfg.RateLimit = Service[ratelimit.Options]{Adapter: "memory", Options: ratelimit.Options{Rate: 10, Burst: 20}}
 	cfg.Router = Service[router.Options]{Adapter: "stdhttp"}
 	cfg.Scheduler = Service[scheduler.Options]{Adapter: "embedded", Options: scheduler.Options{Dispatcher: &job.Dispatcher{}}}
 	cfg.Search = Service[search.Options]{Adapter: "sqlite"}

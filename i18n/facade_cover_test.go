@@ -18,7 +18,7 @@ func TestErrors_typedErrorMessage_exact(t *testing.T) {
 	}
 
 	unk := UnknownAdapterError{Adapter: Remote}
-	if want := "i18n: unknown adapter: remote"; unk.Error() != want {
+	if want := "i18n: unknown adapter: remote (forgotten import?)"; unk.Error() != want {
 		t.Errorf("UnknownAdapterError.Error() = %q, want %q", unk.Error(), want)
 	}
 	if (&unk).Error() != unk.Error() {
@@ -89,13 +89,13 @@ func TestOptions_Validate_urlParseFailure_invalid(t *testing.T) {
 	if !errors.Is(err, ErrInvalidOptions) {
 		t.Errorf("url parse failure err = %v, want ErrInvalidOptions", err)
 	}
-	if want := "i18n: invalid options: endpoint must be a valid URL"; err.Error() != want {
+	if want := "i18n: invalid options: endpoint must be a valid url"; err.Error() != want {
 		t.Errorf("url parse failure err %q, want %q", err.Error(), want)
 	}
 	var ioe *InvalidOptionsError
 	if !errors.As(err, &ioe) {
 		t.Errorf("url parse failure err %T is not *InvalidOptionsError", err)
-	} else if ioe.Reason != "endpoint must be a valid URL" {
+	} else if ioe.Reason != "endpoint must be a valid url" {
 		t.Errorf("url parse failure reason %q", ioe.Reason)
 	}
 }

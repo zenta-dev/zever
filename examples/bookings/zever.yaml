@@ -35,13 +35,13 @@ webhook:
   options:
     # Durations are integer nanoseconds in YAML files ("5s" style works via env only).
     timeout: 10000000000 # 10s
-    maxretries: 3
-    queueadapter: memory
-    queueopts:
-      visibilitytimeout: 30000000000 # 30s, must exceed timeout
-      polltimeout: 1000000000 # 1s
+    max_retries: 3
+    queue_adapter: memory
+    queue_opts:
+      visibility_timeout: 30000000000 # 30s, must exceed timeout
+      poll_timeout: 1000000000 # 1s
       buffer: 100
-    deadlettertopic: webhook.dead
+    dead_letter_topic: webhook.dead
 scheduler:
   adapter: embedded
 idempotency:

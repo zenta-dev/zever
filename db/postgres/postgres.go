@@ -369,7 +369,7 @@ func New(opts db.Options) (db.DB, error) {
 
 	pool, err := pgxpool.NewWithConfig(ctx, config)
 	if err != nil {
-		return nil, fmt.Errorf("postgres: open error: %w", err)
+		return nil, fmt.Errorf("postgres: open: %w", err)
 	}
 
 	return &adapter{pool: pool}, nil

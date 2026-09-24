@@ -808,7 +808,7 @@ func New(o webhook.Options) (webhook.Webhook, error) {
 
 	q, err := queue.Open(qa, o.QueueOpts)
 	if err != nil {
-		return nil, fmt.Errorf("queue: open queue: %w", err)
+		return nil, fmt.Errorf("webhook: open queue: %w", err)
 	}
 
 	replayTolerance := o.ReplayTolerance

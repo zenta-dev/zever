@@ -1,6 +1,6 @@
 module example.com/acme
 
-go 1.24
+go 1.27
 
 require github.com/zenta-dev/zever v1.2.3
 

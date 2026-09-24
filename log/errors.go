@@ -23,19 +23,22 @@ var ErrInvalidLevel = errors.New("log: invalid level")
 // ErrInvalidAdapter is returned for an invalid adapter name.
 var ErrInvalidAdapter = errors.New("log: invalid adapter")
 
-// DuplicateError reports a repeated Register for the same adapter.
-type DuplicateError struct {
+// DuplicateAdapterError reports a repeated Register for the same adapter.
+type DuplicateAdapterError struct {
 	// Adapter is the already-registered adapter.
 	Adapter Adapter
 }
 
+// DuplicateError aliases DuplicateAdapterError for compatibility.
+type DuplicateError = DuplicateAdapterError
+
 // Error returns a human-readable description of the duplicate registration.
-func (e *DuplicateError) Error() string {
+func (e *DuplicateAdapterError) Error() string {
 	return fmt.Sprintf("%s: %s", ErrDuplicateAdapter, e.Adapter.String())
 }
 
 // Unwrap returns ErrDuplicateAdapter for errors.Is matching.
-func (e *DuplicateError) Unwrap() error { return ErrDuplicateAdapter }
+func (e *DuplicateAdapterError) Unwrap() error { return ErrDuplicateAdapter }
 
 // UnknownAdapterError reports an Open for an unregistered adapter.
 type UnknownAdapterError struct {
@@ -45,7 +48,7 @@ type UnknownAdapterError struct {
 
 // Error returns a human-readable description of the unknown adapter.
 func (e *UnknownAdapterError) Error() string {
-	return fmt.Sprintf("%s: %s", ErrUnknownAdapter, e.Adapter.String())
+	return fmt.Sprintf("%s: %s (forgotten import?)", ErrUnknownAdapter, e.Adapter.String())
 }
 
 // Unwrap returns ErrUnknownAdapter for errors.Is matching.

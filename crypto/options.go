@@ -17,6 +17,8 @@ type Options struct {
 	SignKey string `json:"sign_key" toml:"sign_key" yaml:"sign_key"`
 }
 
+// Validate checks options for consistency, joining all violations.
+//
 // Validate checks required fields and key formats, joining all violations.
 //
 // Deviation from dirty local/options.Validate: the original only validated

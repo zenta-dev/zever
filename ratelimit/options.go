@@ -21,24 +21,24 @@ type RedisOptions struct {
 	// ConnectOptions holds the shared Redis connection settings.
 	zredis.ConnectOptions
 	// Prefix is the key prefix for Redis ratelimit data.
-	Prefix string
+	Prefix string `json:"prefix" toml:"prefix" yaml:"prefix"`
 }
 
 // Options configures ratelimit behavior and adapter-specific settings.
 type Options struct {
 	// Rate is the token refill rate per second. Required, must be > 0 and finite.
-	Rate float64
+	Rate float64 `json:"rate" toml:"rate" yaml:"rate"`
 	// Burst is the maximum bucket size. Required, must be > 0.
-	Burst int
+	Burst int `json:"burst" toml:"burst" yaml:"burst"`
 	// IdleTTL is the idle entry TTL. Zero means the adapter default; negative fails.
-	IdleTTL time.Duration
+	IdleTTL time.Duration `json:"idle_ttl" toml:"idle_ttl" yaml:"idle_ttl"`
 	// SweepInterval is the idle-entry sweep interval. Zero means the adapter default; negative fails.
-	SweepInterval time.Duration
+	SweepInterval time.Duration `json:"sweep_interval" toml:"sweep_interval" yaml:"sweep_interval"`
 	// Redis holds Redis-specific connection configuration.
-	Redis RedisOptions
+	Redis RedisOptions `json:"redis" toml:"redis" yaml:"redis"`
 }
 
-// Validate checks options for consistency.
+// Validate checks options for consistency, joining all violations.
 func (o Options) Validate() error {
 	if math.IsNaN(o.Rate) || math.IsInf(o.Rate, 0) || o.Rate <= 0 {
 		return &InvalidOptionsError{Reason: "rate must be > 0 and finite"}
@@ -49,11 +49,11 @@ func (o Options) Validate() error {
 	}
 
 	if o.IdleTTL < 0 {
-		return &InvalidOptionsError{Reason: "idle TTL must be >= 0"}
+		return &InvalidOptionsError{Reason: "idle_ttl must be >= 0"}
 	}
 
 	if o.SweepInterval < 0 {
-		return &InvalidOptionsError{Reason: "sweep interval must be >= 0"}
+		return &InvalidOptionsError{Reason: "sweep_interval must be >= 0"}
 	}
 
 	if err := zredis.ValidateAddr(o.Redis.Addr); err != nil {

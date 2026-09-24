@@ -26,8 +26,8 @@ func TestCover_Errors_ExactStrings(t *testing.T) {
 		want string
 	}{
 		{"duplicate rbac", DuplicateError{Adapter: RBAC}, "permission: duplicate registration: rbac"},
-		{"unknown rbac", UnknownAdapterError{Adapter: RBAC}, "permission: unknown adapter: rbac"},
-		{"unknown unregistered", UnknownAdapterError{Adapter: Adapter(9401)}, "permission: unknown adapter: unknown"},
+		{"unknown rbac", UnknownAdapterError{Adapter: RBAC}, "permission: unknown adapter: rbac (forgotten import?)"},
+		{"unknown unregistered", UnknownAdapterError{Adapter: Adapter(9401)}, "permission: unknown adapter: unknown (forgotten import?)"},
 		{"invalid x", InvalidAdapterError{Adapter: "x"}, "permission: invalid adapter: \"x\""},
 		{"invalid options", InvalidOptionsError{Reason: "boom"}, "permission: invalid options: boom"},
 	}
@@ -59,9 +59,9 @@ func TestCover_Options_Validate_Gaps(t *testing.T) {
 		reason string
 	}{
 		{"rule action overlong", Options{Rules: []Rule{{Role: "admin", Action: long}}}, "rule action must be at most 256 characters"},
-		{"model path dotdot", Options{ModelPath: "../m.conf", PolicyPath: "p.csv"}, "model path must not contain .."},
-		{"policy path dotdot", Options{ModelPath: "m.conf", PolicyPath: "../p.csv"}, "policy path must not contain .."},
-		{"role value overlong", Options{Roles: map[string][]string{"admin": {long}}}, "role value must be at most 256 characters"},
+		{"model path dotdot", Options{ModelPath: "../m.conf", PolicyPath: "p.csv"}, "model_path must not contain .."},
+		{"policy path dotdot", Options{ModelPath: "m.conf", PolicyPath: "../p.csv"}, "policy_path must not contain .."},
+		{"role value overlong", Options{Roles: map[string][]string{"admin": {long}}}, "role_value must be at most 256 characters"},
 	}
 	for _, tc := range cases {
 		err := tc.opts.Validate()
@@ -99,8 +99,8 @@ func TestCover_Options_Validate_PolicyMissing(t *testing.T) {
 	if !errors.As(err, &ioe) {
 		t.Fatalf("err %T is not *InvalidOptionsError", err)
 	}
-	if ioe.Reason != "policy path does not exist" {
-		t.Fatalf("reason = %q want %q", ioe.Reason, "policy path does not exist")
+	if ioe.Reason != "policy_path does not exist" {
+		t.Fatalf("reason = %q want %q", ioe.Reason, "policy_path does not exist")
 	}
 }
 

@@ -15,7 +15,7 @@ func TestAdapterString_returnsName(t *testing.T) {
 	}{
 		{name: "memory", in: Memory, want: "memory"},
 		{name: "redis", in: Redis, want: "redis"},
-		{name: "unknown formats", in: Adapter(99), want: "Adapter(99)"},
+		{name: "unknown formats", in: Adapter(99), want: "unknown"},
 	}
 
 	for _, tt := range tests {

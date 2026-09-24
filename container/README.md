@@ -96,8 +96,11 @@ Details:
   carries no deadline; otherwise the parent deadline bounds each wait.
 - Shutdown shape probing (`closeAny`): `Close(context.Context) error`,
   then `Close() error`, then `Stop() error` (the scheduler declares
-  `Stop() error` instead of `Close`), then no-op nil (for example
-  `*job.Dispatcher`, which has no shutdown method).
+  `Stop() error` instead of `Close`), then `Shutdown(context.Context) error`
+  (observability providers declare `Shutdown` so buffered spans/metrics
+   flush), then no-op nil (for example `*job.Dispatcher`, which has no
+   shutdown method). Crypto, log, password, permission, and router declare no
+   Close/Stop/Shutdown and probe as no-op nil.
 - Close-shape standard: pooled or network-backed top-level services that
   may block on shutdown take `Close(ctx)` (`db`, `cache`, `storage`,
   `lock`, `container` itself); lightweight handles, iterators, statements,

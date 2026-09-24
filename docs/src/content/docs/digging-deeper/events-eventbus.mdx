@@ -6,7 +6,7 @@ description: In-process pub/sub with a Redis transport for multi-instance fan-ou
 A user signs up, and three unrelated things need to happen — send a welcome
 email, provision a workspace, notify analytics. Wiring the signup handler to
 call all three directly couples code that has no business knowing about each
-other. `eventbus.Eventbus` lets producers publish a typed message and walk
+other. `eventbus.EventBus` lets producers publish a typed message and walk
 away; consumers subscribe to what they care about, and neither side needs to
 know the other exists.
 
@@ -32,14 +32,14 @@ and serializable.
 
 ```go
 c := container.New(config.Default())
-bus, err := c.Eventbus()
+bus, err := c.EventBus()
 if err != nil {
 	// handle
 }
 _ = bus
 ```
 
-`Eventbus()` resolves lazily on first use; on error the cached state clears so
+`EventBus()` resolves lazily on first use; on error the cached state clears so
 the next call retries.
 
 ## Adapters

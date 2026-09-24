@@ -401,7 +401,7 @@ func TestOpen_QueueOpenError(t *testing.T) {
 		t.Fatalf("New() err = %v, want test transport error", err)
 	}
 
-	if !strings.Contains(err.Error(), "queue: open queue") {
+	if !strings.Contains(err.Error(), "webhook: open queue") {
 		t.Fatalf("New() err = %v, want open queue prefix", err)
 	}
 }
@@ -1704,8 +1704,9 @@ func TestStartConsumer_SecondClosedCheck(t *testing.T) {
 		a.startConsumer("e")
 	}()
 
-	time.Sleep(20 * time.Millisecond)
-
+	// No sleep: the goroutine waits ~100ms in waitForConsumerDone, so
+	// closing here always lands during the wait; the closed check after
+	// the wait then holds deterministically.
 	a.mu.Lock()
 	a.closed = true
 	a.mu.Unlock()
@@ -1740,8 +1741,9 @@ func TestStartConsumer_RacingLiveConsumerWins(t *testing.T) {
 		a.startConsumer("e")
 	}()
 
-	time.Sleep(20 * time.Millisecond)
-
+	// No sleep: the goroutine waits ~200ms in waitForConsumerDone, so
+	// installing the live consumer here always lands during the wait; the
+	// re-check after the wait then keeps it deterministically.
 	live := &consumer{stop: make(chan struct{}), done: make(chan struct{})}
 
 	a.mu.Lock()

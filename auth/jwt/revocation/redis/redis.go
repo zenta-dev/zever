@@ -33,9 +33,9 @@ type Options struct {
 	// ConnectOptions holds the shared Redis connection settings.
 	zredis.ConnectOptions
 	// URL is the Redis connection URL. When set it takes precedence over Addr.
-	URL string
+	URL string `json:"url" toml:"url" yaml:"url"`
 	// Prefix scopes revocation keys to one namespace. Empty uses defaultPrefix.
-	Prefix string
+	Prefix string `json:"prefix" toml:"prefix" yaml:"prefix"`
 }
 
 type store struct {

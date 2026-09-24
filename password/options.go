@@ -28,6 +28,8 @@ type Options struct {
 	KeyLen uint32 `json:"key_length"  toml:"key_length"  yaml:"key_length"`
 }
 
+// Validate checks options for consistency, joining all violations.
+//
 // Validate checks parameter ranges.
 //
 // Each violation returns the bare ErrInvalidHash sentinel. This mirrors the

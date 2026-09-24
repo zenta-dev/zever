@@ -68,7 +68,7 @@ type Stmt interface {
 	Close() error
 }
 
-// Factory creates a DB from typed options.
+// Factory creates a DB from the given Options.
 type Factory func(opts Options) (DB, error)
 
 var factories = registry.New[Adapter, Factory](

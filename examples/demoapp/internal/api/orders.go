@@ -115,8 +115,8 @@ func (s *Server) createOrder(w http.ResponseWriter, req *http.Request) {
 	if s.Job != nil {
 		_ = s.Job.Dispatch(ctx, "ProcessOrder", map[string]any{"order_id": order.ID})
 	}
-	if s.Eventbus != nil {
-		_ = s.Eventbus.Publish(ctx, "order.created", []byte(order.ID), nil)
+	if s.EventBus != nil {
+		_ = s.EventBus.Publish(ctx, "order.created", []byte(order.ID), nil)
 	}
 	if s.Session != nil {
 		sess, err := s.Session.Create(ctx, time.Hour)

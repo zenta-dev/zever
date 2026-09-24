@@ -21,6 +21,19 @@ func openDefault(t *testing.T) session.Store {
 	return st
 }
 
+func eventually(t *testing.T, timeout time.Duration, cond func() bool, msg string) {
+	t.Helper()
+
+	deadline := time.Now().Add(timeout)
+	for !cond() {
+		if time.Now().After(deadline) {
+			t.Fatalf("timed out waiting for %s", msg)
+		}
+
+		time.Sleep(5 * time.Millisecond)
+	}
+}
+
 func TestNew_negative_TTL_fails(t *testing.T) {
 	t.Parallel()
 	if _, err := memory.New(session.Options{TTL: -time.Second}); err == nil {
@@ -135,7 +148,6 @@ func TestSave_keeps_expiry(t *testing.T) {
 	}
 	want := s.ExpiresAt
 	s.Data["k"] = "v"
-	time.Sleep(2 * time.Millisecond)
 	if serr := st.Save(ctx, s); serr != nil {
 		t.Fatalf("Save err = %v", serr)
 	}
@@ -185,10 +197,10 @@ func TestExpiry_lazy(t *testing.T) {
 	if err != nil {
 		t.Fatalf("Create err = %v", err)
 	}
-	time.Sleep(150 * time.Millisecond)
-	if _, err := st.Get(ctx, s.ID); !errors.Is(err, session.ErrNotFound) {
-		t.Fatalf("Get expired err = %v, want ErrNotFound", err)
-	}
+	eventually(t, 2*time.Second, func() bool {
+		_, err := st.Get(ctx, s.ID)
+		return errors.Is(err, session.ErrNotFound)
+	}, "session expiry")
 	// expired entry purged: second Get still generic miss
 	if _, err := st.Get(ctx, s.ID); !errors.Is(err, session.ErrNotFound) {
 		t.Fatalf("Get purged err = %v, want ErrNotFound", err)
@@ -207,10 +219,10 @@ func TestSweeper_purges(t *testing.T) {
 	if err != nil {
 		t.Fatalf("Create err = %v", err)
 	}
-	time.Sleep(500 * time.Millisecond) // allow sweeper ticks to run
-	if _, err := st.Get(ctx, s.ID); !errors.Is(err, session.ErrNotFound) {
-		t.Fatalf("Get after sweep err = %v, want ErrNotFound", err)
-	}
+	eventually(t, 2*time.Second, func() bool {
+		_, err := st.Get(ctx, s.ID)
+		return errors.Is(err, session.ErrNotFound)
+	}, "sweeper expiry")
 }
 
 func TestDelete_idempotent(t *testing.T) {

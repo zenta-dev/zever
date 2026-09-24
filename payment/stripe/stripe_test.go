@@ -737,9 +737,13 @@ func TestStripe_WebhookEvent_defensiveMaxBytes(t *testing.T) {
 func TestStripe_Timeout(t *testing.T) {
 	t.Parallel()
 
-	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, _ *http.Request) {
-		time.Sleep(300 * time.Millisecond)
-		writeJSON(w, map[string]any{"id": "pi_slow"})
+	srv := httptest.NewServer(http.HandlerFunc(func(_ http.ResponseWriter, r *http.Request) {
+		// Stall past the 50ms client timeout without a fixed sleep: return
+		// early if the client goes away, else fall back to a bounded wait.
+		select {
+		case <-r.Context().Done():
+		case <-time.After(300 * time.Millisecond):
+		}
 	}))
 	t.Cleanup(srv.Close)
 

@@ -1,7 +1,5 @@
 package lock
 
-import "fmt"
-
 // Adapter identifies the lock backend implementation.
 type Adapter int
 
@@ -20,19 +18,19 @@ func (a Adapter) String() string {
 	case Redis:
 		return "redis"
 	default:
-		return fmt.Sprintf("Adapter(%d)", int(a))
+		return "unknown"
 	}
 }
 
 // ParseAdapter parses adapter name into an Adapter.
-// It returns InvalidAdapterError for unknown names.
-func ParseAdapter(adapter string) (Adapter, error) {
-	switch adapter {
+// Only exact lowercase names match; anything else fails.
+func ParseAdapter(s string) (Adapter, error) {
+	switch s {
 	case "memory":
 		return Memory, nil
 	case "redis":
 		return Redis, nil
 	default:
-		return Memory, &InvalidAdapterError{Adapter: adapter}
+		return Memory, &InvalidAdapterError{Adapter: s}
 	}
 }
