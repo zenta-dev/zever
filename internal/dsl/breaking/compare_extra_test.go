@@ -60,6 +60,12 @@ func TestCompareModuleRemovedIsBreaking(t *testing.T) {
 			if c.Breaking {
 				t.Fatalf("KindModuleAdded change is marked Breaking: %+v", c)
 			}
+		case KindEntityRemoved, KindEntityAdded, KindFieldRemoved, KindFieldAdded,
+			KindFieldRenamed, KindFieldTypeChanged, KindFieldOptionalityChanged,
+			KindMessageRemoved, KindMessageAdded, KindServiceRemoved, KindServiceAdded,
+			KindOperationRemoved, KindOperationAdded, KindOperationParamsChanged,
+			KindOperationReturnsChanged, KindOperationHTTPChanged, KindValidateAdded:
+			// Other change kinds are not relevant to this test.
 		}
 	}
 

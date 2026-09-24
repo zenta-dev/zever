@@ -4,6 +4,7 @@ import (
 	"context"
 	"fmt"
 	"iter"
+	"math"
 
 	"github.com/zenta-dev/zever/db"
 	"github.com/zenta-dev/zever/orm/dialect"
@@ -2698,7 +2699,11 @@ func assignAny(dest any, src any) error {
 			return err
 		}
 
-		*d = int32(v) //nolint:gosec // narrowing matches the driver-returned column width, mirrors orm.Option's own convertScan
+		if v < math.MinInt32 || v > math.MaxInt32 {
+			return fmt.Errorf("cannot scan int64 %d into int32: out of range", v)
+		}
+
+		*d = int32(v)
 	case *float64:
 		v, err := scanFloat64(src)
 		if err != nil {

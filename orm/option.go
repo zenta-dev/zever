@@ -3,6 +3,7 @@ package orm
 import (
 	"database/sql/driver"
 	"fmt"
+	"math"
 	"strconv"
 	"time"
 )
@@ -112,7 +113,11 @@ func convertScan[T any](src any) (T, error) {
 			return zero, err
 		}
 
-		return any(int32(n)).(T), nil //nolint:forcetypeassert,gosec // guarded by the outer type switch; narrowing matches the driver-returned column width
+		if n < math.MinInt32 || n > math.MaxInt32 {
+			return zero, fmt.Errorf("cannot scan int64 %d into int32: out of range", n)
+		}
+
+		return any(int32(n)).(T), nil //nolint:forcetypeassert,gosec // guarded by the outer type switch; range checked above
 	case float64:
 		f, err := scanFloat64(src)
 		if err != nil {

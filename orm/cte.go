@@ -609,7 +609,7 @@ func (j CTEJoin[A, PA, B, PB]) renderOuter(d dialect.Dialect) (string, []any, er
 		return "", nil, err
 	}
 
-	if err := requireJoin(d, JoinType(j.body.JoinType)); err != nil {
+	if err := requireJoin(d, j.body.JoinType); err != nil {
 		return "", nil, err
 	}
 

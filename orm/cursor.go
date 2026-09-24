@@ -423,6 +423,10 @@ func decodeCursorValue(tag byte, payload []byte) (any, error) {
 			return nil, errors.New("orm: CursorKey.Decode: corrupt float32 value")
 		}
 
+		if bits > math.MaxUint32 {
+			return nil, errors.New("orm: CursorKey.Decode: corrupt float32 value")
+		}
+
 		return math.Float32frombits(uint32(bits)), nil
 	case cursorTagBool:
 		if len(payload) != 1 {
