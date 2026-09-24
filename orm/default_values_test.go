@@ -30,7 +30,7 @@ var (
 func newDefaultsDB(t *testing.T) (context.Context, db.DB) {
 	t.Helper()
 
-	ctx := context.Background()
+	ctx := t.Context()
 
 	conn := openORMTestDB(ctx, t)
 
@@ -110,7 +110,7 @@ func TestInsertDefaultValuesRenderedSQL(t *testing.T) {
 // closed when combined with Values, Columns, or Select rather than silently
 // picking a source.
 func TestInsertDefaultValuesMutuallyExclusive(t *testing.T) {
-	ctx := context.Background()
+	ctx := t.Context()
 
 	withValues := InsertInto(defaultWidgets).DefaultValues().Values(Set(defaultWidgetName, "x"))
 	if err := withValues.Exec(ctx, mockExec{dialectName: "sqlite"}); err == nil {
@@ -137,7 +137,7 @@ func TestInsertDefaultValuesMutuallyExclusive(t *testing.T) {
 // TestInsertDefaultValuesWithOnConflictRejected proves DefaultValues cannot
 // silently combine with an upsert (an upsert needs a row to conflict on).
 func TestInsertDefaultValuesWithOnConflictRejected(t *testing.T) {
-	ctx := context.Background()
+	ctx := t.Context()
 
 	err := InsertInto(defaultWidgets).
 		DefaultValues().
@@ -152,7 +152,7 @@ func TestInsertDefaultValuesWithOnConflictRejected(t *testing.T) {
 // TestDefaultValuesErrorMentionsFeature guards the error text carries the
 // orm: prefix and names the conflict.
 func TestDefaultValuesErrorMentionsFeature(t *testing.T) {
-	ctx := context.Background()
+	ctx := t.Context()
 
 	err := InsertInto(defaultWidgets).DefaultValues().
 		Values(Set(defaultWidgetName, "x")).

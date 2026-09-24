@@ -1,7 +1,6 @@
 package orm
 
 import (
-	"context"
 	"errors"
 	"strings"
 	"testing"
@@ -306,7 +305,7 @@ func TestQueryTablesampleUnsupportedOnSQLite(t *testing.T) {
 // TestQueryTablesamplePostgresRenders proves a valid TABLESAMPLE renders
 // through the Postgres path against a recording exec.
 func TestQueryTablesamplePostgresRenders(t *testing.T) {
-	ctx := context.Background()
+	ctx := t.Context()
 
 	rec := &recordingExec{dialectName: "postgres"}
 
@@ -323,7 +322,7 @@ func TestQueryTablesamplePostgresRenders(t *testing.T) {
 // TestQueryForUpdateOfUnknownTableDropped proves a column without a home
 // table contributes nothing to the FOR UPDATE OF list.
 func TestQueryForUpdateOfUnknownTableDropped(t *testing.T) {
-	ctx := context.Background()
+	ctx := t.Context()
 
 	//lint:allow-unsafesql test: ident is from the test's own allowlist
 	col, err := UnsafeIdent[widget, string]("name", []string{"id", "name", "quantity", "bio"})
@@ -515,7 +514,7 @@ func init() {
 // through sqlite and a base-only dialect (typed error) and through
 // postgres (gate passes, empty result set yields no rows).
 func TestExtendedLockModesGate(t *testing.T) {
-	ctx := context.Background()
+	ctx := t.Context()
 
 	forms := []struct {
 		name  string
@@ -547,7 +546,7 @@ func TestExtendedLockModesGate(t *testing.T) {
 // TestExtendedLockModesRender pins the exact SQL each extended strength
 // emits on postgres.
 func TestExtendedLockModesRender(t *testing.T) {
-	ctx := context.Background()
+	ctx := t.Context()
 
 	for _, tc := range []struct {
 		name string
@@ -576,7 +575,7 @@ func TestExtendedLockModesRender(t *testing.T) {
 // TestExtendedLockCountRejected proves Count/Exists reject the extended
 // lock modes with ErrLockingNotSelect rather than silently dropping them.
 func TestExtendedLockCountRejected(t *testing.T) {
-	ctx := context.Background()
+	ctx := t.Context()
 
 	for _, q := range []Query[widget, *widget]{
 		From(widgets).ForNoKeyUpdate(),
@@ -611,7 +610,7 @@ func TestExtendedLockSupportedDefaultUnreachable(t *testing.T) {
 // their own capability, not the lock strength's: a dialect with FOR UPDATE
 // but no NOWAIT accepts the lock and rejects the suffix.
 func TestLockingSuffixesGateIndependently(t *testing.T) {
-	ctx := context.Background()
+	ctx := t.Context()
 
 	if _, err := From(widgets).ForUpdate().All(ctx, mockExec{dialectName: "mock-no-nowait"}); err != nil {
 		t.Fatalf("ForUpdate err = %v, want nil", err)
@@ -636,7 +635,7 @@ func TestLockingSuffixesGateIndependently(t *testing.T) {
 // TestFirstErrorPaths proves First and FirstOrErr surface execution errors
 // instead of masking them as "no rows".
 func TestFirstErrorPaths(t *testing.T) {
-	ctx := context.Background()
+	ctx := t.Context()
 
 	if _, _, err := From(widgets).First(ctx, fakeDB{}); err == nil {
 		t.Fatal("First with an unsupported dialect succeeded, want an error")
@@ -677,7 +676,7 @@ func TestCountErrorPaths(t *testing.T) {
 // TestFTSOrderTermRenders proves an FTS ranking order term renders the
 // Postgres ts_rank expression with its bound query text.
 func TestFTSOrderTermRenders(t *testing.T) {
-	ctx := context.Background()
+	ctx := t.Context()
 
 	rec := &recordingExec{dialectName: "postgres"}
 
@@ -700,7 +699,7 @@ func TestFTSOrderTermRenders(t *testing.T) {
 // TestFTSNodeWithColumnsCopied proves an FTS node carrying Columns
 // shape-converts without aliasing the caller's slice.
 func TestFTSNodeWithColumnsCopied(t *testing.T) {
-	ctx := context.Background()
+	ctx := t.Context()
 
 	rec := &recordingExec{dialectName: "postgres"}
 
@@ -728,7 +727,7 @@ func TestFTSNodeWithColumnsCopied(t *testing.T) {
 // OrderBy.
 func TestOrderByRendersTypedColumnTemplate(t *testing.T) {
 	rec := &recordingExec{dialectName: "postgres"}
-	ctx := context.Background()
+	ctx := t.Context()
 
 	_, _ = From(widgets).OrderBy(widgetName.Asc()).Limit(10).All(ctx, rec)
 	q, _ := rec.last()

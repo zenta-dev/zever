@@ -150,7 +150,7 @@ func init() {
 // on a dialect reporting every mutation capability, single-table and joined
 // ORDER BY/LIMIT/OFFSET updates and deletes run instead of failing closed.
 func TestMutateOrderSuccessOnFullCapability(t *testing.T) {
-	ctx := context.Background()
+	ctx := t.Context()
 	e := mockExec{dialectName: "mock-mutatefull"}
 
 	rel := NewRelation[widget, widgetOrder]("id", "widget_id", widgetOrders)
@@ -190,7 +190,7 @@ func TestMutateOrderSuccessOnFullCapability(t *testing.T) {
 // matrix: no in-tree dialect supports mutation ORDER BY/LIMIT/OFFSET;
 // Postgres, SQLite, OFFSET, and every joined form are typed errors.
 func TestMutateOrderCapabilityGate(t *testing.T) {
-	ctx := context.Background()
+	ctx := t.Context()
 
 	rel := NewRelation[widget, widgetOrder]("id", "widget_id", widgetOrders)
 
@@ -398,7 +398,7 @@ func init() {
 // on single-table and joined mutations when the dialect supports
 // ORDER BY/LIMIT but not OFFSET.
 func TestMutateOffsetRejectedOnPartialCapability(t *testing.T) {
-	ctx := context.Background()
+	ctx := t.Context()
 	e := mockExec{dialectName: "mock-mutatepartial"}
 
 	rel := NewRelation[widget, widgetOrder]("id", "widget_id", widgetOrders)

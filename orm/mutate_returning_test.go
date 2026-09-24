@@ -1,7 +1,6 @@
 package orm
 
 import (
-	"context"
 	"errors"
 	"testing"
 
@@ -215,7 +214,7 @@ func TestMutateExecReturningRequiresReturning(t *testing.T) {
 // dialect.ErrUnsupportedByDialect. Postgres is the positive path: the gate
 // passes and the mocked empty result set yields no rows.
 func TestMutateReturningCapabilityGate(t *testing.T) {
-	ctx := context.Background()
+	ctx := t.Context()
 
 	upd := UpdateTable(widgets).
 		Where(widgetID.Eq("w1")).
@@ -345,7 +344,7 @@ func TestUpdateJoinReturningRoundTrip(t *testing.T) {
 // missing RETURNING clause, a missing assignment list, and a gated
 // statement before any SQL is issued.
 func TestMutateReturningValidationEdges(t *testing.T) {
-	ctx := context.Background()
+	ctx := t.Context()
 
 	if _, err := UpdateTable(widgets).Set(Set(widgetName, "x")).ExecReturning[*widget](ctx, mockExec{dialectName: "sqlite"}); err == nil {
 		t.Fatal("Update.ExecReturning without Returning() succeeded, want an error")

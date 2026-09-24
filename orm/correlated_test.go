@@ -41,7 +41,7 @@ var (
 func newCorrelatedDB(t *testing.T) (context.Context, db.DB) {
 	t.Helper()
 
-	ctx := context.Background()
+	ctx := t.Context()
 
 	conn := openORMTestDB(ctx, t)
 

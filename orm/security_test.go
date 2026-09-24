@@ -224,7 +224,7 @@ func loadInjectionCorpus(tb testing.TB) []string {
 // the fixed template (so no payload can be concatenated into SQL text) and
 // the payload is present among the placeholder-bound args.
 func TestPublicAPIInjectionCorpus(t *testing.T) {
-	ctx := context.Background()
+	ctx := t.Context()
 	payloads := loadInjectionCorpus(t)
 	ops := securityOps()
 
@@ -281,7 +281,7 @@ func TestUnsafeIdent(t *testing.T) {
 		// The returned Column renders through the normal fluent path as a
 		// quoted column, never a raw string.
 		exec := &recordingExec{dialectName: "sqlite"}
-		_, _ = From(widgets).Where(col.Eq("v")).All(context.Background(), exec)
+		_, _ = From(widgets).Where(col.Eq("v")).All(t.Context(), exec)
 
 		if got, _ := exec.last(); got != `SELECT "id", "name", "quantity", "bio" FROM "widgets" WHERE "name" = ?` {
 			t.Fatalf("UnsafeIdent column rendered SQL %q, want quoted-column Eq template", got)
@@ -309,7 +309,7 @@ func TestUnsafeIdent(t *testing.T) {
 // strings -- travel to the driver as args, never formatted into SQL text,
 // on both dialects.
 func TestEncodeArgsNeverInterpolates(t *testing.T) {
-	ctx := context.Background()
+	ctx := t.Context()
 
 	for _, dial := range []string{"sqlite", "postgres"} {
 		exec := &recordingExec{dialectName: dial}
@@ -371,7 +371,7 @@ func FuzzPublicAPINoInjection(f *testing.F) {
 			t.Skip("empty payload trivially matches; not an injection signal")
 		}
 
-		ctx := context.Background()
+		ctx := t.Context()
 
 		for _, op := range ops {
 			exec := &recordingExec{dialectName: "sqlite"}

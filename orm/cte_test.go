@@ -32,7 +32,7 @@ var (
 func newOrgUnitsDB(t *testing.T) (context.Context, db.DB) {
 	t.Helper()
 
-	ctx := context.Background()
+	ctx := t.Context()
 
 	conn := openORMTestDB(ctx, t)
 
@@ -510,7 +510,7 @@ func TestCTEJoinChainModifiers(t *testing.T) {
 // capability, no materialization support, and a gated join keyword in the
 // body each surface typed errors before any SQL is issued.
 func TestCTEJoinGateErrors(t *testing.T) {
-	ctx := context.Background()
+	ctx := t.Context()
 
 	name, err := NewCTEName("j")
 	if err != nil {
@@ -639,7 +639,7 @@ func TestCTEGroupedMaterializationAndAliasGate(t *testing.T) {
 // TestCTEQueryExecutionErrorPaths drives render, scan, iteration and
 // close failures through CTEQuery All/Count.
 func TestCTEQueryExecutionErrorPaths(t *testing.T) {
-	ctx := context.Background()
+	ctx := t.Context()
 	boom := errors.New("boom")
 
 	name, err := NewCTEName("w")
@@ -837,7 +837,7 @@ func TestCTEQueryWhereDoubleCombines(t *testing.T) {
 // render (an ordered aggregate rejected at construction) fails at render
 // time rather than emitting invalid SQL.
 func TestCTEGroupedBodyRenderError(t *testing.T) {
-	ctx := context.Background()
+	ctx := t.Context()
 
 	name, err := NewCTEName("g")
 	if err != nil {

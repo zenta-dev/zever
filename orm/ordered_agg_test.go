@@ -1,7 +1,6 @@
 package orm
 
 import (
-	"context"
 	"errors"
 	"testing"
 
@@ -105,7 +104,7 @@ func TestOrderedAggregateSQLiteRoundTrip(t *testing.T) {
 // delimiter is a bound placeholder and the order term is an identifier.
 func TestOrderedAggregatePostgresSyntax(t *testing.T) {
 	rec := &ormRecordingExec{dialectName: "postgres"}
-	ctx := context.Background()
+	ctx := t.Context()
 
 	err := From(widgets).
 		GroupBy().
@@ -131,7 +130,7 @@ func TestOrderedAggregatePostgresSyntax(t *testing.T) {
 // dialects that lack its function with the typed
 // dialect.ErrUnsupportedByDialect.
 func TestOrderedAggregateDialectGates(t *testing.T) {
-	ctx := context.Background()
+	ctx := t.Context()
 
 	tests := []struct {
 		name string
@@ -163,7 +162,7 @@ func TestOrderedAggregateDialectGates(t *testing.T) {
 // unordered group_concat still renders on 3.43, while an ordered form is a
 // typed error there.
 func TestOrderedAggregateSQLiteVersionGate(t *testing.T) {
-	ctx := context.Background()
+	ctx := t.Context()
 
 	if err := From(widgets).GroupBy().Agg(GroupConcat(widgetName, ",")).Scan(ctx, mockExec{dialectName: "sqlite-3.43"}, func(Row) error { return nil }); err != nil {
 		t.Fatalf("unordered group_concat on 3.43 err = %v, want nil", err)
@@ -179,7 +178,7 @@ func TestOrderedAggregateSQLiteVersionGate(t *testing.T) {
 // not a plain column (an expression, here) is a typed rendering error, never
 // silently dropped.
 func TestOrderedAggregateBadOrderTermFailsClosed(t *testing.T) {
-	ctx := context.Background()
+	ctx := t.Context()
 
 	err := From(widgets).
 		GroupBy().
@@ -193,7 +192,7 @@ func TestOrderedAggregateBadOrderTermFailsClosed(t *testing.T) {
 // TestGroupConcatTooManyDelimitersFailsClosed proves the variadic delimiter
 // rejects more than one value rather than silently picking one.
 func TestGroupConcatTooManyDelimitersFailsClosed(t *testing.T) {
-	ctx := context.Background()
+	ctx := t.Context()
 
 	err := From(widgets).
 		GroupBy().

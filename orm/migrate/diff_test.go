@@ -1,7 +1,6 @@
 package migrate
 
 import (
-	"context"
 	"errors"
 	"strings"
 	"testing"
@@ -18,7 +17,7 @@ func TestPlan_unsupportedDialect(t *testing.T) {
 
 	conn := &fakeDB{dialect: "oracle"}
 
-	if _, err := Plan(context.Background(), conn, &ir.Schema{}, PlanOptions{}); !errors.Is(err, ErrUnsupportedDialect) {
+	if _, err := Plan(t.Context(), conn, &ir.Schema{}, PlanOptions{}); !errors.Is(err, ErrUnsupportedDialect) {
 		t.Fatalf("Plan = %v, want ErrUnsupportedDialect", err)
 	}
 }
@@ -56,7 +55,7 @@ func TestValidateIdent(t *testing.T) {
 }
 
 func TestPlan_bootstrapAndNoop(t *testing.T) {
-	ctx := context.Background()
+	ctx := t.Context()
 	conn := openTestSQLite(t, "plan.db")
 
 	v1 := compileSchema(t, applyTestSchema)
@@ -89,7 +88,7 @@ func TestPlan_bootstrapAndNoop(t *testing.T) {
 }
 
 func TestPlan_addAndDropColumn(t *testing.T) {
-	ctx := context.Background()
+	ctx := t.Context()
 	conn := openTestSQLite(t, "adddrop.db")
 
 	v1 := compileSchema(t, applyTestSchema)
@@ -153,7 +152,7 @@ func TestPlan_addAndDropColumn(t *testing.T) {
 }
 
 func TestTableExists(t *testing.T) {
-	ctx := context.Background()
+	ctx := t.Context()
 	conn := openTestSQLite(t, "exists.db")
 
 	e := &ir.Entity{Name: "User"}
@@ -198,7 +197,7 @@ func TestTableExists(t *testing.T) {
 func TestTableExists_postgresAndMysql(t *testing.T) {
 	t.Parallel()
 
-	ctx := context.Background()
+	ctx := t.Context()
 	e := &ir.Entity{Name: "User", Schema: "public"}
 
 	pg := &fakeDB{
@@ -227,7 +226,7 @@ func TestTableExists_postgresAndMysql(t *testing.T) {
 func TestIntrospectColumns(t *testing.T) {
 	t.Parallel()
 
-	ctx := context.Background()
+	ctx := t.Context()
 	e := &ir.Entity{Name: "User"}
 
 	t.Run("postgresFromState", func(t *testing.T) {
@@ -271,7 +270,7 @@ func TestIntrospectColumns(t *testing.T) {
 func TestIntrospectPostgresColumns(t *testing.T) {
 	t.Parallel()
 
-	ctx := context.Background()
+	ctx := t.Context()
 
 	t.Run("grouped", func(t *testing.T) {
 		t.Parallel()
@@ -360,7 +359,7 @@ func TestIntrospectPostgresColumns(t *testing.T) {
 }
 
 func TestIntrospectSQLiteColumns(t *testing.T) {
-	ctx := context.Background()
+	ctx := t.Context()
 	conn := openTestSQLite(t, "cols.db")
 
 	v1 := compileSchema(t, applyTestSchema)
@@ -549,7 +548,7 @@ func TestDropStatementsFor(t *testing.T) {
 func TestLoadLiveSchemaState(t *testing.T) {
 	t.Parallel()
 
-	ctx := context.Background()
+	ctx := t.Context()
 
 	t.Run("nonPostgresEmpty", func(t *testing.T) {
 		t.Parallel()
@@ -616,7 +615,7 @@ func TestLoadLiveSchemaState(t *testing.T) {
 }
 
 func TestTypeChangeStatementFor_sqliteWarns(t *testing.T) {
-	ctx := context.Background()
+	ctx := t.Context()
 	conn := openTestSQLite(t, "typewarn.db")
 
 	if _, err := conn.Exec(ctx, `CREATE TABLE "widgets" ("id" TEXT NOT NULL, "size" TEXT);`); err != nil {
@@ -655,7 +654,7 @@ func TestPlan_computeError(t *testing.T) {
 		},
 	}
 
-	if _, err := Plan(context.Background(), conn, schema, PlanOptions{}); err == nil {
+	if _, err := Plan(t.Context(), conn, schema, PlanOptions{}); err == nil {
 		t.Fatal("Plan: want introspection error, got nil")
 	}
 }
@@ -675,7 +674,7 @@ func TestPlan_renderSchemaError(t *testing.T) {
 		},
 	}
 
-	if _, err := Plan(context.Background(), conn, schema, PlanOptions{}); err == nil {
+	if _, err := Plan(t.Context(), conn, schema, PlanOptions{}); err == nil {
 		t.Fatal("Plan: want render error for fieldless entity, got nil")
 	}
 }
@@ -708,7 +707,7 @@ func TestPlan_postgresTypeChangeAndNullability(t *testing.T) {
 		},
 	}
 
-	plan, err := Plan(context.Background(), conn, schema, PlanOptions{DetectTypeChanges: true})
+	plan, err := Plan(t.Context(), conn, schema, PlanOptions{DetectTypeChanges: true})
 	if err != nil {
 		t.Fatalf("Plan: %v", err)
 	}
@@ -757,7 +756,7 @@ func TestPlan_mysqlTypeChangeAndDrop(t *testing.T) {
 		},
 	}
 
-	plan, err := Plan(context.Background(), conn, schema, PlanOptions{DetectTypeChanges: true, DropColumns: true})
+	plan, err := Plan(t.Context(), conn, schema, PlanOptions{DetectTypeChanges: true, DropColumns: true})
 	if err != nil {
 		t.Fatalf("Plan: %v", err)
 	}
@@ -782,7 +781,7 @@ func TestPlan_mysqlTypeChangeAndDrop(t *testing.T) {
 func TestAlterStatementsFor_errors(t *testing.T) {
 	t.Parallel()
 
-	ctx := context.Background()
+	ctx := t.Context()
 	schema := compileSchema(t, applyTestSchema).Schema
 
 	var user *ir.Entity
@@ -933,7 +932,7 @@ func TestPlan_tableExistsError(t *testing.T) {
 		},
 	}
 
-	if _, err := Plan(context.Background(), conn, schema, PlanOptions{}); err == nil {
+	if _, err := Plan(t.Context(), conn, schema, PlanOptions{}); err == nil {
 		t.Fatal("Plan: want table-exists error, got nil")
 	}
 }
@@ -962,7 +961,7 @@ func TestPlan_mysqlIndexesError(t *testing.T) {
 		},
 	}
 
-	if _, err := Plan(context.Background(), conn, schema, PlanOptions{}); err == nil {
+	if _, err := Plan(t.Context(), conn, schema, PlanOptions{}); err == nil {
 		t.Fatal("Plan: want indexes error, got nil")
 	}
 }
@@ -986,7 +985,7 @@ func TestTableExists_badIdent(t *testing.T) {
 
 	e := &ir.Entity{Name: "0bad"}
 
-	if _, err := tableExists(context.Background(), &fakeDB{dialect: atlas.DialectSQLite}, atlas.DialectSQLite, e); err == nil {
+	if _, err := tableExists(t.Context(), &fakeDB{dialect: atlas.DialectSQLite}, atlas.DialectSQLite, e); err == nil {
 		t.Fatal("tableExists bad ident: want error, got nil")
 	}
 }
@@ -1001,7 +1000,7 @@ func TestIntrospectSQLiteColumns_scanError(t *testing.T) {
 		},
 	}
 
-	if _, err := introspectSQLiteColumns(context.Background(), conn, "users"); err == nil {
+	if _, err := introspectSQLiteColumns(t.Context(), conn, "users"); err == nil {
 		t.Fatal("want scan error, got nil")
 	}
 }
@@ -1009,7 +1008,7 @@ func TestIntrospectSQLiteColumns_scanError(t *testing.T) {
 func TestLoadLiveSchemaState_indexAndFkError(t *testing.T) {
 	t.Parallel()
 
-	ctx := context.Background()
+	ctx := t.Context()
 	schema := compileSchema(t, applyTestSchema).Schema
 
 	t.Run("indexError", func(t *testing.T) {
