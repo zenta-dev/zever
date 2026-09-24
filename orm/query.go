@@ -11,21 +11,20 @@ import (
 	"github.com/zenta-dev/zever/orm/render"
 )
 
-// LockMode identifies the row-level lock a Query's SELECT acquires. Its
-// values mirror render.LockMode's (same underlying int representation), so
-// the renderer gets a plain type conversion at the call site.
-type LockMode int
+// LockMode identifies the row-level lock a Query's SELECT acquires. Type
+// alias for render.LockMode (orm imports render, never the reverse -- see
+// orm.Op's doc comment for why aliasing beats a separately-kept-in-sync
+// mirror).
+type LockMode = render.LockMode
 
 // Supported row-lock modes. LockNone is the zero value and renders no lock.
+// These re-export render's identically-named constants.
 const (
-	LockNone LockMode = iota
-	LockForUpdate
-	LockForShare
-	// LockForNoKeyUpdate and LockForKeyShare are Postgres-only weaker lock
-	// strengths (`FOR NO KEY UPDATE`, `FOR KEY SHARE`); other dialects
-	// reject them with a typed dialect.ErrUnsupportedByDialect.
-	LockForNoKeyUpdate
-	LockForKeyShare
+	LockNone           = render.LockNone
+	LockForUpdate      = render.LockForUpdate
+	LockForShare       = render.LockForShare
+	LockForNoKeyUpdate = render.LockForNoKeyUpdate
+	LockForKeyShare    = render.LockForKeyShare
 )
 
 // Typed errors for invalid locking usage. They are dialect-independent
@@ -63,14 +62,16 @@ type ptrScanner[T any] interface {
 // and NullsLast force NULLs to the front/back. The modifier is gated by
 // dialect.NullsOrderDialect at render time: Postgres and SQLite >= 3.30.0
 // support it; other dialects do not (see OrderTerm.NullsFirst for the
-// documented CASE-expression workaround).
-type NullsOrder int
+// documented CASE-expression workaround). Type alias for render.NullsOrder;
+// see LockMode's doc comment for why aliasing beats mirroring.
+type NullsOrder = render.NullsOrder
 
 // Supported NULLS-ordering positions. NullsDefault renders no NULLS suffix.
+// These re-export render's identically-named constants.
 const (
-	NullsDefault NullsOrder = iota
-	NullsFirst
-	NullsLast
+	NullsDefault = render.NullsDefault
+	NullsFirst   = render.NullsFirst
+	NullsLast    = render.NullsLast
 )
 
 // OrderTerm is one column of an ORDER BY clause, plus its direction.
@@ -393,7 +394,7 @@ func (q Query[T, PT]) selectModifiers() render.SelectModifiers {
 	mods := render.SelectModifiers{
 		Distinct:   q.distinct,
 		DistinctOn: q.distinctOn,
-		Lock:       render.LockMode(q.lock),
+		Lock:       q.lock,
 		LockOf:     q.lockOf,
 		NoWait:     q.nowait,
 		SkipLocked: q.skipLocked,
@@ -438,20 +439,14 @@ func validateSelectModifiers(d dialect.Dialect, distinct bool, distinctOn []stri
 	return validateLockMode(d, lock, lockOf, nowait, skipLocked)
 }
 
-// validateDistinctOn gates a DISTINCT ON request on the dialect capability;
-// a nil list is unset (no check), an explicitly empty list is a caller error.
+// validateDistinctOn gates a DISTINCT ON request on the dialect capability
+// via dialect.CheckDistinctOn -- the single rule shared with
+// render.validateSelectModifiers's own DISTINCT ON check, so the two
+// validation sites (query-build time here, render time there) can never
+// independently drift on what "supports DISTINCT ON" means.
 func validateDistinctOn(d dialect.Dialect, distinctOn []string) error {
-	if distinctOn == nil {
-		return nil
-	}
-
-	if len(distinctOn) == 0 {
-		return errors.New("orm: Query: DISTINCT ON requires at least one column")
-	}
-
-	dd, ok := d.(dialect.DistinctOnDialect)
-	if !ok || !dd.SupportsDistinctOn() {
-		return fmt.Errorf("orm: %w: dialect %q does not support DISTINCT ON", dialect.ErrUnsupportedByDialect, d.Name())
+	if err := dialect.CheckDistinctOn(d, distinctOn); err != nil {
+		return fmt.Errorf("orm: %w", err)
 	}
 
 	return nil
@@ -591,7 +586,7 @@ func toRenderNode[T any](n Node) render.Node {
 			steps[i] = render.JSONStep{Key: s.Key, Index: s.Index, IsIndex: s.IsIndex}
 		}
 
-		j = &render.JSONExpr{Op: render.JSONOp(n.JSON.Op), Steps: steps, Path: n.JSON.Path}
+		j = &render.JSONExpr{Op: n.JSON.Op, Steps: steps, Path: n.JSON.Path}
 	}
 
 	var f *render.FTSExpr
@@ -602,7 +597,7 @@ func toRenderNode[T any](n Node) render.Node {
 			cols = append([]string(nil), cols...)
 		}
 
-		f = &render.FTSExpr{Op: render.FTSOp(n.FTS.Op), Query: n.FTS.Query, Mode: render.FTSMode(n.FTS.Mode), Columns: cols}
+		f = &render.FTSExpr{Op: n.FTS.Op, Query: n.FTS.Query, Mode: n.FTS.Mode, Columns: cols}
 	}
 
 	value := n.Value
@@ -640,12 +635,12 @@ func toRenderNode[T any](n Node) render.Node {
 	}
 
 	return render.Node{
-		Kind:     render.NodeKind(n.Kind),
+		Kind:     n.Kind,
 		Table:    n.Table,
 		Column:   n.Column,
-		Op:       render.Op(n.Op),
+		Op:       n.Op,
 		Value:    value,
-		Compound: render.CompoundOp(n.Compound),
+		Compound: n.Compound,
 		Children: children,
 		Tuple:    n.Tuple,
 		JSON:     j,
@@ -698,10 +693,10 @@ func toRenderOrder[T any](order []OrderTerm[T]) []render.OrderTerm {
 				cols = append([]string(nil), cols...)
 			}
 
-			f = &render.FTSExpr{Op: render.FTSOp(o.FTS.Op), Query: o.FTS.Query, Mode: render.FTSMode(o.FTS.Mode), Columns: cols}
+			f = &render.FTSExpr{Op: o.FTS.Op, Query: o.FTS.Query, Mode: o.FTS.Mode, Columns: cols}
 		}
 
-		out[i] = render.OrderTerm{Column: o.Column.Name(), Table: o.Column.Table(), Desc: o.Desc, Nulls: render.NullsOrder(o.Nulls), FTS: f, Func: toRenderFunc[T](o.Func)}
+		out[i] = render.OrderTerm{Column: o.Column.Name(), Table: o.Column.Table(), Desc: o.Desc, Nulls: o.Nulls, FTS: f, Func: toRenderFunc[T](o.Func)}
 	}
 
 	return out

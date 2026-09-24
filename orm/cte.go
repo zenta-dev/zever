@@ -469,7 +469,7 @@ func (j Join2[A, PA, B, PB]) cteBody() render.CTEBody {
 		Order:        toRenderOrder(j.left.order),
 		Limit:        j.left.limit,
 		Offset:       j.left.offset,
-		JoinType:     render.JoinType(j.joinType),
+		JoinType:     j.joinType,
 		RightTable:   j.rel.childTable.Name(),
 		RightColumns: j.rel.childTable.Columns(),
 		ParentCol:    j.rel.parentCol,
