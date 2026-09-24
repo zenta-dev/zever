@@ -59,26 +59,16 @@ import (
 // Backend renders a resolved schema to per-module Go application-layer
 // source files.
 type Backend struct {
+	// pbImportRoot is the root under which protogogen's generated message
+	// packages are imported from: "<pbImportRoot>/<module>" for a named
+	// module, or bare "<pbImportRoot>" for the implicit unnamed module.
+	// This matches protogogen's actual "paths=source_relative" output
+	// layout (see internal/dsl/backend/protogogen/request.go's
+	// codeGeneratorParameter) everywhere, including outside this repo, so
+	// it is the only formula this backend applies -- both New() and
+	// NewWithPBImportRoot use it, differing only in which root they start
+	// from.
 	pbImportRoot string
-	// pbImportFlat selects which formula pbGoPackage uses to turn
-	// pbImportRoot into a per-module import path. false (New()'s default)
-	// applies the legacy "<root>/zeverv1" or "<root>/zever/<module>"
-	// convention kept from the predecessor repo this backend was ported
-	// from -- no zever gen package exists yet, so the default root is
-	// override-required for any real project (see defaultPBImportRoot).
-	// true (set by NewWithPBImportRoot) applies a flat
-	// "<root>/<module>" (or bare "<root>" for the implicit module) formula
-	// instead, matching what protogogen's OWN output layout actually is
-	// everywhere, including outside this repo: protogogen compiles with
-	// protoc's "paths=source_relative" (see
-	// internal/dsl/backend/protogogen/request.go's codeGeneratorParameter),
-	// so a module's generated package lands at "<out>/protogogen/<module>/"
-	// -- mirroring its .proto source path exactly, never nested under an
-	// extra "zever/" segment. The "/zever/"-prefixed formula is a legacy
-	// repo-specific naming choice, not a property of how protogogen itself
-	// lays out output, so an external caller's override must not have it
-	// applied on their behalf.
-	pbImportFlat bool
 }
 
 // New returns a new gogen Backend that assumes protogogen's generated
@@ -91,14 +81,8 @@ func New() *Backend {
 }
 
 // NewWithPBImportRoot returns a new gogen Backend that imports each
-// module's protogogen-generated message package from "<pbImportRoot>/
-// <module>" (a named module) or bare "<pbImportRoot>" (the implicit
-// unnamed module) instead of New()'s default root and "/zever/"-prefixed
-// formula -- see Backend.pbImportFlat's doc comment for why this formula,
-// not the default one, is the correct one for an override: it matches
-// protogogen's actual "paths=source_relative" output layout, which every
-// external caller's protogogen output follows, regardless of where they
-// point pbImportRoot. Use this when the target project places its
+// module's protogogen-generated message package from pbImportRoot instead
+// of New()'s default root. Use this when the target project places its
 // protogogen output somewhere other than under defaultPBImportRoot --
 // Generate(schema) is never told the calling project's module path or
 // --out layout, so an exact downstream import path can't be derived in
@@ -108,7 +92,7 @@ func NewWithPBImportRoot(pbImportRoot string) *Backend {
 		pbImportRoot = defaultPBImportRoot
 	}
 
-	return &Backend{pbImportRoot: pbImportRoot, pbImportFlat: true}
+	return &Backend{pbImportRoot: pbImportRoot}
 }
 
 // Name returns the backend's identifier.
@@ -130,7 +114,7 @@ func (b *Backend) Generate(schema *ir.Schema) (map[string][]byte, error) {
 		}
 
 		pkg, dir := moduleNaming(m)
-		data := newModuleModel(m, pkg, b.pbImportRoot, b.pbImportFlat)
+		data := newModuleModel(m, pkg, b.pbImportRoot)
 
 		files, err := renderModuleFiles(pkg, dir, data)
 		if err != nil {

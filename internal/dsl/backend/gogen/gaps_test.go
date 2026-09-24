@@ -75,8 +75,8 @@ func TestPBGoParamTypeFallback(t *testing.T) {
 	}
 }
 
-// TestNewDefaultWithNamedModule covers pbGoPackage's legacy named-module
-// formula under New(): "<root>/zever/<module>".
+// TestNewDefaultWithNamedModule covers pbGoPackage's named-module formula
+// under New(): "<root>/<module>".
 func TestNewDefaultWithNamedModule(t *testing.T) {
 	file := compileSchema(t, `entity User {
 	id: uuid @primary
@@ -100,8 +100,8 @@ service UserService {
 	}
 
 	types := string(out["iam/types.go"])
-	if !strings.Contains(types, `pb "github.com/zenta-dev/zever/gen/zever/iam"`) {
-		t.Fatalf("New() named module must use the legacy /zever/ formula, got:\n%s", types)
+	if !strings.Contains(types, `pb "github.com/zenta-dev/zever/gen/iam"`) {
+		t.Fatalf("New() named module must use the flat formula, got:\n%s", types)
 	}
 }
 
@@ -257,13 +257,10 @@ service UserService {
 	}
 }
 
-// TestNumericLiteralDefault covers numericLiteral's fallback for a decoded
-// value of unexpected dynamic type.
+// TestNumericLiteralDefault covers numericLiteral's typed paths, and that a
+// decoded value of unexpected dynamic type panics instead of silently
+// splicing an unescaped %v-stringified value into generated Go source.
 func TestNumericLiteralDefault(t *testing.T) {
-	if got := numericLiteral("7"); got != "7" {
-		t.Fatalf("numericLiteral(string) = %q, want 7", got)
-	}
-
 	if got := numericLiteral(int64(7)); got != "7" {
 		t.Fatalf("numericLiteral(int64) = %q, want 7", got)
 	}
@@ -271,4 +268,11 @@ func TestNumericLiteralDefault(t *testing.T) {
 	if got := numericLiteral(0.5); got != "0.5" {
 		t.Fatalf("numericLiteral(float64) = %q, want 0.5", got)
 	}
+
+	defer func() {
+		if r := recover(); r == nil {
+			t.Fatal("numericLiteral(string) did not panic on unexpected type")
+		}
+	}()
+	numericLiteral("7")
 }
