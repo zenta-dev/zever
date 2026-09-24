@@ -31,7 +31,13 @@ func coverWaitFor(t *testing.T, what string, cond func() bool) {
 			t.Fatalf("timed out waiting for %s", what)
 		}
 
-		time.Sleep(5 * time.Millisecond)
+		timer := time.NewTimer(5 * time.Millisecond)
+		select {
+		case <-t.Context().Done():
+			timer.Stop()
+			t.Fatalf("test context done waiting for %s", what)
+		case <-timer.C:
+		}
 	}
 }
 

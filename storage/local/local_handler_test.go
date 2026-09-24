@@ -962,7 +962,7 @@ func TestSign(t *testing.T) {
 	}
 }
 
-func TestUrlFor(t *testing.T) {
+func TestURLFor(t *testing.T) {
 	a := newTestAdapter(t, storage.Options{URLBase: "https://cdn.example.com/base"})
 	exp := time.Now().Add(time.Hour).Unix()
 

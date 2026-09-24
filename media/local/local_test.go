@@ -100,7 +100,13 @@ func eventually(t *testing.T, timeout, interval time.Duration, cond func() bool,
 		if time.Now().After(deadline) {
 			t.Fatalf("condition not met within %v: %s", timeout, msg)
 		}
-		time.Sleep(interval)
+		timer := time.NewTimer(interval)
+		select {
+		case <-t.Context().Done():
+			timer.Stop()
+			t.Fatalf("test context done waiting for %s", msg)
+		case <-timer.C:
+		}
 	}
 }
 
