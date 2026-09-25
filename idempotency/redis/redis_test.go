@@ -3,7 +3,6 @@ package redis
 import (
 	"errors"
 	"fmt"
-	"os"
 	"sync"
 	"sync/atomic"
 	"testing"
@@ -14,34 +13,9 @@ import (
 	"github.com/zenta-dev/zever/idempotency"
 )
 
-// Shared hermetic server for all tests.
-//
-// New threads through the internal/redis shared Pool singleton, so every
-// test must dial the same address: per-test miniredis instances on distinct
-// ports would thrash the singleton (each New closes the previous client).
-// Isolation comes from unique keys per test instead.
-var (
-	testMini *miniredis.Miniredis
-	testAddr string
-	keySeq   atomic.Int64
-)
-
-func TestMain(m *testing.M) {
-	s, err := miniredis.Run()
-	if err != nil {
-		fmt.Fprintln(os.Stderr, "miniredis start:", err)
-		os.Exit(1)
-	}
-
-	testMini = s
-	testAddr = s.Addr()
-
-	code := m.Run()
-
-	s.Close()
-
-	os.Exit(code)
-}
+// keySeq keeps generated keys unique even within a single test's shared
+// miniredis instance.
+var keySeq atomic.Int64
 
 func freshKey(t *testing.T) string {
 	t.Helper()
@@ -49,27 +23,45 @@ func freshKey(t *testing.T) string {
 	return fmt.Sprintf("k-%d", keySeq.Add(1))
 }
 
-func testOptions() idempotency.Options {
-	return idempotency.Options{Redis: idempotency.RedisOptions{Addr: testAddr}}
+// testServer starts a per-test miniredis instance, auto-closed via
+// t.Cleanup.
+func testServer(t *testing.T) *miniredis.Miniredis {
+	t.Helper()
+
+	return miniredis.RunT(t)
+}
+
+// testOptions starts a per-test miniredis instance and returns options
+// pointed at it.
+func testOptions(t *testing.T) idempotency.Options {
+	t.Helper()
+
+	return idempotency.Options{Redis: idempotency.RedisOptions{Addr: testServer(t).Addr()}}
 }
 
 func newTestStore(t *testing.T) idempotency.Store {
 	t.Helper()
 
-	opts := testOptions()
+	return newTestStoreWithServer(t, testServer(t))
+}
 
-	s, err := New(opts)
+func newTestStoreWithServer(t *testing.T, s *miniredis.Miniredis) idempotency.Store {
+	t.Helper()
+
+	opts := idempotency.Options{Redis: idempotency.RedisOptions{Addr: s.Addr()}}
+
+	store, err := New(opts)
 	if err != nil {
 		t.Fatalf("New err = %v, want nil", err)
 	}
 
 	t.Cleanup(func() {
-		if err := s.Close(); err != nil {
+		if err := store.Close(); err != nil {
 			t.Errorf("Close err = %v, want nil", err)
 		}
 	})
 
-	return s
+	return store
 }
 
 func TestRedis_claimCompleteReplay(t *testing.T) {
@@ -237,11 +229,12 @@ func TestRedis_completeMismatchNoOverwrite(t *testing.T) {
 	}
 }
 
-// Sequential on purpose: FastForward jumps the shared server clock, so it
-// must not run alongside other tests.
 func TestRedis_expiry(t *testing.T) {
+	t.Parallel()
+
+	server := testServer(t)
 	ctx := t.Context()
-	s := newTestStore(t)
+	s := newTestStoreWithServer(t, server)
 	key := freshKey(t)
 	fp := []byte("fp")
 
@@ -249,7 +242,7 @@ func TestRedis_expiry(t *testing.T) {
 		t.Fatalf("Begin err = %v, want nil", err)
 	}
 
-	testMini.FastForward(3 * time.Second)
+	server.FastForward(3 * time.Second)
 
 	out, err := s.Begin(ctx, key, idempotency.BeginOptions{Fingerprint: fp})
 	if err != nil {
@@ -408,7 +401,7 @@ func TestRedis_invalidOptions(t *testing.T) {
 		"negative ttl": func(o *idempotency.Options) { o.TTL = -time.Second },
 		"bad prefix":   func(o *idempotency.Options) { o.Redis.Prefix = "has space" },
 	} {
-		opts := testOptions()
+		opts := testOptions(t)
 		mutate(&opts)
 
 		if _, err := New(opts); err == nil {

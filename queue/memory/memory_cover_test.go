@@ -342,7 +342,7 @@ func TestMemory_CoverWaitForCapacityBranches(t *testing.T) {
 		t.Fatalf("Push fill: %v", err)
 	}
 	// cover waitForSpace ctx.Done (345)
-	ctx, cancel := context.WithTimeout(t.Context(), 60*time.Millisecond)
+	ctx, cancel := context.WithTimeout(t.Context(), 300*time.Millisecond)
 	defer cancel()
 	err := ma.waitForSpace(ctx, tq)
 	if err == nil {

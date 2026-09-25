@@ -113,13 +113,10 @@ jobs:
   # Full gate: race detector + atomic coverage + Codecov upload. This is
   # the expensive pass (typically 2-10x slower than a plain `go test`
   # because of race instrumentation, plus more overhead from atomic
-  # coverage counters). It only needs to run on commits that actually land
-  # on main or get tagged for release — every PR still gets full vet/build/
-  # test coverage from the fast job above, it just doesn't pay the race
-  # detector's cost on every push.
+  # coverage counters). Runs on every push and PR so races are caught before
+  # merge instead of intermittently surfacing after landing on main.
   test-race:
     name: test (race + coverage)
-    if: github.event_name == 'push'
     runs-on: ubuntu-latest
     permissions:
       contents: read

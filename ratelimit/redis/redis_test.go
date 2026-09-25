@@ -3,7 +3,6 @@ package redis
 import (
 	"errors"
 	"fmt"
-	"os"
 	"sync"
 	"sync/atomic"
 	"testing"
@@ -14,35 +13,32 @@ import (
 	"github.com/zenta-dev/zever/ratelimit"
 )
 
-// Shared hermetic server: internal/redis Pool singleton means all tests
-// must dial the same address; isolation comes from unique keys per subtest.
-var (
-	testMini *miniredis.Miniredis
-	testAddr string
-	keySeq   atomic.Int64
-)
-
-func TestMain(m *testing.M) {
-	s, err := miniredis.Run()
-	if err != nil {
-		fmt.Fprintln(os.Stderr, "miniredis start:", err)
-		os.Exit(1)
-	}
-
-	testMini = s
-	testAddr = s.Addr()
-
-	code := m.Run()
-
-	s.Close()
-
-	os.Exit(code)
-}
+// keySeq keeps generated keys unique even within a single test's shared
+// miniredis instance.
+var keySeq atomic.Int64
 
 func freshKey(t *testing.T) string {
 	t.Helper()
 
 	return fmt.Sprintf("k-%d", keySeq.Add(1))
+}
+
+// testServer starts a per-test miniredis instance, auto-closed via
+// t.Cleanup.
+func testServer(t *testing.T) *miniredis.Miniredis {
+	t.Helper()
+
+	return miniredis.RunT(t)
+}
+
+// optionsFor builds ratelimit.Options pointed at an already-running server,
+// for tests that need multiple limiters sharing one backend.
+func optionsFor(s *miniredis.Miniredis) ratelimit.Options {
+	return ratelimit.Options{
+		Rate:  10,
+		Burst: 3,
+		Redis: ratelimit.RedisOptions{Addr: s.Addr()},
+	}
 }
 
 func eventually(t *testing.T, timeout time.Duration, cond func() bool, msg string) {
@@ -58,12 +54,10 @@ func eventually(t *testing.T, timeout time.Duration, cond func() bool, msg strin
 	}
 }
 
-func testOptions() ratelimit.Options {
-	return ratelimit.Options{
-		Rate:  10,
-		Burst: 3,
-		Redis: ratelimit.RedisOptions{Addr: testAddr},
-	}
+func testOptions(t *testing.T) ratelimit.Options {
+	t.Helper()
+
+	return optionsFor(testServer(t))
 }
 
 func newTestLimiter(t *testing.T, opts ratelimit.Options) ratelimit.Limiter {
@@ -87,7 +81,7 @@ func TestRedis_allowBurstThenDeny(t *testing.T) {
 	t.Parallel()
 
 	ctx := t.Context()
-	l := newTestLimiter(t, testOptions())
+	l := newTestLimiter(t, testOptions(t))
 	key := freshKey(t)
 
 	for i := 0; i < 3; i++ {
@@ -123,7 +117,7 @@ func TestRedis_refill(t *testing.T) {
 	t.Parallel()
 
 	ctx := t.Context()
-	opts := testOptions()
+	opts := testOptions(t)
 	opts.Rate = 5
 	opts.Burst = 2
 	l := newTestLimiter(t, opts)
@@ -150,7 +144,7 @@ func TestRedis_invalidCost(t *testing.T) {
 	t.Parallel()
 
 	ctx := t.Context()
-	l := newTestLimiter(t, testOptions())
+	l := newTestLimiter(t, testOptions(t))
 	key := freshKey(t)
 
 	for _, cost := range []float64{0, -1} {
@@ -164,7 +158,7 @@ func TestRedis_invalidKey(t *testing.T) {
 	t.Parallel()
 
 	ctx := t.Context()
-	l := newTestLimiter(t, testOptions())
+	l := newTestLimiter(t, testOptions(t))
 
 	long := make([]byte, ratelimit.MaxKeyLen+1)
 	for i := range long {
@@ -193,7 +187,7 @@ func TestRedis_resetRestores(t *testing.T) {
 	t.Parallel()
 
 	ctx := t.Context()
-	l := newTestLimiter(t, testOptions())
+	l := newTestLimiter(t, testOptions(t))
 	key := freshKey(t)
 
 	for i := 0; i < 3; i++ {
@@ -229,9 +223,10 @@ func TestRedis_prefixIsolation(t *testing.T) {
 
 	ctx := t.Context()
 
-	optsA := testOptions()
+	server := testServer(t)
+	optsA := optionsFor(server)
 	optsA.Redis.Prefix = "pfxA"
-	optsB := testOptions()
+	optsB := optionsFor(server)
 	optsB.Redis.Prefix = "pfxB"
 
 	a := newTestLimiter(t, optsA)
@@ -264,7 +259,7 @@ func TestRedis_afterClose(t *testing.T) {
 	t.Parallel()
 
 	ctx := t.Context()
-	l := newTestLimiter(t, testOptions())
+	l := newTestLimiter(t, testOptions(t))
 	key := freshKey(t)
 
 	if err := l.Close(); err != nil {
@@ -288,7 +283,7 @@ func TestRedis_concurrentSingleBucketBounded(t *testing.T) {
 	t.Parallel()
 
 	ctx := t.Context()
-	opts := testOptions()
+	opts := testOptions(t)
 	opts.Rate = 1
 	opts.Burst = 5
 	l := newTestLimiter(t, opts)
@@ -340,7 +335,7 @@ func TestRedis_invalidOptions(t *testing.T) {
 		"bad addr":   func(o *ratelimit.Options) { o.Redis.Addr = "://bad" },
 		"bad prefix": func(o *ratelimit.Options) { o.Redis.Prefix = "has space" },
 	} {
-		opts := testOptions()
+		opts := testOptions(t)
 		mutate(&opts)
 
 		if _, err := New(opts); err == nil {

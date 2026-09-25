@@ -11,8 +11,9 @@ import (
 func TestPull_crossInstance(t *testing.T) {
 	t.Parallel()
 
-	b1 := freshAdapter(t, nil)
-	b2 := freshAdapter(t, nil)
+	server := testServer(t)
+	b1 := freshAdapterOn(t, server, nil)
+	b2 := freshAdapterOn(t, server, nil)
 	ctx := t.Context()
 	topic := freshTopic()
 

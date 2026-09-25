@@ -156,7 +156,7 @@ func whiteStore(t *testing.T, c *goredis.Client) *store {
 func TestCover_NewDefaults(t *testing.T) {
 	t.Parallel()
 
-	s, err := New(testOptions())
+	s, err := New(testOptions(t))
 	if err != nil {
 		t.Fatalf("New err = %v, want nil", err)
 	}
@@ -180,7 +180,7 @@ func TestCover_NewDefaults(t *testing.T) {
 func TestCover_NewExplicit(t *testing.T) {
 	t.Parallel()
 
-	opts := testOptions()
+	opts := testOptions(t)
 	opts.TTL = time.Hour
 	opts.Redis.Prefix = "cov-"
 
@@ -208,7 +208,7 @@ func TestCover_NewExplicit(t *testing.T) {
 func TestCover_NewPingFail(t *testing.T) {
 	t.Parallel()
 
-	opts := testOptions()
+	opts := testOptions(t)
 	opts.Redis.Addr = "127.0.0.1:1"
 
 	s, err := New(opts)
@@ -313,8 +313,9 @@ func TestCover_BeginGetErr(t *testing.T) {
 func TestCover_BeginDecodeErr(t *testing.T) {
 	t.Parallel()
 
+	server := testServer(t)
 	ctx := t.Context()
-	s := newTestStore(t)
+	s := newTestStoreWithServer(t, server)
 	key := freshKey(t)
 
 	st, ok := s.(*store)
@@ -322,7 +323,7 @@ func TestCover_BeginDecodeErr(t *testing.T) {
 		t.Fatalf("store type = %T, want *store", s)
 	}
 
-	if err := testMini.Set(st.prefix+key, "garbage-not-a-record"); err != nil {
+	if err := server.Set(st.prefix+key, "garbage-not-a-record"); err != nil {
 		t.Fatalf("seed err = %v, want nil", err)
 	}
 
@@ -357,8 +358,9 @@ func TestCover_CompleteGetErr(t *testing.T) {
 func TestCover_CompleteDecodeErr(t *testing.T) {
 	t.Parallel()
 
+	server := testServer(t)
 	ctx := t.Context()
-	s := newTestStore(t)
+	s := newTestStoreWithServer(t, server)
 	key := freshKey(t)
 
 	st, ok := s.(*store)
@@ -366,7 +368,7 @@ func TestCover_CompleteDecodeErr(t *testing.T) {
 		t.Fatalf("store type = %T, want *store", s)
 	}
 
-	if err := testMini.Set(st.prefix+key, "garbage-not-a-record"); err != nil {
+	if err := server.Set(st.prefix+key, "garbage-not-a-record"); err != nil {
 		t.Fatalf("seed err = %v, want nil", err)
 	}
 
