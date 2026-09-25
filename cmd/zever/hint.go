@@ -2,9 +2,10 @@ package main
 
 import "os"
 
-// shouldShowHint reports whether hint footer should be emitted.
+// shouldShowHint reports whether hint footer should be emitted. Suppressed
+// by ZEVER_NO_HINT or the global --quiet flag (quietMode in root.go).
 func shouldShowHint() bool {
-	return os.Getenv("ZEVER_NO_HINT") == ""
+	return os.Getenv("ZEVER_NO_HINT") == "" && !quietMode
 }
 
 // generalTips rotates through contextual tips. Keep deterministic for tests.

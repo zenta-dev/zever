@@ -335,6 +335,15 @@ func TestPrintUsage_colorBranches(t *testing.T) {
 func runCoverChild(ctx context.Context, t *testing.T, bin string, coverDir string, args []string, stdin io.Reader, stderr io.Writer, extraEnv []string) int {
 	t.Helper()
 
+	return runCoverChildOut(ctx, t, bin, coverDir, args, stdin, nil, stderr, extraEnv)
+}
+
+// runCoverChildOut is runCoverChild with an optional stdout capture. A nil
+// stdout discards it. Cobra prints --help to stdout (uniform with kubectl/gh
+// style CLIs); errors and bare-invocation usage stay on stderr.
+func runCoverChildOut(ctx context.Context, t *testing.T, bin string, coverDir string, args []string, stdin io.Reader, stdout, stderr io.Writer, extraEnv []string) int {
+	t.Helper()
+
 	cmd := exec.CommandContext(ctx, bin, args...)
 	cmd.Env = append(os.Environ(), "GOCOVERDIR="+coverDir)
 	cmd.Env = append(cmd.Env, extraEnv...)
@@ -347,7 +356,11 @@ func runCoverChild(ctx context.Context, t *testing.T, bin string, coverDir strin
 		cmd.Stderr = stderr
 	}
 
-	cmd.Stdout = io.Discard
+	if stdout != nil {
+		cmd.Stdout = stdout
+	} else {
+		cmd.Stdout = io.Discard
+	}
 
 	err := cmd.Run()
 	if err == nil {
@@ -387,15 +400,15 @@ func TestMain_subprocessCover(t *testing.T) {
 	}
 	defer func() { _ = devnullErr.Close() }()
 
-	// 1. --help over pipes: run returns nil, main falls through (exit 0).
-	var helpErr bytes.Buffer
+	// 1. --help over pipes: Cobra prints help to stdout, exit 0.
+	var helpOut, helpErr bytes.Buffer
 
-	if code := runCoverChild(ctx, t, bin, coverDir, []string{"--help"}, nil, &helpErr, nil); code != 0 {
-		t.Fatalf("--help exit = %d, want 0\nstderr:\n%s", code, helpErr.String())
+	if code := runCoverChildOut(ctx, t, bin, coverDir, []string{"--help"}, nil, &helpOut, &helpErr, nil); code != 0 {
+		t.Fatalf("--help exit = %d, want 0\nstdout:\n%s", code, helpOut.String())
 	}
 
-	if !strings.Contains(helpErr.String(), "Usage:") {
-		t.Fatalf("--help stderr lacks Usage:\n%s", helpErr.String())
+	if !strings.Contains(helpOut.String(), "Usage:") {
+		t.Fatalf("--help stdout lacks Usage:\n%s", helpOut.String())
 	}
 
 	// 2. Bare with piped stdin: missing-subcommand, error printed without
@@ -422,5 +435,65 @@ func TestMain_subprocessCover(t *testing.T) {
 	if code := runCoverChild(ctx, t, bin, coverDir, []string{"frobnicate"}, pr, devnullErr,
 		[]string{"TERM=xterm-256color", "NO_COLOR="}); code != 1 {
 		t.Fatalf("unknown-color exit = %d, want 1", code)
+	}
+}
+
+func TestUseCobra_routing(t *testing.T) {
+	for _, tc := range []struct {
+		name string
+		args []string
+		want bool
+	}{
+		{"nil", nil, false},
+		{"empty", []string{}, false},
+		{"bare global flag", []string{"-i"}, false},
+		{"version long", []string{"--version"}, false},
+		{"version short", []string{"-V"}, false},
+		{"help alias", []string{"help"}, false},
+		{"help ported sub", []string{"help", "new"}, false},
+		{"unknown sub", []string{"frobnicate"}, false},
+		{"inspect compile ported", []string{"compile"}, true},
+		{"inspect routes ported", []string{"routes"}, true},
+		{"inspect alias ported", []string{"check:boundaries"}, true},
+		{"completion ported", []string{"completion", "bash"}, true},
+		{"docs ported", []string{"docs", "--dir", "man"}, true},
+		{"unknown flag first routes to Cobra for exit-2 mapping", []string{"--bogus", "new"}, true},
+		{"new", []string{"new", "myapp"}, true},
+		{"global short before", []string{"-i", "new"}, true},
+		{"global long before", []string{"--interactive", "generate"}, true},
+		{"global quiet before", []string{"--quiet", "dev"}, true},
+		{"generate", []string{"generate", "entity"}, true},
+		{"extract", []string{"extract", "shop"}, true},
+		{"serve", []string{"serve"}, true},
+		{"dev", []string{"dev"}, true},
+		{"queue work", []string{"queue:work"}, true},
+		{"schedule run", []string{"schedule:run"}, true},
+		{"tinker", []string{"tinker"}, true},
+		{"bare db", []string{"db"}, true},
+		{"db help flag", []string{"db", "-h"}, true},
+		{"db migrate", []string{"db", "migrate", "schema/app.zen"}, true},
+		{"db rollback", []string{"db", "rollback"}, true},
+		{"db seed", []string{"db", "seed"}, true},
+		{"db unknown stays legacy", []string{"db", "frobnicate"}, false},
+	} {
+		t.Run(tc.name, func(t *testing.T) {
+			if got := useCobra(tc.args); got != tc.want {
+				t.Fatalf("useCobra(%v) = %v, want %v", tc.args, got, tc.want)
+			}
+		})
+	}
+}
+
+func TestErrFlagUsage_zeverPrefixedAndIs(t *testing.T) {
+	if !strings.HasPrefix(errFlagUsage.Error(), "zever:") {
+		t.Fatalf("errFlagUsage = %q, want zever: prefix", errFlagUsage)
+	}
+
+	r := newRootCmd()
+	r.SetArgs([]string{"--bogus-flag"})
+
+	err := r.Execute()
+	if !errors.Is(err, errFlagUsage) {
+		t.Fatalf("Execute(--bogus-flag) = %v, want errFlagUsage", err)
 	}
 }
