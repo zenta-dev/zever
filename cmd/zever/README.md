@@ -11,7 +11,7 @@ Single-module repo (no nested `go.mod` under `cmd/zever`), so install from
 the module root path:
 
 ```sh
-go install github.com/zenta-dev/zever/cmd/zever@v0.3.0
+go install github.com/zenta-dev/zever/cmd/zever@v0.4.0
 ```
 
 Then `zever --help` prints the grouped command map (Scaffolding /

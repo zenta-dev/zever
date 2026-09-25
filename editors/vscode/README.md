@@ -25,7 +25,7 @@ go install ./tools/zever-lsp
 Without a local clone, install the published release instead:
 
 ```bash
-go install github.com/zenta-dev/zever/tools/zever-lsp@v0.3.0
+go install github.com/zenta-dev/zever/tools/zever-lsp@v0.4.0
 ```
 
 Make sure the resulting binary is on your `$PATH` (`go install` puts it in `$(go env GOPATH)/bin` by default). If `zever-lsp` cannot be found when the extension activates, you'll see an error notification with this same instruction.

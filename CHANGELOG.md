@@ -7,6 +7,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [v0.4.0] - 2026-09-25
+
 ### Changed
 
 - **Breaking:** `zever` CLI migrated to Cobra: every subcommand is a
