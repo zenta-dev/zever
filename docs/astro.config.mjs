@@ -36,11 +36,20 @@ export default defineConfig({
 					],
 				},
 				{
+					label: 'Tutorials',
+					items: [
+						{ label: 'Overview', link: 'tutorials/overview' },
+						{ label: 'Build a Booking API', link: 'tutorials/build-a-booking-api' },
+						{ label: 'Explore the Showcase App', link: 'tutorials/explore-the-showcase-app' },
+					],
+				},
+				{
 					label: 'Architecture',
 					items: [
 						{ label: 'Lifecycle', link: 'architecture/lifecycle' },
 						{ label: 'Container', link: 'architecture/container' },
 						{ label: 'Providers & Adapters', link: 'architecture/providers-adapters' },
+						{ label: 'Compiler Boundary', link: 'architecture/compiler-boundary' },
 					],
 				},
 				{
@@ -50,7 +59,9 @@ export default defineConfig({
 						{ label: 'Middleware', link: 'basics/middleware' },
 						{ label: 'Requests & Responses', link: 'basics/requests-responses' },
 						{ label: 'Validation', link: 'basics/validation' },
-						{ label: 'Errors & Logging', link: 'basics/errors-logging' },
+						{ label: 'Errors', link: 'basics/errors-logging' },
+						{ label: 'Logging', link: 'basics/logging' },
+						{ label: 'Codec', link: 'basics/codec' },
 						{ label: 'Sessions', link: 'basics/sessions' },
 						{ label: 'Internationalization', link: 'basics/i18n' },
 					],

@@ -88,9 +88,8 @@ var (
 //
 // "module" keeps its historical calling convention exactly: runGenerateModule
 // owns its own flag set and expects the literal "module" word among its
-// arguments, so anything that is not a recognized subcommand word (notably a
-// leading flag, as in `zever generate --lang=go module x`) is handed through
-// to it unchanged rather than rejected here.
+// arguments, so anything that is not a recognized subcommand word is handed
+// through to it unchanged rather than rejected here.
 func runGenerate(args []string) error { //nolint:gocyclo
 	// Support -i/--interactive at this level as well (handles "zever generate -i").
 	args = peelInteractive(args)
@@ -314,14 +313,12 @@ func splitPositionals(args []string, n int) (positional, remainder []string) {
 	return positional, args[i:]
 }
 
-// GenerateModuleConfig is the pure input to GenerateModule: the module name,
-// the target language, and the schema directory that owns the new module.
-// Stdout and Stderr receive the success and hint lines; nil writers silence
-// output. The working directory is the filesystem root (tests chdir into a
-// temp dir).
+// GenerateModuleConfig is the pure input to GenerateModule: the module name
+// and the schema directory that owns the new module. Stdout and Stderr
+// receive the success and hint lines; nil writers silence output. The
+// working directory is the filesystem root (tests chdir into a temp dir).
 type GenerateModuleConfig struct {
 	Name      string
-	Lang      string
 	SchemaDir string
 	Stdout    io.Writer
 	Stderr    io.Writer
@@ -339,10 +336,6 @@ func GenerateModule(cfg GenerateModuleConfig) (string, error) {
 
 	if !isIdent(cfg.Name) {
 		return "", fmt.Errorf("%s: name must be an identifier, got %q", tag, cfg.Name)
-	}
-
-	if cfg.Lang != "go" {
-		return "", fmt.Errorf("%s: lang %q not yet implemented (only \"go\" is supported)", tag, cfg.Lang)
 	}
 
 	dir, err := joinUnderRoot(cfg.SchemaDir, cfg.Name)
@@ -380,7 +373,6 @@ func GenerateModule(cfg GenerateModuleConfig) (string, error) {
 func runGenerateModule(args []string) error {
 	args = peelInteractive(args)
 	fs := flag.NewFlagSet("generate", flag.ContinueOnError)
-	lang := fs.String("lang", "go", `target language for scaffolding (only "go" is implemented)`)
 	// coverageProof: no local -i/--interactive flags; peelInteractive
 	// strips them before Parse and sets interactiveMode globally.
 
@@ -405,7 +397,7 @@ func runGenerateModule(args []string) error {
 				return err
 			}
 		} else {
-			return errors.New(`zever generate: usage: zever generate module <name> [--lang=go]`)
+			return errors.New(`zever generate: usage: zever generate module <name>`)
 		}
 	}
 
@@ -440,7 +432,6 @@ func runGenerateModule(args []string) error {
 
 	_, err := GenerateModule(GenerateModuleConfig{
 		Name:      name,
-		Lang:      *lang,
 		SchemaDir: schemaDir,
 		Stdout:    os.Stdout,
 		Stderr:    os.Stderr,

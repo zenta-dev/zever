@@ -14,7 +14,7 @@ import (
 	"github.com/zenta-dev/zever/internal/dsl/ir"
 )
 
-const newUsage = `zever new <name> [--module PATH] [--dir PATH] [--framework-path PATH] [--framework-version V] [--force]
+const newUsage = `zever new <name> [--module PATH] [--dir PATH] [--framework-version V] [--force]
 
 Scaffolds a brand new, buildable zever application from scratch: a fresh
 go.mod, a starter schema/app.zen (one User entity), cmd/server + cmd/worker +
@@ -24,12 +24,13 @@ subcommand (serve, dev, queue:work, db migrate/seed, tinker) works against
 the new project with no zever.yaml/.json needed.
 
 By default the new project depends on the published zever module
-(github.com/zenta-dev/zever %s) with no replace directive. Use
---framework-path to replace against a local checkout for framework
-development (auto-detected by walking up from the working directory looking
-for a go.mod declaring "module github.com/zenta-dev/zever" when running
-inside a clone of the framework itself). Pass --framework-version to pin a
-different published version.
+(github.com/zenta-dev/zever %s) with no replace directive. Pass
+--framework-version to pin a different published version. When run from
+inside a clone of the zever framework itself (a go.mod declaring "module
+github.com/zenta-dev/zever" somewhere above the working directory), the
+scaffold automatically replaces against that local checkout instead --
+there is no flag for this since it only ever applies to framework
+development, never to an ordinary project.
 
 What is NOT generated: real HTTP route handlers and real job logic. Every
 entrypoint this command writes has the same TODO-stub ceiling as
@@ -139,8 +140,6 @@ func runNew(args []string) error {
 	fs := flag.NewFlagSet("new", flag.ContinueOnError)
 	modulePath := fs.String("module", "", "Go module path for the new project (default: the app name itself, see -h)")
 	dirFlag := fs.String("dir", "", "output directory (default ./<name>)")
-	frameworkPath := fs.String("framework-path", "",
-		"path to a local zever checkout to replace against (default: auto-detected)")
 	frameworkVersion := fs.String("framework-version", "",
 		"depend on a published zever version instead of a local replace directive")
 	force := fs.Bool("force", false, "scaffold into a non-empty directory anyway")
@@ -168,10 +167,6 @@ func runNew(args []string) error {
 	name := positional[0]
 	if !isValidAppName(name) {
 		return fmt.Errorf("%s: %q is not a valid app name (letters, digits, - and _ only)", tag, name)
-	}
-
-	if *frameworkPath != "" && *frameworkVersion != "" {
-		return fmt.Errorf("%s: --framework-path and --framework-version are mutually exclusive", tag)
 	}
 
 	outDir := *dirFlag
@@ -239,7 +234,7 @@ func runNew(args []string) error {
 	case cwdHasCargo:
 		return fmt.Errorf("%s: Rust scaffolding not supported yet; zever new targets Go projects", tag)
 	default:
-		if fwErr := resolveFramework(tag, &plan, *frameworkPath, *frameworkVersion); fwErr != nil {
+		if fwErr := resolveFramework(tag, &plan, *frameworkVersion); fwErr != nil {
 			return fwErr
 		}
 	}
@@ -279,13 +274,22 @@ func isValidAppName(s string) bool {
 	return true
 }
 
+// zeverFrameworkPathEnv is an unexported test/dogfooding seam: when set, it
+// overrides framework-checkout auto-detection with an explicit path. It is
+// intentionally not a CLI flag -- ordinary users of the published module
+// never need it, and this repo's own test suite is the only expected
+// consumer (tests run with a cwd outside the repo tree via t.TempDir(),
+// so walk-up auto-detection alone can't find the checkout to replace
+// against, which is what keeps scaffolded-project builds hermetic in CI).
+const zeverFrameworkPathEnv = "ZEVER_FRAMEWORK_PATH"
+
 // resolveFramework decides how the new project depends on zever: a real
-// version (--framework-version, or defaultFrameworkVersion when neither
-// --framework-path nor --framework-version is given and no checkout is
-// detected) with no replace directive, or a local checkout
-// (--framework-path, or auto-detected by walking up from the working
-// directory) with a replace directive.
-func resolveFramework(tag string, plan *NewConfig, frameworkPath, frameworkVersion string) error {
+// version (--framework-version, or defaultFrameworkVersion when
+// --framework-version is not given and no checkout is detected) with no
+// replace directive, or a local checkout (auto-detected by walking up from
+// the working directory, or overridden via ZEVER_FRAMEWORK_PATH for this
+// repo's own tests) with a replace directive.
+func resolveFramework(tag string, plan *NewConfig, frameworkVersion string) error {
 	if frameworkVersion != "" {
 		plan.FrameworkVersion = frameworkVersion
 		plan.GoVersion = defaultGoVersion
@@ -293,7 +297,7 @@ func resolveFramework(tag string, plan *NewConfig, frameworkPath, frameworkVersi
 		return nil
 	}
 
-	fwDir := frameworkPath
+	fwDir := os.Getenv(zeverFrameworkPathEnv)
 
 	if fwDir == "" {
 		detected, err := detectFrameworkCheckout()
@@ -578,6 +582,13 @@ func (c NewConfig) batterySelections() []batterySelection {
 	return sel
 }
 
+// zeverYamlSchemaModeline is prepended to the scaffolded zever.yaml so
+// editors with the YAML Language Server extension get autocomplete and
+// inline validation against the sibling zever.schema.json this scaffold
+// also writes. It is a YAML comment: config.Load ignores it like any other
+// comment line.
+const zeverYamlSchemaModeline = "# yaml-language-server: $schema=./zever.schema.json\n"
+
 // renderZeverYaml builds the always-emitted zever.yaml: exactly
 // cfg.Batteries' adapter picks (never the full config.Default() service
 // map -- see NewConfig.Batteries' own doc comment for why the set is
@@ -730,12 +741,16 @@ func writeNewProject(tag string, cfg NewConfig) ([]string, error) {
 		return nil, writeErr
 	}
 
+	if writeErr := write("zever.schema.json", config.SchemaJSON); writeErr != nil {
+		return nil, writeErr
+	}
+
 	yamlData, err := renderZeverYaml(cfg)
 	if err != nil {
 		return nil, err
 	}
 
-	if writeErr := write("zever.yaml", yamlData); writeErr != nil {
+	if writeErr := write("zever.yaml", append([]byte(zeverYamlSchemaModeline), yamlData...)); writeErr != nil {
 		return nil, writeErr
 	}
 

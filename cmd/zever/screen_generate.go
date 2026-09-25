@@ -333,7 +333,7 @@ func runGenerateModuleScreen(name string) (string, error) {
 		schemaDir = pc.SchemaDir
 	}
 
-	return GenerateModule(GenerateModuleConfig{Name: name, Lang: "go", SchemaDir: schemaDir})
+	return GenerateModule(GenerateModuleConfig{Name: name, SchemaDir: schemaDir})
 }
 
 // runGenerateEntityScreen parses the field list and appends the entity.

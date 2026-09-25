@@ -1,0 +1,1256 @@
+$defs:
+    aiOptions:
+        additionalProperties: false
+        properties:
+            api_key:
+                type: string
+            base_url:
+                description: Must be a valid https URL when set.
+                type: string
+            model:
+                type: string
+            timeout:
+                $ref: '#/$defs/durationNs'
+        type: object
+    analyticsOptions:
+        additionalProperties: false
+        properties:
+            anonymous_id:
+                description: 'Default: "anonymous".'
+                type: string
+            api_key:
+                type: string
+            endpoint:
+                type: string
+            group_type:
+                description: 'Default: "organization".'
+                type: string
+            max_properties:
+                minimum: 0
+                type: integer
+            max_properties_bytes:
+                description: 'Default: 65536 (64 KiB).'
+                minimum: 0
+                type: integer
+        type: object
+    authOptions:
+        additionalProperties: false
+        properties:
+            jwt:
+                additionalProperties: false
+                properties:
+                    audience:
+                        type: string
+                    issuer:
+                        description: Required by the jwt adapter.
+                        type: string
+                    max_ttl:
+                        $ref: '#/$defs/durationNs'
+                        description: Zero means no cap.
+                    secret:
+                        description: HMAC signing secret, minimum 32 bytes (adapter-validated).
+                        type: string
+                type: object
+            oidc:
+                additionalProperties: false
+                properties:
+                    client_id:
+                        description: Required by the oidc adapter.
+                        type: string
+                    issuer:
+                        description: Required by the oidc adapter.
+                        type: string
+                    timeout:
+                        $ref: '#/$defs/durationNs'
+                type: object
+            session:
+                additionalProperties: false
+                description: SessionOptions.Store is a Go-only session.Store injection (json:"-") -- there is nothing settable here from a config file.
+                properties: {}
+                type: object
+        type: object
+    cacheOptions:
+        additionalProperties: false
+        properties:
+            adapter:
+                description: 'Deprecated/legacy: cache.Options carries its own internal Adapter int field (0=memory,1=redis), separate from and easily confused with the outer service.adapter string. Prefer the outer adapter field; avoid setting this.'
+                enum:
+                    - 0
+                    - 1
+                type: integer
+            addr:
+                type: string
+            capacity:
+                type: integer
+            db:
+                type: integer
+            max_conn_idle_time:
+                $ref: '#/$defs/durationNs'
+            max_conn_lifetime:
+                $ref: '#/$defs/durationNs'
+            max_entries:
+                type: integer
+            min_idle_conns:
+                type: integer
+            password:
+                type: string
+            pool_size:
+                type: integer
+            pool_timeout:
+                $ref: '#/$defs/durationNs'
+            require_tls:
+                type: boolean
+            sweep_interval:
+                $ref: '#/$defs/durationNs'
+            tls:
+                type: boolean
+            url:
+                description: Redis connection URL; takes precedence over addr when set.
+                type: string
+            verbose:
+                type: boolean
+        type: object
+    cryptoOptions:
+        additionalProperties: false
+        properties:
+            key:
+                description: Required. Base64-encoded 32-byte encryption key.
+                type: string
+            sign_key:
+                description: Base64-encoded 64-byte signing key.
+                type: string
+        type: object
+    dbOptions:
+        additionalProperties: false
+        properties:
+            dsn:
+                description: Postgres connection string.
+                type: string
+            max_conn_idle_time:
+                $ref: '#/$defs/durationNs'
+            max_conn_lifetime:
+                $ref: '#/$defs/durationNs'
+            max_conns:
+                minimum: 0
+                type: integer
+            min_conns:
+                description: Minimum pool size (postgres) or idle-connection target (sqlite).
+                minimum: 0
+                type: integer
+            path:
+                description: SQLite database file path.
+                type: string
+        type: object
+    documentOptions:
+        additionalProperties: false
+        properties:
+            api_key:
+                type: string
+            dpi:
+                minimum: 0
+                type: integer
+            endpoint:
+                type: string
+            latex_command:
+                description: 'Default: pdflatex.'
+                type: string
+            latex_pdf_to_ppm:
+                description: 'Default: pdftoppm.'
+                type: string
+            latex_runs:
+                minimum: 0
+                type: integer
+            max_output_bytes:
+                minimum: 0
+                type: integer
+            quality:
+                maximum: 100
+                minimum: 0
+                type: integer
+            timeout:
+                $ref: '#/$defs/durationNs'
+            tmp_dir:
+                type: string
+        type: object
+    durationNs:
+        description: time.Duration serialized as an integer count of nanoseconds in JSON/YAML config files (e.g. 5s = 5000000000). Not a Go duration string -- "5s" style strings only work for environment-variable overrides, never inside zever.yaml/.yml/.json.
+        minimum: 0
+        type: integer
+    eventbusOptions:
+        additionalProperties: false
+        properties:
+            buffer_size:
+                description: Zero means adapter default (1024).
+                minimum: 0
+                type: integer
+            close_timeout:
+                $ref: '#/$defs/durationNs'
+                description: Zero means adapter default (5s).
+            handler_timeout:
+                $ref: '#/$defs/durationNs'
+                description: Zero means adapter default (30s).
+            max_handlers:
+                description: Zero means adapter default (128).
+                minimum: 0
+                type: integer
+            redis:
+                $ref: '#/$defs/zredisOptionsWithPrefix'
+        type: object
+    flagOptions:
+        additionalProperties: false
+        properties:
+            firebase:
+                additionalProperties: false
+                properties:
+                    project_id:
+                        type: string
+                    service_account:
+                        description: Path to the service-account JSON key file.
+                        type: string
+                    timeout:
+                        $ref: '#/$defs/durationNs'
+                type: object
+            static:
+                additionalProperties: false
+                properties:
+                    path:
+                        type: string
+                    reload:
+                        type: boolean
+                type: object
+        type: object
+    geoOptions:
+        additionalProperties: false
+        properties:
+            allow_insecure:
+                type: boolean
+            api_key:
+                type: string
+            base_url:
+                description: Google Maps API base URL override.
+                type: string
+            endpoint:
+                description: Mapbox/OSM API endpoint override.
+                type: string
+            max_response_body:
+                minimum: 0
+                type: integer
+            path:
+                description: JSON file for the static adapter.
+                type: string
+            timeout:
+                $ref: '#/$defs/durationNs'
+            user_agent:
+                description: Required for the osm adapter.
+                type: string
+        type: object
+    i18nOptions:
+        additionalProperties: false
+        properties:
+            embed:
+                additionalProperties: false
+                properties:
+                    dir:
+                        description: 'Default: ".".'
+                        type: string
+                    fallback:
+                        type: string
+                type: object
+            remote:
+                additionalProperties: false
+                properties:
+                    allow_insecure:
+                        type: boolean
+                    api_key:
+                        type: string
+                    endpoint:
+                        type: string
+                    max_in_flight:
+                        description: Zero means adapter default (1000).
+                        minimum: 0
+                        type: integer
+                    timeout:
+                        $ref: '#/$defs/durationNs'
+                type: object
+        type: object
+    idempotencyOptions:
+        additionalProperties: false
+        properties:
+            redis:
+                $ref: '#/$defs/zredisOptionsWithPrefix'
+            ttl:
+                $ref: '#/$defs/durationNs'
+                description: Zero means adapter default (24h).
+        type: object
+    lockOptions:
+        additionalProperties: false
+        properties:
+            addr:
+                type: string
+            db:
+                type: integer
+            password:
+                type: string
+            prefix:
+                type: string
+            require_tls:
+                type: boolean
+            retry_interval:
+                $ref: '#/$defs/durationNs'
+                description: Zero means adapter default (50ms).
+            tls:
+                type: boolean
+            ttl:
+                $ref: '#/$defs/durationNs'
+                description: Zero means adapter default (30s).
+            url:
+                description: Takes precedence over addr when set.
+                type: string
+        type: object
+    logOptions:
+        additionalProperties: false
+        properties:
+            min_level:
+                description: 0=debug, 1=info, 2=warn, 3=error, 4=fatal. log.Level has no custom JSON (un)marshaling, so config files must use the integer, not the string name.
+                enum:
+                    - 0
+                    - 1
+                    - 2
+                    - 3
+                    - 4
+                type: integer
+        type: object
+    mailerOptions:
+        additionalProperties: false
+        properties:
+            encryption:
+                description: Empty means starttls.
+                enum:
+                    - ""
+                    - starttls
+                    - implicit
+                    - none
+                type: string
+            host:
+                description: Required; must not contain a scheme.
+                type: string
+            max_message_size:
+                minimum: 0
+                type: integer
+            password:
+                type: string
+            port:
+                maximum: 65535
+                minimum: 1
+                type: integer
+            timeout:
+                $ref: '#/$defs/durationNs'
+            username:
+                type: string
+        type: object
+    mediaOptions:
+        additionalProperties: false
+        properties:
+            access_key_id:
+                type: string
+            base_url:
+                type: string
+            bucket:
+                type: string
+            derived_ttl:
+                $ref: '#/$defs/durationNs'
+                description: 'Default: 10m.'
+            endpoint:
+                type: string
+            ffmpeg:
+                description: 'Default: ffmpeg.'
+                type: string
+            ffprobe:
+                description: 'Default: ffprobe.'
+                type: string
+            max_download_bytes:
+                description: 'Default: 67108864 (64 MiB).'
+                minimum: 0
+                type: integer
+            max_duration:
+                $ref: '#/$defs/durationNs'
+                description: Zero means unlimited.
+            max_pixels:
+                description: 'Default: 52428800.'
+                minimum: 0
+                type: integer
+            presign_ttl:
+                $ref: '#/$defs/durationNs'
+                description: 'Default: 1h. Must be <= 604800000000000 ns (7 days) -- exceeding it is REJECTED at Validate() time with InvalidOptionsError, not silently clamped.'
+                maximum: 6.048e+14
+                type: integer
+            region:
+                description: 'Default: us-east-1.'
+                type: string
+            root:
+                type: string
+            secret_access_key:
+                type: string
+        type: object
+    notificationOptions:
+        additionalProperties: false
+        properties:
+            fcm:
+                additionalProperties: false
+                properties:
+                    project_id:
+                        description: Required.
+                        type: string
+                    service_account:
+                        description: Required. Path to the service-account JSON key file.
+                        type: string
+                type: object
+            timeout:
+                $ref: '#/$defs/durationNs'
+            twilio:
+                additionalProperties: false
+                properties:
+                    account_sid:
+                        type: string
+                    auth_token:
+                        type: string
+                    from_number:
+                        description: E.164 format.
+                        type: string
+                type: object
+        type: object
+    observabilityOptions:
+        additionalProperties: false
+        properties:
+            attr_value_limit:
+                description: 0 (default) or 256-16384.
+                type: integer
+            ca_file:
+                type: string
+            cert_file:
+                description: Must be set together with key_file.
+                type: string
+            endpoint:
+                description: Collector address as host:port -- no scheme, no path.
+                type: string
+            headers:
+                additionalProperties:
+                    type: string
+                maxProperties: 32
+                type: object
+            insecure:
+                description: Only allowed when endpoint resolves to a loopback host.
+                type: boolean
+            key_file:
+                type: string
+            sample_ratio:
+                maximum: 1
+                minimum: 0
+                type: number
+            service_name:
+                description: Required.
+                maxLength: 128
+                minLength: 1
+                type: string
+            set_globals:
+                type: boolean
+            verbose:
+                type: boolean
+        type: object
+    passwordOptions:
+        additionalProperties: false
+        properties:
+            key_length:
+                description: 'Default: 32.'
+                maximum: 128
+                minimum: 16
+                type: integer
+            memory:
+                description: 'Argon2id memory cost in KiB. Default: 65536 (64 MiB).'
+                maximum: 1.048576e+06
+                minimum: 8192
+                type: integer
+            salt_length:
+                description: 'Default: 16.'
+                maximum: 64
+                minimum: 8
+                type: integer
+            threads:
+                description: 'Default: 4.'
+                maximum: 16
+                minimum: 1
+                type: integer
+            time:
+                description: 'Argon2id iterations. Default: 3.'
+                maximum: 10
+                minimum: 1
+                type: integer
+        type: object
+    paymentOptions:
+        additionalProperties: false
+        properties:
+            api_key:
+                type: string
+            auto_approve:
+                description: Marks new payments as succeeded instead of pending.
+                type: boolean
+            endpoint:
+                type: string
+            max_webhook_bytes:
+                description: 'Default: 1048576 (1 MiB).'
+                minimum: 0
+                type: integer
+            sandbox:
+                type: boolean
+            secret_key:
+                type: string
+            webhook_secret:
+                type: string
+        type: object
+    permissionOptions:
+        additionalProperties: false
+        properties:
+            model_path:
+                description: Casbin model file path; must be set together with policy_path.
+                type: string
+            policy_path:
+                description: Casbin policy file path.
+                type: string
+            roles:
+                additionalProperties:
+                    items:
+                        maxLength: 256
+                        type: string
+                    type: array
+                description: Subject-ID to allowed-roles allowlist gating privilege escalation.
+                type: object
+            rules:
+                description: permission.Rule carries no json/yaml/toml struct tags, so keys are the exported Go field names verbatim (capitalized), unlike every other snake_case option in this schema.
+                items:
+                    $ref: '#/$defs/permissionRule'
+                type: array
+        type: object
+    permissionRule:
+        additionalProperties: false
+        properties:
+            Action:
+                maxLength: 256
+                type: string
+            Effect:
+                description: Empty means allow.
+                enum:
+                    - ""
+                    - allow
+                    - deny
+                type: string
+            OwnedAttr:
+                description: Required when OwnedOnly is true.
+                type: string
+            OwnedOnly:
+                type: boolean
+            Role:
+                maxLength: 256
+                type: string
+        type: object
+    providersCommon:
+        additionalProperties: false
+        description: Shared Stripe/Paddle option shape (internal/providers.Common), embedded directly into billing.Options and payment.Options -- no wrapper key.
+        properties:
+            api_key:
+                description: Provider API key (Paddle).
+                type: string
+            endpoint:
+                description: Optional custom provider endpoint URL; must include scheme and host when set.
+                type: string
+            sandbox:
+                type: boolean
+            secret_key:
+                description: Provider secret key (Stripe).
+                type: string
+        type: object
+    queueOptions:
+        additionalProperties: false
+        properties:
+            addr:
+                type: string
+            buffer:
+                minimum: 0
+                type: integer
+            db:
+                type: integer
+            password:
+                type: string
+            poll_timeout:
+                $ref: '#/$defs/durationNs'
+            prefix:
+                type: string
+            require_tls:
+                type: boolean
+            tls:
+                type: boolean
+            url:
+                type: string
+            visibility_timeout:
+                $ref: '#/$defs/durationNs'
+        type: object
+    ratelimitOptions:
+        additionalProperties: false
+        properties:
+            burst:
+                description: Required.
+                exclusiveMinimum: 0
+                type: integer
+            idle_ttl:
+                $ref: '#/$defs/durationNs'
+                description: Zero means adapter default (10m).
+            rate:
+                description: Token refill rate per second. Required.
+                exclusiveMinimum: 0
+                type: number
+            redis:
+                $ref: '#/$defs/zredisOptionsWithPrefix'
+            sweep_interval:
+                $ref: '#/$defs/durationNs'
+                description: Zero means adapter default (1m).
+        type: object
+    routerOptions:
+        additionalProperties: false
+        properties:
+            app_name:
+                description: Empty defaults to "app".
+                maxLength: 64
+                type: string
+        type: object
+    schedulerOptions:
+        additionalProperties: false
+        description: scheduler.Options.Dispatcher is required by Validate() but is a *job.Dispatcher (json:"-") that can only be wired in code, never from a config file -- close_timeout is the only field a file can actually set.
+        properties:
+            close_timeout:
+                $ref: '#/$defs/durationNs'
+                description: Zero means adapter default (5s).
+        type: object
+    searchOptions:
+        additionalProperties: false
+        properties:
+            api_key:
+                type: string
+            dsn:
+                description: Postgres URL or sqlite path; required by postgres/sqlite adapters.
+                type: string
+            host:
+                description: Meilisearch URL; required by the meilisearch adapter.
+                type: string
+        type: object
+    secretsOptions:
+        additionalProperties: false
+        properties:
+            addr:
+                description: Vault server address.
+                type: string
+            mount:
+                description: Vault KV mount path.
+                type: string
+            prefix:
+                description: 'Default: ZEVER.'
+                type: string
+            project_id:
+                description: GCP project ID.
+                type: string
+            region:
+                description: AWS region.
+                type: string
+            token:
+                description: Vault authentication token.
+                type: string
+        type: object
+    service:
+        additionalProperties: false
+        properties:
+            adapter:
+                description: Backend implementation name. Present but omitted keeps config.Default()'s adapter for this service.
+                type: string
+            options:
+                description: Backend-specific typed settings; shape depends on adapter's package Options struct.
+                type: object
+        type: object
+    sessionOptions:
+        additionalProperties: false
+        properties:
+            redis:
+                $ref: '#/$defs/zredisOptionsWithPrefix'
+            ttl:
+                $ref: '#/$defs/durationNs'
+                description: Zero means adapter default (15m).
+        type: object
+    storageOptions:
+        additionalProperties: false
+        properties:
+            access_key_id:
+                description: s3 adapter.
+                type: string
+            account_id:
+                description: 'r2 adapter: Cloudflare account ID.'
+                type: string
+            endpoint:
+                description: 's3 adapter: overrides the endpoint for S3-compatible stores.'
+                type: string
+            policy:
+                additionalProperties:
+                    $ref: '#/$defs/storagePolicy'
+                description: 'storage.PolicyConfig has custom (Un)MarshalJSON: it is a flat map, not {default, buckets}. The "default" key is the fallback policy for unlisted buckets; every other key is a bucket name.'
+                type: object
+            policy_sync:
+                description: s3 adapter.
+                enum:
+                    - ""
+                    - manual
+                    - auto
+                type: string
+            public_url:
+                description: 'local adapter: public base URL for unsigned links.'
+                type: string
+            region:
+                description: s3 adapter; default us-east-1.
+                type: string
+            root:
+                description: 'local adapter: directory objects are stored under.'
+                type: string
+            secret:
+                description: 'local adapter: HMAC key for presigned URLs.'
+                type: string
+            secret_access_key:
+                description: s3 adapter.
+                type: string
+            sync_fail:
+                description: s3 adapter.
+                enum:
+                    - ""
+                    - warn
+                    - require
+                type: string
+            url_base:
+                description: Base URL presigned URLs are built on.
+                type: string
+        type: object
+    storagePolicy:
+        additionalProperties: false
+        properties:
+            delete:
+                $ref: '#/$defs/storagePolicyRule'
+            read:
+                $ref: '#/$defs/storagePolicyRule'
+            update:
+                $ref: '#/$defs/storagePolicyRule'
+            version:
+                type: string
+            write:
+                $ref: '#/$defs/storagePolicyRule'
+        type: object
+    storagePolicyRule:
+        additionalProperties: false
+        properties:
+            allow:
+                description: Subjects granted access. "*" matches any authenticated subject, "anonymous" matches everyone.
+                items:
+                    type: string
+                type: array
+            deny:
+                description: Subjects refused access; deny wins over allow.
+                items:
+                    type: string
+                type: array
+            public:
+                description: Allow unsigned access.
+                type: boolean
+        type: object
+    tenantOptions:
+        additionalProperties: false
+        properties:
+            header:
+                description: 'Default: X-Tenant-ID.'
+                type: string
+            id:
+                description: Fixed tenant ID for the single adapter; default "default".
+                type: string
+            subdomain_regex:
+                maxLength: 500
+                type: string
+        type: object
+    vectorstoreOptions:
+        additionalProperties: false
+        properties:
+            api_key:
+                type: string
+            dimension:
+                description: 'Default: 1536.'
+                minimum: 0
+                type: integer
+            dsn:
+                description: sqlite path or postgres URL (pgvector).
+                type: string
+            url:
+                description: Qdrant address.
+                type: string
+        type: object
+    webhookOptions:
+        additionalProperties: false
+        properties:
+            allow_private_targets:
+                description: Testing only; leave false in production.
+                type: boolean
+            dead_letter_topic:
+                type: string
+            dsn:
+                description: sqlite adapter database path; empty means a private in-memory-style database.
+                type: string
+            max_retries:
+                description: Zero means no retries.
+                minimum: 0
+                type: integer
+            queue_adapter:
+                description: Only used by the queue adapter.
+                type: string
+            queue_opts:
+                $ref: '#/$defs/queueOptions'
+                description: Only used by the queue adapter.
+            replay_tolerance:
+                $ref: '#/$defs/durationNs'
+                description: Zero means adapter default (5m).
+            timeout:
+                $ref: '#/$defs/durationNs'
+                description: Zero means adapter default.
+        type: object
+    workflowOptions:
+        additionalProperties: false
+        properties:
+            host_port:
+                type: string
+            namespace:
+                type: string
+        type: object
+    zredisConnectOptions:
+        additionalProperties: false
+        properties:
+            addr:
+                description: host:port, or redis:// / rediss:// URL. Empty means localhost:6379.
+                type: string
+            db:
+                type: integer
+            password:
+                type: string
+            require_tls:
+                description: Fail fast instead of silently connecting in plaintext when TLS would not be used.
+                type: boolean
+            tls:
+                description: Enable TLS (1.2 floor) for a plain host:port address.
+                type: boolean
+        type: object
+    zredisOptions:
+        additionalProperties: false
+        properties:
+            addr:
+                type: string
+            db:
+                type: integer
+            max_conn_idle_time:
+                $ref: '#/$defs/durationNs'
+            max_conn_lifetime:
+                $ref: '#/$defs/durationNs'
+            min_idle_conns:
+                type: integer
+            password:
+                type: string
+            pool_size:
+                type: integer
+            pool_timeout:
+                $ref: '#/$defs/durationNs'
+            require_tls:
+                type: boolean
+            tls:
+                type: boolean
+        type: object
+    zredisOptionsWithPrefix:
+        additionalProperties: false
+        description: zredis.Options embedded plus a Prefix field -- used by eventbus/idempotency/ratelimit/session Redis adapters.
+        properties:
+            addr:
+                type: string
+            db:
+                type: integer
+            max_conn_idle_time:
+                $ref: '#/$defs/durationNs'
+            max_conn_lifetime:
+                $ref: '#/$defs/durationNs'
+            min_idle_conns:
+                type: integer
+            password:
+                type: string
+            pool_size:
+                type: integer
+            pool_timeout:
+                $ref: '#/$defs/durationNs'
+            prefix:
+                type: string
+            require_tls:
+                type: boolean
+            tls:
+                type: boolean
+        type: object
+$id: https://raw.githubusercontent.com/zenta-dev/zever/main/config/schema/zever.schema.json
+$schema: https://json-schema.org/draft/2020-12/schema
+additionalProperties: false
+description: 'Schema for zever.yaml / zever.yml / zever.json (config.Config). One property per battery service, each shaped { adapter, options }. File decoding is strict: unknown top-level services and unknown fields inside an options block are rejected (config/decode.go DisallowUnknownFields). time.Duration fields are plain integer nanoseconds in file config (only environment-variable overrides accept Go duration strings like "5s") -- see config/README.md and getting-started/configuration.mdx.'
+properties:
+    ai:
+        $ref: '#/$defs/service'
+        properties:
+            adapter:
+                enum:
+                    - anthropic
+                    - openai
+                    - gemini
+                    - ollama
+            options:
+                $ref: '#/$defs/aiOptions'
+        type: object
+    analytics:
+        $ref: '#/$defs/service'
+        properties:
+            adapter:
+                enum:
+                    - log
+                    - posthog
+            options:
+                $ref: '#/$defs/analyticsOptions'
+        type: object
+    auth:
+        $ref: '#/$defs/service'
+        properties:
+            adapter:
+                enum:
+                    - jwt
+                    - session
+                    - oidc
+            options:
+                $ref: '#/$defs/authOptions'
+        type: object
+    billing:
+        $ref: '#/$defs/service'
+        properties:
+            adapter:
+                enum:
+                    - stub
+                    - stripe
+                    - paddle
+            options:
+                $ref: '#/$defs/providersCommon'
+        type: object
+    cache:
+        $ref: '#/$defs/service'
+        properties:
+            adapter:
+                enum:
+                    - memory
+                    - redis
+            options:
+                $ref: '#/$defs/cacheOptions'
+        type: object
+    crypto:
+        $ref: '#/$defs/service'
+        properties:
+            adapter:
+                enum:
+                    - local
+            options:
+                $ref: '#/$defs/cryptoOptions'
+        type: object
+    db:
+        $ref: '#/$defs/service'
+        properties:
+            adapter:
+                enum:
+                    - sqlite
+                    - postgres
+            options:
+                $ref: '#/$defs/dbOptions'
+        type: object
+    document:
+        $ref: '#/$defs/service'
+        properties:
+            adapter:
+                enum:
+                    - local
+                    - remote
+                    - latex
+            options:
+                $ref: '#/$defs/documentOptions'
+        type: object
+    eventbus:
+        $ref: '#/$defs/service'
+        properties:
+            adapter:
+                enum:
+                    - memory
+                    - redis
+            options:
+                $ref: '#/$defs/eventbusOptions'
+        type: object
+    flag:
+        $ref: '#/$defs/service'
+        properties:
+            adapter:
+                enum:
+                    - static
+                    - firebase
+            options:
+                $ref: '#/$defs/flagOptions'
+        type: object
+    geo:
+        $ref: '#/$defs/service'
+        properties:
+            adapter:
+                enum:
+                    - google
+                    - static
+                    - osm
+            options:
+                $ref: '#/$defs/geoOptions'
+        type: object
+    i18n:
+        $ref: '#/$defs/service'
+        properties:
+            adapter:
+                enum:
+                    - embed
+                    - remote
+            options:
+                $ref: '#/$defs/i18nOptions'
+        type: object
+    idempotency:
+        $ref: '#/$defs/service'
+        properties:
+            adapter:
+                enum:
+                    - memory
+                    - redis
+            options:
+                $ref: '#/$defs/idempotencyOptions'
+        type: object
+    lock:
+        $ref: '#/$defs/service'
+        properties:
+            adapter:
+                enum:
+                    - memory
+                    - redis
+            options:
+                $ref: '#/$defs/lockOptions'
+        type: object
+    log:
+        $ref: '#/$defs/service'
+        properties:
+            adapter:
+                enum:
+                    - noop
+                    - zerolog
+                    - slog
+                    - pretty
+            options:
+                $ref: '#/$defs/logOptions'
+        type: object
+    mailer:
+        $ref: '#/$defs/service'
+        properties:
+            adapter:
+                enum:
+                    - log
+                    - smtp
+            options:
+                $ref: '#/$defs/mailerOptions'
+        type: object
+    media:
+        $ref: '#/$defs/service'
+        properties:
+            adapter:
+                enum:
+                    - local
+                    - s3
+            options:
+                $ref: '#/$defs/mediaOptions'
+        type: object
+    notification:
+        $ref: '#/$defs/service'
+        properties:
+            adapter:
+                enum:
+                    - log
+                    - twilio
+                    - fcm
+            options:
+                $ref: '#/$defs/notificationOptions'
+        type: object
+    observability:
+        $ref: '#/$defs/service'
+        properties:
+            adapter:
+                enum:
+                    - noop
+                    - stdout
+                    - otlp
+            options:
+                $ref: '#/$defs/observabilityOptions'
+        type: object
+    password:
+        $ref: '#/$defs/service'
+        properties:
+            adapter:
+                enum:
+                    - argon2id
+            options:
+                $ref: '#/$defs/passwordOptions'
+        type: object
+    payment:
+        $ref: '#/$defs/service'
+        properties:
+            adapter:
+                enum:
+                    - stub
+                    - stripe
+                    - paddle
+            options:
+                $ref: '#/$defs/paymentOptions'
+        type: object
+    permission:
+        $ref: '#/$defs/service'
+        properties:
+            adapter:
+                enum:
+                    - noop
+                    - rbac
+                    - casbin
+            options:
+                $ref: '#/$defs/permissionOptions'
+        type: object
+    queue:
+        $ref: '#/$defs/service'
+        properties:
+            adapter:
+                enum:
+                    - memory
+                    - redis
+            options:
+                $ref: '#/$defs/queueOptions'
+        type: object
+    ratelimit:
+        $ref: '#/$defs/service'
+        properties:
+            adapter:
+                enum:
+                    - memory
+                    - redis
+            options:
+                $ref: '#/$defs/ratelimitOptions'
+        type: object
+    router:
+        $ref: '#/$defs/service'
+        properties:
+            adapter:
+                enum:
+                    - fiber
+                    - stdhttp
+            options:
+                $ref: '#/$defs/routerOptions'
+        type: object
+    scheduler:
+        $ref: '#/$defs/service'
+        properties:
+            adapter:
+                enum:
+                    - embedded
+            options:
+                $ref: '#/$defs/schedulerOptions'
+        type: object
+    search:
+        $ref: '#/$defs/service'
+        properties:
+            adapter:
+                enum:
+                    - postgres
+                    - meilisearch
+                    - sqlite
+            options:
+                $ref: '#/$defs/searchOptions'
+        type: object
+    secrets:
+        $ref: '#/$defs/service'
+        properties:
+            adapter:
+                enum:
+                    - env
+            options:
+                $ref: '#/$defs/secretsOptions'
+        type: object
+    session:
+        $ref: '#/$defs/service'
+        properties:
+            adapter:
+                enum:
+                    - memory
+                    - redis
+            options:
+                $ref: '#/$defs/sessionOptions'
+        type: object
+    storage:
+        $ref: '#/$defs/service'
+        properties:
+            adapter:
+                enum:
+                    - local
+                    - s3
+                    - r2
+            options:
+                $ref: '#/$defs/storageOptions'
+        type: object
+    tenant:
+        $ref: '#/$defs/service'
+        properties:
+            adapter:
+                enum:
+                    - single
+                    - header
+            options:
+                $ref: '#/$defs/tenantOptions'
+        type: object
+    vectorstore:
+        $ref: '#/$defs/service'
+        properties:
+            adapter:
+                enum:
+                    - sqlite
+                    - pgvector
+                    - qdrant
+            options:
+                $ref: '#/$defs/vectorstoreOptions'
+        type: object
+    webhook:
+        $ref: '#/$defs/service'
+        properties:
+            adapter:
+                enum:
+                    - http
+                    - queue
+                    - sqlite
+            options:
+                $ref: '#/$defs/webhookOptions'
+        type: object
+    workflow:
+        $ref: '#/$defs/service'
+        properties:
+            adapter:
+                enum:
+                    - memory
+            options:
+                $ref: '#/$defs/workflowOptions'
+        type: object
+title: zever configuration
+type: object

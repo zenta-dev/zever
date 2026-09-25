@@ -68,7 +68,7 @@ srv.Shutdown(ctx)
 return c.Close(ctx)
 ```
 
-`Close(ctx)` closes only services already resolved, in dependency order (dependents first, `cache`/`queue` leaves last), joining failures with `errors.Join`. Panics surface as `*ClosePanicError`, timeouts as `*CloseTimeoutError` — match on those types, not strings.
+`Close(ctx)` closes only services already resolved, in dependency order (dependents first, `cache`/`queue` leaves last), joining failures with `errors.Join`. Panics surface as `container.ClosePanicError`, timeouts as `container.CloseTimeoutError` — both are value types (value receivers throughout), so match with `errors.As` against value targets (`var pe container.ClosePanicError`), not pointer targets, or the match silently never fires.
 
 ## Production checklist
 
@@ -76,7 +76,7 @@ return c.Close(ctx)
 |---|---|
 | Real crypto/JWT secrets via file or env | defaults are deterministic and public |
 | `log` adapter set to `slog`/`zerolog`, not `log` | structured output for aggregators |
-| `observability` set to `otlp`, not `noop` | traces and metrics actually export |
+| `observability` set to `otlp`, not `stdout` (the default) | traces and metrics actually export off-box |
 | `Close(ctx)` with a timeout parent | buffered spans flush via `Shutdown(ctx)` probing |
 | Never log raw option maps | use `config.RedactedServices`, errors name fields only |
 | Never point `zever tinker` at prod | it evals arbitrary Go against a live container |

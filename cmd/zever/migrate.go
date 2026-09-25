@@ -238,7 +238,23 @@ func runDBMigrate(args []string) error {
 		}
 	}
 
-	files, err := loadFiles(rawFiles)
+	// Non-interactive (or interactive-with-nothing-selected) callers with no
+	// explicit files still get the same recursive schema-dir auto-discovery
+	// every other file-consuming command uses, instead of failing outright.
+	resolvedFiles, err := resolveInputFiles(rawFiles)
+	if err != nil {
+		if shouldShowHint() {
+			_, _ = fmt.Fprintln(os.Stderr, formatHint("try 'zever db migrate -i' for guided file selection"))
+		}
+
+		return err
+	}
+
+	if len(rawFiles) == 0 {
+		reportAutoDiscovery(resolvedFiles)
+	}
+
+	files, err := loadFiles(resolvedFiles)
 	if err != nil {
 		if shouldShowHint() {
 			_, _ = fmt.Fprintln(os.Stderr, formatHint("try 'zever db migrate -i' for guided file selection"))

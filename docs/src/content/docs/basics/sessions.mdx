@@ -16,11 +16,12 @@ session:
 session:
   adapter: redis    # production: shared across instances
   options:
-    addr: redis:6379
+    redis:
+      addr: redis:6379
 ```
 
 ```go
-sess, err := c.Session()
+store, err := c.Session()
 if err != nil {
     return err
 }
@@ -28,42 +29,87 @@ if err != nil {
 
 `New(nil)` containers and `config.Default()` resolve the memory adapter, so session tests run hermetically with no server.
 
+## The `Store` interface
+
+```go
+type Store interface {
+    Create(ctx context.Context, ttl time.Duration) (Session, error)
+    Get(ctx context.Context, id string) (Session, error)
+    Save(ctx context.Context, sess Session) error
+    Delete(ctx context.Context, id string) error
+    Close() error
+}
+```
+
+`Create` mints a fresh ID and expiry; a `ttl <= 0` means no expiry. `Get`
+returns `ErrNotFound` on a miss or an expired session — the two are
+indistinguishable by design. `Session.Data` is a plain `map[string]any` set
+directly, not behind an accessor method.
+
 ## Reading and writing
 
 ```go
-func login(w http.ResponseWriter, r *http.Request) {
-    s, err := sess.Get(r)
+func login(ctx context.Context, store session.Store, w http.ResponseWriter) error {
+    sess, err := store.Create(ctx, session.DefaultTTL)
     if err != nil {
-        writeError(w, http.StatusUnauthorized, "no session")
-        return
+        return err
     }
-    s.Set("user_id", "u_123")
-    if err := sess.Save(w, r, s); err != nil {
-        writeError(w, http.StatusInternalServerError, "cannot persist session")
-        return
+
+    sess.Data["user_id"] = "u_123"
+    if err := store.Save(ctx, sess); err != nil {
+        return err
     }
+
+    cookie.Set(w, sess.ID, cookie.Options{})
+    return nil
+}
+
+func loadSession(ctx context.Context, store session.Store, r *http.Request) (session.Session, error) {
+    c, err := r.Cookie(cookie.DefaultName)
+    if err != nil {
+        return session.Session{}, err
+    }
+    return store.Get(ctx, c.Value)
 }
 ```
 
 | Operation | Purpose |
 |---|---|
-| `Get(r)` | load session by cookie ID; error means missing/expired |
-| `Set(key, value)` | stage values (user ID, CSRF token, flash) |
-| `Save(w, r, s)` | persist and set the cookie |
-| `Destroy(w, r)` | delete server row + clear cookie (logout) |
+| `Create(ctx, ttl)` | mint a fresh session; `ttl <= 0` never expires |
+| `Get(ctx, id)` | load session by ID; `ErrNotFound` on missing/expired |
+| `sess.Data[key] = value` | stage values (user ID, CSRF token, flash) directly on the struct |
+| `Save(ctx, sess)` | upsert the row and touch `UpdatedAt` |
+| `Delete(ctx, id)` | remove the row; idempotent on missing IDs (logout) |
 
 Keep session payloads small (IDs and flags, not full records) — every request loads the row.
 
-## Cookie security
+## Cookies
 
-| Attribute | Setting |
+`session.Store` has no knowledge of HTTP — cookie construction is a separate
+helper, `session/cookie`, that builds a plain `*http.Cookie` from a session
+ID:
+
+```go
+import "github.com/zenta-dev/zever/session/cookie"
+
+c := cookie.New(sess.ID, cookie.Options{})
+http.SetCookie(w, c)
+// or, equivalently:
+cookie.Set(w, sess.ID, cookie.Options{})
+```
+
+| Attribute | Default |
 |---|---|
-| `HttpOnly` | always — JS never reads the ID |
-| `Secure` | always in production (HTTPS only) |
-| `SameSite` | `Lax` by default; `Strict` for high-risk apps |
-| Expiry | short idle timeout; rolling on `Save` |
+| `HttpOnly` | `true` (JS never reads the ID) |
+| `Secure` | `true` (HTTPS only) |
+| `SameSite` | `Lax`; set `Options.SameSite` to `http.SameSiteStrictMode` for high-risk apps |
+| `MaxAge` | `0` — a session cookie with no `Max-Age`/`Expires` |
 
-Rotate the session ID at privilege changes (login, password reset) to block fixation: `Destroy` the old row and `Save` a fresh one.
+`Secure` and `HTTPOnly` are `*bool` so an explicit `false` (e.g. local HTTP
+dev) can be distinguished from "unset, use the secure default."
+
+Rotate the session ID at privilege changes (login, password reset) to block
+fixation: `Delete` the old row and `Create` a fresh one.
 
 ## Auth vs. session
 

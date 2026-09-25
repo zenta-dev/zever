@@ -7,17 +7,7 @@ description: Editor support, CLI inspection commands, and grammar generation for
 
 ## CLI inspection commands
 
-Every dashboard row maps to an exact CLI invocation, and every screen shows that CLI line so TUI learning transfers to scripts:
-
-| Command | Purpose |
-|---|---|
-| `zever compile` | compile schemas (defaults: all backends, `./generated`) |
-| `zever check` | surface resolver diagnostics |
-| `zever breaking` | diff old-vs-new schemas for breaking changes |
-| `zever fmt` | format files (list-only by default) |
-| `zever doctor` | environment and config sanity |
-| `zever routes` / `explain` / `graph` | inspect resolved routes and schema graph |
-| `zever check-boundaries` | enforce runtime-must-not-import-DSL rule |
+Every dashboard row maps to an exact CLI invocation, and every screen shows that CLI line so TUI learning transfers to scripts. See [CLI Reference](../reference/cli/) for the full screen map; the ones you'll reach for most while iterating on a schema:
 
 ```sh
 zever fmt --write schema/
@@ -25,21 +15,41 @@ zever check schema/
 zever compile --out ./generated
 ```
 
+`zever check-boundaries` reports cross-schema-module violations (a relation, RPC return type, or permission resource reaching from one `.zen` module into another) — see [Compiler Boundary](../architecture/compiler-boundary/), which also covers the separate, Go-toolchain-enforced rule that runtime packages never import the DSL compiler itself.
+
 ## LSP server
 
-`tools/zever-lsp` is an independently versioned Go module speaking stdio LSP. It requires the published `zever` release (no local `replace`), tagged as `tools/zever-lsp/vX.Y.Z`:
+`tools/zever-lsp` is an independently versioned Go module speaking stdio LSP 3.18, built on the `go.lsp.dev` stack. It requires the published `zever` release (no local `replace`), tagged as `tools/zever-lsp/vX.Y.Z`:
 
 ```sh
 go install github.com/zenta-dev/zever/tools/zever-lsp@v0.2.0
 ```
 
-Configure your editor to launch it for `.zen` files. You get diagnostics with positions, keyword completion, and hover over scalar types — the same tables the compiler uses, so editor and build never disagree.
+Make sure the resulting binary directory (`$(go env GOPATH)/bin` by default) is on your `PATH`, then point your editor at the `zever-lsp` binary. It compiles your `.zen` workspace in-process, so diagnostics and hover use the exact same resolver the compiler does — editor and build can never disagree.
+
+### Capabilities
+
+| Area | Methods |
+|---|---|
+| Sync | `didOpen`/`didChange` (full)/`didSave`/`didClose`, `didChangeWatchedFiles` |
+| Diagnostics | `publishDiagnostics` (debounced, per-file; clean files get an empty array) |
+| Symbols | `documentSymbol`, `workspace/symbol` |
+| Navigation | `definition`, `references`, `documentHighlight`, `foldingRange` |
+| Hover / Completion | `hover`; `completion` (triggers `@`, `:`, ` `) + `completionItem/resolve` |
+| Signature help | `signatureHelp` (triggers `(`, `,`) |
+| Formatting | `formatting`, `rangeFormatting` |
+| Actions | `codeAction` (quick fixes for unknown scalar types and unknown relation targets) |
+| Rename | `prepareRename`, `rename` (entities, fields, jobs, services, RPCs) |
+| Semantic tokens | `semanticTokens/full` |
+| Inlay hints | `inlayHint` + resolve (implicit-module and `errors:`-case annotations) |
+
+**Transport is stdio only.** The server reads JSON-RPC from stdin and writes it to stdout — logging goes to stderr by design. A wrapper script or plugin that merges the streams will corrupt the protocol.
 
 ## Editor extensions
 
 | Editor | Path | Provides |
 |---|---|---|
-| Neovim | `editors/nvim` | filetype detection + syntax highlighting |
+| Neovim | `editors/nvim` | filetype detection + syntax highlighting + documented LSP wiring |
 | VS Code | `editors/vscode` | highlighting + LSP client |
 
 Both grammars derive from `token.Keywords` and `resolver.ScalarTypeNames` through `tools/gengrammar`. After touching either table:
@@ -49,6 +59,29 @@ make generate
 ```
 
 `editors/parity_test.go` diffs the generator output against the checked-in grammar files, so forgetting the step fails the build.
+
+### Neovim (built-in LSP, 0.11+)
+
+Filetype detection and syntax highlighting work as soon as your plugin manager loads `editors/nvim` — see the [Neovim README](https://github.com/zenta-dev/zever/tree/main/editors/nvim) for lazy.nvim/packer wiring, since a subdirectory-as-plugin-root isn't a first-class feature in most plugin managers. LSP registration is not automatic (a project/user decision, not something a filetype plugin should do for you):
+
+```lua
+vim.lsp.config('zever-lsp', {
+  cmd = { 'zever-lsp' },
+  filetypes = { 'zen' },
+  root_markers = { '.git' },
+})
+vim.lsp.enable('zever-lsp')
+```
+
+### VS Code
+
+Install the extension (or build it locally — see the [VS Code README](https://github.com/zenta-dev/zever/tree/main/editors/vscode)), then have `zever-lsp` on your `$PATH`. The extension is a client only; it does not bundle or auto-install the server binary.
+
+### Troubleshooting
+
+- **`zever-lsp: command not found`** — the binary isn't on `PATH`. Re-run `go install` and check `$(go env GOPATH)/bin` is on it.
+- **No diagnostics, nothing happens** — confirm the client actually attached (`:LspInfo` in Neovim, Output panel in VS Code). `didChangeWatchedFiles` only rescans from the workspace root given at `initialize`, so opening the right folder matters.
+- **Garbled responses** — something is writing to the server's stdout. Check for wrapper scripts or plugins merging stdout/stderr.
 
 ## Scaffold and runtime tools
 
