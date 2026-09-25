@@ -205,7 +205,8 @@ releases) — everything else moves together:
 
 - `CHANGELOG.md`: cut `## [Unreleased]` to `## [vX.Y.Z] - YYYY-MM-DD`.
 - Root pins: `CITATION.cff`, `cmd/zever/new.go` (`defaultFrameworkVersion`)
-  plus `cmd/zever/new_test.go`, `cmd/zever/README.md`.
+  plus `cmd/zever/new_test.go`, `cmd/zever/main.go` (`cliVersion`),
+  `cmd/zever/README.md`.
 - LSP: `tools/zever-lsp/server.go` (`serverVersion`), `tools/zever-lsp/go.mod`
   (require published root) + `go.sum` via `go mod tidy`, `tools/zever-lsp/README.md`.
 - Editors: `editors/vscode/package.json`, `editors/vscode/README.md`,
