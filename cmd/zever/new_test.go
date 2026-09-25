@@ -65,8 +65,9 @@ func TestRunNewScaffoldsAndBuilds(t *testing.T) {
 	repoRoot := repoRootAbs(t)
 	workDir := t.TempDir()
 	withWorkingDir(t, workDir)
+	t.Setenv(zeverFrameworkPathEnv, repoRoot)
 
-	if err := runNew([]string{"acme", "--framework-path", repoRoot}); err != nil {
+	if err := runNew([]string{"acme"}); err != nil {
 		t.Fatalf("runNew: %v", err)
 	}
 
@@ -117,6 +118,7 @@ func TestRunNewRefusesNonEmptyDirWithoutForce(t *testing.T) {
 	repoRoot := repoRootAbs(t)
 	workDir := t.TempDir()
 	withWorkingDir(t, workDir)
+	t.Setenv(zeverFrameworkPathEnv, repoRoot)
 
 	if err := os.MkdirAll("beta", 0o750); err != nil {
 		t.Fatalf("mkdir: %v", err)
@@ -126,7 +128,7 @@ func TestRunNewRefusesNonEmptyDirWithoutForce(t *testing.T) {
 		t.Fatalf("write: %v", err)
 	}
 
-	err := runNew([]string{"beta", "--framework-path", repoRoot})
+	err := runNew([]string{"beta"})
 	if err == nil {
 		t.Fatalf("expected an error scaffolding into a non-empty directory")
 	}
@@ -135,7 +137,7 @@ func TestRunNewRefusesNonEmptyDirWithoutForce(t *testing.T) {
 		t.Fatalf("error %q does not mention the directory being non-empty", err)
 	}
 
-	if err := runNew([]string{"beta", "--framework-path", repoRoot, "--force"}); err != nil {
+	if err := runNew([]string{"beta", "--force"}); err != nil {
 		t.Fatalf("runNew --force: %v", err)
 	}
 
@@ -148,11 +150,12 @@ func TestRunNewRefusesNonEmptyDirWithoutForce(t *testing.T) {
 	}
 }
 
-// TestRunNewAutoDetectsFrameworkCheckout proves --framework-path can be
-// omitted when the command runs from inside a clone of zever itself: it
-// walks up from the working directory looking for a go.mod declaring
-// "module github.com/zenta-dev/zever", exactly what this repository's own
-// go.mod declares.
+// TestRunNewAutoDetectsFrameworkCheckout proves the scaffold correctly
+// detects it is running from inside a clone of zever itself: it walks up
+// from the working directory looking for a go.mod declaring "module
+// github.com/zenta-dev/zever", exactly what this repository's own go.mod
+// declares. There is no flag for this -- it only ever applies to framework
+// development.
 func TestRunNewAutoDetectsFrameworkCheckout(t *testing.T) {
 	if testing.Short() {
 		t.Skip("scaffolding under the module root is slow to clean up in short mode")
@@ -180,10 +183,9 @@ func TestRunNewAutoDetectsFrameworkCheckout(t *testing.T) {
 }
 
 // TestRunNewNoFrameworkCheckoutFound covers the zero-flag onboarding path:
-// outside any zever clone, with neither --framework-path nor
-// --framework-version given, `zever new <name>` must still succeed by
-// defaulting the local replace directive to the working directory, rather
-// than blocking scaffolding on a checkout it can't find.
+// outside any zever clone, with no --framework-version given, `zever new
+// <name>` must still succeed by defaulting to the published module version,
+// rather than blocking scaffolding on a checkout it can't find.
 func TestRunNewNoFrameworkCheckoutFound(t *testing.T) {
 	workDir := t.TempDir()
 	withWorkingDir(t, workDir)
@@ -198,19 +200,6 @@ func TestRunNewNoFrameworkCheckoutFound(t *testing.T) {
 	}
 	if !strings.Contains(gomod, "require github.com/zenta-dev/zever v0.2.0") {
 		t.Fatalf("want upstream require:\n%s", gomod)
-	}
-}
-
-// TestRunNewMutuallyExclusiveFrameworkFlags: --framework-path picks a local
-// replace directive, --framework-version picks a real dependency version;
-// giving both is a contradiction the command should reject up front.
-func TestRunNewMutuallyExclusiveFrameworkFlags(t *testing.T) {
-	workDir := t.TempDir()
-	withWorkingDir(t, workDir)
-
-	err := runNew([]string{"eps", "--framework-path", ".", "--framework-version", "v1.0.0"})
-	if err == nil || !strings.Contains(err.Error(), "mutually exclusive") {
-		t.Fatalf("expected a mutually-exclusive-flags error, got %v", err)
 	}
 }
 
@@ -269,12 +258,12 @@ func TestRunNewModuleAndDirOverrides(t *testing.T) {
 	repoRoot := repoRootAbs(t)
 	workDir := t.TempDir()
 	withWorkingDir(t, workDir)
+	t.Setenv(zeverFrameworkPathEnv, repoRoot)
 
 	err := runNew([]string{
 		"eta",
 		"--module", "example.com/eta",
 		"--dir", "custom-out",
-		"--framework-path", repoRoot,
 	})
 	if err != nil {
 		t.Fatalf("runNew: %v", err)
@@ -329,8 +318,9 @@ func TestRunNewScaffoldsMinimalZeverYaml(t *testing.T) {
 	repoRoot := repoRootAbs(t)
 	workDir := t.TempDir()
 	withWorkingDir(t, workDir)
+	t.Setenv(zeverFrameworkPathEnv, repoRoot)
 
-	if err := runNew([]string{"zeta", "--framework-path", repoRoot}); err != nil {
+	if err := runNew([]string{"zeta"}); err != nil {
 		t.Fatalf("runNew: %v", err)
 	}
 
@@ -372,6 +362,34 @@ func TestRunNewScaffoldsMinimalZeverYaml(t *testing.T) {
 	}
 }
 
+// TestRunNewWritesConfigSchema proves `zever new` scaffolds a
+// zever.schema.json alongside zever.yaml (byte-identical to config.SchemaJSON,
+// the framework's own embedded schema) and points zever.yaml at it via a
+// yaml-language-server modeline comment, so editors get autocomplete/
+// validation for the generated project's config out of the box.
+func TestRunNewWritesConfigSchema(t *testing.T) {
+	repoRoot := repoRootAbs(t)
+	workDir := t.TempDir()
+	withWorkingDir(t, workDir)
+	t.Setenv(zeverFrameworkPathEnv, repoRoot)
+
+	if err := runNew([]string{"zeta"}); err != nil {
+		t.Fatalf("runNew: %v", err)
+	}
+
+	out := filepath.Join(workDir, "zeta")
+
+	schemaContent := readFile(t, filepath.Join(out, "zever.schema.json"))
+	if schemaContent != string(config.SchemaJSON) {
+		t.Fatalf("zever.schema.json content does not match config.SchemaJSON")
+	}
+
+	yamlContent := readFile(t, filepath.Join(out, "zever.yaml"))
+	if !strings.HasPrefix(yamlContent, zeverYamlSchemaModeline) {
+		t.Fatalf("zever.yaml does not start with the yaml-language-server modeline:\n%s", yamlContent)
+	}
+}
+
 // TestRunNewAppGoImportsMatchZeverYamlBatteries proves app.go's blank
 // imports are exactly the services zever.yaml lists -- the two files can
 // never drift, because both are rendered from the same NewConfig.Batteries.
@@ -379,8 +397,9 @@ func TestRunNewAppGoImportsMatchZeverYamlBatteries(t *testing.T) {
 	repoRoot := repoRootAbs(t)
 	workDir := t.TempDir()
 	withWorkingDir(t, workDir)
+	t.Setenv(zeverFrameworkPathEnv, repoRoot)
 
-	if err := runNew([]string{"theta", "--framework-path", repoRoot}); err != nil {
+	if err := runNew([]string{"theta"}); err != nil {
 		t.Fatalf("runNew: %v", err)
 	}
 
