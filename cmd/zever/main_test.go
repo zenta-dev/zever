@@ -157,6 +157,31 @@ func TestRun_helpVariants_returnNil(t *testing.T) {
 	}
 }
 
+func TestRun_versionFlag_printsVersionToStdout(t *testing.T) {
+	resetInteractiveMode(t)
+	for _, args := range [][]string{{"--version"}, {"-V"}} {
+		resetInteractiveMode(t)
+		out := captureStdout(t, func() {
+			if err := run(args); err != nil {
+				t.Fatalf("run(%v) = %v, want nil", args, err)
+			}
+		})
+		if !strings.Contains(out, "zever v"+cliVersion) {
+			t.Fatalf("run(%v) stdout = %q, want %q", args, out, "zever v"+cliVersion)
+		}
+	}
+
+	resetInteractiveMode(t)
+	errOut := captureStderr(t, func() {
+		if err := run([]string{"--version"}); err != nil {
+			t.Fatalf("run([--version]) = %v, want nil", err)
+		}
+	})
+	if errOut != "" {
+		t.Fatalf("run([--version]) stderr = %q, want empty (version goes to stdout)", errOut)
+	}
+}
+
 func TestRun_unknownSubcommand_error(t *testing.T) {
 	resetInteractiveMode(t)
 	for _, tc := range []struct {

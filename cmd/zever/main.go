@@ -50,6 +50,11 @@ var isStdinTerminal = func() bool {
 // with the handler agents.
 var interactiveMode bool
 
+// cliVersion is the CLI release version printed by -V/--version.
+// It tracks the framework release version; bump with every release
+// (see .github/CONTRIBUTING.md release checklist).
+const cliVersion = "0.3.0"
+
 // envInteractive returns true if ZEVER_INTERACTIVE=1/true/yes (case-insensitive).
 func envInteractive() bool {
 	v := strings.ToLower(strings.TrimSpace(os.Getenv("ZEVER_INTERACTIVE")))
@@ -153,6 +158,11 @@ func run(args []string) error {
 	}
 
 	sub, rest := args[0], args[1:]
+
+	if sub == "-V" || sub == "--version" {
+		_, _ = fmt.Fprintln(os.Stdout, "zever v"+cliVersion)
+		return nil
+	}
 
 	if h, ok := subcommandHandlers[sub]; ok {
 		return h(rest)
@@ -398,6 +408,7 @@ func printUsage() {
 		"",
 		dim("Run '")+cmd("zever <command> -h")+dim("' for subcommand flags  •  ")+hint("tip: ")+dim(generalTips[2]),
 		dim("Add ")+cmd("-i / --interactive")+dim(" for guided prompts  •  ")+dim("set ")+cmd("ZEVER_NO_HINT=1")+dim(" to silence hints"),
+		dim("Run ")+cmd("zever --version")+dim(" (-V) to print the CLI version"),
 	)
 	// Optionally wrap in a subtle box when color enabled and wide terminal.
 	if colorEnabled {

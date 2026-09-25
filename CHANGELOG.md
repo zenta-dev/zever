@@ -7,6 +7,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Added
+
+- `zever --version` (`-V`) prints the CLI release version (`zever vX.Y.Z`) to stdout.
+
 ## [v0.3.0] - 2026-09-25
 
 ### Added
