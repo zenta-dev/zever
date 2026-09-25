@@ -102,6 +102,8 @@ type GenerateWorkerResult struct {
 // GenerateWorker compiles the schema directory, renders the worker
 // entrypoint (and job stubs), and writes them to disk. It performs no flag
 // parsing and no prompting.
+//
+//nolint:unparam // result kept for callers/tests; user output goes to cfg Stdout/Stderr writers.
 func GenerateWorker(cfg GenerateWorkerConfig) (GenerateWorkerResult, error) {
 	const tag = "zever generate worker"
 

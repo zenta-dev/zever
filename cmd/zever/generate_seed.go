@@ -53,6 +53,8 @@ type GenerateSeedResult struct {
 // GenerateSeed renders the seed entrypoint (and seed stub) from resolved
 // inputs and writes them to disk. It performs no flag parsing and no
 // prompting.
+//
+//nolint:unparam // result kept for callers/tests; user output goes to cfg Stdout/Stderr writers.
 func GenerateSeed(cfg GenerateSeedConfig) (GenerateSeedResult, error) {
 	const tag = "zever generate seed"
 

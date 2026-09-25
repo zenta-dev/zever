@@ -1,12 +1,12 @@
-// Command zever is the zever CLI dispatch shell: a thin, TUI-first entry
-// point that routes subcommands to their handlers and yields to the
-// interactive dashboard when invoked bare on a TTY.
+// Command zever is the zever CLI dispatch shell: a thin entry point
+// routing subcommands to their handlers; bare invocation prints usage to
+// stderr and exits 1.
 //
 // This file owns the run(args) → error seam (thin main → run, os.Exit on
-// error, stderr only), the errInteractive sentinel the TUI agent wires the
-// dashboard to, the subcommand dispatch table, and the top-level usage text.
-// Handler implementations (runNew, runCompile, …) land via parallel agents;
-// each table entry names its handler exactly so the wiring is a pure rename.
+// error, stderr only), the errMissingSubcommand sentinel, the subcommand
+// dispatch table, and the top-level usage text. Handler implementations
+// (runNew, runCompile, …) land via parallel agents; each table entry names
+// its handler exactly so the wiring is a pure rename.
 package main
 
 import (
@@ -17,25 +17,16 @@ import (
 	"strings"
 )
 
-// errInteractive is returned by run when zever is invoked with no subcommand
-// on an interactive terminal. main maps it to launching the dashboard (the
-// TUI agent owns that branch); any other caller can use errors.Is to detect
-// the "drop to interactive mode" case.
-var errInteractive = errors.New("zever: interactive session requested")
-
 // errMissingSubcommand is returned by run when zever is invoked with no
-// subcommand and stdin is not a terminal, after usage is printed.
+// subcommand, after usage is printed.
 var errMissingSubcommand = errors.New("zever: missing subcommand")
 
 // isStdinTerminal reports whether stdin is an interactive terminal.
 //
 // It is a seam var (not a direct term.IsTerminal call) so tests can override
 // it and so this file stays stdlib-only: golang.org/x/term is not a direct
-// dependency. The default is a conservative os.ModeCharDevice check — it can
-// false-positive on /dev/null (a char device that is not a TTY), which is the
-// safe direction here (worst case: errInteractive on a headless box, which
-// main surfaces explicitly). Swap the body for term.IsTerminal once x/term is
-// a direct dependency.
+// dependency. The default is a conservative os.ModeCharDevice check.
+// prompt.go reuses this seam for its --interactive TTY probe.
 var isStdinTerminal = func() bool {
 	fi, err := os.Stdin.Stat()
 	if err != nil {
@@ -115,24 +106,6 @@ var subcommandHandlers = map[string]func([]string) error{
 
 func main() {
 	if err := run(os.Args[1:]); err != nil {
-		if errors.Is(err, errInteractive) {
-			// TUI-first: bare `zever` on a TTY drops into the
-			// dashboard (see dashboard.go: single shell program,
-			// model swap on select, esc-back pops). Exit status
-			// reflects the session: 0 on clean quit.
-			if derr := runDashboard(); derr != nil {
-				if colorEnabled {
-					_, _ = fmt.Fprintln(os.Stderr, red(derr.Error()))
-				} else {
-					_, _ = fmt.Fprintln(os.Stderr, derr)
-				}
-
-				os.Exit(1)
-			}
-
-			os.Exit(0)
-		}
-
 		if colorEnabled {
 			_, _ = fmt.Fprintln(os.Stderr, red(err.Error()))
 		} else {
@@ -148,10 +121,6 @@ func run(args []string) error {
 	args = peelInteractive(args)
 
 	if len(args) == 0 {
-		if isStdinTerminal() {
-			return errInteractive
-		}
-
 		printUsage()
 
 		return errMissingSubcommand

@@ -41,17 +41,6 @@ var tinkerPrelude = []string{
 	`job := zevertinker.Job`,
 }
 
-// tinkerBanner is printed once the shim answers its readiness ping.
-const tinkerBanner = `zever tinker — live container REPL (yaegi),yaegi
-
-  db.Query("select 1")            db.Exec("insert into ...", args...)
-  cache.Set("k", "v", 60)         cache.Get("k") / cache.Delete("k") / cache.Exists("k")
-  queue.Push("topic", "payload")  queue.Length("topic")
-  job.Dispatch("name", args)
-
-Go expressions are evaluated by yaegi with the standard library available.
-Type :help for this banner, :exit (or Ctrl-D) to quit.`
-
 // tinkerDevWarning is printed to stderr on every start. The REPL evaluates
 // arbitrary Go with live container credentials: it is a development-only
 // tool and must never run against production data.

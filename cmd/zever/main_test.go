@@ -21,70 +21,47 @@ func resetInteractiveMode(t *testing.T) {
 	interactiveMode = false
 }
 
-// stubStdinTerminal overrides the TTY seam for the duration of a test.
-func stubStdinTerminal(t *testing.T, v bool) {
-	t.Helper()
-	old := isStdinTerminal
-	t.Cleanup(func() { isStdinTerminal = old })
-	isStdinTerminal = func() bool { return v }
-}
-
-func TestRun_bareTTY_returnsErrInteractive(t *testing.T) {
+func TestRun_bareNil_returnsMissingSubcommand(t *testing.T) {
 	resetInteractiveMode(t)
-	stubStdinTerminal(t, true)
-
-	err := run(nil)
-	if !errors.Is(err, errInteractive) {
-		t.Fatalf("run(nil) on TTY = %v, want errInteractive", err)
-	}
-}
-
-func TestRun_bareEmptySlice_TTY_returnsErrInteractive(t *testing.T) {
-	resetInteractiveMode(t)
-	stubStdinTerminal(t, true)
-
-	if err := run([]string{}); !errors.Is(err, errInteractive) {
-		t.Fatalf("run([]) on TTY = %v, want errInteractive", err)
-	}
-}
-
-func TestRun_bareNonTTY_returnsMissingSubcommand(t *testing.T) {
-	resetInteractiveMode(t)
-	stubStdinTerminal(t, false)
 
 	err := run(nil)
 	if !errors.Is(err, errMissingSubcommand) {
-		t.Fatalf("run(nil) non-TTY = %v, want errMissingSubcommand", err)
+		t.Fatalf("run(nil) = %v, want errMissingSubcommand", err)
 	}
 }
 
-func TestRun_bareNonTTY_interactiveFlagStillMissingSubcommand(t *testing.T) {
+func TestRun_bareEmptySlice_returnsMissingSubcommand(t *testing.T) {
 	resetInteractiveMode(t)
-	stubStdinTerminal(t, false)
 
-	// -i is peeled, leaving bare args: still missing-subcommand off-TTY.
+	if err := run([]string{}); !errors.Is(err, errMissingSubcommand) {
+		t.Fatalf("run([]) = %v, want errMissingSubcommand", err)
+	}
+}
+
+func TestRun_bareInteractiveFlag_returnsMissingSubcommand(t *testing.T) {
+	resetInteractiveMode(t)
+
+	// -i is peeled, leaving bare args: still missing-subcommand.
 	err := run([]string{"-i"})
 	if !errors.Is(err, errMissingSubcommand) {
-		t.Fatalf("run([-i]) non-TTY = %v, want errMissingSubcommand", err)
+		t.Fatalf("run([-i]) = %v, want errMissingSubcommand", err)
 	}
 	if !interactiveMode {
 		t.Fatalf("interactiveMode = false, want true after peeling -i")
 	}
 }
 
-func TestRun_bareTTY_interactiveFlagReturnsErrInteractive(t *testing.T) {
+func TestRun_bareLongInteractiveFlag_returnsMissingSubcommand(t *testing.T) {
 	resetInteractiveMode(t)
-	stubStdinTerminal(t, true)
 
 	err := run([]string{"--interactive"})
-	if !errors.Is(err, errInteractive) {
-		t.Fatalf("run([--interactive]) on TTY = %v, want errInteractive", err)
+	if !errors.Is(err, errMissingSubcommand) {
+		t.Fatalf("run([--interactive]) = %v, want errMissingSubcommand", err)
 	}
 }
 
 func TestErrSentinels_zeverPrefixed(t *testing.T) {
 	for name, err := range map[string]error{
-		"errInteractive":       errInteractive,
 		"errMissingSubcommand": errMissingSubcommand,
 	} {
 		if !strings.HasPrefix(err.Error(), "zever:") {
@@ -202,7 +179,7 @@ func TestRun_unknownSubcommand_error(t *testing.T) {
 			if !strings.HasPrefix(err.Error(), "zever: unknown subcommand") {
 				t.Fatalf("run(%v) = %q, want zever: unknown subcommand prefix", tc.args, err)
 			}
-			if errors.Is(err, errInteractive) || errors.Is(err, errMissingSubcommand) {
+			if errors.Is(err, errMissingSubcommand) {
 				t.Fatalf("run(%v) = %v, must not match sentinels", tc.args, err)
 			}
 		})
@@ -296,7 +273,6 @@ var errDispatchProbe = errors.New("zever: dispatch probe")
 
 func TestRun_dispatchesToHandler(t *testing.T) {
 	resetInteractiveMode(t)
-	stubStdinTerminal(t, false)
 
 	const name = "test-dispatch-probe"
 
@@ -389,10 +365,6 @@ func runCoverChild(ctx context.Context, t *testing.T, bin string, coverDir strin
 }
 
 func TestMain_subprocessCover(t *testing.T) {
-	if _, err := exec.LookPath("python3"); err != nil {
-		t.Fatalf("need python3 (stdlib pty driver) for the pty-backed dashboard run: %v", err)
-	}
-
 	ctx, cancel := context.WithTimeout(t.Context(), 90*time.Second)
 	defer cancel()
 
@@ -408,12 +380,6 @@ func TestMain_subprocessCover(t *testing.T) {
 	if out, err := build.CombinedOutput(); err != nil {
 		t.Fatalf("go build -cover: %v\n%s", err, out)
 	}
-
-	devnull, err := os.Open("/dev/null")
-	if err != nil {
-		t.Fatalf("open /dev/null: %v", err)
-	}
-	defer func() { _ = devnull.Close() }()
 
 	devnullErr, err := os.Open("/dev/null")
 	if err != nil {
@@ -432,8 +398,8 @@ func TestMain_subprocessCover(t *testing.T) {
 		t.Fatalf("--help stderr lacks Usage:\n%s", helpErr.String())
 	}
 
-	// 2. Bare with piped stdin (not a char device): missing-subcommand,
-	// error printed without color (stderr is a pipe), exit 1.
+	// 2. Bare with piped stdin: missing-subcommand, error printed without
+	// color (stderr is a pipe), exit 1.
 	pr, pw, err := os.Pipe()
 	if err != nil {
 		t.Fatalf("os.Pipe: %v", err)
@@ -451,152 +417,10 @@ func TestMain_subprocessCover(t *testing.T) {
 		t.Fatalf("bare-pipe stderr lacks missing subcommand:\n%s", bareErr.String())
 	}
 
-	// 3. Bare with /dev/null stdin (/dev/null is a char device, so the
-	// conservative isStdinTerminal reports a TTY): errInteractive, then the
-	// dashboard program fails headless — wrapped zever: dashboard error,
-	// printed without color, exit 1.
-	var dashErr bytes.Buffer
-
-	if code := runCoverChild(ctx, t, bin, coverDir, nil, devnull, &dashErr, nil); code != 1 {
-		t.Fatalf("bare-devnull exit = %d, want 1\nstderr:\n%s", code, dashErr.String())
-	}
-
-	if !strings.Contains(dashErr.String(), "dashboard") {
-		t.Fatalf("bare-devnull stderr lacks dashboard:\n%s", dashErr.String())
-	}
-
-	// 4. Same dashboard failure but with a char-device stderr and TERM set:
-	// the error prints through the color branch (output discarded).
-	if code := runCoverChild(ctx, t, bin, coverDir, nil, devnull, devnullErr,
-		[]string{"TERM=xterm-256color", "NO_COLOR="}); code != 1 {
-		t.Fatalf("bare-devnull-color exit = %d, want 1", code)
-	}
-
-	// 5. Unknown subcommand with char-device stderr: generic error through
+	// 3. Unknown subcommand with char-device stderr: generic error through
 	// the color branch, exit 1.
 	if code := runCoverChild(ctx, t, bin, coverDir, []string{"frobnicate"}, pr, devnullErr,
 		[]string{"TERM=xterm-256color", "NO_COLOR="}); code != 1 {
 		t.Fatalf("unknown-color exit = %d, want 1", code)
 	}
-
-	// 6. Bare on a real pty (raw mode, stdlib pty driver below): genuine
-	// TTY, dashboard starts, ctrl+c quits cleanly — dashboard success,
-	// exit 0. Raw mode matters: a cooked pty would line-buffer the byte
-	// (never delivered) or turn it into SIGINT (no clean exit, no
-	// coverdata flush). Draining the master matters too: the dashboard
-	// repaints continuously and would block on a full output buffer,
-	// starving its input loop.
-	driver := filepath.Join(tmp, "pty_quit.py")
-	if writeErr := os.WriteFile(driver, []byte(ptyQuitDriver), 0o600); writeErr != nil {
-		t.Fatalf("write pty driver: %v", writeErr)
-	}
-	// Owner-execute so the pty child can run it (WriteFile above stays 0600).
-	if chmodErr := os.Chmod(driver, 0o700); chmodErr != nil {
-		t.Fatalf("chmod pty driver: %v", chmodErr)
-	}
-
-	ptyCmd := exec.CommandContext(ctx, "python3", driver, bin, coverDir)
-
-	var ptyOut bytes.Buffer
-	ptyCmd.Stdout = &ptyOut
-	ptyCmd.Stderr = &ptyOut
-
-	if runErr := ptyCmd.Run(); runErr != nil {
-		t.Fatalf("pty dashboard run: %v\noutput:\n%s", runErr, ptyOut.String())
-	}
-
-	if !strings.Contains(ptyOut.String(), "child-exit=0") {
-		t.Fatalf("pty dashboard lacks child-exit=0:\n%s", ptyOut.String())
-	}
-
-	// Prove main() itself ran under coverage: convert the children's
-	// coverdata and require func main to be fully covered (mirrors
-	// tools/zever-lsp/main_test.go).
-	entries, err := os.ReadDir(coverDir)
-	if err != nil {
-		t.Fatalf("read coverdata: %v", err)
-	}
-
-	if len(entries) == 0 {
-		t.Fatalf("GOCOVERDIR %s is empty, want coverage output from main()", coverDir)
-	}
-
-	funcCov := exec.CommandContext(ctx, "go", "tool", "covdata", "func", "-i="+coverDir) //nolint:gosec // test-only: coverDir is a t.TempDir() path, never user input
-	out, covErr := funcCov.CombinedOutput()
-
-	if covErr != nil {
-		t.Fatalf("go tool covdata func: %v\n%s", covErr, out)
-	}
-
-	t.Logf("subprocess coverdata:\n%s", covdataMainLines(t, out))
-
-	mainCovered := false
-
-	for _, line := range strings.Split(string(out), "\n") {
-		fields := strings.Fields(line)
-		if len(fields) != 3 {
-			continue
-		}
-
-		if strings.Contains(fields[0], "main.go:") && fields[1] == "main" && fields[2] == "100.0%" {
-			mainCovered = true
-		}
-	}
-
-	if !mainCovered {
-		t.Errorf("subprocess coverdata lacks 100%% func main coverage:\n%s", out)
-	}
-}
-
-// ptyQuitDriver is a stdlib-only python3 program: it allocates a raw-mode
-// pty (slave is the child's stdin/stdout/stderr), drains the master while
-// the dashboard runs, sends one literal ctrl+c byte, and exits 0 only when
-// the child exits 0. argv: <binary> <coverdir>.
-const ptyQuitDriver = `import fcntl, os, pty, select, struct, subprocess, sys, termios, time, tty
-bincov, coverdir = sys.argv[1], sys.argv[2]
-m, s = pty.openpty()
-tty.setraw(s)
-fcntl.ioctl(s, termios.TIOCSWINSZ, struct.pack("HHHH", 24, 80, 0, 0))
-env = dict(os.environ, GOCOVERDIR=coverdir, TERM="xterm-256color", NO_COLOR="")
-p = subprocess.Popen([bincov], stdin=s, stdout=s, stderr=s, env=env, close_fds=True)
-os.close(s)
-os.set_blocking(m, False)
-t0 = time.time()
-sent = False
-while True:
-    if p.poll() is not None:
-        break
-    if time.time() - t0 > 25:
-        print("TIMEOUT waiting for dashboard exit")
-        p.kill()
-        sys.exit(99)
-    r, _, _ = select.select([m], [], [], 0.3)
-    if r:
-        try:
-            if not os.read(m, 65536):
-                break
-        except OSError:
-            break
-    if not sent and time.time() - t0 > 2.0:
-        os.write(m, b"\x03")
-        sent = True
-rc = p.wait(timeout=10)
-print(f"child-exit={rc}")
-sys.exit(0 if rc == 0 else 42)
-`
-
-// covdataMainLines extracts the main.go func lines for the test log.
-func covdataMainLines(t *testing.T, out []byte) string {
-	t.Helper()
-
-	var b strings.Builder
-
-	for _, line := range strings.Split(string(out), "\n") {
-		if strings.Contains(line, "main.go:") {
-			b.WriteString(line)
-			b.WriteString("\n")
-		}
-	}
-
-	return b.String()
 }

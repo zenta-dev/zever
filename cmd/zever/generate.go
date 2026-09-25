@@ -327,6 +327,8 @@ type GenerateModuleConfig struct {
 // GenerateModule scaffolds schema/<name>/<name>.zen and returns the stub
 // path. It performs no flag parsing and reads no global state beyond the
 // working directory, so tests can drive it inside a temp dir.
+//
+//nolint:unparam // path result kept for callers/tests; user output goes to cfg Stdout/Stderr writers.
 func GenerateModule(cfg GenerateModuleConfig) (string, error) {
 	const tag = "zever generate module"
 
