@@ -166,7 +166,34 @@ func promptMultiSelect(title string, options []string) ([]string, error) {
 	return vals, nil
 }
 
-// discoverZenFiles finds .zen files under the project's schema dir (or default).
+// walkZenFiles recursively walks root and returns every .zen file path found,
+// in WalkDir's (lexicographic, depth-first) order. This is the single shared
+// implementation behind both discoverZenFiles (best-effort: swallows the
+// error) and collectZenFiles (propagates it): flat (schema/*.zen), versioned
+// (schema/v1/*.zen), or arbitrarily nested layouts all resolve the same way,
+// since discovery walks directories rather than matching a glob pattern.
+func walkZenFiles(root string) ([]string, error) {
+	var files []string
+
+	err := filepath.WalkDir(root, func(path string, d os.DirEntry, walkErr error) error {
+		if walkErr != nil {
+			return walkErr
+		}
+
+		if !d.IsDir() && strings.EqualFold(filepath.Ext(path), ".zen") {
+			files = append(files, path)
+		}
+
+		return nil
+	})
+
+	return files, err
+}
+
+// discoverZenFiles finds .zen files under the project's schema dir (or
+// default). Best-effort: a missing or unreadable schema dir yields no files
+// rather than an error, since callers already treat "no files found" as the
+// signal to fall back or report errNoInputFiles.
 func discoverZenFiles() []string {
 	pc, err := loadProjectConfig()
 
@@ -175,16 +202,7 @@ func discoverZenFiles() []string {
 		schemaDir = pc.SchemaDir
 	}
 
-	var files []string
-
-	_ = filepath.WalkDir(schemaDir, func(path string, d os.DirEntry, walkErr error) error {
-		// Best-effort discovery: unreadable entries are skipped, not fatal.
-		if walkErr == nil && !d.IsDir() && strings.HasSuffix(path, ".zen") {
-			files = append(files, path)
-		}
-
-		return nil
-	})
+	files, _ := walkZenFiles(schemaDir)
 
 	return files
 }

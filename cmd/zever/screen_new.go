@@ -219,7 +219,7 @@ func (m *NewScreen) buildExec() tui.ExecModel {
 func runNewScreen(cfg NewConfig) (string, error) {
 	const tag = "zever new"
 
-	if err := resolveFramework(tag, &cfg, "", ""); err != nil {
+	if err := resolveFramework(tag, &cfg, ""); err != nil {
 		return "", err
 	}
 	if err := ensureTargetDir(tag, cfg.OutDir, cfg.Force); err != nil {
