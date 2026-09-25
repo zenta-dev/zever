@@ -14,6 +14,7 @@ import (
 
 	"github.com/zenta-dev/zever/idempotency"
 	"github.com/zenta-dev/zever/internal/httpclient"
+	"github.com/zenta-dev/zever/internal/providers"
 	"github.com/zenta-dev/zever/payment"
 )
 
@@ -67,14 +68,7 @@ func New(o payment.Options) (payment.Payment, error) {
 		return nil, ErrMissingAPIKey
 	}
 
-	endpoint := o.Endpoint
-	if endpoint == "" {
-		if o.Sandbox {
-			endpoint = paddle.SandboxBaseURL
-		} else {
-			endpoint = paddle.ProductionBaseURL
-		}
-	}
+	endpoint := providers.PaddleEndpoint(o.Endpoint, o.Sandbox)
 
 	client, err := newSDK(o.APIKey, paddle.WithBaseURL(endpoint), paddle.WithClient(httpclient.NewClient(payment.DefaultHTTPTimeout)))
 	if err != nil {

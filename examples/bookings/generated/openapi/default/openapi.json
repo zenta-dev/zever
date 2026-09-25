@@ -12,7 +12,7 @@
           "content": {
             "application/json": {
               "schema": {
-                "$ref": "#/components/schemas/CreateBookingRequest"
+                "$ref": "#/components/schemas/BookingServiceCreateBookingRequest"
               }
             }
           }
@@ -81,7 +81,7 @@
           "content": {
             "application/json": {
               "schema": {
-                "$ref": "#/components/schemas/AddReviewRequest"
+                "$ref": "#/components/schemas/BookingServiceAddReviewRequest"
               }
             }
           }
@@ -132,7 +132,7 @@
           "content": {
             "application/json": {
               "schema": {
-                "$ref": "#/components/schemas/CreateSpaceRequest"
+                "$ref": "#/components/schemas/BookingServiceCreateSpaceRequest"
               }
             }
           }
@@ -192,22 +192,6 @@
   },
   "components": {
     "schemas": {
-      "AddReviewRequest": {
-        "type": "object",
-        "properties": {
-          "body": {
-            "type": "string"
-          },
-          "rating": {
-            "type": "integer",
-            "format": "int64"
-          },
-          "space_id": {
-            "type": "string",
-            "format": "uuid"
-          }
-        }
-      },
       "Booking": {
         "type": "object",
         "properties": {
@@ -241,7 +225,23 @@
           "id"
         ]
       },
-      "CreateBookingRequest": {
+      "BookingServiceAddReviewRequest": {
+        "type": "object",
+        "properties": {
+          "body": {
+            "type": "string"
+          },
+          "rating": {
+            "type": "integer",
+            "format": "int64"
+          },
+          "space_id": {
+            "type": "string",
+            "format": "uuid"
+          }
+        }
+      },
+      "BookingServiceCreateBookingRequest": {
         "type": "object",
         "properties": {
           "end_date": {
@@ -256,7 +256,7 @@
           }
         }
       },
-      "CreateSpaceRequest": {
+      "BookingServiceCreateSpaceRequest": {
         "type": "object",
         "properties": {
           "description": {

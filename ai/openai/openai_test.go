@@ -67,9 +67,50 @@ func TestOpen_Success(t *testing.T) {
 	}
 }
 
+// TestNewHTTPClient_HonorsTimeout covers the fix for newHTTPClient always
+// passing 0 (no client-side timeout) to httpclient.NewClient regardless of
+// what ai.Options.Timeout the caller configured -- every sibling ai/*
+// adapter (anthropic, gemini, ollama) already threaded it through.
+func TestNewHTTPClient_HonorsTimeout(t *testing.T) {
+	t.Parallel()
+
+	const want = 7 * time.Second
+
+	c := newHTTPClient(want)
+	if c.Timeout != want {
+		t.Fatalf("newHTTPClient(%v).Timeout = %v, want %v", want, c.Timeout, want)
+	}
+}
+
+// TestNew_ClientHonorsConfiguredTimeout covers the same fix end-to-end
+// through the public constructor.
+func TestNew_ClientHonorsConfiguredTimeout(t *testing.T) {
+	// Mutates global newHTTPClient: must not be parallel.
+	orig := newHTTPClient
+
+	var gotTimeout time.Duration
+
+	newHTTPClient = func(d time.Duration) *http.Client {
+		gotTimeout = d
+
+		return orig(d)
+	}
+	defer func() { newHTTPClient = orig }()
+
+	const want = 9 * time.Second
+
+	if _, err := New(ai.Options{APIKey: "sk-test", Model: "gpt-4", Timeout: want}); err != nil {
+		t.Fatalf("New err = %v", err)
+	}
+
+	if gotTimeout != want {
+		t.Fatalf("New passed Timeout %v to newHTTPClient, want %v", gotTimeout, want)
+	}
+}
+
 func TestNewHTTPClient_CloneTLS12(t *testing.T) {
 	// Checks DefaultTransport cloning: must not be parallel due to global read.
-	c := newHTTPClient()
+	c := newHTTPClient(0)
 	tr, ok := c.Transport.(*http.Transport)
 	if !ok {
 		t.Fatalf("transport %T not *http.Transport", c.Transport)
@@ -90,7 +131,7 @@ func TestNewHTTPClient_Fallback(t *testing.T) {
 	http.DefaultTransport = roundTripFunc(func(_ *http.Request) (*http.Response, error) { return nil, errors.New("fallback") })
 	t.Cleanup(func() { http.DefaultTransport = prev })
 
-	c := newHTTPClient()
+	c := newHTTPClient(0)
 	tr, ok := c.Transport.(*http.Transport)
 	if !ok {
 		t.Fatalf("transport %T not *http.Transport", c.Transport)
@@ -107,7 +148,7 @@ func TestNewHTTPClient_UpgradeLegacyTLS(t *testing.T) {
 	http.DefaultTransport = &http.Transport{TLSClientConfig: &tls.Config{MinVersion: tls.VersionTLS10}} //nolint:gosec
 	t.Cleanup(func() { http.DefaultTransport = prev })
 
-	c := newHTTPClient()
+	c := newHTTPClient(0)
 	tr, ok := c.Transport.(*http.Transport)
 	if !ok {
 		t.Fatalf("transport %T not *http.Transport", c.Transport)
@@ -1283,7 +1324,7 @@ func TestNewHTTPClient_NilTLSConfig(t *testing.T) {
 	prev := http.DefaultTransport
 	http.DefaultTransport = &http.Transport{TLSClientConfig: nil}
 	t.Cleanup(func() { http.DefaultTransport = prev })
-	c := newHTTPClient()
+	c := newHTTPClient(0)
 	tr, ok := c.Transport.(*http.Transport)
 	if !ok {
 		t.Fatalf("transport %T", c.Transport)
@@ -1296,22 +1337,22 @@ func TestNewHTTPClient_NilTLSConfig(t *testing.T) {
 func TestNewHTTPClientFromTransport(t *testing.T) {
 	t.Parallel()
 	// nil transport
-	c := newHTTPClientFromTransport(nil)
+	c := newHTTPClientFromTransport(0, nil)
 	if tr, ok := c.Transport.(*http.Transport); !ok || tr.TLSClientConfig.MinVersion != tls.VersionTLS12 {
 		t.Fatalf("nil transport not correct")
 	}
 	// nil TLSConfig
-	c = newHTTPClientFromTransport(&http.Transport{TLSClientConfig: nil})
+	c = newHTTPClientFromTransport(0, &http.Transport{TLSClientConfig: nil})
 	if tr, ok := c.Transport.(*http.Transport); !ok || tr.TLSClientConfig.MinVersion != tls.VersionTLS12 {
 		t.Fatalf("nil TLSConfig not correct")
 	}
 	// legacy TLS
-	c = newHTTPClientFromTransport(&http.Transport{TLSClientConfig: &tls.Config{MinVersion: tls.VersionTLS10}}) //nolint:gosec
+	c = newHTTPClientFromTransport(0, &http.Transport{TLSClientConfig: &tls.Config{MinVersion: tls.VersionTLS10}}) //nolint:gosec
 	if tr, ok := c.Transport.(*http.Transport); !ok || tr.TLSClientConfig.MinVersion != tls.VersionTLS12 {
 		t.Fatalf("legacy TLS not upgraded")
 	}
 	// already TLS12
-	c = newHTTPClientFromTransport(&http.Transport{TLSClientConfig: &tls.Config{MinVersion: tls.VersionTLS12}})
+	c = newHTTPClientFromTransport(0, &http.Transport{TLSClientConfig: &tls.Config{MinVersion: tls.VersionTLS12}})
 	if tr, ok := c.Transport.(*http.Transport); !ok || tr.TLSClientConfig.MinVersion != tls.VersionTLS12 {
 		t.Fatalf("TLS12 not preserved")
 	}
@@ -1358,7 +1399,7 @@ func TestGenerate_OverflowCompletionTokens(t *testing.T) {
 func TestGenerate_NilResponse(t *testing.T) {
 	// Mutates global newHTTPClient: must not be parallel.
 	orig := newHTTPClient
-	newHTTPClient = func() *http.Client {
+	newHTTPClient = func(time.Duration) *http.Client {
 		return &http.Client{Transport: roundTripFunc(func(_ *http.Request) (*http.Response, error) {
 			return nil, nil
 		})}

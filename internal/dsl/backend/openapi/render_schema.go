@@ -1,6 +1,10 @@
 package openapi
 
-import "github.com/zenta-dev/zever/internal/dsl/ir"
+import (
+	"fmt"
+
+	"github.com/zenta-dev/zever/internal/dsl/ir"
+)
 
 // schemaObject is a minimal hand-rolled OpenAPI 3.0.3 Schema Object,
 // covering exactly the shapes this backend emits: plain scalars
@@ -84,7 +88,10 @@ func openAPIFormatName(format string) string {
 
 // toInt64/toFloat64 convert a decoded @validate numeric argument (always
 // int64 or float64, per resolver.decodeValidateValue) to the requested
-// numeric type.
+// numeric type. A value of any other dynamic type means that invariant
+// broke upstream: panicking here (matching gogen's numericLiteral) fails
+// loudly instead of silently emitting a bogus minLength:0/minimum:0 (etc.)
+// constraint into generated OpenAPI with no diagnostic anywhere.
 func toInt64(v any) int64 {
 	switch n := v.(type) {
 	case int64:
@@ -92,7 +99,7 @@ func toInt64(v any) int64 {
 	case float64:
 		return int64(n)
 	default:
-		return 0
+		panic(fmt.Sprintf("openapi: toInt64: unexpected value type %T (resolver invariant violated)", v))
 	}
 }
 
@@ -103,7 +110,7 @@ func toFloat64(v any) float64 {
 	case float64:
 		return n
 	default:
-		return 0
+		panic(fmt.Sprintf("openapi: toFloat64: unexpected value type %T (resolver invariant violated)", v))
 	}
 }
 

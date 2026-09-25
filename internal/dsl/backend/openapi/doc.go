@@ -69,6 +69,12 @@ type docBuilder struct {
 	// RPC's Returns value).
 	schemaAdded map[string]bool
 
+	// requestSchemaOwner records, per synthesized request-schema name, the
+	// "<Service>.<RPCName>" that first claimed it -- see
+	// addRequestSchema's doc comment for why this needs a real collision
+	// check rather than schemaAdded's idempotent-skip.
+	requestSchemaOwner map[string]string
+
 	// enums is a name -> *ir.Enum lookup spanning every module of the
 	// schema (named enums are global, so a field in any module may
 	// reference an enum declared in any other), used by addEnumSchema to
@@ -89,10 +95,11 @@ func newDocBuilder(title string, qualify qualifyFunc, enums map[string]*ir.Enum)
 				},
 			},
 		},
-		qualify:     qualify,
-		pathOwner:   map[string]string{},
-		schemaAdded: map[string]bool{},
-		enums:       enums,
+		qualify:            qualify,
+		pathOwner:          map[string]string{},
+		schemaAdded:        map[string]bool{},
+		requestSchemaOwner: map[string]string{},
+		enums:              enums,
 	}
 }
 
@@ -189,19 +196,34 @@ func (d *docBuilder) addTypeRefSchema(ref *ir.TypeRef) string {
 	return ""
 }
 
-// addRequestSchema registers a synthesized "<RPCName>Request" schema
-// (baseName already includes the "Request" suffix) scoped to module m, and
-// returns its qualified component name. Any param referencing an
-// entity/message (p.Ref set) registers that type's own component schema
-// (idempotent, via addTypeRefSchema) and is rendered as a $ref property
-// rather than an inline scalar schema.
-func (d *docBuilder) addRequestSchema(baseName string, m *ir.Module, params []*ir.Param) string {
+// addRequestSchema registers a synthesized "<Service><RPCName>Request"
+// schema (baseName already includes the service name and "Request" suffix,
+// matching OperationID's own "<Service>_<RPCName>" namespacing) scoped to
+// module m, and returns its qualified component name. owner identifies the
+// RPC registering it ("<Service>.<RPCName>"), for the collision error
+// below. Any param referencing an entity/message (p.Ref set) registers that
+// type's own component schema (idempotent, via addTypeRefSchema) and is
+// rendered as a $ref property rather than an inline scalar schema.
+//
+// Unlike addEntitySchema/addMessageSchema (where re-adding the same name is
+// always safe -- it's always the same source entity/message re-rendering to
+// identical content), a request-schema name collision from two DIFFERENT
+// owners means two distinct RPCs would silently share one (wrong-for-one-
+// of-them) component schema, so this errors instead -- the same "name both
+// conflicting owners" contract addOperation already provides for
+// path+method collisions.
+func (d *docBuilder) addRequestSchema(baseName, owner string, m *ir.Module, params []*ir.Param) (string, error) {
 	name := d.qualify(baseName, m)
 
+	if prior, ok := d.requestSchemaOwner[name]; ok && prior != owner {
+		return "", fmt.Errorf("openapi: request schema %q is declared by both %s and %s", name, prior, owner)
+	}
+
+	d.requestSchemaOwner[name] = owner
 	d.doc.Components.Schemas[name] = d.renderRequestSchema(params)
 	d.schemaAdded[name] = true
 
-	return name
+	return name, nil
 }
 
 // paramSchema renders one param's schema: a $ref to its referenced type's

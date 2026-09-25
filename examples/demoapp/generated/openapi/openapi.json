@@ -12,7 +12,7 @@
           "content": {
             "application/json": {
               "schema": {
-                "$ref": "#/components/schemas/default_CreateOrderRequest"
+                "$ref": "#/components/schemas/default_OrderServiceCreateOrderRequest"
               }
             }
           }
@@ -107,7 +107,7 @@
           "content": {
             "application/json": {
               "schema": {
-                "$ref": "#/components/schemas/default_CreateProductRequest"
+                "$ref": "#/components/schemas/default_ProductServiceCreateProductRequest"
               }
             }
           }
@@ -275,26 +275,6 @@
           "id"
         ]
       },
-      "default_CreateOrderRequest": {
-        "type": "object",
-        "properties": {
-          "product_ids": {
-            "type": "string"
-          }
-        }
-      },
-      "default_CreateProductRequest": {
-        "type": "object",
-        "properties": {
-          "name": {
-            "type": "string"
-          },
-          "price_cents": {
-            "type": "integer",
-            "format": "int64"
-          }
-        }
-      },
       "default_Order": {
         "type": "object",
         "properties": {
@@ -349,6 +329,14 @@
         "required": [
           "id"
         ]
+      },
+      "default_OrderServiceCreateOrderRequest": {
+        "type": "object",
+        "properties": {
+          "product_ids": {
+            "type": "string"
+          }
+        }
       },
       "default_Post": {
         "type": "object",
@@ -416,6 +404,18 @@
         "required": [
           "id"
         ]
+      },
+      "default_ProductServiceCreateProductRequest": {
+        "type": "object",
+        "properties": {
+          "name": {
+            "type": "string"
+          },
+          "price_cents": {
+            "type": "integer",
+            "format": "int64"
+          }
+        }
       },
       "default_User": {
         "type": "object",

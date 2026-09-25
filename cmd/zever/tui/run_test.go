@@ -4,6 +4,7 @@ import (
 	"context"
 	"errors"
 	"testing"
+	"time"
 
 	"charm.land/bubbles/v2/spinner"
 	tea "charm.land/bubbletea/v2"
@@ -138,6 +139,86 @@ func TestExecEscCancelsRunning(t *testing.T) {
 	view := stripANSI(em.View().Content)
 	if !containsStr(view, "canceled") {
 		t.Fatalf("cancel view missing marker:\n%s", view)
+	}
+}
+
+// TestExecEscActuallyCancelsContext covers the fix for esc being purely
+// cosmetic: previously Start always ran with context.Background(), so
+// canceling in the UI never stopped the in-flight ExecFunc (e.g. a real
+// `db migrate`/`rollback`/`seed` subprocess capture kept running
+// unattended). esc must now cancel the context Start's ExecFunc receives.
+func TestExecEscActuallyCancelsContext(t *testing.T) {
+	started := make(chan struct{})
+	fn := func(ctx context.Context) (string, error) {
+		close(started)
+		<-ctx.Done()
+
+		return "", ctx.Err()
+	}
+
+	m := NewExec("migrate", "zever db migrate", fn)
+
+	resultCh := make(chan tea.Msg, 1)
+	go func() { resultCh <- m.Start() }()
+
+	<-started
+
+	updated, _ := m.Update(specialKey(tea.KeyEscape))
+	em, ok := updated.(ExecModel)
+	if !ok {
+		t.Fatalf("Update = %T, want ExecModel", updated)
+	}
+
+	if em.State() != ExecCanceled {
+		t.Fatalf("state = %v, want ExecCanceled", em.State())
+	}
+
+	select {
+	case msg := <-resultCh:
+		errMsg, ok := msg.(ExecErrMsg)
+		if !ok {
+			t.Fatalf("Start() result = %T, want ExecErrMsg", msg)
+		}
+		if !errors.Is(errMsg.Err, context.Canceled) {
+			t.Fatalf("Start() err = %v, want context.Canceled", errMsg.Err)
+		}
+	case <-time.After(2 * time.Second):
+		t.Fatal("esc did not cancel the running ExecFunc's context within 2s")
+	}
+}
+
+// TestExecLateDoneAfterCancelIsNoop covers the fix for a late
+// ExecDoneMsg/ExecErrMsg (from a slow op that finishes after the user
+// already canceled) silently flipping a canceled ExecModel back to
+// done/failed.
+func TestExecLateDoneAfterCancelIsNoop(t *testing.T) {
+	m := NewExec("x", "zever x", nil)
+
+	canceled, _ := m.Update(specialKey(tea.KeyEscape))
+	em, ok := canceled.(ExecModel)
+	if !ok {
+		t.Fatalf("Update = %T, want ExecModel", canceled)
+	}
+	if em.State() != ExecCanceled {
+		t.Fatalf("state = %v, want ExecCanceled", em.State())
+	}
+
+	afterDone, _ := em.Update(ExecDoneMsg{Output: "late"})
+	doneModel, ok := afterDone.(ExecModel)
+	if !ok {
+		t.Fatalf("Update = %T, want ExecModel", afterDone)
+	}
+	if doneModel.State() != ExecCanceled {
+		t.Fatalf("late ExecDoneMsg flipped state to %v, want it to stay ExecCanceled", doneModel.State())
+	}
+
+	afterErr, _ := em.Update(ExecErrMsg{Err: errors.New("late failure")})
+	errModel, ok := afterErr.(ExecModel)
+	if !ok {
+		t.Fatalf("Update = %T, want ExecModel", afterErr)
+	}
+	if errModel.State() != ExecCanceled {
+		t.Fatalf("late ExecErrMsg flipped state to %v, want it to stay ExecCanceled", errModel.State())
 	}
 }
 

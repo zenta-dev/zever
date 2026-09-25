@@ -296,12 +296,12 @@ func (m *GenerateScreen) buildExec() tui.ExecModel {
 	case "server":
 		force := m.force
 		return tui.NewExec(title, cli, func(context.Context) (string, error) {
-			return runGenerateServerScreen(force)
+			return runGenerateServerScreen(force) //nolint:contextcheck // CLI entrypoint helpers take no ctx by convention; threading ctx through the CLI layer is out of scope
 		})
 	case "worker":
 		force := m.force
 		return tui.NewExec(title, cli, func(context.Context) (string, error) {
-			return runGenerateWorkerScreen(force)
+			return runGenerateWorkerScreen(force) //nolint:contextcheck // CLI entrypoint helpers take no ctx by convention; threading ctx through the CLI layer is out of scope
 		})
 	case "seed":
 		force := m.force

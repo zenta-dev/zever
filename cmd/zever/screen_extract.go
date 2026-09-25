@@ -121,7 +121,7 @@ func (m *ExtractScreen) buildExec() tui.ExecModel {
 	cli := extractScreenCLI(cfg)
 
 	return tui.NewExec("zever extract "+cfg.Module, cli, func(context.Context) (string, error) {
-		return runExtractScreen(cfg)
+		return runExtractScreen(cfg) //nolint:contextcheck // CLI entrypoint helpers take no ctx by convention; threading ctx through the CLI layer is out of scope
 	})
 }
 

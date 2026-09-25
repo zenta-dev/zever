@@ -25,6 +25,18 @@ func newTestRouter(t *testing.T) router.Router {
 	return r
 }
 
+// TestNewRejectsInvalidOptions covers the fix for New skipping
+// opts.Validate() entirely, unlike router/fiber.New: an AppName invalid for
+// every adapter (a NUL byte, per router.Options.Validate) previously
+// succeeded silently against stdhttp while failing against fiber, breaking
+// adapter-swap transparency.
+func TestNewRejectsInvalidOptions(t *testing.T) {
+	_, err := New(router.Options{AppName: "bad\x00name"})
+	if err == nil {
+		t.Fatal("New() with an invalid AppName succeeded, want an error")
+	}
+}
+
 func serve(t *testing.T, h http.Handler, method, target string) *httptest.ResponseRecorder {
 	t.Helper()
 

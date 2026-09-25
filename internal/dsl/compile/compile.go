@@ -3,6 +3,7 @@
 package compile
 
 import (
+	"context"
 	"sort"
 
 	"github.com/zenta-dev/zever/internal/dsl/ast"
@@ -31,6 +32,11 @@ type Result struct {
 // backends assume a fully-resolved schema and must never run against one
 // that isn't. A backend's own Generate error is recorded as a diagnostic and
 // does not prevent other backends from running.
+//
+// Compile runs every backend's Generate with no cancellation hook (the
+// same as always); use CompileContext to bound/cancel backends that
+// implement backend.ContextBackend (currently only protogogen, which shells
+// out to a subprocess).
 func Compile(files map[string]string, backends ...backend.Backend) (*Result, diag.List) {
 	return WithSchemaDir(files, "schema", backends...)
 }
@@ -38,6 +44,25 @@ func Compile(files map[string]string, backends ...backend.Backend) (*Result, dia
 // WithSchemaDir is like Compile but with an explicit schemaDir for
 // dir-derived module assignment. An empty schemaDir defaults to "schema".
 func WithSchemaDir(files map[string]string, schemaDir string, backends ...backend.Backend) (*Result, diag.List) {
+	return WithSchemaDirContext(context.Background(), files, schemaDir, backends...)
+}
+
+// CompileContext is Compile, but runs each backend.ContextBackend's
+// GenerateContext with ctx instead of Generate -- so a caller with a real
+// deadline/cancellation source (e.g. `zever generate --timeout`, or a CI
+// job wanting to bound the whole compile) can actually reach the one
+// backend that does I/O (protogogen shelling out to
+// `go tool protoc-gen-go-grpc`) instead of that backend always fabricating
+// context.Background() internally. Backends that only implement
+// backend.Backend are unaffected: their plain Generate still runs the same
+// as always, ctx or not.
+func CompileContext(ctx context.Context, files map[string]string, backends ...backend.Backend) (*Result, diag.List) { //nolint:revive // CompileContext mirrors stdlib exec.CommandContext naming; bare Context would read as a type
+	return WithSchemaDirContext(ctx, files, "schema", backends...)
+}
+
+// WithSchemaDirContext is CompileContext with an explicit schemaDir; see
+// WithSchemaDir/CompileContext.
+func WithSchemaDirContext(ctx context.Context, files map[string]string, schemaDir string, backends ...backend.Backend) (*Result, diag.List) {
 	if schemaDir == "" {
 		schemaDir = "schema"
 	}
@@ -73,7 +98,7 @@ func WithSchemaDir(files map[string]string, schemaDir string, backends ...backen
 	result.Outputs = make(map[string]map[string][]byte, len(backends))
 
 	for _, b := range backends {
-		output, err := b.Generate(schema)
+		output, err := generateWithContext(ctx, b, schema)
 		if err != nil {
 			diags = append(diags, diag.Wrap(b.Name(), diag.Position{}, err, "backend failed: %v", err))
 			continue
@@ -83,4 +108,14 @@ func WithSchemaDir(files map[string]string, schemaDir string, backends ...backen
 	}
 
 	return result, diags
+}
+
+// generateWithContext runs b.GenerateContext(ctx, schema) when b implements
+// backend.ContextBackend, else b.Generate(schema).
+func generateWithContext(ctx context.Context, b backend.Backend, schema *ir.Schema) (map[string][]byte, error) {
+	if cb, ok := b.(backend.ContextBackend); ok {
+		return cb.GenerateContext(ctx, schema)
+	}
+
+	return b.Generate(schema)
 }

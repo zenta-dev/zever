@@ -1,11 +1,102 @@
 package compile
 
 import (
+	"context"
+	"errors"
 	"testing"
 
 	"github.com/zenta-dev/zever/internal/dsl/backend/proto"
 	"github.com/zenta-dev/zever/internal/dsl/ir"
 )
+
+// fakePlainBackend implements only backend.Backend (no GenerateContext),
+// recording whether Generate was called.
+type fakePlainBackend struct{ called bool }
+
+func (b *fakePlainBackend) Name() string { return "fake-plain" }
+func (b *fakePlainBackend) Generate(*ir.Schema) (map[string][]byte, error) {
+	b.called = true
+
+	return map[string][]byte{"plain.txt": []byte("plain")}, nil
+}
+
+// markerKey marks the ctx a test passes to CompileContext; the fake
+// backend records only the marker value, never the ctx itself.
+type markerKey struct{}
+
+// fakeContextBackend implements backend.ContextBackend, recording the
+// marker from the ctx GenerateContext received and whether the plain
+// Generate was ever called (it must not be, when the caller goes
+// through CompileContext).
+type fakeContextBackend struct {
+	gotMarker     any
+	generateCalls int
+}
+
+func (b *fakeContextBackend) Name() string { return "fake-ctx" }
+func (b *fakeContextBackend) Generate(*ir.Schema) (map[string][]byte, error) {
+	b.generateCalls++
+
+	return nil, errors.New("fakeContextBackend.Generate must not be called by CompileContext")
+}
+
+func (b *fakeContextBackend) GenerateContext(ctx context.Context, _ *ir.Schema) (map[string][]byte, error) {
+	b.gotMarker = ctx.Value(markerKey{})
+
+	return map[string][]byte{"ctx.txt": []byte("ctx")}, nil
+}
+
+const minimalSchemaSrc = `entity User {
+	id: uuid @primary
+}`
+
+// TestCompileContextUsesGenerateContextWhenImplemented covers the
+// backend.ContextBackend extension: CompileContext must call
+// GenerateContext (with the caller's ctx) on a backend that implements it,
+// and must never fall back to that backend's plain Generate.
+func TestCompileContextUsesGenerateContextWhenImplemented(t *testing.T) {
+	cb := &fakeContextBackend{}
+
+	ctx := context.WithValue(t.Context(), markerKey{}, "marker")
+
+	result, diags := CompileContext(ctx, map[string]string{"app.zen": minimalSchemaSrc}, cb)
+	if diags.HasErrors() {
+		t.Fatalf("unexpected diagnostics: %v", diags)
+	}
+
+	if cb.generateCalls != 0 {
+		t.Fatalf("Generate was called %d times, want 0 (GenerateContext should have been used)", cb.generateCalls)
+	}
+
+	if cb.gotMarker != "marker" {
+		t.Fatalf("GenerateContext did not receive the caller's ctx: got marker %v", cb.gotMarker)
+	}
+
+	if _, ok := result.Outputs["fake-ctx"]; !ok {
+		t.Fatalf("missing fake-ctx output: %v", result.Outputs)
+	}
+}
+
+// TestCompileContextFallsBackToGenerateForPlainBackend covers backward
+// compatibility: a backend implementing only backend.Backend (every
+// existing backend except protogogen) keeps working unchanged through
+// CompileContext.
+func TestCompileContextFallsBackToGenerateForPlainBackend(t *testing.T) {
+	pb := &fakePlainBackend{}
+
+	result, diags := CompileContext(t.Context(), map[string]string{"app.zen": minimalSchemaSrc}, pb)
+	if diags.HasErrors() {
+		t.Fatalf("unexpected diagnostics: %v", diags)
+	}
+
+	if !pb.called {
+		t.Fatal("Generate was never called")
+	}
+
+	if _, ok := result.Outputs["fake-plain"]; !ok {
+		t.Fatalf("missing fake-plain output: %v", result.Outputs)
+	}
+}
 
 // findEntity searches every module of schema for an entity named name.
 func findEntity(schema *ir.Schema, name string) *ir.Entity {

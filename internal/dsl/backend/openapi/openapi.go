@@ -117,7 +117,11 @@ func populateDoc(d *docBuilder, m *ir.Module) error {
 				continue
 			}
 
-			op := buildOperation(svc, rpc, http, d)
+			op, err := buildOperation(svc, rpc, http, d)
+			if err != nil {
+				return err
+			}
+
 			owner := fmt.Sprintf("%s.%s.%s", moduleLabel(m), svc.Name, rpc.Name)
 
 			if err := d.addOperation(http.Method, http.Path, op, owner); err != nil {

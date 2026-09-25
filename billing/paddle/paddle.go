@@ -10,6 +10,7 @@ import (
 
 	"github.com/zenta-dev/zever/billing"
 	"github.com/zenta-dev/zever/internal/httpclient"
+	"github.com/zenta-dev/zever/internal/providers"
 )
 
 // newSDK creates the underlying Paddle SDK client. It is a seam for tests.
@@ -29,14 +30,7 @@ func New(o billing.Options) (billing.Billing, error) {
 		return nil, ErrMissingAPIKey
 	}
 
-	endpoint := o.Endpoint
-	if endpoint == "" {
-		if o.Sandbox {
-			endpoint = paddle.SandboxBaseURL
-		} else {
-			endpoint = paddle.ProductionBaseURL
-		}
-	}
+	endpoint := providers.PaddleEndpoint(o.Endpoint, o.Sandbox)
 
 	client, err := newSDK(o.APIKey, paddle.WithBaseURL(endpoint), paddle.WithClient(httpclient.NewClient(billing.DefaultHTTPTimeout)))
 	if err != nil {

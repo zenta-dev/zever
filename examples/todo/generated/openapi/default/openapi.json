@@ -12,7 +12,7 @@
           "content": {
             "application/json": {
               "schema": {
-                "$ref": "#/components/schemas/CreateTaskRequest"
+                "$ref": "#/components/schemas/GrpcTaskServiceCreateTaskRequest"
               }
             }
           }
@@ -143,7 +143,7 @@
           "content": {
             "application/json": {
               "schema": {
-                "$ref": "#/components/schemas/CreateNoteRequest"
+                "$ref": "#/components/schemas/NoteServiceCreateNoteRequest"
               }
             }
           }
@@ -247,7 +247,7 @@
           "content": {
             "application/json": {
               "schema": {
-                "$ref": "#/components/schemas/UpdateNoteRequest"
+                "$ref": "#/components/schemas/NoteServiceUpdateNoteRequest"
               }
             }
           }
@@ -274,28 +274,6 @@
   },
   "components": {
     "schemas": {
-      "CreateNoteRequest": {
-        "type": "object",
-        "properties": {
-          "body": {
-            "type": "string"
-          },
-          "title": {
-            "type": "string"
-          }
-        }
-      },
-      "CreateTaskRequest": {
-        "type": "object",
-        "properties": {
-          "body": {
-            "type": "string"
-          },
-          "title": {
-            "type": "string"
-          }
-        }
-      },
       "GrpcTask": {
         "type": "object",
         "properties": {
@@ -323,6 +301,17 @@
         "required": [
           "id"
         ]
+      },
+      "GrpcTaskServiceCreateTaskRequest": {
+        "type": "object",
+        "properties": {
+          "body": {
+            "type": "string"
+          },
+          "title": {
+            "type": "string"
+          }
+        }
       },
       "Note": {
         "type": "object",
@@ -355,7 +344,18 @@
           "id"
         ]
       },
-      "UpdateNoteRequest": {
+      "NoteServiceCreateNoteRequest": {
+        "type": "object",
+        "properties": {
+          "body": {
+            "type": "string"
+          },
+          "title": {
+            "type": "string"
+          }
+        }
+      },
+      "NoteServiceUpdateNoteRequest": {
         "type": "object",
         "properties": {
           "body": {

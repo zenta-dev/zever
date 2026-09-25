@@ -1,6 +1,7 @@
 package ollama
 
 import (
+	"bufio"
 	"bytes"
 	"context"
 	"errors"
@@ -20,6 +21,11 @@ import (
 const (
 	maxResponseBytes = 16 << 20
 	maxErrorBody     = 1024
+	// streamLineBufSize is bufio.Reader's initial buffer for Stream's
+	// incremental NDJSON line reads. It grows automatically (bufio.Reader.
+	// ReadBytes has no fixed line-length ceiling), this only sizes the
+	// starting allocation for the common case.
+	streamLineBufSize = 4096
 )
 
 // adapter talks to an Ollama server over plain HTTP with whole-exchange timeouts.
@@ -29,8 +35,27 @@ type adapter struct {
 	client       *http.Client
 }
 
-// New creates an AI backed by the Ollama server at opts.Addr.
-func New(opts Options) (ai.AI, error) {
+// New creates an AI backed by the Ollama server named by opts.BaseURL,
+// matching ai.Factory's signature (unlike NewWithOptions, so
+// ai.Register(ai.Ollama, New) needs no translating closure, the way every
+// sibling ai/* adapter's New already can be registered directly). It
+// forwards APIKey/Model/BaseURL/Timeout; Transport (a test-only seam, see
+// Options.Transport) has no ai.Options equivalent and is left nil --
+// callers needing it use NewWithOptions directly.
+func New(opts ai.Options) (ai.AI, error) {
+	return NewWithOptions(Options{
+		Addr:    opts.BaseURL,
+		Model:   opts.Model,
+		Timeout: opts.Timeout,
+	})
+}
+
+// NewWithOptions creates an AI backed by the Ollama server at opts.Addr,
+// using ollama's own Options (Addr instead of BaseURL, plus the
+// Transport test seam ai.Options has no equivalent for). Prefer New for
+// ai.Factory-compatible registration; use this directly only when Transport
+// injection is needed.
+func NewWithOptions(opts Options) (ai.AI, error) {
 	if err := opts.Validate(); err != nil {
 		return nil, err
 	}
@@ -247,119 +272,134 @@ func (a *adapter) Stream(ctx context.Context, model string, messages []ai.Messag
 		defer close(ch)
 		defer func() { _ = resp.Body.Close() }()
 
-		// codec.Codec[V] has no streaming form (only Decode([]byte) (V, error)),
-		// so the full response is buffered up front and then split into its
-		// newline-delimited JSON records. This trades incremental decoding as
-		// bytes arrive for a single buffered read; acceptable for the response
-		// sizes these single API calls produce.
-		respBody, readErr := httpclient.ReadLimited(ctx, resp.Body, maxResponseBytes)
-		if readErr != nil {
-			if errors.Is(readErr, httpclient.ErrTooLarge) {
-				readErr = fmt.Errorf("ollama: stream response exceeds %d bytes", maxResponseBytes)
-			} else {
-				readErr = fmt.Errorf("ollama: read stream: %w", readErr)
+		// Read and decode one NDJSON line at a time as bytes arrive, instead
+		// of buffering the whole response before emitting anything: a
+		// buffer-then-split approach defeats the point of a streaming API
+		// (zero time-to-first-token improvement over Generate, and up to
+		// maxResponseBytes held in memory per in-flight stream).
+		reader := bufio.NewReaderSize(resp.Body, streamLineBufSize)
+
+		var total int64
+
+		for {
+			if err := ctx.Err(); err != nil {
+				return
 			}
 
-			select {
-			case ch <- ai.StreamChunk{Err: readErr}:
-			case <-ctx.Done():
-			}
+			line, readErr := reader.ReadBytes('\n')
+			total += int64(len(line))
 
-			return
-		}
-
-		lines := bytes.Split(respBody, []byte("\n"))
-
-		for _, line := range lines {
-			line = bytes.TrimSpace(line)
-			if len(line) == 0 {
-				continue
-			}
-
-			sr, err := streamResponseCodec.Decode(line)
-			if err != nil {
-				select {
-				case ch <- ai.StreamChunk{Err: fmt.Errorf("ollama: decode stream: %w", err)}:
-				case <-ctx.Done():
-				}
+			if total > maxResponseBytes {
+				sendOllamaStreamErr(ctx, ch, fmt.Errorf("ollama: stream response exceeds %d bytes", maxResponseBytes))
 
 				return
 			}
 
-			if sr.Error != "" {
-				select {
-				case ch <- ai.StreamChunk{Err: fmt.Errorf("ollama: stream error: %s", sr.Error)}:
-				case <-ctx.Done():
+			if trimmed := bytes.TrimSpace(line); len(trimmed) > 0 {
+				if stop := processOllamaStreamLine(ctx, ch, trimmed); stop {
+					return
+				}
+			}
+
+			if readErr != nil {
+				if readErr != io.EOF {
+					sendOllamaStreamErr(ctx, ch, fmt.Errorf("ollama: read stream: %w", readErr))
 				}
 
 				return
-			}
-
-			if len(sr.Message.ToolCalls) > 0 {
-				if sr.Message.Content != "" {
-					select {
-					case ch <- ai.StreamChunk{Delta: sr.Message.Content}:
-					case <-ctx.Done():
-						return
-					}
-				}
-
-				for i, tc := range sr.Message.ToolCalls {
-					argsBytes, err := toolArgsCodec.Encode(tc.Function.Arguments)
-					if err != nil {
-						select {
-						case ch <- ai.StreamChunk{Err: fmt.Errorf("ollama: marshal tool arguments: %w", err)}:
-						case <-ctx.Done():
-						}
-
-						return
-					}
-
-					argsStr := string(argsBytes)
-					if tc.Function.Arguments == nil {
-						argsStr = "{}"
-					}
-
-					select {
-					case ch <- ai.StreamChunk{
-						ToolCallID:    fmt.Sprintf("call_%d", i),
-						ToolName:      tc.Function.Name,
-						ToolArgsDelta: argsStr,
-					}:
-					case <-ctx.Done():
-						return
-					}
-				}
-
-				if sr.Done {
-					usage := ai.Usage{PromptTokens: sr.PromptEvalCount, CompletionTokens: sr.EvalCount}
-					select {
-					case ch <- ai.StreamChunk{Done: true, Usage: &usage}:
-					case <-ctx.Done():
-					}
-
-					return
-				}
-			} else {
-				chunk := ai.StreamChunk{Delta: sr.Message.Content, Done: sr.Done}
-				if sr.Done {
-					chunk.Usage = &ai.Usage{PromptTokens: sr.PromptEvalCount, CompletionTokens: sr.EvalCount}
-				}
-
-				select {
-				case ch <- chunk:
-				case <-ctx.Done():
-					return
-				}
-
-				if sr.Done {
-					return
-				}
 			}
 		}
 	}()
 
 	return ch, nil
+}
+
+// sendOllamaStreamErr delivers err on ch, respecting ctx cancellation the
+// same way every other send in Stream's goroutine does.
+func sendOllamaStreamErr(ctx context.Context, ch chan<- ai.StreamChunk, err error) {
+	select {
+	case ch <- ai.StreamChunk{Err: err}:
+	case <-ctx.Done():
+	}
+}
+
+// processOllamaStreamLine decodes and emits one NDJSON line from Stream's
+// response body. It reports stop=true when the caller's read loop must
+// return (a decode/protocol error, Done, or ctx cancellation) -- the exact
+// set of cases the inline for-loop this was extracted from used to `return`
+// on.
+func processOllamaStreamLine(ctx context.Context, ch chan<- ai.StreamChunk, line []byte) (stop bool) {
+	sr, err := streamResponseCodec.Decode(line)
+	if err != nil {
+		sendOllamaStreamErr(ctx, ch, fmt.Errorf("ollama: decode stream: %w", err))
+
+		return true
+	}
+
+	if sr.Error != "" {
+		sendOllamaStreamErr(ctx, ch, fmt.Errorf("ollama: stream error: %s", sr.Error))
+
+		return true
+	}
+
+	if len(sr.Message.ToolCalls) > 0 {
+		if sr.Message.Content != "" {
+			select {
+			case ch <- ai.StreamChunk{Delta: sr.Message.Content}:
+			case <-ctx.Done():
+				return true
+			}
+		}
+
+		for i, tc := range sr.Message.ToolCalls {
+			argsBytes, err := toolArgsCodec.Encode(tc.Function.Arguments)
+			if err != nil {
+				sendOllamaStreamErr(ctx, ch, fmt.Errorf("ollama: marshal tool arguments: %w", err))
+
+				return true
+			}
+
+			argsStr := string(argsBytes)
+			if tc.Function.Arguments == nil {
+				argsStr = "{}"
+			}
+
+			select {
+			case ch <- ai.StreamChunk{
+				ToolCallID:    fmt.Sprintf("call_%d", i),
+				ToolName:      tc.Function.Name,
+				ToolArgsDelta: argsStr,
+			}:
+			case <-ctx.Done():
+				return true
+			}
+		}
+
+		if sr.Done {
+			usage := ai.Usage{PromptTokens: sr.PromptEvalCount, CompletionTokens: sr.EvalCount}
+			select {
+			case ch <- ai.StreamChunk{Done: true, Usage: &usage}:
+			case <-ctx.Done():
+			}
+
+			return true
+		}
+
+		return false
+	}
+
+	chunk := ai.StreamChunk{Delta: sr.Message.Content, Done: sr.Done}
+	if sr.Done {
+		chunk.Usage = &ai.Usage{PromptTokens: sr.PromptEvalCount, CompletionTokens: sr.EvalCount}
+	}
+
+	select {
+	case ch <- chunk:
+	case <-ctx.Done():
+		return true
+	}
+
+	return sr.Done
 }
 
 // Embed returns one vector per input. Dimensions requests are not supported.

@@ -140,9 +140,7 @@ func registerAdapters() {
 	_ = ai.Register(ai.Anthropic, anthropic.New)
 	_ = ai.Register(ai.OpenAI, openai.New)
 	_ = ai.Register(ai.Gemini, gemini.New)
-	_ = ai.Register(ai.Ollama, func(o ai.Options) (ai.AI, error) {
-		return aiollama.New(aiollama.Options{Addr: o.BaseURL, Model: o.Model, Timeout: o.Timeout})
-	})
+	_ = ai.Register(ai.Ollama, aiollama.New)
 
 	_ = analytics.Register(analytics.Log, analyticslog.New)
 	_ = analytics.Register(analytics.PostHog, posthog.New)

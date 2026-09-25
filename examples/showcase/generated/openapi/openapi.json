@@ -73,7 +73,7 @@
           "content": {
             "application/json": {
               "schema": {
-                "$ref": "#/components/schemas/shop_CheckoutRequest"
+                "$ref": "#/components/schemas/shop_ShopServiceCheckoutRequest"
               }
             }
           }
@@ -202,7 +202,7 @@
           "content": {
             "application/json": {
               "schema": {
-                "$ref": "#/components/schemas/shop_CreateProductRequest"
+                "$ref": "#/components/schemas/shop_ShopServiceCreateProductRequest"
               }
             }
           }
@@ -321,7 +321,7 @@
           "content": {
             "application/json": {
               "schema": {
-                "$ref": "#/components/schemas/shop_PatchProductRequest"
+                "$ref": "#/components/schemas/shop_ShopServicePatchProductRequest"
               }
             }
           }
@@ -370,7 +370,7 @@
           "content": {
             "application/json": {
               "schema": {
-                "$ref": "#/components/schemas/shop_UpdateProductRequest"
+                "$ref": "#/components/schemas/shop_ShopServiceUpdateProductRequest"
               }
             }
           }
@@ -430,8 +430,12 @@
       "shop_CheckoutRequest": {
         "type": "object",
         "properties": {
-          "req": {
-            "$ref": "#/components/schemas/shop_CheckoutRequest"
+          "gift_note": {
+            "type": "string",
+            "maxLength": 500
+          },
+          "order": {
+            "$ref": "#/components/schemas/shop_CreateOrderRequest"
           }
         }
       },
@@ -451,21 +455,6 @@
           "user_id": {
             "type": "string",
             "format": "uuid"
-          }
-        }
-      },
-      "shop_CreateProductRequest": {
-        "type": "object",
-        "properties": {
-          "name": {
-            "type": "string",
-            "minLength": 1,
-            "maxLength": 200
-          },
-          "price_cents": {
-            "type": "integer",
-            "format": "int64",
-            "minimum": 0
           }
         }
       },
@@ -559,16 +548,6 @@
           "shipped",
           "cancelled"
         ]
-      },
-      "shop_PatchProductRequest": {
-        "type": "object",
-        "properties": {
-          "stock": {
-            "type": "integer",
-            "format": "int64",
-            "minimum": 0
-          }
-        }
       },
       "shop_Product": {
         "type": "object",
@@ -685,6 +664,49 @@
           "member"
         ]
       },
+      "shop_ShopServiceCheckoutRequest": {
+        "type": "object",
+        "properties": {
+          "req": {
+            "$ref": "#/components/schemas/shop_CheckoutRequest"
+          }
+        }
+      },
+      "shop_ShopServiceCreateProductRequest": {
+        "type": "object",
+        "properties": {
+          "name": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 200
+          },
+          "price_cents": {
+            "type": "integer",
+            "format": "int64",
+            "minimum": 0
+          }
+        }
+      },
+      "shop_ShopServicePatchProductRequest": {
+        "type": "object",
+        "properties": {
+          "stock": {
+            "type": "integer",
+            "format": "int64",
+            "minimum": 0
+          }
+        }
+      },
+      "shop_ShopServiceUpdateProductRequest": {
+        "type": "object",
+        "properties": {
+          "name": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 200
+          }
+        }
+      },
       "shop_Tag": {
         "type": "object",
         "properties": {
@@ -705,16 +727,6 @@
         "required": [
           "id"
         ]
-      },
-      "shop_UpdateProductRequest": {
-        "type": "object",
-        "properties": {
-          "name": {
-            "type": "string",
-            "minLength": 1,
-            "maxLength": 200
-          }
-        }
       },
       "shop_User": {
         "type": "object",

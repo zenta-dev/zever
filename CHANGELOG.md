@@ -9,6 +9,103 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Changed
 
+- **Breaking:** new `internal/providers` package (mirrors the existing
+  `internal/s3opts` pattern shared by `storage/s3`/`storage/r2`/`media/s3`)
+  holds the connection-option fields and SDK client construction
+  `billing`/`payment`'s Stripe and Paddle adapters were independently
+  duplicating: `billing.Options`/`payment.Options` now embed
+  `providers.Common` (`SecretKey`/`APIKey`/`Endpoint`/`Sandbox`) instead of
+  redeclaring those fields (JSON/TOML/YAML shape unchanged -- embedding
+  promotes the same field names); both packages' `DefaultHTTPTimeout` are
+  now aliases of `providers.DefaultHTTPTimeout` instead of two independently
+  declared identical constants; all 4 adapters (`billing/stripe`,
+  `payment/stripe`, `billing/paddle`, `payment/paddle`) now call
+  `providers.NewStripeClient`/`providers.PaddleEndpoint` instead of each
+  separately constructing the same `*stripe.Client`/resolving the same
+  sandbox-vs-production URL. `billing.Options.Validate()`'s endpoint error
+  messages are now as specific as `payment.Options.Validate()`'s always
+  were (separate "must include scheme"/"must include host" reasons instead
+  of one generic "must be a valid url" covering every failure shape) --
+  breaking only in the sense that error *text* changed; the `*InvalidOptionsError`
+  type and `errors.Is(err, ErrInvalidOptions)` contract are unchanged.
+
+- `internal/dsl/backend.Backend` gained an optional `ContextBackend`
+  extension (`GenerateContext(ctx, schema)`); `internal/dsl/compile` gained
+  `CompileContext`/`WithSchemaDirContext`, which call it when a backend
+  implements it. `protogogen` (the only backend doing real I/O -- it shells
+  out to `go tool protoc-gen-go-grpc`) now implements it, so a caller with a
+  real deadline/cancellation source can bound that subprocess instead of it
+  always running with a fabricated `context.Background()`. Additive: plain
+  `Compile`/`WithSchemaDir` and every other backend are unchanged.
+- `ai/ollama.New` now matches `ai.Factory` directly
+  (`func(ai.Options) (ai.AI, error)`), so `ai.Register(ai.Ollama,
+  ollama.New)` needs no translating closure, unlike before -- the old
+  `Options`-taking constructor is renamed `NewWithOptions` (used when the
+  `Transport` test-seam field is needed; `ai.Options` has no equivalent).
+  `container/services.go`'s hand-written closure is removed.
+- `router/stdhttp.New` now calls `Options.Validate()`, matching
+  `router/fiber.New` -- previously an `AppName` invalid for every adapter
+  succeeded silently against `stdhttp` while failing against `fiber`,
+  breaking adapter-swap transparency.
+
+### Fixed
+
+- **Security:** `internal/dsl/backend/atlas`'s HCL renderer spliced an
+  `@schema(...)` value unquoted into `schema = schema.<name>` (an HCL
+  *reference* expression, which cannot be quoted like a string literal --
+  unlike the properly-`%q`-quoted `schema "<name>" {}` *declaration* three
+  lines above). `@schema(...)` accepts an arbitrary string literal at the
+  resolver, so a value containing HCL-structural characters could inject or
+  malform the generated migration file. Now validated against a bare-HCL-
+  identifier regex at render time, erroring clearly instead of emitting
+  unsafe HCL.
+- **Correctness:** `internal/dsl/backend/openapi`'s synthesized request
+  schemas were namespaced only by RPC name + module (not by service name,
+  unlike the correctly-namespaced `OperationID`), with no collision guard —
+  unlike every sibling `add*Schema` method and unlike `addOperation`'s own
+  path/method collision check. Two services in the same module both
+  declaring a same-named RPC with body params silently produced ONE
+  component schema (whichever was processed last); regenerating
+  `examples/showcase`'s output surfaced a real instance of this — a
+  self-referencing `shop_CheckoutRequest` schema. Request schemas are now
+  namespaced by `<Service><RPCName>Request` and a collision returns a clear
+  error naming both owning RPCs, matching `addOperation`'s existing
+  contract. All affected example `openapi.json` outputs regenerated.
+- `internal/dsl/backend/openapi`'s `toInt64`/`toFloat64` silently defaulted
+  to `0` on an unexpected `@validate` argument type, emitting a bogus
+  `minLength: 0`/`minimum: 0` constraint into generated OpenAPI with no
+  diagnostic (same root-cause class as gogen's `numericLiteral` bug fixed
+  earlier, but this one wasn't). Now panics on the invariant violation,
+  matching gogen's fix.
+- **Security:** `ai/openai.New` silently dropped the configured
+  `ai.Options.Timeout` (`newHTTPClient()` always passed `0`, meaning no
+  client-side timeout) while every sibling `ai/*` adapter honored it — a
+  hung/slow upstream could block a goroutine indefinitely. Now threads the
+  configured timeout through, like `anthropic`/`gemini`/`ollama` already
+  did.
+- `ai/ollama.Stream` buffered the entire NDJSON response (up to 16 MiB)
+  before decoding/emitting anything, giving zero time-to-first-token
+  improvement over `Generate` and defeating the point of a streaming API.
+  Now reads and emits one line at a time as bytes arrive, with the same
+  total-byte cap enforced incrementally instead of via one buffered read.
+- **TUI:** pressing esc during a running `db migrate`/`rollback`/`seed`
+  screen only changed local UI state and popped the screen; the already-
+  running operation (a real subprocess/in-process capture) kept executing
+  unattended in the background with no way to stop it — the "esc cancel"
+  hint promised behavior the code didn't deliver. `ExecModel` now creates a
+  cancelable context in `NewExec` and cancels it on esc, so any `ExecFunc`
+  that honors `ctx` (as every `ExecFunc` signature already requires) is
+  actually canceled. Note: `runDBMigrate`/`runDBRollback`/the seed launcher
+  themselves don't currently honor `ctx` (synchronous CLI entrypoints /
+  signal-forwarding launcher, by established repo convention) — this fix
+  makes cancellation reach any `ExecFunc` that respects it, but making
+  those specific CLI entrypoints interruptible mid-flight is a separate,
+  larger design question not addressed here.
+- **TUI:** a late `ExecDoneMsg`/`ExecErrMsg` (from an operation finishing
+  after the user already canceled) could silently flip a canceled
+  `ExecModel` back to done/failed. `Update` now ignores both once
+  `state == ExecCanceled`.
+
 - `session.RedisOptions`/`ratelimit.RedisOptions`/`idempotency.RedisOptions`/
   `eventbus.RedisOptions` now embed `zredis.Options` (connection AND
   pooling: `PoolSize`, `MinIdleConns`, `PoolTimeout`, `MaxConnIdleTime`,

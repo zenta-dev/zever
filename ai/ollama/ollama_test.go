@@ -45,7 +45,7 @@ func chatOK(content string, prompt, eval int) map[string]any {
 func openFake(t *testing.T, tr fakeTransport, model string) ai.AI {
 	t.Helper()
 
-	a, err := New(Options{Addr: "http://localhost:11434", Model: model, Transport: tr})
+	a, err := NewWithOptions(Options{Addr: "http://localhost:11434", Model: model, Transport: tr})
 	if err != nil {
 		t.Fatalf("Open: %v", err)
 	}
@@ -56,7 +56,7 @@ func openFake(t *testing.T, tr fakeTransport, model string) ai.AI {
 func TestOpen_defaults(t *testing.T) {
 	t.Parallel()
 
-	a, err := New(Options{})
+	a, err := NewWithOptions(Options{})
 	if err != nil {
 		t.Fatalf("Open: %v", err)
 	}
@@ -78,7 +78,7 @@ func TestOpen_defaults(t *testing.T) {
 func TestOpen_custom(t *testing.T) {
 	t.Parallel()
 
-	a, err := New(Options{Addr: "http://ollama:11434", Model: "llama3", Timeout: 5 * time.Second})
+	a, err := NewWithOptions(Options{Addr: "http://ollama:11434", Model: "llama3", Timeout: 5 * time.Second})
 	if err != nil {
 		t.Fatalf("Open: %v", err)
 	}
@@ -100,14 +100,49 @@ func TestOpen_custom(t *testing.T) {
 	}
 }
 
+// TestNewSatisfiesAIFactory covers the fix for ollama.New not matching
+// ai.Factory (func(ai.Options) (ai.AI, error)): previously only
+// NewWithOptions existed, taking ollama's own package-local Options (Addr
+// instead of BaseURL, plus a Transport field ai.Options has no equivalent
+// of), so ai.Register(ai.Ollama, ollama.New) required a hand-written
+// translating closure (as container/services.go used to have) -- unlike
+// every sibling ai/* adapter's New, directly registerable.
+func TestNewSatisfiesAIFactory(t *testing.T) {
+	t.Parallel()
+
+	var factory ai.Factory = New // compile-time proof New satisfies ai.Factory
+
+	a, err := factory(ai.Options{BaseURL: "http://ollama:11434", Model: "llama3", Timeout: 5 * time.Second})
+	if err != nil {
+		t.Fatalf("New: %v", err)
+	}
+
+	ad, ok := a.(*adapter)
+	if !ok {
+		t.Fatalf("New = %T, want *adapter", a)
+	}
+
+	if ad.addr != "http://ollama:11434" {
+		t.Fatalf("addr = %q, want ai.Options.BaseURL to map to ollama.Options.Addr", ad.addr)
+	}
+
+	if ad.defaultModel != "llama3" {
+		t.Fatalf("model = %q", ad.defaultModel)
+	}
+
+	if ad.requestTimeout() != 5*time.Second {
+		t.Fatalf("timeout = %v", ad.requestTimeout())
+	}
+}
+
 func TestOpen_invalid(t *testing.T) {
 	t.Parallel()
 
-	if _, err := New(Options{Timeout: -time.Second}); err == nil {
+	if _, err := NewWithOptions(Options{Timeout: -time.Second}); err == nil {
 		t.Fatal("expected error, got nil")
 	}
 
-	if _, err := New(Options{Addr: "ftp://example.com"}); err == nil {
+	if _, err := NewWithOptions(Options{Addr: "ftp://example.com"}); err == nil {
 		t.Fatal("expected error, got nil")
 	}
 }
@@ -930,6 +965,118 @@ func TestStream_eofCloses(t *testing.T) {
 
 	if deltas != "partial" {
 		t.Fatalf("deltas = %q, want partial", deltas)
+	}
+}
+
+// blockingLineReader emits ndjson one line at a time, blocking before each
+// subsequent line until unblock is signaled, simulating a real streaming
+// HTTP body that arrives incrementally rather than all at once.
+type blockingLineReader struct {
+	lines   [][]byte
+	i       int
+	cur     []byte
+	unblock <-chan struct{}
+}
+
+func (r *blockingLineReader) Read(p []byte) (int, error) {
+	if len(r.cur) == 0 {
+		if r.i >= len(r.lines) {
+			return 0, io.EOF
+		}
+
+		if r.i > 0 {
+			<-r.unblock
+		}
+
+		r.cur = r.lines[r.i]
+		r.i++
+	}
+
+	n := copy(p, r.cur)
+	r.cur = r.cur[n:]
+
+	return n, nil
+}
+
+// TestStream_emitsIncrementally covers the fix for Stream buffering the
+// entire response before emitting anything (via httpclient.ReadLimited)
+// instead of decoding and sending each NDJSON line as it arrives -- zero
+// time-to-first-token improvement over Generate, defeating the point of a
+// streaming API. The first chunk must now be receivable before the second
+// line has even arrived on the wire.
+func TestStream_emitsIncrementally(t *testing.T) {
+	t.Parallel()
+
+	unblock := make(chan struct{})
+	body := &blockingLineReader{
+		lines: [][]byte{
+			[]byte("{\"message\":{\"content\":\"first\"},\"done\":false}\n"),
+			[]byte("{\"message\":{\"content\":\"second\"},\"done\":true,\"eval_count\":1,\"prompt_eval_count\":1}\n"),
+		},
+		unblock: unblock,
+	}
+
+	a := openFake(t, func(_ *http.Request) (*http.Response, error) {
+		return &http.Response{StatusCode: http.StatusOK, Body: io.NopCloser(body)}, nil
+	}, "llama3")
+
+	ch, err := a.Stream(t.Context(), "", []ai.Message{{Role: ai.RoleUser, Content: "hi"}}, ai.GenerateOptions{})
+	if err != nil {
+		t.Fatalf("Stream: %v", err)
+	}
+
+	select {
+	case c, ok := <-ch:
+		if !ok {
+			t.Fatal("channel closed before first chunk")
+		}
+		if c.Err != nil {
+			t.Fatalf("chunk err: %v", c.Err)
+		}
+		if c.Delta != "first" {
+			t.Fatalf("first delta = %q, want %q (received before the second line was even sent)", c.Delta, "first")
+		}
+	case <-time.After(2 * time.Second):
+		t.Fatal("did not receive the first chunk without the second line ever arriving -- Stream is still buffering the whole response")
+	}
+
+	close(unblock)
+
+	for c := range ch {
+		if c.Err != nil {
+			t.Fatalf("chunk err: %v", c.Err)
+		}
+	}
+}
+
+// TestStream_oversized covers the total-byte cap on the incremental reader:
+// previously enforced by httpclient.ReadLimited over the whole buffered
+// response, now enforced by hand over the running total across incremental
+// line reads.
+func TestStream_oversized(t *testing.T) {
+	t.Parallel()
+
+	big := `{"message":{"content":"` + strings.Repeat("a", maxResponseBytes) + `"}}` + "\n"
+
+	a := openFake(t, func(_ *http.Request) (*http.Response, error) {
+		return &http.Response{StatusCode: http.StatusOK, Body: io.NopCloser(strings.NewReader(big))}, nil
+	}, "llama3")
+
+	ch, err := a.Stream(t.Context(), "", []ai.Message{{Role: ai.RoleUser, Content: "hi"}}, ai.GenerateOptions{})
+	if err != nil {
+		t.Fatalf("Stream: %v", err)
+	}
+
+	var gotErr error
+
+	for c := range ch {
+		if c.Err != nil {
+			gotErr = c.Err
+		}
+	}
+
+	if gotErr == nil || !strings.Contains(gotErr.Error(), "exceeds") {
+		t.Fatalf("err = %v, want it to mention exceeding the byte limit", gotErr)
 	}
 }
 
