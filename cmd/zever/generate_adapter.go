@@ -1219,7 +1219,7 @@ func (o *optionSpecs) Set(value string) error {
 
 // AdapterOption is one --field declaration for GenerateAdapter: a
 // snake_case config key and an adapterOptionTypes key. It mirrors optionSpec
-// in exported form so screen agents can construct adapter input without
+// in exported form so callers can construct adapter input without
 // touching flag parsing.
 type AdapterOption struct {
 	Key  string
@@ -1248,6 +1248,8 @@ type GenerateAdapterResult struct {
 // inputs and writes them to disk. Both files render before either is
 // written, so a collision on options.go cannot leave a half-scaffolded
 // package behind. It performs no flag parsing and no prompting.
+//
+//nolint:unparam // result kept for callers/tests; user output goes to cfg Stdout/Stderr writers.
 func GenerateAdapter(cfg GenerateAdapterConfig) (GenerateAdapterResult, error) {
 	const tag = "zever generate adapter"
 

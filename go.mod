@@ -3,10 +3,8 @@ module github.com/zenta-dev/zever
 go 1.27.0
 
 require (
-	charm.land/bubbles/v2 v2.2.1
-	charm.land/bubbletea/v2 v2.0.9
+	charm.land/bubbletea/v2 v2.0.2
 	charm.land/huh/v2 v2.0.3
-	charm.land/lipgloss/v2 v2.0.6
 	firebase.google.com/go/v4 v4.21.0
 	github.com/PaddleHQ/paddle-go-sdk/v5 v5.2.0
 	github.com/alicebob/miniredis/v2 v2.39.0
@@ -19,7 +17,7 @@ require (
 	github.com/aws/smithy-go v1.28.1
 	github.com/bufbuild/protocompile v0.14.1
 	github.com/casbin/casbin/v2 v2.135.0
-	github.com/charmbracelet/x/exp/teatest/v2 v2.0.0-20260913004009-c615ff2f7805
+	github.com/charmbracelet/x/exp/teatest/v2 v2.0.0-20260924144451-d676b019604b
 	github.com/chromedp/cdproto v0.0.0-20260714215040-dc233986426f
 	github.com/chromedp/chromedp v0.16.0
 	github.com/coreos/go-oidc/v3 v3.21.0
@@ -63,6 +61,8 @@ require (
 
 require (
 	cel.dev/expr v0.25.2 // indirect
+	charm.land/bubbles/v2 v2.0.0 // indirect
+	charm.land/lipgloss/v2 v2.0.1 // indirect
 	cloud.google.com/go v0.123.0 // indirect
 	cloud.google.com/go/auth v0.23.2 // indirect
 	cloud.google.com/go/auth/oauth2adapt v0.2.8 // indirect

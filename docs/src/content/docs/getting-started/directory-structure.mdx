@@ -16,7 +16,7 @@ zever/
 ├── middleware/    # HTTP middleware + gRPC interceptors, no registry
 ├── orm/           # generics typed SQL builder over db.DB
 ├── internal/dsl/  # .zen compiler frontend (lexer→parser→resolver→IR)
-├── cmd/zever/     # Bubble Tea TUI-first CLI
+├── cmd/zever/     # flags-only CLI
 ├── docs/          # this Starlight site (npm, not Go)
 ├── tools/         # gengrammar generator, zever-lsp module
 ├── config/README.md container/README.md ...  # per-package guides
@@ -50,7 +50,7 @@ Do not add methods to a public service interface — it breaks every implementer
 | `container/` | `New(cfg)` (nil valid), lazy accessors (`c.DB()`, `c.Cache()`), retry-on-error, `Close(ctx)` in dependency order |
 | `orm/` | `NewTable` / `NewColumn` / `From`, dialect per-call from `conn.Dialect()`, fail-closed errors |
 | `internal/dsl/` | `lexer → parser → ast → resolver → ir.Schema`, `compile → backend.Generate`; runtime must not import it |
-| `cmd/zever/` | dashboard on bare TTY, usage-to-stderr off TTY, `dev` watch mode, dev-only `tinker` REPL |
+| `cmd/zever/` | flags-only CLI, usage-to-stderr on bare invocation, `dev` watch mode, dev-only `tinker` REPL |
 
 ## Conventions that shape the tree
 

@@ -7,6 +7,16 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Changed
+
+- **Breaking:** `zever` dashboard/TUI removed. `cmd/zever` is now
+  flags-only: bare `zever` (TTY or not) prints usage to stderr and exits 1
+  (`zever: missing subcommand`) instead of opening an interactive
+  dashboard. `bubbletea`/`bubbles`/`lipgloss` removed from production
+  dependencies (`bubbletea`/`teatest` remain as test-only dependencies
+  driving the kept `huh` prompt tests); `-i`/`--interactive` (`ZEVER_INTERACTIVE`) `huh` guided prompts
+  (`prompt.go`) are kept.
+
 ### Added
 
 - `zever --version` (`-V`) prints the CLI release version (`zever vX.Y.Z`) to stdout.

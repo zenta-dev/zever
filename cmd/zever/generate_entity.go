@@ -107,8 +107,8 @@ func isIdent(s string) bool {
 }
 
 // EntityField is one --field declaration for GenerateEntity: a .zen field
-// name and scalar type. It mirrors fieldSpec in exported form so screen
-// agents can construct entity input without touching flag parsing.
+// name and scalar type. It mirrors fieldSpec in exported form so callers
+// can construct entity input without touching flag parsing.
 type EntityField struct {
 	Name string
 	Type string
@@ -126,6 +126,8 @@ type GenerateEntityConfig struct {
 
 // GenerateEntity appends the rendered entity declaration to the module's
 // .zen file and returns the file path. It performs no flag parsing.
+//
+//nolint:unparam // path result kept for callers/tests; user output goes to cfg Stdout/Stderr writers.
 func GenerateEntity(cfg GenerateEntityConfig) (string, error) {
 	const tag = "zever generate entity"
 
