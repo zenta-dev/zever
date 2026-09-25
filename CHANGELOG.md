@@ -7,6 +7,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [v0.3.0] - 2026-09-25
+
 ### Added
 
 - `config/schema/`: a hand-authored JSON Schema (draft 2020-12) for
