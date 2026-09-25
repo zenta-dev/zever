@@ -63,6 +63,8 @@ var ErrScheduleUsage = errors.New(`usage: zever generate schedule <module> <name
 // rendered schedule declaration to the module's .zen file, and returns the
 // file path. It performs no flag parsing and no prompting: callers fill every
 // field first.
+//
+//nolint:unparam // path result kept for callers/tests; user output goes to cfg Stdout/Stderr writers.
 func GenerateSchedule(cfg GenerateScheduleConfig) (string, error) {
 	const tag = "zever generate schedule"
 

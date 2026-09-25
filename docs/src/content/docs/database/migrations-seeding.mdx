@@ -13,7 +13,7 @@ zever db rollback --dsn 'postgres://app:secret@db:5432/app'
 zever db seed --dsn 'postgres://app:secret@db:5432/app'
 ```
 
-The dashboard rows (`migrate`, `rollback`, `seed`) mirror these exact invocations. DSNs are always masked in displayed CLI lines (`--dsn ***`), password-masked on input, and scrubbed from output.
+Run them via the exact invocations above. DSNs are always masked in displayed CLI lines (`--dsn ***`), password-masked on input, and scrubbed from output.
 
 ## Plan then apply
 
