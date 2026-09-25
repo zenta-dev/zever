@@ -479,7 +479,7 @@ func TestMemory_Buffer_backpressure(t *testing.T) {
 		t.Fatalf("Length = %d want 2", n)
 	}
 
-	ctx, cancel := context.WithTimeout(t.Context(), 80*time.Millisecond)
+	ctx, cancel := context.WithTimeout(t.Context(), 300*time.Millisecond)
 	defer cancel()
 	err := q.Push(ctx, topic, queue.Payload([]byte("3")), nil)
 	if err == nil {
@@ -514,7 +514,7 @@ func TestMemory_Buffer_backpressure(t *testing.T) {
 	if pushBErr := q.PushDelayed(t.Context(), topic, queue.Payload([]byte("b")), nil, 200*time.Millisecond); pushBErr != nil {
 		t.Fatalf("PushDelayed b: %v", err)
 	}
-	ctx2, cancel2 := context.WithTimeout(t.Context(), 80*time.Millisecond)
+	ctx2, cancel2 := context.WithTimeout(t.Context(), 150*time.Millisecond)
 	defer cancel2()
 	err = q.PushDelayed(ctx2, topic, queue.Payload([]byte("c")), nil, 200*time.Millisecond)
 	if err == nil {
@@ -531,7 +531,7 @@ func TestMemory_Buffer_backpressure(t *testing.T) {
 	if pushYErr := q.Push(t.Context(), topic3, queue.Payload([]byte("y")), nil); pushYErr != nil {
 		t.Fatalf("Push y: %v", err)
 	}
-	ctx3, cancel3 := context.WithTimeout(t.Context(), 80*time.Millisecond)
+	ctx3, cancel3 := context.WithTimeout(t.Context(), 300*time.Millisecond)
 	defer cancel3()
 	err = q.PushDelayed(ctx3, topic3, queue.Payload([]byte("z")), nil, 0)
 	if err == nil {

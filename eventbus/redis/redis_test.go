@@ -4,7 +4,6 @@ import (
 	"context"
 	"errors"
 	"fmt"
-	"os"
 	"strings"
 	"sync"
 	"sync/atomic"
@@ -16,47 +15,47 @@ import (
 	"github.com/zenta-dev/zever/eventbus"
 )
 
-// Shared hermetic broker for all tests.
-//
-// The adapter reuses the internal/redis shared Pool singleton, so every test
-// must dial the same server address: per-test miniredis instances on distinct
-// ports would thrash the singleton (each New closes the previous client).
-// Isolation comes from unique topics per test instead.
-var (
-	testMini *miniredis.Miniredis
-	testAddr string
-	topicSeq atomic.Int64
-)
-
-func TestMain(m *testing.M) {
-	s, err := miniredis.Run()
-	if err != nil {
-		fmt.Fprintln(os.Stderr, "miniredis start:", err)
-		os.Exit(1)
-	}
-
-	testMini = s
-	testAddr = s.Addr()
-
-	code := m.Run()
-
-	s.Close()
-
-	os.Exit(code)
-}
+// topicSeq keeps generated topics unique even within a single test's shared
+// miniredis instance.
+var topicSeq atomic.Int64
 
 func freshTopic() string {
 	return fmt.Sprintf("t%d", topicSeq.Add(1))
 }
 
-func testOptions() eventbus.Options {
-	return eventbus.Options{Redis: eventbus.RedisOptions{Addr: testAddr}}
+// testServer starts a per-test miniredis instance, auto-closed via
+// t.Cleanup.
+func testServer(t *testing.T) *miniredis.Miniredis {
+	t.Helper()
+
+	return miniredis.RunT(t)
 }
 
+// optionsFor builds eventbus.Options pointed at an already-running server,
+// for tests that need multiple adapters sharing one broker.
+func optionsFor(s *miniredis.Miniredis) eventbus.Options {
+	return eventbus.Options{Redis: eventbus.RedisOptions{Addr: s.Addr()}}
+}
+
+func testOptions(t *testing.T) eventbus.Options {
+	t.Helper()
+
+	return optionsFor(testServer(t))
+}
+
+// freshAdapter builds an adapter on its own isolated server, unless mutate
+// or a shared server is needed — see freshAdapterOn.
 func freshAdapter(t *testing.T, mutate func(*eventbus.Options)) eventbus.EventBus {
 	t.Helper()
 
-	opts := testOptions()
+	return freshAdapterOn(t, testServer(t), mutate)
+}
+
+// freshAdapterOn builds an adapter on the given (possibly shared) server.
+func freshAdapterOn(t *testing.T, s *miniredis.Miniredis, mutate func(*eventbus.Options)) eventbus.EventBus {
+	t.Helper()
+
+	opts := optionsFor(s)
 	if mutate != nil {
 		mutate(&opts)
 	}
@@ -78,7 +77,13 @@ func freshAdapter(t *testing.T, mutate func(*eventbus.Options)) eventbus.EventBu
 func newTestAdapter(t *testing.T, mutate func(*eventbus.Options)) *adapter {
 	t.Helper()
 
-	opts := testOptions()
+	return newTestAdapterOn(t, testServer(t), mutate)
+}
+
+func newTestAdapterOn(t *testing.T, s *miniredis.Miniredis, mutate func(*eventbus.Options)) *adapter {
+	t.Helper()
+
+	opts := optionsFor(s)
 	if mutate != nil {
 		mutate(&opts)
 	}
@@ -149,7 +154,7 @@ func TestNew_invalidOptions(t *testing.T) {
 		t.Run(tc.name, func(t *testing.T) {
 			t.Parallel()
 
-			opts := testOptions()
+			opts := testOptions(t)
 			tc.mutate(&opts)
 
 			if _, err := New(opts); !errors.Is(err, eventbus.ErrInvalidOptions) {
@@ -483,9 +488,10 @@ func TestPrefix_isolation(t *testing.T) {
 	t.Parallel()
 
 	topic := freshTopic()
+	server := testServer(t)
 
-	busA := freshAdapter(t, func(o *eventbus.Options) { o.Redis.Prefix = "pa" })
-	busB := freshAdapter(t, func(o *eventbus.Options) { o.Redis.Prefix = "pb" })
+	busA := freshAdapterOn(t, server, func(o *eventbus.Options) { o.Redis.Prefix = "pa" })
+	busB := freshAdapterOn(t, server, func(o *eventbus.Options) { o.Redis.Prefix = "pb" })
 
 	gotB := make(chan eventbus.Message, 4)
 	unsubB, err := busB.Subscribe(t.Context(), topic, func(_ context.Context, msg eventbus.Message) {
@@ -532,7 +538,7 @@ func TestNew_unreachablePing(t *testing.T) {
 		t.Fatalf("New unreachable err = %v, want it to mention redis: ping", err)
 	}
 
-	if _, err := New(testOptions()); err != nil {
+	if _, err := New(testOptions(t)); err != nil {
 		t.Fatalf("New restore err = %v, want nil", err)
 	}
 }

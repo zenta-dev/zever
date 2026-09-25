@@ -4,7 +4,6 @@ import (
 	"context"
 	"errors"
 	"fmt"
-	"os"
 	"strings"
 	"sync"
 	"sync/atomic"
@@ -18,30 +17,16 @@ import (
 	sredis "github.com/zenta-dev/zever/session/redis"
 )
 
-// Shared hermetic server for all tests. Each store built via New now owns
-// an independent client, so sharing one server is just convenience;
-// isolation still comes from unique key prefixes per test.
-var (
-	testMini *miniredis.Miniredis
-	testAddr string
-	keySeq   atomic.Int64
-)
+// keySeq keeps generated key prefixes unique even within a single test's
+// shared miniredis instance.
+var keySeq atomic.Int64
 
-func TestMain(m *testing.M) {
-	s, err := miniredis.Run()
-	if err != nil {
-		fmt.Fprintln(os.Stderr, "miniredis start:", err)
-		os.Exit(1)
-	}
+// testServer starts a per-test miniredis instance, auto-closed via
+// t.Cleanup.
+func testServer(t *testing.T) *miniredis.Miniredis {
+	t.Helper()
 
-	testMini = s
-	testAddr = s.Addr()
-
-	code := m.Run()
-
-	s.Close()
-
-	os.Exit(code)
+	return miniredis.RunT(t)
 }
 
 // testPrefix returns a unique, validation-safe key prefix per test.
@@ -68,10 +53,18 @@ func testPrefix(t *testing.T) string {
 	return p
 }
 
+// optionsFor builds session.Options pointed at an already-running server,
+// for tests that need a raw client sharing the store's backend.
+func optionsFor(t *testing.T, s *miniredis.Miniredis) session.Options {
+	t.Helper()
+
+	return session.Options{Redis: session.RedisOptions{Addr: s.Addr(), Prefix: testPrefix(t)}}
+}
+
 func testOptions(t *testing.T) session.Options {
 	t.Helper()
 
-	return session.Options{Redis: session.RedisOptions{Addr: testAddr, Prefix: testPrefix(t)}}
+	return optionsFor(t, testServer(t))
 }
 
 func newTestStore(t *testing.T, opts session.Options) session.Store {
@@ -91,12 +84,13 @@ func newTestStore(t *testing.T, opts session.Options) session.Store {
 	return st
 }
 
-// rawClient dials the test server directly, bypassing the shared Pool, for
-// scaffolding (planting corrupt records, asserting raw TTLs).
-func rawClient(t *testing.T) *goredis.Client {
+// rawClient dials addr directly, bypassing the store, for scaffolding
+// (planting corrupt records, asserting raw TTLs). addr must match the
+// store's own Redis.Addr to observe the same backend.
+func rawClient(t *testing.T, addr string) *goredis.Client {
 	t.Helper()
 
-	c := goredis.NewClient(&goredis.Options{Addr: testAddr})
+	c := goredis.NewClient(&goredis.Options{Addr: addr})
 	t.Cleanup(func() { _ = c.Close() })
 
 	return c
@@ -105,9 +99,11 @@ func rawClient(t *testing.T) *goredis.Client {
 func TestNew_invalidOptions(t *testing.T) {
 	t.Parallel()
 
+	addr := testServer(t).Addr()
+
 	for name, opts := range map[string]session.Options{
 		"negative TTL":   {TTL: -time.Second},
-		"bad prefix":     {Redis: session.RedisOptions{Addr: testAddr, Prefix: "has space"}},
+		"bad prefix":     {Redis: session.RedisOptions{Addr: addr, Prefix: "has space"}},
 		"scheme in addr": {Redis: session.RedisOptions{Addr: "redis://localhost:6379"}},
 	} {
 		if _, err := sredis.New(opts); !errors.Is(err, session.ErrInvalidOptions) {
@@ -196,13 +192,14 @@ func TestGet_miss_ErrNotFound(t *testing.T) {
 	}
 }
 
-// Sequential on purpose: FastForward jumps the shared server clock, so it
-// must not run alongside other tests.
 func TestExpiry(t *testing.T) {
+	t.Parallel()
+
+	server := testServer(t)
 	ctx := t.Context()
-	opts := testOptions(t)
+	opts := optionsFor(t, server)
 	st := newTestStore(t, opts)
-	raw := rawClient(t)
+	raw := rawClient(t, opts.Redis.Addr)
 
 	s, err := st.Create(ctx, 2*time.Second)
 	if err != nil {
@@ -213,7 +210,7 @@ func TestExpiry(t *testing.T) {
 		t.Fatalf("Get before expiry err = %v, want nil", err)
 	}
 
-	testMini.FastForward(3 * time.Second)
+	server.FastForward(3 * time.Second)
 
 	if _, err := st.Get(ctx, s.ID); !errors.Is(err, session.ErrNotFound) {
 		t.Fatalf("Get after expiry err = %v, want ErrNotFound", err)
@@ -280,7 +277,7 @@ func TestSave_keepsExpiry(t *testing.T) {
 	ctx := t.Context()
 	opts := testOptions(t)
 	st := newTestStore(t, opts)
-	raw := rawClient(t)
+	raw := rawClient(t, opts.Redis.Addr)
 
 	s, err := st.Create(ctx, time.Hour)
 	if err != nil {
@@ -350,7 +347,7 @@ func TestGet_corruptRecord(t *testing.T) {
 	ctx := t.Context()
 	opts := testOptions(t)
 	st := newTestStore(t, opts)
-	raw := rawClient(t)
+	raw := rawClient(t, opts.Redis.Addr)
 
 	s, err := st.Create(ctx, time.Hour)
 	if err != nil {
@@ -381,7 +378,7 @@ func TestSave_corruptOverwrites(t *testing.T) {
 	ctx := t.Context()
 	opts := testOptions(t)
 	st := newTestStore(t, opts)
-	raw := rawClient(t)
+	raw := rawClient(t, opts.Redis.Addr)
 
 	s, err := st.Create(ctx, time.Hour)
 	if err != nil {
@@ -410,9 +407,10 @@ func TestSave_corruptOverwrites(t *testing.T) {
 func TestDefaultPrefix(t *testing.T) {
 	t.Parallel()
 
+	server := testServer(t)
 	ctx := t.Context()
-	st := newTestStore(t, session.Options{Redis: session.RedisOptions{Addr: testAddr}})
-	raw := rawClient(t)
+	st := newTestStore(t, session.Options{Redis: session.RedisOptions{Addr: server.Addr()}})
+	raw := rawClient(t, server.Addr())
 
 	s, err := st.Create(ctx, time.Hour)
 	if err != nil {
