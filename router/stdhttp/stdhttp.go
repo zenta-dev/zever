@@ -13,9 +13,17 @@ import (
 
 // New creates a router.Router backed by the standard net/http.ServeMux.
 //
-// AppName is ignored; opts are accepted for registry compatibility.
+// AppName is ignored (accepted only for registry compatibility) but still
+// validated via opts.Validate() -- like every other router adapter -- so
+// options that fail against one adapter fail the same way against every
+// adapter they're swapped to, rather than only surfacing on whichever
+// adapter happens to check.
 // Use appends router-wide middleware affecting only later registrations.
 func New(opts router.Options) (router.Router, error) {
+	if err := opts.Validate(); err != nil {
+		return nil, fmt.Errorf("stdhttp: %w", err)
+	}
+
 	return &driver{mux: http.NewServeMux(), routes: make(map[string]bool), logger: opts.Logger}, nil
 }
 

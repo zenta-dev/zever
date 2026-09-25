@@ -429,27 +429,101 @@ func TestValidateRuleRendersJSONSchemaConstraint(t *testing.T) {
 		t.Fatalf("bio schema = %v, want minLength=1 maxLength=280", bio)
 	}
 
-	req := asMap(t, schemas["CreateUserRequest"])
+	req := asMap(t, schemas["UserServiceCreateUserRequest"])
 	reqProps := asMap(t, req["properties"])
 
 	reqEmail := asMap(t, reqProps["email"])
 	if reqEmail["format"] != "email" {
-		t.Fatalf("CreateUserRequest.email schema = %v, want format=email", reqEmail)
+		t.Fatalf("UserServiceCreateUserRequest.email schema = %v, want format=email", reqEmail)
 	}
 
 	age := asMap(t, reqProps["age"])
 	if age["minimum"] != float64(17) {
-		t.Fatalf("CreateUserRequest.age schema = %v, want minimum=17", age)
+		t.Fatalf("UserServiceCreateUserRequest.age schema = %v, want minimum=17", age)
 	}
 
 	if age["exclusiveMinimum"] != true {
-		t.Fatalf("CreateUserRequest.age schema = %v, want exclusiveMinimum=true (gt is exclusive)", age)
+		t.Fatalf("UserServiceCreateUserRequest.age schema = %v, want exclusiveMinimum=true (gt is exclusive)", age)
 	}
 }
 
 // TestPostRPCPathAndExtraParams proves a path param never doubles up in the
 // synthesized request schema: it appears only in parameters, and the
 // remaining params appear only in the request schema.
+// TestSameRPCNameDifferentServicesDoesNotCollide covers the fix for
+// addRequestSchema previously namespacing a synthesized request schema by
+// rpc.Name + module only (not svc.Name, unlike OperationID's own
+// "<Service>_<RPCName>" scheme): two services in the same module both
+// declaring a same-named RPC with body params used to silently produce ONE
+// component schema (whichever was processed last), leaving the other
+// operation's $ref pointing at the wrong (or even self-referencing, as
+// found regenerating examples/showcase's real output) schema with zero
+// diagnostic. Both request schemas must now exist, distinctly named and
+// correctly content-matched to their own service.
+func TestSameRPCNameDifferentServicesDoesNotCollide(t *testing.T) {
+	schema := compileSchema(t, `entity Widget {
+		id: uuid @primary
+	}
+
+	entity Gadget {
+		id: uuid @primary
+	}
+
+	service WidgetService {
+		rpc Create(name: string) -> Widget {
+			http: POST "/v1/widgets"
+			auth: required
+		}
+	}
+
+	service GadgetService {
+		rpc Create(label: string) -> Gadget {
+			http: POST "/v1/gadgets"
+			auth: required
+		}
+	}`)
+
+	out := mustGenerate(t, schema)
+	doc := decodeDoc(t, out["default/openapi.json"])
+	schemas := componentSchemas(t, doc)
+
+	widgetReq, ok := schemas["WidgetServiceCreateRequest"]
+	if !ok {
+		t.Fatalf("missing WidgetServiceCreateRequest component schema: %v", keysOfAny(schemas))
+	}
+
+	gadgetReq, ok := schemas["GadgetServiceCreateRequest"]
+	if !ok {
+		t.Fatalf("missing GadgetServiceCreateRequest component schema: %v", keysOfAny(schemas))
+	}
+
+	widgetProps := asMap(t, asMap(t, widgetReq)["properties"])
+	if _, ok := widgetProps["name"]; !ok {
+		t.Fatalf("WidgetServiceCreateRequest missing its own %q param: %v", "name", widgetProps)
+	}
+	if _, ok := widgetProps["label"]; ok {
+		t.Fatalf("WidgetServiceCreateRequest wrongly carries GadgetService's %q param: %v", "label", widgetProps)
+	}
+
+	gadgetProps := asMap(t, asMap(t, gadgetReq)["properties"])
+	if _, ok := gadgetProps["label"]; !ok {
+		t.Fatalf("GadgetServiceCreateRequest missing its own %q param: %v", "label", gadgetProps)
+	}
+	if _, ok := gadgetProps["name"]; ok {
+		t.Fatalf("GadgetServiceCreateRequest wrongly carries WidgetService's %q param: %v", "name", gadgetProps)
+	}
+
+	widgetOp := operationAt(t, doc, "/v1/widgets", "post")
+	if refOf(t, widgetOp, "requestBody") != "#/components/schemas/WidgetServiceCreateRequest" {
+		t.Fatalf("widget op requestBody $ref = %v, want WidgetServiceCreateRequest", refOf(t, widgetOp, "requestBody"))
+	}
+
+	gadgetOp := operationAt(t, doc, "/v1/gadgets", "post")
+	if refOf(t, gadgetOp, "requestBody") != "#/components/schemas/GadgetServiceCreateRequest" {
+		t.Fatalf("gadget op requestBody $ref = %v, want GadgetServiceCreateRequest", refOf(t, gadgetOp, "requestBody"))
+	}
+}
+
 func TestPostRPCPathAndExtraParams(t *testing.T) {
 	schema := compileSchema(t, `entity Order {
 		id: uuid @primary
@@ -483,15 +557,15 @@ func TestPostRPCPathAndExtraParams(t *testing.T) {
 	}
 
 	ref := refOf(t, op, "requestBody")
-	if ref != "#/components/schemas/UpdateOrderRequest" {
-		t.Fatalf("requestBody $ref = %v, want #/components/schemas/UpdateOrderRequest", ref)
+	if ref != "#/components/schemas/OrderServiceUpdateOrderRequest" {
+		t.Fatalf("requestBody $ref = %v, want #/components/schemas/OrderServiceUpdateOrderRequest", ref)
 	}
 
 	schemas := componentSchemas(t, doc)
 
-	reqSchema, ok := schemas["UpdateOrderRequest"]
+	reqSchema, ok := schemas["OrderServiceUpdateOrderRequest"]
 	if !ok {
-		t.Fatalf("missing UpdateOrderRequest component schema: %v", schemas)
+		t.Fatalf("missing OrderServiceUpdateOrderRequest component schema: %v", schemas)
 	}
 
 	props := asMap(t, asMap(t, reqSchema)["properties"])

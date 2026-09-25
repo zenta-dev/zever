@@ -12,7 +12,7 @@
           "content": {
             "application/json": {
               "schema": {
-                "$ref": "#/components/schemas/default_CreateBookingRequest"
+                "$ref": "#/components/schemas/default_BookingServiceCreateBookingRequest"
               }
             }
           }
@@ -81,7 +81,7 @@
           "content": {
             "application/json": {
               "schema": {
-                "$ref": "#/components/schemas/default_AddReviewRequest"
+                "$ref": "#/components/schemas/default_BookingServiceAddReviewRequest"
               }
             }
           }
@@ -132,7 +132,7 @@
           "content": {
             "application/json": {
               "schema": {
-                "$ref": "#/components/schemas/default_CreateSpaceRequest"
+                "$ref": "#/components/schemas/default_BookingServiceCreateSpaceRequest"
               }
             }
           }
@@ -192,22 +192,6 @@
   },
   "components": {
     "schemas": {
-      "default_AddReviewRequest": {
-        "type": "object",
-        "properties": {
-          "body": {
-            "type": "string"
-          },
-          "rating": {
-            "type": "integer",
-            "format": "int64"
-          },
-          "space_id": {
-            "type": "string",
-            "format": "uuid"
-          }
-        }
-      },
       "default_Booking": {
         "type": "object",
         "properties": {
@@ -241,7 +225,23 @@
           "id"
         ]
       },
-      "default_CreateBookingRequest": {
+      "default_BookingServiceAddReviewRequest": {
+        "type": "object",
+        "properties": {
+          "body": {
+            "type": "string"
+          },
+          "rating": {
+            "type": "integer",
+            "format": "int64"
+          },
+          "space_id": {
+            "type": "string",
+            "format": "uuid"
+          }
+        }
+      },
+      "default_BookingServiceCreateBookingRequest": {
         "type": "object",
         "properties": {
           "end_date": {
@@ -256,7 +256,7 @@
           }
         }
       },
-      "default_CreateSpaceRequest": {
+      "default_BookingServiceCreateSpaceRequest": {
         "type": "object",
         "properties": {
           "description": {

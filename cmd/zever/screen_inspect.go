@@ -275,7 +275,7 @@ func makeCompileExecFn(files []string, backends, outDir string) tui.ExecFunc {
 			files = discoverZenFiles()
 		}
 		var buf bytes.Buffer
-		err := runCompileWith(CompileConfig{Files: files, Backends: backends, OutDir: outDir, Out: &buf})
+		err := runCompileWith(CompileConfig{Files: files, Backends: backends, OutDir: outDir, Out: &buf}) //nolint:contextcheck // CLI entrypoint helpers take no ctx by convention; threading ctx through the CLI layer is out of scope
 		return buf.String(), err
 	}
 }
@@ -375,7 +375,7 @@ func makeCheckExecFn(files []string) tui.ExecFunc {
 			files = discoverZenFiles()
 		}
 		var buf bytes.Buffer
-		err := runCheckWith(CheckConfig{Files: files, Out: &buf})
+		err := runCheckWith(CheckConfig{Files: files, Out: &buf}) //nolint:contextcheck // CLI entrypoint helpers take no ctx by convention; threading ctx through the CLI layer is out of scope
 		return buf.String(), err
 	}
 }
@@ -453,7 +453,7 @@ func makeBreakingExecFn(oldFiles, newFiles []string) tui.ExecFunc {
 			return "", err
 		}
 		var buf bytes.Buffer
-		err := runBreakingWith(BreakingConfig{OldFiles: oldFiles, NewFiles: newFiles, Out: &buf})
+		err := runBreakingWith(BreakingConfig{OldFiles: oldFiles, NewFiles: newFiles, Out: &buf}) //nolint:contextcheck // CLI entrypoint helpers take no ctx by convention; threading ctx through the CLI layer is out of scope
 		return buf.String(), err
 	}
 }

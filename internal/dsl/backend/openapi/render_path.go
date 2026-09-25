@@ -1,6 +1,7 @@
 package openapi
 
 import (
+	"fmt"
 	nethttp "net/http"
 	"strconv"
 	"strings"
@@ -102,8 +103,10 @@ func findHTTPTransport(transports []ir.Transport) (ir.HTTPTransport, bool) {
 // buildOperation renders one rpc (which must have an HTTP transport) into
 // its OpenAPI operation, registering any component schemas it needs (the
 // response entity, and a synthesized request schema for POST/PUT/PATCH RPCs
-// with non-path params) on d.
-func buildOperation(svc *ir.Service, rpc *ir.Operation, http ir.HTTPTransport, d *docBuilder) *operation {
+// with non-path params) on d. It returns an error if the synthesized
+// request schema name collides with a different RPC's (see
+// docBuilder.addRequestSchema).
+func buildOperation(svc *ir.Service, rpc *ir.Operation, http ir.HTTPTransport, d *docBuilder) (*operation, error) {
 	op := &operation{
 		OperationID: svc.Name + "_" + rpc.Name,
 		Responses:   map[string]*response{},
@@ -142,7 +145,13 @@ func buildOperation(svc *ir.Service, rpc *ir.Operation, http ir.HTTPTransport, d
 		}
 	default: // POST, PUT, PATCH
 		if len(rest) > 0 {
-			reqName := d.addRequestSchema(rpc.Name+"Request", svc.Module, rest)
+			owner := fmt.Sprintf("%s.%s", svc.Name, rpc.Name)
+
+			reqName, err := d.addRequestSchema(svc.Name+rpc.Name+"Request", owner, svc.Module, rest)
+			if err != nil {
+				return nil, err
+			}
+
 			op.RequestBody = &requestBody{
 				Content: map[string]*mediaType{
 					"application/json": {Schema: &schemaObject{Ref: "#/components/schemas/" + reqName}},
@@ -198,7 +207,7 @@ func buildOperation(svc *ir.Service, rpc *ir.Operation, http ir.HTTPTransport, d
 		op.XPermission = xp
 	}
 
-	return op
+	return op, nil
 }
 
 // addErrorResponses populates op.Responses with one entry per distinct HTTP

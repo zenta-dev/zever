@@ -12,6 +12,7 @@ import (
 
 	"github.com/zenta-dev/zever/idempotency"
 	"github.com/zenta-dev/zever/internal/httpclient"
+	"github.com/zenta-dev/zever/internal/providers"
 	"github.com/zenta-dev/zever/payment"
 )
 
@@ -44,13 +45,7 @@ func New(o payment.Options) (payment.Payment, error) {
 	}
 
 	httpClient := httpclient.NewClient(payment.DefaultHTTPTimeout)
-
-	cfg := &stripe.BackendConfig{HTTPClient: httpClient}
-	if o.Endpoint != "" {
-		cfg.URL = stripe.String(o.Endpoint)
-	}
-
-	client := stripe.NewClient(o.SecretKey, stripe.WithBackends(stripe.NewBackendsWithConfig(cfg)))
+	client := providers.NewStripeClientWithHTTPClient(o.SecretKey, o.Endpoint, httpClient)
 
 	maxBytes := o.MaxWebhookBytes
 	if maxBytes <= 0 {

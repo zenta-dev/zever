@@ -7,7 +7,7 @@ import (
 	"github.com/stripe/stripe-go/v82"
 
 	"github.com/zenta-dev/zever/billing"
-	"github.com/zenta-dev/zever/internal/httpclient"
+	"github.com/zenta-dev/zever/internal/providers"
 )
 
 var _ billing.Billing = (*driver)(nil)
@@ -26,12 +26,7 @@ func New(o billing.Options) (billing.Billing, error) {
 		return nil, ErrMissingSecretKey
 	}
 
-	cfg := &stripe.BackendConfig{HTTPClient: httpclient.NewClient(billing.DefaultHTTPTimeout)}
-	if o.Endpoint != "" {
-		cfg.URL = stripe.String(o.Endpoint)
-	}
-
-	client := stripe.NewClient(o.SecretKey, stripe.WithBackends(stripe.NewBackendsWithConfig(cfg)))
+	client := providers.NewStripeClient(o.SecretKey, o.Endpoint, billing.DefaultHTTPTimeout)
 
 	return &driver{client: client}, nil
 }
