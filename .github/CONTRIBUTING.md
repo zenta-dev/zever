@@ -196,6 +196,28 @@ cd tools/zever-lsp && go mod edit -replace github.com/zenta-dev/zever=../.. && g
 git checkout -- tools/zever-lsp/go.mod tools/zever-lsp/go.sum
 ```
 
+## Release checklist (bump everything together)
+
+Every release ships one number across all components, so no surface
+confuses users with a stale version. The `internal/dsl` compiler has no
+release-version constant (schema `v1`/`v2` segments are API versions, not
+releases) — everything else moves together:
+
+- `CHANGELOG.md`: cut `## [Unreleased]` to `## [vX.Y.Z] - YYYY-MM-DD`.
+- Root pins: `CITATION.cff`, `cmd/zever/new.go` (`defaultFrameworkVersion`)
+  plus `cmd/zever/new_test.go`, `cmd/zever/main.go` (`cliVersion`),
+  `cmd/zever/README.md`.
+- LSP: `tools/zever-lsp/server.go` (`serverVersion`), `tools/zever-lsp/go.mod`
+  (require published root) + `go.sum` via `go mod tidy`, `tools/zever-lsp/README.md`.
+- Editors: `editors/vscode/package.json`, `editors/vscode/README.md`,
+  `editors/nvim/README.md` (LSP install pins).
+- Docs: `docs/src/content/docs/getting-started/installation.mdx`,
+  `docs/src/content/docs/getting-started/upgrade.mdx`,
+  `docs/src/content/docs/dsl/lsp-tooling.mdx`.
+- Tags: `vX.Y.Z` on the changelog cut, `tools/zever-lsp/vX.Y.Z` on main once
+  the bump lands. Verify with `grep -rn` for the old version (excluding
+  `CHANGELOG.md` history and third-party `go.sum` lines) before tagging.
+
 ## Commit Convention
 
 Use [Conventional Commits](https://www.conventionalcommits.org/) style messages:

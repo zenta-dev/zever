@@ -142,7 +142,7 @@ module.
 Without a local clone, install the published release instead:
 
 ```bash
-go install github.com/zenta-dev/zever/tools/zever-lsp@v0.1.0
+go install github.com/zenta-dev/zever/tools/zever-lsp@v0.3.0
 ```
 
 ## Verifying it worked

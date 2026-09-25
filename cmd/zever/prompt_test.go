@@ -68,6 +68,34 @@ func captureStderr(t *testing.T, fn func()) string {
 	return string(out)
 }
 
+// captureStdout redirects os.Stdout to a pipe while fn runs and returns what
+// was written.
+func captureStdout(t *testing.T, fn func()) string {
+	t.Helper()
+
+	prev := os.Stdout
+	r, w, err := os.Pipe()
+	if err != nil {
+		t.Fatalf("os.Pipe: %v", err)
+	}
+
+	os.Stdout = w
+	defer func() { os.Stdout = prev }()
+
+	fn()
+
+	if closeErr := w.Close(); closeErr != nil {
+		t.Fatalf("close pipe writer: %v", closeErr)
+	}
+
+	out, err := io.ReadAll(r)
+	if err != nil {
+		t.Fatalf("read pipe: %v", err)
+	}
+
+	return string(out)
+}
+
 // writeZenFixture writes content at rel under dir, creating parents.
 func writeZenFixture(t *testing.T, dir, rel, content string) {
 	t.Helper()
