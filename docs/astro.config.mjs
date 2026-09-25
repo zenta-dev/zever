@@ -15,6 +15,9 @@ export default defineConfig({
 				alt: 'zever logo',
 			},
 			customCss: ['./src/styles/custom.css'],
+			components: {
+				Head: './src/components/Head.astro',
+			},
 			plugins: [
 				starlightThemeBlack({
 					navLinks: [{ label: 'Docs', link: '/getting-started/installation' }],
