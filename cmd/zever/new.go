@@ -56,7 +56,7 @@ const (
 	// defaultFrameworkVersion is the published zever version a new project
 	// depends on by default when neither --framework-path nor
 	// --framework-version is given and no framework checkout is detected.
-	defaultFrameworkVersion = "v0.2.0"
+	defaultFrameworkVersion = "v0.3.0"
 
 	// pseudoVersionZero is the placeholder version a require line carries
 	// when the real resolution comes from a local replace directive.

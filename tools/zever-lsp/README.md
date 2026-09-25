@@ -8,7 +8,7 @@ edits to any LSP-capable editor over stdio.
 ## Install
 
 ```sh
-go install github.com/zenta-dev/zever/tools/zever-lsp@v0.2.0
+go install github.com/zenta-dev/zever/tools/zever-lsp@v0.3.0
 ```
 
 Make sure the resulting binary directory (`$(go env GOPATH)/bin` by default)
@@ -78,7 +78,7 @@ the protocol stream.
   to stderr by design; check for wrapper scripts or editor plugins that
   merge the streams.
 - There is no `--version` (or any) CLI flag: the server speaks LSP over
-   stdio only. The version (`0.2.0` in `server.go`) is reported in the
+   stdio only. The version (`0.3.0` in `server.go`) is reported in the
   `initialize` result's `serverInfo`.
 
 ## The DSL itself

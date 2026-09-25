@@ -22,7 +22,7 @@ zever compile --out ./generated
 `tools/zever-lsp` is an independently versioned Go module speaking stdio LSP 3.18, built on the `go.lsp.dev` stack. It requires the published `zever` release (no local `replace`), tagged as `tools/zever-lsp/vX.Y.Z`:
 
 ```sh
-go install github.com/zenta-dev/zever/tools/zever-lsp@v0.2.0
+go install github.com/zenta-dev/zever/tools/zever-lsp@v0.3.0
 ```
 
 Make sure the resulting binary directory (`$(go env GOPATH)/bin` by default) is on your `PATH`, then point your editor at the `zever-lsp` binary. It compiles your `.zen` workspace in-process, so diagnostics and hover use the exact same resolver the compiler does — editor and build can never disagree.
