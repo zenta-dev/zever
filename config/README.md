@@ -179,3 +179,9 @@ supply real secrets via file or environment.
 working directory; first hit wins, absent files skip silently. An explicit
 path must exist and decode — any failure returns `nil` plus the error, as
 does any merge, env, or validation failure.
+
+## Editor autocomplete and validation
+
+`config/schema/` has a JSON Schema for `zever.yaml`/`.yml`/`.json` (plus a
+TOML-format copy for TOML-aware tooling) — see `config/schema/README.md`
+for how to wire it into your editor.

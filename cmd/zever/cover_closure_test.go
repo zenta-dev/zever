@@ -29,32 +29,28 @@ func TestClosureGenerateModuleErrors(t *testing.T) {
 	dir := t.TempDir()
 	withWorkingDir(t, dir)
 
-	if _, err := GenerateModule(GenerateModuleConfig{Name: "../evil", Lang: "go", SchemaDir: "schema"}); !isTraversalError(err) {
+	if _, err := GenerateModule(GenerateModuleConfig{Name: "../evil", SchemaDir: "schema"}); !isTraversalError(err) {
 		t.Fatalf("traversal = %v", err)
 	}
 
-	if _, err := GenerateModule(GenerateModuleConfig{Name: "bad-name", Lang: "go", SchemaDir: "schema"}); err == nil {
+	if _, err := GenerateModule(GenerateModuleConfig{Name: "bad-name", SchemaDir: "schema"}); err == nil {
 		t.Fatal("want ident error")
 	}
 
-	if _, err := GenerateModule(GenerateModuleConfig{Name: "ok", Lang: "rust", SchemaDir: "schema"}); err == nil {
-		t.Fatal("want lang error")
-	}
-
 	// joinUnderRoot error: absolute SchemaDir escapes root.
-	if _, err := GenerateModule(GenerateModuleConfig{Name: "ok", Lang: "go", SchemaDir: "/abs"}); err == nil {
+	if _, err := GenerateModule(GenerateModuleConfig{Name: "ok", SchemaDir: "/abs"}); err == nil {
 		t.Fatal("want joinUnderRoot error")
 	}
 
 	// Mkdir failure: schema dir parent is a file.
 	writeZeverFixture(t, dir, "blocker", "x")
 
-	if _, err := GenerateModule(GenerateModuleConfig{Name: "m", Lang: "go", SchemaDir: "blocker/sub"}); err == nil {
+	if _, err := GenerateModule(GenerateModuleConfig{Name: "m", SchemaDir: "blocker/sub"}); err == nil {
 		t.Fatal("want mkdir error")
 	}
 
 	// Write failure: make the target path a directory.
-	if _, err := GenerateModule(GenerateModuleConfig{Name: "w", Lang: "go", SchemaDir: "schema"}); err != nil {
+	if _, err := GenerateModule(GenerateModuleConfig{Name: "w", SchemaDir: "schema"}); err != nil {
 		t.Fatalf("setup module: %v", err)
 	}
 
@@ -67,7 +63,7 @@ func TestClosureGenerateModuleErrors(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	if _, err := GenerateModule(GenerateModuleConfig{Name: "w", Lang: "go", SchemaDir: "schema"}); err == nil {
+	if _, err := GenerateModule(GenerateModuleConfig{Name: "w", SchemaDir: "schema"}); err == nil {
 		t.Fatal("want write error")
 	}
 }
@@ -1197,10 +1193,6 @@ func TestClosureRunNewBranches(t *testing.T) {
 		t.Fatal("want app name error")
 	}
 
-	if err := runNew([]string{"app", "--framework-path", "x", "--framework-version", "v1"}); err == nil {
-		t.Fatal("want mutual exclusion error")
-	}
-
 	// Cargo present.
 	writeZeverFixture(t, dir, "Cargo.toml", "[package]\n")
 
@@ -1224,10 +1216,15 @@ func TestClosureRunNewBranches(t *testing.T) {
 		_ = os.Remove(link)
 	}
 
-	// resolveFramework explicit bad path.
-	if err := runNew([]string{"app", "--framework-path", filepath.Join(dir, "nope")}); err == nil {
+	// resolveFramework explicit bad path (via the test-only env seam, since
+	// --framework-path no longer exists as a CLI flag).
+	t.Setenv(zeverFrameworkPathEnv, filepath.Join(dir, "nope"))
+
+	if err := runNew([]string{"app"}); err == nil {
 		t.Fatal("want framework-path error")
 	}
+
+	t.Setenv(zeverFrameworkPathEnv, "")
 
 	// Version path success.
 	out := filepath.Join(dir, "vapp")
@@ -1259,7 +1256,9 @@ func TestClosureRunNewBranches(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	if err := runNew([]string{"fwapp", "--framework-path", emptyFw, "--dir", filepath.Join(dir, "fwapp")}); err == nil {
+	t.Setenv(zeverFrameworkPathEnv, emptyFw)
+
+	if err := runNew([]string{"fwapp", "--dir", filepath.Join(dir, "fwapp")}); err == nil {
 		t.Fatal("want fw checkout error")
 	}
 }

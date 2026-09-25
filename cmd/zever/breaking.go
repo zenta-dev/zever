@@ -11,6 +11,36 @@ import (
 	"github.com/zenta-dev/zever/internal/dsl/compile"
 )
 
+// expandDirArgs replaces every bare-directory entry in paths with every .zen
+// file recursively discovered under it (flat, versioned, or arbitrarily
+// nested layouts all resolve the same way as everywhere else in the CLI --
+// see walkZenFiles in prompt.go), leaving glob-expanded files and any other
+// entry untouched. This lets `zever breaking old-schema -- new-schema` work
+// without the caller spelling out `old-schema/*.zen`.
+func expandDirArgs(paths []string) ([]string, error) {
+	expanded := make([]string, 0, len(paths))
+
+	for _, p := range paths {
+		info, err := os.Stat(p)
+		if err != nil || !info.IsDir() {
+			// Not a directory (or unreadable) -- leave it for loadFiles to
+			// read directly, which reports the real error if any.
+			expanded = append(expanded, p)
+
+			continue
+		}
+
+		found, walkErr := walkZenFiles(p)
+		if walkErr != nil {
+			return nil, fmt.Errorf("zever breaking: scan %q: %w", p, walkErr)
+		}
+
+		expanded = append(expanded, found...)
+	}
+
+	return expanded, nil
+}
+
 //nolint:unused
 const breakingUsage = `zever breaking <old-files...> -- <new-files...>
 
@@ -19,6 +49,12 @@ change between them (removed entity/message/service/rpc/field, a changed
 field/param/return type, a changed HTTP method or path). Additions and new
 @validate rules are reported too, but as non-breaking, informational
 changes. Exits non-zero if any breaking change is found, so it can gate CI.
+
+Each side accepts individual files, a shell-expanded glob, or a bare
+directory -- a directory is recursively discovered for every .zen file
+under it (flat, versioned, or arbitrarily nested layouts all work), so
+` + "`zever breaking schema-old -- schema`" + ` behaves the same as spelling
+out ` + "`schema-old/*.zen`" + `.
 
 Flags:`
 
@@ -94,12 +130,22 @@ func runBreaking(args []string) error {
 func runBreakingWith(cfg BreakingConfig) error {
 	out := outOrStdout(cfg.Out)
 
-	oldFiles, err := loadFiles(cfg.OldFiles)
+	oldArgs, err := expandDirArgs(cfg.OldFiles)
+	if err != nil {
+		return err
+	}
+
+	newArgs, err := expandDirArgs(cfg.NewFiles)
+	if err != nil {
+		return err
+	}
+
+	oldFiles, err := loadFiles(oldArgs)
 	if err != nil {
 		return fmt.Errorf("zever breaking: old schema: %w", err)
 	}
 
-	newFiles, err := loadFiles(cfg.NewFiles)
+	newFiles, err := loadFiles(newArgs)
 	if err != nil {
 		return fmt.Errorf("zever breaking: new schema: %w", err)
 	}

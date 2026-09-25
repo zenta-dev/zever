@@ -55,5 +55,5 @@ After touching `token.Keywords` or `resolver.ScalarTypeNames`, run `make generat
 `breaking` diffs old-vs-new schemas into a `Change` taxonomy (additive vs. breaking). Wire it into CI so a removed field or renamed RPC fails the build before clients break:
 
 ```sh
-zever breaking --old schema/v1 --new schema/v2
+zever breaking schema-old/*.zen -- schema/*.zen
 ```

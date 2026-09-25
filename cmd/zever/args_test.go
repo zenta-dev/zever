@@ -15,7 +15,6 @@ func newTestFlagSet() *flag.FlagSet {
 	fs.String("module", "", "")
 	fs.String("dir", "", "")
 	fs.String("field", "", "")
-	fs.String("lang", "go", "")
 	fs.String("config", "", "")
 	fs.Bool("interactive", false, "")
 	fs.Bool("i", false, "")
@@ -23,7 +22,6 @@ func newTestFlagSet() *flag.FlagSet {
 	fs.Bool("drop-columns", false, "")
 	fs.Bool("force", false, "")
 	// additional value flags mentioned in spec
-	fs.String("framework-path", "", "")
 	fs.String("framework-version", "", "")
 	fs.String("entry", "", "")
 	fs.String("app", "", "")

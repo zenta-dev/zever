@@ -16,7 +16,8 @@ i18n:
 i18n:
   adapter: remote  # production: shared catalog service
   options:
-    endpoint: https://i18n.example.com
+    remote:
+      endpoint: https://i18n.example.com
 ```
 
 ```go
@@ -24,7 +25,7 @@ t, err := c.I18n()
 if err != nil {
     return err
 }
-msg := t.Get(ctx, "en", "welcome", map[string]any{"Name": "Ada"})
+msg, err := t.Translate(ctx, "en", "welcome", map[string]string{"Name": "Ada"})
 ```
 
 ## Locale resolution
@@ -54,7 +55,7 @@ Keep locale resolution in one middleware or helper so every handler reads the sa
 | Plural | `"cart.n": "{Count} item / {Count} items"` (CLDR rules per locale) |
 | Fallback | missing key in `fr` falls back to `en`, never an empty string |
 
-Pass structured args (`map[string]any`) rather than pre-formatted strings — word order differs across languages, and translators need the placeholders.
+Pass structured args (`map[string]string`) rather than pre-formatted strings — word order differs across languages, and translators need the placeholders.
 
 ## Testing
 

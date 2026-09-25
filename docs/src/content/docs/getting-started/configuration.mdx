@@ -53,6 +53,23 @@ Discovery rules:
 | Unsupported extension | fails with `ErrUnsupportedFormat` (only `.yaml`, `.yml`, `.json`) |
 | Null / empty block | decodes to zero values |
 
+File keys are strict snake_case — old flat spellings from before the
+naming pass are rejected as unknown fields, not silently accepted:
+
+| Old key | New key |
+|---|---|
+| `apikey` | `api_key` |
+| `maxconns` / `minconns` | `max_conns` / `min_conns` |
+| `secretkey` / `webhooksecret` | `secret_key` / `webhook_secret` |
+
+If a file key you expect to work is rejected as unknown, check whether it
+predates this rename — see `CHANGELOG.md` for the full list of renamed
+fields per service.
+
+For editor autocomplete and inline validation of `zever.yaml`/`.yml`/`.json`,
+see the JSON Schema and setup instructions in
+[`config/schema/`](https://github.com/zenta-dev/zever/tree/main/config/schema).
+
 ## Environment: no prefix, best-effort
 
 Variables carry no prefix — just `<SERVICE>_<FIELD>`, uppercased:

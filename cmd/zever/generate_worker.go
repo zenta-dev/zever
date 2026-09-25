@@ -5,7 +5,6 @@ import (
 	"flag"
 	"fmt"
 	"io"
-	"io/fs"
 	"os"
 	"path/filepath"
 	"sort"
@@ -206,8 +205,9 @@ func compileSchemaDir(tag, dir string) (*ir.Schema, error) {
 	return result.Schema, nil
 }
 
-// collectZenFiles walks dir recursively and reads every .zen file into the
-// map shape compile.Compile expects.
+// collectZenFiles walks dir recursively (via the shared walkZenFiles helper
+// in prompt.go) and reads every .zen file into the map shape compile.Compile
+// expects.
 func collectZenFiles(tag, dir string) (map[string]string, error) {
 	info, err := os.Stat(dir)
 	if err != nil {
@@ -222,28 +222,20 @@ func collectZenFiles(tag, dir string) (map[string]string, error) {
 		return nil, fmt.Errorf("%s: schema_dir %q is not a directory", tag, dir)
 	}
 
-	files := map[string]string{}
+	paths, walkErr := walkZenFiles(dir)
+	if walkErr != nil {
+		return nil, fmt.Errorf("%s: scan %q: %w", tag, dir, walkErr)
+	}
 
-	walkErr := filepath.WalkDir(dir, func(path string, entry fs.DirEntry, err error) error {
-		if err != nil {
-			return err
-		}
+	files := make(map[string]string, len(paths))
 
-		if entry.IsDir() || !strings.EqualFold(filepath.Ext(path), ".zen") {
-			return nil
-		}
-
+	for _, path := range paths {
 		data, err := os.ReadFile(path) //nolint:gosec // developer-supplied schema directory
 		if err != nil {
-			return err
+			return nil, fmt.Errorf("%s: scan %q: %w", tag, dir, err)
 		}
 
 		files[path] = string(data)
-
-		return nil
-	})
-	if walkErr != nil {
-		return nil, fmt.Errorf("%s: scan %q: %w", tag, dir, walkErr)
 	}
 
 	return files, nil

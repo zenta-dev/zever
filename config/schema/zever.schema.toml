@@ -1,0 +1,1561 @@
+'$id' = 'https://raw.githubusercontent.com/zenta-dev/zever/main/config/schema/zever.schema.json'
+'$schema' = 'https://json-schema.org/draft/2020-12/schema'
+additionalProperties = false
+description = 'Schema for zever.yaml / zever.yml / zever.json (config.Config). One property per battery service, each shaped { adapter, options }. File decoding is strict: unknown top-level services and unknown fields inside an options block are rejected (config/decode.go DisallowUnknownFields). time.Duration fields are plain integer nanoseconds in file config (only environment-variable overrides accept Go duration strings like "5s") -- see config/README.md and getting-started/configuration.mdx.'
+title = 'zever configuration'
+type = 'object'
+
+['$defs']
+['$defs'.aiOptions]
+additionalProperties = false
+type = 'object'
+
+['$defs'.aiOptions.properties]
+['$defs'.aiOptions.properties.api_key]
+type = 'string'
+
+['$defs'.aiOptions.properties.base_url]
+description = 'Must be a valid https URL when set.'
+type = 'string'
+
+['$defs'.aiOptions.properties.model]
+type = 'string'
+
+['$defs'.aiOptions.properties.timeout]
+'$ref' = '#/$defs/durationNs'
+
+['$defs'.analyticsOptions]
+additionalProperties = false
+type = 'object'
+
+['$defs'.analyticsOptions.properties]
+['$defs'.analyticsOptions.properties.anonymous_id]
+description = 'Default: "anonymous".'
+type = 'string'
+
+['$defs'.analyticsOptions.properties.api_key]
+type = 'string'
+
+['$defs'.analyticsOptions.properties.endpoint]
+type = 'string'
+
+['$defs'.analyticsOptions.properties.group_type]
+description = 'Default: "organization".'
+type = 'string'
+
+['$defs'.analyticsOptions.properties.max_properties]
+minimum = 0.0
+type = 'integer'
+
+['$defs'.analyticsOptions.properties.max_properties_bytes]
+description = 'Default: 65536 (64 KiB).'
+minimum = 0.0
+type = 'integer'
+
+['$defs'.authOptions]
+additionalProperties = false
+type = 'object'
+
+['$defs'.authOptions.properties]
+['$defs'.authOptions.properties.jwt]
+additionalProperties = false
+type = 'object'
+
+['$defs'.authOptions.properties.jwt.properties]
+['$defs'.authOptions.properties.jwt.properties.audience]
+type = 'string'
+
+['$defs'.authOptions.properties.jwt.properties.issuer]
+description = 'Required by the jwt adapter.'
+type = 'string'
+
+['$defs'.authOptions.properties.jwt.properties.max_ttl]
+'$ref' = '#/$defs/durationNs'
+description = 'Zero means no cap.'
+
+['$defs'.authOptions.properties.jwt.properties.secret]
+description = 'HMAC signing secret, minimum 32 bytes (adapter-validated).'
+type = 'string'
+
+['$defs'.authOptions.properties.oidc]
+additionalProperties = false
+type = 'object'
+
+['$defs'.authOptions.properties.oidc.properties]
+['$defs'.authOptions.properties.oidc.properties.client_id]
+description = 'Required by the oidc adapter.'
+type = 'string'
+
+['$defs'.authOptions.properties.oidc.properties.issuer]
+description = 'Required by the oidc adapter.'
+type = 'string'
+
+['$defs'.authOptions.properties.oidc.properties.timeout]
+'$ref' = '#/$defs/durationNs'
+
+['$defs'.authOptions.properties.session]
+additionalProperties = false
+description = 'SessionOptions.Store is a Go-only session.Store injection (json:"-") -- there is nothing settable here from a config file.'
+type = 'object'
+
+['$defs'.authOptions.properties.session.properties]
+['$defs'.cacheOptions]
+additionalProperties = false
+type = 'object'
+
+['$defs'.cacheOptions.properties]
+['$defs'.cacheOptions.properties.adapter]
+description = 'Deprecated/legacy: cache.Options carries its own internal Adapter int field (0=memory,1=redis), separate from and easily confused with the outer service.adapter string. Prefer the outer adapter field; avoid setting this.'
+enum = [0.0, 1.0]
+type = 'integer'
+
+['$defs'.cacheOptions.properties.addr]
+type = 'string'
+
+['$defs'.cacheOptions.properties.capacity]
+type = 'integer'
+
+['$defs'.cacheOptions.properties.db]
+type = 'integer'
+
+['$defs'.cacheOptions.properties.max_conn_idle_time]
+'$ref' = '#/$defs/durationNs'
+
+['$defs'.cacheOptions.properties.max_conn_lifetime]
+'$ref' = '#/$defs/durationNs'
+
+['$defs'.cacheOptions.properties.max_entries]
+type = 'integer'
+
+['$defs'.cacheOptions.properties.min_idle_conns]
+type = 'integer'
+
+['$defs'.cacheOptions.properties.password]
+type = 'string'
+
+['$defs'.cacheOptions.properties.pool_size]
+type = 'integer'
+
+['$defs'.cacheOptions.properties.pool_timeout]
+'$ref' = '#/$defs/durationNs'
+
+['$defs'.cacheOptions.properties.require_tls]
+type = 'boolean'
+
+['$defs'.cacheOptions.properties.sweep_interval]
+'$ref' = '#/$defs/durationNs'
+
+['$defs'.cacheOptions.properties.tls]
+type = 'boolean'
+
+['$defs'.cacheOptions.properties.url]
+description = 'Redis connection URL; takes precedence over addr when set.'
+type = 'string'
+
+['$defs'.cacheOptions.properties.verbose]
+type = 'boolean'
+
+['$defs'.cryptoOptions]
+additionalProperties = false
+type = 'object'
+
+['$defs'.cryptoOptions.properties]
+['$defs'.cryptoOptions.properties.key]
+description = 'Required. Base64-encoded 32-byte encryption key.'
+type = 'string'
+
+['$defs'.cryptoOptions.properties.sign_key]
+description = 'Base64-encoded 64-byte signing key.'
+type = 'string'
+
+['$defs'.dbOptions]
+additionalProperties = false
+type = 'object'
+
+['$defs'.dbOptions.properties]
+['$defs'.dbOptions.properties.dsn]
+description = 'Postgres connection string.'
+type = 'string'
+
+['$defs'.dbOptions.properties.max_conn_idle_time]
+'$ref' = '#/$defs/durationNs'
+
+['$defs'.dbOptions.properties.max_conn_lifetime]
+'$ref' = '#/$defs/durationNs'
+
+['$defs'.dbOptions.properties.max_conns]
+minimum = 0.0
+type = 'integer'
+
+['$defs'.dbOptions.properties.min_conns]
+description = 'Minimum pool size (postgres) or idle-connection target (sqlite).'
+minimum = 0.0
+type = 'integer'
+
+['$defs'.dbOptions.properties.path]
+description = 'SQLite database file path.'
+type = 'string'
+
+['$defs'.documentOptions]
+additionalProperties = false
+type = 'object'
+
+['$defs'.documentOptions.properties]
+['$defs'.documentOptions.properties.api_key]
+type = 'string'
+
+['$defs'.documentOptions.properties.dpi]
+minimum = 0.0
+type = 'integer'
+
+['$defs'.documentOptions.properties.endpoint]
+type = 'string'
+
+['$defs'.documentOptions.properties.latex_command]
+description = 'Default: pdflatex.'
+type = 'string'
+
+['$defs'.documentOptions.properties.latex_pdf_to_ppm]
+description = 'Default: pdftoppm.'
+type = 'string'
+
+['$defs'.documentOptions.properties.latex_runs]
+minimum = 0.0
+type = 'integer'
+
+['$defs'.documentOptions.properties.max_output_bytes]
+minimum = 0.0
+type = 'integer'
+
+['$defs'.documentOptions.properties.quality]
+maximum = 100.0
+minimum = 0.0
+type = 'integer'
+
+['$defs'.documentOptions.properties.timeout]
+'$ref' = '#/$defs/durationNs'
+
+['$defs'.documentOptions.properties.tmp_dir]
+type = 'string'
+
+['$defs'.durationNs]
+description = 'time.Duration serialized as an integer count of nanoseconds in JSON/YAML config files (e.g. 5s = 5000000000). Not a Go duration string -- "5s" style strings only work for environment-variable overrides, never inside zever.yaml/.yml/.json.'
+minimum = 0.0
+type = 'integer'
+
+['$defs'.eventbusOptions]
+additionalProperties = false
+type = 'object'
+
+['$defs'.eventbusOptions.properties]
+['$defs'.eventbusOptions.properties.buffer_size]
+description = 'Zero means adapter default (1024).'
+minimum = 0.0
+type = 'integer'
+
+['$defs'.eventbusOptions.properties.close_timeout]
+'$ref' = '#/$defs/durationNs'
+description = 'Zero means adapter default (5s).'
+
+['$defs'.eventbusOptions.properties.handler_timeout]
+'$ref' = '#/$defs/durationNs'
+description = 'Zero means adapter default (30s).'
+
+['$defs'.eventbusOptions.properties.max_handlers]
+description = 'Zero means adapter default (128).'
+minimum = 0.0
+type = 'integer'
+
+['$defs'.eventbusOptions.properties.redis]
+'$ref' = '#/$defs/zredisOptionsWithPrefix'
+
+['$defs'.flagOptions]
+additionalProperties = false
+type = 'object'
+
+['$defs'.flagOptions.properties]
+['$defs'.flagOptions.properties.firebase]
+additionalProperties = false
+type = 'object'
+
+['$defs'.flagOptions.properties.firebase.properties]
+['$defs'.flagOptions.properties.firebase.properties.project_id]
+type = 'string'
+
+['$defs'.flagOptions.properties.firebase.properties.service_account]
+description = 'Path to the service-account JSON key file.'
+type = 'string'
+
+['$defs'.flagOptions.properties.firebase.properties.timeout]
+'$ref' = '#/$defs/durationNs'
+
+['$defs'.flagOptions.properties.static]
+additionalProperties = false
+type = 'object'
+
+['$defs'.flagOptions.properties.static.properties]
+['$defs'.flagOptions.properties.static.properties.path]
+type = 'string'
+
+['$defs'.flagOptions.properties.static.properties.reload]
+type = 'boolean'
+
+['$defs'.geoOptions]
+additionalProperties = false
+type = 'object'
+
+['$defs'.geoOptions.properties]
+['$defs'.geoOptions.properties.allow_insecure]
+type = 'boolean'
+
+['$defs'.geoOptions.properties.api_key]
+type = 'string'
+
+['$defs'.geoOptions.properties.base_url]
+description = 'Google Maps API base URL override.'
+type = 'string'
+
+['$defs'.geoOptions.properties.endpoint]
+description = 'Mapbox/OSM API endpoint override.'
+type = 'string'
+
+['$defs'.geoOptions.properties.max_response_body]
+minimum = 0.0
+type = 'integer'
+
+['$defs'.geoOptions.properties.path]
+description = 'JSON file for the static adapter.'
+type = 'string'
+
+['$defs'.geoOptions.properties.timeout]
+'$ref' = '#/$defs/durationNs'
+
+['$defs'.geoOptions.properties.user_agent]
+description = 'Required for the osm adapter.'
+type = 'string'
+
+['$defs'.i18nOptions]
+additionalProperties = false
+type = 'object'
+
+['$defs'.i18nOptions.properties]
+['$defs'.i18nOptions.properties.embed]
+additionalProperties = false
+type = 'object'
+
+['$defs'.i18nOptions.properties.embed.properties]
+['$defs'.i18nOptions.properties.embed.properties.dir]
+description = 'Default: ".".'
+type = 'string'
+
+['$defs'.i18nOptions.properties.embed.properties.fallback]
+type = 'string'
+
+['$defs'.i18nOptions.properties.remote]
+additionalProperties = false
+type = 'object'
+
+['$defs'.i18nOptions.properties.remote.properties]
+['$defs'.i18nOptions.properties.remote.properties.allow_insecure]
+type = 'boolean'
+
+['$defs'.i18nOptions.properties.remote.properties.api_key]
+type = 'string'
+
+['$defs'.i18nOptions.properties.remote.properties.endpoint]
+type = 'string'
+
+['$defs'.i18nOptions.properties.remote.properties.max_in_flight]
+description = 'Zero means adapter default (1000).'
+minimum = 0.0
+type = 'integer'
+
+['$defs'.i18nOptions.properties.remote.properties.timeout]
+'$ref' = '#/$defs/durationNs'
+
+['$defs'.idempotencyOptions]
+additionalProperties = false
+type = 'object'
+
+['$defs'.idempotencyOptions.properties]
+['$defs'.idempotencyOptions.properties.redis]
+'$ref' = '#/$defs/zredisOptionsWithPrefix'
+
+['$defs'.idempotencyOptions.properties.ttl]
+'$ref' = '#/$defs/durationNs'
+description = 'Zero means adapter default (24h).'
+
+['$defs'.lockOptions]
+additionalProperties = false
+type = 'object'
+
+['$defs'.lockOptions.properties]
+['$defs'.lockOptions.properties.addr]
+type = 'string'
+
+['$defs'.lockOptions.properties.db]
+type = 'integer'
+
+['$defs'.lockOptions.properties.password]
+type = 'string'
+
+['$defs'.lockOptions.properties.prefix]
+type = 'string'
+
+['$defs'.lockOptions.properties.require_tls]
+type = 'boolean'
+
+['$defs'.lockOptions.properties.retry_interval]
+'$ref' = '#/$defs/durationNs'
+description = 'Zero means adapter default (50ms).'
+
+['$defs'.lockOptions.properties.tls]
+type = 'boolean'
+
+['$defs'.lockOptions.properties.ttl]
+'$ref' = '#/$defs/durationNs'
+description = 'Zero means adapter default (30s).'
+
+['$defs'.lockOptions.properties.url]
+description = 'Takes precedence over addr when set.'
+type = 'string'
+
+['$defs'.logOptions]
+additionalProperties = false
+type = 'object'
+
+['$defs'.logOptions.properties]
+['$defs'.logOptions.properties.min_level]
+description = '0=debug, 1=info, 2=warn, 3=error, 4=fatal. log.Level has no custom JSON (un)marshaling, so config files must use the integer, not the string name.'
+enum = [0.0, 1.0, 2.0, 3.0, 4.0]
+type = 'integer'
+
+['$defs'.mailerOptions]
+additionalProperties = false
+type = 'object'
+
+['$defs'.mailerOptions.properties]
+['$defs'.mailerOptions.properties.encryption]
+description = 'Empty means starttls.'
+enum = ['', 'starttls', 'implicit', 'none']
+type = 'string'
+
+['$defs'.mailerOptions.properties.host]
+description = 'Required; must not contain a scheme.'
+type = 'string'
+
+['$defs'.mailerOptions.properties.max_message_size]
+minimum = 0.0
+type = 'integer'
+
+['$defs'.mailerOptions.properties.password]
+type = 'string'
+
+['$defs'.mailerOptions.properties.port]
+maximum = 65535.0
+minimum = 1.0
+type = 'integer'
+
+['$defs'.mailerOptions.properties.timeout]
+'$ref' = '#/$defs/durationNs'
+
+['$defs'.mailerOptions.properties.username]
+type = 'string'
+
+['$defs'.mediaOptions]
+additionalProperties = false
+type = 'object'
+
+['$defs'.mediaOptions.properties]
+['$defs'.mediaOptions.properties.access_key_id]
+type = 'string'
+
+['$defs'.mediaOptions.properties.base_url]
+type = 'string'
+
+['$defs'.mediaOptions.properties.bucket]
+type = 'string'
+
+['$defs'.mediaOptions.properties.derived_ttl]
+'$ref' = '#/$defs/durationNs'
+description = 'Default: 10m.'
+
+['$defs'.mediaOptions.properties.endpoint]
+type = 'string'
+
+['$defs'.mediaOptions.properties.ffmpeg]
+description = 'Default: ffmpeg.'
+type = 'string'
+
+['$defs'.mediaOptions.properties.ffprobe]
+description = 'Default: ffprobe.'
+type = 'string'
+
+['$defs'.mediaOptions.properties.max_download_bytes]
+description = 'Default: 67108864 (64 MiB).'
+minimum = 0.0
+type = 'integer'
+
+['$defs'.mediaOptions.properties.max_duration]
+'$ref' = '#/$defs/durationNs'
+description = 'Zero means unlimited.'
+
+['$defs'.mediaOptions.properties.max_pixels]
+description = 'Default: 52428800.'
+minimum = 0.0
+type = 'integer'
+
+['$defs'.mediaOptions.properties.presign_ttl]
+'$ref' = '#/$defs/durationNs'
+description = 'Default: 1h. Must be <= 604800000000000 ns (7 days) -- exceeding it is REJECTED at Validate() time with InvalidOptionsError, not silently clamped.'
+maximum = 604800000000000.0
+type = 'integer'
+
+['$defs'.mediaOptions.properties.region]
+description = 'Default: us-east-1.'
+type = 'string'
+
+['$defs'.mediaOptions.properties.root]
+type = 'string'
+
+['$defs'.mediaOptions.properties.secret_access_key]
+type = 'string'
+
+['$defs'.notificationOptions]
+additionalProperties = false
+type = 'object'
+
+['$defs'.notificationOptions.properties]
+['$defs'.notificationOptions.properties.fcm]
+additionalProperties = false
+type = 'object'
+
+['$defs'.notificationOptions.properties.fcm.properties]
+['$defs'.notificationOptions.properties.fcm.properties.project_id]
+description = 'Required.'
+type = 'string'
+
+['$defs'.notificationOptions.properties.fcm.properties.service_account]
+description = 'Required. Path to the service-account JSON key file.'
+type = 'string'
+
+['$defs'.notificationOptions.properties.timeout]
+'$ref' = '#/$defs/durationNs'
+
+['$defs'.notificationOptions.properties.twilio]
+additionalProperties = false
+type = 'object'
+
+['$defs'.notificationOptions.properties.twilio.properties]
+['$defs'.notificationOptions.properties.twilio.properties.account_sid]
+type = 'string'
+
+['$defs'.notificationOptions.properties.twilio.properties.auth_token]
+type = 'string'
+
+['$defs'.notificationOptions.properties.twilio.properties.from_number]
+description = 'E.164 format.'
+type = 'string'
+
+['$defs'.observabilityOptions]
+additionalProperties = false
+type = 'object'
+
+['$defs'.observabilityOptions.properties]
+['$defs'.observabilityOptions.properties.attr_value_limit]
+description = '0 (default) or 256-16384.'
+type = 'integer'
+
+['$defs'.observabilityOptions.properties.ca_file]
+type = 'string'
+
+['$defs'.observabilityOptions.properties.cert_file]
+description = 'Must be set together with key_file.'
+type = 'string'
+
+['$defs'.observabilityOptions.properties.endpoint]
+description = 'Collector address as host:port -- no scheme, no path.'
+type = 'string'
+
+['$defs'.observabilityOptions.properties.headers]
+maxProperties = 32.0
+type = 'object'
+
+['$defs'.observabilityOptions.properties.headers.additionalProperties]
+type = 'string'
+
+['$defs'.observabilityOptions.properties.insecure]
+description = 'Only allowed when endpoint resolves to a loopback host.'
+type = 'boolean'
+
+['$defs'.observabilityOptions.properties.key_file]
+type = 'string'
+
+['$defs'.observabilityOptions.properties.sample_ratio]
+maximum = 1.0
+minimum = 0.0
+type = 'number'
+
+['$defs'.observabilityOptions.properties.service_name]
+description = 'Required.'
+maxLength = 128.0
+minLength = 1.0
+type = 'string'
+
+['$defs'.observabilityOptions.properties.set_globals]
+type = 'boolean'
+
+['$defs'.observabilityOptions.properties.verbose]
+type = 'boolean'
+
+['$defs'.passwordOptions]
+additionalProperties = false
+type = 'object'
+
+['$defs'.passwordOptions.properties]
+['$defs'.passwordOptions.properties.key_length]
+description = 'Default: 32.'
+maximum = 128.0
+minimum = 16.0
+type = 'integer'
+
+['$defs'.passwordOptions.properties.memory]
+description = 'Argon2id memory cost in KiB. Default: 65536 (64 MiB).'
+maximum = 1048576.0
+minimum = 8192.0
+type = 'integer'
+
+['$defs'.passwordOptions.properties.salt_length]
+description = 'Default: 16.'
+maximum = 64.0
+minimum = 8.0
+type = 'integer'
+
+['$defs'.passwordOptions.properties.threads]
+description = 'Default: 4.'
+maximum = 16.0
+minimum = 1.0
+type = 'integer'
+
+['$defs'.passwordOptions.properties.time]
+description = 'Argon2id iterations. Default: 3.'
+maximum = 10.0
+minimum = 1.0
+type = 'integer'
+
+['$defs'.paymentOptions]
+additionalProperties = false
+type = 'object'
+
+['$defs'.paymentOptions.properties]
+['$defs'.paymentOptions.properties.api_key]
+type = 'string'
+
+['$defs'.paymentOptions.properties.auto_approve]
+description = 'Marks new payments as succeeded instead of pending.'
+type = 'boolean'
+
+['$defs'.paymentOptions.properties.endpoint]
+type = 'string'
+
+['$defs'.paymentOptions.properties.max_webhook_bytes]
+description = 'Default: 1048576 (1 MiB).'
+minimum = 0.0
+type = 'integer'
+
+['$defs'.paymentOptions.properties.sandbox]
+type = 'boolean'
+
+['$defs'.paymentOptions.properties.secret_key]
+type = 'string'
+
+['$defs'.paymentOptions.properties.webhook_secret]
+type = 'string'
+
+['$defs'.permissionOptions]
+additionalProperties = false
+type = 'object'
+
+['$defs'.permissionOptions.properties]
+['$defs'.permissionOptions.properties.model_path]
+description = 'Casbin model file path; must be set together with policy_path.'
+type = 'string'
+
+['$defs'.permissionOptions.properties.policy_path]
+description = 'Casbin policy file path.'
+type = 'string'
+
+['$defs'.permissionOptions.properties.roles]
+description = 'Subject-ID to allowed-roles allowlist gating privilege escalation.'
+type = 'object'
+
+['$defs'.permissionOptions.properties.roles.additionalProperties]
+type = 'array'
+
+['$defs'.permissionOptions.properties.roles.additionalProperties.items]
+maxLength = 256.0
+type = 'string'
+
+['$defs'.permissionOptions.properties.rules]
+description = 'permission.Rule carries no json/yaml/toml struct tags, so keys are the exported Go field names verbatim (capitalized), unlike every other snake_case option in this schema.'
+type = 'array'
+
+['$defs'.permissionOptions.properties.rules.items]
+'$ref' = '#/$defs/permissionRule'
+
+['$defs'.permissionRule]
+additionalProperties = false
+type = 'object'
+
+['$defs'.permissionRule.properties]
+['$defs'.permissionRule.properties.Action]
+maxLength = 256.0
+type = 'string'
+
+['$defs'.permissionRule.properties.Effect]
+description = 'Empty means allow.'
+enum = ['', 'allow', 'deny']
+type = 'string'
+
+['$defs'.permissionRule.properties.OwnedAttr]
+description = 'Required when OwnedOnly is true.'
+type = 'string'
+
+['$defs'.permissionRule.properties.OwnedOnly]
+type = 'boolean'
+
+['$defs'.permissionRule.properties.Role]
+maxLength = 256.0
+type = 'string'
+
+['$defs'.providersCommon]
+additionalProperties = false
+description = 'Shared Stripe/Paddle option shape (internal/providers.Common), embedded directly into billing.Options and payment.Options -- no wrapper key.'
+type = 'object'
+
+['$defs'.providersCommon.properties]
+['$defs'.providersCommon.properties.api_key]
+description = 'Provider API key (Paddle).'
+type = 'string'
+
+['$defs'.providersCommon.properties.endpoint]
+description = 'Optional custom provider endpoint URL; must include scheme and host when set.'
+type = 'string'
+
+['$defs'.providersCommon.properties.sandbox]
+type = 'boolean'
+
+['$defs'.providersCommon.properties.secret_key]
+description = 'Provider secret key (Stripe).'
+type = 'string'
+
+['$defs'.queueOptions]
+additionalProperties = false
+type = 'object'
+
+['$defs'.queueOptions.properties]
+['$defs'.queueOptions.properties.addr]
+type = 'string'
+
+['$defs'.queueOptions.properties.buffer]
+minimum = 0.0
+type = 'integer'
+
+['$defs'.queueOptions.properties.db]
+type = 'integer'
+
+['$defs'.queueOptions.properties.password]
+type = 'string'
+
+['$defs'.queueOptions.properties.poll_timeout]
+'$ref' = '#/$defs/durationNs'
+
+['$defs'.queueOptions.properties.prefix]
+type = 'string'
+
+['$defs'.queueOptions.properties.require_tls]
+type = 'boolean'
+
+['$defs'.queueOptions.properties.tls]
+type = 'boolean'
+
+['$defs'.queueOptions.properties.url]
+type = 'string'
+
+['$defs'.queueOptions.properties.visibility_timeout]
+'$ref' = '#/$defs/durationNs'
+
+['$defs'.ratelimitOptions]
+additionalProperties = false
+type = 'object'
+
+['$defs'.ratelimitOptions.properties]
+['$defs'.ratelimitOptions.properties.burst]
+description = 'Required.'
+exclusiveMinimum = 0.0
+type = 'integer'
+
+['$defs'.ratelimitOptions.properties.idle_ttl]
+'$ref' = '#/$defs/durationNs'
+description = 'Zero means adapter default (10m).'
+
+['$defs'.ratelimitOptions.properties.rate]
+description = 'Token refill rate per second. Required.'
+exclusiveMinimum = 0.0
+type = 'number'
+
+['$defs'.ratelimitOptions.properties.redis]
+'$ref' = '#/$defs/zredisOptionsWithPrefix'
+
+['$defs'.ratelimitOptions.properties.sweep_interval]
+'$ref' = '#/$defs/durationNs'
+description = 'Zero means adapter default (1m).'
+
+['$defs'.routerOptions]
+additionalProperties = false
+type = 'object'
+
+['$defs'.routerOptions.properties]
+['$defs'.routerOptions.properties.app_name]
+description = 'Empty defaults to "app".'
+maxLength = 64.0
+type = 'string'
+
+['$defs'.schedulerOptions]
+additionalProperties = false
+description = 'scheduler.Options.Dispatcher is required by Validate() but is a *job.Dispatcher (json:"-") that can only be wired in code, never from a config file -- close_timeout is the only field a file can actually set.'
+type = 'object'
+
+['$defs'.schedulerOptions.properties]
+['$defs'.schedulerOptions.properties.close_timeout]
+'$ref' = '#/$defs/durationNs'
+description = 'Zero means adapter default (5s).'
+
+['$defs'.searchOptions]
+additionalProperties = false
+type = 'object'
+
+['$defs'.searchOptions.properties]
+['$defs'.searchOptions.properties.api_key]
+type = 'string'
+
+['$defs'.searchOptions.properties.dsn]
+description = 'Postgres URL or sqlite path; required by postgres/sqlite adapters.'
+type = 'string'
+
+['$defs'.searchOptions.properties.host]
+description = 'Meilisearch URL; required by the meilisearch adapter.'
+type = 'string'
+
+['$defs'.secretsOptions]
+additionalProperties = false
+type = 'object'
+
+['$defs'.secretsOptions.properties]
+['$defs'.secretsOptions.properties.addr]
+description = 'Vault server address.'
+type = 'string'
+
+['$defs'.secretsOptions.properties.mount]
+description = 'Vault KV mount path.'
+type = 'string'
+
+['$defs'.secretsOptions.properties.prefix]
+description = 'Default: ZEVER.'
+type = 'string'
+
+['$defs'.secretsOptions.properties.project_id]
+description = 'GCP project ID.'
+type = 'string'
+
+['$defs'.secretsOptions.properties.region]
+description = 'AWS region.'
+type = 'string'
+
+['$defs'.secretsOptions.properties.token]
+description = 'Vault authentication token.'
+type = 'string'
+
+['$defs'.service]
+additionalProperties = false
+type = 'object'
+
+['$defs'.service.properties]
+['$defs'.service.properties.adapter]
+description = "Backend implementation name. Present but omitted keeps config.Default()'s adapter for this service."
+type = 'string'
+
+['$defs'.service.properties.options]
+description = "Backend-specific typed settings; shape depends on adapter's package Options struct."
+type = 'object'
+
+['$defs'.sessionOptions]
+additionalProperties = false
+type = 'object'
+
+['$defs'.sessionOptions.properties]
+['$defs'.sessionOptions.properties.redis]
+'$ref' = '#/$defs/zredisOptionsWithPrefix'
+
+['$defs'.sessionOptions.properties.ttl]
+'$ref' = '#/$defs/durationNs'
+description = 'Zero means adapter default (15m).'
+
+['$defs'.storageOptions]
+additionalProperties = false
+type = 'object'
+
+['$defs'.storageOptions.properties]
+['$defs'.storageOptions.properties.access_key_id]
+description = 's3 adapter.'
+type = 'string'
+
+['$defs'.storageOptions.properties.account_id]
+description = 'r2 adapter: Cloudflare account ID.'
+type = 'string'
+
+['$defs'.storageOptions.properties.endpoint]
+description = 's3 adapter: overrides the endpoint for S3-compatible stores.'
+type = 'string'
+
+['$defs'.storageOptions.properties.policy]
+description = 'storage.PolicyConfig has custom (Un)MarshalJSON: it is a flat map, not {default, buckets}. The "default" key is the fallback policy for unlisted buckets; every other key is a bucket name.'
+type = 'object'
+
+['$defs'.storageOptions.properties.policy.additionalProperties]
+'$ref' = '#/$defs/storagePolicy'
+
+['$defs'.storageOptions.properties.policy_sync]
+description = 's3 adapter.'
+enum = ['', 'manual', 'auto']
+type = 'string'
+
+['$defs'.storageOptions.properties.public_url]
+description = 'local adapter: public base URL for unsigned links.'
+type = 'string'
+
+['$defs'.storageOptions.properties.region]
+description = 's3 adapter; default us-east-1.'
+type = 'string'
+
+['$defs'.storageOptions.properties.root]
+description = 'local adapter: directory objects are stored under.'
+type = 'string'
+
+['$defs'.storageOptions.properties.secret]
+description = 'local adapter: HMAC key for presigned URLs.'
+type = 'string'
+
+['$defs'.storageOptions.properties.secret_access_key]
+description = 's3 adapter.'
+type = 'string'
+
+['$defs'.storageOptions.properties.sync_fail]
+description = 's3 adapter.'
+enum = ['', 'warn', 'require']
+type = 'string'
+
+['$defs'.storageOptions.properties.url_base]
+description = 'Base URL presigned URLs are built on.'
+type = 'string'
+
+['$defs'.storagePolicy]
+additionalProperties = false
+type = 'object'
+
+['$defs'.storagePolicy.properties]
+['$defs'.storagePolicy.properties.delete]
+'$ref' = '#/$defs/storagePolicyRule'
+
+['$defs'.storagePolicy.properties.read]
+'$ref' = '#/$defs/storagePolicyRule'
+
+['$defs'.storagePolicy.properties.update]
+'$ref' = '#/$defs/storagePolicyRule'
+
+['$defs'.storagePolicy.properties.version]
+type = 'string'
+
+['$defs'.storagePolicy.properties.write]
+'$ref' = '#/$defs/storagePolicyRule'
+
+['$defs'.storagePolicyRule]
+additionalProperties = false
+type = 'object'
+
+['$defs'.storagePolicyRule.properties]
+['$defs'.storagePolicyRule.properties.allow]
+description = 'Subjects granted access. "*" matches any authenticated subject, "anonymous" matches everyone.'
+type = 'array'
+
+['$defs'.storagePolicyRule.properties.allow.items]
+type = 'string'
+
+['$defs'.storagePolicyRule.properties.deny]
+description = 'Subjects refused access; deny wins over allow.'
+type = 'array'
+
+['$defs'.storagePolicyRule.properties.deny.items]
+type = 'string'
+
+['$defs'.storagePolicyRule.properties.public]
+description = 'Allow unsigned access.'
+type = 'boolean'
+
+['$defs'.tenantOptions]
+additionalProperties = false
+type = 'object'
+
+['$defs'.tenantOptions.properties]
+['$defs'.tenantOptions.properties.header]
+description = 'Default: X-Tenant-ID.'
+type = 'string'
+
+['$defs'.tenantOptions.properties.id]
+description = 'Fixed tenant ID for the single adapter; default "default".'
+type = 'string'
+
+['$defs'.tenantOptions.properties.subdomain_regex]
+maxLength = 500.0
+type = 'string'
+
+['$defs'.vectorstoreOptions]
+additionalProperties = false
+type = 'object'
+
+['$defs'.vectorstoreOptions.properties]
+['$defs'.vectorstoreOptions.properties.api_key]
+type = 'string'
+
+['$defs'.vectorstoreOptions.properties.dimension]
+description = 'Default: 1536.'
+minimum = 0.0
+type = 'integer'
+
+['$defs'.vectorstoreOptions.properties.dsn]
+description = 'sqlite path or postgres URL (pgvector).'
+type = 'string'
+
+['$defs'.vectorstoreOptions.properties.url]
+description = 'Qdrant address.'
+type = 'string'
+
+['$defs'.webhookOptions]
+additionalProperties = false
+type = 'object'
+
+['$defs'.webhookOptions.properties]
+['$defs'.webhookOptions.properties.allow_private_targets]
+description = 'Testing only; leave false in production.'
+type = 'boolean'
+
+['$defs'.webhookOptions.properties.dead_letter_topic]
+type = 'string'
+
+['$defs'.webhookOptions.properties.dsn]
+description = 'sqlite adapter database path; empty means a private in-memory-style database.'
+type = 'string'
+
+['$defs'.webhookOptions.properties.max_retries]
+description = 'Zero means no retries.'
+minimum = 0.0
+type = 'integer'
+
+['$defs'.webhookOptions.properties.queue_adapter]
+description = 'Only used by the queue adapter.'
+type = 'string'
+
+['$defs'.webhookOptions.properties.queue_opts]
+'$ref' = '#/$defs/queueOptions'
+description = 'Only used by the queue adapter.'
+
+['$defs'.webhookOptions.properties.replay_tolerance]
+'$ref' = '#/$defs/durationNs'
+description = 'Zero means adapter default (5m).'
+
+['$defs'.webhookOptions.properties.timeout]
+'$ref' = '#/$defs/durationNs'
+description = 'Zero means adapter default.'
+
+['$defs'.workflowOptions]
+additionalProperties = false
+type = 'object'
+
+['$defs'.workflowOptions.properties]
+['$defs'.workflowOptions.properties.host_port]
+type = 'string'
+
+['$defs'.workflowOptions.properties.namespace]
+type = 'string'
+
+['$defs'.zredisConnectOptions]
+additionalProperties = false
+type = 'object'
+
+['$defs'.zredisConnectOptions.properties]
+['$defs'.zredisConnectOptions.properties.addr]
+description = 'host:port, or redis:// / rediss:// URL. Empty means localhost:6379.'
+type = 'string'
+
+['$defs'.zredisConnectOptions.properties.db]
+type = 'integer'
+
+['$defs'.zredisConnectOptions.properties.password]
+type = 'string'
+
+['$defs'.zredisConnectOptions.properties.require_tls]
+description = 'Fail fast instead of silently connecting in plaintext when TLS would not be used.'
+type = 'boolean'
+
+['$defs'.zredisConnectOptions.properties.tls]
+description = 'Enable TLS (1.2 floor) for a plain host:port address.'
+type = 'boolean'
+
+['$defs'.zredisOptions]
+additionalProperties = false
+type = 'object'
+
+['$defs'.zredisOptions.properties]
+['$defs'.zredisOptions.properties.addr]
+type = 'string'
+
+['$defs'.zredisOptions.properties.db]
+type = 'integer'
+
+['$defs'.zredisOptions.properties.max_conn_idle_time]
+'$ref' = '#/$defs/durationNs'
+
+['$defs'.zredisOptions.properties.max_conn_lifetime]
+'$ref' = '#/$defs/durationNs'
+
+['$defs'.zredisOptions.properties.min_idle_conns]
+type = 'integer'
+
+['$defs'.zredisOptions.properties.password]
+type = 'string'
+
+['$defs'.zredisOptions.properties.pool_size]
+type = 'integer'
+
+['$defs'.zredisOptions.properties.pool_timeout]
+'$ref' = '#/$defs/durationNs'
+
+['$defs'.zredisOptions.properties.require_tls]
+type = 'boolean'
+
+['$defs'.zredisOptions.properties.tls]
+type = 'boolean'
+
+['$defs'.zredisOptionsWithPrefix]
+additionalProperties = false
+description = 'zredis.Options embedded plus a Prefix field -- used by eventbus/idempotency/ratelimit/session Redis adapters.'
+type = 'object'
+
+['$defs'.zredisOptionsWithPrefix.properties]
+['$defs'.zredisOptionsWithPrefix.properties.addr]
+type = 'string'
+
+['$defs'.zredisOptionsWithPrefix.properties.db]
+type = 'integer'
+
+['$defs'.zredisOptionsWithPrefix.properties.max_conn_idle_time]
+'$ref' = '#/$defs/durationNs'
+
+['$defs'.zredisOptionsWithPrefix.properties.max_conn_lifetime]
+'$ref' = '#/$defs/durationNs'
+
+['$defs'.zredisOptionsWithPrefix.properties.min_idle_conns]
+type = 'integer'
+
+['$defs'.zredisOptionsWithPrefix.properties.password]
+type = 'string'
+
+['$defs'.zredisOptionsWithPrefix.properties.pool_size]
+type = 'integer'
+
+['$defs'.zredisOptionsWithPrefix.properties.pool_timeout]
+'$ref' = '#/$defs/durationNs'
+
+['$defs'.zredisOptionsWithPrefix.properties.prefix]
+type = 'string'
+
+['$defs'.zredisOptionsWithPrefix.properties.require_tls]
+type = 'boolean'
+
+['$defs'.zredisOptionsWithPrefix.properties.tls]
+type = 'boolean'
+
+[properties]
+[properties.ai]
+'$ref' = '#/$defs/service'
+type = 'object'
+
+[properties.ai.properties]
+[properties.ai.properties.adapter]
+enum = ['anthropic', 'openai', 'gemini', 'ollama']
+
+[properties.ai.properties.options]
+'$ref' = '#/$defs/aiOptions'
+
+[properties.analytics]
+'$ref' = '#/$defs/service'
+type = 'object'
+
+[properties.analytics.properties]
+[properties.analytics.properties.adapter]
+enum = ['log', 'posthog']
+
+[properties.analytics.properties.options]
+'$ref' = '#/$defs/analyticsOptions'
+
+[properties.auth]
+'$ref' = '#/$defs/service'
+type = 'object'
+
+[properties.auth.properties]
+[properties.auth.properties.adapter]
+enum = ['jwt', 'session', 'oidc']
+
+[properties.auth.properties.options]
+'$ref' = '#/$defs/authOptions'
+
+[properties.billing]
+'$ref' = '#/$defs/service'
+type = 'object'
+
+[properties.billing.properties]
+[properties.billing.properties.adapter]
+enum = ['stub', 'stripe', 'paddle']
+
+[properties.billing.properties.options]
+'$ref' = '#/$defs/providersCommon'
+
+[properties.cache]
+'$ref' = '#/$defs/service'
+type = 'object'
+
+[properties.cache.properties]
+[properties.cache.properties.adapter]
+enum = ['memory', 'redis']
+
+[properties.cache.properties.options]
+'$ref' = '#/$defs/cacheOptions'
+
+[properties.crypto]
+'$ref' = '#/$defs/service'
+type = 'object'
+
+[properties.crypto.properties]
+[properties.crypto.properties.adapter]
+enum = ['local']
+
+[properties.crypto.properties.options]
+'$ref' = '#/$defs/cryptoOptions'
+
+[properties.db]
+'$ref' = '#/$defs/service'
+type = 'object'
+
+[properties.db.properties]
+[properties.db.properties.adapter]
+enum = ['sqlite', 'postgres']
+
+[properties.db.properties.options]
+'$ref' = '#/$defs/dbOptions'
+
+[properties.document]
+'$ref' = '#/$defs/service'
+type = 'object'
+
+[properties.document.properties]
+[properties.document.properties.adapter]
+enum = ['local', 'remote', 'latex']
+
+[properties.document.properties.options]
+'$ref' = '#/$defs/documentOptions'
+
+[properties.eventbus]
+'$ref' = '#/$defs/service'
+type = 'object'
+
+[properties.eventbus.properties]
+[properties.eventbus.properties.adapter]
+enum = ['memory', 'redis']
+
+[properties.eventbus.properties.options]
+'$ref' = '#/$defs/eventbusOptions'
+
+[properties.flag]
+'$ref' = '#/$defs/service'
+type = 'object'
+
+[properties.flag.properties]
+[properties.flag.properties.adapter]
+enum = ['static', 'firebase']
+
+[properties.flag.properties.options]
+'$ref' = '#/$defs/flagOptions'
+
+[properties.geo]
+'$ref' = '#/$defs/service'
+type = 'object'
+
+[properties.geo.properties]
+[properties.geo.properties.adapter]
+enum = ['google', 'static', 'osm']
+
+[properties.geo.properties.options]
+'$ref' = '#/$defs/geoOptions'
+
+[properties.i18n]
+'$ref' = '#/$defs/service'
+type = 'object'
+
+[properties.i18n.properties]
+[properties.i18n.properties.adapter]
+enum = ['embed', 'remote']
+
+[properties.i18n.properties.options]
+'$ref' = '#/$defs/i18nOptions'
+
+[properties.idempotency]
+'$ref' = '#/$defs/service'
+type = 'object'
+
+[properties.idempotency.properties]
+[properties.idempotency.properties.adapter]
+enum = ['memory', 'redis']
+
+[properties.idempotency.properties.options]
+'$ref' = '#/$defs/idempotencyOptions'
+
+[properties.lock]
+'$ref' = '#/$defs/service'
+type = 'object'
+
+[properties.lock.properties]
+[properties.lock.properties.adapter]
+enum = ['memory', 'redis']
+
+[properties.lock.properties.options]
+'$ref' = '#/$defs/lockOptions'
+
+[properties.log]
+'$ref' = '#/$defs/service'
+type = 'object'
+
+[properties.log.properties]
+[properties.log.properties.adapter]
+enum = ['noop', 'zerolog', 'slog', 'pretty']
+
+[properties.log.properties.options]
+'$ref' = '#/$defs/logOptions'
+
+[properties.mailer]
+'$ref' = '#/$defs/service'
+type = 'object'
+
+[properties.mailer.properties]
+[properties.mailer.properties.adapter]
+enum = ['log', 'smtp']
+
+[properties.mailer.properties.options]
+'$ref' = '#/$defs/mailerOptions'
+
+[properties.media]
+'$ref' = '#/$defs/service'
+type = 'object'
+
+[properties.media.properties]
+[properties.media.properties.adapter]
+enum = ['local', 's3']
+
+[properties.media.properties.options]
+'$ref' = '#/$defs/mediaOptions'
+
+[properties.notification]
+'$ref' = '#/$defs/service'
+type = 'object'
+
+[properties.notification.properties]
+[properties.notification.properties.adapter]
+enum = ['log', 'twilio', 'fcm']
+
+[properties.notification.properties.options]
+'$ref' = '#/$defs/notificationOptions'
+
+[properties.observability]
+'$ref' = '#/$defs/service'
+type = 'object'
+
+[properties.observability.properties]
+[properties.observability.properties.adapter]
+enum = ['noop', 'stdout', 'otlp']
+
+[properties.observability.properties.options]
+'$ref' = '#/$defs/observabilityOptions'
+
+[properties.password]
+'$ref' = '#/$defs/service'
+type = 'object'
+
+[properties.password.properties]
+[properties.password.properties.adapter]
+enum = ['argon2id']
+
+[properties.password.properties.options]
+'$ref' = '#/$defs/passwordOptions'
+
+[properties.payment]
+'$ref' = '#/$defs/service'
+type = 'object'
+
+[properties.payment.properties]
+[properties.payment.properties.adapter]
+enum = ['stub', 'stripe', 'paddle']
+
+[properties.payment.properties.options]
+'$ref' = '#/$defs/paymentOptions'
+
+[properties.permission]
+'$ref' = '#/$defs/service'
+type = 'object'
+
+[properties.permission.properties]
+[properties.permission.properties.adapter]
+enum = ['noop', 'rbac', 'casbin']
+
+[properties.permission.properties.options]
+'$ref' = '#/$defs/permissionOptions'
+
+[properties.queue]
+'$ref' = '#/$defs/service'
+type = 'object'
+
+[properties.queue.properties]
+[properties.queue.properties.adapter]
+enum = ['memory', 'redis']
+
+[properties.queue.properties.options]
+'$ref' = '#/$defs/queueOptions'
+
+[properties.ratelimit]
+'$ref' = '#/$defs/service'
+type = 'object'
+
+[properties.ratelimit.properties]
+[properties.ratelimit.properties.adapter]
+enum = ['memory', 'redis']
+
+[properties.ratelimit.properties.options]
+'$ref' = '#/$defs/ratelimitOptions'
+
+[properties.router]
+'$ref' = '#/$defs/service'
+type = 'object'
+
+[properties.router.properties]
+[properties.router.properties.adapter]
+enum = ['fiber', 'stdhttp']
+
+[properties.router.properties.options]
+'$ref' = '#/$defs/routerOptions'
+
+[properties.scheduler]
+'$ref' = '#/$defs/service'
+type = 'object'
+
+[properties.scheduler.properties]
+[properties.scheduler.properties.adapter]
+enum = ['embedded']
+
+[properties.scheduler.properties.options]
+'$ref' = '#/$defs/schedulerOptions'
+
+[properties.search]
+'$ref' = '#/$defs/service'
+type = 'object'
+
+[properties.search.properties]
+[properties.search.properties.adapter]
+enum = ['postgres', 'meilisearch', 'sqlite']
+
+[properties.search.properties.options]
+'$ref' = '#/$defs/searchOptions'
+
+[properties.secrets]
+'$ref' = '#/$defs/service'
+type = 'object'
+
+[properties.secrets.properties]
+[properties.secrets.properties.adapter]
+enum = ['env']
+
+[properties.secrets.properties.options]
+'$ref' = '#/$defs/secretsOptions'
+
+[properties.session]
+'$ref' = '#/$defs/service'
+type = 'object'
+
+[properties.session.properties]
+[properties.session.properties.adapter]
+enum = ['memory', 'redis']
+
+[properties.session.properties.options]
+'$ref' = '#/$defs/sessionOptions'
+
+[properties.storage]
+'$ref' = '#/$defs/service'
+type = 'object'
+
+[properties.storage.properties]
+[properties.storage.properties.adapter]
+enum = ['local', 's3', 'r2']
+
+[properties.storage.properties.options]
+'$ref' = '#/$defs/storageOptions'
+
+[properties.tenant]
+'$ref' = '#/$defs/service'
+type = 'object'
+
+[properties.tenant.properties]
+[properties.tenant.properties.adapter]
+enum = ['single', 'header']
+
+[properties.tenant.properties.options]
+'$ref' = '#/$defs/tenantOptions'
+
+[properties.vectorstore]
+'$ref' = '#/$defs/service'
+type = 'object'
+
+[properties.vectorstore.properties]
+[properties.vectorstore.properties.adapter]
+enum = ['sqlite', 'pgvector', 'qdrant']
+
+[properties.vectorstore.properties.options]
+'$ref' = '#/$defs/vectorstoreOptions'
+
+[properties.webhook]
+'$ref' = '#/$defs/service'
+type = 'object'
+
+[properties.webhook.properties]
+[properties.webhook.properties.adapter]
+enum = ['http', 'queue', 'sqlite']
+
+[properties.webhook.properties.options]
+'$ref' = '#/$defs/webhookOptions'
+
+[properties.workflow]
+'$ref' = '#/$defs/service'
+type = 'object'
+
+[properties.workflow.properties]
+[properties.workflow.properties.adapter]
+enum = ['memory']
+
+[properties.workflow.properties.options]
+'$ref' = '#/$defs/workflowOptions'

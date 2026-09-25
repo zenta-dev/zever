@@ -3,6 +3,7 @@ package main
 import (
 	"bytes"
 	"errors"
+	"path/filepath"
 	"strings"
 	"testing"
 
@@ -64,6 +65,29 @@ func TestRunBreakingNoDifferences(t *testing.T) {
 
 	if !strings.Contains(out.String(), "no differences found") {
 		t.Fatalf("output = %q, want no-differences message", out.String())
+	}
+}
+
+// TestRunBreakingExpandsBareDirectories proves each side of `--` accepts a
+// bare directory instead of requiring an explicit glob/file list, and that
+// discovery recurses into arbitrarily nested subdirectories (a versioned
+// schema/v1/*.zen-style layout) exactly like every other command's
+// auto-discovery.
+func TestRunBreakingExpandsBareDirectories(t *testing.T) {
+	dir := t.TempDir()
+	oldDir := filepath.Join(dir, "schema-old")
+	newDir := filepath.Join(dir, "schema-new")
+	writeInspectFixture(t, oldDir, "v1/user.zen", inspectBreakingOldSchema)
+	writeInspectFixture(t, newDir, "v1/user.zen", inspectBreakingNewSchema)
+
+	var out bytes.Buffer
+	err := runBreakingWith(BreakingConfig{OldFiles: []string{oldDir}, NewFiles: []string{newDir}, Out: &out})
+	if err == nil {
+		t.Fatalf("expected error for breaking change discovered via bare directories")
+	}
+
+	if !strings.Contains(err.Error(), "breaking change") {
+		t.Fatalf("error = %v, want a breaking-change error", err)
 	}
 }
 

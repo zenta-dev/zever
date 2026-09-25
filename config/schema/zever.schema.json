@@ -1,0 +1,612 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://raw.githubusercontent.com/zenta-dev/zever/main/config/schema/zever.schema.json",
+  "title": "zever configuration",
+  "description": "Schema for zever.yaml / zever.yml / zever.json (config.Config). One property per battery service, each shaped { adapter, options }. File decoding is strict: unknown top-level services and unknown fields inside an options block are rejected (config/decode.go DisallowUnknownFields). time.Duration fields are plain integer nanoseconds in file config (only environment-variable overrides accept Go duration strings like \"5s\") -- see config/README.md and getting-started/configuration.mdx.",
+  "type": "object",
+  "additionalProperties": false,
+  "properties": {
+    "ai": { "$ref": "#/$defs/service", "type": "object", "properties": { "adapter": { "enum": ["anthropic", "openai", "gemini", "ollama"] }, "options": { "$ref": "#/$defs/aiOptions" } } },
+    "analytics": { "$ref": "#/$defs/service", "type": "object", "properties": { "adapter": { "enum": ["log", "posthog"] }, "options": { "$ref": "#/$defs/analyticsOptions" } } },
+    "auth": { "$ref": "#/$defs/service", "type": "object", "properties": { "adapter": { "enum": ["jwt", "session", "oidc"] }, "options": { "$ref": "#/$defs/authOptions" } } },
+    "billing": { "$ref": "#/$defs/service", "type": "object", "properties": { "adapter": { "enum": ["stub", "stripe", "paddle"] }, "options": { "$ref": "#/$defs/providersCommon" } } },
+    "cache": { "$ref": "#/$defs/service", "type": "object", "properties": { "adapter": { "enum": ["memory", "redis"] }, "options": { "$ref": "#/$defs/cacheOptions" } } },
+    "crypto": { "$ref": "#/$defs/service", "type": "object", "properties": { "adapter": { "enum": ["local"] }, "options": { "$ref": "#/$defs/cryptoOptions" } } },
+    "db": { "$ref": "#/$defs/service", "type": "object", "properties": { "adapter": { "enum": ["sqlite", "postgres"] }, "options": { "$ref": "#/$defs/dbOptions" } } },
+    "document": { "$ref": "#/$defs/service", "type": "object", "properties": { "adapter": { "enum": ["local", "remote", "latex"] }, "options": { "$ref": "#/$defs/documentOptions" } } },
+    "eventbus": { "$ref": "#/$defs/service", "type": "object", "properties": { "adapter": { "enum": ["memory", "redis"] }, "options": { "$ref": "#/$defs/eventbusOptions" } } },
+    "flag": { "$ref": "#/$defs/service", "type": "object", "properties": { "adapter": { "enum": ["static", "firebase"] }, "options": { "$ref": "#/$defs/flagOptions" } } },
+    "geo": { "$ref": "#/$defs/service", "type": "object", "properties": { "adapter": { "enum": ["google", "static", "osm"] }, "options": { "$ref": "#/$defs/geoOptions" } } },
+    "i18n": { "$ref": "#/$defs/service", "type": "object", "properties": { "adapter": { "enum": ["embed", "remote"] }, "options": { "$ref": "#/$defs/i18nOptions" } } },
+    "idempotency": { "$ref": "#/$defs/service", "type": "object", "properties": { "adapter": { "enum": ["memory", "redis"] }, "options": { "$ref": "#/$defs/idempotencyOptions" } } },
+    "lock": { "$ref": "#/$defs/service", "type": "object", "properties": { "adapter": { "enum": ["memory", "redis"] }, "options": { "$ref": "#/$defs/lockOptions" } } },
+    "log": { "$ref": "#/$defs/service", "type": "object", "properties": { "adapter": { "enum": ["noop", "zerolog", "slog", "pretty"] }, "options": { "$ref": "#/$defs/logOptions" } } },
+    "mailer": { "$ref": "#/$defs/service", "type": "object", "properties": { "adapter": { "enum": ["log", "smtp"] }, "options": { "$ref": "#/$defs/mailerOptions" } } },
+    "media": { "$ref": "#/$defs/service", "type": "object", "properties": { "adapter": { "enum": ["local", "s3"] }, "options": { "$ref": "#/$defs/mediaOptions" } } },
+    "notification": { "$ref": "#/$defs/service", "type": "object", "properties": { "adapter": { "enum": ["log", "twilio", "fcm"] }, "options": { "$ref": "#/$defs/notificationOptions" } } },
+    "observability": { "$ref": "#/$defs/service", "type": "object", "properties": { "adapter": { "enum": ["noop", "stdout", "otlp"] }, "options": { "$ref": "#/$defs/observabilityOptions" } } },
+    "password": { "$ref": "#/$defs/service", "type": "object", "properties": { "adapter": { "enum": ["argon2id"] }, "options": { "$ref": "#/$defs/passwordOptions" } } },
+    "payment": { "$ref": "#/$defs/service", "type": "object", "properties": { "adapter": { "enum": ["stub", "stripe", "paddle"] }, "options": { "$ref": "#/$defs/paymentOptions" } } },
+    "permission": { "$ref": "#/$defs/service", "type": "object", "properties": { "adapter": { "enum": ["noop", "rbac", "casbin"] }, "options": { "$ref": "#/$defs/permissionOptions" } } },
+    "queue": { "$ref": "#/$defs/service", "type": "object", "properties": { "adapter": { "enum": ["memory", "redis"] }, "options": { "$ref": "#/$defs/queueOptions" } } },
+    "ratelimit": { "$ref": "#/$defs/service", "type": "object", "properties": { "adapter": { "enum": ["memory", "redis"] }, "options": { "$ref": "#/$defs/ratelimitOptions" } } },
+    "router": { "$ref": "#/$defs/service", "type": "object", "properties": { "adapter": { "enum": ["fiber", "stdhttp"] }, "options": { "$ref": "#/$defs/routerOptions" } } },
+    "scheduler": { "$ref": "#/$defs/service", "type": "object", "properties": { "adapter": { "enum": ["embedded"] }, "options": { "$ref": "#/$defs/schedulerOptions" } } },
+    "search": { "$ref": "#/$defs/service", "type": "object", "properties": { "adapter": { "enum": ["postgres", "meilisearch", "sqlite"] }, "options": { "$ref": "#/$defs/searchOptions" } } },
+    "secrets": { "$ref": "#/$defs/service", "type": "object", "properties": { "adapter": { "enum": ["env"] }, "options": { "$ref": "#/$defs/secretsOptions" } } },
+    "session": { "$ref": "#/$defs/service", "type": "object", "properties": { "adapter": { "enum": ["memory", "redis"] }, "options": { "$ref": "#/$defs/sessionOptions" } } },
+    "storage": { "$ref": "#/$defs/service", "type": "object", "properties": { "adapter": { "enum": ["local", "s3", "r2"] }, "options": { "$ref": "#/$defs/storageOptions" } } },
+    "tenant": { "$ref": "#/$defs/service", "type": "object", "properties": { "adapter": { "enum": ["single", "header"] }, "options": { "$ref": "#/$defs/tenantOptions" } } },
+    "vectorstore": { "$ref": "#/$defs/service", "type": "object", "properties": { "adapter": { "enum": ["sqlite", "pgvector", "qdrant"] }, "options": { "$ref": "#/$defs/vectorstoreOptions" } } },
+    "webhook": { "$ref": "#/$defs/service", "type": "object", "properties": { "adapter": { "enum": ["http", "queue", "sqlite"] }, "options": { "$ref": "#/$defs/webhookOptions" } } },
+    "workflow": { "$ref": "#/$defs/service", "type": "object", "properties": { "adapter": { "enum": ["memory"] }, "options": { "$ref": "#/$defs/workflowOptions" } } }
+  },
+  "$defs": {
+    "service": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "adapter": { "type": "string", "description": "Backend implementation name. Present but omitted keeps config.Default()'s adapter for this service." },
+        "options": { "type": "object", "description": "Backend-specific typed settings; shape depends on adapter's package Options struct." }
+      }
+    },
+
+    "durationNs": {
+      "type": "integer",
+      "minimum": 0,
+      "description": "time.Duration serialized as an integer count of nanoseconds in JSON/YAML config files (e.g. 5s = 5000000000). Not a Go duration string -- \"5s\" style strings only work for environment-variable overrides, never inside zever.yaml/.yml/.json."
+    },
+
+    "zredisConnectOptions": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "addr": { "type": "string", "description": "host:port, or redis:// / rediss:// URL. Empty means localhost:6379." },
+        "password": { "type": "string" },
+        "db": { "type": "integer" },
+        "tls": { "type": "boolean", "description": "Enable TLS (1.2 floor) for a plain host:port address." },
+        "require_tls": { "type": "boolean", "description": "Fail fast instead of silently connecting in plaintext when TLS would not be used." }
+      }
+    },
+    "zredisOptions": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "addr": { "type": "string" },
+        "password": { "type": "string" },
+        "db": { "type": "integer" },
+        "tls": { "type": "boolean" },
+        "require_tls": { "type": "boolean" },
+        "pool_size": { "type": "integer" },
+        "min_idle_conns": { "type": "integer" },
+        "pool_timeout": { "$ref": "#/$defs/durationNs" },
+        "max_conn_idle_time": { "$ref": "#/$defs/durationNs" },
+        "max_conn_lifetime": { "$ref": "#/$defs/durationNs" }
+      }
+    },
+    "zredisOptionsWithPrefix": {
+      "type": "object",
+      "additionalProperties": false,
+      "description": "zredis.Options embedded plus a Prefix field -- used by eventbus/idempotency/ratelimit/session Redis adapters.",
+      "properties": {
+        "addr": { "type": "string" },
+        "password": { "type": "string" },
+        "db": { "type": "integer" },
+        "tls": { "type": "boolean" },
+        "require_tls": { "type": "boolean" },
+        "pool_size": { "type": "integer" },
+        "min_idle_conns": { "type": "integer" },
+        "pool_timeout": { "$ref": "#/$defs/durationNs" },
+        "max_conn_idle_time": { "$ref": "#/$defs/durationNs" },
+        "max_conn_lifetime": { "$ref": "#/$defs/durationNs" },
+        "prefix": { "type": "string" }
+      }
+    },
+    "providersCommon": {
+      "type": "object",
+      "additionalProperties": false,
+      "description": "Shared Stripe/Paddle option shape (internal/providers.Common), embedded directly into billing.Options and payment.Options -- no wrapper key.",
+      "properties": {
+        "secret_key": { "type": "string", "description": "Provider secret key (Stripe)." },
+        "api_key": { "type": "string", "description": "Provider API key (Paddle)." },
+        "endpoint": { "type": "string", "description": "Optional custom provider endpoint URL; must include scheme and host when set." },
+        "sandbox": { "type": "boolean" }
+      }
+    },
+
+    "aiOptions": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "api_key": { "type": "string" },
+        "model": { "type": "string" },
+        "base_url": { "type": "string", "description": "Must be a valid https URL when set." },
+        "timeout": { "$ref": "#/$defs/durationNs" }
+      }
+    },
+    "analyticsOptions": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "api_key": { "type": "string" },
+        "endpoint": { "type": "string" },
+        "anonymous_id": { "type": "string", "description": "Default: \"anonymous\"." },
+        "group_type": { "type": "string", "description": "Default: \"organization\"." },
+        "max_properties_bytes": { "type": "integer", "minimum": 0, "description": "Default: 65536 (64 KiB)." },
+        "max_properties": { "type": "integer", "minimum": 0 }
+      }
+    },
+    "authOptions": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "jwt": {
+          "type": "object",
+          "additionalProperties": false,
+          "properties": {
+            "secret": { "type": "string", "description": "HMAC signing secret, minimum 32 bytes (adapter-validated)." },
+            "issuer": { "type": "string", "description": "Required by the jwt adapter." },
+            "audience": { "type": "string" },
+            "max_ttl": { "$ref": "#/$defs/durationNs", "description": "Zero means no cap." }
+          }
+        },
+        "session": {
+          "type": "object",
+          "additionalProperties": false,
+          "description": "SessionOptions.Store is a Go-only session.Store injection (json:\"-\") -- there is nothing settable here from a config file.",
+          "properties": {}
+        },
+        "oidc": {
+          "type": "object",
+          "additionalProperties": false,
+          "properties": {
+            "issuer": { "type": "string", "description": "Required by the oidc adapter." },
+            "client_id": { "type": "string", "description": "Required by the oidc adapter." },
+            "timeout": { "$ref": "#/$defs/durationNs" }
+          }
+        }
+      }
+    },
+    "cacheOptions": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "adapter": {
+          "type": "integer",
+          "enum": [0, 1],
+          "description": "Deprecated/legacy: cache.Options carries its own internal Adapter int field (0=memory,1=redis), separate from and easily confused with the outer service.adapter string. Prefer the outer adapter field; avoid setting this."
+        },
+        "capacity": { "type": "integer" },
+        "verbose": { "type": "boolean" },
+        "sweep_interval": { "$ref": "#/$defs/durationNs" },
+        "max_entries": { "type": "integer" },
+        "url": { "type": "string", "description": "Redis connection URL; takes precedence over addr when set." },
+        "addr": { "type": "string" },
+        "password": { "type": "string" },
+        "db": { "type": "integer" },
+        "tls": { "type": "boolean" },
+        "require_tls": { "type": "boolean" },
+        "pool_size": { "type": "integer" },
+        "min_idle_conns": { "type": "integer" },
+        "pool_timeout": { "$ref": "#/$defs/durationNs" },
+        "max_conn_idle_time": { "$ref": "#/$defs/durationNs" },
+        "max_conn_lifetime": { "$ref": "#/$defs/durationNs" }
+      }
+    },
+    "cryptoOptions": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "key": { "type": "string", "description": "Required. Base64-encoded 32-byte encryption key." },
+        "sign_key": { "type": "string", "description": "Base64-encoded 64-byte signing key." }
+      }
+    },
+    "dbOptions": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "dsn": { "type": "string", "description": "Postgres connection string." },
+        "max_conns": { "type": "integer", "minimum": 0 },
+        "min_conns": { "type": "integer", "minimum": 0, "description": "Minimum pool size (postgres) or idle-connection target (sqlite)." },
+        "max_conn_lifetime": { "$ref": "#/$defs/durationNs" },
+        "max_conn_idle_time": { "$ref": "#/$defs/durationNs" },
+        "path": { "type": "string", "description": "SQLite database file path." }
+      }
+    },
+    "documentOptions": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "tmp_dir": { "type": "string" },
+        "timeout": { "$ref": "#/$defs/durationNs" },
+        "quality": { "type": "integer", "minimum": 0, "maximum": 100 },
+        "dpi": { "type": "integer", "minimum": 0 },
+        "endpoint": { "type": "string" },
+        "api_key": { "type": "string" },
+        "latex_command": { "type": "string", "description": "Default: pdflatex." },
+        "latex_pdf_to_ppm": { "type": "string", "description": "Default: pdftoppm." },
+        "max_output_bytes": { "type": "integer", "minimum": 0 },
+        "latex_runs": { "type": "integer", "minimum": 0 }
+      }
+    },
+    "eventbusOptions": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "buffer_size": { "type": "integer", "minimum": 0, "description": "Zero means adapter default (1024)." },
+        "max_handlers": { "type": "integer", "minimum": 0, "description": "Zero means adapter default (128)." },
+        "handler_timeout": { "$ref": "#/$defs/durationNs", "description": "Zero means adapter default (30s)." },
+        "close_timeout": { "$ref": "#/$defs/durationNs", "description": "Zero means adapter default (5s)." },
+        "redis": { "$ref": "#/$defs/zredisOptionsWithPrefix" }
+      }
+    },
+    "flagOptions": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "static": {
+          "type": "object", "additionalProperties": false,
+          "properties": { "path": { "type": "string" }, "reload": { "type": "boolean" } }
+        },
+        "firebase": {
+          "type": "object", "additionalProperties": false,
+          "properties": {
+            "project_id": { "type": "string" },
+            "service_account": { "type": "string", "description": "Path to the service-account JSON key file." },
+            "timeout": { "$ref": "#/$defs/durationNs" }
+          }
+        }
+      }
+    },
+    "geoOptions": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "api_key": { "type": "string" },
+        "base_url": { "type": "string", "description": "Google Maps API base URL override." },
+        "endpoint": { "type": "string", "description": "Mapbox/OSM API endpoint override." },
+        "timeout": { "$ref": "#/$defs/durationNs" },
+        "path": { "type": "string", "description": "JSON file for the static adapter." },
+        "max_response_body": { "type": "integer", "minimum": 0 },
+        "allow_insecure": { "type": "boolean" },
+        "user_agent": { "type": "string", "description": "Required for the osm adapter." }
+      }
+    },
+    "i18nOptions": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "embed": {
+          "type": "object", "additionalProperties": false,
+          "properties": {
+            "dir": { "type": "string", "description": "Default: \".\"." },
+            "fallback": { "type": "string" }
+          }
+        },
+        "remote": {
+          "type": "object", "additionalProperties": false,
+          "properties": {
+            "endpoint": { "type": "string" },
+            "api_key": { "type": "string" },
+            "timeout": { "$ref": "#/$defs/durationNs" },
+            "max_in_flight": { "type": "integer", "minimum": 0, "description": "Zero means adapter default (1000)." },
+            "allow_insecure": { "type": "boolean" }
+          }
+        }
+      }
+    },
+    "idempotencyOptions": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "ttl": { "$ref": "#/$defs/durationNs", "description": "Zero means adapter default (24h)." },
+        "redis": { "$ref": "#/$defs/zredisOptionsWithPrefix" }
+      }
+    },
+    "lockOptions": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "addr": { "type": "string" },
+        "password": { "type": "string" },
+        "db": { "type": "integer" },
+        "tls": { "type": "boolean" },
+        "require_tls": { "type": "boolean" },
+        "url": { "type": "string", "description": "Takes precedence over addr when set." },
+        "prefix": { "type": "string" },
+        "ttl": { "$ref": "#/$defs/durationNs", "description": "Zero means adapter default (30s)." },
+        "retry_interval": { "$ref": "#/$defs/durationNs", "description": "Zero means adapter default (50ms)." }
+      }
+    },
+    "logOptions": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "min_level": {
+          "type": "integer",
+          "enum": [0, 1, 2, 3, 4],
+          "description": "0=debug, 1=info, 2=warn, 3=error, 4=fatal. log.Level has no custom JSON (un)marshaling, so config files must use the integer, not the string name."
+        }
+      }
+    },
+    "mailerOptions": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "host": { "type": "string", "description": "Required; must not contain a scheme." },
+        "port": { "type": "integer", "minimum": 1, "maximum": 65535 },
+        "username": { "type": "string" },
+        "password": { "type": "string" },
+        "encryption": { "type": "string", "enum": ["", "starttls", "implicit", "none"], "description": "Empty means starttls." },
+        "timeout": { "$ref": "#/$defs/durationNs" },
+        "max_message_size": { "type": "integer", "minimum": 0 }
+      }
+    },
+    "mediaOptions": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "root": { "type": "string" },
+        "base_url": { "type": "string" },
+        "max_download_bytes": { "type": "integer", "minimum": 0, "description": "Default: 67108864 (64 MiB)." },
+        "max_pixels": { "type": "integer", "minimum": 0, "description": "Default: 52428800." },
+        "derived_ttl": { "$ref": "#/$defs/durationNs", "description": "Default: 10m." },
+        "presign_ttl": { "$ref": "#/$defs/durationNs", "type": "integer", "maximum": 604800000000000, "description": "Default: 1h. Must be <= 604800000000000 ns (7 days) -- exceeding it is REJECTED at Validate() time with InvalidOptionsError, not silently clamped." },
+        "max_duration": { "$ref": "#/$defs/durationNs", "description": "Zero means unlimited." },
+        "endpoint": { "type": "string" },
+        "region": { "type": "string", "description": "Default: us-east-1." },
+        "bucket": { "type": "string" },
+        "access_key_id": { "type": "string" },
+        "secret_access_key": { "type": "string" },
+        "ffmpeg": { "type": "string", "description": "Default: ffmpeg." },
+        "ffprobe": { "type": "string", "description": "Default: ffprobe." }
+      }
+    },
+    "notificationOptions": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "timeout": { "$ref": "#/$defs/durationNs" },
+        "twilio": {
+          "type": "object", "additionalProperties": false,
+          "properties": {
+            "account_sid": { "type": "string" },
+            "auth_token": { "type": "string" },
+            "from_number": { "type": "string", "description": "E.164 format." }
+          }
+        },
+        "fcm": {
+          "type": "object", "additionalProperties": false,
+          "properties": {
+            "project_id": { "type": "string", "description": "Required." },
+            "service_account": { "type": "string", "description": "Required. Path to the service-account JSON key file." }
+          }
+        }
+      }
+    },
+    "observabilityOptions": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "endpoint": { "type": "string", "description": "Collector address as host:port -- no scheme, no path." },
+        "service_name": { "type": "string", "minLength": 1, "maxLength": 128, "description": "Required." },
+        "insecure": { "type": "boolean", "description": "Only allowed when endpoint resolves to a loopback host." },
+        "set_globals": { "type": "boolean" },
+        "verbose": { "type": "boolean" },
+        "ca_file": { "type": "string" },
+        "cert_file": { "type": "string", "description": "Must be set together with key_file." },
+        "key_file": { "type": "string" },
+        "headers": { "type": "object", "additionalProperties": { "type": "string" }, "maxProperties": 32 },
+        "sample_ratio": { "type": "number", "minimum": 0, "maximum": 1 },
+        "attr_value_limit": { "type": "integer", "description": "0 (default) or 256-16384." }
+      }
+    },
+    "passwordOptions": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "time": { "type": "integer", "minimum": 1, "maximum": 10, "description": "Argon2id iterations. Default: 3." },
+        "memory": { "type": "integer", "minimum": 8192, "maximum": 1048576, "description": "Argon2id memory cost in KiB. Default: 65536 (64 MiB)." },
+        "threads": { "type": "integer", "minimum": 1, "maximum": 16, "description": "Default: 4." },
+        "salt_length": { "type": "integer", "minimum": 8, "maximum": 64, "description": "Default: 16." },
+        "key_length": { "type": "integer", "minimum": 16, "maximum": 128, "description": "Default: 32." }
+      }
+    },
+    "paymentOptions": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "secret_key": { "type": "string" },
+        "api_key": { "type": "string" },
+        "endpoint": { "type": "string" },
+        "sandbox": { "type": "boolean" },
+        "webhook_secret": { "type": "string" },
+        "auto_approve": { "type": "boolean", "description": "Marks new payments as succeeded instead of pending." },
+        "max_webhook_bytes": { "type": "integer", "minimum": 0, "description": "Default: 1048576 (1 MiB)." }
+      }
+    },
+    "permissionOptions": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "rules": {
+          "type": "array",
+          "items": { "$ref": "#/$defs/permissionRule" },
+          "description": "permission.Rule carries no json/yaml/toml struct tags, so keys are the exported Go field names verbatim (capitalized), unlike every other snake_case option in this schema."
+        },
+        "model_path": { "type": "string", "description": "Casbin model file path; must be set together with policy_path." },
+        "policy_path": { "type": "string", "description": "Casbin policy file path." },
+        "roles": {
+          "type": "object",
+          "additionalProperties": { "type": "array", "items": { "type": "string", "maxLength": 256 } },
+          "description": "Subject-ID to allowed-roles allowlist gating privilege escalation."
+        }
+      }
+    },
+    "permissionRule": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "Role": { "type": "string", "maxLength": 256 },
+        "Action": { "type": "string", "maxLength": 256 },
+        "Effect": { "type": "string", "enum": ["", "allow", "deny"], "description": "Empty means allow." },
+        "OwnedOnly": { "type": "boolean" },
+        "OwnedAttr": { "type": "string", "description": "Required when OwnedOnly is true." }
+      }
+    },
+    "queueOptions": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "visibility_timeout": { "$ref": "#/$defs/durationNs" },
+        "poll_timeout": { "$ref": "#/$defs/durationNs" },
+        "buffer": { "type": "integer", "minimum": 0 },
+        "addr": { "type": "string" },
+        "password": { "type": "string" },
+        "db": { "type": "integer" },
+        "tls": { "type": "boolean" },
+        "require_tls": { "type": "boolean" },
+        "url": { "type": "string" },
+        "prefix": { "type": "string" }
+      }
+    },
+    "ratelimitOptions": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "rate": { "type": "number", "exclusiveMinimum": 0, "description": "Token refill rate per second. Required." },
+        "burst": { "type": "integer", "exclusiveMinimum": 0, "description": "Required." },
+        "idle_ttl": { "$ref": "#/$defs/durationNs", "description": "Zero means adapter default (10m)." },
+        "sweep_interval": { "$ref": "#/$defs/durationNs", "description": "Zero means adapter default (1m)." },
+        "redis": { "$ref": "#/$defs/zredisOptionsWithPrefix" }
+      }
+    },
+    "routerOptions": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "app_name": { "type": "string", "maxLength": 64, "description": "Empty defaults to \"app\"." }
+      }
+    },
+    "schedulerOptions": {
+      "type": "object",
+      "additionalProperties": false,
+      "description": "scheduler.Options.Dispatcher is required by Validate() but is a *job.Dispatcher (json:\"-\") that can only be wired in code, never from a config file -- close_timeout is the only field a file can actually set.",
+      "properties": {
+        "close_timeout": { "$ref": "#/$defs/durationNs", "description": "Zero means adapter default (5s)." }
+      }
+    },
+    "searchOptions": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "host": { "type": "string", "description": "Meilisearch URL; required by the meilisearch adapter." },
+        "api_key": { "type": "string" },
+        "dsn": { "type": "string", "description": "Postgres URL or sqlite path; required by postgres/sqlite adapters." }
+      }
+    },
+    "secretsOptions": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "addr": { "type": "string", "description": "Vault server address." },
+        "token": { "type": "string", "description": "Vault authentication token." },
+        "mount": { "type": "string", "description": "Vault KV mount path." },
+        "project_id": { "type": "string", "description": "GCP project ID." },
+        "prefix": { "type": "string", "description": "Default: ZEVER." },
+        "region": { "type": "string", "description": "AWS region." }
+      }
+    },
+    "sessionOptions": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "ttl": { "$ref": "#/$defs/durationNs", "description": "Zero means adapter default (15m)." },
+        "redis": { "$ref": "#/$defs/zredisOptionsWithPrefix" }
+      }
+    },
+    "storageOptions": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "url_base": { "type": "string", "description": "Base URL presigned URLs are built on." },
+        "policy": {
+          "type": "object",
+          "additionalProperties": { "$ref": "#/$defs/storagePolicy" },
+          "description": "storage.PolicyConfig has custom (Un)MarshalJSON: it is a flat map, not {default, buckets}. The \"default\" key is the fallback policy for unlisted buckets; every other key is a bucket name."
+        },
+        "root": { "type": "string", "description": "local adapter: directory objects are stored under." },
+        "secret": { "type": "string", "description": "local adapter: HMAC key for presigned URLs." },
+        "public_url": { "type": "string", "description": "local adapter: public base URL for unsigned links." },
+        "access_key_id": { "type": "string", "description": "s3 adapter." },
+        "secret_access_key": { "type": "string", "description": "s3 adapter." },
+        "region": { "type": "string", "description": "s3 adapter; default us-east-1." },
+        "endpoint": { "type": "string", "description": "s3 adapter: overrides the endpoint for S3-compatible stores." },
+        "policy_sync": { "type": "string", "enum": ["", "manual", "auto"], "description": "s3 adapter." },
+        "sync_fail": { "type": "string", "enum": ["", "warn", "require"], "description": "s3 adapter." },
+        "account_id": { "type": "string", "description": "r2 adapter: Cloudflare account ID." }
+      }
+    },
+    "storagePolicy": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "version": { "type": "string" },
+        "read": { "$ref": "#/$defs/storagePolicyRule" },
+        "write": { "$ref": "#/$defs/storagePolicyRule" },
+        "update": { "$ref": "#/$defs/storagePolicyRule" },
+        "delete": { "$ref": "#/$defs/storagePolicyRule" }
+      }
+    },
+    "storagePolicyRule": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "public": { "type": "boolean", "description": "Allow unsigned access." },
+        "allow": { "type": "array", "items": { "type": "string" }, "description": "Subjects granted access. \"*\" matches any authenticated subject, \"anonymous\" matches everyone." },
+        "deny": { "type": "array", "items": { "type": "string" }, "description": "Subjects refused access; deny wins over allow." }
+      }
+    },
+    "tenantOptions": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "header": { "type": "string", "description": "Default: X-Tenant-ID." },
+        "subdomain_regex": { "type": "string", "maxLength": 500 },
+        "id": { "type": "string", "description": "Fixed tenant ID for the single adapter; default \"default\"." }
+      }
+    },
+    "vectorstoreOptions": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "dsn": { "type": "string", "description": "sqlite path or postgres URL (pgvector)." },
+        "url": { "type": "string", "description": "Qdrant address." },
+        "api_key": { "type": "string" },
+        "dimension": { "type": "integer", "minimum": 0, "description": "Default: 1536." }
+      }
+    },
+    "webhookOptions": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "timeout": { "$ref": "#/$defs/durationNs", "description": "Zero means adapter default." },
+        "max_retries": { "type": "integer", "minimum": 0, "description": "Zero means no retries." },
+        "allow_private_targets": { "type": "boolean", "description": "Testing only; leave false in production." },
+        "queue_adapter": { "type": "string", "description": "Only used by the queue adapter." },
+        "queue_opts": { "$ref": "#/$defs/queueOptions", "description": "Only used by the queue adapter." },
+        "dead_letter_topic": { "type": "string" },
+        "dsn": { "type": "string", "description": "sqlite adapter database path; empty means a private in-memory-style database." },
+        "replay_tolerance": { "$ref": "#/$defs/durationNs", "description": "Zero means adapter default (5m)." }
+      }
+    },
+    "workflowOptions": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "host_port": { "type": "string" },
+        "namespace": { "type": "string" }
+      }
+    }
+  }
+}
