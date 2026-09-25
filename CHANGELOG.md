@@ -7,7 +7,42 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Added
+
+- `config/schema/`: a hand-authored JSON Schema (draft 2020-12) for
+  `zever.yaml`/`.yml`/`.json`, covering every one of `config.Config`'s 34
+  services' adapters and typed options, plus mechanically-generated
+  `.yaml`/`.yml`/`.toml` equivalents for tooling that expects a schema file
+  in its own format (`config/schema/README.md` covers editor wiring and the
+  caveat that `.toml` is schema-only -- zever itself still only loads
+  `.yaml`/`.yml`/`.json`). `config.SchemaJSON` embeds the canonical file for
+  in-process use. `zever new` now scaffolds a `zever.schema.json` into every
+  new project and points the generated `zever.yaml` at it via a
+  `yaml-language-server` modeline comment, so scaffolded projects get
+  config autocomplete/validation out of the box.
+
 ### Changed
+
+- **Breaking:** `zever new` no longer accepts `--framework-path`. It only
+  ever existed to replace a scaffold's `go.mod` against a local zever
+  checkout for framework development -- now that the framework is a
+  published module with real tagged releases, auto-detection (walking up
+  from the working directory for a `go.mod` declaring "module
+  github.com/zenta-dev/zever") still covers that case with no flag needed,
+  and `--framework-version` still covers pinning a scaffold to a specific
+  published release. `--framework-version` is unchanged.
+- **Breaking:** `zever generate module` no longer accepts `--lang`. It only
+  ever accepted `"go"` (its own help text said so) -- pure speculative
+  surface for a language target that doesn't exist yet; it can come back
+  without a breaking change once one does.
+- `zever breaking <old> -- <new>` now accepts a bare directory on either
+  side of `--`, recursively discovering every `.zen` file under it (flat,
+  versioned, or arbitrarily nested layouts), instead of requiring an
+  explicit glob or file list -- matching every other schema-consuming
+  command's auto-discovery.
+- `zever db migrate` now falls back to the same recursive schema-dir
+  auto-discovery as `compile`/`check`/`routes`/etc. when run
+  non-interactively with no file arguments, instead of failing immediately.
 
 - **Breaking:** new `internal/providers` package (mirrors the existing
   `internal/s3opts` pattern shared by `storage/s3`/`storage/r2`/`media/s3`)
