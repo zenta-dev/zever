@@ -84,23 +84,11 @@ func TestRunGenerateModuleGo(t *testing.T) {
 	}
 }
 
-func TestRunGenerateModuleUnsupportedLang(t *testing.T) {
-	dir := t.TempDir()
-	withWorkingDir(t, dir)
-
-	err := runGenerateModule([]string{"--lang=rust", "module", "widgets"})
-	if err == nil {
-		t.Fatalf("expected error for unsupported lang, got nil")
-	}
-}
-
-// TestRunGenerateDispatchesModule covers both calling conventions the
-// dispatcher has to keep working: the plain subcommand word, and the legacy
-// flags-before-positionals form runGenerateModule owns.
+// TestRunGenerateDispatchesModule covers the dispatcher's calling
+// convention: the plain subcommand word.
 func TestRunGenerateDispatchesModule(t *testing.T) {
 	for _, args := range [][]string{
 		{"module", "widgets"},
-		{"--lang=go", "module", "widgets"},
 	} {
 		dir := t.TempDir()
 		withWorkingDir(t, dir)
@@ -246,7 +234,7 @@ func TestGenerateModuleRejectsTraversal(t *testing.T) {
 			dir := t.TempDir()
 			withWorkingDir(t, dir)
 
-			cfg := GenerateModuleConfig{Name: name, Lang: "go", SchemaDir: "schema"}
+			cfg := GenerateModuleConfig{Name: name, SchemaDir: "schema"}
 
 			if _, err := GenerateModule(cfg); !isTraversalError(err) {
 				t.Fatalf("GenerateModule(%q) = %v, want ErrPathTraversal", name, err)
@@ -382,12 +370,12 @@ func TestCoverRunGenerateModuleInteractive(t *testing.T) {
 	dir := t.TempDir()
 	withWorkingDir(t, dir)
 	promptInputForGenerate = func(string, string, func(string) error) (string, error) { return "prompted", nil }
-	if err := runGenerateModule([]string{"--lang=go"}); err != nil {
+	if err := runGenerateModule([]string{}); err != nil {
 		t.Fatalf("prompted module: %v", err)
 	}
 	// Error: prompt fails.
 	promptInputForGenerate = func(string, string, func(string) error) (string, error) { return "", errors.New("boom") }
-	if err := runGenerateModule([]string{"--lang=go"}); err == nil {
+	if err := runGenerateModule([]string{}); err == nil {
 		t.Fatalf("expected prompt error")
 	}
 	// Empty name positional triggers second prompt success.
@@ -430,14 +418,11 @@ func TestCoverRunGenerateModuleInteractive(t *testing.T) {
 func TestCoverGenerateModuleErrors(t *testing.T) {
 	dir := t.TempDir()
 	withWorkingDir(t, dir)
-	if _, err := GenerateModule(GenerateModuleConfig{Name: "bad-name!", Lang: "go", SchemaDir: "schema"}); err == nil {
+	if _, err := GenerateModule(GenerateModuleConfig{Name: "bad-name!", SchemaDir: "schema"}); err == nil {
 		t.Fatalf("expected ident error")
 	}
-	if _, err := GenerateModule(GenerateModuleConfig{Name: "ok", Lang: "rust", SchemaDir: "schema"}); err == nil {
-		t.Fatalf("expected lang error")
-	}
 	// Mkdir failure via missing-parent path (non-root-safe fault injection).
-	if _, err := GenerateModule(GenerateModuleConfig{Name: "m", Lang: "go", SchemaDir: filepath.Join("nope", "sub", "schema")}); err != nil {
+	if _, err := GenerateModule(GenerateModuleConfig{Name: "m", SchemaDir: filepath.Join("nope", "sub", "schema")}); err != nil {
 		// May succeed if MkdirAll creates parents; force failure with file blocking.
 		_ = err
 	}
@@ -445,7 +430,7 @@ func TestCoverGenerateModuleErrors(t *testing.T) {
 	if err := os.WriteFile(blocker, []byte("x"), 0o600); err != nil {
 		t.Fatalf("write blocker: %v", err)
 	}
-	if _, err := GenerateModule(GenerateModuleConfig{Name: "m", Lang: "go", SchemaDir: filepath.Join(blocker, "schema")}); err == nil {
+	if _, err := GenerateModule(GenerateModuleConfig{Name: "m", SchemaDir: filepath.Join(blocker, "schema")}); err == nil {
 		t.Fatalf("expected mkdir error")
 	}
 	// Write failure: schema dir is a file.

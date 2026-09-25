@@ -37,6 +37,27 @@ func TestRunDBMigrateNoFiles(t *testing.T) {
 	}
 }
 
+// TestRunDBMigrateAutoDiscoversSchemaDir proves the non-interactive path
+// (as in a CI script, never a TTY under go test) falls back to the same
+// recursive schema-dir auto-discovery every other file-consuming command
+// uses, instead of requiring an explicit file argument -- including when
+// the schema lives in a nested, versioned subdirectory.
+func TestRunDBMigrateAutoDiscoversSchemaDir(t *testing.T) {
+	dir := t.TempDir()
+	withWorkingDir(t, dir)
+	writeZeverFixture(t, dir, filepath.Join("schema", "v1", "user.zen"), migrateSchema)
+
+	output := captureZeverStdout(t, func() {
+		if err := runDBMigrate([]string{"--dry-run"}); err != nil {
+			t.Fatalf("runDBMigrate (auto-discovery): %v", err)
+		}
+	})
+
+	if !strings.Contains(output, `table "users" {`) {
+		t.Fatalf("dry-run output missing discovered schema's table:\n%s", output)
+	}
+}
+
 func TestRunDBMigrateUnknownAdapter(t *testing.T) {
 	dir := t.TempDir()
 	schemaPath := writeZeverFixture(t, dir, "schema.zen", migrateSchema)
