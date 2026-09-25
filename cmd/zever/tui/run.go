@@ -60,6 +60,16 @@ type ExecModel struct {
 	spin   spinner.Model
 	theme  Theme
 	keys   Keymap
+	// ctx/cancel back Start's ExecFunc call. esc during ExecRunning calls
+	// cancel so the running operation actually stops instead of merely
+	// hiding the running screen while the real work (e.g. a `db migrate`/
+	// `rollback`/`seed` subprocess capture) keeps executing unattended.
+	// Every ExecModel value produced by Update shares the same cancel
+	// closure (func values copy by reference to the same underlying
+	// context), so cancellation reaches Start's in-flight call regardless
+	// of which copy Update last returned.
+	ctx    context.Context //nolint:containedctx // ExecModel owns its fn-call scope: created in NewExec, canceled on esc, must be stored to survive Update value copies
+	cancel context.CancelFunc
 }
 
 // NewExec returns an ExecModel ready to run title via fn. cli is the
@@ -68,14 +78,18 @@ type ExecModel struct {
 // as a tea.Cmd.
 func NewExec(title, cli string, fn ExecFunc) ExecModel {
 	sp := spinner.New(spinner.WithSpinner(spinner.MiniDot))
+	ctx, cancel := context.WithCancel(context.Background())
+
 	return ExecModel{
-		title: title,
-		cli:   cli,
-		fn:    fn,
-		state: ExecRunning,
-		spin:  sp,
-		theme: NewTheme(),
-		keys:  DefaultKeymap(),
+		title:  title,
+		cli:    cli,
+		fn:     fn,
+		state:  ExecRunning,
+		spin:   sp,
+		theme:  NewTheme(),
+		keys:   DefaultKeymap(),
+		ctx:    ctx,
+		cancel: cancel,
 	}
 }
 
@@ -104,7 +118,13 @@ func (m ExecModel) Start() tea.Msg {
 	if m.fn == nil {
 		return ExecDoneMsg{}
 	}
-	out, err := m.fn(context.Background())
+	ctx := m.ctx
+	if ctx == nil {
+		// Defensive: a zero-value ExecModel (not built via NewExec) has no
+		// context to cancel. Never block Start on a nil ctx.
+		ctx = context.Background()
+	}
+	out, err := m.fn(ctx)
 	if err != nil {
 		return ExecErrMsg{Err: err}
 	}
@@ -119,14 +139,25 @@ func (m ExecModel) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		if m.keys.Back.Matches(msg.String()) && m.state == ExecRunning {
 			m.state = ExecCanceled
 			m.err = ErrCanceled
+			if m.cancel != nil {
+				m.cancel()
+			}
 			return m, func() tea.Msg { return CanceledMsg{} }
 		}
 		return m, nil
 	case ExecDoneMsg:
+		if m.state == ExecCanceled {
+			// A late completion racing the esc-cancel above must not
+			// overwrite what the user already saw as canceled.
+			return m, nil
+		}
 		m.state = ExecDone
 		m.output = msg.Output
 		return m, nil
 	case ExecErrMsg:
+		if m.state == ExecCanceled {
+			return m, nil
+		}
 		if errors.Is(msg.Err, ErrCanceled) || errors.Is(msg.Err, context.Canceled) {
 			m.state = ExecCanceled
 		} else {
