@@ -3,7 +3,7 @@ title: 'Tutorial: Explore the Showcase App'
 description: A tour of examples/showcase — every DSL feature in one schema, served over HTTP and gRPC from one implementation.
 ---
 
-Where [Build a Booking API](/zever/tutorials/build-a-booking-api/) walks a
+Where [Build a Booking API](build-a-booking-api/) walks a
 narrow, realistic flow end to end, `examples/showcase` goes wide: one `.zen`
 schema exercising every scalar, relation kind, attribute, and RPC shape the
 DSL supports, served over both HTTP and gRPC from a single business-logic
@@ -37,7 +37,7 @@ cd examples/showcase
 | Every HTTP verb, every `auth:` shape, `permission: check`, `errors:` sets, `paginated: true` | `ShopService` RPCs |
 | Job params, queues, retry shapes, `cron` + `dispatch` | 4 jobs, 2 schedules |
 
-See [Syntax (.zen)](/zever/dsl/syntax-zen/) for what each of these means in
+See [Syntax (.zen)](../dsl/syntax-zen/) for what each of these means in
 isolation; this schema is the "all of them together" reference.
 
 ## One implementation, two transports
@@ -58,7 +58,7 @@ one schedule registration per declared schedule.
 
 `AUTH_JWT_SECRET` (at least 32 bytes) is required by every entrypoint —
 this app fails closed, unlike the demo-friendly default some other examples
-use (see [Configuration](/zever/getting-started/configuration/)).
+use (see [Configuration](../getting-started/configuration/)).
 
 ```sh
 export AUTH_JWT_SECRET=dev-only-secret-at-least-32-bytes-long
@@ -104,8 +104,8 @@ overwritten by a regenerate.
 
 ## Next
 
-- [Backends](/zever/dsl/backends/) to understand what each of the six
+- [Backends](../dsl/backends/) to understand what each of the six
   backends (`atlas`, `gogen`, `openapi`, `proto`, `protogogen`, `zenorm`)
   actually produces from this one schema.
-- [Query Builder](/zever/database/query-builder/) for the typed ORM the
+- [Query Builder](../database/query-builder/) for the typed ORM the
   `zenorm` backend generates and this app's service implementation uses.

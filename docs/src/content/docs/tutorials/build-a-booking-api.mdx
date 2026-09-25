@@ -29,7 +29,7 @@ cat schema/bookings.zen
 ```
 
 You don't need to write this yourself for the tutorial; it's already
-checked in. See [Syntax (.zen)](/zever/dsl/syntax-zen/) once you're ready to
+checked in. See [Syntax (.zen)](../dsl/syntax-zen/) once you're ready to
 extend it.
 
 ## 2. Compile and migrate
@@ -57,7 +57,7 @@ This creates a demo host (`host@example.com`), a demo guest
 ## 4. Set a JWT secret and serve
 
 The bookings app fails closed if `AUTH_JWT_SECRET` is missing or short —
-see [Configuration](/zever/getting-started/configuration/) for why. Export
+see [Configuration](../getting-started/configuration/) for why. Export
 one (at least 32 bytes, never commit a real one):
 
 ```sh
@@ -128,9 +128,9 @@ zero-infra gaps in the example, not framework bugs.
 
 ## Next
 
-- [Explore the Showcase App](/zever/tutorials/explore-the-showcase-app/) for
+- [Explore the Showcase App](explore-the-showcase-app/) for
   a schema that exercises every DSL feature in one place, served over both
   HTTP and gRPC.
-- [Architecture: Providers and Adapters](/zever/architecture/providers-adapters/)
+- [Architecture: Providers and Adapters](../architecture/providers-adapters/)
   to understand why swapping `payment: stub` for `payment: stripe` in
   `zever.yaml` is the only change a real deployment needs.

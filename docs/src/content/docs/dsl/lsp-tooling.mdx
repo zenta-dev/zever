@@ -7,7 +7,7 @@ description: Editor support, CLI inspection commands, and grammar generation for
 
 ## CLI inspection commands
 
-Every dashboard row maps to an exact CLI invocation, and every screen shows that CLI line so TUI learning transfers to scripts. See [CLI Reference](/zever/reference/cli/) for the full screen map; the ones you'll reach for most while iterating on a schema:
+Every dashboard row maps to an exact CLI invocation, and every screen shows that CLI line so TUI learning transfers to scripts. See [CLI Reference](../reference/cli/) for the full screen map; the ones you'll reach for most while iterating on a schema:
 
 ```sh
 zever fmt --write schema/
@@ -15,7 +15,7 @@ zever check schema/
 zever compile --out ./generated
 ```
 
-`zever check-boundaries` reports cross-schema-module violations (a relation, RPC return type, or permission resource reaching from one `.zen` module into another) — see [Compiler Boundary](/zever/architecture/compiler-boundary/), which also covers the separate, Go-toolchain-enforced rule that runtime packages never import the DSL compiler itself.
+`zever check-boundaries` reports cross-schema-module violations (a relation, RPC return type, or permission resource reaching from one `.zen` module into another) — see [Compiler Boundary](../architecture/compiler-boundary/), which also covers the separate, Go-toolchain-enforced rule that runtime packages never import the DSL compiler itself.
 
 ## LSP server
 

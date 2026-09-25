@@ -3,7 +3,7 @@ title: Errors
 description: Typed errors with stable gRPC codes and HTTP mappings.
 ---
 
-Errors are typed values with stable codes. Handlers match the error, pick a status, and log once — see [Logging](/zever/basics/logging/) for the structured-logging half of that pattern.
+Errors are typed values with stable codes. Handlers match the error, pick a status, and log once — see [Logging](logging/) for the structured-logging half of that pattern.
 
 ## Typed errors
 
@@ -28,8 +28,8 @@ if errors.Is(err, db.ErrNotFound) {
 ## Error text never echoes secrets
 
 Error text names services and fields only — values are never echoed, the
-same rule [Logging](/zever/basics/logging/) and
-[Configuration](/zever/getting-started/configuration/) apply to log lines
+same rule [Logging](logging/) and
+[Configuration](../getting-started/configuration/) apply to log lines
 and displayed config. The CLI follows it too: `zever config show` prints
 redacted config, and `migrate` screens mask `--dsn ***`.
 
