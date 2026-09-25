@@ -17,6 +17,25 @@ go install github.com/zenta-dev/zever/cmd/zever@v0.3.0
 Then `zever --help` prints the grouped command map (Scaffolding /
 Inspection / Runtime / Database).
 
+## Global flags and exit codes
+
+- `--quiet`: suppress hints/tips on stderr; errors still print.
+- `--no-color`: disable styled output (also honored via `NO_COLOR` /
+  `TERM=dumb` ambient env).
+- Exit codes: `0` success, `1` runtime error, `2` flag misuse
+  (bad flags print the error to stderr with no usage dump).
+- `--help` output goes to stdout; errors and bare-invocation usage go
+  to stderr.
+
+## Generated docs
+
+- `zever completion <bash|zsh|fish|powershell>` prints that shell's
+  completion script to stdout; redirect into your completions dir, e.g.
+  `zever completion bash > /etc/bash_completion.d/zever`.
+- `zever docs --dir <dir>` writes one man page plus one markdown file
+  per command into `<dir>`; build stripped release binaries with
+  `make build-release` (`-trimpath -ldflags="-s -w"`).
+
 ## Flags-only UX
 
 - **Bare `zever` (no subcommand)**, on a TTY or not: prints usage to

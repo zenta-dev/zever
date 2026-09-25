@@ -40,6 +40,25 @@ command map.
 | Database | `zever db migrate` |
 | Database | `zever db rollback` |
 | Database | `zever db seed` |
+| Tooling | `zever completion <bash\|zsh\|fish\|powershell>` |
+| Tooling | `zever docs --dir <dir>` |
+
+## Global flags and exit codes
+
+- `--quiet`: suppress hints/tips on stderr; errors still print.
+- `--no-color`: disable styled output (also honored via `NO_COLOR` /
+  `TERM=dumb` ambient env).
+- Exit codes: `0` success, `1` runtime error, `2` flag misuse (bad
+  flags print the error to stderr with no usage dump).
+- `--help` output goes to stdout; errors and bare-invocation usage go
+  to stderr.
+
+## Shell completion and generated docs
+
+- `zever completion <shell>` prints that shell's completion script to
+  stdout, e.g. `zever completion bash > /etc/bash_completion.d/zever`.
+- `zever docs --dir <dir>` writes one man page plus one markdown file
+  per command into `<dir>`.
 
 ## Dev and tinker rules
 
