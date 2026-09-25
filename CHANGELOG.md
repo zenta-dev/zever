@@ -9,6 +9,18 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Changed
 
+- **Breaking:** `zever` CLI migrated to Cobra: every subcommand is a
+  `*cobra.Command` under one root with persistent `--quiet`/`--no-color`
+  flags; exit codes are now `0` ok / `1` runtime error / `2` flag misuse
+  (Cobra's `SilenceUsage` convention — bad flags no longer print the
+  full usage-plus-error mix); `-h`/`--help` works uniformly, fixing the
+  hand-rolled `-h` gaps on `routes`/`graph`/`check-boundaries`/`explain`;
+  new `zever completion <bash|zsh|fish|powershell>` and
+  `zever docs --dir <dir>` (man pages + markdown) commands; release
+  builds strip via `make build-release`
+  (`-trimpath -ldflags="-s -w"`). (`bubbletea`/`teatest` remain as
+  test-only dependencies driving the kept `huh` prompt tests — unrelated
+  to this migration; see the TUI-removal entry below, left intact.)
 - **Breaking:** `zever` dashboard/TUI removed. `cmd/zever` is now
   flags-only: bare `zever` (TTY or not) prints usage to stderr and exits 1
   (`zever: missing subcommand`) instead of opening an interactive

@@ -37,9 +37,12 @@ require-tools: ## Fail fast if required development tools are missing
 	@command -v $(GOLANGCI_LINT) >/dev/null 2>&1 || { printf '%s\n' "golangci-lint not found: run 'make setup'"; exit 1; }
 	@command -v $(GOVULNCHECK) >/dev/null 2>&1 || { printf '%s\n' "govulncheck not found: run 'make setup'"; exit 1; }
 
-.PHONY: build
+.PHONY: build build-release
 build: ## Build all packages
 	$(GO) build ./...
+
+build-release: ## Build stripped release binary (smaller: -s -w -trimpath)
+	$(GO) build -trimpath -ldflags="-s -w" -o bin/zever ./cmd/zever
 
 .PHONY: generate
 generate: ## Regenerate editor grammar files from internal/dsl/gengrammar

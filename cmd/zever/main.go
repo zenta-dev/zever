@@ -105,6 +105,25 @@ var subcommandHandlers = map[string]func([]string) error{
 }
 
 func main() {
+	if useCobra(os.Args[1:]) {
+		rootCmd.SetArgs(os.Args[1:])
+		if err := rootCmd.Execute(); err != nil {
+			if colorEnabled {
+				_, _ = fmt.Fprintln(os.Stderr, red(err.Error()))
+			} else {
+				_, _ = fmt.Fprintln(os.Stderr, err)
+			}
+
+			if errors.Is(err, errFlagUsage) {
+				os.Exit(2)
+			}
+
+			os.Exit(1)
+		}
+
+		return
+	}
+
 	if err := run(os.Args[1:]); err != nil {
 		if colorEnabled {
 			_, _ = fmt.Fprintln(os.Stderr, red(err.Error()))
