@@ -1,0 +1,68 @@
+---
+title: Tutorials Overview
+description: Runnable example apps under examples/, from single-battery demos to full showcase apps.
+---
+
+Every battery in this framework has a runnable example under `examples/` in
+the repository — no separate module, no extra setup: `go test
+./examples/...` covers all of them with zero infrastructure. Two tutorials
+in this section walk you through the two most complete apps step by step;
+this page is the map of everything else.
+
+There is deliberately no separate Go module under `examples/`: they live in
+the main module so `internal/` packages stay importable and the whole tree
+builds and tests as one unit. If you need a heavier dependency for your own
+experiment, isolate it behind its own `go.mod` the way a real add-on would.
+
+## Full apps (Stage 2)
+
+Start here if you want to see a complete, wired application:
+
+| App | Demonstrates |
+|---|---|
+| [`bookings`](https://github.com/zenta-dev/zever/tree/main/examples/bookings) | Marketplace domain: hosts list spaces, guests book them — walked through in [Build a Booking API](/zever/tutorials/build-a-booking-api/) |
+| [`showcase`](https://github.com/zenta-dev/zever/tree/main/examples/showcase) | DSL depth: every schema feature in one shop schema, HTTP + gRPC parity — walked through in [Explore the Showcase App](/zever/tutorials/explore-the-showcase-app/) |
+| [`demoapp`](https://github.com/zenta-dev/zever/tree/main/examples/demoapp) | Battery breadth: every service battery behind one HTTP API |
+| [`todo`](https://github.com/zenta-dev/zever/tree/main/examples/todo) | Auth-gated notes app with HTTP + gRPC cross-transport parity tests |
+
+## Focused ORM ports (Stage 1b)
+
+Smaller apps, each proving one ORM feature end to end against sqlite:
+
+| App | Demonstrates |
+|---|---|
+| [`transactions`](https://github.com/zenta-dev/zever/tree/main/examples/transactions) | `orm.WithNestedTx` savepoint-nested transfers |
+| [`bulk_upsert`](https://github.com/zenta-dev/zever/tree/main/examples/bulk_upsert) | Multi-row `Insert`, `OnConflict(...).DoUpdate/DoNothing`, `Returning().ExecReturning` |
+| [`pagination`](https://github.com/zenta-dev/zever/tree/main/examples/pagination) | Offset paging (`Limit`/`Offset`/`Count`) and keyset paging (`AfterTuple`, cursor encode/decode) |
+| [`recursive_cte`](https://github.com/zenta-dev/zever/tree/main/examples/recursive_cte) | `orm.WithRecursive` — an org chart in one query |
+| [`json_query`](https://github.com/zenta-dev/zever/tree/main/examples/json_query) | `orm/json/sqlite` nested-key, key-exists, and array-membership filters |
+| [`fts`](https://github.com/zenta-dev/zever/tree/main/examples/fts) | `orm/fts/sqlite` full-text `MATCH` with rank-ordered search |
+| [`ormdrill`](https://github.com/zenta-dev/zever/tree/main/examples/ormdrill) | Cursors, preload, joins, subqueries, and expressions without codegen (raw builder) |
+
+## Per-battery examples (Stage 1)
+
+Every service battery — `cache`, `queue`, `db`, `payment`, `ai`,
+`vectorstore`, and every other one listed in [Config
+Reference](/zever/reference/config-reference/) — has at least one
+`ExampleXxx` test against its zero-infra adapter, each showing one happy
+path and one error path via `// Output:` comments. Browse them under
+`examples/<battery>/` in the repository; the test itself is the
+documentation, so `go doc` or reading the source is the fastest way in.
+
+## Running the examples
+
+```sh
+go test ./examples/...        # everything, zero infra, no setup needed
+go test -race ./examples/...  # with the race detector
+```
+
+Some examples opt into a real backend via environment variables when you
+want to see the adapter swap in action, for example:
+
+```sh
+DB_ADAPTER=postgres DB_DSN=postgres://... go test ./examples/...
+```
+
+Unset, every example runs against the zero-infra defaults from
+[`config.Default()`](/zever/getting-started/configuration/) — no database,
+no Redis, no external service required.

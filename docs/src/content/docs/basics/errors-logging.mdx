@@ -1,9 +1,9 @@
 ---
-title: Errors and Logging
-description: Typed errors with gRPC codes, HTTP mappings, and secret-safe structured logging.
+title: Errors
+description: Typed errors with stable gRPC codes and HTTP mappings.
 ---
 
-Errors are typed values with stable codes; logs are structured lines with redacted secrets. Handlers map one to the other: match the error, pick the status, log once.
+Errors are typed values with stable codes. Handlers match the error, pick a status, and log once — see [Logging](/zever/basics/logging/) for the structured-logging half of that pattern.
 
 ## Typed errors
 
@@ -20,44 +20,19 @@ if errors.Is(err, db.ErrNotFound) {
 |---|---|
 | sentinel + `errors.Is` | stable branches (`db.ErrNotFound`, `dialect.ErrUnsupportedByDialect`) |
 | `%w` wrapping | add context without losing identity |
-| `errors.As` for `*ClosePanicError` / `*CloseTimeoutError` | shutdown diagnostics |
+| `errors.As` for `ClosePanicError` / `CloseTimeoutError` (value types, not pointers) | shutdown diagnostics |
 | `orm:` / `orm/render:` prefixes | ORM failures stay greppable and compatible |
 
 `.zen` RPCs declare their error set (`errors: { already_exists }`), so generated OpenAPI and clients know which codes to expect. The `breaking` checker treats error-set changes as API changes.
 
-## Logging
+## Error text never echoes secrets
 
-Resolve one logger and inject it — middleware constructors take it as an argument:
+Error text names services and fields only — values are never echoed, the
+same rule [Logging](/zever/basics/logging/) and
+[Configuration](/zever/getting-started/configuration/) apply to log lines
+and displayed config. The CLI follows it too: `zever config show` prints
+redacted config, and `migrate` screens mask `--dsn ***`.
 
-```go
-logger, err := c.Log()
-if err != nil {
-    return err
-}
-handler := middleware.RequestLogger(logger)(mux)
-```
-
-| Adapter | Config | Output |
-|---|---|---|
-| `noop` | default (silent) | nothing |
-| `slog` | `log: {adapter: slog}` | stdlib structured lines |
-| `zerolog` | `log: {adapter: zerolog}` | high-throughput JSON |
-| `pretty` | `log: {adapter: pretty}` | human-readable dev lines |
-
-`RequestLogger` emits one line per request (method, path, status, `duration_ms`, plus `request_id` when present). `Recover` logs panics with value + stack and responds 500 `{"error":"internal error"}`.
-
-## The redaction rule
-
-Raw option maps may hold secrets as plain strings. Never log them directly:
-
-```go
-// Wrong: may print DSNs, API keys, JWT secrets.
-log.Info("config", "cfg", cfg)
-
-// Right: sole display path for logging or debugging.
-fmt.Println(config.RedactedServices(cfg))
-```
-
-Error text names services and fields only — values are never echoed. The CLI follows the same rule (`zever config show` prints redacted config; migrate screens mask `--dsn ***`).
-
-Panics in handlers become 500s via `Recover`; panics during `Close` become `*ClosePanicError` in the joined shutdown error. Log the shutdown error once at exit — it already aggregates every service.
+Panics in handlers become `500`s via `middleware.Recover`; panics during
+`Close` become `ClosePanicError` in the joined shutdown error. Log the
+shutdown error once at exit — it already aggregates every service.

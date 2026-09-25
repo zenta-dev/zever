@@ -1,0 +1,62 @@
+---
+title: Compiler Boundary
+description: Why runtime packages never import the DSL compiler, and how it's enforced.
+---
+
+`internal/dsl` is the schema compiler frontend: source text through the
+lexer, parser, resolver, and codegen backends, ending at `*ir.Schema` and
+generated output. It is marked `internal/` for the same reason Go's own
+`internal/` visibility rule exists — and the constraint it enforces is
+stricter than "don't import a private package by accident."
+
+## The rule
+
+**Runtime packages must never import `internal/dsl`.**
+
+A running service — the container, an adapter, generated application code —
+has no business linking against a lexer, a parser, or a resolver. Those
+exist for one moment: compile time, when `zever compile` turns your `.zen`
+schema into Go source. Once that source exists, the compiler's job is done;
+a deployed binary should never carry it, and no runtime code path should
+ever need to.
+
+```
+source text → lexer → parser → ast → resolver → ir.Schema
+                                    ↘ compile → backend outputs
+```
+
+Everything left of the final arrow is compile-time-only. Everything the
+generated output produces — the typed ORM, the HTTP routes, the gRPC
+service stubs — is what runtime code actually imports.
+
+## Why this matters
+
+- **Binary size and attack surface.** A compiler frontend pulls in a lexer,
+  parser, and multiple codegen backends worth of dependencies. None of that
+  belongs in a production binary that only needs to run generated code
+  against a database.
+- **Layering stays honest.** If runtime code could reach into the resolver,
+  it would be tempting to special-case schema-shaped logic at request time
+  instead of generating it once, ahead of time — reintroducing exactly the
+  kind of runtime reflection/interpretation this framework's codegen-first
+  design exists to avoid.
+- **The same rule Go itself enforces.** Placing the compiler under
+  `internal/` means the Go toolchain rejects an accidental import from
+  outside the module at compile time — this isn't a lint you have to
+  remember to run, it's a build failure the moment someone tries.
+
+Because the enforcement is Go's own `internal/` visibility mechanism,
+there's no separate CLI check for this rule and none is needed: `go build`
+already fails the build for any import of `internal/dsl` from outside the
+module.
+
+## A different boundary: schema modules
+
+Don't confuse this compiler boundary with `zever check-boundaries`, which
+checks something else entirely — cross-**schema-module** references (a
+relation, RPC return type, or permission resource that reaches from one
+`.zen` module directory into another). That's a modeling rule enforced by
+the resolver on every compile; `check-boundaries` is just a report-only
+view over diagnostics `Resolve()` already produces. See [Syntax
+(.zen)](/zever/dsl/syntax-zen/) for how modules are derived from directory
+structure.

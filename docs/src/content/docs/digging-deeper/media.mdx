@@ -61,9 +61,10 @@ _ = m
 traversal through an asset ID — never build a filesystem or storage key by
 concatenating a raw caller-supplied ID without going through it. Decoded images
 are capped at 50M pixels (`MaxPixels`) so a crafted image can't blow up memory
-during a transform. Presigned URLs cap at 7 days (`MaxPresignTTL`) no matter
-what `PresignTTL` you configure — asking for longer just gets clamped, not
-rejected, so don't assume your requested TTL is what you actually got back.
+during a transform. Presigned URLs cap at 7 days (`MaxPresignTTL`) — configuring
+a `PresignTTL` longer than that is rejected at `Validate()` time with
+`InvalidOptionsError`, not silently clamped, so a too-long TTL fails at
+startup instead of quietly shipping a different value than requested.
 
 `AccessKeyID` and `SecretAccessKey` never appear in logs; downloads are capped
 at 64MB by default (`MaxDownloadBytes`) to keep a single request from exhausting

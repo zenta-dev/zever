@@ -1,0 +1,78 @@
+---
+title: Codec
+description: Composable, typed Encoder/Decoder pairs for values stored as bytes.
+---
+
+Cache values, queue payloads, session data, webhook bodies — anywhere a
+typed Go value has to cross a byte-oriented boundary, something has to
+serialize it. `codec` is that one small, generic seam every adapter in the
+framework uses instead of each package hand-rolling its own
+`json.Marshal`/`Unmarshal` calls.
+
+## The interfaces
+
+```go
+package codec
+
+type Encoder[V any] interface {
+	Encode(v V) ([]byte, error)
+}
+
+type Decoder[V any] interface {
+	Decode(data []byte) (V, error)
+}
+
+type Codec[V any] interface {
+	Encoder[V]
+	Decoder[V]
+}
+```
+
+`Codec[V]` does no I/O and manages no connections — it's a pure
+byte-in/byte-out conversion, which is what makes it safe to share across
+`cache`, `queue`, `session`, and every other service that stores an
+arbitrary typed value.
+
+## The built-in implementation
+
+`JSONCodec[V]` is the one codec the framework ships:
+
+```go
+import "github.com/zenta-dev/zever/codec"
+
+c := codec.JSONCodec[MyPayload]{}
+
+data, err := c.Encode(payload)
+// ...
+back, err := c.Decode(data)
+```
+
+JSON output is deterministic, so codec-backed cache/queue snapshots stay
+stable across runs — useful when a test asserts on the exact bytes an
+adapter wrote.
+
+There is no `Open` or `Register` surface here, unlike most services in this
+framework: `codec` isn't a swappable-adapter battery with a container
+accessor. Construct `JSONCodec[V]` directly wherever you need one.
+
+## Writing your own
+
+Implement `Codec[V]` for a type when JSON isn't the right wire format — a
+binary protocol, a compressed representation, or a format a specific
+third-party API requires:
+
+```go
+type gobCodec[V any] struct{}
+
+func (gobCodec[V]) Encode(v V) ([]byte, error) { /* ... */ }
+func (gobCodec[V]) Decode(data []byte) (V, error) { /* ... */ }
+
+var _ codec.Codec[MyPayload] = gobCodec[MyPayload]{}
+```
+
+Keep it symmetric: whatever `Encode` produces, `Decode` must be able to
+read back, including across a version of your code that added a field.
+`JSONCodec`'s forward-compatible-by-default behavior (unknown fields on
+decode are ignored, missing fields default) is why it's the framework's
+default choice — a hand-rolled binary format usually needs its own explicit
+versioning story to get the same property.
