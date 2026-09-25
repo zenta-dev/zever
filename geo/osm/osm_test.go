@@ -1068,7 +1068,7 @@ func TestPace_ContextCanceledDuringWait(t *testing.T) {
 		t.Fatalf("first Geocode: %v", gerr)
 	}
 
-	ctx, cancel := context.WithTimeout(t.Context(), 20*time.Millisecond)
+	ctx, cancel := context.WithTimeout(t.Context(), 200*time.Millisecond)
 	defer cancel()
 
 	_, err = m.Geocode(ctx, "x")

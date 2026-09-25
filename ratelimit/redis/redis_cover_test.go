@@ -59,7 +59,7 @@ func deadPortLimiter(t *testing.T, burst int) *limiter {
 func TestRedisCover_newDefaults(t *testing.T) {
 	t.Parallel()
 
-	opts := testOptions()
+	opts := testOptions(t)
 	opts.Redis.Prefix = ""
 	// IdleTTL/SweepInterval are meaningless for Redis and must be ignored.
 	opts.IdleTTL = time.Minute
@@ -84,7 +84,7 @@ func TestRedisCover_newDefaults(t *testing.T) {
 		t.Errorf("burst = %v, want %v", rl.burst, opts.Burst)
 	}
 
-	custom := testOptions()
+	custom := testOptions(t)
 	custom.Redis.Prefix = "pfx"
 	cl := newTestLimiter(t, custom).(*limiter) //nolint:forcetypeassert // guarded by constructor return type.
 
@@ -96,7 +96,7 @@ func TestRedisCover_newDefaults(t *testing.T) {
 func TestRedisCover_newPingFail(t *testing.T) {
 	t.Parallel()
 
-	opts := testOptions()
+	opts := testOptions(t)
 	opts.Redis.Addr = "127.0.0.1:1"
 
 	_, err := New(opts)
@@ -110,7 +110,7 @@ func TestRedisCover_newPingFail(t *testing.T) {
 
 	// New with a distinct client is unaffected by the failed New above:
 	// no shared singleton to poison.
-	l, err := New(testOptions())
+	l, err := New(testOptions(t))
 	if err != nil {
 		t.Fatalf("New(healthy) err = %v, want nil", err)
 	}
@@ -146,7 +146,7 @@ func TestRedisCover_redactAddr(t *testing.T) {
 func TestRedisCover_allowCtxCanceled(t *testing.T) {
 	t.Parallel()
 
-	l := newTestLimiter(t, testOptions())
+	l := newTestLimiter(t, testOptions(t))
 
 	ctx, cancel := context.WithCancel(t.Context())
 	cancel()
@@ -159,7 +159,7 @@ func TestRedisCover_allowCtxCanceled(t *testing.T) {
 func TestRedisCover_allowBadCost(t *testing.T) {
 	t.Parallel()
 
-	l := newTestLimiter(t, testOptions())
+	l := newTestLimiter(t, testOptions(t))
 	key := freshKey(t)
 
 	for _, cost := range []float64{math.NaN(), math.Inf(1), math.Inf(-1)} {
@@ -173,7 +173,7 @@ func TestRedisCover_allowOversizedCostCapped(t *testing.T) {
 	t.Parallel()
 
 	ctx := t.Context()
-	l := newTestLimiter(t, testOptions())
+	l := newTestLimiter(t, testOptions(t))
 	key := freshKey(t)
 
 	// Cost above burst is capped at burst: allowed once, bucket drained.
@@ -211,7 +211,7 @@ func TestRedisCover_scriptShapes(t *testing.T) {
 	// Sequential (no t.Parallel): swaps allowScript under the write lock;
 	// parallel Allow tests stay paused until this returns.
 	ctx := t.Context()
-	l := newTestLimiter(t, testOptions())
+	l := newTestLimiter(t, testOptions(t))
 
 	for _, tc := range []struct {
 		name string
@@ -240,7 +240,7 @@ func TestRedisCover_scriptNegativeRetryClamped(t *testing.T) {
 	// Sequential: negative retryMS clamps to 0 with a denial.
 	swapAllowScript(t, `return {0, 0, -5}`)
 
-	d, err := newTestLimiter(t, testOptions()).Allow(t.Context(), freshKey(t), 1)
+	d, err := newTestLimiter(t, testOptions(t)).Allow(t.Context(), freshKey(t), 1)
 	if err != nil {
 		t.Fatalf("Allow err = %v, want nil", err)
 	}
@@ -261,7 +261,7 @@ func TestRedisCover_scriptNegativeRetryClamped(t *testing.T) {
 func TestRedisCover_resetCtxCanceled(t *testing.T) {
 	t.Parallel()
 
-	l := newTestLimiter(t, testOptions())
+	l := newTestLimiter(t, testOptions(t))
 
 	ctx, cancel := context.WithCancel(t.Context())
 	cancel()

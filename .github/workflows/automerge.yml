@@ -64,7 +64,7 @@ jobs:
             local checks
             checks=$(gh api "repos/$REPO/commits/$sha/check-runs?per_page=100" \
               --jq '[.check_runs[] | select(.status == "completed")] | sort_by(.completed_at) | map({(.name): .conclusion}) | add // {}')
-            for name in gofmt "golangci-lint" "test (go 1.27)" govulncheck sbom dependency-review "Analyze (go)" CodeQL; do
+            for name in gofmt "golangci-lint" "test (go 1.27)" "test (race + coverage)" govulncheck sbom dependency-review "Analyze (go)" CodeQL; do
               got=$(jq -r --arg n "$name" '.[$n] // "MISSING"' <<<"$checks")
               if [ "$got" != "success" ]; then
                 echo "PR #$nr: gate not green ($name: $got)"

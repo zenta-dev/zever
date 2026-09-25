@@ -119,8 +119,9 @@ func TestSubscribe_closedAfterLock(t *testing.T) {
 func TestDeliver_skipsBadFrames(t *testing.T) {
 	t.Parallel()
 
-	b := freshAdapter(t, nil)
-	a := newTestAdapter(t, nil)
+	server := testServer(t)
+	b := freshAdapterOn(t, server, nil)
+	a := newTestAdapterOn(t, server, nil)
 	topic := freshTopic()
 
 	got := make(chan eventbus.Message, 16)
@@ -132,7 +133,7 @@ func TestDeliver_skipsBadFrames(t *testing.T) {
 	}
 	defer unsub()
 
-	raw := goredis.NewClient(&goredis.Options{Addr: testAddr})
+	raw := goredis.NewClient(&goredis.Options{Addr: server.Addr()})
 	t.Cleanup(func() { _ = raw.Close() })
 
 	ctx := t.Context()

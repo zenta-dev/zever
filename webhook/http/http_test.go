@@ -418,7 +418,7 @@ func TestDeliver_ctxCancelDuringBackoff(t *testing.T) {
 		t.Fatalf("Register err = %v", regErr)
 	}
 
-	cancelCtx, cancel := context.WithTimeout(ctx, 100*time.Millisecond)
+	cancelCtx, cancel := context.WithTimeout(ctx, 300*time.Millisecond)
 	defer cancel()
 
 	err = w.Deliver(cancelCtx, "e", []byte(`{}`))
