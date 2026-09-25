@@ -24,7 +24,11 @@ locally.
   least one concrete gotcha. Keep config keys, adapter names, and code
   snippets accurate to the real Go packages — verify against the package's
   `doc.go`/`options.go`/`adapter.go` before publishing, never invent a method
-  signature or config key.
+  signature or config key. If the package also has its own `README.md`,
+  check it too: several package READMEs (`config`, `container`, `orm`,
+  `cmd/zever`, `tools/zever-lsp`, `editors/*`) carry more precedence/option/
+  install detail than made it into the corresponding docs page — a README
+  update that isn't reflected here is a docs gap, not a duplicate.
 - Code snippets should compile against the current module — copy real
   imports (`github.com/zenta-dev/zever/...`), don't abbreviate package paths.
 - Cross-link related pages, e.g. a new service page should link back to

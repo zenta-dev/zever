@@ -1,0 +1,111 @@
+---
+title: 'Tutorial: Explore the Showcase App'
+description: A tour of examples/showcase — every DSL feature in one schema, served over HTTP and gRPC from one implementation.
+---
+
+Where [Build a Booking API](/zever/tutorials/build-a-booking-api/) walks a
+narrow, realistic flow end to end, `examples/showcase` goes wide: one `.zen`
+schema exercising every scalar, relation kind, attribute, and RPC shape the
+DSL supports, served over both HTTP and gRPC from a single business-logic
+implementation. Use it as a reference for "what does the DSL actually
+support" and "how does one `Service` implementation back two transports."
+
+All commands below run from `examples/showcase/` in a clone of the repo.
+
+```sh
+cd examples/showcase
+```
+
+## What one schema can declare
+
+`schema/shop/shop.zen` is the whole domain — `User`, `Profile`, `Category`,
+`Product`, `Tag`, `Order`, `OrderItem`, `Review` entities plus
+`ShopService` — and deliberately touches every DSL feature in one place:
+
+| Feature | Where |
+|---|---|
+| All 11 scalars | `User` fields |
+| Named `enum` | `OrderStatus`, `Role` |
+| Inline `enum()` | `Order.priority` |
+| Optional field + `@default` | `User.nickname`, `Order.note` |
+| `has_many` / `belongs_to` | the `User`/`Order`/`OrderItem`/`Review` graph |
+| `has_one` (`@unique` foreign key) | `User.profile` |
+| `many_to_many` with reciprocal `join_table` | `Product.tags` |
+| `@schema` | `Order` → a separate `billing` schema |
+| `@renamed_from` | `Product.headline` (was `title`) |
+| `message` request/nested/returns | `CreateOrderRequest`, `CheckoutRequest`, `OrderReceipt` |
+| Every HTTP verb, every `auth:` shape, `permission: check`, `errors:` sets, `paginated: true` | `ShopService` RPCs |
+| Job params, queues, retry shapes, `cron` + `dispatch` | 4 jobs, 2 schedules |
+
+See [Syntax (.zen)](/zever/dsl/syntax-zen/) for what each of these means in
+isolation; this schema is the "all of them together" reference.
+
+## One implementation, two transports
+
+`cmd/server` mirrors what `zever generate server` produces: HTTP (`:8080`)
+and gRPC (`:9090`) from one container, with auth enforced identically on
+both transports via the same generated `GRPCPolicies` plus `authz`. The
+business logic lives in exactly one place —
+`internal/service/shop/shop_service.go` (`ShopServiceImpl`) — and both
+transports call into it. `/api/*` HTTP routes that need richer shapes than
+the generated ones (register/login, item-list checkout) are thin adapters
+over that same implementation, never a second copy of the logic.
+
+`cmd/worker` mirrors `zever generate worker`: one handler per declared job,
+one schedule registration per declared schedule.
+
+## Run it
+
+`AUTH_JWT_SECRET` (at least 32 bytes) is required by every entrypoint —
+this app fails closed, unlike the demo-friendly default some other examples
+use (see [Configuration](/zever/getting-started/configuration/)).
+
+```sh
+export AUTH_JWT_SECRET=dev-only-secret-at-least-32-bytes-long
+
+zever db migrate --adapter=sqlite --dsn=data/showcase.db schema/shop/shop.zen
+go run ./db/seed          # idempotent
+
+go run ./cmd/server       # HTTP :8080 + gRPC :9090
+go run ./cmd/worker       # jobs + embedded scheduler, separate terminal
+```
+
+## Inspect the schema without running anything
+
+Every one of these is read-only:
+
+```sh
+zever check schema/shop/shop.zen
+zever fmt schema/shop/shop.zen
+zever routes schema/shop/shop.zen
+zever graph schema/shop/shop.zen
+zever explain ShopService.Checkout schema/shop/shop.zen
+zever check-boundaries schema/shop/shop.zen
+```
+
+`explain` in particular is worth running against `Checkout` here: it shows
+you exactly how one RPC resolves through auth, permission, validation, and
+its declared error set, without reading the generated code.
+
+## Regenerating after a schema change
+
+`generated/` is CLI output — never hand-edit it. From the repository root
+(so `gogen`/`protogogen` import paths resolve):
+
+```sh
+zever compile examples/showcase/schema/shop/shop.zen \
+  --backend=atlas,gogen,openapi,proto,protogogen,zenorm \
+  --out examples/showcase/generated
+```
+
+Everything under `internal/app`, `internal/service`, `internal/api`, the
+schema itself, `zever.yaml`, and the tests are hand-owned and never
+overwritten by a regenerate.
+
+## Next
+
+- [Backends](/zever/dsl/backends/) to understand what each of the six
+  backends (`atlas`, `gogen`, `openapi`, `proto`, `protogogen`, `zenorm`)
+  actually produces from this one schema.
+- [Query Builder](/zever/database/query-builder/) for the typed ORM the
+  `zenorm` backend generates and this app's service implementation uses.

@@ -62,8 +62,8 @@ if err := c.Close(ctx); err != nil {
 
 | Signal | Type | Meaning |
 |---|---|---|
-| panic during close | `*container.ClosePanicError` | adapter panicked; shutdown continued |
-| per-service timeout | `*container.CloseTimeoutError` | adapter exceeded its bound |
+| panic during close | `container.ClosePanicError` (value type — `errors.As` target must not be a pointer) | adapter panicked; shutdown continued |
+| per-service timeout | `container.CloseTimeoutError` (value type — `errors.As` target must not be a pointer) | adapter exceeded its bound |
 | multiple failures | `errors.Join` | inspect with `errors.As` per type |
 
 Error values name the service only — never resolved values or secrets. Keep timeout tests short (parent ~100ms, block ~500ms) and let stragglers finish before the test returns, so `goleak.VerifyTestMain` stays green.

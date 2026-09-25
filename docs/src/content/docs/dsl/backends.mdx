@@ -32,7 +32,7 @@ The canonical `app.zen` fixture exercises all four: both entities compile under 
 ```sh
 zever compile --out ./generated            # all backends
 zever generate tinker                      # scaffold the tinker shim
-go test ./internal/dsl/compile/ -run TestGogenGeneratesCommittedAppPackage -update
+go test ./internal/dsl/backend/gogen/ -run TestGoldenFiles -update
 ```
 
 The last line regenerates the committed `gogen/app` golden package. Only use `-update` when the fixture changed deliberately — golden diffs are the review surface for codegen changes.

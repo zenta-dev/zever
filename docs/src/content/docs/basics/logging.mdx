@@ -1,0 +1,110 @@
+---
+title: Logging
+description: Structured logging with swappable adapters, resolved once through the container.
+---
+
+Every service in this framework logs through one small interface,
+`log.Logger`, instead of each package picking its own logging library.
+Swap the adapter — `noop` for tests, `slog` for the stdlib, `zerolog` for
+high-throughput JSON, `pretty` for local development — and every log line
+in the app changes shape with it, with zero call-site changes.
+
+## Resolve one logger and inject it
+
+```go
+import "github.com/zenta-dev/zever/container"
+
+c := container.New(config.Default())
+logger, err := c.Log()
+if err != nil {
+	return err
+}
+
+handler := middleware.RequestLogger(logger)(mux)
+```
+
+`Log()` resolves lazily and caches the result, like every other container
+accessor. There's no `Close` on `Logger` itself — only resolved services
+close, via `container.Close(ctx)`.
+
+## Writing a log line
+
+```go
+logger.Info().
+	Str("user_id", userID).
+	Dur("duration", elapsed).
+	Msg("request handled")
+
+logger.Error().Err(err).Msg("failed to process order")
+```
+
+`Event` gives you one typed method per value kind (`Str`, `Int`, `Int64`,
+`Float64`, `Bool`, `Dur`, `Time`, `Err`/`AnErr`, `Any`) instead of a
+`fmt.Sprintf`-style message — this is what makes `slog`/`zerolog` output
+genuinely structured (queryable JSON fields) rather than a formatted string
+that happens to contain the same information.
+
+Check `Enabled` before building an expensive event (e.g. one that computes
+a field value):
+
+```go
+if logger.Enabled(log.DebugLevel) {
+	logger.Debug().Any("payload", expensiveToCompute()).Send()
+}
+```
+
+`noop` is a zero-cost discard path either way, so this check matters most
+for the adapters that actually write.
+
+## Loggers travel through context
+
+```go
+ctx = log.ContextWithLogger(ctx, logger.With().Str("request_id", id).Logger())
+// ... deeper in the call stack ...
+log.FromContext(ctx).Info().Msg("still has request_id attached")
+```
+
+The context never stores anything but the logger value itself — no I/O
+state, matching the framework's "`ctx` as first arg, never stored on a
+struct" rule everywhere else.
+
+## Config
+
+```yaml
+log:
+  adapter: slog
+```
+
+```sh
+LOG_ADAPTER=slog
+```
+
+## Adapters
+
+| Adapter | Output |
+|---|---|
+| `noop` | discards everything — safe for tests, not the default |
+| `slog` | stdlib structured lines — `config.Default()`'s adapter |
+| `zerolog` | high-throughput JSON |
+| `pretty` | human-readable lines for local development |
+
+`RequestLogger` (in `middleware`) emits one line per request — method,
+path, status, `duration_ms`, plus `request_id` when present. `Recover`
+logs panics with the value and stack, then responds `500`.
+
+## Never log secrets
+
+Raw option maps and resolved config may hold secrets as plain strings.
+Never pass them into a field or message directly:
+
+```go
+// Wrong — may print DSNs, API keys, JWT secrets.
+logger.Info().Any("cfg", cfg).Send()
+
+// Right — the sole display path for logging or debugging.
+logger.Info().Any("cfg", config.RedactedServices(cfg)).Send()
+```
+
+See [Errors](/zever/basics/errors-logging/) for how the same redaction rule
+applies to error text, and [Configuration](/zever/getting-started/configuration/)
+for the full precedence/redaction story.

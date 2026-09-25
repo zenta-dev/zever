@@ -20,17 +20,24 @@ The dashboard rows (`migrate`, `rollback`, `seed`) mirror these exact invocation
 The engine diffs desired vs. live and emits an ordered plan. Review it before applying in production:
 
 ```go
-plan, err := migrate.Plan(ctx, conn, desired)
+plan, err := migrate.Plan(ctx, conn, desired, migrate.PlanOptions{})
 if err != nil {
     return err
 }
-for _, stmt := range plan.Statements {
-    fmt.Println(stmt.SQL)
+for _, stmt := range plan.Statements() {
+    fmt.Println(stmt)
 }
-if err := migrate.Apply(ctx, conn, plan); err != nil {
+applied, err := migrate.Apply(ctx, conn, plan)
+if err != nil {
     return err
 }
+fmt.Printf("applied %d statement(s)\n", applied)
 ```
+
+`PlanOptions{DropColumns: true}` opts into emitting `DROP COLUMN` for live
+columns no longer declared (off by default: destructive);
+`DetectTypeChanges: true` opts into comparing a live column's type against
+the declared one (postgres emits `ALTER COLUMN TYPE`; sqlite only warns).
 
 | Step | Purpose |
 |---|---|

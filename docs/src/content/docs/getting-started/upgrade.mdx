@@ -32,13 +32,13 @@ Then walk this checklist:
 
 ## Recent breaking examples
 
-`billing.Billing` gained a required idempotency key so client retries cannot double-bill:
+`billing.Billing.CreateCustomer` gained a required idempotency key so client retries cannot double-bill:
 
 ```go
 // Before
-cust, err := billing.CreateCustomer(ctx, params)
+cust, err := b.CreateCustomer(ctx, name, email)
 // After: pass "" for the previous non-idempotent behavior.
-cust, err := billing.CreateCustomer(ctx, params, "")
+cust, err := b.CreateCustomer(ctx, name, email, "")
 ```
 
 The migration engine moved from `zen/migrate` to `orm/migrate`:
