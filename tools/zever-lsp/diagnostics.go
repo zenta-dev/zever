@@ -9,7 +9,7 @@ import (
 
 	"go.lsp.dev/protocol"
 
-	"github.com/zenta-dev/zever/internal/dsl/diag"
+	"github.com/zenta-dev/zever/dsl/diag"
 )
 
 // debounceDelay is how long an edit burst must settle before recompiling.

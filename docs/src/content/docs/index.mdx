@@ -35,7 +35,7 @@ config file  ->  Load     ->  one Config          ->  container.New(cfg)
 adapter name ->  config   ->  registry lookup     ->  cached instance
 ```
 
-You need Go 1.27 or newer and a module rooted at `github.com/zenta-dev/zever` semantics (single `go.mod`, no nested modules). No Node, Docker, or database server is needed for the default path: `config.Default()` picks zero-infra adapters (sqlite, memory, log) so the first build and test run pass on a clean machine.
+You need Go 1.27 or newer. The repo is a Go multi-module monorepo: `core/<b>` holds each battery interface plus its `Register`/`Open` registry (resolved by `container`); `adapters/<b>/<a>` holds one Go module per adapter whose `Register()` wires it into its `core` registry; `shared/*` holds SDK-free helpers. Local dev builds through the committed `go.work` workspace at the repo root (143 `use` entries covering every module), so `go build ./...` and `go test ./...` resolve from the root. No Node, Docker, or database server is needed for the default path: `config.Default()` picks zero-infra adapters (sqlite, memory, log) so the first build and test run pass on a clean machine.
 
 ## Config
 
@@ -160,7 +160,7 @@ Never log raw option maps: print `config.RedactedServices(cfg)` instead, which m
 - `architecture/container/` for lazy accessors and ordered shutdown
 - `architecture/compiler-boundary/` for why runtime never imports the compiler
 - `dsl/syntax-zen/` for the full schema language behind the example above
-- Package guides as text: `README.md`, `config/README.md`, `container/README.md`, `internal/dsl/README.md`, `cmd/zever/README.md`
+- Package guides as text: `README.md`, `config/README.md`, `container/README.md`, `dsl/README.md`, `cmd/zever/README.md`
 
 ## What you get
 

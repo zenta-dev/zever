@@ -21,8 +21,8 @@ jobs:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
       - uses: actions/setup-go@b7ad1dad31e06c5925ef5d2fc7ad053ef454303e # v7.0.0
         with:
-          go-version-file: go.mod
-          cache-dependency-path: go.sum
+          go-version-file: go.work
+          cache-dependency-path: go.work.sum
       - name: Check formatting
         run: |
           files=$(gofmt -l .)
@@ -42,8 +42,8 @@ jobs:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
       - uses: actions/setup-go@b7ad1dad31e06c5925ef5d2fc7ad053ef454303e # v7.0.0
         with:
-          go-version-file: go.mod
-          cache-dependency-path: go.sum
+          go-version-file: go.work
+          cache-dependency-path: go.work.sum
       - name: golangci-lint
         uses: golangci/golangci-lint-action@ba0d7d2ec06a0ea1cb5fa41b2e4a3ab91d21278a # v9.3.0
         with:
@@ -67,8 +67,8 @@ jobs:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
       - uses: actions/setup-go@b7ad1dad31e06c5925ef5d2fc7ad053ef454303e # v7.0.0
         with:
-          go-version-file: go.mod
-          cache-dependency-path: go.sum
+          go-version-file: go.work
+          cache-dependency-path: go.work.sum
       - name: Download dependencies
         run: go mod download
       - name: Verify go.mod is tidy
@@ -97,8 +97,8 @@ jobs:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
       - uses: actions/setup-go@b7ad1dad31e06c5925ef5d2fc7ad053ef454303e # v7.0.0
         with:
-          go-version-file: go.mod
-          cache-dependency-path: go.sum
+          go-version-file: go.work
+          cache-dependency-path: go.work.sum
       - name: Download dependencies
         run: go mod download
       - name: Verify go.mod is tidy
@@ -109,6 +109,65 @@ jobs:
         run: go test -vet=off -count=1 ./...
       - name: go build
         run: go build ./...
+
+  # Multi-module gate: loops fmt/vet/tidy-check/test across every
+  # directory containing a go.mod (143 modules in the committed go.work
+  # workspace at root). Per-module commands only. Fast by design:
+  # no -race, no coverage (those stay in test-race). Keep in sync
+  # with `make check-all`.
+  modules:
+    name: all modules (fmt/vet/tidy/test)
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+    env:
+      # Same Chrome sandbox limitation as the fast gate above.
+      ZEVER_CHROMEDP_NO_SANDBOX: "1"
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+      - uses: actions/setup-go@b7ad1dad31e06c5925ef5d2fc7ad053ef454303e # v7.0.0
+        with:
+          go-version-file: go.work
+          cache-dependency-path: go.work.sum
+      - name: Check formatting
+        run: |
+          files=$(gofmt -l .)
+          if [ -n "$files" ]; then
+            echo "The following files are not formatted with gofmt:"
+            printf '%s\n' "$files"
+            exit 1
+          fi
+      - name: go vet (all modules)
+        run: |
+          set -e
+          for d in $(find . -type f -name go.mod -not -path "./.git/*" -exec dirname {} \; | sort); do
+            echo "== $d =="
+            (cd "$d" && go vet ./...)
+          done
+      - name: Verify go.mod is tidy (all modules)
+        run: |
+          set -e
+          for d in $(find . -type f -name go.mod -not -path "./.git/*" -exec dirname {} \; | sort); do
+            echo "== $d =="
+            (cd "$d" && go mod tidy -diff)
+          done
+      - name: go test (all modules)
+        # -vet=off: go vet already ran as its own step above, so skip the
+        # implicit vet pass go test does before compiling — avoids
+        # re-running the same analysis twice.
+        run: |
+          set -e
+          for d in $(find . -type f -name go.mod -not -path "./.git/*" -exec dirname {} \; | sort); do
+            echo "== $d =="
+            (cd "$d" && go test -vet=off -count=1 ./...)
+          done
+      - name: go build (all modules)
+        run: |
+          set -e
+          for d in $(find . -type f -name go.mod -not -path "./.git/*" -exec dirname {} \; | sort); do
+            echo "== $d =="
+            (cd "$d" && go build ./...)
+          done
 
   # Full gate: race detector + atomic coverage + Codecov upload. This is
   # the expensive pass (typically 2-10x slower than a plain `go test`
@@ -128,8 +187,8 @@ jobs:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
       - uses: actions/setup-go@b7ad1dad31e06c5925ef5d2fc7ad053ef454303e # v7.0.0
         with:
-          go-version-file: go.mod
-          cache-dependency-path: go.sum
+          go-version-file: go.work
+          cache-dependency-path: go.work.sum
       - name: Download dependencies
         run: go mod download
       - name: go test -race
@@ -147,8 +206,8 @@ jobs:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
       - uses: actions/setup-go@b7ad1dad31e06c5925ef5d2fc7ad053ef454303e # v7.0.0
         with:
-          go-version-file: go.mod
-          cache-dependency-path: go.sum
+          go-version-file: go.work
+          cache-dependency-path: go.work.sum
       - uses: actions/cache@55cc8345863c7cc4c66a329aec7e433d2d1c52a9 # v6.1.0
         with:
           path: ~/go/bin
@@ -156,7 +215,7 @@ jobs:
       - name: Install tools
         run: make setup-govulncheck
       - name: govulncheck
-        run: make vulncheck
+        run: make vulncheck-all
 
   sbom:
     name: sbom
@@ -165,8 +224,8 @@ jobs:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
       - uses: actions/setup-go@b7ad1dad31e06c5925ef5d2fc7ad053ef454303e # v7.0.0
         with:
-          go-version-file: go.mod
-          cache-dependency-path: go.sum
+          go-version-file: go.work
+          cache-dependency-path: go.work.sum
       - uses: actions/cache@55cc8345863c7cc4c66a329aec7e433d2d1c52a9 # v6.1.0
         with:
           path: ~/go/bin

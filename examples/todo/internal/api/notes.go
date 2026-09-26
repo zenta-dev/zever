@@ -7,9 +7,9 @@ import (
 
 	"github.com/google/uuid"
 
+	"github.com/zenta-dev/zever/core/router"
 	genapp "github.com/zenta-dev/zever/examples/todo/generated/zenorm/orm/gen/app"
 	"github.com/zenta-dev/zever/orm"
-	"github.com/zenta-dev/zever/router"
 )
 
 // Note is the JSON shape for notes.

@@ -5,10 +5,10 @@ import (
 
 	"google.golang.org/grpc"
 
-	"github.com/zenta-dev/zever/auth"
-	"github.com/zenta-dev/zever/authz"
+	"github.com/zenta-dev/zever/core/auth"
+	"github.com/zenta-dev/zever/core/authz"
+	"github.com/zenta-dev/zever/core/permission"
 	genapp "github.com/zenta-dev/zever/examples/todo/generated/gogen/app"
-	"github.com/zenta-dev/zever/permission"
 )
 
 // deleteAllowChecker is a permission.Checker for the todo grpc proof: it
