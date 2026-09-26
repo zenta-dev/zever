@@ -3,28 +3,94 @@ title: Routing
 description: Register routes on fiber or stdhttp drivers with uniform params, groups, and method validation.
 ---
 
-Handlers are plain `http.HandlerFunc`s. The router facade (`fiber` or `stdhttp` driver) normalizes patterns and exposes params uniformly through `router.Param`, so switching drivers is configuration — not a rewrite.
+Handlers are plain `http.HandlerFunc` values. The `router` package adds a thin facade over two drivers (`fiber`, `stdhttp`) that normalizes patterns and exposes path params through one helper, `router.Param`. Use this page when wiring HTTP endpoints by hand or when mirroring `.zen` RPC bindings in custom routes.
 
-## Registering routes
+Use `router` when you need explicit control of paths, groups, and per-route middleware. When your surface is declared in `.zen`, treat the schema RPC bindings as the source of truth and mirror them here; `zever routes` prints the resolved table for review.
+
+## Config
+
+```yaml
+router:
+  adapter: stdhttp   # default: stdlib ServeMux, no extra dependency
+```
+
+```yaml
+router:
+  adapter: fiber     # alternative driver, same handler signatures
+```
+
+```sh
+ROUTER_ADAPTER=fiber
+```
+
+`config.Default()` picks a zero-infrastructure driver so tests run with no setup. Switching drivers is configuration only: handler signatures stay `http.HandlerFunc` on both.
+
+## Resolve via container
 
 ```go
+import (
+    "github.com/zenta-dev/zever/config"
+    "github.com/zenta-dev/zever/container"
+)
+
+c := container.New(config.Default())
 r, err := c.Router()
 if err != nil {
     return err
 }
-r.Handle("GET", "/users/{id}", func(w http.ResponseWriter, req *http.Request) {
-    id := router.Param(req, "id")
-    fmt.Fprintf(w, "user %s", id)
-})
 ```
 
-Drivers inject matched params into the request context under a uniform key:
+`Router()` resolves lazily and caches the instance, like every container accessor. On error the cached state clears so the next call retries. The router declares no `Close`, so shutdown needs nothing extra: `c.Close(ctx)` probes close shapes and treats it as a no-op.
 
-| Helper | Purpose |
-|---|---|
-| `router.Param(req, "id")` | single param by name; empty when absent |
-| `router.ParamNames(req)` | all params as a copy |
-| `router.WithParams(ctx, params)` | context helper for tests and middleware |
+## Runnable example
+
+```go
+package main
+
+import (
+    "fmt"
+    "net/http"
+
+    "github.com/zenta-dev/zever/config"
+    "github.com/zenta-dev/zever/container"
+    "github.com/zenta-dev/zever/router"
+)
+
+func main() {
+    c := container.New(config.Default())
+    r, err := c.Router()
+    if err != nil {
+        panic(err)
+    }
+
+    r.Handle("GET", "/users/{id}", func(w http.ResponseWriter, req *http.Request) {
+        id := router.Param(req, "id")
+        fmt.Fprintf(w, "user %s", id)
+    })
+
+    api := r.Group("/v1")
+    api.Handle("GET", "/users/{id}", func(w http.ResponseWriter, req *http.Request) {
+        fmt.Fprintf(w, "v1 user %s", router.Param(req, "id"))
+    })
+
+    _ = http.ListenAndServe(":8080", r)
+}
+```
+
+```sh
+go run ./cmd/server &
+curl -s localhost:8080/users/42
+curl -s localhost:8080/v1/users/42
+```
+
+Expected output:
+
+```text
+user 42
+v1 user 42
+```
+
+Drivers inject matched params into the request context under a uniform key, so `router.Param` works identically on both drivers. In tests and middleware, seed params directly with `router.WithParams`.
 
 ## Pattern syntax
 
@@ -38,20 +104,47 @@ Drivers inject matched params into the request context under a uniform key:
 | `/users/{$}` | literal | `{$}` exact match |
 | `/items/:id<[0-9]+>` | `:id<[0-9]+>` passthrough | rejected (regex constraint) |
 
-Fiber routes match case-sensitively (`/Users/:id` and `/users/:id` differ), and duplicate detection is likewise case-sensitive.
+Fiber routes match case-sensitively: `/Users/:id` and `/users/:id` are distinct routes, and duplicate detection is case-sensitive too. The stdlib mux has no constraint syntax, so regex-constrained patterns are rejected there.
 
-## Groups and middleware
+## API table
 
-```go
-api := r.Group("/v1", authMiddleware)
-api.Handle("GET", "/users/{id}", getUser)
-api.Handle("POST", "/users", createUser)
-```
+| Method / helper | Purpose |
+|---|---|
+| `Handle(method, pattern, handler)` | register one route on the router |
+| `Group(prefix, middlewares...)` | scoped routes under a prefix with group-only middleware, applied in order |
+| `Group.Group(prefix, middlewares...)` | nested group under a parent group |
+| `Use(middlewares...)` | append middleware router-wide, or group-wide on a `Group` |
+| `router.Param(req, name)` | single path param by name; empty string when absent |
+| `router.ParamNames(req)` | all matched params as a copy |
+| `router.WithParams(ctx, params)` | context helper for tests and middleware |
+| `router.ValidMethod(method)` | report whether a method string is in the standard set |
+| `router.Open(adapter, opts)` | open a driver directly without the container |
+| `router.Register(adapter, factory)` | add a custom driver (tests use `freshAdapter`-style fakes) |
 
-`Group(prefix, middlewares...)` applies middleware to the group's routes only, in order, on both drivers. `Use` applies router-wide (or group-wide); on `stdhttp`, `Use` affects only routes registered after the call because middleware snapshots per route.
+`Group(prefix, middlewares...)` applies middleware to the group's routes only; non-group routes are unaffected. On `stdhttp`, `Use` affects only routes registered after the call because middleware is snapshotted per route.
 
 ## Methods
 
-Method strings validate against the standard set (GET, POST, PUT, PATCH, DELETE, HEAD, OPTIONS, CONNECT, TRACE). Invalid or duplicate registrations are skipped with a `[router] <driver>:` log line — fiber leaves the route unregistered, while stdhttp relies on the mux's automatic 405 for registered paths.
+Method strings validate against the standard set: GET, POST, PUT, PATCH, DELETE, HEAD, OPTIONS, CONNECT, TRACE. Invalid or duplicate registrations are skipped with a `[router] <driver>:` log line. The fiber driver leaves the route unregistered; the stdhttp driver relies on the mux's automatic 405 Method Not Allowed for registered paths and skips conflicting patterns.
 
-Prefer `.zen` RPC bindings (`http: GET "/v1/users/{id}"`) as the source of truth, then mirror them here. `zever routes` prints the resolved table for review.
+## Production notes
+
+- Close semantics: the router holds no connection or pool, declares no `Close`/`Stop`/`Shutdown`, and probes as no-op nil inside `c.Close(ctx)`. Close the `http.Server` around it with your own graceful shutdown (see the bookings example: `shutdownGrace = 10s` with read/write/idle timeouts set on the server).
+- Redaction: route tables contain no secrets, but never log raw option maps alongside them; use `config.RedactedServices` for any config display.
+- Timeouts: set `ReadHeaderTimeout` (5s in the bookings server), `ReadTimeout`, `WriteTimeout`, and `IdleTimeout` on `http.Server`. Pair with `middleware.Timeout` so handler contexts carry deadlines downstream.
+- Driver choice: `stdhttp` removes a dependency and matches stdlib semantics exactly; `fiber` accepts both param syntaxes and passes `:name<constraint>` through as-is. Pick one per process and keep it.
+
+## Troubleshooting
+
+1. **Route works on fiber but 404s on stdhttp.** You used `:id` colon syntax or a regex constraint. Rewrite as `{id}` and move constraint checks into the handler; stdhttp accepts only ServeMux-native syntax.
+2. **`Use` middleware does not run on stdhttp.** It was registered after the route. On `stdhttp`, `Use` affects only routes registered after the call. Move `Use` before `Handle`, or attach the middleware to a `Group` instead.
+3. **Duplicate route silently missing.** Invalid or duplicate registrations are skipped with a `[router] <driver>:` log line, not an error. Check startup logs for that prefix and fix the method/pattern pair.
+4. **`/Users/1` and `/users/1` behave differently.** Fiber matches case-sensitively by design. Register both spellings or normalize with a redirect handler.
+5. **Params empty in unit tests.** The driver injects params via request context, which plain `httptest` requests lack. Wrap the context with `router.WithParams` before calling the handler.
+
+## See also
+
+- [Middleware](middleware/) - logging, recovery, rate limiting, and tracing around these routes
+- [Requests and Responses](requests-responses/) - params, bodies, and JSON envelopes inside handlers
+- [Validation](validation/) - `@validate` rules from `.zen` and handler-level checks
+- [Configuration](../getting-started/configuration/) - adapter selection and redaction rules

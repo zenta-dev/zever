@@ -3,18 +3,30 @@ title: Observability
 description: Traces, metrics, and structured attributes from noop to an OTLP collector.
 ---
 
-You want to know why a request was slow or a job failed without grepping logs
-across three services — that means traces and metrics, and it means them being
-there in every environment, not just production. `observability` gives you one
-`Provider`/`Tracer`/`Metrics`/`Span` facade with typed attributes, and it
-deliberately never wires a global SDK behind your back — what you get is
-exactly what you asked `Open` for.
+## Purpose
 
-`noop` keeps tests silent and fast. `stdout` (the default) is what you want
-locally — spans and metrics print where you can actually see them while
-developing. Switch to `otlp` for anything that needs to reach a real collector
-and become a dashboard or an alert; that's a config change away, not a
-different set of `Span`/`Attr` calls in your code.
+Use `observability` for traces and metrics that exist in every
+environment, not just production. One `Provider` facade hands out scoped
+`Tracer` and `Metrics` handles with typed `Attr` values (`String`,
+`Int`, `Int64`, `Float64`, `Bool`). It never wires a global SDK behind
+your back: what you get is exactly what you asked `Open` for, and
+`set_globals` stays opt-in.
+
+## When to use
+
+Use `noop` in tests to stay silent and fast. Use `stdout` (the default)
+locally so spans and metrics print where you can see them while
+developing. Use `otlp` for anything that must reach a real collector and
+become a dashboard or an alert; switching backends is a config change,
+not a rewrite of `Span` / `Attr` calls. The bookings example runs
+`observability.adapter: stdout` for local visibility.
+
+Attribute bounds are a feature: keys cap at 256 bytes, string values at
+4096 by default, 32 attributes per span (`MaxKeyLen`, `MaxValueLen`,
+`MaxAttrs`). `attr_value_limit` tunes the value cap (0 means default,
+else 256-16384). `sample_ratio` sets trace sampling in [0,1]. Sensitive
+keys (password, secret, token, api_key, auth, cookie, session,
+private_key) are redacted to `[redacted]` before export.
 
 ## Config
 
@@ -23,39 +35,130 @@ observability:
   adapter: stdout
   options:
     service_name: zever
+    sample_ratio: 1
+    attr_value_limit: 4096
 ```
+
+OTLP variant:
+
+```yaml
+observability:
+  adapter: otlp
+  options:
+    service_name: bookings
+    endpoint: collector:4317
+    sample_ratio: 0.1
+    headers:
+      x-tenant: acme
+```
+
+Env (no prefix, `<SERVICE>_<FIELD>`):
 
 ```sh
 OBSERVABILITY_ADAPTER=otlp
+OBSERVABILITY_SERVICENAME=bookings
+OBSERVABILITY_ENDPOINT=collector:4317
+OBSERVABILITY_SAMPLERATIO=0.1
+OBSERVABILITY_ATTRVALUELIMIT=4096
 ```
 
-## Resolve
+`Validate` requires `service_name` of 1-128 chars with no control
+characters; `endpoint` must be `host:port` with no scheme or path;
+`insecure` is loopback-only; `cert_file` / `key_file` pair together;
+over 32 headers fails; `sample_ratio` must sit in [0,1].
+
+## Resolve via container
 
 ```go
 c := container.New(config.Default())
 o, err := c.Observability()
 if err != nil {
-	// handle
+    // handle
 }
 _ = o
 ```
+
+Resolution is lazy and cached per container, retrying after errors.
+
+## Runnable example
+
+```go
+package main
+
+import (
+    "context"
+    "fmt"
+
+    "github.com/zenta-dev/zever/config"
+    "github.com/zenta-dev/zever/container"
+    "github.com/zenta-dev/zever/observability"
+)
+
+func main() {
+    c := container.New(config.Default())
+    p, err := c.Observability()
+    if err != nil {
+        panic(err)
+    }
+    defer p.Shutdown(context.Background())
+
+    ctx := context.Background()
+    tr := p.Tracer("bookings")
+    ctx, span := tr.Start(ctx, "booking.create")
+    span.SetAttributes(observability.String("space_id", "room-1"))
+    span.End()
+    m := p.Meter("bookings")
+    fmt.Println(m.Counter(ctx, "bookings_created", 1, observability.String("tenant", "default")))
+}
+```
+
+Expected output (stdout adapter prints spans, counter returns nil):
+
+```text
+<nil>
+```
+
+Span lines appear on stdout in human-readable form before the `<nil>`.
 
 ## Adapters
 
 | Adapter | Package | Notes |
 |---|---|---|
 | `noop` | `observability/noop` | Silent; use in tests |
-| `stdout` | `observability/stdout` | Default; prints locally |
+| `stdout` | `observability/stdout` | Default; prints spans and metrics locally |
 | `otlp` | `observability/otlp` | Ships to a production collector |
 
-## Attributes are bounded, and that's a feature
+## Production notes
 
-`Attr` values are capped — 256-byte keys, 4096-byte values, 32 attributes per
-span — specifically so a careless `attr.String("payload", hugeBlob)` can't
-balloon your telemetry backend's ingestion bill or blow past a collector's
-limits. Name spans after the operation (`queue.dispatch`), not the adapter
-that happens to be handling it, so switching from `stdout` to `otlp` doesn't
-also mean renaming every span in your dashboards. Keep high-cardinality values
-like user IDs out of metric labels — that's a cardinality explosion waiting to
-happen — and never attach a secret as an attribute; sensitive keys should be
-redacted before the value ever reaches a `Span`, not filtered on the way out.
+- Close semantics: providers declare `Shutdown(ctx)` (not `Close`), so
+  container shutdown probes `Shutdown` and buffered spans/metrics flush
+  instead of dropping. Always `Shutdown` with a timeout-bearing context
+  on exit; per-service timeouts apply and failures join via
+  `errors.Join`.
+- Multi-instance behavior: `noop` / `stdout` are per-process; `otlp`
+  funnels every replica into one collector keyed by `service_name`.
+  Name spans after the operation (`queue.dispatch`), not the adapter,
+  so backend switches never rename dashboards. Keep high-cardinality
+  values (user IDs) out of metric labels to avoid cardinality blowup.
+- Redaction: never attach a secret as an attribute; sensitive keys are
+  redacted at normalize time, but the value should never reach the span
+  at all. Never log raw option maps; use `config.RedactedServices`.
+  `insecure` plus an `authorization` header is rejected because creds
+  must not ride plaintext past loopback.
+
+## Troubleshooting
+
+1. `service_name must be 1-128 characters`: the name is empty or too
+   long. Set a short stable name (`bookings`); it keys every dashboard.
+2. `insecure requires a loopback endpoint`: `insecure: true` points at
+   a non-loopback collector. Use TLS or point at localhost for local
+   collectors only.
+3. Attributes silently truncated: a string over `attr_value_limit`
+   (default 4096) or past 32 attrs per span is cut by design. Shrink
+   payloads into IDs and counts; never stuff blobs into attributes.
+
+## See also
+
+- [Scheduler and Jobs](./scheduler-jobs.mdx) - spans around job runs
+- [Tenants](./tenants.mdx) - tenant as span attribute
+- [Cache](./cache.mdx) - cache hit counters as metrics

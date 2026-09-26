@@ -3,63 +3,113 @@ title: Codec
 description: Composable, typed Encoder/Decoder pairs for values stored as bytes.
 ---
 
-Cache values, queue payloads, session data, webhook bodies — anywhere a
-typed Go value has to cross a byte-oriented boundary, something has to
-serialize it. `codec` is that one small, generic seam every adapter in the
-framework uses instead of each package hand-rolling its own
-`json.Marshal`/`Unmarshal` calls.
+Cache values, queue payloads, session data, webhook bodies - anywhere a typed Go value crosses a byte-oriented boundary, something must serialize it. `codec` is the one small generic seam every adapter uses instead of each package hand-rolling `json.Marshal`/`Unmarshal` calls.
 
-## The interfaces
+Use it when storing typed values in `cache`, `queue`, or `session`, or when defining the wire format for a new adapter. Reach for a custom codec only when JSON is the wrong format (binary protocol, compressed form, third-party requirement).
 
-```go
-package codec
+## Config
 
-type Encoder[V any] interface {
-	Encode(v V) ([]byte, error)
-}
-
-type Decoder[V any] interface {
-	Decode(data []byte) (V, error)
-}
-
-type Codec[V any] interface {
-	Encoder[V]
-	Decoder[V]
-}
-```
-
-`Codec[V]` does no I/O and manages no connections — it's a pure
-byte-in/byte-out conversion, which is what makes it safe to share across
-`cache`, `queue`, `session`, and every other service that stores an
-arbitrary typed value.
-
-## The built-in implementation
-
-`JSONCodec[V]` is the one codec the framework ships:
+No YAML, no env, no container accessor. `codec` is not a swappable-adapter service with `Open`/`Register`; construct the value directly where needed:
 
 ```go
 import "github.com/zenta-dev/zever/codec"
 
 c := codec.JSONCodec[MyPayload]{}
-
-data, err := c.Encode(payload)
-// ...
-back, err := c.Decode(data)
 ```
 
-JSON output is deterministic, so codec-backed cache/queue snapshots stay
-stable across runs — useful when a test asserts on the exact bytes an
-adapter wrote.
+State the default adapter path: there is none - `JSONCodec[V]` is the single implementation the framework ships, used directly.
 
-There is no `Open` or `Register` surface here, unlike most services in this
-framework: `codec` isn't a swappable-adapter battery with a container
-accessor. Construct `JSONCodec[V]` directly wherever you need one.
+## Resolve via container
+
+Not applicable. There is no `c.Codec()`; the codec travels with the typed wrapper that needs it:
+
+```go
+// cache typed wrapper takes a codec at construction
+cache := cache.NewTyped[MyPayload](inner, codec.JSONCodec[MyPayload]{})
+```
+
+Resolve the underlying service (`c.Cache()`, `c.Queue()`, `c.Session()`) through the container as usual; pass the codec to the typed layer on top.
+
+## Runnable example
+
+```go
+package main
+
+import (
+    "fmt"
+
+    "github.com/zenta-dev/zever/codec"
+)
+
+type MyPayload struct {
+    ID   string `json:"id"`
+    Name string `json:"name"`
+}
+
+func main() {
+    c := codec.JSONCodec[MyPayload]{}
+
+    data, err := c.Encode(MyPayload{ID: "u_1", Name: "Ada"})
+    if err != nil {
+        panic(err)
+    }
+    back, err := c.Decode(data)
+    if err != nil {
+        panic(err)
+    }
+    fmt.Printf("%s %s\n", back.ID, back.Name)
+}
+```
+
+```sh
+go run ./cmd/codec-demo
+```
+
+Expected output:
+
+```text
+u_1 Ada
+```
+
+JSON output is deterministic, so codec-backed cache/queue snapshots stay stable across runs - useful when a test asserts on the exact bytes an adapter wrote. `Codec[V]` does no I/O and manages no connections; it is pure byte-in/byte-out conversion, which is what makes it safe to share across services.
+
+## Codec at the cache edge
+
+The typical use site is a typed wrapper over a byte store:
+
+```go
+c := container.New(config.Default())
+inner, err := c.Cache()
+if err != nil {
+    return err
+}
+typed := cache.NewTyped[MyPayload](inner, codec.JSONCodec[MyPayload]{})
+
+if err := typed.Set(ctx, "user:u_1", MyPayload{ID: "u_1", Name: "Ada"}, time.Minute); err != nil {
+    return err
+}
+got, ok, err := typed.Get(ctx, "user:u_1")
+if err != nil {
+    return err
+}
+fmt.Println(got.Name, ok)
+```
+
+```sh
+go test ./cache/... -run TestTyped -v
+```
+
+Expected output:
+
+```text
+Ada true
+```
+
+One `Codec[V]` per stored type, shared by the writer and the reader. The queue and session paths follow the same shape: bytes on the wire, typed values in handlers.
 
 ## Writing your own
 
-Implement `Codec[V]` for a type when JSON isn't the right wire format — a
-binary protocol, a compressed representation, or a format a specific
-third-party API requires:
+Implement `Codec[V]` when JSON is not the right wire format:
 
 ```go
 type gobCodec[V any] struct{}
@@ -70,9 +120,40 @@ func (gobCodec[V]) Decode(data []byte) (V, error) { /* ... */ }
 var _ codec.Codec[MyPayload] = gobCodec[MyPayload]{}
 ```
 
-Keep it symmetric: whatever `Encode` produces, `Decode` must be able to
-read back, including across a version of your code that added a field.
-`JSONCodec`'s forward-compatible-by-default behavior (unknown fields on
-decode are ignored, missing fields default) is why it's the framework's
-default choice — a hand-rolled binary format usually needs its own explicit
-versioning story to get the same property.
+Keep it symmetric: whatever `Encode` produces, `Decode` must read back, including across a version that added a field. `JSONCodec` ignores unknown fields on decode and defaults missing ones, which gives forward compatibility for free - a hand-rolled binary format needs an explicit versioning story for the same property.
+
+## API table
+
+| Type / method | Purpose |
+|---|---|
+| `Encoder[V]` | `Encode(v V) ([]byte, error)` - typed value to bytes |
+| `Decoder[V]` | `Decode(data []byte) (V, error)` - bytes back to typed value |
+| `Codec[V]` | both directions in one value; pure, no I/O |
+| `JSONCodec[V]` | the built-in JSON implementation; construct directly |
+| `JSONCodec.Encode(v)` | deterministic JSON bytes for a value |
+| `JSONCodec.Decode(data)` | parse JSON bytes; unknown fields ignored |
+| typed `get` / `set` wrappers | `cache` helpers applying a `codec.Codec` to stored values |
+| `cache.Encode` / `cache.Decode` | names of the `codec.Codec` operation on the cache path |
+
+Lowercase `typed get/set` names the wrapper; `Encode`/`Decode` names the codec operation. Keep the distinction when reading cache source.
+
+## Production notes
+
+- Close semantics: codecs hold no connections, pools, or goroutines. Nothing to shut down; lifecycle belongs to the service using the codec.
+- Redaction: encoded bytes may contain secrets (session rows, queue payloads). Never log `data` at info level; log IDs and sizes instead.
+- Timeouts: none - encoding is in-memory CPU work. Bound it by keeping payloads small (IDs and flags in sessions, not full records).
+- Determinism: `JSONCodec` output is stable byte-for-byte, so snapshot tests and content hashes built on it do not flap.
+
+## Troubleshooting
+
+1. **Decode fails after adding a field.** Old bytes lack the new key - that defaults fine - so the failure is a type change, not an addition. Keep JSON types stable or add a versioned wrapper type.
+2. **Cache reads return zero values.** The writer and reader use different codecs (JSON vs gob). Use one `Codec[V]` per stored type and construct both sides from it.
+3. **Snapshot tests flap.** A custom codec emits maps with random key order or timestamps. Stick to `JSONCodec` for snapshotted data, or sort keys in the custom `Encode`.
+4. **Payloads too large for Redis values.** The type grew unbounded (embedded records, base64 blobs). Store IDs in cache/session and fetch bodies from `storage` or `db`.
+5. **Unknown fields error on decode.** That is not `JSONCodec` behavior - it ignores them. A custom `Decode` is strict; relax it or version the type.
+
+## See also
+
+- [Sessions](sessions/) - server-side rows serialized behind a cookie
+- [Redis](../database/redis/) - the shared byte store codecs write through
+- [Requests and Responses](requests-responses/) - JSON bodies at the HTTP edge

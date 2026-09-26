@@ -3,24 +3,22 @@ title: Authorization and Permissions
 description: Noop by default, with RBAC and Casbin for enforced access control.
 ---
 
-Authenticating a caller (`auth`) only tells you who they are — `permission`
-answers the next question, what they're allowed to do. It's a pure `Can(subject,
-action, resource) -> Decision` check: `allow`, `implicit_deny`, or
-`explicit_deny`. Critically, an *error* from `Can` means the permission system
-itself failed (a backend was unreachable, a policy file was malformed) — it is
-not the same thing as a denial, and callers need to treat the two differently.
+## Purpose
 
-`noop` (the default) allows everything — fine for local development, and
-deliberately something you have to opt out of before any protected deployment,
-not something that silently ships. `rbac` gives you role-based checks without
-external files; reach for `casbin` when you need policy defined declaratively
-in model/policy files rather than in Go.
+Authenticating a caller (`auth`) only tells you who they are.
+`permission` answers the next question, what they may do: a pure
+`Can(subject, action, resource)` check returning `allow`,
+`implicit_deny`, or `explicit_deny`.
 
-Actually wiring `permission` into HTTP or gRPC handlers is a separate package,
-`authz` — it extracts the bearer token, runs the `auth.Auth` verify step, then
-calls into `permission.Checker`, exposed as `Middleware` for HTTP and
-`UnaryServerInterceptor` for gRPC. `authz` has no container accessor of its
-own; it composes the `Auth()` and `Permission()` you've already resolved.
+When to use: guard an RPC, route, or job with an allow/deny decision.
+When not to use: identity itself (`auth`), transport (`authz` middleware),
+and credential storage (`password`) are separate packages.
+
+## Prerequisites
+
+- A resolved `auth.Auth` for subject identity.
+- A `permission.Checker` resolved from the container.
+- `authz` middleware (HTTP) or interceptor (gRPC) to compose the two.
 
 ## Config
 
@@ -33,33 +31,124 @@ permission:
 PERMISSION_ADAPTER=rbac
 ```
 
+`noop` (default) allows everything: fine for local development, and
+something to opt out of before any protected deployment, never something
+that ships silently. `rbac` gives role checks without external files;
+`casbin` reads policy declaratively from model/policy files.
+
 ## Resolve
 
 ```go
 c := container.New(config.Default())
 p, err := c.Permission()
 if err != nil {
-	// handle
+    // handle: config invalid or policy files unreadable
 }
-_ = p
 ```
 
-## Adapters
+`authz` has no container accessor of its own; it composes the `Auth()` and
+`Permission()` instances already resolved, exposed as `Middleware` for HTTP
+and `UnaryServerInterceptor` for gRPC.
 
-| Adapter | Package | Notes |
+## Runnable example
+
+Wire the HTTP middleware around a protected route:
+
+```go
+authn, err := c.Auth()
+if err != nil {
+    return err
+}
+checker, err := c.Permission()
+if err != nil {
+    return err
+}
+guarded := authz.Middleware(authn, checker)(handler)
+_ = guarded
+```
+
+Expected output:
+
+```text
+requests with a valid token and a matching grant reach the handler
+requests without a grant get a denial status; checker errors are denied, not allowed
+```
+
+Same composition for gRPC:
+
+```go
+guardedUnary := authz.UnaryServerInterceptor(authn, checker)
+_ = guardedUnary
+```
+
+Expected output:
+
+```text
+unary calls verify the bearer token, extract the resource id, then check Can
+denied or errored checks fail the call before the handler runs
+```
+
+An error from `Can` means the permission system itself failed (backend
+unreachable, policy file malformed). It is not a denial value; treat it as
+a denial for UX purposes, never as "probably fine".
+
+The `GetId` pattern: gRPC resource extraction works through the
+`ResourceIDer` interface:
+
+```go
+type ResourceIDer interface {
+    GetId() string
+}
+```
+
+`GetId` (not `GetID`) mirrors the getter `protoc-gen-go` emits for an `id`
+field, so generated request types satisfy the interface without adapters.
+
+## Reference
+
+| Adapter | Package | Use when |
 |---|---|---|
-| `noop` | `permission/noop` | Default; allows everything |
-| `rbac` | `permission/rbac` | In-memory role checks |
-| `casbin` | `permission/casbin` | Model/policy file enforcement |
+| `noop` | `permission/noop` | default; local dev, everything allowed |
+| `rbac` | `permission/rbac` | in-memory role checks, no files |
+| `casbin` | `permission/casbin` | model/policy files, declarative rules |
 
-## Deny by default, and don't touch the public interface
+| Decision | Meaning |
+|---|---|
+| `allow` | grant the action |
+| `implicit_deny` | no rule matched; fail closed |
+| `explicit_deny` | a rule refused; fail closed |
 
-Unknown roles and missing policies fail closed — a `Checker` that can't
-determine an answer denies rather than defaulting to allow, and callers should
-mirror that: treat a `Can` error as a denial for UX purposes, never as
-"probably fine." Model and policy file paths reject `..` traversal and must
-already exist at `Open`, so a bad path fails at startup, not on the first
-request that needs it. If you're extending `permission` yourself: never add a
-method to the public `Checker` interface — every external implementer breaks
-the moment you do. A new capability is a new, smaller interface, same rule as
-everywhere else in this codebase.
+Unknown roles and missing policies fail closed. Model and policy file paths
+reject `..` traversal and must exist at `Open`, so a bad path fails at
+startup, not on the first request that needs it.
+
+## Production notes
+
+- Switch off `noop` before any protected deployment; audit the adapter
+  value in the shipped config.
+- Deny by default in callers too: unknown answers and checker errors both
+  deny.
+- Never add a method to the public `Checker` interface; every external
+  implementer breaks when it changes. A new capability is a new, smaller
+  interface.
+- Keep policy files in version control and review them like code; sync them
+  across instances or serve them from one source.
+
+## Troubleshooting
+
+- **Everything allowed in staging**: the adapter is still `noop`. Set
+  `PERMISSION_ADAPTER=rbac` (or `casbin`) in the deployed env.
+- **`Open` fails on policy paths**: the path uses `..` or does not exist.
+  Use a repo-relative path that exists at startup.
+- **Denials for valid roles**: the role name or resource string mismatches
+  the policy (case, prefix, plural). Compare the exact `Can` arguments
+  against the policy file.
+- **`Can` errors under load**: the backing store is unreachable. Treat as
+  denial, alert on the error rate, and check store connectivity.
+
+## See also
+
+- [Authentication](./auth/) for identity before checks
+- [Password Hashing](./password-hashing/) for credential storage
+- [Config Reference](../reference/config-reference/) for adapter values
+- [Adapters Matrix](../reference/adapters-matrix/) for use-case guidance

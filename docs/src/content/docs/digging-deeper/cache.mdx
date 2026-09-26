@@ -4,35 +4,75 @@ description: In-process and shared caching with typed helpers and CAS support.
 ---
 
 Fetching the same expensive value on every request wastes work the moment your
-app sees real traffic — rendered fragments, computed permissions, rate-budget
+app sees real traffic - rendered fragments, computed permissions, rate-budget
 counters. `cache.Cache` gives every service the same small interface for
 stashing that value with a TTL, instead of each package inventing its own map
 and its own bugs.
 
-Reach for `memory` while you're a single process — it's zero-infra, and that's
-exactly what `config.Default()` ships for tests. The moment you run more than
-one instance behind a load balancer, switch to `redis`: a write on instance A
-needs to be visible to a read on instance B, and `memory` can't do that by
-definition.
+## Purpose and when to use
+
+Use cache for values that are slow to compute, safe to reuse for a bounded
+time, and keyed by something stable such as a user id, a listing id, or a
+query hash. The bookings app uses this shape for rendered space cards and
+availability slices: recompute on write, serve from cache on read.
+
+Pick `memory` while you run a single process. It ships as the default in
+`config.Default()`, needs no infra, and keeps tests hermetic. Pick `redis`
+the moment you run two or more instances behind a load balancer or split web
+and worker processes. A write on instance A must be visible to a read on
+instance B, and a process-local map cannot do that by definition.
+
+Do not use cache as a primary store. Entries expire, evict under `max_entries`
+pressure, and vanish on restart for `memory`. If loss of the value breaks
+correctness, keep it in `db` and use cache only as a read shortcut.
 
 ## Config
+
+File decoding is strict and snake_case. Duration fields in YAML or JSON files
+are integer nanoseconds. The same fields accept Go duration strings such as
+`"5s"` through environment overrides only.
 
 ```yaml
 cache:
   adapter: memory
   options:
-    sweep_interval: 1m
+    sweep_interval: 60000000000
+    max_entries: 10000
+    capacity: 1024
+    verbose: false
+```
+
+Redis-backed shared cache:
+
+```yaml
+cache:
+  adapter: redis
+  options:
+    addr: localhost:6379
+    db: 0
+    pool_size: 20
+    min_idle_conns: 2
+    pool_timeout: 5000000000
+    max_conn_idle_time: 300000000000
+    max_conn_lifetime: 3600000000000
 ```
 
 ```sh
 CACHE_ADAPTER=redis
-CACHE_SWEEPINTERVAL=1m
+CACHE_SWEEP_INTERVAL=1m
+CACHE_MAX_ENTRIES=10000
+CACHE_ADDR=localhost:6379
+CACHE_DB=0
+CACHE_POOL_SIZE=20
 ```
 
-Redis shares connection settings with the standard `addr` / `db` style
-options; unknown env vars are ignored per the best-effort env rule.
+Env matching is best-effort and case-insensitive with `_` ignored, so
+`CACHE_SWEEPINTERVAL` also resolves. Unknown `CACHE_*` vars are ignored.
+Only unparsable values for a resolved field return `InvalidOptionsError`.
+File loads fail fast on unknown fields, so a typo such as `sweepinterval`
+is rejected - the canonical key is `sweep_interval`.
 
-## Resolve
+## Resolve via container
 
 ```go
 import (
@@ -40,37 +80,135 @@ import (
 	"github.com/zenta-dev/zever/container"
 )
 
-c := container.New(config.Default())
-ch, err := c.Cache()
-if err != nil {
-	// handle
+func openCache() error {
+	c := container.New(config.Default())
+	ch, err := c.Cache()
+	if err != nil {
+		return err
+	}
+	defer func() { _ = ch.Close(ctx) }()
+	return nil
 }
-_ = ch
 ```
 
-`Cache()` resolves lazily on first use and caches the result; on error the
-cached state clears so the next call retries. Unlike most services, it closes
-with `Close(ctx)` — it takes a context — and it's a leaf dependency, so it
-closes last.
+`container.New(nil)` is valid and closes cleanly when nothing was resolved.
+`Cache()` resolves lazily on first use and caches the instance. On error the
+cached state clears so the next call retries instead of sticking on a broken
+handle. The bookings worker resolves cache once at startup and shares it
+across confirmation and reminder paths.
+
+Close shape: `cache.Cache` declares `Close(ctx context.Context) error`. The
+container probes `Close(ctx)` first, so a pool-backed redis handle drains
+within the parent deadline. Cache is a leaf dependency and closes last, after
+scheduler and job dependents. Only resolved services close - an untouched
+cache never opens during shutdown.
+
+## Runnable example
+
+Set a session-scoped value with a TTL, read it back, then use the typed
+helper for a struct. The typed path in `cache/typed.go` handles encode and
+decode so call sites stay free of manual JSON plumbing.
+
+```go
+package main
+
+import (
+	"context"
+	"fmt"
+	"time"
+
+	"github.com/zenta-dev/zever/cache"
+	"github.com/zenta-dev/zever/cache/memory"
+	typedcache "github.com/zenta-dev/zever/cache/typed"
+)
+
+type SpaceCard struct {
+	Title      string `json:"title"`
+	PriceCents int64  `json:"price_cents"`
+}
+
+func main() error {
+	ctx := context.Background()
+	backend, err := memory.New(cache.Options{})
+	if err != nil {
+		return err
+	}
+	defer func() { _ = backend.Close(ctx) }()
+
+	if err := backend.Set(ctx, "space:42", []byte("loft"), 5*time.Minute); err != nil {
+		return err
+	}
+	raw, err := backend.Get(ctx, "space:42")
+	if err != nil {
+		return err
+	}
+	fmt.Println(string(raw))
+
+	typed := typedcache.New[SpaceCard](backend)
+	if err := typed.Set(ctx, "space:card:42", SpaceCard{Title: "Loft", PriceCents: 12000}, 5*time.Minute); err != nil {
+		return err
+	}
+	card, err := typed.Get(ctx, "space:card:42")
+	if err != nil {
+		return err
+	}
+	fmt.Println(card.Title, card.PriceCents)
+	return nil
+}
+```
+
+Expected behavior: the first print shows `loft`, the second shows
+`Loft 12000`. A second run in the same process hits the stored entries until
+the 5 minute TTL lapses or `Delete` removes the key. For check-then-set races use compare-and-swap in `cache/cas.go`.
 
 ## Adapters
 
 | Adapter | Package | Notes |
 |---|---|---|
-| `memory` | `cache/memory` | Default; process-local, no infra |
-| `redis` | `cache/redis` | Shared; use for multi-instance deploys |
+| `memory` | `cache/memory` | Default, process-local, zero infra, closes instantly |
+| `redis` | `cache/redis` | Shared across instances, pool-backed, `Close(ctx)` drains pool |
 
-## The gotcha: cached values can outlive the shape you cached them as
+Both adapters serve the same `cache.Cache` interface, so the bookings app
+runs `memory` locally and `redis` in staging with only a config change.
 
-The typed helpers in `cache/typed.go` decode values for you, which is
-convenient — but it also means a cache poisoned by a stale schema (you renamed
-a struct field, redeployed, and old cached JSON is still sitting in Redis)
-fails at *read* time, not write time. If you change a cached type's shape,
-bump the cache key so old entries just miss instead of decode-erroring. `cas.go`
-gives you compare-and-swap for check-then-set flows where two writers racing
-would otherwise clobber each other.
+## Gotchas and production notes
 
-Cached values may hold secrets, so never log a key or a payload directly —
-route anything you need to inspect through `config.RedactedServices`. Errors
-stay `errors.Is`-compatible; wrap with `%w`, never `github.com/pkg/errors`
-(the repo's `depguard` rule blocks it).
+- Bump the key when the cached type shape changes. Typed get decodes at read time, so JSON from an older revision fails after a rename. Version the key (`space:card:v2:42`) so old entries miss.
+- Keep TTLs explicit and short for user-facing reads. Pass a real duration such as `5 * time.Minute` from a named const rather than a magic literal.
+- Never log keys or payloads that may hold secrets. Route display output through `config.RedactedServices` and keep values out of error text.
+- Size `max_entries` and `capacity` for the working set. An unbounded local cache grows with key cardinality, so set a bound and let eviction cap memory.
+- Tune the redis pool with `pool_size`, `min_idle_conns`, `pool_timeout`, `max_conn_idle_time`, and `max_conn_lifetime`. Defaults favor dev; prod wants explicit bounds tied to concurrency.
+- Close order is load-bearing: `Close(ctx)` shuts scheduler and job first, then snapshots, then `cache` and `queue` last.
+- Errors stay `errors.Is`-compatible. Wrap with `%w` and never import
+  `github.com/pkg/errors`, which `depguard` denies.
+
+## Troubleshooting
+
+Symptom: typed `Get` returns decode errors after a deploy.
+Cause: stale entries written with the previous struct shape still sit in Redis.
+Fix: bump the key version (`v1` to `v2`), redeploy, and let old keys expire.
+For hot keys, `Delete` the old prefix once after rollout.
+
+Symptom: instance A writes, instance B reads a miss.
+Cause: `memory` adapter in a multi-instance deploy. Each process holds a
+private map by design.
+Fix: set `cache.adapter` to `redis` with a shared `addr` in every instance,
+then verify with `RedactedServices` that all instances resolve the same host.
+
+Symptom: `Load` fails with unknown field `sweepinterval`.
+Cause: file decoding is strict and only accepts `sweep_interval`.
+Fix: rename the key to `sweep_interval` and express the duration as integer
+nanoseconds in the file. Keep `"1m"` style strings for env overrides only.
+
+Symptom: shutdown hangs or logs pool timeouts.
+Cause: parent context has no deadline while redis drains, or cache closed
+before workers finished.
+Fix: pass a `context.WithTimeout` to `c.Close(ctx)` and keep default close
+order so cache drains after scheduler and job stop.
+
+## See also
+
+- [Queue](queue/) for durable work transport behind the job dispatcher
+- [Scheduler and Jobs](scheduler-jobs/) for cron ticks that warm or bust cache keys
+- [Build a Booking API](../tutorials/build-a-booking-api/) for the bookings tutorial
+- `examples/bookings/zever.yaml` for zero-infra defaults and `schema/bookings.zen` for SendConfirmation and SendReminder jobs

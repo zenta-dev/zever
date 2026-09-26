@@ -9,35 +9,87 @@ hero:
     alt: zever logo
   actions:
     - text: Get started
-      link: /zever/getting-started/installation/
+      link: getting-started/installation/
       icon: right-arrow
     - text: Configuration
-      link: /zever/getting-started/configuration/
+      link: getting-started/configuration/
       icon: setting
       variant: minimal
 ---
 
 import { Card, CardGrid, Code } from '@astrojs/starlight/components';
 
-## Why zever
+## Purpose + When to use
 
-Every Go backend ends up wiring the same plumbing by hand: a database driver,
-a cache client, a queue connection, routing, auth middleware, config loading —
-all before a single line of business logic runs. Do it enough times across
-enough services and it stops being infrastructure work and starts being
-repetitive, error-prone busywork that has nothing to do with the product
-you're actually building.
+zever fits Go backends that repeat the same plumbing on every service: database pools, cache clients, queue connections, routing, auth middleware, and typed config. Use it when you want that plumbing compiled from one schema and resolved through one container, while your handlers keep full control of business logic.
 
-zever's answer is to describe a service's shape once, in a small
-proto-inspired schema language, and compile *that* into the plumbing — not
-into your business logic. It never generates or dictates what your handlers
-do; it only generates the infrastructure they run on top of.
+Use it for CRUD services, workers, and schedulers that share one config shape across dev and prod. Skip it for single-file scripts or services where hand-wired stdlib already covers every need with no shared infrastructure.
 
-```sh
-go get github.com/zenta-dev/zever
+## Prerequisites and mental model
+
+Three ideas carry the whole framework:
+
+```text
+.zen schema  ->  compile  ->  generated plumbing  ->  container resolves it
+config file  ->  Load     ->  one Config          ->  container.New(cfg)
+adapter name ->  config   ->  registry lookup     ->  cached instance
 ```
 
-## A tiny example
+You need Go 1.27 or newer and a module rooted at `github.com/zenta-dev/zever` semantics (single `go.mod`, no nested modules). No Node, Docker, or database server is needed for the default path: `config.Default()` picks zero-infra adapters (sqlite, memory, log) so the first build and test run pass on a clean machine.
+
+## Config
+
+Every page in this site returns to the same layering: `defaults < file < env`. A minimal file plus two env overrides:
+
+```yaml
+# zever.yaml
+db:
+  adapter: sqlite
+  options:
+    path: data/app.db
+log:
+  adapter: slog
+cache:
+  adapter: memory
+```
+
+```sh
+DB_ADAPTER=sqlite
+DB_MAXCONNS=10
+AUTH_JWT_SECRET='dev-only-secret-at-least-32-bytes-long'
+```
+
+Files are strict (unknown services or snake_case fields fail the load). Env is best-effort (stray variables such as `PATH` are ignored; only unparsable values for resolved fields return `InvalidOptionsError`). Full detail lives in `getting-started/configuration/`.
+
+## Resolve via container
+
+One container per process is the sole resolver. Accessors are lazy and retry on error:
+
+```go
+package main
+
+import (
+	"fmt"
+
+	"github.com/zenta-dev/zever/config"
+	"github.com/zenta-dev/zever/container"
+)
+
+func main() {
+	c := container.New(config.Default())
+	defer c.Close(nil)
+
+	db, err := c.DB()
+	if err != nil {
+		panic(err)
+	}
+	fmt.Println("db resolved:", db != nil)
+}
+```
+
+`container.New(nil)` is valid and closes cleanly. `Close(ctx)` shuts down only services already resolved, in dependency order. See `architecture/container/` for the full accessor table and close probing order.
+
+## Runnable example
 
 Describe an entity and a service once, in a `.zen` file:
 
@@ -56,24 +108,59 @@ service UserService {
 }
 ```
 
-Compile it:
+Compile it, then run the smoke test:
 
 ```sh
+go get github.com/zenta-dev/zever
 zever compile
+go run .
 ```
 
-Then resolve whatever that schema needs through one container — no manual
-driver wiring, no hand-registered routes:
+Expected output or behavior:
 
-```go
-c := container.New(config.Load(""))
-db, err := c.DB()
+```text
+db resolved: true
 ```
 
-Later, swapping `db`'s adapter from `sqlite` to `postgres` is a one-line
-config change — `UserService` never has to know. That's the whole idea: see
-[Syntax (.zen)](dsl/syntax-zen/) for the full language, and
-[Installation](getting-started/installation/) for the complete setup.
+No database server starts and no migration runs. The default sqlite adapter opens in-process, the memory cache needs no connection, and `zever compile` only emits generated plumbing next to your schema. When the output prints, the install, schema pipeline, and container path all work.
+
+## Variants
+
+| Path | Command or adapter | When to pick it |
+|---|---|---|
+| Zero-infra dev | `sqlite`, `memory`, `log`, `noop` defaults | First run, unit tests, docs examples |
+| Postgres service | `db.adapter: postgres` with `dsn` | Prod reads and writes, connection pooling |
+| Redis backing | `cache.adapter: redis`, `queue.adapter: redis` | Shared cache or queue across processes |
+| HTTP driver | `router.adapter: fiber` or `stdhttp` | Fiber routing features vs stdlib-only deploys |
+| Compiler backends | `zever compile --backend=zenorm,openapi,atlas` | Typed ORM, OpenAPI, and DDL from one schema |
+| Worker process | `c.Job()` plus `c.Scheduler()` | Jobs and cron sharing one queue connection |
+
+Swapping a row is a config edit, never a rewrite: handlers keep calling `c.DB()` and `c.Cache()` while the registry returns the new driver. The todo and bookings examples (`examples/todo/README.md`, `examples/bookings/README.md`) show the same code running on sqlite locally and postgres in prod.
+
+## Production notes
+
+Close order on `SIGTERM` is: stop the HTTP server first (`srv.Shutdown(ctx)`), then `c.Close(ctx)` with a timeout parent (10s is the documented shape). Dependents holding a queue reference (`scheduler`, `job`) close first; leaf dependencies (`cache`, `queue`) close last; failures join with `errors.Join`.
+
+Never log raw option maps: print `config.RedactedServices(cfg)` instead, which masks secrets and names services and fields only. Ship real secrets via file or env (`AUTH_JWT_SECRET`, provider `secret_key`), because `Default()` crypto keys are deterministic and public. `zever tinker` evals arbitrary Go against a live container and stays dev-only; `zever dev` is local watch mode only, never a prod supervisor.
+
+## Troubleshooting
+
+| Symptom | Cause | Fix |
+|---|---|---|
+| `go run .` prints a JWT or crypto validation error | `Default()` dev secrets were overridden with an empty value, or `doctor` runs against zero-infra defaults without env | Export `AUTH_JWT_SECRET` with at least 32 bytes for the real path; keep `Default()` for tests only |
+| `config.Load` fails with unknown field | File key uses a pre-rename flat spelling (`maxconns`, `apikey`) or a typo | Rename to strict snake_case (`max_conns`, `api_key`); check `CHANGELOG.md` for the rename list |
+| `c.Close` reports `CloseTimeoutError` or `ClosePanicError` at shutdown | An adapter blocked past its bound or panicked during close | Give the parent context a deadline, check adapter `Close`/`Stop` impl, match with value-type `errors.As` targets |
+| `zever` with no subcommand hangs a script | Bare invocation contract misunderstood | It prints usage to stderr and exits 1 by design; always pass an explicit subcommand in scripts |
+
+## See also
+
+- `getting-started/installation/` for Go version, module fetch, and first build
+- `getting-started/configuration/` for layering, strict files, and redaction
+- `getting-started/directory-structure/` for where each package lives
+- `architecture/container/` for lazy accessors and ordered shutdown
+- `architecture/compiler-boundary/` for why runtime never imports the compiler
+- `dsl/syntax-zen/` for the full schema language behind the example above
+- Package guides as text: `README.md`, `config/README.md`, `container/README.md`, `internal/dsl/README.md`, `cmd/zever/README.md`
 
 ## What you get
 
@@ -91,7 +178,7 @@ config change — `UserService` never has to know. That's the whole idea: see
     Generics query builder over `db.DB` with per-call dialects and closed-world errors for unsupported SQL.
   </Card>
   <Card title="Swap adapters, not code" icon="rocket">
-    Every backend concern — db, cache, queue, auth, storage, and 25+ more — is a small interface with interchangeable adapters. Changing one is a config edit, never a rewrite.
+    Every backend concern (db, cache, queue, auth, storage, and more) is a small interface with interchangeable adapters. Changing one is a config edit, never a rewrite.
   </Card>
 </CardGrid>
 

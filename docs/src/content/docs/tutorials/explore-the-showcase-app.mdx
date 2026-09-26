@@ -1,6 +1,6 @@
 ---
 title: 'Tutorial: Explore the Showcase App'
-description: A tour of examples/showcase — every DSL feature in one schema, served over HTTP and gRPC from one implementation.
+description: A tour of examples/showcase - every DSL feature in one schema, served over HTTP and gRPC from one implementation.
 ---
 
 Where [Build a Booking API](build-a-booking-api/) walks a
@@ -18,9 +18,9 @@ cd examples/showcase
 
 ## What one schema can declare
 
-`schema/shop/shop.zen` is the whole domain — `User`, `Profile`, `Category`,
+`schema/shop/shop.zen` is the whole domain - `User`, `Profile`, `Category`,
 `Product`, `Tag`, `Order`, `OrderItem`, `Review` entities plus
-`ShopService` — and deliberately touches every DSL feature in one place:
+`ShopService` - and deliberately touches every DSL feature in one place:
 
 | Feature | Where |
 |---|---|
@@ -31,44 +31,85 @@ cd examples/showcase
 | `has_many` / `belongs_to` | the `User`/`Order`/`OrderItem`/`Review` graph |
 | `has_one` (`@unique` foreign key) | `User.profile` |
 | `many_to_many` with reciprocal `join_table` | `Product.tags` |
-| `@schema` | `Order` → a separate `billing` schema |
+| `index()` + `@unique` index | `Product`, `Order` |
+| `@schema` | `Order` maps to a separate `billing` schema |
 | `@renamed_from` | `Product.headline` (was `title`) |
-| `message` request/nested/returns | `CreateOrderRequest`, `CheckoutRequest`, `OrderReceipt` |
+| `message` request + nested + returns | `CreateOrderRequest`, `CheckoutRequest`, `OrderReceipt` |
 | Every HTTP verb, every `auth:` shape, `permission: check`, `errors:` sets, `paginated: true` | `ShopService` RPCs |
 | Job params, queues, retry shapes, `cron` + `dispatch` | 4 jobs, 2 schedules |
 
 See [Syntax (.zen)](../dsl/syntax-zen/) for what each of these means in
-isolation; this schema is the "all of them together" reference.
+isolation; this schema is the "all of them together" reference. When you
+wonder whether the DSL supports a shape, grep this schema first.
 
 ## One implementation, two transports
 
 `cmd/server` mirrors what `zever generate server` produces: HTTP (`:8080`)
 and gRPC (`:9090`) from one container, with auth enforced identically on
 both transports via the same generated `GRPCPolicies` plus `authz`. The
-business logic lives in exactly one place —
-`internal/service/shop/shop_service.go` (`ShopServiceImpl`) — and both
-transports call into it. `/api/*` HTTP routes that need richer shapes than
-the generated ones (register/login, item-list checkout) are thin adapters
-over that same implementation, never a second copy of the logic.
+business logic lives in exactly one place -
+`internal/service/shop/shop_service.go` (`ShopServiceImpl`, 9 RPCs) - and
+both transports call into it. `/api/*` HTTP routes that need richer shapes
+than the generated ones (register/login, item-list checkout) are thin
+adapters over that same implementation, never a second copy of the logic.
 
 `cmd/worker` mirrors `zever generate worker`: one handler per declared job,
 one schedule registration per declared schedule.
 
 ## Run it
 
-`AUTH_JWT_SECRET` (at least 32 bytes) is required by every entrypoint —
-this app fails closed, unlike the demo-friendly default some other examples
-use (see [Configuration](../getting-started/configuration/)).
+`AUTH_JWT_SECRET` (at least 32 bytes) is required by every entrypoint -
+this app fails closed (see [Configuration](../getting-started/configuration/)).
 
 ```sh
 export AUTH_JWT_SECRET=dev-only-secret-at-least-32-bytes-long
 
 zever db migrate --adapter=sqlite --dsn=data/showcase.db schema/shop/shop.zen
 go run ./db/seed          # idempotent
+```
 
+Expected output:
+
+```text
+applied 8 tables to data/showcase.db
+seeded demo shop data
+```
+
+Then serve and work (two terminals):
+
+```sh
 go run ./cmd/server       # HTTP :8080 + gRPC :9090
 go run ./cmd/worker       # jobs + embedded scheduler, separate terminal
 ```
+
+Expected output (server):
+
+```text
+http listening on :8080
+grpc listening on :9090
+```
+
+Expected output (worker):
+
+```text
+registered 4 jobs
+scheduler started: 2 schedules
+```
+
+Prove parity with curl on HTTP, then the same RPC over gRPC:
+
+```sh
+curl -s localhost:8080/api/products | head -c 200
+```
+
+Expected output:
+
+```text
+{"products":[{...}]}
+```
+
+Both transports enforce the same auth: an unauthenticated call to a guarded
+RPC fails identically on `:8080` and `:9090`.
 
 ## Inspect the schema without running anything
 
@@ -83,13 +124,22 @@ zever explain ShopService.Checkout schema/shop/shop.zen
 zever check-boundaries schema/shop/shop.zen
 ```
 
+Expected output shape per command:
+
+```text
+# check: ok, no diagnostics
+# routes: one line per RPC with verb + path
+# graph: entity nodes with relation edges
+# explain: auth, permission, validation, error set for Checkout
+```
+
 `explain` in particular is worth running against `Checkout` here: it shows
 you exactly how one RPC resolves through auth, permission, validation, and
 its declared error set, without reading the generated code.
 
 ## Regenerating after a schema change
 
-`generated/` is CLI output — never hand-edit it. From the repository root
+`generated/` is CLI output - never hand-edit it. From the repository root
 (so `gogen`/`protogogen` import paths resolve):
 
 ```sh
@@ -98,9 +148,35 @@ zever compile examples/showcase/schema/shop/shop.zen \
   --out examples/showcase/generated
 ```
 
+Expected output:
+
+```text
+wrote atlas output
+wrote gogen output
+wrote openapi output
+wrote proto output
+wrote protogogen output
+wrote zenorm output
+```
+
 Everything under `internal/app`, `internal/service`, `internal/api`, the
 schema itself, `zever.yaml`, and the tests are hand-owned and never
 overwritten by a regenerate.
+
+## Troubleshooting
+
+**Server exits naming `AUTH_JWT_SECRET`.**
+Same fail-closed gate as bookings: export a 32+ byte dev value in every
+terminal running an entrypoint.
+
+**`zever compile` writes to the wrong import paths.**
+You ran it from `examples/showcase/` instead of the repo root. Rerun from
+the root so `gogen`/`protogogen` paths resolve.
+
+**HTTP works but gRPC auth behaves differently.**
+That is a parity-test failure, not a config difference: both transports
+share `GRPCPolicies` plus `authz`. Run the cross-transport tests and fix
+the impl, not the transport wiring.
 
 ## Next
 
@@ -108,4 +184,4 @@ overwritten by a regenerate.
   backends (`atlas`, `gogen`, `openapi`, `proto`, `protogogen`, `zenorm`)
   actually produces from this one schema.
 - [Query Builder](../database/query-builder/) for the typed ORM the
-  `zenorm` backend generates and this app's service implementation uses.
+  `zenorm` backend generates and this app service implementation uses.

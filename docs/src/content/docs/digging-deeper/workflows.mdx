@@ -3,39 +3,109 @@ title: Workflows
 description: Durable, multi-step runs over swappable orchestration backends.
 ---
 
-Onboarding, payouts, provisioning — these aren't single requests, they're
-sequences of steps that need to survive a restart partway through. `workflow`
-starts runs, delivers signals, evaluates queries, and cancels runs, so a crash
-after step 3 resumes at step 3 instead of restarting the whole thing from
-scratch. It isn't a cron scheduler — nothing here fires on a time spec; that's
-what `scheduler` is for.
+## Purpose
 
-`memory` (the default) keeps everything in-process, which is fine for local
-dev and tests but means a run's state disappears if the process dies —
-production workflows that must survive a crash need a durable backend behind
-this interface.
+Use `workflow` for multi-step runs (onboarding, payouts, provisioning)
+that must survive a restart partway through. The interface covers run
+lifecycle: `Start` a named workflow with JSON-marshalable input,
+`Signal` a running channel, `Query` state into an output value, and
+`Cancel` a run. A crash after step 3 resumes at step 3 instead of
+restarting from scratch.
+
+## When to use
+
+Use `memory` (the default and currently only adapter) for local dev and
+tests: everything stays in-process with a bounded pending buffer that
+reports `ErrPendingFull` instead of blocking forever when full. This is
+not a cron scheduler; nothing here fires on a time spec. Use
+`scheduler` for cron-shaped firing and `queue` plus `job` for plain
+background tasks. Production runs that must survive a crash need a
+durable backend behind this interface when one lands.
+
+Engines with host-registered steps expose them through the separate
+`StepRegistrar` interface (`RegisterStep`), so engines without the
+concept are unaffected and no existing implementer breaks. Step input
+and output must be JSON-marshalable: the output becomes queryable state,
+so keep payloads small and reference-backed rather than embedding blobs
+that every `Query` must then marshal.
 
 ## Config
 
 ```yaml
 workflow:
   adapter: memory
+  options:
+    namespace: bookings
 ```
+
+`host_port` names a workflow server address when the backend needs one;
+`namespace` scopes runs. Both are optional for `memory`.
+
+Env (no prefix, `<SERVICE>_<FIELD>`):
 
 ```sh
 WORKFLOW_ADAPTER=memory
+WORKFLOW_NAMESPACE=bookings
+WORKFLOW_HOSTPORT=127.0.0.1:7233
 ```
 
-## Resolve
+`Validate` only rejects a malformed `host_port` (must split as
+host:port when set). Everything else passes through to the adapter.
+
+## Resolve via container
 
 ```go
 c := container.New(config.Default())
 wf, err := c.Workflow()
 if err != nil {
-	// handle
+    // handle
 }
 _ = wf
 ```
+
+Resolution is lazy and cached per container, retrying after errors.
+
+## Runnable example
+
+```go
+package main
+
+import (
+    "context"
+    "fmt"
+
+    "github.com/zenta-dev/zever/config"
+    "github.com/zenta-dev/zever/container"
+)
+
+func main() {
+    c := container.New(config.Default())
+    wf, err := c.Workflow()
+    if err != nil {
+        panic(err)
+    }
+    defer wf.Close()
+
+    ctx := context.Background()
+    id, err := wf.Start(ctx, "booking-confirm", map[string]string{"booking_id": "b-1"}, "wf-b-1")
+    fmt.Println(id, err)
+    var state map[string]any
+    fmt.Println(wf.Query(ctx, id, "status", &state))
+    fmt.Println(wf.Cancel(ctx, id))
+}
+```
+
+Expected output (memory backend, run starts then cancels cleanly):
+
+```text
+wf-b-1 <nil>
+<nil>
+<nil>
+```
+
+Exact run ID echo depends on the backend; the shape is start, query,
+cancel with no errors. Signal fits later: deliver a named value to the
+running ID when the flow needs outside input mid-run.
 
 ## Adapters
 
@@ -43,14 +113,38 @@ _ = wf
 |---|---|---|
 | `memory` | `workflow/memory` | Default; in-process, bounded pending buffer |
 
-## Design a run around idempotent steps
+## Production notes
 
-Because a crashed run resumes rather than restarts, every step has to be safe
-to execute more than once — if step 3 partially completed before the crash,
-resuming means step 3 might run again. Money-moving or side-effecting steps
-should go through `lock` singletons and idempotency keys rather than trusting
-"this only runs once." Emit an observability span per step so a stalled run is
-something you can actually locate, not just infer from a timeout. The `memory`
-backend reports `ErrPendingFull` rather than blocking indefinitely once its
-buffer fills — cap retries per step and route poison inputs to a dead-letter
-path instead of retrying forever against a buffer that's already full.
+- Close semantics: `Workflow.Close() error` with no context
+  (instant-close shape). Container closes only resolved services and
+  joins errors via `errors.Join`; panics become `*ClosePanicError`.
+- Multi-instance behavior: `memory` state dies with the process, so two
+  replicas each see only their own runs and a restart loses all of
+  them. Design every step idempotent now (locks plus idempotency keys
+  for money-moving steps), so a future durable backend can replay
+  safely. Cap retries per step and route poison inputs to a dead-letter
+  path instead of retrying forever against a full pending buffer.
+- Redaction: inputs, signals, and step results become queryable state
+  and may cross process boundaries later. Never log raw option maps;
+  use `config.RedactedServices`. Keep secrets and PII out of workflow
+  inputs; pass references instead.
+
+## Troubleshooting
+
+1. `ErrPendingFull` on start: the memory pending buffer is full. Drain
+   or cancel stuck runs, cap per-step retries, and send poison inputs
+   to a dead-letter path rather than looping.
+2. `Query` fails with a marshal error: `Start` / `Signal` store values
+   as-is and only marshal lazily at `Query` time, so a non-marshalable
+   input surfaces here, not at start. Pass only JSON-marshalable
+   values (maps, slices, structs without channels or funcs).
+3. Steps re-run side effects after a crash: the step was not idempotent.
+   Gate side-effecting steps behind `lock` singletons and idempotency
+   keys (see the booking flow), and emit an observability span per step
+   so stalled runs are locatable.
+
+## See also
+
+- [Scheduler and Jobs](./scheduler-jobs.mdx) - cron firing vs runs
+- [Locks and Idempotency](./lock-idempotency.mdx) - idempotent steps
+- [Observability](./observability.mdx) - spans per workflow step

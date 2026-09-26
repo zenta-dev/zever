@@ -3,19 +3,25 @@ title: Authentication
 description: JWT, session, and OIDC login behind one auth interface.
 ---
 
-Knowing who's calling is a different problem depending on who's calling — a
-stateless API client wants a bearer token, a browser wants a cookie-backed
-session, and plenty of apps just want to delegate the whole question to an
-external identity provider. `auth` gives you one `Issue`/`Verify`/`Revoke`
-surface over all three, and it stays deliberately narrow: it doesn't hash
-passwords (that's `password`) and it doesn't encrypt anything (that's
-`crypto`) — those are opt-in companions, not auth's job.
+## Purpose
 
-`jwt` (the default) is the right call for stateless APIs — no server-side
-session store, just a signed token. Reach for `session` when you're serving a
-browser and want server-revocable state instead of a token that's valid until
-it expires no matter what. `oidc` is for when you don't want to own
-credentials at all — login delegates entirely to an external provider.
+Knowing who calls is a different problem per caller: a stateless API client
+wants a bearer token, a browser wants a cookie-backed session, and plenty
+of apps delegate the whole question to an external identity provider.
+`auth` gives one `Issue` / `Verify` / `Revoke` surface over all three.
+
+When to use: issue and verify caller identity at login and on each
+request. When not to use: password hashing is `password`, field encryption
+is `crypto`, and allow/deny checks are `permission` - `auth` answers who,
+never what they may do.
+
+## Prerequisites
+
+- `config` layered setup: defaults, file, then env.
+- A JWT secret of at least 32 bytes for any non-dev deployment
+  (`AUTH_JWT_SECRET`); `Open` refuses shorter secrets outright.
+- The bookings tutorial flow for the end-to-end shape (register, login,
+  bearer calls).
 
 ## Config
 
@@ -33,8 +39,10 @@ AUTH_JWT_SECRET=prod-secret-at-least-32-bytes-long
 ```
 
 One nesting level maps via the first underscore, so `AUTH_JWT_SECRET` sets
-`Options.JWT.Secret` — and that secret has to clear `MinSecretLen` bytes or
-`Open` refuses it outright rather than accepting a weak key silently.
+`Options.JWT.Secret`. The secret must clear `MinSecretLen` (32 bytes) or
+`Open` fails closed rather than accepting a weak key silently. Defaults
+ship with no production credentials, so `config.Default()` in prod fails
+to authenticate anything instead of accepting a known dev secret.
 
 ## Resolve
 
@@ -42,29 +50,101 @@ One nesting level maps via the first underscore, so `AUTH_JWT_SECRET` sets
 c := container.New(config.Default())
 a, err := c.Auth()
 if err != nil {
-	// handle
+    // handle: config invalid or adapter unavailable
 }
-_ = a
 ```
 
-## Adapters
+Accessors resolve lazily and retry on the next call after an error.
 
-| Adapter | Package | Notes |
+## Runnable example
+
+Register a guest and log in (bookings tutorial shape):
+
+```sh
+curl -s -X POST localhost:8080/api/register \
+  -H 'Content-Type: application/json' \
+  -d '{"email":"you@example.com","password":"correct horse battery staple"}'
+
+curl -s -X POST localhost:8080/api/login \
+  -H 'Content-Type: application/json' \
+  -d '{"email":"you@example.com","password":"correct horse battery staple"}'
+```
+
+Expected output:
+
+```text
+register: 201 with the created user object
+login: 200 with a signed JWT in the token field
+```
+
+Use the token as a bearer credential on every other route:
+
+```sh
+TOKEN=... # from the login response
+
+curl -s localhost:8080/api/spaces -H "Authorization: Bearer $TOKEN"
+
+curl -s -X POST localhost:8080/api/bookings \
+  -H "Authorization: Bearer $TOKEN" -H 'Content-Type: application/json' \
+  -d '{"space_id":"...","start_date":"2026-01-01","end_date":"2026-01-03"}'
+```
+
+Expected output:
+
+```text
+spaces: 200 with the space list
+bookings: 201 with the created booking; 401 without a valid bearer token
+```
+
+## Reference
+
+| Adapter | Package | Use when |
 |---|---|---|
-| `jwt` | `auth/jwt` | Default; stateless tokens |
-| `session` | `auth/session` | Cookie-backed, server-revocable |
-| `oidc` | `auth/oidc` | External IdP login |
+| `jwt` | `auth/jwt` | default; stateless APIs, no server-side session store |
+| `session` | `auth/session` | browsers; server-revocable cookie-backed state |
+| `oidc` | `auth/oidc` | external IdP owns credentials; login delegates fully |
 
-## Failures are deliberately generic
+| Method | Role |
+|---|---|
+| `Issue` | mint a credential after login |
+| `Verify` | check a presented credential per request |
+| `Revoke` | invalidate a credential (session-backed adapters) |
 
-An invalid token and an expired token return the same generic failure from
-`Verify` — not because the distinction doesn't exist internally, but because
-telling a caller *which* check failed is a free enumeration oracle: an
-attacker probing your login endpoint can tell a real username from a fake one
-just by which error comes back. `auth` fails closed and vague on purpose; if
-you need to log the specific reason for your own debugging, do it server-side,
-never in the response body. Token values, JWT secrets, and OIDC client
-material never appear in an error or a log line, no matter which adapter
-produced the failure — and defaults ship with no production credentials, so
-running `config.Default()` in prod by mistake fails to authenticate anything
-rather than silently accepting a known dev secret.
+Failures are deliberately generic: an invalid token and an expired token
+return the same failure from `Verify`. Telling a caller which check failed
+is a free enumeration oracle, so `auth` fails closed and vague on purpose.
+Log specifics server-side, never in the response body. Token values, JWT
+secrets, and OIDC client material never appear in errors or logs.
+
+## Production notes
+
+- Generate the JWT secret from a CSPRNG at 32+ bytes; store it in file or
+  env, never in source. Rotate by issuing under the new secret and
+  accepting the old one during overlap.
+- Prefer `session` when immediate revocation matters (logout, ban, role
+  drop); JWTs stay valid until expiry by construction.
+- Rate-limit login and register; hashing cost (`password`) is not a
+  substitute for attempt limits.
+- Never log raw option maps; display config via `RedactedServices` /
+  `Redact`.
+
+## Troubleshooting
+
+- **`Open` rejects the JWT secret**: it is shorter than 32 bytes.
+  Generate a longer secret and set `AUTH_JWT_SECRET`.
+- **All logins 401 after a secret rotation**: tokens signed with the old
+  secret no longer verify. Re-login to mint fresh tokens, or accept both
+  secrets during overlap.
+- **Session adapter loses logins on restart**: the session store is
+  in-memory by default. Point `session` at a shared store for
+  multi-instance deployments.
+- **OIDC login loops**: the provider redirect URL and the configured
+  callback disagree. Align the IdP app registration with the deployed
+  callback URL.
+
+## See also
+
+- [Authorization and Permissions](./authz-permissions/) for allow/deny checks
+- [Password Hashing](./password-hashing/) for credential storage
+- [Crypto](./crypto-secrets/) for encryption and named secrets
+- [Config Reference](../reference/config-reference/) for the env scheme

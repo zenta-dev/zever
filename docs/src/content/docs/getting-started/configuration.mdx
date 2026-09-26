@@ -3,28 +3,34 @@ title: Configuration
 description: Layered typed config with defaults, strict files, best-effort env, and secret redaction.
 ---
 
-zever configuration layers cleanly: built-in defaults, then a config file, then environment variables. Later layers win:
+## Purpose + When to use
+
+This page explains the only config system in zever: typed defaults, then a strict YAML or JSON file, then best-effort environment overrides. Read it before writing your first `zever.yaml`, before debugging a load failure, and before printing config anywhere near logs.
+
+Concrete payoff: local tests run with zero setup via `Default()`, deploys fail fast on typos via strict files, and stray process env never breaks startup.
+
+## Prerequisites and mental model
+
+Layering is fixed and later layers win:
 
 ```text
 defaults < file < env
 ```
 
-`config.Default()` always returns a working setup. `config.Load(path)` overlays a file and the process environment on top.
+`config.Default()` always returns a working setup with zero-infra adapters (memory, local, sqlite, log, noop). `config.Load(path)` overlays a file and the process environment on top. Validation runs at load: an unknown adapter or unparsable value fails here, not mid-request.
 
-## Defaults: zero infrastructure
+The one deliberate asymmetry:
 
-`Default()` picks the zero-infra adapter for every service — memory, local, sqlite, log, noop — so tests run with no manual setup:
+| Source | Unknown input | Rationale |
+|---|---|---|
+| File | error | typos fail fast at deploy time |
+| Env | silently ignored | stray process env (`PATH`, `HOME`, `AUTH_TOKEN`) must not break startup |
 
-```go
-cfg := config.Default()
-c := container.New(cfg)
-```
+Only a value that fails to parse for a resolved field returns `InvalidOptionsError`, for example `DB_MAXCONNS=abc`.
 
-The only exception is secrets the adapter `Validate` requires. The dev crypto key is deterministic and public: convenient for tests, and it must never ship to production.
+## Config
 
-## Files: strict YAML or JSON
-
-`Load(path)` decodes YAML or JSON strictly. Unknown services and unknown fields are errors — typos fail fast instead of silently falling back:
+File form is strict snake_case YAML (or JSON). Env form carries no prefix: `<SERVICE>_<FIELD>`, uppercased.
 
 ```yaml
 # zever.yaml
@@ -33,16 +39,31 @@ db:
   options:
     dsn: postgres://app:secret@db:5432/app
     max_conns: 20
+    min_conns: 2
+cache:
+  adapter: redis
+  options:
+    addr: redis:6379
 log:
   adapter: slog
+auth:
+  adapter: jwt
+  options:
+    jwt:
+      secret: prod-secret-at-least-32-bytes-long
+      issuer: myapp
 ```
 
-```go
-cfg, err := config.Load("zever.yaml")
-if err != nil {
-    log.Fatal(err)
-}
+```sh
+DB_ADAPTER=postgres
+DB_MAXCONNS=20
+DB_MAXCONNLIFETIME=5m
+CACHE_ADAPTER=redis
+AUTH_JWT_SECRET='prod-secret-at-least-32-bytes-long'
+RATELIMIT_RATE=100
 ```
+
+Notes with real keys: field matching is case-insensitive with `_` ignored (`MAX_RETRIES` matches `MaxRetries`). One nesting level splits at the first `_`, so `AUTH_JWT_SECRET` sets `Options.JWT.Secret`. Durations accept `"5s"` style strings in env only; files store `time.Duration` as integer nanoseconds (see `config/schema/zever.schema.json`). `_ADAPTER` switches the service adapter (`DB_ADAPTER=postgres`).
 
 Discovery rules:
 
@@ -53,67 +74,143 @@ Discovery rules:
 | Unsupported extension | fails with `ErrUnsupportedFormat` (only `.yaml`, `.yml`, `.json`) |
 | Null / empty block | decodes to zero values |
 
-File keys are strict snake_case — old flat spellings from before the
-naming pass are rejected as unknown fields, not silently accepted:
+File keys are strict snake_case. Old flat spellings from before the naming pass are rejected as unknown fields, not silently accepted:
 
 | Old key | New key |
 |---|---|
 | `apikey` | `api_key` |
+| `baseurl` | `base_url` |
 | `maxconns` / `minconns` | `max_conns` / `min_conns` |
+| `maxconnlifetime` / `maxconnidletime` | `max_conn_lifetime` / `max_conn_idle_time` |
 | `secretkey` / `webhooksecret` | `secret_key` / `webhook_secret` |
+| `poolsize` / `pooltimeout` | `pool_size` / `pool_timeout` |
 
-If a file key you expect to work is rejected as unknown, check whether it
-predates this rename — see `CHANGELOG.md` for the full list of renamed
-fields per service.
+Env names are unaffected: env matching ignores `_` and case, so `DB_MAXCONNS` keeps working. For editor autocomplete and inline validation, see the JSON Schema setup in `config/schema/` (path as text: `config/schema/zever.schema.json`).
 
-For editor autocomplete and inline validation of `zever.yaml`/`.yml`/`.json`,
-see the JSON Schema and setup instructions in
-[`config/schema/`](https://github.com/zenta-dev/zever/tree/main/config/schema).
+## Resolve via container
 
-## Environment: no prefix, best-effort
-
-Variables carry no prefix — just `<SERVICE>_<FIELD>`, uppercased:
-
-```sh
-DB_ADAPTER=postgres
-DB_MAXCONNS=20
-DB_MAXCONNLIFETIME=5m
-AUTH_JWT_SECRET=prod-secret-at-least-32-bytes-long
-RATELIMIT_RATE=100
-```
-
-Field matching is case-insensitive with `_` ignored (`MAX_RETRIES` matches `MaxRetries`). One nesting level splits at the first `_`, so `AUTH_JWT_SECRET` sets `Options.JWT.Secret`. Durations accept `"5s"` style strings, and `_ADAPTER` switches the service adapter.
-
-The asymmetry is deliberate:
-
-| Source | Unknown input | Rationale |
-|---|---|---|
-| File | error | typos fail fast at deploy time |
-| Env | silently ignored | stray process env (`PATH`, `HOME`, `AUTH_TOKEN`) must not break startup |
-
-Only a value that fails to *parse* for a resolved field returns `InvalidOptionsError` — for example `DB_MAXCONNS=abc`.
-
-## Never log raw options
-
-Raw option maps may hold secrets as plain strings. Never log them directly. Use `RedactedServices` (built on `Redact`) as the sole display path:
+Config means nothing until the container resolves it. Build one container per process from the loaded value:
 
 ```go
-fmt.Println(config.RedactedServices(cfg))
-```
+package main
 
-Error text names services and fields only — values are never echoed. The CLI follows the same rule: `zever config show` prints the resolved, redacted config, and `migrate` screens mask the DSN as `--dsn ***`.
+import (
+	"log"
 
-## Putting it together
+	"github.com/zenta-dev/zever/config"
+	"github.com/zenta-dev/zever/container"
+)
 
-```go
-// Development: zero-infra defaults, no file needed.
-cfg := config.Default()
+func main() {
+	cfg, err := config.Load("zever.yaml")
+	if err != nil {
+		log.Fatal(err)
+	}
+	c := container.New(cfg)
+	defer c.Close(nil)
 
-// Production: explicit file + env overrides, validated on load.
-cfg, err := config.Load("/etc/myapp/zever.yaml")
-if err != nil {
-    return err
+	db, err := c.DB()
+	if err != nil {
+		log.Fatal(err)
+	}
+	_ = db
 }
 ```
 
-Supply real secrets via file or environment, and keep `Default()` where it belongs: local dev and tests.
+`container.New(nil)` is valid for tests that never load a file. Each accessor (`c.DB()`, `c.Cache()`, `c.Queue()`) resolves lazily on first use and retries on error because the cache clears on failure.
+
+## Runnable example
+
+Load layered config, resolve two services, and print the redacted view:
+
+```go
+package main
+
+import (
+	"fmt"
+	"log"
+
+	"github.com/zenta-dev/zever/config"
+	"github.com/zenta-dev/zever/container"
+)
+
+func main() {
+	// Development: zero-infra defaults, no file needed.
+	dev := config.Default()
+	fmt.Println(config.RedactedServices(dev))
+
+	// Production: explicit file + env overrides, validated on load.
+	cfg, err := config.Load("zever.yaml")
+	if err != nil {
+		log.Fatal(err)
+	}
+	c := container.New(cfg)
+	db, err := c.DB()
+	if err != nil {
+		log.Fatal(err)
+	}
+	cache, err := c.Cache()
+	if err != nil {
+		log.Fatal(err)
+	}
+	fmt.Println("ready:", db != nil && cache != nil)
+}
+```
+
+```sh
+DB_ADAPTER=sqlite ./myapp
+DB_ADAPTER=postgres DB_DSN='postgres://app:${DB_PASSWORD}@db:5432/app' ./myapp
+```
+
+Expected output or behavior:
+
+```text
+db[sqlite] cache[memory] log[slog] ...
+ready: true
+```
+
+The first line is the redacted summary (adapters named, secrets masked). The second line confirms both services resolved under layered config. Raw option maps never print: error text names services and fields only, and `zever config show` prints the resolved, redacted config with the DSN masked as `--dsn ***`.
+
+## Variants
+
+| Service | Adapters | Default pick |
+|---|---|---|
+| `db` | `sqlite`, `postgres` | `sqlite` |
+| `cache` | `memory`, `redis` | `memory` |
+| `queue` | `memory`, `redis` | `memory` |
+| `auth` | `jwt`, `session`, `oidc` | `jwt` |
+| `session` | `memory`, `redis` | `memory` |
+| `storage` | `local`, `s3`, `r2` | `local` |
+| `log` | `noop`, `zerolog`, `slog`, `pretty` | per scaffold |
+| `observability` | `noop`, `stdout`, `otlp` | `stdout` |
+| `payment` / `billing` | `stub`, `stripe`, `paddle` | `stub` |
+| `secrets` | `env` | `env` with `ZEVER` prefix |
+
+Defaults pick the zero-infra adapter per service. Two exceptions need keys: `ai` has no keyless backend (defaults to `anthropic`, requires an API key via file or env), and `mailer` defaults to `log` with a dummy localhost host and port because `Validate` requires them. The `secrets` env adapter requires a non-empty prefix (default `ZEVER`, so `ZEVER_FOO` maps to secret `FOO`). The full table lives in `config/README.md` (over thirty services from `ai` to `workflow`).
+
+## Production notes
+
+Supply real secrets via file or environment and keep `Default()` where it belongs: local dev and tests. The dev crypto key is deterministic and public; `AUTH_JWT_SECRET` and provider keys must come from env or a mounted file in prod.
+
+Fail-closed behavior: unknown services and unknown fields in files are errors (typos fail fast); env ignores unknown variables but errors on unparsable resolved values. Store durations as integer nanoseconds in files; `"5s"` strings work only in env. Never log raw option maps: `RedactedServices` (built on `Redact`) is the sole display path, and `Close` error values name the service only. Close with a timeout parent so buffered spans flush via `Shutdown(ctx)` probing.
+
+## Troubleshooting
+
+| Symptom | Cause | Fix |
+|---|---|---|
+| `Load` fails with unknown field `maxconns` | Pre-rename flat spelling in file | Rename to `max_conns`; check `CHANGELOG.md` for the full rename list |
+| `Load("")` ignores your file | File named outside the probe list or in another directory | Name it `zever.yaml`, `zever.yml`, or `zever.json` in the working dir, or pass an explicit path |
+| `DB_MAXCONNS=abc` returns `InvalidOptionsError` | Value fails to parse for a resolved field | Set an integer (`DB_MAXCONNS=20`); unset vars are ignored, bad values are not |
+| `AUTH_TOKEN` seems to do nothing | Best-effort env: head `AUTH` is known but remainder matches no field, so it is ignored | Set the real field (`AUTH_JWT_SECRET`) instead of a lookalike |
+| Secret appears in logs | Raw option map printed directly | Replace with `fmt.Println(config.RedactedServices(cfg))` and audit error paths |
+| `ErrUnsupportedFormat` on load | Config file uses an extension outside `.yaml`/`.yml`/`.json` | Rename to a supported extension; TOML copy in `config/schema/` is for editor tooling only |
+
+## See also
+
+- `./installation.mdx` for toolchain setup and first build
+- `./directory-structure.mdx` for where `config/` sits in the module
+- `./deployment.mdx` for prod files, env secrets, and shutdown
+- `../architecture/container/` for how loaded config becomes live services
+- `../architecture/providers-adapters/` for the adapter matrix and swap rules
+- `../dsl/syntax-zen/` for schema-side defaults vs runtime config
+- Package guides as text: `config/README.md`, `container/README.md`, `config/schema/zever.schema.json`

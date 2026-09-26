@@ -4,17 +4,26 @@ description: LLM generation, streaming, and embeddings behind one interface.
 ---
 
 Every LLM provider has its own SDK, its own message shape, its own streaming
-protocol — and if you wire a service directly to Anthropic's or OpenAI's client,
-switching providers later (or just adding a fallback) means touching business
-logic. `ai.AI` gives you one facade — `Generate`, `Stream`, `Embed` — with typed
-messages, tools, and usage accounting, so the provider is a config value, not an
-import.
+protocol - and if you wire a service directly to one vendor client, switching
+providers later (or just adding a fallback) means touching business logic.
+`ai.AI` gives you one facade - `Generate`, `Stream`, `Embed` - with typed
+messages, tools, and usage accounting, so the provider is a config value,
+not an import.
 
-Pick `anthropic` (the default) or `openai`/`gemini` based on which models you
-actually want to call; there's no meaningful "better" adapter here, only "which
-provider's models." What matters more is that switching between them later, or
-routing different services at different providers, costs a config change, never
-a rewrite of the code that calls `Generate`.
+## Purpose and when to use
+
+Reach for `ai` when your app calls an LLM for generation, streams tokens to
+a client, or produces embeddings for `vectorstore`. Pick `anthropic`,
+`openai`, or `gemini` based on which models you actually want to call; there
+is no meaningful "better" adapter here, only "which provider models."
+Use `ollama` for self-hosted inference behind your own endpoint. Switching
+between them later costs a config change, never a rewrite of the code that
+calls `Generate`.
+
+Unlike most services, `ai` has no zero-infra default. Every backend needs
+credentials or a local daemon, so `config.Default()` selects `anthropic`
+and `Validate` requires an API key (or a `base_url` plus key). Tests that
+touch `ai` must supply a key or point at a fake endpoint.
 
 ## Config
 
@@ -29,46 +38,128 @@ ai:
 
 ```sh
 AI_ADAPTER=openai
-AI_APIKEY=sk-...
+AI_API_KEY=sk-...
 AI_MODEL=gpt-5
+AI_TIMEOUT=30s
+AI_BASE_URL=https://proxy.internal/v1
 ```
 
-`BaseURL` is optional — set it to point at a proxy or self-hosted gateway — but it
-must resolve to an `https` URL; anything else fails validation before a single
-request goes out.
+`base_url` is optional - set it to point at a proxy or self-hosted gateway.
+It must be a valid URL with scheme and host, and the `https` scheme is
+required; anything else fails validation before a single request goes out.
+`timeout` bounds each request; a negative value is rejected.
 
 ## Resolve
 
 ```go
+import (
+	"github.com/zenta-dev/zever/config"
+	"github.com/zenta-dev/zever/container"
+)
+
 c := container.New(config.Default())
-ai, err := c.AI()
+backend, err := c.AI()
 if err != nil {
-	// handle
+	// handle: missing key, bad base_url, unknown adapter
 }
-_ = ai
+_ = backend
 ```
 
-`AI()` resolves lazily and caches the result; on error the cache clears so the
-next call retries.
+`AI()` resolves lazily and caches the result; on error the cache clears so
+the next call retries. `Close(ctx)` shuts down only services already
+resolved, in dependency order.
+
+## Runnable example
+
+```go
+package main
+
+import (
+	"context"
+	"fmt"
+
+	"github.com/zenta-dev/zever/ai"
+	"github.com/zenta-dev/zever/config"
+	"github.com/zenta-dev/zever/container"
+)
+
+func main() {
+	c := container.New(config.Default())
+	defer c.Close(context.Background())
+
+	backend, err := c.AI()
+	if err != nil {
+		fmt.Println("resolve error:", err)
+		return
+	}
+
+	out, err := backend.Generate(context.Background(), "", []ai.Message{
+		{Role: "user", Content: "Say hi in five words."},
+	}, ai.GenerateOptions{})
+	if err != nil {
+		fmt.Println("generate error:", err)
+		return
+	}
+	fmt.Println("text:", out.Text)
+	fmt.Println("tokens:", out.Usage.TotalTokens)
+}
+
+// Expected output (text varies by model):
+// text: Hello, glad you are here.
+// tokens: 24
+```
+
+For streaming, call `Stream` and range over the returned channel until the
+producer closes it; the channel is bounded, so a stalled consumer cannot
+leak a goroutine on an unbounded buffer.
 
 ## Adapters
 
 | Adapter | Package | Notes |
 |---|---|---|
-| `anthropic` | `ai/anthropic` | Default |
-| `openai` | `ai/openai` | |
-| `gemini` | `ai/gemini` | |
-| `ollama` | `ai/ollama` | Self-hosted via `Addr` |
+| `anthropic` | `ai/anthropic` | Default selection; needs `api_key` |
+| `openai` | `ai/openai` | Needs `api_key` |
+| `gemini` | `ai/gemini` | Needs `api_key` |
+| `ollama` | `ai/ollama` | Self-hosted; `BaseURL` bridges to `Addr` |
 
-## The gotcha: features fail closed, not silently
+Bridge note: `ollama.New` takes `ollama.Options` with an `Addr` field, not
+`ai.Options`. The container bridges the two: when `adapter: ollama`, the
+shared `ai.Options.BaseURL` value is passed through as the Ollama server
+address (`Addr`), with `model` and `timeout` carried over. You only ever
+write `ai:` config; you never construct `ollama.Options` by hand.
 
-Not every provider supports every capability the same way — a tool-call shape or
-streaming mode one adapter handles natively might not exist on another. `ai` never
-papers over that gap by silently downgrading a request: an unsupported feature
-returns `ErrNotSupported` so you find out at the call site, in development,
-instead of discovering a quietly-dropped tool call in production. Streams are
-backed by bounded channels the producer closes, so a stalled consumer can't leak
-a goroutine waiting on an unbounded buffer.
+## Production notes
 
-`APIKey` never appears in logs or error values — route any debug output through
-`config.RedactedServices` rather than printing `Options` directly.
+- Store keys in file config or env (`AI_API_KEY`), never in code. Route any
+  debug output through `config.RedactedServices` rather than printing
+  `Options` directly; `APIKey` never appears in logs or error values.
+- Set `timeout` explicitly per deploy; the zero value falls back to the
+  adapter default, which may exceed your handler deadline.
+- Features fail closed, not silently: an unsupported capability on the
+  selected provider returns `ErrNotSupported` at the call site instead of
+  quietly dropping a tool call or a stream flag.
+- Pin `model` in config so a provider-side default change does not silently
+  move you to a new model with different pricing.
+
+## Troubleshooting
+
+**`AI()` fails with an invalid-options error at startup.**
+The key is missing or `base_url` failed validation. Check `AI_API_KEY` is
+set and `AI_BASE_URL` (if used) includes the `https` scheme and a host.
+
+**`Generate` returns `ErrNotSupported` for a call that worked on another adapter.**
+The selected provider has no native shape for that feature (tool-call form,
+streaming mode). Either gate the feature per adapter or switch adapters;
+the facade never downgrades silently.
+
+**Token usage looks wrong after switching providers.**
+Usage accounting follows each provider response shape, so field mappings
+differ. Compare `Usage` per adapter in a test before relying on totals for
+billing.
+
+## See also
+
+- [Vector Store](vectorstore/) for storing `Embed` output and cosine search
+- [Secrets](secrets/) for holding provider keys outside YAML
+- [Container](../../architecture/container/) for lazy resolve and close order
+- [Adapters Matrix](../../reference/adapters-matrix/) for the full table

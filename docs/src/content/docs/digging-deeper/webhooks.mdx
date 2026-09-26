@@ -3,59 +3,160 @@ title: Webhooks
 description: Signed outbound delivery over HTTP, queue fan-out, or SQLite outbox.
 ---
 
-Delivering a webhook sounds like "POST some JSON somewhere," until you need
-retries, per-target secrets, and a way to prove to the receiver that the
-payload actually came from you and hasn't been replayed. `webhook.Webhook`
-handles registration, unregistration, and signed delivery — with the signature
-scheme (`t=<timestamp>,v1=<hex-hmac>` over `<timestamp>.<payload>`, verified
-with `hmac.Equal` and a timestamp window) built in rather than something every
-target implementation reinvents.
+## Purpose
 
-`http` (the default) posts directly — simplest option, no durability if your
-process dies mid-delivery. `queue` routes delivery through the job system so
-retries and backoff come from infrastructure you already have. `sqlite` adds a
-durable outbox on top, so an in-flight delivery survives a crash instead of
-just vanishing.
+Use `webhook` for signed outbound event delivery with per-target secrets.
+The interface covers `Register`, `Unregister`, and `Deliver` fan-out,
+with the signature scheme built in: `t=<timestamp>,v1=<hex-hmac>` over
+`<timestamp>.<payload>`, verified with `hmac.Equal` inside a timestamp
+window. There is intentionally no top-level API key in `Options`; every
+target gets its own secret at `Register` time so one compromised secret
+never exposes every integration.
+
+## When to use
+
+Pick `http` (the default) for direct POST delivery with no durability:
+simplest shape, but a crash mid-delivery loses the event. Pick `queue`
+when delivery should ride the job system for retries and backoff. Pick
+`sqlite` when in-flight delivery must survive a crash via a durable
+outbox (`dsn`, empty means a private in-memory-style database).
+
+The bookings example sets `webhook.adapter: queue` with `timeout: 10s`,
+`max_retries: 3`, `queue_adapter: memory`, `queue_opts` (visibility 30s
+which must exceed timeout, poll 1s, buffer 100), and
+`dead_letter_topic: webhook.dead`. Demo targets come from the
+environment only (`BOOKINGS_WEBHOOK_CREATED_TARGET` plus
+`BOOKINGS_WEBHOOK_CREATED_SECRET`, and the `CANCELLED` pair);
+`RegisterDemoTargets` skips pairs with an empty target, so delivery is
+quietly skipped when unconfigured and the worker runs without them.
 
 ## Config
 
+YAML durations are integer nanoseconds (`"5s"` style works via env only):
+
 ```yaml
 webhook:
-  adapter: http
+  adapter: queue
+  options:
+    timeout: 10000000000 # 10s
+    max_retries: 3
+    queue_adapter: memory
+    queue_opts:
+      visibility_timeout: 30000000000 # 30s, must exceed timeout
+      poll_timeout: 1000000000 # 1s
+      buffer: 100
+    dead_letter_topic: webhook.dead
+    replay_tolerance: 300000000000 # 5m default
 ```
+
+Env (no prefix, `<SERVICE>_<FIELD>`; secrets stay out of the file):
 
 ```sh
 WEBHOOK_ADAPTER=queue
+WEBHOOK_MAXRETRIES=3
+WEBHOOK_REPLAYTOLERANCE=5m
+BOOKINGS_WEBHOOK_CREATED_TARGET=https://partner.example.com/hooks
+BOOKINGS_WEBHOOK_CREATED_SECRET=per-target-secret
 ```
 
-## Resolve
+`Validate` rejects negative `timeout` / `max_retries` /
+`replay_tolerance`. Queue-specific rules (adapter required, visibility
+exceeding timeout) are enforced by the queue adapter, not core.
+
+## Resolve via container
 
 ```go
 c := container.New(config.Default())
 wh, err := c.Webhook()
 if err != nil {
-	// handle
+    // handle
 }
 _ = wh
 ```
+
+Resolution is lazy and cached per container, retrying after errors.
+
+## Runnable example
+
+```go
+package main
+
+import (
+    "context"
+    "fmt"
+
+    "github.com/zenta-dev/zever/config"
+    "github.com/zenta-dev/zever/container"
+)
+
+func main() {
+    c := container.New(config.Default())
+    wh, err := c.Webhook()
+    if err != nil {
+        panic(err)
+    }
+    defer wh.Close()
+
+    ctx := context.Background()
+    target := "" // empty means skip, like RegisterDemoTargets
+    if target == "" {
+        fmt.Println("delivery skipped: no target configured")
+        return
+    }
+    _ = wh.Register(ctx, "booking.created", target, "secret")
+    fmt.Println("delivered")
+}
+```
+
+Expected output (unconfigured worker, delivery skipped by design):
+
+```text
+delivery skipped: no target configured
+```
+
+With a target set and an `http` adapter, `Deliver` POSTs the signed
+payload to every subscriber of the event.
 
 ## Adapters
 
 | Adapter | Package | Notes |
 |---|---|---|
-| `http` | `webhook/http` | Default; direct POST |
-| `queue` | `webhook/queue` | Retryable via jobs |
-| `sqlite` | `webhook/sqlite` | Durable outbox |
+| `http` | `webhook/http` | Default; direct POST, no durability |
+| `queue` | `webhook/queue` | Retryable via the job system |
+| `sqlite` | `webhook/sqlite` | Durable outbox across crashes |
 
-## The gotcha: there's no shared API key, by design, and replay defense is a timestamp window
+## Production notes
 
-Notice `Options` has no top-level `APIKey` — that's deliberate. Every target
-gets its own secret at `Register` time, so compromising one integration's
-secret never exposes every other target's signature. Verifiers must check both
-halves: the HMAC itself (constant-time, via `hmac.Equal`, never `==`) *and*
-that the embedded timestamp falls inside `ReplayTolerance` (default 5 minutes)
-— checking the HMAC alone doesn't stop someone from replaying a
-still-validly-signed request from an hour ago. `AllowPrivateTargets` should
-stay `false` in production; flipping it opens delivery to internal-network
-URLs, which is exactly the kind of SSRF surface you don't want a webhook
-registration form to hand out.
+- Close semantics: `Webhook.Close() error` with no context
+  (instant-close shape). Container closes only resolved services and
+  joins errors via `errors.Join`. The bookings README notes the queue
+  variant needs its queue reference wired before doctor goes green.
+- Multi-instance behavior: `http` delivery from N replicas means N
+  independent retry loops; prefer `queue` / `sqlite` so retries funnel
+  through shared infrastructure with a dead-letter topic for exhausted
+  deliveries (`webhook.dead` in the demo).
+- Redaction: per-target secrets are passed to `Register` and must never
+  be logged; adapters must never log them. Never log raw option maps;
+  use `config.RedactedServices`. Verifiers must check both the HMAC
+  (constant-time) and the timestamp inside `replay_tolerance` (default
+  5m). Keep `allow_private_targets` false in production to avoid SSRF
+  into internal URLs.
+
+## Troubleshooting
+
+1. Webhook silently does nothing: the target env var is empty, so
+   registration was skipped by design. Set
+   `BOOKINGS_WEBHOOK_CREATED_TARGET` (and secret) and restart the
+   worker; this is not an error path.
+2. Signature verifies but replays succeed: the verifier checks the HMAC
+   but not the timestamp window. Enforce `replay_tolerance` on the
+   embedded `t=` value so hour-old payloads are rejected.
+3. Queue adapter open fails: `queue_adapter` is unset or
+   `visibility_timeout` does not exceed `timeout`. Mirror the bookings
+   `zever.yaml` shape (memory adapter, 30s visibility over 10s timeout).
+
+## See also
+
+- [Queue](./queue.mdx) - retry and backoff under delivery
+- [Locks and Idempotency](./lock-idempotency.mdx) - dedupe for retried events
+- [Scheduler and Jobs](./scheduler-jobs.mdx) - worker wiring

@@ -3,19 +3,31 @@ title: Rate Limiting
 description: Token-bucket limits in memory or shared over Redis.
 ---
 
-An endpoint with no rate limit is one abusive client away from taking down
-everyone else's experience. `ratelimit.Limiter` gives you a token-bucket
-`Allow` check per key that returns a `Decision` — `Allowed`, `RetryAfter`,
-`Remaining` — and stays deliberately unopinionated about HTTP: mapping a denial
-to a `429` and choosing fail-open-vs-fail-closed on limiter error is on you.
+## Purpose
 
-`memory` (the default) is fine while you run one instance — a token bucket that
-only your process can see is still a real limit. The moment you run more than
-one replica behind a load balancer, a per-instance bucket means your effective
-limit is `limit × replica count`, which is rarely what you meant; switch to
-`redis` so every replica shares the same counters.
+Use `ratelimit` to bound how fast a single key (user, IP, API token) can
+consume an endpoint. `Limiter.Allow` implements a token bucket and returns
+a `Decision` with `Allowed`, `RetryAfter`, and `Remaining`. The package
+stays unopinionated about HTTP: mapping a denial to `429` and choosing
+fail-open vs fail-closed on limiter error is the caller's job.
+
+## When to use
+
+Stay on `memory` (the default) for a single instance: a process-local
+bucket is a real limit and needs no server. Switch to `redis` the moment
+more than one replica serves traffic, because per-instance buckets
+multiply the effective limit (`limit x replica count`). The `rate` field
+(refill per second) and `burst` (max bucket size) are both required and
+must be over zero and finite.
+
+The booking request path in the bookings example shows the pattern:
+`handleCreateBooking` calls `a.RateLimit.Allow(ctx, "book:"+guest, 1)`
+first, returns `429` when `!dec.Allowed`, and returns `500` when the
+limiter itself errors. The demo config sets `rate: 10`, `burst: 20`.
 
 ## Config
+
+YAML durations are integer nanoseconds (`"5s"` style works via env only):
 
 ```yaml
 ratelimit:
@@ -23,38 +35,121 @@ ratelimit:
   options:
     rate: 10
     burst: 20
+    idle_ttl: 600000000000 # 10m default
+    sweep_interval: 60000000000 # 1m default
 ```
+
+Redis variant:
+
+```yaml
+ratelimit:
+  adapter: redis
+  options:
+    rate: 100
+    burst: 200
+    redis:
+      addr: 127.0.0.1:6379
+      prefix: rl:
+```
+
+Env (no prefix, `<SERVICE>_<FIELD>`):
 
 ```sh
 RATELIMIT_ADAPTER=redis
 RATELIMIT_RATE=100
+RATELIMIT_BURST=200
 ```
 
-## Resolve
+`Validate` rejects non-positive or non-finite `rate` / `burst`, negative
+`idle_ttl` / `sweep_interval`, and bad Redis `addr` / `prefix`. Zero
+`idle_ttl` / `sweep_interval` select adapter defaults (10m / 1m).
+
+## Resolve via container
 
 ```go
 c := container.New(config.Default())
 rl, err := c.RateLimit()
 if err != nil {
-	// handle
+    // handle
 }
 _ = rl
+```
+
+`Ratelimit()` is an alias. Resolution is lazy and cached; on error the
+cache clears so the next call retries.
+
+## Runnable example
+
+```go
+package main
+
+import (
+    "context"
+    "fmt"
+
+    "github.com/zenta-dev/zever/config"
+    "github.com/zenta-dev/zever/container"
+)
+
+func main() {
+    c := container.New(config.Default())
+    rl, err := c.RateLimit()
+    if err != nil {
+        panic(err)
+    }
+    defer rl.Close()
+
+    ctx := context.Background()
+    for i := 0; i < 3; i++ {
+        dec, err := rl.Allow(ctx, "book:guest-1", 1)
+        fmt.Println(dec.Allowed, dec.Remaining, err)
+    }
+}
+```
+
+Expected output (default zero-infra config is memory-backed; exact
+`Remaining` depends on configured rate/burst):
+
+```text
+true 19 <nil>
+true 18 <nil>
+true 17 <nil>
 ```
 
 ## Adapters
 
 | Adapter | Package | Notes |
 |---|---|---|
-| `memory` | `ratelimit/memory` | Default; process-local |
-| `redis` | `ratelimit/redis` | Shared counters |
+| `memory` | `ratelimit/memory` | Default; process-local bucket |
+| `redis` | `ratelimit/redis` | Shared counters across replicas |
 
-## The gotcha: choose fail-open vs. fail-closed deliberately, per path
+## Production notes
 
-`ratelimit` doesn't decide this for you — a limiter error on a login endpoint
-should probably fail closed (deny) since that's an auth-adjacent path where
-"just let it through" is the riskier default; a limiter error on a
-non-critical read path can reasonably fail open so a Redis blip doesn't take
-your whole API down. Keys are capped at 256 bytes with no control bytes
-(`InvalidKeyError` reports only the length, since keys — an IP, a user ID — can
-be PII), and charges cap at the bucket's burst size, so a single oversized
-request can't silently drain more budget than the bucket actually holds.
+- Close semantics: `Limiter.Close() error` with no context (instant-close
+  shape). Container closes only resolved services and joins errors via
+  `errors.Join`; panics become `*ClosePanicError`.
+- Multi-instance behavior: `memory` buckets do not coordinate, so each
+  replica enforces its own copy of the limit. `redis` shares counters
+  under `redis.prefix`; give each environment its own prefix so staging
+  traffic never consumes production budget.
+- Redaction: keys can be PII (IP, user ID), and `InvalidKeyError` reports
+  only length for that reason. Never log raw option maps; use
+  `config.RedactedServices`. Charges cap at burst size, so one oversized
+  request cannot drain more than the bucket holds.
+
+## Troubleshooting
+
+1. Effective limit looks multiplied: replicas run `memory` buckets. Move
+   to `redis` or divide the per-instance rate by replica count as a stop
+   gap while the shared store lands.
+2. `rate must be > 0 and finite`: `rate`/`burst` are required; zero values
+   from an empty options block fail `Validate`. Set both explicitly, as
+   the bookings `zever.yaml` does (`rate: 10`, `burst: 20`).
+3. `InvalidKeyError` on `Allow`: keys cap at 256 bytes (`MaxKeyLen`) with
+   no control bytes. Hash or truncate long composite keys before calling.
+
+## See also
+
+- [Locks and Idempotency](./lock-idempotency.mdx) - booking-path guards
+- [Queue](./queue.mdx) - shedding load behind a queue
+- [Observability](./observability.mdx) - counting denials as metrics

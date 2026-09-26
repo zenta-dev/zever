@@ -3,59 +3,153 @@ title: Tenants
 description: Resolve which tenant a request belongs to, from single-tenant to header-based SaaS.
 ---
 
-A single-tenant app and a multi-tenant SaaS shouldn't need different code for
-"which customer is this request for" — they need different `tenant` adapters.
-`tenant` resolves a tenant ID from request metadata and scopes a context to
-it; it's deliberately not an auth gate and enforces nothing on its own — it
-answers "who owns this data," not "is this caller allowed to see it."
+## Purpose
 
-Start with `single` (the default): every request belongs to one hardcoded
-tenant, which is exactly right until you actually have more than one customer.
-Switch to `header` once you do — it reads the tenant ID from a configured
-request header, which is the common shape for SaaS APIs where a gateway or
-client sets that header per call.
+Use `tenant` to answer "which customer owns this request" without
+sprinkling tenant parsing through every handler. `Resolve` maps request
+metadata to a tenant ID, and `Scoped` carries that ID on the context.
+The package is deliberately not an auth gate: it resolves ownership, it
+does not decide access. Pair it with `permission` for the allow/deny
+half.
+
+## When to use
+
+Start with `single` (the default): every request belongs to one
+hardcoded ID (`id`, default `"default"`). Stay there until a second
+customer actually exists. Switch to `header` for multi-tenant SaaS APIs
+where a gateway or client sets a per-call header (default
+`X-Tenant-ID` via `DefaultHeader`). The optional `subdomain_regex`
+matches a tenant out of the host when header routing does not fit, and
+is capped at 500 chars (`MaxRegexLength`) so a bad pattern cannot become
+a ReDoS vector.
+
+The bookings example runs `tenant.adapter: single` and resolves per
+request in `tenantID`: it passes `X-Tenant` through as metadata and
+returns the fixed ID, tagging bookings, queue headers, and responses
+with that tenant.
 
 ## Config
 
 ```yaml
 tenant:
   adapter: single
+  options:
+    id: default
 ```
+
+Header variant:
+
+```yaml
+tenant:
+  adapter: header
+  options:
+    header: X-Tenant-ID
+    subdomain_regex: ^(?P<tenant>[a-z0-9-]+)\.example\.com$
+```
+
+Env (no prefix, `<SERVICE>_<FIELD>`):
 
 ```sh
 TENANT_ADAPTER=header
+TENANT_HEADER=X-Tenant-ID
+TENANT_SUBDOMAINREGEX=^([a-z0-9-]+)\.example\.com$
+TENANT_ID=default
 ```
 
-`header`'s `Header` and `SubdomainRegex` options come with defaults
-(`DefaultHeader`); a configured regex is capped at `MaxRegexLength` (500) so a
-malicious or malformed pattern can't become a ReDoS vector.
+`Validate` rejects an invalid `header` key (printable ASCII, no
+whitespace, colon, or DEL) and any `subdomain_regex` over 500 chars.
+Empty `header` means the adapter default applies.
 
-## Resolve
+## Resolve via container
 
 ```go
 c := container.New(config.Default())
 t, err := c.Tenant()
 if err != nil {
-	// handle
+    // handle
 }
 _ = t
 ```
+
+Resolution is lazy and cached per container, retrying after errors.
+
+## Runnable example
+
+```go
+package main
+
+import (
+    "context"
+    "fmt"
+
+    "github.com/zenta-dev/zever/config"
+    "github.com/zenta-dev/zever/container"
+)
+
+func main() {
+    c := container.New(config.Default())
+    t, err := c.Tenant()
+    if err != nil {
+        panic(err)
+    }
+    defer t.Close()
+
+    ctx := context.Background()
+    id, err := t.Resolve(ctx, map[string]string{"tenant": ""})
+    fmt.Println(id, err)
+    scoped, err := t.Scoped(ctx, id)
+    fmt.Println(scoped != nil, err)
+}
+```
+
+Expected output (single adapter with default ID):
+
+```text
+default <nil>
+true <nil>
+```
+
+On `header` with `X-Tenant-ID: acme` metadata, `Resolve` returns
+`acme` instead.
 
 ## Adapters
 
 | Adapter | Package | Notes |
 |---|---|---|
-| `single` | `tenant/single` | Default; one tenant, constant-time lookup |
-| `header` | `tenant/header` | Multi-tenant via request header |
+| `single` | `tenant/single` | Default; one fixed ID, constant-time lookup |
+| `header` | `tenant/header` | Multi-tenant via request header (+ optional subdomain regex) |
 
-## Resolve once, propagate everywhere, fail closed on unknown
+## Production notes
 
-Resolve the tenant at the middleware edge and carry it through the rest of the
-request via `tenant/context.go`'s helpers — don't re-derive it deeper in the
-call stack, where it's easy to accidentally trust an unvalidated value instead.
-An unrecognized tenant must be rejected outright, never silently mapped to a
-default tenant — that's the difference between a 404 and a cross-tenant data
-leak. Tenant IDs aren't secrets, but they're still not something to log
-carelessly alongside other request data. If you're on `header`, document the
-header name and its validation rule somewhere your API clients can actually
-find it — it's part of your public contract, not an implementation detail.
+- Close semantics: `Tenant.Close() error` with no context
+  (instant-close shape). Backends hold no connections, so container
+  shutdown is trivial; errors still join via `errors.Join`.
+- Multi-instance behavior: both adapters are stateless, so replicas
+  agree as long as they share config. Resolve once at the middleware
+  edge and propagate via `tenant/context.go` helpers; never re-derive
+  deeper in the stack where an unvalidated value could slip in. An
+  unknown tenant must fail closed (reject), never silently map to a
+  default, or one typo becomes a cross-tenant data leak.
+- Redaction: tenant IDs are not secrets but are still customer data.
+  Never log raw option maps; use `config.RedactedServices`. Document
+  the header name and validation rule for API clients; it is public
+  contract, not implementation detail.
+
+## Troubleshooting
+
+1. Every request lands on `default` after switching to `header`: the
+   gateway is not sending the configured header, or the app reads a
+   different name. Confirm `TENANT_HEADER` matches what the client
+   sends (`X-Tenant-ID` vs `X-Tenant`) and that proxies forward it.
+2. `header must be a valid header key`: the configured name contains
+   whitespace, a colon, or non-ASCII. Fix the name; empty is allowed
+   (means default) but garbage is not.
+3. `subdomain_regex exceeds max length`: the pattern tops 500 chars.
+   Shorten it or split matching into regex plus code; overlong
+   patterns are rejected to bound ReDoS risk.
+
+## See also
+
+- [Feature Flags](./flags.mdx) - per-tenant targeting signals
+- [Rate Limiting](./ratelimit.mdx) - per-tenant buckets
+- [Observability](./observability.mdx) - tenant as span attribute

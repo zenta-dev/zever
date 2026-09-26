@@ -1,61 +1,220 @@
 ---
 title: Search
-description: Full-text search — indexing and ranked queries behind one interface.
+description: Full-text search - indexing and ranked queries behind one interface.
 ---
 
 `LIKE '%term%'` gets you far exactly until a user expects ranked results,
-typo tolerance, or a corpus too big for a table scan. `search.Search` gives you
-one interface — index documents, run ranked queries with filters and paging —
-so the query surface your app exposes doesn't change when the backend behind
-it does.
+prefix matching, or a corpus too big for a table scan. `search.Search` gives
+one interface - index documents, run ranked queries with filters and paging -
+so the query surface your app exposes does not change when the backend does.
 
-`sqlite` (the default) is genuinely fine for small corpora and every test suite
-— it's embedded FTS, zero infra. Reach for `postgres` when you already run
-Postgres and don't want a second datastore just for search; reach for
-`meilisearch` when result quality and query latency matter more than operational
-simplicity, since it's a dedicated cluster you now have to run.
+## Purpose and when to use
+
+Use search for user-typed queries over spaces, bookings, reviews, or help
+articles: "loft near downtown", "booking from last June". The bookings app
+indexes space titles and descriptions so `ListSpaces` can rank instead of
+filtering by exact substring.
+
+Pick `sqlite` for small corpora, every test suite, and single-binary dev. It
+is embedded FTS with zero infra and the default in `config.Default()`. Pick
+`postgres` when Postgres already runs and a second datastore is not wanted -
+search reuses the relational infra through a `dsn`. Pick `meilisearch` when
+result quality and query latency matter more than operational simplicity,
+since it is a dedicated cluster with its own host and api key.
+
+Search ranks by full-text relevance, not embedding similarity. Semantic "find
+things like this" is the vectorstore package, a different service entirely.
 
 ## Config
+
+File decoding is strict snake_case with only three keys: `host`, `api_key`,
+and `dsn`. `host` is the Meilisearch URL, `dsn` is the postgres URL or sqlite
+path. Supply secrets by file or env, never committed plaintext.
 
 ```yaml
 search:
   adapter: sqlite
+  options:
+    dsn: ./data/search.db
+```
+
+Postgres reuses relational infra:
+
+```yaml
+search:
+  adapter: postgres
+  options:
+    dsn: postgres://app:secret@db:5432/app
+```
+
+Dedicated cluster:
+
+```yaml
+search:
+  adapter: meilisearch
+  options:
+    host: http://localhost:7700
+    api_key: dev-only-key
 ```
 
 ```sh
 SEARCH_ADAPTER=meilisearch
+SEARCH_HOST=http://localhost:7700
+SEARCH_API_KEY=dev-only-key
+SEARCH_DSN=postgres://app:secret@db:5432/app
 ```
 
-## Resolve
+`host` must parse as a URL with scheme and host when set. Unknown file fields
+fail the load, so keep the block to exactly these keys.
+
+## Resolve via container
 
 ```go
-c := container.New(config.Default())
-s, err := c.Search()
-if err != nil {
-	// handle
+import (
+	"github.com/zenta-dev/zever/config"
+	"github.com/zenta-dev/zever/container"
+)
+
+func openSearch() error {
+	c := container.New(config.Default())
+	s, err := c.Search()
+	if err != nil {
+		return err
+	}
+	defer func() { _ = s.Close() }()
+	_ = s
+	return nil
 }
-_ = s
 ```
+
+`Search()` resolves lazily and caches the instance. On error the cached state
+clears so the next call retries. `container.New(nil)` stays valid and closes
+cleanly when search was never touched.
+
+Close shape: `search.Search` declares instant `Close() error`. The container
+probes it during `Close(ctx)` as a snapshot service with no leaf ordering.
+
+## Runnable example
+
+Index two space documents in one batch call, then run a ranked query with an
+explicit index filter and paging. Batch indexing keeps bulk imports to one
+round trip instead of one call per document.
+
+```go
+package main
+
+import (
+	"context"
+	"fmt"
+
+	"github.com/zenta-dev/zever/search"
+	searchsqlite "github.com/zenta-dev/zever/search/sqlite"
+)
+
+func main() error {
+	_ = search.Register(search.SQLite, searchsqlite.New)
+	s, err := search.Open(search.SQLite, search.Options{DSN: ":memory:"})
+	if err != nil {
+		return err
+	}
+	defer func() { _ = s.Close() }()
+	ctx := context.Background()
+
+	if err := s.IndexBatch(ctx, []search.Document{
+		{ID: "space-1", Index: "spaces", Content: "sunny loft downtown with balcony"},
+		{ID: "space-2", Index: "spaces", Content: "quiet cabin near lake, slow wifi"},
+	}); err != nil {
+		return err
+	}
+
+	res, err := s.Search(ctx, "loft downtown", search.QueryOptions{
+		Limit:   10,
+		Filters: map[string]string{"index": "spaces"},
+	})
+	if err != nil {
+		return err
+	}
+	fmt.Println("total", res.Total)
+	for _, h := range res.Hits {
+		fmt.Println(h.ID, h.Score)
+	}
+	return nil
+}
+```
+
+Expected behavior: `total` counts all matches independent of `Limit` and
+`Offset`, while `len(res.Hits)` holds at most `Limit` rows. `Limit <= 0`
+selects the 10-hit default. A query with an explicit `index` filter stays
+scoped to that collection - only the `index` filter key is honored.
+
+Backend contrast for the same query surface:
+
+- `sqlite` with `dsn: :memory:` or a file path: embedded FTS, instant boot,
+  best for tests and small catalogs.
+- `postgres` with a `dsn` URL: no extra process, ranking from the existing
+  database, best when Postgres already runs.
+- `meilisearch` with `host` plus `api_key`: external cluster, strongest
+  ranking and latency at the cost of running another service.
 
 ## Adapters
 
 | Adapter | Package | Notes |
 |---|---|---|
-| `sqlite` | `search/sqlite` | Default; embedded FTS |
-| `postgres` | `search/postgres` | Reuses relational infra |
-| `meilisearch` | `search/meilisearch` | External cluster |
+| `sqlite` | `search/sqlite` | Default, embedded FTS, `dsn` is a path or `:memory:` |
+| `postgres` | `search/postgres` | Reuses relational infra, `dsn` is a postgres URL |
+| `meilisearch` | `search/meilisearch` | External cluster, needs `host` and `api_key` |
 
-## Not a vector store
+All three serve `search.Search` (`Index`, `IndexBatch`, `Delete`, `Search`,
+`Close`), so the bookings app promotes from `sqlite` to `meilisearch` with a
+config change and a reindex.
 
-`search` ranks by full-text relevance, not embedding similarity — if you want
-semantic "find things like this" search, that's [Vector Store](vectorstore/),
-a different package entirely. A query's `Limit <= 0` defaults to 10 results, and
-`Total` in a paged response reflects the full match count independent of
-whatever `Limit`/`Offset` you asked for — don't assume `len(results) == Total`.
+## Gotchas and production notes
 
-One gotcha worth planning around: `IndexBatch` exists so bulk-indexing many
-documents is one round trip instead of one call per document — each adapter
-implements it as a native bulk API, a multi-row statement, or a wrapping
-transaction. Keep index writes on the write path (a job after a save), not
-inline in a request handler, and version your index schema alongside your
-`.zen` schema changes so the two never drift apart silently.
+- Keep index writes on the write path, not inline in reads. Index after a
+  save through a job, and version the index schema alongside
+  `schema/bookings.zen` so mapping and entities never drift silently.
+- `Delete` needs a known id on some backends without global id lookup. Track
+  the document id at index time instead of trying to delete by query.
+- `Total` reflects full match count ignoring paging. Do not assume
+  `len(hits) == Total` - page with `Limit` and `Offset` against `Total`.
+- Metadata must stay JSON-encodable. `Document.Validate` rejects maps that
+  cannot marshal, which fails closed before backend I/O.
+- Never log `api_key` or full DSNs. Display config through
+  `config.RedactedServices` and keep values out of error text.
+- Bulk imports must use `IndexBatch`. Per-document `Index` in a loop turns a
+  thousand-row seed into a thousand round trips; the batch path uses a native
+  bulk API, multi-row statement, or wrapping transaction per adapter.
+- Close order: search is a snapshot service. It closes before leaf cache and
+  queue but after scheduler and job stop, so in-flight indexing jobs finish
+  before the index handle drains.
+
+## Troubleshooting
+
+Symptom: `host must be a valid url with scheme and host`.
+Cause: Meilisearch `host` set as bare `localhost:7700` without `http://`.
+Fix: set `http://localhost:7700` (or `https://` in prod) and keep the key in
+`search.options.host`, not at the top level.
+
+Symptom: results mix spaces with help articles.
+Cause: missing or misspelled `Filters["index"]`. Only the `index` filter key
+is honored, and an empty filter searches broadly.
+Fix: always pass `Filters: map[string]string{"index": "spaces"}` (or the
+relevant collection) and assert it in tests.
+
+Symptom: `len(hits)` smaller than `Total` looks like data loss.
+Cause: paging working as designed - `Total` ignores `Limit` and `Offset`.
+Fix: loop with `Offset` increments until covered, and show `Total` as the
+result count while rendering only the page.
+
+Symptom: sqlite search passes locally, postgres path fails in staging.
+Cause: `dsn` still points at a sqlite path while `adapter` says `postgres`,
+or the postgres role lacks index tables.
+Fix: pair each adapter with its DSN shape (path for sqlite, URL for
+postgres), migrate index tables first, then reindex from source rows.
+
+## See also
+
+- [Storage and Media](storage-media/) for blobs whose metadata feeds the index
+- [Scheduler and Jobs](scheduler-jobs/) for background reindex jobs
+- [Build a Booking API](../tutorials/build-a-booking-api/) for the bookings tutorial
+- `examples/bookings/zever.yaml` for the sqlite search default and `schema/bookings.zen` for Space and Review content worth indexing

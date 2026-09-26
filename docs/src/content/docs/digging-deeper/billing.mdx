@@ -3,37 +3,48 @@ title: Billing
 description: Customers, subscriptions, and invoices behind one interface.
 ---
 
-Subscription billing means talking to a provider's API for customers,
-subscriptions, and invoices — and every provider represents money slightly
+Subscription billing means talking to a provider API for customers,
+subscriptions, and invoices - and every provider represents money slightly
 differently. `billing.Billing` gives you one facade over that, with amounts
-always in minor units (`ParseMinorUnits` handles the currency-specific
-precision) so a stray float never rounds a customer's invoice wrong.
+always in minor units so a stray float never rounds a customer invoice wrong.
 
-Start with `stub` — it's zero-infra, keeps everything in memory behind a mutex,
-and is exactly what `config.Default()` ships for tests, since you don't want
-real billing calls firing from your test suite. Move to `stripe` or `paddle`
-once you're ready to talk to a real payment provider; `billing` itself settles
-nothing — that's entirely the provider adapter's job.
+## Purpose and when to use
+
+Start with `stub` - it is zero-infra, keeps everything in memory, and is
+exactly what `config.Default()` ships for tests, since you do not want real
+billing calls firing from your test suite. Move to `stripe` or `paddle` once
+you are ready to talk to a real provider; `billing` itself settles nothing -
+that is entirely the provider adapter job. Use `billing` for the customer
+and subscription lifecycle; use `payment` for the charge itself.
 
 ## Config
 
 ```yaml
 billing:
   adapter: stub
+  options:
+    sandbox: true
 ```
 
 ```sh
 BILLING_ADAPTER=stripe
-BILLING_SECRETKEY=sk_live_...
+BILLING_SECRET_KEY=sk_live_...
 BILLING_SANDBOX=true
 ```
 
-Flip `Sandbox` on while integrating against a provider's test environment —
-it's a boolean the adapter interprets, not a separate credential.
+Shared provider keys come from `internal/providers.Common`: `secret_key`
+(Stripe), `api_key` (Paddle), `endpoint` (custom gateway URL), `sandbox`
+(boolean selecting the provider test environment). `endpoint`, when set,
+must be an absolute URL with scheme and host.
 
 ## Resolve
 
 ```go
+import (
+	"github.com/zenta-dev/zever/config"
+	"github.com/zenta-dev/zever/container"
+)
+
 c := container.New(config.Default())
 b, err := c.Billing()
 if err != nil {
@@ -42,24 +53,102 @@ if err != nil {
 _ = b
 ```
 
+`Billing()` resolves lazily and caches the result; on error the cache clears
+so the next call retries.
+
+## Runnable example
+
+```go
+package main
+
+import (
+	"context"
+	"fmt"
+
+	"github.com/zenta-dev/zever/config"
+	"github.com/zenta-dev/zever/container"
+)
+
+func main() {
+	c := container.New(config.Default())
+	defer c.Close(context.Background())
+
+	b, err := c.Billing()
+	if err != nil {
+		fmt.Println("resolve error:", err)
+		return
+	}
+	ctx := context.Background()
+
+	cust, err := b.CreateCustomer(ctx, "Ada", "ada@example.com", "key-1")
+	if err != nil {
+		fmt.Println("customer error:", err)
+		return
+	}
+	sub, err := b.CreateSubscription(ctx, cust.ID, "plan-pro", "key-2")
+	if err != nil {
+		fmt.Println("subscription error:", err)
+		return
+	}
+	inv, err := b.GetInvoice(ctx, cust.ID)
+	if err != nil {
+		fmt.Println("invoice error:", err)
+		return
+	}
+	fmt.Println("customer:", cust.ID)
+	fmt.Println("subscription:", sub.ID, string(sub.Status))
+	fmt.Println("invoice total:", inv.Total)
+	if err := b.Close(); err != nil {
+		fmt.Println("close error:", err)
+	}
+}
+
+// Expected output with the stub adapter (IDs are ULIDs, values vary):
+// customer: 01J0000000000000000000000
+// subscription: 01J0000000000000000000001 active
+// invoice total: 0
+```
+
 ## Adapters
 
 | Adapter | Package | Notes |
 |---|---|---|
 | `stub` | `billing/stub` | Default; in-memory, ULID-identified records |
-| `stripe` | `billing/stripe` | |
-| `paddle` | `billing/paddle` | |
+| `stripe` | `billing/stripe` | Real provider; needs `secret_key` |
+| `paddle` | `billing/paddle` | Real provider; needs `api_key` |
 
-## The gotcha: this isn't a ledger, and amounts are always minor units
+## Production notes
 
-`billing` is not the system of record for what a customer was actually charged
-— that lives with the provider. What it gives you is a consistent, typed way to
-create and query customers/subscriptions/invoices without hand-rolling HTTP
-calls per provider. Every amount is an `int64` in minor units (cents, not
-dollars) specifically so currency math never touches floating point; if you're
-formatting an amount for display, go through the currency exponent helpers
-rather than dividing by 100 yourself — not every currency has two decimal
-places.
+- `billing` is not the system of record for what a customer was actually
+  charged - that lives with the provider. It gives you a consistent typed
+  way to create and query records without hand-rolling HTTP per provider.
+- Every amount is an `int64` in minor units (cents, not dollars) so currency
+  math never touches floating point. Format for display through the currency
+  exponent helpers rather than dividing by 100; not every currency has two
+  decimal places.
+- `SecretKey` and `APIKey` never surface in errors or logs - same redaction
+  discipline as every other adapter-backed service.
+- Pass a stable idempotency key per create call so retries do not double
+  create customers or subscriptions.
 
-`SecretKey` and `APIKey` never surface in errors or logs — same redaction
-discipline as every other adapter-backed service.
+## Troubleshooting
+
+**Tests hit the real provider.**
+Something overrode the adapter. Check `BILLING_ADAPTER` in the environment
+and the `adapter` field in `zever.yaml`; `config.Default()` alone always
+picks `stub`.
+
+**`Validate` rejects `endpoint`.**
+A custom endpoint must be an absolute URL with scheme and host. Fix the URL
+instead of clearing the field blindly.
+
+**Amounts off by a factor of 100.**
+You passed major units where minor units belong. Multiply by the currency
+exponent (via `ParseMinorUnits`) before calling create.
+
+## See also
+
+- [Payments](payment/) for charges, refunds, and webhook decoding
+- [Secrets](secrets/) for holding provider keys outside YAML
+- [Container](../../architecture/container/) for lazy resolve and close order
+- [Adapters Matrix](../../reference/adapters-matrix/) for the full table

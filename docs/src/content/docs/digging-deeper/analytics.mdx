@@ -1,38 +1,54 @@
 ---
 title: Analytics
-description: Event tracking — Track, Identify, and Group — behind one interface.
+description: Event tracking with Track, Identify, and Group behind one interface.
 ---
 
 Product analytics has the same shape everywhere: track an event, identify a
-user, associate them with a group. What differs is where those events end up —
-a real pipeline like PostHog in production, or just stdout while you're
-building the feature. `analytics.Analytics` keeps your call sites (`Track`,
-`Identify`, `Group`) identical across both.
+user, associate them with a group. What differs is where those events end up -
+a real pipeline like PostHog in production, or just stdout while you build the
+feature. `analytics.Analytics` keeps your call sites (`Track`, `Identify`,
+`Group`) identical across both.
 
-Use `log` (the default) for local development and tests — it's zero-infra and
-prints what would have been sent. Switch to `posthog` once you actually want
-events to land somewhere durable; that's a config change, not a rewrite of every
-`Track` call you've already written.
+## Purpose and when to use
+
+Use `log` (the default) for local development and tests - it is zero-infra
+and prints what would have been sent. Switch to `posthog` once you actually
+want events to land somewhere durable; that is a config change, not a rewrite
+of every `Track` call you already wrote. Keep analytics calls behind this
+interface from day one so the production swap touches config only.
 
 ## Config
 
 ```yaml
 analytics:
   adapter: log
+  options:
+    anonymous_id: anonymous
+    group_type: organization
+    max_properties_bytes: 65536
+    max_properties: 100
 ```
 
 ```sh
 ANALYTICS_ADAPTER=posthog
-ANALYTICS_APIKEY=phc_...
+ANALYTICS_API_KEY=phc_...
+ANALYTICS_ENDPOINT=https://app.posthog.com
 ```
 
-`AnonymousID` (default `"anonymous"`) and `GroupType` (default `"organization"`)
-give every call a sane fallback identity even before you've wired up real user
-IDs.
+`anonymous_id` (default `"anonymous"`) and `group_type` (default
+`"organization"`) give every call a sane fallback identity even before you
+wire up real user IDs. `endpoint` is optional and must include scheme and
+host when set. `max_properties_bytes` and `max_properties` bound a single
+call payload before it is sent; negative values are rejected.
 
 ## Resolve
 
 ```go
+import (
+	"github.com/zenta-dev/zever/config"
+	"github.com/zenta-dev/zever/container"
+)
+
 c := container.New(config.Default())
 an, err := c.Analytics()
 if err != nil {
@@ -41,21 +57,104 @@ if err != nil {
 _ = an
 ```
 
+`Analytics()` resolves lazily and caches the result; on error the cache
+clears so the next call retries.
+
+## Runnable example
+
+```go
+package main
+
+import (
+	"context"
+	"fmt"
+
+	"github.com/zenta-dev/zever/config"
+	"github.com/zenta-dev/zever/container"
+)
+
+func main() {
+	c := container.New(config.Default())
+	defer c.Close(context.Background())
+
+	an, err := c.Analytics()
+	if err != nil {
+		fmt.Println("resolve error:", err)
+		return
+	}
+
+	if err := an.Track(context.Background(), "signup", map[string]any{
+		"plan": "pro",
+	}); err != nil {
+		fmt.Println("track error:", err)
+		return
+	}
+	if err := an.Identify(context.Background(), "user-1", map[string]any{
+		"email": "you@example.com",
+	}); err != nil {
+		fmt.Println("identify error:", err)
+		return
+	}
+	if err := an.Group(context.Background(), "user-1", "acme", nil); err != nil {
+		fmt.Println("group error:", err)
+		return
+	}
+	if err := an.Close(); err != nil {
+		fmt.Println("close error:", err)
+		return
+	}
+	fmt.Println("tracked 1 event for user-1")
+}
+
+// Expected output with the log adapter:
+// {"event":"signup","properties":{"plan":"pro"}}
+// {"user":"user-1","traits":{"email":"you@example.com"}}
+// {"user":"user-1","group":"acme"}
+// tracked 1 event for user-1
+```
+
 ## Adapters
 
 | Adapter | Package | Notes |
 |---|---|---|
 | `log` | `analytics/log` | Default; debug output, no PII redaction |
-| `posthog` | `analytics/posthog` | |
+| `posthog` | `analytics/posthog` | Real pipeline; needs `api_key` |
 
-## The gotcha: flush on shutdown, and don't debug with `log` in prod
+Spelling note: where the `posthog` adapter mirrors the vendor event shape,
+field names keep the upstream vendor spelling on purpose. Do not "fix" an
+oddly-cased wire field; it matches what the PostHog API expects, per the
+repo rule that external-mirror shapes keep upstream spelling.
 
-Events sent through `posthog` (or any real backend) are buffered before they go
-over the wire — call `Close()` before process exit or your last batch of events
-never leaves the process. And because the `log` adapter exists purely for
-debugging, it applies no PII redaction to what it prints: treat it as a
-development tool, never a fallback for production traffic.
+## Production notes
 
-`MaxPropertiesBytes` (default 64KiB) and `MaxProperties` bound a single call's
-payload before it's sent — a runaway properties map fails fast locally instead
-of getting silently truncated by the backend.
+- Events sent through `posthog` are buffered before they go over the wire -
+  call `Close()` before process exit or your last batch never leaves the
+  process.
+- The `log` adapter exists purely for debugging and applies no PII
+  redaction to what it prints: treat it as a development tool, never a
+  fallback for production traffic.
+- `max_properties_bytes` (default 64KiB) and `max_properties` bound a single
+  call payload - a runaway properties map fails fast locally instead of
+  getting silently truncated by the backend.
+- Never log raw option maps; use `config.RedactedServices` for display.
+
+## Troubleshooting
+
+**Events vanish on shutdown.**
+You exited without `Close()`. Flush the analytics handle (and the container)
+before process exit so the buffered batch is delivered.
+
+**`Validate` rejects `endpoint`.**
+The URL must parse and include both scheme and host. Check for a missing
+scheme prefix first.
+
+**Payload rejected for size.**
+You exceeded `max_properties_bytes` or `max_properties`. Trim the
+properties map or raise the bound deliberately, not blindly.
+
+## See also
+
+- [Container](../../architecture/container/) for lazy resolve and close order
+- [Secrets](secrets/) for holding the PostHog write key
+- [Configuration](../../getting-started/configuration/) for layered config
+- [Adapters Matrix](../../reference/adapters-matrix/) for the full table

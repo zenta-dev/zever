@@ -3,21 +3,22 @@ title: Providers and Adapters
 description: Small interfaces, self-registering adapters, and the container as sole resolver.
 ---
 
-Every backend concern is a small interface with multiple swappable adapters. Adapters self-register, and the shared container resolves and caches each one lazily. Swapping an adapter means changing configuration, not code.
+## Purpose + When to use
 
-## The pattern
+This page explains the provider pattern behind every backend concern: one small interface, multiple self-registering adapters, and the container as sole resolver. Read it before swapping a backend, before adding an adapter, and before reviewing any PR that touches a service interface.
 
-```go
-// Package db: one small interface.
-type DB interface {
-    Query(ctx context.Context, sql string, args ...any) (Rows, error)
-    Exec(ctx context.Context, sql string, args ...any) (Result, error)
-    Dialect() string
-}
+Concrete payoff: changing `sqlite` to `postgres` or `memory` to `redis` stays a config edit, never a rewrite of handlers.
 
-// Adapter sqlite registers itself; postgres registers itself elsewhere.
-func init() { db.Register(db.SQLite, New) } // wiring only, no globals in app code
-```
+## Prerequisites and mental model
+
+Four roles, fixed responsibilities:
+
+| Role | Rule |
+|---|---|
+| Interface | stays small; never add methods (breaks implementers); prefer a new interface |
+| Adapter | self-registers, one subdirectory per backend |
+| Container | sole resolver; owns construction, caching, retry, and close |
+| Config | selects the adapter (`DB_ADAPTER=postgres`) plus options |
 
 Application code speaks the interface. The container speaks the registry:
 
@@ -25,14 +26,138 @@ Application code speaks the interface. The container speaks the registry:
 conn, err := db.Open(db.SQLite, db.Options{Path: ":memory:"})
 ```
 
-| Role | Rule |
-|---|---|
-| Interface | stays small; never add methods (breaks implementers) — prefer a new interface |
-| Adapter | self-registers, one subdirectory per backend |
-| Container | sole resolver; owns construction, caching, retry, and close |
-| Config | selects the adapter (`DB_ADAPTER=postgres`) plus options |
+Placeholders stay `?` on both `db` drivers (the postgres driver rewrites to `$n` before pgx) and route params read uniformly via `router.Param`, so most swaps are invisible to handlers. Where backends genuinely differ, the adapter fails fast or documents the gap instead of silently degrading.
 
-## Adapter matrix (excerpt)
+## Config
+
+Adapter choice plus options, in file and env form. Dev uses zero infra; prod swaps names only:
+
+```yaml
+# dev: zero infra
+db:
+  adapter: sqlite
+  options:
+    path: data/app.db
+cache:
+  adapter: memory
+queue:
+  adapter: memory
+```
+
+```yaml
+# prod: same code, real backends
+# db:
+#   adapter: postgres
+#   options:
+#     dsn: postgres://app:secret@db:5432/app
+#     max_conns: 20
+# cache:
+#   adapter: redis
+#   options:
+#     addr: redis:6379
+```
+
+```sh
+DB_ADAPTER=postgres
+DB_MAXCONNS=20
+CACHE_ADAPTER=redis
+QUEUE_ADAPTER=redis
+AUTH_JWT_SECRET='prod-secret-at-least-32-bytes-long'
+```
+
+Real keys above follow `<SERVICE>_<FIELD>` with no prefix. Two semantic gaps to know: `MinConns` means pool-minimum on postgres but `SetMaxIdleConns` on sqlite; regex route constraints exist on fiber but not stdhttp. Both are documented at the adapter, not hidden.
+
+## Resolve via container
+
+Handlers resolve interfaces, never drivers. The container maps the configured name to the registered constructor:
+
+```go
+package main
+
+import (
+	"github.com/zenta-dev/zever/config"
+	"github.com/zenta-dev/zever/container"
+)
+
+func main() {
+	c := container.New(config.Default())
+
+	db, err := c.DB()
+	if err != nil {
+		panic(err)
+	}
+	cache, err := c.Cache()
+	if err != nil {
+		panic(err)
+	}
+	storage, err := c.Storage()
+	if err != nil {
+		panic(err)
+	}
+	_, _, _ = db, cache, storage
+}
+```
+
+The pattern per package:
+
+```go
+// Package db: one small interface.
+type DB interface {
+	Query(ctx context.Context, sql string, args ...any) (Rows, error)
+	Exec(ctx context.Context, sql string, args ...any) (Result, error)
+	Dialect() string
+}
+
+// Adapter sqlite registers itself; postgres registers itself elsewhere.
+func init() { db.Register(db.SQLite, New) } // wiring only, no globals in app code
+```
+
+## Runnable example
+
+Swap the cache backend without touching handler code:
+
+```go
+package main
+
+import (
+	"context"
+	"fmt"
+	"time"
+
+	"github.com/zenta-dev/zever/config"
+	"github.com/zenta-dev/zever/container"
+)
+
+func main() {
+	c := container.New(config.Default())
+	cache, err := c.Cache()
+	if err != nil {
+		panic(err)
+	}
+	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
+	defer cancel()
+	_ = cache
+	fmt.Println("cache ready:", true)
+}
+```
+
+```sh
+CACHE_ADAPTER=memory go run ./cmd/myapp
+CACHE_ADAPTER=redis go run ./cmd/myapp
+zever doctor --config zever.yaml
+```
+
+Expected output or behavior:
+
+```text
+cache ready: true
+```
+
+Both runs print the same line; only the driver behind `c.Cache()` changes. `zever doctor` reports per-service health (the bookings example documents expected FAILs under zero-infra defaults: missing api key, jwt secret, cities file, embed FS are config gaps, not framework bugs).
+
+## Variants
+
+Adapter matrix (excerpt; full table in `config/README.md`, over thirty services from `ai` to `workflow`, each defaulting to its zero-infra adapter):
 
 | Service | Adapters | Default |
 |---|---|---|
@@ -43,34 +168,42 @@ conn, err := db.Open(db.SQLite, db.Options{Path: ":memory:"})
 | `auth` | `jwt`, `session`, `oidc` | `jwt` |
 | `session` | `memory`, `redis` | `memory` |
 | `storage` | `local`, `s3`, `r2` | `local` |
+| `search` | `postgres`, `meilisearch`, `sqlite` | per scaffold |
+| `vectorstore` | `sqlite`, `pgvector`, `qdrant` | per scaffold |
 | `payment` / `billing` | `stub`, `stripe`, `paddle` | `stub` |
+| `log` | `noop`, `zerolog`, `slog`, `pretty` | per scaffold |
+| `secrets` | `env` | `env` with `ZEVER` prefix |
 
-The full table lives in `config/README.md` — over thirty services from `ai` to `workflow`, each defaulting to its zero-infra adapter.
+Rules for new adapters:
 
-## Swapping without rewiring
-
-Change configuration, not code:
-
-```yaml
-# dev: zero infra
-cache:
-  adapter: memory
-```
-
-```yaml
-# prod: same code, real backend
-cache:
-  adapter: redis
-  options:
-    addr: redis:6379
-```
-
-Because placeholders stay `?` on both `db` drivers (the postgres driver rewrites to `$n` before pgx) and route params read uniformly via `router.Param`, most swaps are invisible to handlers. Where backends genuinely differ — `MinConns` means pool-minimum on postgres but `SetMaxIdleConns` on sqlite; regex route constraints exist on fiber but not stdhttp — the adapter fails fast or documents the gap instead of silently degrading.
-
-## Rules for new adapters
-
-1. Implement the existing interface exactly — no extra exported methods on the facade.
+1. Implement the existing interface exactly: no extra exported methods on the facade.
 2. Parse options with typed readers; return `InvalidOptionsError` on unparsable values.
 3. Never log raw option maps; expose redaction via `Redact` / `RedactedServices`.
 4. Make shutdown cheap and idempotent: implement `Close(ctx)`, `Close()`, or `Stop()` so `closeAny` probing finds it.
 5. Keep tests hermetic (sqlite `:memory:`, in-memory fakes); gate live tests behind env like `POSTGRES_DSN`.
+
+## Production notes
+
+Close order is a provider contract: pooled or network-backed adapters take `Close(ctx)` (`db`, `cache`, `storage`, `lock`); lightweight handles take `Close()` (`auth`, `queue`, `session`, `payment`); the scheduler alone uses `Stop()`; observability uses `Shutdown(ctx)` so buffered spans flush. `closeAny` probes in that order so callers never guess.
+
+Fail-closed: unsupported ORM features return dialect errors (`dialect.ErrUnsupportedByDialect`, prefixed `orm:`) instead of wrong SQL; strict config rejects typos at load; redaction masks secrets in every display path. Timeouts are `time.Duration` with package-level `Default*Timeout` consts, no magic numbers. Unexported adapter structs are conventionally named `driver` with receiver `d`.
+
+## Troubleshooting
+
+| Symptom | Cause | Fix |
+|---|---|---|
+| Swap changes nothing at runtime | Old adapter name still set via env override (`CACHE_ADAPTER` beats file) | Check env first: layering is `defaults < file < env`, so unset or correct the override |
+| `Load` rejects a known adapter name | Typo in `adapter:` or adapter not registered for that service | Match the matrix spelling exactly (`postgres`, not `postgresql`); check the package README |
+| Handler sees different SQL on postgres | Placeholder rewrite misunderstood | Keep writing `?`; the postgres driver rewrites to `$n` before pgx automatically |
+| Fiber-only route constraint breaks stdhttp | Backend gap: regex constraints exist on fiber only | Restructure the route to constructs both drivers share, or pin `fiber` |
+| Live adapter test fails in CI | Test needs a real backend but no DSN is set | Gate behind env (`POSTGRES_DSN='postgres://user:pass@localhost:5432/test?sslmode=disable'`) and keep defaults hermetic |
+
+## See also
+
+- `./container/` for the sole-resolver mechanics and accessor table
+- `./lifecycle/` for when resolution and close run in a process
+- `./compiler-boundary/` for why providers never import the compiler
+- `../getting-started/configuration/` for adapter selection and strict keys
+- `../getting-started/deployment/` for per-env swaps
+- `../database/query-builder/` for dialect gating over `db.DB`
+- Package guides as text: `config/README.md`, `container/README.md`, `README.md`

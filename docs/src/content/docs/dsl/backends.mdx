@@ -3,9 +3,38 @@ title: Backends
 description: Pluggable codegen backends that turn resolved schemas into backend output.
 ---
 
-Backends are the codegen extension point. The frontend resolves `*ir.Schema`; each backend turns it into files. The `backend` package holds the interface only — concrete backends land in later phases.
+## Purpose
 
-## The interface
+Backends are the codegen extension point. The frontend resolves
+`*ir.Schema`; each backend turns it into files. The `backend` package holds
+the interface only, concrete backends plug in behind it.
+
+When to use: generate typed bindings, protobuf, OpenAPI, or migration HCL
+from a resolved schema. When not to use: business logic and adapter wiring
+stay hand-written; backends emit scaffolding, not behavior.
+
+## Prerequisites
+
+- A checked schema: `zever check schema/` passes.
+- Familiarity with [Syntax](./syntax-zen/) and [Resolver and IR](./resolver-ir/).
+- Know that output is deterministic: same inputs, same bytes, every run.
+
+## Config
+
+Backends take no per-run config struct. Selection happens at the
+`compile.Compile` call or the `--backend` CLI flag:
+
+```sh
+zever compile --out ./generated
+zever compile --backend=atlas,gogen,openapi,proto,protogogen,zenorm --out ./generated
+```
+
+The `--backend` list filters which `Generate` implementations run; omit it
+to run all backends.
+
+## Resolve
+
+The interface each backend implements:
 
 ```go
 type Backend interface {
@@ -14,38 +43,109 @@ type Backend interface {
 }
 ```
 
-`compile.Compile` parses filename-sorted inputs, resolves once, then calls each backend's `Generate` in order. Output is deterministic: same inputs, same bytes, every run.
+`compile.Compile` parses filename-sorted inputs, resolves once, then calls
+each backend's `Generate` in order. Backends read only `*ir.Schema`, never
+re-parse source.
 
-## Built-in backends
-
-| Backend | Reads | Emits |
-|---|---|---|
-| `gogen/app` | modules + services | application layer (handlers, wiring) |
-| `zenorm` | `schema.Modules[*].Entities` only | typed table/column bindings |
-| `proto/protogogen` | modules + enums + RPCs | `zever.app.v1` protobuf + `gen/zever/app` Go |
-| `openapi` | services + HTTP bindings | `zever API` OpenAPI document |
-
-The canonical `app.zen` fixture exercises all four: both entities compile under the virtual path `schema/app/app.zen` (module `app`), so the two-way `User ↔ Order` relation needs no import, and the `UserService` / `OrderService` RPCs give `gogen` real paginated and validated operations to generate from.
-
-## Running codegen
+## Runnable example
 
 ```sh
-zever compile --out ./generated            # all backends
-zever generate tinker                      # scaffold the tinker shim
+zever compile --out ./generated
+ls ./generated
+echo exit:$?
+```
+
+Expected output:
+
+```text
+./generated holds one subtree per backend: zenorm bindings, gogen app layer,
+proto descriptors, OpenAPI document, Atlas HCL
+exit:0
+```
+
+To refresh committed goldens after a deliberate fixture change:
+
+```sh
 go test ./internal/dsl/backend/gogen/ -run TestGoldenFiles -update
 ```
 
-The last line regenerates the committed `gogen/app` golden package. Only use `-update` when the fixture changed deliberately — golden diffs are the review surface for codegen changes.
+Only use `-update` when the fixture changed deliberately; golden diffs are
+the review surface for codegen changes.
 
-## Naming and dialects
+## Reference
 
-`internal/dsl/naming` converts schema names for each target: `APIKey` becomes `api_key` in Postgres/SQLite table names (acronym runs stay one word, per protobuf style) and the matching Go/proto spellings elsewhere. SQL text always binds args and quotes identifiers; dialect capability gates live with the ORM, not the backends.
+| Backend | Reads | Emits |
+|---|---|---|
+| `zenorm` | `schema.Modules[*].Entities` only | typed table/column bindings |
+| `gogen/app` | modules + services | application layer (handlers, wiring) |
+| `proto` | modules + enums + RPCs | protobuf descriptors |
+| `protogogen` | modules + enums + RPCs | `zever.app.v1` protobuf + `gen/zever/app` Go |
+| `openapi` | services + HTTP bindings | `zever API` OpenAPI document |
+| `atlas` | modules + entities | Atlas HCL migration files, one per module |
 
-## Writing a backend
+The canonical `app.zen` fixture exercises all six: both entities compile
+under the virtual path `schema/app/app.zen` (module `app`), so the two-way
+`User <-> Order` relation needs no import, and the `UserService` /
+`OrderService` RPCs give `gogen` real paginated and validated operations to
+generate from. Adding services never affects zenorm output: zenorm reads
+entities only.
+
+Naming: `internal/dsl/naming` converts schema names per target (`APIKey`
+becomes `api_key` in Postgres/SQLite table names; acronym runs stay one
+word, per protobuf style). SQL text always binds args and quotes
+identifiers; dialect capability gates live with the ORM, not the backends.
+
+Deterministic output rules every backend follows:
+
+| Rule | Why |
+|---|---|
+| Sort map keys before rendering | Go map order is random per run |
+| Pin timestamps (no clock reads in output) | same inputs must give same bytes |
+| Repo-relative `File` paths | outputs diff cleanly across machines |
+| One subtree per backend | `--backend=` filtering stays trivial |
+| No network or unseeded randomness | hermetic codegen |
+
+Writing a backend:
 
 1. Implement `Backend` with a stable `Name()`.
-2. Read only `*ir.Schema` — never re-parse source.
-3. Emit `File` values with repo-relative paths; keep rendering deterministic (sort maps, fix timestamps).
+2. Read only `*ir.Schema`, never re-parse source.
+3. Emit `File` values with repo-relative paths; keep rendering
+   deterministic (sort maps, fix timestamps).
 4. Add a golden test under `internal/dsl/compile/` with committed output.
 
-Keep backends pure: no network, no clock reads, no unseeded randomness. Anything environment-specific belongs in adapter options, not generated code.
+Golden workflow: edit `.zen`, run `zever check`, run `compile`, review the
+full golden diff as the executable spec of the change. Accept with
+`-update` only after review; unrelated golden churn means the backend
+leaks non-determinism.
+
+## Production notes
+
+- Never hand-edit `generated/`: the next compile overwrites it, and drift
+  between schema and generated code fails review. Fix the `.zen` source.
+- Pin backend selection in CI (`--backend=...`) so a new backend cannot
+  change build outputs silently.
+- Review golden diffs like code: they are the executable spec of what the
+  schema means.
+- Keep backends pure: no network, no clock reads, no unseeded randomness.
+  Environment specifics belong in adapter options, not generated code.
+
+## Troubleshooting
+
+- **Generated output changed unexpectedly**: diff against committed
+  goldens; a schema edit or keyword change is the usual cause. Revert the
+  schema or accept the golden with `-update` after review.
+- **Backend missing from output**: check the `--backend=` filter spelling;
+  names are lowercase (`atlas`, `gogen`, `openapi`, `proto`,
+  `protogogen`, `zenorm`).
+- **Non-deterministic diffs in CI**: a backend is likely iterating a map
+  without sorting or embedding a timestamp. Fix the backend to sort keys
+  and pin times.
+- **`Generate` error names an unknown type**: the schema failed binding;
+  run `zever check` first, backends assume a resolved schema.
+
+## See also
+
+- [Syntax](./syntax-zen/) for the `.zen` source language
+- [Resolver and IR](./resolver-ir/) for the pipeline feeding `Generate`
+- [LSP and Tooling](./lsp-tooling/) for editor support while editing schemas
+- [CLI Reference](../reference/cli/) for `compile` flags
