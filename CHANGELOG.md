@@ -7,6 +7,80 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Changed
+
+- **Breaking:** heavyweight adapters move out of the core `container`
+  package into explicit `container/adapters` bundles (W4 module-split
+  prep). `container` no longer imports them at compile time; hosts
+  register what they need with one call (`adapters.RegisterAll()`, or
+  per-family `adapters.RegisterAI()` etc. — no `init` wiring, no I/O).
+  Unregistered adapters now fail resolution with `UnknownAdapterError`
+  (hinting at the forgotten `Register` call) instead of resolving.
+  This entry covers the first family:
+  - **Breaking:** `ai` SDK adapters (`anthropic`, `openai`, `gemini`)
+    require `adapters.RegisterAI()` (or `RegisterAll()`); the local
+    `ollama` adapter stays wired by the container. `cmd/zever` registers
+    all bundles at startup, so CLI behavior is unchanged.
+  - **Breaking:** cloud adapters (`storage` `s3`/`r2`, `media` `s3`,
+    `flag` `firebase`) require `adapters.RegisterCloud()` (or
+    `RegisterAll()`); `storage` `local` and `flag` `static` stay wired
+    by the container.
+  - **Breaking:** provider-backed `billing`/`payment` adapters (`stripe`,
+    `paddle`) require `adapters.RegisterPayments()` (or `RegisterAll()`);
+    the `stub` adapters stay wired by the container.
+  - **Breaking:** external `search`/`vectorstore` adapters (`meilisearch`,
+    `qdrant`) require `adapters.RegisterSearchVector()` (or
+    `RegisterAll()`); the `postgres`/`sqlite` adapters stay wired by the
+    container.
+  - **Breaking:** local rendering adapters (`document` `local` via
+    chromedp, `media` `local` via bild) require `adapters.RegisterDoc()`
+    (or `RegisterAll()`); both facades default to `local`, so a default
+    config resolves them only after registering. `document`
+    `remote`/`latex` stay wired by the container; `media` has no other
+    core adapter.
+  - **Breaking:** provider-backed `notification` adapters (`fcm`,
+    `twilio`) require `adapters.RegisterNotify()` (or `RegisterAll()`);
+    the `log` adapter stays wired by the container.
+  - **Breaking:** the `router` `fiber` adapter (gofiber/fasthttp)
+    requires `adapters.RegisterWeb()` (or `RegisterAll()`); the
+    `stdhttp` adapter stays wired by the container.
+  - **Breaking:** the `permission` `casbin` adapter requires
+    `adapters.RegisterPermission()` (or `RegisterAll()`); the `noop`
+    and `rbac` adapters stay wired by the container.
+  - **Breaking:** the `analytics` `posthog` adapter requires
+    `adapters.RegisterAnalytics()` (or `RegisterAll()`); the `log`
+    adapter stays wired by the container.
+  - **Breaking:** the `geo` `google` adapter requires
+    `adapters.RegisterGeo()` (or `RegisterAll()`); the `static` and
+    `osm` adapters stay wired by the container.
+
+### Security
+
+- **Breaking:** `payment/stub` `WebhookEvent` now fails closed with
+  `payment.ErrInvalidSignature` instead of returning a static
+  `stub.event`. `stub.New` documented test-only, never production.
+- **Breaking:** `payment/paddle` `New` now rejects empty `WebhookSecret`
+  with `payment.ErrMissingWebhookSecret`, mirroring `payment/stripe`.
+- **Breaking:** `authz.BearerTokenFromMD` now rejects multiple
+  `authorization` metadata values (returns empty), mirroring
+  `authz.BearerToken` fail-closed handling.
+
+### Fixed
+
+- Scaffolded `internal/app/app.go` now emits the `container/adapters`
+  bundle `Register` calls its heavy adapters need (e.g.
+  `adapters.RegisterNotify()` for `notification/fcm`): adapter packages
+  never self-register, so the old blank-import-only wiring resolved
+  nothing for heavy adapters (`UnknownAdapterError` at runtime).
+  Light-only selections render no adapters import, as before.
+
+- `zever new --help` and `zever compile --help` now expose the real flags
+  (`--module`, `--dir`, `--framework-version`, `--force` for `new`;
+  `--backend`, `--out` default `./generated` for `compile`) via
+  cobra-registered flags and shared stdlib flag-set helpers, so
+  `-h`/`--help`/`help` stay uniform with exit 0; execution still uses the
+  legacy parsers (exit 0 ok / 1 runtime error / 2 flag misuse unchanged).
+
 ## [v0.4.0] - 2026-09-25
 
 ### Changed
