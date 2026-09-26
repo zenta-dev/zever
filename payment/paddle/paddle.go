@@ -68,6 +68,10 @@ func New(o payment.Options) (payment.Payment, error) {
 		return nil, ErrMissingAPIKey
 	}
 
+	if o.WebhookSecret == "" {
+		return nil, payment.ErrMissingWebhookSecret
+	}
+
 	endpoint := providers.PaddleEndpoint(o.Endpoint, o.Sandbox)
 
 	client, err := newSDK(o.APIKey, paddle.WithBaseURL(endpoint), paddle.WithClient(httpclient.NewClient(payment.DefaultHTTPTimeout)))

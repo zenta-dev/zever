@@ -7,20 +7,14 @@ import (
 	"google.golang.org/grpc"
 
 	"github.com/zenta-dev/zever/ai"
-	"github.com/zenta-dev/zever/ai/anthropic"
-	"github.com/zenta-dev/zever/ai/gemini"
 	aiollama "github.com/zenta-dev/zever/ai/ollama"
-	"github.com/zenta-dev/zever/ai/openai"
 	"github.com/zenta-dev/zever/analytics"
 	analyticslog "github.com/zenta-dev/zever/analytics/log"
-	"github.com/zenta-dev/zever/analytics/posthog"
 	"github.com/zenta-dev/zever/auth"
 	"github.com/zenta-dev/zever/auth/jwt"
 	"github.com/zenta-dev/zever/auth/oidc"
 	authsession "github.com/zenta-dev/zever/auth/session"
 	"github.com/zenta-dev/zever/billing"
-	billingpaddle "github.com/zenta-dev/zever/billing/paddle"
-	billingstripe "github.com/zenta-dev/zever/billing/stripe"
 	billingstub "github.com/zenta-dev/zever/billing/stub"
 	"github.com/zenta-dev/zever/cache"
 	cachememory "github.com/zenta-dev/zever/cache/memory"
@@ -32,16 +26,13 @@ import (
 	dbsqlite "github.com/zenta-dev/zever/db/sqlite"
 	"github.com/zenta-dev/zever/document"
 	documentlatex "github.com/zenta-dev/zever/document/latex"
-	documentlocal "github.com/zenta-dev/zever/document/local"
 	documentremote "github.com/zenta-dev/zever/document/remote"
 	"github.com/zenta-dev/zever/eventbus"
 	eventbusmemory "github.com/zenta-dev/zever/eventbus/memory"
 	eventbusredis "github.com/zenta-dev/zever/eventbus/redis"
 	"github.com/zenta-dev/zever/flag"
-	flagfirebase "github.com/zenta-dev/zever/flag/firebase"
 	flagstatic "github.com/zenta-dev/zever/flag/static"
 	"github.com/zenta-dev/zever/geo"
-	geogoogle "github.com/zenta-dev/zever/geo/google"
 	geoosm "github.com/zenta-dev/zever/geo/osm"
 	geostatic "github.com/zenta-dev/zever/geo/static"
 	"github.com/zenta-dev/zever/i18n"
@@ -63,12 +54,8 @@ import (
 	mailerlog "github.com/zenta-dev/zever/mailer/log"
 	"github.com/zenta-dev/zever/mailer/smtp"
 	"github.com/zenta-dev/zever/media"
-	medialocal "github.com/zenta-dev/zever/media/local"
-	medias3 "github.com/zenta-dev/zever/media/s3"
 	"github.com/zenta-dev/zever/notification"
-	notificationfcm "github.com/zenta-dev/zever/notification/fcm"
 	notificationlog "github.com/zenta-dev/zever/notification/log"
-	notificationtwilio "github.com/zenta-dev/zever/notification/twilio"
 	"github.com/zenta-dev/zever/observability"
 	observabilitynoop "github.com/zenta-dev/zever/observability/noop"
 	"github.com/zenta-dev/zever/observability/otlp"
@@ -76,11 +63,8 @@ import (
 	"github.com/zenta-dev/zever/password"
 	"github.com/zenta-dev/zever/password/argon2"
 	"github.com/zenta-dev/zever/payment"
-	paymentpaddle "github.com/zenta-dev/zever/payment/paddle"
-	paymentstripe "github.com/zenta-dev/zever/payment/stripe"
 	paymentstub "github.com/zenta-dev/zever/payment/stub"
 	"github.com/zenta-dev/zever/permission"
-	permissioncasbin "github.com/zenta-dev/zever/permission/casbin"
 	permissionnoop "github.com/zenta-dev/zever/permission/noop"
 	permissionrbac "github.com/zenta-dev/zever/permission/rbac"
 	"github.com/zenta-dev/zever/queue"
@@ -90,12 +74,10 @@ import (
 	ratelimitmemory "github.com/zenta-dev/zever/ratelimit/memory"
 	ratelimitredis "github.com/zenta-dev/zever/ratelimit/redis"
 	"github.com/zenta-dev/zever/router"
-	routerfiber "github.com/zenta-dev/zever/router/fiber"
 	routerstdhttp "github.com/zenta-dev/zever/router/stdhttp"
 	"github.com/zenta-dev/zever/scheduler"
 	schedulerembedded "github.com/zenta-dev/zever/scheduler/embedded"
 	"github.com/zenta-dev/zever/search"
-	searchmeilisearch "github.com/zenta-dev/zever/search/meilisearch"
 	searchpostgres "github.com/zenta-dev/zever/search/postgres"
 	searchsqlite "github.com/zenta-dev/zever/search/sqlite"
 	"github.com/zenta-dev/zever/secrets"
@@ -105,14 +87,11 @@ import (
 	sessionredis "github.com/zenta-dev/zever/session/redis"
 	"github.com/zenta-dev/zever/storage"
 	storagelocal "github.com/zenta-dev/zever/storage/local"
-	storager2 "github.com/zenta-dev/zever/storage/r2"
-	storages3 "github.com/zenta-dev/zever/storage/s3"
 	"github.com/zenta-dev/zever/tenant"
 	tenantheader "github.com/zenta-dev/zever/tenant/header"
 	tenantsingle "github.com/zenta-dev/zever/tenant/single"
 	"github.com/zenta-dev/zever/vectorstore"
 	vectorstorepgvector "github.com/zenta-dev/zever/vectorstore/pgvector"
-	vectorstoreqdrant "github.com/zenta-dev/zever/vectorstore/qdrant"
 	vectorstoresqlite "github.com/zenta-dev/zever/vectorstore/sqlite"
 	"github.com/zenta-dev/zever/webhook"
 	webhookhttp "github.com/zenta-dev/zever/webhook/http"
@@ -125,9 +104,11 @@ import (
 // adaptersOnce guards the process-wide adapter registration below.
 var adaptersOnce sync.Once
 
-// ensureAdapters registers every service adapter factory exactly once per
-// process. Adapter packages expose constructors but never self-register,
+// ensureAdapters registers every light service adapter factory exactly once
+// per process. Adapter packages expose constructors but never self-register,
 // so the container — the composition root — wires them before first use.
+// Heavyweight families (see container/adapters) are excluded: the host
+// registers those explicitly via adapters.RegisterAI/RegisterAll.
 // Registration only fills factory maps; it opens nothing and starts no
 // background work. Duplicate errors are ignored: every factory passed here
 // is valid by construction, so the only failure mode is a factory the host
@@ -137,21 +118,15 @@ func ensureAdapters() {
 }
 
 func registerAdapters() {
-	_ = ai.Register(ai.Anthropic, anthropic.New)
-	_ = ai.Register(ai.OpenAI, openai.New)
-	_ = ai.Register(ai.Gemini, gemini.New)
 	_ = ai.Register(ai.Ollama, aiollama.New)
 
 	_ = analytics.Register(analytics.Log, analyticslog.New)
-	_ = analytics.Register(analytics.PostHog, posthog.New)
 
 	_ = auth.Register(auth.JWT, jwt.New)
 	_ = auth.Register(auth.Session, authsession.New)
 	_ = auth.Register(auth.OIDC, oidc.New)
 
 	_ = billing.Register(billing.Stub, billingstub.Open)
-	_ = billing.Register(billing.Stripe, billingstripe.New)
-	_ = billing.Register(billing.Paddle, billingpaddle.New)
 
 	_ = cache.Register(cache.Memory, cachememory.New)
 	_ = cache.Register(cache.Redis, cacheredis.New)
@@ -161,7 +136,6 @@ func registerAdapters() {
 	_ = db.Register(db.SQLite, dbsqlite.New)
 	_ = db.Register(db.Postgres, dbpostgres.New)
 
-	_ = document.Register(document.Local, documentlocal.New)
 	_ = document.Register(document.Remote, documentremote.New)
 	_ = document.Register(document.Latex, documentlatex.New)
 
@@ -169,9 +143,7 @@ func registerAdapters() {
 	_ = eventbus.Register(eventbus.Redis, eventbusredis.New)
 
 	_ = flag.Register(flag.Static, flagstatic.New)
-	_ = flag.Register(flag.Firebase, flagfirebase.New)
 
-	_ = geo.Register(geo.Google, geogoogle.New)
 	_ = geo.Register(geo.Static, geostatic.New)
 	_ = geo.Register(geo.OSM, geoosm.New)
 
@@ -192,12 +164,7 @@ func registerAdapters() {
 	_ = mailer.Register(mailer.Log, mailerlog.New)
 	_ = mailer.Register(mailer.SMTP, smtp.New)
 
-	_ = media.Register(media.Local, medialocal.New)
-	_ = media.Register(media.S3, medias3.New)
-
 	_ = notification.Register(notification.Log, notificationlog.New)
-	_ = notification.Register(notification.Twilio, notificationtwilio.New)
-	_ = notification.Register(notification.FCM, notificationfcm.New)
 
 	_ = observability.Register(observability.Noop, func(observability.Options) (observability.Provider, error) {
 		return observabilitynoop.New(), nil
@@ -208,12 +175,9 @@ func registerAdapters() {
 	_ = password.Register(password.AdapterArgon2ID, argon2.New)
 
 	_ = payment.Register(payment.Stub, paymentstub.New)
-	_ = payment.Register(payment.Stripe, paymentstripe.New)
-	_ = payment.Register(payment.Paddle, paymentpaddle.New)
 
 	_ = permission.Register(permission.Noop, permissionnoop.New)
 	_ = permission.Register(permission.RBAC, permissionrbac.New)
-	_ = permission.Register(permission.Casbin, permissioncasbin.New)
 
 	_ = queue.Register(queue.Memory, queuememory.New)
 	_ = queue.Register(queue.Redis, queueredis.New)
@@ -221,13 +185,11 @@ func registerAdapters() {
 	_ = ratelimit.Register(ratelimit.Memory, ratelimitmemory.New)
 	_ = ratelimit.Register(ratelimit.Redis, ratelimitredis.New)
 
-	_ = router.Register(router.AdapterFiber, routerfiber.New)
 	_ = router.Register(router.AdapterStdHTTP, routerstdhttp.New)
 
 	_ = scheduler.Register(scheduler.Embedded, schedulerembedded.New)
 
 	_ = search.Register(search.Postgres, searchpostgres.New)
-	_ = search.Register(search.Meilisearch, searchmeilisearch.New)
 	_ = search.Register(search.SQLite, searchsqlite.New)
 
 	_ = secrets.Register(secrets.Env, func(o secrets.Options) (secrets.Secrets, error) {
@@ -238,15 +200,12 @@ func registerAdapters() {
 	_ = session.Register(session.Redis, sessionredis.New)
 
 	_ = storage.Register(storage.AdapterLocal, storagelocal.New)
-	_ = storage.Register(storage.AdapterS3, storages3.New)
-	_ = storage.Register(storage.AdapterR2, storager2.New)
 
 	_ = tenant.Register(tenant.Single, tenantsingle.New)
 	_ = tenant.Register(tenant.Header, tenantheader.New)
 
 	_ = vectorstore.Register(vectorstore.SQLite, vectorstoresqlite.New)
 	_ = vectorstore.Register(vectorstore.PGVector, vectorstorepgvector.New)
-	_ = vectorstore.Register(vectorstore.Qdrant, vectorstoreqdrant.New)
 
 	_ = webhook.Register(webhook.AdapterHTTP, webhookhttp.New)
 	_ = webhook.Register(webhook.AdapterQueue, webhookqueue.New)

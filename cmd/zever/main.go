@@ -162,14 +162,11 @@ func run(args []string) error {
 			// Dispatch `zever help <subcommand>` to that subcommand's help.
 			switch rest[0] {
 			case "new":
-				// new has no dedicated print func; show top usage with hint.
-				printUsage()
-
-				_, _ = fmt.Fprintln(os.Stderr, formatHint("try 'zever new -h' for full flags")) //nolint:wsl_v5
+				printNewUsage(newNewFlagSet())
 
 				return nil
 			case "compile":
-				printCompileUsage(flag.NewFlagSet("compile", flag.ContinueOnError))
+				printCompileUsage(newCompileFlagSet())
 				return nil
 			case "check":
 				printCheckUsage(flag.NewFlagSet("check", flag.ContinueOnError))

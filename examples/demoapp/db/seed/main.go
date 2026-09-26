@@ -13,6 +13,7 @@ import (
 
 	"github.com/zenta-dev/zever/config"
 	"github.com/zenta-dev/zever/container"
+	"github.com/zenta-dev/zever/container/adapters"
 	"github.com/zenta-dev/zever/examples/demoapp/internal/service/seed"
 )
 
@@ -33,6 +34,7 @@ func run() error {
 	if err != nil {
 		return fmt.Errorf("[seed] load config: %w", err)
 	}
+	adapters.RegisterAll()
 	c := container.New(cfg)
 
 	defer func() {

@@ -378,7 +378,12 @@ func runCoverChildOut(ctx context.Context, t *testing.T, bin string, coverDir st
 }
 
 func TestMain_subprocessCover(t *testing.T) {
-	ctx, cancel := context.WithTimeout(t.Context(), 90*time.Second)
+	// The cover build below compiles the whole cmd/zever import closure
+	// (~1500 packages) with coverage instrumentation, which takes ~60s
+	// from a cold build cache on a fast machine and longer on loaded CI
+	// runners compiling sibling packages concurrently -- well past a tight
+	// budget. The timeout only bounds a hung build, not test speed.
+	ctx, cancel := context.WithTimeout(t.Context(), 4*time.Minute)
 	defer cancel()
 
 	tmp := t.TempDir()

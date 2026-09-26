@@ -187,7 +187,7 @@ MAJOR.MINOR.PATCH
 - **MINOR**: backward-compatible additions.
 - **PATCH**: backward-compatible bug fixes.
 
-While the project is below `v1.0.0`, treat `0.x` as a pre-1.0 phase: minor releases may contain breaking changes, and they should still be documented as such in the release notes. Releases are tagged with a `v` prefix (for example `v0.1.0`).
+While the project is below `v1.0.0`, treat `0.x` as a pre-1.0 phase: minor releases may contain breaking changes, and they should still be documented as such in the release notes. Releases are tagged with a `v` prefix (for example `v0.1.0`). See [STABILITY.md](../STABILITY.md) for core vs extended tiers.
 
 Nested modules (`tools/zever-lsp`) are versioned independently with prefixed tags (`tools/zever-lsp/v0.1.0`) and must `require` a published root version — never a committed `replace`. To iterate locally against working-tree root changes, use a temporary replace and revert it before committing:
 

@@ -323,13 +323,8 @@ func TestWebhookEvent_static(t *testing.T) {
 
 	p := newStub(t, true)
 
-	ev, err := p.WebhookEvent(t.Context(), []byte(`{}`), "sig")
-	if err != nil {
-		t.Fatalf("WebhookEvent err = %v", err)
-	}
-
-	if ev.Type != payment.EventType("stub.event") {
-		t.Fatalf("Type = %v, want stub.event", ev.Type)
+	if _, err := p.WebhookEvent(t.Context(), []byte(`{}`), "sig"); !errors.Is(err, payment.ErrInvalidSignature) {
+		t.Fatalf("WebhookEvent err = %v, want ErrInvalidSignature", err)
 	}
 }
 

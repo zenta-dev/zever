@@ -189,6 +189,10 @@ func TestBearerTokenFromMD(t *testing.T) {
 	if got := authz.BearerTokenFromMD(t.Context()); got != "" {
 		t.Fatalf("BearerTokenFromMD() no-md = %q, want empty", got)
 	}
+	multi := metadata.NewIncomingContext(t.Context(), metadata.MD{"authorization": {"Bearer abc", "Bearer def"}})
+	if got := authz.BearerTokenFromMD(multi); got != "" {
+		t.Fatalf("BearerTokenFromMD() multi = %q, want empty (fail closed)", got)
+	}
 }
 
 type idRequest struct{ id string }

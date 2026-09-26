@@ -14,7 +14,10 @@ import (
 var _ auth.Auth = (*adapter)(nil)
 
 // expiryLeeway tolerates clock skew between issuer and verifier before an
-// envelope expiry counts as expired.
+// envelope expiry counts as expired. One minute covers typical NTP drift
+// and container clock skew without materially extending short-lived
+// sessions; tokens remain hard-expired by the backing store independently,
+// so leeway only affects the envelope check here, never store TTL.
 const expiryLeeway = time.Minute
 
 // Envelope keys inside session Data.

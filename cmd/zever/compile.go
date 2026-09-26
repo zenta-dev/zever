@@ -160,17 +160,26 @@ func backendNamesSlice() []string {
 	return names
 }
 
-func runCompile(args []string) error { //nolint:gocyclo
-	args = peelInteractive(args)
+// newCompileFlagSet builds the stdlib flag set for `zever compile`: the
+// single source for runCompile parsing and for help/usage printers, so help
+// can never drift from the real flags (notably --backend and --out).
+func newCompileFlagSet() *flag.FlagSet {
 	fs := flag.NewFlagSet("compile", flag.ContinueOnError)
-	backendsFlag := fs.String("backend", defaultBackends(), "comma-separated list of backends to run (available: "+backendNames()+")")
-	outDir := fs.String("out", "./generated", "output directory for generated files")
+	fs.String("backend", defaultBackends(), "comma-separated list of backends to run (available: "+backendNames()+")")
+	fs.String("out", "./generated", "output directory for generated files")
 	// coverageProof: no local -i/--interactive flags; peelInteractive
 	// strips them before Parse and sets interactiveMode globally.
 
 	fs.Usage = func() {
 		printCompileUsage(fs)
 	}
+
+	return fs
+}
+
+func runCompile(args []string) error { //nolint:gocyclo
+	args = peelInteractive(args)
+	fs := newCompileFlagSet()
 
 	posArgs, err := flexibleParse(fs, args)
 	if err != nil {
@@ -219,8 +228,8 @@ func runCompile(args []string) error { //nolint:gocyclo
 
 	return runCompileWith(CompileConfig{
 		Files:    paths,
-		Backends: *backendsFlag,
-		OutDir:   *outDir,
+		Backends: fs.Lookup("backend").Value.String(),
+		OutDir:   fs.Lookup("out").Value.String(),
 	})
 }
 
