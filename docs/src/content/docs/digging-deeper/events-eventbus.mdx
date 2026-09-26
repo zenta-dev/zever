@@ -3,64 +3,218 @@ title: Events and Event Bus
 description: In-process pub/sub with a Redis transport for multi-instance fan-out.
 ---
 
-A user signs up, and three unrelated things need to happen — send a welcome
-email, provision a workspace, notify analytics. Wiring the signup handler to
+A user signs up, and three unrelated things need to happen - send a welcome
+mail, provision a workspace, notify analytics. Wiring the signup handler to
 call all three directly couples code that has no business knowing about each
 other. `eventbus.EventBus` lets producers publish a typed message and walk
-away; consumers subscribe to what they care about, and neither side needs to
+away. Consumers subscribe to what they care about, and neither side needs to
 know the other exists.
 
-`memory` (the default) is enough for a monolith or a test — delivery happens
-in-process, push or pull. Switch to `redis` the moment you run more than one
-instance and need a publish on one process to reach a subscriber on another.
+## Purpose and when to use
+
+Use the bus for notify-style fan-out where zero or more live listeners react
+and no single reaction is load-bearing. The bookings worker uses this shape
+for `booking.created` and `booking.cancelled` signals: mail, push, and
+webhook paths each subscribe without the booking write path naming them.
+
+Pick `memory` for a monolith, a single worker, or tests. Delivery happens
+in-process with push (`Subscribe`) and pull (`SubscribeChan`) forms, and it
+is the default in `config.Default()`. Pick `redis` the moment you run more
+than one instance and a publish on one process must reach a subscriber on
+another. That cross-process hop is the only reason to pay for the transport.
+
+Do not use the bus for work that must happen. There is no durability and no
+redelivery for offline handlers. Must-run side effects belong on `queue` via
+`job.Dispatcher`, where ack tracking and retries hold the work until done.
 
 ## Config
+
+File decoding is strict snake_case. Redis pooling keys sit under a nested
+`redis` block. Durations in files are integer nanoseconds.
 
 ```yaml
 eventbus:
   adapter: memory
+  options:
+    buffer_size: 1024
+    max_handlers: 128
+    handler_timeout: 30000000000
+    close_timeout: 5000000000
+```
+
+Shared fan-out across instances:
+
+```yaml
+eventbus:
+  adapter: redis
+  options:
+    buffer_size: 1024
+    max_handlers: 128
+    handler_timeout: 30000000000
+    close_timeout: 5000000000
+    redis:
+      addr: localhost:6379
+      db: 0
+      prefix: bookings
+      pool_size: 20
+      min_idle_conns: 2
+      pool_timeout: 5000000000
 ```
 
 ```sh
 EVENTBUS_ADAPTER=redis
+EVENTBUS_BUFFER_SIZE=1024
+EVENTBUS_MAX_HANDLERS=128
+EVENTBUS_HANDLER_TIMEOUT=30s
+EVENTBUS_CLOSE_TIMEOUT=5s
 ```
 
-Message shape lives in `eventbus/message.go`; keep payloads small, versioned,
-and serializable.
+Zero means adapter default (`buffer_size` 1024, `max_handlers` 128,
+`handler_timeout` 30s, `close_timeout` 5s). Only negative values fail
+validation. Env is best-effort: unknown vars ignored, unparsable resolved
+values error.
 
-## Resolve
+## Resolve via container
 
 ```go
-c := container.New(config.Default())
-bus, err := c.EventBus()
-if err != nil {
-	// handle
+import (
+	"github.com/zenta-dev/zever/config"
+	"github.com/zenta-dev/zever/container"
+)
+
+func openBus() error {
+	c := container.New(config.Default())
+	bus, err := c.EventBus()
+	if err != nil {
+		return err
+	}
+	defer func() { _ = bus.Close() }()
+	_ = bus
+	return nil
 }
-_ = bus
 ```
 
-`EventBus()` resolves lazily on first use; on error the cached state clears so
-the next call retries.
+`EventBus()` (alias `Eventbus()`) resolves lazily on first use and caches the
+instance. On error the cached state clears so the next call retries. `Open`
+always returns a bus with pull support: adapters expose the `Pusher` push
+core and the package wraps it unless pull is already present.
+
+Close shape: the pusher declares instant `Close() error` with no context. Every subscription needs an explicit exit path - keep the unsubscribe func or call `Unsubscribe` - or leak tests flag the stray goroutine.
+
+## Runnable example
+
+Publish one order event and receive it on a pull channel. Push form uses a
+handler func instead of a channel and returns an unsubscribe closure.
+
+```go
+package main
+
+import (
+	"context"
+	"fmt"
+
+	"github.com/zenta-dev/zever/eventbus"
+	"github.com/zenta-dev/zever/eventbus/memory"
+)
+
+func main() error {
+	_ = eventbus.Register(eventbus.Memory, memory.New)
+	bus, err := eventbus.Open(eventbus.Memory, eventbus.Options{})
+	if err != nil {
+		return err
+	}
+	defer func() { _ = bus.Close() }()
+	ctx := context.Background()
+
+	ch, err := bus.SubscribeChan(ctx, "orders", 16)
+	if err != nil {
+		return err
+	}
+	defer func() { _ = bus.Unsubscribe("orders", ch) }()
+
+	unsub, err := bus.Subscribe(ctx, "orders", func(_ context.Context, msg eventbus.Message) {
+		fmt.Println("push saw", string(msg.Payload))
+	})
+	if err != nil {
+		return err
+	}
+	defer unsub()
+
+	if err := bus.Publish(ctx, "orders", eventbus.NewPayload([]byte("hello")), nil); err != nil {
+		return err
+	}
+	msg := <-ch
+	fmt.Println("pull saw", string(msg.Payload))
+	return nil
+}
+```
+
+Expected behavior: both prints show `hello`, one from the push handler and
+one from the pull channel. Message shape lives in `eventbus/message.go` with
+`Payload` and `Headers`. Keep payloads small, versioned JSON.
+
+The bookings worker publishes `booking.created` after persisting the booking.
+With no subscriber configured the delivery is skipped quietly, which is the
+intended shape for optional webhook targets. Empty target URLs skip without
+error, and private targets stay rejected unless `allow_private_targets` is
+set for `httptest` flows.
 
 ## Adapters
 
 | Adapter | Package | Notes |
 |---|---|---|
-| `memory` | `eventbus/memory` | Default; process-local |
-| `redis` | `eventbus/redis` | Shared fan-out |
+| `memory` | `eventbus/memory` | Default, process-local, push plus pull, zero infra |
+| `redis` | `eventbus/redis` | Shared fan-out, prefix-keyed, pool-backed |
 
-## The gotcha: it's not a durable log, and it drops under pressure
+Both serve the same `eventbus.EventBus` interface, so local runs stay on
+`memory` while staging flips to `redis` with no call-site change.
 
-`eventbus` is not `queue` or `job` — there's no durability guarantee and no
-redelivery if a handler is offline when a message publishes. Per-topic buffers
-default to 1024 messages with drop-newest backpressure: if a slow or stuck
-subscriber lets its buffer fill, new messages for that topic get dropped
-rather than blocking the publisher. If a piece of work absolutely must
-happen — not just "notify whoever's listening" — enqueue it as a job instead;
-the bus is for notification-style fan-out, not guaranteed execution.
+## Gotchas and production notes
 
-Push `Subscribe` returns an unsubscribe function and pull `SubscribeChan`
-returns a channel that `Unsubscribe` or `Close` closes — every subscription
-needs an explicit exit path, or leak tests will catch it. Never put secrets in
-event payloads; redaction only applies to what gets logged, not to the payload
-itself.
+- The bus is not durable. A handler offline at publish time misses the
+  message with no replay. Route must-run work through `queue` instead.
+- Backpressure drops newest. Per-topic buffers default to 1024, and a full
+  buffer drops the newest message for that subscriber only. Size
+  `buffer_size` for burst plus handler latency, and keep handlers fast.
+- Bound handler time with `handler_timeout` (default 30s). A stuck handler
+  holds its slot and lets its buffer fill, which turns into drops elsewhere.
+- Cap fan-out with `max_handlers` (default 128). Unbounded subscribe calls
+  from request paths leak handlers and trip leak checks.
+- Never put secrets in payloads. Redaction covers logged config, not message
+  bodies. Secrets travel via `secrets` env wiring, never inside events.
+- Validate topics in code: non-empty, at most 256 bytes (`MaxTopicLen`),
+  payloads at most 4 MiB (`MaxMessageSize`). Oversize publishes fail closed.
+- Handle panics with `OnPanic` when handlers run third-party code. The hook
+  is never validated, so set it explicitly wherever a bad subscriber must
+  not take down the publisher.
+
+## Troubleshooting
+
+Symptom: subscriber on host B never fires for publishes on host A.
+Cause: `memory` adapter in a multi-instance deploy. Delivery is in-process.
+Fix: set `eventbus.adapter` to `redis` with a shared `addr` and `prefix`,
+then confirm every instance resolves the same endpoint via redacted output.
+
+Symptom: messages vanish under load with no error.
+Cause: per-topic buffer full, drop-newest backpressure engaged.
+Fix: raise `buffer_size`, shorten handler work (enqueue a job for slow I/O),
+and check for one slow subscriber starving its own channel.
+
+Symptom: strict load rejects `buffersize` or `maxhandlers`.
+Cause: flat pre-rename spellings. Canonical keys are `buffer_size`,
+`max_handlers`, plus `handler_timeout` and `close_timeout`.
+Fix: rename keys and use integer nanoseconds in the file. Env still accepts
+compact spellings since `_` is ignored during matching.
+
+Symptom: leak test fails after adding a subscription.
+Cause: missing exit path - unsubscribe func never called or `SubscribeChan`
+channel never passed to `Unsubscribe` or closed via bus `Close`.
+Fix: defer the unsubscribe closure right after `Subscribe`, and defer
+`Unsubscribe` right after `SubscribeChan`.
+
+## See also
+
+- [Queue](queue/) for durable delivery with ack and retry
+- [Scheduler and Jobs](scheduler-jobs/) for deferred execution instead of fan-out
+- [Build a Booking API](../tutorials/build-a-booking-api/) for the bookings tutorial
+- `examples/bookings/zever.yaml` for the memory bus default and `schema/bookings.zen` for job-triggered notify flows

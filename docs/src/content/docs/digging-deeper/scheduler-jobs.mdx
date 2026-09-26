@@ -3,67 +3,217 @@ title: Scheduler and Jobs
 description: In-process cron scheduling over the shared queue via the job dispatcher.
 ---
 
-"Run this every night at 2am" and "run this once, right now, in the
-background" are related problems but not the same one — the first needs a
-cron spec and dedup so a slow tick doesn't fire twice; the second just needs
+"Run this every night at 9am" and "run this once, right now, in the
+background" are related problems but not the same one - the first needs a
+cron spec and dedup so a slow tick does not fire twice, the second just needs
 somewhere durable to push work. `scheduler` handles the first by registering
 job names on cron specs and firing them through the job dispatcher with
-per-slot dedup; `job.Dispatcher` handles the second by wrapping the resolved
+per-slot dedup. `job.Dispatcher` handles the second by wrapping the resolved
 `Queue`.
 
-There's only one scheduler adapter (`embedded`, in-process ticks), so the real
-decision isn't which scheduler to pick — it's which queue backs it. `Job()`
-has no registry of its own: it builds a `*job.Dispatcher` directly over the
-resolved queue, and `Scheduler()` injects that same dispatcher, so scheduling
-work and dispatching work share one connection instead of opening a redundant
-one.
+## Purpose and when to use
 
-## Resolve
+Use jobs for deferred or retryable units of work: booking confirmations,
+receipt mail, guest push, webhook delivery. Use the scheduler for recurring
+triggers: the bookings `Reminder` schedule fires `0 9 * * *` each morning and
+dispatches `SendReminder` for confirmed bookings starting within 7 days.
 
-```go
-c := container.New(config.Default())
-d, err := c.Job()       // dispatcher over resolved Queue
-s, err := c.Scheduler() // shares Queue via Job(); resolves both as a side effect
-_ = s
-_ = d
-```
+There is only one scheduler adapter (`embedded`, in-process ticks), so the real decision is which queue backs it. `memory` keeps web, worker, and ticks in one process for dev. `redis` lets ticks fire in one process while any worker in the fleet pops the job.
 
-`job.Batch` and `job/lock.go` cover batch enqueue and locked dispatch for
-singleton-style jobs — reach for the lock helper when a job must run on
-exactly one instance even though every instance is registered to run it.
+Do not use the scheduler as a durable timeline. If the process is down when a
+slot fires, that run is gone. For must-not-miss work, pair the trigger with
+idempotent handlers plus `lock` or `idempotency`, and consider a catch-up
+query on boot.
 
 ## Config
+
+Only `close_timeout` is file-settable for the scheduler. `Dispatcher`,
+`Locker`, and `Logger` are code-wired (tagged `yaml:"-"`) and injected by the
+container. Queue options still matter because dispatch rides the queue.
 
 ```yaml
 queue:
   adapter: memory
+  options:
+    visibility_timeout: 30000000000
+    poll_timeout: 1000000000
+    buffer: 100
 scheduler:
   adapter: embedded
+  options:
+    close_timeout: 5000000000
 ```
 
 ```sh
 QUEUE_ADAPTER=redis
+QUEUE_VISIBILITY_TIMEOUT=30s
+QUEUE_POLL_TIMEOUT=1s
 SCHEDULER_ADAPTER=embedded
 ```
 
-Switching the queue to `redis` makes both dispatch and scheduled runs durable
-across processes — the scheduler adapter itself doesn't change.
+File durations are integer nanoseconds. Env accepts `"5s"` style strings.
+The bookings `zever.yaml` pins exactly this shape: memory queue plus
+`embedded` scheduler for one-process dev.
+
+## Resolve via container
+
+```go
+import (
+	"github.com/zenta-dev/zever/config"
+	"github.com/zenta-dev/zever/container"
+)
+
+func openScheduler() error {
+	c := container.New(config.Default())
+	d, err := c.Job() // dispatcher over resolved Queue
+	if err != nil {
+		return err
+	}
+	_ = d
+	s, err := c.Scheduler() // shares Queue via Job()
+	if err != nil {
+		return err
+	}
+	defer func() { _ = s.Stop() }()
+	return nil
+}
+```
+
+`Job()` has no registry. It builds a `*job.Dispatcher` over the resolved `Queue`, so `d.Q` is the shared instance. `Scheduler()` injects that dispatcher, so resolving the scheduler resolves `Job()` and `Queue` as a side effect.
+
+Close shape: the scheduler declares `Stop() error` instead of `Close`. The container shuts scheduler and job dependents first, before snapshots and leaf `cache` and `queue`.
+
+## Runnable example
+
+Register two typed jobs, dispatch one immediately, and schedule the other on
+a cron spec. Run the embedded worker in the same process for dev, mirroring
+`go run ./cmd/worker` in `examples/bookings`.
+
+```go
+package main
+
+import (
+	"context"
+	"time"
+
+	"github.com/zenta-dev/zever/job"
+	"github.com/zenta-dev/zever/queue"
+	queuememory "github.com/zenta-dev/zever/queue/memory"
+	"github.com/zenta-dev/zever/scheduler"
+	schedulerembedded "github.com/zenta-dev/zever/scheduler/embedded"
+)
+
+type ConfirmArgs struct {
+	BookingID string `json:"booking_id"`
+}
+
+type ReminderArgs struct {
+	SpaceID string `json:"space_id"`
+}
+
+func main() error {
+	job.Reset()
+	defer job.Reset()
+	ctx := context.Background()
+
+	if err := job.Register("SendConfirmation", func(_ context.Context, a ConfirmArgs) error {
+		_ = a.BookingID
+		return nil
+	}); err != nil {
+		return err
+	}
+	if err := job.Register("SendReminder", func(_ context.Context, a ReminderArgs) error {
+		_ = a.SpaceID
+		return nil
+	}); err != nil {
+		return err
+	}
+
+	q, err := queuememory.New(queue.Options{})
+	if err != nil {
+		return err
+	}
+	defer func() { _ = q.Close() }()
+	d := &job.Dispatcher{Q: q}
+
+	_ = scheduler.Register(scheduler.Embedded, schedulerembedded.New)
+	s, err := scheduler.Open(scheduler.Embedded, scheduler.Options{Dispatcher: d})
+	if err != nil {
+		return err
+	}
+	defer func() { _ = s.Stop() }()
+
+	if err := d.Dispatch(ctx, "SendConfirmation", ConfirmArgs{BookingID: "b_123"}); err != nil {
+		return err
+	}
+	id, err := s.Schedule(ctx, "0 9 * * *", "SendReminder", ReminderArgs{SpaceID: "s_42"})
+	if err != nil {
+		return err
+	}
+	_ = id
+	if err := s.Start(); err != nil {
+		return err
+	}
+	time.Sleep(50 * time.Millisecond)
+	return s.Remove(id)
+}
+```
+
+Worker command for the bookings app, from `examples/bookings`:
+
+```sh
+go run ./cmd/worker
+```
+
+Expected behavior: the dispatch enqueues onto topic `default`, the schedule registers `Reminder` on `0 9 * * *`, and `Start` begins ticks. The worker registers `SendConfirmation` on `default` and `SendReminder` on `low` with concurrency 4.
 
 ## Adapters
 
 | Service | Adapter | Package | Notes |
 |---|---|---|---|
-| job | — | `job` | Dispatcher only, no adapter/registry |
-| scheduler | `embedded` | `scheduler/embedded` | In-process ticks |
+| job | - | `job` | Dispatcher only, no adapter registry, topics are priority names |
+| scheduler | `embedded` | `scheduler/embedded` | In-process cron ticks, `Stop()` ends ticks |
 
-## The gotcha: `scheduler` doesn't catch up missed ticks
+`job.Batch` covers batch enqueue and `job/lock.go` covers locked dispatch
+for singleton-style jobs. Use the lock helper with `UniqueBy` when a job must
+run on exactly one instance even though every instance is registered.
 
-If the process is down when a cron slot fires, that run is simply gone — the
-scheduler is not a durable timeline it replays on restart, it's an in-process
-ticker with per-slot dedup so a slow handler can't double-fire the same slot.
-For anything where a missed run matters, pair the scheduled trigger with
-idempotent job handlers backed by `lock` or `idempotency`, so a late catch-up
-enqueue (if you build one) or an overlapping retry doesn't double-apply.
-`zever queue:work` runs the worker and `zever schedule:run` runs the scheduler
-in-process; `Close` shuts the scheduler down via `Stop() error` probing before
-the queue closes.
+## Gotchas and production notes
+
+- Missed ticks do not replay. A restart skips slots that fired while down. Keep handlers idempotent so a manual catch-up dispatch never double-applies.
+- Guard overlapping ticks with the unique locker. A slow run plus a fast cadence double-fires the same slot without per-slot dedup.
+- Keep job payloads small JSON. The dispatcher marshals args per dispatch, and large blobs inflate every retry and queue read.
+- Retry policy and priority are set at `job.Register` time with `WithRetryPolicy` and `WithPriority`. Bookings pins `max_attempts(3)` with exponential base 30s.
+- `Scheduler()` shares one queue connection through `Job()`. Do not open a second queue for scheduled work.
+- Close dependents first: scheduler `Stop()`, then snapshots, then queue and cache.
+- Never log raw option maps. Use `config.RedactedServices` for display, and
+  keep `close_timeout` explicit in prod instead of relying on the 5s default.
+
+## Troubleshooting
+
+Symptom: reminders fire twice from two hosts.
+Cause: two schedulers tick the same spec with no shared locker.
+Fix: wire one `job.UniqueLocker` into both (redis or db backed) so only the first claims each slot, or run a single scheduler replica.
+
+Symptom: `scheduler.Open` fails with `dispatcher_is_required`.
+Cause: `Dispatcher` is code-only and was left nil. It cannot come from YAML.
+Fix: resolve through `c.Scheduler()` so the container injects `Job()`, or
+pass `scheduler.Options{Dispatcher: d}` explicitly in hand-wired code.
+
+Symptom: dispatched job never runs, worker idle.
+Cause: topic mismatch - `job.Register` defaults to `PriorityLow` (topic
+`low`) while the worker polls only `default`, or vice versa.
+Fix: align priorities with `job.WithPriority` at register time and poll both
+`default` and `low` in order, as the bookings worker does.
+
+Symptom: shutdown drops a tick that already started.
+Cause: `close_timeout` too short or queue closed before the scheduler.
+Fix: raise `close_timeout` (nanoseconds in file, `"5s"` in env) and keep
+container close order so `Stop()` waits for running ticks first.
+
+## See also
+
+- [Queue](queue/) for the shared transport underneath dispatch and ticks
+- [Events and Event Bus](events-eventbus/) for non-durable fan-out instead of jobs
+- [Build a Booking API](../tutorials/build-a-booking-api/) for the bookings tutorial
+- `examples/bookings/zever.yaml` for worker queue and scheduler wiring and `schema/bookings.zen` for SendConfirmation, SendReminder, and the Reminder cron

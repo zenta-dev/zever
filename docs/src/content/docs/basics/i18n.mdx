@@ -3,13 +3,19 @@ title: Internationalization
 description: Translate strings with embedded catalogs locally and remote backends in production.
 ---
 
-`i18n` resolves user-facing strings per locale. Development embeds the catalog in the binary; production can pull from a remote service — same interface, configuration-only swap.
+`i18n` resolves user-facing strings per locale. Development embeds the catalog in the binary; production can pull from a remote service - same interface, configuration-only swap.
 
-## Setup
+Use it for every user-visible string (booking confirmations, emails, error explanations). Never concatenate translated fragments in code; translators need full sentences with placeholders.
+
+## Config
 
 ```yaml
 i18n:
   adapter: embed   # default: compiled-in catalog
+  options:
+    embed:
+      dir: locales
+      fallback: en
 ```
 
 ```yaml
@@ -17,16 +23,66 @@ i18n:
   adapter: remote  # production: shared catalog service
   options:
     remote:
-      endpoint: https://i18n.example.com
+      endpoint: i18n.internal:8080
+      timeout: 30s
 ```
 
+```sh
+I18N_ADAPTER=embed
+I18N_ADAPTER=remote
+I18N_ENDPOINT=i18n.internal:8080
+```
+
+The bookings server sets runtime fields the YAML does not carry: `cfg.I18n.Options.Embed = i18n.EmbedOptions{FS: api.LocalesFS, Dir: "locales", Fallback: "en"}`. `DefaultTimeout` is 30s for remote fetches. File keys are snake_case and strict; env matching ignores case and `_`.
+
+## Resolve via container
+
 ```go
+import (
+    "github.com/zenta-dev/zever/config"
+    "github.com/zenta-dev/zever/container"
+)
+
+c := container.New(config.Default())
 t, err := c.I18n()
 if err != nil {
     return err
 }
 msg, err := t.Translate(ctx, "en", "welcome", map[string]string{"Name": "Ada"})
+if err != nil {
+    return err
+}
 ```
+
+`I18n()` resolves lazily and caches; on error the cache clears so the next call retries. Shutdown needs nothing extra: catalogs hold no closeable connection beyond the shared client `c.Close(ctx)` drains.
+
+## Runnable example
+
+```go
+// locales/en.json: {"welcome": "Welcome back!", "hello": "Hello, {Name}!"}
+// locales/fr.json: {"hello": "Bonjour, {Name}!"}
+
+msg, _ := t.Translate(ctx, "fr", "hello", map[string]string{"Name": "Ada"})
+fmt.Println(msg)
+
+missing, _ := t.Translate(ctx, "fr", "welcome", nil)
+fmt.Println(missing)
+```
+
+```sh
+go run ./cmd/server &
+curl -s localhost:8080/hello -H 'Accept-Language: fr-CA,fr;q=0.9'
+curl -s localhost:8080/hello -H 'Accept-Language: en'
+```
+
+Expected output:
+
+```text
+Bonjour, Ada!
+Welcome back!
+```
+
+A key missing in `fr` falls back to the `en` catalog, never an empty string. Log the resolved locale at debug level when diagnosing mismatches - never the full catalog or raw option maps.
 
 ## Locale resolution
 
@@ -44,7 +100,7 @@ func localeOf(r *http.Request, user *User) string {
 }
 ```
 
-Keep locale resolution in one middleware or helper so every handler reads the same value.
+Keep locale resolution in one middleware or helper so every handler reads the same value. Pass structured args (`map[string]string`) rather than pre-formatted strings - word order differs across languages.
 
 ## Message patterns
 
@@ -53,9 +109,36 @@ Keep locale resolution in one middleware or helper so every handler reads the sa
 | Simple | `"welcome": "Welcome back!"` |
 | Interpolated | `"hello": "Hello, {Name}!"` |
 | Plural | `"cart.n": "{Count} item / {Count} items"` (CLDR rules per locale) |
-| Fallback | missing key in `fr` falls back to `en`, never an empty string |
+| Fallback | missing key in `fr` falls back to `en`, never empty |
 
-Pass structured args (`map[string]string`) rather than pre-formatted strings — word order differs across languages, and translators need the placeholders.
+## API table
+
+| Method / helper | Purpose |
+|---|---|
+| `Translate(ctx, locale, key, args)` | message for locale and key with interpolation; falls back on miss |
+| `i18n.Open(adapter, opts)` | open an adapter without the container |
+| `i18n.Register(adapter, factory)` | add a custom adapter |
+| `EmbedOptions{FS, Dir, Fallback}` | compiled-in catalog: file system, directory, default locale |
+| `RemoteOptions{Endpoint, Timeout}` | shared catalog service endpoint and fetch timeout |
+| `Options.Validate()` | reject bad adapter settings at startup |
+| locale helper (app-owned) | single resolution point: profile, then header, then default |
+
+Catalogs are data, not code: version them with the schema, diff them in review, and deploy them beside the binary (embed) or behind the remote endpoint.
+
+## Production notes
+
+- Close semantics: catalogs hold no per-service shutdown beyond shared clients; `c.Close(ctx)` covers the rest. Remote fetches honor context deadlines.
+- Redaction: catalogs are safe to diff, but option maps may carry endpoint credentials. Display config only through `config.RedactedServices`.
+- Timeouts: remote catalog fetches default to `DefaultTimeout` (30s); pass `r.Context()` so slow catalog backends do not hang requests. Cache hot keys in front of remote.
+- Fallback chain: always configure `Fallback: "en"` (or your source locale) so a missing translation degrades to readable text, not a blank.
+
+## Troubleshooting
+
+1. **Blank strings in one locale.** No fallback configured, or the helper returns empty on miss. Set `Fallback` and assert the chain (missing `fr` key returns `en` text) in tests.
+2. **Wrong language served.** Two resolution points disagree. Centralize `localeOf` in one middleware and log the resolved locale at debug level.
+3. **Remote catalog hangs requests.** Fetch ignores the request context or timeout is unset. Thread `r.Context()` through `Translate` and keep `DefaultTimeout` bounded.
+4. **Translations change without review.** Catalogs ship outside the binary with no versioning. Commit embed catalogs beside the schema, or pin remote catalog versions per release.
+5. **Placeholder order breaks a language.** Code pre-formats `"Hello " + name`. Pass `map[string]string` args and let each locale order its own placeholders.
 
 ## Testing
 
@@ -66,6 +149,23 @@ tests := []struct{ locale, key, want string }{
     {"en", "welcome", "Welcome back!"},
     {"fr", "missing.key", "fallback English text"},
 }
+for _, tt := range tests {
+    t.Run(tt.key+tt.locale, func(t *testing.T) {
+        got, err := tr.Translate(t.Context(), tt.locale, tt.key, nil)
+        if err != nil {
+            t.Fatal(err)
+        }
+        if got != tt.want {
+            t.Errorf("got %q, want %q", got, tt.want)
+        }
+    })
+}
 ```
 
-Catalogs are data, not code: version them with the schema, diff them in review, and deploy them alongside the binary (embed) or behind the remote endpoint. Log the resolved locale at debug level when diagnosing mismatches — never log the full catalog or raw option maps.
+Keep tests deterministic: no network (use embed), no unseeded randomness, no timing assertions.
+
+## See also
+
+- [Sessions](sessions/) - locale preference stored per user session
+- [Validation](validation/) - field-named errors worth translating at the edge
+- [Configuration](../getting-started/configuration/) - file plus env layering for adapter choice

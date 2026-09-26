@@ -5,22 +5,100 @@ description: Flags-only toolkit shell with exact CLI invocations for every comma
 
 ## Purpose
 
-`zever` is a flags-only toolkit shell. Bare `zever` (no subcommand, TTY or
-not) prints usage to stderr and exits 1 so scripts never hang. Every
-command has an exact CLI invocation; run `zever --help` for the grouped
-command map.
+`zever` is a flags-only toolkit shell. Every command has an exact CLI
+invocation; run `zever --help` for the grouped command map.
 
-## Bare-command contract
+When to use: scaffold, inspect, run, migrate, and document a zever
+project. When not to use: project code stays in Go and `.zen`; the CLI
+drives it, never hosts logic.
 
-- Bare `zever` (no subcommand, TTY or not): usage to stderr plus `zever: missing subcommand`, exit 1.
-- All errors go to stderr; stdout stays clean for command output.
+## Prerequisites
 
-## Commands
+- Install from the module root (single-module repo, no nested `go.mod`):
+
+```sh
+go install github.com/zenta-dev/zever/cmd/zever@v0.4.0
+```
+
+- `zever --help` prints the grouped map (Scaffolding / Inspection /
+  Runtime / Database).
+
+## Config
+
+Global flags apply to every command:
+
+```sh
+zever --quiet <command>     # suppress hints/tips on stderr; errors still print
+zever --no-color <command>  # disable styled output
+```
+
+`--no-color` is also honored via ambient `NO_COLOR` / `TERM=dumb`. Guided
+prompts for one-shot commands: `-i` / `--interactive` (before or after the
+subcommand) or `ZEVER_INTERACTIVE=1|true|yes` enables `huh` prompts.
+`zever <command> -h` always prints flags without running anything.
+
+Bare-command contract: bare `zever` (no subcommand, TTY or not) prints
+usage to stderr plus `zever: missing subcommand` and exits 1, so scripts
+never hang. All errors go to stderr; stdout stays clean for command
+output.
+
+## Resolve
+
+No resolver step: pick the command, pass flags, check the exit code.
+
+| Code | Meaning |
+|---|---|
+| `0` | success |
+| `1` | runtime error (message on stderr) |
+| `2` | flag misuse (error on stderr, no usage dump) |
+
+`--help` output goes to stdout; errors and bare-invocation usage go to
+stderr.
+
+## Runnable example
+
+```sh
+zever --help
+zever completion bash > /tmp/zever.bash
+zever docs --dir /tmp/zever-docs
+ls /tmp/zever-docs
+echo exit:$?
+```
+
+Expected output:
+
+```text
+grouped command map on stdout (Scaffolding / Inspection / Runtime / Database)
+completion script at /tmp/zever.bash
+one man page plus one markdown file per command under /tmp/zever-docs
+exit:0
+```
+
+Schema loop example:
+
+```sh
+zever fmt --write schema/
+zever check schema/
+zever compile --out ./generated
+echo exit:$?
+```
+
+Expected output:
+
+```text
+fmt: normalized files listed, if any
+check: silent on success
+compile: per-backend output under ./generated
+exit:0
+```
+
+## Reference
 
 | Group | Equivalent CLI |
 |---|---|
 | Scaffold | `zever new` |
 | Scaffold | `zever generate` |
+| Scaffold | `zever generate tinker` |
 | Scaffold | `zever extract` |
 | Inspect | `zever compile` |
 | Inspect | `zever check` |
@@ -43,34 +121,63 @@ command map.
 | Tooling | `zever completion <bash\|zsh\|fish\|powershell>` |
 | Tooling | `zever docs --dir <dir>` |
 
-## Global flags and exit codes
+| Flag | Effect |
+|---|---|
+| `--quiet` | suppress hints/tips on stderr |
+| `--no-color` | disable styled output |
+| `-i`, `--interactive` | guided `huh` prompts for one-shot commands |
+| `-h` | print flags without running |
 
-- `--quiet`: suppress hints/tips on stderr; errors still print.
-- `--no-color`: disable styled output (also honored via `NO_COLOR` /
-  `TERM=dumb` ambient env).
-- Exit codes: `0` success, `1` runtime error, `2` flag misuse (bad
-  flags print the error to stderr with no usage dump).
-- `--help` output goes to stdout; errors and bare-invocation usage go
-  to stderr.
+### Dev and tinker rules
 
-## Shell completion and generated docs
+- `zever dev` is local watch-only: it prints
+  `zever dev: watching <schemaDir> and <serverEntry> … (Ctrl-C to stop)`
+  to stdout and restarts the server entrypoint on change. Ctrl-C stops the
+  watcher and the server. Never a deployment path.
+- `zever tinker` is dev-only: every start prints
+  `WARNING: zever tinker is development-only: it evaluates arbitrary Go
+  against a live container, so run it against a development database only.`
+  to stderr. The REPL talks to the real container via the per-project shim
+  (`project.tinker_entry`, default `cmd/tinker-shim`; scaffold with
+  `zever generate tinker`). Never point it at production data.
+
+### Shell completion and generated docs
 
 - `zever completion <shell>` prints that shell's completion script to
-  stdout, e.g. `zever completion bash > /etc/bash_completion.d/zever`.
-- `zever docs --dir <dir>` writes one man page plus one markdown file
-  per command into `<dir>`.
+  stdout; redirect into the completions dir, e.g.
+  `zever completion bash > /etc/bash_completion.d/zever`.
+- `zever docs --dir <dir>` writes one man page plus one markdown file per
+  command into `<dir>`; build stripped release binaries with
+  `make build-release` (`-trimpath -ldflags="-s -w"`).
+- `migrate` / `rollback` mask the DSN (`--dsn ***`) in display and output.
 
-## Dev and tinker rules
+## Production notes
 
-- `zever dev` is local watch-only: it watches the schema dir and server
-  entrypoint, restarts on change, and stops on Ctrl-C. Never a deployment
-  path.
-- `zever tinker` is dev-only: every start prints the development-only warning
-  to stderr and evaluates arbitrary Go against a live container via the
-  per-project shim (`cmd/tinker-shim`). Never point it at production data.
+- Script against exit codes, not output text: `0` / `1` / `2` are the
+  contract; hint wording may change (and `--quiet` suppresses hints).
+- Keep stdout parseable: errors never touch stdout, so pipes and
+  `$(...)` capture stay clean.
+- `dev` and `tinker` never run in prod: `dev` is watch-only, `tinker`
+  evaluates arbitrary Go. Gate both out of deployment images.
+- Pin the installed CLI version to the repo release; flag surfaces move
+  with releases.
 
-## Notes
+## Troubleshooting
 
-- `zever <command> -h` always prints flags without running anything.
-- `-i` / `--interactive` (or `ZEVER_INTERACTIVE=1`) enables guided `huh` prompts for one-shot commands.
-- `migrate`/`rollback` mask the DSN (`--dsn ***`) in display and output.
+- **Bare `zever` exits 1**: expected; it prints usage to stderr with
+  `zever: missing subcommand`. Pass a subcommand or `--help`.
+- **Exit 2 with no usage dump**: flag misuse. Re-check flag spelling with
+  `zever <command> -h`; only the error prints.
+- **`tinker` warns on every start**: by design, the dev-only warning goes
+  to stderr each launch. Do not silence it; do not aim it at prod data.
+- **`dev` does not restart on edits**: it watches the schema dir and the
+  server entrypoint only. Edits outside those paths need a manual restart.
+- **Styled output garbles CI logs**: pass `--no-color` or set
+  `NO_COLOR=1`; `TERM=dumb` is honored the same way.
+
+## See also
+
+- [Syntax](../dsl/syntax-zen/) for the schema files inspected commands read
+- [LSP and Tooling](../dsl/lsp-tooling/) for editor-side inspection
+- [Config Reference](./config-reference/) for `config show` output
+- [Backends](../dsl/backends/) for `compile` outputs

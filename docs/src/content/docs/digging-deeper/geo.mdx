@@ -3,56 +3,162 @@ title: Geo
 description: Geocoding, reverse geocoding, and distance behind one interface.
 ---
 
-"Where is this address" and "how far apart are these two points" are two
-questions almost every app eventually needs answered, and neither one should
-require your test suite to make a real network call. `geo.Geo` covers both —
-geocode an address, reverse-geocode coordinates, measure distance in meters —
-through one interface with three very different backends underneath.
+## Purpose
 
-`static` (the default) serves a bundled, file-backed list from memory: no
-network, fully deterministic, exactly what you want in tests. `osm` gets you
-free geocoding against OpenStreetMap data (it requires a `User-Agent`, per
-their usage policy) when you don't need Google-grade accuracy. `google` is the
-adapter to reach for when accuracy actually matters in production and you're
-willing to pay for an API key.
+Use `geo` when the app must turn an address into coordinates, coordinates
+into an address, or two points into a distance in meters. One `Geo`
+interface covers `Geocode`, `ReverseGeocode`, and `Distance`, so callers
+stay fixed while the backend changes between tests and production.
+
+## When to use
+
+Pick `static` (the default) for tests and offline dev: it serves a
+file-backed list (`path` points at a JSON fixture) from memory with no
+network and fully deterministic results. Pick `osm` for free
+OpenStreetMap-backed geocoding when Google-grade accuracy is not needed;
+it requires a `User-Agent` per Nominatim usage policy. Pick `google` when
+accuracy matters in production and an API key budget exists.
+
+The bookings example pins `geo.adapter: static` in `zever.yaml`, and its
+API tests point `cfg.Geo.Options.Path` at `testdata/cities.json`. The
+bookings README doctor note records the expected gap: `zever doctor`
+FAILs on geo with zero-infra defaults because the `cities.json` fixture
+is missing until seed data lands. That FAIL is a fixture gap, not a
+framework bug.
 
 ## Config
 
 ```yaml
 geo:
   adapter: static
+  options:
+    path: data/cities.json
 ```
+
+OSM variant:
+
+```yaml
+geo:
+  adapter: osm
+  options:
+    endpoint: https://nominatim.openstreetmap.org
+    user_agent: bookings-demo/1.0
+```
+
+Google variant:
+
+```yaml
+geo:
+  adapter: google
+  options:
+    api_key: ${GEO_API_KEY}
+    base_url: https://maps.googleapis.com
+```
+
+Env (no prefix, `<SERVICE>_<FIELD>`):
 
 ```sh
 GEO_ADAPTER=osm
+GEO_USERAGENT=bookings-demo/1.0
+GEO_APIKEY=secret-key
+GEO_ALLOWINSECURE=false
 ```
 
-## Resolve
+`Validate` rejects negative `timeout` / `max_response_body` and any
+`base_url` / `endpoint` that is not a valid `https` URL unless
+`allow_insecure` is set.
+
+## Resolve via container
 
 ```go
 c := container.New(config.Default())
 g, err := c.Geo()
 if err != nil {
-	// handle
+    // handle
 }
 _ = g
 ```
+
+Resolution is lazy and cached per container. On error the cached state
+clears so the next call retries.
+
+## Runnable example
+
+```go
+package main
+
+import (
+    "context"
+    "fmt"
+
+    "github.com/zenta-dev/zever/config"
+    "github.com/zenta-dev/zever/container"
+    "github.com/zenta-dev/zever/geo"
+)
+
+func main() {
+    c := container.New(config.Default())
+    g, err := c.Geo()
+    if err != nil {
+        panic(err)
+    }
+    defer g.Close()
+
+    ctx := context.Background()
+    locs, err := g.Geocode(ctx, "Berlin")
+    fmt.Println(len(locs), err)
+    d, err := g.Distance(ctx, geo.Point{Lat: 52.52, Lng: 13.40}, geo.Point{Lat: 48.85, Lng: 2.35})
+    fmt.Println(d, err)
+}
+```
+
+Expected output (static fixture with seeded cities):
+
+```text
+1 <nil>
+878000 <nil>
+```
+
+Exact distance depends on the fixture data; the shape is count, then
+meters as a float.
 
 ## Adapters
 
 | Adapter | Package | Notes |
 |---|---|---|
-| `static` | `geo/static` | Default; bundled, offline |
-| `osm` | `geo/osm` | OpenStreetMap-backed; needs a `User-Agent` |
-| `google` | `geo/google` | Google-backed, needs an API key |
+| `static` | `geo/static` | Default; file-backed list, offline, deterministic |
+| `osm` | `geo/osm` | OpenStreetMap-backed; requires `user_agent` |
+| `google` | `geo/google` | Google-backed; needs `api_key` |
 
-## The gotcha: HTTPS is required, not optional
+## Production notes
 
-Both external adapters require `https` for their endpoints — `AllowInsecure`
-exists as an explicit escape hatch for tests only, not a config flag you'd ever
-flip in production. `ValidCoord` checks WGS84 range and finiteness before a
-coordinate goes anywhere, catching a swapped lat/lng or a NaN before it reaches
-a provider. Since real geocoding calls are genuinely slow relative to a request
-handler, put them behind a job or a cache rather than the hot path — coordinates
-for a given address rarely change, so caching a geocode result is almost always
-correct, and keeps tests pinned to `static` for determinism.
+- Close semantics: `Geo.Close() error` with no context (instant-close
+  shape). Container closes only already-resolved services in dependency
+  order and joins errors via `errors.Join`.
+- Multi-instance behavior: `static` is per-process memory, so every
+  replica needs the same fixture file. `osm` / `google` are remote and
+  shared by nature; put them behind a cache or a job since real geocode
+  calls are slow relative to a request handler and coordinates per
+  address rarely change.
+- Redaction: `api_key` is secret. Never log raw option maps; use
+  `config.RedactedServices`. `ValidCoord` checks WGS84 range and
+  finiteness before coordinates reach a provider, catching swapped
+  lat/lng or NaN early.
+
+## Troubleshooting
+
+1. `zever doctor` FAILs on geo: expected with zero-infra defaults when
+   `cities.json` (or any `path` fixture) is missing. Seed the fixture or
+   point `path` at committed test data; do not patch framework code.
+2. `base_url must use https` error: external adapters require `https`.
+   `allow_insecure` exists only for tests with `httptest` servers; never
+   enable it in production.
+3. OSM rejects requests: the `user_agent` is missing or generic.
+   Set a real app-identifying `User-Agent` per Nominatim policy, and
+   cache results to stay inside usage limits.
+
+## See also
+
+- [Cache](./cache.mdx) - caching geocode results
+- [Rate Limiting](./ratelimit.mdx) - bounding provider call volume
+- [Observability](./observability.mdx) - spans around slow geo calls

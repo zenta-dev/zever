@@ -3,36 +3,156 @@ title: Errors
 description: Typed errors with stable gRPC codes and HTTP mappings.
 ---
 
-Errors are typed values with stable codes. Handlers match the error, pick a status, and log once — see [Logging](logging/) for the structured-logging half of that pattern.
+Errors are typed values with stable codes. Handlers match the error, pick a status, and log once - see [Logging](logging/) for the structured-logging half of that pattern.
 
-## Typed errors
+Use this page when deciding how a failure surfaces: which sentinel to match, which status to write, and what may appear in the message text.
 
-`apperror` defines the shared vocabulary with gRPC codes and HTTP mappings, mirrored by the DSL's `ir.ErrorCode` table:
+## Config
+
+Errors take no YAML or env block. They are values returned by services, not a swappable adapter. The only related setting is log output for the single log line:
+
+```yaml
+log:
+  adapter: slog
+```
+
+```sh
+LOG_ADAPTER=slog
+```
+
+State the default adapter path: `config.Default()` wires zero-infrastructure services whose errors are the same typed values production returns.
+
+## Resolve via container
+
+No accessor: errors arrive as return values from resolved services. Match them at the call site:
 
 ```go
+c := container.New(config.Default())
+db, err := c.DB()
+if err != nil {
+    return err
+}
+
+user, err := findUser(ctx, db, id)
 if errors.Is(err, db.ErrNotFound) {
     writeError(w, http.StatusNotFound, "user not found")
     return
 }
+if err != nil {
+    logger.Error().Err(err).Msg("find user failed")
+    writeError(w, http.StatusInternalServerError, "internal error")
+    return
+}
 ```
 
-| Pattern | Use |
-|---|---|
-| sentinel + `errors.Is` | stable branches (`db.ErrNotFound`, `dialect.ErrUnsupportedByDialect`) |
-| `%w` wrapping | add context without losing identity |
-| `errors.As` for `ClosePanicError` / `CloseTimeoutError` (value types, not pointers) | shutdown diagnostics |
-| `orm:` / `orm/render:` prefixes | ORM failures stay greppable and compatible |
+Log once, at the boundary. Libraries add context with `%w`; handlers decide the status.
+
+## Runnable example
+
+```go
+func showUser(w http.ResponseWriter, r *http.Request) {
+    user, err := findUser(r.Context(), id)
+    if errors.Is(err, db.ErrNotFound) {
+        writeError(w, http.StatusNotFound, "user not found")
+        return
+    }
+    if errors.Is(err, dialect.ErrUnsupportedByDialect) {
+        writeError(w, http.StatusBadRequest, "query not supported by this database")
+        return
+    }
+    if err != nil {
+        writeError(w, http.StatusInternalServerError, "internal error")
+        return
+    }
+    writeJSON(w, http.StatusOK, user)
+}
+```
+
+```sh
+go run ./cmd/server &
+curl -s localhost:8080/v1/users/missing -w "\n%{http_code}\n"
+curl -s localhost:8080/v1/users/42 -w "\n%{http_code}\n"
+```
+
+Expected output:
+
+```text
+{"error":"user not found"}
+404
+{"id":"42"}
+200
+```
 
 `.zen` RPCs declare their error set (`errors: { already_exists }`), so generated OpenAPI and clients know which codes to expect. The `breaking` checker treats error-set changes as API changes.
 
+## API table
+
+| Pattern | Use |
+|---|---|
+| sentinel + `errors.Is` | stable branches: `db.ErrNotFound`, `dialect.ErrUnsupportedByDialect` |
+| `%w` wrapping | add context without losing identity |
+| `errors.As` for shutdown errors | `ClosePanicError` / `CloseTimeoutError` diagnostics (see note below) |
+| `orm:` / `orm/render:` prefixes | ORM failures stay greppable and `errors.Is`-compatible |
+| `middleware.Recover` | handler panics become 500 `{"error":"internal error"}` |
+| `writeError(w, status, msg)` | app helper writing the shared `{"error": msg}` envelope |
+| `ir.ErrorCode` table | DSL-side mirror of the `apperror` vocabulary |
+
+Note: close errors surface as `*container.ClosePanicError` / `*container.CloseTimeoutError` pointer types matched with `errors.As`. Older notes describing them as values are out of date.
+
+## Status mapping
+
+Keep the mapping in one helper so handlers never invent codes inline:
+
+| Error | Status | Envelope |
+|---|---|---|
+| `db.ErrNotFound` | 404 | `{"error":"user not found"}` |
+| `dialect.ErrUnsupportedByDialect` | 400 | `{"error":"query not supported by this database"}` |
+| `already_exists` (RPC error set) | 409 | `{"error":"already exists"}` |
+| rate-limit deny | 429 + `Retry-After` | `{"error":"rate limited"}` |
+| context deadline | 504 | `{"error":"deadline exceeded"}` |
+| handler panic | 500 via `middleware.Recover` | `{"error":"internal error"}` |
+| anything else | 500 | `{"error":"internal error"}` |
+
+```go
+func writeStatusFor(w http.ResponseWriter, err error) bool {
+    switch {
+    case errors.Is(err, db.ErrNotFound):
+        writeError(w, http.StatusNotFound, "user not found")
+        return true
+    case errors.Is(err, dialect.ErrUnsupportedByDialect):
+        writeError(w, http.StatusBadRequest, "query not supported by this database")
+        return true
+    }
+    return false
+}
+```
+
+Return `true` when the helper handles the error so the caller skips the generic 500 branch. Log the 500 branch once with the full context; log handled branches at debug or not at all.
+
 ## Error text never echoes secrets
 
-Error text names services and fields only — values are never echoed, the
-same rule [Logging](logging/) and
-[Configuration](../getting-started/configuration/) apply to log lines
-and displayed config. The CLI follows it too: `zever config show` prints
-redacted config, and `migrate` screens mask `--dsn ***`.
+Error text names services and fields only - values are never echoed. The same rule covers log lines and displayed config, and the CLI follows it too: `zever config show` prints redacted config, and `migrate` screens mask `--dsn ***`. When config must appear in output, render it only through `config.RedactedServices`.
 
-Panics in handlers become `500`s via `middleware.Recover`; panics during
-`Close` become `ClosePanicError` in the joined shutdown error. Log the
-shutdown error once at exit — it already aggregates every service.
+Panics in handlers become 500s via `middleware.Recover`; panics during `Close` become `ClosePanicError` in the joined shutdown error. Log the shutdown error once at exit - it already aggregates every service through `errors.Join`.
+
+## Production notes
+
+- Close semantics: `c.Close(ctx)` returns `errors.Join` of per-service errors. Branch with `errors.As` into the timeout/panic types, log once, exit non-zero.
+- Redaction: messages carry stable slugs (`user not found`), never DSNs, keys, or raw rows. Debug detail goes to the log line, not the wire.
+- Timeouts: map context deadline failures to 504. `middleware.Timeout` applies the standard envelope; handlers must forward `r.Context()` so ORM and RPC calls observe it.
+- Status discipline: 400 unparsable, 422 invalid, 404 missing (`db.ErrNotFound`), 409 conflict (`already_exists`), 429 quota, 500 everything else. Keep the mapping in one helper.
+
+## Troubleshooting
+
+1. **`errors.Is(err, db.ErrNotFound)` never matches.** An intermediate layer dropped the chain with `%v` or a new error. Wrap with `%w` at every layer so identity survives.
+2. **500 body leaks internals.** The handler writes `err.Error()` to the client. Write a stable slug instead and put detail in the log line.
+3. **Shutdown error is opaque.** The exit path prints only the first error. `Close` joins all of them: iterate or log the full joined value, then `errors.As` for panic/timeout branches.
+4. **Dialect failure looks like a bug.** A postgres-only feature on sqlite returns `dialect.ErrUnsupportedByDialect` by design (fail closed). Match it explicitly and fall back to a portable formulation.
+5. **Clients cannot handle new errors.** The RPC error set changed without notice. Declare the set in `.zen`, treat changes as breaking, and update generated clients together.
+
+## See also
+
+- [Logging](logging/) - the single structured line per failure
+- [Middleware](middleware/) - `Recover` and timeout envelopes
+- [Validation](validation/) - 400 vs 422 vs 409 at the boundary
+- [Query Builder](../database/query-builder/) - `orm:` error prefixes and dialect gating

@@ -4,7 +4,7 @@ description: Runnable example apps under examples/, from single-battery demos to
 ---
 
 Every battery in this framework has a runnable example under `examples/` in
-the repository — no separate module, no extra setup: `go test
+the repository - no separate module, no extra setup: `go test
 ./examples/...` covers all of them with zero infrastructure. Two tutorials
 in this section walk you through the two most complete apps step by step;
 this page is the map of everything else.
@@ -14,36 +14,36 @@ the main module so `internal/` packages stay importable and the whole tree
 builds and tests as one unit. If you need a heavier dependency for your own
 experiment, isolate it behind its own `go.mod` the way a real add-on would.
 
-## Full apps (Stage 2)
+## Full apps
 
 Start here if you want to see a complete, wired application:
 
-| App | Demonstrates |
+| App | What it proves |
 |---|---|
-| [`bookings`](https://github.com/zenta-dev/zever/tree/main/examples/bookings) | Marketplace domain: hosts list spaces, guests book them — walked through in [Build a Booking API](build-a-booking-api/) |
-| [`showcase`](https://github.com/zenta-dev/zever/tree/main/examples/showcase) | DSL depth: every schema feature in one shop schema, HTTP + gRPC parity — walked through in [Explore the Showcase App](explore-the-showcase-app/) |
-| [`demoapp`](https://github.com/zenta-dev/zever/tree/main/examples/demoapp) | Battery breadth: every service battery behind one HTTP API |
-| [`todo`](https://github.com/zenta-dev/zever/tree/main/examples/todo) | Auth-gated notes app with HTTP + gRPC cross-transport parity tests |
+| `examples/bookings` | Marketplace domain: hosts list spaces, guests book them - walked through in [Build a Booking API](build-a-booking-api/). Proves `payment` stub charges, `billing`, `geo`, `media`, `search`, and `vectorstore` compose inside one realistic request flow, with worker jobs and a cron schedule on the side. |
+| `examples/showcase` | DSL depth: every schema feature in one shop schema, HTTP + gRPC parity - walked through in [Explore the Showcase App](explore-the-showcase-app/). Proves one `Service` implementation backs two transports with identical auth. |
+| `examples/demoapp` | Battery breadth: every service battery behind one HTTP API. Proves the container can resolve the full service set in one process and that adapter swaps stay config-only across all of them. |
+| `examples/todo` | Auth-gated notes app with HTTP + gRPC cross-transport parity tests. Proves JWT auth enforced identically on both transports and that parity tests catch drift between them. |
 
-## Focused ORM ports (Stage 1b)
+## Focused ORM ports
 
 Smaller apps, each proving one ORM feature end to end against sqlite:
 
-| App | Demonstrates |
+| App | What it proves |
 |---|---|
-| [`transactions`](https://github.com/zenta-dev/zever/tree/main/examples/transactions) | `orm.WithNestedTx` savepoint-nested transfers |
-| [`bulk_upsert`](https://github.com/zenta-dev/zever/tree/main/examples/bulk_upsert) | Multi-row `Insert`, `OnConflict(...).DoUpdate/DoNothing`, `Returning().ExecReturning` |
-| [`pagination`](https://github.com/zenta-dev/zever/tree/main/examples/pagination) | Offset paging (`Limit`/`Offset`/`Count`) and keyset paging (`AfterTuple`, cursor encode/decode) |
-| [`recursive_cte`](https://github.com/zenta-dev/zever/tree/main/examples/recursive_cte) | `orm.WithRecursive` — an org chart in one query |
-| [`json_query`](https://github.com/zenta-dev/zever/tree/main/examples/json_query) | `orm/json/sqlite` nested-key, key-exists, and array-membership filters |
-| [`fts`](https://github.com/zenta-dev/zever/tree/main/examples/fts) | `orm/fts/sqlite` full-text `MATCH` with rank-ordered search |
-| [`ormdrill`](https://github.com/zenta-dev/zever/tree/main/examples/ormdrill) | Cursors, preload, joins, subqueries, and expressions without codegen (raw builder) |
+| `examples/transactions` | `orm.WithNestedTx` savepoint-nested transfers. Proves a failed inner transfer rolls back to its savepoint without aborting the outer transaction. |
+| `examples/bulk_upsert` | Multi-row `Insert`, `OnConflict(...).DoUpdate/DoNothing`, `Returning().ExecReturning`. Proves bulk writes stay one round trip and conflicts resolve per-row as declared. |
+| `examples/pagination` | Offset paging (`Limit`/`Offset`/`Count`) and keyset paging (`AfterTuple`, cursor encode/decode). Proves stable page traversal with and without concurrent inserts shifting offsets. |
+| `examples/recursive_cte` | `orm.WithRecursive` - an org chart in one query. Proves recursive common-table expressions build reporting trees without N+1 queries. |
+| `examples/json_query` | `orm/json/sqlite` nested-key, key-exists, and array-membership filters. Proves JSON columns stay queryable with typed predicates instead of raw SQL strings. |
+| `examples/fts` | `orm/fts/sqlite` full-text `MATCH` with rank-ordered search. Proves ranked text search works on the zero-infra adapter before you reach for a dedicated engine. |
+| `examples/ormdrill` | Cursors, preload, joins, subqueries, and expressions without codegen (raw builder). Proves the untyped builder covers queries too dynamic for generated code. |
 
-## Per-battery examples (Stage 1)
+## Per-battery examples
 
-Every service battery — `cache`, `queue`, `db`, `payment`, `ai`,
+Every service battery - `cache`, `queue`, `db`, `payment`, `ai`,
 `vectorstore`, and every other one listed in [Config
-Reference](../reference/config-reference/) — has at least one
+Reference](../reference/config-reference/) - has at least one
 `ExampleXxx` test against its zero-infra adapter, each showing one happy
 path and one error path via `// Output:` comments. Browse them under
 `examples/<battery>/` in the repository; the test itself is the
@@ -56,13 +56,133 @@ go test ./examples/...        # everything, zero infra, no setup needed
 go test -race ./examples/...  # with the race detector
 ```
 
+Expected output for the full run:
+
+```text
+ok  github.com/zenta-dev/zever/examples/bookings  0.42s
+ok  github.com/zenta-dev/zever/examples/showcase  0.61s
+ok  github.com/zenta-dev/zever/examples/todo      0.18s
+...
+```
+
+Package names and times vary by machine; the signal is `ok` on every line
+and no `FAIL` anywhere.
+
 Some examples opt into a real backend via environment variables when you
 want to see the adapter swap in action, for example:
 
 ```sh
-DB_ADAPTER=postgres DB_DSN=postgres://... go test ./examples/...
+DB_ADAPTER=postgres DB_DSN=postgres://user:pass@localhost:5432/test?sslmode=disable go test ./examples/...
 ```
 
 Unset, every example runs against the zero-infra defaults from
-[`config.Default()`](../getting-started/configuration/) — no database,
+[`config.Default()`](../getting-started/configuration/) - no database,
 no Redis, no external service required.
+
+## How to read an example
+
+Each example follows the same layout so you always know where to look:
+
+1. `schema/*.zen` (full apps only) - the domain; never hand-edit
+   `generated/` next to it.
+2. `zever.yaml` - explicit zero-infra adapters; the diff against
+   `config.Default()` is the deploy surface.
+3. `db/seed` - idempotent demo data; safe to re-run.
+4. `cmd/server` and `cmd/worker` - entrypoints mirroring
+   `zever generate server` / `zever generate worker`.
+5. Tests next to the code they cover - the `// Output:` comments are
+   runnable claims, not prose.
+
+## Suggested order
+
+New to the framework: [Build a Booking API](build-a-booking-api/) first
+for the realistic single flow, then
+[Explore the Showcase App](explore-the-showcase-app/) for DSL breadth.
+After that, pick focused ORM ports by the query problem you actually have
+(pagination, FTS, JSON filters), and use [Battery breadth](#full-apps)
+`demoapp` as the adapter-swap reference.
+
+## Running one focused port
+
+Each ORM port runs standalone with zero infra:
+
+```sh
+go test ./examples/pagination/... -v
+go test ./examples/fts/... -v
+go test ./examples/transactions/... -v
+```
+
+Expected output shape:
+
+```text
+=== RUN   TestKeysetPaging
+--- PASS: TestKeysetPaging (0.02s)
+ok  github.com/zenta-dev/zever/examples/pagination  0.05s
+```
+
+Test names differ per port; the signal is `PASS` plus a trailing `ok`.
+To see the adapter swap on a port that supports postgres:
+
+```sh
+DB_ADAPTER=postgres DB_DSN=postgres://user:pass@localhost:5432/test?sslmode=disable go test ./examples/pagination/...
+```
+
+Expected output is the same `ok` line - the point is the queries pass
+unchanged against a second dialect. Postgres-gated assertions fail closed
+with `dialect.ErrUnsupportedByDialect` where a feature has no mapping, so
+a skip there is a documented boundary, not a broken test.
+
+## Running the full apps
+
+```sh
+cd examples/bookings
+zever db migrate --adapter=sqlite --dsn=data/bookings.db schema/bookings.zen
+go run ./db/seed
+```
+
+Expected output:
+
+```text
+applied 4 tables to data/bookings.db
+seeded host host@example.com
+seeded guest guest@example.com
+```
+
+```sh
+cd ../showcase
+zever db migrate --adapter=sqlite --dsn=data/showcase.db schema/shop/shop.zen
+go run ./db/seed
+```
+
+Expected output:
+
+```text
+applied 8 tables to data/showcase.db
+seeded demo shop data
+```
+
+Both seeds are idempotent: re-running prints the same lines without
+duplicating rows. Both servers require `AUTH_JWT_SECRET` of at least 32
+bytes and fail closed without it.
+
+## Troubleshooting
+
+**`go test ./examples/...` fails on a clean clone.**
+Run `go mod download` first, then re-run. Examples share the root module;
+a half-downloaded module cache breaks all of them at once.
+
+**A postgres-backed run fails to connect.**
+The DSN form is `postgres://user:pass@localhost:5432/test?sslmode=disable`.
+Confirm the server is up and the database exists; unset the vars to fall
+back to zero-infra sqlite.
+
+**You edited a schema and tests drifted.**
+Regenerate with `zever compile` (see the showcase tutorial) and re-run
+`zever db migrate --dry-run` for fresh DDL. Never hand-edit `generated/`.
+
+## See also
+
+- [Build a Booking API](build-a-booking-api/) for the guided bookings flow
+- [Explore the Showcase App](explore-the-showcase-app/) for the DSL tour
+- [Configuration](../getting-started/configuration/) for layered config
+- [Container](../architecture/container/) for how examples resolve services

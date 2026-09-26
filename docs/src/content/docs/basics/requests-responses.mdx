@@ -5,41 +5,63 @@ description: Decode JSON bodies, read params and headers, and write consistent J
 
 zever handlers stay close to `net/http`: decode the request explicitly, run business logic, and encode a consistent JSON envelope. No magic binding, no global helpers.
 
-## Reading the request
+Use this pattern for hand-written routes and for custom endpoints beside generated `.zen` services (the bookings server does exactly this: generated shapes cover entities, hand-written routes in `internal/api` carry the full booking flow).
 
-```go
-func createUser(w http.ResponseWriter, r *http.Request) {
-    id := router.Param(r, "id")          // path param, uniform across drivers
-    q := r.URL.Query().Get("verbose")    // query string
-    token := r.Header.Get("Authorization")
+## Config
 
-    var in struct {
-        Email string `json:"email"`
-        Name  string `json:"name"`
-    }
-    if err := json.NewDecoder(r.Body).Decode(&in); err != nil {
-        writeError(w, http.StatusBadRequest, "invalid body")
-        return
-    }
-    _ = q
-    _ = token
-    _ = in
-}
+No adapter and no config block: request handling is pure `net/http` plus the `router` driver. The only related setting is which router driver serves the mux:
+
+```yaml
+router:
+  adapter: stdhttp
 ```
 
-| Source | How |
-|---|---|
-| Path params | `router.Param(req, name)` / `router.ParamNames(req)` |
-| Query | `r.URL.Query().Get(...)` |
-| Headers | `r.Header.Get(...)` |
-| JSON body | `json.NewDecoder(r.Body).Decode(&v)` |
-| Context values | `router.WithParams` in tests and middleware |
+```sh
+ROUTER_ADAPTER=stdhttp
+```
 
-Bound the body on public endpoints (`http.MaxBytesReader`) and always pass `r.Context()` downstream so `middleware.Timeout` deadlines propagate.
+State the default adapter path: tests use `config.Default()` with an in-memory stack and `httptest` recorders, no server required.
 
-## Writing the response
+## Resolve via container
+
+Handlers need the container only for services, not for I/O primitives:
 
 ```go
+c := container.New(config.Default())
+db, err := c.DB()
+if err != nil {
+    return err
+}
+r, err := c.Router()
+if err != nil {
+    return err
+}
+r.Handle("POST", "/v1/users", createUser(db))
+```
+
+`c.Router()` and `c.DB()` resolve lazily and cache; errors clear the cache so the next call retries. Shutdown stays central: `c.Close(ctx)` closes only resolved services.
+
+## Runnable example
+
+```go
+func createUser(db db.DB) http.HandlerFunc {
+    return func(w http.ResponseWriter, r *http.Request) {
+        var in struct {
+            Email string `json:"email"`
+            Name  string `json:"name"`
+        }
+        if err := json.NewDecoder(r.Body).Decode(&in); err != nil {
+            writeError(w, http.StatusBadRequest, "invalid body")
+            return
+        }
+        if strings.TrimSpace(in.Email) == "" {
+            writeError(w, http.StatusUnprocessableEntity, "email: required")
+            return
+        }
+        writeJSON(w, http.StatusCreated, map[string]string{"email": in.Email})
+    }
+}
+
 func writeJSON(w http.ResponseWriter, status int, v any) {
     w.Header().Set("Content-Type", "application/json")
     w.WriteHeader(status)
@@ -51,25 +73,101 @@ func writeError(w http.ResponseWriter, status int, msg string) {
 }
 ```
 
-Conventions:
+```sh
+go run ./cmd/server &
+curl -s -X POST localhost:8080/v1/users \
+  -H 'Content-Type: application/json' \
+  -d '{"email":"a@example.com","name":"Ada"}'
+curl -s -X POST localhost:8080/v1/users \
+  -H 'Content-Type: application/json' \
+  -d '{"email":""}'
+```
 
-- Success: the resource (or list) as JSON with the appropriate status (`200`, `201` on create).
-- Errors: `{"error": "<stable message>"}` — the same envelope `middleware.Recover` uses for 500s, and rate limiting uses for 429s (plus `Retry-After`).
-- Always set `Content-Type: application/json` before `WriteHeader`.
+Expected output:
+
+```text
+{"email":"a@example.com"}
+{"error":"email: required"}
+```
+
+Conventions: success encodes the resource with `200` (`201` on create); errors use `{"error": "<stable message>"}` - the same envelope `middleware.Recover` uses for 500s and rate limiting uses for 429s (plus `Retry-After`). Always set `Content-Type: application/json` before `WriteHeader`.
+
+## Reading the request
+
+```go
+func showUser(w http.ResponseWriter, r *http.Request) {
+    id := router.Param(r, "id")        // path param, uniform across drivers
+    verbose := r.URL.Query().Get("verbose")
+    token := r.Header.Get("Authorization")
+    _ = verbose
+    _ = token
+}
+```
+
+| Source | How |
+|---|---|
+| Path params | `router.Param(req, name)` / `router.ParamNames(req)` |
+| Query string | `r.URL.Query().Get(...)` |
+| Headers | `r.Header.Get(...)` |
+| JSON body | `json.NewDecoder(r.Body).Decode(&v)` |
+| Test params | `router.WithParams(ctx, params)` |
+| Downstream cancel | `r.Context()` passed into DB/cache/queue calls |
+
+Bound the body on public endpoints (`http.MaxBytesReader`) and always pass `r.Context()` downstream so `middleware.Timeout` deadlines propagate.
 
 ## Paginated lists
 
-`.zen` RPCs flagged `paginated: true` generate cursor scaffolding. Expose it as opaque cursors, not offsets:
+`.zen` RPCs flagged `paginated: true` generate cursor scaffolding. Expose opaque cursors, not offsets:
 
 ```sh
 GET /v1/orders?cursor=eyJpZCI6NDJ9&limit=50
 ```
 
 ```go
-users, err := orm.From(Users).
-    Where(orm.CursorKey(UserID, cursor)).
-    Limit(50).
-    All(ctx, conn)
+key := orm.NewCursorKey(UserID, lastSeenID)
+users, err := orm.NextPage(
+    orm.From(Users).OrderBy(UserID.Asc()),
+    key,
+).Limit(50).All(ctx, conn)
 ```
 
-Return the next cursor alongside the page so clients never construct keyset predicates themselves. Keep stdout clean for command output — all diagnostics and errors belong on stderr.
+The pagination example walks both styles: `orm.OffsetPage(q, page, size)` plus `Count` for totals, and keyset pages via `orm.AfterTuple` with an opaque token from `orm.NewCursorKey(...).Encode`, verified each hop with `orm.DecodeCursor`. Return the next cursor beside the page so clients never build keyset predicates themselves.
+
+## API table
+
+| Helper | Purpose |
+|---|---|
+| `router.Param(req, name)` | path param by name; empty when absent |
+| `router.ParamNames(req)` | all params as a copy |
+| `router.WithParams(ctx, params)` | seed params in tests and middleware |
+| `json.NewDecoder(r.Body).Decode(&v)` | stream-decode the JSON body |
+| `http.MaxBytesReader(w, r.Body, n)` | cap body size on public endpoints |
+| `r.URL.Query().Get(key)` | read one query value |
+| `r.Header.Get(key)` | read one header |
+| `r.Context()` | request-scoped context carrying deadlines |
+| `writeJSON(w, status, v)` | app helper: envelope + content type + status |
+| `writeError(w, status, msg)` | app helper: `{"error": msg}` envelope |
+
+Keep stdout clean for command output: diagnostics and errors belong on stderr (the bookings `main` writes `server: ...` to stderr and exits 1).
+
+## Production notes
+
+- Close semantics: handlers hold no closeable state. Lifecycle lives in the `http.Server` (graceful shutdown with a timeout parent) and `c.Close(ctx)` for services.
+- Redaction: error envelopes carry stable messages only, never secrets or raw option maps. Log with `config.RedactedServices` when config must appear.
+- Timeouts: wrap slow routes in `middleware.Timeout` and set server read/write timeouts; handlers that ignore `r.Context()` defeat both.
+- Body limits: cap public bodies before decode; oversized payloads should fail fast with 413 rather than filling memory.
+
+## Troubleshooting
+
+1. **Empty body decodes without error.** `r.Body` was already consumed or is nil in a test. Build test requests with `httptest.NewRequest` plus a `strings.Reader` body and set `Content-Type`.
+2. **Params always empty under test.** Plain test requests carry no driver context. Seed with `router.WithParams` before invoking the handler.
+3. **Client sees `Content-Type: text/plain`.** `WriteHeader` ran before the header set. Set `Content-Type: application/json` first, then status, then body.
+4. **Huge uploads exhaust memory.** No `MaxBytesReader` on the route. Wrap `r.Body` with a cap and return 413 past it.
+5. **Deadline middleware has no effect.** The handler or ORM call uses `context.Background()` instead of `r.Context()`. Thread the request context through every downstream call.
+
+## See also
+
+- [Routing](routing/) - registering the routes these handlers attach to
+- [Middleware](middleware/) - logging, recovery, and timeout wrappers
+- [Validation](validation/) - field checks that pick 400 vs 422
+- [Query Builder](../database/query-builder/) - typed reads behind list endpoints

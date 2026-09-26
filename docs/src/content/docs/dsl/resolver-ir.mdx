@@ -3,7 +3,26 @@ title: Resolver and IR
 description: How the compiler resolves schemas into IR with keep-going diagnostics.
 ---
 
-The frontend pipeline turns source text into a resolved schema plus diagnostics:
+## Purpose
+
+The frontend pipeline turns source text into a resolved schema plus
+diagnostics. One run surfaces every problem in the file set instead of
+stopping at the first error.
+
+When to use: debug a schema error, extend the compiler, or consume
+`*ir.Schema` from a backend. When not to use: runtime packages must never
+import `internal/dsl`; it is compiler-internal by design.
+
+## Prerequisites
+
+- Familiarity with [Syntax](./syntax-zen/): entities, services, RPCs.
+- Go toolchain for running the compiler tests.
+- The canonical fixture `internal/dsl/compile/testdata/app.zen` checked out.
+
+## Config
+
+No config file drives the pipeline. Inputs are `[]*ast.File` plus a backend
+list; output order is deterministic (filename-sorted).
 
 ```text
 source text → lexer → parser → ast → resolver → ir.Schema
@@ -12,48 +31,123 @@ source text → lexer → parser → ast → resolver → ir.Schema
 
 | Package | Role |
 |---|---|
+| `diag` | positions, diagnostics, multi-error lists; zero deps |
 | `token` | token vocabulary + keywords |
-| `lexer` | bytes → tokens; never panics; fuzz-tested |
+| `lexer` | bytes to tokens; never panics; fuzz-tested |
 | `ast` | pure-data syntax tree, positions on every node |
 | `parser` | best-effort parse with per-decl recovery + depth guard |
-| `resolver` | multi-pass `[]*ast.File` → `*ir.Schema`, keep-going diagnostics |
+| `naming` | case converters for backends |
+| `resolver` | multi-pass `[]*ast.File` to `*ir.Schema`, keep-going diagnostics |
 | `ir` | resolved schema + gRPC-canonical `ErrorCode` table |
 | `format` | token-gap formatter; refuses lex-dirty input; idempotent |
+| `breaking` | old-vs-new schema compatibility (`Change` taxonomy) |
+| `compile` | filename-sorted parse, resolve, then `backend.Backend.Generate` |
+| `backend` | `Backend` interface only; concrete backends plug in |
 
-## Entry points
+## Resolve
+
+Entry points, parse-first or full-path:
 
 ```go
 f := parser.New("schema/app/app.zen", src).ParseFile()
 schema, diags := resolver.Resolve([]*ast.File{f})
 ```
 
-Or the full path with deterministic filename-sorted output:
-
 ```go
 out, diags := compile.Compile(files, backends...)
 ```
 
-`compile/testdata/app.zen` is the canonical fixture: golden backend outputs are committed, and regeneration is explicit (`go test ./internal/dsl/compile/ -run TestName -update`).
+`compile/testdata/app.zen` is the canonical fixture: golden backend outputs
+are committed, and regeneration is explicit
+(`go test ./internal/dsl/compile/ -run TestName -update`).
 
-## Resolver passes
+Resolver passes:
 
-1. **Collect** — index modules, entities, enums, and services by name; duplicates are diagnostics, not panics.
-2. **Bind types** — resolve field and RPC types against scalars plus declared entities; unknown names diagnose and continue.
-3. **Check relations** — verify both sides of `has_many` / `belongs_to` agree on the foreign key.
-4. **Check RPCs** — validate HTTP templates against params, `@validate` expressions, and the `ErrorCode` table.
+1. **Collect** - index modules, entities, enums, and services by name;
+   duplicates are diagnostics, not panics.
+2. **Bind types** - resolve field and RPC types against scalars plus
+   declared entities; unknown names diagnose and continue.
+3. **Check relations** - verify both sides of `has_many` / `belongs_to`
+   agree on the foreign key.
+4. **Check RPCs** - validate HTTP templates against params, `@validate`
+   expressions, and the `ErrorCode` table.
 
-The resolver never stops at the first error. It accumulates diagnostics with positions so one run surfaces every problem in the file set.
+## Runnable example
 
-## IR shape
+```sh
+go test ./internal/dsl/compile/ -run TestGogenGeneratesCommittedAppPackage -v
+echo exit:$?
+```
 
-`ir.Schema` is the compiler's contract with backends: fully resolved modules, entities with bound field types, services with bound RPC signatures, and normalized error codes. Backends read `schema.Modules[*].Entities` (the zenorm backend, for example, ignores services entirely).
+Expected output:
 
-After touching `token.Keywords` or `resolver.ScalarTypeNames`, run `make generate` — the Neovim and VS Code grammars derive from those tables via `tools/gengrammar`.
+```text
+--- PASS: TestGogenGeneratesCommittedAppPackage
+PASS
+ok  github.com/zenta-dev/zever/internal/dsl/compile
+exit:0
+```
 
-## Breaking changes
+The test parses the canonical fixture, resolves it, runs the `gogen`
+backend, and diffs against the committed golden package. Only re-run with
+`-update` when the fixture changed deliberately.
 
-`breaking` diffs old-vs-new schemas into a `Change` taxonomy (additive vs. breaking). Wire it into CI so a removed field or renamed RPC fails the build before clients break:
+## Reference
+
+| IR element | Contents |
+|---|---|
+| `Schema.Modules` | resolved modules keyed by dir-derived name |
+| Module entities | bound field types, primary/unique/default metadata |
+| Module services | bound RPC signatures with HTTP/auth bindings |
+| `ErrorCode` table | gRPC-canonical codes shared by all backends |
+| `Change` taxonomy | additive vs. breaking schema diffs |
+
+`ir.Schema` is the compiler contract with backends: backends read
+`schema.Modules[*].Entities` (the zenorm backend, for example, ignores
+services entirely) and never re-parse source.
+
+### Breaking changes
+
+`breaking` diffs old-vs-new schemas into additive vs. breaking changes.
+Wire it into CI so a removed field or renamed RPC fails the build before
+clients break:
 
 ```sh
 zever breaking schema-old/*.zen -- schema/*.zen
 ```
+
+| Change class | Examples | CI posture |
+|---|---|---|
+| Additive | new entity, new optional field, new RPC | pass |
+| Breaking | removed field, renamed RPC, changed scalar type | fail build |
+
+## Production notes
+
+- The parser and resolver never panic on user input: per-declaration
+  recovery plus a depth guard keep hostile files from crashing the build.
+- After touching `token.Keywords` or `resolver.ScalarTypeNames`, run
+  `make generate` - editor grammars derive from those tables via
+  `tools/gengrammar`, and the parity test fails the build if they drift.
+- Fuzz tests for lexer, parser, and resolver run seed corpora as unit
+  tests; add seeds for new syntax.
+- Keep backends pure: no network, no clock reads, no unseeded randomness.
+
+## Troubleshooting
+
+- **Resolve reports unknown type**: the name is not a scalar and no entity
+  declares it in scope. Check module paths for cross-module references.
+- **Relation mismatch diagnostic**: the two sides disagree on the foreign
+  key column. Align both `@foreign_key(...)` spellings.
+- **Golden test fails after a grammar change**: expected when keywords or
+  scalar names changed. Regenerate with `-update`, review the diff, then
+  run `make generate` for the editor grammars.
+- **Empty schema with no diagnostics**: inputs were not `[]*ast.File` from
+  the parser, or files failed to parse into declarations. Check
+  per-declaration recovery output first.
+
+## See also
+
+- [Syntax](./syntax-zen/) for `.zen` blocks and attributes
+- [Backends](./backends/) for the `Generate` contract and golden files
+- [LSP and Tooling](./lsp-tooling/) for grammar generation
+- [CLI Reference](../reference/cli/) for `check` and `breaking` commands

@@ -3,9 +3,13 @@ title: Validation
 description: Validate .zen-declared rules, request input, and fail with precise errors.
 ---
 
-Validation lives in two places: declarative rules on `.zen` RPC inputs (checked at the boundary) and explicit Go checks inside handlers. Both fail with precise, field-named errors — never silent coercion.
+Validation lives in two places: declarative rules on `.zen` inputs (checked at the boundary) and explicit Go checks inside handlers. Both fail with precise, field-named errors - never silent coercion.
 
-## Schema-declared rules
+Use schema rules for shapes the DSL owns (entities, RPC inputs), and handler checks for transport concerns (malformed JSON, missing headers) plus business rules the schema cannot express.
+
+## Config
+
+Validation takes no YAML or env block. Rules ship with the schema and the handler code:
 
 ```zen
 rpc CreateUser(email: string @validate(format: "email")) -> User {
@@ -15,9 +19,28 @@ rpc CreateUser(email: string @validate(format: "email")) -> User {
 }
 ```
 
-`@validate` travels with the field into generated code and OpenAPI output, so the docs, the server, and the client agree. The resolver checks the expression at compile time (`zever check` surfaces bad rules with positions).
+```zen
+field title: string @validate(min_len: 1, max_len: 200)
+```
 
-## Handler-level checks
+The bookings schema shows both forms: `email` carries `@validate(format: "email")`, `title` carries `@validate(min_len: 1, max_len: 200)`. The resolver checks the expression at compile time; `zever check` surfaces bad rules with positions. State the default adapter path: none exists, validation is code and schema, not a swappable service.
+
+## Resolve via container
+
+No container accessor: validation is not a service. Handlers validate inline before touching resolved services:
+
+```go
+c := container.New(config.Default())
+db, err := c.DB()
+if err != nil {
+    return err
+}
+r.Handle("POST", "/v1/users", createUser(db))
+```
+
+Keep the order strict: parse, validate, then call `db`/`queue`/payment. Failed validation must never open a transaction or emit a side effect.
+
+## Runnable example
 
 ```go
 func createUser(w http.ResponseWriter, r *http.Request) {
@@ -37,7 +60,23 @@ func createUser(w http.ResponseWriter, r *http.Request) {
         writeError(w, http.StatusUnprocessableEntity, "name: required")
         return
     }
+    writeJSON(w, http.StatusCreated, map[string]string{"email": in.Email})
 }
+```
+
+```sh
+go run ./cmd/server &
+curl -s -X POST localhost:8080/v1/users -d '{"email":"a@example.com","name":"Ada"}'
+curl -s -X POST localhost:8080/v1/users -d '{"email":"nope","name":"Ada"}'
+curl -s -X POST localhost:8080/v1/users -d 'not json'
+```
+
+Expected output:
+
+```text
+{"email":"a@example.com"}
+{"error":"email: must be a valid address"}
+{"error":"invalid body"}
 ```
 
 | Status | When |
@@ -46,29 +85,67 @@ func createUser(w http.ResponseWriter, r *http.Request) {
 | `422` | well-formed but semantically invalid (bad email, empty name) |
 | `409` | `already_exists` (maps from the `errors:` set) |
 
-## Config and option validation
+## Schema vs handler split
 
-Adapter options validate the same way at startup: unknown file fields fail `Load`, and unparsable env values return `InvalidOptionsError` (e.g. `DB_MAXCONNS=abc`). Fix the value — the error names the service and field, never the secret.
+Decide ownership per rule so behavior never depends on which layer runs first:
 
-## Testing validation
+| Rule kind | Owner | Example |
+|---|---|---|
+| Shape and format | `.zen` `@validate` | `email` format, `title` length bounds |
+| Transport integrity | handler | JSON parses, required headers present |
+| Business state | handler plus store | email not already registered (409) |
+| Config sanity | startup `Validate` | adapter options, DSN present |
 
-Table-drive the boundary:
+The bookings schema carries format rules on entities (`User.email`, `Space.title`) while `internal/api` enforces flow rules the schema cannot see (guest phone present, idempotency key supplied, flag-gated checkout enabled). Generated OpenAPI reflects only the schema half - document handler rules in the endpoint notes.
 
 ```go
-tests := []struct {
-    name  string
-    email string
-    want  int
-}{
-    {"ok", "a@example.com", http.StatusCreated},
-    {"no at-sign", "not-an-email", http.StatusUnprocessableEntity},
-    {"empty", "", http.StatusUnprocessableEntity},
+// Flow rule the schema cannot express: feature-flag gate.
+if !flags.Enabled(ctx, "checkout") {
+    writeError(w, http.StatusNotFound, "checkout disabled")
+    return
 }
-for _, tt := range tests {
-    t.Run(tt.name, func(t *testing.T) {
-        // post to handler, assert status code
-    })
+// Store rule: natural-key conflict maps to the declared error set.
+if errors.Is(err, db.ErrConflict) {
+    writeError(w, http.StatusConflict, "already exists")
+    return
 }
-```
 
-Keep tests deterministic: no network, no unseeded randomness, no timing assertions. Validation failures are pure functions of input — assert exact status and message.
+## Config and option validation
+
+Adapter options validate the same way at startup: unknown file fields fail `Load` (strict YAML/JSON - typos fail fast), and unparsable env values return `InvalidOptionsError` (for example `DB_MAXCONNS=abc`). The error names the service and field, never the secret value. Unknown env vars are ignored by design (best-effort), so a stray `AUTH_TOKEN` cannot break boot.
+
+## API table
+
+| Rule / helper | Purpose |
+|---|---|
+| `@validate(format: "email")` | schema-declared email shape on a `.zen` field |
+| `@validate(min_len: n, max_len: m)` | schema-declared string length bounds |
+| `zever check` | compile-time check of rule expressions with positions |
+| `writeError(w, 400, ...)` | handler helper: body or query cannot parse |
+| `writeError(w, 422, ...)` | handler helper: parses but violates a rule |
+| `errors: { already_exists }` | `.zen` RPC error set mapping to 409 |
+| `config.Load(path)` | strict file decode: unknown service or field fails |
+| `InvalidOptionsError` | unparsable env value for a resolved field |
+
+`@validate` travels with the field into generated code and OpenAPI output, so docs, server, and client agree on the contract.
+
+## Production notes
+
+- Close semantics: validation is pure computation with nothing to shut down. Failed requests must exit before any service call so `c.Close(ctx)` has no partial work to drain.
+- Redaction: validation messages name the field and the rule, never the secret value. `email: must be a valid address` is safe; echoing the rejected token is not.
+- Timeouts: validation runs before I/O, so it needs no deadline of its own; keep it fast and allocation-light on hot paths.
+- Contract stability: the `breaking` checker treats RPC error-set changes as API changes. Adding a new error variant is a contract change - note it in release docs.
+
+## Troubleshooting
+
+1. **`zever check` rejects a rule the handler accepts.** The schema expression has a typo or unsupported constraint. Fix the `.zen` source; the resolver is the authority, not the handler copy.
+2. **Clients get 400 for business errors.** The handler conflates parse failure with rule failure. Return 400 only when the body cannot parse; use 422 for well-formed but invalid values.
+3. **409 never fires on duplicates.** The RPC lacks `errors: { already_exists }` or the handler does not map the conflict. Declare the error set and translate the store conflict to 409 explicitly.
+4. **Boot fails on a config typo.** Strict file decoding rejects unknown fields. Correct the snake_case key (`max_conns`, not `maxconns`); env names are unaffected since matching ignores case and `_`.
+5. **Tests pass bad emails.** Assertions check status only, not the field message. Table-drive the boundary (ok / no at-sign / empty) and assert exact status plus message.
+
+## See also
+
+- [Requests and Responses](requests-responses/) - body decoding and the `{"error": msg}` envelope
+- [Errors](errors-logging/) - typed errors and status mapping
+- [Routing](routing/) - where validated handlers attach

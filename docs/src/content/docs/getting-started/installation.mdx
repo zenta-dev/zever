@@ -3,9 +3,15 @@ title: Installation
 description: Install zever on Go 1.27, fetch the module, and run your first build and tests.
 ---
 
-zever is a single-module Go framework. There are no nested `go.mod` files to manage: every package, adapter, and tool lives under `github.com/zenta-dev/zever`. Once Go is installed, adding zever to a project is one command.
+## Purpose + When to use
 
-## Requirements
+This page takes a clean machine to a verified zever checkout: Go toolchain, module fetch, pinned dev tools, and a smoke test that resolves the default container. Follow it when you join the repo, set up CI, or confirm a toolchain upgrade did not break the build.
+
+It covers install only. Service wiring lives in `../architecture/container/`, schema work lives in `../dsl/syntax-zen/`, and prod rollout lives in `./deployment.mdx`.
+
+## Prerequisites and mental model
+
+zever is a single-module Go framework. There are no nested `go.mod` files: every package, adapter, and tool lives under `github.com/zenta-dev/zever`. Adding it to a project is one `go get`; installing the CLI is one `go install` at a pinned version.
 
 | Requirement | Version | Notes |
 |---|---|---|
@@ -13,56 +19,40 @@ zever is a single-module Go framework. There are no nested `go.mod` files to man
 | Git | any recent | needed for `go get` and scaffolding |
 | Node.js | 18+ | docs site only (`docs/`) |
 
-Check your toolchain first:
+Check the toolchain first:
 
 ```sh
 go version
+git --version
 ```
 
-You should see `go1.27` or newer. If not, install from [go.dev](https://go.dev/dl/) before continuing.
+You should see `go1.27` or newer. If not, install from `https://go.dev/dl/` before continuing. The docs site (`docs/`, npm) is independent of the Go build and is not needed for backend work.
 
-## Add zever to your project
+## Config
 
-Initialize a module if you do not have one, then fetch zever:
+A fresh install needs no config file: `config.Default()` supplies zero-infra adapters so the first build and test pass with no database server. When you add a file later, this shape is the starting point:
+
+```yaml
+# zever.yaml
+db:
+  adapter: sqlite
+  options:
+    path: data/app.db
+log:
+  adapter: slog
+```
 
 ```sh
-go mod init example.com/myapp
-go get github.com/zenta-dev/zever
+DB_ADAPTER=sqlite
+DB_MAXCONNS=10
+LOG_ADAPTER=slog
 ```
 
-To install the CLI globally at a pinned version:
+Real keys follow the `<SERVICE>_<FIELD>` scheme with no prefix (`DB_ADAPTER`, `DB_MAXCONNS`, `AUTH_JWT_SECRET`, `RATELIMIT_RATE`). Keep `Default()` for local runs and tests; load the file plus env in real services. Detail: `./configuration.mdx`.
 
-```sh
-go install github.com/zenta-dev/zever/cmd/zever@v0.4.0
-zever --help
-```
+## Resolve via container
 
-## Install dev tools
-
-Pinned linters and scanners are installed with one target:
-
-```sh
-make setup
-```
-
-This installs `golangci-lint` v2.13.2, `govulncheck` v1.8.0, and `cyclonedx-gomod` v1.12.0. Run it once per machine, then verify the standard workflow:
-
-```sh
-make build
-make test
-```
-
-| Target | What it does |
-|---|---|
-| `make build` | `go build ./...` across the module |
-| `make test` | `go test ./...` |
-| `make test-race` | `go test -race ./...` (part of local `make check`) |
-| `make fmt` / `make fmt-fix` | check / write `gofmt` formatting |
-| `make lint` | `golangci-lint run` with `.golangci.yml` |
-
-## Verify your install
-
-Create a smoke test that resolves the default container without any infrastructure:
+The smoke test below is also the install check: it builds one container from defaults and resolves the database handle.
 
 ```go
 package main
@@ -84,16 +74,97 @@ func main() {
 }
 ```
 
-Run it:
+`container.New(nil)` is valid as well and closes cleanly. On error an accessor clears its cache so the next call retries instead of pinning a broken handle.
 
-```sh
-go run .
+## Runnable example
+
+Add zever to a project, install the CLI, set up tools, and verify:
+
+```go
+// main.go: smoke test that resolves the default container.
+package main
+
+import (
+	"fmt"
+
+	"github.com/zenta-dev/zever/config"
+	"github.com/zenta-dev/zever/container"
+)
+
+func main() {
+	c := container.New(config.Default())
+	db, err := c.DB()
+	if err != nil {
+		panic(err)
+	}
+	fmt.Println("db resolved:", db != nil)
+}
 ```
 
-If it prints `db resolved: true`, your install works. The default config uses zero-infra adapters (sqlite, memory, log), so no database server is required.
+```sh
+go mod init example.com/myapp
+go get github.com/zenta-dev/zever
+go install github.com/zenta-dev/zever/cmd/zever@v0.4.0
+make setup
+make build
+make test
+go run .
+zever --help
+```
 
-## Next steps
+Expected output or behavior:
 
-- Configure layers in [Configuration](./configuration.mdx).
-- Learn the layout in [Directory Structure](./directory-structure.mdx).
-- Run `make check` before every push: it mirrors CI (fmt, vet, lint, race, vulncheck, build).
+```text
+db resolved: true
+```
+
+`make setup` installs `golangci-lint` v2.13.2, `govulncheck` v1.8.0, and `cyclonedx-gomod` v1.12.0 once per machine. `make build` runs `go build ./...`, `make test` runs `go test ./...`, and `zever --help` prints the grouped command map (Scaffolding / Inspection / Runtime / Database). If the smoke line prints, fetch, build, tools, and default resolution all work.
+
+## Variants
+
+| Target or flag | What it does | When to run it |
+|---|---|---|
+| `make build` | `go build ./...` across the module | After fetch, before first test |
+| `make test` | `go test ./...` | Default verification |
+| `make test-race` | `go test -race ./...` | Local gate (`make check` runs this; PR fast-gate does not) |
+| `make fmt` / `make fmt-fix` | check / write `gofmt` formatting | Before every push |
+| `make lint` / `make lint-fix` | `golangci-lint run` with `.golangci.yml` | Before every push |
+| `make vet` | `go vet` | Separate CI step (`go test` runs with `-vet=off -count=1`) |
+| `make vulncheck` | `govulncheck` scan | Dependency review before push |
+| `make tidy-check` | `go mod tidy -diff` | After version bumps |
+| `make generate` | `go run ./tools/gengrammar` | After touching `token.Keywords` or `resolver.ScalarTypeNames` |
+| `make check` | Full local gate (download, fmt, vet, tidy-check, lint, test-race, vulncheck, build) | Before every push |
+
+Focused test forms:
+
+```sh
+go test ./orm/...
+go test ./container/... -run TestName -v
+go test -race ./config/...
+```
+
+## Production notes
+
+Pin the CLI install to the same version as the module (`go install .../cmd/zever@v0.4.0`) so TUI and backend behavior match; the release checklist bumps every version pin together (root, LSP, editors, docs). Run `make check` before pushing: it mirrors CI (fmt, vet, lint, race, vulncheck, build).
+
+Never log raw option maps in install scripts or CI output; print `config.RedactedServices(cfg)` instead. `Default()` ships a deterministic dev crypto key that must never reach prod: supply real secrets via file or env. Close every container you open (`c.Close(ctx)` with a timeout parent) even in smoke tests, so leak checks (`goleak.VerifyTestMain` in `container/`) stay green.
+
+## Troubleshooting
+
+| Symptom | Cause | Fix |
+|---|---|---|
+| `go version` reports older than 1.27 | Stale toolchain on PATH | Install Go 1.27+ from `https://go.dev/dl/`, then re-run `go version` |
+| `go get` fails with network or proxy error | Offline sandbox or `GOPROXY` block | Set `GOPROXY` per site policy, retry `go mod download`, then `go get` again |
+| `make setup` fails on lint install | Pinned tool download blocked or partial install | Re-run `make setup`, verify binaries on PATH, then `make build` |
+| `zever --help` prints nothing useful or command not found | CLI installed to a dir outside PATH | Add `$(go env GOPATH)/bin` to PATH or reinstall with `go install .../cmd/zever@v0.4.0` |
+| Smoke test panics resolving `DB()` | Broken local state or edited defaults | Reset to `config.Default()` with no file or env, run `go run .` again, then layer config back |
+
+## See also
+
+- `./configuration.mdx` for layered config, env mapping, and redaction
+- `./directory-structure.mdx` for module layout and package roles
+- `./deployment.mdx` for prod builds and shutdown wiring
+- `./upgrade.mdx` for version bumps and breaking-change policy
+- `../architecture/container/` for lazy accessors and retry semantics
+- `../dsl/syntax-zen/` for the schema language behind `zever compile`
+- Package guides as text: `README.md`, `config/README.md`, `container/README.md`, `cmd/zever/README.md`

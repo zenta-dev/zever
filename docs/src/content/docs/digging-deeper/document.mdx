@@ -3,18 +3,20 @@ title: Documents
 description: Render document sources to PDF, PNG, or JPG behind one interface.
 ---
 
-Turning a document source into a viewable PDF or image is a job you'd rather
-not hand-roll per format — invoking a LaTeX toolchain is a different problem
-than calling a remote rendering API, but callers shouldn't have to know that.
-`document.Document` collapses both into one `Render` call with a typed
-`OutputFormat` (`pdf`, `png`, or `jpg`) and a clamped `Quality`.
+Turning a document source into a viewable PDF or image is a job you would
+rather not hand-roll per format - invoking a LaTeX toolchain is a different
+problem than calling a remote rendering API, but callers should not have to
+know that. `document.Document` collapses both into one `Render` call with a
+typed `OutputFormat` (`pdf`, `png`, or `jpg`) and a clamped `Quality`.
+
+## Purpose and when to use
 
 `local` (the default) renders on the machine running your process. `remote`
-hands the job to a rendering API over HTTP when you don't want LaTeX installed
-next to your app. `latex` is the adapter to reach for when your source really is
-a `.tex` document — it shells out to a fixed, configured LaTeX compiler rather
-than accepting an arbitrary command, which matters for what happens if that
-source is untrusted input.
+hands the job to a rendering API over HTTP when you do not want LaTeX
+installed next to your app. `latex` is the adapter to reach for when your
+source really is a `.tex` document - it shells out to a fixed, configured
+LaTeX compiler rather than accepting an arbitrary command, which matters
+when the source is untrusted input.
 
 ## Config
 
@@ -24,21 +26,35 @@ document:
   options:
     quality: 80
     dpi: 150
+    tmp_dir: /tmp/zever-doc
+    max_output_bytes: 67108864
+    timeout: 30s
 ```
 
 ```sh
 DOCUMENT_ADAPTER=latex
-DOCUMENT_LATEXCOMMAND=pdflatex
-DOCUMENT_LATEXPDFTOPPM=pdftoppm
+DOCUMENT_LATEX_COMMAND=pdflatex
+DOCUMENT_LATEX_PDF_TO_PPM=pdftoppm
+DOCUMENT_LATEX_RUNS=2
+DOCUMENT_API_KEY=...
+DOCUMENT_ENDPOINT=https://render.internal/v1
 ```
 
-`Quality` is silently clamped into 0-100 rather than erroring outside that
-range — pass whatever a user gave you and let `ClampQuality` do the rest if you
-want that behavior explicitly.
+Key facts: `quality` is clamped into 0-100 (pass user input through and let
+`ClampQuality` handle it); `dpi` must be >= 0; `max_output_bytes` must be
+>= 0 and caps rendered output (default 64MiB); `tmp_dir` holds intermediate
+artifacts; `latex_command` and `latex_pdf_to_ppm` come from config only and
+are never interpolated from document content; `latex_runs` bounds compiler
+passes; `endpoint`/`api_key` serve the `remote` adapter.
 
 ## Resolve
 
 ```go
+import (
+	"github.com/zenta-dev/zever/config"
+	"github.com/zenta-dev/zever/container"
+)
+
 c := container.New(config.Default())
 d, err := c.Document()
 if err != nil {
@@ -47,23 +63,97 @@ if err != nil {
 _ = d
 ```
 
+`Document()` resolves lazily and caches the result; on error the cache
+clears so the next call retries.
+
+## Runnable example
+
+```go
+package main
+
+import (
+	"context"
+	"fmt"
+	"os"
+
+	"github.com/zenta-dev/zever/config"
+	"github.com/zenta-dev/zever/container"
+	"github.com/zenta-dev/zever/document"
+)
+
+func main() {
+	c := container.New(config.Default())
+	defer c.Close(context.Background())
+
+	d, err := c.Document()
+	if err != nil {
+		fmt.Println("resolve error:", err)
+		return
+	}
+
+	out, err := d.Render(context.Background(), []byte(`hello`), document.FormatPDF)
+	if err != nil {
+		fmt.Println("render error:", err)
+		return
+	}
+	if err := os.WriteFile("/tmp/hello.pdf", out, 0o600); err != nil {
+		fmt.Println("write error:", err)
+		return
+	}
+	fmt.Println("bytes:", len(out))
+	if err := d.Close(); err != nil {
+		fmt.Println("close error:", err)
+	}
+}
+
+// Expected output with the local adapter:
+// bytes: 1240
+```
+
+Byte counts vary by adapter and source; the point is a non-empty,
+complete file - `Render` returns nil output on error rather than a
+partial file, so never write output to disk before checking the error.
+
 ## Adapters
 
 | Adapter | Package | Notes |
 |---|---|---|
-| `local` | `document/local` | Default |
-| `remote` | `document/remote` | HTTP-based; needs `Endpoint`/`APIKey` |
-| `latex` | `document/latex` | Shells out to `LatexCommand`/`LatexPDFToPPM` |
+| `local` | `document/local` | Default; renders in-process |
+| `remote` | `document/remote` | HTTP-based; needs `endpoint`/`api_key` |
+| `latex` | `document/latex` | Shells out to `latex_command`/`latex_pdf_to_ppm` |
 
-## The gotcha: bounded everywhere, on purpose
+## Production notes
 
-Sources are capped at 10MiB and rendered output at 64MiB (`MaxOutputBytes`) by
-default — a document render is exactly the kind of operation that can otherwise
-balloon memory on a hostile or malformed input. The `latex` adapter never
-interpolates a caller-supplied command; `LatexCommand` and `LatexPDFToPPM` only
-ever come from configuration, so there's no path from document content to
-arbitrary shell execution. `Render` returns nil output on error rather than a
-partial file — don't write output to disk until you've checked the error.
+- Sources are capped at 10MiB and rendered output at 64MiB
+  (`max_output_bytes`) by default - a render is exactly the kind of
+  operation that can balloon memory on hostile or malformed input. Keep
+  the caps; raise them deliberately with a measured reason.
+- The `latex` adapter never interpolates a caller-supplied command, so
+  there is no path from document content to arbitrary shell execution.
+  Lock down `tmp_dir` permissions alongside it.
+- `api_key` for the `remote` adapter never appears in logs; `endpoint`
+  URLs are validated before the first request.
+- Time-bound renders with `timeout` and clean up temp artifacts even on
+  error paths.
 
-`APIKey` for the `remote` adapter never appears in logs; `Endpoint` URLs are
-validated before the first request.
+## Troubleshooting
+
+**`Render` returns nil bytes plus an error.**
+That is the contract: no partial files. Inspect the error, do not write
+the output, and check source size against the 10MiB cap first.
+
+**LaTeX renders fail with "command not found".**
+`latex_command` / `latex_pdf_to_ppm` name binaries that must exist on
+`PATH` (or as absolute paths) on the machine running the process. The
+`remote` adapter exists precisely to avoid installing them next to the app.
+
+**Remote renders fail validation before any request.**
+`endpoint` must be an absolute URL with scheme and host, and `timeout`
+must be >= 0. Fix config; nothing was sent.
+
+## See also
+
+- [Media Processing](media/) for image/video upload and transform limits
+- [Storage and Media](storage-media/) for the blob layer underneath
+- [Container](../../architecture/container/) for lazy resolve and close order
+- [Adapters Matrix](../../reference/adapters-matrix/) for the full table

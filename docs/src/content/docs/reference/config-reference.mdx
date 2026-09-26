@@ -6,10 +6,115 @@ description: Full service table with adapters, env scheme, and precedence.
 ## Purpose
 
 Layered typed config resolves as `defaults < file < env`. Defaults are
-zero-infra so tests run bare; files are strict YAML/JSON; env is best-effort
-`<SERVICE>_<FIELD>` with no prefix.
+zero-infra so tests run bare; files are strict YAML/JSON; env is
+best-effort `<SERVICE>_<FIELD>` with no prefix.
 
-## Full service table
+When to use: pick adapters per service and layer overrides for deploy.
+When not to use: secrets rotation mechanics live with each service;
+naming-convention history below is migration help, not daily config.
+
+## Prerequisites
+
+- `config.Default()` baseline understood (zero-infra adapters).
+- A `zever.yaml` (or `.yml` / `.json`) for file layering.
+- Env access for the deploy layer; `Load("")` probing order known.
+
+## Config
+
+File example (YAML):
+
+```yaml
+db:
+  adapter: postgres
+  options:
+    dsn: postgres://app:secret@db:5432/app
+    max_conns: 20
+log:
+  adapter: slog
+auth:
+  adapter: jwt
+  options:
+    jwt:
+      secret: change-me-to-at-least-32-bytes
+```
+
+`Load("")` probes `zever.yaml`, then `zever.yml`, then `zever.json` in the
+working directory; first hit wins, absent files skip silently. An explicit
+path must exist and decode; any failure returns `nil` plus the error, as
+does any merge, env, or validation failure. Only `.yaml`, `.yml`, and
+`.json` decode; anything else fails with `ErrUnsupportedFormat`. Null or
+empty service blocks decode to zero values.
+
+Env scheme (`<SERVICE>_<FIELD>`, uppercased, no prefix):
+
+```sh
+DB_ADAPTER=postgres
+DB_MAXCONNS=20
+DB_MAXCONNLIFETIME=5m
+AUTH_JWT_SECRET=prod-secret-at-least-32-bytes-long
+RATELIMIT_RATE=100
+```
+
+Field matching is case-insensitive with `_` ignored (`MAX_RETRIES` matches
+`MaxRetries`). One nesting level splits at the first `_`
+(`AUTH_JWT_SECRET` sets `Options.JWT.Secret`). Durations take `"5s"` style
+strings. `_ADAPTER` sets the service adapter (validated later by
+`Validate`, not at assignment).
+
+## Resolve
+
+```go
+cfg, err := config.Load("")
+if err != nil {
+    return err // explicit path missing, strict decode, or validation failure
+}
+c := container.New(cfg)
+```
+
+Strictness asymmetry is deliberate: files are strict (unknown service or
+field fails the load, typos fail fast), while env is best-effort (unknown
+variables ignored, stray process environment cannot break startup). Only
+values that fail to parse for a resolved field (`DB_MAXCONNS=abc`) return
+`InvalidOptionsError`. Bare names like `PATH`, `HOME`, `USER` contain no
+`_` at all, and plausible heads like `AUTH` in `AUTH_TOKEN` collide with
+real service names, so strict env mode would break real shells.
+
+## Runnable example
+
+```sh
+cat > /tmp/zever.yaml <<'EOF'
+db:
+  adapter: sqlite
+log:
+  adapter: slog
+EOF
+DB_MAXCONNS=20 go run ./cmd/myapp --config /tmp/zever.yaml
+echo exit:$?
+```
+
+Expected output:
+
+```text
+db: sqlite adapter with max_conns 20 (env over file default)
+log: slog output
+exit:0
+```
+
+Unknown file fields fail fast; unknown env vars are ignored:
+
+```sh
+DB_MAXCONNS=abc go run ./cmd/myapp
+echo exit:$?
+```
+
+Expected output:
+
+```text
+InvalidOptionsError naming db.max_conns (value never echoed)
+exit:1
+```
+
+## Reference
 
 | Service | Adapters | Default |
 |---|---|---|
@@ -48,34 +153,64 @@ zero-infra so tests run bare; files are strict YAML/JSON; env is best-effort
 | webhook | http, queue, sqlite | http |
 | workflow | memory | memory |
 
-## File example
+Defaults pick the zero-infra adapter per service (ai has none - all
+backends need keys - so it defaults to `anthropic` and requires an API key
+via file/env; mailer defaults to `log` with a dummy localhost SMTP
+host/port because `Validate` requires them; secrets defaults to `env`
+with a `ZEVER` prefix because `Validate` requires a non-empty prefix).
 
-```yaml
-db:
-  adapter: postgres
-  options:
-    dsn: postgres://app:secret@db:5432/app
-    max_conns: 20
-log:
-  adapter: slog
-```
+### snake_case rename note
 
-`Load("")` probes `zever.yaml`, `zever.yml`, then `zever.json`; first hit
-wins. Unknown services/fields fail fast.
+File keys are snake_case and strict: pre-rename flat spellings are
+rejected as unknown fields. Env names are unaffected (matching ignores `_`
+and case, so `DB_MAXCONNS` keeps working).
 
-## Env scheme
+| Old key | New key |
+|---|---|
+| `apikey` | `api_key` |
+| `baseurl` | `base_url` |
+| `maxconns` / `minconns` | `max_conns` / `min_conns` |
+| `maxconnlifetime` / `maxconnidletime` | `max_conn_lifetime` / `max_conn_idle_time` |
+| `maxttl` | `max_ttl` |
+| `clientid` | `client_id` |
+| `modelpath` / `policypath` | `model_path` / `policy_path` |
+| `secretkey` / `webhooksecret` | `secret_key` / `webhook_secret` |
+| `accesskeyid` / `secretaccesskey` | `access_key_id` / `secret_access_key` |
+| `accountid` / `urlbase` | `account_id` / `url_base` |
 
-```sh
-DB_ADAPTER=postgres
-DB_MAXCONNS=20
-AUTH_JWT_SECRET=prod-secret-at-least-32-bytes-long
-```
+### Redaction rule
 
-Best-effort: unknown vars ignored, only unparsable resolved fields error.
-Field matching is case-insensitive with `_` ignored; one nesting level
-splits at the first `_`.
+Raw option maps may hold secrets in plain strings. Never log them
+directly. `RedactedServices` (built on `Redact`) is the sole display path
+for logging or debugging output. Error text names services and fields
+only; values are never echoed.
 
-## Notes
+## Production notes
 
-- Dev secrets (crypto key) are deterministic and must never reach production.
-- Never log raw option maps; display via `RedactedServices`/`Redact`.
+- Dev secrets (crypto key) are deterministic and must never reach
+  production; supply real secrets via file or environment.
+- Prefer file for structure (adapters, nested options) and env for secrets
+  and per-deploy tweaks; env wins on conflict.
+- `config/schema/` ships a JSON Schema for editor autocomplete and
+  validation of `zever.yaml` / `.yml` / `.json`.
+- Validate early: load and `Validate` at startup so typos fail before
+  serving.
+
+## Troubleshooting
+
+- **Unknown field on load**: file keys are strict snake_case. Check the
+  rename table above; flat spellings like `maxconns` are rejected.
+- **`DB_MAXCONNS=abc` errors but `FOO_BAR=1` does not**: only resolved
+  fields with unparsable values error; unknown vars are ignored by design.
+- **Wrong file picked up**: `Load("")` probes `zever.yaml`, then
+  `zever.yml`, then `zever.json`; first hit wins. Pass an explicit path to
+  skip probing.
+- **Secrets prefix rejected**: `secrets` env adapter requires a non-empty
+  prefix without slash, `..`, or spaces (default `ZEVER`).
+
+## See also
+
+- [Adapters Matrix](./adapters-matrix/) for per-service use-case guidance
+- [API Index](./api-index/) for container accessors over this config
+- [CLI Reference](./cli/) for `config show` and global flags
+- [Crypto](./crypto-secrets/) for dev-key and prefix handling

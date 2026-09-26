@@ -3,9 +3,55 @@ title: Migrations and Seeding
 description: Plan and apply schema migrations with rollback, then seed deterministically.
 ---
 
-zever migrations use a live-schema-diff engine: compare the desired schema against the live database, plan the statements, then apply them. Rollbacks reverse the last batch, and seeds load deterministic data afterward.
+zever migrations use a live-schema-diff engine in `orm/migrate`: compare the desired schema against the live database, plan the statements, then apply them. Rollbacks reverse the last batch, and seeds load deterministic data afterward.
 
-## Workflow
+Use this flow when the `.zen` schema changes, when promoting to a new environment, and when resetting dev data. Review the plan before applying in production.
+
+## Config
+
+Migrations run against the `db` service config:
+
+```yaml
+db:
+  adapter: postgres
+  options:
+    dsn: postgres://app:secret@db:5432/app
+    max_conns: 20
+```
+
+```yaml
+db:
+  adapter: sqlite
+  options:
+    dsn: app.db
+```
+
+```sh
+DB_ADAPTER=postgres
+DB_DSN=postgres://app:secret@db:5432/app
+```
+
+sqlite defaults to `app.db`; `:memory:` forces a single connection even if `MaxConns` is set. Postgres requires `Options.DSN`; `MinConns` is a real pool minimum there but maps to `SetMaxIdleConns` on sqlite. DSNs are always masked in displayed CLI lines (`--dsn ***`), password-masked on input, and scrubbed from output.
+
+## Resolve via container
+
+```go
+import (
+    "github.com/zenta-dev/zever/config"
+    "github.com/zenta-dev/zever/container"
+)
+
+c := container.New(config.Default())
+conn, err := c.DB()
+if err != nil {
+    return err
+}
+defer c.Close(ctx)
+```
+
+`DB()` resolves lazily and caches; migration helpers take the `db.DB` directly. `Close` drains only resolved services, so an untouched container closes cleanly.
+
+## Runnable example
 
 ```sh
 zever db migrate --dsn 'postgres://app:secret@db:5432/app'
@@ -13,7 +59,16 @@ zever db rollback --dsn 'postgres://app:secret@db:5432/app'
 zever db seed --dsn 'postgres://app:secret@db:5432/app'
 ```
 
-Run them via the exact invocations above. DSNs are always masked in displayed CLI lines (`--dsn ***`), password-masked on input, and scrubbed from output.
+Expected output (displayed DSN masked):
+
+```text
+plan: 4 statement(s)
+applied 4 statement(s) [--dsn ***]
+rollback: reverted last batch (2 statement(s))
+seed: 25 product(s), 7 employee(s)
+```
+
+Run them via the exact invocations above. `Plan` is pure diff with no side effects, safe to run in CI; `Apply` runs statements inside a transaction where the driver supports it.
 
 ## Plan then apply
 
@@ -34,18 +89,15 @@ if err != nil {
 fmt.Printf("applied %d statement(s)\n", applied)
 ```
 
-`PlanOptions{DropColumns: true}` opts into emitting `DROP COLUMN` for live
-columns no longer declared (off by default: destructive);
-`DetectTypeChanges: true` opts into comparing a live column's type against
-the declared one (postgres emits `ALTER COLUMN TYPE`; sqlite only warns).
+`PlanOptions{DropColumns: true}` opts into emitting `DROP COLUMN` for live columns no longer declared (off by default: destructive); `DetectTypeChanges: true` opts into comparing a live column's type against the declared one (postgres emits `ALTER COLUMN TYPE`; sqlite only warns).
 
 | Step | Purpose |
 |---|---|
-| `Plan` | pure diff, no side effects; safe to run in CI |
-| `Apply` | runs statements inside a transaction where the driver supports it |
-| `rollback` | reverses the last applied batch |
+| `Plan` | pure diff, no side effects; safe in CI |
+| `Apply` | runs statements in a transaction where supported |
+| `ApplyRollback` | reverses the last applied batch |
 
-`WithTx` semantics apply: commit on success, rollback on error or panic (re-panicking after rollback), nesting rejected with `ErrNestedTx`. Savepoint names validate as `[_A-Za-z][_A-Za-z0-9]*` — identifiers, never user values.
+`db.WithTx` semantics apply: commit on success, rollback on error or panic (re-panicking after rollback), nesting rejected with `ErrNestedTx`. Savepoint names validate as `[_A-Za-z][_A-Za-z0-9]*` - identifiers, never user values.
 
 ## Seeding
 
@@ -54,7 +106,7 @@ Seeds are ordinary Go using the ORM, so they get typed builders and transactions
 ```go
 err := db.WithTx(ctx, conn, nil, func(ctx context.Context, tx db.Tx) error {
     for _, u := range seedUsers {
-        if err := orm.Insert(Users).Values(u).Exec(ctx, tx); err != nil {
+        if err := orm.InsertInto(Users).Values(u).Exec(ctx, tx); err != nil {
             return err
         }
     }
@@ -62,10 +114,48 @@ err := db.WithTx(ctx, conn, nil, func(ctx context.Context, tx db.Tx) error {
 })
 ```
 
-Keep seeds idempotent (`Conflict` upserts on a natural key) so re-running `zever db seed` is safe after a rollback.
+Keep seeds idempotent (`Conflict` upserts on a natural key) so re-running `zever db seed` is safe after a rollback. The examples seed this way: pagination inserts 25 products, recursive_cte inserts a 7-person org chart, fts inserts 4 documents (with the FTS5 virtual table created via raw `conn.Exec` - virtual-table shapes are a migration concern the `.zen` DSL cannot express).
 
-## Environment notes
+## API table
 
-- sqlite defaults to `app.db`; `:memory:` forces a single connection even if `MaxConns` is set (extra connections would each get an isolated database).
-- postgres requires `Options.DSN`; `MinConns` is a real pool minimum there but maps to `SetMaxIdleConns` on sqlite.
-- Live postgres tests (migrations included) gate behind `POSTGRES_DSN`; sqlite paths run hermetically in CI.
+| Helper | Purpose |
+|---|---|
+| `migrate.Plan(ctx, conn, schema, opts)` | diff desired schema vs live; returns ordered `MigrationPlan` |
+| `plan.Statements()` | reviewable SQL strings before apply |
+| `migrate.Apply(ctx, conn, plan)` | execute the plan; returns applied count |
+| `migrate.ApplyRollback(ctx, conn, plan)` | reverse the last applied batch |
+| `migrate.PlanOptions{DropColumns}` | opt into `DROP COLUMN` for undeclared live columns |
+| `migrate.PlanOptions{DetectTypeChanges}` | opt into live-vs-declared type comparison |
+| `db.WithTx(ctx, db, opts, fn)` | transactional seed/apply unit |
+| `orm.InsertInto(table).Values(...)` | typed seed inserts |
+| `zever db migrate / rollback / seed` | CLI entry points with masked DSN display |
+
+Regenerate ORM builders after schema edits, from the repo root so import paths resolve:
+
+```sh
+zever compile examples/pagination/schema/pagination.zen --backend=zenorm --out examples/pagination/generated
+```
+
+`generated/` is committed CLI output - never hand-edit it.
+
+## Production notes
+
+- Close semantics: `Apply` runs in a transaction where the driver supports it; always `c.Close(ctx)` after migrate/seed so pools drain. `Close` returns `errors.Join` of per-service errors.
+- Redaction: DSNs carry passwords. CLI masks `--dsn ***` on display and scrubs output; never log the raw `Options` map or the resolved conn string. Use `config.RedactedServices` for any display.
+- Timeouts: run DDL with a bounded context; long `ALTER` on big postgres tables can hold locks. Plan first, apply during a maintenance window, keep a rollback tested.
+- Destructive gates: `DropColumns` defaults off. Turning it on drops live data; snapshot before applying any plan that contains `DROP`.
+
+## Troubleshooting
+
+1. **Plan shows unexpected DROPs.** `DropColumns: true` is set, or the desired schema lost a field. Re-check the `.zen` source; keep the flag off unless the drop is intended.
+2. **Type change ignored on sqlite.** `DetectTypeChanges` only warns on sqlite; only postgres emits `ALTER COLUMN TYPE`. Recreate the sqlite table or migrate data manually.
+3. **`ErrNestedTx` during seed.** A seed helper opened a transaction inside `WithTx`. Flatten to one `WithTx` unit; nesting is rejected.
+4. **Live postgres tests skipped.** The gate is `POSTGRES_DSN` - sqlite paths run hermetically in CI, postgres needs the variable. Export it for the live pass, including migrations.
+5. **Rollback does not restore data.** Rollback reverses schema batches, not row contents. Re-run `zever db seed` (idempotent upserts) after rolling back.
+
+## See also
+
+- [Query Builder](query-builder/) - typed reads and writes against the migrated schema
+- [Redis](redis/) - memory vs shared choices for stateful services beside the DB
+- [Errors](../basics/errors-logging/) - typed failures and redacted messages
+- [Configuration](../getting-started/configuration/) - DSN handling and secret rules

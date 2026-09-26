@@ -3,77 +3,185 @@ title: Locks and Idempotency
 description: Distributed mutual exclusion plus exactly-once handling for jobs and webhooks.
 ---
 
-Two problems that look similar but aren't: "make sure only one worker runs
-this migration right now" is mutual exclusion — that's `lock`. "Make sure this
-webhook, retried three times by an impatient provider, only takes effect once"
-is deduplication — that's `idempotency`. Conflating them is a common source of
-bugs, so `zever` keeps them as two small, separately-resolved services rather
-than one that tries to do both.
+## Purpose
 
-### Lock
+Use `lock` for mutual exclusion ("only one worker runs this migration
+now") and `idempotency` for dedupe ("this webhook retried three times
+takes effect once"). They look similar but are different problems, so
+zever keeps them as two small separately-resolved services. `Locker`
+offers single-attempt `TryAcquire`, blocking `Acquire` (polls every
+`RetryInterval`, default 50ms), `Extend`, and ownership-checked `Unlock`.
+`Store` reserves a caller key with `Begin` and records the outcome with
+`Complete`, so retries replay the stored result.
 
-`lock.Locker` gives you `TryAcquire` (single attempt, no retry), blocking
-`Acquire` (polls every `RetryInterval`, default 50ms), `Extend`, and `Unlock`
-— with ownership checks baked in, so releasing a lock you don't hold fails
-instead of stealing it out from under whoever does. `memory` needs no server
-and is fine for a single instance; `redis` is what makes the lock actually
-distributed across replicas.
+## When to use
 
-### Idempotency
+Keep both on `memory` (the default) for single-instance dev and tests.
+Move both to `redis` when replicas or workers must coordinate: the lock
+only becomes distributed over Redis, and dedupe only works across
+processes with a shared store. Idempotency fails closed on every error
+path by design; an untrusted dedupe check must not wave duplicates
+through.
 
-`idempotency.Store` reserves a caller-supplied key with `Begin` and records the
-outcome with `Complete`, so a retried request replays the stored result instead
-of re-executing. It fails closed on every error path by design — an
-idempotency store you can't trust to dedupe correctly isn't one you want
-silently letting duplicates through.
+The booking request path wires both in order: `handleCreateBooking`
+checks `RateLimit.Allow`, then `Idempotency.Begin` with key
+`booking:<key>` and a `guest|space|start|end` fingerprint (replay returns
+the stored bytes, `ErrInProgress` yields `409`, `ErrKeyMismatch` yields
+`400`), then `Lock.TryAcquire` on
+`booking:<space>:<start>:<end>` with a 30s TTL to hold the date range
+while the overlap check, stub charge, and insert run.
 
 ## Config
+
+YAML durations are integer nanoseconds (`"5s"` style works via env only):
 
 ```yaml
 lock:
   adapter: memory
+  options:
+    ttl: 30000000000 # 30s default lease
+    retry_interval: 50000000 # 50ms default poll
+    prefix: bookings:
 idempotency:
   adapter: memory
+  options:
+    ttl: 86400000000000 # 24h default reservation
 ```
+
+Redis variants share the same shape over a Redis namespace:
+
+```yaml
+lock:
+  adapter: redis
+idempotency:
+  adapter: redis
+```
+
+Env (no prefix, `<SERVICE>_<FIELD>`):
 
 ```sh
 LOCK_ADAPTER=redis
+LOCK_TTL=30s
+LOCK_RETRYINTERVAL=50ms
 IDEMPOTENCY_ADAPTER=redis
+IDEMPOTENCY_TTL=24h
 ```
 
-## Resolve
+Lock `Validate` is a no-op at the core level; each adapter factory
+validates its own fields. Idempotency rejects negative `ttl` (zero means
+the 24h default) plus bad Redis addr/prefix. Keys cap at 255 bytes
+(`MaxKeyLen`).
+
+## Resolve via container
 
 ```go
 c := container.New(config.Default())
 lk, err := c.Lock()
 if err != nil {
-	// handle
+    // handle
 }
 idem, err := c.Idempotency()
 if err != nil {
-	// handle
+    // handle
 }
 _, _ = lk, idem
 ```
+
+Both resolve lazily and cache per container, retrying after errors.
+
+## Runnable example
+
+```go
+package main
+
+import (
+    "context"
+    "fmt"
+    "time"
+
+    "github.com/zenta-dev/zever/config"
+    "github.com/zenta-dev/zever/container"
+    "github.com/zenta-dev/zever/idempotency"
+)
+
+func main() {
+    c := container.New(config.Default())
+    lk, err := c.Lock()
+    if err != nil {
+        panic(err)
+    }
+    idem, err := c.Idempotency()
+    if err != nil {
+        panic(err)
+    }
+
+    ctx := context.Background()
+    lease, ok, err := lk.TryAcquire(ctx, "booking:room-1:2026-01-01:2026-01-03", 30*time.Second)
+    fmt.Println(ok, err)
+    if ok {
+        defer lease.Unlock(ctx)
+    }
+    out, err := idem.Begin(ctx, "booking:req-1", idempotency.BeginOptions{Fingerprint: []byte("guest|room-1")})
+    fmt.Println(out.Replay, err)
+    if !out.Replay {
+        _ = idem.Complete(ctx, "booking:req-1", []byte("guest|room-1"), []byte(`{"status":"confirmed"}`))
+    }
+}
+```
+
+Expected output (fresh memory stores, first attempt reserves):
+
+```text
+true <nil>
+false <nil>
+```
+
+A second `Begin` with the same key and fingerprint would print
+`true <nil>` with the stored bytes.
 
 ## Adapters
 
 | Service | Adapter | Package | Notes |
 |---|---|---|---|
-| lock | `memory` | `lock/memory` | Default |
-| lock | `redis` | `lock/redis` | Distributed |
-| idempotency | `memory` | `idempotency/memory` | Default |
-| idempotency | `redis` | `idempotency/redis` | Shared dedupe |
+| lock | `memory` | `lock/memory` | Default; single-process only |
+| lock | `redis` | `lock/redis` | Distributed leases across replicas |
+| idempotency | `memory` | `idempotency/memory` | Default; single-process only |
+| idempotency | `redis` | `idempotency/redis` | Shared dedupe across workers |
 
-## The gotcha: `Close` doesn't release your lease
+## Production notes
 
-Calling `Close(ctx)` on a resolved `lock.Locker` releases the *adapter's*
-resources (its Redis connection, say) — it does not release any lease your
-code currently holds. A held lock always expires on its own TTL (default 30s);
-plan for that expiry explicitly rather than assuming shutdown cleans it up.
-Idempotency keys cap at 255 bytes and fingerprints at 4096 — key on a stable
-external ID (a webhook's event ID, a job's dedupe key), never on the request
-payload itself, since two semantically-identical payloads can still differ
-byte-for-byte. For anything money-moving, both services should fail closed on
-error: a lock you can't confirm you hold, or a dedupe check you can't complete,
-means don't proceed.
+- Close semantics: `Lock.Close(ctx)` takes a context (pooled,
+  network-backed shape) while `Store.Close()` is instant-close. Neither
+  releases caller-held leases or reservations: held locks expire on
+  their TTL (default 30s), so plan expiry explicitly instead of assuming
+  shutdown cleans up. Container closes only resolved services in
+  dependency order and joins errors.
+- Multi-instance behavior: `memory` for either service is invisible to
+  other replicas; double booking and duplicate webhook effects become
+  possible the moment a second instance exists. `redis` with a shared
+  namespace is the production shape. Key the lock on the contended
+  range and the idempotency key on a stable external ID (webhook event
+  ID, job dedupe key), never on raw payload bytes.
+- Redaction: never log raw option maps; use `config.RedactedServices`.
+  Fingerprints may carry PII; keep them out of logs.
+
+## Troubleshooting
+
+1. `409 dates already booked` under no real overlap: a prior attempt
+   still holds the lock key until its 30s TTL lapses, or a crashed
+   worker never unlocked. Wait out the TTL or scope the key tighter,
+   and always `defer Unlock` as the bookings handler does.
+2. `409 booking in progress` that never clears: a `Begin` reservation
+   without a matching `Complete` (crash between the two) stays pending
+   until TTL. Ensure `Complete` runs on every post-reservation path, or
+   `Forget` the key after investigation.
+3. `400 idempotency key mismatch`: the same key arrived with a different
+   fingerprint, meaning key reuse across different payloads. Key on a
+   per-attempt ID (header or body `idempotency_key`), not on guest plus
+   dates alone.
+
+## See also
+
+- [Rate Limiting](./ratelimit.mdx) - pre-guard before reserving
+- [Webhooks](./webhooks.mdx) - dedupe for retried deliveries
+- [Workflows](./workflows.mdx) - idempotent steps for resumed runs

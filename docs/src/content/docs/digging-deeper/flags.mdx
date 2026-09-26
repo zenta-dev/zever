@@ -3,57 +3,151 @@ title: Feature Flags
 description: Static defaults with Firebase Remote Config for dynamic rollout.
 ---
 
-Shipping a risky change behind a flag means the flag check has to be cheap,
-typed, and safe to call from a hot path — and the moment you want to flip it
-without a redeploy, "just read a config file" stops being enough. `flag`
-resolves `Bool`, `String`, `Int`, and `JSON` values against per-request
-targeting context, and it's deliberately *not* a config system: a missing key
-returns your fallback, never an error, so a flag lookup can never be the thing
-that takes your app down.
+## Purpose
 
-`static` (the default) reads a JSON file, loaded once with optional reload —
-no network call in the hot path, which is exactly what you want for tests and
-anything offline. Move to `firebase` when product/growth actually needs to flip
-a flag live without waiting on a deploy; that's the whole point of Remote
-Config, but it comes with a real dependency and a 30s default timeout on the
-network round trip.
+Use `flag` when a code path needs a typed on/off switch that is safe to
+evaluate in a hot request handler. The interface exposes `Bool`, `String`,
+`Int`, and `JSON` lookups against per-request targeting context carried by
+`WithEvalContext`. A missing key returns the caller-supplied fallback with a
+nil error, so a flag lookup can never be the thing that takes the app down.
+
+## When to use
+
+Reach for `static` (the default) for tests, offline dev, and any rollout
+that can ship with a deploy: flags live in a JSON file, load once, and cost
+no network call per evaluation. Move to `firebase` when product or growth
+needs to flip a flag live without waiting on a deploy. That buys remote
+rollout at the cost of a real dependency plus a 30s default operation
+timeout (`DefaultTimeout`).
+
+The bookings example gates its checkout path this way: `checkoutVersion`
+calls `a.Flag.Bool(ctx, "new_checkout", false)` and reports `v2` when on,
+else `v1`. The fallback is `false`, so a missing key or a flag outage keeps
+serving the old checkout instead of erroring the booking.
 
 ## Config
+
+YAML durations are integer nanoseconds (`"5s"` style works via env only):
 
 ```yaml
 flag:
   adapter: static
+  options:
+    static:
+      path: data/flags.json
+      reload: false
 ```
+
+Firebase variant:
+
+```yaml
+flag:
+  adapter: firebase
+  options:
+    firebase:
+      project_id: my-project
+      service_account: /run/secrets/firebase.json
+      timeout: 30000000000 # 30s in nanoseconds
+```
+
+Env (no prefix, `<SERVICE>_<FIELD>`; `_` and case ignored when matching):
 
 ```sh
 FLAG_ADAPTER=firebase
+FLAG_FIREBASE_PROJECTID=my-project
+FLAG_FIREBASE_TIMEOUT=30s
 ```
 
-## Resolve
+`Validate` only rejects a negative `firebase.timeout`. Zero means apply the
+default. Empty static `path` is valid and means an empty flag set.
+
+## Resolve via container
 
 ```go
 c := container.New(config.Default())
 f, err := c.Flag()
 if err != nil {
-	// handle
+    // handle
 }
 _ = f
+```
+
+Resolution is lazy and cached per container. On error the cached state
+clears so the next call retries. `container.New(nil)` is valid.
+
+## Runnable example
+
+```go
+package main
+
+import (
+    "context"
+    "fmt"
+
+    "github.com/zenta-dev/zever/config"
+    "github.com/zenta-dev/zever/container"
+    "github.com/zenta-dev/zever/flag"
+)
+
+func main() {
+    c := container.New(config.Default())
+    f, err := c.Flag()
+    if err != nil {
+        panic(err)
+    }
+    defer f.Close()
+
+    ctx := flag.WithEvalContext(context.Background(), flag.EvalContext{
+        RandomizationID: "user-123",
+        Signals:         map[string]any{"plan": "pro"},
+    })
+    on, err := f.Bool(ctx, "new_checkout", false)
+    fmt.Println(on, err)
+}
+```
+
+Expected output (empty static set, fallback applies, no error):
+
+```text
+false <nil>
 ```
 
 ## Adapters
 
 | Adapter | Package | Notes |
 |---|---|---|
-| `static` | `flag/static` | Default; file-defined, offline |
-| `firebase` | `flag/firebase` | Dynamic; needs credentials |
+| `static` | `flag/static` | Default; file-backed, offline, optional reload |
+| `firebase` | `flag/firebase` | Remote Config; needs `project_id` + `service_account` |
 
-## The gotcha: a missing key is not an error, so default safe
+## Production notes
 
-Because unresolved flags fall back silently instead of erroring, the fallback
-value you pass *is* your safety net — default every flag to the behavior you'd
-want if the flag system vanished entirely. A flag that defaults to "open" on
-missing/error is a flag that fails open the moment `firebase` has a bad day.
-Name keys hierarchically (`billing.checkout_v2`) so ownership is legible at a
-glance, and audit unexpected flips first when investigating an incident — a
-flag state change is one of the cheapest things to check and one of the easiest
-to overlook.
+- Close semantics: `Flag.Close() error` with no context (instant-close
+  shape). Container probes it during `Close(ctx)`; per-service errors join
+  via `errors.Join`, panics surface as `*ClosePanicError`.
+- Multi-instance behavior: `static` is per-process state, so a file change
+  only lands where the file lands (plus `reload` when enabled). `firebase`
+  is the shared source of truth across replicas; design fallbacks so all
+  replicas degrade the same way when it is unreachable.
+- Redaction: never log raw option maps. Use `config.RedactedServices` for
+  display. The service-account value is a file path, not key material, but
+  keep it out of logs anyway. Error text names services and fields only.
+
+## Troubleshooting
+
+1. Flag always returns fallback: check the static file `path` resolves
+   relative to the working dir (empty or missing path means an empty set
+   by design), and confirm the key spelling matches (`billing.checkout_v2`
+   style hierarchy avoids collisions).
+2. Type mismatch error on a key that exists: the stored JSON type does not
+   match the accessor (`String` on a bool key returns fallback plus error).
+   Align the file value type with the call, or read via `JSON`.
+3. Firebase open fails or times out: verify `project_id` and the
+   `service_account` JSON path, plus egress to the Remote Config endpoint.
+   Remember zero timeout means the 30s default; only negative fails
+   `Validate`, so a hang is a network problem, not a config shape problem.
+
+## See also
+
+- [Tenants](./tenants.mdx) - per-tenant targeting signals
+- [Observability](./observability.mdx) - span per flag-gated branch
+- [Rate Limiting](./ratelimit.mdx) - guarding flagged endpoints

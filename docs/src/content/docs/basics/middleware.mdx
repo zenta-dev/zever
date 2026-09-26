@@ -3,35 +3,122 @@ title: Middleware
 description: Compose logging, recovery, rate limiting, and tracing over HTTP and gRPC.
 ---
 
-`middleware` builds plain HTTP middleware and gRPC unary interceptors over resolved `log`, `ratelimit`, and `observability` instances. There is no registry and no adapter — call the constructors once when wiring a server.
+`middleware` builds plain HTTP middleware and gRPC unary interceptors over resolved `log`, `ratelimit`, and `observability` instances. There is no registry and no adapter: call the constructors once when wiring a server.
 
-## HTTP chain
+Use it when every request needs the same cross-cutting behavior: one log line, panic safety, abuse protection, and a trace span. Business logic stays in handlers; this package owns the wrapper order around them.
+
+## Config
+
+Middleware itself takes no YAML or env block. It is constructed from already-resolved services, so configure those instead:
+
+```yaml
+log:
+  adapter: slog
+ratelimit:
+  adapter: memory
+observability:
+  adapter: stdout
+```
+
+```sh
+LOG_ADAPTER=slog
+RATELIMIT_ADAPTER=memory
+```
+
+Defaults are zero-infrastructure (`config.Default()`), so the chain below runs in tests with no server. State the default adapter path here rather than inventing middleware options: there are none.
+
+## Resolve via container
 
 ```go
-handler := middleware.RequestLogger(logger)(
-    middleware.Tracing(provider)(
-        middleware.RateLimit(limiter, middleware.RemoteAddrKey)(
-            middleware.Recover(logger)(mux))))
+import (
+    "github.com/zenta-dev/zever/config"
+    "github.com/zenta-dev/zever/container"
+)
+
+c := container.New(config.Default())
+
+logger, err := c.Log()
+if err != nil {
+    return err
+}
+limiter, err := c.RateLimit()
+if err != nil {
+    return err
+}
+obs, err := c.Observability()
+if err != nil {
+    return err
+}
+```
+
+Each accessor resolves lazily and caches the result; on error the cache clears so the next call retries. Middleware holds no state worth shutting down: close via `c.Close(ctx)`, which closes the underlying services.
+
+## Runnable example
+
+```go
+package main
+
+import (
+    "fmt"
+    "net/http"
+
+    "github.com/zenta-dev/zever/config"
+    "github.com/zenta-dev/zever/container"
+    "github.com/zenta-dev/zever/middleware"
+)
+
+func main() {
+    c := container.New(config.Default())
+    logger, _ := c.Log()
+    limiter, _ := c.RateLimit()
+    obs, _ := c.Observability()
+
+    mux := http.NewServeMux()
+    mux.HandleFunc("/hello", func(w http.ResponseWriter, r *http.Request) {
+        fmt.Fprint(w, `{"ok":true}`)
+    })
+
+    handler := middleware.RequestLogger(logger)(
+        middleware.Tracing(obs)(
+            middleware.RateLimit(limiter, middleware.RemoteAddrKey)(
+                middleware.Recover(logger)(mux))))
+
+    _ = http.ListenAndServe(":8080", handler)
+}
+```
+
+```sh
+go run ./cmd/server &
+curl -s localhost:8080/hello
+curl -s -o /dev/null -w "%{http_code}\n" localhost:8080/hello
+```
+
+Expected output:
+
+```text
+{"ok":true}
+200
 ```
 
 Order matters: `RequestLogger` outermost so a recovered panic still logs with its 500 status; `Recover` innermost (closest to the handler) so it catches panics from inner middleware too.
 
+## API table
+
 | Constructor | Behavior |
 |---|---|
 | `RequestLogger(logger)` | one structured line per request: method, path, status, `duration_ms`, plus `request_id` when present |
-| `Recover(logger)` | recovers panics, logs value + stack, responds 500 `{"error":"internal error"}`; if the handler already committed, logs only |
+| `Recover(logger)` | recovers handler panics, logs value + stack, responds 500 `{"error":"internal error"}`; if the handler already committed, logs only |
 | `RateLimit(limiter, keyFunc)` | denies with 429 JSON + `Retry-After` (ceiled seconds); limiter errors fail open; default key `RemoteAddrKey` (client IP) |
 | `Tracing(provider)` | span per request named by path, `http.status_code` attribute, span error on 5xx, `http.request` counter by method/status |
+| `Timeout(d)` | bounds a handler to a fixed duration; the request context carries the deadline downstream |
+| `RemoteAddrKey(req)` | key func: client IP for HTTP rate limiting |
+| `RecoverUnaryServerInterceptor(logger)` | gRPC twin of `Recover`: panic maps to `Internal` |
+| `RateLimitUnaryServerInterceptor(limiter, keyFunc)` | gRPC twin of `RateLimit`: deny maps to `ResourceExhausted`, errors fail open, key via `PeerAddrKey` |
+| `TracingUnaryServerInterceptor(provider)` | gRPC twin of `Tracing`: span per `FullMethod`, `rpc.request` counter by method/outcome |
+| `TimeoutUnaryServerInterceptor(d)` | gRPC twin of `Timeout`: cuts slow handlers off at `d` |
+| `PeerAddrKey(ctx)` | key func: peer address for gRPC rate limiting |
 
 The status recorder reuses a single wrapper through the chain (no double-wrap) and exposes `Unwrap`, so `http.ResponseController` still reaches `Flush` / `Hijack` on the underlying writer.
-
-## Timeouts
-
-```go
-handler := middleware.Timeout(5 * time.Second)(mux)
-```
-
-`Timeout` bounds a handler to a fixed duration with the standard error envelope (504 HTTP). The handler's context carries the deadline, so downstream calls using it cancel too.
 
 ## gRPC interceptors
 
@@ -39,23 +126,39 @@ Pair each HTTP middleware with its unary interceptor:
 
 | HTTP | gRPC | Deny mapping |
 |---|---|---|
-| `Recover` | `RecoverUnaryServerInterceptor` | panic → `Internal` |
-| `RateLimit` | `RateLimitUnaryServerInterceptor` | deny → `ResourceExhausted`, errors fail open, key via `PeerAddrKey` |
-| `Tracing` | `TracingUnaryServerInterceptor` | span per `FullMethod`, `rpc.request` counter by method/outcome |
+| `Recover` | `RecoverUnaryServerInterceptor` | panic maps to `Internal` |
+| `RateLimit` | `RateLimitUnaryServerInterceptor` | deny maps to `ResourceExhausted` |
+| `Tracing` | `TracingUnaryServerInterceptor` | span per `FullMethod` |
+| `Timeout` | `TimeoutUnaryServerInterceptor` | deadline exceeded at `d` |
 
 Recovery interceptors go last in the chain so other interceptors observe recovered state.
 
-## Wiring with the container
+## Timeouts
 
 ```go
-log, _ := c.Log()
-limiter, _ := c.RateLimit()
-obs, _ := c.Observability()
-mux := buildRoutes(c)
-srv := &http.Server{Addr: ":8080", Handler: middleware.RequestLogger(log)(
-    middleware.Recover(log)(mux))}
-_ = limiter
-_ = obs
+handler := middleware.Timeout(5 * time.Second)(mux)
 ```
 
-Resolve once at startup, close via `c.Close(ctx)` — middleware itself holds no state worth shutting down.
+`Timeout` bounds a handler with the standard error envelope (504 HTTP). The handler's context carries the deadline, so downstream calls that accept it cancel too. Always pass `r.Context()` into DB, cache, and queue calls.
+
+## Production notes
+
+- Close semantics: middleware constructors return plain `func(http.Handler) http.Handler` values with no `Close`. Shut down the `http.Server` and the container (`c.Close(ctx)`); nothing middleware-specific remains.
+- Redaction: `RequestLogger` logs method, path, status, and duration only. Never add headers, bodies, or option maps to its fields; display config solely through `config.RedactedServices`.
+- Timeouts: set server-level `ReadHeaderTimeout`/`ReadTimeout`/`WriteTimeout` (bookings uses 5s/15s/15s) plus per-route `Timeout` for slow endpoints. Keep timeout tests short and deterministic.
+- Fail-open rate limiting: limiter errors fail open by design, so a Redis blip does not take the site down. Alert on limiter errors instead of blocking on them.
+
+## Troubleshooting
+
+1. **Panics return empty 200s.** `Recover` is outside `RequestLogger`, or missing entirely. Put `RequestLogger` outermost and `Recover` innermost, closest to the mux.
+2. **429s during a Redis outage.** Check whether the limiter is actually erroring: errors fail open, so steady 429s mean real quota exhaustion, not backend failure. Raise the rate or burst, or scope keys more narrowly than `RemoteAddrKey`.
+3. **SSE / hijacked connections break.** An extra wrapper may sit between middleware and the writer. The built-in recorder exposes `Unwrap`; custom middleware must forward it too, or `http.ResponseController` cannot reach `Flush`/`Hijack`.
+4. **Traces missing for failed requests.** The provider may be `noop` in that environment. Set `observability.adapter: stdout` (or OTLP) and confirm spans are named by path with the `http.status_code` attribute.
+5. **Timeouts do not stop work.** The handler ignores `r.Context()`. Thread the request context into every downstream call so the deadline cancels DB and RPC work.
+
+## See also
+
+- [Routing](routing/) - where the wrapped mux and its groups come from
+- [Requests and Responses](requests-responses/) - the error envelope `Recover` and rate limiting share
+- [Logging](logging/) - the `log.Logger` behind `RequestLogger` and `Recover`
+- [Errors](errors-logging/) - typed errors and status mapping under the middleware

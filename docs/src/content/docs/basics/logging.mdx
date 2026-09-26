@@ -3,108 +3,161 @@ title: Logging
 description: Structured logging with swappable adapters, resolved once through the container.
 ---
 
-Every service in this framework logs through one small interface,
-`log.Logger`, instead of each package picking its own logging library.
-Swap the adapter — `noop` for tests, `slog` for the stdlib, `zerolog` for
-high-throughput JSON, `pretty` for local development — and every log line
-in the app changes shape with it, with zero call-site changes.
+Every service logs through one small interface, `log.Logger`, instead of each package picking its own library. Swap the adapter - `noop` for tests, `slog` for the stdlib, `zerolog` for high-throughput JSON, `pretty` for local development - and every log line changes shape with zero call-site changes.
 
-## Resolve one logger and inject it
+Use one resolved logger for the process and inject it into handlers, middleware, and workers. Tests resolve `noop` so output stays clean.
+
+## Config
+
+```yaml
+log:
+  adapter: slog   # default in config.Default()
+```
+
+```yaml
+log:
+  adapter: zerolog
+```
+
+```yaml
+log:
+  adapter: pretty   # local development, human-readable lines
+```
+
+```sh
+LOG_ADAPTER=slog
+LOG_ADAPTER=zerolog
+```
+
+File keys are snake_case and strict: unknown fields fail `Load`. Env matching is case-insensitive with `_` ignored. `Options.Validate()` accepts the zero value; adapter choice is validated at resolve time.
+
+## Resolve via container
 
 ```go
-import "github.com/zenta-dev/zever/container"
+import (
+    "github.com/zenta-dev/zever/config"
+    "github.com/zenta-dev/zever/container"
+)
 
 c := container.New(config.Default())
 logger, err := c.Log()
 if err != nil {
-	return err
+    return err
 }
 
 handler := middleware.RequestLogger(logger)(mux)
 ```
 
-`Log()` resolves lazily and caches the result, like every other container
-accessor. There's no `Close` on `Logger` itself — only resolved services
-close, via `container.Close(ctx)`.
+`Log()` resolves lazily and caches the result, like every other container accessor. On error the cache clears so the next call retries. There is no `Close` on `Logger` itself - only resolved services close, via `c.Close(ctx)`, where logging probes as no-op nil.
 
-## Writing a log line
+## Runnable example
 
 ```go
 logger.Info().
-	Str("user_id", userID).
-	Dur("duration", elapsed).
-	Msg("request handled")
+    Str("user_id", userID).
+    Dur("duration", elapsed).
+    Msg("request handled")
 
 logger.Error().Err(err).Msg("failed to process order")
-```
 
-`Event` gives you one typed method per value kind (`Str`, `Int`, `Int64`,
-`Float64`, `Bool`, `Dur`, `Time`, `Err`/`AnErr`, `Any`) instead of a
-`fmt.Sprintf`-style message — this is what makes `slog`/`zerolog` output
-genuinely structured (queryable JSON fields) rather than a formatted string
-that happens to contain the same information.
-
-Check `Enabled` before building an expensive event (e.g. one that computes
-a field value):
-
-```go
 if logger.Enabled(log.DebugLevel) {
-	logger.Debug().Any("payload", expensiveToCompute()).Send()
+    logger.Debug().Any("payload", expensiveToCompute()).Send()
 }
 ```
 
-`noop` is a zero-cost discard path either way, so this check matters most
-for the adapters that actually write.
+```sh
+go run ./cmd/server &
+curl -s localhost:8080/hello >/dev/null
+```
+
+Expected output (stderr, `slog` shape):
+
+```text
+level=INFO msg="request handled" user_id=u_123 duration=12ms method=GET path=/hello status=200 duration_ms=3
+```
+
+`Event` gives one typed method per value kind (`Str`, `Int`, `Int64`, `Float64`, `Bool`, `Dur`, `Time`, `Err`/`AnErr`, `Any`) instead of `fmt.Sprintf` formatting - this keeps `slog`/`zerolog` output queryable JSON rather than a flat string. Check `Enabled` before building expensive events. `noop` discards everything, so the check matters most for adapters that write.
 
 ## Loggers travel through context
 
 ```go
 ctx = log.ContextWithLogger(ctx, logger.With().Str("request_id", id).Logger())
 // ... deeper in the call stack ...
-log.FromContext(ctx).Info().Msg("still has request_id attached")
+log.FromContext(ctx, logger).Info().Msg("still has request_id attached")
 ```
 
-The context never stores anything but the logger value itself — no I/O
-state, matching the framework's "`ctx` as first arg, never stored on a
-struct" rule everywhere else.
+The context carries only the logger value - no I/O state - matching the framework rule of context as first arg, never stored on a struct. `FromContext` takes a fallback logger for contexts that carry none.
 
-## Config
+## API table
 
-```yaml
-log:
-  adapter: slog
-```
-
-```sh
-LOG_ADAPTER=slog
-```
-
-## Adapters
-
-| Adapter | Output |
+| Method / helper | Purpose |
 |---|---|
-| `noop` | discards everything — safe for tests, not the default |
-| `slog` | stdlib structured lines — `config.Default()`'s adapter |
-| `zerolog` | high-throughput JSON |
-| `pretty` | human-readable lines for local development |
+| `Debug() Event` | debug-level event builder |
+| `Info() Event` | info-level event builder |
+| `Warn() Event` | warning-level event builder |
+| `Error() Event` | error-level event builder |
+| `With() Context` | derived context builder for attached fields |
+| `Enabled(level Level)` | report whether a level will emit; gate expensive fields |
+| `Event.Str(key, val)` | attach a string field |
+| `Event.Int / Int64 / Float64 / Bool` | attach numeric and boolean fields |
+| `Event.Dur(key, d)` | attach a `time.Duration` field |
+| `Event.Time(key, t)` | attach a timestamp field |
+| `Event.Err(err) / AnErr(key, err)` | attach an error field |
+| `Event.Any(key, val)` | attach an arbitrary structured value |
+| `Event.Msg(msg)` / `Send()` | emit the line |
+| `log.ContextWithLogger(ctx, l)` | store a logger in the context |
+| `log.FromContext(ctx, fallback)` | load it back, or use fallback |
+| `log.Open(adapter, opts)` | open an adapter directly without the container |
+| `middleware.RequestLogger(logger)` | one line per request: method, path, status, `duration_ms`, plus `request_id` when present |
 
-`RequestLogger` (in `middleware`) emits one line per request — method,
-path, status, `duration_ms`, plus `request_id` when present. `Recover`
-logs panics with the value and stack, then responds `500`.
+`RequestLogger` emits the per-request line; `Recover` logs panics with value and stack, then responds 500.
+
+## Field discipline
+
+Pick the narrowest typed method for each value so lines stay queryable:
+
+```go
+logger.Info().
+    Str("method", r.Method).
+    Str("path", r.URL.Path).
+    Int("status", rec.Status()).
+    Dur("elapsed", time.Since(start)).
+    Msg("request")
+```
+
+Prefer `Str`/`Int`/`Dur` over `Any` for hot fields - `Any` falls back to reflection and costs more per line. Reserve `Any` for genuinely dynamic payloads, and never pass request bodies, headers, or config maps through it. One line per request from `RequestLogger`, one line per failure from the handler: no duplicate lines for the same event.
 
 ## Never log secrets
 
-Raw option maps and resolved config may hold secrets as plain strings.
-Never pass them into a field or message directly:
+Raw option maps and resolved config may hold secrets as plain strings. Never pass them into a field or message directly:
 
 ```go
-// Wrong — may print DSNs, API keys, JWT secrets.
+// Wrong - may print DSNs, API keys, JWT secrets.
 logger.Info().Any("cfg", cfg).Send()
 
-// Right — the sole display path for logging or debugging.
+// Right - the sole display path for logging or debugging.
 logger.Info().Any("cfg", config.RedactedServices(cfg)).Send()
 ```
 
-See [Errors](errors-logging/) for how the same redaction rule
-applies to error text, and [Configuration](../getting-started/configuration/)
-for the full precedence/redaction story.
+The same rule covers error text: name services and fields only, never values.
+
+## Production notes
+
+- Close semantics: loggers declare no `Close`; buffered providers flush through their own `Shutdown(ctx)` shape probed by `c.Close(ctx)`. Do not exit before `Close` returns or trailing spans/lines drop.
+- Redaction: `RedactedServices` (built on `Redact`) is the sole display path. Error text, CLI output, and log fields all follow it.
+- Timeouts: logging never blocks shutdown past its per-service bound (5s when the parent carries no deadline, else the parent deadline). Keep log I/O fast; never format unbounded payloads into a line.
+- Adapter choice: `slog` for stdlib-only builds, `zerolog` for high-throughput JSON, `pretty` for local shells, `noop` for tests. One process, one adapter.
+
+## Troubleshooting
+
+1. **No log output in tests.** The resolved adapter is `noop`. That is correct for hermetic tests; assert behavior, not lines. Resolve `slog` explicitly when testing the line itself.
+2. **Missing `request_id` on lines.** The context logger was never attached. Wrap the context with `log.ContextWithLogger` in middleware before handlers run.
+3. **Secrets in log files.** A call passes raw config or headers into `Any`. Replace with `config.RedactedServices(cfg)` and fixed field names.
+4. **Expensive debug work on hot paths.** Fields compute even when the level is off. Gate with `logger.Enabled(log.DebugLevel)` first.
+5. **Trailing lines lost at exit.** The process exits before `c.Close(ctx)` finishes. Defer `Close` with a timeout parent and check the joined error.
+
+## See also
+
+- [Errors](errors-logging/) - how the same redaction rule applies to error text
+- [Middleware](middleware/) - `RequestLogger` and `Recover` wiring
+- [Configuration](../getting-started/configuration/) - precedence and the full redaction story

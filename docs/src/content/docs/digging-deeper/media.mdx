@@ -3,22 +3,23 @@ title: Media Processing
 description: Upload, probe, transform, and serve media assets with bounded limits.
 ---
 
-This page covers the `media` package specifically — upload, download, probe,
+This page covers the `media` package specifically - upload, download, probe,
 and transform of media assets, including invoking `ffmpeg`/`ffprobe` for
-transcodes. It's a level above plain blob storage: see
-[Storage & Media](storage-media/) for the `storage`
-service that `media`'s `local`/`s3` adapters sit on top of.
+transcodes. It is a level above plain blob storage: see
+[Storage and Media](storage-media/) for the `storage`
+service that `media` `local`/`s3` adapters sit on top of.
 
-Serving user-uploaded images or video means validating IDs, capping decode size,
-probing format before you trust it, and only then transforming — `media.Media`
-bundles that pipeline behind `Upload`, `Download`, `DownloadRange`, `Stat`,
-`Probe`, `Transform`, and `Delete`, so no caller reimplements ID validation or
-size caps by hand.
+## Purpose and when to use
 
-`local` (the default) writes to a filesystem root — fine for single-instance
-deployments and tests. `s3` is the adapter for anything that needs to survive a
-redeploy or be shared across instances; transforms invoke the configured
-`ffmpeg`/`ffprobe` binaries regardless of which storage adapter you pick.
+Serving user-uploaded images or video means validating IDs, capping decode
+size, probing format before you trust it, and only then transforming -
+`media.Media` bundles that pipeline behind `Upload`, `Download`,
+`DownloadRange`, `Stat`, `Probe`, `Transform`, and `Delete`, so no caller
+reimplements ID validation or size caps by hand. `local` (the default)
+writes to a filesystem root - fine for single-instance deploys and tests.
+`s3` is the adapter for anything that must survive a redeploy or be shared
+across instances; transforms invoke the configured `ffmpeg`/`ffprobe`
+binaries regardless of which storage adapter you pick.
 
 ## Config
 
@@ -27,19 +28,35 @@ media:
   adapter: local
   options:
     root: /var/media
-    maxdownloadbytes: 67108864
+    max_download_bytes: 67108864
+    max_pixels: 50000000
+    presign_ttl: 1h
 ```
 
 ```sh
 MEDIA_ADAPTER=s3
 MEDIA_BUCKET=my-assets
-MEDIA_ACCESSKEYID=...
-MEDIA_SECRETACCESSKEY=...
+MEDIA_REGION=us-east-1
+MEDIA_ACCESS_KEY_ID=...
+MEDIA_SECRET_ACCESS_KEY=...
+MEDIA_FFMPEG=/usr/bin/ffmpeg
+MEDIA_FFPROBE=/usr/bin/ffprobe
 ```
+
+Full key list: `root`, `base_url`, `max_download_bytes` (default 64MB),
+`max_pixels` (decode cap), `derived_ttl`, `presign_ttl` (max 7 days),
+`max_duration`, `endpoint`, `region`, `bucket`, `access_key_id`,
+`secret_access_key`, `ffmpeg`, `ffprobe`. All byte/pixel/duration bounds
+reject negatives at `Validate` time.
 
 ## Resolve
 
 ```go
+import (
+	"github.com/zenta-dev/zever/config"
+	"github.com/zenta-dev/zever/container"
+)
+
 c := container.New(config.Default())
 m, err := c.Media()
 if err != nil {
@@ -48,6 +65,70 @@ if err != nil {
 _ = m
 ```
 
+`Media()` resolves lazily and caches the result; on error the cache clears
+so the next call retries.
+
+## Runnable example
+
+```go
+package main
+
+import (
+	"context"
+	"fmt"
+	"os"
+
+	"github.com/zenta-dev/zever/config"
+	"github.com/zenta-dev/zever/container"
+)
+
+func main() {
+	c := container.New(config.Default())
+	defer c.Close(context.Background())
+
+	m, err := c.Media()
+	if err != nil {
+		fmt.Println("resolve error:", err)
+		return
+	}
+	ctx := context.Background()
+
+	raw, err := os.ReadFile("testdata/avatar.png")
+	if err != nil {
+		fmt.Println("read error:", err)
+		return
+	}
+	asset, err := m.Upload(ctx, "avatars/u1.png", raw, struct{}{})
+	_ = asset
+	if err != nil {
+		fmt.Println("upload error:", err)
+		return
+	}
+	info, err := m.Stat(ctx, "avatars/u1.png")
+	if err != nil {
+		fmt.Println("stat error:", err)
+		return
+	}
+	fmt.Println("size:", info.Size)
+	probe, err := m.Probe(ctx, "avatars/u1.png")
+	if err != nil {
+		fmt.Println("probe error:", err)
+		return
+	}
+	fmt.Println("format:", probe.Format)
+	if err := m.Close(); err != nil {
+		fmt.Println("close error:", err)
+	}
+}
+
+// Expected output with the local adapter:
+// size: 48210
+// format: png
+```
+
+Values vary with the fixture file; the shape (size line, then format line)
+is what to assert on.
+
 ## Adapters
 
 | Adapter | Package | Notes |
@@ -55,17 +136,39 @@ _ = m
 | `local` | `media/local` | Default; filesystem-backed |
 | `s3` | `media/s3` | Shared; needs bucket/region/credentials |
 
-## The gotcha: every limit here exists because someone hit it
+## Production notes
 
-`ValidID` rejects empty, `.`, and `..` forms specifically to block path
-traversal through an asset ID — never build a filesystem or storage key by
-concatenating a raw caller-supplied ID without going through it. Decoded images
-are capped at 50M pixels (`MaxPixels`) so a crafted image can't blow up memory
-during a transform. Presigned URLs cap at 7 days (`MaxPresignTTL`) — configuring
-a `PresignTTL` longer than that is rejected at `Validate()` time with
-`InvalidOptionsError`, not silently clamped, so a too-long TTL fails at
-startup instead of quietly shipping a different value than requested.
+- `ValidID` rejects empty, `.`, and `..` forms to block path traversal
+  through an asset ID - never build a filesystem or storage key by
+  concatenating a raw caller-supplied ID without going through it.
+- Decoded images are capped at 50M pixels (`max_pixels`) so a crafted
+  image cannot blow up memory during a transform. Downloads are capped at
+  64MB by default (`max_download_bytes`).
+- Presigned URLs cap at 7 days: a `presign_ttl` longer than that is
+  rejected at `Validate()` time with `InvalidOptionsError`, not silently
+  clamped, so a too-long TTL fails at startup instead of shipping a
+  different value than requested.
+- `access_key_id` and `secret_access_key` never appear in logs. Pin the
+  `ffmpeg`/`ffprobe` binary paths in config so deploys do not depend on
+  ambient `PATH`.
 
-`AccessKeyID` and `SecretAccessKey` never appear in logs; downloads are capped
-at 64MB by default (`MaxDownloadBytes`) to keep a single request from exhausting
-memory.
+## Troubleshooting
+
+**`Stat` or `Download` fails on an ID you just uploaded.**
+The ID likely failed `ValidID` at upload (empty, `.`, `..`, or separator
+games). Sanitize caller input before using it as an asset path.
+
+**Transforms fail with "binary not found".**
+`ffmpeg`/`ffprobe` point at binaries missing from this machine. Install
+them or set absolute paths in config; storage adapter choice does not
+affect this.
+
+**Startup fails with `InvalidOptionsError` on `presign_ttl`.**
+You set a TTL over 7 days. Lower it; the limit is enforced, not clamped.
+
+## See also
+
+- [Storage and Media](storage-media/) for the blob layer underneath
+- [Documents](document/) for render-to-PDF/image flows
+- [Container](../../architecture/container/) for lazy resolve and close order
+- [Adapters Matrix](../../reference/adapters-matrix/) for the full table

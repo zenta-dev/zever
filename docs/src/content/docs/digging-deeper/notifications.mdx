@@ -3,59 +3,217 @@ title: Notifications
 description: Multi-channel user notifications with a safe log default.
 ---
 
-"Notify the user" shouldn't mean "know whether that's a push notification or
-an SMS today, and rewrite the call site when it changes tomorrow." `notification.Notifier`
-fans a single intent out to whatever channel the adapter targets — code calls
+"Notify the user" should not mean "know whether that is push or SMS today,
+and rewrite the call site when it changes tomorrow." `notification.Notifier`
+fans a single intent out to whatever channel the adapter targets - code calls
 `Notify` against the interface, and adding FCM push or Twilio SMS later is a
-config change, not a rewrite of every place that sends a notification.
+config change, not a rewrite of every sender.
 
-Stay on `log` (the default) until you actually need a real channel wired
-up — it writes instead of sending, so nothing goes out by accident in
-development. Pick `twilio` when the target is SMS and `fcm` when it's push;
-both need real credentials, supplied via file or env, never hardcoded.
+## Purpose and when to use
+
+Use notifications for user-directed pings that are not mail: booking
+reminders, check-in prompts, fraud alerts. The bookings worker sends guest
+push from `SendReminder` through `notification/log` in dev, so replaying the
+reminder schedule never pings a real device.
+
+Stay on `log` until a real channel is wired. It writes instead of sending, so
+nothing escapes by accident. Pick `twilio` when the target is SMS and `fcm`
+when it is push. Both need real credentials from file or env, never baked
+into committed YAML.
+
+The package does not queue or schedule. Enqueue notifications as jobs for
+retry and backpressure, and never let a channel failure fail the request that
+triggered it.
 
 ## Config
+
+File decoding is strict snake_case. `twilio` and `fcm` blocks are nested maps
+under `options`. Only `timeout` lives at the top level beside them.
 
 ```yaml
 notification:
   adapter: log
+  options:
+    timeout: 30000000000
+```
+
+SMS via Twilio:
+
+```yaml
+notification:
+  adapter: twilio
+  options:
+    timeout: 30000000000
+    twilio:
+      account_sid: ACxxxxxxxxxxxxxxxx
+      auth_token: prod-secret-here
+      from_number: +15551234567
+```
+
+Push via FCM:
+
+```yaml
+notification:
+  adapter: fcm
+  options:
+    timeout: 30000000000
+    fcm:
+      project_id: bookings-prod
+      service_account: /run/secrets/fcm.json
 ```
 
 ```sh
 NOTIFICATION_ADAPTER=fcm
+NOTIFICATION_TIMEOUT=30s
 ```
 
-## Resolve
+Zero `timeout` means the 30s default. Only negative values fail validation.
+Supply `account_sid`, `auth_token`, and `service_account` by file or env and
+display config only through `config.RedactedServices`.
+
+## Resolve via container
 
 ```go
-c := container.New(config.Default())
-n, err := c.Notification()
-if err != nil {
-	// handle
+import (
+	"github.com/zenta-dev/zever/config"
+	"github.com/zenta-dev/zever/container"
+)
+
+func openNotify() error {
+	c := container.New(config.Default())
+	n, err := c.Notification()
+	if err != nil {
+		return err
+	}
+	defer func() { _ = n.Close() }()
+	_ = n
+	return nil
 }
-_ = n
 ```
+
+`Notification()` resolves lazily and caches the instance. On error the cached
+state clears so the next call retries. Channel and priority types live beside
+the interface: `ChannelPush` and `ChannelSMS`, plus `PriorityLow`,
+`PriorityNormal`, and `PriorityHigh` with normal as the zero-value default.
+
+Close shape: `notification.Notifier` declares instant `Close() error`. The
+container probes it during `Close(ctx)` as a snapshot service.
+
+## Runnable example
+
+Deliver one push through the log adapter, then validate an SMS target before
+sending. SMS targets must be E.164 (`+` plus 7 to 15 digits) or `Validate`
+returns `InvalidTargetError` without echoing the number.
+
+```go
+package main
+
+import (
+	"context"
+	"fmt"
+
+	"github.com/zenta-dev/zever/notification"
+	notificationlog "github.com/zenta-dev/zever/notification/log"
+)
+
+func main() error {
+	_ = notification.Register(notification.Log, func(o notification.Options) (notification.Notifier, error) {
+		return notificationlog.NewWithWriter(o, discardWriter())
+	})
+	n, err := notification.Open(notification.Log, notification.Options{})
+	if err != nil {
+		return err
+	}
+	defer func() { _ = n.Close() }()
+
+	push := notification.NewNotification("device-token-abc", notification.ChannelPush, "Reminder: check-in at 3pm")
+	push.Title = "Booking reminder"
+	push.Data = map[string]string{"booking_id": "b_123"}
+	if err := push.Validate(); err != nil {
+		return err
+	}
+	if err := n.Notify(context.Background(), &push); err != nil {
+		return err
+	}
+
+	sms := notification.NewNotification("+15551234567", notification.ChannelSMS, "Code 4821")
+	if err := sms.Validate(); err != nil {
+		return err
+	}
+	if err := n.Notify(context.Background(), &sms); err != nil {
+		return err
+	}
+	fmt.Println("notified push and sms via log adapter")
+	return nil
+}
+```
+
+Expected behavior: both `Notify` calls validate, write to the log writer, and
+return nil with no network use. A wrong-channel call (SMS fields on push, or
+`Title` on SMS) fails closed with `InvalidNotificationError` before delivery.
+
+Note: `discardWriter()` above stands in for any `io.Writer` such as
+`io.Discard` in tests or `os.Stdout` in dev. The log adapter constructor
+takes options plus a writer.
 
 ## Adapters
 
 | Adapter | Package | Notes |
 |---|---|---|
-| `log` | `notification/log` | Default; safe sink |
-| `twilio` | `notification/twilio` | SMS delivery |
-| `fcm` | `notification/fcm` | Push delivery |
+| `log` | `notification/log` | Default, safe sink, writes instead of sending |
+| `twilio` | `notification/twilio` | SMS delivery, E.164 targets, basic-auth by sid and token |
+| `fcm` | `notification/fcm` | Push delivery, project plus service-account key file |
 
-## The gotcha: the log adapter echoes the target — don't ship it to prod
+Unsupported channels fail closed with `ChannelNotSupportedError` rather than
+silently dropping. All errors stay `errors.Is`-compatible.
 
-Because `log` exists purely for local visibility, it prints the actual
-notification target (phone number, device token) to the log — exactly the
-kind of thing you don't want in production log output. Disable it once you
-deploy for real. Separately, `InvalidTargetError` deliberately carries only a
-reason, never the target itself, to keep PII out of error paths even when
-validation fails; SMS targets must be E.164-formatted before they reach the
-adapter. A channel a given adapter doesn't support fails closed with a
-`ChannelNotSupportedError` rather than silently dropping the notification.
+## Gotchas and production notes
 
-`notification` does not queue or schedule anything itself — for retry and
-backpressure, enqueue notifications as jobs rather than calling `Notify`
-directly from a request path, and make sure a channel failure never fails the
-request that triggered it.
+- The log adapter echoes the target for local visibility. Phone numbers and
+  device tokens land in log output, which is exactly what you do not want in
+  prod. Switch to `twilio` or `fcm` before deploy, or gate log output.
+- `InvalidTargetError` carries a reason only, never the target, so PII stays
+  out of error paths and wrapped errors. Keep that property when adding
+  logging around `Notify` - log channel and reason, not the number or token.
+- SMS is body-only. `Title` and `Data` on `ChannelSMS` fail validation as
+  push-only fields. Keep titles and payload maps on the push path.
+- `TTL` zero means none, negative fails validation. Priority zero means
+  normal. Set explicit priorities for urgent alerts and leave the rest default.
+- Do not call `Notify` inline on the request path for slow channels. Dispatch
+  a job (bookings uses `SendReminder` on queue `low`) so provider latency and
+  retries never gate the booking write.
+- Webhook-style skip applies here too: when no push token or phone exists for
+  a user, skip quietly at the job layer instead of erroring the whole batch.
+- Never log raw option maps. `auth_token` and service-account paths are
+  secrets - route display through `config.RedactedServices`.
+
+## Troubleshooting
+
+Symptom: `sms target must be E.164` on valid-looking numbers.
+Cause: missing `+` prefix, spaces, or dashes. The matcher wants `+` plus 7 to
+15 digits starting non-zero.
+Fix: normalize with an E.164 formatter before `Validate`, and reject the
+input at the API boundary when it cannot normalize.
+
+Symptom: `title is push-only` or `data is push-only`.
+Cause: SMS notification built with push fields copied from a push template.
+Fix: branch by channel - set `Title` and `Data` only for `ChannelPush`, body
+only for `ChannelSMS`.
+
+Symptom: pushes work in dev but nothing arrives in prod.
+Cause: still on the `log` adapter, or FCM `project_id` and `service_account`
+point at a dev project.
+Fix: set `notification.adapter` to `fcm` with the prod project and key path,
+and confirm the file is mounted where the deployed process reads it.
+
+Symptom: `ChannelNotSupportedError` after switching adapters.
+Cause: code sends both push and SMS but the new adapter serves one channel.
+Fix: keep one notifier per channel or route by channel at the job layer, and
+cover both paths in tests with the log adapter plus validation checks.
+
+## See also
+
+- [Mailer](mailer/) for transactional mail next to push and SMS
+- [Scheduler and Jobs](scheduler-jobs/) for retry wrapping around notify calls
+- [Build a Booking API](../tutorials/build-a-booking-api/) for the bookings tutorial
+- `examples/bookings/zever.yaml` for the log notification default and `schema/bookings.zen` for the SendReminder job

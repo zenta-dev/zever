@@ -3,9 +3,54 @@ title: Query Builder
 description: Typed ORM queries over db.DB with joins, CTEs, windows, and dialect gating.
 ---
 
-The ORM is a generics-typed SQL builder over `db.DB` — not raw string SQL. Tables and columns are typed values, SQL text is rendered centrally with bound args and quoted identifiers, and the dialect resolves per call from `conn.Dialect()`.
+The ORM is a generics-typed SQL builder over `db.DB` - not raw string SQL. Tables and columns are typed values, SQL text renders centrally with bound args and quoted identifiers, and the dialect resolves per call from `conn.Dialect()`.
 
-## Model and reads
+Use it for every database read and write behind handlers, workers, and seeds. Drop to raw `conn.Exec` only for shapes the DSL cannot express (FTS5 virtual-table DDL is the documented case).
+
+## Config
+
+The ORM takes no YAML of its own; it rides on the `db` service:
+
+```yaml
+db:
+  adapter: sqlite
+  options:
+    dsn: app.db
+```
+
+```yaml
+db:
+  adapter: postgres
+  options:
+    dsn: postgres://app:secret@db:5432/app
+    max_conns: 20
+```
+
+```sh
+DB_ADAPTER=postgres
+DB_MAXCONNS=20
+```
+
+`config.Default()` uses sqlite so tests run with no server. sqlite `:memory:` forces a single connection even if `MaxConns` is set - extra connections would each get an isolated database. Postgres requires `Options.DSN`.
+
+## Resolve via container
+
+```go
+import (
+    "github.com/zenta-dev/zever/config"
+    "github.com/zenta-dev/zever/container"
+)
+
+c := container.New(config.Default())
+conn, err := c.DB()
+if err != nil {
+    return err
+}
+```
+
+Pass `conn` (a `db.DB`) into every ORM call; the dialect resolves from `conn.Dialect()` per call with no silent fallback. `Close` stays central: `c.Close(ctx)` closes the pool; statements reuse `db.Preparer` where the adapter offers it.
+
+## Model, reads, and runnable example
 
 ```go
 type User struct {
@@ -30,60 +75,176 @@ users, err := orm.From(Users).
     All(ctx, conn) // []*User
 ```
 
-`From[T, PT]` infers the pointer-scanner type, so call sites never write type arguments. The remaining read shapes:
+```sh
+go run ./examples/pagination/cmd/app
+```
 
-| Method | Returns |
+Expected output (offset page 2 of 25 seeded products, then the keyset walk):
+
+```text
+offset page 2 of 25 total products (LIMIT 5 OFFSET 5):
+  p15 gadget-15     7.49
+  p22 gadget-22     7.49
+keyset walk (page size 5, ascending price then id):
+  page 1 (cursor ): p07:499 p14:499 p21:499 p01:749 p08:749
+  page 2 (cursor AQAIcHJvZHVjdHMCaWRzA3AwOA): p15:749 p22:749 p02:999 p09:999 p16:999
+```
+
+`From[T, PT]` infers the pointer-scanner type, so call sites never write type arguments. Columns also come in nullable form via `orm.NewNullableColumn` (`IsNull`, `IsNotNull`, `SetValue`, `SetNull`).
+
+| Read method | Returns |
 |---|---|
-| `First` / `FirstOrErr` | one row (`FirstOrErr` wraps `db.ErrNotFound`) |
-| `Count` | `int64` |
-| `Exists` | `bool` |
-| `Stream` | `iter.Seq2` for constant-memory scans |
+| `All(ctx, conn)` | all matching rows (`[]PT`) |
+| `First(ctx, conn)` | one row plus `ok bool` |
+| `FirstOrErr(ctx, conn)` | one row; wraps `db.ErrNotFound` on miss |
+| `Count(ctx, conn)` | `int64` over the same predicates |
+| `Exists(ctx, conn)` | `bool` without fetching rows |
+| `Stream(ctx, conn)` | `iter.Seq2` for constant-memory scans |
 
-## Writes and transactions
+Chainable clauses: `Where`, `OrderBy` (`Asc`/`Desc`), `Limit`, `Offset`, `Columns` (projections into subsets), `Distinct`, `DistinctOn` (postgres-only).
+
+## Writes, conflicts, merges
 
 ```go
-err := orm.Insert(Users).Values(&User{Name: "alice"}).Exec(ctx, conn)
+err := orm.InsertInto(Users).Values(&User{Name: "alice"}).Exec(ctx, conn)
 
+n, err := orm.UpdateTable(Users).
+    Set(UserName.Set("bob")).
+    Where(UserID.Eq(1)).
+    Exec(ctx, tx)
+
+n, err := orm.DeleteFrom(Users).Where(UserID.Eq(1)).Exec(ctx, tx)
+```
+
+`InsertInto` / `UpdateTable` / `DeleteFrom` cover writes; `Conflict` builders express upserts and `MergeInto` expresses merge statements. `Returning` plus `ExecReturning` fetch affected rows in one round trip where the dialect allows.
+
+## Transactions and retries
+
+```go
 err = db.WithTx(ctx, conn, &db.TxOptions{Isolation: db.Serializable}, func(ctx context.Context, tx db.Tx) error {
-    return orm.Update(Users).Set(UserName.Set("bob")).Where(UserID.Eq(1)).Exec(ctx, tx)
+    return orm.UpdateTable(Users).Set(UserName.Set("bob")).Where(UserID.Eq(1)).Exec(ctx, tx)
+})
+
+err = orm.WithNestedTx(ctx, conn, func(ctx context.Context, tx db.Tx) error {
+    return seed(ctx, tx)
+})
+
+err = orm.RetryTx(ctx, conn, opts, func(ctx context.Context, tx db.Tx) error {
+    return transfer(ctx, tx)
 })
 ```
 
-`Insert` / `Update` / `Delete` builders cover writes, plus `Conflict` upserts and `Merge`. `Tx` / `WithNestedTx` run units of work with savepoints, and `RetryTx` retries serialization failures. Statements reuse `db.Preparer` where the adapter offers it (sqlite caches server-side preparation over an internal LRU).
+Commit on success, rollback on error or panic (re-panicking after rollback).
 
-## Advanced queries
+## Joins, CTEs, windows, sets
+
+```go
+j := orm.JoinOn(orm.From(Users), rel, orm.InnerJoin)
+left := orm.LeftJoinOn(orm.From(Users), rel)
+
+name, err := orm.NewCTEName("active_users")
+cte := orm.With(name, orm.From(Users).Where(Active.Eq(true)))
+tree := orm.WithRecursive(name, base, recursiveWhere, cteRel)
+```
 
 | Feature | API |
 |---|---|
-| Joins | `Join2` / `Join3` plus outer variants |
-| CTEs | chained `With` blocks |
-| Windows | window-function helpers |
-| Sets | union / intersect / except |
-| Projections | select subsets into scanners |
-| Cursors | `CursorKey` keyset pagination |
-| Preload | batched association load (no N+1) |
-| Locking | row-lock modes |
-| Inspection | `Explain` |
+| Joins | `JoinOn`, `LeftJoinOn`, `RightJoinOn`, `FullJoinOn`, `JoinOn3` family, lateral variants |
+| CTEs | `With`, `WithRecursive`, `WithJoin`, `WithGrouped`, `NewCTEName`, `CTETable` |
+| Windows | `RowNumber`, `Rank`, `DenseRank`, `Lead`, `Lag`, `NTile`, `CountOver`, `SumOver`, `AvgOver`, `MinOver`, `MaxOver`, frame bounds (`Preceding`, `Following`, `CurrentRow`, unbounded variants) |
+| Sets / projections / inspection | union / intersect / except, `Columns(...)` subsets, `Explain` helpers |
 
-`orm/json` and `orm/fts` add per-dialect JSON and full-text helpers.
+Features a dialect lacks fail closed with typed `dialect.ErrUnsupportedByDialect` - `DISTINCT ON` and strong lock modes are postgres-only, right/full joins and recursive CTEs gate by capability too.
 
-## Dialect gating
+## Pagination, preload, locking
 
-There is no silent fallback: placeholders, quoting, and capability gates resolve per call from `conn.Dialect()` (`"sqlite"` / `"postgres"`). Features a dialect lacks fail closed with typed `dialect.ErrUnsupportedByDialect` — `DISTINCT ON` and strong lock modes are postgres-only, for example:
+```go
+key := orm.NewCursorKey(UserID, lastSeenID)
+page := orm.NextPage(orm.From(Users).OrderBy(UserID.Asc()), key)
+
+q, err := orm.OffsetPage(orm.From(Users), page, size)
+total, err := orm.From(Users).Count(ctx, conn)
+
+pred, err := orm.AfterTuple(cols, vals, false)
+token := key.Encode()
+back, ok, err := orm.DecodeCursor(token, UserID)
+
+err = orm.Preload(ctx, conn, users, rel, func(u *User) *[]Booking { return &u.Bookings })
+
+locked := orm.From(Users).Where(UserID.Eq(1)).ForUpdate()
+shared := orm.From(Users).Where(UserID.Eq(1)).ForShare().SkipLocked()
+```
+
+The keyset predicate must mirror `OrderBy` exactly or pages skip or duplicate rows. The pagination example proves both styles return the same contents over 25 products with a duplicate sort key.
+
+## JSON and full-text search
+
+JSON documents store in a TEXT column typed as `orm.JSONText` (binds as TEXT, scans from TEXT, marshals as raw JSON). Typed predicates come from `orm/json/sqlite` (nested-key match, key existence, `json_each` array membership, `json_type` checks composed with `orm.And`) plus a postgres twin over jsonb operators:
+
+Full-text search uses `orm/fts/sqlite` (`Match` for `col MATCH ?`, `Rank` for relevance order) with a `orm/fts/postgres` twin over `tsvector` (`to_tsvector @@ plainto_tsquery`, `ts_rank`):
+
+```sh
+go run ./examples/json_query/cmd/app
+go run ./examples/fts/cmd/app
+go run ./examples/recursive_cte/cmd/app
+```
+
+Expected FTS output: `body matches "go": [d1 "Go release" d4 "Go on the web"]`, count = 2.
+
+The query text is always a bound placeholder - FTS5 boolean/phrase syntax flows through the argument, never into SQL text. The FTS5 virtual table itself is raw DDL in a migration: the `.zen` DSL cannot express virtual-table shapes.
+
+## Dialect gating with errors.Is
 
 ```go
 rows, err := q.All(ctx, conn)
 if errors.Is(err, dialect.ErrUnsupportedByDialect) {
     // fall back to a portable formulation
+    rows, err = portableQuery.All(ctx, conn)
 }
 ```
 
-All errors carry the `orm:` prefix (`orm/render:`, `orm/dialect:`) and remain `errors.Is`-compatible.
+There is no silent fallback: placeholders, quoting, and capability gates resolve per call from `conn.Dialect()` (`"sqlite"` / `"postgres"`). All errors carry the `orm:` prefix (`orm/render:`, `orm/dialect:`) and remain `errors.Is`-compatible. `ErrUnsupportedByDialect.Error()` is the stable string `orm/dialect: unsupported by dialect`.
+
+## API table
+
+| Helper | Purpose |
+|---|---|
+| `orm.From(table)` | start a typed select; `Where`, `OrderBy`, `Limit`, `Offset`, `Columns`, `Distinct`, `DistinctOn` chain |
+| `All / First / FirstOrErr / Count / Exists / Stream` | read shapes over `db.DB` (`FirstOrErr` wraps `db.ErrNotFound`) |
+| `orm.InsertInto / UpdateTable / DeleteFrom` | write builders with `Exec` / `ExecReturning` (`Returning` where supported) |
+| `orm.MergeInto(table)` | merge statements with `MergeSource` / `MergeValue` assignments |
+| `db.WithTx / orm.WithNestedTx / orm.RetryTx` | transactional units with savepoints and serialization retries (`[_A-Za-z][_A-Za-z0-9]*` savepoints, never user values) |
+| `JoinOn` family / `JoinOn3` family | inner/left/right/full and lateral joins over declared relations |
+| `With / WithRecursive / NewCTEName / CTETable` | CTEs including recursion |
+| `NewCursorKey / NextPage / OffsetPage / AfterTuple / DecodeCursor` | keyset and offset pagination |
+| `orm.Preload` | batched association load (no N+1) |
+| `ForUpdate / ForShare / NoWait / SkipLocked` | row locking (strong modes postgres-only) |
+| `orm/json/*`, `orm/fts/*` | per-dialect JSON and full-text helpers (sqlite plus postgres twins) |
+
+## Production notes
+
+- Close semantics: the ORM holds no pool; `c.Close(ctx)` closes the underlying `db` pool (`Close(ctx)` shape). Develop on sqlite `:memory:`, gate postgres-only features behind `errors.Is(err, dialect.ErrUnsupportedByDialect)`, and run the live pass before release.
+- Redaction and timeouts: SQL text holds placeholders, never values - display config only via `config.RedactedServices`. Pass `ctx` into every call; `Stream` holds its connection, so bound it and close promptly.
 
 ## Testing
 
 Units run on sqlite `:memory:` with no server. Set `POSTGRES_DSN` for a live postgres pass:
 
 ```sh
-POSTGRES_DSN='postgres://user:pass@localhost:5432/test?sslmode=disable' go test ./orm/...
+go test ./orm/... && POSTGRES_DSN='postgres://user:pass@localhost:5432/test?sslmode=disable' go test ./orm/...
 ```
+
+The examples double as integration checks (`go test -count=1 ./examples/pagination/... ./examples/json_query/... ./examples/fts/... ./examples/recursive_cte/...`).
+
+## Troubleshooting
+
+1. **`dialect.ErrUnsupportedByDialect` on sqlite.** The query uses a postgres-only feature (`DISTINCT ON`, strong lock mode). Match with `errors.Is` and use a portable formulation on sqlite.
+2. **Keyset pages skip or duplicate rows.** The `AfterTuple` columns do not mirror `OrderBy` exactly. Keep `(price_cents ASC, id ASC)` identical in both, including the tie-breaker.
+3. **`:memory:` tests see empty tables.** The pool opened a second connection with its own database. `:memory:` forces one connection; do not raise `MaxConns` for it.
+
+## See also
+
+- [Migrations and Seeding](migrations-seeding/) - schema plans behind these queries
+- [Redis](redis/) - when the backing store is memory vs shared
+- [Requests and Responses](../basics/requests-responses/) - paginated list endpoints
+- [Errors](../basics/errors-logging/) - typed error branches and status mapping

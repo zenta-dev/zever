@@ -4,16 +4,20 @@ description: Create, refund, fetch, and decode payment webhooks behind one inter
 ---
 
 Where `billing` tracks customers and subscriptions, `payment` handles the
-transaction itself — creating a charge, refunding it, and decoding the
-provider's webhook events so you know when a payment actually settled.
-`payment.Payment` keeps that flow identical whether you're pointed at `stub`,
+transaction itself - creating a charge, refunding it, and decoding the
+provider webhook events so you know when a payment actually settled.
+`payment.Payment` keeps that flow identical whether you point at `stub`,
 `stripe`, or `paddle`.
 
-`stub` (the default) is what you want for tests and local development — no real
-money moves and nothing calls out over the network. Switch to `stripe` or
-`paddle` for a real integration; `AutoApprove` lets `stub` mark payments as
-succeeded immediately instead of pending, which is handy for exercising the
-"payment succeeded" path in a test without waiting on a webhook.
+## Purpose and when to use
+
+`stub` (the default) is what you want for tests and local development - no
+real money moves and nothing calls out over the network. Switch to `stripe`
+or `paddle` for a real integration. `auto_approve` lets `stub` mark payments
+as succeeded immediately instead of pending, which is handy for exercising
+the "payment succeeded" path in a test without waiting on a webhook. The
+bookings example leans on exactly this: a stub charge inside the booking
+flow, verified end to end with no provider account.
 
 ## Config
 
@@ -21,22 +25,30 @@ succeeded immediately instead of pending, which is handy for exercising the
 payment:
   adapter: stub
   options:
-    autoapprove: true
+    auto_approve: true
+    max_webhook_bytes: 1048576
 ```
 
 ```sh
 PAYMENT_ADAPTER=stripe
-PAYMENT_SECRETKEY=sk_live_...
-PAYMENT_WEBHOOKSECRET=whsec_...
+PAYMENT_SECRET_KEY=sk_live_...
+PAYMENT_WEBHOOK_SECRET=whsec_...
 ```
 
-`MaxWebhookBytes` (default 1MiB) bounds how large an inbound webhook payload
-`payment` will decode — a provider sending something absurdly large gets
-rejected before it's ever parsed.
+Shared provider keys come from `internal/providers.Common`: `secret_key`
+(Stripe), `api_key` (Paddle), `endpoint`, `sandbox`. Payment adds
+`webhook_secret` (signature verification, never logged), `auto_approve`
+(stub marks new payments succeeded), and `max_webhook_bytes` (default
+1MiB; negative values rejected). Keep `webhook_secret` in env, never YAML.
 
 ## Resolve
 
 ```go
+import (
+	"github.com/zenta-dev/zever/config"
+	"github.com/zenta-dev/zever/container"
+)
+
 c := container.New(config.Default())
 p, err := c.Payment()
 if err != nil {
@@ -45,22 +57,103 @@ if err != nil {
 _ = p
 ```
 
+`Payment()` resolves lazily and caches the result; on error the cache clears
+so the next call retries.
+
+## Runnable example
+
+```go
+package main
+
+import (
+	"context"
+	"fmt"
+
+	"github.com/zenta-dev/zever/config"
+	"github.com/zenta-dev/zever/container"
+	"github.com/zenta-dev/zever/payment"
+)
+
+func main() {
+	c := container.New(config.Default())
+	defer c.Close(context.Background())
+
+	p, err := c.Payment()
+	if err != nil {
+		fmt.Println("resolve error:", err)
+		return
+	}
+	ctx := context.Background()
+
+	res, err := p.CreatePayment(ctx, payment.Request{
+		Amount:   2500,
+		Currency: "usd",
+	})
+	if err != nil {
+		fmt.Println("charge error:", err)
+		return
+	}
+	fmt.Println("payment:", res.ID, string(res.Status))
+
+	got, err := p.GetPayment(ctx, res.ID)
+	if err != nil {
+		fmt.Println("fetch error:", err)
+		return
+	}
+	fmt.Println("fetched:", got.ID, string(got.Status))
+	if err := p.Close(); err != nil {
+		fmt.Println("close error:", err)
+	}
+}
+
+// Expected output with stub + auto_approve: true (IDs vary):
+// payment: pay_01J0000000 succeeded
+// fetched: pay_01J0000000 succeeded
+```
+
+With `auto_approve: false`, the same program prints `pending` instead of
+`succeeded` - the webhook path is what would flip it later.
+
 ## Adapters
 
 | Adapter | Package | Notes |
 |---|---|---|
 | `stub` | `payment/stub` | Default; no network, no real money |
-| `stripe` | `payment/stripe` | |
-| `paddle` | `payment/paddle` | |
+| `stripe` | `payment/stripe` | Real provider; needs `secret_key` |
+| `paddle` | `payment/paddle` | Real provider; needs `api_key` |
 
-## The gotcha: not a ledger, and webhooks are verified before they're trusted
+## Production notes
 
-`payment` never stores card data — that's the provider's PCI-scoped
-responsibility, not this package's. And it's not a ledger of record either: it
-gives you a typed way to initiate and react to payments, not the authoritative
-history of what was charged. Webhook decoding verifies the provider's signature
-against `WebhookSecret` before touching the payload, under the `MaxWebhookBytes`
-size bound — a request that fails signature verification or exceeds the bound
-never reaches your handler as a trusted `Event`.
+- `payment` never stores card data - that is the provider PCI-scoped
+  responsibility, not this package. It is not a ledger of record either:
+  it initiates and reacts to payments; the provider holds history.
+- Webhook decoding verifies the provider signature against
+  `webhook_secret` before touching the payload, under the
+  `max_webhook_bytes` size bound. A request that fails verification or
+  exceeds the bound never reaches your handler as a trusted `Event`.
+- `SecretKey`, `APIKey`, and `WebhookSecret` never appear in logs or
+  errors. Use `config.RedactedServices` for any debug display.
+- Pass a refund idempotency key so a retried refund cannot double-refund.
 
-`SecretKey`, `APIKey`, and `WebhookSecret` never appear in logs or errors.
+## Troubleshooting
+
+**Stub payments stay `pending` in tests.**
+`auto_approve` is false. Set `auto_approve: true` (or `PAYMENT_AUTO_APPROVE`)
+for the test config so the success path runs without a webhook.
+
+**Webhook handler never fires.**
+The signature check runs first. Confirm `PAYMENT_WEBHOOK_SECRET` matches
+the provider dashboard value and the raw body is passed unmodified to
+`WebhookEvent`.
+
+**`max_webhook_bytes` rejections on large events.**
+A provider sent a payload over the bound. Raise the bound deliberately
+after checking the payload is legitimate, not as a first reflex.
+
+## See also
+
+- [Billing](billing/) for customers, subscriptions, and invoices
+- [Build a Booking API](../../tutorials/build-a-booking-api/) for the stub
+  charge inside a realistic booking flow
+- [Secrets](secrets/) for holding `webhook_secret` outside YAML
+- [Adapters Matrix](../../reference/adapters-matrix/) for the full table

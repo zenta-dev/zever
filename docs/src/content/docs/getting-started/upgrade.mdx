@@ -3,60 +3,153 @@ title: Upgrade Guide
 description: Pre-1.0 breaking-change policy, how to read the changelog, and safe upgrade steps.
 ---
 
-zever is pre-1.0. While below `v1.0.0`, `0.x` releases may contain breaking changes. Every break is documented in the release notes — upgrading is a matter of reading the changelog entry and applying the listed codemod.
+## Purpose + When to use
 
-## Versioning policy
+This page sets the upgrade contract for a pre-1.0 framework and gives a repeatable bump procedure. Read it before changing the pinned version, before reviewing a PR that alters public API, and when a bump breaks the build in a way you need to classify fast.
+
+Concrete promise: every break ships with a documented fix. Undocumented breaks are bugs, so open an issue.
+
+## Prerequisites and mental model
+
+zever is pre-1.0. While below `v1.0.0`, `0.x` releases may contain breaking changes, and each one is documented in the release notes under `Changed` with a `**Breaking:**` prefix.
 
 | Range | Guarantee |
 |---|---|
-| `0.x` patch/minor | may break; breaks documented under `Changed` with `**Breaking:**` prefix |
+| `0.x` patch/minor | may break; breaks documented with `**Breaking:**` prefix |
 | `1.0+` (future) | SemVer: majors break, minors add, patches fix |
 
-Public API changes — new exports, config struct or default changes, serialization changes — need explicit maintainer review. Expect them to arrive with migration notes.
+Public API changes (new exports, config struct or default changes, serialization changes) need explicit maintainer review and arrive with migration notes. From `0.x` to `1.0`, expect release-note docs with every break rather than silent drift.
 
-## How to upgrade
+## Config
+
+Upgrades can rename config keys. Files are strict snake_case, so a renamed key fails fast instead of silently falling back. Keep a known-good file and env pair to diff against after each bump:
+
+```yaml
+# zever.yaml (recheck after every bump)
+db:
+  adapter: postgres
+  options:
+    dsn: postgres://app:secret@db:5432/app
+    max_conns: 20
+log:
+  adapter: slog
+```
+
+```sh
+DB_ADAPTER=postgres
+DB_MAXCONNS=20
+DB_MAXCONNLIFETIME=5m
+AUTH_JWT_SECRET='prod-secret-at-least-32-bytes-long'
+```
+
+If `Load` rejects a key that worked before the bump (for example `maxconns`, `apikey`, `secretkey`), check `CHANGELOG.md` for the rename (`max_conns`, `api_key`, `secret_key`) and update the file. Env names are unaffected because env matching ignores `_` and case.
+
+## Resolve via container
+
+Container construction is stable across bumps, so the upgrade smoke test stays the same. Resolve after bumping and confirm nothing in the accessor path changed:
+
+```go
+package main
+
+import (
+	"fmt"
+
+	"github.com/zenta-dev/zever/config"
+	"github.com/zenta-dev/zever/container"
+)
+
+func main() {
+	c := container.New(config.Default())
+	db, err := c.DB()
+	if err != nil {
+		panic(err)
+	}
+	q, err := c.Queue()
+	if err != nil {
+		panic(err)
+	}
+	fmt.Println("upgrade ok:", db != nil && q != nil)
+}
+```
+
+`container.New(nil)` stays valid; `Close(ctx)` keeps closing only resolved services in dependency order. If this snippet breaks after a bump, the changelog entry names the fix.
+
+## Runnable example
+
+Bump the module, tidy, verify the gate, and exercise the documented breaking patterns:
+
+```go
+// After bump: idempotency key is required on billing calls.
+package main
+
+import (
+	"context"
+	"fmt"
+)
+
+func demo(b Billing, ctx context.Context) {
+	// Before: cust, err := b.CreateCustomer(ctx, name, email)
+	cust, err := b.CreateCustomer(ctx, "Ada", "ada@example.com", "")
+	fmt.Println(cust, err)
+}
+
+// After bump: migration engine lives at orm/migrate, not zen/migrate.
+import _ "github.com/zenta-dev/zever/orm/migrate"
+```
 
 ```sh
 go get github.com/zenta-dev/zever@v0.4.0
 go mod tidy
 make tidy-check
 make check
+go install github.com/zenta-dev/zever/cmd/zever@v0.4.0
 ```
 
-Then walk this checklist:
+Expected output or behavior:
 
-1. Read `CHANGELOG.md` `## [Unreleased]` and the target version section.
-2. Search for `**Breaking:**` lines — each names the package, the old signature, and the fix.
-3. Apply import or call-site changes (examples below).
-4. Run `make check` (fmt, vet, lint, race, vulncheck, build) before pushing.
-
-## Recent breaking examples
-
-`billing.Billing.CreateCustomer` gained a required idempotency key so client retries cannot double-bill:
-
-```go
-// Before
-cust, err := b.CreateCustomer(ctx, name, email)
-// After: pass "" for the previous non-idempotent behavior.
-cust, err := b.CreateCustomer(ctx, name, email, "")
+```text
+upgrade ok: true
 ```
 
-The migration engine moved from `zen/migrate` to `orm/migrate`:
+`make check` runs the full local gate (download, fmt, vet, tidy-check, lint, test-race, vulncheck, build). Real breaking examples from recent notes: `billing.Billing.CreateCustomer` gained a required idempotency key (pass `""` for prior non-idempotent behavior); the migration engine moved from `zen/migrate` to `orm/migrate`; `search.Search` and `vectorstore.VectorStore` gained batch methods (`IndexBatch`, `UpsertBatch`) that external implementations must add (compilation failure is the signal, not a runtime surprise).
 
-```go
-// Before
-import "github.com/zenta-dev/zever/zen/migrate"
-// After
-import "github.com/zenta-dev/zever/orm/migrate"
-```
+## Variants
 
-`search.Search` and `vectorstore.VectorStore` gained batch methods (`IndexBatch`, `UpsertBatch`). All bundled adapters implement them; external implementations must add the new method or compilation fails — that failure is the signal, not a runtime surprise.
+| Step | Command | Catches |
+|---|---|---|
+| Read notes | `CHANGELOG.md` `## [Unreleased]` plus target section | Every `**Breaking:**` line with package, old signature, fix |
+| Tidy | `go mod tidy` then `make tidy-check` | `go.mod` / `go.sum` drift |
+| Format and vet | `make fmt`, `make vet` | Formatting and static faults |
+| Lint | `make lint` (`golangci-lint run`, `.golangci.yml`) | Style and guard regressions |
+| Race tests | `make test-race` | Data races the fast gate skips |
+| Vuln scan | `make vulncheck` (`govulncheck` v1.8.0) | Known dependency CVEs |
+| Grammars | `make generate` (`go run ./tools/gengrammar`) | Stale editor grammars after touching `token.Keywords` or `resolver.ScalarTypeNames` |
+| CLI pin | `go install .../cmd/zever@v0.4.0` | TUI vs backend version skew |
 
-## Keeping upgrades cheap
+Releases bump every version pin together (root, LSP, editors, docs; file list in `.github/CONTRIBUTING.md` release checklist) and tag both `vX.Y.Z` and `tools/zever-lsp/vX.Y.Z`. `internal/dsl` carries no release version (schema `v1`/`v2` are API versions). Keep user-facing changes in `CHANGELOG.md` under `## [Unreleased]` with every PR, one logical change per commit, Conventional Commits (`feat/fix/perf/refactor/test/docs/ci/build:`).
 
-- Pin the CLI install (`go install .../cmd/zever@v0.4.0`) so TUI and backend versions match.
-- Keep user-facing changes in `CHANGELOG.md` under `## [Unreleased]` with every PR.
-- Use Conventional Commits (`feat/fix/perf/refactor/test/docs/ci/build:`), one logical change per commit.
-- After touching `token.Keywords` or `resolver.ScalarTypeNames`, run `make generate` — editor grammars derive from those tables.
+## Production notes
 
-If an upgrade breaks in a way the changelog does not cover, open an issue: undocumented breaks are treated as bugs.
+Pin the CLI install to the bumped version so `zever compile`, `migrate`, and `doctor` match backend behavior. Re-validate prod config files after each bump: strict decoding turns renames into loud failures, which is the desired fail-closed path before rollout. Re-check redaction (`config.RedactedServices`) and close wiring (`Close(ctx)` with timeout parent) after any container-adjacent change.
+
+Keep timeout tests short (parent about 100ms, block about 500ms) so `goleak.VerifyTestMain` stays green during upgrade verification. `go test` runs with `-vet=off -count=1` (vet is a separate step); the race plus coverage gate runs only on `push` to main and tags, not PRs, so run `make test-race` locally before pushing a bump.
+
+## Troubleshooting
+
+| Symptom | Cause | Fix |
+|---|---|---|
+| `Load` rejects a previously valid file key | Config rename shipped in the bump | Read the `**Breaking:**` lines, rename (e.g. `maxconns` to `max_conns`), re-run `make check` |
+| `CreateCustomer` no longer compiles | Required idempotency key added | Pass `""` to keep prior behavior or a real key for safe retries |
+| `zen/migrate` import fails | Engine moved to `orm/migrate` | Rewrite the import to `github.com/zenta-dev/zever/orm/migrate` |
+| Custom `search`/`vectorstore` adapter fails to compile | New batch methods (`IndexBatch`, `UpsertBatch`) required | Implement the new methods on the adapter; bundled adapters already have them |
+| Editor highlighting misses new keywords | Grammars derive from `token.Keywords` / `resolver.ScalarTypeNames` | Run `make generate` and commit the regenerated grammar files |
+
+## See also
+
+- `./installation.mdx` for pinned tools and first build
+- `./configuration.mdx` for strict keys and rename history
+- `./deployment.mdx` for rolling a bumped binary to prod
+- `../architecture/providers-adapters/` for interface stability rules
+- `../architecture/compiler-boundary/` for what version bumps never move into runtime
+- `../dsl/syntax-zen/` for schema-side breaks vs runtime breaks
+- Package guides as text: `README.md`, `config/README.md`, `container/README.md`, `.github/CONTRIBUTING.md`, `CHANGELOG.md`
