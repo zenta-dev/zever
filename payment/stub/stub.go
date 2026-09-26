@@ -26,6 +26,9 @@ type driver struct {
 
 // New validates o then returns an in-memory stub backend honoring
 // AutoApprove.
+//
+// WARNING: test-only, never production. The stub performs no signature
+// verification and stores no real funds.
 func New(o payment.Options) (payment.Payment, error) {
 	if err := o.Validate(); err != nil {
 		return nil, fmt.Errorf("stub: %w", err)
@@ -126,13 +129,11 @@ func (d *driver) GetPayment(_ context.Context, id string) (payment.Result, error
 	return res, nil
 }
 
-// WebhookEvent returns a static test-only event without verification.
+// WebhookEvent always fails closed with ErrInvalidSignature. The stub
+// performs zero verification by design, so accepting any payload would
+// forge events; callers must treat all stub webhooks as untrusted.
 func (d *driver) WebhookEvent(_ context.Context, _ []byte, _ string) (payment.Event, error) {
-	// Static test-only event; no payload inspection or signature check.
-	return payment.Event{
-		Type:   payment.EventType("stub.event"),
-		Object: payment.Result{},
-	}, nil
+	return payment.Event{}, fmt.Errorf("stub: webhook: %w", payment.ErrInvalidSignature)
 }
 
 // Close releases backend resources.
