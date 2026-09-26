@@ -130,6 +130,32 @@ func quickstartBackends(cfg NewConfig) string {
 	return strings.Join(cfg.Backends, ",")
 }
 
+// newNewFlagSet builds the stdlib flag set for `zever new`: the single
+// source for runNew parsing and for help/usage printers, so help can never
+// drift from the real flags.
+func newNewFlagSet() *flag.FlagSet {
+	fs := flag.NewFlagSet("new", flag.ContinueOnError)
+	fs.String("module", "", "Go module path for the new project (default: the app name itself, see -h)")
+	fs.String("dir", "", "output directory (default ./<name>)")
+	fs.String("framework-version", "",
+		"depend on a published zever version instead of a local replace directive")
+	fs.Bool("force", false, "scaffold into a non-empty directory anyway")
+
+	fs.Usage = func() {
+		_, _ = fmt.Fprintf(fs.Output(), newUsage+"\n", defaultFrameworkVersion)
+		fs.PrintDefaults()
+	}
+
+	return fs
+}
+
+// printNewUsage writes the full `zever new` help (header + real flag
+// defaults) to fs.Output, for the legacy `zever help new` path.
+func printNewUsage(fs *flag.FlagSet) {
+	_, _ = fmt.Fprintf(fs.Output(), newUsage+"\n", defaultFrameworkVersion)
+	fs.PrintDefaults()
+}
+
 // runNew scaffolds a new project from flags only. There is no interactive
 // path here: no wizard, no huh prompts, no TTY checks. Guided input lives in
 // the TUI screens, which build a NewConfig and call writeNewProject
@@ -137,17 +163,7 @@ func quickstartBackends(cfg NewConfig) string {
 func runNew(args []string) error {
 	const tag = "zever new"
 
-	fs := flag.NewFlagSet("new", flag.ContinueOnError)
-	modulePath := fs.String("module", "", "Go module path for the new project (default: the app name itself, see -h)")
-	dirFlag := fs.String("dir", "", "output directory (default ./<name>)")
-	frameworkVersion := fs.String("framework-version", "",
-		"depend on a published zever version instead of a local replace directive")
-	force := fs.Bool("force", false, "scaffold into a non-empty directory anyway")
-
-	fs.Usage = func() {
-		_, _ = fmt.Fprintf(fs.Output(), newUsage+"\n", defaultFrameworkVersion)
-		fs.PrintDefaults()
-	}
+	fs := newNewFlagSet()
 
 	positional, err := flexibleParse(fs, args)
 	if err != nil {
@@ -169,7 +185,20 @@ func runNew(args []string) error {
 		return fmt.Errorf("%s: %q is not a valid app name (letters, digits, - and _ only)", tag, name)
 	}
 
-	outDir := *dirFlag
+	flagString := func(name string) string {
+		if f := fs.Lookup(name); f != nil {
+			return f.Value.String()
+		}
+		return ""
+	}
+	flagBool := func(name string) bool {
+		if f := fs.Lookup(name); f != nil {
+			return f.Value.String() == "true"
+		}
+		return false
+	}
+
+	outDir := flagString("dir")
 	if outDir == "" {
 		outDir = "./" + name
 	}
@@ -179,12 +208,12 @@ func runNew(args []string) error {
 	plan := NewConfig{
 		Name:      name,
 		OutDir:    outDir,
-		Force:     *force,
+		Force:     flagBool("force"),
 		Batteries: batteriesFor(nil, ""),
 	}
 
-	plan.ModulePath = *modulePath
-	explicitModule := *modulePath != ""
+	plan.ModulePath = flagString("module")
+	explicitModule := flagString("module") != ""
 
 	if plan.ModulePath == "" {
 		// Unlike `zever extract`, which derives a module path from an
@@ -234,12 +263,12 @@ func runNew(args []string) error {
 	case cwdHasCargo:
 		return fmt.Errorf("%s: Rust scaffolding not supported yet; zever new targets Go projects", tag)
 	default:
-		if fwErr := resolveFramework(tag, &plan, *frameworkVersion); fwErr != nil {
+		if fwErr := resolveFramework(tag, &plan, flagString("framework-version")); fwErr != nil {
 			return fwErr
 		}
 	}
 
-	if targetErr := ensureTargetDir(tag, outDir, *force); targetErr != nil {
+	if targetErr := ensureTargetDir(tag, outDir, flagBool("force")); targetErr != nil {
 		return targetErr
 	}
 
