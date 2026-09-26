@@ -3,8 +3,8 @@ package main
 import (
 	"go.lsp.dev/protocol"
 
-	"github.com/zenta-dev/zever/internal/dsl/ast"
-	"github.com/zenta-dev/zever/internal/dsl/diag"
+	"github.com/zenta-dev/zever/dsl/ast"
+	"github.com/zenta-dev/zever/dsl/diag"
 )
 
 // lspPosition converts a 1-based compiler position to a 0-based LSP position.

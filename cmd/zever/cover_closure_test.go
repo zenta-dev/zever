@@ -8,7 +8,7 @@ import (
 	"strings"
 	"testing"
 
-	"github.com/zenta-dev/zever/internal/dsl/ir"
+	"github.com/zenta-dev/zever/dsl/ir"
 )
 
 // writeSchemaModuleFixture writes schema/<module>/<module>.zen under dir.
@@ -175,8 +175,8 @@ func TestClosureGenerateAdapterErrors(t *testing.T) {
 
 	// Write failure: pre-create options.go as a directory so the second
 	// write fails after the adapter file check passes with Force.
-	_ = os.MkdirAll(filepath.Join(dir, "db", "partial"), 0o750)
-	_ = os.MkdirAll(filepath.Join(dir, "db", "partial", "options.go"), 0o750)
+	_ = os.MkdirAll(filepath.Join(dir, "adapters", "db", "partial"), 0o750)
+	_ = os.MkdirAll(filepath.Join(dir, "adapters", "db", "partial", "options.go"), 0o750)
 
 	if _, err := GenerateAdapter(GenerateAdapterConfig{Battery: "db", Name: "partial", Force: true}); err == nil {
 		t.Fatal("want options write error")
@@ -1126,14 +1126,14 @@ func TestClosureNewHelpers(t *testing.T) {
 	cfg := NewConfig{Name: "app", ModulePath: "example.com/app", GoVersion: "1.24", OutDir: target, FrameworkVersion: "v1.0.0"}
 
 	got, err := renderNewGoMod("tag", cfg)
-	if err != nil || !strings.Contains(string(got), "require github.com/zenta-dev/zever v1.0.0") {
+	if err != nil || !strings.Contains(string(got), "require github.com/zenta-dev/zever/container v1.0.0") {
 		t.Fatalf("gomod = %q, %v", got, err)
 	}
 
 	cfg.FrameworkDir = fw
 
 	got, err = renderNewGoMod("tag", cfg)
-	if err != nil || !strings.Contains(string(got), "replace github.com/zenta-dev/zever =>") {
+	if err != nil || !strings.Contains(string(got), "replace github.com/zenta-dev/zever/container =>") {
 		t.Fatalf("gomod replace = %q, %v", got, err)
 	}
 

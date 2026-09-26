@@ -13,6 +13,12 @@ CYCLONEDX_GOMOD_VERSION ?= v1.12.0
 COVERAGE ?= coverage.out
 SBOM ?= sbom.json
 
+# All Go modules in the repo (143 uses in the committed go.work workspace
+# at root), so every *-all target loops per-module with fail-fast `set -e`.
+# examples/external-sms is intentionally outside go.work (it proves third-party
+# independence); verify it standalone with: GOWORK=off go -C examples/external-sms test ./...
+ALL_MODULES := $(shell find . -type f -name go.mod -not -path "./.git/*" -not -path "./examples/external-sms/*" -exec dirname {} \; | sort)
+
 .PHONY: help
 help: ## Show this help
 	@awk 'BEGIN {FS = ":.*##"; printf "Usage:\n  make \033[36m<target>\033[0m\n"} /^[a-zA-Z_-]+:.*##/ {printf "  \033[36m%-14s\033[0m %s\n", $$1, $$2}' $(MAKEFILE_LIST)
@@ -128,7 +134,35 @@ clean: ## Remove coverage output and build artifacts
 	rm -f $(COVERAGE) $(SBOM)
 
 .PHONY: check
-check: require-tools download fmt vet vet-lsp tidy-check tidy-lsp-check lint test-race test-lsp vulncheck build ## Run all local CI checks (run 'make setup' first)
+check: require-tools download fmt check-all lint-all vulncheck-all ## Run all local CI checks (run 'make setup' first)
+
+# Multi-module targets: per-module loops over the committed go.work workspace.
+.PHONY: check-all build-all test-all vet-all tidy-all tidy-check-all lint-all vulncheck-all
+check-all: ## Run vet + tidy-check + test (-vet=off -count=1) + build across all modules
+	set -e; for d in $(ALL_MODULES); do echo "== $$d =="; (cd $$d && $(GO) vet ./... && $(GO) mod tidy -diff && $(GO) test -vet=off -count=1 ./... && $(GO) build ./...); done
+
+build-all: ## Build all packages in every module
+	set -e; for d in $(ALL_MODULES); do echo "== $$d =="; (cd $$d && $(GO) build ./...); done
+
+test-all: ## Run tests in every module
+	set -e; for d in $(ALL_MODULES); do echo "== $$d =="; (cd $$d && $(GO) test ./...); done
+
+vet-all: ## Run go vet in every module
+	set -e; for d in $(ALL_MODULES); do echo "== $$d =="; (cd $$d && $(GO) vet ./...); done
+
+tidy-all: ## Run go mod tidy in every module
+	set -e; for d in $(ALL_MODULES); do echo "== $$d =="; (cd $$d && $(GO) mod tidy); done
+
+tidy-check-all: ## Verify go.mod/go.sum are tidy in every module
+	set -e; for d in $(ALL_MODULES); do echo "== $$d =="; (cd $$d && $(GO) mod tidy -diff); done
+
+lint-all: ## Run golangci-lint in every module
+	@command -v $(GOLANGCI_LINT) >/dev/null 2>&1 || { printf '%s\n' "golangci-lint not found: run 'make setup'"; exit 1; }
+	set -e; for d in $(ALL_MODULES); do echo "== $$d =="; (cd $$d && $(GOLANGCI_LINT) run ./...); done
+
+vulncheck-all: ## Scan every module for known vulnerabilities
+	@command -v $(GOVULNCHECK) >/dev/null 2>&1 || { printf '%s\n' "govulncheck not found: run 'make setup'"; exit 1; }
+	set -e; for d in $(ALL_MODULES); do echo "== $$d =="; (cd $$d && $(GOVULNCHECK) ./...); done
 
 .PHONY: docs-dev docs-build docs-preview
 docs-dev: ## Run docs dev server

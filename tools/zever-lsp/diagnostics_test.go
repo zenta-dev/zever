@@ -9,7 +9,7 @@ import (
 
 	"go.lsp.dev/protocol"
 
-	"github.com/zenta-dev/zever/internal/dsl/diag"
+	"github.com/zenta-dev/zever/dsl/diag"
 )
 
 // errPublishBoom is the sentinel a fake client fails with, so tests can

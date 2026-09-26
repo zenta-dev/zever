@@ -9,7 +9,7 @@ import (
 
 	"github.com/google/uuid"
 
-	"github.com/zenta-dev/zever/permission"
+	"github.com/zenta-dev/zever/core/permission"
 
 	genshop "github.com/zenta-dev/zever/examples/showcase/generated/gogen/shop"
 )

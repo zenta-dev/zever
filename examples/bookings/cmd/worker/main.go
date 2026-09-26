@@ -25,20 +25,20 @@ import (
 
 	"github.com/zenta-dev/zever/config"
 	"github.com/zenta-dev/zever/container"
+	"github.com/zenta-dev/zever/core/job"
 	"github.com/zenta-dev/zever/examples/bookings/internal/service/jobs"
-	"github.com/zenta-dev/zever/job"
 
 	// Blank imports register the adapters selected in zever.yaml.
-	_ "github.com/zenta-dev/zever/cache/memory"
-	_ "github.com/zenta-dev/zever/db/sqlite"
-	_ "github.com/zenta-dev/zever/log/slog"
-	_ "github.com/zenta-dev/zever/mailer/log"
-	_ "github.com/zenta-dev/zever/notification/log"
-	_ "github.com/zenta-dev/zever/password/argon2"
-	_ "github.com/zenta-dev/zever/queue/memory"
-	_ "github.com/zenta-dev/zever/scheduler/embedded"
-	_ "github.com/zenta-dev/zever/secrets/env"
-	_ "github.com/zenta-dev/zever/webhook/queue"
+	_ "github.com/zenta-dev/zever/adapters/cache/memory"
+	_ "github.com/zenta-dev/zever/adapters/db/sqlite"
+	_ "github.com/zenta-dev/zever/adapters/log/slog"
+	_ "github.com/zenta-dev/zever/adapters/mailer/log"
+	_ "github.com/zenta-dev/zever/adapters/notification/log"
+	_ "github.com/zenta-dev/zever/adapters/password/argon2"
+	_ "github.com/zenta-dev/zever/adapters/queue/memory"
+	_ "github.com/zenta-dev/zever/adapters/scheduler/embedded"
+	_ "github.com/zenta-dev/zever/adapters/secrets/env"
+	_ "github.com/zenta-dev/zever/adapters/webhook/queue"
 )
 
 const (

@@ -81,7 +81,7 @@ func TestRunGenerateServer(t *testing.T) {
 
 	for _, fragment := range []string{
 		`"example.com/shop/internal/app"`,
-		`"github.com/zenta-dev/zever/middleware"`,
+		`"github.com/zenta-dev/zever/core/middleware"`,
 		"func main()",
 		"httpServer.Shutdown(shutdownCtx)",
 		"grpcServer.GracefulStop()",
@@ -120,24 +120,29 @@ func TestRunGenerateServer(t *testing.T) {
 
 	for _, fragment := range []string{
 		"package app",
-		`_ "github.com/zenta-dev/zever/router/stdhttp"`,
-		// The zero-infra defaults every generated server resolves
-		// unconditionally must have their adapters registered here: this
-		// file is scaffolded once and never regenerated, so a battery added
-		// to the server template later can't rely on a later re-scaffold to
-		// pick up its adapter import.
-		`_ "github.com/zenta-dev/zever/auth/jwt"`,
-		`_ "github.com/zenta-dev/zever/permission/noop"`,
-		`_ "github.com/zenta-dev/zever/observability/stdout"`,
-		`_ "github.com/zenta-dev/zever/ratelimit/memory"`,
-		`_ "github.com/zenta-dev/zever/log/slog"`,
-		`_ "github.com/zenta-dev/zever/db/sqlite"`,
-		`_ "github.com/zenta-dev/zever/queue/memory"`,
-		`_ "github.com/zenta-dev/zever/scheduler/embedded"`,
+		// The floor is log + router only, both adapter modules with named
+		// imports plus Register() calls -- the container wires nothing
+		// itself. No blank imports, no bundle imports.
+		`logslog "github.com/zenta-dev/zever/adapters/log/slog"`,
+		`routerstdhttp "github.com/zenta-dev/zever/adapters/router/stdhttp"`,
+		"logslog.Register()",
+		"routerstdhttp.Register()",
 		"func New() (*container.Container, error)",
 	} {
 		if !strings.Contains(app, fragment) {
 			t.Fatalf("app.go lacks %q:\n%s", fragment, app)
+		}
+	}
+
+	for _, dropped := range []string{
+		`_ "github.com/zenta-dev/zever/`,
+		`"github.com/zenta-dev/zever/container/adapters/`,
+		`"github.com/zenta-dev/zever/adapters/auth/jwt"`,
+		`"github.com/zenta-dev/zever/adapters/db/sqlite"`,
+		`"github.com/zenta-dev/zever/adapters/scheduler/embedded"`,
+	} {
+		if strings.Contains(app, dropped) {
+			t.Fatalf("app.go must not contain %q:\n%s", dropped, app)
 		}
 	}
 
@@ -438,12 +443,12 @@ func TestRunGenerateServerWiresRateLimitWhenConfigured(t *testing.T) {
 	}
 }
 
-// TestRenderAppContentEmitsBundleRegisters proves the scaffold wires
-// heavyweight adapters explicitly: a selection needing bundle adapters
-// renders their adapters.Register calls into New (adapter packages never
-// self-register, so blank imports alone would resolve nothing), while a
-// light-only selection emits no adapters import at all.
-func TestRenderAppContentEmitsBundleRegisters(t *testing.T) {
+// TestRenderAppContentEmitsAdapterRegisters proves the scaffold wires
+// every adapter explicitly: each selection renders its named import and
+// qualified Register() call into New (adapter packages never
+// self-register, so imports alone would resolve nothing). There are no
+// blank imports and no container/adapters bundle imports at all.
+func TestRenderAppContentEmitsAdapterRegisters(t *testing.T) {
 	t.Parallel()
 
 	app, err := renderAppContent("test", []batterySelection{
@@ -456,15 +461,20 @@ func TestRenderAppContentEmitsBundleRegisters(t *testing.T) {
 	}
 
 	for _, fragment := range []string{
-		`"github.com/zenta-dev/zever/container/adapters"`,
-		"adapters.RegisterNotify()",
-		"adapters.RegisterWeb()",
-		`_ "github.com/zenta-dev/zever/notification/fcm"`,
-		`_ "github.com/zenta-dev/zever/router/fiber"`,
+		`dbsqlite "github.com/zenta-dev/zever/adapters/db/sqlite"`,
+		"dbsqlite.Register()",
+		`notificationfcm "github.com/zenta-dev/zever/adapters/notification/fcm"`,
+		"notificationfcm.Register()",
+		`routerfiber "github.com/zenta-dev/zever/adapters/router/fiber"`,
+		"routerfiber.Register()",
 	} {
 		if !strings.Contains(string(app), fragment) {
 			t.Errorf("app.go lacks %q:\n%s", fragment, app)
 		}
+	}
+
+	if strings.Contains(string(app), `"github.com/zenta-dev/zever/container/adapters`) {
+		t.Errorf("app.go must not import container/adapters bundles:\n%s", app)
 	}
 
 	light, err := renderAppContent("test", coreBatterySelections())
@@ -472,15 +482,15 @@ func TestRenderAppContentEmitsBundleRegisters(t *testing.T) {
 		t.Fatalf("renderAppContent core: %v", err)
 	}
 
-	if strings.Contains(string(light), `"github.com/zenta-dev/zever/container/adapters"`) {
-		t.Errorf("light-only app.go must not import container/adapters:\n%s", light)
+	if strings.Contains(string(light), `_ "github.com/zenta-dev/zever/`) {
+		t.Errorf("floor app.go must not blank-pin adapters:\n%s", light)
 	}
 }
 
-// TestCoreBatterySelectionsMatchDefaults pins the adapter floor every
-// generated entrypoint needs: one selection per core battery, each matching
-// config.Default()'s own adapter pick, so app.go's blank imports can never
-// drift from what the entrypoints resolve.
+// TestCoreBatterySelectionsMatchDefaults pins the slim floor: one selection
+// per core battery (log, router), each matching config.Default()'s own
+// adapter pick, so app.go's imports can never drift from what the
+// entrypoints resolve.
 func TestCoreBatterySelectionsMatchDefaults(t *testing.T) {
 	sel := coreBatterySelections()
 
@@ -489,9 +499,8 @@ func TestCoreBatterySelectionsMatchDefaults(t *testing.T) {
 	}
 
 	for _, fragment := range []string{
-		"github.com/zenta-dev/zever/auth/jwt",
-		"github.com/zenta-dev/zever/db/sqlite",
-		"github.com/zenta-dev/zever/router/stdhttp",
+		"github.com/zenta-dev/zever/adapters/log/slog",
+		"github.com/zenta-dev/zever/adapters/router/stdhttp",
 	} {
 		found := false
 
