@@ -35,6 +35,12 @@ func newInspectCmds() []*cobra.Command {
 			return runCompile(args)
 		},
 	}
+	// Cobra renders LocalFlags in help even with DisableFlagParsing, so
+	// registering the real flags here fixes `compile --help` hiding
+	// --backend/--out while keeping the legacy stdlib parser authoritative
+	// for execution.
+	compileCmd.Flags().String("backend", defaultBackends(), "comma-separated list of backends to run (available: "+backendNames()+")")
+	compileCmd.Flags().String("out", "./generated", "output directory for generated files")
 
 	checkCmd := &cobra.Command{
 		Use:   "check <files...>",

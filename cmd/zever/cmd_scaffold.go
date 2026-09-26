@@ -15,16 +15,20 @@ func newScaffoldCmds() []*cobra.Command {
 }
 
 func newNewCmd() *cobra.Command {
-	return &cobra.Command{
-		Use:   "new <name>",
+	cmd := &cobra.Command{
+		Use:   "new <name> [--module PATH] [--dir PATH] [--framework-version V] [--force]",
 		Short: "Scaffold a brand new zever application",
 		Long: `Scaffold a brand new, buildable zever application from scratch:
 a fresh go.mod, a starter schema/app.zen, cmd/server + cmd/worker +
 db/seed entrypoints, and internal/app wiring.`,
-		Example: `  zever new myapp`,
-		Args:    cobra.ArbitraryArgs,
+		Example: `  zever new myapp
+  zever new myapp --module example.com/myapp --dir ./out --force`,
+		Args: cobra.ArbitraryArgs,
 		// DisableFlagParsing keeps the legacy stdlib flag set (including
-		// --module, --dir, --framework-version, --force, -h) authoritative.
+		// --module, --dir, --framework-version, --force, -h) authoritative
+		// for execution. The cobra flags below exist only so -h/--help
+		// exposes the real flags (cobra renders LocalFlags in help even
+		// when parsing is disabled).
 		DisableFlagParsing: true,
 		RunE: func(cmd *cobra.Command, args []string) error {
 			if herr := printHelpIfRequested(cmd, args); herr != nil {
@@ -44,6 +48,12 @@ db/seed entrypoints, and internal/app wiring.`,
 			return runNew(args)
 		},
 	}
+	cmd.Flags().String("module", "", "Go module path for the new project (default: the app name itself)")
+	cmd.Flags().String("dir", "", "output directory (default ./<name>)")
+	cmd.Flags().String("framework-version", "", "depend on a published zever version instead of a local replace directive")
+	cmd.Flags().Bool("force", false, "scaffold into a non-empty directory anyway")
+
+	return cmd
 }
 
 func newGenerateCmd() *cobra.Command {
