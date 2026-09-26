@@ -14,6 +14,7 @@ import (
 )
 
 // BearerTokenFromMD extracts the bearer token from gRPC metadata, returning empty on any malformed input.
+// Multiple authorization values fail closed, mirroring BearerToken (RFC 6750 forbids more than one auth method per request).
 func BearerTokenFromMD(ctx context.Context) string {
 	md, ok := metadata.FromIncomingContext(ctx)
 	if !ok {
@@ -21,7 +22,7 @@ func BearerTokenFromMD(ctx context.Context) string {
 	}
 
 	values := md.Get("authorization")
-	if len(values) == 0 {
+	if len(values) != 1 {
 		return ""
 	}
 
