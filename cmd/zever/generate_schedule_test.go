@@ -4,7 +4,7 @@ import (
 	"strings"
 	"testing"
 
-	"github.com/zenta-dev/zever/internal/dsl/ast"
+	"github.com/zenta-dev/zever/dsl/ast"
 )
 
 // jobModuleFixture declares one parameterless job, the precondition every

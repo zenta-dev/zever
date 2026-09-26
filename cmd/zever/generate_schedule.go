@@ -9,7 +9,7 @@ import (
 	"sort"
 	"strings"
 
-	"github.com/zenta-dev/zever/internal/dsl/ast"
+	"github.com/zenta-dev/zever/dsl/ast"
 )
 
 const scheduleUsageBody = `Appends a schedule declaration to internal/<module>/<module>.zen. --dispatch

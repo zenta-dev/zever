@@ -83,6 +83,7 @@ func peelInteractive(args []string) []string {
 // `schedule:run`); sub-resources space-separated (`config show`, `db migrate`).
 var subcommandHandlers = map[string]func([]string) error{
 	"new":              runNew,
+	"add":              runAdd,
 	"compile":          runCompile,
 	"doctor":           runDoctor,
 	"config":           runConfig,
@@ -163,6 +164,13 @@ func run(args []string) error {
 			switch rest[0] {
 			case "new":
 				printNewUsage(newNewFlagSet())
+
+				return nil
+			case "add":
+				_, _ = fmt.Fprintln(os.Stderr, title("zever add")+dim(" — add one battery to the calling project"))
+				_, _ = fmt.Fprintln(os.Stderr, bold("Usage:")+"  "+cmd("zever add")+dim("  ")+cyan("<battery>[/<adapter>]"))
+				_, _ = fmt.Fprintln(os.Stderr, "")
+				_, _ = fmt.Fprintln(os.Stderr, addUsageBody)
 
 				return nil
 			case "compile":
@@ -359,6 +367,7 @@ func printUsage() {
 		"",
 		sectionScaffold,
 		line("new", "Scaffold a brand new zever application"),
+		line("add", "Add one battery to the calling project"),
 		line("generate", "Scaffold modules, entities, jobs, schedules, entrypoints"),
 		line("extract", "Extract one module into a standalone service"),
 		"",

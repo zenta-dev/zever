@@ -6,8 +6,8 @@ import (
 	"strings"
 	"testing"
 
-	"github.com/zenta-dev/zever/internal/dsl/diag"
-	"github.com/zenta-dev/zever/internal/dsl/ir"
+	"github.com/zenta-dev/zever/dsl/diag"
+	"github.com/zenta-dev/zever/dsl/ir"
 )
 
 // exerciseIdentValidator runs a prompt validator over reject/accept inputs so
@@ -236,7 +236,7 @@ func TestClosure2AdapterValidators(t *testing.T) {
 	}
 
 	// Adapter-path write error: pre-create the target as a directory.
-	pre := filepath.Join(dir, "db", "asdir")
+	pre := filepath.Join(dir, "adapters", "db", "asdir")
 	if err := os.MkdirAll(filepath.Join(pre, "asdir.go"), 0o750); err != nil {
 		t.Fatal(err)
 	}

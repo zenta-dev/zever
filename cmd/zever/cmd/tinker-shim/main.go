@@ -28,8 +28,6 @@ import (
 
 	"github.com/zenta-dev/zever/container"
 	"github.com/zenta-dev/zever/core/db"
-
-	app "example.com/proj/internal/app"
 )
 
 // framePrefix marks a stdout line as a protocol response, so that anything
@@ -130,10 +128,7 @@ func main() {
 }
 
 func run() error {
-	c, err := app.New()
-	if err != nil {
-		return fmt.Errorf("build container: %w", err)
-	}
+	c := container.New(nil)
 
 	ctx := context.Background()
 	defer func() { _ = c.Close(ctx) }()
