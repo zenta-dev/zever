@@ -1,7 +1,7 @@
 package s3
 
 import (
-	"github.com/zenta-dev/zever/internal/s3opts"
+	"github.com/zenta-dev/zever/shared/s3opts"
 )
 
 // ErrMissingBucket is returned when the S3 bucket name is empty.

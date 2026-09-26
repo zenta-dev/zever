@@ -3,7 +3,7 @@ package codec_test
 import (
 	"fmt"
 
-	"github.com/zenta-dev/zever/codec"
+	"github.com/zenta-dev/zever/shared/codec"
 )
 
 type point struct {

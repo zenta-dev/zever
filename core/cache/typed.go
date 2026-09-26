@@ -5,7 +5,7 @@ import (
 	"fmt"
 	"time"
 
-	"github.com/zenta-dev/zever/codec"
+	"github.com/zenta-dev/zever/shared/codec"
 )
 
 // Key constrains the key types usable with Typed.

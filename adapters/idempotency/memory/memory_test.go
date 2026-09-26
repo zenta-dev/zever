@@ -9,8 +9,8 @@ import (
 	"testing"
 	"time"
 
-	"github.com/zenta-dev/zever/idempotency"
-	"github.com/zenta-dev/zever/idempotency/memory"
+	"github.com/zenta-dev/zever/adapters/idempotency/memory"
+	"github.com/zenta-dev/zever/core/idempotency"
 )
 
 func newStore(t *testing.T) idempotency.Store {

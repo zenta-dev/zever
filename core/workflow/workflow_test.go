@@ -7,13 +7,15 @@ import (
 	"sync/atomic"
 	"testing"
 
-	"github.com/zenta-dev/zever/workflow"
+	"fmt"
+
+	"github.com/zenta-dev/zever/core/workflow"
 )
 
 var workflowAdapterSeq atomic.Int64
 
 func freshWorkflowAdapter() workflow.Adapter {
-	return workflow.Adapter(1000 + workflowAdapterSeq.Add(1))
+	return workflow.Adapter(fmt.Sprintf("test-%d", 1000+workflowAdapterSeq.Add(1)))
 }
 
 type stubWorkflow struct{}
@@ -69,7 +71,7 @@ func TestWorkflowRegisterDuplicate(t *testing.T) {
 func TestWorkflowOpenUnknown(t *testing.T) {
 	t.Parallel()
 
-	w, err := workflow.Open(workflow.Adapter(9999), workflow.Options{})
+	w, err := workflow.Open(workflow.Adapter("test-9999"), workflow.Options{})
 	if w != nil {
 		t.Fatalf("Open(unknown) = %v, want nil", w)
 	}

@@ -6,7 +6,7 @@ import (
 	"net/http/httptest"
 	"testing"
 
-	"github.com/zenta-dev/zever/log/noop"
+	"github.com/zenta-dev/zever/adapters/log/noop"
 )
 
 // BenchmarkRequestLoggerAndTracingChained measures a request through

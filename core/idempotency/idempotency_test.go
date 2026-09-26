@@ -2,6 +2,7 @@ package idempotency
 
 import (
 	"errors"
+	"fmt"
 	"strings"
 	"sync/atomic"
 	"testing"
@@ -10,7 +11,7 @@ import (
 var freshAdapterCounter int64
 
 func freshAdapter() Adapter {
-	return Adapter(1000 + atomic.AddInt64(&freshAdapterCounter, 1))
+	return Adapter(fmt.Sprintf("test-%d", 1000+atomic.AddInt64(&freshAdapterCounter, 1)))
 }
 
 func TestRegister_nil_factory_fails(t *testing.T) {

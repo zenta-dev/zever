@@ -4,7 +4,7 @@ import (
 	"context"
 	"fmt"
 
-	"github.com/zenta-dev/zever/permission"
+	"github.com/zenta-dev/zever/core/permission"
 )
 
 // checker is an in-memory role-based permission.Checker.

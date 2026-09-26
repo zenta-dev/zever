@@ -5,7 +5,7 @@ import (
 	"strings"
 	"testing"
 
-	"github.com/zenta-dev/zever/idempotency"
+	"github.com/zenta-dev/zever/core/idempotency"
 )
 
 func TestDecodeCorruptIs(t *testing.T) {

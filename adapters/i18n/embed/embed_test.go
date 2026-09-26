@@ -7,7 +7,7 @@ import (
 	"testing"
 	"testing/fstest"
 
-	"github.com/zenta-dev/zever/i18n"
+	"github.com/zenta-dev/zever/core/i18n"
 )
 
 func testFS() fstest.MapFS {

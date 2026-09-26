@@ -27,7 +27,7 @@ func TestCover_Errors_ExactStrings(t *testing.T) {
 	}{
 		{"duplicate rbac", DuplicateError{Adapter: RBAC}, "permission: duplicate registration: rbac"},
 		{"unknown rbac", UnknownAdapterError{Adapter: RBAC}, "permission: unknown adapter: rbac (forgotten import?)"},
-		{"unknown unregistered", UnknownAdapterError{Adapter: Adapter(9401)}, "permission: unknown adapter: unknown (forgotten import?)"},
+		{"unknown unregistered", UnknownAdapterError{Adapter: Adapter("test-9401")}, "permission: unknown adapter: test-9401 (forgotten import?)"},
 		{"invalid x", InvalidAdapterError{Adapter: "x"}, "permission: invalid adapter: \"x\""},
 		{"invalid options", InvalidOptionsError{Reason: "boom"}, "permission: invalid options: boom"},
 	}
@@ -109,7 +109,7 @@ func TestCover_Options_Validate_PolicyMissing(t *testing.T) {
 var errCoverOpenFactory = errors.New("cover boom 9202")
 
 func TestCover_Open_Success9201(t *testing.T) {
-	a := Adapter(9201)
+	a := Adapter("test-9201")
 	if err := Register(a, func(Options) (Checker, error) { return coverStubChecker{}, nil }); err != nil {
 		var dup *DuplicateError
 		if !errors.As(err, &dup) {
@@ -135,7 +135,7 @@ func TestCover_Open_Success9201(t *testing.T) {
 }
 
 func TestCover_Open_FactoryError9202(t *testing.T) {
-	a := Adapter(9202)
+	a := Adapter("test-9202")
 	sentinel := errCoverOpenFactory
 	if err := Register(a, func(Options) (Checker, error) { return nil, sentinel }); err != nil {
 		var dup *DuplicateError

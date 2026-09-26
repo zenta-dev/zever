@@ -5,7 +5,7 @@ import (
 	"sync"
 	"testing"
 
-	"github.com/zenta-dev/zever/payment"
+	"github.com/zenta-dev/zever/core/payment"
 )
 
 func newStub(t *testing.T, autoApprove bool) payment.Payment {

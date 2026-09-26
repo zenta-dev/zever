@@ -3,7 +3,7 @@ package session
 import (
 	"time"
 
-	zredis "github.com/zenta-dev/zever/internal/redis"
+	redisopt "github.com/zenta-dev/zever/shared/redisopt"
 )
 
 const (
@@ -18,7 +18,7 @@ type RedisOptions struct {
 	// MaxConnLifetime) -- previously only ConnectOptions was embedded here,
 	// silently dropping every pooling knob to go-redis's defaults with no
 	// way for a caller to tune them for a hot session store.
-	zredis.Options
+	redisopt.Options
 	// Prefix is the key prefix for Redis session data.
 	Prefix string `json:"prefix" toml:"prefix" yaml:"prefix"`
 }
@@ -37,10 +37,10 @@ func (o Options) Validate() error {
 	if o.TTL < 0 {
 		return &InvalidOptionsError{Reason: "ttl must be >= 0"}
 	}
-	if err := zredis.ValidateAddr(o.Redis.Addr); err != nil {
+	if err := redisopt.ValidateAddr(o.Redis.Addr); err != nil {
 		return &InvalidOptionsError{Reason: err.Error()}
 	}
-	if err := zredis.ValidatePrefix(o.Redis.Prefix); err != nil {
+	if err := redisopt.ValidatePrefix(o.Redis.Prefix); err != nil {
 		return &InvalidOptionsError{Reason: err.Error()}
 	}
 

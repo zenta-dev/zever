@@ -4,7 +4,7 @@ import (
 	"bytes"
 	"testing"
 
-	"github.com/zenta-dev/zever/log"
+	"github.com/zenta-dev/zever/core/log"
 )
 
 // RED: NewWithWriter injects writer seam.

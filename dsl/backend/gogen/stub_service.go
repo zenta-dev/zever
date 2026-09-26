@@ -4,7 +4,7 @@ import (
 	"fmt"
 	"strings"
 
-	"github.com/zenta-dev/zever/internal/dsl/ir"
+	"github.com/zenta-dev/zever/dsl/ir"
 )
 
 // stubHeader deliberately does NOT say "DO NOT EDIT" -- unlike every other

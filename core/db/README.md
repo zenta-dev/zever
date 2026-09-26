@@ -53,5 +53,5 @@ without a server (config parsing, placeholder rewriting, fail-fast error
 paths, interface fakes); set `POSTGRES_DSN` for the live integration test:
 
 ```sh
-POSTGRES_DSN='postgres://user:pass@localhost:5432/test?sslmode=disable' go test ./db/...
+POSTGRES_DSN='postgres://user:pass@localhost:5432/test?sslmode=disable' go test ./core/db/...
 ```

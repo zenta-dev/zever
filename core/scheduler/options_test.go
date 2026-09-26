@@ -5,7 +5,7 @@ import (
 	"testing"
 	"time"
 
-	"github.com/zenta-dev/zever/job"
+	"github.com/zenta-dev/zever/core/job"
 )
 
 func TestOptionsZeroInvalid(t *testing.T) {

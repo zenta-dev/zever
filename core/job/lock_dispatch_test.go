@@ -9,11 +9,11 @@ import (
 	"testing"
 	"time"
 
-	"github.com/zenta-dev/zever/cache"
-	cachememory "github.com/zenta-dev/zever/cache/memory"
-	"github.com/zenta-dev/zever/log/noop"
-	"github.com/zenta-dev/zever/queue"
-	queuememory "github.com/zenta-dev/zever/queue/memory"
+	cachememory "github.com/zenta-dev/zever/adapters/cache/memory"
+	"github.com/zenta-dev/zever/adapters/log/noop"
+	queuememory "github.com/zenta-dev/zever/adapters/queue/memory"
+	"github.com/zenta-dev/zever/core/cache"
+	"github.com/zenta-dev/zever/core/queue"
 )
 
 // helpers

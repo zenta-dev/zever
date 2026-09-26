@@ -6,9 +6,9 @@ import (
 	"testing"
 	"time"
 
-	"github.com/zenta-dev/zever/cache"
-	"github.com/zenta-dev/zever/cache/memory"
-	"github.com/zenta-dev/zever/codec"
+	"github.com/zenta-dev/zever/adapters/cache/memory"
+	"github.com/zenta-dev/zever/core/cache"
+	"github.com/zenta-dev/zever/shared/codec"
 )
 
 type mapBackend struct {

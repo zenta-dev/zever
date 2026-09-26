@@ -5,7 +5,7 @@ import (
 	"strings"
 	"testing"
 
-	"github.com/zenta-dev/zever/eventbus"
+	"github.com/zenta-dev/zever/core/eventbus"
 )
 
 func TestNewInvalidOptions(t *testing.T) {

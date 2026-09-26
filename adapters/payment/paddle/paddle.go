@@ -12,10 +12,10 @@ import (
 
 	"github.com/PaddleHQ/paddle-go-sdk/v5"
 
-	"github.com/zenta-dev/zever/idempotency"
-	"github.com/zenta-dev/zever/internal/httpclient"
-	"github.com/zenta-dev/zever/internal/providers"
-	"github.com/zenta-dev/zever/payment"
+	"github.com/zenta-dev/zever/core/idempotency"
+	"github.com/zenta-dev/zever/core/payment"
+	"github.com/zenta-dev/zever/shared/httpclient"
+	"github.com/zenta-dev/zever/shared/providersopt"
 )
 
 // newSDK constructs the Paddle SDK. It is a variable so tests can stub construction.
@@ -72,7 +72,7 @@ func New(o payment.Options) (payment.Payment, error) {
 		return nil, payment.ErrMissingWebhookSecret
 	}
 
-	endpoint := providers.PaddleEndpoint(o.Endpoint, o.Sandbox)
+	endpoint := providersopt.PaddleEndpoint(o.Endpoint, o.Sandbox)
 
 	client, err := newSDK(o.APIKey, paddle.WithBaseURL(endpoint), paddle.WithClient(httpclient.NewClient(payment.DefaultHTTPTimeout)))
 	if err != nil {

@@ -3,7 +3,7 @@ package noop
 import (
 	"time"
 
-	"github.com/zenta-dev/zever/log"
+	"github.com/zenta-dev/zever/core/log"
 )
 
 type noopEvent struct{}

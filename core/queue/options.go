@@ -3,13 +3,13 @@ package queue
 import (
 	"time"
 
-	zredis "github.com/zenta-dev/zever/internal/redis"
+	redisopt "github.com/zenta-dev/zever/shared/redisopt"
 )
 
 // RedisOptions holds connection settings for the Redis adapter.
 type RedisOptions struct {
 	// ConnectOptions holds the shared Redis connection settings.
-	zredis.ConnectOptions
+	redisopt.ConnectOptions
 	// URL is the Redis connection URL.
 	// When set it takes precedence over Addr.
 	URL string `json:"url" toml:"url" yaml:"url"`

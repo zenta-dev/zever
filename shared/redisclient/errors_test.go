@@ -1,4 +1,4 @@
-package redis
+package redisclient
 
 import (
 	"errors"
@@ -20,7 +20,7 @@ func TestSentinelMessages(t *testing.T) {
 
 func TestToRedisOptionsMissingHost(t *testing.T) {
 	t.Parallel()
-	_, err := Options{Addr: "redis://"}.toRedisOptions()
+	_, err := toRedisOptions(Options{Addr: "redis://"})
 	if err == nil {
 		t.Fatal("expected error")
 	}
@@ -35,7 +35,7 @@ func TestToRedisOptionsMissingHost(t *testing.T) {
 
 func TestToRedisOptionsBadURL(t *testing.T) {
 	t.Parallel()
-	_, err := Options{Addr: "redis://%zz"}.toRedisOptions()
+	_, err := toRedisOptions(Options{Addr: "redis://%zz"})
 	if err == nil {
 		t.Fatal("expected error")
 	}
@@ -49,7 +49,7 @@ func TestToRedisOptionsBadURL(t *testing.T) {
 
 func TestToRedisOptionsValid(t *testing.T) {
 	t.Parallel()
-	opt, err := Options{Addr: "localhost:6379"}.toRedisOptions()
+	opt, err := toRedisOptions(Options{Addr: "localhost:6379"})
 	if err != nil {
 		t.Fatalf("toRedisOptions() err = %v", err)
 	}

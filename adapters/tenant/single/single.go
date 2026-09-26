@@ -4,7 +4,7 @@ import (
 	"context"
 	"fmt"
 
-	"github.com/zenta-dev/zever/tenant"
+	"github.com/zenta-dev/zever/core/tenant"
 )
 
 // adapter is the fixed-ID single-tenant backend.

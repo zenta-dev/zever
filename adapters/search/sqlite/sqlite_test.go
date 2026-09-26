@@ -12,7 +12,7 @@ import (
 	"sync"
 	"testing"
 
-	"github.com/zenta-dev/zever/search"
+	"github.com/zenta-dev/zever/core/search"
 )
 
 func newMemoryStore(t *testing.T) *Store {

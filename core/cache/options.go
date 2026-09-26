@@ -3,7 +3,7 @@ package cache
 import (
 	"time"
 
-	zredis "github.com/zenta-dev/zever/internal/redis"
+	redisopt "github.com/zenta-dev/zever/shared/redisopt"
 )
 
 // MemoryOptions configures the in-memory cache backend.
@@ -17,7 +17,7 @@ type MemoryOptions struct {
 // RedisOptions configures the Redis-backed cache backend.
 type RedisOptions struct {
 	// ConnectOptions holds the shared Redis connection settings.
-	zredis.ConnectOptions
+	redisopt.ConnectOptions
 	// URL holds the Redis connection URL.
 	// When set it takes precedence over Addr.
 	URL string `json:"url" toml:"url" yaml:"url"`

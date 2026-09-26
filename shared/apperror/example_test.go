@@ -3,7 +3,7 @@ package apperror_test
 import (
 	"fmt"
 
-	"github.com/zenta-dev/zever/apperror"
+	"github.com/zenta-dev/zever/shared/apperror"
 )
 
 // ExampleNew builds a typed error and maps it to an HTTP status.

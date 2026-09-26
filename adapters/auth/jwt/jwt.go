@@ -25,9 +25,9 @@ import (
 
 	jwtv5 "github.com/golang-jwt/jwt/v5"
 
-	"github.com/zenta-dev/zever/auth"
-	"github.com/zenta-dev/zever/auth/jwt/revocation"
-	revocationmemory "github.com/zenta-dev/zever/auth/jwt/revocation/memory"
+	"github.com/zenta-dev/zever/core/auth"
+	"github.com/zenta-dev/zever/core/auth/revocation"
+	revocationmemory "github.com/zenta-dev/zever/core/auth/revocation/memory"
 )
 
 // randReader is the CSPRNG source for JTIs, swappable in tests to

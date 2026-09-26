@@ -9,7 +9,7 @@ import (
 
 	"google.golang.org/grpc"
 
-	"github.com/zenta-dev/zever/observability"
+	"github.com/zenta-dev/zever/core/observability"
 )
 
 type traceSpanCtxKey struct{}

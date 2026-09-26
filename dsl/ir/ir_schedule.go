@@ -1,6 +1,6 @@
 package ir
 
-import "github.com/zenta-dev/zever/internal/dsl/diag"
+import "github.com/zenta-dev/zever/dsl/diag"
 
 // Schedule represents a scheduled job trigger in the schema.
 type Schedule struct {

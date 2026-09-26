@@ -1,30 +1,27 @@
 package crypto
 
 // Adapter identifies the cryptography backend implementation.
-type Adapter int
+
+type Adapter string
 
 const (
 	// AdapterLocal is the local cryptography adapter.
-	AdapterLocal Adapter = iota
+	AdapterLocal Adapter = "local"
 )
 
 // String returns the canonical name of Adapter.
 func (a Adapter) String() string {
-	switch a {
-	case AdapterLocal:
-		return "local"
-	default:
+	if a == "" {
 		return "unknown"
 	}
+	return string(a)
 }
 
 // ParseAdapter parses adapter name into an Adapter.
-// Only exact lowercase names match; anything else fails.
+// Any non-empty name is accepted to allow custom adapters; empty fails.
 func ParseAdapter(s string) (Adapter, error) {
-	switch s {
-	case "local":
-		return AdapterLocal, nil
-	default:
-		return AdapterLocal, &InvalidAdapterError{Adapter: s}
+	if s == "" {
+		return Adapter(""), &InvalidAdapterError{Adapter: s}
 	}
+	return Adapter(s), nil
 }

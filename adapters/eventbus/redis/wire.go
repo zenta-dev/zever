@@ -4,8 +4,8 @@ import (
 	"fmt"
 	"time"
 
-	"github.com/zenta-dev/zever/codec"
-	"github.com/zenta-dev/zever/eventbus"
+	"github.com/zenta-dev/zever/core/eventbus"
+	"github.com/zenta-dev/zever/shared/codec"
 )
 
 // wireMessage is the JSON envelope stored on the Redis channel.

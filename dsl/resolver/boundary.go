@@ -1,8 +1,8 @@
 package resolver
 
 import (
-	"github.com/zenta-dev/zever/internal/dsl/diag"
-	"github.com/zenta-dev/zever/internal/dsl/ir"
+	"github.com/zenta-dev/zever/dsl/diag"
+	"github.com/zenta-dev/zever/dsl/ir"
 )
 
 // CheckCrossModule scans a resolved schema for cross-module references that

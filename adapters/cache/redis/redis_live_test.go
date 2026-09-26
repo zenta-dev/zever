@@ -8,7 +8,7 @@ import (
 
 	"github.com/alicebob/miniredis/v2"
 
-	"github.com/zenta-dev/zever/cache"
+	"github.com/zenta-dev/zever/core/cache"
 )
 
 // newLiveAdapter starts an in-process miniredis server (loopback only,

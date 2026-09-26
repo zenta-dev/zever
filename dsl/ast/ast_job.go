@@ -1,6 +1,6 @@
 package ast
 
-import "github.com/zenta-dev/zever/internal/dsl/diag"
+import "github.com/zenta-dev/zever/dsl/diag"
 
 // JobDecl represents a background job declaration.
 type JobDecl struct {

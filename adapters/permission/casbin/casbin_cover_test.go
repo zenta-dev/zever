@@ -11,7 +11,7 @@ import (
 	casbinlib "github.com/casbin/casbin/v2"
 	"github.com/casbin/casbin/v2/model"
 
-	"github.com/zenta-dev/zever/permission"
+	"github.com/zenta-dev/zever/core/permission"
 )
 
 // glessModelText is a model without a role definition: every grouping

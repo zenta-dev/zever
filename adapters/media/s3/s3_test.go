@@ -22,7 +22,7 @@ import (
 	s3sdk "github.com/aws/aws-sdk-go-v2/service/s3"
 	"github.com/aws/smithy-go"
 
-	"github.com/zenta-dev/zever/media"
+	"github.com/zenta-dev/zever/core/media"
 )
 
 const testID = "0123456789abcdef0123456789abcdef"

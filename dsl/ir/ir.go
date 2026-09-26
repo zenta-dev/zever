@@ -2,7 +2,7 @@
 // It contains pure data types with no logic except Entity.FieldByName.
 package ir
 
-import "github.com/zenta-dev/zever/internal/dsl/diag"
+import "github.com/zenta-dev/zever/dsl/diag"
 
 // ScalarType represents a scalar type constant in the schema.
 type ScalarType int

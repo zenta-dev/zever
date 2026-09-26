@@ -3,8 +3,8 @@ package payment_test
 import (
 	"context"
 
-	"github.com/zenta-dev/zever/payment"
-	"github.com/zenta-dev/zever/payment/stub"
+	"github.com/zenta-dev/zever/adapters/payment/stub"
+	"github.com/zenta-dev/zever/core/payment"
 )
 
 // ExampleOpen opens the stub backend and creates a payment.

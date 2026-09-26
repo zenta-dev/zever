@@ -3,6 +3,7 @@ package queue
 import (
 	"context"
 	"errors"
+	"fmt"
 	"strings"
 	"sync/atomic"
 	"testing"
@@ -11,7 +12,7 @@ import (
 
 var queueAdapterSeq atomic.Int64
 
-func freshQueueAdapter() Adapter { return Adapter(1000 + queueAdapterSeq.Add(1)) }
+func freshQueueAdapter() Adapter { return Adapter(fmt.Sprintf("test-%d", 1000+queueAdapterSeq.Add(1))) }
 
 type stubQueue struct{}
 
@@ -88,7 +89,7 @@ func TestQueueRegister_duplicate(t *testing.T) {
 }
 
 func TestQueueOpen_unknown(t *testing.T) {
-	_, err := Open(Adapter(9999), Options{})
+	_, err := Open(Adapter("test-9999"), Options{})
 	if !errors.Is(err, ErrUnknownAdapter) {
 		t.Fatalf("Open(unknown) = %v, want ErrUnknownAdapter", err)
 	}

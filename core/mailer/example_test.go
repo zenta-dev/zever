@@ -5,8 +5,8 @@ import (
 	"errors"
 	"io"
 
-	"github.com/zenta-dev/zever/mailer"
-	maillog "github.com/zenta-dev/zever/mailer/log"
+	maillog "github.com/zenta-dev/zever/adapters/mailer/log"
+	"github.com/zenta-dev/zever/core/mailer"
 )
 
 // ExampleOpen sends one message through the log adapter.

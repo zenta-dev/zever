@@ -5,8 +5,8 @@ import (
 	"context"
 	"fmt"
 
-	"github.com/zenta-dev/zever/analytics"
-	analyzelog "github.com/zenta-dev/zever/analytics/log"
+	analyzelog "github.com/zenta-dev/zever/adapters/analytics/log"
+	"github.com/zenta-dev/zever/core/analytics"
 )
 
 // ExampleOpen opens the log backend against a buffer and tracks one event.

@@ -12,8 +12,8 @@ import (
 
 	"firebase.google.com/go/v4/remoteconfig"
 
-	"github.com/zenta-dev/zever/flag"
-	sharedfirebase "github.com/zenta-dev/zever/internal/firebase"
+	"github.com/zenta-dev/zever/core/flag"
+	sharedfirebase "github.com/zenta-dev/zever/shared/firebase"
 )
 
 var _ flag.Flag = (*client)(nil)

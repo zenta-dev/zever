@@ -8,9 +8,9 @@ import (
 	"fmt"
 	"time"
 
-	"github.com/zenta-dev/zever/log"
-	"github.com/zenta-dev/zever/log/noop"
-	"github.com/zenta-dev/zever/queue"
+	"github.com/zenta-dev/zever/adapters/log/noop"
+	"github.com/zenta-dev/zever/core/log"
+	"github.com/zenta-dev/zever/core/queue"
 )
 
 // Dispatcher enqueues registered jobs onto a queue with optional delay and uniqueness.

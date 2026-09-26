@@ -15,8 +15,9 @@ import (
 
 	goredis "github.com/redis/go-redis/v9"
 
-	"github.com/zenta-dev/zever/auth/jwt/revocation"
-	zredis "github.com/zenta-dev/zever/internal/redis"
+	"github.com/zenta-dev/zever/core/auth/revocation"
+	redisclient "github.com/zenta-dev/zever/shared/redisclient"
+	redisopt "github.com/zenta-dev/zever/shared/redisopt"
 )
 
 // defaultPrefix namespaces revocation keys when no prefix is set.
@@ -34,7 +35,7 @@ var _ revocation.Store = (*store)(nil)
 // Options configures the Redis-backed revocation.Store.
 type Options struct {
 	// ConnectOptions holds the shared Redis connection settings.
-	zredis.ConnectOptions
+	redisopt.ConnectOptions
 	// URL is the Redis connection URL. When set it takes precedence over Addr.
 	URL string `json:"url" toml:"url" yaml:"url"`
 	// Prefix scopes revocation keys to one namespace. Empty uses defaultPrefix.
@@ -49,22 +50,24 @@ type store struct {
 
 // connOptions maps Options onto the shared client options. A set URL takes
 // precedence over Addr; both spellings connect.
-func connOptions(opts Options) zredis.Options {
+func connOptions(opts Options) redisopt.Options {
 	addr := strings.TrimSpace(opts.URL)
 	if addr == "" {
 		addr = opts.Addr
 	}
 
-	return zredis.Options{
-		Addr:     addr,
-		Password: opts.Password,
-		DB:       opts.DB,
-		TLS:      opts.TLS,
+	return redisopt.Options{
+		Addr:       addr,
+		Password:   opts.Password,
+		DB:         opts.DB,
+		TLS:        opts.TLS,
+		RequireTLS: opts.RequireTLS,
 	}
 }
 
-// New creates a Redis-backed revocation.Store with its own internal/redis
-// client. Empty prefix falls back to defaultPrefix. It verifies connectivity
+// New creates a Redis-backed revocation.Store with its own shared client.
+// Empty prefix falls back to defaultPrefix. It verifies connectivity
+// with a 3s ping check.
 // with a 3s ping check.
 func New(opts Options) (revocation.Store, error) {
 	prefix := strings.TrimSpace(opts.Prefix)
@@ -72,7 +75,7 @@ func New(opts Options) (revocation.Store, error) {
 		prefix = defaultPrefix
 	}
 
-	client, err := zredis.New(connOptions(opts))
+	client, err := redisclient.New(connOptions(opts))
 	if err != nil {
 		return nil, fmt.Errorf("revocation/redis: connect %q: %w", redactURL(opts), err)
 	}
@@ -81,7 +84,7 @@ func New(opts Options) (revocation.Store, error) {
 	defer cancel()
 
 	if err := client.Ping(ctx).Err(); err != nil {
-		_ = zredis.Close(client)
+		_ = redisclient.Close(client)
 
 		return nil, fmt.Errorf("revocation/redis: ping %q: %w", redactURL(opts), err)
 	}
@@ -92,7 +95,7 @@ func New(opts Options) (revocation.Store, error) {
 // redactURL returns opts.URL (or opts.Addr, if URL is empty) with any
 // embedded userinfo credentials masked, safe for inclusion in errors.
 func redactURL(opts Options) string {
-	return zredis.RedactEndpoint(opts.URL, opts.Addr)
+	return redisopt.RedactEndpoint(opts.URL, opts.Addr)
 }
 
 func (s *store) key(jti string) string {
@@ -148,5 +151,5 @@ func (s *store) Close() error {
 		return nil
 	}
 
-	return zredis.Close(s.client)
+	return redisclient.Close(s.client)
 }

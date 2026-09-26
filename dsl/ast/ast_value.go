@@ -3,7 +3,7 @@ package ast
 import (
 	"time"
 
-	"github.com/zenta-dev/zever/internal/dsl/diag"
+	"github.com/zenta-dev/zever/dsl/diag"
 )
 
 // Value is the interface implemented by all value expressions.

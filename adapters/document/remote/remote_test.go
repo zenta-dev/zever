@@ -13,7 +13,7 @@ import (
 	"testing"
 	"time"
 
-	"github.com/zenta-dev/zever/document"
+	"github.com/zenta-dev/zever/core/document"
 )
 
 func TestRenderRoundtripJSON(t *testing.T) {

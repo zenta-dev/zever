@@ -6,8 +6,8 @@ import (
 	"testing"
 	"time"
 
-	"github.com/zenta-dev/zever/job"
-	"github.com/zenta-dev/zever/queue"
+	"github.com/zenta-dev/zever/core/job"
+	"github.com/zenta-dev/zever/core/queue"
 )
 
 type stubQueue struct {
@@ -86,7 +86,7 @@ func stubFactory(Options) (Scheduler, error) {
 func TestRegisterNilFactory(t *testing.T) {
 	t.Parallel()
 
-	err := Register(Adapter(101), nil)
+	err := Register(Adapter("test-101"), nil)
 	if !errors.Is(err, ErrNilFactory) {
 		t.Fatalf("err=%v want ErrNilFactory", err)
 	}
@@ -99,7 +99,7 @@ var errOpenFactory = errors.New("boom")
 func TestRegisterDuplicate(t *testing.T) {
 	t.Parallel()
 
-	a := Adapter(102)
+	a := Adapter("test-102")
 	d := &job.Dispatcher{Q: &stubQueue{}}
 
 	if err := Register(a, func(Options) (Scheduler, error) {
@@ -130,7 +130,7 @@ func TestRegisterDuplicate(t *testing.T) {
 func TestOpenUnknown(t *testing.T) {
 	t.Parallel()
 
-	_, err := Open(Adapter(103), Options{Dispatcher: &job.Dispatcher{}})
+	_, err := Open(Adapter("test-103"), Options{Dispatcher: &job.Dispatcher{}})
 	if !errors.Is(err, ErrUnknownAdapter) {
 		t.Fatalf("err=%v want ErrUnknownAdapter", err)
 	}
@@ -144,7 +144,7 @@ func TestOpenUnknown(t *testing.T) {
 func TestOpenFactoryErrorWrapped(t *testing.T) {
 	t.Parallel()
 
-	a := Adapter(104)
+	a := Adapter("test-104")
 	sentinel := errOpenFactory
 
 	if err := Register(a, func(Options) (Scheduler, error) {
@@ -167,7 +167,7 @@ func TestOpenFactoryErrorWrapped(t *testing.T) {
 func TestOpenOk(t *testing.T) {
 	t.Parallel()
 
-	a := Adapter(105)
+	a := Adapter("test-105")
 	d := &job.Dispatcher{Q: &stubQueue{}}
 
 	if err := Register(a, func(Options) (Scheduler, error) {

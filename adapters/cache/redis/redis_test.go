@@ -4,7 +4,7 @@ import (
 	"errors"
 	"testing"
 
-	"github.com/zenta-dev/zever/cache"
+	"github.com/zenta-dev/zever/core/cache"
 )
 
 func TestRedactURL_masksCredentials(t *testing.T) {

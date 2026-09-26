@@ -12,7 +12,7 @@ import (
 	"google.golang.org/grpc/codes"
 	"google.golang.org/grpc/status"
 
-	"github.com/zenta-dev/zever/log"
+	"github.com/zenta-dev/zever/core/log"
 )
 
 // panicEvent is a minimal log.Event fake recording fields and the message a

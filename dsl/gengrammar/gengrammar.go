@@ -23,8 +23,8 @@ import (
 	"sort"
 	"strings"
 
-	"github.com/zenta-dev/zever/internal/dsl/resolver"
-	"github.com/zenta-dev/zever/internal/dsl/token"
+	"github.com/zenta-dev/zever/dsl/resolver"
+	"github.com/zenta-dev/zever/dsl/token"
 )
 
 // VimPath and TmPath are the checked-in grammar files' locations, relative

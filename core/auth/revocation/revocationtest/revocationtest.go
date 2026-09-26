@@ -8,7 +8,7 @@ import (
 	"testing"
 	"time"
 
-	"github.com/zenta-dev/zever/auth/jwt/revocation"
+	"github.com/zenta-dev/zever/core/auth/revocation"
 )
 
 // Run exercises the revocation.Store contract against a fresh store built by

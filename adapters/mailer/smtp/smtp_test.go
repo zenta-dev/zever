@@ -13,8 +13,8 @@ import (
 	"testing"
 	"time"
 
-	"github.com/zenta-dev/zever/mailer"
-	mailsmtp "github.com/zenta-dev/zever/mailer/smtp"
+	mailsmtp "github.com/zenta-dev/zever/adapters/mailer/smtp"
+	"github.com/zenta-dev/zever/core/mailer"
 )
 
 type serverConfig struct {

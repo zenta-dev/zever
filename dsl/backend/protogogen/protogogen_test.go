@@ -4,9 +4,9 @@ import (
 	"strings"
 	"testing"
 
-	"github.com/zenta-dev/zever/internal/dsl/ast"
-	"github.com/zenta-dev/zever/internal/dsl/parser"
-	"github.com/zenta-dev/zever/internal/dsl/resolver"
+	"github.com/zenta-dev/zever/dsl/ast"
+	"github.com/zenta-dev/zever/dsl/parser"
+	"github.com/zenta-dev/zever/dsl/resolver"
 )
 
 // compileSchema mirrors the other backends' own test helper: run src through

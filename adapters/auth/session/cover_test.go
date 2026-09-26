@@ -1,8 +1,8 @@
 package session_test
 
-// Coverage note: the memory.New error branch in New was pruned by evidence:
-// sessionmemory.New with zero options performs no I/O and validates trivially,
-// so it cannot fail. The error return is discarded via store, _ = assignment.
+// Coverage note: a nil Session.Store fails New with *auth.InvalidOptionsError
+// (see TestNilStoreError): the adapter never constructs a store itself and
+// depends only on the session.Store interface.
 
 import (
 	"context"
@@ -10,9 +10,9 @@ import (
 	"testing"
 	"time"
 
-	"github.com/zenta-dev/zever/auth"
-	authsession "github.com/zenta-dev/zever/auth/session"
-	"github.com/zenta-dev/zever/session"
+	authsession "github.com/zenta-dev/zever/adapters/auth/session"
+	"github.com/zenta-dev/zever/core/auth"
+	"github.com/zenta-dev/zever/core/session"
 )
 
 // failStore injects infrastructure failures into every Store method.

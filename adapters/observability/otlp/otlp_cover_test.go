@@ -25,7 +25,7 @@ import (
 	sdktrace "go.opentelemetry.io/otel/sdk/trace"
 	"go.opentelemetry.io/otel/sdk/trace/tracetest"
 
-	"github.com/zenta-dev/zever/observability"
+	"github.com/zenta-dev/zever/core/observability"
 )
 
 type foreignProvider struct{}

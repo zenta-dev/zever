@@ -3,7 +3,7 @@ package flag
 import (
 	"time"
 
-	"github.com/zenta-dev/zever/log"
+	"github.com/zenta-dev/zever/core/log"
 )
 
 // DefaultTimeout is the default flag operation timeout applied by adapters.

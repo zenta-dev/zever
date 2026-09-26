@@ -1,48 +1,33 @@
 package log
 
 // Adapter identifies a registered logging backend.
-type Adapter int
+
+type Adapter string
 
 const (
 	// Noop selects the discard-all logging adapter.
-	Noop Adapter = iota
+	Noop Adapter = "noop"
 	// ZeroLog selects the zerolog-backed logging adapter.
-	ZeroLog
+	ZeroLog Adapter = "zerolog"
 	// Slog selects the standard library log/slog-backed logging adapter.
-	Slog
+	Slog Adapter = "slog"
 	// Pretty selects the human-readable local-development logging adapter.
-	Pretty
+	Pretty Adapter = "pretty"
 )
 
-// String returns the canonical lowercase name of the adapter.
+// String returns the canonical name of Adapter.
 func (a Adapter) String() string {
-	switch a {
-	case Noop:
-		return "noop"
-	case ZeroLog:
-		return "zerolog"
-	case Slog:
-		return "slog"
-	case Pretty:
-		return "pretty"
-	default:
+	if a == "" {
 		return "unknown"
 	}
+	return string(a)
 }
 
 // ParseAdapter parses adapter name into an Adapter.
-// Only exact lowercase names match; anything else fails.
+// Any non-empty name is accepted to allow custom adapters; empty fails.
 func ParseAdapter(s string) (Adapter, error) {
-	switch s {
-	case "noop":
-		return Noop, nil
-	case "zerolog":
-		return ZeroLog, nil
-	case "slog":
-		return Slog, nil
-	case "pretty":
-		return Pretty, nil
-	default:
-		return Noop, &InvalidAdapterError{Adapter: s}
+	if s == "" {
+		return Adapter(""), &InvalidAdapterError{Adapter: s}
 	}
+	return Adapter(s), nil
 }

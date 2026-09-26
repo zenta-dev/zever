@@ -3,6 +3,7 @@ package log
 import (
 	"context"
 	"errors"
+	"fmt"
 	"sync"
 	"sync/atomic"
 	"testing"
@@ -11,7 +12,7 @@ import (
 
 var adapterSeq atomic.Int64
 
-func freshAdapter() Adapter { return Adapter(1000 + adapterSeq.Add(1)) }
+func freshAdapter() Adapter { return Adapter(fmt.Sprintf("test-%d", 1000+adapterSeq.Add(1))) }
 
 type stubEvent struct{}
 

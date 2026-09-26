@@ -4,7 +4,7 @@ import (
 	"context"
 	"fmt"
 
-	"github.com/zenta-dev/zever/internal/registry"
+	"github.com/zenta-dev/zever/shared/registry"
 )
 
 // Logger is the structured logging facade used throughout zever.

@@ -7,7 +7,7 @@ import (
 	"log/slog"
 	"os"
 
-	"github.com/zenta-dev/zever/analytics"
+	"github.com/zenta-dev/zever/core/analytics"
 )
 
 // adapter renders analytics events as JSON log lines.

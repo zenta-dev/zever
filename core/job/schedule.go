@@ -11,8 +11,8 @@ import (
 
 	"github.com/robfig/cron/v3"
 
-	"github.com/zenta-dev/zever/log"
-	"github.com/zenta-dev/zever/log/noop"
+	"github.com/zenta-dev/zever/adapters/log/noop"
+	"github.com/zenta-dev/zever/core/log"
 )
 
 // EntryID wraps cron.EntryID identifying a registered schedule.

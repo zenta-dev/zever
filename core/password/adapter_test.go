@@ -4,7 +4,7 @@ import (
 	"errors"
 	"testing"
 
-	"github.com/zenta-dev/zever/password"
+	"github.com/zenta-dev/zever/core/password"
 )
 
 func TestAdapterString(t *testing.T) {
@@ -16,7 +16,7 @@ func TestAdapterString(t *testing.T) {
 		want    string
 	}{
 		{name: "argon2id", adapter: password.AdapterArgon2ID, want: "argon2id"},
-		{name: "unknown", adapter: password.Adapter(999), want: "unknown"},
+		{name: "unknown", adapter: password.Adapter(""), want: "unknown"},
 	}
 
 	for _, tc := range cases {
@@ -40,9 +40,9 @@ func TestParseAdapter(t *testing.T) {
 		wantErr bool
 	}{
 		{name: "argon2id", input: "argon2id", want: password.AdapterArgon2ID, wantErr: false},
-		{name: "empty", input: "", want: password.AdapterArgon2ID, wantErr: true},
-		{name: "uppercase", input: "Argon2id", want: password.AdapterArgon2ID, wantErr: true},
-		{name: "other", input: "bcrypt", want: password.AdapterArgon2ID, wantErr: true},
+		{name: "empty", input: "", want: password.Adapter(""), wantErr: true},
+		{name: "uppercase", input: "Argon2id", want: password.Adapter("Argon2id"), wantErr: false},
+		{name: "other", input: "bcrypt", want: password.Adapter("bcrypt"), wantErr: false},
 	}
 
 	for _, tc := range cases {

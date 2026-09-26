@@ -15,7 +15,7 @@ import (
 	"sync"
 	"testing"
 
-	"github.com/zenta-dev/zever/vectorstore"
+	"github.com/zenta-dev/zever/core/vectorstore"
 )
 
 func newMemoryStore(t *testing.T) *Store {

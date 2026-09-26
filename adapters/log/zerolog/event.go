@@ -5,7 +5,7 @@ import (
 
 	zl "github.com/rs/zerolog"
 
-	"github.com/zenta-dev/zever/log"
+	"github.com/zenta-dev/zever/core/log"
 )
 
 type zerologEvent struct {

@@ -13,7 +13,7 @@ import (
 	"testing"
 	"time"
 
-	"github.com/zenta-dev/zever/geo"
+	"github.com/zenta-dev/zever/core/geo"
 )
 
 func TestNew_RequiresUserAgent(t *testing.T) {

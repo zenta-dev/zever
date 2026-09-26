@@ -4,7 +4,7 @@ import (
 	"errors"
 	"unicode"
 
-	"github.com/zenta-dev/zever/log"
+	"github.com/zenta-dev/zever/core/log"
 )
 
 // Options holds typed configuration for router adapters.

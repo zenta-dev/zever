@@ -1,8 +1,8 @@
 package workflow_test
 
 import (
-	"github.com/zenta-dev/zever/workflow"
-	workflowmemory "github.com/zenta-dev/zever/workflow/memory"
+	workflowmemory "github.com/zenta-dev/zever/adapters/workflow/memory"
+	"github.com/zenta-dev/zever/core/workflow"
 )
 
 // ExampleOpen opens the in-memory workflow backend with defaults.

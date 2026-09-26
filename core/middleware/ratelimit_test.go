@@ -14,7 +14,7 @@ import (
 	"google.golang.org/grpc/peer"
 	"google.golang.org/grpc/status"
 
-	"github.com/zenta-dev/zever/ratelimit"
+	"github.com/zenta-dev/zever/core/ratelimit"
 )
 
 // errHandlerRan marks a test handler that must never execute.

@@ -21,7 +21,7 @@ import (
 	"strings"
 	"testing"
 
-	"github.com/zenta-dev/zever/internal/dsl/ir"
+	"github.com/zenta-dev/zever/dsl/ir"
 )
 
 // TestGenerateNamedEnumSchema proves a named `enum` declaration renders once

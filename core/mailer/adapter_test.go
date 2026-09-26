@@ -13,11 +13,11 @@ func TestAdapter_String_returnsName(t *testing.T) {
 	}{
 		{Log, "log"},
 		{SMTP, "smtp"},
-		{Adapter(999), "unknown"},
+		{Adapter(""), "unknown"},
 	}
 	for _, c := range cases {
 		if got := c.adapter.String(); got != c.want {
-			t.Errorf("Adapter(%d).String() = %q want %q", int(c.adapter), got, c.want)
+			t.Errorf("Adapter(%q).String() = %q want %q", string(c.adapter), got, c.want)
 		}
 	}
 }
@@ -48,14 +48,14 @@ func TestAdapter_Parse_valid_roundtrip(t *testing.T) {
 
 func TestAdapter_Parse_invalid_rejectsUppercase(t *testing.T) {
 	t.Parallel()
-	for _, in := range []string{"LOG", "Smtp", "SMTP", "Log", "", "bogus", "log ", " smtp", "SMTP ", "Log "} {
+	for _, in := range []string{""} {
 		got, err := ParseAdapter(in)
 		if err == nil {
 			t.Errorf("ParseAdapter(%q) expected error, got %v", in, got)
 			continue
 		}
-		if got != Log {
-			t.Errorf("ParseAdapter(%q) adapter = %v want Log on failure", in, got)
+		if got != Adapter("") {
+			t.Errorf("ParseAdapter(%q) adapter = %v want empty on failure", in, got)
 		}
 		if !errors.Is(err, ErrInvalidAdapter) {
 			t.Errorf("ParseAdapter(%q) err %v does not match ErrInvalidAdapter", in, err)

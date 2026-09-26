@@ -5,8 +5,8 @@ import (
 	"errors"
 	"testing"
 
-	"github.com/zenta-dev/zever/internal/dsl/backend/proto"
-	"github.com/zenta-dev/zever/internal/dsl/ir"
+	"github.com/zenta-dev/zever/dsl/backend/proto"
+	"github.com/zenta-dev/zever/dsl/ir"
 )
 
 // fakePlainBackend implements only backend.Backend (no GenerateContext),

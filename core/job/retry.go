@@ -3,7 +3,7 @@ package job
 import (
 	"time"
 
-	"github.com/zenta-dev/zever/internal/retry"
+	"github.com/zenta-dev/zever/shared/retry"
 )
 
 // RetryPolicy controls how many attempts a job gets and the base delay between them.

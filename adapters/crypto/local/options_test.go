@@ -5,7 +5,7 @@ import (
 	"errors"
 	"testing"
 
-	"github.com/zenta-dev/zever/crypto"
+	"github.com/zenta-dev/zever/core/crypto"
 )
 
 func b64Bytes(n int) string {

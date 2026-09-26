@@ -4,7 +4,7 @@ import (
 	"errors"
 	"testing"
 
-	"github.com/zenta-dev/zever/notification"
+	"github.com/zenta-dev/zever/core/notification"
 )
 
 func TestSentinelMessages(t *testing.T) {

@@ -10,7 +10,7 @@ import (
 
 	gmaps "googlemaps.github.io/maps"
 
-	"github.com/zenta-dev/zever/geo"
+	"github.com/zenta-dev/zever/core/geo"
 )
 
 func TestNew_RequiresAPIKey(t *testing.T) {

@@ -1,4 +1,4 @@
-package s3core
+package s3opts
 
 import (
 	"context"
@@ -15,7 +15,7 @@ import (
 	"github.com/aws/aws-sdk-go-v2/credentials"
 	"github.com/aws/aws-sdk-go-v2/service/s3"
 
-	"github.com/zenta-dev/zever/storage"
+	"github.com/zenta-dev/zever/core/storage"
 )
 
 var errBoom = errors.New("boom")
@@ -164,15 +164,15 @@ func TestNewStaticURLCustom(t *testing.T) {
 	}
 }
 
-func TestNewClient(t *testing.T) {
+func TestNewCoreClient(t *testing.T) {
 	ctx := t.Context()
-	if _, _, err := NewClient(ctx, "p", "us-east-1", "://bad", "", "ak", "sk"); err == nil {
-		t.Fatal("NewClient(bad endpoint) = nil, want error")
+	if _, _, err := NewCoreClient(ctx, "p", "us-east-1", "://bad", "", "ak", "sk"); err == nil {
+		t.Fatal("NewCoreClient(bad endpoint) = nil, want error")
 	}
-	if _, _, err := NewClient(ctx, "p", "us-east-1", "", "://bad", "ak", "sk"); err == nil {
-		t.Fatal("NewClient(bad url_base) = nil, want error")
+	if _, _, err := NewCoreClient(ctx, "p", "us-east-1", "", "://bad", "ak", "sk"); err == nil {
+		t.Fatal("NewCoreClient(bad url_base) = nil, want error")
 	}
-	plain, presigner, err := NewClient(ctx, "p", "us-east-1", "", "", "ak", "sk")
+	plain, presigner, err := NewCoreClient(ctx, "p", "us-east-1", "", "", "ak", "sk")
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -185,7 +185,7 @@ func TestNewClient(t *testing.T) {
 	if plain.Options().Region != "us-east-1" {
 		t.Fatalf("Region = %q, want us-east-1", plain.Options().Region)
 	}
-	ep, _, err := NewClient(ctx, "p", "eu-west-1", "http://localhost:9000", "", "ak", "sk")
+	ep, _, err := NewCoreClient(ctx, "p", "eu-west-1", "http://localhost:9000", "", "ak", "sk")
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -198,7 +198,7 @@ func TestNewClient(t *testing.T) {
 	if ep.Options().Region != "eu-west-1" {
 		t.Fatalf("Region = %q, want eu-west-1", ep.Options().Region)
 	}
-	ub, _, err := NewClient(ctx, "p", "eu-west-1", "", "https://cdn.example", "ak", "sk")
+	ub, _, err := NewCoreClient(ctx, "p", "eu-west-1", "", "https://cdn.example", "ak", "sk")
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -207,11 +207,11 @@ func TestNewClient(t *testing.T) {
 	}
 }
 
-func TestNewClientLoadConfigError(t *testing.T) {
+func TestNewCoreClientLoadConfigError(t *testing.T) {
 	ctx := t.Context()
 	t.Setenv("AWS_MAX_ATTEMPTS", "bogus")
-	if _, _, err := NewClient(ctx, "p", "us-east-1", "", "", "ak", "sk"); err == nil {
-		t.Fatal("NewClient(bad env) = nil, want load config error")
+	if _, _, err := NewCoreClient(ctx, "p", "us-east-1", "", "", "ak", "sk"); err == nil {
+		t.Fatal("NewCoreClient(bad env) = nil, want load config error")
 	}
 }
 

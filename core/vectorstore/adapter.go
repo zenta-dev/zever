@@ -1,42 +1,31 @@
 package vectorstore
 
 // Adapter identifies the vectorstore backend implementation.
-type Adapter int
+
+type Adapter string
 
 const (
 	// SQLite selects the SQLite-backed vectorstore.
-	SQLite Adapter = iota
+	SQLite Adapter = "sqlite"
 	// PGVector selects the Postgres pgvector backend.
-	PGVector
+	PGVector Adapter = "pgvector"
 	// Qdrant selects the Qdrant backend.
-	Qdrant
+	Qdrant Adapter = "qdrant"
 )
 
 // String returns the canonical name of Adapter.
 func (a Adapter) String() string {
-	switch a {
-	case SQLite:
-		return "sqlite"
-	case PGVector:
-		return "pgvector"
-	case Qdrant:
-		return "qdrant"
-	default:
+	if a == "" {
 		return "unknown"
 	}
+	return string(a)
 }
 
 // ParseAdapter parses adapter name into an Adapter.
-// Only exact lowercase names match; anything else fails.
+// Any non-empty name is accepted to allow custom adapters; empty fails.
 func ParseAdapter(s string) (Adapter, error) {
-	switch s {
-	case "sqlite":
-		return SQLite, nil
-	case "pgvector":
-		return PGVector, nil
-	case "qdrant":
-		return Qdrant, nil
-	default:
-		return SQLite, &InvalidAdapterError{Adapter: s}
+	if s == "" {
+		return Adapter(""), &InvalidAdapterError{Adapter: s}
 	}
+	return Adapter(s), nil
 }

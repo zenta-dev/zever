@@ -9,7 +9,7 @@ import (
 	"sync"
 	"testing"
 
-	"github.com/zenta-dev/zever/crypto"
+	"github.com/zenta-dev/zever/core/crypto"
 )
 
 func genAESKey(t *testing.T) string {
@@ -417,7 +417,7 @@ func TestDecrypt_WrongKey_Fails(t *testing.T) {
 func TestRegistry_Integration(t *testing.T) {
 	// No t.Parallel() - registry is global
 	// Use a fresh adapter to avoid collision with existing registrations
-	adapter := crypto.Adapter(9999)
+	adapter := crypto.Adapter("test-9999")
 	// Ensure not already registered - try register, ignore duplicate from prior run
 	_ = crypto.Register(adapter, New)
 	// Open via crypto.Open should succeed with valid opts

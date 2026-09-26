@@ -13,8 +13,8 @@ import (
 
 	_ "modernc.org/sqlite" // register sqlite driver
 
-	"github.com/zenta-dev/zever/db"
-	"github.com/zenta-dev/zever/internal/lrucache"
+	"github.com/zenta-dev/zever/core/db"
+	"github.com/zenta-dev/zever/shared/lrucache"
 )
 
 // pragmaFK enforces foreign keys on every connection opened from the DSN.

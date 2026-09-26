@@ -14,10 +14,10 @@ import (
 	"sync"
 	"time"
 
-	"github.com/zenta-dev/zever/codec"
-	"github.com/zenta-dev/zever/i18n"
-	"github.com/zenta-dev/zever/internal/httpclient"
-	"github.com/zenta-dev/zever/internal/lrucache"
+	"github.com/zenta-dev/zever/core/i18n"
+	"github.com/zenta-dev/zever/shared/codec"
+	"github.com/zenta-dev/zever/shared/httpclient"
+	"github.com/zenta-dev/zever/shared/lrucache"
 )
 
 var (

@@ -6,17 +6,17 @@ package app
 import (
 	"encoding/json"
 	"errors"
-	"github.com/zenta-dev/zever/apperror"
-	"github.com/zenta-dev/zever/auth"
-	"github.com/zenta-dev/zever/authz"
-	"github.com/zenta-dev/zever/permission"
+	"github.com/zenta-dev/zever/core/auth"
+	"github.com/zenta-dev/zever/core/authz"
+	"github.com/zenta-dev/zever/core/permission"
+	"github.com/zenta-dev/zever/shared/apperror"
 	"google.golang.org/protobuf/encoding/protojson"
 	"google.golang.org/protobuf/proto"
 	"io"
 	"net/http"
 	"strconv"
 
-	"github.com/zenta-dev/zever/router"
+	"github.com/zenta-dev/zever/core/router"
 )
 
 const maxRequestBodyBytes = 10 << 20 // 10MB, matches document/local.maxSourceBytes

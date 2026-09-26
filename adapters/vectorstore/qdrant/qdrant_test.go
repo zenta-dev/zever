@@ -15,7 +15,7 @@ import (
 
 	"github.com/qdrant/go-client/qdrant"
 
-	"github.com/zenta-dev/zever/vectorstore"
+	"github.com/zenta-dev/zever/core/vectorstore"
 )
 
 type stored struct {

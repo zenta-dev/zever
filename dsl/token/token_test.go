@@ -3,7 +3,7 @@ package token
 import (
 	"testing"
 
-	"github.com/zenta-dev/zever/internal/dsl/diag"
+	"github.com/zenta-dev/zever/dsl/diag"
 )
 
 func TestKindString(t *testing.T) {

@@ -3,8 +3,8 @@ package auth
 import (
 	"time"
 
-	"github.com/zenta-dev/zever/auth/jwt/revocation"
-	"github.com/zenta-dev/zever/session"
+	"github.com/zenta-dev/zever/core/auth/revocation"
+	"github.com/zenta-dev/zever/core/session"
 )
 
 const (
@@ -32,8 +32,8 @@ type JWTOptions struct {
 
 // SessionOptions configures the session-backed adapter.
 type SessionOptions struct {
-	// Store is the session backend. Nil means the adapter builds a
-	// memory store with session defaults.
+	// Store is the session backend. Required: nil fails New with
+	// *InvalidOptionsError since the adapter no longer builds a default.
 	Store session.Store `json:"-" toml:"-" yaml:"-"`
 }
 

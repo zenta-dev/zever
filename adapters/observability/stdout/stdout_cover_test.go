@@ -7,7 +7,7 @@ import (
 	"strings"
 	"testing"
 
-	"github.com/zenta-dev/zever/observability"
+	"github.com/zenta-dev/zever/core/observability"
 )
 
 func validCoverOptions() observability.Options {

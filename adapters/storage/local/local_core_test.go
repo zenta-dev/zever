@@ -12,7 +12,7 @@ import (
 	"testing"
 	"time"
 
-	"github.com/zenta-dev/zever/storage"
+	"github.com/zenta-dev/zever/core/storage"
 )
 
 // ---------------------------------------------------------------------------

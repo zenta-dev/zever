@@ -6,7 +6,7 @@ import (
 	"sync"
 	"testing"
 
-	"github.com/zenta-dev/zever/internal/registry"
+	"github.com/zenta-dev/zever/shared/registry"
 )
 
 type adapter int

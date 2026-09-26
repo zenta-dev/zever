@@ -4,8 +4,8 @@ import (
 	"reflect"
 	"testing"
 
-	"github.com/zenta-dev/zever/job"
-	"github.com/zenta-dev/zever/scheduler"
+	"github.com/zenta-dev/zever/core/job"
+	"github.com/zenta-dev/zever/core/scheduler"
 )
 
 func TestFacadeParityEntryIDAlias(t *testing.T) {

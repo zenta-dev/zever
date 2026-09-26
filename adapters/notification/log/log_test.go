@@ -10,8 +10,8 @@ import (
 	"testing"
 	"time"
 
-	"github.com/zenta-dev/zever/notification"
-	notificationlog "github.com/zenta-dev/zever/notification/log"
+	notificationlog "github.com/zenta-dev/zever/adapters/notification/log"
+	"github.com/zenta-dev/zever/core/notification"
 )
 
 func validNotification() *notification.Notification {

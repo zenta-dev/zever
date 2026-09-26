@@ -3,7 +3,7 @@ package openapi
 import (
 	"fmt"
 
-	"github.com/zenta-dev/zever/internal/dsl/ir"
+	"github.com/zenta-dev/zever/dsl/ir"
 )
 
 // openAPIDoc is the root OpenAPI 3.0.3 document object, restricted to the

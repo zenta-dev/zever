@@ -11,7 +11,7 @@ import (
 
 	"firebase.google.com/go/v4/remoteconfig"
 
-	"github.com/zenta-dev/zever/flag"
+	"github.com/zenta-dev/zever/core/flag"
 )
 
 // Coverage note: two defensive branches in loadTemplate are provably dead

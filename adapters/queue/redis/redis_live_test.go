@@ -10,7 +10,7 @@ import (
 
 	"github.com/alicebob/miniredis/v2"
 
-	"github.com/zenta-dev/zever/queue"
+	"github.com/zenta-dev/zever/core/queue"
 )
 
 // eventually polls cond until timeout, for async delivery/visibility-timeout

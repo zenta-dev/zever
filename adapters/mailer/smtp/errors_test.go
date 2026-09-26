@@ -4,7 +4,7 @@ import (
 	"errors"
 	"testing"
 
-	"github.com/zenta-dev/zever/mailer"
+	"github.com/zenta-dev/zever/core/mailer"
 )
 
 func TestSentinelMessages(t *testing.T) {

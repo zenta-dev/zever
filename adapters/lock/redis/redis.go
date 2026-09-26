@@ -11,9 +11,10 @@ import (
 
 	goredis "github.com/redis/go-redis/v9"
 
-	"github.com/zenta-dev/zever/internal/cas"
-	zredis "github.com/zenta-dev/zever/internal/redis"
-	"github.com/zenta-dev/zever/lock"
+	"github.com/zenta-dev/zever/core/lock"
+	"github.com/zenta-dev/zever/shared/cas"
+	redisclient "github.com/zenta-dev/zever/shared/redisclient"
+	redisopt "github.com/zenta-dev/zever/shared/redisopt"
 )
 
 // releaseScript deletes the key only when it still holds holder.
@@ -51,7 +52,7 @@ type adapter struct {
 
 // closeShared releases the adapter's own zredis client. It is a seam so
 // tests can inject a close failure.
-var closeShared = zredis.Close
+var closeShared = redisclient.Close
 
 // handle is one acquired lock.Lock.
 type handle struct {
@@ -63,13 +64,13 @@ type handle struct {
 
 // connOptions maps lock options onto the shared client options. A set URL
 // takes precedence over Addr; both spellings connect.
-func connOptions(opts lock.Options) zredis.Options {
+func connOptions(opts lock.Options) redisopt.Options {
 	addr := strings.TrimSpace(opts.URL)
 	if addr == "" {
 		addr = opts.Addr
 	}
 
-	return zredis.Options{
+	return redisopt.Options{
 		Addr:       addr,
 		Password:   opts.Password,
 		DB:         opts.DB,
@@ -97,7 +98,7 @@ func New(opts lock.Options) (lock.Locker, error) {
 		retry = lock.DefaultRetryInterval
 	}
 
-	client, err := zredis.New(connOptions(opts))
+	client, err := redisclient.New(connOptions(opts))
 	if err != nil {
 		return nil, fmt.Errorf("lock: connect %q: %w", redactURL(opts), err)
 	}
@@ -124,7 +125,7 @@ func New(opts lock.Options) (lock.Locker, error) {
 // embedded userinfo credentials masked, suitable for inclusion in error
 // messages and safe to log: secrets never appear in errors.
 func redactURL(opts lock.Options) string {
-	return zredis.RedactEndpoint(opts.URL, opts.Addr)
+	return redisopt.RedactEndpoint(opts.URL, opts.Addr)
 }
 
 // randRead is a seam for newHolderID, stubbed in tests to force failure.

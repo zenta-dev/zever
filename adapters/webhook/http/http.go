@@ -14,8 +14,8 @@ import (
 	"sync"
 	"time"
 
-	"github.com/zenta-dev/zever/internal/retry"
-	"github.com/zenta-dev/zever/webhook"
+	"github.com/zenta-dev/zever/core/webhook"
+	"github.com/zenta-dev/zever/shared/retry"
 )
 
 // DefaultBaseDelay is the initial delivery retry delay.

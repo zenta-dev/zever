@@ -1,36 +1,29 @@
 package queue
 
 // Adapter identifies the queue backend implementation.
-type Adapter int
+
+type Adapter string
 
 const (
 	// Memory is the in-memory queue adapter.
-	Memory Adapter = iota
+	Memory Adapter = "memory"
 	// Redis is the Redis-backed queue adapter.
-	Redis
+	Redis Adapter = "redis"
 )
 
 // String returns the canonical name of Adapter.
 func (a Adapter) String() string {
-	switch a {
-	case Memory:
-		return "memory"
-	case Redis:
-		return "redis"
-	default:
+	if a == "" {
 		return "unknown"
 	}
+	return string(a)
 }
 
 // ParseAdapter parses adapter name into an Adapter.
-// Only exact lowercase names match; anything else fails.
+// Any non-empty name is accepted to allow custom adapters; empty fails.
 func ParseAdapter(s string) (Adapter, error) {
-	switch s {
-	case "memory":
-		return Memory, nil
-	case "redis":
-		return Redis, nil
-	default:
-		return Memory, &InvalidAdapterError{Adapter: s}
+	if s == "" {
+		return Adapter(""), &InvalidAdapterError{Adapter: s}
 	}
+	return Adapter(s), nil
 }

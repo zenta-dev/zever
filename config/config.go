@@ -1,43 +1,44 @@
 package config
 
 import (
+	"encoding/json"
 	"os"
 
-	"github.com/zenta-dev/zever/ai"
-	"github.com/zenta-dev/zever/analytics"
-	"github.com/zenta-dev/zever/auth"
-	"github.com/zenta-dev/zever/billing"
-	"github.com/zenta-dev/zever/cache"
-	"github.com/zenta-dev/zever/codec"
-	"github.com/zenta-dev/zever/crypto"
-	"github.com/zenta-dev/zever/db"
-	"github.com/zenta-dev/zever/document"
-	"github.com/zenta-dev/zever/eventbus"
-	"github.com/zenta-dev/zever/flag"
-	"github.com/zenta-dev/zever/geo"
-	"github.com/zenta-dev/zever/i18n"
-	"github.com/zenta-dev/zever/idempotency"
-	"github.com/zenta-dev/zever/lock"
-	"github.com/zenta-dev/zever/log"
-	"github.com/zenta-dev/zever/mailer"
-	"github.com/zenta-dev/zever/media"
-	"github.com/zenta-dev/zever/notification"
-	"github.com/zenta-dev/zever/observability"
-	"github.com/zenta-dev/zever/password"
-	"github.com/zenta-dev/zever/payment"
-	"github.com/zenta-dev/zever/permission"
-	"github.com/zenta-dev/zever/queue"
-	"github.com/zenta-dev/zever/ratelimit"
-	"github.com/zenta-dev/zever/router"
-	"github.com/zenta-dev/zever/scheduler"
-	"github.com/zenta-dev/zever/search"
-	"github.com/zenta-dev/zever/secrets"
-	"github.com/zenta-dev/zever/session"
-	"github.com/zenta-dev/zever/storage"
-	"github.com/zenta-dev/zever/tenant"
-	"github.com/zenta-dev/zever/vectorstore"
-	"github.com/zenta-dev/zever/webhook"
-	"github.com/zenta-dev/zever/workflow"
+	"github.com/zenta-dev/zever/core/ai"
+	"github.com/zenta-dev/zever/core/analytics"
+	"github.com/zenta-dev/zever/core/auth"
+	"github.com/zenta-dev/zever/core/billing"
+	"github.com/zenta-dev/zever/core/cache"
+	"github.com/zenta-dev/zever/core/crypto"
+	"github.com/zenta-dev/zever/core/db"
+	"github.com/zenta-dev/zever/core/document"
+	"github.com/zenta-dev/zever/core/eventbus"
+	"github.com/zenta-dev/zever/core/flag"
+	"github.com/zenta-dev/zever/core/geo"
+	"github.com/zenta-dev/zever/core/i18n"
+	"github.com/zenta-dev/zever/core/idempotency"
+	"github.com/zenta-dev/zever/core/lock"
+	"github.com/zenta-dev/zever/core/log"
+	"github.com/zenta-dev/zever/core/mailer"
+	"github.com/zenta-dev/zever/core/media"
+	"github.com/zenta-dev/zever/core/notification"
+	"github.com/zenta-dev/zever/core/observability"
+	"github.com/zenta-dev/zever/core/password"
+	"github.com/zenta-dev/zever/core/payment"
+	"github.com/zenta-dev/zever/core/permission"
+	"github.com/zenta-dev/zever/core/queue"
+	"github.com/zenta-dev/zever/core/ratelimit"
+	"github.com/zenta-dev/zever/core/router"
+	"github.com/zenta-dev/zever/core/scheduler"
+	"github.com/zenta-dev/zever/core/search"
+	"github.com/zenta-dev/zever/core/secrets"
+	"github.com/zenta-dev/zever/core/session"
+	"github.com/zenta-dev/zever/core/storage"
+	"github.com/zenta-dev/zever/core/tenant"
+	"github.com/zenta-dev/zever/core/vectorstore"
+	"github.com/zenta-dev/zever/core/webhook"
+	"github.com/zenta-dev/zever/core/workflow"
+	"github.com/zenta-dev/zever/shared/codec"
 )
 
 // Service holds one service's adapter selection and typed options.
@@ -84,6 +85,12 @@ type Config struct {
 	VectorStore   Service[vectorstore.Options]   `json:"vectorstore" yaml:"vectorstore"`
 	Webhook       Service[webhook.Options]       `json:"webhook" yaml:"webhook"`
 	Workflow      Service[workflow.Options]      `json:"workflow" yaml:"workflow"`
+	// Plugins holds third-party plugin services keyed by plugin name. Each
+	// entry carries the plugin's adapter selection plus its raw, untyped
+	// options: unknown option fields pass through untouched because the
+	// plugin validates them itself (see RegisterPluginValidator). Nil by
+	// default; Default leaves it nil and merge initializes it on first use.
+	Plugins map[string]Service[json.RawMessage] `json:"plugins" yaml:"plugins" toml:"plugins"`
 }
 
 // knownServiceNames returns the 34 lowercase service names in sorted order.
@@ -130,7 +137,7 @@ func serviceToMap[T any](o T) map[string]any {
 // never log raw option maps directly. The returned maps are fresh copies;
 // mutating them does not affect the Config.
 func (c *Config) RedactedServices() map[string]ServiceConfig {
-	out := make(map[string]ServiceConfig, 34)
+	out := make(map[string]ServiceConfig, 34+len(c.Plugins))
 	put := func(name, adapter string, opts any) {
 		out[name] = ServiceConfig{Adapter: adapter, Options: Redact(serviceToMap(opts))}
 	}
@@ -168,6 +175,21 @@ func (c *Config) RedactedServices() map[string]ServiceConfig {
 	put("vectorstore", c.VectorStore.Adapter, c.VectorStore.Options)
 	put("webhook", c.Webhook.Adapter, c.Webhook.Options)
 	put("workflow", c.Workflow.Adapter, c.Workflow.Options)
+	for _, name := range sortedPluginNames(c.Plugins) {
+		svc := c.Plugins[name]
+		var m map[string]any
+		if len(svc.Options) > 0 {
+			// Best-effort: corrupt raw options degrade to an empty
+			// redacted map rather than failing display.
+			if err := json.Unmarshal(svc.Options, &m); err != nil {
+				m = nil
+			}
+		}
+		if m == nil {
+			m = map[string]any{}
+		}
+		out[name] = ServiceConfig{Adapter: svc.Adapter, Options: Redact(m)}
+	}
 	return out
 }
 

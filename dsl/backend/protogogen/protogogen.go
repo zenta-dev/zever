@@ -27,9 +27,9 @@ import (
 	"context"
 	"fmt"
 
-	"github.com/zenta-dev/zever/internal/dsl/backend"
-	"github.com/zenta-dev/zever/internal/dsl/backend/proto"
-	"github.com/zenta-dev/zever/internal/dsl/ir"
+	"github.com/zenta-dev/zever/dsl/backend"
+	"github.com/zenta-dev/zever/dsl/backend/proto"
+	"github.com/zenta-dev/zever/dsl/ir"
 )
 
 // Backend renders a resolved schema all the way through to real, compilable

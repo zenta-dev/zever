@@ -14,7 +14,7 @@ import (
 	"testing"
 	"time"
 
-	"github.com/zenta-dev/zever/ai"
+	"github.com/zenta-dev/zever/core/ai"
 )
 
 // fakeTransport hand-fakes the HTTP layer: no network is touched.

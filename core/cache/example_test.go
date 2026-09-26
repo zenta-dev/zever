@@ -4,8 +4,8 @@ import (
 	"context"
 	"fmt"
 
-	"github.com/zenta-dev/zever/cache"
-	"github.com/zenta-dev/zever/cache/memory"
+	"github.com/zenta-dev/zever/adapters/cache/memory"
+	"github.com/zenta-dev/zever/core/cache"
 )
 
 // ExampleOpen opens the memory backend, stores a value and reads it back.

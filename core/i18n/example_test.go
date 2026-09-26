@@ -5,8 +5,8 @@ import (
 	"fmt"
 	"testing/fstest"
 
-	"github.com/zenta-dev/zever/i18n"
-	"github.com/zenta-dev/zever/i18n/embed"
+	"github.com/zenta-dev/zever/adapters/i18n/embed"
+	"github.com/zenta-dev/zever/core/i18n"
 )
 
 // ExampleOpen opens the embed adapter and translates a message.

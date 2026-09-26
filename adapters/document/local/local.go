@@ -11,7 +11,7 @@ import (
 	"github.com/chromedp/cdproto/page"
 	"github.com/chromedp/chromedp"
 
-	"github.com/zenta-dev/zever/document"
+	"github.com/zenta-dev/zever/core/document"
 )
 
 const maxSourceBytes = document.DefaultMaxSourceBytes

@@ -1,43 +1,31 @@
 package storage
 
 // Adapter identifies a storage backend.
-type Adapter uint8
 
-// Adapter backend identifiers.
+type Adapter string
+
 const (
 	// AdapterLocal selects the local-filesystem backend.
-	AdapterLocal Adapter = iota
+	AdapterLocal Adapter = "local"
 	// AdapterS3 selects the Amazon S3 backend.
-	AdapterS3
+	AdapterS3 Adapter = "s3"
 	// AdapterR2 selects the Cloudflare R2 backend.
-	AdapterR2
+	AdapterR2 Adapter = "r2"
 )
 
-// String returns the canonical adapter name.
+// String returns the canonical name of Adapter.
 func (a Adapter) String() string {
-	switch a {
-	case AdapterLocal:
-		return "local"
-	case AdapterS3:
-		return "s3"
-	case AdapterR2:
-		return "r2"
-	default:
+	if a == "" {
 		return "unknown"
 	}
+	return string(a)
 }
 
 // ParseAdapter parses adapter name into an Adapter.
-// Only exact lowercase names match; anything else fails.
+// Any non-empty name is accepted to allow custom adapters; empty fails.
 func ParseAdapter(s string) (Adapter, error) {
-	switch s {
-	case "local":
-		return AdapterLocal, nil
-	case "s3":
-		return AdapterS3, nil
-	case "r2":
-		return AdapterR2, nil
-	default:
-		return AdapterLocal, &InvalidAdapterError{Adapter: s}
+	if s == "" {
+		return Adapter(""), &InvalidAdapterError{Adapter: s}
 	}
+	return Adapter(s), nil
 }

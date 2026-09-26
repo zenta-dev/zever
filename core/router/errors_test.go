@@ -78,16 +78,13 @@ func TestErrors_typed_As(t *testing.T) {
 	t.Parallel()
 	t.Run("invalid_adapter", func(t *testing.T) {
 		t.Parallel()
-		_, err := ParseAdapter("bad")
+		_, err := ParseAdapter("")
 		var iae *InvalidAdapterError
 		if !errors.As(err, &iae) {
 			t.Fatalf("err type = %T, want *InvalidAdapterError", err)
 		}
-		if iae.Adapter != "bad" {
-			t.Fatalf("Adapter = %q, want %q", iae.Adapter, "bad")
-		}
-		if !strings.Contains(iae.Error(), "bad") {
-			t.Fatalf("Error() = %q, want adapter name", iae.Error())
+		if iae.Adapter != "" {
+			t.Fatalf("Adapter = %q, want %q", iae.Adapter, "")
 		}
 	})
 	t.Run("duplicate", func(t *testing.T) {
@@ -109,12 +106,12 @@ func TestErrors_typed_As(t *testing.T) {
 	})
 	t.Run("unknown", func(t *testing.T) {
 		t.Parallel()
-		e := &UnknownAdapterError{Adapter: Adapter(99)}
+		e := &UnknownAdapterError{Adapter: Adapter("")}
 		var ue *UnknownAdapterError
 		if !errors.As(e, &ue) {
 			t.Fatalf("err type = %T, want *UnknownAdapterError", e)
 		}
-		if ue.Adapter != Adapter(99) {
+		if ue.Adapter != Adapter("") {
 			t.Fatalf("Adapter = %v, want 99", ue.Adapter)
 		}
 		if !strings.Contains(ue.Error(), "unknown") {
@@ -186,8 +183,8 @@ func TestErrors_carried_fields(t *testing.T) {
 	if de.Adapter != AdapterFiber {
 		t.Fatalf("DuplicateAdapterError.Adapter = %v", de.Adapter)
 	}
-	ue := &UnknownAdapterError{Adapter: Adapter(5)}
-	if ue.Adapter != Adapter(5) {
+	ue := &UnknownAdapterError{Adapter: Adapter("test-5")}
+	if ue.Adapter != Adapter("test-5") {
 		t.Fatalf("UnknownAdapterError.Adapter = %v", ue.Adapter)
 	}
 	iae := &InvalidAdapterError{Adapter: "nope"}

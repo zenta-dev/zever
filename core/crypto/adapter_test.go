@@ -5,7 +5,7 @@ import (
 	"strings"
 	"testing"
 
-	"github.com/zenta-dev/zever/crypto"
+	"github.com/zenta-dev/zever/core/crypto"
 )
 
 func TestAdapter_String(t *testing.T) {
@@ -16,8 +16,8 @@ func TestAdapter_String(t *testing.T) {
 		want string
 	}{
 		{name: "local", a: crypto.AdapterLocal, want: "local"},
-		{name: "unknown", a: crypto.Adapter(99), want: "unknown"},
-		{name: "negative", a: crypto.Adapter(-1), want: "unknown"},
+		{name: "unknown", a: crypto.Adapter(""), want: "unknown"},
+		{name: "negative", a: crypto.Adapter(""), want: "unknown"},
 	}
 	for _, tc := range cases {
 		tc := tc
@@ -39,11 +39,11 @@ func TestParseAdapter_roundtrip(t *testing.T) {
 		ok   bool
 	}{
 		{name: "local", in: "local", want: crypto.AdapterLocal, ok: true},
-		{name: "empty", in: "", want: crypto.AdapterLocal, ok: false},
-		{name: "uppercase", in: "Local", want: crypto.AdapterLocal, ok: false},
-		{name: "LOCAL", in: "LOCAL", want: crypto.AdapterLocal, ok: false},
-		{name: "unknown", in: "redis", want: crypto.AdapterLocal, ok: false},
-		{name: "vault", in: "vault", want: crypto.AdapterLocal, ok: false},
+		{name: "empty", in: "", want: crypto.Adapter(""), ok: false},
+		{name: "uppercase", in: "Local", want: crypto.Adapter("Local"), ok: true},
+		{name: "LOCAL", in: "LOCAL", want: crypto.Adapter("LOCAL"), ok: true},
+		{name: "unknown", in: "redis", want: crypto.Adapter("redis"), ok: true},
+		{name: "vault", in: "vault", want: crypto.Adapter("vault"), ok: true},
 	}
 	for _, tc := range cases {
 		tc := tc
@@ -74,7 +74,7 @@ func TestParseAdapter_roundtrip(t *testing.T) {
 				if !errors.Is(err, crypto.ErrInvalidAdapter) {
 					t.Fatalf("err = %v, want ErrInvalidAdapter", err)
 				}
-				if got != crypto.AdapterLocal {
+				if got != crypto.Adapter("") {
 					t.Fatalf("ParseAdapter(%q) adapter = %v, want AdapterLocal", tc.in, got)
 				}
 				if !strings.Contains(err.Error(), tc.in) && tc.in != "" {
@@ -98,15 +98,11 @@ func TestParseAdapter_String_consistency(t *testing.T) {
 
 func TestAdapter_Parse_unknown_carries_adapter(t *testing.T) {
 	t.Parallel()
-	_, err := crypto.ParseAdapter("bad-adapter")
-	if err == nil {
-		t.Fatal("expected error")
+	got, err := crypto.ParseAdapter("bad-adapter")
+	if err != nil {
+		t.Fatalf("ParseAdapter(bad-adapter) err = %v, want nil (open adapter)", err)
 	}
-	var iae *crypto.InvalidAdapterError
-	if !errors.As(err, &iae) {
-		t.Fatalf("type = %T", err)
-	}
-	if !errors.Is(err, crypto.ErrInvalidAdapter) {
-		t.Fatalf("Is ErrInvalidAdapter false")
+	if got != crypto.Adapter("bad-adapter") {
+		t.Fatalf("ParseAdapter(bad-adapter) = %v, want %v", got, crypto.Adapter("bad-adapter"))
 	}
 }

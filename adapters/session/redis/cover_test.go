@@ -6,7 +6,7 @@ import (
 	"testing"
 	"time"
 
-	"github.com/zenta-dev/zever/session"
+	"github.com/zenta-dev/zever/core/session"
 )
 
 // plantRaw writes a raw wire record directly, bypassing the store, for

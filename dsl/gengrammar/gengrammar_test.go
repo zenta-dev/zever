@@ -6,8 +6,8 @@ import (
 	"strings"
 	"testing"
 
-	"github.com/zenta-dev/zever/internal/dsl/resolver"
-	"github.com/zenta-dev/zever/internal/dsl/token"
+	"github.com/zenta-dev/zever/dsl/resolver"
+	"github.com/zenta-dev/zever/dsl/token"
 )
 
 // TestKeywords_matchesTokenKeywordsMinusBooleans proves Keywords() is

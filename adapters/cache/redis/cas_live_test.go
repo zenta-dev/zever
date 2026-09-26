@@ -5,7 +5,7 @@ import (
 	"testing"
 	"time"
 
-	"github.com/zenta-dev/zever/cache"
+	"github.com/zenta-dev/zever/core/cache"
 )
 
 func mustSetLive(t *testing.T, c cache.Cache, key string, value []byte, ttl time.Duration) {

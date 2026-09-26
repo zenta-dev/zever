@@ -4,7 +4,7 @@ import (
 	"net/http"
 	"testing"
 
-	"github.com/zenta-dev/zever/internal/dsl/ast"
+	"github.com/zenta-dev/zever/dsl/ast"
 )
 
 // parseSrc runs the parser over src end-to-end, as a caller would.

@@ -12,7 +12,7 @@ import (
 
 	"github.com/alicebob/miniredis/v2"
 
-	"github.com/zenta-dev/zever/eventbus"
+	"github.com/zenta-dev/zever/core/eventbus"
 )
 
 // topicSeq keeps generated topics unique even within a single test's shared

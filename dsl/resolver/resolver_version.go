@@ -3,8 +3,8 @@ package resolver
 import (
 	"strings"
 
-	"github.com/zenta-dev/zever/internal/dsl/diag"
-	"github.com/zenta-dev/zever/internal/dsl/ir"
+	"github.com/zenta-dev/zever/dsl/diag"
+	"github.com/zenta-dev/zever/dsl/ir"
 )
 
 // versionPathDrift is an opt-in lint: for every operation with an HTTP

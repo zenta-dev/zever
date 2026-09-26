@@ -4,7 +4,7 @@ import (
 	"context"
 	"fmt"
 
-	"github.com/zenta-dev/zever/internal/registry"
+	"github.com/zenta-dev/zever/shared/registry"
 )
 
 // Geo is the interface that geo adapters must implement.

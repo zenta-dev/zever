@@ -8,8 +8,8 @@ import (
 	"testing"
 	"time"
 
-	"github.com/zenta-dev/zever/ratelimit"
-	"github.com/zenta-dev/zever/ratelimit/memory"
+	"github.com/zenta-dev/zever/adapters/ratelimit/memory"
+	"github.com/zenta-dev/zever/core/ratelimit"
 )
 
 func newLimiter(t *testing.T, opts ratelimit.Options) ratelimit.Limiter {

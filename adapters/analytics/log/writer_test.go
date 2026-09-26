@@ -5,7 +5,7 @@ import (
 	"encoding/json"
 	"testing"
 
-	"github.com/zenta-dev/zever/analytics"
+	"github.com/zenta-dev/zever/core/analytics"
 )
 
 // RED: NewWithWriter injects writer seam; Track/Identify/Group emit JSON lines.

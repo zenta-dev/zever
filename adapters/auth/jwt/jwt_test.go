@@ -10,8 +10,8 @@ import (
 
 	jwtv5 "github.com/golang-jwt/jwt/v5"
 
-	"github.com/zenta-dev/zever/auth"
-	"github.com/zenta-dev/zever/auth/jwt/revocation"
+	"github.com/zenta-dev/zever/core/auth"
+	"github.com/zenta-dev/zever/core/auth/revocation"
 )
 
 // fakeRevocationStore records calls, so tests can assert the adapter wires

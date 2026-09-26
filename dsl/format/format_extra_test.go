@@ -3,8 +3,8 @@ package format
 import (
 	"testing"
 
-	"github.com/zenta-dev/zever/internal/dsl/diag"
-	"github.com/zenta-dev/zever/internal/dsl/token"
+	"github.com/zenta-dev/zever/dsl/diag"
+	"github.com/zenta-dev/zever/dsl/token"
 )
 
 func TestCanonicalGapRefusesIllegalAndEOF(t *testing.T) {

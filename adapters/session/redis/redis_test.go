@@ -13,8 +13,8 @@ import (
 	"github.com/alicebob/miniredis/v2"
 	goredis "github.com/redis/go-redis/v9"
 
-	"github.com/zenta-dev/zever/session"
-	sredis "github.com/zenta-dev/zever/session/redis"
+	sredis "github.com/zenta-dev/zever/adapters/session/redis"
+	"github.com/zenta-dev/zever/core/session"
 )
 
 // keySeq keeps generated key prefixes unique even within a single test's

@@ -5,7 +5,7 @@ import (
 	"fmt"
 	"time"
 
-	"github.com/zenta-dev/zever/internal/registry"
+	"github.com/zenta-dev/zever/shared/registry"
 )
 
 // Token is an issued authentication credential.

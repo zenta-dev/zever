@@ -3,6 +3,7 @@ package flag
 import (
 	"context"
 	"errors"
+	"fmt"
 	"strings"
 	"sync/atomic"
 	"testing"
@@ -11,7 +12,7 @@ import (
 var freshSeq atomic.Int64
 
 func freshAdapter() Adapter {
-	return Adapter(1000 + int(freshSeq.Add(1)))
+	return Adapter(fmt.Sprintf("test-%d", 1000+int(freshSeq.Add(1))))
 }
 
 type stubFlag struct{}
@@ -57,7 +58,7 @@ func TestRegister_duplicate_returnsDuplicateError(t *testing.T) {
 }
 
 func TestOpen_unknownAdapter_returnsUnknownError(t *testing.T) {
-	a := Adapter(9999)
+	a := Adapter("test-9999")
 	_, err := Open(a, Options{})
 	if !errors.Is(err, ErrUnknownAdapter) {
 		t.Fatalf("Open unknown err = %v, want ErrUnknownAdapter", err)

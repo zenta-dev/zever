@@ -5,7 +5,7 @@ import (
 	"errors"
 	"testing"
 
-	"github.com/zenta-dev/zever/queue"
+	"github.com/zenta-dev/zever/core/queue"
 )
 
 func TestSentinelMessages(t *testing.T) {

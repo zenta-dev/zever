@@ -4,7 +4,7 @@ import (
 	"context"
 	"testing"
 
-	"github.com/zenta-dev/zever/auth"
+	"github.com/zenta-dev/zever/core/auth"
 )
 
 func TestClaimsRoundtrip(t *testing.T) {

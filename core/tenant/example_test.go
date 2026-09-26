@@ -1,8 +1,8 @@
 package tenant_test
 
 import (
-	"github.com/zenta-dev/zever/tenant"
-	tenantsingle "github.com/zenta-dev/zever/tenant/single"
+	tenantsingle "github.com/zenta-dev/zever/adapters/tenant/single"
+	"github.com/zenta-dev/zever/core/tenant"
 )
 
 // ExampleOpen opens the single-tenant backend with a fixed ID.

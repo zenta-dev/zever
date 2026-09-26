@@ -16,7 +16,7 @@ import (
 	"go.uber.org/goleak"
 	"google.golang.org/genai"
 
-	"github.com/zenta-dev/zever/ai"
+	"github.com/zenta-dev/zever/core/ai"
 )
 
 func TestOpen_APIKeyRequired(t *testing.T) {

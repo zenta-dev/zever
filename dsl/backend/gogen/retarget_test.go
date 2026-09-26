@@ -4,9 +4,9 @@ import (
 	"strings"
 	"testing"
 
-	"github.com/zenta-dev/zever/internal/dsl/ast"
-	"github.com/zenta-dev/zever/internal/dsl/ir"
-	"github.com/zenta-dev/zever/internal/dsl/resolver"
+	"github.com/zenta-dev/zever/dsl/ast"
+	"github.com/zenta-dev/zever/dsl/ir"
+	"github.com/zenta-dev/zever/dsl/resolver"
 )
 
 // TestGeneratedRouterUsesZeverMiddleware is the retarget proof for the HTTP
@@ -26,11 +26,11 @@ func TestGeneratedRouterUsesZeverMiddleware(t *testing.T) {
 	}
 
 	for _, want := range []string{
-		`"github.com/zenta-dev/zever/router"`,
-		`"github.com/zenta-dev/zever/apperror"`,
-		`"github.com/zenta-dev/zever/authz"`,
-		`"github.com/zenta-dev/zever/auth"`,
-		`"github.com/zenta-dev/zever/permission"`,
+		`"github.com/zenta-dev/zever/core/router"`,
+		`"github.com/zenta-dev/zever/shared/apperror"`,
+		`"github.com/zenta-dev/zever/core/authz"`,
+		`"github.com/zenta-dev/zever/core/auth"`,
+		`"github.com/zenta-dev/zever/core/permission"`,
 	} {
 		if !strings.Contains(router, want) {
 			t.Errorf("router.go missing zever import %s", want)
@@ -54,7 +54,7 @@ func TestGeneratedGRPCUsesZeverPaths(t *testing.T) {
 			t.Errorf("%s still imports dirty zen-go paths", path)
 		}
 
-		if !strings.Contains(got, `"github.com/zenta-dev/zever/apperror"`) {
+		if !strings.Contains(got, `"github.com/zenta-dev/zever/shared/apperror"`) {
 			t.Errorf("%s missing zever apperror import", path)
 		}
 	}
@@ -65,9 +65,9 @@ func TestGeneratedGRPCUsesZeverPaths(t *testing.T) {
 	}
 
 	for _, want := range []string{
-		`"github.com/zenta-dev/zever/router"`,
-		`"github.com/zenta-dev/zever/auth"`,
-		`"github.com/zenta-dev/zever/permission"`,
+		`"github.com/zenta-dev/zever/core/router"`,
+		`"github.com/zenta-dev/zever/core/auth"`,
+		`"github.com/zenta-dev/zever/core/permission"`,
 	} {
 		if !strings.Contains(register, want) {
 			t.Errorf("register.go missing zever import %s", want)

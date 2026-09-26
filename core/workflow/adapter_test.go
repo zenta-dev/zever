@@ -1,10 +1,9 @@
 package workflow_test
 
 import (
-	"errors"
 	"testing"
 
-	"github.com/zenta-dev/zever/workflow"
+	"github.com/zenta-dev/zever/core/workflow"
 )
 
 func TestAdapterString(t *testing.T) {
@@ -16,7 +15,7 @@ func TestAdapterString(t *testing.T) {
 		want    string
 	}{
 		{"memory", workflow.Memory, "memory"},
-		{"unknown", workflow.Adapter(99), "unknown"},
+		{"unknown", workflow.Adapter(""), "unknown"},
 	}
 
 	for _, c := range cases {
@@ -25,7 +24,7 @@ func TestAdapterString(t *testing.T) {
 			t.Parallel()
 
 			if got := c.adapter.String(); got != c.want {
-				t.Errorf("Adapter(%d).String() = %q, want %q", int(c.adapter), got, c.want)
+				t.Errorf("Adapter(%q).String() = %q, want %q", string(c.adapter), got, c.want)
 			}
 		})
 	}
@@ -47,42 +46,26 @@ func TestParseAdapter(t *testing.T) {
 		}
 	})
 
-	t.Run("invalid/bogus", func(t *testing.T) {
+	t.Run("open/bogus", func(t *testing.T) {
 		t.Parallel()
 
 		got, err := workflow.ParseAdapter("bogus")
-		if err == nil {
-			t.Fatal("ParseAdapter(bogus) = nil, want error")
+		if err != nil {
+			t.Fatalf("ParseAdapter(bogus) error = %v, want nil (open adapter)", err)
 		}
-
-		if got != workflow.Memory {
-			t.Errorf("ParseAdapter(bogus) got = %v, want %v", got, workflow.Memory)
-		}
-
-		if !errors.Is(err, workflow.ErrInvalidAdapter) {
-			t.Errorf("errors.Is(err, ErrInvalidAdapter) = false (err = %v)", err)
-		}
-
-		var invErr *workflow.InvalidAdapterError
-		if !errors.As(err, &invErr) {
-			t.Fatalf("errors.As(err, *InvalidAdapterError) = false (err = %T %v)", err, err)
-		}
-
-		if invErr.Adapter != "bogus" {
-			t.Errorf("InvalidAdapterError.Adapter = %q, want %q", invErr.Adapter, "bogus")
+		if got != workflow.Adapter("bogus") {
+			t.Errorf("ParseAdapter(bogus) got = %v, want %v", got, workflow.Adapter("bogus"))
 		}
 	})
 
-	t.Run("invalid/uppercase", func(t *testing.T) {
+	t.Run("open/uppercase", func(t *testing.T) {
 		t.Parallel()
-
-		_, err := workflow.ParseAdapter("Memory")
-		if err == nil {
-			t.Fatal("ParseAdapter(Memory) = nil, want error")
+		got, err := workflow.ParseAdapter("Memory")
+		if err != nil {
+			t.Fatalf("ParseAdapter(Memory) error = %v, want nil (open adapter)", err)
 		}
-
-		if !errors.Is(err, workflow.ErrInvalidAdapter) {
-			t.Errorf("errors.Is(err, ErrInvalidAdapter) = false (err = %v)", err)
+		if got != workflow.Adapter("Memory") {
+			t.Errorf("ParseAdapter(Memory) got = %v, want %v", got, workflow.Adapter("Memory"))
 		}
 	})
 

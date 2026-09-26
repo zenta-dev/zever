@@ -6,7 +6,7 @@ import (
 	"regexp"
 	"strings"
 
-	"github.com/zenta-dev/zever/internal/registry"
+	"github.com/zenta-dev/zever/shared/registry"
 )
 
 // Secrets is the interface that secret-management adapters must implement.

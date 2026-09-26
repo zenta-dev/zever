@@ -80,7 +80,7 @@ func TestQueueAdapterString_returnsName(t *testing.T) {
 	}{
 		{"memory", Memory, "memory"},
 		{"redis", Redis, "redis"},
-		{"unknown", Adapter(99), "unknown"},
+		{"unknown", Adapter(""), "unknown"},
 	}
 
 	for _, c := range cases {
@@ -88,7 +88,7 @@ func TestQueueAdapterString_returnsName(t *testing.T) {
 		t.Run(c.name, func(t *testing.T) {
 			t.Parallel()
 			if got := c.adapter.String(); got != c.want {
-				t.Errorf("Adapter(%d).String() = %q, want %q", int(c.adapter), got, c.want)
+				t.Errorf("Adapter(%q).String() = %q, want %q", string(c.adapter), got, c.want)
 			}
 		})
 	}
@@ -119,14 +119,25 @@ func TestQueueParseAdapter(t *testing.T) {
 		}
 	})
 
-	t.Run("invalid/bogus", func(t *testing.T) {
+	t.Run("open/bogus", func(t *testing.T) {
 		t.Parallel()
 		got, err := ParseAdapter("bogus")
-		if err == nil {
-			t.Fatal("ParseAdapter(bogus) = nil, want error")
+		if err != nil {
+			t.Fatalf("ParseAdapter(bogus) error = %v, want nil (open adapter)", err)
 		}
-		if got != Memory {
-			t.Errorf("ParseAdapter(bogus) got = %v, want %v", got, Memory)
+		if got != Adapter("bogus") {
+			t.Errorf("ParseAdapter(bogus) got = %v, want %v", got, Adapter("bogus"))
+		}
+	})
+
+	t.Run("invalid/empty", func(t *testing.T) {
+		t.Parallel()
+		got, err := ParseAdapter("")
+		if err == nil {
+			t.Fatal("ParseAdapter(\"\") = nil, want error")
+		}
+		if got != Adapter("") {
+			t.Errorf("ParseAdapter(\"\") got = %v, want empty", got)
 		}
 		if !errors.Is(err, ErrInvalidAdapter) {
 			t.Errorf("errors.Is(err, ErrInvalidAdapter) = false (err = %v)", err)
@@ -135,8 +146,8 @@ func TestQueueParseAdapter(t *testing.T) {
 		if !errors.As(err, &invErr) {
 			t.Fatalf("errors.As(err, *InvalidAdapterError) = false (err = %T %v)", err, err)
 		}
-		if invErr.Adapter != "bogus" {
-			t.Errorf("InvalidAdapterError.Adapter = %q, want %q", invErr.Adapter, "bogus")
+		if invErr.Adapter != "" {
+			t.Errorf("InvalidAdapterError.Adapter = %q, want %q", invErr.Adapter, "")
 		}
 	})
 }
@@ -243,9 +254,9 @@ func TestQueueTypedErrorMessages_unwrap(t *testing.T) {
 			t.Errorf("errors.Is(InvalidAdapterError, ErrInvalidAdapter) = false")
 		}
 		var target *InvalidAdapterError
-		_, perr := ParseAdapter("bogus")
+		_, perr := ParseAdapter("")
 		if !errors.As(perr, &target) {
-			t.Errorf("errors.As(ParseAdapter bogus, *InvalidAdapterError) = false")
+			t.Errorf("errors.As(ParseAdapter empty, *InvalidAdapterError) = false")
 		}
 		perr2 := &InvalidAdapterError{Adapter: "bogus"}
 		if !errors.As(perr2, &target) {
@@ -273,7 +284,7 @@ func TestQueueTypedErrorMessages_unwrap(t *testing.T) {
 
 	t.Run("unknown", func(t *testing.T) {
 		t.Parallel()
-		err := &UnknownAdapterError{Adapter: Adapter(99)}
+		err := &UnknownAdapterError{Adapter: Adapter("")}
 		if got := err.Error(); got != "queue: unknown adapter: unknown (forgotten import?)" {
 			t.Errorf("UnknownAdapterError.Error() = %q, want %q", got, "queue: unknown adapter: unknown (forgotten import?)")
 		}
@@ -284,8 +295,8 @@ func TestQueueTypedErrorMessages_unwrap(t *testing.T) {
 		if !errors.As(err, &target) {
 			t.Errorf("errors.As(err, *UnknownAdapterError) = false")
 		}
-		if target != nil && target.Adapter != Adapter(99) {
-			t.Errorf("UnknownAdapterError.Adapter = %v, want %v", target.Adapter, Adapter(99))
+		if target != nil && target.Adapter != Adapter("") {
+			t.Errorf("UnknownAdapterError.Adapter = %v, want %v", target.Adapter, Adapter(""))
 		}
 	})
 }

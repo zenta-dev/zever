@@ -10,7 +10,7 @@ import (
 	"sync"
 	"testing"
 
-	"github.com/zenta-dev/zever/analytics"
+	"github.com/zenta-dev/zever/core/analytics"
 )
 
 // lockedWriter serializes writes into buf.

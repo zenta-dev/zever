@@ -6,7 +6,7 @@ import (
 	"os"
 	"strings"
 
-	"github.com/zenta-dev/zever/secrets"
+	"github.com/zenta-dev/zever/core/secrets"
 )
 
 // adapter reads secrets from environment variables sharing a prefix.

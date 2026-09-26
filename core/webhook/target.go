@@ -7,8 +7,8 @@ import (
 	"net"
 	"net/url"
 
-	"github.com/zenta-dev/zever/internal/endpoint"
-	"github.com/zenta-dev/zever/internal/httpclient"
+	"github.com/zenta-dev/zever/shared/endpoint"
+	"github.com/zenta-dev/zever/shared/httpclient"
 )
 
 // ValidateTarget validates target as an HTTPS webhook URL whose host does not

@@ -3,7 +3,7 @@ package compile
 import (
 	"testing"
 
-	"github.com/zenta-dev/zever/internal/dsl/diag"
+	"github.com/zenta-dev/zever/dsl/diag"
 )
 
 // zeroPos reports whether p is the zero diag.Position, i.e. no source

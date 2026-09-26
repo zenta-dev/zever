@@ -9,8 +9,8 @@ import (
 	"sync/atomic"
 	"testing"
 
-	"github.com/zenta-dev/zever/idempotency"
-	"github.com/zenta-dev/zever/payment"
+	"github.com/zenta-dev/zever/core/idempotency"
+	"github.com/zenta-dev/zever/core/payment"
 )
 
 // fakeStore is an in-memory idempotency.Store fake for refund guard tests.

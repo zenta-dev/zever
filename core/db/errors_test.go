@@ -29,7 +29,7 @@ func TestErrorMessages(t *testing.T) {
 		},
 		{
 			name:     "unknown adapter",
-			err:      &UnknownAdapterError{Adapter: Adapter(42)},
+			err:      &UnknownAdapterError{Adapter: Adapter("test-42")},
 			wantSub:  "db: unknown adapter",
 			sentinel: ErrUnknownAdapter,
 		},

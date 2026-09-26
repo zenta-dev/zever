@@ -1,30 +1,27 @@
 package workflow
 
 // Adapter identifies the workflow backend implementation.
-type Adapter int
+
+type Adapter string
 
 const (
 	// Memory is the in-memory workflow adapter.
-	Memory Adapter = iota
+	Memory Adapter = "memory"
 )
 
 // String returns the canonical name of Adapter.
 func (a Adapter) String() string {
-	switch a {
-	case Memory:
-		return "memory"
-	default:
+	if a == "" {
 		return "unknown"
 	}
+	return string(a)
 }
 
 // ParseAdapter parses adapter name into an Adapter.
-// It returns InvalidAdapterError for unknown names.
+// Any non-empty name is accepted to allow custom adapters; empty fails.
 func ParseAdapter(s string) (Adapter, error) {
-	switch s {
-	case "memory":
-		return Memory, nil
-	default:
-		return Memory, &InvalidAdapterError{Adapter: s}
+	if s == "" {
+		return Adapter(""), &InvalidAdapterError{Adapter: s}
 	}
+	return Adapter(s), nil
 }

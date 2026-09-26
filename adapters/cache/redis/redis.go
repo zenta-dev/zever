@@ -10,9 +10,10 @@ import (
 
 	goredis "github.com/redis/go-redis/v9"
 
-	"github.com/zenta-dev/zever/cache"
-	"github.com/zenta-dev/zever/internal/cas"
-	zredis "github.com/zenta-dev/zever/internal/redis"
+	"github.com/zenta-dev/zever/core/cache"
+	"github.com/zenta-dev/zever/shared/cas"
+	redisclient "github.com/zenta-dev/zever/shared/redisclient"
+	redisopt "github.com/zenta-dev/zever/shared/redisopt"
 )
 
 type redisAdapter struct {
@@ -27,13 +28,13 @@ var _ cache.CompareAndSwapCache = (*redisAdapter)(nil)
 
 // connOptions maps cache options onto the shared client options. A set URL
 // takes precedence over Addr; both spellings connect.
-func connOptions(opts cache.Options) zredis.Options {
+func connOptions(opts cache.Options) redisopt.Options {
 	addr := strings.TrimSpace(opts.URL)
 	if addr == "" {
 		addr = opts.Addr
 	}
 
-	return zredis.Options{
+	return redisopt.Options{
 		Addr:            addr,
 		Password:        opts.Password,
 		DB:              opts.DB,
@@ -53,7 +54,7 @@ func New(opts cache.Options) (cache.Cache, error) {
 		return nil, err
 	}
 
-	client, err := zredis.New(connOptions(opts))
+	client, err := redisclient.New(connOptions(opts))
 	if err != nil {
 		return nil, fmt.Errorf("cache: connect %q error: %w", redactURL(opts), err)
 	}
@@ -74,7 +75,7 @@ func New(opts cache.Options) (cache.Cache, error) {
 // embedded userinfo credentials masked, suitable for inclusion in error
 // messages.
 func redactURL(opts cache.Options) string {
-	return zredis.RedactEndpoint(opts.URL, opts.Addr)
+	return redisopt.RedactEndpoint(opts.URL, opts.Addr)
 }
 
 func (a *redisAdapter) Get(ctx context.Context, key string) ([]byte, error) {
@@ -213,5 +214,5 @@ func (a *redisAdapter) Close(_ context.Context) error {
 		return nil
 	}
 
-	return zredis.Close(a.client)
+	return redisclient.Close(a.client)
 }

@@ -1,6 +1,6 @@
 // Package s3opts provides a shared typed S3 credential and endpoint helper
 // for media and storage backends. It validates bucket, credentials, region
-// defaults, and endpoint scheme/host, and builds S3 clients via s3core
+// defaults, and endpoint scheme/host, and builds S3 clients via NewCoreClient
 // without extra network calls. Secrets are never included in errors.
 package s3opts
 
@@ -12,8 +12,6 @@ import (
 	"strings"
 
 	"github.com/aws/aws-sdk-go-v2/service/s3"
-
-	"github.com/zenta-dev/zever/storage/s3core"
 )
 
 const DefaultRegion = "us-east-1"
@@ -133,7 +131,7 @@ func (o Options) Validate(requireBucket, requireCredentials bool) error {
 	return errors.Join(errs...)
 }
 
-var coreNewClient = s3core.NewClient
+var coreNewClient = NewCoreClient
 
 func NewClient(ctx context.Context, prefix string, cfg Options, urlBase string) (*s3.Client, *s3.PresignClient, error) {
 	region := cfg.Region

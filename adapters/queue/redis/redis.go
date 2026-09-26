@@ -12,9 +12,10 @@ import (
 
 	goredis "github.com/redis/go-redis/v9"
 
-	zredis "github.com/zenta-dev/zever/internal/redis"
-	"github.com/zenta-dev/zever/internal/retry"
-	"github.com/zenta-dev/zever/queue"
+	"github.com/zenta-dev/zever/core/queue"
+	redisclient "github.com/zenta-dev/zever/shared/redisclient"
+	redisopt "github.com/zenta-dev/zever/shared/redisopt"
+	"github.com/zenta-dev/zever/shared/retry"
 )
 
 var (
@@ -90,13 +91,13 @@ type redisAdapter struct {
 
 // connOptions maps queue options onto the shared client options. A set URL
 // takes precedence over Addr; both spellings connect.
-func connOptions(opts queue.Options) zredis.Options {
+func connOptions(opts queue.Options) redisopt.Options {
 	addr := strings.TrimSpace(opts.URL)
 	if addr == "" {
 		addr = opts.Addr
 	}
 
-	return zredis.Options{
+	return redisopt.Options{
 		Addr:       addr,
 		Password:   opts.Password,
 		DB:         opts.DB,
@@ -128,7 +129,7 @@ func New(opts queue.Options) (queue.Queue, error) {
 
 	buf := opts.Buffer
 
-	client, err := zredis.New(connOptions(opts))
+	client, err := redisclient.New(connOptions(opts))
 	if err != nil {
 		return nil, fmt.Errorf("queue: connect %q: %w", redactURL(opts), err)
 	}
@@ -156,7 +157,7 @@ func New(opts queue.Options) (queue.Queue, error) {
 // embedded userinfo credentials masked, suitable for inclusion in error
 // messages.
 func redactURL(opts queue.Options) string {
-	return zredis.RedactEndpoint(opts.URL, opts.Addr)
+	return redisopt.RedactEndpoint(opts.URL, opts.Addr)
 }
 
 func (a *redisAdapter) Push(ctx context.Context, topic string, payload queue.Payload, headers queue.Headers) error {
@@ -313,7 +314,7 @@ func (a *redisAdapter) Close() error {
 		return nil
 	}
 
-	return zredis.Close(a.rawClient)
+	return redisclient.Close(a.rawClient)
 }
 
 func (a *redisAdapter) Name() string { return "redis" }

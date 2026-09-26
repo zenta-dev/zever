@@ -4,7 +4,7 @@ import (
 	"errors"
 	"testing"
 
-	"github.com/zenta-dev/zever/storage"
+	"github.com/zenta-dev/zever/core/storage"
 )
 
 func TestSentinelMessages(t *testing.T) {

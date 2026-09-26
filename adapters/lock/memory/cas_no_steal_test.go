@@ -5,7 +5,7 @@ import (
 	"testing"
 	"time"
 
-	"github.com/zenta-dev/zever/lock"
+	"github.com/zenta-dev/zever/core/lock"
 )
 
 func TestExtend_afterTakeoverDoesNotStealLock(t *testing.T) {

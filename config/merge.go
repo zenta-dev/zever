@@ -1,48 +1,59 @@
 package config
 
 import (
-	"github.com/zenta-dev/zever/ai"
-	"github.com/zenta-dev/zever/analytics"
-	"github.com/zenta-dev/zever/auth"
-	"github.com/zenta-dev/zever/billing"
-	"github.com/zenta-dev/zever/cache"
-	"github.com/zenta-dev/zever/crypto"
-	"github.com/zenta-dev/zever/db"
-	"github.com/zenta-dev/zever/document"
-	"github.com/zenta-dev/zever/eventbus"
-	"github.com/zenta-dev/zever/flag"
-	"github.com/zenta-dev/zever/geo"
-	"github.com/zenta-dev/zever/i18n"
-	"github.com/zenta-dev/zever/idempotency"
-	"github.com/zenta-dev/zever/lock"
-	"github.com/zenta-dev/zever/log"
-	"github.com/zenta-dev/zever/mailer"
-	"github.com/zenta-dev/zever/media"
-	"github.com/zenta-dev/zever/notification"
-	"github.com/zenta-dev/zever/observability"
-	"github.com/zenta-dev/zever/password"
-	"github.com/zenta-dev/zever/payment"
-	"github.com/zenta-dev/zever/permission"
-	"github.com/zenta-dev/zever/queue"
-	"github.com/zenta-dev/zever/ratelimit"
-	"github.com/zenta-dev/zever/router"
-	"github.com/zenta-dev/zever/scheduler"
-	"github.com/zenta-dev/zever/search"
-	"github.com/zenta-dev/zever/secrets"
-	"github.com/zenta-dev/zever/session"
-	"github.com/zenta-dev/zever/storage"
-	"github.com/zenta-dev/zever/tenant"
-	"github.com/zenta-dev/zever/vectorstore"
-	"github.com/zenta-dev/zever/webhook"
-	"github.com/zenta-dev/zever/workflow"
+	"encoding/json"
+
+	"github.com/zenta-dev/zever/core/ai"
+	"github.com/zenta-dev/zever/core/analytics"
+	"github.com/zenta-dev/zever/core/auth"
+	"github.com/zenta-dev/zever/core/billing"
+	"github.com/zenta-dev/zever/core/cache"
+	"github.com/zenta-dev/zever/core/crypto"
+	"github.com/zenta-dev/zever/core/db"
+	"github.com/zenta-dev/zever/core/document"
+	"github.com/zenta-dev/zever/core/eventbus"
+	"github.com/zenta-dev/zever/core/flag"
+	"github.com/zenta-dev/zever/core/geo"
+	"github.com/zenta-dev/zever/core/i18n"
+	"github.com/zenta-dev/zever/core/idempotency"
+	"github.com/zenta-dev/zever/core/lock"
+	"github.com/zenta-dev/zever/core/log"
+	"github.com/zenta-dev/zever/core/mailer"
+	"github.com/zenta-dev/zever/core/media"
+	"github.com/zenta-dev/zever/core/notification"
+	"github.com/zenta-dev/zever/core/observability"
+	"github.com/zenta-dev/zever/core/password"
+	"github.com/zenta-dev/zever/core/payment"
+	"github.com/zenta-dev/zever/core/permission"
+	"github.com/zenta-dev/zever/core/queue"
+	"github.com/zenta-dev/zever/core/ratelimit"
+	"github.com/zenta-dev/zever/core/router"
+	"github.com/zenta-dev/zever/core/scheduler"
+	"github.com/zenta-dev/zever/core/search"
+	"github.com/zenta-dev/zever/core/secrets"
+	"github.com/zenta-dev/zever/core/session"
+	"github.com/zenta-dev/zever/core/storage"
+	"github.com/zenta-dev/zever/core/tenant"
+	"github.com/zenta-dev/zever/core/vectorstore"
+	"github.com/zenta-dev/zever/core/webhook"
+	"github.com/zenta-dev/zever/core/workflow"
 )
 
 // merge overlays raw file service envelopes onto cfg. It is strict: unknown
 // service names fail with UnknownServiceError, and unknown option fields
 // fail via decodeOptions (typed per service, values never echoed). An empty
 // adapter keeps the default; empty/nil options keep the default options.
+// The top-level `plugins` key is exempt from the known-service check: it
+// maps plugin names to {adapter, options} envelopes and fans out into
+// cfg.Plugins via mergePlugins.
 func merge(cfg *Config, raw map[string]ServiceConfig) error {
 	for name, sc := range raw {
+		if name == "plugins" {
+			if err := mergePlugins(cfg, sc); err != nil {
+				return err
+			}
+			continue
+		}
 		apply, ok := serviceMergers[name]
 		if !ok {
 			return &UnknownServiceError{Service: name, Suggestion: closest(name, knownServiceNames())}
@@ -50,6 +61,41 @@ func merge(cfg *Config, raw map[string]ServiceConfig) error {
 		if err := apply(cfg, sc); err != nil {
 			return err
 		}
+	}
+	return nil
+}
+
+// mergePlugins fans the top-level `plugins` block out into cfg.Plugins,
+// initializing the map on first use. Each plugin entry must be a strict
+// {adapter, options} envelope (unknown envelope keys fail, like core
+// services), but the options inside pass through raw: unknown option
+// fields never fail here because the plugin validates them itself (see
+// RegisterPluginValidator). An empty adapter keeps the current value;
+// empty/nil options keep the current raw options.
+func mergePlugins(cfg *Config, sc ServiceConfig) error {
+	if len(sc.Options) == 0 {
+		return nil
+	}
+	if cfg.Plugins == nil {
+		cfg.Plugins = make(map[string]Service[json.RawMessage], len(sc.Options))
+	}
+	for pname, pentry := range sc.Options {
+		psc, err := decodeServiceEntry(pname, pentry)
+		if err != nil {
+			return err
+		}
+		cur := cfg.Plugins[pname]
+		if psc.Adapter != "" {
+			cur.Adapter = psc.Adapter
+		}
+		if len(psc.Options) > 0 {
+			raw, err := json.Marshal(psc.Options)
+			if err != nil {
+				return &DecodeError{Service: pname, Err: err}
+			}
+			cur.Options = json.RawMessage(raw)
+		}
+		cfg.Plugins[pname] = cur
 	}
 	return nil
 }

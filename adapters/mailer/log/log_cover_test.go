@@ -9,8 +9,8 @@ import (
 	"strings"
 	"testing"
 
-	"github.com/zenta-dev/zever/codec"
-	"github.com/zenta-dev/zever/mailer"
+	"github.com/zenta-dev/zever/core/mailer"
+	"github.com/zenta-dev/zever/shared/codec"
 )
 
 func coverOptions() mailer.Options {

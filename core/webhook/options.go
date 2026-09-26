@@ -4,8 +4,8 @@ import (
 	"errors"
 	"time"
 
-	"github.com/zenta-dev/zever/log"
-	"github.com/zenta-dev/zever/queue"
+	"github.com/zenta-dev/zever/core/log"
+	"github.com/zenta-dev/zever/core/queue"
 )
 
 // Options configures webhook construction.

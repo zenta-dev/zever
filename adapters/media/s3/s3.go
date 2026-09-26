@@ -21,9 +21,9 @@ import (
 	s3sdk "github.com/aws/aws-sdk-go-v2/service/s3"
 	"github.com/aws/smithy-go"
 
-	"github.com/zenta-dev/zever/codec"
-	"github.com/zenta-dev/zever/internal/s3opts"
-	"github.com/zenta-dev/zever/media"
+	"github.com/zenta-dev/zever/core/media"
+	"github.com/zenta-dev/zever/shared/codec"
+	"github.com/zenta-dev/zever/shared/s3opts"
 )
 
 // driver stores media assets in an S3-compatible bucket.

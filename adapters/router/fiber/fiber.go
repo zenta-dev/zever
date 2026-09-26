@@ -12,9 +12,9 @@ import (
 	recovermw "github.com/gofiber/fiber/v2/middleware/recover"
 	"github.com/valyala/fasthttp/fasthttpadaptor"
 
-	"github.com/zenta-dev/zever/log"
-	"github.com/zenta-dev/zever/log/noop"
-	"github.com/zenta-dev/zever/router"
+	"github.com/zenta-dev/zever/adapters/log/noop"
+	"github.com/zenta-dev/zever/core/log"
+	"github.com/zenta-dev/zever/core/router"
 )
 
 // New creates a router.Router backed by Fiber v2.

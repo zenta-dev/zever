@@ -8,7 +8,7 @@ import (
 	"testing"
 	"time"
 
-	"github.com/zenta-dev/zever/cache"
+	"github.com/zenta-dev/zever/core/cache"
 )
 
 func stubCache(t *testing.T, opts cache.Options) cache.Cache {

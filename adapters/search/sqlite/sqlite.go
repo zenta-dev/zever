@@ -11,8 +11,8 @@ import (
 
 	"modernc.org/sqlite"
 
-	"github.com/zenta-dev/zever/codec"
-	"github.com/zenta-dev/zever/search"
+	"github.com/zenta-dev/zever/core/search"
+	"github.com/zenta-dev/zever/shared/codec"
 )
 
 var metadataCodec = codec.JSONCodec[map[string]any]{}

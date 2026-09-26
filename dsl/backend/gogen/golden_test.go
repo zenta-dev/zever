@@ -10,8 +10,8 @@ import (
 	"strings"
 	"testing"
 
-	"github.com/zenta-dev/zever/internal/dsl/ast"
-	"github.com/zenta-dev/zever/internal/dsl/resolver"
+	"github.com/zenta-dev/zever/dsl/ast"
+	"github.com/zenta-dev/zever/dsl/resolver"
 )
 
 var updateGolden = flag.Bool("update", false, "rewrite golden files under testdata/golden")

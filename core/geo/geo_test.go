@@ -3,6 +3,7 @@ package geo
 import (
 	"context"
 	"errors"
+	"fmt"
 	"strings"
 	"sync/atomic"
 	"testing"
@@ -31,7 +32,7 @@ func (s *stubGeo) Close() error {
 
 var geoAdapterSeq atomic.Int64
 
-func geoFreshAdapter() Adapter { return Adapter(1000 + geoAdapterSeq.Add(1)) }
+func geoFreshAdapter() Adapter { return Adapter(fmt.Sprintf("test-%d", 1000+geoAdapterSeq.Add(1))) }
 
 func TestRegister(t *testing.T) {
 	tests := []struct {
@@ -44,14 +45,14 @@ func TestRegister(t *testing.T) {
 	}{
 		{
 			name:    "nil factory",
-			adapter: Adapter(90),
+			adapter: Adapter("test-90"),
 			factory: nil,
 			wantIs:  ErrNilFactory,
 			wantErr: true,
 		},
 		{
 			name:    "success",
-			adapter: Adapter(91),
+			adapter: Adapter("test-91"),
 			factory: func(Options) (Geo, error) { return &stubGeo{}, nil },
 			wantErr: false,
 		},
@@ -104,7 +105,7 @@ func TestRegisterDuplicate(t *testing.T) {
 
 func TestOpen(t *testing.T) {
 	t.Run("validate failure", func(t *testing.T) {
-		_, err := Open(Adapter(92), Options{Timeout: -1})
+		_, err := Open(Adapter("test-92"), Options{Timeout: -1})
 		if err == nil {
 			t.Fatal("expected error, got nil")
 		}
@@ -114,7 +115,7 @@ func TestOpen(t *testing.T) {
 	})
 
 	t.Run("unknown adapter", func(t *testing.T) {
-		const unknown = Adapter(93)
+		const unknown = Adapter("test-93")
 		_, err := Open(unknown, Options{})
 		if err == nil {
 			t.Fatal("expected error, got nil")

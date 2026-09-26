@@ -9,7 +9,7 @@ import (
 	"testing"
 	"time"
 
-	"github.com/zenta-dev/zever/eventbus"
+	"github.com/zenta-dev/zever/core/eventbus"
 )
 
 func testOpts() eventbus.Options {

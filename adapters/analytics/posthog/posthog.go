@@ -8,7 +8,7 @@ import (
 
 	posthog "github.com/posthog/posthog-go"
 
-	"github.com/zenta-dev/zever/analytics"
+	"github.com/zenta-dev/zever/core/analytics"
 )
 
 // client is the minimal seam the adapter needs from the PostHog SDK.

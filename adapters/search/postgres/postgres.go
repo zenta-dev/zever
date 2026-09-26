@@ -10,8 +10,8 @@ import (
 	"github.com/jackc/pgx/v5/pgconn"
 	"github.com/jackc/pgx/v5/pgxpool"
 
-	"github.com/zenta-dev/zever/codec"
-	"github.com/zenta-dev/zever/search"
+	"github.com/zenta-dev/zever/core/search"
+	"github.com/zenta-dev/zever/shared/codec"
 )
 
 var metadataCodec = codec.JSONCodec[map[string]any]{}

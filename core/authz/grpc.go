@@ -9,8 +9,8 @@ import (
 	"google.golang.org/grpc/metadata"
 	"google.golang.org/grpc/status"
 
-	"github.com/zenta-dev/zever/auth"
-	"github.com/zenta-dev/zever/permission"
+	"github.com/zenta-dev/zever/core/auth"
+	"github.com/zenta-dev/zever/core/permission"
 )
 
 // BearerTokenFromMD extracts the bearer token from gRPC metadata, returning empty on any malformed input.

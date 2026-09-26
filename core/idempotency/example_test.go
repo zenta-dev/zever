@@ -4,8 +4,8 @@ import (
 	"context"
 	"fmt"
 
-	"github.com/zenta-dev/zever/idempotency"
-	"github.com/zenta-dev/zever/idempotency/memory"
+	"github.com/zenta-dev/zever/adapters/idempotency/memory"
+	"github.com/zenta-dev/zever/core/idempotency"
 )
 
 // ExampleOpen opens the memory store and replays a completed key.

@@ -1,6 +1,6 @@
 package ir
 
-import "github.com/zenta-dev/zever/internal/dsl/diag"
+import "github.com/zenta-dev/zever/dsl/diag"
 
 // Module groups every declaration that belongs together for the "database
 // ownership is per-module, no cross-module joins" rule (design doc §10).

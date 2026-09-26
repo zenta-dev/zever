@@ -7,7 +7,7 @@ import (
 
 	"github.com/alicebob/miniredis/v2"
 
-	"github.com/zenta-dev/zever/lock"
+	"github.com/zenta-dev/zever/core/lock"
 )
 
 func TestLive_staleExtendDoesNotStealSuccessor(t *testing.T) {

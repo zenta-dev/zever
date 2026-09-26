@@ -3,7 +3,7 @@ package redis
 import (
 	"testing"
 
-	"github.com/zenta-dev/zever/queue"
+	"github.com/zenta-dev/zever/core/queue"
 )
 
 func TestConnOptions_mapping(t *testing.T) {

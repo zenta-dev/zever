@@ -5,8 +5,8 @@ import (
 	"errors"
 	"io"
 
-	"github.com/zenta-dev/zever/notification"
-	notificationlog "github.com/zenta-dev/zever/notification/log"
+	notificationlog "github.com/zenta-dev/zever/adapters/notification/log"
+	"github.com/zenta-dev/zever/core/notification"
 )
 
 // ExampleOpen delivers one push notification through the log adapter.

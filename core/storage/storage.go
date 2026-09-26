@@ -5,7 +5,7 @@ import (
 	"fmt"
 	"time"
 
-	"github.com/zenta-dev/zever/internal/registry"
+	"github.com/zenta-dev/zever/shared/registry"
 )
 
 // HTTPMethod is an HTTP verb used in presigned URLs.

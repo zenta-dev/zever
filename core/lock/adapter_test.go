@@ -15,7 +15,7 @@ func TestAdapterString_returnsName(t *testing.T) {
 	}{
 		{name: "memory", in: Memory, want: "memory"},
 		{name: "redis", in: Redis, want: "redis"},
-		{name: "unknown formats", in: Adapter(99), want: "unknown"},
+		{name: "unknown formats", in: Adapter(""), want: "unknown"},
 	}
 
 	for _, tt := range tests {
@@ -59,9 +59,7 @@ func TestParseAdapter_invalid_returnsInvalidAdapterError(t *testing.T) {
 		name string
 		in   string
 	}{
-		{name: "bogus", in: "bogus"},
 		{name: "empty", in: ""},
-		{name: "case sensitive", in: "Memory"},
 	}
 
 	for _, tt := range tests {
@@ -73,8 +71,8 @@ func TestParseAdapter_invalid_returnsInvalidAdapterError(t *testing.T) {
 				t.Fatal("ParseAdapter() = nil, want ErrInvalidAdapter")
 			}
 
-			if got != Memory {
-				t.Errorf("ParseAdapter() = %v, want Memory fallback", got)
+			if got != Adapter("") {
+				t.Errorf("ParseAdapter() = %v, want empty fallback", got)
 			}
 
 			if !errors.Is(err, ErrInvalidAdapter) {
@@ -90,5 +88,17 @@ func TestParseAdapter_invalid_returnsInvalidAdapterError(t *testing.T) {
 				t.Errorf("InvalidAdapterError.Adapter = %q, want %q", invErr.Adapter, tt.in)
 			}
 		})
+	}
+}
+func TestParseAdapter_open_acceptsCustom(t *testing.T) {
+	t.Parallel()
+	for _, in := range []string{"bogus", "Memory", "memory "} {
+		got, err := ParseAdapter(in)
+		if err != nil {
+			t.Fatalf("ParseAdapter(%q) error = %v, want nil (open adapter)", in, err)
+		}
+		if got != Adapter(in) {
+			t.Errorf("ParseAdapter(%q) = %v, want %v", in, got, Adapter(in))
+		}
 	}
 }

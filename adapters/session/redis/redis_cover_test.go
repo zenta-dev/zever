@@ -20,7 +20,7 @@ import (
 	"github.com/alicebob/miniredis/v2"
 	goredis "github.com/redis/go-redis/v9"
 
-	"github.com/zenta-dev/zever/session"
+	"github.com/zenta-dev/zever/core/session"
 )
 
 // coverStore builds a store over a dedicated miniredis server (never the

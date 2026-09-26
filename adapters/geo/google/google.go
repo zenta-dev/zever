@@ -7,9 +7,9 @@ import (
 
 	gmaps "googlemaps.github.io/maps"
 
-	"github.com/zenta-dev/zever/geo"
-	"github.com/zenta-dev/zever/internal/endpoint"
-	"github.com/zenta-dev/zever/internal/httpclient"
+	"github.com/zenta-dev/zever/core/geo"
+	"github.com/zenta-dev/zever/shared/endpoint"
+	"github.com/zenta-dev/zever/shared/httpclient"
 )
 
 type adapter struct {

@@ -10,7 +10,7 @@ import (
 
 	goredis "github.com/redis/go-redis/v9"
 
-	"github.com/zenta-dev/zever/queue"
+	"github.com/zenta-dev/zever/core/queue"
 )
 
 type fakeClient struct {

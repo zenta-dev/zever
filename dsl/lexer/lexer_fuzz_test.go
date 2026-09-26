@@ -7,7 +7,7 @@ import (
 	"strings"
 	"testing"
 
-	"github.com/zenta-dev/zever/internal/dsl/token"
+	"github.com/zenta-dev/zever/dsl/token"
 )
 
 // repoFixture reads a file at rel, relative to the module root, using the
@@ -24,8 +24,8 @@ func repoFixture(f *testing.F, rel string) (string, bool) {
 		f.Fatalf("runtime.Caller failed while locating fixture %q", rel)
 	}
 
-	// internal/dsl/lexer -> repo root is three levels up.
-	root := filepath.Join(filepath.Dir(file), "..", "..", "..")
+	// dsl/lexer -> module root is one level up.
+	root := filepath.Join(filepath.Dir(file), "..")
 
 	data, err := os.ReadFile(filepath.Join(root, rel))
 	if err != nil {
@@ -118,9 +118,9 @@ func FuzzLex(f *testing.F) {
 
 	// Real .zen fixtures used elsewhere in the repo (skipped when absent).
 	for _, rel := range []string{
-		"internal/dsl/testdata/todo.zen",
-		"internal/dsl/testdata/demoapp.zen",
-		"internal/dsl/compile/testdata/app.zen",
+		"testdata/todo.zen",
+		"testdata/demoapp.zen",
+		"compile/testdata/app.zen",
 	} {
 		if src, ok := repoFixture(f, rel); ok {
 			f.Add(src)

@@ -7,7 +7,7 @@ import (
 
 	goredis "github.com/redis/go-redis/v9"
 
-	"github.com/zenta-dev/zever/session"
+	"github.com/zenta-dev/zever/core/session"
 )
 
 // deadStore builds a store dialed at a closed port: every command fails

@@ -3,6 +3,7 @@ package ai
 import (
 	"context"
 	"errors"
+	"fmt"
 	"strings"
 	"sync/atomic"
 	"testing"
@@ -12,7 +13,7 @@ import (
 var testSeq atomic.Int64
 
 func freshAdapter() Adapter {
-	return Adapter(1000 + int(testSeq.Add(1)))
+	return Adapter(fmt.Sprintf("test-%d", 1000+int(testSeq.Add(1))))
 }
 
 type stubAI struct {
@@ -93,7 +94,7 @@ func TestRegister_duplicate(t *testing.T) {
 
 func TestOpen_unknownAdapter(t *testing.T) {
 	t.Parallel()
-	a := Adapter(9999)
+	a := Adapter("test-9999")
 	got, err := Open(a, Options{})
 	if !errors.Is(err, ErrUnknownAdapter) {
 		t.Fatalf("err = %v, want ErrUnknownAdapter", err)

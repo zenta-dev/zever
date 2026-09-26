@@ -6,7 +6,7 @@ import (
 	"testing"
 	"time"
 
-	"github.com/zenta-dev/zever/ratelimit"
+	"github.com/zenta-dev/zever/core/ratelimit"
 )
 
 func newCoverStore(t *testing.T, opts ratelimit.Options) *store {

@@ -3,7 +3,7 @@ package memory
 import (
 	"time"
 
-	"github.com/zenta-dev/zever/queue"
+	"github.com/zenta-dev/zever/core/queue"
 )
 
 type delayedEntry struct {

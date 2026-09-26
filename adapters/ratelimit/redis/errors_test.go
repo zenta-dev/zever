@@ -5,7 +5,7 @@ import (
 	"strings"
 	"testing"
 
-	"github.com/zenta-dev/zever/ratelimit"
+	"github.com/zenta-dev/zever/core/ratelimit"
 )
 
 func TestNewInvalidOptions(t *testing.T) {

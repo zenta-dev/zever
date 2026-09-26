@@ -4,7 +4,7 @@ import (
 	"errors"
 	"testing"
 
-	"github.com/zenta-dev/zever/password"
+	"github.com/zenta-dev/zever/core/password"
 )
 
 func validOptions() password.Options {

@@ -39,7 +39,7 @@ func TestRegisterNilFactory(t *testing.T) {
 func TestOpenUnknownAdapter(t *testing.T) {
 	t.Parallel()
 
-	_, err := Open(Adapter(99), Options{})
+	_, err := Open(Adapter(""), Options{})
 	if err == nil {
 		t.Fatal("Open(unknown) = nil, want ErrUnknownAdapter")
 	}
@@ -70,9 +70,9 @@ func TestParseLevelInvalid(t *testing.T) {
 func TestParseAdapterInvalid(t *testing.T) {
 	t.Parallel()
 
-	_, err := ParseAdapter("bogus")
+	_, err := ParseAdapter("")
 	if err == nil {
-		t.Fatal("ParseAdapter(bogus) = nil, want ErrInvalidAdapter")
+		t.Fatal("ParseAdapter(\"\") = nil, want ErrInvalidAdapter")
 	}
 
 	if !errors.Is(err, ErrInvalidAdapter) {
@@ -146,7 +146,7 @@ func TestTypedErrors_messageAndUnwrap(t *testing.T) {
 	t.Run("unknown adapter", func(t *testing.T) {
 		t.Parallel()
 
-		err := &UnknownAdapterError{Adapter: Adapter(99)}
+		err := &UnknownAdapterError{Adapter: Adapter("")}
 		if got, want := err.Error(), `log: unknown adapter: unknown (forgotten import?)`; got != want {
 			t.Errorf("Error() = %q, want %q", got, want)
 		}

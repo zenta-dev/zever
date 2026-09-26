@@ -6,8 +6,8 @@ import (
 	"net/http"
 	"net/http/httptest"
 
-	"github.com/zenta-dev/zever/log/noop"
-	"github.com/zenta-dev/zever/middleware"
+	"github.com/zenta-dev/zever/adapters/log/noop"
+	"github.com/zenta-dev/zever/core/middleware"
 )
 
 // ExampleRequestLogger wraps a handler and logs one line per request.

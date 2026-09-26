@@ -6,8 +6,8 @@ import (
 	"sort"
 	"strings"
 
-	"github.com/zenta-dev/zever/internal/dsl/ir"
-	"github.com/zenta-dev/zever/internal/dsl/naming"
+	"github.com/zenta-dev/zever/dsl/ir"
+	"github.com/zenta-dev/zever/dsl/naming"
 )
 
 const (

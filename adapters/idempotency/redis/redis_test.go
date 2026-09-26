@@ -10,7 +10,7 @@ import (
 
 	"github.com/alicebob/miniredis/v2"
 
-	"github.com/zenta-dev/zever/idempotency"
+	"github.com/zenta-dev/zever/core/idempotency"
 )
 
 // keySeq keeps generated keys unique even within a single test's shared

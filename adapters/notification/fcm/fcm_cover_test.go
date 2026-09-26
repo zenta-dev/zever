@@ -13,7 +13,7 @@ import (
 	"strings"
 	"testing"
 
-	"github.com/zenta-dev/zever/notification"
+	"github.com/zenta-dev/zever/core/notification"
 )
 
 // writeServiceAccountJSON generates an RSA key in-test and writes a

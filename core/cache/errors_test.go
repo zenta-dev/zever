@@ -5,8 +5,8 @@ import (
 	"testing"
 	"time"
 
-	"github.com/zenta-dev/zever/cache"
-	"github.com/zenta-dev/zever/cache/memory"
+	"github.com/zenta-dev/zever/adapters/cache/memory"
+	"github.com/zenta-dev/zever/core/cache"
 )
 
 func TestSentinelMessages(t *testing.T) {
@@ -29,9 +29,9 @@ func TestSentinelMessages(t *testing.T) {
 
 func TestParseAdapterInvalid(t *testing.T) {
 	t.Parallel()
-	_, err := cache.ParseAdapter("bogus")
+	_, err := cache.ParseAdapter("")
 	if err == nil {
-		t.Fatal("ParseAdapter(bogus) = nil, want ErrInvalidAdapter")
+		t.Fatal("ParseAdapter(\"\") = nil, want ErrInvalidAdapter")
 	}
 	if !errors.Is(err, cache.ErrInvalidAdapter) {
 		t.Errorf("errors.Is(err, ErrInvalidAdapter) = false (err = %v)", err)
@@ -39,6 +39,17 @@ func TestParseAdapterInvalid(t *testing.T) {
 	var invErr *cache.InvalidAdapterError
 	if !errors.As(err, &invErr) {
 		t.Errorf("errors.As(err, InvalidAdapterError) = false (err = %T %v)", err, err)
+	}
+}
+
+func TestParseAdapterOpen_acceptsCustom(t *testing.T) {
+	t.Parallel()
+	got, err := cache.ParseAdapter("bogus")
+	if err != nil {
+		t.Fatalf("ParseAdapter(bogus) error = %v, want nil (open adapter)", err)
+	}
+	if got != cache.Adapter("bogus") {
+		t.Errorf("ParseAdapter(bogus) = %v, want %v", got, cache.Adapter("bogus"))
 	}
 }
 
@@ -112,7 +123,7 @@ func TestAdapterString_returnsName(t *testing.T) {
 	}{
 		{name: "memory", in: cache.Memory, want: "memory"},
 		{name: "redis", in: cache.Redis, want: "redis"},
-		{name: "unknown formats", in: cache.Adapter(99), want: "unknown"},
+		{name: "unknown formats", in: cache.Adapter(""), want: "unknown"},
 	}
 
 	for _, tt := range tests {
@@ -157,8 +168,8 @@ func TestParseAdapter_empty_returnsInvalidAdapterError(t *testing.T) {
 		t.Fatal("ParseAdapter() = nil, want ErrInvalidAdapter")
 	}
 
-	if got != cache.Memory {
-		t.Errorf("ParseAdapter() = %v, want Memory fallback", got)
+	if got != cache.Adapter("") {
+		t.Errorf("ParseAdapter() = %v, want empty fallback", got)
 	}
 
 	if !errors.Is(err, cache.ErrInvalidAdapter) {
@@ -247,7 +258,7 @@ func TestTypedErrorMessages_unwrap(t *testing.T) {
 	t.Run("unknown adapter", func(t *testing.T) {
 		t.Parallel()
 
-		err := &cache.UnknownAdapterError{Adapter: cache.Adapter(99)}
+		err := &cache.UnknownAdapterError{Adapter: cache.Adapter("")}
 		if got, want := err.Error(), `cache: unknown adapter: unknown (forgotten import?)`; got != want {
 			t.Errorf("Error() = %q, want %q", got, want)
 		}

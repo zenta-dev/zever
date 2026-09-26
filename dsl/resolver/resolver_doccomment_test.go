@@ -3,7 +3,7 @@ package resolver
 import (
 	"testing"
 
-	"github.com/zenta-dev/zever/internal/dsl/ast"
+	"github.com/zenta-dev/zever/dsl/ast"
 )
 
 // TestResolveDocCommentSurvivesIntoIR confirms ast.*Decl.DocComment set by

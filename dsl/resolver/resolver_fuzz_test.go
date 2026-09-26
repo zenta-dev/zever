@@ -7,8 +7,8 @@ import (
 	"strings"
 	"testing"
 
-	"github.com/zenta-dev/zever/internal/dsl/ast"
-	"github.com/zenta-dev/zever/internal/dsl/parser"
+	"github.com/zenta-dev/zever/dsl/ast"
+	"github.com/zenta-dev/zever/dsl/parser"
 )
 
 // repoFixture reads a file at rel, relative to the module root, using the
@@ -22,8 +22,8 @@ func repoFixture(f *testing.F, rel string) string {
 		f.Fatalf("runtime.Caller failed while locating fixture %q", rel)
 	}
 
-	// internal/dsl/resolver -> repo root is three levels up.
-	root := filepath.Join(filepath.Dir(file), "..", "..", "..")
+	// dsl/resolver -> module root is one level up.
+	root := filepath.Join(filepath.Dir(file), "..")
 
 	data, err := os.ReadFile(filepath.Join(root, rel))
 	if err != nil {
@@ -137,9 +137,9 @@ func FuzzResolve(f *testing.F) {
 	}
 
 	for _, rel := range []string{
-		"internal/dsl/testdata/todo.zen",
-		"internal/dsl/testdata/demoapp.zen",
-		"internal/dsl/compile/testdata/app.zen",
+		"testdata/todo.zen",
+		"testdata/demoapp.zen",
+		"compile/testdata/app.zen",
 	} {
 		f.Add(repoFixture(f, rel))
 	}

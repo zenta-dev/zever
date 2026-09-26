@@ -1,6 +1,6 @@
 package ir
 
-import "github.com/zenta-dev/zever/internal/dsl/diag"
+import "github.com/zenta-dev/zever/dsl/diag"
 
 // Param represents a parameter for an RPC method.
 type Param struct {

@@ -1,6 +1,6 @@
 package ast
 
-import "github.com/zenta-dev/zever/internal/dsl/diag"
+import "github.com/zenta-dev/zever/dsl/diag"
 
 // EnumDecl represents a top-level named enum declaration:
 // enum Name { value1, value2, ... }.

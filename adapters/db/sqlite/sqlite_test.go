@@ -14,7 +14,7 @@ import (
 	"testing"
 	"time"
 
-	"github.com/zenta-dev/zever/db"
+	"github.com/zenta-dev/zever/core/db"
 )
 
 // NOTE: no registry test here by design. db.Register rejects duplicate

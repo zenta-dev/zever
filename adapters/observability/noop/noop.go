@@ -3,7 +3,7 @@ package noop
 import (
 	"context"
 
-	"github.com/zenta-dev/zever/observability"
+	"github.com/zenta-dev/zever/core/observability"
 )
 
 type noopProvider struct{}

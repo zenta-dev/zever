@@ -8,7 +8,7 @@ import (
 	"runtime"
 	"testing"
 
-	"github.com/zenta-dev/zever/geo"
+	"github.com/zenta-dev/zever/core/geo"
 )
 
 func fixturePath(t *testing.T) string {

@@ -15,8 +15,8 @@ func TestAdapterString(t *testing.T) {
 	}{
 		{name: "sqlite", adapter: SQLite, want: "sqlite"},
 		{name: "postgres", adapter: Postgres, want: "postgres"},
-		{name: "unknown negative", adapter: Adapter(-1), want: "unknown"},
-		{name: "unknown large", adapter: Adapter(99), want: "unknown"},
+		{name: "unknown negative", adapter: Adapter(""), want: "unknown"},
+		{name: "unknown large", adapter: Adapter(""), want: "unknown"},
 	}
 
 	for _, tt := range tests {
@@ -41,10 +41,10 @@ func TestParseAdapter(t *testing.T) {
 	}{
 		{name: "sqlite", input: "sqlite", want: SQLite},
 		{name: "postgres", input: "postgres", want: Postgres},
-		{name: "invalid", input: "mysql", wantErr: true},
+		{name: "open custom", input: "mysql", want: Adapter("mysql")},
 		{name: "empty", input: "", wantErr: true},
-		{name: "uppercase rejected", input: "SQLite", wantErr: true},
-		{name: "whitespace rejected", input: " sqlite", wantErr: true},
+		{name: "open uppercase", input: "SQLite", want: Adapter("SQLite")},
+		{name: "open whitespace", input: " sqlite", want: Adapter(" sqlite")},
 	}
 
 	for _, tt := range tests {

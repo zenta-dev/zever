@@ -24,7 +24,7 @@ import (
 	"testing"
 	"time"
 
-	"github.com/zenta-dev/zever/mailer"
+	"github.com/zenta-dev/zever/core/mailer"
 )
 
 var errCoverFail = errors.New("cover: forced failure")

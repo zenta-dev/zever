@@ -7,7 +7,7 @@ import (
 	"testing"
 	"time"
 
-	"github.com/zenta-dev/zever/eventbus"
+	"github.com/zenta-dev/zever/core/eventbus"
 )
 
 func coverMustBus(t *testing.T, opts eventbus.Options) *bus {

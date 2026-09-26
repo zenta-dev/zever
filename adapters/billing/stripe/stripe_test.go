@@ -10,7 +10,7 @@ import (
 	"sync/atomic"
 	"testing"
 
-	"github.com/zenta-dev/zever/billing"
+	"github.com/zenta-dev/zever/core/billing"
 )
 
 func writeJSON(w http.ResponseWriter, v any) {

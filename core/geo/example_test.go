@@ -6,8 +6,8 @@ import (
 	"os"
 	"path/filepath"
 
-	"github.com/zenta-dev/zever/geo"
-	"github.com/zenta-dev/zever/geo/static"
+	"github.com/zenta-dev/zever/adapters/geo/static"
+	"github.com/zenta-dev/zever/core/geo"
 )
 
 // ExampleOpen opens the static adapter over a small cities file and geocodes.

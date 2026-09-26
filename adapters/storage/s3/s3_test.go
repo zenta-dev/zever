@@ -13,8 +13,8 @@ import (
 	"github.com/aws/aws-sdk-go-v2/credentials"
 	s3sdk "github.com/aws/aws-sdk-go-v2/service/s3"
 
-	"github.com/zenta-dev/zever/storage"
-	"github.com/zenta-dev/zever/storage/s3core"
+	"github.com/zenta-dev/zever/core/storage"
+	"github.com/zenta-dev/zever/shared/s3opts"
 )
 
 // stubTransport is an aws.HTTPClient with scripted responses.
@@ -55,7 +55,7 @@ func stubAdapter(t *testing.T, cfg *storage.PolicyConfig, syncFail string, tr *s
 	}
 
 	return &s3Adapter{
-		Core:       s3core.New("s3", "us-east-1", "", newStubClient(t, tr), nil, store, nil),
+		Core:       s3opts.New("s3", "us-east-1", "", newStubClient(t, tr), nil, store, nil),
 		policySync: "auto",
 		syncFail:   syncFail,
 	}
@@ -70,7 +70,7 @@ func newPolicyOnlyAdapter(t *testing.T, cfg *storage.PolicyConfig) *s3Adapter {
 	}
 
 	return &s3Adapter{
-		Core:       s3core.New("s3", "us-east-1", "", nil, nil, store, nil),
+		Core:       s3opts.New("s3", "us-east-1", "", nil, nil, store, nil),
 		policySync: "auto",
 		syncFail:   "warn",
 	}
@@ -233,7 +233,7 @@ func TestPolicySyncErrorBranches(t *testing.T) {
 	}
 
 	warn := &s3Adapter{
-		Core:     s3core.New("s3", "us-east-1", "", nil, nil, storage.PolicyStore{}, nil),
+		Core:     s3opts.New("s3", "us-east-1", "", nil, nil, storage.PolicyStore{}, nil),
 		syncFail: "warn",
 	}
 	if err := warn.policySyncError(t.Context(), "b", sentinel); err != nil {

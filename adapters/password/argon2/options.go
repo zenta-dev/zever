@@ -1,7 +1,7 @@
 package argon2
 
 import (
-	"github.com/zenta-dev/zever/password"
+	"github.com/zenta-dev/zever/core/password"
 )
 
 // Default parameters tuned for ~200ms on modern hardware per OWASP 2023.

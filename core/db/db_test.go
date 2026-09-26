@@ -3,13 +3,14 @@ package db
 import (
 	"context"
 	"errors"
+	"fmt"
 	"sync/atomic"
 	"testing"
 )
 
 var dbAdapterSeq atomic.Int64
 
-func dbFreshAdapter() Adapter { return Adapter(2000 + dbAdapterSeq.Add(1)) }
+func dbFreshAdapter() Adapter { return Adapter(fmt.Sprintf("test-%d", 2000+dbAdapterSeq.Add(1))) }
 
 type stubRows struct{}
 
@@ -43,7 +44,7 @@ func TestRegister(t *testing.T) {
 	t.Run("nil factory", func(t *testing.T) {
 		t.Parallel()
 
-		err := Register(Adapter(1001), nil)
+		err := Register(Adapter("test-1001"), nil)
 		if err == nil {
 			t.Fatal("expected error, got nil")
 		}
@@ -109,7 +110,7 @@ func TestOpen(t *testing.T) {
 	t.Run("unknown adapter", func(t *testing.T) {
 		t.Parallel()
 
-		_, err := Open(Adapter(1999), Options{})
+		_, err := Open(Adapter("test-1999"), Options{})
 		if err == nil {
 			t.Fatal("expected error, got nil")
 		}
@@ -129,7 +130,7 @@ func TestOpen(t *testing.T) {
 
 		// Even for an unregistered adapter, invalid options must win:
 		// Validate runs before registry lookup.
-		_, err := Open(Adapter(2999), Options{MaxConns: -1})
+		_, err := Open(Adapter("test-2999"), Options{MaxConns: -1})
 		if err == nil {
 			t.Fatal("expected validation error, got nil")
 		}

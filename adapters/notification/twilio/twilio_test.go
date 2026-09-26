@@ -13,7 +13,7 @@ import (
 
 	twilioclient "github.com/twilio/twilio-go/client"
 
-	"github.com/zenta-dev/zever/notification"
+	"github.com/zenta-dev/zever/core/notification"
 )
 
 const (

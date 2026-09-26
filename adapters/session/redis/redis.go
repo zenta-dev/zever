@@ -20,9 +20,10 @@ import (
 
 	goredis "github.com/redis/go-redis/v9"
 
-	"github.com/zenta-dev/zever/codec"
-	zredis "github.com/zenta-dev/zever/internal/redis"
-	"github.com/zenta-dev/zever/session"
+	"github.com/zenta-dev/zever/core/session"
+	"github.com/zenta-dev/zever/shared/codec"
+	redisclient "github.com/zenta-dev/zever/shared/redisclient"
+	redisopt "github.com/zenta-dev/zever/shared/redisopt"
 )
 
 // defaultPrefix namespaces session keys when no prefix is set.
@@ -77,7 +78,7 @@ func New(opts session.Options) (session.Store, error) {
 		ttl = session.DefaultTTL
 	}
 
-	client, err := zredis.New(opts.Redis.Options)
+	client, err := redisclient.New(opts.Redis.Options)
 	if err != nil {
 		return nil, fmt.Errorf("redis: connect %q: %w", redactAddr(opts.Redis.Addr), err)
 	}
@@ -97,7 +98,7 @@ func New(opts session.Options) (session.Store, error) {
 // redactAddr masks any embedded userinfo credentials, suitable for error
 // messages. The password from options is never included.
 func redactAddr(addr string) string {
-	return zredis.RedactAddr(addr)
+	return redisopt.RedactAddr(addr)
 }
 
 func (s *store) key(id string) string {
@@ -355,5 +356,5 @@ func (s *store) Close() error {
 		return nil
 	}
 
-	return zredis.Close(s.client)
+	return redisclient.Close(s.client)
 }

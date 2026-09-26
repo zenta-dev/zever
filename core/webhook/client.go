@@ -4,7 +4,7 @@ import (
 	"net/http"
 	"time"
 
-	"github.com/zenta-dev/zever/internal/httpclient"
+	"github.com/zenta-dev/zever/shared/httpclient"
 )
 
 // NewSafeClient returns an *http.Client that enforces TLS 1.2 minimum,

@@ -10,10 +10,10 @@ import (
 
 	"google.golang.org/genai"
 
-	"github.com/zenta-dev/zever/ai"
-	"github.com/zenta-dev/zever/codec"
-	"github.com/zenta-dev/zever/internal/endpoint"
-	"github.com/zenta-dev/zever/internal/httpclient"
+	"github.com/zenta-dev/zever/core/ai"
+	"github.com/zenta-dev/zever/shared/codec"
+	"github.com/zenta-dev/zever/shared/endpoint"
+	"github.com/zenta-dev/zever/shared/httpclient"
 )
 
 // funcArgsCodec handles JSON encoding/decoding of function-call argument maps.

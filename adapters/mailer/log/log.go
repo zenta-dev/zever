@@ -8,8 +8,8 @@ import (
 	"sync"
 	"sync/atomic"
 
-	"github.com/zenta-dev/zever/codec"
-	"github.com/zenta-dev/zever/mailer"
+	"github.com/zenta-dev/zever/core/mailer"
+	"github.com/zenta-dev/zever/shared/codec"
 )
 
 // checker renders messages as JSON lines without sending.

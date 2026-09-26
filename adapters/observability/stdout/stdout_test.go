@@ -7,8 +7,8 @@ import (
 	"sync"
 	"testing"
 
-	"github.com/zenta-dev/zever/observability"
-	"github.com/zenta-dev/zever/observability/stdout"
+	"github.com/zenta-dev/zever/adapters/observability/stdout"
+	"github.com/zenta-dev/zever/core/observability"
 )
 
 func validOptions() observability.Options {

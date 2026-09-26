@@ -5,7 +5,7 @@ import (
 
 	goredis "github.com/redis/go-redis/v9"
 
-	"github.com/zenta-dev/zever/eventbus"
+	"github.com/zenta-dev/zever/core/eventbus"
 )
 
 func (a *adapter) deliver(ctx context.Context, sub *subscription, handler eventbus.Handler) {

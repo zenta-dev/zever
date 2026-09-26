@@ -7,7 +7,7 @@ import (
 	"sync/atomic"
 	"time"
 
-	"github.com/zenta-dev/zever/session"
+	"github.com/zenta-dev/zever/core/session"
 )
 
 var _ session.Store = (*store)(nil)

@@ -3,10 +3,10 @@ package breaking
 import (
 	"testing"
 
-	"github.com/zenta-dev/zever/internal/dsl/ast"
-	"github.com/zenta-dev/zever/internal/dsl/ir"
-	"github.com/zenta-dev/zever/internal/dsl/parser"
-	"github.com/zenta-dev/zever/internal/dsl/resolver"
+	"github.com/zenta-dev/zever/dsl/ast"
+	"github.com/zenta-dev/zever/dsl/ir"
+	"github.com/zenta-dev/zever/dsl/parser"
+	"github.com/zenta-dev/zever/dsl/resolver"
 )
 
 // resolveSrc parses and resolves a single-file schema, failing the test on

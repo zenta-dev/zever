@@ -1,42 +1,31 @@
 package geo
 
 // Adapter identifies the geo backend implementation.
-type Adapter int
+
+type Adapter string
 
 const (
 	// Google selects the Google Maps geo backend.
-	Google Adapter = iota
+	Google Adapter = "google"
 	// Static selects the local JSON-backed geo backend.
-	Static
+	Static Adapter = "static"
 	// OSM selects the OpenStreetMap Nominatim geo backend.
-	OSM
+	OSM Adapter = "osm"
 )
 
 // String returns the canonical name of Adapter.
 func (a Adapter) String() string {
-	switch a {
-	case Google:
-		return "google"
-	case Static:
-		return "static"
-	case OSM:
-		return "osm"
-	default:
+	if a == "" {
 		return "unknown"
 	}
+	return string(a)
 }
 
 // ParseAdapter parses adapter name into an Adapter.
-// Only exact lowercase names match; anything else fails.
+// Any non-empty name is accepted to allow custom adapters; empty fails.
 func ParseAdapter(s string) (Adapter, error) {
-	switch s {
-	case "google":
-		return Google, nil
-	case "static":
-		return Static, nil
-	case "osm":
-		return OSM, nil
-	default:
-		return Google, &InvalidAdapterError{Adapter: s}
+	if s == "" {
+		return Adapter(""), &InvalidAdapterError{Adapter: s}
 	}
+	return Adapter(s), nil
 }

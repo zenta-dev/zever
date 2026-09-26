@@ -14,7 +14,7 @@ import (
 	"github.com/jackc/pgx/v5/pgconn"
 	"github.com/jackc/pgx/v5/pgtype"
 
-	"github.com/zenta-dev/zever/search"
+	"github.com/zenta-dev/zever/core/search"
 )
 
 // fakeRows is a scripted pgx.Rows implementation for unit tests.

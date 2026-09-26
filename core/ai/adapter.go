@@ -1,48 +1,33 @@
 package ai
 
 // Adapter identifies the LLM backend implementation.
-type Adapter int
+
+type Adapter string
 
 const (
 	// Anthropic selects the Anthropic backend.
-	Anthropic Adapter = iota
+	Anthropic Adapter = "anthropic"
 	// OpenAI selects the OpenAI backend.
-	OpenAI
+	OpenAI Adapter = "openai"
 	// Gemini selects the Gemini backend.
-	Gemini
+	Gemini Adapter = "gemini"
 	// Ollama selects the Ollama backend.
-	Ollama
+	Ollama Adapter = "ollama"
 )
 
 // String returns the canonical name of Adapter.
 func (a Adapter) String() string {
-	switch a {
-	case Anthropic:
-		return "anthropic"
-	case OpenAI:
-		return "openai"
-	case Gemini:
-		return "gemini"
-	case Ollama:
-		return "ollama"
-	default:
+	if a == "" {
 		return "unknown"
 	}
+	return string(a)
 }
 
 // ParseAdapter parses adapter name into an Adapter.
-// Only exact lowercase names match; anything else fails.
+// Any non-empty name is accepted to allow custom adapters; empty fails.
 func ParseAdapter(s string) (Adapter, error) {
-	switch s {
-	case "anthropic":
-		return Anthropic, nil
-	case "openai":
-		return OpenAI, nil
-	case "gemini":
-		return Gemini, nil
-	case "ollama":
-		return Ollama, nil
-	default:
-		return Anthropic, &InvalidAdapterError{Adapter: s}
+	if s == "" {
+		return Adapter(""), &InvalidAdapterError{Adapter: s}
 	}
+	return Adapter(s), nil
 }

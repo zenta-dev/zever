@@ -4,7 +4,7 @@ import (
 	"errors"
 	"testing"
 
-	"github.com/zenta-dev/zever/lock"
+	"github.com/zenta-dev/zever/core/lock"
 )
 
 func TestSentinelMessages(t *testing.T) {
@@ -57,7 +57,7 @@ func TestTypedErrorMessages_unwrap(t *testing.T) {
 	t.Run("unknown adapter", func(t *testing.T) {
 		t.Parallel()
 
-		err := &lock.UnknownAdapterError{Adapter: lock.Adapter(99)}
+		err := &lock.UnknownAdapterError{Adapter: lock.Adapter("")}
 		if got, want := err.Error(), `lock: unknown adapter: unknown (forgotten import?)`; got != want {
 			t.Errorf("Error() = %q, want %q", got, want)
 		}

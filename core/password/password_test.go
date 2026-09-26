@@ -6,7 +6,9 @@ import (
 	"sync"
 	"testing"
 
-	"github.com/zenta-dev/zever/password"
+	"fmt"
+
+	"github.com/zenta-dev/zever/core/password"
 )
 
 type stubHasher struct{}
@@ -34,7 +36,7 @@ var errOpenFactory = errors.New("boom")
 func TestRegisterNil(t *testing.T) {
 	t.Parallel()
 
-	err := password.Register(password.Adapter(210), nil)
+	err := password.Register(password.Adapter("test-210"), nil)
 	if err == nil {
 		t.Fatal("expected non-nil error")
 	}
@@ -47,7 +49,7 @@ func TestRegisterNil(t *testing.T) {
 func TestRegisterDuplicate(t *testing.T) {
 	t.Parallel()
 
-	a := password.Adapter(211)
+	a := password.Adapter("test-211")
 
 	if err := password.Register(a, stubFactory); err != nil {
 		var dup *password.DuplicateError
@@ -80,7 +82,7 @@ func TestRegisterDuplicate(t *testing.T) {
 func TestOpenUnknown(t *testing.T) {
 	t.Parallel()
 
-	h, err := password.Open(password.Adapter(998), password.Options{Time: password.DefaultTime, Memory: password.DefaultMemory, Threads: password.DefaultThreads, SaltLen: password.DefaultSaltLen, KeyLen: password.DefaultKeyLen})
+	h, err := password.Open(password.Adapter("test-998"), password.Options{Time: password.DefaultTime, Memory: password.DefaultMemory, Threads: password.DefaultThreads, SaltLen: password.DefaultSaltLen, KeyLen: password.DefaultKeyLen})
 	if err == nil {
 		t.Fatal("expected non-nil error")
 	}
@@ -102,7 +104,7 @@ func TestOpenUnknown(t *testing.T) {
 func TestOpenFactoryError(t *testing.T) {
 	t.Parallel()
 
-	a := password.Adapter(212)
+	a := password.Adapter("test-212")
 	factoryErr := errOpenFactory
 
 	if err := password.Register(a, func(_ password.Options) (password.Hasher, error) {
@@ -133,7 +135,7 @@ func TestOpenFactoryError(t *testing.T) {
 func TestOpenSuccess(t *testing.T) {
 	t.Parallel()
 
-	a := password.Adapter(213)
+	a := password.Adapter("test-213")
 
 	if err := password.Register(a, stubFactory); err != nil {
 		var dup *password.DuplicateError
@@ -261,7 +263,7 @@ func TestConcurrentRegisterOpen(t *testing.T) {
 		go func(i int) {
 			defer wg.Done()
 
-			a := password.Adapter(100 + i)
+			a := password.Adapter(fmt.Sprintf("test-%d", 100+i))
 
 			if err := password.Register(a, stubFactory); err != nil {
 				var dup *password.DuplicateError

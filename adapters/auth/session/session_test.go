@@ -5,10 +5,10 @@ import (
 	"testing"
 	"time"
 
-	"github.com/zenta-dev/zever/auth"
-	authsession "github.com/zenta-dev/zever/auth/session"
-	"github.com/zenta-dev/zever/session"
-	sessionmemory "github.com/zenta-dev/zever/session/memory"
+	authsession "github.com/zenta-dev/zever/adapters/auth/session"
+	sessionmemory "github.com/zenta-dev/zever/adapters/session/memory"
+	"github.com/zenta-dev/zever/core/auth"
+	"github.com/zenta-dev/zever/core/session"
 )
 
 func newAdapter(t *testing.T, store session.Store) auth.Auth {
@@ -97,25 +97,15 @@ func TestRoundtrip(t *testing.T) {
 	}
 }
 
-func TestNilStoreDefault(t *testing.T) {
+func TestNilStoreError(t *testing.T) {
 	t.Parallel()
-	a, err := authsession.New(auth.Options{})
-	if err != nil {
-		t.Fatalf("New(zero opts) err = %v", err)
+	_, err := authsession.New(auth.Options{})
+	if err == nil {
+		t.Fatal("New(zero opts) = nil, want store-required error")
 	}
-	t.Cleanup(func() { _ = a.Close() })
-
-	ctx := t.Context()
-	tok, err := a.Issue(ctx, "bob", nil, time.Minute)
-	if err != nil {
-		t.Fatalf("Issue err = %v", err)
-	}
-	got, err := a.Verify(ctx, tok.Value)
-	if err != nil {
-		t.Fatalf("Verify err = %v", err)
-	}
-	if got.Subject != "bob" {
-		t.Fatalf("Subject = %q, want bob", got.Subject)
+	var ioe *auth.InvalidOptionsError
+	if !errors.As(err, &ioe) {
+		t.Fatalf("New(zero opts) err = %T (%v), want *auth.InvalidOptionsError", err, err)
 	}
 }
 

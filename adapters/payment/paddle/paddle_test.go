@@ -17,7 +17,7 @@ import (
 
 	"github.com/PaddleHQ/paddle-go-sdk/v5"
 
-	"github.com/zenta-dev/zever/payment"
+	"github.com/zenta-dev/zever/core/payment"
 )
 
 // signWebhook returns a Paddle-Signature header value for body.

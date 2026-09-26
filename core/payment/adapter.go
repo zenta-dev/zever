@@ -1,42 +1,31 @@
 package payment
 
 // Adapter identifies the payment backend implementation.
-type Adapter int
+
+type Adapter string
 
 const (
 	// Stub selects the in-memory stub payment backend.
-	Stub Adapter = iota
+	Stub Adapter = "stub"
 	// Stripe selects the Stripe payment backend.
-	Stripe
+	Stripe Adapter = "stripe"
 	// Paddle selects the Paddle payment backend.
-	Paddle
+	Paddle Adapter = "paddle"
 )
 
 // String returns the canonical name of Adapter.
 func (a Adapter) String() string {
-	switch a {
-	case Stub:
-		return "stub"
-	case Stripe:
-		return "stripe"
-	case Paddle:
-		return "paddle"
-	default:
+	if a == "" {
 		return "unknown"
 	}
+	return string(a)
 }
 
 // ParseAdapter parses adapter name into an Adapter.
-// Only exact lowercase names match; anything else fails.
+// Any non-empty name is accepted to allow custom adapters; empty fails.
 func ParseAdapter(s string) (Adapter, error) {
-	switch s {
-	case "stub":
-		return Stub, nil
-	case "stripe":
-		return Stripe, nil
-	case "paddle":
-		return Paddle, nil
-	default:
-		return Stub, &InvalidAdapterError{Adapter: s}
+	if s == "" {
+		return Adapter(""), &InvalidAdapterError{Adapter: s}
 	}
+	return Adapter(s), nil
 }

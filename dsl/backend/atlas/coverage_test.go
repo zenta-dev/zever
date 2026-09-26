@@ -17,7 +17,7 @@ import (
 	"strings"
 	"testing"
 
-	"github.com/zenta-dev/zever/internal/dsl/ir"
+	"github.com/zenta-dev/zever/dsl/ir"
 )
 
 // TestSchemaOf_table covers the explicit-schema and empty (public default)

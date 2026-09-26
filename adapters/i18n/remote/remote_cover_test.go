@@ -11,8 +11,8 @@ import (
 	"testing"
 	"time"
 
-	"github.com/zenta-dev/zever/i18n"
-	"github.com/zenta-dev/zever/internal/lrucache"
+	"github.com/zenta-dev/zever/core/i18n"
+	"github.com/zenta-dev/zever/shared/lrucache"
 )
 
 // eventually polls cond until it holds or timeout elapses, failing the

@@ -2,6 +2,7 @@ package mailer
 
 import (
 	"errors"
+	"fmt"
 	"strings"
 	"sync/atomic"
 	"testing"
@@ -11,7 +12,7 @@ import (
 var stubAdapterSeq atomic.Int64
 
 func stubAdapter() Adapter {
-	return Adapter(20000 + int(stubAdapterSeq.Add(1)))
+	return Adapter(fmt.Sprintf("test-%d", 20000+stubAdapterSeq.Add(1)))
 }
 
 func TestCoverTypedErrorStrings(t *testing.T) {

@@ -15,8 +15,8 @@ import (
 	"syscall"
 	"time"
 
-	"github.com/zenta-dev/zever/codec"
-	"github.com/zenta-dev/zever/media"
+	"github.com/zenta-dev/zever/core/media"
+	"github.com/zenta-dev/zever/shared/codec"
 )
 
 // probeCodec decodes ffprobe JSON output into ProbeResult. ProbeResult's

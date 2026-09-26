@@ -1,36 +1,29 @@
 package mailer
 
 // Adapter identifies the mailer backend implementation.
-type Adapter int
+
+type Adapter string
 
 const (
 	// Log is the log mailer adapter.
-	Log Adapter = iota
+	Log Adapter = "log"
 	// SMTP is the SMTP mailer adapter.
-	SMTP
+	SMTP Adapter = "smtp"
 )
 
 // String returns the canonical name of Adapter.
 func (a Adapter) String() string {
-	switch a {
-	case Log:
-		return "log"
-	case SMTP:
-		return "smtp"
-	default:
+	if a == "" {
 		return "unknown"
 	}
+	return string(a)
 }
 
 // ParseAdapter parses adapter name into an Adapter.
-// Only exact lowercase names match; anything else fails.
+// Any non-empty name is accepted to allow custom adapters; empty fails.
 func ParseAdapter(s string) (Adapter, error) {
-	switch s {
-	case "log":
-		return Log, nil
-	case "smtp":
-		return SMTP, nil
-	default:
-		return Log, &InvalidAdapterError{Adapter: s}
+	if s == "" {
+		return Adapter(""), &InvalidAdapterError{Adapter: s}
 	}
+	return Adapter(s), nil
 }

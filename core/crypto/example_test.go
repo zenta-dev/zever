@@ -4,8 +4,8 @@ import (
 	"context"
 	"fmt"
 
-	"github.com/zenta-dev/zever/crypto"
-	"github.com/zenta-dev/zever/crypto/local"
+	"github.com/zenta-dev/zever/adapters/crypto/local"
+	"github.com/zenta-dev/zever/core/crypto"
 )
 
 // ExampleOpen opens the local adapter and round-trips a secret.

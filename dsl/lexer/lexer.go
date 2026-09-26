@@ -22,8 +22,8 @@ import (
 	"unicode/utf16"
 	"unicode/utf8"
 
-	"github.com/zenta-dev/zever/internal/dsl/diag"
-	"github.com/zenta-dev/zever/internal/dsl/token"
+	"github.com/zenta-dev/zever/dsl/diag"
+	"github.com/zenta-dev/zever/dsl/token"
 )
 
 // durationUnits lists recognized duration suffixes, longest match first so

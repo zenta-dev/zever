@@ -5,7 +5,7 @@ import (
 	"testing"
 	"time"
 
-	"github.com/zenta-dev/zever/cache"
+	"github.com/zenta-dev/zever/core/cache"
 )
 
 type baseOnlyCache struct{ stubCache }

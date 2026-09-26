@@ -10,7 +10,7 @@ import (
 	"testing"
 	"time"
 
-	"github.com/zenta-dev/zever/queue"
+	"github.com/zenta-dev/zever/core/queue"
 )
 
 func newQueue(t *testing.T, opts queue.Options) queue.Queue {

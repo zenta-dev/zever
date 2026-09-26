@@ -17,9 +17,9 @@ import (
 	"testing"
 	"time"
 
-	corequeue "github.com/zenta-dev/zever/queue"
-	"github.com/zenta-dev/zever/queue/memory"
-	"github.com/zenta-dev/zever/webhook"
+	"github.com/zenta-dev/zever/adapters/queue/memory"
+	corequeue "github.com/zenta-dev/zever/core/queue"
+	"github.com/zenta-dev/zever/core/webhook"
 )
 
 var errTestTransport = errors.New("test transport boom")
@@ -384,8 +384,8 @@ func TestOpen_UnknownQueueAdapter(t *testing.T) {
 	t.Parallel()
 
 	_, err := New(webhook.Options{QueueAdapter: "bogus"})
-	if !errors.Is(err, corequeue.ErrInvalidAdapter) {
-		t.Fatalf("New() err = %v, want ErrInvalidAdapter", err)
+	if !errors.Is(err, corequeue.ErrUnknownAdapter) {
+		t.Fatalf("New() err = %v, want ErrUnknownAdapter", err)
 	}
 
 	if !strings.Contains(err.Error(), "queue: ") {

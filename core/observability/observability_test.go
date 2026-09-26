@@ -41,13 +41,13 @@ func TestParseAdapterRoundtrip(t *testing.T) {
 func TestParseAdapterInvalid(t *testing.T) {
 	t.Parallel()
 
-	if _, err := ParseAdapter("nope"); !errors.Is(err, ErrInvalidAdapter) {
+	if _, err := ParseAdapter(""); !errors.Is(err, ErrInvalidAdapter) {
 		t.Fatalf("ParseAdapter invalid err = %v, want ErrInvalidAdapter", err)
 	}
 }
 
 func TestRegisterNilAndDuplicate(t *testing.T) {
-	a := Adapter(9001)
+	a := Adapter("test-9001")
 	if err := Register(a, nil); !errors.Is(err, ErrNilFactory) {
 		t.Fatalf("Register nil err = %v, want ErrNilFactory", err)
 	}
@@ -70,7 +70,7 @@ func TestRegisterNilAndDuplicate(t *testing.T) {
 func TestOpenUnknown(t *testing.T) {
 	t.Parallel()
 
-	if _, err := Open(Adapter(9999), Options{ServiceName: "test"}); !errors.Is(err, ErrUnknownAdapter) {
+	if _, err := Open(Adapter("test-9999"), Options{ServiceName: "test"}); !errors.Is(err, ErrUnknownAdapter) {
 		t.Fatalf("Open unknown err = %v, want ErrUnknownAdapter", err)
 	}
 }

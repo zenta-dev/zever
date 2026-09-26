@@ -91,7 +91,7 @@ func TestTypedErrors(t *testing.T) {
 
 	t.Run("UnknownAdapterError", func(t *testing.T) {
 		t.Parallel()
-		err := &UnknownAdapterError{Adapter: Adapter(99)}
+		err := &UnknownAdapterError{Adapter: Adapter("")}
 		if !strings.Contains(err.Error(), ErrUnknownAdapter.Error()) {
 			t.Fatalf("Error() = %q, want prefix %q", err.Error(), ErrUnknownAdapter)
 		}

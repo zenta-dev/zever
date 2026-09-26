@@ -10,13 +10,15 @@ import (
 	"sync/atomic"
 	"testing"
 
-	"github.com/zenta-dev/zever/crypto"
+	"fmt"
+
+	"github.com/zenta-dev/zever/core/crypto"
 )
 
 var cryptoTestSeq int32 = 2000
 
 func freshCryptoAdapter() crypto.Adapter {
-	return crypto.Adapter(atomic.AddInt32(&cryptoTestSeq, 1))
+	return crypto.Adapter(fmt.Sprintf("test-%d", atomic.AddInt32(&cryptoTestSeq, 1)))
 }
 
 func validOpts() crypto.Options {
@@ -234,7 +236,7 @@ func TestOpen_concurrent_Register_Open(t *testing.T) {
 		wg.Add(1)
 		go func(idx int) {
 			defer wg.Done()
-			a := crypto.Adapter(100 + idx)
+			a := crypto.Adapter(fmt.Sprintf("test-%d", 100+idx))
 			// Register may already be done by parallel runs across other test invocations;
 			// use fresh distinct adapters via 100+idx per this test's isolated run.
 			// To avoid cross-test collision, we shift by a generation when needed.
@@ -246,13 +248,13 @@ func TestOpen_concurrent_Register_Open(t *testing.T) {
 	wg.Wait()
 	// Verify all 8 are openable
 	for i := range 8 {
-		a := crypto.Adapter(100 + i)
+		a := crypto.Adapter(fmt.Sprintf("test-%d", 100+i))
 		c, err := crypto.Open(a, validOpts())
 		if err != nil {
-			t.Fatalf("Open adapter %d err = %v", a, err)
+			t.Fatalf("Open adapter %s err = %v", a, err)
 		}
 		if c == nil {
-			t.Fatalf("Open adapter %d got nil", a)
+			t.Fatalf("Open adapter %s got nil", a)
 		}
 	}
 }

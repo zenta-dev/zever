@@ -94,7 +94,7 @@ func TestDuplicateError_alias_compat(t *testing.T) {
 
 func TestUnknownAdapterError(t *testing.T) {
 	t.Parallel()
-	err := &UnknownAdapterError{Adapter: Adapter(123)}
+	err := &UnknownAdapterError{Adapter: Adapter("test-123")}
 	if !errors.Is(err, ErrUnknownAdapter) {
 		t.Fatalf("Is = false")
 	}
@@ -102,7 +102,7 @@ func TestUnknownAdapterError(t *testing.T) {
 	if !errors.As(err, &target) {
 		t.Fatalf("As failed")
 	}
-	if target.Adapter != Adapter(123) {
+	if target.Adapter != Adapter("test-123") {
 		t.Errorf("Adapter = %v, want 123", target.Adapter)
 	}
 	if !strings.Contains(err.Error(), "unknown") {

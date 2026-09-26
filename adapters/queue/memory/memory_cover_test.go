@@ -7,7 +7,7 @@ import (
 	"testing"
 	"time"
 
-	"github.com/zenta-dev/zever/queue"
+	"github.com/zenta-dev/zever/core/queue"
 )
 
 // cover Push/PushDelayed closed race (65,73,109,116) via hammer.

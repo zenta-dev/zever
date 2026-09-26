@@ -1,4 +1,4 @@
-package s3core
+package s3opts
 
 import (
 	"context"
@@ -9,7 +9,7 @@ import (
 	"github.com/aws/aws-sdk-go-v2/credentials"
 	"github.com/aws/aws-sdk-go-v2/service/s3"
 
-	"github.com/zenta-dev/zever/storage"
+	"github.com/zenta-dev/zever/core/storage"
 )
 
 // Core is shared S3-compatible state used by s3 and r2 adapters. Unexported prefix and staticURL customize endpoint scoping and public URL generation.
@@ -53,8 +53,8 @@ func New(
 	return c
 }
 
-// NewClient builds an S3 client and presigner from endpoint and credential settings. It validates endpoint and url_base, loads AWS config with static credentials, and sets BaseEndpoint with path-style addressing when a base is set.
-func NewClient(ctx context.Context, prefix, region, endpoint, urlBase, accessKey, secretKey string) (*s3.Client, *s3.PresignClient, error) {
+// NewCoreClient builds an S3 client and presigner from endpoint and credential settings. It validates endpoint and url_base, loads AWS config with static credentials, and sets BaseEndpoint with path-style addressing when a base is set.
+func NewCoreClient(ctx context.Context, prefix, region, endpoint, urlBase, accessKey, secretKey string) (*s3.Client, *s3.PresignClient, error) {
 	if err := storage.ValidateBaseURL(prefix, "endpoint", endpoint); err != nil {
 		return nil, nil, err
 	}

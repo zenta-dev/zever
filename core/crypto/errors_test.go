@@ -5,7 +5,7 @@ import (
 	"strings"
 	"testing"
 
-	"github.com/zenta-dev/zever/crypto"
+	"github.com/zenta-dev/zever/core/crypto"
 )
 
 func TestErrors_sentinels_prefix(t *testing.T) {
@@ -65,15 +65,15 @@ func TestErrors_typed_As(t *testing.T) {
 	t.Parallel()
 	t.Run("invalid_adapter", func(t *testing.T) {
 		t.Parallel()
-		_, err := crypto.ParseAdapter("bad")
+		_, err := crypto.ParseAdapter("")
 		var iae *crypto.InvalidAdapterError
 		if !errors.As(err, &iae) {
 			t.Fatalf("err type = %T, want *InvalidAdapterError", err)
 		}
-		if iae.Adapter != "bad" {
+		if iae.Adapter != "" {
 			t.Fatalf("Adapter = %q, want %q", iae.Adapter, "bad")
 		}
-		if !strings.Contains(iae.Error(), "bad") {
+		if !strings.Contains(iae.Error(), "\"\"") {
 			t.Fatalf("Error() = %q, want adapter name", iae.Error())
 		}
 	})
@@ -96,12 +96,12 @@ func TestErrors_typed_As(t *testing.T) {
 	})
 	t.Run("unknown", func(t *testing.T) {
 		t.Parallel()
-		e := &crypto.UnknownAdapterError{Adapter: crypto.Adapter(99)}
+		e := &crypto.UnknownAdapterError{Adapter: crypto.Adapter("")}
 		var ue *crypto.UnknownAdapterError
 		if !errors.As(e, &ue) {
 			t.Fatalf("err type = %T, want *UnknownAdapterError", e)
 		}
-		if ue.Adapter != crypto.Adapter(99) {
+		if ue.Adapter != crypto.Adapter("") {
 			t.Fatalf("Adapter = %v, want 99", ue.Adapter)
 		}
 		if !strings.Contains(ue.Error(), "unknown") {
@@ -133,8 +133,8 @@ func TestErrors_carried_fields(t *testing.T) {
 	if de.Adapter != crypto.AdapterLocal {
 		t.Fatalf("DuplicateAdapterError.Adapter = %v", de.Adapter)
 	}
-	ue := &crypto.UnknownAdapterError{Adapter: crypto.Adapter(5)}
-	if ue.Adapter != crypto.Adapter(5) {
+	ue := &crypto.UnknownAdapterError{Adapter: crypto.Adapter("test-5")}
+	if ue.Adapter != crypto.Adapter("test-5") {
 		t.Fatalf("UnknownAdapterError.Adapter = %v", ue.Adapter)
 	}
 	iae := &crypto.InvalidAdapterError{Adapter: "nope"}

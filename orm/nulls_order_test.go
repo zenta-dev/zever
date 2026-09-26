@@ -4,7 +4,7 @@ import (
 	"context"
 	"testing"
 
-	"github.com/zenta-dev/zever/db"
+	"github.com/zenta-dev/zever/core/db"
 )
 
 // joinOrderNote is a nullable column on the join_orders fixture used by the

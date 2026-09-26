@@ -4,8 +4,8 @@ import (
 	"context"
 	"fmt"
 
-	"github.com/zenta-dev/zever/internal/registry"
-	"github.com/zenta-dev/zever/job"
+	"github.com/zenta-dev/zever/core/job"
+	"github.com/zenta-dev/zever/shared/registry"
 )
 
 // EntryID identifies a registered schedule. Zero is invalid.

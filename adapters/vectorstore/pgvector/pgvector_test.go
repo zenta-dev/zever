@@ -13,7 +13,7 @@ import (
 	"github.com/jackc/pgx/v5/pgconn"
 	"github.com/jackc/pgx/v5/pgtype"
 
-	"github.com/zenta-dev/zever/vectorstore"
+	"github.com/zenta-dev/zever/core/vectorstore"
 )
 
 var _ pgx.Rows = (*fakeRows)(nil)

@@ -3,8 +3,8 @@ package rbac_test
 import (
 	"testing"
 
-	"github.com/zenta-dev/zever/permission"
-	"github.com/zenta-dev/zever/permission/rbac"
+	"github.com/zenta-dev/zever/adapters/permission/rbac"
+	"github.com/zenta-dev/zever/core/permission"
 )
 
 func TestCan_matrix(t *testing.T) {

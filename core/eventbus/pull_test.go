@@ -3,6 +3,7 @@ package eventbus
 import (
 	"context"
 	"errors"
+	"fmt"
 	"sync"
 	"testing"
 	"time"
@@ -79,7 +80,7 @@ func (b *fakeBus) Name() string { return "fake" }
 func openPullBus(t *testing.T, inner Pusher) EventBus {
 	t.Helper()
 
-	a := Adapter(2000 + int(freshSeq.Add(1)))
+	a := Adapter(fmt.Sprintf("test-%d", 2000+int(freshSeq.Add(1))))
 	if err := Register(a, func(Options) (EventBus, error) { return Wrap(inner), nil }); err != nil {
 		t.Fatalf("Register err = %v, want nil", err)
 	}

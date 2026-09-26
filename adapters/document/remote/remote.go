@@ -10,10 +10,10 @@ import (
 	"net/http"
 	"strings"
 
-	"github.com/zenta-dev/zever/codec"
-	"github.com/zenta-dev/zever/document"
-	"github.com/zenta-dev/zever/internal/endpoint"
-	"github.com/zenta-dev/zever/internal/httpclient"
+	"github.com/zenta-dev/zever/core/document"
+	"github.com/zenta-dev/zever/shared/codec"
+	"github.com/zenta-dev/zever/shared/endpoint"
+	"github.com/zenta-dev/zever/shared/httpclient"
 )
 
 type driver struct {

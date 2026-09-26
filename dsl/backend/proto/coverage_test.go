@@ -19,7 +19,7 @@ import (
 	"strings"
 	"testing"
 
-	"github.com/zenta-dev/zever/internal/dsl/ir"
+	"github.com/zenta-dev/zever/dsl/ir"
 )
 
 // TestName_returnsProto covers Backend.Name, which no golden test calls.

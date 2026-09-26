@@ -4,7 +4,7 @@ import (
 	"database/sql"
 	"errors"
 
-	"github.com/zenta-dev/zever/internal/lrucache"
+	"github.com/zenta-dev/zever/shared/lrucache"
 )
 
 // defaultStmtCacheSize bounds the stmt cache when newStmtCache gets a

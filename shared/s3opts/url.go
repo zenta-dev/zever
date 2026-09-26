@@ -1,4 +1,4 @@
-package s3core
+package s3opts
 
 import (
 	"fmt"

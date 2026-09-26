@@ -12,10 +12,10 @@ import (
 	"strings"
 	"time"
 
-	"github.com/zenta-dev/zever/ai"
-	"github.com/zenta-dev/zever/codec"
-	"github.com/zenta-dev/zever/internal/endpoint"
-	"github.com/zenta-dev/zever/internal/httpclient"
+	"github.com/zenta-dev/zever/core/ai"
+	"github.com/zenta-dev/zever/shared/codec"
+	"github.com/zenta-dev/zever/shared/endpoint"
+	"github.com/zenta-dev/zever/shared/httpclient"
 )
 
 const (

@@ -15,9 +15,9 @@ func TestAdapter_String(t *testing.T) {
 	}{
 		{name: "fiber", a: AdapterFiber, want: "fiber"},
 		{name: "stdhttp", a: AdapterStdHTTP, want: "stdhttp"},
-		{name: "unknown", a: Adapter(99), want: "unknown"},
-		{name: "negative", a: Adapter(-1), want: "unknown"},
-		{name: "zero is fiber", a: Adapter(0), want: "fiber"},
+		{name: "unknown", a: Adapter(""), want: "unknown"},
+		{name: "negative", a: Adapter(""), want: "unknown"},
+		{name: "custom passthrough", a: Adapter("test-0"), want: "test-0"},
 	}
 	for _, tc := range cases {
 		tc := tc
@@ -40,13 +40,13 @@ func TestParseAdapter_roundtrip(t *testing.T) {
 	}{
 		{name: "fiber", in: "fiber", want: AdapterFiber, ok: true},
 		{name: "stdhttp", in: "stdhttp", want: AdapterStdHTTP, ok: true},
-		{name: "empty", in: "", want: AdapterFiber, ok: false},
-		{name: "uppercase fiber", in: "Fiber", want: AdapterFiber, ok: false},
-		{name: "upper stdhttp", in: "STDHTTP", want: AdapterFiber, ok: false},
-		{name: "padded", in: " fiber", want: AdapterFiber, ok: false},
-		{name: "trailing space", in: "fiber ", want: AdapterFiber, ok: false},
-		{name: "unknown", in: "chi", want: AdapterFiber, ok: false},
-		{name: "zero string", in: "0", want: AdapterFiber, ok: false},
+		{name: "empty", in: "", want: Adapter(""), ok: false},
+		{name: "uppercase fiber", in: "Fiber", want: Adapter("Fiber"), ok: true},
+		{name: "upper stdhttp", in: "STDHTTP", want: Adapter("STDHTTP"), ok: true},
+		{name: "padded", in: " fiber", want: Adapter(" fiber"), ok: true},
+		{name: "trailing space", in: "fiber ", want: Adapter("fiber "), ok: true},
+		{name: "unknown", in: "chi", want: Adapter("chi"), ok: true},
+		{name: "zero string", in: "0", want: Adapter("0"), ok: true},
 	}
 	for _, tc := range cases {
 		tc := tc
@@ -77,7 +77,7 @@ func TestParseAdapter_roundtrip(t *testing.T) {
 				if !errors.Is(err, ErrInvalidAdapter) {
 					t.Fatalf("err = %v, want ErrInvalidAdapter", err)
 				}
-				if got != AdapterFiber {
+				if got != Adapter("") {
 					t.Fatalf("ParseAdapter(%q) adapter = %v, want AdapterFiber", tc.in, got)
 				}
 				if tc.in != "" && !strings.Contains(err.Error(), tc.in) {
@@ -107,18 +107,11 @@ func TestParseAdapter_String_consistency(t *testing.T) {
 
 func TestAdapter_Parse_unknown_carries_adapter(t *testing.T) {
 	t.Parallel()
-	_, err := ParseAdapter("bad-adapter")
-	if err == nil {
-		t.Fatal("expected error")
+	got, err := ParseAdapter("bad-adapter")
+	if err != nil {
+		t.Fatalf("ParseAdapter(bad-adapter) err = %v, want nil (open adapter)", err)
 	}
-	var iae *InvalidAdapterError
-	if !errors.As(err, &iae) {
-		t.Fatalf("type = %T", err)
-	}
-	if !errors.Is(err, ErrInvalidAdapter) {
-		t.Fatal("Is ErrInvalidAdapter false")
-	}
-	if iae.Adapter != "bad-adapter" {
-		t.Fatalf("Adapter = %q", iae.Adapter)
+	if got != Adapter("bad-adapter") {
+		t.Fatalf("ParseAdapter(bad-adapter) = %v, want %v", got, Adapter("bad-adapter"))
 	}
 }

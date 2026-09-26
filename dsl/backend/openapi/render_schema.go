@@ -3,7 +3,7 @@ package openapi
 import (
 	"fmt"
 
-	"github.com/zenta-dev/zever/internal/dsl/ir"
+	"github.com/zenta-dev/zever/dsl/ir"
 )
 
 // schemaObject is a minimal hand-rolled OpenAPI 3.0.3 Schema Object,

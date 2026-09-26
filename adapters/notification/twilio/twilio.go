@@ -11,8 +11,8 @@ import (
 	twilioclient "github.com/twilio/twilio-go/client"
 	openapi "github.com/twilio/twilio-go/rest/api/v2010"
 
-	"github.com/zenta-dev/zever/internal/httpclient"
-	"github.com/zenta-dev/zever/notification"
+	"github.com/zenta-dev/zever/core/notification"
+	"github.com/zenta-dev/zever/shared/httpclient"
 )
 
 // maxResponseBytes caps the bytes read from a Twilio response body.

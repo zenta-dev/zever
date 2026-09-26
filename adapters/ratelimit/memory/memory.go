@@ -7,7 +7,7 @@ import (
 	"sync/atomic"
 	"time"
 
-	"github.com/zenta-dev/zever/ratelimit"
+	"github.com/zenta-dev/zever/core/ratelimit"
 )
 
 var _ ratelimit.Limiter = (*store)(nil)

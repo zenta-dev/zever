@@ -3,6 +3,7 @@ package auth
 import (
 	"context"
 	"errors"
+	"fmt"
 	"reflect"
 	"strings"
 	"sync/atomic"
@@ -13,7 +14,7 @@ import (
 var testAdapterSeq int32 = 1000
 
 func freshAdapter() Adapter {
-	return Adapter(atomic.AddInt32(&testAdapterSeq, 1))
+	return Adapter(fmt.Sprintf("test-%d", atomic.AddInt32(&testAdapterSeq, 1)))
 }
 
 func TestRegister_nil_factory_fails(t *testing.T) {

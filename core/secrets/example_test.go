@@ -3,8 +3,8 @@ package secrets_test
 import (
 	"context"
 
-	"github.com/zenta-dev/zever/secrets"
-	secretsenv "github.com/zenta-dev/zever/secrets/env"
+	secretsenv "github.com/zenta-dev/zever/adapters/secrets/env"
+	"github.com/zenta-dev/zever/core/secrets"
 )
 
 // ExampleOpen opens the env secrets backend scoped to one prefix.

@@ -3,7 +3,7 @@ package lock
 import (
 	"time"
 
-	zredis "github.com/zenta-dev/zever/internal/redis"
+	redisopt "github.com/zenta-dev/zever/shared/redisopt"
 )
 
 const (
@@ -18,7 +18,7 @@ const (
 // Fields are a union of all adapter options; each adapter uses only what it needs.
 type Options struct {
 	// ConnectOptions holds the shared Redis connection settings.
-	zredis.ConnectOptions
+	redisopt.ConnectOptions
 	// URL is the Redis connection URL.
 	// When set it takes precedence over Addr.
 	URL string `json:"url" toml:"url" yaml:"url"`

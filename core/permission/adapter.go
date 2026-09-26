@@ -1,42 +1,31 @@
 package permission
 
 // Adapter identifies a registered permission backend.
-type Adapter int
+
+type Adapter string
 
 const (
 	// Noop selects the allow/deny-all permission adapter.
-	Noop Adapter = iota
+	Noop Adapter = "noop"
 	// RBAC selects the role-based permission adapter.
-	RBAC
+	RBAC Adapter = "rbac"
 	// Casbin selects the Casbin-backed permission adapter.
-	Casbin
+	Casbin Adapter = "casbin"
 )
 
-// String returns the canonical lowercase name of the adapter.
+// String returns the canonical name of Adapter.
 func (a Adapter) String() string {
-	switch a {
-	case Noop:
-		return "noop"
-	case RBAC:
-		return "rbac"
-	case Casbin:
-		return "casbin"
-	default:
+	if a == "" {
 		return "unknown"
 	}
+	return string(a)
 }
 
 // ParseAdapter parses adapter name into an Adapter.
-// Only exact lowercase names match; anything else fails.
+// Any non-empty name is accepted to allow custom adapters; empty fails.
 func ParseAdapter(s string) (Adapter, error) {
-	switch s {
-	case "noop":
-		return Noop, nil
-	case "rbac":
-		return RBAC, nil
-	case "casbin":
-		return Casbin, nil
-	default:
-		return Noop, &InvalidAdapterError{Adapter: s}
+	if s == "" {
+		return Adapter(""), &InvalidAdapterError{Adapter: s}
 	}
+	return Adapter(s), nil
 }

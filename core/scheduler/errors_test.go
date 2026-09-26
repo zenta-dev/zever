@@ -38,7 +38,7 @@ func TestDuplicateAdapterErrorUnwrap(t *testing.T) {
 func TestUnknownAdapterErrorUnwrap(t *testing.T) {
 	t.Parallel()
 
-	err := &UnknownAdapterError{Adapter: Adapter(999)}
+	err := &UnknownAdapterError{Adapter: Adapter("")}
 	if !errors.Is(err, ErrUnknownAdapter) {
 		t.Fatalf("err=%v want ErrUnknownAdapter", err)
 	}

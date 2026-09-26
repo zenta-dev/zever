@@ -9,8 +9,8 @@ import (
 	"testing"
 	"time"
 
-	"github.com/zenta-dev/zever/log"
-	"github.com/zenta-dev/zever/webhook"
+	"github.com/zenta-dev/zever/core/log"
+	"github.com/zenta-dev/zever/core/webhook"
 )
 
 type captureEvent struct {

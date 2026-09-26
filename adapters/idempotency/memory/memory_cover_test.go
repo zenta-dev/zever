@@ -4,7 +4,7 @@ import (
 	"testing"
 	"time"
 
-	"github.com/zenta-dev/zever/idempotency"
+	"github.com/zenta-dev/zever/core/idempotency"
 )
 
 func TestCoverBeginExpiredEntryReclaimed(t *testing.T) {

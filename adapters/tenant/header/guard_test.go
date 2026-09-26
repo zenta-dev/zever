@@ -6,7 +6,7 @@ import (
 	"testing"
 	"time"
 
-	"github.com/zenta-dev/zever/tenant"
+	"github.com/zenta-dev/zever/core/tenant"
 )
 
 func TestResolveReDoSSafe(t *testing.T) {

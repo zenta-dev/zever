@@ -1,4 +1,4 @@
-package redis
+package redisclient
 
 import (
 	"crypto/tls"
@@ -92,7 +92,7 @@ func TestOptions_toRedisOptions_plainAddr(t *testing.T) {
 		t.Run(tt.name, func(t *testing.T) {
 			t.Parallel()
 
-			got, err := tt.in.toRedisOptions()
+			got, err := toRedisOptions(tt.in)
 			if err != nil {
 				t.Fatalf("toRedisOptions() error = %v", err)
 			}
@@ -130,7 +130,7 @@ func TestOptions_toRedisOptions_urlForms(t *testing.T) {
 		t.Run(tt.name, func(t *testing.T) {
 			t.Parallel()
 
-			got, err := tt.in.toRedisOptions()
+			got, err := toRedisOptions(tt.in)
 			if err != nil {
 				t.Fatalf("toRedisOptions() error = %v", err)
 			}
@@ -170,7 +170,7 @@ func TestOptions_toRedisOptions_invalidAddr_typedError(t *testing.T) {
 		t.Parallel()
 
 		for _, addr := range []string{"redis://", "redis:///db0", "rediss://"} {
-			_, err := (Options{Addr: addr}).toRedisOptions()
+			_, err := toRedisOptions(Options{Addr: addr})
 			if err == nil {
 				t.Fatalf("toRedisOptions(%q) = nil, want InvalidAddressError", addr)
 			}
@@ -193,7 +193,7 @@ func TestOptions_toRedisOptions_invalidAddr_typedError(t *testing.T) {
 	t.Run("unparsable url wraps parse sentinel", func(t *testing.T) {
 		t.Parallel()
 
-		_, err := (Options{Addr: "redis://[::1"}).toRedisOptions()
+		_, err := toRedisOptions(Options{Addr: "redis://[::1"})
 		if err == nil {
 			t.Fatal("toRedisOptions() = nil, want parse error")
 		}
@@ -214,7 +214,7 @@ func TestOptions_toRedisOptions_requireTLS(t *testing.T) {
 	t.Run("default allows plaintext", func(t *testing.T) {
 		t.Parallel()
 
-		got, err := (Options{Addr: "localhost:6379"}).toRedisOptions()
+		got, err := toRedisOptions(Options{Addr: "localhost:6379"})
 		if err != nil {
 			t.Fatalf("toRedisOptions() error = %v, want nil", err)
 		}
@@ -227,7 +227,7 @@ func TestOptions_toRedisOptions_requireTLS(t *testing.T) {
 	t.Run("requireTLS with plaintext addr fails", func(t *testing.T) {
 		t.Parallel()
 
-		_, err := (Options{Addr: "localhost:6379", RequireTLS: true}).toRedisOptions()
+		_, err := toRedisOptions(Options{Addr: "localhost:6379", RequireTLS: true})
 		if err == nil {
 			t.Fatal("toRedisOptions() = nil error, want PlaintextRejectedError")
 		}
@@ -245,7 +245,7 @@ func TestOptions_toRedisOptions_requireTLS(t *testing.T) {
 	t.Run("requireTLS with redis url addr fails", func(t *testing.T) {
 		t.Parallel()
 
-		_, err := (Options{Addr: "redis://h:6379", RequireTLS: true}).toRedisOptions()
+		_, err := toRedisOptions(Options{Addr: "redis://h:6379", RequireTLS: true})
 		if err == nil {
 			t.Fatal("toRedisOptions() = nil error, want PlaintextRejectedError")
 		}
@@ -258,7 +258,7 @@ func TestOptions_toRedisOptions_requireTLS(t *testing.T) {
 	t.Run("requireTLS with rediss url addr succeeds", func(t *testing.T) {
 		t.Parallel()
 
-		got, err := (Options{Addr: "rediss://h:6379", RequireTLS: true}).toRedisOptions()
+		got, err := toRedisOptions(Options{Addr: "rediss://h:6379", RequireTLS: true})
 		if err != nil {
 			t.Fatalf("toRedisOptions() error = %v, want nil", err)
 		}
@@ -275,7 +275,7 @@ func TestOptions_toRedisOptions_requireTLS(t *testing.T) {
 	t.Run("requireTLS with explicit TLS true on plain addr succeeds", func(t *testing.T) {
 		t.Parallel()
 
-		got, err := (Options{Addr: "plain:6379", TLS: true, RequireTLS: true}).toRedisOptions()
+		got, err := toRedisOptions(Options{Addr: "plain:6379", TLS: true, RequireTLS: true})
 		if err != nil {
 			t.Fatalf("toRedisOptions() error = %v, want nil", err)
 		}

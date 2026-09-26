@@ -7,7 +7,7 @@ import (
 	"strings"
 	"testing"
 
-	"github.com/zenta-dev/zever/router"
+	"github.com/zenta-dev/zever/core/router"
 )
 
 func newRouter(t *testing.T, opts router.Options) router.Router {

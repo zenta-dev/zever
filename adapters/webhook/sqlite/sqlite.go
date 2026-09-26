@@ -11,8 +11,8 @@ import (
 
 	"modernc.org/sqlite"
 
-	"github.com/zenta-dev/zever/webhook"
-	whttp "github.com/zenta-dev/zever/webhook/http"
+	whttp "github.com/zenta-dev/zever/adapters/webhook/http"
+	"github.com/zenta-dev/zever/core/webhook"
 )
 
 // schema is applied in a single Exec at Open time.

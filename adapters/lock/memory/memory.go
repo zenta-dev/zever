@@ -8,7 +8,7 @@ import (
 	"sync"
 	"time"
 
-	"github.com/zenta-dev/zever/lock"
+	"github.com/zenta-dev/zever/core/lock"
 )
 
 // lease is one held key: who holds it and when the lease lapses.

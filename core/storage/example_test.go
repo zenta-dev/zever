@@ -3,8 +3,8 @@ package storage_test
 import (
 	"context"
 
-	"github.com/zenta-dev/zever/storage"
-	storagelocal "github.com/zenta-dev/zever/storage/local"
+	storagelocal "github.com/zenta-dev/zever/adapters/storage/local"
+	"github.com/zenta-dev/zever/core/storage"
 )
 
 // ExampleOpen opens the local-filesystem storage backend with defaults.

@@ -3,7 +3,7 @@ package lexer
 import (
 	"testing"
 
-	"github.com/zenta-dev/zever/internal/dsl/token"
+	"github.com/zenta-dev/zever/dsl/token"
 )
 
 // lexAllAndComments drains l via Next until EOF (dropping the EOF token, as

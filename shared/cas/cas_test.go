@@ -4,7 +4,7 @@ import (
 	"strings"
 	"testing"
 
-	"github.com/zenta-dev/zever/internal/cas"
+	"github.com/zenta-dev/zever/shared/cas"
 )
 
 func TestScripts_atomicOwnerCheck(t *testing.T) {

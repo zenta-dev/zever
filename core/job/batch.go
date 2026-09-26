@@ -12,8 +12,8 @@ import (
 	"time"
 	"uuid"
 
-	"github.com/zenta-dev/zever/log"
-	"github.com/zenta-dev/zever/log/noop"
+	"github.com/zenta-dev/zever/adapters/log/noop"
+	"github.com/zenta-dev/zever/core/log"
 )
 
 var (

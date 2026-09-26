@@ -4,8 +4,8 @@ import (
 	"context"
 	"fmt"
 
-	"github.com/zenta-dev/zever/flag"
-	"github.com/zenta-dev/zever/flag/static"
+	"github.com/zenta-dev/zever/adapters/flag/static"
+	"github.com/zenta-dev/zever/core/flag"
 )
 
 // ExampleOpen opens the static adapter and evaluates a missing key.

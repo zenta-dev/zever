@@ -1,11 +1,11 @@
 package zenorm
 
 import (
-	"fmt"
 	"os"
 	"os/exec"
 	"path/filepath"
 	"runtime"
+	"strings"
 	"testing"
 )
 
@@ -48,27 +48,41 @@ entity Order {
 }`
 
 // TestGeneratedOutputCompiles writes two generated module outputs into
-// throwaway packages inside this module and runs `go build` over them.
+// an isolated throwaway module that requires `zever/orm` with a replace
+// to this checkout, then runs `go mod tidy` + `go build` over them.
 // Golden comparison plus go/parser only prove the emission is well-formed
 // text; this test proves the emitted generics (Table[T], Column[T, V],
 // Relation[P, C], Query[T, *T], Join2/LeftJoin2) actually instantiate and
-// type-check against the orm package.
+// type-check against the orm package without relying on the enclosing
+// workspace to resolve the import.
 func TestGeneratedOutputCompiles(t *testing.T) {
 	root := moduleRoot(t)
+	repo := filepath.Dir(root)
+	ormDir := filepath.Join(repo, "orm")
 
-	// os.Mkdir (not MkdirTemp): the package must live inside the module so
-	// the generated `github.com/zenta-dev/zever/orm` import resolves
-	// without go.mod tricks.
-	dir := filepath.Join(root, fmt.Sprintf("tmp_zenorm_compile_%d", os.Getpid()))
-	if err := os.Mkdir(dir, 0o755); err != nil {
-		t.Fatalf("mkdir %s: %v", dir, err)
+	dir := t.TempDir()
+
+	replaces := []string{
+		"github.com/zenta-dev/zever/orm => " + ormDir,
+		"github.com/zenta-dev/zever/core/db => " + filepath.Join(repo, "core", "db"),
+		"github.com/zenta-dev/zever/dsl => " + repo + "/dsl",
+		"github.com/zenta-dev/zever/shared/lrucache => " + filepath.Join(repo, "shared", "lrucache"),
+		"github.com/zenta-dev/zever/shared/registry => " + filepath.Join(repo, "shared", "registry"),
+		"github.com/zenta-dev/zever/shared/retry => " + filepath.Join(repo, "shared", "retry"),
+		"github.com/zenta-dev/zever/adapters/db/postgres => " + filepath.Join(repo, "adapters", "db", "postgres"),
+		"github.com/zenta-dev/zever/adapters/db/sqlite => " + filepath.Join(repo, "adapters", "db", "sqlite"),
 	}
-
-	t.Cleanup(func() {
-		if err := os.RemoveAll(dir); err != nil {
-			t.Fatalf("remove %s: %v", dir, err)
-		}
-	})
+	goMod := "module tmpzenormcompile\n\ngo 1.27.0\n\nrequire github.com/zenta-dev/zever/orm v0.0.0\n\nreplace (\n"
+	var sb strings.Builder
+	sb.WriteString(goMod)
+	for _, r := range replaces {
+		sb.WriteString("\t" + r + "\n")
+	}
+	sb.WriteString(")\n")
+	goMod = sb.String()
+	if err := os.WriteFile(filepath.Join(dir, "go.mod"), []byte(goMod), 0o600); err != nil {
+		t.Fatalf("write go.mod: %v", err)
+	}
 
 	fixtures := map[string]string{
 		"scalars":   compileFixtureScalars,
@@ -96,13 +110,21 @@ func TestGeneratedOutputCompiles(t *testing.T) {
 			}
 		}
 
-		pkgs = append(pkgs, "./"+filepath.Join(filepath.Base(dir), name, "..."))
+		pkgs = append(pkgs, "./"+filepath.Join(name, "..."))
+	}
+
+	tidy := exec.CommandContext(t.Context(), "go", "mod", "tidy")
+	tidy.Dir = dir
+	tidy.Env = append(os.Environ(), "GOWORK=off", "GOPROXY=off")
+	if combined, err := tidy.CombinedOutput(); err != nil {
+		t.Fatalf("go mod tidy: %v\n%s", err, combined)
 	}
 
 	args := append([]string{"build"}, pkgs...)
 
 	cmd := exec.CommandContext(t.Context(), "go", args...)
-	cmd.Dir = root
+	cmd.Dir = dir
+	cmd.Env = append(os.Environ(), "GOWORK=off", "GOPROXY=off")
 
 	if combined, err := cmd.CombinedOutput(); err != nil {
 		t.Fatalf("go build %v: %v\n%s", pkgs, err, combined)

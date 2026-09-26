@@ -12,7 +12,7 @@ import (
 
 	"github.com/PaddleHQ/paddle-go-sdk/v5"
 
-	"github.com/zenta-dev/zever/billing"
+	"github.com/zenta-dev/zever/core/billing"
 )
 
 func openTest(t *testing.T, url string) billing.Billing {

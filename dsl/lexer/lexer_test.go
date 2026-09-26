@@ -3,7 +3,7 @@ package lexer
 import (
 	"testing"
 
-	"github.com/zenta-dev/zever/internal/dsl/token"
+	"github.com/zenta-dev/zever/dsl/token"
 )
 
 // lexAll runs the lexer over src until EOF, returning every token produced,

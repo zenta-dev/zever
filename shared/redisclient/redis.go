@@ -1,4 +1,4 @@
-package redis
+package redisclient
 
 import (
 	"fmt"
@@ -10,7 +10,7 @@ import (
 // independently owned client; callers must Close the client they
 // receive once they are done with it.
 func New(opts Options) (*goredis.Client, error) {
-	redisOpt, err := opts.toRedisOptions()
+	redisOpt, err := toRedisOptions(opts)
 	if err != nil {
 		return nil, fmt.Errorf("redis: new client: %w", err)
 	}

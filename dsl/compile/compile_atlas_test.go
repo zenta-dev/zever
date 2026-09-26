@@ -4,7 +4,7 @@ import (
 	"strings"
 	"testing"
 
-	"github.com/zenta-dev/zever/internal/dsl/backend/atlas"
+	"github.com/zenta-dev/zever/dsl/backend/atlas"
 )
 
 // TestCompileValidMultiFileWithAtlasBackend mirrors

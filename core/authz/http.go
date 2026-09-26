@@ -4,9 +4,9 @@ import (
 	"errors"
 	"net/http"
 
-	"github.com/zenta-dev/zever/auth"
-	"github.com/zenta-dev/zever/codec"
-	"github.com/zenta-dev/zever/permission"
+	"github.com/zenta-dev/zever/core/auth"
+	"github.com/zenta-dev/zever/core/permission"
+	"github.com/zenta-dev/zever/shared/codec"
 )
 
 // authzErrorBody is the JSON error body written by writeAuthzError.

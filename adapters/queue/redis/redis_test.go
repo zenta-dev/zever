@@ -6,7 +6,7 @@ import (
 	"testing"
 	"time"
 
-	"github.com/zenta-dev/zever/queue"
+	"github.com/zenta-dev/zever/core/queue"
 )
 
 func TestRedactURL_masks(t *testing.T) {

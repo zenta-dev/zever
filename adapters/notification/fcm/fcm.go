@@ -8,9 +8,9 @@ import (
 
 	"firebase.google.com/go/v4/messaging"
 
-	sharedfirebase "github.com/zenta-dev/zever/internal/firebase"
-	"github.com/zenta-dev/zever/internal/retry"
-	"github.com/zenta-dev/zever/notification"
+	"github.com/zenta-dev/zever/core/notification"
+	sharedfirebase "github.com/zenta-dev/zever/shared/firebase"
+	"github.com/zenta-dev/zever/shared/retry"
 )
 
 // sendRetryPolicy bounds retries of a transient FCM send failure (network

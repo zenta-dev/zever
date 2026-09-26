@@ -7,7 +7,7 @@ import (
 	"sync"
 	"sync/atomic"
 
-	"github.com/zenta-dev/zever/payment"
+	"github.com/zenta-dev/zever/core/payment"
 )
 
 // driver is the in-memory stub payment backend.

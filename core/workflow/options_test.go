@@ -4,7 +4,7 @@ import (
 	"errors"
 	"testing"
 
-	"github.com/zenta-dev/zever/workflow"
+	"github.com/zenta-dev/zever/core/workflow"
 )
 
 func TestOptionsValidate(t *testing.T) {

@@ -5,7 +5,7 @@ import (
 	"io/fs"
 	"time"
 
-	"github.com/zenta-dev/zever/internal/endpoint"
+	"github.com/zenta-dev/zever/shared/endpoint"
 )
 
 // DefaultTimeout is the default i18n operation timeout applied by adapters.

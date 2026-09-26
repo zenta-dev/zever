@@ -11,8 +11,8 @@ import (
 	"sync/atomic"
 	"testing"
 
-	"github.com/zenta-dev/zever/internal/lrucache"
-	"github.com/zenta-dev/zever/search"
+	"github.com/zenta-dev/zever/core/search"
+	"github.com/zenta-dev/zever/shared/lrucache"
 )
 
 const (

@@ -6,9 +6,9 @@ import (
 	"testing"
 	"time"
 
-	"github.com/zenta-dev/zever/auth"
-	"github.com/zenta-dev/zever/authz"
-	"github.com/zenta-dev/zever/permission"
+	"github.com/zenta-dev/zever/core/auth"
+	"github.com/zenta-dev/zever/core/authz"
+	"github.com/zenta-dev/zever/core/permission"
 )
 
 type fakeAuth struct {

@@ -1,8 +1,8 @@
 package webhook_test
 
 import (
-	"github.com/zenta-dev/zever/webhook"
-	webhookhttp "github.com/zenta-dev/zever/webhook/http"
+	webhookhttp "github.com/zenta-dev/zever/adapters/webhook/http"
+	"github.com/zenta-dev/zever/core/webhook"
 )
 
 // ExampleOpen opens the http webhook backend with default options.

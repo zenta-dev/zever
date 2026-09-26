@@ -3,8 +3,8 @@ package queue_test
 import (
 	"context"
 
-	"github.com/zenta-dev/zever/queue"
-	"github.com/zenta-dev/zever/queue/memory"
+	"github.com/zenta-dev/zever/adapters/queue/memory"
+	"github.com/zenta-dev/zever/core/queue"
 )
 
 // ExampleOpen opens the in-memory queue and pushes a message.

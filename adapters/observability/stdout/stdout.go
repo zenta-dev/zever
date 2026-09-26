@@ -11,8 +11,8 @@ import (
 	"sync/atomic"
 	"time"
 
-	"github.com/zenta-dev/zever/codec"
-	"github.com/zenta-dev/zever/observability"
+	"github.com/zenta-dev/zever/core/observability"
+	"github.com/zenta-dev/zever/shared/codec"
 )
 
 type spanCtxKey struct{}

@@ -8,7 +8,7 @@ import (
 	"regexp"
 	"strings"
 
-	"github.com/zenta-dev/zever/tenant"
+	"github.com/zenta-dev/zever/core/tenant"
 )
 
 // maxHostLength caps host length per DNS limits (253 chars textual representation).

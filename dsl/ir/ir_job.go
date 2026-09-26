@@ -3,7 +3,7 @@ package ir
 import (
 	"time"
 
-	"github.com/zenta-dev/zever/internal/dsl/diag"
+	"github.com/zenta-dev/zever/dsl/diag"
 )
 
 // RetryPolicy represents retry configuration for a job.

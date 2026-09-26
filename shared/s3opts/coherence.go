@@ -1,9 +1,9 @@
-package s3core
+package s3opts
 
 import (
 	"fmt"
 
-	"github.com/zenta-dev/zever/storage"
+	"github.com/zenta-dev/zever/core/storage"
 )
 
 // ValidatePolicyCoherence rejects policies where public write and update differ. A static unsigned PUT URL allows both create and overwrite, so write and update public access must match.

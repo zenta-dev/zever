@@ -19,8 +19,8 @@ func repoFixture(f *testing.F, rel string) string {
 		f.Fatalf("runtime.Caller failed while locating fixture %q", rel)
 	}
 
-	// internal/dsl/parser -> repo root is three levels up.
-	root := filepath.Join(filepath.Dir(file), "..", "..", "..")
+	// dsl/parser -> module root is one level up.
+	root := filepath.Join(filepath.Dir(file), "..")
 
 	data, err := os.ReadFile(filepath.Join(root, rel))
 	if err != nil {
@@ -274,9 +274,9 @@ func FuzzParse(f *testing.F) {
 
 	// Real .zen fixtures used elsewhere in the repo.
 	for _, rel := range []string{
-		"internal/dsl/testdata/todo.zen",
-		"internal/dsl/testdata/demoapp.zen",
-		"internal/dsl/compile/testdata/app.zen",
+		"testdata/todo.zen",
+		"testdata/demoapp.zen",
+		"compile/testdata/app.zen",
 	} {
 		f.Add(repoFixture(f, rel))
 	}

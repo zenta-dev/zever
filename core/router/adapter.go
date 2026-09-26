@@ -1,36 +1,29 @@
 package router
 
 // Adapter identifies the HTTP router backend implementation.
-type Adapter int
+
+type Adapter string
 
 const (
 	// AdapterFiber is the Fiber router adapter.
-	AdapterFiber Adapter = iota
+	AdapterFiber Adapter = "fiber"
 	// AdapterStdHTTP is the standard-library HTTP router adapter.
-	AdapterStdHTTP
+	AdapterStdHTTP Adapter = "stdhttp"
 )
 
 // String returns the canonical name of Adapter.
 func (a Adapter) String() string {
-	switch a {
-	case AdapterFiber:
-		return "fiber"
-	case AdapterStdHTTP:
-		return "stdhttp"
-	default:
+	if a == "" {
 		return "unknown"
 	}
+	return string(a)
 }
 
 // ParseAdapter parses adapter name into an Adapter.
-// Only exact lowercase names match; anything else fails.
+// Any non-empty name is accepted to allow custom adapters; empty fails.
 func ParseAdapter(s string) (Adapter, error) {
-	switch s {
-	case "fiber":
-		return AdapterFiber, nil
-	case "stdhttp":
-		return AdapterStdHTTP, nil
-	default:
-		return AdapterFiber, &InvalidAdapterError{Adapter: s}
+	if s == "" {
+		return Adapter(""), &InvalidAdapterError{Adapter: s}
 	}
+	return Adapter(s), nil
 }

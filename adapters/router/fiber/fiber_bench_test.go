@@ -6,7 +6,7 @@ import (
 	"net/http/httptest"
 	"testing"
 
-	"github.com/zenta-dev/zever/router"
+	"github.com/zenta-dev/zever/core/router"
 )
 
 // BenchmarkServeHTTP measures the Handle+ServeHTTP round trip, including

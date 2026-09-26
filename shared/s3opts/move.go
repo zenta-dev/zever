@@ -1,4 +1,4 @@
-package s3core
+package s3opts
 
 import (
 	"context"
@@ -8,7 +8,7 @@ import (
 	"github.com/aws/aws-sdk-go-v2/aws"
 	"github.com/aws/aws-sdk-go-v2/service/s3"
 
-	"github.com/zenta-dev/zever/storage"
+	"github.com/zenta-dev/zever/core/storage"
 )
 
 // Move validates both source and destination bucket/keys, treats self-move as a no-op, and returns ErrNotFound when the source is missing.

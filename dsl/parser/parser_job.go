@@ -1,8 +1,8 @@
 package parser
 
 import (
-	"github.com/zenta-dev/zever/internal/dsl/ast"
-	"github.com/zenta-dev/zever/internal/dsl/token"
+	"github.com/zenta-dev/zever/dsl/ast"
+	"github.com/zenta-dev/zever/dsl/token"
 )
 
 // jobOptionStart is the job-option-body sync predicate: an IDENT whose

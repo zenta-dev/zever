@@ -4,7 +4,7 @@ import (
 	"testing"
 	"time"
 
-	"github.com/zenta-dev/zever/log"
+	"github.com/zenta-dev/zever/core/log"
 )
 
 var (

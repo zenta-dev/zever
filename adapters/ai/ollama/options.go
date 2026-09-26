@@ -6,7 +6,7 @@ import (
 	"net/http"
 	"time"
 
-	"github.com/zenta-dev/zever/internal/endpoint"
+	"github.com/zenta-dev/zever/shared/endpoint"
 )
 
 // DefaultAddr is the Ollama server address used when Options.Addr is empty.

@@ -11,8 +11,8 @@ import (
 	"sync"
 	"time"
 
-	"github.com/zenta-dev/zever/log"
-	"github.com/zenta-dev/zever/observability"
+	"github.com/zenta-dev/zever/core/log"
+	"github.com/zenta-dev/zever/core/observability"
 )
 
 const (

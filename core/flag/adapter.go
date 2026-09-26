@@ -1,36 +1,29 @@
 package flag
 
 // Adapter identifies the feature-flag backend implementation.
-type Adapter int
+
+type Adapter string
 
 const (
 	// Static is the static file-backed flag adapter.
-	Static Adapter = iota
+	Static Adapter = "static"
 	// Firebase is the Firebase-backed flag adapter.
-	Firebase
+	Firebase Adapter = "firebase"
 )
 
 // String returns the canonical name of Adapter.
 func (a Adapter) String() string {
-	switch a {
-	case Static:
-		return "static"
-	case Firebase:
-		return "firebase"
-	default:
+	if a == "" {
 		return "unknown"
 	}
+	return string(a)
 }
 
 // ParseAdapter parses adapter name into an Adapter.
-// Only exact lowercase names match; anything else fails.
+// Any non-empty name is accepted to allow custom adapters; empty fails.
 func ParseAdapter(s string) (Adapter, error) {
-	switch s {
-	case "static":
-		return Static, nil
-	case "firebase":
-		return Firebase, nil
-	default:
-		return Static, &InvalidAdapterError{Adapter: s}
+	if s == "" {
+		return Adapter(""), &InvalidAdapterError{Adapter: s}
 	}
+	return Adapter(s), nil
 }

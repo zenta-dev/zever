@@ -8,7 +8,7 @@ import (
 	"sync/atomic"
 	"time"
 
-	"github.com/zenta-dev/zever/idempotency"
+	"github.com/zenta-dev/zever/core/idempotency"
 )
 
 var _ idempotency.Store = (*store)(nil)

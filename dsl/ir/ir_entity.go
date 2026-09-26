@@ -1,6 +1,6 @@
 package ir
 
-import "github.com/zenta-dev/zever/internal/dsl/diag"
+import "github.com/zenta-dev/zever/dsl/diag"
 
 // Validation represents a validation rule on a field.
 // Kind: format|min_len|max_len|gt|gte|lt|lte.

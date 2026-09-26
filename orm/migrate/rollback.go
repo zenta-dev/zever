@@ -6,8 +6,8 @@ import (
 	"fmt"
 	"regexp"
 
-	"github.com/zenta-dev/zever/db"
-	"github.com/zenta-dev/zever/internal/dsl/backend/atlas"
+	"github.com/zenta-dev/zever/core/db"
+	"github.com/zenta-dev/zever/dsl/backend/atlas"
 )
 
 // This file implements undoing the most recent DDL statements Apply applied,

@@ -6,8 +6,8 @@ import (
 
 	"github.com/stripe/stripe-go/v82"
 
-	"github.com/zenta-dev/zever/billing"
-	"github.com/zenta-dev/zever/internal/providers"
+	"github.com/zenta-dev/zever/core/billing"
+	"github.com/zenta-dev/zever/shared/providersclient"
 )
 
 var _ billing.Billing = (*driver)(nil)
@@ -26,7 +26,7 @@ func New(o billing.Options) (billing.Billing, error) {
 		return nil, ErrMissingSecretKey
 	}
 
-	client := providers.NewStripeClient(o.SecretKey, o.Endpoint, billing.DefaultHTTPTimeout)
+	client := providersclient.NewStripeClient(o.SecretKey, o.Endpoint, billing.DefaultHTTPTimeout)
 
 	return &driver{client: client}, nil
 }

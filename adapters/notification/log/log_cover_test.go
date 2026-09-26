@@ -9,7 +9,7 @@ import (
 	"testing"
 	"time"
 
-	"github.com/zenta-dev/zever/notification"
+	"github.com/zenta-dev/zever/core/notification"
 )
 
 type failWriter struct{}

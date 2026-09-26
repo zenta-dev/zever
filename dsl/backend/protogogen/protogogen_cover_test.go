@@ -11,10 +11,10 @@ import (
 	"google.golang.org/protobuf/proto"
 	"google.golang.org/protobuf/types/pluginpb"
 
-	"github.com/zenta-dev/zever/internal/dsl/ast"
-	protobackend "github.com/zenta-dev/zever/internal/dsl/backend/proto"
-	"github.com/zenta-dev/zever/internal/dsl/ir"
-	"github.com/zenta-dev/zever/internal/dsl/resolver"
+	"github.com/zenta-dev/zever/dsl/ast"
+	protobackend "github.com/zenta-dev/zever/dsl/backend/proto"
+	"github.com/zenta-dev/zever/dsl/ir"
+	"github.com/zenta-dev/zever/dsl/resolver"
 )
 
 // resolvePingSchema parses pingFixture and resolves it, failing the test on

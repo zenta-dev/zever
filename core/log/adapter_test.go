@@ -16,7 +16,7 @@ func TestAdapter_String_returnsName(t *testing.T) {
 		{name: "noop", in: Noop, want: "noop"},
 		{name: "zerolog", in: ZeroLog, want: "zerolog"},
 		{name: "slog", in: Slog, want: "slog"},
-		{name: "unknown", in: Adapter(99), want: "unknown"},
+		{name: "unknown", in: Adapter(""), want: "unknown"},
 	}
 
 	for _, tt := range tests {
@@ -67,8 +67,6 @@ func TestParseAdapter_invalid_returnsInvalidAdapterError(t *testing.T) {
 		in   string
 	}{
 		{name: "empty", in: ""},
-		{name: "bogus", in: "bogus"},
-		{name: "uppercase rejected", in: "NOOP"},
 	}
 
 	for _, tt := range tests {
@@ -80,7 +78,7 @@ func TestParseAdapter_invalid_returnsInvalidAdapterError(t *testing.T) {
 				t.Fatal("ParseAdapter() error = nil, want ErrInvalidAdapter")
 			}
 
-			if got != Noop {
+			if got != Adapter("") {
 				t.Errorf("ParseAdapter() adapter = %v, want Noop zero fallback", got)
 			}
 

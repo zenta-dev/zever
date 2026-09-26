@@ -1,8 +1,8 @@
 package session_test
 
 import (
-	"github.com/zenta-dev/zever/session"
-	sessionmemory "github.com/zenta-dev/zever/session/memory"
+	sessionmemory "github.com/zenta-dev/zever/adapters/session/memory"
+	"github.com/zenta-dev/zever/core/session"
 )
 
 // ExampleOpen opens the in-memory session store with default TTL.

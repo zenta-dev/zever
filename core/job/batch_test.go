@@ -8,8 +8,8 @@ import (
 	"time"
 	"uuid"
 
-	"github.com/zenta-dev/zever/log/noop"
-	"github.com/zenta-dev/zever/queue"
+	"github.com/zenta-dev/zever/adapters/log/noop"
+	"github.com/zenta-dev/zever/core/queue"
 )
 
 type batchFailReader struct{}

@@ -4,7 +4,7 @@ import (
 	"errors"
 	"testing"
 
-	"github.com/zenta-dev/zever/tenant"
+	"github.com/zenta-dev/zever/core/tenant"
 )
 
 func TestResolveReturnsDefault(t *testing.T) {

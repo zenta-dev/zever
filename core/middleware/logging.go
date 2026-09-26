@@ -4,8 +4,8 @@ import (
 	"net/http"
 	"time"
 
-	"github.com/zenta-dev/zever/log"
-	"github.com/zenta-dev/zever/observability"
+	"github.com/zenta-dev/zever/core/log"
+	"github.com/zenta-dev/zever/core/observability"
 )
 
 // RequestLogger returns HTTP middleware that logs one structured line per

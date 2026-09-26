@@ -6,9 +6,8 @@ import (
 	"fmt"
 	"time"
 
-	"github.com/zenta-dev/zever/auth"
-	"github.com/zenta-dev/zever/session"
-	sessionmemory "github.com/zenta-dev/zever/session/memory"
+	"github.com/zenta-dev/zever/core/auth"
+	"github.com/zenta-dev/zever/core/session"
 )
 
 var _ auth.Auth = (*adapter)(nil)
@@ -32,17 +31,17 @@ type adapter struct {
 }
 
 // New builds a session-backed auth.Auth. Core options are validated first.
-// A nil Session.Store builds an in-memory store with session defaults.
+// The Session.Store is required: a nil store fails with
+// *auth.InvalidOptionsError. The adapter never constructs a store itself,
+// so it depends only on the session.Store interface, never on a sibling
+// adapter package.
 func New(opts auth.Options) (auth.Auth, error) {
 	if err := opts.Validate(); err != nil {
 		return nil, fmt.Errorf("session: %w", err)
 	}
 	store := opts.Session.Store
 	if store == nil {
-		// memory.New with zero options performs no I/O and cannot fail:
-		// Options{} passes Validate trivially and the store allocates no
-		// external resources. Error branch pruned by evidence (see cover_test).
-		store, _ = sessionmemory.New(session.Options{})
+		return nil, &auth.InvalidOptionsError{Reason: "session store is required"}
 	}
 	return &adapter{store: store}, nil
 }

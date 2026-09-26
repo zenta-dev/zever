@@ -8,10 +8,10 @@ import (
 	"testing"
 	"time"
 
-	"github.com/zenta-dev/zever/job"
-	"github.com/zenta-dev/zever/queue"
-	queuememory "github.com/zenta-dev/zever/queue/memory"
-	"github.com/zenta-dev/zever/scheduler"
+	queuememory "github.com/zenta-dev/zever/adapters/queue/memory"
+	"github.com/zenta-dev/zever/core/job"
+	"github.com/zenta-dev/zever/core/queue"
+	"github.com/zenta-dev/zever/core/scheduler"
 )
 
 // eventually polls cond until true or timeout, failing the test on expiry.

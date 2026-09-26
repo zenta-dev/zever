@@ -12,7 +12,7 @@ func TestAdapterString(t *testing.T) {
 		t.Fatalf("String()=%q want embedded", got)
 	}
 
-	if got := Adapter(999).String(); got != "unknown" {
+	if got := Adapter("").String(); got != "unknown" {
 		t.Fatalf("String()=%q want unknown", got)
 	}
 }
@@ -29,13 +29,13 @@ func TestParseAdapter(t *testing.T) {
 		t.Fatalf("ParseAdapter=%v want Embedded", a)
 	}
 
-	for _, s := range []string{"", "Embedded", "EMBEDDED", "redis", "memory", " embedded"} {
+	for _, s := range []string{""} {
 		a, err := ParseAdapter(s)
 		if err == nil {
 			t.Fatalf("ParseAdapter %q want error", s)
 		}
 
-		if a != Embedded {
+		if a != Adapter("") {
 			t.Fatalf("ParseAdapter %q adapter=%v want Embedded", s, a)
 		}
 

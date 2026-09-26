@@ -5,7 +5,7 @@ import (
 	"testing"
 	"time"
 
-	"github.com/zenta-dev/zever/auth"
+	"github.com/zenta-dev/zever/core/auth"
 )
 
 func TestCoverVerifyClaimsExtractFails(t *testing.T) {

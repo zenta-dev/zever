@@ -6,7 +6,7 @@ import (
 	"strings"
 	"testing"
 
-	"github.com/zenta-dev/zever/tenant"
+	"github.com/zenta-dev/zever/core/tenant"
 )
 
 func TestResolveFromHeader(t *testing.T) {

@@ -10,9 +10,9 @@ import (
 
 	"github.com/robfig/cron/v3"
 
-	"github.com/zenta-dev/zever/cache"
-	cachememory "github.com/zenta-dev/zever/cache/memory"
-	"github.com/zenta-dev/zever/log/noop"
+	cachememory "github.com/zenta-dev/zever/adapters/cache/memory"
+	"github.com/zenta-dev/zever/adapters/log/noop"
+	"github.com/zenta-dev/zever/core/cache"
 )
 
 func TestSchedulerNewScheduler(t *testing.T) {

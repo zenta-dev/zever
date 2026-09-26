@@ -14,7 +14,7 @@ import (
 
 	posthog "github.com/posthog/posthog-go"
 
-	"github.com/zenta-dev/zever/analytics"
+	"github.com/zenta-dev/zever/core/analytics"
 )
 
 // errFakeClient simulates SDK client construction failures.

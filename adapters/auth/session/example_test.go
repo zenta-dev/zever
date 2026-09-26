@@ -1,21 +1,29 @@
-package auth_test
+package session_test
 
 import (
 	"context"
 	"fmt"
 	"time"
 
-	"github.com/zenta-dev/zever/auth"
-	authsession "github.com/zenta-dev/zever/auth/session"
+	authsession "github.com/zenta-dev/zever/adapters/auth/session"
+	sessionmemory "github.com/zenta-dev/zever/adapters/session/memory"
+	"github.com/zenta-dev/zever/core/auth"
+	coresession "github.com/zenta-dev/zever/core/session"
 )
 
 // ExampleOpen opens the session backend, issues a token and verifies it.
 func ExampleOpen() {
-	const exampleAdapter auth.Adapter = 32002
+	const exampleAdapter auth.Adapter = "example-test"
+
+	store, err := sessionmemory.New(coresession.Options{})
+	if err != nil {
+		fmt.Println("store error")
+		return
+	}
 
 	_ = auth.Register(exampleAdapter, authsession.New)
 
-	backend, err := auth.Open(exampleAdapter, auth.Options{})
+	backend, err := auth.Open(exampleAdapter, auth.Options{Session: auth.SessionOptions{Store: store}})
 	if err != nil {
 		fmt.Println("open error")
 		return

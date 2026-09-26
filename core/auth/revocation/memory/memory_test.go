@@ -4,8 +4,8 @@ import (
 	"testing"
 	"time"
 
-	"github.com/zenta-dev/zever/auth/jwt/revocation"
-	"github.com/zenta-dev/zever/auth/jwt/revocation/revocationtest"
+	"github.com/zenta-dev/zever/core/auth/revocation"
+	"github.com/zenta-dev/zever/core/auth/revocation/revocationtest"
 )
 
 func newTestStore(t *testing.T) revocation.Store {

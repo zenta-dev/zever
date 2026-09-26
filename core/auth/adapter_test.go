@@ -2,7 +2,6 @@ package auth
 
 import (
 	"errors"
-	"strings"
 	"testing"
 )
 
@@ -29,8 +28,8 @@ func TestAdapter_String_oidc(t *testing.T) {
 
 func TestAdapter_String_unknown(t *testing.T) {
 	t.Parallel()
-	if got := Adapter(99).String(); got != "unknown" {
-		t.Fatalf("Adapter(99).String() = %q, want %q", got, "unknown")
+	if got := Adapter("").String(); got != "unknown" {
+		t.Fatalf("Adapter(empty).String() = %q, want %q", got, "unknown")
 	}
 }
 
@@ -71,14 +70,11 @@ func TestParseAdapter_uppercase_rejected(t *testing.T) {
 	t.Parallel()
 	for _, s := range []string{"JWT", "Session", "OIDC"} {
 		a, err := ParseAdapter(s)
-		if err == nil {
-			t.Fatalf("ParseAdapter(%q) expected error, got nil", s)
+		if err != nil {
+			t.Fatalf("ParseAdapter(%q) err = %v, want nil (open adapter)", s, err)
 		}
-		if !errors.Is(err, ErrInvalidAdapter) {
-			t.Fatalf("ParseAdapter(%q) err = %v, want ErrInvalidAdapter", s, err)
-		}
-		if a != JWT {
-			t.Fatalf("ParseAdapter(%q) adapter = %v, want JWT zero value", s, a)
+		if a != Adapter(s) {
+			t.Fatalf("ParseAdapter(%q) adapter = %v, want %v", s, a, Adapter(s))
 		}
 	}
 }
@@ -86,21 +82,11 @@ func TestParseAdapter_uppercase_rejected(t *testing.T) {
 func TestParseAdapter_unknown_fails_zero(t *testing.T) {
 	t.Parallel()
 	a, err := ParseAdapter("redis")
-	if err == nil {
-		t.Fatal("ParseAdapter(redis) expected error, got nil")
+	if err != nil {
+		t.Fatalf("ParseAdapter(redis) err = %v, want nil (open adapter)", err)
 	}
-	var iae *InvalidAdapterError
-	if !errors.As(err, &iae) {
-		t.Fatalf("ParseAdapter(redis) err type = %T, want *InvalidAdapterError", err)
-	}
-	if iae.Adapter != "redis" {
-		t.Fatalf("InvalidAdapterError.Adapter = %q, want %q", iae.Adapter, "redis")
-	}
-	if a != JWT {
-		t.Fatalf("ParseAdapter(redis) adapter = %v, want JWT zero value", a)
-	}
-	if !strings.Contains(err.Error(), "redis") {
-		t.Fatalf("error message should carry adapter name, got %q", err.Error())
+	if a != Adapter("redis") {
+		t.Fatalf("ParseAdapter(redis) adapter = %v, want %v", a, Adapter("redis"))
 	}
 }
 
@@ -113,7 +99,7 @@ func TestParseAdapter_empty_fails_zero(t *testing.T) {
 	if !errors.Is(err, ErrInvalidAdapter) {
 		t.Fatalf("ParseAdapter empty err = %v, want ErrInvalidAdapter", err)
 	}
-	if a != JWT {
-		t.Fatalf("ParseAdapter empty adapter = %v, want JWT zero value", a)
+	if a != Adapter("") {
+		t.Fatalf("ParseAdapter empty adapter = %v, want empty zero value", a)
 	}
 }

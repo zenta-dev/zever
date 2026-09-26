@@ -4,7 +4,7 @@ import (
 	"testing"
 	"time"
 
-	"github.com/zenta-dev/zever/cache"
+	"github.com/zenta-dev/zever/core/cache"
 )
 
 func TestConnOptions_mapping(t *testing.T) {

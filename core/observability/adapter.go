@@ -1,42 +1,31 @@
 package observability
 
 // Adapter identifies a registered observability backend.
-type Adapter int
+
+type Adapter string
 
 const (
 	// Noop selects the discard-all observability adapter.
-	Noop Adapter = iota
+	Noop Adapter = "noop"
 	// Stdout selects the human-readable stdout observability adapter.
-	Stdout
+	Stdout Adapter = "stdout"
 	// OTLP selects the OpenTelemetry OTLP observability adapter.
-	OTLP
+	OTLP Adapter = "otlp"
 )
 
-// String returns the canonical lowercase name of the adapter.
+// String returns the canonical name of Adapter.
 func (a Adapter) String() string {
-	switch a {
-	case Noop:
-		return "noop"
-	case Stdout:
-		return "stdout"
-	case OTLP:
-		return "otlp"
-	default:
+	if a == "" {
 		return "unknown"
 	}
+	return string(a)
 }
 
 // ParseAdapter parses adapter name into an Adapter.
-// Only exact lowercase names match; anything else fails.
+// Any non-empty name is accepted to allow custom adapters; empty fails.
 func ParseAdapter(s string) (Adapter, error) {
-	switch s {
-	case "noop":
-		return Noop, nil
-	case "stdout":
-		return Stdout, nil
-	case "otlp":
-		return OTLP, nil
-	default:
-		return Noop, &InvalidAdapterError{Adapter: s}
+	if s == "" {
+		return Adapter(""), &InvalidAdapterError{Adapter: s}
 	}
+	return Adapter(s), nil
 }

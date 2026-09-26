@@ -6,7 +6,7 @@ import (
 	"fmt"
 	"sync"
 
-	"github.com/zenta-dev/zever/workflow"
+	"github.com/zenta-dev/zever/core/workflow"
 )
 
 type run struct {

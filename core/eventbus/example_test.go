@@ -4,8 +4,8 @@ import (
 	"context"
 	"fmt"
 
-	"github.com/zenta-dev/zever/eventbus"
-	"github.com/zenta-dev/zever/eventbus/memory"
+	"github.com/zenta-dev/zever/adapters/eventbus/memory"
+	"github.com/zenta-dev/zever/core/eventbus"
 )
 
 // ExampleOpen opens the memory bus and receives a published message.

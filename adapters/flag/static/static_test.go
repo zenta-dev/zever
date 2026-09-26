@@ -11,7 +11,7 @@ import (
 	"testing"
 	"time"
 
-	"github.com/zenta-dev/zever/flag"
+	"github.com/zenta-dev/zever/core/flag"
 )
 
 func openTestdata(t *testing.T, reload bool) flag.Flag {

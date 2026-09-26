@@ -8,12 +8,16 @@ import (
 	"testing"
 	"time"
 
-	"github.com/zenta-dev/zever/cache"
+	"fmt"
+
+	"github.com/zenta-dev/zever/core/cache"
 )
 
 var cacheAdapterSeq atomic.Int64
 
-func freshCacheAdapter() cache.Adapter { return cache.Adapter(1000 + cacheAdapterSeq.Add(1)) }
+func freshCacheAdapter() cache.Adapter {
+	return cache.Adapter(fmt.Sprintf("test-%d", 1000+cacheAdapterSeq.Add(1)))
+}
 
 type stubCache struct{}
 
@@ -99,7 +103,7 @@ func TestCacheRegister_duplicate_returnsDuplicate(t *testing.T) {
 }
 
 func TestCacheOpen_unknown_returnsUnknownAdapter(t *testing.T) {
-	_, err := cache.Open(cache.Adapter(9999), cache.Options{})
+	_, err := cache.Open(cache.Adapter("test-9999"), cache.Options{})
 	if err == nil {
 		t.Fatal("Open() = nil, want ErrUnknownAdapter")
 	}

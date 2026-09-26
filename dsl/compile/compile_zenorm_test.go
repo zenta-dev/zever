@@ -3,7 +3,7 @@ package compile
 import (
 	"testing"
 
-	"github.com/zenta-dev/zever/internal/dsl/backend/zenorm"
+	"github.com/zenta-dev/zever/dsl/backend/zenorm"
 )
 
 // TestCompileValidMultiFileWithZenormBackend mirrors

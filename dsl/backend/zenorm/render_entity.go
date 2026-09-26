@@ -14,7 +14,7 @@ import (
 	"fmt"
 	"strings"
 
-	"github.com/zenta-dev/zever/internal/dsl/naming"
+	"github.com/zenta-dev/zever/dsl/naming"
 )
 
 // renderEntityBody appends one entity's whole generated section to b.

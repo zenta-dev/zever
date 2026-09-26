@@ -9,8 +9,8 @@ import (
 	"sync"
 	"testing"
 
-	"github.com/zenta-dev/zever/mailer"
-	mailerlog "github.com/zenta-dev/zever/mailer/log"
+	mailerlog "github.com/zenta-dev/zever/adapters/mailer/log"
+	"github.com/zenta-dev/zever/core/mailer"
 )
 
 func validOptions() mailer.Options {

@@ -2,6 +2,7 @@ package session
 
 import (
 	"errors"
+	"fmt"
 	"strings"
 	"sync/atomic"
 	"testing"
@@ -11,7 +12,7 @@ import (
 var freshAdapterCounter int64
 
 func freshAdapter() Adapter {
-	return Adapter(1000 + atomic.AddInt64(&freshAdapterCounter, 1))
+	return Adapter(fmt.Sprintf("test-%d", 1000+atomic.AddInt64(&freshAdapterCounter, 1)))
 }
 
 func eventually(t *testing.T, timeout time.Duration, cond func() bool, msg string) {

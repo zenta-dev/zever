@@ -14,7 +14,7 @@ import (
 	twilio "github.com/twilio/twilio-go"
 	twilioclient "github.com/twilio/twilio-go/client"
 
-	"github.com/zenta-dev/zever/notification"
+	"github.com/zenta-dev/zever/core/notification"
 )
 
 // stubRoundTripper returns canned responses without network.

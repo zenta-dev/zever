@@ -21,7 +21,7 @@ import (
 	"sync/atomic"
 	"time"
 
-	"github.com/zenta-dev/zever/mailer"
+	"github.com/zenta-dev/zever/core/mailer"
 )
 
 var _ mailer.Mailer = (*smtpMailer)(nil)

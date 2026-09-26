@@ -49,7 +49,7 @@ func TestAdapterString(t *testing.T) {
 		{AdapterLocal, "local"},
 		{AdapterS3, "s3"},
 		{AdapterR2, "r2"},
-		{Adapter(99), "unknown"},
+		{Adapter(""), "unknown"},
 	}
 
 	for i := range cases {
@@ -80,9 +80,17 @@ func TestParseAdapter(t *testing.T) {
 		}
 	}
 
-	_, err := ParseAdapter("bogus")
+	got, err := ParseAdapter("bogus")
+	if err != nil {
+		t.Fatalf("ParseAdapter(bogus) error = %v, want nil (open adapter)", err)
+	}
+	if got != Adapter("bogus") {
+		t.Errorf("ParseAdapter(bogus) = %v, want %v", got, Adapter("bogus"))
+	}
+
+	_, err = ParseAdapter("")
 	if err == nil {
-		t.Fatal("ParseAdapter(bogus) expected error")
+		t.Fatal("ParseAdapter(\"\") expected error")
 	}
 
 	if !errors.Is(err, ErrInvalidAdapter) {
@@ -94,29 +102,29 @@ func TestParseAdapter(t *testing.T) {
 		t.Fatalf("expected *InvalidAdapterError, got %T", err)
 	}
 
-	if inv.Adapter != "bogus" {
-		t.Errorf("Adapter = %q, want %q", inv.Adapter, "bogus")
+	if inv.Adapter != "" {
+		t.Errorf("Adapter = %q, want %q", inv.Adapter, "")
 	}
 
-	if !strings.Contains(err.Error(), `"bogus"`) {
-		t.Errorf("Error() = %q, want it to mention bogus", err.Error())
+	if !strings.Contains(err.Error(), `""`) {
+		t.Errorf("Error() = %q, want it to mention empty", err.Error())
 	}
 }
 
 func TestRegistryRegisterAndOpen(t *testing.T) {
-	if err := Register(Adapter(77), nil); !errors.Is(err, ErrNilFactory) {
+	if err := Register(Adapter("test-77"), nil); !errors.Is(err, ErrNilFactory) {
 		t.Fatalf("Register nil factory: expected ErrNilFactory, got %v", err)
 	}
 
 	stub := func(_ Options) (Storage, error) { return stubStorage{}, nil }
-	if err := Register(Adapter(77), stub); err != nil {
+	if err := Register(Adapter("test-77"), stub); err != nil {
 		var dup *DuplicateError
 		if !errors.As(err, &dup) {
 			t.Fatalf("Register: %v", err)
 		}
 	}
 
-	if err := Register(Adapter(77), stub); !errors.Is(err, ErrDuplicate) {
+	if err := Register(Adapter("test-77"), stub); !errors.Is(err, ErrDuplicate) {
 		t.Fatalf("expected ErrDuplicate, got %v", err)
 	} else {
 		var dup *DuplicateError
@@ -124,16 +132,16 @@ func TestRegistryRegisterAndOpen(t *testing.T) {
 			t.Fatalf("expected *DuplicateError, got %T", err)
 		}
 
-		if dup.Adapter != Adapter(77) {
-			t.Errorf("Adapter = %v, want Adapter(77)", dup.Adapter)
+		if dup.Adapter != Adapter("test-77") {
+			t.Errorf("Adapter = %v, want %v", dup.Adapter, Adapter("test-77"))
 		}
 
-		if !strings.Contains(err.Error(), "unknown") {
+		if !strings.Contains(err.Error(), "test-77") {
 			t.Errorf("Error() = %q", err.Error())
 		}
 	}
 
-	if _, err := Open(Adapter(79), Options{}); !errors.Is(err, ErrUnknownAdapter) {
+	if _, err := Open(Adapter("test-79"), Options{}); !errors.Is(err, ErrUnknownAdapter) {
 		t.Fatalf("expected ErrUnknownAdapter, got %v", err)
 	} else {
 		var unk *UnknownAdapterError
@@ -141,8 +149,8 @@ func TestRegistryRegisterAndOpen(t *testing.T) {
 			t.Fatalf("expected *UnknownAdapterError, got %T", err)
 		}
 
-		if unk.Adapter != Adapter(79) {
-			t.Errorf("Adapter = %v, want Adapter(79)", unk.Adapter)
+		if unk.Adapter != Adapter("test-79") {
+			t.Errorf("Adapter = %v, want %v", unk.Adapter, Adapter("test-79"))
 		}
 
 		if !strings.Contains(err.Error(), "forgotten import?") {
@@ -150,20 +158,20 @@ func TestRegistryRegisterAndOpen(t *testing.T) {
 		}
 	}
 
-	if err := Register(Adapter(78), func(_ Options) (Storage, error) { return nil, ErrExpired }); err != nil {
+	if err := Register(Adapter("test-78"), func(_ Options) (Storage, error) { return nil, ErrExpired }); err != nil {
 		var dup *DuplicateError
 		if !errors.As(err, &dup) {
 			t.Fatalf("Register: %v", err)
 		}
 	}
 
-	if _, err := Open(Adapter(78), Options{}); !errors.Is(err, ErrExpired) {
+	if _, err := Open(Adapter("test-78"), Options{}); !errors.Is(err, ErrExpired) {
 		t.Fatalf("expected wrapped ErrExpired, got %v", err)
 	} else if !strings.Contains(err.Error(), "storage: open") {
 		t.Errorf("Error() = %q, want storage: open prefix", err.Error())
 	}
 
-	s, err := Open(Adapter(77), Options{})
+	s, err := Open(Adapter("test-77"), Options{})
 	if err != nil {
 		t.Fatalf("Open: %v", err)
 	}

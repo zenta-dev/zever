@@ -10,8 +10,9 @@ import (
 
 	goredis "github.com/redis/go-redis/v9"
 
-	"github.com/zenta-dev/zever/idempotency"
-	zredis "github.com/zenta-dev/zever/internal/redis"
+	"github.com/zenta-dev/zever/core/idempotency"
+	redisclient "github.com/zenta-dev/zever/shared/redisclient"
+	redisopt "github.com/zenta-dev/zever/shared/redisopt"
 )
 
 const (
@@ -58,7 +59,7 @@ func New(opts idempotency.Options) (idempotency.Store, error) {
 		ttl = idempotency.DefaultTTL
 	}
 
-	client, err := zredis.New(opts.Redis.Options)
+	client, err := redisclient.New(opts.Redis.Options)
 	if err != nil {
 		return nil, fmt.Errorf("redis: connect %q: %w", redactAddr(opts.Redis.Addr), err)
 	}
@@ -78,7 +79,7 @@ func New(opts idempotency.Options) (idempotency.Store, error) {
 // redactAddr masks any embedded userinfo credentials, suitable for error
 // messages. The password from options is never included.
 func redactAddr(addr string) string {
-	return zredis.RedactAddr(addr)
+	return redisopt.RedactAddr(addr)
 }
 
 func (s *store) redisKey(key string) string {
@@ -256,7 +257,7 @@ func (s *store) Close() error {
 		return nil
 	}
 
-	return zredis.Close(s.client)
+	return redisclient.Close(s.client)
 }
 
 // maxFingerprintLen caps per-call fingerprints: hashes are tiny, wire

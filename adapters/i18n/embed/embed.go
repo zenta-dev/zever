@@ -12,8 +12,8 @@ import (
 	"sync/atomic"
 	"text/template"
 
-	"github.com/zenta-dev/zever/codec"
-	"github.com/zenta-dev/zever/i18n"
+	"github.com/zenta-dev/zever/core/i18n"
+	"github.com/zenta-dev/zever/shared/codec"
 )
 
 // localeCodec decodes a single locale's JSON catalog file (key -> message

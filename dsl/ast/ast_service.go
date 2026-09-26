@@ -1,6 +1,6 @@
 package ast
 
-import "github.com/zenta-dev/zever/internal/dsl/diag"
+import "github.com/zenta-dev/zever/dsl/diag"
 
 // ServiceDecl represents a service declaration.
 type ServiceDecl struct {

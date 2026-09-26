@@ -8,8 +8,8 @@ import (
 	"path/filepath"
 	"strings"
 
-	"github.com/zenta-dev/zever/codec"
-	"github.com/zenta-dev/zever/geo"
+	"github.com/zenta-dev/zever/core/geo"
+	"github.com/zenta-dev/zever/shared/codec"
 )
 
 type city struct {

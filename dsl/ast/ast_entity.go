@@ -1,7 +1,7 @@
 // Package ast defines abstract syntax tree nodes for the zen DSL.
 package ast
 
-import "github.com/zenta-dev/zever/internal/dsl/diag"
+import "github.com/zenta-dev/zever/dsl/diag"
 
 // Decl is the interface implemented by all top-level declarations.
 type Decl interface {

@@ -1,7 +1,7 @@
 package storage
 
 import (
-	"github.com/zenta-dev/zever/log"
+	"github.com/zenta-dev/zever/core/log"
 )
 
 // LocalOptions configures the local-filesystem backend.

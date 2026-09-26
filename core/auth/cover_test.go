@@ -17,7 +17,7 @@ func TestCoverTypedErrorStrings(t *testing.T) {
 		want string
 	}{
 		{"duplicate", DuplicateError{Adapter: JWT}, "auth: duplicate registration"},
-		{"unknown", UnknownAdapterError{Adapter: Adapter(99)}, "auth: unknown adapter: unknown (forgotten import?)"},
+		{"unknown", UnknownAdapterError{Adapter: Adapter("")}, "auth: unknown adapter: unknown (forgotten import?)"},
 	}
 
 	for _, tc := range cases {

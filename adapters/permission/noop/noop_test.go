@@ -3,8 +3,8 @@ package noop_test
 import (
 	"testing"
 
-	"github.com/zenta-dev/zever/permission"
-	"github.com/zenta-dev/zever/permission/noop"
+	"github.com/zenta-dev/zever/adapters/permission/noop"
+	"github.com/zenta-dev/zever/core/permission"
 )
 
 func TestNew_valid_returnsChecker(t *testing.T) {

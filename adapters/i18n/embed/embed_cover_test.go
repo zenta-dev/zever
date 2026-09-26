@@ -7,7 +7,7 @@ import (
 	"testing/fstest"
 	"time"
 
-	"github.com/zenta-dev/zever/i18n"
+	"github.com/zenta-dev/zever/core/i18n"
 )
 
 var errReadFileSentinel = errors.New("sentinel read failure")

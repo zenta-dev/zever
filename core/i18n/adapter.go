@@ -1,36 +1,29 @@
 package i18n
 
 // Adapter identifies the internationalization backend implementation.
-type Adapter int
+
+type Adapter string
 
 const (
 	// Embed is the embedded-catalog i18n adapter.
-	Embed Adapter = iota
+	Embed Adapter = "embed"
 	// Remote is the remote-service i18n adapter.
-	Remote
+	Remote Adapter = "remote"
 )
 
 // String returns the canonical name of Adapter.
 func (a Adapter) String() string {
-	switch a {
-	case Embed:
-		return "embed"
-	case Remote:
-		return "remote"
-	default:
+	if a == "" {
 		return "unknown"
 	}
+	return string(a)
 }
 
 // ParseAdapter parses adapter name into an Adapter.
-// Only exact lowercase names match; anything else fails.
+// Any non-empty name is accepted to allow custom adapters; empty fails.
 func ParseAdapter(s string) (Adapter, error) {
-	switch s {
-	case "embed":
-		return Embed, nil
-	case "remote":
-		return Remote, nil
-	default:
-		return Embed, &InvalidAdapterError{Adapter: s}
+	if s == "" {
+		return Adapter(""), &InvalidAdapterError{Adapter: s}
 	}
+	return Adapter(s), nil
 }

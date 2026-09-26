@@ -14,10 +14,10 @@ import (
 	"github.com/openai/openai-go/v3/option"
 	"github.com/openai/openai-go/v3/shared"
 
-	"github.com/zenta-dev/zever/ai"
-	"github.com/zenta-dev/zever/internal/endpoint"
-	"github.com/zenta-dev/zever/internal/httpclient"
-	"github.com/zenta-dev/zever/internal/retry"
+	"github.com/zenta-dev/zever/core/ai"
+	"github.com/zenta-dev/zever/shared/endpoint"
+	"github.com/zenta-dev/zever/shared/httpclient"
+	"github.com/zenta-dev/zever/shared/retry"
 )
 
 type adapter struct {

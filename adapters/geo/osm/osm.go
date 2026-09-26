@@ -12,10 +12,10 @@ import (
 	"sync"
 	"time"
 
-	"github.com/zenta-dev/zever/codec"
-	"github.com/zenta-dev/zever/geo"
-	endpointpkg "github.com/zenta-dev/zever/internal/endpoint"
-	"github.com/zenta-dev/zever/internal/httpclient"
+	"github.com/zenta-dev/zever/core/geo"
+	"github.com/zenta-dev/zever/shared/codec"
+	endpointpkg "github.com/zenta-dev/zever/shared/endpoint"
+	"github.com/zenta-dev/zever/shared/httpclient"
 )
 
 const defaultEndpoint = "https://nominatim.openstreetmap.org"

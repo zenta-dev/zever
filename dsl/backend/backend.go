@@ -7,7 +7,7 @@ package backend
 import (
 	"context"
 
-	"github.com/zenta-dev/zever/internal/dsl/ir"
+	"github.com/zenta-dev/zever/dsl/ir"
 )
 
 // Backend generates one or more output files from a resolved schema. Name

@@ -15,11 +15,11 @@ import (
 	"sync"
 	"time"
 
-	"github.com/zenta-dev/zever/internal/retry"
-	"github.com/zenta-dev/zever/log"
-	"github.com/zenta-dev/zever/log/noop"
-	"github.com/zenta-dev/zever/queue"
-	"github.com/zenta-dev/zever/webhook"
+	"github.com/zenta-dev/zever/adapters/log/noop"
+	"github.com/zenta-dev/zever/core/log"
+	"github.com/zenta-dev/zever/core/queue"
+	"github.com/zenta-dev/zever/core/webhook"
+	"github.com/zenta-dev/zever/shared/retry"
 )
 
 const (

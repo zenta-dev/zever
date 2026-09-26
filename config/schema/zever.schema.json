@@ -105,7 +105,7 @@
     "providersCommon": {
       "type": "object",
       "additionalProperties": false,
-      "description": "Shared Stripe/Paddle option shape (internal/providers.Common), embedded directly into billing.Options and payment.Options -- no wrapper key.",
+      "description": "Shared Stripe/Paddle option shape (shared/providersopt), embedded directly into billing.Options and payment.Options -- no wrapper key.",
       "properties": {
         "secret_key": { "type": "string", "description": "Provider secret key (Stripe)." },
         "api_key": { "type": "string", "description": "Provider API key (Paddle)." },

@@ -8,7 +8,7 @@ import (
 	"testing"
 	"time"
 
-	"github.com/zenta-dev/zever/workflow"
+	"github.com/zenta-dev/zever/core/workflow"
 )
 
 func newTestAdapter(t *testing.T) *Adapter {

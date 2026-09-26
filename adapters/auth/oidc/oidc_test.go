@@ -15,8 +15,8 @@ import (
 	"testing"
 	"time"
 
-	"github.com/zenta-dev/zever/auth"
-	"github.com/zenta-dev/zever/auth/oidc"
+	"github.com/zenta-dev/zever/adapters/auth/oidc"
+	"github.com/zenta-dev/zever/core/auth"
 )
 
 // NOTE: tests use 2048-bit RSA keys (fast to generate, ~ms) so gosec

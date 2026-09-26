@@ -8,13 +8,17 @@ import (
 	"testing"
 	"time"
 
-	"github.com/zenta-dev/zever/lock"
-	"github.com/zenta-dev/zever/lock/memory"
+	"fmt"
+
+	"github.com/zenta-dev/zever/adapters/lock/memory"
+	"github.com/zenta-dev/zever/core/lock"
 )
 
 var lockAdapterSeq atomic.Int64
 
-func freshLockAdapter() lock.Adapter { return lock.Adapter(1000 + lockAdapterSeq.Add(1)) }
+func freshLockAdapter() lock.Adapter {
+	return lock.Adapter(fmt.Sprintf("test-%d", 1000+lockAdapterSeq.Add(1)))
+}
 
 type stubLock struct{ key string }
 
@@ -107,7 +111,7 @@ func TestLockRegister_duplicate_returnsDuplicate(t *testing.T) {
 }
 
 func TestLockOpen_unknown_returnsUnknownAdapter(t *testing.T) {
-	_, err := lock.Open(lock.Adapter(9999), lock.Options{})
+	_, err := lock.Open(lock.Adapter("test-9999"), lock.Options{})
 	if err == nil {
 		t.Fatal("Open() = nil, want ErrUnknownAdapter")
 	}

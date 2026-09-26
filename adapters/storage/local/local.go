@@ -20,9 +20,9 @@ import (
 	"sync"
 	"time"
 
-	"github.com/zenta-dev/zever/log"
-	"github.com/zenta-dev/zever/log/noop"
-	"github.com/zenta-dev/zever/storage"
+	"github.com/zenta-dev/zever/adapters/log/noop"
+	"github.com/zenta-dev/zever/core/log"
+	"github.com/zenta-dev/zever/core/storage"
 )
 
 type localAdapter struct {

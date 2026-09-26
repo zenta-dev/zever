@@ -3,8 +3,8 @@ package gogen
 import (
 	"strings"
 
-	"github.com/zenta-dev/zever/internal/dsl/ir"
-	"github.com/zenta-dev/zever/internal/dsl/naming"
+	"github.com/zenta-dev/zever/dsl/ir"
+	"github.com/zenta-dev/zever/dsl/naming"
 )
 
 // pbFieldName converts a schema/proto field identifier (snake_case, e.g.
@@ -110,14 +110,14 @@ const (
 	pkgProtoJSON      = "google.golang.org/protobuf/encoding/protojson"
 	pkgUUID           = "github.com/google/uuid"
 
-	pkgRouter     = "github.com/zenta-dev/zever/router"
-	pkgApperror   = "github.com/zenta-dev/zever/apperror"
+	pkgRouter     = "github.com/zenta-dev/zever/core/router"
+	pkgApperror   = "github.com/zenta-dev/zever/shared/apperror"
 	pkgGRPCCodes  = "google.golang.org/grpc/codes"
 	pkgGRPCStat   = "google.golang.org/grpc/status"
 	pkgGRPC       = "google.golang.org/grpc"
-	pkgAuthz      = "github.com/zenta-dev/zever/authz"
-	pkgAuth       = "github.com/zenta-dev/zever/auth"
-	pkgPermission = "github.com/zenta-dev/zever/permission"
+	pkgAuthz      = "github.com/zenta-dev/zever/core/authz"
+	pkgAuth       = "github.com/zenta-dev/zever/core/auth"
+	pkgPermission = "github.com/zenta-dev/zever/core/permission"
 )
 
 // paramModel is one operation parameter, resolved once for every renderer.

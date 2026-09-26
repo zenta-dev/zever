@@ -6,7 +6,7 @@ import (
 	"net/http/httptest"
 	"testing"
 
-	"github.com/zenta-dev/zever/i18n"
+	"github.com/zenta-dev/zever/core/i18n"
 )
 
 func TestNewEmptyEndpoint(t *testing.T) {

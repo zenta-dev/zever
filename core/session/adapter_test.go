@@ -2,7 +2,6 @@ package session
 
 import (
 	"errors"
-	"strings"
 	"testing"
 )
 
@@ -15,8 +14,8 @@ func TestAdapter_String_memory(t *testing.T) {
 
 func TestAdapter_String_unknown(t *testing.T) {
 	t.Parallel()
-	if got := Adapter(99).String(); got != "unknown" {
-		t.Fatalf("Adapter(99).String() = %q, want %q", got, "unknown")
+	if got := Adapter("").String(); got != "unknown" {
+		t.Fatalf("Adapter(empty).String() = %q, want %q", got, "unknown")
 	}
 }
 
@@ -33,12 +32,12 @@ func TestParseAdapter_memory_success(t *testing.T) {
 
 func TestParseAdapter_invalid_uppercase_fails(t *testing.T) {
 	t.Parallel()
-	_, err := ParseAdapter("Memory")
-	if err == nil {
-		t.Fatal("ParseAdapter(Memory) expected error, got nil")
+	a, err := ParseAdapter("Memory")
+	if err != nil {
+		t.Fatalf("ParseAdapter(Memory) err = %v, want nil (open adapter)", err)
 	}
-	if !errors.Is(err, ErrInvalidAdapter) {
-		t.Fatalf("ParseAdapter(Memory) err = %v, want ErrInvalidAdapter", err)
+	if a != Adapter("Memory") {
+		t.Fatalf("ParseAdapter(Memory) = %v, want %v", a, Adapter("Memory"))
 	}
 }
 
@@ -51,28 +50,18 @@ func TestParseAdapter_invalid_empty_fails(t *testing.T) {
 	if !errors.Is(err, ErrInvalidAdapter) {
 		t.Fatalf("ParseAdapter empty err = %v, want ErrInvalidAdapter", err)
 	}
-	if a != Memory {
-		t.Fatalf("ParseAdapter empty adapter = %v, want Memory zero value", a)
+	if a != Adapter("") {
+		t.Fatalf("ParseAdapter empty adapter = %v, want empty zero value", a)
 	}
 }
 
 func TestParseAdapter_invalid_unknown_fails(t *testing.T) {
 	t.Parallel()
 	a, err := ParseAdapter("postgres")
-	if err == nil {
-		t.Fatal("ParseAdapter(postgres) expected error, got nil")
+	if err != nil {
+		t.Fatalf("ParseAdapter(postgres) err = %v, want nil (open adapter)", err)
 	}
-	var iae *InvalidAdapterError
-	if !errors.As(err, &iae) {
-		t.Fatalf("ParseAdapter(postgres) err type = %T, want *InvalidAdapterError", err)
-	}
-	if iae.Adapter != "postgres" {
-		t.Fatalf("InvalidAdapterError.Adapter = %q, want %q", iae.Adapter, "postgres")
-	}
-	if a != Memory {
-		t.Fatalf("ParseAdapter(postgres) adapter = %v, want Memory zero value", a)
-	}
-	if !strings.Contains(err.Error(), "postgres") {
-		t.Fatalf("error message should carry adapter name, got %q", err.Error())
+	if a != Adapter("postgres") {
+		t.Fatalf("ParseAdapter(postgres) adapter = %v, want %v", a, Adapter("postgres"))
 	}
 }

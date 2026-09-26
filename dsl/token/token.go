@@ -1,7 +1,7 @@
 // Package token defines lexical token kinds and keywords for the DSL compiler.
 package token
 
-import "github.com/zenta-dev/zever/internal/dsl/diag"
+import "github.com/zenta-dev/zever/dsl/diag"
 
 // Kind represents a lexical token type.
 type Kind int

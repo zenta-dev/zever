@@ -11,8 +11,8 @@ import (
 	"github.com/jackc/pgx/v5/pgconn"
 	"github.com/jackc/pgx/v5/pgxpool"
 
-	"github.com/zenta-dev/zever/codec"
-	"github.com/zenta-dev/zever/vectorstore"
+	"github.com/zenta-dev/zever/core/vectorstore"
+	"github.com/zenta-dev/zever/shared/codec"
 )
 
 var (

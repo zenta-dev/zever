@@ -3,8 +3,8 @@ package ratelimit_test
 import (
 	"context"
 
-	"github.com/zenta-dev/zever/ratelimit"
-	"github.com/zenta-dev/zever/ratelimit/memory"
+	"github.com/zenta-dev/zever/adapters/ratelimit/memory"
+	"github.com/zenta-dev/zever/core/ratelimit"
 )
 
 // ExampleOpen opens the in-memory limiter and allows one token.

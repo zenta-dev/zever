@@ -7,7 +7,7 @@ import (
 	"sync"
 	"testing"
 
-	"github.com/zenta-dev/zever/permission"
+	"github.com/zenta-dev/zever/core/permission"
 )
 
 func allowOpts() permission.Options {

@@ -4,7 +4,7 @@ import (
 	"context"
 	"testing"
 
-	"github.com/zenta-dev/zever/observability"
+	"github.com/zenta-dev/zever/core/observability"
 )
 
 var (

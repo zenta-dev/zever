@@ -3,8 +3,8 @@ package observability_test
 import (
 	"context"
 
-	"github.com/zenta-dev/zever/observability"
-	"github.com/zenta-dev/zever/observability/noop"
+	"github.com/zenta-dev/zever/adapters/observability/noop"
+	"github.com/zenta-dev/zever/core/observability"
 )
 
 // ExampleOpen opens a noop provider and records a span.

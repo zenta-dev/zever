@@ -9,7 +9,7 @@ import (
 	"sync"
 	"time"
 
-	"github.com/zenta-dev/zever/cache"
+	"github.com/zenta-dev/zever/core/cache"
 )
 
 const defaultMaxEntries = 1000

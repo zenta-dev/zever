@@ -4,7 +4,7 @@ import (
 	"errors"
 	"testing"
 
-	"github.com/zenta-dev/zever/secrets"
+	"github.com/zenta-dev/zever/core/secrets"
 )
 
 func TestNew_requiresPrefix(t *testing.T) {

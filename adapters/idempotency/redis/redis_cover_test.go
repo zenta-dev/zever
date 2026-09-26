@@ -14,7 +14,7 @@ import (
 
 	goredis "github.com/redis/go-redis/v9"
 
-	"github.com/zenta-dev/zever/idempotency"
+	"github.com/zenta-dev/zever/core/idempotency"
 )
 
 // discardRespCommand reads one RESP array (command) from r and drops it.

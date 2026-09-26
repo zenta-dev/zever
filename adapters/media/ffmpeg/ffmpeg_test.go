@@ -9,7 +9,7 @@ import (
 	"testing"
 	"time"
 
-	"github.com/zenta-dev/zever/media"
+	"github.com/zenta-dev/zever/core/media"
 )
 
 func TestIsVideoFormat(t *testing.T) {

@@ -11,8 +11,8 @@ import (
 	"testing"
 	"time"
 
-	"github.com/zenta-dev/zever/i18n"
-	"github.com/zenta-dev/zever/i18n/remote"
+	"github.com/zenta-dev/zever/adapters/i18n/remote"
+	"github.com/zenta-dev/zever/core/i18n"
 )
 
 type stubServer struct {

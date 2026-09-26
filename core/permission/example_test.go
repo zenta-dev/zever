@@ -3,8 +3,8 @@ package permission_test
 import (
 	"context"
 
-	"github.com/zenta-dev/zever/permission"
-	"github.com/zenta-dev/zever/permission/noop"
+	"github.com/zenta-dev/zever/adapters/permission/noop"
+	"github.com/zenta-dev/zever/core/permission"
 )
 
 // ExampleOpen opens the noop checker and runs a check.

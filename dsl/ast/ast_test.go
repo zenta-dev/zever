@@ -3,7 +3,7 @@ package ast
 import (
 	"testing"
 
-	"github.com/zenta-dev/zever/internal/dsl/diag"
+	"github.com/zenta-dev/zever/dsl/diag"
 )
 
 func TestRelationKindString(t *testing.T) {

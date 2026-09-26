@@ -1,42 +1,31 @@
 package auth
 
 // Adapter identifies the authentication backend implementation.
-type Adapter int
+
+type Adapter string
 
 const (
 	// JWT is the JWT authentication adapter.
-	JWT Adapter = iota
+	JWT Adapter = "jwt"
 	// Session is the session-backed authentication adapter.
-	Session
+	Session Adapter = "session"
 	// OIDC is the OpenID Connect authentication adapter.
-	OIDC
+	OIDC Adapter = "oidc"
 )
 
 // String returns the canonical name of Adapter.
 func (a Adapter) String() string {
-	switch a {
-	case JWT:
-		return "jwt"
-	case Session:
-		return "session"
-	case OIDC:
-		return "oidc"
-	default:
+	if a == "" {
 		return "unknown"
 	}
+	return string(a)
 }
 
 // ParseAdapter parses adapter name into an Adapter.
-// Only exact lowercase names match; anything else fails.
+// Any non-empty name is accepted to allow custom adapters; empty fails.
 func ParseAdapter(s string) (Adapter, error) {
-	switch s {
-	case "jwt":
-		return JWT, nil
-	case "session":
-		return Session, nil
-	case "oidc":
-		return OIDC, nil
-	default:
-		return JWT, &InvalidAdapterError{Adapter: s}
+	if s == "" {
+		return Adapter(""), &InvalidAdapterError{Adapter: s}
 	}
+	return Adapter(s), nil
 }

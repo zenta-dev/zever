@@ -6,7 +6,7 @@ import (
 	"math"
 	"time"
 
-	"github.com/zenta-dev/zever/internal/registry"
+	"github.com/zenta-dev/zever/shared/registry"
 )
 
 // Decision is the outcome of an Allow call.

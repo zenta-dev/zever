@@ -1,36 +1,29 @@
 package media
 
 // Adapter identifies the media backend implementation.
-type Adapter int
+
+type Adapter string
 
 const (
 	// Local selects the local-filesystem media backend.
-	Local Adapter = iota
+	Local Adapter = "local"
 	// S3 selects the S3 media backend.
-	S3
+	S3 Adapter = "s3"
 )
 
 // String returns the canonical name of Adapter.
 func (a Adapter) String() string {
-	switch a {
-	case Local:
-		return "local"
-	case S3:
-		return "s3"
-	default:
+	if a == "" {
 		return "unknown"
 	}
+	return string(a)
 }
 
 // ParseAdapter parses adapter name into an Adapter.
-// Only exact lowercase names match; anything else fails.
+// Any non-empty name is accepted to allow custom adapters; empty fails.
 func ParseAdapter(s string) (Adapter, error) {
-	switch s {
-	case "local":
-		return Local, nil
-	case "s3":
-		return S3, nil
-	default:
-		return Local, &InvalidAdapterError{Adapter: s}
+	if s == "" {
+		return Adapter(""), &InvalidAdapterError{Adapter: s}
 	}
+	return Adapter(s), nil
 }

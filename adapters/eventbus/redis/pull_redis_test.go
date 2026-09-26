@@ -3,7 +3,7 @@ package redis
 import (
 	"testing"
 
-	"github.com/zenta-dev/zever/eventbus"
+	"github.com/zenta-dev/zever/core/eventbus"
 )
 
 // TestPull_crossInstance verifies the pull API across two bus instances

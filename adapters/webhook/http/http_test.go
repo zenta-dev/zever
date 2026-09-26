@@ -17,7 +17,7 @@ import (
 	"testing"
 	"time"
 
-	"github.com/zenta-dev/zever/webhook"
+	"github.com/zenta-dev/zever/core/webhook"
 )
 
 // assertValidSignature checks that got is a well-formed "t=<ts>,v1=<hex>"

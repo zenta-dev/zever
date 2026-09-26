@@ -10,8 +10,9 @@ import (
 
 	goredis "github.com/redis/go-redis/v9"
 
-	"github.com/zenta-dev/zever/eventbus"
-	zredis "github.com/zenta-dev/zever/internal/redis"
+	"github.com/zenta-dev/zever/core/eventbus"
+	redisclient "github.com/zenta-dev/zever/shared/redisclient"
+	redisopt "github.com/zenta-dev/zever/shared/redisopt"
 )
 
 type subscription struct {
@@ -92,7 +93,7 @@ func newAdapter(opts eventbus.Options) (*adapter, error) {
 		closeTimeout = eventbus.DefaultCloseTimeout
 	}
 
-	client, err := zredis.New(opts.Redis.Options)
+	client, err := redisclient.New(opts.Redis.Options)
 	if err != nil {
 		return nil, fmt.Errorf("redis: connect %q: %w", redactAddr(opts.Redis.Addr), err)
 	}
@@ -101,7 +102,7 @@ func newAdapter(opts eventbus.Options) (*adapter, error) {
 	defer cancel()
 
 	if err := client.Ping(ctx).Err(); err != nil {
-		_ = zredis.Close(client)
+		_ = redisclient.Close(client)
 
 		return nil, fmt.Errorf("redis: ping %q: %w", redactAddr(opts.Redis.Addr), err)
 	}
@@ -119,7 +120,7 @@ func newAdapter(opts eventbus.Options) (*adapter, error) {
 
 // redactAddr masks any embedded userinfo credentials, suitable for errors.
 func redactAddr(addr string) string {
-	return zredis.RedactAddr(addr)
+	return redisopt.RedactAddr(addr)
 }
 
 // channel maps a topic to its Redis channel.
@@ -296,7 +297,7 @@ func (a *adapter) Close() error {
 	case <-timer.C:
 	}
 
-	return zredis.Close(a.client)
+	return redisclient.Close(a.client)
 }
 
 func (a *adapter) Name() string { return "redis" }

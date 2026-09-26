@@ -10,7 +10,7 @@ import (
 	"strconv"
 	"time"
 
-	"github.com/zenta-dev/zever/document"
+	"github.com/zenta-dev/zever/core/document"
 )
 
 const (

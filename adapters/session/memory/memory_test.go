@@ -7,8 +7,8 @@ import (
 	"testing"
 	"time"
 
-	"github.com/zenta-dev/zever/session"
-	"github.com/zenta-dev/zever/session/memory"
+	"github.com/zenta-dev/zever/adapters/session/memory"
+	"github.com/zenta-dev/zever/core/session"
 )
 
 func openDefault(t *testing.T) session.Store {

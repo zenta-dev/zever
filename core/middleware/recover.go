@@ -10,8 +10,8 @@ import (
 	"google.golang.org/grpc/codes"
 	"google.golang.org/grpc/status"
 
-	"github.com/zenta-dev/zever/codec"
-	"github.com/zenta-dev/zever/log"
+	"github.com/zenta-dev/zever/core/log"
+	"github.com/zenta-dev/zever/shared/codec"
 )
 
 // errorBody is the fixed-shape JSON error envelope ({"error": "<message>"})

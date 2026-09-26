@@ -1,6 +1,6 @@
 // Package memory provides an in-process revocation.Store. It has no
 // cross-instance or durability story: revocations are lost on restart and
-// are not visible to other processes. Use auth/jwt/revocation/redis when
+// are not visible to other processes. Use core/auth/revocation/redis when
 // that matters.
 package memory
 
@@ -13,7 +13,7 @@ import (
 	"sync/atomic"
 	"time"
 
-	"github.com/zenta-dev/zever/auth/jwt/revocation"
+	"github.com/zenta-dev/zever/core/auth/revocation"
 )
 
 // DefaultMaxEntries caps revocation-map memory (~5 MB at ~500 B/entry).

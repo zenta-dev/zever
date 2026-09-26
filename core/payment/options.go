@@ -4,27 +4,27 @@ import (
 	"errors"
 	"time"
 
-	"github.com/zenta-dev/zever/idempotency"
-	"github.com/zenta-dev/zever/internal/providers"
+	"github.com/zenta-dev/zever/core/idempotency"
+	"github.com/zenta-dev/zever/shared/providersopt"
 )
 
 const (
 	// DefaultMaxWebhookBytes is the default byte limit for webhook payloads.
 	DefaultMaxWebhookBytes = 1 << 20
 	// DefaultHTTPTimeout is the default HTTP timeout for provider calls.
-	// Alias for providers.DefaultHTTPTimeout, which billing.DefaultHTTPTimeout
+	// Alias for providersopt.DefaultHTTPTimeout, which billing.DefaultHTTPTimeout
 	// also aliases -- previously both packages independently declared their
 	// own identical constant.
-	DefaultHTTPTimeout = providers.DefaultHTTPTimeout
+	DefaultHTTPTimeout = providersopt.DefaultHTTPTimeout
 	// DefaultRefundIdempotencyTTL bounds refund idempotency reservations.
 	DefaultRefundIdempotencyTTL = 24 * time.Hour
 )
 
 // Options configures payment backend selection and limits. SecretKey/
 // APIKey/Endpoint/Sandbox are shared with billing.Options via
-// providers.Common, validated identically in both packages.
+// providersopt.Common, validated identically in both packages.
 type Options struct {
-	providers.Common
+	providersopt.Common
 	// WebhookSecret holds the webhook verification secret. It is never logged.
 	WebhookSecret string `json:"webhook_secret" toml:"webhook_secret" yaml:"webhook_secret"`
 	// AutoApprove marks new payments as succeeded instead of pending.
@@ -43,7 +43,7 @@ func (o Options) Validate() error {
 		errs = append(errs, &InvalidOptionsError{Reason: "max_webhook_bytes must be >= 0"})
 	}
 
-	for _, e := range providers.ValidateEndpoint(o.Endpoint) {
+	for _, e := range providersopt.ValidateEndpoint(o.Endpoint) {
 		errs = append(errs, &InvalidOptionsError{Reason: e.Error()})
 	}
 

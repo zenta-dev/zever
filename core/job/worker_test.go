@@ -10,9 +10,9 @@ import (
 	"testing"
 	"time"
 
-	"github.com/zenta-dev/zever/log/noop"
-	"github.com/zenta-dev/zever/queue"
-	"github.com/zenta-dev/zever/queue/memory"
+	"github.com/zenta-dev/zever/adapters/log/noop"
+	"github.com/zenta-dev/zever/adapters/queue/memory"
+	"github.com/zenta-dev/zever/core/queue"
 )
 
 // eventually polls cond until true or timeout, failing the test on expiry.

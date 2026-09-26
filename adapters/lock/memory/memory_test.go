@@ -8,7 +8,7 @@ import (
 	"testing"
 	"time"
 
-	"github.com/zenta-dev/zever/lock"
+	"github.com/zenta-dev/zever/core/lock"
 )
 
 func newLocker(t *testing.T, o lock.Options) lock.Locker {

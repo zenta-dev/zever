@@ -16,7 +16,7 @@
 package atlas
 
 import (
-	"github.com/zenta-dev/zever/internal/dsl/ir"
+	"github.com/zenta-dev/zever/dsl/ir"
 )
 
 // Backend renders a resolved schema to Atlas HCL schema files.

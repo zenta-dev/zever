@@ -1,42 +1,31 @@
 package search
 
 // Adapter identifies the search backend implementation.
-type Adapter int
+
+type Adapter string
 
 const (
 	// Postgres selects the postgres search backend.
-	Postgres Adapter = iota
+	Postgres Adapter = "postgres"
 	// Meilisearch selects the meilisearch search backend.
-	Meilisearch
+	Meilisearch Adapter = "meilisearch"
 	// SQLite selects the sqlite search backend.
-	SQLite
+	SQLite Adapter = "sqlite"
 )
 
 // String returns the canonical name of Adapter.
 func (a Adapter) String() string {
-	switch a {
-	case Postgres:
-		return "postgres"
-	case Meilisearch:
-		return "meilisearch"
-	case SQLite:
-		return "sqlite"
-	default:
+	if a == "" {
 		return "unknown"
 	}
+	return string(a)
 }
 
 // ParseAdapter parses adapter name into an Adapter.
-// Only exact lowercase names match; anything else fails.
+// Any non-empty name is accepted to allow custom adapters; empty fails.
 func ParseAdapter(s string) (Adapter, error) {
-	switch s {
-	case "postgres":
-		return Postgres, nil
-	case "meilisearch":
-		return Meilisearch, nil
-	case "sqlite":
-		return SQLite, nil
-	default:
-		return Postgres, &InvalidAdapterError{Adapter: s}
+	if s == "" {
+		return Adapter(""), &InvalidAdapterError{Adapter: s}
 	}
+	return Adapter(s), nil
 }

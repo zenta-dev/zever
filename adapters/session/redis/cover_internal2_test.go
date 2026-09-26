@@ -13,7 +13,7 @@ import (
 	"github.com/alicebob/miniredis/v2"
 	goredis "github.com/redis/go-redis/v9"
 
-	"github.com/zenta-dev/zever/session"
+	"github.com/zenta-dev/zever/core/session"
 )
 
 // failSetHook fails only SET commands against a live server: GET

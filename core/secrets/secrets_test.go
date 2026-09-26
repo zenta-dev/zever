@@ -7,14 +7,16 @@ import (
 	"sync/atomic"
 	"testing"
 
-	"github.com/zenta-dev/zever/secrets"
-	"github.com/zenta-dev/zever/secrets/env"
+	"fmt"
+
+	"github.com/zenta-dev/zever/adapters/secrets/env"
+	"github.com/zenta-dev/zever/core/secrets"
 )
 
 var secretsAdapterSeq atomic.Int64
 
 func freshSecretsAdapter() secrets.Adapter {
-	return secrets.Adapter(1000 + secretsAdapterSeq.Add(1))
+	return secrets.Adapter(fmt.Sprintf("test-%d", 1000+secretsAdapterSeq.Add(1)))
 }
 
 type stubSecrets struct{}
@@ -101,7 +103,7 @@ func TestSecretsRegister_duplicate_returnsDuplicate(t *testing.T) {
 }
 
 func TestSecretsOpen_unknown_returnsUnknownAdapter(t *testing.T) {
-	_, err := secrets.Open(secrets.Adapter(9999), secrets.Options{})
+	_, err := secrets.Open(secrets.Adapter("test-9999"), secrets.Options{})
 	if err == nil {
 		t.Fatal("Open() = nil, want ErrUnknownAdapter")
 	}

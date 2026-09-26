@@ -13,7 +13,7 @@ import (
 	"errors"
 	"fmt"
 
-	"github.com/zenta-dev/zever/crypto"
+	"github.com/zenta-dev/zever/core/crypto"
 )
 
 type localCrypto struct {

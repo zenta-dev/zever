@@ -11,8 +11,9 @@ import (
 
 	goredis "github.com/redis/go-redis/v9"
 
-	zredis "github.com/zenta-dev/zever/internal/redis"
-	"github.com/zenta-dev/zever/ratelimit"
+	"github.com/zenta-dev/zever/core/ratelimit"
+	redisclient "github.com/zenta-dev/zever/shared/redisclient"
+	redisopt "github.com/zenta-dev/zever/shared/redisopt"
 )
 
 //go:embed scripts/allow.lua
@@ -54,7 +55,7 @@ func New(opts ratelimit.Options) (ratelimit.Limiter, error) {
 		prefix = "ratelimit"
 	}
 
-	client, err := zredis.New(opts.Redis.Options)
+	client, err := redisclient.New(opts.Redis.Options)
 	if err != nil {
 		return nil, fmt.Errorf("redis: connect %q: %w", redactAddr(opts.Redis.Addr), err)
 	}
@@ -79,7 +80,7 @@ func New(opts ratelimit.Options) (ratelimit.Limiter, error) {
 // redactAddr masks any embedded userinfo credentials, suitable for error
 // messages. The password from options is never included.
 func redactAddr(addr string) string {
-	return zredis.RedactAddr(addr)
+	return redisopt.RedactAddr(addr)
 }
 
 func (l *limiter) redisKey(key string) string {
@@ -183,7 +184,7 @@ func (l *limiter) Close() error {
 		return nil
 	}
 
-	return zredis.Close(l.client)
+	return redisclient.Close(l.client)
 }
 
 // Name returns the adapter name.

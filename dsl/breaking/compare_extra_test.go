@@ -3,8 +3,8 @@ package breaking
 import (
 	"testing"
 
-	"github.com/zenta-dev/zever/internal/dsl/diag"
-	"github.com/zenta-dev/zever/internal/dsl/ir"
+	"github.com/zenta-dev/zever/dsl/diag"
+	"github.com/zenta-dev/zever/dsl/ir"
 )
 
 func pos(line int) diag.Position { return diag.Position{File: "x.zen", Line: line, Col: 1} }

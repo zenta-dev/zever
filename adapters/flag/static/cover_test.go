@@ -9,7 +9,7 @@ import (
 	"testing"
 	"time"
 
-	"github.com/zenta-dev/zever/flag"
+	"github.com/zenta-dev/zever/core/flag"
 )
 
 func TestCoverNewInvalidCoreOpts(t *testing.T) {

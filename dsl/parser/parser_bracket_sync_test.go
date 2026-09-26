@@ -3,7 +3,7 @@ package parser
 import (
 	"testing"
 
-	"github.com/zenta-dev/zever/internal/dsl/ast"
+	"github.com/zenta-dev/zever/dsl/ast"
 )
 
 // TestSyncTopLevelTracksBrackets verifies R27: syncTopLevel must track

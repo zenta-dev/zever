@@ -4,7 +4,7 @@ import (
 	"regexp/syntax"
 	"strings"
 
-	"github.com/zenta-dev/zever/tenant"
+	"github.com/zenta-dev/zever/core/tenant"
 )
 
 // isCatastrophicPattern reports whether s risks catastrophic backtracking.

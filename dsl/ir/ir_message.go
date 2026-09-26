@@ -1,6 +1,6 @@
 package ir
 
-import "github.com/zenta-dev/zever/internal/dsl/diag"
+import "github.com/zenta-dev/zever/dsl/diag"
 
 // Message represents a non-persistent DTO used only in service payloads.
 type Message struct {

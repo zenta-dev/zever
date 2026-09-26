@@ -7,7 +7,7 @@ import (
 	"sync"
 	"testing"
 
-	"github.com/zenta-dev/zever/router"
+	"github.com/zenta-dev/zever/core/router"
 )
 
 func newTestRouter(t *testing.T) router.Router {

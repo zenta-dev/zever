@@ -12,8 +12,8 @@ import (
 	"google.golang.org/grpc/status"
 	"google.golang.org/protobuf/types/known/wrapperspb"
 
-	"github.com/zenta-dev/zever/auth"
-	"github.com/zenta-dev/zever/authz"
+	"github.com/zenta-dev/zever/core/auth"
+	"github.com/zenta-dev/zever/core/authz"
 )
 
 type echoSrv struct {

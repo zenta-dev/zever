@@ -1,42 +1,31 @@
 package notification
 
 // Adapter identifies the notification backend implementation.
-type Adapter int
+
+type Adapter string
 
 const (
 	// Log is the log notification adapter.
-	Log Adapter = iota
+	Log Adapter = "log"
 	// Twilio is the Twilio SMS notification adapter.
-	Twilio
+	Twilio Adapter = "twilio"
 	// FCM is the Firebase Cloud Messaging push adapter.
-	FCM
+	FCM Adapter = "fcm"
 )
 
 // String returns the canonical name of Adapter.
 func (a Adapter) String() string {
-	switch a {
-	case Log:
-		return "log"
-	case Twilio:
-		return "twilio"
-	case FCM:
-		return "fcm"
-	default:
+	if a == "" {
 		return "unknown"
 	}
+	return string(a)
 }
 
 // ParseAdapter parses adapter name into an Adapter.
-// Only exact lowercase names match; anything else fails.
+// Any non-empty name is accepted to allow custom adapters; empty fails.
 func ParseAdapter(s string) (Adapter, error) {
-	switch s {
-	case "log":
-		return Log, nil
-	case "twilio":
-		return Twilio, nil
-	case "fcm":
-		return FCM, nil
-	default:
-		return Log, &InvalidAdapterError{Adapter: s}
+	if s == "" {
+		return Adapter(""), &InvalidAdapterError{Adapter: s}
 	}
+	return Adapter(s), nil
 }

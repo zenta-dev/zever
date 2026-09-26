@@ -6,7 +6,7 @@ import (
 	"regexp"
 	"time"
 
-	"github.com/zenta-dev/zever/internal/registry"
+	"github.com/zenta-dev/zever/shared/registry"
 )
 
 // Channel identifies the notification delivery channel.

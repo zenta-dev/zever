@@ -4,7 +4,7 @@ import (
 	"context"
 	"time"
 
-	"github.com/zenta-dev/zever/cache"
+	"github.com/zenta-dev/zever/core/cache"
 )
 
 // UniqueLocker deduplicates jobs using cache-backed keys under a fixed prefix.

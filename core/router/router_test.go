@@ -2,6 +2,7 @@ package router
 
 import (
 	"errors"
+	"fmt"
 	"net/http"
 	"strings"
 	"sync"
@@ -12,7 +13,7 @@ import (
 var routerTestSeq int32 = 2000
 
 func freshRouterAdapter() Adapter {
-	return Adapter(atomic.AddInt32(&routerTestSeq, 1))
+	return Adapter(fmt.Sprintf("test-%d", atomic.AddInt32(&routerTestSeq, 1)))
 }
 
 type mockRouter struct{}

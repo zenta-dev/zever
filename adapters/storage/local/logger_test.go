@@ -8,8 +8,8 @@ import (
 	"testing"
 	"time"
 
-	"github.com/zenta-dev/zever/log"
-	"github.com/zenta-dev/zever/storage"
+	"github.com/zenta-dev/zever/core/log"
+	"github.com/zenta-dev/zever/core/storage"
 )
 
 type captureEvent struct {

@@ -17,7 +17,7 @@ import (
 	"testing"
 	"time"
 
-	"github.com/zenta-dev/zever/media"
+	"github.com/zenta-dev/zever/core/media"
 )
 
 func openTest(t *testing.T, opts media.Options) media.Media {

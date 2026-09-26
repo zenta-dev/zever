@@ -4,13 +4,12 @@ import (
 	"context"
 	"fmt"
 
-	"github.com/zenta-dev/zever/internal/s3opts"
-	"github.com/zenta-dev/zever/storage"
-	"github.com/zenta-dev/zever/storage/s3core"
+	"github.com/zenta-dev/zever/core/storage"
+	"github.com/zenta-dev/zever/shared/s3opts"
 )
 
 type s3Adapter struct {
-	*s3core.Core
+	*s3opts.Core
 	policySync string
 	syncFail   string
 }
@@ -67,7 +66,7 @@ func New(opts storage.Options) (storage.Storage, error) {
 	}
 
 	if store.Configured() {
-		if err := s3core.ValidatePolicyCoherence(prefix, store.Policies(), store.Default()); err != nil {
+		if err := s3opts.ValidatePolicyCoherence(prefix, store.Policies(), store.Default()); err != nil {
 			return nil, fmt.Errorf("s3: %w", err)
 		}
 	}
@@ -78,7 +77,7 @@ func New(opts storage.Options) (storage.Storage, error) {
 	}
 
 	return &s3Adapter{
-		Core:       s3core.New(prefix, region, urlBase, client, presigner, store, nil),
+		Core:       s3opts.New(prefix, region, urlBase, client, presigner, store, nil),
 		policySync: policySync,
 		syncFail:   syncFail,
 	}, nil

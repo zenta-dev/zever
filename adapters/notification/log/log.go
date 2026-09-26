@@ -9,8 +9,8 @@ import (
 	"sync/atomic"
 	"time"
 
-	"github.com/zenta-dev/zever/codec"
-	"github.com/zenta-dev/zever/notification"
+	"github.com/zenta-dev/zever/core/notification"
+	"github.com/zenta-dev/zever/shared/codec"
 )
 
 // checker renders notifications as JSON lines without sending.

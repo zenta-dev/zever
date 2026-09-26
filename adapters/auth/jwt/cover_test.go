@@ -6,7 +6,7 @@ package jwt
 //   - claims type assertion (verify + revoke): pruned — ParseWithClaims
 //     into &MapClaims{} guarantees concrete type; nil error implies Valid.
 //   - revocation cap/prune/ticker coverage lives in
-//     auth/jwt/revocation/memory now that the adapter delegates to a
+//     core/auth/revocation/memory now that the adapter delegates to a
 //     revocation.Store instead of holding the map itself.
 
 import (
@@ -19,7 +19,7 @@ import (
 
 	jwtv5 "github.com/golang-jwt/jwt/v5"
 
-	"github.com/zenta-dev/zever/auth"
+	"github.com/zenta-dev/zever/core/auth"
 )
 
 type brokenReader struct{}

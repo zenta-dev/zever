@@ -21,7 +21,7 @@ import (
 
 	_ "modernc.org/sqlite" // register sqlite driver for raw-SQL fixtures
 
-	"github.com/zenta-dev/zever/webhook"
+	"github.com/zenta-dev/zever/core/webhook"
 )
 
 func testOptions(dsn string) webhook.Options {

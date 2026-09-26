@@ -4,7 +4,7 @@ import (
 	"errors"
 	"testing"
 
-	"github.com/zenta-dev/zever/permission"
+	"github.com/zenta-dev/zever/core/permission"
 )
 
 func TestSentinelMessages(t *testing.T) {

@@ -6,15 +6,14 @@ import (
 	"net/url"
 	"strings"
 
-	"github.com/zenta-dev/zever/internal/s3opts"
-	"github.com/zenta-dev/zever/storage"
-	"github.com/zenta-dev/zever/storage/s3core"
+	"github.com/zenta-dev/zever/core/storage"
+	"github.com/zenta-dev/zever/shared/s3opts"
 )
 
 const defaultRegion = "auto"
 
 type r2Adapter struct {
-	*s3core.Core
+	*s3opts.Core
 }
 
 // New creates an R2 Storage backend from opts.
@@ -77,7 +76,7 @@ func New(opts storage.Options) (storage.Storage, error) {
 			return nil, err
 		}
 
-		if err = s3core.ValidatePolicyCoherence(prefix, store.Policies(), store.Default()); err != nil {
+		if err = s3opts.ValidatePolicyCoherence(prefix, store.Policies(), store.Default()); err != nil {
 			return nil, err
 		}
 	}
@@ -90,11 +89,11 @@ func New(opts storage.Options) (storage.Storage, error) {
 	// New rejects public policies without pubBase above, so pubBase is always
 	// set whenever this closure runs for a public permission.
 	static := func(bucket, key string) (string, error) {
-		return strings.TrimRight(pubBase, "/") + "/" + url.PathEscape(bucket) + "/" + s3core.EscapeKey(key), nil
+		return strings.TrimRight(pubBase, "/") + "/" + url.PathEscape(bucket) + "/" + s3opts.EscapeKey(key), nil
 	}
 
 	a := &r2Adapter{
-		Core: s3core.New(prefix, region, urlBase, client, presigner, store, static),
+		Core: s3opts.New(prefix, region, urlBase, client, presigner, store, static),
 	}
 
 	return a, nil

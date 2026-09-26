@@ -7,8 +7,8 @@ import (
 	"strings"
 	"testing"
 
-	"github.com/zenta-dev/zever/auth"
-	"github.com/zenta-dev/zever/authz"
+	"github.com/zenta-dev/zever/core/auth"
+	"github.com/zenta-dev/zever/core/authz"
 )
 
 func TestBearerTokenTable(t *testing.T) {

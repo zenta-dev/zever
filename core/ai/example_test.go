@@ -4,7 +4,7 @@ import (
 	"context"
 	"fmt"
 
-	"github.com/zenta-dev/zever/ai"
+	"github.com/zenta-dev/zever/core/ai"
 )
 
 type stubAI struct{}
@@ -32,7 +32,7 @@ func (stubAI) Close() error { return nil }
 
 // ExampleOpen opens a registered backend and runs a generation.
 func ExampleOpen() {
-	const exampleAdapter ai.Adapter = 32001
+	const exampleAdapter ai.Adapter = "example-test"
 
 	_ = ai.Register(exampleAdapter, func(ai.Options) (ai.AI, error) { return stubAI{}, nil })
 

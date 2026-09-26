@@ -3,7 +3,7 @@ package zenorm
 import (
 	"testing"
 
-	"github.com/zenta-dev/zever/internal/dsl/ir"
+	"github.com/zenta-dev/zever/dsl/ir"
 )
 
 func TestModuleNaming(t *testing.T) {

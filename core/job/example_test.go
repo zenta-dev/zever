@@ -3,9 +3,9 @@ package job_test
 import (
 	"context"
 
-	"github.com/zenta-dev/zever/job"
-	"github.com/zenta-dev/zever/queue"
-	queuememory "github.com/zenta-dev/zever/queue/memory"
+	queuememory "github.com/zenta-dev/zever/adapters/queue/memory"
+	"github.com/zenta-dev/zever/core/job"
+	"github.com/zenta-dev/zever/core/queue"
 )
 
 type welcomeArgs struct {

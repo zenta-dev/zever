@@ -7,14 +7,14 @@ import (
 
 	"github.com/alicebob/miniredis/v2"
 
-	"github.com/zenta-dev/zever/auth/jwt/revocation"
-	"github.com/zenta-dev/zever/auth/jwt/revocation/revocationtest"
-	zredis "github.com/zenta-dev/zever/internal/redis"
+	"github.com/zenta-dev/zever/core/auth/revocation"
+	"github.com/zenta-dev/zever/core/auth/revocation/revocationtest"
+	redisopt "github.com/zenta-dev/zever/shared/redisopt"
 )
 
 // zredisConnectOptions builds ConnectOptions pointed at addr.
-func zredisConnectOptions(addr string) zredis.ConnectOptions {
-	return zredis.ConnectOptions{Addr: addr}
+func zredisConnectOptions(addr string) redisopt.ConnectOptions {
+	return redisopt.ConnectOptions{Addr: addr}
 }
 
 // newTestStore starts a fresh miniredis server per test and opens a store

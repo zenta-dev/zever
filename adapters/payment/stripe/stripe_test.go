@@ -15,7 +15,7 @@ import (
 	"github.com/stripe/stripe-go/v82"
 	"github.com/stripe/stripe-go/v82/webhook"
 
-	"github.com/zenta-dev/zever/payment"
+	"github.com/zenta-dev/zever/core/payment"
 )
 
 // fakeStripe is scriptable state for the fake Stripe v1 API.

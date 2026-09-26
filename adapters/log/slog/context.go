@@ -5,7 +5,7 @@ import (
 
 	stdslog "log/slog"
 
-	"github.com/zenta-dev/zever/log"
+	"github.com/zenta-dev/zever/core/log"
 )
 
 type slogContext struct {

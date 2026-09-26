@@ -3,7 +3,7 @@ package zerolog
 import (
 	zl "github.com/rs/zerolog"
 
-	"github.com/zenta-dev/zever/log"
+	"github.com/zenta-dev/zever/core/log"
 )
 
 func toZeroLogLevel(l log.Level) zl.Level {

@@ -5,7 +5,7 @@ import (
 	"fmt"
 	"testing"
 
-	"github.com/zenta-dev/zever/password"
+	"github.com/zenta-dev/zever/core/password"
 )
 
 func TestSentinels(t *testing.T) {
@@ -28,22 +28,22 @@ func TestSentinels(t *testing.T) {
 		},
 		{
 			name: "nil factory via register",
-			err:  mustRegisterNil(t, password.Adapter(201)),
+			err:  mustRegisterNil(t, password.Adapter("test-201")),
 			want: password.ErrNilFactory,
 		},
 		{
 			name: "duplicate via double register",
-			err:  mustRegisterDup(t, password.Adapter(202)),
+			err:  mustRegisterDup(t, password.Adapter("test-202")),
 			want: password.ErrDuplicate,
 		},
 		{
 			name: "unknown adapter via open",
-			err:  mustOpenUnknown(t, password.Adapter(999)),
+			err:  mustOpenUnknown(t, password.Adapter("")),
 			want: password.ErrUnknownAdapter,
 		},
 		{
 			name: "invalid adapter via parse",
-			err:  mustParseInvalid(t, "bcrypt"),
+			err:  mustParseInvalid(t, ""),
 			want: password.ErrInvalidAdapter,
 		},
 	}
@@ -83,7 +83,7 @@ func TestTypedErrorStrings(t *testing.T) {
 		},
 		{
 			name: "unknown adapter",
-			err:  &password.UnknownAdapterError{Adapter: password.Adapter(999)},
+			err:  &password.UnknownAdapterError{Adapter: password.Adapter("")},
 			want: "password: unknown adapter: unknown (forgotten import?)",
 		},
 	}

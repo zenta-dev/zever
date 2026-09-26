@@ -5,7 +5,7 @@ import (
 	"strings"
 	"testing"
 
-	"github.com/zenta-dev/zever/authz"
+	"github.com/zenta-dev/zever/core/authz"
 )
 
 func TestSentinels(t *testing.T) {

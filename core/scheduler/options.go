@@ -3,8 +3,8 @@ package scheduler
 import (
 	"time"
 
-	"github.com/zenta-dev/zever/job"
-	"github.com/zenta-dev/zever/log"
+	"github.com/zenta-dev/zever/core/job"
+	"github.com/zenta-dev/zever/core/log"
 )
 
 const (

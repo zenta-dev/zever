@@ -4,7 +4,7 @@ import (
 	"errors"
 	"time"
 
-	"github.com/zenta-dev/zever/internal/endpoint"
+	"github.com/zenta-dev/zever/shared/endpoint"
 )
 
 // Options holds typed configuration for geo adapters.

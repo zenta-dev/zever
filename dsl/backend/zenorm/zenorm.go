@@ -1,7 +1,7 @@
 package zenorm
 
 import (
-	"github.com/zenta-dev/zever/internal/dsl/ir"
+	"github.com/zenta-dev/zever/dsl/ir"
 )
 
 // Backend renders a resolved schema to per-module Go orm query-builder

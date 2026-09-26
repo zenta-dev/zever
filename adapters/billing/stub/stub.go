@@ -10,7 +10,7 @@ import (
 
 	"github.com/oklog/ulid/v2"
 
-	"github.com/zenta-dev/zever/billing"
+	"github.com/zenta-dev/zever/core/billing"
 )
 
 var _ billing.Billing = (*driver)(nil)

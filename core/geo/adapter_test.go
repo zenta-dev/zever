@@ -16,7 +16,7 @@ func TestAdapterString(t *testing.T) {
 		{name: "google", adapter: Google, want: "google"},
 		{name: "static", adapter: Static, want: "static"},
 		{name: "osm", adapter: OSM, want: "osm"},
-		{name: "unknown", adapter: Adapter(99), want: "unknown"},
+		{name: "unknown", adapter: Adapter(""), want: "unknown"},
 	}
 
 	for _, tt := range tests {
@@ -41,8 +41,8 @@ func TestParseAdapter(t *testing.T) {
 		{name: "google", input: "google", want: Google},
 		{name: "static", input: "static", want: Static},
 		{name: "osm", input: "osm", want: OSM},
-		{name: "unknown", input: "bogus", wantErr: true},
-		{name: "case sensitive", input: "Google", wantErr: true},
+		{name: "unknown", input: "bogus", want: Adapter("bogus")},
+		{name: "case sensitive", input: "Google", want: Adapter("Google")},
 		{name: "empty", input: "", wantErr: true},
 	}
 

@@ -19,8 +19,8 @@ import (
 	"github.com/anthonynsimon/bild/imgio"
 	"github.com/anthonynsimon/bild/transform"
 
-	"github.com/zenta-dev/zever/media"
-	"github.com/zenta-dev/zever/media/ffmpeg"
+	"github.com/zenta-dev/zever/adapters/media/ffmpeg"
+	"github.com/zenta-dev/zever/core/media"
 )
 
 type adapter struct {

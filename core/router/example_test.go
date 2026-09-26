@@ -3,8 +3,8 @@ package router_test
 import (
 	"net/http"
 
-	"github.com/zenta-dev/zever/router"
-	"github.com/zenta-dev/zever/router/stdhttp"
+	"github.com/zenta-dev/zever/adapters/router/stdhttp"
+	"github.com/zenta-dev/zever/core/router"
 )
 
 // ExampleOpen opens the stdhttp router and registers a route.

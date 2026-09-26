@@ -6,9 +6,9 @@ import (
 
 	"github.com/meilisearch/meilisearch-go"
 
-	"github.com/zenta-dev/zever/codec"
-	"github.com/zenta-dev/zever/internal/lrucache"
-	"github.com/zenta-dev/zever/search"
+	"github.com/zenta-dev/zever/core/search"
+	"github.com/zenta-dev/zever/shared/codec"
+	"github.com/zenta-dev/zever/shared/lrucache"
 )
 
 const maxIDIndexes = 10000

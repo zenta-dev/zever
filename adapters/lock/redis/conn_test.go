@@ -3,7 +3,7 @@ package redis
 import (
 	"testing"
 
-	"github.com/zenta-dev/zever/lock"
+	"github.com/zenta-dev/zever/core/lock"
 )
 
 func TestConnOptions_mapping(t *testing.T) {

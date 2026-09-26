@@ -13,10 +13,10 @@ import (
 	"github.com/anthropics/anthropic-sdk-go"
 	"github.com/anthropics/anthropic-sdk-go/option"
 
-	"github.com/zenta-dev/zever/ai"
-	"github.com/zenta-dev/zever/codec"
-	"github.com/zenta-dev/zever/internal/httpclient"
-	"github.com/zenta-dev/zever/internal/retry"
+	"github.com/zenta-dev/zever/core/ai"
+	"github.com/zenta-dev/zever/shared/codec"
+	"github.com/zenta-dev/zever/shared/httpclient"
+	"github.com/zenta-dev/zever/shared/retry"
 )
 
 var toolArgsCodec = codec.JSONCodec[map[string]any]{}

@@ -1,6 +1,6 @@
 package ast
 
-import "github.com/zenta-dev/zever/internal/dsl/diag"
+import "github.com/zenta-dev/zever/dsl/diag"
 
 // ScheduleDecl represents a scheduled job declaration.
 type ScheduleDecl struct {

@@ -8,7 +8,7 @@ import (
 
 	"github.com/coreos/go-oidc/v3/oidc"
 
-	"github.com/zenta-dev/zever/auth"
+	"github.com/zenta-dev/zever/core/auth"
 )
 
 // adapter verifies OIDC ID tokens against a discovered provider.

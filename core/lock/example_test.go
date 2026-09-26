@@ -5,8 +5,8 @@ import (
 	"errors"
 	"fmt"
 
-	"github.com/zenta-dev/zever/lock"
-	"github.com/zenta-dev/zever/lock/memory"
+	"github.com/zenta-dev/zever/adapters/lock/memory"
+	"github.com/zenta-dev/zever/core/lock"
 )
 
 // ExampleOpen acquires and releases a memory lease.

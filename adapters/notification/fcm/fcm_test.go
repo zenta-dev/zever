@@ -11,7 +11,7 @@ import (
 
 	"firebase.google.com/go/v4/messaging"
 
-	"github.com/zenta-dev/zever/notification"
+	"github.com/zenta-dev/zever/core/notification"
 )
 
 func validPush() *notification.Notification {

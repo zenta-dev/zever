@@ -10,10 +10,10 @@ import (
 
 	"github.com/stripe/stripe-go/v82"
 
-	"github.com/zenta-dev/zever/idempotency"
-	"github.com/zenta-dev/zever/internal/httpclient"
-	"github.com/zenta-dev/zever/internal/providers"
-	"github.com/zenta-dev/zever/payment"
+	"github.com/zenta-dev/zever/core/idempotency"
+	"github.com/zenta-dev/zever/core/payment"
+	"github.com/zenta-dev/zever/shared/httpclient"
+	"github.com/zenta-dev/zever/shared/providersclient"
 )
 
 // driver is the Stripe payment backend.
@@ -45,7 +45,7 @@ func New(o payment.Options) (payment.Payment, error) {
 	}
 
 	httpClient := httpclient.NewClient(payment.DefaultHTTPTimeout)
-	client := providers.NewStripeClientWithHTTPClient(o.SecretKey, o.Endpoint, httpClient)
+	client := providersclient.NewStripeClientWithHTTPClient(o.SecretKey, o.Endpoint, httpClient)
 
 	maxBytes := o.MaxWebhookBytes
 	if maxBytes <= 0 {

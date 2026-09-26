@@ -34,8 +34,8 @@ import (
 	"strings"
 	"unicode/utf8"
 
-	"github.com/zenta-dev/zever/internal/dsl/lexer"
-	"github.com/zenta-dev/zever/internal/dsl/token"
+	"github.com/zenta-dev/zever/dsl/lexer"
+	"github.com/zenta-dev/zever/dsl/token"
 )
 
 // ErrDirty is returned by Format when src has lexical errors and is

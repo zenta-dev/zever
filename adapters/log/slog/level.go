@@ -3,7 +3,7 @@ package slog
 import (
 	stdslog "log/slog"
 
-	"github.com/zenta-dev/zever/log"
+	"github.com/zenta-dev/zever/core/log"
 )
 
 // fatalLevel is log.LevelFatal's slog equivalent. slog has no fatal level, so

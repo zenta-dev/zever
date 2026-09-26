@@ -1,7 +1,7 @@
 package redis
 
 import (
-	"github.com/zenta-dev/zever/queue"
+	"github.com/zenta-dev/zever/core/queue"
 )
 
 type wireMessage struct {
