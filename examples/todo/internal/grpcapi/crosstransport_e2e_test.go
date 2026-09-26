@@ -19,14 +19,7 @@ import (
 	genapp "github.com/zenta-dev/zever/examples/todo/generated/gogen/app"
 	pb "github.com/zenta-dev/zever/examples/todo/generated/protogogen"
 	"github.com/zenta-dev/zever/examples/todo/internal/grpcapi"
-
-	_ "github.com/zenta-dev/zever/auth/jwt"
-	_ "github.com/zenta-dev/zever/cache/memory"
-	_ "github.com/zenta-dev/zever/db/sqlite"
-	_ "github.com/zenta-dev/zever/log/slog"
-	_ "github.com/zenta-dev/zever/password/argon2"
-	_ "github.com/zenta-dev/zever/queue/memory"
-	_ "github.com/zenta-dev/zever/router/stdhttp"
+	"github.com/zenta-dev/zever/examples/todo/internal/testsetup"
 )
 
 const testJWTSecret = "test-secret-for-todo-grpc-32-bytes-min!"
@@ -42,6 +35,8 @@ type fixture struct {
 
 func newFixture(t *testing.T) *fixture {
 	t.Helper()
+
+	testsetup.RegisterDefaults()
 
 	cfg := config.Default()
 	cfg.Auth.Options.JWT.Secret = testJWTSecret

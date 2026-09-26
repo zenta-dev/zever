@@ -13,23 +13,22 @@ import (
 	"testing"
 	"time"
 
+	mailerlog "github.com/zenta-dev/zever/adapters/mailer/log"
+	notificationlog "github.com/zenta-dev/zever/adapters/notification/log"
 	"github.com/zenta-dev/zever/config"
 	"github.com/zenta-dev/zever/container"
-	"github.com/zenta-dev/zever/db"
+	"github.com/zenta-dev/zever/core/db"
+	"github.com/zenta-dev/zever/core/log"
+	"github.com/zenta-dev/zever/core/mailer"
+	"github.com/zenta-dev/zever/core/notification"
+	"github.com/zenta-dev/zever/core/queue"
 	"github.com/zenta-dev/zever/examples/bookings/internal/service/jobs"
-	"github.com/zenta-dev/zever/log"
-	"github.com/zenta-dev/zever/mailer"
-	mailerlog "github.com/zenta-dev/zever/mailer/log"
-	"github.com/zenta-dev/zever/notification"
-	notificationlog "github.com/zenta-dev/zever/notification/log"
-	"github.com/zenta-dev/zever/queue"
 
-	_ "github.com/zenta-dev/zever/cache/memory"
-	_ "github.com/zenta-dev/zever/db/sqlite"
-	_ "github.com/zenta-dev/zever/log/slog"
-	_ "github.com/zenta-dev/zever/queue/memory"
-	"github.com/zenta-dev/zever/webhook"
-	_ "github.com/zenta-dev/zever/webhook/queue"
+	dbsqlite "github.com/zenta-dev/zever/adapters/db/sqlite"
+	logslog "github.com/zenta-dev/zever/adapters/log/slog"
+	queuememory "github.com/zenta-dev/zever/adapters/queue/memory"
+	webhookqueue "github.com/zenta-dev/zever/adapters/webhook/queue"
+	"github.com/zenta-dev/zever/core/webhook"
 )
 
 // eventually polls cond until true or timeout, failing the test on expiry.
@@ -70,6 +69,12 @@ func migrate(t *testing.T, database db.DB) {
 
 func newTestDB(t *testing.T) (db.DB, log.Logger, context.Context) {
 	t.Helper()
+
+	dbsqlite.Register()
+	logslog.Register()
+	queuememory.Register()
+	webhookqueue.Register()
+
 	cfg := config.Default()
 	cfg.DB.Options.Path = filepath.Join(t.TempDir(), "test.db")
 	c := container.New(cfg)

@@ -8,8 +8,8 @@ import (
 
 	"github.com/google/uuid"
 
-	"github.com/zenta-dev/zever/geo"
-	"github.com/zenta-dev/zever/router"
+	"github.com/zenta-dev/zever/core/geo"
+	"github.com/zenta-dev/zever/core/router"
 )
 
 // Space is the JSON shape for spaces.

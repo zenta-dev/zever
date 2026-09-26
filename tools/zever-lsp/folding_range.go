@@ -3,7 +3,7 @@ package main
 import (
 	"go.lsp.dev/protocol"
 
-	"github.com/zenta-dev/zever/internal/dsl/token"
+	"github.com/zenta-dev/zever/dsl/token"
 )
 
 // foldingRangesFor returns one FoldingRange per matched "{...}" brace pair

@@ -5,10 +5,10 @@ import (
 
 	"go.lsp.dev/protocol"
 
-	"github.com/zenta-dev/zever/internal/dsl/ast"
-	"github.com/zenta-dev/zever/internal/dsl/diag"
-	"github.com/zenta-dev/zever/internal/dsl/ir"
-	"github.com/zenta-dev/zever/internal/dsl/resolver"
+	"github.com/zenta-dev/zever/dsl/ast"
+	"github.com/zenta-dev/zever/dsl/diag"
+	"github.com/zenta-dev/zever/dsl/ir"
+	"github.com/zenta-dev/zever/dsl/resolver"
 )
 
 // Inlay hints use the protocol's native LSP 3.18 types directly:
