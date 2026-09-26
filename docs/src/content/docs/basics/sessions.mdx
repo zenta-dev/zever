@@ -5,7 +5,9 @@ description: Server-side sessions over memory or Redis with secure cookies.
 
 Sessions are server-side rows behind a cookie: the browser holds an opaque ID, the server holds the data. The facade swaps `memory` and `redis` adapters through configuration.
 
-## Setup
+Use server-side sessions for browser flows that need revocation (logout, password reset, privilege change). Use stateless tokens (`auth`) for APIs, mobile, and service-to-service calls.
+
+## Config
 
 ```yaml
 session:
@@ -20,33 +22,31 @@ session:
       addr: redis:6379
 ```
 
+```sh
+SESSION_ADAPTER=redis
+SESSION_ADDR=redis:6379
+```
+
+`New(nil)` containers and `config.Default()` resolve the memory adapter, so session tests run hermetically with no server. Redis options carry pool fields (`pool_size`, `min_idle_conns`, timeouts); when a DSN-style value is set it takes precedence over `addr`. `Options.Validate()` rejects negative TTLs; zero means `DefaultTTL` (15 minutes).
+
+## Resolve via container
+
 ```go
+import (
+    "github.com/zenta-dev/zever/config"
+    "github.com/zenta-dev/zever/container"
+)
+
+c := container.New(config.Default())
 store, err := c.Session()
 if err != nil {
     return err
 }
 ```
 
-`New(nil)` containers and `config.Default()` resolve the memory adapter, so session tests run hermetically with no server.
+`Session()` resolves lazily and caches; on error the cache clears so the next call retries. Use more than one app instance only with the redis adapter - memory sessions pin users to a single process.
 
-## The `Store` interface
-
-```go
-type Store interface {
-    Create(ctx context.Context, ttl time.Duration) (Session, error)
-    Get(ctx context.Context, id string) (Session, error)
-    Save(ctx context.Context, sess Session) error
-    Delete(ctx context.Context, id string) error
-    Close() error
-}
-```
-
-`Create` mints a fresh ID and expiry; a `ttl <= 0` means no expiry. `Get`
-returns `ErrNotFound` on a miss or an expired session — the two are
-indistinguishable by design. `Session.Data` is a plain `map[string]any` set
-directly, not behind an accessor method.
-
-## Reading and writing
+## Runnable example
 
 ```go
 func login(ctx context.Context, store session.Store, w http.ResponseWriter) error {
@@ -73,21 +73,25 @@ func loadSession(ctx context.Context, store session.Store, r *http.Request) (ses
 }
 ```
 
-| Operation | Purpose |
-|---|---|
-| `Create(ctx, ttl)` | mint a fresh session; `ttl <= 0` never expires |
-| `Get(ctx, id)` | load session by ID; `ErrNotFound` on missing/expired |
-| `sess.Data[key] = value` | stage values (user ID, CSRF token, flash) directly on the struct |
-| `Save(ctx, sess)` | upsert the row and touch `UpdatedAt` |
-| `Delete(ctx, id)` | remove the row; idempotent on missing IDs (logout) |
+```sh
+go run ./cmd/server &
+curl -s -i -X POST localhost:8080/login | head -8
+curl -s localhost:8080/me --cookie "session_id=<id-from-login>"
+```
 
-Keep session payloads small (IDs and flags, not full records) — every request loads the row.
+Expected output:
+
+```text
+HTTP/1.1 200 OK
+Set-Cookie: session_id=<opaque-id>; Path=/; HttpOnly; Secure; SameSite=Lax
+{"user_id":"u_123"}
+```
+
+`Create` mints a fresh ID and expiry; a `ttl <= 0` means no expiry at the `Store` level (adapter default `DefaultTTL` applies when the configured TTL is zero). `Get` returns `ErrNotFound` on a miss or an expired session - the two are indistinguishable by design. `Session.Data` is a plain `map[string]any` set directly, not behind accessors. Keep payloads small: IDs and flags, not full records - every request loads the row.
 
 ## Cookies
 
-`session.Store` has no knowledge of HTTP — cookie construction is a separate
-helper, `session/cookie`, that builds a plain `*http.Cookie` from a session
-ID:
+`session.Store` has no knowledge of HTTP - cookie construction is the separate `session/cookie` helper building a plain `*http.Cookie` from a session ID:
 
 ```go
 import "github.com/zenta-dev/zever/session/cookie"
@@ -100,16 +104,31 @@ cookie.Set(w, sess.ID, cookie.Options{})
 
 | Attribute | Default |
 |---|---|
+| Name | `cookie.DefaultName` (`session_id`); `Options.Name` overrides |
+| Path | `cookie.DefaultPath` (`/`) |
 | `HttpOnly` | `true` (JS never reads the ID) |
 | `Secure` | `true` (HTTPS only) |
 | `SameSite` | `Lax`; set `Options.SameSite` to `http.SameSiteStrictMode` for high-risk apps |
-| `MaxAge` | `0` — a session cookie with no `Max-Age`/`Expires` |
+| `MaxAge` | `0` - a session cookie with no `Max-Age`/`Expires` |
 
-`Secure` and `HTTPOnly` are `*bool` so an explicit `false` (e.g. local HTTP
-dev) can be distinguished from "unset, use the secure default."
+`Secure` and `HttpOnly` are `*bool` so an explicit `false` (local HTTP dev) is distinguishable from unset (secure default). Rotate the session ID at privilege changes (login, password reset) to block fixation: `Delete` the old row and `Create` a fresh one.
 
-Rotate the session ID at privilege changes (login, password reset) to block
-fixation: `Delete` the old row and `Create` a fresh one.
+## API table
+
+| Method / helper | Purpose |
+|---|---|
+| `Create(ctx, ttl)` | mint a fresh session; `ttl <= 0` never expires |
+| `Get(ctx, id)` | load by ID; `ErrNotFound` on missing or expired |
+| `sess.Data[key] = value` | stage values directly on the struct map |
+| `Save(ctx, sess)` | upsert the row and touch `UpdatedAt` |
+| `Delete(ctx, id)` | remove the row; idempotent on missing IDs (logout) |
+| `session.NewSession(id, ttl)` | construct a session value with expiry |
+| `Session.Clone()` | deep copy including `Data` |
+| `Session.Expired(now)` | report whether the session lapsed |
+| `cookie.New(id, opts)` | build a `*http.Cookie` for a session ID |
+| `cookie.Set(w, id, opts)` | write the `Set-Cookie` header directly |
+| `session.Open(adapter, opts)` | open an adapter without the container |
+| `session.Register(adapter, factory)` | add a custom adapter |
 
 ## Auth vs. session
 
@@ -119,4 +138,24 @@ fixation: `Delete` the old row and `Create` a fresh one.
 | server-side rows | `session` (`memory`, `redis`) | browser flows needing revocation |
 | bridge | `authz` | verify via `auth`, decide via `permission` |
 
-Use Redis-backed sessions when more than one app instance serves traffic — memory sessions pin users to a single process. Closing follows the container: session stores shut down with everything else in `c.Close(ctx)`.
+## Production notes
+
+- Close semantics: session stores are `Close()`-shaped (instant-close, no context). They shut down with everything else in `c.Close(ctx)`; shared redis clients close once via pointer-identity dedup.
+- Redaction: session rows may hold user IDs and flags. Never log `Session.Data` whole; log the session ID and selected fields. Display config only via `config.RedactedServices`.
+- Timeouts: pass `r.Context()` into `Create`/`Get`/`Save` so request deadlines bound Redis round trips. Keep TTLs explicit per session type (short for sensitive flows).
+- Memory vs Redis: one instance and dev/test work stays on `memory`; two or more instances require `redis` or users stick to one process.
+
+## Troubleshooting
+
+1. **Login works locally, drops in production.** Two instances run `memory` sessions. Switch `session.adapter` to `redis` with a shared `addr` so every instance reads the same rows.
+2. **Cookies missing on HTTP dev.** `Secure` defaults to true and browsers drop it over plain HTTP. Set explicit `false` for local dev only; keep the default in production.
+3. **`Get` returns `ErrNotFound` right after `Create`.** `Save` was skipped, or the wrong ID went into the cookie. Always `Save` after mutating `Data`, and set the cookie from `sess.ID`.
+4. **Logout does not stick.** Only the cookie was cleared client-side. Call `Delete` server-side too; deletion is idempotent on missing IDs.
+5. **Sessions never expire.** A non-positive TTL was passed meaning no expiry. Pass an explicit duration or leave zero so `DefaultTTL` (15m) applies.
+
+## See also
+
+- [Redis](../database/redis/) - shared vs memory decision and redis options
+- [Codec](codec/) - how typed values become stored bytes
+- [Requests and Responses](requests-responses/) - cookie and header handling in handlers
+- [Errors](errors-logging/) - `ErrNotFound` branching with `errors.Is`

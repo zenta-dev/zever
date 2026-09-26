@@ -3,9 +3,28 @@ title: Syntax (.zen)
 description: Entities, services, RPCs, and attributes in the zever schema language.
 ---
 
-`.zen` files describe your services once with proto-inspired syntax. The compiler turns that shape into database access, routing, and cross-cutting infrastructure — never business logic.
+## Purpose
 
-## Entities
+`.zen` files describe services once with proto-inspired syntax. The compiler
+turns that shape into database access, routing, and cross-cutting
+infrastructure, never business logic.
+
+When to use: declare entities, relations, services, and RPC bindings for a
+new module. When not to use: hand-written Go, SQL migrations, or OpenAPI
+documents stay outside `.zen`; backends generate those from the schema.
+
+## Prerequisites
+
+- A schema directory, one file per module (module name derives from the
+  immediate subdirectory: `schema/app/app.zen` compiles as module `app`).
+- The canonical fixture `internal/dsl/compile/testdata/app.zen` as a style
+  reference; new syntax must round-trip through it.
+- CLI available: `zever fmt` to normalize, `zever check` for diagnostics,
+  `zever compile` for codegen.
+
+## Syntax
+
+### Entity block
 
 ```zen
 entity User {
@@ -25,18 +44,25 @@ entity Order {
 }
 ```
 
-Both sides of a relation are declared explicitly (`has_many` / `belongs_to`) with a shared `@foreign_key`. Types reference each other by bare in-package name — no import, so no Go import cycle in generated code.
+Both sides of a relation are declared explicitly (`has_many` /
+`belongs_to`, also `has_one` and `many_to_many`) with a shared
+`@foreign_key`. Types reference each other by bare in-package name, no
+import, so no Go import cycle appears in generated code.
+
+Scalar types: `uuid`, `string`, `int32`, `int64`, `float32`, `float64`,
+`bool`, `timestamp`, `date`, `bytes`, `json`.
 
 | Attribute | Meaning |
 |---|---|
 | `@primary` | primary key |
 | `@unique` | unique constraint |
+| `@required` | value must be present |
 | `@default(now())` | server-side default expression |
+| `@validate(format: "email")` | input validation rule |
 | `@foreign_key(user_id)` | join column for the relation |
+| `@on_delete(cascade)` | referential action on delete |
 
-Scalar types include `uuid`, `string`, `int64`, and `timestamp`. The canonical fixture is `internal/dsl/compile/testdata/app.zen` — new syntax must round-trip through it.
-
-## Services and RPCs
+### Service and RPC blocks
 
 ```zen
 service UserService {
@@ -53,7 +79,7 @@ service UserService {
 }
 ```
 
-Each `rpc` names its inputs, its return entity, its HTTP binding, and its auth posture. Pagination is a flag, not a second endpoint:
+### HTTP and auth bindings
 
 ```zen
 rpc ListOrders(user_id: uuid) -> Order {
@@ -66,18 +92,105 @@ rpc ListOrders(user_id: uuid) -> Order {
 | Block | Contents |
 |---|---|
 | `http:` | method plus `"/path/{param}"` template |
-| `auth:` | `required` (or omitted for public) |
+| `auth:` | `required` (omit for public routes) |
+| `permission:` | resource check wired through `authz` |
 | `errors:` | `{ already_exists, ... }` gRPC-canonical codes |
 | `paginated:` | `true` emits cursor/page scaffolding |
+| `queue:` | dispatch target for job-backed RPCs |
+| `retry:` | retry policy for the generated caller |
 
-## Files and modules
+Other top-level blocks: `job`, `schedule`, `message`, `enum`, `index`.
 
-The module name derives from the immediate subdirectory: `schema/app/app.zen` compiles as module `app`. Keep related entities and their services in one directory so cross-references stay bare names.
+### Files and modules
 
 ```text
 schema/
-├── app/app.zen        # module app: User, Order + services
-└── billing/billing.zen # module billing: imports app types by path
+├── app/app.zen          # module app: User, Order + services
+└── billing/billing.zen  # module billing: references app types by path
 ```
 
-The parser never panics: malformed input produces best-effort output plus diagnostics with positions. Run `zever fmt` to normalize formatting and `zever check` to surface diagnostics before compiling.
+Keep related entities and their services in one directory so
+cross-references stay bare names. Cross-module references use the module
+path; `zever check-boundaries` flags relations, RPC return types, or
+permission resources that reach across modules.
+
+## Resolve
+
+The parser never panics: malformed input produces best-effort output plus
+diagnostics with positions. Format and check before compiling:
+
+```sh
+zever fmt --write schema/
+zever check schema/
+zever compile --out ./generated
+```
+
+## Runnable example
+
+Given `schema/app/app.zen` holding the `User` / `Order` entities plus
+`UserService` from this page:
+
+```sh
+zever check schema/app/app.zen
+zever compile --out ./generated
+echo exit:$?
+```
+
+Expected output:
+
+```text
+check: no diagnostics
+generated: zenorm tables, gogen handlers, proto + OpenAPI docs under ./generated
+exit:0
+```
+
+`check` prints nothing on success. `compile` runs every backend in order
+with deterministic filename-sorted output: same inputs, same bytes.
+
+## Reference
+
+| Construct | Keyword | Notes |
+|---|---|---|
+| Entity | `entity` | typed record with fields + relations |
+| Service | `service` | named group of RPCs |
+| RPC | `rpc` | inputs, return entity, bindings |
+| Relation | `has_many`, `has_one`, `belongs_to`, `many_to_many` | both sides declared |
+| Background work | `job`, `schedule` | queue target + `cron:` expression |
+| Events | `message` | queue payload shape |
+| Vocabulary | `enum` | closed string set |
+| Lookup | `index` | secondary index over fields |
+| Auth posture | `auth: required` | omit for public |
+| Errors | `errors: { ... }` | gRPC-canonical codes |
+
+## Production notes
+
+- New syntax must round-trip through the canonical fixture; golden backend
+  outputs are committed and regeneration is explicit (`-update` only on
+  deliberate fixture change).
+- Cross-module references are a design smell: prefer one module per
+  directory of related entities, and run `check-boundaries` in CI.
+- `paginated: true` is a flag, not a second endpoint; clients get stable
+  cursor/page scaffolding from one RPC.
+- Validation attributes (`@validate`) run at the generated boundary, not in
+  business logic; keep domain rules in Go.
+
+## Troubleshooting
+
+- **Unknown scalar type**: the compiler suggests the closest scalar, and
+  the LSP offers a quick fix. Check spelling against the scalar list above.
+- **Unresolved relation target**: both sides must name the same
+  `@foreign_key`, and the target entity must live in the same module or be
+  referenced by module path.
+- **HTTP template param has no matching RPC arg**: every `{param}` in the
+  `http:` template needs a same-named RPC input; rename one side.
+- **Formatter refuses the file**: `format` rejects lex-dirty input. Fix the
+  reported lex error first, then re-run `zever fmt --write`.
+- **Module name surprises**: the module comes from the immediate
+  subdirectory, not the file name. Move the file, not the declaration.
+
+## See also
+
+- [Resolver and IR](./resolver-ir/) for the compile pipeline and diagnostics
+- [Backends](./backends/) for codegen outputs and golden files
+- [LSP and Tooling](./lsp-tooling/) for editor support and `make generate`
+- [CLI Reference](../reference/cli/) for `fmt`, `check`, and `compile` flags

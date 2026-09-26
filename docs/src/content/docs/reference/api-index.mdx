@@ -1,6 +1,6 @@
 ---
 title: API Index
-description: Package entry points with pkg.go.dev links for every service.
+description: Package entry points with container accessors for every service.
 ---
 
 ## Purpose
@@ -8,54 +8,194 @@ description: Package entry points with pkg.go.dev links for every service.
 Single-module repo (`github.com/zenta-dev/zever`, no nested `go.mod`).
 Import any top-level package directly; resolve through `container`.
 
-## Core
+When to use: find the package, accessor, and close shape for a service.
+When not to use: DSL internals (`internal/dsl`) are internal-only;
+runtime code must not import the compiler.
 
-- `config` — https://pkg.go.dev/github.com/zenta-dev/zever/config
-- `container` — https://pkg.go.dev/github.com/zenta-dev/zever/container
-- `orm` — https://pkg.go.dev/github.com/zenta-dev/zever/orm
-- `middleware` — https://pkg.go.dev/github.com/zenta-dev/zever/middleware
-- `cmd/zever` — CLI; see `cmd/zever/README.md`
+## Prerequisites
 
-## Services
+- Go module importing `github.com/zenta-dev/zever`.
+- `config.Default()` or `config.Load("")` for the container root.
+- `ctx` as first arg for IO; never stored in structs.
 
-- `ai` — https://pkg.go.dev/github.com/zenta-dev/zever/ai
-- `analytics` — https://pkg.go.dev/github.com/zenta-dev/zever/analytics
-- `auth` — https://pkg.go.dev/github.com/zenta-dev/zever/auth
-- `billing` — https://pkg.go.dev/github.com/zenta-dev/zever/billing
-- `cache` — https://pkg.go.dev/github.com/zenta-dev/zever/cache
-- `crypto` — https://pkg.go.dev/github.com/zenta-dev/zever/crypto
-- `db` — https://pkg.go.dev/github.com/zenta-dev/zever/db
-- `document` — https://pkg.go.dev/github.com/zenta-dev/zever/document
-- `eventbus` — https://pkg.go.dev/github.com/zenta-dev/zever/eventbus
-- `flag` — https://pkg.go.dev/github.com/zenta-dev/zever/flag
-- `geo` — https://pkg.go.dev/github.com/zenta-dev/zever/geo
-- `i18n` — https://pkg.go.dev/github.com/zenta-dev/zever/i18n
-- `idempotency` — https://pkg.go.dev/github.com/zenta-dev/zever/idempotency
-- `job` — https://pkg.go.dev/github.com/zenta-dev/zever/job
-- `lock` — https://pkg.go.dev/github.com/zenta-dev/zever/lock
-- `log` — https://pkg.go.dev/github.com/zenta-dev/zever/log
-- `mailer` — https://pkg.go.dev/github.com/zenta-dev/zever/mailer
-- `media` — https://pkg.go.dev/github.com/zenta-dev/zever/media
-- `notification` — https://pkg.go.dev/github.com/zenta-dev/zever/notification
-- `observability` — https://pkg.go.dev/github.com/zenta-dev/zever/observability
-- `password` — https://pkg.go.dev/github.com/zenta-dev/zever/password
-- `payment` — https://pkg.go.dev/github.com/zenta-dev/zever/payment
-- `permission` — https://pkg.go.dev/github.com/zenta-dev/zever/permission
-- `queue` — https://pkg.go.dev/github.com/zenta-dev/zever/queue
-- `ratelimit` — https://pkg.go.dev/github.com/zenta-dev/zever/ratelimit
-- `router` — https://pkg.go.dev/github.com/zenta-dev/zever/router
-- `scheduler` — https://pkg.go.dev/github.com/zenta-dev/zever/scheduler
-- `search` — https://pkg.go.dev/github.com/zenta-dev/zever/search
-- `secrets` — https://pkg.go.dev/github.com/zenta-dev/zever/secrets
-- `session` — https://pkg.go.dev/github.com/zenta-dev/zever/session
-- `storage` — https://pkg.go.dev/github.com/zenta-dev/zever/storage
-- `tenant` — https://pkg.go.dev/github.com/zenta-dev/zever/tenant
-- `vectorstore` — https://pkg.go.dev/github.com/zenta-dev/zever/vectorstore
-- `webhook` — https://pkg.go.dev/github.com/zenta-dev/zever/webhook
-- `workflow` — https://pkg.go.dev/github.com/zenta-dev/zever/workflow
+## Config
 
-## Notes
+No API-index config: construction is always config plus container:
 
-- Start from `config.Default()` + `container.New`, then per-service accessors.
-- Keep to documented interfaces; new behavior means new interfaces.
-- DSL internals (`internal/dsl`) are internal-only; runtime must not import.
+```go
+import (
+    "github.com/zenta-dev/zever/config"
+    "github.com/zenta-dev/zever/container"
+)
+
+c := container.New(config.Default())
+db, err := c.DB()
+if err != nil {
+    return err
+}
+```
+
+`container.New(nil)` is valid: an untouched container closes cleanly
+without opening anything.
+
+## Resolve
+
+Each service resolves on first use and caches the result. On error the
+cached state clears so the next call retries.
+
+```go
+q, err := c.Queue()
+if err != nil {
+    return err
+}
+d, err := c.Job() // d shares the resolved queue instance
+if err != nil {
+    return err
+}
+```
+
+`Job()` has no registry of its own: it builds a `*job.Dispatcher` over the
+already-resolved `Queue`. `Scheduler()` injects that dispatcher, so the
+scheduler shares the same `Queue` connection instead of opening a
+redundant one. Resolving `Scheduler()` therefore resolves `Job()` and,
+transitively, `Queue` as a side effect.
+
+## Runnable example
+
+```go
+ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
+defer cancel()
+db, err := c.DB()
+if err != nil {
+    return err
+}
+_ = db
+if err := c.Close(ctx); err != nil {
+    var te *container.CloseTimeoutError
+    var pe *container.ClosePanicError
+    _ = te
+    _ = pe
+    return err
+}
+```
+
+Expected output:
+
+```text
+db resolves on first use; Close shuts down only resolved services, dependents first
+exit:0 (non-nil only on per-service close failures, joined via errors.Join)
+```
+
+## Reference
+
+### Core packages
+
+| Package | Role |
+|---|---|
+| `config` | layered typed config, defaults/file/env |
+| `container` | sole resolver, lazy accessors, ordered close |
+| `orm` | generics typed builder over `db.DB` |
+| `middleware` | shared HTTP middleware |
+| `cmd/zever` | flags-only toolkit shell |
+
+### Service packages and accessors
+
+| Package | Accessor | Notes |
+|---|---|---|
+| `ai` | `AI()` | |
+| `analytics` | `Analytics()` | |
+| `auth` | `Auth()` | |
+| `billing` | `Billing()` | |
+| `cache` | `Cache()` | leaf dependency, closed last |
+| `crypto` | `Crypto()` | |
+| `db` | `DB()` | plus `Transactor()` helper |
+| `document` | `Document()` | |
+| `eventbus` | `EventBus()` (`Eventbus()` alias) | |
+| `flag` | `Flag()` | |
+| `geo` | `Geo()` | |
+| `grpc` | `GRPC(opts...)` | lazy `*grpc.Server` singleton, no registry |
+| `i18n` | `I18n()` | |
+| `idempotency` | `Idempotency()` | |
+| `job` | `Job()` | `*job.Dispatcher` over resolved `Queue` |
+| `lock` | `Lock()` | |
+| `log` | `Log()` | |
+| `mailer` | `Mailer()` | |
+| `media` | `Media()` | |
+| `notification` | `Notification()` | |
+| `observability` | `Observability()` | |
+| `password` | `Password()` | |
+| `payment` | `Payment()` | |
+| `permission` | `Permission()` | |
+| `queue` | `Queue()` | leaf dependency, closed last |
+| `ratelimit` | `RateLimit()` (`Ratelimit()` alias) | |
+| `router` | `Router()` | |
+| `scheduler` | `Scheduler()` | shares `Queue` via `Job()`, closed first |
+| `search` | `Search()` | |
+| `secrets` | `Secrets()` | |
+| `session` | `Session()` | |
+| `storage` | `Storage()` | |
+| `tenant` | `Tenant()` | |
+| `vectorstore` | `VectorStore()` | |
+| `webhook` | `Webhook()` | |
+| `workflow` | `Workflow()` | |
+
+### Close-shape standard
+
+| Shape | Used by | Semantics |
+|---|---|---|
+| `Close(ctx)` | pooled or network-backed services that may block (`db`, `cache`, `storage`, `lock`, `container` itself) | context-bounded shutdown |
+| `Close()` | lightweight handles, iterators, statements, instant-close in-memory adapters (`auth`, `queue`, `session`, `payment`, `eventbus.Pusher`, `ratelimit.Limiter`, `db.Rows`, `db.Stmt`) | instant close |
+| `Stop()` | scheduler only | cron lifecycle stop |
+
+Probing (`closeAny`) tries `Close(context.Context) error`, then `Close()
+error`, then `Stop() error`, then `Shutdown(context.Context) error`
+(observability providers flush buffered spans/metrics), then no-op nil
+(`*job.Dispatcher` has no shutdown method). Crypto, log, password,
+permission, and router declare no Close/Stop/Shutdown and probe as no-op
+nil. Callers never guess: the probe picks the shape.
+
+Close order:
+
+```text
+scheduler, job        dependents holding a queue ref, first
+snapshots             everything without explicit ordering
+cache, queue          leaf dependencies, last
+grpcServer            independent GracefulStop/Stop, bounded by ctx
+```
+
+Details: per-service bound is 5s only when the parent context carries no
+deadline; otherwise the parent deadline bounds each wait. Shared instances
+close once (pointer-identity dedup with a `keepAlive` set for the
+duration). Failures join via `errors.Join`; panics become
+`*ClosePanicError`, timeouts become `*CloseTimeoutError`. Error values name
+the service only, never resolved values. `Close` never opens anything:
+untouched services stay untouched.
+
+## Production notes
+
+- Start from `config.Default()` + `container.New`, then per-service
+  accessors; no globals, no `init()` wiring.
+- Keep to documented interfaces; new behavior means new interfaces, never
+  new methods on public ones.
+- Pass a parent deadline to `Close` in servers so shutdown is bounded end
+  to end; inspect `CloseTimeoutError` / `ClosePanicError` with `errors.As`.
+- Goroutine-safe types document their exit path; resolve the in-memory
+  subset and `Close` it in tests so `goleak` stays clean.
+
+## Troubleshooting
+
+- **Close hangs**: parent context has no deadline and a service blocks;
+  pass a timeout context (per-service bound is 5s only without one).
+- **Close reports `CloseTimeoutError`**: a service outlived its bound.
+  Check which service is named, then its backing store health.
+- **Close reports `ClosePanicError`**: a service panicked during shutdown.
+  Fix the service; the panic value is captured, not re-thrown.
+- **Accessor keeps failing**: cached state clears on error, so each call
+  retries fresh. Persistent failure means config or backend, not the
+  container; check `Validate` and connectivity.
+
+## See also
+
+- [Adapters Matrix](./adapters-matrix/) for adapter choice per service
+- [Config Reference](./config-reference/) for values behind accessors
+- [CLI Reference](./cli/) for runtime commands over the container

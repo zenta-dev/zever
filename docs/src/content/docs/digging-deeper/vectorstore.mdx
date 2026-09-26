@@ -3,17 +3,20 @@ title: Vector Store
 description: Store embeddings and query top matches by cosine similarity.
 ---
 
-Semantic search needs somewhere to put embeddings and a way to ask "what's
-closest to this vector" — and that's genuinely a different storage problem than
-your relational data. `vectorstore.VectorStore` gives you `Upsert`,
+Semantic search needs somewhere to put embeddings and a way to ask "what is
+closest to this vector" - and that is genuinely a different storage problem
+than your relational data. `vectorstore.VectorStore` gives you `Upsert`,
 `UpsertBatch`, `Delete`, and `Query` over embeddings, ranked by cosine
-similarity, without tying your code to one vector database's client.
+similarity, without tying your code to one vector database client.
 
-`sqlite` (the default, using an in-memory DSN) is enough for tests and small
-local datasets. Move to `pgvector` if you already run Postgres and want vectors
-living next to your relational data, or `qdrant` when you need a
-purpose-built vector database at scale — the interface your code calls against
-doesn't change either way.
+## Purpose and when to use
+
+`sqlite` (the default, in-memory DSN) is enough for tests and small local
+datasets. Move to `pgvector` if you already run Postgres and want vectors
+living next to relational data, or `qdrant` when you need a purpose-built
+vector database at scale - the interface your code calls does not change
+either way. Pair with `ai.Embed` for the write path: embed text, upsert the
+vectors, then query with a fresh embedding.
 
 ## Config
 
@@ -22,20 +25,29 @@ vectorstore:
   adapter: sqlite
   options:
     dimension: 1536
+    dsn: ":memory:"
 ```
 
 ```sh
 VECTORSTORE_ADAPTER=pgvector
 VECTORSTORE_DSN=postgres://user:pass@localhost:5432/db
+VECTORSTORE_DIMENSION=1536
 ```
 
-`Dimension` defaults to 1536 (OpenAI's `text-embedding-3-small` size) — set it
+`dimension` defaults to 1536 (OpenAI `text-embedding-3-small` size) - set it
 to match whatever embedding model actually produced your vectors, since a
-mismatched dimension is a query that silently returns nonsense, not an error.
+mismatched dimension is a query that silently returns nonsense, not an
+error. `dsn` serves sqlite/pgvector; `url` plus `api_key` serve `qdrant`.
+Negative dimensions are rejected.
 
 ## Resolve
 
 ```go
+import (
+	"github.com/zenta-dev/zever/config"
+	"github.com/zenta-dev/zever/container"
+)
+
 c := container.New(config.Default())
 vs, err := c.VectorStore()
 if err != nil {
@@ -44,24 +56,101 @@ if err != nil {
 _ = vs
 ```
 
+`VectorStore()` resolves lazily and caches the result; on error the cache
+clears so the next call retries.
+
+## Runnable example
+
+```go
+package main
+
+import (
+	"context"
+	"fmt"
+
+	"github.com/zenta-dev/zever/config"
+	"github.com/zenta-dev/zever/container"
+	"github.com/zenta-dev/zever/vectorstore"
+)
+
+func main() {
+	c := container.New(config.Default())
+	defer c.Close(context.Background())
+
+	vs, err := c.VectorStore()
+	if err != nil {
+		fmt.Println("resolve error:", err)
+		return
+	}
+	ctx := context.Background()
+
+	err = vs.UpsertBatch(ctx, []vectorstore.Vector{
+		{ID: "doc-1", Embedding: []float32{1, 0, 0}},
+		{ID: "doc-2", Embedding: []float32{0, 1, 0}},
+	})
+	if err != nil {
+		fmt.Println("upsert error:", err)
+		return
+	}
+	matches, err := vs.Query(ctx, []float32{1, 0, 0}, 2)
+	if err != nil {
+		fmt.Println("query error:", err)
+		return
+	}
+	for _, m := range matches {
+		fmt.Println("match:", m.ID, m.Score)
+	}
+	if err := vs.Close(); err != nil {
+		fmt.Println("close error:", err)
+	}
+}
+
+// Expected output:
+// match: doc-1 1
+// match: doc-2 0
+```
+
+Cosine similarity puts the identical vector first with score 1 and the
+orthogonal one last with score 0.
+
 ## Adapters
 
 | Adapter | Package | Notes |
 |---|---|---|
 | `sqlite` | `vectorstore/sqlite` | Default; DSN `:memory:` |
-| `pgvector` | `vectorstore/pgvector` | Postgres extension |
-| `qdrant` | `vectorstore/qdrant` | Dedicated vector database |
+| `pgvector` | `vectorstore/pgvector` | Postgres extension; needs `dsn` |
+| `qdrant` | `vectorstore/qdrant` | Dedicated store; needs `url` (+ `api_key`) |
 
-## The gotcha: cosine-only, and batch means one round trip
+## Production notes
 
-`Query` ranks by cosine similarity only — there's no hybrid full-text-plus-vector
-ranking built in here; if you need that, you're combining `vectorstore` with
-`search` yourself at the application layer. `topK <= 0` defaults to 10, so an
-unset or zero topK isn't "give me everything," it's "give me the default page."
-`UpsertBatch` exists specifically so writing many vectors is one round trip
-instead of one per vector — each adapter implements it as a native batch API, a
-multi-row statement, or a transaction, but the point from the caller's side is
-the same: don't loop calling single-item `Upsert` when you have a batch.
+- `Query` ranks by cosine similarity only - there is no hybrid
+  full-text-plus-vector ranking here; combine with `search` at the
+  application layer if you need that.
+- `topK <= 0` defaults to 10, so an unset topK is "default page", not
+  "everything". Paginate explicitly for large result sets.
+- `UpsertBatch` is one round trip instead of one per vector - each adapter
+  implements it natively, as a multi-row statement, or as a transaction.
+  Never loop single `Upsert` for a batch.
+- `api_key` (for `qdrant`) never appears in logs; empty embeddings are
+  rejected before any IO happens.
 
-`APIKey` (for `qdrant`) never appears in logs; empty embeddings are rejected
-before any IO happens.
+## Troubleshooting
+
+**Query results look random.**
+`dimension` does not match the embedding model. Align the config value with
+the model that produced the vectors and re-upsert.
+
+**Writes are slow at scale.**
+You are looping `Upsert`. Switch to `UpsertBatch` for one round trip per
+batch.
+
+**`qdrant` fails to resolve.**
+`url` must parse with scheme and host. Check `VECTORSTORE_URL` for a
+missing scheme prefix first.
+
+## See also
+
+- [AI](ai/) for the `Embed` call that produces your vectors
+- [Search](../../digging-deeper/search/) for full-text search to combine with
+- [Container](../../architecture/container/) for lazy resolve and close order
+- [Adapters Matrix](../../reference/adapters-matrix/) for the full table

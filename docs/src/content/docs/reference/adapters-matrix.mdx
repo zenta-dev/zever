@@ -5,11 +5,94 @@ description: Every service, adapter, package, and container accessor in one tabl
 
 ## Purpose
 
-One interface per top-level package, self-registering adapters, container as
-sole resolver. This matrix maps service to adapter packages and accessors so
-swaps stay config-only.
+One interface per top-level package, self-registering adapters, container
+as sole resolver. This matrix maps service to adapter packages and
+accessors so swaps stay config-only, plus guidance on when the
+single-process default stops being enough.
 
-## Matrix
+When to use: choose an adapter per service for an environment. When not
+to use: interface changes (new methods break implementers; prefer new
+interfaces).
+
+## Prerequisites
+
+- [Config Reference](./config-reference/) layering: defaults, file, env.
+- Deployment shape known: single process vs. multi-instance.
+- `container.New(cfg)` as the sole resolution path.
+
+## Config
+
+Swap adapters without touching Go:
+
+```yaml
+cache:
+  adapter: redis
+  options:
+    addr: redis:6379
+queue:
+  adapter: redis
+db:
+  adapter: postgres
+  options:
+    dsn: postgres://app:secret@db:5432/app
+```
+
+```sh
+CACHE_ADAPTER=redis
+QUEUE_ADAPTER=redis
+DB_ADAPTER=postgres
+```
+
+## Resolve
+
+```go
+c := container.New(cfg)
+cache, err := c.Cache()
+if err != nil {
+    return err
+}
+q, err := c.Queue()
+if err != nil {
+    return err
+}
+```
+
+`New(nil)` is valid; untouched services close cleanly without opening.
+Accessors resolve lazily and retry on the next call after an error.
+`Job()` builds over the resolved `Queue`; `Scheduler()` shares both, so
+resolving `Scheduler()` resolves `Job()` and `Queue` as a side effect.
+
+## Runnable example
+
+Single-process dev (all defaults, no infra):
+
+```sh
+go run ./cmd/myapp
+echo exit:$?
+```
+
+Expected output:
+
+```text
+all services resolve to memory/local/sqlite/log/noop adapters
+exit:0
+```
+
+Multi-instance staging (shared state moves to redis/postgres):
+
+```sh
+DB_ADAPTER=postgres CACHE_ADAPTER=redis QUEUE_ADAPTER=redis go run ./cmd/myapp
+echo exit:$?
+```
+
+Expected output:
+
+```text
+db/cache/queue resolve to shared backends; instances share state
+exit:0
+```
+
+## Reference
 
 | Service | Adapters | Packages | Accessor |
 |---|---|---|---|
@@ -47,12 +130,49 @@ swaps stay config-only.
 | vectorstore | sqlite, pgvector, qdrant | `vectorstore/*` | `VectorStore()` |
 | webhook | http, queue, sqlite | `webhook/*` | `Webhook()` |
 | workflow | memory | `workflow/memory` | `Workflow()` |
-| job | — (dispatcher) | `job` | `Job()` |
+| job | - (dispatcher) | `job` | `Job()` |
 
-## Notes
+### Single-process vs. multi-instance guidance
 
-- `New(nil)` is valid; untouched services close cleanly without opening.
-- Accessors resolve lazily and retry on next call after an error.
-- `Job()` builds over resolved `Queue`; `Scheduler()` shares both.
-- `Close(ctx)` closes only resolved services, dependents first.
-- Don't add methods to public interfaces; prefer new interfaces.
+| Group | Single process | Multi-instance |
+|---|---|---|
+| cache, lock, ratelimit, idempotency, session, queue, eventbus | `memory` | `redis` (state must be shared) |
+| db | `sqlite` | `postgres` |
+| storage, media | `local` | `s3` / `r2` |
+| auth | `jwt` (stateless) or `session` + shared store | `jwt`, or `session` only with shared store |
+| search | `sqlite` | `postgres` / `meilisearch` |
+| vectorstore | `sqlite` | `pgvector` / `qdrant` |
+| mailer, notification, analytics | `log` (dev) | `smtp` / `twilio`+`fcm` / `posthog` |
+| permission | `noop` (dev) / `rbac` | `rbac` / `casbin` |
+| billing, payment | `stub` (dev) | `stripe` / `paddle` |
+
+## Production notes
+
+- `Close(ctx)` closes only resolved services, dependents first; see
+  [API Index](./api-index/) for order and close shapes.
+- `grpc` has a lazy `*grpc.Server` singleton accessor (`GRPC(opts...)`)
+  with no registry; `EventBus()` keeps an `Eventbus()` alias and
+  `RateLimit()` a `Ratelimit()` alias.
+- Do not add methods to public interfaces; prefer new interfaces so
+  external implementers keep compiling.
+- Shared redis/postgres endpoints become critical path: monitor, pool
+  (`max_conns`), and bound timeouts per service.
+
+## Troubleshooting
+
+- **State differs per instance**: a `memory` adapter is still in the mix
+  (cache, queue, session, lock). Move each shared-state service to `redis`.
+- **Logins lost on restart**: `session` on `memory` does not survive
+  restarts. Use a shared session store for anything beyond local dev.
+- **Jobs run twice or not at all**: workers each resolved an isolated
+  `memory` queue. Point all workers at the same `redis` queue.
+- **Swap did not take effect**: `_ADAPTER` env or file adapter misspelled,
+  or an old binary without the adapter compiled in. Check `config show`
+  output and rebuild.
+
+## See also
+
+- [Config Reference](./config-reference/) for adapter values and env scheme
+- [API Index](./api-index/) for accessors and close order
+- [Authentication](../security/auth/) for jwt/session/oidc choice
+- [Authorization and Permissions](../security/authz-permissions/) for noop/rbac/casbin choice

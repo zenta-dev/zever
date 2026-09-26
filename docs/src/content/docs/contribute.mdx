@@ -1,10 +1,37 @@
 ---
 title: Contribute
-description: How to run and edit this documentation site.
+description: How to contribute to zever and preview this documentation site.
 ---
 
-This site is an [Astro](https://astro.build) + [Starlight](https://starlight.astro.build)
-project living in `docs/`. To preview changes locally:
+This page covers the docs site plus the Go contribution path end to end.
+The site is an Astro + Starlight project living in `docs/`. The framework
+itself follows trunk-based development on `main` with Conventional Commits
+and a full `make check` gate.
+
+## Setup
+
+Install Go 1.27 or newer, then install the pinned development tools
+(`golangci-lint` v2.13.2, `govulncheck`, `cyclonedx-gomod`):
+
+```sh
+make setup
+```
+
+Expected output ends with the tool versions installed cleanly. Then:
+
+```sh
+git clone git@github.com:zenta-dev/zever.git
+cd zever
+make download   # go mod download
+make test       # go test ./...
+```
+
+`make test-race` runs the same suite with the race detector. `make help`
+lists every target.
+
+## Docs preview
+
+To preview docs changes locally:
 
 ```sh
 cd docs
@@ -12,33 +39,133 @@ npm install
 npm run dev
 ```
 
-`npm run build` produces the static site; `npm run preview` serves that build
-locally.
+Expected output: a local URL (usually `http://localhost:4321`) serving the
+site with hot reload. `npm run build` produces the static site; `npm run
+preview` serves that build locally. Verify your edited page renders (headings,
+code blocks, tables) before opening the PR.
 
-## Writing conventions
+## Development workflow
 
-- Every service page under **Digging Deeper** and **Security** follows the
-  same loose shape: a short narrative on *why* the service exists and *when*
-  to reach for each adapter, a `Config` section (YAML + env var form), a
-  `Resolve` section (container accessor snippet), an `Adapters` table, and at
-  least one concrete gotcha. Keep config keys, adapter names, and code
-  snippets accurate to the real Go packages — verify against the package's
-  `doc.go`/`options.go`/`adapter.go` before publishing, never invent a method
-  signature or config key. If the package also has its own `README.md`,
-  check it too: several package READMEs (`config`, `container`, `orm`,
-  `cmd/zever`, `tools/zever-lsp`, `editors/*`) carry more precedence/option/
-  install detail than made it into the corresponding docs page — a README
-  update that isn't reflected here is a docs gap, not a duplicate.
-- Code snippets should compile against the current module — copy real
-  imports (`github.com/zenta-dev/zever/...`), don't abbreviate package paths.
-- Cross-link related pages, e.g. a new service page should link back to
-  [Adapters Matrix](reference/adapters-matrix/) and to
-  [Container](architecture/container/).
+Trunk-based, short-lived branches off `main`:
 
-## Everything else
+```text
+main
+  ↑
+  └── feat/fix/docs/perf branch
+          ↓
+        Pull Request
+          ↓
+        Review
+          ↓
+        main
+```
 
-For build/test/lint commands, coding standards, commit conventions, and the
-full contribution process for the `zever` Go module itself, see
-[`.github/CONTRIBUTING.md`](https://github.com/zenta-dev/zever/blob/main/.github/CONTRIBUTING.md)
-and [`CLAUDE.md`](https://github.com/zenta-dev/zever/blob/main/CLAUDE.md) in
-the repository root.
+Suggested branch names: `feat/schema-compiler`, `fix/resolver-panic`,
+`perf/lexer-allocations`, `docs/readme`, `refactor/container`,
+`test/adapters`, `ci/github-actions`.
+
+1. Create a branch off `main`.
+2. Make small, focused commits (one logical change per commit).
+3. Open a pull request against `main` early; draft if not ready.
+4. Address review feedback.
+5. Merge once CI passes and maintainers approve.
+
+## Conventional Commits
+
+Every commit message follows Conventional Commits style:
+
+```text
+<type>: <short description>
+```
+
+```text
+feat: add schema compiler
+fix: prevent resolver panic
+perf: reduce lexer allocations
+refactor: simplify container wiring
+test: add parser regression tests
+docs: improve adapter documentation
+ci: test against Go 1.27
+build: update dependencies
+```
+
+Rules: subject line completes "This change will ...". Keep it concise.
+Never squash unrelated changes into one commit. User-facing changes also
+need a `CHANGELOG.md` entry under `## [Unreleased]` before the PR opens.
+
+## The check gate
+
+Run the full local gate before pushing:
+
+```sh
+make check
+```
+
+`make check` runs, in order: `download`, `fmt` check, `vet`,
+`tidy-check`, `lint`, `test-race`, `vulncheck`, `build`. Expected output
+is a clean pass on every step with no failures. Individual steps:
+
+```sh
+make fmt / make fmt-fix     # gofmt check / write in place
+make lint / make lint-fix   # golangci-lint run (config .golangci.yml)
+make vet                    # go vet ./...
+make vulncheck              # govulncheck ./...
+make tidy-check             # go mod tidy -diff
+make generate               # go run ./tools/gengrammar (after touching token.Keywords or resolver.ScalarTypeNames)
+```
+
+CI runs vet separately and `go test` with `-vet=off -count=1`; the
+race+coverage gate runs only on `push` to main/tags, not PRs. Local
+`make check` runs race, so a green local gate means CI is safe.
+
+## Coding standards (short form)
+
+- Idiomatic Go; run `make fmt-fix` before committing.
+- Exported identifiers need doc comments starting with the name.
+- No globals, no `init()` wiring; `ctx` first arg for IO, never stored.
+- Handle errors explicitly with `%w`; `depguard` denies
+  `github.com/pkg/errors` and `io/ioutil`.
+- Small interfaces; never add methods to public interfaces (breaks
+  implementers) - prefer a new interface.
+- Tests deterministic: no `time.Sleep` sync, no network, no unseeded
+  randomness, no timing assertions. `t.Fatal` for setup, `t.Error` for
+  table assertions, `t.Helper` on helpers, `t.Context()` in tests.
+- Public API changes (exports, config structs, defaults, serialization)
+  need explicit maintainer review.
+
+## Writing conventions for docs
+
+- Every service page under Digging Deeper follows the same shape: purpose
+  plus when-to-use, `Config` (YAML + env), `Resolve` (container accessor),
+  runnable example with expected output, `Adapters` table, production
+  notes, three troubleshooting entries, and See also links.
+- Verify config keys against the package `options.go` and the JSON Schema
+  at `config/schema/zever.schema.json` - never invent a key. File keys are
+  snake_case (`auto_approve`, `max_download_bytes`); env is
+  `<SERVICE>_<FIELD>` with no prefix.
+- Code snippets use real imports (`github.com/zenta-dev/zever/...`).
+- Use relative links only; never use em or en dashes (hyphen `-` only).
+- If a package `README.md` (`config`, `container`, `orm`, `cmd/zever`)
+  carries detail missing from the docs page, that is a docs gap - port it.
+
+## Troubleshooting
+
+**`make lint` fails on files you did not touch.**
+Run `make setup` to pin `golangci-lint` v2.13.2; a newer global install
+applies different rules than CI.
+
+**`make tidy-check` fails.**
+Run `go mod tidy` and commit the result. The repo has no nested `go.mod`,
+so one tidy covers the tree.
+
+**Docs preview shows a blank page.**
+Re-run `npm install` inside `docs/` (not the repo root) and check the
+terminal for Starlight content errors naming the broken file.
+
+## See also
+
+- [Tutorials Overview](../tutorials/overview/) for the example map
+- [Build a Booking API](../tutorials/build-a-booking-api/) for the main
+  guided flow
+- [Architecture: Container](../architecture/container/) for resolve semantics
+- [Configuration](../getting-started/configuration/) for layered config

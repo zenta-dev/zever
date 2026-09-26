@@ -3,67 +3,177 @@ title: Lifecycle
 description: Request lifecycle from config load to container shutdown in a zever process.
 ---
 
-A zever process has four phases: load config, build the container, serve requests against lazily resolved services, and close in dependency order. No globals and no `init()` wiring participate anywhere.
+## Purpose + When to use
 
-## The four phases
+This page traces one zever process from `config.Load` to `c.Close`: the four phases every request lives inside. Read it before writing `main.go`, before debugging startup vs request-time failures, and before reviewing shutdown code.
+
+Concrete payoff: you will know which failures belong to load (fail fast), which belong to first resolution (retry), and which belong to close (join and inspect).
+
+## Prerequisites and mental model
+
+A zever process has four phases. No globals and no `init()` wiring participate anywhere:
 
 ```text
-config.Load  →  container.New  →  resolve on first use  →  Close(ctx)
-   file+env       one per          c.DB(), c.Cache()…        dependents
-                  process          retry on error            first, leaves last
+config.Load  ->  container.New  ->  resolve on first use  ->  Close(ctx)
+   file+env       one per          c.DB(), c.Cache()...        dependents
+                  process          retry on error              first, leaves last
 ```
 
-### 1. Load config
+Build one container per process. A server and a worker built from the same config each own their connections; nothing is shared through package state. `container.New(nil)` is valid: an untouched container closes cleanly without opening anything.
+
+## Config
+
+Each phase starts from the same layered value (`defaults < file < env`). Load once at boot; every later phase reads the result:
+
+```yaml
+# zever.yaml
+db:
+  adapter: postgres
+  options:
+    dsn: postgres://app:secret@db:5432/app
+    max_conns: 20
+cache:
+  adapter: redis
+  options:
+    addr: redis:6379
+log:
+  adapter: slog
+```
+
+```sh
+DB_ADAPTER=postgres
+DB_MAXCONNS=20
+DB_MAXCONNLIFETIME=5m
+AUTH_JWT_SECRET='prod-secret-at-least-32-bytes-long'
+```
+
+Files are strict (typos fail fast); env is best-effort (stray variables ignored). Validation runs at load, so an unknown adapter or unparsable value fails in phase 1, not mid-request in phase 3.
+
+## Resolve via container
+
+Phases 2 and 3 in code: build once, resolve lazily inside handlers, reuse the cached instance:
 
 ```go
-cfg, err := config.Load("zever.yaml") // "" probes zever.yaml/.yml/.json
-if err != nil {
-    return err
+package main
+
+import (
+	"github.com/zenta-dev/zever/config"
+	"github.com/zenta-dev/zever/container"
+)
+
+func boot() (*container.Container, error) {
+	cfg, err := config.Load("zever.yaml") // "" probes zever.yaml/.yml/.json
+	if err != nil {
+		return nil, err
+	}
+	return container.New(cfg), nil
 }
-```
 
-`defaults < file < env`. Files are strict (typos fail fast); env is best-effort (stray variables ignored). Validation runs at load — an unknown adapter or unparsable value fails here, not mid-request.
-
-### 2. Build the container
-
-```go
-c := container.New(cfg) // container.New(nil) is valid: closes cleanly, opens nothing
-```
-
-Build one container per process. A server and a worker built from the same config each own their connections — nothing is shared through package state.
-
-### 3. Serve with lazy resolution
-
-Handlers resolve services on first use and reuse the cached instance:
-
-```go
-func handleList(w http.ResponseWriter, r *http.Request) {
-    users, err := orm.From(Users).Limit(50).All(r.Context(), mustDB(r))
-    // ... encode response
+func handleList(c *container.Container) error {
+	db, err := c.DB()
+	if err != nil {
+		return err
+	}
+	_ = db
+	return nil
 }
 ```
 
 On error the cached state clears, so the next call retries instead of pinning a broken handle. `Job()` builds a dispatcher over the resolved `Queue`; `Scheduler()` shares that same queue connection rather than opening a second one.
 
-### 4. Close in order
+## Runnable example
+
+Full lifecycle in one process: load, build, serve with lazy resolution, close in order.
 
 ```go
-ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
-defer cancel()
-srv.Shutdown(ctx)
-if err := c.Close(ctx); err != nil {
-    // errors.Join of per-service errors
+package main
+
+import (
+	"context"
+	"log"
+	"net/http"
+	"time"
+
+	"github.com/zenta-dev/zever/config"
+	"github.com/zenta-dev/zever/container"
+)
+
+func main() {
+	cfg, err := config.Load("zever.yaml")
+	if err != nil {
+		log.Fatal(err)
+	}
+	c := container.New(cfg)
+
+	srv := &http.Server{Addr: ":8080", Handler: routes(c)}
+	go srv.ListenAndServe()
+
+	<-sigCh // SIGINT / SIGTERM
+	ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
+	defer cancel()
+	_ = srv.Shutdown(ctx)
+	if err := c.Close(ctx); err != nil {
+		log.Fatal(err)
+	}
 }
 ```
 
-`Close` never opens anything: untouched services stay untouched. Dependents holding a queue reference (`scheduler`, `job`) close first, unordered snapshots next, leaf dependencies (`cache`, `queue`) last. Each service gets a 5s bound when the parent carries no deadline.
+```sh
+DB_ADAPTER=sqlite go run ./cmd/myapp
+kill -TERM $!
+zever doctor --config zever.yaml
+```
 
-## Failure shapes
+Expected output or behavior:
+
+```text
+listening on :8080
+shutdown complete
+```
+
+`Close` never opens anything: untouched services stay untouched, so a failing factory on an unused service cannot fail shutdown. Dependents holding a queue reference (`scheduler`, `job`) close first, unordered snapshots next, leaf dependencies (`cache`, `queue`) last. Each service gets a 5s bound when the parent carries no deadline.
+
+## Variants
+
+| Phase | State change | Failure shape |
+|---|---|---|
+| 1. Load config | file + env merged into one typed `Config` | strict file error, `InvalidOptionsError`, `ErrUnsupportedFormat` |
+| 2. Build container | one `Container` owns future connections | none (`New` never dials; `nil` cfg valid) |
+| 3a. First resolution | adapter constructed and cached | error returned, cache cleared, next call retries |
+| 3b. Steady serving | cached instance reused per accessor | per-call errors only, no rebuild |
+| 3c. Shared resolution | `Scheduler()` resolves `Job()` then `Queue` | transitive side effect, one shared connection |
+| 4. Close | resolved services shut down in order | `errors.Join` of per-service errors |
+
+Failure shapes at close:
 
 | Signal | Type | Meaning |
 |---|---|---|
-| panic during close | `container.ClosePanicError` (value type — `errors.As` target must not be a pointer) | adapter panicked; shutdown continued |
-| per-service timeout | `container.CloseTimeoutError` (value type — `errors.As` target must not be a pointer) | adapter exceeded its bound |
+| panic during close | `container.ClosePanicError` (value type: `errors.As` target must not be a pointer) | adapter panicked; shutdown continued |
+| per-service timeout | `container.CloseTimeoutError` (value type: `errors.As` target must not be a pointer) | adapter exceeded its bound |
 | multiple failures | `errors.Join` | inspect with `errors.As` per type |
 
-Error values name the service only — never resolved values or secrets. Keep timeout tests short (parent ~100ms, block ~500ms) and let stragglers finish before the test returns, so `goleak.VerifyTestMain` stays green.
+## Production notes
+
+Stop the HTTP server before closing the container (`srv.Shutdown(ctx)` then `c.Close(ctx)`), always with a timeout parent. Error values name the service only, never resolved values or secrets; display config via `config.RedactedServices`. `Default()` dev secrets stay in tests; prod secrets arrive via file or env.
+
+Keep timeout tests short (parent about 100ms, block about 500ms) and let stragglers finish before the test returns, so `goleak.VerifyTestMain` stays green. `go test` runs with `-vet=off -count=1` (vet is a separate step). Shared instances close once via pointer-identity dedup, so resolving `Scheduler()`, `Job()`, and `Queue()` in one process still shuts down cleanly.
+
+## Troubleshooting
+
+| Symptom | Cause | Fix |
+|---|---|---|
+| Failure at boot before serving | Strict file error or unparsable env value | Read the `Load` error (service + field named), fix the file key or env value |
+| First request fails but the next succeeds | Transient backend error on first resolution | No action needed: cache cleared on error, next call retried; check adapter health if it repeats |
+| Shutdown hangs with no deadline | `Close` called on a bare context while an adapter blocks | Wrap in `context.WithTimeout` (10s shape); each service then gets a 5s bound |
+| `errors.As` for close errors never matches | Pointer target used against value-type errors | Declare value targets (`var pe container.ClosePanicError`) and pass `&pe` |
+| Goroutine leak reported after lifecycle test | Background goroutine outlived `Close` | Make the adapter's `Close` stop its goroutine before returning; keep timeout blocks short |
+
+## See also
+
+- `./container/` for accessor table and close probing order
+- `./providers-adapters/` for interface and registry roles in each phase
+- `./compiler-boundary/` for why the compiler never runs in this lifecycle
+- `../getting-started/configuration/` for layering and strictness
+- `../getting-started/deployment/` for prod shutdown wiring
+- `../dsl/syntax-zen/` for the schema compiled before phase 1
+- Package guides as text: `container/README.md`, `config/README.md`, `internal/dsl/README.md`

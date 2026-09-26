@@ -4,59 +4,214 @@ description: Durable job transport backing the job dispatcher and scheduler.
 ---
 
 `job.Dispatcher` and the scheduler both need somewhere to put work that
-outlives a single request — and they both need to agree on the same
+outlives a single request - and they both need to agree on the same
 transport, or you end up with two connections doing the same job worse than
 one. `queue.Queue` is that shared transport: push, delay, pop, ack, nack, all
-through typed `Message`/`Payload`/`Headers` values with UUIDv7 message IDs.
+through typed `Message`, `Payload`, and `Headers` values with UUIDv7 message ids.
 
-`memory` (the default) is process-local — fine for tests and a single-node
-dev setup, but a message pushed on one process is invisible to a worker on
-another. `redis` is the adapter you want the moment you run more than one
-worker: it's the shared, multi-process transport that makes horizontal
-scaling of consumers actually work.
+## Purpose and when to use
 
-## Resolve
+Use queue when the response cannot wait for the work. Booking writes in the
+bookings app return fast while `SendConfirmation` (queue `default`) and
+`SendReminder` (queue `low`) run in a worker. Anything that must survive a
+restart, retry with backoff, or fan out to N workers belongs here.
 
-```go
-c := container.New(config.Default())
-q, err := c.Queue()
-if err != nil {
-	// handle
-}
-d, err := c.Job() // d.Q is the shared queue instance
-_ = d
-```
+Pick `memory` for a single process: tests, local dev, and the single-binary
+bookings worker over the shared memory queue. It is the default and needs no
+infra. Pick `redis` the moment you run more than one worker process or split
+web and worker tiers. A message pushed on one host must be poppable on
+another, and only the shared adapter gives you that.
 
-`Queue()` is a leaf dependency, closed last. `Job()` has no registry of its
-own — it builds a `*job.Dispatcher` directly over the already-resolved queue,
-so it has no separate shutdown method: `Close` treats it as a no-op nil.
+Do not use queue as an event log or a pub/sub fan-out bus. It offers
+per-topic pop with ack tracking, not broadcast replay. For notify-style
+fan-out to live subscribers, use the event bus instead.
 
 ## Config
+
+File decoding is strict snake_case. Durations in files are integer
+nanoseconds. Env overrides accept Go duration strings such as `"30s"`.
 
 ```yaml
 queue:
   adapter: memory
+  options:
+    visibility_timeout: 30000000000
+    poll_timeout: 1000000000
+    buffer: 100
+```
+
+Shared multi-worker transport:
+
+```yaml
+queue:
+  adapter: redis
+  options:
+    addr: localhost:6379
+    db: 0
+    prefix: bookings
+    visibility_timeout: 30000000000
+    poll_timeout: 1000000000
+    buffer: 100
 ```
 
 ```sh
 QUEUE_ADAPTER=redis
+QUEUE_ADDR=localhost:6379
+QUEUE_VISIBILITY_TIMEOUT=30s
+QUEUE_POLL_TIMEOUT=1s
+QUEUE_BUFFER=100
 ```
+
+`visibility_timeout` is how long a popped message stays invisible before it
+can be reclaimed. `poll_timeout` is how long `Pop` waits before returning
+empty. `buffer` caps buffered ready messages per topic. The bookings
+`zever.yaml` webhook block shows the same three keys under `queue_opts`,
+with timeout set below `visibility_timeout` on purpose.
+
+## Resolve via container
+
+```go
+import (
+	"github.com/zenta-dev/zever/config"
+	"github.com/zenta-dev/zever/container"
+)
+
+func openQueue() error {
+	c := container.New(config.Default())
+	q, err := c.Queue()
+	if err != nil {
+		return err
+	}
+	defer func() { _ = q.Close() }()
+	d, err := c.Job() // d.Q is the shared queue instance
+	if err != nil {
+		return err
+	}
+	_ = d
+	return nil
+}
+```
+
+`Queue()` resolves lazily and caches the instance. On error the cached state clears so the next call retries. `Job()` has no registry: it builds a `*job.Dispatcher` over the resolved queue, so both share one connection.
+
+Close shape: `queue.Queue` declares `Close() error` with no context, per the
+close-shape standard for instant-close handles. Queue is a leaf dependency
+and closes last, after scheduler and job dependents. `Close(ctx)` on the
+container never opens an untouched queue just to close it.
+
+## Runnable example
+
+Push a confirmation payload, pop it in the worker, ack on success and nack
+with requeue on transient failure. `Pop` on an empty topic returns `ErrEmpty`
+as an expected result, not a crash.
+
+```go
+package main
+
+import (
+	"context"
+	"errors"
+	"fmt"
+	"time"
+
+	"github.com/zenta-dev/zever/queue"
+	"github.com/zenta-dev/zever/queue/memory"
+)
+
+func main() error {
+	q, err := memory.New(queue.Options{
+		VisibilityTimeout: 30 * time.Second,
+		PollTimeout:       time.Second,
+		Buffer:            100,
+	})
+	if err != nil {
+		return err
+	}
+	defer func() { _ = q.Close() }()
+
+	ctx := context.Background()
+	payload := queue.NewPayload([]byte(`{"booking_id":"b_123"}`))
+	headers := queue.NewHeaders(map[string]string{"job_name": "SendConfirmation"})
+	if err := q.Push(ctx, "default", payload, headers); err != nil {
+		return err
+	}
+
+	msg, err := q.Pop(ctx, "default")
+	if err != nil {
+		if errors.Is(err, queue.ErrEmpty) {
+			fmt.Println("empty, poll again")
+			return nil
+		}
+		return err
+	}
+	fmt.Println("popped", msg.ID)
+
+	if err := q.Ack(ctx, msg); err != nil {
+		return err
+	}
+	fmt.Println("acked")
+
+	n, err := q.Length(ctx, "default")
+	if err != nil {
+		return err
+	}
+	fmt.Println("remaining", n)
+	return nil
+}
+```
+
+Expected behavior: prints a popped id, then `acked`, then `remaining 0`.
+Replace `Ack` with `Nack(ctx, msg, true)` when the SMTP call or push call
+fails transiently so the message becomes visible again after
+`visibility_timeout`.
 
 ## Adapters
 
 | Adapter | Package | Notes |
 |---|---|---|
-| `memory` | `queue/memory` | Default; no infra |
-| `redis` | `queue/redis` | Shared; required for multi-worker setups |
+| `memory` | `queue/memory` | Default, process-local, no infra, ideal for tests |
+| `redis` | `queue/redis` | Shared, required for multi-worker setups, keyed by `prefix` |
 
-## The gotcha: no ordering or exactly-once guarantee beyond the backend
+Message shape lives in `queue/message.go`. Keep payloads small, explicit JSON,
+and versioned alongside `schema/bookings.zen` job definitions.
 
-`queue` deliberately promises less than you might assume: no cross-topic
-ordering and no exactly-once delivery beyond whatever the chosen backend
-actually provides — design consumers to handle a redelivered message
-gracefully rather than trusting it arrives exactly once. `Pop` on an empty
-topic isn't an error condition to panic over; it returns `ErrEmpty` (or an
-`EmptyError`) as an expected, checkable result. Message shape lives in
-`queue/message.go` — keep payloads small and explicit, since resolving
-`Scheduler()` resolves `Job()` and transitively `Queue` as a side effect, and
-shutdown closes scheduler/job dependents first, queue last.
+## Gotchas and production notes
+
+- Design consumers for redelivery. Queue promises pop, ack, and reclaim, not exactly-once. Handlers must be idempotent or guarded by `lock` or `idempotency` keys.
+- Keep `visibility_timeout` above the slowest handler path. The bookings webhook block sets timeout 10s against `visibility_timeout` 30s so a slow delivery never resurfaces mid-flight.
+- Keep `poll_timeout` low in request-scoped pops and higher in workers. A long poll inside an HTTP handler holds the request open for no benefit.
+- There is no cross-topic ordering. Priority comes from which topic the worker polls (`default` before `low`), not from insertion order.
+- Never log full payloads that may carry PII. Log ids and topic names, and route config display through `config.RedactedServices`.
+- Close order matters: scheduler and job stop first, then snapshots, then `queue` and `cache` last.
+- `Name()` reports the adapter for health output. `Length` and `IsEmpty`
+  drive autoscaling signals, not control flow for pops - always handle
+  `ErrEmpty` directly.
+
+## Troubleshooting
+
+Symptom: same job runs twice within seconds.
+Cause: `visibility_timeout` shorter than handler runtime, so the message is
+reclaimed while the first attempt still runs.
+Fix: raise `visibility_timeout` above the p99 handler latency plus retry
+backoff, or shorten the handler by moving slow I/O behind a second dispatch.
+
+Symptom: `Pop` spins hot and logs `ErrEmpty` floods.
+Cause: tight poll loop with near-zero `poll_timeout` on an idle topic.
+Fix: raise `poll_timeout` (workers commonly use 1s) and back off after consecutive empties.
+
+Symptom: worker on host B never sees pushes from host A.
+Cause: `memory` adapter in a scaled deploy. Each process owns a private buffer.
+Fix: switch `queue.adapter` to `redis` with a shared `addr` and `db`, keep the same `prefix` across tiers, and restart both.
+
+Symptom: strict file load rejects `visibilitytimeout`.
+Cause: flat pre-rename spelling. Canonical file keys are
+`visibility_timeout`, `poll_timeout`.
+Fix: rename both keys and use integer nanoseconds in YAML. Env keeps
+accepting `QUEUE_VISIBILITYTIMEOUT` style since `_` is ignored there.
+
+## See also
+
+- [Scheduler and Jobs](scheduler-jobs/) for the dispatcher and cron layer over this transport
+- [Events and Event Bus](events-eventbus/) for fan-out that does not need durability
+- [Build a Booking API](../tutorials/build-a-booking-api/) for the bookings tutorial
+- `examples/bookings/zever.yaml` for queue and webhook queue_opts and `schema/bookings.zen` for SendConfirmation and SendReminder topics

@@ -3,56 +3,217 @@ title: Storage and Media
 description: File storage with policy-gated access and local-first defaults.
 ---
 
-Uploaded files, generated reports, exported backups — anything your app needs
-to persist as a blob shouldn't be tied to one filesystem or one cloud provider
-in the code that writes it. `storage.Storage` gives you a single interface
-gated by policy (`storage/policy.go`, `storage/decision.go`) so access checks
-live in one place instead of scattered across every call site that touches a
-file.
+Uploaded files, generated reports, exported backups - anything your app keeps
+as a blob should not be tied to one filesystem or one cloud provider in the
+code that writes it. `storage.Storage` gives one interface gated by policy
+(`storage/policy.go`, `storage/decision.go`) so access checks live in one
+place instead of scattered across every call site that touches a file.
 
-`local` (the default) writes to disk — zero infra, fine for a single instance
-and for tests. Move to `s3` or `r2` the moment more than one instance needs to
-see the same files, since `local` storage is, definitionally, local.
+## Purpose and when to use
 
-For the `media` package — upload/transform/probe pipelines with `ffmpeg`
-support built on top of storage — see the dedicated
-[Media Processing](media/) page.
+Use storage for opaque objects: space photos, receipt PDFs, export archives.
+Use media for the pipeline on top of storage: upload, transform, and probe
+with `ffmpeg` support, plus presigned or public URLs for serving.
+
+Pick `local` while single-instance. It writes under `root`, needs no infra, and matches `config.Default()` for tests. The bookings app keeps both on `local` for dev. Pick `s3` or `r2` the moment more than one instance must see the same files.
+
+Do not bypass policy by reaching for adapter internals. The policy layer
+answers "may this caller read or write this path" before disk or bucket I/O.
+Calling the backend raw reintroduces the per-call-site access bugs the
+package exists to prevent.
 
 ## Config
+
+File decoding is strict snake_case. Storage nests local, S3, and R2 keys flat
+under `options` beside `url_base` and `policy`. Media keeps its own limits
+such as `max_download_bytes` and `presign_ttl` under its own block.
 
 ```yaml
 storage:
   adapter: local
+  options:
+    root: ./data/storage
+    secret: dev-only-hmac-secret
+    public_url: http://localhost:8080/files
+    url_base: http://localhost:8080/files
+media:
+  adapter: local
+  options:
+    root: /tmp/media
+    base_url: /media
+    max_download_bytes: 67108864
+    max_pixels: 52428800
+    derived_ttl: 600000000000
+    presign_ttl: 3600000000000
+    region: us-east-1
+```
+
+Shared S3-backed storage:
+
+```yaml
+storage:
+  adapter: s3
+  options:
+    region: us-east-1
+    endpoint: https://s3.us-east-1.amazonaws.com
+    access_key_id: AKIAEXAMPLE
+    secret_access_key: prod-secret-here
+    policy_sync: manual
+    sync_fail: warn
+    url_base: https://files.example.com
+media:
+  adapter: s3
+  options:
+    region: us-east-1
+    bucket: bookings-media
+    access_key_id: AKIAEXAMPLE
+    secret_access_key: prod-secret-here
+    endpoint: https://s3.us-east-1.amazonaws.com
+    base_url: https://media.example.com
+    presign_ttl: 3600000000000
 ```
 
 ```sh
 STORAGE_ADAPTER=s3
+STORAGE_REGION=us-east-1
+STORAGE_ACCESS_KEY_ID=AKIAEXAMPLE
+STORAGE_SECRET_ACCESS_KEY=prod-secret-here
+STORAGE_URL_BASE=https://files.example.com
+MEDIA_ADAPTER=s3
+MEDIA_BUCKET=bookings-media
+MEDIA_BASE_URL=https://media.example.com
 ```
 
-## Resolve
+`policy_sync` accepts `manual` or `auto`, `sync_fail` accepts `warn` or
+`require`. Media `presign_ttl` must stay at or under 7 days or `Validate`
+rejects it. File durations are integer nanoseconds, env accepts `"1h"` style.
+
+## Resolve via container
 
 ```go
-c := container.New(config.Default())
-st, err := c.Storage()
-if err != nil {
-	// handle
+import (
+	"github.com/zenta-dev/zever/config"
+	"github.com/zenta-dev/zever/container"
+)
+
+func openStorage() error {
+	c := container.New(config.Default())
+	st, err := c.Storage()
+	if err != nil {
+		return err
+	}
+	_ = st
+	m, err := c.Media()
+	if err != nil {
+		return err
+	}
+	_ = m
+	return nil
 }
-_ = st
 ```
+
+`Storage()` and `Media()` each resolve lazily and cache the instance. On error the cached state clears so the next call retries.
+
+Close shape: `storage.Storage` declares `Close(ctx)` for pool-backed drains. Both are snapshot services, ahead of leaf `cache` and `queue`. Only resolved services close.
+
+## Runnable example
+
+Store a receipt, mint a time-boxed link, then run a media probe with byte and
+pixel caps. The bookings confirmation path uses this shape: PDF to storage,
+thumbnail through media, link back in the mail body.
+
+```go
+package main
+
+import (
+	"context"
+	"fmt"
+	"time"
+
+	"github.com/zenta-dev/zever/media"
+	"github.com/zenta-dev/zever/storage"
+	storagelocal "github.com/zenta-dev/zever/storage/local"
+	medialocal "github.com/zenta-dev/zever/media/local"
+)
+
+func main() error {
+	ctx := context.Background()
+	st, err := storagelocal.New(storage.Options{})
+	if err != nil {
+		return err
+	}
+	defer func() { _ = st.Close(ctx) }()
+
+	if err := st.Put(ctx, "receipts/b_123.pdf", []byte("%PDF-1.4 receipt")); err != nil {
+		return err
+	}
+	url, err := st.Presign(ctx, "receipts/b_123.pdf", time.Hour)
+	if err != nil {
+		return err
+	}
+	fmt.Println("receipt link", url)
+
+	m, err := medialocal.New(media.Options{Root: "/tmp/media", BaseURL: "/media"})
+	if err != nil {
+		return err
+	}
+	info, err := m.Probe(ctx, "receipts/b_123.pdf")
+	if err != nil {
+		fmt.Println("probe skipped", err)
+		return nil
+	}
+	fmt.Println("probed", info.Format)
+	return nil
+}
+```
+
+Expected behavior: prints a presigned link valid for one hour, then probe metadata or a clean skip when the fixture is not decodable media. Check `storage/storage.go` and `media/media.go` for exact signatures before wiring handlers.
 
 ## Adapters
 
 | Adapter | Package | Notes |
 |---|---|---|
-| `local` | `storage/local` | Default; filesystem |
-| `s3` | `storage/s3` | S3-compatible; shared core in `storage/s3core` |
-| `r2` | `storage/r2` | Cloudflare R2 |
+| `local` | `storage/local` | Default filesystem store, presigned HMAC via `secret` |
+| `s3` | `storage/s3` | S3-compatible, shared core in `storage/s3core` |
+| `r2` | `storage/r2` | Cloudflare R2, needs `account_id` |
+| `local` | `media/local` | Default pipeline root, serves under `base_url` |
+| `s3` | `media/s3` | Shared object hold, needs `bucket` plus creds |
 
-## The gotcha: gate through policy, don't call the adapter raw
+Storage and media adapters version independently: local files can back
+storage while media already points at S3, though keeping them aligned avoids
+cross-store copies.
 
-`storage`'s policy layer exists to answer "is this caller allowed to read/write
-this path" before the adapter ever touches disk or a bucket — bypassing it by
-reaching for adapter internals directly reintroduces exactly the per-call-site
-access-control bugs the package exists to prevent. Never log a DSN or
-credential directly; route anything you need to display through
-`config.RedactedServices`.
+## Gotchas and production notes
+
+- Gate through policy, never around it. Resolve `PolicyConfig`, then call the checked path. Unchecked adapter calls skip the audit point.
+- Cap everything: `max_download_bytes` (64 MiB default), `max_pixels` (about 50 MP default), `max_duration` for video, `presign_ttl` at 1h default with a 7-day ceiling.
+- Keep `ffmpeg` and `ffprobe` names or paths explicit in containers. Defaults assume both on `PATH`; a missing binary surfaces at probe time, not boot.
+- Never log a DSN or credential. `access_key_id` and `secret_access_key` ride file or env only, and display goes through `config.RedactedServices`.
+- `endpoint` must include scheme and host when set. A bare hostname fails validation.
+- When no source file exists or no target subscribes, skip quietly at the job layer rather than failing the booking flow.
+
+## Troubleshooting
+
+Symptom: `presign_ttl must be >= 0 and <= 7 days`.
+Cause: presign window past the 7-day ceiling, often `720h` copied from a sample.
+Fix: lower to at or under `604800000000000` ns in YAML (7 days) or `"168h"` in env.
+
+Symptom: S3 writes work locally but fail in deploy with endpoint errors.
+Cause: `endpoint` missing scheme, or region left empty against a store that needs it.
+Fix: set a full URL such as `https://s3.us-east-1.amazonaws.com` and pin `region`.
+
+Symptom: probe fails with missing `ffmpeg` in containers.
+Cause: slim image without the binaries, defaults assume `PATH` presence.
+Fix: install both in the image or set `ffmpeg` and `ffprobe` to absolute
+paths, then smoke-test `Probe` in CI on a fixture file.
+
+Symptom: second instance serves 404 for a just-uploaded file.
+Cause: `local` adapter with two hosts. Each filesystem is private.
+Fix: move both to `s3` or `r2` with a shared bucket and re-upload.
+
+## See also
+
+- [Search](search/) for indexing file metadata alongside blobs
+- [Mailer](mailer/) for linking presigned receipts in confirmation mail
+- [Build a Booking API](../tutorials/build-a-booking-api/) for the bookings tutorial
+- `examples/bookings/zever.yaml` for local storage and media defaults and `schema/bookings.zen` for Space and Booking entities that own the files

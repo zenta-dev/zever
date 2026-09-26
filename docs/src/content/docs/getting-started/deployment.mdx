@@ -3,27 +3,26 @@ title: Deployment
 description: Build a static binary, configure via file and env, and shut down the container cleanly.
 ---
 
-Deploying zever is standard Go: compile a static binary, configure it with a file plus environment overrides, and let the container close services in dependency order on `SIGTERM`.
+## Purpose + When to use
 
-## Build
+This page turns a tested checkout into a running prod process: static build, strict file plus env secrets, signal handling, and ordered shutdown. Follow it for every environment above local dev: staging, prod, and preview deploys behind systemd, Kubernetes, or a container runtime.
 
-```sh
-make build
-# or directly:
-go build -o myapp ./cmd/myapp
+Local-only tools (`zever dev` watch mode, `zever tinker` REPL) do not appear in this path except as warnings.
+
+## Prerequisites and mental model
+
+Deploying zever is standard Go with one extra rule:
+
+```text
+build once  ->  configure per env  ->  one container per process  ->  close on SIGTERM
+go build        zever.yaml + env       container.New(cfg)             srv.Shutdown + c.Close
 ```
 
-There is no build-time codegen step for normal services. The `.zen` schema compiler runs explicitly via `zever compile` / `zever generate` during development — never at container start.
+There is no build-time codegen step for normal services. The `.zen` schema compiler runs explicitly via `zever compile` / `zever generate` during development, never at container start. Cross-compile with plain Go when the target differs from the build host.
 
-Cross-compile with plain Go:
+## Config
 
-```sh
-GOOS=linux GOARCH=amd64 go build -o myapp ./cmd/myapp
-```
-
-## Configure for production
-
-Ship a strict config file and override secrets per environment:
+Ship a strict config file and override secrets per environment. Layering stays `defaults < file < env`; zero-infra defaults never reach prod.
 
 ```yaml
 # /etc/myapp/zever.yaml
@@ -32,53 +31,157 @@ db:
   options:
     dsn: postgres://app:secret@db:5432/app
     max_conns: 20
+    min_conns: 2
 cache:
   adapter: redis
   options:
     addr: redis:6379
 log:
   adapter: slog
+observability:
+  adapter: otlp
+  options:
+    endpoint: otel:4317
+    service_name: myapp
 ```
 
 ```sh
 DB_DSN='postgres://app:${DB_PASSWORD}@db:5432/app'
+DB_MAXCONNS=20
 AUTH_JWT_SECRET='prod-secret-at-least-32-bytes-long'
+CACHE_ADAPTER=redis
 ```
 
-Remember the layering: `defaults < file < env`. The zero-infra defaults (`sqlite`, `memory`, deterministic dev crypto key) are for local dev and tests only — never production. `Default()` secrets are public by design.
+Real keys used above: `DB_DSN`, `DB_MAXCONNS`, `AUTH_JWT_SECRET`, `CACHE_ADAPTER`. Secrets travel via env or mounted files, never via `config.Default()` (its crypto key is deterministic and public). Files hold structure; env holds secrets and per-env deltas.
 
-## Wire startup and shutdown
+## Resolve via container
 
-Build one container per process from the loaded config, and always close it:
+Build one container per process from the loaded config, resolve services inside handlers, and always close it on shutdown:
 
 ```go
-cfg, err := config.Load("/etc/myapp/zever.yaml")
-if err != nil {
-    return err
+package main
+
+import (
+	"context"
+	"log"
+	"net/http"
+	"time"
+
+	"github.com/zenta-dev/zever/config"
+	"github.com/zenta-dev/zever/container"
+)
+
+func main() {
+	cfg, err := config.Load("/etc/myapp/zever.yaml")
+	if err != nil {
+		log.Fatal(err)
+	}
+	c := container.New(cfg)
+
+	srv := &http.Server{Addr: ":8080", Handler: routes(c)}
+	go func() {
+		if err := srv.ListenAndServe(); err != nil && err != http.ErrServerClosed {
+			log.Fatal(err)
+		}
+	}()
+
+	<-sigCh // SIGINT / SIGTERM
+	ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
+	defer cancel()
+	_ = srv.Shutdown(ctx)
+	if err := c.Close(ctx); err != nil {
+		log.Fatal(err)
+	}
 }
-c := container.New(cfg)
-
-srv := &http.Server{Addr: ":8080", Handler: routes(c)}
-go srv.ListenAndServe()
-
-<-sigCh // SIGINT / SIGTERM
-ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
-defer cancel()
-srv.Shutdown(ctx)
-return c.Close(ctx)
 ```
 
-`Close(ctx)` closes only services already resolved, in dependency order (dependents first, `cache`/`queue` leaves last), joining failures with `errors.Join`. Panics surface as `container.ClosePanicError`, timeouts as `container.CloseTimeoutError` — both are value types (value receivers throughout), so match with `errors.As` against value targets (`var pe container.ClosePanicError`), not pointer targets, or the match silently never fires.
+`Close(ctx)` closes only services already resolved, in dependency order (dependents first, `cache`/`queue` leaves last), joining failures with `errors.Join`. Panics surface as `container.ClosePanicError`, timeouts as `container.CloseTimeoutError` (both value types with value receivers, so match with value `errors.As` targets, or the match silently never fires).
 
-## Production checklist
+## Runnable example
 
-| Check | Why |
-|---|---|
-| Real crypto/JWT secrets via file or env | defaults are deterministic and public |
-| `log` adapter set to `slog`/`zerolog`, not `log` | structured output for aggregators |
-| `observability` set to `otlp`, not `stdout` (the default) | traces and metrics actually export off-box |
-| `Close(ctx)` with a timeout parent | buffered spans flush via `Shutdown(ctx)` probing |
-| Never log raw option maps | use `config.RedactedServices`, errors name fields only |
-| Never point `zever tinker` at prod | it evals arbitrary Go against a live container |
+Build, configure, and dry-run the shutdown path end to end:
 
-`zever dev` is local watch-mode only. Production runs the compiled binary behind your process supervisor — systemd, Kubernetes, or a container runtime.
+```go
+// cmd/myapp/main.go (sketch): load, serve, trap SIGTERM, close in order.
+package main
+
+import (
+	"context"
+	"fmt"
+	"time"
+
+	"github.com/zenta-dev/zever/config"
+	"github.com/zenta-dev/zever/container"
+)
+
+func boot() error {
+	cfg, err := config.Load("/etc/myapp/zever.yaml")
+	if err != nil {
+		return err
+	}
+	c := container.New(cfg)
+	defer c.Close(context.Background())
+	db, err := c.DB()
+	if err != nil {
+		return err
+	}
+	fmt.Println("boot ok:", db.Dialect())
+	return nil
+}
+
+var _ = time.Second
+```
+
+```sh
+make build
+GOOS=linux GOARCH=amd64 go build -o myapp ./cmd/myapp
+DB_DSN='postgres://app:${DB_PASSWORD}@db:5432/app' ./myapp
+kill -TERM $!
+```
+
+Expected output or behavior:
+
+```text
+boot ok: postgres
+```
+
+The process starts, resolves postgres (not sqlite), serves on `:8080`, and on `SIGTERM` stops the HTTP server before closing the container. If the DSN is wrong the failure lands at `Load` or first `DB()` call, not mid-request, because validation runs at load and accessors fail fast.
+
+## Variants
+
+| Target | Command | When to pick it |
+|---|---|---|
+| Native build | `make build` (runs `go build ./...`) | Same-arch deploys, CI check |
+| Single binary | `go build -o myapp ./cmd/myapp` | Ship one artifact per service |
+| Cross-compile | `GOOS=linux GOARCH=amd64 go build -o myapp ./cmd/myapp` | Build on macOS, run on Linux |
+| Systemd unit | `ExecStart=/usr/local/bin/myapp` with `EnvironmentFile` | VM and bare-metal hosts |
+| Kubernetes | image plus `env:` secrets and mounted `zever.yaml` | Orchestrated rollouts |
+| Container runtime | image with `ENTRYPOINT ["./myapp"]` | Docker and Podman fleets |
+
+`zever dev` is local watch-mode only in every row: it prints `zever dev: watching <schemaDir> and <serverEntry> ... (Ctrl-C to stop)` and restarts on change. Production runs the compiled binary behind the supervisor, never the watcher.
+
+## Production notes
+
+Checklist before rollout: real crypto and JWT secrets via file or env (defaults are public); `log` set to `slog` or `zerolog`, not the dev adapter; `observability` set to `otlp`, not `stdout` (the default), so traces export off-box; `Close(ctx)` with a timeout parent so buffered spans flush via `Shutdown(ctx)` probing.
+
+Redaction: never log raw option maps; use `config.RedactedServices`, whose error text names services and fields only. Fail-closed: strict files reject typos at load; unparsable env values return `InvalidOptionsError`; unsupported ORM features return dialect errors instead of wrong SQL. Never point `zever tinker` at prod: it evals arbitrary Go against a live container (every start prints the dev-only warning to stderr).
+
+## Troubleshooting
+
+| Symptom | Cause | Fix |
+|---|---|---|
+| Process starts on sqlite despite a postgres file | `Load("")` probed the wrong directory or env overrode the adapter | Pass the explicit path (`/etc/myapp/zever.yaml`), check `DB_ADAPTER` is unset or correct |
+| `Load` fails with unknown field at deploy | File uses a pre-rename key (`maxconns`) or a typo | Rename to snake_case (`max_conns`); verify against `config/schema/zever.schema.json` |
+| SIGTERM hangs past the grace period | `Close(ctx)` called with no deadline or an adapter blocks | Wrap shutdown in `context.WithTimeout` (10s shape) and check the blocking adapter's `Close` |
+| Traces never arrive in the collector | `observability` still on `stdout` default | Set adapter `otlp` with `endpoint` as `host:port` (no scheme) and a `service_name` |
+| Secrets visible in supervisor logs | Raw options printed at boot | Print `config.RedactedServices(cfg)` only; audit `log.Fatal(err)` paths for echoed values |
+
+## See also
+
+- `./installation.mdx` for builds and dev tools
+- `./configuration.mdx` for layering, strict files, and redaction
+- `./directory-structure.mdx` for module layout
+- `../architecture/lifecycle/` for the four process phases
+- `../architecture/container/` for close order and error types
+- `../architecture/providers-adapters/` for adapter swaps per environment
+- Package guides as text: `config/README.md`, `container/README.md`, `cmd/zever/README.md`

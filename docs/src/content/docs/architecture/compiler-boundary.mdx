@@ -3,60 +3,149 @@ title: Compiler Boundary
 description: Why runtime packages never import the DSL compiler, and how it's enforced.
 ---
 
-`internal/dsl` is the schema compiler frontend: source text through the
-lexer, parser, resolver, and codegen backends, ending at `*ir.Schema` and
-generated output. It is marked `internal/` for the same reason Go's own
-`internal/` visibility rule exists — and the constraint it enforces is
-stricter than "don't import a private package by accident."
+## Purpose + When to use
 
-## The rule
+This page states the hardest boundary in the repo: runtime packages must never import `internal/dsl`. Read it before adding an import, before generating code, and before confusing this compiler rule with the separate schema-module rule (`check-boundaries`).
 
-**Runtime packages must never import `internal/dsl`.**
+Concrete payoff: prod binaries stay small, layering stays honest, and the Go toolchain (not a lint you must remember) rejects violations at build time.
 
-A running service — the container, an adapter, generated application code —
-has no business linking against a lexer, a parser, or a resolver. Those
-exist for one moment: compile time, when `zever compile` turns your `.zen`
-schema into Go source. Once that source exists, the compiler's job is done;
-a deployed binary should never carry it, and no runtime code path should
-ever need to.
+## Prerequisites and mental model
 
-```
-source text → lexer → parser → ast → resolver → ir.Schema
-                                    ↘ compile → backend outputs
+`internal/dsl` is the schema compiler frontend: source text through the lexer, parser, resolver, and codegen backends, ending at `*ir.Schema` and generated output.
+
+```text
+source text -> lexer -> parser -> ast -> resolver -> ir.Schema
+                                    -> compile -> backend outputs
 ```
 
-Everything left of the final arrow is compile-time-only. Everything the
-generated output produces — the typed ORM, the HTTP routes, the gRPC
-service stubs — is what runtime code actually imports.
+Everything left of the final arrow is compile-time-only. Everything the generated output produces (the typed ORM, the HTTP routes, the gRPC service stubs) is what runtime code actually imports. A running service has no business linking against a lexer, a parser, or a resolver: those exist for one moment, when `zever compile` turns a `.zen` schema into Go source.
 
-## Why this matters
+## Config
 
-- **Binary size and attack surface.** A compiler frontend pulls in a lexer,
-  parser, and multiple codegen backends worth of dependencies. None of that
-  belongs in a production binary that only needs to run generated code
-  against a database.
-- **Layering stays honest.** If runtime code could reach into the resolver,
-  it would be tempting to special-case schema-shaped logic at request time
-  instead of generating it once, ahead of time — reintroducing exactly the
-  kind of runtime reflection/interpretation this framework's codegen-first
-  design exists to avoid.
-- **The same rule Go itself enforces.** Placing the compiler under
-  `internal/` means the Go toolchain rejects an accidental import from
-  outside the module at compile time — this isn't a lint you have to
-  remember to run, it's a build failure the moment someone tries.
+The compiler takes no runtime config. Its inputs are schema files and backend flags; service config (`zever.yaml` plus env) belongs to the running binary, never to the compile step:
 
-Because the enforcement is Go's own `internal/` visibility mechanism,
-there's no separate CLI check for this rule and none is needed: `go build`
-already fails the build for any import of `internal/dsl` from outside the
-module.
+```yaml
+# zever.yaml (runtime only: the compiler never reads this)
+db:
+  adapter: sqlite
+  options:
+    path: data/app.db
+log:
+  adapter: slog
+```
 
-## A different boundary: schema modules
+```sh
+DB_ADAPTER=sqlite
+DB_MAXCONNS=10
+AUTH_JWT_SECRET='dev-only-secret-at-least-32-bytes-long'
+```
 
-Don't confuse this compiler boundary with `zever check-boundaries`, which
-checks something else entirely — cross-**schema-module** references (a
-relation, RPC return type, or permission resource that reaches from one
-`.zen` module directory into another). That's a modeling rule enforced by
-the resolver on every compile; `check-boundaries` is just a report-only
-view over diagnostics `Resolve()` already produces. See [Syntax
-(.zen)](../dsl/syntax-zen/) for how modules are derived from directory
-structure.
+Keep the two inputs apart when debugging: schema errors (parse, resolve, diagnostics) come from `.zen` files and `zever` flags; service errors (adapters, DSNs, secrets) come from `config.Load`. A boundary violation usually looks like the second input leaking into the first: runtime code reaching for resolver types instead of generated output.
+
+## Resolve via container
+
+The container is runtime and therefore lives entirely on the far side of the boundary. It resolves generated plumbing, never compiler packages:
+
+```go
+package main
+
+import (
+	"github.com/zenta-dev/zever/config"
+	"github.com/zenta-dev/zever/container"
+)
+
+func main() {
+	// Runtime path: config -> container -> generated ORM and routes.
+	// No import of internal/dsl anywhere in this graph.
+	c := container.New(config.Default())
+	db, err := c.DB()
+	if err != nil {
+		panic(err)
+	}
+	_ = db
+}
+```
+
+Entry points on the compile side (for reference, not for runtime import): `parser.New(file, src).ParseFile()` then `resolver.Resolve(files)` to `*ir.Schema`, or `compile.Compile(files, backends...)` for the full path with `compile/testdata/app.zen` as the canonical fixture. After touching `token.Keywords` or `resolver.ScalarTypeNames`, run `make generate` (`go run ./tools/gengrammar`) to refresh editor grammars.
+
+## Runnable example
+
+Compile a schema, then run the service against generated output (never against the compiler):
+
+```go
+// main.go: runtime imports generated code + container only.
+package main
+
+import (
+	"fmt"
+
+	"github.com/zenta-dev/zever/config"
+	"github.com/zenta-dev/zever/container"
+)
+
+func main() {
+	c := container.New(config.Default())
+	db, err := c.DB()
+	if err != nil {
+		panic(err)
+	}
+	fmt.Println("runtime ready:", db != nil)
+}
+```
+
+```sh
+zever check schema/todo.zen
+zever fmt -l schema/todo.zen
+zever compile schema/todo.zen --backend=zenorm,openapi,atlas --out generated
+zever db migrate --dry-run --adapter=sqlite schema/todo.zen
+go run ./examples/todo/cmd/server -addr :8080
+```
+
+Expected output or behavior:
+
+```text
+runtime ready: true
+```
+
+`zever check` validates, `fmt -l` lists files needing format, `compile` emits ORM plus OpenAPI plus DDL into `generated/`, and `migrate --dry-run` previews SQL without touching the database. The server then imports `generated/` and resolves `c.DB()`: at no point does it import `internal/dsl`. Regenerate with `zever compile`; never hand-edit `generated/`.
+
+## Variants
+
+| Side | Packages | Role |
+|---|---|---|
+| Compile time | `diag`, `token`, `lexer`, `ast`, `parser` | bytes to best-effort syntax tree (never panics, depth guard, per-decl recovery) |
+| Compile time | `naming`, `resolver`, `ir` | multi-pass `[]*ast.File` to `*ir.Schema` with keep-going diagnostics |
+| Compile time | `format`, `breaking`, `compile`, `backend` | formatter, old-vs-new `Change` taxonomy, filename-sorted build, `Backend` interface |
+| Compile time | `gengrammar` via `tools/gengrammar` | renders `editors/nvim` and `editors/vscode` grammars |
+| Runtime | `container`, `config`, `orm`, adapters | load, resolve, query, close |
+| Tooling | `cmd/zever`, `tools/zever-lsp` | CLI and editor support (LSP is its own module) |
+
+A different boundary: schema modules. Do not confuse this compiler rule with `zever check-boundaries`, which checks cross-schema-module references (a relation, RPC return type, or permission resource that reaches from one `.zen` module directory into another). That is a modeling rule enforced by the resolver on every compile; `check-boundaries` is a report-only view over diagnostics `Resolve()` already produces. See `../dsl/syntax-zen/` for how modules derive from directory structure.
+
+## Production notes
+
+Why the rule matters in prod: a compiler frontend pulls in lexer, parser, and codegen dependencies that do not belong in a binary whose job is running generated code against a database (size and attack surface). Layering stays honest: if runtime could reach the resolver, request-time code would special-case schema logic instead of generating it once ahead of time, reintroducing the reflection the codegen-first design exists to avoid.
+
+Enforcement is Go's own `internal/` visibility: an accidental import of `internal/dsl` from outside the module fails `go build` immediately. There is no separate CLI check and none is needed. Because the toolchain owns this rule, it holds on every machine and every CI runner with no config to keep in sync.
+
+Fail-closed companions keep the boundary useful in practice: Fail-closed companions: the parser never panics (best-effort output plus diagnostics even on malformed input); the formatter refuses lex-dirty input and stays idempotent; fuzz tests run seed corpora as unit tests. Never log raw option maps; use `config.RedactedServices`. Close containers with a timeout parent even in codegen-adjacent workers.
+
+## Troubleshooting
+
+| Symptom | Cause | Fix |
+|---|---|---|
+| `go build` fails importing `internal/dsl` | Runtime package reached into the compiler frontend | Drop the import; consume `generated/` output (ORM, routes, stubs) and resolve via `container` |
+| `check-boundaries` reports cross-module refs | Relation or RPC type reaches across `.zen` module dirs | Move the type or relation so each module is self-contained; see `../dsl/syntax-zen/` |
+| `compile` emits diagnostics but no output | Schema has resolve errors; backends run only on success | Read each diagnostic position, fix the `.zen` source, re-run `zever check` first |
+| Editor misses new keywords after a grammar change | `token.Keywords` or `resolver.ScalarTypeNames` changed without regen | Run `make generate` and commit the refreshed `editors/` files |
+| `generated/` edits vanish | Hand-edits overwritten by design | Edit the `.zen` source and re-run `zever compile`; treat `generated/` as read-only |
+
+## See also
+
+- `./lifecycle/` for where compile output runs in a process
+- `./container/` for the runtime resolver on the far side of the boundary
+- `./providers-adapters/` for runtime interfaces vs compile-time backends
+- `../dsl/syntax-zen/` for modules, relations, and `check-boundaries`
+- `../dsl/backends/` for the `Backend.Generate` extension point
+- `../getting-started/deployment/` for shipping generated output without the compiler
+- Package guides as text: `internal/dsl/README.md`, `README.md`, `cmd/zever/README.md`
