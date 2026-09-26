@@ -35,7 +35,7 @@ PAYMENT_SECRET_KEY=sk_live_...
 PAYMENT_WEBHOOK_SECRET=whsec_...
 ```
 
-Shared provider keys come from `internal/providers.Common`: `secret_key`
+Shared provider keys come from `shared/providersopt`: `secret_key`
 (Stripe), `api_key` (Paddle), `endpoint`, `sandbox`. Payment adds
 `webhook_secret` (signature verification, never logged), `auto_approve`
 (stub marks new payments succeeded), and `max_webhook_bytes` (default
@@ -71,7 +71,7 @@ import (
 
 	"github.com/zenta-dev/zever/config"
 	"github.com/zenta-dev/zever/container"
-	"github.com/zenta-dev/zever/payment"
+	"github.com/zenta-dev/zever/core/payment"
 )
 
 func main() {
@@ -118,9 +118,9 @@ With `auto_approve: false`, the same program prints `pending` instead of
 
 | Adapter | Package | Notes |
 |---|---|---|
-| `stub` | `payment/stub` | Default; no network, no real money |
-| `stripe` | `payment/stripe` | Real provider; needs `secret_key` |
-| `paddle` | `payment/paddle` | Real provider; needs `api_key` |
+| `stub` | `adapters/payment/stub` | Default; no network, no real money |
+| `stripe` | `adapters/payment/stripe` | Real provider; needs `secret_key` |
+| `paddle` | `adapters/payment/paddle` | Real provider; needs `api_key` |
 
 ## Production notes
 

@@ -3,12 +3,12 @@ package main
 import (
 	"go.lsp.dev/protocol"
 
-	"github.com/zenta-dev/zever/internal/dsl/format"
-	"github.com/zenta-dev/zever/internal/dsl/token"
+	"github.com/zenta-dev/zever/dsl/format"
+	"github.com/zenta-dev/zever/dsl/token"
 )
 
 // The whole-document, protocol-agnostic formatting core (token-stream-based
-// indentation and inter-token spacing) lives in internal/dsl/format, shared
+// indentation and inter-token spacing) lives in dsl/format, shared
 // with the zever fmt CLI command. What stays here is genuinely
 // LSP-protocol-specific: converting the shared package's plain-int Edit
 // values into protocol.TextEdit, and range-scoped formatting

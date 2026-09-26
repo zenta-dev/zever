@@ -63,7 +63,7 @@ func TestDamerauLevenshtein(t *testing.T) {
 
 func TestCandidateLists_complete(t *testing.T) {
 	wantTop := []string{
-		"new", "compile", "check", "breaking", "fmt", "doctor", "config", "routes", "explain",
+		"new", "add", "compile", "check", "breaking", "fmt", "doctor", "config", "routes", "explain",
 		"check-boundaries", "check:boundaries", "graph", "generate", "extract", "serve", "dev",
 		"queue:work", "schedule:run", "tinker", "db", "help",
 	}

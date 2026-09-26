@@ -730,7 +730,7 @@ type = 'string'
 
 ['$defs'.providersCommon]
 additionalProperties = false
-description = 'Shared Stripe/Paddle option shape (internal/providers.Common), embedded directly into billing.Options and payment.Options -- no wrapper key.'
+description = 'Shared Stripe/Paddle option shape (shared/providersopt), embedded directly into billing.Options and payment.Options -- no wrapper key.'
 type = 'object'
 
 ['$defs'.providersCommon.properties]

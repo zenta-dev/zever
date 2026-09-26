@@ -5,8 +5,8 @@ import (
 	"fmt"
 	"strings"
 
-	"github.com/zenta-dev/zever/db"
-	"github.com/zenta-dev/zever/internal/dsl/backend/atlas"
+	"github.com/zenta-dev/zever/core/db"
+	"github.com/zenta-dev/zever/dsl/backend/atlas"
 )
 
 // This file holds the MySQL half of the live-diffing engine, mirroring the

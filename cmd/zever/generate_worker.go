@@ -10,9 +10,9 @@ import (
 	"sort"
 	"strings"
 
-	"github.com/zenta-dev/zever/internal/dsl/compile"
-	"github.com/zenta-dev/zever/internal/dsl/ir"
-	"github.com/zenta-dev/zever/internal/dsl/naming"
+	"github.com/zenta-dev/zever/dsl/compile"
+	"github.com/zenta-dev/zever/dsl/ir"
+	"github.com/zenta-dev/zever/dsl/naming"
 )
 
 const workerUsageBody = `Scaffolds the background worker entrypoint at <worker_entry>/main.go (default
@@ -455,7 +455,7 @@ import (
 	"time"
 {{- end}}
 
-	"github.com/zenta-dev/zever/apperror"
+	"github.com/zenta-dev/zever/shared/apperror"
 )
 
 // {{.ArgsType}} is the payload of the {{.Name}} job declared in the schema.
@@ -495,7 +495,7 @@ import (
 	"syscall"
 	"time"
 
-	"github.com/zenta-dev/zever/job"
+	"github.com/zenta-dev/zever/core/job"
 
 	"{{.ModulePath}}/internal/app"
 {{- if .Jobs}}

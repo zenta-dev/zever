@@ -155,8 +155,7 @@ Run `make setup` to pin `golangci-lint` v2.13.2; a newer global install
 applies different rules than CI.
 
 **`make tidy-check` fails.**
-Run `go mod tidy` and commit the result. The repo has no nested `go.mod`,
-so one tidy covers the tree.
+Run `go mod tidy` in each touched module and commit the result. The repo is a multi-module monorepo (`core/<b>`, `adapters/<b>/<a>`, `shared/*`, `config`, `container`, `orm`, `dsl`, `cmd/zever`), so tidy the modules you touched; local dev resolves them through the committed `go.work` workspace at the repo root, so `go build/test ./...` runs from the root while per-module standalone commands run with `GOWORK=off` in CI.
 
 **Docs preview shows a blank page.**
 Re-run `npm install` inside `docs/` (not the repo root) and check the

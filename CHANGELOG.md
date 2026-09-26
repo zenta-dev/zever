@@ -7,58 +7,120 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Added
+
+- `core/cache/cachetest`: new `Conformance(t, factory)` kit covering
+  `Get`/`Set`/TTL expiry (short TTL plus deadline-polled expiry, no
+  `time.Sleep` sync), `SetIfAbsent`, `Delete`, `Increment`/`Decrement`,
+  `Exists`, and `Close`. External adapters run it against their factory;
+  in-tree proof is `core/cache/cachetest/conformance_test.go` over the `memory`
+  adapter. See `docs/writing-a-plugin.md`.
+- `docs/writing-a-plugin.md`: plugin authoring guide — new adapter for an
+  existing battery via `Register`/`Open` (worked `cache` example with a
+  string adapter name), entirely new battery via `RegisterPlugin`/`Resolve`
+  plus `Plugins` config and `RegisterPluginValidator` (worked `sms`
+  example), `PluginAPIVersion` contract, and repo naming
+  `zever-adapter-<name>` / `zever-battery-<name>`.
+- **Breaking:** every battery `Adapter` changes from an `int` enum to a
+  string type (`Memory Adapter = "memory"`, etc.). `String()` is now the
+  identity (`"unknown"` only for empty) and `ParseAdapter` accepts any
+   non-empty name, so out-of-tree adapters (`core/cache.Adapter("foo")`) resolve
+   via `Register`/`Open` and round-trip through config-file/env selection
+   like core adapters. Numeric `Adapter(...)` conversions and exhaustiveness
+   over the old constants no longer compile.
+- `zever new` battery picker (opt-in only): `--interactive` (`-i`,
+  `ZEVER_INTERACTIVE`) runs the `huh` wizard to pick extra batteries;
+  without it the command never prompts and scaffolds the floor set
+  (`log`+`router`) plus whatever `--batteries a,b` and
+  `--adapters b=a` select. `--list-batteries` prints the
+  battery/default-adapter table and exits.
+- `examples/external-sms`: out-of-tree proof battery template
+  (`github.com/example/zever-sms`, deliberately outside the workspace)
+  proving a third-party author can ship a battery on public modules only
+  (`config`, `container`, `shared/registry`). Ships `SMS` interface plus
+  `Options{From}` with `Validate`, string `Adapter` with
+  `Register`/`Open`, a deterministic network-free stub, and plugin
+  wiring (`config.RegisterPluginValidator` plus
+  `container.RegisterPlugin("sms", container.PluginAPIVersion,
+  BuildFromConfig)`); `app_test.go` asserts `Resolve`/`Send` end to end
+  plus the version-mismatch failure. See `docs/writing-a-plugin.md`.
+- `core/queue/queuetest` and `core/storage/storagetest`: new
+  `Conformance(t, factory)` kits mirroring `core/cache/cachetest`, so
+  queue and storage adapters prove parity the same way cache adapters do.
+  See `docs/writing-a-plugin.md`.
+- `zever new` picker veto/skip semantics: `-y`/`--yes` skips the whole
+  wizard (floor plus flags only), while `--batteries` skips the battery
+  prompt and `--adapters b=a` skips that battery's adapter prompt, so
+  every wizard answer has a flag; `ZEVER_INTERACTIVE` also opts in. See
+  `cmd/zever/new.go` (`wantNewPicker`, `runBatteryPicker`).
+
 ### Changed
 
-- **Breaking:** heavyweight adapters move out of the core `container`
-  package into explicit `container/adapters` bundles (W4 module-split
-  prep). `container` no longer imports them at compile time; hosts
-  register what they need with one call (`adapters.RegisterAll()`, or
-  per-family `adapters.RegisterAI()` etc. — no `init` wiring, no I/O).
-  Unregistered adapters now fail resolution with `UnknownAdapterError`
-  (hinting at the forgotten `Register` call) instead of resolving.
-  This entry covers the first family:
-  - **Breaking:** `ai` SDK adapters (`anthropic`, `openai`, `gemini`)
-    require `adapters.RegisterAI()` (or `RegisterAll()`); the local
-    `ollama` adapter stays wired by the container. `cmd/zever` registers
-    all bundles at startup, so CLI behavior is unchanged.
-  - **Breaking:** cloud adapters (`storage` `s3`/`r2`, `media` `s3`,
-    `flag` `firebase`) require `adapters.RegisterCloud()` (or
-    `RegisterAll()`); `storage` `local` and `flag` `static` stay wired
-    by the container.
-  - **Breaking:** provider-backed `billing`/`payment` adapters (`stripe`,
-    `paddle`) require `adapters.RegisterPayments()` (or `RegisterAll()`);
-    the `stub` adapters stay wired by the container.
-  - **Breaking:** external `search`/`vectorstore` adapters (`meilisearch`,
-    `qdrant`) require `adapters.RegisterSearchVector()` (or
-    `RegisterAll()`); the `postgres`/`sqlite` adapters stay wired by the
-    container.
-  - **Breaking:** local rendering adapters (`document` `local` via
-    chromedp, `media` `local` via bild) require `adapters.RegisterDoc()`
-    (or `RegisterAll()`); both facades default to `local`, so a default
-    config resolves them only after registering. `document`
-    `remote`/`latex` stay wired by the container; `media` has no other
-    core adapter.
-  - **Breaking:** provider-backed `notification` adapters (`fcm`,
-    `twilio`) require `adapters.RegisterNotify()` (or `RegisterAll()`);
-    the `log` adapter stays wired by the container.
-  - **Breaking:** the `router` `fiber` adapter (gofiber/fasthttp)
-    requires `adapters.RegisterWeb()` (or `RegisterAll()`); the
-    `stdhttp` adapter stays wired by the container.
-  - **Breaking:** the `permission` `casbin` adapter requires
-    `adapters.RegisterPermission()` (or `RegisterAll()`); the `noop`
-    and `rbac` adapters stay wired by the container.
-  - **Breaking:** the `analytics` `posthog` adapter requires
-    `adapters.RegisterAnalytics()` (or `RegisterAll()`); the `log`
-    adapter stays wired by the container.
-  - **Breaking:** the `geo` `google` adapter requires
-    `adapters.RegisterGeo()` (or `RegisterAll()`); the `static` and
-    `osm` adapters stay wired by the container.
+- **Breaking:** scaffold floor slimmed to `log`, `router`. `observability` (`stdout`), `permission` (`noop`), `queue`
+  (`memory`) and `ratelimit` (`memory`) are no longer pinned into every
+  generated `app.go`/`zever.yaml`: all four defaults are light
+  (container-wired, no registration call), so existing generated
+  entrypoints keep resolving them at runtime with no change; new scaffolds
+  just stop pinning them. Re-add by picking the battery in `zever new`.
+- **Breaking:** every third-party adapter is now a nested Go module with
+  its own `Register()` (43 modules: all `*/redis` adapters, `db/sqlite`,
+  `db/postgres`, `auth/jwt`, `auth/oidc`, `ai/anthropic|openai|gemini`,
+  `billing/stripe|paddle|stub`, `payment/stripe|paddle`,
+  `search/sqlite|postgres|meilisearch`,
+  `vectorstore/sqlite|pgvector|qdrant`, `storage/s3|r2`,
+  `media/local|s3`, `document/local`, `notification/fcm|twilio`,
+  `permission/casbin`, `router/fiber`, `analytics/posthog`,
+  `flag/firebase`, `geo/google`, `log/zerolog`, `observability/otlp`,
+  `password/argon2`, `scheduler/embedded`, `webhook/sqlite`, plus the
+  `storage/s3core` shared library). The `container` wires only stdlib-only
+  adapters itself; everything else resolves only after the host calls its
+  `Register()` (or the per-family `container/adapters/<family>`
+  bundle, which stays as a thin aggregator). Unregistered adapters fail
+  resolution with `UnknownAdapterError` hinting at the forgotten call.
+  `cmd/zever` registers every family at startup, so CLI behavior is
+  unchanged.
+- **Breaking:** `container/adapters` is now one subpackage per family
+  (`container/adapters/ai`, `cloud`, `payments`, `searchvector`,
+  `docrender`, `notify`, `web`, `permission`, `analytics`, `geo`) instead
+  of one flat package: importing any single family no longer compiles the
+  other nine families' SDKs. `adapters.RegisterAll` is deleted; call the
+  families needed.
+- **Breaking:** `zever new` emits one `require` (+ local `replace` in
+  `--framework-path` mode) per chosen nested adapter module, so a blank
+  app's module graph contains only its selection. In checkout mode it also
+  emits version-less replaces for the remaining nested modules so
+  `go list -m` resolves offline without widening requirements.
+- Shared SDK-independent option fields moved to light internal packages
+  so facades compile without SDKs: `internal/redisopt` (ex-`internal/redis`
+  address/prefix/validation helpers; `internal/redis` keeps only client
+  constructors) and `internal/providersopt` (ex-`internal/providers`
+  `Common`/`ValidateEndpoint`/`PaddleEndpoint`; `internal/providers` keeps
+  only the Stripe client constructors).
 
 ### Security
 
 - **Breaking:** `payment/stub` `WebhookEvent` now fails closed with
   `payment.ErrInvalidSignature` instead of returning a static
   `stub.event`. `stub.New` documented test-only, never production.
+
+### Changed
+
+- **Breaking:** repo is now a Go multi-module monorepo: battery
+  interfaces plus `Register`/`Open` registries in `core/<b>`, one Go
+  module per adapter in `adapters/<b>/<a>` with `Register()` wiring it
+  into its `core` registry, SDK-free helpers in `shared/*`, plus
+  `config|container|orm|dsl|cmd/zever` modules. Local dev wires them
+  with a `go.work` workspace (`go work init/use`; no `go.work` committed).
+  Releases are lockstep: one version, per-module tags `<path>/vX.Y.Z`
+  via `tools/tag-release.sh`. See `docs/src/content/docs/getting-started/migration.mdx`.
+- **Breaking:** `container/adapters` flat bundles deleted
+  (`RegisterAll` deleted); every heavy adapter resolves only after the
+  host calls its module `Register()`. Unregistered adapters fail with
+  `UnknownAdapterError` hinting at the forgotten call.
+- Planned (not shipped): `zever add` battery-adding command (no
+  `cmd/zever/add.go` yet; use the `zever new` battery picker) and
+  `tools/migrate-imports.sh` (use the manual `sed` mapping in the
+  migration guide until it lands).
 - **Breaking:** `payment/paddle` `New` now rejects empty `WebhookSecret`
   with `payment.ErrMissingWebhookSecret`, mirroring `payment/stripe`.
 - **Breaking:** `authz.BearerTokenFromMD` now rejects multiple
@@ -67,12 +129,11 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Fixed
 
-- Scaffolded `internal/app/app.go` now emits the `container/adapters`
-  bundle `Register` calls its heavy adapters need (e.g.
-  `adapters.RegisterNotify()` for `notification/fcm`): adapter packages
-  never self-register, so the old blank-import-only wiring resolved
-  nothing for heavy adapters (`UnknownAdapterError` at runtime).
-  Light-only selections render no adapters import, as before.
+- Scaffolded `internal/app/app.go` imports and registers exactly the
+  selected batteries: one named import plus `Register()` call per nested
+  adapter module (e.g. `dbsqlite.Register()` for `db/sqlite`), one family
+  subpackage import and call per heavy family, and nothing else.
+  Light-only selections render no adapter-module import at all.
 
 - `zever new --help` and `zever compile --help` now expose the real flags
   (`--module`, `--dir`, `--framework-version`, `--force` for `new`;

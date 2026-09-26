@@ -1,0 +1,10 @@
+package stripe
+
+import (
+	"github.com/zenta-dev/zever/core/billing"
+)
+
+// Register wires this adapter into its battery registry. Call from your app's main or generated app.go; no init magic.
+func Register() {
+	_ = billing.Register(billing.Stripe, New)
+}

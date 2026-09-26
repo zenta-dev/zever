@@ -6,14 +6,12 @@ import (
 	"fmt"
 	"time"
 
-	"github.com/zenta-dev/zever/db"
+	"github.com/zenta-dev/zever/core/db"
+	"github.com/zenta-dev/zever/core/password"
 	gen "github.com/zenta-dev/zever/examples/demoapp/generated/zenorm/orm/gen/app"
 	"github.com/zenta-dev/zever/orm"
-	"github.com/zenta-dev/zever/password"
 
-	// Blank import registers the argon2id adapter used to hash demo
-	// passwords.
-	_ "github.com/zenta-dev/zever/password/argon2"
+	passwordargon2 "github.com/zenta-dev/zever/adapters/password/argon2"
 )
 
 // Demo identities and content. IDs are fixed so re-runs find existing rows.
@@ -31,6 +29,8 @@ const (
 // Run seeds the database: one admin, one member, one category, one product,
 // and one post. Seeding is idempotent: existing rows are left untouched.
 func Run(ctx context.Context, database db.DB) error {
+	passwordargon2.Register()
+
 	if err := ensureUser(ctx, database, AdminID, AdminEmail, "Ada Admin", "admin"); err != nil {
 		return err
 	}

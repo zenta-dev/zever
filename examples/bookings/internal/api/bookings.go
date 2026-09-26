@@ -9,12 +9,12 @@ import (
 
 	"github.com/google/uuid"
 
-	"github.com/zenta-dev/zever/billing"
-	"github.com/zenta-dev/zever/idempotency"
-	"github.com/zenta-dev/zever/payment"
-	"github.com/zenta-dev/zever/permission"
-	"github.com/zenta-dev/zever/queue"
-	"github.com/zenta-dev/zever/router"
+	"github.com/zenta-dev/zever/core/billing"
+	"github.com/zenta-dev/zever/core/idempotency"
+	"github.com/zenta-dev/zever/core/payment"
+	"github.com/zenta-dev/zever/core/permission"
+	"github.com/zenta-dev/zever/core/queue"
+	"github.com/zenta-dev/zever/core/router"
 )
 
 // Booking is the JSON shape for bookings.

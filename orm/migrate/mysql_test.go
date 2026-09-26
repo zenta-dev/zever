@@ -4,8 +4,8 @@ import (
 	"errors"
 	"testing"
 
-	"github.com/zenta-dev/zever/db"
-	"github.com/zenta-dev/zever/internal/dsl/backend/atlas"
+	"github.com/zenta-dev/zever/core/db"
+	"github.com/zenta-dev/zever/dsl/backend/atlas"
 )
 
 func TestQuoteIdent(t *testing.T) {
