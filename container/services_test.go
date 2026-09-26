@@ -13,6 +13,7 @@ import (
 	"google.golang.org/grpc"
 
 	"github.com/zenta-dev/zever/config"
+	"github.com/zenta-dev/zever/container/adapters"
 	"github.com/zenta-dev/zever/db"
 	"github.com/zenta-dev/zever/i18n"
 )
@@ -24,6 +25,11 @@ import (
 // deterministic; nothing touches the network.
 func testConfig(t *testing.T) *config.Config {
 	t.Helper()
+
+	// Heavyweight adapters are no longer wired by the container itself;
+	// register the explicit bundles so default-adapter resolution keeps
+	// working under test. Registration is idempotent and performs no I/O.
+	adapters.RegisterAll()
 
 	cfg := config.Default()
 	cfg.AI.Options.APIKey = "test-key"

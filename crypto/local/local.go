@@ -97,6 +97,9 @@ func (l *localCrypto) Sign(_ context.Context, message []byte) ([]byte, error) {
 }
 
 func (l *localCrypto) Verify(_ context.Context, message, signature []byte) (bool, error) {
+	// Contract: (false, nil) means key present but signature invalid;
+	// (false, ErrKeyNotFound) means no signing key configured. Callers
+	// must check err before trusting ok=false as a plain mismatch.
 	if l.signPriv == nil {
 		return false, crypto.ErrKeyNotFound
 	}
@@ -111,6 +114,10 @@ func (l *localCrypto) Mac(_ context.Context, message []byte) ([]byte, error) {
 }
 
 func (l *localCrypto) VerifyMac(_ context.Context, message, mac []byte) (bool, error) {
+	// Contract differs from Verify by history: mismatch returns
+	// (false, ErrIntegrity), not (false, nil). Callers must use
+	// errors.Is(err, crypto.ErrIntegrity) to detect forgery; ok alone
+	// is insufficient. Kept as-is to avoid breaking verifiers.
 	h := hmac.New(sha256.New, l.macKey)
 	_, _ = h.Write(message)
 	computed := h.Sum(nil)

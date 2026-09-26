@@ -66,6 +66,8 @@ func Default() *Config {
 	cfg.Notification = Service[notification.Options]{Adapter: "log"}
 	cfg.Observability = Service[observability.Options]{Adapter: "stdout", Options: observability.Options{ServiceName: "zever"}}
 	cfg.Password = Service[password.Options]{Adapter: "argon2id", Options: password.Options{Time: password.DefaultTime, Memory: password.DefaultMemory, Threads: password.DefaultThreads, SaltLen: password.DefaultSaltLen, KeyLen: password.DefaultKeyLen}}
+	// WARNING: stub payment performs zero webhook verification (fail-closed)
+	// and holds no real funds. Test-only, never production.
 	cfg.Payment = Service[payment.Options]{Adapter: "stub"}
 	cfg.Permission = Service[permission.Options]{Adapter: "noop"}
 	cfg.Queue = Service[queue.Options]{Adapter: "memory"}

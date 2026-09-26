@@ -17,6 +17,33 @@ There is no global state and no `init()` wiring. A server and a worker
 process each build their own `Container` from the same config. `New(nil)`
 is valid: an untouched container closes cleanly without opening anything.
 
+## Heavy adapters
+
+The container only wires light adapters itself. Heavyweight families
+(LLM SDKs, cloud SDKs, billing SDKs, external search/vector clients,
+headless-Chrome rendering) live in `container/adapters` and are
+registered explicitly by the host — one call, no I/O, idempotent:
+
+```go
+import "github.com/zenta-dev/zever/container/adapters"
+
+adapters.RegisterAll()      // everything, or per family:
+adapters.RegisterAI()       // anthropic/openai/gemini (ollama stays core)
+adapters.RegisterCloud()    // storage s3/r2, media s3, flag firebase
+adapters.RegisterPayments() // billing/payment stripe/paddle (stubs stay core)
+adapters.RegisterSearchVector() // search meilisearch, vectorstore qdrant
+adapters.RegisterDoc()      // document local (chromedp), media local (bild)
+adapters.RegisterNotify()   // notification fcm, twilio (log stays core)
+adapters.RegisterWeb()      // router fiber (stdhttp stays core)
+adapters.RegisterPermission() // permission casbin (noop/rbac stay core)
+adapters.RegisterAnalytics() // analytics posthog (log stays core)
+adapters.RegisterGeo()      // geo google (static/osm stay core)
+```
+
+Resolving an unregistered adapter fails with `UnknownAdapterError`
+naming the missing `Register` call. `cmd/zever` calls `RegisterAll()`
+at startup, so CLI behavior is unchanged.
+
 ## Accessors
 
 Each service resolves on first use and caches the result. On error the

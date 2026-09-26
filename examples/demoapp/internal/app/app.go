@@ -14,6 +14,7 @@ import (
 
 	"github.com/zenta-dev/zever/config"
 	"github.com/zenta-dev/zever/container"
+	"github.com/zenta-dev/zever/container/adapters"
 	"github.com/zenta-dev/zever/examples/demoapp/locales"
 	"github.com/zenta-dev/zever/i18n"
 	"github.com/zenta-dev/zever/permission"
@@ -117,12 +118,15 @@ func Config() (*config.Config, error) {
 }
 
 // New builds the container every binary in this project uses. Nothing is
-// opened until a battery is first requested.
+// opened until a battery is first requested. It registers the heavyweight
+// adapter bundles the core container no longer wires itself.
 func New() (*container.Container, error) {
 	cfg, err := Config()
 	if err != nil {
 		return nil, err
 	}
+
+	adapters.RegisterAll()
 
 	return container.New(cfg), nil
 }

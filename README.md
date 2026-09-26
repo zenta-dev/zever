@@ -26,6 +26,46 @@ In one line: define a service's shape once, and zever compiles it into the
 database, cache, and routing infrastructure around it, while staying completely
 out of the way of the actual business logic you write on top.
 
+## Quickstart (schema -> running API)
+
+Define one entity and two RPCs in `schema/app.zen`:
+
+```zen
+entity Task {
+  id: uuid @primary
+  title: string @validate(min_len: 1, max_len: 200)
+  done: bool
+  created_at: timestamp @default(now())
+}
+
+service TaskService {
+  rpc CreateTask(title: string) -> Task {
+    http: POST "/v1/tasks"
+    auth: required
+  }
+
+  rpc ListTasks() -> Task {
+    http: GET "/v1/tasks"
+    auth: required
+    paginated: true
+  }
+}
+```
+
+Scaffold, validate, generate, preview DDL, migrate, serve:
+
+```bash
+zever new hello --dir ./hello --force
+zever check schema/app.zen
+zever compile --backend=zenorm,atlas,openapi --out ./generated schema/app.zen
+zever db migrate --dry-run --adapter=sqlite schema/app.zen
+zever db migrate --adapter=sqlite --dsn=data/app.db schema/app.zen
+zever serve
+```
+
+See `examples/todo` for a full working app (`schema/todo.zen`,
+`zever.yaml`, `cmd/server`, `internal/app`).
+
 ## Adapters
 
 Every backend concern is modeled as a small interface with multiple swappable

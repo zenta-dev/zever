@@ -1,14 +1,16 @@
 // Package app builds the config and container shared by this project's
 // binaries.
 //
-// The blank imports below are the whole of the "wiring" a zever app has to
-// do: a battery's registry only learns about an adapter once that adapter
-// package's init() has run, so an app imports exactly the adapters it
-// actually uses and nothing else. This list was picked at scaffold time
-// (`zever new`'s battery picker, or the fixed set every generated
+// Adapter packages expose constructors but never self-register, so wiring
+// is twofold: the blank imports below pin exactly the adapters this app
+// uses (and pull their modules into the build), while the container wires
+// every light adapter itself and the adapters.Register calls in New wire
+// the heavyweight ones (see container/adapters). This list was picked at
+// scaffold time (`zever new`'s battery picker, or the fixed set every generated
 // entrypoint needs when there was no prior `zever new`) -- add a battery
 // later by giving it an adapter in zever.yaml and adding its one blank
-// import below by hand; this file is scaffolded once and never regenerated.
+// import below by hand (plus its Register call when it is a heavy
+// adapter); this file is scaffolded once and never regenerated.
 package app
 
 import (
@@ -17,7 +19,7 @@ import (
 	"github.com/zenta-dev/zever/config"
 	"github.com/zenta-dev/zever/container"
 
-	// Blank imports register the adapters this app selects; see the package
+	// Blank imports pin the adapters this app selects; see the package
 	// comment.
 	_ "github.com/zenta-dev/zever/auth/jwt"
 	_ "github.com/zenta-dev/zever/db/sqlite"

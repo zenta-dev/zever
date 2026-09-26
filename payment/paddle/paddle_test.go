@@ -78,6 +78,14 @@ func TestOpenMissingAPIKey(t *testing.T) {
 	}
 }
 
+func TestOpenMissingWebhookSecret(t *testing.T) {
+	t.Parallel()
+
+	if _, err := New(payment.Options{APIKey: "x"}); !errors.Is(err, payment.ErrMissingWebhookSecret) {
+		t.Fatalf("expected ErrMissingWebhookSecret, got %v", err)
+	}
+}
+
 func TestOpenInvalidOptions(t *testing.T) {
 	t.Parallel()
 
@@ -90,7 +98,7 @@ func TestOpenInvalidOptions(t *testing.T) {
 func TestOpenSandboxAndDefault(t *testing.T) {
 	t.Parallel()
 
-	sandbox, err := New(payment.Options{APIKey: "x", Sandbox: true})
+	sandbox, err := New(payment.Options{APIKey: "x", Sandbox: true, WebhookSecret: "whsec_test"})
 	if err != nil {
 		t.Fatalf("sandbox Open: %v", err)
 	}
@@ -99,7 +107,7 @@ func TestOpenSandboxAndDefault(t *testing.T) {
 		t.Fatal("expected non-nil sandbox driver")
 	}
 
-	prod, err := New(payment.Options{APIKey: "x"})
+	prod, err := New(payment.Options{APIKey: "x", WebhookSecret: "whsec_test"})
 	if err != nil {
 		t.Fatalf("default Open: %v", err)
 	}
@@ -116,7 +124,7 @@ func TestOpenNewSDKError(t *testing.T) {
 	}
 	defer func() { newSDK = old }()
 
-	if _, err := New(payment.Options{APIKey: "x"}); err == nil || !strings.Contains(err.Error(), "paddle:") {
+	if _, err := New(payment.Options{APIKey: "x", WebhookSecret: "whsec_test"}); err == nil || !strings.Contains(err.Error(), "paddle:") {
 		t.Fatalf("expected wrapped constructor error, got %v", err)
 	}
 }
@@ -210,7 +218,7 @@ func TestCreatePaymentValidation(t *testing.T) {
 		t.Run(tc.name, func(t *testing.T) {
 			t.Parallel()
 
-			p, oerr := New(payment.Options{APIKey: "x", Endpoint: "http://127.0.0.1:1"})
+			p, oerr := New(payment.Options{APIKey: "x", Endpoint: "http://127.0.0.1:1", WebhookSecret: "whsec_test"})
 			if oerr != nil {
 				t.Fatalf("Open: %v", oerr)
 			}
@@ -577,7 +585,7 @@ func TestWebhookEventErrors(t *testing.T) {
 		t.Fatalf("expected ErrInvalidSignature for malformed sig, got %v", werr)
 	}
 
-	bare := openTest(t, srv, func(o *payment.Options) { o.WebhookSecret = "" })
+	bare := &driver{maxWebhookBytes: payment.DefaultMaxWebhookBytes}
 	if _, werr := bare.WebhookEvent(ctx, []byte("{}"), "x"); !errors.Is(werr, payment.ErrMissingWebhookSecret) {
 		t.Fatalf("expected ErrMissingWebhookSecret, got %v", werr)
 	}
