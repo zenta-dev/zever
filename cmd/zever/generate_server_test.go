@@ -438,6 +438,45 @@ func TestRunGenerateServerWiresRateLimitWhenConfigured(t *testing.T) {
 	}
 }
 
+// TestRenderAppContentEmitsBundleRegisters proves the scaffold wires
+// heavyweight adapters explicitly: a selection needing bundle adapters
+// renders their adapters.Register calls into New (adapter packages never
+// self-register, so blank imports alone would resolve nothing), while a
+// light-only selection emits no adapters import at all.
+func TestRenderAppContentEmitsBundleRegisters(t *testing.T) {
+	t.Parallel()
+
+	app, err := renderAppContent("test", []batterySelection{
+		{Battery: "db", Adapter: "sqlite"},
+		{Battery: "notification", Adapter: "fcm"},
+		{Battery: "router", Adapter: "fiber"},
+	})
+	if err != nil {
+		t.Fatalf("renderAppContent: %v", err)
+	}
+
+	for _, fragment := range []string{
+		`"github.com/zenta-dev/zever/container/adapters"`,
+		"adapters.RegisterNotify()",
+		"adapters.RegisterWeb()",
+		`_ "github.com/zenta-dev/zever/notification/fcm"`,
+		`_ "github.com/zenta-dev/zever/router/fiber"`,
+	} {
+		if !strings.Contains(string(app), fragment) {
+			t.Errorf("app.go lacks %q:\n%s", fragment, app)
+		}
+	}
+
+	light, err := renderAppContent("test", coreBatterySelections())
+	if err != nil {
+		t.Fatalf("renderAppContent core: %v", err)
+	}
+
+	if strings.Contains(string(light), `"github.com/zenta-dev/zever/container/adapters"`) {
+		t.Errorf("light-only app.go must not import container/adapters:\n%s", light)
+	}
+}
+
 // TestCoreBatterySelectionsMatchDefaults pins the adapter floor every
 // generated entrypoint needs: one selection per core battery, each matching
 // config.Default()'s own adapter pick, so app.go's blank imports can never

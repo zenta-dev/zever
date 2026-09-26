@@ -13,6 +13,7 @@ import (
 
 	"github.com/zenta-dev/zever/config"
 	"github.com/zenta-dev/zever/container"
+	"github.com/zenta-dev/zever/container/adapters"
 	"github.com/zenta-dev/zever/db"
 	"github.com/zenta-dev/zever/examples/demoapp/internal/api"
 	"github.com/zenta-dev/zever/examples/demoapp/locales"
@@ -67,6 +68,8 @@ func newTestSetup(t *testing.T) testSetup {
 	cfg.VectorStore.Options.Dimension = 8
 	cfg.Storage.Options.Root = filepath.Join(tmp, "storage")
 	cfg.Media.Options.Root = filepath.Join(tmp, "media")
+
+	adapters.RegisterAll()
 
 	c := container.New(cfg)
 

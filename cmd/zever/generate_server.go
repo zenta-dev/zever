@@ -180,9 +180,45 @@ func coreBatterySelections() []batterySelection {
 }
 
 // appTemplateData is appTemplate's render input: Imports are already-resolved
-// adapter import paths, sorted for deterministic output.
+// adapter import paths and Registers are the container/adapters bundle calls
+// (e.g. RegisterNotify) the selection's heavy adapters need, both sorted
+// for deterministic output.
 type appTemplateData struct {
-	Imports []string
+	Imports   []string
+	Registers []string
+}
+
+// heavyAdapterRegister maps one battery selection to the container/adapters
+// bundle Register call its adapter needs, or "" when the container wires
+// the adapter itself. Adapter packages expose constructors but never
+// self-register (no init wiring anywhere), so a heavy adapter resolves
+// only after its bundle call; light adapters need nothing because
+// container/services.go registers them before first use.
+func heavyAdapterRegister(b batterySelection) string {
+	switch b.Battery + "/" + b.Adapter {
+	case "ai/anthropic", "ai/openai", "ai/gemini":
+		return "RegisterAI"
+	case "storage/s3", "storage/r2", "media/s3", "flag/firebase":
+		return "RegisterCloud"
+	case "billing/stripe", "billing/paddle", "payment/stripe", "payment/paddle":
+		return "RegisterPayments"
+	case "search/meilisearch", "vectorstore/qdrant":
+		return "RegisterSearchVector"
+	case "document/local", "media/local":
+		return "RegisterDoc"
+	case "notification/fcm", "notification/twilio":
+		return "RegisterNotify"
+	case "router/fiber":
+		return "RegisterWeb"
+	case "permission/casbin":
+		return "RegisterPermission"
+	case "analytics/posthog":
+		return "RegisterAnalytics"
+	case "geo/google":
+		return "RegisterGeo"
+	default:
+		return ""
+	}
 }
 
 // renderAppContent renders appTemplate for exactly the given battery
@@ -191,23 +227,33 @@ type appTemplateData struct {
 // the two callers can never format the import block differently.
 func renderAppContent(tag string, selections []batterySelection) ([]byte, error) {
 	imports := make([]string, 0, len(selections))
+	seen := map[string]bool{}
+
+	var registers []string
+
 	for _, s := range selections {
 		imports = append(imports, batteryImportPath(s))
+
+		if r := heavyAdapterRegister(s); r != "" && !seen[r] {
+			seen[r] = true
+			registers = append(registers, r)
+		}
 	}
 
 	sort.Strings(imports)
+	sort.Strings(registers)
 
-	return renderGoFile(tag, "app.go", appTemplate, appTemplateData{Imports: imports})
+	return renderGoFile(tag, "app.go", appTemplate, appTemplateData{Imports: imports, Registers: registers})
 }
 
 // ensureAppPackage scaffolds internal/app/app.go when the target project has
 // none. Every generated entrypoint calls app.New(), mirroring
-// examples/todo/internal/app: the container's adapter registries only learn
-// about an adapter once that adapter package's init() has run, so one place
-// per project owns those blank imports. Called with no battery-selection
-// context (e.g. `zever generate server` run without a prior `zever new`), so
-// it renders with just coreBatterySelections -- the floor every generated
-// entrypoint needs, not a developer's fuller pick.
+// examples/todo/internal/app: adapter packages never self-register, so one
+// place per project owns the adapter selection (blank imports) and the
+// heavyweight bundle calls (adapters.Register). Called with no
+// battery-selection context (e.g. `zever generate server` run without a
+// prior `zever new`), so it renders with just coreBatterySelections -- the
+// floor every generated entrypoint needs, not a developer's fuller pick.
 func ensureAppPackage(tag string) (created bool, err error) {
 	path := filepath.Join("internal", "app", "app.go")
 
@@ -657,14 +703,16 @@ func writeStubIfMissing(tag, path string, content []byte) (written bool, err err
 const appTemplate = `// Package app builds the config and container shared by this project's
 // binaries.
 //
-// The blank imports below are the whole of the "wiring" a zever app has to
-// do: a battery's registry only learns about an adapter once that adapter
-// package's init() has run, so an app imports exactly the adapters it
-// actually uses and nothing else. This list was picked at scaffold time
-// (` + "`zever new`" + `'s battery picker, or the fixed set every generated
+// Adapter packages expose constructors but never self-register, so wiring
+// is twofold: the blank imports below pin exactly the adapters this app
+// uses (and pull their modules into the build), while the container wires
+// every light adapter itself and the adapters.Register calls in New wire
+// the heavyweight ones (see container/adapters). This list was picked at
+// scaffold time (` + "`zever new`" + `'s battery picker, or the fixed set every generated
 // entrypoint needs when there was no prior ` + "`zever new`" + `) -- add a battery
 // later by giving it an adapter in zever.yaml and adding its one blank
-// import below by hand; this file is scaffolded once and never regenerated.
+// import below by hand (plus its Register call when it is a heavy
+// adapter); this file is scaffolded once and never regenerated.
 package app
 
 import (
@@ -672,8 +720,9 @@ import (
 
 	"github.com/zenta-dev/zever/config"
 	"github.com/zenta-dev/zever/container"
-
-	// Blank imports register the adapters this app selects; see the package
+{{if .Registers}}	"github.com/zenta-dev/zever/container/adapters"
+{{end}}
+	// Blank imports pin the adapters this app selects; see the package
 	// comment.
 {{range .Imports}}	_ {{printf "%q" .}}
 {{end}})
@@ -705,7 +754,8 @@ func Config() (*config.Config, error) {
 // New builds the container every binary in this project uses. Nothing is
 // opened until a battery is first requested.
 func New() (*container.Container, error) {
-	cfg, err := Config()
+{{range .Registers}}	adapters.{{.}}()
+{{end}}	cfg, err := Config()
 	if err != nil {
 		return nil, err
 	}
