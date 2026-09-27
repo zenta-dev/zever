@@ -767,12 +767,29 @@ func (a *localAdapter) ensurePutDir(full string) (string, error) {
 		return "", storage.ErrForbidden
 	}
 
-	dir := filepath.Dir(full)
-	if err := os.MkdirAll(dir, a.dirModeForPut(full)); err != nil {
+	rootAbs, err := filepath.Abs(a.root)
+	if err != nil {
+		return "", storage.ErrForbidden
+	}
+
+	fullAbs, err := filepath.Abs(full)
+	if err != nil {
+		return "", storage.ErrForbidden
+	}
+
+	rootAbs = filepath.Clean(rootAbs)
+	fullAbs = filepath.Clean(fullAbs)
+	rootPrefix := rootAbs + string(os.PathSeparator)
+	if fullAbs != rootAbs && !strings.HasPrefix(fullAbs, rootPrefix) {
+		return "", storage.ErrForbidden
+	}
+
+	dir := filepath.Dir(fullAbs)
+	if err := os.MkdirAll(dir, a.dirModeForPut(fullAbs)); err != nil {
 		return "", err
 	}
 
-	if !a.lexicallyContained(full) {
+	if !a.lexicallyContained(fullAbs) {
 		return "", storage.ErrForbidden
 	}
 
