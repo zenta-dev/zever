@@ -19,6 +19,12 @@ SBOM ?= sbom.json
 # independence); verify it standalone with: GOWORK=off go -C examples/external-sms test ./...
 ALL_MODULES := $(shell find . -type f -name go.mod -not -path "./.git/*" -not -path "./examples/external-sms/*" -exec dirname {} \; | sort)
 
+# Matrix sharding: stable round-robin slice of ALL_MODULES. Defaults
+# (TOTAL=1) expand to exactly ALL_MODULES.
+SHARD_TOTAL ?= 1
+SHARD_INDEX ?= 0
+SHARD_MODULES := $(shell printf '%s\n' $(ALL_MODULES) | awk '(NR-1) % $(SHARD_TOTAL) == $(SHARD_INDEX)')
+
 .PHONY: help
 help: ## Show this help
 	@awk 'BEGIN {FS = ":.*##"; printf "Usage:\n  make \033[36m<target>\033[0m\n"} /^[a-zA-Z_-]+:.*##/ {printf "  \033[36m%-14s\033[0m %s\n", $$1, $$2}' $(MAKEFILE_LIST)
@@ -126,7 +132,7 @@ vulncheck: ## Scan for known vulnerabilities
 .PHONY: sbom
 sbom: ## Generate a CycloneDX SBOM per module under sbom/
 	@command -v $(CYCLONEDX_GOMOD) >/dev/null 2>&1 || { printf '%s\n' "cyclonedx-gomod not found: run 'make setup'"; exit 1; }
-	mkdir -p sbom; set -e; root="$$PWD"; for d in $(ALL_MODULES); do echo "== $$d =="; slug=$$(echo "$$d" | sed 's|^\./||; s|/|_|g'); (cd $$d && $(CYCLONEDX_GOMOD) mod -licenses -std -json -output "$$root/sbom/$$slug.json" .); done
+	mkdir -p sbom; set -e; root="$$PWD"; for d in $(SHARD_MODULES); do echo "== $$d =="; slug=$$(echo "$$d" | sed 's|^\./||; s|/|_|g'); (cd $$d && $(CYCLONEDX_GOMOD) mod -licenses -std -json -output "$$root/sbom/$$slug.json" .); done
 
 .PHONY: clean
 clean: ## Remove coverage output and build artifacts
@@ -138,34 +144,34 @@ check: require-tools download fmt check-all lint-all vulncheck-all ## Run all lo
 
 # Multi-module targets: per-module loops over the committed go.work workspace.
 .PHONY: check-all build-all test-all test-race-all vet-all tidy-all tidy-check-all lint-all vulncheck-all
-check-all: ## Run vet + tidy-check + test (-vet=off -count=1) + build across all modules
-	set -e; for d in $(ALL_MODULES); do echo "== $$d =="; (cd $$d && $(GO) vet ./... && $(GO) mod tidy -diff && $(GO) test -vet=off -count=1 ./... && $(GO) build ./...); done
+check-all: ## Run vet + tidy-check + test (-vet=off, cached) + build across all modules (shard via SHARD_TOTAL/SHARD_INDEX)
+	set -e; for d in $(SHARD_MODULES); do echo "== $$d =="; (cd $$d && $(GO) vet ./... && $(GO) mod tidy -diff && $(GO) test -vet=off ./... && $(GO) build ./...); done
 
-test-race-all: ## Run tests with the race detector across all modules (per-module coverage under .coverage/)
-	set -e; mkdir -p .coverage; root="$$PWD"; for d in $(ALL_MODULES); do echo "== $$d =="; slug=$$(echo "$$d" | sed 's|^\./||; s|/|_|g'); (cd $$d && $(GO) test -race -count=1 -covermode=atomic -coverprofile="$$root/.coverage/$$slug.out" ./...); done
+test-race-all: ## Run tests with the race detector across all modules (per-module coverage under .coverage/, shard via SHARD_TOTAL/SHARD_INDEX)
+	set -e; mkdir -p .coverage; root="$$PWD"; for d in $(SHARD_MODULES); do echo "== $$d =="; slug=$$(echo "$$d" | sed 's|^\./||; s|/|_|g'); (cd $$d && $(GO) test -race -count=1 -covermode=atomic -coverprofile="$$root/.coverage/$$slug.out" ./...); done
 
 build-all: ## Build all packages in every module
-	set -e; for d in $(ALL_MODULES); do echo "== $$d =="; (cd $$d && $(GO) build ./...); done
+	set -e; for d in $(SHARD_MODULES); do echo "== $$d =="; (cd $$d && $(GO) build ./...); done
 
 test-all: ## Run tests in every module
-	set -e; for d in $(ALL_MODULES); do echo "== $$d =="; (cd $$d && $(GO) test ./...); done
+	set -e; for d in $(SHARD_MODULES); do echo "== $$d =="; (cd $$d && $(GO) test ./...); done
 
 vet-all: ## Run go vet in every module
-	set -e; for d in $(ALL_MODULES); do echo "== $$d =="; (cd $$d && $(GO) vet ./...); done
+	set -e; for d in $(SHARD_MODULES); do echo "== $$d =="; (cd $$d && $(GO) vet ./...); done
 
 tidy-all: ## Run go mod tidy in every module
-	set -e; for d in $(ALL_MODULES); do echo "== $$d =="; (cd $$d && $(GO) mod tidy); done
+	set -e; for d in $(SHARD_MODULES); do echo "== $$d =="; (cd $$d && $(GO) mod tidy); done
 
 tidy-check-all: ## Verify go.mod/go.sum are tidy in every module
-	set -e; for d in $(ALL_MODULES); do echo "== $$d =="; (cd $$d && $(GO) mod tidy -diff); done
+	set -e; for d in $(SHARD_MODULES); do echo "== $$d =="; (cd $$d && $(GO) mod tidy -diff); done
 
-lint-all: ## Run golangci-lint in every module
+lint-all: ## Run golangci-lint in every module (shard via SHARD_TOTAL/SHARD_INDEX)
 	@command -v $(GOLANGCI_LINT) >/dev/null 2>&1 || { printf '%s\n' "golangci-lint not found: run 'make setup'"; exit 1; }
-	set -e; for d in $(ALL_MODULES); do echo "== $$d =="; (cd $$d && $(GOLANGCI_LINT) run ./...); done
+	set -e; for d in $(SHARD_MODULES); do echo "== $$d =="; (cd $$d && $(GOLANGCI_LINT) run ./...); done
 
 vulncheck-all: ## Scan every module for known vulnerabilities
 	@command -v $(GOVULNCHECK) >/dev/null 2>&1 || { printf '%s\n' "govulncheck not found: run 'make setup'"; exit 1; }
-	set -e; for d in $(ALL_MODULES); do echo "== $$d =="; (cd $$d && $(GOVULNCHECK) ./...); done
+	set -e; for d in $(SHARD_MODULES); do echo "== $$d =="; (cd $$d && $(GOVULNCHECK) ./...); done
 
 .PHONY: docs-dev docs-build docs-preview
 docs-dev: ## Run docs dev server

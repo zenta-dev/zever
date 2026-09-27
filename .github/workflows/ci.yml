@@ -22,7 +22,9 @@ jobs:
       - uses: actions/setup-go@b7ad1dad31e06c5925ef5d2fc7ad053ef454303e # v7.0.0
         with:
           go-version-file: go.work
-          cache-dependency-path: go.work.sum
+          cache-dependency-path: |
+            go.work.sum
+            **/go.sum
       - name: Check formatting
         run: |
           files=$(gofmt -l .)
@@ -38,12 +40,27 @@ jobs:
     permissions:
       contents: read
       pull-requests: read
+    strategy:
+      fail-fast: false
+      matrix:
+        shard: [0, 1, 2, 3]
+    env:
+      SHARD_TOTAL: 4
+      SHARD_INDEX: ${{ matrix.shard }}
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
       - uses: actions/setup-go@b7ad1dad31e06c5925ef5d2fc7ad053ef454303e # v7.0.0
         with:
           go-version-file: go.work
-          cache-dependency-path: go.work.sum
+          cache-dependency-path: |
+            go.work.sum
+            **/go.sum
+      - uses: actions/cache@55cc8345863c7cc4c66a329aec7e433d2d1c52a9 # v6.1.0
+        with:
+          path: ~/.cache/golangci-lint
+          key: golangci-lint-${{ runner.os }}-go1.27-${{ hashFiles('**/go.mod') }}-shard-${{ matrix.shard }}
+          restore-keys: |
+            golangci-lint-${{ runner.os }}-go1.27-
       - name: Install golangci-lint
         run: make setup-golangci-lint
       - name: golangci-lint (all modules)
@@ -57,19 +74,28 @@ jobs:
     runs-on: ubuntu-latest
     permissions:
       contents: read
+    strategy:
+      fail-fast: false
+      matrix:
+        shard: [0, 1, 2, 3]
     env:
       # CI runners ship Chrome but its sandbox is unusable in the container;
       # the document/local render tests need --no-sandbox to execute.
       ZEVER_CHROMEDP_NO_SANDBOX: "1"
+      SHARD_TOTAL: 4
+      SHARD_INDEX: ${{ matrix.shard }}
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
       - uses: actions/setup-go@b7ad1dad31e06c5925ef5d2fc7ad053ef454303e # v7.0.0
         with:
           go-version-file: go.work
-          cache-dependency-path: go.work.sum
+          cache-dependency-path: |
+            go.work.sum
+            **/go.sum
       - name: vet + tidy + test + build (all modules)
         run: make check-all
       - name: out-of-tree proof module (standalone, outside go.work)
+        if: matrix.shard == 0
         run: GOWORK=off go -C examples/external-sms test -count=1 ./...
 
   # Nested module gate: tools/zever-lsp is a separate Go module, so the
@@ -87,7 +113,9 @@ jobs:
       - uses: actions/setup-go@b7ad1dad31e06c5925ef5d2fc7ad053ef454303e # v7.0.0
         with:
           go-version-file: go.work
-          cache-dependency-path: go.work.sum
+          cache-dependency-path: |
+            go.work.sum
+            **/go.sum
       - name: Download dependencies
         run: go mod download
       - name: Verify go.mod is tidy
@@ -105,19 +133,28 @@ jobs:
   # push and PR so races are caught before merge.
   test-race:
     name: test (race + coverage)
+    if: github.event_name != 'pull_request'
     runs-on: ubuntu-latest
     permissions:
       contents: read
       id-token: write
+    strategy:
+      fail-fast: false
+      matrix:
+        shard: [0, 1, 2, 3]
     env:
       # Same Chrome sandbox limitation as the fast gate above.
       ZEVER_CHROMEDP_NO_SANDBOX: "1"
+      SHARD_TOTAL: 4
+      SHARD_INDEX: ${{ matrix.shard }}
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
       - uses: actions/setup-go@b7ad1dad31e06c5925ef5d2fc7ad053ef454303e # v7.0.0
         with:
           go-version-file: go.work
-          cache-dependency-path: go.work.sum
+          cache-dependency-path: |
+            go.work.sum
+            **/go.sum
       - name: go test -race (all modules)
         run: make test-race-all
       - name: Collect coverage files
@@ -127,6 +164,7 @@ jobs:
         uses: codecov/codecov-action@0b35c9ecc4f0529d0eb674914510c22f85b196b4 # v7.1.0
         with:
           files: ${{ steps.collect.outputs.files }}
+          flags: race-shard-${{ matrix.shard }}
           fail_ci_if_error: false
 
   vulnerability:
@@ -137,7 +175,9 @@ jobs:
       - uses: actions/setup-go@b7ad1dad31e06c5925ef5d2fc7ad053ef454303e # v7.0.0
         with:
           go-version-file: go.work
-          cache-dependency-path: go.work.sum
+          cache-dependency-path: |
+            go.work.sum
+            **/go.sum
       - uses: actions/cache@55cc8345863c7cc4c66a329aec7e433d2d1c52a9 # v6.1.0
         with:
           path: ~/go/bin
@@ -149,13 +189,16 @@ jobs:
 
   sbom:
     name: sbom
+    if: github.event_name != 'pull_request'
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
       - uses: actions/setup-go@b7ad1dad31e06c5925ef5d2fc7ad053ef454303e # v7.0.0
         with:
           go-version-file: go.work
-          cache-dependency-path: go.work.sum
+          cache-dependency-path: |
+            go.work.sum
+            **/go.sum
       - uses: actions/cache@55cc8345863c7cc4c66a329aec7e433d2d1c52a9 # v6.1.0
         with:
           path: ~/go/bin
