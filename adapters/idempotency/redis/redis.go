@@ -5,6 +5,7 @@ import (
 	"encoding/binary"
 	"errors"
 	"fmt"
+	"math"
 	"sync/atomic"
 	"time"
 
@@ -274,7 +275,12 @@ func checkFingerprint(fp []byte) error {
 
 // encodePending builds a pending wire record: tag + fpLen + fingerprint.
 func encodePending(fp []byte) []byte {
-	out := make([]byte, 0, 3+len(fp))
+	if len(fp) > math.MaxInt-3 {
+		panic("redis: encodePending size overflow")
+	}
+	size := 3 + len(fp)
+
+	out := make([]byte, 0, size)
 	out = append(out, tagPending, byte((len(fp)>>8)&0xff), byte(len(fp)&0xff))
 
 	return append(out, fp...)
@@ -283,7 +289,16 @@ func encodePending(fp []byte) []byte {
 // encodeDone builds a completed wire record: tag + fpLen + fingerprint +
 // result.
 func encodeDone(fp, result []byte) []byte {
-	out := make([]byte, 0, 3+len(fp)+len(result))
+	if len(fp) > math.MaxInt-3 {
+		panic("redis: encodeDone size overflow")
+	}
+	base := 3 + len(fp)
+	if len(result) > math.MaxInt-base {
+		panic("redis: encodeDone size overflow")
+	}
+	size := base + len(result)
+
+	out := make([]byte, 0, size)
 	out = append(out, tagDone, byte((len(fp)>>8)&0xff), byte(len(fp)&0xff))
 	out = append(out, fp...)
 
