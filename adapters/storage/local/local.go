@@ -636,6 +636,22 @@ func parseBucketKey(path string) (string, string, bool) {
 		return "", "", false
 	}
 
+	// Defense in depth against path traversal / absolute-path tricks before
+	// any filesystem path construction.
+	if bucket == "." || bucket == ".." || strings.Contains(bucket, "/") || strings.Contains(bucket, "\\") {
+		return "", "", false
+	}
+
+	if key == "" || strings.HasPrefix(key, "/") || strings.HasPrefix(key, "\\") || strings.Contains(key, "\\") {
+		return "", "", false
+	}
+
+	for _, part := range strings.Split(key, "/") {
+		if part == "" || part == "." || part == ".." {
+			return "", "", false
+		}
+	}
+
 	return bucket, key, true
 }
 
