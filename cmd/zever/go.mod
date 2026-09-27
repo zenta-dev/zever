@@ -3,7 +3,7 @@ module github.com/zenta-dev/zever/cmd/zever
 go 1.27.0
 
 require (
-	charm.land/bubbletea/v2 v2.0.2
+	charm.land/bubbletea/v2 v2.0.10
 	charm.land/huh/v2 v2.0.3
 	github.com/charmbracelet/x/exp/teatest/v2 v2.0.0-20260924144451-d676b019604b
 	github.com/fsnotify/fsnotify v1.10.1
