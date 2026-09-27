@@ -115,12 +115,14 @@ func TestGeneratedOutputCompiles(t *testing.T) {
 
 	// -e: tidy must also resolve tests of imported packages (e.g.
 	// pgconn's tests import testify), but testify is in no repo module
-	// graph, so an offline tidy cannot fetch it. The subsequent go build
-	// below is the real gate: it only needs build-list packages, which
-	// are all replaced or cached.
+	// graph. The proxy stays ON deliberately so such third-party-only
+	// gaps resolve over the network: GOWORK=off (kept) is what isolates
+	// the throwaway module from the workspace, forcing zever/* imports
+	// through the replaces above. The subsequent go build below is the
+	// real gate and needs only build-list packages.
 	tidy := exec.CommandContext(t.Context(), "go", "mod", "tidy", "-e")
 	tidy.Dir = dir
-	tidy.Env = append(os.Environ(), "GOWORK=off", "GOPROXY=off")
+	tidy.Env = append(os.Environ(), "GOWORK=off")
 	if combined, err := tidy.CombinedOutput(); err != nil {
 		t.Fatalf("go mod tidy: %v\n%s", err, combined)
 	}
@@ -129,7 +131,7 @@ func TestGeneratedOutputCompiles(t *testing.T) {
 
 	cmd := exec.CommandContext(t.Context(), "go", args...)
 	cmd.Dir = dir
-	cmd.Env = append(os.Environ(), "GOWORK=off", "GOPROXY=off")
+	cmd.Env = append(os.Environ(), "GOWORK=off")
 
 	if combined, err := cmd.CombinedOutput(); err != nil {
 		t.Fatalf("go build %v: %v\n%s", pkgs, err, combined)
