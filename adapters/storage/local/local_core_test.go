@@ -1075,16 +1075,18 @@ func TestLocalCoreResolve(t *testing.T) {
 		t.Fatal("expected resolve to reject outside-root bucket")
 	}
 
-	// Key ".." cleans to the bucket dir itself (Join lexically); callers
-	// rely on ValidKey to reject it before resolve, and on
-	// lexicallyContained afterwards.
-	full, ok = a.resolve("bkt", "..")
-	if !ok {
-		t.Fatal("expected resolve to clean parent key to bucket dir")
+	// Parent keys are rejected by resolve as defense-in-depth; callers
+	// rely on ValidKey before resolve.
+	if _, ok = a.resolve("bkt", ".."); ok {
+		t.Fatal("expected resolve to reject parent key")
 	}
 
-	if want := a.root; full != want {
-		t.Fatalf("full = %q, want %q", full, want)
+	if _, ok = a.resolve("bkt", "../.."); ok {
+		t.Fatal("expected resolve to reject nested parent key")
+	}
+
+	if _, ok = a.resolve("bkt", "a/../../b"); ok {
+		t.Fatal("expected resolve to reject traversing key")
 	}
 }
 
