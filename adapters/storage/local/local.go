@@ -869,7 +869,9 @@ func (a *localAdapter) put(w http.ResponseWriter, r *http.Request, full string, 
 
 	if metaTmp != "" {
 		if err := os.Rename(metaTmp, full+metaSuffix); err != nil { //nolint:gosec // metaTmp from CreateTemp
-			_ = os.Remove(full)
+			if a.lexicallyContained(full) {
+				_ = os.Remove(full)
+			}
 
 			http.Error(w, "internal error", http.StatusInternalServerError)
 
