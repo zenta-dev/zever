@@ -495,7 +495,23 @@ func containedRel(root, full string) bool {
 // the handler re-validates them and this containment check guards against any
 // traversal slip.
 func (a *localAdapter) resolve(bucket, key string) (string, bool) {
-	full := filepath.Join(a.root, bucket, filepath.FromSlash(key))
+	// bucket must stay a single path component.
+	if bucket == "" || filepath.Base(bucket) != bucket || strings.ContainsAny(bucket, `/\`) {
+		return "", false
+	}
+
+	// key may contain subdirectories, but must remain relative and must not
+	// traverse outside root.
+	keyPath := filepath.FromSlash(key)
+	cleanKey := filepath.Clean(keyPath)
+	if cleanKey == "." || cleanKey == "" || filepath.IsAbs(cleanKey) {
+		return "", false
+	}
+	if cleanKey == ".." || strings.HasPrefix(cleanKey, ".."+string(filepath.Separator)) {
+		return "", false
+	}
+
+	full := filepath.Join(a.root, bucket, cleanKey)
 
 	if !containedRel(a.root, full) {
 		return "", false
