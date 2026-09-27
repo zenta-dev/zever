@@ -34,7 +34,7 @@ jobs:
         id: affected
         run: |
           if [ "${{ github.event_name }}" = "pull_request" ]; then
-            OUT=$(go run ./tools/affected --mode=affected --base "origin/${{ github.base_ref }}" --max-groups 8)
+            OUT=$(go run ./tools/affected --mode=affected --base "origin/${{ github.base_ref }}" --max-groups 4)
           else
             OUT=$(go run ./tools/affected --mode=all --max-groups 4)
           fi
