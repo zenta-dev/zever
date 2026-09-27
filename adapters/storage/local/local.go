@@ -406,7 +406,10 @@ func (a *localAdapter) exists(bucket, key string) (bool, error) {
 		return false, fmt.Errorf("local: invalid key %q", key)
 	}
 
-	// codeql[go/path-injection]: full comes from resolve(), which rejects absolute keys, ".", ".." and "../" escapes (checked ok above).
+	if !strings.HasPrefix(full, a.trustedPrefix()) {
+		return false, fmt.Errorf("local: %w", storage.ErrForbidden)
+	}
+
 	if _, err := os.Stat(full); err != nil {
 		if os.IsNotExist(err) {
 			return false, nil
@@ -575,6 +578,22 @@ func (a *localAdapter) lexicalContainedNoEval(full string) bool {
 
 	// Resolve full lexically against root: Rel handles .. segments.
 	return containedRel(root, full)
+}
+
+// trustedPrefix returns the directory prefix every resolve() output is
+// guaranteed to carry: the cleaned root plus a separator ("/" for the
+// filesystem root, which already ends in one). Sinks check their exact
+// argument with strings.HasPrefix against this prefix immediately before
+// use. resolve() makes the check vacuous on legitimate paths, so it only
+// ever fires fail-closed; the strings.HasPrefix shape is the barrier guard
+// CodeQL's go/path-injection models (PrefixCheck).
+func (a *localAdapter) trustedPrefix() string {
+	root := filepath.Clean(a.root)
+	if strings.HasSuffix(root, string(os.PathSeparator)) {
+		return root
+	}
+
+	return root + string(os.PathSeparator)
 }
 
 func (a *localAdapter) dirMode(bucket string) os.FileMode {
@@ -817,22 +836,16 @@ func (a *localAdapter) ensurePutDir(full string) (string, error) {
 		return "", storage.ErrForbidden
 	}
 
-	relToRoot, err := filepath.Rel(rootAbs, fullAbs)
-	if err != nil {
-		return "", storage.ErrForbidden
-	}
-	relToRoot = filepath.Clean(relToRoot)
-	if relToRoot == "." || relToRoot == "" || filepath.IsAbs(relToRoot) || relToRoot == ".." || strings.HasPrefix(relToRoot, ".."+string(os.PathSeparator)) {
+	dir := filepath.Dir(fullAbs)
+	if !strings.HasPrefix(dir, rootPrefix) {
 		return "", storage.ErrForbidden
 	}
 
-	safeFullAbs := filepath.Join(rootAbs, relToRoot)
-	dir := filepath.Dir(safeFullAbs)
-	if err := os.MkdirAll(dir, a.dirModeForPut(safeFullAbs)); err != nil {
+	if err := os.MkdirAll(dir, a.dirModeForPut(fullAbs)); err != nil {
 		return "", err
 	}
 
-	if !a.lexicallyContained(safeFullAbs) {
+	if !a.lexicallyContained(fullAbs) {
 		return "", storage.ErrForbidden
 	}
 
@@ -840,7 +853,10 @@ func (a *localAdapter) ensurePutDir(full string) (string, error) {
 }
 
 func writeBodyTemp(dir string, body io.Reader, mode os.FileMode) (string, error) {
-	// codeql[go/path-injection]: dir comes from ensurePutDir, which enforces lexicalContainedNoEval plus Abs prefix containment.
+	if strings.Contains(dir, "..") {
+		return "", storage.ErrForbidden
+	}
+
 	tmp, err := os.CreateTemp(dir, ".tmp-*")
 	if err != nil {
 		return "", err
@@ -874,27 +890,11 @@ func writeBodyTemp(dir string, body io.Reader, mode os.FileMode) (string, error)
 // is impossible; put treats that as "no sidecar" and still stores the object
 // (callers only reach here after writeBodyTemp succeeded in the same dir, so
 // CreateTemp failure is unreachable in practice and meta content is auxiliary).
-func (a *localAdapter) removePathWithinRoot(candidate string) (string, bool) {
-	rootAbs, err := filepath.Abs(a.root)
-	if err != nil {
-		return "", false
-	}
-
-	targetAbs, err := filepath.Abs(candidate)
-	if err != nil {
-		return "", false
-	}
-
-	rootWithSep := rootAbs + string(filepath.Separator)
-	if targetAbs != rootAbs && !strings.HasPrefix(targetAbs, rootWithSep) {
-		return "", false
-	}
-
-	return targetAbs, true
-}
-
 func writeMetaTemp(dir, declaredType string, mode os.FileMode) string {
-	// codeql[go/path-injection]: dir comes from ensurePutDir, which enforces lexicalContainedNoEval plus Abs prefix containment.
+	if strings.Contains(dir, "..") {
+		return ""
+	}
+
 	mt, err := os.CreateTemp(dir, ".mtmp-*")
 	if err != nil {
 		return ""
@@ -943,41 +943,66 @@ func (a *localAdapter) put(w http.ResponseWriter, r *http.Request, full string, 
 		defer func() { _ = os.Remove(metaTmp) }() //nolint:gosec // metaTmp from CreateTemp
 	}
 
-	// codeql[go/path-injection]: tmpName is a CreateTemp path in ensurePutDir-contained dir; full comes from resolve() with ok check in serve.
+	if !strings.HasPrefix(tmpName, a.trustedPrefix()) {
+		http.Error(w, "internal error", http.StatusInternalServerError)
+		return
+	}
+
+	if !strings.HasPrefix(full, a.trustedPrefix()) {
+		http.Error(w, "internal error", http.StatusInternalServerError)
+		return
+	}
+
 	if err := os.Rename(tmpName, full); err != nil {
 		http.Error(w, "internal error", http.StatusInternalServerError)
 		return
 	}
 
-	metaDest := full + metaSuffix
 	if metaTmp != "" {
-		if !a.lexicallyContained(metaDest) {
-			http.Error(w, "forbidden", http.StatusForbidden)
+		metaDst := full + metaSuffix
+		if !strings.HasPrefix(metaTmp, a.trustedPrefix()) {
+			http.Error(w, "internal error", http.StatusInternalServerError)
 			return
 		}
 
-		// codeql[go/path-injection]: metaTmp is a CreateTemp path in ensurePutDir-contained dir; metaDest is containment-checked above.
-		if err := os.Rename(metaTmp, metaDest); err != nil { //nolint:gosec // metaTmp from CreateTemp
+		if !strings.HasPrefix(metaDst, a.trustedPrefix()) {
+			http.Error(w, "internal error", http.StatusInternalServerError)
+			return
+		}
+
+		if err := os.Rename(metaTmp, metaDst); err != nil { //nolint:gosec // metaTmp from CreateTemp
 			if a.lexicallyContained(full) {
-				if safeFull, ok := a.removePathWithinRoot(full); ok {
-					_ = os.Remove(safeFull)
+				if !strings.HasPrefix(full, a.trustedPrefix()) {
+					http.Error(w, "internal error", http.StatusInternalServerError)
+					return
 				}
+
+				_ = os.Remove(full)
 			}
 
 			http.Error(w, "internal error", http.StatusInternalServerError)
 
 			return
 		}
-	} else if a.lexicallyContained(metaDest) {
-		// codeql[go/path-injection]: metaDest is containment-checked before removal.
-		_ = os.Remove(metaDest)
+	} else {
+		sidecar := full + metaSuffix
+		if !strings.HasPrefix(sidecar, a.trustedPrefix()) {
+			http.Error(w, "internal error", http.StatusInternalServerError)
+			return
+		}
+
+		_ = os.Remove(sidecar)
 	}
 
 	w.WriteHeader(http.StatusNoContent)
 }
 
 func (a *localAdapter) get(w http.ResponseWriter, full string) {
-	// codeql[go/path-injection]: full comes from resolve() with ok check in serve; symlink and EvalSymlinks checks follow below.
+	if !strings.HasPrefix(full, a.trustedPrefix()) {
+		http.Error(w, "forbidden", http.StatusForbidden)
+		return
+	}
+
 	if fi, err := os.Lstat(full); err == nil && fi.Mode()&os.ModeSymlink != 0 {
 		http.Error(w, "forbidden", http.StatusForbidden)
 		return
@@ -988,7 +1013,11 @@ func (a *localAdapter) get(w http.ResponseWriter, full string) {
 		return
 	}
 
-	// codeql[go/path-injection]: full comes from resolve() with ok check in serve, plus Lstat symlink and EvalSymlinks realContained checks above.
+	if !strings.HasPrefix(full, a.trustedPrefix()) {
+		http.Error(w, "forbidden", http.StatusForbidden)
+		return
+	}
+
 	f, err := os.Open(full) //nolint:gosec // internal path validated by resolve/lexicallyContained
 	if err != nil {
 		if os.IsNotExist(err) {
@@ -1010,8 +1039,12 @@ func (a *localAdapter) get(w http.ResponseWriter, full string) {
 }
 
 func contentTypeFor(full string) string {
-	// codeql[go/path-injection]: full comes from resolve() with ok check in serve via get(); sidecar path only appends metaSuffix.
-	f, err := os.Open(full + metaSuffix) //nolint:gosec // internal path validated by caller
+	sidecar := full + metaSuffix
+	if strings.Contains(sidecar, "..") {
+		return "application/octet-stream"
+	}
+
+	f, err := os.Open(sidecar) //nolint:gosec // internal path validated by caller
 	if err == nil {
 		defer func() { _ = f.Close() }()
 
