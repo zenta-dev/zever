@@ -21,6 +21,11 @@ func hasChrome() bool {
 	return false
 }
 
+// renderTestTimeout gives headless Chrome room to cold-launch on slow CI
+// runners (notably -race with a cold module cache). These tests assert
+// output shape, not speed; production DefaultTimeout is unchanged.
+const renderTestTimeout = 2 * document.DefaultTimeout
+
 func TestOpenDefaults(t *testing.T) {
 	t.Parallel()
 
@@ -235,7 +240,7 @@ func TestRenderPDF(t *testing.T) {
 		t.Skip("no Chrome binary found, skipping render test")
 	}
 
-	d, err := New(document.Options{})
+	d, err := New(document.Options{Timeout: renderTestTimeout})
 	if err != nil {
 		t.Fatalf("New() error = %v", err)
 	}
@@ -259,7 +264,7 @@ func TestRenderPNG(t *testing.T) {
 		t.Skip("no Chrome binary found, skipping render test")
 	}
 
-	d, err := New(document.Options{})
+	d, err := New(document.Options{Timeout: renderTestTimeout})
 	if err != nil {
 		t.Fatalf("New() error = %v", err)
 	}
@@ -283,7 +288,7 @@ func TestRenderJPG(t *testing.T) {
 		t.Skip("no Chrome binary found, skipping render test")
 	}
 
-	d, err := New(document.Options{})
+	d, err := New(document.Options{Timeout: renderTestTimeout})
 	if err != nil {
 		t.Fatalf("New() error = %v", err)
 	}
@@ -307,7 +312,7 @@ func TestRenderJPGHighQuality(t *testing.T) {
 		t.Skip("no Chrome binary found, skipping render test")
 	}
 
-	d, err := New(document.Options{Quality: 100})
+	d, err := New(document.Options{Quality: 100, Timeout: renderTestTimeout})
 	if err != nil {
 		t.Fatalf("New() error = %v", err)
 	}
@@ -331,7 +336,7 @@ func TestRenderPNGWithTmpDir(t *testing.T) {
 		t.Skip("no Chrome binary found, skipping render test")
 	}
 
-	d, err := New(document.Options{TmpDir: t.TempDir()})
+	d, err := New(document.Options{TmpDir: t.TempDir(), Timeout: renderTestTimeout})
 	if err != nil {
 		t.Fatalf("New() error = %v", err)
 	}
