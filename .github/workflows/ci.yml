@@ -175,7 +175,7 @@ jobs:
   # push and PR so races are caught before merge.
   test-race:
     name: test (race + coverage)
-    if: github.event_name != 'pull_request' && needs.detect.outputs.groups != '[]'
+    if: needs.detect.outputs.groups != '[]'
     runs-on: ubuntu-latest
     needs: [detect]
     permissions:
@@ -197,12 +197,18 @@ jobs:
           cache-dependency-path: |
             go.work.sum
             **/go.sum
-      - name: go test -race (all modules)
+      - name: go test -race (PR fast gate, no coverage)
+        if: github.event_name == 'pull_request'
+        run: make test-race-fast
+      - name: go test -race with coverage (main/tags)
+        if: github.event_name != 'pull_request'
         run: make test-race-all
       - name: Collect coverage files
+        if: github.event_name != 'pull_request'
         id: collect
         run: echo "files=$(find .coverage -name '*.out' | paste -sd ',' -)" >> "$GITHUB_OUTPUT"
       - name: Upload coverage to Codecov
+        if: github.event_name != 'pull_request'
         uses: codecov/codecov-action@0b35c9ecc4f0529d0eb674914510c22f85b196b4 # v7.1.0
         with:
           files: ${{ steps.collect.outputs.files }}
@@ -231,8 +237,15 @@ jobs:
 
   sbom:
     name: sbom
-    if: github.event_name != 'pull_request'
+    if: needs.detect.outputs.groups != '[]'
     runs-on: ubuntu-latest
+    needs: [detect]
+    strategy:
+      fail-fast: false
+      matrix:
+        group: ${{ fromJson(needs.detect.outputs.groups) }}
+    env:
+      MODULES: ${{ join(matrix.group, ' ') }}
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
       - uses: actions/setup-go@b7ad1dad31e06c5925ef5d2fc7ad053ef454303e # v7.0.0
@@ -247,11 +260,11 @@ jobs:
           key: ${{ runner.os }}-gobin-cyclonedx-gomod-v1.12.0
       - name: Install tools
         run: make setup-cyclonedx-gomod
-      - name: Generate SBOM (all modules)
+      - name: Generate SBOM (affected modules)
         run: make sbom
       - uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
         with:
-          name: sbom-cyclonedx
+          name: sbom-cyclonedx-${{ strategy.job-index }}
           path: sbom/
 
   ci-gate:

@@ -147,12 +147,15 @@ clean: ## Remove coverage output and build artifacts
 check: require-tools download fmt check-all lint-all vulncheck-all ## Run all local CI checks (run 'make setup' first)
 
 # Multi-module targets: per-module loops over the committed go.work workspace.
-.PHONY: check-all build-all test-all test-race-all vet-all tidy-all tidy-check-all lint-all vulncheck-all
+.PHONY: check-all build-all test-all test-race-all test-race-fast vet-all tidy-all tidy-check-all lint-all vulncheck-all
 check-all: ## Run vet + tidy-check + test (-vet=off, cached) + build across all modules (shard via SHARD_TOTAL/SHARD_INDEX, override list via MODULES)
 	set -e; for d in $(if $(MODULES),$(MODULES),$(SHARD_MODULES)); do echo "== $$d =="; (cd $$d && $(GO) vet ./... && $(GO) mod tidy -diff && $(GO) test -vet=off ./... && $(GO) build ./...); done
 
 test-race-all: ## Run tests with the race detector across all modules (per-module coverage under .coverage/, shard via SHARD_TOTAL/SHARD_INDEX, override list via MODULES)
 	set -e; mkdir -p .coverage; root="$$PWD"; for d in $(if $(MODULES),$(MODULES),$(SHARD_MODULES)); do echo "== $$d =="; slug=$$(echo "$$d" | sed 's|^\./||; s|/|_|g'); (cd $$d && $(GO) test -race -count=1 -covermode=atomic -coverprofile="$$root/.coverage/$$slug.out" ./...); done
+
+test-race-fast: ## Run tests with the race detector, no coverage (PR gate; cached, override list via MODULES)
+	set -e; for d in $(if $(MODULES),$(MODULES),$(SHARD_MODULES)); do echo "== $$d =="; (cd $$d && $(GO) test -race -vet=off ./...); done
 
 build-all: ## Build all packages in every module (override list via MODULES)
 	set -e; for d in $(if $(MODULES),$(MODULES),$(SHARD_MODULES)); do echo "== $$d =="; (cd $$d && $(GO) build ./...); done
