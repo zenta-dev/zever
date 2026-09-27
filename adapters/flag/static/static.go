@@ -132,7 +132,11 @@ func (d *driver) lookup(key string) (any, bool) {
 }
 
 // reloadIfChanged re-reads the file when its modtime advanced. A missing
-// file, read error, identical hash, or bad JSON all keep last-good.
+// file, read error, or bad JSON keeps last-good. Modtime is the version:
+// only observations newer than the committed state apply, so a stale read
+// racing a newer commit can neither clobber flags nor pin lastMod ahead of
+// the content it guards (fail-closed, last-good stays until a genuinely
+// newer read commits).
 func (d *driver) reloadIfChanged() {
 	path := d.path
 
@@ -160,9 +164,20 @@ func (d *driver) reloadIfChanged() {
 	hash := sha256.Sum256(data)
 	if hash == lastHash {
 		d.mu.Lock()
-		d.lastMod = fi.ModTime()
+		// Recheck under the write lock: a concurrent reload may have
+		// committed different content after our snapshot, in which case
+		// this read describes neither the snapshot nor the current
+		// state and must not advance the modtime past it.
+		if hash == d.lastHash {
+			if fi.ModTime().After(d.lastMod) {
+				d.lastMod = fi.ModTime()
+			}
+			d.mu.Unlock()
+			return
+		}
 		d.mu.Unlock()
-		return
+		// Snapshot raced a newer commit for different content: decide
+		// below as a fresh candidate instead of trusting the snapshot.
 	}
 
 	var flags map[string]any
@@ -178,7 +193,14 @@ func (d *driver) reloadIfChanged() {
 	defer d.mu.Unlock()
 
 	if hash == d.lastHash {
-		d.lastMod = fi.ModTime()
+		if fi.ModTime().After(d.lastMod) {
+			d.lastMod = fi.ModTime()
+		}
+		return
+	}
+	// Drop stale observations: a newer commit already won, so an older
+	// read must not clobber last-good flags.
+	if !fi.ModTime().After(d.lastMod) {
 		return
 	}
 	d.flags = flags
