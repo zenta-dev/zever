@@ -124,22 +124,25 @@ vulncheck: ## Scan for known vulnerabilities
 	$(GOVULNCHECK) ./...
 
 .PHONY: sbom
-sbom: ## Generate a CycloneDX SBOM for the module
+sbom: ## Generate a CycloneDX SBOM per module under sbom/
 	@command -v $(CYCLONEDX_GOMOD) >/dev/null 2>&1 || { printf '%s\n' "cyclonedx-gomod not found: run 'make setup'"; exit 1; }
-	$(CYCLONEDX_GOMOD) mod -licenses -std -json -output $(SBOM) .
+	mkdir -p sbom; set -e; root="$$PWD"; for d in $(ALL_MODULES); do echo "== $$d =="; slug=$$(echo "$$d" | sed 's|^\./||; s|/|_|g'); (cd $$d && $(CYCLONEDX_GOMOD) mod -licenses -std -json -output "$$root/sbom/$$slug.json" .); done
 
 .PHONY: clean
 clean: ## Remove coverage output and build artifacts
-	$(GO) clean ./...
+	rm -rf sbom .coverage
 	rm -f $(COVERAGE) $(SBOM)
 
 .PHONY: check
 check: require-tools download fmt check-all lint-all vulncheck-all ## Run all local CI checks (run 'make setup' first)
 
 # Multi-module targets: per-module loops over the committed go.work workspace.
-.PHONY: check-all build-all test-all vet-all tidy-all tidy-check-all lint-all vulncheck-all
+.PHONY: check-all build-all test-all test-race-all vet-all tidy-all tidy-check-all lint-all vulncheck-all
 check-all: ## Run vet + tidy-check + test (-vet=off -count=1) + build across all modules
 	set -e; for d in $(ALL_MODULES); do echo "== $$d =="; (cd $$d && $(GO) vet ./... && $(GO) mod tidy -diff && $(GO) test -vet=off -count=1 ./... && $(GO) build ./...); done
+
+test-race-all: ## Run tests with the race detector across all modules (per-module coverage under .coverage/)
+	set -e; mkdir -p .coverage; root="$$PWD"; for d in $(ALL_MODULES); do echo "== $$d =="; slug=$$(echo "$$d" | sed 's|^\./||; s|/|_|g'); (cd $$d && $(GO) test -race -count=1 -covermode=atomic -coverprofile="$$root/.coverage/$$slug.out" ./...); done
 
 build-all: ## Build all packages in every module
 	set -e; for d in $(ALL_MODULES); do echo "== $$d =="; (cd $$d && $(GO) build ./...); done

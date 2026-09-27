@@ -1,5 +1,7 @@
 /coverage.out
+/.coverage/
 /sbom.json
+/sbom/
 *.db
 /zever
 /cmd/zever/zever
