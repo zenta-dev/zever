@@ -9,6 +9,7 @@
 package main
 
 import (
+	"context"
 	"encoding/json"
 	"flag"
 	"fmt"
@@ -140,7 +141,7 @@ func loadRequires(root string, modules []string) (map[string][]string, error) {
 }
 
 func gitTopLevel() (string, error) {
-	out, err := exec.Command("git", "rev-parse", "--show-toplevel").Output()
+	out, err := exec.CommandContext(context.Background(), "git", "rev-parse", "--show-toplevel").Output()
 	if err != nil {
 		return "", err
 	}
@@ -148,7 +149,7 @@ func gitTopLevel() (string, error) {
 }
 
 func gitMergeBase(root, base string) (string, error) {
-	out, err := exec.Command("git", "-C", root, "merge-base", "HEAD", base).Output()
+	out, err := exec.CommandContext(context.Background(), "git", "-C", root, "merge-base", "HEAD", base).Output()
 	if err != nil {
 		return "", err
 	}
@@ -156,7 +157,7 @@ func gitMergeBase(root, base string) (string, error) {
 }
 
 func gitChanged(root, mergeBase string) ([]string, error) {
-	out, err := exec.Command("git", "-C", root, "diff", "--name-only", mergeBase, "HEAD").Output()
+	out, err := exec.CommandContext(context.Background(), "git", "-C", root, "diff", "--name-only", mergeBase, "HEAD").Output()
 	if err != nil {
 		return nil, err
 	}
