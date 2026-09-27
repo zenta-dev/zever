@@ -865,6 +865,25 @@ func writeBodyTemp(dir string, body io.Reader, mode os.FileMode) (string, error)
 // is impossible; put treats that as "no sidecar" and still stores the object
 // (callers only reach here after writeBodyTemp succeeded in the same dir, so
 // CreateTemp failure is unreachable in practice and meta content is auxiliary).
+func (a *localAdapter) removePathWithinRoot(candidate string) (string, bool) {
+	rootAbs, err := filepath.Abs(a.root)
+	if err != nil {
+		return "", false
+	}
+
+	targetAbs, err := filepath.Abs(candidate)
+	if err != nil {
+		return "", false
+	}
+
+	rootWithSep := rootAbs + string(filepath.Separator)
+	if targetAbs != rootAbs && !strings.HasPrefix(targetAbs, rootWithSep) {
+		return "", false
+	}
+
+	return targetAbs, true
+}
+
 func writeMetaTemp(dir, declaredType string, mode os.FileMode) string {
 	// codeql[go/path-injection]: dir comes from ensurePutDir, which enforces lexicalContainedNoEval plus Abs prefix containment.
 	mt, err := os.CreateTemp(dir, ".mtmp-*")
@@ -925,8 +944,9 @@ func (a *localAdapter) put(w http.ResponseWriter, r *http.Request, full string, 
 		// codeql[go/path-injection]: metaTmp is a CreateTemp path in ensurePutDir-contained dir; dest full comes from resolve() with ok check in serve.
 		if err := os.Rename(metaTmp, full+metaSuffix); err != nil { //nolint:gosec // metaTmp from CreateTemp
 			if a.lexicallyContained(full) {
-				// codeql[go/path-injection]: full comes from resolve() with ok check in serve, rechecked by lexicallyContained on this branch.
-				_ = os.Remove(full)
+				if safeFull, ok := a.removePathWithinRoot(full); ok {
+					_ = os.Remove(safeFull)
+				}
 			}
 
 			http.Error(w, "internal error", http.StatusInternalServerError)
