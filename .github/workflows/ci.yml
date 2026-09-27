@@ -14,6 +14,33 @@ concurrency:
   cancel-in-progress: ${{ github.ref != 'refs/heads/main' }}
 
 jobs:
+  detect:
+    name: detect affected modules
+    runs-on: ubuntu-latest
+    outputs:
+      groups: ${{ steps.affected.outputs.groups }}
+      reason: ${{ steps.affected.outputs.reason }}
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          fetch-depth: 0
+      - uses: actions/setup-go@b7ad1dad31e06c5925ef5d2fc7ad053ef454303e # v7.0.0
+        with:
+          go-version-file: go.work
+          cache-dependency-path: |
+            go.work.sum
+            **/go.sum
+      - name: Compute affected groups
+        id: affected
+        run: |
+          if [ "${{ github.event_name }}" = "pull_request" ]; then
+            OUT=$(go run ./tools/affected --mode=affected --base "origin/${{ github.base_ref }}" --max-groups 8)
+          else
+            OUT=$(go run ./tools/affected --mode=all --max-groups 4)
+          fi
+          echo "groups=$(echo "$OUT" | jq -c .groups)" >> "$GITHUB_OUTPUT"
+          echo "reason=$(echo "$OUT" | jq -r .reason)" >> "$GITHUB_OUTPUT"
+
   fmt:
     name: gofmt
     runs-on: ubuntu-latest
@@ -37,16 +64,17 @@ jobs:
   lint:
     name: golangci-lint
     runs-on: ubuntu-latest
+    needs: [detect]
+    if: needs.detect.outputs.groups != '[]'
     permissions:
       contents: read
       pull-requests: read
     strategy:
       fail-fast: false
       matrix:
-        shard: [0, 1, 2, 3]
+        group: ${{ fromJson(needs.detect.outputs.groups) }}
     env:
-      SHARD_TOTAL: 4
-      SHARD_INDEX: ${{ matrix.shard }}
+      MODULES: ${{ join(matrix.group, ' ') }}
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
       - uses: actions/setup-go@b7ad1dad31e06c5925ef5d2fc7ad053ef454303e # v7.0.0
@@ -58,7 +86,7 @@ jobs:
       - uses: actions/cache@55cc8345863c7cc4c66a329aec7e433d2d1c52a9 # v6.1.0
         with:
           path: ~/.cache/golangci-lint
-          key: golangci-lint-${{ runner.os }}-go1.27-${{ hashFiles('**/go.mod') }}-shard-${{ matrix.shard }}
+          key: golangci-lint-${{ runner.os }}-go1.27-${{ hashFiles('**/go.mod') }}
           restore-keys: |
             golangci-lint-${{ runner.os }}-go1.27-
       - name: Install golangci-lint
@@ -72,18 +100,19 @@ jobs:
   test:
     name: test (go 1.27)
     runs-on: ubuntu-latest
+    needs: [detect]
+    if: needs.detect.outputs.groups != '[]'
     permissions:
       contents: read
     strategy:
       fail-fast: false
       matrix:
-        shard: [0, 1, 2, 3]
+        group: ${{ fromJson(needs.detect.outputs.groups) }}
     env:
       # CI runners ship Chrome but its sandbox is unusable in the container;
       # the document/local render tests need --no-sandbox to execute.
       ZEVER_CHROMEDP_NO_SANDBOX: "1"
-      SHARD_TOTAL: 4
-      SHARD_INDEX: ${{ matrix.shard }}
+      MODULES: ${{ join(matrix.group, ' ') }}
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
       - uses: actions/setup-go@b7ad1dad31e06c5925ef5d2fc7ad053ef454303e # v7.0.0
@@ -94,8 +123,21 @@ jobs:
             **/go.sum
       - name: vet + tidy + test + build (all modules)
         run: make check-all
+
+  external-sms:
+    name: out-of-tree proof module
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+      - uses: actions/setup-go@b7ad1dad31e06c5925ef5d2fc7ad053ef454303e # v7.0.0
+        with:
+          go-version-file: go.work
+          cache-dependency-path: |
+            go.work.sum
+            **/go.sum
       - name: out-of-tree proof module (standalone, outside go.work)
-        if: matrix.shard == 0
         run: GOWORK=off go -C examples/external-sms test -count=1 ./...
 
   # Nested module gate: tools/zever-lsp is a separate Go module, so the
@@ -133,20 +175,20 @@ jobs:
   # push and PR so races are caught before merge.
   test-race:
     name: test (race + coverage)
-    if: github.event_name != 'pull_request'
+    if: github.event_name != 'pull_request' && needs.detect.outputs.groups != '[]'
     runs-on: ubuntu-latest
+    needs: [detect]
     permissions:
       contents: read
       id-token: write
     strategy:
       fail-fast: false
       matrix:
-        shard: [0, 1, 2, 3]
+        group: ${{ fromJson(needs.detect.outputs.groups) }}
     env:
       # Same Chrome sandbox limitation as the fast gate above.
       ZEVER_CHROMEDP_NO_SANDBOX: "1"
-      SHARD_TOTAL: 4
-      SHARD_INDEX: ${{ matrix.shard }}
+      MODULES: ${{ join(matrix.group, ' ') }}
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
       - uses: actions/setup-go@b7ad1dad31e06c5925ef5d2fc7ad053ef454303e # v7.0.0
@@ -164,7 +206,7 @@ jobs:
         uses: codecov/codecov-action@0b35c9ecc4f0529d0eb674914510c22f85b196b4 # v7.1.0
         with:
           files: ${{ steps.collect.outputs.files }}
-          flags: race-shard-${{ matrix.shard }}
+          flags: race-group-${{ strategy.job-index }}
           fail_ci_if_error: false
 
   vulnerability:
@@ -211,3 +253,16 @@ jobs:
         with:
           name: sbom-cyclonedx
           path: sbom/
+
+  ci-gate:
+    name: ci-gate
+    if: always()
+    runs-on: ubuntu-latest
+    needs: [detect, fmt, lint, test, test-race, sbom, lsp, vulnerability, external-sms]
+    steps:
+      - name: Aggregate results
+        run: |
+          case "${{ join(needs.*.result, ' ') }}" in
+            *failure*|*cancelled*) echo gate failed; exit 1;;
+            *) echo "gate passed";;
+          esac

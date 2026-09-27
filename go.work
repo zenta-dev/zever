@@ -143,5 +143,6 @@ use (
 	./shared/registry
 	./shared/retry
 	./shared/s3opts
+	./tools/affected
 	./tools/zever-lsp
 )
