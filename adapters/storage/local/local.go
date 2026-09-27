@@ -653,9 +653,14 @@ func (a *localAdapter) serve(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	// parseBucketKey validated above, so resolve cannot fail; put/get
-	// recheck containment (symlink-aware) before touching the filesystem.
-	full, _ := a.resolve(bucket, key)
+	// parseBucketKey validated above; still require resolve success before
+	// using the filesystem path. put/get recheck containment (symlink-aware)
+	// before touching the filesystem.
+	full, ok := a.resolve(bucket, key)
+	if !ok {
+		http.Error(w, "forbidden", http.StatusForbidden)
+		return
+	}
 
 	if r.URL.Query().Get("sig") == "" {
 		a.serveUnsigned(w, r, bucket, key, full)
