@@ -940,9 +940,15 @@ func (a *localAdapter) put(w http.ResponseWriter, r *http.Request, full string, 
 		return
 	}
 
+	metaDest := full + metaSuffix
 	if metaTmp != "" {
-		// codeql[go/path-injection]: metaTmp is a CreateTemp path in ensurePutDir-contained dir; dest full comes from resolve() with ok check in serve.
-		if err := os.Rename(metaTmp, full+metaSuffix); err != nil { //nolint:gosec // metaTmp from CreateTemp
+		if !a.lexicallyContained(metaDest) {
+			http.Error(w, "forbidden", http.StatusForbidden)
+			return
+		}
+
+		// codeql[go/path-injection]: metaTmp is a CreateTemp path in ensurePutDir-contained dir; metaDest is containment-checked above.
+		if err := os.Rename(metaTmp, metaDest); err != nil { //nolint:gosec // metaTmp from CreateTemp
 			if a.lexicallyContained(full) {
 				if safeFull, ok := a.removePathWithinRoot(full); ok {
 					_ = os.Remove(safeFull)
@@ -953,9 +959,9 @@ func (a *localAdapter) put(w http.ResponseWriter, r *http.Request, full string, 
 
 			return
 		}
-	} else {
-		// codeql[go/path-injection]: full comes from resolve() with ok check in serve; sidecar path only appends metaSuffix.
-		_ = os.Remove(full + metaSuffix)
+	} else if a.lexicallyContained(metaDest) {
+		// codeql[go/path-injection]: metaDest is containment-checked before removal.
+		_ = os.Remove(metaDest)
 	}
 
 	w.WriteHeader(http.StatusNoContent)
