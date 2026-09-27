@@ -817,13 +817,22 @@ func (a *localAdapter) ensurePutDir(full string) (string, error) {
 		return "", storage.ErrForbidden
 	}
 
-	dir := filepath.Dir(fullAbs)
-	// codeql[go/path-injection]: dir derives from fullAbs after Abs prefix containment check and lexicalContainedNoEval pre-check above.
-	if err := os.MkdirAll(dir, a.dirModeForPut(fullAbs)); err != nil {
+	relToRoot, err := filepath.Rel(rootAbs, fullAbs)
+	if err != nil {
+		return "", storage.ErrForbidden
+	}
+	relToRoot = filepath.Clean(relToRoot)
+	if relToRoot == "." || relToRoot == "" || filepath.IsAbs(relToRoot) || relToRoot == ".." || strings.HasPrefix(relToRoot, ".."+string(os.PathSeparator)) {
+		return "", storage.ErrForbidden
+	}
+
+	safeFullAbs := filepath.Join(rootAbs, relToRoot)
+	dir := filepath.Dir(safeFullAbs)
+	if err := os.MkdirAll(dir, a.dirModeForPut(safeFullAbs)); err != nil {
 		return "", err
 	}
 
-	if !a.lexicallyContained(fullAbs) {
+	if !a.lexicallyContained(safeFullAbs) {
 		return "", storage.ErrForbidden
 	}
 
