@@ -113,7 +113,12 @@ func TestGeneratedOutputCompiles(t *testing.T) {
 		pkgs = append(pkgs, "./"+filepath.Join(name, "..."))
 	}
 
-	tidy := exec.CommandContext(t.Context(), "go", "mod", "tidy")
+	// -e: tidy must also resolve tests of imported packages (e.g.
+	// pgconn's tests import testify), but testify is in no repo module
+	// graph, so an offline tidy cannot fetch it. The subsequent go build
+	// below is the real gate: it only needs build-list packages, which
+	// are all replaced or cached.
+	tidy := exec.CommandContext(t.Context(), "go", "mod", "tidy", "-e")
 	tidy.Dir = dir
 	tidy.Env = append(os.Environ(), "GOWORK=off", "GOPROXY=off")
 	if combined, err := tidy.CombinedOutput(); err != nil {
