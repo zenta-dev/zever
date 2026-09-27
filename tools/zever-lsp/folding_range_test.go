@@ -20,7 +20,7 @@ func findRange(got []protocol.FoldingRange, startLine uint32) (protocol.FoldingR
 
 func TestFoldingRangesForEntityBody(t *testing.T) {
 	// index(...) uses parens, not braces (confirmed against the grammar:
-	// internal/dsl/parser only ever opens index bodies with LPAREN), so an
+	// dsl/parser only ever opens index bodies with LPAREN), so an
 	// entity with an index declaration has exactly one foldable brace pair:
 	// the entity body itself. There is no nested multi-line brace block to
 	// assert here.

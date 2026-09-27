@@ -3,7 +3,7 @@ package main
 import (
 	"go.lsp.dev/protocol"
 
-	"github.com/zenta-dev/zever/internal/dsl/ast"
+	"github.com/zenta-dev/zever/dsl/ast"
 )
 
 // highlightsAt resolves the cursor to a symbol via renameTargetAt, then

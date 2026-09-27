@@ -1,9 +1,9 @@
 // Package app builds the config and container shared by this project's
 // binaries.
 //
-// Blank imports register exactly the adapters selected in zever.yaml.
-// JWT secret comes from the environment only: set AUTH_JWT_SECRET to at
-// least 32 bytes. It is never stored in zever.yaml.
+// Explicit Register calls register exactly the adapters selected in
+// zever.yaml. JWT secret comes from the environment only: set
+// AUTH_JWT_SECRET to at least 32 bytes. It is never stored in zever.yaml.
 package app
 
 import (
@@ -13,40 +13,15 @@ import (
 	"github.com/zenta-dev/zever/config"
 	"github.com/zenta-dev/zever/container"
 
-	// Blank imports register the adapters this app selects.
-	_ "github.com/zenta-dev/zever/analytics/log"
-	_ "github.com/zenta-dev/zever/auth/jwt"
-	_ "github.com/zenta-dev/zever/billing/stub"
-	_ "github.com/zenta-dev/zever/cache/memory"
-	_ "github.com/zenta-dev/zever/crypto/local"
-	_ "github.com/zenta-dev/zever/db/sqlite"
-	_ "github.com/zenta-dev/zever/document/local"
-	_ "github.com/zenta-dev/zever/eventbus/memory"
-	_ "github.com/zenta-dev/zever/flag/static"
-	_ "github.com/zenta-dev/zever/geo/static"
-	_ "github.com/zenta-dev/zever/i18n/embed"
-	_ "github.com/zenta-dev/zever/idempotency/memory"
-	_ "github.com/zenta-dev/zever/lock/memory"
-	_ "github.com/zenta-dev/zever/log/slog"
-	_ "github.com/zenta-dev/zever/mailer/log"
-	_ "github.com/zenta-dev/zever/media/local"
-	_ "github.com/zenta-dev/zever/notification/log"
-	_ "github.com/zenta-dev/zever/observability/stdout"
-	_ "github.com/zenta-dev/zever/password/argon2"
-	_ "github.com/zenta-dev/zever/payment/stub"
-	_ "github.com/zenta-dev/zever/permission/rbac"
-	_ "github.com/zenta-dev/zever/queue/memory"
-	_ "github.com/zenta-dev/zever/ratelimit/memory"
-	_ "github.com/zenta-dev/zever/router/stdhttp"
-	_ "github.com/zenta-dev/zever/scheduler/embedded"
-	_ "github.com/zenta-dev/zever/search/sqlite"
-	_ "github.com/zenta-dev/zever/secrets/env"
-	_ "github.com/zenta-dev/zever/session/memory"
-	_ "github.com/zenta-dev/zever/storage/local"
-	_ "github.com/zenta-dev/zever/tenant/single"
-	_ "github.com/zenta-dev/zever/vectorstore/sqlite"
-	_ "github.com/zenta-dev/zever/webhook/queue"
-	_ "github.com/zenta-dev/zever/workflow/memory"
+	authjwt "github.com/zenta-dev/zever/adapters/auth/jwt"
+	billingstub "github.com/zenta-dev/zever/adapters/billing/stub"
+	dbsqlite "github.com/zenta-dev/zever/adapters/db/sqlite"
+	documentlocal "github.com/zenta-dev/zever/adapters/document/local"
+	medialocal "github.com/zenta-dev/zever/adapters/media/local"
+	passwordargon2 "github.com/zenta-dev/zever/adapters/password/argon2"
+	schedulerembedded "github.com/zenta-dev/zever/adapters/scheduler/embedded"
+	searchsqlite "github.com/zenta-dev/zever/adapters/search/sqlite"
+	vectorsqlite "github.com/zenta-dev/zever/adapters/vectorstore/sqlite"
 )
 
 // DefaultDBPath is the sqlite file used when nothing else supplies one. It is
@@ -86,6 +61,16 @@ func New() (*container.Container, error) {
 	if err != nil {
 		return nil, err
 	}
+
+	authjwt.Register()
+	billingstub.Register()
+	dbsqlite.Register()
+	documentlocal.Register()
+	medialocal.Register()
+	passwordargon2.Register()
+	schedulerembedded.Register()
+	searchsqlite.Register()
+	vectorsqlite.Register()
 
 	return container.New(cfg), nil
 }

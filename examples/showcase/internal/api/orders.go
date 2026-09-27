@@ -10,8 +10,8 @@ import (
 
 	"github.com/google/uuid"
 
-	"github.com/zenta-dev/zever/db"
-	"github.com/zenta-dev/zever/queue"
+	"github.com/zenta-dev/zever/core/db"
+	"github.com/zenta-dev/zever/core/queue"
 
 	genshop "github.com/zenta-dev/zever/examples/showcase/generated/gogen/shop"
 	pb "github.com/zenta-dev/zever/examples/showcase/generated/protogogen/shop"

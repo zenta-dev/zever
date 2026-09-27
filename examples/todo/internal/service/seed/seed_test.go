@@ -10,14 +10,13 @@ import (
 	"github.com/zenta-dev/zever/container"
 	"github.com/zenta-dev/zever/examples/todo/internal/service/seed"
 
-	_ "github.com/zenta-dev/zever/cache/memory"
-	_ "github.com/zenta-dev/zever/db/sqlite"
-	_ "github.com/zenta-dev/zever/log/slog"
-	_ "github.com/zenta-dev/zever/queue/memory"
+	dbsqlite "github.com/zenta-dev/zever/adapters/db/sqlite"
 )
 
 // TestRunIsIdempotent runs the seeder twice and checks row counts stay stable.
 func TestRunIsIdempotent(t *testing.T) {
+	dbsqlite.Register()
+
 	cfg := config.Default()
 	cfg.DB.Options.Path = filepath.Join(t.TempDir(), "test.db")
 	c := container.New(cfg)

@@ -7,10 +7,10 @@ package shop
 import (
 	"google.golang.org/grpc"
 
-	"github.com/zenta-dev/zever/auth"
-	"github.com/zenta-dev/zever/permission"
+	"github.com/zenta-dev/zever/core/auth"
+	"github.com/zenta-dev/zever/core/permission"
 
-	"github.com/zenta-dev/zever/router"
+	"github.com/zenta-dev/zever/core/router"
 
 	pb "github.com/zenta-dev/zever/examples/showcase/generated/protogogen/shop"
 )

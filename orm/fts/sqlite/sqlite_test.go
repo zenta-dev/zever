@@ -4,8 +4,8 @@ import (
 	"context"
 	"testing"
 
-	"github.com/zenta-dev/zever/db"
-	"github.com/zenta-dev/zever/db/sqlite"
+	"github.com/zenta-dev/zever/adapters/db/sqlite"
+	"github.com/zenta-dev/zever/core/db"
 	orm "github.com/zenta-dev/zever/orm"
 )
 

@@ -7,9 +7,9 @@ import (
 
 	"go.lsp.dev/protocol"
 
-	"github.com/zenta-dev/zever/internal/dsl/ast"
-	"github.com/zenta-dev/zever/internal/dsl/ir"
-	"github.com/zenta-dev/zever/internal/dsl/parser"
+	"github.com/zenta-dev/zever/dsl/ast"
+	"github.com/zenta-dev/zever/dsl/ir"
+	"github.com/zenta-dev/zever/dsl/parser"
 )
 
 // serverName is the log base name and the binary name editors invoke.
@@ -171,7 +171,7 @@ func (s *Server) Initialize(ctx context.Context, params *protocol.InitializePara
 // round of diagnostics.
 func (s *Server) Initialized(ctx context.Context, _ *protocol.InitializedParams) error {
 	s.captureClient(ctx)
-	s.refreshDiagnostics()
+	s.refreshDiagnostics() //nolint:contextcheck // publish is intentionally background: the stored client serves contexts (e.g. debounce timer) that carry none
 
 	return nil
 }
@@ -205,7 +205,7 @@ func (s *Server) SetTrace(ctx context.Context, params *protocol.SetTraceParams) 
 func (s *Server) DidOpen(ctx context.Context, params *protocol.DidOpenTextDocumentParams) error {
 	s.captureClient(ctx)
 	s.ws.SetDoc(string(params.TextDocument.URI), params.TextDocument.Text)
-	s.refreshDiagnostics()
+	s.refreshDiagnostics() //nolint:contextcheck // publish is intentionally background: the stored client serves contexts (e.g. debounce timer) that carry none
 
 	return nil
 }
@@ -248,7 +248,7 @@ func (s *Server) DidClose(ctx context.Context, params *protocol.DidCloseTextDocu
 	s.captureClient(ctx)
 	s.publisher.cancel(string(params.TextDocument.URI))
 	s.ws.CloseDoc(string(params.TextDocument.URI))
-	s.refreshDiagnostics()
+	s.refreshDiagnostics() //nolint:contextcheck // publish is intentionally background: the stored client serves contexts (e.g. debounce timer) that carry none
 
 	return nil
 }
@@ -258,7 +258,7 @@ func (s *Server) DidClose(ctx context.Context, params *protocol.DidCloseTextDocu
 func (s *Server) DidChangeWatchedFiles(ctx context.Context, _ *protocol.DidChangeWatchedFilesParams) error {
 	s.captureClient(ctx)
 	s.ws.Rescan()
-	s.refreshDiagnostics()
+	s.refreshDiagnostics() //nolint:contextcheck // publish is intentionally background: the stored client serves contexts (e.g. debounce timer) that carry none
 
 	return nil
 }
@@ -461,6 +461,8 @@ func (s *Server) Rename(ctx context.Context, params *protocol.RenameParams) (*pr
 		return renameJobEdits(parsedFiles, target.Name, params.NewName)
 	case serviceKind:
 		return renameServiceEdits(parsedFiles, target.Name, params.NewName)
+	case rpcKind:
+		return renameRPCEdits(parsedFiles, target.Owner, target.Name, params.NewName)
 	}
 	// Proof: renameTargetAt yields only the five kinds dispatched here and
 	// below; rpcKind is the sole remaining reachable kind, so control reaches

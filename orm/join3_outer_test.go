@@ -5,7 +5,7 @@ import (
 	"errors"
 	"testing"
 
-	"github.com/zenta-dev/zever/db"
+	"github.com/zenta-dev/zever/core/db"
 	"github.com/zenta-dev/zever/orm/dialect"
 )
 

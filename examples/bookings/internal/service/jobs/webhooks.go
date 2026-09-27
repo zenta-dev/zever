@@ -4,7 +4,7 @@ import (
 	"context"
 	"fmt"
 
-	"github.com/zenta-dev/zever/webhook"
+	"github.com/zenta-dev/zever/core/webhook"
 )
 
 // Webhook events fanned out by the bookings jobs.

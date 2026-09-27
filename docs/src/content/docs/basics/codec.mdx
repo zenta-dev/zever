@@ -12,7 +12,7 @@ Use it when storing typed values in `cache`, `queue`, or `session`, or when defi
 No YAML, no env, no container accessor. `codec` is not a swappable-adapter service with `Open`/`Register`; construct the value directly where needed:
 
 ```go
-import "github.com/zenta-dev/zever/codec"
+import "github.com/zenta-dev/zever/shared/codec"
 
 c := codec.JSONCodec[MyPayload]{}
 ```
@@ -38,7 +38,7 @@ package main
 import (
     "fmt"
 
-    "github.com/zenta-dev/zever/codec"
+    "github.com/zenta-dev/zever/shared/codec"
 )
 
 type MyPayload struct {

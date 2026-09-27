@@ -12,12 +12,21 @@ import (
 	"errors"
 	"fmt"
 
+	documentlocal "github.com/zenta-dev/zever/adapters/document/local"
+	medialocal "github.com/zenta-dev/zever/adapters/media/local"
 	"github.com/zenta-dev/zever/config"
 	"github.com/zenta-dev/zever/container"
-	"github.com/zenta-dev/zever/container/adapters"
+	"github.com/zenta-dev/zever/core/i18n"
+	"github.com/zenta-dev/zever/core/permission"
 	"github.com/zenta-dev/zever/examples/demoapp/locales"
-	"github.com/zenta-dev/zever/i18n"
-	"github.com/zenta-dev/zever/permission"
+
+	authjwt "github.com/zenta-dev/zever/adapters/auth/jwt"
+	billingstub "github.com/zenta-dev/zever/adapters/billing/stub"
+	dbsqlite "github.com/zenta-dev/zever/adapters/db/sqlite"
+	passwordargon2 "github.com/zenta-dev/zever/adapters/password/argon2"
+	schedulerembedded "github.com/zenta-dev/zever/adapters/scheduler/embedded"
+	searchsqlite "github.com/zenta-dev/zever/adapters/search/sqlite"
+	vectorsqlite "github.com/zenta-dev/zever/adapters/vectorstore/sqlite"
 )
 
 const (
@@ -118,15 +127,23 @@ func Config() (*config.Config, error) {
 }
 
 // New builds the container every binary in this project uses. Nothing is
-// opened until a battery is first requested. It registers the heavyweight
-// adapter bundles the core container no longer wires itself.
+// opened until a battery is first requested. It registers the nested
+// adapter modules the core container no longer wires itself.
 func New() (*container.Container, error) {
 	cfg, err := Config()
 	if err != nil {
 		return nil, err
 	}
 
-	adapters.RegisterAll()
+	authjwt.Register()
+	billingstub.Register()
+	dbsqlite.Register()
+	passwordargon2.Register()
+	schedulerembedded.Register()
+	searchsqlite.Register()
+	vectorsqlite.Register()
+	documentlocal.Register()
+	medialocal.Register()
 
 	return container.New(cfg), nil
 }

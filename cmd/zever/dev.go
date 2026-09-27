@@ -12,7 +12,7 @@ import (
 
 	"github.com/fsnotify/fsnotify"
 
-	"github.com/zenta-dev/zever/internal/dsl/compile"
+	"github.com/zenta-dev/zever/dsl/compile"
 )
 
 const devTag = "zever dev"

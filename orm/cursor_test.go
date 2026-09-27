@@ -10,7 +10,7 @@ import (
 	"testing"
 	"time"
 
-	"github.com/zenta-dev/zever/db"
+	"github.com/zenta-dev/zever/core/db"
 )
 
 // cursorRow is a fixture entity with one column per CursorKeyValue member,

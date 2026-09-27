@@ -8,13 +8,12 @@ import (
 
 	"github.com/google/uuid"
 
-	"github.com/zenta-dev/zever/db"
+	"github.com/zenta-dev/zever/core/db"
+	"github.com/zenta-dev/zever/core/password"
 	genapp "github.com/zenta-dev/zever/examples/bookings/generated/zenorm/orm/gen/app"
 	"github.com/zenta-dev/zever/orm"
-	"github.com/zenta-dev/zever/password"
 
-	// Blank import registers the argon2id adapter used to hash demo passwords.
-	_ "github.com/zenta-dev/zever/password/argon2"
+	passwordargon2 "github.com/zenta-dev/zever/adapters/password/argon2"
 )
 
 // Demo identities and content. IDs are fixed so re-runs find existing rows.
@@ -36,6 +35,8 @@ const (
 // Seeding is idempotent: existing rows are left untouched, so re-running
 // this command is safe.
 func Run(ctx context.Context, database db.DB) error {
+	passwordargon2.Register()
+
 	hostID, err := ensureUser(ctx, database, HostID, HostEmail)
 	if err != nil {
 		return err

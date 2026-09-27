@@ -4,8 +4,8 @@ import (
 	"os"
 	"testing"
 
-	"github.com/zenta-dev/zever/db"
-	dbpostgres "github.com/zenta-dev/zever/db/postgres"
+	dbpostgres "github.com/zenta-dev/zever/adapters/db/postgres"
+	"github.com/zenta-dev/zever/core/db"
 )
 
 type pgWidget struct {

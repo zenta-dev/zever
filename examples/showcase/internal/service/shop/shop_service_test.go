@@ -11,23 +11,19 @@ import (
 	"testing"
 	"time"
 
-	"github.com/zenta-dev/zever/apperror"
-	"github.com/zenta-dev/zever/auth"
-	"github.com/zenta-dev/zever/authz"
 	"github.com/zenta-dev/zever/config"
 	"github.com/zenta-dev/zever/container"
-	"github.com/zenta-dev/zever/db"
+	"github.com/zenta-dev/zever/core/auth"
+	"github.com/zenta-dev/zever/core/authz"
+	"github.com/zenta-dev/zever/core/db"
+	"github.com/zenta-dev/zever/core/queue"
 	"github.com/zenta-dev/zever/examples/showcase/internal/service/seed"
 	shopsvc "github.com/zenta-dev/zever/examples/showcase/internal/service/shop"
-	"github.com/zenta-dev/zever/queue"
+	"github.com/zenta-dev/zever/examples/showcase/internal/testsetup"
+	"github.com/zenta-dev/zever/shared/apperror"
 
 	genshop "github.com/zenta-dev/zever/examples/showcase/generated/gogen/shop"
 	pb "github.com/zenta-dev/zever/examples/showcase/generated/protogogen/shop"
-
-	_ "github.com/zenta-dev/zever/auth/jwt"
-	_ "github.com/zenta-dev/zever/db/sqlite"
-	_ "github.com/zenta-dev/zever/log/slog"
-	_ "github.com/zenta-dev/zever/queue/memory"
 )
 
 // testSetup bundles the service with the infra tests assert against.
@@ -41,6 +37,8 @@ type testSetup struct {
 // newTestSetup builds a fresh sqlite-backed service per test.
 func newTestSetup(t *testing.T) testSetup {
 	t.Helper()
+
+	testsetup.RegisterDefaults()
 
 	cfg := config.Default()
 	cfg.DB.Options.Path = filepath.Join(t.TempDir(), "test.db")

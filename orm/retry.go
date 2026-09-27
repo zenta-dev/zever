@@ -8,8 +8,8 @@ import (
 
 	"github.com/jackc/pgx/v5/pgconn"
 
-	"github.com/zenta-dev/zever/db"
-	"github.com/zenta-dev/zever/internal/retry"
+	"github.com/zenta-dev/zever/core/db"
+	"github.com/zenta-dev/zever/shared/retry"
 )
 
 // ErrRetryable marks an error as a transient transaction failure worth

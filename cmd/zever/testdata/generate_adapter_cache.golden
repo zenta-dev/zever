@@ -7,13 +7,12 @@
 // New) with the real integration; `make lint` will keep reporting the
 // TODOs until you do. Delete this paragraph when the adapter is real.
 //
-// WIRING: zever registers adapters explicitly in
-// container/services.go's registerAdapters, not via init(). After filling
-// in the TODOs, add a Memcached constant to the cache Adapter enum
-// (plus its ParseAdapter case), register the constructor
-// (_ = cache.Register(cache.Memcached, New)), and
-// select it in zever.yaml. Until then this package builds but is
-// unreachable.
+// WIRING: zever registers adapters explicitly, never via init(). After
+// filling in the TODOs, add a Memcached constant to the cache Adapter enum
+// in core/cache/adapter.go (plus its ParseAdapter case), point the
+// scaffolded register.go at it (replacing the ParseAdapter placeholder),
+// and select it in zever.yaml. Until then this package builds but is
+// reachable only through its placeholder registration.
 package memcached
 
 import (
@@ -21,7 +20,7 @@ import (
 	"errors"
 	"time"
 
-	"github.com/zenta-dev/zever/cache"
+	"github.com/zenta-dev/zever/core/cache"
 )
 
 // errNotImplemented is returned by every stub method that has not been

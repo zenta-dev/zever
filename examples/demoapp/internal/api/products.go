@@ -6,11 +6,11 @@ import (
 
 	"github.com/google/uuid"
 
+	"github.com/zenta-dev/zever/core/permission"
+	"github.com/zenta-dev/zever/core/router"
+	"github.com/zenta-dev/zever/core/search"
 	gen "github.com/zenta-dev/zever/examples/demoapp/generated/zenorm/orm/gen/app"
 	"github.com/zenta-dev/zever/orm"
-	"github.com/zenta-dev/zever/permission"
-	"github.com/zenta-dev/zever/router"
-	"github.com/zenta-dev/zever/search"
 )
 
 // listProducts returns up to 100 products, optionally filtered by

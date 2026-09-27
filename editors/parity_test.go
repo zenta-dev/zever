@@ -20,7 +20,7 @@ import (
 	"strings"
 	"testing"
 
-	"github.com/zenta-dev/zever/internal/dsl/gengrammar"
+	"github.com/zenta-dev/zever/dsl/gengrammar"
 )
 
 // Grammar file locations, relative to the editors package directory (the

@@ -11,7 +11,7 @@ It covers install only. Service wiring lives in `../architecture/container/`, sc
 
 ## Prerequisites and mental model
 
-zever is a single-module Go framework. There are no nested `go.mod` files: every package, adapter, and tool lives under `github.com/zenta-dev/zever`. Adding it to a project is one `go get`; installing the CLI is one `go install` at a pinned version.
+zever is a Go multi-module monorepo. Battery interfaces plus their `Register`/`Open` registries live in `core/<b>`; every adapter is its own module in `adapters/<b>/<a>` with a `Register()` wiring it into its `core` registry; SDK-free helpers live in `shared/*`; `config`, `container`, `orm`, `dsl`, and `cmd/zever` are separate modules. Local dev resolves them through the committed `go.work` workspace at the repo root (143 `use` entries covering every module), so `go build/test ./...` from the root just works; per-module standalone commands run with `GOWORK=off` in CI. Adding a battery to a project is a `go get` of the `core` module plus the adapter modules you need; installing the CLI is one `go install` of `cmd/zever` at a pinned version.
 
 | Requirement | Version | Notes |
 |---|---|---|

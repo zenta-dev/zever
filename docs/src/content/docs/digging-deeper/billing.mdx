@@ -32,7 +32,7 @@ BILLING_SECRET_KEY=sk_live_...
 BILLING_SANDBOX=true
 ```
 
-Shared provider keys come from `internal/providers.Common`: `secret_key`
+Shared provider keys come from `shared/providersopt`: `secret_key`
 (Stripe), `api_key` (Paddle), `endpoint` (custom gateway URL), `sandbox`
 (boolean selecting the provider test environment). `endpoint`, when set,
 must be an absolute URL with scheme and host.
@@ -113,9 +113,9 @@ func main() {
 
 | Adapter | Package | Notes |
 |---|---|---|
-| `stub` | `billing/stub` | Default; in-memory, ULID-identified records |
-| `stripe` | `billing/stripe` | Real provider; needs `secret_key` |
-| `paddle` | `billing/paddle` | Real provider; needs `api_key` |
+| `stub` | `adapters/billing/stub` | Default; in-memory, ULID-identified records |
+| `stripe` | `adapters/billing/stripe` | Real provider; needs `secret_key` |
+| `paddle` | `adapters/billing/paddle` | Real provider; needs `api_key` |
 
 ## Production notes
 

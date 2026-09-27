@@ -4,10 +4,10 @@
 package jobs
 
 import (
-	"github.com/zenta-dev/zever/db"
-	"github.com/zenta-dev/zever/log"
-	"github.com/zenta-dev/zever/mailer"
-	"github.com/zenta-dev/zever/notification"
+	"github.com/zenta-dev/zever/core/db"
+	"github.com/zenta-dev/zever/core/log"
+	"github.com/zenta-dev/zever/core/mailer"
+	"github.com/zenta-dev/zever/core/notification"
 )
 
 // Deps carries the resolved services job handlers need. It keeps the global

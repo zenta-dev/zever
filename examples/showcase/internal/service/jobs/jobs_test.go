@@ -12,17 +12,15 @@ import (
 	gen "github.com/zenta-dev/zever/examples/showcase/generated/zenorm/orm/gen/shop"
 	"github.com/zenta-dev/zever/examples/showcase/internal/service/jobs"
 	"github.com/zenta-dev/zever/examples/showcase/internal/service/seed"
+	"github.com/zenta-dev/zever/examples/showcase/internal/testsetup"
 	"github.com/zenta-dev/zever/orm"
-
-	_ "github.com/zenta-dev/zever/db/sqlite"
-	_ "github.com/zenta-dev/zever/log/slog"
-	_ "github.com/zenta-dev/zever/mailer/log"
-	_ "github.com/zenta-dev/zever/notification/log"
 )
 
 // testDeps builds a seeded database and job deps per test.
 func testDeps(t *testing.T) (context.Context, jobs.Deps) {
 	t.Helper()
+
+	testsetup.RegisterDefaults()
 
 	cfg := config.Default()
 	cfg.DB.Options.Path = filepath.Join(t.TempDir(), "jobs.db")

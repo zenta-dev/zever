@@ -4,7 +4,7 @@ import (
 	"context"
 	"fmt"
 
-	"github.com/zenta-dev/zever/db"
+	"github.com/zenta-dev/zever/core/db"
 	"github.com/zenta-dev/zever/orm/dialect"
 	"github.com/zenta-dev/zever/orm/render"
 )

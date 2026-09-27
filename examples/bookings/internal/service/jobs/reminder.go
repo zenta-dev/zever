@@ -5,9 +5,9 @@ import (
 	"fmt"
 	"time"
 
-	"github.com/zenta-dev/zever/db"
+	"github.com/zenta-dev/zever/core/db"
+	"github.com/zenta-dev/zever/core/notification"
 	genapp "github.com/zenta-dev/zever/examples/bookings/generated/zenorm/orm/gen/app"
-	"github.com/zenta-dev/zever/notification"
 	"github.com/zenta-dev/zever/orm"
 )
 

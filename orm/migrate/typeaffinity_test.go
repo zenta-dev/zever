@@ -3,8 +3,8 @@ package migrate
 import (
 	"testing"
 
-	"github.com/zenta-dev/zever/internal/dsl/backend/atlas"
-	"github.com/zenta-dev/zever/internal/dsl/ir"
+	"github.com/zenta-dev/zever/dsl/backend/atlas"
+	"github.com/zenta-dev/zever/dsl/ir"
 )
 
 func strField(name string, scalar ir.ScalarType) *ir.Field {

@@ -5,7 +5,7 @@ import (
 
 	"go.lsp.dev/protocol"
 
-	"github.com/zenta-dev/zever/internal/dsl/ast"
+	"github.com/zenta-dev/zever/dsl/ast"
 )
 
 // referencesAt resolves the cursor to a symbol via renameTargetAt, then

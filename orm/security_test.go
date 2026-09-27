@@ -9,7 +9,7 @@ import (
 	"strings"
 	"testing"
 
-	"github.com/zenta-dev/zever/db"
+	"github.com/zenta-dev/zever/core/db"
 )
 
 // recordingExec is a db.DB that captures every query/args pair instead of

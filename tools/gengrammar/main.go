@@ -14,7 +14,7 @@ import (
 	"os"
 	"path/filepath"
 
-	"github.com/zenta-dev/zever/internal/dsl/gengrammar"
+	"github.com/zenta-dev/zever/dsl/gengrammar"
 )
 
 func main() {

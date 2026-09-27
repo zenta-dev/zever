@@ -645,3 +645,41 @@ func TestPromptMultiSelect_cancel_wrapsError(t *testing.T) {
 		t.Fatalf("promptMultiSelect cancel = %q, want prompt-title wrap", err)
 	}
 }
+
+func TestPromptMultiSelectDefault_preselected_teatest(t *testing.T) {
+	stubPromptTTY(t, true)
+	setPromptInteractive(t)
+
+	// Enter with no toggles: the pre-checked floor value survives, proving
+	// the picker's "floor pre-selected, user can deselect" wiring.
+	stubRunForm(t, func(f *huh.Form) error {
+		driveFormTeatest(t, f, "", promptSpecial(tea.KeyEnter))
+		return nil
+	})
+
+	got, err := promptMultiSelectDefault("Pick", []string{"a", "b"}, []string{"b"})
+	if err != nil {
+		t.Fatalf("promptMultiSelectDefault: %v", err)
+	}
+
+	if len(got) != 1 || got[0] != "b" {
+		t.Fatalf("promptMultiSelectDefault = %v, want [b]", got)
+	}
+}
+
+func TestPromptMultiSelectDefault_emptyOptions(t *testing.T) {
+	stubPromptTTY(t, true)
+	setPromptInteractive(t)
+
+	if _, err := promptMultiSelectDefault("Pick", nil, []string{"a"}); err == nil {
+		t.Fatal("expected error for empty options, got nil")
+	}
+}
+
+func TestPromptMultiSelectDefault_nonInteractive_error(t *testing.T) {
+	stubPromptTTY(t, false)
+
+	if _, err := promptMultiSelectDefault("Pick", []string{"a"}, nil); err == nil {
+		t.Error("promptMultiSelectDefault: expected error, got nil")
+	}
+}

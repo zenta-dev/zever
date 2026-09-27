@@ -7,8 +7,8 @@ import (
 	"io"
 	"os"
 
-	"github.com/zenta-dev/zever/internal/dsl/breaking"
-	"github.com/zenta-dev/zever/internal/dsl/compile"
+	"github.com/zenta-dev/zever/dsl/breaking"
+	"github.com/zenta-dev/zever/dsl/compile"
 )
 
 // expandDirArgs replaces every bare-directory entry in paths with every .zen

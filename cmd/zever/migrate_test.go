@@ -7,8 +7,8 @@ import (
 	"strings"
 	"testing"
 
-	"github.com/zenta-dev/zever/db"
-	"github.com/zenta-dev/zever/internal/dsl/compile"
+	"github.com/zenta-dev/zever/core/db"
+	"github.com/zenta-dev/zever/dsl/compile"
 	"github.com/zenta-dev/zever/orm/migrate"
 )
 

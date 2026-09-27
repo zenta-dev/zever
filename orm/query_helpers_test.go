@@ -6,8 +6,8 @@ import (
 	"strings"
 	"testing"
 
-	"github.com/zenta-dev/zever/db"
-	"github.com/zenta-dev/zever/db/sqlite"
+	"github.com/zenta-dev/zever/adapters/db/sqlite"
+	"github.com/zenta-dev/zever/core/db"
 )
 
 // widget is a small fixture entity shared by the query, examples and

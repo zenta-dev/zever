@@ -16,8 +16,8 @@ import (
 	"os"
 	"sort"
 
-	"github.com/zenta-dev/zever/db"
-	"github.com/zenta-dev/zever/db/sqlite"
+	"github.com/zenta-dev/zever/adapters/db/sqlite"
+	"github.com/zenta-dev/zever/core/db"
 	gen "github.com/zenta-dev/zever/examples/recursive_cte/generated/zenorm/orm/gen/app"
 	"github.com/zenta-dev/zever/orm"
 )

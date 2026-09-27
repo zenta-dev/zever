@@ -5,8 +5,8 @@ import (
 	"io"
 	"os"
 
-	"github.com/zenta-dev/zever/internal/dsl/compile"
-	"github.com/zenta-dev/zever/internal/dsl/resolver"
+	"github.com/zenta-dev/zever/dsl/compile"
+	"github.com/zenta-dev/zever/dsl/resolver"
 )
 
 // BoundariesConfig carries every input runCheckBoundariesWith needs. Screen

@@ -8,8 +8,8 @@ import (
 	"os"
 	"strings"
 
-	"github.com/zenta-dev/zever/db"
-	"github.com/zenta-dev/zever/internal/dsl/backend/atlas"
+	"github.com/zenta-dev/zever/core/db"
+	"github.com/zenta-dev/zever/dsl/backend/atlas"
 	"github.com/zenta-dev/zever/orm/migrate"
 )
 

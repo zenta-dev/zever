@@ -15,8 +15,8 @@ import (
 	"fmt"
 	"os"
 
-	"github.com/zenta-dev/zever/db"
-	"github.com/zenta-dev/zever/db/sqlite"
+	"github.com/zenta-dev/zever/adapters/db/sqlite"
+	"github.com/zenta-dev/zever/core/db"
 	gen "github.com/zenta-dev/zever/examples/fts/generated/zenorm/orm/gen/app"
 	"github.com/zenta-dev/zever/orm"
 	ftssqlite "github.com/zenta-dev/zever/orm/fts/sqlite"

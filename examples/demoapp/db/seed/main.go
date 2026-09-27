@@ -11,10 +11,13 @@ import (
 	"os"
 	"time"
 
+	documentlocal "github.com/zenta-dev/zever/adapters/document/local"
+	medialocal "github.com/zenta-dev/zever/adapters/media/local"
 	"github.com/zenta-dev/zever/config"
 	"github.com/zenta-dev/zever/container"
-	"github.com/zenta-dev/zever/container/adapters"
 	"github.com/zenta-dev/zever/examples/demoapp/internal/service/seed"
+
+	dbsqlite "github.com/zenta-dev/zever/adapters/db/sqlite"
 )
 
 const (
@@ -34,7 +37,9 @@ func run() error {
 	if err != nil {
 		return fmt.Errorf("[seed] load config: %w", err)
 	}
-	adapters.RegisterAll()
+	documentlocal.Register()
+	medialocal.Register()
+	dbsqlite.Register()
 	c := container.New(cfg)
 
 	defer func() {

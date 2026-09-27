@@ -138,6 +138,13 @@ func hasInteractiveFlag(args []string) bool {
 
 // promptMultiSelect shows a huh MultiSelect and returns chosen values.
 func promptMultiSelect(title string, options []string) ([]string, error) {
+	return promptMultiSelectDefault(title, options, nil)
+}
+
+// promptMultiSelectDefault shows a huh MultiSelect with selected
+// pre-checked and returns chosen values. Preselection is advisory: the
+// user can deselect anything, including floor batteries.
+func promptMultiSelectDefault(title string, options, selected []string) ([]string, error) {
 	if err := requireInteractive(); err != nil {
 		return nil, err
 	}
@@ -146,7 +153,7 @@ func promptMultiSelect(title string, options []string) ([]string, error) {
 		return nil, fmt.Errorf("no options for %q", title)
 	}
 
-	var vals []string
+	vals := append([]string(nil), selected...)
 
 	opts := make([]huh.Option[string], 0, len(options))
 	for _, o := range options {

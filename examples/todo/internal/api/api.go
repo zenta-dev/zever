@@ -6,10 +6,10 @@ import (
 	"net/http"
 	"strings"
 
-	"github.com/zenta-dev/zever/auth"
-	"github.com/zenta-dev/zever/db"
-	"github.com/zenta-dev/zever/password"
-	"github.com/zenta-dev/zever/router"
+	"github.com/zenta-dev/zever/core/auth"
+	"github.com/zenta-dev/zever/core/db"
+	"github.com/zenta-dev/zever/core/password"
+	"github.com/zenta-dev/zever/core/router"
 )
 
 // API holds the dependencies note and user handlers need.

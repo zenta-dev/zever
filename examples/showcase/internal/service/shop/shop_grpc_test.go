@@ -16,25 +16,20 @@ import (
 	"google.golang.org/grpc/status"
 	"google.golang.org/protobuf/encoding/protojson"
 
-	"github.com/zenta-dev/zever/auth"
-	"github.com/zenta-dev/zever/authz"
+	"github.com/zenta-dev/zever/adapters/permission/rbac"
 	"github.com/zenta-dev/zever/config"
 	"github.com/zenta-dev/zever/container"
-	"github.com/zenta-dev/zever/db"
+	"github.com/zenta-dev/zever/core/auth"
+	"github.com/zenta-dev/zever/core/authz"
+	"github.com/zenta-dev/zever/core/db"
+	"github.com/zenta-dev/zever/core/permission"
+	"github.com/zenta-dev/zever/core/queue"
 	"github.com/zenta-dev/zever/examples/showcase/internal/service/seed"
 	shopsvc "github.com/zenta-dev/zever/examples/showcase/internal/service/shop"
-	"github.com/zenta-dev/zever/permission"
-	"github.com/zenta-dev/zever/permission/rbac"
-	"github.com/zenta-dev/zever/queue"
+	"github.com/zenta-dev/zever/examples/showcase/internal/testsetup"
 
 	genshop "github.com/zenta-dev/zever/examples/showcase/generated/gogen/shop"
 	pb "github.com/zenta-dev/zever/examples/showcase/generated/protogogen/shop"
-
-	_ "github.com/zenta-dev/zever/auth/jwt"
-	_ "github.com/zenta-dev/zever/db/sqlite"
-	_ "github.com/zenta-dev/zever/log/slog"
-	_ "github.com/zenta-dev/zever/queue/memory"
-	_ "github.com/zenta-dev/zever/router/stdhttp"
 )
 
 // grpcParityJWTSecret signs the tokens this fixture issues.
@@ -55,6 +50,8 @@ type grpcParityFixture struct {
 // newGRPCFixture builds a fresh sqlite-backed service per test.
 func newGRPCFixture(t *testing.T) *grpcParityFixture {
 	t.Helper()
+
+	testsetup.RegisterDefaults()
 
 	cfg := config.Default()
 	cfg.DB.Options.Path = filepath.Join(t.TempDir(), "test.db")

@@ -10,12 +10,12 @@ import (
 	"strings"
 	"sync"
 
-	"github.com/zenta-dev/zever/db"
-	dbpostgres "github.com/zenta-dev/zever/db/postgres"
-	dbsqlite "github.com/zenta-dev/zever/db/sqlite"
-	"github.com/zenta-dev/zever/internal/dsl/backend/atlas"
-	"github.com/zenta-dev/zever/internal/dsl/compile"
-	"github.com/zenta-dev/zever/internal/dsl/ir"
+	dbpostgres "github.com/zenta-dev/zever/adapters/db/postgres"
+	dbsqlite "github.com/zenta-dev/zever/adapters/db/sqlite"
+	"github.com/zenta-dev/zever/core/db"
+	"github.com/zenta-dev/zever/dsl/backend/atlas"
+	"github.com/zenta-dev/zever/dsl/compile"
+	"github.com/zenta-dev/zever/dsl/ir"
 	"github.com/zenta-dev/zever/orm/migrate"
 )
 

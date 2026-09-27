@@ -3,8 +3,8 @@ package orm
 import (
 	"testing"
 
-	"github.com/zenta-dev/zever/db"
-	"github.com/zenta-dev/zever/db/sqlite"
+	"github.com/zenta-dev/zever/adapters/db/sqlite"
+	"github.com/zenta-dev/zever/core/db"
 )
 
 func TestJSONStepConstructors(t *testing.T) {

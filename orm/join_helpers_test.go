@@ -3,8 +3,8 @@ package orm
 import (
 	"context"
 
-	"github.com/zenta-dev/zever/db"
-	"github.com/zenta-dev/zever/db/sqlite"
+	"github.com/zenta-dev/zever/adapters/db/sqlite"
+	"github.com/zenta-dev/zever/core/db"
 )
 
 // ormTestCleaner is the subset of *testing.T/*testing.B a fixture helper

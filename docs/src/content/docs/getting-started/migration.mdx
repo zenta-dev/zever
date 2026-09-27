@@ -1,0 +1,92 @@
+---
+title: Migration to Multi-Module Layout
+description: Old flat imports to core/adapters/shared modules, plus workspace and release notes.
+---
+
+## Purpose + When to use
+
+This page migrates code written against the old flat layout (top-level `auth/`, `db/`, `cache/`, `internal/dsl/`, `container/adapters` bundles) to the multi-module monorepo (`core/<b>`, `adapters/<b>/<a>`, `shared/*`, `dsl/`). Follow it when a bump breaks imports or when resolution fails with `UnknownAdapterError`.
+
+Scaffold floor is `auth, db, log, router, scheduler`. Extra batteries come from the `zever new` battery picker. `zever add` is planned (no `cmd/zever/add.go` yet) - until it lands, add batteries by hand in `zever.yaml` plus `app.go` (see below).
+
+## Prerequisites and mental model
+
+- `core/<b>` = battery interface + `Register`/`Open` registry (container resolves).
+- `adapters/<b>/<a>` = one Go module per adapter; `Register()` wires it into its `core` registry.
+- `shared/*` = SDK-free helpers (one module each).
+- `config`, `container`, `orm`, `dsl`, `cmd/zever` = separate modules.
+- Dev workflow uses the committed `go.work` at the repo root (143 `use` entries covering every module): `go build/test ./...` from the root resolves via the workspace; per-module standalone commands run with `GOWORK=off` in CI.
+- Releases are lockstep: one version, per-module tags `<path>/vX.Y.Z` via `tools/tag-release.sh`.
+
+## Old to new import table
+
+| Old import | New import | Notes |
+|---|---|---|
+| `github.com/zenta-dev/zever/auth` | `github.com/zenta-dev/zever/core/auth` | interface + registry |
+| `github.com/zenta-dev/zever/auth/jwt` | `github.com/zenta-dev/zever/adapters/auth/jwt` | `jwt.Register()` |
+| `github.com/zenta-dev/zever/db` | `github.com/zenta-dev/zever/core/db` | interface + registry |
+| `github.com/zenta-dev/zever/db/sqlite` | `github.com/zenta-dev/zever/adapters/db/sqlite` | `sqlite.Register()` |
+| `github.com/zenta-dev/zever/db/postgres` | `github.com/zenta-dev/zever/adapters/db/postgres` | `postgres.Register()` |
+| `github.com/zenta-dev/zever/cache` | `github.com/zenta-dev/zever/core/cache` | interface + registry |
+| `github.com/zenta-dev/zever/cache/redis` | `github.com/zenta-dev/zever/adapters/cache/redis` | `redis.Register()` |
+| `github.com/zenta-dev/zever/queue/redis` | `github.com/zenta-dev/zever/adapters/queue/redis` | `redis.Register()` |
+| `github.com/zenta-dev/zever/router/fiber` | `github.com/zenta-dev/zever/adapters/router/fiber` | `fiber.Register()` |
+| `github.com/zenta-dev/zever/password/argon2` | `github.com/zenta-dev/zever/adapters/password/argon2` | `argon2.Register()` |
+| `github.com/zenta-dev/zever/scheduler/embedded` | `github.com/zenta-dev/zever/adapters/scheduler/embedded` | `embedded.Register()` |
+| `github.com/zenta-dev/zever/codec` | `github.com/zenta-dev/zever/shared/codec` | helper, no registry |
+| `github.com/zenta-dev/zever/internal/redis` | `github.com/zenta-dev/zever/shared/redisclient` + `shared/redisopt` | split: client vs options |
+| `github.com/zenta-dev/zever/internal/retry` | `github.com/zenta-dev/zever/shared/retry` | helper |
+| `github.com/zenta-dev/zever/internal/endpoint` | `github.com/zenta-dev/zever/shared/endpoint` | helper |
+| `github.com/zenta-dev/zever/internal/dsl/...` | `github.com/zenta-dev/zever/dsl/...` | compiler frontend moved |
+| `github.com/zenta-dev/zever/container/adapters` (flat bundle) | per-adapter `Register()` calls | flat bundle deleted; `RegisterAll` deleted |
+
+Same pattern for every other battery: `core/<b>` for the interface, `adapters/<b>/<a>` for each driver. Full per-adapter module list: [Adapters Matrix](../reference/adapters-matrix/).
+
+## Manual migration (planned script)
+
+`tools/migrate-imports.sh` is planned and does not exist yet. Until it lands, migrate with `sed`:
+
+```sh
+# dry run first
+grep -rn "zenta-dev/zever/auth\|zenta-dev/zever/db\|zenta-dev/zever/cache\|zenta-dev/zever/internal/dsl\|zenta-dev/zever/codec\|container/adapters" --include="*.go" . | head -30
+sed -i 's#zenta-dev/zever/auth"#zenta-dev/zever/core/auth"#; s#zenta-dev/zever/db"#zenta-dev/zever/core/db"#; s#zenta-dev/zever/cache"#zenta-dev/zever/core/cache"#; s#zenta-dev/zever/queue"#zenta-dev/zever/core/queue"#; s#zenta-dev/zever/codec#zenta-dev/zever/shared/codec#; s#zenta-dev/zever/internal/dsl#zenta-dev/zever/dsl#' $(grep -rl "zenta-dev/zever" --include="*.go" .)
+go mod tidy   # per touched module
+```
+
+Then add the adapter modules you resolve plus their `Register()` calls:
+
+```go
+import (
+    dbsqlite "github.com/zenta-dev/zever/adapters/db/sqlite"
+    cacheredis "github.com/zenta-dev/zever/adapters/cache/redis"
+)
+
+dbsqlite.Register()
+cacheredis.Register()
+```
+
+Unregistered adapters fail resolution with `UnknownAdapterError` hinting at the forgotten call.
+
+## Workspace
+
+```sh
+go work init ./config ./container ./orm ./dsl ./cmd/zever ./core/db ./adapters/db/sqlite
+go work use ./core/cache ./adapters/cache/redis ./shared/redisclient
+go build ./...
+```
+
+`go.work` is committed at the repo root (143 `use` entries covering every module) and is the supported dev workflow: `go build ./...` from the root resolves via the workspace, while per-module standalone commands run with `GOWORK=off` in CI.
+
+## Troubleshooting
+
+| Symptom | Cause | Fix |
+|---|---|---|
+| `UnknownAdapterError` after bump | Adapter module not required or `Register()` not called | `go get` the `adapters/<b>/<a>` module, call `Register()` before `container.New` |
+| `go build` fails importing `internal/dsl` | Path moved to `dsl/` | Rewrite to `github.com/zenta-dev/zever/dsl/...` |
+| `container/adapters` import fails | Flat bundles deleted | Replace with per-adapter `Register()` calls |
+
+## See also
+
+- [Adapters Matrix](../reference/adapters-matrix/) for every adapter module path and `Register()` call
+- [Directory Structure](./directory-structure/) for the module layout
+- [Installation](./installation/) for toolchain and first build

@@ -94,8 +94,13 @@ func TestRunNewScaffoldsAndBuilds(t *testing.T) {
 
 	for _, fragment := range []string{
 		"module acme",
-		"replace github.com/zenta-dev/zever => ",
-		"require github.com/zenta-dev/zever ",
+		"replace github.com/zenta-dev/zever/container => ",
+		"require github.com/zenta-dev/zever/container ",
+		"require github.com/zenta-dev/zever/config ",
+		"require github.com/zenta-dev/zever/core/log ",
+		"require github.com/zenta-dev/zever/core/router ",
+		"require github.com/zenta-dev/zever/adapters/log/slog ",
+		"require github.com/zenta-dev/zever/adapters/router/stdhttp ",
 	} {
 		if !strings.Contains(gomod, fragment) {
 			t.Fatalf("go.mod lacks %q:\n%s", fragment, gomod)
@@ -177,7 +182,7 @@ func TestRunNewAutoDetectsFrameworkCheckout(t *testing.T) {
 	}
 
 	gomod := readFile(t, filepath.Join(sandbox, "gamma", "go.mod"))
-	if !strings.Contains(gomod, "replace github.com/zenta-dev/zever => ") {
+	if !strings.Contains(gomod, "replace github.com/zenta-dev/zever/container => ") {
 		t.Fatalf("expected an auto-detected local replace directive:\n%s", gomod)
 	}
 }
@@ -195,10 +200,10 @@ func TestRunNewNoFrameworkCheckoutFound(t *testing.T) {
 	}
 
 	gomod := readFile(t, filepath.Join(workDir, "delta", "go.mod"))
-	if strings.Contains(gomod, "replace github.com/zenta-dev/zever => ") {
+	if strings.Contains(gomod, "replace github.com/zenta-dev/zever/container => ") {
 		t.Fatalf("did not expect replace for upstream default:\n%s", gomod)
 	}
-	if !strings.Contains(gomod, "require github.com/zenta-dev/zever v0.4.0") {
+	if !strings.Contains(gomod, "require github.com/zenta-dev/zever/container v0.4.0") {
 		t.Fatalf("want upstream require:\n%s", gomod)
 	}
 }
@@ -245,7 +250,7 @@ func TestRunNewFrameworkVersionSkipsReplace(t *testing.T) {
 		t.Fatalf("did not expect a replace directive:\n%s", gomod)
 	}
 
-	for _, fragment := range []string{"module zeta", "require github.com/zenta-dev/zever v1.2.3"} {
+	for _, fragment := range []string{"module zeta", "require github.com/zenta-dev/zever/container v1.2.3"} {
 		if !strings.Contains(gomod, fragment) {
 			t.Fatalf("go.mod lacks %q:\n%s", fragment, gomod)
 		}
@@ -390,7 +395,7 @@ func TestRunNewWritesConfigSchema(t *testing.T) {
 	}
 }
 
-// TestRunNewAppGoImportsMatchZeverYamlBatteries proves app.go's blank
+// TestRunNewAppGoImportsMatchZeverYamlBatteries proves app.go's adapter
 // imports are exactly the services zever.yaml lists -- the two files can
 // never drift, because both are rendered from the same NewConfig.Batteries.
 func TestRunNewAppGoImportsMatchZeverYamlBatteries(t *testing.T) {
@@ -405,17 +410,20 @@ func TestRunNewAppGoImportsMatchZeverYamlBatteries(t *testing.T) {
 
 	app := readFile(t, filepath.Join(workDir, "theta", "internal", "app", "app.go"))
 
-	for _, b := range coreBatteries {
-		marker := "\"github.com/zenta-dev/zever/" + b + "/"
-		if !strings.Contains(app, marker) {
-			t.Errorf("app.go missing a blank import for core service %q:\n%s", b, app)
+	for _, sel := range coreBatterySelections() {
+		alias, path, call := adapterBinding(sel)
+
+		for _, marker := range []string{`"` + path + `"`, alias + ` "` + path + `"`, call} {
+			if !strings.Contains(app, marker) {
+				t.Errorf("app.go missing %q for core service %q:\n%s", marker, sel.Battery, app)
+			}
 		}
 	}
 
 	// cache is not core and nothing generated resolves c.Cache(), so it must
 	// not be imported by default.
-	if strings.Contains(app, "cache/memory") {
-		t.Fatalf("app.go unexpectedly imports cache/memory with no cache service selected:\n%s", app)
+	if strings.Contains(app, "adapters/cache/memory") {
+		t.Fatalf("app.go unexpectedly imports adapters/cache/memory with no cache service selected:\n%s", app)
 	}
 }
 
@@ -563,6 +571,92 @@ func TestNonCoreBatteryNamesExcludesCore(t *testing.T) {
 // TestAllServiceAdaptersMatchDefault is the drift guard: every service the
 // runtime knows must appear in allServiceAdapters with the live default
 // adapter, and vice versa.
+// TestNestedModuleDirsMatchCheckout pins nestedModuleDirs against the
+// checkout: every adapters/<battery>/<adapter> go.mod must be listed, and
+// every listed directory must contain a go.mod. Without this, scaffolded
+// projects silently lose module-graph replaces for newly extracted
+// adapters. tools/ stays excluded (separate release line, never a scaffold
+// dependency).
+func TestNestedModuleDirsMatchCheckout(t *testing.T) {
+	t.Parallel()
+
+	root := repoRootAbs(t)
+
+	found := map[string]bool{}
+	for _, dir := range nestedModuleDirs {
+		if _, err := os.Stat(filepath.Join(root, dir, "go.mod")); err != nil {
+			t.Errorf("nestedModuleDirs[%q] has no go.mod: %v", dir, err)
+		}
+
+		found[dir] = true
+	}
+
+	batteries, err := os.ReadDir(filepath.Join(root, "adapters"))
+	if err != nil {
+		t.Fatalf("read adapters: %v", err)
+	}
+
+	for _, battery := range batteries {
+		if !battery.IsDir() || battery.Name() == "tools" || strings.HasPrefix(battery.Name(), ".") {
+			continue
+		}
+
+		impls, ierr := os.ReadDir(filepath.Join(root, "adapters", battery.Name()))
+		if ierr != nil {
+			t.Fatalf("read adapters/%s: %v", battery.Name(), ierr)
+		}
+
+		for _, impl := range impls {
+			if !impl.IsDir() {
+				continue
+			}
+
+			dir := "adapters/" + battery.Name() + "/" + impl.Name()
+
+			if _, serr := os.Stat(filepath.Join(root, dir, "go.mod")); serr != nil {
+				continue
+			}
+
+			if !found[dir] {
+				t.Errorf("nested module %q missing from nestedModuleDirs", dir)
+			}
+		}
+	}
+
+	// sharedModuleDirs gets the same drift guard: every shared go.mod must
+	// be listed, and every listed directory must contain one.
+	sharedFound := map[string]bool{}
+
+	for _, dir := range sharedModuleDirs {
+		if _, serr := os.Stat(filepath.Join(root, dir, "go.mod")); serr != nil {
+			t.Errorf("sharedModuleDirs[%q] has no go.mod: %v", dir, serr)
+		}
+
+		sharedFound[dir] = true
+	}
+
+	shared, err := os.ReadDir(filepath.Join(root, "shared"))
+	if err != nil {
+		t.Fatalf("read shared: %v", err)
+	}
+
+	for _, entry := range shared {
+		if !entry.IsDir() || strings.HasPrefix(entry.Name(), ".") {
+			continue
+		}
+
+		dir := "shared/" + entry.Name()
+
+		if _, err := os.Stat(filepath.Join(root, dir, "go.mod")); err != nil {
+			continue
+		}
+
+		if !sharedFound[dir] {
+			t.Errorf("shared module %q missing from sharedModuleDirs", dir)
+		}
+	}
+}
+
 func TestAllServiceAdaptersMatchDefault(t *testing.T) {
 	live := config.Default().RedactedServices()
 
@@ -708,5 +802,444 @@ func TestWriteNewProjectRefusesClobber(t *testing.T) {
 
 	if got := readFile(t, filepath.Join(out, "schema", "app.zen")); got == handwritten {
 		t.Fatal("--force did not overwrite the stub schema")
+	}
+}
+
+// --- opt-in picker tests ---
+
+// TestParseBatteriesFlag pins --batteries parsing: sorted de-duplicated
+// output, empty means none, unknown names fail closed.
+func TestParseBatteriesFlag(t *testing.T) {
+	t.Run("valid", func(t *testing.T) {
+		got, err := parseBatteriesFlag("queue,db,db")
+		if err != nil {
+			t.Fatalf("parseBatteriesFlag: %v", err)
+		}
+
+		if len(got) != 2 || got[0] != "db" || got[1] != "queue" {
+			t.Fatalf("parseBatteriesFlag = %v, want [db queue]", got)
+		}
+	})
+
+	t.Run("empty", func(t *testing.T) {
+		for _, raw := range []string{"", "  ", " , "} {
+			got, err := parseBatteriesFlag(raw)
+			if err != nil {
+				t.Fatalf("parseBatteriesFlag(%q): %v", raw, err)
+			}
+
+			if len(got) != 0 {
+				t.Fatalf("parseBatteriesFlag(%q) = %v, want empty", raw, got)
+			}
+		}
+	})
+
+	t.Run("unknown", func(t *testing.T) {
+		if _, err := parseBatteriesFlag("db,nope"); err == nil {
+			t.Fatal("expected an error for an unknown battery")
+		} else if !strings.Contains(err.Error(), "nope") {
+			t.Fatalf("error %q does not name the bad battery", err)
+		}
+	})
+}
+
+// TestParseAdaptersFlag pins --adapters parsing: pairs, malformed entries,
+// unknown batteries and unknown adapters all fail closed.
+func TestParseAdaptersFlag(t *testing.T) {
+	t.Run("valid", func(t *testing.T) {
+		got, err := parseAdaptersFlag("db=postgres,router=fiber")
+		if err != nil {
+			t.Fatalf("parseAdaptersFlag: %v", err)
+		}
+
+		if got["db"] != "postgres" || got["router"] != "fiber" {
+			t.Fatalf("parseAdaptersFlag = %v, want db=postgres router=fiber", got)
+		}
+	})
+
+	t.Run("empty", func(t *testing.T) {
+		got, err := parseAdaptersFlag("")
+		if err != nil {
+			t.Fatalf("parseAdaptersFlag: %v", err)
+		}
+
+		if len(got) != 0 {
+			t.Fatalf("parseAdaptersFlag = %v, want empty", got)
+		}
+	})
+
+	t.Run("malformed", func(t *testing.T) {
+		for _, raw := range []string{"db", "db=", "=postgres", "db-postgres"} {
+			if _, err := parseAdaptersFlag(raw); err == nil {
+				t.Errorf("expected an error for %q", raw)
+			}
+		}
+	})
+
+	t.Run("unknown battery", func(t *testing.T) {
+		if _, err := parseAdaptersFlag("nope=memory"); err == nil {
+			t.Fatal("expected an error for an unknown battery")
+		}
+	})
+
+	t.Run("unknown adapter", func(t *testing.T) {
+		if _, err := parseAdaptersFlag("db=oracle"); err == nil {
+			t.Fatal("expected an error for an unknown adapter")
+		}
+	})
+}
+
+// TestBatteryAdapters pins the picker's adapter universe: derived from
+// nestedModuleDirs, default first, covering every known service, with the
+// password dir exception mapped back to argon2id.
+func TestBatteryAdapters(t *testing.T) {
+	all := batteryAdapters()
+
+	if len(all) != len(allServiceAdapters) {
+		t.Fatalf("batteryAdapters covers %d batteries, want %d", len(all), len(allServiceAdapters))
+	}
+
+	for battery, def := range allServiceAdapters {
+		choices := all[battery]
+		if len(choices) == 0 {
+			t.Errorf("batteryAdapters[%q] empty", battery)
+			continue
+		}
+
+		if choices[0] != def {
+			t.Errorf("batteryAdapters[%q][0] = %q, want default %q", battery, choices[0], def)
+		}
+
+		if !sort.StringsAreSorted(choices[1:]) {
+			t.Errorf("batteryAdapters[%q] tail not sorted: %v", battery, choices)
+		}
+	}
+
+	db := all["db"]
+	if !batteryPicked(db, "sqlite") || !batteryPicked(db, "postgres") {
+		t.Fatalf("batteryAdapters[db] = %v, want sqlite and postgres", db)
+	}
+
+	if pw := all["password"]; !batteryPicked(pw, "argon2id") {
+		t.Fatalf("batteryAdapters[password] = %v, want PHC-canonical argon2id", pw)
+	}
+}
+
+// TestRunNewBatteriesFlagScaffoldsExtras proves --batteries extends the
+// floor set in both zever.yaml and go.mod without any prompting.
+func TestRunNewBatteriesFlagScaffoldsExtras(t *testing.T) {
+	resetInteractiveMode(t)
+
+	repoRoot := repoRootAbs(t)
+	workDir := t.TempDir()
+	withWorkingDir(t, workDir)
+	t.Setenv(zeverFrameworkPathEnv, repoRoot)
+
+	if err := runNew([]string{"flagapp", "--batteries", "db,cache"}); err != nil {
+		t.Fatalf("runNew: %v", err)
+	}
+
+	yamlContent := readFile(t, filepath.Join(workDir, "flagapp", "zever.yaml"))
+
+	var doc map[string]any
+
+	if err := yaml.Unmarshal([]byte(yamlContent), &doc); err != nil {
+		t.Fatalf("parse zever.yaml: %v", err)
+	}
+
+	for _, want := range []string{"log", "router", "db", "cache"} {
+		if _, ok := doc[want]; !ok {
+			t.Errorf("zever.yaml missing %q: %v", want, doc)
+		}
+	}
+
+	gomod := readFile(t, filepath.Join(workDir, "flagapp", "go.mod"))
+
+	for _, fragment := range []string{
+		"require github.com/zenta-dev/zever/adapters/db/sqlite ",
+		"require github.com/zenta-dev/zever/adapters/cache/memory ",
+	} {
+		if !strings.Contains(gomod, fragment) {
+			t.Errorf("go.mod lacks %q:\n%s", fragment, gomod)
+		}
+	}
+}
+
+// TestRunNewAdaptersFlagOverrides proves --adapters steers the adapter
+// pick and implies its battery, so --adapters db=postgres alone scaffolds
+// db on postgres.
+func TestRunNewAdaptersFlagOverrides(t *testing.T) {
+	resetInteractiveMode(t)
+
+	repoRoot := repoRootAbs(t)
+	workDir := t.TempDir()
+	withWorkingDir(t, workDir)
+	t.Setenv(zeverFrameworkPathEnv, repoRoot)
+
+	if err := runNew([]string{"adaptapp", "--adapters", "db=postgres"}); err != nil {
+		t.Fatalf("runNew: %v", err)
+	}
+
+	yamlContent := readFile(t, filepath.Join(workDir, "adaptapp", "zever.yaml"))
+
+	var doc map[string]batteryYAML
+
+	if err := yaml.Unmarshal([]byte(yamlContent), &doc); err != nil {
+		t.Fatalf("parse zever.yaml: %v", err)
+	}
+
+	if doc["db"].Adapter != "postgres" {
+		t.Fatalf("zever.yaml db adapter = %q, want postgres: %v", doc["db"].Adapter, doc)
+	}
+
+	gomod := readFile(t, filepath.Join(workDir, "adaptapp", "go.mod"))
+
+	if !strings.Contains(gomod, "require github.com/zenta-dev/zever/adapters/db/postgres ") {
+		t.Fatalf("go.mod lacks the postgres adapter require:\n%s", gomod)
+	}
+
+	if strings.Contains(gomod, "require github.com/zenta-dev/zever/adapters/db/sqlite ") {
+		t.Fatalf("go.mod unexpectedly requires sqlite alongside postgres:\n%s", gomod)
+	}
+}
+
+// TestRunNewFlagOnlyMatchesFloorGolden proves the flags/floor path is
+// byte-identical to the historical floor-only scaffold: no flags means no
+// battery drift.
+func TestRunNewFlagOnlyMatchesFloorGolden(t *testing.T) {
+	resetInteractiveMode(t)
+
+	repoRoot := repoRootAbs(t)
+	workDir := t.TempDir()
+	withWorkingDir(t, workDir)
+	t.Setenv(zeverFrameworkPathEnv, repoRoot)
+
+	if err := runNew([]string{"floorapp"}); err != nil {
+		t.Fatalf("runNew: %v", err)
+	}
+
+	yamlContent := readFile(t, filepath.Join(workDir, "floorapp", "zever.yaml"))
+
+	var doc map[string]any
+
+	if err := yaml.Unmarshal([]byte(yamlContent), &doc); err != nil {
+		t.Fatalf("parse zever.yaml: %v", err)
+	}
+
+	if len(doc) != len(coreBatteries) {
+		t.Fatalf("zever.yaml lists %d services, want exactly the %d core ones: %v", len(doc), len(coreBatteries), doc)
+	}
+}
+
+// TestListBatteries prints the name+default table to stdout and exits 0
+// without needing an app name or scaffolding anything.
+func TestListBatteries(t *testing.T) {
+	resetInteractiveMode(t)
+	workDir := t.TempDir()
+	withWorkingDir(t, workDir)
+
+	out := captureStdout(t, func() {
+		if err := runNew([]string{"--list-batteries"}); err != nil {
+			t.Fatalf("runNew --list-batteries: %v", err)
+		}
+	})
+
+	for _, want := range []string{"BATTERY", "db sqlite", "log slog (floor)", "router stdhttp (floor)"} {
+		if !strings.Contains(out, want) {
+			t.Errorf("list output missing %q:\n%s", want, out)
+		}
+	}
+
+	if entries, _ := os.ReadDir(workDir); len(entries) != 0 {
+		t.Fatalf("--list-batteries scaffolded files: %v", entries)
+	}
+}
+
+// TestRunNewYesSkipsPicker proves -y/--yes stays on the floor+flags path
+// even when interactive input was requested globally.
+func TestRunNewYesSkipsPicker(t *testing.T) {
+	resetInteractiveMode(t)
+	interactiveMode = true
+
+	repoRoot := repoRootAbs(t)
+	workDir := t.TempDir()
+	withWorkingDir(t, workDir)
+	t.Setenv(zeverFrameworkPathEnv, repoRoot)
+
+	stubPickerFuncs(t, nil, nil, true)
+
+	if err := runNew([]string{"yesapp", "-y"}); err != nil {
+		t.Fatalf("runNew -y: %v", err)
+	}
+
+	yamlContent := readFile(t, filepath.Join(workDir, "yesapp", "zever.yaml"))
+
+	var doc map[string]any
+
+	if err := yaml.Unmarshal([]byte(yamlContent), &doc); err != nil {
+		t.Fatalf("parse zever.yaml: %v", err)
+	}
+
+	if len(doc) != len(coreBatteries) {
+		t.Fatalf("-y scaffolded %d services, want exactly the %d floor ones: %v", len(doc), len(coreBatteries), doc)
+	}
+}
+
+// TestRunNewInteractiveWithoutTTYFails proves the off-TTY picker path
+// errors (TTY, never a hang) and leaves no scaffold behind.
+func TestRunNewInteractiveWithoutTTYFails(t *testing.T) {
+	stubPromptTTY(t, false)
+	setPromptInteractive(t)
+
+	workDir := t.TempDir()
+	withWorkingDir(t, workDir)
+
+	err := runNew([]string{"ttyapp", "--interactive"})
+	if err == nil {
+		t.Fatal("expected a TTY error, got nil")
+	}
+
+	if !strings.Contains(err.Error(), "TTY") {
+		t.Fatalf("error = %q, want mention of TTY", err)
+	}
+
+	if _, statErr := os.Stat(filepath.Join(workDir, "ttyapp")); !os.IsNotExist(statErr) {
+		t.Fatal("--interactive without TTY left a scaffold behind")
+	}
+}
+
+// TestRunNewOffTTYArityFailsFast proves the bare off-TTY misuse path is
+// untouched: usage + error, no prompt, no hang.
+func TestRunNewOffTTYArityFailsFast(t *testing.T) {
+	stubPromptTTY(t, false)
+
+	workDir := t.TempDir()
+	withWorkingDir(t, workDir)
+
+	if err := runNew(nil); err == nil {
+		t.Fatal("expected an arity error, got nil")
+	}
+}
+
+// stubPickerFuncs replaces the picker seams for a test: batteries/adapters
+// are the canned answers (nil = prompt reached only when the test stubs a
+// failure), failOnCall turns any prompt attempt into a test failure for
+// flag-parity proofs.
+func stubPickerFuncs(t *testing.T, batteries []string, adapters map[string]string, failOnCall bool) {
+	t.Helper()
+
+	prevBatteries := pickBatteriesFunc
+	prevAdapter := pickAdapterFunc
+	t.Cleanup(func() { pickBatteriesFunc, pickAdapterFunc = prevBatteries, prevAdapter })
+
+	pickBatteriesFunc = func(_, _ []string) ([]string, error) {
+		if failOnCall {
+			t.Fatal("battery prompt ran despite flags covering it")
+		}
+
+		return batteries, nil
+	}
+	pickAdapterFunc = func(battery string, options []string) (string, error) {
+		if failOnCall {
+			t.Fatalf("adapter prompt ran for %q despite flags covering it", battery)
+		}
+
+		if a, ok := adapters[battery]; ok {
+			return a, nil
+		}
+
+		return options[0], nil
+	}
+}
+
+// TestRunNewPickerStubbed proves the wizard feeds batteriesFor and the
+// adapter overrides: canned picks land in zever.yaml and go.mod.
+func TestRunNewPickerStubbed(t *testing.T) {
+	stubPromptTTY(t, true)
+	setPromptInteractive(t)
+	stubPickerFuncs(t, []string{"log", "router", "db"}, map[string]string{"db": "postgres"}, false)
+
+	repoRoot := repoRootAbs(t)
+	workDir := t.TempDir()
+	withWorkingDir(t, workDir)
+	t.Setenv(zeverFrameworkPathEnv, repoRoot)
+
+	if err := runNew([]string{"pickapp", "--interactive"}); err != nil {
+		t.Fatalf("runNew --interactive: %v", err)
+	}
+
+	yamlContent := readFile(t, filepath.Join(workDir, "pickapp", "zever.yaml"))
+
+	var doc map[string]batteryYAML
+
+	if err := yaml.Unmarshal([]byte(yamlContent), &doc); err != nil {
+		t.Fatalf("parse zever.yaml: %v", err)
+	}
+
+	if doc["db"].Adapter != "postgres" {
+		t.Fatalf("zever.yaml db adapter = %q, want postgres: %v", doc["db"].Adapter, doc)
+	}
+
+	gomod := readFile(t, filepath.Join(workDir, "pickapp", "go.mod"))
+
+	if !strings.Contains(gomod, "require github.com/zenta-dev/zever/adapters/db/postgres ") {
+		t.Fatalf("go.mod lacks the picked postgres adapter:\n%s", gomod)
+	}
+}
+
+// TestRunNewFlagsSkipPickerPrompts is the flag-parity proof: with
+// --batteries and --adapters covering every prompt, the wizard must not
+// prompt at all.
+func TestRunNewFlagsSkipPickerPrompts(t *testing.T) {
+	stubPromptTTY(t, true)
+	setPromptInteractive(t)
+	stubPickerFuncs(t, nil, nil, true)
+
+	repoRoot := repoRootAbs(t)
+	workDir := t.TempDir()
+	withWorkingDir(t, workDir)
+	t.Setenv(zeverFrameworkPathEnv, repoRoot)
+
+	args := []string{"parityapp", "--interactive", "--batteries", "db", "--adapters", "db=postgres"}
+	if err := runNew(args); err != nil {
+		t.Fatalf("runNew: %v", err)
+	}
+
+	yamlContent := readFile(t, filepath.Join(workDir, "parityapp", "zever.yaml"))
+
+	var doc map[string]batteryYAML
+
+	if err := yaml.Unmarshal([]byte(yamlContent), &doc); err != nil {
+		t.Fatalf("parse zever.yaml: %v", err)
+	}
+
+	if doc["db"].Adapter != "postgres" {
+		t.Fatalf("zever.yaml db adapter = %q, want postgres: %v", doc["db"].Adapter, doc)
+	}
+}
+
+// TestBatterySelectionsAdaptersMap pins the render seam: the Adapters map
+// steers every battery, and the legacy fields still win over it.
+func TestBatterySelectionsAdaptersMap(t *testing.T) {
+	cfg := NewConfig{
+		Batteries: []string{"db", "router"},
+		Adapters:  map[string]string{"db": "postgres", "router": "fiber"},
+	}
+
+	sel := cfg.batterySelections()
+	byName := map[string]string{}
+
+	for _, s := range sel {
+		byName[s.Battery] = s.Adapter
+	}
+
+	if byName["db"] != "postgres" || byName["router"] != "fiber" {
+		t.Fatalf("batterySelections = %v, want db=postgres router=fiber", byName)
+	}
+
+	cfg.DBAdapter = "sqlite"
+
+	if got := cfg.batterySelections()[0].Adapter; got != "sqlite" {
+		t.Fatalf("legacy DBAdapter lost to the map: %q", got)
 	}
 }

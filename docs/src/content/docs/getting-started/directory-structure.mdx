@@ -1,24 +1,28 @@
 ---
 title: Directory Structure
-description: Single-module layout with top-level services, container, ORM, DSL compiler, and CLI.
+description: Multi-module layout with core batteries, per-adapter modules, shared helpers, container, ORM, DSL compiler, and CLI.
 ---
 
 ## Purpose + When to use
 
-This page maps the repo tree so you can find any package in seconds: top-level services, `config/`, `container/`, `orm/`, `internal/dsl/`, and `cmd/zever/`. Read it on day one, before adding a service, and before reviewing a PR that touches an unfamiliar area.
+This page maps the repo tree so you can find any package in seconds: `core/<b>`, `adapters/<b>/<a>`, `shared/*`, `config/`, `container/`, `orm/`, `dsl/`, and `cmd/zever/`. Read it on day one, before adding a service, and before reviewing a PR that touches an unfamiliar area.
 
-Concrete rule from this layout: application code imports top-level service packages and `container/`; runtime code never imports `internal/dsl/`.
+Concrete rule from this layout: application code imports `core` interfaces plus chosen adapter modules and `container/`; runtime code never imports `dsl/`.
 
 ## Prerequisites and mental model
 
-zever is one Go module (`github.com/zenta-dev/zever`, `go 1.27.0`) with no nested `go.mod` files. The tree has four roles:
+zever is a Go multi-module monorepo (`go 1.27.0`). The tree has four roles:
 
 ```text
-services   auth/ cache/ db/ queue/ ...  one small interface + adapters each
-wiring     config/ container/           layered config + lazy resolver
-language   internal/dsl/                .zen compiler frontend (compile time only)
-surface    orm/ router/ cmd/zever/      typed queries, HTTP, CLI
+core/<b>        battery interface + Register/Open registry (container resolves)
+adapters/<b>/<a> one Go module per adapter, Register() wires into core registry
+shared/*        SDK-free helpers (codec, redisclient, s3opts, retry, ...)
+wiring          config/ container/        layered config + lazy resolver
+language        dsl/                      .zen compiler frontend (compile time only)
+surface         orm/ cmd/zever/           typed queries, CLI
 ```
+
+Local dev resolves the modules through the committed `go.work` workspace at the repo root (143 `use` entries covering every module): `go build/test ./...` from the root resolves via the workspace, while per-module standalone commands run with `GOWORK=off` in CI. Releases are lockstep: one version, per-module tags `<path>/vX.Y.Z` via `tools/tag-release.sh`.
 
 No globals and no `init()` wiring in app code; `ctx` is the first arg for IO and is never stored in a struct. Exported identifiers need a doc comment starting with the name; unexported ones do not. `goimports` local prefix is `github.com/zenta-dev/zever`; `depguard` denies `github.com/pkg/errors` and `io/ioutil`.
 
@@ -100,8 +104,8 @@ func main() {
 ```
 
 ```sh
-ls auth/ cache/ db/ queue/ container/ config/ orm/ internal/dsl/ cmd/zever/
-go build ./...
+ls core/ adapters/ shared/ container/ config/ orm/ dsl/ cmd/zever/
+go build ./...   # per module, or once across the go.work workspace
 go test ./orm/... ./container/... ./config/...
 ```
 
@@ -112,7 +116,7 @@ db: sqlite cache: memory
 ok  orm/...  ok  container/...  ok  config/...
 ```
 
-The `ls` confirms the four roles exist; the build covers the whole module at once (single `go.mod` means one command); the tests hit the three packages every request touches. Dialect comes per-call from `conn.Dialect()`, so the same query code prints `sqlite` here and `postgres` in prod.
+The `ls` confirms the roles exist; the build covers each module (`go build ./...` per module, or via the `go.work` workspace); the tests hit the three packages every request touches. Dialect comes per-call from `conn.Dialect()`, so the same query code prints `sqlite` here and `postgres` in prod.
 
 ## Variants
 
@@ -120,13 +124,15 @@ The `ls` confirms the four roles exist; the build covers the whole module at onc
 |---|---|---|
 | `config/` | `Default()` zero-infra, strict `Load(path)`, best-effort env, `RedactedServices` | yes |
 | `container/` | `New(cfg)` (nil valid), lazy accessors, retry-on-error, `Close(ctx)` in dependency order | yes |
-| `auth/ cache/ db/ queue/ ...` | one small interface plus self-registering adapters each | yes (interfaces) |
+| `core/<b>` | battery interface + `Register`/`Open` registry (e.g. `core/cache`, `core/db`); container is sole resolver | yes (interfaces) |
+| `adapters/<b>/<a>` | one Go module per adapter (e.g. `adapters/cache/redis`); `Register()` wires it into its `core` registry | yes (the ones you pick) |
+| `shared/*` | SDK-free helpers (`codec`, `redisclient`, `redisopt`, `s3opts`, `retry`, ...) | yes |
 | `orm/` | `NewTable` / `NewColumn` / `From`, dialect per-call, fail-closed errors | yes |
-| `router/` | `fiber` / `stdhttp` adapters over `http.HandlerFunc` | yes |
+| `core/router` | `fiber` / `stdhttp` adapters over `http.HandlerFunc` | yes (interface) |
 | `middleware/` | HTTP middleware + gRPC interceptors, no registry | yes |
-| `internal/dsl/` | `lexer -> parser -> ast -> resolver -> ir.Schema`, `compile -> backend.Generate` | no (compile time only) |
+| `dsl/` | `lexer -> parser -> ast -> resolver -> ir.Schema`, `compile -> backend.Generate` | no (compile time only) |
 | `cmd/zever/` | flags-only CLI, bare usage to stderr, `dev` watch, dev-only `tinker` | no (tool binary) |
-| `tools/` | `gengrammar` generator, `zever-lsp` module | no |
+| `tools/` | `gengrammar` generator, `tag-release.sh` lockstep tagger | no |
 | `docs/` | Starlight site (npm, not Go) | no |
 | `examples/todo/`, `examples/bookings/` | runnable skeletons with schema, server, worker, seed | reference |
 
@@ -141,7 +147,7 @@ Service areas at a glance:
 | Product | `mailer`, `notification`, `storage`, `media`, `document`, `payment`, `billing` |
 | Platform | `log`, `observability`, `analytics`, `flag`, `i18n`, `ai`, `geo` |
 
-Do not add methods to a public service interface: it breaks every implementer. Prefer a new interface instead. When you add a service, follow the existing shape: small interface at the package root, one subdirectory per adapter, registration without globals, and a `README.md` with an adapter table.
+Do not add methods to a public service interface: it breaks every implementer. Prefer a new interface instead. When you add a service, follow the existing shape: interface + `Register`/`Open` registry in `core/<b>`, one module per adapter in `adapters/<b>/<a>` with a `Register()` call, shared SDK-free code in `shared/*`, and a `README.md` with an adapter table.
 
 ## Production notes
 
@@ -153,7 +159,7 @@ Never log raw option maps; use `config.RedactedServices`. Timeouts and intervals
 
 | Symptom | Cause | Fix |
 |---|---|---|
-| Import of `internal/dsl` from a service package | Boundary crossed: compiler frontend pulled into runtime | Remove the import; consume generated output (ORM, routes, stubs) instead. See `../architecture/compiler-boundary/` |
+| Import of `dsl` from a service package | Boundary crossed: compiler frontend pulled into runtime | Remove the import; consume generated output (ORM, routes, stubs) instead. See `../architecture/compiler-boundary/` |
 | New interface method breaks all adapters | Public interface grew a method | Revert to a new interface; never extend a public service interface in place |
 | `go build ./...` passes but docs site fails | `docs/` is npm, not Go | Run `npm run dev` under `docs/`; keep Node 18+ separate from the Go toolchain |
 | Adapter table missing for a new service | Scaffolding skipped the package README | Add interface, per-adapter subdirs, registration, and a `README.md` with the adapter table |
@@ -167,5 +173,5 @@ Never log raw option maps; use `config.RedactedServices`. Timeouts and intervals
 - `../architecture/lifecycle/` for the four process phases
 - `../architecture/container/` for accessor and close detail
 - `../architecture/providers-adapters/` for interface and swap rules
-- `../architecture/compiler-boundary/` for the `internal/dsl` import ban
-- Package guides as text: `README.md`, `config/README.md`, `container/README.md`, `internal/dsl/README.md`, `cmd/zever/README.md`
+- `../architecture/compiler-boundary/` for the `dsl` import ban
+- Package guides as text: `README.md`, `config/README.md`, `container/README.md`, `dsl/README.md`, `cmd/zever/README.md`

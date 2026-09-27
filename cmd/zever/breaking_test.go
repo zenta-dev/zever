@@ -7,7 +7,7 @@ import (
 	"strings"
 	"testing"
 
-	"github.com/zenta-dev/zever/internal/dsl/breaking"
+	"github.com/zenta-dev/zever/dsl/breaking"
 )
 
 // inspectBreakingOldSchema / New remove one field: a breaking change.

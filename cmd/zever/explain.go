@@ -6,8 +6,8 @@ import (
 	"io"
 	"strings"
 
-	"github.com/zenta-dev/zever/internal/dsl/compile"
-	"github.com/zenta-dev/zever/internal/dsl/ir"
+	"github.com/zenta-dev/zever/dsl/compile"
+	"github.com/zenta-dev/zever/dsl/ir"
 )
 
 // errExplainUsage is returned when runExplain is invoked without the

@@ -7,8 +7,8 @@ import (
 	"sync"
 	"testing"
 
-	"github.com/zenta-dev/zever/internal/dsl/compile"
-	"github.com/zenta-dev/zever/internal/dsl/diag"
+	"github.com/zenta-dev/zever/dsl/compile"
+	"github.com/zenta-dev/zever/dsl/diag"
 )
 
 // writeFile creates a file under dir, making parent directories as needed.

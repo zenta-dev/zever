@@ -2,8 +2,6 @@ package acme
 
 import (
 	"time"
-
-	"github.com/zenta-dev/zever/internal/opts"
 )
 
 // Options configures the acme storage adapter.
@@ -22,21 +20,31 @@ type Options struct {
 	Extra map[string]any `json:"extra" toml:"extra" yaml:"extra"`
 }
 
+// fieldOr returns the T held at key, or def when the key is missing or held
+// a different type. It keeps ParseOptions stdlib-only, so the stub compiles
+// inside its own adapter module with no shared helpers to import.
+func fieldOr[T any](m map[string]any, key string, def T) T {
+	if v, ok := m[key].(T); ok {
+		return v
+	}
+
+	return def
+}
+
 // ParseOptions extracts typed options from a raw configuration map.
 //
-// TODO: add the required-field checks this adapter needs, in the style of the
-// other adapters: an empty value that the adapter cannot run without should
-// fail here with a "[storage] acme: <field> is required" error, not
-// at first use.
+// TODO: add the required-field checks this adapter needs: an empty value
+// that the adapter cannot run without should fail here with a
+// "[storage] acme: <field> is required" error, not at first use.
 func ParseOptions(m map[string]any) (Options, error) {
 	var o Options
 
-	o.APIKey = opts.String(m, "api_key", "")
-	o.Timeout = opts.Duration(m, "timeout", 0)
-	o.MaxRetries = opts.Int(m, "max_retries", 0)
-	o.Endpoints = opts.StringSlice(m, "endpoints")
-	o.UseTLS = opts.Bool(m, "use_tls", false)
-	o.Extra = opts.Map(m, "extra")
+	o.APIKey = fieldOr[string](m, "api_key", "")
+	o.Timeout = fieldOr[time.Duration](m, "timeout", 0)
+	o.MaxRetries = fieldOr[int](m, "max_retries", 0)
+	o.Endpoints = fieldOr[[]string](m, "endpoints", nil)
+	o.UseTLS = fieldOr[bool](m, "use_tls", false)
+	o.Extra = fieldOr[map[string]any](m, "extra", nil)
 
 	return o, nil
 }
