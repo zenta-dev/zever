@@ -77,7 +77,24 @@ func applyEnv(cfg *Config) error {
 			}
 		}
 	}
+	applyPluginEnv(cfg)
 	return nil
+}
+
+// applyPluginEnv overlays `<PLUGIN>_ADAPTER` variables onto cfg.Plugins,
+// one per registered plugin name (uppercased). Best-effort like the core
+// path: missing or empty variables are ignored, and with no plugins this
+// is a no-op. Only the adapter is overridable; plugin options stay raw
+// because they have no typed fields to coerce into.
+func applyPluginEnv(cfg *Config) {
+	for name, svc := range cfg.Plugins {
+		v, ok := os.LookupEnv(strings.ToUpper(name) + "_ADAPTER")
+		if !ok || v == "" {
+			continue
+		}
+		svc.Adapter = v
+		cfg.Plugins[name] = svc
+	}
 }
 
 // serviceRefs returns pointers to the named service's adapter and options.

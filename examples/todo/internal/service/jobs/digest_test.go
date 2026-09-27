@@ -13,15 +13,13 @@ import (
 	"github.com/zenta-dev/zever/config"
 	"github.com/zenta-dev/zever/container"
 	"github.com/zenta-dev/zever/examples/todo/internal/service/jobs"
-
-	_ "github.com/zenta-dev/zever/cache/memory"
-	_ "github.com/zenta-dev/zever/db/sqlite"
-	_ "github.com/zenta-dev/zever/log/slog"
-	_ "github.com/zenta-dev/zever/queue/memory"
+	"github.com/zenta-dev/zever/examples/todo/internal/testsetup"
 )
 
 func newTestDB(t *testing.T) (*container.Container, context.Context) {
 	t.Helper()
+
+	testsetup.RegisterDefaults()
 
 	cfg := config.Default()
 	cfg.DB.Options.Path = filepath.Join(t.TempDir(), "test.db")

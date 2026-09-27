@@ -10,10 +10,10 @@ import (
 	"sync"
 	"testing"
 
-	"github.com/zenta-dev/zever/db"
-	"github.com/zenta-dev/zever/db/sqlite"
-	"github.com/zenta-dev/zever/internal/dsl/backend/atlas"
-	"github.com/zenta-dev/zever/internal/dsl/compile"
+	"github.com/zenta-dev/zever/adapters/db/sqlite"
+	"github.com/zenta-dev/zever/core/db"
+	"github.com/zenta-dev/zever/dsl/backend/atlas"
+	"github.com/zenta-dev/zever/dsl/compile"
 )
 
 func compileSchema(t *testing.T, src string) *compile.Result {

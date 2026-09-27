@@ -14,25 +14,13 @@ import (
 
 	"github.com/zenta-dev/zever/config"
 	"github.com/zenta-dev/zever/container"
-	"github.com/zenta-dev/zever/db"
+	"github.com/zenta-dev/zever/core/db"
+	"github.com/zenta-dev/zever/core/i18n"
+	"github.com/zenta-dev/zever/core/permission"
+	"github.com/zenta-dev/zever/core/queue"
 	"github.com/zenta-dev/zever/examples/showcase/internal/api"
 	"github.com/zenta-dev/zever/examples/showcase/internal/service/seed"
-	"github.com/zenta-dev/zever/i18n"
-	"github.com/zenta-dev/zever/permission"
-	"github.com/zenta-dev/zever/queue"
-
-	_ "github.com/zenta-dev/zever/auth/jwt"
-	_ "github.com/zenta-dev/zever/db/sqlite"
-	_ "github.com/zenta-dev/zever/flag/static"
-	_ "github.com/zenta-dev/zever/i18n/embed"
-	_ "github.com/zenta-dev/zever/log/slog"
-	_ "github.com/zenta-dev/zever/mailer/log"
-	_ "github.com/zenta-dev/zever/notification/log"
-	_ "github.com/zenta-dev/zever/password/argon2"
-	_ "github.com/zenta-dev/zever/permission/rbac"
-	_ "github.com/zenta-dev/zever/queue/memory"
-	_ "github.com/zenta-dev/zever/ratelimit/memory"
-	_ "github.com/zenta-dev/zever/router/stdhttp"
+	"github.com/zenta-dev/zever/examples/showcase/internal/testsetup"
 )
 
 const testJWTSecret = "test-secret-for-showcase-32-bytes-min"
@@ -50,6 +38,8 @@ type testSetup struct {
 // newTestSetup builds a fresh sqlite-backed API per test.
 func newTestSetup(t *testing.T) testSetup {
 	t.Helper()
+
+	testsetup.RegisterDefaults()
 
 	cfg := config.Default()
 	cfg.DB.Options.Path = filepath.Join(t.TempDir(), "test.db")

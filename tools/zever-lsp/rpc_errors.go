@@ -3,8 +3,8 @@ package main
 import (
 	"go.lsp.dev/protocol"
 
-	"github.com/zenta-dev/zever/internal/dsl/ast"
-	"github.com/zenta-dev/zever/internal/dsl/diag"
+	"github.com/zenta-dev/zever/dsl/ast"
+	"github.com/zenta-dev/zever/dsl/diag"
 )
 
 // walkErrorCases calls fn once for every item in every rpc's errors: {...}

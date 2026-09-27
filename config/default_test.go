@@ -3,7 +3,7 @@ package config
 import (
 	"testing"
 
-	"github.com/zenta-dev/zever/password"
+	"github.com/zenta-dev/zever/core/password"
 )
 
 func TestDefaultSnapshot(t *testing.T) {

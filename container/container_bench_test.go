@@ -9,9 +9,7 @@ import (
 )
 
 func testConfigMemoryDB() *config.Config {
-	cfg := config.Default()
-	cfg.DB.Options.Path = ":memory:"
-	return cfg
+	return config.Default()
 }
 
 // BenchmarkContainer_ResolveSubset measures resolving the shutdown-critical

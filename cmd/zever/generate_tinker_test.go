@@ -39,7 +39,7 @@ func TestRenderTinkerShimIsValidGo(t *testing.T) {
 		"MUST STAY IN SYNC WITH cmd/zever/tinker_protocol.go",
 		`go run ./cmd/tinker-shim`,
 		`"github.com/zenta-dev/zever/container"`,
-		`"github.com/zenta-dev/zever/db"`,
+		`"github.com/zenta-dev/zever/core/db"`,
 	} {
 		if !strings.Contains(text, want) {
 			t.Errorf("generated shim does not contain %q", want)

@@ -1,10 +1,9 @@
 // Package app builds the config and container shared by this project's
 // binaries.
 //
-// The blank imports below are the whole of the "wiring" a zever app has to
-// do: a battery's registry only learns about an adapter once that adapter
-// package's init() has run, so an app imports exactly the adapters it
-// actually uses and nothing else.
+// Explicit Register calls below are the whole of the "wiring" a zever app
+// has to do: nested adapter modules expose no init magic, so an app calls
+// Register for exactly the adapters it actually uses and nothing else.
 //
 // JWT secret comes from the environment only: set AUTH_JWT_SECRET to at
 // least 32 bytes. It is never stored in zever.yaml. `zever doctor` reports
@@ -17,15 +16,9 @@ import (
 	"github.com/zenta-dev/zever/config"
 	"github.com/zenta-dev/zever/container"
 
-	// Blank imports register the adapters this app selects; see the package
-	// comment.
-	_ "github.com/zenta-dev/zever/auth/jwt"
-	_ "github.com/zenta-dev/zever/cache/memory"
-	_ "github.com/zenta-dev/zever/db/sqlite"
-	_ "github.com/zenta-dev/zever/log/slog"
-	_ "github.com/zenta-dev/zever/password/argon2"
-	_ "github.com/zenta-dev/zever/queue/memory"
-	_ "github.com/zenta-dev/zever/router/stdhttp"
+	authjwt "github.com/zenta-dev/zever/adapters/auth/jwt"
+	dbsqlite "github.com/zenta-dev/zever/adapters/db/sqlite"
+	passwordargon2 "github.com/zenta-dev/zever/adapters/password/argon2"
 )
 
 // DefaultDBPath is the sqlite file used when nothing else supplies one. It is
@@ -61,6 +54,10 @@ func New() (*container.Container, error) {
 	if err != nil {
 		return nil, err
 	}
+
+	authjwt.Register()
+	dbsqlite.Register()
+	passwordargon2.Register()
 
 	return container.New(cfg), nil
 }

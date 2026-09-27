@@ -2,34 +2,22 @@
 // binaries.
 //
 // Adapter packages expose constructors but never self-register, so wiring
-// is twofold: the blank imports below pin exactly the adapters this app
-// uses (and pull their modules into the build), while the container wires
-// every light adapter itself and the adapters.Register calls in New wire
-// the heavyweight ones (see container/adapters). This list was picked at
-// scaffold time (`zever new`'s battery picker, or the fixed set every generated
-// entrypoint needs when there was no prior `zever new`) -- add a battery
-// later by giving it an adapter in zever.yaml and adding its one blank
-// import below by hand (plus its Register call when it is a heavy
-// adapter); this file is scaffolded once and never regenerated.
+// is explicit: the named imports below pin exactly the adapters this app
+// uses, and each has a matching Register call in New wiring its battery
+// registry. This list was picked at scaffold time (`zever new`'s battery picker, or the floor
+// (log, router) when there was no prior `zever new`) -- add a battery
+// later with `zever add <battery>` (or by hand in zever.yaml plus one
+// import and Register call here); this file is scaffolded once and never
+// regenerated.
 package app
 
 import (
 	"fmt"
 
+	logslog "github.com/zenta-dev/zever/adapters/log/slog"
+	routerstdhttp "github.com/zenta-dev/zever/adapters/router/stdhttp"
 	"github.com/zenta-dev/zever/config"
 	"github.com/zenta-dev/zever/container"
-
-	// Blank imports pin the adapters this app selects; see the package
-	// comment.
-	_ "github.com/zenta-dev/zever/auth/jwt"
-	_ "github.com/zenta-dev/zever/db/sqlite"
-	_ "github.com/zenta-dev/zever/log/slog"
-	_ "github.com/zenta-dev/zever/observability/stdout"
-	_ "github.com/zenta-dev/zever/permission/noop"
-	_ "github.com/zenta-dev/zever/queue/memory"
-	_ "github.com/zenta-dev/zever/ratelimit/memory"
-	_ "github.com/zenta-dev/zever/router/stdhttp"
-	_ "github.com/zenta-dev/zever/scheduler/embedded"
 )
 
 // DefaultDBPath is the sqlite file used when nothing else supplies one. It is
@@ -59,6 +47,8 @@ func Config() (*config.Config, error) {
 // New builds the container every binary in this project uses. Nothing is
 // opened until a battery is first requested.
 func New() (*container.Container, error) {
+	logslog.Register()
+	routerstdhttp.Register()
 	cfg, err := Config()
 	if err != nil {
 		return nil, err

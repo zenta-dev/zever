@@ -4,7 +4,7 @@ import (
 	"context"
 	"fmt"
 
-	"github.com/zenta-dev/zever/db"
+	"github.com/zenta-dev/zever/core/db"
 )
 
 // ParentWithChildren is the result of Preload: one parent T with all of its

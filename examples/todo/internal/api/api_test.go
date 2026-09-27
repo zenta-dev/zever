@@ -14,14 +14,7 @@ import (
 	"github.com/zenta-dev/zever/config"
 	"github.com/zenta-dev/zever/container"
 	"github.com/zenta-dev/zever/examples/todo/internal/api"
-
-	_ "github.com/zenta-dev/zever/auth/jwt"
-	_ "github.com/zenta-dev/zever/cache/memory"
-	_ "github.com/zenta-dev/zever/db/sqlite"
-	_ "github.com/zenta-dev/zever/log/slog"
-	_ "github.com/zenta-dev/zever/password/argon2"
-	_ "github.com/zenta-dev/zever/queue/memory"
-	_ "github.com/zenta-dev/zever/router/stdhttp"
+	"github.com/zenta-dev/zever/examples/todo/internal/testsetup"
 )
 
 const testJWTSecret = "test-secret-for-todo-app-32-bytes-min!"
@@ -29,6 +22,8 @@ const testJWTSecret = "test-secret-for-todo-app-32-bytes-min!"
 // newTestHandler builds a fresh sqlite-backed API per test.
 func newTestHandler(t *testing.T) http.Handler {
 	t.Helper()
+
+	testsetup.RegisterDefaults()
 
 	cfg := config.Default()
 	cfg.DB.Options.Path = filepath.Join(t.TempDir(), "test.db")

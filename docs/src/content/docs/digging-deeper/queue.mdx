@@ -114,12 +114,12 @@ import (
 	"fmt"
 	"time"
 
-	"github.com/zenta-dev/zever/queue"
-	"github.com/zenta-dev/zever/queue/memory"
+	"github.com/zenta-dev/zever/core/queue"
+	queuememory "github.com/zenta-dev/zever/adapters/queue/memory"
 )
 
 func main() error {
-	q, err := memory.New(queue.Options{
+	q, err := queuememory.New(queue.Options{
 		VisibilityTimeout: 30 * time.Second,
 		PollTimeout:       time.Second,
 		Buffer:            100,
@@ -169,10 +169,10 @@ fails transiently so the message becomes visible again after
 
 | Adapter | Package | Notes |
 |---|---|---|
-| `memory` | `queue/memory` | Default, process-local, no infra, ideal for tests |
-| `redis` | `queue/redis` | Shared, required for multi-worker setups, keyed by `prefix` |
+| `memory` | `adapters/queue/memory` | Default, process-local, no infra, ideal for tests |
+| `redis` | `adapters/queue/redis` | Shared, required for multi-worker setups, keyed by `prefix` |
 
-Message shape lives in `queue/message.go`. Keep payloads small, explicit JSON,
+Message shape lives in `core/queue/message.go`. Keep payloads small, explicit JSON,
 and versioned alongside `schema/bookings.zen` job definitions.
 
 ## Gotchas and production notes

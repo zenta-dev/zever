@@ -280,6 +280,12 @@ func (c *Container) Close(ctx context.Context) error {
 		tryClose("queue", v)
 	}
 
+	for _, ps := range c.pluginSnapshots() {
+		if ps.ok {
+			tryClose("plugin "+ps.name, ps.v)
+		}
+	}
+
 	// gRPC has no dependency on (and nothing depends on) cache/queue/
 	// scheduler/job, so it is stopped here rather than woven into the
 	// dependency-ordered sequence above -- only its own resolved-check

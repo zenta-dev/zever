@@ -296,7 +296,7 @@ import (
 	"unsafe"
 
 	"github.com/zenta-dev/zever/container"
-	"github.com/zenta-dev/zever/db"
+	"github.com/zenta-dev/zever/core/db"
 
 	app "{{.AppPkg}}"
 )

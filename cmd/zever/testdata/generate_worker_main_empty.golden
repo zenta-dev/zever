@@ -15,7 +15,7 @@ import (
 	"syscall"
 	"time"
 
-	"github.com/zenta-dev/zever/job"
+	"github.com/zenta-dev/zever/core/job"
 
 	"example.com/shop/internal/app"
 )

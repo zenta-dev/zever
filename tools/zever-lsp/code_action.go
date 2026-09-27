@@ -6,8 +6,8 @@ import (
 	"go.lsp.dev/protocol"
 	"go.lsp.dev/uri"
 
-	"github.com/zenta-dev/zever/internal/dsl/ast"
-	"github.com/zenta-dev/zever/internal/dsl/ir"
+	"github.com/zenta-dev/zever/dsl/ast"
+	"github.com/zenta-dev/zever/dsl/ir"
 )
 
 // quickFixKind is shared by every CodeAction this server produces: both

@@ -23,12 +23,12 @@ import (
 	"google.golang.org/grpc"
 	"google.golang.org/grpc/keepalive"
 
-	"github.com/zenta-dev/zever/authz"
+	"github.com/zenta-dev/zever/core/authz"
+	"github.com/zenta-dev/zever/core/middleware"
 	genshop "github.com/zenta-dev/zever/examples/showcase/generated/gogen/shop"
 	"github.com/zenta-dev/zever/examples/showcase/internal/api"
 	"github.com/zenta-dev/zever/examples/showcase/internal/app"
 	shopimpl "github.com/zenta-dev/zever/examples/showcase/internal/service/shop"
-	"github.com/zenta-dev/zever/middleware"
 )
 
 const (

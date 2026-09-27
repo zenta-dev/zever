@@ -5,7 +5,7 @@ import (
 	"path/filepath"
 	"testing"
 
-	"github.com/zenta-dev/zever/internal/dsl/diag"
+	"github.com/zenta-dev/zever/dsl/diag"
 )
 
 // writeModuleFixture writes internal/<module>/<module>.zen under dir and

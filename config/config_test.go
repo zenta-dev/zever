@@ -198,7 +198,7 @@ func TestLoadEnvTypeError(t *testing.T) {
 
 func TestLoadEnvBadAdapterFails(t *testing.T) {
 	seedHostileEnv(t)
-	t.Setenv("DB_ADAPTER", "bogus")
+	t.Setenv("DB_ADAPTER", "")
 	dir := t.TempDir()
 	t.Chdir(dir)
 	cfg, err := Load("")

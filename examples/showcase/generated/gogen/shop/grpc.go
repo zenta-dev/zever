@@ -10,8 +10,8 @@ import (
 	"google.golang.org/grpc/codes"
 	"google.golang.org/grpc/status"
 
-	"github.com/zenta-dev/zever/apperror"
-	"github.com/zenta-dev/zever/authz"
+	"github.com/zenta-dev/zever/core/authz"
+	"github.com/zenta-dev/zever/shared/apperror"
 
 	pb "github.com/zenta-dev/zever/examples/showcase/generated/protogogen/shop"
 )

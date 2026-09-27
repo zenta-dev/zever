@@ -2,225 +2,52 @@ package container
 
 import (
 	"fmt"
-	"sync"
 
 	"google.golang.org/grpc"
 
-	"github.com/zenta-dev/zever/ai"
-	aiollama "github.com/zenta-dev/zever/ai/ollama"
-	"github.com/zenta-dev/zever/analytics"
-	analyticslog "github.com/zenta-dev/zever/analytics/log"
-	"github.com/zenta-dev/zever/auth"
-	"github.com/zenta-dev/zever/auth/jwt"
-	"github.com/zenta-dev/zever/auth/oidc"
-	authsession "github.com/zenta-dev/zever/auth/session"
-	"github.com/zenta-dev/zever/billing"
-	billingstub "github.com/zenta-dev/zever/billing/stub"
-	"github.com/zenta-dev/zever/cache"
-	cachememory "github.com/zenta-dev/zever/cache/memory"
-	cacheredis "github.com/zenta-dev/zever/cache/redis"
-	"github.com/zenta-dev/zever/crypto"
-	cryptolocal "github.com/zenta-dev/zever/crypto/local"
-	"github.com/zenta-dev/zever/db"
-	dbpostgres "github.com/zenta-dev/zever/db/postgres"
-	dbsqlite "github.com/zenta-dev/zever/db/sqlite"
-	"github.com/zenta-dev/zever/document"
-	documentlatex "github.com/zenta-dev/zever/document/latex"
-	documentremote "github.com/zenta-dev/zever/document/remote"
-	"github.com/zenta-dev/zever/eventbus"
-	eventbusmemory "github.com/zenta-dev/zever/eventbus/memory"
-	eventbusredis "github.com/zenta-dev/zever/eventbus/redis"
-	"github.com/zenta-dev/zever/flag"
-	flagstatic "github.com/zenta-dev/zever/flag/static"
-	"github.com/zenta-dev/zever/geo"
-	geoosm "github.com/zenta-dev/zever/geo/osm"
-	geostatic "github.com/zenta-dev/zever/geo/static"
-	"github.com/zenta-dev/zever/i18n"
-	i18nembed "github.com/zenta-dev/zever/i18n/embed"
-	i18nremote "github.com/zenta-dev/zever/i18n/remote"
-	"github.com/zenta-dev/zever/idempotency"
-	idempotencymemory "github.com/zenta-dev/zever/idempotency/memory"
-	idempotencyredis "github.com/zenta-dev/zever/idempotency/redis"
-	"github.com/zenta-dev/zever/job"
-	"github.com/zenta-dev/zever/lock"
-	lockmemory "github.com/zenta-dev/zever/lock/memory"
-	lockredis "github.com/zenta-dev/zever/lock/redis"
-	"github.com/zenta-dev/zever/log"
-	lognoop "github.com/zenta-dev/zever/log/noop"
-	logpretty "github.com/zenta-dev/zever/log/pretty"
-	"github.com/zenta-dev/zever/log/slog"
-	"github.com/zenta-dev/zever/log/zerolog"
-	"github.com/zenta-dev/zever/mailer"
-	mailerlog "github.com/zenta-dev/zever/mailer/log"
-	"github.com/zenta-dev/zever/mailer/smtp"
-	"github.com/zenta-dev/zever/media"
-	"github.com/zenta-dev/zever/notification"
-	notificationlog "github.com/zenta-dev/zever/notification/log"
-	"github.com/zenta-dev/zever/observability"
-	observabilitynoop "github.com/zenta-dev/zever/observability/noop"
-	"github.com/zenta-dev/zever/observability/otlp"
-	"github.com/zenta-dev/zever/observability/stdout"
-	"github.com/zenta-dev/zever/password"
-	"github.com/zenta-dev/zever/password/argon2"
-	"github.com/zenta-dev/zever/payment"
-	paymentstub "github.com/zenta-dev/zever/payment/stub"
-	"github.com/zenta-dev/zever/permission"
-	permissionnoop "github.com/zenta-dev/zever/permission/noop"
-	permissionrbac "github.com/zenta-dev/zever/permission/rbac"
-	"github.com/zenta-dev/zever/queue"
-	queuememory "github.com/zenta-dev/zever/queue/memory"
-	queueredis "github.com/zenta-dev/zever/queue/redis"
-	"github.com/zenta-dev/zever/ratelimit"
-	ratelimitmemory "github.com/zenta-dev/zever/ratelimit/memory"
-	ratelimitredis "github.com/zenta-dev/zever/ratelimit/redis"
-	"github.com/zenta-dev/zever/router"
-	routerstdhttp "github.com/zenta-dev/zever/router/stdhttp"
-	"github.com/zenta-dev/zever/scheduler"
-	schedulerembedded "github.com/zenta-dev/zever/scheduler/embedded"
-	"github.com/zenta-dev/zever/search"
-	searchpostgres "github.com/zenta-dev/zever/search/postgres"
-	searchsqlite "github.com/zenta-dev/zever/search/sqlite"
-	"github.com/zenta-dev/zever/secrets"
-	secretsenv "github.com/zenta-dev/zever/secrets/env"
-	"github.com/zenta-dev/zever/session"
-	sessionmemory "github.com/zenta-dev/zever/session/memory"
-	sessionredis "github.com/zenta-dev/zever/session/redis"
-	"github.com/zenta-dev/zever/storage"
-	storagelocal "github.com/zenta-dev/zever/storage/local"
-	"github.com/zenta-dev/zever/tenant"
-	tenantheader "github.com/zenta-dev/zever/tenant/header"
-	tenantsingle "github.com/zenta-dev/zever/tenant/single"
-	"github.com/zenta-dev/zever/vectorstore"
-	vectorstorepgvector "github.com/zenta-dev/zever/vectorstore/pgvector"
-	vectorstoresqlite "github.com/zenta-dev/zever/vectorstore/sqlite"
-	"github.com/zenta-dev/zever/webhook"
-	webhookhttp "github.com/zenta-dev/zever/webhook/http"
-	webhookqueue "github.com/zenta-dev/zever/webhook/queue"
-	webhooksqlite "github.com/zenta-dev/zever/webhook/sqlite"
-	"github.com/zenta-dev/zever/workflow"
-	workflowmemory "github.com/zenta-dev/zever/workflow/memory"
+	"github.com/zenta-dev/zever/core/ai"
+	"github.com/zenta-dev/zever/core/analytics"
+	"github.com/zenta-dev/zever/core/auth"
+	"github.com/zenta-dev/zever/core/billing"
+	"github.com/zenta-dev/zever/core/cache"
+	"github.com/zenta-dev/zever/core/crypto"
+	"github.com/zenta-dev/zever/core/db"
+	"github.com/zenta-dev/zever/core/document"
+	"github.com/zenta-dev/zever/core/eventbus"
+	"github.com/zenta-dev/zever/core/flag"
+	"github.com/zenta-dev/zever/core/geo"
+	"github.com/zenta-dev/zever/core/i18n"
+	"github.com/zenta-dev/zever/core/idempotency"
+	"github.com/zenta-dev/zever/core/job"
+	"github.com/zenta-dev/zever/core/lock"
+	"github.com/zenta-dev/zever/core/log"
+	"github.com/zenta-dev/zever/core/mailer"
+	"github.com/zenta-dev/zever/core/media"
+	"github.com/zenta-dev/zever/core/notification"
+	"github.com/zenta-dev/zever/core/observability"
+	"github.com/zenta-dev/zever/core/password"
+	"github.com/zenta-dev/zever/core/payment"
+	"github.com/zenta-dev/zever/core/permission"
+	"github.com/zenta-dev/zever/core/queue"
+	"github.com/zenta-dev/zever/core/ratelimit"
+	"github.com/zenta-dev/zever/core/router"
+	"github.com/zenta-dev/zever/core/scheduler"
+	"github.com/zenta-dev/zever/core/search"
+	"github.com/zenta-dev/zever/core/secrets"
+	"github.com/zenta-dev/zever/core/session"
+	"github.com/zenta-dev/zever/core/storage"
+	"github.com/zenta-dev/zever/core/tenant"
+	"github.com/zenta-dev/zever/core/vectorstore"
+	"github.com/zenta-dev/zever/core/webhook"
+	"github.com/zenta-dev/zever/core/workflow"
 )
 
-// adaptersOnce guards the process-wide adapter registration below.
-var adaptersOnce sync.Once
-
-// ensureAdapters registers every light service adapter factory exactly once
-// per process. Adapter packages expose constructors but never self-register,
-// so the container — the composition root — wires them before first use.
-// Heavyweight families (see container/adapters) are excluded: the host
-// registers those explicitly via adapters.RegisterAI/RegisterAll.
-// Registration only fills factory maps; it opens nothing and starts no
-// background work. Duplicate errors are ignored: every factory passed here
-// is valid by construction, so the only failure mode is a factory the host
-// application already registered, which is benign.
-func ensureAdapters() {
-	adaptersOnce.Do(registerAdapters)
-}
-
-func registerAdapters() {
-	_ = ai.Register(ai.Ollama, aiollama.New)
-
-	_ = analytics.Register(analytics.Log, analyticslog.New)
-
-	_ = auth.Register(auth.JWT, jwt.New)
-	_ = auth.Register(auth.Session, authsession.New)
-	_ = auth.Register(auth.OIDC, oidc.New)
-
-	_ = billing.Register(billing.Stub, billingstub.Open)
-
-	_ = cache.Register(cache.Memory, cachememory.New)
-	_ = cache.Register(cache.Redis, cacheredis.New)
-
-	_ = crypto.Register(crypto.AdapterLocal, cryptolocal.New)
-
-	_ = db.Register(db.SQLite, dbsqlite.New)
-	_ = db.Register(db.Postgres, dbpostgres.New)
-
-	_ = document.Register(document.Remote, documentremote.New)
-	_ = document.Register(document.Latex, documentlatex.New)
-
-	_ = eventbus.Register(eventbus.Memory, eventbusmemory.New)
-	_ = eventbus.Register(eventbus.Redis, eventbusredis.New)
-
-	_ = flag.Register(flag.Static, flagstatic.New)
-
-	_ = geo.Register(geo.Static, geostatic.New)
-	_ = geo.Register(geo.OSM, geoosm.New)
-
-	_ = i18n.Register(i18n.Embed, i18nembed.New)
-	_ = i18n.Register(i18n.Remote, i18nremote.New)
-
-	_ = idempotency.Register(idempotency.Memory, idempotencymemory.New)
-	_ = idempotency.Register(idempotency.Redis, idempotencyredis.New)
-
-	_ = lock.Register(lock.Memory, lockmemory.New)
-	_ = lock.Register(lock.Redis, lockredis.New)
-
-	_ = log.Register(log.Noop, func(log.Options) (log.Logger, error) { return lognoop.New(), nil })
-	_ = log.Register(log.ZeroLog, func(o log.Options) (log.Logger, error) { return zerolog.New(o), nil })
-	_ = log.Register(log.Slog, func(o log.Options) (log.Logger, error) { return slog.New(o), nil })
-	_ = log.Register(log.Pretty, func(o log.Options) (log.Logger, error) { return logpretty.New(o), nil })
-
-	_ = mailer.Register(mailer.Log, mailerlog.New)
-	_ = mailer.Register(mailer.SMTP, smtp.New)
-
-	_ = notification.Register(notification.Log, notificationlog.New)
-
-	_ = observability.Register(observability.Noop, func(observability.Options) (observability.Provider, error) {
-		return observabilitynoop.New(), nil
-	})
-	_ = observability.Register(observability.Stdout, stdout.New)
-	_ = observability.Register(observability.OTLP, otlp.New)
-
-	_ = password.Register(password.AdapterArgon2ID, argon2.New)
-
-	_ = payment.Register(payment.Stub, paymentstub.New)
-
-	_ = permission.Register(permission.Noop, permissionnoop.New)
-	_ = permission.Register(permission.RBAC, permissionrbac.New)
-
-	_ = queue.Register(queue.Memory, queuememory.New)
-	_ = queue.Register(queue.Redis, queueredis.New)
-
-	_ = ratelimit.Register(ratelimit.Memory, ratelimitmemory.New)
-	_ = ratelimit.Register(ratelimit.Redis, ratelimitredis.New)
-
-	_ = router.Register(router.AdapterStdHTTP, routerstdhttp.New)
-
-	_ = scheduler.Register(scheduler.Embedded, schedulerembedded.New)
-
-	_ = search.Register(search.Postgres, searchpostgres.New)
-	_ = search.Register(search.SQLite, searchsqlite.New)
-
-	_ = secrets.Register(secrets.Env, func(o secrets.Options) (secrets.Secrets, error) {
-		return secretsenv.New(secretsenv.Options{Prefix: o.Prefix})
-	})
-
-	_ = session.Register(session.Memory, sessionmemory.New)
-	_ = session.Register(session.Redis, sessionredis.New)
-
-	_ = storage.Register(storage.AdapterLocal, storagelocal.New)
-
-	_ = tenant.Register(tenant.Single, tenantsingle.New)
-	_ = tenant.Register(tenant.Header, tenantheader.New)
-
-	_ = vectorstore.Register(vectorstore.SQLite, vectorstoresqlite.New)
-	_ = vectorstore.Register(vectorstore.PGVector, vectorstorepgvector.New)
-
-	_ = webhook.Register(webhook.AdapterHTTP, webhookhttp.New)
-	_ = webhook.Register(webhook.AdapterQueue, webhookqueue.New)
-	_ = webhook.Register(webhook.AdapterSQLite, webhooksqlite.New)
-
-	_ = workflow.Register(workflow.Memory, workflowmemory.New)
-}
-
 // openService parses a service's adapter name, then opens it with typed
-// opts. The adapter string never reaches Open: parse failures short-circuit
+// opts. Adapters register caller-side via each battery's Register; resolving
+// an unregistered adapter fails with UnknownAdapterError. The adapter string
 // before any construction. Wrapping adds only the service name, so
 // secret-bearing option values never leak into error text.
 func openService[T any, A any, O any](service string, name string, parse func(string) (A, error), open func(A, O) (T, error), opts O) (T, error) {
-	ensureAdapters()
-
 	a, err := parse(name)
 	if err != nil {
 		var zero T

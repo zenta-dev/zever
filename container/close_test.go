@@ -10,32 +10,30 @@ import (
 	"testing"
 	"time"
 
-	"github.com/zenta-dev/zever/cache"
-	cachememory "github.com/zenta-dev/zever/cache/memory"
 	"github.com/zenta-dev/zever/config"
-	"github.com/zenta-dev/zever/db"
-	"github.com/zenta-dev/zever/db/sqlite"
-	"github.com/zenta-dev/zever/observability"
-	observabilitynoop "github.com/zenta-dev/zever/observability/noop"
-	"github.com/zenta-dev/zever/queue"
-	queuememory "github.com/zenta-dev/zever/queue/memory"
-	"github.com/zenta-dev/zever/scheduler"
-	schedulerembedded "github.com/zenta-dev/zever/scheduler/embedded"
+	"github.com/zenta-dev/zever/core/cache"
+	"github.com/zenta-dev/zever/core/db"
+	"github.com/zenta-dev/zever/core/observability"
+	"github.com/zenta-dev/zever/core/queue"
+	"github.com/zenta-dev/zever/core/scheduler"
 )
 
 // errFakeUnimplemented marks fakeCtx methods that tests never invoke.
 var errFakeUnimplemented = errors.New("fakeCtx: unimplemented")
 
-// registerTestAdapters wires the zero-infrastructure factories once.
-// Adapter registries are global; duplicates from parallel helpers are ignored.
+// registerTestAdapters wires the shared zero-value fakes (defined in
+// services_test.go) under the default adapter names. Adapter registries are
+// global; duplicates from parallel helpers are ignored. Nothing here may
+// import nested adapter modules: the container resolves only caller-side
+// registrations, and tests stand in for the caller with fakes.
 var registerAdaptersOnce sync.Once
 
 func registerTestAdapters() {
 	registerAdaptersOnce.Do(func() {
-		_ = cache.Register(cache.Memory, cachememory.New)
-		_ = db.Register(db.SQLite, sqlite.New)
-		_ = queue.Register(queue.Memory, queuememory.New)
-		_ = scheduler.Register(scheduler.Embedded, schedulerembedded.New)
+		_ = cache.Register(cache.Memory, newFakeCache)
+		_ = db.Register(db.SQLite, newFakeDB)
+		_ = queue.Register(queue.Memory, newFakeQueue)
+		_ = scheduler.Register(scheduler.Embedded, newFakeScheduler)
 	})
 }
 
@@ -211,7 +209,8 @@ func TestContainer_Snapshots_CoversAllServices(t *testing.T) {
 	typ := reflect.TypeOf(c).Elem()
 	totalLazy := 0
 	for i := 0; i < typ.NumField(); i++ {
-		if typ.Field(i).Name == "cfg" {
+		name := typ.Field(i).Name
+		if name == "cfg" || name == "pluginsMu" || name == "plugins" {
 			continue
 		}
 		totalLazy++
@@ -229,7 +228,6 @@ func TestContainer_Snapshots_CoversAllServices(t *testing.T) {
 func TestContainer_Close_OnlyResolvedClosed(t *testing.T) {
 	registerTestAdapters()
 	cfg := config.Default()
-	cfg.DB.Options.Path = ":memory:"
 	cfg.Payment.Adapter = "no-such-adapter-zzz"
 	c := New(cfg)
 
@@ -262,7 +260,6 @@ func TestContainer_Close_OnlyResolvedClosed(t *testing.T) {
 func TestContainer_Close_NeverOpensUntouched(t *testing.T) {
 	registerTestAdapters()
 	cfg := config.Default()
-	cfg.DB.Options.Path = ":memory:"
 	cfg.Auth.Adapter = "bogus-adapter-never-opened"
 	c := New(cfg)
 
@@ -683,10 +680,10 @@ func (p *shutdownOnlyProvider) Shutdown(context.Context) error {
 	return nil
 }
 
-// trackedNoopProvider wraps the real observability/noop.Provider, delegating
+// trackedNoopProvider wraps a fake observability.Provider, delegating
 // Tracer/Meter and Shutdown to it while counting Shutdown invocations, so
 // the test can observe whether Container.Close actually reached the
-// underlying real service's Shutdown method (the noop provider itself has no
+// underlying service's Shutdown method (the fake itself has no
 // externally observable side effect to assert against).
 type trackedNoopProvider struct {
 	observability.Provider
@@ -699,12 +696,12 @@ func (p *trackedNoopProvider) Shutdown(ctx context.Context) error {
 }
 
 // TestContainer_Close_ObservabilityProviderShutdownFlushed exercises the
-// actual affected service (observability.Provider, backed by the real
-// observability/noop adapter) through the real Container.Close path, not
-// just a synthetic fake, confirming the fix closes the real bug end-to-end.
+// actual affected service (observability.Provider, backed by a fake provider
+// implementing the full Provider shape) through the real Container.Close
+// path, confirming the fix closes the real bug end-to-end.
 func TestContainer_Close_ObservabilityProviderShutdownFlushed(t *testing.T) {
 	c := New(config.Default())
-	tracked := &trackedNoopProvider{Provider: observabilitynoop.New()}
+	tracked := &trackedNoopProvider{Provider: &fakeObservability{}}
 	c.observability.val = tracked
 	c.observability.done = true
 	c.observability.ready.Store(true)

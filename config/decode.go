@@ -79,6 +79,9 @@ func decodeServiceEntry(name string, entry any) (ServiceConfig, error) {
 	if entry == nil {
 		return sc, nil
 	}
+	if name == "plugins" {
+		return decodePluginsEntry(name, entry)
+	}
 	data, err := json.Marshal(entry)
 	if err != nil {
 		return sc, &DecodeError{Service: name, Err: err}
@@ -89,6 +92,52 @@ func decodeServiceEntry(name string, entry any) (ServiceConfig, error) {
 		return sc, &DecodeError{Service: name, Err: classifyDecodeError(name, err, []string{"adapter", "options"})}
 	}
 	return sc, nil
+}
+
+// decodePluginsEntry decodes the top-level `plugins` block, which maps
+// plugin names to {adapter, options} envelopes instead of being one
+// envelope itself. Two shapes are accepted: the direct map
+// (`plugins: {myplugin: {adapter, options}}`) and the uniform envelope
+// (`plugins: {adapter, options: {myplugin: ...}}`); both converge to a
+// ServiceConfig whose Options is the plugin map so merge can fan it out.
+// Each plugin envelope stays strict (unknown envelope keys rejected),
+// while the options inside stay raw for the plugin's own validator.
+func decodePluginsEntry(name string, entry any) (ServiceConfig, error) {
+	data, err := json.Marshal(entry)
+	if err != nil {
+		return ServiceConfig{}, &DecodeError{Service: name, Err: err}
+	}
+	var m map[string]any
+	if err := json.Unmarshal(data, &m); err != nil {
+		return ServiceConfig{}, &DecodeError{Service: name, Err: err}
+	}
+	if isEnvelopeKeys(m) {
+		var sc ServiceConfig
+		dec := json.NewDecoder(bytes.NewReader(data))
+		dec.DisallowUnknownFields()
+		if err := dec.Decode(&sc); err != nil {
+			return ServiceConfig{}, &DecodeError{Service: name, Err: classifyDecodeError(name, err, []string{"adapter", "options"})}
+		}
+		return sc, nil
+	}
+	for pname, pentry := range m {
+		if _, err := decodeServiceEntry(pname, pentry); err != nil {
+			return ServiceConfig{}, err
+		}
+	}
+	return ServiceConfig{Options: m}, nil
+}
+
+// isEnvelopeKeys reports whether m's keys fit a ServiceConfig envelope
+// ({adapter, options} only). An empty map counts as an envelope so
+// `plugins: {}` decodes to the zero ServiceConfig.
+func isEnvelopeKeys(m map[string]any) bool {
+	for k := range m {
+		if k != "adapter" && k != "options" {
+			return false
+		}
+	}
+	return true
 }
 
 // decodeOptions strictly decodes a service's untyped option map into the

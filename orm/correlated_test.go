@@ -5,7 +5,7 @@ import (
 	"strings"
 	"testing"
 
-	"github.com/zenta-dev/zever/db"
+	"github.com/zenta-dev/zever/core/db"
 )
 
 // order_tag is a second child entity of widget_orders, used by the nested

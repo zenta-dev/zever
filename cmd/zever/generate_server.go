@@ -15,10 +15,10 @@ import (
 	"text/template"
 
 	"github.com/zenta-dev/zever/config"
-	"github.com/zenta-dev/zever/internal/dsl/backend/gogen"
-	"github.com/zenta-dev/zever/internal/dsl/compile"
-	"github.com/zenta-dev/zever/internal/dsl/ir"
-	"github.com/zenta-dev/zever/internal/dsl/naming"
+	"github.com/zenta-dev/zever/dsl/backend/gogen"
+	"github.com/zenta-dev/zever/dsl/compile"
+	"github.com/zenta-dev/zever/dsl/ir"
+	"github.com/zenta-dev/zever/dsl/naming"
 )
 
 // --- shared scaffolding helpers (server, worker and seed all use these) ---
@@ -120,15 +120,18 @@ func writeScaffold(tag, path string, content []byte, force bool) error {
 	return nil
 }
 
-// coreBatteries is the fixed, always-scaffolded battery set: every name here
-// is one the generated entrypoints (serverTemplate, workerTemplate,
-// seedTemplate) resolve unconditionally, or opt into once configured
-// (ratelimit -- see rateLimitConfigured's doc comment for why its adapter
-// must still always be registered). This is the floor a battery selection
-// never goes below, whether it comes from `zever new`'s wizard/flags or
-// ensureAppPackage's no-selection-context fallback.
+// coreBatteries is the fixed, always-scaffolded battery set: the minimal
+// floor every generated entrypoint needs.
+//
+//   - log (slog): stdlib logger; every entrypoint resolves c.Log() first.
+//   - router (stdhttp): net/http based; fiber is the heavy alternative.
+//
+// Both are adapter modules with a Register() wiring their battery registry
+// (see adapterBinding): the container wires nothing itself. Anything beyond
+// the floor is added via `zever new`'s battery picker (or `zever add`, or
+// by hand in zever.yaml + app.go).
 var coreBatteries = []string{
-	"auth", "db", "log", "observability", "permission", "queue", "ratelimit", "router", "scheduler",
+	"log", "router",
 }
 
 // batterySelection is one battery+adapter pair, the single shape both
@@ -139,13 +142,26 @@ type batterySelection struct {
 	Adapter string
 }
 
-// batteryImportPath returns b's adapter package import path. Mechanical and
-// exception-free across every battery/adapter pair in this module: every
-// adapter lives at "<battery>/<adapter>" (e.g. cache/memory, db/sqlite,
-// search/postgres), matching config.Default()'s own battery/adapter naming
-// exactly.
+// adapterDirName maps a battery selection to its adapter module directory
+// ("<battery>/<adapter>"), the path segment batteryImportPath builds on.
+// It is mechanical across every pair with one exception: the password
+// adapter string is PHC-canonical "argon2id" while its package directory
+// is "argon2".
+func adapterDirName(b batterySelection) string {
+	if b.Battery == "password" && b.Adapter == "argon2id" {
+		return "password/argon2"
+	}
+
+	return b.Battery + "/" + b.Adapter
+}
+
+// batteryImportPath returns b's adapter package import path. Mechanical
+// across every battery/adapter pair: every adapter lives at
+// "adapters/<battery>/<adapter>" (e.g. adapters/cache/memory,
+// adapters/db/sqlite), matching config.Default()'s own battery/adapter
+// naming exactly (modulo adapterDirName's password exception).
 func batteryImportPath(b batterySelection) string {
-	return "github.com/zenta-dev/zever/" + b.Battery + "/" + b.Adapter
+	return "github.com/zenta-dev/zever/adapters/" + adapterDirName(b)
 }
 
 // coreBatterySelections resolves coreBatteries against config.Default()'s
@@ -159,15 +175,8 @@ func coreBatterySelections() []batterySelection {
 	cfg := config.Default()
 
 	byName := map[string]string{
-		"auth":          cfg.Auth.Adapter,
-		"db":            cfg.DB.Adapter,
-		"log":           cfg.Log.Adapter,
-		"observability": cfg.Observability.Adapter,
-		"permission":    cfg.Permission.Adapter,
-		"queue":         cfg.Queue.Adapter,
-		"ratelimit":     cfg.RateLimit.Adapter,
-		"router":        cfg.Router.Adapter,
-		"scheduler":     cfg.Scheduler.Adapter,
+		"log":    cfg.Log.Adapter,
+		"router": cfg.Router.Adapter,
 	}
 
 	sel := make([]batterySelection, 0, len(coreBatteries))
@@ -179,81 +188,73 @@ func coreBatterySelections() []batterySelection {
 	return sel
 }
 
-// appTemplateData is appTemplate's render input: Imports are already-resolved
-// adapter import paths and Registers are the container/adapters bundle calls
-// (e.g. RegisterNotify) the selection's heavy adapters need, both sorted
-// for deterministic output.
+// appTemplateData is appTemplate's render input: ModuleImports are the
+// adapter modules' named imports (alias + path, e.g. logslog +
+// adapters/log/slog) the selection needs Register() calls for, and
+// Registers are the qualified Register calls (e.g. logslog.Register()),
+// all sorted for deterministic output.
 type appTemplateData struct {
-	Imports   []string
-	Registers []string
+	ModuleImports []moduleImport
+	Registers     []string
 }
 
-// heavyAdapterRegister maps one battery selection to the container/adapters
-// bundle Register call its adapter needs, or "" when the container wires
-// the adapter itself. Adapter packages expose constructors but never
-// self-register (no init wiring anywhere), so a heavy adapter resolves
-// only after its bundle call; light adapters need nothing because
-// container/services.go registers them before first use.
-func heavyAdapterRegister(b batterySelection) string {
-	switch b.Battery + "/" + b.Adapter {
-	case "ai/anthropic", "ai/openai", "ai/gemini":
-		return "RegisterAI"
-	case "storage/s3", "storage/r2", "media/s3", "flag/firebase":
-		return "RegisterCloud"
-	case "billing/stripe", "billing/paddle", "payment/stripe", "payment/paddle":
-		return "RegisterPayments"
-	case "search/meilisearch", "vectorstore/qdrant":
-		return "RegisterSearchVector"
-	case "document/local", "media/local":
-		return "RegisterDoc"
-	case "notification/fcm", "notification/twilio":
-		return "RegisterNotify"
-	case "router/fiber":
-		return "RegisterWeb"
-	case "permission/casbin":
-		return "RegisterPermission"
-	case "analytics/posthog":
-		return "RegisterAnalytics"
-	case "geo/google":
-		return "RegisterGeo"
-	default:
-		return ""
-	}
+// moduleImport is one adapter module import in the generated app.go:
+// Alias is the local name New's qualified Register call uses (battery +
+// adapter, e.g. logslog), Path the adapter package import path. Adapter
+// packages expose constructors but never self-register, so every adapter
+// module ships a Register() wiring its battery registry.
+type moduleImport struct {
+	Alias string
+	Path  string
+}
+
+// adapterBinding maps one battery selection to its adapter module: the
+// alias app.go imports it under, the adapter package import path, and the
+// qualified Register call New must make. Every battery/adapter pair binds:
+// every adapter (stdlib-only included) is a module with a Register()
+// wiring its battery registry, and the container wires nothing itself.
+// Aliases are battery + adapter with no separator; every pair is unique
+// and collides with neither stdlib names nor facade package names.
+func adapterBinding(b batterySelection) (alias, path, call string) {
+	alias = b.Battery + b.Adapter
+
+	return alias, batteryImportPath(b), alias + ".Register()"
 }
 
 // renderAppContent renders appTemplate for exactly the given battery
 // selection -- the one place that turns a []batterySelection into app.go's
 // content, shared by ensureAppPackage and `zever new`'s writeNewProject so
-// the two callers can never format the import block differently.
+// the two callers can never format the import block differently. The
+// output imports and registers exactly the selection (floor + user picks,
+// nothing more): one named import plus Register() call per selection,
+// sorted deterministically. There are no blank imports and no bundle
+// imports: every adapter registers itself explicitly.
 func renderAppContent(tag string, selections []batterySelection) ([]byte, error) {
-	imports := make([]string, 0, len(selections))
-	seen := map[string]bool{}
+	var moduleImports = make([]moduleImport, 0, len(selections))
 
-	var registers []string
+	var registers = make([]string, 0, len(selections))
 
 	for _, s := range selections {
-		imports = append(imports, batteryImportPath(s))
-
-		if r := heavyAdapterRegister(s); r != "" && !seen[r] {
-			seen[r] = true
-			registers = append(registers, r)
-		}
+		alias, path, call := adapterBinding(s)
+		moduleImports = append(moduleImports, moduleImport{Alias: alias, Path: path})
+		registers = append(registers, call)
 	}
 
-	sort.Strings(imports)
+	sort.Slice(moduleImports, func(i, j int) bool { return moduleImports[i].Path < moduleImports[j].Path })
 	sort.Strings(registers)
 
-	return renderGoFile(tag, "app.go", appTemplate, appTemplateData{Imports: imports, Registers: registers})
+	return renderGoFile(tag, "app.go", appTemplate, appTemplateData{ModuleImports: moduleImports, Registers: registers})
 }
 
 // ensureAppPackage scaffolds internal/app/app.go when the target project has
 // none. Every generated entrypoint calls app.New(), mirroring
 // examples/todo/internal/app: adapter packages never self-register, so one
-// place per project owns the adapter selection (blank imports) and the
-// heavyweight bundle calls (adapters.Register). Called with no
+// place per project owns the adapter selection (imports) and the Register
+// calls. Called with no
 // battery-selection context (e.g. `zever generate server` run without a
 // prior `zever new`), so it renders with just coreBatterySelections -- the
-// floor every generated entrypoint needs, not a developer's fuller pick.
+// floor (log, router), both adapter modules with Register calls, not a
+// developer's fuller pick.
 func ensureAppPackage(tag string) (created bool, err error) {
 	path := filepath.Join("internal", "app", "app.go")
 
@@ -700,19 +701,26 @@ func writeStubIfMissing(tag, path string, content []byte) (written bool, err err
 // appTemplate mirrors examples/todo/internal/app/app.go: the one place a
 // project selects its adapters and builds its container. Rendered via
 // renderAppContent, never directly -- see appTemplateData.
+//
+// Adapter packages expose constructors but never self-register, so wiring
+// is explicit: the named imports below pin exactly the adapters this app
+// uses, and each has a matching Register call in New wiring its battery
+// registry. This list was picked at scaffold time (`zever new`'s battery
+// picker, or the floor (log, router) when there was no prior `zever new`)
+// -- add a battery later with `zever add <battery>` (or by hand in
+// zever.yaml plus one import and Register call here); this file is
+// scaffolded once and never regenerated.
 const appTemplate = `// Package app builds the config and container shared by this project's
 // binaries.
 //
 // Adapter packages expose constructors but never self-register, so wiring
-// is twofold: the blank imports below pin exactly the adapters this app
-// uses (and pull their modules into the build), while the container wires
-// every light adapter itself and the adapters.Register calls in New wire
-// the heavyweight ones (see container/adapters). This list was picked at
-// scaffold time (` + "`zever new`" + `'s battery picker, or the fixed set every generated
-// entrypoint needs when there was no prior ` + "`zever new`" + `) -- add a battery
-// later by giving it an adapter in zever.yaml and adding its one blank
-// import below by hand (plus its Register call when it is a heavy
-// adapter); this file is scaffolded once and never regenerated.
+// is explicit: the named imports below pin exactly the adapters this app
+// uses, and each has a matching Register call in New wiring its battery
+// registry. This list was picked at scaffold time (` + "`zever new`" + `'s battery picker, or the floor
+// (log, router) when there was no prior ` + "`zever new`" + `) -- add a battery
+// later with ` + "`zever add <battery>`" + ` (or by hand in zever.yaml plus one
+// import and Register call here); this file is scaffolded once and never
+// regenerated.
 package app
 
 import (
@@ -720,11 +728,7 @@ import (
 
 	"github.com/zenta-dev/zever/config"
 	"github.com/zenta-dev/zever/container"
-{{if .Registers}}	"github.com/zenta-dev/zever/container/adapters"
-{{end}}
-	// Blank imports pin the adapters this app selects; see the package
-	// comment.
-{{range .Imports}}	_ {{printf "%q" .}}
+{{range .ModuleImports}}	{{.Alias}} {{printf "%q" .Path}}
 {{end}})
 
 // DefaultDBPath is the sqlite file used when nothing else supplies one. It is
@@ -754,7 +758,7 @@ func Config() (*config.Config, error) {
 // New builds the container every binary in this project uses. Nothing is
 // opened until a battery is first requested.
 func New() (*container.Container, error) {
-{{range .Registers}}	adapters.{{.}}()
+{{range .Registers}}	{{.}}
 {{end}}	cfg, err := Config()
 	if err != nil {
 		return nil, err
@@ -803,8 +807,8 @@ import (
 	"google.golang.org/grpc"
 	"google.golang.org/grpc/keepalive"
 
-	"github.com/zenta-dev/zever/authz"
-	"github.com/zenta-dev/zever/middleware"
+	"github.com/zenta-dev/zever/core/authz"
+	"github.com/zenta-dev/zever/core/middleware"
 
 	"{{.ModulePath}}/internal/app"
 {{range .Modules}}	{{.Alias}} "{{.ImportPath}}"

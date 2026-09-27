@@ -5,7 +5,7 @@ import (
 	"fmt"
 	"time"
 
-	"github.com/zenta-dev/zever/db"
+	"github.com/zenta-dev/zever/core/db"
 	"github.com/zenta-dev/zever/orm"
 )
 

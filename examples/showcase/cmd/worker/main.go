@@ -19,9 +19,9 @@ import (
 	"syscall"
 	"time"
 
+	"github.com/zenta-dev/zever/core/job"
 	"github.com/zenta-dev/zever/examples/showcase/internal/app"
 	"github.com/zenta-dev/zever/examples/showcase/internal/service/jobs"
-	"github.com/zenta-dev/zever/job"
 )
 
 const (

@@ -1,0 +1,798 @@
+package meilisearch
+
+import (
+	"encoding/json"
+	"errors"
+	"io"
+	"net/http"
+	"net/http/httptest"
+	"strings"
+	"sync"
+	"sync/atomic"
+	"testing"
+
+	"github.com/zenta-dev/zever/core/search"
+	"github.com/zenta-dev/zever/shared/lrucache"
+)
+
+const (
+	testTaskResponse   = `{"taskUid":1,"indexUid":"idx","status":"enqueued"}`
+	testErrorResponse  = `{"message":"boom"}`
+	testSearchResponse = `{"hits":[{"id":"doc-1","content":"hello","metadata":{"k":"v"},"_rankingScore":0.9}],"totalHits":1,"processingTimeMs":1,"query":"hello"}`
+)
+
+type capturedRequest struct {
+	method string
+	path   string
+	auth   string
+	body   []byte
+}
+
+func serveJSON(t *testing.T, status int, body string, capt *capturedRequest) http.HandlerFunc {
+	t.Helper()
+
+	return func(w http.ResponseWriter, r *http.Request) {
+		if capt != nil {
+			capt.method = r.Method
+			capt.path = r.URL.Path
+			capt.auth = r.Header.Get("Authorization")
+			b, err := io.ReadAll(r.Body)
+			if err == nil {
+				capt.body = b
+			}
+		}
+		w.Header().Set("Content-Type", "application/json")
+		w.WriteHeader(status)
+		_, _ = w.Write([]byte(body))
+	}
+}
+
+func openTest(t *testing.T, srv *httptest.Server, key string) search.Search {
+	t.Helper()
+
+	s, err := New(search.Options{Host: srv.URL, APIKey: key})
+	if err != nil {
+		t.Fatalf("Open err = %v", err)
+	}
+
+	return s
+}
+
+func TestOpen_missingHost_returnsErrMissingHost(t *testing.T) {
+	t.Parallel()
+
+	if _, err := New(search.Options{}); !errors.Is(err, ErrMissingHost) {
+		t.Fatalf("Open err = %v, want ErrMissingHost", err)
+	}
+}
+
+func TestOpen_invalidOptions_wrapsErrInvalidOptions(t *testing.T) {
+	t.Parallel()
+
+	_, err := New(search.Options{Host: "localhost:7700"})
+	if !errors.Is(err, search.ErrInvalidOptions) {
+		t.Fatalf("Open err = %v, want wrap of ErrInvalidOptions", err)
+	}
+}
+
+func TestOpen_apiKey_setsBearerHeader(t *testing.T) {
+	t.Parallel()
+
+	var capt capturedRequest
+	srv := httptest.NewServer(serveJSON(t, 202, testTaskResponse, &capt))
+	defer srv.Close()
+
+	s := openTest(t, srv, "secret")
+	defer func() { _ = s.Close() }()
+
+	if err := s.Index(t.Context(), search.Document{ID: "d1", Index: "idx", Content: "hi"}); err != nil {
+		t.Fatalf("Index err = %v", err)
+	}
+
+	if capt.auth != "Bearer secret" {
+		t.Fatalf("Authorization = %q, want %q", capt.auth, "Bearer secret")
+	}
+}
+
+func TestOpen_anonymous_sendsNoAuthHeader(t *testing.T) {
+	t.Parallel()
+
+	var capt capturedRequest
+	srv := httptest.NewServer(serveJSON(t, 202, testTaskResponse, &capt))
+	defer srv.Close()
+
+	s := openTest(t, srv, "")
+	defer func() { _ = s.Close() }()
+
+	if err := s.Index(t.Context(), search.Document{ID: "d1", Index: "idx", Content: "hi"}); err != nil {
+		t.Fatalf("Index err = %v", err)
+	}
+
+	if capt.auth != "" {
+		t.Fatalf("Authorization = %q, want empty", capt.auth)
+	}
+}
+
+func TestIndex_sendsDocumentStructure(t *testing.T) {
+	t.Parallel()
+
+	var capt capturedRequest
+	srv := httptest.NewServer(serveJSON(t, 202, testTaskResponse, &capt))
+	defer srv.Close()
+
+	s := openTest(t, srv, "")
+	defer func() { _ = s.Close() }()
+
+	meta := map[string]any{"k": "v"}
+	if err := s.Index(t.Context(), search.Document{ID: "d1", Index: "idx", Content: "hello", Metadata: meta}); err != nil {
+		t.Fatalf("Index err = %v", err)
+	}
+
+	if capt.method != http.MethodPost {
+		t.Fatalf("method = %q, want POST", capt.method)
+	}
+
+	if capt.path != "/indexes/idx/documents" {
+		t.Fatalf("path = %q, want /indexes/idx/documents", capt.path)
+	}
+
+	var docs []map[string]any
+	if err := json.Unmarshal(capt.body, &docs); err != nil {
+		t.Fatalf("add body unmarshal err = %v", err)
+	}
+
+	if len(docs) != 1 {
+		t.Fatalf("docs len = %d, want 1", len(docs))
+	}
+
+	if docs[0]["id"] != "d1" || docs[0]["content"] != "hello" {
+		t.Fatalf("doc = %v, want id d1 content hello", docs[0])
+	}
+
+	gotMeta, ok := docs[0]["metadata"].(map[string]any)
+	if !ok || gotMeta["k"] != "v" {
+		t.Fatalf("metadata = %v, want map[k:v]", docs[0]["metadata"])
+	}
+
+	if len(meta) != 1 || meta["k"] != "v" {
+		t.Fatalf("caller metadata mutated: %v", meta)
+	}
+}
+
+func TestIndexBatch_sendsSingleRequestPerIndex(t *testing.T) {
+	t.Parallel()
+
+	var mu sync.Mutex
+
+	var paths []string
+
+	var bodies [][]byte
+
+	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		mu.Lock()
+
+		paths = append(paths, r.URL.Path)
+
+		b, _ := io.ReadAll(r.Body)
+		bodies = append(bodies, b)
+
+		mu.Unlock()
+
+		w.Header().Set("Content-Type", "application/json")
+		w.WriteHeader(http.StatusAccepted)
+		_, _ = w.Write([]byte(testTaskResponse))
+	}))
+	defer srv.Close()
+
+	s := openTest(t, srv, "")
+	defer func() { _ = s.Close() }()
+
+	docs := []search.Document{
+		{ID: "d1", Index: "idx-a", Content: "hello"},
+		{ID: "d2", Index: "idx-a", Content: "world"},
+		{ID: "d3", Index: "idx-b", Content: "goodbye"},
+	}
+
+	mc, ok := s.(*meilisearchClient)
+	if !ok {
+		t.Fatal("openTest did not return *meilisearchClient")
+	}
+
+	if err := mc.IndexBatch(t.Context(), docs); err != nil {
+		t.Fatalf("IndexBatch err = %v", err)
+	}
+
+	// Two distinct indexes among 3 docs, so exactly 2 HTTP calls (one bulk
+	// call per index), not 3 (one per document).
+	if len(paths) != 2 {
+		t.Fatalf("HTTP calls = %d, want 2", len(paths))
+	}
+
+	if paths[0] != "/indexes/idx-a/documents" || paths[1] != "/indexes/idx-b/documents" {
+		t.Fatalf("paths = %v", paths)
+	}
+
+	var idxADocs []map[string]any
+	if err := json.Unmarshal(bodies[0], &idxADocs); err != nil {
+		t.Fatalf("idx-a body unmarshal err = %v", err)
+	}
+
+	if len(idxADocs) != 2 {
+		t.Fatalf("idx-a docs = %d, want 2", len(idxADocs))
+	}
+}
+
+func TestIndexBatch_empty(t *testing.T) {
+	t.Parallel()
+
+	srv := httptest.NewServer(serveJSON(t, 202, testTaskResponse, nil))
+	defer srv.Close()
+
+	s := openTest(t, srv, "")
+	defer func() { _ = s.Close() }()
+
+	mc, ok := s.(*meilisearchClient)
+	if !ok {
+		t.Fatal("openTest did not return *meilisearchClient")
+	}
+
+	if err := mc.IndexBatch(t.Context(), nil); err != nil {
+		t.Fatalf("IndexBatch(nil) err = %v, want nil", err)
+	}
+}
+
+func TestIndexBatch_error_returnsErrorWithoutPhantomTrack(t *testing.T) {
+	t.Parallel()
+
+	srv := httptest.NewServer(serveJSON(t, 500, testErrorResponse, nil))
+	defer srv.Close()
+
+	s := openTest(t, srv, "")
+	defer func() { _ = s.Close() }()
+
+	docs := []search.Document{{ID: "d1", Index: "idx", Content: "hi"}}
+
+	mc, ok := s.(*meilisearchClient)
+	if !ok {
+		t.Fatal("openTest did not return *meilisearchClient")
+	}
+
+	if err := mc.IndexBatch(t.Context(), docs); err == nil {
+		t.Fatal("IndexBatch err = nil, want error")
+	}
+
+	err := s.Delete(t.Context(), "d1")
+
+	var nf *search.NotFoundError
+	if !errors.As(err, &nf) {
+		t.Fatalf("Delete err = %v, want NotFoundError (no phantom track)", err)
+	}
+}
+
+func TestIndexBatch_matchesLoopedIndex_tracking(t *testing.T) {
+	t.Parallel()
+
+	docs := []search.Document{
+		{ID: "loop-d1", Index: "idx", Content: "hello"},
+		{ID: "loop-d2", Index: "idx", Content: "world"},
+	}
+
+	loopSrv := httptest.NewServer(serveJSON(t, 202, testTaskResponse, nil))
+	defer loopSrv.Close()
+
+	loopS := openTest(t, loopSrv, "")
+	defer func() { _ = loopS.Close() }()
+
+	for _, d := range docs {
+		if err := loopS.Index(t.Context(), d); err != nil {
+			t.Fatalf("loop Index err = %v", err)
+		}
+	}
+
+	batchSrv := httptest.NewServer(serveJSON(t, 202, testTaskResponse, nil))
+	defer batchSrv.Close()
+
+	batchS := openTest(t, batchSrv, "")
+	defer func() { _ = batchS.Close() }()
+
+	mc, ok := batchS.(*meilisearchClient)
+	if !ok {
+		t.Fatal("openTest did not return *meilisearchClient")
+	}
+
+	if err := mc.IndexBatch(t.Context(), docs); err != nil {
+		t.Fatalf("IndexBatch err = %v", err)
+	}
+
+	// Both paths must leave every document tracked for Delete, proving
+	// IndexBatch reaches the same end-state as the looped Index calls.
+	for _, d := range docs {
+		if err := loopS.Delete(t.Context(), d.ID); err != nil {
+			t.Fatalf("loop Delete(%s) err = %v", d.ID, err)
+		}
+
+		if err := batchS.Delete(t.Context(), d.ID); err != nil {
+			t.Fatalf("batch Delete(%s) err = %v", d.ID, err)
+		}
+	}
+}
+
+func TestIndex_error_returnsErrorWithoutPhantomTrack(t *testing.T) {
+	t.Parallel()
+
+	srv := httptest.NewServer(serveJSON(t, 500, testErrorResponse, nil))
+	defer srv.Close()
+
+	s := openTest(t, srv, "")
+	defer func() { _ = s.Close() }()
+
+	if err := s.Index(t.Context(), search.Document{ID: "d1", Index: "idx", Content: "hi"}); err == nil {
+		t.Fatal("Index err = nil, want error")
+	}
+
+	err := s.Delete(t.Context(), "d1")
+	var nf *search.NotFoundError
+	if !errors.As(err, &nf) {
+		t.Fatalf("Delete err = %v, want NotFoundError (no phantom track)", err)
+	}
+}
+
+func TestDelete_untracked_returnsNotFoundWithHint(t *testing.T) {
+	t.Parallel()
+
+	s := &meilisearchClient{client: nil, idIndexes: lrucache.New[string, []string](maxIDIndexes)}
+	defer func() { _ = s.Close() }()
+
+	err := s.Delete(t.Context(), "ghost")
+
+	var nf *search.NotFoundError
+	if !errors.As(err, &nf) {
+		t.Fatalf("Delete err type = %T, want *NotFoundError", err)
+	}
+
+	if nf.ID != "ghost" {
+		t.Fatalf("NotFoundError.ID = %q, want ghost", nf.ID)
+	}
+
+	if !errors.Is(err, search.ErrNotFound) {
+		t.Fatalf("Delete err = %v, want wrap of ErrNotFound", err)
+	}
+
+	for _, hint := range []string{"re-Index before Delete", "lost on restart", "unsafe with multiple instances"} {
+		if !strings.Contains(err.Error(), hint) {
+			t.Fatalf("Delete err %q missing hint %q", err.Error(), hint)
+		}
+	}
+}
+
+func TestDelete_fanOut_deletesFromTwoIndexes(t *testing.T) {
+	t.Parallel()
+
+	var calls atomic.Int64
+
+	var mu sync.Mutex
+	paths := map[string]bool{}
+	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		if r.Method == http.MethodPost {
+			serveJSON(t, 202, testTaskResponse, nil)(w, r)
+
+			return
+		}
+		if r.Method == http.MethodDelete {
+			calls.Add(1)
+			mu.Lock()
+			paths[r.URL.Path] = true
+			mu.Unlock()
+			serveJSON(t, 202, testTaskResponse, nil)(w, r)
+
+			return
+		}
+		w.WriteHeader(http.StatusNotFound)
+	}))
+	defer srv.Close()
+
+	s := openTest(t, srv, "")
+	defer func() { _ = s.Close() }()
+
+	ctx := t.Context()
+	if err := s.Index(ctx, search.Document{ID: "d1", Index: "a", Content: "x"}); err != nil {
+		t.Fatalf("Index a err = %v", err)
+	}
+
+	if err := s.Index(ctx, search.Document{ID: "d1", Index: "b", Content: "x"}); err != nil {
+		t.Fatalf("Index b err = %v", err)
+	}
+
+	if err := s.Delete(ctx, "d1"); err != nil {
+		t.Fatalf("Delete err = %v", err)
+	}
+
+	if got := calls.Load(); got != 2 {
+		t.Fatalf("DELETE calls = %d, want 2", got)
+	}
+
+	for _, want := range []string{"/indexes/a/documents/d1", "/indexes/b/documents/d1"} {
+		mu.Lock()
+		ok := paths[want]
+		mu.Unlock()
+		if !ok {
+			t.Fatalf("missing DELETE %s, got %v", want, paths)
+		}
+	}
+
+	if err := s.Delete(ctx, "d1"); !errors.Is(err, search.ErrNotFound) {
+		t.Fatalf("second Delete err = %v, want ErrNotFound", err)
+	}
+}
+
+func TestDelete_perIndexError_returnsError(t *testing.T) {
+	t.Parallel()
+
+	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		if r.Method == http.MethodPost {
+			serveJSON(t, 202, testTaskResponse, nil)(w, r)
+
+			return
+		}
+		serveJSON(t, 500, testErrorResponse, nil)(w, r)
+	}))
+	defer srv.Close()
+
+	s := openTest(t, srv, "")
+	defer func() { _ = s.Close() }()
+
+	ctx := t.Context()
+	if err := s.Index(ctx, search.Document{ID: "d1", Index: "idx", Content: "x"}); err != nil {
+		t.Fatalf("Index err = %v", err)
+	}
+
+	err := s.Delete(ctx, "d1")
+	if err == nil || !strings.Contains(err.Error(), "delete") {
+		t.Fatalf("Delete err = %v, want delete error", err)
+	}
+}
+
+func TestDelete_afterSearch_seededIndexSucceeds(t *testing.T) {
+	t.Parallel()
+
+	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		switch {
+		case r.Method == http.MethodPost && strings.HasSuffix(r.URL.Path, "/search"):
+			serveJSON(t, 200, testSearchResponse, nil)(w, r)
+		case r.Method == http.MethodDelete:
+			if r.URL.Path != "/indexes/idx/documents/doc-1" {
+				t.Errorf("DELETE path = %q, want /indexes/idx/documents/doc-1", r.URL.Path)
+			}
+			serveJSON(t, 202, testTaskResponse, nil)(w, r)
+		default:
+			w.WriteHeader(http.StatusNotFound)
+		}
+	}))
+	defer srv.Close()
+
+	s := openTest(t, srv, "")
+	defer func() { _ = s.Close() }()
+
+	ctx := t.Context()
+	res, err := s.Search(ctx, "hello", search.QueryOptions{Filters: map[string]string{"index": "idx"}})
+	if err != nil {
+		t.Fatalf("Search err = %v", err)
+	}
+
+	if len(res.Hits) != 1 {
+		t.Fatalf("hits = %d, want 1", len(res.Hits))
+	}
+
+	if err := s.Delete(ctx, "doc-1"); err != nil {
+		t.Fatalf("Delete err = %v, want nil (search seeded track)", err)
+	}
+}
+
+func TestSearch_emptyQuery_shortCircuitsWithoutHTTP(t *testing.T) {
+	t.Parallel()
+
+	var hits atomic.Int64
+	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, _ *http.Request) {
+		hits.Add(1)
+		w.WriteHeader(http.StatusOK)
+	}))
+	defer srv.Close()
+
+	s := openTest(t, srv, "")
+	defer func() { _ = s.Close() }()
+
+	res, err := s.Search(t.Context(), "", search.QueryOptions{Filters: map[string]string{"index": "idx"}})
+	if err != nil {
+		t.Fatalf("Search err = %v", err)
+	}
+
+	if hits.Load() != 0 {
+		t.Fatalf("server hits = %d, want 0", hits.Load())
+	}
+
+	if len(res.Hits) != 0 || res.Total != 0 {
+		t.Fatalf("result = %+v, want empty", res)
+	}
+}
+
+func TestSearch_withoutIndex_returnsErrIndexRequired(t *testing.T) {
+	t.Parallel()
+
+	srv := httptest.NewServer(serveJSON(t, 200, testSearchResponse, nil))
+	defer srv.Close()
+
+	s := openTest(t, srv, "")
+	defer func() { _ = s.Close() }()
+
+	for name, filters := range map[string]map[string]string{
+		"nil":         nil,
+		"empty":       {},
+		"empty value": {"index": ""},
+		"other key":   {"other": "idx"},
+	} {
+		_, err := s.Search(t.Context(), "q", search.QueryOptions{Filters: filters})
+		if !errors.Is(err, ErrIndexRequired) {
+			t.Fatalf("%s: Search err = %v, want ErrIndexRequired", name, err)
+		}
+	}
+}
+
+func TestSearch_appliesLimitOffsetAndRankingScore(t *testing.T) {
+	t.Parallel()
+
+	var capt capturedRequest
+	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		b, _ := io.ReadAll(r.Body)
+		capt.method = r.Method
+		capt.path = r.URL.Path
+		capt.body = b
+
+		serveJSON(t, 200, testSearchResponse, nil)(w, r)
+	}))
+	defer srv.Close()
+
+	s := openTest(t, srv, "")
+	defer func() { _ = s.Close() }()
+
+	res, err := s.Search(t.Context(), "hello", search.QueryOptions{Limit: 5, Offset: 3, Filters: map[string]string{"index": "idx"}})
+	if err != nil {
+		t.Fatalf("Search err = %v", err)
+	}
+
+	if capt.method != http.MethodPost || capt.path != "/indexes/idx/search" {
+		t.Fatalf("request = %s %s, want POST /indexes/idx/search", capt.method, capt.path)
+	}
+
+	var body map[string]any
+	if err := json.Unmarshal(capt.body, &body); err != nil {
+		t.Fatalf("search body unmarshal err = %v", err)
+	}
+
+	if body["q"] != "hello" {
+		t.Fatalf("q = %v, want hello", body["q"])
+	}
+
+	if body["limit"] != float64(5) || body["offset"] != float64(3) {
+		t.Fatalf("limit/offset = %v/%v, want 5/3", body["limit"], body["offset"])
+	}
+
+	if body["showRankingScore"] != true {
+		t.Fatalf("showRankingScore = %v, want true", body["showRankingScore"])
+	}
+
+	if len(res.Hits) != 1 || res.Hits[0].ID != "doc-1" {
+		t.Fatalf("hits = %+v, want doc-1", res.Hits)
+	}
+
+	if res.Hits[0].Score != 0.9 {
+		t.Fatalf("score = %v, want 0.9", res.Hits[0].Score)
+	}
+
+	if res.Hits[0].Metadata["k"] != "v" {
+		t.Fatalf("metadata = %v, want map[k:v]", res.Hits[0].Metadata)
+	}
+
+	if res.Total != 1 {
+		t.Fatalf("total = %d, want 1", res.Total)
+	}
+}
+
+func TestSearch_defaultLimitAndClampedOffset(t *testing.T) {
+	t.Parallel()
+
+	var capt capturedRequest
+	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		b, _ := io.ReadAll(r.Body)
+		capt.body = b
+		serveJSON(t, 200, `{"hits":[],"totalHits":0,"processingTimeMs":1,"query":"q"}`, nil)(w, r)
+	}))
+	defer srv.Close()
+
+	s := openTest(t, srv, "")
+	defer func() { _ = s.Close() }()
+
+	res, err := s.Search(t.Context(), "q", search.QueryOptions{Offset: -5, Filters: map[string]string{"index": "idx"}})
+	if err != nil {
+		t.Fatalf("Search err = %v", err)
+	}
+
+	var body map[string]any
+	if err := json.Unmarshal(capt.body, &body); err != nil {
+		t.Fatalf("body unmarshal err = %v", err)
+	}
+
+	if body["limit"] != float64(search.DefaultLimit) {
+		t.Fatalf("limit = %v, want %d", body["limit"], search.DefaultLimit)
+	}
+
+	if body["offset"] != nil && body["offset"] != float64(0) {
+		t.Fatalf("offset = %v, want absent or 0", body["offset"])
+	}
+
+	if len(res.Hits) != 0 || res.Total != 0 {
+		t.Fatalf("result = %+v, want empty", res)
+	}
+}
+
+func TestSearch_malformedHitFields_skipsBadFieldsKeepsHit(t *testing.T) {
+	t.Parallel()
+
+	payload := `{"hits":[{"id":42,"content":"x","metadata":["nope"],"_rankingScore":"high"}],"totalHits":1,"processingTimeMs":1,"query":"q"}`
+	srv := httptest.NewServer(serveJSON(t, 200, payload, nil))
+	defer srv.Close()
+
+	s := openTest(t, srv, "")
+	defer func() { _ = s.Close() }()
+
+	res, err := s.Search(t.Context(), "q", search.QueryOptions{Filters: map[string]string{"index": "idx"}})
+	if err != nil {
+		t.Fatalf("Search err = %v", err)
+	}
+
+	if len(res.Hits) != 1 {
+		t.Fatalf("hits = %d, want 1", len(res.Hits))
+	}
+
+	if res.Hits[0].ID != "" {
+		t.Fatalf("ID = %q, want empty (numeric id skipped)", res.Hits[0].ID)
+	}
+
+	if res.Hits[0].Score != 0 {
+		t.Fatalf("Score = %v, want 0 (string score skipped)", res.Hits[0].Score)
+	}
+
+	if res.Hits[0].Metadata != nil {
+		t.Fatalf("Metadata = %v, want nil (array metadata skipped)", res.Hits[0].Metadata)
+	}
+}
+
+func TestSearch_httpError_returnsError(t *testing.T) {
+	t.Parallel()
+
+	srv := httptest.NewServer(serveJSON(t, 500, testErrorResponse, nil))
+	defer srv.Close()
+
+	s := openTest(t, srv, "")
+	defer func() { _ = s.Close() }()
+
+	_, err := s.Search(t.Context(), "q", search.QueryOptions{Filters: map[string]string{"index": "idx"}})
+	if err == nil || !strings.Contains(err.Error(), "search") {
+		t.Fatalf("Search err = %v, want search error", err)
+	}
+}
+
+func TestToHits_missingKeys_yieldsZeroHit(t *testing.T) {
+	t.Parallel()
+
+	hits := toHits(nil)
+	if len(hits) != 0 {
+		t.Fatalf("toHits(nil) = %v, want empty", hits)
+	}
+}
+
+// TestTracker_addGetCloneDedupMoveBackEvict exercises the idIndexes cache
+// (now a plain lrucache.Cache[string, []string]) through the same observable
+// contract the old hand-rolled idIndexTracker had: reads are independent
+// copies (no aliasing), recordIndex dedups an already-tracked index, and
+// capacity overflow evicts the least-recently-used id while a Get-based
+// touch keeps an id alive.
+func TestTracker_addGetCloneDedupMoveBackEvict(t *testing.T) {
+	t.Parallel()
+
+	tr := lrucache.New[string, []string](2)
+	tr.Put("a", cloneIndexes([]string{"i1"}))
+	tr.Put("b", cloneIndexes([]string{"i2"}))
+
+	got, ok := tr.Get("a")
+	if !ok || len(got) != 1 || got[0] != "i1" {
+		t.Fatalf("Get(a) = %v,%v, want [i1],true", got, ok)
+	}
+
+	got = cloneIndexes(got)
+	got[0] = "mutated"
+	again, _ := tr.Get("a")
+	if again[0] != "i1" {
+		t.Fatalf("clone broken: Get(a) = %v after mutate", again)
+	}
+
+	tr.Put("a", cloneIndexes(recordIndex([]string{"i1"}, "i1")))
+	if got, _ := tr.Get("a"); len(got) != 1 {
+		t.Fatalf("dedup failed: Get(a) = %v, want [i1]", got)
+	}
+
+	tr.Put("a", cloneIndexes(recordIndex([]string{"i1"}, "i3")))
+	if got, _ := tr.Get("a"); len(got) != 2 {
+		t.Fatalf("record failed: Get(a) = %v, want [i1 i3]", got)
+	}
+
+	// Touch "a" to make it most-recently-used before overflowing capacity.
+	tr.Get("a")
+	tr.Put("c", cloneIndexes([]string{"i4"}))
+	if _, ok := tr.Get("b"); ok {
+		t.Fatal("evict failed: b still present after cap overflow")
+	}
+
+	if _, ok := tr.Get("a"); !ok {
+		t.Fatal("move-back failed: a evicted instead of b")
+	}
+
+	if _, ok := tr.Get("c"); !ok {
+		t.Fatal("c missing after add")
+	}
+
+	if tr.Len() != 2 {
+		t.Fatalf("Len = %d, want 2", tr.Len())
+	}
+}
+
+func TestTracker_delete_missing(t *testing.T) {
+	t.Parallel()
+
+	tr := lrucache.New[string, []string](10)
+	tr.Delete("ghost") // must not panic on a missing key
+
+	tr.Put("b", cloneIndexes([]string{"i1"}))
+	tr.Delete("b")
+
+	if _, ok := tr.Get("b"); ok {
+		t.Fatal("b should be deleted")
+	}
+
+	if tr.Len() != 0 {
+		t.Fatalf("Len = %d, want 0", tr.Len())
+	}
+}
+
+func TestRecordIndex_table(t *testing.T) {
+	t.Parallel()
+
+	if got := recordIndex(nil, "x"); len(got) != 1 || got[0] != "x" {
+		t.Fatalf("recordIndex(nil,x) = %v", got)
+	}
+
+	if got := recordIndex([]string{"x"}, "x"); len(got) != 1 {
+		t.Fatalf("recordIndex dup = %v, want [x]", got)
+	}
+
+	if got := recordIndex([]string{"x"}, "y"); len(got) != 2 {
+		t.Fatalf("recordIndex append = %v, want [x y]", got)
+	}
+}
+
+func TestResolveIndex_table(t *testing.T) {
+	t.Parallel()
+
+	got, err := resolveIndex(map[string]string{"index": "idx"})
+	if err != nil || got != "idx" {
+		t.Fatalf("resolveIndex = %q,%v, want idx,nil", got, err)
+	}
+}
+
+func TestClose_returnsNil(t *testing.T) {
+	t.Parallel()
+
+	s := &meilisearchClient{client: nil, idIndexes: lrucache.New[string, []string](1)}
+	if err := s.Close(); err != nil {
+		t.Fatalf("Close err = %v, want nil", err)
+	}
+}

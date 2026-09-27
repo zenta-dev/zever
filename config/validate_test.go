@@ -16,7 +16,7 @@ func TestValidateFailClosed(t *testing.T) {
 	t.Parallel()
 	cfg := Default()
 	cfg.Crypto.Options.Key = "x"
-	cfg.DB.Adapter = "bogus"
+	cfg.DB.Adapter = ""
 	err := cfg.Validate()
 	if err == nil {
 		t.Fatal("want error")
@@ -32,7 +32,7 @@ func TestValidateFailClosed(t *testing.T) {
 func TestValidateBadAdapter(t *testing.T) {
 	t.Parallel()
 	cfg := Default()
-	cfg.Router.Adapter = "bogus"
+	cfg.Router.Adapter = ""
 	if err := cfg.Validate(); err == nil {
 		t.Fatal("want error")
 	}

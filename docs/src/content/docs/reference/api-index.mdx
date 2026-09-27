@@ -5,11 +5,11 @@ description: Package entry points with container accessors for every service.
 
 ## Purpose
 
-Single-module repo (`github.com/zenta-dev/zever`, no nested `go.mod`).
-Import any top-level package directly; resolve through `container`.
+Multi-module monorepo. Battery interfaces live in `core/<b>` with the `Register`/`Open` registry; each adapter lives in its own module at `adapters/<b>/<a>` with a `Register()` call wiring it in; SDK-free helpers live in `shared/*`.
+Import the `core` interface plus the adapter modules you need; resolve through `container`.
 
 When to use: find the package, accessor, and close shape for a service.
-When not to use: DSL internals (`internal/dsl`) are internal-only;
+When not to use: DSL internals (`dsl/*`) are internal-only;
 runtime code must not import the compiler.
 
 ## Prerequisites
@@ -92,52 +92,56 @@ exit:0 (non-nil only on per-service close failures, joined via errors.Join)
 
 | Package | Role |
 |---|---|
-| `config` | layered typed config, defaults/file/env |
-| `container` | sole resolver, lazy accessors, ordered close |
-| `orm` | generics typed builder over `db.DB` |
+| `config` | layered typed config, defaults/file/env (own module) |
+| `container` | sole resolver, lazy accessors, ordered close (own module) |
+| `orm` | generics typed builder over `core/db` (own module) |
+| `dsl` | `.zen` compiler frontend, compile time only (own module) |
 | `middleware` | shared HTTP middleware |
-| `cmd/zever` | flags-only toolkit shell |
+| `cmd/zever` | flags-only toolkit shell (own module) |
+| `shared/*` | SDK-free helpers (`codec`, `redisclient`, `s3opts`, `retry`, ...), one module each |
+
+`core/<b>` holds each battery interface plus its `Register`/`Open` registry; `adapters/<b>/<a>` holds one module per adapter whose `Register()` wires it in.
 
 ### Service packages and accessors
 
 | Package | Accessor | Notes |
 |---|---|---|
-| `ai` | `AI()` | |
-| `analytics` | `Analytics()` | |
-| `auth` | `Auth()` | |
-| `billing` | `Billing()` | |
-| `cache` | `Cache()` | leaf dependency, closed last |
-| `crypto` | `Crypto()` | |
-| `db` | `DB()` | plus `Transactor()` helper |
-| `document` | `Document()` | |
-| `eventbus` | `EventBus()` (`Eventbus()` alias) | |
-| `flag` | `Flag()` | |
-| `geo` | `Geo()` | |
+| `core/ai` | `AI()` | |
+| `core/analytics` | `Analytics()` | |
+| `core/auth` | `Auth()` | |
+| `core/billing` | `Billing()` | |
+| `core/cache` | `Cache()` | leaf dependency, closed last |
+| `core/crypto` | `Crypto()` | |
+| `core/db` | `DB()` | plus `Transactor()` helper |
+| `core/document` | `Document()` | |
+| `core/eventbus` | `EventBus()` (`Eventbus()` alias) | |
+| `core/flag` | `Flag()` | |
+| `core/geo` | `Geo()` | |
 | `grpc` | `GRPC(opts...)` | lazy `*grpc.Server` singleton, no registry |
-| `i18n` | `I18n()` | |
-| `idempotency` | `Idempotency()` | |
-| `job` | `Job()` | `*job.Dispatcher` over resolved `Queue` |
-| `lock` | `Lock()` | |
-| `log` | `Log()` | |
-| `mailer` | `Mailer()` | |
-| `media` | `Media()` | |
-| `notification` | `Notification()` | |
-| `observability` | `Observability()` | |
-| `password` | `Password()` | |
-| `payment` | `Payment()` | |
-| `permission` | `Permission()` | |
-| `queue` | `Queue()` | leaf dependency, closed last |
-| `ratelimit` | `RateLimit()` (`Ratelimit()` alias) | |
-| `router` | `Router()` | |
-| `scheduler` | `Scheduler()` | shares `Queue` via `Job()`, closed first |
-| `search` | `Search()` | |
-| `secrets` | `Secrets()` | |
-| `session` | `Session()` | |
-| `storage` | `Storage()` | |
-| `tenant` | `Tenant()` | |
-| `vectorstore` | `VectorStore()` | |
-| `webhook` | `Webhook()` | |
-| `workflow` | `Workflow()` | |
+| `core/i18n` | `I18n()` | |
+| `core/idempotency` | `Idempotency()` | |
+| `core/job` | `Job()` | `*job.Dispatcher` over resolved `Queue` |
+| `core/lock` | `Lock()` | |
+| `core/log` | `Log()` | |
+| `core/mailer` | `Mailer()` | |
+| `core/media` | `Media()` | |
+| `core/notification` | `Notification()` | |
+| `core/observability` | `Observability()` | |
+| `core/password` | `Password()` | |
+| `core/payment` | `Payment()` | |
+| `core/permission` | `Permission()` | |
+| `core/queue` | `Queue()` | leaf dependency, closed last |
+| `core/ratelimit` | `RateLimit()` (`Ratelimit()` alias) | |
+| `core/router` | `Router()` | |
+| `core/scheduler` | `Scheduler()` | shares `Queue` via `Job()`, closed first |
+| `core/search` | `Search()` | |
+| `core/secrets` | `Secrets()` | |
+| `core/session` | `Session()` | |
+| `core/storage` | `Storage()` | |
+| `core/tenant` | `Tenant()` | |
+| `core/vectorstore` | `VectorStore()` | |
+| `core/webhook` | `Webhook()` | |
+| `core/workflow` | `Workflow()` | |
 
 ### Close-shape standard
 

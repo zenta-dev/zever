@@ -4,8 +4,8 @@ import (
 	"fmt"
 	"io"
 
-	"github.com/zenta-dev/zever/internal/dsl/compile"
-	"github.com/zenta-dev/zever/internal/dsl/ir"
+	"github.com/zenta-dev/zever/dsl/compile"
+	"github.com/zenta-dev/zever/dsl/ir"
 )
 
 // GraphConfig carries every input runGraphWith needs. Screen agents build it

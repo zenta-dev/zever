@@ -7,8 +7,8 @@ import (
 	"go.lsp.dev/protocol"
 	"go.lsp.dev/uri"
 
-	"github.com/zenta-dev/zever/internal/dsl/ast"
-	"github.com/zenta-dev/zever/internal/dsl/diag"
+	"github.com/zenta-dev/zever/dsl/ast"
+	"github.com/zenta-dev/zever/dsl/diag"
 )
 
 // ErrRenameEmptyName rejects a blank new name before any edit is built.
@@ -25,7 +25,7 @@ var ErrRenameInvalidIdent = errors.New("zever-lsp: rename requires a valid ident
 var errRenameInvalidIdent = ErrRenameInvalidIdent
 
 // isValidZenIdent reports whether name is a legal zen DSL identifier,
-// mirroring internal/dsl/lexer's exact isIdentStart/isIdentContinue rule:
+// mirroring dsl/lexer's exact isIdentStart/isIdentContinue rule:
 // the first character must be '_' or an ASCII letter, and every subsequent
 // character must be '_', an ASCII letter, or an ASCII digit.
 func isValidZenIdent(name string) bool {

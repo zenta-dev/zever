@@ -19,11 +19,11 @@ import (
 	"time"
 
 	"github.com/zenta-dev/zever/container"
+	"github.com/zenta-dev/zever/core/i18n"
+	"github.com/zenta-dev/zever/core/middleware"
+	"github.com/zenta-dev/zever/core/permission"
 	"github.com/zenta-dev/zever/examples/bookings/internal/api"
 	"github.com/zenta-dev/zever/examples/bookings/internal/app"
-	"github.com/zenta-dev/zever/i18n"
-	"github.com/zenta-dev/zever/middleware"
-	"github.com/zenta-dev/zever/permission"
 )
 
 const (

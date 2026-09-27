@@ -4,7 +4,7 @@ import (
 	"context"
 	"testing"
 
-	"github.com/zenta-dev/zever/db"
+	"github.com/zenta-dev/zever/core/db"
 )
 
 // These tests run genuine RIGHT/FULL SQL through the DEFAULT sqlite dialect

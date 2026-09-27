@@ -6,7 +6,7 @@ description: File storage with policy-gated access and local-first defaults.
 Uploaded files, generated reports, exported backups - anything your app keeps
 as a blob should not be tied to one filesystem or one cloud provider in the
 code that writes it. `storage.Storage` gives one interface gated by policy
-(`storage/policy.go`, `storage/decision.go`) so access checks live in one
+(`core/storage/policy.go`, `core/storage/decision.go`) so access checks live in one
 place instead of scattered across every call site that touches a file.
 
 ## Purpose and when to use
@@ -130,10 +130,10 @@ import (
 	"fmt"
 	"time"
 
-	"github.com/zenta-dev/zever/media"
-	"github.com/zenta-dev/zever/storage"
-	storagelocal "github.com/zenta-dev/zever/storage/local"
-	medialocal "github.com/zenta-dev/zever/media/local"
+	"github.com/zenta-dev/zever/core/media"
+	"github.com/zenta-dev/zever/core/storage"
+	storagelocal "github.com/zenta-dev/zever/adapters/storage/local"
+	medialocal "github.com/zenta-dev/zever/adapters/media/local"
 )
 
 func main() error {
@@ -167,17 +167,17 @@ func main() error {
 }
 ```
 
-Expected behavior: prints a presigned link valid for one hour, then probe metadata or a clean skip when the fixture is not decodable media. Check `storage/storage.go` and `media/media.go` for exact signatures before wiring handlers.
+Expected behavior: prints a presigned link valid for one hour, then probe metadata or a clean skip when the fixture is not decodable media. Check `core/storage/storage.go` and `core/media/media.go` for exact signatures before wiring handlers.
 
 ## Adapters
 
 | Adapter | Package | Notes |
 |---|---|---|
-| `local` | `storage/local` | Default filesystem store, presigned HMAC via `secret` |
-| `s3` | `storage/s3` | S3-compatible, shared core in `storage/s3core` |
-| `r2` | `storage/r2` | Cloudflare R2, needs `account_id` |
-| `local` | `media/local` | Default pipeline root, serves under `base_url` |
-| `s3` | `media/s3` | Shared object hold, needs `bucket` plus creds |
+| `local` | `adapters/storage/local` | Default filesystem store, presigned HMAC via `secret` |
+| `s3` | `adapters/storage/s3` | S3-compatible, shared core in `shared/s3opts` |
+| `r2` | `adapters/storage/r2` | Cloudflare R2, needs `account_id` |
+| `local` | `adapters/media/local` | Default pipeline root, serves under `base_url` |
+| `s3` | `adapters/media/s3` | Shared object hold, needs `bucket` plus creds |
 
 Storage and media adapters version independently: local files can back
 storage while media already points at S3, though keeping them aligned avoids

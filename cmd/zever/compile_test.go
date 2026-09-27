@@ -11,7 +11,7 @@ import (
 	"strings"
 	"testing"
 
-	"github.com/zenta-dev/zever/internal/dsl/diag"
+	"github.com/zenta-dev/zever/dsl/diag"
 )
 
 const inspectUserSchema = `entity User {

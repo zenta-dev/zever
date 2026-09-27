@@ -12,44 +12,27 @@ import (
 
 	"github.com/zenta-dev/zever/config"
 	"github.com/zenta-dev/zever/container"
+	"github.com/zenta-dev/zever/core/i18n"
+	"github.com/zenta-dev/zever/core/permission"
+	"github.com/zenta-dev/zever/core/queue"
 	"github.com/zenta-dev/zever/examples/bookings/internal/api"
-	"github.com/zenta-dev/zever/i18n"
-	"github.com/zenta-dev/zever/permission"
-	"github.com/zenta-dev/zever/queue"
 
-	_ "github.com/zenta-dev/zever/analytics/log"
-	_ "github.com/zenta-dev/zever/auth/jwt"
-	_ "github.com/zenta-dev/zever/billing/stub"
-	_ "github.com/zenta-dev/zever/cache/memory"
-	_ "github.com/zenta-dev/zever/crypto/local"
-	_ "github.com/zenta-dev/zever/db/sqlite"
-	_ "github.com/zenta-dev/zever/document/local"
-	_ "github.com/zenta-dev/zever/eventbus/memory"
-	_ "github.com/zenta-dev/zever/flag/static"
-	_ "github.com/zenta-dev/zever/geo/static"
-	_ "github.com/zenta-dev/zever/i18n/embed"
-	_ "github.com/zenta-dev/zever/idempotency/memory"
-	_ "github.com/zenta-dev/zever/lock/memory"
-	_ "github.com/zenta-dev/zever/log/slog"
-	_ "github.com/zenta-dev/zever/mailer/log"
-	_ "github.com/zenta-dev/zever/media/local"
-	_ "github.com/zenta-dev/zever/notification/log"
-	_ "github.com/zenta-dev/zever/observability/stdout"
-	_ "github.com/zenta-dev/zever/password/argon2"
-	_ "github.com/zenta-dev/zever/payment/stub"
-	_ "github.com/zenta-dev/zever/permission/rbac"
-	_ "github.com/zenta-dev/zever/queue/memory"
-	_ "github.com/zenta-dev/zever/ratelimit/memory"
-	_ "github.com/zenta-dev/zever/router/stdhttp"
-	_ "github.com/zenta-dev/zever/scheduler/embedded"
-	_ "github.com/zenta-dev/zever/search/sqlite"
-	_ "github.com/zenta-dev/zever/secrets/env"
-	_ "github.com/zenta-dev/zever/session/memory"
-	_ "github.com/zenta-dev/zever/storage/local"
-	_ "github.com/zenta-dev/zever/tenant/single"
-	_ "github.com/zenta-dev/zever/vectorstore/sqlite"
-	_ "github.com/zenta-dev/zever/webhook/queue"
-	_ "github.com/zenta-dev/zever/workflow/memory"
+	authjwt "github.com/zenta-dev/zever/adapters/auth/jwt"
+	billingstub "github.com/zenta-dev/zever/adapters/billing/stub"
+	cryptolocal "github.com/zenta-dev/zever/adapters/crypto/local"
+	dbsqlite "github.com/zenta-dev/zever/adapters/db/sqlite"
+	flagstatic "github.com/zenta-dev/zever/adapters/flag/static"
+	geostatic "github.com/zenta-dev/zever/adapters/geo/static"
+	i18nembed "github.com/zenta-dev/zever/adapters/i18n/embed"
+	idempotencymemory "github.com/zenta-dev/zever/adapters/idempotency/memory"
+	lockmemory "github.com/zenta-dev/zever/adapters/lock/memory"
+	passwordargon2 "github.com/zenta-dev/zever/adapters/password/argon2"
+	paymentstub "github.com/zenta-dev/zever/adapters/payment/stub"
+	permissionrbac "github.com/zenta-dev/zever/adapters/permission/rbac"
+	queuememory "github.com/zenta-dev/zever/adapters/queue/memory"
+	ratelimitmemory "github.com/zenta-dev/zever/adapters/ratelimit/memory"
+	routerstdhttp "github.com/zenta-dev/zever/adapters/router/stdhttp"
+	tenantsingle "github.com/zenta-dev/zever/adapters/tenant/single"
 )
 
 const testJWTSecret = "test-secret-for-bookings-32-bytes-min!"
@@ -63,6 +46,23 @@ type testSetup struct {
 // newTestSetup builds a fresh sqlite-backed API per test.
 func newTestSetup(t *testing.T) testSetup {
 	t.Helper()
+
+	authjwt.Register()
+	billingstub.Register()
+	cryptolocal.Register()
+	dbsqlite.Register()
+	flagstatic.Register()
+	geostatic.Register()
+	i18nembed.Register()
+	idempotencymemory.Register()
+	lockmemory.Register()
+	passwordargon2.Register()
+	paymentstub.Register()
+	permissionrbac.Register()
+	queuememory.Register()
+	ratelimitmemory.Register()
+	routerstdhttp.Register()
+	tenantsingle.Register()
 
 	cfg := config.Default()
 	cfg.DB.Options.Path = filepath.Join(t.TempDir(), "test.db")

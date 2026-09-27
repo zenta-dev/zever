@@ -32,14 +32,14 @@ you caught every signature.
 
 WIRING (by hand, after filling in the TODOs): zever registers adapters
 explicitly, not via init(). Add a Name constant to the battery's Adapter
-enum plus its ParseAdapter case in <battery>/adapter.go, register the
-constructor in container/services.go's registerAdapters
-(_ = <battery>.Register(<battery>.Name, <name>.New), then select it in
-zever.yaml (<battery>: {adapter: <name>}).
+enum plus its ParseAdapter case in core/<battery>/adapter.go, point the
+scaffolded register.go at it (replacing the ParseAdapter placeholder), and
+select the adapter in zever.yaml (<battery>: {adapter: <name>}).
 
-This is a contributor command: it writes into this repository's own battery
-directories, and the generated options.go imports the module-internal
-github.com/zenta-dev/zever/internal/opts helpers.
+This is a contributor command: it writes into this repository's own
+adapters/<battery>/<name>/ module directory, and the generated files are
+stdlib-only apart from the core/<battery> import, so the stub compiles
+inside its own adapter module.
 
 --field pre-declares an Options field, as name:type; it may be repeated, and
 may appear before or after the positional arguments. Valid types: ` + adapterOptionTypeList + `.`
@@ -1129,25 +1129,26 @@ var batterySpecs = map[string]batterySpec{
 // --- Options field types ---
 
 // adapterOptionType maps a --field type name onto the Go type used in the
-// generated Options struct and the internal/opts helper that parses it.
+// generated Options struct and the fieldOr assignment that reads it.
 type adapterOptionType struct {
 	GoType string
-	// Parse is a format string taking the option key, producing the
-	// right-hand side of the ParseOptions assignment.
-	Parse string
+	// Assign is a format string taking the option key, producing the
+	// right-hand side of the ParseOptions assignment: a fieldOr call with
+	// an explicit type argument, so the stub compiles without helpers.
+	Assign string
 	// Import is the extra stdlib import the Go type needs, if any.
 	Import string
 }
 
 var adapterOptionTypes = map[string]adapterOptionType{
-	"string":   {GoType: "string", Parse: `opts.String(m, %q, "")`},
-	"bool":     {GoType: "bool", Parse: `opts.Bool(m, %q, false)`},
-	"int":      {GoType: "int", Parse: `opts.Int(m, %q, 0)`},
-	"int64":    {GoType: "int64", Parse: `opts.Int64(m, %q, 0)`},
-	"float64":  {GoType: "float64", Parse: `opts.Float64(m, %q, 0)`},
-	"duration": {GoType: "time.Duration", Parse: `opts.Duration(m, %q, 0)`, Import: "time"},
-	"strings":  {GoType: "[]string", Parse: `opts.StringSlice(m, %q)`},
-	"map":      {GoType: "map[string]any", Parse: `opts.Map(m, %q)`},
+	"string":   {GoType: "string", Assign: `fieldOr[string](m, %q, "")`},
+	"bool":     {GoType: "bool", Assign: `fieldOr[bool](m, %q, false)`},
+	"int":      {GoType: "int", Assign: `fieldOr[int](m, %q, 0)`},
+	"int64":    {GoType: "int64", Assign: `fieldOr[int64](m, %q, 0)`},
+	"float64":  {GoType: "float64", Assign: `fieldOr[float64](m, %q, 0)`},
+	"duration": {GoType: "time.Duration", Assign: `fieldOr[time.Duration](m, %q, 0)`, Import: "time"},
+	"strings":  {GoType: "[]string", Assign: `fieldOr[[]string](m, %q, nil)`},
+	"map":      {GoType: "map[string]any", Assign: `fieldOr[map[string]any](m, %q, nil)`},
 }
 
 // adapterOptionTypeList is the sorted, comma-separated set of --field types,
@@ -1239,15 +1240,17 @@ type GenerateAdapterConfig struct {
 
 // GenerateAdapterResult names everything GenerateAdapter wrote.
 type GenerateAdapterResult struct {
-	Dir         string
-	AdapterPath string
-	OptionsPath string
+	Dir          string
+	AdapterPath  string
+	OptionsPath  string
+	RegisterPath string
 }
 
-// GenerateAdapter renders the adapter stub and options files from resolved
-// inputs and writes them to disk. Both files render before either is
-// written, so a collision on options.go cannot leave a half-scaffolded
-// package behind. It performs no flag parsing and no prompting.
+// GenerateAdapter renders the adapter stub, options and register files
+// from resolved inputs and writes them to disk. All three files render
+// before any is written, so a collision on one cannot leave a
+// half-scaffolded package behind. It performs no flag parsing and no
+// prompting.
 //
 //nolint:unparam // result kept for callers/tests; user output goes to cfg Stdout/Stderr writers.
 func GenerateAdapter(cfg GenerateAdapterConfig) (GenerateAdapterResult, error) {
@@ -1275,11 +1278,11 @@ func GenerateAdapter(cfg GenerateAdapterConfig) (GenerateAdapterResult, error) {
 		}
 	}
 
-	// Both path components are re-derived from validated values — the battery
+	// All three path components are re-derived from validated values — the battery
 	// directory from the table entry, not the argument, and the adapter name
 	// from a fresh [a-z][a-z0-9]* string — so no traversal can reach the
 	// filesystem calls below.
-	dir := filepath.Join(spec.Package, sanitizedPackageName(cfg.Name))
+	dir := filepath.Join("adapters", spec.Package, sanitizedPackageName(cfg.Name))
 
 	adapterSrc, err := renderAdapterFile(tag, spec, cfg.Name)
 	if err != nil {
@@ -1291,17 +1294,24 @@ func GenerateAdapter(cfg GenerateAdapterConfig) (GenerateAdapterResult, error) {
 		return res, err
 	}
 
+	registerSrc, err := renderAdapterRegisterFile(tag, spec, cfg.Name)
+	if err != nil {
+		return res, err
+	}
+
 	adapterPath := filepath.Join(dir, cfg.Name+".go")
 	optionsPath := filepath.Join(dir, "options.go")
+	registerPath := filepath.Join(dir, "register.go")
 
 	res.Dir = dir
 	res.AdapterPath = adapterPath
 	res.OptionsPath = optionsPath
+	res.RegisterPath = registerPath
 
-	// Both files are checked before either is written, so a collision on
-	// options.go cannot leave a half-scaffolded package on disk.
+	// Every file is checked before any is written, so a collision on one
+	// cannot leave a half-scaffolded package on disk.
 	if !cfg.Force {
-		for _, path := range []string{adapterPath, optionsPath} {
+		for _, path := range []string{adapterPath, optionsPath, registerPath} {
 			if _, statErr := os.Stat(path); statErr == nil {
 				return res, fmt.Errorf("%s: %q already exists (pass --force to overwrite)", tag, path)
 			}
@@ -1313,6 +1323,10 @@ func GenerateAdapter(cfg GenerateAdapterConfig) (GenerateAdapterResult, error) {
 	}
 
 	if err := writeScaffold(tag, optionsPath, optionsSrc, cfg.Force); err != nil {
+		return res, err
+	}
+
+	if err := writeScaffold(tag, registerPath, registerSrc, cfg.Force); err != nil {
 		return res, err
 	}
 
@@ -1516,13 +1530,12 @@ const adapterFileTemplate = `// Package {{.Name}} provides a {{.Name}} adapter f
 // New) with the real integration; ` + "`make lint`" + ` will keep reporting the
 // TODOs until you do. Delete this paragraph when the adapter is real.
 //
-// WIRING: zever registers adapters explicitly in
-// container/services.go's registerAdapters, not via init(). After filling
-// in the TODOs, add a {{.AdapterConst}} constant to the {{.Battery}} Adapter enum
-// (plus its ParseAdapter case), register the constructor
-// (_ = {{.Battery}}.Register({{.Battery}}.{{.AdapterConst}}, New)), and
-// select it in zever.yaml. Until then this package builds but is
-// unreachable.
+// WIRING: zever registers adapters explicitly, never via init(). After
+// filling in the TODOs, add a {{.AdapterConst}} constant to the {{.Battery}} Adapter enum
+// in core/{{.Battery}}/adapter.go (plus its ParseAdapter case), point the
+// scaffolded register.go at it (replacing the ParseAdapter placeholder),
+// and select it in zever.yaml. Until then this package builds but is
+// reachable only through its placeholder registration.
 package {{.Name}}
 
 import (
@@ -1557,7 +1570,7 @@ func renderAdapterFile(tag string, spec batterySpec, name string) ([]byte, error
 		Name:         name,
 		Interface:    spec.Interface,
 		AdapterConst: goIdent(name),
-		LocalImports: []string{"github.com/zenta-dev/zever/" + spec.Package},
+		LocalImports: []string{"github.com/zenta-dev/zever/core/" + spec.Package},
 	}
 
 	stdImports := append([]string(nil), spec.Imports...)
@@ -1655,13 +1668,12 @@ func adapterMethodBody(m batteryMethod) (body string, usesErrors bool) {
 }
 
 type adapterOptionsData struct {
-	Battery      string
-	Name         string
-	Fields       []adapterOptionsField
-	StdImports   []string
-	LocalImports []string
-	HasFields    bool
-	ParseParam   string
+	Battery    string
+	Name       string
+	Fields     []adapterOptionsField
+	StdImports []string
+	HasFields  bool
+	ParseParam string
 }
 
 type adapterOptionsField struct {
@@ -1673,11 +1685,9 @@ type adapterOptionsField struct {
 }
 
 const adapterOptionsTemplate = `package {{.Name}}
-{{if .LocalImports}}
+{{if .StdImports}}
 import (
 {{range .StdImports}}	"{{.}}"
-{{end}}
-{{range .LocalImports}}	"{{.}}"
 {{end}})
 {{end}}
 // Options configures the {{.Name}} {{.Battery}} adapter.{{if not .HasFields}}
@@ -1691,14 +1701,24 @@ import (
 {{- end}}
 }
 
+// fieldOr returns the T held at key, or def when the key is missing or held
+// a different type. It keeps ParseOptions stdlib-only, so the stub compiles
+// inside its own adapter module with no shared helpers to import.
+func fieldOr[T any](m map[string]any, key string, def T) T {
+	if v, ok := m[key].(T); ok {
+		return v
+	}
+
+	return def
+}
+
 {{else}}type Options struct{}
 {{end}}
 // ParseOptions extracts typed options from a raw configuration map.
 //
-// TODO: add the required-field checks this adapter needs, in the style of the
-// other adapters: an empty value that the adapter cannot run without should
-// fail here with a "[{{.Battery}}] {{.Name}}: <field> is required" error, not
-// at first use.
+// TODO: add the required-field checks this adapter needs: an empty value
+// that the adapter cannot run without should fail here with a
+// "[{{.Battery}}] {{.Name}}: <field> is required" error, not at first use.
 func ParseOptions({{.ParseParam}} map[string]any) (Options, error) {
 {{- if .HasFields}}
 	var o Options
@@ -1723,7 +1743,6 @@ func renderAdapterOptionsFile(tag, battery, name string, fields optionSpecs) ([]
 
 	if data.HasFields {
 		data.ParseParam = "m"
-		data.LocalImports = append(data.LocalImports, "github.com/zenta-dev/zever/internal/opts")
 	}
 
 	extra := map[string]bool{}
@@ -1740,16 +1759,54 @@ func renderAdapterOptionsFile(tag, battery, name string, fields optionSpecs) ([]
 			GoType:  typ.GoType,
 			Key:     f.Key,
 			Comment: fmt.Sprintf("%s is the %q option. TODO: document it.", goFieldName(f.Key), f.Key),
-			Assign:  fmt.Sprintf(typ.Parse, f.Key),
+			Assign:  fmt.Sprintf(typ.Assign, f.Key),
 		})
 	}
 
-	// gofmt sorts a contiguous import block alphabetically, which would put
-	// the module-local opts import above "time"; goimports' local-prefix
-	// grouping wants them in separate blocks, so keep the two lists apart.
 	data.StdImports = sortedKeys(extra)
 
 	return renderGoFile(tag, "adapter options", adapterOptionsTemplate, data)
+}
+
+// adapterRegisterData is renderAdapterRegisterFile's render input.
+type adapterRegisterData struct {
+	Battery string
+	Name    string
+	// AdapterConst is the suggested Adapter enum constant for the wiring
+	// comment (e.g. "Memcached"). It names nothing in code yet: adding the
+	// real constant to the battery package is a manual wiring step, so the
+	// Register body resolves the adapter through ParseAdapter until then.
+	AdapterConst string
+}
+
+// adapterRegisterTemplate renders the adapter module's register.go: the
+// Register() wiring its battery registry, the same shape every hand-written
+// adapter module carries. The body resolves through ParseAdapter (which
+// accepts any non-empty name) because the dedicated Adapter enum constant
+// does not exist until the manual wiring step adds it.
+const adapterRegisterTemplate = `package {{.Name}}
+
+import (
+	"github.com/zenta-dev/zever/core/{{.Battery}}"
+)
+
+// Register wires this adapter into its battery registry. Call from your app's main or generated app.go; no init magic.
+//
+// SCAFFOLD: {{.AdapterConst}} does not exist yet -- add it to the {{.Battery}} Adapter
+// enum (plus its ParseAdapter case) as part of the manual wiring, then
+// replace the ParseAdapter call below with the constant.
+func Register() {
+	adapter, _ := {{.Battery}}.ParseAdapter("{{.Name}}")
+	_ = {{.Battery}}.Register(adapter, New)
+}
+`
+
+func renderAdapterRegisterFile(tag string, spec batterySpec, name string) ([]byte, error) {
+	return renderGoFile(tag, "adapter register", adapterRegisterTemplate, adapterRegisterData{
+		Battery:      spec.Package,
+		Name:         name,
+		AdapterConst: goIdent(name),
+	})
 }
 
 // goInitialisms are the words Go style spells in all caps, so that

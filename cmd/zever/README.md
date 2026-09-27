@@ -7,8 +7,7 @@ Module root: [`../../README.md`](../../README.md).
 
 ## Install
 
-Single-module repo (no nested `go.mod` under `cmd/zever`), so install from
-the module root path:
+Multi-module repo (`cmd/zever` is its own module; batteries live in `core/<b>` with the `Register`/`Open` registry, adapters in `adapters/<b>/<a>` each with `Register()`, helpers in `shared/*`), so install the CLI module at a pinned version:
 
 ```sh
 go install github.com/zenta-dev/zever/cmd/zever@v0.4.0

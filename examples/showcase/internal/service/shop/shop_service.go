@@ -13,12 +13,12 @@ import (
 	"github.com/google/uuid"
 	"google.golang.org/protobuf/types/known/timestamppb"
 
-	"github.com/zenta-dev/zever/apperror"
-	"github.com/zenta-dev/zever/authz"
-	"github.com/zenta-dev/zever/db"
-	"github.com/zenta-dev/zever/log"
+	"github.com/zenta-dev/zever/core/authz"
+	"github.com/zenta-dev/zever/core/db"
+	"github.com/zenta-dev/zever/core/log"
+	"github.com/zenta-dev/zever/core/queue"
 	"github.com/zenta-dev/zever/orm"
-	"github.com/zenta-dev/zever/queue"
+	"github.com/zenta-dev/zever/shared/apperror"
 
 	genshop "github.com/zenta-dev/zever/examples/showcase/generated/gogen/shop"
 	pb "github.com/zenta-dev/zever/examples/showcase/generated/protogogen/shop"

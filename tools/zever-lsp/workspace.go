@@ -12,10 +12,10 @@ import (
 
 	"go.lsp.dev/uri"
 
-	"github.com/zenta-dev/zever/internal/dsl/ast"
-	"github.com/zenta-dev/zever/internal/dsl/compile"
-	"github.com/zenta-dev/zever/internal/dsl/diag"
-	"github.com/zenta-dev/zever/internal/dsl/parser"
+	"github.com/zenta-dev/zever/dsl/ast"
+	"github.com/zenta-dev/zever/dsl/compile"
+	"github.com/zenta-dev/zever/dsl/diag"
+	"github.com/zenta-dev/zever/dsl/parser"
 )
 
 // zenExt is the file extension of zen DSL schema files.

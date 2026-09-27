@@ -10,15 +10,15 @@ import (
 	"sort"
 	"strings"
 
-	"github.com/zenta-dev/zever/internal/dsl/backend"
-	"github.com/zenta-dev/zever/internal/dsl/backend/atlas"
-	"github.com/zenta-dev/zever/internal/dsl/backend/gogen"
-	"github.com/zenta-dev/zever/internal/dsl/backend/openapi"
-	"github.com/zenta-dev/zever/internal/dsl/backend/proto"
-	"github.com/zenta-dev/zever/internal/dsl/backend/protogogen"
-	"github.com/zenta-dev/zever/internal/dsl/backend/zenorm"
-	"github.com/zenta-dev/zever/internal/dsl/compile"
-	"github.com/zenta-dev/zever/internal/dsl/diag"
+	"github.com/zenta-dev/zever/dsl/backend"
+	"github.com/zenta-dev/zever/dsl/backend/atlas"
+	"github.com/zenta-dev/zever/dsl/backend/gogen"
+	"github.com/zenta-dev/zever/dsl/backend/openapi"
+	"github.com/zenta-dev/zever/dsl/backend/proto"
+	"github.com/zenta-dev/zever/dsl/backend/protogogen"
+	"github.com/zenta-dev/zever/dsl/backend/zenorm"
+	"github.com/zenta-dev/zever/dsl/compile"
+	"github.com/zenta-dev/zever/dsl/diag"
 )
 
 // errNoInputFiles is returned when neither explicit args nor auto-discovery

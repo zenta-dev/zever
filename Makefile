@@ -13,6 +13,22 @@ CYCLONEDX_GOMOD_VERSION ?= v1.12.0
 COVERAGE ?= coverage.out
 SBOM ?= sbom.json
 
+# All Go modules in the repo (143 uses in the committed go.work workspace
+# at root), so every *-all target loops per-module with fail-fast `set -e`.
+# examples/external-sms is intentionally outside go.work (it proves third-party
+# independence); verify it standalone with: GOWORK=off go -C examples/external-sms test ./...
+ALL_MODULES := $(shell find . -type f -name go.mod -not -path "./.git/*" -not -path "./examples/external-sms/*" -exec dirname {} \; | sort)
+
+# Matrix sharding: stable round-robin slice of ALL_MODULES. Defaults
+# (TOTAL=1) expand to exactly ALL_MODULES.
+SHARD_TOTAL ?= 1
+SHARD_INDEX ?= 0
+SHARD_MODULES := $(shell printf '%s\n' $(ALL_MODULES) | awk '(NR-1) % $(SHARD_TOTAL) == $(SHARD_INDEX)')
+
+# Explicit module override for scoped CI (e.g. from tools/affected output):
+# empty MODULES = current behavior bit-for-bit (all loops use SHARD_MODULES).
+MODULES ?=
+
 .PHONY: help
 help: ## Show this help
 	@awk 'BEGIN {FS = ":.*##"; printf "Usage:\n  make \033[36m<target>\033[0m\n"} /^[a-zA-Z_-]+:.*##/ {printf "  \033[36m%-14s\033[0m %s\n", $$1, $$2}' $(MAKEFILE_LIST)
@@ -118,17 +134,51 @@ vulncheck: ## Scan for known vulnerabilities
 	$(GOVULNCHECK) ./...
 
 .PHONY: sbom
-sbom: ## Generate a CycloneDX SBOM for the module
+sbom: ## Generate a CycloneDX SBOM per module under sbom/ (override list via MODULES)
 	@command -v $(CYCLONEDX_GOMOD) >/dev/null 2>&1 || { printf '%s\n' "cyclonedx-gomod not found: run 'make setup'"; exit 1; }
-	$(CYCLONEDX_GOMOD) mod -licenses -std -json -output $(SBOM) .
+	mkdir -p sbom; set -e; root="$$PWD"; for d in $(if $(MODULES),$(MODULES),$(SHARD_MODULES)); do echo "== $$d =="; slug=$$(echo "$$d" | sed 's|^\./||; s|/|_|g'); (cd $$d && $(CYCLONEDX_GOMOD) mod -licenses -std -json -output "$$root/sbom/$$slug.json" .); done
 
 .PHONY: clean
 clean: ## Remove coverage output and build artifacts
-	$(GO) clean ./...
+	rm -rf sbom .coverage
 	rm -f $(COVERAGE) $(SBOM)
 
 .PHONY: check
-check: require-tools download fmt vet vet-lsp tidy-check tidy-lsp-check lint test-race test-lsp vulncheck build ## Run all local CI checks (run 'make setup' first)
+check: require-tools download fmt check-all lint-all vulncheck-all ## Run all local CI checks (run 'make setup' first)
+
+# Multi-module targets: per-module loops over the committed go.work workspace.
+.PHONY: check-all build-all test-all test-race-all test-race-fast vet-all tidy-all tidy-check-all lint-all vulncheck-all
+check-all: ## Run vet + tidy-check + test (-vet=off, cached) + build across all modules (shard via SHARD_TOTAL/SHARD_INDEX, override list via MODULES)
+	set -e; for d in $(if $(MODULES),$(MODULES),$(SHARD_MODULES)); do echo "== $$d =="; (cd $$d && $(GO) vet ./... && $(GO) mod tidy -diff && $(GO) test -vet=off ./... && $(GO) build ./...); done
+
+test-race-all: ## Run tests with the race detector across all modules (per-module coverage under .coverage/, shard via SHARD_TOTAL/SHARD_INDEX, override list via MODULES)
+	set -e; mkdir -p .coverage; root="$$PWD"; for d in $(if $(MODULES),$(MODULES),$(SHARD_MODULES)); do echo "== $$d =="; slug=$$(echo "$$d" | sed 's|^\./||; s|/|_|g'); (cd $$d && $(GO) test -race -count=1 -covermode=atomic -coverprofile="$$root/.coverage/$$slug.out" ./...); done
+
+test-race-fast: ## Run tests with the race detector, no coverage (PR gate; cached, override list via MODULES)
+	set -e; for d in $(if $(MODULES),$(MODULES),$(SHARD_MODULES)); do echo "== $$d =="; (cd $$d && $(GO) test -race -vet=off ./...); done
+
+build-all: ## Build all packages in every module (override list via MODULES)
+	set -e; for d in $(if $(MODULES),$(MODULES),$(SHARD_MODULES)); do echo "== $$d =="; (cd $$d && $(GO) build ./...); done
+
+test-all: ## Run tests in every module (override list via MODULES)
+	set -e; for d in $(if $(MODULES),$(MODULES),$(SHARD_MODULES)); do echo "== $$d =="; (cd $$d && $(GO) test ./...); done
+
+vet-all: ## Run go vet in every module (override list via MODULES)
+	set -e; for d in $(if $(MODULES),$(MODULES),$(SHARD_MODULES)); do echo "== $$d =="; (cd $$d && $(GO) vet ./...); done
+
+tidy-all: ## Run go mod tidy in every module (override list via MODULES)
+	set -e; for d in $(if $(MODULES),$(MODULES),$(SHARD_MODULES)); do echo "== $$d =="; (cd $$d && $(GO) mod tidy); done
+
+tidy-check-all: ## Verify go.mod/go.sum are tidy in every module (override list via MODULES)
+	set -e; for d in $(if $(MODULES),$(MODULES),$(SHARD_MODULES)); do echo "== $$d =="; (cd $$d && $(GO) mod tidy -diff); done
+
+lint-all: ## Run golangci-lint in every module (shard via SHARD_TOTAL/SHARD_INDEX, override list via MODULES)
+	@command -v $(GOLANGCI_LINT) >/dev/null 2>&1 || { printf '%s\n' "golangci-lint not found: run 'make setup'"; exit 1; }
+	set -e; for d in $(if $(MODULES),$(MODULES),$(SHARD_MODULES)); do echo "== $$d =="; (cd $$d && $(GOLANGCI_LINT) run ./...); done
+
+vulncheck-all: ## Scan every module for known vulnerabilities (override list via MODULES)
+	@command -v $(GOVULNCHECK) >/dev/null 2>&1 || { printf '%s\n' "govulncheck not found: run 'make setup'"; exit 1; }
+	set -e; for d in $(if $(MODULES),$(MODULES),$(SHARD_MODULES)); do echo "== $$d =="; (cd $$d && $(GOVULNCHECK) ./...); done
 
 .PHONY: docs-dev docs-build docs-preview
 docs-dev: ## Run docs dev server

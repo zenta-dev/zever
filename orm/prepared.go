@@ -3,7 +3,7 @@ package orm
 import (
 	"context"
 
-	"github.com/zenta-dev/zever/db"
+	"github.com/zenta-dev/zever/core/db"
 )
 
 // queryRows runs query against exec, preferring a prepared statement when

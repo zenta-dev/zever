@@ -69,7 +69,8 @@ See `examples/todo` for a full working app (`schema/todo.zen`,
 ## Adapters
 
 Every backend concern is modeled as a small interface with multiple swappable
-adapters. Adapters self-register, and a shared container resolves and caches
+adapters. Adapters register explicitly via each adapter module's `Register()`
+call, and a shared container resolves and caches
 each one lazily on first use. Swapping an adapter means changing configuration,
 not code.
 
@@ -108,12 +109,12 @@ notes. See [CONTRIBUTING](.github/CONTRIBUTING.md) for versioning details.
 
 ## Requirements
 
-- Go 1.27 or newer (`go 1.27.0` in `go.mod`).
+- Go 1.27 or newer (`go 1.27.0` in each module's `go.mod`; `go.work` wires local dev).
 
 ## Installation
 
 ```bash
-go get github.com/zenta-dev/zever
+go get github.com/zenta-dev/zever/core/cache
 ```
 
 ## Development

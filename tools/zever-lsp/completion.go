@@ -10,11 +10,11 @@ import (
 
 	"go.lsp.dev/protocol"
 
-	"github.com/zenta-dev/zever/internal/dsl/ast"
-	"github.com/zenta-dev/zever/internal/dsl/ir"
-	"github.com/zenta-dev/zever/internal/dsl/lexer"
-	"github.com/zenta-dev/zever/internal/dsl/resolver"
-	"github.com/zenta-dev/zever/internal/dsl/token"
+	"github.com/zenta-dev/zever/dsl/ast"
+	"github.com/zenta-dev/zever/dsl/ir"
+	"github.com/zenta-dev/zever/dsl/lexer"
+	"github.com/zenta-dev/zever/dsl/resolver"
+	"github.com/zenta-dev/zever/dsl/token"
 )
 
 // completionContext names the syntactic slot the cursor sits in. Each one
@@ -201,6 +201,8 @@ func completionAt(
 		return items(validateFormatCandidates, protocol.CompletionItemKindEnumMember, prefix)
 	case ctxErrorsValue:
 		return items(errorCandidates, protocol.CompletionItemKindEnumMember, prefix)
+	case ctxNone:
+		return nil
 	}
 	// Proof: completionContextAt yields only the twelve contexts dispatched
 	// above plus ctxNone, and both ctxNone and any (impossible) unknown

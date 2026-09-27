@@ -14,6 +14,33 @@ concurrency:
   cancel-in-progress: ${{ github.ref != 'refs/heads/main' }}
 
 jobs:
+  detect:
+    name: detect affected modules
+    runs-on: ubuntu-latest
+    outputs:
+      groups: ${{ steps.affected.outputs.groups }}
+      reason: ${{ steps.affected.outputs.reason }}
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          fetch-depth: 0
+      - uses: actions/setup-go@b7ad1dad31e06c5925ef5d2fc7ad053ef454303e # v7.0.0
+        with:
+          go-version-file: go.work
+          cache-dependency-path: |
+            go.work.sum
+            **/go.sum
+      - name: Compute affected groups
+        id: affected
+        run: |
+          if [ "${{ github.event_name }}" = "pull_request" ]; then
+            OUT=$(go run ./tools/affected --mode=affected --base "origin/${{ github.base_ref }}" --max-groups 4)
+          else
+            OUT=$(go run ./tools/affected --mode=all --max-groups 4)
+          fi
+          echo "groups=$(echo "$OUT" | jq -c .groups)" >> "$GITHUB_OUTPUT"
+          echo "reason=$(echo "$OUT" | jq -r .reason)" >> "$GITHUB_OUTPUT"
+
   fmt:
     name: gofmt
     runs-on: ubuntu-latest
@@ -21,8 +48,10 @@ jobs:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
       - uses: actions/setup-go@b7ad1dad31e06c5925ef5d2fc7ad053ef454303e # v7.0.0
         with:
-          go-version-file: go.mod
-          cache-dependency-path: go.sum
+          go-version-file: go.work
+          cache-dependency-path: |
+            go.work.sum
+            **/go.sum
       - name: Check formatting
         run: |
           files=$(gofmt -l .)
@@ -35,53 +64,81 @@ jobs:
   lint:
     name: golangci-lint
     runs-on: ubuntu-latest
+    needs: [detect]
+    if: needs.detect.outputs.groups != '[]'
     permissions:
       contents: read
       pull-requests: read
+    strategy:
+      fail-fast: false
+      matrix:
+        group: ${{ fromJson(needs.detect.outputs.groups) }}
+    env:
+      MODULES: ${{ join(matrix.group, ' ') }}
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
       - uses: actions/setup-go@b7ad1dad31e06c5925ef5d2fc7ad053ef454303e # v7.0.0
         with:
-          go-version-file: go.mod
-          cache-dependency-path: go.sum
-      - name: golangci-lint
-        uses: golangci/golangci-lint-action@ba0d7d2ec06a0ea1cb5fa41b2e4a3ab91d21278a # v9.3.0
+          go-version-file: go.work
+          cache-dependency-path: |
+            go.work.sum
+            **/go.sum
+      - uses: actions/cache@55cc8345863c7cc4c66a329aec7e433d2d1c52a9 # v6.1.0
         with:
-          version: v2.13.2
-          args: ./...
+          path: ~/.cache/golangci-lint
+          key: golangci-lint-${{ runner.os }}-go1.27-${{ hashFiles('**/go.mod') }}
+          restore-keys: |
+            golangci-lint-${{ runner.os }}-go1.27-
+      - name: Install golangci-lint
+        run: make setup-golangci-lint
+      - name: golangci-lint (all modules)
+        run: make lint-all
 
   # Fast gate: runs on every push and PR. No -race, no coverage, no
   # instrumentation — just enough to catch build breaks, vet issues, and
-  # go.mod drift quickly. This is what most pushes (including dependency
-  # bumps that touch no Go code) should pay for.
+  # go.mod drift quickly. Per-module loops (no root go.mod exists).
   test:
     name: test (go 1.27)
     runs-on: ubuntu-latest
+    needs: [detect]
+    if: needs.detect.outputs.groups != '[]'
     permissions:
       contents: read
+    strategy:
+      fail-fast: false
+      matrix:
+        group: ${{ fromJson(needs.detect.outputs.groups) }}
     env:
       # CI runners ship Chrome but its sandbox is unusable in the container;
       # the document/local render tests need --no-sandbox to execute.
       ZEVER_CHROMEDP_NO_SANDBOX: "1"
+      MODULES: ${{ join(matrix.group, ' ') }}
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
       - uses: actions/setup-go@b7ad1dad31e06c5925ef5d2fc7ad053ef454303e # v7.0.0
         with:
-          go-version-file: go.mod
-          cache-dependency-path: go.sum
-      - name: Download dependencies
-        run: go mod download
-      - name: Verify go.mod is tidy
-        run: go mod tidy -diff
-      - name: go vet
-        run: go vet ./...
-      - name: go test
-        # -vet=off: go vet already ran as its own step above, so skip the
-        # implicit vet pass go test does before compiling — avoids
-        # re-running the same analysis twice.
-        run: go test -vet=off -count=1 ./...
-      - name: go build
-        run: go build ./...
+          go-version-file: go.work
+          cache-dependency-path: |
+            go.work.sum
+            **/go.sum
+      - name: vet + tidy + test + build (all modules)
+        run: make check-all
+
+  external-sms:
+    name: out-of-tree proof module
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+      - uses: actions/setup-go@b7ad1dad31e06c5925ef5d2fc7ad053ef454303e # v7.0.0
+        with:
+          go-version-file: go.work
+          cache-dependency-path: |
+            go.work.sum
+            **/go.sum
+      - name: out-of-tree proof module (standalone, outside go.work)
+        run: GOWORK=off go -C examples/external-sms test -count=1 ./...
 
   # Nested module gate: tools/zever-lsp is a separate Go module, so the
   # root jobs above never compile or test it. Mirrors the fast gate.
@@ -97,8 +154,10 @@ jobs:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
       - uses: actions/setup-go@b7ad1dad31e06c5925ef5d2fc7ad053ef454303e # v7.0.0
         with:
-          go-version-file: go.mod
-          cache-dependency-path: go.sum
+          go-version-file: go.work
+          cache-dependency-path: |
+            go.work.sum
+            **/go.sum
       - name: Download dependencies
         run: go mod download
       - name: Verify go.mod is tidy
@@ -110,34 +169,50 @@ jobs:
       - name: go build
         run: go build ./...
 
-  # Full gate: race detector + atomic coverage + Codecov upload. This is
-  # the expensive pass (typically 2-10x slower than a plain `go test`
-  # because of race instrumentation, plus more overhead from atomic
-  # coverage counters). Runs on every push and PR so races are caught before
-  # merge instead of intermittently surfacing after landing on main.
+  # Full gate: race detector + atomic coverage + Codecov upload, per
+  # module (no root go.mod exists). Coverage profiles land per module
+  # under .coverage/ and upload merged. Expensive pass: runs on every
+  # push and PR so races are caught before merge.
   test-race:
     name: test (race + coverage)
+    if: needs.detect.outputs.groups != '[]'
     runs-on: ubuntu-latest
+    needs: [detect]
     permissions:
       contents: read
       id-token: write
+    strategy:
+      fail-fast: false
+      matrix:
+        group: ${{ fromJson(needs.detect.outputs.groups) }}
     env:
       # Same Chrome sandbox limitation as the fast gate above.
       ZEVER_CHROMEDP_NO_SANDBOX: "1"
+      MODULES: ${{ join(matrix.group, ' ') }}
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
       - uses: actions/setup-go@b7ad1dad31e06c5925ef5d2fc7ad053ef454303e # v7.0.0
         with:
-          go-version-file: go.mod
-          cache-dependency-path: go.sum
-      - name: Download dependencies
-        run: go mod download
-      - name: go test -race
-        run: go test -race -covermode=atomic -coverprofile=coverage.out ./...
+          go-version-file: go.work
+          cache-dependency-path: |
+            go.work.sum
+            **/go.sum
+      - name: go test -race (PR fast gate, no coverage)
+        if: github.event_name == 'pull_request'
+        run: make test-race-fast
+      - name: go test -race with coverage (main/tags)
+        if: github.event_name != 'pull_request'
+        run: make test-race-all
+      - name: Collect coverage files
+        if: github.event_name != 'pull_request'
+        id: collect
+        run: echo "files=$(find .coverage -name '*.out' | paste -sd ',' -)" >> "$GITHUB_OUTPUT"
       - name: Upload coverage to Codecov
+        if: github.event_name != 'pull_request'
         uses: codecov/codecov-action@0b35c9ecc4f0529d0eb674914510c22f85b196b4 # v7.1.0
         with:
-          files: coverage.out
+          files: ${{ steps.collect.outputs.files }}
+          flags: race-group-${{ strategy.job-index }}
           fail_ci_if_error: false
 
   vulnerability:
@@ -147,8 +222,10 @@ jobs:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
       - uses: actions/setup-go@b7ad1dad31e06c5925ef5d2fc7ad053ef454303e # v7.0.0
         with:
-          go-version-file: go.mod
-          cache-dependency-path: go.sum
+          go-version-file: go.work
+          cache-dependency-path: |
+            go.work.sum
+            **/go.sum
       - uses: actions/cache@55cc8345863c7cc4c66a329aec7e433d2d1c52a9 # v6.1.0
         with:
           path: ~/go/bin
@@ -156,26 +233,49 @@ jobs:
       - name: Install tools
         run: make setup-govulncheck
       - name: govulncheck
-        run: make vulncheck
+        run: make vulncheck-all
 
   sbom:
     name: sbom
+    if: needs.detect.outputs.groups != '[]'
     runs-on: ubuntu-latest
+    needs: [detect]
+    strategy:
+      fail-fast: false
+      matrix:
+        group: ${{ fromJson(needs.detect.outputs.groups) }}
+    env:
+      MODULES: ${{ join(matrix.group, ' ') }}
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
       - uses: actions/setup-go@b7ad1dad31e06c5925ef5d2fc7ad053ef454303e # v7.0.0
         with:
-          go-version-file: go.mod
-          cache-dependency-path: go.sum
+          go-version-file: go.work
+          cache-dependency-path: |
+            go.work.sum
+            **/go.sum
       - uses: actions/cache@55cc8345863c7cc4c66a329aec7e433d2d1c52a9 # v6.1.0
         with:
           path: ~/go/bin
           key: ${{ runner.os }}-gobin-cyclonedx-gomod-v1.12.0
       - name: Install tools
         run: make setup-cyclonedx-gomod
-      - name: Generate SBOM
+      - name: Generate SBOM (affected modules)
         run: make sbom
       - uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
         with:
-          name: sbom-cyclonedx
-          path: sbom.json
+          name: sbom-cyclonedx-${{ strategy.job-index }}
+          path: sbom/
+
+  ci-gate:
+    name: ci-gate
+    if: always()
+    runs-on: ubuntu-latest
+    needs: [detect, fmt, lint, test, test-race, sbom, lsp, vulnerability, external-sms]
+    steps:
+      - name: Aggregate results
+        run: |
+          case "${{ join(needs.*.result, ' ') }}" in
+            *failure*|*cancelled*) echo gate failed; exit 1;;
+            *) echo "gate passed";;
+          esac

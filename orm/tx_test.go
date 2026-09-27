@@ -6,7 +6,7 @@ import (
 	"strings"
 	"testing"
 
-	"github.com/zenta-dev/zever/db"
+	"github.com/zenta-dev/zever/core/db"
 )
 
 // renameWidget runs a raw UPDATE through exec: the tx/retry tests exercise

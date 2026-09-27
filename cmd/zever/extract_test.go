@@ -10,8 +10,8 @@ import (
 	"testing"
 	"time"
 
-	"github.com/zenta-dev/zever/internal/dsl/diag"
-	"github.com/zenta-dev/zever/internal/dsl/ir"
+	"github.com/zenta-dev/zever/dsl/diag"
+	"github.com/zenta-dev/zever/dsl/ir"
 )
 
 // extractBillingSchema and extractShippingSchema are two modules in two files.

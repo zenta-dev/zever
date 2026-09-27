@@ -18,10 +18,10 @@ import (
 	"github.com/zenta-dev/zever/examples/bookings/internal/service/seed"
 
 	// Blank imports register the adapters this binary needs.
-	_ "github.com/zenta-dev/zever/cache/memory"
-	_ "github.com/zenta-dev/zever/db/sqlite"
-	_ "github.com/zenta-dev/zever/log/slog"
-	_ "github.com/zenta-dev/zever/queue/memory"
+	_ "github.com/zenta-dev/zever/adapters/cache/memory"
+	_ "github.com/zenta-dev/zever/adapters/db/sqlite"
+	_ "github.com/zenta-dev/zever/adapters/log/slog"
+	_ "github.com/zenta-dev/zever/adapters/queue/memory"
 )
 
 const (

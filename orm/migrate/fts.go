@@ -4,7 +4,7 @@ import (
 	"fmt"
 	"strings"
 
-	"github.com/zenta-dev/zever/internal/dsl/backend/atlas"
+	"github.com/zenta-dev/zever/dsl/backend/atlas"
 )
 
 // This file holds standalone SQLite FTS5 virtual-table DDL helpers.

@@ -3,9 +3,9 @@ package main
 import (
 	"go.lsp.dev/protocol"
 
-	"github.com/zenta-dev/zever/internal/dsl/ast"
-	"github.com/zenta-dev/zever/internal/dsl/diag"
-	"github.com/zenta-dev/zever/internal/dsl/ir"
+	"github.com/zenta-dev/zever/dsl/ast"
+	"github.com/zenta-dev/zever/dsl/diag"
+	"github.com/zenta-dev/zever/dsl/ir"
 )
 
 // findEntity looks a resolved entity up by name across every module. The

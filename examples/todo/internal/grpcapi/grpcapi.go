@@ -11,9 +11,9 @@ import (
 	"github.com/google/uuid"
 	"google.golang.org/protobuf/types/known/timestamppb"
 
-	"github.com/zenta-dev/zever/apperror"
-	"github.com/zenta-dev/zever/authz"
+	"github.com/zenta-dev/zever/core/authz"
 	genapp "github.com/zenta-dev/zever/examples/todo/generated/gogen/app"
+	"github.com/zenta-dev/zever/shared/apperror"
 )
 
 // Service is a goroutine-safe in-memory GrpcTaskService implementation.

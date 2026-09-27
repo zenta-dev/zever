@@ -5,10 +5,10 @@ import (
 
 	"go.lsp.dev/protocol"
 
-	"github.com/zenta-dev/zever/internal/dsl/compile"
-	"github.com/zenta-dev/zever/internal/dsl/diag"
-	"github.com/zenta-dev/zever/internal/dsl/ir"
-	"github.com/zenta-dev/zever/internal/dsl/parser"
+	"github.com/zenta-dev/zever/dsl/compile"
+	"github.com/zenta-dev/zever/dsl/diag"
+	"github.com/zenta-dev/zever/dsl/ir"
+	"github.com/zenta-dev/zever/dsl/parser"
 )
 
 // inlayLabel extracts a hint's label text, asserting the native union arm.

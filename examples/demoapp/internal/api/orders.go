@@ -7,10 +7,10 @@ import (
 
 	"github.com/google/uuid"
 
-	"github.com/zenta-dev/zever/db"
+	"github.com/zenta-dev/zever/core/db"
+	"github.com/zenta-dev/zever/core/router"
 	gen "github.com/zenta-dev/zever/examples/demoapp/generated/zenorm/orm/gen/app"
 	"github.com/zenta-dev/zever/orm"
-	"github.com/zenta-dev/zever/router"
 )
 
 // listOrders returns the caller's orders, newest last.

@@ -2,7 +2,11 @@ module example.com/acme
 
 go 1.24
 
-require github.com/zenta-dev/zever v1.2.3
+require github.com/zenta-dev/zever/container v1.2.3
+require github.com/zenta-dev/zever/config v1.2.3
+require github.com/zenta-dev/zever/core/job v1.2.3
+require github.com/zenta-dev/zever/core/authz v1.2.3
+require github.com/zenta-dev/zever/core/middleware v1.2.3
 
 // protogogen's grpc codegen shells out to this pinned tool dependency
 // ("go tool protoc-gen-go-grpc") instead of requiring a protoc-gen-go-grpc

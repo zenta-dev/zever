@@ -4,8 +4,8 @@ import (
 	"fmt"
 	"strings"
 
-	"github.com/zenta-dev/zever/internal/dsl/backend/atlas"
-	"github.com/zenta-dev/zever/internal/dsl/ir"
+	"github.com/zenta-dev/zever/dsl/backend/atlas"
+	"github.com/zenta-dev/zever/dsl/ir"
 )
 
 // This file holds the type-comparison half of the diffing engine: turning a

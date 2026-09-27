@@ -5,9 +5,9 @@ import (
 	"errors"
 	"fmt"
 
+	"github.com/zenta-dev/zever/core/mailer"
+	"github.com/zenta-dev/zever/core/notification"
 	gen "github.com/zenta-dev/zever/examples/showcase/generated/zenorm/orm/gen/shop"
-	"github.com/zenta-dev/zever/mailer"
-	"github.com/zenta-dev/zever/notification"
 	"github.com/zenta-dev/zever/orm"
 )
 

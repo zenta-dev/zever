@@ -224,7 +224,7 @@ package seed
 import (
 	"context"
 
-	"github.com/zenta-dev/zever/db"
+	"github.com/zenta-dev/zever/core/db"
 )
 
 // Run seeds database with development data. Called once by db/seed/main.go

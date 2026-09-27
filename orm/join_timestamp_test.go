@@ -4,8 +4,8 @@ import (
 	"testing"
 	"time"
 
-	"github.com/zenta-dev/zever/db"
-	"github.com/zenta-dev/zever/db/sqlite"
+	"github.com/zenta-dev/zever/adapters/db/sqlite"
+	"github.com/zenta-dev/zever/core/db"
 )
 
 // tsUser/tsPost mirror the schema codegen shape for a timestamp-column

@@ -5,7 +5,7 @@ import (
 	"errors"
 	"fmt"
 
-	"github.com/zenta-dev/zever/db"
+	"github.com/zenta-dev/zever/core/db"
 	"github.com/zenta-dev/zever/orm"
 	"github.com/zenta-dev/zever/orm/dialect"
 )

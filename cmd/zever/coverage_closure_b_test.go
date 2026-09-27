@@ -20,8 +20,8 @@ import (
 	"github.com/fsnotify/fsnotify"
 	"github.com/traefik/yaegi/stdlib"
 
-	"github.com/zenta-dev/zever/internal/dsl/backend/atlas"
-	"github.com/zenta-dev/zever/internal/dsl/compile"
+	"github.com/zenta-dev/zever/dsl/backend/atlas"
+	"github.com/zenta-dev/zever/dsl/compile"
 	"github.com/zenta-dev/zever/orm/migrate"
 )
 

@@ -5,8 +5,8 @@ import (
 	"sort"
 	"testing"
 
-	"github.com/zenta-dev/zever/db"
-	"github.com/zenta-dev/zever/db/sqlite"
+	"github.com/zenta-dev/zever/adapters/db/sqlite"
+	"github.com/zenta-dev/zever/core/db"
 	gen "github.com/zenta-dev/zever/examples/json_query/generated/zenorm/orm/gen/app"
 	"github.com/zenta-dev/zever/orm"
 	sqlitejson "github.com/zenta-dev/zever/orm/json/sqlite"

@@ -6,7 +6,7 @@ import (
 	"io"
 	"os"
 
-	"github.com/zenta-dev/zever/internal/dsl/format"
+	"github.com/zenta-dev/zever/dsl/format"
 )
 
 // FmtConfig carries every input runFmtWith needs. Screen agents build it

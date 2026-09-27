@@ -6,7 +6,7 @@ import (
 	"io"
 	"os"
 
-	"github.com/zenta-dev/zever/internal/dsl/compile"
+	"github.com/zenta-dev/zever/dsl/compile"
 )
 
 // CheckConfig carries every input runCheckWith needs. Screen agents build it

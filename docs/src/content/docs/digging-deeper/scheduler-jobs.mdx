@@ -96,11 +96,11 @@ import (
 	"context"
 	"time"
 
-	"github.com/zenta-dev/zever/job"
-	"github.com/zenta-dev/zever/queue"
-	queuememory "github.com/zenta-dev/zever/queue/memory"
-	"github.com/zenta-dev/zever/scheduler"
-	schedulerembedded "github.com/zenta-dev/zever/scheduler/embedded"
+	"github.com/zenta-dev/zever/core/job"
+	"github.com/zenta-dev/zever/core/queue"
+	queuememory "github.com/zenta-dev/zever/adapters/queue/memory"
+	"github.com/zenta-dev/zever/core/scheduler"
+	schedulerembedded "github.com/zenta-dev/zever/adapters/scheduler/embedded"
 )
 
 type ConfirmArgs struct {
@@ -171,10 +171,10 @@ Expected behavior: the dispatch enqueues onto topic `default`, the schedule regi
 
 | Service | Adapter | Package | Notes |
 |---|---|---|---|
-| job | - | `job` | Dispatcher only, no adapter registry, topics are priority names |
-| scheduler | `embedded` | `scheduler/embedded` | In-process cron ticks, `Stop()` ends ticks |
+| job | - | `core/job` | Dispatcher only, no adapter registry, topics are priority names |
+| scheduler | `embedded` | `adapters/scheduler/embedded` | In-process cron ticks, `Stop()` ends ticks |
 
-`job.Batch` covers batch enqueue and `job/lock.go` covers locked dispatch
+`job.Batch` covers batch enqueue and `core/job/lock.go` covers locked dispatch
 for singleton-style jobs. Use the lock helper with `UniqueBy` when a job must
 run on exactly one instance even though every instance is registered.
 

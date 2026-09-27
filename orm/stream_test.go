@@ -8,7 +8,7 @@ import (
 	"strings"
 	"testing"
 
-	"github.com/zenta-dev/zever/db"
+	"github.com/zenta-dev/zever/core/db"
 )
 
 // TestQueryStreamMatchesAll proves Stream yields exactly the rows All does,

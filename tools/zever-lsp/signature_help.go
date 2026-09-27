@@ -6,7 +6,7 @@ import (
 
 	"go.lsp.dev/protocol"
 
-	"github.com/zenta-dev/zever/internal/dsl/token"
+	"github.com/zenta-dev/zever/dsl/token"
 )
 
 // sigParam is one parameter of a call-like construct's signature: its name

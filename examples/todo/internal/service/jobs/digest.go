@@ -6,9 +6,9 @@ import (
 	"fmt"
 	"time"
 
-	"github.com/zenta-dev/zever/db"
+	"github.com/zenta-dev/zever/core/db"
+	"github.com/zenta-dev/zever/core/log"
 	genapp "github.com/zenta-dev/zever/examples/todo/generated/zenorm/orm/gen/app"
-	"github.com/zenta-dev/zever/log"
 	"github.com/zenta-dev/zever/orm"
 )
 

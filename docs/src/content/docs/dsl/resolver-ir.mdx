@@ -11,13 +11,13 @@ stopping at the first error.
 
 When to use: debug a schema error, extend the compiler, or consume
 `*ir.Schema` from a backend. When not to use: runtime packages must never
-import `internal/dsl`; it is compiler-internal by design.
+import `dsl`; it is compiler-internal by design.
 
 ## Prerequisites
 
 - Familiarity with [Syntax](./syntax-zen/): entities, services, RPCs.
 - Go toolchain for running the compiler tests.
-- The canonical fixture `internal/dsl/compile/testdata/app.zen` checked out.
+- The canonical fixture `dsl/compile/testdata/app.zen` checked out.
 
 ## Config
 
@@ -59,7 +59,7 @@ out, diags := compile.Compile(files, backends...)
 
 `compile/testdata/app.zen` is the canonical fixture: golden backend outputs
 are committed, and regeneration is explicit
-(`go test ./internal/dsl/compile/ -run TestName -update`).
+(`go test ./dsl/compile/ -run TestName -update`).
 
 Resolver passes:
 
@@ -75,7 +75,7 @@ Resolver passes:
 ## Runnable example
 
 ```sh
-go test ./internal/dsl/compile/ -run TestGogenGeneratesCommittedAppPackage -v
+go test ./dsl/compile/ -run TestGogenGeneratesCommittedAppPackage -v
 echo exit:$?
 ```
 
@@ -84,7 +84,7 @@ Expected output:
 ```text
 --- PASS: TestGogenGeneratesCommittedAppPackage
 PASS
-ok  github.com/zenta-dev/zever/internal/dsl/compile
+ok  github.com/zenta-dev/zever/dsl/compile
 exit:0
 ```
 

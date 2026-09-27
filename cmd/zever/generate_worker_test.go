@@ -6,7 +6,7 @@ import (
 	"strings"
 	"testing"
 
-	"github.com/zenta-dev/zever/internal/dsl/ir"
+	"github.com/zenta-dev/zever/dsl/ir"
 )
 
 // writeSchemaFile writes name under dir/schema/. Owned

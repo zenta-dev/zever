@@ -14,7 +14,7 @@ drives it, never hosts logic.
 
 ## Prerequisites
 
-- Install from the module root (single-module repo, no nested `go.mod`):
+- Install the `cmd/zever` module (multi-module repo: `core/<b>` = battery interface + `Register`/`Open` registry, `adapters/<b>/<a>` = one module per adapter with `Register()`, `shared/*` = SDK-free helpers):
 
 ```sh
 go install github.com/zenta-dev/zever/cmd/zever@v0.4.0
@@ -96,7 +96,8 @@ exit:0
 
 | Group | Equivalent CLI |
 |---|---|
-| Scaffold | `zever new` |
+| Scaffold | `zever new` (battery picker adds beyond the `auth, db, log, router, scheduler` floor) |
+| Scaffold | `zever add` (planned - no `cmd/zever/add.go` yet; add by hand in `zever.yaml` + `app.go`) |
 | Scaffold | `zever generate` |
 | Scaffold | `zever generate tinker` |
 | Scaffold | `zever extract` |

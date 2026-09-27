@@ -7,9 +7,9 @@ import (
 	"sort"
 	"strings"
 
-	"github.com/zenta-dev/zever/db"
-	"github.com/zenta-dev/zever/internal/dsl/backend/atlas"
-	"github.com/zenta-dev/zever/internal/dsl/ir"
+	"github.com/zenta-dev/zever/core/db"
+	"github.com/zenta-dev/zever/dsl/backend/atlas"
+	"github.com/zenta-dev/zever/dsl/ir"
 )
 
 // This file extends diff.go's diffing past columns to indexes, unique
