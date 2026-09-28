@@ -166,7 +166,7 @@ development database only, never production data.
   that merges the streams corrupts the protocol.
 - Editor and build can never disagree: the server compiles the workspace
   in-process with the exact same resolver the compiler uses.
-- The LSP module is independently versioned (`tools/zever-lsp/vX.Y.Z` tags);
+- The LSP module shares the lockstep release version (`tools/zever-lsp/vX.Y.Z` tags);
   releases bump it together with the root module.
 
 ## Troubleshooting
