@@ -9,9 +9,7 @@ require (
 
 require (
 	github.com/go-jose/go-jose/v4 v4.1.4 // indirect
-	github.com/zenta-dev/zever/adapters/session/memory v0.5.2
 	github.com/zenta-dev/zever/core/session v0.5.2 // indirect
-	github.com/zenta-dev/zever/shared/redisclient v0.5.2
 	github.com/zenta-dev/zever/shared/redisopt v0.5.2 // indirect
 	github.com/zenta-dev/zever/shared/registry v0.5.2 // indirect
 	golang.org/x/oauth2 v0.36.0 // indirect

@@ -264,16 +264,13 @@ require (
 	github.com/valyala/fasthttp v1.74.0 // indirect
 	github.com/xo/terminfo v0.0.0-20220910002029-abceb7e1c41e // indirect
 	github.com/zenta-dev/zever/adapters/media/ffmpeg v0.5.2 // indirect
-	github.com/zenta-dev/zever/core/authz v0.5.2
 	github.com/zenta-dev/zever/core/billing v0.5.2 // indirect
 	github.com/zenta-dev/zever/core/job v0.5.2 // indirect
 	github.com/zenta-dev/zever/core/media v0.5.2 // indirect
-	github.com/zenta-dev/zever/core/middleware v0.5.2
 	github.com/zenta-dev/zever/core/password v0.5.2 // indirect
 	github.com/zenta-dev/zever/core/scheduler v0.5.2 // indirect
 	github.com/zenta-dev/zever/core/search v0.5.2 // indirect
 	github.com/zenta-dev/zever/core/vectorstore v0.5.2 // indirect
-	github.com/zenta-dev/zever/shared/apperror v0.5.2
 	github.com/zenta-dev/zever/shared/cas v0.5.2 // indirect
 	github.com/zenta-dev/zever/shared/codec v0.5.2 // indirect
 	github.com/zenta-dev/zever/shared/endpoint v0.5.2 // indirect

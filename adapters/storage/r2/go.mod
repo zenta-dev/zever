@@ -28,8 +28,6 @@ require (
 replace github.com/zenta-dev/zever/shared/s3opts => ../../../shared/s3opts
 
 require (
-	github.com/zenta-dev/zever/adapters/log/noop v0.5.2
-	github.com/zenta-dev/zever/adapters/storage/local v0.5.2
 	github.com/zenta-dev/zever/core/storage v0.5.2
 	github.com/zenta-dev/zever/shared/s3opts v0.5.2
 )

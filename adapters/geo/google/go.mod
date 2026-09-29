@@ -11,8 +11,6 @@ require (
 
 require (
 	github.com/google/uuid v1.6.0 // indirect
-	github.com/zenta-dev/zever/adapters/geo/static v0.5.2
-	github.com/zenta-dev/zever/shared/codec v0.5.2
 	github.com/zenta-dev/zever/shared/registry v0.5.2 // indirect
 	go.opencensus.io v0.24.0 // indirect
 	golang.org/x/time v0.15.0 // indirect

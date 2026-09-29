@@ -11,9 +11,7 @@ require (
 
 require (
 	github.com/twilio/twilio-go v1.31.1
-	github.com/zenta-dev/zever/adapters/notification/log v0.5.2
 	github.com/zenta-dev/zever/core/notification v0.5.2
-	github.com/zenta-dev/zever/shared/codec v0.5.2
 	github.com/zenta-dev/zever/shared/httpclient v0.5.2
 )
 

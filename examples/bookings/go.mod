@@ -83,17 +83,8 @@ require (
 	github.com/oklog/ulid/v2 v2.1.2 // indirect
 	github.com/remyoudompheng/bigfft v0.0.0-20230129092748-24d4a6f8daec // indirect
 	github.com/robfig/cron/v3 v3.0.1 // indirect
-	github.com/zenta-dev/zever/adapters/analytics/log v0.5.2
-	github.com/zenta-dev/zever/adapters/db/postgres v0.5.2
-	github.com/zenta-dev/zever/adapters/eventbus/memory v0.5.2
 	github.com/zenta-dev/zever/adapters/log/noop v0.5.2 // indirect
 	github.com/zenta-dev/zever/adapters/media/ffmpeg v0.5.2 // indirect
-	github.com/zenta-dev/zever/adapters/observability/noop v0.5.2
-	github.com/zenta-dev/zever/adapters/permission/noop v0.5.2
-	github.com/zenta-dev/zever/adapters/session/memory v0.5.2
-	github.com/zenta-dev/zever/adapters/storage/local v0.5.2
-	github.com/zenta-dev/zever/adapters/webhook/http v0.5.2
-	github.com/zenta-dev/zever/adapters/workflow/memory v0.5.2
 	github.com/zenta-dev/zever/core/ai v0.5.2 // indirect
 	github.com/zenta-dev/zever/core/analytics v0.5.2 // indirect
 	github.com/zenta-dev/zever/core/cache v0.5.2 // indirect
@@ -108,13 +99,11 @@ require (
 	github.com/zenta-dev/zever/core/storage v0.5.2 // indirect
 	github.com/zenta-dev/zever/core/vectorstore v0.5.2 // indirect
 	github.com/zenta-dev/zever/core/workflow v0.5.2 // indirect
-	github.com/zenta-dev/zever/dsl v0.5.2
 	github.com/zenta-dev/zever/shared/codec v0.5.2 // indirect
 	github.com/zenta-dev/zever/shared/endpoint v0.5.2 // indirect
 	github.com/zenta-dev/zever/shared/httpclient v0.5.2 // indirect
 	github.com/zenta-dev/zever/shared/lrucache v0.5.2 // indirect
 	github.com/zenta-dev/zever/shared/providersopt v0.5.2 // indirect
-	github.com/zenta-dev/zever/shared/redisclient v0.5.2
 	github.com/zenta-dev/zever/shared/redisopt v0.5.2 // indirect
 	github.com/zenta-dev/zever/shared/registry v0.5.2 // indirect
 	github.com/zenta-dev/zever/shared/retry v0.5.2 // indirect

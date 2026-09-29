@@ -5,7 +5,6 @@ go 1.27.0
 require github.com/zenta-dev/zever/core/payment v0.5.2
 
 require (
-	github.com/zenta-dev/zever/adapters/idempotency/memory v0.5.2
 	github.com/zenta-dev/zever/core/idempotency v0.5.2 // indirect
 	github.com/zenta-dev/zever/shared/providersopt v0.5.2 // indirect
 	github.com/zenta-dev/zever/shared/redisopt v0.5.2 // indirect

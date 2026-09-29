@@ -1,12 +1,15 @@
 #!/usr/bin/env python3
-"""Ensure every module's go.mod carries requires+replaces for its full local closure.
+"""Ensure every module's go.mod requires+replaces what it directly imports.
 
 Go ignores replace directives in dependency go.mods, so each module must
-repeat require+replace for every intra-repo module it (transitively)
-imports. This script computes that closure from source imports and patches
-each go.mod via `go mod edit`, then runs a best-effort offline tidy.
+repeat require+replace for every intra-repo module it directly imports
+(transitives resolve via each dep's own go.mod). This script computes that
+set from source imports and patches each go.mod via `go mod edit`.
 
-Usage: python3 tools/fix-module-graph.py [--tidy] [--check] [--root DIR]
+Direct-only is deliberate: `go mod tidy -diff` drops requires nothing
+imports, so a transitive closure here would fight tidy forever.
+
+Usage: python3 tools/fix-module-graph.py [--tidy] [--check] [--version=vX.Y.Z] [--root DIR]
   --tidy  also run `go mod tidy` per module (needs primed module cache).
   --check compute the required require+replace closure per module and exit 1
           with a drift listing when a go.mod lacks entries; exit 0 when
@@ -20,7 +23,118 @@ import subprocess
 import sys
 
 ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
-IMPORT_RE = re.compile(r'"(github\.com/zenta-dev/zever/[^"]+)"')
+ZEVER_PREFIX = "github.com/zenta-dev/zever/"
+
+
+def scan_imports(text):
+    """Intra-repo paths from real import statements only.
+
+    A mini-lexer: raw strings (backtick, incl. stray backticks in
+    comments or interpreted strings, which break naive splitting),
+    interpreted strings, rune literals, and both comment forms are
+    skipped; only the `import` declaration grammar is interpreted.
+    Code-generator templates (cmd/zever's server/worker templates,
+    dsl's backend emitters) and test fixtures therefore never count,
+    while real imports — block, single-line, aliased — always do.
+    """
+    found = set()
+    n = len(text)
+
+    def skip_ws(i):
+        while i < n and text[i] in " \t\r\n":
+            i += 1
+        return i
+
+    def read_quoted(i):
+        vals = []
+        j = i + 1
+        while j < n and text[j] != '"' and text[j] != '\n':
+            if text[j] == "\\" and j + 1 < n:
+                vals.append(text[j + 1])
+                j += 2
+            else:
+                vals.append(text[j])
+                j += 1
+        if j < n and text[j] == '"':
+            return "".join(vals), j + 1
+        return None, j
+
+    def skip_string(i):
+        if text[i] == "`":
+            j = text.find("`", i + 1)
+            return n if j == -1 else j + 1
+        if text[i] == '"':
+            return read_quoted(i)[1]
+        if text[i] == "'":
+            j = i + 1
+            while j < n and text[j] != "'" and text[j] != '\n':
+                j += 2 if text[j] == "\\" else 1
+            return j + 1 if j < n and text[j] == "'" else j
+        return i
+
+    def skip_comment(i):
+        if text[i + 1] == "/":
+            j = text.find("\n", i)
+            return n if j == -1 else j
+        j = text.find("*/", i + 2)
+        return n if j == -1 else j + 2
+
+    def take_path(i):
+        i = skip_ws(i)
+        if i < n and text[i] == '"':
+            path, i = read_quoted(i)
+            if path is not None and path.startswith(ZEVER_PREFIX):
+                found.add(path)
+        return i
+
+    def parse_import(i):
+        i = skip_ws(i)
+        if i < n and text[i] == "(":
+            i += 1
+            while i < n:
+                c = text[i]
+                if c == "`" or c == '"' or c == "'":
+                    if c == '"':
+                        i = take_path(i)
+                    else:
+                        i = skip_string(i)
+                    continue
+                if c == "/" and i + 1 < n and text[i + 1] in "/*":
+                    i = skip_comment(i)
+                    continue
+                if c == ")":
+                    return i + 1
+                i += 1
+            return i
+        if i < n and (text[i].isalpha() or text[i] == "_" or text[i] == "."):
+            if text[i] == ".":
+                i += 1
+            else:
+                while i < n and (text[i].isalnum() or text[i] == "_"):
+                    i += 1
+            return take_path(i)
+        return take_path(i)
+
+    i = 0
+    while i < n:
+        c = text[i]
+        if c == "`" or c == '"' or c == "'":
+            i = skip_string(i)
+            continue
+        if c == "/" and i + 1 < n and text[i + 1] in "/*":
+            i = skip_comment(i)
+            continue
+        if c.isalpha() or c == "_":
+            j = i
+            while j < n and (text[j].isalnum() or text[j] == "_"):
+                j += 1
+            if text[i:j] == "import":
+                i = parse_import(j)
+                continue
+            i = j
+            continue
+        i += 1
+    return found
 
 
 def sh(cmd, cwd, **kw):
@@ -60,7 +174,7 @@ def local_imports(moddir, mods):
             if not fn.endswith(".go"):
                 continue
             with open(os.path.join(dirpath, fn)) as f:
-                for imp in IMPORT_RE.findall(f.read()):
+                for imp in scan_imports(f.read()):
                     found.add(imp)
     return found
 
@@ -111,24 +225,38 @@ def gomod_replaces(moddir):
 
 
 def needed_closure(path, moddir, mods):
-    """Full local require closure for one module (direct + transitive)."""
+    """Direct intra-repo imports of one module (no transitive fixpoint).
+
+    Deliberately direct-only: `go mod tidy -diff` (CI fast gate) drops
+    requires nothing imports, so a transitive closure here would fight
+    tidy forever. Transitive deps resolve externally via each dep's own
+    go.mod (MVS); the require+replace pair here covers local/workspace
+    resolution of what this module actually imports.
+    """
     needed = set()
     for imp in local_imports(moddir, mods):
         prov = provider(imp, mods)
         if prov and prov != path:
             needed.add(prov)
-    # fixpoint over local requires (transitive replaces are ignored by go)
-    queue = list(needed)
-    while queue:
-        dep = queue.pop()
-        depdir = mods.get(dep)
-        if not depdir:
-            continue
-        for req in gomod_requires(depdir):
-            if req in mods and req != path and req not in needed:
-                needed.add(req)
-                queue.append(req)
     return needed
+
+
+def lockstep_version():
+    """Current lockstep version from CHANGELOG (`## [vX.Y.Z]`), for fix mode.
+
+    New requires must carry a resolvable version (v0.0.0 placeholders
+    break external `go get`); the changelog header is the one place the
+    in-progress release version is written before tagging.
+    """
+    try:
+        with open(os.path.join(ROOT, "CHANGELOG.md")) as f:
+            for line in f:
+                m = re.match(r"## \[(v\d+\.\d+\.\d+)\]", line.strip())
+                if m:
+                    return m.group(1)
+    except OSError:
+        pass
+    return "v0.0.0"
 
 
 def check_modules(mods):
@@ -171,6 +299,10 @@ def main():
         return 1
     mods = find_modules()
     print(f"modules: {len(mods)}")
+    ver = lockstep_version()
+    for a in args:
+        if a.startswith("--version="):
+            ver = a.split("=", 1)[1]
     for path in sorted(mods):
         moddir = mods[path]
         if moddir == ".":
@@ -181,7 +313,7 @@ def main():
         full = os.path.join(ROOT, moddir)
         for dep in sorted(needed):
             rel = os.path.relpath(os.path.join(ROOT, mods[dep]), full)
-            sh(["go", "mod", "edit", f"-require={dep}@v0.0.0",
+            sh(["go", "mod", "edit", f"-require={dep}@{ver}",
                 f"-replace={dep}={rel}", "go.mod"], cwd=full)
         print(f"{moddir}: +{len(needed)}")
     if do_tidy:

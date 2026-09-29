@@ -14,7 +14,6 @@ require (
 )
 
 require (
-	github.com/zenta-dev/zever/adapters/cache/memory v0.5.2
 	github.com/zenta-dev/zever/core/cache v0.5.2 // indirect
 	github.com/zenta-dev/zever/shared/redisopt v0.5.2 // indirect
 	github.com/zenta-dev/zever/shared/registry v0.5.2 // indirect

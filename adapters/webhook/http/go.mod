@@ -8,8 +8,6 @@ require (
 )
 
 require (
-	github.com/zenta-dev/zever/adapters/log/noop v0.5.2
-	github.com/zenta-dev/zever/adapters/queue/memory v0.5.2
 	github.com/zenta-dev/zever/core/log v0.5.2 // indirect
 	github.com/zenta-dev/zever/core/queue v0.5.2 // indirect
 	github.com/zenta-dev/zever/shared/endpoint v0.5.2 // indirect

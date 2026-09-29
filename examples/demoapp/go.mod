@@ -112,19 +112,14 @@ require (
 	github.com/tidwall/match v1.1.1 // indirect
 	github.com/tidwall/pretty v1.2.1 // indirect
 	github.com/tidwall/sjson v1.2.5 // indirect
-	github.com/zenta-dev/zever/adapters/db/postgres v0.5.2
 	github.com/zenta-dev/zever/adapters/log/noop v0.5.2 // indirect
 	github.com/zenta-dev/zever/adapters/media/ffmpeg v0.5.2 // indirect
-	github.com/zenta-dev/zever/adapters/observability/noop v0.5.2
-	github.com/zenta-dev/zever/adapters/permission/noop v0.5.2
 	github.com/zenta-dev/zever/core/scheduler v0.5.2 // indirect
-	github.com/zenta-dev/zever/dsl v0.5.2
 	github.com/zenta-dev/zever/shared/codec v0.5.2 // indirect
 	github.com/zenta-dev/zever/shared/endpoint v0.5.2 // indirect
 	github.com/zenta-dev/zever/shared/httpclient v0.5.2 // indirect
 	github.com/zenta-dev/zever/shared/lrucache v0.5.2 // indirect
 	github.com/zenta-dev/zever/shared/providersopt v0.5.2 // indirect
-	github.com/zenta-dev/zever/shared/redisclient v0.5.2
 	github.com/zenta-dev/zever/shared/redisopt v0.5.2 // indirect
 	github.com/zenta-dev/zever/shared/registry v0.5.2 // indirect
 	github.com/zenta-dev/zever/shared/retry v0.5.2 // indirect
