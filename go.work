@@ -144,5 +144,6 @@ use (
 	./shared/retry
 	./shared/s3opts
 	./tools/affected
+	./tools/modgraph
 	./tools/zever-lsp
 )

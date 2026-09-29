@@ -124,10 +124,10 @@ jobs:
       - name: vet + tidy + test + build (all modules)
         run: make check-all
 
-  # Module-graph drift gate: every module's go.mod must carry the full
-  # require+replace closure computed by tools/fix-module-graph.py (Go
-  # ignores replaces in dependency go.mods). --check exits 1 with a
-  # listing when any entry is missing; run the script without --check
+  # Module-graph drift gate: every module's go.mod must require+replace
+  # each intra-repo module it directly imports, computed by tools/modgraph
+  # (Go ignores replaces in dependency go.mods). --check exits 1 with a
+  # listing when any entry is missing; run the tool without --check
   # locally to repair.
   module-graph:
     name: module-graph
@@ -143,7 +143,7 @@ jobs:
             go.work.sum
             **/go.sum
       - name: Check module graph closure
-        run: python3 tools/fix-module-graph.py --check
+        run: go run ./tools/modgraph --check
 
   # Cross-adapter conformance gate: the shared kits (memory/local-backed,
   # hermetic, no network) plus the redis adapter conformance tests
