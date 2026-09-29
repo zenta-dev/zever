@@ -3,6 +3,7 @@ package fiber
 import (
 	"fmt"
 	"net/http"
+	"net/http/httptest"
 	"runtime/debug"
 	"strings"
 	"sync"
@@ -117,7 +118,7 @@ func (d *fiberDriver) Group(prefix string, middlewares ...func(http.Handler) htt
 
 	fg := d.app.Group(prefix)
 	for _, mw := range middlewares {
-		fg.Use(adaptor.HTTPMiddleware(mw))
+		fg.Use(wrapMiddleware(mw))
 	}
 
 	return &fiberGroup{d: d, group: fg, prefix: prefix}
@@ -125,7 +126,7 @@ func (d *fiberDriver) Group(prefix string, middlewares ...func(http.Handler) htt
 
 func (d *fiberDriver) Use(middlewares ...func(http.Handler) http.Handler) {
 	for _, mw := range middlewares {
-		d.app.Use(adaptor.HTTPMiddleware(mw))
+		d.app.Use(wrapMiddleware(mw))
 	}
 }
 
@@ -168,7 +169,7 @@ func (g *fiberGroup) Group(prefix string, middlewares ...func(http.Handler) http
 
 	fg := g.group.Group(prefix)
 	for _, mw := range middlewares {
-		fg.Use(adaptor.HTTPMiddleware(mw))
+		fg.Use(wrapMiddleware(mw))
 	}
 
 	return &fiberGroup{d: g.d, group: fg, prefix: g.fullPath(prefix)}
@@ -180,7 +181,7 @@ func (g *fiberGroup) fullPath(pattern string) string {
 
 func (g *fiberGroup) Use(middlewares ...func(http.Handler) http.Handler) {
 	for _, mw := range middlewares {
-		g.group.Use(adaptor.HTTPMiddleware(mw))
+		g.group.Use(wrapMiddleware(mw))
 	}
 }
 
@@ -218,11 +219,72 @@ func (d *fiberDriver) routerLogf(format string, args ...any) {
 
 func wrapHandler(handler http.HandlerFunc) fiber.Handler {
 	return func(c *fiber.Ctx) error {
-		h := fasthttpadaptor.NewFastHTTPHandler(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		h := http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 			handler(w, r.WithContext(router.WithParams(r.Context(), c.AllParams())))
-		}))
-		h(c.Context())
+		})
+		serveHTTP(c, h)
 
 		return nil
+	}
+}
+
+// wrapMiddleware bridges net/http middleware to a fiber handler.
+//
+// gofiber/adaptor.HTTPMiddleware is unusable here: since fasthttp v1.62 the
+// underlying fasthttpadaptor buffers each conversion and applies it with
+// Response.SetBody, so every chained handler replaces the response body and
+// middleware bytes written before next.ServeHTTP are lost. This bridge keeps
+// append semantics: middleware output is appended to the fiber response body
+// before continuing the chain with c.Next.
+func wrapMiddleware(mw func(http.Handler) http.Handler) fiber.Handler {
+	return func(c *fiber.Ctx) error {
+		var next bool
+
+		nextHandler := http.HandlerFunc(func(_ http.ResponseWriter, r *http.Request) {
+			next = true
+			// Propagate request mutations back to the fiber ctx, mirroring
+			// gofiber/adaptor.HTTPMiddleware.
+			c.Request().Header.SetMethod(r.Method)
+			c.Request().SetRequestURI(r.RequestURI)
+			c.Request().SetHost(r.Host)
+			for key, val := range r.Header {
+				for _, v := range val {
+					c.Request().Header.Set(key, v)
+				}
+			}
+		})
+		serveHTTP(c, mw(nextHandler))
+		if next {
+			return c.Next()
+		}
+
+		return nil
+	}
+}
+
+// serveHTTP runs h against the current fiber request and merges the recorded
+// status, headers and body back into the fiber response. The body is appended
+// (never replaced) so output from earlier chained handlers is preserved.
+func serveHTTP(c *fiber.Ctx, h http.Handler) {
+	var r http.Request
+	if err := fasthttpadaptor.ConvertRequest(c.Context(), &r, true); err != nil {
+		c.Status(fiber.StatusInternalServerError)
+
+		return
+	}
+
+	rec := httptest.NewRecorder()
+	h.ServeHTTP(rec, r.WithContext(c.Context()))
+
+	for k, vv := range rec.Header() {
+		for _, v := range vv {
+			c.Response().Header.Add(k, v)
+		}
+	}
+	if rec.Code != 0 {
+		c.Status(rec.Code)
+	}
+	if rec.Body.Len() > 0 {
+		c.Response().AppendBody(rec.Body.Bytes())
 	}
 }
