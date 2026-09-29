@@ -3,20 +3,20 @@ module github.com/zenta-dev/zever/core/authz
 go 1.27.0
 
 require (
-	github.com/zenta-dev/zever/core/auth v0.0.0
-	github.com/zenta-dev/zever/core/permission v0.0.0
-	github.com/zenta-dev/zever/shared/codec v0.0.0
+	github.com/zenta-dev/zever/core/auth v0.5.0
+	github.com/zenta-dev/zever/core/permission v0.5.0
+	github.com/zenta-dev/zever/shared/codec v0.5.0
 	google.golang.org/grpc v1.83.2
 	google.golang.org/protobuf v1.36.11
 )
 
 require (
-	github.com/zenta-dev/zever/adapters/permission/noop v0.0.0
-	github.com/zenta-dev/zever/adapters/session/memory v0.0.0
-	github.com/zenta-dev/zever/core/session v0.0.0 // indirect
-	github.com/zenta-dev/zever/shared/redisclient v0.0.0
-	github.com/zenta-dev/zever/shared/redisopt v0.0.0 // indirect
-	github.com/zenta-dev/zever/shared/registry v0.0.0 // indirect
+	github.com/zenta-dev/zever/adapters/permission/noop v0.5.0
+	github.com/zenta-dev/zever/adapters/session/memory v0.5.0
+	github.com/zenta-dev/zever/core/session v0.5.0 // indirect
+	github.com/zenta-dev/zever/shared/redisclient v0.5.0
+	github.com/zenta-dev/zever/shared/redisopt v0.5.0 // indirect
+	github.com/zenta-dev/zever/shared/registry v0.5.0 // indirect
 	golang.org/x/net v0.58.0 // indirect
 	golang.org/x/sys v0.47.0 // indirect
 	golang.org/x/text v0.41.0 // indirect

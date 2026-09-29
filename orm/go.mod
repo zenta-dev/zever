@@ -4,11 +4,11 @@ go 1.27.0
 
 require (
 	github.com/jackc/pgx/v5 v5.11.0
-	github.com/zenta-dev/zever/adapters/db/postgres v0.0.0
-	github.com/zenta-dev/zever/adapters/db/sqlite v0.0.0
-	github.com/zenta-dev/zever/core/db v0.0.0
-	github.com/zenta-dev/zever/dsl v0.0.0
-	github.com/zenta-dev/zever/shared/retry v0.0.0
+	github.com/zenta-dev/zever/adapters/db/postgres v0.5.0
+	github.com/zenta-dev/zever/adapters/db/sqlite v0.5.0
+	github.com/zenta-dev/zever/core/db v0.5.0
+	github.com/zenta-dev/zever/dsl v0.5.0
+	github.com/zenta-dev/zever/shared/retry v0.5.0
 )
 
 require (
@@ -21,22 +21,22 @@ require (
 	github.com/ncruces/go-strftime v1.0.0 // indirect
 	github.com/remyoudompheng/bigfft v0.0.0-20230129092748-24d4a6f8daec // indirect
 	github.com/robfig/cron/v3 v3.0.1 // indirect
-	github.com/zenta-dev/zever/adapters/log/noop v0.0.0
-	github.com/zenta-dev/zever/adapters/permission/noop v0.0.0
-	github.com/zenta-dev/zever/adapters/router/stdhttp v0.0.0
-	github.com/zenta-dev/zever/adapters/session/memory v0.0.0
-	github.com/zenta-dev/zever/core/auth v0.0.0
-	github.com/zenta-dev/zever/core/authz v0.0.0
-	github.com/zenta-dev/zever/core/log v0.0.0
-	github.com/zenta-dev/zever/core/permission v0.0.0
-	github.com/zenta-dev/zever/core/router v0.0.0
-	github.com/zenta-dev/zever/core/session v0.0.0
-	github.com/zenta-dev/zever/shared/apperror v0.0.0
-	github.com/zenta-dev/zever/shared/codec v0.0.0
-	github.com/zenta-dev/zever/shared/lrucache v0.0.0 // indirect
-	github.com/zenta-dev/zever/shared/redisclient v0.0.0
-	github.com/zenta-dev/zever/shared/redisopt v0.0.0
-	github.com/zenta-dev/zever/shared/registry v0.0.0 // indirect
+	github.com/zenta-dev/zever/adapters/log/noop v0.5.0
+	github.com/zenta-dev/zever/adapters/permission/noop v0.5.0
+	github.com/zenta-dev/zever/adapters/router/stdhttp v0.5.0
+	github.com/zenta-dev/zever/adapters/session/memory v0.5.0
+	github.com/zenta-dev/zever/core/auth v0.5.0
+	github.com/zenta-dev/zever/core/authz v0.5.0
+	github.com/zenta-dev/zever/core/log v0.5.0
+	github.com/zenta-dev/zever/core/permission v0.5.0
+	github.com/zenta-dev/zever/core/router v0.5.0
+	github.com/zenta-dev/zever/core/session v0.5.0
+	github.com/zenta-dev/zever/shared/apperror v0.5.0
+	github.com/zenta-dev/zever/shared/codec v0.5.0
+	github.com/zenta-dev/zever/shared/lrucache v0.5.0 // indirect
+	github.com/zenta-dev/zever/shared/redisclient v0.5.0
+	github.com/zenta-dev/zever/shared/redisopt v0.5.0
+	github.com/zenta-dev/zever/shared/registry v0.5.0 // indirect
 	golang.org/x/sync v0.23.0 // indirect
 	golang.org/x/sys v0.48.0 // indirect
 	golang.org/x/text v0.42.0 // indirect

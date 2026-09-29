@@ -4,16 +4,16 @@ go 1.27.0
 
 require (
 	github.com/coreos/go-oidc/v3 v3.21.0
-	github.com/zenta-dev/zever/core/auth v0.0.0
+	github.com/zenta-dev/zever/core/auth v0.5.0
 )
 
 require (
 	github.com/go-jose/go-jose/v4 v4.1.4 // indirect
-	github.com/zenta-dev/zever/adapters/session/memory v0.0.0
-	github.com/zenta-dev/zever/core/session v0.0.0 // indirect
-	github.com/zenta-dev/zever/shared/redisclient v0.0.0
-	github.com/zenta-dev/zever/shared/redisopt v0.0.0 // indirect
-	github.com/zenta-dev/zever/shared/registry v0.0.0 // indirect
+	github.com/zenta-dev/zever/adapters/session/memory v0.5.0
+	github.com/zenta-dev/zever/core/session v0.5.0 // indirect
+	github.com/zenta-dev/zever/shared/redisclient v0.5.0
+	github.com/zenta-dev/zever/shared/redisopt v0.5.0 // indirect
+	github.com/zenta-dev/zever/shared/registry v0.5.0 // indirect
 	golang.org/x/oauth2 v0.36.0 // indirect
 )
 

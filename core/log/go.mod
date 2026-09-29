@@ -3,8 +3,8 @@ module github.com/zenta-dev/zever/core/log
 go 1.27.0
 
 require (
-	github.com/zenta-dev/zever/adapters/log/noop v0.0.0
-	github.com/zenta-dev/zever/shared/registry v0.0.0
+	github.com/zenta-dev/zever/adapters/log/noop v0.5.0
+	github.com/zenta-dev/zever/shared/registry v0.5.0
 )
 
 replace github.com/zenta-dev/zever/shared/registry => ../../shared/registry

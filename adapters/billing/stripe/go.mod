@@ -4,14 +4,14 @@ go 1.27.0
 
 require (
 	github.com/stripe/stripe-go/v82 v82.5.1
-	github.com/zenta-dev/zever/core/billing v0.0.0
-	github.com/zenta-dev/zever/shared/providersclient v0.0.0
+	github.com/zenta-dev/zever/core/billing v0.5.0
+	github.com/zenta-dev/zever/shared/providersclient v0.5.0
 )
 
 require (
-	github.com/zenta-dev/zever/shared/httpclient v0.0.0 // indirect
-	github.com/zenta-dev/zever/shared/providersopt v0.0.0 // indirect
-	github.com/zenta-dev/zever/shared/registry v0.0.0 // indirect
+	github.com/zenta-dev/zever/shared/httpclient v0.5.0 // indirect
+	github.com/zenta-dev/zever/shared/providersopt v0.5.0 // indirect
+	github.com/zenta-dev/zever/shared/registry v0.5.0 // indirect
 )
 
 replace github.com/zenta-dev/zever/shared/providersclient => ../../../shared/providersclient

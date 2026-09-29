@@ -4,8 +4,8 @@ go 1.27.0
 
 require (
 	firebase.google.com/go/v4 v4.22.0
-	github.com/zenta-dev/zever/core/flag v0.0.0
-	github.com/zenta-dev/zever/shared/firebase v0.0.0
+	github.com/zenta-dev/zever/core/flag v0.5.0
+	github.com/zenta-dev/zever/shared/firebase v0.5.0
 )
 
 require (
@@ -39,10 +39,10 @@ require (
 	github.com/googleapis/gax-go/v2 v2.24.0 // indirect
 	github.com/planetscale/vtprotobuf v0.6.1-0.20240319094008-0393e58bdf10 // indirect
 	github.com/spiffe/go-spiffe/v2 v2.8.1 // indirect
-	github.com/zenta-dev/zever/adapters/flag/static v0.0.0
-	github.com/zenta-dev/zever/adapters/log/noop v0.0.0
-	github.com/zenta-dev/zever/core/log v0.0.0 // indirect
-	github.com/zenta-dev/zever/shared/registry v0.0.0 // indirect
+	github.com/zenta-dev/zever/adapters/flag/static v0.5.0
+	github.com/zenta-dev/zever/adapters/log/noop v0.5.0
+	github.com/zenta-dev/zever/core/log v0.5.0 // indirect
+	github.com/zenta-dev/zever/shared/registry v0.5.0 // indirect
 	go.opentelemetry.io/auto/sdk v1.2.1 // indirect
 	go.opentelemetry.io/contrib/detectors/gcp v1.44.0 // indirect
 	go.opentelemetry.io/contrib/instrumentation/google.golang.org/grpc/otelgrpc v0.70.0 // indirect
