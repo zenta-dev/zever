@@ -5,16 +5,16 @@ go 1.27.0
 require (
 	github.com/andybalholm/brotli v1.1.1 // indirect
 	github.com/golang-jwt/jwt/v5 v5.3.1 // indirect
-	github.com/zenta-dev/zever/shared/registry v0.5.0 // indirect
+	github.com/zenta-dev/zever/shared/registry v0.5.2 // indirect
 )
 
 replace github.com/zenta-dev/zever/adapters/search/sqlite => ../sqlite
 
 require (
 	github.com/meilisearch/meilisearch-go v0.36.3
-	github.com/zenta-dev/zever/core/search v0.5.0
-	github.com/zenta-dev/zever/shared/codec v0.5.0
-	github.com/zenta-dev/zever/shared/lrucache v0.5.0
+	github.com/zenta-dev/zever/core/search v0.5.2
+	github.com/zenta-dev/zever/shared/codec v0.5.2
+	github.com/zenta-dev/zever/shared/lrucache v0.5.2
 )
 
 replace github.com/zenta-dev/zever/core/search => ../../../core/search

@@ -2,7 +2,7 @@
   "name": "zever-dsl",
   "displayName": "Zever DSL",
   "description": "Syntax highlighting and language server client integration for the zever schema DSL (.zen files)",
-  "version": "0.5.0",
+  "version": "0.5.2",
   "publisher": "zenta-dev",
   "license": "MIT",
   "repository": {

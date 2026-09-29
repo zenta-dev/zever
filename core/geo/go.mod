@@ -3,12 +3,12 @@ module github.com/zenta-dev/zever/core/geo
 go 1.27.0
 
 require (
-	github.com/zenta-dev/zever/adapters/geo/static v0.5.0
-	github.com/zenta-dev/zever/shared/endpoint v0.5.0
-	github.com/zenta-dev/zever/shared/registry v0.5.0
+	github.com/zenta-dev/zever/adapters/geo/static v0.5.2
+	github.com/zenta-dev/zever/shared/endpoint v0.5.2
+	github.com/zenta-dev/zever/shared/registry v0.5.2
 )
 
-require github.com/zenta-dev/zever/shared/codec v0.5.0 // indirect
+require github.com/zenta-dev/zever/shared/codec v0.5.2 // indirect
 
 replace (
 	github.com/zenta-dev/zever/adapters/geo/static => ../../adapters/geo/static

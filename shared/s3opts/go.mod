@@ -7,7 +7,7 @@ require (
 	github.com/aws/aws-sdk-go-v2/config v1.33.6
 	github.com/aws/aws-sdk-go-v2/credentials v1.20.6
 	github.com/aws/aws-sdk-go-v2/service/s3 v1.113.4
-	github.com/zenta-dev/zever/core/storage v0.5.0
+	github.com/zenta-dev/zever/core/storage v0.5.2
 )
 
 require (
@@ -25,10 +25,10 @@ require (
 	github.com/aws/aws-sdk-go-v2/service/ssooidc v1.43.1 // indirect
 	github.com/aws/aws-sdk-go-v2/service/sts v1.51.1 // indirect
 	github.com/aws/smithy-go v1.28.1 // indirect
-	github.com/zenta-dev/zever/adapters/log/noop v0.5.0
-	github.com/zenta-dev/zever/adapters/storage/local v0.5.0
-	github.com/zenta-dev/zever/core/log v0.5.0 // indirect
-	github.com/zenta-dev/zever/shared/registry v0.5.0 // indirect
+	github.com/zenta-dev/zever/adapters/log/noop v0.5.2
+	github.com/zenta-dev/zever/adapters/storage/local v0.5.2
+	github.com/zenta-dev/zever/core/log v0.5.2 // indirect
+	github.com/zenta-dev/zever/shared/registry v0.5.2 // indirect
 )
 
 replace github.com/zenta-dev/zever/core/storage => ../../core/storage
