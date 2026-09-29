@@ -44,16 +44,20 @@ Negative dimensions are rejected.
 
 ```go
 import (
+	"github.com/zenta-dev/zever/adapters/vectorstore/sqlite"
 	"github.com/zenta-dev/zever/config"
 	"github.com/zenta-dev/zever/container"
 )
 
-c := container.New(config.Default())
-vs, err := c.VectorStore()
-if err != nil {
-	// handle
+func main() {
+	sqlite.Register() // container wires nothing; register before resolving
+	c := container.New(config.Default())
+	vs, err := c.VectorStore()
+	if err != nil {
+		// handle
+	}
+	_ = vs
 }
-_ = vs
 ```
 
 `VectorStore()` resolves lazily and caches the result; on error the cache
@@ -68,12 +72,14 @@ import (
 	"context"
 	"fmt"
 
+	"github.com/zenta-dev/zever/adapters/vectorstore/sqlite"
 	"github.com/zenta-dev/zever/config"
 	"github.com/zenta-dev/zever/container"
-	"github.com/zenta-dev/zever/vectorstore"
+	"github.com/zenta-dev/zever/core/vectorstore"
 )
 
 func main() {
+	sqlite.Register() // container wires nothing; register before resolving
 	c := container.New(config.Default())
 	defer c.Close(context.Background())
 
@@ -117,9 +123,9 @@ orthogonal one last with score 0.
 
 | Adapter | Package | Notes |
 |---|---|---|
-| `sqlite` | `vectorstore/sqlite` | Default; DSN `:memory:` |
-| `pgvector` | `vectorstore/pgvector` | Postgres extension; needs `dsn` |
-| `qdrant` | `vectorstore/qdrant` | Dedicated store; needs `url` (+ `api_key`) |
+| `sqlite` | `adapters/vectorstore/sqlite` | Default; DSN `:memory:` |
+| `pgvector` | `adapters/vectorstore/pgvector` | Postgres extension; needs `dsn` |
+| `qdrant` | `adapters/vectorstore/qdrant` | Dedicated store; needs `url` (+ `api_key`) |
 
 ## Production notes
 

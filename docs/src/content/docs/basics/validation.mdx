@@ -30,6 +30,8 @@ The bookings schema shows both forms: `email` carries `@validate(format: "email"
 No container accessor: validation is not a service. Handlers validate inline before touching resolved services:
 
 ```go
+// Once at startup (container wires nothing): dbsqlite.Register()
+// (alias for github.com/zenta-dev/zever/adapters/db/sqlite)
 c := container.New(config.Default())
 db, err := c.DB()
 if err != nil {
@@ -100,15 +102,18 @@ The bookings schema carries format rules on entities (`User.email`, `Space.title
 
 ```go
 // Flow rule the schema cannot express: feature-flag gate.
-if !flags.Enabled(ctx, "checkout") {
+// (fl is the resolved core/flag Flag; missing keys fall back to false.)
+if ok, _ := fl.Bool(ctx, "checkout", false); !ok {
     writeError(w, http.StatusNotFound, "checkout disabled")
     return
 }
 // Store rule: natural-key conflict maps to the declared error set.
-if errors.Is(err, db.ErrConflict) {
+// (ErrConflict is an app-owned sentinel from the store layer.)
+if errors.Is(err, ErrConflict) {
     writeError(w, http.StatusConflict, "already exists")
     return
 }
+```
 
 ## Config and option validation
 
