@@ -12,6 +12,7 @@ require (
 )
 
 require (
+	github.com/zenta-dev/zever/adapters/webhook/http v0.0.0
 	github.com/zenta-dev/zever/shared/endpoint v0.0.0 // indirect
 	github.com/zenta-dev/zever/shared/httpclient v0.0.0 // indirect
 	github.com/zenta-dev/zever/shared/redisopt v0.0.0 // indirect

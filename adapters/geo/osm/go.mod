@@ -9,7 +9,10 @@ require (
 	github.com/zenta-dev/zever/shared/httpclient v0.0.0
 )
 
-require github.com/zenta-dev/zever/shared/registry v0.0.0 // indirect
+require (
+	github.com/zenta-dev/zever/adapters/geo/static v0.0.0
+	github.com/zenta-dev/zever/shared/registry v0.0.0 // indirect
+)
 
 replace (
 	github.com/zenta-dev/zever/core/geo => ../../../core/geo

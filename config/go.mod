@@ -45,10 +45,34 @@ require (
 
 require (
 	github.com/robfig/cron/v3 v3.0.1 // indirect
+	github.com/zenta-dev/zever/adapters/analytics/log v0.0.0
+	github.com/zenta-dev/zever/adapters/cache/memory v0.0.0
+	github.com/zenta-dev/zever/adapters/crypto/local v0.0.0
+	github.com/zenta-dev/zever/adapters/eventbus/memory v0.0.0
+	github.com/zenta-dev/zever/adapters/flag/static v0.0.0
+	github.com/zenta-dev/zever/adapters/geo/static v0.0.0
+	github.com/zenta-dev/zever/adapters/i18n/embed v0.0.0
+	github.com/zenta-dev/zever/adapters/idempotency/memory v0.0.0
+	github.com/zenta-dev/zever/adapters/lock/memory v0.0.0
 	github.com/zenta-dev/zever/adapters/log/noop v0.0.0 // indirect
+	github.com/zenta-dev/zever/adapters/mailer/log v0.0.0
+	github.com/zenta-dev/zever/adapters/notification/log v0.0.0
+	github.com/zenta-dev/zever/adapters/observability/noop v0.0.0
+	github.com/zenta-dev/zever/adapters/payment/stub v0.0.0
+	github.com/zenta-dev/zever/adapters/permission/noop v0.0.0
+	github.com/zenta-dev/zever/adapters/queue/memory v0.0.0
+	github.com/zenta-dev/zever/adapters/ratelimit/memory v0.0.0
+	github.com/zenta-dev/zever/adapters/router/stdhttp v0.0.0
+	github.com/zenta-dev/zever/adapters/secrets/env v0.0.0
+	github.com/zenta-dev/zever/adapters/session/memory v0.0.0
+	github.com/zenta-dev/zever/adapters/storage/local v0.0.0
+	github.com/zenta-dev/zever/adapters/tenant/single v0.0.0
+	github.com/zenta-dev/zever/adapters/webhook/http v0.0.0
+	github.com/zenta-dev/zever/adapters/workflow/memory v0.0.0
 	github.com/zenta-dev/zever/shared/endpoint v0.0.0 // indirect
 	github.com/zenta-dev/zever/shared/httpclient v0.0.0 // indirect
 	github.com/zenta-dev/zever/shared/providersopt v0.0.0 // indirect
+	github.com/zenta-dev/zever/shared/redisclient v0.0.0
 	github.com/zenta-dev/zever/shared/registry v0.0.0 // indirect
 	github.com/zenta-dev/zever/shared/retry v0.0.0 // indirect
 )

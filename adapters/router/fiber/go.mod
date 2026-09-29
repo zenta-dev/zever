@@ -20,6 +20,7 @@ require (
 	github.com/gofiber/fiber/v2 v2.52.15
 	github.com/valyala/fasthttp v1.74.0
 	github.com/zenta-dev/zever/adapters/log/noop v0.0.0
+	github.com/zenta-dev/zever/adapters/router/stdhttp v0.0.0
 	github.com/zenta-dev/zever/core/log v0.0.0
 	github.com/zenta-dev/zever/core/router v0.0.0
 )

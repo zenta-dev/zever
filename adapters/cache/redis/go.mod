@@ -14,6 +14,7 @@ require (
 require (
 	github.com/cespare/xxhash/v2 v2.3.0 // indirect
 	github.com/yuin/gopher-lua v1.1.1 // indirect
+	github.com/zenta-dev/zever/adapters/cache/memory v0.0.0
 	github.com/zenta-dev/zever/shared/codec v0.0.0 // indirect
 	github.com/zenta-dev/zever/shared/registry v0.0.0 // indirect
 	go.uber.org/atomic v1.11.0 // indirect

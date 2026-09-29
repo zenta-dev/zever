@@ -6,8 +6,13 @@ repeat require+replace for every intra-repo module it (transitively)
 imports. This script computes that closure from source imports and patches
 each go.mod via `go mod edit`, then runs a best-effort offline tidy.
 
-Usage: python3 tools/fix-module-graph.py [--tidy]
+Usage: python3 tools/fix-module-graph.py [--tidy] [--check] [--root DIR]
   --tidy  also run `go mod tidy` per module (needs primed module cache).
+  --check compute the required require+replace closure per module and exit 1
+          with a drift listing when a go.mod lacks entries; exit 0 when
+          clean. Makes no changes.
+  --root DIR  check/fix the repo rooted at DIR (default: script's parent).
+          Used to exercise drift detection against a scratch copy.
 """
 import os
 import re
@@ -87,31 +92,90 @@ def gomod_requires(moddir):
     return reqs
 
 
-def main():
-    do_tidy = "--tidy" in sys.argv
-    mods = find_modules()
-    print(f"modules: {len(mods)}")
-    to_path = {v: k for k, v in mods.items()}
+def gomod_replaces(moddir):
+    """Local zever paths replaced by moddir/go.mod (single-line and block forms)."""
+    reps = set()
+    try:
+        with open(os.path.join(ROOT, moddir, "go.mod")) as f:
+            text = f.read()
+    except OSError:
+        return reps
+    for m in re.finditer(r'replace\s+(github\.com/zenta-dev/zever/\S+)\s+=>', text):
+        reps.add(m.group(1))
+    for m in re.finditer(r'replace\s*\((.*?)\)', text, re.S):
+        for line in m.group(1).split("\n"):
+            line = line.strip()
+            if line.startswith("github.com/zenta-dev/zever/"):
+                reps.add(line.split()[0])
+    return reps
+
+
+def needed_closure(path, moddir, mods):
+    """Full local require closure for one module (direct + transitive)."""
+    needed = set()
+    for imp in local_imports(moddir, mods):
+        prov = provider(imp, mods)
+        if prov and prov != path:
+            needed.add(prov)
+    # fixpoint over local requires (transitive replaces are ignored by go)
+    queue = list(needed)
+    while queue:
+        dep = queue.pop()
+        depdir = mods.get(dep)
+        if not depdir:
+            continue
+        for req in gomod_requires(depdir):
+            if req in mods and req != path and req not in needed:
+                needed.add(req)
+                queue.append(req)
+    return needed
+
+
+def check_modules(mods):
+    """Return {moddir: {'require': [...], 'replace': [...]}} of missing entries."""
+    drift = {}
     for path in sorted(mods):
         moddir = mods[path]
         if moddir == ".":
             continue
-        needed = set()
-        for imp in local_imports(moddir, mods):
-            prov = provider(imp, mods)
-            if prov and prov != path:
-                needed.add(prov)
-        # fixpoint over local requires (transitive replaces are ignored by go)
-        queue = list(needed)
-        while queue:
-            dep = queue.pop()
-            depdir = mods.get(dep)
-            if not depdir:
-                continue
-            for req in gomod_requires(depdir):
-                if req in mods and req != path and req not in needed:
-                    needed.add(req)
-                    queue.append(req)
+        needed = needed_closure(path, moddir, mods)
+        if not needed:
+            continue
+        missing_req = sorted(d for d in needed if d not in gomod_requires(moddir))
+        missing_rep = sorted(d for d in needed if d not in gomod_replaces(moddir))
+        if missing_req or missing_rep:
+            drift[moddir] = {"require": missing_req, "replace": missing_rep}
+    return drift
+
+
+def main():
+    global ROOT
+    args = sys.argv[1:]
+    do_tidy = "--tidy" in args
+    do_check = "--check" in args
+    if "--root" in args:
+        ROOT = os.path.abspath(args[args.index("--root") + 1])
+    if do_check:
+        mods = find_modules()
+        drift = check_modules(mods)
+        if not drift:
+            print(f"modules: {len(mods)}; module-graph clean")
+            return 0
+        print(f"modules: {len(mods)}; drift in {len(drift)} module(s):")
+        for moddir in sorted(drift):
+            missing = drift[moddir]
+            if missing["require"]:
+                print(f"{moddir}: missing require: {' '.join(missing['require'])}")
+            if missing["replace"]:
+                print(f"{moddir}: missing replace: {' '.join(missing['replace'])}")
+        return 1
+    mods = find_modules()
+    print(f"modules: {len(mods)}")
+    for path in sorted(mods):
+        moddir = mods[path]
+        if moddir == ".":
+            continue
+        needed = needed_closure(path, moddir, mods)
         if not needed:
             continue
         full = os.path.join(ROOT, moddir)
@@ -132,4 +196,4 @@ def main():
 
 
 if __name__ == "__main__":
-    main()
+    sys.exit(main())

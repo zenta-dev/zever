@@ -16,6 +16,8 @@ replace github.com/zenta-dev/zever/shared/providersopt => ../../../shared/provid
 
 require (
 	github.com/stripe/stripe-go/v82 v82.5.1
+	github.com/zenta-dev/zever/adapters/idempotency/memory v0.0.0
+	github.com/zenta-dev/zever/adapters/payment/stub v0.0.0
 	github.com/zenta-dev/zever/core/idempotency v0.0.0
 	github.com/zenta-dev/zever/core/payment v0.0.0
 	github.com/zenta-dev/zever/shared/httpclient v0.0.0

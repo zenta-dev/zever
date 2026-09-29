@@ -11,6 +11,7 @@ require (
 
 require (
 	github.com/rs/zerolog v1.35.1
+	github.com/zenta-dev/zever/adapters/log/noop v0.0.0
 	github.com/zenta-dev/zever/core/log v0.0.0
 )
 
