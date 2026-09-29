@@ -267,11 +267,32 @@ jobs:
           name: sbom-cyclonedx-${{ strategy.job-index }}
           path: sbom/
 
+  # Doc snippet guard: every ```go block import path / pkg.Symbol in *.md/*.mdx
+  # must resolve against the workspace (migration.mdx + CHANGELOG.md history
+  # exempt — old paths there are intentional).
+  doc-snippets:
+    name: doc-snippets
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+      - uses: actions/setup-go@b7ad1dad31e06c5925ef5d2fc7ad053ef454303e # v7.0.0
+        with:
+          go-version-file: go.work
+          cache-dependency-path: |
+            go.work.sum
+            **/go.sum
+      - name: Check doc Go snippets
+        run: tools/check-doc-snippets.sh
+      - name: Tested doc samples (docs/examples, outside go.work)
+        run: GOWORK=off go -C docs/examples test -count=1 ./...
+
   ci-gate:
     name: ci-gate
     if: always()
     runs-on: ubuntu-latest
-    needs: [detect, fmt, lint, test, test-race, sbom, lsp, vulnerability, external-sms]
+    needs: [detect, fmt, lint, test, test-race, sbom, lsp, vulnerability, external-sms, doc-snippets]
     steps:
       - name: Aggregate results
         run: |

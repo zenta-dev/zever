@@ -12,7 +12,7 @@ postgres driver rewrites them to `$n` before handing the query to pgx.
 | `postgres` | `pgxpool` | `Options.DSN` postgres URL (required) |
 
 ```go
-_ = db.Register(db.SQLite, sqlite.New) // once, at startup
+dbsqlite.Register() // once, at startup
 
 conn, err := db.Open(db.SQLite, db.Options{Path: ":memory:"})
 ```

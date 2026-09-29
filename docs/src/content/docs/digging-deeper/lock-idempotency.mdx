@@ -75,6 +75,9 @@ the 24h default) plus bad Redis addr/prefix. Keys cap at 255 bytes
 ## Resolve via container
 
 ```go
+// Once at startup (container wires nothing):
+// lockmemory.Register(); idemmemory.Register()
+// (aliases for adapters/lock/memory and adapters/idempotency/memory)
 c := container.New(config.Default())
 lk, err := c.Lock()
 if err != nil {
@@ -99,12 +102,16 @@ import (
     "fmt"
     "time"
 
+    idemmemory "github.com/zenta-dev/zever/adapters/idempotency/memory"
+    lockmemory "github.com/zenta-dev/zever/adapters/lock/memory"
     "github.com/zenta-dev/zever/config"
     "github.com/zenta-dev/zever/container"
-    "github.com/zenta-dev/zever/idempotency"
+    "github.com/zenta-dev/zever/core/idempotency"
 )
 
 func main() {
+    lockmemory.Register() // container wires nothing; register before resolving
+    idemmemory.Register()
     c := container.New(config.Default())
     lk, err := c.Lock()
     if err != nil {
@@ -143,10 +150,10 @@ A second `Begin` with the same key and fingerprint would print
 
 | Service | Adapter | Package | Notes |
 |---|---|---|---|
-| lock | `memory` | `lock/memory` | Default; single-process only |
-| lock | `redis` | `lock/redis` | Distributed leases across replicas |
-| idempotency | `memory` | `idempotency/memory` | Default; single-process only |
-| idempotency | `redis` | `idempotency/redis` | Shared dedupe across workers |
+| lock | `memory` | `adapters/lock/memory` | Default; single-process only |
+| lock | `redis` | `adapters/lock/redis` | Distributed leases across replicas |
+| idempotency | `memory` | `adapters/idempotency/memory` | Default; single-process only |
+| idempotency | `redis` | `adapters/idempotency/redis` | Shared dedupe across workers |
 
 ## Production notes
 

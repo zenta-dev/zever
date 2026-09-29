@@ -75,11 +75,14 @@ display config only through `config.RedactedServices`.
 
 ```go
 import (
+	notificationlog "github.com/zenta-dev/zever/adapters/notification/log"
 	"github.com/zenta-dev/zever/config"
 	"github.com/zenta-dev/zever/container"
 )
 
 func openNotify() error {
+	notificationlog.Register()
+
 	c := container.New(config.Default())
 	n, err := c.Notification()
 	if err != nil {
@@ -112,14 +115,13 @@ import (
 	"context"
 	"fmt"
 
-	"github.com/zenta-dev/zever/notification"
-	notificationlog "github.com/zenta-dev/zever/notification/log"
+	notificationlog "github.com/zenta-dev/zever/adapters/notification/log"
+	"github.com/zenta-dev/zever/core/notification"
 )
 
 func main() error {
-	_ = notification.Register(notification.Log, func(o notification.Options) (notification.Notifier, error) {
-		return notificationlog.NewWithWriter(o, discardWriter())
-	})
+	notificationlog.Register()
+
 	n, err := notification.Open(notification.Log, notification.Options{})
 	if err != nil {
 		return err
@@ -152,9 +154,9 @@ Expected behavior: both `Notify` calls validate, write to the log writer, and
 return nil with no network use. A wrong-channel call (SMS fields on push, or
 `Title` on SMS) fails closed with `InvalidNotificationError` before delivery.
 
-Note: `discardWriter()` above stands in for any `io.Writer` such as
-`io.Discard` in tests or `os.Stdout` in dev. The log adapter constructor
-takes options plus a writer.
+Note: `notificationlog.Register()` wires the default log adapter, which writes
+single JSON lines to `os.Stdout`. Use `NewWithWriter(opts, w)` with any
+`io.Writer` such as `io.Discard` in tests when you need to capture output.
 
 ## Adapters
 

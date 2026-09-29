@@ -71,11 +71,14 @@ default. File durations are integer nanoseconds, env accepts `"30s"` style.
 
 ```go
 import (
+	maillog "github.com/zenta-dev/zever/adapters/mailer/log"
 	"github.com/zenta-dev/zever/config"
 	"github.com/zenta-dev/zever/container"
 )
 
 func openMailer() error {
+	maillog.Register()
+
 	c := container.New(config.Default())
 	m, err := c.Mailer()
 	if err != nil {
@@ -106,16 +109,14 @@ package main
 import (
 	"context"
 	"fmt"
-	"os"
 
-	"github.com/zenta-dev/zever/mailer"
-	maillog "github.com/zenta-dev/zever/mailer/log"
+	maillog "github.com/zenta-dev/zever/adapters/mailer/log"
+	"github.com/zenta-dev/zever/core/mailer"
 )
 
 func main() error {
-	_ = mailer.Register(mailer.Log, func(o mailer.Options) (mailer.Mailer, error) {
-		return maillog.NewWithWriter(o, os.Stdout)
-	})
+	maillog.Register()
+
 	m, err := mailer.Open(mailer.Log, mailer.Options{Host: "localhost", Port: 25})
 	if err != nil {
 		return err

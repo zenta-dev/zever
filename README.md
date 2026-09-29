@@ -78,7 +78,7 @@ not code.
 
 Configuration layers cleanly: built-in zero-infra defaults, then a config file,
 then environment variables, with strict parsing: no silent fallbacks on typos
-or unknown keys. The container wires everything without globals or init-time
+or unknown keys. The container resolves only explicitly registered adapters, without globals or init-time
 magic, and closes resolved adapters in correct dependency order on shutdown.
 
 ## Schema compiler

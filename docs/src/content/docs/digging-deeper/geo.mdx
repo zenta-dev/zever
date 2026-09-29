@@ -71,6 +71,8 @@ GEO_ALLOWINSECURE=false
 ## Resolve via container
 
 ```go
+// Once at startup (container wires nothing): geostatic.Register()
+// (alias for github.com/zenta-dev/zever/adapters/geo/static)
 c := container.New(config.Default())
 g, err := c.Geo()
 if err != nil {
@@ -91,12 +93,14 @@ import (
     "context"
     "fmt"
 
+    "github.com/zenta-dev/zever/adapters/geo/static"
     "github.com/zenta-dev/zever/config"
     "github.com/zenta-dev/zever/container"
-    "github.com/zenta-dev/zever/geo"
+    "github.com/zenta-dev/zever/core/geo"
 )
 
 func main() {
+    static.Register() // container wires nothing; register before resolving
     c := container.New(config.Default())
     g, err := c.Geo()
     if err != nil {
@@ -126,9 +130,9 @@ meters as a float.
 
 | Adapter | Package | Notes |
 |---|---|---|
-| `static` | `geo/static` | Default; file-backed list, offline, deterministic |
-| `osm` | `geo/osm` | OpenStreetMap-backed; requires `user_agent` |
-| `google` | `geo/google` | Google-backed; needs `api_key` |
+| `static` | `adapters/geo/static` | Default; file-backed list, offline, deterministic |
+| `osm` | `adapters/geo/osm` | OpenStreetMap-backed; requires `user_agent` |
+| `google` | `adapters/geo/google` | Google-backed; needs `api_key` |
 
 ## Production notes
 

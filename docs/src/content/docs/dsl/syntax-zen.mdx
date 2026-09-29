@@ -17,7 +17,7 @@ documents stay outside `.zen`; backends generate those from the schema.
 
 - A schema directory, one file per module (module name derives from the
   immediate subdirectory: `schema/app/app.zen` compiles as module `app`).
-- The canonical fixture `internal/dsl/compile/testdata/app.zen` as a style
+- The canonical fixture `dsl/compile/testdata/app.zen` as a style
   reference; new syntax must round-trip through it.
 - CLI available: `zever fmt` to normalize, `zever check` for diagnostics,
   `zever compile` for codegen.

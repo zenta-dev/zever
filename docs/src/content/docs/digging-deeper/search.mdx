@@ -71,11 +71,14 @@ fail the load, so keep the block to exactly these keys.
 
 ```go
 import (
+	searchsqlite "github.com/zenta-dev/zever/adapters/search/sqlite"
 	"github.com/zenta-dev/zever/config"
 	"github.com/zenta-dev/zever/container"
 )
 
 func openSearch() error {
+	searchsqlite.Register()
+
 	c := container.New(config.Default())
 	s, err := c.Search()
 	if err != nil {
@@ -107,12 +110,12 @@ import (
 	"context"
 	"fmt"
 
-	"github.com/zenta-dev/zever/search"
-	searchsqlite "github.com/zenta-dev/zever/search/sqlite"
+	searchsqlite "github.com/zenta-dev/zever/adapters/search/sqlite"
+	"github.com/zenta-dev/zever/core/search"
 )
 
 func main() error {
-	_ = search.Register(search.SQLite, searchsqlite.New)
+	searchsqlite.Register()
 	s, err := search.Open(search.SQLite, search.Options{DSN: ":memory:"})
 	if err != nil {
 		return err

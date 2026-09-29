@@ -2,7 +2,7 @@
 
 A fully functional demo app that exercises **every battery** in `zever` via
 HTTP and background jobs. One `.zen` schema drives the ORM, Protobuf API and
-SQL schema; `container.Container` wires all adapters.
+SQL schema; `container.Container` resolves only explicitly-registered adapters.
 
 This app runs with **zero external services** — every battery uses its
 in-memory/local adapter by default (sqlite files under `data/`). Swap

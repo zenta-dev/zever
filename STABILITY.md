@@ -18,9 +18,11 @@ fields) and `container` accessors (`container/services.go`,
   pre-1.0 development. They are still documented in release notes
   (`CHANGELOG.md` `## [Unreleased]` before PR), but no stability promise
   is made before 1.0.
-- **Where adapters live:** each top-level package is one small interface
-  plus self-registering adapters in subpackages (for example
-  `cache/memory`, `cache/redis`). The container is the sole resolver
+- **Where adapters live:** each battery is one small interface
+  in `core/<b>` plus adapters in `adapters/<b>/<a>` with explicit
+  `Register()` calls (for example
+  `adapters/cache/memory`, `adapters/cache/redis`). The container is the
+  sole resolver and wires nothing by itself
   (`container.New(cfg)` plus lazy per-service accessors). Do not add
   methods to public interfaces (breaks implementers); prefer a new
   interface.
@@ -41,7 +43,7 @@ fields) and `container` accessors (`container/services.go`,
 | `crypto` | Facade (`local`); dev key deterministic, never prod. |
 | `password` | Facade (`argon2id`). |
 | `secrets` | Facade (`env` only); `ZEVER`-prefixed env exception. |
-| `internal/dsl` | `.zen` compiler frontend (internal-only, no release version; schema `v1`/`v2` are API versions). |
+| `dsl` | `.zen` compiler frontend (compile-time only, no release version; schema `v1`/`v2` are API versions). |
 
 ## Extended
 
@@ -75,7 +77,7 @@ release-note docs.
 | `mailer` | Facade (`log`, `smtp`). |
 | `permission` | Facade (`noop`, `rbac`, `casbin`). |
 | `ratelimit` | Facade (`memory`, `redis`). |
-| `scheduler` | Facade (`embedded`); shares `Cache`/`Queue` via `Job()`. |
+| `scheduler` | Facade (`embedded`); shares `Queue` via `Job()`. |
 | `webhook` | Facade (`http`, `queue`, `sqlite`). |
 | `apperror` | Typed error vocabulary (gRPC/HTTP mappings). |
 | `authz` | `auth`-to-`permission` bridge (HTTP middleware, gRPC interceptor). |

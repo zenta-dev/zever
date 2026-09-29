@@ -78,11 +78,14 @@ values error.
 
 ```go
 import (
+	eventbusmemory "github.com/zenta-dev/zever/adapters/eventbus/memory"
 	"github.com/zenta-dev/zever/config"
 	"github.com/zenta-dev/zever/container"
 )
 
 func openBus() error {
+	eventbusmemory.Register()
+
 	c := container.New(config.Default())
 	bus, err := c.EventBus()
 	if err != nil {
@@ -113,12 +116,12 @@ import (
 	"context"
 	"fmt"
 
-	"github.com/zenta-dev/zever/eventbus"
-	"github.com/zenta-dev/zever/eventbus/memory"
+	eventbusmemory "github.com/zenta-dev/zever/adapters/eventbus/memory"
+	"github.com/zenta-dev/zever/core/eventbus"
 )
 
 func main() error {
-	_ = eventbus.Register(eventbus.Memory, memory.New)
+	eventbusmemory.Register()
 	bus, err := eventbus.Open(eventbus.Memory, eventbus.Options{})
 	if err != nil {
 		return err

@@ -10,7 +10,7 @@ database access, caching, queues, routing, and other backend plumbing. It never
 generates or dictates business logic — only the infrastructure that logic runs on.
 
 Every backend concern (db, cache, queue, auth, storage, ...) is a small interface
-with multiple swappable adapters, self-registered and lazily resolved through a
+with multiple swappable adapters, explicitly registered and lazily resolved through a
 shared `container.Container`. Swapping an adapter is a config change, not a code
 change.
 
@@ -84,9 +84,9 @@ lazily on first accessor call (`c.DB()`, `c.Cache()`, ...) and caches the result
 a server and a worker each build their own `Container` from the same config.
 
 - `Job()` has no adapter of its own — it builds a `*job.Dispatcher` over the
-  already-resolved `Queue`. `Scheduler()` injects the resolved `Cache`/`Queue`
-  so it shares connections instead of opening new ones; resolving it resolves
-  `Cache`/`Queue` as a side effect.
+  already-resolved `Queue`. `Scheduler()` resolves the `Job()` dispatcher
+  so it shares the process-wide `Queue` instead of opening new connections;
+  resolving it resolves `Queue` as a side effect.
 - `Close(ctx)` only closes services actually resolved, in dependency order
   (dependents holding cache/queue refs → other snapshots → cache/queue leaves →
   grpc server). Shutdown shape is probed per service: `Close(ctx) error` →
@@ -100,12 +100,13 @@ Full accessor table and close-order diagram: `container/README.md`.
 
 ### Layer 3: business-logic packages
 
-Each top-level package (`auth/`, `db/`, `cache/`, `queue/`, `session/`, `payment/`,
-`storage/`, `permission/`, `workflow/`, ...) defines one small interface plus
-self-registering adapters, matching the service table in `config/README.md`.
-The container is the only place that resolves an interface to a concrete adapter.
+Each battery (`db`, `cache`, `queue`, `session`, `payment`,
+`storage/`, `permission/`, `workflow/`, ...) defines one small interface in
+`core/<b>` plus adapters in `adapters/<b>/<a>` with explicit `Register()`
+calls, matching the service table in `config/README.md`.
+The container is the only place that resolves an interface to a concrete adapter, and it wires nothing by itself.
 
-### Schema compiler (`internal/dsl/`)
+### Schema compiler (`dsl/`)
 
 Compiler frontend for the `.zen` schema language, **internal**: runtime packages
 must not import it (mirrors Go's `internal/` visibility rule).
@@ -133,9 +134,9 @@ source text → lexer → parser → ast → resolver → ir.Schema
 
 Entry points: `parser.New(file, src).ParseFile()` → `resolver.Resolve(files)` →
 `*ir.Schema`; or `compile.Compile(files, backends...)` for the full pipeline.
-Canonical fixture: `internal/dsl/compile/testdata/app.zen` (a two-entity,
+Canonical fixture: `dsl/compile/testdata/app.zen` (a two-entity,
 two-service schema with a `has_many`/`belongs_to` relation pair, used by
-committed-output integration tests — regenerate with `go test ./internal/dsl/compile/ -run <TestName> -update`).
+committed-output integration tests — regenerate with `go test ./dsl/compile/ -run <TestName> -update`).
 
 The parser never panics on malformed input; it always produces best-effort
 output plus diagnostics.

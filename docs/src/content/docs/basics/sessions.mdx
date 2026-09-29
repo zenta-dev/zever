@@ -33,9 +33,12 @@ SESSION_ADDR=redis:6379
 
 ```go
 import (
+    sessionmemory "github.com/zenta-dev/zever/adapters/session/memory"
     "github.com/zenta-dev/zever/config"
     "github.com/zenta-dev/zever/container"
 )
+
+sessionmemory.Register()
 
 c := container.New(config.Default())
 store, err := c.Session()
@@ -49,6 +52,11 @@ if err != nil {
 ## Runnable example
 
 ```go
+import (
+    "github.com/zenta-dev/zever/adapters/session/cookie"
+    "github.com/zenta-dev/zever/core/session"
+)
+
 func login(ctx context.Context, store session.Store, w http.ResponseWriter) error {
     sess, err := store.Create(ctx, session.DefaultTTL)
     if err != nil {
@@ -94,7 +102,7 @@ Set-Cookie: session_id=<opaque-id>; Path=/; HttpOnly; Secure; SameSite=Lax
 `session.Store` has no knowledge of HTTP - cookie construction is the separate `session/cookie` helper building a plain `*http.Cookie` from a session ID:
 
 ```go
-import "github.com/zenta-dev/zever/session/cookie"
+import "github.com/zenta-dev/zever/adapters/session/cookie"
 
 c := cookie.New(sess.ID, cookie.Options{})
 http.SetCookie(w, c)

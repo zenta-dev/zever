@@ -35,7 +35,7 @@ config file  ->  Load     ->  one Config          ->  container.New(cfg)
 adapter name ->  config   ->  registry lookup     ->  cached instance
 ```
 
-You need Go 1.27 or newer. The repo is a Go multi-module monorepo: `core/<b>` holds each battery interface plus its `Register`/`Open` registry (resolved by `container`); `adapters/<b>/<a>` holds one Go module per adapter whose `Register()` wires it into its `core` registry; `shared/*` holds SDK-free helpers. Local dev builds through the committed `go.work` workspace at the repo root (143 `use` entries covering every module), so `go build ./...` and `go test ./...` resolve from the root. No Node, Docker, or database server is needed for the default path: `config.Default()` picks zero-infra adapters (sqlite, memory, log) so the first build and test run pass on a clean machine.
+You need Go 1.27 or newer. The repo is a Go multi-module monorepo: `core/<b>` holds each battery interface plus its `Register`/`Open` registry (resolved by `container`); `adapters/<b>/<a>` holds one Go module per adapter whose `Register()` wires it into its `core` registry; `shared/*` holds SDK-free helpers. Local dev builds through the committed `go.work` workspace at the repo root (144 `use` entries covering every workspace module (`examples/external-sms` and `docs/examples` stay outside `go.work` by design)), so `go build ./...` and `go test ./...` resolve from the root. No Node, Docker, or database server is needed for the default path: `config.Default()` picks zero-infra adapters (sqlite, memory, log) so the first build and test run pass on a clean machine.
 
 ## Config
 
@@ -111,7 +111,7 @@ service UserService {
 Compile it, then run the smoke test:
 
 ```sh
-go get github.com/zenta-dev/zever
+go get github.com/zenta-dev/zever/config@vX.Y.Z github.com/zenta-dev/zever/container@vX.Y.Z
 zever compile
 go run .
 ```

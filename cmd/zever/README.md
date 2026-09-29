@@ -44,6 +44,17 @@ Inspection / Runtime / Database).
   before or after the subcommand) or `ZEVER_INTERACTIVE=1|true|yes` sets
   interactive mode via `huh` guided prompts (`prompt.go`); `zever <command> -h` /
   `zever help <command>` always prints flags without running anything.
+- **`zever new` battery picker (opt-in)**: without `--interactive` the command
+  never prompts and scaffolds the floor set (`log`+`router`) plus whatever
+  `--batteries a,b` and `--adapters b=a` select; `-y` / `--yes` skips all
+   prompts, `--list-batteries` prints the battery/default-adapter table and
+   exits.
+- `zever new --module PATH`: Go module path for the new project (default:
+  the app name itself).
+- `zever new --dir PATH`: output directory (default `./<name>`).
+- `zever new --framework-version V`: depend on a published zever version
+  instead of a local replace directive.
+- `zever new --force`: scaffold into a non-empty directory anyway.
 - For the full command list, see `zever --help`.
 
 ## Non-TTY contract
