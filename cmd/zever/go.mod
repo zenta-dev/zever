@@ -145,7 +145,7 @@ require (
 	github.com/PaddleHQ/paddle-go-sdk/v5 v5.2.0 // indirect
 	github.com/andybalholm/brotli v1.1.1 // indirect
 	github.com/anthonynsimon/bild v0.17.1 // indirect
-	github.com/anthropics/anthropic-sdk-go v1.73.0 // indirect
+	github.com/anthropics/anthropic-sdk-go v1.75.0 // indirect
 	github.com/atotto/clipboard v0.1.4 // indirect
 	github.com/aws/aws-sdk-go-v2 v1.47.0 // indirect
 	github.com/aws/aws-sdk-go-v2/aws/protocol/eventstream v1.7.20 // indirect
