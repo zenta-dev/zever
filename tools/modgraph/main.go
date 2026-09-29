@@ -9,19 +9,25 @@
 package main
 
 import (
+	"context"
 	"flag"
 	"fmt"
 	"os"
+	"os/signal"
 	"path/filepath"
 	"runtime"
 	"sort"
+	"strings"
 )
 
 func main() {
-	os.Exit(run(os.Args[1:], os.Stdout, os.Stderr))
+	ctx, stop := signal.NotifyContext(context.Background(), os.Interrupt)
+	code := run(ctx, os.Args[1:], os.Stdout, os.Stderr)
+	stop()
+	os.Exit(code)
 }
 
-func run(args []string, stdout, stderr *os.File) int {
+func run(ctx context.Context, args []string, stdout, stderr *os.File) int {
 	fs := flag.NewFlagSet("modgraph", flag.ContinueOnError)
 	fs.SetOutput(stderr)
 	check := fs.Bool("check", false, "report drift without changing files (exit 1 when drifted)")
@@ -41,7 +47,7 @@ func run(args []string, stdout, stderr *os.File) int {
 	}
 	root = abs
 
-	mods, err := findModules(root)
+	mods, err := findModules(ctx, root)
 	if err != nil {
 		fmt.Fprintf(stderr, "modgraph: list modules: %v\n", err)
 		return 1
@@ -53,7 +59,7 @@ func run(args []string, stdout, stderr *os.File) int {
 	if ver == "" {
 		ver = lockstepVersion(root)
 	}
-	return runFix(root, mods, ver, stdout, stderr)
+	return runFix(ctx, root, mods, ver, stdout, stderr)
 }
 
 // defaultRoot returns the repo root derived from this source file's
@@ -93,7 +99,7 @@ func runCheck(root string, mods map[string]string, stdout *os.File) int {
 }
 
 // runFix adds missing require+replace pairs per module via `go mod edit`.
-func runFix(root string, mods map[string]string, ver string, stdout, stderr *os.File) int {
+func runFix(ctx context.Context, root string, mods map[string]string, ver string, stdout, stderr *os.File) int {
 	fmt.Fprintf(stdout, "modules: %d\n", len(mods))
 	paths := make([]string, 0, len(mods))
 	for path := range mods {
@@ -118,7 +124,7 @@ func runFix(root string, mods map[string]string, ver string, stdout, stderr *os.
 			deps = append(deps, dep)
 		}
 		sort.Strings(deps)
-		if err := fixModule(root, moddir, deps, mods, ver); err != nil {
+		if err := fixModule(ctx, root, moddir, deps, mods, ver); err != nil {
 			fmt.Fprintf(stderr, "modgraph: %s: %v\n", moddir, err)
 			return 1
 		}
@@ -139,12 +145,12 @@ func sortedKeys(d map[string]drift) []string {
 
 // joinAll joins entries with single spaces.
 func joinAll(ss []string) string {
-	out := ""
+	var b strings.Builder
 	for i, s := range ss {
 		if i > 0 {
-			out += " "
+			b.WriteString(" ")
 		}
-		out += s
+		b.WriteString(s)
 	}
-	return out
+	return b.String()
 }
