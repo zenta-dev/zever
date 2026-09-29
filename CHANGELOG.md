@@ -53,6 +53,15 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   prompt and `--adapters b=a` skips that battery's adapter prompt, so
   every wizard answer has a flag; `ZEVER_INTERACTIVE` also opts in. See
   `cmd/zever/new.go` (`wantNewPicker`, `runBatteryPicker`).
+- `zever add` flags and plugin batteries: `--adapter <name>` (must agree
+  with the positional slash form when both are given), `--force` to
+  overwrite an already-pinned `zever.yaml` stanza (re-adding without it
+  now errors naming the current adapter), and plugin-battery support for
+  names outside `config.Default()`'s set — a `plugins:` stanza in
+  `zever.yaml`, a `--module <path[@version]>` require in `go.mod`
+  (version defaults to `v0.1.0`), and a
+  `container.RegisterPlugin`/`Resolve` wiring comment in
+  `internal/app/app.go`. See `cmd/zever/add.go`.
 
 ### Changed
 

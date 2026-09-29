@@ -145,15 +145,22 @@ func TestRunAddEditsProjectFiles(t *testing.T) {
 		}
 	}
 
-	// Re-running the same add is a no-op: byte-identical files.
+	// Re-running the same add without --force errors, naming the current
+	// adapter; with --force it is a no-op: byte-identical files.
 	before := map[string]string{
 		"go.mod":     gomod,
 		"app.go":     app,
 		"zever.yaml": yamlContent,
 	}
 
-	if err := runAdd([]string{"cache/redis"}); err != nil {
-		t.Fatalf("runAdd again: %v", err)
+	if err := runAdd([]string{"cache/redis"}); err == nil {
+		t.Fatal("runAdd again without --force succeeded, want a duplicate error")
+	} else if !strings.Contains(err.Error(), "redis") {
+		t.Fatalf("duplicate error does not name the current adapter: %v", err)
+	}
+
+	if err := runAdd([]string{"cache/redis", "--force"}); err != nil {
+		t.Fatalf("runAdd again with --force: %v", err)
 	}
 
 	for file, want := range map[string]string{
@@ -288,6 +295,180 @@ func TestRunAddErrors(t *testing.T) {
 			t.Fatalf("error does not point at app.go: %v", err)
 		}
 	})
+}
+
+func TestRunAddAdapterFlagEqualsSlashForm(t *testing.T) {
+	dir := t.TempDir()
+	withWorkingDir(t, dir)
+	writeAddFixture(t, dir, "")
+
+	if err := runAdd([]string{"cache", "--adapter", "redis"}); err != nil {
+		t.Fatalf("runAdd: %v", err)
+	}
+
+	yamlContent := readFile(t, filepath.Join(dir, "zever.yaml"))
+	if !strings.Contains(yamlContent, "adapter: redis") {
+		t.Fatalf("zever.yaml lacks adapter: redis:\n%s", yamlContent)
+	}
+
+	gomod := readFile(t, filepath.Join(dir, "go.mod"))
+	if !strings.Contains(gomod, "require github.com/zenta-dev/zever/adapters/cache/redis v0.4.0") {
+		t.Fatalf("go.mod lacks redis adapter require:\n%s", gomod)
+	}
+}
+
+func TestRunAddAdapterFlagConflictErrors(t *testing.T) {
+	dir := t.TempDir()
+	withWorkingDir(t, dir)
+	writeAddFixture(t, dir, "")
+
+	err := runAdd([]string{"cache/redis", "--adapter", "memory"})
+	if err == nil {
+		t.Fatal("runAdd with conflicting adapters succeeded, want error")
+	}
+
+	if !strings.Contains(err.Error(), "conflict") {
+		t.Fatalf("error does not mention conflict: %v", err)
+	}
+}
+
+func TestRunAddDuplicateWithoutForceErrors(t *testing.T) {
+	dir := t.TempDir()
+	withWorkingDir(t, dir)
+	writeAddFixture(t, dir, "")
+
+	if err := runAdd([]string{"cache/redis"}); err != nil {
+		t.Fatalf("runAdd: %v", err)
+	}
+
+	err := runAdd([]string{"cache/redis"})
+	if err == nil {
+		t.Fatal("second runAdd without --force succeeded, want duplicate error")
+	}
+
+	if !strings.Contains(err.Error(), "redis") {
+		t.Fatalf("duplicate error does not name current adapter: %v", err)
+	}
+}
+
+func TestRunAddForceOverwritesStanza(t *testing.T) {
+	dir := t.TempDir()
+	withWorkingDir(t, dir)
+	writeAddFixture(t, dir, "")
+
+	if err := runAdd([]string{"cache/redis"}); err != nil {
+		t.Fatalf("runAdd: %v", err)
+	}
+
+	if err := runAdd([]string{"cache/memory", "--force"}); err != nil {
+		t.Fatalf("runAdd --force: %v", err)
+	}
+
+	yamlContent := readFile(t, filepath.Join(dir, "zever.yaml"))
+	if !strings.Contains(yamlContent, "adapter: memory") {
+		t.Fatalf("zever.yaml lacks overwritten adapter: memory:\n%s", yamlContent)
+	}
+
+	if strings.Contains(yamlContent, "adapter: redis") {
+		t.Fatalf("zever.yaml still pins stale adapter redis:\n%s", yamlContent)
+	}
+}
+
+func TestRunAddForceReAddByteIdentical(t *testing.T) {
+	dir := t.TempDir()
+	withWorkingDir(t, dir)
+	writeAddFixture(t, dir, "")
+
+	if err := runAdd([]string{"cache/redis"}); err != nil {
+		t.Fatalf("runAdd: %v", err)
+	}
+
+	before := map[string]string{
+		"go.mod":     readFile(t, filepath.Join(dir, "go.mod")),
+		"app.go":     readGenerated(t, filepath.Join(dir, "internal", "app", "app.go")),
+		"zever.yaml": readFile(t, filepath.Join(dir, "zever.yaml")),
+	}
+
+	if err := runAdd([]string{"cache/redis", "--force"}); err != nil {
+		t.Fatalf("runAdd --force: %v", err)
+	}
+
+	for file, want := range map[string]string{
+		"go.mod":     readFile(t, filepath.Join(dir, "go.mod")),
+		"app.go":     readGenerated(t, filepath.Join(dir, "internal", "app", "app.go")),
+		"zever.yaml": readFile(t, filepath.Join(dir, "zever.yaml")),
+	} {
+		if want != before[file] {
+			t.Fatalf("%s changed on --force re-add:\n--- before ---\n%s\n--- after ---\n%s", file, before[file], want)
+		}
+	}
+}
+
+func TestRunAddPluginEditsProjectFiles(t *testing.T) {
+	dir := t.TempDir()
+	withWorkingDir(t, dir)
+	writeAddFixture(t, dir, "")
+
+	if err := runAdd([]string{"sms/stub", "--module", "github.com/example/zever-sms@v0.1.0"}); err != nil {
+		t.Fatalf("runAdd plugin: %v", err)
+	}
+
+	gomod := readFile(t, filepath.Join(dir, "go.mod"))
+	if !strings.Contains(gomod, "require github.com/example/zever-sms v0.1.0") {
+		t.Fatalf("go.mod lacks plugin require:\n%s", gomod)
+	}
+
+	yamlContent := readFile(t, filepath.Join(dir, "zever.yaml"))
+	for _, fragment := range []string{"plugins:", "sms:", "adapter: stub"} {
+		if !strings.Contains(yamlContent, fragment) {
+			t.Fatalf("zever.yaml lacks %q:\n%s", fragment, yamlContent)
+		}
+	}
+
+	app := readGenerated(t, filepath.Join(dir, "internal", "app", "app.go"))
+	for _, fragment := range []string{
+		`github.com/example/zever-sms`,
+		`RegisterPlugin("sms", container.PluginAPIVersion`,
+		`Resolve(`,
+	} {
+		if !strings.Contains(app, fragment) {
+			t.Fatalf("app.go lacks %q:\n%s", fragment, app)
+		}
+	}
+
+	before := map[string]string{
+		"go.mod":     gomod,
+		"app.go":     app,
+		"zever.yaml": yamlContent,
+	}
+
+	if err := runAdd([]string{"sms/stub", "--module", "github.com/example/zever-sms@v0.1.0", "--force"}); err != nil {
+		t.Fatalf("runAdd plugin --force: %v", err)
+	}
+
+	for file, want := range map[string]string{
+		"go.mod":     readFile(t, filepath.Join(dir, "go.mod")),
+		"app.go":     readGenerated(t, filepath.Join(dir, "internal", "app", "app.go")),
+		"zever.yaml": readFile(t, filepath.Join(dir, "zever.yaml")),
+	} {
+		if want != before[file] {
+			t.Fatalf("%s changed on plugin --force re-add:\n--- before ---\n%s\n--- after ---\n%s", file, before[file], want)
+		}
+	}
+
+	if err := runAdd([]string{"sms/stub", "--module", "github.com/example/zever-sms@v0.1.0"}); err == nil {
+		t.Fatal("second plugin runAdd without --force succeeded, want duplicate error")
+	}
+}
+
+func TestRunAddPluginRequiresModule(t *testing.T) {
+	dir := t.TempDir()
+	withWorkingDir(t, dir)
+	writeAddFixture(t, dir, "")
+
+	if err := runAdd([]string{"sms/stub"}); err == nil {
+		t.Fatal("runAdd plugin without --module succeeded, want error")
+	}
 }
 
 func TestGoModRequireVersion(t *testing.T) {
