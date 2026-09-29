@@ -60,7 +60,7 @@ require (
 )
 
 require (
-	firebase.google.com/go/v4 v4.21.0
+	firebase.google.com/go/v4 v4.22.0
 	github.com/zenta-dev/zever/core/notification v0.0.0
 	github.com/zenta-dev/zever/shared/firebase v0.0.0
 	github.com/zenta-dev/zever/shared/retry v0.0.0
