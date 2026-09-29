@@ -98,11 +98,11 @@ import _ "github.com/zenta-dev/zever/orm/migrate"
 ```
 
 ```sh
-go get github.com/zenta-dev/zever/config@v0.4.0 github.com/zenta-dev/zever/container@v0.4.0
+go get github.com/zenta-dev/zever/config@v0.5.0 github.com/zenta-dev/zever/container@v0.5.0
 go mod tidy
 make tidy-check
 make check
-go install github.com/zenta-dev/zever/cmd/zever@v0.4.0
+go install github.com/zenta-dev/zever/cmd/zever@v0.5.0
 ```
 
 Expected output or behavior:
@@ -124,7 +124,7 @@ upgrade ok: true
 | Race tests | `make test-race` | Data races the fast gate skips |
 | Vuln scan | `make vulncheck` (`govulncheck` v1.8.0) | Known dependency CVEs |
 | Grammars | `make generate` (`go run ./tools/gengrammar`) | Stale editor grammars after touching `token.Keywords` or `resolver.ScalarTypeNames` |
-| CLI pin | `go install .../cmd/zever@v0.4.0` | TUI vs backend version skew |
+| CLI pin | `go install .../cmd/zever@v0.5.0` | TUI vs backend version skew |
 
 Releases bump every version pin together (root, LSP, editors, docs; file list in `.github/CONTRIBUTING.md` release checklist) and tag both `vX.Y.Z` and `tools/zever-lsp/vX.Y.Z`. `dsl` carries no release version (schema `v1`/`v2` are API versions). Keep user-facing changes in `CHANGELOG.md` under `## [Unreleased]` with every PR, one logical change per commit, Conventional Commits (`feat/fix/perf/refactor/test/docs/ci/build:`).
 

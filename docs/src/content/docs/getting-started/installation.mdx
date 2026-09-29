@@ -103,8 +103,8 @@ func main() {
 
 ```sh
 go mod init example.com/myapp
-go get github.com/zenta-dev/zever/config@v0.4.0 github.com/zenta-dev/zever/container@v0.4.0
-go install github.com/zenta-dev/zever/cmd/zever@v0.4.0
+go get github.com/zenta-dev/zever/config@v0.5.0 github.com/zenta-dev/zever/container@v0.5.0
+go install github.com/zenta-dev/zever/cmd/zever@v0.5.0
 make setup
 make build
 make test
@@ -145,7 +145,7 @@ go test -race ./config/...
 
 ## Production notes
 
-Pin the CLI install to the same version as the module (`go install .../cmd/zever@v0.4.0`) so TUI and backend behavior match; the release checklist bumps every version pin together (root, LSP, editors, docs). Run `make check` before pushing: it mirrors CI (fmt, vet, lint, race, vulncheck, build).
+Pin the CLI install to the same version as the module (`go install .../cmd/zever@v0.5.0`) so TUI and backend behavior match; the release checklist bumps every version pin together (root, LSP, editors, docs). Run `make check` before pushing: it mirrors CI (fmt, vet, lint, race, vulncheck, build).
 
 Never log raw option maps in install scripts or CI output; print `config.RedactedServices(cfg)` instead. `Default()` ships a deterministic dev crypto key that must never reach prod: supply real secrets via file or env. Close every container you open (`c.Close(ctx)` with a timeout parent) even in smoke tests, so leak checks (`goleak.VerifyTestMain` in `container/`) stay green.
 
@@ -156,7 +156,7 @@ Never log raw option maps in install scripts or CI output; print `config.Redacte
 | `go version` reports older than 1.27 | Stale toolchain on PATH | Install Go 1.27+ from `https://go.dev/dl/`, then re-run `go version` |
 | `go get` fails with network or proxy error | Offline sandbox or `GOPROXY` block | Set `GOPROXY` per site policy, retry `go mod download`, then `go get` again |
 | `make setup` fails on lint install | Pinned tool download blocked or partial install | Re-run `make setup`, verify binaries on PATH, then `make build` |
-| `zever --help` prints nothing useful or command not found | CLI installed to a dir outside PATH | Add `$(go env GOPATH)/bin` to PATH or reinstall with `go install .../cmd/zever@v0.4.0` |
+| `zever --help` prints nothing useful or command not found | CLI installed to a dir outside PATH | Add `$(go env GOPATH)/bin` to PATH or reinstall with `go install .../cmd/zever@v0.5.0` |
 | Smoke test panics resolving `DB()` | Broken local state or edited defaults | Reset to `config.Default()` with no file or env, run `go run .` again, then layer config back |
 
 ## See also
