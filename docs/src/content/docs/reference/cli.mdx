@@ -137,6 +137,50 @@ exit:0
 | `--force` | `zever new`: scaffold into a non-empty directory anyway |
 | `-h` | print flags without running |
 
+### `zever add`
+
+<!-- NOTE: extend this section when --adapter/--force/plugin flags land (separate CLI task owns them). -->
+
+Adds one core battery to an existing project. Synopsis (exactly one
+positional, no prompting):
+
+```sh
+zever add <battery>[/<adapter>]
+```
+
+The adapter may be omitted (`zever add cache` selects
+`config.Default()`'s own pick, e.g. `memory`) or pinned explicitly
+(`zever add cache/redis`). Empty halves, extra slashes, and unknown
+batteries are errors. Run it from the project root (the directory
+holding `go.mod`); without one it fails.
+
+Effects (three append-only edits, never overwriting hand-written code):
+
+- `go.mod`: adds `require` entries for the battery's core and adapter
+  modules at the version pinned by the framework require (falling back
+  to the CLI's built-in framework version). For local checkouts (a
+  `replace github.com/zenta-dev/zever => <local-dir>` marker), matching
+  local replaces are derived for both modules. Paths already required
+  (any version) or already replaced are left untouched.
+- `internal/app/app.go`: splices in the adapter's named import plus its
+  `Register()` call (gofmt-normalized). Either half already present is
+  skipped, so re-adding the same battery is a no-op. Fails if the file
+  has no import block or no `func New` — scaffold it with
+  `zever generate server` first.
+- `zever.yaml`: sets `<battery>.adapter`, preserving every other entry
+  (including the entry's own options). A missing or empty file starts a
+  fresh document (with the schema modeline, like `zever new`); an
+  existing file keeps its header.
+
+`zever add` does not run `go mod tidy` — run it afterwards so `go.sum`
+catches up, then serve:
+
+```sh
+zever add cache/redis
+go mod tidy
+zever serve
+```
+
 ### Dev and tinker rules
 
 - `zever dev` is local watch-only: it prints
