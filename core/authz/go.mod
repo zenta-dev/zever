@@ -11,10 +11,7 @@ require (
 )
 
 require (
-	github.com/zenta-dev/zever/adapters/permission/noop v0.5.2
-	github.com/zenta-dev/zever/adapters/session/memory v0.5.2
 	github.com/zenta-dev/zever/core/session v0.5.2 // indirect
-	github.com/zenta-dev/zever/shared/redisclient v0.5.2
 	github.com/zenta-dev/zever/shared/redisopt v0.5.2 // indirect
 	github.com/zenta-dev/zever/shared/registry v0.5.2 // indirect
 	golang.org/x/net v0.58.0 // indirect

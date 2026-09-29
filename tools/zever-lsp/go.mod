@@ -12,27 +12,6 @@ require (
 require (
 	github.com/go-json-experiment/json v0.0.0-20260623181947-01eb4420fa68 // indirect
 	github.com/robfig/cron/v3 v3.0.1 // indirect
-	github.com/zenta-dev/zever/adapters/db/postgres v0.5.2
-	github.com/zenta-dev/zever/adapters/db/sqlite v0.5.2
-	github.com/zenta-dev/zever/adapters/log/noop v0.5.2
-	github.com/zenta-dev/zever/adapters/permission/noop v0.5.2
-	github.com/zenta-dev/zever/adapters/router/stdhttp v0.5.2
-	github.com/zenta-dev/zever/adapters/session/memory v0.5.2
-	github.com/zenta-dev/zever/core/auth v0.5.2
-	github.com/zenta-dev/zever/core/authz v0.5.2
-	github.com/zenta-dev/zever/core/db v0.5.2
-	github.com/zenta-dev/zever/core/log v0.5.2
-	github.com/zenta-dev/zever/core/permission v0.5.2
-	github.com/zenta-dev/zever/core/router v0.5.2
-	github.com/zenta-dev/zever/core/session v0.5.2
-	github.com/zenta-dev/zever/orm v0.5.2
-	github.com/zenta-dev/zever/shared/apperror v0.5.2
-	github.com/zenta-dev/zever/shared/codec v0.5.2
-	github.com/zenta-dev/zever/shared/lrucache v0.5.2
-	github.com/zenta-dev/zever/shared/redisclient v0.5.2
-	github.com/zenta-dev/zever/shared/redisopt v0.5.2
-	github.com/zenta-dev/zever/shared/registry v0.5.2
-	github.com/zenta-dev/zever/shared/retry v0.5.2
 )
 
 replace github.com/zenta-dev/zever/dsl => ../../dsl

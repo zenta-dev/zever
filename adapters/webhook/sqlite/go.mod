@@ -22,8 +22,6 @@ require (
 )
 
 require (
-	github.com/zenta-dev/zever/adapters/log/noop v0.5.2
-	github.com/zenta-dev/zever/adapters/queue/memory v0.5.2
 	github.com/zenta-dev/zever/adapters/webhook/http v0.5.2
 	github.com/zenta-dev/zever/core/webhook v0.5.2
 	modernc.org/sqlite v1.59.0

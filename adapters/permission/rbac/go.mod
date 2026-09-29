@@ -4,10 +4,7 @@ go 1.27.0
 
 require github.com/zenta-dev/zever/core/permission v0.5.2
 
-require (
-	github.com/zenta-dev/zever/adapters/permission/noop v0.5.2
-	github.com/zenta-dev/zever/shared/registry v0.5.2 // indirect
-)
+require github.com/zenta-dev/zever/shared/registry v0.5.2 // indirect
 
 replace github.com/zenta-dev/zever/core/permission => ../../../core/permission
 

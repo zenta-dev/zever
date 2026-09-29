@@ -12,8 +12,6 @@ require (
 )
 
 require (
-	github.com/zenta-dev/zever/adapters/log/noop v0.5.2
-	github.com/zenta-dev/zever/adapters/queue/memory v0.5.2
 	github.com/zenta-dev/zever/shared/redisopt v0.5.2 // indirect
 	github.com/zenta-dev/zever/shared/retry v0.5.2 // indirect
 )

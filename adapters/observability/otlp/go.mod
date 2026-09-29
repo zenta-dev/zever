@@ -21,7 +21,6 @@ require (
 )
 
 require (
-	github.com/zenta-dev/zever/adapters/observability/noop v0.5.2
 	github.com/zenta-dev/zever/core/observability v0.5.2
 	go.opentelemetry.io/otel v1.46.0
 	go.opentelemetry.io/otel/exporters/otlp/otlpmetric/otlpmetricgrpc v1.46.0

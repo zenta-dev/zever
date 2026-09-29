@@ -13,7 +13,6 @@ require (
 	github.com/google/uuid v1.6.0 // indirect
 	github.com/hashicorp/golang-lru/v2 v2.0.7 // indirect
 	github.com/klauspost/compress v1.20.0 // indirect
-	github.com/zenta-dev/zever/adapters/analytics/log v0.5.2
 	github.com/zenta-dev/zever/shared/registry v0.5.2 // indirect
 	golang.org/x/sys v0.48.0 // indirect
 	golang.org/x/text v0.42.0 // indirect

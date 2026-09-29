@@ -10,7 +10,6 @@ require (
 )
 
 require (
-	github.com/zenta-dev/zever/adapters/i18n/embed v0.5.2
 	github.com/zenta-dev/zever/shared/endpoint v0.5.2 // indirect
 	github.com/zenta-dev/zever/shared/registry v0.5.2 // indirect
 )
