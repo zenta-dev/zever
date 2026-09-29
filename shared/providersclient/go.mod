@@ -4,7 +4,7 @@ go 1.27.0
 
 require (
 	github.com/stripe/stripe-go/v82 v82.5.1
-	github.com/zenta-dev/zever/shared/httpclient v0.5.0
+	github.com/zenta-dev/zever/shared/httpclient v0.5.2
 )
 
 replace github.com/zenta-dev/zever/shared/httpclient => ../httpclient

@@ -5,7 +5,7 @@ go 1.27.0
 require (
 	github.com/cespare/xxhash/v2 v2.3.0 // indirect
 	github.com/yuin/gopher-lua v1.1.1 // indirect
-	github.com/zenta-dev/zever/shared/registry v0.5.0 // indirect
+	github.com/zenta-dev/zever/shared/registry v0.5.2 // indirect
 	go.uber.org/atomic v1.11.0 // indirect
 	golang.org/x/sys v0.48.0 // indirect
 )
@@ -19,11 +19,11 @@ replace github.com/zenta-dev/zever/shared/retry => ../../../shared/retry
 require (
 	github.com/alicebob/miniredis/v2 v2.39.0
 	github.com/redis/go-redis/v9 v9.22.0
-	github.com/zenta-dev/zever/adapters/queue/memory v0.5.0
-	github.com/zenta-dev/zever/core/queue v0.5.0
-	github.com/zenta-dev/zever/shared/redisclient v0.5.0
-	github.com/zenta-dev/zever/shared/redisopt v0.5.0
-	github.com/zenta-dev/zever/shared/retry v0.5.0
+	github.com/zenta-dev/zever/adapters/queue/memory v0.5.2
+	github.com/zenta-dev/zever/core/queue v0.5.2
+	github.com/zenta-dev/zever/shared/redisclient v0.5.2
+	github.com/zenta-dev/zever/shared/redisopt v0.5.2
+	github.com/zenta-dev/zever/shared/retry v0.5.2
 )
 
 replace github.com/zenta-dev/zever/core/queue => ../../../core/queue

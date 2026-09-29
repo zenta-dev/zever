@@ -3,8 +3,8 @@ module github.com/zenta-dev/zever/core/workflow
 go 1.27.0
 
 require (
-	github.com/zenta-dev/zever/adapters/workflow/memory v0.5.0
-	github.com/zenta-dev/zever/shared/registry v0.5.0
+	github.com/zenta-dev/zever/adapters/workflow/memory v0.5.2
+	github.com/zenta-dev/zever/shared/registry v0.5.2
 )
 
 replace github.com/zenta-dev/zever/shared/registry => ../../shared/registry
