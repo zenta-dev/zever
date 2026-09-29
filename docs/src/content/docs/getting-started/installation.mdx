@@ -52,7 +52,7 @@ Real keys follow the `<SERVICE>_<FIELD>` scheme with no prefix (`DB_ADAPTER`, `D
 
 ## Resolve via container
 
-The smoke test below is also the install check: it builds one container from defaults and resolves the database handle.
+The smoke test below is also the install check: it builds one container from defaults and resolves the database handle. The default `db` adapter is `sqlite`, so the check requires that adapter module plus its `Register()` call — unregistered adapters fail with `UnknownAdapterError`.
 
 ```go
 package main
@@ -60,11 +60,13 @@ package main
 import (
 	"fmt"
 
+	"github.com/zenta-dev/zever/adapters/db/sqlite"
 	"github.com/zenta-dev/zever/config"
 	"github.com/zenta-dev/zever/container"
 )
 
 func main() {
+	sqlite.Register()
 	c := container.New(config.Default())
 	db, err := c.DB()
 	if err != nil {
@@ -87,11 +89,13 @@ package main
 import (
 	"fmt"
 
+	"github.com/zenta-dev/zever/adapters/db/sqlite"
 	"github.com/zenta-dev/zever/config"
 	"github.com/zenta-dev/zever/container"
 )
 
 func main() {
+	sqlite.Register()
 	c := container.New(config.Default())
 	db, err := c.DB()
 	if err != nil {
@@ -103,7 +107,7 @@ func main() {
 
 ```sh
 go mod init example.com/myapp
-go get github.com/zenta-dev/zever/config@v0.5.2 github.com/zenta-dev/zever/container@v0.5.2
+go get github.com/zenta-dev/zever/config@v0.5.2 github.com/zenta-dev/zever/container@v0.5.2 github.com/zenta-dev/zever/adapters/db/sqlite@v0.5.2
 go install github.com/zenta-dev/zever/cmd/zever@v0.5.2
 make setup
 make build
