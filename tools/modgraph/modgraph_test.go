@@ -175,7 +175,7 @@ func TestCheckDriftFixture(t *testing.T) {
 	mustWriteFile(t, filepath.Join(root, "libs", "app", "app.go"),
 		"package app\n\nimport \"github.com/zenta-dev/zever/libs/leaf\"\n\nvar _ = leaf.X\n")
 
-	mods, err := findModules(root)
+	mods, err := findModules(t.Context(), root)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -211,11 +211,10 @@ func TestNestedModuleSubtreeSkipped(t *testing.T) {
 		"module github.com/zenta-dev/zever/libs/leaf\n\ngo 1.27.0\n")
 	mustWriteFile(t, filepath.Join(root, "libs", "leaf", "leaf.go"), "package leaf\n")
 
-	mods, err := findModules(root)
-	if err != nil {
+	if _, err := findModules(t.Context(), root); err != nil {
 		t.Fatal(err)
 	}
-	got, err := localImports(root, "outer", mods)
+	got, err := localImports(root, "outer")
 	if err != nil {
 		t.Fatal(err)
 	}

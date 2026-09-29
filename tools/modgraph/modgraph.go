@@ -1,7 +1,9 @@
 package main
 
 import (
+	"context"
 	"encoding/json"
+	"fmt"
 	"go/parser"
 	"go/token"
 	"io/fs"
@@ -71,7 +73,7 @@ type modEditJSON struct {
 // directory under root holding a go.mod. Discovery runs `go mod edit -json`
 // per dir like the Python find_modules. .git and node_modules subtrees are
 // skipped.
-func findModules(root string) (map[string]string, error) {
+func findModules(ctx context.Context, root string) (map[string]string, error) {
 	mods := make(map[string]string)
 	err := filepath.WalkDir(root, func(p string, d fs.DirEntry, err error) error {
 		if err != nil {
@@ -92,15 +94,18 @@ func findModules(root string) (map[string]string, error) {
 		if d.Name() != "go.mod" {
 			return nil
 		}
-		cmd := exec.Command("go", "mod", "edit", "-json", "go.mod")
+		cmd := exec.CommandContext(ctx, "go", "mod", "edit", "-json", "go.mod")
 		cmd.Dir = filepath.Dir(p)
 		out, err := cmd.Output()
 		if err != nil {
-			return nil
+			return fmt.Errorf("modgraph: go mod edit -json in %s: %w", filepath.Dir(p), err)
 		}
 		var v modEditJSON
-		if err := json.Unmarshal(out, &v); err != nil || v.Module.Path == "" {
-			return nil
+		if err := json.Unmarshal(out, &v); err != nil {
+			return fmt.Errorf("modgraph: parse go mod edit output in %s: %w", filepath.Dir(p), err)
+		}
+		if v.Module.Path == "" {
+			return fmt.Errorf("modgraph: go mod edit output in %s has empty module path", filepath.Dir(p))
 		}
 		dir := filepath.ToSlash(filepath.Dir(rel))
 		mods[v.Module.Path] = dir
@@ -120,7 +125,7 @@ func hasGoMod(dir string) bool {
 
 // localImports returns all intra-repo import paths in .go files under
 // moddir, excluding nested-module subtrees.
-func localImports(root, moddir string, mods map[string]string) (map[string]bool, error) {
+func localImports(root, moddir string) (map[string]bool, error) {
 	base := filepath.Join(root, filepath.FromSlash(moddir))
 	found := make(map[string]bool)
 	err := filepath.WalkDir(base, func(p string, d fs.DirEntry, err error) error {
@@ -141,7 +146,7 @@ func localImports(root, moddir string, mods map[string]string) (map[string]bool,
 		if !strings.HasSuffix(d.Name(), ".go") {
 			return nil
 		}
-		content, err := os.ReadFile(p)
+		content, err := os.ReadFile(p) //nolint:gosec // p comes from walking the repo root, not user input
 		if err != nil {
 			return err
 		}
@@ -227,7 +232,7 @@ func gomodReplaces(root, moddir string) map[string]bool {
 // direct-only: `go mod tidy` drops requires nothing imports, so a
 // transitive closure here would fight tidy forever.
 func neededClosure(root, path, moddir string, mods map[string]string) (map[string]bool, error) {
-	imports, err := localImports(root, moddir, mods)
+	imports, err := localImports(root, moddir)
 	if err != nil {
 		return nil, err
 	}
@@ -295,14 +300,14 @@ func checkModules(root string, mods map[string]string) map[string]drift {
 
 // fixModule adds require@ver + relative replace entries for every dep of
 // one module via `go mod edit`.
-func fixModule(root, moddir string, deps []string, mods map[string]string, ver string) error {
+func fixModule(ctx context.Context, root, moddir string, deps []string, mods map[string]string, ver string) error {
 	full := filepath.Join(root, filepath.FromSlash(moddir))
 	for _, dep := range deps {
 		rel, err := filepath.Rel(full, filepath.Join(root, filepath.FromSlash(mods[dep])))
 		if err != nil {
 			return err
 		}
-		cmd := exec.Command("go", "mod", "edit",
+		cmd := exec.CommandContext(ctx, "go", "mod", "edit", //nolint:gosec // fixed "go mod edit" argv; dep/ver come from the repo's own go.mod files, no shell
 			"-require="+dep+"@"+ver,
 			"-replace="+dep+"="+filepath.ToSlash(rel),
 			"go.mod")
