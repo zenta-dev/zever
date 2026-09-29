@@ -4,13 +4,13 @@ go 1.27.0
 
 require (
 	github.com/golang-jwt/jwt/v5 v5.3.1
-	github.com/zenta-dev/zever/core/auth v0.5.2
+	github.com/zenta-dev/zever/core/auth v0.5.3
 )
 
 require (
-	github.com/zenta-dev/zever/core/session v0.5.2 // indirect
-	github.com/zenta-dev/zever/shared/redisopt v0.5.2 // indirect
-	github.com/zenta-dev/zever/shared/registry v0.5.2 // indirect
+	github.com/zenta-dev/zever/core/session v0.5.3 // indirect
+	github.com/zenta-dev/zever/shared/redisopt v0.5.3 // indirect
+	github.com/zenta-dev/zever/shared/registry v0.5.3 // indirect
 )
 
 replace github.com/zenta-dev/zever/core/auth => ../../../core/auth
