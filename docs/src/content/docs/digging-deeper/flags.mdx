@@ -64,6 +64,8 @@ default. Empty static `path` is valid and means an empty flag set.
 ## Resolve via container
 
 ```go
+// Once at startup (container wires nothing): flagstatic.Register()
+// (alias for github.com/zenta-dev/zever/adapters/flag/static)
 c := container.New(config.Default())
 f, err := c.Flag()
 if err != nil {
@@ -84,12 +86,14 @@ import (
     "context"
     "fmt"
 
+    "github.com/zenta-dev/zever/adapters/flag/static"
     "github.com/zenta-dev/zever/config"
     "github.com/zenta-dev/zever/container"
-    "github.com/zenta-dev/zever/flag"
+    "github.com/zenta-dev/zever/core/flag"
 )
 
 func main() {
+    static.Register() // container wires nothing; register before resolving
     c := container.New(config.Default())
     f, err := c.Flag()
     if err != nil {
@@ -116,8 +120,8 @@ false <nil>
 
 | Adapter | Package | Notes |
 |---|---|---|
-| `static` | `flag/static` | Default; file-backed, offline, optional reload |
-| `firebase` | `flag/firebase` | Remote Config; needs `project_id` + `service_account` |
+| `static` | `adapters/flag/static` | Default; file-backed, offline, optional reload |
+| `firebase` | `adapters/flag/firebase` | Remote Config; needs `project_id` + `service_account` |
 
 ## Production notes
 

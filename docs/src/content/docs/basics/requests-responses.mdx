@@ -27,6 +27,9 @@ State the default adapter path: tests use `config.Default()` with an in-memory s
 Handlers need the container only for services, not for I/O primitives:
 
 ```go
+// Once at startup (container wires nothing):
+// dbsqlite.Register(); routestdhttp.Register()
+// (aliases for adapters/db/sqlite and adapters/router/stdhttp)
 c := container.New(config.Default())
 db, err := c.DB()
 if err != nil {

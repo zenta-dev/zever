@@ -66,7 +66,7 @@ exit:0
 To refresh committed goldens after a deliberate fixture change:
 
 ```sh
-go test ./internal/dsl/backend/gogen/ -run TestGoldenFiles -update
+go test ./dsl/backend/gogen/ -run TestGoldenFiles -update
 ```
 
 Only use `-update` when the fixture changed deliberately; golden diffs are
@@ -90,7 +90,7 @@ under the virtual path `schema/app/app.zen` (module `app`), so the two-way
 generate from. Adding services never affects zenorm output: zenorm reads
 entities only.
 
-Naming: `internal/dsl/naming` converts schema names per target (`APIKey`
+Naming: `dsl/naming` converts schema names per target (`APIKey`
 becomes `api_key` in Postgres/SQLite table names; acronym runs stay one
 word, per protobuf style). SQL text always binds args and quotes
 identifiers; dialect capability gates live with the ORM, not the backends.
@@ -111,7 +111,7 @@ Writing a backend:
 2. Read only `*ir.Schema`, never re-parse source.
 3. Emit `File` values with repo-relative paths; keep rendering
    deterministic (sort maps, fix timestamps).
-4. Add a golden test under `internal/dsl/compile/` with committed output.
+4. Add a golden test under `dsl/compile/` with committed output.
 
 Golden workflow: edit `.zen`, run `zever check`, run `compile`, review the
 full golden diff as the executable spec of the change. Accept with

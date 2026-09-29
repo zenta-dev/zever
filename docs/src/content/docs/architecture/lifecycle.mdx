@@ -57,11 +57,13 @@ Phases 2 and 3 in code: build once, resolve lazily inside handlers, reuse the ca
 package main
 
 import (
+	dbsqlite "github.com/zenta-dev/zever/adapters/db/sqlite"
 	"github.com/zenta-dev/zever/config"
 	"github.com/zenta-dev/zever/container"
 )
 
 func boot() (*container.Container, error) {
+	dbsqlite.Register() // container wires nothing; register before resolving
 	cfg, err := config.Load("zever.yaml") // "" probes zever.yaml/.yml/.json
 	if err != nil {
 		return nil, err
@@ -176,4 +178,4 @@ Keep timeout tests short (parent about 100ms, block about 500ms) and let straggl
 - `../getting-started/configuration/` for layering and strictness
 - `../getting-started/deployment/` for prod shutdown wiring
 - `../dsl/syntax-zen/` for the schema compiled before phase 1
-- Package guides as text: `container/README.md`, `config/README.md`, `internal/dsl/README.md`
+- Package guides as text: `container/README.md`, `config/README.md`, `dsl/README.md`
