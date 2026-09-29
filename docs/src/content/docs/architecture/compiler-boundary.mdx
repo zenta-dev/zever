@@ -5,13 +5,13 @@ description: Why runtime packages never import the DSL compiler, and how it's en
 
 ## Purpose + When to use
 
-This page states the hardest boundary in the repo: runtime packages must never import `internal/dsl`. Read it before adding an import, before generating code, and before confusing this compiler rule with the separate schema-module rule (`check-boundaries`).
+This page states the hardest boundary in the repo: runtime packages must never import `dsl`. Read it before adding an import, before generating code, and before confusing this compiler rule with the separate schema-module rule (`check-boundaries`).
 
 Concrete payoff: prod binaries stay small, layering stays honest, and the Go toolchain (not a lint you must remember) rejects violations at build time.
 
 ## Prerequisites and mental model
 
-`internal/dsl` is the schema compiler frontend: source text through the lexer, parser, resolver, and codegen backends, ending at `*ir.Schema` and generated output.
+`dsl` is the schema compiler frontend: source text through the lexer, parser, resolver, and codegen backends, ending at `*ir.Schema` and generated output.
 
 ```text
 source text -> lexer -> parser -> ast -> resolver -> ir.Schema
@@ -50,13 +50,15 @@ The container is runtime and therefore lives entirely on the far side of the bou
 package main
 
 import (
+	dbsqlite "github.com/zenta-dev/zever/adapters/db/sqlite"
 	"github.com/zenta-dev/zever/config"
 	"github.com/zenta-dev/zever/container"
 )
 
 func main() {
 	// Runtime path: config -> container -> generated ORM and routes.
-	// No import of internal/dsl anywhere in this graph.
+	// No import of dsl anywhere in this graph.
+	dbsqlite.Register() // container wires nothing; register before resolving
 	c := container.New(config.Default())
 	db, err := c.DB()
 	if err != nil {
@@ -79,11 +81,13 @@ package main
 import (
 	"fmt"
 
+	dbsqlite "github.com/zenta-dev/zever/adapters/db/sqlite"
 	"github.com/zenta-dev/zever/config"
 	"github.com/zenta-dev/zever/container"
 )
 
 func main() {
+	dbsqlite.Register() // container wires nothing; register before resolving
 	c := container.New(config.Default())
 	db, err := c.DB()
 	if err != nil {
@@ -107,7 +111,7 @@ Expected output or behavior:
 runtime ready: true
 ```
 
-`zever check` validates, `fmt -l` lists files needing format, `compile` emits ORM plus OpenAPI plus DDL into `generated/`, and `migrate --dry-run` previews SQL without touching the database. The server then imports `generated/` and resolves `c.DB()`: at no point does it import `internal/dsl`. Regenerate with `zever compile`; never hand-edit `generated/`.
+`zever check` validates, `fmt -l` lists files needing format, `compile` emits ORM plus OpenAPI plus DDL into `generated/`, and `migrate --dry-run` previews SQL without touching the database. The server then imports `generated/` and resolves `c.DB()`: at no point does it import `dsl`. Regenerate with `zever compile`; never hand-edit `generated/`.
 
 ## Variants
 
@@ -126,7 +130,7 @@ A different boundary: schema modules. Do not confuse this compiler rule with `ze
 
 Why the rule matters in prod: a compiler frontend pulls in lexer, parser, and codegen dependencies that do not belong in a binary whose job is running generated code against a database (size and attack surface). Layering stays honest: if runtime could reach the resolver, request-time code would special-case schema logic instead of generating it once ahead of time, reintroducing the reflection the codegen-first design exists to avoid.
 
-Enforcement is Go's own `internal/` visibility: an accidental import of `internal/dsl` from outside the module fails `go build` immediately. There is no separate CLI check and none is needed. Because the toolchain owns this rule, it holds on every machine and every CI runner with no config to keep in sync.
+Enforcement is the module layering rule: `dsl` is a top-level module, so the old Go `internal/` visibility no longer applies. An accidental import of `dsl` from runtime code fails review and breaks the layering boundary — keep runtime on generated output, not the compiler. There is no separate CLI check and none is needed. Because the boundary is a hard module rule, it holds on every machine and every CI runner with no config to keep in sync.
 
 Fail-closed companions keep the boundary useful in practice: Fail-closed companions: the parser never panics (best-effort output plus diagnostics even on malformed input); the formatter refuses lex-dirty input and stays idempotent; fuzz tests run seed corpora as unit tests. Never log raw option maps; use `config.RedactedServices`. Close containers with a timeout parent even in codegen-adjacent workers.
 
@@ -134,7 +138,7 @@ Fail-closed companions keep the boundary useful in practice: Fail-closed compani
 
 | Symptom | Cause | Fix |
 |---|---|---|
-| `go build` fails importing `internal/dsl` | Runtime package reached into the compiler frontend | Drop the import; consume `generated/` output (ORM, routes, stubs) and resolve via `container` |
+| `go build` fails importing `dsl` | Runtime package reached into the compiler frontend | Drop the import; consume `generated/` output (ORM, routes, stubs) and resolve via `container` |
 | `check-boundaries` reports cross-module refs | Relation or RPC type reaches across `.zen` module dirs | Move the type or relation so each module is self-contained; see `../dsl/syntax-zen/` |
 | `compile` emits diagnostics but no output | Schema has resolve errors; backends run only on success | Read each diagnostic position, fix the `.zen` source, re-run `zever check` first |
 | Editor misses new keywords after a grammar change | `token.Keywords` or `resolver.ScalarTypeNames` changed without regen | Run `make generate` and commit the refreshed `editors/` files |
@@ -148,4 +152,4 @@ Fail-closed companions keep the boundary useful in practice: Fail-closed compani
 - `../dsl/syntax-zen/` for modules, relations, and `check-boundaries`
 - `../dsl/backends/` for the `Backend.Generate` extension point
 - `../getting-started/deployment/` for shipping generated output without the compiler
-- Package guides as text: `internal/dsl/README.md`, `README.md`, `cmd/zever/README.md`
+- Package guides as text: `dsl/README.md`, `README.md`, `cmd/zever/README.md`
