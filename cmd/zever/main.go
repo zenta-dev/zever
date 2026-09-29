@@ -168,7 +168,7 @@ func run(args []string) error {
 				return nil
 			case "add":
 				_, _ = fmt.Fprintln(os.Stderr, title("zever add")+dim(" — add one battery to the calling project"))
-				_, _ = fmt.Fprintln(os.Stderr, bold("Usage:")+"  "+cmd("zever add")+dim("  ")+cyan("<battery>[/<adapter>]"))
+				_, _ = fmt.Fprintln(os.Stderr, bold("Usage:")+"  "+cmd("zever add")+dim("  ")+cyan("<battery>[/<adapter>] [--adapter <name>] [--force] [--module <path[@version]>]"))
 				_, _ = fmt.Fprintln(os.Stderr, "")
 				_, _ = fmt.Fprintln(os.Stderr, addUsageBody)
 
