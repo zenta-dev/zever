@@ -39,10 +39,12 @@ The bookings server sets runtime fields the YAML does not carry: `cfg.I18n.Optio
 
 ```go
 import (
+    "github.com/zenta-dev/zever/adapters/i18n/embed"
     "github.com/zenta-dev/zever/config"
     "github.com/zenta-dev/zever/container"
 )
 
+embed.Register() // container wires nothing; register before resolving
 c := container.New(config.Default())
 t, err := c.I18n()
 if err != nil {

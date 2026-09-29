@@ -14,7 +14,7 @@ runtime code must not import the compiler.
 
 ## Prerequisites
 
-- Go module importing `github.com/zenta-dev/zever`.
+- Go module requiring the `core` interfaces plus the adapter modules you resolve (no root module: every battery, adapter, and helper is its own module).
 - `config.Default()` or `config.Load("")` for the container root.
 - `ctx` as first arg for IO; never stored in structs.
 
