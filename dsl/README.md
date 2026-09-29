@@ -1,9 +1,9 @@
-# internal/dsl
+# dsl
 
 Compiler frontend for the zever schema language: source text → resolved
 schema (`*ir.Schema`) plus formatting, compatibility checking, and the
 codegen extension point. Compiler-internal: runtime packages must not
-import it (mirrors the `internal/` rule of the original design).
+import it (layering rule for the top-level `dsl` module).
 
 ## Pipeline
 
@@ -31,7 +31,7 @@ source text → lexer → parser → ast → resolver → ir.Schema
 Entry points: `parser.New(file, src).ParseFile()` →
 `resolver.Resolve(files)` → `*ir.Schema`; or `compile.Compile(files,
 backends...)` for the full path with `compile/testdata/app.zen` as the
-canonical fixture (plus `internal/dsl/testdata/` fuzz seeds).
+canonical fixture (plus `dsl/testdata/` fuzz seeds).
 
 ## Notes
 

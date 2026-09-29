@@ -29,9 +29,12 @@ ROUTER_ADAPTER=fiber
 
 ```go
 import (
+    routerstdhttp "github.com/zenta-dev/zever/adapters/router/stdhttp"
     "github.com/zenta-dev/zever/config"
     "github.com/zenta-dev/zever/container"
 )
+
+routerstdhttp.Register()
 
 c := container.New(config.Default())
 r, err := c.Router()
@@ -51,12 +54,15 @@ import (
     "fmt"
     "net/http"
 
+    routerstdhttp "github.com/zenta-dev/zever/adapters/router/stdhttp"
     "github.com/zenta-dev/zever/config"
     "github.com/zenta-dev/zever/container"
-    "github.com/zenta-dev/zever/router"
+    "github.com/zenta-dev/zever/core/router"
 )
 
 func main() {
+    routerstdhttp.Register()
+
     c := container.New(config.Default())
     r, err := c.Router()
     if err != nil {

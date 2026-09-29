@@ -53,9 +53,12 @@ required; anything else fails validation before a single request goes out.
 
 ```go
 import (
+	aianthropic "github.com/zenta-dev/zever/adapters/ai/anthropic"
 	"github.com/zenta-dev/zever/config"
 	"github.com/zenta-dev/zever/container"
 )
+
+aianthropic.Register()
 
 c := container.New(config.Default())
 backend, err := c.AI()
@@ -78,12 +81,15 @@ import (
 	"context"
 	"fmt"
 
-	"github.com/zenta-dev/zever/ai"
+	aianthropic "github.com/zenta-dev/zever/adapters/ai/anthropic"
 	"github.com/zenta-dev/zever/config"
 	"github.com/zenta-dev/zever/container"
+	"github.com/zenta-dev/zever/core/ai"
 )
 
 func main() {
+	aianthropic.Register()
+
 	c := container.New(config.Default())
 	defer c.Close(context.Background())
 
@@ -94,14 +100,14 @@ func main() {
 	}
 
 	out, err := backend.Generate(context.Background(), "", []ai.Message{
-		{Role: "user", Content: "Say hi in five words."},
+		{Role: ai.RoleUser, Content: "Say hi in five words."},
 	}, ai.GenerateOptions{})
 	if err != nil {
 		fmt.Println("generate error:", err)
 		return
 	}
-	fmt.Println("text:", out.Text)
-	fmt.Println("tokens:", out.Usage.TotalTokens)
+	fmt.Println("text:", out.Content)
+	fmt.Println("tokens:", out.Usage.PromptTokens+out.Usage.CompletionTokens)
 }
 
 // Expected output (text varies by model):
