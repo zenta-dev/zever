@@ -11,7 +11,9 @@ require (
 
 require (
 	github.com/robfig/cron/v3 v3.0.1 // indirect
+	github.com/zenta-dev/zever/adapters/cache/memory v0.0.0
 	github.com/zenta-dev/zever/adapters/log/noop v0.0.0 // indirect
+	github.com/zenta-dev/zever/adapters/queue/memory v0.0.0
 	github.com/zenta-dev/zever/core/cache v0.0.0 // indirect
 	github.com/zenta-dev/zever/shared/codec v0.0.0 // indirect
 	github.com/zenta-dev/zever/shared/redisopt v0.0.0 // indirect

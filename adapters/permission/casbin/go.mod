@@ -11,6 +11,7 @@ require (
 
 require (
 	github.com/casbin/casbin/v2 v2.135.0
+	github.com/zenta-dev/zever/adapters/permission/noop v0.0.0
 	github.com/zenta-dev/zever/core/permission v0.0.0
 )
 

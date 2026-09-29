@@ -85,8 +85,11 @@ require (
 	github.com/tidwall/match v1.1.1 // indirect
 	github.com/tidwall/pretty v1.2.1 // indirect
 	github.com/tidwall/sjson v1.2.5 // indirect
+	github.com/zenta-dev/zever/adapters/db/postgres v0.0.0
 	github.com/zenta-dev/zever/adapters/log/noop v0.0.0 // indirect
 	github.com/zenta-dev/zever/adapters/media/ffmpeg v0.0.0 // indirect
+	github.com/zenta-dev/zever/adapters/observability/noop v0.0.0
+	github.com/zenta-dev/zever/adapters/permission/noop v0.0.0
 	github.com/zenta-dev/zever/core/ai v0.0.0 // indirect
 	github.com/zenta-dev/zever/core/analytics v0.0.0 // indirect
 	github.com/zenta-dev/zever/core/billing v0.0.0 // indirect
@@ -115,11 +118,13 @@ require (
 	github.com/zenta-dev/zever/core/vectorstore v0.0.0 // indirect
 	github.com/zenta-dev/zever/core/webhook v0.0.0 // indirect
 	github.com/zenta-dev/zever/core/workflow v0.0.0 // indirect
+	github.com/zenta-dev/zever/dsl v0.0.0
 	github.com/zenta-dev/zever/shared/codec v0.0.0 // indirect
 	github.com/zenta-dev/zever/shared/endpoint v0.0.0 // indirect
 	github.com/zenta-dev/zever/shared/httpclient v0.0.0 // indirect
 	github.com/zenta-dev/zever/shared/lrucache v0.0.0 // indirect
 	github.com/zenta-dev/zever/shared/providersopt v0.0.0 // indirect
+	github.com/zenta-dev/zever/shared/redisclient v0.0.0
 	github.com/zenta-dev/zever/shared/redisopt v0.0.0 // indirect
 	github.com/zenta-dev/zever/shared/registry v0.0.0 // indirect
 	github.com/zenta-dev/zever/shared/retry v0.0.0 // indirect

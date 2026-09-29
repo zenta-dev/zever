@@ -9,7 +9,10 @@ require (
 	github.com/zenta-dev/zever/shared/registry v0.0.0
 )
 
-require github.com/zenta-dev/zever/shared/redisopt v0.0.0 // indirect
+require (
+	github.com/zenta-dev/zever/adapters/idempotency/memory v0.0.0
+	github.com/zenta-dev/zever/shared/redisopt v0.0.0 // indirect
+)
 
 replace github.com/zenta-dev/zever/core/idempotency => ../idempotency
 

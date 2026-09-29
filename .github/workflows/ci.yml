@@ -124,6 +124,54 @@ jobs:
       - name: vet + tidy + test + build (all modules)
         run: make check-all
 
+  # Module-graph drift gate: every module's go.mod must carry the full
+  # require+replace closure computed by tools/fix-module-graph.py (Go
+  # ignores replaces in dependency go.mods). --check exits 1 with a
+  # listing when any entry is missing; run the script without --check
+  # locally to repair.
+  module-graph:
+    name: module-graph
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+      - uses: actions/setup-go@b7ad1dad31e06c5925ef5d2fc7ad053ef454303e # v7.0.0
+        with:
+          go-version-file: go.work
+          cache-dependency-path: |
+            go.work.sum
+            **/go.sum
+      - name: Check module graph closure
+        run: python3 tools/fix-module-graph.py --check
+
+  # Cross-adapter conformance gate: the shared kits (memory/local-backed,
+  # hermetic, no network) plus the redis adapter conformance tests
+  # (currently skipped with reasons until miniredis is faithful; the
+  # -run Conformance invocations keep them wired into the gate).
+  conformance:
+    name: conformance
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+      - uses: actions/setup-go@b7ad1dad31e06c5925ef5d2fc7ad053ef454303e # v7.0.0
+        with:
+          go-version-file: go.work
+          cache-dependency-path: |
+            go.work.sum
+            **/go.sum
+      - name: conformance kits (in-kit suites)
+        run: |
+          go -C core/cache test -count=1 ./...
+          go -C core/queue test -count=1 ./...
+          go -C core/storage test -count=1 ./...
+      - name: cross-adapter conformance (redis)
+        run: |
+          go -C adapters/cache/redis test -count=1 -run Conformance ./...
+          go -C adapters/queue/redis test -count=1 -run Conformance ./...
+
   external-sms:
     name: out-of-tree proof module
     runs-on: ubuntu-latest
@@ -292,7 +340,7 @@ jobs:
     name: ci-gate
     if: always()
     runs-on: ubuntu-latest
-    needs: [detect, fmt, lint, test, test-race, sbom, lsp, vulnerability, external-sms, doc-snippets]
+    needs: [detect, fmt, lint, test, test-race, sbom, lsp, vulnerability, external-sms, doc-snippets, module-graph, conformance]
     steps:
       - name: Aggregate results
         run: |
