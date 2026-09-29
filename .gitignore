@@ -5,6 +5,8 @@
 *.db
 /zever
 /cmd/zever/zever
+__pycache__/
+*.pyc
 
 .worktrees/
 docs/node_modules/
