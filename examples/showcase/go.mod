@@ -65,7 +65,7 @@ require (
 require (
 	github.com/HugoSmits86/nativewebp v1.3.0 // indirect
 	github.com/anthonynsimon/bild v0.17.1 // indirect
-	github.com/anthropics/anthropic-sdk-go v1.73.0 // indirect
+	github.com/anthropics/anthropic-sdk-go v1.75.0 // indirect
 	github.com/bahlo/generic-list-go v0.2.0 // indirect
 	github.com/buger/jsonparser v1.1.2 // indirect
 	github.com/chromedp/cdproto v0.0.0-20260714215040-dc233986426f // indirect
