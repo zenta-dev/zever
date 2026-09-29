@@ -25,7 +25,7 @@ Not applicable. There is no `c.Codec()`; the codec travels with the typed wrappe
 
 ```go
 // cache typed wrapper takes a codec at construction
-cache := cache.NewTyped[MyPayload](inner, codec.JSONCodec[MyPayload]{})
+typed := cache.NewTyped[string, MyPayload](inner, codec.JSONCodec[MyPayload]{})
 ```
 
 Resolve the underlying service (`c.Cache()`, `c.Queue()`, `c.Session()`) through the container as usual; pass the codec to the typed layer on top.
@@ -61,10 +61,6 @@ func main() {
 }
 ```
 
-```sh
-go run ./cmd/codec-demo
-```
-
 Expected output:
 
 ```text
@@ -78,31 +74,34 @@ JSON output is deterministic, so codec-backed cache/queue snapshots stay stable 
 The typical use site is a typed wrapper over a byte store:
 
 ```go
-c := container.New(config.Default())
+// imports: config, container,
+//   "github.com/zenta-dev/zever/adapters/cache/memory" (cachememory),
+//   "github.com/zenta-dev/zever/core/cache", "github.com/zenta-dev/zever/shared/codec"
+c := container.New(config.Default()) // call cachememory.Register() once at startup
 inner, err := c.Cache()
 if err != nil {
     return err
 }
-typed := cache.NewTyped[MyPayload](inner, codec.JSONCodec[MyPayload]{})
+typed := cache.NewTyped[string, MyPayload](inner, codec.JSONCodec[MyPayload]{})
 
 if err := typed.Set(ctx, "user:u_1", MyPayload{ID: "u_1", Name: "Ada"}, time.Minute); err != nil {
     return err
 }
-got, ok, err := typed.Get(ctx, "user:u_1")
+got, err := typed.Get(ctx, "user:u_1")
 if err != nil {
     return err
 }
-fmt.Println(got.Name, ok)
+fmt.Println(got.Name, err)
 ```
 
 ```sh
-go test ./cache/... -run TestTyped -v
+go test ./core/cache/... -run TestTyped -v
 ```
 
 Expected output:
 
 ```text
-Ada true
+Ada <nil>
 ```
 
 One `Codec[V]` per stored type, shared by the writer and the reader. The queue and session paths follow the same shape: bytes on the wire, typed values in handlers.

@@ -61,9 +61,26 @@ func parseRequires(content string) []string {
 	return out
 }
 
+// excludedDir reports whether a directory (slash-separated, relative to the
+// repo root) holds no workspace module: .git metadata and the two
+// out-of-workspace proof modules, which resolve nothing via go.work and
+// would break the per-module loops.
+func excludedDir(rel string) bool {
+	switch {
+	case rel == ".git" || strings.HasPrefix(rel, ".git/"):
+		return true
+	case rel == "examples/external-sms" || strings.HasPrefix(rel, "examples/external-sms/"):
+		return true
+	case rel == "docs/examples" || strings.HasPrefix(rel, "docs/examples/"):
+		return true
+	}
+	return false
+}
+
 // listModules returns every module dir (dir containing go.mod) under root,
 // relative without a ./ prefix, sorted. It mirrors the Makefile ALL_MODULES
-// find exclusions exactly: ./.git/** and ./examples/external-sms/**.
+// find exclusions exactly: ./.git/**, ./examples/external-sms/** and
+// ./docs/examples/**.
 func listModules(root string) ([]string, error) {
 	var mods []string
 	err := filepath.WalkDir(root, func(p string, d fs.DirEntry, err error) error {
@@ -76,10 +93,7 @@ func listModules(root string) ([]string, error) {
 		}
 		rel = filepath.ToSlash(rel)
 		if d.IsDir() {
-			if rel == ".git" || strings.HasPrefix(rel, ".git/") {
-				return filepath.SkipDir
-			}
-			if rel == "examples/external-sms" || strings.HasPrefix(rel, "examples/external-sms/") {
+			if excludedDir(rel) {
 				return filepath.SkipDir
 			}
 			return nil
@@ -203,10 +217,28 @@ func isGlobalPath(file string) bool {
 	return false
 }
 
+// isOutOfWorkspace reports whether a changed file lives in an excluded
+// out-of-workspace proof module (see excludedDir). Such files are covered
+// by their own standalone CI jobs, never by the per-module matrix loops,
+// so they contribute no affected scope on their own.
+func isOutOfWorkspace(file string) bool {
+	f := path.Clean(filepath.ToSlash(file))
+	return f == "docs/examples" || strings.HasPrefix(f, "docs/examples/") ||
+		f == "examples/external-sms" || strings.HasPrefix(f, "examples/external-sms/")
+}
+
 // classify maps changed files to (groups, reason) following the contract
-// rules in order: none when empty or docs-only, all when any file is global
-// or module-less, else owning modules plus transitive reverse dependents.
+// rules in order: none when empty, docs-only, or only out-of-workspace
+// proof files; all when any remaining file is global or module-less; else
+// owning modules plus transitive reverse dependents.
 func classify(changed []string, modules []string, requires map[string][]string, maxGroups int) ([][]string, string) {
+	effective := changed[:0:0]
+	for _, f := range changed {
+		if !isOutOfWorkspace(f) {
+			effective = append(effective, f)
+		}
+	}
+	changed = effective
 	if len(changed) == 0 {
 		return [][]string{}, "none"
 	}
