@@ -198,7 +198,7 @@ git checkout -- tools/zever-lsp/go.mod tools/zever-lsp/go.sum
 
 ## Release checklist (lockstep per-module tags)
 
-Every release ships one number across all modules via `tools/tag-release.sh` (finds every `go.mod`, tags root as `vX.Y.Z` and each other module as `<module-path>/vX.Y.Z`, e.g. `github.com/zenta-dev/zever/adapters/cache/redis/vX.Y.Z`; prints a `git push --tags` hint, never pushes). The `dsl` compiler has no
+Every release ships one number across all modules via `tools/tag-release.sh` (finds every `go.mod`, tags each module as `<module-path>/vX.Y.Z`, e.g. `github.com/zenta-dev/zever/adapters/cache/redis/vX.Y.Z`, in dependency order — `shared/*`, then `core/*` plus `config`/`container`/`orm`/`dsl`/`cmd`, then `adapters/*` and the rest; preview with `--dry-run`; prints a `git push --tags` hint, never pushes). There is no root `go.mod`, so the script creates no bare `vX.Y.Z` tag; bare `vX.Y.Z` tags in history are the historical root marker while the per-module tags carry the release payload. The `dsl` compiler has no
 release-version constant (schema `v1`/`v2` segments are API versions, not
 releases) — everything else moves together:
 
@@ -213,7 +213,7 @@ releases) — everything else moves together:
 - Docs: `docs/src/content/docs/getting-started/installation.mdx`,
   `docs/src/content/docs/getting-started/upgrade.mdx`,
   `docs/src/content/docs/dsl/lsp-tooling.mdx`.
-- Tags: run `tools/tag-release.sh vX.Y.Z` on main once the bump lands (creates `vX.Y.Z` plus one `<path>/vX.Y.Z` per module). Verify with `grep -rn` for the old version (excluding
+- Tags: run `tools/tag-release.sh vX.Y.Z` on main once the bump lands (creates one `<path>/vX.Y.Z` per module, dependency order; no bare `vX.Y.Z` — see above). Verify with `grep -rn` for the old version (excluding
   `CHANGELOG.md` history and third-party `go.sum` lines) before tagging.
 
 ## Commit Convention
