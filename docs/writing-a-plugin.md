@@ -168,6 +168,21 @@ a stored value of the wrong type fails `Resolve` with a type-mismatch
 error. Resolved plugins close with `Container.Close`. See
 `examples/sms/app/main.go` for the full startup-to-`Send` flow.
 
+## `.zen` schema boundary
+
+`.zen` schemas cannot reference plugin batteries directly. This is a
+scope boundary, not a bug: the schema compiler resolves only core
+batteries at compile time (service/RPC groupings plus the job `Queue`
+default `"default"`, which is never validated against registered
+adapters), while plugins are wired at runtime through
+`config.Plugins` plus `container.RegisterPlugin`/`Resolve`. Model the
+domain in `.zen` as usual, then wire the plugin battery in Go
+(config + container) outside the schema.
+
+For core batteries, `zever add <battery>[/<adapter>]` scaffolds the
+`go.mod` / `app.go` / `zever.yaml` wiring — see the `zever add`
+section in `docs/src/content/docs/reference/cli.mdx`.
+
 ## No-manifest third-party pattern
 
 There is no plugin manifest file. Two artifacts you already ship are the
