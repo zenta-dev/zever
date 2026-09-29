@@ -235,6 +235,7 @@ require (
 	github.com/mattn/go-runewidth v0.0.27 // indirect
 	github.com/meilisearch/meilisearch-go v0.36.3 // indirect
 	github.com/mitchellh/hashstructure/v2 v2.0.2 // indirect
+	github.com/molecule-man/go-brrr v1.0.1 // indirect
 	github.com/muesli/cancelreader v0.2.2 // indirect
 	github.com/ncruces/go-strftime v1.0.0 // indirect
 	github.com/oklog/ulid/v2 v2.1.2 // indirect
@@ -260,8 +261,7 @@ require (
 	github.com/tidwall/sjson v1.2.5 // indirect
 	github.com/twilio/twilio-go v1.31.1 // indirect
 	github.com/valyala/bytebufferpool v1.0.0 // indirect
-	github.com/valyala/fasthttp v1.51.0 // indirect
-	github.com/valyala/tcplisten v1.0.0 // indirect
+	github.com/valyala/fasthttp v1.74.0 // indirect
 	github.com/xo/terminfo v0.0.0-20220910002029-abceb7e1c41e // indirect
 	github.com/zenta-dev/zever/adapters/media/ffmpeg v0.0.0 // indirect
 	github.com/zenta-dev/zever/core/billing v0.0.0 // indirect
