@@ -203,7 +203,7 @@ func TestRunNewNoFrameworkCheckoutFound(t *testing.T) {
 	if strings.Contains(gomod, "replace github.com/zenta-dev/zever/container => ") {
 		t.Fatalf("did not expect replace for upstream default:\n%s", gomod)
 	}
-	if !strings.Contains(gomod, "require github.com/zenta-dev/zever/container v0.4.0") {
+	if !strings.Contains(gomod, "require github.com/zenta-dev/zever/container v0.5.0") {
 		t.Fatalf("want upstream require:\n%s", gomod)
 	}
 }
