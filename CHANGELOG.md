@@ -59,11 +59,11 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - **Breaking:** scaffold floor slimmed to `log`, `router`. `observability` (`stdout`), `permission` (`noop`), `queue`
   (`memory`) and `ratelimit` (`memory`) are no longer pinned into every
   generated `app.go`/`zever.yaml`: all four defaults are light
-  (container-wired, no registration call), so existing generated
+  (dependency-free, still explicitly registered by the generated `app.go`),
   entrypoints keep resolving them at runtime with no change; new scaffolds
   just stop pinning them. Re-add by picking the battery in `zever new`.
 - **Breaking:** every third-party adapter is now a nested Go module with
-  its own `Register()` (43 modules: all `*/redis` adapters, `db/sqlite`,
+  its own `Register()` (81 adapter modules: all `*/redis` adapters, `db/sqlite`,
   `db/postgres`, `auth/jwt`, `auth/oidc`, `ai/anthropic|openai|gemini`,
   `billing/stripe|paddle|stub`, `payment/stripe|paddle`,
   `search/sqlite|postgres|meilisearch`,
@@ -72,29 +72,26 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   `permission/casbin`, `router/fiber`, `analytics/posthog`,
   `flag/firebase`, `geo/google`, `log/zerolog`, `observability/otlp`,
   `password/argon2`, `scheduler/embedded`, `webhook/sqlite`, plus the
-  `storage/s3core` shared library). The `container` wires only stdlib-only
-  adapters itself; everything else resolves only after the host calls its
-  `Register()` (or the per-family `container/adapters/<family>`
-  bundle, which stays as a thin aggregator). Unregistered adapters fail
+  `storage/s3core` shared library). The `container` wires nothing itself;
+  every adapter resolves only after the host calls its
+  `Register()`. Unregistered adapters fail
   resolution with `UnknownAdapterError` hinting at the forgotten call.
   `cmd/zever` registers every family at startup, so CLI behavior is
   unchanged.
-- **Breaking:** `container/adapters` is now one subpackage per family
-  (`container/adapters/ai`, `cloud`, `payments`, `searchvector`,
-  `docrender`, `notify`, `web`, `permission`, `analytics`, `geo`) instead
-  of one flat package: importing any single family no longer compiles the
-  other nine families' SDKs. `adapters.RegisterAll` is deleted; call the
-  families needed.
+- **Breaking:** `container/adapters` bundles deleted entirely (flat bundle
+  and per-family subpackages gone); every adapter resolves only after the
+  host calls its module `Register()`. `RegisterAll` is deleted; call the
+  `Register()` of each adapter module you resolve.
 - **Breaking:** `zever new` emits one `require` (+ local `replace` in
-  `--framework-path` mode) per chosen nested adapter module, so a blank
+  `ZEVER_FRAMEWORK_PATH`/checkout mode) per chosen nested adapter module, so a blank
   app's module graph contains only its selection. In checkout mode it also
   emits version-less replaces for the remaining nested modules so
   `go list -m` resolves offline without widening requirements.
-- Shared SDK-independent option fields moved to light internal packages
-  so facades compile without SDKs: `internal/redisopt` (ex-`internal/redis`
-  address/prefix/validation helpers; `internal/redis` keeps only client
-  constructors) and `internal/providersopt` (ex-`internal/providers`
-  `Common`/`ValidateEndpoint`/`PaddleEndpoint`; `internal/providers` keeps
+- Shared SDK-independent option fields moved to light shared packages
+  so facades compile without SDKs: `shared/redisopt` (ex-`internal/redis`
+  address/prefix/validation helpers; `shared/redisclient` keeps only client
+  constructors) and `shared/providersopt` (ex-`internal/providers`
+  `Common`/`ValidateEndpoint`/`PaddleEndpoint`; `shared/providersclient` keeps
   only the Stripe client constructors).
 
 ### Security
@@ -109,18 +106,19 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   interfaces plus `Register`/`Open` registries in `core/<b>`, one Go
   module per adapter in `adapters/<b>/<a>` with `Register()` wiring it
   into its `core` registry, SDK-free helpers in `shared/*`, plus
-  `config|container|orm|dsl|cmd/zever` modules. Local dev wires them
-  with a `go.work` workspace (`go work init/use`; no `go.work` committed).
+   `config|container|orm|dsl|cmd/zever` modules. Local dev resolves them
+   through the committed `go.work` workspace at the repo root (144 `use`
+   entries covering every workspace module (`examples/external-sms` and `docs/examples` stay outside `go.work` by design)).
   Releases are lockstep: one version, per-module tags `<path>/vX.Y.Z`
   via `tools/tag-release.sh`. See `docs/src/content/docs/getting-started/migration.mdx`.
 - **Breaking:** `container/adapters` flat bundles deleted
-  (`RegisterAll` deleted); every heavy adapter resolves only after the
+  (`RegisterAll` deleted); every adapter resolves only after the
   host calls its module `Register()`. Unregistered adapters fail with
   `UnknownAdapterError` hinting at the forgotten call.
-- Planned (not shipped): `zever add` battery-adding command (no
-  `cmd/zever/add.go` yet; use the `zever new` battery picker) and
-  `tools/migrate-imports.sh` (use the manual `sed` mapping in the
-  migration guide until it lands).
+- Shipped: `zever add <battery>[/<adapter>]` battery-adding command
+  (`cmd/zever/add.go`; adds a require plus the `Register()` wiring to the
+  calling project) and `tools/migrate-imports.sh` import rewriter
+  (old flat paths to `core/`/`adapters/`/`shared/`/`dsl/` modules).
 - **Breaking:** `payment/paddle` `New` now rejects empty `WebhookSecret`
   with `payment.ErrMissingWebhookSecret`, mirroring `payment/stripe`.
 - **Breaking:** `authz.BearerTokenFromMD` now rejects multiple
@@ -130,13 +128,14 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ### Fixed
 
 - Scaffolded `internal/app/app.go` imports and registers exactly the
-  selected batteries: one named import plus `Register()` call per nested
-  adapter module (e.g. `dbsqlite.Register()` for `db/sqlite`), one family
-  subpackage import and call per heavy family, and nothing else.
-  Light-only selections render no adapter-module import at all.
+  selected batteries: one named import plus `Register()` call per adapter
+  module (e.g. `dbsqlite.Register()` for `db/sqlite`,
+  `logslog.Register()` for `log/slog`), and nothing else.
 
 - `zever new --help` and `zever compile --help` now expose the real flags
-  (`--module`, `--dir`, `--framework-version`, `--force` for `new`;
+  (`--module`, `--dir`, `--framework-version`, `--force`,
+  `--interactive`/`-i`, `--batteries`, `--adapters`, `-y`/`--yes`,
+  `--list-batteries` for `new`;
   `--backend`, `--out` default `./generated` for `compile`) via
   cobra-registered flags and shared stdlib flag-set helpers, so
   `-h`/`--help`/`help` stay uniform with exit 0; execution still uses the

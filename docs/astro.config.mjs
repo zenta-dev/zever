@@ -36,6 +36,7 @@ export default defineConfig({
 						{ label: 'Directory Structure', link: 'getting-started/directory-structure' },
 						{ label: 'Deployment', link: 'getting-started/deployment' },
 						{ label: 'Upgrade', link: 'getting-started/upgrade' },
+						{ label: 'Migration', link: 'getting-started/migration' },
 					],
 				},
 				{

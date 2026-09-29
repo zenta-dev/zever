@@ -81,6 +81,7 @@ func TestOwnerModule(t *testing.T) {
 		{"root file has no owner", "Makefile", ""},
 		{"root go.work has no owner", "go.work", ""},
 		{"unknown tree has no owner", "examples/external-sms/go.mod", ""},
+		{"docs examples tree has no owner", "docs/examples/go.mod", ""},
 		{"docs file owned by module", "dsl/README.md", "dsl"},
 	}
 	for _, tc := range tests {
@@ -149,6 +150,22 @@ func TestChunkGroups(t *testing.T) {
 	}
 }
 
+func TestExcludedDir(t *testing.T) {
+	t.Parallel()
+	yes := []string{".git", ".git/objects", "examples/external-sms", "examples/external-sms/go.mod", "docs/examples", "docs/examples/cache_test.go"}
+	for _, d := range yes {
+		if !excludedDir(d) {
+			t.Errorf("excludedDir(%q) = false, want true", d)
+		}
+	}
+	no := []string{".", "examples", "examples/bookings", "docs", "docs/src/x.mdx", "tools/affected", "core/cache"}
+	for _, d := range no {
+		if excludedDir(d) {
+			t.Errorf("excludedDir(%q) = true, want false", d)
+		}
+	}
+}
+
 func TestIsDocsPath(t *testing.T) {
 	t.Parallel()
 	docs := []string{"README.md", "core/cache/README.md", "x/y.mdx", "docs/guide.md", "CHANGELOG.md", "CITATION.cff", "LICENSE", "LICENSE-MIT", "core/db/LICENSE.md"}
@@ -186,6 +203,9 @@ func TestClassify(t *testing.T) {
 		{"leaf with dependents", []string{"a/a.go"}, 8, [][]string{{"a"}, {"b"}, {"c"}}, "affected"},
 		{"chunked affected", []string{"a/a.go"}, 2, [][]string{{"a", "b"}, {"c"}}, "affected"},
 		{"docs plus code is affected", []string{"z/NOTES.md", "z/z.go"}, 8, [][]string{{"z"}}, "affected"},
+		{"docs examples only is none", []string{"docs/examples/cache_test.go", "docs/examples/go.mod"}, 8, [][]string{}, "none"},
+		{"external-sms only is none", []string{"examples/external-sms/sms.go"}, 8, [][]string{}, "none"},
+		{"out-of-workspace plus leaf is leaf scope", []string{"docs/examples/x_test.go", "examples/external-sms/y.go", "a/a.go"}, 8, [][]string{{"a"}, {"b"}, {"c"}}, "affected"},
 	}
 	for _, tc := range tests {
 		t.Run(tc.name, func(t *testing.T) {

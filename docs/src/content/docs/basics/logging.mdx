@@ -35,10 +35,12 @@ File keys are snake_case and strict: unknown fields fail `Load`. Env matching is
 
 ```go
 import (
+    "github.com/zenta-dev/zever/adapters/log/slog"
     "github.com/zenta-dev/zever/config"
     "github.com/zenta-dev/zever/container"
 )
 
+slog.Register() // container wires nothing; register before resolving
 c := container.New(config.Default())
 logger, err := c.Log()
 if err != nil {
@@ -60,7 +62,7 @@ logger.Info().
 
 logger.Error().Err(err).Msg("failed to process order")
 
-if logger.Enabled(log.DebugLevel) {
+if logger.Enabled(log.LevelDebug) {
     logger.Debug().Any("payload", expensiveToCompute()).Send()
 }
 ```
@@ -153,7 +155,7 @@ The same rule covers error text: name services and fields only, never values.
 1. **No log output in tests.** The resolved adapter is `noop`. That is correct for hermetic tests; assert behavior, not lines. Resolve `slog` explicitly when testing the line itself.
 2. **Missing `request_id` on lines.** The context logger was never attached. Wrap the context with `log.ContextWithLogger` in middleware before handlers run.
 3. **Secrets in log files.** A call passes raw config or headers into `Any`. Replace with `config.RedactedServices(cfg)` and fixed field names.
-4. **Expensive debug work on hot paths.** Fields compute even when the level is off. Gate with `logger.Enabled(log.DebugLevel)` first.
+4. **Expensive debug work on hot paths.** Fields compute even when the level is off. Gate with `logger.Enabled(log.LevelDebug)` first.
 5. **Trailing lines lost at exit.** The process exits before `c.Close(ctx)` finishes. Defer `Close` with a timeout parent and check the joined error.
 
 ## See also
