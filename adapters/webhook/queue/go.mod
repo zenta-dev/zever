@@ -3,19 +3,19 @@ module github.com/zenta-dev/zever/adapters/webhook/queue
 go 1.27.0
 
 require (
-	github.com/zenta-dev/zever/adapters/log/noop v0.5.2
-	github.com/zenta-dev/zever/adapters/queue/memory v0.5.2
-	github.com/zenta-dev/zever/core/log v0.5.2
-	github.com/zenta-dev/zever/core/queue v0.5.2
-	github.com/zenta-dev/zever/core/webhook v0.5.2
-	github.com/zenta-dev/zever/shared/retry v0.5.2
+	github.com/zenta-dev/zever/adapters/log/noop v0.5.3
+	github.com/zenta-dev/zever/adapters/queue/memory v0.5.3
+	github.com/zenta-dev/zever/core/log v0.5.3
+	github.com/zenta-dev/zever/core/queue v0.5.3
+	github.com/zenta-dev/zever/core/webhook v0.5.3
+	github.com/zenta-dev/zever/shared/retry v0.5.3
 )
 
 require (
-	github.com/zenta-dev/zever/shared/endpoint v0.5.2 // indirect
-	github.com/zenta-dev/zever/shared/httpclient v0.5.2 // indirect
-	github.com/zenta-dev/zever/shared/redisopt v0.5.2 // indirect
-	github.com/zenta-dev/zever/shared/registry v0.5.2 // indirect
+	github.com/zenta-dev/zever/shared/endpoint v0.5.3 // indirect
+	github.com/zenta-dev/zever/shared/httpclient v0.5.3 // indirect
+	github.com/zenta-dev/zever/shared/redisopt v0.5.3 // indirect
+	github.com/zenta-dev/zever/shared/registry v0.5.3 // indirect
 )
 
 replace (

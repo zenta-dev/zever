@@ -44,7 +44,7 @@ var interactiveMode bool
 // cliVersion is the CLI release version printed by -V/--version.
 // It tracks the framework release version; bump with every release
 // (see .github/CONTRIBUTING.md release checklist).
-const cliVersion = "0.5.2"
+const cliVersion = "0.5.3"
 
 // envInteractive returns true if ZEVER_INTERACTIVE=1/true/yes (case-insensitive).
 func envInteractive() bool {
