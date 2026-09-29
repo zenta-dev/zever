@@ -7,6 +7,21 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Added
+
+- `tools/modgraph`: Go port of the `fix-module-graph.py` build tool
+  (exact `go/parser` import analysis instead of regex over template
+  text). The CI module-graph job runs it; new requires pin to the
+  CHANGELOG lockstep version.
+
+### Fixed
+
+- Module-graph gate reconciled with `go mod tidy` (direct-import
+  closure; 250 unused requires dropped across 55 drifted modules).
+- Installation guide: the external-consumer snippet now registers the
+  `sqlite` adapter (`UnknownAdapterError` before), verified verbatim
+  from a scratch module outside `go.work`.
+
 ## [v0.5.2] - 2026-09-29
 
 ### Added
