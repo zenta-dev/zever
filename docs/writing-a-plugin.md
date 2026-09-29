@@ -226,15 +226,18 @@ its name, the host decides which names exist in its binary.
 
 ## Lazy deps: register only what you choose
 
-The scaffold floor is intentionally slim (`auth`, `db`, `log`, `router`,
-`scheduler`). `log/slog` and `router/stdhttp` are stdlib-only and wired by
-the container itself; `auth/jwt`, `db/sqlite` and `scheduler/embedded` are
-nested modules the generated `app.go` imports and registers explicitly.
-Everything else is opt-in, and the container never pulls a heavy client
+The scaffold floor is intentionally slim (`log`, `router`). Every adapter,
+stdlib-only or not, is a nested module the generated `app.go` imports and
+registers explicitly (`log/slog`, `router/stdhttp`, `auth/jwt`, `db/sqlite`,
+`scheduler/embedded`, ...): the container wires nothing by itself, and
+unregistered adapters fail resolution with `UnknownAdapterError`. Everything
+else is opt-in, and the container never pulls a heavy client
 into the build unless chosen:
 
-- Light adapter (e.g. `queue/memory`, `permission/noop`): resolves via the
-  container's own wiring. No import and no `Register` call needed.
+- Light adapter (e.g. `queue/memory`, `permission/noop`): import its module
+  **and** call its `Register` before first use (e.g. `memory.Register()`),
+  and require the module in `go.mod` (`zever new` emits both) — the same
+  rule as heavy adapters; the modules just pull no heavy SDKs.
 - Nested-module adapter (e.g. `notification/fcm`, `cache/redis`,
   `db/sqlite`): import its module **and** call its `Register` before first
   use (e.g. `fcm.Register()`), and require the module in `go.mod`

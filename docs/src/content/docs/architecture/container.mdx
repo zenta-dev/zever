@@ -60,11 +60,17 @@ Construction plus the three most-used accessors:
 package main
 
 import (
+	cachememory "github.com/zenta-dev/zever/adapters/cache/memory"
+	dbsqlite "github.com/zenta-dev/zever/adapters/db/sqlite"
+	queuememory "github.com/zenta-dev/zever/adapters/queue/memory"
 	"github.com/zenta-dev/zever/config"
 	"github.com/zenta-dev/zever/container"
 )
 
 func main() {
+	cachememory.Register() // container wires nothing; register before resolving
+	dbsqlite.Register()
+	queuememory.Register()
 	c := container.New(config.Default())
 
 	db, err := c.DB()
@@ -137,11 +143,15 @@ import (
 	"fmt"
 	"time"
 
+	queuememory "github.com/zenta-dev/zever/adapters/queue/memory"
+	schedembedded "github.com/zenta-dev/zever/adapters/scheduler/embedded"
 	"github.com/zenta-dev/zever/config"
 	"github.com/zenta-dev/zever/container"
 )
 
 func main() {
+	queuememory.Register() // container wires nothing; register before resolving
+	schedembedded.Register()
 	c := container.New(config.Default())
 
 	d, err := c.Job() // d.Q is the shared queue instance

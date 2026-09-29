@@ -75,11 +75,17 @@ Handlers resolve interfaces, never drivers. The container maps the configured na
 package main
 
 import (
+	cachememory "github.com/zenta-dev/zever/adapters/cache/memory"
+	dbsqlite "github.com/zenta-dev/zever/adapters/db/sqlite"
+	storagelocal "github.com/zenta-dev/zever/adapters/storage/local"
 	"github.com/zenta-dev/zever/config"
 	"github.com/zenta-dev/zever/container"
 )
 
 func main() {
+	dbsqlite.Register() // container wires nothing; register before resolving
+	cachememory.Register()
+	storagelocal.Register()
 	c := container.New(config.Default())
 
 	db, err := c.DB()
@@ -109,7 +115,8 @@ type DB interface {
 }
 
 // Adapter sqlite registers itself; postgres registers itself elsewhere.
-func init() { db.Register(db.SQLite, New) } // wiring only, no globals in app code
+// Call Register once from main (no init magic); app code holds no globals.
+func Register() { _ = db.Register(db.SQLite, New) }
 ```
 
 ## Runnable example
@@ -124,11 +131,13 @@ import (
 	"fmt"
 	"time"
 
+	cachememory "github.com/zenta-dev/zever/adapters/cache/memory"
 	"github.com/zenta-dev/zever/config"
 	"github.com/zenta-dev/zever/container"
 )
 
 func main() {
+	cachememory.Register() // container wires nothing; swap via CACHE_ADAPTER + matching Register
 	c := container.New(config.Default())
 	cache, err := c.Cache()
 	if err != nil {

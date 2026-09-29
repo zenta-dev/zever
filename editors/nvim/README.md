@@ -1,6 +1,6 @@
 # zever Neovim support
 
-Neovim support for the `.zen` schema DSL used by `internal/dsl` in
+Neovim support for the `.zen` schema DSL used by `dsl` in
 [zenta-dev/zever](https://github.com/zenta-dev/zever).
 
 This subdirectory is a self-contained Neovim "runtime" plugin: point your

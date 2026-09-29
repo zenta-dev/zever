@@ -13,11 +13,11 @@ CYCLONEDX_GOMOD_VERSION ?= v1.12.0
 COVERAGE ?= coverage.out
 SBOM ?= sbom.json
 
-# All Go modules in the repo (143 uses in the committed go.work workspace
+# Every workspace module (144 uses in the committed go.work workspace
 # at root), so every *-all target loops per-module with fail-fast `set -e`.
-# examples/external-sms is intentionally outside go.work (it proves third-party
-# independence); verify it standalone with: GOWORK=off go -C examples/external-sms test ./...
-ALL_MODULES := $(shell find . -type f -name go.mod -not -path "./.git/*" -not -path "./examples/external-sms/*" -exec dirname {} \; | sort)
+# examples/external-sms and docs/examples stay outside `go.work` by design
+# (third-party/consumer proofs); verify them standalone with: GOWORK=off go -C examples/external-sms test ./...
+ALL_MODULES := $(shell find . -type f -name go.mod -not -path "./.git/*" -not -path "./examples/external-sms/*" -not -path "./docs/examples/*" -exec dirname {} \; | sort)
 
 # Matrix sharding: stable round-robin slice of ALL_MODULES. Defaults
 # (TOTAL=1) expand to exactly ALL_MODULES.

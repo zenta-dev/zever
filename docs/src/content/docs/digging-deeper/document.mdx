@@ -51,9 +51,12 @@ passes; `endpoint`/`api_key` serve the `remote` adapter.
 
 ```go
 import (
+	documentlocal "github.com/zenta-dev/zever/adapters/document/local"
 	"github.com/zenta-dev/zever/config"
 	"github.com/zenta-dev/zever/container"
 )
+
+documentlocal.Register()
 
 c := container.New(config.Default())
 d, err := c.Document()
@@ -76,12 +79,15 @@ import (
 	"fmt"
 	"os"
 
+	documentlocal "github.com/zenta-dev/zever/adapters/document/local"
 	"github.com/zenta-dev/zever/config"
 	"github.com/zenta-dev/zever/container"
-	"github.com/zenta-dev/zever/document"
+	"github.com/zenta-dev/zever/core/document"
 )
 
 func main() {
+	documentlocal.Register()
+
 	c := container.New(config.Default())
 	defer c.Close(context.Background())
 
