@@ -22,7 +22,7 @@ language        dsl/                      .zen compiler frontend (compile time o
 surface         orm/ cmd/zever/           typed queries, CLI
 ```
 
-Local dev resolves the modules through the committed `go.work` workspace at the repo root (143 `use` entries covering every module): `go build/test ./...` from the root resolves via the workspace, while per-module standalone commands run with `GOWORK=off` in CI. Releases are lockstep: one version, per-module tags `<path>/vX.Y.Z` via `tools/tag-release.sh`.
+Local dev resolves the modules through the committed `go.work` workspace at the repo root (144 `use` entries covering every workspace module (`examples/external-sms` and `docs/examples` stay outside `go.work` by design)): `go build/test ./...` from the root resolves via the workspace, while per-module standalone commands run with `GOWORK=off` in CI. Releases are lockstep: one version, per-module tags `<path>/vX.Y.Z` via `tools/tag-release.sh`.
 
 No globals and no `init()` wiring in app code; `ctx` is the first arg for IO and is never stored in a struct. Exported identifiers need a doc comment starting with the name; unexported ones do not. `goimports` local prefix is `github.com/zenta-dev/zever`; `depguard` denies `github.com/pkg/errors` and `io/ioutil`.
 

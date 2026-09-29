@@ -27,6 +27,8 @@ State the default adapter path: `config.Default()` wires zero-infrastructure ser
 No accessor: errors arrive as return values from resolved services. Match them at the call site:
 
 ```go
+// Once at startup (container wires nothing): dbsqlite.Register()
+// (alias for github.com/zenta-dev/zever/adapters/db/sqlite)
 c := container.New(config.Default())
 db, err := c.DB()
 if err != nil {
@@ -97,7 +99,7 @@ Expected output:
 | `writeError(w, status, msg)` | app helper writing the shared `{"error": msg}` envelope |
 | `ir.ErrorCode` table | DSL-side mirror of the `apperror` vocabulary |
 
-Note: close errors surface as `*container.ClosePanicError` / `*container.CloseTimeoutError` pointer types matched with `errors.As`. Older notes describing them as values are out of date.
+Note: close errors surface as `container.ClosePanicError` / `container.CloseTimeoutError` value types matched with `errors.As` (declare `var pe container.ClosePanicError` and pass `&pe`).
 
 ## Status mapping
 

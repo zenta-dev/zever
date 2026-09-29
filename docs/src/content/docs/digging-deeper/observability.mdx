@@ -70,6 +70,8 @@ over 32 headers fails; `sample_ratio` must sit in [0,1].
 ## Resolve via container
 
 ```go
+// Once at startup (container wires nothing): stdout.Register()
+// (package github.com/zenta-dev/zever/adapters/observability/stdout)
 c := container.New(config.Default())
 o, err := c.Observability()
 if err != nil {
@@ -89,12 +91,14 @@ import (
     "context"
     "fmt"
 
+    "github.com/zenta-dev/zever/adapters/observability/stdout"
     "github.com/zenta-dev/zever/config"
     "github.com/zenta-dev/zever/container"
-    "github.com/zenta-dev/zever/observability"
+    "github.com/zenta-dev/zever/core/observability"
 )
 
 func main() {
+    stdout.Register() // container wires nothing; register before resolving
     c := container.New(config.Default())
     p, err := c.Observability()
     if err != nil {
@@ -124,9 +128,9 @@ Span lines appear on stdout in human-readable form before the `<nil>`.
 
 | Adapter | Package | Notes |
 |---|---|---|
-| `noop` | `observability/noop` | Silent; use in tests |
-| `stdout` | `observability/stdout` | Default; prints spans and metrics locally |
-| `otlp` | `observability/otlp` | Ships to a production collector |
+| `noop` | `adapters/observability/noop` | Silent; use in tests |
+| `stdout` | `adapters/observability/stdout` | Default; prints spans and metrics locally |
+| `otlp` | `adapters/observability/otlp` | Ships to a production collector |
 
 ## Production notes
 

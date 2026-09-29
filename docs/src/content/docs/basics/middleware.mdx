@@ -31,9 +31,16 @@ Defaults are zero-infrastructure (`config.Default()`), so the chain below runs i
 
 ```go
 import (
+    logslog "github.com/zenta-dev/zever/adapters/log/slog"
+    ratelimitmemory "github.com/zenta-dev/zever/adapters/ratelimit/memory"
+    observabilitystdout "github.com/zenta-dev/zever/adapters/observability/stdout"
     "github.com/zenta-dev/zever/config"
     "github.com/zenta-dev/zever/container"
 )
+
+logslog.Register()
+ratelimitmemory.Register()
+observabilitystdout.Register()
 
 c := container.New(config.Default())
 
@@ -62,12 +69,19 @@ import (
     "fmt"
     "net/http"
 
+    logslog "github.com/zenta-dev/zever/adapters/log/slog"
+    observabilitystdout "github.com/zenta-dev/zever/adapters/observability/stdout"
+    ratelimitmemory "github.com/zenta-dev/zever/adapters/ratelimit/memory"
     "github.com/zenta-dev/zever/config"
     "github.com/zenta-dev/zever/container"
-    "github.com/zenta-dev/zever/middleware"
+    "github.com/zenta-dev/zever/core/middleware"
 )
 
 func main() {
+    logslog.Register()
+    ratelimitmemory.Register()
+    observabilitystdout.Register()
+
     c := container.New(config.Default())
     logger, _ := c.Log()
     limiter, _ := c.RateLimit()
