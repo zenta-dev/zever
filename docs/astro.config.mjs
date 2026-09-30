@@ -61,6 +61,7 @@ export default defineConfig({
 					items: [
 						{ label: 'Routing', link: 'basics/routing' },
 						{ label: 'Middleware', link: 'basics/middleware' },
+						{ label: 'CORS', link: 'basics/cors' },
 						{ label: 'Requests & Responses', link: 'basics/requests-responses' },
 						{ label: 'Validation', link: 'basics/validation' },
 						{ label: 'Errors', link: 'basics/errors-logging' },

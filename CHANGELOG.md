@@ -7,6 +7,15 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Added
+
+- `core/middleware`: new `CORS` HTTP middleware over an app-level
+  `Options` value (explicit origin allowlist echoed, never reflected;
+  preflight `OPTIONS` answers 204 or 403; `Vary: Origin` always; invalid
+  options fail closed with 500). Ships `Options.Validate` and
+  `DefaultCORSMaxAge`, wired outermost in the `bookings`, `showcase`, and
+  `todo` example servers. See `basics/cors`.
+
 ## [v0.5.3] - 2026-09-29
 
 ### Added

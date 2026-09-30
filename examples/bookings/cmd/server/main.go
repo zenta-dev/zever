@@ -174,6 +174,12 @@ func run(addr string) error {
 		handler = middleware.RateLimit(limiter, middleware.RemoteAddrKey)(handler)
 	}
 	handler = middleware.Recover(logger)(handler)
+	handler = middleware.CORS(middleware.Options{
+		AllowedOrigins: []string{"https://example.com"},
+		AllowedMethods: []string{"GET", "POST", "PUT", "PATCH", "DELETE"},
+		AllowedHeaders: []string{"Content-Type", "Authorization"},
+		MaxAge:         10 * time.Minute,
+	})(handler)
 
 	srv := &http.Server{
 		Addr:              addr,

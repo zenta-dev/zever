@@ -11,6 +11,7 @@ import (
 	"syscall"
 	"time"
 
+	"github.com/zenta-dev/zever/core/middleware"
 	"github.com/zenta-dev/zever/examples/todo/internal/api"
 	"github.com/zenta-dev/zever/examples/todo/internal/app"
 )
@@ -80,8 +81,13 @@ func run(addr string) error {
 	api.New(database, authInst, hasher).Routes(r)
 
 	srv := &http.Server{
-		Addr:              addr,
-		Handler:           r,
+		Addr: addr,
+		Handler: middleware.CORS(middleware.Options{
+			AllowedOrigins: []string{"https://example.com"},
+			AllowedMethods: []string{"GET", "POST", "PUT", "PATCH", "DELETE"},
+			AllowedHeaders: []string{"Content-Type", "Authorization"},
+			MaxAge:         10 * time.Minute,
+		})(r),
 		ReadHeaderTimeout: readHeaderTimeout,
 		ReadTimeout:       readTimeout,
 		WriteTimeout:      writeTimeout,
