@@ -7,6 +7,8 @@ type Adapter string
 const (
 	// AdapterLocal is the local cryptography adapter.
 	AdapterLocal Adapter = "local"
+	// AdapterKMS is the KMS envelope cryptography adapter.
+	AdapterKMS Adapter = "kms"
 )
 
 // String returns the canonical name of Adapter.

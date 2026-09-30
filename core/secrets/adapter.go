@@ -7,6 +7,10 @@ type Adapter string
 const (
 	// Env is the environment-variable secrets adapter.
 	Env Adapter = "env"
+	// AdapterVault is the Vault KVv2 secrets adapter.
+	AdapterVault Adapter = "vault"
+	// Vault aliases AdapterVault for consistency with Env.
+	Vault Adapter = AdapterVault
 )
 
 // String returns the canonical name of Adapter.
