@@ -11,6 +11,7 @@ import (
 
 	"github.com/zenta-dev/zever/core/notification"
 	"github.com/zenta-dev/zever/shared/codec"
+	"github.com/zenta-dev/zever/shared/traceprop"
 )
 
 // checker renders notifications as JSON lines without sending.
@@ -51,6 +52,11 @@ type logNotification struct {
 	Data       map[string]string `json:"data,omitempty"`
 	Priority   string            `json:"priority"`
 	TTLSeconds float64           `json:"ttl_seconds"`
+	// TraceID carries the W3C trace ID from ctx for log correlation.
+	// Empty when ctx holds no valid span. The wire payload (Data) is never
+	// mutated: push/SMS have no header channel, so correlation is log-attrs
+	// only and no protocol headers are invented.
+	TraceID string `json:"trace_id,omitempty"`
 }
 
 // Notify validates n and writes one JSON line echoing the full notification
@@ -77,6 +83,7 @@ func (c *checker) Notify(ctx context.Context, n *notification.Notification) erro
 		Data:       n.Data,
 		Priority:   string(n.Priority),
 		TTLSeconds: n.TTL.Seconds(),
+		TraceID:    traceprop.TraceID(ctx),
 	}
 	c.mu.Lock()
 	defer c.mu.Unlock()
