@@ -20,7 +20,10 @@ func mustNew(t *testing.T, opts Options) *driver {
 	t.Helper()
 
 	if opts.Path == "" && opts.DSN == "" {
-		opts.Path = ":memory:"
+		// Fresh file per test: ":memory:" sqlite uses shared cache
+		// (process-global), so fixed run IDs would collide across
+		// reruns (-count) and leak between parallel tests.
+		opts.Path = filepath.Join(t.TempDir(), "workflow.db")
 	}
 
 	if opts.Owner == "" {
@@ -286,12 +289,21 @@ func TestOptionsValidate(t *testing.T) {
 	}
 }
 
-func TestRegisterReservesNameFailsClosed(t *testing.T) {
+func TestRegisterOpensViaCoreOptions(t *testing.T) {
 	Register()
 
-	_, err := workflow.Open(Adapter, workflow.Options{})
-	if !errors.Is(err, ErrNotConfigured) {
-		t.Fatalf("Open = %v, want ErrNotConfigured", err)
+	wf, err := workflow.Open(Adapter, workflow.Options{})
+	if err != nil {
+		t.Fatalf("Open = %v", err)
+	}
+
+	closer, ok := wf.(interface{ Close() error })
+	if !ok {
+		t.Fatalf("workflow %T has no Close", wf)
+	}
+
+	if err := closer.Close(); err != nil {
+		t.Fatalf("Close = %v", err)
 	}
 }
 
