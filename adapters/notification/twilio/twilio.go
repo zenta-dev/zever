@@ -94,6 +94,9 @@ func New(opts notification.Options) (notification.Notifier, error) {
 // Title and Data are rejected by core validation (push-only); Priority and
 // TTL are accepted but ignored because SMS has no such fields.
 //
+// Trace correlation is log-attrs only: SMS has no header or metadata channel,
+// so no trace ID is sent on the wire and no protocol headers are invented.
+//
 // Deliberately not retried on transient failure (unlike notification/fcm's
 // push Notify): this SDK's Messages API has no idempotency-key parameter,
 // so a caller-side retry after an ambiguous failure (the request may have

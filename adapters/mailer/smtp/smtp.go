@@ -83,6 +83,10 @@ func New(opts mailer.Options) (mailer.Mailer, error) {
 }
 
 // Send delivers msg over a fresh per-send connection.
+//
+// Trace correlation is log-attrs only (see mailer/log): SMTP/MIME offers no
+// correlation field without inventing protocol headers, so the MIME body is
+// never mutated for tracing.
 func (m *smtpMailer) Send(ctx context.Context, msg *mailer.Mail) error {
 	if msg == nil {
 		return ErrNilMessage

@@ -11,6 +11,7 @@ import (
 	"github.com/zenta-dev/zever/adapters/log/noop"
 	"github.com/zenta-dev/zever/core/log"
 	"github.com/zenta-dev/zever/core/queue"
+	"github.com/zenta-dev/zever/shared/traceprop"
 )
 
 // Dispatcher enqueues registered jobs onto a queue with optional delay and uniqueness.
@@ -115,6 +116,11 @@ func (d *Dispatcher) Dispatch(
 
 		headers[headerUniqueID] = uid
 	}
+
+	// Propagate the caller's trace (including scheduler root spans named
+	// schedule.<name>) into queue headers so workers can continue it.
+	// No valid span in ctx injects nothing.
+	headers = traceprop.Inject(ctx, headers)
 
 	delay := o.delay
 	if o.at != nil {

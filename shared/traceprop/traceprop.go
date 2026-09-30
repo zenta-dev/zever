@@ -73,6 +73,19 @@ func ContinueSpan(
 	return StartConsumeSpan(ctx, headers, spanName, opts...)
 }
 
+// TraceID returns the hex-encoded trace ID from ctx, or "" when ctx holds
+// no valid span. It is the log/metadata correlation escape hatch for send
+// paths with no header channel (mailer, SMS/push): record the ID in logs,
+// never invent protocol headers.
+func TraceID(ctx context.Context) string {
+	sc := trace.SpanContextFromContext(ctx)
+	if !sc.IsValid() {
+		return ""
+	}
+
+	return sc.TraceID().String()
+}
+
 // StartConsumeSpan extracts the remote span context from headers into ctx
 // and starts a consumer child span named spanName over the result.
 // Callers must end the returned span (defer span.End()). Extra opts append

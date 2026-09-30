@@ -58,6 +58,10 @@ func New(opts scheduler.Options) (scheduler.Scheduler, error) {
 
 // Schedule validates spec, jobName, and args, then registers the schedule.
 // Unknown job names wrap job.ErrUnknownJob.
+//
+// Each cron fire runs as a trace root named schedule.<jobName> (see
+// core/job Scheduler): the registration caller's trace is never inherited,
+// and no fake parent is synthesized.
 func (e *embedded) Schedule(ctx context.Context, spec, jobName string, args any) (scheduler.EntryID, error) {
 	if err := ctx.Err(); err != nil {
 		return 0, fmt.Errorf("scheduler: schedule %q: %w", spec, err)
@@ -109,6 +113,9 @@ func (e *embedded) Entries() []scheduler.EntryID {
 }
 
 // Start begins cron ticks. It is idempotent and non-blocking.
+//
+// Ticks run detached from the registration caller's trace: Start roots at
+// Background, so each fire starts a fresh schedule.<jobName> root span.
 func (e *embedded) Start() error {
 	e.mu.Lock()
 	defer e.mu.Unlock()

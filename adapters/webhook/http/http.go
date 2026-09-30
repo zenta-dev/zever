@@ -16,6 +16,7 @@ import (
 
 	"github.com/zenta-dev/zever/core/webhook"
 	"github.com/zenta-dev/zever/shared/retry"
+	"github.com/zenta-dev/zever/shared/traceprop"
 )
 
 // DefaultBaseDelay is the initial delivery retry delay.
@@ -214,6 +215,14 @@ func (a *adapter) buildRequest(
 
 	if r.secret != "" {
 		req.Header.Set("X-Hub-Signature-256", sign(r.secret, payload))
+	}
+
+	// Propagate W3C trace context from ctx into the outgoing POST via the
+	// same OTel propagator as queue/eventbus (traceprop.Inject over a header
+	// carrier adapter). No valid span in ctx sets nothing. Headers stay
+	// parseable downstream via traceprop.Extract.
+	for k, v := range traceprop.Inject(ctx, nil) {
+		req.Header.Set(k, v)
 	}
 
 	return req, nil

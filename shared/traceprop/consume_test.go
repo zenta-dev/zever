@@ -2,8 +2,6 @@ package traceprop
 
 import (
 	"testing"
-
-	"go.opentelemetry.io/otel"
 )
 
 // TestExtractOrBackground_Valid verifies a pushed span context survives the
@@ -45,10 +43,8 @@ func TestExtractOrBackground_Untrusted(t *testing.T) {
 func TestContinueSpan_LinksRemoteParent(t *testing.T) {
 	t.Parallel()
 
-	prev := otel.GetTracerProvider()
-	st := &stubTracer{}
-	otel.SetTracerProvider(&stubProvider{tracer: st})
-	t.Cleanup(func() { otel.SetTracerProvider(prev) })
+	// Install a private stub (serializes on the provider lock).
+	useStubTracer(t)
 
 	traceID := mustTraceID(t)
 	spanID := mustSpanID(t)
@@ -76,6 +72,10 @@ func TestContinueSpan_LinksRemoteParent(t *testing.T) {
 // usable context and span when headers carry nothing extractable.
 func TestContinueSpan_InvalidHeaders(t *testing.T) {
 	t.Parallel()
+
+	// Serialize on the provider lock: ContinueSpan resolves the global
+	// provider, which parallel tests may otherwise swap mid-call.
+	useStubTracer(t)
 
 	ctx, span := ContinueSpan(t.Context(), map[string]string{"traceparent": "bogus"}, "test.continue-invalid")
 	defer span.End()
