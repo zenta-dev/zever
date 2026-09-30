@@ -7,6 +7,7 @@ import (
 	"time"
 
 	"github.com/zenta-dev/zever/core/queue"
+	"github.com/zenta-dev/zever/shared/traceprop"
 )
 
 type inflight struct {
@@ -59,7 +60,7 @@ func (a *memoryAdapter) Push(ctx context.Context, topic string, payload queue.Pa
 		}
 	}
 
-	msg := queue.NewMessage(topic, payload, headers)
+	msg := queue.NewMessage(topic, payload, traceprop.Inject(ctx, headers))
 
 	a.mu.Lock()
 	if a.closed {
@@ -94,7 +95,7 @@ func (a *memoryAdapter) PushDelayed(ctx context.Context, topic string, payload q
 		}
 	}
 
-	msg := queue.NewMessage(topic, payload, headers)
+	msg := queue.NewMessage(topic, payload, traceprop.Inject(ctx, headers))
 
 	a.mu.Lock()
 	if a.closed {

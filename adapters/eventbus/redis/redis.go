@@ -13,6 +13,7 @@ import (
 	"github.com/zenta-dev/zever/core/eventbus"
 	redisclient "github.com/zenta-dev/zever/shared/redisclient"
 	redisopt "github.com/zenta-dev/zever/shared/redisopt"
+	"github.com/zenta-dev/zever/shared/traceprop"
 )
 
 type subscription struct {
@@ -157,7 +158,7 @@ func (a *adapter) Publish(ctx context.Context, topic string, payload eventbus.Pa
 		return fmt.Errorf("%w: %d > %d", eventbus.ErrPayloadTooLarge, len(payload), eventbus.MaxMessageSize)
 	}
 
-	msg := eventbus.NewMessage(topic, payload, headers)
+	msg := eventbus.NewMessage(topic, payload, traceprop.Inject(ctx, headers))
 
 	wm := wireMessage{
 		ID:      msg.ID.String(),

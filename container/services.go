@@ -192,6 +192,13 @@ func (c *Container) Idempotency() (idempotency.Store, error) {
 // adapter registry of its own: it shares the process-wide queue instance
 // instead of opening redundant connections. Logger stays zero, which the
 // dispatcher treats as a noop default.
+//
+// Trace propagation: Dispatch carries the caller's W3C trace context into the
+// message headers (queue adapters inject on Push/PushDelayed via
+// shared/traceprop), so workers that pop from the shared queue can extract it
+// with traceprop.Extract and continue the trace with a consumer child span
+// (traceprop.StartConsumeSpan). The dispatcher wraps the shared queue
+// unwrapped: d.Q is the process-wide Queue instance.
 func (c *Container) Job() (*job.Dispatcher, error) {
 	return c.job.get(func() (*job.Dispatcher, error) {
 		q, err := c.Queue()

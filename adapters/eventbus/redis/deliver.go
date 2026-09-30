@@ -4,8 +4,11 @@ import (
 	"context"
 
 	goredis "github.com/redis/go-redis/v9"
+	"go.opentelemetry.io/otel/attribute"
+	"go.opentelemetry.io/otel/trace"
 
 	"github.com/zenta-dev/zever/core/eventbus"
+	"github.com/zenta-dev/zever/shared/traceprop"
 )
 
 func (a *adapter) deliver(ctx context.Context, sub *subscription, handler eventbus.Handler) {
@@ -44,6 +47,10 @@ func (a *adapter) deliver(ctx context.Context, sub *subscription, handler eventb
 func (a *adapter) invoke(ctx context.Context, topic string, msg eventbus.Message, handler eventbus.Handler) {
 	hctx, cancel := context.WithTimeout(context.WithoutCancel(ctx), a.handlerTimeout)
 	defer cancel()
+
+	hctx, span := traceprop.StartConsumeSpan(hctx, msg.Headers, "eventbus.deliver",
+		trace.WithAttributes(attribute.String("messaging.destination.name", topic)))
+	defer span.End()
 
 	defer func() {
 		if r := recover(); r != nil && a.onPanic != nil {
