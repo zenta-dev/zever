@@ -84,6 +84,8 @@ func TestRunNewScaffoldsAndBuilds(t *testing.T) {
 		filepath.Join("internal", "app", "app.go"),
 		".gitignore",
 		"README.md",
+		"Dockerfile",
+		".dockerignore",
 	} {
 		if _, err := os.Stat(filepath.Join(out, rel)); err != nil {
 			t.Fatalf("expected %s to exist: %v", rel, err)
@@ -1215,6 +1217,102 @@ func TestRunNewFlagsSkipPickerPrompts(t *testing.T) {
 
 	if doc["db"].Adapter != "postgres" {
 		t.Fatalf("zever.yaml db adapter = %q, want postgres: %v", doc["db"].Adapter, doc)
+	}
+}
+
+// TestRenderNewDockerfileReference pins the reference Dockerfile contract:
+// multi-stage golang builder to distroless nonroot, non-root USER, EXPOSE,
+// ENTRYPOINT, HEALTHCHECK on /healthz, zever.yaml + binary copied, no
+// secrets baked, no absolute local paths.
+func TestRenderNewDockerfileReference(t *testing.T) {
+	t.Parallel()
+
+	dockerfile := renderNewDockerfile("1.27")
+
+	for _, fragment := range []string{
+		"FROM golang:1.27-bookworm AS builder",
+		"FROM gcr.io/distroless/static-debian12:nonroot",
+		"USER nonroot",
+		"EXPOSE 8080 9090",
+		`ENTRYPOINT ["/app/server"]`,
+		"HEALTHCHECK",
+		"/healthz",
+		"COPY zever.yaml",
+		"./cmd/server",
+	} {
+		if !strings.Contains(dockerfile, fragment) {
+			t.Errorf("Dockerfile lacks %q:\n%s", fragment, dockerfile)
+		}
+	}
+
+	for _, banned := range []string{
+		"SECRET", "PASSWORD", "API_KEY", "TOKEN=",
+		"ENV DB_", "ENV ZEVER_",
+		"COPY /home/", "COPY /Users/", "COPY C:\\",
+		"--password", "--token",
+	} {
+		if strings.Contains(dockerfile, banned) {
+			t.Errorf("Dockerfile must not contain %q:\n%s", banned, dockerfile)
+		}
+	}
+}
+
+// TestRenderNewDockerfileDefaultsGoVersion pins the empty-version fallback
+// to defaultGoVersion so a NewConfig without resolution still renders a
+// valid builder tag.
+func TestRenderNewDockerfileDefaultsGoVersion(t *testing.T) {
+	t.Parallel()
+
+	got := renderNewDockerfile("")
+	if !strings.Contains(got, "FROM golang:"+defaultGoVersion) {
+		t.Fatalf("empty goVersion did not fall back to %q:\n%s", defaultGoVersion, got)
+	}
+}
+
+// TestRenderNewDockerignore pins the build-context exclusions: local sqlite
+// files, build output, VCS metadata and JS deps never ship.
+func TestRenderNewDockerignore(t *testing.T) {
+	t.Parallel()
+
+	for _, fragment := range []string{"*.db", "dist/", ".git/", "node_modules/"} {
+		if !strings.Contains(newDockerignore, fragment) {
+			t.Errorf(".dockerignore lacks %q:\n%s", fragment, newDockerignore)
+		}
+	}
+}
+
+// TestRunNewWritesDockerScaffold proves `zever new` emits Dockerfile +
+// .dockerignore with the reference content.
+func TestRunNewWritesDockerScaffold(t *testing.T) {
+	repoRoot := repoRootAbs(t)
+	workDir := t.TempDir()
+	withWorkingDir(t, workDir)
+	t.Setenv(zeverFrameworkPathEnv, repoRoot)
+
+	if err := runNew([]string{"dockapp"}); err != nil {
+		t.Fatalf("runNew: %v", err)
+	}
+
+	out := filepath.Join(workDir, "dockapp")
+
+	dockerfile := readFile(t, filepath.Join(out, "Dockerfile"))
+	for _, fragment := range []string{
+		"FROM golang:",
+		"distroless",
+		"USER nonroot",
+		"HEALTHCHECK",
+		"/healthz",
+	} {
+		if !strings.Contains(dockerfile, fragment) {
+			t.Errorf("scaffolded Dockerfile lacks %q:\n%s", fragment, dockerfile)
+		}
+	}
+
+	dockerignore := readFile(t, filepath.Join(out, ".dockerignore"))
+	for _, fragment := range []string{"*.db", "dist/", ".git/", "node_modules/"} {
+		if !strings.Contains(dockerignore, fragment) {
+			t.Errorf("scaffolded .dockerignore lacks %q:\n%s", fragment, dockerignore)
+		}
 	}
 }
 
