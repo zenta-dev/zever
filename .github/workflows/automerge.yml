@@ -9,10 +9,10 @@ name: automerge
 # condition below holds.
 #
 # Gate (all must report success on the PR head SHA):
-#   FMT ............ gofmt
-#   LINT ........... golangci-lint
-#   TEST ........... test (go 1.27)  (test (race + coverage) is push-only)
-#   SECURE ......... govulncheck, dependency-review (+ sbom artifact job)
+#   CI ............. ci-gate (aggregates fmt, lint, test, race, sbom, ...;
+#                    matrix check names have unstable suffixes, so never
+#                    match the individual jobs by name)
+#   SECURE ......... dependency-review
 #   NO MALICIOUS ... CodeQL findings check, Analyze (go)
 #
 # Notes:
@@ -34,6 +34,7 @@ permissions: {}
 
 jobs:
   automerge:
+    timeout-minutes: 10
     runs-on: ubuntu-latest
     permissions:
       contents: write
@@ -64,7 +65,9 @@ jobs:
             local checks
             checks=$(gh api "repos/$REPO/commits/$sha/check-runs?per_page=100" \
               --jq '[.check_runs[] | select(.status == "completed")] | sort_by(.completed_at) | map({(.name): .conclusion}) | add // {}')
-            for name in gofmt "golangci-lint" "test (go 1.27)" "test (race + coverage)" govulncheck sbom dependency-review "Analyze (go)" CodeQL; do
+            # Matrix jobs carry a module-list suffix in their check names, so the
+            # single ci-gate aggregate (needs: every job) is the stable signal.
+            for name in ci-gate dependency-review "Analyze (go)" CodeQL; do
               got=$(jq -r --arg n "$name" '.[$n] // "MISSING"' <<<"$checks")
               if [ "$got" != "success" ]; then
                 echo "PR #$nr: gate not green ($name: $got)"

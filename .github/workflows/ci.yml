@@ -16,6 +16,7 @@ concurrency:
 jobs:
   detect:
     name: detect affected modules
+    timeout-minutes: 10
     runs-on: ubuntu-latest
     outputs:
       groups: ${{ steps.affected.outputs.groups }}
@@ -43,6 +44,7 @@ jobs:
 
   fmt:
     name: gofmt
+    timeout-minutes: 10
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
@@ -63,6 +65,7 @@ jobs:
 
   lint:
     name: golangci-lint
+    timeout-minutes: 30
     runs-on: ubuntu-latest
     needs: [detect]
     if: needs.detect.outputs.groups != '[]'
@@ -86,11 +89,15 @@ jobs:
       - uses: actions/cache@55cc8345863c7cc4c66a329aec7e433d2d1c52a9 # v6.1.0
         with:
           path: ~/.cache/golangci-lint
-          key: golangci-lint-${{ runner.os }}-go1.27-${{ hashFiles('**/go.mod') }}
+          key: golangci-lint-${{ runner.os }}-${{ hashFiles('go.work') }}-${{ hashFiles('**/go.mod') }}
           restore-keys: |
-            golangci-lint-${{ runner.os }}-go1.27-
+            golangci-lint-${{ runner.os }}-${{ hashFiles('go.work') }}-
+      - uses: actions/cache@55cc8345863c7cc4c66a329aec7e433d2d1c52a9 # v6.1.0
+        with:
+          path: ~/go/bin
+          key: ${{ runner.os }}-gobin-golangci-lint-v2.13.2
       - name: Install golangci-lint
-        run: make setup-golangci-lint
+        run: command -v golangci-lint >/dev/null || make setup-golangci-lint
       - name: golangci-lint (all modules)
         run: make lint-all
 
@@ -99,6 +106,7 @@ jobs:
   # go.mod drift quickly. Per-module loops (no root go.mod exists).
   test:
     name: test (go 1.27)
+    timeout-minutes: 30
     runs-on: ubuntu-latest
     needs: [detect]
     if: needs.detect.outputs.groups != '[]'
@@ -121,6 +129,13 @@ jobs:
           cache-dependency-path: |
             go.work.sum
             **/go.sum
+      - name: Pre-download modules (retry on transient proxy errors)
+        run: |
+          for i in 1 2 3; do
+            make -s download-all && exit 0
+            echo "download attempt $i failed; retrying"; sleep $((i * 10))
+          done
+          exit 1
       - name: vet + tidy + test + build (all modules)
         run: make check-all
 
@@ -131,6 +146,7 @@ jobs:
   # locally to repair.
   module-graph:
     name: module-graph
+    timeout-minutes: 10
     runs-on: ubuntu-latest
     permissions:
       contents: read
@@ -151,6 +167,7 @@ jobs:
   # -run Conformance invocations keep them wired into the gate).
   conformance:
     name: conformance
+    timeout-minutes: 15
     runs-on: ubuntu-latest
     permissions:
       contents: read
@@ -174,6 +191,7 @@ jobs:
 
   external-sms:
     name: out-of-tree proof module
+    timeout-minutes: 10
     runs-on: ubuntu-latest
     permissions:
       contents: read
@@ -192,6 +210,7 @@ jobs:
   # root jobs above never compile or test it. Mirrors the fast gate.
   lsp:
     name: zever-lsp module
+    timeout-minutes: 15
     runs-on: ubuntu-latest
     permissions:
       contents: read
@@ -223,6 +242,7 @@ jobs:
   # push and PR so races are caught before merge.
   test-race:
     name: test (race + coverage)
+    timeout-minutes: 40
     if: needs.detect.outputs.groups != '[]'
     runs-on: ubuntu-latest
     needs: [detect]
@@ -245,6 +265,13 @@ jobs:
           cache-dependency-path: |
             go.work.sum
             **/go.sum
+      - name: Pre-download modules (retry on transient proxy errors)
+        run: |
+          for i in 1 2 3; do
+            make -s download-all && exit 0
+            echo "download attempt $i failed; retrying"; sleep $((i * 10))
+          done
+          exit 1
       - name: go test -race (PR fast gate, no coverage)
         if: github.event_name == 'pull_request'
         run: make test-race-fast
@@ -265,6 +292,10 @@ jobs:
 
   vulnerability:
     name: govulncheck
+    timeout-minutes: 30
+    # New advisories must not turn unrelated PRs red: on PRs the result is
+    # informational (still visible); main/schedule stay blocking.
+    continue-on-error: ${{ github.event_name == 'pull_request' }}
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
@@ -285,6 +316,7 @@ jobs:
 
   sbom:
     name: sbom
+    timeout-minutes: 20
     if: needs.detect.outputs.groups != '[]'
     runs-on: ubuntu-latest
     needs: [detect]
@@ -320,6 +352,7 @@ jobs:
   # exempt — old paths there are intentional).
   doc-snippets:
     name: doc-snippets
+    timeout-minutes: 15
     runs-on: ubuntu-latest
     permissions:
       contents: read
@@ -338,6 +371,7 @@ jobs:
 
   ci-gate:
     name: ci-gate
+    timeout-minutes: 5
     if: always()
     runs-on: ubuntu-latest
     needs: [detect, fmt, lint, test, test-race, sbom, lsp, vulnerability, external-sms, doc-snippets, module-graph, conformance]

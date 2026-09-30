@@ -1,0 +1,57 @@
+name: vulncheck
+
+# Scheduled govulncheck. The vulnerability database changes independently of
+# the code, so a PR-only gate turns unrelated PRs red whenever an advisory
+# lands. ci.yml keeps an informational PR run; this workflow is the blocking
+# drift detector and opens an issue when it fails.
+
+on:
+  schedule:
+    - cron: "17 5 * * *"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: vulncheck
+  cancel-in-progress: false
+
+jobs:
+  govulncheck:
+    name: govulncheck (scheduled)
+    runs-on: ubuntu-latest
+    timeout-minutes: 45
+    permissions:
+      contents: read
+      issues: write
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+      - uses: actions/setup-go@b7ad1dad31e06c5925ef5d2fc7ad053ef454303e # v7.0.0
+        with:
+          go-version-file: go.work
+          cache-dependency-path: |
+            go.work.sum
+            **/go.sum
+      - uses: actions/cache@55cc8345863c7cc4c66a329aec7e433d2d1c52a9 # v6.1.0
+        with:
+          path: ~/go/bin
+          key: ${{ runner.os }}-gobin-govulncheck-v1.8.0
+      - name: Install tools
+        run: make setup-govulncheck
+      - name: govulncheck
+        id: scan
+        run: make vulncheck-all
+      - name: Open or update tracking issue
+        if: failure()
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          title="govulncheck: new advisories affect the workspace"
+          body="Scheduled run failed: ${GITHUB_SERVER_URL}/${GITHUB_REPOSITORY}/actions/runs/${GITHUB_RUN_ID}"
+          num=$(gh issue list --state open --search "in:title \"$title\"" --json number --jq '.[0].number // empty')
+          if [ -n "$num" ]; then
+            gh issue comment "$num" --body "$body"
+          else
+            gh issue create --title "$title" --body "$body"
+          fi
