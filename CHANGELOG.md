@@ -9,6 +9,12 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Added
 
+- `docs/production.md`: single operator-facing production deployment guide
+  tying together the generated server contract (`/healthz`/`/readyz`,
+  `signal.NotifyContext` + `Shutdown`), Postgres pool/TLS/DSN rules,
+  read-only env secrets baseline, rate-limit wiring, `orm/migrate`
+  plan/apply/rollback, OTLP observability, CI gates, and
+  pre-deploy/deploy/post-deploy checklists.
 - `core/middleware`: new `CORS` HTTP middleware over an app-level
   `Options` value (explicit origin allowlist echoed, never reflected;
   preflight `OPTIONS` answers 204 or 403; `Vary: Origin` always; invalid
