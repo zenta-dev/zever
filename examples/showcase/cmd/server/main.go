@@ -136,6 +136,12 @@ func run(addr, grpcAddr string) error {
 		return err
 	}
 
+	r.Use(middleware.CORS(middleware.Options{
+		AllowedOrigins: []string{"https://example.com"},
+		AllowedMethods: []string{"GET", "POST", "PUT", "PATCH", "DELETE"},
+		AllowedHeaders: []string{"Content-Type", "Authorization"},
+		MaxAge:         10 * time.Minute,
+	}))
 	r.Use(middleware.Recover(logger), middleware.RequestLogger(logger), middleware.Tracing(obs))
 
 	r.Use(middleware.RateLimit(limiter, middleware.RemoteAddrKey))

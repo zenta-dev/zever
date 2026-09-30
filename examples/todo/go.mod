@@ -45,6 +45,7 @@ require (
 	github.com/zenta-dev/zever/core/db v0.5.3
 	github.com/zenta-dev/zever/core/job v0.5.3
 	github.com/zenta-dev/zever/core/log v0.5.3
+	github.com/zenta-dev/zever/core/middleware v0.5.3
 	github.com/zenta-dev/zever/core/password v0.5.3
 	github.com/zenta-dev/zever/core/permission v0.5.3
 	github.com/zenta-dev/zever/core/router v0.5.3
@@ -305,3 +306,5 @@ replace github.com/zenta-dev/zever/adapters/scheduler/embedded => ../../adapters
 replace github.com/zenta-dev/zever/adapters/search/sqlite => ../../adapters/search/sqlite
 
 replace github.com/zenta-dev/zever/adapters/vectorstore/sqlite => ../../adapters/vectorstore/sqlite
+
+replace github.com/zenta-dev/zever/core/middleware => ../../core/middleware
