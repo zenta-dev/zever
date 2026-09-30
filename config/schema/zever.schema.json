@@ -33,13 +33,13 @@
     "router": { "$ref": "#/$defs/service", "type": "object", "properties": { "adapter": { "enum": ["fiber", "stdhttp"] }, "options": { "$ref": "#/$defs/routerOptions" } } },
     "scheduler": { "$ref": "#/$defs/service", "type": "object", "properties": { "adapter": { "enum": ["embedded"] }, "options": { "$ref": "#/$defs/schedulerOptions" } } },
     "search": { "$ref": "#/$defs/service", "type": "object", "properties": { "adapter": { "enum": ["postgres", "meilisearch", "sqlite"] }, "options": { "$ref": "#/$defs/searchOptions" } } },
-    "secrets": { "$ref": "#/$defs/service", "type": "object", "properties": { "adapter": { "enum": ["env"] }, "options": { "$ref": "#/$defs/secretsOptions" } } },
+    "secrets": { "$ref": "#/$defs/service", "type": "object", "properties": { "adapter": { "enum": ["env", "vault"] }, "options": { "$ref": "#/$defs/secretsOptions" } } },
     "session": { "$ref": "#/$defs/service", "type": "object", "properties": { "adapter": { "enum": ["memory", "redis"] }, "options": { "$ref": "#/$defs/sessionOptions" } } },
     "storage": { "$ref": "#/$defs/service", "type": "object", "properties": { "adapter": { "enum": ["local", "s3", "r2"] }, "options": { "$ref": "#/$defs/storageOptions" } } },
     "tenant": { "$ref": "#/$defs/service", "type": "object", "properties": { "adapter": { "enum": ["single", "header"] }, "options": { "$ref": "#/$defs/tenantOptions" } } },
     "vectorstore": { "$ref": "#/$defs/service", "type": "object", "properties": { "adapter": { "enum": ["sqlite", "pgvector", "qdrant"] }, "options": { "$ref": "#/$defs/vectorstoreOptions" } } },
-    "webhook": { "$ref": "#/$defs/service", "type": "object", "properties": { "adapter": { "enum": ["http", "queue", "sqlite"] }, "options": { "$ref": "#/$defs/webhookOptions" } } },
-    "workflow": { "$ref": "#/$defs/service", "type": "object", "properties": { "adapter": { "enum": ["memory"] }, "options": { "$ref": "#/$defs/workflowOptions" } } }
+    "webhook": { "$ref": "#/$defs/service", "type": "object", "properties": { "adapter": { "enum": ["http", "queue"] }, "options": { "$ref": "#/$defs/webhookOptions" } } },
+    "workflow": { "$ref": "#/$defs/service", "type": "object", "properties": { "adapter": { "enum": ["memory", "postgres"] }, "options": { "$ref": "#/$defs/workflowOptions" } } }
   },
   "$defs": {
     "service": {
@@ -511,7 +511,9 @@
       "properties": {
         "addr": { "type": "string", "description": "Vault server address." },
         "token": { "type": "string", "description": "Vault authentication token." },
+        "token_file": { "type": "string", "description": "Reads the Vault token from a file when token is empty." },
         "mount": { "type": "string", "description": "Vault KV mount path." },
+        "namespace": { "type": "string", "description": "Vault namespace." },
         "project_id": { "type": "string", "description": "GCP project ID." },
         "prefix": { "type": "string", "description": "Default: ZEVER." },
         "region": { "type": "string", "description": "AWS region." }
@@ -596,7 +598,6 @@
         "queue_adapter": { "type": "string", "description": "Only used by the queue adapter." },
         "queue_opts": { "$ref": "#/$defs/queueOptions", "description": "Only used by the queue adapter." },
         "dead_letter_topic": { "type": "string" },
-        "dsn": { "type": "string", "description": "sqlite adapter database path; empty means a private in-memory-style database." },
         "replay_tolerance": { "$ref": "#/$defs/durationNs", "description": "Zero means adapter default (5m)." }
       }
     },
@@ -605,7 +606,9 @@
       "additionalProperties": false,
       "properties": {
         "host_port": { "type": "string" },
-        "namespace": { "type": "string" }
+        "namespace": { "type": "string" },
+        "dsn": { "type": "string", "description": "Postgres connection string; empty selects sqlite (dev/test)." },
+        "table": { "type": "string", "description": "Workflow-runs table name; empty selects the adapter default." }
       }
     }
   }

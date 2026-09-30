@@ -14,7 +14,6 @@ func TestAdapter_String_returnsName(t *testing.T) {
 	}{
 		{"http", AdapterHTTP, "http"},
 		{"queue", AdapterQueue, "queue"},
-		{"sqlite", AdapterSQLite, "sqlite"},
 		{"unknown", Adapter(""), "unknown"},
 	}
 	for _, c := range cases {
@@ -35,7 +34,6 @@ func TestAdapter_Parse_valid_roundtrip(t *testing.T) {
 	}{
 		{"http", AdapterHTTP},
 		{"queue", AdapterQueue},
-		{"sqlite", AdapterSQLite},
 	}
 	for _, c := range cases {
 		t.Run(c.name, func(t *testing.T) {

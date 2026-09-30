@@ -650,6 +650,9 @@ $defs:
             mount:
                 description: Vault KV mount path.
                 type: string
+            namespace:
+                description: Vault namespace.
+                type: string
             prefix:
                 description: 'Default: ZEVER.'
                 type: string
@@ -661,6 +664,9 @@ $defs:
                 type: string
             token:
                 description: Vault authentication token.
+                type: string
+            token_file:
+                description: Reads the Vault token from a file when token is empty.
                 type: string
         type: object
     service:
@@ -800,9 +806,6 @@ $defs:
                 type: boolean
             dead_letter_topic:
                 type: string
-            dsn:
-                description: sqlite adapter database path; empty means a private in-memory-style database.
-                type: string
             max_retries:
                 description: Zero means no retries.
                 minimum: 0
@@ -823,9 +826,15 @@ $defs:
     workflowOptions:
         additionalProperties: false
         properties:
+            dsn:
+                description: Postgres connection string; empty selects sqlite (dev/test).
+                type: string
             host_port:
                 type: string
             namespace:
+                type: string
+            table:
+                description: Workflow-runs table name; empty selects the adapter default.
                 type: string
         type: object
     zredisConnectOptions:
@@ -1187,6 +1196,7 @@ properties:
             adapter:
                 enum:
                     - env
+                    - vault
             options:
                 $ref: '#/$defs/secretsOptions'
         type: object
@@ -1239,7 +1249,6 @@ properties:
                 enum:
                     - http
                     - queue
-                    - sqlite
             options:
                 $ref: '#/$defs/webhookOptions'
         type: object
@@ -1249,6 +1258,7 @@ properties:
             adapter:
                 enum:
                     - memory
+                    - postgres
             options:
                 $ref: '#/$defs/workflowOptions'
         type: object

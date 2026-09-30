@@ -1194,6 +1194,7 @@ var sharedModuleDirs = []string{
 	"shared/registry",
 	"shared/retry",
 	"shared/s3opts",
+	"shared/traceprop",
 }
 
 // checkout that a scaffolded project's module graph may need a go.mod
@@ -1208,7 +1209,7 @@ var nestedModuleDirs = []string{
 	"adapters/auth/jwt", "adapters/auth/oidc", "adapters/auth/session",
 	"adapters/billing/paddle", "adapters/billing/stripe", "adapters/billing/stub",
 	"adapters/cache/memory", "adapters/cache/redis",
-	"adapters/crypto/local",
+	"adapters/crypto/kms", "adapters/crypto/local",
 	"adapters/db/postgres", "adapters/db/sqlite",
 	"adapters/document/latex", "adapters/document/local", "adapters/document/remote",
 	"adapters/eventbus/memory", "adapters/eventbus/redis",
@@ -1230,13 +1231,13 @@ var nestedModuleDirs = []string{
 	"adapters/router/fiber", "adapters/router/stdhttp",
 	"adapters/scheduler/embedded",
 	"adapters/search/meilisearch", "adapters/search/postgres", "adapters/search/sqlite",
-	"adapters/secrets/env",
+	"adapters/secrets/env", "adapters/secrets/vault",
 	"adapters/session/cookie", "adapters/session/memory", "adapters/session/redis",
 	"adapters/storage/local", "adapters/storage/r2", "adapters/storage/s3",
 	"adapters/tenant/header", "adapters/tenant/single",
 	"adapters/vectorstore/pgvector", "adapters/vectorstore/qdrant", "adapters/vectorstore/sqlite",
-	"adapters/webhook/http", "adapters/webhook/queue", "adapters/webhook/sqlite",
-	"adapters/workflow/memory",
+	"adapters/webhook/http", "adapters/webhook/queue",
+	"adapters/workflow/memory", "adapters/workflow/postgres",
 }
 
 // coreModulePath returns the framework module path for one battery's core
