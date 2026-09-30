@@ -62,6 +62,8 @@ func ExtractOrBackground(headers map[string]string) context.Context {
 // StartConsumeSpan in one call for consume paths that already hold a
 // caller context. Callers must end the returned span (defer span.End()).
 // Extra opts append after the default SpanKindConsumer.
+//
+//nolint:spancheck // ContinueSpan returns the span to the caller, who owns calling End() (documented above); this is the standard tracer.Start contract, not a leak
 func ContinueSpan(
 	ctx context.Context,
 	headers map[string]string,
@@ -84,5 +86,6 @@ func StartConsumeSpan(
 	ctx = Extract(ctx, headers)
 	opts = append([]trace.SpanStartOption{trace.WithSpanKind(trace.SpanKindConsumer)}, opts...)
 
+	//nolint:spancheck // StartConsumeSpan returns the span to the caller, who owns calling End(); standard tracer.Start contract, not a leak
 	return otel.Tracer(ScopeName).Start(ctx, spanName, opts...)
 }

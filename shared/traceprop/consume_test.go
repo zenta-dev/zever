@@ -11,8 +11,8 @@ import (
 func TestExtractOrBackground_Valid(t *testing.T) {
 	t.Parallel()
 
-	traceID := mustTraceID(t, "4bf92f3577b34da6a3ce929d0e0e4736")
-	spanID := mustSpanID(t, "00f067aa0ba902b7")
+	traceID := mustTraceID(t)
+	spanID := mustSpanID(t)
 
 	headers := Inject(
 		ctxWithSpanContext(t.Context(), traceID, spanID, true),
@@ -50,8 +50,8 @@ func TestContinueSpan_LinksRemoteParent(t *testing.T) {
 	otel.SetTracerProvider(&stubProvider{tracer: st})
 	t.Cleanup(func() { otel.SetTracerProvider(prev) })
 
-	traceID := mustTraceID(t, "4bf92f3577b34da6a3ce929d0e0e4736")
-	spanID := mustSpanID(t, "00f067aa0ba902b7")
+	traceID := mustTraceID(t)
+	spanID := mustSpanID(t)
 
 	headers := Inject(ctxWithSpanContext(t.Context(), traceID, spanID, true), nil)
 
