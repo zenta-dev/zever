@@ -4,10 +4,6 @@ import (
 	"errors"
 )
 
-// ErrNotConfigured is returned by the Register factory: core
-// workflow.Options carries no DSN, so use New or Open with Options.
-var ErrNotConfigured = errors.New("postgres: not configured (use postgres.New or postgres.Open with Options{DSN: ...})")
-
 // ErrLeaseHeld is returned by Reclaim when another live owner holds the run.
 var ErrLeaseHeld = errors.New("postgres: lease held by another owner")
 

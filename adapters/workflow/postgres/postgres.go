@@ -159,7 +159,9 @@ var (
 
 // New creates a DB-backed workflow engine. Empty DSN selects sqlite at
 // Path (default ":memory:"); a set DSN opens postgres. The runs table is
-// created when missing.
+// created when missing. Note: ":memory:" sqlite uses shared cache, so two
+// drivers with Path ":memory:" in one process share state; use distinct
+// file paths for isolation.
 func New(o Options) (workflow.Workflow, error) {
 	return Open(o)
 }
@@ -550,9 +552,9 @@ func (d *driver) Reclaim(ctx context.Context, runID workflow.RunID, owner string
 	}
 
 	if n == 0 {
-		cur, err := d.load(ctx, runID)
-		if err != nil {
-			return err
+		cur, reloadErr := d.load(ctx, runID)
+		if reloadErr != nil {
+			return reloadErr
 		}
 
 		return &LeaseHeldError{RunID: string(runID), Owner: cur.LeaseOwner}
@@ -565,8 +567,8 @@ func (d *driver) Reclaim(ctx context.Context, runID workflow.RunID, owner string
 
 	var input any
 	if len(row.Payload) > 0 {
-		if err := json.Unmarshal(row.Payload, &input); err != nil {
-			return fmt.Errorf("postgres: reclaim %q: decode input: %w", runID, err)
+		if uerr := json.Unmarshal(row.Payload, &input); uerr != nil {
+			return fmt.Errorf("postgres: reclaim %q: decode input: %w", runID, uerr)
 		}
 	}
 

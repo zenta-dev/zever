@@ -9,6 +9,13 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Added
 
+- `core/workflow`: `PostgresOptions` (`DSN`/`Table`) embedded in `Options`
+  plus `Postgres` adapter const, so `adapters/workflow/postgres`
+  registers a working `workflow.Open` factory (sqlite on empty DSN,
+  postgres when set) instead of failing closed; flows through
+  `config` file/env and `container.Workflow()` unchanged.
+  `docs/production.md` gains a Workflows section and correct
+  Vault/KMS coverage.
 - `docs/production.md`: single operator-facing production deployment guide
   tying together the generated server contract (`/healthz`/`/readyz`,
   `signal.NotifyContext` + `Shutdown`), Postgres pool/TLS/DSN rules,

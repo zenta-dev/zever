@@ -72,14 +72,22 @@ func run() error {
   constructor never logs the DSN (`New` doc, `:324-332`). Keep summed
   `MaxConns` across `db`/`search`/`vectorstore` pools below the server
   `max_connections`.
-- Secrets: only the `env` adapter ships (`core/secrets/adapter.go`,
-  `adapters/secrets/env/env.go`). `New` requires `Prefix`
-  (`adapters/secrets/env/options.go`); `Get`/`List` read prefixed env
-  vars; `Set`/`Delete` always return `secrets.ErrNotSupported`
-  (`env.go:55-63`) — rotation means redeploy/restart with new env, not
-  an API call. `core/secrets/options.go` reserves `Addr`/`Token`/`Mount`
-  (Vault) and `ProjectID`/`Region` (GCP/AWS) for future backends; no
-  Vault/KMS adapter exists yet. Crypto keys load from secrets, never
+- Secrets: `env` baseline plus real backends (`core/secrets/adapter.go`,
+  `adapters/secrets/env/env.go`, `adapters/secrets/vault/`). `env.New`
+  requires `Prefix` (`adapters/secrets/env/options.go`); `Get`/`List`
+  read prefixed env vars; `Set`/`Delete` always return
+  `secrets.ErrNotSupported` (`env.go:55-63`) — rotation means
+  redeploy/restart with new env, not an API call. `vault` is the KVv2
+  adapter (`Addr`/`Token`/`TokenFile`/`Mount`/`Namespace` in
+  `adapters/secrets/vault/options.go`): `Get`/`Set`/`Delete`/`List`
+  over HTTP with `DefaultHTTPTimeout`, values never appear in errors.
+  Prefer Vault for anything handling payment credentials (SOC2/PCI
+  expect a real secrets manager); keep `env` for local dev.
+- Crypto: `local` (AES-256-GCM, dev key) plus `kms` envelope adapter
+  (`adapters/crypto/kms/`). Envelope format is
+  `version||keyID||encrypted-DEK||nonce||ciphertext` (`kms.go:165-185`); `KeyIDs` accepts prior key IDs
+  so rotation decrypts old values while new writes use `KeyID`
+  (`core/crypto/options.go`). Crypto keys load from secrets, never
   hard-coded (`core/crypto/doc.go`; `security/crypto-secrets.mdx`,
   `digging-deeper/secrets.mdx`).
 
@@ -152,6 +160,19 @@ func applyPending(ctx context.Context, c *container.Container, plan *migrate.Mig
 	return migrate.Apply(ctx, db, plan)
 }
 ```
+
+## Workflows
+
+`memory` is in-process only: every in-flight run is lost on restart or
+deploy (`adapters/workflow/memory/doc.go`). Anything business-critical
+runs on `postgres` (`adapters/workflow/postgres/`): DB-backed runs table
+with lease-based crash recovery and idempotency keys, so a second
+replica reclaims expired leases after a crash. `core/workflow.Options`
+carries `DSN`/`Table` (`core/workflow/options.go`, following the
+`core/queue` `RedisOptions` precedent); empty DSN selects sqlite for
+dev, set DSN opens postgres for durable runs. Resolve via
+`container.Workflow()` like every other battery — `memory` is the
+`config.Default()` adapter, never prod.
 
 ## Observability
 

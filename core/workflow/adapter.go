@@ -7,6 +7,9 @@ type Adapter string
 const (
 	// Memory is the in-memory workflow adapter.
 	Memory Adapter = "memory"
+	// Postgres is the durable DB-backed workflow adapter
+	// (adapters/workflow/postgres).
+	Postgres Adapter = "postgres"
 )
 
 // String returns the canonical name of Adapter.
