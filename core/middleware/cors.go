@@ -1,7 +1,7 @@
 package middleware
 
 import (
-	"fmt"
+	"errors"
 	"net/http"
 	"strconv"
 	"strings"
@@ -44,30 +44,30 @@ type Options struct {
 // wildcard origin combined with credentials, and negative MaxAge.
 func (o Options) Validate() error {
 	if len(o.AllowedOrigins) == 0 {
-		return fmt.Errorf("middleware: cors requires at least one allowed origin")
+		return errors.New("middleware: cors requires at least one allowed origin")
 	}
 	if len(o.AllowedMethods) == 0 {
-		return fmt.Errorf("middleware: cors requires at least one allowed method")
+		return errors.New("middleware: cors requires at least one allowed method")
 	}
 	for _, origin := range o.AllowedOrigins {
 		if strings.TrimSpace(origin) == "" {
-			return fmt.Errorf("middleware: cors allowed origin must not be blank")
+			return errors.New("middleware: cors allowed origin must not be blank")
 		}
 	}
 	for _, method := range o.AllowedMethods {
 		if strings.TrimSpace(method) == "" {
-			return fmt.Errorf("middleware: cors allowed method must not be blank")
+			return errors.New("middleware: cors allowed method must not be blank")
 		}
 	}
 	if o.AllowCredentials {
 		for _, origin := range o.AllowedOrigins {
 			if origin == "*" {
-				return fmt.Errorf("middleware: cors wildcard origin must not combine with allow credentials")
+				return errors.New("middleware: cors wildcard origin must not combine with allow credentials")
 			}
 		}
 	}
 	if o.MaxAge < 0 {
-		return fmt.Errorf("middleware: cors max age must not be negative")
+		return errors.New("middleware: cors max age must not be negative")
 	}
 
 	return nil
@@ -85,7 +85,7 @@ func (o Options) Validate() error {
 // middleware per route at registration).
 func CORS(opts Options) func(http.Handler) http.Handler {
 	if err := opts.Validate(); err != nil {
-		return func(next http.Handler) http.Handler {
+		return func(http.Handler) http.Handler {
 			return http.HandlerFunc(func(w http.ResponseWriter, _ *http.Request) {
 				w.Header().Set("Content-Type", "application/json")
 				w.WriteHeader(http.StatusInternalServerError)
