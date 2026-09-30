@@ -7,7 +7,11 @@ import (
 	"sync/atomic"
 	"time"
 
+	"go.opentelemetry.io/otel/attribute"
+	"go.opentelemetry.io/otel/trace"
+
 	"github.com/zenta-dev/zever/core/eventbus"
+	"github.com/zenta-dev/zever/shared/traceprop"
 )
 
 var _ eventbus.Pusher = (*bus)(nil)
@@ -117,7 +121,7 @@ func (b *bus) Publish(ctx context.Context, topic string, payload eventbus.Payloa
 		return eventbus.ErrPayloadTooLarge
 	}
 
-	base := eventbus.NewMessage(topic, payload, headers)
+	base := eventbus.NewMessage(topic, payload, traceprop.Inject(ctx, headers))
 
 	b.mu.RLock()
 	subs := append([]*subscription(nil), b.topics[topic]...)
@@ -228,6 +232,10 @@ func (b *bus) forward(parent context.Context, topic string, sub *subscription, h
 
 				ctx, cancel := context.WithTimeout(context.WithoutCancel(parent), b.handlerTimeout)
 				defer cancel()
+
+				ctx, span := traceprop.StartConsumeSpan(ctx, m.Headers, "eventbus.deliver",
+					trace.WithAttributes(attribute.String("messaging.destination.name", topic)))
+				defer span.End()
 
 				doneCh := make(chan struct{})
 

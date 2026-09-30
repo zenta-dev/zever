@@ -143,6 +143,7 @@ use (
 	./shared/registry
 	./shared/retry
 	./shared/s3opts
+	./shared/traceprop
 	./tools/affected
 	./tools/modgraph
 	./tools/zever-lsp
