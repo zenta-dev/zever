@@ -82,6 +82,7 @@ use (
 	./adapters/webhook/queue
 	./adapters/webhook/sqlite
 	./adapters/workflow/memory
+	./adapters/workflow/postgres
 	./cmd/zever
 	./config
 	./container
