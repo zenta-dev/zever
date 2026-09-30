@@ -290,6 +290,33 @@ jobs:
           flags: race-group-${{ strategy.job-index }}
           fail_ci_if_error: false
 
+  # Security coverage floor: Codecov uploads are informational only, so this
+  # gate hard-fails main/tags when auth/crypto/payment coverage drops below
+  # the floor (80; stripe measured 83.0, so 85 would ship red-on-main — see
+  # tools/coverage-floor.sh header). Scoped re-run (7 modules) stays under 5
+  # minutes. PRs run the race fast-gate without coverage, so this job is
+  # main/tags only and ignores affected-modules (always runs).
+  coverage-floor:
+    name: coverage-floor
+    timeout-minutes: 10
+    if: github.event_name != 'pull_request'
+    runs-on: ubuntu-latest
+    needs: [detect, test-race]
+    permissions:
+      contents: read
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+      - uses: actions/setup-go@b7ad1dad31e06c5925ef5d2fc7ad053ef454303e # v7.0.0
+        with:
+          go-version-file: go.work
+          cache-dependency-path: |
+            go.work.sum
+            **/go.sum
+      - name: race + coverage (scoped security modules)
+        run: make test-race-all MODULES="core/auth core/crypto core/password core/authz core/payment adapters/payment/stripe adapters/payment/paddle"
+      - name: enforce coverage floor
+        run: tools/coverage-floor.sh --threshold 80
+
   vulnerability:
     name: govulncheck
     timeout-minutes: 30
@@ -374,7 +401,7 @@ jobs:
     timeout-minutes: 5
     if: always()
     runs-on: ubuntu-latest
-    needs: [detect, fmt, lint, test, test-race, sbom, lsp, vulnerability, external-sms, doc-snippets, module-graph, conformance]
+    needs: [detect, fmt, lint, test, test-race, coverage-floor, sbom, lsp, vulnerability, external-sms, doc-snippets, module-graph, conformance]
     steps:
       - name: Aggregate results
         run: |
