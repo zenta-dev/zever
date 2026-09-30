@@ -82,7 +82,6 @@ use (
 	./adapters/vectorstore/sqlite
 	./adapters/webhook/http
 	./adapters/webhook/queue
-	./adapters/webhook/sqlite
 	./adapters/workflow/memory
 	./adapters/workflow/postgres
 	./cmd/zever

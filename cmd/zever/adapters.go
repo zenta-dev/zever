@@ -107,7 +107,6 @@ import (
 	vectorstorepgvector "github.com/zenta-dev/zever/adapters/vectorstore/pgvector"
 	vectorstoreqdrant "github.com/zenta-dev/zever/adapters/vectorstore/qdrant"
 	vectorstoresqlite "github.com/zenta-dev/zever/adapters/vectorstore/sqlite"
-	webhooksqlite "github.com/zenta-dev/zever/adapters/webhook/sqlite"
 )
 
 // Adapters in this binary are registered explicitly: adapter packages
@@ -202,5 +201,4 @@ func init() {
 	vectorstorepgvector.Register()
 	vectorstoreqdrant.Register()
 	vectorstoresqlite.Register()
-	webhooksqlite.Register()
 }

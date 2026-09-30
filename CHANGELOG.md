@@ -7,6 +7,15 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Removed
+
+- `adapters/webhook/sqlite`: removed mistaken adapter module and its
+  `core/webhook` surface (`AdapterSQLite`, `Options.DSN`). `http` and
+  `queue` remain; default stays `http`. Config schema, scaffold list,
+  adapter matrix, and Dependabot entries updated (regen also picks up
+  previously missing `kms`/`vault`/`workflow/postgres`/`traceprop`
+  entries).
+
 ### Added
 
 - `core/workflow`: `PostgresOptions` (`DSN`/`Table`) embedded in `Options`

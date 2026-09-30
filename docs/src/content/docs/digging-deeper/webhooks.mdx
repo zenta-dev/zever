@@ -1,6 +1,6 @@
 ---
 title: Webhooks
-description: Signed outbound delivery over HTTP, queue fan-out, or SQLite outbox.
+description: Signed outbound delivery over HTTP or queue fan-out.
 ---
 
 ## Purpose
@@ -17,9 +17,7 @@ never exposes every integration.
 
 Pick `http` (the default) for direct POST delivery with no durability:
 simplest shape, but a crash mid-delivery loses the event. Pick `queue`
-when delivery should ride the job system for retries and backoff. Pick
-`sqlite` when in-flight delivery must survive a crash via a durable
-outbox (`dsn`, empty means a private in-memory-style database).
+when delivery should ride the job system for retries and backoff.
 
 The bookings example sets `webhook.adapter: queue` with `timeout: 10s`,
 `max_retries: 3`, `queue_adapter: memory`, `queue_opts` (visibility 30s
@@ -123,7 +121,6 @@ payload to every subscriber of the event.
 |---|---|---|
 | `http` | `webhook/http` | Default; direct POST, no durability |
 | `queue` | `webhook/queue` | Retryable via the job system |
-| `sqlite` | `webhook/sqlite` | Durable outbox across crashes |
 
 ## Production notes
 
@@ -132,7 +129,7 @@ payload to every subscriber of the event.
   joins errors via `errors.Join`. The bookings README notes the queue
   variant needs its queue reference wired before doctor goes green.
 - Multi-instance behavior: `http` delivery from N replicas means N
-  independent retry loops; prefer `queue` / `sqlite` so retries funnel
+  independent retry loops; prefer `queue` so retries funnel
   through shared infrastructure with a dead-letter topic for exhausted
   deliveries (`webhook.dead` in the demo).
 - Redaction: per-target secrets are passed to `Register` and must never

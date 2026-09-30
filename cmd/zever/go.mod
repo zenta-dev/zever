@@ -86,7 +86,6 @@ require (
 	github.com/zenta-dev/zever/adapters/vectorstore/sqlite v0.5.3
 	github.com/zenta-dev/zever/adapters/webhook/http v0.5.3
 	github.com/zenta-dev/zever/adapters/webhook/queue v0.5.3
-	github.com/zenta-dev/zever/adapters/webhook/sqlite v0.5.3
 	github.com/zenta-dev/zever/adapters/workflow/memory v0.5.3
 	github.com/zenta-dev/zever/config v0.5.3
 	github.com/zenta-dev/zever/container v0.5.3
@@ -284,6 +283,7 @@ require (
 	github.com/zenta-dev/zever/shared/registry v0.5.3 // indirect
 	github.com/zenta-dev/zever/shared/retry v0.5.3 // indirect
 	github.com/zenta-dev/zever/shared/s3opts v0.5.3 // indirect
+	github.com/zenta-dev/zever/shared/traceprop v0.5.3 // indirect
 	go.opencensus.io v0.24.0 // indirect
 	go.opentelemetry.io/auto/sdk v1.2.1 // indirect
 	go.opentelemetry.io/contrib/detectors/gcp v1.44.0 // indirect
@@ -401,7 +401,6 @@ replace (
 	github.com/zenta-dev/zever/adapters/vectorstore/sqlite => ../../adapters/vectorstore/sqlite
 	github.com/zenta-dev/zever/adapters/webhook/http => ../../adapters/webhook/http
 	github.com/zenta-dev/zever/adapters/webhook/queue => ../../adapters/webhook/queue
-	github.com/zenta-dev/zever/adapters/webhook/sqlite => ../../adapters/webhook/sqlite
 	github.com/zenta-dev/zever/adapters/workflow/memory => ../../adapters/workflow/memory
 	github.com/zenta-dev/zever/core/ai => ../../core/ai
 	github.com/zenta-dev/zever/core/analytics => ../../core/analytics
@@ -477,6 +476,8 @@ replace github.com/zenta-dev/zever/shared/registry => ../../shared/registry
 replace github.com/zenta-dev/zever/shared/retry => ../../shared/retry
 
 replace github.com/zenta-dev/zever/shared/s3opts => ../../shared/s3opts
+
+replace github.com/zenta-dev/zever/shared/traceprop => ../../shared/traceprop
 
 replace github.com/zenta-dev/zever/adapters/media/ffmpeg => ../../adapters/media/ffmpeg
 

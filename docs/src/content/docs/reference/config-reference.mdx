@@ -145,13 +145,13 @@ exit:1
 | router | fiber, stdhttp | stdhttp |
 | scheduler | embedded | embedded |
 | search | postgres, meilisearch, sqlite | sqlite |
-| secrets | env | env (prefix ZEVER) |
+| secrets | env, vault | env (prefix ZEVER) |
 | session | memory, redis | memory |
 | storage | local, s3, r2 | local |
 | tenant | single, header | single |
 | vectorstore | sqlite, pgvector, qdrant | sqlite |
-| webhook | http, queue, sqlite | http |
-| workflow | memory | memory |
+| webhook | http, queue | http |
+| workflow | memory, postgres | memory |
 
 Defaults pick the zero-infra adapter per service (ai has none - all
 backends need keys - so it defaults to `anthropic` and requires an API key

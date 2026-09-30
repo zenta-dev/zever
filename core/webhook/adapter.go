@@ -9,8 +9,6 @@ const (
 	AdapterHTTP Adapter = "http"
 	// AdapterQueue delivers webhooks through a queue topic.
 	AdapterQueue Adapter = "queue"
-	// AdapterSQLite persists webhook subscriptions in SQLite.
-	AdapterSQLite Adapter = "sqlite"
 )
 
 // String returns the canonical name of Adapter.

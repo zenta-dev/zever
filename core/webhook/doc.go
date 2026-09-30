@@ -2,7 +2,7 @@
 //
 // It registers per-target secrets, unregisters subscriptions, and delivers payloads to event targets. It is not a queue itself though one backend rides on queue.
 //
-// Type safety: Webhook plus typed Options plus Adapter enum plus Factory. Options carry Timeout plus MaxRetries plus QueueAdapter plus QueueOpts plus DeadLetterTopic plus DSN plus ReplayTolerance; there is no shared APIKey by design. Unsupported features fail closed.
+// Type safety: Webhook plus typed Options plus Adapter enum plus Factory. Options carry Timeout plus MaxRetries plus QueueAdapter plus QueueOpts plus DeadLetterTopic plus ReplayTolerance; there is no shared APIKey by design. Unsupported features fail closed.
 //
 // DX: Open with Open, custom backends with Register. Options are typed with zero-infra defaults for tests. Config file plus env WEBHOOK_<FIELD> (no prefix, e.g. WEBHOOK_ADAPTER). See config/README.md.
 //

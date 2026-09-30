@@ -50,13 +50,13 @@ config file, overlaid by environment variables. Later layers win:
 | router        | fiber, stdhttp                      |
 | scheduler     | embedded                            |
 | search        | postgres, meilisearch, sqlite       |
-| secrets       | env                                  |
+| secrets       | env, vault                          |
 | session       | memory, redis                       |
 | storage       | local, s3, r2                       |
 | tenant        | single, header                      |
 | vectorstore   | sqlite, pgvector, qdrant            |
-| webhook       | http, queue, sqlite                 |
-| workflow      | memory                              |
+| webhook       | http, queue                         |
+| workflow      | memory, postgres                    |
 
 Defaults pick the zero-infra adapter per service (ai has none — all backends
 need keys — so it defaults to `anthropic` and requires an API key via

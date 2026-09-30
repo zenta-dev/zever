@@ -31,9 +31,6 @@ type Options struct {
 	QueueOpts queue.Options `json:"queue_opts" toml:"queue_opts" yaml:"queue_opts"`
 	// DeadLetterTopic is the queue topic for deliveries that exhaust retries.
 	DeadLetterTopic string `json:"dead_letter_topic" toml:"dead_letter_topic" yaml:"dead_letter_topic"`
-	// DSN is the SQLite database path for the sqlite adapter.
-	// Empty means a unique private in-memory-style database.
-	DSN string `json:"dsn" toml:"dsn" yaml:"dsn"`
 	// Logger emits background delivery warnings. Defaults to a no-op logger when nil.
 	Logger log.Logger
 	// ReplayTolerance bounds how far a signature's embedded timestamp may

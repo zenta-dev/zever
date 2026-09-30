@@ -860,6 +860,10 @@ type = 'string'
 description = 'Vault KV mount path.'
 type = 'string'
 
+['$defs'.secretsOptions.properties.namespace]
+description = 'Vault namespace.'
+type = 'string'
+
 ['$defs'.secretsOptions.properties.prefix]
 description = 'Default: ZEVER.'
 type = 'string'
@@ -874,6 +878,10 @@ type = 'string'
 
 ['$defs'.secretsOptions.properties.token]
 description = 'Vault authentication token.'
+type = 'string'
+
+['$defs'.secretsOptions.properties.token_file]
+description = 'Reads the Vault token from a file when token is empty.'
 type = 'string'
 
 ['$defs'.service]
@@ -1052,10 +1060,6 @@ type = 'boolean'
 ['$defs'.webhookOptions.properties.dead_letter_topic]
 type = 'string'
 
-['$defs'.webhookOptions.properties.dsn]
-description = 'sqlite adapter database path; empty means a private in-memory-style database.'
-type = 'string'
-
 ['$defs'.webhookOptions.properties.max_retries]
 description = 'Zero means no retries.'
 minimum = 0.0
@@ -1082,10 +1086,18 @@ additionalProperties = false
 type = 'object'
 
 ['$defs'.workflowOptions.properties]
+['$defs'.workflowOptions.properties.dsn]
+description = 'Postgres connection string; empty selects sqlite (dev/test).'
+type = 'string'
+
 ['$defs'.workflowOptions.properties.host_port]
 type = 'string'
 
 ['$defs'.workflowOptions.properties.namespace]
+type = 'string'
+
+['$defs'.workflowOptions.properties.table]
+description = 'Workflow-runs table name; empty selects the adapter default.'
 type = 'string'
 
 ['$defs'.zredisConnectOptions]
@@ -1489,7 +1501,7 @@ type = 'object'
 
 [properties.secrets.properties]
 [properties.secrets.properties.adapter]
-enum = ['env']
+enum = ['env', 'vault']
 
 [properties.secrets.properties.options]
 '$ref' = '#/$defs/secretsOptions'
@@ -1544,7 +1556,7 @@ type = 'object'
 
 [properties.webhook.properties]
 [properties.webhook.properties.adapter]
-enum = ['http', 'queue', 'sqlite']
+enum = ['http', 'queue']
 
 [properties.webhook.properties.options]
 '$ref' = '#/$defs/webhookOptions'
@@ -1555,7 +1567,7 @@ type = 'object'
 
 [properties.workflow.properties]
 [properties.workflow.properties.adapter]
-enum = ['memory']
+enum = ['memory', 'postgres']
 
 [properties.workflow.properties.options]
 '$ref' = '#/$defs/workflowOptions'

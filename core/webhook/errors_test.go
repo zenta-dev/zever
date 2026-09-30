@@ -62,7 +62,7 @@ func TestErrors_carried_fields(t *testing.T) {
 	if de := (DuplicateAdapterError{Adapter: AdapterQueue}); de.Adapter != AdapterQueue {
 		t.Errorf("DuplicateAdapterError adapter = %v", de.Adapter)
 	}
-	if ue := (UnknownAdapterError{Adapter: AdapterSQLite}); ue.Adapter != AdapterSQLite {
+	if ue := (UnknownAdapterError{Adapter: AdapterQueue}); ue.Adapter != AdapterQueue {
 		t.Errorf("UnknownAdapterError adapter = %v", ue.Adapter)
 	}
 	if iae := (InvalidAdapterError{Adapter: "bogus"}); iae.Adapter != "bogus" {
