@@ -14,6 +14,7 @@ import (
 	"github.com/zenta-dev/zever/core/log"
 	"github.com/zenta-dev/zever/core/queue"
 	"github.com/zenta-dev/zever/shared/retry"
+	"github.com/zenta-dev/zever/shared/traceprop"
 )
 
 // DeadLetterFunc handles jobs that exhaust retries or are unregistered.
@@ -209,7 +210,7 @@ func (w *Worker) launchHandler(ctx context.Context, msg queue.Message, topic str
 			inflight.Done()
 		}()
 
-		detached := context.WithoutCancel(ctx)
+		detached := traceprop.Extract(context.WithoutCancel(ctx), msg.Headers)
 
 		handlerCtx, cancel := context.WithTimeout(detached, w.drainTimeout())
 		defer cancel()

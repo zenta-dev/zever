@@ -20,6 +20,7 @@ import (
 	"github.com/zenta-dev/zever/core/queue"
 	"github.com/zenta-dev/zever/core/webhook"
 	"github.com/zenta-dev/zever/shared/retry"
+	"github.com/zenta-dev/zever/shared/traceprop"
 )
 
 const (
@@ -310,7 +311,7 @@ func (a *adapter) safeProcess(event string, msg queue.Message) {
 }
 
 func (a *adapter) processMessage(event string, msg queue.Message) {
-	ctx, cancel := context.WithTimeout(context.Background(), a.timeout)
+	ctx, cancel := context.WithTimeout(traceprop.ExtractOrBackground(msg.Headers), a.timeout)
 	defer cancel()
 
 	if a.isDLQRetry(msg) {
@@ -498,7 +499,7 @@ func (a *adapter) attemptFromHeader(msg queue.Message) int {
 func (a *adapter) requeue(event string, msg queue.Message, attempt int) {
 	attempt++
 
-	ctx, cancel := context.WithTimeout(context.Background(), a.timeout)
+	ctx, cancel := context.WithTimeout(traceprop.ExtractOrBackground(msg.Headers), a.timeout)
 	defer cancel()
 
 	headers := a.cloneHeaders(msg.Headers)
@@ -521,7 +522,7 @@ func (a *adapter) delayedRequeue(event string, msg queue.Message, headers map[st
 
 	attempt := a.attemptFromHeader(msg)
 	if attempt > a.maxRetries {
-		ctx, cancel := context.WithTimeout(context.Background(), a.timeout)
+		ctx, cancel := context.WithTimeout(traceprop.ExtractOrBackground(headers), a.timeout)
 		defer cancel()
 
 		_ = a.queue.Nack(ctx, msg, false)
@@ -533,7 +534,7 @@ func (a *adapter) delayedRequeue(event string, msg queue.Message, headers map[st
 	attempt = min(attempt+1, a.maxRetries)
 	headers["X-Webhook-Attempt"] = strconv.Itoa(attempt)
 
-	ctx, cancel := context.WithTimeout(context.Background(), a.timeout)
+	ctx, cancel := context.WithTimeout(traceprop.ExtractOrBackground(headers), a.timeout)
 	defer cancel()
 
 	if err := a.queue.PushDelayed(ctx, msg.Topic, msg.Payload, headers, a.dlqRetryDelay()); err != nil {
@@ -549,7 +550,7 @@ func (a *adapter) deadLetter(event string, msg queue.Message, reason string) {
 	headers := a.cloneHeaders(msg.Headers)
 	headers["X-Webhook-Error"] = reason
 
-	ctx, cancel := context.WithTimeout(context.Background(), a.timeout)
+	ctx, cancel := context.WithTimeout(traceprop.ExtractOrBackground(headers), a.timeout)
 	defer cancel()
 
 	if err := a.queue.Push(ctx, a.dlqTopic, msg.Payload, headers); err != nil {
@@ -571,7 +572,7 @@ func (a *adapter) retryDeadLetter(event string, msg queue.Message, headers map[s
 	headers["X-Webhook-DLQ-Failures"] = strconv.Itoa(failures)
 
 	if failures >= maxDLQFailures {
-		ctx, cancel := context.WithTimeout(context.Background(), a.timeout)
+		ctx, cancel := context.WithTimeout(traceprop.ExtractOrBackground(headers), a.timeout)
 		defer cancel()
 
 		_ = a.queue.Nack(ctx, msg, false)
@@ -581,7 +582,7 @@ func (a *adapter) retryDeadLetter(event string, msg queue.Message, headers map[s
 		return
 	}
 
-	ctx, cancel := context.WithTimeout(context.Background(), a.timeout)
+	ctx, cancel := context.WithTimeout(traceprop.ExtractOrBackground(headers), a.timeout)
 	defer cancel()
 
 	if err := a.queue.PushDelayed(ctx, msg.Topic, msg.Payload, headers, a.dlqRetryDelay()); err != nil {

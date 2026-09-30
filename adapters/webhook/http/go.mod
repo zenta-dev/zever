@@ -7,15 +7,6 @@ require (
 	github.com/zenta-dev/zever/shared/retry v0.5.3
 )
 
-require (
-	github.com/zenta-dev/zever/core/log v0.5.3 // indirect
-	github.com/zenta-dev/zever/core/queue v0.5.3 // indirect
-	github.com/zenta-dev/zever/shared/endpoint v0.5.3 // indirect
-	github.com/zenta-dev/zever/shared/httpclient v0.5.3 // indirect
-	github.com/zenta-dev/zever/shared/redisopt v0.5.3 // indirect
-	github.com/zenta-dev/zever/shared/registry v0.5.3 // indirect
-)
-
 replace (
 	github.com/zenta-dev/zever/core/webhook => ../../../core/webhook
 	github.com/zenta-dev/zever/shared/retry => ../../../shared/retry
@@ -36,3 +27,14 @@ replace github.com/zenta-dev/zever/shared/httpclient => ../../../shared/httpclie
 replace github.com/zenta-dev/zever/shared/redisopt => ../../../shared/redisopt
 
 replace github.com/zenta-dev/zever/shared/registry => ../../../shared/registry
+
+replace github.com/zenta-dev/zever/shared/traceprop => ../../../shared/traceprop
+
+require (
+	github.com/zenta-dev/zever/core/log v0.5.3 // indirect
+	github.com/zenta-dev/zever/core/queue v0.5.3 // indirect
+	github.com/zenta-dev/zever/shared/endpoint v0.5.3 // indirect
+	github.com/zenta-dev/zever/shared/httpclient v0.5.3 // indirect
+	github.com/zenta-dev/zever/shared/redisopt v0.5.3 // indirect
+	github.com/zenta-dev/zever/shared/registry v0.5.3 // indirect
+)
