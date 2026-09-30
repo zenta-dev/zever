@@ -57,6 +57,27 @@ Inspection / Runtime / Database).
 - `zever new --force`: scaffold into a non-empty directory anyway.
 - For the full command list, see `zever --help`.
 
+## `zever new` Docker scaffold
+
+Every `zever new` project ships a reference `Dockerfile` + `.dockerignore`:
+
+- Multi-stage build: `golang:<ver>-bookworm` builder compiles
+  `./cmd/server`, then `gcr.io/distroless/static-debian12:nonroot`
+  runs it (a `busybox` stage supplies `/usr/bin/wget` for the
+  healthcheck only).
+- Runs as non-root (`USER nonroot:nonroot`), exposes `8080` (HTTP)
+  + `9090` (gRPC), `ENTRYPOINT ["/app/server"]`, and healthchecks
+  `GET /healthz` (the same endpoint the generated server template
+  serves; `/readyz` gates on DB readiness).
+- Copies the binary + `zever.yaml` only. Secrets are never baked
+  into the image — pass config at runtime via environment, e.g.
+  `docker run -e DB_DSN=... app`.
+
+```sh
+docker build -t app .
+docker run --rm -p 8080:8080 -p 9090:9090 app
+```
+
 ## Non-TTY contract
 
 `run()` with no subcommand prints usage to stderr + `errMissingSubcommand`,

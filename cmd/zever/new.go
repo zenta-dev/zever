@@ -1138,6 +1138,14 @@ func writeNewProject(tag string, cfg NewConfig) ([]string, error) {
 		return nil, writeErr
 	}
 
+	if writeErr := write("Dockerfile", []byte(renderNewDockerfile(cfg.GoVersion))); writeErr != nil {
+		return nil, writeErr
+	}
+
+	if writeErr := write(".dockerignore", []byte(newDockerignore)); writeErr != nil {
+		return nil, writeErr
+	}
+
 	if writeErr := write("README.md", []byte(renderNewReadme(cfg.Name, quickstartBackends(cfg)))); writeErr != nil {
 		return nil, writeErr
 	}
@@ -1397,6 +1405,59 @@ const newGitignore = `# The local sqlite database is created by ` + "`zever db m
 /generated/
 `
 
+// newDockerignore keeps build context small and secrets out of the image:
+// local sqlite files, build output, VCS metadata and JS deps never ship.
+const newDockerignore = `# Local sqlite databases created by ` + "`zever db migrate`" + `.
+*.db
+
+# Build output.
+dist/
+
+# VCS metadata.
+.git/
+
+# JS deps (docs tooling only, never part of the Go image).
+node_modules/
+`
+
+// renderNewDockerfile returns the reference Dockerfile for a scaffolded
+// project: multi-stage golang builder -> distroless nonroot runtime,
+// HEALTHCHECK against the scaffolded /healthz endpoint, zever.yaml copied
+// alongside the binary. goVersion selects the builder tag
+// (golang:<ver>-bookworm); empty falls back to defaultGoVersion. The output
+// carries no secrets and no absolute local paths.
+func renderNewDockerfile(goVersion string) string {
+	if goVersion == "" {
+		goVersion = defaultGoVersion
+	}
+
+	return fmt.Sprintf(`# Scaffolded by `+"`zever new`"+`. Reference production image.
+#
+# Build with: docker build -t app .
+# Run with: docker run --rm -p 8080:8080 -p 9090:9090 app
+# Config via environment (never baked in): docker run -e DB_DSN=... app
+
+FROM golang:%s-bookworm AS builder
+WORKDIR /src
+COPY go.mod go.sum ./
+RUN go mod download
+COPY . .
+RUN CGO_ENABLED=0 GOOS=linux go build -trimpath -ldflags="-s -w" -o /out/server ./cmd/server
+
+FROM busybox:1.36.1-musl AS busybox
+
+FROM gcr.io/distroless/static-debian12:nonroot
+WORKDIR /app
+COPY --from=busybox /bin/wget /usr/bin/wget
+COPY --from=builder /out/server /app/server
+COPY zever.yaml ./zever.yaml
+EXPOSE 8080 9090
+USER nonroot:nonroot
+ENTRYPOINT ["/app/server"]
+HEALTHCHECK --interval=30s --timeout=3s --start-period=5s --retries=3 CMD ["/usr/bin/wget", "--no-verbose", "--tries=1", "--spider", "http://127.0.0.1:8080/healthz"]
+`, goVersion)
+}
+
 // renderNewReadme is a genuine quickstart, not filler: every command in it
 // is one a freshly scaffolded project can actually run, in order.
 func renderNewReadme(name, backends string) string {
@@ -1431,6 +1492,17 @@ zever queue:work
 # watch schema and server source; recompile and restart on change
 zever dev
 ` + "```" + `
+
+## Docker
+
+` + "```bash" + `
+docker build -t %[1]s .
+docker run --rm -p 8080:8080 -p 9090:9090 %[1]s
+` + "```" + `
+
+Pass config at runtime via environment (never baked into the image),
+e.g. ` + backtick + `docker run -e DB_DSN=... %[1]s` + backtick + `. The image
+healthchecks ` + backtick + `GET /healthz` + backtick + `.
 
 ## What's here, and what's not
 
