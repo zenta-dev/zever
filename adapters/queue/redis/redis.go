@@ -16,6 +16,7 @@ import (
 	redisclient "github.com/zenta-dev/zever/shared/redisclient"
 	redisopt "github.com/zenta-dev/zever/shared/redisopt"
 	"github.com/zenta-dev/zever/shared/retry"
+	"github.com/zenta-dev/zever/shared/traceprop"
 )
 
 var (
@@ -171,7 +172,7 @@ func (a *redisAdapter) Push(ctx context.Context, topic string, payload queue.Pay
 		}
 	}
 
-	msg := toWireMessage(queue.NewMessage(topic, payload, headers))
+	msg := toWireMessage(queue.NewMessage(topic, payload, traceprop.Inject(ctx, headers)))
 
 	b, err := jsonMarshal(msg)
 	if err != nil {
@@ -200,7 +201,7 @@ func (a *redisAdapter) PushDelayed(ctx context.Context, topic string, payload qu
 		}
 	}
 
-	msg := toWireMessage(queue.NewMessage(topic, payload, headers))
+	msg := toWireMessage(queue.NewMessage(topic, payload, traceprop.Inject(ctx, headers)))
 
 	b, err := jsonMarshal(msg)
 	if err != nil {
