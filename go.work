@@ -16,6 +16,7 @@ use (
 	./adapters/cache/memory
 	./adapters/cache/redis
 	./adapters/crypto/local
+	./adapters/crypto/kms
 	./adapters/db/postgres
 	./adapters/db/sqlite
 	./adapters/document/latex
@@ -67,6 +68,7 @@ use (
 	./adapters/search/postgres
 	./adapters/search/sqlite
 	./adapters/secrets/env
+	./adapters/secrets/vault
 	./adapters/session/cookie
 	./adapters/session/memory
 	./adapters/session/redis
