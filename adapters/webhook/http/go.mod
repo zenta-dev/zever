@@ -37,5 +37,4 @@ require (
 	github.com/zenta-dev/zever/shared/httpclient v0.5.3 // indirect
 	github.com/zenta-dev/zever/shared/redisopt v0.5.3 // indirect
 	github.com/zenta-dev/zever/shared/registry v0.5.3 // indirect
-	github.com/zenta-dev/zever/shared/traceprop v0.5.3 // indirect
 )
