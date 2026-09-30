@@ -13,6 +13,7 @@ import (
 	"encoding/binary"
 	"errors"
 	"fmt"
+	"math"
 	"strings"
 
 	"github.com/zenta-dev/zever/core/crypto"
@@ -165,11 +166,17 @@ func (d *driver) Encrypt(ctx context.Context, plaintext []byte) ([]byte, error) 
 	out = append(out, envelopeVersion)
 
 	var lb [2]byte
-	binary.BigEndian.PutUint16(lb[:], uint16(len(d.keyID)))
+	if len(d.keyID) > math.MaxUint16 {
+		return nil, fmt.Errorf("kms: %w: key id too long", crypto.ErrInvalidKey)
+	}
+	binary.BigEndian.PutUint16(lb[:], uint16(len(d.keyID))) //nolint:gosec // length bounded above
 	out = append(out, lb[:]...)
 	out = append(out, d.keyID...)
 
-	binary.BigEndian.PutUint16(lb[:], uint16(len(encDEK)))
+	if len(encDEK) > math.MaxUint16 {
+		return nil, fmt.Errorf("kms: %w: encrypted data key too long", crypto.ErrInvalidKey)
+	}
+	binary.BigEndian.PutUint16(lb[:], uint16(len(encDEK))) //nolint:gosec // length bounded above
 	out = append(out, lb[:]...)
 	out = append(out, encDEK...)
 	out = append(out, nonce...)
@@ -197,7 +204,9 @@ func (d *driver) Decrypt(ctx context.Context, ciphertext []byte) ([]byte, error)
 		return nil, crypto.ErrIntegrity
 	}
 
-	keyID := string(rest[:keyLen])
+	if _, ok := d.allowed[string(rest[:keyLen])]; !ok {
+		return nil, crypto.ErrIntegrity
+	}
 	rest = rest[keyLen:]
 	encLen := int(binary.BigEndian.Uint16(rest[:2]))
 	rest = rest[2:]
@@ -209,10 +218,6 @@ func (d *driver) Decrypt(ctx context.Context, ciphertext []byte) ([]byte, error)
 	rest = rest[encLen:]
 	nonce := rest[:nonceSize]
 	sealed := rest[nonceSize:]
-
-	if _, ok := d.allowed[keyID]; !ok {
-		return nil, crypto.ErrIntegrity
-	}
 
 	plainDEK, err := d.client.Decrypt(ctx, encDEK)
 	if err != nil {
