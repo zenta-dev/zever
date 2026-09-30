@@ -49,6 +49,28 @@ func Extract(ctx context.Context, headers map[string]string) context.Context {
 	return propagator().Extract(ctx, propagation.MapCarrier(headers))
 }
 
+// ExtractOrBackground returns the remote span context found in headers over
+// a fresh background context. Missing or invalid headers yield a background
+// context with no valid span. Incoming propagation is untrusted: the OTel
+// propagator validates traceparent/tracestate and invalid values are a no-op.
+func ExtractOrBackground(headers map[string]string) context.Context {
+	return Extract(context.Background(), headers)
+}
+
+// ContinueSpan extracts the remote span context from headers into ctx and
+// starts a consumer child span named spanName over the result. It is
+// StartConsumeSpan in one call for consume paths that already hold a
+// caller context. Callers must end the returned span (defer span.End()).
+// Extra opts append after the default SpanKindConsumer.
+func ContinueSpan(
+	ctx context.Context,
+	headers map[string]string,
+	spanName string,
+	opts ...trace.SpanStartOption,
+) (context.Context, trace.Span) {
+	return StartConsumeSpan(ctx, headers, spanName, opts...)
+}
+
 // StartConsumeSpan extracts the remote span context from headers into ctx
 // and starts a consumer child span named spanName over the result.
 // Callers must end the returned span (defer span.End()). Extra opts append
