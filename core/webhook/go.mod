@@ -11,11 +11,6 @@ require (
 	github.com/zenta-dev/zever/shared/registry v0.5.3
 )
 
-require (
-	github.com/zenta-dev/zever/shared/redisopt v0.5.3 // indirect
-	github.com/zenta-dev/zever/shared/retry v0.5.3 // indirect
-)
-
 replace (
 	github.com/zenta-dev/zever/core/log => ../log
 	github.com/zenta-dev/zever/core/queue => ../queue
@@ -33,3 +28,10 @@ replace github.com/zenta-dev/zever/adapters/queue/memory => ../../adapters/queue
 replace github.com/zenta-dev/zever/shared/redisopt => ../../shared/redisopt
 
 replace github.com/zenta-dev/zever/shared/retry => ../../shared/retry
+
+replace github.com/zenta-dev/zever/shared/traceprop => ../../shared/traceprop
+
+require (
+	github.com/zenta-dev/zever/shared/redisopt v0.5.3 // indirect
+	github.com/zenta-dev/zever/shared/retry v0.5.3 // indirect
+)
