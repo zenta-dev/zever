@@ -1,7 +1,8 @@
 // Package middleware provides HTTP handling with swappable resolved backends.
 //
-// It ships recovery, structured access logging, rate limiting, timeouts, and
-// tracing as HTTP plus unary-gRPC pairs with matching semantics. It does not
+// It ships recovery, structured access logging, rate limiting, timeouts,
+// CORS, and tracing as HTTP plus unary-gRPC pairs with matching semantics
+// (CORS is HTTP-only: gRPC has no preflight concept). It does not
 // own an adapter registry or config section, it wraps already-resolved
 // instances.
 //
@@ -11,12 +12,14 @@
 // closed with fixed error envelopes.
 //
 // DX: plain constructors over resolved instances instead of a registry:
-// RequestLogger, Recover, RateLimit, Timeout, and Tracing plus their
-// UnaryServerInterceptor counterparts, with RemoteAddrKey and PeerAddrKey for
-// keying. No adapter name to parse and no middleware section in config files.
+// RequestLogger, Recover, RateLimit, Timeout, Tracing, and CORS plus their
+// UnaryServerInterceptor counterparts (except CORS, which is HTTP-only),
+// with RemoteAddrKey and PeerAddrKey for keying. No adapter name to parse
+// and no middleware section in config files.
 // See config/README.md.
 //
-// Chain order: Recover outermost, so it catches panics from every other
+// Chain order: CORS outermost, so preflights short-circuit before logging
+// or rate limiting; Recover next, so it catches panics from every other
 // middleware and from a Timeout-abandoned handler still running in the
 // background; Timeout next, so it bounds everything inside it (including
 // RateLimit's own limiter call); RateLimit inside that, so a denied request
