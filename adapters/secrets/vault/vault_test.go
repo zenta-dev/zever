@@ -112,12 +112,12 @@ func (s *stubVault) handleMetadata(w http.ResponseWriter, r *http.Request) {
 	http.Error(w, "method not allowed", http.StatusMethodNotAllowed)
 }
 
-func mustStubServer(t *testing.T, token, mount string) (*stubVault, *httptest.Server) {
+func mustStubServer(t *testing.T, token, mount string) *httptest.Server {
 	t.Helper()
 	stub := &stubVault{t: t, store: map[string]string{}, token: token, mount: mount}
 	srv := httptest.NewServer(stub.handler())
 	t.Cleanup(srv.Close)
-	return stub, srv
+	return srv
 }
 
 func mustNew(t *testing.T, opts Options) secrets.Secrets {
@@ -130,7 +130,7 @@ func mustNew(t *testing.T, opts Options) secrets.Secrets {
 }
 
 func TestRoundTrip_GetSetDeleteList(t *testing.T) {
-	_, srv := mustStubServer(t, "test-token", "secret")
+	srv := mustStubServer(t, "test-token", "secret")
 	s := mustNew(t, Options{Addr: srv.URL, Token: "test-token", Mount: "secret"})
 	ctx := t.Context()
 
@@ -144,7 +144,7 @@ func TestRoundTrip_GetSetDeleteList(t *testing.T) {
 	if string(val) != "hello" {
 		t.Fatalf("got %q, want %q", val, "hello")
 	}
-	if err := s.Set(ctx, "beta", []byte("world")); err != nil {
+	if err = s.Set(ctx, "beta", []byte("world")); err != nil {
 		t.Fatalf("Set beta: %v", err)
 	}
 	keys, err := s.List(ctx)
@@ -167,7 +167,7 @@ func TestRoundTrip_GetSetDeleteList(t *testing.T) {
 }
 
 func TestGet_Missing_ErrNotFound(t *testing.T) {
-	_, srv := mustStubServer(t, "test-token", "secret")
+	srv := mustStubServer(t, "test-token", "secret")
 	s := mustNew(t, Options{Addr: srv.URL, Token: "test-token", Mount: "secret"})
 	if _, err := s.Get(t.Context(), "does-not-exist"); !errors.Is(err, secrets.ErrNotFound) {
 		t.Fatalf("err = %v, want ErrNotFound", err)
@@ -175,7 +175,7 @@ func TestGet_Missing_ErrNotFound(t *testing.T) {
 }
 
 func TestTokenFile_Read(t *testing.T) {
-	_, srv := mustStubServer(t, "file-token", "secret")
+	srv := mustStubServer(t, "file-token", "secret")
 	dir := t.TempDir()
 	path := filepath.Join(dir, "token")
 	if err := os.WriteFile(path, []byte("file-token\n"), 0o600); err != nil {
