@@ -147,15 +147,19 @@ clean: ## Remove coverage output and build artifacts
 check: require-tools download fmt check-all lint-all vulncheck-all ## Run all local CI checks (run 'make setup' first)
 
 # Multi-module targets: per-module loops over the committed go.work workspace.
+.PHONY: download-all
+download-all: ## Download dependencies of every module (override list via MODULES)
+	set -e; for d in $(if $(MODULES),$(MODULES),$(SHARD_MODULES)); do (cd $$d && $(GO) mod download); done
+
 .PHONY: check-all build-all test-all test-race-all test-race-fast vet-all tidy-all tidy-check-all lint-all vulncheck-all
 check-all: ## Run vet + tidy-check + test (-vet=off, cached) + build across all modules (shard via SHARD_TOTAL/SHARD_INDEX, override list via MODULES)
-	set -e; for d in $(if $(MODULES),$(MODULES),$(SHARD_MODULES)); do echo "== $$d =="; (cd $$d && $(GO) vet ./... && $(GO) mod tidy -diff && $(GO) test -vet=off ./... && $(GO) build ./...); done
+	failed=""; for d in $(if $(MODULES),$(MODULES),$(SHARD_MODULES)); do echo "== $$d =="; if ! (cd $$d && $(GO) vet ./... && $(GO) mod tidy -diff && $(GO) test -vet=off ./... && $(GO) build ./...); then failed="$$failed $$d"; echo "::error::module failed: $$d"; fi; done; [ -z "$$failed" ] || { echo "FAILED modules:$$failed"; exit 1; }
 
 test-race-all: ## Run tests with the race detector across all modules (per-module coverage under .coverage/, shard via SHARD_TOTAL/SHARD_INDEX, override list via MODULES)
-	set -e; mkdir -p .coverage; root="$$PWD"; for d in $(if $(MODULES),$(MODULES),$(SHARD_MODULES)); do echo "== $$d =="; slug=$$(echo "$$d" | sed 's|^\./||; s|/|_|g'); (cd $$d && $(GO) test -race -count=1 -covermode=atomic -coverprofile="$$root/.coverage/$$slug.out" ./...); done
+	mkdir -p .coverage; root="$$PWD"; failed=""; for d in $(if $(MODULES),$(MODULES),$(SHARD_MODULES)); do echo "== $$d =="; slug=$$(echo "$$d" | sed 's|^\./||; s|/|_|g'); if ! (cd $$d && $(GO) test -race -count=1 -covermode=atomic -coverprofile="$$root/.coverage/$$slug.out" ./...); then failed="$$failed $$d"; echo "::error::module failed: $$d"; fi; done; [ -z "$$failed" ] || { echo "FAILED modules:$$failed"; exit 1; }
 
 test-race-fast: ## Run tests with the race detector, no coverage (PR gate; cached, override list via MODULES)
-	set -e; for d in $(if $(MODULES),$(MODULES),$(SHARD_MODULES)); do echo "== $$d =="; (cd $$d && $(GO) test -race -vet=off ./...); done
+	failed=""; for d in $(if $(MODULES),$(MODULES),$(SHARD_MODULES)); do echo "== $$d =="; if ! (cd $$d && $(GO) test -race -vet=off ./...); then failed="$$failed $$d"; echo "::error::module failed: $$d"; fi; done; [ -z "$$failed" ] || { echo "FAILED modules:$$failed"; exit 1; }
 
 build-all: ## Build all packages in every module (override list via MODULES)
 	set -e; for d in $(if $(MODULES),$(MODULES),$(SHARD_MODULES)); do echo "== $$d =="; (cd $$d && $(GO) build ./...); done
@@ -174,11 +178,11 @@ tidy-check-all: ## Verify go.mod/go.sum are tidy in every module (override list 
 
 lint-all: ## Run golangci-lint in every module (shard via SHARD_TOTAL/SHARD_INDEX, override list via MODULES)
 	@command -v $(GOLANGCI_LINT) >/dev/null 2>&1 || { printf '%s\n' "golangci-lint not found: run 'make setup'"; exit 1; }
-	set -e; for d in $(if $(MODULES),$(MODULES),$(SHARD_MODULES)); do echo "== $$d =="; (cd $$d && $(GOLANGCI_LINT) run ./...); done
+	failed=""; for d in $(if $(MODULES),$(MODULES),$(SHARD_MODULES)); do echo "== $$d =="; if ! (cd $$d && $(GOLANGCI_LINT) run ./...); then failed="$$failed $$d"; echo "::error::module failed: $$d"; fi; done; [ -z "$$failed" ] || { echo "FAILED modules:$$failed"; exit 1; }
 
 vulncheck-all: ## Scan every module for known vulnerabilities (override list via MODULES)
 	@command -v $(GOVULNCHECK) >/dev/null 2>&1 || { printf '%s\n' "govulncheck not found: run 'make setup'"; exit 1; }
-	set -e; for d in $(if $(MODULES),$(MODULES),$(SHARD_MODULES)); do echo "== $$d =="; (cd $$d && $(GOVULNCHECK) ./...); done
+	failed=""; for d in $(if $(MODULES),$(MODULES),$(SHARD_MODULES)); do echo "== $$d =="; if ! (cd $$d && $(GOVULNCHECK) ./...); then failed="$$failed $$d"; echo "::error::module failed: $$d"; fi; done; [ -z "$$failed" ] || { echo "FAILED modules:$$failed"; exit 1; }
 
 .PHONY: docs-dev docs-build docs-preview
 docs-dev: ## Run docs dev server
