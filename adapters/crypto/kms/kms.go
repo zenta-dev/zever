@@ -136,8 +136,14 @@ func NewWithClient(opts Options, client Client) (crypto.Crypto, error) {
 // version||keyID||encryptedDEK||nonce||ciphertext. Rotating KeyID/KeyIDs
 // keeps old envelopes decryptable: Decrypt accepts any allowed key ID.
 func (d *driver) Encrypt(ctx context.Context, plaintext []byte) ([]byte, error) {
+	if len(d.keyID) > math.MaxUint16 {
+		return nil, fmt.Errorf("kms: %w: key id too long", crypto.ErrInvalidKey)
+	}
 	plainDEK, encDEK, err := d.client.GenerateDataKey(ctx, d.keyID)
 	if err != nil {
+		if ctxErr := ctx.Err(); ctxErr != nil {
+			return nil, fmt.Errorf("kms: generate data key: %w", errors.Join(err, ctxErr))
+		}
 		return nil, fmt.Errorf("kms: generate data key: %w", err)
 	}
 
@@ -166,9 +172,6 @@ func (d *driver) Encrypt(ctx context.Context, plaintext []byte) ([]byte, error) 
 	out = append(out, envelopeVersion)
 
 	var lb [2]byte
-	if len(d.keyID) > math.MaxUint16 {
-		return nil, fmt.Errorf("kms: %w: key id too long", crypto.ErrInvalidKey)
-	}
 	binary.BigEndian.PutUint16(lb[:], uint16(len(d.keyID))) //nolint:gosec // length bounded above
 	out = append(out, lb[:]...)
 	out = append(out, d.keyID...)
@@ -221,6 +224,9 @@ func (d *driver) Decrypt(ctx context.Context, ciphertext []byte) ([]byte, error)
 
 	plainDEK, err := d.client.Decrypt(ctx, encDEK)
 	if err != nil {
+		if ctxErr := ctx.Err(); ctxErr != nil {
+			return nil, errors.Join(ctxErr, crypto.ErrIntegrity)
+		}
 		return nil, crypto.ErrIntegrity
 	}
 

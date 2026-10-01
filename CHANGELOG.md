@@ -37,6 +37,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   options fail closed with 500). Ships `Options.Validate` and
   `DefaultCORSMaxAge`, wired outermost in the `bookings`, `showcase`, and
   `todo` example servers. See `basics/cors`.
+- `core/secrets/secretstest`: new conformance kit mirroring
+  `core/cache/cachetest` (missing-key, round-trip, list, delete, name
+  validation, close), run against `env` and `vault` adapters.
+
 
 ### Fixed
 
@@ -45,6 +49,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   returns `RunCompletedError`/`ErrUnknownRun` instead of silent success.
 - `core/job`: worker consume path uses `traceprop.StartConsumeSpan`
   (`queue.consume`) instead of bare `Extract`, restoring trace continuity.
+- `adapters/crypto/kms`: reject overlong `KeyID`/`KeyIDs` in
+  `Options.Validate` and before the KMS call (no wasted `GenerateDataKey`);
+  `Decrypt`/`Encrypt` now preserve `context.Canceled`/`DeadlineExceeded`
+  via `errors.Join` so callers can `errors.Is` cancellation.
 
 
 ## [v0.5.3] - 2026-09-29
