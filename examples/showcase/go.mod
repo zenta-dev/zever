@@ -58,7 +58,7 @@ require (
 	github.com/zenta-dev/zever/orm v0.5.3
 	github.com/zenta-dev/zever/shared/apperror v0.5.3
 	google.golang.org/genproto/googleapis/api v0.0.0-20260819154853-08b0e4226688
-	google.golang.org/grpc v1.83.2
+	google.golang.org/grpc v1.84.0
 	google.golang.org/protobuf v1.36.12
 )
 
