@@ -156,6 +156,7 @@ The process starts, resolves postgres (not sqlite), serves on `:8080`, and on `S
 | Cross-compile | `GOOS=linux GOARCH=amd64 go build -o myapp ./cmd/myapp` | Build on macOS, run on Linux |
 | Systemd unit | `ExecStart=/usr/local/bin/myapp` with `EnvironmentFile` | VM and bare-metal hosts |
 | Kubernetes | image plus `env:` secrets and mounted `zever.yaml` | Orchestrated rollouts |
+| Compose (external services) | `DB_PASSWORD=... docker compose up --build` (scaffolded `compose.yaml`) | `zever new` with `db=postgres` or `*=redis`: app + postgres/redis, health-gated startup |
 | Container runtime | image with `ENTRYPOINT ["./myapp"]` | Docker and Podman fleets |
 
 `zever dev` is local watch-mode only in every row: it prints `zever dev: watching <schemaDir> and <serverEntry> ... (Ctrl-C to stop)` and restarts on change. Production runs the compiled binary behind the supervisor, never the watcher.
