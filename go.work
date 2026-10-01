@@ -33,6 +33,7 @@ use (
 	./adapters/i18n/remote
 	./adapters/idempotency/memory
 	./adapters/idempotency/redis
+	./adapters/idempotency/db
 	./adapters/lock/memory
 	./adapters/lock/redis
 	./adapters/log/noop
@@ -72,6 +73,7 @@ use (
 	./adapters/session/cookie
 	./adapters/session/memory
 	./adapters/session/redis
+	./adapters/session/db
 	./adapters/storage/local
 	./adapters/storage/r2
 	./adapters/storage/s3
@@ -144,6 +146,7 @@ use (
 	./shared/redisopt
 	./shared/registry
 	./shared/retry
+	./shared/kvstore
 	./shared/s3opts
 	./shared/traceprop
 	./tools/affected
