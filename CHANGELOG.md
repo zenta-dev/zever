@@ -37,6 +37,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   options fail closed with 500). Ships `Options.Validate` and
   `DefaultCORSMaxAge`, wired outermost in the `bookings`, `showcase`, and
   `todo` example servers. See `basics/cors`.
+- `core/secrets/secretstest`: new conformance kit mirroring
+  `core/cache/cachetest` (missing-key, round-trip, list, delete, name
+  validation, close), run against `env` and `vault` adapters.
+
 
 ### Fixed
 
