@@ -119,8 +119,8 @@ func TestDecrypt_ContextCancel_Preserved(t *testing.T) {
 	}
 	ctx, cancel := context.WithCancel(t.Context())
 	cancel()
-	if _, err := c.Encrypt(ctx, []byte("x")); !errors.Is(err, context.Canceled) {
-		t.Fatalf("Encrypt canceled ctx err = %v, want context.Canceled", err)
+	if _, encErr := c.Encrypt(ctx, []byte("x")); !errors.Is(encErr, context.Canceled) {
+		t.Fatalf("Encrypt canceled ctx err = %v, want context.Canceled", encErr)
 	}
 	// Decrypt path joins ctx err with integrity so both match.
 	stub, _ := New(Options{KeyID: "key-a"})
