@@ -47,6 +47,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - `adapters/workflow/postgres`: `Signal`/`Cancel` are state-guarded
   (`state=running` predicate + row-count check) so a race with completion
   returns `RunCompletedError`/`ErrUnknownRun` instead of silent success.
+- `adapters/crypto/kms`: reject overlong `KeyID`/`KeyIDs` in
+  `Options.Validate` and before the KMS call (no wasted `GenerateDataKey`);
+  `Decrypt`/`Encrypt` now preserve `context.Canceled`/`DeadlineExceeded`
+  via `errors.Join` so callers can `errors.Is` cancellation.
 
 
 ## [v0.5.3] - 2026-09-29
