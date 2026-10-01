@@ -21,7 +21,7 @@ type consumeStubTracer struct {
 	names []string
 }
 
-func (t *consumeStubTracer) Start(ctx context.Context, name string, opts ...trace.SpanStartOption) (context.Context, trace.Span) {
+func (t *consumeStubTracer) Start(ctx context.Context, name string, _ ...trace.SpanStartOption) (context.Context, trace.Span) {
 	t.mu.Lock()
 	t.names = append(t.names, name)
 	t.mu.Unlock()
