@@ -1360,6 +1360,65 @@ func TestRunNewWritesDockerScaffold(t *testing.T) {
 	}
 }
 
+// TestRenderNewComposePostgresRedis pins the compose contract: app + db +
+// redis services, health-gated depends_on, env-carried secrets, no baked
+// credentials.
+func TestRenderNewComposePostgresRedis(t *testing.T) {
+	t.Parallel()
+	got := renderNewCompose([]batterySelection{{Battery: "db", Adapter: "postgres"}, {Battery: "cache", Adapter: "redis"}})
+	for _, fragment := range []string{
+		"services:", "image: postgres:", "image: redis:", "depends_on:",
+		"DB_DSN", "CACHE_URL: redis://redis:6379", "service_healthy", "pgdata:", "redisdata:",
+		"docker compose up --build",
+	} {
+		if !strings.Contains(got, fragment) {
+			t.Errorf("compose lacks %q:\n%s", fragment, got)
+		}
+	}
+	for _, banned := range []string{"API_KEY", "TOKEN=", "ENV DB_", "COPY /home/"} {
+		if strings.Contains(got, banned) {
+			t.Errorf("compose must not contain %q:\n%s", banned, got)
+		}
+	}
+	if strings.Contains(got, "devsecret123") || strings.Contains(got, "password123") {
+		t.Errorf("compose must not bake literal credentials:\n%s", got)
+	}
+}
+
+// TestRenderNewComposeEmptyWhenLocal proves all-local picks emit no file.
+func TestRenderNewComposeEmptyWhenLocal(t *testing.T) {
+	t.Parallel()
+	if got := renderNewCompose([]batterySelection{{Battery: "db", Adapter: "sqlite"}, {Battery: "cache", Adapter: "memory"}}); got != "" {
+		t.Fatalf("expected empty compose, got:\n%s", got)
+	}
+}
+
+// TestRunNewWritesComposeWhenPostgres proves `zever new` emits compose.yaml
+// for external picks and omits it for local-only scaffolds.
+func TestRunNewWritesComposeWhenPostgres(t *testing.T) {
+	repoRoot := repoRootAbs(t)
+	workDir := t.TempDir()
+	withWorkingDir(t, workDir)
+	t.Setenv(zeverFrameworkPathEnv, repoRoot)
+
+	if err := runNew([]string{"pgapp", "--adapters", "db=postgres"}); err != nil {
+		t.Fatalf("runNew: %v", err)
+	}
+	compose := readFile(t, filepath.Join(workDir, "pgapp", "compose.yaml"))
+	if !strings.Contains(compose, "image: postgres:") {
+		t.Fatalf("compose.yaml lacks postgres service:\n%s", compose)
+	}
+
+	workDir2 := t.TempDir()
+	withWorkingDir(t, workDir2)
+	if err := runNew([]string{"liteapp"}); err != nil {
+		t.Fatalf("runNew: %v", err)
+	}
+	if _, err := os.Stat(filepath.Join(workDir2, "liteapp", "compose.yaml")); !os.IsNotExist(err) {
+		t.Fatalf("expected no compose.yaml for local scaffold, stat err = %v", err)
+	}
+}
+
 // TestBatterySelectionsAdaptersMap pins the render seam: the Adapters map
 // steers every battery, and the legacy fields still win over it.
 func TestBatterySelectionsAdaptersMap(t *testing.T) {
