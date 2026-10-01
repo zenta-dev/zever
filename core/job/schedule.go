@@ -10,6 +10,7 @@ import (
 	"time"
 
 	"github.com/robfig/cron/v3"
+	"go.opentelemetry.io/otel"
 
 	"github.com/zenta-dev/zever/adapters/log/noop"
 	"github.com/zenta-dev/zever/core/log"
@@ -18,6 +19,9 @@ import (
 // EntryID wraps cron.EntryID identifying a registered schedule.
 // It is a uint64 scheduler handle, not a uuid BatchID.
 type EntryID uint64
+
+// ScheduleSpanScope identifies the tracer that starts per-fire schedule root spans.
+const ScheduleSpanScope = "github.com/zenta-dev/zever/core/job"
 
 // Scheduler fires registered jobs on cron specs using Dispatcher.
 // Dispatcher enqueues due jobs, Locker suppresses duplicate slots, and Logger reports schedule errors.
@@ -155,7 +159,20 @@ func (s *Scheduler) storeSchedule(spec string, sched cron.Schedule) cron.Schedul
 }
 
 func (s *Scheduler) fireWithSchedule(jobName string, args any, spec string, sched cron.Schedule) {
-	ctx := s.loadCtx()
+	// Each cron fire is a trace root: start a new span named schedule.<name>
+	// from Background so fires never inherit the registration caller's trace
+	// (EveryWithSchedule deliberately does not take ctx) nor the Run ctx's
+	// trace. No fake parent is synthesized; the SDK assigns a fresh traceID
+	// per fire, and Dispatcher/queue Push propagates it downstream via
+	// traceprop.Inject. Cancellation from Run is merged without merging trace
+	// (AfterFunc), so Stop still aborts in-flight fires.
+	base := s.loadCtx()
+	traceCtx, span := otel.Tracer(ScheduleSpanScope).Start(context.Background(), "schedule."+jobName)
+	defer span.End()
+	ctx, stop := context.WithCancel(traceCtx)
+	defer stop()
+	stopAfter := context.AfterFunc(base, stop)
+	defer stopAfter()
 
 	// Nil Locker = no cross-instance dedup; dispatch directly in single-instance mode.
 	if s.Locker != nil {

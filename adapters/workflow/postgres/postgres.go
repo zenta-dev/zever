@@ -146,6 +146,7 @@ type driver struct {
 	tableName string
 	owner     string
 	leaseTTL  time.Duration
+	owns      bool
 	mu        sync.RWMutex
 	steps     map[string]workflow.StepFunc
 	nextID    atomic.Uint64
@@ -172,6 +173,63 @@ func Open(o Options) (workflow.Workflow, error) {
 		return nil, err
 	}
 
+	poolOpts := o.Options
+	if strings.TrimSpace(poolOpts.DSN) == "" && poolOpts.Path == "" {
+		poolOpts.Path = ":memory:"
+	}
+
+	var (
+		conn coredb.DB
+		err  error
+	)
+
+	if strings.TrimSpace(poolOpts.DSN) != "" {
+		conn, err = dbpostgres.New(poolOpts)
+	} else {
+		conn, err = dbsqlite.New(poolOpts)
+	}
+
+	if err != nil {
+		return nil, err
+	}
+
+	d, err := openFromDB(conn, o, true)
+	if err != nil {
+		_ = conn.Close(context.Background())
+
+		return nil, err
+	}
+
+	return d, nil
+}
+
+// NewFromDB creates a DB-backed workflow engine over an already-open
+// coredb.DB, skipping DSN/Path construction. The caller retains ownership
+// of db: Close on the returned Workflow does not close db, and a failed
+// NewFromDB never closes db. Only sqlite and postgres dialects are
+// supported; anything else fails closed.
+func NewFromDB(conn coredb.DB, o Options) (workflow.Workflow, error) {
+	if conn == nil {
+		return nil, errors.New("postgres: db must not be nil")
+	}
+
+	if err := o.Validate(); err != nil {
+		return nil, err
+	}
+
+	return openFromDB(conn, o, false)
+}
+
+// OpenFromDB creates a DB-backed workflow engine over an already-open
+// coredb.DB; see NewFromDB.
+func OpenFromDB(conn coredb.DB, o Options) (workflow.Workflow, error) {
+	return NewFromDB(conn, o)
+}
+
+// openFromDB resolves table/owner/lease defaults, pings conn, ensures the
+// schema, and wires the driver. owns reports whether the driver owns conn
+// and may close it in Close.
+func openFromDB(conn coredb.DB, o Options, owns bool) (workflow.Workflow, error) {
 	table := o.Table
 	if table == "" {
 		table = DefaultTable
@@ -187,38 +245,10 @@ func Open(o Options) (workflow.Workflow, error) {
 		ttl = DefaultLeaseTTL
 	}
 
-	var (
-		conn coredb.DB
-		err  error
-	)
-
-	if strings.TrimSpace(o.DSN) != "" {
-		conn, err = dbpostgres.New(coredb.Options{
-			DSN: o.DSN, MaxConns: o.MaxConns, MinConns: o.MinConns,
-			MaxConnLifetime: o.MaxConnLifetime, MaxConnIdleTime: o.MaxConnIdleTime,
-		})
-	} else {
-		path := o.Path
-		if path == "" {
-			path = ":memory:"
-		}
-
-		conn, err = dbsqlite.New(coredb.Options{
-			Path: path, MaxConns: o.MaxConns, MinConns: o.MinConns,
-			MaxConnLifetime: o.MaxConnLifetime, MaxConnIdleTime: o.MaxConnIdleTime,
-		})
-	}
-
-	if err != nil {
-		return nil, err
-	}
-
 	ctx, cancel := context.WithTimeout(context.Background(), DefaultConnectTimeout)
 	defer cancel()
 
 	if err := conn.Ping(ctx); err != nil {
-		_ = conn.Close(ctx)
-
 		return nil, err
 	}
 
@@ -234,13 +264,11 @@ func Open(o Options) (workflow.Workflow, error) {
 		cAttempt:  orm.NewColumn[runRow, int64](table, "attempt"),
 		cCreated:  orm.NewColumn[runRow, time.Time](table, "created_at"),
 		cUpdated:  orm.NewColumn[runRow, time.Time](table, "updated_at"),
-		tableName: table, owner: owner, leaseTTL: ttl,
+		tableName: table, owner: owner, leaseTTL: ttl, owns: owns,
 		steps: make(map[string]workflow.StepFunc),
 	}
 
 	if err := d.ensureSchema(ctx); err != nil {
-		_ = conn.Close(ctx)
-
 		return nil, err
 	}
 
@@ -458,12 +486,30 @@ func (d *driver) Signal(ctx context.Context, runID workflow.RunID, _ string, val
 		return fmt.Errorf("postgres: signal %q: marshal value: %w", runID, err)
 	}
 
-	_, err = orm.UpdateTable(d.tbl).Where(d.cID.Eq(string(runID))).Set(
+	// State-guarded so a Signal racing a completion cannot resurrect or
+	// overwrite a completed run: zero rows means it finished or vanished.
+	n, err := orm.UpdateTable(d.tbl).Where(orm.And(
+		d.cID.Eq(string(runID)),
+		d.cState.Eq(stateRunning),
+	)).Set(
 		orm.Set(d.cPayload, valueJSON),
 		orm.Set(d.cUpdated, time.Now().UTC()),
 	).Exec(ctx, d.conn)
+	if err != nil {
+		return err
+	}
+	if n == 0 {
+		cur, rerr := d.load(ctx, runID)
+		if rerr != nil {
+			return rerr
+		}
+		if cur.State == stateCompleted {
+			return &workflow.RunCompletedError{RunID: runID}
+		}
+		return workflow.ErrUnknownRun
+	}
 
-	return err
+	return nil
 }
 
 // Query decodes the run's stored state into out.
@@ -504,9 +550,27 @@ func (d *driver) Cancel(ctx context.Context, runID workflow.RunID) error {
 		return &workflow.RunCompletedError{RunID: runID}
 	}
 
-	_, err = orm.DeleteFrom(d.tbl).Where(d.cID.Eq(string(runID))).Exec(ctx, d.conn)
+	// State-guarded delete so a Cancel racing a completion keeps the
+	// completed audit row; zero rows means it finished or vanished.
+	n, err := orm.DeleteFrom(d.tbl).Where(orm.And(
+		d.cID.Eq(string(runID)),
+		d.cState.Eq(stateRunning),
+	)).Exec(ctx, d.conn)
+	if err != nil {
+		return err
+	}
+	if n == 0 {
+		cur, rerr := d.load(ctx, runID)
+		if rerr != nil {
+			return rerr
+		}
+		if cur.State == stateCompleted {
+			return &workflow.RunCompletedError{RunID: runID}
+		}
+		return workflow.ErrUnknownRun
+	}
 
-	return err
+	return nil
 }
 
 // Reclaim takes over runID for owner when its lease has expired and
@@ -601,8 +665,14 @@ func (d *driver) Reclaim(ctx context.Context, runID workflow.RunID, owner string
 	return nil
 }
 
-// Close releases the database pool.
+// Close releases the database pool when this driver owns its connection
+// (built via New/Open). Drivers built via NewFromDB/OpenFromDB borrow the
+// caller's DB and Close is a no-op.
 func (d *driver) Close() error {
+	if !d.owns {
+		return nil
+	}
+
 	return d.conn.Close(context.Background())
 }
 

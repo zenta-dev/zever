@@ -62,6 +62,10 @@ func New(opts notification.Options) (notification.Notifier, error) {
 }
 
 // Notify validates n and sends it as a push message via FCM.
+//
+// Trace correlation is log-attrs only: the FCM Data map is user-visible wire
+// payload, not a header channel, so no trace ID is injected there and no
+// protocol headers are invented.
 func (f *notifier) Notify(ctx context.Context, n *notification.Notification) error {
 	if n == nil {
 		return notification.ErrNilNotification
