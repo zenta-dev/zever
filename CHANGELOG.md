@@ -37,6 +37,11 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   options fail closed with 500). Ships `Options.Validate` and
   `DefaultCORSMaxAge`, wired outermost in the `bookings`, `showcase`, and
   `todo` example servers. See `basics/cors`.
+- `examples/showcase/Dockerfile`: worked multi-stage container image
+  (`golang:1.27.1-bookworm` static build,
+  `distroless/static-debian13:nonroot` runtime, non-root
+  `ENTRYPOINT ["/server"]`); `docs/production.md` and `deployment.mdx`
+  link it with `/healthz` vs `/readyz` probe mapping.
 - `zever new`: emit `compose.yaml` when picked batteries need external
   infra (`db`/`search`/`vectorstore` on postgres/pgvector, or any
   `cache`/`queue`/`session`/`ratelimit`/`lock`/`eventbus`/`idempotency`
