@@ -37,6 +37,13 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   options fail closed with 500). Ships `Options.Validate` and
   `DefaultCORSMaxAge`, wired outermost in the `bookings`, `showcase`, and
   `todo` example servers. See `basics/cors`.
+- `zever new`: emit `compose.yaml` when picked batteries need external
+  infra (`db`/`search`/`vectorstore` on postgres/pgvector, or any
+  `cache`/`queue`/`session`/`ratelimit`/`lock`/`eventbus`/`idempotency`
+  on redis) — `app` plus health-gated `postgres:16-bookworm`/`redis:7-alpine`
+  with persistent volumes and env-carried secrets; local-only picks emit
+  no file.
+
 
 ### Fixed
 
