@@ -32,11 +32,17 @@ func (o Options) Validate() error {
 
 	if strings.TrimSpace(o.KeyID) == "" {
 		errs = append(errs, errors.New("kms: key_id is required"))
+	} else if len(o.KeyID) > 65535 {
+		errs = append(errs, errors.New("kms: key_id too long"))
 	}
 
 	for _, id := range o.KeyIDs {
 		if strings.TrimSpace(id) == "" {
 			errs = append(errs, errors.New("kms: key_ids must not contain empty entries"))
+			break
+		}
+		if len(id) > 65535 {
+			errs = append(errs, errors.New("kms: key_ids must not contain overlong entries"))
 			break
 		}
 	}

@@ -1146,6 +1146,12 @@ func writeNewProject(tag string, cfg NewConfig) ([]string, error) {
 		return nil, writeErr
 	}
 
+	if compose := renderNewCompose(cfg.batterySelections()); compose != "" {
+		if writeErr := write("compose.yaml", []byte(compose)); writeErr != nil {
+			return nil, writeErr
+		}
+	}
+
 	if writeErr := write("README.md", []byte(renderNewReadme(cfg.Name, quickstartBackends(cfg)))); writeErr != nil {
 		return nil, writeErr
 	}
@@ -1186,6 +1192,7 @@ var sharedModuleDirs = []string{
 	"shared/endpoint",
 	"shared/firebase",
 	"shared/httpclient",
+	"shared/kvstore",
 	"shared/lrucache",
 	"shared/providersclient",
 	"shared/providersopt",
@@ -1216,7 +1223,7 @@ var nestedModuleDirs = []string{
 	"adapters/flag/firebase", "adapters/flag/static",
 	"adapters/geo/google", "adapters/geo/osm", "adapters/geo/static",
 	"adapters/i18n/embed", "adapters/i18n/remote",
-	"adapters/idempotency/memory", "adapters/idempotency/redis",
+	"adapters/idempotency/db", "adapters/idempotency/memory", "adapters/idempotency/redis",
 	"adapters/lock/memory", "adapters/lock/redis",
 	"adapters/log/noop", "adapters/log/pretty", "adapters/log/slog", "adapters/log/zerolog",
 	"adapters/mailer/log", "adapters/mailer/smtp",
@@ -1232,7 +1239,7 @@ var nestedModuleDirs = []string{
 	"adapters/scheduler/embedded",
 	"adapters/search/meilisearch", "adapters/search/postgres", "adapters/search/sqlite",
 	"adapters/secrets/env", "adapters/secrets/vault",
-	"adapters/session/cookie", "adapters/session/memory", "adapters/session/redis",
+	"adapters/session/cookie", "adapters/session/db", "adapters/session/memory", "adapters/session/redis",
 	"adapters/storage/local", "adapters/storage/r2", "adapters/storage/s3",
 	"adapters/tenant/header", "adapters/tenant/single",
 	"adapters/vectorstore/pgvector", "adapters/vectorstore/qdrant", "adapters/vectorstore/sqlite",
@@ -1457,6 +1464,100 @@ USER nonroot:nonroot
 ENTRYPOINT ["/app/server"]
 HEALTHCHECK --interval=30s --timeout=3s --start-period=5s --retries=3 CMD ["/usr/bin/wget", "--no-verbose", "--tries=1", "--spider", "http://127.0.0.1:8080/healthz"]
 `, goVersion)
+}
+
+// renderNewCompose returns compose.yaml for a scaffolded project, or ""
+// when no picked battery needs external infra. Postgres picks (db,
+// search, vectorstore) add a db service; redis picks (cache, queue,
+// session, ratelimit, lock, eventbus, idempotency) share one redis
+// service. Env carries secrets at run time (never baked in); per-battery
+// URL vars point at the compose services.
+func renderNewCompose(sel []batterySelection) string {
+	needsPG := false
+	redisBatteries := []string{}
+
+	for _, s := range sel {
+		switch {
+		case s.Battery == "db" && s.Adapter == "postgres":
+			needsPG = true
+		case (s.Battery == "search" && s.Adapter == "postgres") ||
+			(s.Battery == "vectorstore" && s.Adapter == "pgvector"):
+			needsPG = true
+		case (s.Battery == "cache" || s.Battery == "queue" || s.Battery == "session" ||
+			s.Battery == "ratelimit" || s.Battery == "lock" || s.Battery == "eventbus" ||
+			s.Battery == "idempotency") && s.Adapter == "redis":
+			redisBatteries = append(redisBatteries, s.Battery)
+		}
+	}
+
+	if !needsPG && len(redisBatteries) == 0 {
+		return ""
+	}
+
+	var b strings.Builder
+	b.WriteString("# Scaffolded by `zever new`. External services for local prod-like runs.\n")
+	b.WriteString("#\n")
+	b.WriteString("# Up with: docker compose up --build\n")
+	b.WriteString("# Secrets via environment (never baked in): DB_PASSWORD=... docker compose up --build\n")
+	b.WriteString("#\n")
+	b.WriteString("# Worker uses the same image:\n")
+	b.WriteString("#   docker compose run --rm app ./worker\n")
+	b.WriteString("services:\n")
+	b.WriteString("  app:\n")
+	b.WriteString("    build: .\n")
+	b.WriteString("    ports:\n")
+	b.WriteString("      - \"8080:8080\"\n")
+	b.WriteString("      - \"9090:9090\"\n")
+	if needsPG || len(redisBatteries) > 0 {
+		b.WriteString("    depends_on:\n")
+		if needsPG {
+			b.WriteString("      db:\n        condition: service_healthy\n")
+		}
+		if len(redisBatteries) > 0 {
+			b.WriteString("      redis:\n        condition: service_healthy\n")
+		}
+	}
+	b.WriteString("    environment:\n")
+	if needsPG {
+		b.WriteString("      DB_DSN: postgres://app:${DB_PASSWORD:-devsecret}@db:5432/app?sslmode=disable\n")
+	}
+	for _, battery := range redisBatteries {
+		b.WriteString("      " + strings.ToUpper(battery) + "_URL: redis://redis:6379\n")
+	}
+	if needsPG {
+		b.WriteString("  db:\n")
+		b.WriteString("    image: postgres:16-bookworm\n")
+		b.WriteString("    environment:\n")
+		b.WriteString("      POSTGRES_USER: app\n")
+		b.WriteString("      POSTGRES_PASSWORD: ${DB_PASSWORD:-devsecret}\n")
+		b.WriteString("      POSTGRES_DB: app\n")
+		b.WriteString("    volumes:\n")
+		b.WriteString("      - pgdata:/var/lib/postgresql/data\n")
+		b.WriteString("    healthcheck:\n")
+		b.WriteString("      test: [\"CMD-SHELL\", \"pg_isready -U app\"]\n")
+		b.WriteString("      interval: 5s\n")
+		b.WriteString("      timeout: 3s\n")
+		b.WriteString("      retries: 10\n")
+	}
+	if len(redisBatteries) > 0 {
+		b.WriteString("  redis:\n")
+		b.WriteString("    image: redis:7-alpine\n")
+		b.WriteString("    volumes:\n")
+		b.WriteString("      - redisdata:/data\n")
+		b.WriteString("    healthcheck:\n")
+		b.WriteString("      test: [\"CMD\", \"redis-cli\", \"ping\"]\n")
+		b.WriteString("      interval: 5s\n")
+		b.WriteString("      timeout: 3s\n")
+		b.WriteString("      retries: 10\n")
+	}
+	b.WriteString("volumes:\n")
+	if needsPG {
+		b.WriteString("  pgdata:\n")
+	}
+	if len(redisBatteries) > 0 {
+		b.WriteString("  redisdata:\n")
+	}
+	return b.String()
 }
 
 // renderNewReadme is a genuine quickstart, not filler: every command in it

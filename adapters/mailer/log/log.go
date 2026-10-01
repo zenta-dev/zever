@@ -10,6 +10,7 @@ import (
 
 	"github.com/zenta-dev/zever/core/mailer"
 	"github.com/zenta-dev/zever/shared/codec"
+	"github.com/zenta-dev/zever/shared/traceprop"
 )
 
 // checker renders messages as JSON lines without sending.
@@ -60,6 +61,11 @@ type logMessage struct {
 	Body        string          `json:"body"`
 	HTML        string          `json:"html"`
 	Attachments []logAttachment `json:"attachments"`
+	// TraceID carries the W3C trace ID from ctx for log correlation.
+	// Empty when ctx holds no valid span. SMTP has no header channel for
+	// correlation without inventing protocol headers, so this is log-attrs
+	// only; the MIME body is never mutated.
+	TraceID string `json:"trace_id,omitempty"`
 }
 
 func toLogAddress(a mailer.Address) logAddress {
@@ -117,6 +123,7 @@ func (c *checker) Send(ctx context.Context, msg *mailer.Mail) error {
 		Body:        msg.Body,
 		HTML:        msg.HTML,
 		Attachments: make([]logAttachment, 0, len(msg.Attachments)),
+		TraceID:     traceprop.TraceID(ctx),
 	}
 	for _, a := range msg.Attachments {
 		out.Attachments = append(out.Attachments, logAttachment{

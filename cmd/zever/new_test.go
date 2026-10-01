@@ -1,6 +1,7 @@
 package main
 
 import (
+	"context"
 	"os"
 	"os/exec"
 	"path/filepath"
@@ -29,13 +30,56 @@ func runGoInDir(t *testing.T, dir string, args ...string) {
 		t.Skipf("no go toolchain on PATH: %v", err)
 	}
 
-	cmd := exec.CommandContext(t.Context(), goBin, args...)
-	cmd.Dir = dir
+	// The scaffold resolves dependencies over the network, so a transient
+	// proxy/DNS/TLS failure is retried; any other failure is a real build
+	// break and fails immediately.
+	const attempts = 3
 
-	out, err := cmd.CombinedOutput()
+	var out []byte
+
+	for range attempts {
+		ctx, cancel := context.WithTimeout(t.Context(), goCommandTimeout)
+		cmd := exec.CommandContext(ctx, goBin, args...)
+		cmd.Dir = dir
+
+		out, err = cmd.CombinedOutput()
+
+		cancel()
+
+		if err == nil || !isTransientGoFailure(string(out)) {
+			break
+		}
+
+		t.Logf("go %s: transient network failure, retrying: %v", strings.Join(args, " "), err)
+	}
+
 	if err != nil {
 		t.Fatalf("go %s (in %s): %v\n%s", strings.Join(args, " "), dir, err, out)
 	}
+}
+
+// isTransientGoFailure reports whether go tool output looks like a flaky
+// network/proxy error rather than a deterministic resolution or build error.
+func isTransientGoFailure(out string) bool {
+	for _, marker := range []string{
+		"i/o timeout",
+		"TLS handshake timeout",
+		"connection reset by peer",
+		"connection refused",
+		"unexpected EOF",
+		"no such host",
+		"Client.Timeout exceeded",
+		"503 Service Unavailable",
+		"502 Bad Gateway",
+		"504 Gateway Timeout",
+		"429 Too Many Requests",
+	} {
+		if strings.Contains(out, marker) {
+			return true
+		}
+	}
+
+	return false
 }
 
 // repoRootAbs returns this repository's own root, the framework checkout
@@ -1316,6 +1360,65 @@ func TestRunNewWritesDockerScaffold(t *testing.T) {
 	}
 }
 
+// TestRenderNewComposePostgresRedis pins the compose contract: app + db +
+// redis services, health-gated depends_on, env-carried secrets, no baked
+// credentials.
+func TestRenderNewComposePostgresRedis(t *testing.T) {
+	t.Parallel()
+	got := renderNewCompose([]batterySelection{{Battery: "db", Adapter: "postgres"}, {Battery: "cache", Adapter: "redis"}})
+	for _, fragment := range []string{
+		"services:", "image: postgres:", "image: redis:", "depends_on:",
+		"DB_DSN", "CACHE_URL: redis://redis:6379", "service_healthy", "pgdata:", "redisdata:",
+		"docker compose up --build",
+	} {
+		if !strings.Contains(got, fragment) {
+			t.Errorf("compose lacks %q:\n%s", fragment, got)
+		}
+	}
+	for _, banned := range []string{"API_KEY", "TOKEN=", "ENV DB_", "COPY /home/"} {
+		if strings.Contains(got, banned) {
+			t.Errorf("compose must not contain %q:\n%s", banned, got)
+		}
+	}
+	if strings.Contains(got, "devsecret123") || strings.Contains(got, "password123") {
+		t.Errorf("compose must not bake literal credentials:\n%s", got)
+	}
+}
+
+// TestRenderNewComposeEmptyWhenLocal proves all-local picks emit no file.
+func TestRenderNewComposeEmptyWhenLocal(t *testing.T) {
+	t.Parallel()
+	if got := renderNewCompose([]batterySelection{{Battery: "db", Adapter: "sqlite"}, {Battery: "cache", Adapter: "memory"}}); got != "" {
+		t.Fatalf("expected empty compose, got:\n%s", got)
+	}
+}
+
+// TestRunNewWritesComposeWhenPostgres proves `zever new` emits compose.yaml
+// for external picks and omits it for local-only scaffolds.
+func TestRunNewWritesComposeWhenPostgres(t *testing.T) {
+	repoRoot := repoRootAbs(t)
+	workDir := t.TempDir()
+	withWorkingDir(t, workDir)
+	t.Setenv(zeverFrameworkPathEnv, repoRoot)
+
+	if err := runNew([]string{"pgapp", "--adapters", "db=postgres"}); err != nil {
+		t.Fatalf("runNew: %v", err)
+	}
+	compose := readFile(t, filepath.Join(workDir, "pgapp", "compose.yaml"))
+	if !strings.Contains(compose, "image: postgres:") {
+		t.Fatalf("compose.yaml lacks postgres service:\n%s", compose)
+	}
+
+	workDir2 := t.TempDir()
+	withWorkingDir(t, workDir2)
+	if err := runNew([]string{"liteapp"}); err != nil {
+		t.Fatalf("runNew: %v", err)
+	}
+	if _, err := os.Stat(filepath.Join(workDir2, "liteapp", "compose.yaml")); !os.IsNotExist(err) {
+		t.Fatalf("expected no compose.yaml for local scaffold, stat err = %v", err)
+	}
+}
+
 // TestBatterySelectionsAdaptersMap pins the render seam: the Adapters map
 // steers every battery, and the legacy fields still win over it.
 func TestBatterySelectionsAdaptersMap(t *testing.T) {
@@ -1339,5 +1442,28 @@ func TestBatterySelectionsAdaptersMap(t *testing.T) {
 
 	if got := cfg.batterySelections()[0].Adapter; got != "sqlite" {
 		t.Fatalf("legacy DBAdapter lost to the map: %q", got)
+	}
+}
+
+func TestIsTransientGoFailure(t *testing.T) {
+	t.Parallel()
+
+	cases := []struct {
+		out  string
+		want bool
+	}{
+		{"dial tcp: lookup proxy.golang.org: no such host", true},
+		{"read tcp: connection reset by peer", true},
+		{"net/http: TLS handshake timeout", true},
+		{"reading https://proxy.golang.org/x/@v/list: 503 Service Unavailable", true},
+		{"undefined: foo", false},
+		{"module lookup disabled by GOPROXY=off", false},
+		{"", false},
+	}
+
+	for _, c := range cases {
+		if got := isTransientGoFailure(c.out); got != c.want {
+			t.Errorf("isTransientGoFailure(%q) = %v, want %v", c.out, got, c.want)
+		}
 	}
 }
