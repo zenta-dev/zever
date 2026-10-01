@@ -53,6 +53,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - `adapters/workflow/postgres`: `Signal`/`Cancel` are state-guarded
   (`state=running` predicate + row-count check) so a race with completion
   returns `RunCompletedError`/`ErrUnknownRun` instead of silent success.
+- `core/job`: worker consume path uses `traceprop.StartConsumeSpan`
+  (`queue.consume`) instead of bare `Extract`, restoring trace continuity.
 - `adapters/crypto/kms`: reject overlong `KeyID`/`KeyIDs` in
   `Options.Validate` and before the KMS call (no wasted `GenerateDataKey`);
   `Decrypt`/`Encrypt` now preserve `context.Canceled`/`DeadlineExceeded`

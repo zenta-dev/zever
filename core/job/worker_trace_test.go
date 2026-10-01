@@ -7,17 +7,56 @@ import (
 	"testing"
 	"time"
 
+	"go.opentelemetry.io/otel"
 	"go.opentelemetry.io/otel/trace"
 
 	"github.com/zenta-dev/zever/adapters/log/noop"
 	"github.com/zenta-dev/zever/core/queue"
+	"github.com/zenta-dev/zever/shared/traceprop"
 )
+
+type consumeStubTracer struct {
+	trace.Tracer
+	mu    sync.Mutex
+	names []string
+}
+
+func (t *consumeStubTracer) Start(ctx context.Context, name string, _ ...trace.SpanStartOption) (context.Context, trace.Span) {
+	t.mu.Lock()
+	t.names = append(t.names, name)
+	t.mu.Unlock()
+	// Preserve the extracted parent TraceID like a real SDK consumer span.
+	parent := trace.SpanContextFromContext(ctx)
+	var sid trace.SpanID
+	sid[0], sid[7] = 0xab, 0x01
+	sc := trace.NewSpanContext(trace.SpanContextConfig{
+		TraceID:    parent.TraceID(),
+		SpanID:     sid,
+		TraceFlags: trace.FlagsSampled,
+	})
+	span := &traceStubSpan{sc: sc}
+	return trace.ContextWithSpan(ctx, span), span
+}
+
+type consumeStubProvider struct {
+	trace.TracerProvider
+	tracer *consumeStubTracer
+}
+
+func (p *consumeStubProvider) Tracer(_ string, _ ...trace.TracerOption) trace.Tracer {
+	return p.tracer
+}
 
 // TestWorkerLaunchHandler_ExtractsTrace verifies the consume-side gap is
 // closed: a job message carrying a producer traceparent gives the handler a
 // context with the same trace ID.
 func TestWorkerLaunchHandler_ExtractsTrace(t *testing.T) {
 	Reset()
+
+	prev := otel.GetTracerProvider()
+	st := &consumeStubTracer{}
+	otel.SetTracerProvider(&consumeStubProvider{tracer: st})
+	t.Cleanup(func() { otel.SetTracerProvider(prev) })
 
 	const traceIDHex = "4bf92f3577b34da6a3ce929d0e0e4736"
 
@@ -58,6 +97,20 @@ func TestWorkerLaunchHandler_ExtractsTrace(t *testing.T) {
 	case <-time.After(2 * time.Second):
 		t.Fatal("handler not called in time")
 	}
+
+	st.mu.Lock()
+	found := false
+	for _, n := range st.names {
+		if n == "queue.consume" {
+			found = true
+		}
+	}
+	names := append([]string(nil), st.names...)
+	st.mu.Unlock()
+	if !found {
+		t.Errorf("spans = %v, want queue.consume", names)
+	}
+	_ = traceprop.ScopeName
 
 	done := make(chan struct{})
 	go func() {
