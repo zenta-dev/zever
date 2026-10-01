@@ -42,6 +42,9 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   `distroless/static-debian13:nonroot` runtime, non-root
   `ENTRYPOINT ["/server"]`); `docs/production.md` and `deployment.mdx`
   link it with `/healthz` vs `/readyz` probe mapping.
+- `core/secrets/secretstest`: new conformance kit mirroring
+  `core/cache/cachetest` (missing-key, round-trip, list, delete, name
+  validation, close), run against `env` and `vault` adapters.
 
 
 ### Fixed
