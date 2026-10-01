@@ -20,7 +20,7 @@ func mustLeakServer(t *testing.T, token string) (*httptest.Server, Options) {
 // the secret name and status, never auth material or secret bytes.
 func TestErrors_NeverLeakTokenOrValue(t *testing.T) {
 	t.Parallel()
-	const token = "s.leak-check-token-abc123"
+	const token = "s.leak-check-token-abc123" //nolint:gosec // fake token for leak assertion, never a real credential
 	const value = "super-secret-value-xyz"
 	srv, opts := mustLeakServer(t, token)
 	_ = srv

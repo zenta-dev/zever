@@ -86,8 +86,8 @@ func conformanceSetGet(t *testing.T, factory func(t *testing.T) secrets.Secrets)
 		t.Fatalf("Get() = %q, want conformance-value-01 (returned copy)", again)
 	}
 
-	if err := s.Set(ctx, name, []byte("conformance-value-02")); err != nil {
-		t.Fatalf("Set() overwrite error = %v", err)
+	if setErr := s.Set(ctx, name, []byte("conformance-value-02")); setErr != nil {
+		t.Fatalf("Set() overwrite error = %v", setErr)
 	}
 
 	got, err = s.Get(ctx, name)
