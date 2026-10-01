@@ -486,12 +486,30 @@ func (d *driver) Signal(ctx context.Context, runID workflow.RunID, _ string, val
 		return fmt.Errorf("postgres: signal %q: marshal value: %w", runID, err)
 	}
 
-	_, err = orm.UpdateTable(d.tbl).Where(d.cID.Eq(string(runID))).Set(
+	// State-guarded so a Signal racing a completion cannot resurrect or
+	// overwrite a completed run: zero rows means it finished or vanished.
+	n, err := orm.UpdateTable(d.tbl).Where(orm.And(
+		d.cID.Eq(string(runID)),
+		d.cState.Eq(stateRunning),
+	)).Set(
 		orm.Set(d.cPayload, valueJSON),
 		orm.Set(d.cUpdated, time.Now().UTC()),
 	).Exec(ctx, d.conn)
+	if err != nil {
+		return err
+	}
+	if n == 0 {
+		cur, rerr := d.load(ctx, runID)
+		if rerr != nil {
+			return rerr
+		}
+		if cur.State == stateCompleted {
+			return &workflow.RunCompletedError{RunID: runID}
+		}
+		return workflow.ErrUnknownRun
+	}
 
-	return err
+	return nil
 }
 
 // Query decodes the run's stored state into out.
@@ -532,9 +550,27 @@ func (d *driver) Cancel(ctx context.Context, runID workflow.RunID) error {
 		return &workflow.RunCompletedError{RunID: runID}
 	}
 
-	_, err = orm.DeleteFrom(d.tbl).Where(d.cID.Eq(string(runID))).Exec(ctx, d.conn)
+	// State-guarded delete so a Cancel racing a completion keeps the
+	// completed audit row; zero rows means it finished or vanished.
+	n, err := orm.DeleteFrom(d.tbl).Where(orm.And(
+		d.cID.Eq(string(runID)),
+		d.cState.Eq(stateRunning),
+	)).Exec(ctx, d.conn)
+	if err != nil {
+		return err
+	}
+	if n == 0 {
+		cur, rerr := d.load(ctx, runID)
+		if rerr != nil {
+			return rerr
+		}
+		if cur.State == stateCompleted {
+			return &workflow.RunCompletedError{RunID: runID}
+		}
+		return workflow.ErrUnknownRun
+	}
 
-	return err
+	return nil
 }
 
 // Reclaim takes over runID for owner when its lease has expired and
