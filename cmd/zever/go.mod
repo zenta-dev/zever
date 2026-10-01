@@ -243,7 +243,7 @@ require (
 	github.com/pkg/errors v0.9.1 // indirect
 	github.com/planetscale/vtprotobuf v0.6.1-0.20240319094008-0393e58bdf10 // indirect
 	github.com/posthog/posthog-go v1.27.0 // indirect
-	github.com/qdrant/go-client v1.19.2 // indirect
+	github.com/qdrant/go-client v1.19.3 // indirect
 	github.com/redis/go-redis/v9 v9.22.0 // indirect
 	github.com/remyoudompheng/bigfft v0.0.0-20230129092748-24d4a6f8daec // indirect
 	github.com/rivo/uniseg v0.4.7 // indirect
@@ -314,7 +314,7 @@ require (
 	google.golang.org/genproto v0.0.0-20260715232425-e75dac1f907d // indirect
 	google.golang.org/genproto/googleapis/api v0.0.0-20260819154853-08b0e4226688 // indirect
 	google.golang.org/genproto/googleapis/rpc v0.0.0-20260819154853-08b0e4226688 // indirect
-	google.golang.org/grpc v1.83.2 // indirect
+	google.golang.org/grpc v1.84.0 // indirect
 	google.golang.org/protobuf v1.36.12 // indirect
 	googlemaps.github.io/maps v1.7.0 // indirect
 	modernc.org/libc v1.75.7 // indirect
