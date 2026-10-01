@@ -210,9 +210,12 @@ func (w *Worker) launchHandler(ctx context.Context, msg queue.Message, topic str
 			inflight.Done()
 		}()
 
-		detached := traceprop.Extract(context.WithoutCancel(ctx), msg.Headers)
+		detached := context.WithoutCancel(ctx)
 
-		handlerCtx, cancel := context.WithTimeout(detached, w.drainTimeout())
+		handlerCtx, span := traceprop.StartConsumeSpan(detached, msg.Headers, "queue.consume")
+		defer span.End()
+
+		handlerCtx, cancel := context.WithTimeout(handlerCtx, w.drainTimeout())
 		defer cancel()
 
 		w.process(handlerCtx, msg, topic)
