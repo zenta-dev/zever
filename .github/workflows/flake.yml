@@ -1,0 +1,54 @@
+name: flake-hunt
+
+# Nightly flaky-test hunter. Runs every module under the race detector with
+# shuffled order and repeated iterations, which is what surfaces tests that
+# depend on shared process-global state, ordering, or timing. Not a PR gate:
+# a red run here names a test to fix, it never blocks unrelated merges.
+
+on:
+  schedule:
+    - cron: "43 3 * * *"
+  workflow_dispatch:
+    inputs:
+      count:
+        description: "Iterations per test (-count)"
+        default: "5"
+
+permissions:
+  contents: read
+
+concurrency:
+  group: flake-hunt
+  cancel-in-progress: false
+
+jobs:
+  flake:
+    name: flake (shard ${{ matrix.index }}/8)
+    timeout-minutes: 60
+    runs-on: ubuntu-latest
+    strategy:
+      fail-fast: false
+      matrix:
+        index: [0, 1, 2, 3, 4, 5, 6, 7]
+    env:
+      ZEVER_CHROMEDP_NO_SANDBOX: "1"
+      SHARD_TOTAL: "8"
+      SHARD_INDEX: ${{ matrix.index }}
+      FLAKE_COUNT: ${{ inputs.count || '5' }}
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+      - uses: actions/setup-go@b7ad1dad31e06c5925ef5d2fc7ad053ef454303e # v7.0.0
+        with:
+          go-version-file: go.work
+          cache-dependency-path: |
+            go.work.sum
+            **/go.sum
+      - name: Pre-download modules (retry on transient proxy errors)
+        run: |
+          for i in 1 2 3; do
+            make -s download-all && exit 0
+            echo "download attempt $i failed; retrying"; sleep $((i * 10))
+          done
+          exit 1
+      - name: go test -race -shuffle=on -count=${{ env.FLAKE_COUNT }}
+        run: make test-flake

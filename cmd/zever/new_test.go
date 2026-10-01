@@ -1,6 +1,7 @@
 package main
 
 import (
+	"context"
 	"os"
 	"os/exec"
 	"path/filepath"
@@ -29,13 +30,56 @@ func runGoInDir(t *testing.T, dir string, args ...string) {
 		t.Skipf("no go toolchain on PATH: %v", err)
 	}
 
-	cmd := exec.CommandContext(t.Context(), goBin, args...)
-	cmd.Dir = dir
+	// The scaffold resolves dependencies over the network, so a transient
+	// proxy/DNS/TLS failure is retried; any other failure is a real build
+	// break and fails immediately.
+	const attempts = 3
 
-	out, err := cmd.CombinedOutput()
+	var out []byte
+
+	for range attempts {
+		ctx, cancel := context.WithTimeout(t.Context(), goCommandTimeout)
+		cmd := exec.CommandContext(ctx, goBin, args...)
+		cmd.Dir = dir
+
+		out, err = cmd.CombinedOutput()
+
+		cancel()
+
+		if err == nil || !isTransientGoFailure(string(out)) {
+			break
+		}
+
+		t.Logf("go %s: transient network failure, retrying: %v", strings.Join(args, " "), err)
+	}
+
 	if err != nil {
 		t.Fatalf("go %s (in %s): %v\n%s", strings.Join(args, " "), dir, err, out)
 	}
+}
+
+// isTransientGoFailure reports whether go tool output looks like a flaky
+// network/proxy error rather than a deterministic resolution or build error.
+func isTransientGoFailure(out string) bool {
+	for _, marker := range []string{
+		"i/o timeout",
+		"TLS handshake timeout",
+		"connection reset by peer",
+		"connection refused",
+		"unexpected EOF",
+		"no such host",
+		"Client.Timeout exceeded",
+		"503 Service Unavailable",
+		"502 Bad Gateway",
+		"504 Gateway Timeout",
+		"429 Too Many Requests",
+	} {
+		if strings.Contains(out, marker) {
+			return true
+		}
+	}
+
+	return false
 }
 
 // repoRootAbs returns this repository's own root, the framework checkout
@@ -1339,5 +1383,28 @@ func TestBatterySelectionsAdaptersMap(t *testing.T) {
 
 	if got := cfg.batterySelections()[0].Adapter; got != "sqlite" {
 		t.Fatalf("legacy DBAdapter lost to the map: %q", got)
+	}
+}
+
+func TestIsTransientGoFailure(t *testing.T) {
+	t.Parallel()
+
+	cases := []struct {
+		out  string
+		want bool
+	}{
+		{"dial tcp: lookup proxy.golang.org: no such host", true},
+		{"read tcp: connection reset by peer", true},
+		{"net/http: TLS handshake timeout", true},
+		{"reading https://proxy.golang.org/x/@v/list: 503 Service Unavailable", true},
+		{"undefined: foo", false},
+		{"module lookup disabled by GOPROXY=off", false},
+		{"", false},
+	}
+
+	for _, c := range cases {
+		if got := isTransientGoFailure(c.out); got != c.want {
+			t.Errorf("isTransientGoFailure(%q) = %v, want %v", c.out, got, c.want)
+		}
 	}
 }
