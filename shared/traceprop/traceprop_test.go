@@ -36,6 +36,25 @@ func mustSpanID(t *testing.T) trace.SpanID {
 	return id
 }
 
+// providerMu serializes tests that swap the global tracer provider.
+// Parallel tests must route provider swaps through useStubTracer; direct
+// otel.SetTracerProvider calls race with each other.
+var providerMu sync.Mutex
+
+// useStubTracer installs a fresh stub provider for the test. The global
+// provider is restored and the lock released on cleanup, so parallel tests
+// never observe each other's tracers.
+func useStubTracer(t *testing.T) {
+	t.Helper()
+
+	providerMu.Lock()
+	t.Cleanup(providerMu.Unlock)
+
+	prev := otel.GetTracerProvider()
+	otel.SetTracerProvider(&stubProvider{tracer: &stubTracer{}})
+	t.Cleanup(func() { otel.SetTracerProvider(prev) })
+}
+
 func ctxWithSpanContext(
 	ctx context.Context,
 	traceID trace.TraceID,
@@ -292,9 +311,7 @@ func startConsumeSpanWithTracer(
 func TestStartConsumeSpan_EndsCleanly(t *testing.T) {
 	t.Parallel()
 
-	prev := otel.GetTracerProvider()
-	otel.SetTracerProvider(&stubProvider{tracer: &stubTracer{}})
-	t.Cleanup(func() { otel.SetTracerProvider(prev) })
+	useStubTracer(t)
 
 	_, span := StartConsumeSpan(t.Context(), nil, "test.noop")
 	span.End()

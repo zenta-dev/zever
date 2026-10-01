@@ -156,7 +156,22 @@ The process starts, resolves postgres (not sqlite), serves on `:8080`, and on `S
 | Cross-compile | `GOOS=linux GOARCH=amd64 go build -o myapp ./cmd/myapp` | Build on macOS, run on Linux |
 | Systemd unit | `ExecStart=/usr/local/bin/myapp` with `EnvironmentFile` | VM and bare-metal hosts |
 | Kubernetes | image plus `env:` secrets and mounted `zever.yaml` | Orchestrated rollouts |
-| Container runtime | image with `ENTRYPOINT ["./myapp"]` | Docker and Podman fleets |
+| Container image | `docker build -f examples/showcase/Dockerfile .` | Worked multi-stage: golang builder, static binary, distroless/static-debian13:nonroot |
+| Container runtime | image with `ENTRYPOINT ["/server"]` (absolute, no shell) | Docker and Podman fleets |
+| Compose (external services) | `DB_PASSWORD=... docker compose up --build` (scaffolded `compose.yaml`) | `zever new` with `db=postgres` or `*=redis`: app + postgres/redis, health-gated startup |
+
+### Probes
+
+Map the generated-server contract to supervisor probes: `/healthz` (always
+200, no dependency checks) is liveness; `/readyz` (200 ready, 503 when the
+DB ping fails) is readiness. Kubernetes shape:
+
+```yaml
+livenessProbe:
+  httpGet: {path: /healthz, port: 8080}
+readinessProbe:
+  httpGet: {path: /readyz, port: 8080}
+```
 
 `zever dev` is local watch-mode only in every row: it prints `zever dev: watching <schemaDir> and <serverEntry> ... (Ctrl-C to stop)` and restarts on change. Production runs the compiled binary behind the supervisor, never the watcher.
 

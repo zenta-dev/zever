@@ -37,6 +37,34 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   options fail closed with 500). Ships `Options.Validate` and
   `DefaultCORSMaxAge`, wired outermost in the `bookings`, `showcase`, and
   `todo` example servers. See `basics/cors`.
+- `examples/showcase/Dockerfile`: worked multi-stage container image
+  (`golang:1.27.1-bookworm` static build,
+  `distroless/static-debian13:nonroot` runtime, non-root
+  `ENTRYPOINT ["/server"]`); `docs/production.md` and `deployment.mdx`
+  link it with `/healthz` vs `/readyz` probe mapping.
+- `zever new`: emit `compose.yaml` when picked batteries need external
+  infra (`db`/`search`/`vectorstore` on postgres/pgvector, or any
+  `cache`/`queue`/`session`/`ratelimit`/`lock`/`eventbus`/`idempotency`
+  on redis) — `app` plus health-gated `postgres:16-bookworm`/`redis:7-alpine`
+  with persistent volumes and env-carried secrets; local-only picks emit
+  no file.
+- `core/secrets/secretstest`: new conformance kit mirroring
+  `core/cache/cachetest` (missing-key, round-trip, list, delete, name
+  validation, close), run against `env` and `vault` adapters.
+
+
+### Fixed
+
+- `adapters/workflow/postgres`: `Signal`/`Cancel` are state-guarded
+  (`state=running` predicate + row-count check) so a race with completion
+  returns `RunCompletedError`/`ErrUnknownRun` instead of silent success.
+- `core/job`: worker consume path uses `traceprop.StartConsumeSpan`
+  (`queue.consume`) instead of bare `Extract`, restoring trace continuity.
+- `adapters/crypto/kms`: reject overlong `KeyID`/`KeyIDs` in
+  `Options.Validate` and before the KMS call (no wasted `GenerateDataKey`);
+  `Decrypt`/`Encrypt` now preserve `context.Canceled`/`DeadlineExceeded`
+  via `errors.Join` so callers can `errors.Is` cancellation.
+
 
 ## [v0.5.3] - 2026-09-29
 

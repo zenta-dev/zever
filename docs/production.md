@@ -202,9 +202,18 @@ plus `GOWORK=off go -C docs/examples test`). Pins
 (`Makefile:9-11`): golangci-lint `v2.13.2`, govulncheck `v1.8.0`,
 cyclonedx-gomod `v1.12.0`.
 
-No `Dockerfile`/distroless base is checked in. Ship a static binary
-per `deployment.mdx` variants (`make build`, `GOOS=linux go build`,
-systemd unit, K8s image with `ENTRYPOINT`). One container per process.
+Worked image: `examples/showcase/Dockerfile` (multi-stage:
+`golang:1.27.1-bookworm` builder emitting a `CGO_ENABLED=0` static binary
+via `-trimpath -ldflags="-s -w"`, final
+`gcr.io/distroless/static-debian13:nonroot` with absolute `ENTRYPOINT`).
+Build from the repo root (`docker build -f examples/showcase/Dockerfile
+.`); the builder runs with `GOWORK=off`, so only the showcase module plus
+its replace targets ship in the build context. The worker follows the same
+pattern (`./cmd/worker`, commented in the Dockerfile). Static works because
+sqlite is pure-Go (no cgo) and the static distroless base carries CA certs
+for stripe/cloud TLS. One container per process; other build shapes
+(`make build`, `GOOS=linux go build`, systemd unit) stay in
+`deployment.mdx` variants.
 
 ## Checklists
 
