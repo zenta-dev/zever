@@ -144,7 +144,7 @@ clean: ## Remove coverage output and build artifacts
 	rm -f $(COVERAGE) $(SBOM)
 
 .PHONY: check
-check: require-tools download fmt check-all lint-all vulncheck-all ## Run all local CI checks (run 'make setup' first)
+check: require-tools download fmt check-all modgraph-check lint-all vulncheck-all ## Run all local CI checks (run 'make setup' first)
 
 # Multi-module targets: per-module loops over the committed go.work workspace.
 .PHONY: download-all
@@ -160,6 +160,14 @@ test-race-all: ## Run tests with the race detector across all modules (per-modul
 
 test-race-fast: ## Run tests with the race detector, no coverage (PR gate; cached, override list via MODULES)
 	failed=""; for d in $(if $(MODULES),$(MODULES),$(SHARD_MODULES)); do echo "== $$d =="; if ! (cd $$d && $(GO) test -race -vet=off ./...); then failed="$$failed $$d"; echo "::error::module failed: $$d"; fi; done; [ -z "$$failed" ] || { echo "FAILED modules:$$failed"; exit 1; }
+
+.PHONY: modgraph-check
+modgraph-check: ## Verify every module requires+replaces the intra-repo modules it imports (CI module-graph gate)
+	$(GO) run ./tools/modgraph --check
+
+.PHONY: test-flake
+test-flake: ## Hunt flaky tests: race + shuffle + repeat across modules (FLAKE_COUNT=5, override list via MODULES)
+	failed=""; for d in $(if $(MODULES),$(MODULES),$(SHARD_MODULES)); do echo "== $$d =="; if ! (cd $$d && $(GO) test -race -vet=off -count=$(or $(FLAKE_COUNT),5) -shuffle=on ./...); then failed="$$failed $$d"; echo "::error::flaky/failing module: $$d"; fi; done; [ -z "$$failed" ] || { echo "FAILED modules:$$failed"; exit 1; }
 
 build-all: ## Build all packages in every module (override list via MODULES)
 	set -e; for d in $(if $(MODULES),$(MODULES),$(SHARD_MODULES)); do echo "== $$d =="; (cd $$d && $(GO) build ./...); done

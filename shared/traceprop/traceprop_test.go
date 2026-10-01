@@ -10,8 +10,10 @@ import (
 	"go.opentelemetry.io/otel/trace"
 )
 
-func mustTraceID(t *testing.T, hex string) trace.TraceID {
+func mustTraceID(t *testing.T) trace.TraceID {
 	t.Helper()
+
+	const hex = "4bf92f3577b34da6a3ce929d0e0e4736"
 
 	id, err := trace.TraceIDFromHex(hex)
 	if err != nil {
@@ -21,8 +23,10 @@ func mustTraceID(t *testing.T, hex string) trace.TraceID {
 	return id
 }
 
-func mustSpanID(t *testing.T, hex string) trace.SpanID {
+func mustSpanID(t *testing.T) trace.SpanID {
 	t.Helper()
+
+	const hex = "00f067aa0ba902b7"
 
 	id, err := trace.SpanIDFromHex(hex)
 	if err != nil {
@@ -30,6 +34,25 @@ func mustSpanID(t *testing.T, hex string) trace.SpanID {
 	}
 
 	return id
+}
+
+// providerMu serializes tests that swap the global tracer provider.
+// Parallel tests must route provider swaps through useStubTracer; direct
+// otel.SetTracerProvider calls race with each other.
+var providerMu sync.Mutex
+
+// useStubTracer installs a fresh stub provider for the test. The global
+// provider is restored and the lock released on cleanup, so parallel tests
+// never observe each other's tracers.
+func useStubTracer(t *testing.T) {
+	t.Helper()
+
+	providerMu.Lock()
+	t.Cleanup(providerMu.Unlock)
+
+	prev := otel.GetTracerProvider()
+	otel.SetTracerProvider(&stubProvider{tracer: &stubTracer{}})
+	t.Cleanup(func() { otel.SetTracerProvider(prev) })
 }
 
 func ctxWithSpanContext(
@@ -57,8 +80,8 @@ func spanContextOf(ctx context.Context) trace.SpanContext {
 func TestInjectExtract_RoundTrip(t *testing.T) {
 	t.Parallel()
 
-	traceID := mustTraceID(t, "4bf92f3577b34da6a3ce929d0e0e4736")
-	spanID := mustSpanID(t, "00f067aa0ba902b7")
+	traceID := mustTraceID(t)
+	spanID := mustSpanID(t)
 
 	ctx := ctxWithSpanContext(t.Context(), traceID, spanID, true)
 	out := Inject(ctx, map[string]string{"k": "v"})
@@ -90,8 +113,8 @@ func TestInjectExtract_RoundTrip(t *testing.T) {
 func TestInjectExtract_SampledFlag(t *testing.T) {
 	t.Parallel()
 
-	traceID := mustTraceID(t, "4bf92f3577b34da6a3ce929d0e0e4736")
-	spanID := mustSpanID(t, "00f067aa0ba902b7")
+	traceID := mustTraceID(t)
+	spanID := mustSpanID(t)
 
 	tests := []struct {
 		name    string
@@ -130,8 +153,8 @@ func TestInjectExtract_Tracestate(t *testing.T) {
 	}
 
 	ctx = trace.ContextWithSpanContext(ctx, trace.NewSpanContext(trace.SpanContextConfig{
-		TraceID:    mustTraceID(t, "4bf92f3577b34da6a3ce929d0e0e4736"),
-		SpanID:     mustSpanID(t, "00f067aa0ba902b7"),
+		TraceID:    mustTraceID(t),
+		SpanID:     mustSpanID(t),
 		TraceFlags: 0x01,
 		TraceState: ts,
 	}))
@@ -171,8 +194,8 @@ func TestInject_NoSpan(t *testing.T) {
 func TestInject_DoesNotMutateInput(t *testing.T) {
 	t.Parallel()
 
-	traceID := mustTraceID(t, "4bf92f3577b34da6a3ce929d0e0e4736")
-	spanID := mustSpanID(t, "00f067aa0ba902b7")
+	traceID := mustTraceID(t)
+	spanID := mustSpanID(t)
 
 	in := map[string]string{"k": "v"}
 	Inject(ctxWithSpanContext(t.Context(), traceID, spanID, true), in)
@@ -245,8 +268,8 @@ func (p *stubProvider) Tracer(_ string, _ ...trace.TracerOption) trace.Tracer {
 func TestStartConsumeSpan_LinksRemoteParent(t *testing.T) {
 	t.Parallel()
 
-	traceID := mustTraceID(t, "4bf92f3577b34da6a3ce929d0e0e4736")
-	spanID := mustSpanID(t, "00f067aa0ba902b7")
+	traceID := mustTraceID(t)
+	spanID := mustSpanID(t)
 
 	headers := Inject(ctxWithSpanContext(t.Context(), traceID, spanID, true), nil)
 
@@ -281,15 +304,14 @@ func startConsumeSpanWithTracer(
 	ctx = Extract(ctx, headers)
 	opts = append([]trace.SpanStartOption{trace.WithSpanKind(trace.SpanKindConsumer)}, opts...)
 
+	//nolint:spancheck // helper returns the span to the test, which owns calling End(); standard tracer.Start contract, not a leak
 	return tracer.Start(ctx, spanName, opts...)
 }
 
 func TestStartConsumeSpan_EndsCleanly(t *testing.T) {
 	t.Parallel()
 
-	prev := otel.GetTracerProvider()
-	otel.SetTracerProvider(&stubProvider{tracer: &stubTracer{}})
-	t.Cleanup(func() { otel.SetTracerProvider(prev) })
+	useStubTracer(t)
 
 	_, span := StartConsumeSpan(t.Context(), nil, "test.noop")
 	span.End()
