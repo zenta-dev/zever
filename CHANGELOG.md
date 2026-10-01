@@ -43,6 +43,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - `adapters/workflow/postgres`: `Signal`/`Cancel` are state-guarded
   (`state=running` predicate + row-count check) so a race with completion
   returns `RunCompletedError`/`ErrUnknownRun` instead of silent success.
+- `core/job`: worker consume path uses `traceprop.StartConsumeSpan`
+  (`queue.consume`) instead of bare `Extract`, restoring trace continuity.
 
 
 ## [v0.5.3] - 2026-09-29
