@@ -272,6 +272,7 @@ require (
 	github.com/zenta-dev/zever/core/vectorstore v0.5.3 // indirect
 	github.com/zenta-dev/zever/shared/cas v0.5.3 // indirect
 	github.com/zenta-dev/zever/shared/codec v0.5.3 // indirect
+	github.com/zenta-dev/zever/shared/dbconn v0.5.3 // indirect
 	github.com/zenta-dev/zever/shared/endpoint v0.5.3 // indirect
 	github.com/zenta-dev/zever/shared/firebase v0.5.3 // indirect
 	github.com/zenta-dev/zever/shared/httpclient v0.5.3 // indirect
@@ -455,6 +456,8 @@ replace github.com/zenta-dev/zever/core/vectorstore => ../../core/vectorstore
 replace github.com/zenta-dev/zever/shared/cas => ../../shared/cas
 
 replace github.com/zenta-dev/zever/shared/codec => ../../shared/codec
+
+replace github.com/zenta-dev/zever/shared/dbconn => ../../shared/dbconn
 
 replace github.com/zenta-dev/zever/shared/endpoint => ../../shared/endpoint
 
