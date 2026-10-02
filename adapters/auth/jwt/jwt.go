@@ -148,9 +148,13 @@ func (a *adapter) Issue(_ context.Context, subject string, custom map[string]any
 		claims[k] = auth.CloneValue(v)
 	}
 
-	// HMAC-SHA256 over a validated []byte secret with JSON-serializable
-	// MapClaims: signing cannot fail.
-	raw, _ := jwtv5.NewWithClaims(jwtv5.SigningMethodHS256, claims).SignedString(a.secret)
+	// HMAC-SHA256 over a validated []byte secret. Custom claims must be
+	// JSON-serializable; unserializable values fail here instead of
+	// minting an empty token.
+	raw, err := jwtv5.NewWithClaims(jwtv5.SigningMethodHS256, claims).SignedString(a.secret)
+	if err != nil {
+		return auth.Token{}, fmt.Errorf("jwt: issue: signing failed: %w", errors.Join(auth.ErrInvalidToken, err))
+	}
 	return auth.Token{Value: raw, ExpiresAt: now.Add(ttl)}, nil
 }
 
@@ -183,6 +187,12 @@ func (a *adapter) Verify(ctx context.Context, token string) (auth.Claims, error)
 	}
 
 	subject, _ := claims.GetSubject()
+	// Issue always sets a non-empty subject, but a manually-signed token
+	// sharing the secret could omit sub and otherwise verify: an empty
+	// subject must never authenticate.
+	if subject == "" {
+		return auth.Claims{}, fmt.Errorf("jwt: verify: %w: empty subject", auth.ErrInvalidToken)
+	}
 	exp, _ := claims.GetExpirationTime()
 	var expiresAt time.Time
 	if exp != nil {

@@ -213,7 +213,8 @@ pattern (`./cmd/worker`, commented in the Dockerfile). Static works because
 sqlite is pure-Go (no cgo) and the static distroless base carries CA certs
 for stripe/cloud TLS. One container per process; other build shapes
 (`make build`, `GOOS=linux go build`, systemd unit) stay in
-`deployment.mdx` variants.
+`deployment.mdx` variants. Newcomers clone `examples/showcase` first:
+it is the reference app behind this page.
 
 ## Checklists
 
@@ -260,6 +261,12 @@ zever db migrate --dry-run   # expect: no pending statements
   unsupported on the env adapter by design.
 - [ ] `SIGTERM` drill: `kill -TERM`, confirm `Shutdown` +
   container `Close` complete within grace period, buffered spans flush.
+
+## Benchmarks
+
+Measured router/ORM/queue baselines plus repro commands live in
+`docs/benchmarks.md`. Numbers are a point-in-time snapshot, not a deploy
+gate; re-run locally before drawing conclusions.
 
 ## See also
 

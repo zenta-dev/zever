@@ -137,8 +137,18 @@ func newChecker(e *casbinlib.SyncedEnforcer, roles map[string][]string) (permiss
 
 // Can reports whether subject may perform action on resource. Enforcement
 // failures are fail-closed: they return a zero Decision with the error.
+// A cancelled or timed-out ctx fails closed the same way without touching
+// the enforcer. A nil ctx is treated as context.Background, matching the
+// rbac adapter.
 func (c *checker) Can(ctx context.Context, subject permission.Subject, action string, resource permission.Resource) (permission.Decision, error) {
-	_ = ctx
+	// A nil ctx is treated as context.Background (no deadline to
+	// observe), matching the rbac adapter. Never mint a fresh root
+	// context from a possibly-cancelled parent.
+	if ctx != nil {
+		if err := ctx.Err(); err != nil {
+			return permission.Decision{}, fmt.Errorf("casbin: enforce: %w", err)
+		}
+	}
 
 	added, err := c.prepareGroupings(subject)
 	if err != nil {

@@ -108,6 +108,20 @@ test/adapters
 ci/github-actions
 ```
 
+### Issue labels
+
+Issues suitable for newcomers carry the `good first issue` label:
+small scope, no public API change, verifiable with existing tests.
+Maintainers apply the label; contributors pick labeled issues without
+asking for assignment.
+
+### Proposing a new battery
+
+Proposing a new battery (new adapter or new service)? Read
+[`docs/writing-a-plugin.md`](../docs/writing-a-plugin.md) first: it
+defines the plugin shapes, the conformance-kit acceptance gate, and the
+naming rules.
+
 ## Go Coding Standards
 
 Write idiomatic Go. When in doubt, follow [Effective Go](https://go.dev/doc/effective_go).

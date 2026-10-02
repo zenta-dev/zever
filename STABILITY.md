@@ -85,6 +85,37 @@ release-note docs.
 | `middleware` | HTTP middleware + gRPC interceptors. |
 | `cmd/zever` | Flags-only CLI toolkit; see `cmd/zever/README.md`. |
 
+## 1.0 promotion criteria
+
+Core graduates from "toward 1.0 promise" to the 1.0 compatibility promise
+only when all of the following hold. Until then the pre-1.0 policy above
+applies unchanged.
+
+- **6 months without a core break:** no breaking change to any `Core`
+  package below in the 6 months before the 1.0 tag, measured from
+  `CHANGELOG.md` release-note entries.
+- **100% core kits:** every `Core` battery with an adapter registry ships
+  a conformance kit (`<b>test` package), and every shipped adapter runs
+  it green in CI — including the currently skipped redis suites
+  (`adapters/cache/redis`, `adapters/queue/redis`).
+- **External production user:** at least one application outside this
+  repo runs a tagged release in production and its deployment is
+  referenced from `docs/production.md`.
+
+## Current standing (honest)
+
+- Core breaks: still permitted with release notes; the 6-month clock has
+  not started.
+- Kits: 4 exist (`cache`, `queue`, `storage`, `secrets`); CI runs 3
+  in-kit suites plus 2 skipped redis suites. The remaining core
+  batteries have no kit.
+- External prod user: none known.
+- Supply chain: SBOM per affected module in CI
+  (`.github/workflows/ci.yml` `sbom` job); SLSA provenance attested on
+  SBOMs in the same job, verifiable via
+  `gh attestation verify sbom/<slug>.json --repo zenta-dev/zever`. No
+  release-attached artifacts yet (no `release.yml`).
+
 ## Coverage note
 
 Every top-level package is classified above. `config`/`container` cover
