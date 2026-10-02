@@ -16,6 +16,7 @@ import (
 	"github.com/zenta-dev/zever/core/workflow"
 	"github.com/zenta-dev/zever/orm"
 	"github.com/zenta-dev/zever/orm/dialect"
+	"github.com/zenta-dev/zever/shared/dbconn"
 )
 
 // Run states persisted in the state column.
@@ -237,7 +238,7 @@ func openFromDB(conn coredb.DB, o Options, owns bool) (workflow.Workflow, error)
 
 	owner := o.Owner
 	if owner == "" {
-		owner = "workflow-owner"
+		owner = dbconn.RandomOwner("workflow-owner")
 	}
 
 	ttl := o.LeaseTTL

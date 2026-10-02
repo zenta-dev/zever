@@ -74,6 +74,15 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 - `adapters/auth/jwt`: propagate `SignedString` errors instead of
   minting an empty token; reject empty `sub` on verify.
+- Default lease owners in `adapters/workflow/postgres` and
+  `adapters/scheduler/postgres` are now random per driver (via the new
+  `shared/dbconn` helper, matching `adapters/queue/db`) instead of the
+  static `"workflow-owner"`/`"scheduler-owner"`: two replicas sharing
+  one database no longer share one lease-holder identity. Table-name
+  validation errors from these adapters (and `queue/db`) now wrap the
+  shared `dbconn.ErrInvalidTableName` sentinel, so the text gains a
+  `dbconn:` segment (e.g. `postgres: dbconn: invalid table name:
+  "no-dashes!"`); match with `errors.Is` going forward.
 - `core/authz`: nil `Auth`/`Checker` now fail closed
   (`Unauthenticated`/`PermissionDenied`); clone claims/roles/subjects
   across context boundaries.

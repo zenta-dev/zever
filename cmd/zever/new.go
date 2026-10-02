@@ -1189,6 +1189,7 @@ var sharedModuleDirs = []string{
 	"shared/apperror",
 	"shared/cas",
 	"shared/codec",
+	"shared/dbconn",
 	"shared/endpoint",
 	"shared/firebase",
 	"shared/httpclient",

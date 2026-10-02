@@ -2,8 +2,6 @@ package db
 
 import (
 	"context"
-	"crypto/rand"
-	"encoding/hex"
 	"encoding/json"
 	"errors"
 	"fmt"
@@ -17,6 +15,7 @@ import (
 	"github.com/zenta-dev/zever/core/queue"
 	"github.com/zenta-dev/zever/orm"
 	"github.com/zenta-dev/zever/orm/dialect"
+	"github.com/zenta-dev/zever/shared/dbconn"
 	"github.com/zenta-dev/zever/shared/traceprop"
 )
 
@@ -234,7 +233,7 @@ func openFromDB(conn coredb.DB, o Options, owns bool) (queue.Queue, error) {
 
 	owner := o.Owner
 	if owner == "" {
-		owner = randomOwner()
+		owner = dbconn.RandomOwner("queue-owner")
 	}
 
 	visibility := o.VisibilityTimeout
@@ -286,19 +285,6 @@ func openFromDB(conn coredb.DB, o Options, owns bool) (queue.Queue, error) {
 	}
 
 	return d, nil
-}
-
-// randomOwner mints a unique claim-holder name for one driver instance.
-// crypto/rand failure is impossible to surface usefully here, so a short
-// fallback keeps construction infallible.
-func randomOwner() string {
-	var b [8]byte
-
-	if _, err := rand.Read(b[:]); err != nil {
-		return "queue-owner-fallback"
-	}
-
-	return "queue-owner-" + hex.EncodeToString(b[:])
 }
 
 // checkDialect fails closed on dialects outside sqlite/postgres.

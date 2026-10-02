@@ -15,6 +15,7 @@ require (
 	github.com/zenta-dev/zever/core/scheduler v0.5.3
 	github.com/zenta-dev/zever/orm v0.5.3
 	github.com/zenta-dev/zever/shared/codec v0.5.3
+	github.com/zenta-dev/zever/shared/dbconn v0.5.3
 )
 
 require (
@@ -82,3 +83,5 @@ replace github.com/zenta-dev/zever/shared/registry => ../../../shared/registry
 replace github.com/zenta-dev/zever/shared/retry => ../../../shared/retry
 
 replace github.com/zenta-dev/zever/shared/traceprop => ../../../shared/traceprop
+
+replace github.com/zenta-dev/zever/shared/dbconn => ../../../shared/dbconn

@@ -7,6 +7,7 @@ import (
 
 	coredb "github.com/zenta-dev/zever/core/db"
 	"github.com/zenta-dev/zever/core/scheduler"
+	"github.com/zenta-dev/zever/shared/dbconn"
 )
 
 // DefaultTable is the scheduler-slots table created when Options.Table is empty.
@@ -22,7 +23,7 @@ const DefaultConnectTimeout = 5 * time.Second
 // Options holds typed configuration for the postgres scheduler adapter.
 // An empty DSN selects sqlite (Path, default ":memory:"); a set DSN opens
 // postgres. Table defaults to DefaultTable; Owner identifies this replica's
-// lease holder and must differ per replica that may claim slots.
+// lease holder and defaults to a random value unique per driver.
 //
 // Scheduler behavior (Dispatcher, Locker, Logger, CloseTimeout) embeds
 // scheduler.Options so container and Open flow through unchanged; pool
@@ -35,7 +36,7 @@ type Options struct {
 	PoolOptions coredb.Options
 	// Table is the scheduler-slots table name. Default DefaultTable.
 	Table string `json:"table" toml:"table" yaml:"table"`
-	// Owner identifies this replica as a lease holder.
+	// Owner identifies this replica as a lease holder. Default random.
 	Owner string `json:"owner" toml:"owner" yaml:"owner"`
 	// LeaseTTL is the slot lease granted to a claim holder.
 	LeaseTTL time.Duration `json:"lease_ttl" toml:"lease_ttl" yaml:"lease_ttl"`
@@ -58,29 +59,10 @@ func (o Options) Validate() error {
 	}
 
 	if o.Table != "" {
-		if err := validateTableName(o.Table); err != nil {
-			errs = append(errs, err)
+		if err := dbconn.ValidateTableName(o.Table); err != nil {
+			errs = append(errs, fmt.Errorf("postgres: %w", err))
 		}
 	}
 
 	return errors.Join(errs...)
-}
-
-// validateTableName rejects table names outside [A-Za-z_][A-Za-z0-9_]*
-// because the name is interpolated into DDL (orm has no DDL builder).
-func validateTableName(name string) error {
-	if name == "" {
-		return errors.New("postgres: table must not be empty")
-	}
-
-	for i := 0; i < len(name); i++ {
-		c := name[i]
-		ok := c == '_' || (c >= 'a' && c <= 'z') || (c >= 'A' && c <= 'Z') || (i > 0 && c >= '0' && c <= '9')
-
-		if !ok {
-			return fmt.Errorf("postgres: invalid table name %q", name)
-		}
-	}
-
-	return nil
 }
