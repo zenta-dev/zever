@@ -381,7 +381,7 @@ func (d *driver) adoptRow(ctx context.Context, row *slotRow) error {
 		}
 	}
 
-	if err := d.register(row.Spec, row.JobName, args, row.Slot); err != nil {
+	if err := d.register(ctx, row.Spec, args, row.Slot); err != nil {
 		return err
 	}
 
@@ -419,7 +419,9 @@ func (d *driver) load(ctx context.Context, slot string) (row *slotRow, ok bool, 
 
 // register parses spec and adds the gated tick for slot to the local cron.
 // Callers must hold the lease (or own the fresh row) before registering.
-func (d *driver) register(spec, jobName string, args any, slot string) error {
+// The tick fires detached from registration cancellation but inherits its
+// values.
+func (d *driver) register(ctx context.Context, spec string, args any, slot string) error {
 	parsed, err := cron.ParseStandard(spec)
 	if err != nil {
 		return &scheduler.InvalidSpecError{Spec: spec, Err: err}
@@ -428,8 +430,9 @@ func (d *driver) register(spec, jobName string, args any, slot string) error {
 	d.mu.Lock()
 	defer d.mu.Unlock()
 
+	tickCtx := context.WithoutCancel(ctx)
 	id := d.cron.Schedule(parsed, cron.FuncJob(func() {
-		d.fire(slot)
+		d.fire(tickCtx, slot)
 	}))
 
 	//nolint:gosec // cron EntryIDs are a small positive sequence starting at 1.
@@ -443,9 +446,7 @@ func (d *driver) register(spec, jobName string, args any, slot string) error {
 // fire claims slot and dispatches its job when the claim lands. A live
 // foreign lease means another instance owns the slot: the tick is skipped,
 // which is what makes multi-instance firing safe.
-func (d *driver) fire(slot string) {
-	ctx := context.Background()
-
+func (d *driver) fire(ctx context.Context, slot string) {
 	row, ok, err := d.load(ctx, slot)
 	if err != nil || !ok {
 		return
@@ -519,9 +520,9 @@ func (d *driver) Schedule(ctx context.Context, spec, jobName string, args any) (
 	for {
 		candidate := fmt.Sprintf("sched-%d", d.nextID.Add(1))
 
-		_, ok, err := d.load(ctx, candidate)
-		if err != nil {
-			return 0, err
+		_, ok, loadErr := d.load(ctx, candidate)
+		if loadErr != nil {
+			return 0, loadErr
 		}
 
 		if !ok {
@@ -546,7 +547,7 @@ func (d *driver) Schedule(ctx context.Context, spec, jobName string, args any) (
 		return 0, err
 	}
 
-	if err := d.register(spec, jobName, args, slot); err != nil {
+	if err := d.register(ctx, spec, args, slot); err != nil {
 		_, _ = orm.DeleteFrom(d.tbl).Where(d.cSlot.Eq(slot)).Exec(ctx, d.conn)
 
 		return 0, err
