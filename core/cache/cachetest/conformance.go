@@ -24,6 +24,12 @@ const (
 // Exists, and Close. Each subtest takes a fresh instance from factory so
 // cases stay isolated. Expiry waits poll with a context deadline; they never
 // synchronize with time.Sleep and never touch the network.
+//
+// Virtual-time fakes: when the factory product also implements
+// FastForward(time.Duration) (e.g. a miniredis wrapper whose TTLs advance
+// only via FastForward), expiry polls advance that clock by the poll
+// interval after each unsuccessful attempt so TTLs expire without wall-clock
+// waiting. Real-time adapters do not implement it and are unaffected.
 func Conformance(t *testing.T, factory func(t *testing.T) cache.Cache) {
 	t.Helper()
 
@@ -112,12 +118,24 @@ func conformanceTTLExpiry(t *testing.T, factory func(t *testing.T) cache.Cache) 
 
 	eventually(t, "key expired from Get", func(ctx context.Context) bool {
 		_, err := c.Get(ctx, "k")
-		return errors.Is(err, cache.ErrNotFound)
+		if errors.Is(err, cache.ErrNotFound) {
+			return true
+		}
+
+		maybeFastForward(c)
+
+		return false
 	})
 
 	eventually(t, "exists false after expiry", func(ctx context.Context) bool {
 		ok, _ := c.Exists(ctx, "k")
-		return !ok
+		if !ok {
+			return true
+		}
+
+		maybeFastForward(c)
+
+		return false
 	})
 
 	if err := c.Set(ctx, "keep", []byte("v"), 0); err != nil {
@@ -160,7 +178,13 @@ func conformanceSetIfAbsent(t *testing.T, factory func(t *testing.T) cache.Cache
 
 	eventually(t, "expired key accepted by SetIfAbsent", func(ctx context.Context) bool {
 		ok, _ := c.SetIfAbsent(ctx, "e", []byte("new"), 0)
-		return ok
+		if ok {
+			return true
+		}
+
+		maybeFastForward(c)
+
+		return false
 	})
 
 	got, err = c.Get(ctx, "e")
@@ -325,7 +349,13 @@ func conformanceExists(t *testing.T, factory func(t *testing.T) cache.Cache) {
 
 	eventually(t, "exists false for expired entry", func(ctx context.Context) bool {
 		ok, err := c.Exists(ctx, "e")
-		return err == nil && !ok
+		if err == nil && !ok {
+			return true
+		}
+
+		maybeFastForward(c)
+
+		return false
 	})
 }
 
@@ -369,6 +399,21 @@ func conformanceClose(t *testing.T, factory func(t *testing.T) cache.Cache) {
 
 	if _, err := c.Exists(ctx, "k"); !errors.Is(err, cache.ErrClosed) {
 		t.Errorf("Exists() err = %v, want ErrClosed", err)
+	}
+}
+
+// fastForwarder is implemented by conformance factories running against
+// virtual-time fakes (e.g. a miniredis wrapper whose TTLs advance only via
+// FastForward). Expiry polls advance it after each unsuccessful attempt.
+type fastForwarder interface {
+	FastForward(time.Duration)
+}
+
+// maybeFastForward advances c's virtual clock when it implements
+// fastForwarder; it is a no-op for real-time adapters.
+func maybeFastForward(c cache.Cache) {
+	if f, ok := any(c).(fastForwarder); ok {
+		f.FastForward(DefaultPollInterval)
 	}
 }
 
