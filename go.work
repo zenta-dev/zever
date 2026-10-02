@@ -15,8 +15,8 @@ use (
 	./adapters/billing/stub
 	./adapters/cache/memory
 	./adapters/cache/redis
-	./adapters/crypto/local
 	./adapters/crypto/kms
+	./adapters/crypto/local
 	./adapters/db/postgres
 	./adapters/db/sqlite
 	./adapters/document/latex
@@ -31,9 +31,9 @@ use (
 	./adapters/geo/static
 	./adapters/i18n/embed
 	./adapters/i18n/remote
+	./adapters/idempotency/db
 	./adapters/idempotency/memory
 	./adapters/idempotency/redis
-	./adapters/idempotency/db
 	./adapters/lock/memory
 	./adapters/lock/redis
 	./adapters/log/noop
@@ -65,15 +65,16 @@ use (
 	./adapters/router/fiber
 	./adapters/router/stdhttp
 	./adapters/scheduler/embedded
+	./adapters/scheduler/postgres
 	./adapters/search/meilisearch
 	./adapters/search/postgres
 	./adapters/search/sqlite
 	./adapters/secrets/env
 	./adapters/secrets/vault
 	./adapters/session/cookie
+	./adapters/session/db
 	./adapters/session/memory
 	./adapters/session/redis
-	./adapters/session/db
 	./adapters/storage/local
 	./adapters/storage/r2
 	./adapters/storage/s3
@@ -139,6 +140,7 @@ use (
 	./shared/endpoint
 	./shared/firebase
 	./shared/httpclient
+	./shared/kvstore
 	./shared/lrucache
 	./shared/providersclient
 	./shared/providersopt
@@ -146,7 +148,6 @@ use (
 	./shared/redisopt
 	./shared/registry
 	./shared/retry
-	./shared/kvstore
 	./shared/s3opts
 	./shared/traceprop
 	./tools/affected
