@@ -12,6 +12,15 @@
 //     jwt.WithIssuer/WithAudience. When empty, tokens carrying an
 //     issuer/audience are rejected to avoid cross-tenant bypass when the
 //     same HMAC secret is shared across tenants.
+//
+// Timestamps (exp, iat) are second-precision on the wire: NumericDate
+// serializes as unix seconds, so sub-second TTLs round down and expiry
+// checks resolve to whole seconds. Keep TTLs >= 1s.
+//
+// Proposal (not implemented -- wire change): a sub-second-precision
+// envelope would need a versioned claim or a new token version, breaking
+// every issued token, so it stays a proposal until a token versioning
+// scheme exists.
 package jwt
 
 import (
@@ -21,6 +30,7 @@ import (
 	"errors"
 	"fmt"
 	"io"
+	"sync/atomic"
 	"time"
 
 	jwtv5 "github.com/golang-jwt/jwt/v5"
@@ -47,8 +57,10 @@ type adapter struct {
 	issuer   string
 	audience string
 	maxTTL   time.Duration
+	leeway   time.Duration
 
 	revocation revocation.Store
+	closed     atomic.Bool
 }
 
 // New builds an HS256 JWT Auth from opts.
@@ -82,6 +94,7 @@ func New(opts auth.Options) (auth.Auth, error) {
 		issuer:     opts.JWT.Issuer,
 		audience:   opts.JWT.Audience,
 		maxTTL:     opts.JWT.MaxTTL,
+		leeway:     opts.JWT.Leeway,
 		revocation: store,
 	}
 	return a, nil
@@ -106,11 +119,24 @@ func (a *adapter) parserOptions() []jwtv5.ParserOption {
 	if a.audience != "" {
 		options = append(options, jwtv5.WithAudience(a.audience))
 	}
+	if a.leeway > 0 {
+		options = append(options, jwtv5.WithLeeway(a.leeway))
+	}
 	return options
+}
+
+// closedErr reports use after Close. It joins auth.ErrInvalidToken so
+// callers matching on the existing error taxonomy keep failing closed
+// without learning a new sentinel.
+func (a *adapter) closedErr(op string) error {
+	return fmt.Errorf("jwt: %s: %w: adapter closed", op, auth.ErrInvalidToken)
 }
 
 // Issue mints an HS256 token for subject carrying custom claims for ttl.
 func (a *adapter) Issue(_ context.Context, subject string, custom map[string]any, ttl time.Duration) (auth.Token, error) {
+	if a.closed.Load() {
+		return auth.Token{}, a.closedErr("issue")
+	}
 	if subject == "" {
 		return auth.Token{}, fmt.Errorf("jwt: issue: %w: empty subject", auth.ErrInvalidToken)
 	}
@@ -160,6 +186,9 @@ func (a *adapter) Issue(_ context.Context, subject string, custom map[string]any
 
 // Verify authenticates token and returns its claims.
 func (a *adapter) Verify(ctx context.Context, token string) (auth.Claims, error) {
+	if a.closed.Load() {
+		return auth.Claims{}, a.closedErr("verify")
+	}
 	if token == "" {
 		return auth.Claims{}, auth.ErrInvalidToken
 	}
@@ -235,6 +264,9 @@ func (a *adapter) Verify(ctx context.Context, token string) (auth.Claims, error)
 // wrapping revocation.ErrNoJTI: adapter-issued tokens always carry a jti
 // (see Issue), so this only rejects hand-crafted or foreign tokens.
 func (a *adapter) Revoke(ctx context.Context, token string) error {
+	if a.closed.Load() {
+		return a.closedErr("revoke")
+	}
 	if token == "" {
 		return fmt.Errorf("jwt: revoke: %w: empty token", auth.ErrInvalidToken)
 	}
@@ -269,7 +301,11 @@ func (a *adapter) Revoke(ctx context.Context, token string) error {
 	return nil
 }
 
-// Close releases the revocation store's resources. Idempotent.
+// Close releases the revocation store's resources and zeroes the HMAC
+// secret copy so key material does not linger after shutdown. Idempotent:
+// signing and verification fail closed once closed.
 func (a *adapter) Close() error {
+	a.closed.Store(true)
+	clear(a.secret)
 	return a.revocation.Close()
 }

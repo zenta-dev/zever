@@ -9,6 +9,13 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Added
 
+- Security hardening (additive, fail-closed defaults): `authz`
+  `UnaryServerInterceptorStrict` denying unlisted gRPC methods; opt-in
+  `Policy.OwnerField` wiring into resource attributes; `permission.Options`
+  rejects `Rules` combined with `ModelPath`; JWT `Leeway` option for clock
+  skew (default 0); secret zeroization on `Close` for the JWT and local
+  crypto adapters; session/OIDC revocation and timestamp-precision doc
+  notes.
 - Conformance kits for 11 batteries (`lock`, `ratelimit`, `eventbus`,
   `idempotency`, `flag`, `log`, `observability`, `crypto`, `password`,
   `billing`, `payment`) plus adapter wiring; kit list in
