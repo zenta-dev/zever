@@ -4,6 +4,7 @@ import (
 	"context"
 	"errors"
 	"fmt"
+	"strconv"
 	"strings"
 	"time"
 
@@ -28,6 +29,11 @@ var ErrInvalidKey = errors.New("kvstore: invalid key")
 // ErrInvalidTable is returned when the table name is outside the
 // identifier shape the DDL interpolation requires.
 var ErrInvalidTable = errors.New("kvstore: invalid table")
+
+// ErrInvalidInteger is returned when AddDelta finds a present, unexpired
+// record whose value is not a base-10 int64. Future cache/db adapters map
+// it to cache.InvalidValueError{Key}.
+var ErrInvalidInteger = errors.New("kvstore: invalid integer")
 
 // kvRow is the key-value entity. Column order matches kvColumns: the
 // positional Scan must read them in exactly this order.
@@ -349,6 +355,98 @@ func (s *Store) SetNX(ctx context.Context, key string, value []byte, ttl time.Du
 	}
 
 	return true, nil
+}
+
+// AddDelta atomically adds delta to the decimal integer stored under key
+// and returns the new value. A missing or expired record behaves as base 0
+// (expired rows are deleted and recreated with no expiry, mirroring Get's
+// lazy delete); a present record keeps its existing expires_at — only the
+// value column is rewritten. Values are stored as base-10 ASCII bytes, so a
+// present but non-numeric value fails with ErrInvalidInteger and the stored
+// value is left untouched.
+//
+// Atomicity is per-row read-modify-write inside a transaction (SELECT, then
+// ParseInt in Go, then UPDATE or INSERT): Go-side parsing is what keeps
+// sqlite honest, where CAST(value AS INTEGER) would silently coerce "abc" to
+// 0. Concurrent increments on the same key are serialized by the database
+// write lock; under postgres ReadCommitted two overlapping transactions can
+// still interleave their reads (no SELECT FOR UPDATE — sqlite rejects it),
+// so strict counter use under high contention should retry on conflict
+// rather than assume single-statement linearity.
+func (s *Store) AddDelta(ctx context.Context, key string, delta int64) (int64, error) {
+	if err := ctx.Err(); err != nil {
+		return 0, err
+	}
+
+	if err := validateKey(key); err != nil {
+		return 0, err
+	}
+
+	if err := s.checkDialect(); err != nil {
+		return 0, err
+	}
+
+	var out int64
+
+	err := orm.WithNestedTx(ctx, s.db, func(txCtx context.Context, tx coredb.Tx) error {
+		row, found, qerr := orm.From[kvRow, *kvRow](s.tbl).Where(s.cKey.Eq(key)).First(txCtx, tx)
+		if qerr != nil {
+			return fmt.Errorf("kvstore: adddelta %q: %w", key, qerr)
+		}
+
+		var (
+			cur    int64
+			exists bool
+		)
+
+		if found {
+			if expired(row.ExpiresAt, time.Now()) {
+				if _, derr := orm.DeleteFrom(s.tbl).Where(s.cKey.Eq(key)).Exec(txCtx, tx); derr != nil {
+					return fmt.Errorf("kvstore: adddelta %q: %w", key, derr)
+				}
+			} else {
+				n, perr := strconv.ParseInt(string(row.Value), 10, 64)
+				if perr != nil {
+					return fmt.Errorf("kvstore: adddelta %q: %w: %w", key, ErrInvalidInteger, perr)
+				}
+
+				cur = n
+				exists = true
+			}
+		}
+
+		out = cur + delta
+		raw := []byte(strconv.FormatInt(out, 10))
+
+		if !exists {
+			if ierr := orm.InsertInto(s.tbl).Values(
+				orm.Set(s.cKey, key),
+				orm.Set(s.cValue, raw),
+				orm.Set(s.cExpires, time.Time{}),
+			).Exec(txCtx, tx); ierr != nil {
+				return fmt.Errorf("kvstore: adddelta %q: %w", key, ierr)
+			}
+
+			return nil
+		}
+
+		n, uerr := orm.UpdateTable(s.tbl).Where(s.cKey.Eq(key)).
+			Set(orm.Set(s.cValue, raw)).Exec(txCtx, tx)
+		if uerr != nil {
+			return fmt.Errorf("kvstore: adddelta %q: %w", key, uerr)
+		}
+
+		if n != 1 {
+			return fmt.Errorf("kvstore: adddelta %q: lost update", key)
+		}
+
+		return nil
+	})
+	if err != nil {
+		return 0, err
+	}
+
+	return out, nil
 }
 
 // Delete removes key; missing keys return nil.
