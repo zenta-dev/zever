@@ -320,7 +320,8 @@
         "url": { "type": "string", "description": "Takes precedence over addr when set." },
         "prefix": { "type": "string" },
         "ttl": { "$ref": "#/$defs/durationNs", "description": "Zero means adapter default (30s)." },
-        "retry_interval": { "$ref": "#/$defs/durationNs", "description": "Zero means adapter default (50ms)." }
+        "retry_interval": { "$ref": "#/$defs/durationNs", "description": "Zero means adapter default (50ms)." },
+        "max_entries": { "type": "integer", "description": "Memory adapter lease-table bound before LRU eviction; evicted live leases report ErrNotHeld. Non-positive means 1000." }
       }
     },
     "logOptions": {
