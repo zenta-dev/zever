@@ -153,7 +153,6 @@ replace (
 	github.com/zenta-dev/zever/adapters/scheduler/embedded => ../../adapters/scheduler/embedded
 	github.com/zenta-dev/zever/adapters/search/meilisearch => ../../adapters/search/meilisearch
 	github.com/zenta-dev/zever/adapters/search/postgres => ../../adapters/search/postgres
-	github.com/zenta-dev/zever/adapters/search/sqlite => ../../adapters/search/sqlite
 	github.com/zenta-dev/zever/adapters/secrets/env => ../../adapters/secrets/env
 	github.com/zenta-dev/zever/adapters/session/cookie => ../../adapters/session/cookie
 	github.com/zenta-dev/zever/adapters/session/memory => ../../adapters/session/memory

@@ -71,13 +71,13 @@ fail the load, so keep the block to exactly these keys.
 
 ```go
 import (
-	searchsqlite "github.com/zenta-dev/zever/adapters/search/sqlite"
+	searchpostgres "github.com/zenta-dev/zever/adapters/search/postgres"
 	"github.com/zenta-dev/zever/config"
 	"github.com/zenta-dev/zever/container"
 )
 
 func openSearch() error {
-	searchsqlite.Register()
+	searchpostgres.Register()
 
 	c := container.New(config.Default())
 	s, err := c.Search()
@@ -100,8 +100,8 @@ probes it during `Close(ctx)` as a snapshot service with no leaf ordering.
 ## Runnable example
 
 Index two space documents in one batch call, then run a ranked query with an
-explicit index filter and paging. Batch indexing keeps bulk imports to one
-round trip instead of one call per document.
+explicit index filter and paging. Batch indexing validates every document
+before writing any.
 
 ```go
 package main
@@ -110,12 +110,12 @@ import (
 	"context"
 	"fmt"
 
-	searchsqlite "github.com/zenta-dev/zever/adapters/search/sqlite"
+	searchpostgres "github.com/zenta-dev/zever/adapters/search/postgres"
 	"github.com/zenta-dev/zever/core/search"
 )
 
 func main() error {
-	searchsqlite.Register()
+	searchpostgres.Register()
 	s, err := search.Open(search.SQLite, search.Options{DSN: ":memory:"})
 	if err != nil {
 		return err
@@ -163,7 +163,7 @@ Backend contrast for the same query surface:
 
 | Adapter | Package | Notes |
 |---|---|---|
-| `sqlite` | `search/sqlite` | Default, embedded FTS, `dsn` is a path or `:memory:` |
+| `sqlite` | `search/postgres` | Default, embedded FTS, `dsn` is a path or `:memory:` (served by the postgres package) |
 | `postgres` | `search/postgres` | Reuses relational infra, `dsn` is a postgres URL |
 | `meilisearch` | `search/meilisearch` | External cluster, needs `host` and `api_key` |
 

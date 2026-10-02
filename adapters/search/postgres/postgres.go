@@ -2,117 +2,255 @@ package postgres
 
 import (
 	"context"
+	"errors"
 	"fmt"
 	"strings"
-	"time"
+	"sync/atomic"
 
-	"github.com/jackc/pgx/v5"
-	"github.com/jackc/pgx/v5/pgconn"
-	"github.com/jackc/pgx/v5/pgxpool"
-
+	dbpostgres "github.com/zenta-dev/zever/adapters/db/postgres"
+	dbsqlite "github.com/zenta-dev/zever/adapters/db/sqlite"
+	coredb "github.com/zenta-dev/zever/core/db"
 	"github.com/zenta-dev/zever/core/search"
+	"github.com/zenta-dev/zever/orm"
+	"github.com/zenta-dev/zever/orm/dialect"
 	"github.com/zenta-dev/zever/shared/codec"
 )
 
 var metadataCodec = codec.JSONCodec[map[string]any]{}
 
-const createTable = `CREATE TABLE IF NOT EXISTS search_documents (
-	id TEXT NOT NULL,
-	idx TEXT NOT NULL,
-	content TEXT NOT NULL,
-	metadata JSONB,
-	PRIMARY KEY (id, idx)
-)`
-
-const createIndex = `CREATE INDEX IF NOT EXISTS search_documents_content_idx
-	ON search_documents USING GIN (to_tsvector('english', content))`
-
-// dbpool is the narrow pool seam used by postgres. *pgxpool.Pool satisfies it;
-// tests substitute scripted fakes so no live database is required.
-type dbpool interface {
-	Exec(ctx context.Context, sql string, args ...any) (pgconn.CommandTag, error)
-	Query(ctx context.Context, sql string, args ...any) (pgx.Rows, error)
-	Close()
+// docRow is the search_documents entity. Column order matches docColumns:
+// the positional Scan must read them in exactly this order.
+type docRow struct {
+	ID       string
+	Index    string
+	Content  string
+	Metadata []byte
 }
 
-var _ dbpool = (*pgxpool.Pool)(nil)
+// docColumns is the entity column list in Scan order.
+var docColumns = []string{"id", "idx", "content", "metadata"}
 
-// DefaultDDLTimeout bounds connect plus DDL during construction. Shared 10s
-// floor with vectorstore/pgvector: pgvector ivfflat index build slower than
-// plain B-tree/GIN; single budget for connect+DDL during construction so they
-// don't drift. Server backend; local embedded DB uses 5s.
-const DefaultDDLTimeout = 10 * time.Second
+// Scan reads one row positionally, coercing driver representations:
+// metadata arrives as []byte (postgres JSONB, sqlite BLOB) or string.
+func (r *docRow) Scan(row orm.Row) error {
+	var id, index, content string
 
-type postgres struct {
-	db dbpool
+	var metaRaw any
+
+	if err := row.Scan(&id, &index, &content, &metaRaw); err != nil {
+		return err
+	}
+
+	meta, err := coerceMeta(metaRaw)
+	if err != nil {
+		return err
+	}
+
+	*r = docRow{ID: id, Index: index, Content: content, Metadata: meta}
+
+	return nil
 }
 
-// newPool constructs the connection pool. It is a variable (rather than a
-// direct pgxpool.New call) so tests can stub the seam without a live database.
-// Production pools go through PoolConfig with DefaultMaxConns so adapters
-// sharing one DSN stay bounded; see PoolConfig for sharing guidance.
-var newPool = func(ctx context.Context, dsn string) (dbpool, error) {
-	cfg, err := PoolConfig(dsn, DefaultMaxConns)
+// coerceMeta converts a metadata cell to raw JSON bytes.
+func coerceMeta(v any) ([]byte, error) {
+	switch t := v.(type) {
+	case nil:
+		return nil, nil
+	case []byte:
+		return t, nil
+	case string:
+		return []byte(t), nil
+	default:
+		return nil, fmt.Errorf("postgres: unsupported metadata %T", v)
+	}
+}
+
+// driver is a DB-backed search.Search. It is safe for concurrent use.
+type driver struct {
+	conn   coredb.DB
+	tbl    orm.Table[docRow]
+	cID    orm.Column[docRow, string]
+	cIdx   orm.Column[docRow, string]
+	cBody  orm.Column[docRow, string]
+	cMeta  orm.Column[docRow, []byte]
+	owns   bool
+	closed atomic.Bool
+}
+
+var _ search.Search = (*driver)(nil)
+
+// New creates a DB-backed search.Search. Empty DSN selects sqlite at Path
+// (default ":memory:"); a postgres URL DSN opens postgres; any other
+// non-empty DSN is a sqlite file path. The schema (documents table plus the
+// postgres GIN index or the sqlite FTS5 index) is created when missing. The
+// driver owns its connection: Close releases it.
+func New(o Options) (search.Search, error) {
+	return Open(o)
+}
+
+// Open creates a DB-backed search.Search; see New.
+func Open(o Options) (search.Search, error) {
+	if err := o.Validate(); err != nil {
+		return nil, err
+	}
+
+	poolOpts := o.Options
+
+	var (
+		conn coredb.DB
+		err  error
+	)
+
+	switch {
+	case strings.TrimSpace(poolOpts.DSN) == "" && poolOpts.Path == "":
+		poolOpts.Path = ":memory:"
+		conn, err = dbsqlite.New(poolOpts)
+	case isPostgresDSN(poolOpts.DSN):
+		conn, err = dbpostgres.New(poolOpts)
+	case strings.TrimSpace(poolOpts.DSN) != "":
+		poolOpts.Path = poolOpts.DSN
+		poolOpts.DSN = ""
+		conn, err = dbsqlite.New(poolOpts)
+	default:
+		conn, err = dbsqlite.New(poolOpts)
+	}
+
 	if err != nil {
 		return nil, err
 	}
 
-	return pgxpool.NewWithConfig(ctx, cfg)
+	d, err := openFromDB(conn, o, true)
+	if err != nil {
+		_ = conn.Close(context.Background())
+
+		return nil, err
+	}
+
+	return d, nil
 }
 
-// New creates a postgres-backed search.Search.
-// An empty DSN returns a dev no-op instance (nil pool) so container
-// construction succeeds in dev; every operation on it reports ErrNotConfigured.
-// Otherwise a single 10s budget covers connect plus DDL.
-//
-// Pool guidance: search opens its own pool per New call. When search,
-// vectorstore, and db share one Postgres DSN, keep the sum of per-adapter
-// MaxConns below the server's max_connections. New uses DefaultMaxConns;
-// for a custom cap, build a config with PoolConfig and open the pool beside
-// this adapter without changing this signature.
-func New(o search.Options) (search.Search, error) {
+// NewFromDB creates a DB-backed search.Search over an already-open
+// coredb.DB, skipping DSN/Path construction. The caller retains ownership
+// of db: Close on the returned Search does not close db, and a failed
+// NewFromDB never closes db. Only sqlite and postgres dialects are
+// supported; anything else fails closed.
+func NewFromDB(conn coredb.DB, o Options) (search.Search, error) {
+	if conn == nil {
+		return nil, errors.New("postgres: db must not be nil")
+	}
+
 	if err := o.Validate(); err != nil {
-		return nil, fmt.Errorf("postgres: %w", err)
+		return nil, err
 	}
 
-	if o.DSN == "" {
-		return &postgres{db: nil}, nil
-	}
+	return openFromDB(conn, o, false)
+}
 
-	ctx, cancel := context.WithTimeout(context.Background(), DefaultDDLTimeout)
+// OpenFromDB creates a DB-backed search.Search over an already-open
+// coredb.DB; see NewFromDB.
+func OpenFromDB(conn coredb.DB, o Options) (search.Search, error) {
+	return NewFromDB(conn, o)
+}
+
+// openFromDB pings conn, ensures the schema, and wires the driver. owns
+// reports whether the driver owns conn and may close it in Close.
+func openFromDB(conn coredb.DB, _ Options, owns bool) (search.Search, error) {
+	ctx, cancel := context.WithTimeout(context.Background(), DefaultConnectTimeout)
 	defer cancel()
 
-	pool, err := newPool(ctx, o.DSN)
-	if err != nil {
-		return nil, fmt.Errorf("postgres: open: %w", err)
+	if err := conn.Ping(ctx); err != nil {
+		return nil, err
 	}
 
-	if _, err := pool.Exec(ctx, createTable); err != nil {
-		pool.Close()
+	const table = "search_documents"
 
-		return nil, fmt.Errorf("postgres: create table: %w", err)
+	d := &driver{
+		conn:  conn,
+		tbl:   orm.NewTable[docRow](table, docColumns),
+		cID:   orm.NewColumn[docRow, string](table, "id"),
+		cIdx:  orm.NewColumn[docRow, string](table, "idx"),
+		cBody: orm.NewColumn[docRow, string](table, "content"),
+		cMeta: orm.NewColumn[docRow, []byte](table, "metadata"),
+		owns:  owns,
 	}
 
-	if _, err := pool.Exec(ctx, createIndex); err != nil {
-		pool.Close()
-
-		return nil, fmt.Errorf("postgres: create index: %w", err)
+	if err := d.ensureSchema(ctx); err != nil {
+		return nil, err
 	}
 
-	return &postgres{db: pool}, nil
+	return d, nil
 }
 
-// indexRowCols is the number of bind parameters IndexBatch's per-row
-// placeholder ($n, $n, $n, $n) consumes.
-const indexRowCols = 4
+// checkDialect fails closed on dialects outside sqlite/postgres.
+func (d *driver) checkDialect() error {
+	switch d.conn.Dialect() {
+	case "sqlite", "postgres":
+		return nil
+	default:
+		return fmt.Errorf("orm: postgres: unsupported dialect %q: %w",
+			d.conn.Dialect(), dialect.ErrUnsupportedByDialect)
+	}
+}
 
-// maxIndexBatchRows caps rows per INSERT statement in IndexBatch. Postgres's
-// extended-protocol wire format allows at most 65535 bind parameters per
-// statement; at indexRowCols (4) params/row that's a hard ceiling around
-// 16383 rows. maxIndexBatchRows keeps 4*15000 = 60000 params per statement, a
-// generous margin under the 65535 limit rather than cutting it at the
-// boundary.
-const maxIndexBatchRows = 15000
+// ensureSchema creates the documents table plus the dialect full-text
+// index when missing. DDL only: writes below go through the orm typed
+// builder, and ranked reads use dialect-parameterized SELECTs (the orm
+// query API cannot project the ts_rank/bm25 score expression alongside
+// rows -- see orm/fts/postgres's Rank limitation note).
+func (d *driver) ensureSchema(ctx context.Context) error {
+	if err := d.checkDialect(); err != nil {
+		return err
+	}
+
+	if d.conn.Dialect() == "postgres" {
+		for _, ddl := range []string{
+			`CREATE TABLE IF NOT EXISTS search_documents (` +
+				`id TEXT NOT NULL, ` +
+				`idx TEXT NOT NULL, ` +
+				`content TEXT NOT NULL, ` +
+				`metadata JSONB, ` +
+				`PRIMARY KEY (id, idx))`,
+			`CREATE INDEX IF NOT EXISTS search_documents_content_idx ` +
+				`ON search_documents USING GIN (to_tsvector('english', content))`,
+		} {
+			if _, err := d.conn.Exec(ctx, ddl); err != nil {
+				return fmt.Errorf("postgres: ensure schema: %w", err)
+			}
+		}
+	} else {
+		// External-content FTS5 plus triggers is the documented
+		// keep-in-sync shape: writes touch only search_documents (via
+		// orm) and the triggers mirror them into search_fts.
+		for _, ddl := range []string{
+			`CREATE TABLE IF NOT EXISTS search_documents (` +
+				`id TEXT NOT NULL, ` +
+				`idx TEXT NOT NULL, ` +
+				`content TEXT NOT NULL, ` +
+				`metadata BLOB, ` +
+				`PRIMARY KEY (id, idx))`,
+			`CREATE VIRTUAL TABLE IF NOT EXISTS search_fts USING fts5(` +
+				`content, id UNINDEXED, idx UNINDEXED, ` +
+				`content='search_documents', content_rowid='rowid')`,
+			`CREATE TRIGGER IF NOT EXISTS search_fts_ai AFTER INSERT ON search_documents BEGIN ` +
+				`INSERT INTO search_fts(rowid, content, id, idx) ` +
+				`VALUES (new.rowid, new.content, new.id, new.idx); END`,
+			`CREATE TRIGGER IF NOT EXISTS search_fts_ad AFTER DELETE ON search_documents BEGIN ` +
+				`INSERT INTO search_fts(search_fts, rowid, content, id, idx) ` +
+				`VALUES ('delete', old.rowid, old.content, old.id, old.idx); END`,
+			`CREATE TRIGGER IF NOT EXISTS search_fts_au AFTER UPDATE ON search_documents BEGIN ` +
+				`INSERT INTO search_fts(search_fts, rowid, content, id, idx) ` +
+				`VALUES ('delete', old.rowid, old.content, old.id, old.idx); ` +
+				`INSERT INTO search_fts(rowid, content, id, idx) ` +
+				`VALUES (new.rowid, new.content, new.id, new.idx); END`,
+		} {
+			if _, err := d.conn.Exec(ctx, ddl); err != nil {
+				return fmt.Errorf("postgres: ensure schema: %w", err)
+			}
+		}
+	}
+
+	return nil
+}
 
 // encodeDocumentMetadata clones doc's metadata with its content injected
 // under the "content" key (without mutating the caller's map) and encodes
@@ -129,10 +267,31 @@ func encodeDocumentMetadata(doc search.Document) ([]byte, error) {
 	return metadataCodec.Encode(meta)
 }
 
+// upsertOne writes one document with INSERT ... ON CONFLICT (id, idx)
+// DO UPDATE so re-indexing replaces the row. Batch callers loop it: the
+// typed builder has no EXCLUDED reference, so one shared DO UPDATE SET list
+// cannot carry per-row replacement values for a multi-row statement.
+func (d *driver) upsertOne(ctx context.Context, op string, doc search.Document, metaJSON []byte) error {
+	err := orm.InsertInto(d.tbl).Values(
+		orm.Set(d.cID, doc.ID),
+		orm.Set(d.cIdx, doc.Index),
+		orm.Set(d.cBody, doc.Content),
+		orm.Set(d.cMeta, metaJSON),
+	).OnConflict(d.cID.Col(), d.cIdx.Col()).DoUpdate(
+		orm.Set(d.cBody, doc.Content),
+		orm.Set(d.cMeta, metaJSON),
+	).Exec(ctx, d.conn)
+	if err != nil {
+		return fmt.Errorf("postgres: %s: %w", op, err)
+	}
+
+	return nil
+}
+
 // Index adds or replaces doc in its index.
-func (p *postgres) Index(ctx context.Context, doc search.Document) error {
-	if p.db == nil {
-		return ErrNotConfigured
+func (d *driver) Index(ctx context.Context, doc search.Document) error {
+	if err := d.checkDialect(); err != nil {
+		return err
 	}
 
 	if err := doc.Validate(); err != nil {
@@ -144,25 +303,14 @@ func (p *postgres) Index(ctx context.Context, doc search.Document) error {
 		return fmt.Errorf("postgres: index: %w", err)
 	}
 
-	_, err = p.db.Exec(ctx,
-		`INSERT INTO search_documents (id, idx, content, metadata)
-		 VALUES ($1, $2, $3, $4)
-		 ON CONFLICT (id, idx) DO UPDATE SET content = $5, metadata = $6`,
-		doc.ID, doc.Index, doc.Content, metaJSON, doc.Content, metaJSON)
-	if err != nil {
-		return fmt.Errorf("postgres: index: %w", err)
-	}
-
-	return nil
+	return d.upsertOne(ctx, "index", doc, metaJSON)
 }
 
-// IndexBatch adds or replaces all of docs, chunked into multi-row INSERT
-// statements of at most maxIndexBatchRows rows each to stay under Postgres's
-// bind-parameter limit, still far fewer round trips than one-by-one calls. An
-// empty docs is a no-op.
-func (p *postgres) IndexBatch(ctx context.Context, docs []search.Document) error {
-	if p.db == nil {
-		return ErrNotConfigured
+// IndexBatch adds or replaces all of docs, one typed upsert per document
+// (see upsertOne). An empty docs is a no-op.
+func (d *driver) IndexBatch(ctx context.Context, docs []search.Document) error {
+	if err := d.checkDialect(); err != nil {
+		return err
 	}
 
 	if len(docs) == 0 {
@@ -175,13 +323,13 @@ func (p *postgres) IndexBatch(ctx context.Context, docs []search.Document) error
 		}
 	}
 
-	for start := 0; start < len(docs); start += maxIndexBatchRows {
-		end := start + maxIndexBatchRows
-		if end > len(docs) {
-			end = len(docs)
+	for i, doc := range docs {
+		metaJSON, err := encodeDocumentMetadata(doc)
+		if err != nil {
+			return fmt.Errorf("postgres: index batch: index %d: %w", i, err)
 		}
 
-		if err := p.indexBatchChunk(ctx, docs[start:end]); err != nil {
+		if err := d.upsertOne(ctx, "index batch", doc, metaJSON); err != nil {
 			return err
 		}
 	}
@@ -189,50 +337,20 @@ func (p *postgres) IndexBatch(ctx context.Context, docs []search.Document) error
 	return nil
 }
 
-// indexBatchChunk executes a single multi-row INSERT for chunk, which must
-// be small enough to stay under Postgres's bind-parameter limit.
-func (p *postgres) indexBatchChunk(ctx context.Context, chunk []search.Document) error {
-	placeholders := make([]string, 0, len(chunk))
-	args := make([]any, 0, len(chunk)*indexRowCols)
-
-	for i, doc := range chunk {
-		metaJSON, err := encodeDocumentMetadata(doc)
-		if err != nil {
-			return fmt.Errorf("postgres: index batch: %w", err)
-		}
-
-		base := i * indexRowCols
-		placeholders = append(placeholders, fmt.Sprintf("($%d, $%d, $%d, $%d)", base+1, base+2, base+3, base+4))
-		args = append(args, doc.ID, doc.Index, doc.Content, metaJSON)
-	}
-
-	query := fmt.Sprintf(
-		`INSERT INTO search_documents (id, idx, content, metadata) VALUES %s
-		 ON CONFLICT (id, idx) DO UPDATE SET content = EXCLUDED.content, metadata = EXCLUDED.metadata`,
-		strings.Join(placeholders, ", "),
-	)
-
-	if _, err := p.db.Exec(ctx, query, args...); err != nil {
-		return fmt.Errorf("postgres: index batch: %w", err)
-	}
-
-	return nil
-}
-
 // Delete removes the document with id.
-func (p *postgres) Delete(ctx context.Context, id string) error {
-	if p.db == nil {
-		return ErrNotConfigured
+func (d *driver) Delete(ctx context.Context, id string) error {
+	if err := d.checkDialect(); err != nil {
+		return err
 	}
 
 	// RowsAffected replaces the RETURNING round trip with identical behavior:
 	// zero affected rows means the document does not exist.
-	tag, err := p.db.Exec(ctx, `DELETE FROM search_documents WHERE id = $1`, id)
+	n, err := orm.DeleteFrom(d.tbl).Where(d.cID.Eq(id)).Exec(ctx, d.conn)
 	if err != nil {
 		return fmt.Errorf("postgres: delete: %w", err)
 	}
 
-	if tag.RowsAffected() == 0 {
+	if n == 0 {
 		// notFound is typed as error first: go vet's printf check rejects
 		// %w with *NotFoundError directly (value-receiver Error method);
 		// same pattern as search/meilisearch.
@@ -289,10 +407,41 @@ func buildSearchQueries(
 	return sb.String(), countSQL, hitsArgs, countArgs
 }
 
+// buildMatch sanitizes query into an FTS5 MATCH expression. Each
+// whitespace-separated token is stripped of double quotes (which would
+// otherwise break out of phrase quoting or unbalance the expression),
+// empty tokens are dropped, and the survivors are wrapped in double quotes
+// and joined with spaces. Quoted phrases are literals in FTS5, so quoting
+// every token neutralizes keywords (AND/OR/NOT/NEAR), column filters (:),
+// and grouping parens; tokens join with implicit AND. A trailing * keeps
+// its FTS5 prefix meaning inside quotes. It returns "" when no usable token
+// remains; callers must skip querying.
+func buildMatch(query string) string {
+	var b strings.Builder
+
+	for _, tok := range strings.Fields(query) {
+		tok = strings.ReplaceAll(tok, `"`, "")
+
+		if tok == "" {
+			continue
+		}
+
+		if b.Len() > 0 {
+			b.WriteByte(' ')
+		}
+
+		b.WriteByte('"')
+		b.WriteString(tok)
+		b.WriteByte('"')
+	}
+
+	return b.String()
+}
+
 // Search runs query with opts and returns ranked hits.
-func (p *postgres) Search(ctx context.Context, query string, opts search.QueryOptions) (search.Result, error) {
-	if p.db == nil {
-		return search.Result{}, ErrNotConfigured
+func (d *driver) Search(ctx context.Context, query string, opts search.QueryOptions) (search.Result, error) {
+	if err := d.checkDialect(); err != nil {
+		return search.Result{}, err
 	}
 
 	limit := opts.Limit
@@ -305,34 +454,40 @@ func (p *postgres) Search(ctx context.Context, query string, opts search.QueryOp
 		offset = 0
 	}
 
-	hitsSQL, countSQL, hitsArgs, countArgs := buildSearchQueries(query, opts.Filters, limit, offset)
+	if d.conn.Dialect() == "postgres" {
+		return d.searchPostgres(ctx, query, opts.Filters, limit, offset)
+	}
 
-	rows, err := p.db.Query(ctx, hitsSQL, hitsArgs...)
+	return d.searchSQLite(ctx, query, opts.Filters, limit, offset)
+}
+
+// searchPostgres runs the tsvector ranked query plus its COUNT(*) twin.
+func (d *driver) searchPostgres(ctx context.Context, query string, filters map[string]string, limit, offset int) (search.Result, error) {
+	hitsSQL, countSQL, hitsArgs, countArgs := buildSearchQueries(query, filters, limit, offset)
+
+	rows, err := d.conn.Query(ctx, hitsSQL, hitsArgs...)
 	if err != nil {
 		return search.Result{}, fmt.Errorf("postgres: search: %w", err)
 	}
 
-	defer rows.Close()
+	defer func() { _ = rows.Close() }()
 
 	var hits []search.Hit
 
 	for rows.Next() {
 		var id string
 
-		var metaJSON []byte
+		var metaRaw any
 
 		var score float64
 
-		if err = rows.Scan(&id, &metaJSON, &score); err != nil {
+		if err = rows.Scan(&id, &metaRaw, &score); err != nil {
 			return search.Result{}, fmt.Errorf("postgres: search scan: %w", err)
 		}
 
-		var meta map[string]any
-
-		if metaJSON != nil {
-			if meta, err = metadataCodec.Decode(metaJSON); err != nil {
-				return search.Result{}, fmt.Errorf("postgres: search scan: %w", err)
-			}
+		meta, derr := decodeHitMeta(metaRaw)
+		if derr != nil {
+			return search.Result{}, fmt.Errorf("postgres: search scan: %w", derr)
 		}
 
 		hits = append(hits, search.Hit{ID: id, Score: score, Metadata: meta})
@@ -342,38 +497,138 @@ func (p *postgres) Search(ctx context.Context, query string, opts search.QueryOp
 		return search.Result{}, fmt.Errorf("postgres: search: %w", err)
 	}
 
-	countRows, err := p.db.Query(ctx, countSQL, countArgs...)
-	if err != nil {
-		return search.Result{}, fmt.Errorf("postgres: search count: %w", err)
-	}
-
-	defer countRows.Close()
-
-	if !countRows.Next() {
-		if err := countRows.Err(); err != nil {
-			return search.Result{}, fmt.Errorf("postgres: search count: %w", err)
-		}
-
-		// Defensive: COUNT(*) always returns exactly one row.
-		return search.Result{}, fmt.Errorf("postgres: search count: no rows") //nolint:perfsprint // spec-mandated error form
-	}
-
-	var total int64
-	if err := countRows.Scan(&total); err != nil {
-		return search.Result{}, fmt.Errorf("postgres: search count: %w", err)
+	total, terr := d.searchCount(ctx, countSQL, countArgs)
+	if terr != nil {
+		return search.Result{}, terr
 	}
 
 	return search.Result{Hits: hits, Total: total}, nil
 }
 
-// Close releases backend resources. Unlike pgx rows, pool Close is void, so
-// there are no close-error branches.
-func (p *postgres) Close() error {
-	if p.db == nil {
+// searchSQLite runs the FTS5 ranked query plus its COUNT(*) twin. Scores
+// are -bm25 units (bm25 ranks lower-better, so negation orders
+// higher-first). An empty sanitized query returns an empty Result without
+// querying. Without an "index" filter the search spans all indexes: the
+// embedded DB is single-tenant, a documented difference from meilisearch.
+func (d *driver) searchSQLite(ctx context.Context, query string, filters map[string]string, limit, offset int) (search.Result, error) {
+	match := buildMatch(query)
+	if match == "" {
+		return search.Result{}, nil
+	}
+
+	where := "search_fts MATCH ?"
+
+	var filter []any
+
+	if index := filters["index"]; index != "" {
+		where += " AND d.idx = ?"
+		filter = []any{index}
+	}
+
+	hitsSQL := "SELECT d.id, d.metadata, -bm25(search_fts) FROM search_fts f" +
+		" JOIN search_documents d ON d.rowid = f.rowid WHERE " + where +
+		" ORDER BY bm25(search_fts) LIMIT ? OFFSET ?"
+	hitsArgs := append(append([]any{match}, filter...), limit, offset)
+
+	countSQL := "SELECT COUNT(*) FROM search_fts f" +
+		" JOIN search_documents d ON d.rowid = f.rowid WHERE " + where
+	countArgs := append([]any{match}, filter...)
+
+	rows, err := d.conn.Query(ctx, hitsSQL, hitsArgs...)
+	if err != nil {
+		return search.Result{}, fmt.Errorf("postgres: search: query: %w", err)
+	}
+
+	defer func() { _ = rows.Close() }()
+
+	hits := make([]search.Hit, 0)
+
+	for rows.Next() {
+		var id string
+
+		var metaRaw any
+
+		var score float64
+
+		if scanErr := rows.Scan(&id, &metaRaw, &score); scanErr != nil {
+			return search.Result{}, fmt.Errorf("postgres: search: scan: %w", scanErr)
+		}
+
+		meta, unmarshalErr := decodeHitMeta(metaRaw)
+		if unmarshalErr != nil {
+			return search.Result{}, fmt.Errorf("postgres: search: scan: %w", unmarshalErr)
+		}
+
+		hits = append(hits, search.Hit{ID: id, Score: score, Metadata: meta})
+	}
+
+	if rowsErr := rows.Err(); rowsErr != nil {
+		return search.Result{}, fmt.Errorf("postgres: search: rows: %w", rowsErr)
+	}
+
+	total, err := d.searchCount(ctx, countSQL, countArgs)
+	if err != nil {
+		return search.Result{}, err
+	}
+
+	return search.Result{Hits: hits, Total: total}, nil
+}
+
+// searchCount runs a COUNT(*) twin query shared by both dialect reads.
+func (d *driver) searchCount(ctx context.Context, countSQL string, countArgs []any) (int64, error) {
+	countRows, err := d.conn.Query(ctx, countSQL, countArgs...)
+	if err != nil {
+		return 0, fmt.Errorf("postgres: search count: %w", err)
+	}
+
+	defer func() { _ = countRows.Close() }()
+
+	if !countRows.Next() {
+		if err := countRows.Err(); err != nil {
+			return 0, fmt.Errorf("postgres: search count: %w", err)
+		}
+
+		// Defensive: COUNT(*) always returns exactly one row.
+		return 0, errors.New("postgres: search count: no rows")
+	}
+
+	var total int64
+	if err := countRows.Scan(&total); err != nil {
+		return 0, fmt.Errorf("postgres: search count: %w", err)
+	}
+
+	return total, nil
+}
+
+// decodeHitMeta decodes one hit's stored metadata JSON.
+func decodeHitMeta(metaRaw any) (map[string]any, error) {
+	metaJSON, err := coerceMeta(metaRaw)
+	if err != nil {
+		return nil, err
+	}
+
+	var meta map[string]any
+
+	if metaJSON != nil {
+		if meta, err = metadataCodec.Decode(metaJSON); err != nil {
+			return nil, err
+		}
+	}
+
+	return meta, nil
+}
+
+// Close releases the database pool when this driver owns its connection
+// (built via New/Open). Drivers built via NewFromDB/OpenFromDB borrow the
+// caller's DB and Close is a no-op. Close is idempotent.
+func (d *driver) Close() error {
+	if !d.closed.CompareAndSwap(false, true) {
 		return nil
 	}
 
-	p.db.Close()
+	if !d.owns {
+		return nil
+	}
 
-	return nil
+	return d.conn.Close(context.Background())
 }

@@ -72,7 +72,6 @@ require (
 	github.com/zenta-dev/zever/adapters/scheduler/embedded v0.5.3
 	github.com/zenta-dev/zever/adapters/search/meilisearch v0.5.3
 	github.com/zenta-dev/zever/adapters/search/postgres v0.5.3
-	github.com/zenta-dev/zever/adapters/search/sqlite v0.5.3
 	github.com/zenta-dev/zever/adapters/secrets/env v0.5.3
 	github.com/zenta-dev/zever/adapters/session/memory v0.5.3
 	github.com/zenta-dev/zever/adapters/session/redis v0.5.3
@@ -387,7 +386,6 @@ replace (
 	github.com/zenta-dev/zever/adapters/scheduler/embedded => ../../adapters/scheduler/embedded
 	github.com/zenta-dev/zever/adapters/search/meilisearch => ../../adapters/search/meilisearch
 	github.com/zenta-dev/zever/adapters/search/postgres => ../../adapters/search/postgres
-	github.com/zenta-dev/zever/adapters/search/sqlite => ../../adapters/search/sqlite
 	github.com/zenta-dev/zever/adapters/secrets/env => ../../adapters/secrets/env
 	github.com/zenta-dev/zever/adapters/session/memory => ../../adapters/session/memory
 	github.com/zenta-dev/zever/adapters/session/redis => ../../adapters/session/redis

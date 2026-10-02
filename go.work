@@ -68,7 +68,6 @@ use (
 	./adapters/scheduler/postgres
 	./adapters/search/meilisearch
 	./adapters/search/postgres
-	./adapters/search/sqlite
 	./adapters/secrets/env
 	./adapters/secrets/vault
 	./adapters/session/cookie

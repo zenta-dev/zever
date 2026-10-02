@@ -32,7 +32,7 @@ import (
 	ratelimitmemory "github.com/zenta-dev/zever/adapters/ratelimit/memory"
 	routerstdhttp "github.com/zenta-dev/zever/adapters/router/stdhttp"
 	schedulerembedded "github.com/zenta-dev/zever/adapters/scheduler/embedded"
-	searchsqlite "github.com/zenta-dev/zever/adapters/search/sqlite"
+	searchpostgres "github.com/zenta-dev/zever/adapters/search/postgres"
 	secretsenv "github.com/zenta-dev/zever/adapters/secrets/env"
 	sessionmemory "github.com/zenta-dev/zever/adapters/session/memory"
 	storagelocal "github.com/zenta-dev/zever/adapters/storage/local"
@@ -70,7 +70,7 @@ func RegisterDefaults() {
 	ratelimitmemory.Register()
 	routerstdhttp.Register()
 	schedulerembedded.Register()
-	searchsqlite.Register()
+	searchpostgres.Register()
 	secretsenv.Register()
 	sessionmemory.Register()
 	storagelocal.Register()
