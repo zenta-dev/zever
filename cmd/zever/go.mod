@@ -262,11 +262,7 @@ require (
 	github.com/valyala/bytebufferpool v1.0.0 // indirect
 	github.com/valyala/fasthttp v1.74.0 // indirect
 	github.com/xo/terminfo v0.0.0-20220910002029-abceb7e1c41e // indirect
-	github.com/zenta-dev/zever/adapters/idempotency/db v0.5.3 // indirect
 	github.com/zenta-dev/zever/adapters/media/ffmpeg v0.5.3 // indirect
-	github.com/zenta-dev/zever/adapters/scheduler/postgres v0.5.3 // indirect
-	github.com/zenta-dev/zever/adapters/session/db v0.5.3 // indirect
-	github.com/zenta-dev/zever/adapters/workflow/postgres v0.5.3 // indirect
 	github.com/zenta-dev/zever/core/billing v0.5.3 // indirect
 	github.com/zenta-dev/zever/core/job v0.5.3 // indirect
 	github.com/zenta-dev/zever/core/media v0.5.3 // indirect
@@ -497,10 +493,3 @@ replace github.com/zenta-dev/zever/core/middleware => ../../core/middleware
 
 replace github.com/zenta-dev/zever/shared/apperror => ../../shared/apperror
 
-replace github.com/zenta-dev/zever/adapters/idempotency/db => ../../adapters/idempotency/db
-
-replace github.com/zenta-dev/zever/adapters/scheduler/postgres => ../../adapters/scheduler/postgres
-
-replace github.com/zenta-dev/zever/adapters/session/db => ../../adapters/session/db
-
-replace github.com/zenta-dev/zever/adapters/workflow/postgres => ../../adapters/workflow/postgres

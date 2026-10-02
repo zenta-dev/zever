@@ -1,6 +1,7 @@
 package db
 
 import (
+	coredb "github.com/zenta-dev/zever/core/db"
 	"github.com/zenta-dev/zever/core/idempotency"
 	"github.com/zenta-dev/zever/shared/dbconn"
 )
@@ -14,5 +15,10 @@ func Register() {
 		poolOpts := dbconn.SplitDSN(o.DSN)
 		poolOpts.DedicatedPool = o.DedicatedPool
 		return New(Options{Options: poolOpts, TTL: o.TTL})
+	})
+	_ = idempotency.RegisterShared(Adapter, func(conn coredb.DB, o idempotency.Options) (idempotency.Store, error) {
+		poolOpts := dbconn.SplitDSN(o.DSN)
+		poolOpts.DedicatedPool = o.DedicatedPool
+		return OpenFromDB(conn, Options{Options: poolOpts, TTL: o.TTL})
 	})
 }

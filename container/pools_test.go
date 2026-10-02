@@ -364,11 +364,43 @@ func TestContainer_DedicatedPoolIsolation(t *testing.T) {
 	}
 }
 
+// stubSearch is a no-op search.Search proving the borrower path without
+// importing a search adapter.
+type stubSearch struct{}
+
+func (s *stubSearch) Index(_ context.Context, _ search.Document) error { return nil }
+
+func (s *stubSearch) IndexBatch(_ context.Context, _ []search.Document) error { return nil }
+
+func (s *stubSearch) Delete(_ context.Context, _ string) error { return nil }
+
+func (s *stubSearch) Search(_ context.Context, _ string, _ search.QueryOptions) (search.Result, error) {
+	return search.Result{}, nil
+}
+
+func (s *stubSearch) Close() error { return nil }
+
 func TestContainer_SharedPool_SQLiteFile(t *testing.T) {
-	// No core-registry use here: the shared path builds pools via
-	// c.pools.open and borrowers via direct OpenFromDB imports, so this
-	// test stays deterministic regardless of which fake adapters other
-	// test files registered globally (first registration wins there).
+	// The shared path builds pools via c.pools.open and borrowers via the
+	// batteries' OpenShared registries, so this test registers stub shared
+	// constructors: no adapter import, so container tests never drag
+	// adapter modules (and their SDKs) into downstream tidy graphs. No
+	// other test file registers shared factories, and factory-registry
+	// fakes for other adapters never shadow the separate shared
+	// registries, so this stays deterministic regardless of which fake
+	// adapters other test files registered globally (first registration
+	// wins there). Real OpenFromDB behavior stays covered per-adapter.
+	dbsqlite.Register()
+	_ = cache.RegisterShared(cache.DB, func(_ db.DB, _ cache.Options) (cache.Cache, error) {
+		return &fakeCache{}, nil
+	})
+	_ = queue.RegisterShared(queue.DB, func(_ db.DB, _ queue.Options) (queue.Queue, error) {
+		return &fakeQueue{}, nil
+	})
+	_ = search.RegisterShared(search.SQLite, func(_ db.DB, _ search.Options) (search.Search, error) {
+		return &stubSearch{}, nil
+	})
+
 	file := filepath.Join(t.TempDir(), "shared.db")
 	cfg := config.Default()
 	cfg.DB.Adapter = "sqlite"
@@ -381,8 +413,12 @@ func TestContainer_SharedPool_SQLiteFile(t *testing.T) {
 	cfg.Cache.Options = cache.Options{DSN: file}
 
 	c := New(cfg)
-	c.pools.warn = func(string) {}
+	var warns warnSink
+	c.pools.warn = warns.warn
+	var opens atomic.Int32
 	c.pools.open = func(_ db.Adapter, opts db.Options) (db.DB, error) {
+		opens.Add(1)
+
 		return dbsqlite.New(opts)
 	}
 
@@ -401,14 +437,21 @@ func TestContainer_SharedPool_SQLiteFile(t *testing.T) {
 		t.Fatal("DB is nil")
 	}
 
-	q, err := c.Queue()
-	must("Queue", err)
+	if _, err := c.Queue(); err != nil {
+		t.Fatalf("Queue: %v", err)
+	}
 
-	s, err := c.Search()
-	must("Search", err)
+	if _, err := c.Search(); err != nil {
+		t.Fatalf("Search: %v", err)
+	}
 
-	ch, err := c.Cache()
-	must("Cache", err)
+	if _, err := c.Cache(); err != nil {
+		t.Fatalf("Cache: %v", err)
+	}
+
+	if got := opens.Load(); got != 1 {
+		t.Errorf("pool opens = %d, want 1 shared pool", got)
+	}
 
 	snaps := c.pools.snapshot()
 	if len(snaps) != 1 {
@@ -419,32 +462,19 @@ func TestContainer_SharedPool_SQLiteFile(t *testing.T) {
 		t.Errorf("registry entry = %q, want all four borrowers", snaps[0].name)
 	}
 
-	must("Push", q.Push(ctx, "t", queue.Payload("v"), nil))
-
-	msg, err := q.Pop(ctx, "t")
-	must("Pop", err)
-
-	if string(msg.Payload) != "v" {
-		t.Errorf("Pop payload = %q, want %q", msg.Payload, "v")
+	for _, m := range warns.all() {
+		if strings.Contains(m, file) {
+			t.Errorf("warn leaks path: %q", m)
+		}
 	}
 
-	must("Ack", q.Ack(ctx, msg))
-	must("Index", s.Index(ctx, search.Document{ID: "d1", Index: "main", Content: "hello world"}))
-
-	res, err := s.Search(ctx, "hello", search.QueryOptions{Limit: 10, Filters: map[string]string{"index": "main"}})
-	must("Search", err)
-
-	if res.Total != 1 {
-		t.Errorf("Search total = %d, want 1", res.Total)
+	// The shared pool is a real sqlite pool: borrowers build over it.
+	if _, err := d.Exec(ctx, "CREATE TABLE IF NOT EXISTS probe (id INTEGER PRIMARY KEY)"); err != nil {
+		t.Fatalf("Exec over shared pool: %v", err)
 	}
 
-	must("Set", ch.Set(ctx, "k", []byte("v"), time.Minute))
-
-	got, err := ch.Get(ctx, "k")
-	must("Get", err)
-
-	if string(got) != "v" {
-		t.Errorf("Get = %q, want %q", got, "v")
+	if err := d.Ping(ctx); err != nil {
+		t.Fatalf("Ping shared pool: %v", err)
 	}
 
 	closeCtx, cancel := context.WithTimeout(t.Context(), 10*time.Second)

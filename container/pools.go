@@ -9,14 +9,6 @@ import (
 	"strings"
 	"sync"
 
-	cachedb "github.com/zenta-dev/zever/adapters/cache/db"
-	idemdb "github.com/zenta-dev/zever/adapters/idempotency/db"
-	queuedb "github.com/zenta-dev/zever/adapters/queue/db"
-	schedpostgres "github.com/zenta-dev/zever/adapters/scheduler/postgres"
-	searchpostgres "github.com/zenta-dev/zever/adapters/search/postgres"
-	sessiondb "github.com/zenta-dev/zever/adapters/session/db"
-	vectorstorepgvector "github.com/zenta-dev/zever/adapters/vectorstore/pgvector"
-	workflowpostgres "github.com/zenta-dev/zever/adapters/workflow/postgres"
 	"github.com/zenta-dev/zever/core/cache"
 	"github.com/zenta-dev/zever/core/db"
 	"github.com/zenta-dev/zever/core/idempotency"
@@ -319,6 +311,7 @@ func openShared[T any](c *Container, service, adapter string, dbAdapters []strin
 		return zero, true, err
 	}
 
+	//nolint:contextcheck // single ctx-free bridge by design: lazy accessors resolve with no caller ctx and adapter constructors take none (frozen public shapes), so there is no context to propagate — the same intentionally ctx-free boundary as the teardown callback in adapters/eventbus/redis/redis.go and the shared singleflight fetch in adapters/i18n/remote/remote.go. Pool opens use bounded internal timeouts instead of a caller ctx.
 	v, err := fromDB(conn)
 	if err != nil {
 		return zero, true, fmt.Errorf("container: %s (shared pool): %w", service, err)
@@ -368,7 +361,7 @@ func (c *Container) openSharedCache() (cache.Cache, bool, error) {
 
 	return openShared(c, "cache", c.cfg.Cache.Adapter, []string{string(cache.DB)},
 		key, backend, ok, o.DedicatedPool, poolOpts, func(conn db.DB) (cache.Cache, error) {
-			return cachedb.OpenFromDB(conn, cachedb.Options{Options: poolOpts})
+			return cache.OpenShared(cache.Adapter(c.cfg.Cache.Adapter), conn, o)
 		})
 }
 
@@ -381,13 +374,7 @@ func (c *Container) openSharedQueue() (queue.Queue, bool, error) {
 
 	return openShared(c, "queue", c.cfg.Queue.Adapter, []string{string(queue.DB)},
 		key, backend, ok, o.DedicatedPool, poolOpts, func(conn db.DB) (queue.Queue, error) {
-			return queuedb.OpenFromDB(conn, queuedb.Options{
-				Options:           poolOpts,
-				Table:             o.Table,
-				VisibilityTimeout: o.VisibilityTimeout,
-				PollTimeout:       o.PollTimeout,
-				Buffer:            o.Buffer,
-			})
+			return queue.OpenShared(queue.Adapter(c.cfg.Queue.Adapter), conn, o)
 		})
 }
 
@@ -401,7 +388,7 @@ func (c *Container) openSharedSearch() (search.Search, bool, error) {
 	return openShared(c, "search", c.cfg.Search.Adapter,
 		[]string{string(search.Postgres), string(search.SQLite)},
 		key, backend, ok, o.DedicatedPool, poolOpts, func(conn db.DB) (search.Search, error) {
-			return searchpostgres.OpenFromDB(conn, searchpostgres.Options{Options: poolOpts})
+			return search.OpenShared(search.Adapter(c.cfg.Search.Adapter), conn, o)
 		})
 }
 
@@ -412,9 +399,9 @@ func (c *Container) openSharedSession() (session.Store, bool, error) {
 	key, backend, ok := coreDSNPoolKey(o.DSN)
 	poolOpts := sharedPoolOpts(o.DSN, o.DedicatedPool)
 
-	return openShared(c, "session", c.cfg.Session.Adapter, []string{string(sessiondb.Adapter)},
+	return openShared(c, "session", c.cfg.Session.Adapter, []string{"db"}, // "db" is sessiondb.Adapter; core/session defines no DB const.
 		key, backend, ok, o.DedicatedPool, poolOpts, func(conn db.DB) (session.Store, error) {
-			return sessiondb.OpenFromDB(conn, sessiondb.Options{Options: poolOpts, TTL: o.TTL})
+			return session.OpenShared(session.Adapter(c.cfg.Session.Adapter), conn, o)
 		})
 }
 
@@ -425,9 +412,9 @@ func (c *Container) openSharedIdempotency() (idempotency.Store, bool, error) {
 	key, backend, ok := coreDSNPoolKey(o.DSN)
 	poolOpts := sharedPoolOpts(o.DSN, o.DedicatedPool)
 
-	return openShared(c, "idempotency", c.cfg.Idempotency.Adapter, []string{string(idemdb.Adapter)},
+	return openShared(c, "idempotency", c.cfg.Idempotency.Adapter, []string{"db"}, // "db" is idemdb.Adapter; core/idempotency defines no DB const.
 		key, backend, ok, o.DedicatedPool, poolOpts, func(conn db.DB) (idempotency.Store, error) {
-			return idemdb.OpenFromDB(conn, idemdb.Options{Options: poolOpts, TTL: o.TTL})
+			return idempotency.OpenShared(idempotency.Adapter(c.cfg.Idempotency.Adapter), conn, o)
 		})
 }
 
@@ -440,7 +427,7 @@ func (c *Container) openSharedWorkflow() (workflow.Workflow, bool, error) {
 
 	return openShared(c, "workflow", c.cfg.Workflow.Adapter, []string{string(workflow.Postgres)},
 		key, poolPostgres, ok, o.DedicatedPool, poolOpts, func(conn db.DB) (workflow.Workflow, error) {
-			return workflowpostgres.OpenFromDB(conn, workflowpostgres.Options{Options: poolOpts, Table: o.Table})
+			return workflow.OpenShared(workflow.Adapter(c.cfg.Workflow.Adapter), conn, o)
 		})
 }
 
@@ -461,9 +448,9 @@ func (c *Container) openSharedScheduler() (scheduler.Scheduler, bool, error) {
 	key, backend, ok := coreDSNPoolKey(opts.DSN)
 	poolOpts := sharedPoolOpts(opts.DSN, opts.DedicatedPool)
 
-	return openShared(c, "scheduler", c.cfg.Scheduler.Adapter, []string{string(schedpostgres.Adapter)},
+	return openShared(c, "scheduler", c.cfg.Scheduler.Adapter, []string{"postgres"}, // "postgres" is schedpostgres.Adapter; core/scheduler defines no Postgres const.
 		key, backend, ok, opts.DedicatedPool, poolOpts, func(conn db.DB) (scheduler.Scheduler, error) {
-			return schedpostgres.OpenFromDB(conn, schedpostgres.Options{Options: opts, PoolOptions: poolOpts})
+			return scheduler.OpenShared(scheduler.Adapter(c.cfg.Scheduler.Adapter), conn, opts)
 		})
 }
 
@@ -477,6 +464,6 @@ func (c *Container) openSharedVectorStore() (vectorstore.VectorStore, bool, erro
 		[]string{string(vectorstore.PGVector), string(vectorstore.SQLite)},
 		key, backend, ok, o.DedicatedPool, sharedPoolOpts(o.DSN, o.DedicatedPool),
 		func(conn db.DB) (vectorstore.VectorStore, error) {
-			return vectorstorepgvector.OpenFromDB(conn, o)
+			return vectorstore.OpenShared(vectorstore.Adapter(c.cfg.VectorStore.Adapter), conn, o)
 		})
 }

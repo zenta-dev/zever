@@ -76,7 +76,12 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   on exact-DSN (or same-file) match, and downgrading requires removing the
   new fields (strict decoding). Queue, workflow, and scheduler under
   sustained load should use `dedicated_pool: true` with a separate
-  database (Solid Queue guidance).
+  database (Solid Queue guidance). Wiring lives in the battery cores now:
+  each db-backed core exposes `RegisterShared`/`OpenShared` (adapters
+  register their `OpenFromDB` constructors there), so the container
+  resolves pools via `db.Open` plus the battery cores only — the scaffold
+  floor no longer vendors pgx/modernc and consumers need no lockstep
+  adapter replaces.
 - `adapters/cache/memory`: reimplemented on
   `shared/lrucache.TTLCache[string, []byte]` (deleted the hand-rolled
   map+list; `SetIfAbsent`/`CompareAndDelete`/`CompareAndExtend` and the

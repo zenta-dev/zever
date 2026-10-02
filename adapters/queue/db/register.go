@@ -1,6 +1,7 @@
 package db
 
 import (
+	coredb "github.com/zenta-dev/zever/core/db"
 	"github.com/zenta-dev/zever/core/queue"
 	"github.com/zenta-dev/zever/shared/dbconn"
 )
@@ -14,6 +15,17 @@ func Register() {
 		poolOpts := dbconn.SplitDSN(o.DSN)
 		poolOpts.DedicatedPool = o.DedicatedPool
 		return New(Options{
+			Options:           poolOpts,
+			Table:             o.Table,
+			VisibilityTimeout: o.VisibilityTimeout,
+			PollTimeout:       o.PollTimeout,
+			Buffer:            o.Buffer,
+		})
+	})
+	_ = queue.RegisterShared(Adapter, func(conn coredb.DB, o queue.Options) (queue.Queue, error) {
+		poolOpts := dbconn.SplitDSN(o.DSN)
+		poolOpts.DedicatedPool = o.DedicatedPool
+		return OpenFromDB(conn, Options{
 			Options:           poolOpts,
 			Table:             o.Table,
 			VisibilityTimeout: o.VisibilityTimeout,

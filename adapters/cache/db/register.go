@@ -2,6 +2,7 @@ package db
 
 import (
 	"github.com/zenta-dev/zever/core/cache"
+	coredb "github.com/zenta-dev/zever/core/db"
 	"github.com/zenta-dev/zever/shared/dbconn"
 )
 
@@ -14,5 +15,10 @@ func Register() {
 		poolOpts := dbconn.SplitDSN(o.DSN)
 		poolOpts.DedicatedPool = o.DedicatedPool
 		return New(Options{Options: poolOpts})
+	})
+	_ = cache.RegisterShared(Adapter, func(conn coredb.DB, o cache.Options) (cache.Cache, error) {
+		poolOpts := dbconn.SplitDSN(o.DSN)
+		poolOpts.DedicatedPool = o.DedicatedPool
+		return OpenFromDB(conn, Options{Options: poolOpts})
 	})
 }

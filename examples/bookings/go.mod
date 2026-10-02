@@ -231,15 +231,9 @@ require (
 	github.com/oklog/ulid/v2 v2.1.2 // indirect
 	github.com/remyoudompheng/bigfft v0.0.0-20230129092748-24d4a6f8daec // indirect
 	github.com/robfig/cron/v3 v3.0.1 // indirect
-	github.com/zenta-dev/zever/adapters/cache/db v0.5.3 // indirect
 	github.com/zenta-dev/zever/adapters/db/postgres v0.5.3 // indirect
-	github.com/zenta-dev/zever/adapters/idempotency/db v0.5.3 // indirect
 	github.com/zenta-dev/zever/adapters/log/noop v0.5.3 // indirect
 	github.com/zenta-dev/zever/adapters/media/ffmpeg v0.5.3 // indirect
-	github.com/zenta-dev/zever/adapters/queue/db v0.5.3 // indirect
-	github.com/zenta-dev/zever/adapters/scheduler/postgres v0.5.3 // indirect
-	github.com/zenta-dev/zever/adapters/session/db v0.5.3 // indirect
-	github.com/zenta-dev/zever/adapters/workflow/postgres v0.5.3 // indirect
 	github.com/zenta-dev/zever/core/ai v0.5.3 // indirect
 	github.com/zenta-dev/zever/core/analytics v0.5.3 // indirect
 	github.com/zenta-dev/zever/core/cache v0.5.3 // indirect
@@ -258,7 +252,6 @@ require (
 	github.com/zenta-dev/zever/shared/dbconn v0.5.3 // indirect
 	github.com/zenta-dev/zever/shared/endpoint v0.5.3 // indirect
 	github.com/zenta-dev/zever/shared/httpclient v0.5.3 // indirect
-	github.com/zenta-dev/zever/shared/kvstore v0.5.3 // indirect
 	github.com/zenta-dev/zever/shared/lrucache v0.5.3 // indirect
 	github.com/zenta-dev/zever/shared/providersopt v0.5.3 // indirect
 	github.com/zenta-dev/zever/shared/redisopt v0.5.3 // indirect
@@ -283,16 +276,3 @@ require (
 	modernc.org/sqlite v1.59.0 // indirect
 )
 
-replace github.com/zenta-dev/zever/adapters/cache/db => ../../adapters/cache/db
-
-replace github.com/zenta-dev/zever/adapters/idempotency/db => ../../adapters/idempotency/db
-
-replace github.com/zenta-dev/zever/adapters/queue/db => ../../adapters/queue/db
-
-replace github.com/zenta-dev/zever/adapters/scheduler/postgres => ../../adapters/scheduler/postgres
-
-replace github.com/zenta-dev/zever/adapters/session/db => ../../adapters/session/db
-
-replace github.com/zenta-dev/zever/adapters/workflow/postgres => ../../adapters/workflow/postgres
-
-replace github.com/zenta-dev/zever/shared/kvstore => ../../shared/kvstore

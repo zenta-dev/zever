@@ -1,6 +1,7 @@
 package postgres
 
 import (
+	coredb "github.com/zenta-dev/zever/core/db"
 	"github.com/zenta-dev/zever/core/scheduler"
 	"github.com/zenta-dev/zever/shared/dbconn"
 )
@@ -19,5 +20,10 @@ func Register() {
 		poolOpts := dbconn.SplitDSN(o.DSN)
 		poolOpts.DedicatedPool = o.DedicatedPool
 		return New(Options{Options: o, PoolOptions: poolOpts})
+	})
+	_ = scheduler.RegisterShared(Adapter, func(conn coredb.DB, o scheduler.Options) (scheduler.Scheduler, error) {
+		poolOpts := dbconn.SplitDSN(o.DSN)
+		poolOpts.DedicatedPool = o.DedicatedPool
+		return OpenFromDB(conn, Options{Options: o, PoolOptions: poolOpts})
 	})
 }

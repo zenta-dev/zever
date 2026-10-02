@@ -1,6 +1,7 @@
 package db
 
 import (
+	coredb "github.com/zenta-dev/zever/core/db"
 	"github.com/zenta-dev/zever/core/session"
 	"github.com/zenta-dev/zever/shared/dbconn"
 )
@@ -14,5 +15,10 @@ func Register() {
 		poolOpts := dbconn.SplitDSN(o.DSN)
 		poolOpts.DedicatedPool = o.DedicatedPool
 		return New(Options{Options: poolOpts, TTL: o.TTL})
+	})
+	_ = session.RegisterShared(Adapter, func(conn coredb.DB, o session.Options) (session.Store, error) {
+		poolOpts := dbconn.SplitDSN(o.DSN)
+		poolOpts.DedicatedPool = o.DedicatedPool
+		return OpenFromDB(conn, Options{Options: poolOpts, TTL: o.TTL})
 	})
 }

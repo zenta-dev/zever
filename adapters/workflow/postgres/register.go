@@ -13,4 +13,7 @@ func Register() {
 	_ = workflow.Register(Adapter, func(o workflow.Options) (workflow.Workflow, error) {
 		return New(Options{Options: coredb.Options{DSN: o.DSN, DedicatedPool: o.DedicatedPool}, Table: o.Table})
 	})
+	_ = workflow.RegisterShared(Adapter, func(conn coredb.DB, o workflow.Options) (workflow.Workflow, error) {
+		return OpenFromDB(conn, Options{Options: coredb.Options{DSN: o.DSN, DedicatedPool: o.DedicatedPool}, Table: o.Table})
+	})
 }
