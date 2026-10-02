@@ -13,6 +13,7 @@ func TestAdapter_String_values(t *testing.T) {
 		adapter Adapter
 		want    string
 	}{
+		{"db", DB, "db"},
 		{"sqlite", SQLite, "sqlite"},
 		{"pgvector", PGVector, "pgvector"},
 		{"qdrant", Qdrant, "qdrant"},
@@ -36,6 +37,7 @@ func TestAdapter_Parse_valid_roundtrip(t *testing.T) {
 		name string
 		want Adapter
 	}{
+		{"db", DB},
 		{"sqlite", SQLite},
 		{"pgvector", PGVector},
 		{"qdrant", Qdrant},

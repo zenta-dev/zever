@@ -49,14 +49,14 @@ config file, overlaid by environment variables. Later layers win:
 | ratelimit     | memory, redis                       |
 | router        | fiber, stdhttp                      |
 | scheduler     | embedded, postgres                  |
-| search        | postgres, meilisearch, sqlite       |
+| search        | db, postgres, meilisearch, sqlite   |
 | secrets       | env, vault                          |
 | session       | memory, redis, db                   |
 | storage       | local, s3, r2                       |
 | tenant        | single, header                      |
-| vectorstore   | sqlite, pgvector, qdrant            |
+| vectorstore   | db, sqlite, pgvector, qdrant        |
 | webhook       | http, queue                         |
-| workflow      | memory, postgres                    |
+| workflow      | memory, db, postgres                |
 
 Defaults pick the zero-infra adapter per service (ai has none — all backends
 need keys — so it defaults to `anthropic` and requires an API key via
@@ -88,11 +88,17 @@ database).
 
 ```yaml
 search:
-  adapter: postgres
+  adapter: db
   options:
     dsn: "postgres://app:secret@db:5432/app?sslmode=require"
     dedicated_pool: false   # default false shares; true opens a private pool
 ```
+
+`db` is the canonical DB-backed name for `search`, `vectorstore`, and
+`workflow` (empty DSN selects the embedded sqlite backend, a postgres URL
+selects postgres). The old names (`postgres`, `sqlite`, `pgvector`) stay
+registered as aliases, so existing files keep resolving; new files should
+use `db`.
 
 - Matching is the exact DSN string after trim (a URL with and without a
   query string are different pools); sqlite shares by cleaned file path and

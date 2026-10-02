@@ -479,9 +479,10 @@ func parseAdaptersFlag(raw string) (map[string]string, error) {
 // The password adapter dir ("argon2") maps back to its PHC-canonical
 // adapter string ("argon2id", mirroring adapterDirName); the consolidated
 // DB-backed dirs ("search/db", "vectorstore/db", "workflow/db") map back
-// to their canonical adapter names ("postgres", "pgvector", "postgres");
-// every battery's default adapter is included even if its module dir were
-// ever missing.
+// to their canonical "db" adapter name, with the legacy alias names
+// ("postgres", "pgvector", "sqlite") appended so old picks still validate
+// in --adapters and `zever add`; every battery's default adapter is
+// included even if its module dir were ever missing.
 func batteryAdapters() map[string][]string {
 	out := map[string][]string{}
 
@@ -501,20 +502,30 @@ func batteryAdapters() map[string][]string {
 			adapter = defaultServiceAdapter(battery)
 		}
 
-		if battery == "search" && adapterDir == "db" {
-			adapter = "postgres"
-		}
-
-		if battery == "vectorstore" && adapterDir == "db" {
-			adapter = "pgvector"
-		}
-
-		if battery == "workflow" && adapterDir == "db" {
-			adapter = "postgres"
+		// Consolidated DB-backed dirs serve the canonical "db" name; the
+		// legacy per-backend names stay pickable as aliases (mirroring
+		// adapterDirName, which routes all of them to the same dir).
+		if adapterDir == "db" && (battery == "search" || battery == "vectorstore" || battery == "workflow") {
+			adapter = "db"
 		}
 
 		if !batteryPicked(out[battery], adapter) {
 			out[battery] = append(out[battery], adapter)
+		}
+	}
+
+	// Legacy DB-backed alias names: no module dir of their own (they share
+	// the consolidated db dir), but they must stay valid picks so old
+	// --adapters values and `zever add` invocations keep working.
+	for battery, aliases := range map[string][]string{
+		"search":      {"postgres", "sqlite"},
+		"vectorstore": {"pgvector", "sqlite"},
+		"workflow":    {"postgres"},
+	} {
+		for _, alias := range aliases {
+			if !batteryPicked(out[battery], alias) {
+				out[battery] = append(out[battery], alias)
+			}
 		}
 	}
 
@@ -887,12 +898,12 @@ var allServiceAdapters = map[string]string{
 	"ratelimit":     "memory",
 	"router":        "stdhttp",
 	"scheduler":     "embedded",
-	"search":        "sqlite",
+	"search":        "db",
 	"secrets":       "env",
 	"session":       "memory",
 	"storage":       "local",
 	"tenant":        "single",
-	"vectorstore":   "sqlite",
+	"vectorstore":   "db",
 	"webhook":       "http",
 	"workflow":      "memory",
 }
@@ -1488,6 +1499,11 @@ HEALTHCHECK --interval=30s --timeout=3s --start-period=5s --retries=3 CMD ["/usr
 // session, ratelimit, lock, eventbus, idempotency) share one redis
 // service. Env carries secrets at run time (never baked in); per-battery
 // URL vars point at the compose services.
+//
+// The canonical "db" adapter name always provisions postgres: it selects
+// the backend by DSN at runtime (empty means embedded sqlite), and the
+// compose db service is what a postgres DSN points at. Legacy alias names
+// ("postgres", "pgvector") provision it too; legacy "sqlite" never does.
 func renderNewCompose(sel []batterySelection) string {
 	needsPG := false
 	redisBatteries := []string{}
@@ -1496,9 +1512,9 @@ func renderNewCompose(sel []batterySelection) string {
 		switch {
 		case s.Battery == "db" && s.Adapter == "postgres":
 			needsPG = true
-		case (s.Battery == "search" && s.Adapter == "postgres") ||
-			(s.Battery == "vectorstore" && s.Adapter == "pgvector") ||
-			(s.Battery == "workflow" && s.Adapter == "postgres"):
+		case (s.Battery == "search" && (s.Adapter == "db" || s.Adapter == "postgres")) ||
+			(s.Battery == "vectorstore" && (s.Adapter == "db" || s.Adapter == "pgvector")) ||
+			(s.Battery == "workflow" && (s.Adapter == "db" || s.Adapter == "postgres")):
 			needsPG = true
 		case (s.Battery == "cache" || s.Battery == "queue" || s.Battery == "session" ||
 			s.Battery == "ratelimit" || s.Battery == "lock" || s.Battery == "eventbus" ||

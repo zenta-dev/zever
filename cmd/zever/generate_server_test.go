@@ -516,3 +516,33 @@ func TestCoreBatterySelectionsMatchDefaults(t *testing.T) {
 		}
 	}
 }
+
+// TestAdapterDirNameDBCanonical pins the consolidated db dirs: the
+// canonical "db" name is mechanical, and every legacy alias routes to the
+// same dir so old --adapters picks scaffold identical module graphs.
+func TestAdapterDirNameDBCanonical(t *testing.T) {
+	t.Parallel()
+
+	cases := []struct {
+		battery string
+		adapter string
+		want    string
+	}{
+		{"search", "db", "search/db"},
+		{"search", "postgres", "search/db"},
+		{"search", "sqlite", "search/db"},
+		{"search", "meilisearch", "search/meilisearch"},
+		{"vectorstore", "db", "vectorstore/db"},
+		{"vectorstore", "pgvector", "vectorstore/db"},
+		{"vectorstore", "sqlite", "vectorstore/db"},
+		{"vectorstore", "qdrant", "vectorstore/qdrant"},
+		{"workflow", "db", "workflow/db"},
+		{"workflow", "postgres", "workflow/db"},
+		{"workflow", "memory", "workflow/memory"},
+	}
+	for _, tc := range cases {
+		if got := adapterDirName(batterySelection{Battery: tc.battery, Adapter: tc.adapter}); got != tc.want {
+			t.Errorf("adapterDirName(%s/%s) = %q, want %q", tc.battery, tc.adapter, got, tc.want)
+		}
+	}
+}

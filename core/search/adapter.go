@@ -5,11 +5,17 @@ package search
 type Adapter string
 
 const (
-	// Postgres selects the postgres search backend.
+	// DB selects the DB-backed search backend (adapters/search/db): a
+	// postgres URL selects PostgreSQL tsvector/GIN, anything else selects
+	// embedded SQLite FTS5.
+	DB Adapter = "db"
+	// Postgres is a legacy alias for DB kept so existing zever.yaml files
+	// keep resolving.
 	Postgres Adapter = "postgres"
 	// Meilisearch selects the meilisearch search backend.
 	Meilisearch Adapter = "meilisearch"
-	// SQLite selects the sqlite search backend.
+	// SQLite is a legacy alias for DB kept so existing zever.yaml files
+	// keep resolving.
 	SQLite Adapter = "sqlite"
 )
 

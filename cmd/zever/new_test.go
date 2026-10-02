@@ -966,6 +966,20 @@ func TestBatteryAdapters(t *testing.T) {
 		t.Fatalf("batteryAdapters[db] = %v, want sqlite and postgres", db)
 	}
 
+	// Consolidated DB-backed batteries offer canonical "db" first (the
+	// default) with legacy aliases after, all routing to the same db dir.
+	for battery, want := range map[string][]string{
+		"search":      {"db", "postgres", "sqlite", "meilisearch"},
+		"vectorstore": {"db", "pgvector", "sqlite", "qdrant"},
+		"workflow":    {"db", "postgres", "memory"},
+	} {
+		for _, adapter := range want {
+			if !batteryPicked(all[battery], adapter) {
+				t.Errorf("batteryAdapters[%q] = %v, want %q", battery, all[battery], adapter)
+			}
+		}
+	}
+
 	if pw := all["password"]; !batteryPicked(pw, "argon2id") {
 		t.Fatalf("batteryAdapters[password] = %v, want PHC-canonical argon2id", pw)
 	}
@@ -1382,6 +1396,24 @@ func TestRenderNewComposePostgresRedis(t *testing.T) {
 	}
 	if strings.Contains(got, "devsecret123") || strings.Contains(got, "password123") {
 		t.Errorf("compose must not bake literal credentials:\n%s", got)
+	}
+}
+
+// TestRenderNewComposeCanonicalDB pins the compose contract for the
+// canonical "db" adapter name: search=db provisions postgres just like the
+// legacy postgres alias, while legacy sqlite stays local-only.
+func TestRenderNewComposeCanonicalDB(t *testing.T) {
+	t.Parallel()
+	got := renderNewCompose([]batterySelection{{Battery: "search", Adapter: "db"}})
+	if !strings.Contains(got, "image: postgres:") {
+		t.Errorf("compose for search=db lacks postgres service:\n%s", got)
+	}
+	gotLegacy := renderNewCompose([]batterySelection{{Battery: "search", Adapter: "postgres"}})
+	if got != gotLegacy {
+		t.Errorf("compose for search=db differs from search=postgres:\n%s\n---\n%s", got, gotLegacy)
+	}
+	if got := renderNewCompose([]batterySelection{{Battery: "search", Adapter: "sqlite"}}); got != "" {
+		t.Errorf("expected empty compose for search=sqlite, got:\n%s", got)
 	}
 }
 

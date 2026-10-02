@@ -32,14 +32,14 @@
     "ratelimit": { "$ref": "#/$defs/service", "type": "object", "properties": { "adapter": { "enum": ["memory", "redis"] }, "options": { "$ref": "#/$defs/ratelimitOptions" } } },
     "router": { "$ref": "#/$defs/service", "type": "object", "properties": { "adapter": { "enum": ["fiber", "stdhttp"] }, "options": { "$ref": "#/$defs/routerOptions" } } },
     "scheduler": { "$ref": "#/$defs/service", "type": "object", "properties": { "adapter": { "enum": ["embedded", "postgres"] }, "options": { "$ref": "#/$defs/schedulerOptions" } } },
-    "search": { "$ref": "#/$defs/service", "type": "object", "properties": { "adapter": { "enum": ["postgres", "meilisearch", "sqlite"] }, "options": { "$ref": "#/$defs/searchOptions" } } },
+    "search": { "$ref": "#/$defs/service", "type": "object", "properties": { "adapter": { "enum": ["db", "postgres", "meilisearch", "sqlite"] }, "options": { "$ref": "#/$defs/searchOptions" } } },
     "secrets": { "$ref": "#/$defs/service", "type": "object", "properties": { "adapter": { "enum": ["env", "vault"] }, "options": { "$ref": "#/$defs/secretsOptions" } } },
     "session": { "$ref": "#/$defs/service", "type": "object", "properties": { "adapter": { "enum": ["memory", "redis", "db"] }, "options": { "$ref": "#/$defs/sessionOptions" } } },
     "storage": { "$ref": "#/$defs/service", "type": "object", "properties": { "adapter": { "enum": ["local", "s3", "r2"] }, "options": { "$ref": "#/$defs/storageOptions" } } },
     "tenant": { "$ref": "#/$defs/service", "type": "object", "properties": { "adapter": { "enum": ["single", "header"] }, "options": { "$ref": "#/$defs/tenantOptions" } } },
-    "vectorstore": { "$ref": "#/$defs/service", "type": "object", "properties": { "adapter": { "enum": ["sqlite", "pgvector", "qdrant"] }, "options": { "$ref": "#/$defs/vectorstoreOptions" } } },
+    "vectorstore": { "$ref": "#/$defs/service", "type": "object", "properties": { "adapter": { "enum": ["db", "sqlite", "pgvector", "qdrant"] }, "options": { "$ref": "#/$defs/vectorstoreOptions" } } },
     "webhook": { "$ref": "#/$defs/service", "type": "object", "properties": { "adapter": { "enum": ["http", "queue"] }, "options": { "$ref": "#/$defs/webhookOptions" } } },
-    "workflow": { "$ref": "#/$defs/service", "type": "object", "properties": { "adapter": { "enum": ["memory", "postgres"] }, "options": { "$ref": "#/$defs/workflowOptions" } } }
+    "workflow": { "$ref": "#/$defs/service", "type": "object", "properties": { "adapter": { "enum": ["memory", "db", "postgres"] }, "options": { "$ref": "#/$defs/workflowOptions" } } }
   },
   "$defs": {
     "service": {

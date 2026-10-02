@@ -7,8 +7,11 @@ type Adapter string
 const (
 	// Memory is the in-memory workflow adapter.
 	Memory Adapter = "memory"
-	// Postgres is the durable DB-backed workflow adapter
+	// DB selects the durable DB-backed workflow adapter
 	// (adapters/workflow/db).
+	DB Adapter = "db"
+	// Postgres is a legacy alias for DB kept so existing zever.yaml files
+	// keep resolving.
 	Postgres Adapter = "postgres"
 )
 

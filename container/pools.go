@@ -386,7 +386,7 @@ func (c *Container) openSharedSearch() (search.Search, bool, error) {
 	poolOpts := sharedPoolOpts(o.DSN, o.DedicatedPool)
 
 	return openShared(c, "search", c.cfg.Search.Adapter,
-		[]string{string(search.Postgres), string(search.SQLite)},
+		[]string{string(search.DB), string(search.Postgres), string(search.SQLite)},
 		key, backend, ok, o.DedicatedPool, poolOpts, func(conn db.DB) (search.Search, error) {
 			return search.OpenShared(search.Adapter(c.cfg.Search.Adapter), conn, o)
 		})
@@ -425,7 +425,7 @@ func (c *Container) openSharedWorkflow() (workflow.Workflow, bool, error) {
 	key, ok := postgresPoolKey(o.DSN)
 	poolOpts := db.Options{DSN: o.DSN, DedicatedPool: o.DedicatedPool}
 
-	return openShared(c, "workflow", c.cfg.Workflow.Adapter, []string{string(workflow.Postgres)},
+	return openShared(c, "workflow", c.cfg.Workflow.Adapter, []string{string(workflow.DB), string(workflow.Postgres)},
 		key, poolPostgres, ok, o.DedicatedPool, poolOpts, func(conn db.DB) (workflow.Workflow, error) {
 			return workflow.OpenShared(workflow.Adapter(c.cfg.Workflow.Adapter), conn, o)
 		})
@@ -461,7 +461,7 @@ func (c *Container) openSharedVectorStore() (vectorstore.VectorStore, bool, erro
 	key, backend, ok := coreDSNPoolKey(o.DSN)
 
 	return openShared(c, "vectorstore", c.cfg.VectorStore.Adapter,
-		[]string{string(vectorstore.PGVector), string(vectorstore.SQLite)},
+		[]string{string(vectorstore.DB), string(vectorstore.PGVector), string(vectorstore.SQLite)},
 		key, backend, ok, o.DedicatedPool, sharedPoolOpts(o.DSN, o.DedicatedPool),
 		func(conn db.DB) (vectorstore.VectorStore, error) {
 			return vectorstore.OpenShared(vectorstore.Adapter(c.cfg.VectorStore.Adapter), conn, o)

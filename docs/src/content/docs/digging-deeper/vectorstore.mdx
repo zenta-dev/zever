@@ -11,25 +11,27 @@ similarity, without tying your code to one vector database client.
 
 ## Purpose and when to use
 
-`sqlite` (the default, in-memory DSN) is enough for tests and small local
-datasets. Move to `pgvector` if you already run Postgres and want vectors
-living next to relational data, or `qdrant` when you need a purpose-built
-vector database at scale - the interface your code calls does not change
-either way. Pair with `ai.Embed` for the write path: embed text, upsert the
-vectors, then query with a fresh embedding.
+`db` (the default) serves both backends through one name: an empty DSN
+selects embedded sqlite for tests and small local datasets, a postgres URL
+selects `pgvector` for vectors living next to relational data. Move to
+`qdrant` when you need a purpose-built vector database at scale - the
+interface your code calls does not change either way. Pair with `ai.Embed`
+for the write path: embed text, upsert the vectors, then query with a fresh
+embedding. The legacy `sqlite` and `pgvector` names stay registered as
+aliases, so old files keep resolving; new files should use `db`.
 
 ## Config
 
 ```yaml
 vectorstore:
-  adapter: sqlite
+  adapter: db
   options:
     dimension: 1536
     dsn: ":memory:"
 ```
 
 ```sh
-VECTORSTORE_ADAPTER=pgvector
+VECTORSTORE_ADAPTER=db
 VECTORSTORE_DSN=postgres://user:pass@localhost:5432/db
 VECTORSTORE_DIMENSION=1536
 ```
@@ -37,7 +39,7 @@ VECTORSTORE_DIMENSION=1536
 `dimension` defaults to 1536 (OpenAI `text-embedding-3-small` size) - set it
 to match whatever embedding model actually produced your vectors, since a
 mismatched dimension is a query that silently returns nonsense, not an
-error. `dsn` serves sqlite/pgvector; `url` plus `api_key` serve `qdrant`.
+error. `dsn` serves the `db` adapter (sqlite or pgvector by URL); `url` plus `api_key` serve `qdrant`.
 Negative dimensions are rejected.
 
 ## Resolve
@@ -123,8 +125,9 @@ orthogonal one last with score 0.
 
 | Adapter | Package | Notes |
 |---|---|---|
-| `sqlite` | `adapters/vectorstore/db` | Default; empty DSN selects embedded sqlite |
-| `pgvector` | `adapters/vectorstore/db` | Postgres extension; needs `dsn` |
+| `db` | `adapters/vectorstore/db` | Default; empty DSN selects embedded sqlite, postgres URL selects pgvector |
+| `sqlite` | `adapters/vectorstore/db` | Legacy alias for `db` |
+| `pgvector` | `adapters/vectorstore/db` | Legacy alias for `db`; needs `dsn` |
 | `qdrant` | `adapters/vectorstore/qdrant` | Dedicated store; needs `url` (+ `api_key`) |
 
 ## Production notes

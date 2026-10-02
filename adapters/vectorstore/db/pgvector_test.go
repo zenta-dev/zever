@@ -364,3 +364,22 @@ func TestEmbeddingCodec_roundTrip(t *testing.T) {
 		t.Fatal("decodeEmbedding(3 bytes) = nil, want error")
 	}
 }
+
+// TestOpenRegister_allNames proves the canonical "db" name and both legacy
+// aliases resolve through the registry to a working store.
+func TestOpenRegister_allNames(t *testing.T) {
+	Register()
+
+	for _, adapter := range []vectorstore.Adapter{vectorstore.DB, vectorstore.PGVector, vectorstore.SQLite} {
+		s, err := vectorstore.Open(adapter, vectorstore.Options{})
+		if err != nil {
+			t.Fatalf("Open(%s) error = %v", adapter, err)
+		}
+
+		if err := s.Upsert(t.Context(), vectorstore.Vector{ID: "w", Embedding: []float32{1, 0}}); err != nil {
+			t.Errorf("Open(%s) Upsert() error = %v", adapter, err)
+		}
+
+		_ = s.Close()
+	}
+}

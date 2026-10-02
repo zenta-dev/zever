@@ -9,17 +9,17 @@ import (
 )
 
 // TestConformance runs the shared vectorstore kit against the migrated adapter.
-// The sqlite leg runs on :memory: with no infra; the postgres leg runs only
-// when POSTGRES_DSN (fallback PGVECTOR_TEST_DSN) names a live server. Never
-// fake infra for conformance.
+// The db leg runs on :memory: with no infra; the pgvector leg keeps the
+// legacy alias name and runs only when POSTGRES_DSN (fallback
+// PGVECTOR_TEST_DSN) names a live server. Never fake infra for conformance.
 func TestConformance(t *testing.T) {
-	t.Run("sqlite", func(t *testing.T) {
+	t.Run("db", func(t *testing.T) {
 		vectorstoretest.Conformance(t, func(t *testing.T) vectorstore.VectorStore {
 			t.Helper()
 
 			Register()
 
-			s, err := vectorstore.Open(vectorstore.SQLite, vectorstore.Options{})
+			s, err := vectorstore.Open(vectorstore.DB, vectorstore.Options{})
 			if err != nil {
 				t.Fatalf("Open() error = %v", err)
 			}

@@ -348,10 +348,10 @@ func (c *Container) Scheduler() (scheduler.Scheduler, error) {
 	})
 }
 
-// Search resolves and returns the search service instance. A postgres or
-// sqlite search pointing at an already-pooled DSN borrows the shared pool
-// (owns=false); DedicatedPool or a non-shareable DSN opens a private pool
-// as before.
+// Search resolves and returns the search service instance. A db-backed
+// search (canonical "db" or its "postgres"/"sqlite" aliases) pointing at
+// an already-pooled DSN borrows the shared pool (owns=false);
+// DedicatedPool or a non-shareable DSN opens a private pool as before.
 func (c *Container) Search() (search.Search, error) {
 	return c.search.get(func() (search.Search, error) {
 		if v, shared, err := c.openSharedSearch(); shared || err != nil {
@@ -398,9 +398,10 @@ func (c *Container) Tenant() (tenant.Tenant, error) {
 }
 
 // VectorStore resolves and returns the vectorstore service instance. A
-// pgvector or sqlite vectorstore pointing at an already-pooled DSN borrows
-// the shared pool (owns=false); DedicatedPool or a non-shareable DSN opens
-// a private pool as before.
+// db-backed vectorstore (canonical "db" or its "pgvector"/"sqlite"
+// aliases) pointing at an already-pooled DSN borrows the shared pool
+// (owns=false); DedicatedPool or a non-shareable DSN opens a private pool
+// as before.
 func (c *Container) VectorStore() (vectorstore.VectorStore, error) {
 	return c.vectorstore.get(func() (vectorstore.VectorStore, error) {
 		if v, shared, err := c.openSharedVectorStore(); shared || err != nil {
@@ -418,11 +419,11 @@ func (c *Container) Webhook() (webhook.Webhook, error) {
 	})
 }
 
-// Workflow resolves and returns the workflow service instance. A postgres
-// workflow pointing at an already-pooled DSN borrows the shared pool
-// (owns=false); DedicatedPool or a non-shareable DSN opens a private pool
-// as before. Under sustained load prefer a separate workflow database with
-// DedicatedPool.
+// Workflow resolves and returns the workflow service instance. A db-backed
+// workflow (canonical "db" or its "postgres" alias) pointing at an
+// already-pooled DSN borrows the shared pool (owns=false); DedicatedPool
+// or a non-shareable DSN opens a private pool as before. Under sustained
+// load prefer a separate workflow database with DedicatedPool.
 func (c *Container) Workflow() (workflow.Workflow, error) {
 	return c.workflow.get(func() (workflow.Workflow, error) {
 		if v, shared, err := c.openSharedWorkflow(); shared || err != nil {
