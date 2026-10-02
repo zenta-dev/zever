@@ -477,8 +477,11 @@ func parseAdaptersFlag(raw string) (map[string]string, error) {
 // nestedModuleDirs (the same source renderNewGoMod's replace set uses), so
 // the picker's offer list cannot drift from the scaffold's module graph.
 // The password adapter dir ("argon2") maps back to its PHC-canonical
-// adapter string ("argon2id", mirroring adapterDirName); every battery's
-// default adapter is included even if its module dir were ever missing.
+// adapter string ("argon2id", mirroring adapterDirName); the consolidated
+// DB-backed dirs ("search/db", "vectorstore/db", "workflow/db") map back
+// to their canonical adapter names ("postgres", "pgvector", "postgres");
+// every battery's default adapter is included even if its module dir were
+// ever missing.
 func batteryAdapters() map[string][]string {
 	out := map[string][]string{}
 
@@ -496,6 +499,18 @@ func batteryAdapters() map[string][]string {
 		adapter := adapterDir
 		if battery == "password" && adapterDir == "argon2" {
 			adapter = defaultServiceAdapter(battery)
+		}
+
+		if battery == "search" && adapterDir == "db" {
+			adapter = "postgres"
+		}
+
+		if battery == "vectorstore" && adapterDir == "db" {
+			adapter = "pgvector"
+		}
+
+		if battery == "workflow" && adapterDir == "db" {
+			adapter = "postgres"
 		}
 
 		if !batteryPicked(out[battery], adapter) {
@@ -1238,14 +1253,14 @@ var nestedModuleDirs = []string{
 	"adapters/ratelimit/memory", "adapters/ratelimit/redis",
 	"adapters/router/fiber", "adapters/router/stdhttp",
 	"adapters/scheduler/embedded", "adapters/scheduler/postgres",
-	"adapters/search/meilisearch", "adapters/search/postgres",
+	"adapters/search/meilisearch", "adapters/search/db",
 	"adapters/secrets/env", "adapters/secrets/vault",
 	"adapters/session/cookie", "adapters/session/db", "adapters/session/memory", "adapters/session/redis",
 	"adapters/storage/local", "adapters/storage/r2", "adapters/storage/s3",
 	"adapters/tenant/header", "adapters/tenant/single",
-	"adapters/vectorstore/pgvector", "adapters/vectorstore/qdrant",
+	"adapters/vectorstore/db", "adapters/vectorstore/qdrant",
 	"adapters/webhook/http", "adapters/webhook/queue",
-	"adapters/workflow/memory", "adapters/workflow/postgres",
+	"adapters/workflow/memory", "adapters/workflow/db",
 }
 
 // coreModulePath returns the framework module path for one battery's core

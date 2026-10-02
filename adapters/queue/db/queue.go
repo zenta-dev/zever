@@ -571,7 +571,7 @@ func (d *driver) Pop(ctx context.Context, topic string) (queue.Message, error) {
 
 // tryClaim adopts the oldest ready row in topic with a compare-and-set
 // UPDATE guarded on the previously read lease, exactly like
-// workflow/postgres's reclaim CAS and the redis claim.lua pop. Contended
+// workflow/db's reclaim CAS and the redis claim.lua pop. Contended
 // rows report not-claimed so Pop retries; only sqlite and postgres reach
 // here, so no row-locking variant is needed (sqlite has no FOR UPDATE).
 func (d *driver) tryClaim(ctx context.Context, topic string) (queue.Message, bool, error) {

@@ -165,7 +165,7 @@ func applyPending(ctx context.Context, c *container.Container, plan *migrate.Mig
 
 `memory` is in-process only: every in-flight run is lost on restart or
 deploy (`adapters/workflow/memory/doc.go`). Anything business-critical
-runs on `postgres` (`adapters/workflow/postgres/`): DB-backed runs table
+runs on `postgres` (`adapters/workflow/db/`): DB-backed runs table
 with lease-based crash recovery and idempotency keys, so a second
 replica reclaims expired leases after a crash. `core/workflow.Options`
 carries `DSN`/`Table` (`core/workflow/options.go`, following the

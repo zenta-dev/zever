@@ -1,4 +1,4 @@
-package postgres
+package db
 
 import (
 	coredb "github.com/zenta-dev/zever/core/db"

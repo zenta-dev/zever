@@ -1,4 +1,4 @@
-// Package postgres provides a DB-backed workflow.Workflow implementation
+// Package db provides a DB-backed workflow.Workflow implementation
 // whose run state survives process restarts.
 //
 // Runs live in one table (default workflow_runs); every state transition
@@ -19,4 +19,4 @@
 // core/workflow. Container wiring shares one pool per exact DSN across
 // batteries (see container/pools.go); dedicated_pool: true restores a
 // private pool.
-package postgres
+package db

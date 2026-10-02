@@ -54,10 +54,10 @@ replace (
 	github.com/zenta-dev/zever/adapters/log/noop => ../adapters/log/noop
 	github.com/zenta-dev/zever/adapters/queue/db => ../adapters/queue/db
 	github.com/zenta-dev/zever/adapters/scheduler/postgres => ../adapters/scheduler/postgres
-	github.com/zenta-dev/zever/adapters/search/postgres => ../adapters/search/postgres
+	github.com/zenta-dev/zever/adapters/search/db => ../adapters/search/db
 	github.com/zenta-dev/zever/adapters/session/db => ../adapters/session/db
-	github.com/zenta-dev/zever/adapters/vectorstore/pgvector => ../adapters/vectorstore/pgvector
-	github.com/zenta-dev/zever/adapters/workflow/postgres => ../adapters/workflow/postgres
+	github.com/zenta-dev/zever/adapters/vectorstore/db => ../adapters/vectorstore/db
+	github.com/zenta-dev/zever/adapters/workflow/db => ../adapters/workflow/db
 	github.com/zenta-dev/zever/config => ../config
 	github.com/zenta-dev/zever/core/ai => ../core/ai
 	github.com/zenta-dev/zever/core/analytics => ../core/analytics

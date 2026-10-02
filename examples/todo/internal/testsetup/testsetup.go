@@ -32,12 +32,12 @@ import (
 	ratelimitmemory "github.com/zenta-dev/zever/adapters/ratelimit/memory"
 	routerstdhttp "github.com/zenta-dev/zever/adapters/router/stdhttp"
 	schedulerembedded "github.com/zenta-dev/zever/adapters/scheduler/embedded"
-	searchpostgres "github.com/zenta-dev/zever/adapters/search/postgres"
+	searchdb "github.com/zenta-dev/zever/adapters/search/db"
 	secretsenv "github.com/zenta-dev/zever/adapters/secrets/env"
 	sessionmemory "github.com/zenta-dev/zever/adapters/session/memory"
 	storagelocal "github.com/zenta-dev/zever/adapters/storage/local"
 	tenantsingle "github.com/zenta-dev/zever/adapters/tenant/single"
-	vectorstorepgvector "github.com/zenta-dev/zever/adapters/vectorstore/pgvector"
+	vectorstoredb "github.com/zenta-dev/zever/adapters/vectorstore/db"
 	webhookhttp "github.com/zenta-dev/zever/adapters/webhook/http"
 	workflowmemory "github.com/zenta-dev/zever/adapters/workflow/memory"
 )
@@ -70,12 +70,12 @@ func RegisterDefaults() {
 	ratelimitmemory.Register()
 	routerstdhttp.Register()
 	schedulerembedded.Register()
-	searchpostgres.Register()
+	searchdb.Register()
 	secretsenv.Register()
 	sessionmemory.Register()
 	storagelocal.Register()
 	tenantsingle.Register()
-	vectorstorepgvector.Register()
+	vectorstoredb.Register()
 	webhookhttp.Register()
 	workflowmemory.Register()
 }

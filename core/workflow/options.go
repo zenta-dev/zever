@@ -15,7 +15,7 @@ type PostgresOptions struct {
 	// (dev/test); set DSN opens postgres for durable runs.
 	DSN string `json:"dsn" toml:"dsn" yaml:"dsn"`
 	// Table is the workflow-runs table name. Empty selects the adapter
-	// default (DefaultTable in adapters/workflow/postgres).
+	// default (DefaultTable in adapters/workflow/db).
 	Table string `json:"table" toml:"table" yaml:"table"`
 	// DedicatedPool opts out of container-level pool sharing. Default false
 	// shares one pool per exact DSN; true opens a private pool.

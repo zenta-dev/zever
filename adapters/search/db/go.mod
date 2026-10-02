@@ -1,4 +1,4 @@
-module github.com/zenta-dev/zever/adapters/workflow/postgres
+module github.com/zenta-dev/zever/adapters/search/db
 
 go 1.27.0
 
@@ -6,8 +6,9 @@ require (
 	github.com/zenta-dev/zever/adapters/db/postgres v0.5.3
 	github.com/zenta-dev/zever/adapters/db/sqlite v0.5.3
 	github.com/zenta-dev/zever/core/db v0.5.3
-	github.com/zenta-dev/zever/core/workflow v0.5.3
+	github.com/zenta-dev/zever/core/search v0.5.3
 	github.com/zenta-dev/zever/orm v0.5.3
+	github.com/zenta-dev/zever/shared/codec v0.5.3
 	github.com/zenta-dev/zever/shared/dbconn v0.5.3
 )
 
@@ -39,9 +40,11 @@ replace github.com/zenta-dev/zever/adapters/db/sqlite => ../../db/sqlite
 
 replace github.com/zenta-dev/zever/core/db => ../../../core/db
 
-replace github.com/zenta-dev/zever/core/workflow => ../../../core/workflow
+replace github.com/zenta-dev/zever/core/search => ../../../core/search
 
 replace github.com/zenta-dev/zever/orm => ../../../orm
+
+replace github.com/zenta-dev/zever/shared/codec => ../../../shared/codec
 
 replace github.com/zenta-dev/zever/shared/registry => ../../../shared/registry
 

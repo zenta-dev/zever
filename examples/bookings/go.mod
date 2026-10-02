@@ -26,10 +26,10 @@ require (
 	github.com/zenta-dev/zever/adapters/ratelimit/memory v0.5.3
 	github.com/zenta-dev/zever/adapters/router/stdhttp v0.5.3
 	github.com/zenta-dev/zever/adapters/scheduler/embedded v0.5.3
-	github.com/zenta-dev/zever/adapters/search/postgres v0.5.3
+	github.com/zenta-dev/zever/adapters/search/db v0.5.3
 	github.com/zenta-dev/zever/adapters/secrets/env v0.5.3
 	github.com/zenta-dev/zever/adapters/tenant/single v0.5.3
-	github.com/zenta-dev/zever/adapters/vectorstore/pgvector v0.5.3
+	github.com/zenta-dev/zever/adapters/vectorstore/db v0.5.3
 	github.com/zenta-dev/zever/adapters/webhook/queue v0.5.3
 	github.com/zenta-dev/zever/config v0.5.3
 	github.com/zenta-dev/zever/container v0.5.3
@@ -76,9 +76,9 @@ replace (
 	github.com/zenta-dev/zever/adapters/password/argon2 => ../../adapters/password/argon2
 	github.com/zenta-dev/zever/adapters/queue/memory => ../../adapters/queue/memory
 	github.com/zenta-dev/zever/adapters/scheduler/embedded => ../../adapters/scheduler/embedded
-	github.com/zenta-dev/zever/adapters/search/postgres => ../../adapters/search/postgres
+	github.com/zenta-dev/zever/adapters/search/db => ../../adapters/search/db
 	github.com/zenta-dev/zever/adapters/secrets/env => ../../adapters/secrets/env
-	github.com/zenta-dev/zever/adapters/vectorstore/pgvector => ../../adapters/vectorstore/pgvector
+	github.com/zenta-dev/zever/adapters/vectorstore/db => ../../adapters/vectorstore/db
 	github.com/zenta-dev/zever/adapters/webhook/queue => ../../adapters/webhook/queue
 	github.com/zenta-dev/zever/config => ../../config
 	github.com/zenta-dev/zever/container => ../../container

@@ -176,9 +176,9 @@ redis.Register()
 | router | stdhttp | `github.com/zenta-dev/zever/adapters/router/stdhttp` | `stdhttp.Register()` | `Router()` |
 | scheduler | embedded | `github.com/zenta-dev/zever/adapters/scheduler/embedded` | `embedded.Register()` | `Scheduler()` |
 | scheduler | postgres | `github.com/zenta-dev/zever/adapters/scheduler/postgres` | `postgres.Register()` | `Scheduler()` |
-| search | postgres | `github.com/zenta-dev/zever/adapters/search/postgres` | `postgres.Register()` | `Search()` |
+| search | postgres | `github.com/zenta-dev/zever/adapters/search/db` | `db.Register()` | `Search()` |
 | search | meilisearch | `github.com/zenta-dev/zever/adapters/search/meilisearch` | `meilisearch.Register()` | `Search()` |
-| search | sqlite | `github.com/zenta-dev/zever/adapters/search/postgres` | `postgres.Register()` | `Search()` |
+| search | sqlite | `github.com/zenta-dev/zever/adapters/search/db` | `db.Register()` | `Search()` |
 | secrets | env | `github.com/zenta-dev/zever/adapters/secrets/env` | `env.Register()` | `Secrets()` |
 | session | memory | `github.com/zenta-dev/zever/adapters/session/memory` | `memory.Register()` | `Session()` |
 | session | redis | `github.com/zenta-dev/zever/adapters/session/redis` | `redis.Register()` | `Session()` |
@@ -188,13 +188,13 @@ redis.Register()
 | storage | r2 | `github.com/zenta-dev/zever/adapters/storage/r2` | `r2.Register()` | `Storage()` |
 | tenant | single | `github.com/zenta-dev/zever/adapters/tenant/single` | `single.Register()` | `Tenant()` |
 | tenant | header | `github.com/zenta-dev/zever/adapters/tenant/header` | `header.Register()` | `Tenant()` |
-| vectorstore | sqlite | `github.com/zenta-dev/zever/adapters/vectorstore/pgvector` | `pgvector.Register()` | `VectorStore()` |
-| vectorstore | pgvector | `github.com/zenta-dev/zever/adapters/vectorstore/pgvector` | `pgvector.Register()` | `VectorStore()` |
+| vectorstore | sqlite | `github.com/zenta-dev/zever/adapters/vectorstore/db` | `db.Register()` | `VectorStore()` |
+| vectorstore | pgvector | `github.com/zenta-dev/zever/adapters/vectorstore/db` | `db.Register()` | `VectorStore()` |
 | vectorstore | qdrant | `github.com/zenta-dev/zever/adapters/vectorstore/qdrant` | `qdrant.Register()` | `VectorStore()` |
 | webhook | http | `github.com/zenta-dev/zever/adapters/webhook/http` | `http.Register()` | `Webhook()` |
 | webhook | queue | `github.com/zenta-dev/zever/adapters/webhook/queue` | `queue.Register()` | `Webhook()` |
 | workflow | memory | `github.com/zenta-dev/zever/adapters/workflow/memory` | `memory.Register()` | `Workflow()` |
-| workflow | postgres | `github.com/zenta-dev/zever/adapters/workflow/postgres` | `postgres.Register()` | `Workflow()` |
+| workflow | postgres | `github.com/zenta-dev/zever/adapters/workflow/db` | `db.Register()` | `Workflow()` |
 | job | - (dispatcher) | `github.com/zenta-dev/zever/core/job` | `none (no registry)` | `Job()` |
 
 ### Single-process vs. multi-instance guidance

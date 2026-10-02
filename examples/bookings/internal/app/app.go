@@ -20,8 +20,8 @@ import (
 	medialocal "github.com/zenta-dev/zever/adapters/media/local"
 	passwordargon2 "github.com/zenta-dev/zever/adapters/password/argon2"
 	schedulerembedded "github.com/zenta-dev/zever/adapters/scheduler/embedded"
-	searchpostgres "github.com/zenta-dev/zever/adapters/search/postgres"
-	vectorstorepgvector "github.com/zenta-dev/zever/adapters/vectorstore/pgvector"
+	searchdb "github.com/zenta-dev/zever/adapters/search/db"
+	vectorstoredb "github.com/zenta-dev/zever/adapters/vectorstore/db"
 )
 
 // DefaultDBPath is the sqlite file used when nothing else supplies one. It is
@@ -69,8 +69,8 @@ func New() (*container.Container, error) {
 	medialocal.Register()
 	passwordargon2.Register()
 	schedulerembedded.Register()
-	searchpostgres.Register()
-	vectorstorepgvector.Register()
+	searchdb.Register()
+	vectorstoredb.Register()
 
 	return container.New(cfg), nil
 }
