@@ -14,13 +14,12 @@ restarting from scratch.
 
 ## When to use
 
-Use `memory` (the default and currently only adapter) for local dev and
-tests: everything stays in-process with a bounded pending buffer that
+Use `memory` (the default) for local dev and tests: everything stays in-process with a bounded pending buffer that
 reports `ErrPendingFull` instead of blocking forever when full. This is
 not a cron scheduler; nothing here fires on a time spec. Use
 `scheduler` for cron-shaped firing and `queue` plus `job` for plain
-background tasks. Production runs that must survive a crash need a
-durable backend behind this interface when one lands.
+background tasks. Production runs that must survive a crash need the
+durable `postgres` backend behind this interface.
 
 Engines with host-registered steps expose them through the separate
 `StepRegistrar` interface (`RegisterStep`), so engines without the
@@ -117,6 +116,7 @@ running ID when the flow needs outside input mid-run.
 | Adapter | Package | Notes |
 |---|---|---|
 | `memory` | `workflow/memory` | Default; in-process, bounded pending buffer |
+| `postgres` | `workflow/postgres` | Durable DB-backed runs, lease-reclaimed steps, needs `dsn` |
 
 ## Production notes
 

@@ -87,6 +87,7 @@ require (
 	github.com/zenta-dev/zever/adapters/webhook/http v0.5.3
 	github.com/zenta-dev/zever/adapters/webhook/queue v0.5.3
 	github.com/zenta-dev/zever/adapters/workflow/memory v0.5.3
+	github.com/zenta-dev/zever/adapters/workflow/postgres v0.5.3
 	github.com/zenta-dev/zever/config v0.5.3
 	github.com/zenta-dev/zever/container v0.5.3
 	github.com/zenta-dev/zever/core/ai v0.5.3
@@ -404,6 +405,7 @@ replace (
 	github.com/zenta-dev/zever/adapters/webhook/http => ../../adapters/webhook/http
 	github.com/zenta-dev/zever/adapters/webhook/queue => ../../adapters/webhook/queue
 	github.com/zenta-dev/zever/adapters/workflow/memory => ../../adapters/workflow/memory
+	github.com/zenta-dev/zever/adapters/workflow/postgres => ../../adapters/workflow/postgres
 	github.com/zenta-dev/zever/core/ai => ../../core/ai
 	github.com/zenta-dev/zever/core/analytics => ../../core/analytics
 	github.com/zenta-dev/zever/core/auth => ../../core/auth

@@ -194,6 +194,7 @@ redis.Register()
 | webhook | http | `github.com/zenta-dev/zever/adapters/webhook/http` | `http.Register()` | `Webhook()` |
 | webhook | queue | `github.com/zenta-dev/zever/adapters/webhook/queue` | `queue.Register()` | `Webhook()` |
 | workflow | memory | `github.com/zenta-dev/zever/adapters/workflow/memory` | `memory.Register()` | `Workflow()` |
+| workflow | postgres | `github.com/zenta-dev/zever/adapters/workflow/postgres` | `postgres.Register()` | `Workflow()` |
 | job | - (dispatcher) | `github.com/zenta-dev/zever/core/job` | `none (no registry)` | `Job()` |
 
 ### Single-process vs. multi-instance guidance
