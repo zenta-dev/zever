@@ -43,6 +43,18 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   binaries and SBOMs; verify with
   `gh attestation verify <artifact> --repo zenta-dev/zever`.
 
+### Changed
+
+- `adapters/cache/memory`: reimplemented on
+  `shared/lrucache.TTLCache[string, []byte]` (deleted the hand-rolled
+  map+list; `SetIfAbsent`/`CompareAndDelete`/`CompareAndExtend` and the
+  `Increment`/`Decrement` CAS loop delegate to the library's atomic
+  primitives; the janitor calls `PurgeExpired`). One deliberate
+  boundary change: entries now expire exactly at their TTL deadline
+  (`!expiresAt.After(now)`) instead of staying live until strictly
+  after it — a read landing on the exact deadline nanosecond now
+  misses. `cachetest` conformance passes identically before/after.
+
 ### Fixed
 
 - `adapters/auth/jwt`: propagate `SignedString` errors instead of
