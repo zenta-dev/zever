@@ -35,7 +35,7 @@ config file, overlaid by environment variables. Later layers win:
 | flag          | static, firebase                    |
 | geo           | google, static, osm                 |
 | i18n          | embed, remote                       |
-| idempotency   | memory, redis                       |
+| idempotency   | memory, redis, db              |
 | lock          | memory, redis                       |
 | log           | noop, zerolog, slog, pretty         |
 | mailer        | log, smtp                           |
@@ -48,10 +48,10 @@ config file, overlaid by environment variables. Later layers win:
 | queue         | memory, redis, db                   |
 | ratelimit     | memory, redis                       |
 | router        | fiber, stdhttp                      |
-| scheduler     | embedded                            |
+| scheduler     | embedded, postgres                  |
 | search        | postgres, meilisearch, sqlite       |
 | secrets       | env, vault                          |
-| session       | memory, redis                       |
+| session       | memory, redis, db                   |
 | storage       | local, s3, r2                       |
 | tenant        | single, header                      |
 | vectorstore   | sqlite, pgvector, qdrant            |
@@ -75,6 +75,35 @@ db:
 log:
   adapter: slog
 ```
+
+## Shared pools (`dedicated_pool`)
+
+Db-backed batteries (`db`, `cache`, `queue`, `search`, `session`,
+`idempotency`, `workflow`, `scheduler`, `vectorstore`) share one container
+pool per exact DSN by default: point two batteries at the same DSN and the
+second borrows the first opener's pool (`owns=false`, never closes it).
+`cache`, `session`, `idempotency`, and `scheduler` also accept `dsn` for
+their `db`/`postgres` adapters (empty still means a private in-memory
+database).
+
+```yaml
+search:
+  adapter: postgres
+  options:
+    dsn: "postgres://app:secret@db:5432/app?sslmode=require"
+    dedicated_pool: false   # default false shares; true opens a private pool
+```
+
+- Matching is the exact DSN string after trim (a URL with and without a
+  query string are different pools); sqlite shares by cleaned file path and
+  `:memory:` never shares.
+- The shared pool takes the first opener's pool knobs; a differing nonzero
+  `MaxConns` warns without DSN content. Queue, workflow, and scheduler
+  under sustained load should use `dedicated_pool: true` with a separate
+  database (Solid Queue guidance).
+- Env: `SEARCH_DEDICATEDPOOL=true`, `QUEUE_DSN=...`, `SESSION_DSN=...`.
+  Downgrade note: old binaries reject the new fields under strict
+  decoding, so remove `dedicated_pool`/`dsn` lines before downgrading.
 
 Only `.yaml`, `.yml`, and `.json` decode; anything else fails with
 `ErrUnsupportedFormat`. Null or empty service blocks decode to zero values.

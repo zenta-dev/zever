@@ -5,6 +5,7 @@ go 1.27.0
 require (
 	github.com/cespare/xxhash/v2 v2.3.0 // indirect
 	github.com/yuin/gopher-lua v1.1.1 // indirect
+	github.com/zenta-dev/zever/core/db v0.5.3 // indirect
 	github.com/zenta-dev/zever/shared/registry v0.5.3 // indirect
 	go.uber.org/atomic v1.11.0 // indirect
 	golang.org/x/sys v0.48.0 // indirect
@@ -30,3 +31,5 @@ replace github.com/zenta-dev/zever/core/session => ../../../core/session
 replace github.com/zenta-dev/zever/adapters/session/memory => ../memory
 
 replace github.com/zenta-dev/zever/shared/registry => ../../../shared/registry
+
+replace github.com/zenta-dev/zever/core/db => ../../../core/db

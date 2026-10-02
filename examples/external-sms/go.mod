@@ -74,6 +74,7 @@ replace (
 	github.com/zenta-dev/zever/core/webhook => ../../core/webhook
 	github.com/zenta-dev/zever/core/workflow => ../../core/workflow
 	github.com/zenta-dev/zever/shared/codec => ../../shared/codec
+	github.com/zenta-dev/zever/shared/dbconn => ../../shared/dbconn
 	github.com/zenta-dev/zever/shared/endpoint => ../../shared/endpoint
 	github.com/zenta-dev/zever/shared/httpclient => ../../shared/httpclient
 	github.com/zenta-dev/zever/shared/lrucache => ../../shared/lrucache
@@ -128,6 +129,7 @@ require (
 	github.com/zenta-dev/zever/core/webhook v0.5.3 // indirect
 	github.com/zenta-dev/zever/core/workflow v0.5.3 // indirect
 	github.com/zenta-dev/zever/shared/codec v0.5.3 // indirect
+	github.com/zenta-dev/zever/shared/dbconn v0.5.3 // indirect
 	github.com/zenta-dev/zever/shared/endpoint v0.5.3 // indirect
 	github.com/zenta-dev/zever/shared/httpclient v0.5.3 // indirect
 	github.com/zenta-dev/zever/shared/providersopt v0.5.3 // indirect
@@ -141,8 +143,12 @@ require (
 	go.yaml.in/yaml/v3 v3.0.5 // indirect
 	golang.org/x/net v0.58.0 // indirect
 	golang.org/x/sys v0.48.0 // indirect
-	golang.org/x/text v0.41.0 // indirect
+	golang.org/x/text v0.42.0 // indirect
 	google.golang.org/genproto/googleapis/rpc v0.0.0-20260526163538-3dc84a4a5aaa // indirect
 	google.golang.org/grpc v1.83.2 // indirect
 	google.golang.org/protobuf v1.36.11 // indirect
 )
+
+replace github.com/zenta-dev/zever/adapters/workflow/postgres => ../../adapters/workflow/postgres
+
+replace github.com/zenta-dev/zever/adapters/search/postgres => ../../adapters/search/postgres

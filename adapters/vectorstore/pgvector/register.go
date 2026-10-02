@@ -16,4 +16,6 @@ const Adapter vectorstore.Adapter = vectorstore.PGVector
 func Register() {
 	_ = vectorstore.Register(vectorstore.PGVector, New)
 	_ = vectorstore.Register(vectorstore.SQLite, New)
+	_ = vectorstore.RegisterShared(vectorstore.PGVector, OpenFromDB)
+	_ = vectorstore.RegisterShared(vectorstore.SQLite, OpenFromDB)
 }

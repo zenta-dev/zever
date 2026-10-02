@@ -6,6 +6,7 @@ require (
 	github.com/ggicci/httpin v0.20.3 // indirect
 	github.com/ggicci/owl v0.8.2 // indirect
 	github.com/hashicorp/go-cleanhttp v0.5.2 // indirect
+	github.com/zenta-dev/zever/core/db v0.5.3 // indirect
 	github.com/zenta-dev/zever/shared/redisopt v0.5.3 // indirect
 	github.com/zenta-dev/zever/shared/registry v0.5.3 // indirect
 )
@@ -33,3 +34,5 @@ replace github.com/zenta-dev/zever/adapters/payment/stub => ../stub
 replace github.com/zenta-dev/zever/shared/redisopt => ../../../shared/redisopt
 
 replace github.com/zenta-dev/zever/shared/registry => ../../../shared/registry
+
+replace github.com/zenta-dev/zever/core/db => ../../../core/db

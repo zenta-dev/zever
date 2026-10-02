@@ -29,6 +29,12 @@ type RedisOptions struct {
 type Options struct {
 	// TTL is the default reservation lifetime. Zero means DefaultTTL.
 	TTL time.Duration `json:"ttl" toml:"ttl" yaml:"ttl"`
+	// DSN is the postgres connection string or sqlite path for the db
+	// adapter. Empty selects a private in-memory database.
+	DSN string `json:"dsn" toml:"dsn" yaml:"dsn"`
+	// DedicatedPool opts out of container-level pool sharing. Default false
+	// shares one pool per exact DSN; true opens a private pool.
+	DedicatedPool bool `json:"dedicated_pool" toml:"dedicated_pool" yaml:"dedicated_pool"`
 	// Redis holds Redis-specific connection configuration.
 	Redis RedisOptions `json:"redis" toml:"redis" yaml:"redis"`
 }

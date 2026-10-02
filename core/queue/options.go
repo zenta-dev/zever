@@ -29,6 +29,9 @@ type DBOptions struct {
 	// Table is the queue-messages table name. Empty selects the adapter
 	// default (DefaultTable in adapters/queue/db).
 	Table string `json:"table" toml:"table" yaml:"table"`
+	// DedicatedPool opts out of container-level pool sharing. Default false
+	// shares one pool per exact DSN; true opens a private pool.
+	DedicatedPool bool `json:"dedicated_pool" toml:"dedicated_pool" yaml:"dedicated_pool"`
 }
 
 // Options configures queue behavior and adapter-specific settings.

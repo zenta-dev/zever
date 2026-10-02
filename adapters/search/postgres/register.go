@@ -1,6 +1,7 @@
 package postgres
 
 import (
+	coredb "github.com/zenta-dev/zever/core/db"
 	"github.com/zenta-dev/zever/core/search"
 	"github.com/zenta-dev/zever/shared/dbconn"
 )
@@ -16,9 +17,20 @@ const Adapter search.Adapter = search.Postgres
 // package. New projects should select search.Postgres.
 func Register() {
 	_ = search.Register(search.Postgres, func(o search.Options) (search.Search, error) {
-		return New(Options{Options: dbconn.SplitDSN(o.DSN)})
+		poolOpts := dbconn.SplitDSN(o.DSN)
+		poolOpts.DedicatedPool = o.DedicatedPool
+		return New(Options{Options: poolOpts})
 	})
 	_ = search.Register(search.SQLite, func(o search.Options) (search.Search, error) {
-		return New(Options{Options: dbconn.SplitDSN(o.DSN)})
+		poolOpts := dbconn.SplitDSN(o.DSN)
+		poolOpts.DedicatedPool = o.DedicatedPool
+		return New(Options{Options: poolOpts})
 	})
+	shared := func(conn coredb.DB, o search.Options) (search.Search, error) {
+		poolOpts := dbconn.SplitDSN(o.DSN)
+		poolOpts.DedicatedPool = o.DedicatedPool
+		return OpenFromDB(conn, Options{Options: poolOpts})
+	}
+	_ = search.RegisterShared(search.Postgres, shared)
+	_ = search.RegisterShared(search.SQLite, shared)
 }
