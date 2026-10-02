@@ -133,12 +133,12 @@ func renderInsertManyText(d dialect.Dialect, table string, columns []string, row
 	b.WriteString(strings.Join(quoted, ", "))
 	b.WriteString(") VALUES ")
 
-	cap, err := insertManyCap(n, len(rows))
+	argCap, err := insertManyCap(n, len(rows))
 	if err != nil {
 		return "", nil, err
 	}
 
-	args = make([]any, 0, cap)
+	args = make([]any, 0, argCap)
 	counter := &argCounter{}
 
 	for i, row := range rows {
