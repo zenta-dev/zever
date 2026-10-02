@@ -88,6 +88,9 @@ func TestDialects_implement_capability_interfaces(t *testing.T) {
 		WindowFrameDialect(sqliteDialect),
 		CTEMaterializationDialect(sqliteDialect),
 		CTESearchCycleDialect(sqliteDialect),
+		VectorOpsDialect(sqliteDialect),
+		FullTextDialect(sqliteDialect),
+		LeaseClaimDialect(sqliteDialect),
 	}
 
 	postgresIfaces := []any{
@@ -114,10 +117,94 @@ func TestDialects_implement_capability_interfaces(t *testing.T) {
 		WindowFrameDialect(postgresDialect),
 		CTEMaterializationDialect(postgresDialect),
 		CTESearchCycleDialect(postgresDialect),
+		VectorOpsDialect(postgresDialect),
+		FullTextDialect(postgresDialect),
+		LeaseClaimDialect(postgresDialect),
 	}
 
 	if len(sqliteIfaces) == 0 || len(postgresIfaces) == 0 {
 		t.Fatal("capability interface lists must not be empty")
+	}
+}
+
+// TestDBCapabilities_matrix pins the DB-backed-adapter capability answers
+// for both in-tree dialects, resolved through For exactly as adapter
+// Open paths resolve them: pgvector ops and tsvector are postgres-only,
+// FTS5 is sqlite-only, and the row-lease CAS claim holds on both. An
+// unknown dialect name fails closed: For returns an error, so no capability
+// assertion can ever report support for it.
+func TestDBCapabilities_matrix(t *testing.T) {
+	t.Parallel()
+
+	tests := []struct {
+		name       string
+		dialect    string
+		vectorOps  bool
+		tsvector   bool
+		fts5       bool
+		leaseClaim bool
+	}{
+		{name: "sqlite", dialect: "sqlite", vectorOps: false, tsvector: false, fts5: true, leaseClaim: true},
+		{name: "postgres", dialect: "postgres", vectorOps: true, tsvector: true, fts5: false, leaseClaim: true},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			t.Parallel()
+
+			d, err := For(tt.dialect)
+			if err != nil {
+				t.Fatalf("For(%q) error: %v", tt.dialect, err)
+			}
+
+			vec, ok := d.(VectorOpsDialect)
+			if !ok {
+				t.Fatalf("%s dialect does not implement VectorOpsDialect", tt.dialect)
+			}
+
+			if got := vec.SupportsVectorOps(); got != tt.vectorOps {
+				t.Errorf("SupportsVectorOps() = %v, want %v", got, tt.vectorOps)
+			}
+
+			ft, ok := d.(FullTextDialect)
+			if !ok {
+				t.Fatalf("%s dialect does not implement FullTextDialect", tt.dialect)
+			}
+
+			if got := ft.SupportsTSVector(); got != tt.tsvector {
+				t.Errorf("SupportsTSVector() = %v, want %v", got, tt.tsvector)
+			}
+
+			if got := ft.SupportsFTS5(); got != tt.fts5 {
+				t.Errorf("SupportsFTS5() = %v, want %v", got, tt.fts5)
+			}
+
+			lease, ok := d.(LeaseClaimDialect)
+			if !ok {
+				t.Fatalf("%s dialect does not implement LeaseClaimDialect", tt.dialect)
+			}
+
+			if got := lease.SupportsLeaseClaim(); got != tt.leaseClaim {
+				t.Errorf("SupportsLeaseClaim() = %v, want %v", got, tt.leaseClaim)
+			}
+		})
+	}
+}
+
+// TestDBCapabilities_unknown_failsClosed verifies a dialect name For cannot
+// resolve yields no capability interface to assert: adapter Open paths
+// translate the resolution failure into ErrUnsupportedByDialect, never a
+// silently-degraded driver.
+func TestDBCapabilities_unknown_failsClosed(t *testing.T) {
+	t.Parallel()
+
+	d, err := For("mysql")
+	if err == nil {
+		t.Fatalf("For(%q) = nil error, want error", "mysql")
+	}
+
+	if d != nil {
+		t.Fatalf("For(%q) returned non-nil dialect with error", "mysql")
 	}
 }
 

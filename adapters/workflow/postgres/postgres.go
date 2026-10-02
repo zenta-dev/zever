@@ -276,15 +276,25 @@ func openFromDB(conn coredb.DB, o Options, owns bool) (workflow.Workflow, error)
 	return d, nil
 }
 
-// checkDialect fails closed on dialects outside sqlite/postgres.
+// checkDialect fails closed unless the connection's dialect resolves to a
+// LeaseClaimDialect reporting row-lease compare-and-set support: the atomic
+// single-row CAS every state transition below depends on for crash-recovery
+// leases. An unresolvable dialect name, or one without the claim invariant,
+// is rejected with the capability error, never a silently-degraded driver.
 func (d *driver) checkDialect() error {
-	switch d.conn.Dialect() {
-	case "sqlite", "postgres":
-		return nil
-	default:
+	dd, err := dialect.For(d.conn.Dialect())
+	if err != nil {
 		return fmt.Errorf("orm: postgres: unsupported dialect %q: %w",
 			d.conn.Dialect(), dialect.ErrUnsupportedByDialect)
 	}
+
+	lease, ok := dd.(dialect.LeaseClaimDialect)
+	if !ok || !lease.SupportsLeaseClaim() {
+		return fmt.Errorf("orm: postgres: unsupported dialect %q: %w",
+			d.conn.Dialect(), dialect.ErrUnsupportedByDialect)
+	}
+
+	return nil
 }
 
 // ensureSchema creates the runs table when missing. DDL only: every

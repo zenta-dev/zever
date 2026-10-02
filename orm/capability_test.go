@@ -123,6 +123,14 @@ func TestCapabilityInterfacesCompile(t *testing.T) {
 		_ dialect.DistinctOnDialect      = postgres.New()
 		_ dialect.ExtendedLockingDialect = postgres.New()
 		_ dialect.TablesampleDialect     = postgres.New()
+		// DB-backed-adapter capabilities: vector ops, full-text flavor,
+		// and row-lease CAS claims.
+		_ dialect.VectorOpsDialect  = sqlite.New()
+		_ dialect.FullTextDialect   = sqlite.New()
+		_ dialect.LeaseClaimDialect = sqlite.New()
+		_ dialect.VectorOpsDialect  = postgres.New()
+		_ dialect.FullTextDialect   = postgres.New()
+		_ dialect.LeaseClaimDialect = postgres.New()
 	)
 
 	s := sqlite.New()

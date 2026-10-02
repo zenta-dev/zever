@@ -182,15 +182,29 @@ func openFromDB(conn coredb.DB, _ Options, owns bool) (search.Search, error) {
 	return d, nil
 }
 
-// checkDialect fails closed on dialects outside sqlite/postgres.
+// checkDialect fails closed unless the connection's dialect resolves to a
+// FullTextDialect with a supported flavor (tsvector or FTS5). An
+// unresolvable dialect name, or a dialect with neither flavor, is rejected
+// with the capability error, never a silently-degraded ranking.
 func (d *driver) checkDialect() error {
-	switch d.conn.Dialect() {
-	case "sqlite", "postgres":
-		return nil
-	default:
+	dd, err := dialect.For(d.conn.Dialect())
+	if err != nil {
 		return fmt.Errorf("orm: postgres: unsupported dialect %q: %w",
 			d.conn.Dialect(), dialect.ErrUnsupportedByDialect)
 	}
+
+	ft, ok := dd.(dialect.FullTextDialect)
+	if !ok {
+		return fmt.Errorf("orm: postgres: unsupported dialect %q: %w",
+			d.conn.Dialect(), dialect.ErrUnsupportedByDialect)
+	}
+
+	if !ft.SupportsTSVector() && !ft.SupportsFTS5() {
+		return fmt.Errorf("orm: postgres: unsupported dialect %q: %w",
+			d.conn.Dialect(), dialect.ErrUnsupportedByDialect)
+	}
+
+	return nil
 }
 
 // ensureSchema creates the documents table plus the dialect full-text

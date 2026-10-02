@@ -319,6 +319,46 @@ type CTESearchCycleDialect interface {
 	SupportsCTESearchCycle() bool
 }
 
+// VectorOpsDialect is implemented by dialects that support the pgvector
+// extension bundle: the `vector` type, `<=>` cosine-distance ordering, and
+// the ivfflat/HNSW index methods. SupportsVectorOps is an explicit method,
+// not bare interface presence, so every in-tree dialect implements this
+// method set and reports its own answer. SQLite has no pgvector extension
+// (its vectorstore leg brute-forces cosine distance in Go), so it reports
+// false; a pgvector-only operation on a dialect reporting false is rejected
+// with a typed ErrUnsupportedByDialect, never invalid SQL.
+type VectorOpsDialect interface {
+	Dialect
+	SupportsVectorOps() bool
+}
+
+// FullTextDialect is implemented by dialects that support full-text search:
+// Postgres's `tsvector`/`to_tsvector` ranked queries over a GIN index, or
+// SQLite's FTS5 virtual tables with `MATCH` ranking. The two booleans are
+// explicit per-flavor methods, not a single SupportsFullText, because both
+// in-tree dialects support full-text yet share no syntax: one boolean could
+// never tell an adapter which DDL and query flavor to render. A dialect with
+// neither flavor is rejected with a typed ErrUnsupportedByDialect, never a
+// silently-degraded ranking.
+type FullTextDialect interface {
+	Dialect
+	SupportsTSVector() bool
+	SupportsFTS5() bool
+}
+
+// LeaseClaimDialect is implemented by dialects that support row-lease
+// compare-and-set claims (`UPDATE ... WHERE lease_owner = ... AND
+// lease_expires_at = ...`): the atomic single-row CAS the queue and workflow
+// adapters build crash-recovery leases on. SupportsLeaseClaim is an explicit
+// method, not bare interface presence, so every in-tree dialect implements
+// this method set and reports its own answer. Both in-tree dialects report
+// true; a driver lacking the invariant returns the capability error at Open,
+// never a silently-degraded driver.
+type LeaseClaimDialect interface {
+	Dialect
+	SupportsLeaseClaim() bool
+}
+
 // ErrUnsupportedByDialect is the typed error query methods return when the
 // resolved dialect lacks a capability the query needs. Callers test with
 // errors.Is.
