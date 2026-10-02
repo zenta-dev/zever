@@ -133,6 +133,17 @@ updates:
           - "*"
 
   - package-ecosystem: gomod
+    directory: "/adapters/cache/db"
+    schedule:
+      interval: weekly
+      day: monday
+    open-pull-requests-limit: 10
+    groups:
+      go-modules:
+        patterns:
+          - "*"
+
+  - package-ecosystem: gomod
     directory: "/adapters/cache/memory"
     schedule:
       interval: weekly

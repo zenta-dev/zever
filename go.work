@@ -13,6 +13,7 @@ use (
 	./adapters/billing/paddle
 	./adapters/billing/stripe
 	./adapters/billing/stub
+	./adapters/cache/db
 	./adapters/cache/memory
 	./adapters/cache/redis
 	./adapters/crypto/kms

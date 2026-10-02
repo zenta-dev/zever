@@ -167,8 +167,9 @@ the 5 minute TTL lapses or `Delete` removes the key. For check-then-set races us
 |---|---|---|
 | `memory` | `adapters/cache/memory` | Default, process-local, zero infra, closes instantly |
 | `redis` | `adapters/cache/redis` | Shared across instances, pool-backed, `Close(ctx)` drains pool |
+| `db` | `adapters/cache/db` | DB-backed over `shared/kvstore` (sqlite `:memory:` by default, postgres via DSN); counters are read-modify-write, non-linearizable under contention |
 
-Both adapters serve the same `cache.Cache` interface, so the bookings app
+All three adapters serve the same `cache.Cache` interface, so the bookings app
 runs `memory` locally and `redis` in staging with only a config change.
 
 ## Gotchas and production notes
