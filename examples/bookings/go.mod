@@ -26,7 +26,7 @@ require (
 	github.com/zenta-dev/zever/adapters/ratelimit/memory v0.5.3
 	github.com/zenta-dev/zever/adapters/router/stdhttp v0.5.3
 	github.com/zenta-dev/zever/adapters/scheduler/embedded v0.5.3
-	github.com/zenta-dev/zever/adapters/search/sqlite v0.5.3
+	github.com/zenta-dev/zever/adapters/search/postgres v0.5.3
 	github.com/zenta-dev/zever/adapters/secrets/env v0.5.3
 	github.com/zenta-dev/zever/adapters/tenant/single v0.5.3
 	github.com/zenta-dev/zever/adapters/vectorstore/sqlite v0.5.3
@@ -76,7 +76,7 @@ replace (
 	github.com/zenta-dev/zever/adapters/password/argon2 => ../../adapters/password/argon2
 	github.com/zenta-dev/zever/adapters/queue/memory => ../../adapters/queue/memory
 	github.com/zenta-dev/zever/adapters/scheduler/embedded => ../../adapters/scheduler/embedded
-	github.com/zenta-dev/zever/adapters/search/sqlite => ../../adapters/search/sqlite
+	github.com/zenta-dev/zever/adapters/search/postgres => ../../adapters/search/postgres
 	github.com/zenta-dev/zever/adapters/secrets/env => ../../adapters/secrets/env
 	github.com/zenta-dev/zever/adapters/vectorstore/sqlite => ../../adapters/vectorstore/sqlite
 	github.com/zenta-dev/zever/adapters/webhook/queue => ../../adapters/webhook/queue
@@ -223,11 +223,13 @@ require (
 	github.com/jackc/pgpassfile v1.0.0 // indirect
 	github.com/jackc/pgservicefile v0.0.0-20240606120523-5a60cdf6a761 // indirect
 	github.com/jackc/pgx/v5 v5.11.0 // indirect
+	github.com/jackc/puddle/v2 v2.2.2 // indirect
 	github.com/mattn/go-isatty v0.0.24 // indirect
 	github.com/ncruces/go-strftime v1.0.0 // indirect
 	github.com/oklog/ulid/v2 v2.1.2 // indirect
 	github.com/remyoudompheng/bigfft v0.0.0-20230129092748-24d4a6f8daec // indirect
 	github.com/robfig/cron/v3 v3.0.1 // indirect
+	github.com/zenta-dev/zever/adapters/db/postgres v0.5.3 // indirect
 	github.com/zenta-dev/zever/adapters/log/noop v0.5.3 // indirect
 	github.com/zenta-dev/zever/adapters/media/ffmpeg v0.5.3 // indirect
 	github.com/zenta-dev/zever/core/ai v0.5.3 // indirect
@@ -261,6 +263,7 @@ require (
 	golang.org/x/crypto v0.57.0 // indirect
 	golang.org/x/image v0.45.0 // indirect
 	golang.org/x/net v0.58.0 // indirect
+	golang.org/x/sync v0.23.0 // indirect
 	golang.org/x/sys v0.48.0 // indirect
 	golang.org/x/text v0.42.0 // indirect
 	google.golang.org/genproto/googleapis/rpc v0.0.0-20260818201246-1b0934165a6f // indirect

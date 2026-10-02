@@ -26,7 +26,7 @@ import (
 	billingstub "github.com/zenta-dev/zever/adapters/billing/stub"
 	dbsqlite "github.com/zenta-dev/zever/adapters/db/sqlite"
 	passwordargon2 "github.com/zenta-dev/zever/adapters/password/argon2"
-	searchsqlite "github.com/zenta-dev/zever/adapters/search/sqlite"
+	searchpostgres "github.com/zenta-dev/zever/adapters/search/postgres"
 	vectorsqlite "github.com/zenta-dev/zever/adapters/vectorstore/sqlite"
 
 	aianthropic "github.com/zenta-dev/zever/adapters/ai/anthropic"
@@ -136,7 +136,7 @@ func newTestSetup(t *testing.T) testSetup {
 	webhookhttp.Register()
 	workflowmemory.Register()
 	passwordargon2.Register()
-	searchsqlite.Register()
+	searchpostgres.Register()
 	vectorsqlite.Register()
 
 	c := container.New(cfg)

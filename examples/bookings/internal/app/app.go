@@ -20,7 +20,7 @@ import (
 	medialocal "github.com/zenta-dev/zever/adapters/media/local"
 	passwordargon2 "github.com/zenta-dev/zever/adapters/password/argon2"
 	schedulerembedded "github.com/zenta-dev/zever/adapters/scheduler/embedded"
-	searchsqlite "github.com/zenta-dev/zever/adapters/search/sqlite"
+	searchpostgres "github.com/zenta-dev/zever/adapters/search/postgres"
 	vectorsqlite "github.com/zenta-dev/zever/adapters/vectorstore/sqlite"
 )
 
@@ -69,7 +69,7 @@ func New() (*container.Container, error) {
 	medialocal.Register()
 	passwordargon2.Register()
 	schedulerembedded.Register()
-	searchsqlite.Register()
+	searchpostgres.Register()
 	vectorsqlite.Register()
 
 	return container.New(cfg), nil

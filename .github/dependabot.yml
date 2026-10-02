@@ -738,17 +738,6 @@ updates:
           - "*"
 
   - package-ecosystem: gomod
-    directory: "/adapters/search/sqlite"
-    schedule:
-      interval: weekly
-      day: monday
-    open-pull-requests-limit: 10
-    groups:
-      go-modules:
-        patterns:
-          - "*"
-
-  - package-ecosystem: gomod
     directory: "/adapters/secrets/env"
     schedule:
       interval: weekly

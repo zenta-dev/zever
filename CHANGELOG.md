@@ -62,6 +62,19 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   adapter matrix, and Dependabot entries updated (regen also picks up
   previously missing `kms`/`vault`/`workflow/postgres`/`traceprop`
   entries).
+- `adapters/search/sqlite`: folded into `adapters/search/postgres`, which
+  is now the single DB-backed search adapter (postgres tsvector/GIN on a
+  postgres URL DSN, embedded sqlite FTS5 otherwise; empty DSN selects
+  `:memory:`). The hand-rolled `pool.go` files are gone: construction
+  flows through `adapters/db/postgres` (TLS 1.2 floor) and
+  `adapters/db/sqlite`, writes go through the `orm` typed builder, and
+  `NewFromDB`/`OpenFromDB` share a caller-owned `coredb.DB`.
+  Migration for direct importers: replace
+  `adapters/search/sqlite` with `adapters/search/postgres`
+  (`sqlite.New(search.Options{...})` becomes
+  `postgres.New(postgres.Options{...})` or `search.Open`); the `sqlite`
+  adapter name keeps resolving via `postgres.Register`, so `zever.yaml`
+  files and the `sqlite` default need no change.
 
 ### Added
 

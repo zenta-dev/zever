@@ -30,7 +30,7 @@ require (
 	github.com/zenta-dev/zever/adapters/ratelimit/memory v0.5.3
 	github.com/zenta-dev/zever/adapters/router/stdhttp v0.5.3
 	github.com/zenta-dev/zever/adapters/scheduler/embedded v0.5.3
-	github.com/zenta-dev/zever/adapters/search/sqlite v0.5.3
+	github.com/zenta-dev/zever/adapters/search/postgres v0.5.3
 	github.com/zenta-dev/zever/adapters/secrets/env v0.5.3
 	github.com/zenta-dev/zever/adapters/session/memory v0.5.3
 	github.com/zenta-dev/zever/adapters/storage/local v0.5.3
@@ -90,7 +90,7 @@ replace (
 	github.com/zenta-dev/zever/adapters/media/local => ../../adapters/media/local
 	github.com/zenta-dev/zever/adapters/password/argon2 => ../../adapters/password/argon2
 	github.com/zenta-dev/zever/adapters/scheduler/embedded => ../../adapters/scheduler/embedded
-	github.com/zenta-dev/zever/adapters/search/sqlite => ../../adapters/search/sqlite
+	github.com/zenta-dev/zever/adapters/search/postgres => ../../adapters/search/postgres
 	github.com/zenta-dev/zever/adapters/vectorstore/sqlite => ../../adapters/vectorstore/sqlite
 	github.com/zenta-dev/zever/config => ../../config
 	github.com/zenta-dev/zever/container => ../../container
@@ -241,6 +241,7 @@ require (
 	github.com/jackc/pgpassfile v1.0.0 // indirect
 	github.com/jackc/pgservicefile v0.0.0-20240606120523-5a60cdf6a761 // indirect
 	github.com/jackc/pgx/v5 v5.11.0 // indirect
+	github.com/jackc/puddle/v2 v2.2.2 // indirect
 	github.com/mattn/go-isatty v0.0.24 // indirect
 	github.com/ncruces/go-strftime v1.0.0 // indirect
 	github.com/oklog/ulid/v2 v2.1.2 // indirect
@@ -252,6 +253,7 @@ require (
 	github.com/tidwall/match v1.1.1 // indirect
 	github.com/tidwall/pretty v1.2.1 // indirect
 	github.com/tidwall/sjson v1.2.5 // indirect
+	github.com/zenta-dev/zever/adapters/db/postgres v0.5.3 // indirect
 	github.com/zenta-dev/zever/adapters/log/noop v0.5.3 // indirect
 	github.com/zenta-dev/zever/adapters/media/ffmpeg v0.5.3 // indirect
 	github.com/zenta-dev/zever/core/scheduler v0.5.3 // indirect
