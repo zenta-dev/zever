@@ -376,4 +376,231 @@ func TestUnsupportedDialect(t *testing.T) {
 	if _, err := s.SweepExpired(ctx); !errors.Is(err, dialect.ErrUnsupportedByDialect) {
 		t.Errorf("SweepExpired err = %v, want ErrUnsupportedByDialect", err)
 	}
+
+	if _, err := s.AddDelta(ctx, "k", 1); !errors.Is(err, dialect.ErrUnsupportedByDialect) {
+		t.Errorf("AddDelta err = %v, want ErrUnsupportedByDialect", err)
+	}
+}
+
+func TestAddDeltaMissingStartsAtOne(t *testing.T) {
+	t.Parallel()
+
+	s := mustStore(t)
+	ctx := t.Context()
+
+	n, err := s.AddDelta(ctx, "n", 1)
+	if err != nil {
+		t.Fatalf("AddDelta failed: %v", err)
+	}
+
+	if n != 1 {
+		t.Fatalf("AddDelta = %d, want 1", n)
+	}
+
+	got, ok, err := s.Get(ctx, "n")
+	if err != nil || !ok {
+		t.Fatalf("Get = (%v, %v), want hit", ok, err)
+	}
+
+	if string(got) != "1" {
+		t.Fatalf("Get = %q, want 1", got)
+	}
+}
+
+func TestAddDeltaRoundTrip(t *testing.T) {
+	t.Parallel()
+
+	s := mustStore(t)
+	ctx := t.Context()
+
+	if _, err := s.AddDelta(ctx, "n", 1); err != nil {
+		t.Fatalf("AddDelta failed: %v", err)
+	}
+
+	if _, err := s.AddDelta(ctx, "n", 1); err != nil {
+		t.Fatalf("AddDelta failed: %v", err)
+	}
+
+	n, err := s.AddDelta(ctx, "n", -1)
+	if err != nil {
+		t.Fatalf("AddDelta failed: %v", err)
+	}
+
+	if n != 1 {
+		t.Fatalf("AddDelta = %d, want 1", n)
+	}
+
+	got, ok, err := s.Get(ctx, "n")
+	if err != nil || !ok {
+		t.Fatalf("Get = (%v, %v), want hit", ok, err)
+	}
+
+	if string(got) != "1" {
+		t.Fatalf("Get = %q, want 1", got)
+	}
+}
+
+func TestAddDeltaFreshDecrement(t *testing.T) {
+	t.Parallel()
+
+	s := mustStore(t)
+	ctx := t.Context()
+
+	n, err := s.AddDelta(ctx, "fresh", -1)
+	if err != nil {
+		t.Fatalf("AddDelta failed: %v", err)
+	}
+
+	if n != -1 {
+		t.Fatalf("AddDelta = %d, want -1", n)
+	}
+
+	got, ok, err := s.Get(ctx, "fresh")
+	if err != nil || !ok {
+		t.Fatalf("Get = (%v, %v), want hit", ok, err)
+	}
+
+	if string(got) != "-1" {
+		t.Fatalf("Get = %q, want -1", got)
+	}
+}
+
+func TestAddDeltaBaseValue(t *testing.T) {
+	t.Parallel()
+
+	s := mustStore(t)
+	ctx := t.Context()
+
+	if err := s.Set(ctx, "base", []byte("41"), 0); err != nil {
+		t.Fatalf("Set failed: %v", err)
+	}
+
+	n, err := s.AddDelta(ctx, "base", 1)
+	if err != nil {
+		t.Fatalf("AddDelta failed: %v", err)
+	}
+
+	if n != 42 {
+		t.Fatalf("AddDelta = %d, want 42", n)
+	}
+
+	got, ok, err := s.Get(ctx, "base")
+	if err != nil || !ok {
+		t.Fatalf("Get = (%v, %v), want hit", ok, err)
+	}
+
+	if string(got) != "42" {
+		t.Fatalf("Get = %q, want 42", got)
+	}
+}
+
+func TestAddDeltaNonNumeric(t *testing.T) {
+	t.Parallel()
+
+	s := mustStore(t)
+	ctx := t.Context()
+
+	if err := s.Set(ctx, "bad", []byte("abc"), 0); err != nil {
+		t.Fatalf("Set failed: %v", err)
+	}
+
+	if _, err := s.AddDelta(ctx, "bad", 1); !errors.Is(err, ErrInvalidInteger) {
+		t.Fatalf("AddDelta err = %v, want ErrInvalidInteger", err)
+	}
+
+	got, ok, err := s.Get(ctx, "bad")
+	if err != nil || !ok {
+		t.Fatalf("Get = (%v, %v), want hit", ok, err)
+	}
+
+	if string(got) != "abc" {
+		t.Fatalf("Get = %q, want abc (untouched)", got)
+	}
+}
+
+func TestAddDeltaPreservesExpiry(t *testing.T) {
+	t.Parallel()
+
+	s := mustStore(t)
+	ctx := t.Context()
+
+	if err := s.Set(ctx, "timed", []byte("10"), time.Hour); err != nil {
+		t.Fatalf("Set failed: %v", err)
+	}
+
+	_, before, ok, err := s.GetWithExpiry(ctx, "timed")
+	if err != nil || !ok {
+		t.Fatalf("GetWithExpiry = (%v, %v), want hit", ok, err)
+	}
+
+	if _, derr := s.AddDelta(ctx, "timed", 5); derr != nil {
+		t.Fatalf("AddDelta failed: %v", derr)
+	}
+
+	got, after, ok, err := s.GetWithExpiry(ctx, "timed")
+	if err != nil || !ok {
+		t.Fatalf("GetWithExpiry = (%v, %v), want hit", ok, err)
+	}
+
+	if string(got) != "15" {
+		t.Fatalf("Get = %q, want 15", got)
+	}
+
+	if !after.Equal(before) {
+		t.Fatalf("expiresAt changed: before %v, after %v", before, after)
+	}
+}
+
+func TestAddDeltaExpiredAsMissing(t *testing.T) {
+	t.Parallel()
+
+	s := mustStore(t)
+	ctx := t.Context()
+
+	if err := s.Set(ctx, "gone", []byte("99"), time.Hour); err != nil {
+		t.Fatalf("Set failed: %v", err)
+	}
+
+	expireKey(t, s, "gone", time.Now().Add(-time.Hour))
+
+	n, err := s.AddDelta(ctx, "gone", 5)
+	if err != nil {
+		t.Fatalf("AddDelta failed: %v", err)
+	}
+
+	if n != 5 {
+		t.Fatalf("AddDelta = %d, want 5 (expired base 0)", n)
+	}
+
+	got, exp, ok, err := s.GetWithExpiry(ctx, "gone")
+	if err != nil || !ok {
+		t.Fatalf("GetWithExpiry = (%v, %v), want hit", ok, err)
+	}
+
+	if string(got) != "5" {
+		t.Fatalf("Get = %q, want 5", got)
+	}
+
+	if !exp.IsZero() {
+		t.Fatalf("expiresAt = %v, want zero (expired reset)", exp)
+	}
+}
+
+func TestAddDeltaInvalidKey(t *testing.T) {
+	t.Parallel()
+
+	s := mustStore(t)
+	ctx := t.Context()
+
+	if _, err := s.AddDelta(ctx, "", 1); !errors.Is(err, ErrInvalidKey) {
+		t.Errorf("AddDelta empty = %v, want ErrInvalidKey", err)
+	}
+
+	if _, err := s.AddDelta(ctx, strings.Repeat("k", MaxKeyLen+1), 1); !errors.Is(err, ErrInvalidKey) {
+		t.Errorf("AddDelta too long = %v, want ErrInvalidKey", err)
+	}
+
+	if err := ctx.Err(); err != nil {
+		t.Fatalf("ctx cancelled: %v", err)
+	}
 }
