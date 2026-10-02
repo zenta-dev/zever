@@ -153,7 +153,7 @@ func (a *adapter) Issue(_ context.Context, subject string, custom map[string]any
 	// minting an empty token.
 	raw, err := jwtv5.NewWithClaims(jwtv5.SigningMethodHS256, claims).SignedString(a.secret)
 	if err != nil {
-		return auth.Token{}, fmt.Errorf("jwt: issue: %w: signing failed: %v", auth.ErrInvalidToken, err)
+		return auth.Token{}, fmt.Errorf("jwt: issue: signing failed: %w", errors.Join(auth.ErrInvalidToken, err))
 	}
 	return auth.Token{Value: raw, ExpiresAt: now.Add(ttl)}, nil
 }

@@ -141,11 +141,13 @@ func newChecker(e *casbinlib.SyncedEnforcer, roles map[string][]string) (permiss
 // the enforcer. A nil ctx is treated as context.Background, matching the
 // rbac adapter.
 func (c *checker) Can(ctx context.Context, subject permission.Subject, action string, resource permission.Resource) (permission.Decision, error) {
-	if ctx == nil {
-		ctx = context.Background()
-	}
-	if err := ctx.Err(); err != nil {
-		return permission.Decision{}, fmt.Errorf("casbin: enforce: %w", err)
+	// A nil ctx is treated as context.Background (no deadline to
+	// observe), matching the rbac adapter. Never mint a fresh root
+	// context from a possibly-cancelled parent.
+	if ctx != nil {
+		if err := ctx.Err(); err != nil {
+			return permission.Decision{}, fmt.Errorf("casbin: enforce: %w", err)
+		}
 	}
 
 	added, err := c.prepareGroupings(subject)
