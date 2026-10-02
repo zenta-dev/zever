@@ -1,0 +1,81 @@
+# Release artifacts: static binaries + SBOMs, SLSA-attested, attached to the GitHub release.
+#
+# Trigger: version tags only (`v*`, same shape as the ci.yml tag filter).
+# Local reproduction is partial: `go build` and `make sbom` run anywhere,
+# but actions/attest-build-provenance mints OIDC-backed provenance only on
+# GitHub-hosted runs, so attestation cannot be produced locally.
+#
+# Verify a downloaded artifact with:
+#   gh attestation verify dist/zever-linux-amd64 --repo zenta-dev/zever
+#   gh attestation verify sbom/cmd_zever.json --repo zenta-dev/zever
+name: release
+
+on:
+  push:
+    tags: ["v*"]
+
+permissions:
+  contents: write # attach dist/* + sbom/*.json to the tag release
+  id-token: write # OIDC minting for actions/attest-build-provenance
+  attestations: write # write SLSA provenance for binaries + SBOMs
+
+jobs:
+  release:
+    name: build, attest, attach
+    timeout-minutes: 30
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+      - uses: actions/setup-go@b7ad1dad31e06c5925ef5d2fc7ad053ef454303e # v7.0.0
+        with:
+          go-version-file: go.work
+          cache-dependency-path: |
+            go.work.sum
+            **/go.sum
+      - name: Build static binaries (zever CLI + showcase server/worker)
+        run: |
+          mkdir -p dist
+          # Builder flags mirror examples/showcase/Dockerfile
+          # (golang:1.27.1-bookworm, CGO_ENABLED=0, -trimpath,
+          # -ldflags="-s -w"). The Dockerfile builds with GOWORK=off because
+          # its build context carries only the showcase module plus replace
+          # targets; here the full checkout is present (cmd/zever and
+          # examples/showcase are both in go.work), so the workspace stays on.
+          # Entrypoints: cmd/zever/main.go (zever CLI),
+          # examples/showcase/cmd/server/main.go,
+          # examples/showcase/cmd/worker/main.go. No cmd/worker exists at the
+          # repo root; the worker ships with the showcase module.
+          for arch in amd64 arm64; do
+            CGO_ENABLED=0 GOOS=linux GOARCH="$arch" go build -trimpath -ldflags="-s -w" -o "dist/zever-linux-$arch" ./cmd/zever
+            CGO_ENABLED=0 GOOS=linux GOARCH="$arch" go build -trimpath -ldflags="-s -w" -o "dist/showcase-server-linux-$arch" ./examples/showcase/cmd/server
+            CGO_ENABLED=0 GOOS=linux GOARCH="$arch" go build -trimpath -ldflags="-s -w" -o "dist/showcase-worker-linux-$arch" ./examples/showcase/cmd/worker
+          done
+      - uses: actions/cache@55cc8345863c7cc4c66a329aec7e433d2d1c52a9 # v6.1.0
+        with:
+          path: ~/go/bin
+          key: ${{ runner.os }}-gobin-cyclonedx-gomod-v1.12.0
+      - name: Install tools
+        run: make setup-cyclonedx-gomod
+      - name: Generate SBOMs (all workspace modules)
+        run: make sbom
+      # SLSA build provenance over the release binaries. OIDC-minted
+      # attestations only exist on GitHub-hosted runs (no local
+      # reproduction); verify a downloaded binary with:
+      # gh attestation verify dist/zever-linux-amd64 --repo zenta-dev/zever
+      - uses: actions/attest-build-provenance@62fc1d596301d0ab9914e1fec14dc5c8d93f65cd # v3.2.0
+        with:
+          subject-path: dist/*
+      # Same provenance over the generated SBOMs; verify with:
+      # gh attestation verify sbom/cmd_zever.json --repo zenta-dev/zever
+      - uses: actions/attest-build-provenance@62fc1d596301d0ab9914e1fec14dc5c8d93f65cd # v3.2.0
+        with:
+          subject-path: sbom/*.json
+      - name: Attach artifacts to GitHub release
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          if gh release view "${{ github.ref_name }}" >/dev/null 2>&1; then
+            gh release upload "${{ github.ref_name }}" dist/* sbom/*.json --clobber
+          else
+            gh release create "${{ github.ref_name }}" --generate-notes dist/* sbom/*.json
+          fi
