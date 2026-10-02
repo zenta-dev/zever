@@ -154,11 +154,15 @@ func TestTryAcquire_nonPositiveTTLFallsBackToDefault(t *testing.T) {
 	if !ok {
 		t.Fatalf("locker = %T, want *adapter", l)
 	}
-	a.mu.Lock()
-	ttl := time.Until(a.leases[a.prefix+"k"].expires)
-	a.mu.Unlock()
+	a.mu.RLock()
+	_, exp, ok := a.leases.GetWithExpiry(a.prefix + "k")
+	a.mu.RUnlock()
 
-	if ttl < 29*time.Second {
+	if !ok {
+		t.Fatal("lease missing after acquire")
+	}
+
+	if ttl := time.Until(exp); ttl < 29*time.Second {
 		t.Fatalf("lease ttl = %v, want default %v", ttl, lock.DefaultTTL)
 	}
 
@@ -458,9 +462,9 @@ func TestClose_clearsLeases(t *testing.T) {
 	if !ok {
 		t.Fatalf("locker = %T, want *adapter", l)
 	}
-	a.mu.Lock()
-	n := len(a.leases)
-	a.mu.Unlock()
+	a.mu.RLock()
+	n := a.leases.Len()
+	a.mu.RUnlock()
 
 	if n != 0 {
 		t.Fatalf("leases after close = %d, want 0", n)

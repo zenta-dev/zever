@@ -29,4 +29,6 @@ replace github.com/zenta-dev/zever/shared/cas => ../../../shared/cas
 
 replace github.com/zenta-dev/zever/adapters/lock/memory => ../memory
 
+replace github.com/zenta-dev/zever/shared/lrucache => ../../../shared/lrucache
+
 replace github.com/zenta-dev/zever/shared/registry => ../../../shared/registry
