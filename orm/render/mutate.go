@@ -110,11 +110,11 @@ func renderInsertManyText(d dialect.Dialect, table string, columns []string, row
 	b.WriteString(") VALUES ")
 
 	rowCount := len(rows)
-	if uint(n) > 0 && uint(rowCount) > 0 && uint(n) > uint(^uint(0)>>1)/uint(rowCount) {
+	if n > 0 && rowCount > 0 && rowCount > int(^uint(0)>>1)/n {
 		return "", nil, fmt.Errorf("orm/render: InsertMany: too many values (%d columns x %d rows)", n, rowCount)
 	}
 
-	totalArgs := int(uint(n) * uint(rowCount))
+	totalArgs := n * rowCount
 	args = make([]any, 0, totalArgs)
 	counter := &argCounter{}
 
