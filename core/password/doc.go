@@ -2,7 +2,10 @@
 //
 // It hashes, verifies, and rehash-checks passwords through Hasher with typed
 // Options. It is not a user store and it does not issue tokens; auth calls it
-// on the verification path before issuing anything.
+// on the verification path before issuing anything. It ships one adapter
+// (`argon2id`) by design: hashing is pure CPU work with no network,
+// persistence, or multi-instance axis, so a second backend would add no
+// deployment shape.
 //
 // Type safety: Hasher plus typed Options plus Adapter enum plus Factory. Options
 // carry Time, Memory, Threads, SaltLen, and KeyLen with validated ranges and

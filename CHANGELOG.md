@@ -7,6 +7,32 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Added
+
+- Conformance kits for 11 batteries (`lock`, `ratelimit`, `eventbus`,
+  `idempotency`, `flag`, `log`, `observability`, `crypto`, `password`,
+  `billing`, `payment`) plus adapter wiring; kit list in
+  `docs/writing-a-plugin.md` grows 3 → 15.
+- Concurrent-load benchmarks for router, ORM, and queue with published
+  numbers in `docs/benchmarks.md`.
+- SLSA build provenance attestation over SBOMs in CI
+  (`gh attestation verify sbom/<slug>.json --repo zenta-dev/zever`).
+- `STABILITY.md` 1.0 promotion criteria with current-standing report;
+  `AUDIT-V1.md` readiness audit; DSL plugin-battery design note
+  (`dsl/plugin-batteries.mdx`, boundary recommendation).
+- `examples/showcase` positioned as newcomer-clone-first reference app.
+
+### Fixed
+
+- `adapters/auth/jwt`: propagate `SignedString` errors instead of
+  minting an empty token; reject empty `sub` on verify.
+- `core/authz`: nil `Auth`/`Checker` now fail closed
+  (`Unauthenticated`/`PermissionDenied`); clone claims/roles/subjects
+  across context boundaries.
+- `adapters/permission/casbin`: cancelled context now fails closed.
+- `core/auth/revocation/memory`: ignore already-lapsed entries like the
+  redis store; synchronous ticker construction.
+
 ### Removed
 
 - `adapters/webhook/sqlite`: removed mistaken adapter module and its

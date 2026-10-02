@@ -14,9 +14,13 @@ type Policy struct {
 	AuthRequired bool
 	// Roles carries the candidate roles evaluated by the permission checker.
 	// Ignored when AuthRequired is false: an unauthenticated caller has no
-	// verified identity, so it is never evaluated as holding any role --
-	// only rules that apply regardless of role (e.g. a public wildcard
-	// rule) can allow an anonymous PermissionCheck.
+	// verified identity, so it is never evaluated as holding any role.
+	// An anonymous PermissionCheck therefore denies in the shipped
+	// checkers (rbac requires a non-empty subject ID with at least one
+	// role even for wildcard-role rules; casbin groupings never match an
+	// empty subject): public routes must set AuthRequired false with an
+	// empty PermissionCheck, never rely on a wildcard rule to allow
+	// anonymous callers.
 	Roles []string
 	// PermissionCheck names the action passed to the checker; empty skips checks.
 	PermissionCheck string
@@ -24,12 +28,19 @@ type Policy struct {
 	ResourceType string
 	// OwnerField names the resource's owner field (declared snake_case schema
 	// name, e.g. "user_id") when the permission check is an ownership check.
-	// Empty for non-ownership checks. Carried for checkers that enforce
-	// ownership themselves; see UnaryServerInterceptor.
+	// Empty for non-ownership checks. Informational only: Authorize builds
+	// the permission.Resource with Type and ID alone and never populates
+	// resource Attributes, so ownership-scoped (OwnedOnly) rules deny
+	// through this path today (fail-closed). Wiring OwnerField into
+	// resource Attributes is a behavior change and needs maintainer
+	// review; see UnaryServerInterceptor.
 	OwnerField string
 }
 
 // Authorize verifies the token with a and enforces pol with p, returning the verified claims.
+// Fail-closed on nil backends: a nil Auth with AuthRequired denies as
+// unauthenticated, and a nil Checker with a PermissionCheck denies,
+// instead of panicking.
 func Authorize(ctx context.Context, a auth.Auth, p permission.Checker, pol Policy, token, resourceID string) (auth.Claims, error) {
 	var claims auth.Claims
 
@@ -40,6 +51,9 @@ func Authorize(ctx context.Context, a auth.Auth, p permission.Checker, pol Polic
 	if pol.AuthRequired {
 		if token == "" {
 			return claims, &UnauthenticatedError{Reason: "missing bearer token"}
+		}
+		if a == nil {
+			return claims, &UnauthenticatedError{Reason: "missing authenticator"}
 		}
 
 		verified, err := a.Verify(ctx, token)
@@ -54,9 +68,13 @@ func Authorize(ctx context.Context, a auth.Auth, p permission.Checker, pol Polic
 		return claims, nil
 	}
 
+	if p == nil {
+		return claims, &PermissionDeniedError{Reason: "permission check failed"}
+	}
+
 	var roles []string
 	if pol.AuthRequired {
-		roles = pol.Roles
+		roles = append([]string(nil), pol.Roles...)
 	}
 
 	subject := permission.Subject{
@@ -125,11 +143,17 @@ func parseBearerToken(header string) string {
 type claimsKey struct{}
 
 func withClaims(ctx context.Context, claims auth.Claims) context.Context {
-	return context.WithValue(ctx, claimsKey{}, claims)
+	// Clone so handlers holding ClaimsFromContext results cannot mutate
+	// the stored copy (or each other's) through the shared Custom map.
+	return context.WithValue(ctx, claimsKey{}, claims.Clone())
 }
 
 // ClaimsFromContext returns the claims stored by Middleware or UnaryServerInterceptor.
+// The returned Custom map is a copy; mutating it never affects later lookups.
 func ClaimsFromContext(ctx context.Context) (auth.Claims, bool) {
 	claims, ok := ctx.Value(claimsKey{}).(auth.Claims)
-	return claims, ok
+	if !ok {
+		return auth.Claims{}, false
+	}
+	return claims.Clone(), true
 }

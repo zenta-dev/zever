@@ -4,10 +4,22 @@ Two plugin shapes exist: a new adapter for an existing battery, and an
 entirely new battery (`examples/sms` dogfoods the second shape end to end).
 
 Conformance kits are the acceptance gate for both shapes: run the kit
-before publishing. Three batteries ship kits today:
+before publishing. Fifteen batteries ship kits today:
 `github.com/zenta-dev/zever/core/cache/cachetest`,
-`github.com/zenta-dev/zever/core/queue/queuetest`, and
-`github.com/zenta-dev/zever/core/storage/storagetest`.
+`github.com/zenta-dev/zever/core/queue/queuetest`,
+`github.com/zenta-dev/zever/core/secrets/secretstest`,
+`github.com/zenta-dev/zever/core/storage/storagetest`,
+`github.com/zenta-dev/zever/core/lock/locktest`,
+`github.com/zenta-dev/zever/core/ratelimit/ratelimittest`,
+`github.com/zenta-dev/zever/core/eventbus/eventbustest`,
+`github.com/zenta-dev/zever/core/idempotency/idempotencytest`,
+`github.com/zenta-dev/zever/core/flag/flagtest`,
+`github.com/zenta-dev/zever/core/log/logtest`,
+`github.com/zenta-dev/zever/core/observability/observabilitytest`,
+`github.com/zenta-dev/zever/core/crypto/cryptotest`,
+`github.com/zenta-dev/zever/core/password/passwordtest`,
+`github.com/zenta-dev/zever/core/billing/billingtest`, and
+`github.com/zenta-dev/zever/core/payment/paymenttest`.
 
 ## New adapter for an existing battery
 
@@ -234,8 +246,17 @@ its name, the host decides which names exist in its binary.
 - Conformance self-check is the acceptance proof: run the kit for the
   battery (`core/cache/cachetest` for cache,
   `core/queue/queuetest` for queue, `core/storage/storagetest` for
-  storage) against your factory and link its passing run from the plugin
-  README.
+  storage, `core/lock/locktest` for lock,
+  `core/ratelimit/ratelimittest` for ratelimit,
+  `core/eventbus/eventbustest` for eventbus,
+  `core/idempotency/idempotencytest` for idempotency,
+  `core/flag/flagtest` for flag, `core/log/logtest` for log,
+  `core/observability/observabilitytest` for observability,
+  `core/crypto/cryptotest` for crypto,
+  `core/password/passwordtest` for password,
+  `core/billing/billingtest` for billing,
+  `core/payment/paymenttest` for payment) against your factory and
+  link its passing run from the plugin README.
 - Release both version pins together per the repo release checklist, and
   document user-facing changes under `CHANGELOG.md` `## [Unreleased]`.
 

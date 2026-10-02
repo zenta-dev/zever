@@ -86,8 +86,9 @@ func Run(t *testing.T, newStore func(t *testing.T) revocation.Store) {
 		s := newStore(t)
 		ctx := context.Background()
 
-		// Already-past expiry: the entry is recorded but must read back as
-		// not revoked (mirrors a token whose grace window has lapsed).
+		// Already-past expiry: Revoke is a no-op (or records an
+		// already-lapsed entry) and must read back as not revoked
+		// (mirrors a token whose grace window has lapsed).
 		past := time.Now().Add(-time.Minute)
 		if err := s.Revoke(ctx, "jti-3", past); err != nil {
 			t.Fatalf("Revoke() error = %v", err)

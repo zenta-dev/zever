@@ -92,8 +92,11 @@ type Auth interface {
 	Issue(ctx context.Context, subject string, claims map[string]any, ttl time.Duration) (Token, error)
 	// Verify authenticates token and returns its claims.
 	Verify(ctx context.Context, token string) (Claims, error)
-	// Revoke invalidates token; unknown tokens return ErrInvalidToken,
-	// already-revoked tokens return ErrTokenRevoked.
+	// Revoke invalidates token. Revocation is idempotent: revoking an
+	// unknown or already-revoked token returns nil (the session-backed
+	// adapter deletes idempotently per the session.Store contract, and
+	// the JWT adapter records the jti idempotently in its revocation
+	// store). Malformed tokens return ErrInvalidToken.
 	Revoke(ctx context.Context, token string) error
 	// Close shuts down the backend and releases associated resources.
 	Close() error

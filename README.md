@@ -63,7 +63,9 @@ zever db migrate --adapter=sqlite --dsn=data/app.db schema/app.zen
 zever serve
 ```
 
-See `examples/todo` for a full working app (`schema/todo.zen`,
+Newcomer clone first: `examples/showcase` (DSL-depth shop app with a
+production `Dockerfile`; see `examples/showcase/README.md`). `examples/todo`
+is the smaller auth-gated notes app (`schema/todo.zen`,
 `zever.yaml`, `cmd/server`, `internal/app`).
 
 ## Adapters

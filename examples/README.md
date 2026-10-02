@@ -112,6 +112,9 @@ issues, not drive-by fixes.
 
 ## Stage 2: other showcases
 
+Newcomer clone first: `showcase/` — it wires the most batteries together
+and ships the only production `Dockerfile` of the three.
+
 - `showcase/`: DSL depth — every schema feature in one shop schema, with
   all six backends generated and a single service impl served over both
   HTTP and gRPC.
@@ -163,3 +166,6 @@ Plus two recently-wired batteries to prefer via the container: `lock`
 - Never commit secrets or keys; test fixtures stay in `testdata/`.
 - Doc comment on the example function stating which battery and adapter it
   shows.
+
+Proposing a new battery? Read `docs/writing-a-plugin.md` first (plugin
+shapes, conformance-kit gate, naming).
