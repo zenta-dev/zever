@@ -60,6 +60,23 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Changed
 
+- Shared postgres/sqlite pool (container-owned DSN→pool registry): every
+  db-backed battery pointing at the same DSN (`db`, `cache`, `queue`,
+  `search`, `session`, `idempotency`, `workflow`, `scheduler`,
+  `vectorstore`) now borrows one pool per exact-DSN match instead of
+  opening one pool per battery; borrowers keep `owns=false` and the
+  registry closes each pool once, after every borrower (`db` moved out of
+  the close snapshots into the registry band). The shared pool takes the
+  first opener's pool knobs and a differing nonzero `MaxConns` warns
+  (service named, DSN never logged). Opt out per battery with
+  `dedicated_pool: true` (new option on `core/db.Options` and every
+  db-backed options struct; `db` itself ignores it); `cache`, `session`,
+  `idempotency`, and `scheduler` also accept `dsn` for their `db`/`postgres`
+  adapters. Existing files keep working unchanged: sharing activates only
+  on exact-DSN (or same-file) match, and downgrading requires removing the
+  new fields (strict decoding). Queue, workflow, and scheduler under
+  sustained load should use `dedicated_pool: true` with a separate
+  database (Solid Queue guidance).
 - `adapters/cache/memory`: reimplemented on
   `shared/lrucache.TTLCache[string, []byte]` (deleted the hand-rolled
   map+list; `SetIfAbsent`/`CompareAndDelete`/`CompareAndExtend` and the

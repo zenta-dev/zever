@@ -41,6 +41,11 @@ workflow:
 `host_port` names a workflow server address when the backend needs one;
 `namespace` scopes runs. Both are optional for `memory`.
 
+A durable postgres workflow shares the container pool for its DSN with
+every other battery on that DSN (first opener's `max_conns` wins); set
+`dedicated_pool: true` with a separate workflow database under sustained
+load, following the same Solid Queue guidance as the queue.
+
 Env (no prefix, `<SERVICE>_<FIELD>`):
 
 ```sh

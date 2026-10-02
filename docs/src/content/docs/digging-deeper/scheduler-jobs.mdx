@@ -27,9 +27,10 @@ query on boot.
 
 ## Config
 
-Only `close_timeout` is file-settable for the scheduler. `Dispatcher`,
-`Locker`, and `Logger` are code-wired (tagged `yaml:"-"`) and injected by the
-container. Queue options still matter because dispatch rides the queue.
+Only `dsn`, `dedicated_pool`, and `close_timeout` are file-settable for
+the scheduler. `Dispatcher`, `Locker`, and `Logger` are code-wired
+(tagged `yaml:"-"`) and injected by the container. Queue options still
+matter because dispatch rides the queue.
 
 ```yaml
 queue:
@@ -43,6 +44,12 @@ scheduler:
   options:
     close_timeout: 5000000000
 ```
+
+A durable multi-instance scheduler uses the `postgres` adapter with a DSN;
+it borrows the shared container pool for that DSN unless
+`dedicated_pool: true` restores a private pool. Under sustained load
+prefer a separate database, following the same Solid Queue guidance as the
+queue.
 
 ```sh
 QUEUE_ADAPTER=redis

@@ -19,4 +19,10 @@
 // with 3-5 connections per worker is recommended there, and applies here
 // too). Throughput tops out in the low thousands of jobs per second per
 // topic; beyond that use redis or a dedicated broker.
+//
+// Pool sharing: the container resolves one pool per DSN and shares it
+// across every battery pointing at the same DSN, so a queue on the app
+// database borrows that pool instead of opening its own. Set
+// dedicated_pool: true (ideally with a separate queue database) to restore
+// a private pool under sustained load.
 package db
