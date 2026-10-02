@@ -16,7 +16,7 @@
 //
 // Core stays frozen: this package defines its own Options (DSN plus pool
 // knobs) and the Reclaimer extension interface instead of changing
-// core/workflow. Container wiring is left to the integrator: core
-// workflow.Options carries no DSN, so Register only reserves the adapter
-// name and fails closed until then.
+// core/workflow. Container wiring shares one pool per exact DSN across
+// batteries (see container/pools.go); dedicated_pool: true restores a
+// private pool.
 package postgres

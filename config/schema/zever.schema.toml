@@ -118,6 +118,14 @@ type = 'integer'
 ['$defs'.cacheOptions.properties.db]
 type = 'integer'
 
+['$defs'.cacheOptions.properties.dedicated_pool]
+description = 'Opt out of container-level pool sharing; default false shares one pool per exact DSN, true opens a private pool.'
+type = 'boolean'
+
+['$defs'.cacheOptions.properties.dsn]
+description = 'Postgres connection string or sqlite path for the db adapter; empty selects a private in-memory database.'
+type = 'string'
+
 ['$defs'.cacheOptions.properties.max_conn_idle_time]
 '$ref' = '#/$defs/durationNs'
 
@@ -173,6 +181,10 @@ additionalProperties = false
 type = 'object'
 
 ['$defs'.dbOptions.properties]
+['$defs'.dbOptions.properties.dedicated_pool]
+description = 'Opt out of container-level pool sharing; default false shares one pool per exact DSN, true opens a private pool.'
+type = 'boolean'
+
 ['$defs'.dbOptions.properties.dsn]
 description = 'Postgres connection string.'
 type = 'string'
@@ -378,6 +390,14 @@ additionalProperties = false
 type = 'object'
 
 ['$defs'.idempotencyOptions.properties]
+['$defs'.idempotencyOptions.properties.dedicated_pool]
+description = 'Opt out of container-level pool sharing; default false shares one pool per exact DSN, true opens a private pool.'
+type = 'boolean'
+
+['$defs'.idempotencyOptions.properties.dsn]
+description = 'Postgres connection string or sqlite path for the db adapter; empty selects a private in-memory database.'
+type = 'string'
+
 ['$defs'.idempotencyOptions.properties.redis]
 '$ref' = '#/$defs/zredisOptionsWithPrefix'
 
@@ -394,6 +414,10 @@ type = 'object'
 type = 'string'
 
 ['$defs'.lockOptions.properties.db]
+type = 'integer'
+
+['$defs'.lockOptions.properties.max_entries]
+description = 'Memory adapter lease-table bound before LRU eviction; evicted live leases report ErrNotHeld. Non-positive means 1000.'
 type = 'integer'
 
 ['$defs'.lockOptions.properties.password]
@@ -764,6 +788,14 @@ type = 'integer'
 ['$defs'.queueOptions.properties.db]
 type = 'integer'
 
+['$defs'.queueOptions.properties.dedicated_pool]
+description = 'Opt out of container-level pool sharing; default false shares one pool per exact DSN, true opens a private pool.'
+type = 'boolean'
+
+['$defs'.queueOptions.properties.dsn]
+description = 'Postgres connection string or sqlite path; empty selects a private in-memory-style database.'
+type = 'string'
+
 ['$defs'.queueOptions.properties.password]
 type = 'string'
 
@@ -775,6 +807,10 @@ type = 'string'
 
 ['$defs'.queueOptions.properties.require_tls]
 type = 'boolean'
+
+['$defs'.queueOptions.properties.table]
+description = 'Queue-messages table name; empty selects the adapter default.'
+type = 'string'
 
 ['$defs'.queueOptions.properties.tls]
 type = 'boolean'
@@ -823,13 +859,21 @@ type = 'string'
 
 ['$defs'.schedulerOptions]
 additionalProperties = false
-description = 'scheduler.Options.Dispatcher is required by Validate() but is a *job.Dispatcher (json:"-") that can only be wired in code, never from a config file -- close_timeout is the only field a file can actually set.'
+description = 'scheduler.Options.Dispatcher is required by Validate() but is a *job.Dispatcher (json:"-") that can only be wired in code, never from a config file -- dsn, dedicated_pool and close_timeout are the only fields a file can actually set.'
 type = 'object'
 
 ['$defs'.schedulerOptions.properties]
 ['$defs'.schedulerOptions.properties.close_timeout]
 '$ref' = '#/$defs/durationNs'
 description = 'Zero means adapter default (5s).'
+
+['$defs'.schedulerOptions.properties.dsn]
+description = 'Postgres connection string or sqlite path for the postgres adapter; empty selects a private in-memory database.'
+type = 'string'
+
+['$defs'.schedulerOptions.properties.dedicated_pool]
+description = 'Opt out of container-level pool sharing; default false shares one pool per exact DSN, true opens a private pool.'
+type = 'boolean'
 
 ['$defs'.searchOptions]
 additionalProperties = false
@@ -838,6 +882,10 @@ type = 'object'
 ['$defs'.searchOptions.properties]
 ['$defs'.searchOptions.properties.api_key]
 type = 'string'
+
+['$defs'.searchOptions.properties.dedicated_pool]
+description = 'Opt out of container-level pool sharing; default false shares one pool per exact DSN, true opens a private pool.'
+type = 'boolean'
 
 ['$defs'.searchOptions.properties.dsn]
 description = 'Postgres URL or sqlite path; required by postgres/sqlite adapters.'
@@ -902,6 +950,14 @@ additionalProperties = false
 type = 'object'
 
 ['$defs'.sessionOptions.properties]
+['$defs'.sessionOptions.properties.dedicated_pool]
+description = 'Opt out of container-level pool sharing; default false shares one pool per exact DSN, true opens a private pool.'
+type = 'boolean'
+
+['$defs'.sessionOptions.properties.dsn]
+description = 'Postgres connection string or sqlite path for the db adapter; empty selects a private in-memory database.'
+type = 'string'
+
 ['$defs'.sessionOptions.properties.redis]
 '$ref' = '#/$defs/zredisOptionsWithPrefix'
 
@@ -1035,6 +1091,10 @@ type = 'object'
 ['$defs'.vectorstoreOptions.properties.api_key]
 type = 'string'
 
+['$defs'.vectorstoreOptions.properties.dedicated_pool]
+description = 'Opt out of container-level pool sharing; default false shares one pool per exact DSN, true opens a private pool.'
+type = 'boolean'
+
 ['$defs'.vectorstoreOptions.properties.dimension]
 description = 'Default: 1536.'
 minimum = 0.0
@@ -1086,6 +1146,10 @@ additionalProperties = false
 type = 'object'
 
 ['$defs'.workflowOptions.properties]
+['$defs'.workflowOptions.properties.dedicated_pool]
+description = 'Opt out of container-level pool sharing; default false shares one pool per exact DSN, true opens a private pool.'
+type = 'boolean'
+
 ['$defs'.workflowOptions.properties.dsn]
 description = 'Postgres connection string; empty selects sqlite (dev/test).'
 type = 'string'
@@ -1336,7 +1400,7 @@ type = 'object'
 
 [properties.idempotency.properties]
 [properties.idempotency.properties.adapter]
-enum = ['memory', 'redis']
+enum = ['memory', 'redis', 'db']
 
 [properties.idempotency.properties.options]
 '$ref' = '#/$defs/idempotencyOptions'
@@ -1446,7 +1510,7 @@ type = 'object'
 
 [properties.queue.properties]
 [properties.queue.properties.adapter]
-enum = ['memory', 'redis']
+enum = ['memory', 'redis', 'db']
 
 [properties.queue.properties.options]
 '$ref' = '#/$defs/queueOptions'
@@ -1479,7 +1543,7 @@ type = 'object'
 
 [properties.scheduler.properties]
 [properties.scheduler.properties.adapter]
-enum = ['embedded']
+enum = ['embedded', 'postgres']
 
 [properties.scheduler.properties.options]
 '$ref' = '#/$defs/schedulerOptions'
@@ -1512,7 +1576,7 @@ type = 'object'
 
 [properties.session.properties]
 [properties.session.properties.adapter]
-enum = ['memory', 'redis']
+enum = ['memory', 'redis', 'db']
 
 [properties.session.properties.options]
 '$ref' = '#/$defs/sessionOptions'

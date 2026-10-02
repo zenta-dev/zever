@@ -20,7 +20,9 @@ require (
 	github.com/cespare/xxhash/v2 v2.3.0 // indirect
 	github.com/go-logr/logr v1.4.4 // indirect
 	github.com/go-logr/stdr v1.2.2 // indirect
+	github.com/zenta-dev/zever/core/db v0.5.3 // indirect
 	github.com/zenta-dev/zever/shared/codec v0.5.3 // indirect
+	github.com/zenta-dev/zever/shared/lrucache v0.5.3 // indirect
 	github.com/zenta-dev/zever/shared/redisopt v0.5.3 // indirect
 	github.com/zenta-dev/zever/shared/registry v0.5.3 // indirect
 	go.opentelemetry.io/auto/sdk v1.2.1 // indirect
@@ -42,8 +44,12 @@ replace github.com/zenta-dev/zever/adapters/queue/memory => ../../adapters/queue
 
 replace github.com/zenta-dev/zever/shared/codec => ../../shared/codec
 
+replace github.com/zenta-dev/zever/shared/lrucache => ../../shared/lrucache
+
 replace github.com/zenta-dev/zever/shared/redisopt => ../../shared/redisopt
 
 replace github.com/zenta-dev/zever/shared/registry => ../../shared/registry
 
 replace github.com/zenta-dev/zever/shared/traceprop => ../../shared/traceprop
+
+replace github.com/zenta-dev/zever/core/db => ../db

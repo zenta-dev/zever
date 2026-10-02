@@ -13,6 +13,9 @@ type Options struct {
 	APIKey string `json:"api_key" toml:"api_key" yaml:"api_key"`
 	// DSN holds the postgres URL or sqlite path, required by postgres/sqlite.
 	DSN string `json:"dsn" toml:"dsn" yaml:"dsn"`
+	// DedicatedPool opts out of container-level pool sharing. Default false
+	// shares one pool per exact DSN; true opens a private pool.
+	DedicatedPool bool `json:"dedicated_pool" toml:"dedicated_pool" yaml:"dedicated_pool"`
 }
 
 // Validate checks options for consistency, joining all violations.

@@ -64,6 +64,7 @@ require (
 	github.com/zenta-dev/zever/adapters/permission/casbin v0.5.3
 	github.com/zenta-dev/zever/adapters/permission/noop v0.5.3
 	github.com/zenta-dev/zever/adapters/permission/rbac v0.5.3
+	github.com/zenta-dev/zever/adapters/queue/db v0.5.3
 	github.com/zenta-dev/zever/adapters/queue/memory v0.5.3
 	github.com/zenta-dev/zever/adapters/queue/redis v0.5.3
 	github.com/zenta-dev/zever/adapters/ratelimit/memory v0.5.3
@@ -271,6 +272,7 @@ require (
 	github.com/zenta-dev/zever/core/vectorstore v0.5.3 // indirect
 	github.com/zenta-dev/zever/shared/cas v0.5.3 // indirect
 	github.com/zenta-dev/zever/shared/codec v0.5.3 // indirect
+	github.com/zenta-dev/zever/shared/dbconn v0.5.3 // indirect
 	github.com/zenta-dev/zever/shared/endpoint v0.5.3 // indirect
 	github.com/zenta-dev/zever/shared/firebase v0.5.3 // indirect
 	github.com/zenta-dev/zever/shared/httpclient v0.5.3 // indirect
@@ -379,6 +381,7 @@ replace (
 	github.com/zenta-dev/zever/adapters/permission/casbin => ../../adapters/permission/casbin
 	github.com/zenta-dev/zever/adapters/permission/noop => ../../adapters/permission/noop
 	github.com/zenta-dev/zever/adapters/permission/rbac => ../../adapters/permission/rbac
+	github.com/zenta-dev/zever/adapters/queue/db => ../../adapters/queue/db
 	github.com/zenta-dev/zever/adapters/queue/memory => ../../adapters/queue/memory
 	github.com/zenta-dev/zever/adapters/queue/redis => ../../adapters/queue/redis
 	github.com/zenta-dev/zever/adapters/ratelimit/memory => ../../adapters/ratelimit/memory
@@ -454,6 +457,8 @@ replace github.com/zenta-dev/zever/shared/cas => ../../shared/cas
 
 replace github.com/zenta-dev/zever/shared/codec => ../../shared/codec
 
+replace github.com/zenta-dev/zever/shared/dbconn => ../../shared/dbconn
+
 replace github.com/zenta-dev/zever/shared/endpoint => ../../shared/endpoint
 
 replace github.com/zenta-dev/zever/shared/firebase => ../../shared/firebase
@@ -487,3 +492,4 @@ replace github.com/zenta-dev/zever/core/authz => ../../core/authz
 replace github.com/zenta-dev/zever/core/middleware => ../../core/middleware
 
 replace github.com/zenta-dev/zever/shared/apperror => ../../shared/apperror
+

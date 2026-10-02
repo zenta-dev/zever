@@ -1,11 +1,22 @@
 package render
 
 import (
+	"errors"
 	"fmt"
+	"math"
 	"strings"
 
 	"github.com/zenta-dev/zever/orm/dialect"
 )
+
+// ErrTooManyArgs is returned by InsertMany (and its returning-aware twins)
+// when rows*columns would overflow the argument-slice capacity -- i.e. the
+// input is far beyond any dialect's parameter budget. There is no
+// max-batch constant to reuse in orm (dialect budgets differ: Postgres
+// ~65535 params, SQLite ~999-32766 depending on build flags), so this is a
+// minimal overflow sentinel, not a policy limit. Callers test with
+// errors.Is.
+var ErrTooManyArgs = errors.New("orm/render: too many arguments")
 
 // Assignment is one column=value pair for an UPDATE statement's SET
 // clause. It is render's own copy of the builder's Assignment erased shape;
@@ -67,6 +78,19 @@ func renderInsertText(d dialect.Dialect, table string, columns []string, values 
 	return b.String(), args
 }
 
+// insertManyCap returns the flattened argument count n*numRows, or an
+// ErrTooManyArgs error when the product would overflow int. It is pure
+// arithmetic on counts (no allocation), so callers can reject absurd
+// inputs before building any slice -- and tests can probe the overflow
+// boundary without allocating a huge rows slice.
+func insertManyCap(n, numRows int) (int, error) {
+	if n > 0 && numRows > math.MaxInt/n {
+		return 0, fmt.Errorf("%w: InsertMany of %d rows with %d columns overflows the argument count", ErrTooManyArgs, numRows, n)
+	}
+
+	return n * numRows, nil
+}
+
 // renderInsertManyText renders a single multi-row
 // `INSERT INTO <table> (<columns>) VALUES (<...>), (<...>), ...` and its
 // positional arguments. It is the cache-miss body behind InsertMany (see
@@ -109,13 +133,12 @@ func renderInsertManyText(d dialect.Dialect, table string, columns []string, row
 	b.WriteString(strings.Join(quoted, ", "))
 	b.WriteString(") VALUES ")
 
-	rowCount := len(rows)
-	if n > 0 && rowCount > 0 && rowCount > int(^uint(0)>>1)/n {
-		return "", nil, fmt.Errorf("orm/render: InsertMany: too many values (%d columns x %d rows)", n, rowCount)
+	argCap, err := insertManyCap(n, len(rows))
+	if err != nil {
+		return "", nil, err
 	}
 
-	totalArgs := n * rowCount
-	args = make([]any, 0, totalArgs)
+	args = make([]any, 0, argCap)
 	counter := &argCounter{}
 
 	for i, row := range rows {

@@ -34,6 +34,16 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   `router`, `middleware`, `job`, `auth`, `authz`, `permission`) plus
   adapter wiring; kit list in `docs/writing-a-plugin.md` grows 15 → 24+;
   smoke suites for the `password`/`billing` kits.
+- `adapters/queue/db`: DB-backed queue for multi-worker deploys without
+  Redis (postgres URL opens postgres, anything else opens sqlite, empty
+  selects a private in-memory-style database). Single messages table with
+  lease-based claiming (compare-and-set on `claimed_by`/`claimed_until`,
+  attempt bump on reclaim, `available_at` for delayed delivery), mirroring
+  `adapters/queue/redis`'s claim/reclaim/ack/nack scripts and
+  `adapters/workflow/postgres`'s lease CAS; passes the shared
+  `queuetest.Conformance` kit. Polling transport with moderate throughput,
+  not a Kafka/SQS replacement (separate queue database with 3-5
+  connections per worker recommended).
 - `adapters/scheduler/postgres`: durable leased scheduler for
   multi-instance deploys (mirrors `adapters/workflow/postgres`).
 - `adapters/cache/db`: DB-backed `cache.Cache` over `shared/kvstore`
@@ -47,11 +57,60 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Release workflow (`.github/workflows/release.yml`) with SLSA-attested
   binaries and SBOMs; verify with
   `gh attestation verify <artifact> --repo zenta-dev/zever`.
+- `lock.Options.MaxEntries`: configurable bound for the memory adapter
+  lease table (non-positive means 1000, matching `cache.Options.MaxEntries`).
+  Past the bound the least-recently-used live lease is evicted and its
+  holder observes `lock.ErrNotHeld`; set a large value for effectively
+  unbounded storage. This documents the fixed 1000-entry LRU bound the
+  TTLCache migration imposed on previously-unbounded lease storage.
+
+### Changed
+
+- Shared postgres/sqlite pool (container-owned DSN→pool registry): every
+  db-backed battery pointing at the same DSN (`db`, `cache`, `queue`,
+  `search`, `session`, `idempotency`, `workflow`, `scheduler`,
+  `vectorstore`) now borrows one pool per exact-DSN match instead of
+  opening one pool per battery; borrowers keep `owns=false` and the
+  registry closes each pool once, after every borrower (`db` moved out of
+  the close snapshots into the registry band). The shared pool takes the
+  first opener's pool knobs and a differing nonzero `MaxConns` warns
+  (service named, DSN never logged). Opt out per battery with
+  `dedicated_pool: true` (new option on `core/db.Options` and every
+  db-backed options struct; `db` itself ignores it); `cache`, `session`,
+  `idempotency`, and `scheduler` also accept `dsn` for their `db`/`postgres`
+  adapters. Existing files keep working unchanged: sharing activates only
+  on exact-DSN (or same-file) match, and downgrading requires removing the
+  new fields (strict decoding). Queue, workflow, and scheduler under
+  sustained load should use `dedicated_pool: true` with a separate
+  database (Solid Queue guidance). Wiring lives in the battery cores now:
+  each db-backed core exposes `RegisterShared`/`OpenShared` (adapters
+  register their `OpenFromDB` constructors there), so the container
+  resolves pools via `db.Open` plus the battery cores only — the scaffold
+  floor no longer vendors pgx/modernc and consumers need no lockstep
+  adapter replaces.
+- `adapters/cache/memory`: reimplemented on
+  `shared/lrucache.TTLCache[string, []byte]` (deleted the hand-rolled
+  map+list; `SetIfAbsent`/`CompareAndDelete`/`CompareAndExtend` and the
+  `Increment`/`Decrement` CAS loop delegate to the library's atomic
+  primitives; the janitor calls `PurgeExpired`). One deliberate
+  boundary change: entries now expire exactly at their TTL deadline
+  (`!expiresAt.After(now)`) instead of staying live until strictly
+  after it — a read landing on the exact deadline nanosecond now
+  misses. `cachetest` conformance passes identically before/after.
 
 ### Fixed
 
 - `adapters/auth/jwt`: propagate `SignedString` errors instead of
   minting an empty token; reject empty `sub` on verify.
+- Default lease owners in `adapters/workflow/postgres` and
+  `adapters/scheduler/postgres` are now random per driver (via the new
+  `shared/dbconn` helper, matching `adapters/queue/db`) instead of the
+  static `"workflow-owner"`/`"scheduler-owner"`: two replicas sharing
+  one database no longer share one lease-holder identity. Table-name
+  validation errors from these adapters (and `queue/db`) now wrap the
+  shared `dbconn.ErrInvalidTableName` sentinel, so the text gains a
+  `dbconn:` segment (e.g. `postgres: dbconn: invalid table name:
+  "no-dashes!"`); match with `errors.Is` going forward.
 - `core/authz`: nil `Auth`/`Checker` now fail closed
   (`Unauthenticated`/`PermissionDenied`); clone claims/roles/subjects
   across context boundaries.

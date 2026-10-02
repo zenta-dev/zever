@@ -83,6 +83,83 @@ func TestNew_defaults(t *testing.T) {
 	}
 }
 
+func TestNew_maxEntriesDefaults(t *testing.T) {
+	t.Parallel()
+
+	for _, opts := range []lock.Options{{}, {MaxEntries: -5}} {
+		l, err := New(opts)
+		if err != nil {
+			t.Fatalf("New(%+v): %v", opts, err)
+		}
+
+		a, ok := l.(*adapter)
+		if !ok {
+			t.Fatalf("locker type = %T, want *adapter", l)
+		}
+
+		if a.maxEntries != 1000 {
+			t.Errorf("New(%+v).maxEntries = %d, want 1000", opts, a.maxEntries)
+		}
+	}
+}
+
+func TestNew_maxEntriesExplicitHonored(t *testing.T) {
+	t.Parallel()
+
+	l, err := New(lock.Options{MaxEntries: 7})
+	if err != nil {
+		t.Fatalf("New: %v", err)
+	}
+
+	a, ok := l.(*adapter)
+	if !ok {
+		t.Fatalf("locker type = %T, want *adapter", l)
+	}
+
+	if a.maxEntries != 7 {
+		t.Fatalf("maxEntries = %d, want 7", a.maxEntries)
+	}
+}
+
+func TestMaxEntries_boundEvictsOldestLiveLease(t *testing.T) {
+	t.Parallel()
+
+	ctx := t.Context()
+	l, err := New(lock.Options{MaxEntries: 3})
+	if err != nil {
+		t.Fatalf("New: %v", err)
+	}
+
+	t.Cleanup(func() { _ = l.Close(ctx) })
+
+	holders := make([]lock.Lock, 0, 3)
+
+	for _, k := range []string{"a", "b", "c"} {
+		h, ok, err := l.TryAcquire(ctx, k, time.Minute)
+		if err != nil || !ok {
+			t.Fatalf("acquire %q = (%v, %v), want (true, nil)", k, ok, err)
+		}
+
+		holders = append(holders, h)
+	}
+
+	if _, ok, err := l.TryAcquire(ctx, "d", time.Minute); err != nil || !ok {
+		t.Fatalf("acquire d = (%v, %v), want (true, nil)", ok, err)
+	}
+
+	if err := holders[0].Extend(ctx, time.Minute); !errors.Is(err, lock.ErrNotHeld) {
+		t.Errorf("extend evicted lease = %v, want ErrNotHeld", err)
+	}
+
+	if err := holders[0].Unlock(ctx); !errors.Is(err, lock.ErrNotHeld) {
+		t.Errorf("unlock evicted lease = %v, want ErrNotHeld", err)
+	}
+
+	if _, ok, err := l.TryAcquire(ctx, "a", time.Minute); err != nil || !ok {
+		t.Errorf("re-acquire evicted key = (%v, %v), want (true, nil)", ok, err)
+	}
+}
+
 func TestTryAcquire_excludesSecondHolder(t *testing.T) {
 	t.Parallel()
 
@@ -154,11 +231,15 @@ func TestTryAcquire_nonPositiveTTLFallsBackToDefault(t *testing.T) {
 	if !ok {
 		t.Fatalf("locker = %T, want *adapter", l)
 	}
-	a.mu.Lock()
-	ttl := time.Until(a.leases[a.prefix+"k"].expires)
-	a.mu.Unlock()
+	a.mu.RLock()
+	_, exp, ok := a.leases.GetWithExpiry(a.prefix + "k")
+	a.mu.RUnlock()
 
-	if ttl < 29*time.Second {
+	if !ok {
+		t.Fatal("lease missing after acquire")
+	}
+
+	if ttl := time.Until(exp); ttl < 29*time.Second {
 		t.Fatalf("lease ttl = %v, want default %v", ttl, lock.DefaultTTL)
 	}
 
@@ -458,9 +539,9 @@ func TestClose_clearsLeases(t *testing.T) {
 	if !ok {
 		t.Fatalf("locker = %T, want *adapter", l)
 	}
-	a.mu.Lock()
-	n := len(a.leases)
-	a.mu.Unlock()
+	a.mu.RLock()
+	n := a.leases.Len()
+	a.mu.RUnlock()
 
 	if n != 0 {
 		t.Fatalf("leases after close = %d, want 0", n)

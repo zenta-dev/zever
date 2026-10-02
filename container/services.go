@@ -93,9 +93,15 @@ func (c *Container) Billing() (billing.Billing, error) {
 	})
 }
 
-// Cache resolves and returns the cache service instance.
+// Cache resolves and returns the cache service instance. A db-backed cache
+// pointing at an already-pooled DSN borrows the shared pool (owns=false);
+// DedicatedPool or a non-shareable DSN opens a private pool as before.
 func (c *Container) Cache() (cache.Cache, error) {
 	return c.cache.get(func() (cache.Cache, error) {
+		if v, shared, err := c.openSharedCache(); shared || err != nil {
+			return v, err
+		}
+
 		return openService("cache", c.cfg.Cache.Adapter, cache.ParseAdapter, cache.Open, c.cfg.Cache.Options)
 	})
 }
@@ -107,10 +113,12 @@ func (c *Container) Crypto() (crypto.Crypto, error) {
 	})
 }
 
-// DB resolves and returns the db service instance.
+// DB resolves and returns the db service instance. Shareable pools register
+// in the DSN registry for borrowers; DedicatedPool is meaningless on db
+// itself and is ignored.
 func (c *Container) DB() (db.DB, error) {
 	return c.db.get(func() (db.DB, error) {
-		return openService("db", c.cfg.DB.Adapter, db.ParseAdapter, db.Open, c.cfg.DB.Options)
+		return c.openDB()
 	})
 }
 
@@ -181,9 +189,16 @@ func (c *Container) I18n() (i18n.I18n, error) {
 	})
 }
 
-// Idempotency resolves and returns the idempotency service instance.
+// Idempotency resolves and returns the idempotency service instance. A
+// db-backed store pointing at an already-pooled DSN borrows the shared
+// pool (owns=false); DedicatedPool or a non-shareable DSN opens a private
+// pool as before.
 func (c *Container) Idempotency() (idempotency.Store, error) {
 	return c.idempotency.get(func() (idempotency.Store, error) {
+		if v, shared, err := c.openSharedIdempotency(); shared || err != nil {
+			return v, err
+		}
+
 		return openService("idempotency", c.cfg.Idempotency.Adapter, idempotency.ParseAdapter, idempotency.Open, c.cfg.Idempotency.Options)
 	})
 }
@@ -273,9 +288,17 @@ func (c *Container) Permission() (permission.Checker, error) {
 	})
 }
 
-// Queue resolves and returns the queue service instance.
+// Queue resolves and returns the queue service instance. A db-backed queue
+// pointing at an already-pooled DSN borrows the shared pool (owns=false);
+// DedicatedPool or a non-shareable DSN opens a private pool as before.
+// Under sustained load prefer a separate queue database with
+// DedicatedPool (Solid Queue guidance).
 func (c *Container) Queue() (queue.Queue, error) {
 	return c.queue.get(func() (queue.Queue, error) {
+		if v, shared, err := c.openSharedQueue(); shared || err != nil {
+			return v, err
+		}
+
 		return openService("queue", c.cfg.Queue.Adapter, queue.ParseAdapter, queue.Open, c.cfg.Queue.Options)
 	})
 }
@@ -302,9 +325,15 @@ func (c *Container) Router() (router.Router, error) {
 // Scheduler resolves the scheduler service. A nil Dispatcher in options is
 // replaced with the resolved job dispatcher, so ticks share the
 // process-wide queue instead of opening redundant connections. An explicit
-// Dispatcher is used as-is.
+// Dispatcher is used as-is. A postgres scheduler pointing at an
+// already-pooled DSN borrows the shared pool (owns=false); DedicatedPool
+// or a non-shareable DSN opens a private pool as before.
 func (c *Container) Scheduler() (scheduler.Scheduler, error) {
 	return c.scheduler.get(func() (scheduler.Scheduler, error) {
+		if v, shared, err := c.openSharedScheduler(); shared || err != nil {
+			return v, err
+		}
+
 		opts := c.cfg.Scheduler.Options
 		if opts.Dispatcher == nil {
 			d, err := c.Job()
@@ -319,9 +348,16 @@ func (c *Container) Scheduler() (scheduler.Scheduler, error) {
 	})
 }
 
-// Search resolves and returns the search service instance.
+// Search resolves and returns the search service instance. A postgres or
+// sqlite search pointing at an already-pooled DSN borrows the shared pool
+// (owns=false); DedicatedPool or a non-shareable DSN opens a private pool
+// as before.
 func (c *Container) Search() (search.Search, error) {
 	return c.search.get(func() (search.Search, error) {
+		if v, shared, err := c.openSharedSearch(); shared || err != nil {
+			return v, err
+		}
+
 		return openService("search", c.cfg.Search.Adapter, search.ParseAdapter, search.Open, c.cfg.Search.Options)
 	})
 }
@@ -333,9 +369,16 @@ func (c *Container) Secrets() (secrets.Secrets, error) {
 	})
 }
 
-// Session resolves and returns the session service instance.
+// Session resolves and returns the session service instance. A db-backed
+// session pointing at an already-pooled DSN borrows the shared pool
+// (owns=false); DedicatedPool or a non-shareable DSN opens a private pool
+// as before.
 func (c *Container) Session() (session.Store, error) {
 	return c.session.get(func() (session.Store, error) {
+		if v, shared, err := c.openSharedSession(); shared || err != nil {
+			return v, err
+		}
+
 		return openService("session", c.cfg.Session.Adapter, session.ParseAdapter, session.Open, c.cfg.Session.Options)
 	})
 }
@@ -354,9 +397,16 @@ func (c *Container) Tenant() (tenant.Tenant, error) {
 	})
 }
 
-// VectorStore resolves and returns the vectorstore service instance.
+// VectorStore resolves and returns the vectorstore service instance. A
+// pgvector or sqlite vectorstore pointing at an already-pooled DSN borrows
+// the shared pool (owns=false); DedicatedPool or a non-shareable DSN opens
+// a private pool as before.
 func (c *Container) VectorStore() (vectorstore.VectorStore, error) {
 	return c.vectorstore.get(func() (vectorstore.VectorStore, error) {
+		if v, shared, err := c.openSharedVectorStore(); shared || err != nil {
+			return v, err
+		}
+
 		return openService("vectorstore", c.cfg.VectorStore.Adapter, vectorstore.ParseAdapter, vectorstore.Open, c.cfg.VectorStore.Options)
 	})
 }
@@ -368,9 +418,17 @@ func (c *Container) Webhook() (webhook.Webhook, error) {
 	})
 }
 
-// Workflow resolves and returns the workflow service instance.
+// Workflow resolves and returns the workflow service instance. A postgres
+// workflow pointing at an already-pooled DSN borrows the shared pool
+// (owns=false); DedicatedPool or a non-shareable DSN opens a private pool
+// as before. Under sustained load prefer a separate workflow database with
+// DedicatedPool.
 func (c *Container) Workflow() (workflow.Workflow, error) {
 	return c.workflow.get(func() (workflow.Workflow, error) {
+		if v, shared, err := c.openSharedWorkflow(); shared || err != nil {
+			return v, err
+		}
+
 		return openService("workflow", c.cfg.Workflow.Adapter, workflow.ParseAdapter, workflow.Open, c.cfg.Workflow.Options)
 	})
 }

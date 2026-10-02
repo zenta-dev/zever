@@ -3,6 +3,7 @@ module github.com/zenta-dev/zever/container
 go 1.27.0
 
 require (
+	github.com/zenta-dev/zever/adapters/db/sqlite v0.5.3
 	github.com/zenta-dev/zever/config v0.5.3
 	github.com/zenta-dev/zever/core/ai v0.5.3
 	github.com/zenta-dev/zever/core/analytics v0.5.3
@@ -39,13 +40,24 @@ require (
 	github.com/zenta-dev/zever/core/vectorstore v0.5.3
 	github.com/zenta-dev/zever/core/webhook v0.5.3
 	github.com/zenta-dev/zever/core/workflow v0.5.3
+	github.com/zenta-dev/zever/shared/dbconn v0.5.3
 	github.com/zenta-dev/zever/shared/registry v0.5.3
 	go.uber.org/goleak v1.3.0
 	google.golang.org/grpc v1.83.2
 )
 
 replace (
+	github.com/zenta-dev/zever/adapters/cache/db => ../adapters/cache/db
+	github.com/zenta-dev/zever/adapters/db/postgres => ../adapters/db/postgres
+	github.com/zenta-dev/zever/adapters/db/sqlite => ../adapters/db/sqlite
+	github.com/zenta-dev/zever/adapters/idempotency/db => ../adapters/idempotency/db
 	github.com/zenta-dev/zever/adapters/log/noop => ../adapters/log/noop
+	github.com/zenta-dev/zever/adapters/queue/db => ../adapters/queue/db
+	github.com/zenta-dev/zever/adapters/scheduler/postgres => ../adapters/scheduler/postgres
+	github.com/zenta-dev/zever/adapters/search/postgres => ../adapters/search/postgres
+	github.com/zenta-dev/zever/adapters/session/db => ../adapters/session/db
+	github.com/zenta-dev/zever/adapters/vectorstore/pgvector => ../adapters/vectorstore/pgvector
+	github.com/zenta-dev/zever/adapters/workflow/postgres => ../adapters/workflow/postgres
 	github.com/zenta-dev/zever/config => ../config
 	github.com/zenta-dev/zever/core/ai => ../core/ai
 	github.com/zenta-dev/zever/core/analytics => ../core/analytics
@@ -82,9 +94,12 @@ replace (
 	github.com/zenta-dev/zever/core/vectorstore => ../core/vectorstore
 	github.com/zenta-dev/zever/core/webhook => ../core/webhook
 	github.com/zenta-dev/zever/core/workflow => ../core/workflow
+	github.com/zenta-dev/zever/orm => ../orm
 	github.com/zenta-dev/zever/shared/codec => ../shared/codec
+	github.com/zenta-dev/zever/shared/dbconn => ../shared/dbconn
 	github.com/zenta-dev/zever/shared/endpoint => ../shared/endpoint
 	github.com/zenta-dev/zever/shared/httpclient => ../shared/httpclient
+	github.com/zenta-dev/zever/shared/kvstore => ../shared/kvstore
 	github.com/zenta-dev/zever/shared/providersopt => ../shared/providersopt
 	github.com/zenta-dev/zever/shared/redisopt => ../shared/redisopt
 	github.com/zenta-dev/zever/shared/registry => ../shared/registry
@@ -141,17 +156,25 @@ replace github.com/zenta-dev/zever/adapters/workflow/memory => ../adapters/workf
 
 replace github.com/zenta-dev/zever/shared/redisclient => ../shared/redisclient
 
+replace github.com/zenta-dev/zever/shared/lrucache => ../shared/lrucache
+
 replace github.com/zenta-dev/zever/shared/traceprop => ../shared/traceprop
 
 require (
 	github.com/cespare/xxhash/v2 v2.3.0 // indirect
+	github.com/dustin/go-humanize v1.0.1 // indirect
 	github.com/go-logr/logr v1.4.4 // indirect
 	github.com/go-logr/stdr v1.2.2 // indirect
+	github.com/google/uuid v1.6.0 // indirect
+	github.com/mattn/go-isatty v0.0.24 // indirect
+	github.com/ncruces/go-strftime v1.0.0 // indirect
+	github.com/remyoudompheng/bigfft v0.0.0-20230129092748-24d4a6f8daec // indirect
 	github.com/robfig/cron/v3 v3.0.1 // indirect
 	github.com/zenta-dev/zever/adapters/log/noop v0.5.3 // indirect
 	github.com/zenta-dev/zever/shared/codec v0.5.3 // indirect
 	github.com/zenta-dev/zever/shared/endpoint v0.5.3 // indirect
 	github.com/zenta-dev/zever/shared/httpclient v0.5.3 // indirect
+	github.com/zenta-dev/zever/shared/lrucache v0.5.3 // indirect
 	github.com/zenta-dev/zever/shared/providersopt v0.5.3 // indirect
 	github.com/zenta-dev/zever/shared/redisopt v0.5.3 // indirect
 	github.com/zenta-dev/zever/shared/retry v0.5.3 // indirect
@@ -163,7 +186,11 @@ require (
 	go.yaml.in/yaml/v3 v3.0.5 // indirect
 	golang.org/x/net v0.58.0 // indirect
 	golang.org/x/sys v0.48.0 // indirect
-	golang.org/x/text v0.41.0 // indirect
+	golang.org/x/text v0.42.0 // indirect
 	google.golang.org/genproto/googleapis/rpc v0.0.0-20260526163538-3dc84a4a5aaa // indirect
 	google.golang.org/protobuf v1.36.11 // indirect
+	modernc.org/libc v1.75.7 // indirect
+	modernc.org/mathutil v1.7.1 // indirect
+	modernc.org/memory v1.12.1 // indirect
+	modernc.org/sqlite v1.59.0 // indirect
 )

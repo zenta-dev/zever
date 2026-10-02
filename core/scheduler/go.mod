@@ -4,6 +4,7 @@ go 1.27.0
 
 require (
 	github.com/zenta-dev/zever/adapters/scheduler/embedded v0.5.3
+	github.com/zenta-dev/zever/core/db v0.5.3
 	github.com/zenta-dev/zever/core/job v0.5.3
 	github.com/zenta-dev/zever/core/log v0.5.3
 	github.com/zenta-dev/zever/core/queue v0.5.3
@@ -27,6 +28,8 @@ require (
 	go.opentelemetry.io/otel/trace v1.46.0 // indirect
 )
 
+replace github.com/zenta-dev/zever/core/db => ../db
+
 replace github.com/zenta-dev/zever/core/job => ../job
 
 replace github.com/zenta-dev/zever/core/log => ../log
@@ -44,6 +47,8 @@ replace github.com/zenta-dev/zever/adapters/queue/memory => ../../adapters/queue
 replace github.com/zenta-dev/zever/core/cache => ../cache
 
 replace github.com/zenta-dev/zever/shared/codec => ../../shared/codec
+
+replace github.com/zenta-dev/zever/shared/lrucache => ../../shared/lrucache
 
 replace github.com/zenta-dev/zever/shared/redisopt => ../../shared/redisopt
 

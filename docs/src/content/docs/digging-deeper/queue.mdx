@@ -20,7 +20,18 @@ Pick `memory` for a single process: tests, local dev, and the single-binary
 bookings worker over the shared memory queue. It is the default and needs no
 infra. Pick `redis` the moment you run more than one worker process or split
 web and worker tiers. A message pushed on one host must be poppable on
-another, and only the shared adapter gives you that.
+another, and only a shared adapter gives you that. Pick `db` when you want
+that sharing without adding Redis: it stores messages in a postgres or
+sqlite table you already run, with the same pop/ack/nack contract.
+
+Honest trade-off for `db`: it is a polling transport with moderate
+throughput, not a Kafka/SQS replacement. `Pop` polls the table on
+`poll_interval`, claims serialize on the topic head, and stale claims
+recover on a sweep. It fits durable background jobs on a database you
+already run (a separate queue database with 3-5 connections per worker is
+recommended, following the same guidance as Rails' Solid Queue). Expect low
+thousands of jobs per second per topic at most; beyond that use `redis` or
+a dedicated broker.
 
 Do not use queue as an event log or a pub/sub fan-out bus. It offers
 per-topic pop with ack tracking, not broadcast replay. For notify-style
@@ -54,6 +65,20 @@ queue:
     buffer: 100
 ```
 
+Shared transport without Redis, on a database you already run
+(`dsn` is a postgres URL or a sqlite path; empty selects a
+private in-memory-style database):
+
+```yaml
+queue:
+  adapter: db
+  options:
+    dsn: postgres://app:secret@db:5432/app
+    table: queue_messages
+    visibility_timeout: 30000000000
+    poll_timeout: 1000000000
+```
+
 ```sh
 QUEUE_ADAPTER=redis
 QUEUE_ADDR=localhost:6379
@@ -62,11 +87,25 @@ QUEUE_POLL_TIMEOUT=1s
 QUEUE_BUFFER=100
 ```
 
+```sh
+QUEUE_ADAPTER=db
+QUEUE_DSN=postgres://app:secret@db:5432/app
+QUEUE_TABLE=queue_messages
+QUEUE_VISIBILITY_TIMEOUT=30s
+QUEUE_POLL_TIMEOUT=1s
+```
+
 `visibility_timeout` is how long a popped message stays invisible before it
 can be reclaimed. `poll_timeout` is how long `Pop` waits before returning
 empty. `buffer` caps buffered ready messages per topic. The bookings
 `zever.yaml` webhook block shows the same three keys under `queue_opts`,
 with timeout set below `visibility_timeout` on purpose.
+
+The container shares one pool per exact DSN across every db-backed battery,
+so a queue on the app database borrows that pool instead of opening its
+own (first opener's `max_conns` wins; a differing nonzero cap warns).
+Under sustained load prefer `dedicated_pool: true` with a separate queue
+database, per the Solid Queue guidance above.
 
 ## Resolve via container
 
@@ -170,6 +209,7 @@ fails transiently so the message becomes visible again after
 | Adapter | Package | Notes |
 |---|---|---|
 | `memory` | `adapters/queue/memory` | Default, process-local, no infra, ideal for tests |
+| `db` | `adapters/queue/db` | Shared via postgres/sqlite table, no extra infra, polling, moderate throughput |
 | `redis` | `adapters/queue/redis` | Shared, required for multi-worker setups, keyed by `prefix` |
 
 Message shape lives in `core/queue/message.go`. Keep payloads small, explicit JSON,
@@ -201,7 +241,7 @@ Fix: raise `poll_timeout` (workers commonly use 1s) and back off after consecuti
 
 Symptom: worker on host B never sees pushes from host A.
 Cause: `memory` adapter in a scaled deploy. Each process owns a private buffer.
-Fix: switch `queue.adapter` to `redis` with a shared `addr` and `db`, keep the same `prefix` across tiers, and restart both.
+Fix: switch `queue.adapter` to `redis` with a shared `addr` and `db`, keep the same `prefix` across tiers, and restart both. When no Redis is available, `db` on one shared database gives the same visibility with lower throughput.
 
 Symptom: strict file load rejects `visibilitytimeout`.
 Cause: flat pre-rename spelling. Canonical file keys are

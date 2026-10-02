@@ -21,9 +21,11 @@ import (
 	"github.com/zenta-dev/zever/core/observability"
 	"github.com/zenta-dev/zever/core/payment"
 	"github.com/zenta-dev/zever/core/permission"
+	"github.com/zenta-dev/zever/core/queue"
 	"github.com/zenta-dev/zever/core/ratelimit"
 	"github.com/zenta-dev/zever/core/scheduler"
 	"github.com/zenta-dev/zever/core/search"
+	"github.com/zenta-dev/zever/core/session"
 	"github.com/zenta-dev/zever/core/storage"
 	"github.com/zenta-dev/zever/core/tenant"
 	"github.com/zenta-dev/zever/core/vectorstore"
@@ -297,6 +299,42 @@ func TestDecodeOptions_dbHappy(t *testing.T) {
 	}
 	if got.MaxConnLifetime != 5_000_000_000 {
 		t.Errorf("decodeOptions() MaxConnLifetime = %v, want 5s", got.MaxConnLifetime)
+	}
+}
+
+func TestDecodeOptions_dedicatedPool(t *testing.T) {
+	t.Parallel()
+	dbOpts, err := decodeOptions[db.Options]("db", map[string]any{"dedicated_pool": true})
+	if err != nil {
+		t.Fatalf("decodeOptions() error = %v", err)
+	}
+
+	if !dbOpts.DedicatedPool {
+		t.Error("decodeOptions() DedicatedPool = false, want true")
+	}
+
+	queueOpts, err := decodeOptions[queue.Options]("queue", map[string]any{
+		"dsn":            "postgres://u@h/d",
+		"dedicated_pool": true,
+	})
+	if err != nil {
+		t.Fatalf("decodeOptions() error = %v", err)
+	}
+
+	if queueOpts.DSN != "postgres://u@h/d" || !queueOpts.DedicatedPool {
+		t.Errorf("decodeOptions() = %+v, want DSN/DedicatedPool set", queueOpts)
+	}
+
+	sessionOpts, err := decodeOptions[session.Options]("session", map[string]any{
+		"dsn":            "data/sess.db",
+		"dedicated_pool": true,
+	})
+	if err != nil {
+		t.Fatalf("decodeOptions() error = %v", err)
+	}
+
+	if sessionOpts.DSN != "data/sess.db" || !sessionOpts.DedicatedPool {
+		t.Errorf("decodeOptions() = %+v, want DSN/DedicatedPool set", sessionOpts)
 	}
 }
 

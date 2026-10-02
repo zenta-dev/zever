@@ -17,6 +17,23 @@ type RedisOptions struct {
 	Prefix string `json:"prefix" toml:"prefix" yaml:"prefix"`
 }
 
+// DBOptions holds connection settings for the DB adapter. It follows the
+// core/workflow PostgresOptions precedent: adapter-specific connection
+// configuration embedded in the shared Options so config, container, and
+// Open flow through unchanged.
+type DBOptions struct {
+	// DSN is the postgres connection string or sqlite path. A postgres URL
+	// opens postgres; anything else (including empty) selects sqlite, with
+	// empty meaning a private in-memory-style database.
+	DSN string `json:"dsn" toml:"dsn" yaml:"dsn"`
+	// Table is the queue-messages table name. Empty selects the adapter
+	// default (DefaultTable in adapters/queue/db).
+	Table string `json:"table" toml:"table" yaml:"table"`
+	// DedicatedPool opts out of container-level pool sharing. Default false
+	// shares one pool per exact DSN; true opens a private pool.
+	DedicatedPool bool `json:"dedicated_pool" toml:"dedicated_pool" yaml:"dedicated_pool"`
+}
+
 // Options configures queue behavior and adapter-specific settings.
 type Options struct {
 	// VisibilityTimeout is the duration a popped message remains invisible before reclaim.
@@ -28,6 +45,9 @@ type Options struct {
 
 	// RedisOptions holds Redis-specific connection configuration.
 	RedisOptions
+
+	// DBOptions holds DB-specific connection configuration.
+	DBOptions
 }
 
 // Validate checks options for consistency, joining all violations.
