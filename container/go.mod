@@ -141,6 +141,8 @@ replace github.com/zenta-dev/zever/adapters/workflow/memory => ../adapters/workf
 
 replace github.com/zenta-dev/zever/shared/redisclient => ../shared/redisclient
 
+replace github.com/zenta-dev/zever/shared/lrucache => ../shared/lrucache
+
 replace github.com/zenta-dev/zever/shared/traceprop => ../shared/traceprop
 
 require (
