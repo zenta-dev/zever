@@ -27,6 +27,8 @@ replace github.com/zenta-dev/zever/core/scheduler => ../../../core/scheduler
 
 replace github.com/zenta-dev/zever/shared/codec => ../../../shared/codec
 
+replace github.com/zenta-dev/zever/shared/lrucache => ../../../shared/lrucache
+
 replace github.com/zenta-dev/zever/adapters/cache/memory => ../../cache/memory
 
 replace github.com/zenta-dev/zever/core/cache => ../../../core/cache

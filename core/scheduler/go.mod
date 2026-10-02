@@ -45,6 +45,8 @@ replace github.com/zenta-dev/zever/core/cache => ../cache
 
 replace github.com/zenta-dev/zever/shared/codec => ../../shared/codec
 
+replace github.com/zenta-dev/zever/shared/lrucache => ../../shared/lrucache
+
 replace github.com/zenta-dev/zever/shared/redisopt => ../../shared/redisopt
 
 replace github.com/zenta-dev/zever/shared/retry => ../../shared/retry

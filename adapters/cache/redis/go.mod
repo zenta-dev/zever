@@ -32,4 +32,6 @@ replace github.com/zenta-dev/zever/adapters/cache/memory => ../memory
 
 replace github.com/zenta-dev/zever/shared/codec => ../../../shared/codec
 
+replace github.com/zenta-dev/zever/shared/lrucache => ../../../shared/lrucache
+
 replace github.com/zenta-dev/zever/shared/registry => ../../../shared/registry

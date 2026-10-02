@@ -1,7 +1,6 @@
 package memory
 
 import (
-	"container/list"
 	"errors"
 	"fmt"
 	"sync"
@@ -430,13 +429,6 @@ func TestMemorySweep_removesOnlyExpired(t *testing.T) {
 	a.sweep()
 }
 
-func TestMemoryRemoveFromOrder_nilIndex_safe(t *testing.T) {
-	t.Parallel()
-
-	a := &memoryAdapter{}
-	a.removeFromOrder("missing")
-}
-
 func TestMemorySetIfAbsent_withTTL_expires(t *testing.T) {
 	t.Parallel()
 
@@ -511,178 +503,6 @@ func TestMemoryClose_presetClosed_returnsNil(t *testing.T) {
 	}
 }
 
-func TestMemoryEnsureOrder_allocates(t *testing.T) {
-	t.Parallel()
-
-	a := &memoryAdapter{}
-	a.ensureOrder()
-
-	if a.l == nil {
-		t.Error("l = nil, want allocated list")
-	}
-
-	if a.index == nil {
-		t.Error("index = nil, want allocated map")
-	}
-}
-
-func TestMemoryRemoveFromOrder_variants(t *testing.T) {
-	t.Parallel()
-
-	t.Run("nil list skips remove", func(t *testing.T) {
-		t.Parallel()
-
-		l := list.New()
-		a := &memoryAdapter{l: nil, index: map[string]*list.Element{"k": l.PushBack("k")}}
-		a.removeFromOrder("k")
-
-		if _, ok := a.index["k"]; ok {
-			t.Error("index still holds k, want removed")
-		}
-	})
-
-	t.Run("missing key no-op", func(t *testing.T) {
-		t.Parallel()
-
-		a := &memoryAdapter{l: list.New(), index: map[string]*list.Element{}}
-		a.removeFromOrder("missing")
-	})
-}
-
-func TestMemoryEviction_noListNoEvict(t *testing.T) {
-	t.Parallel()
-
-	c := stubCache(t, cache.Options{MaxEntries: 1})
-
-	a, ok := c.(*memoryAdapter)
-	if !ok {
-		t.Fatalf("New() type = %T, want *memoryAdapter", c)
-	}
-
-	a.mu.Lock()
-	a.items["x"] = item{value: []byte("x")}
-	a.items["y"] = item{value: []byte("y")}
-	a.l.Init()
-	a.mu.Unlock()
-
-	a.mu.Lock()
-	a.evictIfOverCap()
-	a.mu.Unlock()
-}
-
-func directAdapter(t *testing.T) *memoryAdapter {
-	t.Helper()
-
-	c := stubCache(t, cache.Options{})
-
-	a, ok := c.(*memoryAdapter)
-	if !ok {
-		t.Fatalf("New() type = %T, want *memoryAdapter", c)
-	}
-
-	return a
-}
-
-func TestMemoryGetExpired_direct(t *testing.T) {
-	t.Parallel()
-
-	now := time.Now()
-
-	t.Run("closed", func(t *testing.T) {
-		t.Parallel()
-
-		a := directAdapter(t)
-
-		a.mu.Lock()
-		a.closed = true
-		a.mu.Unlock()
-
-		if _, err := a.getExpired("k", now); !errors.Is(err, cache.ErrClosed) {
-			t.Errorf("getExpired() err = %v, want ErrClosed", err)
-		}
-	})
-
-	t.Run("missing", func(t *testing.T) {
-		t.Parallel()
-
-		a := directAdapter(t)
-
-		if _, err := a.getExpired("missing", now); !errors.Is(err, cache.ErrNotFound) {
-			t.Errorf("getExpired() err = %v, want ErrNotFound", err)
-		}
-	})
-
-	t.Run("refreshed returns value", func(t *testing.T) {
-		t.Parallel()
-
-		a := directAdapter(t)
-
-		a.mu.Lock()
-		a.items["k"] = item{value: []byte("v")}
-		a.mu.Unlock()
-
-		got, err := a.getExpired("k", now)
-		if err != nil {
-			t.Fatalf("getExpired() error = %v", err)
-		}
-
-		if string(got) != "v" {
-			t.Errorf("getExpired() = %q, want v", got)
-		}
-	})
-}
-
-func TestMemoryExistsExpired_direct(t *testing.T) {
-	t.Parallel()
-
-	now := time.Now()
-
-	t.Run("closed", func(t *testing.T) {
-		t.Parallel()
-
-		a := directAdapter(t)
-
-		a.mu.Lock()
-		a.closed = true
-		a.mu.Unlock()
-
-		if _, err := a.existsExpired("k", now); !errors.Is(err, cache.ErrClosed) {
-			t.Errorf("existsExpired() err = %v, want ErrClosed", err)
-		}
-	})
-
-	t.Run("missing", func(t *testing.T) {
-		t.Parallel()
-
-		a := directAdapter(t)
-
-		ok, err := a.existsExpired("missing", now)
-		if err != nil || ok {
-			t.Errorf("existsExpired() = %v,%v want false,nil", ok, err)
-		}
-	})
-
-	t.Run("refreshed returns true", func(t *testing.T) {
-		t.Parallel()
-
-		a := directAdapter(t)
-
-		a.mu.Lock()
-		a.items["k"] = item{value: []byte("v")}
-		a.mu.Unlock()
-
-		ok, err := a.existsExpired("k", now)
-		if err != nil || !ok {
-			t.Errorf("existsExpired() = %v,%v want true,nil", ok, err)
-		}
-	})
-}
-
-// TestMemorySweep_racyBranches exercises the snapshot-vs-lock recheck
-// continues in sweep. The delete/refresh must land between the snapshot
-// and the per-key lock — a nanosecond window — so hammer it hard:
-// every iteration is race-clean (all state under the adapter mutex)
-// and a miss in all 1500 iterations is negligible.
 func TestMemorySweep_racyBranches(t *testing.T) {
 	t.Parallel()
 
@@ -712,34 +532,6 @@ func TestMemorySweep_racyBranches(t *testing.T) {
 	}
 
 	wg.Wait()
-}
-
-func TestMemoryEviction_disabledWhenNonPositive(t *testing.T) {
-	t.Parallel()
-
-	ctx := t.Context()
-	c := stubCache(t, cache.Options{})
-
-	a, ok := c.(*memoryAdapter)
-	if !ok {
-		t.Fatalf("New() type = %T, want *memoryAdapter", c)
-	}
-
-	a.mu.Lock()
-	a.maxEntries = 0
-	a.mu.Unlock()
-
-	for _, k := range []string{"a", "b", "c"} {
-		if err := c.Set(ctx, k, []byte(k), 0); err != nil {
-			t.Fatalf("Set(%s) error = %v", k, err)
-		}
-	}
-
-	for _, k := range []string{"a", "b", "c"} {
-		if _, err := c.Get(ctx, k); err != nil {
-			t.Errorf("Get(%s) err = %v, want retained (eviction disabled)", k, err)
-		}
-	}
 }
 
 func TestMemoryClosed_allOpsFail(t *testing.T) {

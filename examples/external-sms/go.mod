@@ -76,6 +76,7 @@ replace (
 	github.com/zenta-dev/zever/shared/codec => ../../shared/codec
 	github.com/zenta-dev/zever/shared/endpoint => ../../shared/endpoint
 	github.com/zenta-dev/zever/shared/httpclient => ../../shared/httpclient
+	github.com/zenta-dev/zever/shared/lrucache => ../../shared/lrucache
 	github.com/zenta-dev/zever/shared/providersopt => ../../shared/providersopt
 	github.com/zenta-dev/zever/shared/redisclient => ../../shared/redisclient
 	github.com/zenta-dev/zever/shared/redisopt => ../../shared/redisopt
