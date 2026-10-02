@@ -62,12 +62,12 @@ jobs:
       # attestations only exist on GitHub-hosted runs (no local
       # reproduction); verify a downloaded binary with:
       # gh attestation verify dist/zever-linux-amd64 --repo zenta-dev/zever
-      - uses: actions/attest-build-provenance@62fc1d596301d0ab9914e1fec14dc5c8d93f65cd # v3.2.0
+      - uses: actions/attest-build-provenance@96278af6caaf10aea03fd8d33a09a777ca52d62f # v3.2.0
         with:
           subject-path: dist/*
       # Same provenance over the generated SBOMs; verify with:
       # gh attestation verify sbom/cmd_zever.json --repo zenta-dev/zever
-      - uses: actions/attest-build-provenance@62fc1d596301d0ab9914e1fec14dc5c8d93f65cd # v3.2.0
+      - uses: actions/attest-build-provenance@96278af6caaf10aea03fd8d33a09a777ca52d62f # v3.2.0
         with:
           subject-path: sbom/*.json
       - name: Attach artifacts to GitHub release
