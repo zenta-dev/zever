@@ -101,6 +101,12 @@ empty. `buffer` caps buffered ready messages per topic. The bookings
 `zever.yaml` webhook block shows the same three keys under `queue_opts`,
 with timeout set below `visibility_timeout` on purpose.
 
+The container shares one pool per exact DSN across every db-backed battery,
+so a queue on the app database borrows that pool instead of opening its
+own (first opener's `max_conns` wins; a differing nonzero cap warns).
+Under sustained load prefer `dedicated_pool: true` with a separate queue
+database, per the Solid Queue guidance above.
+
 ## Resolve via container
 
 ```go

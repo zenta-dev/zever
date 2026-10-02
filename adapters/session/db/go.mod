@@ -8,6 +8,7 @@ require (
 	github.com/zenta-dev/zever/core/db v0.5.3
 	github.com/zenta-dev/zever/core/session v0.5.3
 	github.com/zenta-dev/zever/shared/codec v0.5.3
+	github.com/zenta-dev/zever/shared/dbconn v0.5.3
 	github.com/zenta-dev/zever/shared/kvstore v0.5.3
 )
 
@@ -44,5 +45,7 @@ replace github.com/zenta-dev/zever/core/db => ../../../core/db
 replace github.com/zenta-dev/zever/core/session => ../../../core/session
 
 replace github.com/zenta-dev/zever/shared/codec => ../../../shared/codec
+
+replace github.com/zenta-dev/zever/shared/dbconn => ../../../shared/dbconn
 
 replace github.com/zenta-dev/zever/shared/kvstore => ../../../shared/kvstore

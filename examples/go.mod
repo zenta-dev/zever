@@ -213,6 +213,7 @@ require (
 	github.com/zenta-dev/zever/core/webhook v0.5.3 // indirect
 	github.com/zenta-dev/zever/core/workflow v0.5.3 // indirect
 	github.com/zenta-dev/zever/shared/codec v0.5.3 // indirect
+	github.com/zenta-dev/zever/shared/dbconn v0.5.3 // indirect
 	github.com/zenta-dev/zever/shared/endpoint v0.5.3 // indirect
 	github.com/zenta-dev/zever/shared/httpclient v0.5.3 // indirect
 	github.com/zenta-dev/zever/shared/lrucache v0.5.3 // indirect
@@ -236,3 +237,7 @@ require (
 	modernc.org/memory v1.12.1 // indirect
 	modernc.org/sqlite v1.59.0 // indirect
 )
+
+replace github.com/zenta-dev/zever/shared/dbconn => ../shared/dbconn
+
+replace github.com/zenta-dev/zever/shared/kvstore => ../shared/kvstore

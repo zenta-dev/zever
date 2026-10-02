@@ -17,6 +17,9 @@ type PostgresOptions struct {
 	// Table is the workflow-runs table name. Empty selects the adapter
 	// default (DefaultTable in adapters/workflow/postgres).
 	Table string `json:"table" toml:"table" yaml:"table"`
+	// DedicatedPool opts out of container-level pool sharing. Default false
+	// shares one pool per exact DSN; true opens a private pool.
+	DedicatedPool bool `json:"dedicated_pool" toml:"dedicated_pool" yaml:"dedicated_pool"`
 }
 
 // Options holds typed configuration for workflow adapters.

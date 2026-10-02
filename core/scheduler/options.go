@@ -26,6 +26,12 @@ type Options struct {
 	// CloseTimeout bounds Stop's wait for running ticks.
 	// Zero means DefaultCloseTimeout; negative fails validation.
 	CloseTimeout time.Duration `json:"close_timeout" toml:"close_timeout" yaml:"close_timeout"`
+	// DSN is the postgres connection string or sqlite path for the postgres
+	// adapter. Empty selects a private in-memory database.
+	DSN string `json:"dsn" toml:"dsn" yaml:"dsn"`
+	// DedicatedPool opts out of container-level pool sharing. Default false
+	// shares one pool per exact DSN; true opens a private pool.
+	DedicatedPool bool `json:"dedicated_pool" toml:"dedicated_pool" yaml:"dedicated_pool"`
 }
 
 // Validate checks options for consistency, joining all violations.

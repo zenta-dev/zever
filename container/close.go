@@ -106,13 +106,14 @@ type closeSnapshot struct {
 
 // snapshots returns close snapshots for every lazy service that has no
 // explicit dependency ordering. Intentionally excluded (handled in Close's
-// ordered section): cache, queue (dependencies, closed last), scheduler, job
-// (dependents that hold a queue reference, closed first), grpcServer
-// (separate GracefulStop handling). This list must cover all remaining lazy
-// fields; currently 31 entries + 5 ordered = 36 lazy fields. When adding a
-// new service, add it here unless it depends on cache/queue (then add to
-// Close's ordered section and keep excluded here). Drift is pinned by
-// TestContainer_Snapshots_CoversAllServices via reflection.
+// ordered section): cache, queue (dependencies, closed last), db (its pool
+// lives in the DSN registry and closes with the registry band),
+// scheduler, job (dependents that hold a queue reference, closed first),
+// grpcServer (separate GracefulStop handling). This list must cover all
+// remaining lazy fields; currently 30 entries + 6 ordered = 36 lazy fields.
+// When adding a new service, add it here unless it depends on cache/queue
+// (then add to Close's ordered section and keep excluded here). Drift is
+// pinned by TestContainer_Snapshots_CoversAllServices via reflection.
 func (c *Container) snapshots() []closeSnapshot {
 	return []closeSnapshot{
 		func() closeSnapshot { v, ok := c.ai.getIfResolved(); return closeSnapshot{v, ok} }(),
@@ -120,7 +121,6 @@ func (c *Container) snapshots() []closeSnapshot {
 		func() closeSnapshot { v, ok := c.auth.getIfResolved(); return closeSnapshot{v, ok} }(),
 		func() closeSnapshot { v, ok := c.billing.getIfResolved(); return closeSnapshot{v, ok} }(),
 		func() closeSnapshot { v, ok := c.crypto.getIfResolved(); return closeSnapshot{v, ok} }(),
-		func() closeSnapshot { v, ok := c.db.getIfResolved(); return closeSnapshot{v, ok} }(),
 		func() closeSnapshot { v, ok := c.document.getIfResolved(); return closeSnapshot{v, ok} }(),
 		func() closeSnapshot { v, ok := c.eventbus.getIfResolved(); return closeSnapshot{v, ok} }(),
 		func() closeSnapshot { v, ok := c.flag.getIfResolved(); return closeSnapshot{v, ok} }(),
@@ -154,7 +154,7 @@ func (c *Container) snapshots() []closeSnapshot {
 // including resolved values.
 func snapshotServiceNames() []string {
 	return []string{
-		"ai", "analytics", "auth", "billing", "crypto", "db", "document",
+		"ai", "analytics", "auth", "billing", "crypto", "document",
 		"eventbus", "flag", "geo", "i18n", "idempotency", "lock", "log", "mailer",
 		"media", "notification", "observability", "password", "payment",
 		"permission", "ratelimit", "router", "search", "secrets", "session", "storage",
@@ -174,6 +174,8 @@ func snapshotServiceNames() []string {
 //	job       -> queue
 //	*         -> (no dep, via snapshots)
 //	cache, queue -> (leaf dependencies, closed last)
+//	db, registry pools -> (shared pools, after every borrower so no
+//	                       use-after-close; borrowers close as no-ops)
 //	grpcServer -> (independent)
 //
 // Scheduler and job are closed first since they may hold a live reference
@@ -278,6 +280,21 @@ func (c *Container) Close(ctx context.Context) error {
 
 	if v, ok := c.queue.getIfResolved(); ok {
 		tryClose("queue", v)
+	}
+
+	// Shared-pool band: the db service (its pool may live in the registry
+	// or stand alone for :memory:) and every registry pool close after all
+	// borrowers. Borrowers hold owns=false wrappers whose Close is a no-op,
+	// so the pool is reached exactly once here; pointer dedup additionally
+	// guards the case where c.db is the registry pool itself.
+	if v, ok := c.db.getIfResolved(); ok {
+		tryClose("db", v)
+	}
+
+	if c.pools != nil {
+		for _, ps := range c.pools.snapshot() {
+			tryClose(ps.name, ps.conn)
+		}
 	}
 
 	for _, ps := range c.pluginSnapshots() {

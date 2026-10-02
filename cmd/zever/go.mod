@@ -492,3 +492,4 @@ replace github.com/zenta-dev/zever/core/authz => ../../core/authz
 replace github.com/zenta-dev/zever/core/middleware => ../../core/middleware
 
 replace github.com/zenta-dev/zever/shared/apperror => ../../shared/apperror
+

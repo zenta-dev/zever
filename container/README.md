@@ -98,6 +98,44 @@ into the scheduler options, so the scheduler shares the same `Queue`
 connection instead of opening a redundant one. Resolving `Scheduler()`
 therefore resolves `Job()` and, transitively, `Queue` as a side effect.
 
+## Shared pools
+
+The container resolves **one pool per DSN** and shares it across every
+db-backed battery pointing at the same DSN (`db`, `cache`, `queue`,
+`search`, `session`, `idempotency`, `workflow`, `scheduler`,
+`vectorstore`), instead of opening one pool per battery. Matching is the
+exact DSN string after trim: a postgres URL with and without a query
+string are different pools. SQLite file paths share after
+`filepath.Clean` (relative paths resolve against the process CWD, so every
+battery must run with the same CWD); `:memory:` (including
+`file::memory:?cache=shared`) never shares.
+
+```yaml
+search:
+  adapter: postgres
+  options:
+    dsn: "postgres://app:secret@db:5432/app?sslmode=require"
+    dedicated_pool: false   # default false shares; true restores a private pool
+```
+
+- Share-by-default: two identical DSNs are unambiguous operator intent, so
+  existing files keep working unchanged — sharing activates only on
+  exact-DSN match (or sqlite same-file match).
+- Single cap: the shared pool is built with the **first opener's** pool
+  knobs; later borrowers' pool knobs are ignored (their table names,
+  prefixes, TTLs still apply). A nonzero `MaxConns` differing from the
+  pool's warns on stderr naming the service, never the DSN.
+- Borrowers keep `owns=false`: their `Close` stays a no-op and the
+  registry closes each pool once, after every borrower.
+- Observability follows the redaction rule: log lines carry only the
+  parsed postgres host/dbname (never userinfo, query, or file paths), and
+  errors are prefixed `container: <service> (shared pool): ...`.
+- Escape hatch: queue, workflow, and scheduler under sustained load should
+  run with `dedicated_pool: true` and, for full isolation, a **separate
+  database** (distinct DSN), per the Solid Queue guidance.
+- WAL stays opt-in for shared sqlite files
+  (`?_pragma=journal_mode(WAL)`); sharing does not change journal mode.
+
 ## Close order
 
 `Close(ctx)` closes only services already resolved. It never opens anything:
@@ -108,6 +146,7 @@ service cannot fail shutdown.
 scheduler, job        dependents holding a queue ref, first
 snapshots             everything without explicit ordering
 cache, queue          leaf dependencies, last
+db, registry pools    shared pools, after every borrower (no use-after-close)
 grpcServer            independent GracefulStop/Stop, bounded by ctx
 ```
 

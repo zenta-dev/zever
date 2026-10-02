@@ -84,6 +84,12 @@ $defs:
                 type: integer
             db:
                 type: integer
+            dedicated_pool:
+                description: Opt out of container-level pool sharing; default false shares one pool per exact DSN, true opens a private pool.
+                type: boolean
+            dsn:
+                description: Postgres connection string or sqlite path for the db adapter; empty selects a private in-memory database.
+                type: string
             max_conn_idle_time:
                 $ref: '#/$defs/durationNs'
             max_conn_lifetime:
@@ -123,6 +129,9 @@ $defs:
     dbOptions:
         additionalProperties: false
         properties:
+            dedicated_pool:
+                description: Opt out of container-level pool sharing; default false shares one pool per exact DSN, true opens a private pool.
+                type: boolean
             dsn:
                 description: Postgres connection string.
                 type: string
@@ -276,6 +285,12 @@ $defs:
     idempotencyOptions:
         additionalProperties: false
         properties:
+            dedicated_pool:
+                description: Opt out of container-level pool sharing; default false shares one pool per exact DSN, true opens a private pool.
+                type: boolean
+            dsn:
+                description: Postgres connection string or sqlite path for the db adapter; empty selects a private in-memory database.
+                type: string
             redis:
                 $ref: '#/$defs/zredisOptionsWithPrefix'
             ttl:
@@ -578,6 +593,9 @@ $defs:
                 type: integer
             db:
                 type: integer
+            dedicated_pool:
+                description: Opt out of container-level pool sharing; default false shares one pool per exact DSN, true opens a private pool.
+                type: boolean
             dsn:
                 description: Postgres connection string or sqlite path; empty selects a private in-memory-style database.
                 type: string
@@ -629,17 +647,26 @@ $defs:
         type: object
     schedulerOptions:
         additionalProperties: false
-        description: scheduler.Options.Dispatcher is required by Validate() but is a *job.Dispatcher (json:"-") that can only be wired in code, never from a config file -- close_timeout is the only field a file can actually set.
+        description: scheduler.Options.Dispatcher is required by Validate() but is a *job.Dispatcher (json:"-") that can only be wired in code, never from a config file -- dsn, dedicated_pool and close_timeout are the only fields a file can actually set.
         properties:
             close_timeout:
                 $ref: '#/$defs/durationNs'
                 description: Zero means adapter default (5s).
+            dsn:
+                description: Postgres connection string or sqlite path for the postgres adapter; empty selects a private in-memory database.
+                type: string
+            dedicated_pool:
+                description: Opt out of container-level pool sharing; default false shares one pool per exact DSN, true opens a private pool.
+                type: boolean
         type: object
     searchOptions:
         additionalProperties: false
         properties:
             api_key:
                 type: string
+            dedicated_pool:
+                description: Opt out of container-level pool sharing; default false shares one pool per exact DSN, true opens a private pool.
+                type: boolean
             dsn:
                 description: Postgres URL or sqlite path; required by postgres/sqlite adapters.
                 type: string
@@ -688,6 +715,12 @@ $defs:
     sessionOptions:
         additionalProperties: false
         properties:
+            dedicated_pool:
+                description: Opt out of container-level pool sharing; default false shares one pool per exact DSN, true opens a private pool.
+                type: boolean
+            dsn:
+                description: Postgres connection string or sqlite path for the db adapter; empty selects a private in-memory database.
+                type: string
             redis:
                 $ref: '#/$defs/zredisOptionsWithPrefix'
             ttl:
@@ -793,6 +826,9 @@ $defs:
         properties:
             api_key:
                 type: string
+            dedicated_pool:
+                description: Opt out of container-level pool sharing; default false shares one pool per exact DSN, true opens a private pool.
+                type: boolean
             dimension:
                 description: 'Default: 1536.'
                 minimum: 0
@@ -832,6 +868,9 @@ $defs:
     workflowOptions:
         additionalProperties: false
         properties:
+            dedicated_pool:
+                description: Opt out of container-level pool sharing; default false shares one pool per exact DSN, true opens a private pool.
+                type: boolean
             dsn:
                 description: Postgres connection string; empty selects sqlite (dev/test).
                 type: string
@@ -1049,6 +1088,7 @@ properties:
                 enum:
                     - memory
                     - redis
+                    - db
             options:
                 $ref: '#/$defs/idempotencyOptions'
         type: object
@@ -1184,6 +1224,7 @@ properties:
             adapter:
                 enum:
                     - embedded
+                    - postgres
             options:
                 $ref: '#/$defs/schedulerOptions'
         type: object
@@ -1215,6 +1256,7 @@ properties:
                 enum:
                     - memory
                     - redis
+                    - db
             options:
                 $ref: '#/$defs/sessionOptions'
         type: object

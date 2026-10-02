@@ -18,6 +18,9 @@ const (
 type Options struct {
 	// DSN holds the sqlite path or postgres URL.
 	DSN string `json:"dsn" toml:"dsn" yaml:"dsn"`
+	// DedicatedPool opts out of container-level pool sharing. Default false
+	// shares one pool per exact DSN; true opens a private pool.
+	DedicatedPool bool `json:"dedicated_pool" toml:"dedicated_pool" yaml:"dedicated_pool"`
 	// URL holds the Qdrant address.
 	URL string `json:"url" toml:"url" yaml:"url"`
 	// APIKey holds the backend credential and is never logged.

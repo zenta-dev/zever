@@ -4,8 +4,13 @@ go 1.27.0
 
 require github.com/zenta-dev/zever/core/workflow v0.5.3
 
-require github.com/zenta-dev/zever/shared/registry v0.5.3 // indirect
+require (
+	github.com/zenta-dev/zever/core/db v0.5.3 // indirect
+	github.com/zenta-dev/zever/shared/registry v0.5.3 // indirect
+)
 
 replace github.com/zenta-dev/zever/core/workflow => ../../../core/workflow
 
 replace github.com/zenta-dev/zever/shared/registry => ../../../shared/registry
+
+replace github.com/zenta-dev/zever/core/db => ../../../core/db

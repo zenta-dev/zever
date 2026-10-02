@@ -9,6 +9,7 @@ require (
 )
 
 require (
+	github.com/zenta-dev/zever/core/db v0.5.3 // indirect
 	github.com/zenta-dev/zever/shared/redisopt v0.5.3 // indirect
 	github.com/zenta-dev/zever/shared/registry v0.5.3 // indirect
 )
@@ -24,3 +25,5 @@ replace github.com/zenta-dev/zever/shared/redisclient => ../../../shared/rediscl
 replace github.com/zenta-dev/zever/shared/redisopt => ../../../shared/redisopt
 
 replace github.com/zenta-dev/zever/shared/registry => ../../../shared/registry
+
+replace github.com/zenta-dev/zever/core/db => ../../../core/db

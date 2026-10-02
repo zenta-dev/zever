@@ -18,7 +18,7 @@
     "flag": { "$ref": "#/$defs/service", "type": "object", "properties": { "adapter": { "enum": ["static", "firebase"] }, "options": { "$ref": "#/$defs/flagOptions" } } },
     "geo": { "$ref": "#/$defs/service", "type": "object", "properties": { "adapter": { "enum": ["google", "static", "osm"] }, "options": { "$ref": "#/$defs/geoOptions" } } },
     "i18n": { "$ref": "#/$defs/service", "type": "object", "properties": { "adapter": { "enum": ["embed", "remote"] }, "options": { "$ref": "#/$defs/i18nOptions" } } },
-    "idempotency": { "$ref": "#/$defs/service", "type": "object", "properties": { "adapter": { "enum": ["memory", "redis"] }, "options": { "$ref": "#/$defs/idempotencyOptions" } } },
+    "idempotency": { "$ref": "#/$defs/service", "type": "object", "properties": { "adapter": { "enum": ["memory", "redis", "db"] }, "options": { "$ref": "#/$defs/idempotencyOptions" } } },
     "lock": { "$ref": "#/$defs/service", "type": "object", "properties": { "adapter": { "enum": ["memory", "redis"] }, "options": { "$ref": "#/$defs/lockOptions" } } },
     "log": { "$ref": "#/$defs/service", "type": "object", "properties": { "adapter": { "enum": ["noop", "zerolog", "slog", "pretty"] }, "options": { "$ref": "#/$defs/logOptions" } } },
     "mailer": { "$ref": "#/$defs/service", "type": "object", "properties": { "adapter": { "enum": ["log", "smtp"] }, "options": { "$ref": "#/$defs/mailerOptions" } } },
@@ -31,10 +31,10 @@
     "queue": { "$ref": "#/$defs/service", "type": "object", "properties": { "adapter": { "enum": ["memory", "redis", "db"] }, "options": { "$ref": "#/$defs/queueOptions" } } },
     "ratelimit": { "$ref": "#/$defs/service", "type": "object", "properties": { "adapter": { "enum": ["memory", "redis"] }, "options": { "$ref": "#/$defs/ratelimitOptions" } } },
     "router": { "$ref": "#/$defs/service", "type": "object", "properties": { "adapter": { "enum": ["fiber", "stdhttp"] }, "options": { "$ref": "#/$defs/routerOptions" } } },
-    "scheduler": { "$ref": "#/$defs/service", "type": "object", "properties": { "adapter": { "enum": ["embedded"] }, "options": { "$ref": "#/$defs/schedulerOptions" } } },
+    "scheduler": { "$ref": "#/$defs/service", "type": "object", "properties": { "adapter": { "enum": ["embedded", "postgres"] }, "options": { "$ref": "#/$defs/schedulerOptions" } } },
     "search": { "$ref": "#/$defs/service", "type": "object", "properties": { "adapter": { "enum": ["postgres", "meilisearch", "sqlite"] }, "options": { "$ref": "#/$defs/searchOptions" } } },
     "secrets": { "$ref": "#/$defs/service", "type": "object", "properties": { "adapter": { "enum": ["env", "vault"] }, "options": { "$ref": "#/$defs/secretsOptions" } } },
-    "session": { "$ref": "#/$defs/service", "type": "object", "properties": { "adapter": { "enum": ["memory", "redis"] }, "options": { "$ref": "#/$defs/sessionOptions" } } },
+    "session": { "$ref": "#/$defs/service", "type": "object", "properties": { "adapter": { "enum": ["memory", "redis", "db"] }, "options": { "$ref": "#/$defs/sessionOptions" } } },
     "storage": { "$ref": "#/$defs/service", "type": "object", "properties": { "adapter": { "enum": ["local", "s3", "r2"] }, "options": { "$ref": "#/$defs/storageOptions" } } },
     "tenant": { "$ref": "#/$defs/service", "type": "object", "properties": { "adapter": { "enum": ["single", "header"] }, "options": { "$ref": "#/$defs/tenantOptions" } } },
     "vectorstore": { "$ref": "#/$defs/service", "type": "object", "properties": { "adapter": { "enum": ["sqlite", "pgvector", "qdrant"] }, "options": { "$ref": "#/$defs/vectorstoreOptions" } } },
@@ -190,7 +190,9 @@
         "min_idle_conns": { "type": "integer" },
         "pool_timeout": { "$ref": "#/$defs/durationNs" },
         "max_conn_idle_time": { "$ref": "#/$defs/durationNs" },
-        "max_conn_lifetime": { "$ref": "#/$defs/durationNs" }
+        "max_conn_lifetime": { "$ref": "#/$defs/durationNs" },
+        "dsn": { "type": "string", "description": "Postgres connection string or sqlite path for the db adapter; empty selects a private in-memory database." },
+        "dedicated_pool": { "type": "boolean", "description": "Opt out of container-level pool sharing; default false shares one pool per exact DSN, true opens a private pool." }
       }
     },
     "cryptoOptions": {
@@ -210,7 +212,8 @@
         "min_conns": { "type": "integer", "minimum": 0, "description": "Minimum pool size (postgres) or idle-connection target (sqlite)." },
         "max_conn_lifetime": { "$ref": "#/$defs/durationNs" },
         "max_conn_idle_time": { "$ref": "#/$defs/durationNs" },
-        "path": { "type": "string", "description": "SQLite database file path." }
+        "path": { "type": "string", "description": "SQLite database file path." },
+        "dedicated_pool": { "type": "boolean", "description": "Opt out of container-level pool sharing; default false shares one pool per exact DSN, true opens a private pool. Ignored on db itself." }
       }
     },
     "documentOptions": {
@@ -300,6 +303,8 @@
       "additionalProperties": false,
       "properties": {
         "ttl": { "$ref": "#/$defs/durationNs", "description": "Zero means adapter default (24h)." },
+        "dsn": { "type": "string", "description": "Postgres connection string or sqlite path for the db adapter; empty selects a private in-memory database." },
+        "dedicated_pool": { "type": "boolean", "description": "Opt out of container-level pool sharing; default false shares one pool per exact DSN, true opens a private pool." },
         "redis": { "$ref": "#/$defs/zredisOptionsWithPrefix" }
       }
     },
@@ -469,7 +474,8 @@
         "url": { "type": "string" },
         "prefix": { "type": "string" },
         "dsn": { "type": "string", "description": "Postgres connection string or sqlite path; empty selects a private in-memory-style database." },
-        "table": { "type": "string", "description": "Queue-messages table name; empty selects the adapter default." }
+        "table": { "type": "string", "description": "Queue-messages table name; empty selects the adapter default." },
+        "dedicated_pool": { "type": "boolean", "description": "Opt out of container-level pool sharing; default false shares one pool per exact DSN, true opens a private pool." }
       }
     },
     "ratelimitOptions": {
@@ -493,9 +499,11 @@
     "schedulerOptions": {
       "type": "object",
       "additionalProperties": false,
-      "description": "scheduler.Options.Dispatcher is required by Validate() but is a *job.Dispatcher (json:\"-\") that can only be wired in code, never from a config file -- close_timeout is the only field a file can actually set.",
+      "description": "scheduler.Options.Dispatcher is required by Validate() but is a *job.Dispatcher (json:\"-\") that can only be wired in code, never from a config file -- dsn, dedicated_pool and close_timeout are the only fields a file can actually set.",
       "properties": {
-        "close_timeout": { "$ref": "#/$defs/durationNs", "description": "Zero means adapter default (5s)." }
+        "close_timeout": { "$ref": "#/$defs/durationNs", "description": "Zero means adapter default (5s)." },
+        "dsn": { "type": "string", "description": "Postgres connection string or sqlite path for the postgres adapter; empty selects a private in-memory database." },
+        "dedicated_pool": { "type": "boolean", "description": "Opt out of container-level pool sharing; default false shares one pool per exact DSN, true opens a private pool." }
       }
     },
     "searchOptions": {
@@ -504,7 +512,8 @@
       "properties": {
         "host": { "type": "string", "description": "Meilisearch URL; required by the meilisearch adapter." },
         "api_key": { "type": "string" },
-        "dsn": { "type": "string", "description": "Postgres URL or sqlite path; required by postgres/sqlite adapters." }
+        "dsn": { "type": "string", "description": "Postgres URL or sqlite path; required by postgres/sqlite adapters." },
+        "dedicated_pool": { "type": "boolean", "description": "Opt out of container-level pool sharing; default false shares one pool per exact DSN, true opens a private pool." }
       }
     },
     "secretsOptions": {
@@ -526,6 +535,8 @@
       "additionalProperties": false,
       "properties": {
         "ttl": { "$ref": "#/$defs/durationNs", "description": "Zero means adapter default (15m)." },
+        "dsn": { "type": "string", "description": "Postgres connection string or sqlite path for the db adapter; empty selects a private in-memory database." },
+        "dedicated_pool": { "type": "boolean", "description": "Opt out of container-level pool sharing; default false shares one pool per exact DSN, true opens a private pool." },
         "redis": { "$ref": "#/$defs/zredisOptionsWithPrefix" }
       }
     },
@@ -587,7 +598,8 @@
         "dsn": { "type": "string", "description": "sqlite path or postgres URL (pgvector)." },
         "url": { "type": "string", "description": "Qdrant address." },
         "api_key": { "type": "string" },
-        "dimension": { "type": "integer", "minimum": 0, "description": "Default: 1536." }
+        "dimension": { "type": "integer", "minimum": 0, "description": "Default: 1536." },
+        "dedicated_pool": { "type": "boolean", "description": "Opt out of container-level pool sharing; default false shares one pool per exact DSN, true opens a private pool." }
       }
     },
     "webhookOptions": {
@@ -610,7 +622,8 @@
         "host_port": { "type": "string" },
         "namespace": { "type": "string" },
         "dsn": { "type": "string", "description": "Postgres connection string; empty selects sqlite (dev/test)." },
-        "table": { "type": "string", "description": "Workflow-runs table name; empty selects the adapter default." }
+        "table": { "type": "string", "description": "Workflow-runs table name; empty selects the adapter default." },
+        "dedicated_pool": { "type": "boolean", "description": "Opt out of container-level pool sharing; default false shares one pool per exact DSN, true opens a private pool." }
       }
     }
   }

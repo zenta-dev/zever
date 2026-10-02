@@ -27,6 +27,11 @@ type Options struct {
 	MaxConnIdleTime time.Duration `json:"max_conn_idle_time" toml:"max_conn_idle_time" yaml:"max_conn_idle_time"`
 	// Path holds the SQLite database file path.
 	Path string `json:"path" toml:"path" yaml:"path"`
+	// DedicatedPool opts out of container-level pool sharing. The container
+	// consults it when borrowing a shared pool for an exact-DSN match;
+	// direct adapter construction ignores it, and the db service itself
+	// ignores it (it owns the pool borrowers share).
+	DedicatedPool bool `json:"dedicated_pool" toml:"dedicated_pool" yaml:"dedicated_pool"`
 }
 
 // Validate checks options for consistency, joining all violations.

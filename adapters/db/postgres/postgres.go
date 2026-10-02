@@ -325,10 +325,11 @@ func (r *rowsAdapter) Columns() ([]string, error) {
 // it via db.Register(db.Postgres, New). DSN is required; pool knobs from
 // opts pass through to the pgxpool config. It never logs the DSN.
 //
-// Pool guidance: each adapter (db, search/postgres, vectorstore/pgvector)
-// opens its own pool. When they share one Postgres DSN, keep the sum of
-// per-adapter MaxConns below the server's max_connections; search and
-// vectorstore default to 4 each (see their PoolConfig helpers).
+// Pool guidance: the container shares one pool per DSN across every
+// battery pointing at it (first opener's MaxConns wins; later nonzero caps
+// warn), so size the shared pool once against the server's max_connections
+// instead of budgeting a sum of per-adapter caps. Set dedicated_pool: true
+// on a battery to restore a private pool.
 func New(opts db.Options) (db.DB, error) {
 	if strings.TrimSpace(opts.DSN) == "" {
 		return nil, fmt.Errorf("postgres: option %q is required", "dsn")

@@ -101,6 +101,25 @@ func TestEnvNested(t *testing.T) {
 	}
 }
 
+func TestEnvDedicatedPool(t *testing.T) {
+	t.Setenv("SEARCH_DEDICATEDPOOL", "true")
+	t.Setenv("QUEUE_DEDICATEDPOOL", "true")
+	t.Setenv("SESSION_DSN", "data/sess.db")
+	cfg := Default()
+	if err := applyEnv(cfg); err != nil {
+		t.Fatal(err)
+	}
+	if !cfg.Search.Options.DedicatedPool {
+		t.Error("SEARCH_DEDICATEDPOOL not applied")
+	}
+	if !cfg.Queue.Options.DedicatedPool {
+		t.Error("QUEUE_DEDICATEDPOOL not applied")
+	}
+	if cfg.Session.Options.DSN != "data/sess.db" {
+		t.Errorf("SESSION_DSN = %q, want data/sess.db", cfg.Session.Options.DSN)
+	}
+}
+
 func TestEnvIgnoreUnknown(t *testing.T) {
 	t.Setenv("FOO_BAR", "x")
 	t.Setenv("AUTH_TOKEN", "hostile")
