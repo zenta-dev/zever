@@ -749,7 +749,7 @@ updates:
           - "*"
 
   - package-ecosystem: gomod
-    directory: "/adapters/search/postgres"
+    directory: "/adapters/search/db"
     schedule:
       interval: weekly
       day: monday
@@ -881,7 +881,7 @@ updates:
           - "*"
 
   - package-ecosystem: gomod
-    directory: "/adapters/vectorstore/pgvector"
+    directory: "/adapters/vectorstore/db"
     schedule:
       interval: weekly
       day: monday
@@ -936,7 +936,7 @@ updates:
           - "*"
 
   - package-ecosystem: gomod
-    directory: "/adapters/workflow/postgres"
+    directory: "/adapters/workflow/db"
     schedule:
       interval: weekly
       day: monday

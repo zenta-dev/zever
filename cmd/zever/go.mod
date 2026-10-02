@@ -72,8 +72,8 @@ require (
 	github.com/zenta-dev/zever/adapters/router/fiber v0.5.3
 	github.com/zenta-dev/zever/adapters/router/stdhttp v0.5.3
 	github.com/zenta-dev/zever/adapters/scheduler/embedded v0.5.3
+	github.com/zenta-dev/zever/adapters/search/db v0.5.3
 	github.com/zenta-dev/zever/adapters/search/meilisearch v0.5.3
-	github.com/zenta-dev/zever/adapters/search/postgres v0.5.3
 	github.com/zenta-dev/zever/adapters/secrets/env v0.5.3
 	github.com/zenta-dev/zever/adapters/session/memory v0.5.3
 	github.com/zenta-dev/zever/adapters/session/redis v0.5.3
@@ -82,12 +82,12 @@ require (
 	github.com/zenta-dev/zever/adapters/storage/s3 v0.5.3
 	github.com/zenta-dev/zever/adapters/tenant/header v0.5.3
 	github.com/zenta-dev/zever/adapters/tenant/single v0.5.3
-	github.com/zenta-dev/zever/adapters/vectorstore/pgvector v0.5.3
+	github.com/zenta-dev/zever/adapters/vectorstore/db v0.5.3
 	github.com/zenta-dev/zever/adapters/vectorstore/qdrant v0.5.3
 	github.com/zenta-dev/zever/adapters/webhook/http v0.5.3
 	github.com/zenta-dev/zever/adapters/webhook/queue v0.5.3
+	github.com/zenta-dev/zever/adapters/workflow/db v0.5.3
 	github.com/zenta-dev/zever/adapters/workflow/memory v0.5.3
-	github.com/zenta-dev/zever/adapters/workflow/postgres v0.5.3
 	github.com/zenta-dev/zever/config v0.5.3
 	github.com/zenta-dev/zever/container v0.5.3
 	github.com/zenta-dev/zever/core/ai v0.5.3
@@ -390,8 +390,8 @@ replace (
 	github.com/zenta-dev/zever/adapters/router/fiber => ../../adapters/router/fiber
 	github.com/zenta-dev/zever/adapters/router/stdhttp => ../../adapters/router/stdhttp
 	github.com/zenta-dev/zever/adapters/scheduler/embedded => ../../adapters/scheduler/embedded
+	github.com/zenta-dev/zever/adapters/search/db => ../../adapters/search/db
 	github.com/zenta-dev/zever/adapters/search/meilisearch => ../../adapters/search/meilisearch
-	github.com/zenta-dev/zever/adapters/search/postgres => ../../adapters/search/postgres
 	github.com/zenta-dev/zever/adapters/secrets/env => ../../adapters/secrets/env
 	github.com/zenta-dev/zever/adapters/session/memory => ../../adapters/session/memory
 	github.com/zenta-dev/zever/adapters/session/redis => ../../adapters/session/redis
@@ -400,12 +400,12 @@ replace (
 	github.com/zenta-dev/zever/adapters/storage/s3 => ../../adapters/storage/s3
 	github.com/zenta-dev/zever/adapters/tenant/header => ../../adapters/tenant/header
 	github.com/zenta-dev/zever/adapters/tenant/single => ../../adapters/tenant/single
-	github.com/zenta-dev/zever/adapters/vectorstore/pgvector => ../../adapters/vectorstore/pgvector
+	github.com/zenta-dev/zever/adapters/vectorstore/db => ../../adapters/vectorstore/db
 	github.com/zenta-dev/zever/adapters/vectorstore/qdrant => ../../adapters/vectorstore/qdrant
 	github.com/zenta-dev/zever/adapters/webhook/http => ../../adapters/webhook/http
 	github.com/zenta-dev/zever/adapters/webhook/queue => ../../adapters/webhook/queue
+	github.com/zenta-dev/zever/adapters/workflow/db => ../../adapters/workflow/db
 	github.com/zenta-dev/zever/adapters/workflow/memory => ../../adapters/workflow/memory
-	github.com/zenta-dev/zever/adapters/workflow/postgres => ../../adapters/workflow/postgres
 	github.com/zenta-dev/zever/core/ai => ../../core/ai
 	github.com/zenta-dev/zever/core/analytics => ../../core/analytics
 	github.com/zenta-dev/zever/core/auth => ../../core/auth
@@ -494,4 +494,3 @@ replace github.com/zenta-dev/zever/core/authz => ../../core/authz
 replace github.com/zenta-dev/zever/core/middleware => ../../core/middleware
 
 replace github.com/zenta-dev/zever/shared/apperror => ../../shared/apperror
-

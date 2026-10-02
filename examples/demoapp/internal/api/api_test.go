@@ -26,8 +26,8 @@ import (
 	billingstub "github.com/zenta-dev/zever/adapters/billing/stub"
 	dbsqlite "github.com/zenta-dev/zever/adapters/db/sqlite"
 	passwordargon2 "github.com/zenta-dev/zever/adapters/password/argon2"
-	searchpostgres "github.com/zenta-dev/zever/adapters/search/postgres"
-	vectorstorepgvector "github.com/zenta-dev/zever/adapters/vectorstore/pgvector"
+	searchdb "github.com/zenta-dev/zever/adapters/search/db"
+	vectorstoredb "github.com/zenta-dev/zever/adapters/vectorstore/db"
 
 	aianthropic "github.com/zenta-dev/zever/adapters/ai/anthropic"
 	analyticslog "github.com/zenta-dev/zever/adapters/analytics/log"
@@ -136,8 +136,8 @@ func newTestSetup(t *testing.T) testSetup {
 	webhookhttp.Register()
 	workflowmemory.Register()
 	passwordargon2.Register()
-	searchpostgres.Register()
-	vectorstorepgvector.Register()
+	searchdb.Register()
+	vectorstoredb.Register()
 
 	c := container.New(cfg)
 

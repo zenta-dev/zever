@@ -1,4 +1,4 @@
-package pgvector
+package db
 
 import (
 	"container/heap"
@@ -58,7 +58,7 @@ type driver struct {
 var _ vectorstore.VectorStore = (*driver)(nil)
 
 // DefaultDDLTimeout bounds connect plus DDL during construction. Shared 10s
-// floor with search/postgres: the pgvector ivfflat index build is slower
+// floor with search/db: the pgvector ivfflat index build is slower
 // than plain B-tree/GIN; single budget for connect+DDL during construction
 // so they don't drift. Server backend; local embedded DB builds trivially
 // inside it.
@@ -336,7 +336,7 @@ func tableDDL(dimension int) string {
 // upsertOne inserts or replaces vec. Batch callers loop it: the typed
 // builder has no EXCLUDED reference, so one shared DO UPDATE SET list
 // cannot carry per-row replacement values for a multi-row statement (same
-// reason search/postgres loops IndexBatch).
+// reason search/db loops IndexBatch).
 func (d *driver) upsertOne(ctx context.Context, op string, vec vectorstore.Vector) error {
 	if len(vec.Embedding) == 0 {
 		return fmt.Errorf("pgvector: %s: %w", op, vectorstore.ErrEmptyEmbedding)

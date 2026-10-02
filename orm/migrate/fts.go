@@ -18,7 +18,7 @@ import (
 // nothing in ir.Field or ir.Entity a diff pass could key off of. Grepping
 // internal/dsl/ir and internal/dsl/parser for "fts"/"fulltext"/"search"
 // confirms this: the only "search" in this module is the unrelated
-// search/postgres package (tsvector/ts_rank), which this migration engine
+// search/db package (tsvector/ts_rank), which this migration engine
 // does not touch.
 //
 // Adding that schema-level signal is a DSL grammar/parser/resolver change --

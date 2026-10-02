@@ -1,4 +1,4 @@
-package pgvector
+package db
 
 import (
 	"github.com/zenta-dev/zever/core/vectorstore"

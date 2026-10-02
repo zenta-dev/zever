@@ -71,13 +71,13 @@ fail the load, so keep the block to exactly these keys.
 
 ```go
 import (
-	searchpostgres "github.com/zenta-dev/zever/adapters/search/postgres"
+	searchdb "github.com/zenta-dev/zever/adapters/search/db"
 	"github.com/zenta-dev/zever/config"
 	"github.com/zenta-dev/zever/container"
 )
 
 func openSearch() error {
-	searchpostgres.Register()
+	searchdb.Register()
 
 	c := container.New(config.Default())
 	s, err := c.Search()
@@ -110,12 +110,12 @@ import (
 	"context"
 	"fmt"
 
-	searchpostgres "github.com/zenta-dev/zever/adapters/search/postgres"
+	searchdb "github.com/zenta-dev/zever/adapters/search/db"
 	"github.com/zenta-dev/zever/core/search"
 )
 
 func main() error {
-	searchpostgres.Register()
+	searchdb.Register()
 	s, err := search.Open(search.SQLite, search.Options{DSN: ":memory:"})
 	if err != nil {
 		return err
@@ -163,8 +163,8 @@ Backend contrast for the same query surface:
 
 | Adapter | Package | Notes |
 |---|---|---|
-| `sqlite` | `search/postgres` | Default, embedded FTS, `dsn` is a path or `:memory:` (served by the postgres package) |
-| `postgres` | `search/postgres` | Reuses relational infra, `dsn` is a postgres URL |
+| `sqlite` | `search/db` | Default, embedded FTS, `dsn` is a path or `:memory:` (served by the db package) |
+| `postgres` | `search/db` | Reuses relational infra, `dsn` is a postgres URL |
 | `meilisearch` | `search/meilisearch` | External cluster, needs `host` and `api_key` |
 
 All three serve `search.Search` (`Index`, `IndexBatch`, `Delete`, `Search`,

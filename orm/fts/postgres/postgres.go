@@ -17,13 +17,13 @@
 //
 // The SQL expression shapes -- `to_tsvector('english', col) @@
 // plainto_tsquery('english', ?)` for matching, `ts_rank(...) AS score` for
-// ranking -- are exactly the ones search/postgres already executes against
-// its own search_documents table (search/postgres/postgres.go's matchWhere
+// ranking -- are exactly the ones search/db already executes against
+// its own search_documents table (search/db/postgres.go's matchWhere
 // and buildSearchQueries): this package exposes those same expressions as
 // typed, composable orm predicates/order terms against arbitrary user
 // tables and columns, integrating with the existing full-text machinery
 // rather than duplicating its storage/search logic. The 'english'
-// text-search configuration is fixed, matching search/postgres. The query
+// text-search configuration is fixed, matching search/db. The query
 // text is ALWAYS a bound placeholder argument (the repo's placeholder-only
 // rule), never string-formatted.
 //
@@ -56,7 +56,7 @@ func MatchTSQuery[T any, V any](c orm.Column[T, V], text string) orm.Predicate[T
 // Rank builds an ORDER BY term ranking rows by how well c's document
 // matches text, rendered as
 // `ORDER BY ts_rank(to_tsvector('english', "c"), plainto_tsquery('english', ?)) DESC`
-// -- the same ts_rank expression search/postgres's buildSearchQueries
+// -- the same ts_rank expression search/db's buildSearchQueries
 // projects as `AS score`. Descending is the default, since a search
 // naturally wants the best match first.
 //

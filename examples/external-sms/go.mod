@@ -149,6 +149,6 @@ require (
 	google.golang.org/protobuf v1.36.11 // indirect
 )
 
-replace github.com/zenta-dev/zever/adapters/workflow/postgres => ../../adapters/workflow/postgres
+replace github.com/zenta-dev/zever/adapters/workflow/db => ../../adapters/workflow/db
 
-replace github.com/zenta-dev/zever/adapters/search/postgres => ../../adapters/search/postgres
+replace github.com/zenta-dev/zever/adapters/search/db => ../../adapters/search/db

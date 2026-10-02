@@ -9,7 +9,7 @@
 // ready row with a compare-and-set UPDATE guarded on the previously read
 // lease, bumps attempt on reclaim, and Ack/Nack settle the row under an
 // (id, attempt) guard, mirroring adapters/queue/redis's claim/reclaim/
-// ack/nack Lua scripts and adapters/workflow/postgres's lease CAS.
+// ack/nack Lua scripts and adapters/workflow/db's lease CAS.
 //
 // Honest trade-off: this is a polling transport with moderate throughput,
 // not a Kafka/SQS replacement. Every Pop polls on PollInterval, claims

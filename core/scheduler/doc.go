@@ -1,6 +1,6 @@
 // Package scheduler dispatches registered jobs on cron specs with swappable adapters.
 //
-// It registers job names on cron specs and fires them through a job dispatcher with per-slot dedup. It is not a queue and does not catch up missed ticks. It ships two adapters: `embedded` (in-process cron, single-instance) and `postgres` (`adapters/scheduler/postgres`, durable leased slots mirroring `adapters/workflow/postgres`) for multi-instance deploys where `embedded` would double-fire. Conformance lives in `schedulertest`: it proves single-fire-in-process firing, which both adapters satisfy, and documents the multi-instance limit the leased adapter lifts.
+// It registers job names on cron specs and fires them through a job dispatcher with per-slot dedup. It is not a queue and does not catch up missed ticks. It ships two adapters: `embedded` (in-process cron, single-instance) and `postgres` (`adapters/scheduler/postgres`, durable leased slots mirroring `adapters/workflow/db`) for multi-instance deploys where `embedded` would double-fire. Conformance lives in `schedulertest`: it proves single-fire-in-process firing, which both adapters satisfy, and documents the multi-instance limit the leased adapter lifts.
 //
 // Type safety: Scheduler plus typed Options plus Adapter enum plus Factory. EntryID aliases job.EntryID. Specs use cron standard format with MaxSpecLen 256 and fail at Schedule time. Unsupported features fail closed.
 //

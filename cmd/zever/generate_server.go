@@ -144,23 +144,27 @@ type batterySelection struct {
 
 // adapterDirName maps a battery selection to its adapter module directory
 // ("<battery>/<adapter>"), the path segment batteryImportPath builds on.
-// It is mechanical across every pair with three exceptions: the password
+// It is mechanical across every pair with four exceptions: the password
 // adapter string is PHC-canonical "argon2id" while its package directory
-// is "argon2", and the search/vectorstore "sqlite" adapter names are served
-// by the "search/postgres" and "vectorstore/pgvector" packages (empty DSN
-// selects the embedded sqlite backend) since adapters/search/sqlite and
+// is "argon2", and the search/vectorstore/workflow DB-backed adapter names
+// are served by consolidated "db" package directories (empty DSN selects
+// the embedded sqlite backend) since adapters/search/sqlite and
 // adapters/vectorstore/sqlite were folded into them.
 func adapterDirName(b batterySelection) string {
 	if b.Battery == "password" && b.Adapter == "argon2id" {
 		return "password/argon2"
 	}
 
-	if b.Battery == "search" && b.Adapter == "sqlite" {
-		return "search/postgres"
+	if b.Battery == "search" && (b.Adapter == "sqlite" || b.Adapter == "postgres") {
+		return "search/db"
 	}
 
-	if b.Battery == "vectorstore" && b.Adapter == "sqlite" {
-		return "vectorstore/pgvector"
+	if b.Battery == "vectorstore" && (b.Adapter == "sqlite" || b.Adapter == "pgvector") {
+		return "vectorstore/db"
+	}
+
+	if b.Battery == "workflow" && b.Adapter == "postgres" {
+		return "workflow/db"
 	}
 
 	return b.Battery + "/" + b.Adapter
@@ -170,7 +174,7 @@ func adapterDirName(b batterySelection) string {
 // across every battery/adapter pair: every adapter lives at
 // "adapters/<battery>/<adapter>" (e.g. adapters/cache/memory,
 // adapters/db/sqlite), matching config.Default()'s own battery/adapter
-// naming exactly (modulo adapterDirName's password exception).
+// naming exactly (modulo adapterDirName's password/db exceptions).
 func batteryImportPath(b batterySelection) string {
 	return "github.com/zenta-dev/zever/adapters/" + adapterDirName(b)
 }
