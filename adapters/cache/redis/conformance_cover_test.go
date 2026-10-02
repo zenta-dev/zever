@@ -2,6 +2,7 @@ package redis
 
 import (
 	"testing"
+	"time"
 
 	"github.com/alicebob/miniredis/v2"
 
@@ -16,19 +17,10 @@ import (
 // shared client singleton, so parallelism is forbidden like the other
 // live tests in this package.
 //
-// Currently skipped: miniredis is not a faithful stand-in for the
-// expiry-dependent subtests. Its clock advances only via FastForward:
-// a key set with a 30ms TTL is still present after 500ms of real time,
-// so TTLExpiry, SetIfAbsent (expired-key branch) and Exists (expiry
-// branch) poll until the kit's 2s deadline and fail. Separately,
-// IncrementDecrement fails because Increment on a non-integer value
-// returns a generic wrapped transport error instead of the
-// cache.ErrInvalidValue / *cache.InvalidValueError the kit (and the
-// memory adapter) require. Re-enable once the adapter maps integer
-// errors and the fake advances TTLs in real time.
+// Miniredis TTLs advance only via FastForward, so the factory wraps the
+// adapter to implement the kit's FastForward seam: expiry polls advance
+// the fake clock by the poll interval after each unsuccessful attempt.
 func TestRedisConformance(t *testing.T) {
-	t.Skip("miniredis clock is frozen without FastForward (TTL subtests cannot pass) and Increment lacks ErrInvalidValue mapping")
-
 	cachetest.Conformance(t, func(t *testing.T) cache.Cache {
 		t.Helper()
 
@@ -41,6 +33,16 @@ func TestRedisConformance(t *testing.T) {
 
 		t.Cleanup(func() { _ = c.Close(t.Context()) })
 
-		return c
+		return &fastForwardCache{Cache: c, s: s}
 	})
 }
+
+// fastForwardCache wraps a cache.Cache with the kit's virtual-time seam,
+// advancing the backing miniredis clock on every expiry poll.
+type fastForwardCache struct {
+	cache.Cache
+	s *miniredis.Miniredis
+}
+
+// FastForward advances the fake clock backing the conformance instance.
+func (c *fastForwardCache) FastForward(d time.Duration) { c.s.FastForward(d) }

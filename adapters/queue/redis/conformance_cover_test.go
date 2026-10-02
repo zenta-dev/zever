@@ -16,18 +16,11 @@ import (
 // here are sequential (no t.Parallel): the adapter shares process-wide
 // script state with the other live tests in this package.
 //
-// Currently skipped: miniredis's Lua cjson is not faithful. claim.lua
-// decodes the stored message and re-encodes it, and miniredis encodes
-// an empty Lua table as a JSON array: stored `"headers":{}` comes back
-// as `"headers":[]`, so decodeMessage fails with "cannot unmarshal JSON
-// array into Go queue.Headers" on every Pop of a message with nil/empty
-// headers (FIFO, Empty, LengthIsEmpty, Ack, NackDrop, Delayed,
-// TopicsIsolated). Separately, miniredis floors BLPop timeouts below 1s
-// up to 1s, which would make every empty-pop case take a second.
-// Re-enable once the fake preserves empty JSON objects through scripts.
+// The adapter stores headers as JSON objects; miniredis Lua re-encodes
+// empty objects as arrays, which the adapter's tolerant wire decoder
+// accepts. Sub-second BLPop waits run client-side so empty pops stay
+// within the kit's short poll timeout instead of the server's 1s floor.
 func TestRedisConformance(t *testing.T) {
-	t.Skip("miniredis Lua cjson mangles empty headers ({} -> []) and floors BLPop below 1s")
-
 	queuetest.Conformance(t, func(t *testing.T) queue.Queue {
 		t.Helper()
 

@@ -1,11 +1,17 @@
 # V1 Readiness Audit
 
-Branch `feat/v1-ci-docs`. Docs-only track; no code changes. Cites are
+Post-merge `main` (this track continues on `feat/v1-release-docs`).
+Docs + `release.yml` only; no code changes. Cites are
 `file:line` against this worktree.
 
 ## 1. Per-battery conformance-kit status
 
-Four kits ship in-tree; the plugin guide names three:
+Fifteen kits ship in-tree (`core/*/*test/conformance.go`: `billing`,
+`cache`, `crypto`, `eventbus`, `flag`, `idempotency`, `lock`, `log`,
+`observability`, `password`, `payment`, `queue`, `ratelimit`,
+`secrets`, `storage`); thirteen of them ship an in-kit
+`conformance_test.go` suite (all except `billing` and `password`,
+which ship the kit without a suite). The plugin guide names three:
 
 - `core/cache/cachetest/conformance.go` — kit + `conformance_test.go`
   in-kit suite.
@@ -31,8 +37,12 @@ passing:
 - `adapters/queue/redis/conformance_cover_test.go:19-29` —
   `t.Skip("miniredis Lua cjson mangles empty headers ...")`.
 
-So: 3 of 4 named kits run green in CI; redis adapter parity is
-wired-but-skipped pending miniredis fidelity. Every other battery
+So: 3 of 15 kits run green in CI; redis adapter parity is
+wired-but-skipped pending miniredis fidelity. The 12 remaining kits
+(`billing`, `crypto`, `eventbus`, `flag`, `idempotency`, `lock`, `log`,
+`observability`, `password`, `payment`, `ratelimit`, `secrets`) run only
+via their in-kit suites (13 ship one; `billing`/`password` ship the kit
+without a suite) and per-adapter tests. Every other battery
 (~30) has no shared kit; new adapters there prove parity only via
 per-adapter tests.
 
@@ -72,7 +82,7 @@ for plugins is greenfield design work (schema syntax, resolver support,
 codegen for `RegisterPlugin` wiring) with no existing partial
 implementation to extend.
 
-## 4. Bench files + no published output
+## 4. Bench files + published output
 
 Four `*_bench_test.go` files exist (untouched per track scope):
 
@@ -83,12 +93,17 @@ Four `*_bench_test.go` files exist (untouched per track scope):
 - `container/container_bench_test.go`.
 - `orm/preload_bench_test.go`.
 
+Baseline output is now published in `docs/benchmarks.md` (Results
+2026-10-02: router sequential vs parallel `ServeHTTP`, ORM sqlite
+`:memory:` Preload below/above chunk size plus concurrent, queue
+memory Push/Pop/Ack round trip — each with ns/op, B/op, allocs/op at
+cpu=1,4 — plus repro commands, machine spec, and a staleness warning
+that numbers are a point-in-time snapshot, not a deploy gate).
 `.github/CONTRIBUTING.md:155-164` requires benchmark evidence only for
-PRs that claim a performance change (`make bench`). There is no
-committed baseline output, no `BENCHMARKS.md`, and no bench-output
-artifact in CI — numbers appear (if at all) inline in PR bodies and are
-not reproducible from the repo. Any 1.0 perf promise needs a published
-baseline first.
+PRs that claim a performance change (`make bench`); numbers appear
+inline in PR bodies and are reproducible from the committed commands.
+Any 1.0 perf promise still needs a freshness policy first (committed
+numbers older than a few weeks are stale by the file's own warning).
 
 ## 5. Auth-group review depth vs crypto group
 
@@ -112,20 +127,24 @@ is not accurate as a process claim:
 Honest statement: auth and crypto share one coverage floor and one
 review rule; neither is singled out.
 
-## 6. CI artifacts (SBOM yes, attest/sign no)
+## 6. CI artifacts (SBOM yes, attest yes, sign no)
 
 - SBOM: yes. `sbom` job (`.github/workflows/ci.yml:344-375`) runs
   `make sbom` (CycloneDX per affected module, `Makefile:137-139`) and
   uploads `sbom/` as `sbom-cyclonedx-*` artifacts (`ci.yml:372-375`).
-- Attestation: no. `rg -i "attest|provenance|cosign|sigstore|slsa"` over
-  `.github/workflows/`, `Makefile`, `tools/` returns zero hits (only
-  `upload-artifact` and automerge commentary mention artifacts in
-  passing). No provenance, no signing, no `gh attestation verify`
-  path. Phase7 of this track adds SLSA provenance to `ci.yml`.
-- No `release.yml` workflow exists (`.github/workflows/` holds
-  `automerge, ci, codeql, dependency-review, docs, flake, vulncheck`
-  only), so the SBOM/provenance story is CI-artifact-only, not
-  release-attached.
+- Attestation: yes, since the readiness-bar commit. `sbom` job attests
+  the SBOMs via
+  `actions/attest-build-provenance@62fc1d596301d0ab9914e1fec14dc5c8d93f65cd`
+  (`ci.yml:380-386`), verifiable with
+  `gh attestation verify sbom/<slug>.json --repo zenta-dev/zever`.
+  No cosign/sigstore signing exists (provenance only).
+- Release: `.github/workflows/release.yml` (this track) builds static
+  binaries (`zever` CLI + showcase server/worker, mirroring
+  `examples/showcase/Dockerfile` builder flags) plus `make sbom`,
+  attests BOTH binaries and SBOMs with the same pinned
+  `actions/attest-build-provenance` action, and attaches everything to
+  the tag release (`gh release upload`). Verify with
+  `gh attestation verify dist/zever-linux-amd64 --repo zenta-dev/zever`.
 
 ## 7. STABILITY promotion language (verbatim)
 
@@ -176,17 +195,21 @@ the Dockerfile + broadest battery coverage, and does not claim compose.
 
 ## Open questions
 
-1. `core/secrets/secretstest` — promote to fourth named kit in
-   `docs/writing-a-plugin.md:6-10`, or deliberately excluded? Needs
-   maintainer call.
+1. `core/secrets/secretstest` — RESOLVED yes: it is the fifteenth
+   in-tree kit (`core/secrets/secretstest/conformance.go`), run by both
+   secrets adapters (`adapters/secrets/env/conformance_cover_test.go:21`,
+   `adapters/secrets/vault/conformance_cover_test.go:15`). Still
+   unnamed in `docs/writing-a-plugin.md:6-10` (out of scope for this
+   track) and not in the CI `conformance` job (cache/queue/storage
+   only).
 2. Scheduler second adapter (postgres-leased) — accept as 1.0-blocker
    proposal, or is embedded-only acceptable at 1.0 with documented
    single-instance limit?
 3. Bench baseline — is any perf promise in scope for 1.0, or do the four
    bench files stay informational?
-4. Attestation subject — Phase7 attests SBOM files (configurable,
-   always present). Prefer attesting built binaries once a
-   `release.yml` exists?
+4. Attestation subject — RESOLVED both: CI `sbom` job attests SBOMs
+   and `.github/workflows/release.yml` (this track) attests built
+   binaries plus SBOMs, attached to the tag release.
 5. `examples/README.md:17-19` says "There is deliberately no new Go
    module here" yet `examples/showcase/go.mod`, `examples/todo/go.mod`,
    and `examples/bookings/go.mod` all exist — stale doc, out of scope

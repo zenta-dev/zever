@@ -27,6 +27,13 @@ const (
 // with a context deadline; they never synchronize with time.Sleep and
 // never touch the network.
 //
+// Virtual-time fakes: when the factory product also implements
+// FastForward(time.Duration) (e.g. a miniredis wrapper whose TTLs advance
+// only via FastForward), expiry polls advance that clock by the poll
+// interval after each unsuccessful attempt so TTLs expire without
+// wall-clock waiting. Real-time adapters do not implement it and are
+// unaffected.
+//
 // No-op adapters: none; every adapter must enforce mutual exclusion.
 // A stub that always reports ok=true would trivially satisfy the shape
 // but violate exclusivity, so no stub exemption exists.
@@ -203,7 +210,13 @@ func conformanceExtendUnlock(t *testing.T, factory func(t *testing.T) lock.Locke
 
 	eventually(t, "expired lease re-acquired", func(ctx context.Context) bool {
 		_, stolen, stolenErr := l.TryAcquire(ctx, "steal", time.Minute)
-		return stolenErr == nil && stolen
+		if stolenErr == nil && stolen {
+			return true
+		}
+
+		maybeFastForward(l)
+
+		return false
 	})
 
 	if err = old.Unlock(ctx); !errors.Is(err, lock.ErrNotHeld) {
@@ -227,7 +240,13 @@ func conformanceExpiry(t *testing.T, factory func(t *testing.T) lock.Locker) {
 
 	eventually(t, "expired key re-acquirable", func(ctx context.Context) bool {
 		_, ok, err := l.TryAcquire(ctx, "ttl", time.Minute)
-		return err == nil && ok
+		if err == nil && ok {
+			return true
+		}
+
+		maybeFastForward(l)
+
+		return false
 	})
 }
 
@@ -243,6 +262,21 @@ func conformanceClose(t *testing.T, factory func(t *testing.T) lock.Locker) {
 
 	if err := l.Close(ctx); err != nil {
 		t.Errorf("Close() second error = %v, want nil", err)
+	}
+}
+
+// fastForwarder is implemented by conformance factories running against
+// virtual-time fakes (e.g. a miniredis wrapper whose TTLs advance only via
+// FastForward). Expiry polls advance it after each unsuccessful attempt.
+type fastForwarder interface {
+	FastForward(time.Duration)
+}
+
+// maybeFastForward advances l's virtual clock when it implements
+// fastForwarder; it is a no-op for real-time adapters.
+func maybeFastForward(l lock.Locker) {
+	if f, ok := any(l).(fastForwarder); ok {
+		f.FastForward(DefaultPollInterval)
 	}
 }
 

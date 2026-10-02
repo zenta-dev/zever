@@ -12,6 +12,7 @@ import (
 	"encoding/base64"
 	"errors"
 	"fmt"
+	"sync/atomic"
 
 	"github.com/zenta-dev/zever/core/crypto"
 )
@@ -21,6 +22,7 @@ type localCrypto struct {
 	gcm      cipher.AEAD
 	macKey   []byte
 	signPriv ed25519.PrivateKey
+	closed   atomic.Bool
 }
 
 // randRead is a seam for testing nonce generation failure.
@@ -50,6 +52,26 @@ func New(opts crypto.Options) (crypto.Crypto, error) {
 	return &localCrypto{aesKey: key, gcm: gcm, macKey: macKey, signPriv: signPriv}, nil
 }
 
+// closedErr reports use after Close: key material was wiped, so every
+// operation fails instead of running keyless.
+func (l *localCrypto) closedErr() error {
+	return fmt.Errorf("local: closed: %w", crypto.ErrKeyNotFound)
+}
+
+// Close zeroes key material (aesKey, macKey, signPriv) and fails all later
+// operations. Idempotent; always nil. The expanded key schedule inside the
+// stdlib cipher.Block has no public wipe API, so the AEAD instance is
+// dropped (GC-able) rather than zeroed in place.
+func (l *localCrypto) Close() error {
+	l.closed.Store(true)
+	clear(l.aesKey)
+	clear(l.macKey)
+	clear(l.signPriv)
+	l.signPriv = nil
+	l.gcm = nil
+	return nil
+}
+
 // Encrypt seals plaintext with AES-256-GCM, returning nonce||ciphertext.
 //
 // No key-id/version is embedded in the output: rotating crypto.Options.Key
@@ -65,6 +87,9 @@ func New(opts crypto.Options) (crypto.Crypto, error) {
 // with the old key, re-encrypt with the new one, migrate at rest) or wait
 // for a future versioned-envelope addition to this package.
 func (l *localCrypto) Encrypt(_ context.Context, plaintext []byte) ([]byte, error) {
+	if l.closed.Load() {
+		return nil, l.closedErr()
+	}
 	nonce := make([]byte, l.gcm.NonceSize())
 	if _, err := randRead(nonce); err != nil {
 		return nil, err
@@ -77,6 +102,9 @@ func (l *localCrypto) Encrypt(_ context.Context, plaintext []byte) ([]byte, erro
 // rotation has no fallback path: ciphertext sealed under a since-rotated
 // key can no longer be opened.
 func (l *localCrypto) Decrypt(_ context.Context, ciphertext []byte) ([]byte, error) {
+	if l.closed.Load() {
+		return nil, l.closedErr()
+	}
 	if len(ciphertext) < l.gcm.NonceSize() {
 		return nil, crypto.ErrIntegrity
 	}
@@ -90,6 +118,9 @@ func (l *localCrypto) Decrypt(_ context.Context, ciphertext []byte) ([]byte, err
 }
 
 func (l *localCrypto) Sign(_ context.Context, message []byte) ([]byte, error) {
+	if l.closed.Load() {
+		return nil, l.closedErr()
+	}
 	if l.signPriv == nil {
 		return nil, crypto.ErrKeyNotFound
 	}
@@ -100,6 +131,9 @@ func (l *localCrypto) Verify(_ context.Context, message, signature []byte) (bool
 	// Contract: (false, nil) means key present but signature invalid;
 	// (false, ErrKeyNotFound) means no signing key configured. Callers
 	// must check err before trusting ok=false as a plain mismatch.
+	if l.closed.Load() {
+		return false, l.closedErr()
+	}
 	if l.signPriv == nil {
 		return false, crypto.ErrKeyNotFound
 	}
@@ -108,6 +142,9 @@ func (l *localCrypto) Verify(_ context.Context, message, signature []byte) (bool
 }
 
 func (l *localCrypto) Mac(_ context.Context, message []byte) ([]byte, error) {
+	if l.closed.Load() {
+		return nil, l.closedErr()
+	}
 	h := hmac.New(sha256.New, l.macKey)
 	_, _ = h.Write(message)
 	return h.Sum(nil), nil
@@ -118,6 +155,9 @@ func (l *localCrypto) VerifyMac(_ context.Context, message, mac []byte) (bool, e
 	// (false, ErrIntegrity), not (false, nil). Callers must use
 	// errors.Is(err, crypto.ErrIntegrity) to detect forgery; ok alone
 	// is insufficient. Kept as-is to avoid breaking verifiers.
+	if l.closed.Load() {
+		return false, l.closedErr()
+	}
 	h := hmac.New(sha256.New, l.macKey)
 	_, _ = h.Write(message)
 	computed := h.Sum(nil)

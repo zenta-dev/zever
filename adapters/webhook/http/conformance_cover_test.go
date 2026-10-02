@@ -1,0 +1,56 @@
+package http_test
+
+import (
+	"net/http"
+	"net/http/httptest"
+	"sync/atomic"
+	"testing"
+
+	webhookhttp "github.com/zenta-dev/zever/adapters/webhook/http"
+	"github.com/zenta-dev/zever/core/webhook"
+	"github.com/zenta-dev/zever/core/webhook/webhooktest"
+)
+
+// TestConformanceHTTP proves the http webhook passes the webhook kit.
+func TestConformanceHTTP(t *testing.T) {
+	t.Parallel()
+
+	webhooktest.Conformance(t, func(t *testing.T) webhook.Webhook {
+		t.Helper()
+
+		return mustKitWebhook(t)
+	})
+}
+
+// TestConformanceDeliveryHTTP proves live fan-out through the http adapter.
+func TestConformanceDeliveryHTTP(t *testing.T) {
+	t.Parallel()
+
+	var received atomic.Int64
+
+	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, _ *http.Request) {
+		received.Add(1)
+		w.WriteHeader(http.StatusOK)
+	}))
+	t.Cleanup(srv.Close)
+
+	w := mustKitWebhook(t)
+	webhooktest.ConformanceDelivery(t, w, "kit.delivery", srv.URL+"/hook")
+
+	if got := received.Load(); got != 1 {
+		t.Errorf("server received %d deliveries, want 1", got)
+	}
+}
+
+func mustKitWebhook(t *testing.T) webhook.Webhook {
+	t.Helper()
+
+	w, err := webhookhttp.New(webhook.Options{AllowPrivateTargets: true})
+	if err != nil {
+		t.Fatalf("New() error = %v", err)
+	}
+
+	t.Cleanup(func() { _ = w.Close() })
+
+	return w
+}
