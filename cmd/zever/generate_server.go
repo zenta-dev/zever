@@ -146,24 +146,25 @@ type batterySelection struct {
 // ("<battery>/<adapter>"), the path segment batteryImportPath builds on.
 // It is mechanical across every pair with four exceptions: the password
 // adapter string is PHC-canonical "argon2id" while its package directory
-// is "argon2", and the search/vectorstore/workflow DB-backed adapter names
-// are served by consolidated "db" package directories (empty DSN selects
-// the embedded sqlite backend) since adapters/search/sqlite and
-// adapters/vectorstore/sqlite were folded into them.
+// is "argon2", and the search/vectorstore/workflow legacy DB-backed adapter
+// names ("postgres", "pgvector", "sqlite") are served by consolidated "db"
+// package directories (empty DSN selects the embedded sqlite backend)
+// since adapters/search/sqlite and adapters/vectorstore/sqlite were folded
+// into them. The canonical "db" name is mechanical (search/db and friends).
 func adapterDirName(b batterySelection) string {
 	if b.Battery == "password" && b.Adapter == "argon2id" {
 		return "password/argon2"
 	}
 
-	if b.Battery == "search" && (b.Adapter == "sqlite" || b.Adapter == "postgres") {
+	if b.Battery == "search" && (b.Adapter == "db" || b.Adapter == "sqlite" || b.Adapter == "postgres") {
 		return "search/db"
 	}
 
-	if b.Battery == "vectorstore" && (b.Adapter == "sqlite" || b.Adapter == "pgvector") {
+	if b.Battery == "vectorstore" && (b.Adapter == "db" || b.Adapter == "sqlite" || b.Adapter == "pgvector") {
 		return "vectorstore/db"
 	}
 
-	if b.Battery == "workflow" && b.Adapter == "postgres" {
+	if b.Battery == "workflow" && (b.Adapter == "db" || b.Adapter == "postgres") {
 		return "workflow/db"
 	}
 

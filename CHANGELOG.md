@@ -66,6 +66,24 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Changed
 
+- feat!: unify DB-backed adapter strings to canonical `db` for `search`,
+  `vectorstore`, and `workflow` (`core/search.DB`, `core/vectorstore.DB`,
+  `core/workflow.DB`; adapter packages' `Adapter` consts now equal the
+  `DB` consts). The old names stay registered as aliases — `postgres` and
+  `sqlite` for search, `pgvector` and `sqlite` for vectorstore, `postgres`
+  for workflow — so existing `zever.yaml` files, `*_ADAPTER` env values,
+  and `search.Open`/`vectorstore.Open`/`workflow.Open` calls keep
+  resolving to the same driver; `ParseAdapter` was already open (any
+  non-empty name) and the config schema enums keep the old spellings
+  alongside `db`. What changes in generated files: `config.Default()`
+  (and therefore `zever new` scaffolds and the `search`/`vectorstore`
+  `allServiceAdapters` defaults) now renders `adapter: db` instead of
+  `adapter: sqlite` — behavior-identical (empty DSN still selects the
+  embedded sqlite backend) but the string differs; `zever new`'s picker
+  offers `db` first with legacy names after, and `compose.yaml` is now
+  emitted for `db`-named picks (a `db` DSN may point at postgres) just
+  like the legacy `postgres`/`pgvector` picks. Migration: prefer `db` in
+  new files; old files need no change.
 - feat!: rename DB-backed adapter directories to `db` (`adapters/search/postgres`
   → `adapters/search/db`, `adapters/vectorstore/pgvector` →
   `adapters/vectorstore/db`, `adapters/workflow/postgres` →

@@ -292,18 +292,21 @@ func TestOptionsValidate(t *testing.T) {
 func TestRegisterOpensViaCoreOptions(t *testing.T) {
 	Register()
 
-	wf, err := workflow.Open(Adapter, workflow.Options{})
-	if err != nil {
-		t.Fatalf("Open = %v", err)
-	}
+	// Canonical "db" plus the legacy "postgres" alias must both resolve.
+	for _, adapter := range []workflow.Adapter{workflow.DB, workflow.Postgres} {
+		wf, err := workflow.Open(adapter, workflow.Options{})
+		if err != nil {
+			t.Fatalf("Open(%s) = %v", adapter, err)
+		}
 
-	closer, ok := wf.(interface{ Close() error })
-	if !ok {
-		t.Fatalf("workflow %T has no Close", wf)
-	}
+		closer, ok := wf.(interface{ Close() error })
+		if !ok {
+			t.Fatalf("workflow %T has no Close", wf)
+		}
 
-	if err := closer.Close(); err != nil {
-		t.Fatalf("Close = %v", err)
+		if err := closer.Close(); err != nil {
+			t.Fatalf("Close(%s) = %v", adapter, err)
+		}
 	}
 }
 

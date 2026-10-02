@@ -177,8 +177,8 @@ Adapter matrix (excerpt; full table in `config/README.md`, over thirty services 
 | `auth` | `jwt`, `session`, `oidc` | `jwt` |
 | `session` | `memory`, `redis` | `memory` |
 | `storage` | `local`, `s3`, `r2` | `local` |
-| `search` | `postgres`, `meilisearch`, `sqlite` | per scaffold |
-| `vectorstore` | `sqlite`, `pgvector`, `qdrant` | per scaffold |
+| `search` | `db`, `postgres`, `meilisearch`, `sqlite` | per scaffold |
+| `vectorstore` | `db`, `sqlite`, `pgvector`, `qdrant` | per scaffold |
 | `payment` / `billing` | `stub`, `stripe`, `paddle` | `stub` |
 | `log` | `noop`, `zerolog`, `slog`, `pretty` | per scaffold |
 | `secrets` | `env` | `env` with `ZEVER` prefix |
