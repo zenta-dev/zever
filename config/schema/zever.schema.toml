@@ -1248,7 +1248,7 @@ type = 'object'
 
 [properties.cache.properties]
 [properties.cache.properties.adapter]
-enum = ['memory', 'redis']
+enum = ['memory', 'redis', 'db']
 
 [properties.cache.properties.options]
 '$ref' = '#/$defs/cacheOptions'

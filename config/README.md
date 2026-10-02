@@ -27,7 +27,7 @@ config file, overlaid by environment variables. Later layers win:
 | analytics     | log, posthog                        |
 | auth          | jwt, session, oidc                  |
 | billing       | stub, stripe, paddle                |
-| cache         | memory, redis                       |
+| cache         | memory, redis, db                   |
 | crypto        | local                               |
 | db            | sqlite, postgres                    |
 | document      | local, remote, latex                |

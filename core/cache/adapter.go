@@ -9,6 +9,8 @@ const (
 	Memory Adapter = "memory"
 	// Redis selects the Redis-backed cache backend.
 	Redis Adapter = "redis"
+	// DB selects the DB-backed cache backend over shared/kvstore.
+	DB Adapter = "db"
 )
 
 // String returns the canonical name of Adapter.

@@ -21,6 +21,7 @@ require (
 	github.com/zenta-dev/zever/adapters/billing/paddle v0.5.3
 	github.com/zenta-dev/zever/adapters/billing/stripe v0.5.3
 	github.com/zenta-dev/zever/adapters/billing/stub v0.5.3
+	github.com/zenta-dev/zever/adapters/cache/db v0.5.3
 	github.com/zenta-dev/zever/adapters/cache/memory v0.5.3
 	github.com/zenta-dev/zever/adapters/cache/redis v0.5.3
 	github.com/zenta-dev/zever/adapters/crypto/local v0.5.3
@@ -273,6 +274,7 @@ require (
 	github.com/zenta-dev/zever/shared/endpoint v0.5.3 // indirect
 	github.com/zenta-dev/zever/shared/firebase v0.5.3 // indirect
 	github.com/zenta-dev/zever/shared/httpclient v0.5.3 // indirect
+	github.com/zenta-dev/zever/shared/kvstore v0.5.3 // indirect
 	github.com/zenta-dev/zever/shared/lrucache v0.5.3 // indirect
 	github.com/zenta-dev/zever/shared/providersclient v0.5.3 // indirect
 	github.com/zenta-dev/zever/shared/providersopt v0.5.3 // indirect
@@ -334,6 +336,7 @@ replace (
 	github.com/zenta-dev/zever/adapters/billing/paddle => ../../adapters/billing/paddle
 	github.com/zenta-dev/zever/adapters/billing/stripe => ../../adapters/billing/stripe
 	github.com/zenta-dev/zever/adapters/billing/stub => ../../adapters/billing/stub
+	github.com/zenta-dev/zever/adapters/cache/db => ../../adapters/cache/db
 	github.com/zenta-dev/zever/adapters/cache/memory => ../../adapters/cache/memory
 	github.com/zenta-dev/zever/adapters/cache/redis => ../../adapters/cache/redis
 	github.com/zenta-dev/zever/adapters/crypto/local => ../../adapters/crypto/local
@@ -456,6 +459,8 @@ replace github.com/zenta-dev/zever/shared/endpoint => ../../shared/endpoint
 replace github.com/zenta-dev/zever/shared/firebase => ../../shared/firebase
 
 replace github.com/zenta-dev/zever/shared/httpclient => ../../shared/httpclient
+
+replace github.com/zenta-dev/zever/shared/kvstore => ../../shared/kvstore
 
 replace github.com/zenta-dev/zever/shared/lrucache => ../../shared/lrucache
 

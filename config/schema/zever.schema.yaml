@@ -961,6 +961,7 @@ properties:
                 enum:
                     - memory
                     - redis
+                    - db
             options:
                 $ref: '#/$defs/cacheOptions'
         type: object
