@@ -9,6 +9,7 @@ import (
 	coredb "github.com/zenta-dev/zever/core/db"
 	"github.com/zenta-dev/zever/core/queue"
 	"github.com/zenta-dev/zever/orm"
+	"github.com/zenta-dev/zever/shared/dbconn"
 )
 
 func mustDriver(t *testing.T, o Options) *driver {
@@ -162,8 +163,8 @@ func TestIsPostgresDSN(t *testing.T) {
 	}
 
 	for _, tc := range cases {
-		if got := isPostgresDSN(tc.dsn); got != tc.want {
-			t.Errorf("isPostgresDSN(%q) = %v, want %v", tc.dsn, got, tc.want)
+		if got := dbconn.IsPostgresDSN(tc.dsn); got != tc.want {
+			t.Errorf("IsPostgresDSN(%q) = %v, want %v", tc.dsn, got, tc.want)
 		}
 	}
 }

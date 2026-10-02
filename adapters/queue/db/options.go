@@ -3,10 +3,10 @@ package db
 import (
 	"errors"
 	"fmt"
-	"strings"
 	"time"
 
 	coredb "github.com/zenta-dev/zever/core/db"
+	"github.com/zenta-dev/zever/shared/dbconn"
 )
 
 // DefaultTable is the queue-messages table created when Options.Table is empty.
@@ -92,53 +92,10 @@ func (o Options) Validate() error {
 	}
 
 	if o.Table != "" {
-		if err := validateTableName(o.Table); err != nil {
-			errs = append(errs, err)
+		if err := dbconn.ValidateTableName(o.Table); err != nil {
+			errs = append(errs, fmt.Errorf("db: %w", err))
 		}
 	}
 
 	return errors.Join(errs...)
-}
-
-// isPostgresDSN reports whether dsn selects the postgres backend: a URL
-// with a postgres scheme. Anything else (including ":memory:") is a sqlite
-// path. Matching is case-insensitive with surrounding whitespace ignored.
-func isPostgresDSN(dsn string) bool {
-	s := strings.ToLower(strings.TrimSpace(dsn))
-
-	return strings.HasPrefix(s, "postgres://") || strings.HasPrefix(s, "postgresql://")
-}
-
-// dbOptions maps a core queue DSN onto shared pool options: a postgres
-// URL stays a DSN, anything else (including empty) becomes a sqlite Path.
-// Empty selects ":memory:".
-func dbOptions(dsn string) coredb.Options {
-	if isPostgresDSN(dsn) {
-		return coredb.Options{DSN: dsn}
-	}
-
-	if strings.TrimSpace(dsn) == "" {
-		return coredb.Options{Path: ":memory:"}
-	}
-
-	return coredb.Options{Path: dsn}
-}
-
-// validateTableName rejects table names outside [A-Za-z_][A-Za-z0-9_]*
-// because the name is interpolated into DDL (orm has no DDL builder).
-func validateTableName(name string) error {
-	if name == "" {
-		return errors.New("db: table must not be empty")
-	}
-
-	for i := 0; i < len(name); i++ {
-		c := name[i]
-		ok := c == '_' || (c >= 'a' && c <= 'z') || (c >= 'A' && c <= 'Z') || (i > 0 && c >= '0' && c <= '9')
-
-		if !ok {
-			return fmt.Errorf("db: invalid table name %q", name)
-		}
-	}
-
-	return nil
 }
