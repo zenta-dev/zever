@@ -144,11 +144,12 @@ type batterySelection struct {
 
 // adapterDirName maps a battery selection to its adapter module directory
 // ("<battery>/<adapter>"), the path segment batteryImportPath builds on.
-// It is mechanical across every pair with two exceptions: the password
+// It is mechanical across every pair with three exceptions: the password
 // adapter string is PHC-canonical "argon2id" while its package directory
-// is "argon2", and the search "sqlite" adapter name is served by the
-// "search/postgres" package (empty DSN selects the embedded sqlite
-// backend) since adapters/search/sqlite was folded into it.
+// is "argon2", and the search/vectorstore "sqlite" adapter names are served
+// by the "search/postgres" and "vectorstore/pgvector" packages (empty DSN
+// selects the embedded sqlite backend) since adapters/search/sqlite and
+// adapters/vectorstore/sqlite were folded into them.
 func adapterDirName(b batterySelection) string {
 	if b.Battery == "password" && b.Adapter == "argon2id" {
 		return "password/argon2"
@@ -156,6 +157,10 @@ func adapterDirName(b batterySelection) string {
 
 	if b.Battery == "search" && b.Adapter == "sqlite" {
 		return "search/postgres"
+	}
+
+	if b.Battery == "vectorstore" && b.Adapter == "sqlite" {
+		return "vectorstore/pgvector"
 	}
 
 	return b.Battery + "/" + b.Adapter

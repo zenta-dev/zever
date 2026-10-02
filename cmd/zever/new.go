@@ -1242,7 +1242,7 @@ var nestedModuleDirs = []string{
 	"adapters/session/cookie", "adapters/session/db", "adapters/session/memory", "adapters/session/redis",
 	"adapters/storage/local", "adapters/storage/r2", "adapters/storage/s3",
 	"adapters/tenant/header", "adapters/tenant/single",
-	"adapters/vectorstore/pgvector", "adapters/vectorstore/qdrant", "adapters/vectorstore/sqlite",
+	"adapters/vectorstore/pgvector", "adapters/vectorstore/qdrant",
 	"adapters/webhook/http", "adapters/webhook/queue",
 	"adapters/workflow/memory", "adapters/workflow/postgres",
 }

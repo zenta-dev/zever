@@ -81,7 +81,6 @@ use (
 	./adapters/tenant/single
 	./adapters/vectorstore/pgvector
 	./adapters/vectorstore/qdrant
-	./adapters/vectorstore/sqlite
 	./adapters/webhook/http
 	./adapters/webhook/queue
 	./adapters/workflow/memory

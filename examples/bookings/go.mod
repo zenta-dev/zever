@@ -29,7 +29,7 @@ require (
 	github.com/zenta-dev/zever/adapters/search/postgres v0.5.3
 	github.com/zenta-dev/zever/adapters/secrets/env v0.5.3
 	github.com/zenta-dev/zever/adapters/tenant/single v0.5.3
-	github.com/zenta-dev/zever/adapters/vectorstore/sqlite v0.5.3
+	github.com/zenta-dev/zever/adapters/vectorstore/pgvector v0.5.3
 	github.com/zenta-dev/zever/adapters/webhook/queue v0.5.3
 	github.com/zenta-dev/zever/config v0.5.3
 	github.com/zenta-dev/zever/container v0.5.3
@@ -78,7 +78,7 @@ replace (
 	github.com/zenta-dev/zever/adapters/scheduler/embedded => ../../adapters/scheduler/embedded
 	github.com/zenta-dev/zever/adapters/search/postgres => ../../adapters/search/postgres
 	github.com/zenta-dev/zever/adapters/secrets/env => ../../adapters/secrets/env
-	github.com/zenta-dev/zever/adapters/vectorstore/sqlite => ../../adapters/vectorstore/sqlite
+	github.com/zenta-dev/zever/adapters/vectorstore/pgvector => ../../adapters/vectorstore/pgvector
 	github.com/zenta-dev/zever/adapters/webhook/queue => ../../adapters/webhook/queue
 	github.com/zenta-dev/zever/config => ../../config
 	github.com/zenta-dev/zever/container => ../../container

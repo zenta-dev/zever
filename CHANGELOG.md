@@ -75,6 +75,20 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   `postgres.New(postgres.Options{...})` or `search.Open`); the `sqlite`
   adapter name keeps resolving via `postgres.Register`, so `zever.yaml`
   files and the `sqlite` default need no change.
+- `adapters/vectorstore/sqlite`: folded into
+  `adapters/vectorstore/pgvector`, which is now the single DB-backed
+  vectorstore adapter (pgvector cosine on a postgres URL DSN, embedded
+  sqlite brute-force otherwise; empty DSN selects `:memory:`). The
+  hand-rolled `pool.go` files are gone: construction flows through
+  `adapters/db/postgres` (TLS 1.2 floor) and `adapters/db/sqlite`,
+  sqlite-leg writes go through the `orm` typed builder, and
+  `NewFromDB`/`OpenFromDB` share a caller-owned `coredb.DB`.
+  Migration for direct importers: replace
+  `adapters/vectorstore/sqlite` with `adapters/vectorstore/pgvector`
+  (`sqlite.New(vectorstore.Options{...})` becomes
+  `pgvector.New(vectorstore.Options{...})` or `vectorstore.Open`); the
+  `sqlite` adapter name keeps resolving via `pgvector.Register`, so
+  `zever.yaml` files and the `sqlite` default need no change.
 
 ### Added
 
