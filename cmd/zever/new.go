@@ -1469,7 +1469,7 @@ HEALTHCHECK --interval=30s --timeout=3s --start-period=5s --retries=3 CMD ["/usr
 
 // renderNewCompose returns compose.yaml for a scaffolded project, or ""
 // when no picked battery needs external infra. Postgres picks (db,
-// search, vectorstore) add a db service; redis picks (cache, queue,
+// search, vectorstore, workflow) add a db service; redis picks (cache, queue,
 // session, ratelimit, lock, eventbus, idempotency) share one redis
 // service. Env carries secrets at run time (never baked in); per-battery
 // URL vars point at the compose services.
@@ -1482,7 +1482,8 @@ func renderNewCompose(sel []batterySelection) string {
 		case s.Battery == "db" && s.Adapter == "postgres":
 			needsPG = true
 		case (s.Battery == "search" && s.Adapter == "postgres") ||
-			(s.Battery == "vectorstore" && s.Adapter == "pgvector"):
+			(s.Battery == "vectorstore" && s.Adapter == "pgvector") ||
+			(s.Battery == "workflow" && s.Adapter == "postgres"):
 			needsPG = true
 		case (s.Battery == "cache" || s.Battery == "queue" || s.Battery == "session" ||
 			s.Battery == "ratelimit" || s.Battery == "lock" || s.Battery == "eventbus" ||
