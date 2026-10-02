@@ -57,6 +57,12 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Release workflow (`.github/workflows/release.yml`) with SLSA-attested
   binaries and SBOMs; verify with
   `gh attestation verify <artifact> --repo zenta-dev/zever`.
+- `lock.Options.MaxEntries`: configurable bound for the memory adapter
+  lease table (non-positive means 1000, matching `cache.Options.MaxEntries`).
+  Past the bound the least-recently-used live lease is evicted and its
+  holder observes `lock.ErrNotHeld`; set a large value for effectively
+  unbounded storage. This documents the fixed 1000-entry LRU bound the
+  TTLCache migration imposed on previously-unbounded lease storage.
 
 ### Changed
 

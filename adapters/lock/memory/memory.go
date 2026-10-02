@@ -13,8 +13,8 @@ import (
 )
 
 // defaultMaxEntries bounds the lease table before LRU eviction, matching the
-// cache/memory adapter default. The lock battery has no MaxEntries option, so
-// a fixed bound keeps the adapter shape without changing core/lock.
+// cache/memory adapter default. It applies when lock.Options.MaxEntries is
+// non-positive.
 const defaultMaxEntries = 1000
 
 // adapter is an in-process lock.Locker over lrucache.TTLCache. The library
@@ -33,6 +33,7 @@ type adapter struct {
 	prefix        string
 	ttl           time.Duration
 	retryInterval time.Duration
+	maxEntries    int
 }
 
 // handle is one acquired lock.Lock.
@@ -44,6 +45,9 @@ type handle struct {
 
 // New creates an in-process lock.Locker. Non-positive TTL and retry
 // intervals fall back to lock.DefaultTTL and lock.DefaultRetryInterval.
+// Non-positive MaxEntries falls back to 1000, matching the cache/memory
+// adapter: past the bound the least-recently-used live lease is evicted
+// and its holder observes lock.ErrNotHeld.
 func New(opts lock.Options) (lock.Locker, error) {
 	ttl := opts.TTL
 	if ttl <= 0 {
@@ -55,11 +59,17 @@ func New(opts lock.Options) (lock.Locker, error) {
 		retry = lock.DefaultRetryInterval
 	}
 
+	maxEntries := opts.MaxEntries
+	if maxEntries <= 0 {
+		maxEntries = defaultMaxEntries
+	}
+
 	return &adapter{
-		leases:        lrucache.NewTTL[string, string](defaultMaxEntries, 0),
+		leases:        lrucache.NewTTL[string, string](maxEntries, 0),
 		prefix:        opts.Prefix,
 		ttl:           ttl,
 		retryInterval: retry,
+		maxEntries:    maxEntries,
 	}, nil
 }
 
@@ -143,7 +153,7 @@ func (a *adapter) Acquire(ctx context.Context, key string, ttl time.Duration) (l
 // empty table, exactly as with the previous map reset.
 func (a *adapter) Close(_ context.Context) error {
 	a.mu.Lock()
-	a.leases = lrucache.NewTTL[string, string](defaultMaxEntries, 0)
+	a.leases = lrucache.NewTTL[string, string](a.maxEntries, 0)
 	a.mu.Unlock()
 
 	return nil

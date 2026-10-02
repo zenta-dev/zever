@@ -416,6 +416,10 @@ type = 'string'
 ['$defs'.lockOptions.properties.db]
 type = 'integer'
 
+['$defs'.lockOptions.properties.max_entries]
+description = 'Memory adapter lease-table bound before LRU eviction; evicted live leases report ErrNotHeld. Non-positive means 1000.'
+type = 'integer'
+
 ['$defs'.lockOptions.properties.password]
 type = 'string'
 

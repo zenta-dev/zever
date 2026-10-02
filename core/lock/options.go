@@ -28,6 +28,12 @@ type Options struct {
 	TTL time.Duration `json:"ttl" toml:"ttl" yaml:"ttl"`
 	// RetryInterval is how long Acquire waits between attempts.
 	RetryInterval time.Duration `json:"retry_interval" toml:"retry_interval" yaml:"retry_interval"`
+	// MaxEntries bounds the number of stored leases before LRU eviction.
+	// Past the bound the least-recently-used live lease is evicted and its
+	// holder observes lock.ErrNotHeld on Extend/Unlock. Non-positive means
+	// the memory adapter default (1000). Callers needing effectively
+	// unbounded storage set a large value knowingly.
+	MaxEntries int `json:"max_entries" toml:"max_entries" yaml:"max_entries"`
 }
 
 // Validate checks options for consistency, joining all violations.
