@@ -28,6 +28,20 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   `AUDIT-V1.md` readiness audit; DSL plugin-battery design note
   (`dsl/plugin-batteries.mdx`, boundary recommendation).
 - `examples/showcase` positioned as newcomer-clone-first reference app.
+- Conformance kits for 19 more batteries (`db`, `search`, `vectorstore`,
+  `document`, `media`, `session`, `notification`, `webhook`, `workflow`,
+  `scheduler`, `ai`, `analytics`, `geo`, `i18n`, `mailer`, `tenant`,
+  `router`, `middleware`, `job`, `auth`, `authz`, `permission`) plus
+  adapter wiring; kit list in `docs/writing-a-plugin.md` grows 15 → 24+;
+  smoke suites for the `password`/`billing` kits.
+- `adapters/scheduler/postgres`: durable leased scheduler for
+  multi-instance deploys (mirrors `adapters/workflow/postgres`).
+- Redis conformance suites (`cache`, `queue`, `lock`) run green on
+  miniredis instead of skipped (FastForward clock seam, header-decoding
+  and BLPop-floor fixes, `Increment` error mapping).
+- Release workflow (`.github/workflows/release.yml`) with SLSA-attested
+  binaries and SBOMs; verify with
+  `gh attestation verify <artifact> --repo zenta-dev/zever`.
 
 ### Fixed
 
