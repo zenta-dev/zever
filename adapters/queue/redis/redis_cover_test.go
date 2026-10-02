@@ -169,7 +169,7 @@ func TestRedisCover_MarshalError(t *testing.T) {
 	jsonMarshal = func(_ any, _ ...json.Options) ([]byte, error) {
 		return nil, errors.New("marshal boom2")
 	}
-	_, _, err := a2.blockingClaim(t.Context(), "rk", "pk", "dk", "123", time.NewTimer(time.Second), time.Millisecond)
+	_, _, err := a2.blockingClaim(t.Context(), "rk", "pk", "dk", "123", time.NewTimer(time.Second), time.Second)
 	if err == nil {
 		t.Fatalf("blockingClaim marshal error = nil")
 	}
@@ -186,7 +186,7 @@ func TestRedisCover_UnmarshalError(t *testing.T) {
 		t.Fatalf("decodeMessage unmarshal error = nil")
 	}
 	a := &redisAdapter{client: &fakeClient{blPopVal: []string{"k", "not-json"}}}
-	_, _, err = a.blockingClaim(t.Context(), "rk", "pk", "dk", "123", time.NewTimer(time.Second), time.Millisecond)
+	_, _, err = a.blockingClaim(t.Context(), "rk", "pk", "dk", "123", time.NewTimer(time.Second), time.Second)
 	if err == nil {
 		t.Fatalf("blockingClaim unmarshal error = nil")
 	}
@@ -235,7 +235,7 @@ func TestRedisCover_ClientErrors(t *testing.T) {
 	}
 	// BLPop error not Nil
 	a8 := &redisAdapter{client: &fakeClient{blPopErr: errors.New("blpop boom")}}
-	_, _, err := a8.blockingClaim(ctx, "rk", "pk", "dk", "123", time.NewTimer(time.Second), time.Millisecond)
+	_, _, err := a8.blockingClaim(ctx, "rk", "pk", "dk", "123", time.NewTimer(time.Second), time.Second)
 	if err == nil {
 		t.Fatalf("blockingClaim BLPop error = nil")
 	}
@@ -243,7 +243,7 @@ func TestRedisCover_ClientErrors(t *testing.T) {
 	ctxCancel, cancel := context.WithCancel(t.Context())
 	cancel()
 	a9 := &redisAdapter{client: &fakeClient{blPopErr: goredis.Nil}}
-	_, _, err = a9.blockingClaim(ctxCancel, "rk", "pk", "dk", "123", time.NewTimer(time.Second), time.Millisecond)
+	_, _, err = a9.blockingClaim(ctxCancel, "rk", "pk", "dk", "123", time.NewTimer(time.Second), time.Second)
 	if err == nil {
 		t.Fatalf("blockingClaim cancelled = nil")
 	}
@@ -253,7 +253,7 @@ func TestRedisCover_ClientErrors(t *testing.T) {
 	poll := time.NewTimer(20 * time.Millisecond)
 	defer poll.Stop()
 	eventually(t, 3*time.Second, func() bool {
-		_, _, err = a10.blockingClaim(ctx, "rk", "pk", "dk", "123", poll, time.Millisecond)
+		_, _, err = a10.blockingClaim(ctx, "rk", "pk", "dk", "123", poll, time.Second)
 		return err != nil
 	}, "blockingClaim poll timeout")
 	var emptyErr *queue.EmptyError
@@ -262,20 +262,20 @@ func TestRedisCover_ClientErrors(t *testing.T) {
 	}
 	// BLPop returns len<2
 	a11 := &redisAdapter{client: &fakeClient{blPopVal: []string{"only-one"}}}
-	_, ok, err := a11.blockingClaim(ctx, "rk", "pk", "dk", "123", time.NewTimer(time.Second), time.Millisecond)
+	_, ok, err := a11.blockingClaim(ctx, "rk", "pk", "dk", "123", time.NewTimer(time.Second), time.Second)
 	if err != nil || ok {
 		t.Fatalf("blockingClaim len<2 = %v,%v want false,nil", ok, err)
 	}
 	// HSet error in blockingClaim
 	a12 := &redisAdapter{client: &fakeClient{blPopVal: []string{"k", `{"id":"` + queue.NewMessage("t", nil, nil).ID.String() + `","payload":null,"headers":null,"attempt":1}`}, hSetErr: errors.New("hset boom")}}
-	_, _, err = a12.blockingClaim(ctx, "rk", "pk", "dk", "123", time.NewTimer(time.Second), time.Millisecond)
+	_, _, err = a12.blockingClaim(ctx, "rk", "pk", "dk", "123", time.NewTimer(time.Second), time.Second)
 	if err == nil {
 		t.Fatalf("blockingClaim HSet error = nil")
 	}
 	// ZAdd error after HSet success
 	a13 := &redisAdapter{client: &fakeClient{blPopVal: []string{"k", `{"id":"` + queue.NewMessage("t", nil, nil).ID.String() + `","payload":null,"headers":null,"attempt":1}`}, zAddErr: errors.New("zadd boom")}}
 
-	_, _, err = a13.blockingClaim(ctx, "rk", "pk", "dk", "123", time.NewTimer(time.Second), time.Millisecond)
+	_, _, err = a13.blockingClaim(ctx, "rk", "pk", "dk", "123", time.NewTimer(time.Second), time.Second)
 	if err == nil {
 		t.Fatalf("blockingClaim ZAdd error = nil")
 	}
@@ -411,7 +411,7 @@ func TestRedisCover_RemainingBranches(t *testing.T) {
 	_ = a6.waitForBuffer(ctx, count2)
 	// blockingClaim with parseErr for now
 	a7 := &redisAdapter{client: &fakeClient{blPopVal: []string{"k", `{"id":"` + queue.NewMessage("t", nil, nil).ID.String() + `","payload":null,"headers":null,"attempt":1}`}}}
-	_, _, err := a7.blockingClaim(ctx, "rk", "pk", "dk", "not-a-number", time.NewTimer(time.Second), time.Millisecond)
+	_, _, err := a7.blockingClaim(ctx, "rk", "pk", "dk", "not-a-number", time.NewTimer(time.Second), time.Second)
 	if err != nil {
 		t.Logf("blockingClaim parseErr not hit, err=%v", err)
 	}
@@ -560,7 +560,7 @@ func TestRedisCover_FinalEight(t *testing.T) {
 	{
 		a := &redisAdapter{client: &fakeClient{blPopErr: goredis.Nil}, pollTimeout: time.Second}
 		poll := time.NewTimer(time.Hour) // cover not fired
-		_, ok, err := a.blockingClaim(ctx, "rk", "pk", "dk", "123", poll, time.Millisecond)
+		_, ok, err := a.blockingClaim(ctx, "rk", "pk", "dk", "123", poll, time.Second)
 		if err != nil || ok {
 			t.Errorf("blockingClaim default nil = %v,%v want false,nil", ok, err)
 		}
@@ -765,7 +765,7 @@ func TestRedisCover_FinalRemaining(t *testing.T) {
 	a5 := &redisAdapter{client: &fakeClient{blPopErr: errors.New("blpop boom")}}
 	ctxCancel, cancel := context.WithCancel(t.Context())
 	cancel()
-	_, _, err := a5.blockingClaim(ctxCancel, "rk", "pk", "dk", "123", time.NewTimer(time.Second), time.Millisecond)
+	_, _, err := a5.blockingClaim(ctxCancel, "rk", "pk", "dk", "123", time.NewTimer(time.Second), time.Second)
 	if err == nil {
 		t.Fatalf("blockingClaim cancelled with non-Nil error = nil")
 	}

@@ -216,6 +216,19 @@ for stripe/cloud TLS. One container per process; other build shapes
 `deployment.mdx` variants. Newcomers clone `examples/showcase` first:
 it is the reference app behind this page.
 
+## Release verification
+
+Tagged releases (`v*`) build static binaries and SBOMs via
+`.github/workflows/release.yml` (builder flags mirror the Dockerfile
+above: `CGO_ENABLED=0`, `-trimpath`, `-ldflags="-s -w"`), attest both
+with SLSA provenance, and attach them to the GitHub release. Verify
+before deploying:
+
+```sh
+gh attestation verify dist/zever-linux-amd64 --repo zenta-dev/zever
+gh attestation verify sbom/cmd_zever.json --repo zenta-dev/zever
+```
+
 ## Checklists
 
 ### Pre-deploy

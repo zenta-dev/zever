@@ -71,6 +71,27 @@ func UnaryServerInterceptor(a auth.Auth, p permission.Checker, policies map[stri
 	}
 }
 
+// UnaryServerInterceptorStrict enforces per-method policies, denying requests
+// without a policy as permission-denied instead of passing them through.
+// For a listed method it delegates to UnaryServerInterceptor, so allow-path
+// behavior is identical. Use for services where every method must be
+// explicitly allowlisted; the legacy interceptor stays fail-open on misses
+// for incremental adoption.
+func UnaryServerInterceptorStrict(a auth.Auth, p permission.Checker, policies map[string]Policy) grpc.UnaryServerInterceptor {
+	legacy := UnaryServerInterceptor(a, p, policies)
+	return func(
+		ctx context.Context,
+		req any,
+		info *grpc.UnaryServerInfo,
+		handler grpc.UnaryHandler,
+	) (any, error) {
+		if _, ok := policies[info.FullMethod]; !ok {
+			return nil, grpcStatusError(&PermissionDeniedError{Reason: "no policy for method"})
+		}
+		return legacy(ctx, req, info, handler)
+	}
+}
+
 func grpcStatusError(err error) error {
 	var unauthenticated *UnauthenticatedError
 	var denied *PermissionDeniedError

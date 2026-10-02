@@ -43,7 +43,7 @@ skipped=0
 pass1=()
 pass2=()
 pass3=()
-for f in $(find . -type f -name go.mod -not -path "./.git/*" | sort); do
+for f in $(find . -type f -name go.mod -not -path "./.git/*" -not -path "./.worktrees/*" | sort); do
   d=$(dirname "$f")
   # Strip leading ./ for pass matching; root "." falls through to the
   # tag step, which skips it (no root module).

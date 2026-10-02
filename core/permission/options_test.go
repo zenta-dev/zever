@@ -87,3 +87,42 @@ func TestOptions_Validate_roles_empty_key(t *testing.T) {
 		t.Fatalf("overlong key err = %v, want ErrInvalidOptions", err)
 	}
 }
+
+func TestOptions_Validate_rulesWithModelRejected(t *testing.T) {
+	t.Parallel()
+
+	dir := t.TempDir()
+	m := filepath.Join(dir, "model.conf")
+	p := filepath.Join(dir, "policy.csv")
+	if err := os.WriteFile(m, []byte("m"), 0o600); err != nil {
+		t.Fatal(err)
+	}
+	if err := os.WriteFile(p, []byte("p"), 0o600); err != nil {
+		t.Fatal(err)
+	}
+
+	rules := []Rule{{Role: "admin", Action: "read"}}
+	tests := []struct {
+		name    string
+		opts    Options
+		wantErr bool
+	}{
+		{name: "rules with model rejected", opts: Options{Rules: rules, ModelPath: m, PolicyPath: p}, wantErr: true},
+		{name: "roles with model allowed", opts: Options{Roles: map[string][]string{"u": {"admin"}}, ModelPath: m, PolicyPath: p}, wantErr: false},
+		{name: "rules without model allowed", opts: Options{Rules: rules}, wantErr: false},
+		{name: "model without rules allowed", opts: Options{ModelPath: m, PolicyPath: p}, wantErr: false},
+	}
+	for _, tc := range tests {
+		tc := tc
+		t.Run(tc.name, func(t *testing.T) {
+			t.Parallel()
+			err := tc.opts.Validate()
+			if tc.wantErr && !errors.Is(err, ErrInvalidOptions) {
+				t.Fatalf("Validate() err = %v, want ErrInvalidOptions", err)
+			}
+			if !tc.wantErr && err != nil {
+				t.Fatalf("Validate() err = %v, want nil", err)
+			}
+		})
+	}
+}

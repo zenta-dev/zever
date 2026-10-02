@@ -178,6 +178,10 @@ func (a *redisAdapter) Increment(ctx context.Context, key string) error {
 	}
 
 	if err := a.client.Incr(ctx, key).Err(); err != nil {
+		if isInvalidIntegerError(err) {
+			return &cache.InvalidValueError{Key: key, Err: err}
+		}
+
 		return fmt.Errorf("cache: increment %q error: %w", key, err)
 	}
 
@@ -190,10 +194,21 @@ func (a *redisAdapter) Decrement(ctx context.Context, key string) error {
 	}
 
 	if err := a.client.Decr(ctx, key).Err(); err != nil {
+		if isInvalidIntegerError(err) {
+			return &cache.InvalidValueError{Key: key, Err: err}
+		}
+
 		return fmt.Errorf("cache: decrement %q error: %w", key, err)
 	}
 
 	return nil
+}
+
+// isInvalidIntegerError reports whether err is a Redis integer-type error
+// (INCR/DECR against a non-integer value), which the cache contract maps
+// to cache.ErrInvalidValue / *cache.InvalidValueError.
+func isInvalidIntegerError(err error) bool {
+	return strings.Contains(strings.ToLower(err.Error()), "not an integer")
 }
 
 func (a *redisAdapter) Exists(ctx context.Context, key string) (bool, error) {

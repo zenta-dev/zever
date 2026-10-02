@@ -173,6 +173,7 @@ Expected behavior: the dispatch enqueues onto topic `default`, the schedule regi
 |---|---|---|---|
 | job | - | `core/job` | Dispatcher only, no adapter registry, topics are priority names |
 | scheduler | `embedded` | `adapters/scheduler/embedded` | In-process cron ticks, `Stop()` ends ticks |
+| scheduler | `postgres` | `adapters/scheduler/postgres` | Durable leased slots, safe for multi-instance deploys |
 
 `job.Batch` covers batch enqueue and `core/job/lock.go` covers locked dispatch
 for singleton-style jobs. Use the lock helper with `UniqueBy` when a job must

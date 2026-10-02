@@ -62,12 +62,14 @@ func parseRequires(content string) []string {
 }
 
 // excludedDir reports whether a directory (slash-separated, relative to the
-// repo root) holds no workspace module: .git metadata and the two
-// out-of-workspace proof modules, which resolve nothing via go.work and
-// would break the per-module loops.
+// repo root) holds no workspace module: .git metadata, git worktree
+// checkouts, and the two out-of-workspace proof modules, which resolve
+// nothing via go.work and would break the per-module loops.
 func excludedDir(rel string) bool {
 	switch {
 	case rel == ".git" || strings.HasPrefix(rel, ".git/"):
+		return true
+	case rel == ".worktrees" || strings.HasPrefix(rel, ".worktrees/"):
 		return true
 	case rel == "examples/external-sms" || strings.HasPrefix(rel, "examples/external-sms/"):
 		return true
@@ -79,8 +81,8 @@ func excludedDir(rel string) bool {
 
 // listModules returns every module dir (dir containing go.mod) under root,
 // relative without a ./ prefix, sorted. It mirrors the Makefile ALL_MODULES
-// find exclusions exactly: ./.git/**, ./examples/external-sms/** and
-// ./docs/examples/**.
+// find exclusions exactly: ./.git/**, ./.worktrees/**,
+// ./examples/external-sms/** and ./docs/examples/**.
 func listModules(root string) ([]string, error) {
 	var mods []string
 	err := filepath.WalkDir(root, func(p string, d fs.DirEntry, err error) error {

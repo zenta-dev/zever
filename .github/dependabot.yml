@@ -331,6 +331,17 @@ updates:
           - "*"
 
   - package-ecosystem: gomod
+    directory: "/adapters/idempotency/db"
+    schedule:
+      interval: weekly
+      day: monday
+    open-pull-requests-limit: 10
+    groups:
+      go-modules:
+        patterns:
+          - "*"
+
+  - package-ecosystem: gomod
     directory: "/adapters/idempotency/memory"
     schedule:
       interval: weekly
@@ -694,6 +705,17 @@ updates:
           - "*"
 
   - package-ecosystem: gomod
+    directory: "/adapters/scheduler/postgres"
+    schedule:
+      interval: weekly
+      day: monday
+    open-pull-requests-limit: 10
+    groups:
+      go-modules:
+        patterns:
+          - "*"
+
+  - package-ecosystem: gomod
     directory: "/adapters/search/meilisearch"
     schedule:
       interval: weekly
@@ -750,6 +772,17 @@ updates:
 
   - package-ecosystem: gomod
     directory: "/adapters/session/cookie"
+    schedule:
+      interval: weekly
+      day: monday
+    open-pull-requests-limit: 10
+    groups:
+      go-modules:
+        patterns:
+          - "*"
+
+  - package-ecosystem: gomod
+    directory: "/adapters/session/db"
     schedule:
       interval: weekly
       day: monday
@@ -1509,6 +1542,17 @@ updates:
 
   - package-ecosystem: gomod
     directory: "/shared/httpclient"
+    schedule:
+      interval: weekly
+      day: monday
+    open-pull-requests-limit: 10
+    groups:
+      go-modules:
+        patterns:
+          - "*"
+
+  - package-ecosystem: gomod
+    directory: "/shared/kvstore"
     schedule:
       interval: weekly
       day: monday

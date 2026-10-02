@@ -12,7 +12,7 @@ out=".github/dependabot.yml"
 
 {
   printf 'version: 2\nupdates:\n'
-  find . -type f -name go.mod -not -path "./.git/*" -exec dirname {} \; \
+  find . -type f -name go.mod -not -path "./.git/*" -not -path "./.worktrees/*" -exec dirname {} \; \
     | sort \
     | while IFS= read -r d; do
       if [ "$d" = "." ]; then

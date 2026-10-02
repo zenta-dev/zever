@@ -106,15 +106,29 @@ applies unchanged.
 
 - Core breaks: still permitted with release notes; the 6-month clock has
   not started.
-- Kits: 4 exist (`cache`, `queue`, `storage`, `secrets`); CI runs 3
-  in-kit suites plus 2 skipped redis suites. The remaining core
-  batteries have no kit.
+- Kits: 15 conformance kits ship under `core/*/*test/conformance.go`
+  (`billing`, `cache`, `crypto`, `eventbus`, `flag`, `idempotency`,
+  `lock`, `log`, `observability`, `password`, `payment`, `queue`,
+  `ratelimit`, `secrets`, `storage`); 13 of them ship an in-kit
+  `conformance_test.go` suite (all except `billing` and `password`).
+  CI (`.github/workflows/ci.yml` `conformance` job) runs 3 in-kit suites
+  (`cache`, `queue`, `storage`) plus 2 `-run Conformance` redis
+  invocations (`adapters/cache/redis`, `adapters/queue/redis`), both
+  currently `t.Skip`ped with miniredis-fidelity reasons
+  (`adapters/cache/redis/conformance_cover_test.go:30`,
+  `adapters/queue/redis/conformance_cover_test.go:29`). Every other
+  battery has no shared kit; new adapters there prove parity only via
+  per-adapter tests.
+- Scheduler: durable (postgres-leased) second adapter in progress on
+  `feat/v1-close`, not done; `embedded` is still the only adapter.
 - External prod user: none known.
 - Supply chain: SBOM per affected module in CI
   (`.github/workflows/ci.yml` `sbom` job); SLSA provenance attested on
   SBOMs in the same job, verifiable via
-  `gh attestation verify sbom/<slug>.json --repo zenta-dev/zever`. No
-  release-attached artifacts yet (no `release.yml`).
+  `gh attestation verify sbom/<slug>.json --repo zenta-dev/zever`.
+  Tagged releases additionally ship static binaries + SBOMs, attested
+  and attached via `.github/workflows/release.yml`; verify with
+  `gh attestation verify dist/zever-linux-amd64 --repo zenta-dev/zever`.
 
 ## Coverage note
 

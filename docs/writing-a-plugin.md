@@ -4,7 +4,7 @@ Two plugin shapes exist: a new adapter for an existing battery, and an
 entirely new battery (`examples/sms` dogfoods the second shape end to end).
 
 Conformance kits are the acceptance gate for both shapes: run the kit
-before publishing. Fifteen batteries ship kits today:
+before publishing. Twenty-four batteries ship kits today:
 `github.com/zenta-dev/zever/core/cache/cachetest`,
 `github.com/zenta-dev/zever/core/queue/queuetest`,
 `github.com/zenta-dev/zever/core/secrets/secretstest`,
@@ -18,8 +18,17 @@ before publishing. Fifteen batteries ship kits today:
 `github.com/zenta-dev/zever/core/observability/observabilitytest`,
 `github.com/zenta-dev/zever/core/crypto/cryptotest`,
 `github.com/zenta-dev/zever/core/password/passwordtest`,
-`github.com/zenta-dev/zever/core/billing/billingtest`, and
-`github.com/zenta-dev/zever/core/payment/paymenttest`.
+`github.com/zenta-dev/zever/core/billing/billingtest`,
+`github.com/zenta-dev/zever/core/payment/paymenttest`,
+`github.com/zenta-dev/zever/core/ai/aitest`,
+`github.com/zenta-dev/zever/core/analytics/analyticstest`,
+`github.com/zenta-dev/zever/core/geo/geotest`,
+`github.com/zenta-dev/zever/core/i18n/i18ntest`,
+`github.com/zenta-dev/zever/core/mailer/mailertest`,
+`github.com/zenta-dev/zever/core/tenant/tenanttest`,
+`github.com/zenta-dev/zever/core/router/routertest`,
+`github.com/zenta-dev/zever/core/middleware/middlewaretest`, and
+`github.com/zenta-dev/zever/core/job/jobtest`.
 
 ## New adapter for an existing battery
 
@@ -255,7 +264,15 @@ its name, the host decides which names exist in its binary.
   `core/crypto/cryptotest` for crypto,
   `core/password/passwordtest` for password,
   `core/billing/billingtest` for billing,
-  `core/payment/paymenttest` for payment) against your factory and
+  `core/payment/paymenttest` for payment,
+  `core/ai/aitest` for ai,
+  `core/analytics/analyticstest` for analytics,
+  `core/geo/geotest` for geo, `core/i18n/i18ntest` for i18n,
+  `core/mailer/mailertest` for mailer,
+  `core/tenant/tenanttest` for tenant,
+  `core/router/routertest` for router,
+  `core/middleware/middlewaretest` for middleware,
+  `core/job/jobtest` for job) against your factory and
   link its passing run from the plugin README.
 - Release both version pins together per the repo release checklist, and
   document user-facing changes under `CHANGELOG.md` `## [Unreleased]`.

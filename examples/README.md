@@ -22,10 +22,11 @@ examples/
   todo/              # STAGE 2: auth-gated notes app (HTTP + gRPC parity)
 ```
 
-There is deliberately **no new Go module** here. Examples live in the main
-module so `go test ./examples/...` covers them and `internal/` packages are
-importable. If an example ever needs a heavy extra dependency, isolate just
-that one behind its own `go.mod`.
+Stage-1 examples live in the main module so `go test ./examples/...`
+covers them and `internal/` packages are importable. The Stage-2 apps
+(`showcase`, `todo`, `bookings`) are separate Go modules with their own
+`go.mod`. If a new example ever needs a heavy extra dependency, isolate
+just that one behind its own `go.mod`.
 
 ## Stage 1: per-battery examples
 

@@ -2,6 +2,7 @@ package redis
 
 import (
 	"testing"
+	"time"
 
 	"github.com/alicebob/miniredis/v2"
 
@@ -13,16 +14,10 @@ import (
 // contract via the shared conformance kit. Each subtest gets a fresh
 // miniredis-backed instance (loopback only, no external network).
 //
-// Currently skipped: miniredis is not a faithful stand-in for the
-// expiry-dependent subtests. Its clock advances only via FastForward:
-// a lease acquired with a 30ms TTL is still held after seconds of
-// real time, so ExtendUnlock (no-steal branch) and Expiry poll until
-// the kit's 2s deadline and fail. The kit drives timing internally,
-// so the fake cannot advance around it. Re-enable once the fake
-// advances TTLs in real time.
+// Miniredis TTLs advance only via FastForward, so the factory wraps the
+// adapter to implement the kit's FastForward seam: expiry polls advance
+// the fake clock by the poll interval after each unsuccessful attempt.
 func TestRedisConformance(t *testing.T) {
-	t.Skip("miniredis clock is frozen without FastForward (expiry subtests cannot pass)")
-
 	locktest.Conformance(t, func(t *testing.T) lock.Locker {
 		t.Helper()
 
@@ -35,6 +30,16 @@ func TestRedisConformance(t *testing.T) {
 
 		t.Cleanup(func() { _ = l.Close(t.Context()) })
 
-		return l
+		return &fastForwardLocker{Locker: l, s: s}
 	})
 }
+
+// fastForwardLocker wraps a lock.Locker with the kit's virtual-time seam,
+// advancing the backing miniredis clock on every expiry poll.
+type fastForwardLocker struct {
+	lock.Locker
+	s *miniredis.Miniredis
+}
+
+// FastForward advances the fake clock backing the conformance instance.
+func (l *fastForwardLocker) FastForward(d time.Duration) { l.s.FastForward(d) }

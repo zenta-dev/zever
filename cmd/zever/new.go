@@ -1236,7 +1236,7 @@ var nestedModuleDirs = []string{
 	"adapters/queue/memory", "adapters/queue/redis",
 	"adapters/ratelimit/memory", "adapters/ratelimit/redis",
 	"adapters/router/fiber", "adapters/router/stdhttp",
-	"adapters/scheduler/embedded",
+	"adapters/scheduler/embedded", "adapters/scheduler/postgres",
 	"adapters/search/meilisearch", "adapters/search/postgres", "adapters/search/sqlite",
 	"adapters/secrets/env", "adapters/secrets/vault",
 	"adapters/session/cookie", "adapters/session/db", "adapters/session/memory", "adapters/session/redis",

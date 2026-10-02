@@ -28,12 +28,16 @@ type Policy struct {
 	ResourceType string
 	// OwnerField names the resource's owner field (declared snake_case schema
 	// name, e.g. "user_id") when the permission check is an ownership check.
-	// Empty for non-ownership checks. Informational only: Authorize builds
-	// the permission.Resource with Type and ID alone and never populates
-	// resource Attributes, so ownership-scoped (OwnedOnly) rules deny
-	// through this path today (fail-closed). Wiring OwnerField into
-	// resource Attributes is a behavior change and needs maintainer
-	// review; see UnaryServerInterceptor.
+	// Empty for non-ownership checks. Opt-in wiring: when non-empty,
+	// Authorize populates the permission.Resource Attributes with
+	// {OwnerField: resourceID}, so ownership-scoped (OwnedOnly) rules can
+	// match. This is correct only when the owner identity equals the
+	// resource ID (e.g. /users/{id}); resources whose owner differs from
+	// their ID need the owner resolved server-side before the check --
+	// passing a foreign ID here would misattribute ownership, so that
+	// resolution is a behavior change left for maintainer review (see
+	// UnaryServerInterceptor). Empty (default) preserves the previous
+	// fail-closed behavior: Attributes stays empty and OwnedOnly rules deny.
 	OwnerField string
 }
 
@@ -86,6 +90,9 @@ func Authorize(ctx context.Context, a auth.Auth, p permission.Checker, pol Polic
 	resource := permission.Resource{
 		Type: pol.ResourceType,
 		ID:   resourceID,
+	}
+	if pol.OwnerField != "" {
+		resource.Attributes = map[string]string{pol.OwnerField: resourceID}
 	}
 
 	decision, err := p.Can(ctx, subject, pol.PermissionCheck, resource)
