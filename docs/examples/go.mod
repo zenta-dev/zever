@@ -164,7 +164,6 @@ replace (
 	github.com/zenta-dev/zever/adapters/tenant/single => ../../adapters/tenant/single
 	github.com/zenta-dev/zever/adapters/vectorstore/pgvector => ../../adapters/vectorstore/pgvector
 	github.com/zenta-dev/zever/adapters/vectorstore/qdrant => ../../adapters/vectorstore/qdrant
-	github.com/zenta-dev/zever/adapters/vectorstore/sqlite => ../../adapters/vectorstore/sqlite
 	github.com/zenta-dev/zever/adapters/webhook/http => ../../adapters/webhook/http
 	github.com/zenta-dev/zever/adapters/webhook/queue => ../../adapters/webhook/queue
 	github.com/zenta-dev/zever/adapters/workflow/memory => ../../adapters/workflow/memory

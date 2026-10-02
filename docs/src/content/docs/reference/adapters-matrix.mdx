@@ -186,7 +186,7 @@ redis.Register()
 | storage | r2 | `github.com/zenta-dev/zever/adapters/storage/r2` | `r2.Register()` | `Storage()` |
 | tenant | single | `github.com/zenta-dev/zever/adapters/tenant/single` | `single.Register()` | `Tenant()` |
 | tenant | header | `github.com/zenta-dev/zever/adapters/tenant/header` | `header.Register()` | `Tenant()` |
-| vectorstore | sqlite | `github.com/zenta-dev/zever/adapters/vectorstore/sqlite` | `sqlite.Register()` | `VectorStore()` |
+| vectorstore | sqlite | `github.com/zenta-dev/zever/adapters/vectorstore/pgvector` | `pgvector.Register()` | `VectorStore()` |
 | vectorstore | pgvector | `github.com/zenta-dev/zever/adapters/vectorstore/pgvector` | `pgvector.Register()` | `VectorStore()` |
 | vectorstore | qdrant | `github.com/zenta-dev/zever/adapters/vectorstore/qdrant` | `qdrant.Register()` | `VectorStore()` |
 | webhook | http | `github.com/zenta-dev/zever/adapters/webhook/http` | `http.Register()` | `Webhook()` |
