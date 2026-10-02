@@ -32,3 +32,35 @@ func BenchmarkServeHTTP(b *testing.B) {
 		r.ServeHTTP(resp, req)
 	}
 }
+
+// BenchmarkServeHTTPParallel measures ServeHTTP under concurrent load. Each
+// worker builds its own request/recorder pair (sharing one *http.Request
+// across goroutines is unsafe), so this captures lock contention in the
+// adaptor wrapping rather than harness races.
+func BenchmarkServeHTTPParallel(b *testing.B) {
+	r, err := New(router.Options{})
+	if err != nil {
+		b.Fatalf("New(): %v", err)
+	}
+
+	r.Handle("GET", "/hello/:name", func(w http.ResponseWriter, req *http.Request) {
+		_, _ = w.Write([]byte(router.Param(req, "name")))
+	})
+
+	ctx := b.Context()
+
+	b.ReportAllocs()
+	b.ResetTimer()
+
+	b.RunParallel(func(pb *testing.PB) {
+		for pb.Next() {
+			req := httptest.NewRequestWithContext(ctx, http.MethodGet, "/hello/world", nil)
+			resp := httptest.NewRecorder()
+			r.ServeHTTP(resp, req)
+			if resp.Code != http.StatusOK {
+				b.Error("ServeHTTP status =", resp.Code)
+				return
+			}
+		}
+	})
+}

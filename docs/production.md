@@ -261,6 +261,12 @@ zever db migrate --dry-run   # expect: no pending statements
 - [ ] `SIGTERM` drill: `kill -TERM`, confirm `Shutdown` +
   container `Close` complete within grace period, buffered spans flush.
 
+## Benchmarks
+
+Measured router/ORM/queue baselines plus repro commands live in
+`docs/benchmarks.md`. Numbers are a point-in-time snapshot, not a deploy
+gate; re-run locally before drawing conclusions.
+
 ## See also
 
 - `docs/src/content/docs/getting-started/deployment.mdx` (build shapes)
