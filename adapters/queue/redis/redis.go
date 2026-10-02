@@ -36,6 +36,13 @@ const DefaultPollTimeout = 5 * time.Second
 // DefaultBlockTimeout is the BLPop block slice capped by the poll timeout.
 const DefaultBlockTimeout = 100 * time.Millisecond
 
+// minBlockingTimeout is the smallest BLPop timeout the server honors.
+// go-redis truncates sub-second BLPop timeouts up to 1s (formatSec), so a
+// 50-100ms block would hold the connection a full second on every empty
+// pop. Shorter waits poll client-side instead: sleep blockTimeout, then let
+// popLoop retry tryClaim until the poll deadline fires.
+const minBlockingTimeout = time.Second
+
 // DefaultBufferBaseDelay is the initial wait-for-buffer backoff.
 const DefaultBufferBaseDelay = 10 * time.Millisecond
 
@@ -406,6 +413,11 @@ func (a *redisAdapter) popLoop(
 
 		raw, claimed, err = a.blockingClaim(ctx, readyKey, processingKey, deadlineKey, now, poll, blockTimeout)
 		if err != nil {
+			var emptyErr *queue.EmptyError
+			if errors.As(err, &emptyErr) && emptyErr.Topic == "" {
+				emptyErr.Topic = topic
+			}
+
 			return "", err
 		}
 
@@ -421,6 +433,10 @@ func (a *redisAdapter) blockingClaim(
 	poll *time.Timer,
 	blockTimeout time.Duration,
 ) (string, bool, error) {
+	if blockTimeout < minBlockingTimeout {
+		return a.shortBlock(ctx, poll, blockTimeout)
+	}
+
 	val, err := a.client.BLPop(ctx, blockTimeout, readyKey).Result()
 	if err != nil {
 		if errors.Is(err, goredis.Nil) {
@@ -490,6 +506,42 @@ func (a *redisAdapter) blockingClaim(
 	return string(enc), true, nil
 }
 
+// shortBlock waits blockTimeout (< minBlockingTimeout) client-side without
+// issuing BLPop, then reports not-claimed so popLoop retries tryClaim. It
+// returns EmptyError when the poll deadline fires first and a cancellation
+// error when ctx lapses. Short server blocks would be truncated to 1s by
+// go-redis, stalling every empty pop; client-side waits keep the kit's
+// 50ms empty-queue cases fast on fakes like miniredis while tryClaim still
+// observes newly pushed messages on the next loop iteration.
+func (a *redisAdapter) shortBlock(
+	ctx context.Context,
+	poll *time.Timer,
+	blockTimeout time.Duration,
+) (string, bool, error) {
+	if blockTimeout < 0 {
+		blockTimeout = 0
+	}
+
+	timer := time.NewTimer(blockTimeout)
+	defer timer.Stop()
+
+	select {
+	case <-ctx.Done():
+		return "", false, fmt.Errorf("queue: pop cancelled: %w", ctx.Err())
+	case <-poll.C:
+		return "", false, &queue.EmptyError{Topic: ""}
+	case <-timer.C:
+		select {
+		case <-ctx.Done():
+			return "", false, fmt.Errorf("queue: pop cancelled: %w", ctx.Err())
+		case <-poll.C:
+			return "", false, &queue.EmptyError{Topic: ""}
+		default:
+			return "", false, nil
+		}
+	}
+}
+
 const promoteBatch = 100
 
 func (a *redisAdapter) promoteDue(ctx context.Context, topic string) error {
@@ -528,7 +580,7 @@ func decodeMessage(raw, topic string) (queue.Message, error) {
 		ID:      id,
 		Topic:   topic,
 		Payload: wm.Payload.Clone(),
-		Headers: wm.Headers.Clone(),
+		Headers: queue.Headers(wm.Headers).Clone(),
 		Attempt: wm.Attempt,
 	}, nil
 }
