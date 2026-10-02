@@ -44,6 +44,13 @@ type Options struct {
 	// Verbose enables additional diagnostic output.
 	Verbose bool `json:"verbose" toml:"verbose" yaml:"verbose"`
 
+	// DSN is the postgres connection string or sqlite path for the db
+	// adapter. Empty selects a private in-memory database.
+	DSN string `json:"dsn" toml:"dsn" yaml:"dsn"`
+	// DedicatedPool opts out of container-level pool sharing. Default false
+	// shares one pool per exact DSN; true opens a private pool.
+	DedicatedPool bool `json:"dedicated_pool" toml:"dedicated_pool" yaml:"dedicated_pool"`
+
 	// MemoryOptions holds in-memory backend settings.
 	MemoryOptions
 	// RedisOptions holds Redis backend settings.

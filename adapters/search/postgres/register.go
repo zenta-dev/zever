@@ -16,9 +16,13 @@ const Adapter search.Adapter = search.Postgres
 // package. New projects should select search.Postgres.
 func Register() {
 	_ = search.Register(search.Postgres, func(o search.Options) (search.Search, error) {
-		return New(Options{Options: dbconn.SplitDSN(o.DSN)})
+		poolOpts := dbconn.SplitDSN(o.DSN)
+		poolOpts.DedicatedPool = o.DedicatedPool
+		return New(Options{Options: poolOpts})
 	})
 	_ = search.Register(search.SQLite, func(o search.Options) (search.Search, error) {
-		return New(Options{Options: dbconn.SplitDSN(o.DSN)})
+		poolOpts := dbconn.SplitDSN(o.DSN)
+		poolOpts.DedicatedPool = o.DedicatedPool
+		return New(Options{Options: poolOpts})
 	})
 }

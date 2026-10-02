@@ -11,8 +11,10 @@ const Adapter queue.Adapter = queue.DB
 // Register wires this adapter into its battery registry. Call from your app's main or generated app.go; no init magic.
 func Register() {
 	_ = queue.Register(Adapter, func(o queue.Options) (queue.Queue, error) {
+		poolOpts := dbconn.SplitDSN(o.DSN)
+		poolOpts.DedicatedPool = o.DedicatedPool
 		return New(Options{
-			Options:           dbconn.SplitDSN(o.DSN),
+			Options:           poolOpts,
 			Table:             o.Table,
 			VisibilityTimeout: o.VisibilityTimeout,
 			PollTimeout:       o.PollTimeout,

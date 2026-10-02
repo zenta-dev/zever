@@ -7,6 +7,7 @@ require (
 	github.com/zenta-dev/zever/adapters/db/sqlite v0.5.3
 	github.com/zenta-dev/zever/core/cache v0.5.3
 	github.com/zenta-dev/zever/core/db v0.5.3
+	github.com/zenta-dev/zever/shared/dbconn v0.5.3
 	github.com/zenta-dev/zever/shared/kvstore v0.5.3
 )
 
@@ -42,5 +43,7 @@ replace github.com/zenta-dev/zever/adapters/db/sqlite => ../../db/sqlite
 replace github.com/zenta-dev/zever/core/cache => ../../../core/cache
 
 replace github.com/zenta-dev/zever/core/db => ../../../core/db
+
+replace github.com/zenta-dev/zever/shared/dbconn => ../../../shared/dbconn
 
 replace github.com/zenta-dev/zever/shared/kvstore => ../../../shared/kvstore
