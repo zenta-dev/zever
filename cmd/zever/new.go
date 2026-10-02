@@ -1215,7 +1215,7 @@ var nestedModuleDirs = []string{
 	"adapters/analytics/log", "adapters/analytics/posthog",
 	"adapters/auth/jwt", "adapters/auth/oidc", "adapters/auth/session",
 	"adapters/billing/paddle", "adapters/billing/stripe", "adapters/billing/stub",
-	"adapters/cache/memory", "adapters/cache/redis",
+	"adapters/cache/db", "adapters/cache/memory", "adapters/cache/redis",
 	"adapters/crypto/kms", "adapters/crypto/local",
 	"adapters/db/postgres", "adapters/db/sqlite",
 	"adapters/document/latex", "adapters/document/local", "adapters/document/remote",

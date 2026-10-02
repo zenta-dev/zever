@@ -75,6 +75,7 @@ import (
 	billingpaddle "github.com/zenta-dev/zever/adapters/billing/paddle"
 	billingstripe "github.com/zenta-dev/zever/adapters/billing/stripe"
 	billingstub "github.com/zenta-dev/zever/adapters/billing/stub"
+	cachedb "github.com/zenta-dev/zever/adapters/cache/db"
 	cacheredis "github.com/zenta-dev/zever/adapters/cache/redis"
 	dbpostgres "github.com/zenta-dev/zever/adapters/db/postgres"
 	dbsqlite "github.com/zenta-dev/zever/adapters/db/sqlite"
@@ -168,6 +169,7 @@ func init() {
 	billingpaddle.Register()
 	billingstripe.Register()
 	billingstub.Register()
+	cachedb.Register()
 	cacheredis.Register()
 	dbpostgres.Register()
 	dbsqlite.Register()

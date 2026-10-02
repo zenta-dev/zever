@@ -36,6 +36,11 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   smoke suites for the `password`/`billing` kits.
 - `adapters/scheduler/postgres`: durable leased scheduler for
   multi-instance deploys (mirrors `adapters/workflow/postgres`).
+- `adapters/cache/db`: DB-backed `cache.Cache` over `shared/kvstore`
+  (mirrors `adapters/session/db`; sqlite `:memory:` by default, postgres
+  via DSN, `NewFromDB` shared-connection path), proven by the
+  `cachetest.Conformance` kit on sqlite and postgres. Opt-in only;
+  default stays `memory`.
 - Redis conformance suites (`cache`, `queue`, `lock`) run green on
   miniredis instead of skipped (FastForward clock seam, header-decoding
   and BLPop-floor fixes, `Increment` error mapping).

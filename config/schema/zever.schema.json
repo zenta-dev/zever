@@ -10,7 +10,7 @@
     "analytics": { "$ref": "#/$defs/service", "type": "object", "properties": { "adapter": { "enum": ["log", "posthog"] }, "options": { "$ref": "#/$defs/analyticsOptions" } } },
     "auth": { "$ref": "#/$defs/service", "type": "object", "properties": { "adapter": { "enum": ["jwt", "session", "oidc"] }, "options": { "$ref": "#/$defs/authOptions" } } },
     "billing": { "$ref": "#/$defs/service", "type": "object", "properties": { "adapter": { "enum": ["stub", "stripe", "paddle"] }, "options": { "$ref": "#/$defs/providersCommon" } } },
-    "cache": { "$ref": "#/$defs/service", "type": "object", "properties": { "adapter": { "enum": ["memory", "redis"] }, "options": { "$ref": "#/$defs/cacheOptions" } } },
+    "cache": { "$ref": "#/$defs/service", "type": "object", "properties": { "adapter": { "enum": ["memory", "redis", "db"] }, "options": { "$ref": "#/$defs/cacheOptions" } } },
     "crypto": { "$ref": "#/$defs/service", "type": "object", "properties": { "adapter": { "enum": ["local"] }, "options": { "$ref": "#/$defs/cryptoOptions" } } },
     "db": { "$ref": "#/$defs/service", "type": "object", "properties": { "adapter": { "enum": ["sqlite", "postgres"] }, "options": { "$ref": "#/$defs/dbOptions" } } },
     "document": { "$ref": "#/$defs/service", "type": "object", "properties": { "adapter": { "enum": ["local", "remote", "latex"] }, "options": { "$ref": "#/$defs/documentOptions" } } },
