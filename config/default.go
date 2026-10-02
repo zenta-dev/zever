@@ -74,12 +74,12 @@ func Default() *Config {
 	cfg.RateLimit = Service[ratelimit.Options]{Adapter: "memory", Options: ratelimit.Options{Rate: 10, Burst: 20}}
 	cfg.Router = Service[router.Options]{Adapter: "stdhttp"}
 	cfg.Scheduler = Service[scheduler.Options]{Adapter: "embedded", Options: scheduler.Options{Dispatcher: &job.Dispatcher{}}}
-	cfg.Search = Service[search.Options]{Adapter: "sqlite"}
+	cfg.Search = Service[search.Options]{Adapter: string(search.DB)}
 	cfg.Secrets = Service[secrets.Options]{Adapter: "env", Options: secrets.Options{Prefix: "ZEVER"}}
 	cfg.Session = Service[session.Options]{Adapter: "memory"}
 	cfg.Storage = Service[storage.Options]{Adapter: "local"}
 	cfg.Tenant = Service[tenant.Options]{Adapter: "single"}
-	cfg.VectorStore = Service[vectorstore.Options]{Adapter: "sqlite"}
+	cfg.VectorStore = Service[vectorstore.Options]{Adapter: string(vectorstore.DB)}
 	cfg.Webhook = Service[webhook.Options]{Adapter: "http"}
 	cfg.Workflow = Service[workflow.Options]{Adapter: "memory"}
 	return cfg

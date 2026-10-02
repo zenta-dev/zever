@@ -16,8 +16,8 @@ func TestDefaultSnapshot(t *testing.T) {
 		"idempotency": "memory", "lock": "memory", "log": "slog", "mailer": "log", "media": "local",
 		"notification": "log", "observability": "stdout", "password": "argon2id",
 		"payment": "stub", "permission": "noop", "queue": "memory", "ratelimit": "memory",
-		"router": "stdhttp", "scheduler": "embedded", "search": "sqlite", "secrets": "env",
-		"session": "memory", "storage": "local", "tenant": "single", "vectorstore": "sqlite",
+		"router": "stdhttp", "scheduler": "embedded", "search": "db", "secrets": "env",
+		"session": "memory", "storage": "local", "tenant": "single", "vectorstore": "db",
 		"webhook": "http", "workflow": "memory",
 	}
 	got := map[string]string{

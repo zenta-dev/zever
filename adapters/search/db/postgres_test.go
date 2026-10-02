@@ -577,7 +577,7 @@ func TestClose_idempotent(t *testing.T) {
 func TestOpenRegister_bothNames(t *testing.T) {
 	Register()
 
-	for _, adapter := range []search.Adapter{search.Postgres, search.SQLite} {
+	for _, adapter := range []search.Adapter{search.DB, search.Postgres, search.SQLite} {
 		s, err := search.Open(adapter, search.Options{})
 		if err != nil {
 			t.Fatalf("Open(%s) error = %v", adapter, err)

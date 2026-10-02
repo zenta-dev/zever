@@ -397,7 +397,7 @@ func TestContainer_SharedPool_SQLiteFile(t *testing.T) {
 	_ = queue.RegisterShared(queue.DB, func(_ db.DB, _ queue.Options) (queue.Queue, error) {
 		return &fakeQueue{}, nil
 	})
-	_ = search.RegisterShared(search.SQLite, func(_ db.DB, _ search.Options) (search.Search, error) {
+	_ = search.RegisterShared(search.DB, func(_ db.DB, _ search.Options) (search.Search, error) {
 		return &stubSearch{}, nil
 	})
 
@@ -407,7 +407,7 @@ func TestContainer_SharedPool_SQLiteFile(t *testing.T) {
 	cfg.DB.Options = db.Options{Path: file}
 	cfg.Queue.Adapter = "db"
 	cfg.Queue.Options = queue.Options{DBOptions: queue.DBOptions{DSN: file}}
-	cfg.Search.Adapter = "sqlite"
+	cfg.Search.Adapter = string(search.DB)
 	cfg.Search.Options = search.Options{DSN: file}
 	cfg.Cache.Adapter = "db"
 	cfg.Cache.Options = cache.Options{DSN: file}

@@ -59,14 +59,14 @@ release-note docs.
 | `storage` | Facade (`local`, `s3`, `r2`). |
 | `media` | Facade (`local`, `s3`). |
 | `document` | Facade (`local`, `remote`, `latex`). |
-| `search` | Facade (`postgres`, `meilisearch`, `sqlite`). |
-| `vectorstore` | Facade (`sqlite`, `pgvector`, `qdrant`). |
+| `search` | Facade (`db`, `postgres`, `meilisearch`, `sqlite`). |
+| `vectorstore` | Facade (`db`, `sqlite`, `pgvector`, `qdrant`). |
 | `notification` | Facade (`log`, `twilio`, `fcm`). |
 | `geo` | Facade (`google`, `static`, `osm`). |
 | `flag` | Facade (`static`, `firebase`). |
 | `observability` | Facade (`noop`, `stdout`, `otlp`); `Shutdown(ctx)` flush path. |
 | `eventbus` | Facade (`memory`, `redis`). |
-| `workflow` | Facade (`memory`). |
+| `workflow` | Facade (`memory`, `db`). |
 | `tenant` | Facade (`single`, `header`). |
 | `analytics` | Facade (`log`, `posthog`). |
 | `i18n` | Facade (`embed`, `remote`). |

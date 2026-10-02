@@ -33,7 +33,7 @@ path. Supply secrets by file or env, never committed plaintext.
 
 ```yaml
 search:
-  adapter: sqlite
+  adapter: db
   options:
     dsn: ./data/search.db
 ```
@@ -42,10 +42,13 @@ Postgres reuses relational infra:
 
 ```yaml
 search:
-  adapter: postgres
+  adapter: db
   options:
     dsn: postgres://app:secret@db:5432/app
 ```
+
+The legacy `postgres` and `sqlite` names stay registered as aliases, so
+old files keep resolving; new files should use `db`.
 
 Dedicated cluster:
 
@@ -116,7 +119,7 @@ import (
 
 func main() error {
 	searchdb.Register()
-	s, err := search.Open(search.SQLite, search.Options{DSN: ":memory:"})
+	s, err := search.Open(search.DB, search.Options{DSN: ":memory:"})
 	if err != nil {
 		return err
 	}

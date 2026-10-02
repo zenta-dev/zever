@@ -112,7 +112,7 @@ battery must run with the same CWD); `:memory:` (including
 
 ```yaml
 search:
-  adapter: postgres
+  adapter: db
   options:
     dsn: "postgres://app:secret@db:5432/app?sslmode=require"
     dedicated_pool: false   # default false shares; true restores a private pool

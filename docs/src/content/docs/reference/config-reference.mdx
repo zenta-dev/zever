@@ -144,14 +144,19 @@ exit:1
 | ratelimit | memory, redis | memory (10/20) |
 | router | fiber, stdhttp | stdhttp |
 | scheduler | embedded | embedded |
-| search | postgres, meilisearch, sqlite | sqlite |
+| search | db, postgres, meilisearch, sqlite | db |
 | secrets | env, vault | env (prefix ZEVER) |
 | session | memory, redis | memory |
 | storage | local, s3, r2 | local |
 | tenant | single, header | single |
-| vectorstore | sqlite, pgvector, qdrant | sqlite |
+| vectorstore | db, sqlite, pgvector, qdrant | db |
 | webhook | http, queue | http |
-| workflow | memory, postgres | memory |
+| workflow | memory, db, postgres | memory |
+
+`db` is the canonical DB-backed name for `search`, `vectorstore`, and
+`workflow` (empty DSN selects embedded sqlite, a postgres URL selects
+postgres). The old names (`postgres`, `sqlite`, `pgvector`) stay
+registered as aliases, so existing files keep resolving.
 
 Defaults pick the zero-infra adapter per service (ai has none - all
 backends need keys - so it defaults to `anthropic` and requires an API key

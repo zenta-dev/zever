@@ -151,7 +151,7 @@ Q1):
 
 ```yaml
 search:
-  adapter: postgres
+  adapter: db
   options:
     dsn: "postgres://app:secret@db:5432/app?sslmode=require"
     max_conns: 10

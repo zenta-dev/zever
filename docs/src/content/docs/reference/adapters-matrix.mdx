@@ -176,6 +176,7 @@ redis.Register()
 | router | stdhttp | `github.com/zenta-dev/zever/adapters/router/stdhttp` | `stdhttp.Register()` | `Router()` |
 | scheduler | embedded | `github.com/zenta-dev/zever/adapters/scheduler/embedded` | `embedded.Register()` | `Scheduler()` |
 | scheduler | postgres | `github.com/zenta-dev/zever/adapters/scheduler/postgres` | `postgres.Register()` | `Scheduler()` |
+| search | db | `github.com/zenta-dev/zever/adapters/search/db` | `db.Register()` | `Search()` |
 | search | postgres | `github.com/zenta-dev/zever/adapters/search/db` | `db.Register()` | `Search()` |
 | search | meilisearch | `github.com/zenta-dev/zever/adapters/search/meilisearch` | `meilisearch.Register()` | `Search()` |
 | search | sqlite | `github.com/zenta-dev/zever/adapters/search/db` | `db.Register()` | `Search()` |
@@ -188,12 +189,14 @@ redis.Register()
 | storage | r2 | `github.com/zenta-dev/zever/adapters/storage/r2` | `r2.Register()` | `Storage()` |
 | tenant | single | `github.com/zenta-dev/zever/adapters/tenant/single` | `single.Register()` | `Tenant()` |
 | tenant | header | `github.com/zenta-dev/zever/adapters/tenant/header` | `header.Register()` | `Tenant()` |
+| vectorstore | db | `github.com/zenta-dev/zever/adapters/vectorstore/db` | `db.Register()` | `VectorStore()` |
 | vectorstore | sqlite | `github.com/zenta-dev/zever/adapters/vectorstore/db` | `db.Register()` | `VectorStore()` |
 | vectorstore | pgvector | `github.com/zenta-dev/zever/adapters/vectorstore/db` | `db.Register()` | `VectorStore()` |
 | vectorstore | qdrant | `github.com/zenta-dev/zever/adapters/vectorstore/qdrant` | `qdrant.Register()` | `VectorStore()` |
 | webhook | http | `github.com/zenta-dev/zever/adapters/webhook/http` | `http.Register()` | `Webhook()` |
 | webhook | queue | `github.com/zenta-dev/zever/adapters/webhook/queue` | `queue.Register()` | `Webhook()` |
 | workflow | memory | `github.com/zenta-dev/zever/adapters/workflow/memory` | `memory.Register()` | `Workflow()` |
+| workflow | db | `github.com/zenta-dev/zever/adapters/workflow/db` | `db.Register()` | `Workflow()` |
 | workflow | postgres | `github.com/zenta-dev/zever/adapters/workflow/db` | `db.Register()` | `Workflow()` |
 | job | - (dispatcher) | `github.com/zenta-dev/zever/core/job` | `none (no registry)` | `Job()` |
 
@@ -205,8 +208,8 @@ redis.Register()
 | db | `sqlite` | `postgres` |
 | storage, media | `local` | `s3` / `r2` |
 | auth | `jwt` (stateless) or `session` + shared store | `jwt`, or `session` only with shared store |
-| search | `sqlite` | `postgres` / `meilisearch` |
-| vectorstore | `sqlite` | `pgvector` / `qdrant` |
+| search | `db` (legacy `sqlite`/`postgres` aliases) | `db` / `meilisearch` |
+| vectorstore | `db` (legacy `sqlite`/`pgvector` aliases) | `db` / `qdrant` |
 | mailer, notification, analytics | `log` (dev) | `smtp` / `twilio`+`fcm` / `posthog` |
 | permission | `noop` (dev) / `rbac` | `rbac` / `casbin` |
 | billing, payment | `stub` (dev) | `stripe` / `paddle` |

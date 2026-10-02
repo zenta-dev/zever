@@ -1554,7 +1554,7 @@ type = 'object'
 
 [properties.search.properties]
 [properties.search.properties.adapter]
-enum = ['postgres', 'meilisearch', 'sqlite']
+enum = ['db', 'postgres', 'meilisearch', 'sqlite']
 
 [properties.search.properties.options]
 '$ref' = '#/$defs/searchOptions'
@@ -1609,7 +1609,7 @@ type = 'object'
 
 [properties.vectorstore.properties]
 [properties.vectorstore.properties.adapter]
-enum = ['sqlite', 'pgvector', 'qdrant']
+enum = ['db', 'sqlite', 'pgvector', 'qdrant']
 
 [properties.vectorstore.properties.options]
 '$ref' = '#/$defs/vectorstoreOptions'
@@ -1631,7 +1631,7 @@ type = 'object'
 
 [properties.workflow.properties]
 [properties.workflow.properties.adapter]
-enum = ['memory', 'postgres']
+enum = ['memory', 'db', 'postgres']
 
 [properties.workflow.properties.options]
 '$ref' = '#/$defs/workflowOptions'

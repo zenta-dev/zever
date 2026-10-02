@@ -1236,6 +1236,7 @@ properties:
         properties:
             adapter:
                 enum:
+                    - db
                     - postgres
                     - meilisearch
                     - sqlite
@@ -1289,6 +1290,7 @@ properties:
         properties:
             adapter:
                 enum:
+                    - db
                     - sqlite
                     - pgvector
                     - qdrant
@@ -1311,6 +1313,7 @@ properties:
             adapter:
                 enum:
                     - memory
+                    - db
                     - postgres
             options:
                 $ref: '#/$defs/workflowOptions'

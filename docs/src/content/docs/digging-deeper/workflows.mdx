@@ -19,7 +19,8 @@ reports `ErrPendingFull` instead of blocking forever when full. This is
 not a cron scheduler; nothing here fires on a time spec. Use
 `scheduler` for cron-shaped firing and `queue` plus `job` for plain
 background tasks. Production runs that must survive a crash need the
-durable `postgres` backend behind this interface.
+durable `db` backend behind this interface (the legacy `postgres` name
+stays registered as an alias).
 
 Engines with host-registered steps expose them through the separate
 `StepRegistrar` interface (`RegisterStep`), so engines without the
@@ -116,7 +117,8 @@ running ID when the flow needs outside input mid-run.
 | Adapter | Package | Notes |
 |---|---|---|
 | `memory` | `workflow/memory` | Default; in-process, bounded pending buffer |
-| `postgres` | `workflow/db` | Durable DB-backed runs, lease-reclaimed steps, needs `dsn` |
+| `db` | `workflow/db` | Durable DB-backed runs, lease-reclaimed steps, needs `dsn` |
+| `postgres` | `workflow/db` | Legacy alias for `db` |
 
 ## Production notes
 
