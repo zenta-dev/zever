@@ -213,7 +213,8 @@ pattern (`./cmd/worker`, commented in the Dockerfile). Static works because
 sqlite is pure-Go (no cgo) and the static distroless base carries CA certs
 for stripe/cloud TLS. One container per process; other build shapes
 (`make build`, `GOOS=linux go build`, systemd unit) stay in
-`deployment.mdx` variants.
+`deployment.mdx` variants. Newcomers clone `examples/showcase` first:
+it is the reference app behind this page.
 
 ## Checklists
 
