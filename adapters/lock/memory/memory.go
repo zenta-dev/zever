@@ -9,18 +9,27 @@ import (
 	"time"
 
 	"github.com/zenta-dev/zever/core/lock"
+	"github.com/zenta-dev/zever/shared/lrucache"
 )
 
-// lease is one held key: who holds it and when the lease lapses.
-type lease struct {
-	holder  string
-	expires time.Time
-}
+// defaultMaxEntries bounds the lease table before LRU eviction, matching the
+// cache/memory adapter default. The lock battery has no MaxEntries option, so
+// a fixed bound keeps the adapter shape without changing core/lock.
+const defaultMaxEntries = 1000
 
-// adapter is an in-process lock.Locker. It is safe for concurrent use.
+// adapter is an in-process lock.Locker over lrucache.TTLCache. The library
+// owns storage, TTL expiry, and all check-and-mutate atomicity; the adapter
+// owns key prefixing, TTL/RetryInterval defaults, and holder-id generation.
+// It is safe for concurrent use: single ops hold mu as readers while calling
+// into the library (which serializes on its own lock) so Close can swap the
+// table out from under them.
+//
+// Expiry boundary is unchanged from the previous hand-rolled map: a lease is
+// live while now is strictly before its deadline and expired at the exact
+// deadline and after.
 type adapter struct {
-	mu            sync.Mutex
-	leases        map[string]*lease
+	mu            sync.RWMutex
+	leases        *lrucache.TTLCache[string, string]
 	prefix        string
 	ttl           time.Duration
 	retryInterval time.Duration
@@ -47,7 +56,7 @@ func New(opts lock.Options) (lock.Locker, error) {
 	}
 
 	return &adapter{
-		leases:        make(map[string]*lease),
+		leases:        lrucache.NewTTL[string, string](defaultMaxEntries, 0),
 		prefix:        opts.Prefix,
 		ttl:           ttl,
 		retryInterval: retry,
@@ -68,9 +77,13 @@ func newHolderID() (string, error) {
 	return hex.EncodeToString(b[:]), nil
 }
 
+// equalHolder reports whether two lease holders are the same.
+func equalHolder(a, b string) bool { return a == b }
+
 // TryAcquire attempts to acquire key exactly once, reporting ok=false with
 // a nil error when the key is currently held. A non-positive ttl selects
-// the adapter default.
+// the adapter default. An expired lease counts as absent, so a lapsed holder
+// never blocks a successor.
 func (a *adapter) TryAcquire(_ context.Context, key string, ttl time.Duration) (lock.Lock, bool, error) {
 	if key == "" {
 		return nil, false, fmt.Errorf("lock: try acquire %q: key is empty", key)
@@ -85,17 +98,15 @@ func (a *adapter) TryAcquire(_ context.Context, key string, ttl time.Duration) (
 		return nil, false, err
 	}
 
-	now := time.Now()
 	k := a.prefix + key
 
-	a.mu.Lock()
-	defer a.mu.Unlock()
+	a.mu.RLock()
+	stored := a.leases.SetIfAbsent(k, holder, ttl)
+	a.mu.RUnlock()
 
-	if l, ok := a.leases[k]; ok && now.Before(l.expires) {
+	if !stored {
 		return nil, false, nil
 	}
-
-	a.leases[k] = &lease{holder: holder, expires: now.Add(ttl)}
 
 	return &handle{a: a, key: key, holder: holder}, true, nil
 }
@@ -127,10 +138,12 @@ func (a *adapter) Acquire(ctx context.Context, key string, ttl time.Duration) (l
 }
 
 // Close drops every lease record. Leases still held by callers are not
-// released individually; they expire on their own TTL.
+// released individually; they expire on their own TTL. Close is idempotent
+// and always reports nil; work issued after Close runs against a fresh
+// empty table, exactly as with the previous map reset.
 func (a *adapter) Close(_ context.Context) error {
 	a.mu.Lock()
-	a.leases = make(map[string]*lease)
+	a.leases = lrucache.NewTTL[string, string](defaultMaxEntries, 0)
 	a.mu.Unlock()
 
 	return nil
@@ -147,18 +160,15 @@ func (h *handle) Extend(_ context.Context, ttl time.Duration) error {
 		ttl = h.a.ttl
 	}
 
-	now := time.Now()
 	k := h.a.prefix + h.key
 
-	h.a.mu.Lock()
-	defer h.a.mu.Unlock()
+	h.a.mu.RLock()
+	extended := h.a.leases.CompareAndExtend(k, h.holder, ttl, equalHolder)
+	h.a.mu.RUnlock()
 
-	l, ok := h.a.leases[k]
-	if !ok || l.holder != h.holder || !now.Before(l.expires) {
+	if !extended {
 		return fmt.Errorf("lock: extend %q: %w", h.key, lock.ErrNotHeld)
 	}
-
-	l.expires = now.Add(ttl)
 
 	return nil
 }
@@ -167,18 +177,15 @@ func (h *handle) Extend(_ context.Context, ttl time.Duration) error {
 // already lost, and never deletes a lease it no longer owns: after the TTL
 // lapses the entry may already belong to another holder.
 func (h *handle) Unlock(_ context.Context) error {
-	now := time.Now()
 	k := h.a.prefix + h.key
 
-	h.a.mu.Lock()
-	defer h.a.mu.Unlock()
+	h.a.mu.RLock()
+	released := h.a.leases.CompareAndDelete(k, h.holder, equalHolder)
+	h.a.mu.RUnlock()
 
-	l, ok := h.a.leases[k]
-	if !ok || l.holder != h.holder || !now.Before(l.expires) {
+	if !released {
 		return fmt.Errorf("lock: unlock %q: %w", h.key, lock.ErrNotHeld)
 	}
-
-	delete(h.a.leases, k)
 
 	return nil
 }
