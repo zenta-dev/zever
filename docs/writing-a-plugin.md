@@ -300,3 +300,25 @@ into the build unless chosen:
 - The generated `app.go` emits exactly the selected set (floor + picks,
   nothing more) — verify by checking `zever.yaml` and `app.go` list the
   same batteries.
+
+## Rejected consolidation: idempotency/lock/ratelimit over cache
+
+Collapsing `idempotency`, `lock`, and `ratelimit` into thin wrappers over
+`cache` was evaluated and rejected: none maps cleanly onto cache
+read/write without leaking abstraction. The correct reuse boundary is
+shared storage primitives (`shared/cas`, `shared/redisclient`), already
+in place for the `lock`/`cache` redis adapters — not shared domain
+interfaces.
+
+- `idempotency.Store` runs a `Begin`/`Complete`/`Forget` reservation
+  protocol with fingerprint-first mismatch checks
+  (`core/idempotency/idempotency.go:42-51`), not a cache `Get`/`Set`
+  (`core/cache/cache.go:12-29`).
+- `lock.Locker` issues holder-scoped leases with ownership-token guarded
+  `Extend`/`Unlock` (`core/lock/lock.go:12-39`,
+  `adapters/lock/redis/redis.go:20-30` owner-check scripts from
+  `shared/cas`), not plain `Set`/`Delete`.
+- `ratelimit.Limiter` does token-bucket accounting returning
+  `Decision{Allowed, RetryAfter, Remaining}` (`core/ratelimit/ratelimit.go:22-40`;
+  `adapters/ratelimit/redis/redis.go:19-23` Lua script), not atomic
+  `Increment`/`Decrement`.
