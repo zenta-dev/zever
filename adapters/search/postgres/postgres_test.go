@@ -7,6 +7,7 @@ import (
 	"strings"
 	"testing"
 
+	dbsqlite "github.com/zenta-dev/zever/adapters/db/sqlite"
 	coredb "github.com/zenta-dev/zever/core/db"
 	"github.com/zenta-dev/zever/core/search"
 	"github.com/zenta-dev/zever/orm/dialect"
@@ -259,6 +260,59 @@ func TestCheckDialect_failsClosed(t *testing.T) {
 
 	if err := d.checkDialect(); !errors.Is(err, dialect.ErrUnsupportedByDialect) {
 		t.Fatalf("checkDialect() error = %v, want unsupported-dialect error", err)
+	}
+}
+
+func TestOpenFromDB_unsupportedDialect(t *testing.T) {
+	t.Parallel()
+
+	conn, err := dbsqlite.New(coredb.Options{Path: ":memory:"})
+	if err != nil {
+		t.Fatalf("dbsqlite.New() error = %v", err)
+	}
+
+	t.Cleanup(func() { _ = conn.Close(t.Context()) })
+
+	stub := &stubDB{DB: conn, dialect: "mysql"}
+
+	if _, err := OpenFromDB(stub, Options{}); !errors.Is(err, dialect.ErrUnsupportedByDialect) {
+		t.Fatalf("OpenFromDB(mysql) err = %v, want ErrUnsupportedByDialect", err)
+	}
+
+	// Failed OpenFromDB never closes the caller's connection.
+	if err := conn.Ping(t.Context()); err != nil {
+		t.Fatalf("Ping() after failed OpenFromDB error = %v, want usable conn", err)
+	}
+}
+
+func TestDriver_unsupportedDialectOps(t *testing.T) {
+	t.Parallel()
+
+	s := mustOpenMemory(t)
+
+	d, ok := s.(*driver)
+	if !ok {
+		t.Fatalf("New() returned %T, want *driver", s)
+	}
+	d.conn = &stubDB{DB: d.conn, dialect: "mysql"}
+
+	ctx := t.Context()
+	doc := search.Document{ID: "x", Index: "idx", Content: "probe"}
+
+	if err := d.Index(ctx, doc); !errors.Is(err, dialect.ErrUnsupportedByDialect) {
+		t.Fatalf("Index(mysql) err = %v, want ErrUnsupportedByDialect", err)
+	}
+
+	if err := d.IndexBatch(ctx, []search.Document{doc}); !errors.Is(err, dialect.ErrUnsupportedByDialect) {
+		t.Fatalf("IndexBatch(mysql) err = %v, want ErrUnsupportedByDialect", err)
+	}
+
+	if err := d.Delete(ctx, "x"); !errors.Is(err, dialect.ErrUnsupportedByDialect) {
+		t.Fatalf("Delete(mysql) err = %v, want ErrUnsupportedByDialect", err)
+	}
+
+	if _, err := d.Search(ctx, "probe", search.QueryOptions{}); !errors.Is(err, dialect.ErrUnsupportedByDialect) {
+		t.Fatalf("Search(mysql) err = %v, want ErrUnsupportedByDialect", err)
 	}
 }
 

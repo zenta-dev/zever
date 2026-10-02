@@ -179,15 +179,26 @@ func openFromDB(conn coredb.DB, _ vectorstore.Options, dimension int, owns bool)
 	return d, nil
 }
 
-// checkDialect fails closed on dialects outside sqlite/postgres.
+// checkDialect fails closed unless the connection's dialect resolves to a
+// VectorOpsDialect. SQLite reports SupportsVectorOps() == false yet stays
+// admitted: its leg brute-forces cosine distance in Go instead of the
+// pgvector extension, so presence of the capability set (not a true answer)
+// is what admits a dialect here. An unresolvable dialect name, or one whose
+// dialect reports no vector capability set at all, is rejected with the
+// capability error, never a silently-degraded store.
 func (d *driver) checkDialect() error {
-	switch d.conn.Dialect() {
-	case "sqlite", "postgres":
-		return nil
-	default:
+	dd, err := dialect.For(d.conn.Dialect())
+	if err != nil {
 		return fmt.Errorf("pgvector: unsupported dialect %q: %w",
 			d.conn.Dialect(), dialect.ErrUnsupportedByDialect)
 	}
+
+	if _, ok := dd.(dialect.VectorOpsDialect); !ok {
+		return fmt.Errorf("pgvector: unsupported dialect %q: %w",
+			d.conn.Dialect(), dialect.ErrUnsupportedByDialect)
+	}
+
+	return nil
 }
 
 // ensureSchema creates the vectors table plus the postgres extension/index

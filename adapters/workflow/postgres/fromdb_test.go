@@ -1,13 +1,23 @@
 package postgres
 
 import (
+	"errors"
 	"path/filepath"
 	"testing"
 
 	dbsqlite "github.com/zenta-dev/zever/adapters/db/sqlite"
 	coredb "github.com/zenta-dev/zever/core/db"
 	"github.com/zenta-dev/zever/core/workflow"
+	"github.com/zenta-dev/zever/orm/dialect"
 )
+
+// stubDB is a coredb.DB double with a scripted dialect.
+type stubDB struct {
+	coredb.DB
+	dialect string
+}
+
+func (s *stubDB) Dialect() string { return s.dialect }
 
 // TestNewFromDBBehavesIdentically builds a driver over an injected sqlite
 // DB and exercises the Start/Query path from TestCreateRunToComplete.
@@ -70,5 +80,67 @@ func TestNewFromDBNilDB(t *testing.T) {
 
 	if _, err := NewFromDB(nil, Options{}); err == nil {
 		t.Fatal("NewFromDB(nil) = nil, want error")
+	}
+}
+
+// TestOpenFromDB_unsupportedDialect fails closed at Open on a dialect with
+// no row-lease CAS capability, without closing the caller's connection.
+func TestOpenFromDB_unsupportedDialect(t *testing.T) {
+	t.Parallel()
+
+	conn, err := dbsqlite.New(coredb.Options{Path: ":memory:"})
+	if err != nil {
+		t.Fatalf("dbsqlite.New() error = %v", err)
+	}
+
+	t.Cleanup(func() { _ = conn.Close(t.Context()) })
+
+	stub := &stubDB{DB: conn, dialect: "mysql"}
+
+	if _, err := OpenFromDB(stub, Options{Owner: "owner-mysql"}); !errors.Is(err, dialect.ErrUnsupportedByDialect) {
+		t.Fatalf("OpenFromDB(mysql) err = %v, want ErrUnsupportedByDialect", err)
+	}
+
+	// Failed OpenFromDB never closes the caller's connection.
+	if err := conn.Ping(t.Context()); err != nil {
+		t.Fatalf("Ping() after failed OpenFromDB error = %v, want usable conn", err)
+	}
+}
+
+// TestDriver_unsupportedDialectOps fails closed per method once the
+// connection reports a dialect with no row-lease CAS capability.
+func TestDriver_unsupportedDialectOps(t *testing.T) {
+	t.Parallel()
+
+	conn, err := dbsqlite.New(coredb.Options{Path: ":memory:"})
+	if err != nil {
+		t.Fatalf("dbsqlite.New() error = %v", err)
+	}
+
+	t.Cleanup(func() { _ = conn.Close(t.Context()) })
+
+	w, err := NewFromDB(conn, Options{Owner: "owner-mysql-ops"})
+	if err != nil {
+		t.Fatalf("NewFromDB() error = %v", err)
+	}
+
+	d, ok := w.(*driver)
+	if !ok {
+		t.Fatalf("NewFromDB() returned %T, want *driver", w)
+	}
+	d.conn = &stubDB{DB: conn, dialect: "mysql"}
+
+	ctx := t.Context()
+
+	if _, err := d.Start(ctx, "greet", "hello", "run-mysql"); !errors.Is(err, dialect.ErrUnsupportedByDialect) {
+		t.Fatalf("Start(mysql) err = %v, want ErrUnsupportedByDialect", err)
+	}
+
+	if err := d.Query(ctx, "run-mysql", "state", new(string)); !errors.Is(err, dialect.ErrUnsupportedByDialect) {
+		t.Fatalf("Query(mysql) err = %v, want ErrUnsupportedByDialect", err)
+	}
+
+	if err := d.Cancel(ctx, "run-mysql"); !errors.Is(err, dialect.ErrUnsupportedByDialect) {
+		t.Fatalf("Cancel(mysql) err = %v, want ErrUnsupportedByDialect", err)
 	}
 }
