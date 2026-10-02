@@ -74,6 +74,7 @@ replace (
 	github.com/zenta-dev/zever/core/webhook => ../../core/webhook
 	github.com/zenta-dev/zever/core/workflow => ../../core/workflow
 	github.com/zenta-dev/zever/shared/codec => ../../shared/codec
+	github.com/zenta-dev/zever/shared/dbconn => ../../shared/dbconn
 	github.com/zenta-dev/zever/shared/endpoint => ../../shared/endpoint
 	github.com/zenta-dev/zever/shared/httpclient => ../../shared/httpclient
 	github.com/zenta-dev/zever/shared/lrucache => ../../shared/lrucache
@@ -88,10 +89,29 @@ replace github.com/zenta-dev/zever/shared/traceprop => ../../shared/traceprop
 
 require (
 	github.com/cespare/xxhash/v2 v2.3.0 // indirect
+	github.com/dustin/go-humanize v1.0.1 // indirect
 	github.com/go-logr/logr v1.4.4 // indirect
 	github.com/go-logr/stdr v1.2.2 // indirect
+	github.com/google/uuid v1.6.0 // indirect
+	github.com/jackc/pgpassfile v1.0.0 // indirect
+	github.com/jackc/pgservicefile v0.0.0-20240606120523-5a60cdf6a761 // indirect
+	github.com/jackc/pgx/v5 v5.11.0 // indirect
+	github.com/jackc/puddle/v2 v2.2.2 // indirect
+	github.com/mattn/go-isatty v0.0.24 // indirect
+	github.com/ncruces/go-strftime v1.0.0 // indirect
+	github.com/remyoudompheng/bigfft v0.0.0-20230129092748-24d4a6f8daec // indirect
 	github.com/robfig/cron/v3 v3.0.1 // indirect
+	github.com/zenta-dev/zever/adapters/cache/db v0.5.3 // indirect
+	github.com/zenta-dev/zever/adapters/db/postgres v0.5.3 // indirect
+	github.com/zenta-dev/zever/adapters/db/sqlite v0.5.3 // indirect
+	github.com/zenta-dev/zever/adapters/idempotency/db v0.5.3 // indirect
 	github.com/zenta-dev/zever/adapters/log/noop v0.5.3 // indirect
+	github.com/zenta-dev/zever/adapters/queue/db v0.5.3 // indirect
+	github.com/zenta-dev/zever/adapters/scheduler/postgres v0.5.3 // indirect
+	github.com/zenta-dev/zever/adapters/search/postgres v0.5.3 // indirect
+	github.com/zenta-dev/zever/adapters/session/db v0.5.3 // indirect
+	github.com/zenta-dev/zever/adapters/vectorstore/pgvector v0.5.3 // indirect
+	github.com/zenta-dev/zever/adapters/workflow/postgres v0.5.3 // indirect
 	github.com/zenta-dev/zever/core/ai v0.5.3 // indirect
 	github.com/zenta-dev/zever/core/analytics v0.5.3 // indirect
 	github.com/zenta-dev/zever/core/auth v0.5.3 // indirect
@@ -127,9 +147,13 @@ require (
 	github.com/zenta-dev/zever/core/vectorstore v0.5.3 // indirect
 	github.com/zenta-dev/zever/core/webhook v0.5.3 // indirect
 	github.com/zenta-dev/zever/core/workflow v0.5.3 // indirect
+	github.com/zenta-dev/zever/orm v0.5.3 // indirect
 	github.com/zenta-dev/zever/shared/codec v0.5.3 // indirect
+	github.com/zenta-dev/zever/shared/dbconn v0.5.3 // indirect
 	github.com/zenta-dev/zever/shared/endpoint v0.5.3 // indirect
 	github.com/zenta-dev/zever/shared/httpclient v0.5.3 // indirect
+	github.com/zenta-dev/zever/shared/kvstore v0.5.3 // indirect
+	github.com/zenta-dev/zever/shared/lrucache v0.5.3 // indirect
 	github.com/zenta-dev/zever/shared/providersopt v0.5.3 // indirect
 	github.com/zenta-dev/zever/shared/redisopt v0.5.3 // indirect
 	github.com/zenta-dev/zever/shared/retry v0.5.3 // indirect
@@ -140,9 +164,38 @@ require (
 	go.opentelemetry.io/otel/trace v1.46.0 // indirect
 	go.yaml.in/yaml/v3 v3.0.5 // indirect
 	golang.org/x/net v0.58.0 // indirect
+	golang.org/x/sync v0.23.0 // indirect
 	golang.org/x/sys v0.48.0 // indirect
-	golang.org/x/text v0.41.0 // indirect
+	golang.org/x/text v0.42.0 // indirect
 	google.golang.org/genproto/googleapis/rpc v0.0.0-20260526163538-3dc84a4a5aaa // indirect
 	google.golang.org/grpc v1.83.2 // indirect
 	google.golang.org/protobuf v1.36.11 // indirect
+	modernc.org/libc v1.75.7 // indirect
+	modernc.org/mathutil v1.7.1 // indirect
+	modernc.org/memory v1.12.1 // indirect
+	modernc.org/sqlite v1.59.0 // indirect
 )
+
+replace github.com/zenta-dev/zever/adapters/cache/db => ../../adapters/cache/db
+
+replace github.com/zenta-dev/zever/adapters/idempotency/db => ../../adapters/idempotency/db
+
+replace github.com/zenta-dev/zever/adapters/queue/db => ../../adapters/queue/db
+
+replace github.com/zenta-dev/zever/adapters/scheduler/postgres => ../../adapters/scheduler/postgres
+
+replace github.com/zenta-dev/zever/adapters/session/db => ../../adapters/session/db
+
+replace github.com/zenta-dev/zever/adapters/workflow/postgres => ../../adapters/workflow/postgres
+
+replace github.com/zenta-dev/zever/adapters/search/postgres => ../../adapters/search/postgres
+
+replace github.com/zenta-dev/zever/adapters/vectorstore/pgvector => ../../adapters/vectorstore/pgvector
+
+replace github.com/zenta-dev/zever/shared/kvstore => ../../shared/kvstore
+
+replace github.com/zenta-dev/zever/orm => ../../orm
+
+replace github.com/zenta-dev/zever/adapters/db/postgres => ../../adapters/db/postgres
+
+replace github.com/zenta-dev/zever/adapters/db/sqlite => ../../adapters/db/sqlite
