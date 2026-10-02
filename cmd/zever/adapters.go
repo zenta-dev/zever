@@ -94,6 +94,7 @@ import (
 	paymentpaddle "github.com/zenta-dev/zever/adapters/payment/paddle"
 	paymentstripe "github.com/zenta-dev/zever/adapters/payment/stripe"
 	permissioncasbin "github.com/zenta-dev/zever/adapters/permission/casbin"
+	queuedb "github.com/zenta-dev/zever/adapters/queue/db"
 	queueredis "github.com/zenta-dev/zever/adapters/queue/redis"
 	ratelimitredis "github.com/zenta-dev/zever/adapters/ratelimit/redis"
 	routerfiber "github.com/zenta-dev/zever/adapters/router/fiber"
@@ -186,6 +187,7 @@ func init() {
 	paymentpaddle.Register()
 	paymentstripe.Register()
 	permissioncasbin.Register()
+	queuedb.Register()
 	queueredis.Register()
 	ratelimitredis.Register()
 	routerfiber.Register()

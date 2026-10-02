@@ -34,6 +34,16 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   `router`, `middleware`, `job`, `auth`, `authz`, `permission`) plus
   adapter wiring; kit list in `docs/writing-a-plugin.md` grows 15 → 24+;
   smoke suites for the `password`/`billing` kits.
+- `adapters/queue/db`: DB-backed queue for multi-worker deploys without
+  Redis (postgres URL opens postgres, anything else opens sqlite, empty
+  selects a private in-memory-style database). Single messages table with
+  lease-based claiming (compare-and-set on `claimed_by`/`claimed_until`,
+  attempt bump on reclaim, `available_at` for delayed delivery), mirroring
+  `adapters/queue/redis`'s claim/reclaim/ack/nack scripts and
+  `adapters/workflow/postgres`'s lease CAS; passes the shared
+  `queuetest.Conformance` kit. Polling transport with moderate throughput,
+  not a Kafka/SQS replacement (separate queue database with 3-5
+  connections per worker recommended).
 - `adapters/scheduler/postgres`: durable leased scheduler for
   multi-instance deploys (mirrors `adapters/workflow/postgres`).
 - Redis conformance suites (`cache`, `queue`, `lock`) run green on

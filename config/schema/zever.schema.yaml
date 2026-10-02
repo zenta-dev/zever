@@ -578,6 +578,9 @@ $defs:
                 type: integer
             db:
                 type: integer
+            dsn:
+                description: Postgres connection string or sqlite path; empty selects a private in-memory-style database.
+                type: string
             password:
                 type: string
             poll_timeout:
@@ -586,6 +589,9 @@ $defs:
                 type: string
             require_tls:
                 type: boolean
+            table:
+                description: Queue-messages table name; empty selects the adapter default.
+                type: string
             tls:
                 type: boolean
             url:
@@ -1147,6 +1153,7 @@ properties:
                 enum:
                     - memory
                     - redis
+                    - db
             options:
                 $ref: '#/$defs/queueOptions'
         type: object

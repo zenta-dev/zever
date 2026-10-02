@@ -167,6 +167,7 @@ redis.Register()
 | permission | rbac | `github.com/zenta-dev/zever/adapters/permission/rbac` | `rbac.Register()` | `Permission()` |
 | permission | casbin | `github.com/zenta-dev/zever/adapters/permission/casbin` | `casbin.Register()` | `Permission()` |
 | queue | memory | `github.com/zenta-dev/zever/adapters/queue/memory` | `memory.Register()` | `Queue()` |
+| queue | db | `github.com/zenta-dev/zever/adapters/queue/db` | `db.Register()` | `Queue()` |
 | queue | redis | `github.com/zenta-dev/zever/adapters/queue/redis` | `redis.Register()` | `Queue()` |
 | ratelimit | memory | `github.com/zenta-dev/zever/adapters/ratelimit/memory` | `memory.Register()` | `RateLimit()` |
 | ratelimit | redis | `github.com/zenta-dev/zever/adapters/ratelimit/redis` | `redis.Register()` | `RateLimit()` |
@@ -227,7 +228,8 @@ redis.Register()
 - **Logins lost on restart**: `session` on `memory` does not survive
   restarts. Use a shared session store for anything beyond local dev.
 - **Jobs run twice or not at all**: workers each resolved an isolated
-  `memory` queue. Point all workers at the same `redis` queue.
+  `memory` queue. Point all workers at the same shared queue (`redis`,
+  or `db` on one database).
 - **Swap did not take effect**: `_ADAPTER` env or file adapter misspelled,
   or an old binary without the adapter compiled in. Check `config show`
   output and rebuild.

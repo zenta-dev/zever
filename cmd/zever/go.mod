@@ -63,6 +63,7 @@ require (
 	github.com/zenta-dev/zever/adapters/permission/casbin v0.5.3
 	github.com/zenta-dev/zever/adapters/permission/noop v0.5.3
 	github.com/zenta-dev/zever/adapters/permission/rbac v0.5.3
+	github.com/zenta-dev/zever/adapters/queue/db v0.5.3
 	github.com/zenta-dev/zever/adapters/queue/memory v0.5.3
 	github.com/zenta-dev/zever/adapters/queue/redis v0.5.3
 	github.com/zenta-dev/zever/adapters/ratelimit/memory v0.5.3
@@ -376,6 +377,7 @@ replace (
 	github.com/zenta-dev/zever/adapters/permission/casbin => ../../adapters/permission/casbin
 	github.com/zenta-dev/zever/adapters/permission/noop => ../../adapters/permission/noop
 	github.com/zenta-dev/zever/adapters/permission/rbac => ../../adapters/permission/rbac
+	github.com/zenta-dev/zever/adapters/queue/db => ../../adapters/queue/db
 	github.com/zenta-dev/zever/adapters/queue/memory => ../../adapters/queue/memory
 	github.com/zenta-dev/zever/adapters/queue/redis => ../../adapters/queue/redis
 	github.com/zenta-dev/zever/adapters/ratelimit/memory => ../../adapters/ratelimit/memory
