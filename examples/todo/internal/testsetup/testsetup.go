@@ -37,7 +37,7 @@ import (
 	sessionmemory "github.com/zenta-dev/zever/adapters/session/memory"
 	storagelocal "github.com/zenta-dev/zever/adapters/storage/local"
 	tenantsingle "github.com/zenta-dev/zever/adapters/tenant/single"
-	vectorsqlite "github.com/zenta-dev/zever/adapters/vectorstore/sqlite"
+	vectorstorepgvector "github.com/zenta-dev/zever/adapters/vectorstore/pgvector"
 	webhookhttp "github.com/zenta-dev/zever/adapters/webhook/http"
 	workflowmemory "github.com/zenta-dev/zever/adapters/workflow/memory"
 )
@@ -75,7 +75,7 @@ func RegisterDefaults() {
 	sessionmemory.Register()
 	storagelocal.Register()
 	tenantsingle.Register()
-	vectorsqlite.Register()
+	vectorstorepgvector.Register()
 	webhookhttp.Register()
 	workflowmemory.Register()
 }

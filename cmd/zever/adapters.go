@@ -105,7 +105,6 @@ import (
 	storages3 "github.com/zenta-dev/zever/adapters/storage/s3"
 	vectorstorepgvector "github.com/zenta-dev/zever/adapters/vectorstore/pgvector"
 	vectorstoreqdrant "github.com/zenta-dev/zever/adapters/vectorstore/qdrant"
-	vectorstoresqlite "github.com/zenta-dev/zever/adapters/vectorstore/sqlite"
 )
 
 // Adapters in this binary are registered explicitly: adapter packages
@@ -198,5 +197,4 @@ func init() {
 	storages3.Register()
 	vectorstorepgvector.Register()
 	vectorstoreqdrant.Register()
-	vectorstoresqlite.Register()
 }

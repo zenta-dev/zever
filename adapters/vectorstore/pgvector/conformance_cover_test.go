@@ -8,28 +8,51 @@ import (
 	"github.com/zenta-dev/zever/core/vectorstore/vectorstoretest"
 )
 
-// TestConformance runs the shared vectorstore kit against pgvector via
-// Register+Open. Skipped unless PGVECTOR_TEST_DSN names a live pgvector
-// server; unit coverage with fakes lives in pgvector_test.go. Never fake
-// infra for conformance.
+// TestConformance runs the shared vectorstore kit against the migrated adapter.
+// The sqlite leg runs on :memory: with no infra; the postgres leg runs only
+// when POSTGRES_DSN (fallback PGVECTOR_TEST_DSN) names a live server. Never
+// fake infra for conformance.
 func TestConformance(t *testing.T) {
-	dsn := os.Getenv("PGVECTOR_TEST_DSN")
-	if dsn == "" {
-		t.Skip("PGVECTOR_TEST_DSN unset; skipping pgvector conformance against a live server")
-	}
+	t.Run("sqlite", func(t *testing.T) {
+		vectorstoretest.Conformance(t, func(t *testing.T) vectorstore.VectorStore {
+			t.Helper()
 
-	vectorstoretest.Conformance(t, func(t *testing.T) vectorstore.VectorStore {
-		t.Helper()
+			Register()
 
-		Register()
+			s, err := vectorstore.Open(vectorstore.SQLite, vectorstore.Options{})
+			if err != nil {
+				t.Fatalf("Open() error = %v", err)
+			}
 
-		s, err := vectorstore.Open(vectorstore.PGVector, vectorstore.Options{DSN: dsn, Dimension: 3})
-		if err != nil {
-			t.Fatalf("Open() error = %v", err)
+			t.Cleanup(func() { _ = s.Close() })
+
+			return s
+		})
+	})
+
+	t.Run("postgres", func(t *testing.T) {
+		dsn := os.Getenv("POSTGRES_DSN")
+		if dsn == "" {
+			dsn = os.Getenv("PGVECTOR_TEST_DSN")
 		}
 
-		t.Cleanup(func() { _ = s.Close() })
+		if dsn == "" {
+			t.Skip("POSTGRES_DSN/PGVECTOR_TEST_DSN not set; skipping postgres conformance against a live server")
+		}
 
-		return s
+		vectorstoretest.Conformance(t, func(t *testing.T) vectorstore.VectorStore {
+			t.Helper()
+
+			Register()
+
+			s, err := vectorstore.Open(vectorstore.PGVector, vectorstore.Options{DSN: dsn, Dimension: 3})
+			if err != nil {
+				t.Fatalf("Open() error = %v", err)
+			}
+
+			t.Cleanup(func() { _ = s.Close() })
+
+			return s
+		})
 	})
 }

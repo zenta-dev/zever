@@ -27,7 +27,7 @@ import (
 	dbsqlite "github.com/zenta-dev/zever/adapters/db/sqlite"
 	passwordargon2 "github.com/zenta-dev/zever/adapters/password/argon2"
 	searchpostgres "github.com/zenta-dev/zever/adapters/search/postgres"
-	vectorsqlite "github.com/zenta-dev/zever/adapters/vectorstore/sqlite"
+	vectorstorepgvector "github.com/zenta-dev/zever/adapters/vectorstore/pgvector"
 
 	aianthropic "github.com/zenta-dev/zever/adapters/ai/anthropic"
 	analyticslog "github.com/zenta-dev/zever/adapters/analytics/log"
@@ -137,7 +137,7 @@ func newTestSetup(t *testing.T) testSetup {
 	workflowmemory.Register()
 	passwordargon2.Register()
 	searchpostgres.Register()
-	vectorsqlite.Register()
+	vectorstorepgvector.Register()
 
 	c := container.New(cfg)
 

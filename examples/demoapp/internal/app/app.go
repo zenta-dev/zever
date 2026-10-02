@@ -26,7 +26,7 @@ import (
 	passwordargon2 "github.com/zenta-dev/zever/adapters/password/argon2"
 	schedulerembedded "github.com/zenta-dev/zever/adapters/scheduler/embedded"
 	searchpostgres "github.com/zenta-dev/zever/adapters/search/postgres"
-	vectorsqlite "github.com/zenta-dev/zever/adapters/vectorstore/sqlite"
+	vectorstorepgvector "github.com/zenta-dev/zever/adapters/vectorstore/pgvector"
 )
 
 const (
@@ -141,7 +141,7 @@ func New() (*container.Container, error) {
 	passwordargon2.Register()
 	schedulerembedded.Register()
 	searchpostgres.Register()
-	vectorsqlite.Register()
+	vectorstorepgvector.Register()
 	documentlocal.Register()
 	medialocal.Register()
 

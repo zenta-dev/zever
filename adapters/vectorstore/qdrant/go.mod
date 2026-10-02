@@ -12,8 +12,6 @@ require (
 	google.golang.org/protobuf v1.36.12 // indirect
 )
 
-replace github.com/zenta-dev/zever/adapters/vectorstore/sqlite => ../sqlite
-
 require (
 	github.com/qdrant/go-client v1.19.2
 	github.com/zenta-dev/zever/core/vectorstore v0.5.3
