@@ -124,6 +124,13 @@ func (s *store) Revoke(_ context.Context, jti string, until time.Time) error {
 
 	now := time.Now()
 
+	// An until that has already lapsed is a no-op (mirrors the redis
+	// store): there is nothing left to enforce, and storing it would only
+	// grow the map until the pruner runs.
+	if !until.After(now) {
+		return nil
+	}
+
 	s.mu.Lock()
 	defer s.mu.Unlock()
 
@@ -213,17 +220,20 @@ func (s *store) evictSoonestToExpireLocked() {
 }
 
 func (s *store) startPruner() {
+	// Jitter the 1m interval to avoid thundering herd when many stores
+	// start together (e.g. rolling deploy).
+	// The ticker is constructed synchronously (not inside the goroutine)
+	// so the newTicker seam is read happens-before New returns: tests
+	// swapping the seam never race a still-starting pruner goroutine.
+	//nolint:gosec // math/rand suffices for non-security jitter.
+	jitter := time.Duration(mrand.Int63n(int64(DefaultPruneJitterWindow))) - DefaultPruneJitterWindow/2
+	ticker := newTicker(DefaultPruneInterval + jitter)
+
 	s.wg.Add(1)
 
 	go func() {
 		defer s.wg.Done()
 		defer func() { _ = recover() }()
-
-		// Jitter the 1m interval to avoid thundering herd when many stores
-		// start together (e.g. rolling deploy).
-		//nolint:gosec // math/rand suffices for non-security jitter.
-		jitter := time.Duration(mrand.Int63n(int64(DefaultPruneJitterWindow))) - DefaultPruneJitterWindow/2
-		ticker := newTicker(DefaultPruneInterval + jitter)
 		defer ticker.Stop()
 
 		for {
