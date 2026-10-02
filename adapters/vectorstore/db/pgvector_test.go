@@ -1,4 +1,4 @@
-package pgvector
+package db
 
 import (
 	"errors"

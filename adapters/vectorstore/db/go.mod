@@ -1,4 +1,4 @@
-module github.com/zenta-dev/zever/adapters/vectorstore/pgvector
+module github.com/zenta-dev/zever/adapters/vectorstore/db
 
 go 1.27.0
 

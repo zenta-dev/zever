@@ -53,7 +53,7 @@ Exactly two batteries with an adapter registry ship one adapter:
 | Battery | Adapter | Verdict |
 |---|---|---|
 | `password` | `argon2` (`adapters/password/argon2`) | By design. Password hashing is pure CPU work with no operational axis (no network, no persistence, no multi-instance coordination); `core/password/doc.go:12` already says "hashing is pure CPU work". A second adapter (bcrypt/scrypt) is possible but adds no deployment shape — proposal text only, do not build. |
-| `scheduler` | `embedded` (`adapters/scheduler/embedded`) | Second adapter genuinely needed before 1.0 for multi-instance deploys. `embedded` is in-process cron (`core/scheduler/doc.go:1-2`); two replicas double-fire every slot. A durable/leased scheduler (postgres-backed, mirroring `adapters/workflow/postgres`) is the honest second adapter. Proposal text only in this track. |
+| `scheduler` | `embedded` (`adapters/scheduler/embedded`) | Second adapter genuinely needed before 1.0 for multi-instance deploys. `embedded` is in-process cron (`core/scheduler/doc.go:1-2`); two replicas double-fire every slot. A durable/leased scheduler (postgres-backed, mirroring `adapters/workflow/db`) is the honest second adapter. Proposal text only in this track. |
 
 Zero-registry packages are by design, not single-adapter gaps:
 

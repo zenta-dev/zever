@@ -69,7 +69,7 @@ use (
 	./adapters/scheduler/embedded
 	./adapters/scheduler/postgres
 	./adapters/search/meilisearch
-	./adapters/search/postgres
+	./adapters/search/db
 	./adapters/secrets/env
 	./adapters/secrets/vault
 	./adapters/session/cookie
@@ -81,12 +81,12 @@ use (
 	./adapters/storage/s3
 	./adapters/tenant/header
 	./adapters/tenant/single
-	./adapters/vectorstore/pgvector
+	./adapters/vectorstore/db
 	./adapters/vectorstore/qdrant
 	./adapters/webhook/http
 	./adapters/webhook/queue
 	./adapters/workflow/memory
-	./adapters/workflow/postgres
+	./adapters/workflow/db
 	./cmd/zever
 	./config
 	./container

@@ -11,9 +11,9 @@ import "github.com/zenta-dev/zever/orm/render"
 // `ts_rank(...)`), SQLite's FTS5 MATCH operator, and MySQL's
 // `MATCH (col, ...) AGAINST (? [mode])` (see 's
 // capability-table row, and render/fts.go). The Postgres SQL expression
-// shapes mirror search/postgres exactly -- the legacy full-text
+// shapes mirror search/db exactly -- the legacy full-text
 // implementation whose storage/search logic this phase wraps rather than
-// duplicates (search/postgres/postgres.go's matchWhere and
+// duplicates (search/db/postgres.go's matchWhere and
 // buildSearchQueries).
 type FTSOp = render.FTSOp
 

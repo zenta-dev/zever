@@ -100,14 +100,14 @@ import (
 	ratelimitredis "github.com/zenta-dev/zever/adapters/ratelimit/redis"
 	routerfiber "github.com/zenta-dev/zever/adapters/router/fiber"
 	schedulerembedded "github.com/zenta-dev/zever/adapters/scheduler/embedded"
+	searchdb "github.com/zenta-dev/zever/adapters/search/db"
 	searchmeilisearch "github.com/zenta-dev/zever/adapters/search/meilisearch"
-	searchpostgres "github.com/zenta-dev/zever/adapters/search/postgres"
 	sessionredis "github.com/zenta-dev/zever/adapters/session/redis"
 	storager2 "github.com/zenta-dev/zever/adapters/storage/r2"
 	storages3 "github.com/zenta-dev/zever/adapters/storage/s3"
-	vectorstorepgvector "github.com/zenta-dev/zever/adapters/vectorstore/pgvector"
+	vectorstoredb "github.com/zenta-dev/zever/adapters/vectorstore/db"
 	vectorstoreqdrant "github.com/zenta-dev/zever/adapters/vectorstore/qdrant"
-	workflowpostgres "github.com/zenta-dev/zever/adapters/workflow/postgres"
+	workflowdb "github.com/zenta-dev/zever/adapters/workflow/db"
 )
 
 // Adapters in this binary are registered explicitly: adapter packages
@@ -196,11 +196,11 @@ func init() {
 	routerfiber.Register()
 	schedulerembedded.Register()
 	searchmeilisearch.Register()
-	searchpostgres.Register()
+	searchdb.Register()
 	sessionredis.Register()
 	storager2.Register()
 	storages3.Register()
-	vectorstorepgvector.Register()
+	vectorstoredb.Register()
 	vectorstoreqdrant.Register()
-	workflowpostgres.Register()
+	workflowdb.Register()
 }

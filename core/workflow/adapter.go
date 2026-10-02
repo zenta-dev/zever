@@ -8,7 +8,7 @@ const (
 	// Memory is the in-memory workflow adapter.
 	Memory Adapter = "memory"
 	// Postgres is the durable DB-backed workflow adapter
-	// (adapters/workflow/postgres).
+	// (adapters/workflow/db).
 	Postgres Adapter = "postgres"
 )
 

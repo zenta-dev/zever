@@ -66,6 +66,16 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Changed
 
+- feat!: rename DB-backed adapter directories to `db` (`adapters/search/postgres`
+  → `adapters/search/db`, `adapters/vectorstore/pgvector` →
+  `adapters/vectorstore/db`, `adapters/workflow/postgres` →
+  `adapters/workflow/db`; packages `postgres`/`pgvector` → `db`).
+  Migration for direct importers: Go import path change only — replace the
+  old import paths with the new `.../db` paths and rename aliases
+  (`searchpostgres` → `searchdb`, `vectorstorepgvector` → `vectorstoredb`,
+  `workflowpostgres` → `workflowdb`); `Register()`/`New`/`Open` signatures
+  unchanged. `zever.yaml`/`config` adapter strings (`postgres`, `pgvector`,
+  `sqlite`, `memory`) keep working unchanged.
 - Shared postgres/sqlite pool (container-owned DSN→pool registry): every
   db-backed battery pointing at the same DSN (`db`, `cache`, `queue`,
   `search`, `session`, `idempotency`, `workflow`, `scheduler`,
