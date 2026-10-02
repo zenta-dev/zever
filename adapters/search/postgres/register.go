@@ -2,6 +2,7 @@ package postgres
 
 import (
 	"github.com/zenta-dev/zever/core/search"
+	"github.com/zenta-dev/zever/shared/dbconn"
 )
 
 // Adapter is the postgres search adapter name.
@@ -15,9 +16,9 @@ const Adapter search.Adapter = search.Postgres
 // package. New projects should select search.Postgres.
 func Register() {
 	_ = search.Register(search.Postgres, func(o search.Options) (search.Search, error) {
-		return New(Options{Options: dbOptions(o.DSN)})
+		return New(Options{Options: dbconn.SplitDSN(o.DSN)})
 	})
 	_ = search.Register(search.SQLite, func(o search.Options) (search.Search, error) {
-		return New(Options{Options: dbOptions(o.DSN)})
+		return New(Options{Options: dbconn.SplitDSN(o.DSN)})
 	})
 }

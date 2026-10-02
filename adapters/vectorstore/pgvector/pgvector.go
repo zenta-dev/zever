@@ -21,6 +21,7 @@ import (
 	"github.com/zenta-dev/zever/orm"
 	"github.com/zenta-dev/zever/orm/dialect"
 	"github.com/zenta-dev/zever/shared/codec"
+	"github.com/zenta-dev/zever/shared/dbconn"
 )
 
 var (
@@ -89,14 +90,14 @@ func Open(o vectorstore.Options) (vectorstore.VectorStore, error) {
 		dimension = vectorstore.DefaultDimension
 	}
 
-	poolOpts := dbOptions(o.DSN)
+	poolOpts := dbconn.SplitDSN(o.DSN)
 
 	var (
 		conn coredb.DB
 		err  error
 	)
 
-	if isPostgresDSN(o.DSN) {
+	if dbconn.IsPostgresDSN(o.DSN) {
 		conn, err = dbpostgres.New(poolOpts)
 	} else {
 		conn, err = dbsqlite.New(poolOpts)
@@ -319,30 +320,6 @@ func tableDDL(dimension int) string {
 		embedding vector(%d) NOT NULL,
 		metadata JSONB
 	)`, dimension)
-}
-
-// isPostgresDSN reports whether dsn selects the postgres backend: a URL
-// with a postgres scheme. Anything else (including ":memory:") is a sqlite
-// path. Matching is case-insensitive with surrounding whitespace ignored.
-func isPostgresDSN(dsn string) bool {
-	s := strings.ToLower(strings.TrimSpace(dsn))
-
-	return strings.HasPrefix(s, "postgres://") || strings.HasPrefix(s, "postgresql://")
-}
-
-// dbOptions maps a vectorstore DSN onto shared pool options: a postgres
-// URL stays a DSN, anything else (including empty) becomes a sqlite Path.
-// Empty selects ":memory:".
-func dbOptions(dsn string) coredb.Options {
-	if isPostgresDSN(dsn) {
-		return coredb.Options{DSN: dsn}
-	}
-
-	if strings.TrimSpace(dsn) == "" {
-		return coredb.Options{Path: ":memory:"}
-	}
-
-	return coredb.Options{Path: dsn}
 }
 
 // upsertOne inserts or replaces vec. Batch callers loop it: the typed

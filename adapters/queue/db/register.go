@@ -2,6 +2,7 @@ package db
 
 import (
 	"github.com/zenta-dev/zever/core/queue"
+	"github.com/zenta-dev/zever/shared/dbconn"
 )
 
 // Adapter is the DB-backed queue adapter name.
@@ -11,7 +12,7 @@ const Adapter queue.Adapter = queue.DB
 func Register() {
 	_ = queue.Register(Adapter, func(o queue.Options) (queue.Queue, error) {
 		return New(Options{
-			Options:           dbOptions(o.DSN),
+			Options:           dbconn.SplitDSN(o.DSN),
 			Table:             o.Table,
 			VisibilityTimeout: o.VisibilityTimeout,
 			PollTimeout:       o.PollTimeout,

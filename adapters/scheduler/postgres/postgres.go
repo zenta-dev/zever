@@ -22,6 +22,7 @@ import (
 	"github.com/zenta-dev/zever/orm"
 	"github.com/zenta-dev/zever/orm/dialect"
 	"github.com/zenta-dev/zever/shared/codec"
+	"github.com/zenta-dev/zever/shared/dbconn"
 )
 
 var argsCodec = codec.JSONCodec[any]{}
@@ -235,7 +236,7 @@ func openFromDB(conn coredb.DB, o Options, owns bool) (scheduler.Scheduler, erro
 
 	owner := o.Owner
 	if owner == "" {
-		owner = "scheduler-owner"
+		owner = dbconn.RandomOwner("scheduler-owner")
 	}
 
 	ttl := o.LeaseTTL

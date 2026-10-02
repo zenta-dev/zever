@@ -9,6 +9,7 @@ import (
 	coredb "github.com/zenta-dev/zever/core/db"
 	"github.com/zenta-dev/zever/core/vectorstore"
 	"github.com/zenta-dev/zever/orm/dialect"
+	"github.com/zenta-dev/zever/shared/dbconn"
 )
 
 // stubDB is a coredb.DB double with a scripted dialect.
@@ -62,8 +63,8 @@ func TestIsPostgresDSN(t *testing.T) {
 		t.Run(tt.dsn, func(t *testing.T) {
 			t.Parallel()
 
-			if got := isPostgresDSN(tt.dsn); got != tt.want {
-				t.Fatalf("isPostgresDSN(%q) = %v, want %v", tt.dsn, got, tt.want)
+			if got := dbconn.IsPostgresDSN(tt.dsn); got != tt.want {
+				t.Fatalf("IsPostgresDSN(%q) = %v, want %v", tt.dsn, got, tt.want)
 			}
 		})
 	}
@@ -72,16 +73,16 @@ func TestIsPostgresDSN(t *testing.T) {
 func TestDbOptions(t *testing.T) {
 	t.Parallel()
 
-	if got := dbOptions(""); got.Path != ":memory:" || got.DSN != "" {
-		t.Fatalf("dbOptions(\"\") = %+v, want sqlite :memory:", got)
+	if got := dbconn.SplitDSN(""); got.Path != ":memory:" || got.DSN != "" {
+		t.Fatalf("SplitDSN(\"\") = %+v, want sqlite :memory:", got)
 	}
 
-	if got := dbOptions("file.db"); got.Path != "file.db" || got.DSN != "" {
-		t.Fatalf("dbOptions(file.db) = %+v, want Path", got)
+	if got := dbconn.SplitDSN("file.db"); got.Path != "file.db" || got.DSN != "" {
+		t.Fatalf("SplitDSN(file.db) = %+v, want Path", got)
 	}
 
-	if got := dbOptions("postgres://h/db"); got.DSN != "postgres://h/db" || got.Path != "" {
-		t.Fatalf("dbOptions(postgres) = %+v, want DSN", got)
+	if got := dbconn.SplitDSN("postgres://h/db"); got.DSN != "postgres://h/db" || got.Path != "" {
+		t.Fatalf("SplitDSN(postgres) = %+v, want DSN", got)
 	}
 }
 

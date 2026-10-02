@@ -9,6 +9,7 @@ require (
 	github.com/zenta-dev/zever/core/search v0.5.3
 	github.com/zenta-dev/zever/orm v0.5.3
 	github.com/zenta-dev/zever/shared/codec v0.5.3
+	github.com/zenta-dev/zever/shared/dbconn v0.5.3
 )
 
 require (
@@ -46,3 +47,5 @@ replace github.com/zenta-dev/zever/orm => ../../../orm
 replace github.com/zenta-dev/zever/shared/codec => ../../../shared/codec
 
 replace github.com/zenta-dev/zever/shared/registry => ../../../shared/registry
+
+replace github.com/zenta-dev/zever/shared/dbconn => ../../../shared/dbconn

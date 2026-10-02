@@ -3,7 +3,6 @@ package postgres
 import (
 	"errors"
 	"fmt"
-	"strings"
 	"time"
 
 	coredb "github.com/zenta-dev/zever/core/db"
@@ -33,28 +32,4 @@ func (o Options) Validate() error {
 	}
 
 	return errors.Join(errs...)
-}
-
-// isPostgresDSN reports whether dsn selects the postgres backend: a URL
-// with a postgres scheme. Anything else (including ":memory:") is a sqlite
-// path. Matching is case-insensitive with surrounding whitespace ignored.
-func isPostgresDSN(dsn string) bool {
-	s := strings.ToLower(strings.TrimSpace(dsn))
-
-	return strings.HasPrefix(s, "postgres://") || strings.HasPrefix(s, "postgresql://")
-}
-
-// dbOptions maps a core search DSN onto shared pool options: a postgres
-// URL stays a DSN, anything else (including empty) becomes a sqlite Path.
-// Empty selects ":memory:".
-func dbOptions(dsn string) coredb.Options {
-	if isPostgresDSN(dsn) {
-		return coredb.Options{DSN: dsn}
-	}
-
-	if strings.TrimSpace(dsn) == "" {
-		return coredb.Options{Path: ":memory:"}
-	}
-
-	return coredb.Options{Path: dsn}
 }

@@ -14,6 +14,7 @@ import (
 	"github.com/zenta-dev/zever/orm"
 	"github.com/zenta-dev/zever/orm/dialect"
 	"github.com/zenta-dev/zever/shared/codec"
+	"github.com/zenta-dev/zever/shared/dbconn"
 )
 
 var metadataCodec = codec.JSONCodec[map[string]any]{}
@@ -105,7 +106,7 @@ func Open(o Options) (search.Search, error) {
 	case strings.TrimSpace(poolOpts.DSN) == "" && poolOpts.Path == "":
 		poolOpts.Path = ":memory:"
 		conn, err = dbsqlite.New(poolOpts)
-	case isPostgresDSN(poolOpts.DSN):
+	case dbconn.IsPostgresDSN(poolOpts.DSN):
 		conn, err = dbpostgres.New(poolOpts)
 	case strings.TrimSpace(poolOpts.DSN) != "":
 		poolOpts.Path = poolOpts.DSN

@@ -8,6 +8,7 @@ require (
 	github.com/zenta-dev/zever/core/db v0.5.3
 	github.com/zenta-dev/zever/core/queue v0.5.3
 	github.com/zenta-dev/zever/orm v0.5.3
+	github.com/zenta-dev/zever/shared/dbconn v0.5.3
 	github.com/zenta-dev/zever/shared/traceprop v0.5.3
 )
 
@@ -52,3 +53,5 @@ replace github.com/zenta-dev/zever/core/queue => ../../../core/queue
 replace github.com/zenta-dev/zever/orm => ../../../orm
 
 replace github.com/zenta-dev/zever/shared/traceprop => ../../../shared/traceprop
+
+replace github.com/zenta-dev/zever/shared/dbconn => ../../../shared/dbconn
