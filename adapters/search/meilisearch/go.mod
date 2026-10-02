@@ -8,8 +8,6 @@ require (
 	github.com/zenta-dev/zever/shared/registry v0.5.3 // indirect
 )
 
-replace github.com/zenta-dev/zever/adapters/search/sqlite => ../sqlite
-
 require (
 	github.com/meilisearch/meilisearch-go v0.36.3
 	github.com/zenta-dev/zever/core/search v0.5.3

@@ -1,787 +1,493 @@
 package postgres
 
 import (
-	"context"
-	"encoding/json"
 	"errors"
-	"fmt"
 	"os"
+	"path/filepath"
 	"strings"
 	"testing"
-	"time"
 
-	"github.com/jackc/pgx/v5"
-	"github.com/jackc/pgx/v5/pgconn"
-	"github.com/jackc/pgx/v5/pgtype"
-
+	coredb "github.com/zenta-dev/zever/core/db"
 	"github.com/zenta-dev/zever/core/search"
+	"github.com/zenta-dev/zever/orm/dialect"
 )
 
-// fakeRows is a scripted pgx.Rows implementation for unit tests.
-type fakeRows struct {
-	rows    [][]any
-	cur     int
-	scanErr error
-	rowErr  error
-	closed  bool
+// stubDB is a coredb.DB double with a scripted dialect.
+type stubDB struct {
+	coredb.DB
+	dialect string
 }
 
-func (r *fakeRows) Close() { r.closed = true }
+func (s *stubDB) Dialect() string { return s.dialect }
 
-func (r *fakeRows) Err() error { return r.rowErr }
-
-func (r *fakeRows) CommandTag() pgconn.CommandTag { return pgconn.NewCommandTag("SELECT 0") }
-
-func (r *fakeRows) FieldDescriptions() []pgconn.FieldDescription { return nil }
-
-func (r *fakeRows) Next() bool {
-	if r.cur < len(r.rows) {
-		r.cur++
-
-		return true
-	}
-
-	return false
-}
-
-func (r *fakeRows) Scan(dest ...any) error {
-	if r.scanErr != nil {
-		return r.scanErr
-	}
-
-	vals := r.rows[r.cur-1]
-	if len(dest) != len(vals) {
-		return fmt.Errorf("fakeRows: dest %d != vals %d", len(dest), len(vals))
-	}
-
-	for i, d := range dest {
-		switch p := d.(type) {
-		case *string:
-			v, ok := vals[i].(string)
-			if !ok {
-				return fmt.Errorf("fakeRows: col %d not a string", i)
-			}
-
-			*p = v
-		case *[]byte:
-			if vals[i] == nil {
-				*p = nil
-			} else {
-				v, ok := vals[i].([]byte)
-				if !ok {
-					return fmt.Errorf("fakeRows: col %d not bytes", i)
-				}
-
-				*p = v
-			}
-		case *int64:
-			v, ok := vals[i].(int64)
-			if !ok {
-				return fmt.Errorf("fakeRows: col %d not an int64", i)
-			}
-
-			*p = v
-		case *float64:
-			v, ok := vals[i].(float64)
-			if !ok {
-				return fmt.Errorf("fakeRows: col %d not a float64", i)
-			}
-
-			*p = v
-		default:
-			return fmt.Errorf("fakeRows: unsupported dest %T", d)
-		}
-	}
-
-	return nil
-}
-
-func (r *fakeRows) Values() ([]any, error) {
-	if r.cur < 1 || r.cur > len(r.rows) {
-		return nil, r.rowErr
-	}
-
-	return r.rows[r.cur-1], nil
-}
-
-func (r *fakeRows) RawValues() [][]byte { return nil }
-
-// TypeMap returns a fresh type map; the adapter never consults it in tests.
-func (r *fakeRows) TypeMap() *pgtype.Map { return pgtype.NewMap() }
-
-func (r *fakeRows) Conn() *pgx.Conn { return nil }
-
-// fakePool is a scripted dbpool implementation for unit tests.
-type fakePool struct {
-	execSQLs  []string
-	execArgs  [][]any
-	execTag   pgconn.CommandTag
-	execErr   error
-	execFail  string // fail Exec when SQL contains this substring
-	queries   []string
-	queryArgs [][]any
-	hitsRows  pgx.Rows
-	countRows pgx.Rows
-	queryErr  error
-	countErr  error
-	closed    bool
-}
-
-func (f *fakePool) Exec(_ context.Context, sql string, args ...any) (pgconn.CommandTag, error) {
-	f.execSQLs = append(f.execSQLs, sql)
-	f.execArgs = append(f.execArgs, args)
-
-	if f.execErr != nil && (f.execFail == "" || strings.Contains(sql, f.execFail)) {
-		return pgconn.CommandTag{}, f.execErr
-	}
-
-	return f.execTag, nil
-}
-
-func (f *fakePool) Query(_ context.Context, sql string, args ...any) (pgx.Rows, error) {
-	f.queries = append(f.queries, sql)
-	f.queryArgs = append(f.queryArgs, args)
-
-	if strings.Contains(sql, "COUNT(*)") {
-		if f.countErr != nil {
-			return nil, f.countErr
-		}
-
-		return f.countRows, nil
-	}
-
-	if f.queryErr != nil {
-		return nil, f.queryErr
-	}
-
-	return f.hitsRows, nil
-}
-
-func (f *fakePool) Close() { f.closed = true }
-
-func stubPool(t *testing.T, pool dbpool) {
+func mustOpenMemory(t *testing.T) search.Search {
 	t.Helper()
 
-	orig := newPool
-	newPool = func(context.Context, string) (dbpool, error) { return pool, nil }
-	t.Cleanup(func() { newPool = orig })
-}
-
-func TestErrors_messages(t *testing.T) {
-	t.Parallel()
-
-	if got := ErrMissingDSN.Error(); got != "postgres: dsn is required" {
-		t.Fatalf("ErrMissingDSN = %q", got)
-	}
-
-	if got := ErrNotConfigured.Error(); got != "postgres: not configured (missing DSN)" {
-		t.Fatalf("ErrNotConfigured = %q", got)
-	}
-}
-
-func TestOpen_invalidOptions(t *testing.T) {
-	t.Parallel()
-
-	_, err := New(search.Options{Host: "http://"})
-	if !errors.Is(err, search.ErrInvalidOptions) {
-		t.Fatalf("Open invalid opts err = %v, want ErrInvalidOptions", err)
-	}
-}
-
-func TestOpen_devNoop(t *testing.T) {
-	t.Parallel()
-
-	ctx := t.Context()
-
-	s, err := New(search.Options{})
+	s, err := New(Options{})
 	if err != nil {
-		t.Fatalf("Open empty DSN err = %v", err)
+		t.Fatalf("New() error = %v", err)
 	}
 
-	if err := s.Index(ctx, search.Document{ID: "d", Index: "i", Content: "c"}); !errors.Is(err, ErrNotConfigured) {
-		t.Fatalf("Index err = %v, want ErrNotConfigured", err)
-	}
+	t.Cleanup(func() { _ = s.Close() })
 
-	if err := s.Delete(ctx, "d"); !errors.Is(err, ErrNotConfigured) {
-		t.Fatalf("Delete err = %v, want ErrNotConfigured", err)
-	}
+	return s
+}
 
-	if _, err := s.Search(ctx, "q", search.QueryOptions{}); !errors.Is(err, ErrNotConfigured) {
-		t.Fatalf("Search err = %v, want ErrNotConfigured", err)
-	}
+func mustIndex(t *testing.T, s search.Search, doc search.Document) {
+	t.Helper()
 
-	if err := s.Close(); err != nil {
-		t.Fatalf("Close err = %v", err)
+	if err := s.Index(t.Context(), doc); err != nil {
+		t.Fatalf("Index(%q) error = %v", doc.ID, err)
 	}
 }
 
-// The Open tests below stub the pool-constructor seam, so they run sequentially.
-
-func TestOpen_poolError(t *testing.T) {
-	orig := newPool
-	newPool = func(context.Context, string) (dbpool, error) { return nil, errors.New("dial boom") }
-	t.Cleanup(func() { newPool = orig })
-
-	if _, err := New(search.Options{DSN: "postgres://db"}); err == nil || !strings.Contains(err.Error(), "postgres:") {
-		t.Fatalf("Open pool err = %v, want postgres-wrapped error", err)
-	}
-}
-
-func TestOpen_createTableError(t *testing.T) {
-	fp := &fakePool{execErr: errors.New("table boom"), execFail: "CREATE TABLE"}
-	stubPool(t, fp)
-
-	if _, err := New(search.Options{DSN: "postgres://db"}); err == nil || !strings.Contains(err.Error(), "create table") {
-		t.Fatalf("Open table err = %v, want create-table error", err)
-	}
-
-	if !fp.closed {
-		t.Fatal("pool not closed on create-table error")
-	}
-}
-
-func TestOpen_createIndexError(t *testing.T) {
-	fp := &fakePool{execErr: errors.New("index boom"), execFail: "CREATE INDEX"}
-	stubPool(t, fp)
-
-	if _, err := New(search.Options{DSN: "postgres://db"}); err == nil || !strings.Contains(err.Error(), "create index") {
-		t.Fatalf("Open index err = %v, want create-index error", err)
-	}
-
-	if !fp.closed {
-		t.Fatal("pool not closed on create-index error")
-	}
-}
-
-func TestOpen_successRunsDDL(t *testing.T) {
-	fp := &fakePool{execTag: pgconn.NewCommandTag("CREATE TABLE")}
-	stubPool(t, fp)
-
-	s, err := New(search.Options{DSN: "postgres://db"})
-	if err != nil {
-		t.Fatalf("Open err = %v", err)
-	}
-
-	if len(fp.execSQLs) != 2 {
-		t.Fatalf("DDL execs = %d, want 2", len(fp.execSQLs))
-	}
-
-	if !strings.Contains(fp.execSQLs[0], "CREATE TABLE") || !strings.Contains(fp.execSQLs[0], "search_documents") {
-		t.Fatalf("table DDL = %q", fp.execSQLs[0])
-	}
-
-	if !strings.Contains(fp.execSQLs[1], "CREATE INDEX") || !strings.Contains(fp.execSQLs[1], "to_tsvector") {
-		t.Fatalf("index DDL = %q", fp.execSQLs[1])
-	}
-
-	if err := s.Close(); err != nil {
-		t.Fatalf("Close err = %v", err)
-	}
-
-	if !fp.closed {
-		t.Fatal("pool not closed")
-	}
-}
-
-func TestIndex_ok(t *testing.T) {
+func TestOptions_Validate(t *testing.T) {
 	t.Parallel()
 
-	ctx := t.Context()
-	fp := &fakePool{execTag: pgconn.NewCommandTag("INSERT 0 1")}
-	p := &postgres{db: fp}
-
-	meta := map[string]any{"k": "v"}
-	doc := search.Document{ID: "d1", Index: "docs", Content: "hello world", Metadata: meta}
-
-	if err := p.Index(ctx, doc); err != nil {
-		t.Fatalf("Index err = %v", err)
+	if err := (Options{}).Validate(); err != nil {
+		t.Fatalf("Validate() error = %v", err)
 	}
 
-	if len(fp.execSQLs) != 1 {
-		t.Fatalf("execs = %d, want 1", len(fp.execSQLs))
+	err := Options{Options: coredb.Options{MaxConns: -1}}.Validate()
+	if err == nil || !strings.Contains(err.Error(), "postgres:") {
+		t.Fatalf("Validate() error = %v, want postgres-wrapped error", err)
+	}
+}
+
+func TestIsPostgresDSN(t *testing.T) {
+	t.Parallel()
+
+	tests := []struct {
+		dsn  string
+		want bool
+	}{
+		{"", false},
+		{":memory:", false},
+		{"file.db", false},
+		{"/tmp/x.db", false},
+		{"postgres://localhost:5432/zever", true},
+		{"postgresql://localhost:5432/zever", true},
+		{"  POSTGRES://h/db  ", true},
+		{"mysql://h/db", false},
+		{"://bad", false},
 	}
 
-	sql := fp.execSQLs[0]
-	for _, sub := range []string{"INSERT INTO search_documents", "$1", "$6", "ON CONFLICT (id, idx)"} {
-		if !strings.Contains(sql, sub) {
-			t.Fatalf("index SQL = %q, want substring %q", sql, sub)
-		}
+	for _, tt := range tests {
+		t.Run(tt.dsn, func(t *testing.T) {
+			t.Parallel()
+
+			if got := isPostgresDSN(tt.dsn); got != tt.want {
+				t.Fatalf("isPostgresDSN(%q) = %v, want %v", tt.dsn, got, tt.want)
+			}
+		})
+	}
+}
+
+func TestDbOptions(t *testing.T) {
+	t.Parallel()
+
+	if got := dbOptions(""); got.Path != ":memory:" || got.DSN != "" {
+		t.Fatalf("dbOptions(\"\") = %+v, want sqlite :memory:", got)
 	}
 
-	args := fp.execArgs[0]
-	if len(args) != 6 {
-		t.Fatalf("args = %d, want 6", len(args))
+	if got := dbOptions("file.db"); got.Path != "file.db" || got.DSN != "" {
+		t.Fatalf("dbOptions(file.db) = %+v, want Path", got)
 	}
 
-	if args[0] != "d1" || args[1] != "docs" || args[2] != "hello world" || args[4] != "hello world" {
-		t.Fatalf("args = %v", args)
+	if got := dbOptions("postgres://h/db"); got.DSN != "postgres://h/db" || got.Path != "" {
+		t.Fatalf("dbOptions(postgres) = %+v, want DSN", got)
 	}
+}
 
-	rawMeta, ok := args[3].([]byte)
+func TestNew_emptySelectsSQLite(t *testing.T) {
+	t.Parallel()
+
+	s := mustOpenMemory(t)
+
+	d, ok := s.(*driver)
 	if !ok {
-		t.Fatalf("metadata arg = %T, want []byte", args[3])
+		t.Fatalf("New() returned %T, want *driver", s)
 	}
 
-	var stored map[string]any
-	if err := json.Unmarshal(rawMeta, &stored); err != nil {
-		t.Fatalf("metadata JSON err = %v", err)
+	if d.conn.Dialect() != "sqlite" {
+		t.Fatalf("Dialect() = %q, want sqlite", d.conn.Dialect())
 	}
 
-	if stored["content"] != "hello world" || stored["k"] != "v" {
-		t.Fatalf("stored metadata = %v", stored)
+	if !d.owns {
+		t.Fatal("owns = false, want true for New-built driver")
 	}
-
-	if _, ok := meta["content"]; ok {
-		t.Fatal("caller metadata mutated")
-	}
-}
-
-func TestIndex_execError(t *testing.T) {
-	t.Parallel()
-
-	fp := &fakePool{execErr: errors.New("exec boom")}
-	p := &postgres{db: fp}
-
-	err := p.Index(t.Context(), search.Document{ID: "d", Index: "i", Content: "c"})
-	if err == nil || !strings.Contains(err.Error(), "postgres: index") {
-		t.Fatalf("Index err = %v, want postgres index error", err)
-	}
-}
-
-func TestIndex_metadataMarshalError(t *testing.T) {
-	t.Parallel()
-
-	p := &postgres{db: &fakePool{}}
-
-	err := p.Index(t.Context(), search.Document{ID: "d", Metadata: map[string]any{"fn": func() {}}})
-	if err == nil || !strings.Contains(err.Error(), "postgres: index") {
-		t.Fatalf("Index err = %v, want postgres index error", err)
-	}
-}
-
-func TestIndexBatch_ok(t *testing.T) {
-	t.Parallel()
 
 	ctx := t.Context()
-	fp := &fakePool{execTag: pgconn.NewCommandTag("INSERT 0 2")}
-	p := &postgres{db: fp}
+	mustIndex(t, s, search.Document{ID: "d1", Index: "main", Content: "hello world"})
 
-	docs := []search.Document{
-		{ID: "d1", Index: "docs", Content: "hello world", Metadata: map[string]any{"k": "v"}},
-		{ID: "d2", Index: "docs", Content: "goodbye world"},
+	res, err := s.Search(ctx, "hello", search.QueryOptions{Limit: 10, Filters: map[string]string{"index": "main"}})
+	if err != nil {
+		t.Fatalf("Search() error = %v", err)
 	}
 
-	if err := p.IndexBatch(ctx, docs); err != nil {
-		t.Fatalf("IndexBatch err = %v", err)
-	}
-
-	if len(fp.execSQLs) != 1 {
-		t.Fatalf("execs = %d, want 1", len(fp.execSQLs))
-	}
-
-	sql := fp.execSQLs[0]
-	for _, sub := range []string{"INSERT INTO search_documents", "$1", "$8", "ON CONFLICT (id, idx)"} {
-		if !strings.Contains(sql, sub) {
-			t.Fatalf("index batch SQL = %q, want substring %q", sql, sub)
-		}
-	}
-
-	args := fp.execArgs[0]
-	if len(args) != 8 {
-		t.Fatalf("args = %d, want 8", len(args))
-	}
-
-	if args[0] != "d1" || args[4] != "d2" {
-		t.Fatalf("args = %v", args)
+	if res.Total != 1 || len(res.Hits) != 1 || res.Hits[0].ID != "d1" {
+		t.Fatalf("Search() = %+v, want one hit d1", res)
 	}
 }
 
-// TestIndexBatch_Chunked proves a batch larger than maxIndexBatchRows is
-// split into multiple sequential INSERT statements instead of one unbounded
-// statement that could overflow Postgres's bind-parameter limit.
-func TestIndexBatch_Chunked(t *testing.T) {
+func TestNew_sqliteFilePath(t *testing.T) {
 	t.Parallel()
 
-	fp := &fakePool{execTag: pgconn.NewCommandTag("INSERT 0 1")}
-	p := &postgres{db: fp}
+	path := filepath.Join(t.TempDir(), "search.db")
 
-	const total = maxIndexBatchRows + 250
-
-	docs := make([]search.Document, total)
-	for i := range docs {
-		docs[i] = search.Document{ID: fmt.Sprintf("d-%d", i), Index: "docs", Content: "hello"}
+	s, err := New(Options{Options: coredb.Options{Path: path}})
+	if err != nil {
+		t.Fatalf("New() error = %v", err)
 	}
 
-	if err := p.IndexBatch(t.Context(), docs); err != nil {
-		t.Fatalf("IndexBatch() err = %v", err)
+	t.Cleanup(func() { _ = s.Close() })
+
+	d, ok := s.(*driver)
+	if !ok {
+		t.Fatalf("New() returned %T, want *driver", s)
 	}
 
-	wantChunks := 2
-	if len(fp.execSQLs) != wantChunks {
-		t.Fatalf("IndexBatch() issued %d exec calls, want %d", len(fp.execSQLs), wantChunks)
-	}
-
-	if len(fp.execArgs[0]) != maxIndexBatchRows*indexRowCols {
-		t.Fatalf("first chunk args = %d, want %d", len(fp.execArgs[0]), maxIndexBatchRows*indexRowCols)
-	}
-
-	if len(fp.execArgs[1]) != 250*indexRowCols {
-		t.Fatalf("second chunk args = %d, want %d", len(fp.execArgs[1]), 250*indexRowCols)
-	}
-
-	// Rows are split in order: the first chunk's last id is d-(maxIndexBatchRows-1),
-	// the second chunk starts at d-maxIndexBatchRows.
-	if fp.execArgs[0][0] != "d-0" {
-		t.Fatalf("first chunk first id = %v, want d-0", fp.execArgs[0][0])
-	}
-
-	if fp.execArgs[1][0] != fmt.Sprintf("d-%d", maxIndexBatchRows) {
-		t.Fatalf("second chunk first id = %v, want d-%d", fp.execArgs[1][0], maxIndexBatchRows)
+	if d.conn.Dialect() != "sqlite" {
+		t.Fatalf("Dialect() = %q, want sqlite", d.conn.Dialect())
 	}
 }
 
-func TestIndexBatch_empty(t *testing.T) {
+func TestNew_nonPostgresDSNIsSQLitePath(t *testing.T) {
 	t.Parallel()
 
-	fp := &fakePool{}
-	p := &postgres{db: fp}
+	path := filepath.Join(t.TempDir(), "dsn.db")
 
-	if err := p.IndexBatch(t.Context(), nil); err != nil {
-		t.Fatalf("IndexBatch(nil) err = %v, want nil", err)
+	s, err := New(Options{Options: coredb.Options{DSN: path}})
+	if err != nil {
+		t.Fatalf("New() error = %v", err)
 	}
 
-	if len(fp.execSQLs) != 0 {
-		t.Fatalf("IndexBatch(nil) issued %d execs, want 0", len(fp.execSQLs))
+	t.Cleanup(func() { _ = s.Close() })
+
+	if d, ok := s.(*driver); !ok {
+		t.Fatalf("New() returned %T, want *driver", s)
+	} else if d.conn.Dialect() != "sqlite" {
+		t.Fatalf("Dialect() = %q, want sqlite", d.conn.Dialect())
 	}
 }
 
-func TestIndexBatch_notConfigured(t *testing.T) {
+// TestNew_postgresRefused proves DSN routing: a postgres URL reaches
+// dbpostgres.New, whose TLS-1.2-flooring constructor then fails dialing the
+// closed port. The error (not the sqlite path) proves the pgx config
+// branch ran; see adapters/db/postgres/postgres.go:342-351.
+func TestNew_postgresRefused(t *testing.T) {
 	t.Parallel()
 
-	p := &postgres{db: nil}
-
-	if err := p.IndexBatch(t.Context(), []search.Document{{ID: "d"}}); !errors.Is(err, ErrNotConfigured) {
-		t.Fatalf("IndexBatch err = %v, want ErrNotConfigured", err)
+	_, err := New(Options{Options: coredb.Options{DSN: "postgres://127.0.0.1:1/db?sslmode=disable"}})
+	if err == nil || !strings.Contains(err.Error(), "postgres:") {
+		t.Fatalf("New() error = %v, want postgres-wrapped dial error", err)
 	}
 }
 
-func TestIndexBatch_execError(t *testing.T) {
+func TestNew_postgresInvalidDSN(t *testing.T) {
 	t.Parallel()
 
-	fp := &fakePool{execErr: errors.New("exec boom")}
-	p := &postgres{db: fp}
-
-	err := p.IndexBatch(t.Context(), []search.Document{{ID: "d", Index: "i", Content: "c"}})
-	if err == nil || !strings.Contains(err.Error(), "postgres: index batch") {
-		t.Fatalf("IndexBatch err = %v, want postgres index batch error", err)
+	_, err := New(Options{Options: coredb.Options{DSN: "postgres://[::1"}})
+	if err == nil || !strings.Contains(err.Error(), "postgres:") {
+		t.Fatalf("New() error = %v, want postgres-wrapped config error", err)
 	}
 }
 
-func TestDelete_found(t *testing.T) {
+func TestNew_invalidOptions(t *testing.T) {
 	t.Parallel()
 
-	fp := &fakePool{execTag: pgconn.NewCommandTag("DELETE 1")}
-	p := &postgres{db: fp}
+	_, err := New(Options{Options: coredb.Options{MaxConns: -1}})
+	if err == nil || !strings.Contains(err.Error(), "postgres:") {
+		t.Fatalf("New() error = %v, want postgres-wrapped error", err)
+	}
+}
 
-	if err := p.Delete(t.Context(), "d1"); err != nil {
-		t.Fatalf("Delete err = %v", err)
+func TestNewFromDB_nil(t *testing.T) {
+	t.Parallel()
+
+	if _, err := NewFromDB(nil, Options{}); err == nil {
+		t.Fatal("NewFromDB(nil) = nil, want error")
+	}
+}
+
+func TestNewFromDB_borrowsConn(t *testing.T) {
+	t.Parallel()
+
+	inner, err := New(Options{})
+	if err != nil {
+		t.Fatalf("New() error = %v", err)
 	}
 
-	if !strings.Contains(fp.execSQLs[0], "DELETE FROM search_documents") || !strings.Contains(fp.execSQLs[0], "$1") {
-		t.Fatalf("delete SQL = %q", fp.execSQLs[0])
+	t.Cleanup(func() { _ = inner.Close() })
+
+	d, ok := inner.(*driver)
+	if !ok {
+		t.Fatalf("New() returned %T, want *driver", inner)
 	}
 
-	if len(fp.execArgs[0]) != 1 || fp.execArgs[0][0] != "d1" {
-		t.Fatalf("delete args = %v", fp.execArgs[0])
+	borrowed, err := NewFromDB(d.conn, Options{})
+	if err != nil {
+		t.Fatalf("NewFromDB() error = %v", err)
+	}
+
+	bd, ok := borrowed.(*driver)
+	if !ok {
+		t.Fatalf("NewFromDB() returned %T, want *driver", borrowed)
+	}
+
+	if bd.owns {
+		t.Fatal("owns = true, want false for borrowed connection")
+	}
+
+	mustIndex(t, borrowed, search.Document{ID: "b1", Index: "idx", Content: "borrowed probe"})
+
+	// Borrowed connection: driver Close must not close the injected DB.
+	if err := borrowed.Close(); err != nil {
+		t.Fatalf("Close() error = %v", err)
+	}
+
+	if err := d.conn.Ping(t.Context()); err != nil {
+		t.Fatalf("injected DB closed by driver Close: %v", err)
+	}
+}
+
+func TestCheckDialect_failsClosed(t *testing.T) {
+	t.Parallel()
+
+	d := &driver{conn: &stubDB{dialect: "mysql"}}
+
+	if err := d.checkDialect(); !errors.Is(err, dialect.ErrUnsupportedByDialect) {
+		t.Fatalf("checkDialect() error = %v, want unsupported-dialect error", err)
+	}
+}
+
+func TestIndex_invalidMetadata(t *testing.T) {
+	t.Parallel()
+
+	s := mustOpenMemory(t)
+
+	bad := search.Document{
+		ID:       "bad",
+		Index:    "idx",
+		Content:  "probe",
+		Metadata: map[string]any{"ch": make(chan int)},
+	}
+
+	if err := s.Index(t.Context(), bad); !errors.Is(err, search.ErrInvalidMetadata) {
+		t.Fatalf("Index() error = %v, want ErrInvalidMetadata", err)
+	}
+
+	if err := s.IndexBatch(t.Context(), []search.Document{bad}); !errors.Is(err, search.ErrInvalidMetadata) {
+		t.Fatalf("IndexBatch() error = %v, want ErrInvalidMetadata", err)
 	}
 }
 
 func TestDelete_missing(t *testing.T) {
 	t.Parallel()
 
-	fp := &fakePool{execTag: pgconn.NewCommandTag("DELETE 0")}
-	p := &postgres{db: fp}
+	s := mustOpenMemory(t)
 
-	err := p.Delete(t.Context(), "ghost")
+	err := s.Delete(t.Context(), "ghost")
 	if err == nil {
-		t.Fatal("Delete err = nil, want NotFoundError")
+		t.Fatal("Delete() error = nil, want NotFoundError")
 	}
 
 	var nf *search.NotFoundError
 	if !errors.As(err, &nf) {
-		t.Fatalf("Delete err = %v, want NotFoundError", err)
+		t.Fatalf("Delete() error = %v, want *NotFoundError", err)
 	}
 
 	if nf.ID != "ghost" {
-		t.Fatalf("NotFoundError ID = %q", nf.ID)
+		t.Fatalf("NotFoundError.ID = %q, want ghost", nf.ID)
 	}
 
 	if !errors.Is(err, search.ErrNotFound) {
-		t.Fatalf("Delete err = %v, want ErrNotFound", err)
+		t.Fatalf("Delete() error = %v, want ErrNotFound", err)
 	}
 }
 
-func TestDelete_execError(t *testing.T) {
+func TestSearchRoundTrip_sqlite(t *testing.T) {
 	t.Parallel()
 
-	fp := &fakePool{execErr: errors.New("exec boom")}
-	p := &postgres{db: fp}
+	s := mustOpenMemory(t)
+	ctx := t.Context()
 
-	err := p.Delete(t.Context(), "d")
-	if err == nil || !strings.Contains(err.Error(), "postgres: delete") {
-		t.Fatalf("Delete err = %v, want postgres delete error", err)
-	}
-}
+	const idx = "rt"
 
-func hitsPool(hits [][]any, total int64) *fakePool {
-	return &fakePool{
-		hitsRows:  &fakeRows{rows: hits},
-		countRows: &fakeRows{rows: [][]any{{total}}},
-	}
-}
+	mustIndex(t, s, search.Document{ID: "a", Index: idx, Content: "conformancealpha bright meadow"})
+	mustIndex(t, s, search.Document{ID: "b", Index: idx, Content: "other silent harbor"})
 
-func TestSearch_defaults(t *testing.T) {
-	t.Parallel()
-
-	fp := hitsPool(nil, 0)
-	p := &postgres{db: fp}
-
-	res, err := p.Search(t.Context(), "hello", search.QueryOptions{})
+	res, err := s.Search(ctx, "conformancealpha", search.QueryOptions{Limit: 10, Filters: map[string]string{"index": idx}})
 	if err != nil {
-		t.Fatalf("Search err = %v", err)
+		t.Fatalf("Search() error = %v", err)
+	}
+
+	if res.Total != 1 || len(res.Hits) != 1 || res.Hits[0].ID != "a" {
+		t.Fatalf("Search() = %+v, want hit a", res)
+	}
+
+	if res.Hits[0].Metadata["content"] != "conformancealpha bright meadow" {
+		t.Fatalf("hit metadata = %v", res.Hits[0].Metadata)
+	}
+
+	// Overwrite replaces: the old term must vanish, total stays 1.
+	mustIndex(t, s, search.Document{ID: "a", Index: idx, Content: "replaced sequoia"})
+
+	res, err = s.Search(ctx, "conformancealpha", search.QueryOptions{Limit: 10, Filters: map[string]string{"index": idx}})
+	if err != nil {
+		t.Fatalf("Search() error = %v", err)
 	}
 
 	if res.Total != 0 || len(res.Hits) != 0 {
-		t.Fatalf("res = %+v", res)
+		t.Fatalf("Search() = %+v, want empty after overwrite", res)
 	}
 
-	if len(fp.queries) != 2 {
-		t.Fatalf("queries = %d, want 2", len(fp.queries))
+	// Delete round trip.
+	if derr := s.Delete(ctx, "a"); derr != nil {
+		t.Fatalf("Delete() error = %v", derr)
 	}
 
-	hitsArgs := fp.queryArgs[0]
-	if hitsArgs[len(hitsArgs)-2] != search.DefaultLimit || hitsArgs[len(hitsArgs)-1] != 0 {
-		t.Fatalf("default limit/offset args = %v", hitsArgs)
-	}
-}
-
-func TestSearch_limitOffset(t *testing.T) {
-	t.Parallel()
-
-	fp := hitsPool(nil, 0)
-	p := &postgres{db: fp}
-
-	_, err := p.Search(t.Context(), "q", search.QueryOptions{Limit: 5, Offset: 7, Filters: map[string]string{"index": "docs"}})
+	res, err = s.Search(ctx, "replaced", search.QueryOptions{Limit: 10, Filters: map[string]string{"index": idx}})
 	if err != nil {
-		t.Fatalf("Search err = %v", err)
+		t.Fatalf("Search() error = %v", err)
 	}
 
-	hitsArgs := fp.queryArgs[0]
-	want := []any{"q", "docs", 5, 7}
-	if len(hitsArgs) != len(want) {
-		t.Fatalf("hits args = %v, want %v", hitsArgs, want)
+	if res.Total != 0 {
+		t.Fatalf("Search().Total = %d, want 0 after delete", res.Total)
 	}
 
-	for i := range want {
-		if hitsArgs[i] != want[i] {
-			t.Fatalf("hits args = %v, want %v", hitsArgs, want)
-		}
-	}
-
-	if got := fp.queryArgs[1]; len(got) != 2 || got[0] != "q" || got[1] != "docs" {
-		t.Fatalf("count args = %v", got)
+	if derr := s.Delete(ctx, "a"); !errors.Is(derr, search.ErrNotFound) {
+		t.Fatalf("Delete() error = %v, want ErrNotFound", derr)
 	}
 }
 
-func TestSearch_negativeOffsetClamped(t *testing.T) {
+func TestSearch_defaultsAndPaging(t *testing.T) {
 	t.Parallel()
 
-	fp := hitsPool(nil, 0)
-	p := &postgres{db: fp}
+	s := mustOpenMemory(t)
+	ctx := t.Context()
 
-	_, err := p.Search(t.Context(), "q", search.QueryOptions{Limit: -3, Offset: -2})
+	mustIndex(t, s, search.Document{ID: "l1", Index: "lim", Content: "paging quiet orchard"})
+
+	res, err := s.Search(ctx, "paging", search.QueryOptions{Filters: map[string]string{"index": "lim"}})
 	if err != nil {
-		t.Fatalf("Search err = %v", err)
+		t.Fatalf("Search() error = %v", err)
 	}
 
-	args := fp.queryArgs[0]
-	if args[len(args)-2] != search.DefaultLimit || args[len(args)-1] != 0 {
-		t.Fatalf("clamped args = %v", args)
+	if res.Total != 1 || len(res.Hits) != 1 {
+		t.Fatalf("Search() = %+v, want default-limit hit", res)
 	}
-}
 
-func TestSearch_hitsMapping(t *testing.T) {
-	t.Parallel()
-
-	fp := hitsPool([][]any{
-		{"doc-1", []byte(`{"content":"hello","k":"v"}`), 0.75},
-		{"doc-2", nil, 0.25},
-	}, 2)
-	p := &postgres{db: fp}
-
-	res, err := p.Search(t.Context(), "hello", search.QueryOptions{Filters: map[string]string{"index": "docs"}})
+	res, err = s.Search(ctx, "paging", search.QueryOptions{Limit: 10, Offset: 100, Filters: map[string]string{"index": "lim"}})
 	if err != nil {
-		t.Fatalf("Search err = %v", err)
+		t.Fatalf("Search() error = %v", err)
 	}
 
-	if res.Total != 2 {
-		t.Fatalf("total = %d, want 2", res.Total)
+	if res.Total != 1 {
+		t.Fatalf("Search().Total = %d, want 1", res.Total)
 	}
 
-	if len(res.Hits) != 2 {
-		t.Fatalf("hits = %+v", res.Hits)
+	if len(res.Hits) != 0 {
+		t.Fatalf("Search().Hits = %v, want none beyond total", res.Hits)
 	}
 
-	if res.Hits[0].ID != "doc-1" || res.Hits[0].Score != 0.75 {
-		t.Fatalf("hit0 = %+v", res.Hits[0])
+	res, err = s.Search(ctx, "   ", search.QueryOptions{Limit: 10})
+	if err != nil {
+		t.Fatalf("Search() error = %v", err)
 	}
 
-	if res.Hits[0].Metadata["k"] != "v" {
-		t.Fatalf("hit0 metadata = %v", res.Hits[0].Metadata)
-	}
-
-	if res.Hits[1].ID != "doc-2" || res.Hits[1].Metadata != nil {
-		t.Fatalf("hit1 = %+v", res.Hits[1])
-	}
-
-	for _, sub := range []string{"ts_rank", "ORDER BY score DESC", "LIMIT $3 OFFSET $4"} {
-		if !strings.Contains(fp.queries[0], sub) {
-			t.Fatalf("hits SQL = %q, want substring %q", fp.queries[0], sub)
-		}
-	}
-
-	if !strings.Contains(fp.queries[1], "SELECT COUNT(*)") {
-		t.Fatalf("count SQL = %q", fp.queries[1])
+	if res.Total != 0 || len(res.Hits) != 0 {
+		t.Fatalf("Search(blank) = %+v, want empty", res)
 	}
 }
 
-func TestSearch_hitsQueryError(t *testing.T) {
+func TestIndexBatch_replacesEachRow(t *testing.T) {
 	t.Parallel()
 
-	fp := &fakePool{queryErr: errors.New("query boom")}
-	p := &postgres{db: fp}
+	s := mustOpenMemory(t)
+	ctx := t.Context()
 
-	_, err := p.Search(t.Context(), "q", search.QueryOptions{})
-	if err == nil || !strings.Contains(err.Error(), "postgres: search:") {
-		t.Fatalf("Search err = %v, want postgres search error", err)
+	docs := []search.Document{
+		{ID: "m1", Index: "mb", Content: "first pine forest"},
+		{ID: "m2", Index: "mb", Content: "second pine forest"},
+	}
+	if err := s.IndexBatch(ctx, docs); err != nil {
+		t.Fatalf("IndexBatch() error = %v", err)
+	}
+
+	// Re-index m1 with new content: conflict replacement must carry m1's
+	// own new content, not a sibling row's.
+	docs[0].Content = "first oak desert"
+
+	if err := s.IndexBatch(ctx, docs); err != nil {
+		t.Fatalf("IndexBatch() error = %v", err)
+	}
+
+	res, err := s.Search(ctx, "pine", search.QueryOptions{Limit: 10, Filters: map[string]string{"index": "mb"}})
+	if err != nil {
+		t.Fatalf("Search() error = %v", err)
+	}
+
+	if res.Total != 1 || len(res.Hits) != 1 || res.Hits[0].ID != "m2" {
+		t.Fatalf("Search(pine) = %+v, want only m2", res)
+	}
+
+	res, err = s.Search(ctx, "oak", search.QueryOptions{Limit: 10, Filters: map[string]string{"index": "mb"}})
+	if err != nil {
+		t.Fatalf("Search() error = %v", err)
+	}
+
+	if res.Total != 1 || len(res.Hits) != 1 || res.Hits[0].ID != "m1" {
+		t.Fatalf("Search(oak) = %+v, want only m1", res)
 	}
 }
 
-func TestSearch_scanError(t *testing.T) {
+func TestBuildMatch(t *testing.T) {
 	t.Parallel()
-
-	fp := hitsPool(nil, 0)
-	fp.hitsRows = &fakeRows{rows: [][]any{{"d", []byte(`{}`), 0.1}}, scanErr: errors.New("scan boom")}
-	p := &postgres{db: fp}
-
-	_, err := p.Search(t.Context(), "q", search.QueryOptions{})
-	if err == nil || !strings.Contains(err.Error(), "postgres: search scan") {
-		t.Fatalf("Search err = %v, want scan error", err)
-	}
-}
-
-func TestSearch_badMetadataJSON(t *testing.T) {
-	t.Parallel()
-
-	fp := hitsPool([][]any{{"d", []byte(`{bad`), 0.1}}, 1)
-	p := &postgres{db: fp}
-
-	_, err := p.Search(t.Context(), "q", search.QueryOptions{})
-	if err == nil || !strings.Contains(err.Error(), "postgres: search scan") {
-		t.Fatalf("Search err = %v, want scan error", err)
-	}
-}
-
-func TestSearch_hitsRowsError(t *testing.T) {
-	t.Parallel()
-
-	fp := hitsPool(nil, 0)
-	fp.hitsRows = &fakeRows{rowErr: errors.New("rows boom")}
-	p := &postgres{db: fp}
-
-	_, err := p.Search(t.Context(), "q", search.QueryOptions{})
-	if err == nil || !strings.Contains(err.Error(), "postgres: search:") {
-		t.Fatalf("Search err = %v, want postgres search error", err)
-	}
-}
-
-func TestSearch_countError(t *testing.T) {
-	t.Parallel()
-
-	fp := hitsPool(nil, 0)
-	fp.countErr = errors.New("count boom")
-	p := &postgres{db: fp}
-
-	_, err := p.Search(t.Context(), "q", search.QueryOptions{})
-	if err == nil || !strings.Contains(err.Error(), "postgres: search count") {
-		t.Fatalf("Search err = %v, want count error", err)
-	}
-}
-
-func TestSearch_countRowsError(t *testing.T) {
-	t.Parallel()
-
-	fp := hitsPool(nil, 0)
-	fp.countRows = &fakeRows{rowErr: errors.New("count rows boom")}
-	p := &postgres{db: fp}
-
-	_, err := p.Search(t.Context(), "q", search.QueryOptions{})
-	if err == nil || !strings.Contains(err.Error(), "postgres: search count") {
-		t.Fatalf("Search err = %v, want count error", err)
-	}
-}
-
-func TestSearch_countNoRows(t *testing.T) {
-	t.Parallel()
-
-	fp := hitsPool(nil, 0)
-	fp.countRows = &fakeRows{}
-	p := &postgres{db: fp}
-
-	_, err := p.Search(t.Context(), "q", search.QueryOptions{})
-	if err == nil || !strings.Contains(err.Error(), "no rows") {
-		t.Fatalf("Search err = %v, want no-rows error", err)
-	}
-}
-
-func TestSearch_countScanError(t *testing.T) {
-	t.Parallel()
-
-	fp := hitsPool(nil, 0)
-	fp.countRows = &fakeRows{rows: [][]any{{"bad"}}}
-	p := &postgres{db: fp}
-
-	_, err := p.Search(t.Context(), "q", search.QueryOptions{})
-	if err == nil || !strings.Contains(err.Error(), "postgres: search count") {
-		t.Fatalf("Search err = %v, want count error", err)
-	}
-}
-
-func TestMatchWhere(t *testing.T) {
-	t.Parallel()
-
-	whereNoFilter := " WHERE to_tsvector('english', content) @@ plainto_tsquery('english', $1)"
-	whereIndex := whereNoFilter + " AND idx = $2"
 
 	tests := []struct {
-		name    string
-		query   string
-		filters map[string]string
-		where   string
-		args    []any
+		name  string
+		query string
+		want  string
 	}{
-		{"no filter", "hello", nil, whereNoFilter, []any{"hello"}},
-		{"empty filters", "hello", map[string]string{}, whereNoFilter, []any{"hello"}},
-		{"index filter", "hello", map[string]string{"index": "docs"}, whereIndex, []any{"hello", "docs"}},
-		{"empty index ignored", "hello", map[string]string{"index": ""}, whereNoFilter, []any{"hello"}},
-		{"other key ignored", "hello", map[string]string{"foo": "bar"}, whereNoFilter, []any{"hello"}},
+		{"empty", "", ""},
+		{"blank", "   ", ""},
+		{"single", "hello", `"hello"`},
+		{"multi", "hello world", `"hello" "world"`},
+		{"quotes stripped", `a"b`, `"ab"`},
+		{"keywords quoted", "AND OR", `"AND" "OR"`},
 	}
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 			t.Parallel()
 
-			where, args := matchWhere(tt.query, tt.filters)
+			if got := buildMatch(tt.query); got != tt.want {
+				t.Fatalf("buildMatch(%q) = %q, want %q", tt.query, got, tt.want)
+			}
+		})
+	}
+}
+
+func TestMatchWhere(t *testing.T) {
+	t.Parallel()
+
+	tests := []struct {
+		name    string
+		filters map[string]string
+		where   string
+		args    []any
+	}{
+		{"nil", nil, " WHERE to_tsvector('english', content) @@ plainto_tsquery('english', $1)", []any{"q"}},
+		{"index", map[string]string{"index": "docs"}, " WHERE to_tsvector('english', content) @@ plainto_tsquery('english', $1) AND idx = $2", []any{"q", "docs"}},
+		{"empty index", map[string]string{"index": ""}, " WHERE to_tsvector('english', content) @@ plainto_tsquery('english', $1)", []any{"q"}},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			t.Parallel()
+
+			where, args := matchWhere("q", tt.filters)
 			if where != tt.where {
 				t.Fatalf("where = %q, want %q", where, tt.where)
 			}
@@ -799,116 +505,65 @@ func TestMatchWhere(t *testing.T) {
 	}
 }
 
-func TestBuildSearchQueries(t *testing.T) {
+func TestClose_idempotent(t *testing.T) {
 	t.Parallel()
 
-	t.Run("no filter", func(t *testing.T) {
-		t.Parallel()
+	s := mustOpenMemory(t)
 
-		hitsSQL, countSQL, hitsArgs, countArgs := buildSearchQueries("hello", nil, 10, 0)
-
-		wantCount := "SELECT COUNT(*) FROM search_documents" +
-			" WHERE to_tsvector('english', content) @@ plainto_tsquery('english', $1)"
-		if countSQL != wantCount {
-			t.Fatalf("countSQL = %q, want %q", countSQL, wantCount)
-		}
-
-		wantHits := "SELECT id, metadata, " +
-			"ts_rank(to_tsvector('english', content), plainto_tsquery('english', $1)) AS score" +
-			" FROM search_documents" +
-			" WHERE to_tsvector('english', content) @@ plainto_tsquery('english', $1)" +
-			" ORDER BY score DESC LIMIT $2 OFFSET $3"
-		if hitsSQL != wantHits {
-			t.Fatalf("hitsSQL = %q, want %q", hitsSQL, wantHits)
-		}
-
-		assertArgs(t, hitsArgs, []any{"hello", 10, 0})
-		assertArgs(t, countArgs, []any{"hello"})
-	})
-
-	t.Run("index filter", func(t *testing.T) {
-		t.Parallel()
-
-		hitsSQL, countSQL, hitsArgs, countArgs := buildSearchQueries("hello", map[string]string{"index": "docs"}, 5, 7)
-
-		wantCount := "SELECT COUNT(*) FROM search_documents" +
-			" WHERE to_tsvector('english', content) @@ plainto_tsquery('english', $1) AND idx = $2"
-		if countSQL != wantCount {
-			t.Fatalf("countSQL = %q, want %q", countSQL, wantCount)
-		}
-
-		wantHits := "SELECT id, metadata, " +
-			"ts_rank(to_tsvector('english', content), plainto_tsquery('english', $1)) AS score" +
-			" FROM search_documents" +
-			" WHERE to_tsvector('english', content) @@ plainto_tsquery('english', $1) AND idx = $2" +
-			" ORDER BY score DESC LIMIT $3 OFFSET $4"
-		if hitsSQL != wantHits {
-			t.Fatalf("hitsSQL = %q, want %q", hitsSQL, wantHits)
-		}
-
-		assertArgs(t, hitsArgs, []any{"hello", "docs", 5, 7})
-		assertArgs(t, countArgs, []any{"hello", "docs"})
-	})
-}
-
-func assertArgs(t *testing.T, got, want []any) {
-	t.Helper()
-
-	if len(got) != len(want) {
-		t.Fatalf("args = %v, want %v", got, want)
+	if err := s.Close(); err != nil {
+		t.Fatalf("Close() error = %v", err)
 	}
 
-	for i := range want {
-		if got[i] != want[i] {
-			t.Fatalf("args = %v, want %v", got, want)
-		}
+	if err := s.Close(); err != nil {
+		t.Fatalf("Close() second error = %v, want nil", err)
 	}
 }
 
-func TestClose(t *testing.T) {
-	t.Parallel()
+func TestOpenRegister_bothNames(t *testing.T) {
+	Register()
 
-	if err := (&postgres{db: nil}).Close(); err != nil {
-		t.Fatalf("nil Close err = %v", err)
-	}
+	for _, adapter := range []search.Adapter{search.Postgres, search.SQLite} {
+		s, err := search.Open(adapter, search.Options{})
+		if err != nil {
+			t.Fatalf("Open(%s) error = %v", adapter, err)
+		}
 
-	fp := &fakePool{}
-	if err := (&postgres{db: fp}).Close(); err != nil {
-		t.Fatalf("Close err = %v", err)
-	}
+		if err := s.Index(t.Context(), search.Document{ID: "w", Index: "kit", Content: "wiring probe"}); err != nil {
+			t.Errorf("Open(%s) Index() error = %v", adapter, err)
+		}
 
-	if !fp.closed {
-		t.Fatal("pool not closed")
+		_ = s.Close()
 	}
 }
 
-func TestLive_roundtrip(t *testing.T) {
-	dsn := os.Getenv("SEARCH_PG_DSN")
+func TestLive_postgres(t *testing.T) {
+	dsn := os.Getenv("POSTGRES_DSN")
 	if dsn == "" {
-		t.Skip("SEARCH_PG_DSN not set")
+		dsn = os.Getenv("SEARCH_PG_DSN")
+	}
+
+	if dsn == "" {
+		t.Skip("POSTGRES_DSN/SEARCH_PG_DSN not set")
 	}
 
 	ctx := t.Context()
 
-	s, err := New(search.Options{DSN: dsn})
+	s, err := New(Options{Options: coredb.Options{DSN: dsn}})
 	if err != nil {
-		t.Fatalf("Open err = %v", err)
+		t.Fatalf("New() error = %v", err)
 	}
 
-	t.Cleanup(func() {
-		_ = s.Close()
-	})
+	t.Cleanup(func() { _ = s.Close() })
 
-	idx := "e2e-postgres"
+	const idx = "e2e-search-db"
+
 	docs := []search.Document{
 		{ID: "e2e-run-once", Index: idx, Content: "going for a run in the park", Metadata: map[string]any{"n": 1}},
 		{ID: "e2e-run-many", Index: idx, Content: "run run run running fast every morning", Metadata: map[string]any{"n": 2}},
 	}
 
-	for _, d := range docs {
-		if err = s.Index(ctx, d); err != nil {
-			t.Fatalf("Index %s err = %v", d.ID, err)
-		}
+	if berr := s.IndexBatch(ctx, docs); berr != nil {
+		t.Fatalf("IndexBatch() error = %v", berr)
 	}
 
 	t.Cleanup(func() {
@@ -920,100 +575,28 @@ func TestLive_roundtrip(t *testing.T) {
 	// Stemming: "running" matches the document containing only "run".
 	res, err := s.Search(ctx, "running", search.QueryOptions{Filters: map[string]string{"index": idx}})
 	if err != nil {
-		t.Fatalf("Search err = %v", err)
+		t.Fatalf("Search() error = %v", err)
 	}
 
 	if res.Total != 2 {
-		t.Fatalf("total = %d, want 2", res.Total)
+		t.Fatalf("Total = %d, want 2", res.Total)
 	}
 
 	// Rank ordering: the document repeating the term ranks first.
 	if len(res.Hits) != 2 || res.Hits[0].ID != "e2e-run-many" {
-		t.Fatalf("hits = %+v, want e2e-run-many first", res.Hits)
+		t.Fatalf("Hits = %+v, want e2e-run-many first", res.Hits)
 	}
 
-	if err = s.Delete(ctx, "e2e-run-once"); err != nil {
-		t.Fatalf("Delete err = %v", err)
+	if derr := s.Delete(ctx, "e2e-run-once"); derr != nil {
+		t.Fatalf("Delete() error = %v", derr)
 	}
 
 	res, err = s.Search(ctx, "running", search.QueryOptions{Filters: map[string]string{"index": idx}})
 	if err != nil {
-		t.Fatalf("Search err = %v", err)
+		t.Fatalf("Search() error = %v", err)
 	}
 
 	if res.Total != 1 || len(res.Hits) != 1 || res.Hits[0].ID != "e2e-run-many" {
-		t.Fatalf("res after delete = %+v", res)
+		t.Fatalf("after delete = %+v", res)
 	}
-
-	if err := s.Delete(ctx, "e2e-run-once"); err == nil {
-		t.Fatal("second Delete err = nil, want NotFoundError")
-	}
-}
-
-// TestLive_indexBatchMatchesLoopedIndex proves IndexBatch produces the same
-// end-state as calling Index N times in a loop, against a live postgres
-// instance. Skipped when SEARCH_PG_DSN is unset, matching TestLive_roundtrip.
-func TestLive_indexBatchMatchesLoopedIndex(t *testing.T) {
-	dsn := os.Getenv("SEARCH_PG_DSN")
-	if dsn == "" {
-		t.Skip("SEARCH_PG_DSN not set")
-	}
-
-	ctx := t.Context()
-
-	s, err := New(search.Options{DSN: dsn})
-	if err != nil {
-		t.Fatalf("Open err = %v", err)
-	}
-
-	t.Cleanup(func() { _ = s.Close() })
-
-	idx := "e2e-postgres-batch"
-	docs := []search.Document{
-		{ID: "e2e-batch-run-once", Index: idx, Content: "going for a run in the park", Metadata: map[string]any{"n": 1}},
-		{ID: "e2e-batch-run-many", Index: idx, Content: "run run run running fast every morning", Metadata: map[string]any{"n": 2}},
-	}
-
-	t.Cleanup(func() {
-		for _, d := range docs {
-			_ = s.Delete(ctx, d.ID)
-		}
-	})
-
-	if batchErr := s.IndexBatch(ctx, docs); batchErr != nil {
-		t.Fatalf("IndexBatch err = %v", batchErr)
-	}
-
-	res, err := s.Search(ctx, "running", search.QueryOptions{Filters: map[string]string{"index": idx}})
-	if err != nil {
-		t.Fatalf("Search err = %v", err)
-	}
-
-	if res.Total != 2 {
-		t.Fatalf("total = %d, want 2", res.Total)
-	}
-
-	if len(res.Hits) != 2 || res.Hits[0].ID != "e2e-batch-run-many" {
-		t.Fatalf("hits = %+v, want e2e-batch-run-many first", res.Hits)
-	}
-}
-
-func TestNewPoolLazyNoConnect(t *testing.T) {
-	t.Parallel()
-
-	// pgxpool.New parses the DSN without connecting, so a closed port still
-	// yields a usable pool value. Covers newPool's success path with no DB.
-	ctx, cancel := context.WithTimeout(t.Context(), 5*time.Second)
-	defer cancel()
-
-	p, err := newPool(ctx, "postgres://127.0.0.1:1/db?sslmode=disable")
-	if err != nil {
-		t.Fatalf("newPool: %v", err)
-	}
-
-	if p == nil {
-		t.Fatal("want non-nil pool")
-	}
-
-	p.Close()
 }

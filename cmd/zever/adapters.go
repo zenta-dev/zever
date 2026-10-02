@@ -100,7 +100,6 @@ import (
 	schedulerembedded "github.com/zenta-dev/zever/adapters/scheduler/embedded"
 	searchmeilisearch "github.com/zenta-dev/zever/adapters/search/meilisearch"
 	searchpostgres "github.com/zenta-dev/zever/adapters/search/postgres"
-	searchsqlite "github.com/zenta-dev/zever/adapters/search/sqlite"
 	sessionredis "github.com/zenta-dev/zever/adapters/session/redis"
 	storager2 "github.com/zenta-dev/zever/adapters/storage/r2"
 	storages3 "github.com/zenta-dev/zever/adapters/storage/s3"
@@ -194,7 +193,6 @@ func init() {
 	schedulerembedded.Register()
 	searchmeilisearch.Register()
 	searchpostgres.Register()
-	searchsqlite.Register()
 	sessionredis.Register()
 	storager2.Register()
 	storages3.Register()

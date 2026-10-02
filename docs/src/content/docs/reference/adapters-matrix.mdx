@@ -176,7 +176,7 @@ redis.Register()
 | scheduler | postgres | `github.com/zenta-dev/zever/adapters/scheduler/postgres` | `postgres.Register()` | `Scheduler()` |
 | search | postgres | `github.com/zenta-dev/zever/adapters/search/postgres` | `postgres.Register()` | `Search()` |
 | search | meilisearch | `github.com/zenta-dev/zever/adapters/search/meilisearch` | `meilisearch.Register()` | `Search()` |
-| search | sqlite | `github.com/zenta-dev/zever/adapters/search/sqlite` | `sqlite.Register()` | `Search()` |
+| search | sqlite | `github.com/zenta-dev/zever/adapters/search/postgres` | `postgres.Register()` | `Search()` |
 | secrets | env | `github.com/zenta-dev/zever/adapters/secrets/env` | `env.Register()` | `Secrets()` |
 | session | memory | `github.com/zenta-dev/zever/adapters/session/memory` | `memory.Register()` | `Session()` |
 | session | redis | `github.com/zenta-dev/zever/adapters/session/redis` | `redis.Register()` | `Session()` |
