@@ -71,8 +71,15 @@ func (t *TTLCache[K, V]) nowTime() time.Time {
 }
 
 // expired reports whether tv's expiry is at or before now, matching
-// i18n/remote/remote.go's `!e.expiresAt.After(now)` check.
+// i18n/remote/remote.go's `!e.expiresAt.After(now)` check. A zero expiry
+// means persist (no expiry, see PutTTL) and is never expired. The boundary
+// is therefore: live while now is strictly before expiresAt, expired at the
+// exact deadline and after. Callers must copy []byte-style values themselves;
+// the cache stores V as-is with no cloning.
 func expired[V any](tv ttlValue[V], now time.Time) bool {
+	if tv.expiresAt.IsZero() {
+		return false
+	}
 	return !tv.expiresAt.After(now)
 }
 
@@ -110,13 +117,20 @@ func (t *TTLCache[K, V]) Put(k K, v V) {
 // least-recently-used entry is evicted (see Cache.Put); the OnEvict
 // callback, if registered, fires with the evicted entry's unwrapped value.
 //
-// This lets a single TTLCache instance serve entries with different TTLs,
-// e.g. a longer TTL for confirmed-present entries and a shorter TTL for
-// negative/not-found caching, matching the negative-caching need already
-// present in i18n/remote/remote.go, the hand-rolled cache this package is
-// designed to eventually replace.
+// A non-positive ttl means persist: the entry is stored with no expiry and
+// never expires until explicitly deleted, evicted, or overwritten. This
+// matches core/cache memory-adapter semantics where ttl<=0 persists. No
+// current in-repo caller passes a non-positive TTL (i18n/remote always uses
+// positive posTTL/negTTL), so this sentinel changes no existing behavior.
+//
+// Values are stored as-is with no copy; callers holding mutable V (e.g.
+// []byte) must copy on store and after retrieval.
 func (t *TTLCache[K, V]) PutTTL(k K, v V, ttl time.Duration) {
-	t.c.Put(k, ttlValue[V]{val: v, expiresAt: t.nowTime().Add(ttl)})
+	var exp time.Time
+	if ttl > 0 {
+		exp = t.nowTime().Add(ttl)
+	}
+	t.c.Put(k, ttlValue[V]{val: v, expiresAt: exp})
 }
 
 // Delete removes k from the cache and returns its value, if present and not
