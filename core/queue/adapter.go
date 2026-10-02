@@ -9,6 +9,8 @@ const (
 	Memory Adapter = "memory"
 	// Redis is the Redis-backed queue adapter.
 	Redis Adapter = "redis"
+	// DB is the DB-backed queue adapter (postgres or sqlite).
+	DB Adapter = "db"
 )
 
 // String returns the canonical name of Adapter.

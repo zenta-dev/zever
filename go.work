@@ -59,6 +59,7 @@ use (
 	./adapters/permission/casbin
 	./adapters/permission/noop
 	./adapters/permission/rbac
+	./adapters/queue/db
 	./adapters/queue/memory
 	./adapters/queue/redis
 	./adapters/ratelimit/memory

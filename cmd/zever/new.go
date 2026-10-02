@@ -1233,7 +1233,7 @@ var nestedModuleDirs = []string{
 	"adapters/password/argon2",
 	"adapters/payment/paddle", "adapters/payment/stripe", "adapters/payment/stub",
 	"adapters/permission/casbin", "adapters/permission/noop", "adapters/permission/rbac",
-	"adapters/queue/memory", "adapters/queue/redis",
+	"adapters/queue/db", "adapters/queue/memory", "adapters/queue/redis",
 	"adapters/ratelimit/memory", "adapters/ratelimit/redis",
 	"adapters/router/fiber", "adapters/router/stdhttp",
 	"adapters/scheduler/embedded", "adapters/scheduler/postgres",

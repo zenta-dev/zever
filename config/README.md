@@ -45,7 +45,7 @@ config file, overlaid by environment variables. Later layers win:
 | password      | argon2id                            |
 | payment       | stub, stripe, paddle                |
 | permission    | noop, rbac, casbin                  |
-| queue         | memory, redis                       |
+| queue         | memory, redis, db                   |
 | ratelimit     | memory, redis                       |
 | router        | fiber, stdhttp                      |
 | scheduler     | embedded                            |

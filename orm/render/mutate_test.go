@@ -1,6 +1,8 @@
 package render
 
 import (
+	"errors"
+	"math"
 	"reflect"
 	"strconv"
 	"strings"
@@ -169,6 +171,85 @@ func TestInsertMany(t *testing.T) {
 
 		if !strings.Contains(err.Error(), "orm/render: InsertMany") {
 			t.Fatalf("err = %v, want it to mention InsertMany", err)
+		}
+	})
+}
+
+func TestInsertManyCapOverflow(t *testing.T) {
+	t.Parallel()
+
+	t.Run("normal product", func(t *testing.T) {
+		t.Parallel()
+
+		total, err := insertManyCap(2, 2)
+		if err != nil {
+			t.Fatalf("err = %v, want nil", err)
+		}
+
+		if total != 4 {
+			t.Fatalf("total = %d, want 4", total)
+		}
+	})
+
+	t.Run("largest fitting product", func(t *testing.T) {
+		t.Parallel()
+
+		total, err := insertManyCap(math.MaxInt/2, 2)
+		if err != nil {
+			t.Fatalf("err = %v, want nil", err)
+		}
+
+		if total != math.MaxInt/2*2 {
+			t.Fatalf("total = %d, want %d", total, math.MaxInt/2*2)
+		}
+	})
+
+	t.Run("overflowing product errors without allocating", func(t *testing.T) {
+		t.Parallel()
+
+		// Pure arithmetic on counts: no rows slice is built, so this
+		// never allocates the gigabytes n*len(rows) would imply.
+		if _, err := insertManyCap(math.MaxInt, 2); !errors.Is(err, ErrTooManyArgs) {
+			t.Fatalf("err = %v, want errors.Is(err, ErrTooManyArgs)", err)
+		}
+
+		_, err := insertManyCap(math.MaxInt/2+1, 2)
+		if !errors.Is(err, ErrTooManyArgs) {
+			t.Fatalf("err = %v, want errors.Is(err, ErrTooManyArgs)", err)
+		}
+
+		if !strings.Contains(err.Error(), "orm/render:") {
+			t.Fatalf("err = %v, want orm-prefixed message", err)
+		}
+	})
+
+	t.Run("zero columns never overflows", func(t *testing.T) {
+		t.Parallel()
+
+		total, err := insertManyCap(0, math.MaxInt)
+		if err != nil {
+			t.Fatalf("err = %v, want nil", err)
+		}
+
+		if total != 0 {
+			t.Fatalf("total = %d, want 0", total)
+		}
+	})
+
+	t.Run("small InsertMany still renders", func(t *testing.T) {
+		t.Parallel()
+
+		q, args, err := InsertMany(fakePostgres{}, "users", []string{"id"}, [][]any{{"1"}, {"2"}})
+		if err != nil {
+			t.Fatalf("err = %v, want nil", err)
+		}
+
+		if want := `INSERT INTO "users" ("id") VALUES ($1), ($2)`; q != want {
+			t.Fatalf("query = %q, want %q", q, want)
+		}
+
+		if !reflect.DeepEqual(args, []any{"1", "2"}) {
+			t.Fatalf("args = %#v", args)
 		}
 	})
 }

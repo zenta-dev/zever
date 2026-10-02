@@ -639,6 +639,17 @@ updates:
           - "*"
 
   - package-ecosystem: gomod
+    directory: "/adapters/queue/db"
+    schedule:
+      interval: weekly
+      day: monday
+    open-pull-requests-limit: 10
+    groups:
+      go-modules:
+        patterns:
+          - "*"
+
+  - package-ecosystem: gomod
     directory: "/adapters/queue/memory"
     schedule:
       interval: weekly
