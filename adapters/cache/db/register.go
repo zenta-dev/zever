@@ -5,7 +5,7 @@ import (
 )
 
 // Adapter is the DB-backed cache adapter name.
-const Adapter cache.Adapter = cache.Adapter("db")
+const Adapter cache.Adapter = cache.DB
 
 // Register wires this adapter into its battery registry. Call from your app's main or generated app.go; no init magic.
 func Register() {
