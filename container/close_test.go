@@ -210,12 +210,12 @@ func TestContainer_Snapshots_CoversAllServices(t *testing.T) {
 	totalLazy := 0
 	for i := 0; i < typ.NumField(); i++ {
 		name := typ.Field(i).Name
-		if name == "cfg" || name == "pluginsMu" || name == "plugins" {
+		if name == "cfg" || name == "pluginsMu" || name == "plugins" || name == "pools" {
 			continue
 		}
 		totalLazy++
 	}
-	const orderedExclusions = 5 // cache, queue, scheduler, job, grpcServer
+	const orderedExclusions = 6 // cache, queue, db, scheduler, job, grpcServer
 	snaps := c.snapshots()
 	if got := len(snaps) + orderedExclusions; got != totalLazy {
 		t.Fatalf("snapshots drift: len(snapshots)=%d + ordered %d = %d, want %d lazy fields", len(snaps), orderedExclusions, got, totalLazy)
@@ -329,15 +329,15 @@ func TestContainer_Close_Ordering(t *testing.T) {
 		}
 		return -1
 	}
-	sPos, oPos, cPos, qPos := pos("scheduler"), pos("other"), pos("cache"), pos("queue")
-	if sPos == -1 || oPos == -1 || cPos == -1 || qPos == -1 {
+	sPos, dPos, cPos, qPos := pos("scheduler"), pos("other"), pos("cache"), pos("queue")
+	if sPos == -1 || dPos == -1 || cPos == -1 || qPos == -1 {
 		t.Fatalf("missing closes in order %v", order)
 	}
-	if sPos >= oPos {
-		t.Fatalf("scheduler should close before snapshots (other): order %v", order)
+	if sPos >= cPos || sPos >= qPos || sPos >= dPos {
+		t.Fatalf("scheduler should close before cache/queue/db: order %v", order)
 	}
-	if oPos >= cPos || oPos >= qPos {
-		t.Fatalf("snapshots (other) should close before cache/queue: order %v", order)
+	if cPos >= dPos || qPos >= dPos {
+		t.Fatalf("db should close after cache/queue (registry band): order %v", order)
 	}
 }
 

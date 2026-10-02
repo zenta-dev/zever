@@ -86,6 +86,10 @@ type Container struct {
 	webhook       lazy[webhook.Webhook]
 	workflow      lazy[workflow.Workflow]
 
+	// pools maps shareable DSNs to one shared db.DB pool per key (see
+	// pools.go). Borrowers resolve through it on exact-DSN matches.
+	pools *poolRegistry
+
 	pluginsMu sync.Mutex
 	plugins   map[string]*pluginEntry
 }
@@ -99,5 +103,5 @@ func New(cfg *config.Config) *Container {
 		cfg = config.Default()
 	}
 
-	return &Container{cfg: cfg}
+	return &Container{cfg: cfg, pools: newPoolRegistry()}
 }
