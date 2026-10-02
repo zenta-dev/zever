@@ -764,6 +764,10 @@ type = 'integer'
 ['$defs'.queueOptions.properties.db]
 type = 'integer'
 
+['$defs'.queueOptions.properties.dsn]
+description = 'Postgres connection string or sqlite path; empty selects a private in-memory-style database.'
+type = 'string'
+
 ['$defs'.queueOptions.properties.password]
 type = 'string'
 
@@ -775,6 +779,10 @@ type = 'string'
 
 ['$defs'.queueOptions.properties.require_tls]
 type = 'boolean'
+
+['$defs'.queueOptions.properties.table]
+description = 'Queue-messages table name; empty selects the adapter default.'
+type = 'string'
 
 ['$defs'.queueOptions.properties.tls]
 type = 'boolean'
@@ -1446,7 +1454,7 @@ type = 'object'
 
 [properties.queue.properties]
 [properties.queue.properties.adapter]
-enum = ['memory', 'redis']
+enum = ['memory', 'redis', 'db']
 
 [properties.queue.properties.options]
 '$ref' = '#/$defs/queueOptions'

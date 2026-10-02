@@ -28,7 +28,7 @@
     "password": { "$ref": "#/$defs/service", "type": "object", "properties": { "adapter": { "enum": ["argon2id"] }, "options": { "$ref": "#/$defs/passwordOptions" } } },
     "payment": { "$ref": "#/$defs/service", "type": "object", "properties": { "adapter": { "enum": ["stub", "stripe", "paddle"] }, "options": { "$ref": "#/$defs/paymentOptions" } } },
     "permission": { "$ref": "#/$defs/service", "type": "object", "properties": { "adapter": { "enum": ["noop", "rbac", "casbin"] }, "options": { "$ref": "#/$defs/permissionOptions" } } },
-    "queue": { "$ref": "#/$defs/service", "type": "object", "properties": { "adapter": { "enum": ["memory", "redis"] }, "options": { "$ref": "#/$defs/queueOptions" } } },
+    "queue": { "$ref": "#/$defs/service", "type": "object", "properties": { "adapter": { "enum": ["memory", "redis", "db"] }, "options": { "$ref": "#/$defs/queueOptions" } } },
     "ratelimit": { "$ref": "#/$defs/service", "type": "object", "properties": { "adapter": { "enum": ["memory", "redis"] }, "options": { "$ref": "#/$defs/ratelimitOptions" } } },
     "router": { "$ref": "#/$defs/service", "type": "object", "properties": { "adapter": { "enum": ["fiber", "stdhttp"] }, "options": { "$ref": "#/$defs/routerOptions" } } },
     "scheduler": { "$ref": "#/$defs/service", "type": "object", "properties": { "adapter": { "enum": ["embedded"] }, "options": { "$ref": "#/$defs/schedulerOptions" } } },
@@ -467,7 +467,9 @@
         "tls": { "type": "boolean" },
         "require_tls": { "type": "boolean" },
         "url": { "type": "string" },
-        "prefix": { "type": "string" }
+        "prefix": { "type": "string" },
+        "dsn": { "type": "string", "description": "Postgres connection string or sqlite path; empty selects a private in-memory-style database." },
+        "table": { "type": "string", "description": "Queue-messages table name; empty selects the adapter default." }
       }
     },
     "ratelimitOptions": {
