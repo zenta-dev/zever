@@ -2,7 +2,6 @@ package render
 
 import (
 	"fmt"
-	"math"
 	"strings"
 
 	"github.com/zenta-dev/zever/orm/dialect"
@@ -111,11 +110,11 @@ func renderInsertManyText(d dialect.Dialect, table string, columns []string, row
 	b.WriteString(") VALUES ")
 
 	rowCount := len(rows)
-	if n > 0 && rowCount > 0 && n > math.MaxInt/rowCount {
+	if uint(n) > 0 && uint(rowCount) > 0 && uint(n) > uint(^uint(0)>>1)/uint(rowCount) {
 		return "", nil, fmt.Errorf("orm/render: InsertMany: too many values (%d columns x %d rows)", n, rowCount)
 	}
 
-	totalArgs := n * rowCount
+	totalArgs := int(uint(n) * uint(rowCount))
 	args = make([]any, 0, totalArgs)
 	counter := &argCounter{}
 
