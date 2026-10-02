@@ -31,6 +31,12 @@ func (o Options) Validate() error {
 	if (o.ModelPath != "") != (o.PolicyPath != "") {
 		return &InvalidOptionsError{Reason: "model_path and policy_path must be set together"}
 	}
+	// A file-loaded model owns the policy: the casbin adapter seeds
+	// neither Rules nor (eagerly) Roles into it, so accepting Rules
+	// alongside ModelPath would silently drop them. Reject instead.
+	if o.ModelPath != "" && len(o.Rules) > 0 {
+		return &InvalidOptionsError{Reason: "rules must be empty when model_path is set"}
+	}
 	if o.ModelPath != "" {
 		if strings.Contains(o.ModelPath, "..") {
 			return &InvalidOptionsError{Reason: "model_path must not contain .."}

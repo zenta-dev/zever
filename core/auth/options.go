@@ -25,6 +25,10 @@ type JWTOptions struct {
 	Audience string `json:"audience" toml:"audience" yaml:"audience"`
 	// MaxTTL caps token lifetimes. Negative fails Validate; zero means no cap.
 	MaxTTL time.Duration `json:"max_ttl" toml:"max_ttl" yaml:"max_ttl"`
+	// Leeway tolerates clock skew when validating exp/nbf. Zero (default)
+	// means strict validation, preserving current behavior; positive values
+	// accept tokens up to Leeway past expiry. Negative fails Validate.
+	Leeway time.Duration `json:"leeway" toml:"leeway" yaml:"leeway"`
 	// RevocationStore tracks revoked token jtis. Nil means the adapter
 	// builds an in-process memory store with its own defaults.
 	RevocationStore revocation.Store `json:"-" toml:"-" yaml:"-"`
@@ -64,6 +68,9 @@ type Options struct {
 func (o Options) Validate() error {
 	if o.JWT.MaxTTL < 0 {
 		return &InvalidOptionsError{Reason: "jwt_max_ttl must be >= 0"}
+	}
+	if o.JWT.Leeway < 0 {
+		return &InvalidOptionsError{Reason: "jwt_leeway must be >= 0"}
 	}
 	if o.OIDC.Timeout < 0 {
 		return &InvalidOptionsError{Reason: "oidc_timeout must be >= 0"}
