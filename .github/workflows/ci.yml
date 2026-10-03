@@ -169,6 +169,10 @@ jobs:
     name: conformance
     timeout-minutes: 15
     runs-on: ubuntu-latest
+    env:
+      # Same Chrome sandbox limitation as the test jobs: the document/local
+      # render conformance suite needs --no-sandbox in the CI container.
+      ZEVER_CHROMEDP_NO_SANDBOX: "1"
     permissions:
       contents: read
     steps:
