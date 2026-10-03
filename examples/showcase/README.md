@@ -7,6 +7,15 @@ optional fields, defaults, all four relation kinds, indexes, `@schema`,
 every auth shape, permission checks, error sets, paginated RPCs, jobs with
 params, and schedules.
 
+## Services (zero-infra)
+
+Every adapter in `zever.yaml` is zero-infra — sqlite plus in-memory and
+local backends — so showcase runs with no external services and ships no
+`compose.yaml`. `zever new` only generates a compose file when a picked
+battery needs Postgres (`db`, `search`, `vectorstore`, `workflow`) or
+Redis (`cache`, `queue`, `session`, `ratelimit`, `lock`, `eventbus`,
+`idempotency`); none of those are selected here.
+
 ## Wiring (CLI owns infra, developer owns logic)
 
 `cmd/server` mirrors `zever generate server`: HTTP (`:8080`) + gRPC
