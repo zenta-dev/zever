@@ -90,7 +90,7 @@ func (d *driver) Get(ctx context.Context, name string) ([]byte, error) {
 	if err != nil {
 		return nil, fmt.Errorf("vault: get %s: %w", name, err)
 	}
-	defer func() { _ = resp.Body.Close }()
+	defer func() { _ = resp.Body.Close() }()
 	if resp.StatusCode == http.StatusNotFound {
 		return nil, fmt.Errorf("vault: get %s: %w", name, secrets.ErrNotFound)
 	}
@@ -131,7 +131,7 @@ func (d *driver) Set(ctx context.Context, name string, value []byte) error {
 	if err != nil {
 		return fmt.Errorf("vault: set %s: %w", name, err)
 	}
-	defer func() { _ = resp.Body.Close }()
+	defer func() { _ = resp.Body.Close() }()
 	if resp.StatusCode != http.StatusOK && resp.StatusCode != http.StatusCreated && resp.StatusCode != http.StatusNoContent {
 		return fmt.Errorf("vault: set %s: unexpected status %d", name, resp.StatusCode)
 	}
@@ -151,7 +151,7 @@ func (d *driver) Delete(ctx context.Context, name string) error {
 	if err != nil {
 		return fmt.Errorf("vault: delete %s: %w", name, err)
 	}
-	defer func() { _ = resp.Body.Close }()
+	defer func() { _ = resp.Body.Close() }()
 	if resp.StatusCode == http.StatusNotFound {
 		return fmt.Errorf("vault: delete %s: %w", name, secrets.ErrNotFound)
 	}
@@ -171,7 +171,7 @@ func (d *driver) List(ctx context.Context) ([]string, error) {
 	if err != nil {
 		return nil, fmt.Errorf("vault: list: %w", err)
 	}
-	defer func() { _ = resp.Body.Close }()
+	defer func() { _ = resp.Body.Close() }()
 	if resp.StatusCode == http.StatusNotFound {
 		return nil, nil
 	}

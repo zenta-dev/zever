@@ -7,6 +7,13 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Security
+
+- `vault` secrets adapter now closes HTTP response bodies on every call
+  (previously leaked a connection per operation). `argon2id` `Verify` and
+  `NeedsRehash` reject stored-hash parameters outside the supported ranges
+  instead of panicking (`t`/`p` below 1) or allocating unbounded memory.
+
 ### Added
 
 - Security hardening (additive, fail-closed defaults): `authz`
