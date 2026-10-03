@@ -3,7 +3,7 @@ module github.com/zenta-dev/zever/adapters/notification/twilio
 go 1.27.0
 
 require (
-	github.com/twilio/twilio-go v1.31.1
+	github.com/twilio/twilio-go v1.31.2
 	github.com/zenta-dev/zever/core/notification v0.5.3
 	github.com/zenta-dev/zever/shared/httpclient v0.5.3
 )
