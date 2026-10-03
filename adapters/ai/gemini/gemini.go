@@ -114,7 +114,10 @@ func (a *adapter) Generate(ctx context.Context, model string, messages []ai.Mess
 	}, nil
 }
 
-// Stream implements ai.AI.
+// Stream returns a channel that emits content, tool-call, and usage chunks
+// as they arrive, then a final Done chunk. The producer goroutine sends
+// until the stream ends or ctx is done: cancel the context before dropping
+// the channel, or the producer blocks on send until then.
 func (a *adapter) Stream(ctx context.Context, model string, messages []ai.Message, opts ai.GenerateOptions) (<-chan ai.StreamChunk, error) {
 	if strings.TrimSpace(model) == "" {
 		return nil, fmt.Errorf("%w: model is required", ai.ErrInvalidRequest)

@@ -226,6 +226,9 @@ type streamResponse struct {
 
 // Stream opens a newline-delimited JSON completion stream.
 // The caller drains the channel; Done carries final usage.
+// The producer goroutine sends until the stream ends or ctx is done: cancel
+// the context before dropping the channel, or the producer blocks on send
+// until then.
 func (a *adapter) Stream(ctx context.Context, model string, messages []ai.Message, opts ai.GenerateOptions) (<-chan ai.StreamChunk, error) {
 	if model == "" {
 		model = a.defaultModel

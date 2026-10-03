@@ -385,7 +385,9 @@ type toolBlockMeta struct {
 // the complete anthropic.Message alongside the incremental emission so the
 // final chunk's usage/finish-reason/tool-call data comes from the same
 // conversion Generate uses (messageToGeneration), not hand-reconstructed
-// from raw deltas.
+// from raw deltas. The producer goroutine sends until the stream ends or
+// ctx is done: cancel the context before dropping the channel, or the
+// producer blocks on send until then.
 func (a *adapter) Stream(ctx context.Context, model string, messages []ai.Message, opts ai.GenerateOptions) (<-chan ai.StreamChunk, error) {
 	if model == "" {
 		model = a.model

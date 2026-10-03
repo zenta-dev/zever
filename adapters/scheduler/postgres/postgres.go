@@ -144,6 +144,7 @@ type driver struct {
 	leaseTTL     time.Duration
 	dispatcher   *job.Dispatcher
 	closeTimeout time.Duration
+	fireTimeout  time.Duration
 	logger       log.Logger
 	owns         bool
 
@@ -153,6 +154,12 @@ type driver struct {
 	args    map[string]any
 	nextID  atomic.Uint64
 	started bool
+
+	// tickCtx is the scheduler-owned background ctx every cron tick is
+	// rooted in; it carries no request values and is canceled by Stop.
+	//nolint:containedctx // deliberate: a long-lived background lifecycle ctx, not a request ctx; canceled in Stop.
+	tickCtx    context.Context
+	tickCancel context.CancelFunc
 }
 
 var _ scheduler.Scheduler = (*driver)(nil)
@@ -254,12 +261,19 @@ func openFromDB(conn coredb.DB, o Options, owns bool) (scheduler.Scheduler, erro
 		closeTimeout = scheduler.DefaultCloseTimeout
 	}
 
+	fireTimeout := o.FireTimeout
+	if fireTimeout <= 0 {
+		fireTimeout = DefaultFireTimeout
+	}
+
 	ctx, cancel := context.WithTimeout(context.Background(), DefaultConnectTimeout)
 	defer cancel()
 
 	if err := conn.Ping(ctx); err != nil {
 		return nil, err
 	}
+
+	tickCtx, tickCancel := context.WithCancel(context.Background())
 
 	d := &driver{
 		conn: conn, tbl: orm.NewTable[slotRow](table, slotColumns),
@@ -273,10 +287,11 @@ func openFromDB(conn coredb.DB, o Options, owns bool) (scheduler.Scheduler, erro
 		cCreated:  orm.NewColumn[slotRow, time.Time](table, "created_at"),
 		cUpdated:  orm.NewColumn[slotRow, time.Time](table, "updated_at"),
 		tableName: table, owner: owner, leaseTTL: ttl,
-		dispatcher: o.Dispatcher, closeTimeout: closeTimeout, logger: logger,
+		dispatcher: o.Dispatcher, closeTimeout: closeTimeout, fireTimeout: fireTimeout, logger: logger,
 		owns: owns, cron: cron.New(),
-		slots: make(map[scheduler.EntryID]string),
-		args:  make(map[string]any),
+		slots:   make(map[scheduler.EntryID]string),
+		args:    make(map[string]any),
+		tickCtx: tickCtx, tickCancel: tickCancel,
 	}
 
 	if err := d.ensureSchema(ctx); err != nil {
@@ -382,7 +397,7 @@ func (d *driver) adoptRow(ctx context.Context, row *slotRow) error {
 		}
 	}
 
-	if err := d.register(ctx, row.Spec, args, row.Slot); err != nil {
+	if err := d.register(row.Spec, args, row.Slot); err != nil {
 		return err
 	}
 
@@ -420,9 +435,10 @@ func (d *driver) load(ctx context.Context, slot string) (row *slotRow, ok bool, 
 
 // register parses spec and adds the gated tick for slot to the local cron.
 // Callers must hold the lease (or own the fresh row) before registering.
-// The tick fires detached from registration cancellation but inherits its
-// values.
-func (d *driver) register(ctx context.Context, spec string, args any, slot string) error {
+// The tick is rooted in the scheduler-owned tickCtx, not the registration
+// request ctx: it must live for the entry's lifetime and must not retain
+// the caller's context values.
+func (d *driver) register(spec string, args any, slot string) error {
 	parsed, err := cron.ParseStandard(spec)
 	if err != nil {
 		return &scheduler.InvalidSpecError{Spec: spec, Err: err}
@@ -431,9 +447,8 @@ func (d *driver) register(ctx context.Context, spec string, args any, slot strin
 	d.mu.Lock()
 	defer d.mu.Unlock()
 
-	tickCtx := context.WithoutCancel(ctx)
 	id := d.cron.Schedule(parsed, cron.FuncJob(func() {
-		d.fire(tickCtx, slot)
+		d.fire(d.tickCtx, slot)
 	}))
 
 	//nolint:gosec // cron EntryIDs are a small positive sequence starting at 1.
@@ -446,8 +461,12 @@ func (d *driver) register(ctx context.Context, spec string, args any, slot strin
 
 // fire claims slot and dispatches its job when the claim lands. A live
 // foreign lease means another instance owns the slot: the tick is skipped,
-// which is what makes multi-instance firing safe.
+// which is what makes multi-instance firing safe. The fire runs under
+// fireTimeout so a hung DB cannot block the tick goroutine past Stop.
 func (d *driver) fire(ctx context.Context, slot string) {
+	ctx, cancel := context.WithTimeout(ctx, d.fireTimeout)
+	defer cancel()
+
 	row, ok, err := d.load(ctx, slot)
 	if err != nil || !ok {
 		return
@@ -548,7 +567,7 @@ func (d *driver) Schedule(ctx context.Context, spec, jobName string, args any) (
 		return 0, err
 	}
 
-	if err := d.register(ctx, spec, args, slot); err != nil {
+	if err := d.register(spec, args, slot); err != nil {
 		_, _ = orm.DeleteFrom(d.tbl).Where(d.cSlot.Eq(slot)).Exec(ctx, d.conn)
 
 		return 0, err
@@ -621,7 +640,9 @@ func (d *driver) Start() error {
 
 // Stop ends cron ticks, waiting for running ticks up to CloseTimeout.
 // Stopping a scheduler that was never started is a no-op returning nil.
-// Leased rows are left in place so a restart or a peer reclaims them.
+// The tick ctx is canceled first so in-flight fires abort with the stop
+// instead of running out their fire timeout. Leased rows are left in place
+// so a restart or a peer reclaims them.
 func (d *driver) Stop() error {
 	d.mu.Lock()
 
@@ -630,6 +651,8 @@ func (d *driver) Stop() error {
 
 		return nil
 	}
+
+	d.tickCancel()
 
 	done := d.cron.Stop()
 	timeout := d.closeTimeout
