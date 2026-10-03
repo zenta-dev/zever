@@ -172,21 +172,23 @@ func NewSafeClient(timeout time.Duration, allowPrivate bool) *http.Client {
 }
 
 // SafeDialContext returns a DialContext function refusing private addresses
-// unless allowPrivate is true. SafeDialContext resolves names and checks every
-// returned address, so a single private record blocks the dial.
+// unless allowPrivate is true. SafeDialContext resolves names, checks every
+// returned address, then dials a validated IP directly so a second lookup
+// cannot return a different (private) address between check and dial.
 func SafeDialContext(allowPrivate bool) func(ctx context.Context, network, addr string) (net.Conn, error) {
 	return func(ctx context.Context, network, addr string) (net.Conn, error) {
-		host, _, err := net.SplitHostPort(addr)
+		host, port, err := net.SplitHostPort(addr)
 		if err != nil {
 			host = addr
+			port = ""
 		}
 		var ips []net.IP
 		if ip := net.ParseIP(host); ip != nil {
 			ips = []net.IP{ip}
 		} else {
-			addrs, err := net.DefaultResolver.LookupIPAddr(ctx, host)
-			if err != nil {
-				return nil, fmt.Errorf("httpclient: host lookup failed for %q: %w", host, err)
+			addrs, lookupErr := net.DefaultResolver.LookupIPAddr(ctx, host)
+			if lookupErr != nil {
+				return nil, fmt.Errorf("httpclient: host lookup failed for %q: %w", host, lookupErr)
 			}
 			for _, a := range addrs {
 				ips = append(ips, a.IP)
@@ -199,8 +201,25 @@ func SafeDialContext(allowPrivate bool) func(ctx context.Context, network, addr 
 				}
 			}
 		}
+		// Dial a validated IP rather than the original hostname: re-resolving
+		// here would allow a DNS-rebinding TOCTOU between the check and dial.
 		var dialer net.Dialer
-		return dialer.DialContext(ctx, network, addr)
+		var lastErr error
+		for _, ip := range ips {
+			target := addr
+			if port != "" {
+				target = net.JoinHostPort(ip.String(), port)
+			}
+			conn, dialErr := dialer.DialContext(ctx, network, target)
+			if dialErr == nil {
+				return conn, nil
+			}
+			lastErr = dialErr
+		}
+		if lastErr == nil {
+			lastErr = fmt.Errorf("httpclient: no addresses to dial for %q", host)
+		}
+		return nil, lastErr
 	}
 }
 
