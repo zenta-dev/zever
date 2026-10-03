@@ -36,7 +36,7 @@ func primaryKeyField(e *ir.Entity) *ir.Field {
 // treated as absent so the column falls back to an unbounded text type.
 func maxLen(f *ir.Field) (int64, bool) {
 	for _, v := range f.Validate {
-		if v.Kind != "max_len" {
+		if v.Kind != ir.ValidationMaxLen {
 			continue
 		}
 

@@ -178,15 +178,16 @@ func AvgOver[T any, V Numeric](c Column[T, V]) WindowExpr[T] {
 	return WindowExpr[T]{agg: &Aggregate{Func: AggAvg, Column: name}, alias: "avg_" + name}
 }
 
-// MinOver builds a MIN(c) OVER (...) aggregate-window expression.
-func MinOver[T any, V any](c Column[T, V]) WindowExpr[T] {
+// MinOver builds a MIN(c) OVER (...) aggregate-window expression. V is
+// constrained to Orderable, matching Min's constraint in agg.go.
+func MinOver[T any, V Orderable](c Column[T, V]) WindowExpr[T] {
 	name := c.Col().Name()
 
 	return WindowExpr[T]{agg: &Aggregate{Func: AggMin, Column: name}, alias: "min_" + name}
 }
 
 // MaxOver builds a MAX(c) OVER (...) aggregate-window expression.
-func MaxOver[T any, V any](c Column[T, V]) WindowExpr[T] {
+func MaxOver[T any, V Orderable](c Column[T, V]) WindowExpr[T] {
 	name := c.Col().Name()
 
 	return WindowExpr[T]{agg: &Aggregate{Func: AggMax, Column: name}, alias: "max_" + name}
@@ -210,7 +211,7 @@ func AvgNullableOver[T any, V Numeric](c NullableColumn[T, V]) WindowExpr[T] {
 
 // MinNullableOver builds a MIN(c) OVER (...) expression over a nullable
 // column.
-func MinNullableOver[T any, V any](c NullableColumn[T, V]) WindowExpr[T] {
+func MinNullableOver[T any, V Orderable](c NullableColumn[T, V]) WindowExpr[T] {
 	name := c.Col().Name()
 
 	return WindowExpr[T]{agg: &Aggregate{Func: AggMin, Column: name}, alias: "min_" + name}
@@ -218,7 +219,7 @@ func MinNullableOver[T any, V any](c NullableColumn[T, V]) WindowExpr[T] {
 
 // MaxNullableOver builds a MAX(c) OVER (...) expression over a nullable
 // column.
-func MaxNullableOver[T any, V any](c NullableColumn[T, V]) WindowExpr[T] {
+func MaxNullableOver[T any, V Orderable](c NullableColumn[T, V]) WindowExpr[T] {
 	name := c.Col().Name()
 
 	return WindowExpr[T]{agg: &Aggregate{Func: AggMax, Column: name}, alias: "max_" + name}

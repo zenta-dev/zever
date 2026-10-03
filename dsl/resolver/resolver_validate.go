@@ -53,7 +53,7 @@ func resolveValidateRules(attr *ast.Attribute, scalar ir.ScalarType) ([]ir.Valid
 		}
 
 		vals = append(vals, ir.Validation{
-			Kind: kind,
+			Kind: ir.ValidationKind(kind),
 			Args: map[string]any{"value": value},
 			Pos:  arg.Pos,
 		})

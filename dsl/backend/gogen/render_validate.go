@@ -145,38 +145,45 @@ func writeValidationCheck(b *strings.Builder, fieldExpr, errName string, v ir.Va
 	value := v.Args["value"]
 
 	switch v.Kind {
-	case "format":
+	case ir.ValidationFormat:
 		writeFormatCheck(b, fieldExpr, errName, value, imports)
-	case "min_len":
+	case ir.ValidationMinLen:
 		n := numericLiteral(value)
 		fmt.Fprintf(b, "\tif len(%s) < %s {\n", fieldExpr, n)
 		fmt.Fprintf(b, "\t\treturn apperror.New(apperror.InvalidArgument, %q)\n", errName+": must be at least "+n+" characters long")
 		b.WriteString("\t}\n\n")
-	case "max_len":
+	case ir.ValidationMaxLen:
 		n := numericLiteral(value)
 		fmt.Fprintf(b, "\tif len(%s) > %s {\n", fieldExpr, n)
 		fmt.Fprintf(b, "\t\treturn apperror.New(apperror.InvalidArgument, %q)\n", errName+": must be at most "+n+" characters long")
 		b.WriteString("\t}\n\n")
-	case "gt":
+	case ir.ValidationGT:
 		n := numericLiteral(value)
 		fmt.Fprintf(b, "\tif %s <= %s {\n", fieldExpr, n)
 		fmt.Fprintf(b, "\t\treturn apperror.New(apperror.InvalidArgument, %q)\n", errName+": must be greater than "+n)
 		b.WriteString("\t}\n\n")
-	case "gte":
+	case ir.ValidationGTE:
 		n := numericLiteral(value)
 		fmt.Fprintf(b, "\tif %s < %s {\n", fieldExpr, n)
 		fmt.Fprintf(b, "\t\treturn apperror.New(apperror.InvalidArgument, %q)\n", errName+": must be greater than or equal to "+n)
 		b.WriteString("\t}\n\n")
-	case "lt":
+	case ir.ValidationLT:
 		n := numericLiteral(value)
 		fmt.Fprintf(b, "\tif %s >= %s {\n", fieldExpr, n)
 		fmt.Fprintf(b, "\t\treturn apperror.New(apperror.InvalidArgument, %q)\n", errName+": must be less than "+n)
 		b.WriteString("\t}\n\n")
-	case "lte":
+	case ir.ValidationLTE:
 		n := numericLiteral(value)
 		fmt.Fprintf(b, "\tif %s > %s {\n", fieldExpr, n)
 		fmt.Fprintf(b, "\t\treturn apperror.New(apperror.InvalidArgument, %q)\n", errName+": must be less than or equal to "+n)
 		b.WriteString("\t}\n\n")
+	default:
+		// resolver.resolveValidateRules guarantees every ir.Validation.Kind is
+		// one of the seven constants above before this backend ever runs; a
+		// mismatch here means that invariant broke upstream, so fail loudly
+		// (matching writeFormatCheck/numericLiteral's invariant guards)
+		// instead of silently emitting no validation check at all.
+		panic(fmt.Sprintf("gogen: writeValidationCheck: unexpected validation kind %q (resolver invariant violated)", v.Kind))
 	}
 }
 

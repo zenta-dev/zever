@@ -47,30 +47,37 @@ func applyValidation(schema *schemaObject, rules []ir.Validation) {
 		value := v.Args["value"]
 
 		switch v.Kind {
-		case "format":
+		case ir.ValidationFormat:
 			if s, ok := value.(string); ok {
 				schema.Format = openAPIFormatName(s)
 			}
-		case "min_len":
+		case ir.ValidationMinLen:
 			n := int(toInt64(value))
 			schema.MinLength = &n
-		case "max_len":
+		case ir.ValidationMaxLen:
 			n := int(toInt64(value))
 			schema.MaxLength = &n
-		case "gt":
+		case ir.ValidationGT:
 			f := toFloat64(value)
 			schema.Minimum = &f
 			schema.ExclusiveMinimum = true
-		case "gte":
+		case ir.ValidationGTE:
 			f := toFloat64(value)
 			schema.Minimum = &f
-		case "lt":
+		case ir.ValidationLT:
 			f := toFloat64(value)
 			schema.Maximum = &f
 			schema.ExclusiveMaximum = true
-		case "lte":
+		case ir.ValidationLTE:
 			f := toFloat64(value)
 			schema.Maximum = &f
+		default:
+			// resolver.resolveValidateRules guarantees every ir.Validation.Kind
+			// is one of the seven constants above before this backend ever
+			// runs; a mismatch here means that invariant broke upstream, so
+			// fail loudly (matching toInt64/toFloat64's invariant guards)
+			// instead of silently emitting a schema with no constraint.
+			panic(fmt.Sprintf("openapi: applyValidation: unexpected validation kind %q (resolver invariant violated)", v.Kind))
 		}
 	}
 }

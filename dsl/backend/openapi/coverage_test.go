@@ -387,7 +387,7 @@ func TestApplyValidation_table(t *testing.T) {
 	}{
 		{
 			name:  "format non-string ignored",
-			rules: []ir.Validation{{Kind: "format", Args: map[string]any{"value": int64(7)}}},
+			rules: []ir.Validation{{Kind: ir.ValidationFormat, Args: map[string]any{"value": int64(7)}}},
 			check: func(t *testing.T, s *schemaObject) {
 				t.Helper()
 				if s.Format != "" {
@@ -396,18 +396,8 @@ func TestApplyValidation_table(t *testing.T) {
 			},
 		},
 		{
-			name:  "unknown kind ignored",
-			rules: []ir.Validation{{Kind: "bogus", Args: map[string]any{"value": int64(1)}}},
-			check: func(t *testing.T, s *schemaObject) {
-				t.Helper()
-				if s.Format != "" || s.MinLength != nil || s.Minimum != nil {
-					t.Fatalf("unknown kind mutated the schema: %+v", s)
-				}
-			},
-		},
-		{
 			name:  "min_len float64",
-			rules: []ir.Validation{{Kind: "min_len", Args: map[string]any{"value": float64(3)}}},
+			rules: []ir.Validation{{Kind: ir.ValidationMinLen, Args: map[string]any{"value": float64(3)}}},
 			check: func(t *testing.T, s *schemaObject) {
 				t.Helper()
 				if s.MinLength == nil || *s.MinLength != 3 {
@@ -417,7 +407,7 @@ func TestApplyValidation_table(t *testing.T) {
 		},
 		{
 			name:  "gt int64",
-			rules: []ir.Validation{{Kind: "gt", Args: map[string]any{"value": int64(2)}}},
+			rules: []ir.Validation{{Kind: ir.ValidationGT, Args: map[string]any{"value": int64(2)}}},
 			check: func(t *testing.T, s *schemaObject) {
 				t.Helper()
 				if s.Minimum == nil || *s.Minimum != 2 || !s.ExclusiveMinimum {
@@ -427,7 +417,7 @@ func TestApplyValidation_table(t *testing.T) {
 		},
 		{
 			name:  "gte float64",
-			rules: []ir.Validation{{Kind: "gte", Args: map[string]any{"value": float64(1.5)}}},
+			rules: []ir.Validation{{Kind: ir.ValidationGTE, Args: map[string]any{"value": float64(1.5)}}},
 			check: func(t *testing.T, s *schemaObject) {
 				t.Helper()
 				if s.Minimum == nil || *s.Minimum != 1.5 || s.ExclusiveMinimum {
@@ -437,7 +427,7 @@ func TestApplyValidation_table(t *testing.T) {
 		},
 		{
 			name:  "lte int64",
-			rules: []ir.Validation{{Kind: "lte", Args: map[string]any{"value": int64(9)}}},
+			rules: []ir.Validation{{Kind: ir.ValidationLTE, Args: map[string]any{"value": int64(9)}}},
 			check: func(t *testing.T, s *schemaObject) {
 				t.Helper()
 				if s.Maximum == nil || *s.Maximum != 9 || s.ExclusiveMaximum {
@@ -458,6 +448,25 @@ func TestApplyValidation_table(t *testing.T) {
 	}
 }
 
+// TestApplyValidation_unknownKindPanics pins the fail-closed default added
+// when ir.Validation.Kind became a typed ValidationKind: a rule whose kind is
+// not one of the seven resolver-produced constants means the resolver
+// invariant broke upstream, so applyValidation panics (matching toInt64/
+// toFloat64's invariant guards) instead of silently emitting a schema with
+// no constraint.
+func TestApplyValidation_unknownKindPanics(t *testing.T) {
+	t.Parallel()
+
+	defer func() {
+		if recover() == nil {
+			t.Fatal("applyValidation with an unknown kind did not panic")
+		}
+	}()
+
+	s := &schemaObject{Type: "string"}
+	applyValidation(s, []ir.Validation{{Kind: "bogus", Args: map[string]any{"value": int64(1)}}})
+}
+
 // TestApplyValidation_nonNumericPanics covers the fix for max_len/lt (and
 // every other numeric @validate kind) silently defaulting to a 0 bound when
 // given a non-numeric Args["value"] -- a resolver-invariant violation must
@@ -465,10 +474,17 @@ func TestApplyValidation_table(t *testing.T) {
 // into generated OpenAPI with no diagnostic.
 func TestApplyValidation_nonNumericPanics(t *testing.T) {
 	t.Parallel()
-
-	for _, kind := range []string{"min_len", "max_len", "gt", "gte", "lt", "lte"} {
-		t.Run(kind, func(t *testing.T) {
+	for _, kind := range []ir.ValidationKind{
+		ir.ValidationMinLen,
+		ir.ValidationMaxLen,
+		ir.ValidationGT,
+		ir.ValidationGTE,
+		ir.ValidationLT,
+		ir.ValidationLTE,
+	} {
+		t.Run(string(kind), func(t *testing.T) {
 			t.Parallel()
+
 			defer func() {
 				if recover() == nil {
 					t.Fatalf("applyValidation(%s) with a string value did not panic", kind)

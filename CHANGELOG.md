@@ -79,6 +79,36 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Changed
 
+- **Breaking:** `orm.Min`/`orm.Max`/`orm.MinNullable`/`orm.MaxNullable` and
+  the four window variants (`orm.MinOver`/`orm.MaxOver`/
+  `orm.MinNullableOver`/`orm.MaxNullableOver`) now constrain their column
+  value type to the new exported `orm.Orderable` constraint (the
+  `~int* | ~uint* | ~float* | ~string` union plus `time.Time` — stdlib
+  `cmp.Ordered` omits `time.Time`, which SQL MIN/MAX do order). Previously
+  `V any` let MIN/MAX compile over non-orderable columns (e.g. `bool`,
+  `[]byte`) and fail only at runtime; now such misuse is a compile error.
+  Migration: none for orderable columns (all existing call sites are
+  `int*`/`float*`/`string`/`time.Time`); a MIN/MAX over a non-orderable
+  column was never valid SQL anyway.
+- **Breaking:** `orm.StringAgg` now constrains its column value type to
+  `~string` (`V ~string` in place of `V any`): the SQL `string_agg(c, ...)`
+  concatenates its argument as text, so a non-string column type was a
+  programmer error that compiled silently. Migration: none for string
+  columns; non-string use was never meaningful.
+- **Breaking:** `ir.Validation.Kind` and `ir.DefaultValue.Kind` are now typed
+  `ir.ValidationKind` / `ir.DefaultKind` (exported string types with
+  constants `ir.ValidationFormat`/`ValidationMinLen`/`ValidationMaxLen`/
+  `ValidationGT`/`ValidationGTE`/`ValidationLT`/`ValidationLTE` and
+  `ir.DefaultLiteral`/`DefaultNow`) instead of bare `string`. Every consumer
+  switch (gogen `writeValidationCheck`, openapi `applyValidation`) now
+  lists all kinds exhaustively and fails closed with a panic on an unknown
+  kind, mirroring the existing invariant-guard style — a new kind added to
+  the resolver now forces every switch site to handle it at compile time.
+  Migration: code comparing `Kind` against string literals still compiles
+  (untyped constants convert); switch sites should move to the typed
+  constants. The openapi behavior change is observable: a validation rule
+  with an out-of-set kind now panics at render time instead of being
+  silently skipped (resolver-produced IR never triggers it).
 - Bounded connection-pool defaults for the `sqlite` and `postgres` `db`
   adapters when `MaxConns` is left at zero: file-backed `sqlite` now caps
   `database/sql`'s previously unlimited pool at `max(1, GOMAXPROCS)`, and
