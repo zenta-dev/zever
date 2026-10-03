@@ -79,7 +79,7 @@ func JoinUserPosts(left orm.Query[User, *User], joinType orm.JoinType) orm.Join2
 }
 
 // LeftJoinUserPosts starts a null-safe LEFT JOIN from Users through the "posts" relation: an
-// unmatched User row comes back with an explicit orm.Option[Post] rather
+// unmatched User row comes back with an explicit orm.Nullable[Post] rather
 // than a zero-valued struct that could be mistaken for a real match.
 func LeftJoinUserPosts(left orm.Query[User, *User]) orm.LeftJoin2[User, *User, Post, *Post] {
 	return orm.LeftJoinOn(left, UserPostsRel)
@@ -99,7 +99,7 @@ func JoinUserOrders(left orm.Query[User, *User], joinType orm.JoinType) orm.Join
 }
 
 // LeftJoinUserOrders starts a null-safe LEFT JOIN from Users through the "orders" relation: an
-// unmatched User row comes back with an explicit orm.Option[Order] rather
+// unmatched User row comes back with an explicit orm.Nullable[Order] rather
 // than a zero-valued struct that could be mistaken for a real match.
 func LeftJoinUserOrders(left orm.Query[User, *User]) orm.LeftJoin2[User, *User, Order, *Order] {
 	return orm.LeftJoinOn(left, UserOrdersRel)
@@ -165,7 +165,7 @@ func JoinCategoryProducts(left orm.Query[Category, *Category], joinType orm.Join
 }
 
 // LeftJoinCategoryProducts starts a null-safe LEFT JOIN from Categories through the "products" relation: an
-// unmatched Category row comes back with an explicit orm.Option[Product] rather
+// unmatched Category row comes back with an explicit orm.Nullable[Product] rather
 // than a zero-valued struct that could be mistaken for a real match.
 func LeftJoinCategoryProducts(left orm.Query[Category, *Category]) orm.LeftJoin2[Category, *Category, Product, *Product] {
 	return orm.LeftJoinOn(left, CategoryProductsRel)
@@ -242,7 +242,7 @@ func JoinProductCategory(left orm.Query[Product, *Product], joinType orm.JoinTyp
 }
 
 // LeftJoinProductCategory starts a null-safe LEFT JOIN from Products through the "category" relation: an
-// unmatched Product row comes back with an explicit orm.Option[Category] rather
+// unmatched Product row comes back with an explicit orm.Nullable[Category] rather
 // than a zero-valued struct that could be mistaken for a real match.
 func LeftJoinProductCategory(left orm.Query[Product, *Product]) orm.LeftJoin2[Product, *Product, Category, *Category] {
 	return orm.LeftJoinOn(left, ProductCategoryRel)
@@ -313,7 +313,7 @@ func JoinOrderUser(left orm.Query[Order, *Order], joinType orm.JoinType) orm.Joi
 }
 
 // LeftJoinOrderUser starts a null-safe LEFT JOIN from Orders through the "user" relation: an
-// unmatched Order row comes back with an explicit orm.Option[User] rather
+// unmatched Order row comes back with an explicit orm.Nullable[User] rather
 // than a zero-valued struct that could be mistaken for a real match.
 func LeftJoinOrderUser(left orm.Query[Order, *Order]) orm.LeftJoin2[Order, *Order, User, *User] {
 	return orm.LeftJoinOn(left, OrderUserRel)
@@ -333,7 +333,7 @@ func JoinOrderItems(left orm.Query[Order, *Order], joinType orm.JoinType) orm.Jo
 }
 
 // LeftJoinOrderItems starts a null-safe LEFT JOIN from Orders through the "items" relation: an
-// unmatched Order row comes back with an explicit orm.Option[OrderItem] rather
+// unmatched Order row comes back with an explicit orm.Nullable[OrderItem] rather
 // than a zero-valued struct that could be mistaken for a real match.
 func LeftJoinOrderItems(left orm.Query[Order, *Order]) orm.LeftJoin2[Order, *Order, OrderItem, *OrderItem] {
 	return orm.LeftJoinOn(left, OrderItemsRel)
@@ -396,7 +396,7 @@ func JoinOrderItemOrder(left orm.Query[OrderItem, *OrderItem], joinType orm.Join
 }
 
 // LeftJoinOrderItemOrder starts a null-safe LEFT JOIN from OrderItems through the "order" relation: an
-// unmatched OrderItem row comes back with an explicit orm.Option[Order] rather
+// unmatched OrderItem row comes back with an explicit orm.Nullable[Order] rather
 // than a zero-valued struct that could be mistaken for a real match.
 func LeftJoinOrderItemOrder(left orm.Query[OrderItem, *OrderItem]) orm.LeftJoin2[OrderItem, *OrderItem, Order, *Order] {
 	return orm.LeftJoinOn(left, OrderItemOrderRel)
@@ -416,7 +416,7 @@ func JoinOrderItemProduct(left orm.Query[OrderItem, *OrderItem], joinType orm.Jo
 }
 
 // LeftJoinOrderItemProduct starts a null-safe LEFT JOIN from OrderItems through the "product" relation: an
-// unmatched OrderItem row comes back with an explicit orm.Option[Product] rather
+// unmatched OrderItem row comes back with an explicit orm.Nullable[Product] rather
 // than a zero-valued struct that could be mistaken for a real match.
 func LeftJoinOrderItemProduct(left orm.Query[OrderItem, *OrderItem]) orm.LeftJoin2[OrderItem, *OrderItem, Product, *Product] {
 	return orm.LeftJoinOn(left, OrderItemProductRel)
@@ -490,7 +490,7 @@ func JoinPostAuthor(left orm.Query[Post, *Post], joinType orm.JoinType) orm.Join
 }
 
 // LeftJoinPostAuthor starts a null-safe LEFT JOIN from Posts through the "author" relation: an
-// unmatched Post row comes back with an explicit orm.Option[User] rather
+// unmatched Post row comes back with an explicit orm.Nullable[User] rather
 // than a zero-valued struct that could be mistaken for a real match.
 func LeftJoinPostAuthor(left orm.Query[Post, *Post]) orm.LeftJoin2[Post, *Post, User, *User] {
 	return orm.LeftJoinOn(left, PostAuthorRel)
@@ -510,7 +510,7 @@ func JoinPostComments(left orm.Query[Post, *Post], joinType orm.JoinType) orm.Jo
 }
 
 // LeftJoinPostComments starts a null-safe LEFT JOIN from Posts through the "comments" relation: an
-// unmatched Post row comes back with an explicit orm.Option[Comment] rather
+// unmatched Post row comes back with an explicit orm.Nullable[Comment] rather
 // than a zero-valued struct that could be mistaken for a real match.
 func LeftJoinPostComments(left orm.Query[Post, *Post]) orm.LeftJoin2[Post, *Post, Comment, *Comment] {
 	return orm.LeftJoinOn(left, PostCommentsRel)
@@ -579,7 +579,7 @@ func JoinCommentPost(left orm.Query[Comment, *Comment], joinType orm.JoinType) o
 }
 
 // LeftJoinCommentPost starts a null-safe LEFT JOIN from Comments through the "post" relation: an
-// unmatched Comment row comes back with an explicit orm.Option[Post] rather
+// unmatched Comment row comes back with an explicit orm.Nullable[Post] rather
 // than a zero-valued struct that could be mistaken for a real match.
 func LeftJoinCommentPost(left orm.Query[Comment, *Comment]) orm.LeftJoin2[Comment, *Comment, Post, *Post] {
 	return orm.LeftJoinOn(left, CommentPostRel)
@@ -599,7 +599,7 @@ func JoinCommentUser(left orm.Query[Comment, *Comment], joinType orm.JoinType) o
 }
 
 // LeftJoinCommentUser starts a null-safe LEFT JOIN from Comments through the "user" relation: an
-// unmatched Comment row comes back with an explicit orm.Option[User] rather
+// unmatched Comment row comes back with an explicit orm.Nullable[User] rather
 // than a zero-valued struct that could be mistaken for a real match.
 func LeftJoinCommentUser(left orm.Query[Comment, *Comment]) orm.LeftJoin2[Comment, *Comment, User, *User] {
 	return orm.LeftJoinOn(left, CommentUserRel)

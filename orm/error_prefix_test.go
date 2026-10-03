@@ -17,16 +17,3 @@ func TestNewCTENameErrorPrefix(t *testing.T) {
 		}
 	}
 }
-
-func TestOptionScanUnsupportedTypeErrorPrefix(t *testing.T) {
-	var o Option[chan int]
-
-	err := o.Scan("x")
-	if err == nil {
-		t.Fatal("Scan into Option[chan int] = nil error, want an error")
-	}
-
-	if !strings.HasPrefix(err.Error(), "orm:") {
-		t.Fatalf("Scan error = %q, want orm: prefix", err)
-	}
-}

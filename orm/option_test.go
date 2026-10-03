@@ -8,7 +8,7 @@ import (
 )
 
 func TestOptionSomeNone(t *testing.T) {
-	s := Some(42)
+	s := Some(int64(42))
 	if !s.IsSome() {
 		t.Fatalf("Some(42).IsSome() = false, want true")
 	}
@@ -18,7 +18,7 @@ func TestOptionSomeNone(t *testing.T) {
 		t.Fatalf("Get() = (%v, %v), want (42, true)", v, ok)
 	}
 
-	n := None[int]()
+	n := None[int64]()
 	if n.IsSome() {
 		t.Fatalf("None[int]().IsSome() = true, want false")
 	}
@@ -30,11 +30,11 @@ func TestOptionSomeNone(t *testing.T) {
 }
 
 func TestOptionGetOr(t *testing.T) {
-	if got := Some(5).GetOr(9); got != 5 {
+	if got := Some(int64(5)).GetOr(9); got != 5 {
 		t.Fatalf("Some(5).GetOr(9) = %d, want 5", got)
 	}
 
-	if got := None[int]().GetOr(9); got != 9 {
+	if got := None[int64]().GetOr(9); got != 9 {
 		t.Fatalf("None[int]().GetOr(9) = %d, want 9", got)
 	}
 }
@@ -381,13 +381,6 @@ func TestScanTimeCoercesToRFC3339Nano(t *testing.T) {
 			t.Fatal("scanBool(time) succeeded, want error")
 		}
 	})
-}
-
-func TestOptionScanUnsupportedType(t *testing.T) {
-	var o Option[chan int]
-	if err := o.Scan("x"); err == nil {
-		t.Fatalf("Scan into Option[chan int] succeeded, want error")
-	}
 }
 
 func TestOptionScanWrongSourceType(t *testing.T) {

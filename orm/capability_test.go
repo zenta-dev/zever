@@ -485,7 +485,7 @@ func TestJoinCapabilityGate(t *testing.T) {
 	left := From[joinUser](joinUsers)
 
 	// Stream hands the gate error through the iterator, not a call return.
-	streamErr := func(it iter.Seq2[Row2[Option[joinUser], joinOrder], error]) error {
+	streamErr := func(it iter.Seq2[Row2[Nullable[joinUser], joinOrder], error]) error {
 		for _, err := range it {
 			return err
 		}

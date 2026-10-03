@@ -85,7 +85,7 @@ func TestLateralRenderPostgres(t *testing.T) {
 }
 
 // TestLateralRenderLeftPostgres renders the LEFT JOIN LATERAL ... ON TRUE
-// shape and its Row2[A, Option[B]] contract's SQL.
+// shape and its Row2[A, Nullable[B]] contract's SQL.
 func TestLateralRenderLeftPostgres(t *testing.T) {
 	inner := From(widgetOrders).Where(orderWidgetID.EqOuter(Outer(widgetID))).Limit(1)
 
@@ -351,7 +351,7 @@ func TestLateralCrossAllScans(t *testing.T) {
 }
 
 // TestLateralLeftAllScansNone proves the LEFT JOIN LATERAL scan path turns
-// an all-NULL inner side into Option[B]{}.IsSome() == false, never a
+// an all-NULL inner side into Nullable[B]{}.IsSome() == false, never a
 // same-shaped zero-valued B{}.
 func TestLateralLeftAllScansNone(t *testing.T) {
 	ctx := t.Context()
