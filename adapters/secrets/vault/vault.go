@@ -102,8 +102,8 @@ func (d *driver) Get(ctx context.Context, name string) ([]byte, error) {
 			Data map[string]string `json:"data"`
 		} `json:"data"`
 	}
-	if err := json.NewDecoder(resp.Body).Decode(&out); err != nil {
-		return nil, fmt.Errorf("vault: get %s: decode: %w", name, err)
+	if decErr := json.NewDecoder(resp.Body).Decode(&out); decErr != nil {
+		return nil, fmt.Errorf("vault: get %s: decode: %w", name, decErr)
 	}
 	raw, ok := out.Data.Data["value"]
 	if !ok {
