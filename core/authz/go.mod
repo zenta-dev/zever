@@ -13,6 +13,7 @@ require (
 require (
 	github.com/zenta-dev/zever/core/db v0.5.3 // indirect
 	github.com/zenta-dev/zever/core/session v0.5.3 // indirect
+	github.com/zenta-dev/zever/shared/endpoint v0.5.3 // indirect
 	github.com/zenta-dev/zever/shared/redisopt v0.5.3 // indirect
 	github.com/zenta-dev/zever/shared/registry v0.5.3 // indirect
 	golang.org/x/net v0.58.0 // indirect
@@ -42,3 +43,5 @@ replace github.com/zenta-dev/zever/shared/redisopt => ../../shared/redisopt
 replace github.com/zenta-dev/zever/shared/registry => ../../shared/registry
 
 replace github.com/zenta-dev/zever/core/db => ../db
+
+replace github.com/zenta-dev/zever/shared/endpoint => ../../shared/endpoint

@@ -111,6 +111,7 @@ func newAdapter(t *testing.T, idp *fakeIDP) auth.Auth {
 	opts := auth.Options{}
 	opts.OIDC.Issuer = idp.srv.URL
 	opts.OIDC.ClientID = "test-client"
+	opts.OIDC.AllowInsecure = true
 	a, err := oidc.New(opts)
 	if err != nil {
 		t.Fatalf("oidc.New: %s", err)
@@ -277,8 +278,10 @@ func TestNew_InvalidOptions(t *testing.T) {
 	idp := newFakeIDP(t)
 
 	cases := map[string]func(*auth.Options){
-		"empty issuer":   func(o *auth.Options) { o.OIDC.Issuer = ""; o.OIDC.ClientID = "c" },
-		"empty clientID": func(o *auth.Options) { o.OIDC.Issuer = idp.srv.URL; o.OIDC.ClientID = "" },
+		"empty issuer":     func(o *auth.Options) { o.OIDC.Issuer = ""; o.OIDC.ClientID = "c" },
+		"empty clientID":   func(o *auth.Options) { o.OIDC.Issuer = idp.srv.URL; o.OIDC.ClientID = "" },
+		"insecure issuer":  func(o *auth.Options) { o.OIDC.Issuer = "http://idp.example.com"; o.OIDC.ClientID = "c" },
+		"issuer no scheme": func(o *auth.Options) { o.OIDC.Issuer = "idp.example.com"; o.OIDC.ClientID = "c" },
 	}
 	for name, mutate := range cases {
 		t.Run(name, func(t *testing.T) {
@@ -323,9 +326,29 @@ func TestNew_DiscoveryFailure(t *testing.T) {
 	opts := auth.Options{}
 	opts.OIDC.Issuer = url
 	opts.OIDC.ClientID = "test-client"
+	opts.OIDC.AllowInsecure = true
 
 	if _, err := oidc.New(opts); err == nil {
 		t.Fatal("New with dead issuer: want error, got nil")
+	}
+}
+
+func TestNew_RefusesPrivateIssuer(t *testing.T) {
+	t.Parallel()
+
+	// https issuer keeps the scheme check happy; the safe client must still
+	// refuse the loopback dial (allowPrivate is false without AllowInsecure).
+	opts := auth.Options{}
+	opts.OIDC.Issuer = "https://127.0.0.1"
+	opts.OIDC.ClientID = "test-client"
+	opts.OIDC.Timeout = time.Second
+
+	_, err := oidc.New(opts)
+	if err == nil {
+		t.Fatal("New with private issuer: want error, got nil")
+	}
+	if !strings.Contains(err.Error(), "refusing to dial private address") {
+		t.Fatalf("New err = %v, want private-address refusal", err)
 	}
 }
 
@@ -341,6 +364,7 @@ func TestNew_Timeout(t *testing.T) {
 	opts := auth.Options{}
 	opts.OIDC.Issuer = srv.URL
 	opts.OIDC.ClientID = "test-client"
+	opts.OIDC.AllowInsecure = true
 	opts.OIDC.Timeout = 200 * time.Millisecond
 
 	start := time.Now()

@@ -53,3 +53,36 @@ func TestOptions_positive_valid(t *testing.T) {
 		t.Fatalf("positive Options Validate err = %v", err)
 	}
 }
+
+func TestOptions_oidc_issuer_scheme(t *testing.T) {
+	t.Parallel()
+
+	cases := []struct {
+		name          string
+		issuer        string
+		allowInsecure bool
+		wantErr       bool
+	}{
+		{"empty valid", "", false, false},
+		{"https valid", "https://idp.example.com", false, false},
+		{"http insecure invalid", "http://idp.example.com", false, true},
+		{"http insecure allowed", "http://idp.example.com", true, false},
+		{"missing scheme invalid", "idp.example.com", false, true},
+		{"bare word invalid", "bogus", false, true},
+		{"unsupported scheme invalid", "ftp://idp.example.com", false, true},
+	}
+	for _, tc := range cases {
+		t.Run(tc.name, func(t *testing.T) {
+			t.Parallel()
+
+			err := Options{OIDC: OIDCOptions{Issuer: tc.issuer, AllowInsecure: tc.allowInsecure}}.Validate()
+			if tc.wantErr && !errors.Is(err, ErrInvalidOptions) {
+				t.Fatalf("Validate(%q, insecure=%v) err = %v, want ErrInvalidOptions", tc.issuer, tc.allowInsecure, err)
+			}
+
+			if !tc.wantErr && err != nil {
+				t.Fatalf("Validate(%q, insecure=%v) err = %v, want nil", tc.issuer, tc.allowInsecure, err)
+			}
+		})
+	}
+}
