@@ -61,11 +61,6 @@ func discardRespCommand(r *bufio.Reader) error {
 	return nil
 }
 
-// bulkReply encodes raw bytes as a RESP bulk string.
-func bulkReply(b []byte) string {
-	return "$" + strconv.Itoa(len(b)) + "\r\n" + string(b) + "\r\n"
-}
-
 // pipeClient builds a go-redis client over net.Pipe with canned RESP
 // replies, one per command. A HELLO rejection is prepended so the
 // handshake falls back to RESP2 without consuming script steps.
@@ -274,42 +269,6 @@ func TestCover_BeginSetNXProtoErr(t *testing.T) {
 	}
 }
 
-func TestCover_BeginNilRetry(t *testing.T) {
-	t.Parallel()
-
-	s := whiteStore(t, pipeClient(t, []string{":0\r\n", "$-1\r\n", ":1\r\n"}))
-
-	out, err := s.Begin(t.Context(), freshKey(t), idempotency.BeginOptions{Fingerprint: []byte("fp")})
-	if err != nil {
-		t.Fatalf("Begin err = %v, want nil", err)
-	}
-
-	if out.Replay {
-		t.Fatal("Begin Replay = true, want false (retry winner)")
-	}
-}
-
-func TestCover_BeginLoopExhaustion(t *testing.T) {
-	t.Parallel()
-
-	s := whiteStore(t, pipeClient(t, []string{":0\r\n", "$-1\r\n", ":0\r\n", "$-1\r\n", ":0\r\n", "$-1\r\n"}))
-
-	_, err := s.Begin(t.Context(), freshKey(t), idempotency.BeginOptions{Fingerprint: []byte("fp")})
-	if !errors.Is(err, idempotency.ErrInProgress) {
-		t.Fatalf("Begin exhausted err = %v, want ErrInProgress", err)
-	}
-}
-
-func TestCover_BeginGetErr(t *testing.T) {
-	t.Parallel()
-
-	s := whiteStore(t, pipeClient(t, []string{":0\r\n", "-ERR boom\r\n"}))
-
-	if _, err := s.Begin(t.Context(), freshKey(t), idempotency.BeginOptions{}); err == nil {
-		t.Fatal("Begin Get err = nil error, want error")
-	}
-}
-
 func TestCover_BeginDecodeErr(t *testing.T) {
 	t.Parallel()
 
@@ -374,52 +333,6 @@ func TestCover_CompleteDecodeErr(t *testing.T) {
 
 	if err := s.Complete(ctx, key, nil, []byte("r")); !errors.Is(err, idempotency.ErrCorruptRecord) {
 		t.Fatalf("Complete garbage err = %v, want ErrCorruptRecord", err)
-	}
-}
-
-func TestCover_CompleteSetErrOnMissing(t *testing.T) {
-	t.Parallel()
-
-	s := whiteStore(t, pipeClient(t, []string{"$-1\r\n", "-ERR boom\r\n"}))
-
-	if err := s.Complete(t.Context(), freshKey(t), nil, []byte("r")); err == nil {
-		t.Fatal("Complete Set err = nil error, want error")
-	}
-}
-
-func TestCover_CompleteFallbackSuccess(t *testing.T) {
-	t.Parallel()
-
-	fp := []byte("fp")
-	done := bulkReply(encodeDone(fp, []byte("old")))
-	s := whiteStore(t, pipeClient(t, []string{done, "$-1\r\n", "+OK\r\n"}))
-
-	if err := s.Complete(t.Context(), freshKey(t), fp, []byte("new")); err != nil {
-		t.Fatalf("Complete fallback err = %v, want nil", err)
-	}
-}
-
-func TestCover_CompleteFallbackSetErr(t *testing.T) {
-	t.Parallel()
-
-	fp := []byte("fp")
-	done := bulkReply(encodeDone(fp, []byte("old")))
-	s := whiteStore(t, pipeClient(t, []string{done, "$-1\r\n", "-ERR boom\r\n"}))
-
-	if err := s.Complete(t.Context(), freshKey(t), fp, []byte("new")); err == nil {
-		t.Fatal("Complete fallback Set err = nil error, want error")
-	}
-}
-
-func TestCover_CompleteSetArgsErr(t *testing.T) {
-	t.Parallel()
-
-	fp := []byte("fp")
-	done := bulkReply(encodeDone(fp, []byte("old")))
-	s := whiteStore(t, pipeClient(t, []string{done, "-ERR boom\r\n"}))
-
-	if err := s.Complete(t.Context(), freshKey(t), fp, []byte("new")); err == nil {
-		t.Fatal("Complete SetArgs err = nil error, want error")
 	}
 }
 

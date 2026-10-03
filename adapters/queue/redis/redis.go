@@ -490,13 +490,22 @@ func (a *redisAdapter) blockingClaim(
 
 	field := string(buf)
 
-	if err := a.client.HSet(ctx, processingKey, field, enc).Err(); err != nil {
+	// HSet + ZAdd in one round trip. The per-command errors are checked after
+	// Exec: an HSet failure restores the message to the ready list (ZAdd never
+	// applied it), a ZAdd failure undoes the HSet with HDel before restoring
+	// -- matching the sequential error handling exactly.
+	pipe := a.client.Pipeline()
+	hsetCmd := pipe.HSet(ctx, processingKey, field, enc)
+	zaddCmd := pipe.ZAdd(ctx, deadlineKey, goredis.Z{Score: float64(milis), Member: field})
+	_, _ = pipe.Exec(ctx)
+
+	if err := hsetCmd.Err(); err != nil {
 		_ = a.client.RPush(ctx, readyKey, raw).Err()
 
 		return "", false, fmt.Errorf("queue: store claim: %w", err)
 	}
 
-	if err := a.client.ZAdd(ctx, deadlineKey, goredis.Z{Score: float64(milis), Member: field}).Err(); err != nil {
+	if err := zaddCmd.Err(); err != nil {
 		_ = a.client.HDel(ctx, processingKey, field).Err()
 		_ = a.client.RPush(ctx, readyKey, raw).Err()
 

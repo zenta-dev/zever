@@ -3,7 +3,6 @@ package redis
 import (
 	"context"
 	"encoding/binary"
-	"errors"
 	"fmt"
 	"math"
 	"sync/atomic"
@@ -22,10 +21,6 @@ const (
 
 	// defaultPrefix namespaces idempotency keys when no prefix is set.
 	defaultPrefix = "idem:"
-
-	// beginAttempts bounds the retry loop for the (rare) case where a
-	// reservation expires between our failed SET NX and the follow-up GET.
-	beginAttempts = 3
 )
 
 // DefaultPingTimeout bounds the startup connectivity check.
@@ -116,50 +111,36 @@ func (s *store) Begin(ctx context.Context, key string, opts idempotency.BeginOpt
 	}
 
 	k := s.redisKey(key)
+	mode, ttlVal := ttlModeVal(ttl)
 
-	for range beginAttempts {
-		won, err := s.client.SetNX(ctx, k, encodePending(opts.Fingerprint), ttl).Result()
-		if err != nil {
-			return idempotency.Outcome{}, fmt.Errorf("redis: begin claim: %w", err)
-		}
-
-		if won {
-			return idempotency.Outcome{}, nil
-		}
-
-		raw, err := s.client.Get(ctx, k).Bytes()
-		if errors.Is(err, goredis.Nil) {
-			// Winner expired mid-race; re-attempt the claim.
-			continue
-		}
-
-		if err != nil {
-			return idempotency.Outcome{}, fmt.Errorf("redis: begin get: %w", err)
-		}
-
-		tag, stored, result, err := decode(raw)
-		if err != nil {
-			// Never replay garbage: fail closed.
-			return idempotency.Outcome{}, fmt.Errorf("redis: begin decode: %w", err)
-		}
-
-		if !idempotency.FingerprintMatches(stored, opts.Fingerprint) {
-			return idempotency.Outcome{}, fmt.Errorf("redis: begin: %w", idempotency.ErrKeyMismatch)
-		}
-
-		if tag == tagPending {
-			return idempotency.Outcome{}, fmt.Errorf("redis: begin: %w", idempotency.ErrInProgress)
-		}
-
-		out := idempotency.Outcome{Replay: true}
-		if len(result) > 0 {
-			out.Result = append([]byte(nil), result...)
-		}
-
-		return out, nil
+	res, err := beginScript.Run(ctx, s.client, []string{k}, encodePending(opts.Fingerprint), mode, ttlVal, opts.Fingerprint).Result()
+	if err != nil {
+		return idempotency.Outcome{}, fmt.Errorf("redis: begin claim: %w", err)
 	}
 
-	return idempotency.Outcome{}, fmt.Errorf("redis: begin: %w", idempotency.ErrInProgress)
+	arr, ok := res.([]any)
+	if !ok || len(arr) != 3 {
+		return idempotency.Outcome{}, fmt.Errorf("redis: begin: unexpected result %v", res)
+	}
+
+	replay := asBool(arr[0])
+	result, _ := arr[1].(string)
+
+	switch status, _ := arr[2].(string); status {
+	case "in_progress":
+		return idempotency.Outcome{}, fmt.Errorf("redis: begin: %w", idempotency.ErrInProgress)
+	case "mismatch":
+		return idempotency.Outcome{}, fmt.Errorf("redis: begin: %w", idempotency.ErrKeyMismatch)
+	case "decode":
+		return idempotency.Outcome{}, fmt.Errorf("redis: begin decode: %w", idempotency.ErrCorruptRecord)
+	}
+
+	out := idempotency.Outcome{Replay: replay}
+	if replay && len(result) > 0 {
+		out.Result = append([]byte(nil), result...)
+	}
+
+	return out, nil
 }
 
 // Complete stores result for key and marks the record done. It reads the
@@ -186,45 +167,23 @@ func (s *store) Complete(ctx context.Context, key string, fingerprint, result []
 	}
 
 	k := s.redisKey(key)
-	done := encodeDone(fingerprint, result)
+	mode, ttlVal := ttlModeVal(s.ttl)
 
-	raw, err := s.client.Get(ctx, k).Bytes()
-	if errors.Is(err, goredis.Nil) {
-		if serr := s.client.Set(ctx, k, done, s.ttl).Err(); serr != nil {
-			return fmt.Errorf("redis: complete set: %w", serr)
-		}
-
-		return nil
-	}
-
+	res, err := completeScript.Run(ctx, s.client, []string{k}, encodeDone(fingerprint, result), mode, ttlVal, fingerprint).Result()
 	if err != nil {
-		return fmt.Errorf("redis: complete get: %w", err)
+		return fmt.Errorf("redis: complete: %w", err)
 	}
 
-	_, stored, _, err := decode(raw)
-	if err != nil {
-		return fmt.Errorf("redis: complete decode: %w", err)
+	arr, ok := res.([]any)
+	if !ok || len(arr) != 1 {
+		return fmt.Errorf("redis: complete: unexpected result %v", res)
 	}
 
-	if !idempotency.FingerprintMatches(stored, fingerprint) {
+	switch status, _ := arr[0].(string); status {
+	case "mismatch":
 		return fmt.Errorf("redis: complete: %w", idempotency.ErrKeyMismatch)
-	}
-
-	// XX + KeepTTL overwrites the reservation in place, preserving the
-	// deadline Begin set. If the reservation expired since the GET, fall
-	// back to a fresh write under the store TTL rather than dropping
-	// the result.
-	setErr := s.client.SetArgs(ctx, k, done, goredis.SetArgs{Mode: "XX", KeepTTL: true}).Err()
-	if setErr != nil {
-		if errors.Is(setErr, goredis.Nil) {
-			if ferr := s.client.Set(ctx, k, done, s.ttl).Err(); ferr != nil {
-				return fmt.Errorf("redis: complete set: %w", ferr)
-			}
-
-			return nil
-		}
-
-		return fmt.Errorf("redis: complete set: %w", setErr)
+	case "decode":
+		return fmt.Errorf("redis: complete decode: %w", idempotency.ErrCorruptRecord)
 	}
 
 	return nil
@@ -271,6 +230,40 @@ func checkFingerprint(fp []byte) error {
 	}
 
 	return nil
+}
+
+// asBool normalizes a Lua table element to a bool. Redis converts a Lua
+// boolean nested in a table to an integer reply, so the script's replay flag
+// can arrive as either a bool or an int64 depending on the reply path.
+func asBool(v any) bool {
+	switch x := v.(type) {
+	case bool:
+		return x
+	case int64:
+		return x != 0
+	case int:
+		return x != 0
+	default:
+		return false
+	}
+}
+
+// ttlModeVal replicates go-redis's SET expiration formatting so the Lua
+// scripts set exactly the duration the previous client calls would: a
+// duration that is not a whole number of seconds (or is sub-second) uses PX
+// with milliseconds, otherwise EX with seconds. The sub-millisecond case
+// truncates to 1ms, matching go-redis's formatMs.
+func ttlModeVal(ttl time.Duration) (string, int64) {
+	if ttl < time.Second || ttl%time.Second != 0 {
+		ms := ttl.Milliseconds()
+		if ttl > 0 && ms == 0 {
+			ms = 1
+		}
+
+		return "PX", ms
+	}
+
+	return "EX", int64(ttl / time.Second)
 }
 
 // encodePending builds a pending wire record: tag + fpLen + fingerprint.

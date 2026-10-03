@@ -416,11 +416,18 @@ func pgPathArray(steps []JSONStep) string {
 	return "'{" + strings.Join(parts, ",") + "}'"
 }
 
+// jsonQuoteReplacer backslash-escapes a backslash and a double quote, the
+// two characters that are special inside a double-quoted JSON-path key or
+// postgres array-literal element. It is hoisted to a package-level var
+// because it is immutable and concurrency-safe, so the per-call replacer
+// construction in pgArrayEscape and sqlitePathBody is avoided.
+var jsonQuoteReplacer = strings.NewReplacer(`\`, `\\`, `"`, `\"`)
+
 // pgArrayEscape escapes a key for use inside a double-quoted postgres
 // array-literal element: `"` and `\` are backslash-escaped, and any `'` is
 // doubled for the enclosing single-quoted literal.
 func pgArrayEscape(s string) string {
-	s = strings.NewReplacer(`\`, `\\`, `"`, `\"`).Replace(s)
+	s = jsonQuoteReplacer.Replace(s)
 
 	return strings.ReplaceAll(s, "'", "''")
 }
@@ -475,7 +482,7 @@ func sqlitePathBody(steps []JSONStep) string {
 		}
 
 		b.WriteString(`."`)
-		b.WriteString(strings.NewReplacer(`\`, `\\`, `"`, `\"`).Replace(s.Key))
+		b.WriteString(jsonQuoteReplacer.Replace(s.Key))
 		b.WriteByte('"')
 	}
 

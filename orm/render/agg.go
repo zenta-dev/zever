@@ -467,16 +467,20 @@ func GroupedSelect(
 	return b.String(), args, nil
 }
 
+// linearDedupMaxLeaves bounds how many group leaves dedup with an in-place
+// linear scan before flattenGroupTerms falls back to a map. A linear scan
+// avoids the map's allocation for the common few-group case; past this many
+// leaves the O(n^2) scan costs more than the map's O(n) inserts.
+const linearDedupMaxLeaves = 8
+
 // flattenGroupTerms returns the select-list leaves a GROUP BY specification
 // projects: every plain column/expression, in first-appearance order, with
 // duplicates removed (a grouping construct may name the same column in more
 // than one set). It walks ROLLUP/CUBE Terms and GROUPING SETS Sets
-// recursively.
+// recursively, collecting every plain leaf, then dedups in first-appearance
+// order -- a linear scan for few leaves, a map for many.
 func flattenGroupTerms(groups []GroupTerm) []GroupTerm {
-	var (
-		out  []GroupTerm
-		seen = map[string]struct{}{}
-	)
+	var out []GroupTerm
 
 	var walk func(g GroupTerm)
 
@@ -493,19 +497,71 @@ func flattenGroupTerms(groups []GroupTerm) []GroupTerm {
 				}
 			}
 		default:
-			key := groupLeafKey(g)
-			if _, ok := seen[key]; ok {
-				return
-			}
-
-			seen[key] = struct{}{}
-
 			out = append(out, g)
 		}
 	}
 
 	for _, g := range groups {
 		walk(g)
+	}
+
+	return dedupGroupLeaves(out)
+}
+
+// sameGroupLeaf reports whether two plain leaves dedup to the same key,
+// without allocating a groupLeafKey string. Two leaves are duplicates exactly
+// when their groupLeafKey values are equal: expression leaves by Func pointer
+// identity, plain columns by name, and an expression never collides with a
+// column (the "f:"/"c:" key prefixes differ).
+func sameGroupLeaf(a, b GroupTerm) bool {
+	if a.Func != nil || b.Func != nil {
+		return a.Func == b.Func
+	}
+
+	return a.Column == b.Column
+}
+
+// dedupGroupLeaves removes duplicate leaves (by groupLeafKey) from leaves,
+// preserving first-appearance order. For few leaves it dedups in place with
+// a linear scan -- no map allocation; for many it falls back to a map. The
+// result is identical to the always-map form the linear scan replaces.
+func dedupGroupLeaves(leaves []GroupTerm) []GroupTerm {
+	if len(leaves) <= linearDedupMaxLeaves {
+		n := 0
+
+		for _, g := range leaves {
+			dup := false
+
+			for i := 0; i < n; i++ {
+				if sameGroupLeaf(leaves[i], g) {
+					dup = true
+
+					break
+				}
+			}
+
+			if !dup {
+				leaves[n] = g
+				n++
+			}
+		}
+
+		return leaves[:n]
+	}
+
+	seen := make(map[string]struct{}, len(leaves))
+	out := make([]GroupTerm, 0, len(leaves))
+
+	for _, g := range leaves {
+		key := groupLeafKey(g)
+
+		if _, ok := seen[key]; ok {
+			continue
+		}
+
+		seen[key] = struct{}{}
+
+		out = append(out, g)
 	}
 
 	return out
