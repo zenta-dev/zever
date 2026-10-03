@@ -610,7 +610,7 @@ func loadServerData(modulePath, outDir, schemaDir string, posArgs []string, rate
 			return data, nil
 		}
 
-		return data, err
+		return data, fmt.Errorf("zever generate server: %w", err)
 	}
 
 	if len(posArgs) == 0 {
@@ -619,7 +619,7 @@ func loadServerData(modulePath, outDir, schemaDir string, posArgs []string, rate
 
 	files, err := loadFiles(paths)
 	if err != nil {
-		return data, err
+		return data, fmt.Errorf("zever generate server: %w", err)
 	}
 
 	result, diags := compile.WithSchemaDir(files, schemaDir)

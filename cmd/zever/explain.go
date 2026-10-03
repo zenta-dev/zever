@@ -44,7 +44,7 @@ func runExplain(args []string) error {
 
 	paths, err := resolveInputFiles(args[1:])
 	if err != nil {
-		return err
+		return fmt.Errorf("zever explain: %w", err)
 	}
 
 	if len(args) < 2 {
@@ -62,7 +62,7 @@ func runExplainWith(cfg ExplainConfig) error {
 
 	files, err := loadFiles(cfg.Files)
 	if err != nil {
-		return err
+		return fmt.Errorf("zever explain: %w", err)
 	}
 
 	result, diags := compile.Compile(files)

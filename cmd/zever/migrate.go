@@ -247,7 +247,7 @@ func runDBMigrate(args []string) error {
 			_, _ = fmt.Fprintln(os.Stderr, formatHint("try 'zever db migrate -i' for guided file selection"))
 		}
 
-		return err
+		return fmt.Errorf("zever db migrate: %w", err)
 	}
 
 	if len(rawFiles) == 0 {
@@ -260,7 +260,7 @@ func runDBMigrate(args []string) error {
 			_, _ = fmt.Fprintln(os.Stderr, formatHint("try 'zever db migrate -i' for guided file selection"))
 		}
 
-		return err
+		return fmt.Errorf("zever db migrate: %w", err)
 	}
 
 	cfg := resolveMigrateConfig(*adapter, *dsn, nil, *dryRun, *dropColumns)

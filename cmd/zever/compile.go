@@ -22,8 +22,9 @@ import (
 )
 
 // errNoInputFiles is returned when neither explicit args nor auto-discovery
-// yields a .zen file.
-var errNoInputFiles = errors.New("zever compile: no input .zen files given")
+// yields a .zen file. It carries no command prefix; each command wraps it with
+// its own name so shared callers (check/fmt/routes/graph/...) report correctly.
+var errNoInputFiles = errors.New("no input .zen files given")
 
 // compilePromptSeams isolate huh prompts for tests.
 // Proof: default values are the production prompt functions, so reachable
@@ -218,7 +219,7 @@ func runCompile(args []string) error { //nolint:gocyclo
 				_, _ = fmt.Fprintln(os.Stderr, formatHint("try 'zever compile schema/app.zen --backend=proto,zenorm'"))
 			}
 
-			return err2
+			return fmt.Errorf("zever compile: %w", err2)
 		}
 
 		if len(posArgs) == 0 {
@@ -252,7 +253,7 @@ func runCompileWith(cfg CompileConfig) error {
 
 	files, err := loadFiles(cfg.Files)
 	if err != nil {
-		return err
+		return fmt.Errorf("zever compile: %w", err)
 	}
 
 	backends, err := resolveBackends(backendsSpec, computeBackendRoots(outDir))
@@ -372,7 +373,7 @@ func loadFiles(paths []string) (map[string]string, error) {
 	for _, path := range paths {
 		data, err := os.ReadFile(path) //nolint:gosec // CLI positional args are developer-supplied file paths
 		if err != nil {
-			return nil, fmt.Errorf("zever compile: read %q: %w", path, err)
+			return nil, fmt.Errorf("read %q: %w", path, err)
 		}
 
 		files[path] = string(data)

@@ -35,7 +35,7 @@ const rootModuleLabel = "root"
 func runGraph(args []string) error {
 	paths, err := resolveInputFiles(args)
 	if err != nil {
-		return err
+		return fmt.Errorf("zever graph: %w", err)
 	}
 
 	if len(args) == 0 {
@@ -54,7 +54,7 @@ func runGraphWith(cfg GraphConfig) error {
 
 	files, err := loadFiles(cfg.Files)
 	if err != nil {
-		return err
+		return fmt.Errorf("zever graph: %w", err)
 	}
 
 	result, diags := compile.Compile(files)

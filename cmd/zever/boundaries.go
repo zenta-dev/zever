@@ -28,7 +28,7 @@ type BoundariesConfig struct {
 func runCheckBoundaries(args []string) error {
 	paths, err := resolveInputFiles(args)
 	if err != nil {
-		return err
+		return fmt.Errorf("zever check-boundaries: %w", err)
 	}
 
 	if len(args) == 0 {
@@ -46,7 +46,7 @@ func runCheckBoundariesWith(cfg BoundariesConfig) error {
 
 	files, err := loadFiles(cfg.Files)
 	if err != nil {
-		return err
+		return fmt.Errorf("zever check-boundaries: %w", err)
 	}
 
 	schemaDir := defaultSchemaDir
