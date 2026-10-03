@@ -17,6 +17,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Security
 
+- `document/local` render now blocks external network egress: Chrome runs
+  with `--host-resolver-rules="MAP * ~NOTFOUND, EXCLUDE localhost"` and
+  `--disable-background-networking`, so untrusted HTML cannot trigger SSRF to
+  internal services or cloud metadata endpoints via embedded resources.
 - `vault` secrets adapter now closes HTTP response bodies on every call
   (previously leaked a connection per operation). `argon2id` `Verify` and
   `NeedsRehash` reject stored-hash parameters outside the supported ranges

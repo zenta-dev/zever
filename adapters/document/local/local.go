@@ -68,6 +68,16 @@ func New(o document.Options) (document.Document, error) {
 		allocOpts = append(allocOpts, chromedp.NoSandbox)
 	}
 
+	// SSRF hardening: the renderer may process untrusted HTML, so embedded
+	// <img>/<script>/<iframe> must not be able to reach internal services or
+	// cloud metadata endpoints. Block all external DNS (resolves to NOTFOUND)
+	// except loopback, and disable background networking. The document source
+	// is self-contained (a data: URI); external resources are not fetched.
+	allocOpts = append(allocOpts,
+		chromedp.Flag("host-resolver-rules", "MAP * ~NOTFOUND, EXCLUDE localhost, EXCLUDE 127.0.0.1"),
+		chromedp.Flag("disable-background-networking", "true"),
+	)
+
 	// Long-lived allocator, closed via driver.Close.
 	d.allocCtx, d.allocCancel = chromedp.NewExecAllocator(context.Background(), allocOpts...)
 
