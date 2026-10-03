@@ -131,8 +131,10 @@ leak a goroutine on an unbounded buffer.
 Bridge note: `ollama.New` takes `ollama.Options` with an `Addr` field, not
 `ai.Options`. The container bridges the two: when `adapter: ollama`, the
 shared `ai.Options.BaseURL` value is passed through as the Ollama server
-address (`Addr`), with `model` and `timeout` carried over. You only ever
-write `ai:` config; you never construct `ollama.Options` by hand.
+address (`Addr`), with `model`, `timeout`, and `allow_insecure` carried over.
+You only ever write `ai:` config; you never construct `ollama.Options` by
+hand. Non-loopback endpoints must use https and TLS is verified unless
+`allow_insecure: true` is set.
 
 ## Production notes
 

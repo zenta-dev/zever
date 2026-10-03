@@ -25,6 +25,17 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   instead of re-resolving the hostname, closing a DNS-rebinding TOCTOU in
   the SSRF guard. `media/s3` validates asset ids as 32-hex before listing,
   preventing an empty-prefix IDOR (first-object match) and enumeration.
+- `ai/ollama` no longer hardcodes insecure endpoints: the adapter requires
+  https for non-loopback `Addr` and verifies TLS unless the new
+  `ai.Options.AllowInsecure` (also `ollama.Options.AllowInsecure`) is set,
+  consistent with the `ai/gemini` fix. Loopback http stays permitted for
+  local development.
+- `session/cookie` adds opt-in `__Host-`/`__Secure-` cookie-name prefixes
+  via `Options.Prefix` (constants `PrefixHost`/`PrefixSecure`). `New`
+  enforces each prefix's browser rules: `__Host-` forces `Secure`,
+  `Path=/`, and omits any `Domain` (which would widen the cookie to
+  subdomains, defeating the host-only guarantee); `__Secure-` forces
+  `Secure`. The default (no prefix) and `SameSite` behavior are unchanged.
 
 ### Added
 
