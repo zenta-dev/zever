@@ -48,7 +48,7 @@ func TestDeliverInjectsTraceHeaders(t *testing.T) {
 
 	w := openPrivate(t, 1)
 	payload := []byte(`{"a":1}`)
-	if err := w.Register(t.Context(), "e", srv.URL, ""); err != nil {
+	if err := w.Register(t.Context(), "e", srv.URL, "s"); err != nil {
 		t.Fatalf("Register err = %v", err)
 	}
 
@@ -91,7 +91,7 @@ func TestDeliverNoSpanNoTraceHeaders(t *testing.T) {
 	t.Cleanup(srv.Close)
 
 	w := openPrivate(t, 1)
-	if err := w.Register(t.Context(), "e", srv.URL, ""); err != nil {
+	if err := w.Register(t.Context(), "e", srv.URL, "s"); err != nil {
 		t.Fatalf("Register err = %v", err)
 	}
 	if err := w.Deliver(t.Context(), "e", []byte(`{}`)); err != nil {
