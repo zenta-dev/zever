@@ -3,6 +3,7 @@ package orm
 import (
 	"context"
 	"fmt"
+	"time"
 
 	"github.com/zenta-dev/zever/core/db"
 	"github.com/zenta-dev/zever/orm/render"
@@ -128,6 +129,18 @@ type Numeric interface {
 	~int32 | ~int64 | ~float32 | ~float64
 }
 
+// Orderable constrains Min/Max's column value type to something a SQL
+// MIN/MAX is actually meaningful over. Unlike stdlib cmp.Ordered, this
+// includes time.Time: a timestamp column is orderable in SQL, so
+// Min/Max over a timestamp column is well-defined.
+type Orderable interface {
+	~int | ~int8 | ~int16 | ~int32 | ~int64 |
+		~uint | ~uint8 | ~uint16 | ~uint32 | ~uint64 | ~uintptr |
+		~float32 | ~float64 |
+		~string |
+		time.Time
+}
+
 // Sum builds a SUM(c) aggregate. V is constrained to Numeric so a caller
 // cannot accidentally SUM a string or timestamp column.
 func Sum[V Numeric, T any](c Column[T, V]) Aggregate {
@@ -145,15 +158,16 @@ func Avg[V Numeric, T any](c Column[T, V]) Aggregate {
 
 // Min builds a MIN(c) aggregate. Unlike Sum/Avg, MIN is meaningful over any
 // orderable column (a string or timestamp column included), so V is
-// unconstrained.
-func Min[V any, T any](c Column[T, V]) Aggregate {
+// constrained to Orderable rather than left fully open.
+func Min[V Orderable, T any](c Column[T, V]) Aggregate {
 	name := c.Col().Name()
 
 	return Aggregate{Func: AggMin, Column: name, Alias: "min_" + name}
 }
 
-// Max builds a MAX(c) aggregate; see Min for why V is unconstrained.
-func Max[V any, T any](c Column[T, V]) Aggregate {
+// Max builds a MAX(c) aggregate; see Min for why V is constrained to
+// Orderable.
+func Max[V Orderable, T any](c Column[T, V]) Aggregate {
 	name := c.Col().Name()
 
 	return Aggregate{Func: AggMax, Column: name, Alias: "max_" + name}
@@ -177,14 +191,14 @@ func AvgNullable[V Numeric, T any](c NullableColumn[T, V]) Aggregate {
 }
 
 // MinNullable builds a MIN(c) aggregate over a nullable column.
-func MinNullable[V any, T any](c NullableColumn[T, V]) Aggregate {
+func MinNullable[V Orderable, T any](c NullableColumn[T, V]) Aggregate {
 	name := c.Col().Name()
 
 	return Aggregate{Func: AggMin, Column: name, Alias: "min_" + name}
 }
 
 // MaxNullable builds a MAX(c) aggregate over a nullable column.
-func MaxNullable[V any, T any](c NullableColumn[T, V]) Aggregate {
+func MaxNullable[V Orderable, T any](c NullableColumn[T, V]) Aggregate {
 	name := c.Col().Name()
 
 	return Aggregate{Func: AggMax, Column: name, Alias: "max_" + name}
