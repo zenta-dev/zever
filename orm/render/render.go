@@ -276,10 +276,10 @@ type FTSExpr struct {
 // RawExpr is the erased payload of a KindRaw node, produced by
 // the UnsafeRaw escape hatch: a caller-supplied SQL fragment plus positional bound
 // arguments. The fragment is rendered verbatim (a security escape hatch
-// the caller must audit -- see the the unsafe-SQL linter); the args
-// are ALWAYS placeholder-bound, never string-formatted, so a bound value
-// containing `'`, `;` or a NUL byte alters only its own value, never the
-// SQL structure.
+// the caller must audit -- gosec G201/G202 plus the UnsafeRaw naming
+// convention are the guard); the args are ALWAYS placeholder-bound, never
+// string-formatted, so a bound value containing `'`, `;` or a NUL byte
+// alters only its own value, never the SQL structure.
 type RawExpr struct {
 	Fragment string
 	Args     []any

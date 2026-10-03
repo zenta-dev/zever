@@ -123,15 +123,15 @@ func addMigrationTrackingColumns(ctx context.Context, conn db.DB, dialect string
 
 		switch dialect {
 		case atlas.DialectPostgres:
-			//lint:allow-unsafesql identifier is schema-introspected, not user input
+			// identifier is schema-introspected, not user input
 			stmt = fmt.Sprintf("ALTER TABLE %s ADD COLUMN IF NOT EXISTS %s %s;",
 				schemaMigrationsTable, col.Name, col.Type)
 		case atlas.DialectSQLite:
-			//lint:allow-unsafesql identifier is schema-introspected, not user input
+			// identifier is schema-introspected, not user input
 			stmt = fmt.Sprintf("ALTER TABLE %s ADD COLUMN %s %s;",
 				schemaMigrationsTable, col.Name, col.Type)
 		case atlas.DialectMySQL:
-			//lint:allow-unsafesql identifier is schema-introspected, not user input
+			// identifier is schema-introspected, not user input
 			stmt = fmt.Sprintf("ALTER TABLE %s ADD COLUMN %s %s;",
 				schemaMigrationsTable, quoteIdent(dialect, col.Name), col.Type)
 		default:

@@ -129,7 +129,7 @@ func securityOps() []injectionOp {
 			},
 			wantArg: func(p string) []string { return []string{p} },
 			run: func(ctx context.Context, exec *recordingExec, p string) {
-				//lint:allow-unsafesql escape-hatch test: the payload is the bound ARG, the fragment is the fixed template
+				// escape-hatch test: the payload is the bound ARG, the fragment is the fixed template
 				_, _ = From(widgets).Where(UnsafeRaw[widget]("quantity > ?", p)).All(ctx, exec)
 			},
 		},
@@ -268,7 +268,7 @@ func TestUnsafeIdent(t *testing.T) {
 	allowlist := []string{"id", "name", "quantity", "bio"}
 
 	t.Run("allowlisted ident accepted", func(t *testing.T) {
-		//lint:allow-unsafesql escape-hatch test: ident is from the test's own allowlist
+		// escape-hatch test: ident is from the test's own allowlist
 		col, err := UnsafeIdent[widget, string]("name", allowlist)
 		if err != nil {
 			t.Fatalf("UnsafeIdent(name, allowlist) = %v, want nil error", err)
@@ -289,7 +289,7 @@ func TestUnsafeIdent(t *testing.T) {
 	})
 
 	t.Run("non-allowlisted ident errors", func(t *testing.T) {
-		//lint:allow-unsafesql escape-hatch test: asserts the non-allowlisted path returns an error
+		// escape-hatch test: asserts the non-allowlisted path returns an error
 		_, err := UnsafeIdent[widget, string]("name; DROP TABLE widgets", allowlist)
 		if err == nil {
 			t.Fatal("UnsafeIdent with an injection ident succeeded, want an error")
@@ -297,7 +297,7 @@ func TestUnsafeIdent(t *testing.T) {
 	})
 
 	t.Run("empty ident errors", func(t *testing.T) {
-		//lint:allow-unsafesql escape-hatch test: asserts the empty-ident path returns an error
+		// escape-hatch test: asserts the empty-ident path returns an error
 		_, err := UnsafeIdent[widget, string]("", allowlist)
 		if err == nil {
 			t.Fatal("UnsafeIdent(\"\") succeeded, want an error")

@@ -137,7 +137,7 @@ func ComputeRollback(ctx context.Context, exec db.DB, n int) (*RollbackPlan, err
 		}
 
 		plan.Statements = append(plan.Statements, stmt,
-			//lint:allow-unsafesql identifier is schema-introspected, not user input
+			// identifier is schema-introspected, not user input
 			fmt.Sprintf("DELETE FROM %s WHERE id = %d;", schemaMigrationsTable, row.ID))
 	}
 
@@ -148,13 +148,13 @@ func ComputeRollback(ctx context.Context, exec db.DB, n int) (*RollbackPlan, err
 func skipReason(row migrationRow) string {
 	switch row.Kind {
 	case "":
-		//lint:allow-unsafesql message text, not executed SQL
+		// message text, not executed SQL
 		return fmt.Sprintf("migration %d predates rollback tracking (no recorded kind or statement), so it cannot be undone", row.ID)
 	case kindCreateTable:
-		//lint:allow-unsafesql message text, not executed SQL
+		// message text, not executed SQL
 		return fmt.Sprintf("migration %d created a table; rolling back a whole table is out of scope", row.ID)
 	default:
-		//lint:allow-unsafesql message text, not executed SQL
+		// message text, not executed SQL
 		return fmt.Sprintf("migration %d (kind %q) has no synthesizable inverse from what was recorded", row.ID, row.Kind)
 	}
 }
@@ -166,21 +166,21 @@ func skipReason(row migrationRow) string {
 func lossyRollbackWarning(row migrationRow) string {
 	switch row.Kind {
 	case kindAddColumn:
-		//lint:allow-unsafesql message text, not executed SQL
+		// message text, not executed SQL
 		return fmt.Sprintf("undoing the ADD of %s.%s DROPS that column: any data written to it since is discarded",
 			row.Table, row.Column)
 	case kindDropColumn:
-		//lint:allow-unsafesql message text, not executed SQL
+		// message text, not executed SQL
 		return fmt.Sprintf(
 			"re-adding %s.%s as an EMPTY %s column: its original data was destroyed by the DROP and is UNRECOVERABLE",
 			row.Table, row.Column, row.PriorType)
 	case kindAlterType:
-		//lint:allow-unsafesql message text, not executed SQL
+		// message text, not executed SQL
 		return fmt.Sprintf("restoring the type of %s.%s to %s: values the forward cast truncated or rounded are not restored",
 			row.Table, row.Column, row.PriorType)
 	case kindAlterNullability:
 		if row.PriorType == "NOT NULL" {
-			//lint:allow-unsafesql message text, not executed SQL
+			// message text, not executed SQL
 			return fmt.Sprintf(
 				"restoring NOT NULL on %s.%s: this FAILS if any NULL was written to it since the column was relaxed",
 				row.Table, row.Column)
@@ -207,11 +207,11 @@ func inverseConstraintStatement(dialect string, row migrationRow) (string, bool)
 		// table recovered from the recorded row since MySQL has no
 		// schema-qualified index name.
 		if dialect == atlas.DialectMySQL {
-			//lint:allow-unsafesql identifier is schema-introspected, not user input
+			// identifier is schema-introspected, not user input
 			return fmt.Sprintf("DROP INDEX %s ON %s;", row.ObjectName, row.Table), true
 		}
 
-		//lint:allow-unsafesql identifier is schema-introspected, not user input
+		// identifier is schema-introspected, not user input
 		return fmt.Sprintf("DROP INDEX IF EXISTS %s;", row.ObjectName), true
 
 	case kindDropIndex:
@@ -231,7 +231,7 @@ func inverseConstraintStatement(dialect string, row migrationRow) (string, bool)
 		// postgres uses DROP CONSTRAINT IF EXISTS, sqlite can never have
 		// recorded this kind.
 		if dialect == atlas.DialectMySQL {
-			//lint:allow-unsafesql identifier is schema-introspected, not user input
+			// identifier is schema-introspected, not user input
 			return fmt.Sprintf("ALTER TABLE %s DROP FOREIGN KEY %s;", row.Table, row.ObjectName), true
 		}
 
@@ -240,7 +240,7 @@ func inverseConstraintStatement(dialect string, row migrationRow) (string, bool)
 			ifExists = "IF EXISTS "
 		}
 
-		//lint:allow-unsafesql identifier is schema-introspected, not user input
+		// identifier is schema-introspected, not user input
 		return fmt.Sprintf("ALTER TABLE %s DROP CONSTRAINT %s%s;", row.Table, ifExists, row.ObjectName), true
 
 	case kindAlterNullability:
@@ -254,7 +254,7 @@ func inverseConstraintStatement(dialect string, row migrationRow) (string, bool)
 				return "", false
 			}
 
-			//lint:allow-unsafesql identifier is schema-introspected, not user input
+			// identifier is schema-introspected, not user input
 			return fmt.Sprintf("ALTER TABLE %s MODIFY COLUMN %s %s;",
 				row.Table, quoteIdent(dialect, row.Column), row.PriorType), true
 		}
@@ -263,10 +263,10 @@ func inverseConstraintStatement(dialect string, row migrationRow) (string, bool)
 
 		switch row.PriorType {
 		case "NULL":
-			//lint:allow-unsafesql identifier is schema-introspected, not user input
+			// identifier is schema-introspected, not user input
 			return fmt.Sprintf("ALTER TABLE %s ALTER COLUMN %s DROP NOT NULL;", row.Table, col), true
 		case "NOT NULL":
-			//lint:allow-unsafesql identifier is schema-introspected, not user input
+			// identifier is schema-introspected, not user input
 			return fmt.Sprintf("ALTER TABLE %s ALTER COLUMN %s SET NOT NULL;", row.Table, col), true
 		default:
 			return "", false
@@ -313,7 +313,7 @@ func inverseStatement(dialect string, row migrationRow) (string, bool) {
 			ifExists = "IF EXISTS "
 		}
 
-		//lint:allow-unsafesql identifier is schema-introspected, not user input
+		// identifier is schema-introspected, not user input
 		return fmt.Sprintf("ALTER TABLE %s DROP COLUMN %s%s;",
 			row.Table, ifExists, quoteIdent(dialect, row.Column)), true
 
@@ -329,7 +329,7 @@ func inverseStatement(dialect string, row migrationRow) (string, bool) {
 
 		// Deliberately no NOT NULL and no default: the column comes back
 		// empty, and sqlite rejects adding a NOT NULL column without one.
-		//lint:allow-unsafesql identifier is schema-introspected, not user input
+		// identifier is schema-introspected, not user input
 		return fmt.Sprintf("ALTER TABLE %s ADD COLUMN %s%s %s;",
 			row.Table, ifNotExists, quoteIdent(dialect, row.Column), row.PriorType), true
 
@@ -338,7 +338,7 @@ func inverseStatement(dialect string, row migrationRow) (string, bool) {
 			return "", false
 		}
 
-		//lint:allow-unsafesql identifier is schema-introspected, not user input
+		// identifier is schema-introspected, not user input
 		return fmt.Sprintf("ALTER TABLE %s RENAME COLUMN %s TO %s;",
 			row.Table, quoteIdent(dialect, row.Column), quoteIdent(dialect, row.PriorName)), true
 
@@ -353,7 +353,7 @@ func inverseStatement(dialect string, row migrationRow) (string, bool) {
 		}
 
 		if dialect == atlas.DialectMySQL {
-			//lint:allow-unsafesql identifier is schema-introspected, not user input
+			// identifier is schema-introspected, not user input
 			return fmt.Sprintf("ALTER TABLE %s MODIFY COLUMN %s %s;",
 				row.Table, quoteIdent(dialect, row.Column), row.PriorType), true
 		}
@@ -364,7 +364,7 @@ func inverseStatement(dialect string, row migrationRow) (string, bool) {
 
 		col := quoteIdent(dialect, row.Column)
 
-		//lint:allow-unsafesql identifier is schema-introspected, not user input
+		// identifier is schema-introspected, not user input
 		return fmt.Sprintf("ALTER TABLE %s ALTER COLUMN %s TYPE %s USING %s::%s;",
 			row.Table, col, row.PriorType, col, row.PriorType), true
 

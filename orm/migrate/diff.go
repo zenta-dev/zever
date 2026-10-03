@@ -232,7 +232,7 @@ type warnings struct {
 }
 
 func (w *warnings) add(format string, args ...any) {
-	//lint:allow-unsafesql builds a human-readable warning string, not executed SQL
+	// builds a human-readable warning string, not executed SQL
 	w.msgs = append(w.msgs, fmt.Sprintf(format, args...))
 }
 
@@ -379,7 +379,7 @@ func introspectSQLiteColumns(ctx context.Context, conn db.DB, table string) ([]l
 		return nil, err
 	}
 
-	//lint:allow-unsafesql identifier is schema-introspected, not user input
+	// identifier is schema-introspected, not user input
 	rows, err := conn.Query(ctx, fmt.Sprintf("PRAGMA table_info(%s)", atlas.QuoteIdent(table)))
 	if err != nil {
 		return nil, fmt.Errorf("[orm/migrate] introspect columns of %q: %w", table, err)
@@ -441,7 +441,7 @@ func renderAddColumn(dialect string, e *ir.Entity, f *ir.Field) (plannedStatemen
 		ifNotExists = "IF NOT EXISTS "
 	}
 
-	//lint:allow-unsafesql identifier is schema-introspected, not user input
+	// identifier is schema-introspected, not user input
 	sql := fmt.Sprintf("ALTER TABLE %s ADD COLUMN %s%s %s;", table, ifNotExists, quoteIdent(dialect, f.Name), colType)
 
 	return plannedStatement{
@@ -476,7 +476,7 @@ func renderDropColumn(dialect string, e *ir.Entity, column, priorType string) (p
 		ifExists = "IF EXISTS "
 	}
 
-	//lint:allow-unsafesql identifier is schema-introspected, not user input
+	// identifier is schema-introspected, not user input
 	sql := fmt.Sprintf("ALTER TABLE %s DROP COLUMN %s%s;", table, ifExists, quoteIdent(dialect, column))
 
 	return plannedStatement{
@@ -509,7 +509,7 @@ func renderRenameColumn(dialect string, e *ir.Entity, oldName, newName string) (
 		return plannedStatement{}, err
 	}
 
-	//lint:allow-unsafesql identifier is schema-introspected, not user input
+	// identifier is schema-introspected, not user input
 	sql := fmt.Sprintf("ALTER TABLE %s RENAME COLUMN %s TO %s;",
 		table, quoteIdent(dialect, oldName), quoteIdent(dialect, newName))
 

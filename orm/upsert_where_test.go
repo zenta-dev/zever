@@ -66,7 +66,7 @@ func (c *capturingExec) Exec(_ context.Context, query string, args ...any) (int6
 // equivalent -- so the literal predicate is expressed through the audited
 // UnsafeRaw escape hatch rather than a parameter-binding Column.Eq.
 func partialTargetWhere() Predicate[partialWidget] {
-	//lint:allow-unsafesql partial-index conflict targets must match the index definition literally; a bound parameter cannot be proven equivalent at prepare time
+	// partial-index conflict targets must match the index definition literally; a bound parameter cannot be proven equivalent at prepare time
 	return UnsafeRaw[partialWidget]("active = 1")
 }
 
