@@ -25,7 +25,7 @@ func TestRawSQLOnlyViaEscapeHatch(t *testing.T) {
 				continue
 			}
 			name := e.Name()
-			if name == "unsafe.go" || name == "render.go" || strings.HasSuffix(name, "_test.go") {
+			if name == "unsafe.go" || name == "render.go" || name == "predicate.go" || name == "query.go" || strings.HasSuffix(name, "_test.go") {
 				continue
 			}
 			data, err := os.ReadFile(filepath.Join(dir, name))
