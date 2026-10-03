@@ -63,6 +63,24 @@ func TestNew_Valid(t *testing.T) {
 	}
 }
 
+func TestNew_DevKeyRejectedWhenRequired(t *testing.T) {
+	const devKey = "MDEyMzQ1Njc4OTAxMjM0NTY3ODkwMTIzNDU2Nzg5MDE="
+
+	if _, err := New(crypto.Options{Key: devKey}); err != nil {
+		t.Fatalf("New(dev key) without env = %v, want nil", err)
+	}
+
+	t.Setenv("ZEVER_CRYPTO_REQUIRE_REAL_KEY", "1")
+	_, err := New(crypto.Options{Key: devKey})
+	if !errors.Is(err, crypto.ErrInvalidKey) {
+		t.Fatalf("New(dev key) with env = %v, want ErrInvalidKey", err)
+	}
+
+	if _, err := New(crypto.Options{Key: genAESKey(t)}); err != nil {
+		t.Fatalf("New(real key) with env = %v, want nil", err)
+	}
+}
+
 func TestEncryptDecrypt_RoundTrip(t *testing.T) {
 	t.Parallel()
 	c := mustNew(t, crypto.Options{Key: genAESKey(t)})
