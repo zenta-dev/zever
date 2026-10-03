@@ -582,21 +582,13 @@ func TestDecodeCursorMalformedTokens(t *testing.T) {
 }
 
 // TestCursorValueHelpersUnit pins the defensive branches unreachable
-// through Encode/DecodeCursor: unsupported kinds, unknown tags, empty
-// version probes and truncated length prefixes.
+// through Encode/DecodeCursor: unknown tags, empty version probes and
+// truncated length prefixes.
 func TestCursorValueHelpersUnit(t *testing.T) {
-	if _, err := encodeCursorValue([]int32{1}); err == nil {
-		t.Fatal("encodeCursorValue([]int32) succeeded, want an error")
-	}
-
-	if _, err := encodeCursorValue(42); err == nil {
-		t.Fatal("encodeCursorValue(int) succeeded, want an error")
-	}
-
-	// cursorTagFor is generic over CursorKeyValue, so an unsupported type
-	// (struct{}, []int32, ...) is now rejected at compile time by the type
-	// constraint itself -- there is no runtime path left to exercise.
-
+	// encodeCursorValue and cursorTagFor are both generic over
+	// CursorKeyValue, so an unsupported type (struct{}, []int32, ...) is
+	// rejected at compile time by the type constraint itself -- there is no
+	// runtime path left to exercise.
 	if got := cursorVersionAt(nil); got != 0 {
 		t.Fatalf("cursorVersionAt(nil) = %d, want 0", got)
 	}

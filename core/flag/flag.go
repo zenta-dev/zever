@@ -27,6 +27,23 @@ type Flag interface {
 	Close() error
 }
 
+// GetJSON decodes the JSON value of key into a T, returning fallback when
+// the flag is absent or its value cannot be decoded.
+//
+// It is the type-safe counterpart to Flag.JSON: a present key that decodes
+// into T yields the decoded value with a nil error, an absent key yields
+// fallback with a nil error, and a decode failure yields fallback together
+// with the underlying error.
+func GetJSON[T any](ctx context.Context, f Flag, key string, fallback T) (T, error) {
+	var out T
+
+	if err := f.JSON(ctx, key, &out, fallback); err != nil {
+		return fallback, err
+	}
+
+	return out, nil
+}
+
 // EvalContext carries per-evaluation data such as targeting signals.
 type EvalContext struct {
 	// RandomizationID is the stable ID used for percentage rollouts.
