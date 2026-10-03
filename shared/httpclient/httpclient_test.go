@@ -83,6 +83,16 @@ func TestSafeDialGuardBlocksPrivate(t *testing.T) {
 	}
 }
 
+func TestSafeDialGuardBlocksResolvedPrivate(t *testing.T) {
+	dial := SafeDialContext(false)
+	// localhost resolves to a loopback address; the guard must block it
+	// after resolution, before dialing. A lookup failure is also an error,
+	// so this asserts refusal either way.
+	if _, err := dial(t.Context(), "tcp", "localhost:80"); err == nil {
+		t.Fatal("expected resolved-private dial refusal")
+	}
+}
+
 func TestNoRedirectPolicy(t *testing.T) {
 	c := NewSafeClient(time.Second, false)
 	if c.CheckRedirect == nil {

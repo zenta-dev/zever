@@ -13,6 +13,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   (previously leaked a connection per operation). `argon2id` `Verify` and
   `NeedsRehash` reject stored-hash parameters outside the supported ranges
   instead of panicking (`t`/`p` below 1) or allocating unbounded memory.
+- `shared/httpclient.SafeDialContext` dials the resolved, validated IP
+  instead of re-resolving the hostname, closing a DNS-rebinding TOCTOU in
+  the SSRF guard. `media/s3` validates asset ids as 32-hex before listing,
+  preventing an empty-prefix IDOR (first-object match) and enumeration.
 
 ### Added
 
