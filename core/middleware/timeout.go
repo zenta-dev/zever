@@ -20,7 +20,10 @@ import (
 // calls using it (db.QueryContext, an outbound http.Client, ...) are
 // canceled too; a handler that ignores ctx keeps running in the background
 // after the client gets the timeout response, but its writes are then
-// discarded rather than racing the timeout response on the wire.
+// discarded rather than racing the timeout response on the wire. The handler
+// goroutine is not killed: each timed-out request whose handler ignores its
+// context leaks one goroutine until the handler returns (best-effort, the
+// same trade-off as TimeoutUnaryServerInterceptor).
 //
 // This deliberately does not use the stdlib http.TimeoutHandler: it writes
 // its own response body on timeout, which would fight this package's fixed

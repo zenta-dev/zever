@@ -95,11 +95,9 @@ func TestLoggerReceivesConsumeError(t *testing.T) {
 	t.Parallel()
 
 	caplog := &captureLogger{}
-	a := &adapter{logger: caplog, timeout: time.Second}
-	c := &consumer{stop: make(chan struct{})}
-	consecutive := 0
+	a := &adapter{logger: caplog, timeout: time.Second, consecutive: make(map[string]int)}
 
-	a.handleConsumeError("evt", errors.New("boom"), &consecutive, c)
+	a.handleConsumeError("evt", errors.New("boom"))
 
 	if !caplog.contains("consumer pop failed") {
 		t.Fatalf("expected injected logger to receive pop failure, got %v", caplog.msgs)

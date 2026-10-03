@@ -230,6 +230,23 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - `adapters/permission/casbin`: cancelled context now fails closed.
 - `core/auth/revocation/memory`: ignore already-lapsed entries like the
   redis store; synchronous ticker construction.
+- `adapters/webhook/queue`: the one-permanent-goroutine-per-event consumer
+  is replaced by a fixed shared worker pool (`DefaultConsumerWorkers`), so a
+  long-lived process with churning event names no longer grows consumer
+  goroutines without bound. Each event is owned by exactly one worker and
+  served round-robin, preserving per-event delivery order; `Close` stops the
+  pool under the same deadline as before.
+- `core/job`: `Scheduler` no longer stores a `context.Context` (previously
+  in an `atomic.Value`, hidden from the `containedctx` linter, overwritten
+  by concurrent `Run` calls, and retaining request-scoped values). Fires
+  now abort off a lazily created lifecycle channel closed when the owning
+  `Run` returns; `Run` remains the only ctx entry point.
+- `adapters/scheduler/postgres`: cron ticks are rooted in a
+  scheduler-owned background ctx instead of the registration request ctx
+  (which retained caller values for the entry's lifetime), and each fire's
+  load/claim/dispatch now runs under a bounded timeout (new
+  `Options.FireTimeout`, default `DefaultFireTimeout` 30s), so a hung DB
+  can no longer block the tick goroutine until `Stop`.
 
 ### Removed
 

@@ -110,14 +110,8 @@ func TestScheduleFireStartsNewRootSpan(t *testing.T) {
 		t.Fatalf("ParseStandard: %v", err)
 	}
 
-	// Caller trace must be discarded: store a caller ctx with a distinct fake trace.
-	callerTid := trace.TraceID{0xde, 0xad, 0xbe, 0xef, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12}
-	callerSid := trace.SpanID{1, 2, 3, 4, 5, 6, 7, 8}
-	callerCtx := trace.ContextWithSpanContext(context.Background(), trace.NewSpanContext(trace.SpanContextConfig{
-		TraceID: callerTid, SpanID: callerSid, TraceFlags: trace.FlagsSampled,
-	}))
-	s.ctx.Store(callerCtx)
-
+	// Caller trace must be discarded: fireWithSchedule always roots at
+	// Background, so no caller ctx is stored on the scheduler.
 	s.fireWithSchedule("trace-root-job", "arg", "0 * * * *", sched)
 	s.now = func() time.Time { return fixed.Add(2 * time.Hour) }
 	s.fireWithSchedule("trace-root-job", "arg", "0 * * * *", sched)
@@ -130,9 +124,6 @@ func TestScheduleFireStartsNewRootSpan(t *testing.T) {
 	for i, id := range traceIDs {
 		if id == "" || id == "00000000000000000000000000000000" {
 			t.Errorf("fire %d traceID = %q, want valid", i, id)
-		}
-		if id == callerTid.String() {
-			t.Errorf("fire %d inherited caller trace %q, want new root", i, id)
 		}
 	}
 	if traceIDs[0] == traceIDs[1] {

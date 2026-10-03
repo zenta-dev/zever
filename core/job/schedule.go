@@ -6,7 +6,6 @@ import (
 	"fmt"
 	"strconv"
 	"sync"
-	"sync/atomic"
 	"time"
 
 	"github.com/robfig/cron/v3"
@@ -36,11 +35,14 @@ type Scheduler struct {
 	// Logger reports locker and dispatch errors and defaults to noop.
 	Logger log.Logger
 	cron   *cron.Cron
-	ctx    atomic.Value
 	now    func() time.Time
 
 	mu        sync.RWMutex
 	schedules map[string]cron.Schedule
+
+	lifeMu     sync.Mutex
+	runDone    chan struct{}
+	runStarted bool
 }
 
 // NewScheduler returns a Scheduler dispatching through d with dedup via locker.
@@ -161,17 +163,16 @@ func (s *Scheduler) storeSchedule(spec string, sched cron.Schedule) cron.Schedul
 func (s *Scheduler) fireWithSchedule(jobName string, args any, spec string, sched cron.Schedule) {
 	// Each cron fire is a trace root: start a new span named schedule.<name>
 	// from Background so fires never inherit the registration caller's trace
-	// (EveryWithSchedule deliberately does not take ctx) nor the Run ctx's
+	// (EveryWithSchedule deliberately does not take ctx) nor any Run ctx's
 	// trace. No fake parent is synthesized; the SDK assigns a fresh traceID
 	// per fire, and Dispatcher/queue Push propagates it downstream via
-	// traceprop.Inject. Cancellation from Run is merged without merging trace
-	// (AfterFunc), so Stop still aborts in-flight fires.
-	base := s.loadCtx()
+	// traceprop.Inject. Cancellation from the Run lifecycle is merged without
+	// merging trace (AfterFunc), so Stop still aborts in-flight fires.
 	traceCtx, span := otel.Tracer(ScheduleSpanScope).Start(context.Background(), "schedule."+jobName)
 	defer span.End()
 	ctx, stop := context.WithCancel(traceCtx)
 	defer stop()
-	stopAfter := context.AfterFunc(base, stop)
+	stopAfter := context.AfterFunc(lifecycleCtx{s.lifecycle()}, stop)
 	defer stopAfter()
 
 	// Nil Locker = no cross-instance dedup; dispatch directly in single-instance mode.
@@ -211,28 +212,77 @@ func (s *Scheduler) log() log.Logger {
 	return noop.New()
 }
 
-func (s *Scheduler) loadCtx() context.Context {
-	v := s.ctx.Load()
-	if v == nil {
-		return context.Background()
+// lifecycle returns the channel closed when the scheduler's owning Run
+// returns. In-flight fires abort via AfterFunc when it closes. The channel
+// is created lazily and recreated after each Run, so a restarted scheduler
+// gets a fresh one. It replaces the old stored context: no request-scoped
+// ctx is retained by the Scheduler, and concurrent Run calls can no longer
+// overwrite each other's cancellation signal.
+func (s *Scheduler) lifecycle() <-chan struct{} {
+	s.lifeMu.Lock()
+	defer s.lifeMu.Unlock()
+
+	if s.runDone == nil {
+		s.runDone = make(chan struct{})
 	}
 
-	if ctx, ok := v.(context.Context); ok && ctx != nil {
-		return ctx
-	}
-
-	return context.Background()
+	return s.runDone
 }
+
+// lifecycleCtx adapts the lifecycle channel to context.Context so
+// context.AfterFunc can watch it. It carries no values and no deadline.
+type lifecycleCtx struct {
+	done <-chan struct{}
+}
+
+func (c lifecycleCtx) Deadline() (time.Time, bool) { return time.Time{}, false }
+func (c lifecycleCtx) Done() <-chan struct{}       { return c.done }
+
+func (c lifecycleCtx) Err() error {
+	select {
+	case <-c.done:
+		return context.Canceled
+	default:
+		return nil
+	}
+}
+
+func (c lifecycleCtx) Value(any) any { return nil }
 
 // Run starts cron ticks and blocks until ctx is done.
 // It stops the cron scheduler cleanly before returning nil.
+// The first Run call owns the scheduler lifecycle: it starts cron and, when
+// its ctx ends, stops cron and closes the lifecycle channel so in-flight
+// fires abort. A concurrent or later Run only waits for its own ctx; once
+// the owning Run has returned, a subsequent Run may start cron again.
 func (s *Scheduler) Run(ctx context.Context) error {
-	s.ctx.Store(ctx)
-	s.cron.Start()
+	s.lifeMu.Lock()
+	owner := !s.runStarted
+	if owner {
+		s.runStarted = true
+	}
+	s.lifeMu.Unlock()
+
+	if owner {
+		s.cron.Start()
+	}
+
 	<-ctx.Done()
+
+	if !owner {
+		return nil
+	}
 
 	stopCtx := s.cron.Stop()
 	<-stopCtx.Done()
+
+	s.lifeMu.Lock()
+	s.runStarted = false
+	if s.runDone != nil {
+		close(s.runDone)
+		s.runDone = nil
+	}
+	s.lifeMu.Unlock()
 
 	return nil
 }

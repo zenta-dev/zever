@@ -339,22 +339,38 @@ func TestSchedulerLog(t *testing.T) {
 	}
 }
 
-func TestSchedulerLoadCtx(t *testing.T) {
+func TestSchedulerRunLifecycle(t *testing.T) {
 	Reset()
 	s := NewScheduler(&Dispatcher{Q: &stubQueue{}}, NewUniqueLocker(&fakeCache{}))
-	if got := s.loadCtx(); got == nil {
-		t.Fatal("loadCtx fresh want non-nil")
+	if _, err := s.Every("@every 1s", "some-job", nil); err != nil {
+		t.Fatalf("Every: %v", err)
 	}
-	s.ctx.Store(42)
-	if got := s.loadCtx(); got == nil {
-		t.Fatal("loadCtx wrong type want non-nil Background")
+
+	lc := s.lifecycle()
+
+	ctx, cancel := context.WithCancel(t.Context())
+	done := make(chan error, 1)
+	go func() {
+		done <- s.Run(ctx)
+	}()
+
+	cancel()
+
+	select {
+	case err := <-done:
+		if err != nil {
+			t.Fatalf("Run err=%v want nil", err)
+		}
+	case <-time.After(time.Second):
+		t.Fatal("Run did not return after cancel")
 	}
-	type ctxKey string
-	want := context.WithValue(t.Context(), ctxKey("k"), "v")
-	s2 := NewScheduler(&Dispatcher{Q: &stubQueue{}}, NewUniqueLocker(&fakeCache{}))
-	s2.ctx.Store(want)
-	if got := s2.loadCtx(); got != want {
-		t.Fatal("loadCtx stored ctx not returned")
+
+	// The lifecycle channel must close when the owning Run returns, so
+	// in-flight fires abort.
+	select {
+	case <-lc:
+	default:
+		t.Fatal("lifecycle channel not closed after Run returned")
 	}
 }
 
@@ -369,10 +385,13 @@ func TestSchedulerRunCancel(t *testing.T) {
 	go func() {
 		done <- s.Run(ctx)
 	}()
-	// Poll until Run has stored ctx (proving cron started) instead of a
-	// fixed sleep, then cancel.
+	// Poll until Run has started (proving cron started) instead of a fixed
+	// sleep, then cancel.
 	eventually(t, 500*time.Millisecond, func() bool {
-		return s.ctx.Load() != nil
+		s.lifeMu.Lock()
+		defer s.lifeMu.Unlock()
+
+		return s.runStarted
 	}, "scheduler Run did not start")
 	cancel()
 	select {
