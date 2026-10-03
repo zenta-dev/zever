@@ -25,7 +25,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - SLSA build provenance attestation over SBOMs in CI
   (`gh attestation verify sbom/<slug>.json --repo zenta-dev/zever`).
 - `STABILITY.md` 1.0 promotion criteria with current-standing report;
-  `AUDIT-V1.md` readiness audit; DSL plugin-battery design note
+  DSL plugin-battery design note
   (`dsl/plugin-batteries.mdx`, boundary recommendation).
 - `examples/showcase` positioned as newcomer-clone-first reference app.
 - Conformance kits for 19 more batteries (`db`, `search`, `vectorstore`,

@@ -96,8 +96,8 @@ applies unchanged.
   `CHANGELOG.md` release-note entries.
 - **100% core kits:** every `Core` battery with an adapter registry ships
   a conformance kit (`<b>test` package), and every shipped adapter runs
-  it green in CI — including the currently skipped redis suites
-  (`adapters/cache/redis`, `adapters/queue/redis`).
+  it green in CI — including the redis suites (`adapters/cache/redis`,
+  `adapters/queue/redis`).
 - **External production user:** at least one application outside this
   repo runs a tagged release in production and its deployment is
   referenced from `docs/production.md`.
@@ -106,21 +106,18 @@ applies unchanged.
 
 - Core breaks: still permitted with release notes; the 6-month clock has
   not started.
-- Kits: 15 conformance kits ship under `core/*/*test/conformance.go`
-  (`billing`, `cache`, `crypto`, `eventbus`, `flag`, `idempotency`,
-  `lock`, `log`, `observability`, `password`, `payment`, `queue`,
-  `ratelimit`, `secrets`, `storage`); 13 of them ship an in-kit
-  `conformance_test.go` suite (all except `billing` and `password`).
-  CI (`.github/workflows/ci.yml` `conformance` job) runs 3 in-kit suites
-  (`cache`, `queue`, `storage`) plus 2 `-run Conformance` redis
-  invocations (`adapters/cache/redis`, `adapters/queue/redis`), both
-  currently `t.Skip`ped with miniredis-fidelity reasons
-  (`adapters/cache/redis/conformance_cover_test.go:30`,
-  `adapters/queue/redis/conformance_cover_test.go:29`). Every other
-  battery has no shared kit; new adapters there prove parity only via
-  per-adapter tests.
-- Scheduler: durable (postgres-leased) second adapter in progress on
-  `feat/v1-close`, not done; `embedded` is still the only adapter.
+- Kits: 38 conformance kit packages ship under `core/*/*test/`; 32 of
+  them ship an in-kit `conformance_test.go` suite (all pass). CI
+  (`.github/workflows/ci.yml` `conformance` job) runs all 32 in-kit
+  suites plus all 83 cross-adapter `-run Conformance` invocations
+  (representative batteries: `ai`, `analytics`, `auth`, `authz`,
+  `billing`, `cache`, `crypto`, `db`, `document`, `eventbus`, `flag`,
+  `geo`, `i18n`, `idempotency`, `job`, `lock`, `log`, `mailer`,
+  `media`, `middleware`, `notification`, `observability`, `password`,
+  `payment`, `permission`, `queue`, `ratelimit`, `router`, `scheduler`,
+  `secrets`, `session`, `storage`, `tenant`, `webhook`, `workflow`).
+- Scheduler: `adapters/scheduler/postgres` is a working durable/leased
+  second adapter; `embedded` remains the zero-infra default.
 - External prod user: none known.
 - Supply chain: SBOM per affected module in CI
   (`.github/workflows/ci.yml` `sbom` job); SLSA provenance attested on
