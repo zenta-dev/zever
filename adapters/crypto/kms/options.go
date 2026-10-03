@@ -24,6 +24,10 @@ type Options struct {
 	// UseEnvelope selects envelope encryption. Always true for this adapter;
 	// kept for parity with core crypto.Options.
 	UseEnvelope bool `json:"use_envelope" toml:"use_envelope" yaml:"use_envelope"`
+	// DevStub opts New into the deterministic no-boundary stub client.
+	// Test/dev only: New fails closed without it, so a production config
+	// selecting this adapter can never silently lose the KMS boundary.
+	DevStub bool `json:"dev_stub" toml:"dev_stub" yaml:"dev_stub"`
 }
 
 // Validate checks Options for consistency, joining all violations.
