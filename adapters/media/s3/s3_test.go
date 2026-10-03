@@ -526,6 +526,34 @@ func TestDownloadCapped(t *testing.T) {
 	}
 }
 
+func TestInvalidIDRejected(t *testing.T) {
+	t.Parallel()
+	tr := &stubTransport{do: func(*http.Request) (int, string, http.Header, error) {
+		return 0, "", nil, errors.New("transport must not be called for invalid id")
+	}}
+	d := testDriver(t, tr)
+	ctx := t.Context()
+
+	if _, err := d.Download(ctx, "../evil"); !errors.Is(err, media.ErrInvalidID) {
+		t.Errorf("Download err = %v, want ErrInvalidID", err)
+	}
+	if _, err := d.DownloadRange(ctx, "", 0, 0); !errors.Is(err, media.ErrInvalidID) {
+		t.Errorf("DownloadRange err = %v, want ErrInvalidID", err)
+	}
+	if err := d.Delete(ctx, "short"); !errors.Is(err, media.ErrInvalidID) {
+		t.Errorf("Delete err = %v, want ErrInvalidID", err)
+	}
+	if _, err := d.Stat(ctx, "xyz"); !errors.Is(err, media.ErrInvalidID) {
+		t.Errorf("Stat err = %v, want ErrInvalidID", err)
+	}
+	if _, err := d.Probe(ctx, "xyz"); !errors.Is(err, media.ErrInvalidID) {
+		t.Errorf("Probe err = %v, want ErrInvalidID", err)
+	}
+	if _, err := d.Transform(ctx, "xyz", media.TransformOps{}); !errors.Is(err, media.ErrInvalidID) {
+		t.Errorf("Transform err = %v, want ErrInvalidID", err)
+	}
+}
+
 func TestDownloadReadError(t *testing.T) {
 	t.Parallel()
 	tr := &stubTransport{

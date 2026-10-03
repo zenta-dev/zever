@@ -136,8 +136,14 @@ func isNoSuchKey(err error) bool {
 }
 
 // findKey resolves an asset id to its full object key via a prefix listing.
-// IDs are hex, so the prefix cannot escape into other assets.
+// The id is validated as 32-hex first, so the prefix can neither be empty
+// (which would match the first object in the bucket) nor escape into other
+// assets.
 func (d *driver) findKey(ctx context.Context, id string) (string, error) {
+	if !media.ValidHexID(id) {
+		return "", &media.InvalidIDError{ID: id}
+	}
+
 	out, err := d.client.ListObjectsV2(ctx, &s3sdk.ListObjectsV2Input{
 		Bucket:  aws.String(d.bucket),
 		Prefix:  aws.String(id),
