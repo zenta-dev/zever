@@ -50,7 +50,7 @@ func serveJSON(t *testing.T, status int, body string, capt *capturedRequest) htt
 func openTest(t *testing.T, srv *httptest.Server, key string) search.Search {
 	t.Helper()
 
-	s, err := New(search.Options{Host: srv.URL, APIKey: key})
+	s, err := New(search.Options{Host: srv.URL, APIKey: key, AllowInsecure: true})
 	if err != nil {
 		t.Fatalf("Open err = %v", err)
 	}
@@ -70,6 +70,15 @@ func TestOpen_invalidOptions_wrapsErrInvalidOptions(t *testing.T) {
 	t.Parallel()
 
 	_, err := New(search.Options{Host: "localhost:7700"})
+	if !errors.Is(err, search.ErrInvalidOptions) {
+		t.Fatalf("Open err = %v, want wrap of ErrInvalidOptions", err)
+	}
+}
+
+func TestOpen_httpHost_rejectedWithoutAllowInsecure(t *testing.T) {
+	t.Parallel()
+
+	_, err := New(search.Options{Host: "http://example.com:7700"})
 	if !errors.Is(err, search.ErrInvalidOptions) {
 		t.Fatalf("Open err = %v, want wrap of ErrInvalidOptions", err)
 	}

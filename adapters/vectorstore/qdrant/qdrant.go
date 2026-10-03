@@ -7,13 +7,13 @@ import (
 	"net/url"
 	"regexp"
 	"strconv"
-	"strings"
 	"sync"
 	"time"
 
 	"github.com/qdrant/go-client/qdrant"
 
 	"github.com/zenta-dev/zever/core/vectorstore"
+	"github.com/zenta-dev/zever/shared/endpoint"
 )
 
 var uuidPattern = regexp.MustCompile(`^[0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{12}$`)
@@ -81,7 +81,16 @@ func New(o vectorstore.Options) (vectorstore.VectorStore, error) {
 		return nil, ErrMissingURL
 	}
 
-	host, port, useTLS := parseAddr(o.URL)
+	// ValidateURL normalizes and re-checks the scheme (https unless
+	// AllowInsecure). The normalized form drives parseAddr, so UseTLS below
+	// follows the validated scheme instead of a bare-host/unknown-scheme
+	// downgrade.
+	normalized, err := endpoint.ValidateURL(o.URL, endpoint.WithAllowInsecure(o.AllowInsecure))
+	if err != nil {
+		return nil, fmt.Errorf("qdrant: %w: %w", vectorstore.ErrInvalidOptions, err)
+	}
+
+	host, port, useTLS := parseAddr(normalized)
 
 	cfg := &qdrant.Config{
 		Host:   host,
@@ -476,15 +485,19 @@ func collectionDim(optDim, embeddingLen int) int {
 	return embeddingLen
 }
 
+// parseAddr splits a validated Qdrant URL into host, port, and TLS mode.
+// Callers pass a URL already accepted by endpoint.ValidateURL (via
+// vectorstore.Options.Validate), so its scheme is https or, only with
+// AllowInsecure, http. TLS follows that validated scheme; the former
+// bare-host/unknown-scheme fallback that silently downgraded to plaintext
+// is gone.
 func parseAddr(addr string) (string, int, bool) {
-	if strings.Contains(addr, "://") {
-		u, err := url.Parse(addr)
-		if err == nil {
-			return hostPort(u)
-		}
+	u, err := url.Parse(addr)
+	if err != nil {
+		return "localhost", 6334, false
 	}
 
-	return splitHostPort(addr)
+	return hostPort(u)
 }
 
 func hostPort(u *url.URL) (string, int, bool) {
@@ -508,23 +521,6 @@ func hostPort(u *url.URL) (string, int, bool) {
 	}
 
 	return host, port, tls
-}
-
-func splitHostPort(addr string) (string, int, bool) {
-	host, port := addr, 6334
-	if i := strings.LastIndex(addr, ":"); i >= 0 {
-		host = addr[:i]
-
-		if n, err := strconv.Atoi(addr[i+1:]); err == nil {
-			port = n
-		}
-	}
-
-	if host == "" {
-		host = "localhost"
-	}
-
-	return host, port, false
 }
 
 func extractValue(v *qdrant.Value) any {
