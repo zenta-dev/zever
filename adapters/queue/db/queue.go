@@ -617,10 +617,16 @@ func (d *driver) tryClaim(ctx context.Context, topic string) (queue.Message, boo
 }
 
 // reclaimStale releases expired claims in topic back to ready with
-// attempt+1, mirroring reclaim.lua and the workflow attempt bump. Each
-// row settles under its own lease guard, so a concurrent claim winning
-// the row skips it instead of double-bumping. At most batch rows release
-// per sweep.
+// attempt+1, mirroring reclaim.lua and the workflow attempt bump. The
+// sweep is one set-based UPDATE over the selected ids: the database
+// computes attempt+1 itself (orm.Add), so the N per-row round trips of
+// the read-modify-write loop collapse to a single statement. The WHERE
+// keeps the per-row lease guard: a row whose claim was settled between
+// the SELECT and the UPDATE (reclaimed, nacked, acked) no longer matches
+// owner != ” AND claimed_until <= now, so it is skipped instead of
+// double-bumped -- the same skip the old (id, owner, attempt) CAS
+// produced, since every settlement path also clears the owner or deletes
+// the row. At most batch rows release per sweep.
 func (d *driver) reclaimStale(ctx context.Context, topic string) error {
 	now := time.Now().UTC()
 
@@ -633,19 +639,27 @@ func (d *driver) reclaimStale(ctx context.Context, topic string) error {
 		return fmt.Errorf("db: reclaim %q: %w", topic, err)
 	}
 
-	for _, row := range rows {
-		_, uerr := orm.UpdateTable(d.tbl).Where(orm.And(
-			d.cID.Eq(row.MessageID),
-			d.cOwner.Eq(row.ClaimedBy),
-			d.cAttempt.Eq(row.Attempt),
-		)).Set(
-			orm.Set(d.cAttempt, row.Attempt+1),
-			orm.Set(d.cOwner, ""),
-			orm.Set(d.cUntil, time.Now().UTC()),
-		).Exec(ctx, d.conn)
-		if uerr != nil {
-			return fmt.Errorf("db: reclaim %q: %w", topic, uerr)
-		}
+	if len(rows) == 0 {
+		return nil
+	}
+
+	ids := make([]string, len(rows))
+	for i, row := range rows {
+		ids[i] = row.MessageID
+	}
+
+	_, err = orm.UpdateTable(d.tbl).Where(orm.And(
+		d.cTopic.Eq(topic),
+		d.cOwner.Neq(""),
+		d.cUntil.Lte(now),
+		d.cID.In(ids...),
+	)).Set(
+		orm.SetExpr(d.cAttempt, orm.Add(d.cAttempt.Expr(), 1)),
+		orm.Set(d.cOwner, ""),
+		orm.Set(d.cUntil, time.Now().UTC()),
+	).Exec(ctx, d.conn)
+	if err != nil {
+		return fmt.Errorf("db: reclaim %q: %w", topic, err)
 	}
 
 	return nil

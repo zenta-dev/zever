@@ -27,14 +27,31 @@ func Set[T any, V any](c Column[T, V], v V) Assignment[T] {
 	return Assignment[T]{Column: c.Col(), Value: v}
 }
 
+// SetExpr builds an expression Assignment of c to e, for Update[T].Set: the
+// SET clause renders `c = <e>` and the database computes the new value, as
+// in `SET attempt = attempt + 1` (see Add). e's result type must match c's
+// value type V. Like Set it is a free function over Column[T, V] for the
+// same receiver-syntax reason, and like Set it reaches into Column's
+// unexported fields directly (same package).
+func SetExpr[T any, V any](c Column[T, V], e Expr[T, V]) Assignment[T] {
+	return Assignment[T]{Column: c.Col(), Expr: Expr[T, any](e)}
+}
+
 // toRenderAssignments converts sets to render's own erased Assignment
 // shape with a plain field-for-field literal, mirroring toRenderNode/
-// toRenderOrder's existing conversion pattern in orm/query.go.
+// toRenderOrder's existing conversion pattern in orm/query.go. An
+// expression assignment (SetExpr) converts its expression tree through the
+// same toRenderNode converter predicates use, so render can walk it
+// without importing the orm root.
 func toRenderAssignments[T any](sets []Assignment[T]) []render.Assignment {
 	out := make([]render.Assignment, len(sets))
 
 	for i, s := range sets {
 		out[i] = render.Assignment{Column: s.Column.Name(), Value: s.Value}
+
+		if s.Expr.n.Kind != NNone {
+			out[i].Expr = toRenderNode[T](s.Expr.n)
+		}
 	}
 
 	return out

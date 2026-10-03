@@ -24,10 +24,12 @@ var ErrTooManyArgs = errors.New("orm/render: too many arguments")
 // field-for-field literal at the call site (see the mutation builder), keeping
 // render decoupled from the orm root package (no import cycle) -- the same
 // pattern the query builder's node/order converters already use for
-// Node/OrderTerm.
+// Node/OrderTerm. Expr is non-zero only for a builder SetExpr assignment:
+// the SET clause renders `col = <Expr>` instead of binding Value.
 type Assignment struct {
 	Column string
 	Value  any
+	Expr   Node
 }
 
 // renderInsertText renders `INSERT INTO <table> (<columns>) VALUES (<...> )`
@@ -223,7 +225,10 @@ func renderUpdateText(d dialect.Dialect, table string, sets []Assignment, where 
 
 	b.WriteString("UPDATE ")
 	b.WriteString(d.QuoteIdent(table))
-	writeSet(&b, d, sets, counter, &args)
+
+	if err := writeSet(&b, d, sets, counter, &args); err != nil {
+		return "", nil, err
+	}
 
 	if err := writeWhereClause(&b, d, where, counter, &args); err != nil {
 		return "", nil, err
@@ -238,17 +243,38 @@ func renderUpdateText(d dialect.Dialect, table string, sets []Assignment, where 
 
 // writeSet writes a ` SET col = ?, ...` clause for sets, advancing counter
 // for each placeholder and appending every value to args in declaration
-// order. It is the shared SET writer for Update and UpdateJoin.
-func writeSet(b *strings.Builder, d dialect.Dialect, sets []Assignment, counter *argCounter, args *[]any) {
+// order. An assignment carrying an Expr renders `col = <expr>` instead, with
+// the expression's own bound arguments appended in placeholder order -- so
+// `SET attempt = attempt + 1` binds the literal 1, not a caller-supplied
+// attempt value. It is the shared SET writer for Update and UpdateJoin.
+// err is non-nil when an expression assignment renders unsupported structure
+// (see renderScalar); a literal assignment never fails.
+func writeSet(b *strings.Builder, d dialect.Dialect, sets []Assignment, counter *argCounter, args *[]any) error {
 	assignments := make([]string, 0, len(sets))
 
 	for _, s := range sets {
-		assignments = append(assignments, quoteColumn(d, s.Column)+" = "+d.Placeholder(counter.next()))
-		*args = append(*args, s.Value)
+		col := quoteColumn(d, s.Column)
+
+		if s.Expr.Kind == KindNone {
+			assignments = append(assignments, col+" = "+d.Placeholder(counter.next()))
+			*args = append(*args, s.Value)
+
+			continue
+		}
+
+		exprText, eargs, err := renderScalar(d, s.Expr, counter, renderScope{})
+		if err != nil {
+			return err
+		}
+
+		assignments = append(assignments, col+" = "+exprText)
+		*args = append(*args, eargs...)
 	}
 
 	b.WriteString(" SET ")
 	b.WriteString(strings.Join(assignments, ", "))
+
+	return nil
 }
 
 // writeWhereClause writes a ` WHERE <clause>` for where, or nothing when
@@ -474,7 +500,9 @@ func UpdateJoin(
 	b.WriteString("UPDATE ")
 	b.WriteString(d.QuoteIdent(table))
 
-	writeSet(&b, d, sets, counter, &args)
+	if err := writeSet(&b, d, sets, counter, &args); err != nil {
+		return "", nil, err
+	}
 
 	b.WriteString(" FROM ")
 	writeFromTables(&b, d, joins)

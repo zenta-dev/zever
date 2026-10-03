@@ -2,6 +2,7 @@ package orm
 
 import (
 	"errors"
+	"sync"
 	"testing"
 
 	"github.com/zenta-dev/zever/core/db"
@@ -55,6 +56,91 @@ func TestUpdateSetDoesNotShareBackingArray(t *testing.T) {
 
 	if len(branchB.sets) != 2 || branchB.sets[1].Value != int64(2) {
 		t.Fatalf("branchB.sets = %v, want second assignment quantity=2", branchB.sets)
+	}
+}
+
+// TestUpdateSetExprRoundTrip proves an expression assignment computes the
+// new value in the database: `SET quantity = quantity + 5` bumps w1 from 10
+// to 15, touching exactly one row.
+func TestUpdateSetExprRoundTrip(t *testing.T) {
+	t.Parallel()
+
+	ctx, conn := newWidgetsDB(t)
+
+	n, err := UpdateTable(widgets).Where(widgetID.Eq("w1")).Set(
+		SetExpr(widgetQty, Add(widgetQty.Expr(), 5)),
+	).Exec(ctx, conn)
+	if err != nil {
+		t.Fatalf("Exec: %v", err)
+	}
+
+	if n != 1 {
+		t.Fatalf("rows affected = %d, want 1", n)
+	}
+
+	row, ok, err := From[widget, *widget](widgets).Where(widgetID.Eq("w1")).First(ctx, conn)
+	if err != nil || !ok {
+		t.Fatalf("load = %+v,%v want row,nil", row, err)
+	}
+
+	if row.Quantity != 15 {
+		t.Fatalf("Quantity = %d, want 15 (10 + 5 computed by the database)", row.Quantity)
+	}
+}
+
+// TestUpdateSetExprCacheHitArgs proves the shape cache reconstructs an
+// expression assignment's bound args on a hit: the same UPDATE rendered
+// twice produces byte-identical SQL and the identical arg list -- the +1
+// literal first, then the where value.
+func TestUpdateSetExprCacheHitArgs(t *testing.T) {
+	t.Parallel()
+
+	exec := &recordingExec{dialectName: "sqlite"}
+
+	var (
+		mu       sync.Mutex
+		queries  []string
+		argsList [][]any
+	)
+
+	restore := SetQueryLogger(func(query string, args []any) {
+		mu.Lock()
+		queries = append(queries, query)
+		argsList = append(argsList, args)
+		mu.Unlock()
+	})
+	defer restore()
+
+	upd := UpdateTable(widgets).Where(widgetID.Eq("w1")).Set(
+		SetExpr(widgetQty, Add(widgetQty.Expr(), 1)),
+	)
+
+	if _, err := upd.Exec(t.Context(), exec); err != nil {
+		t.Fatalf("first Exec: %v", err)
+	}
+
+	if _, err := upd.Exec(t.Context(), exec); err != nil {
+		t.Fatalf("second Exec: %v", err)
+	}
+
+	if len(queries) != 2 {
+		t.Fatalf("captured %d queries, want 2", len(queries))
+	}
+
+	if queries[0] != queries[1] {
+		t.Fatalf("cached text differs:\n  first:  %q\n  second: %q", queries[0], queries[1])
+	}
+
+	want := `UPDATE "widgets" SET "quantity" = "quantity" + ? WHERE "id" = ?`
+	if queries[0] != want {
+		t.Fatalf("query = %q, want %q", queries[0], want)
+	}
+
+	wantArgs := []any{int64(1), "w1"}
+	for i, args := range argsList {
+		if len(args) != len(wantArgs) || args[0] != wantArgs[0] || args[1] != wantArgs[1] {
+			t.Fatalf("args[%d] = %#v, want %#v", i, args, wantArgs)
+		}
 	}
 }
 

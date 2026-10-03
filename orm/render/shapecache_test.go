@@ -444,3 +444,70 @@ func TestCountUpdateDeleteUncacheableAndMissErrors(t *testing.T) {
 		}
 	})
 }
+
+func TestUpdateSetExprCacheHit(t *testing.T) {
+	// Serial: renderTwice asserts a cache hit, which concurrent cache
+	// traffic could evict.
+	incAttempt := func(lit int64) Node {
+		return Node{Kind: KindBinaryExpr, Op: OpAdd, Children: []Node{
+			{Kind: KindColumn, Column: "attempt"},
+			{Kind: KindLit, Value: lit},
+		}}
+	}
+
+	t.Run("expression set caches with its bound literal", func(t *testing.T) {
+		renderTwice(t, func() (string, []any, error) {
+			return Update(sqlited.New(), "users",
+				[]Assignment{{Column: "attempt", Expr: incAttempt(1)}},
+				nBinary("users", "id", OpEq, "1"), nil, 0, 0)
+		})
+	})
+
+	t.Run("same expression shape shares text across different bound literals", func(t *testing.T) {
+		resetShapeCache()
+
+		q1, a1, err := Update(sqlited.New(), "users",
+			[]Assignment{{Column: "attempt", Expr: incAttempt(1)}},
+			nBinary("users", "id", OpEq, "1"), nil, 0, 0)
+		if err != nil {
+			t.Fatalf("first render: %v", err)
+		}
+
+		q2, a2, err := Update(sqlited.New(), "users",
+			[]Assignment{{Column: "attempt", Expr: incAttempt(2)}},
+			nBinary("users", "id", OpEq, "1"), nil, 0, 0)
+		if err != nil {
+			t.Fatalf("second render: %v", err)
+		}
+
+		if q1 != q2 {
+			t.Fatalf("same expression shape rendered different text: %q vs %q", q1, q2)
+		}
+
+		if reflect.DeepEqual(a1, a2) {
+			t.Fatalf("different bound literals produced identical args: %#v", a1)
+		}
+	})
+
+	t.Run("expression and literal assignments on one column never share a shape", func(t *testing.T) {
+		resetShapeCache()
+
+		q1, _, err := Update(sqlited.New(), "users",
+			[]Assignment{{Column: "attempt", Value: int64(2)}},
+			nBinary("users", "id", OpEq, "1"), nil, 0, 0)
+		if err != nil {
+			t.Fatalf("literal render: %v", err)
+		}
+
+		q2, _, err := Update(sqlited.New(), "users",
+			[]Assignment{{Column: "attempt", Expr: incAttempt(2)}},
+			nBinary("users", "id", OpEq, "1"), nil, 0, 0)
+		if err != nil {
+			t.Fatalf("expression render: %v", err)
+		}
+
+		if q1 == q2 {
+			t.Fatalf("literal and expression assignments shared one shape: %q", q1)
+		}
+	})
+}
