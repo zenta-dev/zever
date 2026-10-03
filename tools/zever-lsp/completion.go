@@ -36,6 +36,10 @@ const (
 	ctxOnDeleteValue
 	ctxValidateFormatValue
 	ctxErrorsValue
+	ctxServiceMember
+	ctxRPCOptionName
+	ctxJobOptionName
+	ctxScheduleOptionName
 )
 
 // candidate is one completion suggestion before it becomes a protocol item:
@@ -114,17 +118,56 @@ var indexAttrCandidates = []candidate{
 	{"unique", "make the index unique"},
 }
 
-// validateArgCandidates mirrors resolver.resolveValidateAttribute. Both the
-// string-only and numeric-only kinds are offered; narrowing them by the
-// field's declared scalar type is a follow-up.
-var validateArgCandidates = []candidate{
+// stringValidateArgCandidates are the @validate kinds that apply only to
+// string fields, mirroring resolver.resolveValidateRules.
+var stringValidateArgCandidates = []candidate{
 	{"format", "string format: email, url or uuid"},
 	{"min_len", "minimum string length"},
 	{"max_len", "maximum string length"},
+}
+
+// numericValidateArgCandidates are the @validate kinds that apply only to
+// numeric fields, mirroring resolver.resolveValidateRules.
+var numericValidateArgCandidates = []candidate{
 	{"gt", "numeric greater-than bound"},
 	{"gte", "numeric greater-or-equal bound"},
 	{"lt", "numeric less-than bound"},
 	{"lte", "numeric less-or-equal bound"},
+}
+
+// validateArgCandidates is the union of both kinds, offered when the field's
+// declared scalar type cannot be determined (e.g. the declaration is
+// mid-edit and the parser dropped it).
+var validateArgCandidates = append(
+	append([]candidate{}, stringValidateArgCandidates...),
+	numericValidateArgCandidates...,
+)
+
+// serviceMemberCandidates mirrors parser.serviceMemberStart: only "rpc"
+// starts a service-body member.
+var serviceMemberCandidates = []candidate{
+	{"rpc", "declare an rpc method"},
+}
+
+// rpcOptionCandidates mirrors parser.rpcOptionStart.
+var rpcOptionCandidates = []candidate{
+	{"http", "http: METHOD \"path\" route binding"},
+	{"auth", "auth: none | required | required(roles: {...})"},
+	{"permission", "permission: check(resource: ...)"},
+	{"errors", "errors: { code, ... } response error set"},
+	{"paginated", "paginated: true | false"},
+}
+
+// jobOptionCandidates mirrors parser.jobOptionStart.
+var jobOptionCandidates = []candidate{
+	{"queue", "queue: name of the queue this job drains"},
+	{"retry", "retry: max_attempts(n), backoff(...)"},
+}
+
+// scheduleOptionCandidates mirrors parser.scheduleOptionStart.
+var scheduleOptionCandidates = []candidate{
+	{"cron", "cron: \"0 0 * * *\" schedule spec"},
+	{"dispatch", "dispatch: JobName() to run"},
 }
 
 // onDeleteCandidates mirrors resolver.resolveOnDeleteAttribute.
@@ -194,21 +237,91 @@ func completionAt(
 	case ctxIndexAttrName:
 		return items(indexAttrCandidates, protocol.CompletionItemKindProperty, prefix)
 	case ctxValidateArgName:
-		return items(validateArgCandidates, protocol.CompletionItemKindProperty, prefix)
+		return items(validateArgCandidatesFor(validateScalarAt(src, cursor)), protocol.CompletionItemKindProperty, prefix)
 	case ctxOnDeleteValue:
 		return items(onDeleteCandidates, protocol.CompletionItemKindEnumMember, prefix)
 	case ctxValidateFormatValue:
 		return items(validateFormatCandidates, protocol.CompletionItemKindEnumMember, prefix)
 	case ctxErrorsValue:
 		return items(errorCandidates, protocol.CompletionItemKindEnumMember, prefix)
+	case ctxServiceMember:
+		return items(serviceMemberCandidates, protocol.CompletionItemKindKeyword, prefix)
+	case ctxRPCOptionName:
+		return items(rpcOptionCandidates, protocol.CompletionItemKindProperty, prefix)
+	case ctxJobOptionName:
+		return items(jobOptionCandidates, protocol.CompletionItemKindProperty, prefix)
+	case ctxScheduleOptionName:
+		return items(scheduleOptionCandidates, protocol.CompletionItemKindProperty, prefix)
 	case ctxNone:
 		return nil
 	}
-	// Proof: completionContextAt yields only the twelve contexts dispatched
+	// Proof: completionContextAt yields only the sixteen contexts dispatched
 	// above plus ctxNone, and both ctxNone and any (impossible) unknown
 	// context mean "nothing to enumerate", so they share this single nil
 	// return, which the existing ctxNone tests cover.
 	return nil
+}
+
+// validateArgCandidatesFor narrows the @validate arg-name candidates to the
+// kinds that apply to scalar (a field's declared type name). An empty scalar
+// means "not determinable" and keeps the full list; a known scalar with no
+// applicable kind (uuid, bool, timestamp, date, bytes, json, enum) offers
+// none, matching resolver.resolveValidateRules.
+func validateArgCandidatesFor(scalar string) []candidate {
+	switch scalar {
+	case "":
+		return validateArgCandidates
+	case "string":
+		return stringValidateArgCandidates
+	case "int32", "int64", "float32", "float64":
+		return numericValidateArgCandidates
+	default:
+		return nil
+	}
+}
+
+// validateScalarAt returns the declared scalar type name of the field or
+// param whose @validate(...) the cursor sits inside, or "" when it cannot be
+// determined. The parser drops a field whose attribute is left unclosed, so
+// this reads the re-lexed tokens (which still hold the `name: type @validate(`
+// prefix) rather than the AST. It scans back for the nearest colon outside any
+// preceding attribute's parentheses -- the field's own `name: type` colon --
+// and returns the token after it, so `@default(0) @validate(` and an earlier
+// param's colon do not confuse it.
+func validateScalarAt(src string, cursor protocol.Position) string {
+	toks := lexPrefix(sourceBefore(src, cursor))
+
+	open := openParenIndex(toks)
+	if open < 2 || toks[open-2].Kind != token.AT || toks[open-1].Lit != "validate" {
+		return ""
+	}
+
+	atLine := toks[open-2].Pos.Line
+	depth := 0
+
+	for i := open - 3; i >= 0; i-- {
+		if toks[i].Pos.Line != atLine {
+			return ""
+		}
+
+		switch toks[i].Kind { //nolint:exhaustive // only parens, the type colon, and declaration braces matter here
+		case token.RPAREN:
+			depth++
+		case token.LPAREN:
+			if depth > 0 {
+				depth--
+			}
+		case token.COLON:
+			if depth == 0 && i+1 < len(toks) {
+				return toks[i+1].Lit
+			}
+		case token.LBRACE, token.RBRACE:
+			return ""
+		default:
+		}
+	}
+
+	return ""
 }
 
 // entityCandidates turns every resolved entity into a completion candidate,
@@ -670,12 +783,19 @@ func blockContext(toks []token.Token) completionContext {
 		return ctxTopLevelKeyword
 	}
 
-	switch enclosingDeclKind(toks, open) { //nolint:exhaustive // other blocks have no vocabulary yet
+	switch enclosingDeclKind(toks, open) { //nolint:exhaustive // only declarations with an enumerable body vocabulary are listed
 	case token.ENTITY:
 		return ctxEntityMember
+	case token.SERVICE:
+		return ctxServiceMember
+	case token.RPC:
+		return ctxRPCOptionName
+	case token.JOB:
+		return ctxJobOptionName
+	case token.SCHEDULE:
+		return ctxScheduleOptionName
 	default:
-		// service, job, schedule and rpc bodies use different shapes that
-		// this pass deliberately leaves alone.
+		// message and any other block have no body vocabulary.
 		return ctxNone
 	}
 }

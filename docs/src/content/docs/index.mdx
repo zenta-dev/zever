@@ -91,7 +91,20 @@ func main() {
 
 ## Runnable example
 
-Describe an entity and a service once, in a `.zen` file:
+Install the CLI, scaffold a project, then describe an entity and a service
+once in its `.zen` schema:
+
+```sh
+# install the CLI at the current release
+go install github.com/zenta-dev/zever/cmd/zever@v0.5.3
+
+# scaffold a project: a fresh go.mod, schema/app.zen, and cmd/server
+zever new hello
+cd hello
+go mod tidy
+```
+
+Replace the starter entity in `schema/app.zen` with this entity and service:
 
 ```zen
 entity User {
@@ -108,21 +121,19 @@ service UserService {
 }
 ```
 
-Compile it, then run the smoke test:
+Compile the schema into generated plumbing, then start the server:
 
 ```sh
-go get github.com/zenta-dev/zever/config@vX.Y.Z github.com/zenta-dev/zever/container@vX.Y.Z
-zever compile
-go run .
+zever compile schema/app.zen
+zever serve
 ```
 
-Expected output or behavior:
-
-```text
-db resolved: true
-```
-
-No database server starts and no migration runs. The default sqlite adapter opens in-process, the memory cache needs no connection, and `zever compile` only emits generated plumbing next to your schema. When the output prints, the install, schema pipeline, and container path all work.
+Expected output or behavior: the server starts and logs that it is listening
+(`http server listening`, address `:8080` by default; pass `-addr` to change
+it). No database server starts and no migration runs: the default sqlite
+adapter opens in-process, the memory cache needs no connection, and `zever
+compile` only emits generated plumbing next to your schema. When the server
+listens, the install, schema pipeline, and container path all work.
 
 ## Variants
 

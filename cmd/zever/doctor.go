@@ -15,8 +15,9 @@ import (
 
 // DoctorConfig carries every input runDoctorWith needs. Screen agents build
 // it from huh forms; the flag shell (runDoctor) builds it from argv. An
-// empty ConfigPath verifies config.Default(). A nil Out defaults to
-// os.Stdout.
+// empty ConfigPath runs config.Load(""), which discovers
+// zever.yaml/.yml/.json in the working directory and applies env overrides.
+// A nil Out defaults to os.Stdout.
 type DoctorConfig struct {
 	ConfigPath string
 	Out        io.Writer
@@ -59,8 +60,9 @@ func printDoctorUsage(fs *flag.FlagSet) {
 	}
 }
 
-// runDoctor builds a Container from config.Default() (or, when --config is
-// given, config.Load(path)) and attempts to resolve every battery, printing
+// runDoctor builds a Container from config.Load(path) (which discovers
+// zever.yaml/.yml/.json and applies env when --config is absent) and attempts
+// to resolve every battery, printing
 // "<battery>: OK" or "<battery>: FAIL: <err>" for each. Every Container
 // accessor here follows the same (T, error) shape, so a FAIL for a battery
 // that needs security material it can't safely invent (e.g. auth/jwt with no
@@ -78,7 +80,7 @@ func runDoctor(args []string) error {
 
 	args = peelInteractive(args)
 	fs := flag.NewFlagSet("doctor", flag.ContinueOnError)
-	configPath := fs.String("config", "", "optional config file path (default: config.Default(), zero-infra)")
+	configPath := fs.String("config", "", "optional config file path (default: discover zever.yaml/.yml/.json + env)")
 	strict := fs.Bool("strict", false, "exit non-zero if any battery fails (for CI/pre-deploy gating)")
 	fs.Usage = func() { printDoctorUsage(fs) }
 
@@ -133,15 +135,16 @@ var doctorChecksFor = func(c *container.Container, resolved *config.Config) map[
 	}
 }
 
-// runDoctorWith resolves every battery from cfg (config.Default when
-// ConfigPath is empty, config.Load(ConfigPath) otherwise) and reports one
-// OK/FAIL line per battery to cfg.Out. It validates the config first and
-// reports the result as a "config" row, then resolves each battery against
-// the same Container. By default it always returns nil: a FAIL row is an
-// expected outcome (e.g. a battery needing a secret), not a command error;
-// only a config file that cannot be loaded is an error. Pass cfg.Strict to
-// make any FAIL row return a non-nil error instead, for CI/pre-deploy
-// gating on exit code.
+// runDoctorWith resolves every battery from config.Load(cfg.ConfigPath) --
+// config.Load("") discovers zever.yaml/.yml/.json in the working directory
+// and applies env overrides, matching how the container resolves config --
+// and reports one OK/FAIL line per battery to cfg.Out. It validates the
+// config first and reports the result as a "config" row, then resolves each
+// battery against the same Container. By default it always returns nil: a
+// FAIL row is an expected outcome (e.g. a battery needing a secret), not a
+// command error; only a config that cannot be loaded is an error. Pass
+// cfg.Strict to make any FAIL row return a non-nil error instead, for
+// CI/pre-deploy gating on exit code.
 //
 // No secrets ever reach cfg.Out: only battery resolution errors are
 // printed, and those never echo secret values (see config.Redact, the sole
@@ -149,15 +152,9 @@ var doctorChecksFor = func(c *container.Container, resolved *config.Config) map[
 func runDoctorWith(cfg DoctorConfig) error {
 	out := outOrStdout(cfg.Out)
 
-	resolved := config.Default()
-
-	if cfg.ConfigPath != "" {
-		loaded, err := config.Load(cfg.ConfigPath)
-		if err != nil {
-			return fmt.Errorf("zever doctor: load config %q: %w", cfg.ConfigPath, err)
-		}
-
-		resolved = loaded
+	resolved, err := config.Load(cfg.ConfigPath)
+	if err != nil {
+		return fmt.Errorf("zever doctor: load config %q: %w", cfg.ConfigPath, err)
 	}
 
 	c := container.New(resolved)

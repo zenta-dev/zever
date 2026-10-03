@@ -178,6 +178,11 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Fixed
 
+- `cmd/zever`: `doctor` and `config show` now resolve their config through
+  `config.Load`, so `zever.yaml`/`.yml`/`.json` discovery and `SERVICE_FIELD`
+  env overrides apply when `--config` is absent (previously both silently
+  ignored the file and env layers and used `config.Default()`), matching how
+  the container resolves config.
 - `cmd/zever`: `check`, `fmt`, `routes`, `graph`, `check-boundaries`,
   `explain`, and `db migrate` now prefix "no input .zen files" and
   file-read errors with their own command name instead of the shared
