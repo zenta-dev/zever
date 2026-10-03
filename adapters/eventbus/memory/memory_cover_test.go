@@ -176,7 +176,7 @@ func TestCoverCloseDrainsInflight(t *testing.T) {
 		BufferSize:     8,
 		MaxHandlers:    4,
 		HandlerTimeout: 2 * time.Second,
-		CloseTimeout:   5 * time.Second,
+		CloseTimeout:   100 * time.Millisecond,
 	})
 
 	release := make(chan struct{})
@@ -199,8 +199,10 @@ func TestCoverCloseDrainsInflight(t *testing.T) {
 
 	coverWaitFor(t, "handler to start", entered.Load)
 
-	// Buffered while forward is stuck in the handler. Close does not drain,
-	// so the forward drain-defer must drain them on exit.
+	// Buffered while forward is stuck in the synchronous handler. Close does
+	// not drain, and (like redis) abandons the in-flight handler after
+	// closeTimeout, so the forward drain-defer runs once the handler returns
+	// on the deferred release close.
 	for range 5 {
 		if pubErr := mb.Publish(ctx, "inflight", eventbus.NewPayload([]byte("x")), nil); pubErr != nil {
 			t.Fatalf("Publish: %v", pubErr)
@@ -272,6 +274,61 @@ func TestCoverSemVsDone(t *testing.T) {
 	case m := <-gotB:
 		t.Fatalf("sem-b received after unsubscribe: %+v", m)
 	case <-time.After(200 * time.Millisecond):
+	}
+}
+
+func TestCoverForwardRunsHandlerSynchronously(t *testing.T) {
+	mb := coverMustBus(t, eventbus.Options{
+		BufferSize:     8,
+		MaxHandlers:    4,
+		HandlerTimeout: 20 * time.Millisecond,
+		CloseTimeout:   2 * time.Second,
+	})
+	defer mb.Close()
+
+	ctx := t.Context()
+	release := make(chan struct{})
+	defer close(release)
+
+	var active, maxActive atomic.Int32
+
+	if _, subErr := mb.Subscribe(ctx, "sync", func(context.Context, eventbus.Message) {
+		n := active.Add(1)
+
+		for {
+			m := maxActive.Load()
+			if n <= m || maxActive.CompareAndSwap(m, n) {
+				break
+			}
+		}
+
+		<-release
+		active.Add(-1)
+	}); subErr != nil {
+		t.Fatalf("Subscribe: %v", subErr)
+	}
+
+	// Three buffered messages. A synchronous forward holds one handler (and
+	// its semaphore slot) for the handler's whole life; the old async forward
+	// abandoned each handler at handlerTimeout and spawned the next, so
+	// maxActive climbed with the message count.
+	for range 3 {
+		if pubErr := mb.Publish(ctx, "sync", eventbus.NewPayload([]byte("x")), nil); pubErr != nil {
+			t.Fatalf("Publish: %v", pubErr)
+		}
+	}
+
+	coverWaitFor(t, "handler to start", func() bool { return active.Load() == 1 })
+
+	// Give the old async path time to abandon the handler at its 20ms
+	// timeout and start the next; the synchronous path never does.
+	select {
+	case <-time.After(200 * time.Millisecond):
+	case <-ctx.Done():
+	}
+
+	if got := maxActive.Load(); got != 1 {
+		t.Fatalf("max concurrent handlers = %d want 1 (handler not delivered synchronously)", got)
 	}
 }
 
