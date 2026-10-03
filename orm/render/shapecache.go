@@ -24,12 +24,12 @@ const shapeCacheCapacity = 256
 // the legacy orm/engine/shapecache.go idea into orm/render; the byte-
 // identical contract is enforced by shapecache_test.go.
 //
-// It is a fixed-capacity map guarded by a mutex: when an insert would
-// exceed capacity the map is cleared and the new entry inserted. That keeps
-// the cache bounded under pathological shape churn while staying simple and
-// deterministic for tests (reads vastly outnumber writes in practice).
+// It is a fixed-capacity map guarded by a read/write mutex: when an insert
+// would exceed capacity the map is cleared and the new entry inserted. That
+// keeps the cache bounded under pathological shape churn while staying simple
+// and deterministic for tests (reads vastly outnumber writes in practice).
 var (
-	shapeCacheMu     sync.Mutex
+	shapeCacheMu     sync.RWMutex
 	shapeCacheMap    = make(map[string]string, shapeCacheCapacity)
 	shapeCacheHits   atomic.Int64
 	shapeCacheMisses atomic.Int64
@@ -48,16 +48,16 @@ func resetShapeCache() {
 
 // shapeCacheLen reports the number of cached entries, for tests.
 func shapeCacheLen() int {
-	shapeCacheMu.Lock()
-	defer shapeCacheMu.Unlock()
+	shapeCacheMu.RLock()
+	defer shapeCacheMu.RUnlock()
 
 	return len(shapeCacheMap)
 }
 
 func shapeCacheGet(key string) (string, bool) {
-	shapeCacheMu.Lock()
+	shapeCacheMu.RLock()
 	q, ok := shapeCacheMap[key]
-	shapeCacheMu.Unlock()
+	shapeCacheMu.RUnlock()
 
 	if ok {
 		shapeCacheHits.Add(1)

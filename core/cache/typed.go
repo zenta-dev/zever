@@ -3,6 +3,7 @@ package cache
 import (
 	"context"
 	"fmt"
+	"strconv"
 	"time"
 
 	"github.com/zenta-dev/zever/shared/codec"
@@ -25,7 +26,24 @@ func NewTyped[K Key, V any](backend Cache, codec codec.Codec[V]) *Typed[K, V] {
 }
 
 func (t *Typed[K, V]) key(k K) string {
-	return fmt.Sprint(k)
+	switch v := any(k).(type) {
+	case string:
+		return v
+	case int8:
+		return strconv.FormatInt(int64(v), 10)
+	case int16:
+		return strconv.FormatInt(int64(v), 10)
+	case int32:
+		return strconv.FormatInt(int64(v), 10)
+	case int64:
+		return strconv.FormatInt(v, 10)
+	case float32:
+		return strconv.FormatFloat(float64(v), 'g', -1, 32)
+	case float64:
+		return strconv.FormatFloat(v, 'g', -1, 64)
+	default:
+		return fmt.Sprint(k)
+	}
 }
 
 // Get retrieves and decodes the value stored under k.
