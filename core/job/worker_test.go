@@ -447,10 +447,12 @@ func TestWorkerHandleEmpty(t *testing.T) {
 	var wg sync.WaitGroup
 	attempt := 0
 	maxPollWait := 5 * time.Second
+	timer := time.NewTimer(0)
+	defer timer.Stop()
 
-	// attempt 0 -> wait 0, time.After(0) fast returns false and increments attempt
+	// attempt 0 -> wait 0, timer fires fast, returns false and increments attempt
 	ctx := t.Context()
-	got := w.handleEmpty(ctx, &wg, &attempt, maxPollWait)
+	got := w.handleEmpty(ctx, &wg, &attempt, maxPollWait, timer)
 	if got {
 		t.Fatal("handleEmpty with attempt 0 and bg ctx = true want false")
 	}
@@ -460,11 +462,11 @@ func TestWorkerHandleEmpty(t *testing.T) {
 
 	// already canceled ctx -> returns true
 	// NOTE: attempt must be >0 so the wait is not immediately ready; otherwise
-	// the select between time.After(0) and ctx.Done() is racy.
+	// the select between the timer and ctx.Done() is racy.
 	ctx2, cancel := context.WithCancel(t.Context())
 	cancel()
 	attempt2 := 5
-	got = w.handleEmpty(ctx2, &wg, &attempt2, maxPollWait)
+	got = w.handleEmpty(ctx2, &wg, &attempt2, maxPollWait, timer)
 	if !got {
 		t.Fatal("handleEmpty canceled ctx = false want true")
 	}
@@ -473,7 +475,7 @@ func TestWorkerHandleEmpty(t *testing.T) {
 	// capped wait is used; use canceled ctx to avoid waiting max time: should
 	// still return true fast
 	attempt3 := 20
-	got = w.handleEmpty(ctx2, &wg, &attempt3, 2*time.Second)
+	got = w.handleEmpty(ctx2, &wg, &attempt3, 2*time.Second, timer)
 	if !got {
 		t.Fatal("handleEmpty capped canceled = false want true")
 	}
@@ -1130,7 +1132,9 @@ func TestWorkerHandleEmptyPollWaitUpdate(t *testing.T) {
 	// attempt 1 -> handleEmpty waits nextPollWait(1, max) = 1ms, then increments to 2
 	attempt := 1
 	maxPollWait := 5 * time.Second
-	err := w.handleEmpty(t.Context(), &wg, &attempt, maxPollWait)
+	timer := time.NewTimer(0)
+	defer timer.Stop()
+	err := w.handleEmpty(t.Context(), &wg, &attempt, maxPollWait, timer)
 	if err {
 		t.Fatal("handleEmpty bg ctx should be false")
 	}

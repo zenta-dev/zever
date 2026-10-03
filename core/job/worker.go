@@ -123,6 +123,11 @@ func (w *Worker) runLoop(ctx context.Context, sem chan struct{}, inflight *sync.
 
 	maxPollWait := DefaultMaxPollWait
 
+	// Reuse one timer across empty polls instead of allocating a fresh
+	// timer per poll via time.After. Reset (below) restarts it each time.
+	pollTimer := time.NewTimer(0)
+	defer pollTimer.Stop()
+
 	for {
 		select {
 		case sem <- struct{}{}:
@@ -136,7 +141,7 @@ func (w *Worker) runLoop(ctx context.Context, sem chan struct{}, inflight *sync.
 		if errors.Is(err, queue.ErrEmpty) {
 			<-sem
 
-			if w.handleEmpty(ctx, inflight, &pollAttempt, maxPollWait) {
+			if w.handleEmpty(ctx, inflight, &pollAttempt, maxPollWait, pollTimer) {
 				return nil
 			}
 
@@ -175,16 +180,21 @@ func (w *Worker) sweepBatches(ctx context.Context) {
 // immediately), and every subsequent call waits nextPollWait(*attempt,
 // maxPollWait), matching the doubling sequence the previous
 // mutated-duration implementation produced (0, 1ms, 2ms, 4ms, ..., capped
-// at maxPollWait).
-func (w *Worker) handleEmpty(ctx context.Context, inflight *sync.WaitGroup, attempt *int, maxPollWait time.Duration) bool {
+// at maxPollWait). timer is owned by the caller and reused across polls;
+// handleEmpty only resets and drains it.
+func (w *Worker) handleEmpty(ctx context.Context, inflight *sync.WaitGroup, attempt *int, maxPollWait time.Duration, timer *time.Timer) bool {
 	wait := time.Duration(0)
 	if *attempt > 0 {
 		wait = nextPollWait(*attempt, maxPollWait)
 	}
 
+	timer.Reset(wait)
+
 	select {
-	case <-time.After(wait):
+	case <-timer.C:
 	case <-ctx.Done():
+		timer.Stop()
+
 		w.waitDrain(inflight)
 
 		return true
