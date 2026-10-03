@@ -56,6 +56,7 @@ Scaffold, validate, generate, preview DDL, migrate, serve:
 
 ```bash
 zever new hello --dir ./hello --force
+cd hello
 zever check schema/app.zen
 zever compile --backend=zenorm,atlas,openapi --out ./generated schema/app.zen
 zever db migrate --dry-run --adapter=sqlite schema/app.zen

@@ -1611,8 +1611,8 @@ everything else is resolved from a ` + backtick + `container.Container` + backti
 ` + "```bash" + `
 go mod tidy
 
-# turn schema/app.zen into a query builder (internal/orm), a Protobuf
-# service definition (generated/proto) and SQL DDL
+# turn schema/app.zen into a query builder (generated/zenorm/orm/gen/app), a
+# Protobuf service definition (generated/proto) and SQL DDL
 zever compile --backend=%[2]s schema/app.zen
 
 # create the sqlite database from the schema (safe to re-run)
