@@ -230,8 +230,10 @@ func ArrayAgg[T any, V any](c Column[T, V]) OrderedAggregate[T] {
 // aggregate; delim is bound as a placeholder argument. It is Postgres-only:
 // MySQL and SQLite have no string_agg (use GroupConcat there), so execution
 // returns the typed dialect.ErrUnsupportedByDialect. Order terms are added
-// with OrderBy and must be plain columns.
-func StringAgg[T any, V any](c Column[T, V], delim string) OrderedAggregate[T] {
+// with OrderBy and must be plain columns. V is constrained to ~string: the
+// SQL function concatenates its argument as text, so a non-string column
+// type is a programmer error caught at compile time.
+func StringAgg[T any, V ~string](c Column[T, V], delim string) OrderedAggregate[T] {
 	name := c.Col().Name()
 
 	return OrderedAggregate[T]{Aggregate{
