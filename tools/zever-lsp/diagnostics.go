@@ -22,16 +22,18 @@ type stopper interface {
 }
 
 // diagToLSPDiagnostic translates one compiler diagnostic into its LSP form.
-// The compiler records a point, not a span, so the range is one character
-// wide starting at the reported position (converted from 1-based to 0-based).
-func diagToLSPDiagnostic(d *diag.Diagnostic) protocol.Diagnostic {
+// The compiler records a point, not a span; when the document source is
+// available the range is widened to the whole identifier containing that
+// point, so editors underline the token instead of a single caret. With no
+// source it stays a one-character point range.
+func diagToLSPDiagnostic(d *diag.Diagnostic, src string) protocol.Diagnostic {
 	severity := protocol.DiagnosticSeverityError
 	if d.Severity == diag.SeverityWarning {
 		severity = protocol.DiagnosticSeverityWarning
 	}
 
 	return protocol.Diagnostic{
-		Range:    pointRange(d.Pos),
+		Range:    diagnosticRange(d.Pos, src),
 		Severity: severity,
 		Source:   protocol.NewOptional("zen"),
 		Message:  protocol.String(d.Msg),
@@ -45,6 +47,10 @@ type diagnosticPublisher struct {
 	lastPublished map[string][]protocol.Diagnostic
 	timers        map[string]stopper
 	afterFunc     func(d time.Duration, fn func()) stopper
+	// srcFor supplies a file's source text so diagnostic ranges can widen to
+	// the enclosing identifier. Nil (the zero value) falls back to point
+	// ranges, which is what tests that do not exercise spans rely on.
+	srcFor func(path string) (string, bool)
 }
 
 // newDiagnosticPublisher returns a publisher with empty state and a time.AfterFunc-driven debounce clock.
@@ -60,8 +66,10 @@ func newDiagnosticPublisher() *diagnosticPublisher {
 
 // groupDiagnostics buckets a diagnostic list by the file each one points at.
 // Diagnostics with no file (e.g. a backend-level failure) are dropped, since
-// there is no document to attach them to.
-func groupDiagnostics(diags diag.List) map[string][]protocol.Diagnostic {
+// there is no document to attach them to. srcFor, when non-nil, supplies a
+// file's source text so each range can be widened to its enclosing
+// identifier; a nil srcFor or a miss falls back to a point range.
+func groupDiagnostics(diags diag.List, srcFor func(path string) (string, bool)) map[string][]protocol.Diagnostic {
 	grouped := make(map[string][]protocol.Diagnostic)
 
 	for _, d := range diags {
@@ -69,7 +77,15 @@ func groupDiagnostics(diags diag.List) map[string][]protocol.Diagnostic {
 			continue
 		}
 
-		grouped[d.Pos.File] = append(grouped[d.Pos.File], diagToLSPDiagnostic(d))
+		src := ""
+
+		if srcFor != nil {
+			if content, ok := srcFor(d.Pos.File); ok {
+				src = content
+			}
+		}
+
+		grouped[d.Pos.File] = append(grouped[d.Pos.File], diagToLSPDiagnostic(d, src))
 	}
 
 	return grouped
@@ -85,7 +101,7 @@ func (p *diagnosticPublisher) publish(client protocol.Client, known []string, di
 		return nil
 	}
 
-	grouped := groupDiagnostics(diags)
+	grouped := groupDiagnostics(diags, p.srcFor)
 
 	p.mu.Lock()
 

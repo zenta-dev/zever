@@ -105,6 +105,33 @@ func TestRunDoctorWithCoreBadConfigFile(t *testing.T) {
 	}
 }
 
+// TestRunDoctorWithAppliesEnvOverrides proves `zever doctor` with no
+// --config resolves through config.Load(""), so env overrides apply before
+// batteries are resolved -- the same config the container would build.
+func TestRunDoctorWithAppliesEnvOverrides(t *testing.T) {
+	t.Setenv("DB_ADAPTER", "postgres")
+
+	prev := doctorChecksFor
+	t.Cleanup(func() { doctorChecksFor = prev })
+
+	var gotAdapter string
+
+	doctorChecksFor = func(_ *container.Container, resolved *config.Config) map[string]func() error {
+		gotAdapter = resolved.DB.Adapter
+
+		return map[string]func() error{"config": func() error { return nil }}
+	}
+
+	var out bytes.Buffer
+	if err := runDoctorWith(DoctorConfig{Out: &out}); err != nil {
+		t.Fatalf("runDoctorWith: %v", err)
+	}
+
+	if gotAdapter != "postgres" {
+		t.Fatalf("resolved DB adapter = %q, want postgres from DB_ADAPTER env", gotAdapter)
+	}
+}
+
 func TestPrintDoctorUsageColoredBox(t *testing.T) {
 	prev := colorEnabled
 	colorEnabled = true

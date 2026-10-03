@@ -177,6 +177,14 @@ func (w *Workspace) DocContent(uri string) (string, bool) {
 		return "", false
 	}
 
+	return w.ContentForPath(path)
+}
+
+// ContentForPath returns the best-known content for an absolute path: the
+// open buffer if there is one, otherwise the cached on-disk copy. It is the
+// path-keyed counterpart of DocContent, used where a compiler diagnostic
+// reports a path rather than a URI.
+func (w *Workspace) ContentForPath(path string) (string, bool) {
 	w.mu.Lock()
 	defer w.mu.Unlock()
 

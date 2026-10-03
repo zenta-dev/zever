@@ -45,9 +45,15 @@ type Server struct {
 
 // NewServer returns a server with an empty workspace and no client yet.
 func NewServer() *Server {
+	ws := NewWorkspace()
+	publisher := newDiagnosticPublisher()
+	// Let published diagnostics widen their ranges to the enclosing
+	// identifier using each file's live source.
+	publisher.srcFor = ws.ContentForPath
+
 	return &Server{
-		ws:        NewWorkspace(),
-		publisher: newDiagnosticPublisher(),
+		ws:        ws,
+		publisher: publisher,
 		trace:     protocol.TraceValueOff,
 	}
 }

@@ -160,6 +160,111 @@ func TestCompletionValidateArgName(t *testing.T) {
 	}
 }
 
+// TestCompletionValidateArgNameNarrowsByScalarType proves the @validate arg
+// names are narrowed to the kinds that apply to the field's declared scalar
+// type, instead of always offering both string- and numeric-only variants.
+func TestCompletionValidateArgNameNarrowsByScalarType(t *testing.T) {
+	tests := []struct {
+		name      string
+		src       string
+		want      []string
+		notWanted []string
+	}{
+		{
+			name:      "string field offers string kinds only",
+			src:       "entity User {\n\tname: string @validate(\n}\n",
+			want:      []string{"format", "min_len", "max_len"},
+			notWanted: []string{"gt", "gte", "lt", "lte"},
+		},
+		{
+			name:      "numeric field offers numeric kinds only",
+			src:       "entity User {\n\tage: int64 @validate(\n}\n",
+			want:      []string{"gt", "gte", "lt", "lte"},
+			notWanted: []string{"format", "min_len", "max_len"},
+		},
+		{
+			name:      "attribute before validate still finds the field type",
+			src:       "entity User {\n\tage: int64 @default(0) @validate(\n}\n",
+			want:      []string{"gt", "gte", "lt", "lte"},
+			notWanted: []string{"format", "min_len", "max_len"},
+		},
+		{
+			name: "scalar with no applicable kind offers none",
+			src:  "entity User {\n\tid: uuid @validate(\n}\n",
+		},
+	}
+
+	for _, tc := range tests {
+		t.Run(tc.name, func(t *testing.T) {
+			file, _ := parser.New("u.zen", []byte(tc.src)).ParseFile()
+			cursor := protocol.Position{Line: 1, Character: uint32(len(strings.Split(tc.src, "\n")[1]))} //nolint:gosec // test fixture
+
+			labels := completionLabels(completionAt(nil, file, tc.src, cursor))
+
+			for _, want := range tc.want {
+				if !containsLabel(labels, want) {
+					t.Errorf("missing %q, got %v", want, labels)
+				}
+			}
+
+			for _, notWanted := range tc.notWanted {
+				if containsLabel(labels, notWanted) {
+					t.Errorf("should not offer %q, got %v", notWanted, labels)
+				}
+			}
+
+			if tc.want == nil && len(labels) != 0 {
+				t.Errorf("want no items, got %v", labels)
+			}
+		})
+	}
+}
+
+// TestCompletionValidateArgNameFallsBackWhenTypeUnknown proves that when the
+// field's type cannot be read off the attribute's line (here the attribute is
+// on its own line), completion still offers the full candidate list rather
+// than guessing.
+func TestCompletionValidateArgNameFallsBackWhenTypeUnknown(t *testing.T) {
+	src := "entity User {\n\tname: string\n\t\t@validate(\n}\n"
+
+	file, _ := parser.New("u.zen", []byte(src)).ParseFile()
+	cursor := protocol.Position{Line: 2, Character: uint32(len(strings.Split(src, "\n")[2]))} //nolint:gosec // test fixture
+
+	labels := completionLabels(completionAt(nil, file, src, cursor))
+
+	for _, want := range []string{"format", "min_len", "max_len", "gt", "gte", "lt", "lte"} {
+		if !containsLabel(labels, want) {
+			t.Errorf("fallback missing %q, got %v", want, labels)
+		}
+	}
+}
+
+// TestValidateArgCandidatesFor covers the scalar-type narrowing helper
+// directly, including the not-determinable empty scalar.
+func TestValidateArgCandidatesFor(t *testing.T) {
+	tests := []struct {
+		scalar string
+		want   int
+	}{
+		{"", len(validateArgCandidates)},
+		{"string", len(stringValidateArgCandidates)},
+		{"int32", len(numericValidateArgCandidates)},
+		{"int64", len(numericValidateArgCandidates)},
+		{"float32", len(numericValidateArgCandidates)},
+		{"float64", len(numericValidateArgCandidates)},
+		{"uuid", 0},
+		{"bool", 0},
+		{"timestamp", 0},
+		{"User", 0},
+	}
+
+	for _, tc := range tests {
+		if got := len(validateArgCandidatesFor(tc.scalar)); got != tc.want {
+			t.Errorf("validateArgCandidatesFor(%q) returned %d candidates, want %d", tc.scalar, got, tc.want)
+		}
+	}
+}
+
 func TestCompletionOnDeleteValue(t *testing.T) {
 	src := "entity Task {\n\tuser_id: uuid\n\tbelongs_to user: User @on_delete(\n}\n"
 
@@ -616,17 +721,84 @@ func TestCompletionLoneColonOffersNothing(t *testing.T) {
 	}
 }
 
-func TestCompletionServiceBodyOffersNothing(t *testing.T) {
+func TestCompletionServiceBodyOffersRPC(t *testing.T) {
 	src := "service S {\n\t\n}\n"
 
 	file, _ := parser.New("s.zen", []byte(src)).ParseFile()
 	cursor := protocol.Position{Line: 1, Character: 1}
 
 	// A brace that is not an errors: set falls through past
-	// errorsSetContext to blockContext, which has no vocabulary for
-	// service bodies.
-	if items := completionAt(nil, file, src, cursor); len(items) != 0 {
-		t.Errorf("service body produced %d items, want none: %v", len(items), completionLabels(items))
+	// errorsSetContext to blockContext, which offers the service-body
+	// vocabulary (only rpc).
+	items := completionAt(nil, file, src, cursor)
+	labels := completionLabels(items)
+
+	if !containsLabel(labels, "rpc") {
+		t.Errorf("service body missing %q, got %v", "rpc", labels)
+	}
+
+	if containsLabel(labels, "entity") {
+		t.Errorf("service body should not offer top-level keyword %q, got %v", "entity", labels)
+	}
+}
+
+func TestCompletionRPCBodyOffersOptions(t *testing.T) {
+	src := "service S {\n\trpc M() -> T {\n\t\t\n\t}\n}\n"
+
+	file, _ := parser.New("s.zen", []byte(src)).ParseFile()
+	cursor := protocol.Position{Line: 2, Character: 2}
+
+	items := completionAt(nil, file, src, cursor)
+	labels := completionLabels(items)
+
+	for _, want := range []string{"http", "auth", "permission", "errors", "paginated"} {
+		if !containsLabel(labels, want) {
+			t.Errorf("rpc body missing %q, got %v", want, labels)
+		}
+	}
+
+	if containsLabel(labels, "rpc") {
+		t.Errorf("rpc body should not offer service member %q, got %v", "rpc", labels)
+	}
+}
+
+func TestCompletionJobBodyOffersOptions(t *testing.T) {
+	src := "job J() {\n\t\n}\n"
+
+	file, _ := parser.New("j.zen", []byte(src)).ParseFile()
+	cursor := protocol.Position{Line: 1, Character: 1}
+
+	items := completionAt(nil, file, src, cursor)
+	labels := completionLabels(items)
+
+	for _, want := range []string{"queue", "retry"} {
+		if !containsLabel(labels, want) {
+			t.Errorf("job body missing %q, got %v", want, labels)
+		}
+	}
+
+	if containsLabel(labels, "cron") {
+		t.Errorf("job body should not offer schedule option %q, got %v", "cron", labels)
+	}
+}
+
+func TestCompletionScheduleBodyOffersOptions(t *testing.T) {
+	src := "schedule S {\n\t\n}\n"
+
+	file, _ := parser.New("s.zen", []byte(src)).ParseFile()
+	cursor := protocol.Position{Line: 1, Character: 1}
+
+	items := completionAt(nil, file, src, cursor)
+	labels := completionLabels(items)
+
+	for _, want := range []string{"cron", "dispatch"} {
+		if !containsLabel(labels, want) {
+			t.Errorf("schedule body missing %q, got %v", want, labels)
+		}
+	}
+
+	if containsLabel(labels, "queue") {
+		t.Errorf("schedule body should not offer job option %q, got %v", "queue", labels)
 	}
 }
 
@@ -765,6 +937,20 @@ func TestColonContext_condition_expected(t *testing.T) {
 func TestBlockContext_condition_expected(t *testing.T) {
 	entity := []token.Token{testTok(token.ENTITY, "entity", 1, 1), testTok(token.IDENT, "User", 1, 8), testTok(token.LBRACE, "{", 1, 13)}
 	service := []token.Token{testTok(token.SERVICE, "service", 1, 1), testTok(token.IDENT, "S", 1, 9), testTok(token.LBRACE, "{", 1, 11)}
+	job := []token.Token{testTok(token.JOB, "job", 1, 1), testTok(token.IDENT, "J", 1, 5), testTok(token.LBRACE, "{", 1, 8)}
+	schedule := []token.Token{testTok(token.SCHEDULE, "schedule", 1, 1), testTok(token.IDENT, "S", 1, 10), testTok(token.LBRACE, "{", 1, 12)}
+	rpc := []token.Token{
+		testTok(token.SERVICE, "service", 1, 1),
+		testTok(token.IDENT, "S", 1, 9),
+		testTok(token.LBRACE, "{", 1, 11),
+		testTok(token.RPC, "rpc", 2, 2),
+		testTok(token.IDENT, "M", 2, 6),
+		testTok(token.LPAREN, "(", 2, 7),
+		testTok(token.RPAREN, ")", 2, 8),
+		testTok(token.ARROW, "->", 2, 10),
+		testTok(token.IDENT, "T", 2, 13),
+		testTok(token.LBRACE, "{", 2, 15),
+	}
 	closed := []token.Token{testTok(token.ENTITY, "entity", 1, 1), testTok(token.LBRACE, "{", 1, 8), testTok(token.RBRACE, "}", 1, 9)}
 
 	tests := []struct {
@@ -775,7 +961,10 @@ func TestBlockContext_condition_expected(t *testing.T) {
 		{"empty is top level", nil, ctxTopLevelKeyword},
 		{"closed block is top level", closed, ctxTopLevelKeyword},
 		{"entity body", entity, ctxEntityMember},
-		{"service body has no vocabulary", service, ctxNone},
+		{"service body", service, ctxServiceMember},
+		{"rpc body", rpc, ctxRPCOptionName},
+		{"job body", job, ctxJobOptionName},
+		{"schedule body", schedule, ctxScheduleOptionName},
 	}
 
 	for _, tc := range tests {
