@@ -77,6 +77,13 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Changed
 
+- Bounded connection-pool defaults for the `sqlite` and `postgres` `db`
+  adapters when `MaxConns` is left at zero: file-backed `sqlite` now caps
+  `database/sql`'s previously unlimited pool at `max(1, GOMAXPROCS)`, and
+  `postgres` now defaults to `max(4, GOMAXPROCS)` instead of pgxpool's
+  `max(4, NumCPU)`, so a container's cgroup CPU limit is honored (GOMAXPROCS
+  is container-aware since Go 1.25). Explicit `MaxConns` is unchanged; set
+  it to restore the old unbounded/native behavior.
 - feat!: unify DB-backed adapter strings to canonical `db` for `search`,
   `vectorstore`, and `workflow` (`core/search.DB`, `core/vectorstore.DB`,
   `core/workflow.DB`; adapter packages' `Adapter` consts now equal the

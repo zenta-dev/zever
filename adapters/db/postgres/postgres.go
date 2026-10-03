@@ -5,6 +5,7 @@ import (
 	"crypto/tls"
 	"errors"
 	"fmt"
+	"runtime"
 	"strings"
 	"sync"
 	"time"
@@ -323,7 +324,9 @@ func (r *rowsAdapter) Columns() ([]string, error) {
 
 // New creates a db.DB backed by PostgreSQL via pgxpool. The caller registers
 // it via db.Register(db.Postgres, New). DSN is required; pool knobs from
-// opts pass through to the pgxpool config. It never logs the DSN.
+// opts pass through to the pgxpool config, and a non-positive MaxConns
+// defaults to max(4, GOMAXPROCS) -- container-aware since Go 1.25 -- rather
+// than pgxpool's NumCPU-based default. It never logs the DSN.
 //
 // Pool guidance: the container shares one pool per DSN across every
 // battery pointing at it (first opener's MaxConns wins; later nonzero caps
@@ -354,6 +357,11 @@ func New(opts db.Options) (db.DB, error) {
 
 	if opts.MaxConns > 0 {
 		config.MaxConns = int32(opts.MaxConns) //nolint:gosec // G115: pool size bounded by design
+	} else {
+		// pgxpool's own default is max(4, runtime.NumCPU()), which ignores
+		// cgroup CPU limits. GOMAXPROCS is container-aware (Go 1.25+), so
+		// derive the default from it to respect a constrained container.
+		config.MaxConns = int32(max(4, runtime.GOMAXPROCS(0))) //nolint:gosec // G115: pool size bounded by design
 	}
 
 	if opts.MinConns > 0 {

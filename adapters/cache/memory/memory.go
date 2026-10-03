@@ -246,11 +246,7 @@ func (a *memoryAdapter) Close(_ context.Context) error {
 }
 
 func (a *memoryAdapter) startJanitor(interval time.Duration) {
-	a.wg.Add(1)
-
 	a.wg.Go(func() {
-		defer a.wg.Done()
-
 		jitter := time.Duration(rand.Int64N(int64(interval/10) + 1)) //nolint:gosec // weak rand is fine for jitter
 		if jitter > 0 {
 			interval += jitter

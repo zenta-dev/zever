@@ -227,6 +227,12 @@ func (b *bus) forward(parent context.Context, topic string, sub *subscription, h
 				return
 			}
 
+			// Deliver synchronously, mirroring the redis adapter: the
+			// semaphore slot is held for the handler's whole lifetime, so a
+			// handler that ignores its context cannot outlive forward and
+			// accumulate unbounded leaked goroutines. A handler that blocks
+			// past closeTimeout is abandoned by Close the same way redis
+			// abandons an in-flight handler.
 			func(m eventbus.Message) {
 				defer func() { <-b.sem }()
 
@@ -237,27 +243,15 @@ func (b *bus) forward(parent context.Context, topic string, sub *subscription, h
 					trace.WithAttributes(attribute.String("messaging.destination.name", topic)))
 				defer span.End()
 
-				doneCh := make(chan struct{})
-
-				go func() {
-					defer close(doneCh)
-
-					defer func() {
-						if r := recover(); r != nil {
-							if b.onPanic != nil {
-								b.onPanic(topic, m, r)
-							}
+				defer func() {
+					if r := recover(); r != nil {
+						if b.onPanic != nil {
+							b.onPanic(topic, m, r)
 						}
-					}()
-
-					handler(ctx, m)
+					}
 				}()
 
-				select {
-				case <-doneCh:
-				case <-ctx.Done():
-				case <-sub.done:
-				}
+				handler(ctx, m)
 			}(msg)
 		}
 	}

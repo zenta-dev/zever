@@ -6,6 +6,7 @@ import (
 	"errors"
 	"fmt"
 	"net/url"
+	"runtime"
 	"strings"
 	"sync"
 	"time"
@@ -53,7 +54,9 @@ type adapter struct {
 // single pooled connection, taking precedence over Options.MaxConns, since
 // each additional connection to an in-memory database gets its own isolated
 // database rather than sharing state. File-backed databases apply the pool
-// knobs (MaxConns as max open, MinConns as max idle target, lifetimes).
+// knobs (MaxConns as max open, MinConns as max idle target, lifetimes); a
+// non-positive MaxConns bounds the pool to max(1, GOMAXPROCS) rather than
+// leaving database/sql's unlimited default in place.
 //
 // Error style: driver failures wrap as "sqlite: <op>: %w" so errors.Is/As
 // keep working through the chain. Begin/Commit failures additionally wrap in
@@ -94,6 +97,11 @@ func New(opts db.Options) (db.DB, error) {
 	} else {
 		if opts.MaxConns > 0 {
 			conn.SetMaxOpenConns(opts.MaxConns)
+		} else {
+			// database/sql defaults to unlimited connections when
+			// SetMaxOpenConns is never called. Bound a file-backed pool to a
+			// sane default instead of letting it grow with load.
+			conn.SetMaxOpenConns(max(1, runtime.GOMAXPROCS(0)))
 		}
 
 		if opts.MinConns > 0 {
