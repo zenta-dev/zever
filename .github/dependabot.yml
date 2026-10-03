@@ -738,7 +738,7 @@ updates:
           - "*"
 
   - package-ecosystem: gomod
-    directory: "/adapters/search/meilisearch"
+    directory: "/adapters/search/db"
     schedule:
       interval: weekly
       day: monday
@@ -749,7 +749,7 @@ updates:
           - "*"
 
   - package-ecosystem: gomod
-    directory: "/adapters/search/db"
+    directory: "/adapters/search/meilisearch"
     schedule:
       interval: weekly
       day: monday
@@ -925,7 +925,7 @@ updates:
           - "*"
 
   - package-ecosystem: gomod
-    directory: "/adapters/workflow/memory"
+    directory: "/adapters/workflow/db"
     schedule:
       interval: weekly
       day: monday
@@ -936,7 +936,7 @@ updates:
           - "*"
 
   - package-ecosystem: gomod
-    directory: "/adapters/workflow/db"
+    directory: "/adapters/workflow/memory"
     schedule:
       interval: weekly
       day: monday
