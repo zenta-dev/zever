@@ -12,9 +12,11 @@ import (
 
 const (
 	// DefaultEntryTTL is the short TTL conformance expiry tests set before polling for disappearance.
-	DefaultEntryTTL = 30 * time.Millisecond
+	// It must comfortably exceed the Set→Get round-trip so the "before expiry"
+	// assertion cannot race expiry under CI load (a 30ms TTL flaked there).
+	DefaultEntryTTL = 1 * time.Second
 	// DefaultExpiryTimeout bounds how long expiry polls wait before failing.
-	DefaultExpiryTimeout = 2 * time.Second
+	DefaultExpiryTimeout = 5 * time.Second
 	// DefaultPollInterval is the tick between expiry-poll attempts.
 	DefaultPollInterval = 5 * time.Millisecond
 )
