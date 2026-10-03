@@ -78,7 +78,7 @@ func TestOpen_defaults(t *testing.T) {
 func TestOpen_custom(t *testing.T) {
 	t.Parallel()
 
-	a, err := NewWithOptions(Options{Addr: "http://ollama:11434", Model: "llama3", Timeout: 5 * time.Second})
+	a, err := NewWithOptions(Options{Addr: "http://ollama:11434", Model: "llama3", Timeout: 5 * time.Second, AllowInsecure: true})
 	if err != nil {
 		t.Fatalf("Open: %v", err)
 	}
@@ -93,6 +93,10 @@ func TestOpen_custom(t *testing.T) {
 
 	if ad.defaultModel != "llama3" {
 		t.Fatalf("model = %q", ad.defaultModel)
+	}
+
+	if !ad.allowInsecure {
+		t.Fatal("allowInsecure = false, want true")
 	}
 
 	if ad.requestTimeout() != 5*time.Second {
@@ -112,7 +116,7 @@ func TestNewSatisfiesAIFactory(t *testing.T) {
 
 	var factory ai.Factory = New // compile-time proof New satisfies ai.Factory
 
-	a, err := factory(ai.Options{BaseURL: "http://ollama:11434", Model: "llama3", Timeout: 5 * time.Second})
+	a, err := factory(ai.Options{BaseURL: "http://ollama:11434", Model: "llama3", Timeout: 5 * time.Second, AllowInsecure: true})
 	if err != nil {
 		t.Fatalf("New: %v", err)
 	}
@@ -130,8 +134,78 @@ func TestNewSatisfiesAIFactory(t *testing.T) {
 		t.Fatalf("model = %q", ad.defaultModel)
 	}
 
+	if !ad.allowInsecure {
+		t.Fatal("allowInsecure = false, want ai.Options.AllowInsecure to map to ollama.Options.AllowInsecure")
+	}
+
 	if ad.requestTimeout() != 5*time.Second {
 		t.Fatalf("timeout = %v", ad.requestTimeout())
+	}
+}
+
+func TestNewWithOptions_tlsVerification(t *testing.T) {
+	t.Parallel()
+
+	tests := []struct {
+		name          string
+		allowInsecure bool
+		wantSkip      bool
+	}{
+		{name: "default verifies", allowInsecure: false, wantSkip: false},
+		{name: "AllowInsecure skips", allowInsecure: true, wantSkip: true},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			t.Parallel()
+
+			a, err := NewWithOptions(Options{AllowInsecure: tt.allowInsecure})
+			if err != nil {
+				t.Fatalf("NewWithOptions: %v", err)
+			}
+
+			ad, ok := a.(*adapter)
+			if !ok {
+				t.Fatalf("got %T, want *adapter", a)
+			}
+
+			tr, ok := ad.client.Transport.(*http.Transport)
+			if !ok {
+				t.Fatalf("transport = %T, want *http.Transport", ad.client.Transport)
+			}
+
+			if tr.TLSClientConfig == nil {
+				t.Fatal("TLSClientConfig is nil")
+			}
+
+			if tr.TLSClientConfig.InsecureSkipVerify != tt.wantSkip {
+				t.Fatalf("InsecureSkipVerify = %v, want %v", tr.TLSClientConfig.InsecureSkipVerify, tt.wantSkip)
+			}
+		})
+	}
+}
+
+func TestNewWithOptions_tlsVerification_injectedTransport(t *testing.T) {
+	t.Parallel()
+
+	tr := &http.Transport{}
+
+	a, err := NewWithOptions(Options{Transport: tr, AllowInsecure: true})
+	if err != nil {
+		t.Fatalf("NewWithOptions: %v", err)
+	}
+
+	ad, ok := a.(*adapter)
+	if !ok {
+		t.Fatalf("got %T, want *adapter", a)
+	}
+
+	if ad.client.Transport != http.RoundTripper(tr) {
+		t.Fatal("injected transport not used")
+	}
+
+	if tr.TLSClientConfig == nil || !tr.TLSClientConfig.InsecureSkipVerify {
+		t.Fatalf("TLSClientConfig = %+v, want InsecureSkipVerify true", tr.TLSClientConfig)
 	}
 }
 
@@ -144,6 +218,10 @@ func TestOpen_invalid(t *testing.T) {
 
 	if _, err := NewWithOptions(Options{Addr: "ftp://example.com"}); err == nil {
 		t.Fatal("expected error, got nil")
+	}
+
+	if _, err := NewWithOptions(Options{Addr: "http://ollama.internal:11434"}); err == nil {
+		t.Fatal("expected non-loopback http without AllowInsecure to be rejected")
 	}
 }
 
@@ -694,24 +772,28 @@ func TestPostRequest(t *testing.T) {
 	t.Parallel()
 
 	tests := []struct {
-		name    string
-		addr    string
-		want    string
-		wantErr string
+		name          string
+		addr          string
+		allowInsecure bool
+		want          string
+		wantErr       string
 	}{
 		{name: "simple", addr: "http://localhost:11434", want: "http://localhost:11434/api/chat"},
 		{name: "trailing slash", addr: "http://localhost:11434/", want: "http://localhost:11434/api/chat"},
 		{name: "unparseable", addr: "http://[::1", wantErr: "create request"},
 		{name: "bad scheme", addr: "ftp://example.com", wantErr: "http or https"},
 		{name: "no host", addr: "https:///chat", wantErr: "must have a host"},
-		{name: "user info", addr: "http://user@example.com", wantErr: "user info"},
+		{name: "user info", addr: "http://user@example.com", allowInsecure: true, wantErr: "user info"},
+		{name: "non-loopback http rejected", addr: "http://ollama.internal:11434", wantErr: "https scheme"},
+		{name: "non-loopback http allowed", addr: "http://ollama.internal:11434", allowInsecure: true, want: "http://ollama.internal:11434/api/chat"},
+		{name: "https allowed", addr: "https://ollama.internal:11434", want: "https://ollama.internal:11434/api/chat"},
 	}
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 			t.Parallel()
 
-			req, err := postRequest(t.Context(), tt.addr, "/api/chat", []byte("{}"))
+			req, err := postRequest(t.Context(), tt.addr, "/api/chat", []byte("{}"), tt.allowInsecure)
 			if tt.wantErr != "" {
 				if err == nil || !strings.Contains(err.Error(), tt.wantErr) {
 					t.Fatalf("err = %v, want %q", err, tt.wantErr)
@@ -752,22 +834,25 @@ func TestCheckEndpoint(t *testing.T) {
 	}
 
 	tests := []struct {
-		name    string
-		raw     string
-		wantErr string
+		name          string
+		raw           string
+		allowInsecure bool
+		wantErr       string
 	}{
-		{name: "http ok", raw: "http://example.com/api/chat"},
+		{name: "loopback http ok", raw: "http://localhost:11434/api/chat"},
+		{name: "non-loopback http rejected", raw: "http://example.com/api/chat", wantErr: "https scheme"},
+		{name: "non-loopback http allowed", raw: "http://example.com/api/chat", allowInsecure: true},
 		{name: "https ok", raw: "https://example.com/api/chat"},
 		{name: "bad scheme", raw: "ftp://example.com/x", wantErr: "http or https"},
 		{name: "no host", raw: "https:///chat", wantErr: "must have a host"},
-		{name: "user info", raw: "http://user@example.com/x", wantErr: "user info"},
+		{name: "user info", raw: "http://user@example.com/x", allowInsecure: true, wantErr: "user info"},
 	}
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 			t.Parallel()
 
-			err := checkEndpoint(mustParse(tt.raw))
+			err := checkEndpoint(mustParse(tt.raw), tt.allowInsecure)
 			if tt.wantErr != "" {
 				if err == nil || !strings.Contains(err.Error(), tt.wantErr) {
 					t.Fatalf("err = %v, want %q", err, tt.wantErr)

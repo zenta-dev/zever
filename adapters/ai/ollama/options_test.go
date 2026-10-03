@@ -44,7 +44,7 @@ func TestValidate(t *testing.T) {
 		},
 		{
 			name:    "user info",
-			opts:    Options{Addr: "http://user@example.com"},
+			opts:    Options{Addr: "http://user@example.com", AllowInsecure: true},
 			wantErr: true,
 			want:    []string{"must not contain user info"},
 		},
@@ -53,6 +53,24 @@ func TestValidate(t *testing.T) {
 			opts:    Options{Addr: "http://[::1"},
 			wantErr: true,
 			want:    []string{"must be a valid URL"},
+		},
+		{
+			name: "loopback http allowed by default",
+			opts: Options{Addr: "http://localhost:11434"},
+		},
+		{
+			name:    "non-loopback http rejected by default",
+			opts:    Options{Addr: "http://ollama.internal:11434"},
+			wantErr: true,
+			want:    []string{"https scheme"},
+		},
+		{
+			name: "non-loopback http allowed with AllowInsecure",
+			opts: Options{Addr: "http://ollama.internal:11434", AllowInsecure: true},
+		},
+		{
+			name: "https always allowed",
+			opts: Options{Addr: "https://ollama.internal:11434"},
 		},
 		{
 			name:    "joined violations",

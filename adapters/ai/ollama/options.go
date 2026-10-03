@@ -23,6 +23,11 @@ type Options struct {
 	Model string `json:"model" toml:"model" yaml:"model"`
 	// Timeout bounds each HTTP exchange. Non-positive means DefaultTimeout.
 	Timeout time.Duration `json:"timeout" toml:"timeout" yaml:"timeout"`
+	// AllowInsecure permits a plain-http Addr for non-loopback hosts and
+	// disables TLS certificate verification. Default false: https required
+	// for non-loopback hosts, verification always on. Loopback http (the
+	// DefaultAddr host) is always permitted for local development.
+	AllowInsecure bool `json:"allow_insecure" toml:"allow_insecure" yaml:"allow_insecure"`
 	// Transport overrides the HTTP round tripper. Nil means http.DefaultTransport.
 	// Tests use a hand-fake transport; production leaves it nil.
 	Transport http.RoundTripper `json:"-" toml:"-" yaml:"-"`
@@ -43,7 +48,7 @@ func (o Options) Validate() error {
 	}
 
 	if o.Addr != "" {
-		if err := validateAddr(o.Addr); err != nil {
+		if err := validateAddr(o.Addr, o.AllowInsecure); err != nil {
 			errs = append(errs, err)
 		}
 	}
@@ -52,10 +57,12 @@ func (o Options) Validate() error {
 }
 
 // validateAddr rejects addresses that are not plain http(s) URLs
-// without user info or whitespace.
-func validateAddr(addr string) error {
+// without user info or whitespace. Plain http is permitted only for
+// loopback hosts (local development) unless AllowInsecure opts in.
+func validateAddr(addr string, allowInsecure bool) error {
 	if _, err := endpoint.ValidateURL(addr,
-		endpoint.WithAllowInsecure(true),
+		endpoint.WithAllowInsecure(allowInsecure),
+		endpoint.WithAllowLoopbackHTTP(),
 		endpoint.WithRejectUserinfo(),
 		endpoint.WithRejectWhitespace(),
 	); err != nil {

@@ -4,6 +4,7 @@ import (
 	"bufio"
 	"bytes"
 	"context"
+	"crypto/tls"
 	"errors"
 	"fmt"
 	"io"
@@ -28,25 +29,27 @@ const (
 	streamLineBufSize = 4096
 )
 
-// adapter talks to an Ollama server over plain HTTP with whole-exchange timeouts.
+// adapter talks to an Ollama server over HTTP(S) with whole-exchange timeouts.
 type adapter struct {
-	addr         string
-	defaultModel string
-	client       *http.Client
+	addr          string
+	defaultModel  string
+	allowInsecure bool
+	client        *http.Client
 }
 
 // New creates an AI backed by the Ollama server named by opts.BaseURL,
 // matching ai.Factory's signature (unlike NewWithOptions, so
 // ai.Register(ai.Ollama, New) needs no translating closure, the way every
 // sibling ai/* adapter's New already can be registered directly). It
-// forwards APIKey/Model/BaseURL/Timeout; Transport (a test-only seam, see
-// Options.Transport) has no ai.Options equivalent and is left nil --
-// callers needing it use NewWithOptions directly.
+// forwards APIKey/Model/BaseURL/Timeout/AllowInsecure; Transport (a
+// test-only seam, see Options.Transport) has no ai.Options equivalent and
+// is left nil -- callers needing it use NewWithOptions directly.
 func New(opts ai.Options) (ai.AI, error) {
 	return NewWithOptions(Options{
-		Addr:    opts.BaseURL,
-		Model:   opts.Model,
-		Timeout: opts.Timeout,
+		Addr:          opts.BaseURL,
+		Model:         opts.Model,
+		Timeout:       opts.Timeout,
+		AllowInsecure: opts.AllowInsecure,
 	})
 }
 
@@ -72,17 +75,36 @@ func NewWithOptions(opts Options) (ai.AI, error) {
 
 	transport := opts.Transport
 	if transport == nil {
+		// TLS verification is skipped only on explicit opt-in
+		// (AllowInsecure); the default client always verifies.
+		clientOpts := []httpclient.Option{}
+		if opts.AllowInsecure {
+			clientOpts = append(clientOpts, httpclient.WithInsecureSkipVerify(true))
+		}
+
 		return &adapter{
-			addr:         addr,
-			defaultModel: opts.Model,
-			client:       httpclient.NewClient(timeout),
+			addr:          addr,
+			defaultModel:  opts.Model,
+			allowInsecure: opts.AllowInsecure,
+			client:        httpclient.NewClient(timeout, clientOpts...),
 		}, nil
 	}
 
+	if opts.AllowInsecure {
+		if tr, ok := transport.(*http.Transport); ok {
+			if tr.TLSClientConfig == nil {
+				tr.TLSClientConfig = &tls.Config{}
+			}
+
+			tr.TLSClientConfig.InsecureSkipVerify = true //nolint:gosec // explicit opt-in for test servers
+		}
+	}
+
 	return &adapter{
-		addr:         addr,
-		defaultModel: opts.Model,
-		client:       &http.Client{Timeout: timeout, Transport: transport},
+		addr:          addr,
+		defaultModel:  opts.Model,
+		allowInsecure: opts.AllowInsecure,
+		client:        &http.Client{Timeout: timeout, Transport: transport},
 	}, nil
 }
 
@@ -249,7 +271,7 @@ func (a *adapter) Stream(ctx context.Context, model string, messages []ai.Messag
 		return nil, err
 	}
 
-	httpReq, err := postRequest(ctx, a.addr, "/api/chat", body)
+	httpReq, err := postRequest(ctx, a.addr, "/api/chat", body, a.allowInsecure)
 	if err != nil {
 		return nil, err
 	}
@@ -440,10 +462,11 @@ func (a *adapter) Close() error {
 }
 
 // postRequest builds a JSON POST for addr+path, rejecting endpoint shapes
-// that fail parsing or violate the http(s)+host+no-userinfo policy.
+// that fail parsing or violate the http(s)+host+no-userinfo policy. Plain
+// http is permitted only for loopback hosts unless allowInsecure opts in.
 // Address shape is also enforced at Open; this re-checks per request
 // because the address is used verbatim on every exchange.
-func postRequest(ctx context.Context, addr, path string, body []byte) (*http.Request, error) {
+func postRequest(ctx context.Context, addr, path string, body []byte, allowInsecure bool) (*http.Request, error) {
 	endpoint := strings.TrimRight(addr, "/") + path
 
 	req, err := http.NewRequestWithContext(ctx, http.MethodPost, endpoint, bytes.NewReader(body))
@@ -451,7 +474,7 @@ func postRequest(ctx context.Context, addr, path string, body []byte) (*http.Req
 		return nil, fmt.Errorf("ollama: create request: %w", err)
 	}
 
-	if err := checkEndpoint(req.URL); err != nil {
+	if err := checkEndpoint(req.URL, allowInsecure); err != nil {
 		return nil, err
 	}
 
@@ -460,10 +483,13 @@ func postRequest(ctx context.Context, addr, path string, body []byte) (*http.Req
 	return req, nil
 }
 
-// checkEndpoint enforces the http(s)+host+no-userinfo policy on a parsed URL.
-func checkEndpoint(u *url.URL) error {
+// checkEndpoint enforces the http(s)+host+no-userinfo policy on a parsed
+// URL. Plain http is permitted only for loopback hosts unless allowInsecure
+// opts in.
+func checkEndpoint(u *url.URL, allowInsecure bool) error {
 	if _, err := endpoint.ValidateURL(u.String(),
-		endpoint.WithAllowInsecure(true),
+		endpoint.WithAllowInsecure(allowInsecure),
+		endpoint.WithAllowLoopbackHTTP(),
 		endpoint.WithRejectUserinfo(),
 	); err != nil {
 		return fmt.Errorf("ollama: url %q %s", u.String(), addrReason(err))
@@ -474,7 +500,7 @@ func checkEndpoint(u *url.URL) error {
 
 // doPost sends body to path and returns the bounded response bytes.
 func (a *adapter) doPost(ctx context.Context, path string, body []byte) ([]byte, error) {
-	httpReq, err := postRequest(ctx, a.addr, path, body)
+	httpReq, err := postRequest(ctx, a.addr, path, body, a.allowInsecure)
 	if err != nil {
 		return nil, err
 	}
