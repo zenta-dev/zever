@@ -10,6 +10,12 @@ import (
 	"github.com/zenta-dev/zever/core/ratelimit"
 )
 
+// DefaultStripeCount is the number of lock stripes the bucket table is
+// split into. It must be a power of two so stripe selection is a mask.
+// Concurrent calls on different keys proceed in parallel; same-key calls
+// still serialize on their stripe.
+const DefaultStripeCount = 64
+
 var _ ratelimit.Limiter = (*store)(nil)
 
 type bucket struct {
@@ -17,9 +23,16 @@ type bucket struct {
 	last   time.Time
 }
 
+// stripe is one shard of the bucket table with its own lock.
+type stripe struct {
+	mu      sync.RWMutex
+	buckets map[string]*bucket
+}
+
 type store struct {
-	mu         sync.RWMutex
-	buckets    map[string]*bucket
+	stripes    []stripe
+	total      atomic.Int64
+	admitMu    sync.Mutex
 	rate       float64
 	burst      float64
 	idle       time.Duration
@@ -55,7 +68,7 @@ func New(opts ratelimit.Options) (ratelimit.Limiter, error) {
 	}
 
 	s := &store{
-		buckets:    make(map[string]*bucket),
+		stripes:    make([]stripe, DefaultStripeCount),
 		rate:       opts.Rate,
 		burst:      float64(opts.Burst),
 		idle:       idle,
@@ -63,6 +76,10 @@ func New(opts ratelimit.Options) (ratelimit.Limiter, error) {
 		maxEntries: maxEntries,
 		stop:       make(chan struct{}),
 		done:       make(chan struct{}),
+	}
+
+	for i := range s.stripes {
+		s.stripes[i].buckets = make(map[string]*bucket)
 	}
 
 	go s.run()
@@ -75,6 +92,10 @@ func New(opts ratelimit.Options) (ratelimit.Limiter, error) {
 // Costs above burst are capped at burst for parity with the Redis adapter.
 // bucket.last is touched on every call (allowed and denied) so idle
 // expiry measures time since last activity, not last success.
+//
+// The bucket table is striped: existing-key calls take only their stripe
+// lock. New-key calls briefly take admitMu to reserve a slot under the
+// global MaxEntries bound, never while holding a stripe lock.
 func (s *store) Allow(ctx context.Context, key string, tokens float64) (ratelimit.Decision, error) {
 	if err := ctx.Err(); err != nil {
 		return ratelimit.Decision{}, err
@@ -97,19 +118,38 @@ func (s *store) Allow(ctx context.Context, key string, tokens float64) (ratelimi
 
 	now := time.Now()
 
-	s.mu.Lock()
-	defer s.mu.Unlock()
+	st := s.stripeFor(key)
+
+	st.mu.Lock()
 
 	if s.closed.Load() {
+		st.mu.Unlock()
 		return ratelimit.Decision{}, ratelimit.ErrClosed
 	}
 
-	b, ok := s.buckets[key]
+	b, ok := st.buckets[key]
 	if !ok {
-		s.evictLRULocked(now)
-		b = &bucket{tokens: s.burst, last: now}
-		s.buckets[key] = b
-	} else if now.Sub(b.last) > s.idle {
+		st.mu.Unlock()
+		s.admit(now)
+		st.mu.Lock()
+
+		if s.closed.Load() {
+			s.total.Add(-1)
+			st.mu.Unlock()
+			return ratelimit.Decision{}, ratelimit.ErrClosed
+		}
+
+		if b, ok = st.buckets[key]; !ok {
+			b = &bucket{tokens: s.burst, last: now}
+			st.buckets[key] = b
+		} else {
+			// A concurrent caller inserted this key while we reserved
+			// a slot; release the reservation.
+			s.total.Add(-1)
+		}
+	}
+
+	if ok && now.Sub(b.last) > s.idle {
 		// Opportunistic expiry: treat idle bucket as new.
 		b.tokens = s.burst
 	}
@@ -122,14 +162,19 @@ func (s *store) Allow(ctx context.Context, key string, tokens float64) (ratelimi
 	b.tokens = min(s.burst, b.tokens+elapsed*s.rate)
 	b.last = now
 
+	var d ratelimit.Decision
+
 	if b.tokens >= need {
 		b.tokens -= need
-		return ratelimit.Decision{Allowed: true, Remaining: b.tokens}, nil
+		d = ratelimit.Decision{Allowed: true, Remaining: b.tokens}
+	} else {
+		retry := time.Duration((need - b.tokens) / s.rate * float64(time.Second))
+		d = ratelimit.Decision{Allowed: false, RetryAfter: retry, Remaining: b.tokens}
 	}
 
-	retry := time.Duration((need - b.tokens) / s.rate * float64(time.Second))
+	st.mu.Unlock()
 
-	return ratelimit.Decision{Allowed: false, RetryAfter: retry, Remaining: b.tokens}, nil
+	return d, nil
 }
 
 // Reset clears the bucket state for key. Unknown keys are a no-op.
@@ -146,14 +191,19 @@ func (s *store) Reset(ctx context.Context, key string) error {
 		return ratelimit.ErrClosed
 	}
 
-	s.mu.Lock()
-	defer s.mu.Unlock()
+	st := s.stripeFor(key)
+
+	st.mu.Lock()
+	defer st.mu.Unlock()
 
 	if s.closed.Load() {
 		return ratelimit.ErrClosed
 	}
 
-	delete(s.buckets, key)
+	if _, ok := st.buckets[key]; ok {
+		delete(st.buckets, key)
+		s.total.Add(-1)
+	}
 
 	return nil
 }
@@ -167,9 +217,19 @@ func (s *store) Close() error {
 	close(s.stop)
 	<-s.done
 
-	s.mu.Lock()
-	s.buckets = make(map[string]*bucket)
-	s.mu.Unlock()
+	// Hold admitMu so no admission lands between the wipe and the
+	// total reset; stripe locks serialize against concurrent callers.
+	s.admitMu.Lock()
+	defer s.admitMu.Unlock()
+
+	for i := range s.stripes {
+		st := &s.stripes[i]
+		st.mu.Lock()
+		st.buckets = make(map[string]*bucket)
+		st.mu.Unlock()
+	}
+
+	s.total.Store(0)
 
 	return nil
 }
@@ -192,61 +252,114 @@ func (s *store) run() {
 	}
 }
 
-// evictLRULocked makes room for one new bucket when the table is full.
-// Idle buckets are reaped first; otherwise the least-recently-used live
-// bucket is evicted so an attacker cannot grow the map without bound.
-// Caller must hold s.mu.
-func (s *store) evictLRULocked(now time.Time) {
-	if len(s.buckets) < s.maxEntries {
-		return
+// stripeFor returns the stripe owning key.
+func (s *store) stripeFor(key string) *stripe {
+	return &s.stripes[fnv64a(key)&(DefaultStripeCount-1)]
+}
+
+// admit reserves a slot in the table, evicting the soonest-expired or
+// least-recently-used bucket across all stripes when the table is full,
+// so the global MaxEntries bound holds. Caller must not hold a stripe
+// lock; admitMu serializes admissions.
+func (s *store) admit(now time.Time) {
+	s.admitMu.Lock()
+	defer s.admitMu.Unlock()
+
+	if s.total.Load() >= int64(s.maxEntries) {
+		s.evictOneLocked(now)
 	}
 
+	s.total.Add(1)
+}
+
+// evictOneLocked makes room for one new bucket when the table is full.
+// Idle buckets are reaped first; otherwise the least-recently-used live
+// bucket is evicted so an attacker cannot grow the map without bound.
+// Caller must hold admitMu; total is decremented per deletion.
+func (s *store) evictOneLocked(now time.Time) {
 	var oldestKey string
+	var oldestStripe *stripe
 	var oldestTime time.Time
 	first := true
 
-	for k, b := range s.buckets {
-		if now.Sub(b.last) > s.idle {
-			delete(s.buckets, k)
+	for i := range s.stripes {
+		st := &s.stripes[i]
 
-			return
+		st.mu.Lock()
+
+		for k, b := range st.buckets {
+			if now.Sub(b.last) > s.idle {
+				delete(st.buckets, k)
+				s.total.Add(-1)
+				st.mu.Unlock()
+				return
+			}
+
+			if first || b.last.Before(oldestTime) {
+				oldestKey, oldestStripe, oldestTime, first = k, st, b.last, false
+			}
 		}
 
-		if first || b.last.Before(oldestTime) {
-			oldestKey, oldestTime, first = k, b.last, false
-		}
+		st.mu.Unlock()
 	}
 
 	if oldestKey != "" {
-		delete(s.buckets, oldestKey)
+		oldestStripe.mu.Lock()
+		if _, ok := oldestStripe.buckets[oldestKey]; ok {
+			delete(oldestStripe.buckets, oldestKey)
+			s.total.Add(-1)
+		}
+		oldestStripe.mu.Unlock()
 	}
 }
 
 func (s *store) sweepOnce() {
 	now := time.Now()
 
-	s.mu.RLock()
+	for i := range s.stripes {
+		st := &s.stripes[i]
 
-	var expired []string
+		st.mu.RLock()
 
-	for k, b := range s.buckets {
-		if now.Sub(b.last) > s.idle {
-			expired = append(expired, k)
+		var expired []string
+
+		for k, b := range st.buckets {
+			if now.Sub(b.last) > s.idle {
+				expired = append(expired, k)
+			}
 		}
-	}
 
-	s.mu.RUnlock()
+		st.mu.RUnlock()
 
-	if len(expired) == 0 {
-		return
-	}
-
-	s.mu.Lock()
-	defer s.mu.Unlock()
-
-	for _, k := range expired {
-		if b, ok := s.buckets[k]; ok && now.Sub(b.last) > s.idle {
-			delete(s.buckets, k)
+		if len(expired) == 0 {
+			continue
 		}
+
+		st.mu.Lock()
+
+		for _, k := range expired {
+			if b, ok := st.buckets[k]; ok && now.Sub(b.last) > s.idle {
+				delete(st.buckets, k)
+				s.total.Add(-1)
+			}
+		}
+
+		st.mu.Unlock()
 	}
+}
+
+// fnv64a hashes key into a stripe index. FNV-1a is cheap and distributes
+// typical limiter keys (IPs, user IDs) well enough for striping.
+func fnv64a(s string) uint64 {
+	const (
+		offset = 14695981039346656037
+		prime  = 1099511628211
+	)
+
+	h := uint64(offset)
+	for i := 0; i < len(s); i++ {
+		h ^= uint64(s[i])
+		h *= prime
+	}
+	return h
 }
