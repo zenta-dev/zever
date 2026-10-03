@@ -537,6 +537,10 @@ func (c *tinkerClient) ping(timeout time.Duration) error {
 	}
 }
 
+// callTimeout bounds one round trip so a hung shim cannot hold c.mu (and
+// deadlock every later call) forever. A var so tests can shorten it.
+var callTimeout = 30 * time.Second
+
 // call performs one request/response round trip.
 func (c *tinkerClient) call(verb string, args any) (json.RawMessage, error) {
 	c.mu.Lock()
@@ -570,16 +574,46 @@ func (c *tinkerClient) call(verb string, args any) (json.RawMessage, error) {
 		return nil, fmt.Errorf("zever tinker: write %s request: %w", verb, writeErr)
 	}
 
-	resp, err := c.readResponse()
-	if err != nil {
-		return nil, err
+	// readResponse can block forever if the shim hangs. Run it in a goroutine
+	// and bound the wait; on timeout kill the shim so the blocked read observes
+	// EOF and the goroutine exits instead of leaking while holding c.mu.
+	type readResult struct {
+		resp tinkerResponse
+		err  error
 	}
+	ch := make(chan readResult, 1)
+	go func() {
+		resp, rerr := c.readResponse()
+		ch <- readResult{resp, rerr}
+	}()
 
-	if resp.Error != "" {
-		return nil, errors.New(resp.Error)
+	select {
+	case r := <-ch:
+		if r.err != nil {
+			return nil, r.err
+		}
+
+		if r.resp.Error != "" {
+			return nil, errors.New(r.resp.Error)
+		}
+
+		return r.resp.Result, nil
+	case <-time.After(callTimeout):
+		c.killLocked()
+		return nil, fmt.Errorf("zever tinker: %s timed out after %s", verb, callTimeout)
 	}
+}
 
-	return resp.Result, nil
+// killLocked tears the shim down without taking c.mu (the caller holds it):
+// cancelling the context kills the supervisor and closing stdin unblocks any
+// readResponse waiting on the shim's stdout. After this the client is unusable.
+func (c *tinkerClient) killLocked() {
+	if c.cancel != nil {
+		c.cancel()
+	}
+	if c.stdin != nil {
+		_ = c.stdin.Close()
+	}
 }
 
 // readResponse consumes shim stdout until a framed protocol line arrives,

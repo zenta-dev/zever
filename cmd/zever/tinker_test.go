@@ -428,6 +428,47 @@ func TestTinkerPingTimeout(t *testing.T) {
 	}
 }
 
+func TestTinkerCallTimeout(t *testing.T) {
+	if testing.Short() {
+		t.Skip("spawns a `go run` subprocess")
+	}
+
+	dir := t.TempDir()
+	writeZeverFixture(t, dir, "go.mod", "module sleepshim\n\ngo 1.24\n")
+	writeZeverFixture(t, dir, "main.go", "package main\n\nimport (\n\t\"io\"\n\t\"os\"\n)\n\nfunc main() { _, _ = io.ReadAll(os.Stdin) }")
+	t.Chdir(dir)
+
+	client, err := startTinkerShim(".", nil)
+	if err != nil {
+		t.Fatalf("startTinkerShim: %v", err)
+	}
+
+	orig := callTimeout
+	callTimeout = 200 * time.Millisecond
+	defer func() { callTimeout = orig }()
+
+	// The sleeper never writes a response, so call must time out (not block
+	// forever holding c.mu) and return a timeout error.
+	done := make(chan error, 1)
+	go func() {
+		_, callErr := client.call(verbPing, nil)
+		done <- callErr
+	}()
+
+	select {
+	case callErr := <-done:
+		if callErr == nil || !strings.Contains(callErr.Error(), "timed out") {
+			_ = client.Close()
+			t.Fatalf("expected call timeout, got: %v", callErr)
+		}
+	case <-time.After(5 * time.Second):
+		_ = client.Close()
+		t.Fatal("call did not time out")
+	}
+
+	_ = client.Close()
+}
+
 // TestRunTinkerHelp proves the help path never touches the shim.
 func TestRunTinkerHelp(t *testing.T) {
 	if err := runTinker([]string{"-h"}); err != nil {
