@@ -18,7 +18,7 @@ const placeholderCacheCapacity = 256
 // cache bounded under dynamic-SQL churn while staying simple: reads vastly
 // outnumber writes in practice.
 var (
-	placeholderCacheMu  sync.Mutex
+	placeholderCacheMu  sync.RWMutex
 	placeholderCacheMap = make(map[string]string, placeholderCacheCapacity)
 )
 
@@ -26,9 +26,9 @@ var (
 // leaving JSONB operators, strings, identifiers, dollar-quoted bodies and
 // comments untouched. Results memoize in a bounded mutex-guarded map.
 func replacePlaceholders(query string) string {
-	placeholderCacheMu.Lock()
+	placeholderCacheMu.RLock()
 	cached, ok := placeholderCacheMap[query]
-	placeholderCacheMu.Unlock()
+	placeholderCacheMu.RUnlock()
 
 	if ok {
 		return cached
