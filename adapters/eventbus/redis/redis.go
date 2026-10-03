@@ -44,6 +44,7 @@ var _ eventbus.Pusher = (*adapter)(nil)
 
 type adapter struct {
 	client         *goredis.Client
+	release        func() error
 	prefix         string
 	buffer         int
 	handlerTimeout time.Duration
@@ -57,8 +58,8 @@ type adapter struct {
 
 // New creates a Redis-backed eventbus. It validates opts first, applies
 // defaults (prefix "eventbus", buffer 1024, handler timeout 30s, close
-// timeout 5s), builds its own internal/redis client, and verifies
-// connectivity with a 3s ping.
+// timeout 5s), acquires a shared client from the redisclient registry (one
+// pool per resolved addr+DB), and verifies connectivity with a 3s ping.
 // The returned bus supports both the push and pull APIs.
 func New(opts eventbus.Options) (eventbus.EventBus, error) {
 	a, err := newAdapter(opts)
@@ -94,7 +95,7 @@ func newAdapter(opts eventbus.Options) (*adapter, error) {
 		closeTimeout = eventbus.DefaultCloseTimeout
 	}
 
-	client, err := redisclient.New(opts.Redis.Options)
+	client, release, err := redisclient.Shared(opts.Redis.Options)
 	if err != nil {
 		return nil, fmt.Errorf("redis: connect %q: %w", redactAddr(opts.Redis.Addr), err)
 	}
@@ -103,13 +104,14 @@ func newAdapter(opts eventbus.Options) (*adapter, error) {
 	defer cancel()
 
 	if err := client.Ping(ctx).Err(); err != nil {
-		_ = redisclient.Close(client)
+		_ = release()
 
 		return nil, fmt.Errorf("redis: ping %q: %w", redactAddr(opts.Redis.Addr), err)
 	}
 
 	return &adapter{
 		client:         client,
+		release:        release,
 		prefix:         prefix,
 		buffer:         buffer,
 		handlerTimeout: handlerTimeout,
@@ -298,7 +300,11 @@ func (a *adapter) Close() error {
 	case <-timer.C:
 	}
 
-	return redisclient.Close(a.client)
+	if a.release == nil {
+		return nil
+	}
+
+	return a.release()
 }
 
 func (a *adapter) Name() string { return "redis" }

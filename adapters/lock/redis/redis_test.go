@@ -211,24 +211,17 @@ func TestUnlock_evalError(t *testing.T) {
 }
 
 func TestClose_error(t *testing.T) {
-	old := closeShared
-	closeShared = func(*goredis.Client) error { return errors.New("boom") }
-	t.Cleanup(func() { closeShared = old })
-
-	a := &adapter{client: &fakeClient{}}
+	a := &adapter{client: &fakeClient{}, release: func() error { return errors.New("boom") }}
 
 	if err := a.Close(t.Context()); err == nil {
-		t.Fatal("Close succeeded, want shared-close error")
+		t.Fatal("Close succeeded, want shared-release error")
 	}
 }
 
 func TestClose_idempotent(t *testing.T) {
-	old := closeShared
 	calls := 0
-	closeShared = func(*goredis.Client) error { calls++; return nil }
-	t.Cleanup(func() { closeShared = old })
 
-	a := &adapter{client: &fakeClient{}}
+	a := &adapter{client: &fakeClient{}, release: func() error { calls++; return nil }}
 
 	if err := a.Close(t.Context()); err != nil {
 		t.Fatalf("first Close: %v", err)
@@ -239,7 +232,7 @@ func TestClose_idempotent(t *testing.T) {
 	}
 
 	if calls != 1 {
-		t.Errorf("shared close calls = %d, want 1", calls)
+		t.Errorf("shared release calls = %d, want 1", calls)
 	}
 }
 

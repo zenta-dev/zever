@@ -88,7 +88,7 @@ const sweepInterval = 250 * time.Millisecond
 
 type redisAdapter struct {
 	client            redisClient
-	rawClient         *goredis.Client
+	release           func() error
 	prefix            string
 	visibilityTimeout time.Duration
 	pollTimeout       time.Duration
@@ -114,7 +114,10 @@ func connOptions(opts queue.Options) redisopt.Options {
 	}
 }
 
-// New creates a Redis-backed queue adapter delegated via internal/redis with defaults of prefix "queue", VisibilityTimeout 30s, and PollTimeout 5s when unset. It verifies connectivity with a 3s ping check.
+// New creates a Redis-backed queue adapter using a shared client from the
+// redisclient registry (one pool per resolved addr+DB), with defaults of
+// prefix "queue", VisibilityTimeout 30s, and PollTimeout 5s when unset. It
+// verifies connectivity with a 3s ping check.
 func New(opts queue.Options) (queue.Queue, error) {
 	if err := opts.Validate(); err != nil {
 		return nil, err
@@ -137,7 +140,7 @@ func New(opts queue.Options) (queue.Queue, error) {
 
 	buf := opts.Buffer
 
-	client, err := redisclient.New(connOptions(opts))
+	client, release, err := redisclient.Shared(connOptions(opts))
 	if err != nil {
 		return nil, fmt.Errorf("queue: connect %q: %w", redactURL(opts), err)
 	}
@@ -146,14 +149,14 @@ func New(opts queue.Options) (queue.Queue, error) {
 	defer cancel()
 
 	if err := client.Ping(ctx).Err(); err != nil {
-		_ = client.Close()
+		_ = release()
 
 		return nil, fmt.Errorf("queue: ping %q error: %w", redactURL(opts), err)
 	}
 
 	return &redisAdapter{
 		client:            client,
-		rawClient:         client,
+		release:           release,
 		prefix:            prefix,
 		visibilityTimeout: visibility,
 		pollTimeout:       pollTimeout,
@@ -322,7 +325,11 @@ func (a *redisAdapter) Close() error {
 		return nil
 	}
 
-	return redisclient.Close(a.rawClient)
+	if a.release == nil {
+		return nil
+	}
+
+	return a.release()
 }
 
 func (a *redisAdapter) Name() string { return "redis" }

@@ -126,6 +126,28 @@ Absolute numbers are dominated by miniredis's in-process command parsing.
 | BenchmarkComplete (cpu=1) | 162,142 | 198,666 | 793 |
 | BenchmarkComplete (cpu=4) | 133,553 | 198,746 | 793 |
 
+Shared Redis registry (`shared/redisclient`, offline, 2026-10-04). `Shared`
+now returns a refcounted client keyed by the resolved addr+DB+TLS/password
+identity, so every Redis-backed battery on the same Redis shares one
+client/pool. `BenchmarkSharedAcquireRelease` is a warm registry hit
+(`toRedisOptions` + key + refcount + release) against a pre-seeded entry;
+`BenchmarkPrivateClientBuild` is the per-battery `goredis.NewClient` the
+registry avoids on every borrower after the first (idle-conn warming
+disabled to stay offline). Medians of 3 runs, `-benchtime 1s`.
+
+| Benchmark | ns/op | B/op | allocs/op |
+| --- | --- | --- | --- |
+| BenchmarkSharedAcquireRelease (cpu=1) | 343 | 656 | 5 |
+| BenchmarkSharedAcquireRelease (cpu=4) | 306 | 656 | 5 |
+| BenchmarkPrivateClientBuild (cpu=1) | 10,155 | 8,786 | 71 |
+| BenchmarkPrivateClientBuild (cpu=4) | 9,853 | 18,215 | 71 |
+
+A shared hit is ~30x faster and ~14x fewer allocs than building a private
+client (343 vs 10,155 ns/op, 5 vs 71 allocs/op at cpu=1): later borrowers
+skip the client/pool construction entirely. The shared hit still allocates
+its own `*goredis.Options` and key string per call; those are caller-local
+and dwarfed by the pool build they replace.
+
 ## Commands
 
 Router and queue are fast, so they run 1s per bench; ORM runs 100
@@ -137,6 +159,7 @@ go test -run=NONE -bench=BenchmarkEscapeLike -benchtime=1s -cpu=1,4 -benchmem ./
 go test -run=NONE -bench=BenchmarkFlattenGroupTerms -benchtime=1s -cpu=1,4 -benchmem ./orm/render/
 go test -run=NONE -bench=BenchmarkReclaimStale -benchtime=1s -cpu=1,4 -benchmem ./adapters/queue/db/
 go test -run=NONE -bench=. -benchtime=1s -cpu=1,4 -benchmem ./adapters/idempotency/redis/
+go test -run=NONE -bench='BenchmarkSharedAcquireRelease|BenchmarkPrivateClientBuild' -benchtime=1s -cpu=1,4 -benchmem ./shared/redisclient/
 go test -run=NONE -bench=. -benchtime=100x -cpu=1,4 -benchmem ./orm/
 ```
 
@@ -192,6 +215,10 @@ Round-trip coverage (in-process backends):
   (`adapters/idempotency/redis/redis_bench_test.go`) -- fresh key per
   iteration over one shared miniredis, so every call takes the
   reservation-miss / upsert path.
+- Shared Redis registry: `BenchmarkSharedAcquireRelease` /
+  `BenchmarkPrivateClientBuild` (`shared/redisclient/shared_test.go`) --
+  warm refcounted acquire/release vs a fresh per-battery client build,
+  both offline.
 
 Render-coverage (ORM):
 
