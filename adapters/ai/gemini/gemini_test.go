@@ -1329,8 +1329,8 @@ func TestOpen_InsecureLocalhost(t *testing.T) {
 			t.Error("insecure set without AllowInsecure opt-in")
 		}
 	}
-	if err := a.Close(); err != nil {
-		t.Fatalf("Close err %v", err)
+	if cerr := a.Close(); cerr != nil {
+		t.Fatalf("Close err %v", cerr)
 	}
 
 	// With opt-in, verification is skipped and Generate succeeds.

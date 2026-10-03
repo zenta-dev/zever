@@ -261,16 +261,16 @@ func TestMaxEntriesEvictsSoonestExpiry(t *testing.T) {
 	ctx := t.Context()
 	fp := []byte("fp")
 
-	if _, err := s.Begin(ctx, "k1", idempotency.BeginOptions{Fingerprint: fp, TTL: time.Hour}); err != nil {
-		t.Fatalf("Begin k1: %v", err)
+	if _, berr := s.Begin(ctx, "k1", idempotency.BeginOptions{Fingerprint: fp, TTL: time.Hour}); berr != nil {
+		t.Fatalf("Begin k1: %v", berr)
 	}
-	if _, err := s.Begin(ctx, "k2", idempotency.BeginOptions{Fingerprint: fp, TTL: 2 * time.Hour}); err != nil {
-		t.Fatalf("Begin k2: %v", err)
+	if _, berr := s.Begin(ctx, "k2", idempotency.BeginOptions{Fingerprint: fp, TTL: 2 * time.Hour}); berr != nil {
+		t.Fatalf("Begin k2: %v", berr)
 	}
 
 	// Table full: inserting k3 must evict k1 (soonest expiry).
-	if _, err := s.Begin(ctx, "k3", idempotency.BeginOptions{Fingerprint: fp, TTL: 3 * time.Hour}); err != nil {
-		t.Fatalf("Begin k3: %v", err)
+	if _, berr := s.Begin(ctx, "k3", idempotency.BeginOptions{Fingerprint: fp, TTL: 3 * time.Hour}); berr != nil {
+		t.Fatalf("Begin k3: %v", berr)
 	}
 
 	// k2 survived: still the in-progress owner.
