@@ -7,7 +7,7 @@ require (
 	github.com/zenta-dev/zever/core/permission v0.5.3
 	github.com/zenta-dev/zever/shared/codec v0.5.3
 	google.golang.org/grpc v1.83.2
-	google.golang.org/protobuf v1.36.11
+	google.golang.org/protobuf v1.36.12
 )
 
 require (
