@@ -379,7 +379,7 @@ func TestResolveValidateApplicability(t *testing.T) {
 		mustNotHaveErrors(t, diags)
 
 		field := findEntity(schema, "User").FieldByName("name")
-		if len(field.Validate) != 1 || field.Validate[0].Kind != "min_len" {
+		if len(field.Validate) != 1 || field.Validate[0].Kind != ir.ValidationMinLen {
 			t.Fatalf("Validate = %+v, want one min_len validation", field.Validate)
 		}
 	})
@@ -515,7 +515,7 @@ func TestResolveValidateApplicabilityOnRPCParams(t *testing.T) {
 		mustNotHaveErrors(t, diags)
 
 		param := schema.Modules[0].Services[0].Operations[0].Params[0]
-		if len(param.Validate) != 1 || param.Validate[0].Kind != "min_len" {
+		if len(param.Validate) != 1 || param.Validate[0].Kind != ir.ValidationMinLen {
 			t.Fatalf("Validate = %+v, want one min_len validation", param.Validate)
 		}
 	})
@@ -610,7 +610,7 @@ func TestResolveValidateApplicabilityOnRPCParams(t *testing.T) {
 		mustNotHaveErrors(t, diags)
 
 		param := schema.Modules[0].Services[0].Operations[0].Params[0]
-		if len(param.Validate) != 1 || param.Validate[0].Kind != "format" {
+		if len(param.Validate) != 1 || param.Validate[0].Kind != ir.ValidationFormat {
 			t.Fatalf("Validate = %+v, want one format validation", param.Validate)
 		}
 	})
@@ -655,7 +655,7 @@ func TestResolveDefaultValues(t *testing.T) {
 		mustNotHaveErrors(t, diags)
 
 		field := findEntity(schema, "User").FieldByName("created_at")
-		if field.Default == nil || field.Default.Kind != "now" {
+		if field.Default == nil || field.Default.Kind != ir.DefaultNow {
 			t.Fatalf("Default = %+v, want Kind=now", field.Default)
 		}
 	})
@@ -759,7 +759,7 @@ func TestResolveDefaultValues(t *testing.T) {
 			mustNotHaveErrors(t, diags)
 
 			field := findEntity(schema, "User").FieldByName("active")
-			if field.Default == nil || field.Default.Kind != "literal" || field.Default.Lit != tc.want {
+			if field.Default == nil || field.Default.Kind != ir.DefaultLiteral || field.Default.Lit != tc.want {
 				t.Fatalf("Default = %+v, want Kind=literal Lit=%v", field.Default, tc.want)
 			}
 		})
@@ -809,7 +809,7 @@ func TestResolveDefaultValues(t *testing.T) {
 		mustNotHaveErrors(t, diags)
 
 		field := findEntity(schema, "User").FieldByName("created_at")
-		if field.Default == nil || field.Default.Kind != "literal" || field.Default.Lit != "2024-01-01T00:00:00Z" {
+		if field.Default == nil || field.Default.Kind != ir.DefaultLiteral || field.Default.Lit != "2024-01-01T00:00:00Z" {
 			t.Fatalf("Default = %+v, want Kind=literal Lit=2024-01-01T00:00:00Z", field.Default)
 		}
 	})

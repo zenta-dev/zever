@@ -99,8 +99,8 @@ func TestMaxLen_table(t *testing.T) {
 		{
 			name: "other kind first",
 			field: &ir.Field{Name: "bio", Validate: []ir.Validation{
-				{Kind: "min_len", Args: map[string]any{"value": int64(1)}},
-				{Kind: "max_len", Args: map[string]any{"value": int64(64)}},
+				{Kind: ir.ValidationMinLen, Args: map[string]any{"value": int64(1)}},
+				{Kind: ir.ValidationMaxLen, Args: map[string]any{"value": int64(64)}},
 			}},
 			wantLen:   64,
 			wantFound: true,
@@ -108,21 +108,21 @@ func TestMaxLen_table(t *testing.T) {
 		{
 			name: "non-int64 value",
 			field: &ir.Field{Name: "bio", Validate: []ir.Validation{
-				{Kind: "max_len", Args: map[string]any{"value": "many"}},
+				{Kind: ir.ValidationMaxLen, Args: map[string]any{"value": "many"}},
 			}},
 			wantFound: false,
 		},
 		{
 			name: "zero bound",
 			field: &ir.Field{Name: "bio", Validate: []ir.Validation{
-				{Kind: "max_len", Args: map[string]any{"value": int64(0)}},
+				{Kind: ir.ValidationMaxLen, Args: map[string]any{"value": int64(0)}},
 			}},
 			wantFound: false,
 		},
 		{
 			name: "negative bound",
 			field: &ir.Field{Name: "bio", Validate: []ir.Validation{
-				{Kind: "max_len", Args: map[string]any{"value": int64(-5)}},
+				{Kind: ir.ValidationMaxLen, Args: map[string]any{"value": int64(-5)}},
 			}},
 			wantFound: false,
 		},
@@ -356,7 +356,7 @@ func TestColumnType_table(t *testing.T) {
 
 	strField := func() *ir.Field { return &ir.Field{Name: "nickname"} }
 	bounded := &ir.Field{Name: "nickname", Type: ir.FieldType{Scalar: ir.TString}, Validate: []ir.Validation{
-		{Kind: "max_len", Args: map[string]any{"value": int64(32)}},
+		{Kind: ir.ValidationMaxLen, Args: map[string]any{"value": int64(32)}},
 	}}
 
 	tests := []struct {
@@ -638,7 +638,7 @@ func TestPostgresColumnType_table(t *testing.T) {
 		{
 			name: "varchar",
 			field: &ir.Field{Name: "c", Type: ir.FieldType{Scalar: ir.TString},
-				Validate: []ir.Validation{{Kind: "max_len", Args: map[string]any{"value": int64(16)}}}},
+				Validate: []ir.Validation{{Kind: ir.ValidationMaxLen, Args: map[string]any{"value": int64(16)}}}},
 			want: "varchar(16)",
 		},
 		{name: "int32", field: scalarField(ir.TInt32), want: "integer"},
@@ -688,7 +688,7 @@ func TestSQLiteColumnType_table(t *testing.T) {
 		{
 			name: "varchar",
 			field: &ir.Field{Name: "c", Type: ir.FieldType{Scalar: ir.TString},
-				Validate: []ir.Validation{{Kind: "max_len", Args: map[string]any{"value": int64(16)}}}},
+				Validate: []ir.Validation{{Kind: ir.ValidationMaxLen, Args: map[string]any{"value": int64(16)}}}},
 			want: "VARCHAR(16)",
 		},
 		{name: "bool", field: &ir.Field{Name: "c", Type: ir.FieldType{Scalar: ir.TBool}}, want: "INTEGER"},

@@ -324,7 +324,7 @@ func resolveDefaultCall(v *ast.CallValue, field *ir.Field) diag.List {
 		return diag.List{diag.Wrap("resolve", v.Pos, ErrInvalidAttribute, "now() default only valid on timestamp fields")}
 	}
 
-	field.Default = &ir.DefaultValue{Kind: "now", Pos: v.Pos}
+	field.Default = &ir.DefaultValue{Kind: ir.DefaultNow, Pos: v.Pos}
 
 	return nil
 }
@@ -337,10 +337,10 @@ func resolveDefaultIdent(v *ast.IdentValue, field *ir.Field) diag.List {
 	if field.Type.Scalar == ir.TBool {
 		switch v.Name {
 		case "true":
-			field.Default = &ir.DefaultValue{Kind: "literal", Lit: true, Pos: v.Pos}
+			field.Default = &ir.DefaultValue{Kind: ir.DefaultLiteral, Lit: true, Pos: v.Pos}
 			return nil
 		case "false":
-			field.Default = &ir.DefaultValue{Kind: "literal", Lit: false, Pos: v.Pos}
+			field.Default = &ir.DefaultValue{Kind: ir.DefaultLiteral, Lit: false, Pos: v.Pos}
 			return nil
 		default:
 			return diag.List{diag.Wrap("resolve", v.Pos, ErrInvalidAttribute,
@@ -354,7 +354,7 @@ func resolveDefaultIdent(v *ast.IdentValue, field *ir.Field) diag.List {
 
 	for _, ev := range field.Type.EnumValues {
 		if ev == v.Name {
-			field.Default = &ir.DefaultValue{Kind: "literal", Lit: v.Name, Pos: v.Pos}
+			field.Default = &ir.DefaultValue{Kind: ir.DefaultLiteral, Lit: v.Name, Pos: v.Pos}
 			return nil
 		}
 	}
@@ -369,7 +369,7 @@ func resolveDefaultLiteral(pos diag.Position, lit any, field *ir.Field, allowed 
 		return diag.List{diag.Wrap("resolve", pos, ErrInvalidAttribute, "default value kind mismatches field type")}
 	}
 
-	field.Default = &ir.DefaultValue{Kind: "literal", Lit: lit, Pos: pos}
+	field.Default = &ir.DefaultValue{Kind: ir.DefaultLiteral, Lit: lit, Pos: pos}
 
 	return nil
 }
