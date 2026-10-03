@@ -29,6 +29,14 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   instead of re-resolving the hostname, closing a DNS-rebinding TOCTOU in
   the SSRF guard. `media/s3` validates asset ids as 32-hex before listing,
   preventing an empty-prefix IDOR (first-object match) and enumeration.
+- Outbound endpoints for `search` (Meilisearch `Host`), `vectorstore`
+  (Qdrant `URL`), and `auth` OIDC (`Issuer`) are now https-only by default
+  via `shared/endpoint.ValidateURL`, matching `geo`/`i18n`; each gains an
+  explicit `AllowInsecure` opt-in for tests. Qdrant `UseTLS` follows the
+  validated scheme instead of silently downgrading `http://`/`grpc://`/bare
+  hosts to plaintext, and OIDC discovery runs through
+  `httpclient.NewSafeClient` (TLS 1.2 floor, private-address dial guard, no
+  redirects) instead of `http.DefaultClient`.
 - `ai/ollama` no longer hardcodes insecure endpoints: the adapter requires
   https for non-loopback `Addr` and verifies TLS unless the new
   `ai.Options.AllowInsecure` (also `ollama.Options.AllowInsecure`) is set,

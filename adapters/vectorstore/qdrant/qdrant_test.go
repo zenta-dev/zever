@@ -880,13 +880,12 @@ func TestParseAddr(t *testing.T) {
 		{"http defaults 6334", "http://example.com", "example.com", 6334, false},
 		{"explicit port", "http://example.com:1234", "example.com", 1234, false},
 		{"https explicit port", "https://example.com:9999", "example.com", 9999, true},
-		{"bad port falls back to split", "http://example.com:notaport", "http://example.com", 6334, false},
+		{"bad port unparseable", "http://example.com:notaport", "localhost", 6334, false},
 		{"empty host fallback", "http:///path", "localhost", 6334, false},
-		{"bare host port", "example.com:7777", "example.com", 7777, false},
-		{"bare host", "example.com", "example.com", 6334, false},
-		{"bare bad port", "example.com:notaport", "example.com", 6334, false},
+		{"bare host port no scheme", "example.com:7777", "localhost", 6334, false},
+		{"bare host no scheme", "example.com", "localhost", 6334, false},
 		{"empty", "", "localhost", 6334, false},
-		{"unparseable scheme", "http://[::1", "http://[:", 1, false},
+		{"unparseable scheme", "http://[::1", "localhost", 6334, false},
 	}
 
 	for _, tc := range cases {
@@ -1014,10 +1013,41 @@ func TestNew(t *testing.T) {
 		}
 	})
 
+	t.Run("http rejected without allow insecure", func(t *testing.T) {
+		t.Parallel()
+
+		_, err := New(vectorstore.Options{URL: "http://localhost:6334"})
+		if !errors.Is(err, vectorstore.ErrInvalidOptions) {
+			t.Fatalf("expected ErrInvalidOptions, got %v", err)
+		}
+	})
+
+	t.Run("bare host rejected", func(t *testing.T) {
+		t.Parallel()
+
+		_, err := New(vectorstore.Options{URL: "localhost:6334"})
+		if !errors.Is(err, vectorstore.ErrInvalidOptions) {
+			t.Fatalf("expected ErrInvalidOptions, got %v", err)
+		}
+	})
+
+	t.Run("https ok without allow insecure", func(t *testing.T) {
+		t.Parallel()
+
+		s, err := New(vectorstore.Options{URL: "https://localhost:6335"})
+		if err != nil {
+			t.Fatalf("new: %v", err)
+		}
+
+		if err := s.Close(); err != nil {
+			t.Fatalf("close: %v", err)
+		}
+	})
+
 	t.Run("ok lazy", func(t *testing.T) {
 		t.Parallel()
 
-		vs, err := New(vectorstore.Options{URL: "http://localhost:6334", APIKey: "secret"})
+		vs, err := New(vectorstore.Options{URL: "http://localhost:6334", APIKey: "secret", AllowInsecure: true})
 		if err != nil {
 			t.Fatalf("open: %v", err)
 		}
@@ -1030,7 +1060,7 @@ func TestNew(t *testing.T) {
 	t.Run("lazy no dim", func(t *testing.T) {
 		t.Parallel()
 
-		s, err := New(vectorstore.Options{URL: "http://localhost:6334"})
+		s, err := New(vectorstore.Options{URL: "http://localhost:6334", AllowInsecure: true})
 		if err != nil {
 			t.Fatalf("new: %v", err)
 		}
@@ -1043,7 +1073,7 @@ func TestNew(t *testing.T) {
 	t.Run("ensure failure closes", func(t *testing.T) {
 		t.Parallel()
 
-		if _, err := New(vectorstore.Options{URL: "http://localhost:1", Dimension: 2}); err == nil {
+		if _, err := New(vectorstore.Options{URL: "http://localhost:1", Dimension: 2, AllowInsecure: true}); err == nil {
 			t.Fatalf("expected ensure error")
 		}
 	})

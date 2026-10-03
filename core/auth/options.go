@@ -1,10 +1,12 @@
 package auth
 
 import (
+	"errors"
 	"time"
 
 	"github.com/zenta-dev/zever/core/auth/revocation"
 	"github.com/zenta-dev/zever/core/session"
+	"github.com/zenta-dev/zever/shared/endpoint"
 )
 
 const (
@@ -49,6 +51,9 @@ type OIDCOptions struct {
 	ClientID string `json:"client_id" toml:"client_id" yaml:"client_id"`
 	// Timeout is the operation timeout. Zero means the default; negative fails.
 	Timeout time.Duration `json:"timeout" toml:"timeout" yaml:"timeout"`
+	// AllowInsecure permits an http:// issuer (and a private-address issuer)
+	// for testing. Default false (https and public addresses only).
+	AllowInsecure bool `json:"allow_insecure" toml:"allow_insecure" yaml:"allow_insecure"`
 }
 
 // Options configures auth backend construction.
@@ -74,6 +79,14 @@ func (o Options) Validate() error {
 	}
 	if o.OIDC.Timeout < 0 {
 		return &InvalidOptionsError{Reason: "oidc_timeout must be >= 0"}
+	}
+	if o.OIDC.Issuer != "" {
+		if _, err := endpoint.ValidateURL(o.OIDC.Issuer, endpoint.WithAllowInsecure(o.OIDC.AllowInsecure)); err != nil {
+			if errors.Is(err, endpoint.ErrInsecureScheme) || errors.Is(err, endpoint.ErrUnsupportedScheme) {
+				return &InvalidOptionsError{Reason: "oidc issuer must use https or set allow_insecure"}
+			}
+			return &InvalidOptionsError{Reason: "oidc issuer must be a valid url with scheme and host"}
+		}
 	}
 	return nil
 }

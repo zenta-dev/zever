@@ -2,7 +2,8 @@ package vectorstore
 
 import (
 	"errors"
-	"net/url"
+
+	"github.com/zenta-dev/zever/shared/endpoint"
 )
 
 const (
@@ -27,6 +28,8 @@ type Options struct {
 	APIKey string `json:"api_key" toml:"api_key" yaml:"api_key"`
 	// Dimension holds the expected embedding dimension.
 	Dimension int `json:"dimension" toml:"dimension" yaml:"dimension"`
+	// AllowInsecure permits an http:// URL for testing. Default false (https only).
+	AllowInsecure bool `json:"allow_insecure" toml:"allow_insecure" yaml:"allow_insecure"`
 }
 
 // Validate checks options for consistency, joining all violations.
@@ -38,11 +41,17 @@ func (o Options) Validate() error {
 	}
 
 	if o.URL != "" {
-		u, err := url.Parse(o.URL)
-		if err != nil {
-			errs = append(errs, &InvalidOptionsError{Reason: "url must be a valid url"})
-		} else if u.Scheme == "" || u.Host == "" {
-			errs = append(errs, &InvalidOptionsError{Reason: "url must have scheme and host"})
+		if _, err := endpoint.ValidateURL(o.URL, endpoint.WithAllowInsecure(o.AllowInsecure)); err != nil {
+			switch {
+			case errors.Is(err, endpoint.ErrParse):
+				errs = append(errs, &InvalidOptionsError{Reason: "url must be a valid url"})
+			case errors.Is(err, endpoint.ErrEmpty),
+				errors.Is(err, endpoint.ErrNoScheme),
+				errors.Is(err, endpoint.ErrNoHost):
+				errs = append(errs, &InvalidOptionsError{Reason: "url must have scheme and host"})
+			default:
+				errs = append(errs, &InvalidOptionsError{Reason: "url must use https"})
+			}
 		}
 	}
 

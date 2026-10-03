@@ -31,29 +31,32 @@ func TestOptions_Validate_urls(t *testing.T) {
 	t.Parallel()
 
 	cases := []struct {
-		name    string
-		url     string
-		wantErr bool
+		name          string
+		url           string
+		allowInsecure bool
+		wantErr       bool
 	}{
-		{"empty valid", "", false},
-		{"qdrant valid", "http://localhost:6334", false},
-		{"https valid", "https://qdrant.example.com:6334", false},
-		{"missing scheme invalid", "localhost:6334", true},
-		{"missing host invalid", "http://", true},
-		{"scheme only invalid", "http:", true},
-		{"control char invalid", "http://example.com/\x7f", true},
+		{"empty valid", "", false, false},
+		{"https valid", "https://qdrant.example.com:6334", false, false},
+		{"http insecure invalid by default", "http://localhost:6334", false, true},
+		{"http insecure allowed", "http://localhost:6334", true, false},
+		{"missing scheme invalid", "localhost:6334", false, true},
+		{"missing host invalid", "https://", false, true},
+		{"scheme only invalid", "http:", false, true},
+		{"control char invalid", "http://example.com/\x7f", false, true},
+		{"unsupported scheme invalid", "grpc://example.com:6334", false, true},
 	}
 	for _, tc := range cases {
 		t.Run(tc.name, func(t *testing.T) {
 			t.Parallel()
 
-			err := (Options{URL: tc.url}).Validate()
+			err := (Options{URL: tc.url, AllowInsecure: tc.allowInsecure}).Validate()
 			if tc.wantErr && !errors.Is(err, ErrInvalidOptions) {
-				t.Fatalf("Validate(%q) err = %v, want ErrInvalidOptions", tc.url, err)
+				t.Fatalf("Validate(%q, insecure=%v) err = %v, want ErrInvalidOptions", tc.url, tc.allowInsecure, err)
 			}
 
 			if !tc.wantErr && err != nil {
-				t.Fatalf("Validate(%q) err = %v, want nil", tc.url, err)
+				t.Fatalf("Validate(%q, insecure=%v) err = %v, want nil", tc.url, tc.allowInsecure, err)
 			}
 
 			if tc.wantErr {

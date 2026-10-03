@@ -9,6 +9,7 @@ import (
 	"github.com/coreos/go-oidc/v3/oidc"
 
 	"github.com/zenta-dev/zever/core/auth"
+	"github.com/zenta-dev/zever/shared/httpclient"
 )
 
 // adapter verifies OIDC ID tokens against a discovered provider.
@@ -41,8 +42,15 @@ func New(opts auth.Options) (auth.Auth, error) {
 		timeout = auth.DefaultTimeout
 	}
 
+	// Discovery runs through a safe client (TLS 1.2 floor, private-address
+	// dial guard, no redirects) instead of the process-wide
+	// http.DefaultClient. AllowInsecure opts a test issuer into http and
+	// private addresses; production keeps both blocked.
+	client := httpclient.NewSafeClient(timeout, opts.OIDC.AllowInsecure)
+
 	ctx, cancel := context.WithTimeout(context.Background(), timeout)
 	defer cancel()
+	ctx = oidc.ClientContext(ctx, client)
 
 	provider, err := oidc.NewProvider(ctx, issuer)
 	if err != nil {

@@ -16,9 +16,12 @@ require (
 require (
 	github.com/qdrant/go-client v1.19.2
 	github.com/zenta-dev/zever/core/vectorstore v0.5.3
+	github.com/zenta-dev/zever/shared/endpoint v0.5.3
 )
 
 replace github.com/zenta-dev/zever/core/vectorstore => ../../../core/vectorstore
+
+replace github.com/zenta-dev/zever/shared/endpoint => ../../../shared/endpoint
 
 replace github.com/zenta-dev/zever/shared/registry => ../../../shared/registry
 

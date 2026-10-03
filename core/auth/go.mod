@@ -6,6 +6,7 @@ require (
 	github.com/alicebob/miniredis/v2 v2.39.0
 	github.com/redis/go-redis/v9 v9.22.0
 	github.com/zenta-dev/zever/core/session v0.5.3
+	github.com/zenta-dev/zever/shared/endpoint v0.5.3
 	github.com/zenta-dev/zever/shared/redisclient v0.5.3
 	github.com/zenta-dev/zever/shared/redisopt v0.5.3
 	github.com/zenta-dev/zever/shared/registry v0.5.3
@@ -22,6 +23,7 @@ require (
 replace (
 	github.com/zenta-dev/zever/adapters/auth/session => ../../adapters/auth/session
 	github.com/zenta-dev/zever/core/session => ../session
+	github.com/zenta-dev/zever/shared/endpoint => ../../shared/endpoint
 	github.com/zenta-dev/zever/shared/redisclient => ../../shared/redisclient
 	github.com/zenta-dev/zever/shared/registry => ../../shared/registry
 )
