@@ -14,6 +14,9 @@ import (
 // maxHostLength caps host length per DNS limits (253 chars textual representation).
 const maxHostLength = 253
 
+// maxTenantIDLength bounds a resolved tenant ID.
+const maxTenantIDLength = 128
+
 type adapter struct {
 	header       string
 	subdomainRe  *regexp.Regexp
@@ -31,12 +34,20 @@ func (a *adapter) Resolve(_ context.Context, meta map[string]string) (string, er
 
 	hdr := textproto.CanonicalMIMEHeaderKey(a.header)
 
-	if v, ok := lookupMeta(meta, hdr); ok {
+	if v, ok, err := lookupMeta(meta, hdr); err != nil {
+		return "", err
+	} else if ok {
+		if err := validateTenantID(v); err != nil {
+			return "", err
+		}
+
 		return v, nil
 	}
 
 	if a.subdomainRe != nil {
-		if host, ok := lookupMeta(meta, "Host"); ok {
+		if host, ok, err := lookupMeta(meta, "Host"); err != nil {
+			return "", err
+		} else if ok {
 			if strings.Contains(host, ":") {
 				h, _, splitErr := net.SplitHostPort(host)
 				if splitErr == nil {
@@ -56,6 +67,10 @@ func (a *adapter) Resolve(_ context.Context, meta map[string]string) (string, er
 
 			m := a.subdomainRe.FindStringSubmatch(host)
 			if len(m) > 1 && m[1] != "" {
+				if err := validateTenantID(m[1]); err != nil {
+					return "", err
+				}
+
 				return m[1], nil
 			}
 
@@ -66,14 +81,44 @@ func (a *adapter) Resolve(_ context.Context, meta map[string]string) (string, er
 	return "", fmt.Errorf("header: tenant not found in header %q: %w", a.header, tenant.ErrNotFound)
 }
 
-func lookupMeta(meta map[string]string, key string) (string, bool) {
+// lookupMeta returns the value for key, matching meta keys case-insensitively.
+// Two case variants of key carrying different values are ambiguous and are
+// rejected with ErrDuplicateHeader instead of resolving in nondeterministic
+// map-iteration order; identical duplicates resolve to the shared value.
+func lookupMeta(meta map[string]string, key string) (string, bool, error) {
+	var found string
+
+	var seen bool
+
 	for k, v := range meta {
-		if textproto.CanonicalMIMEHeaderKey(k) == key && v != "" {
-			return v, true
+		if textproto.CanonicalMIMEHeaderKey(k) != key || v == "" {
+			continue
 		}
+
+		if seen && v != found {
+			return "", false, fmt.Errorf("%w: %q", ErrDuplicateHeader, key)
+		}
+
+		found, seen = v, true
 	}
 
-	return "", false
+	return found, seen, nil
+}
+
+// validateTenantID checks a resolved tenant ID for shape and length: 1-128
+// chars of ASCII letters, digits, '-', '_', or '.'.
+func validateTenantID(id string) error {
+	if id == "" || len(id) > maxTenantIDLength {
+		return fmt.Errorf("%w: %q", ErrInvalidTenantID, id)
+	}
+
+	if strings.ContainsFunc(id, func(r rune) bool {
+		return !((r >= 'a' && r <= 'z') || (r >= 'A' && r <= 'Z') || (r >= '0' && r <= '9') || r == '-' || r == '_' || r == '.')
+	}) {
+		return fmt.Errorf("%w: %q", ErrInvalidTenantID, id)
+	}
+
+	return nil
 }
 
 // Scoped returns a context carrying the given tenant ID.
