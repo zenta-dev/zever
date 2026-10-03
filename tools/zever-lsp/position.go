@@ -1,6 +1,9 @@
 package main
 
 import (
+	"strings"
+	"unicode/utf16"
+
 	"go.lsp.dev/protocol"
 
 	"github.com/zenta-dev/zever/dsl/ast"
@@ -33,6 +36,92 @@ func pointRange(p diag.Position) protocol.Range {
 	end.Character++
 
 	return protocol.Range{Start: start, End: end}
+}
+
+// diagnosticRange extends a compiler point to the whole identifier that
+// contains it, so editors underline the token rather than a single caret. It
+// falls back to pointRange when src is empty, the line is unavailable, or the
+// position is not inside an identifier.
+func diagnosticRange(p diag.Position, src string) protocol.Range {
+	line, ok := lineTextAt(src, p.Line)
+	if !ok {
+		return pointRange(p)
+	}
+
+	start, end, ok := identSpanAt(line, p.Col)
+	if !ok {
+		return pointRange(p)
+	}
+
+	return protocol.Range{
+		Start: lspPosition(diag.Position{Line: p.Line, Col: start + 1}),
+		End:   lspPosition(diag.Position{Line: p.Line, Col: end + 1}),
+	}
+}
+
+// lineTextAt returns the text of a 1-based line, without its trailing
+// newline, or ok=false when the line is out of range.
+func lineTextAt(src string, line int) (string, bool) {
+	if line < 1 {
+		return "", false
+	}
+
+	lines := strings.Split(src, "\n")
+	if line > len(lines) {
+		return "", false
+	}
+
+	return strings.TrimSuffix(lines[line-1], "\r"), true
+}
+
+// identSpanAt returns the [start, end) byte span of the identifier that
+// contains the 1-based UTF-16 column col on line, or ok=false when col is not
+// inside an identifier. Identifiers are ASCII (see the lexer's isIdentStart),
+// so byte offsets are safe once the UTF-16 column is resolved to a byte.
+func identSpanAt(line string, col int) (int, int, bool) {
+	i := byteOffsetForUTF16Col(line, col)
+	if i >= len(line) || !isIdentByte(line[i]) {
+		return 0, 0, false
+	}
+
+	start := i
+	for start > 0 && isIdentByte(line[start-1]) {
+		start--
+	}
+
+	end := i
+	for end < len(line) && isIdentByte(line[end]) {
+		end++
+	}
+
+	return start, end, true
+}
+
+// byteOffsetForUTF16Col converts a 1-based UTF-16 column (the lexer's
+// accounting) into a byte offset into line, clamping to the line length.
+func byteOffsetForUTF16Col(line string, col int) int {
+	if col <= 1 {
+		return 0
+	}
+
+	want := col - 1
+	units := 0
+
+	for i, r := range line {
+		if units >= want {
+			return i
+		}
+
+		units += utf16.RuneLen(r)
+	}
+
+	return len(line)
+}
+
+// isIdentByte reports whether b can appear in a DSL identifier, matching the
+// lexer's ASCII identifier rule.
+func isIdentByte(b byte) bool {
+	return b == '_' || (b >= 'a' && b <= 'z') || (b >= 'A' && b <= 'Z') || (b >= '0' && b <= '9')
 }
 
 // identRange spans an identifier starting at p, assuming it is single-line.

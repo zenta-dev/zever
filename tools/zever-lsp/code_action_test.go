@@ -130,7 +130,7 @@ func TestFixUnknownScalarType_typo_suggestsNearestValid(t *testing.T) {
 	_, diags := compile.Compile(map[string]string{"a.zen": src})
 
 	d := renameFindDiag(t, diags, "unknown field type")
-	lspDiag := diagToLSPDiagnostic(d)
+	lspDiag := diagToLSPDiagnostic(d, "")
 
 	file, fileDiags := parser.New("a.zen", []byte(src)).ParseFile()
 	if fileDiags.HasErrors() {
@@ -265,7 +265,7 @@ func TestFixUnresolvedRelationTarget_typo_suggestsNearestEntity(t *testing.T) {
 	_, diags := compile.Compile(map[string]string{"a.zen": aSrc, "b.zen": bSrc})
 
 	d := renameFindDiag(t, diags, "references unknown entity")
-	lspDiag := diagToLSPDiagnostic(d)
+	lspDiag := diagToLSPDiagnostic(d, "")
 
 	// The schema is what fixUnresolvedRelationTarget needs candidate names
 	// from; the relation itself failed to resolve, but Pass 1 already
@@ -430,8 +430,8 @@ func TestCodeActionsAt_recognized_returnsUnionArms(t *testing.T) {
 
 	result, diags := compile.Compile(map[string]string{"a.zen": aSrc, "b.zen": bSrc})
 
-	scalarDiag := diagToLSPDiagnostic(renameFindDiag(t, diags, "unknown field type"))
-	relationDiag := diagToLSPDiagnostic(renameFindDiag(t, diags, "references unknown entity"))
+	scalarDiag := diagToLSPDiagnostic(renameFindDiag(t, diags, "unknown field type"), "")
+	relationDiag := diagToLSPDiagnostic(renameFindDiag(t, diags, "references unknown entity"), "")
 
 	params := &protocol.CodeActionParams{
 		Context: protocol.CodeActionContext{Diagnostics: []protocol.Diagnostic{scalarDiag, relationDiag}},

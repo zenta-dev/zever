@@ -16,8 +16,9 @@ var errConfigUnknownSubcommand = errors.New("zever config: missing subcommand (w
 
 // ConfigConfig carries every input runConfigShowWith needs. Screen agents
 // build it from huh forms; the flag shell (runConfigShow) builds it from
-// argv. An empty ConfigPath verifies config.Default(). A nil Out defaults to
-// os.Stdout.
+// argv. An empty ConfigPath runs config.Load(""), which discovers
+// zever.yaml/.yml/.json in the working directory and applies env overrides.
+// A nil Out defaults to os.Stdout.
 type ConfigConfig struct {
 	ConfigPath string
 	Out        io.Writer
@@ -67,7 +68,7 @@ func printConfigUsage(fs *flag.FlagSet) {
 	fs.PrintDefaults()
 	_, _ = fmt.Fprintln(fs.Output(), "")
 	_, _ = fmt.Fprintln(fs.Output(), dim("Examples:"))
-	_, _ = fmt.Fprintln(fs.Output(), dim("  ")+cmd("zever config show")+dim("  # print config.Default(), redacted"))
+	_, _ = fmt.Fprintln(fs.Output(), dim("  ")+cmd("zever config show")+dim("  # print discovered config + env, redacted"))
 	_, _ = fmt.Fprintln(fs.Output(), dim("  ")+cmd("zever config show --config zever.yaml"))
 }
 
@@ -82,7 +83,7 @@ func runConfigShow(args []string) error {
 	}
 
 	fs := flag.NewFlagSet("config show", flag.ContinueOnError)
-	configPath := fs.String("config", "", "optional config file path (default: config.Default(), zero-infra)")
+	configPath := fs.String("config", "", "optional config file path (default: discover zever.yaml/.yml/.json + env)")
 	fs.Usage = func() { printConfigUsage(fs) }
 
 	if err := fs.Parse(args); err != nil {
@@ -92,9 +93,11 @@ func runConfigShow(args []string) error {
 	return runConfigShowWith(ConfigConfig{ConfigPath: *configPath})
 }
 
-// runConfigShowWith resolves cfg (config.Default when ConfigPath is empty,
-// config.Load(ConfigPath) otherwise) and prints one "<service>: adapter=<x>"
-// header per battery, followed by its redacted option fields, to cfg.Out.
+// runConfigShowWith resolves cfg through config.Load(cfg.ConfigPath) --
+// config.Load("") discovers zever.yaml/.yml/.json in the working directory
+// and applies env overrides, matching how the container resolves config --
+// and prints one "<service>: adapter=<x>" header per battery, followed by its
+// redacted option fields, to cfg.Out.
 //
 // No secrets ever reach cfg.Out: config.Config.RedactedServices is the sole
 // display path, and it replaces every sensitive field with
@@ -102,15 +105,9 @@ func runConfigShow(args []string) error {
 func runConfigShowWith(cfg ConfigConfig) error {
 	out := outOrStdout(cfg.Out)
 
-	resolved := config.Default()
-
-	if cfg.ConfigPath != "" {
-		loaded, err := config.Load(cfg.ConfigPath)
-		if err != nil {
-			return fmt.Errorf("zever config show: load config %q: %w", cfg.ConfigPath, err)
-		}
-
-		resolved = loaded
+	resolved, err := config.Load(cfg.ConfigPath)
+	if err != nil {
+		return fmt.Errorf("zever config show: load config %q: %w", cfg.ConfigPath, err)
 	}
 
 	services := resolved.RedactedServices()

@@ -189,7 +189,7 @@ func TestDiagToLSPDiagnostic(t *testing.T) {
 		t.Run(tc.name, func(t *testing.T) {
 			t.Parallel()
 
-			got := diagToLSPDiagnostic(tc.in)
+			got := diagToLSPDiagnostic(tc.in, "")
 
 			if got.Range != tc.wantRange {
 				t.Errorf("Range = %+v, want %+v", got.Range, tc.wantRange)
@@ -212,6 +212,134 @@ func TestDiagToLSPDiagnostic(t *testing.T) {
 	}
 }
 
+// TestDiagToLSPDiagnosticExtendsToEnclosingIdentifier proves a diagnostic
+// whose point lands anywhere inside an identifier is widened to the whole
+// token, so editors underline it rather than a single caret.
+func TestDiagToLSPDiagnosticExtendsToEnclosingIdentifier(t *testing.T) {
+	t.Parallel()
+
+	src := "entity User {\n\tid: uuid\n}\n"
+
+	tests := []struct {
+		name string
+		col  int
+	}{
+		{"start of identifier", 8},   // 'U'
+		{"middle of identifier", 10}, // 'e'
+	}
+
+	want := protocol.Range{
+		Start: protocol.Position{Line: 0, Character: 7},
+		End:   protocol.Position{Line: 0, Character: 11},
+	}
+
+	for _, tc := range tests {
+		t.Run(tc.name, func(t *testing.T) {
+			t.Parallel()
+
+			got := diagToLSPDiagnostic(&diag.Diagnostic{
+				Pos:      diag.Position{File: "a.zen", Line: 1, Col: tc.col},
+				Severity: diag.SeverityError,
+				Msg:      "boom",
+			}, src)
+
+			if got.Range != want {
+				t.Errorf("Range = %+v, want %+v", got.Range, want)
+			}
+		})
+	}
+}
+
+// TestDiagToLSPDiagnosticFallsBackToPoint covers the cases where no enclosing
+// identifier exists: no source, an out-of-range line, and a point on
+// punctuation.
+func TestDiagToLSPDiagnosticFallsBackToPoint(t *testing.T) {
+	t.Parallel()
+
+	src := "entity User {\n}\n"
+
+	tests := []struct {
+		name string
+		src  string
+		pos  diag.Position
+	}{
+		{"no source", "", diag.Position{File: "a.zen", Line: 1, Col: 8}},
+		{"line past end", src, diag.Position{File: "a.zen", Line: 9, Col: 1}},
+		{"point on punctuation", src, diag.Position{File: "a.zen", Line: 1, Col: 13}},
+		{"zero position", src, diag.Position{File: "a.zen"}},
+	}
+
+	for _, tc := range tests {
+		t.Run(tc.name, func(t *testing.T) {
+			t.Parallel()
+
+			got := diagToLSPDiagnostic(&diag.Diagnostic{Pos: tc.pos, Msg: "boom"}, tc.src)
+			if want := pointRange(tc.pos); got.Range != want {
+				t.Errorf("Range = %+v, want point range %+v", got.Range, want)
+			}
+		})
+	}
+}
+
+// TestGroupDiagnosticsUsesSourceFor proves the source lookup is consulted per
+// file, so one file's identifier span is widened while an unknown file keeps
+// its point range.
+func TestGroupDiagnosticsUsesSourceFor(t *testing.T) {
+	t.Parallel()
+
+	src := "entity User {\n}\n"
+	srcFor := func(path string) (string, bool) {
+		if path == "a.zen" {
+			return src, true
+		}
+
+		return "", false
+	}
+
+	grouped := groupDiagnostics(diag.List{
+		{Pos: diag.Position{File: "a.zen", Line: 1, Col: 8}, Msg: "widened"},
+		{Pos: diag.Position{File: "b.zen", Line: 1, Col: 8}, Msg: "point"},
+	}, srcFor)
+
+	wantWidened := protocol.Range{
+		Start: protocol.Position{Line: 0, Character: 7},
+		End:   protocol.Position{Line: 0, Character: 11},
+	}
+	if got := grouped["a.zen"][0].Range; got != wantWidened {
+		t.Errorf("a.zen range = %+v, want %+v", got, wantWidened)
+	}
+
+	if got, want := grouped["b.zen"][0].Range, pointRange(diag.Position{Line: 1, Col: 8}); got != want {
+		t.Errorf("b.zen range = %+v, want point range %+v", got, want)
+	}
+}
+
+// TestByteOffsetForUTF16Col proves the lexer's UTF-16 column accounting is
+// converted to a byte offset, so a non-ASCII character earlier on the line
+// does not skew the identifier span.
+func TestByteOffsetForUTF16Col(t *testing.T) {
+	t.Parallel()
+
+	line := "é id" // 'é' is two UTF-8 bytes but one UTF-16 code unit.
+
+	tests := []struct {
+		col  int
+		want int
+	}{
+		{1, 0},
+		{2, 2},
+		{3, 3},
+		{4, 4},
+		{99, len(line)},
+	}
+
+	for _, tc := range tests {
+		if got := byteOffsetForUTF16Col(line, tc.col); got != tc.want {
+			t.Errorf("byteOffsetForUTF16Col(%q, %d) = %d, want %d", line, tc.col, got, tc.want)
+		}
+	}
+}
+
 func TestGroupDiagnosticsByFile(t *testing.T) {
 	t.Parallel()
 
@@ -224,7 +352,7 @@ func TestGroupDiagnosticsByFile(t *testing.T) {
 		nil,
 	}
 
-	grouped := groupDiagnostics(diags)
+	grouped := groupDiagnostics(diags, nil)
 
 	if len(grouped) != 2 {
 		t.Fatalf("grouped into %d files, want 2 (%v)", len(grouped), grouped)
@@ -322,6 +450,37 @@ func TestPublishSendsPerFileDiagnostics(t *testing.T) {
 	b, ok := client.published(string(pathToURI("/w/b.zen")))
 	if !ok || len(b) != 1 || b[0].Severity != protocol.DiagnosticSeverityWarning {
 		t.Errorf("b.zen publish = %+v, want one warning", b)
+	}
+}
+
+// TestPublishWidensRangesFromSource proves the publisher consults srcFor, so
+// a delivered diagnostic spans its enclosing identifier rather than a point.
+func TestPublishWidensRangesFromSource(t *testing.T) {
+	t.Parallel()
+
+	client := &fakeClient{}
+	p := newDiagnosticPublisher()
+	p.srcFor = func(path string) (string, bool) {
+		return "entity User {\n}\n", path == "/w/a.zen"
+	}
+
+	if err := p.publish(client, []string{"/w/a.zen"}, diag.List{
+		{Pos: diag.Position{File: "/w/a.zen", Line: 1, Col: 8}, Msg: "boom"},
+	}); err != nil {
+		t.Fatalf("publish: %v", err)
+	}
+
+	list, ok := client.published(string(pathToURI("/w/a.zen")))
+	if !ok || len(list) != 1 {
+		t.Fatalf("publish = %v, want one diagnostic", list)
+	}
+
+	want := protocol.Range{
+		Start: protocol.Position{Line: 0, Character: 7},
+		End:   protocol.Position{Line: 0, Character: 11},
+	}
+	if list[0].Range != want {
+		t.Errorf("range = %+v, want %+v", list[0].Range, want)
 	}
 }
 

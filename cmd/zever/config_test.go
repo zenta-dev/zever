@@ -117,6 +117,22 @@ func TestRunConfigShowWithCoreBadConfigFile(t *testing.T) {
 	}
 }
 
+// TestRunConfigShowWithAppliesEnvOverrides proves `zever config show` with no
+// --config resolves through config.Load(""), so env overrides apply exactly
+// as they do when the container builds its config.
+func TestRunConfigShowWithAppliesEnvOverrides(t *testing.T) {
+	t.Setenv("DB_ADAPTER", "postgres")
+
+	var out bytes.Buffer
+	if err := runConfigShowWith(ConfigConfig{Out: &out}); err != nil {
+		t.Fatalf("runConfigShowWith: %v", err)
+	}
+
+	if got := out.String(); !strings.Contains(got, "db  adapter=postgres") {
+		t.Fatalf("output = %q, want db adapter=postgres from DB_ADAPTER env", got)
+	}
+}
+
 func TestPrintConfigUsageColoredBox(t *testing.T) {
 	prev := colorEnabled
 	colorEnabled = true
