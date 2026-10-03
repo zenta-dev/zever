@@ -3,6 +3,8 @@ package memory
 import (
 	"context"
 	"errors"
+	"fmt"
+	"sync"
 	"testing"
 	"time"
 
@@ -38,6 +40,48 @@ func eventually(t *testing.T, timeout time.Duration, cond func() bool, msg strin
 
 		time.Sleep(5 * time.Millisecond)
 	}
+}
+
+// bareStore builds a store with initialized stripes but no background
+// janitor, for white-box sweep tests.
+func bareStore(idle time.Duration) *store {
+	s := &store{idle: idle, stripes: make([]stripe, DefaultStripeCount)}
+	for i := range s.stripes {
+		s.stripes[i].buckets = make(map[string]*bucket)
+	}
+	return s
+}
+
+// setBuckets inserts m into the owning stripes.
+func setBuckets(t *testing.T, s *store, m map[string]*bucket) {
+	t.Helper()
+	for k, b := range m {
+		st := s.stripeFor(k)
+		st.mu.Lock()
+		st.buckets[k] = b
+		st.mu.Unlock()
+	}
+}
+
+// getBucket returns the bucket for key, or nil.
+func getBucket(t *testing.T, s *store, key string) *bucket {
+	t.Helper()
+	st := s.stripeFor(key)
+	st.mu.RLock()
+	defer st.mu.RUnlock()
+	return st.buckets[key]
+}
+
+// countBuckets sums live buckets across all stripes.
+func countBuckets(s *store) int {
+	n := 0
+	for i := range s.stripes {
+		st := &s.stripes[i]
+		st.mu.RLock()
+		n += len(st.buckets)
+		st.mu.RUnlock()
+	}
+	return n
 }
 
 func TestCoverNewDefaults(t *testing.T) {
@@ -119,7 +163,7 @@ func TestCoverAllowValidation(t *testing.T) {
 func TestCoverAllowPostLockClosed(t *testing.T) {
 	s := newCoverStore(t, ratelimit.Options{Rate: 10, Burst: 5})
 
-	s.mu.Lock()
+	s.stripeFor("k-postlock").mu.Lock()
 
 	type result struct {
 		err error
@@ -132,11 +176,11 @@ func TestCoverAllowPostLockClosed(t *testing.T) {
 		done <- result{err: err}
 	}()
 
-	// The test holds s.mu, so the goroutine blocks on it after the
-	// pre-lock checks; closing underneath exercises the post-lock path
+	// The test holds the stripe lock, so the goroutine blocks on it after
+	// the pre-lock checks; closing underneath exercises the post-lock path
 	// deterministically without any timing wait.
 	s.closed.Store(true)
-	s.mu.Unlock()
+	s.stripeFor("k-postlock").mu.Unlock()
 
 	select {
 	case r := <-done:
@@ -194,9 +238,10 @@ func TestCoverAllowRefillCapped(t *testing.T) {
 
 	// Simulate ~300ms of refill at 5/s without sleeping: backdate last so
 	// the next Allow accrues and caps at burst.
-	s.mu.Lock()
-	s.buckets["k-cap"].last = time.Now().Add(-300 * time.Millisecond)
-	s.mu.Unlock()
+	st := s.stripeFor("k-cap")
+	st.mu.Lock()
+	st.buckets["k-cap"].last = time.Now().Add(-300 * time.Millisecond)
+	st.mu.Unlock()
 
 	d, err := s.Allow(ctx, "k-cap", 1)
 	if err != nil || !d.Allowed {
@@ -229,9 +274,10 @@ func TestCoverAllowIdleExpiryWhiteBox(t *testing.T) {
 		t.Fatal("expected denial before idle expiry")
 	}
 
-	s.mu.Lock()
-	s.buckets["k-idle"].last = time.Now().Add(-2 * s.idle)
-	s.mu.Unlock()
+	st := s.stripeFor("k-idle")
+	st.mu.Lock()
+	st.buckets["k-idle"].last = time.Now().Add(-2 * s.idle)
+	st.mu.Unlock()
 
 	d, err = s.Allow(ctx, "k-idle", 2)
 	if err != nil || !d.Allowed {
@@ -252,9 +298,10 @@ func TestCoverAllowFutureLastClamp(t *testing.T) {
 		t.Fatalf("Remaining = %v, want 4", d.Remaining)
 	}
 
-	s.mu.Lock()
-	s.buckets["k-future"].last = time.Now().Add(time.Second)
-	s.mu.Unlock()
+	st := s.stripeFor("k-future")
+	st.mu.Lock()
+	st.buckets["k-future"].last = time.Now().Add(time.Second)
+	st.mu.Unlock()
 
 	d, err = s.Allow(ctx, "k-future", 1)
 	if err != nil || !d.Allowed {
@@ -306,11 +353,7 @@ func TestCoverResetPaths(t *testing.T) {
 		t.Fatalf("Reset failed: %v", resetErr)
 	}
 
-	s.mu.RLock()
-	_, ok := s.buckets["k-del"]
-	s.mu.RUnlock()
-
-	if ok {
+	if b := getBucket(t, s, "k-del"); b != nil {
 		t.Fatal("bucket still present after Reset")
 	}
 
@@ -323,7 +366,7 @@ func TestCoverResetPaths(t *testing.T) {
 func TestCoverResetPostLockClosed(t *testing.T) {
 	s := newCoverStore(t, ratelimit.Options{Rate: 10, Burst: 5})
 
-	s.mu.Lock()
+	s.stripeFor("k-postlock").mu.Lock()
 
 	done := make(chan error, 1)
 
@@ -331,10 +374,10 @@ func TestCoverResetPostLockClosed(t *testing.T) {
 		done <- s.Reset(t.Context(), "k-postlock")
 	}()
 
-	// Same as Allow post-lock: the goroutine parks on s.mu, which this
-	// test holds, so close underneath without any timing wait.
+	// Same as Allow post-lock: the goroutine parks on the stripe lock,
+	// which this test holds, so close underneath without any timing wait.
 	s.closed.Store(true)
-	s.mu.Unlock()
+	s.stripeFor("k-postlock").mu.Unlock()
 
 	select {
 	case err := <-done:
@@ -365,11 +408,7 @@ func TestCoverCloseIdempotentWipes(t *testing.T) {
 		t.Fatalf("Close failed: %v", closeErr)
 	}
 
-	s.mu.RLock()
-	n := len(s.buckets)
-	s.mu.RUnlock()
-
-	if n != 0 {
+	if n := countBuckets(s); n != 0 {
 		t.Errorf("buckets after Close = %d, want 0", n)
 	}
 
@@ -393,15 +432,13 @@ func TestCoverRunTickerSweepsAndStops(t *testing.T) {
 		t.Fatalf("Allow failed: %v", err)
 	}
 
-	s.mu.Lock()
-	s.buckets["k-sweep"].last = time.Now().Add(-time.Second)
-	s.mu.Unlock()
+	st := s.stripeFor("k-sweep")
+	st.mu.Lock()
+	st.buckets["k-sweep"].last = time.Now().Add(-time.Second)
+	st.mu.Unlock()
 
 	eventually(t, 2*time.Second, func() bool {
-		s.mu.RLock()
-		defer s.mu.RUnlock()
-		_, ok := s.buckets["k-sweep"]
-		return !ok
+		return getBucket(t, s, "k-sweep") == nil
 	}, "background sweeper to remove expired bucket")
 
 	if closeErr := l.Close(); closeErr != nil {
@@ -412,37 +449,33 @@ func TestCoverRunTickerSweepsAndStops(t *testing.T) {
 func TestCoverSweepOnceTable(t *testing.T) {
 	now := time.Now()
 
-	empty := &store{buckets: map[string]*bucket{}, idle: time.Minute}
+	empty := bareStore(time.Minute)
 	empty.sweepOnce()
 
-	if len(empty.buckets) != 0 {
-		t.Errorf("empty sweep buckets = %d, want 0", len(empty.buckets))
+	if n := countBuckets(empty); n != 0 {
+		t.Errorf("empty sweep buckets = %d, want 0", n)
 	}
 
-	kept := &store{
-		buckets: map[string]*bucket{"fresh": {tokens: 1, last: now}},
-		idle:    time.Minute,
-	}
+	kept := bareStore(time.Minute)
+	setBuckets(t, kept, map[string]*bucket{"fresh": {tokens: 1, last: now}})
 	kept.sweepOnce()
 
-	if _, ok := kept.buckets["fresh"]; !ok {
+	if b := getBucket(t, kept, "fresh"); b == nil {
 		t.Error("unexpired bucket removed, want kept")
 	}
 
-	mixed := &store{
-		buckets: map[string]*bucket{
-			"old":   {tokens: 0, last: now.Add(-2 * time.Minute)},
-			"fresh": {tokens: 1, last: now},
-		},
-		idle: time.Minute,
-	}
+	mixed := bareStore(time.Minute)
+	setBuckets(t, mixed, map[string]*bucket{
+		"old":   {tokens: 0, last: now.Add(-2 * time.Minute)},
+		"fresh": {tokens: 1, last: now},
+	})
 	mixed.sweepOnce()
 
-	if _, ok := mixed.buckets["old"]; ok {
+	if b := getBucket(t, mixed, "old"); b != nil {
 		t.Error("expired bucket kept, want removed")
 	}
 
-	if _, ok := mixed.buckets["fresh"]; !ok {
+	if b := getBucket(t, mixed, "fresh"); b == nil {
 		t.Error("unexpired bucket removed, want kept")
 	}
 }
@@ -451,5 +484,58 @@ func TestCoverName(t *testing.T) {
 	s := newCoverStore(t, ratelimit.Options{Rate: 10, Burst: 5})
 	if got := s.Name(); got != "memory" {
 		t.Errorf("Name() = %q, want %q", got, "memory")
+	}
+}
+
+func TestCoverMaxEntriesBoundHeldUnderConcurrency(t *testing.T) {
+	t.Parallel()
+
+	l, err := New(ratelimit.Options{Rate: 10, Burst: 1, MaxEntries: 8})
+	if err != nil {
+		t.Fatalf("New failed: %v", err)
+	}
+
+	s, ok := l.(*store)
+	if !ok {
+		t.Fatalf("New returned %T, want *store", l)
+	}
+
+	t.Cleanup(func() { _ = l.Close() })
+
+	const (
+		goroutines = 16
+		keysPer    = 32
+	)
+
+	var wg sync.WaitGroup
+
+	for g := 0; g < goroutines; g++ {
+		wg.Add(1)
+
+		go func(g int) {
+			defer wg.Done()
+
+			for i := 0; i < keysPer; i++ {
+				key := fmt.Sprintf("g%d-k%d", g, i)
+				if _, err := l.Allow(t.Context(), key, 1); err != nil {
+					t.Errorf("Allow(%s) failed: %v", key, err)
+					return
+				}
+			}
+		}(g)
+	}
+
+	wg.Wait()
+
+	if got := s.total.Load(); got > 8 {
+		t.Fatalf("total = %d, want <= 8 (MaxEntries bound)", got)
+	}
+
+	if got := s.total.Load(); got != 8 {
+		t.Fatalf("total = %d, want 8 (table full)", got)
+	}
+
+	if got := countBuckets(s); got != 8 {
+		t.Fatalf("live buckets = %d, want 8", got)
 	}
 }

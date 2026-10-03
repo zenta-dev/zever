@@ -78,6 +78,43 @@ drops ~3x (331 KB to 109 KB) and allocs/op ~1.8x (5,690 to 3,208) with it.
 A second run confirmed the after numbers within noise (646,554 / 637,319
 ns/op).
 
+Rate limiter (`adapters/ratelimit/memory`, striped lock table). The bucket
+map was sharded into 64 stripes (`DefaultStripeCount`) keyed by an FNV-1a
+hash of the limiter key, each with its own `sync.RWMutex`. The global
+`MaxEntries` bound is preserved exactly: new-key admission takes a short
+`admitMu` to reserve a slot under the bound (evicting idle-first, then
+least-recently-used, across stripes) before inserting into the stripe, so
+existing-key calls never touch `admitMu`. "before" is the single
+`sync.RWMutex` table at commit 9e3a0d0; "after" is the sharded table.
+Medians of 3 runs, `-benchtime 2s`.
+
+| Benchmark | ns/op | B/op | allocs/op |
+| --- | --- | --- | --- |
+| BenchmarkAllowParallel before (cpu=1) | 86.57 | 0 | 0 |
+| BenchmarkAllowParallel after (cpu=1) | 88.08 | 0 | 0 |
+| BenchmarkAllowParallel before (cpu=4) | 122.2 | 0 | 0 |
+| BenchmarkAllowParallel after (cpu=4) | 40.70 | 0 | 0 |
+| BenchmarkAllowParallelHotKey before (cpu=1) | 75.00 | 0 | 0 |
+| BenchmarkAllowParallelHotKey after (cpu=1) | 76.21 | 0 | 0 |
+| BenchmarkAllowParallelHotKey before (cpu=4) | 112.4 | 0 | 0 |
+| BenchmarkAllowParallelHotKey after (cpu=4) | 114.6 | 0 | 0 |
+
+Sharding cuts the many-keys parallel path ~3x at cpu=4 (122.2 to 40.70
+ns/op): before, every `Allow` serialized on one lock and cpu=4 was slower
+than cpu=1; after, different keys proceed in parallel. The single-key
+benchmark is unchanged (75.00 to 76.21 ns/op at cpu=1) because one key
+still serializes on its stripe -- sharding helps key parallelism, not
+same-key throughput. Allocations stay at 0 B/op, 0 allocs/op on every row.
+
+Reproduce:
+
+```
+go test -run '^$' -bench 'BenchmarkAllowParallel' -benchtime 2s -cpu 1,4 -count 3 ./adapters/ratelimit/memory/
+```
+
+Machine: 11th Gen Intel Core i5-11400H @ 2.70GHz (6C/12T), 16 GB RAM,
+go1.27.0 linux/amd64.
+
 Idempotency (`adapters/idempotency/redis`, miniredis). `Begin` and
 `Complete` are now one Lua script each (1 RTT) instead of two client calls.
 Absolute numbers are dominated by miniredis's in-process command parsing.
@@ -134,6 +171,10 @@ Concurrent-load (`b.RunParallel`) coverage:
 - Queue: `BenchmarkMemoryRoundTripParallel`
   (`adapters/queue/memory/memory_bench_test.go`) -- balanced Push/Pop/Ack
   per iteration on one shared topic, flat memory regardless of benchtime.
+- Rate limiter: `BenchmarkAllowParallel` / `BenchmarkAllowParallelHotKey`
+  (`adapters/ratelimit/memory/memory_bench_test.go`) -- 256 precomputed
+  keys cycled per iteration over one shared limiter (many-keys), and one
+  shared key (hot-key, lock-contention shape).
 
 Adaptor-isolation coverage:
 
