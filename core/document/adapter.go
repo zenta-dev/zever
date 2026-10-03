@@ -1,7 +1,6 @@
 package document
 
 // Adapter identifies the document backend implementation.
-
 type Adapter string
 
 const (

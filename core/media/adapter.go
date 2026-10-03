@@ -1,7 +1,6 @@
 package media
 
 // Adapter identifies the media backend implementation.
-
 type Adapter string
 
 const (

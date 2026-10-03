@@ -1,7 +1,6 @@
 package search
 
 // Adapter identifies the search backend implementation.
-
 type Adapter string
 
 const (

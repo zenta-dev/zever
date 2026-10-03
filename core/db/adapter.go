@@ -1,7 +1,6 @@
 package db
 
 // Adapter identifies the database backend implementation.
-
 type Adapter string
 
 const (

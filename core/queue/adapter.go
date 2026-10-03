@@ -1,7 +1,6 @@
 package queue
 
 // Adapter identifies the queue backend implementation.
-
 type Adapter string
 
 const (

@@ -1,7 +1,6 @@
 package router
 
 // Adapter identifies the HTTP router backend implementation.
-
 type Adapter string
 
 const (

@@ -1,7 +1,6 @@
 package payment
 
 // Adapter identifies the payment backend implementation.
-
 type Adapter string
 
 const (

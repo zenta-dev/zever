@@ -1,7 +1,6 @@
 package ai
 
 // Adapter identifies the LLM backend implementation.
-
 type Adapter string
 
 const (
