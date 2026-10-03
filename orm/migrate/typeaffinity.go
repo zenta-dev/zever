@@ -280,7 +280,7 @@ func renderAlterColumnType(dialect string, e *ir.Entity, f *ir.Field, priorType 
 
 	col := atlas.QuoteIdent(f.Name)
 
-	//lint:allow-unsafesql identifier is schema-introspected, not user input
+	// identifier is schema-introspected, not user input
 	sql := fmt.Sprintf("ALTER TABLE %s ALTER COLUMN %s TYPE %s USING %s::%s;", table, col, colType, col, colType)
 
 	return plannedStatement{
@@ -346,7 +346,7 @@ func renderModifyColumn(
 		nullability = " NULL"
 	}
 
-	//lint:allow-unsafesql identifier is schema-introspected, not user input
+	// identifier is schema-introspected, not user input
 	sql := fmt.Sprintf("ALTER TABLE %s MODIFY COLUMN %s %s%s;",
 		table, quoteIdent(dialect, f.Name), colType, nullability)
 

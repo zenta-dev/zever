@@ -109,7 +109,7 @@ func looksManaged(name, table string) bool {
 // a table bootstrapped via RenderSchemaDDL and one migrated into shape here
 // converge on the same identifier.
 func uniqueIndexName(table, column string) string {
-	//lint:allow-unsafesql identifier is schema-introspected, not user input
+	// identifier is schema-introspected, not user input
 	return fmt.Sprintf("%s_%s_key", table, column)
 }
 
@@ -154,7 +154,7 @@ func createIndexSQL(dialect, table, name string, columns []string, unique bool) 
 		ifNotExists = ""
 	}
 
-	//lint:allow-unsafesql identifier is schema-introspected, not user input
+	// identifier is schema-introspected, not user input
 	return fmt.Sprintf("CREATE %sINDEX %s%s ON %s (%s);",
 		uniqueKW, ifNotExists, quoteIdent(dialect, name), table, strings.Join(cols, ", ")), nil
 }
@@ -214,7 +214,7 @@ func renderDropIndex(dialect string, e *ir.Entity, live liveIndex) (plannedState
 		sql = renderMySQLDropIndex(table, live.Name)
 	} else {
 		qualified := qualifiedIndexName(dialect, e, live.Name)
-		//lint:allow-unsafesql identifier is schema-introspected, not user input
+		// identifier is schema-introspected, not user input
 		sql = fmt.Sprintf("DROP INDEX IF EXISTS %s;", qualified)
 	}
 
@@ -350,7 +350,7 @@ func introspectSQLiteIndexes(ctx context.Context, conn db.DB, table string) ([]l
 		return nil, err
 	}
 
-	//lint:allow-unsafesql identifier is schema-introspected, not user input
+	// identifier is schema-introspected, not user input
 	rows, err := conn.Query(ctx, fmt.Sprintf("PRAGMA index_list(%s)", atlas.QuoteIdent(table)))
 	if err != nil {
 		return nil, fmt.Errorf("[orm/migrate] introspect indexes of %q: %w", table, err)
@@ -423,7 +423,7 @@ func introspectSQLiteIndexColumns(ctx context.Context, conn db.DB, indexName str
 		return nil, err
 	}
 
-	//lint:allow-unsafesql identifier is schema-introspected, not user input
+	// identifier is schema-introspected, not user input
 	rows, err := conn.Query(ctx, fmt.Sprintf("PRAGMA index_info(%s)", atlas.QuoteIdent(indexName)))
 	if err != nil {
 		return nil, fmt.Errorf("[orm/migrate] introspect index_info of %q: %w", indexName, err)
@@ -707,7 +707,7 @@ func renderAddForeignKey(dialect string, e *ir.Entity, fk atlas.ForeignKey) (pla
 		ref = quoteIdent(dialect, fk.RefSchema) + "." + ref
 	}
 
-	//lint:allow-unsafesql identifier is schema-introspected, not user input
+	// identifier is schema-introspected, not user input
 	sql := fmt.Sprintf("ALTER TABLE %s ADD CONSTRAINT %s FOREIGN KEY (%s) REFERENCES %s (%s)%s;",
 		table, quoteIdent(dialect, fk.Name), quoteIdent(dialect, fk.Column), ref, quoteIdent(dialect, fk.RefColumn),
 		onDeleteClause(fk.OnDelete))
@@ -798,7 +798,7 @@ func introspectSQLiteForeignKeys(ctx context.Context, conn db.DB, table string) 
 		return nil, err
 	}
 
-	//lint:allow-unsafesql identifier is schema-introspected, not user input
+	// identifier is schema-introspected, not user input
 	rows, err := conn.Query(ctx, fmt.Sprintf("PRAGMA foreign_key_list(%s)", atlas.QuoteIdent(table)))
 	if err != nil {
 		return nil, fmt.Errorf("[orm/migrate] introspect foreign keys of %q: %w", table, err)
@@ -963,7 +963,7 @@ func renderAlterNullability(dialect string, e *ir.Entity, f *ir.Field, declaredN
 		action, priorType = "DROP NOT NULL", "NOT NULL"
 	}
 
-	//lint:allow-unsafesql identifier is schema-introspected, not user input
+	// identifier is schema-introspected, not user input
 	sql := fmt.Sprintf("ALTER TABLE %s ALTER COLUMN %s %s;", table, col, action)
 
 	return plannedStatement{
