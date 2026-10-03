@@ -274,8 +274,8 @@ func TestMaxEntriesEvictsSoonestExpiry(t *testing.T) {
 	}
 
 	// k2 survived: still the in-progress owner.
-	if _, err := s.Begin(ctx, "k2", idempotency.BeginOptions{Fingerprint: fp, TTL: 2 * time.Hour}); !errors.Is(err, idempotency.ErrInProgress) {
-		t.Fatalf("Begin k2 err = %v, want ErrInProgress", err)
+	if _, berr := s.Begin(ctx, "k2", idempotency.BeginOptions{Fingerprint: fp, TTL: 2 * time.Hour}); !errors.Is(berr, idempotency.ErrInProgress) {
+		t.Fatalf("Begin k2 err = %v, want ErrInProgress", berr)
 	}
 
 	// k1 was evicted: re-Begin claims fresh, no replay.
