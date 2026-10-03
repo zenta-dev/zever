@@ -78,6 +78,117 @@ func TestNew_explicitSecureTrue_isRespected(t *testing.T) {
 	}
 }
 
+func TestNew_hostPrefix_forcesConstraints(t *testing.T) {
+	t.Parallel()
+
+	insecure := false
+
+	// Every constraint conflicts with the prefix: Secure explicitly off,
+	// a non-root Path, and a Domain. New must force Secure and Path=/, and
+	// omit the Domain (a Domain would widen scope to subdomains).
+	c := New("sess-id", Options{
+		Name:     "sid",
+		Path:     "/app",
+		Domain:   "example.com",
+		Prefix:   PrefixHost,
+		Secure:   &insecure,
+		SameSite: http.SameSiteStrictMode,
+	})
+
+	if c.Name != "__Host-sid" {
+		t.Fatalf("Name = %q, want %q", c.Name, "__Host-sid")
+	}
+	if !c.Secure {
+		t.Fatal("Secure = false, want true (__Host- requires Secure)")
+	}
+	if c.Path != "/" {
+		t.Fatalf("Path = %q, want %q (__Host- requires Path=/)", c.Path, "/")
+	}
+	if c.Domain != "" {
+		t.Fatalf("Domain = %q, want empty (__Host- must be host-only)", c.Domain)
+	}
+	if c.SameSite != http.SameSiteStrictMode {
+		t.Fatalf("SameSite = %v, want %v (prefix must not change SameSite)", c.SameSite, http.SameSiteStrictMode)
+	}
+}
+
+func TestNew_securePrefix_forcesSecure(t *testing.T) {
+	t.Parallel()
+
+	insecure := false
+
+	c := New("sess-id", Options{
+		Name:   "sid",
+		Path:   "/app",
+		Domain: "example.com",
+		Prefix: PrefixSecure,
+		Secure: &insecure,
+	})
+
+	if c.Name != "__Secure-sid" {
+		t.Fatalf("Name = %q, want %q", c.Name, "__Secure-sid")
+	}
+	if !c.Secure {
+		t.Fatal("Secure = false, want true (__Secure- requires Secure)")
+	}
+	// __Secure- constrains neither Path nor Domain.
+	if c.Path != "/app" {
+		t.Fatalf("Path = %q, want %q", c.Path, "/app")
+	}
+	if c.Domain != "example.com" {
+		t.Fatalf("Domain = %q, want %q", c.Domain, "example.com")
+	}
+}
+
+func TestNew_defaultName_withHostPrefix(t *testing.T) {
+	t.Parallel()
+
+	c := New("sess-id", Options{Prefix: PrefixHost})
+	if c.Name != "__Host-"+DefaultName {
+		t.Fatalf("Name = %q, want %q", c.Name, "__Host-"+DefaultName)
+	}
+}
+
+func TestNew_unknownPrefix_ignored(t *testing.T) {
+	t.Parallel()
+
+	insecure := false
+
+	c := New("sess-id", Options{
+		Name:   "sid",
+		Prefix: "__host-",
+		Secure: &insecure,
+	})
+
+	if c.Name != "sid" {
+		t.Fatalf("Name = %q, want %q (unknown prefix must not be applied)", c.Name, "sid")
+	}
+	if c.Secure {
+		t.Fatal("Secure = true, want false (unknown prefix must not force Secure)")
+	}
+}
+
+func TestSet_hostPrefix_writesPrefixedName(t *testing.T) {
+	t.Parallel()
+
+	rec := httptest.NewRecorder()
+	Set(rec, "sess-id", Options{Prefix: PrefixHost})
+
+	res := rec.Result()
+	defer res.Body.Close()
+
+	cookies := res.Cookies()
+	if len(cookies) != 1 {
+		t.Fatalf("got %d cookies, want 1", len(cookies))
+	}
+	if cookies[0].Name != "__Host-"+DefaultName {
+		t.Fatalf("cookie name = %q, want %q", cookies[0].Name, "__Host-"+DefaultName)
+	}
+	if !cookies[0].Secure || cookies[0].Path != "/" || cookies[0].Domain != "" {
+		t.Fatalf("cookie = %+v, want Secure, Path=/, no Domain", cookies[0])
+	}
+}
+
 func TestNew_zeroMaxAge_isSessionCookie(t *testing.T) {
 	t.Parallel()
 

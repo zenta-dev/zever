@@ -9,10 +9,13 @@ import (
 
 // Options configures the AI backend.
 type Options struct {
-	APIKey  string        `json:"api_key" toml:"api_key" yaml:"api_key"`
-	Model   string        `json:"model" toml:"model" yaml:"model"`
-	BaseURL string        `json:"base_url" toml:"base_url" yaml:"base_url"`
-	Timeout time.Duration `json:"timeout" toml:"timeout" yaml:"timeout"`
+	APIKey  string `json:"api_key" toml:"api_key" yaml:"api_key"`
+	Model   string `json:"model" toml:"model" yaml:"model"`
+	BaseURL string `json:"base_url" toml:"base_url" yaml:"base_url"`
+	// AllowInsecure permits http BaseURL and disables TLS verification for
+	// loopback test servers. Default false: https only, verification always on.
+	AllowInsecure bool          `json:"allow_insecure" toml:"allow_insecure" yaml:"allow_insecure"`
+	Timeout       time.Duration `json:"timeout" toml:"timeout" yaml:"timeout"`
 }
 
 // Validate checks options for consistency, joining all violations.
@@ -24,7 +27,7 @@ func (o Options) Validate() error {
 	}
 
 	if o.BaseURL != "" {
-		if _, err := endpoint.ValidateURL(o.BaseURL); err != nil {
+		if _, err := endpoint.ValidateURL(o.BaseURL, endpoint.WithAllowInsecure(o.AllowInsecure)); err != nil {
 			errs = append(errs, &InvalidOptionsError{Reason: baseURLReason(err)})
 		}
 	}

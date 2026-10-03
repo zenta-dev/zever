@@ -54,26 +54,28 @@ func TestOptions_Validate_timeout(t *testing.T) {
 func TestOptions_Validate_baseURL_table(t *testing.T) {
 	t.Parallel()
 	cases := []struct {
-		name    string
-		baseURL string
-		wantErr bool
-		reasons []string
+		name          string
+		baseURL       string
+		allowInsecure bool
+		wantErr       bool
+		reasons       []string
 	}{
-		{"valid https", "https://api.openai.com/v1", false, nil},
-		{"valid https port", "https://example.com:443/v1", false, nil},
-		{"empty", "", false, nil},
-		{"no scheme", "example.com/api", true, []string{"scheme"}},
-		{"no host", "https:///path", true, []string{"host"}},
-		{"garbage", "http://[::1", true, []string{"valid url"}},
-		{"http blocked", "http://example.com/v1", true, []string{"https"}},
-		{"http localhost blocked", "http://localhost:8080", true, []string{"https"}},
-		{"ftp blocked", "ftp://example.com/v1", true, []string{"https"}},
-		{"scheme only host missing http", "http://", true, []string{"host"}},
+		{"valid https", "https://api.openai.com/v1", false, false, nil},
+		{"valid https port", "https://example.com:443/v1", false, false, nil},
+		{"empty", "", false, false, nil},
+		{"no scheme", "example.com/api", false, true, []string{"scheme"}},
+		{"no host", "https:///path", false, true, []string{"host"}},
+		{"garbage", "http://[::1", false, true, []string{"valid url"}},
+		{"http blocked", "http://example.com/v1", false, true, []string{"https"}},
+		{"http localhost blocked", "http://localhost:8080", false, true, []string{"https"}},
+		{"ftp blocked", "ftp://example.com/v1", false, true, []string{"https"}},
+		{"scheme only host missing http", "http://", false, true, []string{"host"}},
+		{"http allowed with AllowInsecure", "http://localhost:8080", true, false, nil},
 	}
 	for _, tc := range cases {
 		t.Run(tc.name, func(t *testing.T) {
 			t.Parallel()
-			err := Options{BaseURL: tc.baseURL}.Validate()
+			err := Options{BaseURL: tc.baseURL, AllowInsecure: tc.allowInsecure}.Validate()
 			if tc.wantErr && err == nil {
 				t.Fatalf("Validate(%q) = nil, want error", tc.baseURL)
 			}
