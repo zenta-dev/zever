@@ -2,18 +2,43 @@ package ir
 
 import "github.com/zenta-dev/zever/dsl/diag"
 
+// ValidationKind identifies the kind of a validation rule on a field or
+// param. It is a typed string so every consumer switches exhaustively over
+// the closed set below -- a new kind added here forces every switch site to
+// handle it (or fail closed via its default) at compile time.
+type ValidationKind string
+
+// Supported validation kinds.
+const (
+	ValidationFormat ValidationKind = "format"
+	ValidationMinLen ValidationKind = "min_len"
+	ValidationMaxLen ValidationKind = "max_len"
+	ValidationGT     ValidationKind = "gt"
+	ValidationGTE    ValidationKind = "gte"
+	ValidationLT     ValidationKind = "lt"
+	ValidationLTE    ValidationKind = "lte"
+)
+
 // Validation represents a validation rule on a field.
-// Kind: format|min_len|max_len|gt|gte|lt|lte.
 type Validation struct {
-	Kind string         // The validation kind
+	Kind ValidationKind // The validation kind
 	Args map[string]any // Arguments for the validation rule
 	Pos  diag.Position  // Source position
 }
 
+// DefaultKind identifies the kind of a field's default value. It is a
+// typed string for the same exhaustiveness reason as ValidationKind.
+type DefaultKind string
+
+// Supported default kinds.
+const (
+	DefaultLiteral DefaultKind = "literal"
+	DefaultNow     DefaultKind = "now"
+)
+
 // DefaultValue represents a default value for a field.
-// Kind: literal|now.
 type DefaultValue struct {
-	Kind string        // The default kind
+	Kind DefaultKind   // The default kind
 	Lit  any           // The literal value or nil for "now"
 	Pos  diag.Position // Source position
 }
