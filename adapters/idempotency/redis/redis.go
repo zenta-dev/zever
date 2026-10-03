@@ -30,16 +30,17 @@ const DefaultPingTimeout = 3 * time.Second
 var _ idempotency.Store = (*store)(nil)
 
 type store struct {
-	client *goredis.Client
-	prefix string
-	ttl    time.Duration
-	closed atomic.Bool
+	client  *goredis.Client
+	release func() error
+	prefix  string
+	ttl     time.Duration
+	closed  atomic.Bool
 }
 
-// New creates a Redis-backed idempotency.Store with its own client from
-// internal/redis. It verifies connectivity with a 3s ping check and reports
-// failures with the redacted address in errors. Close is idempotent and
-// closes the store's own client.
+// New creates a Redis-backed idempotency.Store using a shared client from
+// the redisclient registry (one pool per resolved addr+DB). It verifies
+// connectivity with a 3s ping check and reports failures with the redacted
+// address in errors. Close is idempotent and releases the store's reference.
 func New(opts idempotency.Options) (idempotency.Store, error) {
 	if err := opts.Validate(); err != nil {
 		return nil, fmt.Errorf("redis: invalid options: %w", err)
@@ -55,7 +56,7 @@ func New(opts idempotency.Options) (idempotency.Store, error) {
 		ttl = idempotency.DefaultTTL
 	}
 
-	client, err := redisclient.New(opts.Redis.Options)
+	client, release, err := redisclient.Shared(opts.Redis.Options)
 	if err != nil {
 		return nil, fmt.Errorf("redis: connect %q: %w", redactAddr(opts.Redis.Addr), err)
 	}
@@ -64,12 +65,12 @@ func New(opts idempotency.Options) (idempotency.Store, error) {
 	defer cancel()
 
 	if err := client.Ping(ctx).Err(); err != nil {
-		_ = client.Close()
+		_ = release()
 
 		return nil, fmt.Errorf("redis: ping %q: %w", redactAddr(opts.Redis.Addr), err)
 	}
 
-	return &store{client: client, prefix: prefix, ttl: ttl}, nil
+	return &store{client: client, release: release, prefix: prefix, ttl: ttl}, nil
 }
 
 // redactAddr masks any embedded userinfo credentials, suitable for error
@@ -217,7 +218,11 @@ func (s *store) Close() error {
 		return nil
 	}
 
-	return redisclient.Close(s.client)
+	if s.release == nil {
+		return nil
+	}
+
+	return s.release()
 }
 
 // maxFingerprintLen caps per-call fingerprints: hashes are tiny, wire

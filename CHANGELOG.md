@@ -70,6 +70,14 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   `idempotency.Options.MaxEntries` (default 1000) with soonest-expiry
   eviction, and replaces the per-`Begin` O(n) full-map purge with a
   background janitor goroutine joined on `Close`.
+- Redis-backed batteries (`cache`, `queue`, `lock`, `ratelimit`,
+  `idempotency`, `session`, `eventbus`) now share one connection pool per
+  resolved addr+DB via the new refcounted `redisclient.Shared` registry
+  (mirroring `container`'s DB pool sharing), instead of opening an
+  independent client per battery. The first caller to open a key supplies
+  the pool-sizing options; later borrowers reuse that pool and their
+  pool-size fields are ignored (first-creator-wins). `redisclient.New`
+  remains for callers that need a private client.
 
 ### Added
 
