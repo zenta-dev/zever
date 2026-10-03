@@ -49,7 +49,7 @@ func renderRelation(b *strings.Builder, m entityModel, r relationModel) {
 
 	fmt.Fprintf(b, "// %s starts a null-safe LEFT JOIN from %s through the %q relation: an\n",
 		leftJoinFunc, m.TableVar, r.Column)
-	fmt.Fprintf(b, "// unmatched %s row comes back with an explicit orm.Option[%s] rather\n",
+	fmt.Fprintf(b, "// unmatched %s row comes back with an explicit orm.Nullable[%s] rather\n",
 		m.Name, r.TargetType)
 	b.WriteString("// than a zero-valued struct that could be mistaken for a real match.\n")
 	fmt.Fprintf(b, "func %s(left orm.Query[%s, *%s]) orm.LeftJoin2[%s, *%s, %s, *%s] {\n",

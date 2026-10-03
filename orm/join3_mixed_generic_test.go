@@ -19,7 +19,7 @@ var allMixedKinds = []JoinType{InnerJoin, LeftJoin, RightJoin, FullJoin}
 // mixedSig renders one fully-optional row as a compact "A/B/C" signature,
 // with "-" for a None side, so a result set can be compared exhaustively
 // against a hand-derived expectation.
-func mixedSig(r Row3[Option[joinUser], Option[joinOrder], Option[joinOrderItem]]) string {
+func mixedSig(r Row3[Nullable[joinUser], Nullable[joinOrder], Nullable[joinOrderItem]]) string {
 	sig := func(id string, some bool) string {
 		if !some {
 			return "-"
@@ -48,7 +48,7 @@ func mixedSig(r Row3[Option[joinUser], Option[joinOrder], Option[joinOrderItem]]
 
 // mixedSigs materializes the result's signatures, sorted, for an
 // order-independent multiset comparison.
-func mixedSigs(rows []Row3[Option[joinUser], Option[joinOrder], Option[joinOrderItem]]) []string {
+func mixedSigs(rows []Row3[Nullable[joinUser], Nullable[joinOrder], Nullable[joinOrderItem]]) []string {
 	out := make([]string, 0, len(rows))
 
 	for _, r := range rows {
@@ -61,7 +61,7 @@ func mixedSigs(rows []Row3[Option[joinUser], Option[joinOrder], Option[joinOrder
 }
 
 // mixedAll runs MixedJoinOn3 for one kind pair via All.
-func mixedAll(ctx context.Context, exec db.DB, ab, bc JoinType) ([]Row3[Option[joinUser], Option[joinOrder], Option[joinOrderItem]], error) {
+func mixedAll(ctx context.Context, exec db.DB, ab, bc JoinType) ([]Row3[Nullable[joinUser], Nullable[joinOrder], Nullable[joinOrderItem]], error) {
 	return MixedJoinOn3(From[joinUser](joinUsers), userOrdersRel, orderItemsRel, ab, bc).All(ctx, exec)
 }
 

@@ -227,7 +227,7 @@ func TestJoin2WhereAndWhereRight(t *testing.T) {
 
 // TestLeftJoin2NullabilityDistinguishesNoMatch is THE proof test for the
 // LEFT JOIN nullability contract: a parent row (u2) with no matching child comes back with
-// Option[joinOrder]{}.IsSome() == false, never a zero-valued joinOrder{}
+// Nullable[joinOrder]{}.IsSome() == false, never a zero-valued joinOrder{}
 // that could be mistaken for a real (if all-zero) match.
 func TestLeftJoin2NullabilityDistinguishesNoMatch(t *testing.T) {
 	ctx, conn := newJoinDB(t)

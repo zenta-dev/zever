@@ -129,8 +129,8 @@ const (
 // prove the join can never actually miss. For the general "the joined side
 // might not match" cases, use LeftJoinOn/RightJoinOn/FullJoinOn instead: they
 // return LeftJoin2/RightJoin2/FullJoin2 whose All/Stream produce
-// Row2[A, Option[B]] / Row2[Option[A], B] / Row2[Option[A], Option[B]] -- the
-// WHOLE unmatched struct wrapped in Option, not per-field -- so an all-NULL
+// Row2[A, Nullable[B]] / Row2[Nullable[A], B] / Row2[Nullable[A], Nullable[B]] -- the
+// WHOLE unmatched struct wrapped in Nullable, not per-field -- so an all-NULL
 // side is unambiguously None, never a same-shaped zero struct. This
 // two-type split (rather than one generic type whose return type depends on
 // a runtime joinType value, which Go's type system cannot express) is the
@@ -370,8 +370,8 @@ func (j Join2[A, PA, B, PB]) Stream(ctx context.Context, exec db.DB) iter.Seq2[R
 
 // LeftJoin2 is the null-safe counterpart to Join2 for LEFT JOINs -- see
 // Join2's doc comment for the design decision. Its All/Stream return
-// Row2[A, Option[B]]: an unmatched left row comes back with
-// Option[B]{}.IsSome() == false, never a same-shaped zero-valued B{} that
+// Row2[A, Nullable[B]]: an unmatched left row comes back with
+// Nullable[B]{}.IsSome() == false, never a same-shaped zero-valued B{} that
 // could be mistaken for a real all-zero-columns match.
 type LeftJoin2[A any, PA ptrScanner[A], B any, PB ptrScanner[B]] struct {
 	left       Query[A, PA]
@@ -399,7 +399,7 @@ func (j LeftJoin2[A, PA, B, PB]) Where(p Predicate[A]) LeftJoin2[A, PA, B, PB] {
 // a set WhereRight predicate can turn an outer join back into something
 // that behaves like an inner join for rows where B doesn't satisfy it.
 // Callers who need "keep the parent row regardless" together with a
-// right-side filter should filter client-side after Some(b) instead.
+// right-side filter should filter client-side after NullableSome(b) instead.
 func (j LeftJoin2[A, PA, B, PB]) WhereRight(p Predicate[B]) LeftJoin2[A, PA, B, PB] {
 	if j.whereRight.IsSet() {
 		j.whereRight = And(j.whereRight, p)
@@ -453,9 +453,9 @@ func (j LeftJoin2[A, PA, B, PB]) render(d dialect.Dialect) (string, []any, error
 }
 
 // All runs j against exec and returns every matching row as a typed
-// Row2[A, Option[B]], scanned via ONE rows.Scan call per row (see
+// Row2[A, Nullable[B]], scanned via ONE rows.Scan call per row (see
 // scanLeftJoinRow) -- one round trip total.
-func (j LeftJoin2[A, PA, B, PB]) All(ctx context.Context, exec db.DB) ([]Row2[A, Option[B]], error) {
+func (j LeftJoin2[A, PA, B, PB]) All(ctx context.Context, exec db.DB) ([]Row2[A, Nullable[B]], error) {
 	d, err := resolveDialect(exec)
 	if err != nil {
 		return nil, err
@@ -472,7 +472,7 @@ func (j LeftJoin2[A, PA, B, PB]) All(ctx context.Context, exec db.DB) ([]Row2[A,
 	}
 	defer func() { _ = rows.Close() }()
 
-	var out []Row2[A, Option[B]]
+	var out []Row2[A, Nullable[B]]
 
 	aCols := len(j.left.table.Columns())
 	bCols := len(j.rel.childTable.Columns())
@@ -499,25 +499,25 @@ func (j LeftJoin2[A, PA, B, PB]) All(ctx context.Context, exec db.DB) ([]Row2[A,
 
 // Stream runs j against exec and yields every matching row one at a time.
 // See Join2.Stream's doc comment for the range-over-func cleanup guarantee.
-func (j LeftJoin2[A, PA, B, PB]) Stream(ctx context.Context, exec db.DB) iter.Seq2[Row2[A, Option[B]], error] {
-	return func(yield func(Row2[A, Option[B]], error) bool) {
+func (j LeftJoin2[A, PA, B, PB]) Stream(ctx context.Context, exec db.DB) iter.Seq2[Row2[A, Nullable[B]], error] {
+	return func(yield func(Row2[A, Nullable[B]], error) bool) {
 		d, err := resolveDialect(exec)
 		if err != nil {
-			yield(Row2[A, Option[B]]{}, err)
+			yield(Row2[A, Nullable[B]]{}, err)
 
 			return
 		}
 
 		query, args, err := j.render(d)
 		if err != nil {
-			yield(Row2[A, Option[B]]{}, fmt.Errorf("orm: LeftJoin2.Stream: %w", err))
+			yield(Row2[A, Nullable[B]]{}, fmt.Errorf("orm: LeftJoin2.Stream: %w", err))
 
 			return
 		}
 
 		rows, err := queryRows(ctx, exec, query, encodeArgs(d, args))
 		if err != nil {
-			yield(Row2[A, Option[B]]{}, fmt.Errorf("orm: LeftJoin2.Stream: %w", err))
+			yield(Row2[A, Nullable[B]]{}, fmt.Errorf("orm: LeftJoin2.Stream: %w", err))
 
 			return
 		}
@@ -529,7 +529,7 @@ func (j LeftJoin2[A, PA, B, PB]) Stream(ctx context.Context, exec db.DB) iter.Se
 		for rows.Next() {
 			row, err := scanLeftJoinRow[A, PA, B, PB](rows, aCols, bCols)
 			if err != nil {
-				yield(Row2[A, Option[B]]{}, fmt.Errorf("orm: LeftJoin2.Stream: scan: %w", err))
+				yield(Row2[A, Nullable[B]]{}, fmt.Errorf("orm: LeftJoin2.Stream: scan: %w", err))
 
 				return
 			}
@@ -540,21 +540,21 @@ func (j LeftJoin2[A, PA, B, PB]) Stream(ctx context.Context, exec db.DB) iter.Se
 		}
 
 		if err := rows.Err(); err != nil {
-			yield(Row2[A, Option[B]]{}, fmt.Errorf("orm: LeftJoin2.Stream: %w", err))
+			yield(Row2[A, Nullable[B]]{}, fmt.Errorf("orm: LeftJoin2.Stream: %w", err))
 
 			return
 		}
 
 		if err := rows.Close(); err != nil {
-			yield(Row2[A, Option[B]]{}, fmt.Errorf("orm: LeftJoin2.Stream: %w", err))
+			yield(Row2[A, Nullable[B]]{}, fmt.Errorf("orm: LeftJoin2.Stream: %w", err))
 		}
 	}
 }
 
 // RightJoin2 is the null-safe counterpart to Join2 for RIGHT JOINs -- see
 // Join2's doc comment for the design decision. Its All/Stream return
-// Row2[Option[A], B]: an unmatched RIGHT-side row (a B with no matching A)
-// comes back with Option[A]{}.IsSome() == false, never a same-shaped
+// Row2[Nullable[A], B]: an unmatched RIGHT-side row (a B with no matching A)
+// comes back with Nullable[A]{}.IsSome() == false, never a same-shaped
 // zero-valued A{} that could be mistaken for a real all-zero-columns match.
 // B is scanned directly -- a RIGHT JOIN preserves every B row, so B's
 // columns can never come back NULL. Requires a dialect with
@@ -640,9 +640,9 @@ func (j RightJoin2[A, PA, B, PB]) render(d dialect.Dialect) (string, []any, erro
 }
 
 // All runs j against exec and returns every matching row as a typed
-// Row2[Option[A], B], scanned via ONE rows.Scan call per row (see
+// Row2[Nullable[A], B], scanned via ONE rows.Scan call per row (see
 // scanRightJoinRow) -- one round trip total.
-func (j RightJoin2[A, PA, B, PB]) All(ctx context.Context, exec db.DB) ([]Row2[Option[A], B], error) {
+func (j RightJoin2[A, PA, B, PB]) All(ctx context.Context, exec db.DB) ([]Row2[Nullable[A], B], error) {
 	d, err := resolveDialect(exec)
 	if err != nil {
 		return nil, err
@@ -659,7 +659,7 @@ func (j RightJoin2[A, PA, B, PB]) All(ctx context.Context, exec db.DB) ([]Row2[O
 	}
 	defer func() { _ = rows.Close() }()
 
-	var out []Row2[Option[A], B]
+	var out []Row2[Nullable[A], B]
 
 	aCols := len(j.left.table.Columns())
 	bCols := len(j.rel.childTable.Columns())
@@ -686,25 +686,25 @@ func (j RightJoin2[A, PA, B, PB]) All(ctx context.Context, exec db.DB) ([]Row2[O
 
 // Stream runs j against exec and yields every matching row one at a time.
 // See Join2.Stream's doc comment for the range-over-func cleanup guarantee.
-func (j RightJoin2[A, PA, B, PB]) Stream(ctx context.Context, exec db.DB) iter.Seq2[Row2[Option[A], B], error] {
-	return func(yield func(Row2[Option[A], B], error) bool) {
+func (j RightJoin2[A, PA, B, PB]) Stream(ctx context.Context, exec db.DB) iter.Seq2[Row2[Nullable[A], B], error] {
+	return func(yield func(Row2[Nullable[A], B], error) bool) {
 		d, err := resolveDialect(exec)
 		if err != nil {
-			yield(Row2[Option[A], B]{}, err)
+			yield(Row2[Nullable[A], B]{}, err)
 
 			return
 		}
 
 		query, args, err := j.render(d)
 		if err != nil {
-			yield(Row2[Option[A], B]{}, fmt.Errorf("orm: RightJoin2.Stream: %w", err))
+			yield(Row2[Nullable[A], B]{}, fmt.Errorf("orm: RightJoin2.Stream: %w", err))
 
 			return
 		}
 
 		rows, err := queryRows(ctx, exec, query, encodeArgs(d, args))
 		if err != nil {
-			yield(Row2[Option[A], B]{}, fmt.Errorf("orm: RightJoin2.Stream: %w", err))
+			yield(Row2[Nullable[A], B]{}, fmt.Errorf("orm: RightJoin2.Stream: %w", err))
 
 			return
 		}
@@ -716,7 +716,7 @@ func (j RightJoin2[A, PA, B, PB]) Stream(ctx context.Context, exec db.DB) iter.S
 		for rows.Next() {
 			row, err := scanRightJoinRow[A, PA, B, PB](rows, aCols, bCols)
 			if err != nil {
-				yield(Row2[Option[A], B]{}, fmt.Errorf("orm: RightJoin2.Stream: scan: %w", err))
+				yield(Row2[Nullable[A], B]{}, fmt.Errorf("orm: RightJoin2.Stream: scan: %w", err))
 
 				return
 			}
@@ -727,22 +727,22 @@ func (j RightJoin2[A, PA, B, PB]) Stream(ctx context.Context, exec db.DB) iter.S
 		}
 
 		if err := rows.Err(); err != nil {
-			yield(Row2[Option[A], B]{}, fmt.Errorf("orm: RightJoin2.Stream: %w", err))
+			yield(Row2[Nullable[A], B]{}, fmt.Errorf("orm: RightJoin2.Stream: %w", err))
 
 			return
 		}
 
 		if err := rows.Close(); err != nil {
-			yield(Row2[Option[A], B]{}, fmt.Errorf("orm: RightJoin2.Stream: %w", err))
+			yield(Row2[Nullable[A], B]{}, fmt.Errorf("orm: RightJoin2.Stream: %w", err))
 		}
 	}
 }
 
 // FullJoin2 is the null-safe counterpart to Join2 for FULL JOINs -- see
 // Join2's doc comment for the design decision. Its All/Stream return
-// Row2[Option[A], Option[B]]: a FULL JOIN preserves BOTH unmatched sides,
+// Row2[Nullable[A], Nullable[B]]: a FULL JOIN preserves BOTH unmatched sides,
 // so either half of a row can come back all-NULL, and each is wrapped in
-// its own Option -- an unmatched left row has B = None, an unmatched right
+// its own Nullable -- an unmatched left row has B = None, an unmatched right
 // row has A = None, unambiguously never a same-shaped zero struct. Requires
 // a dialect with dialect.JoinCapabilities.SupportsFullJoin (see requireJoin).
 type FullJoin2[A any, PA ptrScanner[A], B any, PB ptrScanner[B]] struct {
@@ -826,9 +826,9 @@ func (j FullJoin2[A, PA, B, PB]) render(d dialect.Dialect) (string, []any, error
 }
 
 // All runs j against exec and returns every matching row as a typed
-// Row2[Option[A], Option[B]], scanned via ONE rows.Scan call per row (see
+// Row2[Nullable[A], Nullable[B]], scanned via ONE rows.Scan call per row (see
 // scanFullJoinRow) -- one round trip total.
-func (j FullJoin2[A, PA, B, PB]) All(ctx context.Context, exec db.DB) ([]Row2[Option[A], Option[B]], error) {
+func (j FullJoin2[A, PA, B, PB]) All(ctx context.Context, exec db.DB) ([]Row2[Nullable[A], Nullable[B]], error) {
 	d, err := resolveDialect(exec)
 	if err != nil {
 		return nil, err
@@ -845,7 +845,7 @@ func (j FullJoin2[A, PA, B, PB]) All(ctx context.Context, exec db.DB) ([]Row2[Op
 	}
 	defer func() { _ = rows.Close() }()
 
-	var out []Row2[Option[A], Option[B]]
+	var out []Row2[Nullable[A], Nullable[B]]
 
 	aCols := len(j.left.table.Columns())
 	bCols := len(j.rel.childTable.Columns())
@@ -872,25 +872,25 @@ func (j FullJoin2[A, PA, B, PB]) All(ctx context.Context, exec db.DB) ([]Row2[Op
 
 // Stream runs j against exec and yields every matching row one at a time.
 // See Join2.Stream's doc comment for the range-over-func cleanup guarantee.
-func (j FullJoin2[A, PA, B, PB]) Stream(ctx context.Context, exec db.DB) iter.Seq2[Row2[Option[A], Option[B]], error] {
-	return func(yield func(Row2[Option[A], Option[B]], error) bool) {
+func (j FullJoin2[A, PA, B, PB]) Stream(ctx context.Context, exec db.DB) iter.Seq2[Row2[Nullable[A], Nullable[B]], error] {
+	return func(yield func(Row2[Nullable[A], Nullable[B]], error) bool) {
 		d, err := resolveDialect(exec)
 		if err != nil {
-			yield(Row2[Option[A], Option[B]]{}, err)
+			yield(Row2[Nullable[A], Nullable[B]]{}, err)
 
 			return
 		}
 
 		query, args, err := j.render(d)
 		if err != nil {
-			yield(Row2[Option[A], Option[B]]{}, fmt.Errorf("orm: FullJoin2.Stream: %w", err))
+			yield(Row2[Nullable[A], Nullable[B]]{}, fmt.Errorf("orm: FullJoin2.Stream: %w", err))
 
 			return
 		}
 
 		rows, err := queryRows(ctx, exec, query, encodeArgs(d, args))
 		if err != nil {
-			yield(Row2[Option[A], Option[B]]{}, fmt.Errorf("orm: FullJoin2.Stream: %w", err))
+			yield(Row2[Nullable[A], Nullable[B]]{}, fmt.Errorf("orm: FullJoin2.Stream: %w", err))
 
 			return
 		}
@@ -902,7 +902,7 @@ func (j FullJoin2[A, PA, B, PB]) Stream(ctx context.Context, exec db.DB) iter.Se
 		for rows.Next() {
 			row, err := scanFullJoinRow[A, PA, B, PB](rows, aCols, bCols)
 			if err != nil {
-				yield(Row2[Option[A], Option[B]]{}, fmt.Errorf("orm: FullJoin2.Stream: scan: %w", err))
+				yield(Row2[Nullable[A], Nullable[B]]{}, fmt.Errorf("orm: FullJoin2.Stream: scan: %w", err))
 
 				return
 			}
@@ -913,13 +913,13 @@ func (j FullJoin2[A, PA, B, PB]) Stream(ctx context.Context, exec db.DB) iter.Se
 		}
 
 		if err := rows.Err(); err != nil {
-			yield(Row2[Option[A], Option[B]]{}, fmt.Errorf("orm: FullJoin2.Stream: %w", err))
+			yield(Row2[Nullable[A], Nullable[B]]{}, fmt.Errorf("orm: FullJoin2.Stream: %w", err))
 
 			return
 		}
 
 		if err := rows.Close(); err != nil {
-			yield(Row2[Option[A], Option[B]]{}, fmt.Errorf("orm: FullJoin2.Stream: %w", err))
+			yield(Row2[Nullable[A], Nullable[B]]{}, fmt.Errorf("orm: FullJoin2.Stream: %w", err))
 		}
 	}
 }
@@ -935,9 +935,9 @@ func (j FullJoin2[A, PA, B, PB]) Stream(ctx context.Context, exec db.DB) iter.Se
 // safe for joinType == InnerJoin, or when the caller can prove every non-key
 // column on every side is itself a NullableColumn/Option field. For a
 // null-safe three-table join use the dedicated outer builders, which wrap
-// the optional sides in Option: LeftJoinOn3 (Row3[A, Option[B], Option[C]]),
-// RightJoinOn3 (Row3[Option[A], Option[B], C]), FullJoinOn3 (all three
-// Option), and the mixed-kind InnerLeftJoinOn3 / LeftInnerJoinOn3 (see
+// the optional sides in Nullable: LeftJoinOn3 (Row3[A, Nullable[B], Nullable[C]]),
+// RightJoinOn3 (Row3[Nullable[A], Nullable[B], C]), FullJoinOn3 (all three
+// Nullable), and the mixed-kind InnerLeftJoinOn3 / LeftInnerJoinOn3 (see
 // join3_mixed.go).
 type Join3[A any, PA ptrScanner[A], B any, PB ptrScanner[B], C any, PC ptrScanner[C]] struct {
 	left     Query[A, PA]
@@ -1244,15 +1244,15 @@ func (j Join3[A, PA, B, PB, C, PC]) Stream(ctx context.Context, exec db.DB) iter
 
 // LeftJoin3 is the null-safe three-table LEFT JOIN builder: it chains
 // "A LEFT JOIN B ON ... LEFT JOIN C ON ..." and returns
-// Row3[A, Option[B], Option[C]].
+// Row3[A, Nullable[B], Nullable[C]].
 //
 // Nullability semantics of a chained LEFT JOIN (this is why a single
-// Option on the "joined" side is NOT enough, the way Row2[A, Option[B]] is
+// Nullable on the "joined" side is NOT enough, the way Row2[A, Nullable[B]] is
 // for the two-table case): A is always present; B is present iff some B
 // matched A; C is present iff some C matched a present B. An absent B
 // therefore forces an absent C -- the LEFT-chain invariant
-// C.IsSome() implies B.IsSome() -- so the result carries one Option per
-// joined side and the caller reads B first, then C. Neither Option is ever a
+// C.IsSome() implies B.IsSome() -- so the result carries one Nullable per
+// joined side and the caller reads B first, then C. Neither Nullable is ever a
 // same-shaped zero struct: an unmatched side is unambiguously None, just as
 // LeftJoin2 guarantees for one table.
 //
@@ -1362,9 +1362,9 @@ func (j LeftJoin3[A, PA, B, PB, C, PC]) render(d dialect.Dialect) (string, []any
 }
 
 // All runs j against exec and returns every matching row as a typed
-// Row3[A, Option[B], Option[C]], scanned via ONE rows.Scan call per row (see
+// Row3[A, Nullable[B], Nullable[C]], scanned via ONE rows.Scan call per row (see
 // scanLeftJoinRow3) -- one round trip total.
-func (j LeftJoin3[A, PA, B, PB, C, PC]) All(ctx context.Context, exec db.DB) ([]Row3[A, Option[B], Option[C]], error) {
+func (j LeftJoin3[A, PA, B, PB, C, PC]) All(ctx context.Context, exec db.DB) ([]Row3[A, Nullable[B], Nullable[C]], error) {
 	d, err := resolveDialect(exec)
 	if err != nil {
 		return nil, err
@@ -1381,7 +1381,7 @@ func (j LeftJoin3[A, PA, B, PB, C, PC]) All(ctx context.Context, exec db.DB) ([]
 	}
 	defer func() { _ = rows.Close() }()
 
-	var out []Row3[A, Option[B], Option[C]]
+	var out []Row3[A, Nullable[B], Nullable[C]]
 
 	aCols := len(j.left.table.Columns())
 	bCols := len(j.relAB.childTable.Columns())
@@ -1409,25 +1409,25 @@ func (j LeftJoin3[A, PA, B, PB, C, PC]) All(ctx context.Context, exec db.DB) ([]
 
 // Stream runs j against exec and yields every matching row one at a time.
 // See Join2.Stream's doc comment for the range-over-func cleanup guarantee.
-func (j LeftJoin3[A, PA, B, PB, C, PC]) Stream(ctx context.Context, exec db.DB) iter.Seq2[Row3[A, Option[B], Option[C]], error] {
-	return func(yield func(Row3[A, Option[B], Option[C]], error) bool) {
+func (j LeftJoin3[A, PA, B, PB, C, PC]) Stream(ctx context.Context, exec db.DB) iter.Seq2[Row3[A, Nullable[B], Nullable[C]], error] {
+	return func(yield func(Row3[A, Nullable[B], Nullable[C]], error) bool) {
 		d, err := resolveDialect(exec)
 		if err != nil {
-			yield(Row3[A, Option[B], Option[C]]{}, err)
+			yield(Row3[A, Nullable[B], Nullable[C]]{}, err)
 
 			return
 		}
 
 		query, args, err := j.render(d)
 		if err != nil {
-			yield(Row3[A, Option[B], Option[C]]{}, fmt.Errorf("orm: LeftJoin3.Stream: %w", err))
+			yield(Row3[A, Nullable[B], Nullable[C]]{}, fmt.Errorf("orm: LeftJoin3.Stream: %w", err))
 
 			return
 		}
 
 		rows, err := queryRows(ctx, exec, query, encodeArgs(d, args))
 		if err != nil {
-			yield(Row3[A, Option[B], Option[C]]{}, fmt.Errorf("orm: LeftJoin3.Stream: %w", err))
+			yield(Row3[A, Nullable[B], Nullable[C]]{}, fmt.Errorf("orm: LeftJoin3.Stream: %w", err))
 
 			return
 		}
@@ -1440,7 +1440,7 @@ func (j LeftJoin3[A, PA, B, PB, C, PC]) Stream(ctx context.Context, exec db.DB) 
 		for rows.Next() {
 			row, err := scanLeftJoinRow3[A, PA, B, PB, C, PC](rows, aCols, bCols, cCols)
 			if err != nil {
-				yield(Row3[A, Option[B], Option[C]]{}, fmt.Errorf("orm: LeftJoin3.Stream: scan: %w", err))
+				yield(Row3[A, Nullable[B], Nullable[C]]{}, fmt.Errorf("orm: LeftJoin3.Stream: scan: %w", err))
 
 				return
 			}
@@ -1451,26 +1451,26 @@ func (j LeftJoin3[A, PA, B, PB, C, PC]) Stream(ctx context.Context, exec db.DB) 
 		}
 
 		if err := rows.Err(); err != nil {
-			yield(Row3[A, Option[B], Option[C]]{}, fmt.Errorf("orm: LeftJoin3.Stream: %w", err))
+			yield(Row3[A, Nullable[B], Nullable[C]]{}, fmt.Errorf("orm: LeftJoin3.Stream: %w", err))
 
 			return
 		}
 
 		if err := rows.Close(); err != nil {
-			yield(Row3[A, Option[B], Option[C]]{}, fmt.Errorf("orm: LeftJoin3.Stream: %w", err))
+			yield(Row3[A, Nullable[B], Nullable[C]]{}, fmt.Errorf("orm: LeftJoin3.Stream: %w", err))
 		}
 	}
 }
 
 // RightJoin3 is the null-safe three-table RIGHT JOIN builder: it chains
 // "A RIGHT JOIN B ON ... RIGHT JOIN C ON ..." and returns
-// Row3[Option[A], Option[B], C].
+// Row3[Nullable[A], Nullable[B], C].
 //
 // A chained RIGHT JOIN preserves every C row, so C is always present. B is
 // present iff some B matched the C row; A is present iff that B also matched
 // an A -- so the RIGHT-chain invariant is A.IsSome() implies B.IsSome(), and
 // an absent B forces an absent A. Both optional sides are wrapped in their
-// own Option so an unmatched side is unambiguously None, never a same-shaped
+// own Nullable so an unmatched side is unambiguously None, never a same-shaped
 // zero struct (mirroring RightJoin2). Requires a dialect with
 // dialect.JoinCapabilities.SupportsRightJoin (see requireJoin).
 type RightJoin3[A any, PA ptrScanner[A], B any, PB ptrScanner[B], C any, PC ptrScanner[C]] struct {
@@ -1581,9 +1581,9 @@ func (j RightJoin3[A, PA, B, PB, C, PC]) render(d dialect.Dialect) (string, []an
 }
 
 // All runs j against exec and returns every matching row as a typed
-// Row3[Option[A], Option[B], C], scanned via ONE rows.Scan call per row (see
+// Row3[Nullable[A], Nullable[B], C], scanned via ONE rows.Scan call per row (see
 // scanRightJoinRow3) -- one round trip total.
-func (j RightJoin3[A, PA, B, PB, C, PC]) All(ctx context.Context, exec db.DB) ([]Row3[Option[A], Option[B], C], error) {
+func (j RightJoin3[A, PA, B, PB, C, PC]) All(ctx context.Context, exec db.DB) ([]Row3[Nullable[A], Nullable[B], C], error) {
 	d, err := resolveDialect(exec)
 	if err != nil {
 		return nil, err
@@ -1600,7 +1600,7 @@ func (j RightJoin3[A, PA, B, PB, C, PC]) All(ctx context.Context, exec db.DB) ([
 	}
 	defer func() { _ = rows.Close() }()
 
-	var out []Row3[Option[A], Option[B], C]
+	var out []Row3[Nullable[A], Nullable[B], C]
 
 	aCols := len(j.left.table.Columns())
 	bCols := len(j.relAB.childTable.Columns())
@@ -1628,25 +1628,25 @@ func (j RightJoin3[A, PA, B, PB, C, PC]) All(ctx context.Context, exec db.DB) ([
 
 // Stream runs j against exec and yields every matching row one at a time.
 // See Join2.Stream's doc comment for the range-over-func cleanup guarantee.
-func (j RightJoin3[A, PA, B, PB, C, PC]) Stream(ctx context.Context, exec db.DB) iter.Seq2[Row3[Option[A], Option[B], C], error] {
-	return func(yield func(Row3[Option[A], Option[B], C], error) bool) {
+func (j RightJoin3[A, PA, B, PB, C, PC]) Stream(ctx context.Context, exec db.DB) iter.Seq2[Row3[Nullable[A], Nullable[B], C], error] {
+	return func(yield func(Row3[Nullable[A], Nullable[B], C], error) bool) {
 		d, err := resolveDialect(exec)
 		if err != nil {
-			yield(Row3[Option[A], Option[B], C]{}, err)
+			yield(Row3[Nullable[A], Nullable[B], C]{}, err)
 
 			return
 		}
 
 		query, args, err := j.render(d)
 		if err != nil {
-			yield(Row3[Option[A], Option[B], C]{}, fmt.Errorf("orm: RightJoin3.Stream: %w", err))
+			yield(Row3[Nullable[A], Nullable[B], C]{}, fmt.Errorf("orm: RightJoin3.Stream: %w", err))
 
 			return
 		}
 
 		rows, err := queryRows(ctx, exec, query, encodeArgs(d, args))
 		if err != nil {
-			yield(Row3[Option[A], Option[B], C]{}, fmt.Errorf("orm: RightJoin3.Stream: %w", err))
+			yield(Row3[Nullable[A], Nullable[B], C]{}, fmt.Errorf("orm: RightJoin3.Stream: %w", err))
 
 			return
 		}
@@ -1659,7 +1659,7 @@ func (j RightJoin3[A, PA, B, PB, C, PC]) Stream(ctx context.Context, exec db.DB)
 		for rows.Next() {
 			row, err := scanRightJoinRow3[A, PA, B, PB, C, PC](rows, aCols, bCols, cCols)
 			if err != nil {
-				yield(Row3[Option[A], Option[B], C]{}, fmt.Errorf("orm: RightJoin3.Stream: scan: %w", err))
+				yield(Row3[Nullable[A], Nullable[B], C]{}, fmt.Errorf("orm: RightJoin3.Stream: scan: %w", err))
 
 				return
 			}
@@ -1670,23 +1670,23 @@ func (j RightJoin3[A, PA, B, PB, C, PC]) Stream(ctx context.Context, exec db.DB)
 		}
 
 		if err := rows.Err(); err != nil {
-			yield(Row3[Option[A], Option[B], C]{}, fmt.Errorf("orm: RightJoin3.Stream: %w", err))
+			yield(Row3[Nullable[A], Nullable[B], C]{}, fmt.Errorf("orm: RightJoin3.Stream: %w", err))
 
 			return
 		}
 
 		if err := rows.Close(); err != nil {
-			yield(Row3[Option[A], Option[B], C]{}, fmt.Errorf("orm: RightJoin3.Stream: %w", err))
+			yield(Row3[Nullable[A], Nullable[B], C]{}, fmt.Errorf("orm: RightJoin3.Stream: %w", err))
 		}
 	}
 }
 
 // FullJoin3 is the null-safe three-table FULL JOIN builder: it chains
 // "A FULL JOIN B ON ... FULL JOIN C ON ..." and returns
-// Row3[Option[A], Option[B], Option[C]].
+// Row3[Nullable[A], Nullable[B], Nullable[C]].
 //
 // A FULL JOIN preserves every unmatched side, so any of the three halves can
-// come back all-NULL and each is wrapped in its own Option -- an unmatched
+// come back all-NULL and each is wrapped in its own Nullable -- an unmatched
 // side is unambiguously None, never a same-shaped zero struct (mirroring
 // FullJoin2). Because the second join keys on B, a present C still implies a
 // present B (the FULL-chain invariant C.IsSome() implies B.IsSome()); A is
@@ -1800,9 +1800,9 @@ func (j FullJoin3[A, PA, B, PB, C, PC]) render(d dialect.Dialect) (string, []any
 }
 
 // All runs j against exec and returns every matching row as a typed
-// Row3[Option[A], Option[B], Option[C]], scanned via ONE rows.Scan call per
+// Row3[Nullable[A], Nullable[B], Nullable[C]], scanned via ONE rows.Scan call per
 // row (see scanFullJoinRow3) -- one round trip total.
-func (j FullJoin3[A, PA, B, PB, C, PC]) All(ctx context.Context, exec db.DB) ([]Row3[Option[A], Option[B], Option[C]], error) {
+func (j FullJoin3[A, PA, B, PB, C, PC]) All(ctx context.Context, exec db.DB) ([]Row3[Nullable[A], Nullable[B], Nullable[C]], error) {
 	d, err := resolveDialect(exec)
 	if err != nil {
 		return nil, err
@@ -1819,7 +1819,7 @@ func (j FullJoin3[A, PA, B, PB, C, PC]) All(ctx context.Context, exec db.DB) ([]
 	}
 	defer func() { _ = rows.Close() }()
 
-	var out []Row3[Option[A], Option[B], Option[C]]
+	var out []Row3[Nullable[A], Nullable[B], Nullable[C]]
 
 	aCols := len(j.left.table.Columns())
 	bCols := len(j.relAB.childTable.Columns())
@@ -1847,25 +1847,25 @@ func (j FullJoin3[A, PA, B, PB, C, PC]) All(ctx context.Context, exec db.DB) ([]
 
 // Stream runs j against exec and yields every matching row one at a time.
 // See Join2.Stream's doc comment for the range-over-func cleanup guarantee.
-func (j FullJoin3[A, PA, B, PB, C, PC]) Stream(ctx context.Context, exec db.DB) iter.Seq2[Row3[Option[A], Option[B], Option[C]], error] {
-	return func(yield func(Row3[Option[A], Option[B], Option[C]], error) bool) {
+func (j FullJoin3[A, PA, B, PB, C, PC]) Stream(ctx context.Context, exec db.DB) iter.Seq2[Row3[Nullable[A], Nullable[B], Nullable[C]], error] {
+	return func(yield func(Row3[Nullable[A], Nullable[B], Nullable[C]], error) bool) {
 		d, err := resolveDialect(exec)
 		if err != nil {
-			yield(Row3[Option[A], Option[B], Option[C]]{}, err)
+			yield(Row3[Nullable[A], Nullable[B], Nullable[C]]{}, err)
 
 			return
 		}
 
 		query, args, err := j.render(d)
 		if err != nil {
-			yield(Row3[Option[A], Option[B], Option[C]]{}, fmt.Errorf("orm: FullJoin3.Stream: %w", err))
+			yield(Row3[Nullable[A], Nullable[B], Nullable[C]]{}, fmt.Errorf("orm: FullJoin3.Stream: %w", err))
 
 			return
 		}
 
 		rows, err := queryRows(ctx, exec, query, encodeArgs(d, args))
 		if err != nil {
-			yield(Row3[Option[A], Option[B], Option[C]]{}, fmt.Errorf("orm: FullJoin3.Stream: %w", err))
+			yield(Row3[Nullable[A], Nullable[B], Nullable[C]]{}, fmt.Errorf("orm: FullJoin3.Stream: %w", err))
 
 			return
 		}
@@ -1878,7 +1878,7 @@ func (j FullJoin3[A, PA, B, PB, C, PC]) Stream(ctx context.Context, exec db.DB) 
 		for rows.Next() {
 			row, err := scanFullJoinRow3[A, PA, B, PB, C, PC](rows, aCols, bCols, cCols)
 			if err != nil {
-				yield(Row3[Option[A], Option[B], Option[C]]{}, fmt.Errorf("orm: FullJoin3.Stream: scan: %w", err))
+				yield(Row3[Nullable[A], Nullable[B], Nullable[C]]{}, fmt.Errorf("orm: FullJoin3.Stream: scan: %w", err))
 
 				return
 			}
@@ -1889,13 +1889,13 @@ func (j FullJoin3[A, PA, B, PB, C, PC]) Stream(ctx context.Context, exec db.DB) 
 		}
 
 		if err := rows.Err(); err != nil {
-			yield(Row3[Option[A], Option[B], Option[C]]{}, fmt.Errorf("orm: FullJoin3.Stream: %w", err))
+			yield(Row3[Nullable[A], Nullable[B], Nullable[C]]{}, fmt.Errorf("orm: FullJoin3.Stream: %w", err))
 
 			return
 		}
 
 		if err := rows.Close(); err != nil {
-			yield(Row3[Option[A], Option[B], Option[C]]{}, fmt.Errorf("orm: FullJoin3.Stream: %w", err))
+			yield(Row3[Nullable[A], Nullable[B], Nullable[C]]{}, fmt.Errorf("orm: FullJoin3.Stream: %w", err))
 		}
 	}
 }
@@ -2043,9 +2043,9 @@ func (j LateralJoin2[A, PA, B, PB]) ExplainAnalyze(ctx context.Context, exec db.
 }
 
 // LeftLateralJoin2 is the null-safe sibling of LateralJoin2 for
-// `LEFT JOIN LATERAL (...) ON TRUE`: All/Stream return Row2[A, Option[B]],
+// `LEFT JOIN LATERAL (...) ON TRUE`: All/Stream return Row2[A, Nullable[B]],
 // so an outer row whose lateral subquery matches nothing comes back with
-// Option[B]{}.IsSome() == false, never a same-shaped zero-valued B{} that
+// Nullable[B]{}.IsSome() == false, never a same-shaped zero-valued B{} that
 // could be mistaken for a real all-zero-columns match.
 type LeftLateralJoin2[A any, PA ptrScanner[A], B any, PB ptrScanner[B]] struct {
 	left       Query[A, PA]
@@ -2126,17 +2126,17 @@ func (j LeftLateralJoin2[A, PA, B, PB]) render(d dialect.Dialect) (string, []any
 }
 
 // All runs j against exec and returns every matching row as a typed
-// Row2[A, Option[B]], scanned via ONE rows.Scan call per row (see
+// Row2[A, Nullable[B]], scanned via ONE rows.Scan call per row (see
 // scanLeftJoinRow) -- one round trip total.
-func (j LeftLateralJoin2[A, PA, B, PB]) All(ctx context.Context, exec db.DB) ([]Row2[A, Option[B]], error) {
+func (j LeftLateralJoin2[A, PA, B, PB]) All(ctx context.Context, exec db.DB) ([]Row2[A, Nullable[B]], error) {
 	return lateralCollect(ctx, exec, "LeftLateralJoin2.All", j.render,
 		len(j.left.table.Columns()), len(j.inner.table.Columns()),
 		scanLeftJoinRow[A, PA, B, PB])
 }
 
 // Stream runs j against exec and yields every matching row one at a time,
-// via iter.Seq2[Row2[A, Option[B]], error].
-func (j LeftLateralJoin2[A, PA, B, PB]) Stream(ctx context.Context, exec db.DB) iter.Seq2[Row2[A, Option[B]], error] {
+// via iter.Seq2[Row2[A, Nullable[B]], error].
+func (j LeftLateralJoin2[A, PA, B, PB]) Stream(ctx context.Context, exec db.DB) iter.Seq2[Row2[A, Nullable[B]], error] {
 	return lateralStream(ctx, exec, "LeftLateralJoin2.Stream", j.render,
 		len(j.left.table.Columns()), len(j.inner.table.Columns()),
 		scanLeftJoinRow[A, PA, B, PB])
@@ -2157,7 +2157,7 @@ func (j LeftLateralJoin2[A, PA, B, PB]) ExplainAnalyze(ctx context.Context, exec
 // lateralCollect runs a rendered lateral SELECT and scans each result row
 // through scan into a slice of Row. It is the shared body behind the four
 // lateral All methods, so the CROSS and LEFT variants cannot drift; the
-// typed per-side Option is supplied entirely by the scan function each
+// typed per-side Nullable is supplied entirely by the scan function each
 // caller passes (scanJoinRow vs scanLeftJoinRow).
 func lateralCollect[Row any](
 	ctx context.Context,
@@ -2381,7 +2381,7 @@ func scanJoinRow[A any, PA ptrScanner[A], B any, PB ptrScanner[B]](rows db.Rows,
 	return Row2[A, B]{A: a, B: b}, nil
 }
 
-// scanLeftJoinRow scans one LEFT-JOINed row into a Row2[A, Option[B]] via
+// scanLeftJoinRow scans one LEFT-JOINed row into a Row2[A, Nullable[B]] via
 // exactly one underlying rows.Scan call. A's half is handed to A's own
 // Scan through a rowFeed exactly like scanJoinRow; B's half is scanned into
 // *any holders instead (database/sql always accepts a NULL into an *any
@@ -2390,103 +2390,103 @@ func scanJoinRow[A any, PA ptrScanner[A], B any, PB ptrScanner[B]](rows db.Rows,
 // Scan fed those values -- so B's Scan, including any post-processing such
 // as a timestamp parse, runs against real values, and an unmatched row is
 // unambiguously None rather than a zero-valued B.
-func scanLeftJoinRow[A any, PA ptrScanner[A], B any, PB ptrScanner[B]](rows db.Rows, aCols, bCols int) (Row2[A, Option[B]], error) {
+func scanLeftJoinRow[A any, PA ptrScanner[A], B any, PB ptrScanner[B]](rows db.Rows, aCols, bCols int) (Row2[A, Nullable[B]], error) {
 	holders, dests := joinHolders(aCols + bCols)
 
 	if err := rows.Scan(dests...); err != nil {
-		return Row2[A, Option[B]]{}, fmt.Errorf("orm: left join scan: %w", err)
+		return Row2[A, Nullable[B]]{}, fmt.Errorf("orm: left join scan: %w", err)
 	}
 
 	var a A
 
 	if err := PA(&a).Scan(&rowFeed{vals: holders[:aCols]}); err != nil {
-		return Row2[A, Option[B]]{}, fmt.Errorf("orm: left join scan: %w", err)
+		return Row2[A, Nullable[B]]{}, fmt.Errorf("orm: left join scan: %w", err)
 	}
 
 	allNull := allNil(holders[aCols:])
 
 	if allNull {
-		return Row2[A, Option[B]]{A: a, B: None[B]()}, nil
+		return Row2[A, Nullable[B]]{A: a, B: NullableNone[B]()}, nil
 	}
 
 	var b B
 
 	if err := PB(&b).Scan(&rowFeed{vals: holders[aCols:]}); err != nil {
-		return Row2[A, Option[B]]{}, fmt.Errorf("orm: left join scan: %w", err)
+		return Row2[A, Nullable[B]]{}, fmt.Errorf("orm: left join scan: %w", err)
 	}
 
-	return Row2[A, Option[B]]{A: a, B: Some(b)}, nil
+	return Row2[A, Nullable[B]]{A: a, B: NullableSome(b)}, nil
 }
 
-// scanRightJoinRow scans one RIGHT-JOINed row into a Row2[Option[A], B] via
+// scanRightJoinRow scans one RIGHT-JOINed row into a Row2[Nullable[A], B] via
 // exactly one underlying rows.Scan call. B's half is handed to B's own Scan
 // through a rowFeed exactly like scanJoinRow (a RIGHT JOIN preserves every B
 // row, so B can never be all-NULL); A's half is scanned into *any holders,
 // checked for all-nil (== unmatched right side), and only when at least one
 // is non-nil is A's own Scan fed those values -- so an unmatched row is
 // unambiguously None rather than a zero-valued A.
-func scanRightJoinRow[A any, PA ptrScanner[A], B any, PB ptrScanner[B]](rows db.Rows, aCols, bCols int) (Row2[Option[A], B], error) {
+func scanRightJoinRow[A any, PA ptrScanner[A], B any, PB ptrScanner[B]](rows db.Rows, aCols, bCols int) (Row2[Nullable[A], B], error) {
 	holders, dests := joinHolders(aCols + bCols)
 
 	if err := rows.Scan(dests...); err != nil {
-		return Row2[Option[A], B]{}, fmt.Errorf("orm: right join scan: %w", err)
+		return Row2[Nullable[A], B]{}, fmt.Errorf("orm: right join scan: %w", err)
 	}
 
 	var b B
 
 	if err := PB(&b).Scan(&rowFeed{vals: holders[aCols:]}); err != nil {
-		return Row2[Option[A], B]{}, fmt.Errorf("orm: right join scan: %w", err)
+		return Row2[Nullable[A], B]{}, fmt.Errorf("orm: right join scan: %w", err)
 	}
 
 	if allNil(holders[:aCols]) {
-		return Row2[Option[A], B]{A: None[A](), B: b}, nil
+		return Row2[Nullable[A], B]{A: NullableNone[A](), B: b}, nil
 	}
 
 	var a A
 
 	if err := PA(&a).Scan(&rowFeed{vals: holders[:aCols]}); err != nil {
-		return Row2[Option[A], B]{}, fmt.Errorf("orm: right join scan: %w", err)
+		return Row2[Nullable[A], B]{}, fmt.Errorf("orm: right join scan: %w", err)
 	}
 
-	return Row2[Option[A], B]{A: Some(a), B: b}, nil
+	return Row2[Nullable[A], B]{A: NullableSome(a), B: b}, nil
 }
 
-// scanFullJoinRow scans one FULL-JOINed row into a Row2[Option[A], Option[B]]
+// scanFullJoinRow scans one FULL-JOINed row into a Row2[Nullable[A], Nullable[B]]
 // via exactly one underlying rows.Scan call. BOTH halves are scanned into
 // *any holders and independently checked for all-nil -- a FULL JOIN can put
 // NULLs on either side -- so an unmatched left row comes back B = None and
-// an unmatched right row A = None, each side's Option wrap unambiguous.
-func scanFullJoinRow[A any, PA ptrScanner[A], B any, PB ptrScanner[B]](rows db.Rows, aCols, bCols int) (Row2[Option[A], Option[B]], error) {
+// an unmatched right row A = None, each side's Nullable wrap unambiguous.
+func scanFullJoinRow[A any, PA ptrScanner[A], B any, PB ptrScanner[B]](rows db.Rows, aCols, bCols int) (Row2[Nullable[A], Nullable[B]], error) {
 	holders, dests := joinHolders(aCols + bCols)
 
 	if err := rows.Scan(dests...); err != nil {
-		return Row2[Option[A], Option[B]]{}, fmt.Errorf("orm: full join scan: %w", err)
+		return Row2[Nullable[A], Nullable[B]]{}, fmt.Errorf("orm: full join scan: %w", err)
 	}
 
-	row := Row2[Option[A], Option[B]]{}
+	row := Row2[Nullable[A], Nullable[B]]{}
 
 	if allNil(holders[:aCols]) {
-		row.A = None[A]()
+		row.A = NullableNone[A]()
 	} else {
 		var a A
 
 		if err := PA(&a).Scan(&rowFeed{vals: holders[:aCols]}); err != nil {
-			return Row2[Option[A], Option[B]]{}, fmt.Errorf("orm: full join scan: %w", err)
+			return Row2[Nullable[A], Nullable[B]]{}, fmt.Errorf("orm: full join scan: %w", err)
 		}
 
-		row.A = Some(a)
+		row.A = NullableSome(a)
 	}
 
 	if allNil(holders[aCols:]) {
-		row.B = None[B]()
+		row.B = NullableNone[B]()
 	} else {
 		var b B
 
 		if err := PB(&b).Scan(&rowFeed{vals: holders[aCols:]}); err != nil {
-			return Row2[Option[A], Option[B]]{}, fmt.Errorf("orm: full join scan: %w", err)
+			return Row2[Nullable[A], Nullable[B]]{}, fmt.Errorf("orm: full join scan: %w", err)
 		}
 
-		row.B = Some(b)
+		row.B = NullableSome(b)
 	}
 
 	return row, nil
@@ -2526,102 +2526,102 @@ func scanJoinRow3[A any, PA ptrScanner[A], B any, PB ptrScanner[B], C any, PC pt
 }
 
 // scanLeftJoinRow3 scans one three-table LEFT-JOINed row into a
-// Row3[A, Option[B], Option[C]] via exactly one underlying rows.Scan call.
+// Row3[A, Nullable[B], Nullable[C]] via exactly one underlying rows.Scan call.
 // A's half is handed to A's own Scan through a rowFeed exactly like
 // scanJoinRow3; B's and C's halves are each scanned through the shared
 // scanOptional helper, so an unmatched side becomes an unambiguous None and
 // no side's Scan runs against a fake zero value. The SQL LEFT-chain
 // guarantees C Some implies B Some, so no cross-side reconciliation is
 // needed here.
-func scanLeftJoinRow3[A any, PA ptrScanner[A], B any, PB ptrScanner[B], C any, PC ptrScanner[C]](rows db.Rows, aCols, bCols, cCols int) (Row3[A, Option[B], Option[C]], error) {
+func scanLeftJoinRow3[A any, PA ptrScanner[A], B any, PB ptrScanner[B], C any, PC ptrScanner[C]](rows db.Rows, aCols, bCols, cCols int) (Row3[A, Nullable[B], Nullable[C]], error) {
 	holders, dests := joinHolders(aCols + bCols + cCols)
 
 	if err := rows.Scan(dests...); err != nil {
-		return Row3[A, Option[B], Option[C]]{}, fmt.Errorf("orm: left join3 scan: %w", err)
+		return Row3[A, Nullable[B], Nullable[C]]{}, fmt.Errorf("orm: left join3 scan: %w", err)
 	}
 
 	var a A
 
 	if err := PA(&a).Scan(&rowFeed{vals: holders[:aCols]}); err != nil {
-		return Row3[A, Option[B], Option[C]]{}, fmt.Errorf("orm: left join3 scan: %w", err)
+		return Row3[A, Nullable[B], Nullable[C]]{}, fmt.Errorf("orm: left join3 scan: %w", err)
 	}
 
 	b, err := scanOptional[B, PB](holders[aCols : aCols+bCols])
 	if err != nil {
-		return Row3[A, Option[B], Option[C]]{}, fmt.Errorf("orm: left join3 scan: %w", err)
+		return Row3[A, Nullable[B], Nullable[C]]{}, fmt.Errorf("orm: left join3 scan: %w", err)
 	}
 
 	c, err := scanOptional[C, PC](holders[aCols+bCols:])
 	if err != nil {
-		return Row3[A, Option[B], Option[C]]{}, fmt.Errorf("orm: left join3 scan: %w", err)
+		return Row3[A, Nullable[B], Nullable[C]]{}, fmt.Errorf("orm: left join3 scan: %w", err)
 	}
 
-	return Row3[A, Option[B], Option[C]]{A: a, B: b, C: c}, nil
+	return Row3[A, Nullable[B], Nullable[C]]{A: a, B: b, C: c}, nil
 }
 
 // scanRightJoinRow3 scans one three-table RIGHT-JOINed row into a
-// Row3[Option[A], Option[B], C] via exactly one underlying rows.Scan call.
+// Row3[Nullable[A], Nullable[B], C] via exactly one underlying rows.Scan call.
 // C is always present (a RIGHT JOIN preserves every right-side row), so it
 // is handed to C's own Scan through a rowFeed exactly like scanJoinRow3; A's
 // and B's halves are each scanned through the shared scanOptional helper, so
 // an unmatched side becomes an unambiguous None. The SQL RIGHT-chain
 // guarantees A Some implies B Some.
-func scanRightJoinRow3[A any, PA ptrScanner[A], B any, PB ptrScanner[B], C any, PC ptrScanner[C]](rows db.Rows, aCols, bCols, cCols int) (Row3[Option[A], Option[B], C], error) {
+func scanRightJoinRow3[A any, PA ptrScanner[A], B any, PB ptrScanner[B], C any, PC ptrScanner[C]](rows db.Rows, aCols, bCols, cCols int) (Row3[Nullable[A], Nullable[B], C], error) {
 	holders, dests := joinHolders(aCols + bCols + cCols)
 
 	if err := rows.Scan(dests...); err != nil {
-		return Row3[Option[A], Option[B], C]{}, fmt.Errorf("orm: right join3 scan: %w", err)
+		return Row3[Nullable[A], Nullable[B], C]{}, fmt.Errorf("orm: right join3 scan: %w", err)
 	}
 
 	var c C
 
 	if err := PC(&c).Scan(&rowFeed{vals: holders[aCols+bCols:]}); err != nil {
-		return Row3[Option[A], Option[B], C]{}, fmt.Errorf("orm: right join3 scan: %w", err)
+		return Row3[Nullable[A], Nullable[B], C]{}, fmt.Errorf("orm: right join3 scan: %w", err)
 	}
 
 	a, err := scanOptional[A, PA](holders[:aCols])
 	if err != nil {
-		return Row3[Option[A], Option[B], C]{}, fmt.Errorf("orm: right join3 scan: %w", err)
+		return Row3[Nullable[A], Nullable[B], C]{}, fmt.Errorf("orm: right join3 scan: %w", err)
 	}
 
 	b, err := scanOptional[B, PB](holders[aCols : aCols+bCols])
 	if err != nil {
-		return Row3[Option[A], Option[B], C]{}, fmt.Errorf("orm: right join3 scan: %w", err)
+		return Row3[Nullable[A], Nullable[B], C]{}, fmt.Errorf("orm: right join3 scan: %w", err)
 	}
 
-	return Row3[Option[A], Option[B], C]{A: a, B: b, C: c}, nil
+	return Row3[Nullable[A], Nullable[B], C]{A: a, B: b, C: c}, nil
 }
 
 // scanFullJoinRow3 scans one three-table FULL-JOINed row into a
-// Row3[Option[A], Option[B], Option[C]] via exactly one underlying rows.Scan
+// Row3[Nullable[A], Nullable[B], Nullable[C]] via exactly one underlying rows.Scan
 // call. A FULL JOIN can put NULLs on any side, so all three halves are
-// scanned through the shared scanOptional helper -- each side's Option wrap
+// scanned through the shared scanOptional helper -- each side's Nullable wrap
 // is unambiguous, never a zero struct.
 func scanFullJoinRow3[
 	A any, PA ptrScanner[A], B any, PB ptrScanner[B], C any, PC ptrScanner[C],
-](rows db.Rows, aCols, bCols, cCols int) (Row3[Option[A], Option[B], Option[C]], error) {
+](rows db.Rows, aCols, bCols, cCols int) (Row3[Nullable[A], Nullable[B], Nullable[C]], error) {
 	holders, dests := joinHolders(aCols + bCols + cCols)
 
 	if err := rows.Scan(dests...); err != nil {
-		return Row3[Option[A], Option[B], Option[C]]{}, fmt.Errorf("orm: full join3 scan: %w", err)
+		return Row3[Nullable[A], Nullable[B], Nullable[C]]{}, fmt.Errorf("orm: full join3 scan: %w", err)
 	}
 
 	a, err := scanOptional[A, PA](holders[:aCols])
 	if err != nil {
-		return Row3[Option[A], Option[B], Option[C]]{}, fmt.Errorf("orm: full join3 scan: %w", err)
+		return Row3[Nullable[A], Nullable[B], Nullable[C]]{}, fmt.Errorf("orm: full join3 scan: %w", err)
 	}
 
 	b, err := scanOptional[B, PB](holders[aCols : aCols+bCols])
 	if err != nil {
-		return Row3[Option[A], Option[B], Option[C]]{}, fmt.Errorf("orm: full join3 scan: %w", err)
+		return Row3[Nullable[A], Nullable[B], Nullable[C]]{}, fmt.Errorf("orm: full join3 scan: %w", err)
 	}
 
 	c, err := scanOptional[C, PC](holders[aCols+bCols:])
 	if err != nil {
-		return Row3[Option[A], Option[B], Option[C]]{}, fmt.Errorf("orm: full join3 scan: %w", err)
+		return Row3[Nullable[A], Nullable[B], Nullable[C]]{}, fmt.Errorf("orm: full join3 scan: %w", err)
 	}
 
-	return Row3[Option[A], Option[B], Option[C]]{A: a, B: b, C: c}, nil
+	return Row3[Nullable[A], Nullable[B], Nullable[C]]{A: a, B: b, C: c}, nil
 }
 
 // allNil reports whether every holder in holders holds a nil -- i.e. the
@@ -2652,7 +2652,7 @@ func joinHolders(n int) (holders, dests []any) {
 // assignAny converts src (a raw driver-ish value, or nil) into dest, a
 // pointer previously handed to a codegen'd entity's Scan method. If dest
 // itself implements the same single-argument Scan(any) error shape
-// orm.Option[T] does, that Scan is called directly -- Option[T]'s own Scan
+// orm.Nullable[T] does, that Scan is called directly -- Nullable[T]'s own Scan
 // already handles both a real value and NULL correctly. Otherwise dest is
 // one of the small closed set of concrete pointer types the schema code generator's Scan
 // codegen ever produces (see orm/option.go's convertScan, which this

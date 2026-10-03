@@ -71,7 +71,7 @@ func JoinUserSpaces(left orm.Query[User, *User], joinType orm.JoinType) orm.Join
 }
 
 // LeftJoinUserSpaces starts a null-safe LEFT JOIN from Users through the "spaces" relation: an
-// unmatched User row comes back with an explicit orm.Option[Space] rather
+// unmatched User row comes back with an explicit orm.Nullable[Space] rather
 // than a zero-valued struct that could be mistaken for a real match.
 func LeftJoinUserSpaces(left orm.Query[User, *User]) orm.LeftJoin2[User, *User, Space, *Space] {
 	return orm.LeftJoinOn(left, UserSpacesRel)
@@ -91,7 +91,7 @@ func JoinUserBookings(left orm.Query[User, *User], joinType orm.JoinType) orm.Jo
 }
 
 // LeftJoinUserBookings starts a null-safe LEFT JOIN from Users through the "bookings" relation: an
-// unmatched User row comes back with an explicit orm.Option[Booking] rather
+// unmatched User row comes back with an explicit orm.Nullable[Booking] rather
 // than a zero-valued struct that could be mistaken for a real match.
 func LeftJoinUserBookings(left orm.Query[User, *User]) orm.LeftJoin2[User, *User, Booking, *Booking] {
 	return orm.LeftJoinOn(left, UserBookingsRel)
@@ -111,7 +111,7 @@ func JoinUserReviews(left orm.Query[User, *User], joinType orm.JoinType) orm.Joi
 }
 
 // LeftJoinUserReviews starts a null-safe LEFT JOIN from Users through the "reviews" relation: an
-// unmatched User row comes back with an explicit orm.Option[Review] rather
+// unmatched User row comes back with an explicit orm.Nullable[Review] rather
 // than a zero-valued struct that could be mistaken for a real match.
 func LeftJoinUserReviews(left orm.Query[User, *User]) orm.LeftJoin2[User, *User, Review, *Review] {
 	return orm.LeftJoinOn(left, UserReviewsRel)
@@ -191,7 +191,7 @@ func JoinSpaceHost(left orm.Query[Space, *Space], joinType orm.JoinType) orm.Joi
 }
 
 // LeftJoinSpaceHost starts a null-safe LEFT JOIN from Spaces through the "host" relation: an
-// unmatched Space row comes back with an explicit orm.Option[User] rather
+// unmatched Space row comes back with an explicit orm.Nullable[User] rather
 // than a zero-valued struct that could be mistaken for a real match.
 func LeftJoinSpaceHost(left orm.Query[Space, *Space]) orm.LeftJoin2[Space, *Space, User, *User] {
 	return orm.LeftJoinOn(left, SpaceHostRel)
@@ -211,7 +211,7 @@ func JoinSpaceBookings(left orm.Query[Space, *Space], joinType orm.JoinType) orm
 }
 
 // LeftJoinSpaceBookings starts a null-safe LEFT JOIN from Spaces through the "bookings" relation: an
-// unmatched Space row comes back with an explicit orm.Option[Booking] rather
+// unmatched Space row comes back with an explicit orm.Nullable[Booking] rather
 // than a zero-valued struct that could be mistaken for a real match.
 func LeftJoinSpaceBookings(left orm.Query[Space, *Space]) orm.LeftJoin2[Space, *Space, Booking, *Booking] {
 	return orm.LeftJoinOn(left, SpaceBookingsRel)
@@ -231,7 +231,7 @@ func JoinSpaceReviews(left orm.Query[Space, *Space], joinType orm.JoinType) orm.
 }
 
 // LeftJoinSpaceReviews starts a null-safe LEFT JOIN from Spaces through the "reviews" relation: an
-// unmatched Space row comes back with an explicit orm.Option[Review] rather
+// unmatched Space row comes back with an explicit orm.Nullable[Review] rather
 // than a zero-valued struct that could be mistaken for a real match.
 func LeftJoinSpaceReviews(left orm.Query[Space, *Space]) orm.LeftJoin2[Space, *Space, Review, *Review] {
 	return orm.LeftJoinOn(left, SpaceReviewsRel)
@@ -308,7 +308,7 @@ func JoinBookingSpace(left orm.Query[Booking, *Booking], joinType orm.JoinType) 
 }
 
 // LeftJoinBookingSpace starts a null-safe LEFT JOIN from Bookings through the "space" relation: an
-// unmatched Booking row comes back with an explicit orm.Option[Space] rather
+// unmatched Booking row comes back with an explicit orm.Nullable[Space] rather
 // than a zero-valued struct that could be mistaken for a real match.
 func LeftJoinBookingSpace(left orm.Query[Booking, *Booking]) orm.LeftJoin2[Booking, *Booking, Space, *Space] {
 	return orm.LeftJoinOn(left, BookingSpaceRel)
@@ -328,7 +328,7 @@ func JoinBookingGuest(left orm.Query[Booking, *Booking], joinType orm.JoinType) 
 }
 
 // LeftJoinBookingGuest starts a null-safe LEFT JOIN from Bookings through the "guest" relation: an
-// unmatched Booking row comes back with an explicit orm.Option[User] rather
+// unmatched Booking row comes back with an explicit orm.Nullable[User] rather
 // than a zero-valued struct that could be mistaken for a real match.
 func LeftJoinBookingGuest(left orm.Query[Booking, *Booking]) orm.LeftJoin2[Booking, *Booking, User, *User] {
 	return orm.LeftJoinOn(left, BookingGuestRel)
@@ -402,7 +402,7 @@ func JoinReviewSpace(left orm.Query[Review, *Review], joinType orm.JoinType) orm
 }
 
 // LeftJoinReviewSpace starts a null-safe LEFT JOIN from Reviews through the "space" relation: an
-// unmatched Review row comes back with an explicit orm.Option[Space] rather
+// unmatched Review row comes back with an explicit orm.Nullable[Space] rather
 // than a zero-valued struct that could be mistaken for a real match.
 func LeftJoinReviewSpace(left orm.Query[Review, *Review]) orm.LeftJoin2[Review, *Review, Space, *Space] {
 	return orm.LeftJoinOn(left, ReviewSpaceRel)
@@ -422,7 +422,7 @@ func JoinReviewGuest(left orm.Query[Review, *Review], joinType orm.JoinType) orm
 }
 
 // LeftJoinReviewGuest starts a null-safe LEFT JOIN from Reviews through the "guest" relation: an
-// unmatched Review row comes back with an explicit orm.Option[User] rather
+// unmatched Review row comes back with an explicit orm.Nullable[User] rather
 // than a zero-valued struct that could be mistaken for a real match.
 func LeftJoinReviewGuest(left orm.Query[Review, *Review]) orm.LeftJoin2[Review, *Review, User, *User] {
 	return orm.LeftJoinOn(left, ReviewGuestRel)

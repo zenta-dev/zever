@@ -71,7 +71,7 @@ func JoinUserNotes(left orm.Query[User, *User], joinType orm.JoinType) orm.Join2
 }
 
 // LeftJoinUserNotes starts a null-safe LEFT JOIN from Users through the "notes" relation: an
-// unmatched User row comes back with an explicit orm.Option[Note] rather
+// unmatched User row comes back with an explicit orm.Nullable[Note] rather
 // than a zero-valued struct that could be mistaken for a real match.
 func LeftJoinUserNotes(left orm.Query[User, *User]) orm.LeftJoin2[User, *User, Note, *Note] {
 	return orm.LeftJoinOn(left, UserNotesRel)
@@ -145,7 +145,7 @@ func JoinNoteUser(left orm.Query[Note, *Note], joinType orm.JoinType) orm.Join2[
 }
 
 // LeftJoinNoteUser starts a null-safe LEFT JOIN from Notes through the "user" relation: an
-// unmatched Note row comes back with an explicit orm.Option[User] rather
+// unmatched Note row comes back with an explicit orm.Nullable[User] rather
 // than a zero-valued struct that could be mistaken for a real match.
 func LeftJoinNoteUser(left orm.Query[Note, *Note]) orm.LeftJoin2[Note, *Note, User, *User] {
 	return orm.LeftJoinOn(left, NoteUserRel)

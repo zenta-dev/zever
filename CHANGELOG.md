@@ -161,6 +161,19 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   constants. The openapi behavior change is observable: a validation rule
   with an out-of-set kind now panics at render time instead of being
   silently skipped (resolver-produced IR never triggers it).
+- **Breaking:** `orm.Option[T]` now constrains `T` to the new exported
+  `orm.ScanValue` constraint (`~string | ~[]byte | ~int64 | ~int32 |
+  ~float64 | ~float32 | ~bool | time.Time`; `orm.JSONText` is covered by
+  `~string`). Previously `T any` let a struct/entity or any other
+  non-scannable type compile and fail only when `Scan` ran; now such a type
+  is a compile error. Migration: use the new `orm.Nullable[T]` (same
+  present/absent API — `NullableSome`/`NullableNone`/`IsSome`/`Get`/`GetOr`,
+  but no `Scan`/`Value`) for struct/entity maybe-wrappers, e.g. the
+  outer-join result types (`orm.Row2[A, orm.Nullable[B]]`, and the
+  `LeftJoin2`/`LeftJoin3`/`RightJoin*`/`FullJoin*`/TVF variants).
+  `orm.Option[T]` stays for NULL-capable scan columns (codegen'd nullable
+  fields). Generated relation doc comments and goldens were updated to
+  reference `orm.Nullable`.
 - Bounded connection-pool defaults for the `sqlite` and `postgres` `db`
   adapters when `MaxConns` is left at zero: file-backed `sqlite` now caps
   `database/sql`'s previously unlimited pool at `max(1, GOMAXPROCS)`, and

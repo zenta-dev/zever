@@ -15,8 +15,8 @@ import (
 // (INNER/INNER), LeftJoin3 (LEFT/LEFT), RightJoin3 (RIGHT/RIGHT) and
 // FullJoin3 (FULL/FULL) -- and #413 added the two INNER/LEFT mixed chains:
 //
-// - InnerLeftJoin3: A INNER JOIN B LEFT JOIN C -> Row3[A, B, Option[C]]
-// - LeftInnerJoin3: A LEFT JOIN (B INNER JOIN C) -> Row3[A, Option[B], Option[C]]
+// - InnerLeftJoin3: A INNER JOIN B LEFT JOIN C -> Row3[A, B, Nullable[C]]
+// - LeftInnerJoin3: A LEFT JOIN (B INNER JOIN C) -> Row3[A, Nullable[B], Nullable[C]]
 //
 // Together with Join3 and LeftJoin3 those cover every combination of the
 // two universal join kinds. This file's MixedJoin3 completes the picture:
@@ -25,7 +25,7 @@ import (
 //	A <abKind> JOIN B ON relAB <bcKind> JOIN C ON relBC
 //
 // for ANY (abKind, bcKind) pair -- all 16 combinations uniformly -- with a
-// fully-optional Row3[Option[A], Option[B], Option[C]] result. Go cannot
+// fully-optional Row3[Nullable[A], Nullable[B], Nullable[C]] result. Go cannot
 // compute a per-combination nullability type at the type level, and a
 // fully-optional Row3 is ALWAYS correct: for any chain every side may be
 // absent in some row, and presenting a guaranteed-present side as Some is
@@ -46,8 +46,8 @@ import (
 // InnerLeftJoin3 is the mixed-kind three-table builder for
 // "A INNER JOIN B ON ... LEFT JOIN C ON ...": A and B are inner-joined (so
 // every result row carries a real A and B), then C is left-joined (so C is
-// optional). Its All/Stream return Row3[A, B, Option[C]] -- A and B scanned
-// directly through their own Scan methods, C wrapped whole in Option so an
+// optional). Its All/Stream return Row3[A, B, Nullable[C]] -- A and B scanned
+// directly through their own Scan methods, C wrapped whole in Nullable so an
 // unmatched C is unambiguously None, never a same-shaped zero struct
 // (mirroring LeftJoin2's whole-struct wrap).
 //
@@ -164,9 +164,9 @@ func (j InnerLeftJoin3[A, PA, B, PB, C, PC]) render(d dialect.Dialect) (string, 
 }
 
 // All runs j against exec and returns every matching row as a typed
-// Row3[A, B, Option[C]], scanned via ONE rows.Scan call per row (see
+// Row3[A, B, Nullable[C]], scanned via ONE rows.Scan call per row (see
 // scanInnerLeftJoinRow3) -- one round trip total.
-func (j InnerLeftJoin3[A, PA, B, PB, C, PC]) All(ctx context.Context, exec db.DB) ([]Row3[A, B, Option[C]], error) {
+func (j InnerLeftJoin3[A, PA, B, PB, C, PC]) All(ctx context.Context, exec db.DB) ([]Row3[A, B, Nullable[C]], error) {
 	return gatherJoin3(ctx, exec, "InnerLeftJoin3", j.render,
 		scanInnerLeftJoinRow3[A, PA, B, PB, C, PC],
 		len(j.left.table.Columns()), len(j.relAB.childTable.Columns()), len(j.relBC.childTable.Columns()))
@@ -174,7 +174,7 @@ func (j InnerLeftJoin3[A, PA, B, PB, C, PC]) All(ctx context.Context, exec db.DB
 
 // Stream runs j against exec and yields every matching row one at a time.
 // See Join2.Stream's doc comment for the range-over-func cleanup guarantee.
-func (j InnerLeftJoin3[A, PA, B, PB, C, PC]) Stream(ctx context.Context, exec db.DB) iter.Seq2[Row3[A, B, Option[C]], error] {
+func (j InnerLeftJoin3[A, PA, B, PB, C, PC]) Stream(ctx context.Context, exec db.DB) iter.Seq2[Row3[A, B, Nullable[C]], error] {
 	return streamJoin3(ctx, exec, "InnerLeftJoin3", j.render,
 		scanInnerLeftJoinRow3[A, PA, B, PB, C, PC],
 		len(j.left.table.Columns()), len(j.relAB.childTable.Columns()), len(j.relBC.childTable.Columns()))
@@ -187,7 +187,7 @@ func (j InnerLeftJoin3[A, PA, B, PB, C, PC]) Stream(ctx context.Context, exec db
 // The B/C pair is joined INNER first and rendered as one parenthesized
 // derived table (SelectJoin3Nested), so it is all-or-nothing: a row either
 // has both a real B and a real C, or neither. Its All/Stream therefore
-// return Row3[A, Option[B], Option[C]] with the equivalences B Some <=> C
+// return Row3[A, Nullable[B], Nullable[C]] with the equivalences B Some <=> C
 // Some -- in particular the documented invariant C Some => B Some, and its
 // contrapositive B None => C None.
 //
@@ -312,9 +312,9 @@ func (j LeftInnerJoin3[A, PA, B, PB, C, PC]) render(d dialect.Dialect) (string, 
 }
 
 // All runs j against exec and returns every matching row as a typed
-// Row3[A, Option[B], Option[C]], scanned via ONE rows.Scan call per row (see
+// Row3[A, Nullable[B], Nullable[C]], scanned via ONE rows.Scan call per row (see
 // scanLeftInnerJoinRow3) -- one round trip total.
-func (j LeftInnerJoin3[A, PA, B, PB, C, PC]) All(ctx context.Context, exec db.DB) ([]Row3[A, Option[B], Option[C]], error) {
+func (j LeftInnerJoin3[A, PA, B, PB, C, PC]) All(ctx context.Context, exec db.DB) ([]Row3[A, Nullable[B], Nullable[C]], error) {
 	// A is direct, B/C optional -- exactly scanLeftJoinRow3's shape, reused
 	// rather than duplicated: only the rendered SQL differs between a
 	// flat LEFT-LEFT chain and this nested LEFT-INNER one.
@@ -325,63 +325,63 @@ func (j LeftInnerJoin3[A, PA, B, PB, C, PC]) All(ctx context.Context, exec db.DB
 
 // Stream runs j against exec and yields every matching row one at a time.
 // See Join2.Stream's doc comment for the range-over-func cleanup guarantee.
-func (j LeftInnerJoin3[A, PA, B, PB, C, PC]) Stream(ctx context.Context, exec db.DB) iter.Seq2[Row3[A, Option[B], Option[C]], error] {
+func (j LeftInnerJoin3[A, PA, B, PB, C, PC]) Stream(ctx context.Context, exec db.DB) iter.Seq2[Row3[A, Nullable[B], Nullable[C]], error] {
 	return streamJoin3(ctx, exec, "LeftInnerJoin3", j.render,
 		scanLeftJoinRow3[A, PA, B, PB, C, PC],
 		len(j.left.table.Columns()), len(j.relAB.childTable.Columns()), len(j.relBC.childTable.Columns()))
 }
 
-// scanOptional scans one side of an outer-joined row into Option[T] via a
+// scanOptional scans one side of an outer-joined row into Nullable[T] via a
 // holder slice already populated by the caller's single rows.Scan: all-nil
 // means the side did not match, so the result is None and T's own Scan is
 // never run against a fake zero value; otherwise T's Scan is fed the real
 // values through a rowFeed. Every optional-side scanner below shares this
 // one helper, so the "all-nil vs real value" decision cannot drift between
 // variants.
-func scanOptional[T any, PT ptrScanner[T]](holders []any) (Option[T], error) {
+func scanOptional[T any, PT ptrScanner[T]](holders []any) (Nullable[T], error) {
 	if allNil(holders) {
-		return None[T](), nil
+		return NullableNone[T](), nil
 	}
 
 	var v T
 
 	if err := PT(&v).Scan(&rowFeed{vals: holders}); err != nil {
-		return Option[T]{}, err
+		return Nullable[T]{}, err
 	}
 
-	return Some(v), nil
+	return NullableSome(v), nil
 }
 
 // scanInnerLeftJoinRow3 scans one "A INNER JOIN B LEFT JOIN C" row into a
-// Row3[A, B, Option[C]] via exactly one underlying rows.Scan call. A and B
+// Row3[A, B, Nullable[C]] via exactly one underlying rows.Scan call. A and B
 // are always present (the inner join guarantees both), so each is handed to
 // its own Scan through a rowFeed; C is scanned through scanOptional so an
 // unmatched C becomes an unambiguous None.
-func scanInnerLeftJoinRow3[A any, PA ptrScanner[A], B any, PB ptrScanner[B], C any, PC ptrScanner[C]](rows db.Rows, aCols, bCols, cCols int) (Row3[A, B, Option[C]], error) {
+func scanInnerLeftJoinRow3[A any, PA ptrScanner[A], B any, PB ptrScanner[B], C any, PC ptrScanner[C]](rows db.Rows, aCols, bCols, cCols int) (Row3[A, B, Nullable[C]], error) {
 	holders, dests := joinHolders(aCols + bCols + cCols)
 
 	if err := rows.Scan(dests...); err != nil {
-		return Row3[A, B, Option[C]]{}, fmt.Errorf("orm: inner-left join3 scan: %w", err)
+		return Row3[A, B, Nullable[C]]{}, fmt.Errorf("orm: inner-left join3 scan: %w", err)
 	}
 
 	var a A
 
 	if err := PA(&a).Scan(&rowFeed{vals: holders[:aCols]}); err != nil {
-		return Row3[A, B, Option[C]]{}, fmt.Errorf("orm: inner-left join3 scan: %w", err)
+		return Row3[A, B, Nullable[C]]{}, fmt.Errorf("orm: inner-left join3 scan: %w", err)
 	}
 
 	var b B
 
 	if err := PB(&b).Scan(&rowFeed{vals: holders[aCols : aCols+bCols]}); err != nil {
-		return Row3[A, B, Option[C]]{}, fmt.Errorf("orm: inner-left join3 scan: %w", err)
+		return Row3[A, B, Nullable[C]]{}, fmt.Errorf("orm: inner-left join3 scan: %w", err)
 	}
 
 	c, err := scanOptional[C, PC](holders[aCols+bCols:])
 	if err != nil {
-		return Row3[A, B, Option[C]]{}, fmt.Errorf("orm: inner-left join3 scan: %w", err)
+		return Row3[A, B, Nullable[C]]{}, fmt.Errorf("orm: inner-left join3 scan: %w", err)
 	}
 
-	return Row3[A, B, Option[C]]{A: a, B: b, C: c}, nil
+	return Row3[A, B, Nullable[C]]{A: a, B: b, C: c}, nil
 }
 
 // gatherJoin3 runs a rendered three-table join and scans every row with
@@ -502,7 +502,7 @@ func streamJoin3[Res any](
 //
 // for ANY pair of join kinds -- all 16 (abKind, bcKind) combinations render
 // through the same type and methods -- and whose All/Stream return a
-// fully-optional Row3[Option[A], Option[B], Option[C]].
+// fully-optional Row3[Nullable[A], Nullable[B], Nullable[C]].
 //
 // # Why a fully-optional result for every combination
 //
@@ -511,16 +511,16 @@ func streamJoin3[Res any](
 // describes for its two-table case), so one result type has to serve all 16
 // combinations. A fully-optional Row3 is always correct: in any chain every
 // side may be absent in some row, and presenting a guaranteed-present side
-// as Some is still correct -- it only loses the "this Option can never be
+// as Some is still correct -- it only loses the "this Nullable can never be
 // None" refinement, never soundness. Unmatched sides are unambiguously None
 // (via the shared scanOptional helper), never a same-shaped zero struct.
 //
 // Callers who know their chain's exact kinds should prefer the dedicated
 // builders, which keep precise per-side types: Join3 (Row3[A, B, C]),
-// LeftJoin3 (Row3[A, Option[B], Option[C]]), RightJoin3
-// (Row3[Option[A], Option[B], C]), FullJoin3 (all Option),
-// InnerLeftJoin3 (Row3[A, B, Option[C]]) and LeftInnerJoin3
-// (Row3[A, Option[B], Option[C]]). MixedJoin3 is the escape hatch for a
+// LeftJoin3 (Row3[A, Nullable[B], Nullable[C]]), RightJoin3
+// (Row3[Nullable[A], Nullable[B], C]), FullJoin3 (all Nullable),
+// InnerLeftJoin3 (Row3[A, B, Nullable[C]]) and LeftInnerJoin3
+// (Row3[A, Nullable[B], Nullable[C]]). MixedJoin3 is the escape hatch for a
 // kind pair selected at runtime or otherwise not covered above.
 //
 // # SQL semantics: flat, left-associative
@@ -660,12 +660,12 @@ func (j MixedJoin3[A, PA, B, PB, C, PC]) render(d dialect.Dialect) (string, []an
 }
 
 // All runs j against exec and returns every matching row as a typed
-// Row3[Option[A], Option[B], Option[C]], scanned via ONE rows.Scan call per
+// Row3[Nullable[A], Nullable[B], Nullable[C]], scanned via ONE rows.Scan call per
 // row (see scanFullJoinRow3, whose optional-every-side shape is exactly what
 // the generic builder needs) -- one round trip total. A RIGHT/FULL hop on a
 // dialect without the capability returns the typed
 // dialect.ErrUnsupportedByDialect before any SQL is issued.
-func (j MixedJoin3[A, PA, B, PB, C, PC]) All(ctx context.Context, exec db.DB) ([]Row3[Option[A], Option[B], Option[C]], error) {
+func (j MixedJoin3[A, PA, B, PB, C, PC]) All(ctx context.Context, exec db.DB) ([]Row3[Nullable[A], Nullable[B], Nullable[C]], error) {
 	return gatherJoin3(ctx, exec, "MixedJoin3", j.render,
 		scanFullJoinRow3[A, PA, B, PB, C, PC],
 		len(j.left.table.Columns()), len(j.relAB.childTable.Columns()), len(j.relBC.childTable.Columns()))
@@ -675,7 +675,7 @@ func (j MixedJoin3[A, PA, B, PB, C, PC]) All(ctx context.Context, exec db.DB) ([
 // See Join2.Stream's doc comment for the range-over-func cleanup guarantee.
 // Like All, a missing RIGHT/FULL capability is the typed
 // dialect.ErrUnsupportedByDialect, yielded before any SQL is issued.
-func (j MixedJoin3[A, PA, B, PB, C, PC]) Stream(ctx context.Context, exec db.DB) iter.Seq2[Row3[Option[A], Option[B], Option[C]], error] {
+func (j MixedJoin3[A, PA, B, PB, C, PC]) Stream(ctx context.Context, exec db.DB) iter.Seq2[Row3[Nullable[A], Nullable[B], Nullable[C]], error] {
 	return streamJoin3(ctx, exec, "MixedJoin3", j.render,
 		scanFullJoinRow3[A, PA, B, PB, C, PC],
 		len(j.left.table.Columns()), len(j.relAB.childTable.Columns()), len(j.relBC.childTable.Columns()))

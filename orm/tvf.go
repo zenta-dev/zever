@@ -184,8 +184,8 @@ func (j TVFJoin2[A, PA, B, PB]) ExplainAnalyze(ctx context.Context, exec db.DB) 
 
 // LeftTVFJoin2 is the null-safe sibling of TVFJoin2 for
 // `left LEFT JOIN <source> AS alias ON TRUE`: All/Stream return
-// Row2[A, Option[B]], so an outer row whose source produces nothing comes
-// back with Option[B]{}.IsSome() == false, never a same-shaped zero-valued B{}
+// Row2[A, Nullable[B]], so an outer row whose source produces nothing comes
+// back with Nullable[B]{}.IsSome() == false, never a same-shaped zero-valued B{}
 // that could be mistaken for a real source row.
 type LeftTVFJoin2[A any, PA ptrScanner[A], B any, PB ptrScanner[B]] struct {
 	left        Query[A, PA]
@@ -256,9 +256,9 @@ func (j LeftTVFJoin2[A, PA, B, PB]) render(d dialect.Dialect) (string, []any, er
 }
 
 // All runs j against exec and returns every matching row as a typed
-// Row2[A, Option[B]], scanned via ONE rows.Scan call per row (see
+// Row2[A, Nullable[B]], scanned via ONE rows.Scan call per row (see
 // scanLeftJoinRow) -- one round trip total.
-func (j LeftTVFJoin2[A, PA, B, PB]) All(ctx context.Context, exec db.DB) ([]Row2[A, Option[B]], error) {
+func (j LeftTVFJoin2[A, PA, B, PB]) All(ctx context.Context, exec db.DB) ([]Row2[A, Nullable[B]], error) {
 	return lateralCollect(ctx, exec, "LeftTVFJoin2.All", j.render,
 		len(j.left.table.Columns()), len(j.source.SrcColumns()),
 		j.scan())
@@ -266,17 +266,17 @@ func (j LeftTVFJoin2[A, PA, B, PB]) All(ctx context.Context, exec db.DB) ([]Row2
 
 // scan adapts the source's NewRow into the shared scan signature for the
 // null-safe LEFT form (an all-NULL source side becomes None).
-func (j LeftTVFJoin2[A, PA, B, PB]) scan() func(rows db.Rows, aCols, bCols int) (Row2[A, Option[B]], error) {
+func (j LeftTVFJoin2[A, PA, B, PB]) scan() func(rows db.Rows, aCols, bCols int) (Row2[A, Nullable[B]], error) {
 	newRow := j.source.NewRow
 
-	return func(rows db.Rows, aCols, bCols int) (Row2[A, Option[B]], error) {
+	return func(rows db.Rows, aCols, bCols int) (Row2[A, Nullable[B]], error) {
 		return scanLeftTVFJoinRow[A, PA, B, PB](rows, newRow, aCols, bCols)
 	}
 }
 
 // Stream runs j against exec and yields every matching row one at a time, via
-// iter.Seq2[Row2[A, Option[B]], error].
-func (j LeftTVFJoin2[A, PA, B, PB]) Stream(ctx context.Context, exec db.DB) iter.Seq2[Row2[A, Option[B]], error] {
+// iter.Seq2[Row2[A, Nullable[B]], error].
+func (j LeftTVFJoin2[A, PA, B, PB]) Stream(ctx context.Context, exec db.DB) iter.Seq2[Row2[A, Nullable[B]], error] {
 	return lateralStream(ctx, exec, "LeftTVFJoin2.Stream", j.render,
 		len(j.left.table.Columns()), len(j.source.SrcColumns()),
 		j.scan())
@@ -358,36 +358,36 @@ func scanTVFJoinRow[A any, PA ptrScanner[A], B any, PB ptrScanner[B]](
 	return Row2[A, B]{A: a, B: b}, nil
 }
 
-// scanLeftTVFJoinRow scans one LEFT-JOINed row into a Row2[A, Option[B]] via
+// scanLeftTVFJoinRow scans one LEFT-JOINed row into a Row2[A, Nullable[B]] via
 // exactly one underlying rows.Scan call. It mirrors scanLeftJoinRow (the
 // source side is scanned into *any holders first and only converted to B when
 // at least one is non-nil), with B built by the source's NewRow.
 func scanLeftTVFJoinRow[A any, PA ptrScanner[A], B any, PB ptrScanner[B]](
 	rows db.Rows, newRow func() B, aCols, bCols int,
-) (Row2[A, Option[B]], error) {
+) (Row2[A, Nullable[B]], error) {
 	holders, dests := joinHolders(aCols + bCols)
 
 	if err := rows.Scan(dests...); err != nil {
-		return Row2[A, Option[B]]{}, fmt.Errorf("orm: left tvf join scan: %w", err)
+		return Row2[A, Nullable[B]]{}, fmt.Errorf("orm: left tvf join scan: %w", err)
 	}
 
 	var a A
 
 	if err := PA(&a).Scan(&rowFeed{vals: holders[:aCols]}); err != nil {
-		return Row2[A, Option[B]]{}, fmt.Errorf("orm: left tvf join scan: %w", err)
+		return Row2[A, Nullable[B]]{}, fmt.Errorf("orm: left tvf join scan: %w", err)
 	}
 
 	if allNil(holders[aCols:]) {
-		return Row2[A, Option[B]]{A: a, B: None[B]()}, nil
+		return Row2[A, Nullable[B]]{A: a, B: NullableNone[B]()}, nil
 	}
 
 	b := newRow()
 
 	if err := PB(&b).Scan(&rowFeed{vals: holders[aCols:]}); err != nil {
-		return Row2[A, Option[B]]{}, fmt.Errorf("orm: left tvf join scan: %w", err)
+		return Row2[A, Nullable[B]]{}, fmt.Errorf("orm: left tvf join scan: %w", err)
 	}
 
-	return Row2[A, Option[B]]{A: a, B: Some(b)}, nil
+	return Row2[A, Nullable[B]]{A: a, B: NullableSome(b)}, nil
 }
 
 // validateTVFSource rejects a source that cannot render a well-formed FROM

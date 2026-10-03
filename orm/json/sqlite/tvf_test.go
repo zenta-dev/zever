@@ -104,7 +104,7 @@ func TestJSONEachJoinScans(t *testing.T) {
 }
 
 // TestJSONEachLeftJoinNone proves the LEFT form turns a path that yields no
-// rows into Option[B]{}.IsSome() == false, never a zero EachRow.
+// rows into Nullable[B]{}.IsSome() == false, never a zero EachRow.
 func TestJSONEachLeftJoinNone(t *testing.T) {
 	ctx, conn := newDocsDB(t)
 
