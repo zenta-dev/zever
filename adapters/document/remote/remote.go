@@ -49,7 +49,7 @@ func New(o document.Options) (document.Document, error) {
 
 	trimmed := strings.TrimRight(o.Endpoint, "/")
 	normalized, err := endpoint.ValidateURL(trimmed,
-		endpoint.WithAllowInsecure(true),
+		endpoint.WithAllowInsecure(o.AllowInsecure),
 		endpoint.WithRejectQueryFragment(),
 	)
 	if err != nil {

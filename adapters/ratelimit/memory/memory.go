@@ -18,19 +18,22 @@ type bucket struct {
 }
 
 type store struct {
-	mu      sync.RWMutex
-	buckets map[string]*bucket
-	rate    float64
-	burst   float64
-	idle    time.Duration
-	sweep   time.Duration
-	closed  atomic.Bool
-	stop    chan struct{}
-	done    chan struct{}
+	mu         sync.RWMutex
+	buckets    map[string]*bucket
+	rate       float64
+	burst      float64
+	idle       time.Duration
+	sweep      time.Duration
+	maxEntries int
+	closed     atomic.Bool
+	stop       chan struct{}
+	done       chan struct{}
 }
 
 // New creates an in-process token-bucket limiter from opts.
-// Zero IdleTTL/SweepInterval resolve to ratelimit defaults.
+// Zero IdleTTL/SweepInterval resolve to ratelimit defaults. Non-positive
+// MaxEntries resolves to ratelimit.DefaultMaxEntries; past the bound a new
+// key evicts the least-recently-used live bucket.
 func New(opts ratelimit.Options) (ratelimit.Limiter, error) {
 	if err := opts.Validate(); err != nil {
 		return nil, fmt.Errorf("memory: %w", err)
@@ -46,14 +49,20 @@ func New(opts ratelimit.Options) (ratelimit.Limiter, error) {
 		sweep = ratelimit.DefaultSweepInterval
 	}
 
+	maxEntries := opts.MaxEntries
+	if maxEntries <= 0 {
+		maxEntries = ratelimit.DefaultMaxEntries
+	}
+
 	s := &store{
-		buckets: make(map[string]*bucket),
-		rate:    opts.Rate,
-		burst:   float64(opts.Burst),
-		idle:    idle,
-		sweep:   sweep,
-		stop:    make(chan struct{}),
-		done:    make(chan struct{}),
+		buckets:    make(map[string]*bucket),
+		rate:       opts.Rate,
+		burst:      float64(opts.Burst),
+		idle:       idle,
+		sweep:      sweep,
+		maxEntries: maxEntries,
+		stop:       make(chan struct{}),
+		done:       make(chan struct{}),
 	}
 
 	go s.run()
@@ -97,6 +106,7 @@ func (s *store) Allow(ctx context.Context, key string, tokens float64) (ratelimi
 
 	b, ok := s.buckets[key]
 	if !ok {
+		s.evictLRULocked(now)
 		b = &bucket{tokens: s.burst, last: now}
 		s.buckets[key] = b
 	} else if now.Sub(b.last) > s.idle {
@@ -179,6 +189,36 @@ func (s *store) run() {
 		case <-s.stop:
 			return
 		}
+	}
+}
+
+// evictLRULocked makes room for one new bucket when the table is full.
+// Idle buckets are reaped first; otherwise the least-recently-used live
+// bucket is evicted so an attacker cannot grow the map without bound.
+// Caller must hold s.mu.
+func (s *store) evictLRULocked(now time.Time) {
+	if len(s.buckets) < s.maxEntries {
+		return
+	}
+
+	var oldestKey string
+	var oldestTime time.Time
+	first := true
+
+	for k, b := range s.buckets {
+		if now.Sub(b.last) > s.idle {
+			delete(s.buckets, k)
+
+			return
+		}
+
+		if first || b.last.Before(oldestTime) {
+			oldestKey, oldestTime, first = k, b.last, false
+		}
+	}
+
+	if oldestKey != "" {
+		delete(s.buckets, oldestKey)
 	}
 }
 

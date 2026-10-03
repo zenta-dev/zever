@@ -12,7 +12,6 @@ import (
 
 	"github.com/zenta-dev/zever/core/ai"
 	"github.com/zenta-dev/zever/shared/codec"
-	"github.com/zenta-dev/zever/shared/endpoint"
 	"github.com/zenta-dev/zever/shared/httpclient"
 )
 
@@ -42,11 +41,12 @@ func New(opts ai.Options) (ai.AI, error) {
 
 	httpClient := newHTTPClient(opts.Timeout)
 
-	// For httptest TLS servers on loopback, allow insecure certs.
-	// Only exact loopback hosts match: a substring check would wrongly
-	// trust hosts like 127.0.0.1.evil.com.
-	if tr, ok := httpClient.Transport.(*http.Transport); ok && tr.TLSClientConfig != nil {
-		tr.TLSClientConfig.InsecureSkipVerify = loopbackBaseURL(opts.BaseURL)
+	// TLS verification is skipped only on explicit opt-in (AllowInsecure).
+	// Loopback BaseURLs no longer auto-disable verification.
+	if opts.AllowInsecure {
+		if tr, ok := httpClient.Transport.(*http.Transport); ok && tr.TLSClientConfig != nil {
+			tr.TLSClientConfig.InsecureSkipVerify = true //nolint:gosec // explicit opt-in for test servers
+		}
 	}
 
 	cc := &genai.ClientConfig{
@@ -64,12 +64,6 @@ func New(opts ai.Options) (ai.AI, error) {
 	}
 
 	return &adapter{client: client, apiKey: opts.APIKey}, nil
-}
-
-// loopbackBaseURL reports whether rawURL parses to a loopback host
-// ("localhost" or a loopback IP such as 127.0.0.1 or ::1).
-func loopbackBaseURL(rawURL string) bool {
-	return endpoint.IsLoopbackURL(rawURL)
 }
 
 func newHTTPClient(timeout time.Duration) *http.Client {

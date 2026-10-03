@@ -77,6 +77,64 @@ func TestOpenCaseInsensitiveHeaderOpt(t *testing.T) {
 	}
 }
 
+func TestResolveDuplicateHeaderAmbiguousRejected(t *testing.T) {
+	t.Parallel()
+
+	a := &adapter{header: "X-Tenant-ID"}
+	meta := map[string]string{
+		"X-Tenant-ID": "acme",
+		"x-tenant-id": "other",
+	}
+
+	_, err := a.Resolve(t.Context(), meta)
+	if !errors.Is(err, ErrDuplicateHeader) {
+		t.Fatalf("err = %v, want ErrDuplicateHeader", err)
+	}
+}
+
+func TestResolveDuplicateHeaderIdenticalResolves(t *testing.T) {
+	t.Parallel()
+
+	a := &adapter{header: "X-Tenant-ID"}
+	meta := map[string]string{
+		"X-Tenant-ID": "acme",
+		"x-tenant-id": "acme",
+	}
+
+	id, err := a.Resolve(t.Context(), meta)
+	if err != nil {
+		t.Fatalf("Resolve err = %v, want nil", err)
+	}
+	if id != "acme" {
+		t.Fatalf("id = %q, want acme", id)
+	}
+}
+
+func TestResolveInvalidTenantIDRejected(t *testing.T) {
+	t.Parallel()
+
+	a := &adapter{header: "X-Tenant-ID"}
+
+	for _, id := range []string{"has space", "has/slash", strings.Repeat("a", 129)} {
+		_, err := a.Resolve(t.Context(), map[string]string{"X-Tenant-ID": id})
+		if !errors.Is(err, ErrInvalidTenantID) {
+			t.Errorf("Resolve(%q) err = %v, want ErrInvalidTenantID", id, err)
+		}
+	}
+}
+
+func TestResolveValidTenantIDAccepted(t *testing.T) {
+	t.Parallel()
+
+	a := &adapter{header: "X-Tenant-ID"}
+
+	for _, id := range []string{"acme", "Acme-9_x.z"} {
+		if _, err := a.Resolve(t.Context(), map[string]string{"X-Tenant-ID": id}); err != nil {
+			t.Errorf("Resolve(%q) err = %v, want nil", id, err)
+		}
+	}
+}
+
 func TestResolveMissingHeader(t *testing.T) {
 	t.Parallel()
 

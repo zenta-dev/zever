@@ -286,3 +286,39 @@ func TestNewInvalidOptions(t *testing.T) {
 		t.Errorf("error %q missing %q prefix", err.Error(), "memory: ")
 	}
 }
+
+func TestMaxEntriesEvictsLRU(t *testing.T) {
+	t.Parallel()
+
+	l := newLimiter(t, ratelimit.Options{Rate: 10, Burst: 1, MaxEntries: 2})
+	ctx := t.Context()
+
+	// Fill the table: k1 and k2 each consume their single token.
+	for _, k := range []string{"k1", "k2"} {
+		d, err := l.Allow(ctx, k, 1)
+		if err != nil {
+			t.Fatalf("Allow(%s) failed: %v", k, err)
+		}
+		if !d.Allowed {
+			t.Fatalf("Allow(%s) denied, want allowed", k)
+		}
+	}
+
+	// k1 is least recently used; inserting k3 must evict it.
+	d, err := l.Allow(ctx, "k3", 1)
+	if err != nil {
+		t.Fatalf("Allow(k3) failed: %v", err)
+	}
+	if !d.Allowed {
+		t.Fatal("Allow(k3) denied, want allowed")
+	}
+
+	// k1 was evicted, so it gets a fresh bucket and is allowed again.
+	d, err = l.Allow(ctx, "k1", 1)
+	if err != nil {
+		t.Fatalf("Allow(k1) after eviction failed: %v", err)
+	}
+	if !d.Allowed {
+		t.Fatal("Allow(k1) denied, want allowed (evicted bucket should be fresh)")
+	}
+}

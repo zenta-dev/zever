@@ -247,7 +247,16 @@ func TestDeliver_successHeaders(t *testing.T) {
 	_ = gotPath
 }
 
-func TestDeliver_noSignatureWhenSecretEmpty(t *testing.T) {
+func TestRegister_emptySecretRejected(t *testing.T) {
+	t.Parallel()
+
+	w := openPrivate(t, 1)
+	if err := w.Register(t.Context(), "e", "http://127.0.0.1/hook", ""); !errors.Is(err, ErrMissingSecret) {
+		t.Fatalf("Register err = %v, want ErrMissingSecret", err)
+	}
+}
+
+func TestDeliver_signatureAlwaysPresent(t *testing.T) {
 	t.Parallel()
 
 	var gotSig string
@@ -265,7 +274,7 @@ func TestDeliver_noSignatureWhenSecretEmpty(t *testing.T) {
 	w := openPrivate(t, 1)
 	ctx := t.Context()
 
-	if err := w.Register(ctx, "e", srv.URL, ""); err != nil {
+	if err := w.Register(ctx, "e", srv.URL, "s"); err != nil {
 		t.Fatalf("Register err = %v", err)
 	}
 
@@ -276,9 +285,11 @@ func TestDeliver_noSignatureWhenSecretEmpty(t *testing.T) {
 	mu.Lock()
 	defer mu.Unlock()
 
-	if gotSig != "" {
-		t.Errorf("signature = %q, want empty", gotSig)
+	if gotSig == "" {
+		t.Error("signature empty, want X-Hub-Signature-256 on every delivery")
 	}
+
+	assertValidSignature(t, "s", []byte(`{}`), gotSig)
 }
 
 func TestDeliver_retryThenSuccess(t *testing.T) {
@@ -371,7 +382,7 @@ func TestDeliver_statusCodes(t *testing.T) {
 			w := openPrivate(t, 1)
 			ctx := t.Context()
 
-			if err := w.Register(ctx, "e", srv.URL, ""); err != nil {
+			if err := w.Register(ctx, "e", srv.URL, "s"); err != nil {
 				t.Fatalf("Register err = %v", err)
 			}
 
@@ -390,7 +401,7 @@ func TestDeliver_doError(t *testing.T) {
 	ctx := t.Context()
 
 	// Port 1 is (almost) certainly closed; dial fails covering Do-error + drain(nil).
-	if err := w.Register(ctx, "e", "http://127.0.0.1:1/hook", ""); err != nil {
+	if err := w.Register(ctx, "e", "http://127.0.0.1:1/hook", "s"); err != nil {
 		t.Fatalf("Register err = %v", err)
 	}
 
@@ -414,7 +425,7 @@ func TestDeliver_ctxCancelDuringBackoff(t *testing.T) {
 
 	ctx := t.Context()
 
-	if regErr := w.Register(ctx, "e", srv.URL, ""); regErr != nil {
+	if regErr := w.Register(ctx, "e", srv.URL, "s"); regErr != nil {
 		t.Fatalf("Register err = %v", regErr)
 	}
 
@@ -480,7 +491,7 @@ func TestDeliver_blockedPrivateAtDelivery(t *testing.T) {
 	}))
 	t.Cleanup(srv.Close)
 
-	if err := w.Register(ctx, "e", srv.URL, ""); err != nil {
+	if err := w.Register(ctx, "e", srv.URL, "s"); err != nil {
 		t.Fatalf("Register err = %v", err)
 	}
 
@@ -715,7 +726,7 @@ func TestConcurrent_registerDeliver(t *testing.T) {
 			defer wg.Done()
 
 			event := fmt.Sprintf("e%d", i%4)
-			if err := w.Register(t.Context(), event, fmt.Sprintf("%s/%d", srv.URL, i), ""); err != nil {
+			if err := w.Register(t.Context(), event, fmt.Sprintf("%s/%d", srv.URL, i), "s"); err != nil {
 				t.Errorf("Register err = %v", err)
 				return
 			}

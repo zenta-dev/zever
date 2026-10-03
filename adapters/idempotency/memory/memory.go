@@ -24,23 +24,25 @@ func (e *entry) expired(now time.Time) bool {
 	return now.After(e.expires)
 }
 
+// janitorInterval is how often the background goroutine reaps expired
+// records. Expired records are also reaped lazily on access.
+var janitorInterval = time.Minute
+
 type store struct {
-	mu      sync.Mutex
-	entries map[string]*entry
-	prefix  string
-	ttl     time.Duration
-	closed  atomic.Bool
+	mu         sync.Mutex
+	entries    map[string]*entry
+	prefix     string
+	ttl        time.Duration
+	maxEntries int
+	closed     atomic.Bool
+	stop       chan struct{}
+	done       chan struct{}
 }
 
-func (s *store) sweepLocked(now time.Time) {
-	for k, e := range s.entries {
-		if e.expired(now) {
-			delete(s.entries, k)
-		}
-	}
-}
-
-// New creates an in-memory idempotency Store from opts.
+// New creates an in-memory idempotency Store from opts. Non-positive
+// MaxEntries resolves to idempotency.DefaultMaxEntries; past the bound a
+// new key evicts the soonest-expire live record. A background janitor
+// reaps expired records periodically and is joined on Close.
 func New(opts idempotency.Options) (idempotency.Store, error) {
 	if err := opts.Validate(); err != nil {
 		return nil, fmt.Errorf("memory: %w", err)
@@ -56,11 +58,23 @@ func New(opts idempotency.Options) (idempotency.Store, error) {
 		prefix = "idem:"
 	}
 
-	return &store{
-		entries: make(map[string]*entry),
-		prefix:  prefix,
-		ttl:     ttl,
-	}, nil
+	maxEntries := opts.MaxEntries
+	if maxEntries <= 0 {
+		maxEntries = idempotency.DefaultMaxEntries
+	}
+
+	s := &store{
+		entries:    make(map[string]*entry),
+		prefix:     prefix,
+		ttl:        ttl,
+		maxEntries: maxEntries,
+		stop:       make(chan struct{}),
+		done:       make(chan struct{}),
+	}
+
+	go s.run()
+
+	return s, nil
 }
 
 // maxFingerprintLen caps per-call fingerprints: hashes are tiny and
@@ -103,11 +117,6 @@ func (s *store) Begin(ctx context.Context, key string, opts idempotency.BeginOpt
 		return idempotency.Outcome{}, idempotency.ErrClosed
 	}
 
-	// Opportunistic full-map expiry purge. This is O(n) on every Begin,
-	// which is acceptable for process-local use; beyond ~10k keys prefer
-	// the redis adapter.
-	s.sweepLocked(now)
-
 	k := s.prefix + key
 
 	if e, ok := s.entries[k]; ok && !e.expired(now) {
@@ -122,8 +131,14 @@ func (s *store) Begin(ctx context.Context, key string, opts idempotency.BeginOpt
 		return idempotency.Outcome{Replay: true, Result: slices.Clone(e.result)}, nil
 	}
 
-	// No expired-entry cleanup here: sweepLocked above ran under the same
-	// lock with the same now, so nothing expired can remain.
+	// The live record for k (if any) is expired and will be replaced;
+	// evict before inserting when the table is full.
+	if _, ok := s.entries[k]; ok {
+		delete(s.entries, k)
+	} else {
+		s.evictLocked(now)
+	}
+
 	s.entries[k] = &entry{fp: slices.Clone(opts.Fingerprint), expires: now.Add(ttl)}
 
 	return idempotency.Outcome{}, nil
@@ -166,6 +181,12 @@ func (s *store) Complete(ctx context.Context, key string, fingerprint, result []
 		return nil
 	}
 
+	if _, ok := s.entries[k]; ok {
+		delete(s.entries, k)
+	} else {
+		s.evictLocked(now)
+	}
+
 	s.entries[k] = &entry{
 		fp:      slices.Clone(fingerprint),
 		result:  slices.Clone(result),
@@ -198,15 +219,76 @@ func (s *store) Forget(ctx context.Context, key string) error {
 	return nil
 }
 
-// Close shuts down the store and releases associated resources.
+// Close shuts down the store, stops the janitor, and releases resources.
 func (s *store) Close() error {
 	if s.closed.Swap(true) {
 		return nil
 	}
+
+	close(s.stop)
+	<-s.done
 
 	s.mu.Lock()
 	s.entries = make(map[string]*entry)
 	s.mu.Unlock()
 
 	return nil
+}
+
+// evictLRULocked makes room for one new record when the table is full.
+// Expired records are reaped first; otherwise the soonest-expire live
+// record is evicted so the map cannot grow without bound. Caller must
+// hold s.mu.
+func (s *store) evictLocked(now time.Time) {
+	if len(s.entries) < s.maxEntries {
+		return
+	}
+
+	var victimKey string
+	var victimExpiry time.Time
+	first := true
+
+	for k, e := range s.entries {
+		if e.expired(now) {
+			delete(s.entries, k)
+
+			return
+		}
+
+		if first || e.expires.Before(victimExpiry) {
+			victimKey, victimExpiry, first = k, e.expires, false
+		}
+	}
+
+	if victimKey != "" {
+		delete(s.entries, victimKey)
+	}
+}
+
+func (s *store) run() {
+	t := time.NewTicker(janitorInterval)
+	defer t.Stop()
+	defer close(s.done)
+
+	for {
+		select {
+		case <-t.C:
+			s.sweep()
+		case <-s.stop:
+			return
+		}
+	}
+}
+
+func (s *store) sweep() {
+	now := time.Now()
+
+	s.mu.Lock()
+	defer s.mu.Unlock()
+
+	for k, e := range s.entries {
+		if e.expired(now) {
+			delete(s.entries, k)
+		}
+	}
 }

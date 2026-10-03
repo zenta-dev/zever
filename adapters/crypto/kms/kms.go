@@ -92,10 +92,15 @@ type driver struct {
 	signPriv ed25519.PrivateKey
 }
 
-// New creates a crypto.Crypto using KMS envelope encryption with the
-// deterministic stub client. Test and dev only: production must inject a
-// real KMS client via NewWithClient.
+// New creates a crypto.Crypto using KMS envelope encryption. It fails
+// closed unless opts.DevStub is set: the deterministic stub client provides
+// no real KMS security boundary, so production configs must inject a real
+// KMS client via NewWithClient.
 func New(opts Options) (crypto.Crypto, error) {
+	if !opts.DevStub {
+		return nil, fmt.Errorf("kms: %w: stub client requires DevStub opt-in; use NewWithClient with a real KMS client", crypto.ErrInvalidKey)
+	}
+
 	return NewWithClient(opts, stubClient{})
 }
 

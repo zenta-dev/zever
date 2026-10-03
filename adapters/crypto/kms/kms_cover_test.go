@@ -46,7 +46,7 @@ func (cancelClient) Decrypt(ctx context.Context, _ []byte) ([]byte, error) {
 
 func TestEncrypt_NonceRandomness(t *testing.T) {
 	t.Parallel()
-	c := mustNew(t, Options{KeyID: "test-key-a"})
+	c := mustNew(t, Options{KeyID: "test-key-a", DevStub: true})
 	ctx := t.Context()
 	a, err := c.Encrypt(ctx, []byte("same plaintext"))
 	if err != nil {
@@ -63,7 +63,7 @@ func TestEncrypt_NonceRandomness(t *testing.T) {
 
 func TestDecrypt_VersionNegatives_FailClosed(t *testing.T) {
 	t.Parallel()
-	c := mustNew(t, Options{KeyID: "key-a"})
+	c := mustNew(t, Options{KeyID: "key-a", DevStub: true})
 	ctx := t.Context()
 	enc, err := c.Encrypt(ctx, []byte("secret"))
 	if err != nil {
@@ -87,7 +87,7 @@ func TestEncrypt_RandFailure_Aborts(t *testing.T) {
 	old := randRead
 	randRead = func([]byte) (int, error) { return 0, errors.New("entropy boom") }
 	defer func() { randRead = old }()
-	c := mustNew(t, Options{KeyID: "key-a"})
+	c := mustNew(t, Options{KeyID: "key-a", DevStub: true})
 	if _, err := c.Encrypt(t.Context(), []byte("x")); err == nil {
 		t.Fatal("expected entropy error, got nil")
 	}
@@ -123,7 +123,7 @@ func TestDecrypt_ContextCancel_Preserved(t *testing.T) {
 		t.Fatalf("Encrypt canceled ctx err = %v, want context.Canceled", encErr)
 	}
 	// Decrypt path joins ctx err with integrity so both match.
-	stub, _ := New(Options{KeyID: "key-a"})
+	stub, _ := New(Options{KeyID: "key-a", DevStub: true})
 	enc, err := stub.Encrypt(t.Context(), []byte("x"))
 	if err != nil {
 		t.Fatalf("stub Encrypt err = %v", err)
@@ -133,7 +133,7 @@ func TestDecrypt_ContextCancel_Preserved(t *testing.T) {
 
 func TestConcurrent_EncryptDecrypt(t *testing.T) {
 	t.Parallel()
-	c := mustNew(t, Options{KeyID: "key-a"})
+	c := mustNew(t, Options{KeyID: "key-a", DevStub: true})
 	ctx := t.Context()
 	var wg sync.WaitGroup
 	for i := 0; i < 8; i++ {

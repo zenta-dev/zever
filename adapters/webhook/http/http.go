@@ -64,6 +64,10 @@ func (a *adapter) Register(_ context.Context, event string, target string, secre
 		return ErrMissingTarget
 	}
 
+	if secret == "" {
+		return ErrMissingSecret
+	}
+
 	var err error
 	if a.allowPrivate {
 		err = webhook.ValidateTargetSyntax(target)

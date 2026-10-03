@@ -102,17 +102,21 @@ func (d *driver) Get(ctx context.Context, name string) ([]byte, error) {
 			Data map[string]string `json:"data"`
 		} `json:"data"`
 	}
-	if err := json.NewDecoder(resp.Body).Decode(&out); err != nil {
-		return nil, fmt.Errorf("vault: get %s: decode: %w", name, err)
+	if decErr := json.NewDecoder(resp.Body).Decode(&out); decErr != nil {
+		return nil, fmt.Errorf("vault: get %s: decode: %w", name, decErr)
 	}
 	raw, ok := out.Data.Data["value"]
 	if !ok {
 		return nil, fmt.Errorf("vault: get %s: %w", name, secrets.ErrNotFound)
 	}
-	if decoded, err := base64.StdEncoding.DecodeString(raw); err == nil {
-		return decoded, nil
+	// Set always base64-encodes, so decode strictly: a value that does not
+	// decode was written by a foreign or corrupted client and must never be
+	// returned raw.
+	decoded, err := base64.StdEncoding.DecodeString(raw)
+	if err != nil {
+		return nil, fmt.Errorf("vault: get %s: %w: %w", name, ErrInvalidBase64, err)
 	}
-	return []byte(raw), nil
+	return decoded, nil
 }
 
 // Set stores value under name.

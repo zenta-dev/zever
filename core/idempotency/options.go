@@ -9,6 +9,8 @@ import (
 const (
 	// DefaultTTL is the default reservation lifetime applied by adapters.
 	DefaultTTL = 24 * time.Hour
+	// DefaultMaxEntries bounds the memory adapter's record table before eviction.
+	DefaultMaxEntries = 1000
 	// MaxKeyLen is the maximum allowed idempotency key length in bytes.
 	MaxKeyLen = 255
 )
@@ -37,6 +39,9 @@ type Options struct {
 	DedicatedPool bool `json:"dedicated_pool" toml:"dedicated_pool" yaml:"dedicated_pool"`
 	// Redis holds Redis-specific connection configuration.
 	Redis RedisOptions `json:"redis" toml:"redis" yaml:"redis"`
+	// MaxEntries bounds the number of stored records in the memory adapter
+	// before least-recently-used eviction. Non-positive means DefaultMaxEntries.
+	MaxEntries int `json:"max_entries" toml:"max_entries" yaml:"max_entries"`
 }
 
 // Validate checks options for consistency, joining all violations.

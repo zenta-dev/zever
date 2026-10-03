@@ -36,6 +36,8 @@ type Options struct {
 	DPI int `json:"dpi" toml:"dpi" yaml:"dpi"`
 	// Endpoint holds the optional remote render endpoint URL.
 	Endpoint string `json:"endpoint" toml:"endpoint" yaml:"endpoint"`
+	// AllowInsecure permits http Endpoint for testing. Default false (https only).
+	AllowInsecure bool `json:"allow_insecure" toml:"allow_insecure" yaml:"allow_insecure"`
 	// APIKey holds the remote API key. It is never logged.
 	APIKey string `json:"api_key" toml:"api_key" yaml:"api_key"`
 	// LatexCommand holds the LaTeX compiler command.
