@@ -1,48 +1,80 @@
 # Benchmarks
 
-Measured baseline numbers for router, ORM, and queue hot paths, plus how to
+Measured numbers for router, ORM, and queue hot paths, plus how to
 re-run them. All benchmarks are deterministic (no network, no timing
-assertions) and live in `*_bench_test.go` files next to the code they measure.
+assertions) and live in `*_bench_test.go` files next to the code they
+measure. In-process backends (sqlite `:memory:`, miniredis) keep them
+offline; their absolute numbers are dominated by the backend's own
+parsing, so compare shapes (allocs/op) and relative deltas, not raw ns.
 
 > **Staleness warning:** numbers below are a point-in-time snapshot, not a
 > performance contract. They depend on machine, CPU load, and Go version.
 > Re-run locally before drawing conclusions; treat committed numbers older
 > than a few weeks as stale.
 
-## Results (2026-10-02)
+## Results (2026-10-03)
 
-Router (`adapters/router/fiber`, sequential vs concurrent `ServeHTTP`):
-
-| Benchmark | ns/op | B/op | allocs/op |
-| --- | --- | --- | --- |
-| BenchmarkServeHTTP (cpu=1) | 5,737 | 6,640 | 60 |
-| BenchmarkServeHTTP (cpu=4) | 4,430 | 6,653 | 61 |
-| BenchmarkServeHTTPParallel (cpu=1) | 6,650 | 11,771 | 70 |
-| BenchmarkServeHTTPParallel (cpu=4) | 3,122 | 11,791 | 70 |
-
-ORM (`orm`, sqlite `:memory:`, Preload of 200 authors / 5,000 above-chunk):
+Router (`adapters/router/fiber`, sequential vs concurrent `ServeHTTP`).
+`ServeHTTP` now runs the adaptor over a pooled `*httptest.ResponseRecorder`
+(`recorderPool`); `BenchmarkServeHTTPAdaptor` isolates the adaptor wrapping
+with a no-op handler. "before" is the pre-pool `httptest.NewRecorder()` path.
 
 | Benchmark | ns/op | B/op | allocs/op |
 | --- | --- | --- | --- |
-| BenchmarkPreloadBelowChunkSize (cpu=1) | 440,028 | 114,916 | 3,284 |
-| BenchmarkPreloadBelowChunkSize (cpu=4) | 441,927 | 114,910 | 3,284 |
-| BenchmarkPreloadAboveChunkSize (cpu=1) | 19,334,665 | 3,047,867 | 80,317 |
-| BenchmarkPreloadAboveChunkSize (cpu=4) | 17,449,881 | 3,047,925 | 80,317 |
-| BenchmarkPreloadConcurrent (cpu=1) | 449,707 | 117,204 | 3,301 |
-| BenchmarkPreloadConcurrent (cpu=4) | 450,125 | 116,336 | 3,309 |
+| BenchmarkServeHTTP before (cpu=1) | 5,973 | 6,638 | 60 |
+| BenchmarkServeHTTP after (cpu=1) | 5,874 | 6,062 | 55 |
+| BenchmarkServeHTTP after (cpu=4) | 4,855 | 6,079 | 56 |
+| BenchmarkServeHTTPAdaptor (cpu=1) | 4,651 | 5,457 | 45 |
+| BenchmarkServeHTTPAdaptor (cpu=4) | 3,622 | 5,461 | 45 |
+| BenchmarkServeHTTPParallel (cpu=1) | 8,483 | 11,195 | 65 |
+| BenchmarkServeHTTPParallel (cpu=4) | 4,001 | 11,219 | 65 |
 
-Note: `PreloadConcurrent` matches the sequential time because the sqlite
-`:memory:` adapter pins to a single pooled connection, so workers serialize
-inside `database/sql`. The bench measures contention cost, not speedup.
+The pool removes the recorder's struct/map/buffer allocations from the hot
+path: `ServeHTTP` drops 5 allocs/op and ~576 B/op. `BenchmarkServeHTTPAdaptor`
+shows the adaptor wrapping alone costs ~45 allocs/op (the pooled recorder is
+3 of them).
 
-Queue (`adapters/queue/memory`, Push/Pop/Ack round trip on one topic):
+ORM render (`orm`, sqlite `:memory:`). `escapeLike` and `flattenGroupTerms`
+were hoisted to a package-level replacer / a lazy dedup (linear scan for few
+leaves, map for many). "before" is the per-call `strings.NewReplacer` /
+always-map path.
 
 | Benchmark | ns/op | B/op | allocs/op |
 | --- | --- | --- | --- |
-| BenchmarkMemoryRoundTrip (cpu=1) | 1,784 | 2,440 | 18 |
-| BenchmarkMemoryRoundTrip (cpu=4) | 1,568 | 2,440 | 18 |
-| BenchmarkMemoryRoundTripParallel (cpu=1) | 1,597 | 2,440 | 18 |
-| BenchmarkMemoryRoundTripParallel (cpu=4) | 1,612 | 2,234 | 16 |
+| BenchmarkEscapeLike before (cpu=1) | 1,361 | 6,784 | 8 |
+| BenchmarkEscapeLike after (cpu=1) | 51 | 24 | 1 |
+| BenchmarkEscapeLike after (cpu=4) | 44 | 24 | 1 |
+| BenchmarkFlattenGroupTermsFew before (cpu=1) | 434 | 572 | 7 |
+| BenchmarkFlattenGroupTermsFew after (cpu=1) | 354 | 560 | 3 |
+| BenchmarkFlattenGroupTermsFew after (cpu=4) | 369 | 560 | 3 |
+| BenchmarkFlattenGroupTermsRollup (cpu=1) | 499 | 560 | 3 |
+| BenchmarkFlattenGroupTermsMany (cpu=1) | 7,729 | 21,272 | 75 |
+
+The hoisted replacer cuts `escapeLike` from 8 allocs to 1 (the result
+string). The lazy dedup cuts `flattenGroupTerms` for a few leaves from 7
+allocs to 3 and is also faster (354 vs 434 ns); past the linear-scan
+threshold (`linearDedupMaxLeaves` = 8) it falls back to the map
+(`...Many`), which is the faster shape for many leaves.
+
+Queue (`adapters/queue/db`, stale-claim sweep over sqlite). This is the
+current N+1 reclaim (one SELECT + one UPDATE per stale row) -- see the PR
+body for why it was not collapsed to a single UPDATE.
+
+| Benchmark | ns/op | B/op | allocs/op |
+| --- | --- | --- | --- |
+| BenchmarkReclaimStale (cpu=1) | 4,748,598 | 331,827 | 5,690 |
+| BenchmarkReclaimStale (cpu=4) | 4,869,046 | 331,997 | 5,685 |
+
+Idempotency (`adapters/idempotency/redis`, miniredis). `Begin` and
+`Complete` are now one Lua script each (1 RTT) instead of two client calls.
+Absolute numbers are dominated by miniredis's in-process command parsing.
+
+| Benchmark | ns/op | B/op | allocs/op |
+| --- | --- | --- | --- |
+| BenchmarkBegin (cpu=1) | 152,587 | 190,137 | 786 |
+| BenchmarkBegin (cpu=4) | 128,635 | 190,249 | 786 |
+| BenchmarkComplete (cpu=1) | 162,142 | 198,666 | 793 |
+| BenchmarkComplete (cpu=4) | 133,553 | 198,746 | 793 |
 
 ## Commands
 
@@ -51,14 +83,16 @@ iterations per bench:
 
 ```sh
 go test -run=NONE -bench=. -benchtime=1s -cpu=1,4 -benchmem ./adapters/router/fiber/
+go test -run=NONE -bench=BenchmarkEscapeLike -benchtime=1s -cpu=1,4 -benchmem ./orm/
+go test -run=NONE -bench=BenchmarkFlattenGroupTerms -benchtime=1s -cpu=1,4 -benchmem ./orm/render/
+go test -run=NONE -bench=BenchmarkReclaimStale -benchtime=1s -cpu=1,4 -benchmem ./adapters/queue/db/
+go test -run=NONE -bench=. -benchtime=1s -cpu=1,4 -benchmem ./adapters/idempotency/redis/
 go test -run=NONE -bench=. -benchtime=100x -cpu=1,4 -benchmem ./orm/
-go test -run=NONE -bench=. -benchtime=1s -cpu=1,4 -benchmem ./adapters/queue/memory/
 ```
 
 Each path is its own Go module; run from the repo root with the `go.work`
 workspace active (or `go -C <dir> test ...` from inside the module).
-`-run=NONE` skips functional tests so only benchmarks execute. Total
-runtime is well under a minute on the machine below.
+`-run=NONE` skips functional tests so only benchmarks execute.
 
 ## Machine
 
@@ -70,7 +104,7 @@ runtime is well under a minute on the machine below.
 ## Repro
 
 1. Check out the same commit and ensure `go.work` resolves (`go env GOWORK`).
-2. Run the three commands above; each prints `goos`/`goarch`/`cpu` lines
+2. Run the commands above; each prints `goos`/`goarch`/`cpu` lines
    identifying the machine.
 3. Compare with `benchstat` across runs (`-count=5`) before claiming a
    regression or win; single-run ns/op differences under ~5% are noise.
@@ -87,5 +121,29 @@ Concurrent-load (`b.RunParallel`) coverage:
 - Queue: `BenchmarkMemoryRoundTripParallel`
   (`adapters/queue/memory/memory_bench_test.go`) -- balanced Push/Pop/Ack
   per iteration on one shared topic, flat memory regardless of benchtime.
+
+Adaptor-isolation coverage:
+
+- Router: `BenchmarkServeHTTPAdaptor`
+  (`adapters/router/fiber/fiber_bench_test.go`) -- no-op handler over the
+  pooled recorder, isolating the fasthttpadaptor wrapping from handler logic.
+
+Round-trip coverage (in-process backends):
+
+- Queue: `BenchmarkReclaimStale` (`adapters/queue/db/queue_bench_test.go`) --
+  seeds a batch of expired claims, reclaims them (1 SELECT + N UPDATE),
+  re-stales them with one multi-row UPDATE, repeats.
+- Idempotency: `BenchmarkBegin` / `BenchmarkComplete`
+  (`adapters/idempotency/redis/redis_bench_test.go`) -- fresh key per
+  iteration over one shared miniredis, so every call takes the
+  reservation-miss / upsert path.
+
+Render-coverage (ORM):
+
+- `BenchmarkEscapeLike` (`orm/column_bench_test.go`) -- LIKE-pattern
+  escaping with the hoisted replacer.
+- `BenchmarkFlattenGroupTermsFew` / `...Rollup` / `...Many`
+  (`orm/render/agg_bench_test.go`) -- the lazy dedup: linear scan for few
+  leaves, map fallback past the threshold.
 
 Benchmarks use `b.Context()`; helpers assert `t.Helper` where applicable.

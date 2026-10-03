@@ -262,6 +262,37 @@ func wrapMiddleware(mw func(http.Handler) http.Handler) fiber.Handler {
 	}
 }
 
+// recorderPool recycles *httptest.ResponseRecorder values across serveHTTP
+// calls. A recorder is used only for the duration of one serveHTTP: after the
+// handler returns its status/headers/body are copied into the fiber
+// response, so the recorder can be reset and reused. The body bytes are copied
+// out by fasthttp's AppendBody (which never aliases its argument), so no
+// recorder buffer escapes the call and the reset is race-free.
+var recorderPool = sync.Pool{
+	New: func() any { return httptest.NewRecorder() },
+}
+
+// resetRecorder returns rec to a fresh-from-NewRecorder state so it can be
+// reused, preserving its HeaderMap and Body allocations. The whole-struct
+// assignment is what clears the unexported wroteHeader/result/snapHeader
+// fields -- a field-by-field reset cannot reach them, and a stale wroteHeader
+// would make the next handler's WriteHeader a silent no-op.
+func resetRecorder(rec *httptest.ResponseRecorder) {
+	header := rec.HeaderMap
+	body := rec.Body
+	*rec = httptest.ResponseRecorder{HeaderMap: header, Body: body}
+
+	if header != nil {
+		for k := range header {
+			delete(header, k)
+		}
+	}
+
+	if body != nil {
+		body.Reset()
+	}
+}
+
 // serveHTTP runs h against the current fiber request and merges the recorded
 // status, headers and body back into the fiber response. The body is appended
 // (never replaced) so output from earlier chained handlers is preserved.
@@ -273,7 +304,12 @@ func serveHTTP(c *fiber.Ctx, h http.Handler) {
 		return
 	}
 
-	rec := httptest.NewRecorder()
+	rec := recorderPool.Get().(*httptest.ResponseRecorder)
+	defer func() {
+		resetRecorder(rec)
+		recorderPool.Put(rec)
+	}()
+
 	h.ServeHTTP(rec, r.WithContext(c.Context()))
 
 	for k, vv := range rec.Header() {

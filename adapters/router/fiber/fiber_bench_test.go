@@ -33,6 +33,29 @@ func BenchmarkServeHTTP(b *testing.B) {
 	}
 }
 
+// BenchmarkServeHTTPAdaptor isolates the adaptor wrapping cost: a no-op
+// handler removes handler logic from the measurement, so the ns/op and
+// allocs/op reflect only the fasthttpadaptor conversion, the pooled recorder,
+// and the header/status/body merge back into the fiber response.
+func BenchmarkServeHTTPAdaptor(b *testing.B) {
+	r, err := New(router.Options{})
+	if err != nil {
+		b.Fatalf("New(): %v", err)
+	}
+
+	r.Handle("GET", "/hello/:name", func(w http.ResponseWriter, _ *http.Request) {})
+
+	req := httptest.NewRequestWithContext(context.Background(), http.MethodGet, "/hello/world", nil)
+
+	b.ReportAllocs()
+	b.ResetTimer()
+
+	for i := 0; i < b.N; i++ {
+		resp := httptest.NewRecorder()
+		r.ServeHTTP(resp, req)
+	}
+}
+
 // BenchmarkServeHTTPParallel measures ServeHTTP under concurrent load. Each
 // worker builds its own request/recorder pair (sharing one *http.Request
 // across goroutines is unsafe), so this captures lock contention in the

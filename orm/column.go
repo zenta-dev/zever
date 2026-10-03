@@ -225,15 +225,18 @@ func (c Column[T, V]) Table() string { return c.table }
 // Name returns c's SQL column name.
 func (c Column[T, V]) Name() string { return c.name }
 
+// likeReplacer escapes the LIKE wildcards %, _ and the escape character
+// itself. It is hoisted to a package-level var because it is immutable and
+// concurrency-safe, so escapeLike pays no per-call allocation. Order
+// matters -- backslash must be escaped first, or the escaping added for %
+// and _ would itself be re-escaped.
+var likeReplacer = strings.NewReplacer(`\`, `\\`, `%`, `\%`, `_`, `\_`)
+
 // escapeLike escapes s for safe use inside a LIKE pattern built by
 // Contains/StartsWith/EndsWith: a literal backslash, percent or underscore
-// in s must never be interpreted as a LIKE wildcard. Order matters --
-// backslash must be escaped first, or the escaping added for % and _ would
-// itself be re-escaped.
+// in s must never be interpreted as a LIKE wildcard.
 func escapeLike(s string) string {
-	r := strings.NewReplacer(`\`, `\\`, `%`, `\%`, `_`, `\_`)
-
-	return r.Replace(s)
+	return likeReplacer.Replace(s)
 }
 
 // Contains builds a Column LIKE '%s%' predicate over a string-valued
