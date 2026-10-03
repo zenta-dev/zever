@@ -20,6 +20,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Added
 
+- `flag.GetJSON[T]` — type-safe generic wrapper over `Flag.JSON` that
+  decodes a flag value into a concrete type with a typed fallback.
 - Security hardening (additive, fail-closed defaults): `authz`
   `UnaryServerInterceptorStrict` denying unlisted gRPC methods; opt-in
   `Policy.OwnerField` wiring into resource attributes; `permission.Options`

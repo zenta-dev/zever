@@ -201,7 +201,7 @@ func (k CursorKey[T, V]) Encode() (string, error) {
 	b = appendCursorString(b, k.column.table)
 	b = appendCursorString(b, k.column.name)
 
-	payload, err := encodeCursorValue(any(k.value))
+	payload, err := encodeCursorValue(k.value)
 	if err != nil {
 		return "", err
 	}
@@ -309,14 +309,16 @@ func readCursorString(b []byte) (string, []byte, error) {
 	return string(b[:n]), b[n:], nil
 }
 
-// encodeCursorValue serializes v into its tag byte plus payload. v is one
-// of the CursorKeyValue members; the dispatch is a plain type switch on the
-// exact dynamic type (never reflect). Exact time.Time is encoded as
-// RFC3339Nano UTC text, the same text orm's sqlite path binds timestamps
-// as. Tokens written before the Nano switch (plain RFC3339, no fraction)
-// still decode, since RFC3339Nano parsing accepts them.
-func encodeCursorValue(v any) ([]byte, error) {
-	switch x := v.(type) {
+// encodeCursorValue serializes v into its tag byte plus payload. V is
+// constrained to CursorKeyValue, the same set cursorTagFor[V] decodes
+// against, so an unsupported type is rejected at compile time and the
+// dispatch is a plain type switch on the exact dynamic type (never
+// reflect). Exact time.Time is encoded as RFC3339Nano UTC text, the same
+// text orm's sqlite path binds timestamps as. Tokens written before the
+// Nano switch (plain RFC3339, no fraction) still decode, since RFC3339Nano
+// parsing accepts them.
+func encodeCursorValue[V CursorKeyValue](v V) ([]byte, error) {
+	switch x := any(v).(type) {
 	case string:
 		b := []byte{cursorTagString}
 
