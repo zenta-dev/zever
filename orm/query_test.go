@@ -324,7 +324,7 @@ func TestQueryTablesamplePostgresRenders(t *testing.T) {
 func TestQueryForUpdateOfUnknownTableDropped(t *testing.T) {
 	ctx := t.Context()
 
-	//lint:allow-unsafesql test: ident is from the test's own allowlist
+	// test: ident is from the test's own allowlist
 	col, err := UnsafeIdent[widget, string]("name", []string{"id", "name", "quantity", "bio"})
 	if err != nil {
 		t.Fatalf("UnsafeIdent: %v", err)

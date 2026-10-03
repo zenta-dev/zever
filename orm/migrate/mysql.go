@@ -205,6 +205,6 @@ func introspectMySQLForeignKeys(ctx context.Context, conn db.DB, table string) (
 // create_index row likewise needs the table, which rollback.go's
 // kindCreateIndex branch recovers from row.Table.
 func renderMySQLDropIndex(table, name string) string {
-	//lint:allow-unsafesql identifier is schema-introspected, not user input
+	// identifier is schema-introspected, not user input
 	return fmt.Sprintf("DROP INDEX %s ON %s;", quoteIdent(atlas.DialectMySQL, name), table)
 }

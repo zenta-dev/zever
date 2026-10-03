@@ -61,7 +61,7 @@ func CreateFTS5VirtualTable(tableName string, columns []string) (string, error) 
 		quoted[i] = c
 	}
 
-	//lint:allow-unsafesql identifier is schema-introspected, not user input
+	// identifier is schema-introspected, not user input
 	return fmt.Sprintf("CREATE VIRTUAL TABLE IF NOT EXISTS %s USING fts5(%s);",
 		atlas.QuoteIdent(tableName), strings.Join(quoted, ", ")), nil
 }
@@ -72,6 +72,6 @@ func CreateFTS5VirtualTable(tableName string, columns []string) (string, error) 
 // named for symmetry with CreateFTS5VirtualTable and to keep both halves of
 // the (still unwired) FTS5 lifecycle discoverable from one place.
 func DropFTS5VirtualTable(tableName string) string {
-	//lint:allow-unsafesql identifier is schema-introspected, not user input
+	// identifier is schema-introspected, not user input
 	return fmt.Sprintf("DROP TABLE IF EXISTS %s;", atlas.QuoteIdent(tableName))
 }
