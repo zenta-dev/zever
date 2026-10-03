@@ -15,6 +15,12 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   `google.golang.org/grpc` is held at 1.83.2 (1.84.0 is affected by
   CVE-2026-84445 / GO-2026-6443; no patched stable release yet).
 
+### Fixed
+
+- `zever tinker` no longer deadlocks when the shim hangs: each `call` is bounded
+  by a timeout and kills the shim on expiry, so a stuck read cannot hold the
+  client mutex forever and block later calls or `Close`.
+
 ### Security
 
 - `document/local` render now blocks external network egress: Chrome runs
