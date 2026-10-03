@@ -1,6 +1,6 @@
 // Package s3opts provides a shared typed S3 credential and endpoint helper
 // for media and storage backends. It validates bucket, credentials, region
-// defaults, and endpoint scheme/host, and builds S3 clients via NewCoreClient
+// defaults, and endpoint scheme/host, and builds S3 clients via NewClient
 // without extra network calls. Secrets are never included in errors.
 package s3opts
 
@@ -14,6 +14,7 @@ import (
 	"github.com/aws/aws-sdk-go-v2/service/s3"
 )
 
+// DefaultRegion is the region used when Options.Region is empty.
 const DefaultRegion = "us-east-1"
 
 var (
@@ -23,6 +24,7 @@ var (
 	ErrInvalidRegion      = errors.New("s3opts: invalid region")
 )
 
+// Options holds the S3 endpoint, region, bucket, and static credentials.
 type Options struct {
 	Endpoint        string `json:"endpoint" toml:"endpoint" yaml:"endpoint"`
 	Region          string `json:"region" toml:"region" yaml:"region"`
@@ -34,6 +36,8 @@ type Options struct {
 // Config aliases Options for compatibility.
 type Config = Options
 
+// WithDefaults returns a copy of o with whitespace trimmed and an empty
+// Region replaced by defaultRegion, or DefaultRegion when that is empty.
 func (o Options) WithDefaults(defaultRegion string) Options {
 	if defaultRegion == "" {
 		defaultRegion = DefaultRegion
@@ -51,6 +55,7 @@ func (o Options) WithDefaults(defaultRegion string) Options {
 	return out
 }
 
+// ValidateBucket reports an error when Bucket is empty.
 func (o Options) ValidateBucket() error {
 	if strings.TrimSpace(o.Bucket) == "" {
 		return ErrMissingBucket
@@ -58,6 +63,7 @@ func (o Options) ValidateBucket() error {
 	return nil
 }
 
+// ValidateCredentials reports an error when AccessKeyID or SecretAccessKey is empty.
 func (o Options) ValidateCredentials() error {
 	if strings.TrimSpace(o.AccessKeyID) == "" || strings.TrimSpace(o.SecretAccessKey) == "" {
 		return ErrMissingCredentials
@@ -91,6 +97,8 @@ func validateURL(value string) error {
 	return nil
 }
 
+// ValidateEndpoint reports an error when Endpoint is neither empty nor an
+// http/https URL with a host.
 func (o Options) ValidateEndpoint() error {
 	v := strings.TrimSpace(o.Endpoint)
 	if v == "" {
@@ -99,6 +107,7 @@ func (o Options) ValidateEndpoint() error {
 	return validateURL(v)
 }
 
+// ValidateRegion reports an error when Region is empty or contains whitespace.
 func (o Options) ValidateRegion() error {
 	r := strings.TrimSpace(o.Region)
 	if r == "" {
@@ -110,6 +119,8 @@ func (o Options) ValidateRegion() error {
 	return nil
 }
 
+// Validate reports every problem in o, additionally requiring Bucket when
+// requireBucket is set and credentials when requireCredentials is set.
 func (o Options) Validate(requireBucket, requireCredentials bool) error {
 	var errs []error
 	if err := o.ValidateEndpoint(); err != nil {
@@ -133,6 +144,8 @@ func (o Options) Validate(requireBucket, requireCredentials bool) error {
 
 var coreNewClient = NewCoreClient
 
+// NewClient builds an S3 client and presigner from cfg, prefixing any
+// validation error with prefix. It makes no network calls.
 func NewClient(ctx context.Context, prefix string, cfg Options, urlBase string) (*s3.Client, *s3.PresignClient, error) {
 	region := cfg.Region
 	if region == "" {

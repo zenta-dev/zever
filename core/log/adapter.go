@@ -1,7 +1,6 @@
 package log
 
 // Adapter identifies a registered logging backend.
-
 type Adapter string
 
 const (

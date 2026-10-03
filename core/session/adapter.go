@@ -1,7 +1,6 @@
 package session
 
 // Adapter identifies the session backend implementation.
-
 type Adapter string
 
 const (

@@ -1,7 +1,6 @@
 package analytics
 
 // Adapter identifies the analytics backend implementation.
-
 type Adapter string
 
 const (

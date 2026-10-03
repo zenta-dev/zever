@@ -1,7 +1,6 @@
 package ratelimit
 
 // Adapter identifies the ratelimit backend implementation.
-
 type Adapter string
 
 const (

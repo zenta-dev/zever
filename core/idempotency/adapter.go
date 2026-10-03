@@ -1,7 +1,6 @@
 package idempotency
 
 // Adapter identifies the idempotency backend implementation.
-
 type Adapter string
 
 const (

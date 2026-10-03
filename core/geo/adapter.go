@@ -1,7 +1,6 @@
 package geo
 
 // Adapter identifies the geo backend implementation.
-
 type Adapter string
 
 const (

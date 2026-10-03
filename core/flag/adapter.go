@@ -1,7 +1,6 @@
 package flag
 
 // Adapter identifies the feature-flag backend implementation.
-
 type Adapter string
 
 const (

@@ -1,7 +1,6 @@
 package cache
 
 // Adapter identifies the cache backend selected in Options and the factory registry.
-
 type Adapter string
 
 const (

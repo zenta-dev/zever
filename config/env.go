@@ -59,7 +59,7 @@ func applyEnv(cfg *Config) error {
 			*adapter = value
 			continue
 		}
-		if err := setOptionField(svc, opts, []string{field}, value); err != nil {
+		if err := setOptionField(svc, opts, []string{field}, value, key); err != nil {
 			var unknown *UnknownFieldError
 			if !errors.As(err, &unknown) {
 				return &InvalidOptionsError{Service: svc, Reason: err.Error()}
@@ -68,7 +68,7 @@ func applyEnv(cfg *Config) error {
 				continue
 			}
 			outer, inner, _ := strings.Cut(field, "_")
-			if err := setOptionField(svc, opts, []string{outer, inner}, value); err != nil {
+			if err := setOptionField(svc, opts, []string{outer, inner}, value, key); err != nil {
 				var nested *UnknownFieldError
 				if errors.As(err, &nested) {
 					continue
@@ -250,8 +250,15 @@ func findField(v reflect.Value, name string) (reflect.Value, bool) {
 // them); only value TYPE failures return plain errors (caller wraps them
 // in InvalidOptionsError). Slices, maps, funcs, interfaces, and other
 // complex kinds are rejected as unknown — they have no string form.
-func setOptionField(service string, dst any, path []string, value string) error {
+func setOptionField(service string, dst any, path []string, value string, envName ...string) error {
 	field := strings.Join(path, ".")
+
+	// envName names the source environment variable (e.g. DB_MAXCONNS) for
+	// type-error text; direct callers and tests may omit it.
+	name := ""
+	if len(envName) > 0 {
+		name = envName[0]
+	}
 	// Indirect unwraps one pointer level (dst is *Options; nested fields
 	// may be *struct). It returns an invalid Value for nil pointers and
 	// returns non-pointers unchanged, so validity + struct-kind + settability
@@ -276,20 +283,20 @@ func setOptionField(service string, dst any, path []string, value string) error 
 	if !ok {
 		return &UnknownFieldError{Service: service, Field: field, Suggestion: closest(path[len(path)-1], fieldCandidates(cur))}
 	}
-	return setScalar(service, field, leaf, value)
+	return setScalar(service, field, name, leaf, value)
 }
 
 // setScalar coerces the env string into f by kind. Durations parse via
-// time.ParseDuration ("5s" style). Failures name the field only via
-// scrubbedValue — the raw value is never echoed, so secrets in env/file
-// values cannot leak into error text (decodeOptions already scrubs the
-// file path the same way).
-func setScalar(service, field string, f reflect.Value, value string) error {
+// time.ParseDuration ("5s" style). Failures name the field, source env var,
+// and expected kind via scrubbedValue — the raw value is never echoed, so
+// secrets in env/file values cannot leak into error text (decodeOptions
+// already scrubs the file path the same way).
+func setScalar(service, field, envName string, f reflect.Value, value string) error {
 	miss := func() error { return &UnknownFieldError{Service: service, Field: field} }
 	if f.Type() == durationType {
 		d, err := time.ParseDuration(value)
 		if err != nil {
-			return scrubbedValue(field)
+			return scrubbedValue(field, envName, "duration")
 		}
 		f.SetInt(int64(d))
 		return nil
@@ -301,28 +308,28 @@ func setScalar(service, field string, f reflect.Value, value string) error {
 	case reflect.Bool:
 		b, err := strconv.ParseBool(value)
 		if err != nil {
-			return scrubbedValue(field)
+			return scrubbedValue(field, envName, f.Kind().String())
 		}
 		f.SetBool(b)
 		return nil
 	case reflect.Int, reflect.Int8, reflect.Int16, reflect.Int32, reflect.Int64:
 		n, err := strconv.ParseInt(value, 10, f.Type().Bits())
 		if err != nil {
-			return scrubbedValue(field)
+			return scrubbedValue(field, envName, f.Kind().String())
 		}
 		f.SetInt(n)
 		return nil
 	case reflect.Uint, reflect.Uint8, reflect.Uint16, reflect.Uint32, reflect.Uint64:
 		n, err := strconv.ParseUint(value, 10, f.Type().Bits())
 		if err != nil {
-			return scrubbedValue(field)
+			return scrubbedValue(field, envName, f.Kind().String())
 		}
 		f.SetUint(n)
 		return nil
 	case reflect.Float32, reflect.Float64:
 		n, err := strconv.ParseFloat(value, f.Type().Bits())
 		if err != nil {
-			return scrubbedValue(field)
+			return scrubbedValue(field, envName, f.Kind().String())
 		}
 		f.SetFloat(n)
 		return nil
@@ -331,9 +338,13 @@ func setScalar(service, field string, f reflect.Value, value string) error {
 	}
 }
 
-// scrubbedValue reports an unparseable env value by field name only.
-// strconv and time parse errors quote the offending input, which may be a
-// secret, so only the field name survives.
-func scrubbedValue(field string) error {
-	return fmt.Errorf("%w for field %s", ErrInvalidValue, strconv.Quote(field))
+// scrubbedValue reports an unparseable env value by field name, source env
+// var (when known), and expected kind only. strconv and time parse errors
+// quote the offending input, which may be a secret, so only those survive.
+func scrubbedValue(field, envName, expected string) error {
+	if envName != "" {
+		return fmt.Errorf("%w for field %s from env %s: expected %s", ErrInvalidValue, strconv.Quote(field), envName, expected)
+	}
+
+	return fmt.Errorf("%w for field %s: expected %s", ErrInvalidValue, strconv.Quote(field), expected)
 }

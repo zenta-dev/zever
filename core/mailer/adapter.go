@@ -1,7 +1,6 @@
 package mailer
 
 // Adapter identifies the mailer backend implementation.
-
 type Adapter string
 
 const (

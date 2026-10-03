@@ -1,7 +1,6 @@
 package permission
 
 // Adapter identifies a registered permission backend.
-
 type Adapter string
 
 const (

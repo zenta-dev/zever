@@ -63,7 +63,7 @@ var rootCmd = newRootCmd()
 // (unported commands, help aliases, unknown subcommands with our
 // closest/formatHint did-you-mean style).
 var portedCommands = []string{
-	"new", "generate", "extract",
+	"new", "add", "generate", "extract",
 	"compile", "check", "breaking", "fmt", "doctor", "config",
 	"routes", "explain", "check-boundaries", "check:boundaries", "graph",
 	"serve", "dev", "queue:work", "schedule:run", "tinker",

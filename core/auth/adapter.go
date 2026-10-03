@@ -1,7 +1,6 @@
 package auth
 
 // Adapter identifies the authentication backend implementation.
-
 type Adapter string
 
 const (

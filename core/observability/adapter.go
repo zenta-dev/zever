@@ -1,7 +1,6 @@
 package observability
 
 // Adapter identifies a registered observability backend.
-
 type Adapter string
 
 const (

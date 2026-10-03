@@ -82,7 +82,7 @@ func runFmt(args []string) error {
 
 	resolved, err := resolveInputFiles(posArgs)
 	if err != nil {
-		return err
+		return fmt.Errorf("zever fmt: %w", err)
 	}
 
 	if len(explicit) == 0 {
@@ -103,7 +103,7 @@ func runFmtWith(cfg FmtConfig) error {
 	out := outOrStdout(cfg.Out)
 
 	if len(cfg.Files) == 0 {
-		return errNoInputFiles
+		return fmt.Errorf("zever fmt: %w", errNoInputFiles)
 	}
 
 	var changed []string

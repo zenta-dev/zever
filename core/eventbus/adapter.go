@@ -1,7 +1,6 @@
 package eventbus
 
 // Adapter identifies the eventbus backend implementation.
-
 type Adapter string
 
 const (

@@ -1,7 +1,6 @@
 package tenant
 
 // Adapter identifies the tenant backend implementation.
-
 type Adapter string
 
 const (

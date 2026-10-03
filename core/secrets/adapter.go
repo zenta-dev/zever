@@ -1,7 +1,6 @@
 package secrets
 
 // Adapter identifies the secrets backend implementation.
-
 type Adapter string
 
 const (
