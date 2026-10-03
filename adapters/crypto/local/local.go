@@ -12,8 +12,10 @@ import (
 	"encoding/base64"
 	"errors"
 	"fmt"
+	"os"
 	"sync/atomic"
 
+	"github.com/zenta-dev/zever/config"
 	"github.com/zenta-dev/zever/core/crypto"
 )
 
@@ -32,6 +34,12 @@ var randRead = rand.Read
 func New(opts crypto.Options) (crypto.Crypto, error) {
 	if err := opts.Validate(); err != nil {
 		return nil, fmt.Errorf("local: %w", errors.Join(err, crypto.ErrInvalidKey))
+	}
+
+	// Fail closed in production: the deterministic dev/test key must never
+	// protect real data. Set ZEVER_CRYPTO_REQUIRE_REAL_KEY to reject it.
+	if config.IsDevCryptoKey(opts.Key) && os.Getenv("ZEVER_CRYPTO_REQUIRE_REAL_KEY") != "" {
+		return nil, fmt.Errorf("local: %w: refusing the deterministic dev key; set a real crypto key", crypto.ErrInvalidKey)
 	}
 
 	// Validate guarantees base64 success and correct lengths.

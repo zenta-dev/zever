@@ -27,6 +27,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   with `--host-resolver-rules="MAP * ~NOTFOUND, EXCLUDE localhost"` and
   `--disable-background-networking`, so untrusted HTML cannot trigger SSRF to
   internal services or cloud metadata endpoints via embedded resources.
+- `crypto/local` now fails closed when the deterministic dev key is used and
+  `ZEVER_CRYPTO_REQUIRE_REAL_KEY` is set, so production deployments can reject
+  the publicly known dev key instead of silently running with it. Added
+  `config.IsDevCryptoKey` for the check.
 - `vault` secrets adapter now closes HTTP response bodies on every call
   (previously leaked a connection per operation). `argon2id` `Verify` and
   `NeedsRehash` reject stored-hash parameters outside the supported ranges
