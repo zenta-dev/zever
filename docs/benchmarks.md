@@ -126,6 +126,25 @@ Absolute numbers are dominated by miniredis's in-process command parsing.
 | BenchmarkComplete (cpu=1) | 162,142 | 198,666 | 793 |
 | BenchmarkComplete (cpu=4) | 133,553 | 198,746 | 793 |
 
+Job worker (`core/job`, empty-poll backoff). `runLoop` used to call
+`time.After(wait)` on every empty poll, allocating a fresh timer each time;
+it now creates one `*time.Timer` for the run and `Reset`s it per poll,
+stopping it on exit. `BenchmarkWorkerEmptyPoll` measures the first empty
+poll in a run (attempt 0, wait 0). "before" is the `time.After` path.
+Medians of 5 runs.
+
+| Benchmark | ns/op | B/op | allocs/op |
+| --- | --- | --- | --- |
+| BenchmarkWorkerEmptyPoll before (cpu=1) | 379.0 | 248 | 3 |
+| BenchmarkWorkerEmptyPoll after (cpu=1) | 241.7 | 0 | 0 |
+| BenchmarkWorkerEmptyPoll before (cpu=4) | 335.0 | 248 | 3 |
+| BenchmarkWorkerEmptyPoll after (cpu=4) | 237.8 | 0 | 0 |
+
+Reusing the timer removes the 3 allocs/op (timer, channel, runtime timer)
+and 248 B/op from every idle poll, and cuts the wait path ~1.6x at cpu=1
+(379.0 to 241.7 ns/op). Backoff values are unchanged: the first poll in a
+run still waits 0, then 1ms, 2ms, 4ms, ..., capped at `DefaultMaxPollWait`.
+
 ## Commands
 
 Router and queue are fast, so they run 1s per bench; ORM runs 100
@@ -137,6 +156,7 @@ go test -run=NONE -bench=BenchmarkEscapeLike -benchtime=1s -cpu=1,4 -benchmem ./
 go test -run=NONE -bench=BenchmarkFlattenGroupTerms -benchtime=1s -cpu=1,4 -benchmem ./orm/render/
 go test -run=NONE -bench=BenchmarkReclaimStale -benchtime=1s -cpu=1,4 -benchmem ./adapters/queue/db/
 go test -run=NONE -bench=. -benchtime=1s -cpu=1,4 -benchmem ./adapters/idempotency/redis/
+go test -run=NONE -bench=BenchmarkWorkerEmptyPoll -benchtime=1s -cpu=1,4 -benchmem ./core/job/
 go test -run=NONE -bench=. -benchtime=100x -cpu=1,4 -benchmem ./orm/
 ```
 
@@ -192,6 +212,9 @@ Round-trip coverage (in-process backends):
   (`adapters/idempotency/redis/redis_bench_test.go`) -- fresh key per
   iteration over one shared miniredis, so every call takes the
   reservation-miss / upsert path.
+- Job worker: `BenchmarkWorkerEmptyPoll` (`core/job/worker_bench_test.go`)
+  -- the first empty poll in a run (attempt 0, wait 0) with a reused timer,
+  so the timer allocation shows up directly in allocs/op.
 
 Render-coverage (ORM):
 
