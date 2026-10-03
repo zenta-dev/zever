@@ -8,23 +8,37 @@ import (
 	"time"
 )
 
+// ScanValue constrains Option's T to the driver-compatible types a nullable
+// column can actually be scanned into: the fixed-width numeric kinds, string,
+// []byte, bool, time.Time, and orm.JSONText (a named string type, covered by
+// ~string). T must be a ScanValue so an unsupported scan type is a compile
+// error rather than a runtime one. For a maybe-wrapper over an arbitrary
+// (e.g. struct/entity) type that is never scanned, use Nullable instead.
+type ScanValue interface {
+	~string | ~[]byte | ~int64 | ~int32 | ~float64 | ~float32 | ~bool | time.Time
+}
+
 // Option is the scan-side representation of a nullable column: unlike
 // NullableColumn (predicate-building, bare-V-only), Option[T] is what a
 // codegen'd Scan method reads a NULL-capable column into. The two concepts
 // are deliberately split: NullableColumn.Eq must not accept an Option[V],
 // so "compare to NULL" is only ever spellable as IsNull()/IsNotNull().
 //
+// T must be a ScanValue: an unsupported scan type is rejected at compile
+// time. For a maybe-wrapper over an arbitrary type that is never scanned
+// (a struct/entity produced by an outer join), use Nullable instead.
+//
 // The zero value of Option[T] is None (IsSome reports false).
-type Option[T any] struct {
+type Option[T ScanValue] struct {
 	v     T
 	valid bool
 }
 
 // Some builds a present Option holding v.
-func Some[T any](v T) Option[T] { return Option[T]{v: v, valid: true} }
+func Some[T ScanValue](v T) Option[T] { return Option[T]{v: v, valid: true} }
 
 // None builds an absent Option.
-func None[T any]() Option[T] { return Option[T]{} }
+func None[T ScanValue]() Option[T] { return Option[T]{} }
 
 // IsSome reports whether o holds a value.
 func (o Option[T]) IsSome() bool { return o.valid }
@@ -46,9 +60,9 @@ func (o Option[T]) GetOr(fallback T) T {
 // None. Otherwise src is coerced into T using the same small set of
 // conversions database/sql itself performs for common driver value types
 // (string, []byte, the fixed-width integer/float kinds, bool, time.Time) --
-// see convertScan below. T must be one of that closed set of
-// driver-compatible types (plus orm.JSONText for `json` columns); anything
-// else is a programmer error caught at scan time with a descriptive error,
+// see convertScan below. T is already constrained to ScanValue, so an
+// unsupported scan type is a compile error; a source value that cannot be
+// coerced into a supported T is still caught here with a descriptive error,
 // never a silent zero value.
 func (o *Option[T]) Scan(src any) error {
 	if src == nil {
@@ -80,9 +94,11 @@ func (o Option[T]) Value() (driver.Value, error) {
 // convertScan coerces a driver-returned src into T, covering exactly the
 // concrete types a codegen'd NullableColumn's underlying Go type can be:
 // string, []byte, int64 and its narrower int32 alias, float64/float32,
-// bool, and time.Time. Anything else -- including a genuinely unsupported T
-// -- returns a clear error rather than reaching for reflection.
-func convertScan[T any](src any) (T, error) {
+// bool, and time.Time. T is constrained to ScanValue, so the remaining
+// default arm only catches a named ScanValue type whose dynamic type is not
+// one of the exact arms above; it returns a clear error rather than reaching
+// for reflection.
+func convertScan[T ScanValue](src any) (T, error) {
 	var zero T
 
 	switch any(zero).(type) {

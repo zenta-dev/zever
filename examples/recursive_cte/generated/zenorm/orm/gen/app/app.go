@@ -62,7 +62,7 @@ func JoinEmployeeManager(left orm.Query[Employee, *Employee], joinType orm.JoinT
 }
 
 // LeftJoinEmployeeManager starts a null-safe LEFT JOIN from Employees through the "manager" relation: an
-// unmatched Employee row comes back with an explicit orm.Option[Employee] rather
+// unmatched Employee row comes back with an explicit orm.Nullable[Employee] rather
 // than a zero-valued struct that could be mistaken for a real match.
 func LeftJoinEmployeeManager(left orm.Query[Employee, *Employee]) orm.LeftJoin2[Employee, *Employee, Employee, *Employee] {
 	return orm.LeftJoinOn(left, EmployeeManagerRel)
@@ -82,7 +82,7 @@ func JoinEmployeeReports(left orm.Query[Employee, *Employee], joinType orm.JoinT
 }
 
 // LeftJoinEmployeeReports starts a null-safe LEFT JOIN from Employees through the "reports" relation: an
-// unmatched Employee row comes back with an explicit orm.Option[Employee] rather
+// unmatched Employee row comes back with an explicit orm.Nullable[Employee] rather
 // than a zero-valued struct that could be mistaken for a real match.
 func LeftJoinEmployeeReports(left orm.Query[Employee, *Employee]) orm.LeftJoin2[Employee, *Employee, Employee, *Employee] {
 	return orm.LeftJoinOn(left, EmployeeReportsRel)

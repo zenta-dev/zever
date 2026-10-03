@@ -52,11 +52,11 @@ func ExampleQuery_All() {
 
 // ExampleOption_Get reads back the value/presence pair an Option holds.
 func ExampleOption_Get() {
-	present := Some(42)
+	present := Some(int64(42))
 	v, ok := present.Get()
 	fmt.Println(v, ok)
 
-	absent := None[int]()
+	absent := None[int64]()
 	v2, ok2 := absent.Get()
 	fmt.Println(v2, ok2)
 	// Output:
