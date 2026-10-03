@@ -12,6 +12,8 @@ const (
 	DefaultIdleTTL = 10 * time.Minute
 	// DefaultSweepInterval is the default idle-entry sweep interval applied by adapters for reaping idle entries.
 	DefaultSweepInterval = time.Minute
+	// DefaultMaxEntries bounds the memory adapter's bucket table before LRU eviction.
+	DefaultMaxEntries = 1000
 	// MaxKeyLen is the maximum allowed rate-limit key length.
 	MaxKeyLen = 256
 )
@@ -38,6 +40,9 @@ type Options struct {
 	IdleTTL time.Duration `json:"idle_ttl" toml:"idle_ttl" yaml:"idle_ttl"`
 	// SweepInterval is the idle-entry sweep interval. Zero means the adapter default; negative fails.
 	SweepInterval time.Duration `json:"sweep_interval" toml:"sweep_interval" yaml:"sweep_interval"`
+	// MaxEntries bounds the number of stored buckets in the memory adapter
+	// before least-recently-used eviction. Non-positive means DefaultMaxEntries.
+	MaxEntries int `json:"max_entries" toml:"max_entries" yaml:"max_entries"`
 	// Redis holds Redis-specific connection configuration.
 	Redis RedisOptions `json:"redis" toml:"redis" yaml:"redis"`
 }

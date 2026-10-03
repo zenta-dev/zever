@@ -19,7 +19,7 @@ func mustNew(t *testing.T, opts Options) crypto.Crypto {
 
 func TestEncryptDecrypt_RoundTrip(t *testing.T) {
 	t.Parallel()
-	c := mustNew(t, Options{KeyID: "test-key-a"})
+	c := mustNew(t, Options{KeyID: "test-key-a", DevStub: true})
 	ctx := t.Context()
 	plaintext := []byte("hello kms envelope")
 	enc, err := c.Encrypt(ctx, plaintext)
@@ -40,14 +40,14 @@ func TestEncryptDecrypt_RoundTrip(t *testing.T) {
 
 func TestRotation_DecryptWithKeyIDs(t *testing.T) {
 	t.Parallel()
-	c1 := mustNew(t, Options{KeyID: "key-a"})
+	c1 := mustNew(t, Options{KeyID: "key-a", DevStub: true})
 	ctx := t.Context()
 	enc, err := c1.Encrypt(ctx, []byte("rotate me"))
 	if err != nil {
 		t.Fatalf("Encrypt err = %v", err)
 	}
 	// New primary B, but allow A for rotation.
-	c2 := mustNew(t, Options{KeyID: "key-b", KeyIDs: []string{"key-a"}})
+	c2 := mustNew(t, Options{KeyID: "key-b", KeyIDs: []string{"key-a"}, DevStub: true})
 	dec, err := c2.Decrypt(ctx, enc)
 	if err != nil {
 		t.Fatalf("Decrypt after rotation err = %v", err)
@@ -59,8 +59,8 @@ func TestRotation_DecryptWithKeyIDs(t *testing.T) {
 
 func TestDecrypt_WrongKey_Fails(t *testing.T) {
 	t.Parallel()
-	c1 := mustNew(t, Options{KeyID: "key-a"})
-	c2 := mustNew(t, Options{KeyID: "key-b"})
+	c1 := mustNew(t, Options{KeyID: "key-a", DevStub: true})
+	c2 := mustNew(t, Options{KeyID: "key-b", DevStub: true})
 	ctx := t.Context()
 	enc, err := c1.Encrypt(ctx, []byte("secret"))
 	if err != nil {
@@ -73,7 +73,7 @@ func TestDecrypt_WrongKey_Fails(t *testing.T) {
 
 func TestDecrypt_Tampered_Fails(t *testing.T) {
 	t.Parallel()
-	c := mustNew(t, Options{KeyID: "key-a"})
+	c := mustNew(t, Options{KeyID: "key-a", DevStub: true})
 	ctx := t.Context()
 	enc, err := c.Encrypt(ctx, []byte("tamper me"))
 	if err != nil {
@@ -95,5 +95,15 @@ func TestNew_EmptyKeyID_FailsClosed(t *testing.T) {
 	}
 	if _, err := NewWithClient(Options{}, StubClient()); err == nil {
 		t.Fatal("expected error for empty KeyID with client, got nil")
+	}
+}
+
+func TestNew_StubRequiresDevStubOptIn(t *testing.T) {
+	t.Parallel()
+	if _, err := New(Options{KeyID: "key-a"}); err == nil {
+		t.Fatal("expected error for stub without DevStub, got nil")
+	}
+	if _, err := New(Options{KeyID: "key-a", DevStub: true}); err != nil {
+		t.Fatalf("DevStub opt-in should allow stub: %v", err)
 	}
 }

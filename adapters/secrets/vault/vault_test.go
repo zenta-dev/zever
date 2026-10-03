@@ -166,6 +166,23 @@ func TestRoundTrip_GetSetDeleteList(t *testing.T) {
 	}
 }
 
+func TestGet_RawValue_ErrInvalidBase64(t *testing.T) {
+	t.Parallel()
+
+	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, _ *http.Request) {
+		w.Header().Set("Content-Type", "application/json")
+		_ = json.NewEncoder(w).Encode(map[string]any{
+			"data": map[string]any{"data": map[string]string{"value": "!!!not-base64!!!"}},
+		})
+	}))
+	t.Cleanup(srv.Close)
+
+	s := mustNew(t, Options{Addr: srv.URL, Token: "t", Mount: "secret"})
+	if _, err := s.Get(t.Context(), "raw"); !errors.Is(err, ErrInvalidBase64) {
+		t.Fatalf("err = %v, want ErrInvalidBase64", err)
+	}
+}
+
 func TestGet_Missing_ErrNotFound(t *testing.T) {
 	srv := mustStubServer(t, "test-token", "secret")
 	s := mustNew(t, Options{Addr: srv.URL, Token: "test-token", Mount: "secret"})

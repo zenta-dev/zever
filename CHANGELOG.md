@@ -36,9 +36,42 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   `Path=/`, and omits any `Domain` (which would widen the cookie to
   subdomains, defeating the host-only guarantee); `__Secure-` forces
   `Secure`. The default (no prefix) and `SameSite` behavior are unchanged.
+- `ai/gemini` no longer auto-disables TLS verification for loopback
+  `BaseURL`: the new `ai.Options.AllowInsecure` (https-only default,
+  matching `geo`/`i18n`) is required to skip verification. Loopback
+  endpoints now verify certificates unless explicitly opted out.
+- `document/remote` no longer unconditionally allows insecure endpoints:
+  the new `document.Options.AllowInsecure` gates http endpoints
+  (https-only default, matching `geo`/`i18n`).
+- `crypto/kms` `New` fails closed unless the new `Options.DevStub` opt-in
+  is set: the deterministic stub client provides no real KMS boundary, so
+  production configs must inject a real client via `NewWithClient`.
+- `secrets/vault` `Get` decodes base64 strictly and returns the new
+  `ErrInvalidBase64` on malformed values instead of silently falling back
+  to the raw value (which corrupted secrets written by foreign clients).
+- `webhook/http` `Register` rejects an empty target secret with the new
+  `ErrMissingSecret`: every delivery now carries `X-Hub-Signature-256` and
+  is verifiable by the receiver.
+- `tenant/header` rejects case-variant duplicate tenant headers with the
+  new `ErrDuplicateHeader` (previously resolved in nondeterministic
+  map-iteration order) and validates resolved tenant IDs (1-128 chars of
+  `[A-Za-z0-9._-]`) with the new `ErrInvalidTenantID`.
+
+### Changed
+
+- `ratelimit/memory` bounds its bucket table via the new
+  `ratelimit.Options.MaxEntries` (default 1000, mirroring `lock/memory`);
+  past the bound a new key evicts the least-recently-used live bucket.
+- `idempotency/memory` bounds its record table via the new
+  `idempotency.Options.MaxEntries` (default 1000) with soonest-expiry
+  eviction, and replaces the per-`Begin` O(n) full-map purge with a
+  background janitor goroutine joined on `Close`.
 
 ### Added
 
+- Fuzz targets (seed-corpus regression tests, run with `-fuzz`):
+  `config.FuzzDecodeFile` (YAML/JSON decode path), `orm/render.FuzzRenderRaw`
+  (raw/identifier/JSON render path), `core/session.FuzzValidateID`.
 - `flag.GetJSON[T]` — type-safe generic wrapper over `Flag.JSON` that
   decodes a flag value into a concrete type with a typed fallback.
 - Security hardening (additive, fail-closed defaults): `authz`

@@ -249,6 +249,45 @@ func TestCompleteWithoutBeginUpserts(t *testing.T) {
 	}
 }
 
+func TestMaxEntriesEvictsSoonestExpiry(t *testing.T) {
+	t.Parallel()
+
+	s, err := memory.New(idempotency.Options{MaxEntries: 2})
+	if err != nil {
+		t.Fatalf("New: %v", err)
+	}
+	t.Cleanup(func() { _ = s.Close() })
+
+	ctx := t.Context()
+	fp := []byte("fp")
+
+	if _, berr := s.Begin(ctx, "k1", idempotency.BeginOptions{Fingerprint: fp, TTL: time.Hour}); berr != nil {
+		t.Fatalf("Begin k1: %v", berr)
+	}
+	if _, berr := s.Begin(ctx, "k2", idempotency.BeginOptions{Fingerprint: fp, TTL: 2 * time.Hour}); berr != nil {
+		t.Fatalf("Begin k2: %v", berr)
+	}
+
+	// Table full: inserting k3 must evict k1 (soonest expiry).
+	if _, berr := s.Begin(ctx, "k3", idempotency.BeginOptions{Fingerprint: fp, TTL: 3 * time.Hour}); berr != nil {
+		t.Fatalf("Begin k3: %v", berr)
+	}
+
+	// k2 survived: still the in-progress owner.
+	if _, berr := s.Begin(ctx, "k2", idempotency.BeginOptions{Fingerprint: fp, TTL: 2 * time.Hour}); !errors.Is(berr, idempotency.ErrInProgress) {
+		t.Fatalf("Begin k2 err = %v, want ErrInProgress", berr)
+	}
+
+	// k1 was evicted: re-Begin claims fresh, no replay.
+	out, err := s.Begin(ctx, "k1", idempotency.BeginOptions{Fingerprint: fp, TTL: time.Hour})
+	if err != nil {
+		t.Fatalf("re-Begin k1: %v", err)
+	}
+	if out.Replay {
+		t.Fatal("re-Begin k1 replayed, want fresh claim after eviction")
+	}
+}
+
 func TestExpiryReclaim(t *testing.T) {
 	t.Parallel()
 
