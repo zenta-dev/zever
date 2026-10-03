@@ -137,7 +137,7 @@ func (f *fakeTransport) RoundTrip(_ *http.Request) (*http.Response, error) {
 
 func openWithServer(t *testing.T, srv *httptest.Server) ai.AI { //nolint:unused
 	t.Helper()
-	a, err := New(ai.Options{APIKey: "test-key", BaseURL: srv.URL})
+	a, err := New(ai.Options{APIKey: "test-key", BaseURL: srv.URL, AllowInsecure: true})
 	if err == nil {
 		ad0, ok := a.(*adapter) //nolint:forcetypeassert
 		if !ok {
@@ -163,7 +163,7 @@ func openWithServer(t *testing.T, srv *httptest.Server) ai.AI { //nolint:unused
 
 func openWithKeyAndServer(t *testing.T, key string, srv *httptest.Server) ai.AI {
 	t.Helper()
-	a, err := New(ai.Options{APIKey: key, BaseURL: srv.URL})
+	a, err := New(ai.Options{APIKey: key, BaseURL: srv.URL, AllowInsecure: true})
 	if err != nil {
 		t.Fatalf("Open err = %v", err)
 	}
@@ -224,7 +224,7 @@ func TestGenerate_SuccessMocked(t *testing.T) {
 	srv := httptest.NewTLSServer(http.HandlerFunc(handler))
 	defer srv.Close()
 
-	a, err := New(ai.Options{APIKey: "test-key", BaseURL: srv.URL})
+	a, err := New(ai.Options{APIKey: "test-key", BaseURL: srv.URL, AllowInsecure: true})
 	if err == nil {
 		ad0, ok := a.(*adapter) //nolint:forcetypeassert
 		if !ok {
@@ -331,7 +331,7 @@ func TestGenerate_ErrorMapping(t *testing.T) {
 			}))
 			defer srv.Close()
 
-			a, _ := New(ai.Options{APIKey: "k", BaseURL: srv.URL})
+			a, _ := New(ai.Options{APIKey: "k", BaseURL: srv.URL, AllowInsecure: true})
 			_, err := a.Generate(t.Context(), "models/gemini-1.5-flash", []ai.Message{{Role: ai.RoleUser, Content: "hi"}}, ai.GenerateOptions{})
 			if err == nil {
 				t.Fatalf("want error")
@@ -366,7 +366,7 @@ func TestGenerate_Redaction(t *testing.T) {
 	}))
 	defer srv.Close()
 
-	a, _ := New(ai.Options{APIKey: apiKey, BaseURL: srv.URL})
+	a, _ := New(ai.Options{APIKey: apiKey, BaseURL: srv.URL, AllowInsecure: true})
 	_, err := a.Generate(t.Context(), "models/gemini-1.5-flash", []ai.Message{{Role: ai.RoleUser, Content: "hi"}}, ai.GenerateOptions{})
 	if err == nil {
 		t.Fatal("want error")
@@ -404,7 +404,7 @@ func TestGenerate_WithFunctionCall(t *testing.T) {
 	}))
 	defer srv.Close()
 
-	a, _ := New(ai.Options{APIKey: "k", BaseURL: srv.URL})
+	a, _ := New(ai.Options{APIKey: "k", BaseURL: srv.URL, AllowInsecure: true})
 	gen, err := a.Generate(t.Context(), "models/gemini-1.5-flash", []ai.Message{{Role: ai.RoleUser, Content: "hi"}}, ai.GenerateOptions{})
 	if err != nil {
 		t.Fatalf("err = %v", err)
@@ -1317,18 +1317,33 @@ func TestOpen_InsecureLocalhost(t *testing.T) {
 		_, _ = w.Write([]byte(`{"candidates":[{"content":{"parts":[{"text":"ok"}],"role":"model"}}]}`))
 	}))
 	defer srv.Close()
-	// Use helper which ensures insecure; also test direct Open with localhost sets insecure internally
+
+	// Without opt-in, loopback TLS stays verified.
 	a, err := New(ai.Options{APIKey: "k", BaseURL: srv.URL})
 	if err != nil {
 		t.Fatalf("Open err %v", err)
 	}
 	ad, _ := a.(*adapter) //nolint:forcetypeassert
 	if tr, ok := ad.client.ClientConfig().HTTPClient.Transport.(*http.Transport); ok {
-		if !tr.TLSClientConfig.InsecureSkipVerify {
-			t.Error("insecure not set")
+		if tr.TLSClientConfig.InsecureSkipVerify {
+			t.Error("insecure set without AllowInsecure opt-in")
 		}
 	}
-	// Also ensure Generate works via insecure
+	if err := a.Close(); err != nil {
+		t.Fatalf("Close err %v", err)
+	}
+
+	// With opt-in, verification is skipped and Generate succeeds.
+	a, err = New(ai.Options{APIKey: "k", BaseURL: srv.URL, AllowInsecure: true})
+	if err != nil {
+		t.Fatalf("Open err %v", err)
+	}
+	ad, _ = a.(*adapter) //nolint:forcetypeassert
+	if tr, ok := ad.client.ClientConfig().HTTPClient.Transport.(*http.Transport); ok {
+		if !tr.TLSClientConfig.InsecureSkipVerify {
+			t.Error("insecure not set with AllowInsecure")
+		}
+	}
 	_, err = a.Generate(t.Context(), "m", []ai.Message{{Role: ai.RoleUser, Content: "hi"}}, ai.GenerateOptions{})
 	if err != nil {
 		t.Fatalf("Generate err %v", err)
