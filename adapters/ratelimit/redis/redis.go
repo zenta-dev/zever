@@ -35,16 +35,18 @@ var _ ratelimit.Limiter = (*limiter)(nil)
 const DefaultPingTimeout = 3 * time.Second
 
 type limiter struct {
-	client *goredis.Client
-	prefix string
-	rate   float64
-	burst  int
-	closed atomic.Bool
+	client  *goredis.Client
+	release func() error
+	prefix  string
+	rate    float64
+	burst   int
+	closed  atomic.Bool
 }
 
-// New creates a Redis-backed ratelimit.Limiter with its own client from
-// internal/redis. IdleTTL/SweepInterval are meaningless for Redis and are
-// ignored. It verifies connectivity with a 3s ping check.
+// New creates a Redis-backed ratelimit.Limiter using a shared client from
+// the redisclient registry (one pool per resolved addr+DB).
+// IdleTTL/SweepInterval are meaningless for Redis and are ignored. It
+// verifies connectivity with a 3s ping check.
 func New(opts ratelimit.Options) (ratelimit.Limiter, error) {
 	if err := opts.Validate(); err != nil {
 		return nil, fmt.Errorf("redis: invalid options: %w", err)
@@ -55,7 +57,7 @@ func New(opts ratelimit.Options) (ratelimit.Limiter, error) {
 		prefix = "ratelimit"
 	}
 
-	client, err := redisclient.New(opts.Redis.Options)
+	client, release, err := redisclient.Shared(opts.Redis.Options)
 	if err != nil {
 		return nil, fmt.Errorf("redis: connect %q: %w", redactAddr(opts.Redis.Addr), err)
 	}
@@ -64,16 +66,17 @@ func New(opts ratelimit.Options) (ratelimit.Limiter, error) {
 	defer cancel()
 
 	if err := client.Ping(ctx).Err(); err != nil {
-		_ = client.Close()
+		_ = release()
 
 		return nil, fmt.Errorf("redis: ping %q: %w", redactAddr(opts.Redis.Addr), err)
 	}
 
 	return &limiter{
-		client: client,
-		prefix: prefix,
-		rate:   opts.Rate,
-		burst:  opts.Burst,
+		client:  client,
+		release: release,
+		prefix:  prefix,
+		rate:    opts.Rate,
+		burst:   opts.Burst,
 	}, nil
 }
 
@@ -184,7 +187,11 @@ func (l *limiter) Close() error {
 		return nil
 	}
 
-	return redisclient.Close(l.client)
+	if l.release == nil {
+		return nil
+	}
+
+	return l.release()
 }
 
 // Name returns the adapter name.

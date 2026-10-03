@@ -17,8 +17,9 @@ import (
 )
 
 type redisAdapter struct {
-	client *goredis.Client
-	closed atomic.Bool
+	client  *goredis.Client
+	release func() error
+	closed  atomic.Bool
 }
 
 // DefaultPingTimeout bounds the startup connectivity check.
@@ -48,13 +49,16 @@ func connOptions(opts cache.Options) redisopt.Options {
 	}
 }
 
-// New creates a Redis-backed cache.Cache using a shared client from internal/redis, verifies connectivity with a 3s ping check, and reports failures with the redacted address in errors.
+// New creates a Redis-backed cache.Cache using a shared client from the
+// redisclient registry, verifies connectivity with a 3s ping check, and
+// reports failures with the redacted address in errors. Clients sharing the
+// same resolved addr+DB are shared across batteries.
 func New(opts cache.Options) (cache.Cache, error) {
 	if err := opts.Validate(); err != nil {
 		return nil, err
 	}
 
-	client, err := redisclient.New(connOptions(opts))
+	client, release, err := redisclient.Shared(connOptions(opts))
 	if err != nil {
 		return nil, fmt.Errorf("cache: connect %q error: %w", redactURL(opts), err)
 	}
@@ -63,12 +67,12 @@ func New(opts cache.Options) (cache.Cache, error) {
 	defer cancel()
 
 	if err := client.Ping(ctx).Err(); err != nil {
-		_ = client.Close()
+		_ = release()
 
 		return nil, fmt.Errorf("cache: ping %q error: %w", redactURL(opts), err)
 	}
 
-	return &redisAdapter{client: client}, nil
+	return &redisAdapter{client: client, release: release}, nil
 }
 
 // redactURL returns opts.URL (or opts.Addr, if URL is empty) with any
@@ -229,5 +233,9 @@ func (a *redisAdapter) Close(_ context.Context) error {
 		return nil
 	}
 
-	return redisclient.Close(a.client)
+	if a.release == nil {
+		return nil
+	}
+
+	return a.release()
 }
