@@ -15,7 +15,6 @@ import (
 	"os"
 	"sync/atomic"
 
-	"github.com/zenta-dev/zever/config"
 	"github.com/zenta-dev/zever/core/crypto"
 )
 
@@ -38,7 +37,7 @@ func New(opts crypto.Options) (crypto.Crypto, error) {
 
 	// Fail closed in production: the deterministic dev/test key must never
 	// protect real data. Set ZEVER_CRYPTO_REQUIRE_REAL_KEY to reject it.
-	if config.IsDevCryptoKey(opts.Key) && os.Getenv("ZEVER_CRYPTO_REQUIRE_REAL_KEY") != "" {
+	if crypto.IsDevCryptoKey(opts.Key) && os.Getenv("ZEVER_CRYPTO_REQUIRE_REAL_KEY") != "" {
 		return nil, fmt.Errorf("local: %w: refusing the deterministic dev key; set a real crypto key", crypto.ErrInvalidKey)
 	}
 
