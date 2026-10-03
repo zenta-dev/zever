@@ -184,6 +184,16 @@ tidy-all: ## Run go mod tidy in every module (override list via MODULES)
 tidy-check-all: ## Verify go.mod/go.sum are tidy in every module (override list via MODULES)
 	set -e; for d in $(if $(MODULES),$(MODULES),$(SHARD_MODULES)); do echo "== $$d =="; (cd $$d && $(GO) mod tidy -diff); done
 
+deps-sync: ## Reconcile dependency versions across all modules after a bump
+	$(MAKE) tidy-all
+	GOWORK=off go -C docs/examples mod tidy
+	GOWORK=off go -C examples/external-sms mod tidy
+
+deps-sync-check: ## Verify no dependency drift remains after a bump
+	$(MAKE) tidy-check-all
+	GOWORK=off go -C docs/examples mod tidy -diff
+	GOWORK=off go -C examples/external-sms mod tidy -diff
+
 lint-all: ## Run golangci-lint in every module (shard via SHARD_TOTAL/SHARD_INDEX, override list via MODULES)
 	@command -v $(GOLANGCI_LINT) >/dev/null 2>&1 || { printf '%s\n' "golangci-lint not found: run 'make setup'"; exit 1; }
 	failed=""; for d in $(if $(MODULES),$(MODULES),$(SHARD_MODULES)); do echo "== $$d =="; if ! (cd $$d && $(GOLANGCI_LINT) run ./...); then failed="$$failed $$d"; echo "::error::module failed: $$d"; fi; done; [ -z "$$failed" ] || { echo "FAILED modules:$$failed"; exit 1; }
