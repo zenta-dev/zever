@@ -7,6 +7,14 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Dependencies
+
+- Routine dependency refresh: `anthropics/anthropic-sdk-go` 1.75.0 → 1.76.0,
+  `modernc.org/sqlite` 1.59.0 → 1.60.1, `twilio/twilio-go` 1.31.1 → 1.31.2,
+  `openai/openai-go/v3` 3.66.0 → 3.68.0, `posthog/posthog-go` 1.27.0 → 1.27.1.
+  `google.golang.org/grpc` is held at 1.83.2 (1.84.0 is affected by
+  CVE-2026-84445 / GO-2026-6443; no patched stable release yet).
+
 ### Security
 
 - `vault` secrets adapter now closes HTTP response bodies on every call
