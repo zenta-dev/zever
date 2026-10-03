@@ -169,6 +169,13 @@ func decodeHash(encoded string) (decodedParams, []byte, []byte, error) {
 		return decodedParams{}, nil, nil, password.ErrInvalidHash
 	}
 
+	// Reject parameter values outside the supported ranges before handing
+	// them to argon2.IDKey: out-of-range values panic (t/p < 1) or can
+	// exhaust memory (unbounded m) on a corrupt or crafted stored hash.
+	if time < 1 || time > 10 || memory < 8*1024 || memory > 1024*1024 || threads < 1 || threads > 16 {
+		return decodedParams{}, nil, nil, password.ErrInvalidHash
+	}
+
 	salt, err := base64.RawStdEncoding.DecodeString(saltB64)
 	if err != nil {
 		return decodedParams{}, nil, nil, password.ErrInvalidHash
