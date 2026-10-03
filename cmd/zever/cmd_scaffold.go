@@ -6,12 +6,12 @@ import (
 	"github.com/spf13/cobra"
 )
 
-// newScaffoldCmds returns the scaffolding subcommands: new, generate,
+// newScaffoldCmds returns the scaffolding subcommands: new, add, generate,
 // extract. Each wraps its legacy runX entry point without touching the
 // stdlib flag parsing inside: DisableFlagParsing passes raw args (including
 // -h) straight through so existing usage printers keep working.
 func newScaffoldCmds() []*cobra.Command {
-	return []*cobra.Command{newNewCmd(), newGenerateCmd(), newExtractCmd()}
+	return []*cobra.Command{newNewCmd(), newAddCmd(), newGenerateCmd(), newExtractCmd()}
 }
 
 func newNewCmd() *cobra.Command {
@@ -52,6 +52,46 @@ db/seed entrypoints, and internal/app wiring.`,
 	cmd.Flags().String("dir", "", "output directory (default ./<name>)")
 	cmd.Flags().String("framework-version", "", "depend on a published zever version instead of a local replace directive")
 	cmd.Flags().Bool("force", false, "scaffold into a non-empty directory anyway")
+
+	return cmd
+}
+
+// newAddCmd wraps runAdd without touching its stdlib flag parsing:
+// DisableFlagParsing passes raw args (including -h) straight through so
+// addUsageBody and the real flags stay authoritative for execution.
+func newAddCmd() *cobra.Command {
+	cmd := &cobra.Command{
+		Use:   "add <battery>[/<adapter>] [--adapter NAME] [--force] [--module PATH[@VERSION]]",
+		Short: "Add one battery to the calling project",
+		Long: `Add one battery to the calling project: a require (plus a local
+replace for local checkouts) in go.mod, a Register() call in
+internal/app/app.go, and a stanza in zever.yaml with the chosen adapter.`,
+		Example: `  zever add cache
+  zever add cache/redis --force
+  zever add sms/stub --module example.com/sms-plugin`,
+		Args:               cobra.ArbitraryArgs,
+		DisableFlagParsing: true,
+		RunE: func(cmd *cobra.Command, args []string) error {
+			if herr := printHelpIfRequested(cmd, args); herr != nil {
+				if errors.Is(herr, errHelpShown) {
+					return nil
+				}
+
+				return herr
+			}
+
+			if versionRequested(cmd) {
+				printCLIVersion()
+
+				return nil
+			}
+
+			return runAdd(args)
+		},
+	}
+	cmd.Flags().String("adapter", "", "adapter pick, overriding the positional battery/adapter slash form when both agree")
+	cmd.Flags().Bool("force", false, "overwrite the zever.yaml stanza when the battery is already present")
+	cmd.Flags().String("module", "", "plugin battery's Go module path, with optional @version suffix (required for plugin batteries)")
 
 	return cmd
 }

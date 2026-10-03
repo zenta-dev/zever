@@ -57,7 +57,7 @@ func runCheck(args []string) error {
 
 	paths, err := resolveInputFiles(args)
 	if err != nil {
-		return err
+		return fmt.Errorf("zever check: %w", err)
 	}
 
 	if len(args) == 0 {
@@ -74,7 +74,7 @@ func runCheckWith(cfg CheckConfig) error {
 
 	files, err := loadFiles(cfg.Files)
 	if err != nil {
-		return err
+		return fmt.Errorf("zever check: %w", err)
 	}
 
 	_, diags := compile.Compile(files)

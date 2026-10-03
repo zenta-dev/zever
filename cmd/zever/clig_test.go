@@ -29,7 +29,7 @@ func executeRoot(t *testing.T, args ...string) (stdout, stderr string, err error
 // cligCommands is the full top-level command surface the compliance tests
 // pin. Keep in sync with portedCommands (root.go) as commands migrate.
 var cligCommands = []string{
-	"new", "compile", "doctor", "config", "routes", "check",
+	"new", "add", "compile", "doctor", "config", "routes", "check",
 	"breaking", "fmt", "explain", "check-boundaries", "graph",
 	"generate", "extract", "serve", "dev", "queue:work",
 	"schedule:run", "tinker", "db", "completion", "docs",

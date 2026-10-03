@@ -1,7 +1,6 @@
 package i18n
 
 // Adapter identifies the internationalization backend implementation.
-
 type Adapter string
 
 const (

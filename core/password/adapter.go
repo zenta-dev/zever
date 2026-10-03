@@ -1,7 +1,6 @@
 package password
 
 // Adapter identifies the password-hashing backend implementation.
-
 type Adapter string
 
 const (

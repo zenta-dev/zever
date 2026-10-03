@@ -33,7 +33,7 @@ func findHTTPTransport(transports []ir.Transport) (ir.HTTPTransport, bool) {
 func runRoutes(args []string) error {
 	paths, err := resolveInputFiles(args)
 	if err != nil {
-		return err
+		return fmt.Errorf("zever routes: %w", err)
 	}
 
 	if len(args) == 0 {
@@ -51,7 +51,7 @@ func runRoutesWith(cfg RoutesConfig) error {
 
 	files, err := loadFiles(cfg.Files)
 	if err != nil {
-		return err
+		return fmt.Errorf("zever routes: %w", err)
 	}
 
 	result, diags := compile.Compile(files)

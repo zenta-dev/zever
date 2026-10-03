@@ -1,7 +1,6 @@
 package storage
 
 // Adapter identifies a storage backend.
-
 type Adapter string
 
 const (

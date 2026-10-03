@@ -1,7 +1,6 @@
 package vectorstore
 
 // Adapter identifies the vectorstore backend implementation.
-
 type Adapter string
 
 const (

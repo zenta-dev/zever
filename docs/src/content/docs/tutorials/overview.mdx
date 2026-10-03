@@ -4,15 +4,13 @@ description: Runnable example apps under examples/, from single-battery demos to
 ---
 
 Every battery in this framework has a runnable example under `examples/` in
-the repository - no separate module, no extra setup: `go test
-./examples/...` covers all of them with zero infrastructure. Two tutorials
-in this section walk you through the two most complete apps step by step;
-this page is the map of everything else.
-
-There is deliberately no separate Go module under `examples/`: they live in
-the main module so `internal/` packages stay importable and the whole tree
-builds and tests as one unit. If you need a heavier dependency for your own
-experiment, isolate it behind its own `go.mod` the way a real add-on would.
+the repository, all zero-infrastructure. Most live in the `examples` module
+and run with `go test ./examples/...`. The larger apps (`showcase`, `todo`,
+`bookings`, plus `demoapp` and `external-sms`) are deliberately separate Go
+modules with their own `go.mod`, so they are built and tested from their own
+directory or by path (see [Running the examples](#running-the-examples)).
+Two tutorials in this section walk you through the two most complete apps
+step by step; this page is the map of everything else.
 
 ## Full apps
 
@@ -52,16 +50,22 @@ documentation, so `go doc` or reading the source is the fastest way in.
 ## Running the examples
 
 ```sh
-go test ./examples/...        # everything, zero infra, no setup needed
+# examples that live in the `examples` module
+go test ./examples/...        # zero infra, no setup needed
 go test -race ./examples/...  # with the race detector
+
+# the separate full-app modules, from the repo root (workspace-aware)
+go test ./examples/showcase/...
+go test ./examples/todo/...
+go test ./examples/bookings/...
 ```
 
-Expected output for the full run:
+Expected output for the in-module run:
 
 ```text
-ok  github.com/zenta-dev/zever/examples/bookings  0.42s
-ok  github.com/zenta-dev/zever/examples/showcase  0.61s
-ok  github.com/zenta-dev/zever/examples/todo      0.18s
+ok  github.com/zenta-dev/zever/examples/pagination  0.05s
+ok  github.com/zenta-dev/zever/examples/fts         0.03s
+ok  github.com/zenta-dev/zever/examples/transactions 0.04s
 ...
 ```
 
@@ -168,8 +172,8 @@ bytes and fail closed without it.
 ## Troubleshooting
 
 **`go test ./examples/...` fails on a clean clone.**
-Run `go mod download` first, then re-run. Examples share the root module;
-a half-downloaded module cache breaks all of them at once.
+Run `go mod download` first, then re-run. Every module shares one module
+cache, so a half-downloaded cache breaks all of them at once.
 
 **A postgres-backed run fails to connect.**
 The DSN form is `postgres://user:pass@localhost:5432/test?sslmode=disable`.

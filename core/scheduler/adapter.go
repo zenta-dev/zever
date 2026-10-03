@@ -1,7 +1,6 @@
 package scheduler
 
 // Adapter identifies the scheduler backend implementation.
-
 type Adapter string
 
 const (

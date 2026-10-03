@@ -1,7 +1,6 @@
 package lock
 
 // Adapter identifies the lock backend implementation.
-
 type Adapter string
 
 const (

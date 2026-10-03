@@ -1,7 +1,6 @@
 package billing
 
 // Adapter identifies the billing backend implementation.
-
 type Adapter string
 
 const (

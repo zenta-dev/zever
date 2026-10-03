@@ -1,7 +1,6 @@
 package notification
 
 // Adapter identifies the notification backend implementation.
-
 type Adapter string
 
 const (

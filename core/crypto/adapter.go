@@ -1,7 +1,6 @@
 package crypto
 
 // Adapter identifies the cryptography backend implementation.
-
 type Adapter string
 
 const (

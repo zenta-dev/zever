@@ -146,6 +146,17 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Fixed
 
+- `cmd/zever`: `check`, `fmt`, `routes`, `graph`, `check-boundaries`,
+  `explain`, and `db migrate` now prefix "no input .zen files" and
+  file-read errors with their own command name instead of the shared
+  `zever compile:` text.
+- `config`: env parse errors now name the offending variable (e.g.
+  `DB_MAXCONNS`) and the expected kind, not just the field.
+- Docs: README quickstart adds the missing `cd hello` step; the tutorials
+  overview no longer claims `examples/` has no separate Go modules.
+- `zever new`: scaffolded README points at the real
+  `generated/zenorm/orm/gen/app` query-builder path instead of
+  `internal/orm`.
 - `adapters/auth/jwt`: propagate `SignedString` errors instead of
   minting an empty token; reject empty `sub` on verify.
 - Default lease owners in `adapters/workflow/postgres` and

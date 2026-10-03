@@ -1,7 +1,6 @@
 package workflow
 
 // Adapter identifies the workflow backend implementation.
-
 type Adapter string
 
 const (

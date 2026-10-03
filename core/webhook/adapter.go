@@ -1,7 +1,6 @@
 package webhook
 
 // Adapter identifies the webhook backend implementation.
-
 type Adapter string
 
 const (
