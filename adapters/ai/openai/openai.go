@@ -205,6 +205,11 @@ func (a *adapter) Embed(ctx context.Context, model string, inputs []string, opts
 	return result, nil
 }
 
+// Stream returns a channel that emits content and tool-call deltas as they
+// arrive, then a final Done chunk. The producer goroutine sends until the
+// stream ends or ctx is done: cancel the context before dropping the channel,
+// or the producer blocks on send until then.
+//
 //nolint:gocyclo
 func (a *adapter) Stream(ctx context.Context, model string, messages []ai.Message, opts ai.GenerateOptions) (<-chan ai.StreamChunk, error) {
 	if model == "" {

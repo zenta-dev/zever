@@ -44,6 +44,7 @@ const (
 // DefaultRetryMaxDelay caps the redelivery backoff delay.
 // DefaultTimeout is the per-operation timeout used when Options.Timeout is zero.
 // DefaultVisibilityTimeout is the queue visibility timeout used when QueueOpts leaves it zero.
+// DefaultConsumerWorkers is the fixed size of the shared consumer worker pool.
 const (
 	DefaultConsumerStopSlack = 6 * time.Second
 	DefaultPopTimeout        = 5 * time.Second
@@ -53,6 +54,7 @@ const (
 	DefaultRetryMaxDelay     = 72 * time.Hour
 	DefaultTimeout           = 10 * time.Second
 	DefaultVisibilityTimeout = 30 * time.Second
+	DefaultConsumerWorkers   = 8
 )
 
 // retryPolicy computes the delay before redelivering a failed webhook:
@@ -78,10 +80,86 @@ type registration struct {
 	secret string
 }
 
-type consumer struct {
-	stop    chan struct{}
-	done    chan struct{}
-	stopped bool
+// worker is one goroutine of the shared consumer pool. It owns a set of
+// events and serves them round-robin; an event is owned by exactly one
+// worker at a time, so a worker never processes two messages of the same
+// event concurrently and per-event delivery order is preserved. The pool
+// size is fixed at construction, so churning event names cannot grow the
+// goroutine count the way the old one-goroutine-per-event design did.
+type worker struct {
+	stop chan struct{}
+	done chan struct{}
+	wake chan struct{}
+
+	mu     sync.Mutex
+	events map[string]struct{}
+}
+
+func newWorker() *worker {
+	return &worker{
+		stop:   make(chan struct{}),
+		done:   make(chan struct{}),
+		wake:   make(chan struct{}, 1),
+		events: make(map[string]struct{}),
+	}
+}
+
+// hasEvent reports whether event is assigned to w.
+func (w *worker) hasEvent(event string) bool {
+	w.mu.Lock()
+	defer w.mu.Unlock()
+
+	_, ok := w.events[event]
+
+	return ok
+}
+
+// addEvent assigns event to w and wakes the worker if it was idle.
+func (w *worker) addEvent(event string) {
+	w.mu.Lock()
+	w.events[event] = struct{}{}
+	w.mu.Unlock()
+
+	w.signal()
+}
+
+// removeEvent unassigns event from w and wakes it to re-snapshot.
+func (w *worker) removeEvent(event string) {
+	w.mu.Lock()
+	delete(w.events, event)
+	w.mu.Unlock()
+
+	w.signal()
+}
+
+// eventCount returns the number of events assigned to w.
+func (w *worker) eventCount() int {
+	w.mu.Lock()
+	defer w.mu.Unlock()
+
+	return len(w.events)
+}
+
+// eventNames returns a snapshot of w's assigned events.
+func (w *worker) eventNames() []string {
+	w.mu.Lock()
+	defer w.mu.Unlock()
+
+	names := make([]string, 0, len(w.events))
+	for e := range w.events {
+		names = append(names, e)
+	}
+
+	return names
+}
+
+// signal nudges the worker out of its idle wait; buffered so assign and
+// unassign never block.
+func (w *worker) signal() {
+	select {
+	case w.wake <- struct{}{}:
+	default:
+	}
 }
 
 type adapter struct {
@@ -91,7 +169,8 @@ type adapter struct {
 	timeout         time.Duration
 	maxRetries      int
 	dlqTopic        string
-	consumers       map[string]*consumer
+	workers         []*worker
+	consecutive     map[string]int
 	closed          bool
 	client          *http.Client
 	allowPrivate    bool
@@ -137,147 +216,156 @@ func (a *adapter) Register(_ context.Context, event, target, secret string) erro
 	}
 
 	a.regs[event][target] = registration{target: target, secret: secret}
-	a.mu.Unlock()
 
-	if newEvent {
-		a.startConsumer(event) //nolint:contextcheck // spawns a long-running background consumer that must outlive this Register call, so it deliberately takes no context
+	if newEvent && !a.closed {
+		a.assignEventLocked(event)
 	}
+
+	a.mu.Unlock()
 
 	return nil
 }
 
-func (a *adapter) startConsumer(event string) {
-	a.mu.Lock()
+// assignEventLocked assigns event to the least-loaded worker. Callers must
+// hold a.mu.
+func (a *adapter) assignEventLocked(event string) {
+	var best *worker
 
-	if a.closed {
-		a.mu.Unlock()
-		return
+	for _, w := range a.workers {
+		if best == nil || w.eventCount() < best.eventCount() {
+			best = w
+		}
 	}
 
-	c, ok := a.consumers[event]
-	if ok && !c.stopped {
-		select {
-		case <-c.done:
-		default:
-			a.mu.Unlock()
+	if best != nil {
+		best.addEvent(event)
+	}
+}
+
+// unassignEventLocked removes event from whichever worker owns it. Callers
+// must hold a.mu.
+func (a *adapter) unassignEventLocked(event string) {
+	for _, w := range a.workers {
+		if w.hasEvent(event) {
+			w.removeEvent(event)
+
 			return
 		}
 	}
-
-	a.mu.Unlock()
-
-	if ok {
-		a.waitForConsumerDone(c, event)
-	}
-
-	a.mu.Lock()
-
-	if a.closed {
-		a.mu.Unlock()
-		return
-	}
-
-	if _, stillReg := a.regs[event]; !stillReg {
-		a.mu.Unlock()
-		return
-	}
-
-	if c2, ok2 := a.consumers[event]; ok2 {
-		if !c2.stopped {
-			select {
-			case <-c2.done:
-			default:
-				a.mu.Unlock()
-				return
-			}
-		}
-
-		delete(a.consumers, event)
-	}
-
-	c = &consumer{stop: make(chan struct{}), done: make(chan struct{})}
-	a.consumers[event] = c
-	a.mu.Unlock()
-
-	go a.consume(event, c)
 }
 
-func (a *adapter) waitForConsumerDone(c *consumer, event string) {
-	select {
-	case <-c.done:
-	case <-time.After(a.timeout + DefaultConsumerStopSlack):
-		a.log().Warn().Str("event", event).Msg("webhook: consumer did not stop in time")
+// startWorkers builds the fixed consumer pool and starts one goroutine per
+// worker. It runs once at construction; workers outlive any single event.
+func (a *adapter) startWorkers() {
+	a.workers = make([]*worker, DefaultConsumerWorkers)
+
+	for i := range a.workers {
+		a.workers[i] = newWorker()
+		go a.runWorker(a.workers[i])
 	}
 }
 
-func (a *adapter) stopConsumerLocked(event string) {
-	c, ok := a.consumers[event]
-	if !ok || c.stopped {
-		return
-	}
-
-	c.stopped = true
-	close(c.stop)
-}
-
-// consume runs the per-event delivery loop.
-// It uses context.Background by design: the loop outlives any single caller
-// request, and each queue/process operation derives its own bounded timeout.
-func (a *adapter) consume(event string, c *consumer) {
-	defer close(c.done)
-
-	topic := "webhook:" + event
-	consecutiveErrors := 0
+// runWorker is one shared consumer goroutine. It serves its assigned events
+// round-robin -- one pop-and-process pass per event per round -- so an
+// event's messages are handled strictly in pop order. A round that processed
+// nothing idles briefly instead of busy-polling the queue.
+func (a *adapter) runWorker(w *worker) {
+	defer close(w.done)
 
 	for {
 		select {
-		case <-c.stop:
+		case <-w.stop:
 			return
 		default:
 		}
 
-		ctx, cancel := context.WithTimeout(context.Background(), DefaultPopTimeout)
-		msg, err := a.queue.Pop(ctx, topic)
+		events := w.eventNames()
 
-		cancel()
-
-		if err != nil {
-			if a.handleConsumeError(event, err, &consecutiveErrors, c) {
+		if len(events) == 0 {
+			select {
+			case <-w.stop:
 				return
+			case <-w.wake:
 			}
 
 			continue
 		}
 
-		consecutiveErrors = 0
+		worked := false
 
-		a.safeProcess(event, msg)
+		for _, event := range events {
+			select {
+			case <-w.stop:
+				return
+			default:
+			}
+
+			if a.consumeOne(event) {
+				worked = true
+			}
+		}
+
+		if !worked {
+			a.sleepWithStop(w.stop, DefaultIdlePollInterval)
+		}
 	}
 }
 
-func (a *adapter) handleConsumeError(event string, err error, consecutive *int, c *consumer) bool {
-	// errors.Is (not ==): memory/redis Pop may return *EmptyError, which only
-	// matches via Unwrap. Bare == miscounted idle polls as transport errors
-	// and killed consumers after 5 empties.
-	if errors.Is(err, queue.ErrEmpty) {
-		*consecutive = 0
+// consumeOne pops and processes one message for event. It reports whether a
+// message was processed so the worker can pace idle rounds.
+func (a *adapter) consumeOne(event string) bool {
+	ctx, cancel := context.WithTimeout(context.Background(), DefaultPopTimeout)
+	msg, err := a.queue.Pop(ctx, "webhook:"+event)
+	cancel()
 
-		a.sleepWithStop(c.stop, DefaultIdlePollInterval)
+	if err != nil {
+		a.handleConsumeError(event, err)
 
 		return false
 	}
 
-	*consecutive++
+	a.mu.Lock()
+	delete(a.consecutive, event)
+	a.mu.Unlock()
+
+	a.safeProcess(event, msg)
+
+	return true
+}
+
+// handleConsumeError records one failed pop for event. It reports true when
+// the event's consecutive transport-error cap is reached: the event is
+// unassigned from its worker (the pool equivalent of the old per-event
+// consumer exiting) and re-registering resumes it.
+func (a *adapter) handleConsumeError(event string, err error) bool {
+	// errors.Is (not ==): memory/redis Pop may return *EmptyError, which only
+	// matches via Unwrap. Bare == miscounted idle polls as transport errors
+	// and killed consumers after 5 empties.
+	if errors.Is(err, queue.ErrEmpty) {
+		a.mu.Lock()
+		delete(a.consecutive, event)
+		a.mu.Unlock()
+
+		return false
+	}
+
+	a.mu.Lock()
+	n := a.consecutive[event] + 1
+	a.consecutive[event] = n
+	a.mu.Unlock()
 
 	a.log().Warn().Str("event", event).Err(err).Msg("webhook: consumer pop failed")
 
-	if *consecutive >= maxTransportErrors {
-		a.log().Warn().Str("event", event).Int("consecutive", *consecutive).Msg("webhook: consumer stopped after consecutive queue transport errors; close and re-open the webhook to resume")
+	if n >= maxTransportErrors {
+		a.log().Warn().Str("event", event).Int("consecutive", n).Msg("webhook: consumer stopped after consecutive queue transport errors; close and re-open the webhook to resume")
+
+		a.mu.Lock()
+		delete(a.consecutive, event)
+		a.unassignEventLocked(event)
+		a.mu.Unlock()
 
 		return true
 	}
-
-	a.sleepWithStop(c.stop, DefaultTransportBackoff)
 
 	return false
 }
@@ -611,7 +699,7 @@ func (a *adapter) Unregister(_ context.Context, event, target string) error {
 
 	if len(targets) == 0 {
 		delete(a.regs, event)
-		a.stopConsumerLocked(event)
+		a.unassignEventLocked(event)
 	}
 
 	return nil
@@ -662,21 +750,22 @@ func (a *adapter) Close() error {
 
 	a.closed = true
 
-	for event := range a.consumers {
-		a.stopConsumerLocked(event)
+	workers := a.workers
+	a.workers = nil
+
+	for _, w := range workers {
+		close(w.stop)
 	}
 
-	consumers := a.consumers
-	a.consumers = make(map[string]*consumer)
 	a.mu.Unlock()
 
 	deadline := time.After(a.timeout + DefaultConsumerStopSlack)
 
-	for event, c := range consumers {
+	for _, w := range workers {
 		select {
-		case <-c.done:
+		case <-w.done:
 		case <-deadline:
-			a.log().Warn().Str("event", event).Msg("webhook: consumer did not stop in time; closing queue anyway")
+			a.log().Warn().Msg("webhook: consumer workers did not stop in time; closing queue anyway")
 		}
 	}
 
@@ -836,16 +925,20 @@ func New(o webhook.Options) (webhook.Webhook, error) {
 		replayTolerance = defaultReplayTolerance
 	}
 
-	return &adapter{
+	a := &adapter{
 		regs:            make(map[string]map[string]registration),
 		queue:           q,
 		timeout:         timeout,
 		maxRetries:      maxRetries,
 		dlqTopic:        dlqTopic,
-		consumers:       make(map[string]*consumer),
+		consecutive:     make(map[string]int),
 		client:          newSafeClient(timeout, o.AllowPrivateTargets),
 		allowPrivate:    o.AllowPrivateTargets,
 		logger:          o.Logger,
 		replayTolerance: replayTolerance,
-	}, nil
+	}
+
+	a.startWorkers()
+
+	return a, nil
 }

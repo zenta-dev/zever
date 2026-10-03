@@ -220,17 +220,53 @@ func (s *stubQueue) nackCount() int {
 func newTestAdapter(q corequeue.Queue) *adapter {
 	timeout := 5 * time.Second
 
-	return &adapter{
+	a := &adapter{
 		regs:            make(map[string]map[string]registration),
 		queue:           q,
 		timeout:         timeout,
 		maxRetries:      3,
 		dlqTopic:        "webhook:dead-letter",
-		consumers:       make(map[string]*consumer),
+		consecutive:     make(map[string]int),
 		client:          newSafeClient(timeout, true),
 		allowPrivate:    true,
 		replayTolerance: defaultReplayTolerance,
 	}
+
+	a.startWorkers()
+
+	return a
+}
+
+// serving reports whether event is currently assigned to a pool worker.
+func (a *adapter) serving(event string) bool {
+	a.mu.RLock()
+	workers := a.workers
+	a.mu.RUnlock()
+
+	for _, w := range workers {
+		if w.hasEvent(event) {
+			return true
+		}
+	}
+
+	return false
+}
+
+// assignmentCount returns how many workers currently serve event; an event
+// must be owned by exactly one worker.
+func (a *adapter) assignmentCount(event string) int {
+	a.mu.RLock()
+	workers := a.workers
+	a.mu.RUnlock()
+
+	n := 0
+	for _, w := range workers {
+		if w.hasEvent(event) {
+			n++
+		}
+	}
+
+	return n
 }
 
 // signPayload builds the "t=<ts>,v1=<hex>" envelope tests use to sign
@@ -519,7 +555,7 @@ func TestRegister_RejectFullValidation(t *testing.T) {
 	}
 }
 
-func TestRegister_SpawnsConsumerOnce(t *testing.T) {
+func TestRegister_AssignsEventToWorkerPool(t *testing.T) {
 	a := newTestAdapter(newStubQueue())
 	defer func() { _ = a.Close() }()
 
@@ -530,30 +566,22 @@ func TestRegister_SpawnsConsumerOnce(t *testing.T) {
 		t.Fatalf("Register() err = %v", err)
 	}
 
-	a.mu.RLock()
-	_, ok := a.consumers["e"]
-	a.mu.RUnlock()
-
-	if !ok {
-		t.Fatal("Register did not spawn consumer")
+	if !a.serving("e") {
+		t.Fatal("Register did not assign event to a worker")
 	}
 
-	// Idempotent re-register must not spawn a second consumer.
+	// Idempotent re-register must not duplicate the assignment.
 	if err := a.Register(ctx, "e", target, "s2"); err != nil {
 		t.Fatalf("Register() err = %v", err)
 	}
 
-	// Second target on the same event reuses the running consumer.
+	// Second target on the same event reuses the same worker assignment.
 	if err := a.Register(ctx, "e", "http://127.0.0.1:1/b", "s"); err != nil {
 		t.Fatalf("Register() err = %v", err)
 	}
 
-	a.mu.RLock()
-	n := len(a.consumers)
-	a.mu.RUnlock()
-
-	if n != 1 {
-		t.Fatalf("consumers = %d, want 1", n)
+	if n := a.assignmentCount("e"); n != 1 {
+		t.Fatalf("assignments = %d, want 1", n)
 	}
 }
 
@@ -568,12 +596,8 @@ func TestRegister_ClosedAdapter(t *testing.T) {
 		t.Fatalf("Register() err = %v", err)
 	}
 
-	a.mu.RLock()
-	_, ok := a.consumers["e"]
-	a.mu.RUnlock()
-
-	if ok {
-		t.Fatal("closed adapter spawned consumer")
+	if a.serving("e") {
+		t.Fatal("closed adapter assigned event to a worker")
 	}
 }
 
@@ -602,69 +626,77 @@ func TestUnregister(t *testing.T) {
 		t.Fatalf("Unregister missing target err = %v", err)
 	}
 
-	// Partial removal keeps the consumer.
+	// Partial removal keeps the event assigned.
 	if err := a.Unregister(ctx, "e", targetA); err != nil {
 		t.Fatalf("Unregister() err = %v", err)
 	}
 
-	a.mu.RLock()
-	_, ok := a.consumers["e"]
-	a.mu.RUnlock()
-
-	if !ok {
-		t.Fatal("consumer stopped while targets remain")
+	if !a.serving("e") {
+		t.Fatal("event unassigned while targets remain")
 	}
 
-	// Last removal prunes the event and stops the consumer.
+	// Last removal prunes the event and unassigns it.
 	if err := a.Unregister(ctx, "e", targetB); err != nil {
 		t.Fatalf("Unregister() err = %v", err)
 	}
 
 	a.mu.RLock()
 	_, stillReg := a.regs["e"]
-	c, stillCon := a.consumers["e"]
 	a.mu.RUnlock()
 
 	if stillReg {
 		t.Error("event not pruned")
 	}
 
-	if stillCon && !c.stopped {
-		t.Error("consumer not stopped after last unregister")
+	if a.serving("e") {
+		t.Error("event not unassigned after last unregister")
 	}
 }
 
-func TestStopConsumerLocked_Edge(t *testing.T) {
+func TestWorker_AddRemoveEvent(t *testing.T) {
+	t.Parallel()
+
+	w := newWorker()
+
+	w.addEvent("e")
+
+	if !w.hasEvent("e") {
+		t.Fatal("addEvent did not assign")
+	}
+
+	w.removeEvent("e")
+
+	if w.hasEvent("e") {
+		t.Fatal("removeEvent did not unassign")
+	}
+
+	// Signal on an idle worker must not block.
+	w.signal()
+	w.addEvent("e2")
+	w.removeEvent("e2")
+}
+
+func TestWorker_StopClosesDone(t *testing.T) {
+	t.Parallel()
+
 	a := newTestAdapter(newStubQueue())
 	defer func() { _ = a.Close() }()
 
-	a.stopConsumerLocked("missing")
+	w := newWorker()
+	done := make(chan struct{})
 
-	c := &consumer{stop: make(chan struct{}), done: make(chan struct{}), stopped: true}
-	a.consumers["e"] = c
-	a.stopConsumerLocked("e")
+	go func() {
+		defer close(done)
+		a.runWorker(w)
+	}()
 
-	select {
-	case <-c.stop:
-		t.Fatal("stopped consumer stop channel must stay open")
-	default:
-	}
-
-	c2 := &consumer{stop: make(chan struct{}), done: make(chan struct{})}
-	a.consumers["e2"] = c2
-	a.stopConsumerLocked("e2")
+	close(w.stop)
 
 	select {
-	case <-c2.stop:
-	default:
-		t.Fatal("running consumer stop channel must close")
+	case <-done:
+	case <-time.After(5 * time.Second):
+		t.Fatal("runWorker did not exit after stop")
 	}
-
-	// Fake consumers have no goroutine behind done; drop them so Close returns.
-	a.mu.Lock()
-	delete(a.consumers, "e")
-	delete(a.consumers, "e2")
-	a.mu.Unlock()
 }
 
 func TestDeliver_UnknownEvent(t *testing.T) {
@@ -1129,41 +1161,48 @@ func TestHandleConsumeError(t *testing.T) {
 	t.Parallel()
 
 	a := newTestAdapter(newStubQueue())
-	c := &consumer{stop: make(chan struct{}), done: make(chan struct{})}
 
-	n := 0
-	if a.handleConsumeError("e", corequeue.ErrEmpty, &n, c) {
-		t.Fatal("empty must not stop")
+	if err := a.Register(t.Context(), "e", "http://127.0.0.1:1/a", "s"); err != nil {
+		t.Fatalf("Register() err = %v", err)
 	}
 
-	if n != 0 {
-		t.Fatalf("consecutive = %d, want reset to 0", n)
+	if !a.serving("e") {
+		t.Fatal("event not assigned")
+	}
+
+	if a.handleConsumeError("e", corequeue.ErrEmpty) {
+		t.Fatal("empty must not stop")
 	}
 
 	// Typed empties must behave identically: memory/redis Pop returns
 	// *EmptyError on some paths, and bare == would miscount them as
 	// transport errors, killing idle consumers after 5 polls.
-	n = 0
-	if a.handleConsumeError("e", &corequeue.EmptyError{Topic: "t"}, &n, c) {
+	if a.handleConsumeError("e", &corequeue.EmptyError{Topic: "t"}) {
 		t.Fatal("typed empty must not stop")
 	}
 
-	if n != 0 {
-		t.Fatalf("consecutive = %d, want reset to 0", n)
-	}
-
-	n = 0
-	if a.handleConsumeError("e", errTestTransport, &n, c) {
+	if a.handleConsumeError("e", errTestTransport) {
 		t.Fatal("first transport error must not stop")
 	}
+
+	a.mu.Lock()
+	n := a.consecutive["e"]
+	a.mu.Unlock()
 
 	if n != 1 {
 		t.Fatalf("consecutive = %d, want 1", n)
 	}
 
-	n = maxTransportErrors - 1
-	if !a.handleConsumeError("e", errTestTransport, &n, c) {
+	for range maxTransportErrors - 2 {
+		a.handleConsumeError("e", errTestTransport)
+	}
+
+	if !a.handleConsumeError("e", errTestTransport) {
 		t.Fatal("cap transport errors must stop")
+	}
+
+	if a.serving("e") {
+		t.Error("capped event must be unassigned from its worker")
 	}
 }
 
@@ -1601,257 +1640,56 @@ func TestRetryDeadLetter_RetryPushFail(t *testing.T) {
 	}
 }
 
-func TestStartConsumer_Closed(t *testing.T) {
-	a := newTestAdapter(newStubQueue())
-	defer func() { _ = a.Close() }()
-
-	a.regs["e"] = regsWith(nil, "http://127.0.0.1:1/a", "s")
-	a.closed = true
-	a.startConsumer("e")
-
-	a.mu.RLock()
-	defer a.mu.RUnlock()
-
-	if len(a.consumers) != 0 {
-		t.Fatal("closed adapter must not start consumer")
-	}
-}
-
-func TestStartConsumer_RunningKept(t *testing.T) {
-	a := newTestAdapter(newStubQueue())
-	defer func() { _ = a.Close() }()
-
-	a.regs["e"] = regsWith(nil, "http://127.0.0.1:1/a", "s")
-	a.startConsumer("e")
-
-	a.mu.RLock()
-	first := a.consumers["e"]
-	a.mu.RUnlock()
-
-	a.startConsumer("e")
-
-	a.mu.RLock()
-	second := a.consumers["e"]
-	a.mu.RUnlock()
-
-	if first != second {
-		t.Fatal("running consumer was replaced")
-	}
-}
-
-func TestStartConsumer_RecreatesDeadConsumer(t *testing.T) {
-	a := newTestAdapter(newStubQueue())
-	defer func() { _ = a.Close() }()
-
-	a.regs["e"] = regsWith(nil, "http://127.0.0.1:1/a", "s")
-
-	done := make(chan struct{})
-	close(done)
-
-	old := &consumer{stop: make(chan struct{}), done: done}
-	a.consumers["e"] = old
-	a.startConsumer("e")
-
-	a.mu.RLock()
-	fresh := a.consumers["e"]
-	a.mu.RUnlock()
-
-	if fresh == old {
-		t.Fatal("dead consumer was not replaced")
-	}
-
-	select {
-	case <-fresh.done:
-		t.Fatal("fresh consumer already done")
-	default:
-	}
-}
-
-func TestStartConsumer_RegsGone(t *testing.T) {
-	a := newTestAdapter(newStubQueue())
-	defer func() { _ = a.Close() }()
-
-	done := make(chan struct{})
-	close(done)
-
-	old := &consumer{stop: make(chan struct{}), done: done, stopped: true}
-	a.consumers["e"] = old
-	a.startConsumer("e")
-
-	a.mu.RLock()
-	kept := a.consumers["e"]
-	a.mu.RUnlock()
-
-	if kept != old {
-		t.Fatal("consumer recreated for unregistered event")
-	}
-}
-
-func TestStartConsumer_SecondClosedCheck(t *testing.T) {
-	sq := newStubQueue()
-	a := newTestAdapter(sq)
-	a.timeout = -6*time.Second + 100*time.Millisecond
-
-	defer func() { _ = a.Close() }()
-
-	a.regs["e"] = regsWith(nil, "http://127.0.0.1:1/a", "s")
-	a.consumers["e"] = &consumer{stop: make(chan struct{}), done: make(chan struct{}), stopped: true}
-
-	done := make(chan struct{})
-
-	go func() {
-		defer close(done)
-		a.startConsumer("e")
-	}()
-
-	// No sleep: the goroutine waits ~100ms in waitForConsumerDone, so
-	// closing here always lands during the wait; the closed check after
-	// the wait then holds deterministically.
-	a.mu.Lock()
-	a.closed = true
-	a.mu.Unlock()
-
-	<-done
-
-	a.mu.RLock()
-	c := a.consumers["e"]
-	a.mu.RUnlock()
-
-	if c == nil || !c.stopped {
-		t.Fatal("consumer must not be recreated once closed")
-	}
-
-	if sq.closes != 0 {
-		t.Fatal("queue must not close here")
-	}
-}
-
-func TestStartConsumer_RacingLiveConsumerWins(t *testing.T) {
-	a := newTestAdapter(newStubQueue())
-	defer func() { _ = a.Close() }()
-
-	a.timeout = -6*time.Second + 200*time.Millisecond
-	a.regs["e"] = regsWith(nil, "http://127.0.0.1:1/a", "s")
-	a.consumers["e"] = &consumer{stop: make(chan struct{}), done: make(chan struct{}), stopped: true}
-
-	done := make(chan struct{})
-
-	go func() {
-		defer close(done)
-		a.startConsumer("e")
-	}()
-
-	// No sleep: the goroutine waits ~200ms in waitForConsumerDone, so
-	// installing the live consumer here always lands during the wait; the
-	// re-check after the wait then keeps it deterministically.
-	live := &consumer{stop: make(chan struct{}), done: make(chan struct{})}
-
-	a.mu.Lock()
-	a.consumers["e"] = live
-	a.mu.Unlock()
-
-	<-done
-
-	a.mu.RLock()
-	kept := a.consumers["e"]
-	a.mu.RUnlock()
-
-	if kept != live {
-		t.Fatal("live consumer was replaced")
-	}
-
-	// Live is fake (no goroutine); close done so deferred Close returns.
-	close(live.done)
-}
-
-func TestWaitForConsumerDone(t *testing.T) {
+func TestStartWorkers_BoundedPool(t *testing.T) {
 	t.Parallel()
 
 	a := newTestAdapter(newStubQueue())
 	defer func() { _ = a.Close() }()
 
-	done := make(chan struct{})
-	close(done)
-	a.waitForConsumerDone(&consumer{stop: make(chan struct{}), done: done}, "e")
-
-	a.timeout = -6*time.Second + 50*time.Millisecond
-	a.waitForConsumerDone(&consumer{stop: make(chan struct{}), done: make(chan struct{})}, "e")
+	if len(a.workers) != DefaultConsumerWorkers {
+		t.Fatalf("workers = %d, want %d", len(a.workers), DefaultConsumerWorkers)
+	}
 }
 
-func TestConsume_StopImmediately(t *testing.T) {
-	sq := newStubQueue()
-	a := newTestAdapter(sq)
+func TestRegister_DistributesEventsAcrossWorkers(t *testing.T) {
+	t.Parallel()
+
+	a := newTestAdapter(newStubQueue())
 	defer func() { _ = a.Close() }()
 
-	c := &consumer{stop: make(chan struct{}), done: make(chan struct{})}
-	close(c.stop)
-	a.consume("e", c)
+	const events = 20
 
-	select {
-	case <-c.done:
-	default:
-		t.Fatal("consume did not exit")
+	assigned := 0
+
+	for i := range events {
+		event := fmt.Sprintf("e%d", i)
+		if err := a.Register(t.Context(), event, "http://127.0.0.1:1/a", "s"); err != nil {
+			t.Fatalf("Register(%s) err = %v", event, err)
+		}
 	}
 
-	if sq.pops != 0 {
-		t.Fatalf("pops = %d, want 0", sq.pops)
+	for _, w := range a.workers {
+		assigned += w.eventCount()
 	}
-}
 
-func TestConsume_PopErrorContinueAndStop(t *testing.T) {
-	sq := newStubQueue()
-	sq.popScript = []popOut{
-		{err: errTestTransport},
-		{err: corequeue.ErrEmpty},
+	if assigned != events {
+		t.Fatalf("assigned = %d, want %d", assigned, events)
 	}
-	a := newTestAdapter(sq)
 
-	defer func() { _ = a.Close() }()
+	for i := range events {
+		if !a.serving(fmt.Sprintf("e%d", i)) {
+			t.Fatalf("event e%d not assigned to any worker", i)
+		}
 
-	c := &consumer{stop: make(chan struct{}), done: make(chan struct{})}
-
-	done := make(chan struct{})
-
-	go func() {
-		defer close(done)
-		a.consume("e", c)
-	}()
-
-	waitFor(t, 5*time.Second, func() bool {
-		sq.mu.Lock()
-		defer sq.mu.Unlock()
-
-		return sq.pops >= 2
-	}, "two pops")
-
-	close(c.stop)
-	<-done
-}
-
-func TestConsume_TransportCapStops(t *testing.T) {
-	sq := newStubQueue()
-	sq.popScript = []popOut{
-		{err: errTestTransport},
-		{err: errTestTransport},
-		{err: errTestTransport},
-		{err: errTestTransport},
-		{err: errTestTransport},
-	}
-	a := newTestAdapter(sq)
-
-	defer func() { _ = a.Close() }()
-
-	c := &consumer{stop: make(chan struct{}), done: make(chan struct{})}
-	a.consume("e", c)
-
-	select {
-	case <-c.done:
-	default:
-		t.Fatal("consume did not stop at cap")
+		if n := a.assignmentCount(fmt.Sprintf("e%d", i)); n != 1 {
+			t.Fatalf("event e%d assignments = %d, want 1", i, n)
+		}
 	}
 }
 
-func TestConsume_SuccessThenStop(t *testing.T) {
+func TestConsumeOne_Success(t *testing.T) {
+	t.Parallel()
+
 	var mu sync.Mutex
 
 	count := 0
@@ -1875,19 +1713,79 @@ func TestConsume_SuccessThenStop(t *testing.T) {
 		}, 1)},
 	}
 
-	c := &consumer{stop: make(chan struct{}), done: make(chan struct{})}
-
-	done := make(chan struct{})
-
-	go func() {
-		defer close(done)
-		a.consume("e", c)
-	}()
+	if !a.consumeOne("e") {
+		t.Fatal("consumeOne reported no work for a queued message")
+	}
 
 	waitFor(t, 5*time.Second, func() bool { return sq.ackCount() == 1 }, "ack")
+}
 
-	close(c.stop)
-	<-done
+func TestConsumeOne_Empty(t *testing.T) {
+	t.Parallel()
+
+	a := newTestAdapter(newStubQueue())
+	defer func() { _ = a.Close() }()
+
+	if a.consumeOne("e") {
+		t.Fatal("consumeOne reported work for an empty queue")
+	}
+}
+
+func TestConsumeOne_TransportErrorKeepsEventAssigned(t *testing.T) {
+	t.Parallel()
+
+	sq := newStubQueue()
+	sq.popErr = errTestTransport
+
+	a := newTestAdapter(sq)
+	defer func() { _ = a.Close() }()
+
+	if err := a.Register(t.Context(), "e", "http://127.0.0.1:1/a", "s"); err != nil {
+		t.Fatalf("Register() err = %v", err)
+	}
+
+	if a.consumeOne("e") {
+		t.Fatal("consumeOne reported work for a failed pop")
+	}
+
+	if !a.serving("e") {
+		t.Fatal("event unassigned after a single transport error")
+	}
+}
+
+func TestWorker_ServesAssignedEvent(t *testing.T) {
+	t.Parallel()
+
+	var mu sync.Mutex
+
+	count := 0
+	srv := okServer(t, "s", &mu, &count)
+
+	defer srv.Close()
+
+	sq := newStubQueue()
+
+	target := srv.URL + "/hook"
+
+	payload := []byte(`{}`)
+	sq.popScript = []popOut{
+		{msg: testMessage("webhook:e", payload, map[string]string{
+			"X-Webhook-Target":    target,
+			"X-Webhook-Signature": signPayload("s", payload),
+		}, 1)},
+	}
+
+	// Script the pop before the adapter starts its workers: a worker must
+	// never observe the popScript slice mid-write.
+	a := newTestAdapter(sq)
+
+	defer func() { _ = a.Close() }()
+
+	if err := a.Register(t.Context(), "e", target, "s"); err != nil {
+		t.Fatalf("Register() err = %v", err)
+	}
+
+	waitFor(t, 5*time.Second, func() bool { return sq.ackCount() == 1 }, "ack")
 }
 
 func TestClose_Idempotent(t *testing.T) {
@@ -1929,15 +1827,18 @@ func TestClose_QueueError(t *testing.T) {
 }
 
 func TestClose_DeadlineOverrun(t *testing.T) {
+	t.Parallel()
+
 	sq := newStubQueue()
 	a := newTestAdapter(sq)
 	a.timeout = -6 * time.Second
 
-	stuck := &consumer{stop: make(chan struct{}), done: make(chan struct{})}
-	a.consumers["e"] = stuck
-
 	if err := a.Close(); err != nil {
 		t.Fatalf("Close() err = %v", err)
+	}
+
+	if sq.closes != 1 {
+		t.Fatalf("queue closes = %d, want 1", sq.closes)
 	}
 }
 
@@ -1996,10 +1897,12 @@ func TestEndToEnd_MemoryQueue(t *testing.T) {
 		timeout:      timeout,
 		maxRetries:   3,
 		dlqTopic:     "webhook:dead-letter",
-		consumers:    make(map[string]*consumer),
+		consecutive:  make(map[string]int),
 		client:       newSafeClient(timeout, true),
 		allowPrivate: true,
 	}
+
+	a.startWorkers()
 
 	ctx := t.Context()
 	if err := a.Register(ctx, "deploy", target, secret); err != nil {
