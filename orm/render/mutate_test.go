@@ -327,6 +327,120 @@ func TestUpdate(t *testing.T) {
 	})
 }
 
+func TestUpdateSetExpr(t *testing.T) {
+	t.Parallel()
+	where := Node{Kind: KindBinary, Column: "id", Op: OpEq, Value: "1"}
+	incAttempt := Node{Kind: KindBinaryExpr, Op: OpAdd, Children: []Node{
+		{Kind: KindColumn, Column: "attempt"},
+		{Kind: KindLit, Value: int64(1)},
+	}}
+
+	t.Run("postgres", func(t *testing.T) {
+		t.Parallel()
+		q, args, err := Update(fakePostgres{}, "users",
+			[]Assignment{{Column: "attempt", Expr: incAttempt}}, where, nil, 0, 0)
+		if err != nil {
+			t.Fatalf("err = %v, want nil", err)
+		}
+
+		want := `UPDATE "users" SET "attempt" = "attempt" + $1 WHERE "id" = $2`
+		if q != want {
+			t.Fatalf("query = %q, want %q", q, want)
+		}
+
+		if !reflect.DeepEqual(args, []any{int64(1), "1"}) {
+			t.Fatalf("args = %#v, want [1 \"1\"] (the +1 literal, then the where value)", args)
+		}
+	})
+
+	t.Run("sqlite", func(t *testing.T) {
+		t.Parallel()
+		q, args, err := Update(sqlite.New(), "users",
+			[]Assignment{{Column: "attempt", Expr: incAttempt}}, where, nil, 0, 0)
+		if err != nil {
+			t.Fatalf("err = %v, want nil", err)
+		}
+
+		want := `UPDATE "users" SET "attempt" = "attempt" + ? WHERE "id" = ?`
+		if q != want {
+			t.Fatalf("query = %q, want %q", q, want)
+		}
+
+		if !reflect.DeepEqual(args, []any{int64(1), "1"}) {
+			t.Fatalf("args = %#v, want [1 \"1\"]", args)
+		}
+	})
+
+	t.Run("column operand binds nothing", func(t *testing.T) {
+		t.Parallel()
+		addCols := Node{Kind: KindBinaryExpr, Op: OpAdd, Children: []Node{
+			{Kind: KindColumn, Column: "a"},
+			{Kind: KindColumn, Column: "b"},
+		}}
+
+		q, args, err := Update(sqlite.New(), "users",
+			[]Assignment{{Column: "a", Expr: addCols}}, where, nil, 0, 0)
+		if err != nil {
+			t.Fatalf("err = %v, want nil", err)
+		}
+
+		want := `UPDATE "users" SET "a" = "a" + "b" WHERE "id" = ?`
+		if q != want {
+			t.Fatalf("query = %q, want %q", q, want)
+		}
+
+		if !reflect.DeepEqual(args, []any{"1"}) {
+			t.Fatalf("args = %#v, want [\"1\"] (only the where value binds)", args)
+		}
+	})
+
+	t.Run("mixed literal and expression assignments keep declaration order", func(t *testing.T) {
+		t.Parallel()
+		q, args, err := Update(sqlite.New(), "users",
+			[]Assignment{
+				{Column: "attempt", Expr: incAttempt},
+				{Column: "owner", Value: ""},
+			}, where, nil, 0, 0)
+		if err != nil {
+			t.Fatalf("err = %v, want nil", err)
+		}
+
+		want := `UPDATE "users" SET "attempt" = "attempt" + ?, "owner" = ? WHERE "id" = ?`
+		if q != want {
+			t.Fatalf("query = %q, want %q", q, want)
+		}
+
+		if !reflect.DeepEqual(args, []any{int64(1), "", "1"}) {
+			t.Fatalf("args = %#v, want [1 \"\" \"1\"]", args)
+		}
+	})
+
+	t.Run("unsupported operator errors", func(t *testing.T) {
+		t.Parallel()
+		bad := Node{Kind: KindBinaryExpr, Op: OpEq, Children: []Node{
+			{Kind: KindColumn, Column: "a"},
+			{Kind: KindLit, Value: int64(1)},
+		}}
+
+		if _, _, err := Update(sqlite.New(), "users",
+			[]Assignment{{Column: "a", Expr: bad}}, where, nil, 0, 0); err == nil {
+			t.Fatal("err = nil, want the unsupported-operator error")
+		}
+	})
+
+	t.Run("wrong operand count errors", func(t *testing.T) {
+		t.Parallel()
+		bad := Node{Kind: KindBinaryExpr, Op: OpAdd, Children: []Node{
+			{Kind: KindColumn, Column: "a"},
+		}}
+
+		if _, _, err := Update(sqlite.New(), "users",
+			[]Assignment{{Column: "a", Expr: bad}}, where, nil, 0, 0); err == nil {
+			t.Fatal("err = nil, want the operand-count error")
+		}
+	})
+}
+
 func TestDelete(t *testing.T) {
 	t.Parallel()
 	where := Node{

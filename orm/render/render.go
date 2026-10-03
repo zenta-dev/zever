@@ -69,12 +69,16 @@ const (
 	// on every supported dialect.
 	OpNotIn
 	// OpEqAny/OpNeqAny/OpEqAll/OpNeqAll select the comparison and quantifier
-	// of a KindArray node's Postgres array predicate (`= ANY`, `<> ANY`,
+	// of a KindArray node's Postgres array quantifier predicate (`= ANY`, `<> ANY`,
 	// `= ALL`, `<> ALL`). Order and values match the builder's Op.
 	OpEqAny
 	OpNeqAny
 	OpEqAll
 	OpNeqAll
+	// OpAdd is the infix operator of a KindBinaryExpr arithmetic expression
+	// (`left + right`), built by the builder's Add. It renders identically on
+	// every supported dialect.
+	OpAdd
 )
 
 // NodeKind mirrors the builder's NodeKind values for the kinds this package
@@ -117,6 +121,12 @@ const (
 	// dialect.ArrayDialect and report support, else rendering returns a typed
 	// dialect.ErrUnsupportedByDialect. See render/array.go.
 	KindArray
+	// KindBinaryExpr renders an infix arithmetic scalar expression
+	// (`left + right`) nested inside a SET clause or a function argument
+	// list. Node.Op selects the operator (only OpAdd exists today) and
+	// Node.Children carries the two operand nodes. It is never a standalone
+	// predicate: renderExprCorr rejects it at the top level, failing closed.
+	KindBinaryExpr
 )
 
 // CompoundOp mirrors the builder's CompoundOp values.
@@ -1334,6 +1344,8 @@ func renderScalar(d dialect.Dialect, n Node, counter *argCounter, scope renderSc
 		return d.Placeholder(counter.next()), []any{n.Value}, nil
 	case KindFunc:
 		return renderFuncExpr(d, n.Func, counter, scope)
+	case KindBinaryExpr:
+		return renderBinaryExpr(d, n, counter, scope)
 	case KindSubquery:
 		sq, ok := n.Value.(Subquery)
 		if !ok {
@@ -1353,6 +1365,35 @@ func renderScalar(d dialect.Dialect, n Node, counter *argCounter, scope renderSc
 	default:
 		return "", nil, fmt.Errorf("orm/render: unsupported scalar expression argument kind %d", n.Kind)
 	}
+}
+
+// renderBinaryExpr renders one infix arithmetic scalar expression:
+// `left + right`. Both operands render as scalar expressions, so columns,
+// literals, nested functions and nested binary expressions compose; the
+// operator is a fixed constant, never caller text, and every literal operand
+// binds as a placeholder argument. err is non-nil when the node is not a
+// well-formed OpAdd expression -- a malformed node renders nothing usable
+// and must never silently become broken SQL.
+func renderBinaryExpr(d dialect.Dialect, n Node, counter *argCounter, scope renderScope) (string, []any, error) {
+	if n.Op != OpAdd {
+		return "", nil, fmt.Errorf("orm/render: binary expression operator %d is not supported", n.Op)
+	}
+
+	if len(n.Children) != 2 {
+		return "", nil, fmt.Errorf("orm/render: binary expression requires 2 operands, got %d", len(n.Children))
+	}
+
+	left, largs, err := renderScalar(d, n.Children[0], counter, scope)
+	if err != nil {
+		return "", nil, err
+	}
+
+	right, rargs, err := renderScalar(d, n.Children[1], counter, scope)
+	if err != nil {
+		return "", nil, err
+	}
+
+	return left + " + " + right, append(largs, rargs...), nil
 }
 
 // renderCaseExpr renders a searched CASE expression:

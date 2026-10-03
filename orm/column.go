@@ -488,10 +488,13 @@ func (c NullableColumn[T, V]) Name() string { return c.name }
 // Assignment is one column=value pair for an UPDATE/INSERT statement, built
 // by the mutation builders or by NullableColumn.SetValue/SetNull. Column is
 // an AnyColumn[T] -- never a raw string -- so a caller cannot inject SQL
-// structure through an assignment's column.
+// structure through an assignment's column. An assignment built by SetExpr
+// carries Expr instead of Value: the SET clause renders `col = <expr>` with
+// the expression's own bound arguments, never a caller-supplied value.
 type Assignment[T any] struct {
 	Column AnyColumn[T]
 	Value  any
+	Expr   Expr[T, any]
 }
 
 // SetValue builds a non-NULL Assignment of c to v.

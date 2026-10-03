@@ -2,6 +2,8 @@ package db
 
 import (
 	"path/filepath"
+	"strings"
+	"sync"
 	"testing"
 	"time"
 
@@ -80,6 +82,97 @@ func TestReclaimStaleBumpsAttempt(t *testing.T) {
 
 	if string(row.Payload) != "work" {
 		t.Errorf("Payload = %q, want work (untouched)", row.Payload)
+	}
+}
+
+// TestReclaimStaleCapsBatch inserts batch+5 stale rows and proves one sweep
+// releases at most batch of them: the SELECT's LIMIT and the id IN(...) guard
+// together keep the set-based UPDATE inside the batch bound.
+func TestReclaimStaleCapsBatch(t *testing.T) {
+	t.Parallel()
+
+	d := mustDriver(t, Options{Owner: "owner-a", ReclaimBatch: 10})
+	ctx := t.Context()
+
+	if err := seedStaleRows(ctx, d, d.batch+5); err != nil {
+		t.Fatalf("seed failed: %v", err)
+	}
+
+	if err := d.reclaimStale(ctx, "jobs"); err != nil {
+		t.Fatalf("reclaimStale failed: %v", err)
+	}
+
+	ready, err := orm.From[msgRow, *msgRow](d.tbl).Where(orm.And(
+		d.cTopic.Eq("jobs"),
+		d.cOwner.Eq(""),
+	)).All(ctx, d.conn)
+	if err != nil {
+		t.Fatalf("count ready: %v", err)
+	}
+
+	if len(ready) != d.batch {
+		t.Fatalf("released %d rows, want %d (batch cap)", len(ready), d.batch)
+	}
+}
+
+// TestReclaimStaleSingleSetBasedUpdate proves the sweep collapsed to ONE
+// set-based UPDATE: the captured statements contain no per-row UPDATE, and
+// the single UPDATE computes attempt+1 in the database under the lease guard
+// (owner still set, claim still unexpired) scoped to the selected ids.
+func TestReclaimStaleSingleSetBasedUpdate(t *testing.T) {
+	t.Parallel()
+
+	d := mustDriver(t, Options{Owner: "owner-a"})
+	ctx := t.Context()
+
+	if err := seedStaleRows(ctx, d, 3); err != nil {
+		t.Fatalf("seed failed: %v", err)
+	}
+
+	var (
+		mu      sync.Mutex
+		queries []string
+	)
+
+	restore := orm.SetQueryLogger(func(query string, _ []any) {
+		mu.Lock()
+		queries = append(queries, query)
+		mu.Unlock()
+	})
+	defer restore()
+
+	if err := d.reclaimStale(ctx, "jobs"); err != nil {
+		t.Fatalf("reclaimStale failed: %v", err)
+	}
+
+	// The logger is process-wide and parallel tests share it (Pop runs the
+	// same sweep), so assert on statement SHAPES, not counts: the set-based
+	// UPDATE carries the lease guard and the id IN(...) scope, and no
+	// per-row guarded UPDATE (the old N+1 shape) ran.
+	sawSetBased := false
+
+	for _, q := range queries {
+		switch {
+		case strings.HasPrefix(q, `UPDATE "queue_messages" SET "attempt" = ?`):
+			t.Errorf("per-row guarded UPDATE ran (old N+1 shape): %q", q)
+		case strings.HasPrefix(q, `UPDATE "queue_messages" SET "attempt" = "attempt" + ?`):
+			sawSetBased = true
+
+			for _, want := range []string{
+				`"topic" = ?`,
+				`"claimed_by" != ?`,
+				`"claimed_until" <= ?`,
+				`"message_id" IN (`,
+			} {
+				if !strings.Contains(q, want) {
+					t.Errorf("UPDATE %q missing %q", q, want)
+				}
+			}
+		}
+	}
+
+	if !sawSetBased {
+		t.Errorf("no set-based reclaim UPDATE captured: %q", queries)
 	}
 }
 

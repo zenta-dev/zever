@@ -125,6 +125,18 @@ func Length[T any](e Expr[T, string]) Expr[T, int64] {
 	return scalarCall[T, int64]("LENGTH", e.n)
 }
 
+// Add builds an arithmetic addition expression: e + v, rendering infix as
+// `<e> + <v>` with v bound as a placeholder argument. It exists mainly for
+// expression assignments (Update[T].Set with SetExpr) such as
+// `SET attempt = attempt + 1`, where the increment must be computed by the
+// database rather than read-modify-written by the caller. Both supported
+// dialects render `+` identically. The operands may themselves be columns,
+// literals or nested expressions, so `a + 1`, `a + b` and `(a + 1) + b` are
+// all expressible.
+func Add[T any, V any](e Expr[T, V], v V) Expr[T, V] {
+	return Expr[T, V]{n: Node{Kind: NBinaryExpr, Op: OpAdd, Children: []Node{e.n, scalarLit(v)}}}
+}
+
 // compare roots e into a Predicate[T] comparing its result against the
 // bound value v with op; the expression's own argument list renders BEFORE
 // the comparison placeholder, so bound fallbacks/NULLIF values keep

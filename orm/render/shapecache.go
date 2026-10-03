@@ -150,6 +150,61 @@ func cacheableOrder(order []OrderTerm) bool {
 	return true
 }
 
+// cacheableSets reports whether every SET assignment's expression (when
+// present) renders through the shape cache. Literal assignments always do;
+// expression assignments do only when every node of the expression tree is a
+// kind collectSetExprArgs can mirror exactly -- a cache hit must reconstruct
+// the identical bound-argument list, so any structure the collector does not
+// understand renders fresh instead of risking misplaced args.
+func cacheableSets(sets []Assignment) bool {
+	for _, s := range sets {
+		if s.Expr.Kind == KindNone {
+			continue
+		}
+
+		if !cacheableSetExpr(s.Expr) {
+			return false
+		}
+	}
+
+	return true
+}
+
+// cacheableSetExpr is cacheableSets's per-node mirror: the scalar-expression
+// kinds whose bound arguments collectSetExprArgs reproduces exactly.
+func cacheableSetExpr(n Node) bool {
+	switch n.Kind { //nolint:exhaustive // uncacheable kinds rejected by default
+	case KindNone, KindColumn, KindLit:
+		return true
+	case KindBinaryExpr:
+		if n.Op != OpAdd {
+			return false
+		}
+
+		for _, c := range n.Children {
+			if !cacheableSetExpr(c) {
+				return false
+			}
+		}
+
+		return true
+	case KindFunc:
+		if n.Func == nil {
+			return false
+		}
+
+		for _, a := range n.Func.Args {
+			if !cacheableSetExpr(a) {
+				return false
+			}
+		}
+
+		return true
+	default:
+		return false
+	}
+}
+
 // writeDialectKey writes the dialect parts the renderers branch on: the
 // name, the JSON `->>` capability flag (see dialect.JSONDialect), and the
 // NULLS ordering capability flag (version-gated on the sqlite dialect), so
@@ -219,6 +274,24 @@ func writeFingerprintExpr(b *strings.Builder, n Node) {
 		b.WriteString("C")
 		b.WriteString(fsep)
 		b.WriteString(strconv.Itoa(int(n.Compound)))
+		b.WriteString(fsep)
+
+		for i, c := range n.Children {
+			if i > 0 {
+				b.WriteString(fsep)
+			}
+
+			writeFingerprintExpr(b, c)
+		}
+	case KindBinaryExpr:
+		// A SET expression's structure is part of the shape: the operator and
+		// each operand's structure render into the SQL text. Bound literals
+		// are args, not text, so they stay out of the fingerprint (a 2-element
+		// and a 3-element literal operand share one shape, mirroring how only
+		// an In node's LENGTH is fingerprinted).
+		b.WriteString("E")
+		b.WriteString(fsep)
+		b.WriteString(strconv.Itoa(int(n.Op)))
 		b.WriteString(fsep)
 
 		for i, c := range n.Children {
@@ -397,6 +470,11 @@ func updateShapeKey(d dialect.Dialect, table string, sets []Assignment, where No
 		}
 
 		b.WriteString(s.Column)
+
+		if s.Expr.Kind != KindNone {
+			b.WriteString(fsep)
+			writeFingerprintExpr(&b, s.Expr)
+		}
 	}
 
 	b.WriteString(fsep)
@@ -622,12 +700,24 @@ func countArgs(where Node) []any {
 }
 
 // updateArgs copies the bound arguments of a cacheable UPDATE shape: SET
-// values, where values, then the limit/offset when present -- the mirror
-// of renderUpdateText's placeholder order. Order terms bind nothing unless
-// an FTS ranking term carries one, and such shapes are never cached
-// (cacheableOrder rejects them), so order is deliberately skipped.
+// values (an expression assignment contributes its own bound args -- the
+// literal of `col + 1`, nothing for `col + other`), where values, then the
+// limit/offset when present -- the mirror of renderUpdateText's placeholder
+// order. Order terms bind nothing unless an FTS ranking term carries one,
+// and such shapes are never cached (cacheableOrder rejects them), so order
+// is deliberately skipped.
 func updateArgs(sets []Assignment, where Node, limit, offset int) []any {
-	n := len(sets) + countCollectedArgs(where)
+	n := 0
+
+	for _, s := range sets {
+		if s.Expr.Kind == KindNone {
+			n++
+		} else {
+			n += countSetExprArgs(s.Expr)
+		}
+	}
+
+	n += countCollectedArgs(where)
 	if limit > 0 {
 		n++
 	}
@@ -642,7 +732,11 @@ func updateArgs(sets []Assignment, where Node, limit, offset int) []any {
 	}
 
 	for _, s := range sets {
-		args = append(args, s.Value)
+		if s.Expr.Kind == KindNone {
+			args = append(args, s.Value)
+		} else {
+			collectSetExprArgs(s.Expr, &args)
+		}
 	}
 
 	collectArgs(where, &args)
@@ -656,6 +750,65 @@ func updateArgs(sets []Assignment, where Node, limit, offset int) []any {
 	}
 
 	return args
+}
+
+// collectSetExprArgs appends one scalar expression's bound values, in
+// exactly the order renderScalar emits its placeholders -- the mirror of
+// renderScalar's arg accumulation for the cacheable SET-expression kinds
+// (see cacheableSets). Columns bind nothing; a literal binds its value; a
+// binary expression and a function contribute their operands' args in
+// order.
+func collectSetExprArgs(n Node, out *[]any) {
+	switch n.Kind { //nolint:exhaustive // uncacheable kinds never reach here (cacheableSets guards)
+	case KindNone, KindColumn:
+		return
+	case KindLit:
+		*out = append(*out, n.Value)
+	case KindBinaryExpr:
+		for _, c := range n.Children {
+			collectSetExprArgs(c, out)
+		}
+	case KindFunc:
+		if fn := n.Func; fn != nil {
+			for _, a := range fn.Args {
+				collectSetExprArgs(a, out)
+			}
+		}
+	}
+}
+
+// countSetExprArgs returns how many values collectSetExprArgs would append
+// for n, mirroring its Kind handling exactly, so updateArgs can allocate the
+// exact result length once.
+func countSetExprArgs(n Node) int {
+	switch n.Kind { //nolint:exhaustive // mirrors collectSetExprArgs's uncacheable default
+	case KindNone, KindColumn:
+		return 0
+	case KindLit:
+		return 1
+	case KindBinaryExpr:
+		total := 0
+
+		for _, c := range n.Children {
+			total += countSetExprArgs(c)
+		}
+
+		return total
+	case KindFunc:
+		if n.Func == nil {
+			return 0
+		}
+
+		total := 0
+
+		for _, a := range n.Func.Args {
+			total += countSetExprArgs(a)
+		}
+
+		return total
+	default:
+		return 0
+	}
 }
 
 func deleteArgs(where Node, limit, offset int) []any {
@@ -799,8 +952,10 @@ func Count(d dialect.Dialect, table string, where Node) (query string, args []an
 // doc comment. Cacheable shapes (cacheableWhere AND cacheableOrder; an FTS
 // order term renders through joinOrderBy and binds query arguments, so it
 // always renders fresh) collect their bound args via updateArgs on a hit.
+// A SET expression whose structure cacheableSets cannot mirror exactly also
+// renders fresh, so a cache hit never reconstructs a wrong arg list.
 func Update(d dialect.Dialect, table string, sets []Assignment, where Node, order []OrderTerm, limit, offset int) (query string, args []any, err error) {
-	if !cacheableWhere(where) || !cacheableOrder(order) {
+	if !cacheableWhere(where) || !cacheableOrder(order) || !cacheableSets(sets) {
 		return renderUpdateText(d, table, sets, where, order, limit, offset)
 	}
 

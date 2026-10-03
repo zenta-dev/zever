@@ -72,10 +72,11 @@ func restaleRows(ctx context.Context, d *driver) error {
 }
 
 // BenchmarkReclaimStale measures the stale-claim sweep: one SELECT plus one
-// UPDATE per stale row (the N+1 the audit flagged). Each iteration reclaims a
-// full batch of stale rows, then re-stales them with a single multi-row UPDATE
-// so the next iteration has work. The re-stale is one statement against the
-// reclaim's batch+1, so the reclaim dominates the measurement.
+// set-based UPDATE for the whole batch (attempt+1 computed by the database
+// under the lease guard). Each iteration reclaims a full batch of stale rows,
+// then re-stales them with a single multi-row UPDATE so the next iteration
+// has work. The re-stale is one statement against the reclaim's batch+1, so
+// the reclaim dominates the measurement.
 func BenchmarkReclaimStale(b *testing.B) {
 	d := benchDriver(b)
 	ctx := b.Context()

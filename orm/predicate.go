@@ -34,6 +34,7 @@ const (
 	NeqAny    = render.OpNeqAny
 	EqAll     = render.OpEqAll
 	NeqAll    = render.OpNeqAll
+	OpAdd     = render.OpAdd
 )
 
 // CompoundOp identifies how child nodes of an NCompound Node are combined.
@@ -67,22 +68,23 @@ type NodeKind = render.NodeKind
 // own names; see render.NodeKind's constants for the full per-value
 // documentation (NJSON/NFTS/NTuple/NArray's payload conventions).
 const (
-	NNone     = render.KindNone
-	NLit      = render.KindLit
-	NColumn   = render.KindColumn
-	NUnary    = render.KindUnary
-	NBinary   = render.KindBinary
-	NIn       = render.KindIn
-	NBetween  = render.KindBetween
-	NLike     = render.KindLike
-	NCompound = render.KindCompound
-	NFunc     = render.KindFunc
-	NSubquery = render.KindSubquery
-	NRaw      = render.KindRaw
-	NJSON     = render.KindJSON
-	NFTS      = render.KindFTS
-	NTuple    = render.KindTuple
-	NArray    = render.KindArray
+	NNone       = render.KindNone
+	NLit        = render.KindLit
+	NColumn     = render.KindColumn
+	NUnary      = render.KindUnary
+	NBinary     = render.KindBinary
+	NIn         = render.KindIn
+	NBetween    = render.KindBetween
+	NLike       = render.KindLike
+	NCompound   = render.KindCompound
+	NFunc       = render.KindFunc
+	NSubquery   = render.KindSubquery
+	NRaw        = render.KindRaw
+	NJSON       = render.KindJSON
+	NFTS        = render.KindFTS
+	NTuple      = render.KindTuple
+	NArray      = render.KindArray
+	NBinaryExpr = render.KindBinaryExpr
 )
 
 // Node is the erased, dialect-agnostic shape of one predicate tree, walked
