@@ -56,14 +56,27 @@ allocs to 3 and is also faster (354 vs 434 ns); past the linear-scan
 threshold (`linearDedupMaxLeaves` = 8) it falls back to the map
 (`...Many`), which is the faster shape for many leaves.
 
-Queue (`adapters/queue/db`, stale-claim sweep over sqlite). This is the
-current N+1 reclaim (one SELECT + one UPDATE per stale row) -- see the PR
-body for why it was not collapsed to a single UPDATE.
+Queue (`adapters/queue/db`, stale-claim sweep over sqlite). The sweep is one
+SELECT plus one set-based UPDATE for the whole batch: the database computes
+`attempt = attempt + 1` itself (new orm expression assignment,
+`orm.SetExpr(col, orm.Add(col.Expr(), 1))`), under the same lease guard
+(`claimed_by != '' AND claimed_until <= now AND id IN (...)`), so a row
+settled between the SELECT and the UPDATE is skipped instead of
+double-bumped. "before" is the old N+1 loop (one guarded UPDATE per row).
 
 | Benchmark | ns/op | B/op | allocs/op |
 | --- | --- | --- | --- |
-| BenchmarkReclaimStale (cpu=1) | 4,748,598 | 331,827 | 5,690 |
-| BenchmarkReclaimStale (cpu=4) | 4,869,046 | 331,997 | 5,685 |
+| BenchmarkReclaimStale before (cpu=1) | 4,748,598 | 331,827 | 5,690 |
+| BenchmarkReclaimStale after (cpu=1) | 645,270 | 109,471 | 3,208 |
+| BenchmarkReclaimStale before (cpu=4) | 4,869,046 | 331,997 | 5,685 |
+| BenchmarkReclaimStale after (cpu=4) | 631,722 | 109,574 | 3,210 |
+
+The single set-based UPDATE cuts the sweep ~7.4x (4.75M ns/op to 645K ns/op
+at cpu=1): the N per-row round trips and per-row commit overhead collapse
+into one statement, and the attempt bump moves into the database. B/op
+drops ~3x (331 KB to 109 KB) and allocs/op ~1.8x (5,690 to 3,208) with it.
+A second run confirmed the after numbers within noise (646,554 / 637,319
+ns/op).
 
 Idempotency (`adapters/idempotency/redis`, miniredis). `Begin` and
 `Complete` are now one Lua script each (1 RTT) instead of two client calls.
@@ -131,8 +144,9 @@ Adaptor-isolation coverage:
 Round-trip coverage (in-process backends):
 
 - Queue: `BenchmarkReclaimStale` (`adapters/queue/db/queue_bench_test.go`) --
-  seeds a batch of expired claims, reclaims them (1 SELECT + N UPDATE),
-  re-stales them with one multi-row UPDATE, repeats.
+  seeds a batch of expired claims, reclaims them (1 SELECT + 1 set-based
+  UPDATE computing attempt+1 in the database), re-stales them with one
+  multi-row UPDATE, repeats.
 - Idempotency: `BenchmarkBegin` / `BenchmarkComplete`
   (`adapters/idempotency/redis/redis_bench_test.go`) -- fresh key per
   iteration over one shared miniredis, so every call takes the
