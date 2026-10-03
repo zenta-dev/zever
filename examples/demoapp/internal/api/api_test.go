@@ -777,7 +777,7 @@ func TestDemoBatteries(t *testing.T) {
 
 	t.Run("webhook", func(t *testing.T) {
 		rec := do(t, h, "POST", "/demo/webhook/register", "", map[string]string{
-			"event": "demo.event", "target": "https://example.com/hook",
+			"event": "demo.event", "target": "https://example.com/hook", "secret": "demo-secret",
 		})
 		if rec.Code != http.StatusOK {
 			t.Fatalf("register: status %d: %s", rec.Code, rec.Body.String())
