@@ -278,14 +278,15 @@ var recorderPool = sync.Pool{
 // fields -- a field-by-field reset cannot reach them, and a stale wroteHeader
 // would make the next handler's WriteHeader a silent no-op.
 func resetRecorder(rec *httptest.ResponseRecorder) {
-	header := rec.HeaderMap
+	header := rec.Header()
 	body := rec.Body
-	*rec = httptest.ResponseRecorder{HeaderMap: header, Body: body}
+	// HeaderMap is the only field that carries the header map across a
+	// whole-struct reset; the assignment clears the unexported
+	// wroteHeader/result/snapHeader fields a field-by-field reset cannot reach.
+	*rec = httptest.ResponseRecorder{HeaderMap: header, Body: body} //nolint:staticcheck // see above
 
-	if header != nil {
-		for k := range header {
-			delete(header, k)
-		}
+	for k := range header {
+		delete(header, k)
 	}
 
 	if body != nil {
@@ -304,7 +305,10 @@ func serveHTTP(c *fiber.Ctx, h http.Handler) {
 		return
 	}
 
-	rec := recorderPool.Get().(*httptest.ResponseRecorder)
+	rec, ok := recorderPool.Get().(*httptest.ResponseRecorder)
+	if !ok {
+		rec = httptest.NewRecorder()
+	}
 	defer func() {
 		resetRecorder(rec)
 		recorderPool.Put(rec)

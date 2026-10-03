@@ -17,7 +17,7 @@ import (
 func benchDriver(b *testing.B) *driver {
 	b.Helper()
 
-	conn, err := dbsqlite.New(coredb.Options{Path: fmt.Sprintf("%s/bench.db", b.TempDir())})
+	conn, err := dbsqlite.New(coredb.Options{Path: b.TempDir() + "/bench.db"})
 	if err != nil {
 		b.Fatalf("sqlite New failed: %v", err)
 	}

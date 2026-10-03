@@ -43,7 +43,7 @@ func BenchmarkServeHTTPAdaptor(b *testing.B) {
 		b.Fatalf("New(): %v", err)
 	}
 
-	r.Handle("GET", "/hello/:name", func(w http.ResponseWriter, _ *http.Request) {})
+	r.Handle("GET", "/hello/:name", func(_ http.ResponseWriter, _ *http.Request) {})
 
 	req := httptest.NewRequestWithContext(context.Background(), http.MethodGet, "/hello/world", nil)
 
