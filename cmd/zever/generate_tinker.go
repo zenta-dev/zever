@@ -125,7 +125,7 @@ func runGenerateTinker(args []string) error {
 	fs.Usage = func() { printTinkerGenerateUsage(fs) }
 
 	if err := fs.Parse(args); err != nil {
-		return err
+		return fmt.Errorf("zever generate: %w", err)
 	}
 
 	pc, err := loadProjectConfig()
@@ -155,7 +155,7 @@ func runGenerateTinker(args []string) error {
 			if isInteractiveTerminal() {
 				val, perr := promptInputForTinkerGen("App import path", "", func(s string) error {
 					if strings.TrimSpace(s) == "" {
-						return errors.New("must not be empty")
+						return errors.New("zever generate: must not be empty")
 					}
 
 					return nil

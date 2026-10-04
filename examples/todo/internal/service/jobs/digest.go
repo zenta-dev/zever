@@ -29,7 +29,7 @@ func CountOverdue(ctx context.Context, database db.DB, now time.Time) (int, erro
 		genapp.NoteCols.CreatedAt.Lt(cutoff),
 	)).Count(ctx, database)
 	if err != nil {
-		return 0, fmt.Errorf("[jobs] count overdue: %w", err)
+		return 0, fmt.Errorf("jobs: count overdue: %w", err)
 	}
 	return int(n), nil
 }

@@ -56,7 +56,7 @@ func main() {
 func run() error {
 	cfg, err := config.Load("")
 	if err != nil {
-		return fmt.Errorf("[worker] load config: %w", err)
+		return fmt.Errorf("worker: load config: %w", err)
 	}
 	c := container.New(cfg)
 

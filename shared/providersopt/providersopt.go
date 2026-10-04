@@ -18,7 +18,7 @@ import (
 const DefaultHTTPTimeout = 30 * time.Second
 
 // ErrInvalidEndpoint is returned when a provider endpoint URL is not valid.
-var ErrInvalidEndpoint = errors.New("endpoint must be a valid url")
+var ErrInvalidEndpoint = errors.New("providersopt: endpoint must be a valid url")
 
 // PaddleSandboxBaseURL is the Paddle API base URL for the sandbox
 // environment. It mirrors paddle.SandboxBaseURL without importing the SDK.

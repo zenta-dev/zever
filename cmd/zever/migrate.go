@@ -407,16 +407,16 @@ func openZeverDB(adapterName, dsn string) (db.DB, error) {
 	// MySQL parses as a dialect but has no registered zever adapter yet:
 	// fail here with a gap error instead of an adapter-registry error.
 	if adapterName == "mysql" {
-		return nil, errors.New("zever db: --adapter mysql has no registered zever db adapter yet (sqlite and postgres only)")
+		return nil, errors.New("zever db migrate: --adapter mysql has no registered zever db adapter yet (sqlite and postgres only)")
 	}
 
 	adapter, err := db.ParseAdapter(adapterName)
 	if err != nil {
 		if s := closest(adapterName, migrateAdapters); s != "" {
-			return nil, fmt.Errorf("zever db: unsupported --adapter %q (did you mean %q? want sqlite, postgres, or mysql): %w", adapterName, s, err)
+			return nil, fmt.Errorf("zever db migrate: unsupported --adapter %q (did you mean %q? want sqlite, postgres, or mysql): %w", adapterName, s, err)
 		}
 
-		return nil, fmt.Errorf("zever db: unsupported --adapter %q (want sqlite, postgres, or mysql): %w", adapterName, err)
+		return nil, fmt.Errorf("zever db migrate: unsupported --adapter %q (want sqlite, postgres, or mysql): %w", adapterName, err)
 	}
 
 	opts, err := migrateOptions(adapterName, dsn)

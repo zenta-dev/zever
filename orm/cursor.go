@@ -303,7 +303,7 @@ func readCursorString(b []byte) (string, []byte, error) {
 	b = b[sz:]
 
 	if n > uint64(len(b)) {
-		return "", nil, errors.New("truncated")
+		return "", nil, fmt.Errorf("orm: cursor: %w", ErrTruncated)
 	}
 
 	return string(b[:n]), b[n:], nil

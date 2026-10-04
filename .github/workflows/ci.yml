@@ -403,6 +403,14 @@ jobs:
           files: ${{ steps.collect.outputs.files }}
           flags: race-group-${{ strategy.job-index }}
           fail_ci_if_error: false
+      - name: benchmarks (main/tags only)
+        if: github.event_name != 'pull_request'
+        run: |
+          mkdir -p .bench
+          for m in $MODULES; do
+            go -C "$m" test -run=NONE -bench=. -benchtime=1s -cpu=1,4 -benchmem > ".bench/$(echo "$m" | tr / _).txt" 2>&1 || true
+          done
+          echo "benchmark runs complete"
 
   # Security coverage floor: Codecov uploads are informational only, so this
   # gate hard-fails main/tags when auth/crypto/payment coverage drops below

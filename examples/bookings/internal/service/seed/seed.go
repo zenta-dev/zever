@@ -67,7 +67,7 @@ func Run(ctx context.Context, database db.DB) error {
 func ensureUser(ctx context.Context, database db.DB, id, email string) (string, error) {
 	existing, ok, err := orm.From(genapp.Users).Where(genapp.UserCols.Email.Eq(email)).First(ctx, database)
 	if err != nil {
-		return "", fmt.Errorf("[seed] lookup user: %w", err)
+		return "", fmt.Errorf("seed: lookup user: %w", err)
 	}
 	if ok {
 		return existing.ID, nil
@@ -75,7 +75,7 @@ func ensureUser(ctx context.Context, database db.DB, id, email string) (string, 
 
 	hash, err := password.Hash(ctx, uuid.NewString()[:DemoPassLen])
 	if err != nil {
-		return "", fmt.Errorf("[seed] hash password: %w", err)
+		return "", fmt.Errorf("seed: hash password: %w", err)
 	}
 
 	if err := orm.InsertInto(genapp.Users).Values(
@@ -84,7 +84,7 @@ func ensureUser(ctx context.Context, database db.DB, id, email string) (string, 
 		orm.Set(genapp.UserCols.PasswordHash, hash),
 		orm.Set(genapp.UserCols.CreatedAt, time.Now().UTC()),
 	).Exec(ctx, database); err != nil {
-		return "", fmt.Errorf("[seed] insert user: %w", err)
+		return "", fmt.Errorf("seed: insert user: %w", err)
 	}
 	return id, nil
 }
@@ -92,7 +92,7 @@ func ensureUser(ctx context.Context, database db.DB, id, email string) (string, 
 func ensureSpace(ctx context.Context, database db.DB, id, hostID, title, desc string, lat, lng float64, price int64, now time.Time) error {
 	_, ok, err := orm.From(genapp.Spaces).Where(genapp.SpaceCols.ID.Eq(id)).First(ctx, database)
 	if err != nil {
-		return fmt.Errorf("[seed] lookup space: %w", err)
+		return fmt.Errorf("seed: lookup space: %w", err)
 	}
 	if ok {
 		return nil
@@ -108,7 +108,7 @@ func ensureSpace(ctx context.Context, database db.DB, id, hostID, title, desc st
 		orm.Set(genapp.SpaceCols.PriceCents, price),
 		orm.Set(genapp.SpaceCols.CreatedAt, now),
 	).Exec(ctx, database); err != nil {
-		return fmt.Errorf("[seed] insert space: %w", err)
+		return fmt.Errorf("seed: insert space: %w", err)
 	}
 	return nil
 }
@@ -116,7 +116,7 @@ func ensureSpace(ctx context.Context, database db.DB, id, hostID, title, desc st
 func ensureBooking(ctx context.Context, database db.DB, id, spaceID, guestID string, now time.Time) error {
 	_, ok, err := orm.From(genapp.Bookings).Where(genapp.BookingCols.ID.Eq(id)).First(ctx, database)
 	if err != nil {
-		return fmt.Errorf("[seed] lookup booking: %w", err)
+		return fmt.Errorf("seed: lookup booking: %w", err)
 	}
 	if ok {
 		return nil
@@ -133,7 +133,7 @@ func ensureBooking(ctx context.Context, database db.DB, id, spaceID, guestID str
 		orm.Set(genapp.BookingCols.Status, "confirmed"),
 		orm.Set(genapp.BookingCols.CreatedAt, now),
 	).Exec(ctx, database); err != nil {
-		return fmt.Errorf("[seed] insert booking: %w", err)
+		return fmt.Errorf("seed: insert booking: %w", err)
 	}
 	return nil
 }

@@ -5,13 +5,17 @@ import (
 	"fmt"
 )
 
-// Sentinel errors returned and wrapped by the redis packages.
-var (
-	ErrInvalidAddress    = errors.New("redis: invalid address")
-	ErrParseAddress      = errors.New("redis: parse address failed")
-	ErrCloseClient       = errors.New("redis: close client failed")
-	ErrPlaintextRejected = errors.New("redis: RequireTLS is set but the connection would be plaintext")
-)
+// ErrInvalidAddress indicates an invalid Redis address.
+var ErrInvalidAddress = errors.New("redis: invalid address")
+
+// ErrParseAddress indicates a Redis address parse failure.
+var ErrParseAddress = errors.New("redis: parse address")
+
+// ErrCloseClient indicates a Redis client close failure.
+var ErrCloseClient = errors.New("redis: close client")
+
+// ErrPlaintextRejected indicates a plaintext connection was rejected.
+var ErrPlaintextRejected = errors.New("redis: plaintext rejected")
 
 // InvalidAddressError describes a failure to validate or parse a Redis address.
 type InvalidAddressError struct {
