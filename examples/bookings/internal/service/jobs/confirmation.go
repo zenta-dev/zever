@@ -14,18 +14,18 @@ import (
 )
 
 // ErrBookingNotFound indicates a booking ID has no matching row.
-var ErrBookingNotFound = errors.New("booking not found")
+var ErrBookingNotFound = errors.New("jobs: booking not found")
 
 // ErrGuestNotFound indicates a guest ID has no matching user row.
-var ErrGuestNotFound = errors.New("guest not found")
+var ErrGuestNotFound = errors.New("jobs: guest not found")
 
 // ErrSpaceNotFound indicates a space ID has no matching row.
-var ErrSpaceNotFound = errors.New("space not found")
+var ErrSpaceNotFound = errors.New("jobs: space not found")
 
 var (
-	errEmptyBookingID = errors.New("booking id is empty")
-	errEmptyGuestID   = errors.New("guest id is empty")
-	errEmptySpaceID   = errors.New("space id is empty")
+	errEmptyBookingID = errors.New("jobs: booking id is empty")
+	errEmptyGuestID   = errors.New("jobs: guest id is empty")
+	errEmptySpaceID   = errors.New("jobs: space id is empty")
 )
 
 // SendConfirmationArgs is the payload of the SendConfirmation job declared in
