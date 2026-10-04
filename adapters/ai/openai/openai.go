@@ -21,7 +21,7 @@ import (
 )
 
 // ErrValueOutOfRange is returned when an API numeric value does not fit in an int.
-var ErrValueOutOfRange = errors.New("value out of int range")
+var ErrValueOutOfRange = errors.New("openai: value out of int range")
 
 type adapter struct {
 	client *openai.Client

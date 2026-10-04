@@ -49,6 +49,11 @@ func (e *TooLargeError) Is(target error) bool {
 	return target == ErrTooLarge
 }
 
+// Unwrap exposes ErrTooLarge for errors.Is and errors.As.
+func (e *TooLargeError) Unwrap() error {
+	return ErrTooLarge
+}
+
 // config holds NewClient options.
 type config struct {
 	transport      http.RoundTripper

@@ -10,10 +10,10 @@ func TestSentinelMessages(t *testing.T) {
 	if ErrInvalidAddress.Error() != "redis: invalid address" {
 		t.Fatalf("ErrInvalidAddress = %q", ErrInvalidAddress.Error())
 	}
-	if ErrParseAddress.Error() != "redis: parse address failed" {
+	if ErrParseAddress.Error() != "redis: parse address" {
 		t.Fatalf("ErrParseAddress = %q", ErrParseAddress.Error())
 	}
-	if ErrCloseClient.Error() != "redis: close client failed" {
+	if ErrCloseClient.Error() != "redis: close client" {
 		t.Fatalf("ErrCloseClient = %q", ErrCloseClient.Error())
 	}
 }
