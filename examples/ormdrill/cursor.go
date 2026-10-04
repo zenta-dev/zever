@@ -83,7 +83,7 @@ func DemoCursorPagination(ctx context.Context, conn db.DB) error {
 		// column is a typed error, never a silent wrong page.
 		_, _, wrongColErr := orm.DecodeCursor(token, OrderCols.ID)
 		if wrongColErr == nil {
-			return fmt.Errorf("ormdrill: expected wrong-column cursor decode to fail")
+			return errors.New("ormdrill: expected wrong-column cursor decode to fail")
 		}
 
 		fmt.Printf("  next cursor %s; replay against OrderCols.ID rejected: %v\n", token, wrongColErr)

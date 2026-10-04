@@ -11,8 +11,6 @@ import (
 // ErrWebhookRegister indicates a webhook registration failed.
 var ErrWebhookRegister = errors.New("webhook register")
 
-var errEmptyWebhookTarget = errors.New("webhook target is empty")
-
 // Webhook events fanned out by the bookings jobs.
 const (
 	EventCreated   = "booking.created"
