@@ -170,7 +170,7 @@ func convertScan[T ScanValue](src any) (T, error) {
 
 		return any(j).(T), nil //nolint:forcetypeassert // guarded by the outer type switch
 	default:
-		return zero, fmt.Errorf("orm: Option[%T] is not a supported scan type", zero)
+		return zero, fmt.Errorf("orm: Option[%T] is not a supported scan type: %w", zero, ErrScanTypeMismatch)
 	}
 }
 
@@ -189,7 +189,7 @@ func scanString(src any) (string, error) {
 		// text a plain rows.Scan into *string would have produced.
 		return v.Format(time.RFC3339Nano), nil
 	default:
-		return "", fmt.Errorf("orm: cannot scan %T into string", src)
+		return "", fmt.Errorf("orm: cannot scan %T into string: %w", src, ErrScanTypeMismatch)
 	}
 }
 
@@ -207,7 +207,7 @@ func scanBytes(src any) ([]byte, error) {
 		// time.Time source: its RFC3339Nano bytes.
 		return v.AppendFormat(make([]byte, 0, len(time.RFC3339Nano)), time.RFC3339Nano), nil
 	default:
-		return nil, fmt.Errorf("orm: cannot scan %T into []byte", src)
+		return nil, fmt.Errorf("orm: cannot scan %T into []byte: %w", src, ErrScanTypeMismatch)
 	}
 }
 
@@ -226,7 +226,7 @@ func scanInt64(src any) (int64, error) {
 	case string:
 		return parseInt64(v)
 	default:
-		return 0, fmt.Errorf("orm: cannot scan %T into int64", src)
+		return 0, fmt.Errorf("orm: cannot scan %T into int64: %w", src, ErrScanTypeMismatch)
 	}
 }
 
@@ -252,7 +252,7 @@ func scanFloat64(src any) (float64, error) {
 	case string:
 		return parseFloat64(v)
 	default:
-		return 0, fmt.Errorf("orm: cannot scan %T into float64", src)
+		return 0, fmt.Errorf("orm: cannot scan %T into float64: %w", src, ErrScanTypeMismatch)
 	}
 }
 
@@ -278,7 +278,7 @@ func scanBool(src any) (bool, error) {
 
 		return s != "" && s != "false" && s != "0", nil
 	default:
-		return false, fmt.Errorf("orm: cannot scan %T into bool", src)
+		return false, fmt.Errorf("orm: cannot scan %T into bool: %w", src, ErrScanTypeMismatch)
 	}
 }
 
@@ -291,7 +291,7 @@ func scanTime(src any) (time.Time, error) {
 	case []byte:
 		return parseTime(string(v))
 	default:
-		return time.Time{}, fmt.Errorf("orm: cannot scan %T into time.Time", src)
+		return time.Time{}, fmt.Errorf("orm: cannot scan %T into time.Time: %w", src, ErrScanTypeMismatch)
 	}
 }
 
