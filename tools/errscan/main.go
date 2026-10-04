@@ -75,6 +75,7 @@ func main() {
 
 func scan(root string) ([]violation, error) {
 	var vs []violation
+	// #nosec G703 -- dev-only guard; root is an explicit caller-supplied scan path.
 	err := filepath.WalkDir(root, func(path string, d fs.DirEntry, err error) error {
 		if err != nil {
 			return err
