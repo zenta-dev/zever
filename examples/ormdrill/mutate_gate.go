@@ -53,7 +53,7 @@ func DemoInsertSelectDistinct(ctx context.Context, conn db.DB) error {
 		Select(orm.From(Widgets).Where(WidgetCols.PriceCents.Gt(700))).
 		Exec(ctx, conn); err != nil {
 		return fmt.Errorf("ormdrill: %w: %w", ErrInsertSelect, err)
-		}
+	}
 
 	// A deliberate exact duplicate so DISTINCT has something to remove.
 	if _, err := conn.Exec(ctx, `INSERT INTO widgets_archive SELECT * FROM widgets_archive WHERE id = ?`, "w08"); err != nil {

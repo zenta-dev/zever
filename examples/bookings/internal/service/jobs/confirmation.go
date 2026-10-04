@@ -22,11 +22,7 @@ var ErrGuestNotFound = errors.New("guest not found")
 // ErrSpaceNotFound indicates a space ID has no matching row.
 var ErrSpaceNotFound = errors.New("space not found")
 
-var (
-	errEmptyBookingID = errors.New("booking id is empty")
-	errEmptyGuestID   = errors.New("guest id is empty")
-	errEmptySpaceID   = errors.New("space id is empty")
-)
+var errEmptyBookingID = errors.New("booking id is empty")
 
 // SendConfirmationArgs is the payload of the SendConfirmation job declared in
 // the schema.
