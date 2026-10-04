@@ -594,7 +594,7 @@ func (c *tinkerClient) call(verb string, args any) (json.RawMessage, error) {
 		}
 
 		if r.resp.Error != "" {
-			return nil, errors.New(r.resp.Error)
+			return nil, fmt.Errorf("zever tinker: %s", r.resp.Error)
 		}
 
 		return r.resp.Result, nil

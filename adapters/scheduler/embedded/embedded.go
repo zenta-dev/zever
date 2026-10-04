@@ -2,7 +2,6 @@ package embedded
 
 import (
 	"context"
-	"errors"
 	"fmt"
 	"sync"
 	"time"
@@ -68,7 +67,7 @@ func (e *embedded) Schedule(ctx context.Context, spec, jobName string, args any)
 	}
 
 	if len(spec) == 0 || len(spec) > scheduler.MaxSpecLen {
-		return 0, &scheduler.InvalidSpecError{Spec: spec, Err: errors.New("spec length must be 1-256")}
+		return 0, &scheduler.InvalidSpecError{Spec: spec, Err: fmt.Errorf("embedded: %w", ErrInvalidSpecLength)}
 	}
 
 	parsed, err := cron.ParseStandard(spec)
