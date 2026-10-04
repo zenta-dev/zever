@@ -1,7 +1,6 @@
 package orm
 
 import (
-	"errors"
 	"fmt"
 	"strings"
 )
@@ -41,7 +40,7 @@ type RawExpr struct {
 // identifier still comes from a bounded set, never raw caller input.
 func UnsafeIdent[T any, V any](ident string, allowlist []string) (Column[T, V], error) {
 	if ident == "" {
-		return Column[T, V]{}, errors.New("orm: UnsafeIdent: empty ident")
+		return Column[T, V]{}, fmt.Errorf("orm: UnsafeIdent: %w", ErrEmptyIdent)
 	}
 
 	for _, allowed := range allowlist {

@@ -234,11 +234,11 @@ func (i Insert[T]) requireDefaultValuesExclusive() error {
 
 	switch {
 	case i.rowsLen > 0:
-		return errors.New("orm: Insert.DefaultValues: mutually exclusive with Values rows")
+		return fmt.Errorf("orm: Insert.DefaultValues: %w", ErrMutuallyExclusive)
 	case i.selectSrc != nil:
-		return errors.New("orm: Insert.DefaultValues: mutually exclusive with Select")
+		return fmt.Errorf("orm: Insert.DefaultValues: %w", ErrMutuallyExclusive)
 	case len(i.columns) > 0:
-		return errors.New("orm: Insert.DefaultValues: mutually exclusive with Columns")
+		return fmt.Errorf("orm: Insert.DefaultValues: %w", ErrMutuallyExclusive)
 	}
 
 	return nil
