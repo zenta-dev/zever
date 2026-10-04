@@ -61,7 +61,7 @@ func Run(ctx context.Context, database db.DB) error {
 func ensureUser(ctx context.Context, database db.DB, id, email, name string, role gen.Role) error {
 	existing, ok, err := orm.From(gen.Users).Where(gen.UserCols.Email.Eq(email)).First(ctx, database)
 	if err != nil {
-		return fmt.Errorf("[seed] lookup user: %w", err)
+		return fmt.Errorf("seed: lookup user: %w", err)
 	}
 	if ok {
 		_ = existing
@@ -70,7 +70,7 @@ func ensureUser(ctx context.Context, database db.DB, id, email, name string, rol
 
 	hash, err := password.Hash(ctx, DemoPassword)
 	if err != nil {
-		return fmt.Errorf("[seed] hash password: %w", err)
+		return fmt.Errorf("seed: hash password: %w", err)
 	}
 
 	if err := orm.InsertInto(gen.Users).Values(
@@ -89,7 +89,7 @@ func ensureUser(ctx context.Context, database db.DB, id, email, name string, rol
 		orm.Set(gen.UserCols.Prefs, orm.JSONText(`{"theme":"dark"}`)),
 		orm.Set(gen.UserCols.CreatedAt, time.Now().UTC()),
 	).Exec(ctx, database); err != nil {
-		return fmt.Errorf("[seed] insert user: %w", err)
+		return fmt.Errorf("seed: insert user: %w", err)
 	}
 	return nil
 }
@@ -97,7 +97,7 @@ func ensureUser(ctx context.Context, database db.DB, id, email, name string, rol
 func ensureCategory(ctx context.Context, database db.DB) error {
 	_, ok, err := orm.From(gen.Categories).Where(gen.CategoryCols.ID.Eq(CategoryID)).First(ctx, database)
 	if err != nil {
-		return fmt.Errorf("[seed] lookup category: %w", err)
+		return fmt.Errorf("seed: lookup category: %w", err)
 	}
 	if ok {
 		return nil
@@ -114,7 +114,7 @@ func ensureCategory(ctx context.Context, database db.DB) error {
 func ensureProduct(ctx context.Context, database db.DB, id, sku, headline string, price, stock int64) error {
 	_, ok, err := orm.From(gen.Products).Where(gen.ProductCols.ID.Eq(id)).First(ctx, database)
 	if err != nil {
-		return fmt.Errorf("[seed] lookup product: %w", err)
+		return fmt.Errorf("seed: lookup product: %w", err)
 	}
 	if ok {
 		return nil
@@ -139,7 +139,7 @@ func ensureProduct(ctx context.Context, database db.DB, id, sku, headline string
 func ensureTag(ctx context.Context, database db.DB) error {
 	_, ok, err := orm.From(gen.Tags).Where(gen.TagCols.ID.Eq(TagID)).First(ctx, database)
 	if err != nil {
-		return fmt.Errorf("[seed] lookup tag: %w", err)
+		return fmt.Errorf("seed: lookup tag: %w", err)
 	}
 	if !ok {
 		if err := insertErr(orm.InsertInto(gen.Tags).Values(
@@ -154,7 +154,7 @@ func ensureTag(ctx context.Context, database db.DB) error {
 	for _, pid := range []string{ProductOneID, ProductTwoID} {
 		if _, err := database.Exec(ctx,
 			`INSERT OR IGNORE INTO product_tags (product_id, tag_id) VALUES (?, ?)`, pid, TagID); err != nil {
-			return fmt.Errorf("[seed] link tag: %w", err)
+			return fmt.Errorf("seed: link tag: %w", err)
 		}
 	}
 	return nil
@@ -163,7 +163,7 @@ func ensureTag(ctx context.Context, database db.DB) error {
 func ensureOrder(ctx context.Context, database db.DB) error {
 	_, ok, err := orm.From(gen.Orders).Where(gen.OrderCols.ID.Eq(OrderID)).First(ctx, database)
 	if err != nil {
-		return fmt.Errorf("[seed] lookup order: %w", err)
+		return fmt.Errorf("seed: lookup order: %w", err)
 	}
 	if ok {
 		return nil
@@ -193,7 +193,7 @@ func ensureOrder(ctx context.Context, database db.DB) error {
 
 func insertErr(err error, what string) error {
 	if err != nil {
-		return fmt.Errorf("[seed] insert %s: %w", what, err)
+		return fmt.Errorf("seed: insert %s: %w", what, err)
 	}
 	return nil
 }

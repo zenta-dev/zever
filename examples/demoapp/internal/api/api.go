@@ -52,7 +52,7 @@ import (
 const TokenTTL = time.Hour
 
 // ErrUnauthenticated is returned when no subject is in the context.
-var ErrUnauthenticated = errors.New("[api] not authenticated")
+var ErrUnauthenticated = errors.New("api: not authenticated")
 
 // Deps carries every resolved service the handlers need. Optional batteries
 // stay nil when resolution failed; handlers answer 501 for those.

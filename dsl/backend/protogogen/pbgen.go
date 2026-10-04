@@ -18,7 +18,7 @@ import (
 func generatePBGo(req *pluginpb.CodeGeneratorRequest) (map[string][]byte, error) {
 	gen, err := (&protogen.Options{}).New(req)
 	if err != nil {
-		return nil, fmt.Errorf("[protogogen] protogen.Options.New: %w", err)
+		return nil, fmt.Errorf("protogogen: protogen.Options.New: %w", err)
 	}
 
 	for _, f := range gen.Files {
@@ -29,7 +29,7 @@ func generatePBGo(req *pluginpb.CodeGeneratorRequest) (map[string][]byte, error)
 
 	resp := gen.Response()
 	if resp.GetError() != "" {
-		return nil, fmt.Errorf("[protogogen] protoc-gen-go: %s", resp.GetError())
+		return nil, fmt.Errorf("protogogen: protoc-gen-go: %s", resp.GetError())
 	}
 
 	return responseFilesToMap(resp), nil

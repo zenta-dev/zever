@@ -380,7 +380,7 @@ func updateZeverYamlForAdd(src string, sel batterySelection) ([]byte, error) {
 
 	if strings.TrimSpace(src) != "" {
 		if err := yaml.Unmarshal([]byte(src), &doc); err != nil {
-			return nil, fmt.Errorf("[zever add] parse zever.yaml: %w", err)
+			return nil, fmt.Errorf("zever add: parse zever.yaml: %w", err)
 		}
 
 		if doc == nil {
@@ -396,7 +396,7 @@ func updateZeverYamlForAdd(src string, sel batterySelection) ([]byte, error) {
 
 	data, err := yaml.Marshal(doc)
 	if err != nil {
-		return nil, fmt.Errorf("[zever add] marshal zever.yaml: %w", err)
+		return nil, fmt.Errorf("zever add: marshal zever.yaml: %w", err)
 	}
 
 	return data, nil
@@ -459,7 +459,7 @@ func updateZeverYamlForPlugin(src, plugin, adapter string) ([]byte, error) {
 
 	if strings.TrimSpace(src) != "" {
 		if err := yaml.Unmarshal([]byte(src), &doc); err != nil {
-			return nil, fmt.Errorf("[zever add] parse zever.yaml: %w", err)
+			return nil, fmt.Errorf("zever add: parse zever.yaml: %w", err)
 		}
 
 		if doc == nil {
@@ -482,7 +482,7 @@ func updateZeverYamlForPlugin(src, plugin, adapter string) ([]byte, error) {
 
 	data, err := yaml.Marshal(doc)
 	if err != nil {
-		return nil, fmt.Errorf("[zever add] marshal zever.yaml: %w", err)
+		return nil, fmt.Errorf("zever add: marshal zever.yaml: %w", err)
 	}
 
 	return data, nil

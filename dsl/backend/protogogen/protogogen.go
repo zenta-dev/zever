@@ -91,7 +91,7 @@ func (b *Backend) Generate(schema *ir.Schema) (map[string][]byte, error) {
 func (b *Backend) GenerateContext(ctx context.Context, schema *ir.Schema) (map[string][]byte, error) {
 	protoFiles, err := b.proto.Generate(schema)
 	if err != nil {
-		return nil, fmt.Errorf("[protogogen] render proto: %w", err)
+		return nil, fmt.Errorf("protogogen: render proto: %w", err)
 	}
 
 	req, err := buildCodeGeneratorRequest(protoFiles) //nolint:contextcheck // pure request constructor: takes no ctx and performs no I/O (generateGRPCGo below already receives ctx)

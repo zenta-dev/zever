@@ -1042,7 +1042,7 @@ func renderZeverYaml(cfg NewConfig) ([]byte, error) {
 
 	data, err := yaml.Marshal(batteries)
 	if err != nil {
-		return nil, fmt.Errorf("[zever new] marshal zever.yaml: %w", err)
+		return nil, fmt.Errorf("zever new: marshal zever.yaml: %w", err)
 	}
 
 	return data, nil
