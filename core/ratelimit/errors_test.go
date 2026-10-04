@@ -10,7 +10,7 @@ func TestErrors_sentinel_messages(t *testing.T) {
 	t.Parallel()
 	cases := map[string][2]string{
 		"ErrNilFactory":     {ErrNilFactory.Error(), "ratelimit: nil factory"},
-		"ErrDuplicate":      {ErrDuplicate.Error(), "ratelimit: duplicate registration"},
+		"ErrDuplicate":      {ErrDuplicate.Error(), "ratelimit: duplicate adapter"},
 		"ErrUnknownAdapter": {ErrUnknownAdapter.Error(), "ratelimit: unknown adapter"},
 		"ErrInvalidAdapter": {ErrInvalidAdapter.Error(), "ratelimit: invalid adapter"},
 		"ErrInvalidOptions": {ErrInvalidOptions.Error(), "ratelimit: invalid options"},

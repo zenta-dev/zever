@@ -11,7 +11,7 @@ func TestErrors_sentinel_messages(t *testing.T) {
 	cases := map[string][2]string{
 		"ErrClosed":              {ErrClosed.Error(), "notification: closed"},
 		"ErrNilFactory":          {ErrNilFactory.Error(), "notification: nil factory"},
-		"ErrDuplicate":           {ErrDuplicate.Error(), "notification: duplicate registration"},
+		"ErrDuplicate":           {ErrDuplicate.Error(), "notification: duplicate adapter"},
 		"ErrUnknownAdapter":      {ErrUnknownAdapter.Error(), "notification: unknown adapter"},
 		"ErrInvalidAdapter":      {ErrInvalidAdapter.Error(), "notification: invalid adapter"},
 		"ErrInvalidOptions":      {ErrInvalidOptions.Error(), "notification: invalid options"},

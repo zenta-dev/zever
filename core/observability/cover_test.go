@@ -45,7 +45,7 @@ func TestTypedErrorMessages(t *testing.T) {
 		err  error
 		want string
 	}{
-		{name: "duplicate", err: DuplicateError{Adapter: Noop}, want: "observability: duplicate registration: noop"},
+		{name: "duplicate", err: DuplicateError{Adapter: Noop}, want: "observability: duplicate adapter: noop"},
 		{name: "unknown", err: UnknownAdapterError{Adapter: Adapter("")}, want: "observability: unknown adapter: unknown (forgotten import?)"},
 		{name: "invalid adapter", err: InvalidAdapterError{Adapter: "nope"}, want: `observability: invalid adapter: "nope"`},
 		{name: "invalid options", err: InvalidOptionsError{Reason: "bad thing"}, want: "observability: invalid options: bad thing"},

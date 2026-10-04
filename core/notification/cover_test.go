@@ -32,7 +32,7 @@ func TestCover_Errors_ErrorStrings(t *testing.T) {
 		got  string
 		want string
 	}{
-		{"DuplicateError", DuplicateError{Adapter: Log}.Error(), "notification: duplicate registration: log"},
+		{"DuplicateError", DuplicateError{Adapter: Log}.Error(), "notification: duplicate adapter: log"},
 		{"UnknownAdapterError", UnknownAdapterError{Adapter: Log}.Error(), "notification: unknown adapter: log (forgotten import?)"},
 		{"InvalidAdapterError", InvalidAdapterError{Adapter: "bogus"}.Error(), `notification: invalid adapter: "bogus"`},
 		{"InvalidOptionsError", InvalidOptionsError{Reason: "timeout must be >= 0"}.Error(), "notification: invalid options: timeout must be >= 0"},

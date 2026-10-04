@@ -79,7 +79,7 @@ func TestTypedErrorStrings(t *testing.T) {
 		{
 			name: "duplicate",
 			err:  &password.DuplicateAdapterError{Adapter: password.AdapterArgon2ID},
-			want: "password: duplicate registration: argon2id",
+			want: "password: duplicate adapter: argon2id",
 		},
 		{
 			name: "unknown adapter",

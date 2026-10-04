@@ -19,7 +19,7 @@ func TestCoverTypedErrorStrings(t *testing.T) {
 		got  string
 		want string
 	}{
-		{"DuplicateError", dup.Error(), "eventbus: duplicate registration: memory"},
+		{"DuplicateError", dup.Error(), "eventbus: duplicate adapter: memory"},
 		{"UnknownAdapterError", unknown.Error(), "eventbus: unknown adapter: redis (forgotten import?)"},
 		{"InvalidAdapterError", invalidAdapter.Error(), `eventbus: invalid adapter: "bogus"`},
 		{"InvalidOptionsError", invalidOpts.Error(), "eventbus: invalid options: bad"},

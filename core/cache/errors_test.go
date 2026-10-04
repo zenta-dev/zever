@@ -15,7 +15,7 @@ func TestSentinelMessages(t *testing.T) {
 		"ErrNotFound":       {cache.ErrNotFound.Error(), "cache: not found"},
 		"ErrClosed":         {cache.ErrClosed.Error(), "cache: closed"},
 		"ErrNilFactory":     {cache.ErrNilFactory.Error(), "cache: nil factory"},
-		"ErrDuplicate":      {cache.ErrDuplicate.Error(), "cache: duplicate registration"},
+		"ErrDuplicate":      {cache.ErrDuplicate.Error(), "cache: duplicate adapter"},
 		"ErrUnknownAdapter": {cache.ErrUnknownAdapter.Error(), "cache: unknown adapter"},
 		"ErrInvalidAdapter": {cache.ErrInvalidAdapter.Error(), "cache: invalid adapter"},
 		"ErrInvalidValue":   {cache.ErrInvalidValue.Error(), "cache: invalid value"},
@@ -246,7 +246,7 @@ func TestTypedErrorMessages_unwrap(t *testing.T) {
 		t.Parallel()
 
 		err := &cache.DuplicateAdapterError{Adapter: cache.Memory}
-		if got, want := err.Error(), `cache: duplicate registration: memory`; got != want {
+		if got, want := err.Error(), `cache: duplicate adapter: memory`; got != want {
 			t.Errorf("Error() = %q, want %q", got, want)
 		}
 

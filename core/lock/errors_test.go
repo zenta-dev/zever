@@ -13,7 +13,7 @@ func TestSentinelMessages(t *testing.T) {
 	cases := map[string][2]string{
 		"ErrNotHeld":        {lock.ErrNotHeld.Error(), "lock: lock is no longer held"},
 		"ErrNilFactory":     {lock.ErrNilFactory.Error(), "lock: nil factory"},
-		"ErrDuplicate":      {lock.ErrDuplicate.Error(), "lock: duplicate registration"},
+		"ErrDuplicate":      {lock.ErrDuplicate.Error(), "lock: duplicate adapter"},
 		"ErrUnknownAdapter": {lock.ErrUnknownAdapter.Error(), "lock: unknown adapter"},
 		"ErrInvalidAdapter": {lock.ErrInvalidAdapter.Error(), "lock: invalid adapter"},
 	}
@@ -45,7 +45,7 @@ func TestTypedErrorMessages_unwrap(t *testing.T) {
 		t.Parallel()
 
 		err := &lock.DuplicateAdapterError{Adapter: lock.Memory}
-		if got, want := err.Error(), `lock: duplicate registration: memory`; got != want {
+		if got, want := err.Error(), `lock: duplicate adapter: memory`; got != want {
 			t.Errorf("Error() = %q, want %q", got, want)
 		}
 

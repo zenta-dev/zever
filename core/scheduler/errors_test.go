@@ -30,7 +30,7 @@ func TestDuplicateAdapterErrorUnwrap(t *testing.T) {
 		t.Fatalf("err=%v want ErrDuplicate", err)
 	}
 
-	if got, want := err.Error(), `scheduler: duplicate registration: embedded`; got != want {
+	if got, want := err.Error(), `scheduler: duplicate adapter: embedded`; got != want {
 		t.Fatalf("Error()=%q want %q", got, want)
 	}
 }

@@ -10,7 +10,7 @@ func TestErrors_typedErrorMessage_exact(t *testing.T) {
 	t.Parallel()
 
 	dup := DuplicateError{Adapter: Embed}
-	if want := "i18n: duplicate registration: embed"; dup.Error() != want {
+	if want := "i18n: duplicate adapter: embed"; dup.Error() != want {
 		t.Errorf("DuplicateError.Error() = %q, want %q", dup.Error(), want)
 	}
 	if (&dup).Error() != dup.Error() {

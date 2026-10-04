@@ -11,7 +11,7 @@ func TestErrors_sentinel_messages(t *testing.T) {
 	cases := map[string][2]string{
 		"ErrClosed":           {ErrClosed.Error(), "eventbus: closed"},
 		"ErrNilFactory":       {ErrNilFactory.Error(), "eventbus: nil factory"},
-		"ErrDuplicate":        {ErrDuplicate.Error(), "eventbus: duplicate registration"},
+		"ErrDuplicate":        {ErrDuplicate.Error(), "eventbus: duplicate adapter"},
 		"ErrUnknownAdapter":   {ErrUnknownAdapter.Error(), "eventbus: unknown adapter"},
 		"ErrInvalidAdapter":   {ErrInvalidAdapter.Error(), "eventbus: invalid adapter"},
 		"ErrInvalidOptions":   {ErrInvalidOptions.Error(), "eventbus: invalid options"},
