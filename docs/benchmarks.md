@@ -12,6 +12,29 @@ parsing, so compare shapes (allocs/op) and relative deltas, not raw ns.
 > Re-run locally before drawing conclusions; treat committed numbers older
 > than a few weeks as stale.
 
+## Conventions
+
+Every benchmark lives in a `*_bench_test.go` file next to the code it measures
+and follows these rules:
+
+- **Deterministic:** no network, no `time.Sleep` sync, no unseeded randomness,
+  no timing assertions. In-process backends only (sqlite `:memory:`).
+- **Allocation visibility:** `b.ReportAllocs()` on every benchmark.
+- **Setup excluded:** `b.ResetTimer()` after warmup/setup; `b.Cleanup` for
+  teardown (Open/Close).
+- **Context:** `b.Context()` (or `b.Parallel`'s implicit context), never a
+  stored context.
+- **Concurrent types:** a `b.RunParallel` variant alongside the sequential one,
+  with balanced work per iteration so memory stays flat.
+- **Naming:** `Benchmark<Thing>` for the hot path, `Benchmark<Thing>Parallel`
+  for the concurrent variant, `Benchmark<Thing>Before`/`After` only when
+  documenting an optimization.
+- **Target:** the operation the module exists to perform (e.g. `cache` Get/Set,
+  `queue` Push/Pop, `codec` encode/decode, `orm` query build, `dsl` lex/parse).
+
+Run all benchmarks with `make bench` (`go test -bench=. -benchmem ./...`) or
+per module with `go -C <dir> test -run=NONE -bench=. -benchtime=1s -cpu=1,4 -benchmem`.
+
 ## Results (2026-10-03)
 
 Router (`adapters/router/fiber`, sequential vs concurrent `ServeHTTP`).
