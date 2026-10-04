@@ -175,7 +175,7 @@ func (c *meilisearchClient) Delete(ctx context.Context, id string) error {
 		// %w with *NotFoundError directly (value-receiver Error method);
 		// same pattern as payment/stub. errors.As(*NotFoundError) and
 		// errors.Is(ErrNotFound) both still hold.
-		notFound := error(&search.NotFoundError{ID: id})
+		notFound := error(search.NotFoundError{ID: id})
 		return fmt.Errorf(
 			"%w: index for id %q not tracked; idIndexes is in-memory, populated only by Index and Search calls, "+
 				"lost on restart and unsafe with multiple instances; hint: run a Search for the id in its index "+

@@ -87,7 +87,7 @@ func checkEndpoint(endpoint string) error {
 
 	u, err := url.Parse(endpoint)
 	if err != nil {
-		return &analytics.InvalidOptionsError{Reason: "endpoint must use https or localhost http"}
+		return analytics.InvalidOptionsError{Reason: "endpoint must use https or localhost http"}
 	}
 
 	if u.Scheme == "https" {
@@ -98,7 +98,7 @@ func checkEndpoint(endpoint string) error {
 		return nil
 	}
 
-	return &analytics.InvalidOptionsError{Reason: "endpoint must use https or localhost http"}
+	return analytics.InvalidOptionsError{Reason: "endpoint must use https or localhost http"}
 }
 
 // isLocalhost reports whether host is localhost or a loopback IP.

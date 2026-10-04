@@ -59,7 +59,7 @@ func stubEncrypted(keyID string) []byte {
 // GenerateDataKey mints a deterministic test data key for keyID.
 func (stubClient) GenerateDataKey(_ context.Context, keyID string) ([]byte, []byte, error) {
 	if strings.TrimSpace(keyID) == "" {
-		return nil, nil, fmt.Errorf("kms stub: %w: empty key id", crypto.ErrInvalidKey)
+		return nil, nil, fmt.Errorf("kms: %w: empty key id", crypto.ErrInvalidKey)
 	}
 
 	plain := stubDataKey(keyID)
@@ -71,12 +71,12 @@ func (stubClient) GenerateDataKey(_ context.Context, keyID string) ([]byte, []by
 func (stubClient) Decrypt(_ context.Context, encrypted []byte) ([]byte, error) {
 	s := string(encrypted)
 	if !strings.HasPrefix(s, "stub-enc:") {
-		return nil, fmt.Errorf("kms stub: %w", crypto.ErrIntegrity)
+		return nil, fmt.Errorf("kms: %w", crypto.ErrIntegrity)
 	}
 
 	keyID := strings.TrimPrefix(s, "stub-enc:")
 	if strings.TrimSpace(keyID) == "" {
-		return nil, fmt.Errorf("kms stub: %w", crypto.ErrIntegrity)
+		return nil, fmt.Errorf("kms: %w", crypto.ErrIntegrity)
 	}
 
 	return stubDataKey(keyID), nil

@@ -152,6 +152,7 @@ use (
 	./shared/s3opts
 	./shared/traceprop
 	./tools/affected
+	./tools/errscan
 	./tools/modgraph
 	./tools/zever-lsp
 )

@@ -37,11 +37,11 @@ func TestSentinels_messages(t *testing.T) {
 
 func TestInvalidAdapterError(t *testing.T) {
 	t.Parallel()
-	err := &InvalidAdapterError{Adapter: "bogus"}
+	err := InvalidAdapterError{Adapter: "bogus"}
 	if !errors.Is(err, ErrInvalidAdapter) {
 		t.Fatalf("Is = false, want true")
 	}
-	var target *InvalidAdapterError
+	var target InvalidAdapterError
 	if !errors.As(err, &target) {
 		t.Fatalf("As failed")
 	}
@@ -58,11 +58,11 @@ func TestInvalidAdapterError(t *testing.T) {
 
 func TestDuplicateAdapterError(t *testing.T) {
 	t.Parallel()
-	err := &DuplicateAdapterError{Adapter: OpenAI}
+	err := DuplicateAdapterError{Adapter: OpenAI}
 	if !errors.Is(err, ErrDuplicateAdapter) {
 		t.Fatalf("Is = false")
 	}
-	var target *DuplicateAdapterError
+	var target DuplicateAdapterError
 	if !errors.As(err, &target) {
 		t.Fatalf("As failed")
 	}
@@ -76,11 +76,11 @@ func TestDuplicateAdapterError(t *testing.T) {
 
 func TestDuplicateError_alias_compat(t *testing.T) {
 	t.Parallel()
-	err := &DuplicateAdapterError{Adapter: OpenAI}
+	err := DuplicateAdapterError{Adapter: OpenAI}
 	if !errors.Is(err, ErrDuplicate) {
 		t.Fatalf("Is = false, want true for ErrDuplicate alias")
 	}
-	var target *DuplicateError
+	var target DuplicateError
 	if !errors.As(err, &target) {
 		t.Fatalf("As failed for DuplicateError alias")
 	}
@@ -94,11 +94,11 @@ func TestDuplicateError_alias_compat(t *testing.T) {
 
 func TestUnknownAdapterError(t *testing.T) {
 	t.Parallel()
-	err := &UnknownAdapterError{Adapter: Adapter("test-123")}
+	err := UnknownAdapterError{Adapter: Adapter("test-123")}
 	if !errors.Is(err, ErrUnknownAdapter) {
 		t.Fatalf("Is = false")
 	}
-	var target *UnknownAdapterError
+	var target UnknownAdapterError
 	if !errors.As(err, &target) {
 		t.Fatalf("As failed")
 	}
@@ -112,11 +112,11 @@ func TestUnknownAdapterError(t *testing.T) {
 
 func TestInvalidOptionsError(t *testing.T) {
 	t.Parallel()
-	err := &InvalidOptionsError{Reason: "timeout must be >= 0"}
+	err := InvalidOptionsError{Reason: "timeout must be >= 0"}
 	if !errors.Is(err, ErrInvalidOptions) {
 		t.Fatalf("Is = false")
 	}
-	var target *InvalidOptionsError
+	var target InvalidOptionsError
 	if !errors.As(err, &target) {
 		t.Fatalf("As failed")
 	}
@@ -130,11 +130,11 @@ func TestInvalidOptionsError(t *testing.T) {
 
 func TestRateLimitedError_zero(t *testing.T) {
 	t.Parallel()
-	err := &RateLimitedError{}
+	err := RateLimitedError{}
 	if !errors.Is(err, ErrRateLimited) {
 		t.Fatalf("Is = false")
 	}
-	var target *RateLimitedError
+	var target RateLimitedError
 	if !errors.As(err, &target) {
 		t.Fatalf("As failed")
 	}
@@ -149,7 +149,7 @@ func TestRateLimitedError_zero(t *testing.T) {
 func TestRateLimitedError_withRetry(t *testing.T) {
 	t.Parallel()
 	d := 2 * time.Second
-	err := &RateLimitedError{RetryAfter: d}
+	err := RateLimitedError{RetryAfter: d}
 	if !errors.Is(err, ErrRateLimited) {
 		t.Fatalf("Is = false")
 	}
@@ -160,7 +160,7 @@ func TestRateLimitedError_withRetry(t *testing.T) {
 	if !strings.Contains(msg, "2s") {
 		t.Errorf("Error() %q missing 2s", msg)
 	}
-	var target *RateLimitedError
+	var target RateLimitedError
 	if !errors.As(err, &target) {
 		t.Fatalf("As failed")
 	}
@@ -172,7 +172,7 @@ func TestRateLimitedError_withRetry(t *testing.T) {
 func TestErrors_Unwrap_chain(t *testing.T) {
 	t.Parallel()
 	// Ensure errors.Is works through fmt.Errorf wrapping.
-	base := &InvalidOptionsError{Reason: "x"}
+	base := InvalidOptionsError{Reason: "x"}
 	wrapped := errors.Join(base)
 	if !errors.Is(wrapped, ErrInvalidOptions) {
 		t.Fatalf("Join Is = false")

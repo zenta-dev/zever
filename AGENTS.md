@@ -41,6 +41,7 @@ go test ./dsl/compile/ -run TestName -update  # regen committed backend output o
 
 - Exported identifiers need doc comment starting with name; unexported don't.
 - `goimports` local prefix `github.com/zenta-dev/zever`; `depguard` denies `github.com/pkg/errors` (use stdlib + `%w`) and `io/ioutil`.
+- Errors: `<package>: <message>` prefix (colon form, no brackets/trailing period); sentinels `ErrXxx` package-level in `errors.go` with doc comments; wrap with `%w` (never two in one `fmt.Errorf` — use `errors.Join`); branch with `errors.Is`/`errors.AsType`; panics only in `dsl/backend/gogen/render_validate.go`. Guide: `docs/errors.md`; guard: `make err-lint`.
 - No globals / no `init()` wiring; `ctx` first arg for IO, never stored in struct; goroutine-safe types documented + explicit exit path.
 - Tests deterministic: no `time.Sleep` sync, no network, no unseeded randomness, no timing assertions.
 - Test helper roles: `stub*` = test doubles/fakes, `must*` = do-or-`t.Fatal` assertion helpers, `freshAdapter` = registry fixture adapter. Test-file suffix encodes purpose (`cover`/`live`/`bench`/`internal`/`race`/`closure`); plain `*_test.go` otherwise.

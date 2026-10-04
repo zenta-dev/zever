@@ -11,7 +11,7 @@ func TestErrors_sentinel_messages(t *testing.T) {
 	cases := map[string][2]string{
 		"ErrClosed":           {ErrClosed.Error(), "eventbus: closed"},
 		"ErrNilFactory":       {ErrNilFactory.Error(), "eventbus: nil factory"},
-		"ErrDuplicate":        {ErrDuplicate.Error(), "eventbus: duplicate registration"},
+		"ErrDuplicate":        {ErrDuplicate.Error(), "eventbus: duplicate adapter"},
 		"ErrUnknownAdapter":   {ErrUnknownAdapter.Error(), "eventbus: unknown adapter"},
 		"ErrInvalidAdapter":   {ErrInvalidAdapter.Error(), "eventbus: invalid adapter"},
 		"ErrInvalidOptions":   {ErrInvalidOptions.Error(), "eventbus: invalid options"},
@@ -31,43 +31,43 @@ func TestErrors_sentinel_messages(t *testing.T) {
 
 func TestErrors_typed_unwrap(t *testing.T) {
 	t.Parallel()
-	if !errors.Is(&DuplicateAdapterError{Adapter: Redis}, ErrDuplicate) {
+	if !errors.Is(DuplicateAdapterError{Adapter: Redis}, ErrDuplicate) {
 		t.Error("DuplicateAdapterError does not unwrap to ErrDuplicate")
 	}
-	if !errors.Is(&UnknownAdapterError{Adapter: Redis}, ErrUnknownAdapter) {
+	if !errors.Is(UnknownAdapterError{Adapter: Redis}, ErrUnknownAdapter) {
 		t.Error("UnknownAdapterError does not unwrap to ErrUnknownAdapter")
 	}
-	if !errors.Is(&InvalidAdapterError{Adapter: "x"}, ErrInvalidAdapter) {
+	if !errors.Is(InvalidAdapterError{Adapter: "x"}, ErrInvalidAdapter) {
 		t.Error("InvalidAdapterError does not unwrap to ErrInvalidAdapter")
 	}
-	if !errors.Is(&InvalidOptionsError{Reason: "x"}, ErrInvalidOptions) {
+	if !errors.Is(InvalidOptionsError{Reason: "x"}, ErrInvalidOptions) {
 		t.Error("InvalidOptionsError does not unwrap to ErrInvalidOptions")
 	}
 	cause := errors.New("parse boom")
-	if !errors.Is(&InvalidMessageIDError{ID: "x", Err: cause}, cause) {
+	if !errors.Is(InvalidMessageIDError{ID: "x", Err: cause}, cause) {
 		t.Error("InvalidMessageIDError does not unwrap to cause")
 	}
-	if !errors.Is(&InvalidMessageIDError{ID: "x", Err: cause}, ErrInvalidMessageID) {
+	if !errors.Is(InvalidMessageIDError{ID: "x", Err: cause}, ErrInvalidMessageID) {
 		t.Error("InvalidMessageIDError does not unwrap to ErrInvalidMessageID")
 	}
 }
 
 func TestErrors_carried_fields(t *testing.T) {
 	t.Parallel()
-	if de := (&DuplicateAdapterError{Adapter: Redis}); de.Adapter != Redis {
+	if de := (DuplicateAdapterError{Adapter: Redis}); de.Adapter != Redis {
 		t.Errorf("DuplicateAdapterError adapter = %v", de.Adapter)
 	}
-	if ue := (&UnknownAdapterError{Adapter: Memory}); ue.Adapter != Memory {
+	if ue := (UnknownAdapterError{Adapter: Memory}); ue.Adapter != Memory {
 		t.Errorf("UnknownAdapterError adapter = %v", ue.Adapter)
 	}
-	if iae := (&InvalidAdapterError{Adapter: "bogus"}); iae.Adapter != "bogus" {
+	if iae := (InvalidAdapterError{Adapter: "bogus"}); iae.Adapter != "bogus" {
 		t.Errorf("InvalidAdapterError adapter = %q", iae.Adapter)
 	}
-	if ioe := (&InvalidOptionsError{Reason: "bad"}); ioe.Reason != "bad" {
+	if ioe := (InvalidOptionsError{Reason: "bad"}); ioe.Reason != "bad" {
 		t.Errorf("InvalidOptionsError reason = %q", ioe.Reason)
 	}
 	cause := errors.New("boom")
-	if ime := (&InvalidMessageIDError{ID: "bad", Err: cause}); ime.ID != "bad" || !errors.Is(ime.Err, cause) {
+	if ime := (InvalidMessageIDError{ID: "bad", Err: cause}); ime.ID != "bad" || !errors.Is(ime.Err, cause) {
 		t.Errorf("InvalidMessageIDError fields = %+v", ime)
 	}
 }
@@ -81,7 +81,7 @@ func TestParseMessageIDInvalid(t *testing.T) {
 	if !errors.Is(err, ErrInvalidMessageID) {
 		t.Errorf("errors.Is(err, ErrInvalidMessageID) = false (err = %v)", err)
 	}
-	var ime *InvalidMessageIDError
+	var ime InvalidMessageIDError
 	if !errors.As(err, &ime) {
 		t.Fatalf("errors.As(err, InvalidMessageIDError) = false (err = %T %v)", err, err)
 	}

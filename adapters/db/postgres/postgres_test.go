@@ -403,7 +403,7 @@ func TestWithTx_beginErrorIsTxError(t *testing.T) {
 		t.Fatal("want error, got nil")
 	}
 
-	var txErr *db.TxError
+	var txErr db.TxError
 	if !errors.As(err, &txErr) {
 		t.Fatalf("want *db.TxError, got %T", err)
 	}

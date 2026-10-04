@@ -20,7 +20,7 @@ func TestOptions_negativeBuffer_isInvalid(t *testing.T) {
 	if !errors.Is(err, ErrInvalidOptions) {
 		t.Fatalf("BufferSize -1 err = %v, want ErrInvalidOptions", err)
 	}
-	var ioe *InvalidOptionsError
+	var ioe InvalidOptionsError
 	if !errors.As(err, &ioe) {
 		t.Fatalf("err %T is not *InvalidOptionsError", err)
 	}

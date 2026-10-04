@@ -67,8 +67,8 @@ type StepRegistrar interface {
 
 var factories = registry.New[Adapter, Factory](
 	ErrNilFactory,
-	func(a Adapter) error { return &DuplicateError{Adapter: a} },
-	func(a Adapter) error { return &UnknownAdapterError{Adapter: a} },
+	func(a Adapter) error { return DuplicateError{Adapter: a} },
+	func(a Adapter) error { return UnknownAdapterError{Adapter: a} },
 )
 
 // Register associates an Adapter with a Factory for later use by Open.

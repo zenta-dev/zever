@@ -49,36 +49,36 @@ type Options struct {
 // only negative values fail.
 func (o Options) Validate() error {
 	if strings.TrimSpace(o.Host) == "" {
-		return &InvalidOptionsError{Reason: "host must be non-empty"}
+		return InvalidOptionsError{Reason: "host must be non-empty"}
 	}
 	if strings.Contains(o.Host, "://") {
-		return &InvalidOptionsError{Reason: "host must not contain scheme"}
+		return InvalidOptionsError{Reason: "host must not contain scheme"}
 	}
 
 	if o.Port < 1 || o.Port > 65535 {
-		return &InvalidOptionsError{Reason: "port must be 1-65535"}
+		return InvalidOptionsError{Reason: "port must be 1-65535"}
 	}
 
 	if (o.Username == "") != (o.Password == "") {
-		return &InvalidOptionsError{Reason: "username and password must be set together"}
+		return InvalidOptionsError{Reason: "username and password must be set together"}
 	}
 
 	switch o.Encryption {
 	case "", EncryptionSTARTTLS, EncryptionImplicitTLS, EncryptionNone:
 	default:
-		return &InvalidOptionsError{Reason: "encryption must be starttls, implicit, or none"}
+		return InvalidOptionsError{Reason: "encryption must be starttls, implicit, or none"}
 	}
 
 	if o.Encryption == EncryptionNone && (o.Username != "" || o.Password != "") {
-		return &InvalidOptionsError{Reason: "encryption none must not carry credentials"}
+		return InvalidOptionsError{Reason: "encryption none must not carry credentials"}
 	}
 
 	if o.Timeout < 0 {
-		return &InvalidOptionsError{Reason: "timeout must be >= 0"}
+		return InvalidOptionsError{Reason: "timeout must be >= 0"}
 	}
 
 	if o.MaxMessageSize < 0 {
-		return &InvalidOptionsError{Reason: "max_message_size must be >= 0"}
+		return InvalidOptionsError{Reason: "max_message_size must be >= 0"}
 	}
 
 	return nil

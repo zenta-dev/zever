@@ -22,7 +22,7 @@ func newMessageID() MessageID {
 func ParseMessageID(id string) (MessageID, error) {
 	v, err := uuid.Parse(id)
 	if err != nil {
-		return MessageID{}, &InvalidMessageIDError{ID: id, Err: err}
+		return MessageID{}, InvalidMessageIDError{ID: id, Err: err}
 	}
 
 	return MessageID(v), nil

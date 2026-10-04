@@ -92,7 +92,7 @@ func TestCacheRegister_duplicate_returnsDuplicate(t *testing.T) {
 		t.Errorf("errors.Is(err, ErrDuplicate) = false (err = %v)", err)
 	}
 
-	var dupErr *cache.DuplicateError
+	var dupErr cache.DuplicateError
 	if !errors.As(err, &dupErr) {
 		t.Fatalf("errors.As(err, DuplicateError) = false (err = %T %v)", err, err)
 	}
@@ -112,7 +112,7 @@ func TestCacheOpen_unknown_returnsUnknownAdapter(t *testing.T) {
 		t.Errorf("errors.Is(err, ErrUnknownAdapter) = false (err = %v)", err)
 	}
 
-	var unkErr *cache.UnknownAdapterError
+	var unkErr cache.UnknownAdapterError
 	if !errors.As(err, &unkErr) {
 		t.Fatalf("errors.As(err, UnknownAdapterError) = false (err = %T %v)", err, err)
 	}

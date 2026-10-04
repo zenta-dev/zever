@@ -247,7 +247,7 @@ func TestSQLiteLeg_dimensionMismatch(t *testing.T) {
 
 	err := s.Upsert(ctx, vectorstore.Vector{ID: "dm-two", Embedding: []float32{1, 0}})
 
-	var mmErr *vectorstore.DimensionMismatchError
+	var mmErr vectorstore.DimensionMismatchError
 	if !errors.As(err, &mmErr) {
 		t.Fatalf("Upsert(wrong dim) err = %T %v, want *DimensionMismatchError", err, err)
 	}
@@ -264,7 +264,7 @@ func TestSQLiteLeg_deleteMissing(t *testing.T) {
 
 	err := s.Delete(t.Context(), "no-such-vector")
 
-	var nfErr *vectorstore.NotFoundError
+	var nfErr vectorstore.NotFoundError
 	if !errors.As(err, &nfErr) {
 		t.Fatalf("Delete(missing) err = %T %v, want *NotFoundError", err, err)
 	}

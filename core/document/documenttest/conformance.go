@@ -47,7 +47,7 @@ func conformanceUnsupportedFormat(t *testing.T, factory func(t *testing.T) docum
 
 	_, err := factory(t).Render(t.Context(), []byte(latexSample), document.OutputFormat("docx"))
 
-	var ufErr *document.UnsupportedFormatError
+	var ufErr document.UnsupportedFormatError
 	if !errors.As(err, &ufErr) {
 		t.Fatalf("Render(docx) err = %T %v, want *UnsupportedFormatError", err, err)
 	}
@@ -68,7 +68,7 @@ func conformanceSourceTooLarge(t *testing.T, factory func(t *testing.T) document
 
 	_, err := factory(t).Render(t.Context(), big, document.FormatPDF)
 
-	var slErr *document.SizeLimitError
+	var slErr document.SizeLimitError
 	if !errors.As(err, &slErr) {
 		t.Fatalf("Render(oversized) err = %T %v, want *SizeLimitError", err, err)
 	}

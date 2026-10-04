@@ -413,7 +413,7 @@ func TestErrorStringsDuplicateJob(t *testing.T) {
 	if !errors.Is(val, ErrDuplicateJob) {
 		t.Fatalf("errors.Is value %v want ErrDuplicateJob", val)
 	}
-	ptr := &DuplicateJobError{Name: "x"}
+	ptr := DuplicateJobError{Name: "x"}
 	if got, want := ptr.Error(), `job: duplicate registration: "x"`; got != want {
 		t.Fatalf("ptr Error()=%q want %q", got, want)
 	}
@@ -431,7 +431,7 @@ func TestErrorStringsUnknownJob(t *testing.T) {
 	if !errors.Is(val, ErrUnknownJob) {
 		t.Fatalf("errors.Is value %v want ErrUnknownJob", val)
 	}
-	ptr := &UnknownJobError{Name: "nope"}
+	ptr := UnknownJobError{Name: "nope"}
 	if got, want := ptr.Error(), `job: unknown job: "nope"`; got != want {
 		t.Fatalf("ptr Error()=%q want %q", got, want)
 	}

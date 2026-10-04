@@ -12,7 +12,7 @@ func TestSentinelMessages(t *testing.T) {
 		"ErrClosed":           {ErrClosed.Error(), "queue: closed"},
 		"ErrEmpty":            {ErrEmpty.Error(), "queue: empty"},
 		"ErrNilFactory":       {ErrNilFactory.Error(), "queue: nil factory"},
-		"ErrDuplicate":        {ErrDuplicate.Error(), "queue: duplicate registration"},
+		"ErrDuplicate":        {ErrDuplicate.Error(), "queue: duplicate adapter"},
 		"ErrUnknownAdapter":   {ErrUnknownAdapter.Error(), "queue: unknown adapter"},
 		"ErrInvalidAdapter":   {ErrInvalidAdapter.Error(), "queue: invalid adapter"},
 		"ErrInvalidMessageID": {ErrInvalidMessageID.Error(), "queue: invalid message id"},
@@ -37,12 +37,12 @@ func TestParseMessageIDInvalid(t *testing.T) {
 		t.Errorf("errors.Is(err, ErrInvalidMessageID) = false (err = %v)", err)
 	}
 
-	var invErr *InvalidMessageIDError
+	var invErr InvalidMessageIDError
 	if !errors.As(err, &invErr) {
 		t.Errorf("errors.As(err, InvalidMessageIDError) = false (err = %T %v)", err, err)
 	}
 
-	if invErr != nil && invErr.ID != "not-a-uuid" {
+	if invErr.ID != "not-a-uuid" {
 		t.Errorf("InvalidMessageIDError.ID = %q, want %q", invErr.ID, "not-a-uuid")
 	}
 }
@@ -50,12 +50,12 @@ func TestParseMessageIDInvalid(t *testing.T) {
 func TestEmptyError(t *testing.T) {
 	t.Parallel()
 
-	err := &EmptyError{Topic: "jobs"}
+	err := EmptyError{Topic: "jobs"}
 	if !errors.Is(err, ErrEmpty) {
 		t.Errorf("errors.Is(EmptyError, ErrEmpty) = false")
 	}
 
-	var emptyErr *EmptyError
+	var emptyErr EmptyError
 	if !errors.As(err, &emptyErr) {
 		t.Errorf("errors.As(EmptyError) = false")
 	}
@@ -142,7 +142,7 @@ func TestQueueParseAdapter(t *testing.T) {
 		if !errors.Is(err, ErrInvalidAdapter) {
 			t.Errorf("errors.Is(err, ErrInvalidAdapter) = false (err = %v)", err)
 		}
-		var invErr *InvalidAdapterError
+		var invErr InvalidAdapterError
 		if !errors.As(err, &invErr) {
 			t.Fatalf("errors.As(err, *InvalidAdapterError) = false (err = %T %v)", err, err)
 		}
@@ -157,14 +157,14 @@ func TestQueueTypedErrorMessages_unwrap(t *testing.T) {
 
 	t.Run("empty/with_topic", func(t *testing.T) {
 		t.Parallel()
-		err := &EmptyError{Topic: "jobs"}
+		err := EmptyError{Topic: "jobs"}
 		if got := err.Error(); got != `queue: empty: topic "jobs"` {
 			t.Errorf("EmptyError.Error() = %q, want %q", got, `queue: empty: topic "jobs"`)
 		}
 		if !errors.Is(err, ErrEmpty) {
 			t.Errorf("errors.Is(EmptyError with topic, ErrEmpty) = false")
 		}
-		var target *EmptyError
+		var target EmptyError
 		if !errors.As(err, &target) {
 			t.Errorf("errors.As(err, *EmptyError) = false")
 		}
@@ -172,14 +172,14 @@ func TestQueueTypedErrorMessages_unwrap(t *testing.T) {
 
 	t.Run("empty/bare", func(t *testing.T) {
 		t.Parallel()
-		err := &EmptyError{}
+		err := EmptyError{}
 		if got := err.Error(); got != "queue: empty" {
 			t.Errorf("EmptyError bare Error() = %q, want %q", got, "queue: empty")
 		}
 		if !errors.Is(err, ErrEmpty) {
 			t.Errorf("errors.Is(EmptyError bare, ErrEmpty) = false")
 		}
-		var target *EmptyError
+		var target EmptyError
 		if !errors.As(err, &target) {
 			t.Errorf("errors.As(bare EmptyError, *EmptyError) = false")
 		}
@@ -200,7 +200,7 @@ func TestQueueTypedErrorMessages_unwrap(t *testing.T) {
 		if !errors.Is(err, ErrInvalidMessageID) {
 			t.Errorf("errors.Is(err, ErrInvalidMessageID) = false (err = %v)", err)
 		}
-		var target *InvalidMessageIDError
+		var target InvalidMessageIDError
 		if !errors.As(err, &target) {
 			t.Fatalf("errors.As(err, *InvalidMessageIDError) = false (err = %T %v)", err, err)
 		}
@@ -211,7 +211,7 @@ func TestQueueTypedErrorMessages_unwrap(t *testing.T) {
 
 	t.Run("invalid_message_id/bare", func(t *testing.T) {
 		t.Parallel()
-		err := &InvalidMessageIDError{ID: "x"}
+		err := InvalidMessageIDError{ID: "x"}
 		if got := err.Error(); got != `queue: invalid message id "x": <nil>` && got != `queue: invalid message id "x": %!v(<nil>)` {
 			if len(got) == 0 || got[:27] != `queue: invalid message id "` {
 				t.Errorf("InvalidMessageIDError bare Error() = %q", got)
@@ -220,11 +220,11 @@ func TestQueueTypedErrorMessages_unwrap(t *testing.T) {
 		if !errors.Is(err, ErrInvalidMessageID) {
 			t.Errorf("errors.Is(bare InvalidMessageIDError, ErrInvalidMessageID) = false")
 		}
-		var target *InvalidMessageIDError
+		var target InvalidMessageIDError
 		if !errors.As(err, &target) {
 			t.Errorf("errors.As(bare, *InvalidMessageIDError) = false")
 		}
-		if target != nil && target.ID != "x" {
+		if target.ID != "x" {
 			t.Errorf("ID = %q, want %q", target.ID, "x")
 		}
 	})
@@ -232,7 +232,7 @@ func TestQueueTypedErrorMessages_unwrap(t *testing.T) {
 	t.Run("invalid_message_id/error_string_with_cause", func(t *testing.T) {
 		t.Parallel()
 		cause := errors.New("parse boom")
-		err := &InvalidMessageIDError{ID: "bad-id", Err: cause}
+		err := InvalidMessageIDError{ID: "bad-id", Err: cause}
 		if got := err.Error(); got != `queue: invalid message id "bad-id": parse boom` {
 			t.Errorf("InvalidMessageIDError Error() = %q, want %q", got, `queue: invalid message id "bad-id": parse boom`)
 		}
@@ -253,12 +253,12 @@ func TestQueueTypedErrorMessages_unwrap(t *testing.T) {
 		if !errors.Is(err, ErrInvalidAdapter) {
 			t.Errorf("errors.Is(InvalidAdapterError, ErrInvalidAdapter) = false")
 		}
-		var target *InvalidAdapterError
+		var target InvalidAdapterError
 		_, perr := ParseAdapter("")
 		if !errors.As(perr, &target) {
 			t.Errorf("errors.As(ParseAdapter empty, *InvalidAdapterError) = false")
 		}
-		perr2 := &InvalidAdapterError{Adapter: "bogus"}
+		perr2 := InvalidAdapterError{Adapter: "bogus"}
 		if !errors.As(perr2, &target) {
 			t.Errorf("errors.As(&InvalidAdapterError, *InvalidAdapterError) = false")
 		}
@@ -266,36 +266,36 @@ func TestQueueTypedErrorMessages_unwrap(t *testing.T) {
 
 	t.Run("duplicate", func(t *testing.T) {
 		t.Parallel()
-		err := &DuplicateAdapterError{Adapter: Memory}
-		if got := err.Error(); got != "queue: duplicate registration: memory" {
-			t.Errorf("DuplicateAdapterError.Error() = %q, want %q", got, "queue: duplicate registration: memory")
+		err := DuplicateAdapterError{Adapter: Memory}
+		if got := err.Error(); got != "queue: duplicate adapter: memory" {
+			t.Errorf("DuplicateAdapterError.Error() = %q, want %q", got, "queue: duplicate adapter: memory")
 		}
 		if !errors.Is(err, ErrDuplicate) {
 			t.Errorf("errors.Is(DuplicateAdapterError, ErrDuplicate) = false")
 		}
-		var target *DuplicateAdapterError
+		var target DuplicateAdapterError
 		if !errors.As(err, &target) {
 			t.Errorf("errors.As(err, *DuplicateAdapterError) = false")
 		}
-		if target != nil && target.Adapter != Memory {
+		if target.Adapter != Memory {
 			t.Errorf("DuplicateAdapterError.Adapter = %v, want %v", target.Adapter, Memory)
 		}
 	})
 
 	t.Run("unknown", func(t *testing.T) {
 		t.Parallel()
-		err := &UnknownAdapterError{Adapter: Adapter("")}
+		err := UnknownAdapterError{Adapter: Adapter("")}
 		if got := err.Error(); got != "queue: unknown adapter: unknown (forgotten import?)" {
 			t.Errorf("UnknownAdapterError.Error() = %q, want %q", got, "queue: unknown adapter: unknown (forgotten import?)")
 		}
 		if !errors.Is(err, ErrUnknownAdapter) {
 			t.Errorf("errors.Is(UnknownAdapterError, ErrUnknownAdapter) = false")
 		}
-		var target *UnknownAdapterError
+		var target UnknownAdapterError
 		if !errors.As(err, &target) {
 			t.Errorf("errors.As(err, *UnknownAdapterError) = false")
 		}
-		if target != nil && target.Adapter != Adapter("") {
+		if target.Adapter != Adapter("") {
 			t.Errorf("UnknownAdapterError.Adapter = %v, want %v", target.Adapter, Adapter(""))
 		}
 	})

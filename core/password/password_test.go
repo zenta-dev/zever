@@ -52,7 +52,7 @@ func TestRegisterDuplicate(t *testing.T) {
 	a := password.Adapter("test-211")
 
 	if err := password.Register(a, stubFactory); err != nil {
-		var dup *password.DuplicateError
+		var dup password.DuplicateError
 		if !errors.As(err, &dup) {
 			t.Fatalf("first Register() = %v, want nil", err)
 		}
@@ -69,7 +69,7 @@ func TestRegisterDuplicate(t *testing.T) {
 		t.Fatalf("errors.Is(%v, ErrDuplicate) = false", err)
 	}
 
-	var dup *password.DuplicateError
+	var dup password.DuplicateError
 	if !errors.As(err, &dup) {
 		t.Fatalf("errors.As(%v) to *DuplicateError = false", err)
 	}
@@ -95,7 +95,7 @@ func TestOpenUnknown(t *testing.T) {
 		t.Fatalf("errors.Is(%v, ErrUnknownAdapter) = false", err)
 	}
 
-	var unk *password.UnknownAdapterError
+	var unk password.UnknownAdapterError
 	if !errors.As(err, &unk) {
 		t.Fatalf("errors.As(%v) to *UnknownAdapterError = false", err)
 	}
@@ -110,7 +110,7 @@ func TestOpenFactoryError(t *testing.T) {
 	if err := password.Register(a, func(_ password.Options) (password.Hasher, error) {
 		return nil, factoryErr
 	}); err != nil {
-		var dup *password.DuplicateError
+		var dup password.DuplicateError
 		if !errors.As(err, &dup) {
 			t.Fatalf("Register() = %v, want nil", err)
 		}
@@ -138,7 +138,7 @@ func TestOpenSuccess(t *testing.T) {
 	a := password.Adapter("test-213")
 
 	if err := password.Register(a, stubFactory); err != nil {
-		var dup *password.DuplicateError
+		var dup password.DuplicateError
 		if !errors.As(err, &dup) {
 			t.Fatalf("Register() = %v, want nil", err)
 		}
@@ -216,7 +216,7 @@ func TestConveniences(t *testing.T) {
 	// Nil error means already registered; same repeat-run tolerance.
 
 	if err := password.Register(password.AdapterArgon2ID, stubFactory); err != nil {
-		var dup *password.DuplicateError
+		var dup password.DuplicateError
 		if !errors.As(err, &dup) {
 			t.Fatalf("Register() = %v, want nil", err)
 		}
@@ -266,7 +266,7 @@ func TestConcurrentRegisterOpen(t *testing.T) {
 			a := password.Adapter(fmt.Sprintf("test-%d", 100+i))
 
 			if err := password.Register(a, stubFactory); err != nil {
-				var dup *password.DuplicateError
+				var dup password.DuplicateError
 				if !errors.As(err, &dup) {
 					t.Errorf("Register(%v) = %v, want nil", a, err)
 					return

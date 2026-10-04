@@ -38,8 +38,8 @@ func TestJSONCodecEncodeWrapsSentinel(t *testing.T) {
 		t.Fatalf("error type = %T, want *json.SemanticError (err = %v)", err, err)
 	}
 
-	if !strings.HasPrefix(err.Error(), "codec: encode failed: ") {
-		t.Errorf("err.Error() = %q, want prefix %q", err.Error(), "codec: encode failed: ")
+	if !strings.HasPrefix(err.Error(), "codec: encode failed\n") {
+		t.Errorf("err.Error() = %q, want prefix %q", err.Error(), "codec: encode failed\n")
 	}
 }
 

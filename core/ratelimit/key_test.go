@@ -21,7 +21,7 @@ func TestValidateKey_empty_isInvalid(t *testing.T) {
 	if !errors.Is(err, ErrInvalidKey) {
 		t.Fatalf("empty err = %v, want ErrInvalidKey", err)
 	}
-	var ike *InvalidKeyError
+	var ike InvalidKeyError
 	if !errors.As(err, &ike) {
 		t.Fatalf("err %T is not *InvalidKeyError", err)
 	}
@@ -37,7 +37,7 @@ func TestValidateKey_tooLong_isInvalid(t *testing.T) {
 	if !errors.Is(err, ErrInvalidKey) {
 		t.Fatalf("257-long err = %v, want ErrInvalidKey", err)
 	}
-	var ike *InvalidKeyError
+	var ike InvalidKeyError
 	if !errors.As(err, &ike) {
 		t.Fatalf("err %T is not *InvalidKeyError", err)
 	}
@@ -65,7 +65,7 @@ func TestValidateKey_neverEchoesKey(t *testing.T) {
 	if strings.Contains(err.Error(), "10.0.0.1-secret") {
 		t.Errorf("error %q echoes PII key", err.Error())
 	}
-	var ike *InvalidKeyError
+	var ike InvalidKeyError
 	if !errors.As(err, &ike) {
 		t.Fatalf("err %T is not *InvalidKeyError", err)
 	}

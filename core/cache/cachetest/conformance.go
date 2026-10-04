@@ -54,7 +54,7 @@ func conformanceGetSet(t *testing.T, factory func(t *testing.T) cache.Cache) {
 		t.Fatalf("Get(missing) err = %v, want ErrNotFound", err)
 	}
 
-	var nfErr *cache.NotFoundError
+	var nfErr cache.NotFoundError
 	if _, err := c.Get(ctx, "missing"); !errors.As(err, &nfErr) {
 		t.Fatalf("errors.As(err, NotFoundError) = false (err = %T %v)", err, err)
 	}
@@ -309,7 +309,7 @@ func conformanceCounters(t *testing.T, factory func(t *testing.T) cache.Cache) {
 		t.Errorf("errors.Is(err, ErrInvalidValue) = false (err = %v)", err)
 	}
 
-	var invErr *cache.InvalidValueError
+	var invErr cache.InvalidValueError
 	if !errors.As(err, &invErr) {
 		t.Fatalf("errors.As(err, InvalidValueError) = false (err = %T %v)", err, err)
 	}

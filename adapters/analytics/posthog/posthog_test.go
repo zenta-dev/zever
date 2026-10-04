@@ -489,7 +489,7 @@ func TestOpen_plainHTTP_rejectsNonLocalhost(t *testing.T) {
 	opts := analytics.Options{APIKey: "test-key", Endpoint: "http://example.com"}
 	_, err := New(opts)
 
-	var invalid *analytics.InvalidOptionsError
+	var invalid analytics.InvalidOptionsError
 	if !errors.As(err, &invalid) {
 		t.Fatalf("want *InvalidOptionsError, got %v", err)
 	}
@@ -627,7 +627,7 @@ func TestTrack_tooManyProperties_returnsCountLimit(t *testing.T) {
 	if err := a.Track(t.Context(), "event", props); err == nil {
 		t.Fatal("want error for too many properties, got nil")
 	} else {
-		var countErr *analytics.CountLimitError
+		var countErr analytics.CountLimitError
 		if !errors.As(err, &countErr) {
 			t.Fatalf("want *CountLimitError, got %v", err)
 		}
@@ -647,7 +647,7 @@ func TestTrack_oversizedProperties_returnsSizeLimit(t *testing.T) {
 	if err := a.Track(t.Context(), "event", props); err == nil {
 		t.Fatal("want error for oversized properties, got nil")
 	} else {
-		var sizeErr *analytics.SizeLimitError
+		var sizeErr analytics.SizeLimitError
 		if !errors.As(err, &sizeErr) {
 			t.Fatalf("want *SizeLimitError, got %v", err)
 		}
@@ -667,7 +667,7 @@ func TestIdentify_oversizedTraits_returnsSizeLimit(t *testing.T) {
 	if err := a.Identify(t.Context(), "u1", traits); err == nil {
 		t.Fatal("want error for oversized traits, got nil")
 	} else {
-		var sizeErr *analytics.SizeLimitError
+		var sizeErr analytics.SizeLimitError
 		if !errors.As(err, &sizeErr) {
 			t.Fatalf("want *SizeLimitError, got %v", err)
 		}
@@ -687,7 +687,7 @@ func TestGroup_oversizedTraits_returnsSizeLimit(t *testing.T) {
 	if err := a.Group(t.Context(), "u1", "g1", traits); err == nil {
 		t.Fatal("want error for oversized traits, got nil")
 	} else {
-		var sizeErr *analytics.SizeLimitError
+		var sizeErr analytics.SizeLimitError
 		if !errors.As(err, &sizeErr) {
 			t.Fatalf("want *SizeLimitError, got %v", err)
 		}
@@ -744,7 +744,7 @@ func TestCheckEndpoint_malformedURL_rejectsOptions(t *testing.T) {
 	if err := checkEndpoint("http://[::1"); err == nil {
 		t.Fatal("want error for malformed endpoint, got nil")
 	} else {
-		var invalid *analytics.InvalidOptionsError
+		var invalid analytics.InvalidOptionsError
 		if !errors.As(err, &invalid) {
 			t.Fatalf("want *InvalidOptionsError, got %v", err)
 		}

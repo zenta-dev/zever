@@ -21,7 +21,7 @@ func TestOptions_Validate_negativeDimension(t *testing.T) {
 		t.Fatalf("Validate err = %v, want ErrInvalidOptions", err)
 	}
 
-	var ioe *InvalidOptionsError
+	var ioe InvalidOptionsError
 	if !errors.As(err, &ioe) {
 		t.Fatalf("err %T is not *InvalidOptionsError", err)
 	}
@@ -60,7 +60,7 @@ func TestOptions_Validate_urls(t *testing.T) {
 			}
 
 			if tc.wantErr {
-				var ioe *InvalidOptionsError
+				var ioe InvalidOptionsError
 				if !errors.As(err, &ioe) {
 					t.Fatalf("err %T is not *InvalidOptionsError", err)
 				}

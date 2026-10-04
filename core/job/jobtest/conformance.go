@@ -103,7 +103,7 @@ func conformanceRegisterValidate(t *testing.T) {
 		t.Errorf("Register(duplicate) err = %v, want ErrDuplicateJob", err)
 	}
 
-	var dupErr *job.DuplicateJobError
+	var dupErr job.DuplicateJobError
 	if err := job.Register("kit.dup", func(_ context.Context, _ struct{}) error { return nil }); !errors.As(err, &dupErr) {
 		t.Errorf("errors.As(err, DuplicateJobError) = false (err = %T %v)", err, err)
 	}
@@ -127,7 +127,7 @@ func conformanceDispatchUnknown(t *testing.T) {
 		t.Errorf("Dispatch(unknown) err = %v, want ErrUnknownJob", err)
 	}
 
-	var unknownErr *job.UnknownJobError
+	var unknownErr job.UnknownJobError
 	if err := d.Dispatch(t.Context(), "kit.unknown", struct{}{}); !errors.As(err, &unknownErr) {
 		t.Errorf("errors.As(err, UnknownJobError) = false (err = %T %v)", err, err)
 	}

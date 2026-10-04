@@ -439,7 +439,7 @@ func TestRenderRejectsUnsupportedFormat(t *testing.T) {
 		t.Fatal("expected error for unsupported format")
 	}
 
-	var uf *document.UnsupportedFormatError
+	var uf document.UnsupportedFormatError
 	if !errors.As(err, &uf) {
 		t.Fatalf("want UnsupportedFormatError, got %T: %v", err, err)
 	}
@@ -573,7 +573,7 @@ func TestRenderOversizedBodyRejected(t *testing.T) {
 		t.Fatal("expected error for oversized body")
 	}
 
-	var sl *document.SizeLimitError
+	var sl document.SizeLimitError
 	if !errors.As(err, &sl) {
 		t.Fatalf("want SizeLimitError, got %T: %v", err, err)
 	}

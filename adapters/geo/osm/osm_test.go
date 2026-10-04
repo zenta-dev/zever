@@ -861,8 +861,8 @@ func TestGeocode_UserAgentRequiredOnDo(t *testing.T) {
 	if err == nil {
 		t.Fatalf("expected error from canceled context")
 	}
-	// error should be prefixed geo: osm:
-	if !strings.Contains(err.Error(), "geo: osm:") {
+	// error should be prefixed osm:
+	if !strings.Contains(err.Error(), "osm:") {
 		t.Fatalf("error missing prefix: %v", err)
 	}
 }
@@ -893,7 +893,7 @@ func TestReverse_NilClientError(t *testing.T) {
 	if err == nil {
 		t.Fatalf("expected error for unreachable host")
 	}
-	if !strings.Contains(err.Error(), "geo: osm:") {
+	if !strings.Contains(err.Error(), "osm:") {
 		t.Fatalf("prefix missing: %v", err)
 	}
 }
@@ -911,7 +911,7 @@ func TestGeocode_CreateRequestError(t *testing.T) {
 	if err == nil || !strings.Contains(err.Error(), "create request") {
 		t.Fatalf("expected create request error, got %v", err)
 	}
-	if !strings.Contains(err.Error(), "geo: osm:") {
+	if !strings.Contains(err.Error(), "osm:") {
 		t.Fatalf("prefix missing: %v", err)
 	}
 }
@@ -955,8 +955,8 @@ func TestReverse_DoError(t *testing.T) {
 	t.Parallel()
 	g, _ := New(geo.Options{Endpoint: "https://127.0.0.1:1", UserAgent: "app/1.0", AllowInsecure: true, Timeout: 50 * time.Millisecond})
 	_, err := g.ReverseGeocode(t.Context(), 0, 0)
-	if err == nil || !strings.Contains(err.Error(), "geo: osm:") {
-		t.Fatalf("expected geo: osm: error, got %v", err)
+	if err == nil || !strings.Contains(err.Error(), "osm:") {
+		t.Fatalf("expected osm: error, got %v", err)
 	}
 }
 

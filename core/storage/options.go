@@ -56,12 +56,12 @@ type Options struct {
 // Validate checks options for consistency, joining all violations.
 func (o Options) Validate() error {
 	if err := ValidateBaseURL("storage", "url_base", o.URLBase); err != nil {
-		return &InvalidOptionsError{Reason: err.Error()}
+		return InvalidOptionsError{Reason: err.Error()}
 	}
 
 	if o.Policy != nil {
 		if _, _, _, err := o.Policy.Resolve(); err != nil {
-			return &InvalidOptionsError{Reason: err.Error()}
+			return InvalidOptionsError{Reason: err.Error()}
 		}
 	}
 

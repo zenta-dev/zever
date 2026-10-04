@@ -2,18 +2,12 @@ package orm
 
 import (
 	"context"
-	"errors"
 	"fmt"
 
 	"github.com/zenta-dev/zever/core/db"
 	"github.com/zenta-dev/zever/orm/dialect"
 	"github.com/zenta-dev/zever/orm/render"
 )
-
-// ErrProjectionEmpty is returned when a projected query is executed with no
-// projections: an empty projection list would render `SELECT FROM ...`,
-// which is invalid on every dialect, so it fails closed before rendering.
-var ErrProjectionEmpty = errors.New("orm: projected query requires at least one projection")
 
 // Projection is one aliased scalar output column of a ProjectedQuery: an
 // expression tree (a plain column, a scalar function/CASE expression, or a

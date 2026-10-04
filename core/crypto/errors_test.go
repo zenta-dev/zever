@@ -45,10 +45,10 @@ func TestErrors_unwrap_carries_sentinel(t *testing.T) {
 		err  error
 		want error
 	}{
-		{name: "duplicate", err: &crypto.DuplicateAdapterError{Adapter: crypto.AdapterLocal}, want: crypto.ErrDuplicate},
-		{name: "unknown", err: &crypto.UnknownAdapterError{Adapter: crypto.AdapterLocal}, want: crypto.ErrUnknownAdapter},
-		{name: "invalid_adapter", err: &crypto.InvalidAdapterError{Adapter: "x"}, want: crypto.ErrInvalidAdapter},
-		{name: "invalid_options", err: &crypto.InvalidOptionsError{Reason: "x"}, want: crypto.ErrInvalidOptions},
+		{name: "duplicate", err: crypto.DuplicateAdapterError{Adapter: crypto.AdapterLocal}, want: crypto.ErrDuplicate},
+		{name: "unknown", err: crypto.UnknownAdapterError{Adapter: crypto.AdapterLocal}, want: crypto.ErrUnknownAdapter},
+		{name: "invalid_adapter", err: crypto.InvalidAdapterError{Adapter: "x"}, want: crypto.ErrInvalidAdapter},
+		{name: "invalid_options", err: crypto.InvalidOptionsError{Reason: "x"}, want: crypto.ErrInvalidOptions},
 	}
 	for _, tc := range cases {
 		tc := tc
@@ -66,7 +66,7 @@ func TestErrors_typed_As(t *testing.T) {
 	t.Run("invalid_adapter", func(t *testing.T) {
 		t.Parallel()
 		_, err := crypto.ParseAdapter("")
-		var iae *crypto.InvalidAdapterError
+		var iae crypto.InvalidAdapterError
 		if !errors.As(err, &iae) {
 			t.Fatalf("err type = %T, want *InvalidAdapterError", err)
 		}
@@ -79,8 +79,8 @@ func TestErrors_typed_As(t *testing.T) {
 	})
 	t.Run("duplicate", func(t *testing.T) {
 		t.Parallel()
-		e := &crypto.DuplicateAdapterError{Adapter: crypto.AdapterLocal}
-		var de *crypto.DuplicateAdapterError
+		e := crypto.DuplicateAdapterError{Adapter: crypto.AdapterLocal}
+		var de crypto.DuplicateAdapterError
 		if !errors.As(e, &de) {
 			t.Fatalf("err type = %T, want *DuplicateAdapterError", e)
 		}
@@ -96,8 +96,8 @@ func TestErrors_typed_As(t *testing.T) {
 	})
 	t.Run("unknown", func(t *testing.T) {
 		t.Parallel()
-		e := &crypto.UnknownAdapterError{Adapter: crypto.Adapter("")}
-		var ue *crypto.UnknownAdapterError
+		e := crypto.UnknownAdapterError{Adapter: crypto.Adapter("")}
+		var ue crypto.UnknownAdapterError
 		if !errors.As(e, &ue) {
 			t.Fatalf("err type = %T, want *UnknownAdapterError", e)
 		}
@@ -110,8 +110,8 @@ func TestErrors_typed_As(t *testing.T) {
 	})
 	t.Run("invalid_options", func(t *testing.T) {
 		t.Parallel()
-		e := &crypto.InvalidOptionsError{Reason: "key is required"}
-		var ioe *crypto.InvalidOptionsError
+		e := crypto.InvalidOptionsError{Reason: "key is required"}
+		var ioe crypto.InvalidOptionsError
 		if !errors.As(e, &ioe) {
 			t.Fatalf("err type = %T, want *InvalidOptionsError", e)
 		}
@@ -129,19 +129,19 @@ func TestErrors_typed_As(t *testing.T) {
 
 func TestErrors_carried_fields(t *testing.T) {
 	t.Parallel()
-	de := &crypto.DuplicateAdapterError{Adapter: crypto.AdapterLocal}
+	de := crypto.DuplicateAdapterError{Adapter: crypto.AdapterLocal}
 	if de.Adapter != crypto.AdapterLocal {
 		t.Fatalf("DuplicateAdapterError.Adapter = %v", de.Adapter)
 	}
-	ue := &crypto.UnknownAdapterError{Adapter: crypto.Adapter("test-5")}
+	ue := crypto.UnknownAdapterError{Adapter: crypto.Adapter("test-5")}
 	if ue.Adapter != crypto.Adapter("test-5") {
 		t.Fatalf("UnknownAdapterError.Adapter = %v", ue.Adapter)
 	}
-	iae := &crypto.InvalidAdapterError{Adapter: "nope"}
+	iae := crypto.InvalidAdapterError{Adapter: "nope"}
 	if iae.Adapter != "nope" {
 		t.Fatalf("InvalidAdapterError.Adapter = %q", iae.Adapter)
 	}
-	ioe := &crypto.InvalidOptionsError{Reason: "bad"}
+	ioe := crypto.InvalidOptionsError{Reason: "bad"}
 	if ioe.Reason != "bad" {
 		t.Fatalf("InvalidOptionsError.Reason = %q", ioe.Reason)
 	}

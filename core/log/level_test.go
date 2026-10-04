@@ -93,7 +93,7 @@ func TestParseLevel_invalid_returnsInvalidLevelError(t *testing.T) {
 				t.Errorf("errors.Is(err, ErrInvalidLevel) = false (err = %v)", err)
 			}
 
-			var invErr *InvalidLevelError
+			var invErr InvalidLevelError
 			if !errors.As(err, &invErr) {
 				t.Fatalf("errors.As(err, InvalidLevelError) = false (err = %T %v)", err, err)
 			}

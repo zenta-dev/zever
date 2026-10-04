@@ -88,7 +88,7 @@ func TestOptionsValidate(t *testing.T) {
 			check: func(t *testing.T, err error) {
 				t.Helper()
 
-				var invErr *InvalidOptionsError
+				var invErr InvalidOptionsError
 				if !errors.As(err, &invErr) {
 					t.Fatalf("joined error has no *InvalidOptionsError: %v", err)
 				}

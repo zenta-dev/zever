@@ -236,7 +236,7 @@ func conformanceInvalidSpec(t *testing.T, factory func(t *testing.T, d *job.Disp
 		}
 	}
 
-	var specErr *scheduler.InvalidSpecError
+	var specErr scheduler.InvalidSpecError
 	if _, err := s.Schedule(ctx, "not-a-spec", name, nil); !errors.As(err, &specErr) {
 		t.Errorf("errors.As(err, InvalidSpecError) = false (err = %T %v)", err, err)
 	}

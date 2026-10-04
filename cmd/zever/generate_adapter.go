@@ -1384,7 +1384,7 @@ func runGenerateAdapter(args []string) error {
 		if len(positional) < 2 {
 			val, err := promptInputForAdapter("Adapter name (go package)", "", func(s string) error {
 				if !isPackageName(s) {
-					return fmt.Errorf("zever generate: %w", ErrInvalidPackageName)
+					return fmt.Errorf("%w", ErrInvalidPackageName)
 				}
 
 				return nil
@@ -1409,7 +1409,7 @@ func runGenerateAdapter(args []string) error {
 
 				key, err := promptInputForAdapter("Field name (snake_case)", "", func(s string) error {
 					if !isIdent(s) {
-						return fmt.Errorf("zever generate: %w", ErrInvalidIdentifier)
+						return fmt.Errorf("%w", ErrInvalidIdentifier)
 					}
 
 					return nil
@@ -1546,7 +1546,7 @@ import (
 {{if .NeedsErrors}}
 // errNotImplemented is returned by every stub method that has not been
 // implemented yet. Delete it once none are left.
-var errNotImplemented = errors.New("[{{.Battery}}] {{.Name}}: not implemented")
+var errNotImplemented = errors.New("{{.Battery}}: {{.Name}}: not implemented")
 {{end}}
 type adapter struct{}
 {{range .Methods}}

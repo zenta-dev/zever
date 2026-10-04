@@ -611,7 +611,7 @@ func TestTx_DoubleCommit(t *testing.T) {
 		t.Fatal("second Commit: want error, got nil")
 	}
 
-	var txErr *db.TxError
+	var txErr db.TxError
 	if !errors.As(err, &txErr) || txErr.Op != "commit" {
 		t.Fatalf("second Commit = %v, want *db.TxError{Op: commit}", err)
 	}
@@ -676,7 +676,7 @@ func TestTx_CommitDriverError(t *testing.T) {
 		t.Fatal("Commit after inner rollback: want error, got nil")
 	}
 
-	var txErr *db.TxError
+	var txErr db.TxError
 	if !errors.As(err, &txErr) || txErr.Op != "commit" {
 		t.Fatalf("Commit = %v, want *db.TxError{Op: commit}", err)
 	}

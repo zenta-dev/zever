@@ -129,7 +129,7 @@ func TestGet_notFound(t *testing.T) {
 		t.Fatalf("GetPayment err = %v, want ErrNotFound", err)
 	}
 
-	var nf *payment.NotFoundError
+	var nf payment.NotFoundError
 	if !errors.As(err, &nf) {
 		t.Fatalf("err %T is not *NotFoundError", err)
 	}
@@ -149,7 +149,7 @@ func TestRefund_notFound(t *testing.T) {
 		t.Fatalf("Refund err = %v, want ErrNotFound", err)
 	}
 
-	var nf *payment.NotFoundError
+	var nf payment.NotFoundError
 	if !errors.As(err, &nf) {
 		t.Fatalf("err %T is not *NotFoundError", err)
 	}
@@ -175,7 +175,7 @@ func TestRefund_overflowTotal(t *testing.T) {
 		t.Fatalf("Refund err = %v, want ErrAmountMismatch", err)
 	}
 
-	var mm *payment.AmountMismatchError
+	var mm payment.AmountMismatchError
 	if !errors.As(err, &mm) {
 		t.Fatalf("err %T is not *AmountMismatchError", err)
 	}
@@ -205,7 +205,7 @@ func TestRefund_overflowRemaining(t *testing.T) {
 		t.Fatalf("Refund err = %v, want ErrAmountMismatch", err)
 	}
 
-	var mm *payment.AmountMismatchError
+	var mm payment.AmountMismatchError
 	if !errors.As(err, &mm) {
 		t.Fatalf("err %T is not *AmountMismatchError", err)
 	}
@@ -237,7 +237,7 @@ func TestCreate_invalid(t *testing.T) {
 		t.Fatalf("bad method err = %v, want ErrUnsupportedMethod", err)
 	}
 
-	var um *payment.UnsupportedMethodError
+	var um payment.UnsupportedMethodError
 	if _, err := p.CreatePayment(ctx, payment.Request{Amount: 100, Currency: "USD", Method: "crypto"}); !errors.As(err, &um) {
 		t.Fatalf("err %T is not *UnsupportedMethodError", err)
 	} else if um.Method != "crypto" {

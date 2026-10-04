@@ -125,22 +125,30 @@ func buildOperation(svc *ir.Service, rpc *ir.Operation, http ir.HTTPTransport, d
 	}
 
 	for _, p := range pathParams {
+		schema, err := d.paramSchema(p)
+		if err != nil {
+			return nil, err
+		}
 		op.Parameters = append(op.Parameters, &parameter{
 			In:       "path",
 			Name:     p.Name,
 			Required: true,
-			Schema:   d.paramSchema(p),
+			Schema:   schema,
 		})
 	}
 
 	switch http.Method {
 	case nethttp.MethodGet, nethttp.MethodDelete:
 		for _, p := range rest {
+			schema, err := d.paramSchema(p)
+			if err != nil {
+				return nil, err
+			}
 			op.Parameters = append(op.Parameters, &parameter{
 				In:       "query",
 				Name:     p.Name,
 				Required: true,
-				Schema:   d.paramSchema(p),
+				Schema:   schema,
 			})
 		}
 	default: // POST, PUT, PATCH
@@ -167,7 +175,10 @@ func buildOperation(svc *ir.Service, rpc *ir.Operation, http ir.HTTPTransport, d
 		)
 	}
 
-	respName := d.addTypeRefSchema(rpc.Returns)
+	respName, err := d.addTypeRefSchema(rpc.Returns)
+	if err != nil {
+		return nil, err
+	}
 
 	var respSchema *schemaObject
 	if rpc.Paginated {

@@ -290,7 +290,7 @@ func TestNew_InvalidOptions(t *testing.T) {
 			opts := auth.Options{}
 			mutate(&opts)
 			_, err := oidc.New(opts)
-			var invErr *auth.InvalidOptionsError
+			var invErr auth.InvalidOptionsError
 			if !errors.As(err, &invErr) {
 				t.Fatalf("New err = %v, want *InvalidOptionsError", err)
 			}

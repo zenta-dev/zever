@@ -81,7 +81,7 @@ func conformanceMissingKey(t *testing.T, factory func(t *testing.T) i18n.I18n) {
 		t.Errorf("Translate(missing key) err = %v, want ErrKeyNotFound", err)
 	}
 
-	var keyErr *i18n.KeyNotFoundError
+	var keyErr i18n.KeyNotFoundError
 	if _, err := b.Translate(ctx, "en", "missing-kit-key", nil); !errors.As(err, &keyErr) {
 		t.Errorf("errors.As(err, KeyNotFoundError) = false (err = %T %v)", err, err)
 	}

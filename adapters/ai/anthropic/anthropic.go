@@ -39,7 +39,7 @@ func newClient(opts ai.Options) *http.Client {
 // New creates an Anthropic AI backend.
 func New(opts ai.Options) (ai.AI, error) {
 	if opts.APIKey == "" {
-		return nil, fmt.Errorf("ai: open anthropic: %w", &ai.InvalidOptionsError{Reason: "api_key is required"})
+		return nil, fmt.Errorf("ai: open anthropic: %w", ai.InvalidOptionsError{Reason: "api_key is required"})
 	}
 	if err := opts.Validate(); err != nil {
 		return nil, fmt.Errorf("ai: open anthropic: %w", err)
@@ -109,7 +109,7 @@ func mapGenerateError(err error) error {
 			return fmt.Errorf("anthropic: generate: %w: %w", ai.ErrAuth, err)
 		case http.StatusTooManyRequests:
 			retryAfter := parseRetryAfter(apiErr.Response)
-			return fmt.Errorf("anthropic: generate: %w", &ai.RateLimitedError{RetryAfter: retryAfter})
+			return fmt.Errorf("anthropic: generate: %w", ai.RateLimitedError{RetryAfter: retryAfter})
 		case http.StatusBadRequest:
 			return fmt.Errorf("anthropic: generate: %w: %w", ai.ErrInvalidRequest, err)
 		}

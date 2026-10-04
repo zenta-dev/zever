@@ -19,7 +19,7 @@ func TestPullCoverTopicTooLong(t *testing.T) {
 		t.Fatal("SubscribeChan overlong topic = nil, want InvalidOptionsError")
 	}
 
-	var inv *InvalidOptionsError
+	var inv InvalidOptionsError
 	if !errors.As(err, &inv) {
 		t.Fatalf("err = %T %v, want InvalidOptionsError", err, err)
 	}

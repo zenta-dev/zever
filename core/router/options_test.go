@@ -135,7 +135,7 @@ func TestOptions_Validate_multiple_errors_Join(t *testing.T) {
 	if !strings.Contains(err.Error(), "control") {
 		t.Fatalf("err = %q, want control reason", err.Error())
 	}
-	var ioe *InvalidOptionsError
+	var ioe InvalidOptionsError
 	if !errors.As(err, &ioe) {
 		t.Fatalf("err type = %T, want *InvalidOptionsError", err)
 	}

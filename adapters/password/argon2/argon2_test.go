@@ -406,7 +406,7 @@ func TestRegistryIntegration(t *testing.T) {
 	ctx := t.Context()
 
 	if err := password.Register(password.AdapterArgon2ID, New); err != nil {
-		var dup *password.DuplicateError
+		var dup password.DuplicateError
 		if !errors.As(err, &dup) {
 			t.Fatalf("Register() = %v, want nil", err)
 		}

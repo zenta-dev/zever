@@ -30,7 +30,7 @@ func TestLimitDecode_overCap_returnsSizeLimit(t *testing.T) {
 		t.Fatalf("LimitDecode err = %v, want ErrWebhookTooLarge", err)
 	}
 
-	var sle *SizeLimitError
+	var sle SizeLimitError
 	if !errors.As(err, &sle) {
 		t.Fatalf("err %T is not *SizeLimitError", err)
 	}
@@ -62,7 +62,7 @@ func TestLimitDecode_nonPositiveLimit_returnsSizeLimit(t *testing.T) {
 				t.Fatalf("LimitDecode err = %v, want ErrWebhookTooLarge", err)
 			}
 
-			var sle *SizeLimitError
+			var sle SizeLimitError
 			if !errors.As(err, &sle) {
 				t.Fatalf("err %T is not *SizeLimitError", err)
 			}

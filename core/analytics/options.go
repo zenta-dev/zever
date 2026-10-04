@@ -35,24 +35,24 @@ func (o Options) Validate() error {
 	var errs []error
 
 	if o.MaxPropertiesBytes < 0 {
-		errs = append(errs, &InvalidOptionsError{Reason: "max_properties_bytes must be >= 0"})
+		errs = append(errs, InvalidOptionsError{Reason: "max_properties_bytes must be >= 0"})
 	}
 
 	if o.MaxProperties < 0 {
-		errs = append(errs, &InvalidOptionsError{Reason: "max_properties must be >= 0"})
+		errs = append(errs, InvalidOptionsError{Reason: "max_properties must be >= 0"})
 	}
 
 	if o.Endpoint != "" {
 		u, err := url.Parse(o.Endpoint)
 		if err != nil {
-			errs = append(errs, &InvalidOptionsError{Reason: "endpoint must be a valid url"})
+			errs = append(errs, InvalidOptionsError{Reason: "endpoint must be a valid url"})
 		} else {
 			if u.Scheme == "" {
-				errs = append(errs, &InvalidOptionsError{Reason: "endpoint must include scheme"})
+				errs = append(errs, InvalidOptionsError{Reason: "endpoint must include scheme"})
 			}
 
 			if u.Host == "" {
-				errs = append(errs, &InvalidOptionsError{Reason: "endpoint must include host"})
+				errs = append(errs, InvalidOptionsError{Reason: "endpoint must include host"})
 			}
 		}
 	}

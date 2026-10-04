@@ -5,6 +5,9 @@
 *.db
 /zever
 /cmd/zever/zever
+/tools/affected/affected
+/tools/errscan/errscan
+/tools/modgraph/modgraph
 __pycache__/
 *.pyc
 

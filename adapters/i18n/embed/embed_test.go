@@ -70,12 +70,14 @@ func TestTranslate_missingLocale(t *testing.T) {
 	if !errors.Is(err, i18n.ErrLocaleNotFound) && !errors.Is(err, i18n.ErrKeyNotFound) {
 		t.Fatalf("Translate() error = %v, want ErrLocaleNotFound or ErrKeyNotFound", err)
 	}
-	var knf *i18n.KeyNotFoundError
-	var lnf *i18n.LocaleNotFoundError
-	if !errors.As(err, &knf) && !errors.As(err, &lnf) {
+	var knf i18n.KeyNotFoundError
+	var lnf i18n.LocaleNotFoundError
+	knfOK := errors.As(err, &knf)
+	lnfOK := errors.As(err, &lnf)
+	if !knfOK && !lnfOK {
 		t.Fatalf("Translate() error type = %T, want *KeyNotFoundError or *LocaleNotFoundError", err)
 	}
-	if knf != nil && (knf.Locale != "de" || knf.Key != "hello") {
+	if knfOK && (knf.Locale != "de" || knf.Key != "hello") {
 		t.Errorf("KeyNotFoundError = %+v, want Locale=de Key=hello", knf)
 	}
 }
@@ -87,7 +89,7 @@ func TestTranslate_missingKey(t *testing.T) {
 	if !errors.Is(err, i18n.ErrKeyNotFound) {
 		t.Fatalf("Translate() error = %v, want ErrKeyNotFound", err)
 	}
-	var knf *i18n.KeyNotFoundError
+	var knf i18n.KeyNotFoundError
 	if !errors.As(err, &knf) {
 		t.Fatalf("Translate() error type = %T, want *KeyNotFoundError", err)
 	}
@@ -112,7 +114,7 @@ func TestTranslate_emptyLocale(t *testing.T) {
 	if !errors.Is(err, i18n.ErrLocaleNotFound) {
 		t.Fatalf("Translate() error = %v, want ErrLocaleNotFound", err)
 	}
-	var lnf *i18n.LocaleNotFoundError
+	var lnf i18n.LocaleNotFoundError
 	if !errors.As(err, &lnf) {
 		t.Fatalf("Translate() error type = %T, want *LocaleNotFoundError", err)
 	}

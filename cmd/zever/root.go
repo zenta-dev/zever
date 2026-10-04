@@ -31,7 +31,7 @@ func (e *flagUsageError) Unwrap() []error { return []error{errFlagUsage, e.err} 
 var errHelpShown = errors.New("zever: help shown")
 
 // ErrUnknownSubcommand is returned when a command gets an unrecognized subcommand.
-var ErrUnknownSubcommand = errors.New("unknown subcommand")
+var ErrUnknownSubcommand = errors.New("zever: unknown subcommand")
 
 // printHelpIfRequested implements -h/--help/help for pass-through commands
 // (DisableFlagParsing leaves flag parsing to the legacy handlers, which
@@ -216,7 +216,7 @@ zever applications built from .zen schemas.`,
 				}
 			}
 
-			return fmt.Errorf("zever: %w: %q", ErrUnknownSubcommand, args[0])
+			return fmt.Errorf("%w: %q", ErrUnknownSubcommand, args[0])
 		},
 	}
 

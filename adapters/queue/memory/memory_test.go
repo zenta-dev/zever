@@ -114,7 +114,7 @@ func TestMemory_PushPop_Ack_roundTrip(t *testing.T) {
 	if !errors.Is(err, queue.ErrEmpty) {
 		t.Fatalf("Pop err = %v want ErrEmpty", err)
 	}
-	var ee *queue.EmptyError
+	var ee queue.EmptyError
 	if errors.As(err, &ee) {
 		if ee.Topic != topic {
 			t.Fatalf("EmptyError Topic = %q want %q", ee.Topic, topic)
@@ -616,7 +616,7 @@ func TestMemory_PopEmpty_and_Cancelled(t *testing.T) {
 	if err == nil {
 		t.Fatalf("Pop emptyExisting expected error")
 	}
-	var ee *queue.EmptyError
+	var ee queue.EmptyError
 	if errors.As(err, &ee) {
 		if ee.Topic != topic2 {
 			t.Fatalf("EmptyError Topic = %q want %q", ee.Topic, topic2)

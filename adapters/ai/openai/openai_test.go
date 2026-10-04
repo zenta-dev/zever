@@ -31,7 +31,7 @@ func TestOpen_APIKeyRequired(t *testing.T) {
 		t.Fatalf("err = %v, want ErrInvalidOptions", err)
 	}
 
-	var ioe *ai.InvalidOptionsError
+	var ioe ai.InvalidOptionsError
 	if !errors.As(err, &ioe) {
 		t.Fatalf("err %T not InvalidOptionsError", err)
 	}
@@ -669,7 +669,7 @@ func TestGenerate_ErrorMapping(t *testing.T) {
 			if !errors.Is(err, ai.ErrRateLimited) {
 				return false
 			}
-			var re *ai.RateLimitedError
+			var re ai.RateLimitedError
 			if !errors.As(err, &re) {
 				return false
 			}

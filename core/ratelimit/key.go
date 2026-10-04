@@ -6,13 +6,13 @@ package ratelimit
 func ValidateKey(key string) error {
 	n := len(key)
 	if n == 0 || n > MaxKeyLen {
-		return &InvalidKeyError{KeyLen: n}
+		return InvalidKeyError{KeyLen: n}
 	}
 
 	for i := 0; i < n; i++ {
 		c := key[i]
 		if c < 0x20 || c == 0x7f {
-			return &InvalidKeyError{KeyLen: n}
+			return InvalidKeyError{KeyLen: n}
 		}
 	}
 

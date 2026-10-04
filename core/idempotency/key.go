@@ -13,7 +13,7 @@ import (
 // for errors.As while Error prints the length only.
 func ValidateKey(key string) error {
 	if len(key) == 0 || len(key) > MaxKeyLen {
-		return &InvalidKeyError{KeyLen: len(key)}
+		return InvalidKeyError{KeyLen: len(key)}
 	}
 
 	// No raw-byte walk is needed: UTF-8 is self-synchronizing, so bytes
@@ -24,7 +24,7 @@ func ValidateKey(key string) error {
 			continue
 		}
 		if r < 0x20 || r == 0x7f || unicode.IsControl(r) {
-			return &InvalidKeyError{KeyLen: len(key)}
+			return InvalidKeyError{KeyLen: len(key)}
 		}
 	}
 

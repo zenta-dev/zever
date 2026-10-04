@@ -79,7 +79,7 @@ func TestQueueRegister_duplicate(t *testing.T) {
 	if !errors.Is(err, ErrDuplicate) {
 		t.Fatalf("second Register(%v) = %v, want ErrDuplicate", a, err)
 	}
-	var dupErr *DuplicateError
+	var dupErr DuplicateError
 	if !errors.As(err, &dupErr) {
 		t.Fatalf("errors.As(%v, *DuplicateError) = false", err)
 	}
@@ -93,7 +93,7 @@ func TestQueueOpen_unknown(t *testing.T) {
 	if !errors.Is(err, ErrUnknownAdapter) {
 		t.Fatalf("Open(unknown) = %v, want ErrUnknownAdapter", err)
 	}
-	var unkErr *UnknownAdapterError
+	var unkErr UnknownAdapterError
 	if !errors.As(err, &unkErr) {
 		t.Fatalf("errors.As(%v, *UnknownAdapterError) = false", err)
 	}

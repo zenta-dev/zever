@@ -121,7 +121,7 @@ func renderScan(b *strings.Builder, m entityModel) {
 	}
 
 	fmt.Fprintf(b, "\tif err := row.Scan(%s); err != nil {\n", strings.Join(targets, ", "))
-	fmt.Fprintf(b, "\t\treturn fmt.Errorf(\"[%s] scan error: %%w\", err)\n\t}\n", m.Pkg)
+	fmt.Fprintf(b, "\t\treturn fmt.Errorf(\"%s: scan error: %%w\", err)\n\t}\n", m.Pkg)
 
 	for _, f := range m.Fields {
 		if !f.IsTime || f.Optional {
@@ -130,7 +130,7 @@ func renderScan(b *strings.Builder, m entityModel) {
 
 		fmt.Fprintf(b, "\n\tval%s, err%s := time.Parse(time.RFC3339Nano, raw%s)\n", f.GoName, f.GoName, f.GoName)
 		fmt.Fprintf(b, "\tif err%s != nil {\n", f.GoName)
-		fmt.Fprintf(b, "\t\treturn fmt.Errorf(\"[%s] parse %s error: %%w\", err%s)\n\t}\n", m.Pkg, f.Column, f.GoName)
+		fmt.Fprintf(b, "\t\treturn fmt.Errorf(\"%s: parse %s error: %%w\", err%s)\n\t}\n", m.Pkg, f.Column, f.GoName)
 		fmt.Fprintf(b, "\n\te.%s = val%s\n", f.GoName, f.GoName)
 	}
 

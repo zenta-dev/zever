@@ -38,7 +38,7 @@ type Employee struct {
 // Scan reads one row, whose columns must be in Employees.Columns() order, into e.
 func (e *Employee) Scan(row orm.Row) error {
 	if err := row.Scan(&e.ID, &e.Name, &e.Title, &e.ManagerID); err != nil {
-		return fmt.Errorf("[employee] scan error: %w", err)
+		return fmt.Errorf("employee: scan error: %w", err)
 	}
 
 	return nil

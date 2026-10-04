@@ -31,19 +31,19 @@ type Options struct {
 func (o Options) Validate() error {
 	var errs []error
 	if o.Timeout < 0 {
-		errs = append(errs, &InvalidOptionsError{Reason: "timeout must be >= 0"})
+		errs = append(errs, InvalidOptionsError{Reason: "timeout must be >= 0"})
 	}
 	if o.MaxResponseBody < 0 {
-		errs = append(errs, &InvalidOptionsError{Reason: "max_response_body must be >= 0"})
+		errs = append(errs, InvalidOptionsError{Reason: "max_response_body must be >= 0"})
 	}
 	if o.BaseURL != "" {
 		if _, err := endpoint.ValidateURL(o.BaseURL, endpoint.WithAllowInsecure(o.AllowInsecure)); err != nil {
-			errs = append(errs, &InvalidOptionsError{Reason: httpsReason("base_url", err)})
+			errs = append(errs, InvalidOptionsError{Reason: httpsReason("base_url", err)})
 		}
 	}
 	if o.Endpoint != "" {
 		if _, err := endpoint.ValidateURL(o.Endpoint, endpoint.WithAllowInsecure(o.AllowInsecure)); err != nil {
-			errs = append(errs, &InvalidOptionsError{Reason: httpsReason("endpoint", err)})
+			errs = append(errs, InvalidOptionsError{Reason: httpsReason("endpoint", err)})
 		}
 	}
 	return errors.Join(errs...)

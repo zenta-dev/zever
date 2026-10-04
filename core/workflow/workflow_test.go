@@ -58,7 +58,7 @@ func TestWorkflowRegisterDuplicate(t *testing.T) {
 		t.Fatalf("second Register(%v) = %v, want ErrDuplicate", a, err)
 	}
 
-	var dupErr *workflow.DuplicateError
+	var dupErr workflow.DuplicateError
 	if !errors.As(err, &dupErr) {
 		t.Fatalf("errors.As(%v, *DuplicateError) = false", err)
 	}
@@ -80,7 +80,7 @@ func TestWorkflowOpenUnknown(t *testing.T) {
 		t.Fatalf("Open(unknown) = %v, want ErrUnknownAdapter", err)
 	}
 
-	var unkErr *workflow.UnknownAdapterError
+	var unkErr workflow.UnknownAdapterError
 	if !errors.As(err, &unkErr) {
 		t.Fatalf("errors.As(%v, *UnknownAdapterError) = false", err)
 	}

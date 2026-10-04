@@ -415,7 +415,7 @@ func (s *Store) AddDelta(ctx context.Context, key string, delta int64) (int64, e
 			} else {
 				n, perr := strconv.ParseInt(string(row.Value), 10, 64)
 				if perr != nil {
-					return fmt.Errorf("kvstore: adddelta %q: %w: %w", key, ErrInvalidInteger, perr)
+					return fmt.Errorf("kvstore: adddelta %q: %w", key, errors.Join(ErrInvalidInteger, perr))
 				}
 
 				cur = n

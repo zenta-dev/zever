@@ -1,25 +1,12 @@
 package dialect
 
 import (
-	"errors"
 	"fmt"
 	"sync"
 
 	"github.com/zenta-dev/zever/orm/dialect/postgres"
 	"github.com/zenta-dev/zever/orm/dialect/sqlite"
 )
-
-// ErrEmptyName is returned by Register when name is empty.
-var ErrEmptyName = errors.New("orm/dialect: Register requires a non-empty name")
-
-// ErrNilFactory is returned by Register when factory is nil.
-var ErrNilFactory = errors.New("orm/dialect: Register requires a non-nil factory")
-
-// ErrDuplicate is returned by Register when name is already registered.
-var ErrDuplicate = errors.New("orm/dialect: Register called twice for dialect")
-
-// ErrUnknownDialect is returned by For when name resolves to no factory.
-var ErrUnknownDialect = errors.New("orm/dialect: unknown or unsupported dialect")
 
 var (
 	mu sync.RWMutex

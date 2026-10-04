@@ -144,7 +144,7 @@ func (s *Store) Upsert(ctx context.Context, vec vectorstore.Vector) error {
 
 	if dim > 0 && len(vec.Embedding) != dim {
 		// Pointer chain required for *DimensionMismatchError targets.
-		mismatch := error(&vectorstore.DimensionMismatchError{Got: len(vec.Embedding), Want: dim})
+		mismatch := error(vectorstore.DimensionMismatchError{Got: len(vec.Embedding), Want: dim})
 		return fmt.Errorf("qdrant: upsert: %w", mismatch)
 	}
 
@@ -204,7 +204,7 @@ func (s *Store) UpsertBatch(ctx context.Context, vecs []vectorstore.Vector) erro
 		for _, vec := range vecs {
 			if len(vec.Embedding) != dim {
 				// Pointer chain required for *DimensionMismatchError targets.
-				mismatch := error(&vectorstore.DimensionMismatchError{Got: len(vec.Embedding), Want: dim})
+				mismatch := error(vectorstore.DimensionMismatchError{Got: len(vec.Embedding), Want: dim})
 				return fmt.Errorf("qdrant: upsert batch: %w", mismatch)
 			}
 		}
@@ -297,7 +297,7 @@ func (s *Store) Query(ctx context.Context, embedding []float32, topK int) ([]vec
 
 	if dim > 0 && len(embedding) != dim {
 		// Pointer chain required for *DimensionMismatchError targets.
-		mismatch := error(&vectorstore.DimensionMismatchError{Got: len(embedding), Want: dim})
+		mismatch := error(vectorstore.DimensionMismatchError{Got: len(embedding), Want: dim})
 		return nil, fmt.Errorf("qdrant: query: %w", mismatch)
 	}
 

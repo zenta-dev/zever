@@ -47,7 +47,7 @@ type osmGeo struct {
 // New creates an OSM Nominatim-backed geo.Geo.
 func New(opts geo.Options) (geo.Geo, error) {
 	if strings.TrimSpace(opts.UserAgent) == "" {
-		return nil, fmt.Errorf("geo: osm: %w: user_agent is required", geo.ErrInvalidOptions)
+		return nil, fmt.Errorf("osm: %w: user_agent is required", geo.ErrInvalidOptions)
 	}
 
 	endpoint := opts.Endpoint
@@ -93,9 +93,9 @@ func validateEndpoint(endpoint string, allowInsecure bool) error {
 			errors.Is(err, endpointpkg.ErrEmpty),
 			errors.Is(err, endpointpkg.ErrNoScheme),
 			errors.Is(err, endpointpkg.ErrNoHost):
-			return fmt.Errorf("geo: osm: %w: endpoint must be a valid URL", geo.ErrInvalidOptions)
+			return fmt.Errorf("osm: %w: endpoint must be a valid URL", geo.ErrInvalidOptions)
 		default:
-			return fmt.Errorf("geo: osm: %w: endpoint must use https", geo.ErrInvalidOptions)
+			return fmt.Errorf("osm: %w: endpoint must use https", geo.ErrInvalidOptions)
 		}
 	}
 	return nil
@@ -128,7 +128,7 @@ func (s *osmGeo) Geocode(ctx context.Context, address string) ([]geo.Location, e
 
 	req, err := http.NewRequestWithContext(ctx, http.MethodGet, reqURL, nil)
 	if err != nil {
-		return nil, fmt.Errorf("geo: osm: create request: %w", err)
+		return nil, fmt.Errorf("osm: create request: %w", err)
 	}
 	req.Header.Set("User-Agent", s.userAgent)
 
@@ -148,24 +148,24 @@ func (s *osmGeo) Geocode(ctx context.Context, address string) ([]geo.Location, e
 
 	results, err := nominatimSearchCodec.Decode(body)
 	if err != nil {
-		return nil, fmt.Errorf("geo: osm: decode: %w", err)
+		return nil, fmt.Errorf("osm: decode: %w", err)
 	}
 	if len(results) == 0 {
-		return nil, fmt.Errorf("geo: osm: no results for %q: %w", address, geo.ErrNotFound)
+		return nil, fmt.Errorf("osm: no results for %q: %w", address, geo.ErrNotFound)
 	}
 
 	locs := make([]geo.Location, 0, len(results))
 	for _, r := range results {
 		lat, err := strconv.ParseFloat(r.Lat, 64)
 		if err != nil {
-			return nil, fmt.Errorf("geo: osm: invalid coordinate %q: %w: %w", r.Lat, err, geo.ErrNotFound)
+			return nil, fmt.Errorf("osm: invalid coordinate %q: %w: %w", r.Lat, err, geo.ErrNotFound)
 		}
 		lon, err := strconv.ParseFloat(r.Lon, 64)
 		if err != nil {
-			return nil, fmt.Errorf("geo: osm: invalid coordinate %q: %w: %w", r.Lon, err, geo.ErrNotFound)
+			return nil, fmt.Errorf("osm: invalid coordinate %q: %w: %w", r.Lon, err, geo.ErrNotFound)
 		}
 		if !geo.ValidCoord(lat, lon) {
-			return nil, fmt.Errorf("geo: osm: invalid coordinate (%.6f,%.6f): %w", lat, lon, geo.ErrInvalidCoordinate)
+			return nil, fmt.Errorf("osm: invalid coordinate (%.6f,%.6f): %w", lat, lon, geo.ErrInvalidCoordinate)
 		}
 		locs = append(locs, geo.Location{
 			Lat:       lat,
@@ -179,7 +179,7 @@ func (s *osmGeo) Geocode(ctx context.Context, address string) ([]geo.Location, e
 // ReverseGeocode resolves coordinates to addresses via Nominatim reverse.
 func (s *osmGeo) ReverseGeocode(ctx context.Context, lat, lng float64) ([]geo.Address, error) {
 	if !geo.ValidCoord(lat, lng) {
-		return nil, fmt.Errorf("geo: osm: invalid coordinates: %w", geo.ErrInvalidCoordinate)
+		return nil, fmt.Errorf("osm: invalid coordinates: %w", geo.ErrInvalidCoordinate)
 	}
 
 	reqURL := s.buildURL("/reverse", url.Values{
@@ -191,7 +191,7 @@ func (s *osmGeo) ReverseGeocode(ctx context.Context, lat, lng float64) ([]geo.Ad
 
 	req, err := http.NewRequestWithContext(ctx, http.MethodGet, reqURL, nil)
 	if err != nil {
-		return nil, fmt.Errorf("geo: osm: create request: %w", err)
+		return nil, fmt.Errorf("osm: create request: %w", err)
 	}
 	req.Header.Set("User-Agent", s.userAgent)
 
@@ -212,14 +212,14 @@ func (s *osmGeo) ReverseGeocode(ctx context.Context, lat, lng float64) ([]geo.Ad
 	// Trim space to detect empty body.
 	trimmed := bytes.TrimSpace(body)
 	if len(trimmed) == 0 || string(trimmed) == "[]" || string(trimmed) == "{}" {
-		return nil, fmt.Errorf("geo: osm: no results for (%.6f,%.6f): %w", lat, lng, geo.ErrNotFound)
+		return nil, fmt.Errorf("osm: no results for (%.6f,%.6f): %w", lat, lng, geo.ErrNotFound)
 	}
 
 	// Try decode as array first.
 	arr, decodeErr := nominatimArrayCodec.Decode(body)
 	if decodeErr == nil {
 		if len(arr) == 0 {
-			return nil, fmt.Errorf("geo: osm: no results for (%.6f,%.6f): %w", lat, lng, geo.ErrNotFound)
+			return nil, fmt.Errorf("osm: no results for (%.6f,%.6f): %w", lat, lng, geo.ErrNotFound)
 		}
 		// Check if display_name empty indicates no result.
 		filtered := make([]geo.Address, 0, len(arr))
@@ -237,7 +237,7 @@ func (s *osmGeo) ReverseGeocode(ctx context.Context, lat, lng float64) ([]geo.Ad
 			})
 		}
 		if len(filtered) == 0 {
-			return nil, fmt.Errorf("geo: osm: no results for (%.6f,%.6f): %w", lat, lng, geo.ErrNotFound)
+			return nil, fmt.Errorf("osm: no results for (%.6f,%.6f): %w", lat, lng, geo.ErrNotFound)
 		}
 		return filtered, nil
 	}
@@ -245,10 +245,10 @@ func (s *osmGeo) ReverseGeocode(ctx context.Context, lat, lng float64) ([]geo.Ad
 	// Fallback: single object.
 	single, err := nominatimResultCodec.Decode(body)
 	if err != nil {
-		return nil, fmt.Errorf("geo: osm: decode: %w", err)
+		return nil, fmt.Errorf("osm: decode: %w", err)
 	}
 	if strings.TrimSpace(single.DisplayName) == "" {
-		return nil, fmt.Errorf("geo: osm: no results for (%.6f,%.6f): %w", lat, lng, geo.ErrNotFound)
+		return nil, fmt.Errorf("osm: no results for (%.6f,%.6f): %w", lat, lng, geo.ErrNotFound)
 	}
 	comp := single.Address
 	if comp == nil {
@@ -263,7 +263,7 @@ func (s *osmGeo) ReverseGeocode(ctx context.Context, lat, lng float64) ([]geo.Ad
 // Routing via external service is a future enhancement; current MVP uses haversine only.
 func (s *osmGeo) Distance(_ context.Context, from, to geo.Point) (float64, error) {
 	if !geo.ValidCoord(from.Lat, from.Lng) || !geo.ValidCoord(to.Lat, to.Lng) {
-		return 0, fmt.Errorf("geo: osm: invalid coordinates: %w", geo.ErrInvalidCoordinate)
+		return 0, fmt.Errorf("osm: invalid coordinates: %w", geo.ErrInvalidCoordinate)
 	}
 	return 1000 * haversine(from.Lat, from.Lng, to.Lat, to.Lng), nil
 }
@@ -273,7 +273,7 @@ func (s *osmGeo) Close() error { return nil }
 
 func (s *osmGeo) do(req *http.Request) (*http.Response, error) {
 	if err := s.pace(req.Context()); err != nil {
-		return nil, fmt.Errorf("geo: osm: %w", err)
+		return nil, fmt.Errorf("osm: %w", err)
 	}
 
 	resp, err := s.client.Do(req)
@@ -286,7 +286,7 @@ func (s *osmGeo) do(req *http.Request) (*http.Response, error) {
 	// max() preserves later slots reserved by concurrent callers.
 	s.noteSent()
 	if err != nil {
-		return nil, fmt.Errorf("geo: osm: do: %w", redactURLError(err))
+		return nil, fmt.Errorf("osm: do: %w", redactURLError(err))
 	}
 	return resp, nil
 }
@@ -358,9 +358,9 @@ func readLimitedBody(ctx context.Context, resp *http.Response, limit int64) ([]b
 	data, err := httpclient.ReadLimited(ctx, resp.Body, limit)
 	if err != nil {
 		if errors.Is(err, httpclient.ErrTooLarge) {
-			return nil, fmt.Errorf("geo: osm: %w", geo.ErrTooLarge)
+			return nil, fmt.Errorf("osm: %w", geo.ErrTooLarge)
 		}
-		return nil, fmt.Errorf("geo: osm: read: %w", err)
+		return nil, fmt.Errorf("osm: read: %w", err)
 	}
 	return data, nil
 }
@@ -373,7 +373,7 @@ func checkStatus(resp *http.Response, body []byte) error {
 	if len(msg) > 512 {
 		msg = msg[:512]
 	}
-	return fmt.Errorf("geo: osm: status %d: %s: %w", resp.StatusCode, msg, ErrStatus)
+	return fmt.Errorf("osm: status %d: %s: %w", resp.StatusCode, msg, ErrStatus)
 }
 
 func (s *osmGeo) buildURL(path string, params url.Values) string {

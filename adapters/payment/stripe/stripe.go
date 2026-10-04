@@ -177,7 +177,7 @@ func (d *driver) WebhookEvent(_ context.Context, raw []byte, signature string) (
 	}
 
 	if len(raw) > d.maxWebhookBytes {
-		sizeErr := error(&payment.SizeLimitError{Size: len(raw), Limit: d.maxWebhookBytes})
+		sizeErr := error(payment.SizeLimitError{Size: len(raw), Limit: d.maxWebhookBytes})
 		return payment.Event{}, fmt.Errorf("stripe: webhook: %w", sizeErr)
 	}
 

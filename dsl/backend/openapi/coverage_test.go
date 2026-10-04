@@ -18,6 +18,7 @@
 package openapi
 
 import (
+	"errors"
 	"strings"
 	"testing"
 
@@ -137,12 +138,18 @@ func TestFieldSchema_namedVsInline(t *testing.T) {
 		"Status": {Name: "Status", Values: []string{"active"}, Module: mod},
 	})
 
-	named := b.fieldSchema(ir.FieldType{Scalar: ir.TEnum, EnumName: "Status"}, nil)
+	named, err := b.fieldSchema(ir.FieldType{Scalar: ir.TEnum, EnumName: "Status"}, nil)
+	if err != nil {
+		t.Fatalf("named enum fieldSchema: %v", err)
+	}
 	if named.Ref != "#/components/schemas/Status" {
 		t.Fatalf("named enum fieldSchema = %+v, want $ref to Status", named)
 	}
 
-	inline := b.fieldSchema(ir.FieldType{Scalar: ir.TEnum, EnumValues: []string{"x"}}, nil)
+	inline, err := b.fieldSchema(ir.FieldType{Scalar: ir.TEnum, EnumValues: []string{"x"}}, nil)
+	if err != nil {
+		t.Fatalf("inline enum fieldSchema: %v", err)
+	}
 	if inline.Ref != "" || inline.Type != "string" || len(inline.Enum) != 1 {
 		t.Fatalf("inline enum fieldSchema = %+v, want inline string enum", inline)
 	}
@@ -158,20 +165,20 @@ func TestAddTypeRefSchema_branches(t *testing.T) {
 
 	b := newDocBuilder("t", bareQualify, map[string]*ir.Enum{})
 
-	if got := b.addTypeRefSchema(nil); got != "" {
-		t.Fatalf("addTypeRefSchema(nil) = %q, want empty", got)
+	if got, err := b.addTypeRefSchema(nil); err != nil || got != "" {
+		t.Fatalf("addTypeRefSchema(nil) = %q, %v; want empty, nil", got, err)
 	}
 
-	if got := b.addTypeRefSchema(&ir.TypeRef{}); got != "" {
-		t.Fatalf("addTypeRefSchema(empty) = %q, want empty", got)
+	if got, err := b.addTypeRefSchema(&ir.TypeRef{}); err != nil || got != "" {
+		t.Fatalf("addTypeRefSchema(empty) = %q, %v; want empty, nil", got, err)
 	}
 
-	if got := b.addTypeRefSchema(&ir.TypeRef{Entity: entity}); got != "Widget" {
-		t.Fatalf("addTypeRefSchema(entity) = %q, want Widget", got)
+	if got, err := b.addTypeRefSchema(&ir.TypeRef{Entity: entity}); err != nil || got != "Widget" {
+		t.Fatalf("addTypeRefSchema(entity) = %q, %v; want Widget, nil", got, err)
 	}
 
-	if got := b.addTypeRefSchema(&ir.TypeRef{Message: message}); got != "Payload" {
-		t.Fatalf("addTypeRefSchema(message) = %q, want Payload", got)
+	if got, err := b.addTypeRefSchema(&ir.TypeRef{Message: message}); err != nil || got != "Payload" {
+		t.Fatalf("addTypeRefSchema(message) = %q, %v; want Payload, nil", got, err)
 	}
 }
 
@@ -184,12 +191,18 @@ func TestParamSchema_branches(t *testing.T) {
 	entity := &ir.Entity{Name: "Widget", Module: mod}
 	b := newDocBuilder("t", bareQualify, map[string]*ir.Enum{})
 
-	ref := b.paramSchema(&ir.Param{Name: "w", Ref: &ir.TypeRef{Entity: entity}})
+	ref, err := b.paramSchema(&ir.Param{Name: "w", Ref: &ir.TypeRef{Entity: entity}})
+	if err != nil {
+		t.Fatalf("ref paramSchema: %v", err)
+	}
 	if ref.Ref != "#/components/schemas/Widget" {
 		t.Fatalf("ref paramSchema = %+v, want $ref to Widget", ref)
 	}
 
-	scalar := b.paramSchema(&ir.Param{Name: "id", Type: ir.FieldType{Scalar: ir.TUUID}})
+	scalar, err := b.paramSchema(&ir.Param{Name: "id", Type: ir.FieldType{Scalar: ir.TUUID}})
+	if err != nil {
+		t.Fatalf("scalar paramSchema: %v", err)
+	}
 	if scalar.Type != "string" || scalar.Format != "uuid" {
 		t.Fatalf("scalar paramSchema = %+v, want string/uuid", scalar)
 	}
@@ -442,37 +455,36 @@ func TestApplyValidation_table(t *testing.T) {
 			t.Parallel()
 
 			s := &schemaObject{Type: "string"}
-			applyValidation(s, tt.rules)
+			if err := applyValidation(s, tt.rules); err != nil {
+				t.Fatalf("applyValidation(%s): %v", tt.name, err)
+			}
 			tt.check(t, s)
 		})
 	}
 }
 
-// TestApplyValidation_unknownKindPanics pins the fail-closed default added
+// TestApplyValidation_unknownKindErrors pins the fail-closed default added
 // when ir.Validation.Kind became a typed ValidationKind: a rule whose kind is
 // not one of the seven resolver-produced constants means the resolver
-// invariant broke upstream, so applyValidation panics (matching toInt64/
-// toFloat64's invariant guards) instead of silently emitting a schema with
-// no constraint.
-func TestApplyValidation_unknownKindPanics(t *testing.T) {
+// invariant broke upstream, so applyValidation returns ErrInternalInvariant
+// (matching toInt64/toFloat64's invariant guards) instead of silently
+// emitting a schema with no constraint.
+func TestApplyValidation_unknownKindErrors(t *testing.T) {
 	t.Parallel()
 
-	defer func() {
-		if recover() == nil {
-			t.Fatal("applyValidation with an unknown kind did not panic")
-		}
-	}()
-
 	s := &schemaObject{Type: "string"}
-	applyValidation(s, []ir.Validation{{Kind: "bogus", Args: map[string]any{"value": int64(1)}}})
+	err := applyValidation(s, []ir.Validation{{Kind: "bogus", Args: map[string]any{"value": int64(1)}}})
+	if !errors.Is(err, ErrInternalInvariant) {
+		t.Fatalf("applyValidation with an unknown kind = %v, want ErrInternalInvariant", err)
+	}
 }
 
-// TestApplyValidation_nonNumericPanics covers the fix for max_len/lt (and
+// TestApplyValidation_nonNumericErrors covers the fix for max_len/lt (and
 // every other numeric @validate kind) silently defaulting to a 0 bound when
-// given a non-numeric Args["value"] -- a resolver-invariant violation must
-// now panic instead of emitting a bogus minLength:0/maximum:0 constraint
-// into generated OpenAPI with no diagnostic.
-func TestApplyValidation_nonNumericPanics(t *testing.T) {
+// given a non-numeric Args["value"] -- a resolver-invariant violation now
+// returns ErrInternalInvariant instead of emitting a bogus minLength:0/
+// maximum:0 constraint into generated OpenAPI with no diagnostic.
+func TestApplyValidation_nonNumericErrors(t *testing.T) {
 	t.Parallel()
 	for _, kind := range []ir.ValidationKind{
 		ir.ValidationMinLen,
@@ -485,14 +497,11 @@ func TestApplyValidation_nonNumericPanics(t *testing.T) {
 		t.Run(string(kind), func(t *testing.T) {
 			t.Parallel()
 
-			defer func() {
-				if recover() == nil {
-					t.Fatalf("applyValidation(%s) with a string value did not panic", kind)
-				}
-			}()
-
 			s := &schemaObject{Type: "string"}
-			applyValidation(s, []ir.Validation{{Kind: kind, Args: map[string]any{"value": "not-numeric"}}})
+			err := applyValidation(s, []ir.Validation{{Kind: kind, Args: map[string]any{"value": "not-numeric"}}})
+			if !errors.Is(err, ErrInternalInvariant) {
+				t.Fatalf("applyValidation(%s) with a string value = %v, want ErrInternalInvariant", kind, err)
+			}
 		})
 	}
 }
@@ -523,54 +532,51 @@ func TestOpenAPIFormatName_table(t *testing.T) {
 }
 
 // TestToNumber_table covers toInt64/toFloat64 conversion, and that an
-// unexpected dynamic type panics instead of silently emitting a bogus 0
-// constraint into generated OpenAPI (a resolver-invariant violation must
-// fail loudly, matching gogen's numericLiteral).
+// unexpected dynamic type returns ErrInternalInvariant instead of silently
+// emitting a bogus 0 constraint into generated OpenAPI (a resolver-invariant
+// violation must fail loudly, matching gogen's numericLiteral).
 func TestToNumber_table(t *testing.T) {
 	t.Parallel()
 
 	t.Run("conversions", func(t *testing.T) {
 		t.Parallel()
 
-		if got := toInt64(int64(7)); got != 7 {
-			t.Fatalf("toInt64(int64(7)) = %d, want 7", got)
+		if got, err := toInt64(int64(7)); err != nil || got != 7 {
+			t.Fatalf("toInt64(int64(7)) = %d, %v; want 7, nil", got, err)
 		}
 
-		if got := toInt64(float64(7.9)); got != 7 {
-			t.Fatalf("toInt64(float64(7.9)) = %d, want 7", got)
+		if got, err := toInt64(float64(7.9)); err != nil || got != 7 {
+			t.Fatalf("toInt64(float64(7.9)) = %d, %v; want 7, nil", got, err)
 		}
 
-		if got := toFloat64(int64(7)); got != 7 {
-			t.Fatalf("toFloat64(int64(7)) = %v, want 7", got)
+		if got, err := toFloat64(int64(7)); err != nil || got != 7 {
+			t.Fatalf("toFloat64(int64(7)) = %v, %v; want 7, nil", got, err)
 		}
 
-		if got := toFloat64(float64(7.5)); got != 7.5 {
-			t.Fatalf("toFloat64(float64(7.5)) = %v, want 7.5", got)
+		if got, err := toFloat64(float64(7.5)); err != nil || got != 7.5 {
+			t.Fatalf("toFloat64(float64(7.5)) = %v, %v; want 7.5, nil", got, err)
 		}
 	})
 
-	t.Run("unexpected panics", func(t *testing.T) {
+	t.Run("unexpected errors", func(t *testing.T) {
 		t.Parallel()
 
 		cases := []struct {
 			name string
-			fn   func()
+			fn   func() error
 		}{
-			{"toInt64 string", func() { toInt64("7") }},
-			{"toInt64 nil", func() { toInt64(nil) }},
-			{"toFloat64 string", func() { toFloat64("7") }},
-			{"toFloat64 nil", func() { toFloat64(nil) }},
+			{"toInt64 string", func() error { _, err := toInt64("7"); return err }},
+			{"toInt64 nil", func() error { _, err := toInt64(nil); return err }},
+			{"toFloat64 string", func() error { _, err := toFloat64("7"); return err }},
+			{"toFloat64 nil", func() error { _, err := toFloat64(nil); return err }},
 		}
 
 		for _, tc := range cases {
 			t.Run(tc.name, func(t *testing.T) {
 				t.Parallel()
-				defer func() {
-					if recover() == nil {
-						t.Fatalf("%s did not panic on unexpected type", tc.name)
-					}
-				}()
-				tc.fn()
+				if err := tc.fn(); !errors.Is(err, ErrInternalInvariant) {
+					t.Fatalf("%s = %v, want ErrInternalInvariant", tc.name, err)
+				}
 			})
 		}
 	})

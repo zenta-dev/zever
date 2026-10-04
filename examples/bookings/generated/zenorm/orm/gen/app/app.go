@@ -40,12 +40,12 @@ type User struct {
 func (e *User) Scan(row orm.Row) error {
 	var rawCreatedAt string
 	if err := row.Scan(&e.ID, &e.Email, &e.PasswordHash, &rawCreatedAt); err != nil {
-		return fmt.Errorf("[user] scan error: %w", err)
+		return fmt.Errorf("user: scan error: %w", err)
 	}
 
 	valCreatedAt, errCreatedAt := time.Parse(time.RFC3339Nano, rawCreatedAt)
 	if errCreatedAt != nil {
-		return fmt.Errorf("[user] parse created_at error: %w", errCreatedAt)
+		return fmt.Errorf("user: parse created_at error: %w", errCreatedAt)
 	}
 
 	e.CreatedAt = valCreatedAt
@@ -158,12 +158,12 @@ type Space struct {
 func (e *Space) Scan(row orm.Row) error {
 	var rawCreatedAt string
 	if err := row.Scan(&e.ID, &e.HostID, &e.Title, &e.Description, &e.Lat, &e.Lng, &e.PriceCents, &rawCreatedAt); err != nil {
-		return fmt.Errorf("[space] scan error: %w", err)
+		return fmt.Errorf("space: scan error: %w", err)
 	}
 
 	valCreatedAt, errCreatedAt := time.Parse(time.RFC3339Nano, rawCreatedAt)
 	if errCreatedAt != nil {
-		return fmt.Errorf("[space] parse created_at error: %w", errCreatedAt)
+		return fmt.Errorf("space: parse created_at error: %w", errCreatedAt)
 	}
 
 	e.CreatedAt = valCreatedAt
@@ -275,12 +275,12 @@ type Booking struct {
 func (e *Booking) Scan(row orm.Row) error {
 	var rawCreatedAt string
 	if err := row.Scan(&e.ID, &e.SpaceID, &e.GuestID, &e.StartDate, &e.EndDate, &e.Status, &rawCreatedAt); err != nil {
-		return fmt.Errorf("[booking] scan error: %w", err)
+		return fmt.Errorf("booking: scan error: %w", err)
 	}
 
 	valCreatedAt, errCreatedAt := time.Parse(time.RFC3339Nano, rawCreatedAt)
 	if errCreatedAt != nil {
-		return fmt.Errorf("[booking] parse created_at error: %w", errCreatedAt)
+		return fmt.Errorf("booking: parse created_at error: %w", errCreatedAt)
 	}
 
 	e.CreatedAt = valCreatedAt
@@ -369,12 +369,12 @@ type Review struct {
 func (e *Review) Scan(row orm.Row) error {
 	var rawCreatedAt string
 	if err := row.Scan(&e.ID, &e.SpaceID, &e.GuestID, &e.Rating, &e.Body, &rawCreatedAt); err != nil {
-		return fmt.Errorf("[review] scan error: %w", err)
+		return fmt.Errorf("review: scan error: %w", err)
 	}
 
 	valCreatedAt, errCreatedAt := time.Parse(time.RFC3339Nano, rawCreatedAt)
 	if errCreatedAt != nil {
-		return fmt.Errorf("[review] parse created_at error: %w", errCreatedAt)
+		return fmt.Errorf("review: parse created_at error: %w", errCreatedAt)
 	}
 
 	e.CreatedAt = valCreatedAt

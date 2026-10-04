@@ -36,7 +36,7 @@ func New(opts i18n.Options) (i18n.I18n, error) {
 		return nil, fmt.Errorf("embed: %w", err)
 	}
 	if opts.Embed.FS == nil {
-		return nil, &i18n.InvalidOptionsError{Reason: "embed fs is required"}
+		return nil, i18n.InvalidOptionsError{Reason: "embed fs is required"}
 	}
 	dir := opts.Embed.Dir
 	if dir == "" {
@@ -55,7 +55,7 @@ func New(opts i18n.Options) (i18n.I18n, error) {
 		}
 		locale := strings.TrimSuffix(entry.Name(), ".json")
 		if !validLocaleName(locale) {
-			return nil, &i18n.InvalidOptionsError{Reason: fmt.Sprintf("invalid locale file name %q", entry.Name())}
+			return nil, i18n.InvalidOptionsError{Reason: fmt.Sprintf("invalid locale file name %q", entry.Name())}
 		}
 		data, err := fs.ReadFile(opts.Embed.FS, path.Join(dir, entry.Name()))
 		if err != nil {
@@ -90,7 +90,7 @@ func (d *driver) Translate(ctx context.Context, locale, key string, args map[str
 		return "", i18n.ErrClosed
 	}
 	if strings.TrimSpace(locale) == "" {
-		return "", &i18n.LocaleNotFoundError{Locale: locale}
+		return "", i18n.LocaleNotFoundError{Locale: locale}
 	}
 
 	d.mu.RLock()
@@ -111,7 +111,7 @@ func (d *driver) Translate(ctx context.Context, locale, key string, args map[str
 		}
 		return buf.String(), nil
 	}
-	return "", &i18n.KeyNotFoundError{Locale: locale, Key: key}
+	return "", i18n.KeyNotFoundError{Locale: locale, Key: key}
 }
 
 // Locales lists the available locales in sorted order.

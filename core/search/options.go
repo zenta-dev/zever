@@ -27,7 +27,7 @@ func (o Options) Validate() error {
 
 	if o.Host != "" {
 		if _, err := endpoint.ValidateURL(o.Host, endpoint.WithAllowInsecure(o.AllowInsecure)); err != nil {
-			errs = append(errs, &InvalidOptionsError{Reason: hostReason(err)})
+			errs = append(errs, InvalidOptionsError{Reason: hostReason(err)})
 		}
 	}
 

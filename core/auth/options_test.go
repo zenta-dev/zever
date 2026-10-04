@@ -22,7 +22,7 @@ func TestOptions_negative_jwt_maxttl_fails(t *testing.T) {
 	if !errors.Is(err, ErrInvalidOptions) {
 		t.Fatalf("err = %v, want ErrInvalidOptions", err)
 	}
-	var ioe *InvalidOptionsError
+	var ioe InvalidOptionsError
 	if !errors.As(err, &ioe) {
 		t.Fatalf("err type = %T, want *InvalidOptionsError", err)
 	}
@@ -37,7 +37,7 @@ func TestOptions_negative_oidc_timeout_fails(t *testing.T) {
 	if !errors.Is(err, ErrInvalidOptions) {
 		t.Fatalf("err = %v, want ErrInvalidOptions", err)
 	}
-	var ioe *InvalidOptionsError
+	var ioe InvalidOptionsError
 	if !errors.As(err, &ioe) {
 		t.Fatalf("err type = %T, want *InvalidOptionsError", err)
 	}

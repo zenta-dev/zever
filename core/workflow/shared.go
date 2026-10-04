@@ -18,8 +18,8 @@ type SharedFactory func(conn coredb.DB, opts Options) (Workflow, error)
 
 var sharedFactories = registry.New[Adapter, SharedFactory](
 	ErrNilFactory,
-	func(a Adapter) error { return &DuplicateError{Adapter: a} },
-	func(a Adapter) error { return &UnknownAdapterError{Adapter: a} },
+	func(a Adapter) error { return DuplicateError{Adapter: a} },
+	func(a Adapter) error { return UnknownAdapterError{Adapter: a} },
 )
 
 // RegisterShared associates an Adapter with a SharedFactory for later use

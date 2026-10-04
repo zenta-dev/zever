@@ -159,7 +159,7 @@ func (d *driver) GetInvoice(ctx context.Context, customerID string) (billing.Inv
 	}
 
 	if first == nil {
-		var notFound error = &billing.NotFoundError{Resource: "invoice", ID: customerID}
+		var notFound error = billing.NotFoundError{Resource: "invoice", ID: customerID}
 		return billing.Invoice{}, fmt.Errorf("paddle: list transactions: %w", notFound)
 	}
 

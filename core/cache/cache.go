@@ -33,8 +33,8 @@ type Factory func(opts Options) (Cache, error)
 
 var factories = registry.New[Adapter, Factory](
 	ErrNilFactory,
-	func(adapter Adapter) error { return &DuplicateError{Adapter: adapter} },
-	func(adapter Adapter) error { return &UnknownAdapterError{Adapter: adapter} },
+	func(adapter Adapter) error { return DuplicateError{Adapter: adapter} },
+	func(adapter Adapter) error { return UnknownAdapterError{Adapter: adapter} },
 )
 
 // Register associates an Adapter with a Factory for later use by Open.

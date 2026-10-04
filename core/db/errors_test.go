@@ -17,37 +17,37 @@ func TestErrorMessages(t *testing.T) {
 	}{
 		{
 			name:     "invalid adapter",
-			err:      &InvalidAdapterError{Adapter: "mysql"},
+			err:      InvalidAdapterError{Adapter: "mysql"},
 			wantSub:  "db: invalid adapter",
 			sentinel: ErrInvalidAdapter,
 		},
 		{
 			name:     "duplicate adapter",
-			err:      &DuplicateAdapterError{Adapter: SQLite},
+			err:      DuplicateAdapterError{Adapter: SQLite},
 			wantSub:  "db: duplicate adapter",
 			sentinel: ErrDuplicateAdapter,
 		},
 		{
 			name:     "unknown adapter",
-			err:      &UnknownAdapterError{Adapter: Adapter("test-42")},
+			err:      UnknownAdapterError{Adapter: Adapter("test-42")},
 			wantSub:  "db: unknown adapter",
 			sentinel: ErrUnknownAdapter,
 		},
 		{
 			name:     "invalid options",
-			err:      &InvalidOptionsError{Reason: "max conns must not be negative"},
+			err:      InvalidOptionsError{Reason: "max conns must not be negative"},
 			wantSub:  "db: invalid options",
 			sentinel: ErrInvalidOptions,
 		},
 		{
 			name:     "tx begin",
-			err:      &TxError{Op: "begin", Err: errors.New("boom")},
+			err:      TxError{Op: "begin", Err: errors.New("boom")},
 			wantSub:  "db: transaction begin",
 			sentinel: nil,
 		},
 		{
 			name:     "tx commit",
-			err:      &TxError{Op: "commit", Err: errors.New("boom")},
+			err:      TxError{Op: "commit", Err: errors.New("boom")},
 			wantSub:  "db: transaction commit",
 			sentinel: nil,
 		},
@@ -71,12 +71,12 @@ func TestErrorMessages(t *testing.T) {
 func TestDuplicateAliases_compat(t *testing.T) {
 	t.Parallel()
 
-	err := &DuplicateAdapterError{Adapter: SQLite}
+	err := DuplicateAdapterError{Adapter: SQLite}
 	if !errors.Is(err, ErrDuplicate) {
 		t.Error("does not unwrap to ErrDuplicate alias")
 	}
 
-	var target *DuplicateError
+	var target DuplicateError
 	if !errors.As(err, &target) {
 		t.Error("errors.As failed for DuplicateError alias")
 	}
@@ -92,7 +92,7 @@ func TestErrorUnwrap(t *testing.T) {
 	t.Run("invalid adapter unwraps", func(t *testing.T) {
 		t.Parallel()
 
-		err := &InvalidAdapterError{Adapter: "x"}
+		err := InvalidAdapterError{Adapter: "x"}
 		if !errors.Is(err, ErrInvalidAdapter) {
 			t.Error("does not unwrap to ErrInvalidAdapter")
 		}
@@ -105,7 +105,7 @@ func TestErrorUnwrap(t *testing.T) {
 	t.Run("duplicate unwraps", func(t *testing.T) {
 		t.Parallel()
 
-		err := &DuplicateAdapterError{Adapter: Postgres}
+		err := DuplicateAdapterError{Adapter: Postgres}
 		if !errors.Is(err, ErrDuplicateAdapter) {
 			t.Error("does not unwrap to ErrDuplicateAdapter")
 		}
@@ -118,7 +118,7 @@ func TestErrorUnwrap(t *testing.T) {
 	t.Run("unknown unwraps", func(t *testing.T) {
 		t.Parallel()
 
-		err := &UnknownAdapterError{Adapter: Postgres}
+		err := UnknownAdapterError{Adapter: Postgres}
 		if !errors.Is(err, ErrUnknownAdapter) {
 			t.Error("does not unwrap to ErrUnknownAdapter")
 		}
@@ -131,7 +131,7 @@ func TestErrorUnwrap(t *testing.T) {
 	t.Run("invalid options unwraps", func(t *testing.T) {
 		t.Parallel()
 
-		err := &InvalidOptionsError{Reason: "r"}
+		err := InvalidOptionsError{Reason: "r"}
 		if !errors.Is(err, ErrInvalidOptions) {
 			t.Error("does not unwrap to ErrInvalidOptions")
 		}
@@ -145,7 +145,7 @@ func TestErrorUnwrap(t *testing.T) {
 		t.Parallel()
 
 		inner := errors.New("inner")
-		err := &TxError{Op: "commit", Err: inner}
+		err := TxError{Op: "commit", Err: inner}
 
 		if !errors.Is(err.Unwrap(), inner) {
 			t.Error("Unwrap() did not return inner error")

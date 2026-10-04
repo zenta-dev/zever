@@ -121,7 +121,7 @@ func conformanceDeny(t *testing.T) {
 	_, err := authz.Authorize(t.Context(), kitAuth(), p, kitPolicy(), kitToken, "r1")
 	// Checker denials surface as PermissionDenied, never raw: Authorize
 	// maps Decision{Allowed:false} to *PermissionDeniedError.
-	var denied *authz.PermissionDeniedError
+	var denied authz.PermissionDeniedError
 	if !errors.As(err, &denied) {
 		t.Fatalf("Authorize() err = %T %v, want *PermissionDeniedError", err, err)
 	}
@@ -137,7 +137,7 @@ func conformanceCheckerError(t *testing.T) {
 	// Authorize never propagates backend errors to callers.
 	p := &stubChecker{err: errors.New("kit: backend boom")}
 	_, err := authz.Authorize(t.Context(), kitAuth(), p, kitPolicy(), kitToken, "r1")
-	var denied *authz.PermissionDeniedError
+	var denied authz.PermissionDeniedError
 	if !errors.As(err, &denied) {
 		t.Fatalf("Authorize() err = %T %v, want *PermissionDeniedError", err, err)
 	}
@@ -151,7 +151,7 @@ func conformanceInvalidToken(t *testing.T) {
 	// Auth verification failures surface as Unauthenticated: Authorize
 	// wraps any Verify error in *UnauthenticatedError.
 	_, err := authz.Authorize(t.Context(), a, p, kitPolicy(), "wrong-token", "r1")
-	var unauthenticated *authz.UnauthenticatedError
+	var unauthenticated authz.UnauthenticatedError
 	if !errors.As(err, &unauthenticated) {
 		t.Fatalf("Authorize() err = %T %v, want *UnauthenticatedError", err, err)
 	}
@@ -171,7 +171,7 @@ func conformanceMissingToken(t *testing.T) {
 	// A missing bearer token is Unauthenticated without touching Verify:
 	// Authorize short-circuits before calling Auth.
 	_, err := authz.Authorize(t.Context(), a, p, kitPolicy(), "", "r1")
-	var unauthenticated *authz.UnauthenticatedError
+	var unauthenticated authz.UnauthenticatedError
 	if !errors.As(err, &unauthenticated) {
 		t.Fatalf("Authorize() err = %T %v, want *UnauthenticatedError", err, err)
 	}
@@ -236,7 +236,7 @@ func conformanceNilAuth(t *testing.T) {
 	// panicking: the nil check precedes Verify.
 	p := &stubChecker{allow: true}
 	_, err := authz.Authorize(t.Context(), nil, p, kitPolicy(), kitToken, "r1")
-	var unauthenticated *authz.UnauthenticatedError
+	var unauthenticated authz.UnauthenticatedError
 	if !errors.As(err, &unauthenticated) {
 		t.Fatalf("Authorize() err = %T %v, want *UnauthenticatedError", err, err)
 	}
@@ -254,7 +254,7 @@ func conformanceNilChecker(t *testing.T) {
 	// Nil Checker with a PermissionCheck denies as PermissionDenied
 	// instead of panicking: the nil check precedes Can.
 	_, err := authz.Authorize(t.Context(), kitAuth(), nil, kitPolicy(), kitToken, "r1")
-	var denied *authz.PermissionDeniedError
+	var denied authz.PermissionDeniedError
 	if !errors.As(err, &denied) {
 		t.Fatalf("Authorize() err = %T %v, want *PermissionDeniedError", err, err)
 	}

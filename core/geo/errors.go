@@ -39,12 +39,12 @@ type InvalidAdapterError struct {
 }
 
 // Error returns a human-readable invalid-adapter message.
-func (e *InvalidAdapterError) Error() string {
+func (e InvalidAdapterError) Error() string {
 	return fmt.Sprintf("%s: %q", ErrInvalidAdapter, e.Adapter)
 }
 
 // Unwrap returns ErrInvalidAdapter.
-func (e *InvalidAdapterError) Unwrap() error { return ErrInvalidAdapter }
+func (e InvalidAdapterError) Unwrap() error { return ErrInvalidAdapter }
 
 // DuplicateAdapterError reports a double registration.
 type DuplicateAdapterError struct {
@@ -56,12 +56,12 @@ type DuplicateAdapterError struct {
 type DuplicateError = DuplicateAdapterError
 
 // Error returns a human-readable duplicate-registration message.
-func (e *DuplicateAdapterError) Error() string {
+func (e DuplicateAdapterError) Error() string {
 	return fmt.Sprintf("%s: %s", ErrDuplicateAdapter, e.Adapter)
 }
 
 // Unwrap returns ErrDuplicateAdapter.
-func (e *DuplicateAdapterError) Unwrap() error { return ErrDuplicateAdapter }
+func (e DuplicateAdapterError) Unwrap() error { return ErrDuplicateAdapter }
 
 // UnknownAdapterError reports an open of an unregistered adapter.
 type UnknownAdapterError struct {
@@ -70,12 +70,12 @@ type UnknownAdapterError struct {
 }
 
 // Error returns a human-readable unknown-adapter message.
-func (e *UnknownAdapterError) Error() string {
+func (e UnknownAdapterError) Error() string {
 	return fmt.Sprintf("%s: %s (forgotten import?)", ErrUnknownAdapter, e.Adapter)
 }
 
 // Unwrap returns ErrUnknownAdapter.
-func (e *UnknownAdapterError) Unwrap() error { return ErrUnknownAdapter }
+func (e UnknownAdapterError) Unwrap() error { return ErrUnknownAdapter }
 
 // InvalidOptionsError reports a single options validation failure.
 type InvalidOptionsError struct {
@@ -84,12 +84,12 @@ type InvalidOptionsError struct {
 }
 
 // Error returns a human-readable invalid-options message.
-func (e *InvalidOptionsError) Error() string {
+func (e InvalidOptionsError) Error() string {
 	return fmt.Sprintf("%s: %s", ErrInvalidOptions, e.Reason)
 }
 
 // Unwrap returns ErrInvalidOptions.
-func (e *InvalidOptionsError) Unwrap() error { return ErrInvalidOptions }
+func (e InvalidOptionsError) Unwrap() error { return ErrInvalidOptions }
 
 // NotFoundError reports a missing geo result.
 type NotFoundError struct {
@@ -98,9 +98,9 @@ type NotFoundError struct {
 }
 
 // Error returns a human-readable not-found message.
-func (e *NotFoundError) Error() string {
+func (e NotFoundError) Error() string {
 	return fmt.Sprintf("%s: %q", ErrNotFound, e.Query)
 }
 
 // Unwrap returns ErrNotFound.
-func (e *NotFoundError) Unwrap() error { return ErrNotFound }
+func (e NotFoundError) Unwrap() error { return ErrNotFound }

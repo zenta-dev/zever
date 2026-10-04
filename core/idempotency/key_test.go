@@ -29,7 +29,7 @@ func TestValidateKey_empty_fails(t *testing.T) {
 	if !errors.Is(err, ErrInvalidKey) {
 		t.Fatalf("ValidateKey empty err = %v, want ErrInvalidKey", err)
 	}
-	var ike *InvalidKeyError
+	var ike InvalidKeyError
 	if !errors.As(err, &ike) {
 		t.Fatalf("err type = %T, want *InvalidKeyError", err)
 	}
@@ -48,7 +48,7 @@ func TestValidateKey_overlong_256_fails(t *testing.T) {
 	if !errors.Is(err, ErrInvalidKey) {
 		t.Fatalf("err = %v, want ErrInvalidKey", err)
 	}
-	var ike *InvalidKeyError
+	var ike InvalidKeyError
 	if !errors.As(err, &ike) {
 		t.Fatalf("err type = %T, want *InvalidKeyError", err)
 	}

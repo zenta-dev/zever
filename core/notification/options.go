@@ -41,7 +41,7 @@ type Options struct {
 // Zero Timeout means "apply default" and is valid; only negative values fail.
 func (o Options) Validate() error {
 	if o.Timeout < 0 {
-		return &InvalidOptionsError{Reason: "timeout must be >= 0"}
+		return InvalidOptionsError{Reason: "timeout must be >= 0"}
 	}
 	return nil
 }

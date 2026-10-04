@@ -15,11 +15,11 @@ var ErrClosed = errors.New("session: closed")
 // ErrNilFactory is returned when an adapter factory is nil.
 var ErrNilFactory = errors.New("session: nil factory")
 
-// ErrDuplicate is returned on duplicate adapter registration.
-var ErrDuplicate = errors.New("session: duplicate registration")
+// ErrDuplicateAdapter is returned on duplicate adapter registration.
+var ErrDuplicateAdapter = errors.New("session: duplicate adapter")
 
-// ErrDuplicateAdapter aliases ErrDuplicate for compatibility.
-var ErrDuplicateAdapter = ErrDuplicate
+// ErrDuplicate aliases ErrDuplicateAdapter for compatibility.
+var ErrDuplicate = ErrDuplicateAdapter
 
 // ErrUnknownAdapter is returned for an unregistered adapter.
 var ErrUnknownAdapter = errors.New("session: unknown adapter")
@@ -44,11 +44,11 @@ type DuplicateError = DuplicateAdapterError
 
 // Error returns a human-readable duplicate-registration message.
 func (e DuplicateAdapterError) Error() string {
-	return fmt.Sprintf("%s: %s", ErrDuplicate, e.Adapter.String())
+	return fmt.Sprintf("%s: %s", ErrDuplicateAdapter, e.Adapter.String())
 }
 
-// Unwrap returns ErrDuplicate.
-func (e DuplicateAdapterError) Unwrap() error { return ErrDuplicate }
+// Unwrap returns ErrDuplicateAdapter.
+func (e DuplicateAdapterError) Unwrap() error { return ErrDuplicateAdapter }
 
 // UnknownAdapterError reports a lookup of an unregistered adapter.
 type UnknownAdapterError struct {

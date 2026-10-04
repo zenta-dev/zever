@@ -23,12 +23,12 @@ func (o Options) Validate() error {
 	var errs []error
 
 	if o.Timeout < 0 {
-		errs = append(errs, &InvalidOptionsError{Reason: "timeout must be >= 0"})
+		errs = append(errs, InvalidOptionsError{Reason: "timeout must be >= 0"})
 	}
 
 	if o.BaseURL != "" {
 		if _, err := endpoint.ValidateURL(o.BaseURL, endpoint.WithAllowInsecure(o.AllowInsecure)); err != nil {
-			errs = append(errs, &InvalidOptionsError{Reason: baseURLReason(err)})
+			errs = append(errs, InvalidOptionsError{Reason: baseURLReason(err)})
 		}
 	}
 

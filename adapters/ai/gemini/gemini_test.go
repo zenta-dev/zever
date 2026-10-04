@@ -27,7 +27,7 @@ func TestOpen_APIKeyRequired(t *testing.T) {
 		t.Fatalf("err = %v, want ErrInvalidOptions", err)
 	}
 
-	var ioe *ai.InvalidOptionsError
+	var ioe ai.InvalidOptionsError
 	if !errors.As(err, &ioe) {
 		t.Fatalf("not InvalidOptionsError")
 	}
@@ -346,7 +346,7 @@ func TestGenerate_ErrorMapping(t *testing.T) {
 			}
 
 			if tc.name == "429 rate" {
-				var rle *ai.RateLimitedError
+				var rle ai.RateLimitedError
 				if !errors.As(err, &rle) {
 					t.Errorf("429 not RateLimitedError")
 				}
@@ -1109,7 +1109,7 @@ func TestMapAndRedact(t *testing.T) {
 	// RateLimited redact preserves type
 	err = genai.APIError{Code: 429, Message: "rate mykey"}
 	mapped = mapAndRedact(err, apiKey)
-	var rle *ai.RateLimitedError
+	var rle ai.RateLimitedError
 	if !errors.As(mapped, &rle) {
 		t.Errorf("rate not preserved")
 	}
@@ -1395,7 +1395,7 @@ func TestMapAPIError_429Empty(t *testing.T) {
 	t.Parallel()
 	e := genai.APIError{Code: 429}
 	mapped := mapAPIError(e)
-	var rle *ai.RateLimitedError
+	var rle ai.RateLimitedError
 	if !errors.As(mapped, &rle) {
 		t.Errorf("429 empty not RateLimited")
 	}

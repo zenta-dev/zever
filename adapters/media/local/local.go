@@ -175,7 +175,7 @@ func (a *adapter) Download(_ context.Context, id string) ([]byte, error) {
 	}
 
 	if int64(len(data)) > maxVal {
-		return nil, localErr(&media.SizeLimitError{Size: len(data), Limit: int(maxVal)})
+		return nil, localErr(media.SizeLimitError{Size: len(data), Limit: int(maxVal)})
 	}
 
 	return data, nil
@@ -183,11 +183,11 @@ func (a *adapter) Download(_ context.Context, id string) ([]byte, error) {
 
 func (a *adapter) DownloadRange(_ context.Context, id string, offset, length int64) ([]byte, error) {
 	if offset < 0 {
-		return nil, localErr(&media.InvalidRangeError{Offset: offset, Length: length})
+		return nil, localErr(media.InvalidRangeError{Offset: offset, Length: length})
 	}
 
 	if length < 0 {
-		return nil, localErr(&media.InvalidRangeError{Offset: offset, Length: length})
+		return nil, localErr(media.InvalidRangeError{Offset: offset, Length: length})
 	}
 
 	src, err := a.findFile(id)
@@ -203,7 +203,7 @@ func (a *adapter) DownloadRange(_ context.Context, id string, offset, length int
 	size := int64(len(data))
 
 	if offset >= size {
-		return nil, localErr(&media.InvalidRangeError{Offset: offset, Length: length, Size: size})
+		return nil, localErr(media.InvalidRangeError{Offset: offset, Length: length, Size: size})
 	}
 
 	end := size
@@ -219,7 +219,7 @@ func (a *adapter) DownloadRange(_ context.Context, id string, offset, length int
 	}
 
 	if int64(len(out)) > maxVal {
-		return nil, localErr(&media.SizeLimitError{Size: len(out), Limit: int(maxVal)})
+		return nil, localErr(media.SizeLimitError{Size: len(out), Limit: int(maxVal)})
 	}
 
 	return out, nil
@@ -227,7 +227,7 @@ func (a *adapter) DownloadRange(_ context.Context, id string, offset, length int
 
 func (a *adapter) Delete(_ context.Context, id string) error {
 	if !media.ValidHexID(id) {
-		return localErr(&media.InvalidIDError{ID: id})
+		return localErr(media.InvalidIDError{ID: id})
 	}
 
 	matches, err := filepath.Glob(filepath.Join(a.root, id+".*"))
@@ -272,7 +272,7 @@ func (a *adapter) Probe(ctx context.Context, id string) (media.Probe, error) {
 
 	kind, ok := media.KindForExt(ext)
 	if !ok {
-		return media.Probe{}, localErr(&media.UnsupportedFormatError{Format: ext})
+		return media.Probe{}, localErr(media.UnsupportedFormatError{Format: ext})
 	}
 
 	if kind != media.KindImage {
@@ -309,7 +309,7 @@ func (a *adapter) Transform(ctx context.Context, id string, ops media.TransformO
 
 	kind, ok := media.KindForExt(ext)
 	if !ok {
-		return "", localErr(&media.UnsupportedFormatError{Format: ext})
+		return "", localErr(media.UnsupportedFormatError{Format: ext})
 	}
 
 	if kind != media.KindImage {
@@ -362,33 +362,33 @@ func (a *adapter) avTransform(ctx context.Context, src, id string, kind media.Me
 	}
 
 	if ops.Bitrate < 0 {
-		return "", localErr(&media.InvalidTransformError{Reason: "bitrate must be >= 0"})
+		return "", localErr(media.InvalidTransformError{Reason: "bitrate must be >= 0"})
 	}
 
 	if ops.CRF < 0 || ops.CRF > 51 {
-		return "", localErr(&media.InvalidTransformError{Reason: "crf must be between 0 and 51"})
+		return "", localErr(media.InvalidTransformError{Reason: "crf must be between 0 and 51"})
 	}
 
 	format := strings.TrimPrefix(strings.ToLower(strings.TrimSpace(ops.Format)), ".")
 	if format == "" {
-		return "", localErr(&media.InvalidTransformError{Reason: "format is required for audio/video"})
+		return "", localErr(media.InvalidTransformError{Reason: "format is required for audio/video"})
 	}
 
 	switch {
 	case kind == media.KindAudio && !ffmpeg.IsAudioFormat(format):
-		return "", localErr(&media.InvalidTransformError{Reason: "format " + format + " is not an audio format"})
+		return "", localErr(media.InvalidTransformError{Reason: "format " + format + " is not an audio format"})
 	case kind == media.KindVideo && !ffmpeg.IsVideoFormat(format) && !isThumbFormat(format):
-		return "", localErr(&media.InvalidTransformError{Reason: "format " + format + " is not a video or image format"})
+		return "", localErr(media.InvalidTransformError{Reason: "format " + format + " is not a video or image format"})
 	}
 
 	thumb := isThumbFormat(format)
 
 	if ops.Offset < 0 {
-		return "", localErr(&media.InvalidTransformError{Reason: "offset must be >= 0"})
+		return "", localErr(media.InvalidTransformError{Reason: "offset must be >= 0"})
 	}
 
 	if ops.Offset > 0 && (!thumb || kind != media.KindVideo) {
-		return "", localErr(&media.InvalidTransformError{Reason: "offset is only valid for video thumbnails"})
+		return "", localErr(media.InvalidTransformError{Reason: "offset is only valid for video thumbnails"})
 	}
 
 	ffmpegPath, err := ffmpeg.LookPath(a.ffmpeg)
@@ -503,7 +503,7 @@ func (a *adapter) loadImage(src string) (image.Image, error) {
 	}
 
 	if int64(len(data)) > maxBytes {
-		return nil, localErr(&media.SizeLimitError{Size: len(data), Limit: int(maxBytes)})
+		return nil, localErr(media.SizeLimitError{Size: len(data), Limit: int(maxBytes)})
 	}
 
 	maxPixels := a.maxPixels
@@ -567,7 +567,7 @@ func parseDim(s, name string) (int, error) {
 
 	n, err := strconv.Atoi(s)
 	if err != nil || n < 0 {
-		return 0, localErr(&media.InvalidTransformError{Reason: name + " must be a non-negative integer"})
+		return 0, localErr(media.InvalidTransformError{Reason: name + " must be a non-negative integer"})
 	}
 
 	return n, nil
@@ -607,7 +607,7 @@ func (a *adapter) prepareOutput(src, format string) (string, string, error) {
 
 func (a *adapter) findFile(id string) (string, error) {
 	if !media.ValidHexID(id) {
-		return "", localErr(&media.InvalidIDError{ID: id})
+		return "", localErr(media.InvalidIDError{ID: id})
 	}
 
 	matches, err := filepath.Glob(filepath.Join(a.root, id+".*"))
@@ -616,7 +616,7 @@ func (a *adapter) findFile(id string) (string, error) {
 	}
 
 	if len(matches) == 0 {
-		return "", localErr(&media.NotFoundError{ID: id})
+		return "", localErr(media.NotFoundError{ID: id})
 	}
 
 	return matches[0], nil
@@ -683,7 +683,7 @@ func selectEncoder(ext string, quality int) (imgio.Encoder, error) {
 	case "jpg", "jpeg":
 		return imgio.JPEGEncoder(clampQuality(quality)), nil
 	default:
-		return nil, localErr(&media.UnsupportedFormatError{Format: ext})
+		return nil, localErr(media.UnsupportedFormatError{Format: ext})
 	}
 }
 
@@ -704,6 +704,6 @@ func formatExt(f string) (string, error) {
 	case "jpg", "jpeg", "png", "webp":
 		return "." + strings.ToLower(f), nil
 	default:
-		return "", localErr(&media.UnsupportedFormatError{Format: f})
+		return "", localErr(media.UnsupportedFormatError{Format: f})
 	}
 }

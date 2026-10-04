@@ -51,13 +51,13 @@ type Options struct {
 func (o Options) Validate() error {
 	var errs []error
 	if o.Timeout < 0 {
-		errs = append(errs, &InvalidOptionsError{Reason: "timeout must be >= 0"})
+		errs = append(errs, InvalidOptionsError{Reason: "timeout must be >= 0"})
 	}
 	if o.MaxRetries < 0 {
-		errs = append(errs, &InvalidOptionsError{Reason: "max_retries must be >= 0"})
+		errs = append(errs, InvalidOptionsError{Reason: "max_retries must be >= 0"})
 	}
 	if o.ReplayTolerance < 0 {
-		errs = append(errs, &InvalidOptionsError{Reason: "replay_tolerance must be >= 0"})
+		errs = append(errs, InvalidOptionsError{Reason: "replay_tolerance must be >= 0"})
 	}
 	return errors.Join(errs...)
 }

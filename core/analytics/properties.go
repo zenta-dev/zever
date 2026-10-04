@@ -20,7 +20,7 @@ func ValidatePropertiesSize(m map[string]any, limit int) error {
 	}
 
 	if len(b) > limit {
-		return &SizeLimitError{Size: len(b), Limit: limit}
+		return SizeLimitError{Size: len(b), Limit: limit}
 	}
 
 	return nil
@@ -42,7 +42,7 @@ func MarshalValidated(m map[string]any, limit int) ([]byte, error) {
 	}
 
 	if len(b) > limit {
-		return nil, &SizeLimitError{Size: len(b), Limit: limit}
+		return nil, SizeLimitError{Size: len(b), Limit: limit}
 	}
 
 	return b, nil
@@ -51,7 +51,7 @@ func MarshalValidated(m map[string]any, limit int) ([]byte, error) {
 // ValidateBounds checks the property count then the JSON-encoded size of m.
 func ValidateBounds(m map[string]any, maxProperties int, maxBytes int) error {
 	if maxProperties > 0 && len(m) > maxProperties {
-		return &CountLimitError{Count: len(m), Limit: maxProperties}
+		return CountLimitError{Count: len(m), Limit: maxProperties}
 	}
 
 	return ValidatePropertiesSize(m, maxBytes)

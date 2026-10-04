@@ -29,11 +29,11 @@ func (o Options) Validate() error {
 	var errs []error
 
 	if o.Header != "" && !validHeaderKey(o.Header) {
-		errs = append(errs, &InvalidOptionsError{Reason: "header must be a valid header key"})
+		errs = append(errs, InvalidOptionsError{Reason: "header must be a valid header key"})
 	}
 
 	if len(o.SubdomainRegex) > MaxRegexLength {
-		errs = append(errs, &InvalidOptionsError{Reason: "subdomain_regex exceeds max length"})
+		errs = append(errs, InvalidOptionsError{Reason: "subdomain_regex exceeds max length"})
 	}
 
 	return errors.Join(errs...)

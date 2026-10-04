@@ -321,7 +321,7 @@ func TestUpsertBatch_DimensionMismatch(t *testing.T) {
 		{ID: "b", Embedding: []float32{1, 0, 0}},
 	})
 
-	var mismatch *vectorstore.DimensionMismatchError
+	var mismatch vectorstore.DimensionMismatchError
 	if !errors.As(err, &mismatch) {
 		t.Fatalf("UpsertBatch() = %v, want DimensionMismatchError", err)
 	}
@@ -491,7 +491,7 @@ func TestUpsertErrors(t *testing.T) {
 
 		s := newStore(newStub(), 3)
 		err := s.Upsert(ctx, vectorstore.Vector{ID: "x", Embedding: []float32{1, 2}})
-		var dm *vectorstore.DimensionMismatchError
+		var dm vectorstore.DimensionMismatchError
 
 		if !errors.As(err, &dm) || dm.Got != 2 || dm.Want != 3 {
 			t.Fatalf("expected DimensionMismatchError{2,3}, got %v", err)
@@ -554,7 +554,7 @@ func TestQueryErrors(t *testing.T) {
 
 		s := newStore(newStub(), 3)
 		_, err := s.Query(ctx, []float32{1, 2}, 1)
-		var dm *vectorstore.DimensionMismatchError
+		var dm vectorstore.DimensionMismatchError
 
 		if !errors.As(err, &dm) || dm.Got != 2 || dm.Want != 3 {
 			t.Fatalf("expected DimensionMismatchError{2,3}, got %v", err)

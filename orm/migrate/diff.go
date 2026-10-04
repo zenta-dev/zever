@@ -2,7 +2,6 @@ package migrate
 
 import (
 	"context"
-	"errors"
 	"fmt"
 	"regexp"
 	"sort"
@@ -54,14 +53,6 @@ import (
 //   - Rolling back a whole table: rollback.go inverts column-level
 //     statements only. A CREATE TABLE is recorded with kind="create_table"
 //     and has no inverse, deliberately.
-
-// ErrUnsupportedDialect is returned by Plan (and anything that calls it) when
-// the target database's dialect is not one this migration engine can diff
-// against live state. Today that is every dialect except postgres, sqlite,
-// and mysql -- most notably the Oracle/SQL Server family, which gets neither
-// DDL rendering here nor bootstrap support. See doc.go for the full policy
-// statement.
-var ErrUnsupportedDialect = errors.New("orm/migrate: dialect not supported for live schema diffing (postgres, sqlite, and mysql only)")
 
 // schemaMigrationsTable is the bookkeeping table name. It records the
 // checksum of every DDL statement this tool has successfully executed, so a

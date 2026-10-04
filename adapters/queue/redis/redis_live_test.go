@@ -99,7 +99,7 @@ func TestRedisLive_PushPopAck(t *testing.T) {
 	if !errors.Is(err, queue.ErrEmpty) {
 		t.Errorf("errors.Is(err, ErrEmpty) = false, err = %v", err)
 	}
-	var emptyErr *queue.EmptyError
+	var emptyErr queue.EmptyError
 	if !errors.As(err, &emptyErr) {
 		t.Errorf("errors.As(err, EmptyError) = false, err = %T %v", err, err)
 	}

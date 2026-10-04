@@ -52,7 +52,7 @@ func (d *driver) CreatePayment(_ context.Context, req payment.Request) (payment.
 	}
 
 	if req.Method != "" && req.Method != payment.MethodCard && req.Method != payment.MethodBankTransfer {
-		methodErr := error(&payment.UnsupportedMethodError{Method: req.Method})
+		methodErr := error(payment.UnsupportedMethodError{Method: req.Method})
 		return payment.Result{}, fmt.Errorf("stub: create: %w", methodErr)
 	}
 
@@ -85,7 +85,7 @@ func (d *driver) Refund(_ context.Context, id string, amount int64, _ string) er
 
 	res, ok := d.ledger[id]
 	if !ok {
-		notFound := error(&payment.NotFoundError{PaymentID: id})
+		notFound := error(payment.NotFoundError{PaymentID: id})
 		return fmt.Errorf("stub: refund: %w", notFound)
 	}
 
@@ -94,12 +94,12 @@ func (d *driver) Refund(_ context.Context, id string, amount int64, _ string) er
 	}
 
 	if amount > res.Amount {
-		mismatch := error(&payment.AmountMismatchError{Expected: res.Amount, Actual: amount})
+		mismatch := error(payment.AmountMismatchError{Expected: res.Amount, Actual: amount})
 		return fmt.Errorf("stub: refund: %w", mismatch)
 	}
 
 	if d.refunded[id]+amount > res.Amount {
-		mismatch := error(&payment.AmountMismatchError{Expected: res.Amount - d.refunded[id], Actual: amount})
+		mismatch := error(payment.AmountMismatchError{Expected: res.Amount - d.refunded[id], Actual: amount})
 		return fmt.Errorf("stub: refund: %w", mismatch)
 	}
 
@@ -122,7 +122,7 @@ func (d *driver) GetPayment(_ context.Context, id string) (payment.Result, error
 
 	res, ok := d.ledger[id]
 	if !ok {
-		notFound := error(&payment.NotFoundError{PaymentID: id})
+		notFound := error(payment.NotFoundError{PaymentID: id})
 		return payment.Result{}, fmt.Errorf("stub: get: %w", notFound)
 	}
 

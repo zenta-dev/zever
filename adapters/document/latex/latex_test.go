@@ -235,7 +235,7 @@ func TestOversizedOutput(t *testing.T) {
 
 	d := mustOpen(t, document.Options{MaxOutputBytes: 1})
 	_, err := d.Render(t.Context(), []byte("src"), document.FormatPDF)
-	var sle *document.SizeLimitError
+	var sle document.SizeLimitError
 	if !errors.As(err, &sle) {
 		t.Fatalf("Render() err = %v, want SizeLimitError", err)
 	}
@@ -316,7 +316,7 @@ func TestBadFormat(t *testing.T) {
 
 	d := mustOpen(t, document.Options{})
 	_, err := d.Render(t.Context(), []byte("src"), document.OutputFormat("gif"))
-	var ufe *document.UnsupportedFormatError
+	var ufe document.UnsupportedFormatError
 	if !errors.As(err, &ufe) {
 		t.Fatalf("Render() err = %v, want UnsupportedFormatError", err)
 	}
@@ -331,7 +331,7 @@ func TestOversizedSource(t *testing.T) {
 	d := mustOpen(t, document.Options{})
 	src := make([]byte, document.DefaultMaxSourceBytes+1)
 	_, err := d.Render(t.Context(), src, document.FormatPDF)
-	var sle *document.SizeLimitError
+	var sle document.SizeLimitError
 	if !errors.As(err, &sle) {
 		t.Fatalf("Render() err = %v, want SizeLimitError", err)
 	}

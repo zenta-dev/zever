@@ -35,7 +35,7 @@ type Wallet struct {
 // Scan reads one row, whose columns must be in Wallets.Columns() order, into e.
 func (e *Wallet) Scan(row orm.Row) error {
 	if err := row.Scan(&e.ID, &e.Owner, &e.BalanceCents); err != nil {
-		return fmt.Errorf("[wallet] scan error: %w", err)
+		return fmt.Errorf("wallet: scan error: %w", err)
 	}
 
 	return nil
@@ -76,7 +76,7 @@ type Transfer struct {
 // Scan reads one row, whose columns must be in Transfers.Columns() order, into e.
 func (e *Transfer) Scan(row orm.Row) error {
 	if err := row.Scan(&e.ID, &e.FromWalletID, &e.ToWalletID, &e.AmountCents, &e.Note); err != nil {
-		return fmt.Errorf("[transfer] scan error: %w", err)
+		return fmt.Errorf("transfer: scan error: %w", err)
 	}
 
 	return nil

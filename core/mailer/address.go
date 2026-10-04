@@ -52,48 +52,48 @@ type Attachment struct {
 // and malformed local@domain shapes.
 func (a Address) Validate() error {
 	if len(a.Name) > 256 {
-		return &InvalidAddressError{Field: "Name", Value: a.Name}
+		return InvalidAddressError{Field: "Name", Value: a.Name}
 	}
 	if hasControl(a.Name) {
-		return &InvalidAddressError{Field: "Name", Value: a.Name}
+		return InvalidAddressError{Field: "Name", Value: a.Name}
 	}
 
 	addr := a.Address
 	if len(addr) < 1 || len(addr) > 254 {
-		return &InvalidAddressError{Field: "Address", Value: addr}
+		return InvalidAddressError{Field: "Address", Value: addr}
 	}
 	if strings.Count(addr, "@") != 1 {
-		return &InvalidAddressError{Field: "Address", Value: addr}
+		return InvalidAddressError{Field: "Address", Value: addr}
 	}
 	if hasControl(addr) {
-		return &InvalidAddressError{Field: "Address", Value: addr}
+		return InvalidAddressError{Field: "Address", Value: addr}
 	}
 	if strings.ContainsAny(addr, " <>(),;:\"[]") {
-		return &InvalidAddressError{Field: "Address", Value: addr}
+		return InvalidAddressError{Field: "Address", Value: addr}
 	}
 
 	parts := strings.SplitN(addr, "@", 2)
 	local, domain := parts[0], parts[1]
 	if local == "" || domain == "" {
-		return &InvalidAddressError{Field: "Address", Value: addr}
+		return InvalidAddressError{Field: "Address", Value: addr}
 	}
 	if !strings.Contains(domain, ".") {
-		return &InvalidAddressError{Field: "Address", Value: addr}
+		return InvalidAddressError{Field: "Address", Value: addr}
 	}
 	for i := 0; i < len(local); i++ {
 		if !isLocalChar(local[i]) {
-			return &InvalidAddressError{Field: "Address", Value: addr}
+			return InvalidAddressError{Field: "Address", Value: addr}
 		}
 	}
 	for i := 0; i < len(domain); i++ {
 		if !isDomainChar(domain[i]) {
-			return &InvalidAddressError{Field: "Address", Value: addr}
+			return InvalidAddressError{Field: "Address", Value: addr}
 		}
 	}
 	labels := strings.Split(domain, ".")
 	for _, l := range labels {
 		if l == "" {
-			return &InvalidAddressError{Field: "Address", Value: addr}
+			return InvalidAddressError{Field: "Address", Value: addr}
 		}
 	}
 

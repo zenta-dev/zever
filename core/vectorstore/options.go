@@ -37,20 +37,20 @@ func (o Options) Validate() error {
 	var errs []error
 
 	if o.Dimension < 0 {
-		errs = append(errs, &InvalidOptionsError{Reason: "dimension must not be negative"})
+		errs = append(errs, InvalidOptionsError{Reason: "dimension must not be negative"})
 	}
 
 	if o.URL != "" {
 		if _, err := endpoint.ValidateURL(o.URL, endpoint.WithAllowInsecure(o.AllowInsecure)); err != nil {
 			switch {
 			case errors.Is(err, endpoint.ErrParse):
-				errs = append(errs, &InvalidOptionsError{Reason: "url must be a valid url"})
+				errs = append(errs, InvalidOptionsError{Reason: "url must be a valid url"})
 			case errors.Is(err, endpoint.ErrEmpty),
 				errors.Is(err, endpoint.ErrNoScheme),
 				errors.Is(err, endpoint.ErrNoHost):
-				errs = append(errs, &InvalidOptionsError{Reason: "url must have scheme and host"})
+				errs = append(errs, InvalidOptionsError{Reason: "url must have scheme and host"})
 			default:
-				errs = append(errs, &InvalidOptionsError{Reason: "url must use https"})
+				errs = append(errs, InvalidOptionsError{Reason: "url must use https"})
 			}
 		}
 	}

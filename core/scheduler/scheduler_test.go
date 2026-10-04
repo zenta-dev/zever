@@ -105,7 +105,7 @@ func TestRegisterDuplicate(t *testing.T) {
 	if err := Register(a, func(Options) (Scheduler, error) {
 		return stubFactory(stubFactoryOpts(d))
 	}); err != nil {
-		var dup *DuplicateError
+		var dup DuplicateError
 		if !errors.As(err, &dup) {
 			t.Fatalf("Register: %v", err)
 		}
@@ -117,7 +117,7 @@ func TestRegisterDuplicate(t *testing.T) {
 		return stubFactory(stubFactoryOpts(d))
 	})
 
-	var dup *DuplicateError
+	var dup DuplicateError
 	if !errors.As(err, &dup) {
 		t.Fatalf("err=%v want DuplicateError", err)
 	}
@@ -135,7 +135,7 @@ func TestOpenUnknown(t *testing.T) {
 		t.Fatalf("err=%v want ErrUnknownAdapter", err)
 	}
 
-	var unk *UnknownAdapterError
+	var unk UnknownAdapterError
 	if !errors.As(err, &unk) {
 		t.Fatalf("err=%v want UnknownAdapterError", err)
 	}
@@ -150,7 +150,7 @@ func TestOpenFactoryErrorWrapped(t *testing.T) {
 	if err := Register(a, func(Options) (Scheduler, error) {
 		return nil, sentinel
 	}); err != nil {
-		var dup *DuplicateError
+		var dup DuplicateError
 		if !errors.As(err, &dup) {
 			t.Fatalf("Register: %v", err)
 		}
@@ -173,7 +173,7 @@ func TestOpenOk(t *testing.T) {
 	if err := Register(a, func(Options) (Scheduler, error) {
 		return stubFactory(stubFactoryOpts(d))
 	}); err != nil {
-		var dup *DuplicateError
+		var dup DuplicateError
 		if !errors.As(err, &dup) {
 			t.Fatalf("Register: %v", err)
 		}

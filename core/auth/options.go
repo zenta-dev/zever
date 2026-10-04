@@ -72,20 +72,20 @@ type Options struct {
 // are validated by the adapters themselves.
 func (o Options) Validate() error {
 	if o.JWT.MaxTTL < 0 {
-		return &InvalidOptionsError{Reason: "jwt_max_ttl must be >= 0"}
+		return InvalidOptionsError{Reason: "jwt_max_ttl must be >= 0"}
 	}
 	if o.JWT.Leeway < 0 {
-		return &InvalidOptionsError{Reason: "jwt_leeway must be >= 0"}
+		return InvalidOptionsError{Reason: "jwt_leeway must be >= 0"}
 	}
 	if o.OIDC.Timeout < 0 {
-		return &InvalidOptionsError{Reason: "oidc_timeout must be >= 0"}
+		return InvalidOptionsError{Reason: "oidc_timeout must be >= 0"}
 	}
 	if o.OIDC.Issuer != "" {
 		if _, err := endpoint.ValidateURL(o.OIDC.Issuer, endpoint.WithAllowInsecure(o.OIDC.AllowInsecure)); err != nil {
 			if errors.Is(err, endpoint.ErrInsecureScheme) || errors.Is(err, endpoint.ErrUnsupportedScheme) {
-				return &InvalidOptionsError{Reason: "oidc issuer must use https or set allow_insecure"}
+				return InvalidOptionsError{Reason: "oidc issuer must use https or set allow_insecure"}
 			}
-			return &InvalidOptionsError{Reason: "oidc issuer must be a valid url with scheme and host"}
+			return InvalidOptionsError{Reason: "oidc issuer must be a valid url with scheme and host"}
 		}
 	}
 	return nil

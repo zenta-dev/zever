@@ -209,7 +209,7 @@ func TestWithTx(t *testing.T) {
 			t.Fatal("expected error, got nil")
 		}
 
-		var txErr *TxError
+		var txErr TxError
 		if !errors.As(err, &txErr) {
 			t.Fatalf("error is %T, want *TxError", err)
 		}
@@ -238,7 +238,7 @@ func TestWithTx(t *testing.T) {
 			t.Fatal("expected error, got nil")
 		}
 
-		var txErr *TxError
+		var txErr TxError
 		if !errors.As(err, &txErr) {
 			t.Fatalf("error is %T, want *TxError", err)
 		}

@@ -22,11 +22,11 @@ func TestSentinels(t *testing.T) {
 func TestUnauthenticatedErrorUnwrap(t *testing.T) {
 	t.Parallel()
 
-	err := &authz.UnauthenticatedError{Reason: "missing bearer token"}
+	err := authz.UnauthenticatedError{Reason: "missing bearer token"}
 	if !errors.Is(err, authz.ErrUnauthenticated) {
 		t.Fatalf("errors.Is(%v, ErrUnauthenticated) = false", err)
 	}
-	var target *authz.UnauthenticatedError
+	var target authz.UnauthenticatedError
 	if !errors.As(err, &target) {
 		t.Fatal("errors.As for *UnauthenticatedError failed")
 	}
@@ -38,11 +38,11 @@ func TestUnauthenticatedErrorUnwrap(t *testing.T) {
 func TestPermissionDeniedErrorUnwrap(t *testing.T) {
 	t.Parallel()
 
-	err := &authz.PermissionDeniedError{Reason: "permission denied"}
+	err := authz.PermissionDeniedError{Reason: "permission denied"}
 	if !errors.Is(err, authz.ErrPermissionDenied) {
 		t.Fatalf("errors.Is(%v, ErrPermissionDenied) = false", err)
 	}
-	var target *authz.PermissionDeniedError
+	var target authz.PermissionDeniedError
 	if !errors.As(err, &target) {
 		t.Fatal("errors.As for *PermissionDeniedError failed")
 	}

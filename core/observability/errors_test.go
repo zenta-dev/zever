@@ -10,7 +10,7 @@ func TestSentinelMessages(t *testing.T) {
 		want string
 	}{
 		{ErrNilFactory, "observability: nil factory"},
-		{ErrDuplicate, "observability: duplicate registration"},
+		{ErrDuplicate, "observability: duplicate adapter"},
 		{ErrUnknownAdapter, "observability: unknown adapter"},
 		{ErrInvalidAdapter, "observability: invalid adapter"},
 		{ErrInvalidOptions, "observability: invalid options"},

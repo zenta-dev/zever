@@ -93,11 +93,11 @@ func (b *bus) Name() string {
 
 func validateTopic(topic string) error {
 	if topic == "" {
-		return &eventbus.InvalidOptionsError{Reason: "topic must be non-empty"}
+		return eventbus.InvalidOptionsError{Reason: "topic must be non-empty"}
 	}
 
 	if len(topic) > eventbus.MaxTopicLen {
-		return &eventbus.InvalidOptionsError{Reason: "topic too long"}
+		return eventbus.InvalidOptionsError{Reason: "topic too long"}
 	}
 
 	return nil

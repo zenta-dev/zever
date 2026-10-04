@@ -41,7 +41,7 @@ func TestOptionsValidate(t *testing.T) {
 			t.Errorf("errors.Is(err, ErrInvalidOptions) = false (err = %v)", err)
 		}
 
-		var invErr *workflow.InvalidOptionsError
+		var invErr workflow.InvalidOptionsError
 		if !errors.As(err, &invErr) {
 			t.Fatalf("errors.As(err, *InvalidOptionsError) = false (err = %T %v)", err, err)
 		}

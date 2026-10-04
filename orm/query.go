@@ -2,7 +2,6 @@ package orm
 
 import (
 	"context"
-	"errors"
 	"fmt"
 	"time"
 
@@ -25,23 +24,6 @@ const (
 	LockForShare       = render.LockForShare
 	LockForNoKeyUpdate = render.LockForNoKeyUpdate
 	LockForKeyShare    = render.LockForKeyShare
-)
-
-// Typed errors for invalid locking usage. They are dialect-independent
-// caller bugs testable with errors.Is; a lock mode the resolved dialect
-// lacks is instead reported as dialect.ErrUnsupportedByDialect.
-var (
-	// ErrLockingWithDistinct is returned when DISTINCT is combined with
-	// FOR UPDATE/FOR SHARE. Standard SQL (and Postgres and SQLite) forbid
-	// locking rows in a DISTINCT result, so orm fails closed rather than
-	// emitting invalid SQL.
-	ErrLockingWithDistinct = errors.New("orm: DISTINCT cannot be combined with a row lock (FOR UPDATE/FOR SHARE)")
-	// ErrLockingRequiresLockMode is returned when NOWAIT or SKIP LOCKED is
-	// used without a preceding FOR UPDATE/FOR SHARE.
-	ErrLockingRequiresLockMode = errors.New("orm: NOWAIT and SKIP LOCKED require FOR UPDATE or FOR SHARE")
-	// ErrLockingNotSelect is returned when a row lock is requested on
-	// Count/Exists, which render an aggregate and cannot hold a row lock.
-	ErrLockingNotSelect = errors.New("orm: row locking is only supported on SELECT queries, not Count/Exists")
 )
 
 // Query[T, PT] uses two type parameters: T is the entity's plain struct

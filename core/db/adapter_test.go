@@ -57,7 +57,7 @@ func TestParseAdapter(t *testing.T) {
 					t.Fatal("expected error, got nil")
 				}
 
-				var invErr *InvalidAdapterError
+				var invErr InvalidAdapterError
 				if !errors.As(err, &invErr) {
 					t.Fatalf("error is %T, want *InvalidAdapterError", err)
 				}

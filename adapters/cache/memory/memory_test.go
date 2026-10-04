@@ -474,7 +474,7 @@ func TestMemoryIncrement_nonInteger_invalidValue(t *testing.T) {
 		t.Errorf("errors.Is(err, ErrInvalidValue) = false (err = %v)", err)
 	}
 
-	var invErr *cache.InvalidValueError
+	var invErr cache.InvalidValueError
 	if !errors.As(err, &invErr) {
 		t.Fatalf("errors.As(err, InvalidValueError) = false (err = %T %v)", err, err)
 	}

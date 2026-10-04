@@ -35,7 +35,7 @@ func TestRunGenerateAdapterCache(t *testing.T) {
 		"core/cache/adapter.go",
 		"scaffolded register.go",
 		"type adapter struct{}",
-		`errors.New("[cache] memcached: not implemented")`,
+		`errors.New("cache: memcached: not implemented")`,
 		// every method of cache.Cache, with its real signature
 		"func (a *adapter) Get(ctx context.Context, key string) ([]byte, error)",
 		"func (a *adapter) Set(ctx context.Context, key string, value []byte, ttl time.Duration) error",

@@ -50,7 +50,7 @@ func ConvertColonSegments(seg string) (string, error) {
 		if j < len(seg) && seg[j] == '<' {
 			idx := strings.IndexByte(seg[j+1:], '>')
 			if idx == -1 || idx == 0 {
-				return "", &MalformedPatternError{Pattern: seg, Reason: "malformed colon regex: missing closing '>'"}
+				return "", MalformedPatternError{Pattern: seg, Reason: "malformed colon regex: missing closing '>'"}
 			}
 
 			regex := seg[j+1 : j+1+idx]
@@ -167,7 +167,7 @@ func StripBraceRegexWrapper(pattern string) (string, error) {
 				// Re-run validation: if depth never 0 or not anchored, it's malformed
 				// For strictness, return error
 				if !isValidRegexWrapper(innerRe) {
-					return "", &MalformedPatternError{Pattern: pattern, Reason: "malformed regex wrapper"}
+					return "", MalformedPatternError{Pattern: pattern, Reason: "malformed regex wrapper"}
 				}
 			}
 

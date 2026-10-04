@@ -274,7 +274,7 @@ func (w *Worker) process(ctx context.Context, msg queue.Message, topic string) {
 		isBatch := batchID != "" && w.BatchStore != nil
 		attempt := effectiveAttempt(msg)
 
-		w.handleDeadLetter(context.WithoutCancel(ctx), msg, batchID, jobName, &UnknownJobError{Name: jobName}, attempt, isBatch)
+		w.handleDeadLetter(context.WithoutCancel(ctx), msg, batchID, jobName, UnknownJobError{Name: jobName}, attempt, isBatch)
 
 		return
 	}

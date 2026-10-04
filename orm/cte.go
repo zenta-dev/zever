@@ -10,20 +10,6 @@ import (
 	"github.com/zenta-dev/zever/orm/render"
 )
 
-// ErrCTEClauseRequiresRecursive is returned when a SEARCH or CYCLE clause is
-// requested on a plain (non-recursive) CTE. Both clauses are defined only for
-// a WITH RECURSIVE definition, so With(...).SearchDepthFirst(...) /
-// .Cycle(...) is a caller error, rejected with a typed error before the
-// dialect capability is even consulted. Callers test with errors.Is.
-var ErrCTEClauseRequiresRecursive = errors.New("orm: SEARCH/CYCLE require a recursive CTE (use WithRecursive)")
-
-// ErrCTEClauseEmptyColumns is returned when a SEARCH or CYCLE clause is
-// requested with no BY columns. Both clauses require at least one column to
-// order the traversal / identify a repeated row, so an empty list would
-// render invalid SQL; it is rejected with a typed error instead. Callers
-// test with errors.Is.
-var ErrCTEClauseEmptyColumns = errors.New("orm: SEARCH/CYCLE require at least one BY column")
-
 // CTEName is a validated common-table-expression identifier. Its field is
 // unexported: the only way to construct one is NewCTEName, which validates
 // the identifier strictly, so a CTE name is always a safe, quotable

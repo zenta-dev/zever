@@ -35,7 +35,7 @@ type Doc struct {
 // Scan reads one row, whose columns must be in Docs.Columns() order, into e.
 func (e *Doc) Scan(row orm.Row) error {
 	if err := row.Scan(&e.ID, &e.Title, &e.Data); err != nil {
-		return fmt.Errorf("[doc] scan error: %w", err)
+		return fmt.Errorf("doc: scan error: %w", err)
 	}
 
 	return nil

@@ -105,15 +105,19 @@ func newDocBuilder(title string, qualify qualifyFunc, enums map[string]*ir.Enum)
 
 // addEntitySchema registers e's OpenAPI schema under its qualified
 // component name (idempotent) and returns that name.
-func (d *docBuilder) addEntitySchema(e *ir.Entity) string {
+func (d *docBuilder) addEntitySchema(e *ir.Entity) (string, error) {
 	name := d.qualify(e.Name, e.Module)
 
 	if !d.schemaAdded[name] {
-		d.doc.Components.Schemas[name] = d.renderEntitySchema(e)
+		schema, err := d.renderEntitySchema(e)
+		if err != nil {
+			return "", err
+		}
+		d.doc.Components.Schemas[name] = schema
 		d.schemaAdded[name] = true
 	}
 
-	return name
+	return name, nil
 }
 
 // addEnumSchema registers a named enum's OpenAPI schema ({type: string,
@@ -144,10 +148,10 @@ func (d *docBuilder) addEnumSchema(name string) string {
 // schema (registered via addEnumSchema); everything else -- including an
 // anonymous inline enum(...), which has no shared component to reference --
 // uses the plain renderFieldSchema mapping.
-func (d *docBuilder) fieldSchema(ft ir.FieldType, validate []ir.Validation) *schemaObject {
+func (d *docBuilder) fieldSchema(ft ir.FieldType, validate []ir.Validation) (*schemaObject, error) {
 	if ft.Scalar == ir.TEnum && ft.EnumName != "" {
 		name := d.addEnumSchema(ft.EnumName)
-		return &schemaObject{Ref: "#/components/schemas/" + name}
+		return &schemaObject{Ref: "#/components/schemas/" + name}, nil
 	}
 
 	return renderFieldSchema(ft, validate)
@@ -165,24 +169,29 @@ func (d *docBuilder) fieldSchema(ft ir.FieldType, validate []ir.Validation) *sch
 // the cycle closes. The $ref this and every other caller actually needs is
 // just the qualified name, which is already known up front -- the schema
 // object itself is filled in afterward, in place, once rendering returns.
-func (d *docBuilder) addMessageSchema(m *ir.Message) string {
+func (d *docBuilder) addMessageSchema(m *ir.Message) (string, error) {
 	name := d.qualify(m.Name, m.Module)
 
 	if d.schemaAdded[name] {
-		return name
+		return name, nil
 	}
 
 	d.schemaAdded[name] = true
-	d.doc.Components.Schemas[name] = d.renderMessageSchema(m)
 
-	return name
+	schema, err := d.renderMessageSchema(m)
+	if err != nil {
+		return "", err
+	}
+	d.doc.Components.Schemas[name] = schema
+
+	return name, nil
 }
 
 // addTypeRefSchema registers a TypeRef's underlying entity or message
 // schema and returns its qualified name.
-func (d *docBuilder) addTypeRefSchema(ref *ir.TypeRef) string {
+func (d *docBuilder) addTypeRefSchema(ref *ir.TypeRef) (string, error) {
 	if ref == nil {
-		return ""
+		return "", nil
 	}
 
 	if ref.Entity != nil {
@@ -193,7 +202,7 @@ func (d *docBuilder) addTypeRefSchema(ref *ir.TypeRef) string {
 		return d.addMessageSchema(ref.Message)
 	}
 
-	return ""
+	return "", nil
 }
 
 // addRequestSchema registers a synthesized "<Service><RPCName>Request"
@@ -220,7 +229,12 @@ func (d *docBuilder) addRequestSchema(baseName, owner string, m *ir.Module, para
 	}
 
 	d.requestSchemaOwner[name] = owner
-	d.doc.Components.Schemas[name] = d.renderRequestSchema(params)
+
+	schema, err := d.renderRequestSchema(params)
+	if err != nil {
+		return "", err
+	}
+	d.doc.Components.Schemas[name] = schema
 	d.schemaAdded[name] = true
 
 	return name, nil
@@ -229,10 +243,13 @@ func (d *docBuilder) addRequestSchema(baseName, owner string, m *ir.Module, para
 // paramSchema renders one param's schema: a $ref to its referenced type's
 // component schema (registering it first) when p.Ref is set, otherwise the
 // plain scalar schema built from p.Type/p.Validate.
-func (d *docBuilder) paramSchema(p *ir.Param) *schemaObject {
+func (d *docBuilder) paramSchema(p *ir.Param) (*schemaObject, error) {
 	if p.Ref != nil {
-		name := d.addTypeRefSchema(p.Ref)
-		return &schemaObject{Ref: "#/components/schemas/" + name}
+		name, err := d.addTypeRefSchema(p.Ref)
+		if err != nil {
+			return nil, err
+		}
+		return &schemaObject{Ref: "#/components/schemas/" + name}, nil
 	}
 
 	return d.fieldSchema(p.Type, p.Validate)

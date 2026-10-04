@@ -38,11 +38,11 @@ func TestSentinels(t *testing.T) {
 
 func TestDuplicateAliases_compat(t *testing.T) {
 	t.Parallel()
-	err := &DuplicateAdapterError{Adapter: Google}
+	err := DuplicateAdapterError{Adapter: Google}
 	if !errors.Is(err, ErrDuplicate) {
 		t.Fatalf("expected errors.Is ErrDuplicate alias, got %v", err)
 	}
-	var target *DuplicateError
+	var target DuplicateError
 	if !errors.As(err, &target) {
 		t.Fatalf("expected errors.As DuplicateError alias, got %T", err)
 	}
@@ -55,14 +55,14 @@ func TestTypedErrors(t *testing.T) {
 	t.Parallel()
 	t.Run("InvalidAdapterError", func(t *testing.T) {
 		t.Parallel()
-		err := &InvalidAdapterError{Adapter: "bogus"}
+		err := InvalidAdapterError{Adapter: "bogus"}
 		if !strings.Contains(err.Error(), ErrInvalidAdapter.Error()) {
 			t.Fatalf("Error() = %q, want prefix %q", err.Error(), ErrInvalidAdapter)
 		}
 		if !errors.Is(err, ErrInvalidAdapter) {
 			t.Fatalf("expected errors.Is ErrInvalidAdapter, got %v", err)
 		}
-		var target *InvalidAdapterError
+		var target InvalidAdapterError
 		if !errors.As(err, &target) {
 			t.Fatalf("expected errors.As InvalidAdapterError, got %T", err)
 		}
@@ -73,14 +73,14 @@ func TestTypedErrors(t *testing.T) {
 
 	t.Run("DuplicateAdapterError", func(t *testing.T) {
 		t.Parallel()
-		err := &DuplicateAdapterError{Adapter: Google}
+		err := DuplicateAdapterError{Adapter: Google}
 		if !strings.Contains(err.Error(), ErrDuplicateAdapter.Error()) {
 			t.Fatalf("Error() = %q, want prefix %q", err.Error(), ErrDuplicateAdapter)
 		}
 		if !errors.Is(err, ErrDuplicateAdapter) {
 			t.Fatalf("expected errors.Is ErrDuplicateAdapter, got %v", err)
 		}
-		var target *DuplicateAdapterError
+		var target DuplicateAdapterError
 		if !errors.As(err, &target) {
 			t.Fatalf("expected errors.As DuplicateAdapterError, got %T", err)
 		}
@@ -91,14 +91,14 @@ func TestTypedErrors(t *testing.T) {
 
 	t.Run("UnknownAdapterError", func(t *testing.T) {
 		t.Parallel()
-		err := &UnknownAdapterError{Adapter: Adapter("")}
+		err := UnknownAdapterError{Adapter: Adapter("")}
 		if !strings.Contains(err.Error(), ErrUnknownAdapter.Error()) {
 			t.Fatalf("Error() = %q, want prefix %q", err.Error(), ErrUnknownAdapter)
 		}
 		if !errors.Is(err, ErrUnknownAdapter) {
 			t.Fatalf("expected errors.Is ErrUnknownAdapter, got %v", err)
 		}
-		var target *UnknownAdapterError
+		var target UnknownAdapterError
 		if !errors.As(err, &target) {
 			t.Fatalf("expected errors.As UnknownAdapterError, got %T", err)
 		}
@@ -109,14 +109,14 @@ func TestTypedErrors(t *testing.T) {
 
 	t.Run("InvalidOptionsError", func(t *testing.T) {
 		t.Parallel()
-		err := &InvalidOptionsError{Reason: "timeout must be >= 0"}
+		err := InvalidOptionsError{Reason: "timeout must be >= 0"}
 		if !strings.Contains(err.Error(), ErrInvalidOptions.Error()) {
 			t.Fatalf("Error() = %q, want prefix %q", err.Error(), ErrInvalidOptions)
 		}
 		if !errors.Is(err, ErrInvalidOptions) {
 			t.Fatalf("expected errors.Is ErrInvalidOptions, got %v", err)
 		}
-		var target *InvalidOptionsError
+		var target InvalidOptionsError
 		if !errors.As(err, &target) {
 			t.Fatalf("expected errors.As InvalidOptionsError, got %T", err)
 		}
@@ -127,14 +127,14 @@ func TestTypedErrors(t *testing.T) {
 
 	t.Run("NotFoundError", func(t *testing.T) {
 		t.Parallel()
-		err := &NotFoundError{Query: "nowhere"}
+		err := NotFoundError{Query: "nowhere"}
 		if !strings.Contains(err.Error(), ErrNotFound.Error()) {
 			t.Fatalf("Error() = %q, want prefix %q", err.Error(), ErrNotFound)
 		}
 		if !errors.Is(err, ErrNotFound) {
 			t.Fatalf("expected errors.Is ErrNotFound, got %v", err)
 		}
-		var target *NotFoundError
+		var target NotFoundError
 		if !errors.As(err, &target) {
 			t.Fatalf("expected errors.As NotFoundError, got %T", err)
 		}

@@ -70,7 +70,7 @@ func (d *driver) CreateSubscription(_ context.Context, customerID, planID, _ str
 	defer d.mu.Unlock()
 
 	if _, ok := d.customers[customerID]; !ok {
-		notFound := error(&billing.NotFoundError{Resource: "customer", ID: customerID})
+		notFound := error(billing.NotFoundError{Resource: "customer", ID: customerID})
 		return billing.Subscription{}, fmt.Errorf("stub: create subscription: %w", notFound)
 	}
 
@@ -102,7 +102,7 @@ func (d *driver) CancelSubscription(_ context.Context, id string) error {
 
 	s, ok := d.subscriptions[id]
 	if !ok {
-		notFound := error(&billing.NotFoundError{Resource: "subscription", ID: id})
+		notFound := error(billing.NotFoundError{Resource: "subscription", ID: id})
 		return fmt.Errorf("stub: cancel subscription: %w", notFound)
 	}
 
@@ -122,7 +122,7 @@ func (d *driver) GetInvoice(_ context.Context, customerID string) (billing.Invoi
 
 	invs, ok := d.invoices[customerID]
 	if !ok || len(invs) == 0 {
-		notFound := error(&billing.NotFoundError{Resource: "invoice", ID: customerID})
+		notFound := error(billing.NotFoundError{Resource: "invoice", ID: customerID})
 		return billing.Invoice{}, fmt.Errorf("stub: get invoice: %w", notFound)
 	}
 

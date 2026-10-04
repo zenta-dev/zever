@@ -379,7 +379,7 @@ func (d *driver) upsertPostgres(ctx context.Context, op string, vec vectorstore.
 		// Pointer chain required: callers match with a *DimensionMismatchError
 		// target. The error-typed intermediate keeps that chain while
 		// satisfying govet's printf check.
-		mismatch := error(&vectorstore.DimensionMismatchError{Got: len(vec.Embedding), Want: d.dim})
+		mismatch := error(vectorstore.DimensionMismatchError{Got: len(vec.Embedding), Want: d.dim})
 		return fmt.Errorf("pgvector: %s: %w (set the dimension option or recreate the vectors table)", op, mismatch)
 	}
 
@@ -464,7 +464,7 @@ func (d *driver) Delete(ctx context.Context, id string) error {
 		// Pointer chain required: callers match with a *NotFoundError
 		// target. The error-typed intermediate keeps that chain while
 		// satisfying govet's printf check.
-		notFound := error(&vectorstore.NotFoundError{ID: id})
+		notFound := error(vectorstore.NotFoundError{ID: id})
 		return fmt.Errorf("pgvector: delete: %w", notFound)
 	}
 
@@ -498,7 +498,7 @@ func (d *driver) queryPostgres(ctx context.Context, embedding []float32, topK in
 	if len(embedding) != d.dim {
 		// See upsertPostgres: pointer chain required for
 		// *DimensionMismatchError targets.
-		mismatch := error(&vectorstore.DimensionMismatchError{Got: len(embedding), Want: d.dim})
+		mismatch := error(vectorstore.DimensionMismatchError{Got: len(embedding), Want: d.dim})
 		return nil, fmt.Errorf("pgvector: query: %w (set the dimension option or recreate the vectors table)", mismatch)
 	}
 
@@ -618,7 +618,7 @@ func (d *driver) validateQueryDim(embedding []float32) error {
 	if dim != 0 && len(embedding) != dim {
 		// See upsertPostgres: pointer chain required for
 		// *DimensionMismatchError targets.
-		mismatch := error(&vectorstore.DimensionMismatchError{Got: len(embedding), Want: dim})
+		mismatch := error(vectorstore.DimensionMismatchError{Got: len(embedding), Want: dim})
 		return fmt.Errorf("pgvector: query: %w", mismatch)
 	}
 
@@ -726,7 +726,7 @@ func (d *driver) checkAndSetDim(n int, op string) error {
 	if n != d.dim {
 		// See upsertPostgres: pointer chain required for
 		// *DimensionMismatchError targets.
-		mismatch := error(&vectorstore.DimensionMismatchError{Got: n, Want: d.dim})
+		mismatch := error(vectorstore.DimensionMismatchError{Got: n, Want: d.dim})
 		return fmt.Errorf("pgvector: %s: %w", op, mismatch)
 	}
 

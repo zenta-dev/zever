@@ -141,7 +141,7 @@ func isNoSuchKey(err error) bool {
 // assets.
 func (d *driver) findKey(ctx context.Context, id string) (string, error) {
 	if !media.ValidHexID(id) {
-		return "", &media.InvalidIDError{ID: id}
+		return "", media.InvalidIDError{ID: id}
 	}
 
 	out, err := d.client.ListObjectsV2(ctx, &s3sdk.ListObjectsV2Input{

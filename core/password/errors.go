@@ -12,16 +12,16 @@ var (
 	ErrPasswordTooLong = errors.New("password: password too long")
 	// ErrNilFactory is returned when an adapter factory is nil.
 	ErrNilFactory = errors.New("password: nil factory")
-	// ErrDuplicate is returned on duplicate adapter registration.
-	ErrDuplicate = errors.New("password: duplicate registration")
+	// ErrDuplicateAdapter is returned on duplicate adapter registration.
+	ErrDuplicateAdapter = errors.New("password: duplicate adapter")
 	// ErrUnknownAdapter is returned for an unregistered adapter.
 	ErrUnknownAdapter = errors.New("password: unknown adapter")
 	// ErrInvalidAdapter is returned for an invalid adapter name.
 	ErrInvalidAdapter = errors.New("password: invalid adapter")
 )
 
-// ErrDuplicateAdapter aliases ErrDuplicate for compatibility.
-var ErrDuplicateAdapter = ErrDuplicate
+// ErrDuplicate aliases ErrDuplicateAdapter for compatibility.
+var ErrDuplicate = ErrDuplicateAdapter
 
 // InvalidAdapterError reports an invalid adapter name.
 type InvalidAdapterError struct {
@@ -48,11 +48,11 @@ type DuplicateError = DuplicateAdapterError
 
 // Error returns a human-readable duplicate-registration message.
 func (e DuplicateAdapterError) Error() string {
-	return fmt.Sprintf("%s: %s", ErrDuplicate, e.Adapter)
+	return fmt.Sprintf("%s: %s", ErrDuplicateAdapter, e.Adapter)
 }
 
-// Unwrap returns ErrDuplicate.
-func (e DuplicateAdapterError) Unwrap() error { return ErrDuplicate }
+// Unwrap returns ErrDuplicateAdapter.
+func (e DuplicateAdapterError) Unwrap() error { return ErrDuplicateAdapter }
 
 // UnknownAdapterError reports a lookup of an unregistered adapter.
 type UnknownAdapterError struct {

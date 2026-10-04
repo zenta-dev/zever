@@ -15,7 +15,7 @@ var ErrClosed = errors.New("cache: closed")
 var ErrNilFactory = errors.New("cache: nil factory")
 
 // ErrDuplicateAdapter is returned on duplicate adapter registration.
-var ErrDuplicateAdapter = errors.New("cache: duplicate registration")
+var ErrDuplicateAdapter = errors.New("cache: duplicate adapter")
 
 // ErrDuplicate aliases ErrDuplicateAdapter for compatibility.
 var ErrDuplicate = ErrDuplicateAdapter

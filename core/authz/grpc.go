@@ -86,15 +86,15 @@ func UnaryServerInterceptorStrict(a auth.Auth, p permission.Checker, policies ma
 		handler grpc.UnaryHandler,
 	) (any, error) {
 		if _, ok := policies[info.FullMethod]; !ok {
-			return nil, grpcStatusError(&PermissionDeniedError{Reason: "no policy for method"})
+			return nil, grpcStatusError(PermissionDeniedError{Reason: "no policy for method"})
 		}
 		return legacy(ctx, req, info, handler)
 	}
 }
 
 func grpcStatusError(err error) error {
-	var unauthenticated *UnauthenticatedError
-	var denied *PermissionDeniedError
+	var unauthenticated UnauthenticatedError
+	var denied PermissionDeniedError
 
 	switch {
 	case errors.As(err, &unauthenticated):

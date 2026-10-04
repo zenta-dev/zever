@@ -38,7 +38,7 @@ type Widget struct {
 // Scan reads one row, whose columns must be in Widgets.Columns() order, into e.
 func (e *Widget) Scan(row orm.Row) error {
 	if err := row.Scan(&e.ID, &e.Name, &e.PriceCents, &e.Stock); err != nil {
-		return fmt.Errorf("[widget] scan error: %w", err)
+		return fmt.Errorf("widget: scan error: %w", err)
 	}
 
 	return nil

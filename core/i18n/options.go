@@ -53,10 +53,10 @@ type Options struct {
 // Empty Embed.Dir and Embed.Fallback are valid (adapter defaults apply).
 func (o Options) Validate() error {
 	if o.Remote.Timeout < 0 {
-		return &InvalidOptionsError{Reason: "timeout must be >= 0"}
+		return InvalidOptionsError{Reason: "timeout must be >= 0"}
 	}
 	if o.Remote.MaxInFlight < 0 {
-		return &InvalidOptionsError{Reason: "max_in_flight must be >= 0"}
+		return InvalidOptionsError{Reason: "max_in_flight must be >= 0"}
 	}
 	if o.Remote.Endpoint == "" {
 		return nil
@@ -64,15 +64,15 @@ func (o Options) Validate() error {
 	if _, err := endpoint.ValidateURL(o.Remote.Endpoint, endpoint.WithAllowInsecure(o.Remote.AllowInsecure)); err != nil {
 		switch {
 		case errors.Is(err, endpoint.ErrParse):
-			return &InvalidOptionsError{Reason: "endpoint must be a valid url"}
+			return InvalidOptionsError{Reason: "endpoint must be a valid url"}
 		case errors.Is(err, endpoint.ErrNoScheme),
 			errors.Is(err, endpoint.ErrNoHost),
 			errors.Is(err, endpoint.ErrEmpty):
-			return &InvalidOptionsError{Reason: "endpoint must have scheme and host"}
+			return InvalidOptionsError{Reason: "endpoint must have scheme and host"}
 		case errors.Is(err, endpoint.ErrInsecureScheme):
-			return &InvalidOptionsError{Reason: "http endpoint requires allow_insecure"}
+			return InvalidOptionsError{Reason: "http endpoint requires allow_insecure"}
 		default:
-			return &InvalidOptionsError{Reason: "endpoint scheme must be https"}
+			return InvalidOptionsError{Reason: "endpoint scheme must be https"}
 		}
 	}
 	return nil

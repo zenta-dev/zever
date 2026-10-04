@@ -347,7 +347,7 @@ func TestDelete_missing(t *testing.T) {
 		t.Fatal("Delete() error = nil, want NotFoundError")
 	}
 
-	var nf *search.NotFoundError
+	var nf search.NotFoundError
 	if !errors.As(err, &nf) {
 		t.Fatalf("Delete() error = %v, want *NotFoundError", err)
 	}

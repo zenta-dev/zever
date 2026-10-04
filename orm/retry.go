@@ -12,15 +12,6 @@ import (
 	"github.com/zenta-dev/zever/shared/retry"
 )
 
-// ErrRetryable marks an error as a transient transaction failure worth
-// retrying the WHOLE transaction over. RetryTx treats it (directly or
-// wrapped anywhere in the error chain) as retryable, as does IsRetryable;
-// wrapping a driver/dialect error with it is how a caller retries failures
-// this helper does not recognize on its own -- the dialect-agnostic escape
-// hatch. It is a sentinel for errors.Is/errors.Is-based testing, so wrap
-// it with %w, never build its text.
-var ErrRetryable = errors.New("orm: retryable transaction error")
-
 // IsRetryable reports whether err (or any error it wraps) is a retryable
 // serialization/deadlock failure: it either wraps orm.ErrRetryable, or it
 // is a Postgres error carrying SQLSTATE 40001 (serialization_failure) or

@@ -15,6 +15,18 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   `google.golang.org/grpc` is held at 1.83.2 (1.84.0 is affected by
   CVE-2026-84445 / GO-2026-6443; no patched stable release yet).
 
+### Changed
+
+- Standardized error message format across all modules: messages now use
+  `<package>: <message>` prefixes (colon form, no brackets, no trailing
+  period). Sentinels gained module prefixes, all sentinels carry doc
+  comments, custom error types use value receivers, and duplicate-
+  registration sentinels were unified. Double-`%w` wrapping in a single
+  `fmt.Errorf` is removed (use `errors.Join` to combine a sentinel with a
+  cause). Added `docs/errors.md` as the canonical error conventions guide
+  and `make err-lint` (`tools/errscan`) as a forward-looking guard for the
+  rules above.
+
 ### Fixed
 
 - `zever tinker` no longer deadlocks when the shim hangs: each `call` is bounded

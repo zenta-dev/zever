@@ -25,7 +25,7 @@ func TestCover_Errors_ExactStrings(t *testing.T) {
 		err  error
 		want string
 	}{
-		{"duplicate rbac", DuplicateError{Adapter: RBAC}, "permission: duplicate registration: rbac"},
+		{"duplicate rbac", DuplicateError{Adapter: RBAC}, "permission: duplicate adapter: rbac"},
 		{"unknown rbac", UnknownAdapterError{Adapter: RBAC}, "permission: unknown adapter: rbac (forgotten import?)"},
 		{"unknown unregistered", UnknownAdapterError{Adapter: Adapter("test-9401")}, "permission: unknown adapter: test-9401 (forgotten import?)"},
 		{"invalid x", InvalidAdapterError{Adapter: "x"}, "permission: invalid adapter: \"x\""},
@@ -72,7 +72,7 @@ func TestCover_Options_Validate_Gaps(t *testing.T) {
 		if !errors.Is(err, ErrInvalidOptions) {
 			t.Errorf("%s: err %v does not match ErrInvalidOptions", tc.name, err)
 		}
-		var ioe *InvalidOptionsError
+		var ioe InvalidOptionsError
 		if !errors.As(err, &ioe) {
 			t.Errorf("%s: err %T is not *InvalidOptionsError", tc.name, err)
 			continue
@@ -95,7 +95,7 @@ func TestCover_Options_Validate_PolicyMissing(t *testing.T) {
 	if !errors.Is(err, ErrInvalidOptions) {
 		t.Fatalf("policy-missing err = %v, want ErrInvalidOptions", err)
 	}
-	var ioe *InvalidOptionsError
+	var ioe InvalidOptionsError
 	if !errors.As(err, &ioe) {
 		t.Fatalf("err %T is not *InvalidOptionsError", err)
 	}
@@ -111,7 +111,7 @@ var errCoverOpenFactory = errors.New("cover boom 9202")
 func TestCover_Open_Success9201(t *testing.T) {
 	a := Adapter("test-9201")
 	if err := Register(a, func(Options) (Checker, error) { return coverStubChecker{}, nil }); err != nil {
-		var dup *DuplicateError
+		var dup DuplicateError
 		if !errors.As(err, &dup) {
 			t.Fatalf("Register err = %v", err)
 		}
@@ -138,7 +138,7 @@ func TestCover_Open_FactoryError9202(t *testing.T) {
 	a := Adapter("test-9202")
 	sentinel := errCoverOpenFactory
 	if err := Register(a, func(Options) (Checker, error) { return nil, sentinel }); err != nil {
-		var dup *DuplicateError
+		var dup DuplicateError
 		if !errors.As(err, &dup) {
 			t.Fatalf("Register err = %v", err)
 		}

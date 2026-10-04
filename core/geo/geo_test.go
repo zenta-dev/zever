@@ -71,7 +71,7 @@ func TestRegister(t *testing.T) {
 				return
 			}
 			if err != nil {
-				var dupErr *DuplicateAdapterError
+				var dupErr DuplicateAdapterError
 				if !errors.As(err, &dupErr) {
 					t.Fatalf("expected nil, got %v", err)
 				}
@@ -94,7 +94,7 @@ func TestRegisterDuplicate(t *testing.T) {
 	if !errors.Is(err, ErrDuplicateAdapter) {
 		t.Fatalf("expected errors.Is ErrDuplicateAdapter, got %v", err)
 	}
-	var dupErr *DuplicateAdapterError
+	var dupErr DuplicateAdapterError
 	if !errors.As(err, &dupErr) {
 		t.Fatalf("expected errors.As DuplicateAdapterError, got %T", err)
 	}
@@ -123,7 +123,7 @@ func TestOpen(t *testing.T) {
 		if !errors.Is(err, ErrUnknownAdapter) {
 			t.Fatalf("expected errors.Is ErrUnknownAdapter, got %v", err)
 		}
-		var ue *UnknownAdapterError
+		var ue UnknownAdapterError
 		if !errors.As(err, &ue) {
 			t.Fatalf("expected errors.As UnknownAdapterError, got %T", err)
 		}

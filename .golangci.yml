@@ -56,6 +56,10 @@ linters:
     - wastedassign
     - whitespace
     - zerologlint
+  # wrapcheck is intentionally not enabled: it would fail CI on hundreds of
+  # pre-existing cross-package error returns. The repo's error conventions
+  # (message prefixes, no double %w, no stray panics) are enforced by
+  # `make err-lint` (tools/errscan) instead — see docs/errors.md.
   settings:
     depguard:
       rules:

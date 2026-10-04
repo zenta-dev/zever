@@ -131,7 +131,7 @@ func (d *driver) Get(ctx context.Context, key string) ([]byte, error) {
 	}
 
 	if !ok {
-		return nil, &cache.NotFoundError{Key: key}
+		return nil, cache.NotFoundError{Key: key}
 	}
 
 	return raw, nil
@@ -227,7 +227,7 @@ func (d *driver) addDelta(ctx context.Context, key string, delta int64, op strin
 
 	if _, err := d.kv.AddDelta(ctx, d.key(key), delta); err != nil {
 		if errors.Is(err, kvstore.ErrInvalidInteger) {
-			return &cache.InvalidValueError{Key: key, Err: err}
+			return cache.InvalidValueError{Key: key, Err: err}
 		}
 
 		return fmt.Errorf("db: %s: %w", op, err)

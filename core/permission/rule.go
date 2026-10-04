@@ -35,24 +35,24 @@ func (r Rule) effect() Effect {
 // Validate checks the rule for consistency.
 func (r Rule) Validate() error {
 	if r.Role == "" {
-		return &InvalidOptionsError{Reason: "rule role must be non-empty"}
+		return InvalidOptionsError{Reason: "rule role must be non-empty"}
 	}
 	if len(r.Role) > 256 {
-		return &InvalidOptionsError{Reason: "rule role must be at most 256 characters"}
+		return InvalidOptionsError{Reason: "rule role must be at most 256 characters"}
 	}
 	if r.Action == "" {
-		return &InvalidOptionsError{Reason: "rule action must be non-empty"}
+		return InvalidOptionsError{Reason: "rule action must be non-empty"}
 	}
 	if len(r.Action) > 256 {
-		return &InvalidOptionsError{Reason: "rule action must be at most 256 characters"}
+		return InvalidOptionsError{Reason: "rule action must be at most 256 characters"}
 	}
 	switch r.Effect {
 	case "", Allow, Deny:
 	default:
-		return &InvalidOptionsError{Reason: "rule effect must be allow or deny"}
+		return InvalidOptionsError{Reason: "rule effect must be allow or deny"}
 	}
 	if r.OwnedOnly && r.OwnedAttr == "" {
-		return &InvalidOptionsError{Reason: "rule owned-only requires owned attribute"}
+		return InvalidOptionsError{Reason: "rule owned-only requires owned attribute"}
 	}
 	return nil
 }

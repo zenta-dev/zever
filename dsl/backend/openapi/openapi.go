@@ -103,11 +103,15 @@ func moduleLabel(m *ir.Module) string {
 // HTTP-bound RPC of m's services as a path+operation on d. Messages never emit tables but do emit schemas and return types.
 func populateDoc(d *docBuilder, m *ir.Module) error {
 	for _, e := range m.Entities {
-		d.addEntitySchema(e)
+		if _, err := d.addEntitySchema(e); err != nil {
+			return err
+		}
 	}
 
 	for _, msg := range m.Messages {
-		d.addMessageSchema(msg)
+		if _, err := d.addMessageSchema(msg); err != nil {
+			return err
+		}
 	}
 
 	for _, svc := range m.Services {

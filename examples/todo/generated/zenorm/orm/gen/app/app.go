@@ -40,12 +40,12 @@ type User struct {
 func (e *User) Scan(row orm.Row) error {
 	var rawCreatedAt string
 	if err := row.Scan(&e.ID, &e.Email, &e.PasswordHash, &rawCreatedAt); err != nil {
-		return fmt.Errorf("[user] scan error: %w", err)
+		return fmt.Errorf("user: scan error: %w", err)
 	}
 
 	valCreatedAt, errCreatedAt := time.Parse(time.RFC3339Nano, rawCreatedAt)
 	if errCreatedAt != nil {
-		return fmt.Errorf("[user] parse created_at error: %w", errCreatedAt)
+		return fmt.Errorf("user: parse created_at error: %w", errCreatedAt)
 	}
 
 	e.CreatedAt = valCreatedAt
@@ -112,12 +112,12 @@ type Note struct {
 func (e *Note) Scan(row orm.Row) error {
 	var rawCreatedAt string
 	if err := row.Scan(&e.ID, &e.UserID, &e.Title, &e.Body, &e.Done, &rawCreatedAt); err != nil {
-		return fmt.Errorf("[note] scan error: %w", err)
+		return fmt.Errorf("note: scan error: %w", err)
 	}
 
 	valCreatedAt, errCreatedAt := time.Parse(time.RFC3339Nano, rawCreatedAt)
 	if errCreatedAt != nil {
-		return fmt.Errorf("[note] parse created_at error: %w", errCreatedAt)
+		return fmt.Errorf("note: parse created_at error: %w", errCreatedAt)
 	}
 
 	e.CreatedAt = valCreatedAt
@@ -183,12 +183,12 @@ type GrpcTask struct {
 func (e *GrpcTask) Scan(row orm.Row) error {
 	var rawCreatedAt string
 	if err := row.Scan(&e.ID, &e.UserID, &e.Title, &e.Body, &rawCreatedAt); err != nil {
-		return fmt.Errorf("[grpc_task] scan error: %w", err)
+		return fmt.Errorf("grpc_task: scan error: %w", err)
 	}
 
 	valCreatedAt, errCreatedAt := time.Parse(time.RFC3339Nano, rawCreatedAt)
 	if errCreatedAt != nil {
-		return fmt.Errorf("[grpc_task] parse created_at error: %w", errCreatedAt)
+		return fmt.Errorf("grpc_task: parse created_at error: %w", errCreatedAt)
 	}
 
 	e.CreatedAt = valCreatedAt

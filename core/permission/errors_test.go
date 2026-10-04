@@ -17,35 +17,35 @@ func TestErrors_sentinels(t *testing.T) {
 
 func TestErrors_typed_unwrap(t *testing.T) {
 	t.Parallel()
-	if !errors.Is(&DuplicateAdapterError{Adapter: RBAC}, ErrDuplicate) {
+	if !errors.Is(DuplicateAdapterError{Adapter: RBAC}, ErrDuplicate) {
 		t.Error("DuplicateAdapterError does not unwrap to ErrDuplicate")
 	}
-	if !errors.Is(&UnknownAdapterError{Adapter: RBAC}, ErrUnknownAdapter) {
+	if !errors.Is(UnknownAdapterError{Adapter: RBAC}, ErrUnknownAdapter) {
 		t.Error("UnknownAdapterError does not unwrap to ErrUnknownAdapter")
 	}
-	if !errors.Is(&InvalidAdapterError{Adapter: "x"}, ErrInvalidAdapter) {
+	if !errors.Is(InvalidAdapterError{Adapter: "x"}, ErrInvalidAdapter) {
 		t.Error("InvalidAdapterError does not unwrap to ErrInvalidAdapter")
 	}
-	if !errors.Is(&InvalidOptionsError{Reason: "x"}, ErrInvalidOptions) {
+	if !errors.Is(InvalidOptionsError{Reason: "x"}, ErrInvalidOptions) {
 		t.Error("InvalidOptionsError does not unwrap to ErrInvalidOptions")
 	}
 }
 
 func TestErrors_carried_fields(t *testing.T) {
 	t.Parallel()
-	de := &DuplicateAdapterError{Adapter: Casbin}
+	de := DuplicateAdapterError{Adapter: Casbin}
 	if de.Adapter != Casbin {
 		t.Errorf("DuplicateAdapterError adapter = %v", de.Adapter)
 	}
-	ue := &UnknownAdapterError{Adapter: RBAC}
+	ue := UnknownAdapterError{Adapter: RBAC}
 	if ue.Adapter != RBAC {
 		t.Errorf("UnknownAdapterError adapter = %v", ue.Adapter)
 	}
-	iae := &InvalidAdapterError{Adapter: "bogus"}
+	iae := InvalidAdapterError{Adapter: "bogus"}
 	if iae.Adapter != "bogus" {
 		t.Errorf("InvalidAdapterError adapter = %q", iae.Adapter)
 	}
-	ioe := &InvalidOptionsError{Reason: "bad"}
+	ioe := InvalidOptionsError{Reason: "bad"}
 	if ioe.Reason != "bad" {
 		t.Errorf("InvalidOptionsError reason = %q", ioe.Reason)
 	}

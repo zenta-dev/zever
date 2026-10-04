@@ -19,7 +19,7 @@ func TestNewEmptyEndpoint(t *testing.T) {
 	if !errors.Is(err, i18n.ErrInvalidOptions) {
 		t.Errorf("errors.Is(err, ErrInvalidOptions) = false (err = %v)", err)
 	}
-	var ioe *i18n.InvalidOptionsError
+	var ioe i18n.InvalidOptionsError
 	if !errors.As(err, &ioe) {
 		t.Errorf("errors.As(err, InvalidOptionsError) = false (err = %T %v)", err, err)
 	}

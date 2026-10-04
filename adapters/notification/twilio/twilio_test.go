@@ -134,7 +134,7 @@ func TestNew_invalidOptions(t *testing.T) {
 				t.Fatalf("New err = %v, want ErrInvalidOptions", err)
 			}
 			var ioe notification.InvalidOptionsError
-			var ioePtr *notification.InvalidOptionsError
+			var ioePtr notification.InvalidOptionsError
 			if _, err := New(c.opts); !errors.As(err, &ioe) && !errors.As(err, &ioePtr) {
 				t.Fatalf("New err %v is not InvalidOptionsError", err)
 			}

@@ -17,7 +17,7 @@ func TestCoverTypedErrorStrings(t *testing.T) {
 		err  error
 		want string
 	}{
-		{"duplicate", DuplicateError{Adapter: Memory}, "session: duplicate registration"},
+		{"duplicate", DuplicateError{Adapter: Memory}, "session: duplicate adapter"},
 		{"unknown", UnknownAdapterError{Adapter: Adapter("")}, "session: unknown adapter: unknown (forgotten import?)"},
 	}
 

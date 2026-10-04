@@ -368,7 +368,7 @@ func (d *driver) Delete(ctx context.Context, id string) error {
 		// notFound is typed as error first: go vet's printf check rejects
 		// %w with *NotFoundError directly (value-receiver Error method);
 		// same pattern as search/meilisearch.
-		notFound := error(&search.NotFoundError{ID: id})
+		notFound := error(search.NotFoundError{ID: id})
 
 		return fmt.Errorf("postgres: delete: %w", notFound)
 	}

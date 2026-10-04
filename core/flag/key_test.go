@@ -21,7 +21,7 @@ func TestKey_Validate_empty_returnsInvalidKey(t *testing.T) {
 	if !errors.Is(err, ErrInvalidKey) {
 		t.Fatalf("ValidateKey empty err = %v, want ErrInvalidKey", err)
 	}
-	var ike *InvalidKeyError
+	var ike InvalidKeyError
 	if !errors.As(err, &ike) {
 		t.Fatalf("err %T is not *InvalidKeyError", err)
 	}
@@ -37,7 +37,7 @@ func TestKey_Validate_tooLong_returnsInvalidKey(t *testing.T) {
 	if !errors.Is(err, ErrInvalidKey) {
 		t.Fatalf("ValidateKey 257-long err = %v, want ErrInvalidKey", err)
 	}
-	var ike *InvalidKeyError
+	var ike InvalidKeyError
 	if !errors.As(err, &ike) {
 		t.Fatalf("err %T is not *InvalidKeyError", err)
 	}

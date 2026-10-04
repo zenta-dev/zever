@@ -75,7 +75,7 @@ func (d *Dispatcher) Dispatch(
 ) error {
 	def, ok := Lookup(jobName)
 	if !ok {
-		return &UnknownJobError{Name: jobName}
+		return UnknownJobError{Name: jobName}
 	}
 
 	var o dispatchOptions

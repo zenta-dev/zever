@@ -256,7 +256,7 @@ func TestRedisCover_ClientErrors(t *testing.T) {
 		_, _, err = a10.blockingClaim(ctx, "rk", "pk", "dk", "123", poll, time.Second)
 		return err != nil
 	}, "blockingClaim poll timeout")
-	var emptyErr *queue.EmptyError
+	var emptyErr queue.EmptyError
 	if !errors.As(err, &emptyErr) {
 		t.Fatalf("want EmptyError, got %T %v", err, err)
 	}
@@ -904,7 +904,7 @@ func TestRedisCover_PopLoopThrottlesSweep(t *testing.T) {
 	defer poll.Stop()
 
 	_, err := a.popLoop(ctx, "t", a.readyKey("t"), a.processingKey("t"), a.deadlineKey("t"), poll, time.Millisecond)
-	var emptyErr *queue.EmptyError
+	var emptyErr queue.EmptyError
 	if err != nil && !errors.As(err, &emptyErr) {
 		t.Fatalf("popLoop() error = %v, want nil or EmptyError", err)
 	}

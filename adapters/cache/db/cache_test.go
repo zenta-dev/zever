@@ -72,7 +72,7 @@ func TestIncrementNonInteger(t *testing.T) {
 		t.Fatalf("Increment(abc) = %v, want ErrInvalidValue", err)
 	}
 
-	var invErr *cache.InvalidValueError
+	var invErr cache.InvalidValueError
 	if !errors.As(err, &invErr) {
 		t.Fatalf("errors.As(err, InvalidValueError) = false (err = %T %v)", err, err)
 	}

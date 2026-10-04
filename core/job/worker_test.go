@@ -431,7 +431,7 @@ func TestWorkerPopNextAvailableAllEmpty(t *testing.T) {
 	// also test EmptyError wrapping
 	q2 := &workerStubQueue{
 		popFn: func(context.Context, string) (queue.Message, error) {
-			return queue.Message{}, &queue.EmptyError{Topic: "x"}
+			return queue.Message{}, queue.EmptyError{Topic: "x"}
 		},
 	}
 	w.Q = q2

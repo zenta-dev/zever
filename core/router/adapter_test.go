@@ -67,7 +67,7 @@ func TestParseAdapter_roundtrip(t *testing.T) {
 				if err == nil {
 					t.Fatalf("ParseAdapter(%q) expected error, got nil", tc.in)
 				}
-				var iae *InvalidAdapterError
+				var iae InvalidAdapterError
 				if !errors.As(err, &iae) {
 					t.Fatalf("err type = %T, want *InvalidAdapterError", err)
 				}

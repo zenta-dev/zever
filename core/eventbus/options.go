@@ -56,27 +56,27 @@ type Options struct {
 // "apply adapter defaults" and are valid; only negative values fail.
 func (o Options) Validate() error {
 	if o.BufferSize < 0 {
-		return &InvalidOptionsError{Reason: "buffer_size must be >= 0"}
+		return InvalidOptionsError{Reason: "buffer_size must be >= 0"}
 	}
 
 	if o.MaxHandlers < 0 {
-		return &InvalidOptionsError{Reason: "max_handlers must be >= 0"}
+		return InvalidOptionsError{Reason: "max_handlers must be >= 0"}
 	}
 
 	if o.HandlerTimeout < 0 {
-		return &InvalidOptionsError{Reason: "handler_timeout must be >= 0"}
+		return InvalidOptionsError{Reason: "handler_timeout must be >= 0"}
 	}
 
 	if o.CloseTimeout < 0 {
-		return &InvalidOptionsError{Reason: "close_timeout must be >= 0"}
+		return InvalidOptionsError{Reason: "close_timeout must be >= 0"}
 	}
 
 	if err := redisopt.ValidateAddr(o.Redis.Addr); err != nil {
-		return &InvalidOptionsError{Reason: err.Error()}
+		return InvalidOptionsError{Reason: err.Error()}
 	}
 
 	if err := redisopt.ValidatePrefix(o.Redis.Prefix); err != nil {
-		return &InvalidOptionsError{Reason: err.Error()}
+		return InvalidOptionsError{Reason: err.Error()}
 	}
 
 	return nil

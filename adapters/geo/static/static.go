@@ -38,23 +38,23 @@ func New(opts geo.Options) (geo.Geo, error) {
 
 	cleaned := filepath.Clean(path)
 	if cleaned == "." || cleaned == "" {
-		return nil, fmt.Errorf("geo: static: invalid path %q: %w", path, geo.ErrInvalidOptions)
+		return nil, fmt.Errorf("static: invalid path %q: %w", path, geo.ErrInvalidOptions)
 	}
 
 	for _, el := range strings.Split(path, string(filepath.Separator)) {
 		if el == ".." {
-			return nil, fmt.Errorf("geo: static: path %q contains traversal: %w", path, geo.ErrInvalidOptions)
+			return nil, fmt.Errorf("static: path %q contains traversal: %w", path, geo.ErrInvalidOptions)
 		}
 	}
 
 	data, err := os.ReadFile(cleaned) //nolint:gosec // G304: path is configuration value, not user input
 	if err != nil {
-		return nil, fmt.Errorf("geo: static: read cities: %w", err)
+		return nil, fmt.Errorf("static: read cities: %w", err)
 	}
 
 	cities, err := citiesCodec.Decode(data)
 	if err != nil {
-		return nil, fmt.Errorf("geo: static: parse cities: %w", err)
+		return nil, fmt.Errorf("static: parse cities: %w", err)
 	}
 
 	return &staticGeo{cities: cities}, nil
@@ -63,7 +63,7 @@ func New(opts geo.Options) (geo.Geo, error) {
 func (s *staticGeo) Geocode(_ context.Context, address string) ([]geo.Location, error) {
 	query := strings.ToLower(strings.TrimSpace(address))
 	if query == "" {
-		return nil, fmt.Errorf("geo: static: empty query: %w", geo.ErrNotFound)
+		return nil, fmt.Errorf("static: empty query: %w", geo.ErrNotFound)
 	}
 
 	var exact, prefix []geo.Location
@@ -86,7 +86,7 @@ func (s *staticGeo) Geocode(_ context.Context, address string) ([]geo.Location, 
 	}
 
 	if len(results) == 0 {
-		return nil, fmt.Errorf("geo: static: no match for %q: %w", address, geo.ErrNotFound)
+		return nil, fmt.Errorf("static: no match for %q: %w", address, geo.ErrNotFound)
 	}
 
 	return results, nil
@@ -94,7 +94,7 @@ func (s *staticGeo) Geocode(_ context.Context, address string) ([]geo.Location, 
 
 func (s *staticGeo) ReverseGeocode(_ context.Context, lat float64, lng float64) ([]geo.Address, error) {
 	if !geo.ValidCoord(lat, lng) {
-		return nil, fmt.Errorf("geo: static: invalid coordinates: %w", geo.ErrInvalidCoordinate)
+		return nil, fmt.Errorf("static: invalid coordinates: %w", geo.ErrInvalidCoordinate)
 	}
 
 	var results []geo.Address
@@ -109,7 +109,7 @@ func (s *staticGeo) ReverseGeocode(_ context.Context, lat float64, lng float64) 
 	}
 
 	if len(results) == 0 {
-		return nil, fmt.Errorf("geo: static: no match for (%.4f, %.4f): %w", lat, lng, geo.ErrNotFound)
+		return nil, fmt.Errorf("static: no match for (%.4f, %.4f): %w", lat, lng, geo.ErrNotFound)
 	}
 
 	return results, nil
@@ -117,7 +117,7 @@ func (s *staticGeo) ReverseGeocode(_ context.Context, lat float64, lng float64) 
 
 func (s *staticGeo) Distance(_ context.Context, from geo.Point, to geo.Point) (float64, error) {
 	if !geo.ValidCoord(from.Lat, from.Lng) || !geo.ValidCoord(to.Lat, to.Lng) {
-		return 0, fmt.Errorf("geo: static: invalid coordinates: %w", geo.ErrInvalidCoordinate)
+		return 0, fmt.Errorf("static: invalid coordinates: %w", geo.ErrInvalidCoordinate)
 	}
 
 	return 1000 * haversine(from.Lat, from.Lng, to.Lat, to.Lng), nil

@@ -10,7 +10,7 @@ func TestSentinelMessages(t *testing.T) {
 
 	cases := map[string][2]string{
 		"ErrNilFactory":     {ErrNilFactory.Error(), "log: nil factory"},
-		"ErrDuplicate":      {ErrDuplicate.Error(), "log: duplicate registration"},
+		"ErrDuplicate":      {ErrDuplicate.Error(), "log: duplicate adapter"},
 		"ErrUnknownAdapter": {ErrUnknownAdapter.Error(), "log: unknown adapter"},
 		"ErrInvalidLevel":   {ErrInvalidLevel.Error(), "log: invalid level"},
 		"ErrInvalidAdapter": {ErrInvalidAdapter.Error(), "log: invalid adapter"},
@@ -48,7 +48,7 @@ func TestOpenUnknownAdapter(t *testing.T) {
 		t.Errorf("errors.Is(err, ErrUnknownAdapter) = false (err = %v)", err)
 	}
 
-	var unknownErr *UnknownAdapterError
+	var unknownErr UnknownAdapterError
 	if !errors.As(err, &unknownErr) {
 		t.Errorf("errors.As(err, UnknownAdapterError) = false (err = %T %v)", err, err)
 	}
@@ -117,7 +117,7 @@ func TestRegisterDuplicate_returnsDuplicateAdapterError(t *testing.T) {
 		t.Errorf("errors.Is(err, ErrDuplicate) = false (err = %v)", err)
 	}
 
-	var dupErr *DuplicateAdapterError
+	var dupErr DuplicateAdapterError
 	if !errors.As(err, &dupErr) {
 		t.Fatalf("errors.As(err, DuplicateAdapterError) = false (err = %T %v)", err, err)
 	}
@@ -133,8 +133,8 @@ func TestTypedErrors_messageAndUnwrap(t *testing.T) {
 	t.Run("duplicate", func(t *testing.T) {
 		t.Parallel()
 
-		err := &DuplicateAdapterError{Adapter: Noop}
-		if got, want := err.Error(), `log: duplicate registration: noop`; got != want {
+		err := DuplicateAdapterError{Adapter: Noop}
+		if got, want := err.Error(), `log: duplicate adapter: noop`; got != want {
 			t.Errorf("Error() = %q, want %q", got, want)
 		}
 
@@ -146,7 +146,7 @@ func TestTypedErrors_messageAndUnwrap(t *testing.T) {
 	t.Run("unknown adapter", func(t *testing.T) {
 		t.Parallel()
 
-		err := &UnknownAdapterError{Adapter: Adapter("")}
+		err := UnknownAdapterError{Adapter: Adapter("")}
 		if got, want := err.Error(), `log: unknown adapter: unknown (forgotten import?)`; got != want {
 			t.Errorf("Error() = %q, want %q", got, want)
 		}
@@ -159,7 +159,7 @@ func TestTypedErrors_messageAndUnwrap(t *testing.T) {
 	t.Run("invalid level", func(t *testing.T) {
 		t.Parallel()
 
-		err := &InvalidLevelError{Level: "bogus"}
+		err := InvalidLevelError{Level: "bogus"}
 		if got, want := err.Error(), `log: invalid level: "bogus"`; got != want {
 			t.Errorf("Error() = %q, want %q", got, want)
 		}
@@ -172,7 +172,7 @@ func TestTypedErrors_messageAndUnwrap(t *testing.T) {
 	t.Run("invalid adapter", func(t *testing.T) {
 		t.Parallel()
 
-		err := &InvalidAdapterError{Adapter: "bogus"}
+		err := InvalidAdapterError{Adapter: "bogus"}
 		if got, want := err.Error(), `log: invalid adapter: "bogus"`; got != want {
 			t.Errorf("Error() = %q, want %q", got, want)
 		}

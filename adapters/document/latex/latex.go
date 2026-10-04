@@ -97,12 +97,12 @@ func (d *driver) Render(ctx context.Context, source []byte, format document.Outp
 	switch format {
 	case document.FormatPDF, document.FormatPNG, document.FormatJPG:
 	default:
-		unsupported := error(&document.UnsupportedFormatError{Format: format})
+		unsupported := error(document.UnsupportedFormatError{Format: format})
 		return nil, fmt.Errorf("latex: %w", unsupported)
 	}
 
 	if len(source) > document.DefaultMaxSourceBytes {
-		oversized := error(&document.SizeLimitError{Size: len(source), Limit: document.DefaultMaxSourceBytes})
+		oversized := error(document.SizeLimitError{Size: len(source), Limit: document.DefaultMaxSourceBytes})
 		return nil, fmt.Errorf("latex: %w", oversized)
 	}
 
@@ -162,7 +162,7 @@ func (d *driver) compile(ctx context.Context, dir string, source []byte) ([]byte
 
 func (d *driver) cap(b []byte) ([]byte, error) {
 	if int64(len(b)) > d.maxOutput {
-		oversized := error(&document.SizeLimitError{Size: len(b), Limit: int(d.maxOutput)})
+		oversized := error(document.SizeLimitError{Size: len(b), Limit: int(d.maxOutput)})
 		return nil, fmt.Errorf("latex: %w", oversized)
 	}
 

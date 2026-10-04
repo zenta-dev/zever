@@ -21,16 +21,16 @@ var errGenerateUnknownSubcommand = errors.New(
 var ErrPathTraversal = errors.New("zever generate: path escapes target directory")
 
 // ErrInvalidIdentifier is returned when a name is not a valid identifier.
-var ErrInvalidIdentifier = errors.New("must be identifier")
+var ErrInvalidIdentifier = errors.New("zever: must be identifier")
 
 // ErrMustNotBeEmpty is returned when a required value is empty.
-var ErrMustNotBeEmpty = errors.New("must not be empty")
+var ErrMustNotBeEmpty = errors.New("zever: must not be empty")
 
 // ErrInvalidPackageName is returned when a name is not a valid Go package name.
-var ErrInvalidPackageName = errors.New("lowercase letters/digits, starting with letter")
+var ErrInvalidPackageName = errors.New("zever: lowercase letters/digits, starting with letter")
 
 // ErrInvalidCronChars is returned when a cron spec contains invalid characters.
-var ErrInvalidCronChars = errors.New("must not contain quotes, backslashes or newlines")
+var ErrInvalidCronChars = errors.New("zever: must not contain quotes, backslashes or newlines")
 
 // isTraversalName reports whether a developer-supplied name carries
 // path-traversal or separator content: "..", ".", absolute paths, or any
@@ -400,7 +400,7 @@ func runGenerateModule(args []string) error {
 		if isInteractiveTerminal() {
 			val, err := promptInputForGenerate("Module name", "", func(s string) error {
 				if !isIdent(s) {
-					return fmt.Errorf("zever generate: %w", ErrInvalidIdentifier)
+					return fmt.Errorf("%w", ErrInvalidIdentifier)
 				}
 
 				return nil
@@ -420,11 +420,11 @@ func runGenerateModule(args []string) error {
 		if isInteractiveTerminal() {
 			val, err := promptInputForGenerate("Module name", "", func(s string) error {
 				if s == "" {
-					return fmt.Errorf("zever generate: %w", ErrMustNotBeEmpty)
+					return fmt.Errorf("%w", ErrMustNotBeEmpty)
 				}
 
 				if !isIdent(s) {
-					return fmt.Errorf("zever generate: %w", ErrInvalidIdentifier)
+					return fmt.Errorf("%w", ErrInvalidIdentifier)
 				}
 
 				return nil
@@ -435,7 +435,7 @@ func runGenerateModule(args []string) error {
 
 			name = val
 		} else {
-			return fmt.Errorf("zever generate: %w", ErrMustNotBeEmpty)
+			return fmt.Errorf("%w", ErrMustNotBeEmpty)
 		}
 	}
 

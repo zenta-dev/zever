@@ -358,8 +358,3 @@ type LeaseClaimDialect interface {
 	Dialect
 	SupportsLeaseClaim() bool
 }
-
-// ErrUnsupportedByDialect is the typed error query methods return when the
-// resolved dialect lacks a capability the query needs. Callers test with
-// errors.Is.
-var ErrUnsupportedByDialect = errors.New("orm/dialect: unsupported by dialect")

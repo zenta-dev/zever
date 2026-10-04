@@ -15,7 +15,7 @@ func TestSentinelMessages(t *testing.T) {
 		"ErrNotSupported":   {secrets.ErrNotSupported.Error(), "secrets: not supported"},
 		"ErrInvalidKey":     {secrets.ErrInvalidKey.Error(), "secrets: invalid key"},
 		"ErrNilFactory":     {secrets.ErrNilFactory.Error(), "secrets: nil factory"},
-		"ErrDuplicate":      {secrets.ErrDuplicate.Error(), "secrets: duplicate registration"},
+		"ErrDuplicate":      {secrets.ErrDuplicate.Error(), "secrets: duplicate adapter"},
 		"ErrUnknownAdapter": {secrets.ErrUnknownAdapter.Error(), "secrets: unknown adapter"},
 		"ErrInvalidAdapter": {secrets.ErrInvalidAdapter.Error(), "secrets: invalid adapter"},
 	}
@@ -46,8 +46,8 @@ func TestTypedErrorMessages_unwrap(t *testing.T) {
 	t.Run("duplicate", func(t *testing.T) {
 		t.Parallel()
 
-		err := &secrets.DuplicateAdapterError{Adapter: secrets.Env}
-		if got, want := err.Error(), `secrets: duplicate registration: env`; got != want {
+		err := secrets.DuplicateAdapterError{Adapter: secrets.Env}
+		if got, want := err.Error(), `secrets: duplicate adapter: env`; got != want {
 			t.Errorf("Error() = %q, want %q", got, want)
 		}
 
@@ -59,7 +59,7 @@ func TestTypedErrorMessages_unwrap(t *testing.T) {
 	t.Run("unknown adapter", func(t *testing.T) {
 		t.Parallel()
 
-		err := &secrets.UnknownAdapterError{Adapter: secrets.Adapter("")}
+		err := secrets.UnknownAdapterError{Adapter: secrets.Adapter("")}
 		if got, want := err.Error(), `secrets: unknown adapter: unknown (forgotten import?)`; got != want {
 			t.Errorf("Error() = %q, want %q", got, want)
 		}

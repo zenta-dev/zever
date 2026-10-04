@@ -81,7 +81,7 @@ func (d *driver) Render(ctx context.Context, source []byte, format document.Outp
 	switch format {
 	case document.FormatPDF, document.FormatPNG, document.FormatJPG:
 	default:
-		var uerr error = &document.UnsupportedFormatError{Format: format}
+		var uerr error = document.UnsupportedFormatError{Format: format}
 		return nil, fmt.Errorf("remote: %w", uerr)
 	}
 
@@ -122,7 +122,7 @@ func (d *driver) Render(ctx context.Context, source []byte, format document.Outp
 	body, err := httpclient.ReadLimited(ctx, resp.Body, d.maxOutput)
 	if err != nil {
 		if errors.Is(err, httpclient.ErrTooLarge) {
-			var serr error = &document.SizeLimitError{Size: int(d.maxOutput) + 1, Limit: int(d.maxOutput)}
+			var serr error = document.SizeLimitError{Size: int(d.maxOutput) + 1, Limit: int(d.maxOutput)}
 			return nil, fmt.Errorf("remote: %w", serr)
 		}
 		return nil, fmt.Errorf("remote: read: %w", err)

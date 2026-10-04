@@ -1482,9 +1482,3 @@ func opSymbol(op Op) (string, error) {
 		return "", fmt.Errorf("orm/render: unknown operator %d", op)
 	}
 }
-
-// ErrUnsupported is returned by capability-gated renders when the resolved
-// dialect lacks a feature the caller asked for -- e.g. an aggregate whose
-// SQL function has no equivalent on that dialect (see agg.go). Callers test
-// with errors.Is.
-var ErrUnsupported = errors.New("orm/render: unsupported by dialect")

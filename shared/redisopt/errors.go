@@ -33,12 +33,13 @@ func (e *InvalidAddressError) Error() string {
 	return fmt.Sprintf("%s %q", ErrInvalidAddress.Error(), e.Addr)
 }
 
-// Unwrap returns the sentinel and underlying errors for error inspection.
-func (e *InvalidAddressError) Unwrap() []error {
+// Unwrap returns the sentinel joined with the underlying error for error
+// inspection.
+func (e *InvalidAddressError) Unwrap() error {
 	if e.Err != nil {
-		return []error{ErrInvalidAddress, e.Err}
+		return errors.Join(ErrInvalidAddress, e.Err)
 	}
-	return []error{ErrInvalidAddress}
+	return ErrInvalidAddress
 }
 
 // PlaintextRejectedError reports that RequireTLS is set on Options but the

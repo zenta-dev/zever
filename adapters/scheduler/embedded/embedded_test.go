@@ -84,7 +84,7 @@ func registerJobOnce(t *testing.T, name string) {
 	t.Helper()
 
 	if err := job.Register(name, func(context.Context, string) error { return nil }); err != nil {
-		var dup *job.DuplicateJobError
+		var dup job.DuplicateJobError
 		if !errors.As(err, &dup) {
 			t.Fatalf("Register: %v", err)
 		}

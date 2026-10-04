@@ -34,7 +34,7 @@ func TestOptions_Validate(t *testing.T) {
 				if !errors.Is(err, crypto.ErrInvalidOptions) {
 					t.Fatalf("err = %v, want ErrInvalidOptions", err)
 				}
-				var ioe *crypto.InvalidOptionsError
+				var ioe crypto.InvalidOptionsError
 				if !errors.As(err, &ioe) {
 					t.Fatalf("err type = %T, want *InvalidOptionsError", err)
 				}

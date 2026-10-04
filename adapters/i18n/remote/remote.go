@@ -84,7 +84,7 @@ func New(opts i18n.Options) (i18n.I18n, error) {
 	}
 	endpoint := strings.TrimRight(opts.Remote.Endpoint, "/")
 	if endpoint == "" {
-		return nil, &i18n.InvalidOptionsError{Reason: "endpoint is required"}
+		return nil, i18n.InvalidOptionsError{Reason: "endpoint is required"}
 	}
 	timeout := opts.Remote.Timeout
 	if timeout <= 0 {
@@ -157,7 +157,7 @@ func (a *adapter) store(key string, v cacheValue, ttl time.Duration) {
 
 func (a *adapter) Translate(ctx context.Context, locale, key string, args map[string]string) (string, error) {
 	if locale == "" {
-		return "", &i18n.LocaleNotFoundError{Locale: locale}
+		return "", i18n.LocaleNotFoundError{Locale: locale}
 	}
 	ck := cacheKey(locale, key, args)
 
@@ -169,7 +169,7 @@ func (a *adapter) Translate(ctx context.Context, locale, key string, args map[st
 	if e, ok := a.lookup(ck); ok {
 		a.mu.Unlock()
 		if e.miss {
-			return "", &i18n.KeyNotFoundError{Locale: locale, Key: key}
+			return "", i18n.KeyNotFoundError{Locale: locale, Key: key}
 		}
 		return e.val, nil
 	}
@@ -254,7 +254,7 @@ func (a *adapter) fetch(ctx context.Context, locale, key string, args map[string
 	if v, ok := resp.Translations[key]; ok {
 		return v, nil
 	}
-	return "", &i18n.KeyNotFoundError{Locale: locale, Key: key}
+	return "", i18n.KeyNotFoundError{Locale: locale, Key: key}
 }
 
 type localesResponse struct {
