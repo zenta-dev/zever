@@ -127,9 +127,9 @@ func (a *API) handleCheckout(w http.ResponseWriter, req *http.Request) {
 				return err
 			}
 
-		if affected == 0 {
-			return fmt.Errorf("showcase: checkout: %w", ErrInsufficientStock)
-		}
+			if affected == 0 {
+				return fmt.Errorf("showcase: checkout: %w", ErrInsufficientStock)
+			}
 		}
 
 		return nil

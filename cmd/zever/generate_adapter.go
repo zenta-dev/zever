@@ -1382,13 +1382,13 @@ func runGenerateAdapter(args []string) error {
 		}
 
 		if len(positional) < 2 {
-		val, err := promptInputForAdapter("Adapter name (go package)", "", func(s string) error {
-			if !isPackageName(s) {
-				return fmt.Errorf("zever generate: %w", ErrInvalidPackageName)
-			}
+			val, err := promptInputForAdapter("Adapter name (go package)", "", func(s string) error {
+				if !isPackageName(s) {
+					return fmt.Errorf("zever generate: %w", ErrInvalidPackageName)
+				}
 
-			return nil
-		})
+				return nil
+			})
 			if err != nil {
 				return err
 			}
@@ -1407,13 +1407,13 @@ func runGenerateAdapter(args []string) error {
 					break
 				}
 
-			key, err := promptInputForAdapter("Field name (snake_case)", "", func(s string) error {
-				if !isIdent(s) {
-					return fmt.Errorf("zever generate: %w", ErrInvalidIdentifier)
-				}
+				key, err := promptInputForAdapter("Field name (snake_case)", "", func(s string) error {
+					if !isIdent(s) {
+						return fmt.Errorf("zever generate: %w", ErrInvalidIdentifier)
+					}
 
-				return nil
-			})
+					return nil
+				})
 				if err != nil {
 					return err
 				}

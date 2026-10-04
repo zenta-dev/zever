@@ -154,9 +154,9 @@ func runGenerateTinker(args []string) error {
 		if merr != nil {
 			if isInteractiveTerminal() {
 				val, perr := promptInputForTinkerGen("App import path", "", func(s string) error {
-				if strings.TrimSpace(s) == "" {
-					return errors.New("zever generate: must not be empty")
-				}
+					if strings.TrimSpace(s) == "" {
+						return errors.New("zever generate: must not be empty")
+					}
 
 					return nil
 				})
