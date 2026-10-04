@@ -37,7 +37,7 @@ func BenchmarkGet(b *testing.B) {
 	b.ReportAllocs()
 	b.ResetTimer()
 
-	for i := 0; i < b.N; i++ {
+	for b.Loop() {
 		if _, err := s.Get(ctx, "bench"); err != nil {
 			b.Fatalf("Get(): %v", err)
 		}
@@ -53,7 +53,7 @@ func BenchmarkSet(b *testing.B) {
 	b.ReportAllocs()
 	b.ResetTimer()
 
-	for i := 0; i < b.N; i++ {
+	for b.Loop() {
 		if err := s.Set(ctx, "bench", value); err != nil {
 			b.Fatalf("Set(): %v", err)
 		}
@@ -68,7 +68,7 @@ func BenchmarkList(b *testing.B) {
 	b.ReportAllocs()
 	b.ResetTimer()
 
-	for i := 0; i < b.N; i++ {
+	for b.Loop() {
 		if _, err := s.List(ctx); err != nil {
 			b.Fatalf("List(): %v", err)
 		}

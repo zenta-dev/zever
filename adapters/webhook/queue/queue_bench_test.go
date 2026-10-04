@@ -31,7 +31,7 @@ func BenchmarkDeliver(b *testing.B) {
 	b.ReportAllocs()
 	b.ResetTimer()
 
-	for i := 0; i < b.N; i++ {
+	for b.Loop() {
 		if err := a.Deliver(ctx, "evt", payload); err != nil {
 			b.Fatalf("Deliver(): %v", err)
 		}
@@ -46,7 +46,7 @@ func BenchmarkBuildSignatureHeader(b *testing.B) {
 	b.ReportAllocs()
 	b.ResetTimer()
 
-	for i := 0; i < b.N; i++ {
+	for b.Loop() {
 		if h := buildSignatureHeader("bench-secret", payload, 1700000000); h == "" {
 			b.Fatal("buildSignatureHeader() returned empty header")
 		}
@@ -63,7 +63,7 @@ func BenchmarkVerifySignatureHeader(b *testing.B) {
 	b.ReportAllocs()
 	b.ResetTimer()
 
-	for i := 0; i < b.N; i++ {
+	for b.Loop() {
 		if err := verifySignatureHeader("bench-secret", payload, header, defaultReplayTolerance, now); err != nil {
 			b.Fatalf("verifySignatureHeader(): %v", err)
 		}

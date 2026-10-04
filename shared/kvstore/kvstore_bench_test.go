@@ -89,7 +89,7 @@ func BenchmarkAddDelta(b *testing.B) {
 	b.ReportAllocs()
 	b.ResetTimer()
 
-	for range b.N {
+	for b.Loop() {
 		if _, err := s.AddDelta(ctx, "counter", 1); err != nil {
 			b.Fatalf("AddDelta() error = %v", err)
 		}

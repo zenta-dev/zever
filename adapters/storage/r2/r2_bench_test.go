@@ -31,7 +31,7 @@ func BenchmarkPresignUpload(b *testing.B) {
 	b.ReportAllocs()
 	b.ResetTimer()
 
-	for i := 0; i < b.N; i++ {
+	for b.Loop() {
 		if _, err := a.PresignUpload(ctx, "bucket", "dir/object.txt", "text/plain", time.Minute); err != nil {
 			b.Fatalf("PresignUpload(): %v", err)
 		}
@@ -46,7 +46,7 @@ func BenchmarkPresignDownload(b *testing.B) {
 	b.ReportAllocs()
 	b.ResetTimer()
 
-	for i := 0; i < b.N; i++ {
+	for b.Loop() {
 		if _, err := a.PresignDownload(ctx, "bucket", "dir/object.txt", time.Minute); err != nil {
 			b.Fatalf("PresignDownload(): %v", err)
 		}
@@ -61,7 +61,7 @@ func BenchmarkStaticURL(b *testing.B) {
 	b.ReportAllocs()
 	b.ResetTimer()
 
-	for i := 0; i < b.N; i++ {
+	for b.Loop() {
 		if _, err := a.StaticURL("bucket", "dir/object.txt"); err != nil {
 			b.Fatalf("StaticURL(): %v", err)
 		}
@@ -74,7 +74,7 @@ func BenchmarkR2Endpoint(b *testing.B) {
 	b.ReportAllocs()
 	b.ResetTimer()
 
-	for i := 0; i < b.N; i++ {
+	for b.Loop() {
 		if _, err := r2Endpoint("testaccount123", ""); err != nil {
 			b.Fatalf("r2Endpoint(): %v", err)
 		}

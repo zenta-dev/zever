@@ -25,7 +25,7 @@ func BenchmarkCan(b *testing.B) {
 	ctx := b.Context()
 	b.ReportAllocs()
 	b.ResetTimer()
-	for i := 0; i < b.N; i++ {
+	for b.Loop() {
 		if _, err := c.Can(ctx, sub, "read", res); err != nil {
 			b.Fatalf("Can() = %v", err)
 		}

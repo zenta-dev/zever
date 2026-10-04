@@ -63,7 +63,7 @@ func BenchmarkParseRetryAfterSeconds(b *testing.B) {
 	b.ReportAllocs()
 	b.ResetTimer()
 
-	for range b.N {
+	for b.Loop() {
 		_, _ = ParseRetryAfter("120", now)
 	}
 }
@@ -75,7 +75,7 @@ func BenchmarkParseRetryAfterHTTPDate(b *testing.B) {
 	b.ReportAllocs()
 	b.ResetTimer()
 
-	for range b.N {
+	for b.Loop() {
 		_, _ = ParseRetryAfter("Wed, 21 Oct 2026 07:28:00 GMT", now)
 	}
 }
@@ -89,7 +89,7 @@ func BenchmarkDoImmediateSuccess(b *testing.B) {
 	b.ReportAllocs()
 	b.ResetTimer()
 
-	for range b.N {
+	for b.Loop() {
 		if err := Do(ctx, p, fn); err != nil {
 			b.Fatalf("Do() error = %v", err)
 		}

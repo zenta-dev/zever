@@ -27,7 +27,7 @@ func BenchmarkServeHTTP(b *testing.B) {
 	b.ReportAllocs()
 	b.ResetTimer()
 
-	for i := 0; i < b.N; i++ {
+	for b.Loop() {
 		resp := httptest.NewRecorder()
 		r.ServeHTTP(resp, req)
 	}
@@ -50,7 +50,7 @@ func BenchmarkServeHTTPAdaptor(b *testing.B) {
 	b.ReportAllocs()
 	b.ResetTimer()
 
-	for i := 0; i < b.N; i++ {
+	for b.Loop() {
 		resp := httptest.NewRecorder()
 		r.ServeHTTP(resp, req)
 	}

@@ -46,7 +46,7 @@ func BenchmarkSchedule(b *testing.B) {
 	ctx := b.Context()
 	b.ReportAllocs()
 	b.ResetTimer()
-	for i := 0; i < b.N; i++ {
+	for b.Loop() {
 		id, err := d.Schedule(ctx, "0 * * * *", "bench-pg-schedule", nil)
 		if err != nil {
 			b.Fatalf("Schedule: %v", err)
@@ -69,7 +69,7 @@ func BenchmarkLoad(b *testing.B) {
 	slot := d.slots[id]
 	b.ReportAllocs()
 	b.ResetTimer()
-	for i := 0; i < b.N; i++ {
+	for b.Loop() {
 		if _, ok, err := d.load(ctx, slot); err != nil || !ok {
 			b.Fatalf("load = ok=%v err=%v", ok, err)
 		}
@@ -88,7 +88,7 @@ func BenchmarkEntries(b *testing.B) {
 	}
 	b.ReportAllocs()
 	b.ResetTimer()
-	for i := 0; i < b.N; i++ {
+	for b.Loop() {
 		if got := d.Entries(); len(got) != 16 {
 			b.Fatalf("Entries() len = %d, want 16", len(got))
 		}

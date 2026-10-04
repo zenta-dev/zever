@@ -64,7 +64,7 @@ func BenchmarkCreatePayment(b *testing.B) {
 	req := payment.Request{Amount: 10000, Currency: "USD", Meta: map[string]string{"price_id": "pri_main"}}
 	b.ReportAllocs()
 	b.ResetTimer()
-	for i := 0; i < b.N; i++ {
+	for b.Loop() {
 		if _, err := p.CreatePayment(ctx, req); err != nil {
 			b.Fatalf("CreatePayment() = %v", err)
 		}
@@ -94,7 +94,7 @@ func BenchmarkGetPayment(b *testing.B) {
 	ctx := b.Context()
 	b.ReportAllocs()
 	b.ResetTimer()
-	for i := 0; i < b.N; i++ {
+	for b.Loop() {
 		if _, err := p.GetPayment(ctx, "txn_full"); err != nil {
 			b.Fatalf("GetPayment() = %v", err)
 		}
@@ -107,7 +107,7 @@ func BenchmarkRefund(b *testing.B) {
 	ctx := b.Context()
 	b.ReportAllocs()
 	b.ResetTimer()
-	for i := 0; i < b.N; i++ {
+	for b.Loop() {
 		if err := p.Refund(ctx, "txn_full", 2500, ""); err != nil {
 			b.Fatalf("Refund() = %v", err)
 		}
@@ -127,7 +127,7 @@ func BenchmarkWebhookEvent(b *testing.B) {
 	ctx := b.Context()
 	b.ReportAllocs()
 	b.ResetTimer()
-	for i := 0; i < b.N; i++ {
+	for b.Loop() {
 		if _, err := p.WebhookEvent(ctx, body, sig); err != nil {
 			b.Fatalf("WebhookEvent() = %v", err)
 		}
@@ -138,7 +138,7 @@ func BenchmarkWebhookEvent(b *testing.B) {
 func BenchmarkParsePaddleAmount(b *testing.B) {
 	b.ReportAllocs()
 	b.ResetTimer()
-	for i := 0; i < b.N; i++ {
+	for b.Loop() {
 		if _, err := parsePaddleAmount("100.00"); err != nil {
 			b.Fatalf("parsePaddleAmount() = %v", err)
 		}

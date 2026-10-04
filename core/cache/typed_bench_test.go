@@ -25,7 +25,7 @@ func BenchmarkTypedKeyString(b *testing.B) {
 	b.ReportAllocs()
 	b.ResetTimer()
 
-	for i := 0; i < b.N; i++ {
+	for b.Loop() {
 		if err := tc.Set(b.Context(), "k", "v", time.Minute); err != nil {
 			b.Fatalf("Set() error = %v", err)
 		}
@@ -53,7 +53,7 @@ func BenchmarkTypedKeyInt(b *testing.B) {
 	b.ReportAllocs()
 	b.ResetTimer()
 
-	for i := 0; i < b.N; i++ {
+	for b.Loop() {
 		if err := tc.Set(b.Context(), 42, "v", time.Minute); err != nil {
 			b.Fatalf("Set() error = %v", err)
 		}

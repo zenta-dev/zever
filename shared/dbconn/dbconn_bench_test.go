@@ -7,7 +7,7 @@ func BenchmarkValidateTableName(b *testing.B) {
 	b.ReportAllocs()
 	b.ResetTimer()
 
-	for range b.N {
+	for b.Loop() {
 		if err := ValidateTableName("queue_messages"); err != nil {
 			b.Fatalf("ValidateTableName() error = %v", err)
 		}
@@ -19,7 +19,7 @@ func BenchmarkIsPostgresDSN(b *testing.B) {
 	b.ReportAllocs()
 	b.ResetTimer()
 
-	for range b.N {
+	for b.Loop() {
 		_ = IsPostgresDSN("postgres://user:pass@localhost:5432/zever?sslmode=disable")
 	}
 }
@@ -29,7 +29,7 @@ func BenchmarkSplitDSN(b *testing.B) {
 	b.ReportAllocs()
 	b.ResetTimer()
 
-	for range b.N {
+	for b.Loop() {
 		_ = SplitDSN("postgres://user:pass@localhost:5432/zever?sslmode=disable")
 	}
 }

@@ -34,7 +34,7 @@ func BenchmarkCreate(b *testing.B) {
 	b.ReportAllocs()
 	b.ResetTimer()
 
-	for i := 0; i < b.N; i++ {
+	for b.Loop() {
 		if _, err := st.Create(ctx, time.Hour); err != nil {
 			b.Fatalf("Create(): %v", err)
 		}
@@ -54,7 +54,7 @@ func BenchmarkGet(b *testing.B) {
 	b.ReportAllocs()
 	b.ResetTimer()
 
-	for i := 0; i < b.N; i++ {
+	for b.Loop() {
 		if _, err := st.Get(ctx, s.ID); err != nil {
 			b.Fatalf("Get(): %v", err)
 		}
@@ -74,7 +74,7 @@ func BenchmarkSave(b *testing.B) {
 	b.ReportAllocs()
 	b.ResetTimer()
 
-	for i := 0; i < b.N; i++ {
+	for b.Loop() {
 		if err := st.Save(ctx, s); err != nil {
 			b.Fatalf("Save(): %v", err)
 		}

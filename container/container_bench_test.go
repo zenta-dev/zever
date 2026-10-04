@@ -17,7 +17,7 @@ func testConfigMemoryDB() *config.Config {
 func BenchmarkContainer_ResolveSubset(b *testing.B) {
 	registerTestAdapters()
 	b.ReportAllocs()
-	for i := 0; i < b.N; i++ {
+	for b.Loop() {
 		c := New(testConfigMemoryDB())
 		if _, err := c.DB(); err != nil {
 			b.Fatalf("DB: %v", err)
@@ -64,7 +64,7 @@ func BenchmarkContainer_Close_ResolvedSubset(b *testing.B) {
 	})
 	b.ReportAllocs()
 	b.ResetTimer()
-	for i := 0; i < b.N; i++ {
+	for b.Loop() {
 		ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
 		_ = c.Close(ctx)
 		cancel()
