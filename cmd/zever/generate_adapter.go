@@ -1546,7 +1546,7 @@ import (
 {{if .NeedsErrors}}
 // errNotImplemented is returned by every stub method that has not been
 // implemented yet. Delete it once none are left.
-var errNotImplemented = errors.New("[{{.Battery}}] {{.Name}}: not implemented")
+var errNotImplemented = errors.New("{{.Battery}}: {{.Name}}: not implemented")
 {{end}}
 type adapter struct{}
 {{range .Methods}}

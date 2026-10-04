@@ -32,7 +32,7 @@ type Invoice struct {
 // Scan reads one row, whose columns must be in Invoices.Columns() order, into e.
 func (e *Invoice) Scan(row orm.Row) error {
 	if err := row.Scan(&e.ID, &e.Number); err != nil {
-		return fmt.Errorf("[invoice] scan error: %w", err)
+		return fmt.Errorf("invoice: scan error: %w", err)
 	}
 
 	return nil

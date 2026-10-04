@@ -32,7 +32,7 @@ type User struct {
 // Scan reads one row, whose columns must be in Users.Columns() order, into e.
 func (e *User) Scan(row orm.Row) error {
 	if err := row.Scan(&e.ID, &e.Email); err != nil {
-		return fmt.Errorf("[user] scan error: %w", err)
+		return fmt.Errorf("user: scan error: %w", err)
 	}
 
 	return nil
@@ -64,7 +64,7 @@ type OrderItem struct {
 // Scan reads one row, whose columns must be in OrderItems.Columns() order, into e.
 func (e *OrderItem) Scan(row orm.Row) error {
 	if err := row.Scan(&e.ID, &e.Sku); err != nil {
-		return fmt.Errorf("[order_item] scan error: %w", err)
+		return fmt.Errorf("order_item: scan error: %w", err)
 	}
 
 	return nil

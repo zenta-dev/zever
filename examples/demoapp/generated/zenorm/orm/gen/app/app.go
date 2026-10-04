@@ -46,12 +46,12 @@ type User struct {
 func (e *User) Scan(row orm.Row) error {
 	var rawCreatedAt string
 	if err := row.Scan(&e.ID, &e.Email, &e.Name, &e.Role, &e.PasswordHash, &rawCreatedAt); err != nil {
-		return fmt.Errorf("[user] scan error: %w", err)
+		return fmt.Errorf("user: scan error: %w", err)
 	}
 
 	valCreatedAt, errCreatedAt := time.Parse(time.RFC3339Nano, rawCreatedAt)
 	if errCreatedAt != nil {
-		return fmt.Errorf("[user] parse created_at error: %w", errCreatedAt)
+		return fmt.Errorf("user: parse created_at error: %w", errCreatedAt)
 	}
 
 	e.CreatedAt = valCreatedAt
@@ -134,12 +134,12 @@ type Category struct {
 func (e *Category) Scan(row orm.Row) error {
 	var rawCreatedAt string
 	if err := row.Scan(&e.ID, &e.Name, &e.Description, &rawCreatedAt); err != nil {
-		return fmt.Errorf("[category] scan error: %w", err)
+		return fmt.Errorf("category: scan error: %w", err)
 	}
 
 	valCreatedAt, errCreatedAt := time.Parse(time.RFC3339Nano, rawCreatedAt)
 	if errCreatedAt != nil {
-		return fmt.Errorf("[category] parse created_at error: %w", errCreatedAt)
+		return fmt.Errorf("category: parse created_at error: %w", errCreatedAt)
 	}
 
 	e.CreatedAt = valCreatedAt
@@ -209,12 +209,12 @@ type Product struct {
 func (e *Product) Scan(row orm.Row) error {
 	var rawCreatedAt string
 	if err := row.Scan(&e.ID, &e.CategoryID, &e.Name, &e.Description, &e.PriceCents, &e.Stock, &rawCreatedAt); err != nil {
-		return fmt.Errorf("[product] scan error: %w", err)
+		return fmt.Errorf("product: scan error: %w", err)
 	}
 
 	valCreatedAt, errCreatedAt := time.Parse(time.RFC3339Nano, rawCreatedAt)
 	if errCreatedAt != nil {
-		return fmt.Errorf("[product] parse created_at error: %w", errCreatedAt)
+		return fmt.Errorf("product: parse created_at error: %w", errCreatedAt)
 	}
 
 	e.CreatedAt = valCreatedAt
@@ -280,12 +280,12 @@ type Order struct {
 func (e *Order) Scan(row orm.Row) error {
 	var rawCreatedAt string
 	if err := row.Scan(&e.ID, &e.UserID, &e.TotalCents, &e.Status, &rawCreatedAt); err != nil {
-		return fmt.Errorf("[order] scan error: %w", err)
+		return fmt.Errorf("order: scan error: %w", err)
 	}
 
 	valCreatedAt, errCreatedAt := time.Parse(time.RFC3339Nano, rawCreatedAt)
 	if errCreatedAt != nil {
-		return fmt.Errorf("[order] parse created_at error: %w", errCreatedAt)
+		return fmt.Errorf("order: parse created_at error: %w", errCreatedAt)
 	}
 
 	e.CreatedAt = valCreatedAt
@@ -370,7 +370,7 @@ type OrderItem struct {
 // Scan reads one row, whose columns must be in OrderItems.Columns() order, into e.
 func (e *OrderItem) Scan(row orm.Row) error {
 	if err := row.Scan(&e.ID, &e.OrderID, &e.ProductID, &e.Quantity, &e.PriceCents); err != nil {
-		return fmt.Errorf("[order_item] scan error: %w", err)
+		return fmt.Errorf("order_item: scan error: %w", err)
 	}
 
 	return nil
@@ -457,12 +457,12 @@ type Post struct {
 func (e *Post) Scan(row orm.Row) error {
 	var rawCreatedAt string
 	if err := row.Scan(&e.ID, &e.UserID, &e.Title, &e.Body, &e.Published, &rawCreatedAt); err != nil {
-		return fmt.Errorf("[post] scan error: %w", err)
+		return fmt.Errorf("post: scan error: %w", err)
 	}
 
 	valCreatedAt, errCreatedAt := time.Parse(time.RFC3339Nano, rawCreatedAt)
 	if errCreatedAt != nil {
-		return fmt.Errorf("[post] parse created_at error: %w", errCreatedAt)
+		return fmt.Errorf("post: parse created_at error: %w", errCreatedAt)
 	}
 
 	e.CreatedAt = valCreatedAt
@@ -548,12 +548,12 @@ type Comment struct {
 func (e *Comment) Scan(row orm.Row) error {
 	var rawCreatedAt string
 	if err := row.Scan(&e.ID, &e.PostID, &e.UserID, &e.Body, &rawCreatedAt); err != nil {
-		return fmt.Errorf("[comment] scan error: %w", err)
+		return fmt.Errorf("comment: scan error: %w", err)
 	}
 
 	valCreatedAt, errCreatedAt := time.Parse(time.RFC3339Nano, rawCreatedAt)
 	if errCreatedAt != nil {
-		return fmt.Errorf("[comment] parse created_at error: %w", errCreatedAt)
+		return fmt.Errorf("comment: parse created_at error: %w", errCreatedAt)
 	}
 
 	e.CreatedAt = valCreatedAt
