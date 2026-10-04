@@ -24,6 +24,13 @@ const maxReadChunk = 32 << 10
 // ErrTooLarge is returned (via TooLargeError) when ReadLimited exceeds limit.
 var ErrTooLarge = errors.New("httpclient: response body too large")
 
+// ErrPrivateAddress is returned when SafeDialContext resolves a private
+// address and allowPrivate is false.
+var ErrPrivateAddress = errors.New("httpclient: refusing to dial private address")
+
+// ErrNoAddresses is returned when SafeDialContext has no addresses to dial.
+var ErrNoAddresses = errors.New("httpclient: no addresses to dial")
+
 // TooLargeError reports a body exceeding a byte limit.
 type TooLargeError struct {
 	// Limit is the maximum allowed bytes.
@@ -197,7 +204,7 @@ func SafeDialContext(allowPrivate bool) func(ctx context.Context, network, addr 
 		if !allowPrivate {
 			for _, ip := range ips {
 				if IsPrivateIP(ip) {
-					return nil, fmt.Errorf("httpclient: refusing to dial private address %q", host)
+					return nil, fmt.Errorf("httpclient: refusing to dial private address %q: %w", host, ErrPrivateAddress)
 				}
 			}
 		}
@@ -217,7 +224,7 @@ func SafeDialContext(allowPrivate bool) func(ctx context.Context, network, addr 
 			lastErr = dialErr
 		}
 		if lastErr == nil {
-			lastErr = fmt.Errorf("httpclient: no addresses to dial for %q", host)
+			lastErr = fmt.Errorf("httpclient: no addresses to dial for %q: %w", host, ErrNoAddresses)
 		}
 		return nil, lastErr
 	}
