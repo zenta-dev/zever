@@ -15,8 +15,8 @@ var ErrPreload = errors.New("preload")
 // ErrRetryTx indicates the retry transaction demo failed.
 var ErrRetryTx = errors.New("retry tx")
 
-// ErrFirstOrErr indicates the FirstOrErr demo failed.
-var ErrFirstOrErr = errors.New("firstOrErr")
+// ErrFirstOr indicates the FirstOr demo failed.
+var ErrFirstOr = errors.New("firstOr")
 
 // DemoPreload fetches every widget and attaches its orders via orm.Preload in
 // exactly two queries regardless of the row count. The query logger installed
@@ -107,14 +107,14 @@ func DemoFirstOrErr(ctx context.Context, conn db.DB) error {
 
 	w, err := orm.From(Widgets).Where(WidgetCols.ID.Eq("w01")).FirstOrErr(ctx, conn)
 	if err != nil {
-		return fmt.Errorf("ormdrill: %w hit: %w", ErrFirstOrErr, err)
+		return fmt.Errorf("ormdrill: %w hit: %w", ErrFirstOr, err)
 	}
 
 	fmt.Printf("  hit: %s (%s, %d cents)\n", w.ID, w.Name, w.PriceCents)
 
 	_, err = orm.From(Widgets).Where(WidgetCols.ID.Eq("w99")).FirstOrErr(ctx, conn)
 	if err == nil {
-		return fmt.Errorf("ormdrill: %w: expected miss error, got nil", ErrFirstOrErr)
+		return fmt.Errorf("ormdrill: %w: expected miss error, got nil", ErrFirstOr)
 	}
 
 	fmt.Printf("  miss: %v\n", err)

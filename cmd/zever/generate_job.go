@@ -133,13 +133,13 @@ func runGenerateJob(args []string) error {
 				if len(mods) > 0 {
 					m, err = promptSelectForJob("Module", mods)
 				} else {
-				m, err = promptInputForJob("Module name", "", func(s string) error {
-					if !isIdent(s) {
-						return fmt.Errorf("zever generate: %w", ErrInvalidIdentifier)
-					}
+					m, err = promptInputForJob("Module name", "", func(s string) error {
+						if !isIdent(s) {
+							return fmt.Errorf("zever generate: %w", ErrInvalidIdentifier)
+						}
 
-					return nil
-				})
+						return nil
+					})
 				}
 
 				if err != nil {
@@ -150,13 +150,13 @@ func runGenerateJob(args []string) error {
 			}
 
 			if len(positional) < 2 {
-			n, err := promptInputForJob("Job name", "", func(s string) error {
-				if !isIdent(s) {
-					return fmt.Errorf("zever generate: %w", ErrInvalidIdentifier)
-				}
+				n, err := promptInputForJob("Job name", "", func(s string) error {
+					if !isIdent(s) {
+						return fmt.Errorf("zever generate: %w", ErrInvalidIdentifier)
+					}
 
-				return nil
-			})
+					return nil
+				})
 				if err != nil {
 					return err
 				}
@@ -165,13 +165,13 @@ func runGenerateJob(args []string) error {
 			}
 
 			if isInteractiveTerminal() && strings.TrimSpace(*queue) == "default" {
-			if val, err := promptInputForJob("Queue", "default", func(s string) error {
-				if !isIdent(s) {
-					return fmt.Errorf("zever generate: %w", ErrInvalidIdentifier)
-				}
+				if val, err := promptInputForJob("Queue", "default", func(s string) error {
+					if !isIdent(s) {
+						return fmt.Errorf("zever generate: %w", ErrInvalidIdentifier)
+					}
 
-				return nil
-			}); err == nil && val != "" {
+					return nil
+				}); err == nil && val != "" {
 					*queue = val
 				} else if err != nil {
 					return err

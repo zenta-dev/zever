@@ -20,7 +20,7 @@ import (
 var ErrOrderNotFound = errors.New("order not found")
 
 var (
-	errEmptyEmail  = errors.New("email is empty")
+	errEmptyEmail   = errors.New("email is empty")
 	errEmptyOrderID = errors.New("order id is empty")
 )
 
