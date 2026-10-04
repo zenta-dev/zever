@@ -10,12 +10,19 @@
 package main
 
 import (
+	"errors"
 	"fmt"
 	"os"
 	"path/filepath"
 
 	"github.com/zenta-dev/zever/dsl/gengrammar"
 )
+
+// ErrCreateDir reports a failure to create a generated grammar's directory.
+var ErrCreateDir = errors.New("create directory failed")
+
+// ErrWriteFile reports a failure to write a generated grammar file.
+var ErrWriteFile = errors.New("write file failed")
 
 func main() {
 	if err := run(); err != nil {
@@ -33,11 +40,11 @@ const dirPerms = 0o755
 func run() error {
 	for path, content := range gengrammar.Files() {
 		if err := os.MkdirAll(filepath.Dir(path), dirPerms); err != nil {
-			return fmt.Errorf("gengrammar: create directory for %s: %w", path, err)
+			return fmt.Errorf("gengrammar: create directory for %s: %w: %w", path, ErrCreateDir, err)
 		}
 
 		if err := os.WriteFile(path, content, 0o600); err != nil {
-			return fmt.Errorf("gengrammar: write %s: %w", path, err)
+			return fmt.Errorf("gengrammar: write %s: %w: %w", path, ErrWriteFile, err)
 		}
 	}
 

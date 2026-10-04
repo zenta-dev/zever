@@ -3,6 +3,7 @@ package main
 import (
 	"context"
 	"encoding/json"
+	"errors"
 	"fmt"
 	"go/parser"
 	"go/token"
@@ -18,6 +19,15 @@ import (
 
 // zeverPrefix is the module-path prefix shared by every repo module.
 const zeverPrefix = "github.com/zenta-dev/zever/"
+
+// ErrGoModEdit reports a failed `go mod edit -json` invocation.
+var ErrGoModEdit = errors.New("go mod edit failed")
+
+// ErrParseGoMod reports unparsable `go mod edit -json` output.
+var ErrParseGoMod = errors.New("parse go mod edit output failed")
+
+// ErrEmptyModulePath reports `go mod edit -json` output with no module path.
+var ErrEmptyModulePath = errors.New("go mod edit output has empty module path")
 
 // drift lists the require+replace entries a module's go.mod lacks.
 type drift struct {
@@ -98,14 +108,14 @@ func findModules(ctx context.Context, root string) (map[string]string, error) {
 		cmd.Dir = filepath.Dir(p)
 		out, err := cmd.Output()
 		if err != nil {
-			return fmt.Errorf("modgraph: go mod edit -json in %s: %w", filepath.Dir(p), err)
+			return fmt.Errorf("modgraph: go mod edit -json in %s: %w: %w", filepath.Dir(p), ErrGoModEdit, err)
 		}
 		var v modEditJSON
 		if err := json.Unmarshal(out, &v); err != nil {
-			return fmt.Errorf("modgraph: parse go mod edit output in %s: %w", filepath.Dir(p), err)
+			return fmt.Errorf("modgraph: parse go mod edit output in %s: %w: %w", filepath.Dir(p), ErrParseGoMod, err)
 		}
 		if v.Module.Path == "" {
-			return fmt.Errorf("modgraph: go mod edit output in %s has empty module path", filepath.Dir(p))
+			return fmt.Errorf("modgraph: go mod edit output in %s has empty module path: %w", filepath.Dir(p), ErrEmptyModulePath)
 		}
 		dir := filepath.ToSlash(filepath.Dir(rel))
 		mods[v.Module.Path] = dir
