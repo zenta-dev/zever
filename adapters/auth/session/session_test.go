@@ -11,21 +11,21 @@ import (
 	"github.com/zenta-dev/zever/core/session"
 )
 
-func newAdapter(t *testing.T, store session.Store) auth.Auth {
-	t.Helper()
+func newAdapter(tb testing.TB, store session.Store) auth.Auth {
+	tb.Helper()
 	a, err := authsession.New(auth.Options{Session: auth.SessionOptions{Store: store}})
 	if err != nil {
-		t.Fatalf("New err = %v", err)
+		tb.Fatalf("New err = %v", err)
 	}
-	t.Cleanup(func() { _ = a.Close() })
+	tb.Cleanup(func() { _ = a.Close() })
 	return a
 }
 
-func newMemoryStore(t *testing.T) session.Store {
-	t.Helper()
+func newMemoryStore(tb testing.TB) session.Store {
+	tb.Helper()
 	st, err := sessionmemory.New(session.Options{})
 	if err != nil {
-		t.Fatalf("memory.New err = %v", err)
+		tb.Fatalf("memory.New err = %v", err)
 	}
 	return st
 }

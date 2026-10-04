@@ -15,18 +15,18 @@ import (
 // no external network) and opens a cache adapter against it.
 // Tests here are sequential: New threads through the shared zredis
 // singleton, so t.Parallel is forbidden in this file.
-func newLiveAdapter(t *testing.T) (cache.Cache, *miniredis.Miniredis) {
-	t.Helper()
+func newLiveAdapter(tb testing.TB) (cache.Cache, *miniredis.Miniredis) {
+	tb.Helper()
 
-	s := miniredis.RunT(t)
+	s := miniredis.RunT(tb)
 
 	a, err := New(cache.Options{Addr: s.Addr()})
 	if err != nil {
-		t.Fatalf("New() error = %v", err)
+		tb.Fatalf("New() error = %v", err)
 	}
 
-	t.Cleanup(func() {
-		_ = a.Close(t.Context())
+	tb.Cleanup(func() {
+		_ = a.Close(tb.Context())
 	})
 
 	return a, s

@@ -15,12 +15,12 @@ import (
 	"github.com/zenta-dev/zever/core/billing"
 )
 
-func openTest(t *testing.T, url string) billing.Billing {
-	t.Helper()
+func openTest(tb testing.TB, url string) billing.Billing {
+	tb.Helper()
 
 	b, err := New(billing.Options{APIKey: "pdl_test_123", Endpoint: url})
 	if err != nil {
-		t.Fatalf("Open: %v", err)
+		tb.Fatalf("Open: %v", err)
 	}
 
 	return b
@@ -92,8 +92,8 @@ func TestOpen_newSDKError_wrapped(t *testing.T) {
 	}
 }
 
-func flowMux(t *testing.T) *http.ServeMux {
-	t.Helper()
+func flowMux(tb testing.TB) *http.ServeMux {
+	tb.Helper()
 
 	mux := http.NewServeMux()
 
@@ -131,19 +131,19 @@ func flowMux(t *testing.T) *http.ServeMux {
 			}})
 		case http.MethodGet:
 			if got := r.URL.Query().Get("customer_id"); got != "ctm_123" {
-				t.Errorf("expected customer_id ctm_123, got %s", got)
+				tb.Errorf("expected customer_id ctm_123, got %s", got)
 			}
 
 			if got := r.URL.Query().Get("per_page"); got != "1" {
-				t.Errorf("expected per_page 1, got %s", got)
+				tb.Errorf("expected per_page 1, got %s", got)
 			}
 
 			if got := r.URL.Query()["status"]; !slices.Equal(got, []string{"billed", "paid", "completed"}) {
-				t.Errorf("expected status billed,paid,completed, got %v", got)
+				tb.Errorf("expected status billed,paid,completed, got %v", got)
 			}
 
 			if got := r.URL.Query().Get("order_by"); got != "billed_at[DESC]" {
-				t.Errorf("expected order_by billed_at[DESC], got %s", got)
+				tb.Errorf("expected order_by billed_at[DESC], got %s", got)
 			}
 
 			_ = json.NewEncoder(w).Encode(map[string]any{

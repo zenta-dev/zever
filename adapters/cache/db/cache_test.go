@@ -14,15 +14,15 @@ import (
 // mustNew opens a fresh file-backed cache per test: ":memory:" sqlite uses
 // shared cache (process-global), so fixed keys would collide across reruns
 // and leak between parallel tests.
-func mustNew(t *testing.T) cache.Cache {
-	t.Helper()
+func mustNew(tb testing.TB) cache.Cache {
+	tb.Helper()
 
-	c, err := New(Options{Options: coredb.Options{Path: filepath.Join(t.TempDir(), "cache.db")}})
+	c, err := New(Options{Options: coredb.Options{Path: filepath.Join(tb.TempDir(), "cache.db")}})
 	if err != nil {
-		t.Fatalf("New failed: %v", err)
+		tb.Fatalf("New failed: %v", err)
 	}
 
-	t.Cleanup(func() { _ = c.Close(t.Context()) })
+	tb.Cleanup(func() { _ = c.Close(tb.Context()) })
 
 	return c
 }

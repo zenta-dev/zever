@@ -10,15 +10,15 @@ import (
 	"github.com/zenta-dev/zever/core/cache"
 )
 
-func stubCache(t *testing.T, opts cache.Options) cache.Cache {
-	t.Helper()
+func stubCache(tb testing.TB, opts cache.Options) cache.Cache {
+	tb.Helper()
 
 	c, err := New(opts)
 	if err != nil {
-		t.Fatalf("New() error = %v", err)
+		tb.Fatalf("New() error = %v", err)
 	}
 
-	t.Cleanup(func() { _ = c.Close(t.Context()) })
+	tb.Cleanup(func() { _ = c.Close(tb.Context()) })
 
 	return c
 }
