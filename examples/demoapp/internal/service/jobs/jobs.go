@@ -16,6 +16,14 @@ import (
 	"github.com/zenta-dev/zever/orm"
 )
 
+// ErrOrderNotFound indicates an order ID has no matching row.
+var ErrOrderNotFound = errors.New("order not found")
+
+var (
+	errEmptyEmail  = errors.New("email is empty")
+	errEmptyOrderID = errors.New("order id is empty")
+)
+
 // Deps carries the resolved services job handlers need. It keeps the global
 // job registry free of hidden state: the worker builds one Deps and closes
 // over it when registering handlers.
@@ -41,7 +49,7 @@ type ProcessOrderArgs struct {
 // RunWelcomeEmail sends the welcome mail and pushes a welcome notification.
 func RunWelcomeEmail(ctx context.Context, deps Deps, email, name string) error {
 	if email == "" {
-		return errors.New("[jobs] welcome: email is empty")
+		return fmt.Errorf("jobs: welcome: %w", errEmptyEmail)
 	}
 	if name == "" {
 		name = email
@@ -54,13 +62,13 @@ func RunWelcomeEmail(ctx context.Context, deps Deps, email, name string) error {
 		"Hi "+name+", welcome to the Zever demo!",
 	)
 	if err := deps.Mailer.Send(ctx, &mail); err != nil {
-		return fmt.Errorf("[jobs] welcome: send mail: %w", err)
+		return fmt.Errorf("jobs: welcome: send mail: %w", err)
 	}
 
 	note := notification.NewNotification(email, notification.ChannelPush, "Welcome to Demoapp")
 	note.Title = "Welcome"
 	if err := deps.Notifier.Notify(ctx, &note); err != nil {
-		return fmt.Errorf("[jobs] welcome: notify: %w", err)
+		return fmt.Errorf("jobs: welcome: notify: %w", err)
 	}
 
 	deps.Logger.Info().Str("email", email).Msg("welcome email sent")
@@ -79,17 +87,17 @@ func HandleSendWelcomeEmail(deps Deps) func(ctx context.Context, args SendWelcom
 // payment capture the payment battery would perform.
 func RunProcessOrder(ctx context.Context, deps Deps, orderID string) error {
 	if orderID == "" {
-		return errors.New("[jobs] process: order id is empty")
+		return fmt.Errorf("jobs: process: %w", errEmptyOrderID)
 	}
 
 	n, err := orm.UpdateTable(gen.Orders).Where(gen.OrderCols.ID.Eq(orderID)).Set(
 		orm.Set(gen.OrderCols.Status, "paid"),
 	).Exec(ctx, deps.DB)
 	if err != nil {
-		return fmt.Errorf("[jobs] process: mark paid: %w", err)
+		return fmt.Errorf("jobs: process: mark paid: %w", err)
 	}
 	if n == 0 {
-		return fmt.Errorf("[jobs] process: order %q not found", orderID)
+		return fmt.Errorf("jobs: process: %w: %q", ErrOrderNotFound, orderID)
 	}
 
 	deps.Logger.Info().Str("order_id", orderID).Msg("order marked paid")
@@ -108,7 +116,7 @@ func HandleProcessOrder(deps Deps) func(ctx context.Context, args ProcessOrderAr
 func RunReindex(ctx context.Context, deps Deps) error {
 	items, err := orm.From(gen.Products).All(ctx, deps.DB)
 	if err != nil {
-		return fmt.Errorf("[jobs] reindex: list products: %w", err)
+		return fmt.Errorf("jobs: reindex: list products: %w", err)
 	}
 	deps.Logger.Info().Int("products", len(items)).Msg("search index refreshed")
 	return nil
@@ -126,7 +134,7 @@ func HandleReindexSearch(deps Deps) func(ctx context.Context, args struct{}) err
 func RunDailyReport(ctx context.Context, deps Deps) error {
 	orders, err := orm.From(gen.Orders).Where(gen.OrderCols.Status.Eq("pending")).All(ctx, deps.DB)
 	if err != nil {
-		return fmt.Errorf("[jobs] report: list orders: %w", err)
+		return fmt.Errorf("jobs: report: list orders: %w", err)
 	}
 	deps.Logger.Info().Int("pending_orders", len(orders)).Msg("daily report generated")
 	return nil

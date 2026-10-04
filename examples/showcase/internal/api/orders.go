@@ -4,6 +4,7 @@ import (
 	"context"
 	"encoding/json"
 	"errors"
+	"fmt"
 	"net/http"
 	"strings"
 	"time"
@@ -17,13 +18,13 @@ import (
 	pb "github.com/zenta-dev/zever/examples/showcase/generated/protogogen/shop"
 )
 
-// errInsufficientStock signals a stock guard failure inside the checkout
+// ErrInsufficientStock signals a stock guard failure inside the checkout
 // transaction (see handleCheckout): the UPDATE's own `WHERE stock >= ?`
 // clause is the actual race guard (RowsAffected == 0 means another
 // concurrent checkout already consumed the stock between our read and our
 // write); this sentinel just carries that outcome back out of db.WithTx's
 // fn so the HTTP handler can map it to 409 instead of 500.
-var errInsufficientStock = errors.New("insufficient stock")
+var ErrInsufficientStock = errors.New("insufficient stock")
 
 type checkoutItem struct {
 	ProductID string `json:"product_id"`
@@ -126,16 +127,16 @@ func (a *API) handleCheckout(w http.ResponseWriter, req *http.Request) {
 				return err
 			}
 
-			if affected == 0 {
-				return errInsufficientStock
-			}
+		if affected == 0 {
+			return fmt.Errorf("showcase: checkout: %w", ErrInsufficientStock)
+		}
 		}
 
 		return nil
 	})
 
 	switch {
-	case errors.Is(err, errInsufficientStock):
+	case errors.Is(err, ErrInsufficientStock):
 		writeError(w, http.StatusConflict, "insufficient stock")
 		return
 	case err != nil:
