@@ -71,7 +71,7 @@ func TestOptionsValidate(t *testing.T) {
 				}
 			}
 			if tt.wantCount > 0 {
-				var invErr *InvalidOptionsError
+				var invErr InvalidOptionsError
 				var joinErr interface{ Unwrap() []error }
 				if !errors.As(err, &joinErr) {
 					t.Fatalf("expected join error, got %T", err)

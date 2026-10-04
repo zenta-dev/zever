@@ -124,7 +124,7 @@ func TestHandlerPanicSentinel(t *testing.T) {
 type popEmptyQueue struct{ queue.Queue }
 
 func (popEmptyQueue) Pop(context.Context, string) (queue.Message, error) {
-	return queue.Message{}, &queue.EmptyError{Topic: "t"}
+	return queue.Message{}, queue.EmptyError{Topic: "t"}
 }
 
 var _ queue.Queue = popEmptyQueue{}

@@ -141,9 +141,13 @@ func conformanceEmpty(t *testing.T, factory func(t *testing.T) queue.Queue) {
 		t.Fatalf("Pop(inflight only) err = %v, want ErrEmpty", err)
 	}
 
-	var emptyErr *queue.EmptyError
+	var emptyErr queue.EmptyError
 	if !errors.As(err, &emptyErr) {
-		t.Fatalf("errors.As(err, EmptyError) = false (err = %T %v)", err, err)
+		var ptrErr *queue.EmptyError
+		if !errors.As(err, &ptrErr) {
+			t.Fatalf("errors.As(err, EmptyError) = false (err = %T %v)", err, err)
+		}
+		emptyErr = *ptrErr
 	}
 
 	if emptyErr.Topic != topic {

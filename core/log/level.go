@@ -48,6 +48,6 @@ func ParseLevel(level string) (Level, error) {
 	case "fatal":
 		return LevelFatal, nil
 	default:
-		return LevelDebug, &InvalidLevelError{Level: level}
+		return LevelDebug, InvalidLevelError{Level: level}
 	}
 }

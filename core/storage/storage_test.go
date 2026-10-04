@@ -97,7 +97,7 @@ func TestParseAdapter(t *testing.T) {
 		t.Errorf("expected ErrInvalidAdapter, got %v", err)
 	}
 
-	var inv *InvalidAdapterError
+	var inv InvalidAdapterError
 	if !errors.As(err, &inv) {
 		t.Fatalf("expected *InvalidAdapterError, got %T", err)
 	}
@@ -118,7 +118,7 @@ func TestRegistryRegisterAndOpen(t *testing.T) {
 
 	stub := func(_ Options) (Storage, error) { return stubStorage{}, nil }
 	if err := Register(Adapter("test-77"), stub); err != nil {
-		var dup *DuplicateError
+		var dup DuplicateError
 		if !errors.As(err, &dup) {
 			t.Fatalf("Register: %v", err)
 		}
@@ -127,7 +127,7 @@ func TestRegistryRegisterAndOpen(t *testing.T) {
 	if err := Register(Adapter("test-77"), stub); !errors.Is(err, ErrDuplicate) {
 		t.Fatalf("expected ErrDuplicate, got %v", err)
 	} else {
-		var dup *DuplicateError
+		var dup DuplicateError
 		if !errors.As(err, &dup) {
 			t.Fatalf("expected *DuplicateError, got %T", err)
 		}
@@ -144,7 +144,7 @@ func TestRegistryRegisterAndOpen(t *testing.T) {
 	if _, err := Open(Adapter("test-79"), Options{}); !errors.Is(err, ErrUnknownAdapter) {
 		t.Fatalf("expected ErrUnknownAdapter, got %v", err)
 	} else {
-		var unk *UnknownAdapterError
+		var unk UnknownAdapterError
 		if !errors.As(err, &unk) {
 			t.Fatalf("expected *UnknownAdapterError, got %T", err)
 		}
@@ -159,7 +159,7 @@ func TestRegistryRegisterAndOpen(t *testing.T) {
 	}
 
 	if err := Register(Adapter("test-78"), func(_ Options) (Storage, error) { return nil, ErrExpired }); err != nil {
-		var dup *DuplicateError
+		var dup DuplicateError
 		if !errors.As(err, &dup) {
 			t.Fatalf("Register: %v", err)
 		}
@@ -918,7 +918,7 @@ func TestPolicyStore(t *testing.T) {
 func TestErrorTypes(t *testing.T) {
 	t.Parallel()
 
-	inv := &InvalidAdapterError{Adapter: "nope"}
+	inv := InvalidAdapterError{Adapter: "nope"}
 	if inv.Error() != `storage: invalid adapter: "nope"` {
 		t.Errorf("Error() = %q", inv.Error())
 	}
@@ -931,13 +931,13 @@ func TestErrorTypes(t *testing.T) {
 		t.Error("Unwrap mismatch")
 	}
 
-	var inv2 *InvalidAdapterError
+	var inv2 InvalidAdapterError
 	if !errors.As(inv, &inv2) {
 		t.Errorf("As failed: %T", inv)
 	}
 
-	dup := &DuplicateError{Adapter: AdapterLocal}
-	if dup.Error() != "storage: duplicate registration: local" {
+	dup := DuplicateError{Adapter: AdapterLocal}
+	if dup.Error() != "storage: duplicate adapter: local" {
 		t.Errorf("Error() = %q", dup.Error())
 	}
 
@@ -949,12 +949,12 @@ func TestErrorTypes(t *testing.T) {
 		t.Error("Unwrap mismatch")
 	}
 
-	var dup2 *DuplicateError
+	var dup2 DuplicateError
 	if !errors.As(dup, &dup2) {
 		t.Errorf("As failed: %T", dup)
 	}
 
-	unk := &UnknownAdapterError{Adapter: AdapterS3}
+	unk := UnknownAdapterError{Adapter: AdapterS3}
 	if unk.Error() != "storage: unknown adapter: s3 (forgotten import?)" {
 		t.Errorf("Error() = %q", unk.Error())
 	}
@@ -967,12 +967,12 @@ func TestErrorTypes(t *testing.T) {
 		t.Error("Unwrap mismatch")
 	}
 
-	var unk2 *UnknownAdapterError
+	var unk2 UnknownAdapterError
 	if !errors.As(unk, &unk2) {
 		t.Errorf("As failed: %T", unk)
 	}
 
-	invOpt := &InvalidOptionsError{Reason: "bad url_base"}
+	invOpt := InvalidOptionsError{Reason: "bad url_base"}
 	if invOpt.Error() != "storage: invalid options: bad url_base" {
 		t.Errorf("Error() = %q", invOpt.Error())
 	}
@@ -985,7 +985,7 @@ func TestErrorTypes(t *testing.T) {
 		t.Error("Unwrap mismatch")
 	}
 
-	var invOpt2 *InvalidOptionsError
+	var invOpt2 InvalidOptionsError
 	if !errors.As(invOpt, &invOpt2) {
 		t.Errorf("As failed: %T", invOpt)
 	}
@@ -1005,7 +1005,7 @@ func TestSentinelMessages(t *testing.T) {
 		{ErrExpired, "storage: expired"},
 		{ErrTooLarge, "storage: too large"},
 		{ErrNilFactory, "storage: nil factory"},
-		{ErrDuplicate, "storage: duplicate registration"},
+		{ErrDuplicate, "storage: duplicate adapter"},
 		{ErrUnknownAdapter, "storage: unknown adapter"},
 		{ErrInvalidAdapter, "storage: invalid adapter"},
 		{ErrInvalidOptions, "storage: invalid options"},

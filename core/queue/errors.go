@@ -12,7 +12,7 @@ var ErrClosed = errors.New("queue: closed")
 var ErrNilFactory = errors.New("queue: nil factory")
 
 // ErrDuplicateAdapter is returned on duplicate adapter registration.
-var ErrDuplicateAdapter = errors.New("queue: duplicate registration")
+var ErrDuplicateAdapter = errors.New("queue: duplicate adapter")
 
 // ErrDuplicate aliases ErrDuplicateAdapter for compatibility.
 var ErrDuplicate = ErrDuplicateAdapter
@@ -36,7 +36,7 @@ type EmptyError struct {
 }
 
 // Error returns a human-readable empty-queue message.
-func (e *EmptyError) Error() string {
+func (e EmptyError) Error() string {
 	if e.Topic != "" {
 		return fmt.Sprintf("%s: topic %q", ErrEmpty, e.Topic)
 	}
@@ -44,7 +44,7 @@ func (e *EmptyError) Error() string {
 }
 
 // Unwrap returns ErrEmpty.
-func (e *EmptyError) Unwrap() error { return ErrEmpty }
+func (e EmptyError) Unwrap() error { return ErrEmpty }
 
 // InvalidMessageIDError reports a failure to parse a message ID.
 type InvalidMessageIDError struct {
@@ -55,12 +55,12 @@ type InvalidMessageIDError struct {
 }
 
 // Error returns a human-readable invalid-message-ID message.
-func (e *InvalidMessageIDError) Error() string {
+func (e InvalidMessageIDError) Error() string {
 	return fmt.Sprintf("%s %q: %v", ErrInvalidMessageID, e.ID, e.Err)
 }
 
 // Unwrap returns ErrInvalidMessageID and the cause for errors.Is/As.
-func (e *InvalidMessageIDError) Unwrap() []error {
+func (e InvalidMessageIDError) Unwrap() []error {
 	if e.Err != nil {
 		return []error{ErrInvalidMessageID, e.Err}
 	}
