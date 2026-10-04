@@ -28,12 +28,12 @@ func RegisterPluginValidator(name string, validate func(adapter string, opts jso
 		return errors.New("config: plugin validator name must not be empty")
 	}
 	if validate == nil {
-		return fmt.Errorf("config: plugin validator %q must not be nil", name)
+		return fmt.Errorf("config: plugin validator %q must not be nil: %w", name, ErrInvalidPlugin)
 	}
 	pluginValidatorsMu.Lock()
 	defer pluginValidatorsMu.Unlock()
 	if _, dup := pluginValidators[name]; dup {
-		return fmt.Errorf("config: duplicate plugin validator %q", name)
+		return fmt.Errorf("config: duplicate plugin validator %q: %w", name, ErrInvalidPlugin)
 	}
 	pluginValidators[name] = validate
 	return nil
