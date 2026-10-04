@@ -1,6 +1,7 @@
 package osm
 
 import (
+	"bytes"
 	"context"
 	"errors"
 	"fmt"
@@ -209,8 +210,8 @@ func (s *osmGeo) ReverseGeocode(ctx context.Context, lat, lng float64) ([]geo.Ad
 	}
 
 	// Trim space to detect empty body.
-	trimmed := strings.TrimSpace(string(body))
-	if trimmed == "" || trimmed == "[]" || trimmed == "{}" {
+	trimmed := bytes.TrimSpace(body)
+	if len(trimmed) == 0 || string(trimmed) == "[]" || string(trimmed) == "{}" {
 		return nil, fmt.Errorf("geo: osm: no results for (%.6f,%.6f): %w", lat, lng, geo.ErrNotFound)
 	}
 
