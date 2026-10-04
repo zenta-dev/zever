@@ -152,7 +152,7 @@ func runTinker(args []string) error {
 			return nil
 		}
 
-		return err
+		return fmt.Errorf("zever tinker: %w", err)
 	}
 
 	pc, err := loadProjectConfig()
