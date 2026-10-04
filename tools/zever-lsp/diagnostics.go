@@ -157,7 +157,7 @@ func (p *diagnosticPublisher) publish(client protocol.Client, known []string, di
 		}
 
 		if err := client.PublishDiagnostics(context.Background(), params); err != nil {
-			errs = append(errs, fmt.Errorf("zever-lsp: publish diagnostics for %s: %w: %w", path, ErrPublishDiagnostics, err))
+			errs = append(errs, fmt.Errorf("zever-lsp: publish diagnostics for %s: %w", path, errors.Join(ErrPublishDiagnostics, err)))
 		}
 	}
 

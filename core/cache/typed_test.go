@@ -27,7 +27,7 @@ func (m *mapBackend) Get(_ context.Context, key string) ([]byte, error) {
 
 	v, ok := m.store[key]
 	if !ok {
-		return nil, &cache.NotFoundError{Key: key}
+		return nil, cache.NotFoundError{Key: key}
 	}
 
 	return v, nil

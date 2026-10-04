@@ -138,7 +138,7 @@ func conformanceDeleteMissing(t *testing.T, factory func(t *testing.T) search.Se
 
 	err := factory(t).Delete(t.Context(), "kit-no-such-doc")
 
-	var nfErr *search.NotFoundError
+	var nfErr search.NotFoundError
 	if !errors.As(err, &nfErr) {
 		t.Fatalf("Delete(missing) err = %T %v, want *NotFoundError", err, err)
 	}

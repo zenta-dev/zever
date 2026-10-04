@@ -395,7 +395,7 @@ func (a *memoryAdapter) popWithTopic(ctx context.Context, topic string, t *topic
 			t.mu.Unlock()
 			a.sweepTopic(topic, t)
 
-			return queue.Message{}, &queue.EmptyError{Topic: topic}
+			return queue.Message{}, queue.EmptyError{Topic: topic}
 		}
 	}
 }

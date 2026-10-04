@@ -310,7 +310,7 @@ func TestBadPathErrors(t *testing.T) {
 	if _, err := New(flag.Options{Static: flag.StaticOptions{Path: "testdata/does-not-exist.json"}}); err == nil {
 		t.Fatal("New(missing) = nil; want load error")
 	} else {
-		var ioerr *flag.InvalidOptionsError
+		var ioerr flag.InvalidOptionsError
 		if errors.As(err, &ioerr) {
 			t.Fatalf("New(missing) = %v; want load error, not InvalidOptions", err)
 		}
@@ -330,7 +330,7 @@ func TestBadPathErrors(t *testing.T) {
 		{"traversal", filepath.Join("..", "flags.json")},
 	} {
 		_, nerr := New(flag.Options{Static: flag.StaticOptions{Path: tc.path}})
-		var ioerr *flag.InvalidOptionsError
+		var ioerr flag.InvalidOptionsError
 		if nerr == nil || !errors.As(nerr, &ioerr) {
 			t.Fatalf("New(%s %q) = %v; want *InvalidOptionsError", tc.name, tc.path, nerr)
 		}
@@ -341,7 +341,7 @@ func TestBadPathErrors(t *testing.T) {
 	if _, nerr := New(flag.Options{Static: flag.StaticOptions{Path: filepath.Join(string(filepath.Separator), "tmp", "flags.json")}}); nerr == nil {
 		t.Fatal("New(abs missing) = nil; want load error")
 	} else {
-		var ioerr *flag.InvalidOptionsError
+		var ioerr flag.InvalidOptionsError
 		if errors.As(nerr, &ioerr) {
 			t.Fatalf("New(abs missing) = %v; want load error, not InvalidOptions", nerr)
 		}
@@ -356,7 +356,7 @@ func TestBadPathErrors(t *testing.T) {
 	if _, err := New(flag.Options{Static: flag.StaticOptions{Path: dj}}); err == nil {
 		t.Fatalf("New(dir %q) = nil; want error", dj)
 	} else {
-		var ioerr *flag.InvalidOptionsError
+		var ioerr flag.InvalidOptionsError
 		if !errors.As(err, &ioerr) {
 			t.Fatalf("New(dir) = %v; want *InvalidOptionsError", err)
 		}
@@ -374,7 +374,7 @@ func TestInvalidKey(t *testing.T) {
 	if _, err := f.String(ctx, "bad\nkey", "fb"); err == nil {
 		t.Fatal("control-char key = nil; want error")
 	}
-	var serr *flag.InvalidKeyError
+	var serr flag.InvalidKeyError
 	if _, err := f.Int(ctx, "", 0); !errors.As(err, &serr) {
 		t.Fatalf("Int(empty key) err type = %T; want *InvalidKeyError", err)
 	}

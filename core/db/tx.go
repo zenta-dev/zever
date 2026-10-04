@@ -96,7 +96,7 @@ func WithTx(ctx context.Context, db DB, opts *TxOptions, fn func(context.Context
 
 	tx, err := tr.BeginTx(ctx, opts)
 	if err != nil {
-		return &TxError{Op: "begin", Err: err}
+		return TxError{Op: "begin", Err: err}
 	}
 
 	defer func() {
@@ -118,7 +118,7 @@ func WithTx(ctx context.Context, db DB, opts *TxOptions, fn func(context.Context
 	}
 
 	if err := tx.Commit(ctx); err != nil {
-		return &TxError{Op: "commit", Err: err}
+		return TxError{Op: "commit", Err: err}
 	}
 
 	return nil

@@ -55,34 +55,34 @@ func (o Options) Validate() error {
 	var errs []error
 
 	if o.Timeout < 0 {
-		errs = append(errs, &InvalidOptionsError{Reason: "timeout must be >= 0"})
+		errs = append(errs, InvalidOptionsError{Reason: "timeout must be >= 0"})
 	}
 
 	if o.Quality < 0 || o.Quality > 100 {
-		errs = append(errs, &InvalidOptionsError{Reason: "quality must be between 0 and 100"})
+		errs = append(errs, InvalidOptionsError{Reason: "quality must be between 0 and 100"})
 	}
 
 	if o.DPI < 0 {
-		errs = append(errs, &InvalidOptionsError{Reason: "dpi must be >= 0"})
+		errs = append(errs, InvalidOptionsError{Reason: "dpi must be >= 0"})
 	}
 
 	if o.MaxOutputBytes < 0 {
-		errs = append(errs, &InvalidOptionsError{Reason: "max_output_bytes must be >= 0"})
+		errs = append(errs, InvalidOptionsError{Reason: "max_output_bytes must be >= 0"})
 	}
 
 	if o.LatexRuns < 0 {
-		errs = append(errs, &InvalidOptionsError{Reason: "latex_runs must be >= 0"})
+		errs = append(errs, InvalidOptionsError{Reason: "latex_runs must be >= 0"})
 	}
 
 	if o.Endpoint != "" {
 		if _, err := endpoint.ValidateURL(o.Endpoint, endpoint.WithAllowAnyScheme()); err != nil {
 			switch {
 			case errors.Is(err, endpoint.ErrParse):
-				errs = append(errs, &InvalidOptionsError{Reason: "endpoint must be a valid url"})
+				errs = append(errs, InvalidOptionsError{Reason: "endpoint must be a valid url"})
 			case errors.Is(err, endpoint.ErrNoScheme):
-				errs = append(errs, &InvalidOptionsError{Reason: "endpoint must include scheme"})
+				errs = append(errs, InvalidOptionsError{Reason: "endpoint must include scheme"})
 			default:
-				errs = append(errs, &InvalidOptionsError{Reason: "endpoint must include host"})
+				errs = append(errs, InvalidOptionsError{Reason: "endpoint must include host"})
 			}
 		}
 	}

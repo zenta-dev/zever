@@ -92,7 +92,7 @@ func TestRegister_duplicate_fails(t *testing.T) {
 	if !errors.Is(err, ErrDuplicateAdapter) {
 		t.Fatalf("err = %v, want ErrDuplicateAdapter", err)
 	}
-	var de *DuplicateAdapterError
+	var de DuplicateAdapterError
 	if !errors.As(err, &de) {
 		t.Fatalf("err type = %T, want *DuplicateAdapterError", err)
 	}
@@ -129,7 +129,7 @@ func TestOpen_unknown_adapter_fails(t *testing.T) {
 	if !errors.Is(err, ErrUnknownAdapter) {
 		t.Fatalf("err = %v, want ErrUnknownAdapter", err)
 	}
-	var ue *UnknownAdapterError
+	var ue UnknownAdapterError
 	if !errors.As(err, &ue) {
 		t.Fatalf("err type = %T, want *UnknownAdapterError", err)
 	}

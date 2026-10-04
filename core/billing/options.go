@@ -25,7 +25,7 @@ func (o Options) Validate() error {
 	errs := make([]error, 0, len(endpointErrs))
 
 	for _, e := range endpointErrs {
-		errs = append(errs, &InvalidOptionsError{Reason: e.Error()})
+		errs = append(errs, InvalidOptionsError{Reason: e.Error()})
 	}
 
 	return errors.Join(errs...)

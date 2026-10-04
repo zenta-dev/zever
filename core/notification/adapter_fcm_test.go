@@ -26,7 +26,7 @@ func TestAdapter_Parse_fcm(t *testing.T) {
 	if got.String() != "fcm" {
 		t.Errorf("roundtrip String() = %q, want %q", got.String(), "fcm")
 	}
-	var iae *InvalidAdapterError
+	var iae InvalidAdapterError
 	_ = iae
 	gotUpper, err := ParseAdapter("FCM")
 	if err != nil {

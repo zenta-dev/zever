@@ -362,7 +362,7 @@ func TestTrack_oversizedProperties_returnsSizeLimitError(t *testing.T) {
 		t.Fatal("expected error for oversized properties, got nil")
 	}
 
-	var sizeErr *analytics.SizeLimitError
+	var sizeErr analytics.SizeLimitError
 	if !errors.As(err, &sizeErr) {
 		t.Errorf("expected *SizeLimitError, got %T: %v", err, err)
 	}
@@ -384,7 +384,7 @@ func TestTrack_tooManyProperties_returnsCountLimitError(t *testing.T) {
 		t.Fatal("expected error for too many properties, got nil")
 	}
 
-	var countErr *analytics.CountLimitError
+	var countErr analytics.CountLimitError
 	if !errors.As(err, &countErr) {
 		t.Errorf("expected *CountLimitError, got %T: %v", err, err)
 	}

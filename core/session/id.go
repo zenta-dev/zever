@@ -34,13 +34,13 @@ func NewID() string {
 // the length only.
 func ValidateID(id string) error {
 	if len(id) != 2*idBytes {
-		return &InvalidIDError{IDLen: len(id)}
+		return InvalidIDError{IDLen: len(id)}
 	}
 	for i := 0; i < len(id); i++ {
 		c := id[i]
 		if c < '0' || c > '9' {
 			if c < 'a' || c > 'f' {
-				return &InvalidIDError{IDLen: len(id)}
+				return InvalidIDError{IDLen: len(id)}
 			}
 		}
 	}

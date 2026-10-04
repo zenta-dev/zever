@@ -18,7 +18,7 @@ var ErrInvalidKey = errors.New("secrets: invalid key")
 var ErrNilFactory = errors.New("secrets: nil factory")
 
 // ErrDuplicateAdapter is returned on duplicate adapter registration.
-var ErrDuplicateAdapter = errors.New("secrets: duplicate registration")
+var ErrDuplicateAdapter = errors.New("secrets: duplicate adapter")
 
 // ErrDuplicate aliases ErrDuplicateAdapter for compatibility.
 var ErrDuplicate = ErrDuplicateAdapter

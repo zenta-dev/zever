@@ -87,7 +87,7 @@ func TestGetInvoiceNotFound(t *testing.T) {
 		t.Fatal("expected error, got nil")
 	}
 
-	var nf *billing.NotFoundError
+	var nf billing.NotFoundError
 	if !errors.As(err, &nf) {
 		t.Fatalf("expected NotFoundError, got %T", err)
 	}
@@ -113,7 +113,7 @@ func TestCreateSubscriptionCustomerMiss(t *testing.T) {
 		t.Fatal("expected error, got nil")
 	}
 
-	var nf *billing.NotFoundError
+	var nf billing.NotFoundError
 	if !errors.As(err, &nf) {
 		t.Fatalf("expected NotFoundError, got %T", err)
 	}
@@ -139,7 +139,7 @@ func TestCancelSubscriptionNotFound(t *testing.T) {
 		t.Fatal("expected error, got nil")
 	}
 
-	var nf *billing.NotFoundError
+	var nf billing.NotFoundError
 	if !errors.As(err, &nf) {
 		t.Fatalf("expected NotFoundError, got %T", err)
 	}

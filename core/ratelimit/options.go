@@ -50,27 +50,27 @@ type Options struct {
 // Validate checks options for consistency, joining all violations.
 func (o Options) Validate() error {
 	if math.IsNaN(o.Rate) || math.IsInf(o.Rate, 0) || o.Rate <= 0 {
-		return &InvalidOptionsError{Reason: "rate must be > 0 and finite"}
+		return InvalidOptionsError{Reason: "rate must be > 0 and finite"}
 	}
 
 	if o.Burst <= 0 {
-		return &InvalidOptionsError{Reason: "burst must be > 0"}
+		return InvalidOptionsError{Reason: "burst must be > 0"}
 	}
 
 	if o.IdleTTL < 0 {
-		return &InvalidOptionsError{Reason: "idle_ttl must be >= 0"}
+		return InvalidOptionsError{Reason: "idle_ttl must be >= 0"}
 	}
 
 	if o.SweepInterval < 0 {
-		return &InvalidOptionsError{Reason: "sweep_interval must be >= 0"}
+		return InvalidOptionsError{Reason: "sweep_interval must be >= 0"}
 	}
 
 	if err := redisopt.ValidateAddr(o.Redis.Addr); err != nil {
-		return &InvalidOptionsError{Reason: err.Error()}
+		return InvalidOptionsError{Reason: err.Error()}
 	}
 
 	if err := redisopt.ValidatePrefix(o.Redis.Prefix); err != nil {
-		return &InvalidOptionsError{Reason: err.Error()}
+		return InvalidOptionsError{Reason: err.Error()}
 	}
 
 	return nil

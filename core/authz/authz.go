@@ -54,15 +54,15 @@ func Authorize(ctx context.Context, a auth.Auth, p permission.Checker, pol Polic
 
 	if pol.AuthRequired {
 		if token == "" {
-			return claims, &UnauthenticatedError{Reason: "missing bearer token"}
+			return claims, UnauthenticatedError{Reason: "missing bearer token"}
 		}
 		if a == nil {
-			return claims, &UnauthenticatedError{Reason: "missing authenticator"}
+			return claims, UnauthenticatedError{Reason: "missing authenticator"}
 		}
 
 		verified, err := a.Verify(ctx, token)
 		if err != nil {
-			return claims, &UnauthenticatedError{Reason: "invalid or expired token"}
+			return claims, UnauthenticatedError{Reason: "invalid or expired token"}
 		}
 
 		claims = verified
@@ -73,7 +73,7 @@ func Authorize(ctx context.Context, a auth.Auth, p permission.Checker, pol Polic
 	}
 
 	if p == nil {
-		return claims, &PermissionDeniedError{Reason: "permission check failed"}
+		return claims, PermissionDeniedError{Reason: "permission check failed"}
 	}
 
 	var roles []string
@@ -97,11 +97,11 @@ func Authorize(ctx context.Context, a auth.Auth, p permission.Checker, pol Polic
 
 	decision, err := p.Can(ctx, subject, pol.PermissionCheck, resource)
 	if err != nil {
-		return claims, &PermissionDeniedError{Reason: "permission check failed"}
+		return claims, PermissionDeniedError{Reason: "permission check failed"}
 	}
 
 	if !decision.Allowed {
-		return claims, &PermissionDeniedError{Reason: "permission denied"}
+		return claims, PermissionDeniedError{Reason: "permission denied"}
 	}
 
 	return claims, nil

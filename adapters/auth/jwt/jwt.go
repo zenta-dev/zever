@@ -74,10 +74,10 @@ func New(opts auth.Options) (auth.Auth, error) {
 	}
 	secret := opts.JWT.Secret
 	if secret == "" {
-		return nil, &auth.InvalidOptionsError{Reason: "jwt secret is required"}
+		return nil, auth.InvalidOptionsError{Reason: "jwt secret is required"}
 	}
 	if len([]byte(secret)) < auth.MinSecretLen {
-		return nil, &auth.InvalidOptionsError{
+		return nil, auth.InvalidOptionsError{
 			Reason: fmt.Sprintf("jwt secret must be at least %d bytes", auth.MinSecretLen),
 		}
 	}

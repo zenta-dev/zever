@@ -413,7 +413,7 @@ func TestGetInvoiceOnlyDraftsNotFound(t *testing.T) {
 	if err == nil {
 		t.Fatal("expected error, got nil")
 	}
-	var nf *billing.NotFoundError
+	var nf billing.NotFoundError
 	if !errors.As(err, &nf) {
 		t.Fatalf("expected NotFoundError, got %T: %v", err, err)
 	}

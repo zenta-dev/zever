@@ -11,7 +11,7 @@ func TestErrors_sentinel_messages(t *testing.T) {
 	cases := map[string][2]string{
 		"ErrClosed":              {ErrClosed.Error(), "notification: closed"},
 		"ErrNilFactory":          {ErrNilFactory.Error(), "notification: nil factory"},
-		"ErrDuplicate":           {ErrDuplicate.Error(), "notification: duplicate registration"},
+		"ErrDuplicate":           {ErrDuplicate.Error(), "notification: duplicate adapter"},
 		"ErrUnknownAdapter":      {ErrUnknownAdapter.Error(), "notification: unknown adapter"},
 		"ErrInvalidAdapter":      {ErrInvalidAdapter.Error(), "notification: invalid adapter"},
 		"ErrInvalidOptions":      {ErrInvalidOptions.Error(), "notification: invalid options"},
@@ -33,56 +33,56 @@ func TestErrors_sentinel_messages(t *testing.T) {
 
 func TestErrors_typed_unwrap(t *testing.T) {
 	t.Parallel()
-	if !errors.Is(&DuplicateAdapterError{Adapter: Log}, ErrDuplicate) {
+	if !errors.Is(DuplicateAdapterError{Adapter: Log}, ErrDuplicate) {
 		t.Error("DuplicateAdapterError does not unwrap to ErrDuplicate")
 	}
-	if !errors.Is(&UnknownAdapterError{Adapter: Log}, ErrUnknownAdapter) {
+	if !errors.Is(UnknownAdapterError{Adapter: Log}, ErrUnknownAdapter) {
 		t.Error("UnknownAdapterError does not unwrap to ErrUnknownAdapter")
 	}
-	if !errors.Is(&InvalidAdapterError{Adapter: "x"}, ErrInvalidAdapter) {
+	if !errors.Is(InvalidAdapterError{Adapter: "x"}, ErrInvalidAdapter) {
 		t.Error("InvalidAdapterError does not unwrap to ErrInvalidAdapter")
 	}
-	if !errors.Is(&InvalidOptionsError{Reason: "x"}, ErrInvalidOptions) {
+	if !errors.Is(InvalidOptionsError{Reason: "x"}, ErrInvalidOptions) {
 		t.Error("InvalidOptionsError does not unwrap to ErrInvalidOptions")
 	}
-	if !errors.Is(&InvalidNotificationError{Reason: "x"}, ErrInvalidNotification) {
+	if !errors.Is(InvalidNotificationError{Reason: "x"}, ErrInvalidNotification) {
 		t.Error("InvalidNotificationError does not unwrap to ErrInvalidNotification")
 	}
-	if !errors.Is(&InvalidTargetError{Reason: "x"}, ErrInvalidTarget) {
+	if !errors.Is(InvalidTargetError{Reason: "x"}, ErrInvalidTarget) {
 		t.Error("InvalidTargetError does not unwrap to ErrInvalidTarget")
 	}
-	if !errors.Is(&InvalidChannelError{Channel: "x"}, ErrInvalidChannel) {
+	if !errors.Is(InvalidChannelError{Channel: "x"}, ErrInvalidChannel) {
 		t.Error("InvalidChannelError does not unwrap to ErrInvalidChannel")
 	}
-	if !errors.Is(&ChannelNotSupportedError{Channel: ChannelPush}, ErrChannelNotSupported) {
+	if !errors.Is(ChannelNotSupportedError{Channel: ChannelPush}, ErrChannelNotSupported) {
 		t.Error("ChannelNotSupportedError does not unwrap to ErrChannelNotSupported")
 	}
 }
 
 func TestErrors_carried_fields(t *testing.T) {
 	t.Parallel()
-	if de := (&DuplicateAdapterError{Adapter: Log}); de.Adapter != Log {
+	if de := (DuplicateAdapterError{Adapter: Log}); de.Adapter != Log {
 		t.Errorf("DuplicateAdapterError adapter = %v", de.Adapter)
 	}
-	if ue := (&UnknownAdapterError{Adapter: Log}); ue.Adapter != Log {
+	if ue := (UnknownAdapterError{Adapter: Log}); ue.Adapter != Log {
 		t.Errorf("UnknownAdapterError adapter = %v", ue.Adapter)
 	}
-	if iae := (&InvalidAdapterError{Adapter: "bogus"}); iae.Adapter != "bogus" {
+	if iae := (InvalidAdapterError{Adapter: "bogus"}); iae.Adapter != "bogus" {
 		t.Errorf("InvalidAdapterError adapter = %q", iae.Adapter)
 	}
-	if ioe := (&InvalidOptionsError{Reason: "bad"}); ioe.Reason != "bad" {
+	if ioe := (InvalidOptionsError{Reason: "bad"}); ioe.Reason != "bad" {
 		t.Errorf("InvalidOptionsError reason = %q", ioe.Reason)
 	}
-	if ine := (&InvalidNotificationError{Reason: "bad"}); ine.Reason != "bad" {
+	if ine := (InvalidNotificationError{Reason: "bad"}); ine.Reason != "bad" {
 		t.Errorf("InvalidNotificationError reason = %q", ine.Reason)
 	}
-	if ite := (&InvalidTargetError{Reason: "bad"}); ite.Reason != "bad" {
+	if ite := (InvalidTargetError{Reason: "bad"}); ite.Reason != "bad" {
 		t.Errorf("InvalidTargetError reason = %q", ite.Reason)
 	}
-	if ice := (&InvalidChannelError{Channel: "bogus"}); ice.Channel != "bogus" {
+	if ice := (InvalidChannelError{Channel: "bogus"}); ice.Channel != "bogus" {
 		t.Errorf("InvalidChannelError channel = %q", ice.Channel)
 	}
-	if cnse := (&ChannelNotSupportedError{Channel: ChannelSMS}); cnse.Channel != ChannelSMS {
+	if cnse := (ChannelNotSupportedError{Channel: ChannelSMS}); cnse.Channel != ChannelSMS {
 		t.Errorf("ChannelNotSupportedError channel = %q", cnse.Channel)
 	}
 }
@@ -90,7 +90,7 @@ func TestErrors_carried_fields(t *testing.T) {
 func TestErrors_InvalidTargetError_noPIIEcho(t *testing.T) {
 	t.Parallel()
 	target := "+14155552671"
-	err := (&InvalidTargetError{Reason: "target must be E.164"}).Error()
+	err := (InvalidTargetError{Reason: "target must be E.164"}).Error()
 	if strings.Contains(err, target) {
 		t.Errorf("InvalidTargetError leaks target %q in %q", target, err)
 	}

@@ -35,8 +35,8 @@ type Factory func(opts Options) (Router, error)
 
 var factories = registry.New[Adapter, Factory](
 	ErrNilFactory,
-	func(a Adapter) error { return &DuplicateAdapterError{Adapter: a} },
-	func(a Adapter) error { return &UnknownAdapterError{Adapter: a} },
+	func(a Adapter) error { return DuplicateAdapterError{Adapter: a} },
+	func(a Adapter) error { return UnknownAdapterError{Adapter: a} },
 )
 
 // standardMethods lists the recognized HTTP methods.

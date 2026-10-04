@@ -272,7 +272,7 @@ func TestIndexBatch_error_returnsErrorWithoutPhantomTrack(t *testing.T) {
 
 	err := s.Delete(t.Context(), "d1")
 
-	var nf *search.NotFoundError
+	var nf search.NotFoundError
 	if !errors.As(err, &nf) {
 		t.Fatalf("Delete err = %v, want NotFoundError (no phantom track)", err)
 	}
@@ -340,7 +340,7 @@ func TestIndex_error_returnsErrorWithoutPhantomTrack(t *testing.T) {
 	}
 
 	err := s.Delete(t.Context(), "d1")
-	var nf *search.NotFoundError
+	var nf search.NotFoundError
 	if !errors.As(err, &nf) {
 		t.Fatalf("Delete err = %v, want NotFoundError (no phantom track)", err)
 	}
@@ -354,7 +354,7 @@ func TestDelete_untracked_returnsNotFoundWithHint(t *testing.T) {
 
 	err := s.Delete(t.Context(), "ghost")
 
-	var nf *search.NotFoundError
+	var nf search.NotFoundError
 	if !errors.As(err, &nf) {
 		t.Fatalf("Delete err type = %T, want *NotFoundError", err)
 	}

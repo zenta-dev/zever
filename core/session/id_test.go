@@ -29,7 +29,7 @@ func TestValidateID_empty_fails(t *testing.T) {
 	if !errors.Is(err, ErrInvalidID) {
 		t.Fatalf("ValidateID empty err = %v, want ErrInvalidID", err)
 	}
-	var iie *InvalidIDError
+	var iie InvalidIDError
 	if !errors.As(err, &iie) {
 		t.Fatalf("err type = %T, want *InvalidIDError", err)
 	}
@@ -45,7 +45,7 @@ func TestValidateID_garbage_fails(t *testing.T) {
 		if !errors.Is(err, ErrInvalidID) {
 			t.Fatalf("ValidateID(%q) err = %v, want ErrInvalidID", id, err)
 		}
-		var iie *InvalidIDError
+		var iie InvalidIDError
 		if !errors.As(err, &iie) {
 			t.Fatalf("ValidateID(%q) err type = %T, want *InvalidIDError", id, err)
 		}

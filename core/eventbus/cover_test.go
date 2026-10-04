@@ -19,7 +19,7 @@ func TestCoverTypedErrorStrings(t *testing.T) {
 		got  string
 		want string
 	}{
-		{"DuplicateError", dup.Error(), "eventbus: duplicate registration: memory"},
+		{"DuplicateError", dup.Error(), "eventbus: duplicate adapter: memory"},
 		{"UnknownAdapterError", unknown.Error(), "eventbus: unknown adapter: redis (forgotten import?)"},
 		{"InvalidAdapterError", invalidAdapter.Error(), `eventbus: invalid adapter: "bogus"`},
 		{"InvalidOptionsError", invalidOpts.Error(), "eventbus: invalid options: bad"},
@@ -37,22 +37,22 @@ func TestCoverTypedErrorStrings(t *testing.T) {
 func TestCoverInvalidMessageIDUnwrapBothArms(t *testing.T) {
 	cause := errors.New("boom")
 
-	withCause := (&InvalidMessageIDError{ID: "x", Err: cause}).Unwrap()
-	if len(withCause) != 2 {
-		t.Fatalf("Unwrap with cause len = %d want 2", len(withCause))
+	withCause := (InvalidMessageIDError{ID: "x", Err: cause}).Unwrap()
+	if !errors.Is(withCause, ErrInvalidMessageID) {
+		t.Errorf("Unwrap with cause = %v want ErrInvalidMessageID", withCause)
 	}
 
-	if !errors.Is(withCause[0], ErrInvalidMessageID) || !errors.Is(withCause[1], cause) {
-		t.Errorf("Unwrap with cause = %v want [ErrInvalidMessageID cause]", withCause)
+	if !errors.Is(withCause, cause) {
+		t.Errorf("Unwrap with cause = %v want cause", withCause)
 	}
 
-	withoutCause := (&InvalidMessageIDError{ID: "x"}).Unwrap()
-	if len(withoutCause) != 1 {
-		t.Fatalf("Unwrap without cause len = %d want 1", len(withoutCause))
+	withoutCause := (InvalidMessageIDError{ID: "x"}).Unwrap()
+	if !errors.Is(withoutCause, ErrInvalidMessageID) {
+		t.Errorf("Unwrap without cause = %v want ErrInvalidMessageID", withoutCause)
 	}
 
-	if !errors.Is(withoutCause[0], ErrInvalidMessageID) {
-		t.Errorf("Unwrap without cause = %v want [ErrInvalidMessageID]", withoutCause)
+	if errors.Is(withoutCause, cause) {
+		t.Errorf("Unwrap without cause = %v want no cause", withoutCause)
 	}
 }
 

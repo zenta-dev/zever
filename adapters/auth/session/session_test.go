@@ -103,7 +103,7 @@ func TestNilStoreError(t *testing.T) {
 	if err == nil {
 		t.Fatal("New(zero opts) = nil, want store-required error")
 	}
-	var ioe *auth.InvalidOptionsError
+	var ioe auth.InvalidOptionsError
 	if !errors.As(err, &ioe) {
 		t.Fatalf("New(zero opts) err = %T (%v), want *auth.InvalidOptionsError", err, err)
 	}

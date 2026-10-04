@@ -349,7 +349,7 @@ func (d *driver) load(ctx context.Context, id workflow.RunID) (*runRow, error) {
 	}
 
 	if !ok {
-		return nil, &workflow.UnknownRunError{RunID: id}
+		return nil, workflow.UnknownRunError{RunID: id}
 	}
 
 	return row, nil
@@ -388,7 +388,7 @@ func (d *driver) Start(ctx context.Context, name string, input any, workflowID s
 
 	if workflowID != "" {
 		if _, err := d.load(ctx, workflow.RunID(workflowID)); err == nil {
-			return "", &workflow.DuplicateRunError{RunID: workflowID}
+			return "", workflow.DuplicateRunError{RunID: workflowID}
 		} else if !errors.Is(err, workflow.ErrUnknownRun) {
 			return "", err
 		}
@@ -396,7 +396,7 @@ func (d *driver) Start(ctx context.Context, name string, input any, workflowID s
 
 	fn, ok := d.stepFunc(name)
 	if !ok {
-		return "", &workflow.UnknownStepError{Step: name}
+		return "", workflow.UnknownStepError{Step: name}
 	}
 
 	id := workflow.RunID(workflowID)
@@ -438,7 +438,7 @@ func (d *driver) Start(ctx context.Context, name string, input any, workflowID s
 	).Exec(ctx, d.conn)
 	if err != nil {
 		if isDuplicateErr(err) {
-			return "", &workflow.DuplicateRunError{RunID: string(id)}
+			return "", workflow.DuplicateRunError{RunID: string(id)}
 		}
 
 		return "", err
@@ -489,7 +489,7 @@ func (d *driver) Signal(ctx context.Context, runID workflow.RunID, _ string, val
 	}
 
 	if row.State == stateCompleted {
-		return &workflow.RunCompletedError{RunID: runID}
+		return workflow.RunCompletedError{RunID: runID}
 	}
 
 	valueJSON, err := json.Marshal(value)
@@ -515,7 +515,7 @@ func (d *driver) Signal(ctx context.Context, runID workflow.RunID, _ string, val
 			return rerr
 		}
 		if cur.State == stateCompleted {
-			return &workflow.RunCompletedError{RunID: runID}
+			return workflow.RunCompletedError{RunID: runID}
 		}
 		return workflow.ErrUnknownRun
 	}
@@ -535,7 +535,7 @@ func (d *driver) Query(ctx context.Context, runID workflow.RunID, name string, o
 	}
 
 	if name != "state" {
-		return &workflow.UnknownQueryError{Query: name}
+		return workflow.UnknownQueryError{Query: name}
 	}
 
 	if err := json.Unmarshal(row.Payload, out); err != nil {
@@ -558,7 +558,7 @@ func (d *driver) Cancel(ctx context.Context, runID workflow.RunID) error {
 	}
 
 	if row.State == stateCompleted {
-		return &workflow.RunCompletedError{RunID: runID}
+		return workflow.RunCompletedError{RunID: runID}
 	}
 
 	// State-guarded delete so a Cancel racing a completion keeps the
@@ -576,7 +576,7 @@ func (d *driver) Cancel(ctx context.Context, runID workflow.RunID) error {
 			return rerr
 		}
 		if cur.State == stateCompleted {
-			return &workflow.RunCompletedError{RunID: runID}
+			return workflow.RunCompletedError{RunID: runID}
 		}
 		return workflow.ErrUnknownRun
 	}
@@ -603,7 +603,7 @@ func (d *driver) Reclaim(ctx context.Context, runID workflow.RunID, owner string
 	}
 
 	if row.State == stateCompleted {
-		return &workflow.RunCompletedError{RunID: runID}
+		return workflow.RunCompletedError{RunID: runID}
 	}
 
 	now := time.Now().UTC()
@@ -637,7 +637,7 @@ func (d *driver) Reclaim(ctx context.Context, runID workflow.RunID, owner string
 
 	fn, ok := d.stepFunc(row.Step)
 	if !ok {
-		return &workflow.UnknownStepError{Step: row.Step}
+		return workflow.UnknownStepError{Step: row.Step}
 	}
 
 	var input any

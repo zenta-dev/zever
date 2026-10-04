@@ -27,12 +27,12 @@ func (o Options) Validate() error {
 	var errs []error
 
 	if len(o.AppName) > 64 {
-		errs = append(errs, &InvalidOptionsError{Reason: "app_name must be at most 64 characters"})
+		errs = append(errs, InvalidOptionsError{Reason: "app_name must be at most 64 characters"})
 	}
 
 	for _, r := range o.AppName {
 		if unicode.IsControl(r) {
-			errs = append(errs, &InvalidOptionsError{Reason: "app_name must not contain control characters"})
+			errs = append(errs, InvalidOptionsError{Reason: "app_name must not contain control characters"})
 			break
 		}
 	}

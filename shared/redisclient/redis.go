@@ -1,6 +1,7 @@
 package redisclient
 
 import (
+	"errors"
 	"fmt"
 
 	goredis "github.com/redis/go-redis/v9"
@@ -26,7 +27,7 @@ func Close(client *goredis.Client) error {
 	}
 
 	if err := client.Close(); err != nil {
-		return fmt.Errorf("%w: %w", ErrCloseClient, err)
+		return fmt.Errorf("%w", errors.Join(ErrCloseClient, err))
 	}
 	return nil
 }

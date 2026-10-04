@@ -441,7 +441,7 @@ func (d *driver) load(ctx context.Context, slot string) (row *slotRow, ok bool, 
 func (d *driver) register(spec string, args any, slot string) error {
 	parsed, err := cron.ParseStandard(spec)
 	if err != nil {
-		return &scheduler.InvalidSpecError{Spec: spec, Err: err}
+		return scheduler.InvalidSpecError{Spec: spec, Err: err}
 	}
 
 	d.mu.Lock()
@@ -517,11 +517,11 @@ func (d *driver) Schedule(ctx context.Context, spec, jobName string, args any) (
 	}
 
 	if len(spec) == 0 || len(spec) > scheduler.MaxSpecLen {
-		return 0, &scheduler.InvalidSpecError{Spec: spec, Err: fmt.Errorf("postgres: %w", ErrInvalidSpecLength)}
+		return 0, scheduler.InvalidSpecError{Spec: spec, Err: fmt.Errorf("postgres: %w", ErrInvalidSpecLength)}
 	}
 
 	if _, err := cron.ParseStandard(spec); err != nil {
-		return 0, &scheduler.InvalidSpecError{Spec: spec, Err: err}
+		return 0, scheduler.InvalidSpecError{Spec: spec, Err: err}
 	}
 
 	if _, ok := job.Lookup(jobName); !ok {
@@ -589,7 +589,7 @@ func (d *driver) Schedule(ctx context.Context, spec, jobName string, args any) (
 // row. Zero is invalid and fails; an unknown ID is a no-op returning nil.
 func (d *driver) Remove(id scheduler.EntryID) error {
 	if id == 0 {
-		return &scheduler.InvalidOptionsError{Reason: "invalid_entry_id"}
+		return scheduler.InvalidOptionsError{Reason: "invalid_entry_id"}
 	}
 
 	d.mu.Lock()

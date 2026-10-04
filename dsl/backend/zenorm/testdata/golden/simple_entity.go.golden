@@ -37,12 +37,12 @@ type User struct {
 func (e *User) Scan(row orm.Row) error {
 	var rawCreatedAt string
 	if err := row.Scan(&e.ID, &e.Email, &rawCreatedAt); err != nil {
-		return fmt.Errorf("[user] scan error: %w", err)
+		return fmt.Errorf("user: scan error: %w", err)
 	}
 
 	valCreatedAt, errCreatedAt := time.Parse(time.RFC3339Nano, rawCreatedAt)
 	if errCreatedAt != nil {
-		return fmt.Errorf("[user] parse created_at error: %w", errCreatedAt)
+		return fmt.Errorf("user: parse created_at error: %w", errCreatedAt)
 	}
 
 	e.CreatedAt = valCreatedAt

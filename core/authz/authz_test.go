@@ -82,7 +82,7 @@ func TestAuthorizeMissingToken(t *testing.T) {
 	if err == nil {
 		t.Fatal("Authorize() err = nil, want unauthenticated")
 	}
-	var ue *authz.UnauthenticatedError
+	var ue authz.UnauthenticatedError
 	if !errors.As(err, &ue) {
 		t.Fatalf("Authorize() err = %T %v, want *UnauthenticatedError", err, err)
 	}
@@ -103,7 +103,7 @@ func TestAuthorizeInvalidToken(t *testing.T) {
 	if err == nil {
 		t.Fatal("Authorize() err = nil, want unauthenticated")
 	}
-	var ue *authz.UnauthenticatedError
+	var ue authz.UnauthenticatedError
 	if !errors.As(err, &ue) {
 		t.Fatalf("Authorize() err = %T %v, want *UnauthenticatedError", err, err)
 	}
@@ -263,7 +263,7 @@ func TestAuthorizeCheckerErrMapping(t *testing.T) {
 	if err == nil {
 		t.Fatal("Authorize() err = nil, want permission denied")
 	}
-	var pe *authz.PermissionDeniedError
+	var pe authz.PermissionDeniedError
 	if !errors.As(err, &pe) {
 		t.Fatalf("Authorize() err = %T %v, want *PermissionDeniedError", err, err)
 	}
@@ -282,7 +282,7 @@ func TestAuthorizeDeniedMapping(t *testing.T) {
 	if err == nil {
 		t.Fatal("Authorize() err = nil, want permission denied")
 	}
-	var pe *authz.PermissionDeniedError
+	var pe authz.PermissionDeniedError
 	if !errors.As(err, &pe) {
 		t.Fatalf("Authorize() err = %T %v, want *PermissionDeniedError", err, err)
 	}

@@ -39,12 +39,12 @@ type InvalidAdapterError struct {
 }
 
 // Error returns a human-readable invalid-adapter message.
-func (e *InvalidAdapterError) Error() string {
+func (e InvalidAdapterError) Error() string {
 	return fmt.Sprintf("%s: %q", ErrInvalidAdapter, e.Adapter)
 }
 
 // Unwrap returns ErrInvalidAdapter.
-func (e *InvalidAdapterError) Unwrap() error {
+func (e InvalidAdapterError) Unwrap() error {
 	return ErrInvalidAdapter
 }
 
@@ -58,12 +58,12 @@ type DuplicateAdapterError struct {
 type DuplicateError = DuplicateAdapterError
 
 // Error returns a human-readable duplicate-registration message.
-func (e *DuplicateAdapterError) Error() string {
+func (e DuplicateAdapterError) Error() string {
 	return fmt.Sprintf("%s: %s", ErrDuplicateAdapter, e.Adapter)
 }
 
 // Unwrap returns ErrDuplicateAdapter.
-func (e *DuplicateAdapterError) Unwrap() error {
+func (e DuplicateAdapterError) Unwrap() error {
 	return ErrDuplicateAdapter
 }
 
@@ -74,12 +74,12 @@ type UnknownAdapterError struct {
 }
 
 // Error returns a human-readable unknown-adapter message.
-func (e *UnknownAdapterError) Error() string {
+func (e UnknownAdapterError) Error() string {
 	return fmt.Sprintf("%s: %s (forgotten import?)", ErrUnknownAdapter, e.Adapter)
 }
 
 // Unwrap returns ErrUnknownAdapter.
-func (e *UnknownAdapterError) Unwrap() error {
+func (e UnknownAdapterError) Unwrap() error {
 	return ErrUnknownAdapter
 }
 
@@ -90,12 +90,12 @@ type InvalidOptionsError struct {
 }
 
 // Error returns a human-readable invalid-options message.
-func (e *InvalidOptionsError) Error() string {
+func (e InvalidOptionsError) Error() string {
 	return fmt.Sprintf("%s: %s", ErrInvalidOptions, e.Reason)
 }
 
 // Unwrap returns ErrInvalidOptions.
-func (e *InvalidOptionsError) Unwrap() error {
+func (e InvalidOptionsError) Unwrap() error {
 	return ErrInvalidOptions
 }
 
@@ -108,11 +108,11 @@ type TxError struct {
 }
 
 // Error returns a human-readable transaction failure message.
-func (e *TxError) Error() string {
+func (e TxError) Error() string {
 	return fmt.Sprintf("db: transaction %s: %v", e.Op, e.Err)
 }
 
 // Unwrap returns the underlying transaction failure.
-func (e *TxError) Unwrap() error {
+func (e TxError) Unwrap() error {
 	return e.Err
 }

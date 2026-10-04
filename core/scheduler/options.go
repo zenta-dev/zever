@@ -37,11 +37,11 @@ type Options struct {
 // Validate checks options for consistency, joining all violations.
 func (o Options) Validate() error {
 	if o.Dispatcher == nil {
-		return &InvalidOptionsError{Reason: "dispatcher_is_required"}
+		return InvalidOptionsError{Reason: "dispatcher_is_required"}
 	}
 
 	if o.CloseTimeout < 0 {
-		return &InvalidOptionsError{Reason: "close_timeout must be >= 0"}
+		return InvalidOptionsError{Reason: "close_timeout must be >= 0"}
 	}
 
 	return nil

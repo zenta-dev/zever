@@ -45,11 +45,11 @@ func decodeFile(path string) (map[string]ServiceConfig, error) {
 	switch ext := strings.ToLower(filepath.Ext(path)); ext {
 	case ".yaml", ".yml":
 		if err := yaml.Unmarshal(data, &raw); err != nil {
-			return nil, fmt.Errorf("config: parse yaml %q: %w: %w", path, ErrDecode, err)
+			return nil, fmt.Errorf("config: parse yaml %q: %w", path, errors.Join(ErrDecode, err))
 		}
 	case ".json":
 		if err := json.Unmarshal(data, &raw); err != nil {
-			return nil, fmt.Errorf("config: parse json %q: %w: %w", path, ErrDecode, err)
+			return nil, fmt.Errorf("config: parse json %q: %w", path, errors.Join(ErrDecode, err))
 		}
 	default:
 		return nil, fmt.Errorf("config: %q: unsupported format %q: %w", path, ext, ErrUnsupportedFormat)

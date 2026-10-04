@@ -28,7 +28,7 @@ func TestParseAdapter_redis_reachesOpen(t *testing.T) {
 
 	want := redisOpenStub
 	if regErr := Register(a, func(Options) (Store, error) { return want, nil }); regErr != nil {
-		var dup *DuplicateError
+		var dup DuplicateError
 		if !errors.As(regErr, &dup) {
 			t.Fatalf("Register(Redis) err = %v, want nil", regErr)
 		}

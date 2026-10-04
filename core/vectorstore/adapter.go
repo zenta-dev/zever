@@ -30,7 +30,7 @@ func (a Adapter) String() string {
 // Any non-empty name is accepted to allow custom adapters; empty fails.
 func ParseAdapter(s string) (Adapter, error) {
 	if s == "" {
-		return Adapter(""), &InvalidAdapterError{Adapter: s}
+		return Adapter(""), InvalidAdapterError{Adapter: s}
 	}
 	return Adapter(s), nil
 }

@@ -42,7 +42,10 @@ type schemaObject struct {
 // JSON-Schema/OpenAPI-standard format names), min_len/max_len ->
 // minLength/maxLength, gt/gte/lt/lte -> minimum/maximum (+ the matching
 // exclusive flag). A field/param with no @validate rules is left untouched.
-func applyValidation(schema *schemaObject, rules []ir.Validation) {
+// An unexpected validation kind or non-numeric value is a resolver-invariant
+// violation and returns ErrInternalInvariant rather than silently emitting a
+// schema with no constraint.
+func applyValidation(schema *schemaObject, rules []ir.Validation) error {
 	for _, v := range rules {
 		value := v.Args["value"]
 
@@ -52,34 +55,51 @@ func applyValidation(schema *schemaObject, rules []ir.Validation) {
 				schema.Format = openAPIFormatName(s)
 			}
 		case ir.ValidationMinLen:
-			n := int(toInt64(value))
-			schema.MinLength = &n
+			n, err := toInt64(value)
+			if err != nil {
+				return err
+			}
+			nInt := int(n)
+			schema.MinLength = &nInt
 		case ir.ValidationMaxLen:
-			n := int(toInt64(value))
-			schema.MaxLength = &n
+			n, err := toInt64(value)
+			if err != nil {
+				return err
+			}
+			nInt := int(n)
+			schema.MaxLength = &nInt
 		case ir.ValidationGT:
-			f := toFloat64(value)
+			f, err := toFloat64(value)
+			if err != nil {
+				return err
+			}
 			schema.Minimum = &f
 			schema.ExclusiveMinimum = true
 		case ir.ValidationGTE:
-			f := toFloat64(value)
+			f, err := toFloat64(value)
+			if err != nil {
+				return err
+			}
 			schema.Minimum = &f
 		case ir.ValidationLT:
-			f := toFloat64(value)
+			f, err := toFloat64(value)
+			if err != nil {
+				return err
+			}
 			schema.Maximum = &f
 			schema.ExclusiveMaximum = true
 		case ir.ValidationLTE:
-			f := toFloat64(value)
+			f, err := toFloat64(value)
+			if err != nil {
+				return err
+			}
 			schema.Maximum = &f
 		default:
-			// resolver.resolveValidateRules guarantees every ir.Validation.Kind
-			// is one of the seven constants above before this backend ever
-			// runs; a mismatch here means that invariant broke upstream, so
-			// fail loudly (matching toInt64/toFloat64's invariant guards)
-			// instead of silently emitting a schema with no constraint.
-			panic(fmt.Sprintf("openapi: applyValidation: unexpected validation kind %q (resolver invariant violated)", v.Kind))
+			return fmt.Errorf("openapi: applyValidation: unexpected validation kind %q: %w", v.Kind, ErrInternalInvariant)
 		}
 	}
+
+	return nil
 }
 
 // openAPIFormatName maps a @validate(format: "...") value to its
@@ -96,28 +116,29 @@ func openAPIFormatName(format string) string {
 // toInt64/toFloat64 convert a decoded @validate numeric argument (always
 // int64 or float64, per resolver.decodeValidateValue) to the requested
 // numeric type. A value of any other dynamic type means that invariant
-// broke upstream: panicking here (matching gogen's numericLiteral) fails
-// loudly instead of silently emitting a bogus minLength:0/minimum:0 (etc.)
-// constraint into generated OpenAPI with no diagnostic anywhere.
-func toInt64(v any) int64 {
+// broke upstream: returning ErrInternalInvariant here (matching gogen's
+// numericLiteral) fails loudly instead of silently emitting a bogus
+// minLength:0/minimum:0 (etc.) constraint into generated OpenAPI with no
+// diagnostic anywhere.
+func toInt64(v any) (int64, error) {
 	switch n := v.(type) {
 	case int64:
-		return n
+		return n, nil
 	case float64:
-		return int64(n)
+		return int64(n), nil
 	default:
-		panic(fmt.Sprintf("openapi: toInt64: unexpected value type %T (resolver invariant violated)", v))
+		return 0, fmt.Errorf("openapi: toInt64: unexpected value type %T: %w", v, ErrInternalInvariant)
 	}
 }
 
-func toFloat64(v any) float64 {
+func toFloat64(v any) (float64, error) {
 	switch n := v.(type) {
 	case int64:
-		return float64(n)
+		return float64(n), nil
 	case float64:
-		return n
+		return n, nil
 	default:
-		panic(fmt.Sprintf("openapi: toFloat64: unexpected value type %T (resolver invariant violated)", v))
+		return 0, fmt.Errorf("openapi: toFloat64: unexpected value type %T: %w", v, ErrInternalInvariant)
 	}
 }
 
@@ -162,8 +183,9 @@ func scalarOpenAPI(t ir.ScalarType) (typ, format string) {
 // schema object: an enum field becomes {type: string, enum: [...]} using
 // its declared values, everything else uses the scalarOpenAPI mapping. Any
 // @validate rules declared alongside the field/param are overlaid as the
-// matching JSON Schema constraint keyword(s) via applyValidation.
-func renderFieldSchema(ft ir.FieldType, validate []ir.Validation) *schemaObject {
+// matching JSON Schema constraint keyword(s) via applyValidation, whose
+// resolver-invariant violation is returned to the caller.
+func renderFieldSchema(ft ir.FieldType, validate []ir.Validation) (*schemaObject, error) {
 	var schema *schemaObject
 
 	if ft.Scalar == ir.TEnum {
@@ -173,9 +195,11 @@ func renderFieldSchema(ft ir.FieldType, validate []ir.Validation) *schemaObject 
 		schema = &schemaObject{Type: typ, Format: format}
 	}
 
-	applyValidation(schema, validate)
+	if err := applyValidation(schema, validate); err != nil {
+		return nil, err
+	}
 
-	return schema
+	return schema, nil
 }
 
 // renderEntitySchema renders an entity as an OpenAPI object schema: one
@@ -184,14 +208,17 @@ func renderFieldSchema(ft ir.FieldType, validate []ir.Validation) *schemaObject 
 // optional (`field: type?`) is excluded from required and marked
 // `nullable: true`, folding "omittable in a request" and "NULL in the
 // database" into the DSL's single Optional concept.
-func (d *docBuilder) renderEntitySchema(e *ir.Entity) *schemaObject {
+func (d *docBuilder) renderEntitySchema(e *ir.Entity) (*schemaObject, error) {
 	obj := &schemaObject{
 		Type:       "object",
 		Properties: make(map[string]*schemaObject, len(e.Fields)),
 	}
 
 	for _, f := range e.Fields {
-		fieldSchema := d.fieldSchema(f.Type, f.Validate)
+		fieldSchema, err := d.fieldSchema(f.Type, f.Validate)
+		if err != nil {
+			return nil, err
+		}
 		fieldSchema.Nullable = f.Optional
 		obj.Properties[f.Name] = fieldSchema
 
@@ -200,7 +227,7 @@ func (d *docBuilder) renderEntitySchema(e *ir.Entity) *schemaObject {
 		}
 	}
 
-	return obj
+	return obj, nil
 }
 
 // renderMessageSchema renders a message as an OpenAPI object schema.
@@ -213,7 +240,7 @@ func (d *docBuilder) renderEntitySchema(e *ir.Entity) *schemaObject {
 //
 // A method on *docBuilder (not a free function) because rendering a Ref
 // field needs the same schema registry/qualify machinery paramSchema uses.
-func (d *docBuilder) renderMessageSchema(m *ir.Message) *schemaObject {
+func (d *docBuilder) renderMessageSchema(m *ir.Message) (*schemaObject, error) {
 	obj := &schemaObject{
 		Type:       "object",
 		Properties: make(map[string]*schemaObject, len(m.Fields)),
@@ -223,17 +250,24 @@ func (d *docBuilder) renderMessageSchema(m *ir.Message) *schemaObject {
 		var fieldSchema *schemaObject
 
 		if f.Ref != nil {
-			name := d.addTypeRefSchema(f.Ref)
+			name, err := d.addTypeRefSchema(f.Ref)
+			if err != nil {
+				return nil, err
+			}
 			fieldSchema = &schemaObject{Ref: "#/components/schemas/" + name}
 		} else {
-			fieldSchema = d.fieldSchema(f.Type, f.Validate)
+			var err error
+			fieldSchema, err = d.fieldSchema(f.Type, f.Validate)
+			if err != nil {
+				return nil, err
+			}
 			fieldSchema.Nullable = f.Optional
 		}
 
 		obj.Properties[f.Name] = fieldSchema
 	}
 
-	return obj
+	return obj, nil
 }
 
 // renderRequestSchema renders an RPC's non-path params as a synthesized
@@ -241,17 +275,21 @@ func (d *docBuilder) renderMessageSchema(m *ir.Message) *schemaObject {
 // referencing an entity/message (p.Ref set) renders as a $ref to that
 // type's own component schema (registered on d), not an inline scalar
 // schema -- see docBuilder.paramSchema.
-func (d *docBuilder) renderRequestSchema(params []*ir.Param) *schemaObject {
+func (d *docBuilder) renderRequestSchema(params []*ir.Param) (*schemaObject, error) {
 	obj := &schemaObject{
 		Type:       "object",
 		Properties: make(map[string]*schemaObject, len(params)),
 	}
 
 	for _, p := range params {
-		obj.Properties[p.Name] = d.paramSchema(p)
+		schema, err := d.paramSchema(p)
+		if err != nil {
+			return nil, err
+		}
+		obj.Properties[p.Name] = schema
 	}
 
-	return obj
+	return obj, nil
 }
 
 // renderPaginatedResponseSchema renders a paginated operation's response
