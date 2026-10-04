@@ -39,7 +39,7 @@ func RegisterPlugin[T any](name string, version int, build func(*config.Config) 
 	}
 
 	if version != PluginAPIVersion {
-		return fmt.Errorf("container: plugin %q version mismatch: got %d, want %d", name, version, PluginAPIVersion)
+		return fmt.Errorf("container: plugin %q version mismatch: got %d, want %d: %w", name, version, PluginAPIVersion, ErrPluginVersionMismatch)
 	}
 
 	if build == nil {
@@ -92,7 +92,7 @@ func Resolve[T any](c *Container, name string) (T, error) {
 
 	typed, ok := v.(T)
 	if !ok {
-		return zero, fmt.Errorf("container: plugin %q type mismatch: stored %T, want %T", name, v, zero)
+		return zero, fmt.Errorf("container: plugin %q type mismatch: stored %T, want %T: %w", name, v, zero, ErrPluginTypeMismatch)
 	}
 
 	return typed, nil
