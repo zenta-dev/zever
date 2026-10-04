@@ -509,10 +509,10 @@ func flattenGroupTerms(groups []GroupTerm) []GroupTerm {
 }
 
 // sameGroupLeaf reports whether two plain leaves dedup to the same key,
-// without allocating a groupLeafKey string. Two leaves are duplicates exactly
+// without allocating a groupLeafKey value. Two leaves are duplicates exactly
 // when their groupLeafKey values are equal: expression leaves by Func pointer
 // identity, plain columns by name, and an expression never collides with a
-// column (the "f:"/"c:" key prefixes differ).
+// column (the Func field differs).
 func sameGroupLeaf(a, b GroupTerm) bool {
 	if a.Func != nil || b.Func != nil {
 		return a.Func == b.Func
@@ -549,11 +549,11 @@ func dedupGroupLeaves(leaves []GroupTerm) []GroupTerm {
 		return leaves[:n]
 	}
 
-	seen := make(map[string]struct{}, len(leaves))
+	seen := make(map[groupLeafKey]struct{}, len(leaves))
 	out := make([]GroupTerm, 0, len(leaves))
 
 	for _, g := range leaves {
-		key := groupLeafKey(g)
+		key := groupLeafKey{fn: g.Func, col: g.Column}
 
 		if _, ok := seen[key]; ok {
 			continue
@@ -567,15 +567,13 @@ func dedupGroupLeaves(leaves []GroupTerm) []GroupTerm {
 	return out
 }
 
-// groupLeafKey returns a dedup key for a plain group leaf: the column name
-// for a plain column, or the function tree's pointer identity for an
-// expression.
-func groupLeafKey(g GroupTerm) string {
-	if g.Func != nil {
-		return fmt.Sprintf("f:%p", g.Func)
-	}
-
-	return "c:" + g.Column
+// groupLeafKey is the comparable dedup key for a plain group leaf: an
+// expression leaf keys by its Func pointer identity, a plain column by name.
+// The two never collide because an expression leaf has a non-nil Func and a
+// column leaf does not.
+type groupLeafKey struct {
+	fn  *FuncExpr
+	col string
 }
 
 // renderGroupLeaf renders one plain group leaf: a quoted column or a scalar
