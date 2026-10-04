@@ -361,7 +361,7 @@ func Probe(ctx context.Context, ffprobe, path string) (ProbeResult, error) {
 			return res, fmt.Errorf("ffmpeg: tool %q: %w: %w", ffprobe, ErrToolMissing, err)
 		}
 
-		return res, fmt.Errorf("%w (%s): %q", ErrProbeFailed, err, errSnippet(&stderr)) //nolint:errorlint // spec format keeps sentinel via %w with exit text and capped stderr.
+		return res, fmt.Errorf("%w (%w): %q", ErrProbeFailed, err, errSnippet(&stderr))
 	}
 
 	data, _ := io.ReadAll(io.LimitReader(stdout, maxProbeOutput+1))
@@ -375,12 +375,12 @@ func Probe(ctx context.Context, ffprobe, path string) (ProbeResult, error) {
 	}
 
 	if waitErr := cmd.Wait(); waitErr != nil {
-		return res, fmt.Errorf("%w (%s): %q", ErrProbeFailed, waitErr, errSnippet(&stderr)) //nolint:errorlint // spec format keeps sentinel via %w with exit text and capped stderr.
+		return res, fmt.Errorf("%w (%w): %q", ErrProbeFailed, waitErr, errSnippet(&stderr))
 	}
 
 	res, err = probeCodec.Decode(data)
 	if err != nil {
-		return res, fmt.Errorf("%w (%s): %q", ErrProbeFailed, err, errSnippet(&stderr)) //nolint:errorlint // spec format keeps sentinel via %w with exit text and capped stderr.
+		return res, fmt.Errorf("%w (%w): %q", ErrProbeFailed, err, errSnippet(&stderr))
 	}
 
 	return res, nil
@@ -414,7 +414,7 @@ func RunTranscode(ctx context.Context, ffmpegBin string, argv []string) error {
 			return fmt.Errorf("ffmpeg: tool %q: %w: %w", ffmpegBin, ErrToolMissing, err)
 		}
 
-		return fmt.Errorf("%w (%s): %q", ErrTranscodeFailed, err, errSnippet(&stderr)) //nolint:errorlint // spec format keeps sentinel via %w with exit text and capped stderr.
+		return fmt.Errorf("%w (%w): %q", ErrTranscodeFailed, err, errSnippet(&stderr))
 	}
 
 	return nil

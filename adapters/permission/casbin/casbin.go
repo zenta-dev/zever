@@ -421,7 +421,7 @@ func (c *checker) retryPending() error {
 func (c *checker) removeGroupingPolicy(g []string) (err error) {
 	defer func() {
 		if r := recover(); r != nil {
-			err = fmt.Errorf("casbin: panic removing grouping policy %v: %v", g, r)
+			err = fmt.Errorf("casbin: panic removing grouping policy %v: %v: %w", g, r, ErrPolicyUpdate)
 		}
 	}()
 
@@ -432,7 +432,7 @@ func (c *checker) removeGroupingPolicy(g []string) (err error) {
 
 	_, err = c.e.RemoveGroupingPolicy(args...)
 	if err != nil {
-		err = fmt.Errorf("casbin: remove grouping policy %v: %w", g, err)
+		err = fmt.Errorf("casbin: remove grouping policy %v: %w: %w", g, err, ErrPolicyUpdate)
 	}
 
 	return err

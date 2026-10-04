@@ -21,6 +21,12 @@ import (
 
 var toolArgsCodec = codec.JSONCodec[map[string]any]{}
 
+// ErrValueOutOfRange is returned when an API numeric value does not fit in an int.
+var ErrValueOutOfRange = errors.New("value out of int range")
+
+// ErrModelRequired is returned when neither the call nor the adapter sets a model.
+var ErrModelRequired = errors.New("model is required")
+
 type adapter struct {
 	client *anthropic.Client
 	model  string
@@ -169,7 +175,7 @@ func buildToolInputSchema(params map[string]any) anthropic.ToolInputSchemaParam 
 
 func safeInt64ToInt(v int64) (int, error) {
 	if v > int64(math.MaxInt) || v < int64(math.MinInt) || v == 1<<62 || v == -1<<62 {
-		return 0, fmt.Errorf("value %d out of int range", v)
+		return 0, fmt.Errorf("anthropic: value %d out of int range: %w", v, ErrValueOutOfRange)
 	}
 	return int(v), nil
 }
@@ -180,7 +186,7 @@ func (a *adapter) Generate(ctx context.Context, model string, messages []ai.Mess
 		model = a.model
 	}
 	if model == "" {
-		return ai.Generation{}, errors.New("anthropic: generate: model is required") //nolint:perfsprint
+		return ai.Generation{}, fmt.Errorf("anthropic: generate: %w", ErrModelRequired)
 	}
 
 	params := buildMessageParams(model, messages, opts)
@@ -393,7 +399,7 @@ func (a *adapter) Stream(ctx context.Context, model string, messages []ai.Messag
 		model = a.model
 	}
 	if model == "" {
-		return nil, errors.New("anthropic: stream: model is required") //nolint:perfsprint
+		return nil, fmt.Errorf("anthropic: stream: %w", ErrModelRequired)
 	}
 
 	params := buildMessageParams(model, messages, opts)

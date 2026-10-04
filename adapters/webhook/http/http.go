@@ -162,7 +162,7 @@ func (a *adapter) deliverOne(ctx context.Context, r registration, payload []byte
 		}
 	}
 
-	return fmt.Errorf("http: delivery failed after %d attempts: %w", a.maxRetries, lastErr)
+	return fmt.Errorf("http: delivery failed after %d attempts: %w: %w", a.maxRetries, lastErr, ErrDeliveryFailed)
 }
 
 func (a *adapter) validateIfNeeded(ctx context.Context, target string) error {
@@ -199,10 +199,10 @@ func (a *adapter) singleAttempt(ctx context.Context, r registration, payload []b
 	body := a.drainForError(resp)
 
 	if len(body) == 0 {
-		return fmt.Errorf("http: target returned status %d", resp.StatusCode)
+		return fmt.Errorf("http: target returned status %d: %w", resp.StatusCode, ErrUnexpectedStatus)
 	}
 
-	return fmt.Errorf("http: target returned status %d: %s", resp.StatusCode, body)
+	return fmt.Errorf("http: target returned status %d: %s: %w", resp.StatusCode, body, ErrUnexpectedStatus)
 }
 
 func (a *adapter) buildRequest(

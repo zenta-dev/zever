@@ -109,7 +109,7 @@ func coerceTime(v any) (time.Time, error) {
 	case []byte:
 		return time.Parse(time.RFC3339Nano, string(t))
 	default:
-		return time.Time{}, fmt.Errorf("db: unsupported timestamp %T", v)
+		return time.Time{}, fmt.Errorf("db: unsupported timestamp %T: %w", v, ErrUnsupportedType)
 	}
 }
 
@@ -125,7 +125,7 @@ func coerceInt(v any) (int64, error) {
 	case float64:
 		return int64(n), nil
 	default:
-		return 0, fmt.Errorf("db: unsupported integer %T", v)
+		return 0, fmt.Errorf("db: unsupported integer %T: %w", v, ErrUnsupportedType)
 	}
 }
 

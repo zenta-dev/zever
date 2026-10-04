@@ -86,7 +86,7 @@ func (d *driver) add(m, p string, mws []func(http.Handler) http.Handler, handler
 func (d *driver) safeAdd(pattern string, h http.Handler) (err error) {
 	defer func() {
 		if rec := recover(); rec != nil {
-			err = fmt.Errorf("stdhttp: route registration panicked for %s: %v", pattern, rec)
+			err = fmt.Errorf("stdhttp: route registration panicked for %s: %v: %w", pattern, rec, ErrRoutePanic)
 		}
 	}()
 

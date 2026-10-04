@@ -184,7 +184,7 @@ func (s *Store) UpsertBatch(ctx context.Context, vecs []vectorstore.Vector) erro
 
 	for i, vec := range vecs {
 		if err := vec.Validate(); err != nil {
-			return fmt.Errorf("qdrant: upsert batch: index %d: %w", i, err)
+			return fmt.Errorf("qdrant: upsert batch: index %d: %w: %w", i, ErrInvalidVector, err)
 		}
 	}
 

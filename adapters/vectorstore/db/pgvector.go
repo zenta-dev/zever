@@ -5,7 +5,6 @@ import (
 	"context"
 	"encoding/binary"
 	"encoding/json"
-	"errors"
 	"fmt"
 	"math"
 	"strconv"
@@ -126,7 +125,7 @@ func Open(o vectorstore.Options) (vectorstore.VectorStore, error) {
 // and ignores it.
 func NewFromDB(conn coredb.DB, o vectorstore.Options) (vectorstore.VectorStore, error) {
 	if conn == nil {
-		return nil, errors.New("pgvector: db must not be nil")
+		return nil, ErrNilDB
 	}
 
 	if err := o.Validate(); err != nil {
@@ -298,10 +297,10 @@ func (d *driver) embeddingColumnDim(ctx context.Context) (int, bool, error) {
 }
 
 // checkDimension keeps its domain-specific message verbatim: the text carries
-// both numbers greppably, so no typed error wraps it here.
+// both numbers greppably, and it wraps ErrDimensionMismatch for errors.Is.
 func checkDimension(existing, configured int) error {
 	if existing != configured {
-		return fmt.Errorf("pgvector: existing vectors.embedding dimension %d does not match configured dimension %d", existing, configured)
+		return fmt.Errorf("pgvector: existing vectors.embedding dimension %d does not match configured dimension %d: %w", existing, configured, vectorstore.ErrDimensionMismatch)
 	}
 
 	return nil
@@ -596,7 +595,7 @@ func decodeHitMeta(v any) (map[string]any, error) {
 	case string:
 		raw = []byte(t)
 	default:
-		return nil, fmt.Errorf("pgvector: unsupported metadata %T", v)
+		return nil, fmt.Errorf("pgvector: unsupported metadata %T: %w", v, vectorstore.ErrInvalidMetadata)
 	}
 
 	if raw == nil {
@@ -760,7 +759,7 @@ func encodeEmbedding(e []float32) []byte {
 
 func decodeEmbedding(b []byte) ([]float32, error) {
 	if len(b) == 0 {
-		return nil, errors.New("pgvector: empty embedding blob")
+		return nil, fmt.Errorf("pgvector: empty embedding blob: %w", vectorstore.ErrEmptyEmbedding)
 	}
 
 	// Backwards compat: rows written by adapters/vectorstore/sqlite were
@@ -774,7 +773,7 @@ func decodeEmbedding(b []byte) ([]float32, error) {
 	}
 
 	if len(b)%4 != 0 {
-		return nil, fmt.Errorf("pgvector: invalid embedding blob length %d", len(b))
+		return nil, fmt.Errorf("pgvector: invalid embedding blob length %d: %w", len(b), ErrInvalidEmbedding)
 	}
 
 	out := make([]float32, len(b)/4)
