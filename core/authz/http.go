@@ -58,8 +58,8 @@ func Middleware(a auth.Auth, p permission.Checker, pol Policy, resourceIDFromReq
 }
 
 func writeAuthzError(w http.ResponseWriter, err error, noCredentials bool) {
-	var unauthenticated *UnauthenticatedError
-	var denied *PermissionDeniedError
+	var unauthenticated UnauthenticatedError
+	var denied PermissionDeniedError
 
 	status := http.StatusInternalServerError
 	message := "internal error"

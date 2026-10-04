@@ -71,7 +71,7 @@ func Register[T any](name string, handle func(ctx context.Context, args T) error
 	}
 
 	if _, dup := definitions[name]; dup {
-		return &DuplicateJobError{Name: name}
+		return DuplicateJobError{Name: name}
 	}
 
 	def := Definition{policy: DefaultRetryPolicy(), priority: PriorityLow}

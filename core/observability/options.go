@@ -40,11 +40,11 @@ type Options struct {
 // Validate checks options for consistency, joining all violations.
 func (o Options) Validate() error {
 	if len(o.ServiceName) < 1 || len(o.ServiceName) > 128 {
-		return &InvalidOptionsError{Reason: "service_name must be 1-128 characters"}
+		return InvalidOptionsError{Reason: "service_name must be 1-128 characters"}
 	}
 	for _, r := range o.ServiceName {
 		if unicode.IsControl(r) {
-			return &InvalidOptionsError{Reason: "service_name must not contain control characters"}
+			return InvalidOptionsError{Reason: "service_name must not contain control characters"}
 		}
 	}
 
@@ -57,46 +57,46 @@ func (o Options) Validate() error {
 	if o.Insecure && o.Endpoint != "" {
 		host, _, _ := net.SplitHostPort(o.Endpoint)
 		if !isLoopback(host) {
-			return &InvalidOptionsError{Reason: "insecure requires a loopback endpoint"}
+			return InvalidOptionsError{Reason: "insecure requires a loopback endpoint"}
 		}
 	}
 
 	if o.CAFile != "" {
 		if o.Insecure {
-			return &InvalidOptionsError{Reason: "ca file requires secure mode"}
+			return InvalidOptionsError{Reason: "ca file requires secure mode"}
 		}
 		pemData, err := os.ReadFile(o.CAFile)
 		if err != nil {
-			return &InvalidOptionsError{Reason: fmt.Sprintf("unreadable CA file %q", o.CAFile)}
+			return InvalidOptionsError{Reason: fmt.Sprintf("unreadable CA file %q", o.CAFile)}
 		}
 		pool := x509.NewCertPool()
 		if !pool.AppendCertsFromPEM(pemData) {
-			return &InvalidOptionsError{Reason: "invalid ca file contents"}
+			return InvalidOptionsError{Reason: "invalid ca file contents"}
 		}
 	}
 
 	if (o.CertFile == "") != (o.KeyFile == "") {
-		return &InvalidOptionsError{Reason: "cert_file and key_file must be set together"}
+		return InvalidOptionsError{Reason: "cert_file and key_file must be set together"}
 	}
 
 	if len(o.Headers) > 32 {
-		return &InvalidOptionsError{Reason: "too many headers"}
+		return InvalidOptionsError{Reason: "too many headers"}
 	}
 	for k := range o.Headers {
 		if !isToken(k) {
-			return &InvalidOptionsError{Reason: fmt.Sprintf("invalid header key %q", k)}
+			return InvalidOptionsError{Reason: fmt.Sprintf("invalid header key %q", k)}
 		}
 		if o.Insecure && strings.EqualFold(k, "authorization") {
-			return &InvalidOptionsError{Reason: "authorization_header requires secure mode"}
+			return InvalidOptionsError{Reason: "authorization_header requires secure mode"}
 		}
 	}
 
 	if math.IsNaN(o.SampleRatio) || o.SampleRatio < 0 || o.SampleRatio > 1 {
-		return &InvalidOptionsError{Reason: "sample_ratio must be in [0,1]"}
+		return InvalidOptionsError{Reason: "sample_ratio must be in [0,1]"}
 	}
 
 	if o.AttrValueLimit != 0 && (o.AttrValueLimit < 256 || o.AttrValueLimit > 16384) {
-		return &InvalidOptionsError{Reason: "attribute_value_limit must be 0 or in [256,16384]"}
+		return InvalidOptionsError{Reason: "attribute_value_limit must be 0 or in [256,16384]"}
 	}
 
 	return nil
@@ -104,24 +104,24 @@ func (o Options) Validate() error {
 
 func validateEndpoint(endpoint string) error {
 	if strings.Contains(endpoint, "://") {
-		return &InvalidOptionsError{Reason: fmt.Sprintf("invalid endpoint %q", endpoint)}
+		return InvalidOptionsError{Reason: fmt.Sprintf("invalid endpoint %q", endpoint)}
 	}
 	if strings.ContainsAny(endpoint, "/?#") {
-		return &InvalidOptionsError{Reason: fmt.Sprintf("invalid endpoint %q", endpoint)}
+		return InvalidOptionsError{Reason: fmt.Sprintf("invalid endpoint %q", endpoint)}
 	}
 	host, portStr, err := net.SplitHostPort(endpoint)
 	if err != nil {
-		return &InvalidOptionsError{Reason: fmt.Sprintf("invalid endpoint %q", endpoint)}
+		return InvalidOptionsError{Reason: fmt.Sprintf("invalid endpoint %q", endpoint)}
 	}
 	if host == "" {
-		return &InvalidOptionsError{Reason: fmt.Sprintf("invalid endpoint %q", endpoint)}
+		return InvalidOptionsError{Reason: fmt.Sprintf("invalid endpoint %q", endpoint)}
 	}
 	if host == "0.0.0.0" || host == "::" {
-		return &InvalidOptionsError{Reason: fmt.Sprintf("unspecified endpoint host %q", endpoint)}
+		return InvalidOptionsError{Reason: fmt.Sprintf("unspecified endpoint host %q", endpoint)}
 	}
 	port, err := strconv.Atoi(portStr)
 	if err != nil || port < 1 || port > 65535 {
-		return &InvalidOptionsError{Reason: fmt.Sprintf("invalid endpoint port %q", endpoint)}
+		return InvalidOptionsError{Reason: fmt.Sprintf("invalid endpoint port %q", endpoint)}
 	}
 	return nil
 }

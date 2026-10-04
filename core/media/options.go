@@ -68,36 +68,36 @@ func (o Options) Validate() error {
 	var errs []error
 
 	if o.MaxDownloadBytes < 0 {
-		errs = append(errs, &InvalidOptionsError{Reason: "max_download_bytes must be >= 0"})
+		errs = append(errs, InvalidOptionsError{Reason: "max_download_bytes must be >= 0"})
 	}
 
 	if o.MaxPixels < 0 {
-		errs = append(errs, &InvalidOptionsError{Reason: "max_pixels must be >= 0"})
+		errs = append(errs, InvalidOptionsError{Reason: "max_pixels must be >= 0"})
 	}
 
 	if o.DerivedTTL < 0 {
-		errs = append(errs, &InvalidOptionsError{Reason: "derived_ttl must be >= 0"})
+		errs = append(errs, InvalidOptionsError{Reason: "derived_ttl must be >= 0"})
 	}
 
 	if o.MaxDuration < 0 {
-		errs = append(errs, &InvalidOptionsError{Reason: "max_duration must be >= 0"})
+		errs = append(errs, InvalidOptionsError{Reason: "max_duration must be >= 0"})
 	}
 
 	if o.PresignTTL < 0 || o.PresignTTL > MaxPresignTTL {
-		errs = append(errs, &InvalidOptionsError{Reason: "presign_ttl must be >= 0 and <= 7 days"})
+		errs = append(errs, InvalidOptionsError{Reason: "presign_ttl must be >= 0 and <= 7 days"})
 	}
 
 	if o.Endpoint != "" {
 		u, err := url.Parse(o.Endpoint)
 		if err != nil {
-			errs = append(errs, &InvalidOptionsError{Reason: "endpoint must be a valid url"})
+			errs = append(errs, InvalidOptionsError{Reason: "endpoint must be a valid url"})
 		} else {
 			if u.Scheme == "" {
-				errs = append(errs, &InvalidOptionsError{Reason: "endpoint must include scheme"})
+				errs = append(errs, InvalidOptionsError{Reason: "endpoint must include scheme"})
 			}
 
 			if u.Host == "" {
-				errs = append(errs, &InvalidOptionsError{Reason: "endpoint must include host"})
+				errs = append(errs, InvalidOptionsError{Reason: "endpoint must include host"})
 			}
 		}
 	}
