@@ -41,6 +41,12 @@ var ErrInvalidAdapter = errors.New("storage: invalid adapter")
 // ErrInvalidOptions is returned for invalid storage options.
 var ErrInvalidOptions = errors.New("storage: invalid options")
 
+// ErrPresignTTLExceeded is returned when a presign TTL exceeds MaxPresignTTL.
+var ErrPresignTTLExceeded = errors.New("storage: presign ttl exceeds max")
+
+// ErrEmptyPolicyEntry is returned when a policy allow/deny list contains an empty entry.
+var ErrEmptyPolicyEntry = errors.New("storage: policy contains empty entry")
+
 // InvalidAdapterError reports an invalid adapter name.
 type InvalidAdapterError struct {
 	// Adapter is the invalid adapter name.

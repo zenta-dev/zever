@@ -26,7 +26,7 @@ func ValidateTarget(target string) error {
 // ValidateTargetContext validates target like ValidateTarget using ctx for DNS.
 func ValidateTargetContext(ctx context.Context, target string) error {
 	if target == "" {
-		return errors.New("webhook: target is empty")
+		return fmt.Errorf("%w: target is empty", ErrInvalidTarget)
 	}
 	raw, err := endpoint.ValidateURL(target)
 	if err != nil {
@@ -38,7 +38,7 @@ func ValidateTargetContext(ctx context.Context, target string) error {
 	}
 	host := u.Hostname()
 	if host == "" {
-		return errors.New("webhook: target has no host")
+		return fmt.Errorf("%w: target has no host", ErrInvalidTarget)
 	}
 	var ips []net.IP
 	if ip := net.ParseIP(host); ip != nil {
@@ -54,7 +54,7 @@ func ValidateTargetContext(ctx context.Context, target string) error {
 	}
 	for _, ip := range ips {
 		if httpclient.IsPrivateIP(ip) {
-			return errors.New("webhook: target resolves to private address")
+			return fmt.Errorf("%w: target resolves to private address", ErrInvalidTarget)
 		}
 	}
 	return nil
@@ -65,7 +65,7 @@ func ValidateTargetContext(ctx context.Context, target string) error {
 // cannot tell whether the host is private; use ValidateTargetContext for that.
 func ValidateTargetSyntax(target string) error {
 	if target == "" {
-		return errors.New("webhook: target is empty")
+		return fmt.Errorf("%w: target is empty", ErrInvalidTarget)
 	}
 	normalized, err := endpoint.ValidateURL(target, endpoint.WithAllowInsecure(true))
 	if err != nil {
@@ -73,9 +73,9 @@ func ValidateTargetSyntax(target string) error {
 		case errors.Is(err, endpoint.ErrParse):
 			return fmt.Errorf("webhook: target %q is not a valid URL: %w", target, err)
 		case errors.Is(err, endpoint.ErrNoHost):
-			return errors.New("webhook: target has no host")
+			return fmt.Errorf("%w: target has no host", ErrInvalidTarget)
 		default:
-			return errors.New("webhook: target must use http or https scheme")
+			return fmt.Errorf("%w: target must use http or https scheme", ErrInvalidTarget)
 		}
 	}
 	u, err := url.Parse(normalized)
@@ -83,7 +83,7 @@ func ValidateTargetSyntax(target string) error {
 		return fmt.Errorf("webhook: target %q is not a valid URL: %w", target, err)
 	}
 	if u.Hostname() == "" {
-		return errors.New("webhook: target has no host")
+		return fmt.Errorf("%w: target has no host", ErrInvalidTarget)
 	}
 	return nil
 }
@@ -95,9 +95,9 @@ func mapShapeError(target string, err error) error {
 	case errors.Is(err, endpoint.ErrParse):
 		return fmt.Errorf("webhook: target %q is not a valid URL: %w", target, err)
 	case errors.Is(err, endpoint.ErrNoHost):
-		return errors.New("webhook: target has no host")
+		return fmt.Errorf("%w: target has no host", ErrInvalidTarget)
 	default:
-		return errors.New("webhook: target must use https scheme")
+		return fmt.Errorf("%w: target must use https scheme", ErrInvalidTarget)
 	}
 }
 
