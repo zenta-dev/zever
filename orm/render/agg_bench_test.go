@@ -19,7 +19,7 @@ func BenchmarkFlattenGroupTermsFew(b *testing.B) {
 	b.ReportAllocs()
 	b.ResetTimer()
 
-	for i := 0; i < b.N; i++ {
+	for b.Loop() {
 		_ = flattenGroupTerms(groups)
 	}
 }
@@ -39,7 +39,7 @@ func BenchmarkFlattenGroupTermsRollup(b *testing.B) {
 	b.ReportAllocs()
 	b.ResetTimer()
 
-	for i := 0; i < b.N; i++ {
+	for b.Loop() {
 		_ = flattenGroupTerms(groups)
 	}
 }
@@ -55,7 +55,7 @@ func BenchmarkFlattenGroupTermsMany(b *testing.B) {
 	b.ReportAllocs()
 	b.ResetTimer()
 
-	for i := 0; i < b.N; i++ {
+	for b.Loop() {
 		_ = flattenGroupTerms(terms)
 	}
 }

@@ -44,7 +44,7 @@ func BenchmarkRoundTrip(b *testing.B) {
 	q := newBenchQueue(b)
 	b.ReportAllocs()
 	b.ResetTimer()
-	for i := 0; i < b.N; i++ {
+	for b.Loop() {
 		benchRoundTrip(b, q, "bench")
 	}
 }

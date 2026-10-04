@@ -30,7 +30,7 @@ func BenchmarkUpsert(b *testing.B) {
 	b.ReportAllocs()
 	b.ResetTimer()
 
-	for i := 0; i < b.N; i++ {
+	for b.Loop() {
 		if err := s.Upsert(ctx, vec); err != nil {
 			b.Fatalf("Upsert(): %v", err)
 		}
@@ -55,7 +55,7 @@ func BenchmarkUpsertBatch(b *testing.B) {
 	b.ReportAllocs()
 	b.ResetTimer()
 
-	for i := 0; i < b.N; i++ {
+	for b.Loop() {
 		if err := s.UpsertBatch(ctx, vecs); err != nil {
 			b.Fatalf("UpsertBatch(): %v", err)
 		}
@@ -83,7 +83,7 @@ func BenchmarkQuery(b *testing.B) {
 	b.ReportAllocs()
 	b.ResetTimer()
 
-	for i := 0; i < b.N; i++ {
+	for b.Loop() {
 		if _, err := s.Query(ctx, benchEmbedding(), 10); err != nil {
 			b.Fatalf("Query(): %v", err)
 		}
@@ -96,7 +96,7 @@ func BenchmarkPointID(b *testing.B) {
 	b.ReportAllocs()
 	b.ResetTimer()
 
-	for i := 0; i < b.N; i++ {
+	for b.Loop() {
 		if id := pointID("benchmark-document-id"); id == nil {
 			b.Fatal("pointID() returned nil")
 		}

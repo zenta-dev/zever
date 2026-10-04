@@ -32,7 +32,7 @@ func BenchmarkAllow(b *testing.B) {
 	ctx := b.Context()
 	b.ReportAllocs()
 	b.ResetTimer()
-	for i := 0; i < b.N; i++ {
+	for b.Loop() {
 		if _, err := l.Allow(ctx, "hot", 1); err != nil {
 			b.Fatalf("Allow() = %v", err)
 		}

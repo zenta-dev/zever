@@ -15,7 +15,7 @@ func benchFreshAdapter() Adapter {
 func BenchmarkRegister(b *testing.B) {
 	b.ReportAllocs()
 	b.ResetTimer()
-	for i := 0; i < b.N; i++ {
+	for b.Loop() {
 		if err := Register(benchFreshAdapter(), func(Options) (I18n, error) { return &stubI18n{}, nil }); err != nil {
 			b.Fatalf("Register err = %v", err)
 		}
@@ -29,7 +29,7 @@ func BenchmarkOpen(b *testing.B) {
 	}
 	b.ReportAllocs()
 	b.ResetTimer()
-	for i := 0; i < b.N; i++ {
+	for b.Loop() {
 		n, err := Open(a, Options{})
 		if err != nil {
 			b.Fatalf("Open err = %v", err)
@@ -44,7 +44,7 @@ func BenchmarkAdapter_String(b *testing.B) {
 	a := Adapter("bench-adapter")
 	b.ReportAllocs()
 	b.ResetTimer()
-	for i := 0; i < b.N; i++ {
+	for b.Loop() {
 		_ = a.String()
 	}
 }
@@ -52,7 +52,7 @@ func BenchmarkAdapter_String(b *testing.B) {
 func BenchmarkParseAdapter(b *testing.B) {
 	b.ReportAllocs()
 	b.ResetTimer()
-	for i := 0; i < b.N; i++ {
+	for b.Loop() {
 		_, _ = ParseAdapter("bench-adapter")
 	}
 }
@@ -61,7 +61,7 @@ func BenchmarkOptions_Validate(b *testing.B) {
 	o := Options{Remote: RemoteOptions{Endpoint: "https://example.com/x", Timeout: 5e9, MaxInFlight: 100}}
 	b.ReportAllocs()
 	b.ResetTimer()
-	for i := 0; i < b.N; i++ {
+	for b.Loop() {
 		if err := o.Validate(); err != nil {
 			b.Fatalf("Validate err = %v", err)
 		}

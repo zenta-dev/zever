@@ -15,7 +15,7 @@ func benchFreshAdapter() Adapter {
 func BenchmarkRegister(b *testing.B) {
 	b.ReportAllocs()
 	b.ResetTimer()
-	for i := 0; i < b.N; i++ {
+	for b.Loop() {
 		if err := Register(benchFreshAdapter(), func(Options) (Provider, error) { return stubProvider{}, nil }); err != nil {
 			b.Fatalf("Register err = %v", err)
 		}
@@ -29,7 +29,7 @@ func BenchmarkOpen(b *testing.B) {
 	}
 	b.ReportAllocs()
 	b.ResetTimer()
-	for i := 0; i < b.N; i++ {
+	for b.Loop() {
 		if _, err := Open(a, Options{ServiceName: "svc"}); err != nil {
 			b.Fatalf("Open err = %v", err)
 		}
@@ -55,7 +55,7 @@ func BenchmarkOpenParallel(b *testing.B) {
 func BenchmarkParseAdapter(b *testing.B) {
 	b.ReportAllocs()
 	b.ResetTimer()
-	for i := 0; i < b.N; i++ {
+	for b.Loop() {
 		_, _ = ParseAdapter("otel")
 	}
 }
@@ -64,7 +64,7 @@ func BenchmarkOptionsValidate(b *testing.B) {
 	o := Options{ServiceName: "svc", Endpoint: "localhost:4317", Insecure: true, SampleRatio: 0.5}
 	b.ReportAllocs()
 	b.ResetTimer()
-	for i := 0; i < b.N; i++ {
+	for b.Loop() {
 		if err := o.Validate(); err != nil {
 			b.Fatalf("Validate err = %v", err)
 		}
@@ -79,7 +79,7 @@ func BenchmarkNormalizeAttrs(b *testing.B) {
 	}
 	b.ReportAllocs()
 	b.ResetTimer()
-	for i := 0; i < b.N; i++ {
+	for b.Loop() {
 		_ = normalizeAttrs(attrs, MaxValueLen)
 	}
 }
@@ -87,7 +87,7 @@ func BenchmarkNormalizeAttrs(b *testing.B) {
 func BenchmarkRedact(b *testing.B) {
 	b.ReportAllocs()
 	b.ResetTimer()
-	for i := 0; i < b.N; i++ {
+	for b.Loop() {
 		_ = redact("authorization")
 	}
 }
@@ -96,7 +96,7 @@ func BenchmarkRequestIDFromContext(b *testing.B) {
 	ctx := WithRequestID(b.Context(), "req-1")
 	b.ReportAllocs()
 	b.ResetTimer()
-	for i := 0; i < b.N; i++ {
+	for b.Loop() {
 		_ = RequestIDFromContext(ctx)
 	}
 }
@@ -105,7 +105,7 @@ func BenchmarkMapCarrierSetGet(b *testing.B) {
 	c := MapCarrier{}
 	b.ReportAllocs()
 	b.ResetTimer()
-	for i := 0; i < b.N; i++ {
+	for b.Loop() {
 		c.Set("traceparent", "00-abc-def-01")
 		_ = c.Get("traceparent")
 	}

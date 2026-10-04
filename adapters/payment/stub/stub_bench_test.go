@@ -23,7 +23,7 @@ func BenchmarkCreatePayment(b *testing.B) {
 	req := payment.Request{Amount: 100, Currency: "USD", Method: payment.MethodCard}
 	b.ReportAllocs()
 	b.ResetTimer()
-	for i := 0; i < b.N; i++ {
+	for b.Loop() {
 		if _, err := p.CreatePayment(ctx, req); err != nil {
 			b.Fatalf("CreatePayment() = %v", err)
 		}
@@ -57,7 +57,7 @@ func BenchmarkGetPayment(b *testing.B) {
 	}
 	b.ReportAllocs()
 	b.ResetTimer()
-	for i := 0; i < b.N; i++ {
+	for b.Loop() {
 		if _, err := p.GetPayment(ctx, res.ID); err != nil {
 			b.Fatalf("GetPayment() = %v", err)
 		}
@@ -75,7 +75,7 @@ func BenchmarkRefund(b *testing.B) {
 	}
 	b.ReportAllocs()
 	b.ResetTimer()
-	for i := 0; i < b.N; i++ {
+	for b.Loop() {
 		if err := p.Refund(ctx, res.ID, 1, ""); err != nil {
 			b.Fatalf("Refund() = %v", err)
 		}

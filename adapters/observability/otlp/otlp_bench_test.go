@@ -49,7 +49,7 @@ func BenchmarkSpanStartEnd(b *testing.B) {
 	attrs := benchAttrs()
 	b.ReportAllocs()
 	b.ResetTimer()
-	for i := 0; i < b.N; i++ {
+	for b.Loop() {
 		_, span := tr.Start(b.Context(), "op")
 		span.SetAttributes(attrs...)
 		span.End()
@@ -81,7 +81,7 @@ func BenchmarkNormalizeAttrs(b *testing.B) {
 	}
 	b.ReportAllocs()
 	b.ResetTimer()
-	for i := 0; i < b.N; i++ {
+	for b.Loop() {
 		if got := normalizeAttrs(attrs, 0); len(got) != len(attrs) {
 			b.Fatalf("normalizeAttrs() len = %d, want %d", len(got), len(attrs))
 		}
@@ -95,7 +95,7 @@ func BenchmarkMetricsCounter(b *testing.B) {
 	ctx := b.Context()
 	b.ReportAllocs()
 	b.ResetTimer()
-	for i := 0; i < b.N; i++ {
+	for b.Loop() {
 		if err := m.Counter(ctx, "c", 1, attrs...); err != nil {
 			b.Fatalf("Counter() = %v, want nil", err)
 		}

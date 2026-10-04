@@ -17,7 +17,7 @@ func BenchmarkJSONEncode(b *testing.B) {
 	b.ReportAllocs()
 	b.ResetTimer()
 
-	for range b.N {
+	for b.Loop() {
 		_, _ = c.Encode(benchJSONValue)
 	}
 }
@@ -34,7 +34,7 @@ func BenchmarkJSONDecode(b *testing.B) {
 	b.ReportAllocs()
 	b.ResetTimer()
 
-	for range b.N {
+	for b.Loop() {
 		_, _ = c.Decode(data)
 	}
 }
@@ -46,7 +46,7 @@ func BenchmarkJSONRoundTrip(b *testing.B) {
 	b.ReportAllocs()
 	b.ResetTimer()
 
-	for range b.N {
+	for b.Loop() {
 		data, err := c.Encode(benchJSONValue)
 		if err != nil {
 			b.Fatalf("Encode() error = %v", err)

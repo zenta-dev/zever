@@ -31,7 +31,7 @@ func BenchmarkStubSend(b *testing.B) {
 
 	b.ReportAllocs()
 	b.ResetTimer()
-	for i := 0; i < b.N; i++ {
+	for b.Loop() {
 		if err := svc.Send(ctx, "+15550001", "hello"); err != nil {
 			b.Fatalf("Send: %v", err)
 		}
@@ -52,7 +52,7 @@ func BenchmarkBuildFromConfig(b *testing.B) {
 
 	b.ReportAllocs()
 	b.ResetTimer()
-	for i := 0; i < b.N; i++ {
+	for b.Loop() {
 		if _, err := sms.BuildFromConfig(cfg); err != nil {
 			b.Fatalf("BuildFromConfig: %v", err)
 		}
@@ -63,7 +63,7 @@ func BenchmarkBuildFromConfig(b *testing.B) {
 func BenchmarkParseAdapter(b *testing.B) {
 	b.ReportAllocs()
 	b.ResetTimer()
-	for i := 0; i < b.N; i++ {
+	for b.Loop() {
 		if _, err := sms.ParseAdapter("stub"); err != nil {
 			b.Fatalf("ParseAdapter: %v", err)
 		}
@@ -76,7 +76,7 @@ func BenchmarkOptionsValidate(b *testing.B) {
 
 	b.ReportAllocs()
 	b.ResetTimer()
-	for i := 0; i < b.N; i++ {
+	for b.Loop() {
 		if err := opts.Validate(); err != nil {
 			b.Fatalf("Validate: %v", err)
 		}

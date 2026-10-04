@@ -77,7 +77,7 @@ func BenchmarkRunReindex(b *testing.B) {
 
 	b.ReportAllocs()
 	b.ResetTimer()
-	for i := 0; i < b.N; i++ {
+	for b.Loop() {
 		if err := jobs.RunReindex(ctx, deps); err != nil {
 			b.Fatalf("RunReindex: %v", err)
 		}
@@ -91,7 +91,7 @@ func BenchmarkRunDailyReport(b *testing.B) {
 
 	b.ReportAllocs()
 	b.ResetTimer()
-	for i := 0; i < b.N; i++ {
+	for b.Loop() {
 		if err := jobs.RunDailyReport(ctx, deps); err != nil {
 			b.Fatalf("RunDailyReport: %v", err)
 		}

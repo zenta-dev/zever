@@ -11,7 +11,7 @@ import (
 func BenchmarkRegister(b *testing.B) {
 	b.ReportAllocs()
 	b.ResetTimer()
-	for i := 0; i < b.N; i++ {
+	for b.Loop() {
 		if err := lock.Register(freshLockAdapter(), func(lock.Options) (lock.Locker, error) { return stubLocker{}, nil }); err != nil {
 			b.Fatalf("Register err = %v", err)
 		}
@@ -25,7 +25,7 @@ func BenchmarkOpen(b *testing.B) {
 	}
 	b.ReportAllocs()
 	b.ResetTimer()
-	for i := 0; i < b.N; i++ {
+	for b.Loop() {
 		if _, err := lock.Open(a, lock.Options{}); err != nil {
 			b.Fatalf("Open err = %v", err)
 		}
@@ -51,7 +51,7 @@ func BenchmarkOpenParallel(b *testing.B) {
 func BenchmarkParseAdapter(b *testing.B) {
 	b.ReportAllocs()
 	b.ResetTimer()
-	for i := 0; i < b.N; i++ {
+	for b.Loop() {
 		_, _ = lock.ParseAdapter("redis")
 	}
 }
@@ -60,7 +60,7 @@ func BenchmarkAdapterString(b *testing.B) {
 	a := lock.Adapter("redis")
 	b.ReportAllocs()
 	b.ResetTimer()
-	for i := 0; i < b.N; i++ {
+	for b.Loop() {
 		_ = a.String()
 	}
 }
@@ -79,7 +79,7 @@ func BenchmarkTryAcquire(b *testing.B) {
 	ctx := b.Context()
 	b.ReportAllocs()
 	b.ResetTimer()
-	for i := 0; i < b.N; i++ {
+	for b.Loop() {
 		held, ok, acqErr := l.TryAcquire(ctx, "bench-key", time.Minute)
 		if acqErr != nil {
 			b.Fatalf("TryAcquire err = %v", acqErr)

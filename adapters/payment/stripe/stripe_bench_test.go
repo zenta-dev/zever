@@ -54,7 +54,7 @@ func BenchmarkCreatePayment(b *testing.B) {
 	req := payment.Request{Amount: 2000, Currency: "usd"}
 	b.ReportAllocs()
 	b.ResetTimer()
-	for i := 0; i < b.N; i++ {
+	for b.Loop() {
 		if _, err := p.CreatePayment(ctx, req); err != nil {
 			b.Fatalf("CreatePayment() = %v", err)
 		}
@@ -85,7 +85,7 @@ func BenchmarkRefund(b *testing.B) {
 	ctx := b.Context()
 	b.ReportAllocs()
 	b.ResetTimer()
-	for i := 0; i < b.N; i++ {
+	for b.Loop() {
 		if err := p.Refund(ctx, "pi_bench", 500, ""); err != nil {
 			b.Fatalf("Refund() = %v", err)
 		}
@@ -105,7 +105,7 @@ func BenchmarkWebhookEvent(b *testing.B) {
 	ctx := b.Context()
 	b.ReportAllocs()
 	b.ResetTimer()
-	for i := 0; i < b.N; i++ {
+	for b.Loop() {
 		if _, err := p.WebhookEvent(ctx, raw, sig); err != nil {
 			b.Fatalf("WebhookEvent() = %v", err)
 		}
@@ -116,7 +116,7 @@ func BenchmarkWebhookEvent(b *testing.B) {
 func BenchmarkRefundFingerprint(b *testing.B) {
 	b.ReportAllocs()
 	b.ResetTimer()
-	for i := 0; i < b.N; i++ {
+	for b.Loop() {
 		if got := refundFingerprint("pi_bench", 500); len(got) == 0 {
 			b.Fatal("refundFingerprint() empty")
 		}

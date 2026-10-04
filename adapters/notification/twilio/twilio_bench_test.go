@@ -52,7 +52,7 @@ func BenchmarkNotify(b *testing.B) {
 	in := validSMS()
 	b.ReportAllocs()
 	b.ResetTimer()
-	for i := 0; i < b.N; i++ {
+	for b.Loop() {
 		if err := n.Notify(b.Context(), in); err != nil {
 			b.Fatalf("Notify() = %v, want nil", err)
 		}

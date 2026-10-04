@@ -24,7 +24,7 @@ func BenchmarkTypedCacheRoundTrip(b *testing.B) {
 
 	b.ReportAllocs()
 	b.ResetTimer()
-	for i := 0; i < b.N; i++ {
+	for b.Loop() {
 		if err := typed.Set(ctx, "space:card:42", card, 5*time.Minute); err != nil {
 			b.Fatalf("Set: %v", err)
 		}

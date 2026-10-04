@@ -31,7 +31,7 @@ func BenchmarkLookup(b *testing.B) {
 	}
 	b.ReportAllocs()
 	b.ResetTimer()
-	for i := 0; i < b.N; i++ {
+	for b.Loop() {
 		if _, ok := Lookup("bench-lookup"); !ok {
 			b.Fatal("Lookup miss")
 		}
@@ -58,7 +58,7 @@ func BenchmarkPriorityString(b *testing.B) {
 	var p Priority = PriorityHigh
 	b.ReportAllocs()
 	b.ResetTimer()
-	for i := 0; i < b.N; i++ {
+	for b.Loop() {
 		_ = p.String()
 	}
 }
@@ -67,7 +67,7 @@ func BenchmarkRetryPolicyBackoff(b *testing.B) {
 	p := DefaultRetryPolicy()
 	b.ReportAllocs()
 	b.ResetTimer()
-	for i := 0; i < b.N; i++ {
+	for b.Loop() {
 		_ = p.Backoff(10)
 	}
 }
@@ -82,7 +82,7 @@ func BenchmarkDispatch(b *testing.B) {
 	ctx := b.Context()
 	b.ReportAllocs()
 	b.ResetTimer()
-	for i := 0; i < b.N; i++ {
+	for b.Loop() {
 		if err := d.Dispatch(ctx, "bench-dispatch", args); err != nil {
 			b.Fatalf("Dispatch err = %v", err)
 		}
@@ -94,7 +94,7 @@ func BenchmarkUse(b *testing.B) {
 	mw := func(next Handler) Handler { return next }
 	b.ReportAllocs()
 	b.ResetTimer()
-	for i := 0; i < b.N; i++ {
+	for b.Loop() {
 		if err := Use(mw); err != nil {
 			b.Fatalf("Use err = %v", err)
 		}
@@ -104,7 +104,7 @@ func BenchmarkUse(b *testing.B) {
 func BenchmarkUniqueID(b *testing.B) {
 	b.ReportAllocs()
 	b.ResetTimer()
-	for i := 0; i < b.N; i++ {
+	for b.Loop() {
 		_ = uniqueID("bench-job", "unique-key")
 	}
 }
@@ -119,7 +119,7 @@ func BenchmarkDispatchDelayed(b *testing.B) {
 	ctx := b.Context()
 	b.ReportAllocs()
 	b.ResetTimer()
-	for i := 0; i < b.N; i++ {
+	for b.Loop() {
 		if err := d.Dispatch(ctx, "bench-dispatch-delayed", args, In(time.Hour)); err != nil {
 			b.Fatalf("Dispatch err = %v", err)
 		}

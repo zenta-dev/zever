@@ -17,7 +17,7 @@ func benchFreshAdapter() password.Adapter {
 func BenchmarkRegister(b *testing.B) {
 	b.ReportAllocs()
 	b.ResetTimer()
-	for i := 0; i < b.N; i++ {
+	for b.Loop() {
 		if err := password.Register(benchFreshAdapter(), stubFactory); err != nil {
 			b.Fatalf("Register err = %v", err)
 		}
@@ -42,7 +42,7 @@ func BenchmarkOpen(b *testing.B) {
 	opts := benchOptions()
 	b.ReportAllocs()
 	b.ResetTimer()
-	for i := 0; i < b.N; i++ {
+	for b.Loop() {
 		if _, err := password.Open(a, opts); err != nil {
 			b.Fatalf("Open err = %v", err)
 		}
@@ -69,7 +69,7 @@ func BenchmarkOpenParallel(b *testing.B) {
 func BenchmarkParseAdapter(b *testing.B) {
 	b.ReportAllocs()
 	b.ResetTimer()
-	for i := 0; i < b.N; i++ {
+	for b.Loop() {
 		_, _ = password.ParseAdapter("argon2id")
 	}
 }
@@ -84,7 +84,7 @@ func BenchmarkOptionsValidate(b *testing.B) {
 	}
 	b.ReportAllocs()
 	b.ResetTimer()
-	for i := 0; i < b.N; i++ {
+	for b.Loop() {
 		if err := o.Validate(); err != nil {
 			b.Fatalf("Validate err = %v", err)
 		}
@@ -96,7 +96,7 @@ func BenchmarkHasherHash(b *testing.B) {
 	ctx := b.Context()
 	b.ReportAllocs()
 	b.ResetTimer()
-	for i := 0; i < b.N; i++ {
+	for b.Loop() {
 		if _, err := h.Hash(ctx, "benchmark-password"); err != nil {
 			b.Fatalf("Hash err = %v", err)
 		}
@@ -108,7 +108,7 @@ func BenchmarkHasherVerify(b *testing.B) {
 	ctx := b.Context()
 	b.ReportAllocs()
 	b.ResetTimer()
-	for i := 0; i < b.N; i++ {
+	for b.Loop() {
 		if _, err := h.Verify(ctx, "hash:secret", "secret"); err != nil {
 			b.Fatalf("Verify err = %v", err)
 		}

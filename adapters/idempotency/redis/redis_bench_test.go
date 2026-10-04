@@ -51,7 +51,7 @@ func BenchmarkBegin(b *testing.B) {
 	b.ReportAllocs()
 	b.ResetTimer()
 
-	for i := 0; i < b.N; i++ {
+	for b.Loop() {
 		key := fmt.Sprintf("bench-%d", benchKeySeq.Add(1))
 
 		if _, err := s.Begin(ctx, key, idempotency.BeginOptions{Fingerprint: fp}); err != nil {
@@ -70,7 +70,7 @@ func BenchmarkComplete(b *testing.B) {
 	b.ReportAllocs()
 	b.ResetTimer()
 
-	for i := 0; i < b.N; i++ {
+	for b.Loop() {
 		key := fmt.Sprintf("bench-%d", benchKeySeq.Add(1))
 
 		if err := s.Complete(ctx, key, fp, []byte("result")); err != nil {

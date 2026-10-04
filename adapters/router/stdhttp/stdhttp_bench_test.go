@@ -27,7 +27,7 @@ func BenchmarkServeHTTPParam(b *testing.B) {
 	req := httptest.NewRequestWithContext(b.Context(), http.MethodGet, "/hello/world", nil)
 	b.ReportAllocs()
 	b.ResetTimer()
-	for i := 0; i < b.N; i++ {
+	for b.Loop() {
 		r.ServeHTTP(httptest.NewRecorder(), req)
 	}
 }
@@ -41,7 +41,7 @@ func BenchmarkServeHTTPStatic(b *testing.B) {
 	req := httptest.NewRequestWithContext(b.Context(), http.MethodGet, "/hello", nil)
 	b.ReportAllocs()
 	b.ResetTimer()
-	for i := 0; i < b.N; i++ {
+	for b.Loop() {
 		r.ServeHTTP(httptest.NewRecorder(), req)
 	}
 }

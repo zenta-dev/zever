@@ -7,7 +7,7 @@ func BenchmarkEscapeKey(b *testing.B) {
 	b.ReportAllocs()
 	b.ResetTimer()
 
-	for range b.N {
+	for b.Loop() {
 		_ = EscapeKey("media/2026/photo one.jpg")
 	}
 }
@@ -19,7 +19,7 @@ func BenchmarkStaticURL(b *testing.B) {
 	b.ReportAllocs()
 	b.ResetTimer()
 
-	for range b.N {
+	for b.Loop() {
 		if _, err := c.StaticURL("bucket", "media/photo.jpg"); err != nil {
 			b.Fatalf("StaticURL() error = %v", err)
 		}
@@ -33,7 +33,7 @@ func BenchmarkWithDefaults(b *testing.B) {
 	b.ReportAllocs()
 	b.ResetTimer()
 
-	for range b.N {
+	for b.Loop() {
 		_ = cfg.WithDefaults("")
 	}
 }
@@ -45,7 +45,7 @@ func BenchmarkValidate(b *testing.B) {
 	b.ReportAllocs()
 	b.ResetTimer()
 
-	for range b.N {
+	for b.Loop() {
 		if err := cfg.Validate(true, true); err != nil {
 			b.Fatalf("Validate() error = %v", err)
 		}

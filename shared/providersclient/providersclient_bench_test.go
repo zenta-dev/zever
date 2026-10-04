@@ -15,7 +15,7 @@ func BenchmarkNewStripeClientWithHTTPClient(b *testing.B) {
 	b.ReportAllocs()
 	b.ResetTimer()
 
-	for range b.N {
+	for b.Loop() {
 		if c := NewStripeClientWithHTTPClient("sk_test", "", hc); c == nil {
 			b.Fatal("NewStripeClientWithHTTPClient() = nil")
 		}

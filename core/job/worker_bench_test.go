@@ -21,7 +21,7 @@ func BenchmarkWorkerEmptyPoll(b *testing.B) {
 	b.ReportAllocs()
 	b.ResetTimer()
 
-	for i := 0; i < b.N; i++ {
+	for b.Loop() {
 		attempt := 0
 		if w.handleEmpty(b.Context(), &wg, &attempt, DefaultMaxPollWait, timer) {
 			b.Fatal("handleEmpty returned true for background context")

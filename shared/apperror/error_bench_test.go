@@ -17,7 +17,7 @@ func BenchmarkNew(b *testing.B) {
 	b.ReportAllocs()
 	b.ResetTimer()
 
-	for range b.N {
+	for b.Loop() {
 		_ = New(NotFound, "no such task").Error()
 	}
 }
@@ -29,7 +29,7 @@ func BenchmarkWrap(b *testing.B) {
 	b.ReportAllocs()
 	b.ResetTimer()
 
-	for range b.N {
+	for b.Loop() {
 		_ = Wrap(Internal, "something broke", cause).Error()
 	}
 }

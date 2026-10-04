@@ -42,7 +42,7 @@ func BenchmarkPresignUpload(b *testing.B) {
 	b.ReportAllocs()
 	b.ResetTimer()
 
-	for i := 0; i < b.N; i++ {
+	for b.Loop() {
 		if _, err := a.PresignUpload(ctx, "bucket", "dir/object.txt", "text/plain", time.Minute); err != nil {
 			b.Fatalf("PresignUpload(): %v", err)
 		}
@@ -57,7 +57,7 @@ func BenchmarkPresignDownload(b *testing.B) {
 	b.ReportAllocs()
 	b.ResetTimer()
 
-	for i := 0; i < b.N; i++ {
+	for b.Loop() {
 		if _, err := a.PresignDownload(ctx, "bucket", "dir/object.txt", time.Minute); err != nil {
 			b.Fatalf("PresignDownload(): %v", err)
 		}
@@ -77,7 +77,7 @@ func BenchmarkBucketPolicyDoc(b *testing.B) {
 	b.ReportAllocs()
 	b.ResetTimer()
 
-	for i := 0; i < b.N; i++ {
+	for b.Loop() {
 		if doc := bucketPolicyDoc(p, "bucket"); doc == "" {
 			b.Fatal("bucketPolicyDoc() returned empty document")
 		}

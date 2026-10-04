@@ -9,7 +9,7 @@ import (
 // BenchmarkDefault measures building the zero-infrastructure default config.
 func BenchmarkDefault(b *testing.B) {
 	b.ReportAllocs()
-	for i := 0; i < b.N; i++ {
+	for b.Loop() {
 		if Default() == nil {
 			b.Fatal("nil config")
 		}
@@ -27,7 +27,7 @@ func BenchmarkLoadFile(b *testing.B) {
 
 	b.ReportAllocs()
 	b.ResetTimer()
-	for i := 0; i < b.N; i++ {
+	for b.Loop() {
 		cfg, err := Load(path)
 		if err != nil {
 			b.Fatalf("Load: %v", err)
@@ -45,7 +45,7 @@ func BenchmarkValidate(b *testing.B) {
 
 	b.ReportAllocs()
 	b.ResetTimer()
-	for i := 0; i < b.N; i++ {
+	for b.Loop() {
 		if err := cfg.Validate(); err != nil {
 			b.Fatalf("Validate: %v", err)
 		}
@@ -59,7 +59,7 @@ func BenchmarkRedactedServices(b *testing.B) {
 
 	b.ReportAllocs()
 	b.ResetTimer()
-	for i := 0; i < b.N; i++ {
+	for b.Loop() {
 		if got := cfg.RedactedServices(); len(got) != 34 {
 			b.Fatalf("got %d services, want 34", len(got))
 		}
@@ -80,7 +80,7 @@ func BenchmarkRedact(b *testing.B) {
 
 	b.ReportAllocs()
 	b.ResetTimer()
-	for i := 0; i < b.N; i++ {
+	for b.Loop() {
 		out := Redact(m)
 		if out["dsn"] != RedactedValue {
 			b.Fatalf("dsn not redacted: %v", out["dsn"])
@@ -96,7 +96,7 @@ func BenchmarkApplyEnv(b *testing.B) {
 
 	b.ReportAllocs()
 	b.ResetTimer()
-	for i := 0; i < b.N; i++ {
+	for b.Loop() {
 		if err := applyEnv(cfg); err != nil {
 			b.Fatalf("applyEnv: %v", err)
 		}

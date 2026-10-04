@@ -47,7 +47,7 @@ func BenchmarkDeliver(b *testing.B) {
 	b.ReportAllocs()
 	b.ResetTimer()
 
-	for i := 0; i < b.N; i++ {
+	for b.Loop() {
 		if err := a.Deliver(ctx, "evt", payload); err != nil {
 			b.Fatalf("Deliver(): %v", err)
 		}
@@ -62,7 +62,7 @@ func BenchmarkSignAt(b *testing.B) {
 	b.ReportAllocs()
 	b.ResetTimer()
 
-	for i := 0; i < b.N; i++ {
+	for b.Loop() {
 		if sig := signAt("bench-secret", payload, 1700000000); sig == "" {
 			b.Fatal("signAt() returned empty signature")
 		}

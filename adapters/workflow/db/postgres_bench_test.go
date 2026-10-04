@@ -42,7 +42,7 @@ func BenchmarkStart(b *testing.B) {
 	b.ReportAllocs()
 	b.ResetTimer()
 
-	for i := 0; i < b.N; i++ {
+	for b.Loop() {
 		if _, err := d.Start(ctx, "bench", "input", ""); err != nil {
 			b.Fatalf("Start(): %v", err)
 		}
@@ -65,7 +65,7 @@ func BenchmarkQuery(b *testing.B) {
 	b.ReportAllocs()
 	b.ResetTimer()
 
-	for i := 0; i < b.N; i++ {
+	for b.Loop() {
 		if err := d.Query(ctx, id, "state", &out); err != nil {
 			b.Fatalf("Query(): %v", err)
 		}

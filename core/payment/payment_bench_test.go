@@ -7,7 +7,7 @@ import (
 func BenchmarkRegister(b *testing.B) {
 	b.ReportAllocs()
 	b.ResetTimer()
-	for i := 0; i < b.N; i++ {
+	for b.Loop() {
 		if err := Register(freshAdapter(), func(Options) (Payment, error) { return &stubPayment{}, nil }); err != nil {
 			b.Fatalf("Register err = %v", err)
 		}
@@ -21,7 +21,7 @@ func BenchmarkOpen(b *testing.B) {
 	}
 	b.ReportAllocs()
 	b.ResetTimer()
-	for i := 0; i < b.N; i++ {
+	for b.Loop() {
 		if _, err := Open(a, Options{}); err != nil {
 			b.Fatalf("Open err = %v", err)
 		}
@@ -47,7 +47,7 @@ func BenchmarkOpenParallel(b *testing.B) {
 func BenchmarkParseAdapter(b *testing.B) {
 	b.ReportAllocs()
 	b.ResetTimer()
-	for i := 0; i < b.N; i++ {
+	for b.Loop() {
 		_, _ = ParseAdapter("stripe")
 	}
 }
@@ -56,7 +56,7 @@ func BenchmarkOptionsValidate(b *testing.B) {
 	o := Options{MaxWebhookBytes: DefaultMaxWebhookBytes}
 	b.ReportAllocs()
 	b.ResetTimer()
-	for i := 0; i < b.N; i++ {
+	for b.Loop() {
 		if err := o.Validate(); err != nil {
 			b.Fatalf("Validate err = %v", err)
 		}
@@ -68,7 +68,7 @@ func BenchmarkLimitDecode(b *testing.B) {
 	var out Result
 	b.ReportAllocs()
 	b.ResetTimer()
-	for i := 0; i < b.N; i++ {
+	for b.Loop() {
 		if err := LimitDecode(raw, &out, DefaultMaxWebhookBytes); err != nil {
 			b.Fatalf("LimitDecode err = %v", err)
 		}
@@ -81,7 +81,7 @@ func BenchmarkCreatePayment(b *testing.B) {
 	ctx := b.Context()
 	b.ReportAllocs()
 	b.ResetTimer()
-	for i := 0; i < b.N; i++ {
+	for b.Loop() {
 		if _, err := p.CreatePayment(ctx, req); err != nil {
 			b.Fatalf("CreatePayment err = %v", err)
 		}

@@ -43,7 +43,7 @@ func BenchmarkIndex(b *testing.B) {
 	b.ReportAllocs()
 	b.ResetTimer()
 
-	for i := 0; i < b.N; i++ {
+	for b.Loop() {
 		if err := s.Index(ctx, doc); err != nil {
 			b.Fatalf("Index(): %v", err)
 		}
@@ -67,7 +67,7 @@ func BenchmarkSearch(b *testing.B) {
 	b.ReportAllocs()
 	b.ResetTimer()
 
-	for i := 0; i < b.N; i++ {
+	for b.Loop() {
 		if _, err := s.Search(ctx, "quick fox", opts); err != nil {
 			b.Fatalf("Search(): %v", err)
 		}
@@ -87,7 +87,7 @@ func BenchmarkIndexBatch(b *testing.B) {
 	b.ReportAllocs()
 	b.ResetTimer()
 
-	for i := 0; i < b.N; i++ {
+	for b.Loop() {
 		if err := s.IndexBatch(ctx, docs); err != nil {
 			b.Fatalf("IndexBatch(): %v", err)
 		}

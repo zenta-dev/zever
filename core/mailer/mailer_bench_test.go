@@ -5,7 +5,7 @@ import "testing"
 func BenchmarkRegister(b *testing.B) {
 	b.ReportAllocs()
 	b.ResetTimer()
-	for i := 0; i < b.N; i++ {
+	for b.Loop() {
 		if err := Register(freshAdapter(), func(Options) (Mailer, error) { return &stubMailer{}, nil }); err != nil {
 			b.Fatalf("Register err = %v", err)
 		}
@@ -24,7 +24,7 @@ func BenchmarkOpen(b *testing.B) {
 	opts := benchOptions()
 	b.ReportAllocs()
 	b.ResetTimer()
-	for i := 0; i < b.N; i++ {
+	for b.Loop() {
 		if _, err := Open(a, opts); err != nil {
 			b.Fatalf("Open err = %v", err)
 		}
@@ -51,7 +51,7 @@ func BenchmarkOpenParallel(b *testing.B) {
 func BenchmarkParseAdapter(b *testing.B) {
 	b.ReportAllocs()
 	b.ResetTimer()
-	for i := 0; i < b.N; i++ {
+	for b.Loop() {
 		_, _ = ParseAdapter("smtp")
 	}
 }
@@ -60,7 +60,7 @@ func BenchmarkAddressValidate(b *testing.B) {
 	a := Address{Name: "Alice", Address: "alice@example.com"}
 	b.ReportAllocs()
 	b.ResetTimer()
-	for i := 0; i < b.N; i++ {
+	for b.Loop() {
 		if err := a.Validate(); err != nil {
 			b.Fatalf("Validate err = %v", err)
 		}
@@ -71,7 +71,7 @@ func BenchmarkAddressString(b *testing.B) {
 	a := Address{Name: "Alice", Address: "alice@example.com"}
 	b.ReportAllocs()
 	b.ResetTimer()
-	for i := 0; i < b.N; i++ {
+	for b.Loop() {
 		_ = a.String()
 	}
 }
@@ -81,7 +81,7 @@ func BenchmarkNewMail(b *testing.B) {
 	to := []Address{{Address: "b@example.com"}}
 	b.ReportAllocs()
 	b.ResetTimer()
-	for i := 0; i < b.N; i++ {
+	for b.Loop() {
 		_ = NewMail(from, to, "subject", "body")
 	}
 }
@@ -96,7 +96,7 @@ func BenchmarkMailClone(b *testing.B) {
 	}
 	b.ReportAllocs()
 	b.ResetTimer()
-	for i := 0; i < b.N; i++ {
+	for b.Loop() {
 		_ = m.Clone()
 	}
 }
@@ -108,7 +108,7 @@ func BenchmarkSenderSend(b *testing.B) {
 	ctx := b.Context()
 	b.ReportAllocs()
 	b.ResetTimer()
-	for i := 0; i < b.N; i++ {
+	for b.Loop() {
 		if err := s.Send(ctx, m, msg); err != nil {
 			b.Fatalf("Send err = %v", err)
 		}

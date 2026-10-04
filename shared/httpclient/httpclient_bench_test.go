@@ -14,7 +14,7 @@ func BenchmarkReadLimited(b *testing.B) {
 	b.ReportAllocs()
 	b.ResetTimer()
 
-	for range b.N {
+	for b.Loop() {
 		if _, err := ReadLimited(b.Context(), bytes.NewReader(data), 4096); err != nil {
 			b.Fatalf("ReadLimited() error = %v", err)
 		}
@@ -28,7 +28,7 @@ func BenchmarkIsPrivateIP(b *testing.B) {
 	b.ReportAllocs()
 	b.ResetTimer()
 
-	for range b.N {
+	for b.Loop() {
 		_ = IsPrivateIP(ip)
 	}
 }
@@ -38,7 +38,7 @@ func BenchmarkNewClient(b *testing.B) {
 	b.ReportAllocs()
 	b.ResetTimer()
 
-	for range b.N {
+	for b.Loop() {
 		_ = NewClient(time.Second)
 	}
 }
@@ -48,7 +48,7 @@ func BenchmarkSafeDialContext(b *testing.B) {
 	b.ReportAllocs()
 	b.ResetTimer()
 
-	for range b.N {
+	for b.Loop() {
 		_ = SafeDialContext(false)
 	}
 }

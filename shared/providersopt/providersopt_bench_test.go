@@ -7,7 +7,7 @@ func BenchmarkValidateEndpointValid(b *testing.B) {
 	b.ReportAllocs()
 	b.ResetTimer()
 
-	for range b.N {
+	for b.Loop() {
 		if errs := ValidateEndpoint("https://api.example.com/v1"); len(errs) != 0 {
 			b.Fatalf("ValidateEndpoint() = %v", errs)
 		}
@@ -19,7 +19,7 @@ func BenchmarkValidateEndpointInvalid(b *testing.B) {
 	b.ReportAllocs()
 	b.ResetTimer()
 
-	for range b.N {
+	for b.Loop() {
 		_ = ValidateEndpoint("example.com/v1")
 	}
 }
@@ -29,7 +29,7 @@ func BenchmarkPaddleEndpoint(b *testing.B) {
 	b.ReportAllocs()
 	b.ResetTimer()
 
-	for range b.N {
+	for b.Loop() {
 		_ = PaddleEndpoint("", true)
 	}
 }

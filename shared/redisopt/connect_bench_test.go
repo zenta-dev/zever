@@ -7,7 +7,7 @@ func BenchmarkValidateAddr(b *testing.B) {
 	b.ReportAllocs()
 	b.ResetTimer()
 
-	for range b.N {
+	for b.Loop() {
 		if err := ValidateAddr("localhost:6379"); err != nil {
 			b.Fatalf("ValidateAddr() error = %v", err)
 		}
@@ -19,7 +19,7 @@ func BenchmarkValidatePrefix(b *testing.B) {
 	b.ReportAllocs()
 	b.ResetTimer()
 
-	for range b.N {
+	for b.Loop() {
 		if err := ValidatePrefix("session_v1"); err != nil {
 			b.Fatalf("ValidatePrefix() error = %v", err)
 		}
@@ -31,7 +31,7 @@ func BenchmarkIsTokenChar(b *testing.B) {
 	b.ReportAllocs()
 	b.ResetTimer()
 
-	for range b.N {
+	for b.Loop() {
 		_ = IsTokenChar('a')
 	}
 }
@@ -41,7 +41,7 @@ func BenchmarkRedactAddr(b *testing.B) {
 	b.ReportAllocs()
 	b.ResetTimer()
 
-	for range b.N {
+	for b.Loop() {
 		_ = RedactAddr("redis://bob:s3cret@h:6379")
 	}
 }

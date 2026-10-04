@@ -10,7 +10,7 @@ func BenchmarkToRedisOptions(b *testing.B) {
 	b.ReportAllocs()
 	b.ResetTimer()
 
-	for range b.N {
+	for b.Loop() {
 		if _, err := toRedisOptions(opts); err != nil {
 			b.Fatalf("toRedisOptions() error = %v", err)
 		}
