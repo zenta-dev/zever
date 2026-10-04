@@ -12,29 +12,29 @@ import (
 	"github.com/zenta-dev/zever/core/crypto"
 )
 
-func genAESKey(t *testing.T) string {
-	t.Helper()
+func genAESKey(tb testing.TB) string {
+	tb.Helper()
 	b := make([]byte, 32)
 	if _, err := rand.Read(b); err != nil {
-		t.Fatal(err)
+		tb.Fatal(err)
 	}
 	return base64.StdEncoding.EncodeToString(b)
 }
 
-func genSignKey(t *testing.T) string {
-	t.Helper()
+func genSignKey(tb testing.TB) string {
+	tb.Helper()
 	_, priv, err := ed25519.GenerateKey(rand.Reader)
 	if err != nil {
-		t.Fatal(err)
+		tb.Fatal(err)
 	}
 	return base64.StdEncoding.EncodeToString(priv)
 }
 
-func mustNew(t *testing.T, opts crypto.Options) crypto.Crypto {
-	t.Helper()
+func mustNew(tb testing.TB, opts crypto.Options) crypto.Crypto {
+	tb.Helper()
 	c, err := New(opts)
 	if err != nil {
-		t.Fatalf("New failed: %v", err)
+		tb.Fatalf("New failed: %v", err)
 	}
 	return c
 }

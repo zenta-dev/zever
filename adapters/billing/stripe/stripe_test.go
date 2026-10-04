@@ -111,11 +111,11 @@ func newDefaultMux(invoiceHandler http.HandlerFunc) *http.ServeMux {
 	return mux
 }
 
-func openWithServer(t *testing.T, srv *httptest.Server) billing.Billing {
-	t.Helper()
+func openWithServer(tb testing.TB, srv *httptest.Server) billing.Billing {
+	tb.Helper()
 	b, err := New(billing.Options{SecretKey: "sk_test_123", Endpoint: srv.URL})
 	if err != nil {
-		t.Fatalf("New() error = %v", err)
+		tb.Fatalf("New() error = %v", err)
 	}
 	return b
 }

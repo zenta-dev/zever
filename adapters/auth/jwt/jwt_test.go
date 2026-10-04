@@ -68,15 +68,15 @@ func baseOpts() auth.Options {
 	}}
 }
 
-func freshAdapter(t *testing.T, opts auth.Options) auth.Auth {
-	t.Helper()
+func freshAdapter(tb testing.TB, opts auth.Options) auth.Auth {
+	tb.Helper()
 	a, err := New(opts)
 	if err != nil {
-		t.Fatalf("New() error = %v", err)
+		tb.Fatalf("New() error = %v", err)
 	}
-	t.Cleanup(func() {
+	tb.Cleanup(func() {
 		if err := a.Close(); err != nil {
-			t.Errorf("Close() error = %v", err)
+			tb.Errorf("Close() error = %v", err)
 		}
 	})
 	return a

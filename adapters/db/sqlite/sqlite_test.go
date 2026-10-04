@@ -43,16 +43,16 @@ func newTempDB(t *testing.T, opts db.Options) db.DB {
 }
 
 // newMemoryDB opens an isolated :memory: adapter.
-func newMemoryDB(t *testing.T) db.DB {
-	t.Helper()
+func newMemoryDB(tb testing.TB) db.DB {
+	tb.Helper()
 
 	d, err := New(db.Options{Path: ":memory:"})
 	if err != nil {
-		t.Fatalf("New: %v", err)
+		tb.Fatalf("New: %v", err)
 	}
 
-	t.Cleanup(func() {
-		_ = d.Close(t.Context())
+	tb.Cleanup(func() {
+		_ = d.Close(tb.Context())
 	})
 
 	return d

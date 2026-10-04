@@ -35,12 +35,12 @@ func b64u(b []byte) string {
 	return base64.RawURLEncoding.EncodeToString(b)
 }
 
-func newFakeIDP(t *testing.T) *fakeIDP {
-	t.Helper()
+func newFakeIDP(tb testing.TB) *fakeIDP {
+	tb.Helper()
 
 	key, err := rsa.GenerateKey(rand.Reader, 2048)
 	if err != nil {
-		t.Fatalf("generate test key: %s", err)
+		tb.Fatalf("generate test key: %s", err)
 	}
 
 	idp := &fakeIDP{key: key, kid: "test-key-1"}
@@ -69,17 +69,17 @@ func newFakeIDP(t *testing.T) *fakeIDP {
 	})
 
 	idp.srv = httptest.NewServer(mux)
-	t.Cleanup(idp.srv.Close)
+	tb.Cleanup(idp.srv.Close)
 	return idp
 }
 
 // mintToken hand-rolls an RS256 JWT with stdlib only: no JWT signer dep.
-func mintToken(t *testing.T, key *rsa.PrivateKey, kid, iss, aud string, exp time.Time, extra map[string]any) string {
-	t.Helper()
+func mintToken(tb testing.TB, key *rsa.PrivateKey, kid, iss, aud string, exp time.Time, extra map[string]any) string {
+	tb.Helper()
 
 	header, err := json.Marshal(map[string]any{"alg": "RS256", "kid": kid, "typ": "JWT"})
 	if err != nil {
-		t.Fatalf("marshal header: %s", err)
+		tb.Fatalf("marshal header: %s", err)
 	}
 	payloadMap := map[string]any{
 		"iss": iss,
@@ -93,20 +93,20 @@ func mintToken(t *testing.T, key *rsa.PrivateKey, kid, iss, aud string, exp time
 	}
 	payload, err := json.Marshal(payloadMap)
 	if err != nil {
-		t.Fatalf("marshal payload: %s", err)
+		tb.Fatalf("marshal payload: %s", err)
 	}
 
 	input := b64u(header) + "." + b64u(payload)
 	sum := sha256.Sum256([]byte(input))
 	sig, err := rsa.SignPKCS1v15(rand.Reader, key, crypto.SHA256, sum[:])
 	if err != nil {
-		t.Fatalf("sign token: %s", err)
+		tb.Fatalf("sign token: %s", err)
 	}
 	return input + "." + b64u(sig)
 }
 
-func newAdapter(t *testing.T, idp *fakeIDP) auth.Auth {
-	t.Helper()
+func newAdapter(tb testing.TB, idp *fakeIDP) auth.Auth {
+	tb.Helper()
 
 	opts := auth.Options{}
 	opts.OIDC.Issuer = idp.srv.URL
@@ -114,11 +114,11 @@ func newAdapter(t *testing.T, idp *fakeIDP) auth.Auth {
 	opts.OIDC.AllowInsecure = true
 	a, err := oidc.New(opts)
 	if err != nil {
-		t.Fatalf("oidc.New: %s", err)
+		tb.Fatalf("oidc.New: %s", err)
 	}
-	t.Cleanup(func() {
+	tb.Cleanup(func() {
 		if err := a.Close(); err != nil {
-			t.Errorf("Close: %s", err)
+			tb.Errorf("Close: %s", err)
 		}
 	})
 	return a

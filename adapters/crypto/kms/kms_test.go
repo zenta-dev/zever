@@ -8,11 +8,11 @@ import (
 	"github.com/zenta-dev/zever/core/crypto"
 )
 
-func mustNew(t *testing.T, opts Options) crypto.Crypto {
-	t.Helper()
+func mustNew(tb testing.TB, opts Options) crypto.Crypto {
+	tb.Helper()
 	c, err := New(opts)
 	if err != nil {
-		t.Fatalf("New failed: %v", err)
+		tb.Fatalf("New failed: %v", err)
 	}
 	return c
 }
