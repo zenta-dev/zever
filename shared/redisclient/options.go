@@ -2,6 +2,7 @@ package redisclient
 
 import (
 	"crypto/tls"
+	"errors"
 	"fmt"
 	"net/url"
 	"strings"
@@ -35,7 +36,7 @@ func toRedisOptions(o Options) (*goredis.Options, error) {
 		strings.HasPrefix(strings.ToLower(addr), "rediss://") {
 		u, err := url.Parse(addr)
 		if err != nil {
-			return nil, &InvalidAddressError{Addr: addr, Err: fmt.Errorf("%w: %w", ErrParseAddress, err)}
+			return nil, &InvalidAddressError{Addr: addr, Err: errors.Join(ErrParseAddress, err)}
 		}
 
 		if u.Host == "" {
