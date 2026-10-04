@@ -97,8 +97,8 @@ test-lsp: ## Run zever-lsp module tests
 	cd tools/zever-lsp && $(GO) test ./...
 
 .PHONY: bench
-bench: ## Run benchmarks
-	$(GO) test -bench=. -benchmem ./...
+bench: ## Run benchmarks in every module (shard via SHARD_TOTAL/SHARD_INDEX, override list via MODULES)
+	failed=""; for d in $(if $(MODULES),$(MODULES),$(SHARD_MODULES)); do echo "== $$d =="; if ! (cd $$d && $(GO) test -run='^$$' -bench=. -benchmem ./...); then failed="$$failed $$d"; echo "::error::module failed: $$d"; fi; done; [ -z "$$failed" ] || { echo "FAILED modules:$$failed"; exit 1; }
 
 .PHONY: cover
 cover: ## Run tests with coverage and print the total
