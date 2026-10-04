@@ -168,13 +168,13 @@ func runGenerateSchedule(args []string) error {
 				if len(mods) > 0 {
 					m, err = promptSelectForSchedule("Module", mods)
 				} else {
-				m, err = promptInputForSchedule("Module name", "", func(s string) error {
-					if !isIdent(s) {
-						return fmt.Errorf("zever generate: %w", ErrInvalidIdentifier)
-					}
+					m, err = promptInputForSchedule("Module name", "", func(s string) error {
+						if !isIdent(s) {
+							return fmt.Errorf("zever generate: %w", ErrInvalidIdentifier)
+						}
 
-					return nil
-				})
+						return nil
+					})
 				}
 
 				if err != nil {
@@ -185,13 +185,13 @@ func runGenerateSchedule(args []string) error {
 			}
 
 			if len(positional) < 2 {
-			n, err := promptInputForSchedule("Schedule name", "", func(s string) error {
-				if !isIdent(s) {
-					return fmt.Errorf("zever generate: %w", ErrInvalidIdentifier)
-				}
+				n, err := promptInputForSchedule("Schedule name", "", func(s string) error {
+					if !isIdent(s) {
+						return fmt.Errorf("zever generate: %w", ErrInvalidIdentifier)
+					}
 
-				return nil
-			})
+					return nil
+				})
 				if err != nil {
 					return err
 				}
@@ -209,17 +209,17 @@ func runGenerateSchedule(args []string) error {
 
 	if strings.TrimSpace(*cron) == "" {
 		if isInteractiveTerminal() {
-		val, err := promptInputForSchedule("Cron spec", "*/5 * * * *", func(s string) error {
-			if strings.TrimSpace(s) == "" {
-				return fmt.Errorf("zever generate: %w", ErrMustNotBeEmpty)
-			}
+			val, err := promptInputForSchedule("Cron spec", "*/5 * * * *", func(s string) error {
+				if strings.TrimSpace(s) == "" {
+					return fmt.Errorf("zever generate: %w", ErrMustNotBeEmpty)
+				}
 
-			if strings.ContainsAny(s, "\"\\\n") {
-				return fmt.Errorf("zever generate: %w", ErrInvalidCronChars)
-			}
+				if strings.ContainsAny(s, "\"\\\n") {
+					return fmt.Errorf("zever generate: %w", ErrInvalidCronChars)
+				}
 
-			return nil
-		})
+				return nil
+			})
 			if err != nil {
 				return err
 			}
@@ -242,13 +242,13 @@ func runGenerateSchedule(args []string) error {
 						return err
 					}
 				} else {
-			val, err := promptInputForSchedule("Dispatch job name", "", func(s string) error {
-				if !isIdent(s) {
-					return fmt.Errorf("zever generate: %w", ErrInvalidIdentifier)
-				}
+					val, err := promptInputForSchedule("Dispatch job name", "", func(s string) error {
+						if !isIdent(s) {
+							return fmt.Errorf("zever generate: %w", ErrInvalidIdentifier)
+						}
 
-				return nil
-			})
+						return nil
+					})
 					if err != nil {
 						return err
 					}

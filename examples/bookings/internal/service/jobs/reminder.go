@@ -2,7 +2,6 @@ package jobs
 
 import (
 	"context"
-	"errors"
 	"fmt"
 	"time"
 
@@ -11,11 +10,6 @@ import (
 	genapp "github.com/zenta-dev/zever/examples/bookings/generated/zenorm/orm/gen/app"
 	"github.com/zenta-dev/zever/orm"
 )
-
-// ErrGuestNotFound indicates a guest ID has no matching user row.
-var ErrGuestNotFound = errors.New("guest not found")
-
-var errEmptyGuestID = errors.New("guest id is empty")
 
 // SendReminderArgs is the payload of the SendReminder job declared in the
 // schema. The job takes no parameters, so the payload is empty.

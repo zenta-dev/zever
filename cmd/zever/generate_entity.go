@@ -209,13 +209,13 @@ func runGenerateEntity(args []string) error {
 	if len(positional) != 2 {
 		if isInteractiveTerminal() {
 			if len(positional) < 1 {
-			m, err := promptInputForEntity("Module name", "", func(s string) error {
-				if !isIdent(s) {
-					return fmt.Errorf("zever generate: %w", ErrInvalidIdentifier)
-				}
+				m, err := promptInputForEntity("Module name", "", func(s string) error {
+					if !isIdent(s) {
+						return fmt.Errorf("zever generate: %w", ErrInvalidIdentifier)
+					}
 
-				return nil
-			})
+					return nil
+				})
 				if err != nil {
 					return err
 				}
@@ -224,13 +224,13 @@ func runGenerateEntity(args []string) error {
 			}
 
 			if len(positional) < 2 {
-			n, err := promptInputForEntity("Entity name", "", func(s string) error {
-				if !isIdent(s) {
-					return fmt.Errorf("zever generate: %w", ErrInvalidIdentifier)
-				}
+				n, err := promptInputForEntity("Entity name", "", func(s string) error {
+					if !isIdent(s) {
+						return fmt.Errorf("zever generate: %w", ErrInvalidIdentifier)
+					}
 
-				return nil
-			})
+					return nil
+				})
 				if err != nil {
 					return err
 				}
