@@ -71,7 +71,7 @@ func (i Insert[T]) Select[PT ptrScanner[T]](q Query[T, PT]) Insert[T] {
 // renderInsert does for the Values path.
 func (i Insert[T]) renderInsertSelect(d dialect.Dialect) (query string, args []any, err error) {
 	if i.rowsLen > 0 {
-		return "", nil, errors.New("orm: Insert.Select: Select is mutually exclusive with Values rows")
+		return "", nil, fmt.Errorf("orm: Insert.Select: %w", ErrMutuallyExclusive)
 	}
 
 	columns := i.columns

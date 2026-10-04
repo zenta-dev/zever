@@ -297,7 +297,7 @@ func appendCursorString(b []byte, s string) []byte {
 func readCursorString(b []byte) (string, []byte, error) {
 	n, sz := binary.Uvarint(b)
 	if sz <= 0 {
-		return "", nil, errors.New("bad length prefix")
+		return "", nil, errors.New("orm: bad length prefix")
 	}
 
 	b = b[sz:]

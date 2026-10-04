@@ -44,11 +44,11 @@ func NewCTEName(s string) (CTEName, error) {
 
 	for i, r := range s {
 		if !isCTENameChar(r) {
-			return CTEName{}, fmt.Errorf("orm: invalid CTE name %q: character %q at position %d (only [A-Za-z0-9_] allowed)", s, r, i)
+			return CTEName{}, fmt.Errorf("orm: invalid CTE name %q: character %q at position %d (only [A-Za-z0-9_] allowed): %w", s, r, i, ErrInvalidCTEName)
 		}
 
 		if i == 0 && r >= '0' && r <= '9' {
-			return CTEName{}, fmt.Errorf("orm: invalid CTE name %q: must not start with a digit", s)
+			return CTEName{}, fmt.Errorf("orm: invalid CTE name %q: must not start with a digit: %w", s, ErrInvalidCTEName)
 		}
 	}
 
