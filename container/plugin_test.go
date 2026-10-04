@@ -12,8 +12,8 @@ import (
 
 var pluginTestSeq atomic.Uint64
 
-func mustUniquePluginName(t *testing.T, prefix string) string {
-	t.Helper()
+func mustUniquePluginName(tb testing.TB, prefix string) string {
+	tb.Helper()
 	n := pluginTestSeq.Add(1)
 	return prefix + "-" + itoa(n)
 }
