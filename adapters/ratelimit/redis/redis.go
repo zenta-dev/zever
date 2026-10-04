@@ -126,22 +126,22 @@ func (l *limiter) Allow(ctx context.Context, key string, tokens float64) (rateli
 
 	vals, ok := res.([]any)
 	if !ok || len(vals) != 3 {
-		return ratelimit.Decision{}, fmt.Errorf("redis: allow: unexpected script result %T (%v)", res, res)
+		return ratelimit.Decision{}, fmt.Errorf("redis: allow: unexpected script result %T (%v): %w", res, res, ErrUnexpectedResult)
 	}
 
 	allowed, ok := vals[0].(int64)
 	if !ok {
-		return ratelimit.Decision{}, fmt.Errorf("redis: allow: unexpected allowed type %T", vals[0])
+		return ratelimit.Decision{}, fmt.Errorf("redis: allow: unexpected allowed type %T: %w", vals[0], ErrUnexpectedResult)
 	}
 
 	remaining, ok := vals[1].(int64)
 	if !ok {
-		return ratelimit.Decision{}, fmt.Errorf("redis: allow: unexpected remaining type %T", vals[1])
+		return ratelimit.Decision{}, fmt.Errorf("redis: allow: unexpected remaining type %T: %w", vals[1], ErrUnexpectedResult)
 	}
 
 	retryMS, ok := vals[2].(int64)
 	if !ok {
-		return ratelimit.Decision{}, fmt.Errorf("redis: allow: unexpected retry type %T", vals[2])
+		return ratelimit.Decision{}, fmt.Errorf("redis: allow: unexpected retry type %T: %w", vals[2], ErrUnexpectedResult)
 	}
 
 	if retryMS < 0 {

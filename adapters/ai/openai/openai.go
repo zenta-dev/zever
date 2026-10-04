@@ -20,6 +20,9 @@ import (
 	"github.com/zenta-dev/zever/shared/retry"
 )
 
+// ErrValueOutOfRange is returned when an API numeric value does not fit in an int.
+var ErrValueOutOfRange = errors.New("value out of int range")
+
 type adapter struct {
 	client *openai.Client
 	model  string
@@ -461,7 +464,7 @@ func applyResponseFormat(params *openai.ChatCompletionNewParams, rf *ai.Response
 func safeInt64ToInt(v int64) (int, error) {
 	// Use 32-bit limits to ensure overflow is testable on 64-bit platforms.
 	if v > int64(math.MaxInt32) || v < int64(math.MinInt32) {
-		return 0, fmt.Errorf("value %d out of int range", v)
+		return 0, fmt.Errorf("openai: value %d out of int range: %w", v, ErrValueOutOfRange)
 	}
 
 	return int(v), nil

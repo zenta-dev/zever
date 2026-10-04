@@ -116,7 +116,7 @@ func (d *driver) Render(ctx context.Context, source []byte, format document.Outp
 			errBody = errBody[:512]
 		}
 
-		return nil, fmt.Errorf("remote: render status %d: %q", resp.StatusCode, errBody)
+		return nil, fmt.Errorf("remote: render status %d: %q: %w", resp.StatusCode, errBody, ErrStatus)
 	}
 
 	body, err := httpclient.ReadLimited(ctx, resp.Body, d.maxOutput)

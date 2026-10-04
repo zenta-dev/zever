@@ -345,12 +345,12 @@ func (a *adapter) do(ctx context.Context, op, method, url string, body any) ([]b
 	defer func() { _ = resp.Body.Close() }()
 	if resp.StatusCode != http.StatusOK {
 		eb, _ := io.ReadAll(io.LimitReader(resp.Body, maxErrBody))
-		return nil, fmt.Errorf("%w: %s: %d: %s", i18n.ErrRemoteError, op, resp.StatusCode, strings.TrimSpace(string(eb)))
+		return nil, fmt.Errorf("remote: %w: %s: %d: %s", i18n.ErrRemoteError, op, resp.StatusCode, strings.TrimSpace(string(eb)))
 	}
 	data, err := httpclient.ReadLimited(ctx, resp.Body, maxRespBody)
 	if err != nil {
 		if errors.Is(err, httpclient.ErrTooLarge) {
-			return nil, fmt.Errorf("%w: %s: response body exceeds %d bytes", i18n.ErrRemoteError, op, maxRespBody)
+			return nil, fmt.Errorf("remote: %w: %s: response body exceeds %d bytes", i18n.ErrRemoteError, op, maxRespBody)
 		}
 		return nil, fmt.Errorf("remote: %s: %w", op, err)
 	}

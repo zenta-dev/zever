@@ -26,6 +26,12 @@ const (
 	keyExp     = "exp"
 )
 
+// ErrInvalidTTL is returned when Issue is called with a non-positive ttl.
+var ErrInvalidTTL = errors.New("session: ttl must be positive")
+
+// ErrCorruptEnvelope is returned when a stored session Data envelope cannot be decoded.
+var ErrCorruptEnvelope = errors.New("session: corrupt envelope")
+
 type adapter struct {
 	store session.Store
 }
@@ -52,7 +58,7 @@ func (a *adapter) Issue(ctx context.Context, subject string, claims map[string]a
 		return auth.Token{}, auth.ErrInvalidToken
 	}
 	if ttl <= 0 {
-		return auth.Token{}, fmt.Errorf("session: ttl must be positive, got %v", ttl)
+		return auth.Token{}, fmt.Errorf("session: ttl must be positive, got %v: %w", ttl, ErrInvalidTTL)
 	}
 	// Create mints the ID and the authoritative expiry. A bare Save with
 	// a fresh ID cannot do this: stores ignore caller ExpiresAt on
@@ -138,7 +144,7 @@ func cloneCustom(m map[string]any) map[string]any {
 // envelope, deep-copying custom claims. Missing keys, corrupt types, an
 // empty subject, or a non-positive exp all fail.
 func decode(data map[string]any) (string, map[string]any, time.Time, error) {
-	fail := errors.New("session: corrupt envelope")
+	fail := ErrCorruptEnvelope
 	sub, ok := data[keySubject].(string)
 	if !ok || sub == "" {
 		return "", nil, time.Time{}, fail
