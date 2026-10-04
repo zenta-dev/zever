@@ -40,12 +40,12 @@ type Product struct {
 func (e *Product) Scan(row orm.Row) error {
 	var rawCreatedAt string
 	if err := row.Scan(&e.ID, &e.Name, &e.PriceCents, &rawCreatedAt); err != nil {
-		return fmt.Errorf("[product] scan error: %w", err)
+		return fmt.Errorf("product: scan error: %w", err)
 	}
 
 	valCreatedAt, errCreatedAt := time.Parse(time.RFC3339Nano, rawCreatedAt)
 	if errCreatedAt != nil {
-		return fmt.Errorf("[product] parse created_at error: %w", errCreatedAt)
+		return fmt.Errorf("product: parse created_at error: %w", errCreatedAt)
 	}
 
 	e.CreatedAt = valCreatedAt

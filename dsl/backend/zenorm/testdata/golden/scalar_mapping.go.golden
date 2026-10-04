@@ -65,19 +65,19 @@ func (e *Widget) Scan(row orm.Row) error {
 	var rawCreatedAt string
 	var rawValidOn string
 	if err := row.Scan(&e.ID, &e.Name, &e.Quantity, &e.Views, &e.Ratio, &e.Price, &e.Active, &rawCreatedAt, &rawValidOn, &e.Payload, &e.Metadata, &e.Status); err != nil {
-		return fmt.Errorf("[widget] scan error: %w", err)
+		return fmt.Errorf("widget: scan error: %w", err)
 	}
 
 	valCreatedAt, errCreatedAt := time.Parse(time.RFC3339Nano, rawCreatedAt)
 	if errCreatedAt != nil {
-		return fmt.Errorf("[widget] parse created_at error: %w", errCreatedAt)
+		return fmt.Errorf("widget: parse created_at error: %w", errCreatedAt)
 	}
 
 	e.CreatedAt = valCreatedAt
 
 	valValidOn, errValidOn := time.Parse(time.RFC3339Nano, rawValidOn)
 	if errValidOn != nil {
-		return fmt.Errorf("[widget] parse valid_on error: %w", errValidOn)
+		return fmt.Errorf("widget: parse valid_on error: %w", errValidOn)
 	}
 
 	e.ValidOn = valValidOn
