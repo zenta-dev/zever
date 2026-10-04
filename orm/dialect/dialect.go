@@ -192,7 +192,7 @@ func CheckDistinctOn(d Dialect, distinctOn []string) error {
 	}
 
 	if len(distinctOn) == 0 {
-		return errors.New("DISTINCT ON requires at least one column")
+		return errors.New("orm: DISTINCT ON requires at least one column")
 	}
 
 	dd, ok := d.(DistinctOnDialect)

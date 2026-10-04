@@ -106,7 +106,7 @@ func TestTVFJoinValidation(t *testing.T) {
 		src  fakeTVFSource
 		want string
 	}{
-		{"empty alias", fakeTVFSource{cols: []string{"a"}, sql: "fn()"}, "non-empty alias"},
+		{"empty alias", fakeTVFSource{cols: []string{"a"}, sql: "fn()"}, "empty alias"},
 		{"no columns", fakeTVFSource{alias: "x", sql: "fn()"}, "no output columns"},
 	} {
 		t.Run(tc.name, func(t *testing.T) {

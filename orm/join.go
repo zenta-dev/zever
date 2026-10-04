@@ -2310,13 +2310,13 @@ func lateralInner[B any, PB ptrScanner[B]](inner Query[B, PB]) (render.Subquery,
 
 	tableCols := inner.table.Columns()
 	if len(sq.columns) != len(tableCols) {
-		return render.Subquery{}, fmt.Errorf("lateral subquery must project entity %q's full column list (%d), got %d",
+		return render.Subquery{}, fmt.Errorf("orm: lateral subquery must project entity %q's full column list (%d), got %d",
 			inner.table.Name(), len(tableCols), len(sq.columns))
 	}
 
 	for i := range tableCols {
 		if sq.columns[i] != tableCols[i] {
-			return render.Subquery{}, fmt.Errorf("lateral subquery must project entity %q's full column list in order; column %d is %q, want %q",
+			return render.Subquery{}, fmt.Errorf("orm: lateral subquery must project entity %q's full column list in order; column %d is %q, want %q",
 				inner.table.Name(), i, sq.columns[i], tableCols[i])
 		}
 	}

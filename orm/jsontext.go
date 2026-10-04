@@ -42,7 +42,7 @@ func (j *JSONText) Scan(src any) error {
 
 		return nil
 	default:
-		return fmt.Errorf("orm: cannot scan %T into JSONText", src)
+		return fmt.Errorf("orm: cannot scan %T into JSONText: %w", src, ErrScanTypeMismatch)
 	}
 }
 

@@ -2,7 +2,6 @@ package orm
 
 import (
 	"context"
-	"errors"
 	"fmt"
 	"iter"
 
@@ -396,7 +395,7 @@ func scanLeftTVFJoinRow[A any, PA ptrScanner[A], B any, PB ptrScanner[B]](
 // construction-time bugs reported as typed errors rather than invalid SQL.
 func validateTVFSource[B any](src TableValuedSource[B]) error {
 	if src.SrcAlias() == "" {
-		return errors.New("orm: TVFJoin2: table-valued source needs a non-empty alias")
+		return fmt.Errorf("orm: TVFJoin2: %w", ErrEmptyAlias)
 	}
 
 	if len(src.SrcColumns()) == 0 {
