@@ -62,7 +62,7 @@ func runDB(args []string) error {
 			}
 		}
 
-		return fmt.Errorf("zever db: unknown subcommand %q", sub)
+		return fmt.Errorf("zever db: %w: %q", ErrUnknownSubcommand, sub)
 	}
 }
 

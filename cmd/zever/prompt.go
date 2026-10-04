@@ -33,7 +33,7 @@ func requireInteractive() error {
 		return errors.New("zever: --interactive requires a TTY (stdin not a terminal)")
 	}
 
-	return errors.New("missing required argument (use --interactive for guided prompts)")
+	return errors.New("zever: missing required argument (use --interactive for guided prompts)")
 }
 
 // runForm executes a huh form against the terminal.

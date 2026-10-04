@@ -20,6 +20,18 @@ var errGenerateUnknownSubcommand = errors.New(
 // errors.Is to detect it rather than matching the message text.
 var ErrPathTraversal = errors.New("zever generate: path escapes target directory")
 
+// ErrInvalidIdentifier is returned when a name is not a valid identifier.
+var ErrInvalidIdentifier = errors.New("must be identifier")
+
+// ErrMustNotBeEmpty is returned when a required value is empty.
+var ErrMustNotBeEmpty = errors.New("must not be empty")
+
+// ErrInvalidPackageName is returned when a name is not a valid Go package name.
+var ErrInvalidPackageName = errors.New("lowercase letters/digits, starting with letter")
+
+// ErrInvalidCronChars is returned when a cron spec contains invalid characters.
+var ErrInvalidCronChars = errors.New("must not contain quotes, backslashes or newlines")
+
 // isTraversalName reports whether a developer-supplied name carries
 // path-traversal or separator content: "..", ".", absolute paths, or any
 // slash/backslash. Identifier and package-name checks reject most of these
@@ -388,7 +400,7 @@ func runGenerateModule(args []string) error {
 		if isInteractiveTerminal() {
 			val, err := promptInputForGenerate("Module name", "", func(s string) error {
 				if !isIdent(s) {
-					return errors.New("must be identifier")
+					return fmt.Errorf("zever generate: %w", ErrInvalidIdentifier)
 				}
 
 				return nil
@@ -408,11 +420,11 @@ func runGenerateModule(args []string) error {
 		if isInteractiveTerminal() {
 			val, err := promptInputForGenerate("Module name", "", func(s string) error {
 				if s == "" {
-					return errors.New("must not be empty")
+					return fmt.Errorf("zever generate: %w", ErrMustNotBeEmpty)
 				}
 
 				if !isIdent(s) {
-					return errors.New("must be identifier")
+					return fmt.Errorf("zever generate: %w", ErrInvalidIdentifier)
 				}
 
 				return nil
@@ -423,7 +435,7 @@ func runGenerateModule(args []string) error {
 
 			name = val
 		} else {
-			return errors.New("zever generate module: name must not be empty")
+			return fmt.Errorf("zever generate: %w", ErrMustNotBeEmpty)
 		}
 	}
 
