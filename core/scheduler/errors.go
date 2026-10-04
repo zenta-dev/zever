@@ -99,10 +99,10 @@ func (e InvalidSpecError) Error() string {
 }
 
 // Unwrap returns ErrInvalidSpec and the cause for errors.Is/As.
-func (e InvalidSpecError) Unwrap() []error {
+func (e InvalidSpecError) Unwrap() error {
 	if e.Err != nil {
-		return []error{ErrInvalidSpec, e.Err}
+		return errors.Join(ErrInvalidSpec, e.Err)
 	}
 
-	return []error{ErrInvalidSpec}
+	return ErrInvalidSpec
 }

@@ -112,9 +112,9 @@ func (e InvalidMessageIDError) Error() string {
 }
 
 // Unwrap returns ErrInvalidMessageID and the cause for errors.Is/As.
-func (e InvalidMessageIDError) Unwrap() []error {
+func (e InvalidMessageIDError) Unwrap() error {
 	if e.Err != nil {
-		return []error{ErrInvalidMessageID, e.Err}
+		return errors.Join(ErrInvalidMessageID, e.Err)
 	}
-	return []error{ErrInvalidMessageID}
+	return ErrInvalidMessageID
 }

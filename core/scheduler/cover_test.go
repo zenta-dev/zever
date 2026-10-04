@@ -42,7 +42,7 @@ func TestCoverInvalidSpecUnwrapNilCause(t *testing.T) {
 	}
 
 	unwrapped := err.Unwrap()
-	if len(unwrapped) != 1 || !errors.Is(unwrapped[0], ErrInvalidSpec) {
-		t.Fatalf("Unwrap() = %v, want [ErrInvalidSpec]", unwrapped)
+	if !errors.Is(unwrapped, ErrInvalidSpec) {
+		t.Fatalf("Unwrap() = %v, want ErrInvalidSpec", unwrapped)
 	}
 }
