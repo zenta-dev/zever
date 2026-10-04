@@ -31,10 +31,10 @@ func New(opts auth.Options) (auth.Auth, error) {
 
 	issuer := opts.OIDC.Issuer
 	if issuer == "" {
-		return nil, &auth.InvalidOptionsError{Reason: "oidc issuer must be non-empty"}
+		return nil, auth.InvalidOptionsError{Reason: "oidc issuer must be non-empty"}
 	}
 	if opts.OIDC.ClientID == "" {
-		return nil, &auth.InvalidOptionsError{Reason: "oidc client id must be non-empty"}
+		return nil, auth.InvalidOptionsError{Reason: "oidc client id must be non-empty"}
 	}
 
 	timeout := opts.OIDC.Timeout

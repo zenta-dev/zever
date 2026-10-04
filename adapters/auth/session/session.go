@@ -47,7 +47,7 @@ func New(opts auth.Options) (auth.Auth, error) {
 	}
 	store := opts.Session.Store
 	if store == nil {
-		return nil, &auth.InvalidOptionsError{Reason: "session store is required"}
+		return nil, auth.InvalidOptionsError{Reason: "session store is required"}
 	}
 	return &adapter{store: store}, nil
 }

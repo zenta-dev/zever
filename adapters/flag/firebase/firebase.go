@@ -96,7 +96,7 @@ func validateServiceAccountPath(p string) error {
 // context. The error-interface conversion keeps vet's %w operand check
 // quiet while preserving errors.Is/As through the chain.
 func invalidOptions(reason string) error {
-	return fmt.Errorf("firebase: %w", error(&flag.InvalidOptionsError{Reason: reason}))
+	return fmt.Errorf("firebase: %w", error(flag.InvalidOptionsError{Reason: reason}))
 }
 
 func evalContextMap(ctx context.Context) map[string]any {

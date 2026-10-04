@@ -67,7 +67,7 @@ func (a *Adapter) Start(ctx context.Context, name string, input any, workflowID 
 		if _, exists := a.runs[id]; exists {
 			a.mu.Unlock()
 
-			return "", &workflow.DuplicateRunError{RunID: workflowID}
+			return "", workflow.DuplicateRunError{RunID: workflowID}
 		}
 	} else {
 		for {
@@ -94,7 +94,7 @@ func (a *Adapter) Start(ctx context.Context, name string, input any, workflowID 
 		}
 		a.mu.Unlock()
 
-		return "", &workflow.UnknownStepError{Step: name}
+		return "", workflow.UnknownStepError{Step: name}
 	}
 
 	result, err := fn(ctx, input)
@@ -130,15 +130,15 @@ func (a *Adapter) Signal(_ context.Context, runID workflow.RunID, _ string, valu
 
 	r, ok := a.runs[runID]
 	if !ok {
-		return &workflow.UnknownRunError{RunID: runID}
+		return workflow.UnknownRunError{RunID: runID}
 	}
 
 	if !r.running {
-		return &workflow.RunCompletedError{RunID: runID}
+		return workflow.RunCompletedError{RunID: runID}
 	}
 
 	if len(r.pending) >= 100 {
-		return &workflow.PendingFullError{RunID: runID}
+		return workflow.PendingFullError{RunID: runID}
 	}
 
 	r.pending = append(r.pending, value)
@@ -153,12 +153,12 @@ func (a *Adapter) Query(_ context.Context, runID workflow.RunID, name string, ou
 	r, ok := a.runs[runID]
 	if !ok {
 		a.mu.RUnlock()
-		return &workflow.UnknownRunError{RunID: runID}
+		return workflow.UnknownRunError{RunID: runID}
 	}
 
 	if name != "state" {
 		a.mu.RUnlock()
-		return &workflow.UnknownQueryError{Query: name}
+		return workflow.UnknownQueryError{Query: name}
 	}
 
 	state := r.state
@@ -184,11 +184,11 @@ func (a *Adapter) Cancel(_ context.Context, runID workflow.RunID) error {
 
 	r, ok := a.runs[runID]
 	if !ok {
-		return &workflow.UnknownRunError{RunID: runID}
+		return workflow.UnknownRunError{RunID: runID}
 	}
 
 	if !r.running {
-		return &workflow.RunCompletedError{RunID: runID}
+		return workflow.RunCompletedError{RunID: runID}
 	}
 
 	delete(a.runs, runID)

@@ -67,12 +67,12 @@ func (e *embedded) Schedule(ctx context.Context, spec, jobName string, args any)
 	}
 
 	if len(spec) == 0 || len(spec) > scheduler.MaxSpecLen {
-		return 0, &scheduler.InvalidSpecError{Spec: spec, Err: fmt.Errorf("embedded: %w", ErrInvalidSpecLength)}
+		return 0, scheduler.InvalidSpecError{Spec: spec, Err: fmt.Errorf("embedded: %w", ErrInvalidSpecLength)}
 	}
 
 	parsed, err := cron.ParseStandard(spec)
 	if err != nil {
-		return 0, &scheduler.InvalidSpecError{Spec: spec, Err: err}
+		return 0, scheduler.InvalidSpecError{Spec: spec, Err: err}
 	}
 
 	if _, ok := job.Lookup(jobName); !ok {
@@ -98,7 +98,7 @@ func (e *embedded) Schedule(ctx context.Context, spec, jobName string, args any)
 // Zero is invalid and fails; an unknown ID is a no-op returning nil.
 func (e *embedded) Remove(id scheduler.EntryID) error {
 	if id == 0 {
-		return &scheduler.InvalidOptionsError{Reason: "invalid_entry_id"}
+		return scheduler.InvalidOptionsError{Reason: "invalid_entry_id"}
 	}
 
 	e.sched.Remove(id)

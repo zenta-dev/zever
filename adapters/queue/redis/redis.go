@@ -420,9 +420,10 @@ func (a *redisAdapter) popLoop(
 
 		raw, claimed, err = a.blockingClaim(ctx, readyKey, processingKey, deadlineKey, now, poll, blockTimeout)
 		if err != nil {
-			var emptyErr *queue.EmptyError
+			var emptyErr queue.EmptyError
 			if errors.As(err, &emptyErr) && emptyErr.Topic == "" {
 				emptyErr.Topic = topic
+				return "", emptyErr
 			}
 
 			return "", err
@@ -451,7 +452,7 @@ func (a *redisAdapter) blockingClaim(
 			case <-ctx.Done():
 				return "", false, fmt.Errorf("queue: pop cancelled: %w", ctx.Err())
 			case <-poll.C:
-				return "", false, &queue.EmptyError{Topic: ""}
+				return "", false, queue.EmptyError{Topic: ""}
 			default:
 				return "", false, nil
 			}
@@ -545,13 +546,13 @@ func (a *redisAdapter) shortBlock(
 	case <-ctx.Done():
 		return "", false, fmt.Errorf("queue: pop cancelled: %w", ctx.Err())
 	case <-poll.C:
-		return "", false, &queue.EmptyError{Topic: ""}
+		return "", false, queue.EmptyError{Topic: ""}
 	case <-timer.C:
 		select {
 		case <-ctx.Done():
 			return "", false, fmt.Errorf("queue: pop cancelled: %w", ctx.Err())
 		case <-poll.C:
-			return "", false, &queue.EmptyError{Topic: ""}
+			return "", false, queue.EmptyError{Topic: ""}
 		default:
 			return "", false, nil
 		}

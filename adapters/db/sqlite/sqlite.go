@@ -249,7 +249,7 @@ func (a *adapter) BeginTx(ctx context.Context, opts *db.TxOptions) (db.Tx, error
 
 	tx, err := a.conn.BeginTx(ctx, sqlOpts)
 	if err != nil {
-		return nil, &db.TxError{Op: "begin", Err: fmt.Errorf("sqlite: begin: %w", err)}
+		return nil, db.TxError{Op: "begin", Err: fmt.Errorf("sqlite: begin: %w", err)}
 	}
 
 	return &sqliteTx{tx: tx}, nil
@@ -371,11 +371,11 @@ func (t *sqliteTx) Commit(_ context.Context) error {
 	defer t.mu.Unlock()
 
 	if t.done {
-		return &db.TxError{Op: "commit", Err: fmt.Errorf("sqlite: commit: %w", ErrTxClosed)}
+		return db.TxError{Op: "commit", Err: fmt.Errorf("sqlite: commit: %w", ErrTxClosed)}
 	}
 
 	if err := t.tx.Commit(); err != nil {
-		return &db.TxError{Op: "commit", Err: fmt.Errorf("sqlite: commit: %w", err)}
+		return db.TxError{Op: "commit", Err: fmt.Errorf("sqlite: commit: %w", err)}
 	}
 
 	t.done = true

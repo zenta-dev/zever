@@ -52,22 +52,22 @@ func New(opts flag.Options) (flag.Flag, error) {
 	}
 
 	if filepath.Clean(path) != path {
-		return nil, &flag.InvalidOptionsError{Reason: fmt.Sprintf("static path %q is not clean", path)}
+		return nil, flag.InvalidOptionsError{Reason: fmt.Sprintf("static path %q is not clean", path)}
 	}
 	for _, el := range strings.Split(path, string(filepath.Separator)) {
 		if el == ".." {
-			return nil, &flag.InvalidOptionsError{Reason: fmt.Sprintf("static path %q contains traversal", path)}
+			return nil, flag.InvalidOptionsError{Reason: fmt.Sprintf("static path %q contains traversal", path)}
 		}
 	}
 	if !strings.EqualFold(filepath.Ext(path), ".json") {
-		return nil, &flag.InvalidOptionsError{Reason: fmt.Sprintf("static path %q must have .json extension", path)}
+		return nil, flag.InvalidOptionsError{Reason: fmt.Sprintf("static path %q must have .json extension", path)}
 	}
 	fi, err := os.Stat(path)
 	if err != nil {
 		return nil, fmt.Errorf("static: load %q: %w", path, err)
 	}
 	if fi.IsDir() {
-		return nil, &flag.InvalidOptionsError{Reason: fmt.Sprintf("static path %q is a directory", path)}
+		return nil, flag.InvalidOptionsError{Reason: fmt.Sprintf("static path %q is a directory", path)}
 	}
 
 	data, err := os.ReadFile(path)

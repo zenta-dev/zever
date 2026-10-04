@@ -115,7 +115,7 @@ func (d *driver) GetInvoice(ctx context.Context, customerID string) (billing.Inv
 
 	// Wrap via error interface to satisfy go vet printf check
 	// (direct %w of *NotFoundError triggers false-positive defeats-errors.Is).
-	nf := error(&billing.NotFoundError{Resource: "invoice", ID: customerID})
+	nf := error(billing.NotFoundError{Resource: "invoice", ID: customerID})
 	return billing.Invoice{}, fmt.Errorf("stripe: list invoices: %w", nf)
 }
 
