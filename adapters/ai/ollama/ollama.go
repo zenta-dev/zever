@@ -289,7 +289,7 @@ func (a *adapter) Stream(ctx context.Context, model string, messages []ai.Messag
 
 		b, _ := io.ReadAll(io.LimitReader(resp.Body, maxErrorBody))
 
-		return nil, fmt.Errorf("ollama: status %d: %s", resp.StatusCode, string(b))
+		return nil, fmt.Errorf("ollama: status %d: %s: %w", resp.StatusCode, string(b), ErrOllamaStatus)
 	}
 
 	ch := make(chan ai.StreamChunk, 32)
@@ -526,7 +526,7 @@ func (a *adapter) doPost(ctx context.Context, path string, body []byte) ([]byte,
 	if resp.StatusCode != http.StatusOK {
 		snippet := truncateForError(respBody)
 
-		return nil, fmt.Errorf("ollama: status %d: %s", resp.StatusCode, snippet)
+		return nil, fmt.Errorf("ollama: status %d: %s: %w", resp.StatusCode, snippet, ErrOllamaStatus)
 	}
 
 	return respBody, nil

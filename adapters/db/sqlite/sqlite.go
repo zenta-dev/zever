@@ -3,7 +3,6 @@ package sqlite
 import (
 	"context"
 	"database/sql"
-	"errors"
 	"fmt"
 	"net/url"
 	"runtime"
@@ -63,15 +62,14 @@ type adapter struct {
 // *db.TxError (matching core's Op convention) even though db.WithTx wraps
 // begin/commit once more on its own path; validation failures (bad path,
 // bad savepoint name) are plain "sqlite: ...". No Path/DSN content is
-// included in errors. Per-adapter sentinels were deliberately not added:
-// core errors.go is owned by another agent and a parallel sentinel set
-// would split error identity.
+// included in errors. Path and closed-transaction validation failures wrap
+// package sentinels so callers can match them with errors.Is.
 func New(opts db.Options) (db.DB, error) {
 	path := strings.TrimSpace(opts.Path)
 	if path == "" {
 		// Explicit whitespace-only path is an error; empty (zero-value) defaults to app.db.
 		if opts.Path != "" {
-			return nil, errors.New("sqlite: path must not be empty")
+			return nil, ErrEmptyPath
 		}
 
 		path = "app.db"
@@ -341,7 +339,7 @@ func (t *sqliteTx) Ping(ctx context.Context) error {
 	t.mu.Unlock()
 
 	if done {
-		return errors.New("sqlite: ping: transaction already closed")
+		return fmt.Errorf("sqlite: ping: %w", ErrTxClosed)
 	}
 
 	return nil
@@ -373,7 +371,7 @@ func (t *sqliteTx) Commit(_ context.Context) error {
 	defer t.mu.Unlock()
 
 	if t.done {
-		return &db.TxError{Op: "commit", Err: errors.New("sqlite: commit: transaction already closed")}
+		return &db.TxError{Op: "commit", Err: fmt.Errorf("sqlite: commit: %w", ErrTxClosed)}
 	}
 
 	if err := t.tx.Commit(); err != nil {

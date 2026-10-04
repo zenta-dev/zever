@@ -517,7 +517,7 @@ func (a *adapter) loadImage(src string) (image.Image, error) {
 	}
 
 	if int64(cfg.Width)*int64(cfg.Height) > maxPixels {
-		return nil, fmt.Errorf("local: image dimensions %dx%d exceed max pixels %d", cfg.Width, cfg.Height, maxPixels)
+		return nil, fmt.Errorf("local: image dimensions %dx%d exceed max pixels %d: %w", cfg.Width, cfg.Height, maxPixels, media.ErrTooLarge)
 	}
 
 	img, _, err := image.Decode(bytes.NewReader(data))

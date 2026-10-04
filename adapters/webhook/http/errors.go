@@ -12,3 +12,9 @@ var ErrMissingTarget = errors.New("http: target is empty")
 // secret. Every delivery must carry X-Hub-Signature-256 so the receiver
 // can verify it, so an empty secret is rejected at registration.
 var ErrMissingSecret = errors.New("http: target secret is empty")
+
+// ErrDeliveryFailed is returned when every delivery attempt is exhausted.
+var ErrDeliveryFailed = errors.New("http: delivery failed")
+
+// ErrUnexpectedStatus is returned when the target replies with a non-2xx status.
+var ErrUnexpectedStatus = errors.New("http: unexpected status")

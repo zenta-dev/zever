@@ -11,6 +11,9 @@ var ErrNilEnforcer = errors.New("casbin: nil enforcer")
 // ErrDuplicatePolicy is returned when seeding a duplicate policy rule.
 var ErrDuplicatePolicy = errors.New("casbin: duplicate policy")
 
+// ErrPolicyUpdate is returned when a grouping policy removal fails or panics.
+var ErrPolicyUpdate = errors.New("casbin: policy update failed")
+
 // DuplicatePolicyError reports a duplicate seeded policy rule.
 type DuplicatePolicyError struct {
 	// Role is the duplicated rule role.

@@ -243,7 +243,7 @@ func (d *driver) Bool(ctx context.Context, key string, fallback bool) (bool, err
 	case string:
 		p, perr := parseStrictBool(b)
 		if perr != nil {
-			return fallback, fmt.Errorf("flag: static: key %q is not a bool", key)
+			return fallback, fmt.Errorf("flag: static: key %q is not a bool: %w", key, perr)
 		}
 		return p, nil
 	default:
@@ -371,13 +371,13 @@ func parseStrictBool(s string) (bool, error) {
 	case strings.EqualFold(s, "false"):
 		return false, nil
 	default:
-		return false, errStrictBool
+		return false, ErrStrictBool
 	}
 }
 
-// errStrictBool marks strings outside the true/false pair. Callers wrap
+// ErrStrictBool marks strings outside the true/false pair. Callers wrap
 // it with the key context.
-var errStrictBool = errors.New("flag: static: strict bool parse failed")
+var ErrStrictBool = errors.New("flag: static: strict bool parse failed")
 
 // floatToInt converts an exact integer float to int, rejecting
 // fractions, imprecise magnitudes (>= 2^53), and out-of-range values.

@@ -165,7 +165,7 @@ func (c *client) Int(ctx context.Context, key string, fallback int) (int, error)
 	}
 	n, err := parseFirebaseInt(cfg.GetString(key))
 	if err != nil {
-		return fallback, fmt.Errorf("flag: firebase: key %q is not an int", key)
+		return fallback, fmt.Errorf("flag: firebase: key %q is not an int: %w", key, err)
 	}
 	return n, nil
 }
@@ -174,7 +174,7 @@ func (c *client) Int(ctx context.Context, key string, fallback int) (int, error)
 // fallback is non-nil; invalid stored JSON returns an error.
 func (c *client) JSON(ctx context.Context, key string, out any, fallback any) error {
 	if out == nil {
-		return errors.New("flag: firebase: json out is nil")
+		return ErrNilJSONOut
 	}
 	cfg, err := c.evaluate(ctx, key)
 	if err != nil {
@@ -209,15 +209,18 @@ func parseFirebaseInt(raw string) (int, error) {
 	}
 	f, err := strconv.ParseFloat(strings.TrimSpace(raw), 64)
 	if err != nil || math.IsNaN(f) || math.IsInf(f, 0) {
-		return 0, errNotAnInt
+		return 0, ErrNotAnInt
 	}
 	t := math.Trunc(f)
 	if t > float64(math.MaxInt) || t < float64(math.MinInt) {
-		return 0, errNotAnInt
+		return 0, ErrNotAnInt
 	}
 	return int(t), nil
 }
 
-// errNotAnInt marks unparseable integer flag values. Callers wrap it with
+// ErrNilJSONOut is returned when JSON is called with a nil out parameter.
+var ErrNilJSONOut = errors.New("flag: firebase: json out is nil")
+
+// ErrNotAnInt marks unparseable integer flag values. Callers wrap it with
 // the key context.
-var errNotAnInt = errors.New("not an int")
+var ErrNotAnInt = errors.New("not an int")

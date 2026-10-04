@@ -188,11 +188,11 @@ func (a *adapter) log() log.Logger {
 
 func (a *adapter) Register(_ context.Context, event, target, secret string) error {
 	if event == "" {
-		return errors.New("queue: event is empty")
+		return ErrMissingEvent
 	}
 
 	if target == "" {
-		return errors.New("queue: target is empty")
+		return ErrMissingTarget
 	}
 
 	var err error
