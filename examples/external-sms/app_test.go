@@ -12,7 +12,7 @@ import (
 
 func TestEndToEnd(t *testing.T) {
 	t.Parallel()
-	if err := sms.RegisterPlugin(); err != nil {
+	if err := ensureRegistered(); err != nil {
 		t.Fatalf("RegisterPlugin: %v", err)
 	}
 
