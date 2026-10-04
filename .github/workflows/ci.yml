@@ -407,10 +407,25 @@ jobs:
         if: github.event_name != 'pull_request'
         run: |
           mkdir -p .bench
+          failed=""
           for m in $MODULES; do
-            go -C "$m" test -run=NONE -bench=. -benchtime=1s -cpu=1,4 -benchmem > ".bench/$(echo "$m" | tr / _).txt" 2>&1 || true
+            slug=$(echo "$m" | tr / _)
+            if ! go -C "$m" test -run='^$' -bench=. -benchtime=1s -count=6 -cpu=1 -benchmem > ".bench/$slug.txt" 2>&1; then
+              echo "::error::benchmark failed: $m"
+              cat ".bench/$slug.txt"
+              failed="$failed $m"
+            fi
           done
+          [ -z "$failed" ] || { echo "FAILED benchmark modules:$failed"; exit 1; }
           echo "benchmark runs complete"
+      - name: upload benchmark results
+        if: github.event_name != 'pull_request'
+        uses: actions/upload-artifact@v7
+        with:
+          name: benchmarks
+          path: .bench/
+          if-no-files-found: warn
+          retention-days: 30
 
   # Security coverage floor: Codecov uploads are informational only, so this
   # gate hard-fails main/tags when auth/crypto/payment coverage drops below
