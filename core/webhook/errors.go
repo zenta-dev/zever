@@ -26,6 +26,9 @@ var ErrInvalidOptions = errors.New("webhook: invalid options")
 // ErrNotFound is returned when a webhook subscription is not found.
 var ErrNotFound = errors.New("webhook: not found")
 
+// ErrInvalidTarget is returned for an invalid webhook target URL.
+var ErrInvalidTarget = errors.New("webhook: invalid target")
+
 // DuplicateAdapterError reports a duplicate adapter registration.
 type DuplicateAdapterError struct {
 	// Adapter is the already-registered adapter.
