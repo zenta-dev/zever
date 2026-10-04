@@ -125,7 +125,7 @@ func runGenerateTinker(args []string) error {
 	fs.Usage = func() { printTinkerGenerateUsage(fs) }
 
 	if err := fs.Parse(args); err != nil {
-		return err
+		return fmt.Errorf("zever generate: %w", err)
 	}
 
 	pc, err := loadProjectConfig()

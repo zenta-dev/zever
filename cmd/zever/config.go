@@ -87,7 +87,7 @@ func runConfigShow(args []string) error {
 	fs.Usage = func() { printConfigUsage(fs) }
 
 	if err := fs.Parse(args); err != nil {
-		return err
+		return fmt.Errorf("zever config: %w", err)
 	}
 
 	return runConfigShowWith(ConfigConfig{ConfigPath: *configPath})
