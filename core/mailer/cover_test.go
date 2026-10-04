@@ -40,31 +40,31 @@ func TestCoverTypedErrorUnwrap(t *testing.T) {
 	if !errors.Is(DuplicateError{Adapter: SMTP}, ErrDuplicate) {
 		t.Error("DuplicateError value does not unwrap to ErrDuplicate")
 	}
-	if !errors.Is(&DuplicateError{Adapter: SMTP}, ErrDuplicate) {
+	if !errors.Is(DuplicateError{Adapter: SMTP}, ErrDuplicate) {
 		t.Error("DuplicateError pointer does not unwrap to ErrDuplicate")
 	}
 	if !errors.Is(UnknownAdapterError{Adapter: SMTP}, ErrUnknownAdapter) {
 		t.Error("UnknownAdapterError value does not unwrap to ErrUnknownAdapter")
 	}
-	if !errors.Is(&UnknownAdapterError{Adapter: SMTP}, ErrUnknownAdapter) {
+	if !errors.Is(UnknownAdapterError{Adapter: SMTP}, ErrUnknownAdapter) {
 		t.Error("UnknownAdapterError pointer does not unwrap to ErrUnknownAdapter")
 	}
 	if !errors.Is(InvalidAdapterError{Adapter: "x"}, ErrInvalidAdapter) {
 		t.Error("InvalidAdapterError value does not unwrap to ErrInvalidAdapter")
 	}
-	if !errors.Is(&InvalidAdapterError{Adapter: "x"}, ErrInvalidAdapter) {
+	if !errors.Is(InvalidAdapterError{Adapter: "x"}, ErrInvalidAdapter) {
 		t.Error("InvalidAdapterError pointer does not unwrap to ErrInvalidAdapter")
 	}
 	if !errors.Is(InvalidOptionsError{Reason: "x"}, ErrInvalidOptions) {
 		t.Error("InvalidOptionsError value does not unwrap to ErrInvalidOptions")
 	}
-	if !errors.Is(&InvalidOptionsError{Reason: "x"}, ErrInvalidOptions) {
+	if !errors.Is(InvalidOptionsError{Reason: "x"}, ErrInvalidOptions) {
 		t.Error("InvalidOptionsError pointer does not unwrap to ErrInvalidOptions")
 	}
 	if !errors.Is(InvalidAddressError{Field: "F", Value: "v"}, ErrInvalidAddress) {
 		t.Error("InvalidAddressError value does not unwrap to ErrInvalidAddress")
 	}
-	if !errors.Is(&InvalidAddressError{Field: "F", Value: "v"}, ErrInvalidAddress) {
+	if !errors.Is(InvalidAddressError{Field: "F", Value: "v"}, ErrInvalidAddress) {
 		t.Error("InvalidAddressError pointer does not unwrap to ErrInvalidAddress")
 	}
 }
@@ -296,7 +296,7 @@ func TestCoverOptionsValidateMatrix(t *testing.T) {
 			t.Errorf("%s err = %v, want ErrInvalidOptions", c.name, err)
 			continue
 		}
-		var ioe *InvalidOptionsError
+		var ioe InvalidOptionsError
 		if !errors.As(err, &ioe) {
 			t.Errorf("%s err %T is not *InvalidOptionsError", c.name, err)
 			continue
@@ -436,7 +436,7 @@ func TestCoverAddressValidateTable(t *testing.T) {
 			t.Errorf("%s err = %v, want ErrInvalidAddress", c.name, err)
 			continue
 		}
-		var iae *InvalidAddressError
+		var iae InvalidAddressError
 		if !errors.As(err, &iae) {
 			t.Errorf("%s err %T is not *InvalidAddressError", c.name, err)
 			continue

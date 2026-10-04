@@ -25,7 +25,7 @@ func TestValidatePropertiesSize_over_returnsSizeLimit(t *testing.T) {
 	t.Parallel()
 	m := map[string]any{"k": strings.Repeat("x", 100)}
 	err := ValidatePropertiesSize(m, 10)
-	var sle *SizeLimitError
+	var sle SizeLimitError
 	if !errors.As(err, &sle) {
 		t.Fatalf("err %T is not *SizeLimitError", err)
 	}
@@ -88,7 +88,7 @@ func TestMarshalValidated_over_returnsSizeLimit(t *testing.T) {
 	t.Parallel()
 	m := map[string]any{"k": strings.Repeat("x", 100)}
 	_, err := MarshalValidated(m, 10)
-	var sle *SizeLimitError
+	var sle SizeLimitError
 	if !errors.As(err, &sle) {
 		t.Fatalf("err %T is not *SizeLimitError", err)
 	}
@@ -123,7 +123,7 @@ func TestValidateBounds_countFirst_ordering(t *testing.T) {
 	t.Parallel()
 	m := map[string]any{"a": strings.Repeat("x", 100), "b": "y"}
 	err := ValidateBounds(m, 1, 1)
-	var cle *CountLimitError
+	var cle CountLimitError
 	if !errors.As(err, &cle) {
 		t.Fatalf("err %T is not *CountLimitError", err)
 	}

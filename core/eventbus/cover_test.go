@@ -37,7 +37,7 @@ func TestCoverTypedErrorStrings(t *testing.T) {
 func TestCoverInvalidMessageIDUnwrapBothArms(t *testing.T) {
 	cause := errors.New("boom")
 
-	withCause := (&InvalidMessageIDError{ID: "x", Err: cause}).Unwrap()
+	withCause := (InvalidMessageIDError{ID: "x", Err: cause}).Unwrap()
 	if !errors.Is(withCause, ErrInvalidMessageID) {
 		t.Errorf("Unwrap with cause = %v want ErrInvalidMessageID", withCause)
 	}
@@ -46,7 +46,7 @@ func TestCoverInvalidMessageIDUnwrapBothArms(t *testing.T) {
 		t.Errorf("Unwrap with cause = %v want cause", withCause)
 	}
 
-	withoutCause := (&InvalidMessageIDError{ID: "x"}).Unwrap()
+	withoutCause := (InvalidMessageIDError{ID: "x"}).Unwrap()
 	if !errors.Is(withoutCause, ErrInvalidMessageID) {
 		t.Errorf("Unwrap without cause = %v want ErrInvalidMessageID", withoutCause)
 	}

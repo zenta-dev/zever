@@ -39,7 +39,7 @@ func TestParseAdapter(t *testing.T) {
 			t.Fatalf("ParseAdapter %q adapter=%v want Embedded", s, a)
 		}
 
-		var inv *InvalidAdapterError
+		var inv InvalidAdapterError
 		if !errors.As(err, &inv) {
 			t.Fatalf("ParseAdapter %q err=%v want InvalidAdapterError", s, err)
 		}

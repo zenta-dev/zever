@@ -46,7 +46,7 @@ func TestDuplicateJobErrorIsAs(t *testing.T) {
 		t.Errorf("errors.Is(err, ErrDuplicateJob) = false (err = %T %v)", err, err)
 	}
 
-	var dupErr *DuplicateJobError
+	var dupErr DuplicateJobError
 	if !errors.As(err, &dupErr) {
 		t.Fatalf("errors.As(err, DuplicateJobError) = false (err = %T %v)", err, err)
 	}
@@ -74,7 +74,7 @@ func TestUnknownJobErrorIsAs(t *testing.T) {
 		t.Errorf("errors.Is(err, ErrUnknownJob) = false (err = %T %v)", err, err)
 	}
 
-	var unknownErr *UnknownJobError
+	var unknownErr UnknownJobError
 	if !errors.As(err, &unknownErr) {
 		t.Fatalf("errors.As(err, UnknownJobError) = false (err = %T %v)", err, err)
 	}

@@ -36,7 +36,7 @@ func TestParseAdapterInvalid(t *testing.T) {
 	if !errors.Is(err, cache.ErrInvalidAdapter) {
 		t.Errorf("errors.Is(err, ErrInvalidAdapter) = false (err = %v)", err)
 	}
-	var invErr *cache.InvalidAdapterError
+	var invErr cache.InvalidAdapterError
 	if !errors.As(err, &invErr) {
 		t.Errorf("errors.As(err, InvalidAdapterError) = false (err = %T %v)", err, err)
 	}
@@ -68,7 +68,7 @@ func TestMemoryNotFound(t *testing.T) {
 	if !errors.Is(err, cache.ErrNotFound) {
 		t.Errorf("errors.Is(err, ErrNotFound) = false (err = %v)", err)
 	}
-	var nfErr *cache.NotFoundError
+	var nfErr cache.NotFoundError
 	if !errors.As(err, &nfErr) {
 		t.Errorf("errors.As(err, NotFoundError) = false (err = %T %v)", err, err)
 	}
@@ -176,7 +176,7 @@ func TestParseAdapter_empty_returnsInvalidAdapterError(t *testing.T) {
 		t.Errorf("errors.Is(err, ErrInvalidAdapter) = false (err = %v)", err)
 	}
 
-	var invErr *cache.InvalidAdapterError
+	var invErr cache.InvalidAdapterError
 	if !errors.As(err, &invErr) {
 		t.Fatalf("errors.As(err, InvalidAdapterError) = false (err = %T %v)", err, err)
 	}
@@ -245,7 +245,7 @@ func TestTypedErrorMessages_unwrap(t *testing.T) {
 	t.Run("duplicate", func(t *testing.T) {
 		t.Parallel()
 
-		err := &cache.DuplicateAdapterError{Adapter: cache.Memory}
+		err := cache.DuplicateAdapterError{Adapter: cache.Memory}
 		if got, want := err.Error(), `cache: duplicate adapter: memory`; got != want {
 			t.Errorf("Error() = %q, want %q", got, want)
 		}
@@ -258,7 +258,7 @@ func TestTypedErrorMessages_unwrap(t *testing.T) {
 	t.Run("unknown adapter", func(t *testing.T) {
 		t.Parallel()
 
-		err := &cache.UnknownAdapterError{Adapter: cache.Adapter("")}
+		err := cache.UnknownAdapterError{Adapter: cache.Adapter("")}
 		if got, want := err.Error(), `cache: unknown adapter: unknown (forgotten import?)`; got != want {
 			t.Errorf("Error() = %q, want %q", got, want)
 		}

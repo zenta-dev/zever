@@ -92,7 +92,7 @@ func TestOptions_Validate_urlParseFailure_invalid(t *testing.T) {
 	if want := "i18n: invalid options: endpoint must be a valid url"; err.Error() != want {
 		t.Errorf("url parse failure err %q, want %q", err.Error(), want)
 	}
-	var ioe *InvalidOptionsError
+	var ioe InvalidOptionsError
 	if !errors.As(err, &ioe) {
 		t.Errorf("url parse failure err %T is not *InvalidOptionsError", err)
 	} else if ioe.Reason != "endpoint must be a valid url" {

@@ -73,7 +73,7 @@ func TestOpenSuccess_returnsProvider(t *testing.T) {
 	a := Adapter("test-9101")
 	want := coverOpenSuccessStub
 	if err := Register(a, func(Options) (Provider, error) { return want, nil }); err != nil {
-		var dup *DuplicateError
+		var dup DuplicateError
 		if !errors.As(err, &dup) {
 			t.Fatalf("Register() error = %v", err)
 		}
@@ -94,7 +94,7 @@ func TestOpenFactoryError_wrapsOpen(t *testing.T) {
 	a := Adapter("test-9102")
 	boom := errCoverOpenFactory
 	if err := Register(a, func(Options) (Provider, error) { return nil, boom }); err != nil {
-		var dup *DuplicateError
+		var dup DuplicateError
 		if !errors.As(err, &dup) {
 			t.Fatalf("Register() error = %v", err)
 		}

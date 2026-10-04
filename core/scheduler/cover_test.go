@@ -8,7 +8,7 @@ import (
 func TestCoverUnknownAdapterErrorString(t *testing.T) {
 	t.Parallel()
 
-	err := &UnknownAdapterError{Adapter: Adapter("")}
+	err := UnknownAdapterError{Adapter: Adapter("")}
 	if got, want := err.Error(), "scheduler: unknown adapter: unknown (forgotten import?)"; got != want {
 		t.Fatalf("Error() = %q, want %q", got, want)
 	}
@@ -17,7 +17,7 @@ func TestCoverUnknownAdapterErrorString(t *testing.T) {
 func TestCoverInvalidAdapterErrorString(t *testing.T) {
 	t.Parallel()
 
-	err := &InvalidAdapterError{Adapter: "bogus"}
+	err := InvalidAdapterError{Adapter: "bogus"}
 	if got, want := err.Error(), `scheduler: invalid adapter: "bogus"`; got != want {
 		t.Fatalf("Error() = %q, want %q", got, want)
 	}
@@ -27,7 +27,7 @@ func TestCoverInvalidSpecErrorString(t *testing.T) {
 	t.Parallel()
 
 	cause := errors.New("parse boom")
-	err := &InvalidSpecError{Spec: "bogus", Err: cause}
+	err := InvalidSpecError{Spec: "bogus", Err: cause}
 	if got, want := err.Error(), `scheduler: invalid spec "bogus": parse boom`; got != want {
 		t.Fatalf("Error() = %q, want %q", got, want)
 	}
@@ -36,7 +36,7 @@ func TestCoverInvalidSpecErrorString(t *testing.T) {
 func TestCoverInvalidSpecUnwrapNilCause(t *testing.T) {
 	t.Parallel()
 
-	err := &InvalidSpecError{Spec: "bogus"}
+	err := InvalidSpecError{Spec: "bogus"}
 	if !errors.Is(err, ErrInvalidSpec) {
 		t.Fatalf("err = %v, want ErrInvalidSpec", err)
 	}

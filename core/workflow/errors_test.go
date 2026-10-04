@@ -39,16 +39,16 @@ func TestTypedErrorsUnwrap(t *testing.T) {
 		err  error
 		want error
 	}{
-		{"duplicate", &workflow.DuplicateAdapterError{Adapter: workflow.Memory}, workflow.ErrDuplicate},
-		{"unknown_adapter", &workflow.UnknownAdapterError{Adapter: workflow.Memory}, workflow.ErrUnknownAdapter},
-		{"invalid_adapter", &workflow.InvalidAdapterError{Adapter: "bogus"}, workflow.ErrInvalidAdapter},
-		{"unknown_run", &workflow.UnknownRunError{RunID: "r1"}, workflow.ErrUnknownRun},
-		{"run_completed", &workflow.RunCompletedError{RunID: "r1"}, workflow.ErrRunCompleted},
-		{"pending_full", &workflow.PendingFullError{RunID: "r1"}, workflow.ErrPendingFull},
-		{"unknown_step", &workflow.UnknownStepError{Step: "s1"}, workflow.ErrUnknownStep},
-		{"duplicate_run", &workflow.DuplicateRunError{RunID: "r1"}, workflow.ErrDuplicateRun},
-		{"unknown_query", &workflow.UnknownQueryError{Query: "q1"}, workflow.ErrUnknownQuery},
-		{"invalid_options", &workflow.InvalidOptionsError{Reason: "bad"}, workflow.ErrInvalidOptions},
+		{"duplicate", workflow.DuplicateAdapterError{Adapter: workflow.Memory}, workflow.ErrDuplicate},
+		{"unknown_adapter", workflow.UnknownAdapterError{Adapter: workflow.Memory}, workflow.ErrUnknownAdapter},
+		{"invalid_adapter", workflow.InvalidAdapterError{Adapter: "bogus"}, workflow.ErrInvalidAdapter},
+		{"unknown_run", workflow.UnknownRunError{RunID: "r1"}, workflow.ErrUnknownRun},
+		{"run_completed", workflow.RunCompletedError{RunID: "r1"}, workflow.ErrRunCompleted},
+		{"pending_full", workflow.PendingFullError{RunID: "r1"}, workflow.ErrPendingFull},
+		{"unknown_step", workflow.UnknownStepError{Step: "s1"}, workflow.ErrUnknownStep},
+		{"duplicate_run", workflow.DuplicateRunError{RunID: "r1"}, workflow.ErrDuplicateRun},
+		{"unknown_query", workflow.UnknownQueryError{Query: "q1"}, workflow.ErrUnknownQuery},
+		{"invalid_options", workflow.InvalidOptionsError{Reason: "bad"}, workflow.ErrInvalidOptions},
 	}
 
 	for _, c := range cases {
@@ -104,9 +104,9 @@ func TestTypedErrorsAs(t *testing.T) {
 	t.Run("unknown_run", func(t *testing.T) {
 		t.Parallel()
 
-		err := &workflow.UnknownRunError{RunID: "r1"}
+		err := workflow.UnknownRunError{RunID: "r1"}
 
-		var target *workflow.UnknownRunError
+		var target workflow.UnknownRunError
 		if !errors.As(err, &target) {
 			t.Fatalf("errors.As(%v, *UnknownRunError) = false", err)
 		}
@@ -119,9 +119,9 @@ func TestTypedErrorsAs(t *testing.T) {
 	t.Run("invalid_options", func(t *testing.T) {
 		t.Parallel()
 
-		err := &workflow.InvalidOptionsError{Reason: "bad"}
+		err := workflow.InvalidOptionsError{Reason: "bad"}
 
-		var target *workflow.InvalidOptionsError
+		var target workflow.InvalidOptionsError
 		if !errors.As(err, &target) {
 			t.Fatalf("errors.As(%v, *InvalidOptionsError) = false", err)
 		}

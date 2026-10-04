@@ -73,17 +73,17 @@ func TestTypedErrorStrings(t *testing.T) {
 	}{
 		{
 			name: "invalid adapter",
-			err:  &password.InvalidAdapterError{Adapter: "bcrypt"},
+			err:  password.InvalidAdapterError{Adapter: "bcrypt"},
 			want: `password: invalid adapter: "bcrypt"`,
 		},
 		{
 			name: "duplicate",
-			err:  &password.DuplicateAdapterError{Adapter: password.AdapterArgon2ID},
+			err:  password.DuplicateAdapterError{Adapter: password.AdapterArgon2ID},
 			want: "password: duplicate adapter: argon2id",
 		},
 		{
 			name: "unknown adapter",
-			err:  &password.UnknownAdapterError{Adapter: password.Adapter("")},
+			err:  password.UnknownAdapterError{Adapter: password.Adapter("")},
 			want: "password: unknown adapter: unknown (forgotten import?)",
 		},
 	}
@@ -114,7 +114,7 @@ func mustRegisterDup(t *testing.T, a password.Adapter) error {
 	t.Helper()
 
 	if err := password.Register(a, stubFactory); err != nil {
-		var dup *password.DuplicateError
+		var dup password.DuplicateError
 		if !errors.As(err, &dup) {
 			t.Fatalf("first Register() = %v, want nil", err)
 		}

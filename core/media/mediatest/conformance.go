@@ -190,7 +190,7 @@ func conformanceInvalidID(t *testing.T, factory func(t *testing.T) media.Media) 
 		t.Errorf("Transform(bad id) err = %v, want ErrInvalidID", err)
 	}
 
-	var idErr *media.InvalidIDError
+	var idErr media.InvalidIDError
 
 	if _, err := m.Download(ctx, bad); !errors.As(err, &idErr) {
 		t.Errorf("Download(bad id) err = %T %v, want *InvalidIDError", err, err)
@@ -225,7 +225,7 @@ func conformanceNotFound(t *testing.T, factory func(t *testing.T) media.Media) {
 		t.Errorf("Transform(absent) err = %v, want ErrNotFound", err)
 	}
 
-	var nfErr *media.NotFoundError
+	var nfErr media.NotFoundError
 
 	if _, err := m.Download(ctx, absentID); !errors.As(err, &nfErr) {
 		t.Errorf("Download(absent) err = %T %v, want *NotFoundError", err, err)
@@ -254,7 +254,7 @@ func conformanceInvalidRange(t *testing.T, factory func(t *testing.T) media.Medi
 		t.Errorf("DownloadRange(past end) err = %v, want ErrInvalidRange", err)
 	}
 
-	var rangeErr *media.InvalidRangeError
+	var rangeErr media.InvalidRangeError
 
 	if _, err := m.DownloadRange(ctx, asset.ID, -1, 0); !errors.As(err, &rangeErr) {
 		t.Errorf("DownloadRange(-1,0) err = %T %v, want *InvalidRangeError", err, err)
@@ -294,7 +294,7 @@ func conformanceProbeUnsupported(t *testing.T, factory func(t *testing.T) media.
 		t.Errorf("Probe(txt) err = %v, want ErrUnsupportedFormat", err)
 	}
 
-	var ufErr *media.UnsupportedFormatError
+	var ufErr media.UnsupportedFormatError
 	if !errors.As(err, &ufErr) {
 		t.Errorf("Probe(txt) err = %T %v, want *UnsupportedFormatError", err, err)
 	}

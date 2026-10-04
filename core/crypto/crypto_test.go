@@ -114,7 +114,7 @@ func TestRegister_duplicate_fails(t *testing.T) {
 	if !errors.Is(err, crypto.ErrDuplicate) {
 		t.Fatalf("err = %v, want ErrDuplicate", err)
 	}
-	var de *crypto.DuplicateError
+	var de crypto.DuplicateError
 	if !errors.As(err, &de) {
 		t.Fatalf("err type = %T, want *DuplicateError", err)
 	}
@@ -136,7 +136,7 @@ func TestOpen_unknown_adapter_fails(t *testing.T) {
 	if !errors.Is(err, crypto.ErrUnknownAdapter) {
 		t.Fatalf("err = %v, want ErrUnknownAdapter", err)
 	}
-	var ue *crypto.UnknownAdapterError
+	var ue crypto.UnknownAdapterError
 	if !errors.As(err, &ue) {
 		t.Fatalf("err type = %T, want *UnknownAdapterError", err)
 	}

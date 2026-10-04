@@ -27,7 +27,7 @@ func TestAddress_Validate_missingAt(t *testing.T) {
 	if !errors.Is(err, ErrInvalidAddress) {
 		t.Fatalf("err = %v, want ErrInvalidAddress", err)
 	}
-	var iae *InvalidAddressError
+	var iae InvalidAddressError
 	if !errors.As(err, &iae) {
 		t.Fatalf("err %T is not *InvalidAddressError", err)
 	}

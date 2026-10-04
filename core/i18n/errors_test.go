@@ -31,44 +31,44 @@ func TestErrors_sentinel_messages(t *testing.T) {
 
 func TestErrors_typed_unwrap(t *testing.T) {
 	t.Parallel()
-	if !errors.Is(&DuplicateAdapterError{Adapter: Embed}, ErrDuplicate) {
+	if !errors.Is(DuplicateAdapterError{Adapter: Embed}, ErrDuplicate) {
 		t.Error("DuplicateAdapterError does not unwrap to ErrDuplicate")
 	}
-	if !errors.Is(&UnknownAdapterError{Adapter: Embed}, ErrUnknownAdapter) {
+	if !errors.Is(UnknownAdapterError{Adapter: Embed}, ErrUnknownAdapter) {
 		t.Error("UnknownAdapterError does not unwrap to ErrUnknownAdapter")
 	}
-	if !errors.Is(&InvalidAdapterError{Adapter: "x"}, ErrInvalidAdapter) {
+	if !errors.Is(InvalidAdapterError{Adapter: "x"}, ErrInvalidAdapter) {
 		t.Error("InvalidAdapterError does not unwrap to ErrInvalidAdapter")
 	}
-	if !errors.Is(&InvalidOptionsError{Reason: "x"}, ErrInvalidOptions) {
+	if !errors.Is(InvalidOptionsError{Reason: "x"}, ErrInvalidOptions) {
 		t.Error("InvalidOptionsError does not unwrap to ErrInvalidOptions")
 	}
-	if !errors.Is(&LocaleNotFoundError{Locale: "x"}, ErrLocaleNotFound) {
+	if !errors.Is(LocaleNotFoundError{Locale: "x"}, ErrLocaleNotFound) {
 		t.Error("LocaleNotFoundError does not unwrap to ErrLocaleNotFound")
 	}
-	if !errors.Is(&KeyNotFoundError{Locale: "x", Key: "y"}, ErrKeyNotFound) {
+	if !errors.Is(KeyNotFoundError{Locale: "x", Key: "y"}, ErrKeyNotFound) {
 		t.Error("KeyNotFoundError does not unwrap to ErrKeyNotFound")
 	}
 }
 
 func TestErrors_carried_fields(t *testing.T) {
 	t.Parallel()
-	if de := (&DuplicateAdapterError{Adapter: Embed}); de.Adapter != Embed {
+	if de := (DuplicateAdapterError{Adapter: Embed}); de.Adapter != Embed {
 		t.Errorf("DuplicateAdapterError adapter = %v", de.Adapter)
 	}
-	if ue := (&UnknownAdapterError{Adapter: Remote}); ue.Adapter != Remote {
+	if ue := (UnknownAdapterError{Adapter: Remote}); ue.Adapter != Remote {
 		t.Errorf("UnknownAdapterError adapter = %v", ue.Adapter)
 	}
-	if iae := (&InvalidAdapterError{Adapter: "bogus"}); iae.Adapter != "bogus" {
+	if iae := (InvalidAdapterError{Adapter: "bogus"}); iae.Adapter != "bogus" {
 		t.Errorf("InvalidAdapterError adapter = %q", iae.Adapter)
 	}
-	if ioe := (&InvalidOptionsError{Reason: "bad"}); ioe.Reason != "bad" {
+	if ioe := (InvalidOptionsError{Reason: "bad"}); ioe.Reason != "bad" {
 		t.Errorf("InvalidOptionsError reason = %q", ioe.Reason)
 	}
-	if lne := (&LocaleNotFoundError{Locale: "en-US"}); lne.Locale != "en-US" {
+	if lne := (LocaleNotFoundError{Locale: "en-US"}); lne.Locale != "en-US" {
 		t.Errorf("LocaleNotFoundError locale = %q", lne.Locale)
 	}
-	if kne := (&KeyNotFoundError{Locale: "en", Key: "hello"}); kne.Locale != "en" || kne.Key != "hello" {
+	if kne := (KeyNotFoundError{Locale: "en", Key: "hello"}); kne.Locale != "en" || kne.Key != "hello" {
 		t.Errorf("KeyNotFoundError = %+v", kne)
 	}
 }

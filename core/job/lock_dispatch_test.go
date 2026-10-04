@@ -33,7 +33,7 @@ func (f *fakeCache) Get(ctx context.Context, key string) ([]byte, error) {
 	if f.getFn != nil {
 		return f.getFn(ctx, key)
 	}
-	return nil, &cache.NotFoundError{Key: key}
+	return nil, cache.NotFoundError{Key: key}
 }
 
 func (f *fakeCache) Set(ctx context.Context, key string, value []byte, ttl time.Duration) error {
@@ -393,7 +393,7 @@ func TestDispatchUnknownJob(t *testing.T) {
 	if !errors.Is(err, ErrUnknownJob) {
 		t.Fatalf("errors.Is ErrUnknownJob false err=%v", err)
 	}
-	var ue *UnknownJobError
+	var ue UnknownJobError
 	if !errors.As(err, &ue) {
 		t.Fatalf("errors.As UnknownJobError false err=%v", err)
 	}

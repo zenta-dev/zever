@@ -28,11 +28,11 @@ func TestErrors_sentinel_messages(t *testing.T) {
 
 func TestErrors_duplicate_aliases_compat(t *testing.T) {
 	t.Parallel()
-	err := &DuplicateAdapterError{Adapter: AdapterHTTP}
+	err := DuplicateAdapterError{Adapter: AdapterHTTP}
 	if !errors.Is(err, ErrDuplicate) {
 		t.Error("DuplicateAdapterError does not unwrap to ErrDuplicate alias")
 	}
-	var target *DuplicateError
+	var target DuplicateError
 	if !errors.As(err, &target) {
 		t.Errorf("errors.As failed for DuplicateError alias, got %T", err)
 	}
