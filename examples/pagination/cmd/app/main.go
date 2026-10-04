@@ -15,6 +15,7 @@ package main
 
 import (
 	"context"
+	"errors"
 	"fmt"
 	"os"
 	"time"
@@ -24,6 +25,9 @@ import (
 	gen "github.com/zenta-dev/zever/examples/pagination/generated/zenorm/orm/gen/app"
 	"github.com/zenta-dev/zever/orm"
 )
+
+// ErrKeysetPage indicates a keyset pagination query failed.
+var ErrKeysetPage = errors.New("keyset page")
 
 const pageSize = 5
 
@@ -162,7 +166,7 @@ func keysetPagination(ctx context.Context, conn db.DB) ([][]*gen.Product, error)
 
 		page, err := q.All(ctx, conn)
 		if err != nil {
-			return nil, fmt.Errorf("keyset page %d: %w", pageNo, err)
+			return nil, fmt.Errorf("pagination: %w %d: %w", ErrKeysetPage, pageNo, err)
 		}
 
 		if len(page) == 0 {
@@ -191,7 +195,7 @@ func keysetPagination(ctx context.Context, conn db.DB) ([][]*gen.Product, error)
 		}
 
 		if !ok || decoded.Value() != last.ID {
-			return nil, fmt.Errorf("cursor round-trip mismatch for %s", last.ID)
+			return nil, fmt.Errorf("pagination: cursor round-trip mismatch for %s", last.ID)
 		}
 
 		token, price, id = next, last.PriceCents, last.ID

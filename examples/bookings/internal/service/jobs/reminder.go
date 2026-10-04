@@ -2,6 +2,7 @@ package jobs
 
 import (
 	"context"
+	"errors"
 	"fmt"
 	"time"
 
@@ -10,6 +11,11 @@ import (
 	genapp "github.com/zenta-dev/zever/examples/bookings/generated/zenorm/orm/gen/app"
 	"github.com/zenta-dev/zever/orm"
 )
+
+// ErrGuestNotFound indicates a guest ID has no matching user row.
+var ErrGuestNotFound = errors.New("guest not found")
+
+var errEmptyGuestID = errors.New("guest id is empty")
 
 // SendReminderArgs is the payload of the SendReminder job declared in the
 // schema. The job takes no parameters, so the payload is empty.
@@ -24,7 +30,7 @@ const ReminderWindow = 7 * 24 * time.Hour
 func DueBookings(ctx context.Context, database db.DB, now time.Time) ([]genapp.Booking, error) {
 	rows, err := orm.From(genapp.Bookings).Where(genapp.BookingCols.Status.Eq("confirmed")).All(ctx, database)
 	if err != nil {
-		return nil, fmt.Errorf("[jobs] reminder: list bookings: %w", err)
+		return nil, fmt.Errorf("jobs: reminder: list bookings: %w", err)
 	}
 	end := now.Add(ReminderWindow)
 	var out []genapp.Booking
@@ -53,17 +59,17 @@ func RunReminder(ctx context.Context, deps Deps, now time.Time) (int, error) {
 	for _, b := range due {
 		guest, ok, gerr := orm.From(genapp.Users).Where(genapp.UserCols.ID.Eq(b.GuestID)).First(ctx, deps.DB)
 		if gerr != nil {
-			return 0, fmt.Errorf("[jobs] reminder: lookup guest: %w", gerr)
+			return 0, fmt.Errorf("jobs: reminder: lookup guest: %w", gerr)
 		}
 		if !ok {
-			return 0, fmt.Errorf("[jobs] reminder: guest %q not found", b.GuestID)
+			return 0, fmt.Errorf("jobs: reminder: %w: %q", ErrGuestNotFound, b.GuestID)
 		}
 		body := fmt.Sprintf("Reminder: booking %s starts %s.", b.ID, b.StartDate)
 		note := notification.NewNotification(guest.Email, notification.ChannelPush, body)
 		note.Title = "Upcoming booking"
 		note.Data = map[string]string{"booking_id": b.ID}
 		if nerr := deps.Notifier.Notify(ctx, &note); nerr != nil {
-			return 0, fmt.Errorf("[jobs] reminder: notify guest: %w", nerr)
+			return 0, fmt.Errorf("jobs: reminder: notify guest: %w", nerr)
 		}
 	}
 	deps.Logger.Info().Int("due_bookings", len(due)).Msg("reminder sent")

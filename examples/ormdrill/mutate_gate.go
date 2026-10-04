@@ -10,15 +10,21 @@ import (
 	"github.com/zenta-dev/zever/orm/dialect"
 )
 
+// ErrInsertSelect indicates the INSERT...SELECT demo failed.
+var ErrInsertSelect = errors.New("insert select")
+
+// ErrCreateArchive indicates the archive table creation failed.
+var ErrCreateArchive = errors.New("create widgets_archive")
+
 // reportGate prints a capability-gate result and fails if the error was not
 // the expected typed rejection.
 func reportGate(label string, err, want error) error {
 	if err == nil {
-		return fmt.Errorf("%s: expected %s, got nil", label, want.Error())
+		return fmt.Errorf("ormdrill: %s: expected %s, got nil", label, want.Error())
 	}
 
 	if !errors.Is(err, want) {
-		return fmt.Errorf("%s: got %s, want errors.Is(_, %s)", label, err.Error(), want.Error())
+		return fmt.Errorf("ormdrill: %s: got %s, want errors.Is(_, %s)", label, err.Error(), want.Error())
 	}
 
 	fmt.Printf("  %-30s -> rejected: %v\n", label, err)
@@ -33,7 +39,7 @@ func DemoInsertSelectDistinct(ctx context.Context, conn db.DB) error {
 	fmt.Println("== Round 5: INSERT ... SELECT + Query.Distinct")
 
 	if _, err := conn.Exec(ctx, `CREATE TABLE widgets_archive (id text, name text, price_cents integer, created_at text, note text)`); err != nil {
-		return fmt.Errorf("create widgets_archive: %w", err)
+		return fmt.Errorf("ormdrill: %w: %w", ErrCreateArchive, err)
 	}
 
 	if err := orm.InsertInto(WidgetsArchive).
@@ -46,22 +52,22 @@ func DemoInsertSelectDistinct(ctx context.Context, conn db.DB) error {
 		).
 		Select(orm.From(Widgets).Where(WidgetCols.PriceCents.Gt(700))).
 		Exec(ctx, conn); err != nil {
-		return fmt.Errorf("insert select: %w", err)
-	}
+		return fmt.Errorf("ormdrill: %w: %w", ErrInsertSelect, err)
+		}
 
 	// A deliberate exact duplicate so DISTINCT has something to remove.
 	if _, err := conn.Exec(ctx, `INSERT INTO widgets_archive SELECT * FROM widgets_archive WHERE id = ?`, "w08"); err != nil {
-		return fmt.Errorf("duplicate archive row: %w", err)
+		return fmt.Errorf("ormdrill: duplicate archive row: %w", err)
 	}
 
 	all, err := orm.From(WidgetsArchive).All(ctx, conn)
 	if err != nil {
-		return fmt.Errorf("archive all: %w", err)
+		return fmt.Errorf("ormdrill: archive all: %w", err)
 	}
 
 	unique, err := orm.From(WidgetsArchive).Distinct().All(ctx, conn)
 	if err != nil {
-		return fmt.Errorf("archive distinct: %w", err)
+		return fmt.Errorf("ormdrill: archive distinct: %w", err)
 	}
 
 	fmt.Printf("  INSERT ... SELECT copied the %d widgets priced > 700\n", len(unique))
