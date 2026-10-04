@@ -123,7 +123,7 @@ func normalizeAttrs(attrs []Attr, limit int) []Attr {
 	}
 	out := make([]Attr, 0, n)
 	for i := 0; i < n; i++ {
-		a := attrs[i]
+		a := attrs[i] //nolint:gosec // i < n == len(attrs), bounded above
 		if len(a.Key) > MaxKeyLen {
 			a.Key = a.Key[:MaxKeyLen]
 		}
