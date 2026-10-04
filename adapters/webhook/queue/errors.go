@@ -5,6 +5,12 @@ import "errors"
 // ErrMissingQueueAdapter is returned when Options names no queue backend.
 var ErrMissingQueueAdapter = errors.New("queue: queue adapter is required")
 
+// ErrMissingEvent is returned when Register is called without an event name.
+var ErrMissingEvent = errors.New("queue: event is empty")
+
+// ErrMissingTarget is returned when Register is called without a target URL.
+var ErrMissingTarget = errors.New("queue: target is empty")
+
 // ErrVisibilityTimeout is returned when the queue visibility timeout is not positive.
 var ErrVisibilityTimeout = errors.New("queue: visibility timeout must be greater than timeout")
 

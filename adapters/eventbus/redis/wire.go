@@ -21,7 +21,7 @@ var wireCodec = codec.JSONCodec[wireMessage]{}
 
 func decodeMessage(topic string, raw []byte) (eventbus.Message, error) {
 	if len(raw) > eventbus.MaxMessageSize {
-		return eventbus.Message{}, fmt.Errorf("%w: %d > %d", eventbus.ErrPayloadTooLarge, len(raw), eventbus.MaxMessageSize)
+		return eventbus.Message{}, fmt.Errorf("redis: %w: %d > %d", eventbus.ErrPayloadTooLarge, len(raw), eventbus.MaxMessageSize)
 	}
 
 	wm, err := wireCodec.Decode(raw)

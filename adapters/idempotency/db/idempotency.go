@@ -354,7 +354,7 @@ func encodeDone(fp, result []byte) []byte {
 // Result aliases raw; callers needing ownership must copy.
 func decode(raw []byte) (tag byte, fp, result []byte, err error) {
 	if len(raw) < 3 {
-		return 0, nil, nil, fmt.Errorf("%w: record too short: %d bytes", idempotency.ErrCorruptRecord, len(raw))
+		return 0, nil, nil, fmt.Errorf("db: %w: record too short: %d bytes", idempotency.ErrCorruptRecord, len(raw))
 	}
 
 	tag = raw[0]
@@ -364,7 +364,7 @@ func decode(raw []byte) (tag byte, fp, result []byte, err error) {
 
 	n := int(binary.BigEndian.Uint16(raw[1:3]))
 	if len(raw) < 3+n {
-		return 0, nil, nil, fmt.Errorf("%w: fingerprint length %d exceeds record %d bytes", idempotency.ErrCorruptRecord, n, len(raw))
+		return 0, nil, nil, fmt.Errorf("db: %w: fingerprint length %d exceeds record %d bytes", idempotency.ErrCorruptRecord, n, len(raw))
 	}
 
 	fp = raw[3 : 3+n]

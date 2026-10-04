@@ -44,7 +44,7 @@ func (o Options) Validate() error {
 	var errs []error
 
 	if o.Timeout < 0 {
-		errs = append(errs, errors.New("ollama: timeout must be >= 0"))
+		errs = append(errs, fmt.Errorf("ollama: timeout must be >= 0: %w", ErrInvalidTimeout))
 	}
 
 	if o.Addr != "" {

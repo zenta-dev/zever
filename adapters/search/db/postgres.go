@@ -2,7 +2,6 @@ package db
 
 import (
 	"context"
-	"errors"
 	"fmt"
 	"strings"
 	"sync/atomic"
@@ -62,7 +61,7 @@ func coerceMeta(v any) ([]byte, error) {
 	case string:
 		return []byte(t), nil
 	default:
-		return nil, fmt.Errorf("postgres: unsupported metadata %T", v)
+		return nil, fmt.Errorf("postgres: unsupported metadata %T: %w", v, search.ErrInvalidMetadata)
 	}
 }
 
@@ -137,7 +136,7 @@ func Open(o Options) (search.Search, error) {
 // supported; anything else fails closed.
 func NewFromDB(conn coredb.DB, o Options) (search.Search, error) {
 	if conn == nil {
-		return nil, errors.New("postgres: db must not be nil")
+		return nil, ErrNilDB
 	}
 
 	if err := o.Validate(); err != nil {
@@ -604,7 +603,7 @@ func (d *driver) searchCount(ctx context.Context, countSQL string, countArgs []a
 		}
 
 		// Defensive: COUNT(*) always returns exactly one row.
-		return 0, errors.New("postgres: search count: no rows")
+		return 0, fmt.Errorf("postgres: search count: no rows: %w", search.ErrNotFound)
 	}
 
 	var total int64

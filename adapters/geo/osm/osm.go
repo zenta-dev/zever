@@ -373,7 +373,7 @@ func checkStatus(resp *http.Response, body []byte) error {
 	if len(msg) > 512 {
 		msg = msg[:512]
 	}
-	return fmt.Errorf("geo: osm: status %d: %s", resp.StatusCode, msg)
+	return fmt.Errorf("geo: osm: status %d: %s: %w", resp.StatusCode, msg, ErrStatus)
 }
 
 func (s *osmGeo) buildURL(path string, params url.Values) string {
