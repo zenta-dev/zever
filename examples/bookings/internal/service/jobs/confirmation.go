@@ -13,6 +13,21 @@ import (
 	"github.com/zenta-dev/zever/orm"
 )
 
+// ErrBookingNotFound indicates a booking ID has no matching row.
+var ErrBookingNotFound = errors.New("booking not found")
+
+// ErrGuestNotFound indicates a guest ID has no matching user row.
+var ErrGuestNotFound = errors.New("guest not found")
+
+// ErrSpaceNotFound indicates a space ID has no matching row.
+var ErrSpaceNotFound = errors.New("space not found")
+
+var (
+	errEmptyBookingID = errors.New("booking id is empty")
+	errEmptyGuestID   = errors.New("guest id is empty")
+	errEmptySpaceID   = errors.New("space id is empty")
+)
+
 // SendConfirmationArgs is the payload of the SendConfirmation job declared in
 // the schema.
 type SendConfirmationArgs struct {
@@ -32,31 +47,31 @@ type confirmationPayload struct {
 // It returns nil only when all three deliveries succeed.
 func RunConfirmation(ctx context.Context, deps Deps, bookingID string) error {
 	if bookingID == "" {
-		return errors.New("[jobs] confirmation: booking id is empty")
+		return fmt.Errorf("jobs: confirmation: booking id is empty: %w", errEmptyBookingID)
 	}
 
 	booking, ok, err := orm.From(genapp.Bookings).Where(genapp.BookingCols.ID.Eq(bookingID)).First(ctx, deps.DB)
 	if err != nil {
-		return fmt.Errorf("[jobs] confirmation: lookup booking: %w", err)
+		return fmt.Errorf("jobs: confirmation: lookup booking: %w", err)
 	}
 	if !ok {
-		return fmt.Errorf("[jobs] confirmation: booking %q not found", bookingID)
+		return fmt.Errorf("jobs: confirmation: %w: %q", ErrBookingNotFound, bookingID)
 	}
 
 	guest, ok, err := orm.From(genapp.Users).Where(genapp.UserCols.ID.Eq(booking.GuestID)).First(ctx, deps.DB)
 	if err != nil {
-		return fmt.Errorf("[jobs] confirmation: lookup guest: %w", err)
+		return fmt.Errorf("jobs: confirmation: lookup guest: %w", err)
 	}
 	if !ok {
-		return fmt.Errorf("[jobs] confirmation: guest %q not found", booking.GuestID)
+		return fmt.Errorf("jobs: confirmation: %w: %q", ErrGuestNotFound, booking.GuestID)
 	}
 
 	space, ok, err := orm.From(genapp.Spaces).Where(genapp.SpaceCols.ID.Eq(booking.SpaceID)).First(ctx, deps.DB)
 	if err != nil {
-		return fmt.Errorf("[jobs] confirmation: lookup space: %w", err)
+		return fmt.Errorf("jobs: confirmation: lookup space: %w", err)
 	}
 	if !ok {
-		return fmt.Errorf("[jobs] confirmation: space %q not found", booking.SpaceID)
+		return fmt.Errorf("jobs: confirmation: %w: %q", ErrSpaceNotFound, booking.SpaceID)
 	}
 
 	body := fmt.Sprintf("Booking %s for %q (%s to %s) is %s.",
@@ -69,27 +84,27 @@ func RunConfirmation(ctx context.Context, deps Deps, bookingID string) error {
 		body,
 	)
 	if merr := deps.Mailer.Send(ctx, &mail); merr != nil {
-		return fmt.Errorf("[jobs] confirmation: send mail: %w", merr)
+		return fmt.Errorf("jobs: confirmation: send mail: %w", merr)
 	}
 
 	note := notification.NewNotification(guest.Email, notification.ChannelPush, body)
 	note.Title = "Booking confirmed"
 	note.Data = map[string]string{"booking_id": booking.ID}
 	if nerr := deps.Notifier.Notify(ctx, &note); nerr != nil {
-		return fmt.Errorf("[jobs] confirmation: notify guest: %w", nerr)
+		return fmt.Errorf("jobs: confirmation: notify guest: %w", nerr)
 	}
 
 	payload, err := json.Marshal(confirmationPayload{
 		ID: booking.ID, SpaceID: booking.SpaceID, GuestID: booking.GuestID, Status: booking.Status,
 	})
 	if err != nil {
-		return fmt.Errorf("[jobs] confirmation: encode payload: %w", err)
+		return fmt.Errorf("jobs: confirmation: encode payload: %w", err)
 	}
 	if err := deps.Webhook.Deliver(ctx, EventCreated, payload); err != nil {
 		if errors.Is(err, webhook.ErrNotFound) {
 			deps.Logger.Info().Str("event", EventCreated).Msg("no webhook subscribers")
 		} else {
-			return fmt.Errorf("[jobs] confirmation: deliver webhook: %w", err)
+			return fmt.Errorf("jobs: confirmation: deliver webhook: %w", err)
 		}
 	}
 
