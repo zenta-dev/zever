@@ -16,3 +16,6 @@ var ErrScanTypeMismatch = errors.New("orm: scan type mismatch")
 
 // ErrInvalidCTEName indicates an invalid CTE name.
 var ErrInvalidCTEName = errors.New("orm: invalid CTE name")
+
+// ErrTruncated indicates truncated data.
+var ErrTruncated = errors.New("orm: truncated")

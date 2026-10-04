@@ -91,7 +91,7 @@ func redactURLError(err error) error {
 	if strings.Contains(strings.ToLower(errStr), "x-api-key") {
 		// replace value
 		errStr = "REDACTED"
-		return &url.Error{Op: ue.Op, URL: uStr, Err: errors.New(errStr)}
+		return &url.Error{Op: ue.Op, URL: uStr, Err: fmt.Errorf("anthropic: %s", errStr)}
 	}
 	// If URL itself contains api key pattern, ensure REDACTED
 	if strings.Contains(uStr, "REDACTED") {

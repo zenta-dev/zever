@@ -1,6 +1,8 @@
 package redisclient
 
 import (
+	"errors"
+
 	"github.com/zenta-dev/zever/shared/redisopt"
 )
 
@@ -22,3 +24,6 @@ type InvalidAddressError = redisopt.InvalidAddressError
 // PlaintextRejectedError reports that RequireTLS is set on Options but the
 // resolved address would connect without TLS.
 type PlaintextRejectedError = redisopt.PlaintextRejectedError
+
+// ErrMissingHost indicates a missing host in Redis address.
+var ErrMissingHost = errors.New("redis: missing host")
