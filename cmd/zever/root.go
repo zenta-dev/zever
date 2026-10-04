@@ -30,6 +30,9 @@ func (e *flagUsageError) Unwrap() []error { return []error{errFlagUsage, e.err} 
 // not mistake for "no help requested, run the handler".
 var errHelpShown = errors.New("zever: help shown")
 
+// ErrUnknownSubcommand is returned when a command gets an unrecognized subcommand.
+var ErrUnknownSubcommand = errors.New("unknown subcommand")
+
 // printHelpIfRequested implements -h/--help/help for pass-through commands
 // (DisableFlagParsing leaves flag parsing to the legacy handlers, which
 // historically mistook "-h" for input, e.g. `routes -h` tried to read a file
@@ -213,7 +216,7 @@ zever applications built from .zen schemas.`,
 				}
 			}
 
-			return fmt.Errorf("zever: unknown subcommand %q", args[0])
+			return fmt.Errorf("zever: %w: %q", ErrUnknownSubcommand, args[0])
 		},
 	}
 
