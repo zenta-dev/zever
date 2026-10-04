@@ -15,7 +15,7 @@ func BenchmarkPreloadBelowChunkSize(b *testing.B) {
 
 	b.ResetTimer()
 
-	for i := 0; i < b.N; i++ {
+	for b.Loop() {
 		got, err := Preload(
 			ctx, conn,
 			From(preloadAuthors).OrderBy(preloadAuthorID.Asc()),
@@ -41,7 +41,7 @@ func BenchmarkPreloadAboveChunkSize(b *testing.B) {
 
 	b.ResetTimer()
 
-	for i := 0; i < b.N; i++ {
+	for b.Loop() {
 		got, err := Preload(
 			ctx, conn,
 			From(preloadAuthors).OrderBy(preloadAuthorID.Asc()),

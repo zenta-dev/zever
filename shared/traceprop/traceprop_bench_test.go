@@ -43,7 +43,7 @@ func BenchmarkInject(b *testing.B) {
 	b.ReportAllocs()
 	b.ResetTimer()
 
-	for range b.N {
+	for b.Loop() {
 		_ = Inject(ctx, headers)
 	}
 }
@@ -56,7 +56,7 @@ func BenchmarkExtract(b *testing.B) {
 	b.ReportAllocs()
 	b.ResetTimer()
 
-	for range b.N {
+	for b.Loop() {
 		_ = Extract(base, headers)
 	}
 }
@@ -68,7 +68,7 @@ func BenchmarkTraceID(b *testing.B) {
 	b.ReportAllocs()
 	b.ResetTimer()
 
-	for range b.N {
+	for b.Loop() {
 		_ = TraceID(ctx)
 	}
 }

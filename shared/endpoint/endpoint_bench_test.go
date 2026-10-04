@@ -7,7 +7,7 @@ func BenchmarkValidateURLHTTPS(b *testing.B) {
 	b.ReportAllocs()
 	b.ResetTimer()
 
-	for range b.N {
+	for b.Loop() {
 		if _, err := ValidateURL("https://example.com/v1"); err != nil {
 			b.Fatalf("ValidateURL() error = %v", err)
 		}
@@ -21,7 +21,7 @@ func BenchmarkValidateURLStrict(b *testing.B) {
 	b.ReportAllocs()
 	b.ResetTimer()
 
-	for range b.N {
+	for b.Loop() {
 		if _, err := ValidateURL("https://example.com/v1", opts...); err != nil {
 			b.Fatalf("ValidateURL() error = %v", err)
 		}
@@ -33,7 +33,7 @@ func BenchmarkValidateURLLoopback(b *testing.B) {
 	b.ReportAllocs()
 	b.ResetTimer()
 
-	for range b.N {
+	for b.Loop() {
 		if _, err := ValidateURL("http://127.0.0.1:8080", WithAllowLoopbackHTTP()); err != nil {
 			b.Fatalf("ValidateURL() error = %v", err)
 		}
@@ -45,7 +45,7 @@ func BenchmarkIsLoopbackHost(b *testing.B) {
 	b.ReportAllocs()
 	b.ResetTimer()
 
-	for range b.N {
+	for b.Loop() {
 		_ = IsLoopbackHost("127.0.0.1")
 	}
 }

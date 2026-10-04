@@ -31,7 +31,7 @@ var _ = redis.NewClient
 func BenchmarkScanImports(b *testing.B) {
 	b.ReportAllocs()
 	b.ResetTimer()
-	for i := 0; i < b.N; i++ {
+	for b.Loop() {
 		if got := scanImports(benchSource); len(got) != 3 {
 			b.Fatalf("scanImports = %v, want 3 paths", got)
 		}
@@ -49,7 +49,7 @@ func BenchmarkProvider(b *testing.B) {
 
 	b.ReportAllocs()
 	b.ResetTimer()
-	for i := 0; i < b.N; i++ {
+	for b.Loop() {
 		if got := provider(imp, mods); got != "github.com/zenta-dev/zever/core/cache" {
 			b.Fatalf("provider = %q", got)
 		}
@@ -72,7 +72,7 @@ require (
 
 	b.ReportAllocs()
 	b.ResetTimer()
-	for i := 0; i < b.N; i++ {
+	for b.Loop() {
 		if got := parseRequires(content); len(got) != 3 {
 			b.Fatalf("parseRequires = %v, want 3", got)
 		}
@@ -92,7 +92,7 @@ replace (
 
 	b.ReportAllocs()
 	b.ResetTimer()
-	for i := 0; i < b.N; i++ {
+	for b.Loop() {
 		if got := parseReplaces(content); len(got) != 3 {
 			b.Fatalf("parseReplaces = %v, want 3", got)
 		}

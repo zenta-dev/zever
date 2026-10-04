@@ -5,7 +5,7 @@ import "testing"
 func BenchmarkRegister(b *testing.B) {
 	b.ReportAllocs()
 	b.ResetTimer()
-	for i := 0; i < b.N; i++ {
+	for b.Loop() {
 		if err := Register(freshAdapter(), func(Options) (Notifier, error) { return &stubNotifier{}, nil }); err != nil {
 			b.Fatalf("Register err = %v", err)
 		}
@@ -19,7 +19,7 @@ func BenchmarkOpen(b *testing.B) {
 	}
 	b.ReportAllocs()
 	b.ResetTimer()
-	for i := 0; i < b.N; i++ {
+	for b.Loop() {
 		if _, err := Open(a, Options{}); err != nil {
 			b.Fatalf("Open err = %v", err)
 		}
@@ -45,7 +45,7 @@ func BenchmarkOpenParallel(b *testing.B) {
 func BenchmarkParseAdapter(b *testing.B) {
 	b.ReportAllocs()
 	b.ResetTimer()
-	for i := 0; i < b.N; i++ {
+	for b.Loop() {
 		_, _ = ParseAdapter("fcm")
 	}
 }
@@ -59,7 +59,7 @@ func BenchmarkNotificationValidate(b *testing.B) {
 	}
 	b.ReportAllocs()
 	b.ResetTimer()
-	for i := 0; i < b.N; i++ {
+	for b.Loop() {
 		if err := n.Validate(); err != nil {
 			b.Fatalf("Validate err = %v", err)
 		}
@@ -75,7 +75,7 @@ func BenchmarkNotificationClone(b *testing.B) {
 	}
 	b.ReportAllocs()
 	b.ResetTimer()
-	for i := 0; i < b.N; i++ {
+	for b.Loop() {
 		_ = n.Clone()
 	}
 }
@@ -83,7 +83,7 @@ func BenchmarkNotificationClone(b *testing.B) {
 func BenchmarkNewNotification(b *testing.B) {
 	b.ReportAllocs()
 	b.ResetTimer()
-	for i := 0; i < b.N; i++ {
+	for b.Loop() {
 		_ = NewNotification("token", ChannelPush, "body")
 	}
 }
@@ -94,7 +94,7 @@ func BenchmarkNotifierNotify(b *testing.B) {
 	ctx := b.Context()
 	b.ReportAllocs()
 	b.ResetTimer()
-	for i := 0; i < b.N; i++ {
+	for b.Loop() {
 		if err := n.Notify(ctx, msg); err != nil {
 			b.Fatalf("Notify err = %v", err)
 		}

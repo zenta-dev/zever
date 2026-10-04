@@ -10,7 +10,7 @@ func BenchmarkNew(b *testing.B) {
 	b.ReportAllocs()
 	b.ResetTimer()
 
-	for i := 0; i < b.N; i++ {
+	for b.Loop() {
 		if c := New("sess-id", Options{}); c == nil {
 			b.Fatal("New() returned nil")
 		}
@@ -25,7 +25,7 @@ func BenchmarkNewHostPrefix(b *testing.B) {
 	b.ReportAllocs()
 	b.ResetTimer()
 
-	for i := 0; i < b.N; i++ {
+	for b.Loop() {
 		if c := New("sess-id", opts); c == nil {
 			b.Fatal("New() returned nil")
 		}
@@ -39,7 +39,7 @@ func BenchmarkNewMaxAge(b *testing.B) {
 	b.ReportAllocs()
 	b.ResetTimer()
 
-	for i := 0; i < b.N; i++ {
+	for b.Loop() {
 		if c := New("sess-id", opts); c == nil {
 			b.Fatal("New() returned nil")
 		}
@@ -51,7 +51,7 @@ func BenchmarkSet(b *testing.B) {
 	b.ReportAllocs()
 	b.ResetTimer()
 
-	for i := 0; i < b.N; i++ {
+	for b.Loop() {
 		rec := httptest.NewRecorder()
 		Set(rec, "sess-id", Options{})
 	}

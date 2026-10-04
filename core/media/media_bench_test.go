@@ -14,7 +14,7 @@ func (zeroReader) Read(p []byte) (int, error) {
 func BenchmarkRegister(b *testing.B) {
 	b.ReportAllocs()
 	b.ResetTimer()
-	for i := 0; i < b.N; i++ {
+	for b.Loop() {
 		if err := Register(freshAdapter(), func(Options) (Media, error) { return &stubMedia{}, nil }); err != nil {
 			b.Fatalf("Register err = %v", err)
 		}
@@ -28,7 +28,7 @@ func BenchmarkOpen(b *testing.B) {
 	}
 	b.ReportAllocs()
 	b.ResetTimer()
-	for i := 0; i < b.N; i++ {
+	for b.Loop() {
 		if _, err := Open(a, Options{}); err != nil {
 			b.Fatalf("Open err = %v", err)
 		}
@@ -54,7 +54,7 @@ func BenchmarkOpenParallel(b *testing.B) {
 func BenchmarkParseAdapter(b *testing.B) {
 	b.ReportAllocs()
 	b.ResetTimer()
-	for i := 0; i < b.N; i++ {
+	for b.Loop() {
 		_, _ = ParseAdapter("s3")
 	}
 }
@@ -62,7 +62,7 @@ func BenchmarkParseAdapter(b *testing.B) {
 func BenchmarkValidID(b *testing.B) {
 	b.ReportAllocs()
 	b.ResetTimer()
-	for i := 0; i < b.N; i++ {
+	for b.Loop() {
 		if !ValidID("asset-123_abc") {
 			b.Fatal("ValidID = false, want true")
 		}
@@ -72,7 +72,7 @@ func BenchmarkValidID(b *testing.B) {
 func BenchmarkValidHexID(b *testing.B) {
 	b.ReportAllocs()
 	b.ResetTimer()
-	for i := 0; i < b.N; i++ {
+	for b.Loop() {
 		if !ValidHexID("0123456789abcdef0123456789abcdef") {
 			b.Fatal("ValidHexID = false, want true")
 		}
@@ -83,7 +83,7 @@ func BenchmarkGenerateIDWithReader(b *testing.B) {
 	r := zeroReader{}
 	b.ReportAllocs()
 	b.ResetTimer()
-	for i := 0; i < b.N; i++ {
+	for b.Loop() {
 		if _, err := GenerateIDWithReader(r); err != nil {
 			b.Fatalf("GenerateIDWithReader err = %v", err)
 		}
@@ -93,7 +93,7 @@ func BenchmarkGenerateIDWithReader(b *testing.B) {
 func BenchmarkExtForContentType(b *testing.B) {
 	b.ReportAllocs()
 	b.ResetTimer()
-	for i := 0; i < b.N; i++ {
+	for b.Loop() {
 		_ = ExtForContentType("image/png; charset=binary")
 	}
 }
@@ -101,7 +101,7 @@ func BenchmarkExtForContentType(b *testing.B) {
 func BenchmarkContentTypeForExt(b *testing.B) {
 	b.ReportAllocs()
 	b.ResetTimer()
-	for i := 0; i < b.N; i++ {
+	for b.Loop() {
 		_ = ContentTypeForExt(".png")
 	}
 }
@@ -109,7 +109,7 @@ func BenchmarkContentTypeForExt(b *testing.B) {
 func BenchmarkKindForExt(b *testing.B) {
 	b.ReportAllocs()
 	b.ResetTimer()
-	for i := 0; i < b.N; i++ {
+	for b.Loop() {
 		_, _ = KindForExt("mp4")
 	}
 }

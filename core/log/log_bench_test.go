@@ -8,7 +8,7 @@ import (
 func BenchmarkRegister(b *testing.B) {
 	b.ReportAllocs()
 	b.ResetTimer()
-	for i := 0; i < b.N; i++ {
+	for b.Loop() {
 		if err := Register(freshAdapter(), func(Options) (Logger, error) { return stubLogger{}, nil }); err != nil {
 			b.Fatalf("Register err = %v", err)
 		}
@@ -22,7 +22,7 @@ func BenchmarkOpen(b *testing.B) {
 	}
 	b.ReportAllocs()
 	b.ResetTimer()
-	for i := 0; i < b.N; i++ {
+	for b.Loop() {
 		if _, err := Open(a, Options{}); err != nil {
 			b.Fatalf("Open err = %v", err)
 		}
@@ -48,7 +48,7 @@ func BenchmarkOpenParallel(b *testing.B) {
 func BenchmarkParseLevel(b *testing.B) {
 	b.ReportAllocs()
 	b.ResetTimer()
-	for i := 0; i < b.N; i++ {
+	for b.Loop() {
 		if _, err := ParseLevel("warn"); err != nil {
 			b.Fatalf("ParseLevel err = %v", err)
 		}
@@ -59,7 +59,7 @@ func BenchmarkLevelString(b *testing.B) {
 	l := LevelWarn
 	b.ReportAllocs()
 	b.ResetTimer()
-	for i := 0; i < b.N; i++ {
+	for b.Loop() {
 		_ = l.String()
 	}
 }
@@ -67,7 +67,7 @@ func BenchmarkLevelString(b *testing.B) {
 func BenchmarkParseAdapter(b *testing.B) {
 	b.ReportAllocs()
 	b.ResetTimer()
-	for i := 0; i < b.N; i++ {
+	for b.Loop() {
 		_, _ = ParseAdapter("slog")
 	}
 }
@@ -76,7 +76,7 @@ func BenchmarkFieldConstructors(b *testing.B) {
 	now := time.Unix(0, 0)
 	b.ReportAllocs()
 	b.ResetTimer()
-	for i := 0; i < b.N; i++ {
+	for b.Loop() {
 		_ = String("k", "v")
 		_ = Int("n", 1)
 		_ = Int64("n64", 2)
@@ -94,7 +94,7 @@ func BenchmarkFromContext(b *testing.B) {
 	fallback := stubLogger{}
 	b.ReportAllocs()
 	b.ResetTimer()
-	for i := 0; i < b.N; i++ {
+	for b.Loop() {
 		_ = FromContext(ctx, fallback)
 	}
 }

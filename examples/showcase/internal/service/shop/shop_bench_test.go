@@ -64,7 +64,7 @@ func BenchmarkListProducts(b *testing.B) {
 
 	b.ReportAllocs()
 	b.ResetTimer()
-	for i := 0; i < b.N; i++ {
+	for b.Loop() {
 		resp, err := svc.ListProducts(ctx, nil, "", 10)
 		if err != nil {
 			b.Fatalf("ListProducts: %v", err)
@@ -83,7 +83,7 @@ func BenchmarkGetProduct(b *testing.B) {
 
 	b.ReportAllocs()
 	b.ResetTimer()
-	for i := 0; i < b.N; i++ {
+	for b.Loop() {
 		if _, err := svc.GetProduct(ctx, req); err != nil {
 			b.Fatalf("GetProduct: %v", err)
 		}

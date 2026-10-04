@@ -37,7 +37,7 @@ func BenchmarkSpanEnd(b *testing.B) {
 	attrs := benchAttrs()
 	b.ReportAllocs()
 	b.ResetTimer()
-	for i := 0; i < b.N; i++ {
+	for b.Loop() {
 		_, span := tr.Start(b.Context(), "op")
 		span.SetAttributes(attrs...)
 		span.End()
@@ -68,7 +68,7 @@ func BenchmarkMetricsCounterVerbose(b *testing.B) {
 	attrs := benchAttrs()
 	b.ReportAllocs()
 	b.ResetTimer()
-	for i := 0; i < b.N; i++ {
+	for b.Loop() {
 		if err := m.Counter(b.Context(), "c", 1, attrs...); err != nil {
 			b.Fatalf("Counter() = %v, want nil", err)
 		}

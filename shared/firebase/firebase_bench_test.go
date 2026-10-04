@@ -11,7 +11,7 @@ func BenchmarkValidateServiceAccountPath(b *testing.B) {
 	b.ReportAllocs()
 	b.ResetTimer()
 
-	for range b.N {
+	for b.Loop() {
 		if err := ValidateServiceAccountPath("config/service-account.json"); err != nil {
 			b.Fatalf("ValidateServiceAccountPath() error = %v", err)
 		}
@@ -31,7 +31,7 @@ func BenchmarkCredentialsValidate(b *testing.B) {
 	b.ReportAllocs()
 	b.ResetTimer()
 
-	for range b.N {
+	for b.Loop() {
 		if err := c.Validate(); err != nil {
 			b.Fatalf("Validate() error = %v", err)
 		}

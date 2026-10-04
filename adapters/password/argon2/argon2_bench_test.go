@@ -23,7 +23,7 @@ func BenchmarkHash(b *testing.B) {
 	ctx := b.Context()
 	b.ReportAllocs()
 	b.ResetTimer()
-	for i := 0; i < b.N; i++ {
+	for b.Loop() {
 		if _, err := h.Hash(ctx, "correct horse battery staple"); err != nil {
 			b.Fatalf("Hash() = %v, want nil", err)
 		}
@@ -40,7 +40,7 @@ func BenchmarkVerify(b *testing.B) {
 	}
 	b.ReportAllocs()
 	b.ResetTimer()
-	for i := 0; i < b.N; i++ {
+	for b.Loop() {
 		ok, err := h.Verify(ctx, hash, "correct horse battery staple")
 		if err != nil {
 			b.Fatalf("Verify() = %v", err)
@@ -61,7 +61,7 @@ func BenchmarkNeedsRehash(b *testing.B) {
 	}
 	b.ReportAllocs()
 	b.ResetTimer()
-	for i := 0; i < b.N; i++ {
+	for b.Loop() {
 		if _, err := h.NeedsRehash(ctx, hash); err != nil {
 			b.Fatalf("NeedsRehash() = %v", err)
 		}

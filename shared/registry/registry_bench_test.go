@@ -12,7 +12,7 @@ func BenchmarkLookup(b *testing.B) {
 	b.ReportAllocs()
 	b.ResetTimer()
 
-	for range b.N {
+	for b.Loop() {
 		if _, err := r.Lookup(adapterA); err != nil {
 			b.Fatalf("Lookup() error = %v", err)
 		}
@@ -31,7 +31,7 @@ func BenchmarkRegisterDuplicate(b *testing.B) {
 	b.ReportAllocs()
 	b.ResetTimer()
 
-	for range b.N {
+	for b.Loop() {
 		_ = r.Register(adapterA, factory)
 	}
 }

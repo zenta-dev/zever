@@ -24,7 +24,7 @@ var benchRequires = map[string][]string{
 func BenchmarkDependentsClosure(b *testing.B) {
 	b.ReportAllocs()
 	b.ResetTimer()
-	for i := 0; i < b.N; i++ {
+	for b.Loop() {
 		if got := dependentsClosure([]string{"shared/registry"}, benchRequires); !slices.Contains(got, "cmd/zever") {
 			b.Fatalf("closure missing cmd/zever: %v", got)
 		}
@@ -42,7 +42,7 @@ func BenchmarkClassify(b *testing.B) {
 
 	b.ReportAllocs()
 	b.ResetTimer()
-	for i := 0; i < b.N; i++ {
+	for b.Loop() {
 		groups, reason := classify(changed, modules, benchRequires, 4)
 		if reason != "affected" || len(groups) == 0 {
 			b.Fatalf("classify = (%v, %q)", groups, reason)
@@ -65,7 +65,7 @@ require (
 
 	b.ReportAllocs()
 	b.ResetTimer()
-	for i := 0; i < b.N; i++ {
+	for b.Loop() {
 		if got := parseRequires(content); len(got) != 2 {
 			b.Fatalf("parseRequires = %v, want 2 entries", got)
 		}
@@ -81,7 +81,7 @@ func BenchmarkChunkGroups(b *testing.B) {
 
 	b.ReportAllocs()
 	b.ResetTimer()
-	for i := 0; i < b.N; i++ {
+	for b.Loop() {
 		if got := chunkGroups(mods, 8); len(got) != 8 {
 			b.Fatalf("groups = %d, want 8", len(got))
 		}
@@ -96,7 +96,7 @@ func BenchmarkOwnerModule(b *testing.B) {
 
 	b.ReportAllocs()
 	b.ResetTimer()
-	for i := 0; i < b.N; i++ {
+	for b.Loop() {
 		if got := ownerModule("adapters/cache/redis/deep/dir/f.go", modSet); got != "adapters/cache/redis" {
 			b.Fatalf("ownerModule = %q", got)
 		}
