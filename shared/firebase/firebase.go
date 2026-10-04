@@ -18,6 +18,10 @@ import (
 	"google.golang.org/api/option"
 )
 
+// ErrInvalidPath is returned when a service account path fails validation
+// (not clean, traversal, wrong extension, or is a directory).
+var ErrInvalidPath = errors.New("firebase: invalid path")
+
 // Credentials carries the shared Firebase identity. Both adapters convert
 // their public options into this struct and delegate validation here,
 // preserving their public Options shapes.
@@ -61,18 +65,18 @@ func ValidateServiceAccountPath(p string) error {
 		return errors.New("firebase: service_account is required")
 	}
 	if filepath.Clean(p) != p {
-		return fmt.Errorf("firebase: service_account path %q is not clean", p)
+		return fmt.Errorf("firebase: service_account path %q is not clean: %w", p, ErrInvalidPath)
 	}
 	for _, part := range strings.Split(p, string(filepath.Separator)) {
 		if part == ".." {
-			return fmt.Errorf("firebase: service_account path %q contains traversal", p)
+			return fmt.Errorf("firebase: service_account path %q contains traversal: %w", p, ErrInvalidPath)
 		}
 	}
 	if !strings.EqualFold(filepath.Ext(p), ".json") {
-		return fmt.Errorf("firebase: service_account path %q must have .json extension", p)
+		return fmt.Errorf("firebase: service_account path %q must have .json extension: %w", p, ErrInvalidPath)
 	}
 	if info, err := os.Stat(p); err == nil && info.IsDir() {
-		return fmt.Errorf("firebase: service_account path %q is a directory", p)
+		return fmt.Errorf("firebase: service_account path %q is a directory: %w", p, ErrInvalidPath)
 	}
 	return nil
 }

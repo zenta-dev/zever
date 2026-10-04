@@ -35,6 +35,14 @@ var ErrInvalidTable = errors.New("kvstore: invalid table")
 // it to cache.InvalidValueError{Key}.
 var ErrInvalidInteger = errors.New("kvstore: invalid integer")
 
+// ErrUnsupportedType is returned when coerceValue or coerceTime encounters
+// a Go type it cannot convert.
+var ErrUnsupportedType = errors.New("unsupported type")
+
+// ErrLostUpdate is returned when AddDelta's UPDATE affects zero rows,
+// indicating a concurrent modification.
+var ErrLostUpdate = errors.New("lost update")
+
 // kvRow is the key-value entity. Column order matches kvColumns: the
 // positional Scan must read them in exactly this order.
 type kvRow struct {
@@ -82,7 +90,7 @@ func coerceValue(v any) ([]byte, error) {
 	case string:
 		return []byte(b), nil
 	default:
-		return nil, fmt.Errorf("kvstore: unsupported value %T", v)
+		return nil, fmt.Errorf("kvstore: unsupported value %T: %w", v, ErrUnsupportedType)
 	}
 }
 
@@ -98,7 +106,7 @@ func coerceTime(v any) (time.Time, error) {
 	case []byte:
 		return time.Parse(time.RFC3339Nano, string(t))
 	default:
-		return time.Time{}, fmt.Errorf("kvstore: unsupported timestamp %T", v)
+		return time.Time{}, fmt.Errorf("kvstore: unsupported timestamp %T: %w", v, ErrUnsupportedType)
 	}
 }
 
@@ -437,7 +445,7 @@ func (s *Store) AddDelta(ctx context.Context, key string, delta int64) (int64, e
 		}
 
 		if n != 1 {
-			return fmt.Errorf("kvstore: adddelta %q: lost update", key)
+			return fmt.Errorf("kvstore: adddelta %q: %w", key, ErrLostUpdate)
 		}
 
 		return nil
