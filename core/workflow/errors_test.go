@@ -12,7 +12,7 @@ func TestSentinelMessages(t *testing.T) {
 
 	cases := map[string][2]string{
 		"ErrNilFactory":     {workflow.ErrNilFactory.Error(), "workflow: nil factory"},
-		"ErrDuplicate":      {workflow.ErrDuplicate.Error(), "workflow: duplicate registration"},
+		"ErrDuplicate":      {workflow.ErrDuplicate.Error(), "workflow: duplicate adapter"},
 		"ErrUnknownAdapter": {workflow.ErrUnknownAdapter.Error(), "workflow: unknown adapter"},
 		"ErrInvalidAdapter": {workflow.ErrInvalidAdapter.Error(), "workflow: invalid adapter"},
 		"ErrInvalidOptions": {workflow.ErrInvalidOptions.Error(), "workflow: invalid options"},
@@ -83,7 +83,7 @@ func TestTypedErrorMessages(t *testing.T) {
 		{"unknown_query", workflow.UnknownQueryError{Query: "q1"}, `workflow: unknown query: "q1"`},
 		{"invalid_options", workflow.InvalidOptionsError{Reason: "bad host"}, "workflow: invalid options: bad host"},
 		{"invalid_adapter", workflow.InvalidAdapterError{Adapter: "bogus"}, `workflow: invalid adapter: "bogus"`},
-		{"duplicate", workflow.DuplicateAdapterError{Adapter: workflow.Memory}, "workflow: duplicate registration: memory"},
+		{"duplicate", workflow.DuplicateAdapterError{Adapter: workflow.Memory}, "workflow: duplicate adapter: memory"},
 	}
 
 	for _, c := range cases {

@@ -11,7 +11,7 @@ import (
 func TestCoverDuplicateErrorString(t *testing.T) {
 	t.Parallel()
 	err := &DuplicateError{Adapter: Memory}
-	if got, want := err.Error(), "idempotency: duplicate registration: memory"; got != want {
+	if got, want := err.Error(), "idempotency: duplicate adapter: memory"; got != want {
 		t.Fatalf("DuplicateError.Error() = %q, want %q", got, want)
 	}
 }

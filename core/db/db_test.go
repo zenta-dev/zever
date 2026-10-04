@@ -69,7 +69,7 @@ func TestRegister(t *testing.T) {
 			t.Fatal("expected duplicate error, got nil")
 		}
 
-		var dupErr *DuplicateAdapterError
+		var dupErr DuplicateAdapterError
 		if !errors.As(err, &dupErr) {
 			t.Fatalf("error is %T, want *DuplicateAdapterError", err)
 		}
@@ -115,7 +115,7 @@ func TestOpen(t *testing.T) {
 			t.Fatal("expected error, got nil")
 		}
 
-		var unkErr *UnknownAdapterError
+		var unkErr UnknownAdapterError
 		if !errors.As(err, &unkErr) {
 			t.Fatalf("error is %T, want *UnknownAdapterError", err)
 		}
@@ -139,7 +139,7 @@ func TestOpen(t *testing.T) {
 			t.Errorf("expected ErrInvalidOptions, got %v", err)
 		}
 
-		var unkErr *UnknownAdapterError
+		var unkErr UnknownAdapterError
 		if errors.As(err, &unkErr) {
 			t.Error("validation failure leaked into unknown-adapter error")
 		}

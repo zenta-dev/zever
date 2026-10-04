@@ -22,7 +22,7 @@ func TestCoverTypedErrorStrings(t *testing.T) {
 		err  error
 		want string
 	}{
-		{"Duplicate", DuplicateError{Adapter: SMTP}, "mailer: duplicate registration: smtp"},
+		{"Duplicate", DuplicateError{Adapter: SMTP}, "mailer: duplicate adapter: smtp"},
 		{"Unknown", UnknownAdapterError{Adapter: Log}, "mailer: unknown adapter: log (forgotten import?)"},
 		{"InvalidAdapter", InvalidAdapterError{Adapter: "bogus"}, `mailer: invalid adapter: "bogus"`},
 		{"InvalidOptions", InvalidOptionsError{Reason: "host must be non-empty"}, "mailer: invalid options: host must be non-empty"},
@@ -91,7 +91,7 @@ func TestCoverRegisterDuplicateMessage(t *testing.T) {
 	if !errors.Is(err, ErrDuplicate) {
 		t.Fatalf("second Register err = %v, want ErrDuplicate", err)
 	}
-	want := "mailer: duplicate registration: " + a.String()
+	want := "mailer: duplicate adapter: " + a.String()
 	if err.Error() != want {
 		t.Fatalf("dup err = %q want %q", err.Error(), want)
 	}

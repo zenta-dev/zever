@@ -25,7 +25,7 @@ func TestCover_Errors_ExactStrings(t *testing.T) {
 		err  error
 		want string
 	}{
-		{"duplicate rbac", DuplicateError{Adapter: RBAC}, "permission: duplicate registration: rbac"},
+		{"duplicate rbac", DuplicateError{Adapter: RBAC}, "permission: duplicate adapter: rbac"},
 		{"unknown rbac", UnknownAdapterError{Adapter: RBAC}, "permission: unknown adapter: rbac (forgotten import?)"},
 		{"unknown unregistered", UnknownAdapterError{Adapter: Adapter("test-9401")}, "permission: unknown adapter: test-9401 (forgotten import?)"},
 		{"invalid x", InvalidAdapterError{Adapter: "x"}, "permission: invalid adapter: \"x\""},
