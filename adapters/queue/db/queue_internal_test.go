@@ -149,9 +149,13 @@ func TestReclaimStaleSingleSetBasedUpdate(t *testing.T) {
 	// same sweep), so assert on statement SHAPES, not counts: the set-based
 	// UPDATE carries the lease guard and the id IN(...) scope, and no
 	// per-row guarded UPDATE (the old N+1 shape) ran.
+	mu.Lock()
+	got := append([]string(nil), queries...)
+	mu.Unlock()
+
 	sawSetBased := false
 
-	for _, q := range queries {
+	for _, q := range got {
 		switch {
 		case strings.HasPrefix(q, `UPDATE "queue_messages" SET "attempt" = ?`):
 			t.Errorf("per-row guarded UPDATE ran (old N+1 shape): %q", q)
@@ -172,7 +176,7 @@ func TestReclaimStaleSingleSetBasedUpdate(t *testing.T) {
 	}
 
 	if !sawSetBased {
-		t.Errorf("no set-based reclaim UPDATE captured: %q", queries)
+		t.Errorf("no set-based reclaim UPDATE captured: %q", got)
 	}
 }
 
