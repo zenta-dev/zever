@@ -1,6 +1,7 @@
 package lexer
 
 import (
+	"os"
 	"strings"
 	"testing"
 
@@ -24,8 +25,61 @@ func BenchmarkLex(b *testing.B) {
 	src := strings.Repeat("{", 10000) + strings.Repeat("}", 10000)
 	b.ReportAllocs()
 	b.SetBytes(int64(len(src)))
-	for i := 0; i < b.N; i++ {
+	for b.Loop() {
 		l := New("bench.zen", []byte(src))
+		for {
+			tok := l.Next()
+			if tok.Kind == token.EOF {
+				break
+			}
+		}
+	}
+}
+
+// BenchmarkLexAppFixture drains the canonical compile/testdata/app.zen
+// fixture, a realistic whole-schema workload mixing every token kind the
+// DSL's own source uses (keywords, idents, types, attributes, strings,
+// comments, braces, colons, commas, arrows).
+func BenchmarkLexAppFixture(b *testing.B) {
+	src, err := os.ReadFile("../compile/testdata/app.zen")
+	if err != nil {
+		b.Fatalf("read fixture: %v", err)
+	}
+
+	b.ReportAllocs()
+	b.SetBytes(int64(len(src)))
+	for b.Loop() {
+		l := New("app.zen", src)
+		for {
+			tok := l.Next()
+			if tok.Kind == token.EOF {
+				break
+			}
+		}
+	}
+}
+
+// BenchmarkLexEmpty is the boundary case: an empty source lexes as a single
+// EOF token with no allocations beyond the Lexer itself.
+func BenchmarkLexEmpty(b *testing.B) {
+	b.ReportAllocs()
+	for b.Loop() {
+		l := New("empty.zen", nil)
+		if tok := l.Next(); tok.Kind != token.EOF {
+			b.Fatalf("first token = %v, want EOF", tok.Kind)
+		}
+	}
+}
+
+// BenchmarkLexIllegal measures the error path: every rune is illegal, so
+// each Next() records a diagnostic and emits an ILLEGAL token. The lexer
+// must keep scanning to EOF regardless.
+func BenchmarkLexIllegal(b *testing.B) {
+	src := strings.Repeat("\x01\x02\x03", 3000)
+	b.ReportAllocs()
+	b.SetBytes(int64(len(src)))
+	for b.Loop() {
+		l := New("bad.zen", []byte(src))
 		for {
 			tok := l.Next()
 			if tok.Kind == token.EOF {
@@ -42,7 +96,7 @@ func BenchmarkLexAstral(b *testing.B) {
 	src := strings.Repeat("😀", 500) + "\nentity User { id: uuid }"
 	b.ReportAllocs()
 	b.SetBytes(int64(len(src)))
-	for i := 0; i < b.N; i++ {
+	for b.Loop() {
 		l := New("bench.zen", []byte(src))
 		for {
 			tok := l.Next()
@@ -63,7 +117,7 @@ func BenchmarkLexDuration(b *testing.B) {
 	src := strings.Repeat(line, 800) // ~ 800* (~45B) ~36KB, ~8000 tokens
 	b.ReportAllocs()
 	b.SetBytes(int64(len(src)))
-	for i := 0; i < b.N; i++ {
+	for b.Loop() {
 		l := New("bench.zen", []byte(src))
 		for {
 			tok := l.Next()
@@ -89,7 +143,7 @@ func BenchmarkLexDurationUnits(b *testing.B) {
 			src := strings.Repeat("42"+tc.unit+" ", 5000)
 			b.ReportAllocs()
 			b.SetBytes(int64(len(src)))
-			for i := 0; i < b.N; i++ {
+			for b.Loop() {
 				l := New("bench.zen", []byte(src))
 				for {
 					tok := l.Next()
@@ -120,7 +174,7 @@ entity User {
 	src := strings.Repeat(snippet, 300)
 	b.ReportAllocs()
 	b.SetBytes(int64(len(src)))
-	for i := 0; i < b.N; i++ {
+	for b.Loop() {
 		l := New("bench.zen", []byte(src))
 		for {
 			tok := l.Next()
