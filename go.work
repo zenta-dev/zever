@@ -155,4 +155,5 @@ use (
 	./tools/errscan
 	./tools/modgraph
 	./tools/zever-lsp
+	./editors
 )
