@@ -60,7 +60,7 @@ func TestRegister_duplicate_returnsDuplicateAdapterError(t *testing.T) {
 	if err := Register(a, ok); !errors.Is(err, ErrDuplicateAdapter) {
 		t.Fatalf("second Register err = %v, want ErrDuplicateAdapter", err)
 	}
-	var de *DuplicateAdapterError
+	var de DuplicateAdapterError
 	if err := Register(a, ok); !errors.As(err, &de) {
 		t.Fatalf("dup err %T is not *DuplicateAdapterError", err)
 	} else if de.Adapter != a {
@@ -77,7 +77,7 @@ func TestOpen_unknownAdapter_returnsUnknownError(t *testing.T) {
 	if w != nil {
 		t.Fatalf("Open unknown webhook = %v, want nil", w)
 	}
-	var ue *UnknownAdapterError
+	var ue UnknownAdapterError
 	if !errors.As(err, &ue) {
 		t.Fatalf("err %T is not *UnknownAdapterError", err)
 	}

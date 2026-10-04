@@ -55,7 +55,7 @@ func TestParseAdapter(t *testing.T) {
 					t.Fatal("expected non-nil error")
 				}
 
-				var iae *password.InvalidAdapterError
+				var iae password.InvalidAdapterError
 				if !errors.As(err, &iae) {
 					t.Fatalf("errors.As(%v) to *InvalidAdapterError = false", err)
 				}

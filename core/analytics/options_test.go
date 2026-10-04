@@ -38,7 +38,7 @@ func TestOptions_Validate_violations_table(t *testing.T) {
 					t.Errorf("Validate err %q missing %q", err.Error(), r)
 				}
 			}
-			var ioe *InvalidOptionsError
+			var ioe InvalidOptionsError
 			if !errors.As(err, &ioe) {
 				t.Errorf("err %T is not *InvalidOptionsError", err)
 			}

@@ -49,7 +49,7 @@ func TestOptions_Validate_hosts(t *testing.T) {
 			}
 
 			if tc.wantErr {
-				var ioe *InvalidOptionsError
+				var ioe InvalidOptionsError
 				if !errors.As(err, &ioe) {
 					t.Fatalf("err %T is not *InvalidOptionsError", err)
 				}

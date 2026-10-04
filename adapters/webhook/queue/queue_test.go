@@ -1177,7 +1177,7 @@ func TestHandleConsumeError(t *testing.T) {
 	// Typed empties must behave identically: memory/redis Pop returns
 	// *EmptyError on some paths, and bare == would miscount them as
 	// transport errors, killing idle consumers after 5 polls.
-	if a.handleConsumeError("e", &corequeue.EmptyError{Topic: "t"}) {
+	if a.handleConsumeError("e", corequeue.EmptyError{Topic: "t"}) {
 		t.Fatal("typed empty must not stop")
 	}
 

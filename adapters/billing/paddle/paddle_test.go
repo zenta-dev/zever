@@ -455,7 +455,7 @@ func TestGetInvoice_noInvoices_returnsNotFound(t *testing.T) {
 		t.Fatal("expected error")
 	}
 
-	var nf *billing.NotFoundError
+	var nf billing.NotFoundError
 	if !errors.As(err, &nf) {
 		t.Fatalf("err %T is not *NotFoundError", err)
 	}

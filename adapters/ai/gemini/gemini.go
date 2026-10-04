@@ -36,7 +36,7 @@ func New(opts ai.Options) (ai.AI, error) {
 	}
 
 	if strings.TrimSpace(opts.APIKey) == "" {
-		return nil, &ai.InvalidOptionsError{Reason: "api_key is required"}
+		return nil, ai.InvalidOptionsError{Reason: "api_key is required"}
 	}
 
 	httpClient := newHTTPClient(opts.Timeout)
@@ -550,7 +550,7 @@ func mapAndRedact(err error, apiKey string) error {
 	}
 
 	if errors.Is(mapped, ai.ErrRateLimited) {
-		return &ai.RateLimitedError{}
+		return ai.RateLimitedError{}
 	}
 
 	if errors.Is(mapped, ai.ErrInvalidRequest) {
@@ -590,7 +590,7 @@ func mapError(err error) error {
 	case strings.Contains(msg, "401") || strings.Contains(msg, "403") || strings.Contains(strings.ToLower(msg), "unauthenticated") || strings.Contains(strings.ToLower(msg), "permission_denied"):
 		return fmt.Errorf("%w: %s", ai.ErrAuth, msg)
 	case strings.Contains(msg, "429") || strings.Contains(strings.ToLower(msg), "rate limit") || strings.Contains(strings.ToLower(msg), "resource_exhausted"):
-		return &ai.RateLimitedError{}
+		return ai.RateLimitedError{}
 	case strings.Contains(msg, "400") || strings.Contains(strings.ToLower(msg), "invalid_argument"):
 		return fmt.Errorf("%w: %s", ai.ErrInvalidRequest, msg)
 	case strings.Contains(msg, "404") || strings.Contains(strings.ToLower(msg), "not_found"):
@@ -606,10 +606,10 @@ func mapAPIError(e genai.APIError) error {
 		return fmt.Errorf("%w: %s", ai.ErrAuth, e.Message)
 	case 429:
 		if e.Message != "" {
-			return fmt.Errorf("%w: %s", &ai.RateLimitedError{}, e.Message)
+			return fmt.Errorf("%w: %s", ai.RateLimitedError{}, e.Message)
 		}
 
-		return &ai.RateLimitedError{}
+		return ai.RateLimitedError{}
 	case 400:
 		return fmt.Errorf("%w: %s", ai.ErrInvalidRequest, e.Message)
 	case 404:

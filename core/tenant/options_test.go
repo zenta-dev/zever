@@ -46,7 +46,7 @@ func TestOptions_Validate_headers(t *testing.T) {
 			}
 
 			if tc.wantErr {
-				var ioe *InvalidOptionsError
+				var ioe InvalidOptionsError
 				if !errors.As(err, &ioe) {
 					t.Fatalf("err %T is not *InvalidOptionsError", err)
 				}
@@ -64,7 +64,7 @@ func TestOptions_Validate_regexTooLong(t *testing.T) {
 		t.Fatalf("Validate long regex err = %v, want ErrInvalidOptions", err)
 	}
 
-	var ioe *InvalidOptionsError
+	var ioe InvalidOptionsError
 	if !errors.As(err, &ioe) {
 		t.Fatalf("err %T is not *InvalidOptionsError", err)
 	}

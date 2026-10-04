@@ -555,7 +555,7 @@ func (d *driver) Pop(ctx context.Context, topic string) (queue.Message, error) {
 		case <-ctx.Done():
 			return queue.Message{}, fmt.Errorf("db: pop cancelled: %w", ctx.Err())
 		case <-poll.C:
-			return queue.Message{}, &queue.EmptyError{Topic: topic}
+			return queue.Message{}, queue.EmptyError{Topic: topic}
 		case <-tick.C:
 			now := time.Now().UnixMilli()
 			if last := d.lastSweep.Load(); now-last >= sweepInterval.Milliseconds() {

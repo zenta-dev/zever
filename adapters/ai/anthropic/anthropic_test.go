@@ -33,7 +33,7 @@ func TestOpen_APIKeyRequired(t *testing.T) {
 	if !strings.Contains(err.Error(), "ai: open anthropic") {
 		t.Fatalf("err %q missing ai: open anthropic", err.Error())
 	}
-	var ioe *ai.InvalidOptionsError
+	var ioe ai.InvalidOptionsError
 	if !errors.As(err, &ioe) {
 		t.Fatalf("not InvalidOptionsError")
 	}
@@ -424,7 +424,7 @@ func TestGenerate_ErrorMapping(t *testing.T) {
 				t.Fatalf("err %v want %v", err, tc.wantErr)
 			}
 			if tc.wantErr == ai.ErrRateLimited {
-				var rl *ai.RateLimitedError
+				var rl ai.RateLimitedError
 				if !errors.As(err, &rl) {
 					t.Fatalf("not RateLimitedError: %v", err)
 				}
@@ -459,7 +459,7 @@ func TestGenerate_RetryAfterFloatAndDate(t *testing.T) {
 	client := anthropic.NewClient(option.WithBaseURL(srv.URL), option.WithAPIKey("k"), option.WithMaxRetries(0))
 	a := &adapter{client: &client, model: "m"}
 	_, err := a.Generate(t.Context(), "", []ai.Message{{Role: ai.RoleUser, Content: "hi"}}, ai.GenerateOptions{})
-	var rl *ai.RateLimitedError
+	var rl ai.RateLimitedError
 	if !errors.As(err, &rl) || rl.RetryAfter != 1500*time.Millisecond {
 		t.Fatalf("float retry failed: %v", err)
 	}

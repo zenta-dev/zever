@@ -55,33 +55,33 @@ func (o Options) Validate() error {
 
 	if o.Key == "" {
 		if !isKMS {
-			errs = append(errs, &InvalidOptionsError{Reason: "key is required"})
+			errs = append(errs, InvalidOptionsError{Reason: "key is required"})
 		}
 	} else {
 		b, err := base64.StdEncoding.DecodeString(o.Key)
 		if err != nil {
-			errs = append(errs, &InvalidOptionsError{Reason: "key must be valid base64"})
+			errs = append(errs, InvalidOptionsError{Reason: "key must be valid base64"})
 		} else if len(b) != 32 {
-			errs = append(errs, &InvalidOptionsError{Reason: "key must decode to 32 bytes"})
+			errs = append(errs, InvalidOptionsError{Reason: "key must decode to 32 bytes"})
 		}
 	}
 
 	if o.SignKey != "" {
 		b, err := base64.StdEncoding.DecodeString(o.SignKey)
 		if err != nil {
-			errs = append(errs, &InvalidOptionsError{Reason: "sign_key must be valid base64"})
+			errs = append(errs, InvalidOptionsError{Reason: "sign_key must be valid base64"})
 		} else if len(b) != 64 {
-			errs = append(errs, &InvalidOptionsError{Reason: "sign_key must decode to 64 bytes"})
+			errs = append(errs, InvalidOptionsError{Reason: "sign_key must decode to 64 bytes"})
 		}
 	}
 
 	if o.UseEnvelope && strings.TrimSpace(o.KeyID) == "" {
-		errs = append(errs, &InvalidOptionsError{Reason: "key_id is required when use_envelope is true"})
+		errs = append(errs, InvalidOptionsError{Reason: "key_id is required when use_envelope is true"})
 	}
 
 	for _, id := range o.KeyIDs {
 		if strings.TrimSpace(id) == "" {
-			errs = append(errs, &InvalidOptionsError{Reason: "key_ids must not contain empty entries"})
+			errs = append(errs, InvalidOptionsError{Reason: "key_ids must not contain empty entries"})
 			break
 		}
 	}
@@ -89,10 +89,10 @@ func (o Options) Validate() error {
 	if o.Endpoint != "" {
 		u, err := url.Parse(o.Endpoint)
 		if err != nil || u.Scheme == "" {
-			errs = append(errs, &InvalidOptionsError{Reason: "endpoint must include scheme"})
+			errs = append(errs, InvalidOptionsError{Reason: "endpoint must include scheme"})
 		}
 		if err == nil && u.Host == "" {
-			errs = append(errs, &InvalidOptionsError{Reason: "endpoint must include host"})
+			errs = append(errs, InvalidOptionsError{Reason: "endpoint must include host"})
 		}
 	}
 

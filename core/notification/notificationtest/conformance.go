@@ -88,7 +88,7 @@ func conformanceValidation(t *testing.T, factory func(t *testing.T) notification
 		t.Errorf("Notify(empty target) err = %v, want ErrInvalidTarget", err)
 	}
 
-	var targetErr *notification.InvalidTargetError
+	var targetErr notification.InvalidTargetError
 	if err := n.Notify(ctx, &empty); !errors.As(err, &targetErr) {
 		t.Errorf("errors.As(err, InvalidTargetError) = false (err = %T %v)", err, err)
 	}

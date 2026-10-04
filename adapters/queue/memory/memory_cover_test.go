@@ -266,7 +266,7 @@ func TestMemory_CoverPopWithTopicNotifyAndPoll(t *testing.T) {
 	if err == nil || err.Error() == "" {
 		t.Fatalf("pop poll = nil, want EmptyError")
 	}
-	var emptyErr *queue.EmptyError
+	var emptyErr queue.EmptyError
 	if !errors.As(err, &emptyErr) {
 		t.Errorf("pop poll err = %T %v, want *EmptyError", err, err)
 	}

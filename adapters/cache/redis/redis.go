@@ -89,7 +89,7 @@ func (a *redisAdapter) Get(ctx context.Context, key string) ([]byte, error) {
 
 	b, err := a.client.Get(ctx, key).Bytes()
 	if errors.Is(err, goredis.Nil) {
-		return nil, &cache.NotFoundError{Key: key}
+		return nil, cache.NotFoundError{Key: key}
 	}
 
 	if err != nil {
@@ -183,7 +183,7 @@ func (a *redisAdapter) Increment(ctx context.Context, key string) error {
 
 	if err := a.client.Incr(ctx, key).Err(); err != nil {
 		if isInvalidIntegerError(err) {
-			return &cache.InvalidValueError{Key: key, Err: err}
+			return cache.InvalidValueError{Key: key, Err: err}
 		}
 
 		return fmt.Errorf("cache: increment %q error: %w", key, err)
@@ -199,7 +199,7 @@ func (a *redisAdapter) Decrement(ctx context.Context, key string) error {
 
 	if err := a.client.Decr(ctx, key).Err(); err != nil {
 		if isInvalidIntegerError(err) {
-			return &cache.InvalidValueError{Key: key, Err: err}
+			return cache.InvalidValueError{Key: key, Err: err}
 		}
 
 		return fmt.Errorf("cache: decrement %q error: %w", key, err)

@@ -16,7 +16,7 @@ func TestCoverTypedErrorStrings(t *testing.T) {
 		err  error
 		want string
 	}{
-		{"duplicate", DuplicateError{Adapter: Static}, "flag: duplicate registration"},
+		{"duplicate", DuplicateError{Adapter: Static}, "flag: duplicate adapter"},
 		{"unknown", UnknownAdapterError{Adapter: Adapter("")}, "flag: unknown adapter"},
 		{"invalidAdapter", InvalidAdapterError{Adapter: "bogus"}, "flag: invalid adapter"},
 		{"invalidOptions", InvalidOptionsError{Reason: "bad"}, "flag: invalid options"},

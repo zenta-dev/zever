@@ -15,7 +15,7 @@ func TestAuthorize_NilAuthenticatorFailsClosed(t *testing.T) {
 	if err == nil {
 		t.Fatal("Authorize(nil auth) err = nil, want unauthenticated")
 	}
-	var ue *authz.UnauthenticatedError
+	var ue authz.UnauthenticatedError
 	if !errors.As(err, &ue) {
 		t.Fatalf("Authorize(nil auth) err = %T %v, want *UnauthenticatedError", err, err)
 	}
@@ -35,7 +35,7 @@ func TestAuthorize_NilCheckerFailsClosed(t *testing.T) {
 	if err == nil {
 		t.Fatal("Authorize(nil checker) err = nil, want permission denied")
 	}
-	var pe *authz.PermissionDeniedError
+	var pe authz.PermissionDeniedError
 	if !errors.As(err, &pe) {
 		t.Fatalf("Authorize(nil checker) err = %T %v, want *PermissionDeniedError", err, err)
 	}

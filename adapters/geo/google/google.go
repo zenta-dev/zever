@@ -21,7 +21,7 @@ var newClient = gmaps.NewClient
 // New creates a Google Maps geo adapter from typed options.
 func New(opts geo.Options) (geo.Geo, error) {
 	if opts.APIKey == "" {
-		return nil, fmt.Errorf("geo: google: api_key is required: %w", geo.ErrInvalidOptions)
+		return nil, fmt.Errorf("google: api_key is required: %w", geo.ErrInvalidOptions)
 	}
 
 	if opts.BaseURL != "" {
@@ -41,7 +41,7 @@ func New(opts geo.Options) (geo.Geo, error) {
 
 	c, err := newClient(clientOpts...)
 	if err != nil {
-		return nil, fmt.Errorf("geo: google: new client: %w", err)
+		return nil, fmt.Errorf("google: new client: %w", err)
 	}
 
 	return &adapter{client: c}, nil
@@ -54,9 +54,9 @@ func validateBaseURL(raw string, allowInsecure bool) error {
 			errors.Is(err, endpoint.ErrEmpty),
 			errors.Is(err, endpoint.ErrNoScheme),
 			errors.Is(err, endpoint.ErrNoHost):
-			return fmt.Errorf("geo: google: invalid base_url %q: missing scheme or host: %w", raw, geo.ErrInvalidOptions)
+			return fmt.Errorf("google: invalid base_url %q: missing scheme or host: %w", raw, geo.ErrInvalidOptions)
 		default:
-			return fmt.Errorf("geo: google: base_url must use https (got %q): %w", raw, geo.ErrInvalidOptions)
+			return fmt.Errorf("google: base_url must use https (got %q): %w", raw, geo.ErrInvalidOptions)
 		}
 	}
 
@@ -66,11 +66,11 @@ func validateBaseURL(raw string, allowInsecure bool) error {
 func (a *adapter) Geocode(ctx context.Context, address string) ([]geo.Location, error) {
 	results, err := a.client.Geocode(ctx, &gmaps.GeocodingRequest{Address: address})
 	if err != nil {
-		return nil, fmt.Errorf("geo: google: geocode: %w", err)
+		return nil, fmt.Errorf("google: geocode: %w", err)
 	}
 
 	if len(results) == 0 {
-		return nil, fmt.Errorf("geo: google: no results for %q: %w", address, geo.ErrNotFound)
+		return nil, fmt.Errorf("google: no results for %q: %w", address, geo.ErrNotFound)
 	}
 
 	var locs []geo.Location
@@ -87,18 +87,18 @@ func (a *adapter) Geocode(ctx context.Context, address string) ([]geo.Location, 
 
 func (a *adapter) ReverseGeocode(ctx context.Context, lat, lng float64) ([]geo.Address, error) {
 	if !geo.ValidCoord(lat, lng) {
-		return nil, fmt.Errorf("geo: google: invalid coordinates, |lat| <= 90 and |lng| <= 180 required: %w", geo.ErrInvalidCoordinate)
+		return nil, fmt.Errorf("google: invalid coordinates, |lat| <= 90 and |lng| <= 180 required: %w", geo.ErrInvalidCoordinate)
 	}
 
 	results, err := a.client.ReverseGeocode(ctx, &gmaps.GeocodingRequest{
 		LatLng: &gmaps.LatLng{Lat: lat, Lng: lng},
 	})
 	if err != nil {
-		return nil, fmt.Errorf("geo: google: reverse geocode: %w", err)
+		return nil, fmt.Errorf("google: reverse geocode: %w", err)
 	}
 
 	if len(results) == 0 {
-		return nil, fmt.Errorf("geo: google: no results for (%.4f, %.4f): %w", lat, lng, geo.ErrNotFound)
+		return nil, fmt.Errorf("google: no results for (%.4f, %.4f): %w", lat, lng, geo.ErrNotFound)
 	}
 
 	var addrs []geo.Address
@@ -123,7 +123,7 @@ func (a *adapter) ReverseGeocode(ctx context.Context, lat, lng float64) ([]geo.A
 
 func (a *adapter) Distance(ctx context.Context, from geo.Point, to geo.Point) (float64, error) {
 	if !geo.ValidCoord(from.Lat, from.Lng) || !geo.ValidCoord(to.Lat, to.Lng) {
-		return 0, fmt.Errorf("geo: google: invalid coordinates, |lat| <= 90 and |lng| <= 180 required: %w", geo.ErrInvalidCoordinate)
+		return 0, fmt.Errorf("google: invalid coordinates, |lat| <= 90 and |lng| <= 180 required: %w", geo.ErrInvalidCoordinate)
 	}
 
 	resp, err := a.client.DistanceMatrix(ctx, &gmaps.DistanceMatrixRequest{
@@ -132,16 +132,16 @@ func (a *adapter) Distance(ctx context.Context, from geo.Point, to geo.Point) (f
 		Mode:         gmaps.TravelModeDriving,
 	})
 	if err != nil {
-		return 0, fmt.Errorf("geo: google: distance matrix: %w", err)
+		return 0, fmt.Errorf("google: distance matrix: %w", err)
 	}
 
 	if len(resp.Rows) == 0 || len(resp.Rows[0].Elements) == 0 {
-		return 0, fmt.Errorf("geo: google: no distance results: %w", geo.ErrNotFound)
+		return 0, fmt.Errorf("google: no distance results: %w", geo.ErrNotFound)
 	}
 
 	elem := resp.Rows[0].Elements[0]
 	if elem.Status != "OK" {
-		return 0, fmt.Errorf("geo: google: distance element status: %s: %w", elem.Status, geo.ErrNotFound)
+		return 0, fmt.Errorf("google: distance element status: %s: %w", elem.Status, geo.ErrNotFound)
 	}
 
 	return float64(elem.Distance.Meters), nil

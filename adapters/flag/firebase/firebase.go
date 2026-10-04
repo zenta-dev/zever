@@ -96,7 +96,7 @@ func validateServiceAccountPath(p string) error {
 // context. The error-interface conversion keeps vet's %w operand check
 // quiet while preserving errors.Is/As through the chain.
 func invalidOptions(reason string) error {
-	return fmt.Errorf("firebase: %w", error(&flag.InvalidOptionsError{Reason: reason}))
+	return fmt.Errorf("firebase: %w", error(flag.InvalidOptionsError{Reason: reason}))
 }
 
 func evalContextMap(ctx context.Context) map[string]any {
@@ -165,7 +165,7 @@ func (c *client) Int(ctx context.Context, key string, fallback int) (int, error)
 	}
 	n, err := parseFirebaseInt(cfg.GetString(key))
 	if err != nil {
-		return fallback, fmt.Errorf("flag: firebase: key %q is not an int: %w", key, err)
+		return fallback, fmt.Errorf("firebase: key %q is not an int: %w", key, err)
 	}
 	return n, nil
 }
@@ -186,15 +186,15 @@ func (c *client) JSON(ctx context.Context, key string, out any, fallback any) er
 		}
 		raw, err := json.Marshal(fallback)
 		if err != nil {
-			return fmt.Errorf("flag: firebase: key %q fallback marshal: %w", key, err)
+			return fmt.Errorf("firebase: key %q fallback marshal: %w", key, err)
 		}
 		if err := json.Unmarshal(raw, out); err != nil {
-			return fmt.Errorf("flag: firebase: key %q fallback unmarshal: %w", key, err)
+			return fmt.Errorf("firebase: key %q fallback unmarshal: %w", key, err)
 		}
 		return nil
 	}
 	if err := json.Unmarshal([]byte(cfg.GetString(key)), out); err != nil {
-		return fmt.Errorf("flag: firebase: key %q is not valid JSON: %w", key, err)
+		return fmt.Errorf("firebase: key %q is not valid JSON: %w", key, err)
 	}
 	return nil
 }
@@ -219,8 +219,8 @@ func parseFirebaseInt(raw string) (int, error) {
 }
 
 // ErrNilJSONOut is returned when JSON is called with a nil out parameter.
-var ErrNilJSONOut = errors.New("flag: firebase: json out is nil")
+var ErrNilJSONOut = errors.New("firebase: json out is nil")
 
 // ErrNotAnInt marks unparseable integer flag values. Callers wrap it with
 // the key context.
-var ErrNotAnInt = errors.New("flag: firebase: not an int")
+var ErrNotAnInt = errors.New("firebase: not an int")

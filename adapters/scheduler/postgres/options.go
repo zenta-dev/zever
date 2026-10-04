@@ -67,7 +67,7 @@ func (o Options) Validate() error {
 	}
 
 	if o.FireTimeout < 0 {
-		errs = append(errs, &scheduler.InvalidOptionsError{Reason: "fire_timeout must be >= 0"})
+		errs = append(errs, scheduler.InvalidOptionsError{Reason: "fire_timeout must be >= 0"})
 	}
 
 	if o.Table != "" {

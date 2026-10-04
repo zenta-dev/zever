@@ -72,7 +72,7 @@ func TestAdapter_Parse_invalid_returnsLocalAndInvalidAdapter(t *testing.T) {
 				t.Fatalf("ParseAdapter(%q) err = %v, want ErrInvalidAdapter", in, err)
 			}
 
-			var iae *InvalidAdapterError
+			var iae InvalidAdapterError
 			if !errors.As(err, &iae) {
 				t.Fatalf("ParseAdapter(%q) err %T is not *InvalidAdapterError", in, err)
 			}

@@ -118,7 +118,7 @@ func TestRenderUnsupportedFormat(t *testing.T) {
 
 	_, err = d.Render(t.Context(), []byte("<h1>hi</h1>"), document.OutputFormat("docx"))
 
-	var ufe *document.UnsupportedFormatError
+	var ufe document.UnsupportedFormatError
 	if !errors.As(err, &ufe) {
 		t.Fatalf("Render() error = %v, want errors.As UnsupportedFormatError", err)
 	}
@@ -161,7 +161,7 @@ func TestRenderOversizedSource(t *testing.T) {
 
 	_, err = d.Render(t.Context(), big, document.FormatPDF)
 
-	var sle *document.SizeLimitError
+	var sle document.SizeLimitError
 	if !errors.As(err, &sle) {
 		t.Fatalf("Render() error = %v, want errors.As SizeLimitError", err)
 	}

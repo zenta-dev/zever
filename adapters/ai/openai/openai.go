@@ -35,7 +35,7 @@ func New(opts ai.Options) (ai.AI, error) {
 	}
 
 	if opts.APIKey == "" {
-		return nil, &ai.InvalidOptionsError{Reason: "api_key is required"}
+		return nil, ai.InvalidOptionsError{Reason: "api_key is required"}
 	}
 
 	clientOpts := []option.RequestOption{
@@ -482,7 +482,7 @@ func mapError(err error) error {
 			return fmt.Errorf("%w: %s", ai.ErrAuth, apiErr.Message)
 		case http.StatusTooManyRequests:
 			retryAfter := parseRetryAfter(apiErr.Response)
-			return &ai.RateLimitedError{RetryAfter: retryAfter}
+			return ai.RateLimitedError{RetryAfter: retryAfter}
 		case http.StatusBadRequest:
 			return fmt.Errorf("%w: %s", ai.ErrInvalidRequest, apiErr.Message)
 		}
@@ -508,13 +508,13 @@ func validateOptions(opts ai.Options) error {
 	var errs []error
 
 	if opts.Timeout < 0 {
-		errs = append(errs, &ai.InvalidOptionsError{Reason: "timeout must be >= 0"})
+		errs = append(errs, ai.InvalidOptionsError{Reason: "timeout must be >= 0"})
 	}
 
 	if opts.BaseURL != "" {
 		// Allow http for loopback in tests.
 		if _, err := endpoint.ValidateURL(opts.BaseURL, endpoint.WithAllowLoopbackHTTP()); err != nil {
-			errs = append(errs, &ai.InvalidOptionsError{Reason: baseURLReason(err)})
+			errs = append(errs, ai.InvalidOptionsError{Reason: baseURLReason(err)})
 		}
 	}
 

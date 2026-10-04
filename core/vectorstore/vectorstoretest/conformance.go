@@ -164,7 +164,7 @@ func conformanceDeleteMissing(t *testing.T, factory func(t *testing.T) vectorsto
 		return
 	}
 
-	var nfErr *vectorstore.NotFoundError
+	var nfErr vectorstore.NotFoundError
 	if !errors.As(err, &nfErr) {
 		t.Fatalf("Delete(missing) err = %T %v, want *NotFoundError or nil", err, err)
 	}
@@ -215,7 +215,7 @@ func conformanceDimensionMismatch(t *testing.T, factory func(t *testing.T) vecto
 
 	err := s.Upsert(ctx, vectorstore.Vector{ID: "kit-dm-two", Embedding: []float32{1, 0}})
 
-	var mmErr *vectorstore.DimensionMismatchError
+	var mmErr vectorstore.DimensionMismatchError
 	if !errors.As(err, &mmErr) {
 		t.Fatalf("Upsert(wrong dim) err = %T %v, want *DimensionMismatchError", err, err)
 	}

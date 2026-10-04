@@ -39,38 +39,38 @@ func TestErrors_sentinels_match(t *testing.T) {
 
 func TestErrors_unwrap_carries_sentinel(t *testing.T) {
 	t.Parallel()
-	if !errors.Is(&DuplicateAdapterError{Adapter: JWT}, ErrDuplicate) {
+	if !errors.Is(DuplicateAdapterError{Adapter: JWT}, ErrDuplicate) {
 		t.Fatal("DuplicateAdapterError does not unwrap to ErrDuplicate")
 	}
-	if !errors.Is(&UnknownAdapterError{Adapter: JWT}, ErrUnknownAdapter) {
+	if !errors.Is(UnknownAdapterError{Adapter: JWT}, ErrUnknownAdapter) {
 		t.Fatal("UnknownAdapterError does not unwrap to ErrUnknownAdapter")
 	}
-	if !errors.Is(&InvalidAdapterError{Adapter: "x"}, ErrInvalidAdapter) {
+	if !errors.Is(InvalidAdapterError{Adapter: "x"}, ErrInvalidAdapter) {
 		t.Fatal("InvalidAdapterError does not unwrap to ErrInvalidAdapter")
 	}
-	if !errors.Is(&InvalidOptionsError{Reason: "x"}, ErrInvalidOptions) {
+	if !errors.Is(InvalidOptionsError{Reason: "x"}, ErrInvalidOptions) {
 		t.Fatal("InvalidOptionsError does not unwrap to ErrInvalidOptions")
 	}
 }
 
 func TestErrors_carried_fields(t *testing.T) {
 	t.Parallel()
-	de := &DuplicateAdapterError{Adapter: Session}
+	de := DuplicateAdapterError{Adapter: Session}
 	if de.Adapter != Session {
 		t.Fatalf("DuplicateAdapterError.Adapter = %v", de.Adapter)
 	}
-	ue := &UnknownAdapterError{Adapter: OIDC}
+	ue := UnknownAdapterError{Adapter: OIDC}
 	if ue.Adapter != OIDC {
 		t.Fatalf("UnknownAdapterError.Adapter = %v", ue.Adapter)
 	}
-	iae := &InvalidAdapterError{Adapter: "nope"}
+	iae := InvalidAdapterError{Adapter: "nope"}
 	if iae.Adapter != "nope" {
 		t.Fatalf("InvalidAdapterError.Adapter = %q", iae.Adapter)
 	}
 	if !strings.Contains(iae.Error(), "nope") {
 		t.Fatalf("InvalidAdapterError.Error() = %q, want adapter name", iae.Error())
 	}
-	ioe := &InvalidOptionsError{Reason: "bad ttl"}
+	ioe := InvalidOptionsError{Reason: "bad ttl"}
 	if ioe.Reason != "bad ttl" {
 		t.Fatalf("InvalidOptionsError.Reason = %q", ioe.Reason)
 	}

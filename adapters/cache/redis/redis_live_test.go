@@ -71,7 +71,7 @@ func TestRedisLive_roundTrip(t *testing.T) {
 		t.Errorf("errors.Is(err, ErrNotFound) = false (err = %v)", err)
 	}
 
-	var nfErr *cache.NotFoundError
+	var nfErr cache.NotFoundError
 	if _, err := a.Get(ctx, "k"); !errors.As(err, &nfErr) {
 		t.Errorf("errors.As(err, NotFoundError) = false (err = %T %v)", err, err)
 	} else if nfErr.Key != "k" {

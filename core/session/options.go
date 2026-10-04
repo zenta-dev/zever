@@ -41,13 +41,13 @@ type Options struct {
 // Zero TTL means DefaultTTL and is valid; only negative TTL fails.
 func (o Options) Validate() error {
 	if o.TTL < 0 {
-		return &InvalidOptionsError{Reason: "ttl must be >= 0"}
+		return InvalidOptionsError{Reason: "ttl must be >= 0"}
 	}
 	if err := redisopt.ValidateAddr(o.Redis.Addr); err != nil {
-		return &InvalidOptionsError{Reason: err.Error()}
+		return InvalidOptionsError{Reason: err.Error()}
 	}
 	if err := redisopt.ValidatePrefix(o.Redis.Prefix); err != nil {
-		return &InvalidOptionsError{Reason: err.Error()}
+		return InvalidOptionsError{Reason: err.Error()}
 	}
 
 	return nil

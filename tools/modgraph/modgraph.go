@@ -108,11 +108,11 @@ func findModules(ctx context.Context, root string) (map[string]string, error) {
 		cmd.Dir = filepath.Dir(p)
 		out, err := cmd.Output()
 		if err != nil {
-			return fmt.Errorf("modgraph: go mod edit -json in %s: %w: %w", filepath.Dir(p), ErrGoModEdit, err)
+			return fmt.Errorf("modgraph: go mod edit -json in %s: %w", filepath.Dir(p), errors.Join(ErrGoModEdit, err))
 		}
 		var v modEditJSON
 		if err := json.Unmarshal(out, &v); err != nil {
-			return fmt.Errorf("modgraph: parse go mod edit output in %s: %w: %w", filepath.Dir(p), ErrParseGoMod, err)
+			return fmt.Errorf("modgraph: parse go mod edit output in %s: %w", filepath.Dir(p), errors.Join(ErrParseGoMod, err))
 		}
 		if v.Module.Path == "" {
 			return fmt.Errorf("modgraph: go mod edit output in %s has empty module path: %w", filepath.Dir(p), ErrEmptyModulePath)

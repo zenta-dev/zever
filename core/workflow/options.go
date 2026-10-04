@@ -39,7 +39,7 @@ func (o Options) Validate() error {
 
 	if o.HostPort != "" {
 		if _, _, err := net.SplitHostPort(o.HostPort); err != nil {
-			errs = append(errs, &InvalidOptionsError{Reason: fmt.Sprintf("invalid host_port %q", o.HostPort)})
+			errs = append(errs, InvalidOptionsError{Reason: fmt.Sprintf("invalid host_port %q", o.HostPort)})
 		}
 	}
 

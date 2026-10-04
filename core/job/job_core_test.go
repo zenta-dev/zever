@@ -174,7 +174,7 @@ func TestJobCoreRegisterDuplicate(t *testing.T) {
 	if !errors.Is(err, ErrDuplicateJob) {
 		t.Fatalf("errors.Is dup err=%v want ErrDuplicateJob", err)
 	}
-	var dupErr *DuplicateJobError
+	var dupErr DuplicateJobError
 	if !errors.As(err, &dupErr) {
 		t.Fatalf("errors.As dup err=%T %v want *DuplicateJobError", err, err)
 	}

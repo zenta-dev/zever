@@ -40,11 +40,11 @@ const dirPerms = 0o755
 func run() error {
 	for path, content := range gengrammar.Files() {
 		if err := os.MkdirAll(filepath.Dir(path), dirPerms); err != nil {
-			return fmt.Errorf("gengrammar: create directory for %s: %w: %w", path, ErrCreateDir, err)
+			return fmt.Errorf("gengrammar: create directory for %s: %w", path, errors.Join(ErrCreateDir, err))
 		}
 
 		if err := os.WriteFile(path, content, 0o600); err != nil {
-			return fmt.Errorf("gengrammar: write %s: %w: %w", path, ErrWriteFile, err)
+			return fmt.Errorf("gengrammar: write %s: %w", path, errors.Join(ErrWriteFile, err))
 		}
 	}
 

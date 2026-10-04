@@ -79,7 +79,7 @@ func TestRegister_duplicate(t *testing.T) {
 	if !errors.Is(err, ErrDuplicateAdapter) {
 		t.Fatalf("second Register err = %v, want ErrDuplicateAdapter", err)
 	}
-	var de *DuplicateAdapterError
+	var de DuplicateAdapterError
 	if !errors.As(err, &de) {
 		t.Fatalf("err %T is not *DuplicateAdapterError", err)
 	}
@@ -99,7 +99,7 @@ func TestOpen_unknownAdapter(t *testing.T) {
 	if !errors.Is(err, ErrUnknownAdapter) {
 		t.Fatalf("err = %v, want ErrUnknownAdapter", err)
 	}
-	var ue *UnknownAdapterError
+	var ue UnknownAdapterError
 	if !errors.As(err, &ue) {
 		t.Fatalf("err %T is not *UnknownAdapterError", err)
 	}
@@ -187,7 +187,7 @@ func TestOpen_invalidOptions(t *testing.T) {
 	if !errors.Is(err, ErrInvalidOptions) {
 		t.Fatalf("err = %v, want ErrInvalidOptions", err)
 	}
-	var ioe *InvalidOptionsError
+	var ioe InvalidOptionsError
 	if !errors.As(err, &ioe) {
 		t.Fatalf("err %T is not *InvalidOptionsError", err)
 	}

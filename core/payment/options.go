@@ -40,11 +40,11 @@ func (o Options) Validate() error {
 	var errs []error
 
 	if o.MaxWebhookBytes < 0 {
-		errs = append(errs, &InvalidOptionsError{Reason: "max_webhook_bytes must be >= 0"})
+		errs = append(errs, InvalidOptionsError{Reason: "max_webhook_bytes must be >= 0"})
 	}
 
 	for _, e := range providersopt.ValidateEndpoint(o.Endpoint) {
-		errs = append(errs, &InvalidOptionsError{Reason: e.Error()})
+		errs = append(errs, InvalidOptionsError{Reason: e.Error()})
 	}
 
 	return errors.Join(errs...)

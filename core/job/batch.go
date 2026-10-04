@@ -164,7 +164,7 @@ func (b *Batch) Dispatch(ctx context.Context) error {
 
 		def, ok := Lookup(j.name)
 		if !ok {
-			return &UnknownJobError{Name: j.name}
+			return UnknownJobError{Name: j.name}
 		}
 
 		queued = append(queued, queuedJob{payload, def.priority.String(), j.name})

@@ -41,12 +41,12 @@ func TestErrors_unwrap_carries_sentinel(t *testing.T) {
 		err  error
 		want error
 	}{
-		{name: "duplicate", err: &DuplicateAdapterError{Adapter: AdapterFiber}, want: ErrDuplicateAdapter},
-		{name: "unknown", err: &UnknownAdapterError{Adapter: AdapterFiber}, want: ErrUnknownAdapter},
-		{name: "invalid_adapter", err: &InvalidAdapterError{Adapter: "x"}, want: ErrInvalidAdapter},
-		{name: "invalid_options", err: &InvalidOptionsError{Reason: "x"}, want: ErrInvalidOptions},
-		{name: "invalid_method", err: &InvalidMethodError{Method: "x"}, want: ErrInvalidMethod},
-		{name: "malformed", err: &MalformedPatternError{Pattern: "x", Reason: "y"}, want: ErrMalformedPattern},
+		{name: "duplicate", err: DuplicateAdapterError{Adapter: AdapterFiber}, want: ErrDuplicateAdapter},
+		{name: "unknown", err: UnknownAdapterError{Adapter: AdapterFiber}, want: ErrUnknownAdapter},
+		{name: "invalid_adapter", err: InvalidAdapterError{Adapter: "x"}, want: ErrInvalidAdapter},
+		{name: "invalid_options", err: InvalidOptionsError{Reason: "x"}, want: ErrInvalidOptions},
+		{name: "invalid_method", err: InvalidMethodError{Method: "x"}, want: ErrInvalidMethod},
+		{name: "malformed", err: MalformedPatternError{Pattern: "x", Reason: "y"}, want: ErrMalformedPattern},
 	}
 	for _, tc := range cases {
 		tc := tc
@@ -61,11 +61,11 @@ func TestErrors_unwrap_carries_sentinel(t *testing.T) {
 
 func TestErrors_duplicate_aliases_compat(t *testing.T) {
 	t.Parallel()
-	e := &DuplicateAdapterError{Adapter: AdapterFiber}
+	e := DuplicateAdapterError{Adapter: AdapterFiber}
 	if !errors.Is(e, ErrDuplicate) {
 		t.Fatal("Is ErrDuplicate alias = false")
 	}
-	var de *DuplicateError
+	var de DuplicateError
 	if !errors.As(e, &de) {
 		t.Fatalf("err type = %T, want *DuplicateError alias", e)
 	}
@@ -79,7 +79,7 @@ func TestErrors_typed_As(t *testing.T) {
 	t.Run("invalid_adapter", func(t *testing.T) {
 		t.Parallel()
 		_, err := ParseAdapter("")
-		var iae *InvalidAdapterError
+		var iae InvalidAdapterError
 		if !errors.As(err, &iae) {
 			t.Fatalf("err type = %T, want *InvalidAdapterError", err)
 		}
@@ -89,8 +89,8 @@ func TestErrors_typed_As(t *testing.T) {
 	})
 	t.Run("duplicate", func(t *testing.T) {
 		t.Parallel()
-		e := &DuplicateAdapterError{Adapter: AdapterFiber}
-		var de *DuplicateAdapterError
+		e := DuplicateAdapterError{Adapter: AdapterFiber}
+		var de DuplicateAdapterError
 		if !errors.As(e, &de) {
 			t.Fatalf("err type = %T, want *DuplicateAdapterError", e)
 		}
@@ -106,8 +106,8 @@ func TestErrors_typed_As(t *testing.T) {
 	})
 	t.Run("unknown", func(t *testing.T) {
 		t.Parallel()
-		e := &UnknownAdapterError{Adapter: Adapter("")}
-		var ue *UnknownAdapterError
+		e := UnknownAdapterError{Adapter: Adapter("")}
+		var ue UnknownAdapterError
 		if !errors.As(e, &ue) {
 			t.Fatalf("err type = %T, want *UnknownAdapterError", e)
 		}
@@ -120,8 +120,8 @@ func TestErrors_typed_As(t *testing.T) {
 	})
 	t.Run("invalid_options", func(t *testing.T) {
 		t.Parallel()
-		e := &InvalidOptionsError{Reason: "app_name must be at most 64 characters"}
-		var ioe *InvalidOptionsError
+		e := InvalidOptionsError{Reason: "app_name must be at most 64 characters"}
+		var ioe InvalidOptionsError
 		if !errors.As(e, &ioe) {
 			t.Fatalf("err type = %T, want *InvalidOptionsError", e)
 		}
@@ -137,8 +137,8 @@ func TestErrors_typed_As(t *testing.T) {
 	})
 	t.Run("invalid_method", func(t *testing.T) {
 		t.Parallel()
-		e := &InvalidMethodError{Method: "FETCH"}
-		var ime *InvalidMethodError
+		e := InvalidMethodError{Method: "FETCH"}
+		var ime InvalidMethodError
 		if !errors.As(e, &ime) {
 			t.Fatalf("err type = %T, want *InvalidMethodError", e)
 		}
@@ -154,8 +154,8 @@ func TestErrors_typed_As(t *testing.T) {
 	})
 	t.Run("malformed_pattern", func(t *testing.T) {
 		t.Parallel()
-		e := &MalformedPatternError{Pattern: "/a/{b", Reason: "unclosed brace"}
-		var mpe *MalformedPatternError
+		e := MalformedPatternError{Pattern: "/a/{b", Reason: "unclosed brace"}
+		var mpe MalformedPatternError
 		if !errors.As(e, &mpe) {
 			t.Fatalf("err type = %T, want *MalformedPatternError", e)
 		}
@@ -179,27 +179,27 @@ func TestErrors_typed_As(t *testing.T) {
 
 func TestErrors_carried_fields(t *testing.T) {
 	t.Parallel()
-	de := &DuplicateAdapterError{Adapter: AdapterFiber}
+	de := DuplicateAdapterError{Adapter: AdapterFiber}
 	if de.Adapter != AdapterFiber {
 		t.Fatalf("DuplicateAdapterError.Adapter = %v", de.Adapter)
 	}
-	ue := &UnknownAdapterError{Adapter: Adapter("test-5")}
+	ue := UnknownAdapterError{Adapter: Adapter("test-5")}
 	if ue.Adapter != Adapter("test-5") {
 		t.Fatalf("UnknownAdapterError.Adapter = %v", ue.Adapter)
 	}
-	iae := &InvalidAdapterError{Adapter: "nope"}
+	iae := InvalidAdapterError{Adapter: "nope"}
 	if iae.Adapter != "nope" {
 		t.Fatalf("InvalidAdapterError.Adapter = %q", iae.Adapter)
 	}
-	ioe := &InvalidOptionsError{Reason: "bad"}
+	ioe := InvalidOptionsError{Reason: "bad"}
 	if ioe.Reason != "bad" {
 		t.Fatalf("InvalidOptionsError.Reason = %q", ioe.Reason)
 	}
-	ime := &InvalidMethodError{Method: "BAD"}
+	ime := InvalidMethodError{Method: "BAD"}
 	if ime.Method != "BAD" {
 		t.Fatalf("InvalidMethodError.Method = %q", ime.Method)
 	}
-	mpe := &MalformedPatternError{Pattern: "p", Reason: "r"}
+	mpe := MalformedPatternError{Pattern: "p", Reason: "r"}
 	if mpe.Pattern != "p" || mpe.Reason != "r" {
 		t.Fatalf("MalformedPatternError = %+v", mpe)
 	}

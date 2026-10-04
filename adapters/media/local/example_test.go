@@ -12,7 +12,7 @@ import (
 // ExampleOpen uploads and stats one asset through the local adapter.
 func ExampleOpen() {
 	if err := media.Register(media.Local, medialocal.New); err != nil {
-		var dup *media.DuplicateAdapterError
+		var dup media.DuplicateAdapterError
 		if !errors.As(err, &dup) {
 			return
 		}

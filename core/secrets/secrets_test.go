@@ -92,7 +92,7 @@ func TestSecretsRegister_duplicate_returnsDuplicate(t *testing.T) {
 		t.Errorf("errors.Is(err, ErrDuplicate) = false (err = %v)", err)
 	}
 
-	var dupErr *secrets.DuplicateError
+	var dupErr secrets.DuplicateError
 	if !errors.As(err, &dupErr) {
 		t.Fatalf("errors.As(err, DuplicateError) = false (err = %T %v)", err, err)
 	}
@@ -112,7 +112,7 @@ func TestSecretsOpen_unknown_returnsUnknownAdapter(t *testing.T) {
 		t.Errorf("errors.Is(err, ErrUnknownAdapter) = false (err = %v)", err)
 	}
 
-	var unkErr *secrets.UnknownAdapterError
+	var unkErr secrets.UnknownAdapterError
 	if !errors.As(err, &unkErr) {
 		t.Fatalf("errors.As(err, UnknownAdapterError) = false (err = %T %v)", err, err)
 	}

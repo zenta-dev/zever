@@ -81,32 +81,32 @@ func (n Notification) Validate() error {
 	switch n.Channel {
 	case ChannelPush, ChannelSMS:
 	default:
-		return &InvalidChannelError{Channel: string(n.Channel)}
+		return InvalidChannelError{Channel: string(n.Channel)}
 	}
 
 	if n.Target == "" {
-		return &InvalidTargetError{Reason: "target must be non-empty"}
+		return InvalidTargetError{Reason: "target must be non-empty"}
 	}
 	if n.Channel == ChannelSMS && !e164Re.MatchString(n.Target) {
-		return &InvalidTargetError{Reason: "sms target must be E.164"}
+		return InvalidTargetError{Reason: "sms target must be E.164"}
 	}
 
 	switch n.Priority {
 	case "", PriorityLow, PriorityNormal, PriorityHigh:
 	default:
-		return &InvalidNotificationError{Reason: "priority must be low, normal, or high"}
+		return InvalidNotificationError{Reason: "priority must be low, normal, or high"}
 	}
 
 	if n.TTL < 0 {
-		return &InvalidNotificationError{Reason: "ttl must be >= 0"}
+		return InvalidNotificationError{Reason: "ttl must be >= 0"}
 	}
 
 	if n.Channel == ChannelSMS {
 		if n.Title != "" {
-			return &InvalidNotificationError{Reason: "title is push-only"}
+			return InvalidNotificationError{Reason: "title is push-only"}
 		}
 		if len(n.Data) > 0 {
-			return &InvalidNotificationError{Reason: "data is push-only"}
+			return InvalidNotificationError{Reason: "data is push-only"}
 		}
 	}
 
@@ -126,8 +126,8 @@ type Factory func(opts Options) (Notifier, error)
 
 var factories = registry.New[Adapter, Factory](
 	ErrNilFactory,
-	func(adapter Adapter) error { return &DuplicateError{Adapter: adapter} },
-	func(adapter Adapter) error { return &UnknownAdapterError{Adapter: adapter} },
+	func(adapter Adapter) error { return DuplicateError{Adapter: adapter} },
+	func(adapter Adapter) error { return UnknownAdapterError{Adapter: adapter} },
 )
 
 // Register associates an Adapter with a Factory for later use by Open.

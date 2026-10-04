@@ -65,8 +65,8 @@ type Factory func(opts Options) (EventBus, error)
 
 var factories = registry.New[Adapter, Factory](
 	ErrNilFactory,
-	func(adapter Adapter) error { return &DuplicateError{Adapter: adapter} },
-	func(adapter Adapter) error { return &UnknownAdapterError{Adapter: adapter} },
+	func(adapter Adapter) error { return DuplicateError{Adapter: adapter} },
+	func(adapter Adapter) error { return UnknownAdapterError{Adapter: adapter} },
 )
 
 // Register associates an Adapter with a Factory for later use by Open.
@@ -107,11 +107,11 @@ func Open(adapter Adapter, opts Options) (EventBus, error) {
 // validateTopic checks a topic name: non-empty, at most MaxTopicLen.
 func validateTopic(topic string) error {
 	if topic == "" {
-		return &InvalidOptionsError{Reason: "topic must be non-empty"}
+		return InvalidOptionsError{Reason: "topic must be non-empty"}
 	}
 
 	if len(topic) > MaxTopicLen {
-		return &InvalidOptionsError{Reason: "topic too long"}
+		return InvalidOptionsError{Reason: "topic too long"}
 	}
 
 	return nil

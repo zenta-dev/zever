@@ -23,7 +23,7 @@ func TestOptions_negative_ttl_fails(t *testing.T) {
 	if !errors.Is(err, ErrInvalidOptions) {
 		t.Fatalf("err = %v, want ErrInvalidOptions", err)
 	}
-	var ioe *InvalidOptionsError
+	var ioe InvalidOptionsError
 	if !errors.As(err, &ioe) {
 		t.Fatalf("err type = %T, want *InvalidOptionsError", err)
 	}

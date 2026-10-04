@@ -141,7 +141,7 @@ func TestSignalUnknownRun(t *testing.T) {
 		t.Fatalf("Signal = %v, want ErrUnknownRun", err)
 	}
 
-	var unkErr *workflow.UnknownRunError
+	var unkErr workflow.UnknownRunError
 	if !errors.As(err, &unkErr) {
 		t.Fatalf("errors.As(%v, *UnknownRunError) = false", err)
 	}
@@ -536,7 +536,7 @@ func TestStartDuplicateWorkflowIDRejected(t *testing.T) {
 		t.Fatalf("expected duplicate workflow ID error, got %q", err)
 	}
 
-	var dupErr *workflow.DuplicateRunError
+	var dupErr workflow.DuplicateRunError
 	if !errors.As(err, &dupErr) {
 		t.Fatalf("errors.As(%v, *DuplicateRunError) = false", err)
 	}

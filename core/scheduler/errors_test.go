@@ -25,12 +25,12 @@ func TestSentinels(t *testing.T) {
 func TestDuplicateAdapterErrorUnwrap(t *testing.T) {
 	t.Parallel()
 
-	err := &DuplicateAdapterError{Adapter: Embedded}
+	err := DuplicateAdapterError{Adapter: Embedded}
 	if !errors.Is(err, ErrDuplicate) {
 		t.Fatalf("err=%v want ErrDuplicate", err)
 	}
 
-	if got, want := err.Error(), `scheduler: duplicate registration: embedded`; got != want {
+	if got, want := err.Error(), `scheduler: duplicate adapter: embedded`; got != want {
 		t.Fatalf("Error()=%q want %q", got, want)
 	}
 }
@@ -38,7 +38,7 @@ func TestDuplicateAdapterErrorUnwrap(t *testing.T) {
 func TestUnknownAdapterErrorUnwrap(t *testing.T) {
 	t.Parallel()
 
-	err := &UnknownAdapterError{Adapter: Adapter("")}
+	err := UnknownAdapterError{Adapter: Adapter("")}
 	if !errors.Is(err, ErrUnknownAdapter) {
 		t.Fatalf("err=%v want ErrUnknownAdapter", err)
 	}
@@ -47,7 +47,7 @@ func TestUnknownAdapterErrorUnwrap(t *testing.T) {
 func TestInvalidAdapterErrorUnwrap(t *testing.T) {
 	t.Parallel()
 
-	err := &InvalidAdapterError{Adapter: "bogus"}
+	err := InvalidAdapterError{Adapter: "bogus"}
 	if !errors.Is(err, ErrInvalidAdapter) {
 		t.Fatalf("err=%v want ErrInvalidAdapter", err)
 	}
@@ -56,7 +56,7 @@ func TestInvalidAdapterErrorUnwrap(t *testing.T) {
 func TestInvalidOptionsErrorUnwrap(t *testing.T) {
 	t.Parallel()
 
-	err := &InvalidOptionsError{Reason: "dispatcher_is_required"}
+	err := InvalidOptionsError{Reason: "dispatcher_is_required"}
 	if !errors.Is(err, ErrInvalidOptions) {
 		t.Fatalf("err=%v want ErrInvalidOptions", err)
 	}
@@ -66,7 +66,7 @@ func TestInvalidSpecErrorUnwrap(t *testing.T) {
 	t.Parallel()
 
 	cause := errors.New("parse boom")
-	err := &InvalidSpecError{Spec: "bogus", Err: cause}
+	err := InvalidSpecError{Spec: "bogus", Err: cause}
 
 	if !errors.Is(err, ErrInvalidSpec) {
 		t.Fatalf("err=%v want ErrInvalidSpec", err)
@@ -76,7 +76,7 @@ func TestInvalidSpecErrorUnwrap(t *testing.T) {
 		t.Fatalf("err=%v want wrapped cause", err)
 	}
 
-	var spec *InvalidSpecError
+	var spec InvalidSpecError
 	if !errors.As(err, &spec) {
 		t.Fatalf("err=%v want InvalidSpecError", err)
 	}

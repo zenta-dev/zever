@@ -73,7 +73,7 @@ func (a *memoryAdapter) Get(_ context.Context, key string) ([]byte, error) {
 
 	v, ok := a.tc.Get(key)
 	if !ok {
-		return nil, &cache.NotFoundError{Key: key}
+		return nil, cache.NotFoundError{Key: key}
 	}
 
 	return append([]byte(nil), v...), nil
@@ -185,7 +185,7 @@ func (a *memoryAdapter) addDelta(key string, delta int64) error {
 
 		n, err := strconv.ParseInt(string(cur), 10, 64)
 		if err != nil {
-			return &cache.InvalidValueError{Key: key, Err: err}
+			return cache.InvalidValueError{Key: key, Err: err}
 		}
 
 		next := strconv.AppendInt(nil, n+delta, 10)

@@ -8,11 +8,11 @@ import (
 // ErrNilFactory is returned when an adapter factory is nil.
 var ErrNilFactory = errors.New("permission: nil factory")
 
-// ErrDuplicate is returned on duplicate adapter registration.
-var ErrDuplicate = errors.New("permission: duplicate registration")
+// ErrDuplicateAdapter is returned on duplicate adapter registration.
+var ErrDuplicateAdapter = errors.New("permission: duplicate adapter")
 
-// ErrDuplicateAdapter aliases ErrDuplicate for compatibility.
-var ErrDuplicateAdapter = ErrDuplicate
+// ErrDuplicate aliases ErrDuplicateAdapter for compatibility.
+var ErrDuplicate = ErrDuplicateAdapter
 
 // ErrUnknownAdapter is returned for an unregistered adapter.
 var ErrUnknownAdapter = errors.New("permission: unknown adapter")
@@ -34,11 +34,11 @@ type DuplicateError = DuplicateAdapterError
 
 // Error returns a human-readable description of the duplicate registration.
 func (e DuplicateAdapterError) Error() string {
-	return fmt.Sprintf("%s: %s", ErrDuplicate, e.Adapter.String())
+	return fmt.Sprintf("%s: %s", ErrDuplicateAdapter, e.Adapter.String())
 }
 
-// Unwrap returns ErrDuplicate for errors.Is matching.
-func (e DuplicateAdapterError) Unwrap() error { return ErrDuplicate }
+// Unwrap returns ErrDuplicateAdapter for errors.Is matching.
+func (e DuplicateAdapterError) Unwrap() error { return ErrDuplicateAdapter }
 
 // UnknownAdapterError reports an Open for an unregistered adapter.
 type UnknownAdapterError struct {

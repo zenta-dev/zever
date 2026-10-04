@@ -16,7 +16,7 @@ func TestCoverTypedErrorStrings(t *testing.T) {
 		err  error
 		want string
 	}{
-		{"duplicate", DuplicateError{Adapter: JWT}, "auth: duplicate registration"},
+		{"duplicate", DuplicateError{Adapter: JWT}, "auth: duplicate adapter"},
 		{"unknown", UnknownAdapterError{Adapter: Adapter("")}, "auth: unknown adapter: unknown (forgotten import?)"},
 	}
 

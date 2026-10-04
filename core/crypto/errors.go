@@ -16,8 +16,8 @@ var (
 	ErrIntegrity = errors.New("crypto: integrity check failed")
 	// ErrNilFactory is returned when an adapter factory is nil.
 	ErrNilFactory = errors.New("crypto: nil factory")
-	// ErrDuplicate is returned on duplicate adapter registration.
-	ErrDuplicate = errors.New("crypto: duplicate registration")
+	// ErrDuplicateAdapter is returned on duplicate adapter registration.
+	ErrDuplicateAdapter = errors.New("crypto: duplicate adapter")
 	// ErrUnknownAdapter is returned for an unregistered adapter.
 	ErrUnknownAdapter = errors.New("crypto: unknown adapter")
 	// ErrInvalidAdapter is returned for an invalid adapter name.
@@ -26,8 +26,8 @@ var (
 	ErrInvalidOptions = errors.New("crypto: invalid options")
 )
 
-// ErrDuplicateAdapter aliases ErrDuplicate for compatibility.
-var ErrDuplicateAdapter = ErrDuplicate
+// ErrDuplicate aliases ErrDuplicateAdapter for compatibility.
+var ErrDuplicate = ErrDuplicateAdapter
 
 // InvalidAdapterError reports an invalid adapter name.
 type InvalidAdapterError struct {
@@ -54,11 +54,11 @@ type DuplicateError = DuplicateAdapterError
 
 // Error returns a human-readable duplicate-registration message.
 func (e DuplicateAdapterError) Error() string {
-	return fmt.Sprintf("%s: %s", ErrDuplicate, e.Adapter)
+	return fmt.Sprintf("%s: %s", ErrDuplicateAdapter, e.Adapter)
 }
 
-// Unwrap returns ErrDuplicate.
-func (e DuplicateAdapterError) Unwrap() error { return ErrDuplicate }
+// Unwrap returns ErrDuplicateAdapter.
+func (e DuplicateAdapterError) Unwrap() error { return ErrDuplicateAdapter }
 
 // UnknownAdapterError reports a lookup of an unregistered adapter.
 type UnknownAdapterError struct {

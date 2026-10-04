@@ -694,7 +694,7 @@ func TestStripe_WebhookEvent_oversized(t *testing.T) {
 		t.Fatal("WebhookEvent() err = nil, want SizeLimitError")
 	}
 
-	var sizeErr *payment.SizeLimitError
+	var sizeErr payment.SizeLimitError
 	if !errors.As(err, &sizeErr) {
 		t.Fatalf("WebhookEvent() err = %v, want SizeLimitError", err)
 	}

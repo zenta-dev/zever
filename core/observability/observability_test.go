@@ -54,7 +54,7 @@ func TestRegisterNilAndDuplicate(t *testing.T) {
 
 	stub := func(Options) (Provider, error) { return stubProvider{}, nil }
 	if err := Register(a, stub); err != nil {
-		var dup *DuplicateError
+		var dup DuplicateError
 		if !errors.As(err, &dup) {
 			t.Fatalf("Register() error = %v", err)
 		}

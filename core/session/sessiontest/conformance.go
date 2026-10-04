@@ -207,7 +207,7 @@ func conformanceErrors(t *testing.T, factory func(t *testing.T) session.Store) {
 		t.Errorf("Get(bogus) err = %v, want ErrInvalidID", err)
 	}
 
-	var idErr *session.InvalidIDError
+	var idErr session.InvalidIDError
 	if _, err := s.Get(ctx, "bogus"); !errors.As(err, &idErr) {
 		t.Errorf("errors.As(err, InvalidIDError) = false (err = %T %v)", err, err)
 	}

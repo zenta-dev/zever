@@ -20,7 +20,7 @@ func TestOptions_Validate_negativeTimeout_invalid(t *testing.T) {
 	if !errors.Is(err, ErrInvalidOptions) {
 		t.Fatalf("negative timeout err = %v, want ErrInvalidOptions", err)
 	}
-	var ioe *InvalidOptionsError
+	var ioe InvalidOptionsError
 	if !errors.As(err, &ioe) {
 		t.Fatalf("err %T is not *InvalidOptionsError", err)
 	}

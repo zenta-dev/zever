@@ -405,7 +405,7 @@ func TestDownload_capped(t *testing.T) {
 		t.Fatalf("err = %v, want ErrTooLarge", err)
 	}
 
-	var sle *media.SizeLimitError
+	var sle media.SizeLimitError
 	if !errors.As(err, &sle) {
 		t.Fatalf("err %T is not *SizeLimitError", err)
 	}
@@ -1205,7 +1205,7 @@ func TestDownloadRange_invalid(t *testing.T) {
 				t.Fatalf("err = %v, want ErrInvalidRange", err)
 			}
 
-			var ire *media.InvalidRangeError
+			var ire media.InvalidRangeError
 			if !errors.As(err, &ire) {
 				t.Fatalf("err %T is not *InvalidRangeError", err)
 			}

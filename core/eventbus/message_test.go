@@ -71,7 +71,7 @@ func TestMessage_parseMessageID_invalid(t *testing.T) {
 			t.Errorf("ParseMessageID(%q) expected error, got nil", in)
 			continue
 		}
-		var ime *InvalidMessageIDError
+		var ime InvalidMessageIDError
 		if !errors.As(err, &ime) {
 			t.Errorf("ParseMessageID(%q) err %T is not *InvalidMessageIDError", in, err)
 			continue

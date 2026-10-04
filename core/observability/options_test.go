@@ -196,7 +196,7 @@ func TestOptions_Validate_invalid_returnsInvalidOptionsError(t *testing.T) {
 			if !errors.Is(err, ErrInvalidOptions) {
 				t.Errorf("errors.Is(err, ErrInvalidOptions) = false (err = %v)", err)
 			}
-			var inv *InvalidOptionsError
+			var inv InvalidOptionsError
 			if !errors.As(err, &inv) {
 				t.Fatalf("errors.As(err, InvalidOptionsError) = false (err = %T %v)", err, err)
 			}

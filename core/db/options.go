@@ -41,19 +41,19 @@ func (o Options) Validate() error {
 	var errs []error
 
 	if o.MaxConns < 0 {
-		errs = append(errs, &InvalidOptionsError{Reason: "max_conns must not be negative"})
+		errs = append(errs, InvalidOptionsError{Reason: "max_conns must not be negative"})
 	}
 
 	if o.MinConns < 0 {
-		errs = append(errs, &InvalidOptionsError{Reason: "min_conns must not be negative"})
+		errs = append(errs, InvalidOptionsError{Reason: "min_conns must not be negative"})
 	}
 
 	if o.MaxConnLifetime < 0 {
-		errs = append(errs, &InvalidOptionsError{Reason: "max_conn_lifetime must not be negative"})
+		errs = append(errs, InvalidOptionsError{Reason: "max_conn_lifetime must not be negative"})
 	}
 
 	if o.MaxConnIdleTime < 0 {
-		errs = append(errs, &InvalidOptionsError{Reason: "max_conn_idle_time must not be negative"})
+		errs = append(errs, InvalidOptionsError{Reason: "max_conn_idle_time must not be negative"})
 	}
 
 	return errors.Join(errs...)

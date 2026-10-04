@@ -88,12 +88,12 @@ func (d *driver) Render(ctx context.Context, source []byte, format document.Outp
 	switch format {
 	case document.FormatPDF, document.FormatPNG, document.FormatJPG:
 	default:
-		formatErr := error(&document.UnsupportedFormatError{Format: format})
+		formatErr := error(document.UnsupportedFormatError{Format: format})
 		return nil, fmt.Errorf("local: %w", formatErr)
 	}
 
 	if len(source) > maxSourceBytes {
-		sizeErr := error(&document.SizeLimitError{Size: len(source), Limit: maxSourceBytes})
+		sizeErr := error(document.SizeLimitError{Size: len(source), Limit: maxSourceBytes})
 		return nil, fmt.Errorf("local: %w", sizeErr)
 	}
 
