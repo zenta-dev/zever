@@ -14,6 +14,12 @@ var ErrCloseTimeout = errors.New("container: close timed out")
 // ErrClosePanic reports a service whose Close panicked.
 var ErrClosePanic = errors.New("container: close panicked")
 
+// ErrPluginVersionMismatch indicates a plugin version does not match.
+var ErrPluginVersionMismatch = errors.New("plugin version mismatch")
+
+// ErrPluginTypeMismatch indicates a plugin type does not match.
+var ErrPluginTypeMismatch = errors.New("plugin type mismatch")
+
 // TransactorError names a db adapter that does not support transactions.
 type TransactorError struct {
 	Actual string
