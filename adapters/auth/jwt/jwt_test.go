@@ -88,7 +88,7 @@ func TestNew_RejectsShortSecret(t *testing.T) {
 	if err == nil {
 		t.Fatal("New() with short secret succeeded, want error")
 	}
-	var inv *auth.InvalidOptionsError
+	var inv auth.InvalidOptionsError
 	if !errors.As(err, &inv) {
 		t.Fatalf("New() error = %T (%v), want *InvalidOptionsError", err, err)
 	}
@@ -100,7 +100,7 @@ func TestNew_RejectsEmptySecret(t *testing.T) {
 	if err == nil {
 		t.Fatal("New() with empty secret succeeded, want error")
 	}
-	var inv *auth.InvalidOptionsError
+	var inv auth.InvalidOptionsError
 	if !errors.As(err, &inv) {
 		t.Fatalf("New() error = %T (%v), want *InvalidOptionsError", err, err)
 	}

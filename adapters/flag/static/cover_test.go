@@ -26,7 +26,7 @@ func TestCoverNewNotCleanPath(t *testing.T) {
 
 	// Literal ".." element (filepath.Join would clean it away).
 	_, err := New(flag.Options{Static: flag.StaticOptions{Path: "a/../b.json"}})
-	var ioerr *flag.InvalidOptionsError
+	var ioerr flag.InvalidOptionsError
 	if err == nil || !errors.As(err, &ioerr) {
 		t.Fatalf("New(unclean) = %v, want *InvalidOptionsError", err)
 	}
