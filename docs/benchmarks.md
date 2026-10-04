@@ -190,6 +190,21 @@ and 248 B/op from every idle poll, and cuts the wait path ~1.6x at cpu=1
 (379.0 to 241.7 ns/op). Backoff values are unchanged: the first poll in a
 run still waits 0, then 1ms, 2ms, 4ms, ..., capped at `DefaultMaxPollWait`.
 
+ORM render group dedup (`orm/render`, sqlite). `dedupGroupLeaves`'s map
+fallback keyed on a formatted `string` per leaf; it now keys on a comparable
+`groupLeafKey{fn, col}` struct, removing the per-leaf key allocation. Medians
+of 3 runs, cpu=12.
+
+| Benchmark | ns/op | B/op | allocs/op |
+| --- | --- | --- | --- |
+| BenchmarkFlattenGroupTermsMany before | 6,164 | 21,272 | 75 |
+| BenchmarkFlattenGroupTermsMany after | 5,598 | 22,168 | 11 |
+
+The struct key drops 64 allocs/op (one per leaf) on a 64-leaf GROUP BY and
+cuts ns/op ~9%; B/op rises slightly (the keys are stored inline rather than
+pointing at many tiny strings) but total allocation count — and thus GC
+pressure — falls sharply.
+
 ## Commands
 
 Router and queue are fast, so they run 1s per bench; ORM runs 100
