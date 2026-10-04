@@ -211,7 +211,7 @@ func validateSubjects(entries []Subject, perm string, field string) error {
 
 	for _, e := range entries {
 		if e == "" {
-			return fmt.Errorf("storage: policy %s.%s contains empty entry", perm, field)
+			return fmt.Errorf("%w: policy %s.%s contains empty entry", ErrEmptyPolicyEntry, perm, field)
 		}
 
 		if _, dup := seen[e]; dup {

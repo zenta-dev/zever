@@ -20,7 +20,7 @@ func PresignExpiry(ttl time.Duration) (int64, error) {
 	}
 
 	if ttl > MaxPresignTTL {
-		return 0, fmt.Errorf("storage: presign ttl %s exceeds max %s", ttl, MaxPresignTTL)
+		return 0, fmt.Errorf("%w: presign ttl %s exceeds max %s", ErrPresignTTLExceeded, ttl, MaxPresignTTL)
 	}
 
 	return time.Now().Add(ttl).Unix(), nil
