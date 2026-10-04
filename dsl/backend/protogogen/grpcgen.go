@@ -37,7 +37,7 @@ var protoMarshal = proto.Marshal
 func generateGRPCGo(ctx context.Context, req *pluginpb.CodeGeneratorRequest) (map[string][]byte, error) {
 	reqBytes, err := protoMarshal(req)
 	if err != nil {
-		return nil, fmt.Errorf("[protogogen] marshal CodeGeneratorRequest: %w", err)
+		return nil, fmt.Errorf("protogogen: marshal CodeGeneratorRequest: %w", err)
 	}
 
 	cmd := exec.CommandContext(ctx, "go", "tool", grpcGoToolName)
@@ -49,16 +49,16 @@ func generateGRPCGo(ctx context.Context, req *pluginpb.CodeGeneratorRequest) (ma
 	cmd.Stderr = &stderr
 
 	if err := cmd.Run(); err != nil {
-		return nil, fmt.Errorf("[protogogen] run %q: %w (stderr: %s)", grpcGoToolName, err, stderr.String())
+		return nil, fmt.Errorf("protogogen: run %q: %w (stderr: %s)", grpcGoToolName, err, stderr.String())
 	}
 
 	var resp pluginpb.CodeGeneratorResponse
 	if err := proto.Unmarshal(stdout.Bytes(), &resp); err != nil {
-		return nil, fmt.Errorf("[protogogen] unmarshal %q response: %w", grpcGoToolName, err)
+		return nil, fmt.Errorf("protogogen: unmarshal %q response: %w", grpcGoToolName, err)
 	}
 
 	if resp.GetError() != "" {
-		return nil, fmt.Errorf("[protogogen] %s: %s", grpcGoToolName, resp.GetError())
+		return nil, fmt.Errorf("protogogen: %s: %s", grpcGoToolName, resp.GetError())
 	}
 
 	return responseFilesToMap(&resp), nil

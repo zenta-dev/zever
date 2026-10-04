@@ -277,7 +277,7 @@ func parseEntrypointFlags(args []string, flagName string, usage func(*flag.FlagS
 	}
 
 	if err := fs.Parse(args); err != nil {
-		return empty, "", false, err
+		return empty, "", false, fmt.Errorf("zever generate: %w", err)
 	}
 
 	project, err := loadProjectConfig()
@@ -391,7 +391,7 @@ func runGenerateModule(args []string) error {
 	// strips them before Parse and sets interactiveMode globally.
 
 	if err := fs.Parse(args); err != nil {
-		return err
+		return fmt.Errorf("zever generate: %w", err)
 	}
 
 	rest := fs.Args()

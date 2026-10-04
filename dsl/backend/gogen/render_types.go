@@ -39,7 +39,7 @@ func renderModuleFiles(pkg, dir string, data moduleModel) (map[string][]byte, er
 
 		formatted, err := formatSource(src)
 		if err != nil {
-			return nil, fmt.Errorf("format %s: %w\n--- source ---\n%s", path, err, src)
+			return nil, fmt.Errorf("gogen: format %s: %w\n--- source ---\n%s", path, err, src)
 		}
 
 		out[path] = formatted

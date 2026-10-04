@@ -10,6 +10,9 @@ var ErrLeaseHeld = errors.New("postgres: lease held by another owner")
 // ErrUnsupportedType is returned when a scanned column has an unexpected Go type.
 var ErrUnsupportedType = errors.New("postgres: unsupported type")
 
+// ErrInvalidSpecLength indicates invalid spec length.
+var ErrInvalidSpecLength = errors.New("postgres: spec length must be 1-256")
+
 // LeaseHeldError reports a slot claim against a lease held by a live owner.
 type LeaseHeldError struct {
 	// Slot is the schedule slot whose lease is held.

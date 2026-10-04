@@ -517,7 +517,7 @@ func (d *driver) Schedule(ctx context.Context, spec, jobName string, args any) (
 	}
 
 	if len(spec) == 0 || len(spec) > scheduler.MaxSpecLen {
-		return 0, &scheduler.InvalidSpecError{Spec: spec, Err: errors.New("spec length must be 1-256")}
+		return 0, &scheduler.InvalidSpecError{Spec: spec, Err: fmt.Errorf("postgres: %w", ErrInvalidSpecLength)}
 	}
 
 	if _, err := cron.ParseStandard(spec); err != nil {

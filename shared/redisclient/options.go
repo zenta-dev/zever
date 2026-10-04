@@ -2,7 +2,6 @@ package redisclient
 
 import (
 	"crypto/tls"
-	"errors"
 	"fmt"
 	"net/url"
 	"strings"
@@ -40,7 +39,7 @@ func toRedisOptions(o Options) (*goredis.Options, error) {
 		}
 
 		if u.Host == "" {
-			return nil, &InvalidAddressError{Addr: addr, Err: errors.New("missing host")}
+			return nil, &InvalidAddressError{Addr: addr, Err: fmt.Errorf("redis: %w", ErrMissingHost)}
 		}
 
 		redisOpt := &goredis.Options{

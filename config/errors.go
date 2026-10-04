@@ -21,7 +21,7 @@ var ErrInvalidOptions = errors.New("config: invalid options")
 var ErrDecode = errors.New("config: decode")
 
 // ErrInvalidPlugin indicates a plugin validator is invalid.
-var ErrInvalidPlugin = errors.New("invalid plugin")
+var ErrInvalidPlugin = errors.New("config: invalid plugin")
 
 // UnknownServiceError names a service with no registered loader.
 type UnknownServiceError struct {

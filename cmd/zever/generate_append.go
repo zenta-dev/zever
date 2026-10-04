@@ -113,13 +113,13 @@ func declNameTaken(file *ast.File, name string) (kind string, taken bool) {
 func appendDeclBeforeClosingBrace(path, _, decl string) error {
 	src, err := os.ReadFile(path) //nolint:gosec // path is derived from a developer-supplied module name
 	if err != nil {
-		return fmt.Errorf("[zever] read %q: %w", path, err)
+		return fmt.Errorf("zever: read %q: %w", path, err)
 	}
 
 	if _, diags := parseZen(path, src); diags.HasErrors() {
 		printDiagnostics(diags)
 
-		return fmt.Errorf("[zever] %q does not parse; refusing to edit it", path)
+		return fmt.Errorf("zever: %q does not parse; refusing to edit it", path)
 	}
 
 	next := appendDecl(src, decl)
@@ -127,7 +127,7 @@ func appendDeclBeforeClosingBrace(path, _, decl string) error {
 	if _, diags := parseZen(path, next); diags.HasErrors() {
 		printDiagnostics(diags)
 
-		return fmt.Errorf("[zever] generated declaration would not parse; %q left unchanged", path)
+		return fmt.Errorf("zever: generated declaration would not parse; %q left unchanged", path)
 	}
 
 	return writeAtomically(path, next)
@@ -161,7 +161,7 @@ func writeAtomically(path string, content []byte) error {
 
 	tmp, err := os.CreateTemp(dir, "."+base+".zever-*")
 	if err != nil {
-		return fmt.Errorf("[zever] create temp file next to %q: %w", path, err)
+		return fmt.Errorf("zever: create temp file next to %q: %w", path, err)
 	}
 
 	tmpPath := tmp.Name()
@@ -173,19 +173,19 @@ func writeAtomically(path string, content []byte) error {
 	if _, err := tmp.Write(content); err != nil {
 		_ = tmp.Close()
 
-		return fmt.Errorf("[zever] write %q: %w", tmpPath, err)
+		return fmt.Errorf("zever: write %q: %w", tmpPath, err)
 	}
 
 	if err := tmp.Close(); err != nil {
-		return fmt.Errorf("[zever] close %q: %w", tmpPath, err)
+		return fmt.Errorf("zever: close %q: %w", tmpPath, err)
 	}
 
 	if err := os.Chmod(tmpPath, 0o644); err != nil { //nolint:gosec // a schema file, not a secret
-		return fmt.Errorf("[zever] chmod %q: %w", tmpPath, err)
+		return fmt.Errorf("zever: chmod %q: %w", tmpPath, err)
 	}
 
 	if err := os.Rename(tmpPath, path); err != nil { //nolint:gosec // os.CreateTemp's own name, renamed onto the file it was created beside
-		return fmt.Errorf("[zever] rename %q -> %q: %w", tmpPath, path, err)
+		return fmt.Errorf("zever: rename %q -> %q: %w", tmpPath, path, err)
 	}
 
 	return nil
@@ -227,5 +227,5 @@ func byteOffset(src []byte, pos diag.Position) (int, error) {
 		}
 	}
 
-	return 0, fmt.Errorf("[zever] position %s does not address a character in the file", pos)
+	return 0, fmt.Errorf("zever: position %s does not address a character in the file", pos)
 }

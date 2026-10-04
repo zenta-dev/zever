@@ -85,7 +85,7 @@ func runDoctor(args []string) error {
 	fs.Usage = func() { printDoctorUsage(fs) }
 
 	if err := fs.Parse(args); err != nil {
-		return err
+		return fmt.Errorf("zever doctor: %w", err)
 	}
 
 	return runDoctorWith(DoctorConfig{ConfigPath: *configPath, Strict: *strict})

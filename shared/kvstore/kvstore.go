@@ -37,11 +37,11 @@ var ErrInvalidInteger = errors.New("kvstore: invalid integer")
 
 // ErrUnsupportedType is returned when coerceValue or coerceTime encounters
 // a Go type it cannot convert.
-var ErrUnsupportedType = errors.New("unsupported type")
+var ErrUnsupportedType = errors.New("kvstore: unsupported type")
 
 // ErrLostUpdate is returned when AddDelta's UPDATE affects zero rows,
 // indicating a concurrent modification.
-var ErrLostUpdate = errors.New("lost update")
+var ErrLostUpdate = errors.New("kvstore: lost update")
 
 // kvRow is the key-value entity. Column order matches kvColumns: the
 // positional Scan must read them in exactly this order.

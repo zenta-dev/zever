@@ -566,7 +566,7 @@ func mapAndRedact(err error, apiKey string) error {
 	}
 
 	// Generic: return new error with redacted message, wrapping original if possible.
-	return errors.New(msg)
+	return fmt.Errorf("gemini: %s", msg)
 }
 
 func mapError(err error) error {
@@ -616,10 +616,10 @@ func mapAPIError(e genai.APIError) error {
 		return fmt.Errorf("%w: %s", ai.ErrModelNotFound, e.Message)
 	default:
 		if e.Message != "" {
-			return errors.New(e.Message)
+			return fmt.Errorf("gemini: %s", e.Message)
 		}
 
-		return errors.New(e.Error())
+		return fmt.Errorf("gemini: %s", e.Error())
 	}
 }
 

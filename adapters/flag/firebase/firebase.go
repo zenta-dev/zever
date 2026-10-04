@@ -223,4 +223,4 @@ var ErrNilJSONOut = errors.New("flag: firebase: json out is nil")
 
 // ErrNotAnInt marks unparseable integer flag values. Callers wrap it with
 // the key context.
-var ErrNotAnInt = errors.New("not an int")
+var ErrNotAnInt = errors.New("flag: firebase: not an int")

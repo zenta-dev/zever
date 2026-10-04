@@ -19,10 +19,10 @@ import (
 )
 
 // ErrCreateDir reports a failure to create a generated grammar's directory.
-var ErrCreateDir = errors.New("create directory failed")
+var ErrCreateDir = errors.New("gengrammar: create directory failed")
 
 // ErrWriteFile reports a failure to write a generated grammar file.
-var ErrWriteFile = errors.New("write file failed")
+var ErrWriteFile = errors.New("gengrammar: write file failed")
 
 func main() {
 	if err := run(); err != nil {

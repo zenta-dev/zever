@@ -21,13 +21,13 @@ import (
 const zeverPrefix = "github.com/zenta-dev/zever/"
 
 // ErrGoModEdit reports a failed `go mod edit -json` invocation.
-var ErrGoModEdit = errors.New("go mod edit failed")
+var ErrGoModEdit = errors.New("modgraph: go mod edit failed")
 
 // ErrParseGoMod reports unparsable `go mod edit -json` output.
-var ErrParseGoMod = errors.New("parse go mod edit output failed")
+var ErrParseGoMod = errors.New("modgraph: parse go mod edit output failed")
 
 // ErrEmptyModulePath reports `go mod edit -json` output with no module path.
-var ErrEmptyModulePath = errors.New("go mod edit output has empty module path")
+var ErrEmptyModulePath = errors.New("modgraph: go mod edit output has empty module path")
 
 // drift lists the require+replace entries a module's go.mod lacks.
 type drift struct {

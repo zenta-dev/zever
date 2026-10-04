@@ -228,7 +228,7 @@ func renderMessageBody(w *strings.Builder, owner, protoName, declName string, fi
 		if f.Type.Scalar == ir.TEnum && f.Type.EnumName == "" {
 			enumSrc, err := renderNestedEnum(f.Name, f.Type)
 			if err != nil {
-				return fmt.Errorf("%s: %w", declName, err)
+				return fmt.Errorf("proto: %s: %w", declName, err)
 			}
 
 			enums = append(enums, enumSrc)
@@ -312,7 +312,7 @@ func renderNestedEnum(name string, ft ir.FieldType) (string, error) {
 
 		if prior, ok := seen[valueName]; ok {
 			return "", fmt.Errorf(
-				"proto: enum value name %q generated from both %q and %q collide in enum %s",
+				"enum value name %q generated from both %q and %q collide in enum %s",
 				valueName, prior, v, typeName)
 		}
 

@@ -69,7 +69,7 @@ func buildCodeGeneratorRequest(protoFiles map[string][]byte) (*pluginpb.CodeGene
 
 	files, err := (&protocompile.Compiler{Resolver: resolver}).Compile(context.Background(), toGenerate...)
 	if err != nil {
-		return nil, fmt.Errorf("[protogogen] compile proto sources: %w", err)
+		return nil, fmt.Errorf("protogogen: compile proto sources: %w", err)
 	}
 
 	fileDescriptors := collectFileDescriptorsInDependencyOrder(files)

@@ -22,10 +22,10 @@ import (
 var toolArgsCodec = codec.JSONCodec[map[string]any]{}
 
 // ErrValueOutOfRange is returned when an API numeric value does not fit in an int.
-var ErrValueOutOfRange = errors.New("value out of int range")
+var ErrValueOutOfRange = errors.New("anthropic: value out of int range")
 
 // ErrModelRequired is returned when neither the call nor the adapter sets a model.
-var ErrModelRequired = errors.New("model is required")
+var ErrModelRequired = errors.New("anthropic: model is required")
 
 type adapter struct {
 	client *anthropic.Client
@@ -91,7 +91,7 @@ func redactURLError(err error) error {
 	if strings.Contains(strings.ToLower(errStr), "x-api-key") {
 		// replace value
 		errStr = "REDACTED"
-		return &url.Error{Op: ue.Op, URL: uStr, Err: errors.New(errStr)}
+		return &url.Error{Op: ue.Op, URL: uStr, Err: fmt.Errorf("anthropic: %s", errStr)}
 	}
 	// If URL itself contains api key pattern, ensure REDACTED
 	if strings.Contains(uStr, "REDACTED") {

@@ -758,7 +758,7 @@ const DefaultDBPath = "data/app.db"
 func Config() (*config.Config, error) {
 	cfg, err := config.Load("")
 	if err != nil {
-		return nil, fmt.Errorf("[app] load config: %w", err)
+		return nil, fmt.Errorf("app: load config: %w", err)
 	}
 
 	dbc := cfg.DB

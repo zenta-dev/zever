@@ -49,7 +49,7 @@ func Run(ctx context.Context, database db.DB) error {
 func ensureUser(ctx context.Context, database db.DB, id, email, name, role string) error {
 	_, ok, err := orm.From(gen.Users).Where(gen.UserCols.Email.Eq(email)).First(ctx, database)
 	if err != nil {
-		return fmt.Errorf("[seed] lookup user: %w", err)
+		return fmt.Errorf("seed: lookup user: %w", err)
 	}
 	if ok {
 		return nil
@@ -57,7 +57,7 @@ func ensureUser(ctx context.Context, database db.DB, id, email, name, role strin
 
 	hash, err := password.Hash(ctx, DemoPassword)
 	if err != nil {
-		return fmt.Errorf("[seed] hash password: %w", err)
+		return fmt.Errorf("seed: hash password: %w", err)
 	}
 
 	if err := orm.InsertInto(gen.Users).Values(
@@ -68,7 +68,7 @@ func ensureUser(ctx context.Context, database db.DB, id, email, name, role strin
 		orm.Set(gen.UserCols.PasswordHash, hash),
 		orm.Set(gen.UserCols.CreatedAt, time.Now().UTC()),
 	).Exec(ctx, database); err != nil {
-		return fmt.Errorf("[seed] insert user: %w", err)
+		return fmt.Errorf("seed: insert user: %w", err)
 	}
 	return nil
 }
@@ -76,7 +76,7 @@ func ensureUser(ctx context.Context, database db.DB, id, email, name, role strin
 func ensureCategory(ctx context.Context, database db.DB) error {
 	_, ok, err := orm.From(gen.Categories).Where(gen.CategoryCols.ID.Eq(CategoryID)).First(ctx, database)
 	if err != nil {
-		return fmt.Errorf("[seed] lookup category: %w", err)
+		return fmt.Errorf("seed: lookup category: %w", err)
 	}
 	if ok {
 		return nil
@@ -88,7 +88,7 @@ func ensureCategory(ctx context.Context, database db.DB) error {
 		orm.Set(gen.CategoryCols.Description, "Technology products"),
 		orm.Set(gen.CategoryCols.CreatedAt, time.Now().UTC()),
 	).Exec(ctx, database); err != nil {
-		return fmt.Errorf("[seed] insert category: %w", err)
+		return fmt.Errorf("seed: insert category: %w", err)
 	}
 	return nil
 }
@@ -96,7 +96,7 @@ func ensureCategory(ctx context.Context, database db.DB) error {
 func ensureProduct(ctx context.Context, database db.DB) error {
 	_, ok, err := orm.From(gen.Products).Where(gen.ProductCols.ID.Eq(ProductID)).First(ctx, database)
 	if err != nil {
-		return fmt.Errorf("[seed] lookup product: %w", err)
+		return fmt.Errorf("seed: lookup product: %w", err)
 	}
 	if ok {
 		return nil
@@ -111,7 +111,7 @@ func ensureProduct(ctx context.Context, database db.DB) error {
 		orm.Set(gen.ProductCols.Stock, int64(42)),
 		orm.Set(gen.ProductCols.CreatedAt, time.Now().UTC()),
 	).Exec(ctx, database); err != nil {
-		return fmt.Errorf("[seed] insert product: %w", err)
+		return fmt.Errorf("seed: insert product: %w", err)
 	}
 	return nil
 }
@@ -119,7 +119,7 @@ func ensureProduct(ctx context.Context, database db.DB) error {
 func ensurePost(ctx context.Context, database db.DB) error {
 	_, ok, err := orm.From(gen.Posts).Where(gen.PostCols.ID.Eq(PostID)).First(ctx, database)
 	if err != nil {
-		return fmt.Errorf("[seed] lookup post: %w", err)
+		return fmt.Errorf("seed: lookup post: %w", err)
 	}
 	if ok {
 		return nil
@@ -133,7 +133,7 @@ func ensurePost(ctx context.Context, database db.DB) error {
 		orm.Set(gen.PostCols.Published, true),
 		orm.Set(gen.PostCols.CreatedAt, time.Now().UTC()),
 	).Exec(ctx, database); err != nil {
-		return fmt.Errorf("[seed] insert post: %w", err)
+		return fmt.Errorf("seed: insert post: %w", err)
 	}
 	return nil
 }

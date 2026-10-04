@@ -58,7 +58,7 @@ func Run(ctx context.Context, database db.DB) error {
 func ensureUser(ctx context.Context, database db.DB) (string, error) {
 	existing, ok, err := orm.From(genapp.Users).Where(genapp.UserCols.Email.Eq(DemoEmail)).First(ctx, database)
 	if err != nil {
-		return "", fmt.Errorf("[seed] lookup user: %w", err)
+		return "", fmt.Errorf("seed: lookup user: %w", err)
 	}
 	if ok {
 		return existing.ID, nil
@@ -66,7 +66,7 @@ func ensureUser(ctx context.Context, database db.DB) (string, error) {
 
 	hash, err := password.Hash(ctx, DemoPassword)
 	if err != nil {
-		return "", fmt.Errorf("[seed] hash password: %w", err)
+		return "", fmt.Errorf("seed: hash password: %w", err)
 	}
 
 	id := uuid.NewString()
@@ -76,7 +76,7 @@ func ensureUser(ctx context.Context, database db.DB) (string, error) {
 		orm.Set(genapp.UserCols.PasswordHash, hash),
 		orm.Set(genapp.UserCols.CreatedAt, time.Now().UTC()),
 	).Exec(ctx, database); err != nil {
-		return "", fmt.Errorf("[seed] insert user: %w", err)
+		return "", fmt.Errorf("seed: insert user: %w", err)
 	}
 	return id, nil
 }
@@ -84,7 +84,7 @@ func ensureUser(ctx context.Context, database db.DB) (string, error) {
 func ensureNote(ctx context.Context, database db.DB, id, userID, title, body string, done bool, createdAt time.Time) error {
 	_, ok, err := orm.From(genapp.Notes).Where(genapp.NoteCols.ID.Eq(id)).First(ctx, database)
 	if err != nil {
-		return fmt.Errorf("[seed] lookup note: %w", err)
+		return fmt.Errorf("seed: lookup note: %w", err)
 	}
 	if ok {
 		return nil
@@ -98,7 +98,7 @@ func ensureNote(ctx context.Context, database db.DB, id, userID, title, body str
 		orm.Set(genapp.NoteCols.Done, done),
 		orm.Set(genapp.NoteCols.CreatedAt, createdAt),
 	).Exec(ctx, database); err != nil {
-		return fmt.Errorf("[seed] insert note: %w", err)
+		return fmt.Errorf("seed: insert note: %w", err)
 	}
 	return nil
 }

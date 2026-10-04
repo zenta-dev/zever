@@ -92,7 +92,7 @@ func renderRequestMessage(w *strings.Builder, s *ir.Service, r *ir.Operation, ct
 		if p.Type.Scalar == ir.TEnum {
 			enumSrc, err := renderNestedEnum(p.Name, p.Type)
 			if err != nil {
-				return fmt.Errorf("rpc %s.%s: %w", s.Name, r.Name, err)
+				return fmt.Errorf("proto: rpc %s.%s: %w", s.Name, r.Name, err)
 			}
 
 			enums = append(enums, enumSrc)

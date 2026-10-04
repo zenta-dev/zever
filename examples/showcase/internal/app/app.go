@@ -44,7 +44,7 @@ const DefaultDBPath = "data/showcase.db"
 func Config() (*config.Config, error) {
 	cfg, err := config.Load("")
 	if err != nil {
-		return nil, fmt.Errorf("[app] load config: %w", err)
+		return nil, fmt.Errorf("app: load config: %w", err)
 	}
 
 	if cfg.DB.Options.Path == "" {
@@ -63,7 +63,7 @@ func Config() (*config.Config, error) {
 	}
 
 	if len(cfg.Auth.Options.JWT.Secret) < 32 {
-		return nil, errors.New("[app] AUTH_JWT_SECRET missing or shorter than 32 bytes: set AUTH_JWT_SECRET to at least 32 bytes")
+		return nil, errors.New("app: AUTH_JWT_SECRET missing or shorter than 32 bytes: set AUTH_JWT_SECRET to at least 32 bytes")
 	}
 
 	return cfg, nil

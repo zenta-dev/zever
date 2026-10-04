@@ -97,7 +97,7 @@ func runDBRollback(args []string) error {
 	}
 
 	if err := fs.Parse(args); err != nil {
-		return err
+		return fmt.Errorf("zever db rollback: %w", err)
 	}
 
 	cfg := resolveRollbackConfig(*adapter, *dsn, *count, *dryRun)

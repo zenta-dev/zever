@@ -1027,7 +1027,7 @@ func TestMapError(t *testing.T) {
 
 	// Generic 500 with message
 	mapped = mapError(genai.APIError{Code: 500, Message: "oops"})
-	if mapped.Error() != "oops" {
+	if mapped.Error() != "gemini: oops" {
 		t.Errorf("500 msg %q", mapped.Error())
 	}
 
@@ -1156,7 +1156,7 @@ func TestMapAPIError(t *testing.T) {
 	// 500 with message
 	e := genai.APIError{Code: 500, Message: "oops"}
 	mapped := mapAPIError(e)
-	if mapped.Error() != "oops" {
+	if mapped.Error() != "gemini: oops" {
 		t.Errorf("500 msg %q", mapped.Error())
 	}
 

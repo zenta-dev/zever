@@ -112,7 +112,7 @@ func discoverProjectFile() (string, error) {
 		}
 
 		if err != nil && !os.IsNotExist(err) {
-			return "", fmt.Errorf("[zever] stat %q: %w", name, err)
+			return "", fmt.Errorf("zever: stat %q: %w", name, err)
 		}
 	}
 
@@ -122,7 +122,7 @@ func discoverProjectFile() (string, error) {
 func decodeProjectFile(path string) (ProjectConfig, error) {
 	data, err := os.ReadFile(path) //nolint:gosec // path is a developer-supplied config location, not user input
 	if err != nil {
-		return ProjectConfig{}, fmt.Errorf("[zever] read %q: %w", path, err)
+		return ProjectConfig{}, fmt.Errorf("zever: read %q: %w", path, err)
 	}
 
 	var file projectFile
@@ -130,14 +130,14 @@ func decodeProjectFile(path string) (ProjectConfig, error) {
 	switch ext := strings.ToLower(filepath.Ext(path)); ext {
 	case ".yaml", ".yml":
 		if err := yaml.Unmarshal(data, &file); err != nil {
-			return ProjectConfig{}, fmt.Errorf("[zever] parse yaml %q: %w", path, err)
+			return ProjectConfig{}, fmt.Errorf("zever: parse yaml %q: %w", path, err)
 		}
 	case ".json":
 		if err := json.Unmarshal(data, &file); err != nil {
-			return ProjectConfig{}, fmt.Errorf("[zever] parse json %q: %w", path, err)
+			return ProjectConfig{}, fmt.Errorf("zever: parse json %q: %w", path, err)
 		}
 	default:
-		return ProjectConfig{}, fmt.Errorf("[zever] %q: unsupported config file extension %q", path, ext)
+		return ProjectConfig{}, fmt.Errorf("zever: %q: unsupported config file extension %q", path, ext)
 	}
 
 	return file.Project, nil

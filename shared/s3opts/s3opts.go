@@ -17,12 +17,17 @@ import (
 // DefaultRegion is the region used when Options.Region is empty.
 const DefaultRegion = "us-east-1"
 
-var (
-	ErrMissingBucket      = errors.New("s3opts: bucket is required")
-	ErrMissingCredentials = errors.New("s3opts: access key and secret are required")
-	ErrInvalidEndpoint    = errors.New("s3opts: invalid endpoint")
-	ErrInvalidRegion      = errors.New("s3opts: invalid region")
-)
+// ErrMissingBucket indicates a required bucket is missing.
+var ErrMissingBucket = errors.New("s3opts: bucket is required")
+
+// ErrMissingCredentials indicates required credentials are missing.
+var ErrMissingCredentials = errors.New("s3opts: credentials are required")
+
+// ErrInvalidEndpoint indicates an invalid endpoint URL.
+var ErrInvalidEndpoint = errors.New("s3opts: invalid endpoint")
+
+// ErrInvalidRegion indicates an invalid region.
+var ErrInvalidRegion = errors.New("s3opts: invalid region")
 
 // Options holds the S3 endpoint, region, bucket, and static credentials.
 type Options struct {
