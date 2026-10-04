@@ -2,11 +2,15 @@ package ormdrill
 
 import (
 	"context"
+	"errors"
 	"fmt"
 
 	"github.com/zenta-dev/zever/core/db"
 	"github.com/zenta-dev/zever/orm"
 )
+
+// ErrQueryLogger indicates the query logger demo failed.
+var ErrQueryLogger = errors.New("query logger")
 
 // DemoQueryLogger installs orm.SetQueryLogger around one query and prints the
 // rendered SQL plus bound args. The hook runs synchronously on the executing
@@ -24,7 +28,7 @@ func DemoQueryLogger(ctx context.Context, conn db.DB) error {
 
 	n, err := orm.From(Orders).Where(OrderCols.AmountCents.Gt(1000)).Count(ctx, conn)
 	if err != nil {
-		return fmt.Errorf("captured count: %w", err)
+		return fmt.Errorf("ormdrill: %w: captured count: %w", ErrQueryLogger, err)
 	}
 
 	for _, q := range captured {

@@ -24,6 +24,13 @@ import (
 	"github.com/zenta-dev/zever/orm"
 )
 
+// ErrInsufficientFunds indicates a wallet lacks the balance for a transfer.
+var ErrInsufficientFunds = errors.New("insufficient funds")
+
+// errSimulatedFailure marks the deliberate post-write failure in the nested
+// savepoint demo.
+var errSimulatedFailure = errors.New("simulated failure")
+
 func main() {
 	ctx := context.Background()
 
@@ -125,11 +132,11 @@ func transfer(ctx context.Context, exec db.DB, fromID, toID string, amount int64
 		}
 
 		if !ok {
-			return fmt.Errorf("wallet %s not found", fromID)
+			return fmt.Errorf("transactions: wallet %s not found", fromID)
 		}
 
 		if from.BalanceCents < amount {
-			return fmt.Errorf("insufficient funds: %s has %d cents, needs %d", from.Owner, from.BalanceCents, amount)
+			return fmt.Errorf("transactions: %w: %s has %d cents, needs %d", ErrInsufficientFunds, from.Owner, from.BalanceCents, amount)
 		}
 
 		to, ok, err := orm.From(gen.Wallets).Where(gen.WalletCols.ID.Eq(toID)).First(ctx, tx)
@@ -138,7 +145,7 @@ func transfer(ctx context.Context, exec db.DB, fromID, toID string, amount int64
 		}
 
 		if !ok {
-			return fmt.Errorf("wallet %s not found", toID)
+			return fmt.Errorf("transactions: wallet %s not found", toID)
 		}
 
 		if _, err := orm.UpdateTable(gen.Wallets).
@@ -168,7 +175,7 @@ func transfer(ctx context.Context, exec db.DB, fromID, toID string, amount int64
 		}
 
 		if note == "simulated-failure" {
-			return errors.New("simulated failure after debit, transfer row and credit")
+			return fmt.Errorf("transactions: simulated failure after debit, transfer row and credit: %w", errSimulatedFailure)
 		}
 
 		return nil

@@ -5,6 +5,7 @@ package main
 import (
 	"context"
 	"encoding/json"
+	"errors"
 	"fmt"
 	"os"
 
@@ -13,6 +14,9 @@ import (
 	"github.com/zenta-dev/zever/examples/sms"
 	"github.com/zenta-dev/zever/examples/sms/stub"
 )
+
+// ErrPluginConfig indicates a missing or malformed plugin configuration entry.
+var ErrPluginConfig = errors.New("plugin config")
 
 // pluginName is the cfg.Plugins key and container plugin name.
 const pluginName = "sms"
@@ -27,20 +31,20 @@ func run(ctx context.Context) error {
 	}
 
 	if err := stub.Register(); err != nil {
-		return fmt.Errorf("register sms stub: %w", err)
+		return fmt.Errorf("sms: register stub: %w", err)
 	}
 
 	if err := container.RegisterPlugin[sms.SMS](pluginName, container.PluginAPIVersion, func(cfg *config.Config) (sms.SMS, error) {
 		entry, ok := cfg.Plugins[pluginName]
 		if !ok {
-			return nil, fmt.Errorf("sms plugin: missing plugins[%q] entry", pluginName)
+			return nil, fmt.Errorf("sms: %w: missing plugins[%q] entry", ErrPluginConfig, pluginName)
 		}
 
 		var opts sms.Options
 
 		if len(entry.Options) > 0 {
 			if err := json.Unmarshal(entry.Options, &opts); err != nil {
-				return nil, fmt.Errorf("sms plugin: decode options: %w", err)
+				return nil, fmt.Errorf("sms: decode options: %w", err)
 			}
 		}
 
@@ -51,22 +55,22 @@ func run(ctx context.Context) error {
 
 		return sms.Open(adapter, opts)
 	}); err != nil {
-		return fmt.Errorf("register sms plugin: %w", err)
+		return fmt.Errorf("sms: register plugin: %w", err)
 	}
 
 	c := container.New(cfg)
 
 	svc, err := container.Resolve[sms.SMS](c, pluginName)
 	if err != nil {
-		return fmt.Errorf("resolve sms plugin: %w", err)
+		return fmt.Errorf("sms: resolve plugin: %w", err)
 	}
 
 	if err := svc.Send(ctx, "+15550001", "hello from sms plugin"); err != nil {
-		return fmt.Errorf("sms send: %w", err)
+		return fmt.Errorf("sms: send: %w", err)
 	}
 
 	if err := svc.Close(ctx); err != nil {
-		return fmt.Errorf("sms close: %w", err)
+		return fmt.Errorf("sms: close: %w", err)
 	}
 
 	fmt.Println("sms sent via stub plugin")

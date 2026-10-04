@@ -2,11 +2,18 @@ package ormdrill
 
 import (
 	"context"
+	"errors"
 	"fmt"
 
 	"github.com/zenta-dev/zever/core/db"
 	"github.com/zenta-dev/zever/orm"
 )
+
+// ErrJoin3 indicates the three-way join demo failed.
+var ErrJoin3 = errors.New("join3")
+
+// ErrJoinedUpdate indicates the joined update demo failed.
+var ErrJoinedUpdate = errors.New("joined update")
 
 // DemoJoinOn3 runs one INNER three-way join -- widgets -> orders ->
 // shipments -- through orm.JoinOn3, filtering on the right tables with
@@ -23,7 +30,7 @@ func DemoJoinOn3(ctx context.Context, conn db.DB) error {
 		OrderByRight(OrderCols.ID.Asc()).
 		All(ctx, conn)
 	if err != nil {
-		return fmt.Errorf("join3: %w", err)
+		return fmt.Errorf("ormdrill: %w: %w", ErrJoin3, err)
 	}
 
 	for _, r := range rows {
@@ -76,16 +83,16 @@ func DemoJoinedUpdate(ctx context.Context, conn db.DB) error {
 		Set(orm.Set(WidgetCols.PriceCents, 1299)).
 		Exec(ctx, conn)
 	if err != nil {
-		return fmt.Errorf("joined update: %w", err)
+		return fmt.Errorf("ormdrill: %w: %w", ErrJoinedUpdate, err)
 	}
 
 	if n != 5 {
-		return fmt.Errorf("joined update affected %d rows, want 5 (widgets with orders)", n)
+		return fmt.Errorf("ormdrill: %w: affected %d rows, want 5 (widgets with orders)", ErrJoinedUpdate, n)
 	}
 
 	count, err := orm.From(Widgets).Where(WidgetCols.PriceCents.Eq(1299)).Count(ctx, conn)
 	if err != nil {
-		return fmt.Errorf("count updated widgets: %w", err)
+		return fmt.Errorf("ormdrill: count updated widgets: %w", err)
 	}
 
 	fmt.Printf("  %d widgets affected (the 5 with orders); now priced at 1299: count = %d\n\n", n, count)

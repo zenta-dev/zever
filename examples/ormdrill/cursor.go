@@ -10,6 +10,12 @@ import (
 	"github.com/zenta-dev/zever/orm"
 )
 
+// ErrKeysetPage indicates a keyset pagination query failed.
+var ErrKeysetPage = errors.New("keyset page")
+
+// ErrOffsetPage indicates an offset pagination query failed.
+var ErrOffsetPage = errors.New("offset page")
+
 // DemoCursorPagination walks all orders with a typed CursorKey, proves the
 // Encode -> DecodeCursor round-trip (and that a token cannot be replayed
 // against the wrong column), then shows the OffsetPage number-based
@@ -35,7 +41,7 @@ func DemoCursorPagination(ctx context.Context, conn db.DB) error {
 
 		page, err := q.All(ctx, conn)
 		if err != nil {
-			return fmt.Errorf("keyset page %d: %w", pageNo, err)
+			return fmt.Errorf("ormdrill: %w %d: %w", ErrKeysetPage, pageNo, err)
 		}
 
 		if len(page) == 0 {
@@ -59,16 +65,16 @@ func DemoCursorPagination(ctx context.Context, conn db.DB) error {
 
 		token, err := next.Encode()
 		if err != nil {
-			return fmt.Errorf("encode cursor: %w", err)
+			return fmt.Errorf("ormdrill: encode cursor: %w", err)
 		}
 
 		decoded, ok, err := orm.DecodeCursor(token, OrderCols.CreatedAt)
 		if err != nil {
-			return fmt.Errorf("decode cursor: %w", err)
+			return fmt.Errorf("ormdrill: decode cursor: %w", err)
 		}
 
 		if !ok || decoded.Value() != next.Value() || decoded.Descending() != next.Descending() {
-			return fmt.Errorf("cursor round-trip mismatch: %+v vs %+v", decoded, next)
+			return fmt.Errorf("ormdrill: cursor round-trip mismatch: %+v vs %+v", decoded, next)
 		}
 
 		cursor = decoded
@@ -77,7 +83,7 @@ func DemoCursorPagination(ctx context.Context, conn db.DB) error {
 		// column is a typed error, never a silent wrong page.
 		_, _, wrongColErr := orm.DecodeCursor(token, OrderCols.ID)
 		if wrongColErr == nil {
-			return errors.New("expected wrong-column cursor decode to fail")
+			return fmt.Errorf("ormdrill: expected wrong-column cursor decode to fail")
 		}
 
 		fmt.Printf("  next cursor %s; replay against OrderCols.ID rejected: %v\n", token, wrongColErr)
@@ -90,12 +96,12 @@ func DemoCursorPagination(ctx context.Context, conn db.DB) error {
 	// The number-based alternative: LIMIT pageSize OFFSET (page-1)*pageSize.
 	paged, err := orm.OffsetPage(orm.From(Orders).OrderBy(OrderCols.CreatedAt.Desc()), 2, pageSize)
 	if err != nil {
-		return fmt.Errorf("offset page: %w", err)
+		return fmt.Errorf("ormdrill: %w: %w", ErrOffsetPage, err)
 	}
 
 	rows, err := paged.All(ctx, conn)
 	if err != nil {
-		return fmt.Errorf("offset page all: %w", err)
+		return fmt.Errorf("ormdrill: %w all: %w", ErrOffsetPage, err)
 	}
 
 	ids := make([]string, len(rows))

@@ -9,6 +9,15 @@ import (
 	"github.com/zenta-dev/zever/orm"
 )
 
+// ErrPreload indicates the preload demo failed.
+var ErrPreload = errors.New("preload")
+
+// ErrRetryTx indicates the retry transaction demo failed.
+var ErrRetryTx = errors.New("retry tx")
+
+// ErrFirstOrErr indicates the FirstOrErr demo failed.
+var ErrFirstOrErr = errors.New("firstOrErr")
+
 // DemoPreload fetches every widget and attaches its orders via orm.Preload in
 // exactly two queries regardless of the row count. The query logger installed
 // around the call proves the "2 queries" claim.
@@ -31,11 +40,11 @@ func DemoPreload(ctx context.Context, conn db.DB) error {
 	restore()
 
 	if err != nil {
-		return fmt.Errorf("preload: %w", err)
+		return fmt.Errorf("ormdrill: %w: %w", ErrPreload, err)
 	}
 
 	if queries != 2 {
-		return fmt.Errorf("preload ran %d queries, want exactly 2", queries)
+		return fmt.Errorf("ormdrill: %w: ran %d queries, want exactly 2", ErrPreload, queries)
 	}
 
 	fmt.Printf("  %d queries (parents all + one FK-IN fetch)\n", queries)
@@ -73,13 +82,13 @@ func DemoRetryTx(ctx context.Context, conn db.DB) error {
 		return insert.Exec(ctx, tx)
 	})
 	if err != nil {
-		return fmt.Errorf("retry tx: %w", err)
+		return fmt.Errorf("ormdrill: %w: %w", ErrRetryTx, err)
 	}
 
 	// The whole point of the exercise: the write survived the transaction.
 	shipment, err := orm.From(Shipments).Where(ShipmentCols.ID.Eq("s99")).FirstOrErr(ctx, conn)
 	if err != nil {
-		return fmt.Errorf("read back retried shipment: %w", err)
+		return fmt.Errorf("ormdrill: %w: read back retried shipment: %w", ErrRetryTx, err)
 	}
 
 	fmt.Printf("  committed shipment %s for order %s (%s %s)\n", shipment.ID, shipment.OrderID, shipment.Carrier, shipment.Tracking)
@@ -98,14 +107,14 @@ func DemoFirstOrErr(ctx context.Context, conn db.DB) error {
 
 	w, err := orm.From(Widgets).Where(WidgetCols.ID.Eq("w01")).FirstOrErr(ctx, conn)
 	if err != nil {
-		return fmt.Errorf("firstOrErr hit: %w", err)
+		return fmt.Errorf("ormdrill: %w hit: %w", ErrFirstOrErr, err)
 	}
 
 	fmt.Printf("  hit: %s (%s, %d cents)\n", w.ID, w.Name, w.PriceCents)
 
 	_, err = orm.From(Widgets).Where(WidgetCols.ID.Eq("w99")).FirstOrErr(ctx, conn)
 	if err == nil {
-		return errors.New("expected FirstOrErr miss error, got nil")
+		return fmt.Errorf("ormdrill: %w: expected miss error, got nil", ErrFirstOrErr)
 	}
 
 	fmt.Printf("  miss: %v\n", err)

@@ -2,12 +2,19 @@ package ormdrill
 
 import (
 	"context"
+	"errors"
 	"fmt"
 	"strconv"
 
 	"github.com/zenta-dev/zever/core/db"
 	"github.com/zenta-dev/zever/orm"
 )
+
+// ErrProjection indicates the projection demo failed.
+var ErrProjection = errors.New("projection")
+
+// ErrNullsOrdering indicates the NULLS ordering demo failed.
+var ErrNullsOrdering = errors.New("nulls ordering")
 
 // DemoScalarExpr roots COALESCE/NULLIF/LOWER/UPPER/TRIM/LENGTH/CASE
 // expressions into WHERE predicates and counts the matches. The expression
@@ -19,7 +26,7 @@ func DemoScalarExpr(ctx context.Context, conn db.DB) error {
 	countWhere := func(label string, p orm.Predicate[Widget]) error {
 		n, err := orm.From(Widgets).Where(p).Count(ctx, conn)
 		if err != nil {
-			return fmt.Errorf("%s: %w", label, err)
+			return fmt.Errorf("ormdrill: %s: %w", label, err)
 		}
 
 		fmt.Printf("  %-38s = %d\n", label, n)
@@ -96,7 +103,7 @@ func DemoProjection(ctx context.Context, conn db.DB) error {
 			return nil
 		})
 	if err != nil {
-		return fmt.Errorf("projection All: %w", err)
+		return fmt.Errorf("ormdrill: %w All: %w", ErrProjection, err)
 	}
 
 	fmt.Printf("  projected %d widgets", len(views))
@@ -128,7 +135,7 @@ func DemoProjection(ctx context.Context, conn db.DB) error {
 		).
 		First(ctx, conn, &firstID, &firstAmount)
 	if err != nil {
-		return fmt.Errorf("projection First: %w", err)
+		return fmt.Errorf("ormdrill: %w First: %w", ErrProjection, err)
 	}
 
 	amount := "NULL"
@@ -151,7 +158,7 @@ func DemoNullsOrdering(ctx context.Context, conn db.DB) error {
 		OrderBy(WidgetCols.Note.Asc().NullsFirst(), WidgetCols.ID.Asc()).
 		All(ctx, conn)
 	if err != nil {
-		return fmt.Errorf("nulls first: %w", err)
+		return fmt.Errorf("ormdrill: %w first: %w", ErrNullsOrdering, err)
 	}
 
 	fmt.Print("  NULLS FIRST:")
@@ -166,7 +173,7 @@ func DemoNullsOrdering(ctx context.Context, conn db.DB) error {
 		OrderBy(WidgetCols.Note.Asc().NullsLast(), WidgetCols.ID.Asc()).
 		All(ctx, conn)
 	if err != nil {
-		return fmt.Errorf("nulls last: %w", err)
+		return fmt.Errorf("ormdrill: %w last: %w", ErrNullsOrdering, err)
 	}
 
 	fmt.Print("  NULLS LAST: ")
