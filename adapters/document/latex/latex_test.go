@@ -26,24 +26,24 @@ const (
 	fakeTexArgs    = "#!/bin/sh\nprintf '%%PDF-1.4 fake\\n' > doc.pdf\necho \"$@\" >> \"$ARGSLOG\"\nexit 0\n"
 )
 
-func stubBin(t *testing.T, name, body string) {
-	t.Helper()
-	dir := t.TempDir()
+func stubBin(tb testing.TB, name, body string) {
+	tb.Helper()
+	dir := tb.TempDir()
 	path := filepath.Join(dir, name)
 	if err := os.WriteFile(path, []byte(body), 0o600); err != nil {
-		t.Fatal(err)
+		tb.Fatal(err)
 	}
 	if err := os.Chmod(path, 0o755); err != nil {
-		t.Fatal(err)
+		tb.Fatal(err)
 	}
-	t.Setenv("PATH", dir+string(os.PathListSeparator)+os.Getenv("PATH"))
+	tb.Setenv("PATH", dir+string(os.PathListSeparator)+os.Getenv("PATH"))
 }
 
-func mustOpen(t *testing.T, o document.Options) document.Document {
-	t.Helper()
+func mustOpen(tb testing.TB, o document.Options) document.Document {
+	tb.Helper()
 	d, err := New(o)
 	if err != nil {
-		t.Fatalf("New() err = %v", err)
+		tb.Fatalf("New() err = %v", err)
 	}
 	return d
 }
