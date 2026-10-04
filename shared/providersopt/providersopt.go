@@ -9,12 +9,16 @@ package providersopt
 
 import (
 	"errors"
+	"fmt"
 	"net/url"
 	"time"
 )
 
 // DefaultHTTPTimeout is the default HTTP timeout for provider calls.
 const DefaultHTTPTimeout = 30 * time.Second
+
+// ErrInvalidEndpoint is returned when a provider endpoint URL is not valid.
+var ErrInvalidEndpoint = errors.New("endpoint must be a valid url")
 
 // PaddleSandboxBaseURL is the Paddle API base URL for the sandbox
 // environment. It mirrors paddle.SandboxBaseURL without importing the SDK.
@@ -51,17 +55,17 @@ func ValidateEndpoint(endpoint string) []error {
 
 	u, err := url.Parse(endpoint)
 	if err != nil {
-		return []error{errors.New("endpoint must be a valid url")}
+		return []error{fmt.Errorf("providersopt: %w", ErrInvalidEndpoint)}
 	}
 
 	var errs []error
 
 	if u.Scheme == "" {
-		errs = append(errs, errors.New("endpoint must include scheme"))
+		errs = append(errs, fmt.Errorf("providersopt: endpoint must include scheme: %w", ErrInvalidEndpoint))
 	}
 
 	if u.Host == "" {
-		errs = append(errs, errors.New("endpoint must include host"))
+		errs = append(errs, fmt.Errorf("providersopt: endpoint must include host: %w", ErrInvalidEndpoint))
 	}
 
 	return errs
