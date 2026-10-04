@@ -142,7 +142,7 @@ func (d *driver) reloadIfChanged() {
 
 	fi, err := os.Stat(path)
 	if err != nil {
-		d.rateLimitedLog("flag: static: stat %s failed: %v; keeping last-good flags", path, err)
+		d.rateLimitedLog("static: stat %s failed: %v; keeping last-good flags", path, err)
 		return
 	}
 
@@ -157,7 +157,7 @@ func (d *driver) reloadIfChanged() {
 
 	data, err := os.ReadFile(path)
 	if err != nil {
-		d.rateLimitedLog("flag: static: read %s failed: %v; keeping last-good flags", path, err)
+		d.rateLimitedLog("static: read %s failed: %v; keeping last-good flags", path, err)
 		return
 	}
 
@@ -182,7 +182,7 @@ func (d *driver) reloadIfChanged() {
 
 	var flags map[string]any
 	if err := json.Unmarshal(data, &flags); err != nil {
-		d.rateLimitedLog("flag: static: reload of %s failed: %v; keeping last-good flags", path, err)
+		d.rateLimitedLog("static: reload of %s failed: %v; keeping last-good flags", path, err)
 		return
 	}
 	if flags == nil {
@@ -243,11 +243,11 @@ func (d *driver) Bool(ctx context.Context, key string, fallback bool) (bool, err
 	case string:
 		p, perr := parseStrictBool(b)
 		if perr != nil {
-			return fallback, fmt.Errorf("flag: static: key %q is not a bool: %w", key, perr)
+			return fallback, fmt.Errorf("static: key %q is not a bool: %w", key, perr)
 		}
 		return p, nil
 	default:
-		return fallback, fmt.Errorf("flag: static: key %q is not a bool", key)
+		return fallback, fmt.Errorf("static: key %q is not a bool", key)
 	}
 }
 
@@ -276,7 +276,7 @@ func (d *driver) String(ctx context.Context, key string, fallback string) (strin
 	case bool:
 		return strconv.FormatBool(s), nil
 	default:
-		return fallback, fmt.Errorf("flag: static: key %q is not a string", key)
+		return fallback, fmt.Errorf("static: key %q is not a string", key)
 	}
 }
 
@@ -304,11 +304,11 @@ func (d *driver) Int(ctx context.Context, key string, fallback int) (int, error)
 	case string:
 		f, ferr := strconv.ParseFloat(n, 64)
 		if ferr != nil {
-			return fallback, fmt.Errorf("flag: static: key %q is not an int", key)
+			return fallback, fmt.Errorf("static: key %q is not an int", key)
 		}
 		return floatToInt(key, fallback, f)
 	default:
-		return fallback, fmt.Errorf("flag: static: key %q is not an int", key)
+		return fallback, fmt.Errorf("static: key %q is not an int", key)
 	}
 }
 
@@ -323,7 +323,7 @@ func (d *driver) JSON(ctx context.Context, key string, out any, fallback any) er
 		return fmt.Errorf("static: %w", err)
 	}
 	if out == nil {
-		return fmt.Errorf("flag: static: key %q: nil out", key)
+		return fmt.Errorf("static: key %q: nil out", key)
 	}
 
 	v, ok := d.lookup(key)
@@ -333,10 +333,10 @@ func (d *driver) JSON(ctx context.Context, key string, out any, fallback any) er
 		}
 		b, err := json.Marshal(fallback)
 		if err != nil {
-			return fmt.Errorf("flag: static: key %q: %w", key, err)
+			return fmt.Errorf("static: key %q: %w", key, err)
 		}
 		if err := json.Unmarshal(b, out); err != nil {
-			return fmt.Errorf("flag: static: key %q: %w", key, err)
+			return fmt.Errorf("static: key %q: %w", key, err)
 		}
 		return nil
 	}
@@ -348,11 +348,11 @@ func (d *driver) JSON(ctx context.Context, key string, out any, fallback any) er
 		var err error
 		b, err = json.Marshal(v)
 		if err != nil {
-			return fmt.Errorf("flag: static: key %q: %w", key, err)
+			return fmt.Errorf("static: key %q: %w", key, err)
 		}
 	}
 	if err := json.Unmarshal(b, out); err != nil {
-		return fmt.Errorf("flag: static: key %q: %w", key, err)
+		return fmt.Errorf("static: key %q: %w", key, err)
 	}
 	return nil
 }
@@ -377,7 +377,7 @@ func parseStrictBool(s string) (bool, error) {
 
 // ErrStrictBool marks strings outside the true/false pair. Callers wrap
 // it with the key context.
-var ErrStrictBool = errors.New("flag: static: strict bool parse failed")
+var ErrStrictBool = errors.New("static: strict bool parse failed")
 
 // floatToInt converts an exact integer float to int, rejecting
 // fractions, imprecise magnitudes (>= 2^53), and out-of-range values.
@@ -385,16 +385,16 @@ var ErrStrictBool = errors.New("flag: static: strict bool parse failed")
 // fraction, host-range overflow, then precision.
 func floatToInt(key string, fallback int, n float64) (int, error) {
 	if math.IsNaN(n) || math.IsInf(n, 0) {
-		return fallback, fmt.Errorf("flag: static: key %q is not an int", key)
+		return fallback, fmt.Errorf("static: key %q is not an int", key)
 	}
 	if math.Trunc(n) != n {
-		return fallback, fmt.Errorf("flag: static: key %q is not an int", key)
+		return fallback, fmt.Errorf("static: key %q is not an int", key)
 	}
 	if n < float64(minInt) || n > float64(maxInt) {
-		return fallback, fmt.Errorf("flag: static: key %q overflows int", key)
+		return fallback, fmt.Errorf("static: key %q overflows int", key)
 	}
 	if math.Abs(n) >= precisionLimit {
-		return fallback, fmt.Errorf("flag: static: key %q is not an int", key)
+		return fallback, fmt.Errorf("static: key %q is not an int", key)
 	}
 	return int(n), nil
 }

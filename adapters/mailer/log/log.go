@@ -32,7 +32,7 @@ func New(opts mailer.Options) (mailer.Mailer, error) {
 // A nil w defaults to os.Stdout.
 func NewWithWriter(opts mailer.Options, w io.Writer) (mailer.Mailer, error) {
 	if err := opts.Validate(); err != nil {
-		return nil, fmt.Errorf("mailer: log: %w", err)
+		return nil, fmt.Errorf("log: %w", err)
 	}
 	if w == nil {
 		w = os.Stdout
@@ -93,24 +93,24 @@ func (c *checker) Send(ctx context.Context, msg *mailer.Mail) error {
 		return err
 	}
 	if err := msg.From.Validate(); err != nil {
-		return fmt.Errorf("mailer: log invalid from: %w", err)
+		return fmt.Errorf("log: invalid from: %w", err)
 	}
 	if len(msg.To)+len(msg.Cc)+len(msg.Bcc) == 0 {
 		return mailer.ErrNoRecipients
 	}
 	for i, a := range msg.To {
 		if err := a.Validate(); err != nil {
-			return fmt.Errorf("mailer: log invalid to[%d]: %w", i, err)
+			return fmt.Errorf("log: invalid to[%d]: %w", i, err)
 		}
 	}
 	for i, a := range msg.Cc {
 		if err := a.Validate(); err != nil {
-			return fmt.Errorf("mailer: log invalid cc[%d]: %w", i, err)
+			return fmt.Errorf("log: invalid cc[%d]: %w", i, err)
 		}
 	}
 	for i, a := range msg.Bcc {
 		if err := a.Validate(); err != nil {
-			return fmt.Errorf("mailer: log invalid bcc[%d]: %w", i, err)
+			return fmt.Errorf("log: invalid bcc[%d]: %w", i, err)
 		}
 	}
 

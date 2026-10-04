@@ -95,7 +95,7 @@ func TestLoggerReceivesReloadFailure(t *testing.T) {
 
 	caplog := &captureLogger{}
 	d := &driver{flags: map[string]any{}, logger: caplog}
-	d.rateLimitedLog("flag: static: stat %s failed: %v; keeping last-good flags", "f", "boom")
+	d.rateLimitedLog("static: stat %s failed: %v; keeping last-good flags", "f", "boom")
 
 	if !caplog.contains("boom") {
 		t.Fatalf("expected injected logger to receive reload failure, got %v", caplog.msgs)
