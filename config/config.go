@@ -138,8 +138,13 @@ func serviceToMap[T any](o T) map[string]any {
 // mutating them does not affect the Config.
 func (c *Config) RedactedServices() map[string]ServiceConfig {
 	out := make(map[string]ServiceConfig, 34+len(c.Plugins))
+	// The option maps below are freshly built by serviceToMap and owned
+	// by the result, so redaction runs in place: no deep copy is needed
+	// to keep the Config untouched.
 	put := func(name, adapter string, opts any) {
-		out[name] = ServiceConfig{Adapter: adapter, Options: Redact(serviceToMap(opts))}
+		m := serviceToMap(opts)
+		redactMap(m)
+		out[name] = ServiceConfig{Adapter: adapter, Options: m}
 	}
 	put("ai", c.AI.Adapter, c.AI.Options)
 	put("analytics", c.Analytics.Adapter, c.Analytics.Options)
@@ -188,7 +193,8 @@ func (c *Config) RedactedServices() map[string]ServiceConfig {
 		if m == nil {
 			m = map[string]any{}
 		}
-		out[name] = ServiceConfig{Adapter: svc.Adapter, Options: Redact(m)}
+		redactMap(m)
+		out[name] = ServiceConfig{Adapter: svc.Adapter, Options: m}
 	}
 	return out
 }
