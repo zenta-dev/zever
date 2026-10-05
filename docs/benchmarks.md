@@ -326,10 +326,32 @@ The scratch rows cut `BenchmarkClosest` from 176 to 1 alloc/op (-99.4%) and
 kernel drops 9 to 1 allocs/op (832 to 240 B/op), ns/op within noise. The
 remaining alloc is the single scratch slice per `closest` call.
 
+Vectorstore brute-force query (`adapters/vectorstore/db`, sqlite leg, 2026-10-05).
+256-row scan with topK=10. `decodeRow` used to JSON-decode metadata for every
+scanned row, but only the topK survivors leave the bounded heap (~246 wasted
+decodes per query). The heap item now carries the raw metadata blob,
+`heapToSorted` decodes metadata for the topK survivors only, and the heap is
+preallocated with a bounded constant capacity. "before" is the per-row decode
+path. Medians
+of 10 runs, cpu=12.
+
+| Benchmark | ns/op | B/op | allocs/op |
+| --- | --- | --- | --- |
+| BenchmarkQuery before | 506,500 | 181,030 | 4,919 |
+| BenchmarkQuery after | 260,500 | 84,930 | 3,439 |
+
+Lazy decode cuts allocs/op ~30% (4,919 to 3,439) and ns/op ~49% (506.5µs to
+260.5µs): each skipped decode was a `map[string]any` plus a JSON parse, and
+the decode dominated the scan. B/op falls ~53% (176.8 KiB to 82.9 KiB).
+Semantic note: corrupt metadata in a row that does not survive topK no longer
+fails the query (`TestEdgeQuery_corruptMetadataBelowTopK` documents this); a
+surviving row with corrupt metadata still fails.
+
 Reproduce:
 
 ```
 go test -run '^$' -bench='BenchmarkClosest|BenchmarkDamerauLevenshtein' -benchmem -count=10 ./cmd/zever/
+go test -run '^$' -bench='BenchmarkQuery$' -benchmem -count=10 ./adapters/vectorstore/db/
 ```
 
 ## Commands
@@ -411,6 +433,9 @@ Round-trip coverage (in-process backends):
 - Job worker: `BenchmarkWorkerEmptyPoll` (`core/job/worker_bench_test.go`)
   -- the first empty poll in a run (attempt 0, wait 0) with a reused timer,
   so the timer allocation shows up directly in allocs/op.
+- Vectorstore: `BenchmarkQuery` (`adapters/vectorstore/db/pgvector_bench_test.go`)
+  -- 256-row brute-force sqlite scan through a bounded top-K heap, metadata
+  decoded for survivors only.
 
 Render-coverage (ORM):
 

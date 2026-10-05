@@ -579,7 +579,7 @@ func (d *driver) querySQLite(ctx context.Context, embedding []float32, topK int)
 		return nil, err
 	}
 
-	return heapToSorted(h), nil
+	return heapToSorted(h)
 }
 
 // decodeHitMeta decodes one match's stored metadata JSON. Postgres cells
@@ -626,7 +626,7 @@ func (d *driver) validateQueryDim(embedding []float32) error {
 }
 
 func (d *driver) scanRows(ctx context.Context, rows coredb.Rows, embedding []float32, topK int) (*scoreHeap, error) {
-	h := &scoreHeap{}
+	h := &scoreHeap{items: make([]heaped, 0, topK)}
 	seq := 0
 
 	for rows.Next() {
@@ -642,16 +642,17 @@ func (d *driver) scanRows(ctx context.Context, rows coredb.Rows, embedding []flo
 			return nil, fmt.Errorf("pgvector: query: %w", err)
 		}
 
-		id, vec, meta, err := decodeRow(rows)
+		id, vec, metaBlob, err := decodeRow(rows)
 		if err != nil {
 			return nil, err
 		}
 
 		score := vectorstore.CosineSimilarity(embedding, vec)
 		pushHeap(h, topK, heaped{
-			Seq:   seq,
-			Score: float64(score),
-			Match: vectorstore.ScoreMatch{ID: id, Score: score, Metadata: meta},
+			Seq:     seq,
+			Score:   float64(score),
+			Match:   vectorstore.ScoreMatch{ID: id, Score: score},
+			metaRaw: metaBlob,
 		})
 		seq++
 	}
@@ -663,7 +664,7 @@ func (d *driver) scanRows(ctx context.Context, rows coredb.Rows, embedding []flo
 	return h, nil
 }
 
-func decodeRow(rows coredb.Rows) (string, []float32, map[string]any, error) {
+func decodeRow(rows coredb.Rows) (string, []float32, []byte, error) {
 	var id string
 
 	var embBlob, metaBlob []byte
@@ -677,12 +678,7 @@ func decodeRow(rows coredb.Rows) (string, []float32, map[string]any, error) {
 		return "", nil, nil, fmt.Errorf("pgvector: decode: %w", err)
 	}
 
-	meta, err := decodeMetadata(metaBlob)
-	if err != nil {
-		return "", nil, nil, fmt.Errorf("pgvector: query: metadata decode: %w", err)
-	}
-
-	return id, vec, meta, nil
+	return id, vec, metaBlob, nil
 }
 
 func pushHeap(h *scoreHeap, topK int, item heaped) {
@@ -699,10 +695,20 @@ func pushHeap(h *scoreHeap, topK int, item heaped) {
 	}
 }
 
-func heapToSorted(h *scoreHeap) []vectorstore.ScoreMatch {
+// heapToSorted drains the heap into score order and decodes metadata for the
+// survivors only: rows pushed out of the topK never pay the JSON decode, so
+// corrupt metadata in a non-surviving row no longer fails the query.
+func heapToSorted(h *scoreHeap) ([]vectorstore.ScoreMatch, error) {
 	results := make([]vectorstore.ScoreMatch, 0, len(h.items))
 	for len(h.items) > 0 {
 		v, _ := heap.Pop(h).(heaped)
+
+		meta, err := decodeMetadata(v.metaRaw)
+		if err != nil {
+			return nil, fmt.Errorf("pgvector: query: metadata decode: %w", err)
+		}
+
+		v.Match.Metadata = meta
 		results = append(results, v.Match)
 	}
 
@@ -710,7 +716,7 @@ func heapToSorted(h *scoreHeap) []vectorstore.ScoreMatch {
 		results[i], results[j] = results[j], results[i]
 	}
 
-	return results
+	return results, nil
 }
 
 func (d *driver) checkAndSetDim(n int, op string) error {
@@ -805,11 +811,14 @@ func decodeMetadata(b []byte) (map[string]any, error) {
 	return m, nil
 }
 
-// heaped is a scored candidate with an insertion sequence for stable tie-breaking.
+// heaped is a scored candidate with an insertion sequence for stable
+// tie-breaking. metaRaw carries the undecoded metadata blob: only topK
+// survivors get it decoded in heapToSorted.
 type heaped struct {
-	Seq   int
-	Score float64
-	Match vectorstore.ScoreMatch
+	Seq     int
+	Score   float64
+	Match   vectorstore.ScoreMatch
+	metaRaw []byte
 }
 
 // scoreHeap is a min-heap of heaped ordered by Score ascending, used to

@@ -17,6 +17,12 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Changed
 
+- `vectorstore/db` sqlite query now decodes row metadata lazily: only rows
+  that survive the topK heap get their metadata JSON parsed (was: every
+  scanned row). Corrupt metadata in a row that ranks below topK no longer
+  fails the query; a surviving row with corrupt metadata still fails.
+  `BenchmarkQuery` (256 rows, topK=10) drops ~49% ns/op, ~53% B/op, ~30%
+  allocs/op.
 - Standardized error message format across all modules: messages now use
   `<package>: <message>` prefixes (colon form, no brackets, no trailing
   period). Sentinels gained module prefixes, all sentinels carry doc
