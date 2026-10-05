@@ -18,6 +18,7 @@
 package lexer
 
 import (
+	"strconv"
 	"strings"
 	"unicode/utf16"
 	"unicode/utf8"
@@ -538,9 +539,32 @@ func (l *Lexer) scanMinusOrArrow(pos diag.Position) token.Token {
 // token for it, advances exactly one rune, and lets scanning continue
 // normally on the next call. The lexer never stops on illegal input.
 func (l *Lexer) scanIllegal(pos diag.Position, r rune) token.Token {
-	lit := string(r)
-	l.errorf(pos, "illegal character %q", lit)
+	// Perf: hot error path (BenchmarkLexIllegal: one diagnostic per rune).
+	// The diagnostic message and the token literal are built into a single
+	// stack buffer and materialized with one string(buf) allocation; Msg and
+	// Lit then become zero-copy substrings of that same immutable backing
+	// array. That is 2 allocs/rune (the backing string + the Diagnostic)
+	// instead of 4: the old path allocated string(r), a fmt result, a
+	// variadic []any, and the Diagnostic. strconv.AppendQuote emits exactly
+	// what fmt's %q did for a string, and utf8.EncodeRune emits exactly the
+	// bytes of string(r), so both the message and the literal are unchanged.
+	var rb [utf8.UTFMax]byte
+
+	n := utf8.EncodeRune(rb[:], r)
+
+	// Longest case is the 18-byte prefix + a 12-byte quoted escape
+	// (\U00xxxxxx) + 4 rune bytes = 34; 40 leaves headroom.
+	var buf [40]byte
+
+	b := append(buf[:0], "illegal character "...)
+	b = strconv.AppendQuote(b, string(rb[:n]))
+	msgLen := len(b)
+
+	b = append(b, rb[:n]...)
+	full := string(b)
+
+	l.errs = append(l.errs, diag.NewMsg("lex", pos, full[:msgLen]))
 	l.advance()
 
-	return token.Token{Kind: token.ILLEGAL, Lit: lit, Pos: pos}
+	return token.Token{Kind: token.ILLEGAL, Lit: full[msgLen:], Pos: pos}
 }

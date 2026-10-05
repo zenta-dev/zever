@@ -61,6 +61,20 @@ func New(phase string, pos Position, format string, args ...any) *Diagnostic {
 	}
 }
 
+// NewMsg creates a new Diagnostic from an already-formatted message and no
+// wrapped cause. It is the zero-reflection, zero-variadic-slice alternative
+// to New, for callers that already hold the final message text and sit on a
+// hot path (the lexer's per-rune illegal-character diagnostic). The result
+// is identical to New(phase, pos, "%s", msg).
+func NewMsg(phase string, pos Position, msg string) *Diagnostic {
+	return &Diagnostic{
+		Pos:     pos,
+		Phase:   phase,
+		Msg:     msg,
+		Wrapped: nil,
+	}
+}
+
 // Wrap creates a new Diagnostic with a wrapped cause error.
 func Wrap(phase string, pos Position, cause error, format string, args ...any) *Diagnostic {
 	return &Diagnostic{
