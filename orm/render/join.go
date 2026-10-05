@@ -80,6 +80,7 @@ func SelectJoin(
 ) (query string, args []any, err error) {
 	var b strings.Builder
 
+	b.Grow(64 + 8*(len(leftColumns)+len(rightColumns)))
 	b.WriteString("SELECT ")
 	b.WriteString(joinQualifiedColumns(d, []string{leftTable, rightTable}, [][]string{leftColumns, rightColumns}))
 	b.WriteString(" FROM ")
@@ -253,6 +254,7 @@ func selectJoin3(
 ) (query string, args []any, err error) {
 	var b strings.Builder
 
+	b.Grow(96 + 8*(len(aColumns)+len(bColumns)+len(cColumns)))
 	b.WriteString("SELECT ")
 	b.WriteString(joinQualifiedColumns(d, []string{aTable, bTable, cTable}, [][]string{aColumns, bColumns, cColumns}))
 	b.WriteString(" FROM ")

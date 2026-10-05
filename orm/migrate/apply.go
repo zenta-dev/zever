@@ -3,7 +3,6 @@ package migrate
 import (
 	"context"
 	"crypto/sha256"
-	"encoding/hex"
 	"errors"
 	"fmt"
 
@@ -151,8 +150,22 @@ func addMigrationTrackingColumns(ctx context.Context, conn db.DB, dialect string
 // this tool has no migration files to number).
 func ChecksumOf(stmt string) string {
 	sum := sha256.Sum256([]byte(stmt))
-	return hex.EncodeToString(sum[:])
+
+	// Encode straight into a stack array: hex.EncodeToString would allocate
+	// both its []byte buffer and the string conversion, while this needs only
+	// the final string copy.
+	var buf [sha256.Size * 2]byte
+
+	for i := 0; i < sha256.Size; i++ {
+		buf[i*2] = hexDigits[sum[i]>>4]
+		buf[i*2+1] = hexDigits[sum[i]&0x0f]
+	}
+
+	return string(buf[:])
 }
+
+// hexDigits is the lowercase hex alphabet ChecksumOf encodes with.
+const hexDigits = "0123456789abcdef"
 
 // migrationApplied reports whether a statement with this checksum has
 // already been recorded as applied.

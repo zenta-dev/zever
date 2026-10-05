@@ -138,12 +138,13 @@ type poolRegistry struct {
 	warn func(msg string)
 }
 
-// newPoolRegistry builds an empty registry with production defaults.
+// newPoolRegistry builds an empty registry with production defaults. The
+// pools map is left nil: borrow lazily creates it on first use, so a
+// Container that never resolves a shareable DSN allocates nothing for it.
 func newPoolRegistry() *poolRegistry {
 	return &poolRegistry{
-		pools: make(map[string]*poolEntry),
-		open:  db.Open,
-		warn:  func(msg string) { fmt.Fprintln(os.Stderr, msg) },
+		open: db.Open,
+		warn: func(msg string) { fmt.Fprintln(os.Stderr, msg) },
 	}
 }
 
