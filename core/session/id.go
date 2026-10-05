@@ -25,7 +25,13 @@ func NewID() string {
 	if _, err := io.ReadFull(randReader, b[:]); err != nil {
 		panic("session: crypto/rand unavailable: " + err.Error())
 	}
-	return hex.EncodeToString(b[:])
+
+	// Encode into a stack buffer and convert once: hex.EncodeToString
+	// allocates both the intermediate byte slice and the result string.
+	var out [2 * idBytes]byte
+	hex.Encode(out[:], b[:])
+
+	return string(out[:])
 }
 
 // ValidateID checks a session ID for shape: exactly 64 lowercase hex

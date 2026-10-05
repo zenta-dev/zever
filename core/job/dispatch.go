@@ -8,6 +8,8 @@ import (
 	"fmt"
 	"time"
 
+	"go.opentelemetry.io/otel/trace"
+
 	"github.com/zenta-dev/zever/adapters/log/noop"
 	"github.com/zenta-dev/zever/core/log"
 	"github.com/zenta-dev/zever/core/queue"
@@ -119,8 +121,12 @@ func (d *Dispatcher) Dispatch(
 
 	// Propagate the caller's trace (including scheduler root spans named
 	// schedule.<name>) into queue headers so workers can continue it.
-	// No valid span in ctx injects nothing.
-	headers = traceprop.Inject(ctx, headers)
+	// No valid span in ctx injects nothing, and Inject's defensive clone
+	// of an already-private headers map would be pure overhead, so skip
+	// it entirely on the common untraced path.
+	if trace.SpanContextFromContext(ctx).IsValid() {
+		headers = traceprop.Inject(ctx, headers)
+	}
 
 	delay := o.delay
 	if o.at != nil {
@@ -151,6 +157,23 @@ func (d *Dispatcher) uniqueTTL() time.Duration {
 }
 
 func uniqueID(jobName, key string) string {
+	// Hash a stack-backed jobName:key buffer for the common short-name case
+	// so neither the concatenation nor the digest output reaches the heap.
+	var buf [128]byte
+	if len(jobName)+len(key)+1 <= len(buf) {
+		n := copy(buf[:], jobName)
+		buf[n] = ':'
+		n++
+		n += copy(buf[n:], key)
+
+		sum := sha256.Sum256(buf[:n])
+
+		var out [2 * sha256.Size]byte
+		hex.Encode(out[:], sum[:])
+
+		return string(out[:])
+	}
+
 	h := sha256.New()
 	_, _ = h.Write([]byte(jobName))
 	_, _ = h.Write([]byte(":"))
