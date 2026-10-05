@@ -325,6 +325,34 @@ The scratch rows cut `BenchmarkClosest` from 176 to 1 alloc/op (-99.4%) and
 14,008 to 416 B/op (-97.0%), and ~37% faster (8.6µs to 5.4µs); the standalone
 kernel drops 9 to 1 allocs/op (832 to 240 B/op), ns/op within noise. The
 remaining alloc is the single scratch slice per `closest` call.
+Search (`adapters/search/db`, sqlite file-backed, 2026-10-05). `IndexBatch`
+now writes the whole batch as one multi-row
+`INSERT ... ON CONFLICT (id, idx) DO UPDATE SET content = excluded.content, metadata = excluded.metadata`
+-- both dialects expose the proposed row as `excluded` in the DO UPDATE
+clause, so one shared SET list carries every row's own replacement values --
+instead of one typed upsert per document, and the write goes through the
+`db.Preparer` probe so repeated batch shapes reuse the driver-side cached
+statement. `Search` preallocates the hits slice at `limit` capacity and
+aliases the count query's arg slice to the hits args' prefix (one backing
+array, no realloc). "before" is the per-document orm loop / append-grown
+hits path. Medians of 10 runs.
+
+| Benchmark | ns/op | B/op | allocs/op |
+| --- | --- | --- | --- |
+| BenchmarkIndexBatch before | 630,000 | 28,688 | 553 |
+| BenchmarkIndexBatch after | 132,800 | 8,951 | 182 |
+| BenchmarkSearch before | 379,700 | 11,170 | 253 |
+| BenchmarkSearch after | 372,400 | 10,378 | 244 |
+
+The multi-row upsert cuts `IndexBatch` ~4.7x (630 to 133 ns/op): the eight
+per-document orm chains (Values/OnConflict/DoUpdate allocations, render,
+arg encoding, per-statement exec) collapse into one statement, and
+allocs/op drop 67% (553 to 182) with B/op down 69% (28.0 to 8.7 KiB). The
+remaining per-document work is the metadata map clone plus JSON encode,
+which is irreducible without changing the stored shape. `Search` drops
+9 allocs/op (253 to 244) and ~790 B/op; its ns/op is dominated by the two
+FTS5 queries and the per-hit JSON metadata decode, so the time delta is
+within noise.
 
 Vectorstore brute-force query (`adapters/vectorstore/db`, sqlite leg, 2026-10-05).
 256-row scan with topK=10. `decodeRow` used to JSON-decode metadata for every
@@ -352,6 +380,7 @@ Reproduce:
 ```
 go test -run '^$' -bench='BenchmarkClosest|BenchmarkDamerauLevenshtein' -benchmem -count=10 ./cmd/zever/
 go test -run '^$' -bench='BenchmarkQuery$' -benchmem -count=10 ./adapters/vectorstore/db/
+go test -run '^$' -bench=. -benchmem -count=10 ./adapters/search/db/
 ```
 
 ## Commands
