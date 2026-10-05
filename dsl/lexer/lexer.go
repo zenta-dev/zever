@@ -31,6 +31,21 @@ import (
 // that e.g. "ms" is tried (and wins) before the single-letter "m".
 var durationUnits = []string{"ns", "us", "µs", "ms", "s", "m", "h"}
 
+// illegalCacheSize bounds the per-Lexer memo of scanIllegal's rune→string
+// build. The common case (a few distinct stray runes) fits easily; once full
+// the cache stops growing and further distinct runes rebuild as before, so
+// high-cardinality input degrades to the uncached path with no behavior change.
+const illegalCacheSize = 8
+
+// illegalEntry is one memoized scanIllegal result: the combined
+// "illegal character %q<rune>" string for a rune, with msgLen marking the
+// boundary between the message prefix and the raw rune bytes.
+type illegalEntry struct {
+	r      rune
+	msgLen int
+	full   string
+}
+
 // Lexer scans DSL source bytes into a stream of tokens.
 type Lexer struct {
 	file string
@@ -46,6 +61,12 @@ type Lexer struct {
 	// CommentToken and skipLineComment.
 	lastTokenLine int
 	comments      []CommentToken
+
+	// illegalCache memoizes scanIllegal's pure rune→string build so repeated
+	// illegal runes share one backing array (Go strings are immutable, so this
+	// is safe). Only the first illegalCacheSize distinct runes are cached.
+	illegalCache    [illegalCacheSize]illegalEntry
+	illegalCacheLen int
 }
 
 // CommentToken records one "//" line comment encountered while scanning,
@@ -540,14 +561,35 @@ func (l *Lexer) scanMinusOrArrow(pos diag.Position) token.Token {
 // normally on the next call. The lexer never stops on illegal input.
 func (l *Lexer) scanIllegal(pos diag.Position, r rune) token.Token {
 	// Perf: hot error path (BenchmarkLexIllegal: one diagnostic per rune).
-	// The diagnostic message and the token literal are built into a single
-	// stack buffer and materialized with one string(buf) allocation; Msg and
-	// Lit then become zero-copy substrings of that same immutable backing
-	// array. That is 2 allocs/rune (the backing string + the Diagnostic)
-	// instead of 4: the old path allocated string(r), a fmt result, a
-	// variadic []any, and the Diagnostic. strconv.AppendQuote emits exactly
-	// what fmt's %q did for a string, and utf8.EncodeRune emits exactly the
-	// bytes of string(r), so both the message and the literal are unchanged.
+	// The rune→(msg, lit) string is a pure function, so it is memoized in
+	// l.illegalCache: repeated illegal runes share one backing array, cutting
+	// the per-rune string alloc to zero on cache hits. The Diagnostic alloc
+	// (diag.NewMsg) is unavoidable -- each is retained in l.errs.
+	full, msgLen := l.illegalString(r)
+
+	l.errs = append(l.errs, diag.NewMsg("lex", pos, full[:msgLen]))
+	l.advance()
+
+	return token.Token{Kind: token.ILLEGAL, Lit: full[msgLen:], Pos: pos}
+}
+
+// illegalString returns the combined "illegal character %q<rune>" string for
+// r, with msgLen marking the boundary between the message prefix and the raw
+// rune bytes (so callers can slice Msg and Lit as zero-copy substrings).
+//
+// Perf: the build is memoized per rune in l.illegalCache (see illegalEntry).
+// On a hit the shared backing string is returned directly; on a miss it is
+// built into a single stack buffer and materialized with one string(buf)
+// allocation, exactly as before. strconv.AppendQuote emits what fmt's %q did
+// for a string, and utf8.EncodeRune emits the bytes of string(r), so the
+// message and literal are byte-identical to the uncached path.
+func (l *Lexer) illegalString(r rune) (full string, msgLen int) {
+	for i := 0; i < l.illegalCacheLen; i++ {
+		if e := &l.illegalCache[i]; e.r == r {
+			return e.full, e.msgLen
+		}
+	}
+
 	var rb [utf8.UTFMax]byte
 
 	n := utf8.EncodeRune(rb[:], r)
@@ -558,13 +600,15 @@ func (l *Lexer) scanIllegal(pos diag.Position, r rune) token.Token {
 
 	b := append(buf[:0], "illegal character "...)
 	b = strconv.AppendQuote(b, string(rb[:n]))
-	msgLen := len(b)
+	msgLen = len(b)
 
 	b = append(b, rb[:n]...)
-	full := string(b)
+	full = string(b)
 
-	l.errs = append(l.errs, diag.NewMsg("lex", pos, full[:msgLen]))
-	l.advance()
+	if l.illegalCacheLen < illegalCacheSize {
+		l.illegalCache[l.illegalCacheLen] = illegalEntry{r: r, msgLen: msgLen, full: full}
+		l.illegalCacheLen++
+	}
 
-	return token.Token{Kind: token.ILLEGAL, Lit: full[msgLen:], Pos: pos}
+	return full, msgLen
 }
