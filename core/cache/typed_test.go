@@ -99,12 +99,11 @@ func (c prefixCodec) Decode(b []byte) (string, error) {
 		return "", errors.New("decode boom")
 	}
 
-	s := string(b)
-	if len(s) < 2 || s[:2] != "P:" {
+	if len(b) < 2 || string(b[:2]) != "P:" {
 		return "", errors.New("bad prefix")
 	}
 
-	return s[2:], nil
+	return string(b[2:]), nil
 }
 
 var _ codec.Codec[string] = prefixCodec{}
