@@ -59,6 +59,13 @@ type adapter struct {
 	maxTTL   time.Duration
 	leeway   time.Duration
 
+	// parserOpts and revokeOpts are computed once at construction: the
+	// adapter's validation configuration is immutable after New, and
+	// rebuilding the option slices (plus their closures) on every
+	// Verify/Revoke call only adds allocations.
+	parserOpts []jwtv5.ParserOption
+	revokeOpts []jwtv5.ParserOption
+
 	revocation revocation.Store
 	closed     atomic.Bool
 }
@@ -96,6 +103,11 @@ func New(opts auth.Options) (auth.Auth, error) {
 		maxTTL:     opts.JWT.MaxTTL,
 		leeway:     opts.JWT.Leeway,
 		revocation: store,
+	}
+	a.parserOpts = a.parserOptions()
+	a.revokeOpts = []jwtv5.ParserOption{
+		jwtv5.WithValidMethods([]string{"HS256"}),
+		jwtv5.WithoutClaimsValidation(),
 	}
 	return a, nil
 }
@@ -193,7 +205,7 @@ func (a *adapter) Verify(ctx context.Context, token string) (auth.Claims, error)
 		return auth.Claims{}, auth.ErrInvalidToken
 	}
 
-	parsed, err := jwtv5.ParseWithClaims(token, jwtv5.MapClaims{}, a.keyfunc, a.parserOptions()...)
+	parsed, err := jwtv5.ParseWithClaims(token, jwtv5.MapClaims{}, a.keyfunc, a.parserOpts...)
 	if err != nil {
 		if errors.Is(err, jwtv5.ErrTokenExpired) {
 			return auth.Claims{}, auth.ErrTokenExpired
@@ -273,10 +285,7 @@ func (a *adapter) Revoke(ctx context.Context, token string) error {
 
 	// Signature only: claims are not validated so already-expired tokens
 	// can still be recorded (stored with a 1s grace expiry below).
-	parsed, err := jwtv5.ParseWithClaims(token, jwtv5.MapClaims{}, a.keyfunc,
-		jwtv5.WithValidMethods([]string{"HS256"}),
-		jwtv5.WithoutClaimsValidation(),
-	)
+	parsed, err := jwtv5.ParseWithClaims(token, jwtv5.MapClaims{}, a.keyfunc, a.revokeOpts...)
 	if err != nil || !parsed.Valid {
 		return fmt.Errorf("jwt: revoke: %w", auth.ErrInvalidToken)
 	}

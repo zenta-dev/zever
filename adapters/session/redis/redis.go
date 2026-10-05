@@ -168,7 +168,9 @@ func (s *store) Create(ctx context.Context, ttl time.Duration) (session.Session,
 		return session.Session{}, fmt.Errorf("redis: create set: %w", err)
 	}
 
-	return sess.Clone(), nil
+	// The stored record is the encoded buf snapshot, so the caller-visible
+	// sess shares no mutable state with it; no Clone needed.
+	return sess, nil
 }
 
 // Get returns the session for id, or ErrNotFound on miss or expiry (expired
