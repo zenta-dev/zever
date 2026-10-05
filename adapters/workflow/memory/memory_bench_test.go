@@ -66,3 +66,45 @@ func BenchmarkQuery(b *testing.B) {
 		}
 	}
 }
+
+// BenchmarkSignal measures buffering a signal on a running run. A running run
+// is seeded directly so the success path (lock, map lookup, append) can be
+// measured without hitting the 100-entry pending cap.
+func BenchmarkSignal(b *testing.B) {
+	a := newBenchAdapter(b)
+	ctx := b.Context()
+
+	b.ReportAllocs()
+	b.ResetTimer()
+
+	for b.Loop() {
+		a.mu.Lock()
+		a.runs["bench-run"] = &run{running: true}
+		a.mu.Unlock()
+
+		if err := a.Signal(ctx, "bench-run", "advance", "value"); err != nil {
+			b.Fatalf("Signal(): %v", err)
+		}
+	}
+}
+
+// BenchmarkCancel measures cancelling a running run. A running run is seeded
+// directly each iteration so the success path (lock, map lookup, delete) can
+// be measured repeatably.
+func BenchmarkCancel(b *testing.B) {
+	a := newBenchAdapter(b)
+	ctx := b.Context()
+
+	b.ReportAllocs()
+	b.ResetTimer()
+
+	for b.Loop() {
+		a.mu.Lock()
+		a.runs["bench-run"] = &run{running: true}
+		a.mu.Unlock()
+
+		if err := a.Cancel(ctx, "bench-run"); err != nil {
+			b.Fatalf("Cancel(): %v", err)
+		}
+	}
+}

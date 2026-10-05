@@ -90,6 +90,26 @@ func BenchmarkQuery(b *testing.B) {
 	}
 }
 
+// BenchmarkDelete measures building the delete selector (deterministic point
+// ID, wait flag) and the stub delete round trip.
+func BenchmarkDelete(b *testing.B) {
+	s := newBenchStore(b)
+	ctx := b.Context()
+
+	if err := s.Upsert(ctx, vectorstore.Vector{ID: "bench-del", Embedding: benchEmbedding()}); err != nil {
+		b.Fatalf("seed Upsert(): %v", err)
+	}
+
+	b.ReportAllocs()
+	b.ResetTimer()
+
+	for b.Loop() {
+		if err := s.Delete(ctx, "bench-del"); err != nil {
+			b.Fatalf("Delete(): %v", err)
+		}
+	}
+}
+
 // BenchmarkPointID measures deterministic point-ID generation, which hashes
 // non-UUID ids with SHA-256 and sets RFC 4122 bits.
 func BenchmarkPointID(b *testing.B) {
