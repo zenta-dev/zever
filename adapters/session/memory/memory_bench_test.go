@@ -119,3 +119,24 @@ func BenchmarkCreateParallel(b *testing.B) {
 		}
 	})
 }
+
+// BenchmarkDelete measures removing an existing session: map delete under the
+// write lock. Delete is idempotent, so the same ID is reused.
+func BenchmarkDelete(b *testing.B) {
+	st := newBenchStore(b)
+	ctx := b.Context()
+
+	s, err := st.Create(ctx, time.Hour)
+	if err != nil {
+		b.Fatalf("Create(): %v", err)
+	}
+
+	b.ReportAllocs()
+	b.ResetTimer()
+
+	for b.Loop() {
+		if err := st.Delete(ctx, s.ID); err != nil {
+			b.Fatalf("Delete(): %v", err)
+		}
+	}
+}
