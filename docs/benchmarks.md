@@ -205,6 +205,27 @@ cuts ns/op ~9%; B/op rises slightly (the keys are stored inline rather than
 pointing at many tiny strings) but total allocation count — and thus GC
 pressure — falls sharply.
 
+Container resolve/close (`container`, sqlite shared-pool open+close). The
+shutdown-critical subset (`DB`, `Cache`, `Queue`, `Scheduler`, `Job`) is
+resolved from a cold container and closed. `Close` used to allocate a fresh
+`chan error` and a capturing goroutine closure per service, and deduped with
+a `sync.Map`; it now reuses one buffered result channel across successful
+closes (reallocating only after a timeout abandons a goroutine), runs the
+shutdown body as a top-level `closeAsync` (no closure per `go`), and dedups
+with a local plain map created lazily. `logOpen` also drops its intermediate
+`[...]` string concatenation. Medians of 5 runs, cpu=12.
+
+| Benchmark | ns/op | B/op | allocs/op |
+| --- | --- | --- | --- |
+| BenchmarkContainer_ResolveSubset before | 11,090 | 11,157 | 57 |
+| BenchmarkContainer_ResolveSubset after | 10,884 | 10,289 | 37 |
+
+The close-path rework drops 20 allocs/op (~35%): the per-service result
+channel and goroutine closure disappear, `sync.Map`'s per-key entry nodes are
+replaced by one small map, and the pool log line skips a string concat. ns/op
+is dominated by `config.Default()` and the fresh `Container`, so the delta is
+modest; B/op falls ~870 bytes/op.
+
 ## Commands
 
 Router and queue are fast, so they run 1s per bench; ORM runs 100
@@ -218,6 +239,7 @@ go test -run=NONE -bench=BenchmarkReclaimStale -benchtime=1s -cpu=1,4 -benchmem 
 go test -run=NONE -bench=. -benchtime=1s -cpu=1,4 -benchmem ./adapters/idempotency/redis/
 go test -run=NONE -bench='BenchmarkSharedAcquireRelease|BenchmarkPrivateClientBuild' -benchtime=1s -cpu=1,4 -benchmem ./shared/redisclient/
 go test -run=NONE -bench=BenchmarkWorkerEmptyPoll -benchtime=1s -cpu=1,4 -benchmem ./core/job/
+go test -run=NONE -bench=BenchmarkContainer_ResolveSubset -benchtime=200ms -count=5 -benchmem ./container/
 go test -run=NONE -bench=. -benchtime=100x -cpu=1,4 -benchmem ./orm/
 ```
 
