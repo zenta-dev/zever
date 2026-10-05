@@ -399,24 +399,6 @@ func (d *driver) Start(ctx context.Context, name string, input any, workflowID s
 		return "", workflow.UnknownStepError{Step: name}
 	}
 
-	id := workflow.RunID(workflowID)
-	if id == "" {
-		for {
-			candidate := workflow.RunID(fmt.Sprintf("run-%d", d.nextID.Add(1)))
-
-			_, err := d.load(ctx, candidate)
-			if errors.Is(err, workflow.ErrUnknownRun) {
-				id = candidate
-
-				break
-			}
-
-			if err != nil {
-				return "", err
-			}
-		}
-	}
-
 	inputJSON, err := json.Marshal(input)
 	if err != nil {
 		return "", fmt.Errorf("postgres: start %q: marshal input: %w", name, err)
@@ -424,24 +406,48 @@ func (d *driver) Start(ctx context.Context, name string, input any, workflowID s
 
 	now := time.Now().UTC()
 
-	err = orm.InsertInto(d.tbl).Values(
-		orm.Set(d.cID, string(id)),
-		orm.Set(d.cStep, name),
-		orm.Set(d.cState, stateRunning),
-		orm.Set(d.cPayload, inputJSON),
-		orm.Set(d.cIdem, string(id)),
-		orm.Set(d.cOwner, d.owner),
-		orm.Set(d.cExpires, now.Add(d.leaseTTL)),
-		orm.Set(d.cAttempt, int64(1)),
-		orm.Set(d.cCreated, now),
-		orm.Set(d.cUpdated, now),
-	).Exec(ctx, d.conn)
-	if err != nil {
-		if isDuplicateErr(err) {
-			return "", workflow.DuplicateRunError{RunID: string(id)}
-		}
+	insert := func(id workflow.RunID) error {
+		return orm.InsertInto(d.tbl).Values(
+			orm.Set(d.cID, string(id)),
+			orm.Set(d.cStep, name),
+			orm.Set(d.cState, stateRunning),
+			orm.Set(d.cPayload, inputJSON),
+			orm.Set(d.cIdem, string(id)),
+			orm.Set(d.cOwner, d.owner),
+			orm.Set(d.cExpires, now.Add(d.leaseTTL)),
+			orm.Set(d.cAttempt, int64(1)),
+			orm.Set(d.cCreated, now),
+			orm.Set(d.cUpdated, now),
+		).Exec(ctx, d.conn)
+	}
 
-		return "", err
+	id := workflow.RunID(workflowID)
+	if id != "" {
+		if ierr := insert(id); ierr != nil {
+			if isDuplicateErr(ierr) {
+				return "", workflow.DuplicateRunError{RunID: string(id)}
+			}
+
+			return "", ierr
+		}
+	} else {
+		// A generated ID's uniqueness is enforced by the primary key: a
+		// duplicate insert means another writer took the candidate, so
+		// bump and retry without a separate existence probe.
+		for {
+			candidate := workflow.RunID(fmt.Sprintf("run-%d", d.nextID.Add(1)))
+
+			ierr := insert(candidate)
+			if ierr == nil {
+				id = candidate
+
+				break
+			}
+
+			if !isDuplicateErr(ierr) {
+				return "", ierr
+			}
+		}
 	}
 
 	result, err := fn(ctx, input)

@@ -369,8 +369,9 @@ func (d *driver) adopt(ctx context.Context) error {
 		return err
 	}
 
+	now := time.Now().UTC()
 	for _, row := range rows {
-		if err := d.adoptRow(ctx, row); err != nil {
+		if err := d.adoptRow(ctx, row, now); err != nil {
 			return err
 		}
 	}
@@ -379,8 +380,7 @@ func (d *driver) adopt(ctx context.Context) error {
 }
 
 // adoptRow claims row when its lease is free and registers its tick.
-func (d *driver) adoptRow(ctx context.Context, row *slotRow) error {
-	now := time.Now().UTC()
+func (d *driver) adoptRow(ctx context.Context, row *slotRow, now time.Time) error {
 	if row.LeaseOwner != d.owner && row.LeaseExpiresAt.After(now) {
 		return nil
 	}
@@ -397,7 +397,7 @@ func (d *driver) adoptRow(ctx context.Context, row *slotRow) error {
 		}
 	}
 
-	if err := d.register(row.Spec, args, row.Slot); err != nil {
+	if _, err := d.register(row.Spec, args, row.Slot); err != nil {
 		return err
 	}
 
@@ -438,12 +438,18 @@ func (d *driver) load(ctx context.Context, slot string) (row *slotRow, ok bool, 
 // The tick is rooted in the scheduler-owned tickCtx, not the registration
 // request ctx: it must live for the entry's lifetime and must not retain
 // the caller's context values.
-func (d *driver) register(spec string, args any, slot string) error {
+func (d *driver) register(spec string, args any, slot string) (scheduler.EntryID, error) {
 	parsed, err := cron.ParseStandard(spec)
 	if err != nil {
-		return scheduler.InvalidSpecError{Spec: spec, Err: err}
+		return 0, scheduler.InvalidSpecError{Spec: spec, Err: err}
 	}
 
+	return d.registerParsed(parsed, args, slot), nil
+}
+
+// registerParsed adds the gated tick for slot on an already-parsed schedule,
+// reusing it without re-parsing. See register for the lease and ctx rules.
+func (d *driver) registerParsed(parsed cron.Schedule, args any, slot string) scheduler.EntryID {
 	d.mu.Lock()
 	defer d.mu.Unlock()
 
@@ -456,7 +462,7 @@ func (d *driver) register(spec string, args any, slot string) error {
 	d.slots[entry] = slot
 	d.args[slot] = args
 
-	return nil
+	return entry
 }
 
 // fire claims slot and dispatches its job when the claim lands. A live
@@ -520,7 +526,8 @@ func (d *driver) Schedule(ctx context.Context, spec, jobName string, args any) (
 		return 0, scheduler.InvalidSpecError{Spec: spec, Err: fmt.Errorf("postgres: %w", ErrInvalidSpecLength)}
 	}
 
-	if _, err := cron.ParseStandard(spec); err != nil {
+	parsed, err := cron.ParseStandard(spec)
+	if err != nil {
 		return 0, scheduler.InvalidSpecError{Spec: spec, Err: err}
 	}
 
@@ -535,54 +542,37 @@ func (d *driver) Schedule(ctx context.Context, spec, jobName string, args any) (
 
 	now := time.Now().UTC()
 
+	// A generated slot's uniqueness is enforced by the primary key: a
+	// duplicate insert means another writer took the candidate, so bump
+	// and retry without a separate existence probe.
 	var slot string
 
 	for {
 		candidate := fmt.Sprintf("sched-%d", d.nextID.Add(1))
 
-		_, ok, loadErr := d.load(ctx, candidate)
-		if loadErr != nil {
-			return 0, loadErr
-		}
-
-		if !ok {
+		ierr := orm.InsertInto(d.tbl).Values(
+			orm.Set(d.cSlot, candidate),
+			orm.Set(d.cSpec, spec),
+			orm.Set(d.cJob, jobName),
+			orm.Set(d.cArgs, argsJSON),
+			orm.Set(d.cOwner, d.owner),
+			orm.Set(d.cExpires, now.Add(d.leaseTTL)),
+			orm.Set(d.cAttempt, int64(1)),
+			orm.Set(d.cCreated, now),
+			orm.Set(d.cUpdated, now),
+		).Exec(ctx, d.conn)
+		if ierr == nil {
 			slot = candidate
 
 			break
 		}
-	}
 
-	err = orm.InsertInto(d.tbl).Values(
-		orm.Set(d.cSlot, slot),
-		orm.Set(d.cSpec, spec),
-		orm.Set(d.cJob, jobName),
-		orm.Set(d.cArgs, argsJSON),
-		orm.Set(d.cOwner, d.owner),
-		orm.Set(d.cExpires, now.Add(d.leaseTTL)),
-		orm.Set(d.cAttempt, int64(1)),
-		orm.Set(d.cCreated, now),
-		orm.Set(d.cUpdated, now),
-	).Exec(ctx, d.conn)
-	if err != nil {
-		return 0, err
-	}
-
-	if err := d.register(spec, args, slot); err != nil {
-		_, _ = orm.DeleteFrom(d.tbl).Where(d.cSlot.Eq(slot)).Exec(ctx, d.conn)
-
-		return 0, err
-	}
-
-	d.mu.Lock()
-	defer d.mu.Unlock()
-
-	for entry, s := range d.slots {
-		if s == slot {
-			return entry, nil
+		if !isDuplicateErr(ierr) {
+			return 0, ierr
 		}
 	}
 
-	return 0, errors.New("postgres: schedule registered no entry")
+	return d.registerParsed(parsed, args, slot), nil
 }
 
 // Remove unregisters the schedule with the given ID and deletes its slot
@@ -687,3 +677,12 @@ func (d *driver) Close() error {
 
 // Name returns the adapter name for the scheduler.
 func (d *driver) Name() string { return string(Adapter) }
+
+// isDuplicateErr reports PRIMARY KEY / UNIQUE violations across dialects.
+func isDuplicateErr(err error) bool {
+	msg := strings.ToLower(err.Error())
+
+	return strings.Contains(msg, "unique") ||
+		strings.Contains(msg, "duplicate") ||
+		strings.Contains(msg, "primary key")
+}
