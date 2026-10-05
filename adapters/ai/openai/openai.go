@@ -45,6 +45,9 @@ func New(opts ai.Options) (ai.AI, error) {
 
 	if opts.BaseURL != "" {
 		clientOpts = append(clientOpts, option.WithBaseURL(opts.BaseURL))
+		if endpoint.IsLoopbackURL(opts.BaseURL) {
+			clientOpts = append(clientOpts, option.WithUnsafeAllowHTTP())
+		}
 	}
 
 	client := openai.NewClient(clientOpts...)
