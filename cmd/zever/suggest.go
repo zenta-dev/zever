@@ -30,8 +30,17 @@ func closest(input string, candidates []string) string {
 	best := ""
 	bestDist := 999
 
+	// Scratch rows reused across candidates: three rows of max candidate width.
+	maxLen := 0
 	for _, c := range candidates {
-		d := damerauLevenshtein(lower, strings.ToLower(c))
+		if len(c) > maxLen {
+			maxLen = len(c)
+		}
+	}
+	scratch := make([]int, 3*(maxLen+1))
+
+	for _, c := range candidates {
+		d := damerauLevenshteinScratch(lower, strings.ToLower(c), scratch)
 		// Prefer prefix matches: distance bonus for prefix.
 		if strings.HasPrefix(strings.ToLower(c), lower) && d > 1 {
 			d--
@@ -61,6 +70,13 @@ func closest(input string, candidates []string) string {
 
 // damerauLevenshtein computes edit distance with adjacent transposition.
 func damerauLevenshtein(a, b string) int {
+	return damerauLevenshteinScratch(a, b, nil)
+}
+
+// damerauLevenshteinScratch computes edit distance with adjacent transposition
+// using three rolling rows of lb+1 ints taken from scratch (reallocated when
+// too small), so repeated calls reuse the same buffer.
+func damerauLevenshteinScratch(a, b string, scratch []int) int {
 	la, lb := len(a), len(b)
 	if la == 0 {
 		return lb
@@ -69,37 +85,39 @@ func damerauLevenshtein(a, b string) int {
 	if lb == 0 {
 		return la
 	}
-	// DP table.
-	d := make([][]int, la+1)
-	for i := range d {
-		d[i] = make([]int, lb+1)
-		d[i][0] = i
+	if len(scratch) < 3*(lb+1) {
+		scratch = make([]int, 3*(lb+1))
 	}
-
-	for j := 0; j <= lb; j++ {
-		d[0][j] = j
+	w := lb + 1
+	for j := range scratch[:w] {
+		scratch[j] = j
 	}
 
 	for i := 1; i <= la; i++ {
+		cur := (i % 3) * w
+		prev := ((i + 2) % 3) * w
+		prev2 := ((i + 1) % 3) * w
+		scratch[cur] = i
 		for j := 1; j <= lb; j++ {
 			cost := 0
 			if a[i-1] != b[j-1] {
 				cost = 1
 			}
 
-			d[i][j] = min(
-				d[i-1][j]+1,      // deletion
-				d[i][j-1]+1,      // insertion
-				d[i-1][j-1]+cost, // substitution
+			v := min(
+				scratch[prev+j]+1,      // deletion
+				scratch[cur+j-1]+1,     // insertion
+				scratch[prev+j-1]+cost, // substitution
 			)
 			if i > 1 && j > 1 && a[i-1] == b[j-2] && a[i-2] == b[j-1] {
 				// transposition
-				if d[i-2][j-2]+1 < d[i][j] {
-					d[i][j] = d[i-2][j-2] + 1
+				if d := scratch[prev2+j-2] + 1; d < v {
+					v = d
 				}
 			}
+			scratch[cur+j] = v
 		}
 	}
 
-	return d[la][lb]
+	return scratch[(la%3)*w+lb]
 }
