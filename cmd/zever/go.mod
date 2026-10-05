@@ -207,7 +207,6 @@ require (
 	github.com/gobwas/pool v0.2.1 // indirect
 	github.com/gobwas/ws v1.4.0 // indirect
 	github.com/goccy/go-json v0.10.6 // indirect
-	github.com/gofiber/adaptor/v2 v2.2.1 // indirect
 	github.com/gofiber/fiber/v2 v2.52.15 // indirect
 	github.com/golang-jwt/jwt/v4 v4.5.2 // indirect
 	github.com/golang-jwt/jwt/v5 v5.3.1 // indirect
