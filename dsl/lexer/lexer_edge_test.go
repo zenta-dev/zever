@@ -81,6 +81,10 @@ func TestLexIllegalCharacterRecordsDiagAndContinues(t *testing.T) {
 	if errs[0].Phase != "lex" {
 		t.Fatalf("diag phase = %q, want \"lex\"", errs[0].Phase)
 	}
+
+	if want := `illegal character "\x01"`; errs[0].Msg != want {
+		t.Fatalf("diag msg = %q, want %q", errs[0].Msg, want)
+	}
 }
 
 func TestLexInvalidUTF8DoesNotHangOrPanic(t *testing.T) {
