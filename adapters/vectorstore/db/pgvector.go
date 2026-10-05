@@ -626,15 +626,10 @@ func (d *driver) validateQueryDim(embedding []float32) error {
 }
 
 func (d *driver) scanRows(ctx context.Context, rows coredb.Rows, embedding []float32, topK int) (*scoreHeap, error) {
-	// Preallocate for the rows this scan can actually retain. capHint is
-	// clamped to maxScanRows so the allocation never depends on the
-	// caller-supplied topK, which is otherwise unbounded.
-	capHint := topK
-	if capHint > maxScanRows {
-		capHint = maxScanRows
-	}
-
-	h := &scoreHeap{items: make([]heaped, 0, capHint)}
+	// Preallocate a small buffer sized to the default top-K. The heap grows
+	// on demand for a larger topK; sizing from a package constant (never the
+	// caller-supplied topK) keeps the allocation bounded.
+	h := &scoreHeap{items: make([]heaped, 0, vectorstore.DefaultTopK)}
 	seq := 0
 
 	for rows.Next() {
