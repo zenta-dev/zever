@@ -1,7 +1,6 @@
 package s3opts
 
 import (
-	"fmt"
 	"net/url"
 	"strings"
 )
@@ -12,15 +11,26 @@ func (c *Core) StaticURL(bucket, key string) (string, error) {
 		return strings.TrimRight(c.URLBase, "/") + "/" + url.PathEscape(bucket) + "/" + EscapeKey(key), nil
 	}
 
-	return fmt.Sprintf("https://%s.s3.%s.amazonaws.com/%s", bucket, c.Region, EscapeKey(key)), nil
+	return "https://" + bucket + ".s3." + c.Region + ".amazonaws.com/" + EscapeKey(key), nil
 }
 
 // EscapeKey escapes key segment-wise so slashes survive as separators.
 func EscapeKey(key string) string {
-	segs := strings.Split(key, "/")
-	for i := range segs {
-		segs[i] = url.PathEscape(segs[i])
+	if !strings.Contains(key, "/") {
+		return url.PathEscape(key)
 	}
 
-	return strings.Join(segs, "/")
+	buf := make([]byte, 0, len(key)+8)
+	start := 0
+	for i := 0; i < len(key); i++ {
+		if key[i] == '/' {
+			buf = append(buf, url.PathEscape(key[start:i])...)
+			buf = append(buf, '/')
+			start = i + 1
+		}
+	}
+
+	buf = append(buf, url.PathEscape(key[start:])...)
+
+	return string(buf)
 }

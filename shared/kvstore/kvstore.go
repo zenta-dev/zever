@@ -424,7 +424,8 @@ func (s *Store) AddDelta(ctx context.Context, key string, delta int64) (int64, e
 		}
 
 		out = cur + delta
-		raw := []byte(strconv.FormatInt(out, 10))
+		var rawBuf [20]byte
+		raw := strconv.AppendInt(rawBuf[:0], out, 10)
 
 		if !exists {
 			if ierr := orm.InsertInto(s.tbl).Values(
