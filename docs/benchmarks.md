@@ -226,6 +226,30 @@ replaced by one small map, and the pool log line skips a string concat. ns/op
 is dominated by `config.Default()` and the fresh `Container`, so the delta is
 modest; B/op falls ~870 bytes/op.
 
+SMTP `buildMIME` (`adapters/mailer/smtp`). The header block was written
+with `fmt.Fprintf` (one printer + arg slice per header) and the buffer grew
+unbounded; it now writes precomputed strings through `buf.Write`/`WriteString`
+and grows once via `estimateSize`. `writeBase64` used to allocate
+`encoded[i:end]+"\r\n"` per 76-byte line; it now encodes into a preallocated
+`[]byte` and writes the line and CRLF separately. `joinAddresses` builds into
+a `strings.Builder` (single-address fast path) instead of a `[]string` +
+`strings.Join`. The generated MIME bytes are unchanged. Medians of 10 runs,
+cpu=12.
+
+| Benchmark | ns/op | B/op | allocs/op |
+| --- | --- | --- | --- |
+| BenchmarkBuildMIME before | 8,206 | 5,892 | 102 |
+| BenchmarkBuildMIME after | 6,711 | 6,421 | 90 |
+| BenchmarkBuildMIMEAttachments before | 11,812 | 9,799 | 155 |
+| BenchmarkBuildMIMEAttachments after | 9,332 | 6,933 | 135 |
+
+The rework cuts allocs/op ~12% (102 to 90, 155 to 135) and ns/op ~19-21%.
+B/op rises ~530 bytes/op on `BenchmarkBuildMIME` (the `estimateSize` hint
+over-reserves header slack, still a single buffer allocation) and falls
+~2.9 KB/op on `BenchmarkBuildMIMEAttachments` (the old growth path reallocated
+the buffer ~7 times; the encoded attachment now lives in one preallocated
+slice).
+
 ## Commands
 
 Router and queue are fast, so they run 1s per bench; ORM runs 100
