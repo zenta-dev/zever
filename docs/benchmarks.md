@@ -101,6 +101,29 @@ drops ~3x (331 KB to 109 KB) and allocs/op ~1.8x (5,690 to 3,208) with it.
 A second run confirmed the after numbers within noise (646,554 / 637,319
 ns/op).
 
+Queue (`adapters/queue/db`, stale-claim sweep over sqlite, second pass). The
+sweep collapsed from two statements to one: the batch is now selected and
+released by a single set-based UPDATE whose `IN` subquery projects the same
+stale-claim set the standalone SELECT read (same lease guard, same id order,
+same batch LIMIT), so the ids slice, the per-row `msgRow` scan, and the
+SELECT-to-UPDATE window are gone. "before" is the two-statement sweep at
+commit 8a7f3d9; "after" is the single-statement form. Medians of 10 runs
+(`-count=10`), benchstat p=0.000.
+
+| Benchmark | ns/op | B/op | allocs/op |
+| --- | --- | --- | --- |
+| BenchmarkReclaimStale before (cpu=12) | 898,500 | 109,534 | 3,204 |
+| BenchmarkReclaimStale after (cpu=12) | 405,700 | 10,834 | 130 |
+
+The single set-based UPDATE cuts the sweep a further ~2.2x (898.5µs to
+405.7µs): the SELECT's per-row driver work (cursor allocation, text
+conversion, the 10-cell positional scan) and the ids slice disappear, and
+the subquery plus outer guard evaluate atomically, so a row settled mid-sweep
+is still skipped rather than double-bumped. B/op drops ~10x (107 KB to
+10.6 KB) and allocs/op ~24x (3,204 to 130) with it. One tradeoff: an idle
+sweep now issues a 0-row UPDATE instead of skipping the write entirely
+(~52µs per sweep at the 250ms gate, ~0.2% CPU).
+
 Rate limiter (`adapters/ratelimit/memory`, striped lock table). The bucket
 map was sharded into 64 stripes (`DefaultStripeCount`) keyed by an FNV-1a
 hash of the limiter key, each with its own `sync.RWMutex`. The global
@@ -374,9 +397,9 @@ Adaptor-isolation coverage:
 Round-trip coverage (in-process backends):
 
 - Queue: `BenchmarkReclaimStale` (`adapters/queue/db/queue_bench_test.go`) --
-  seeds a batch of expired claims, reclaims them (1 SELECT + 1 set-based
-  UPDATE computing attempt+1 in the database), re-stales them with one
-  multi-row UPDATE, repeats.
+  seeds a batch of expired claims, reclaims them (one set-based UPDATE whose
+  IN subquery selects the batch, computing attempt+1 in the database),
+  re-stales them with one multi-row UPDATE, repeats.
 - Idempotency: `BenchmarkBegin` / `BenchmarkComplete`
   (`adapters/idempotency/redis/redis_bench_test.go`) -- fresh key per
   iteration over one shared miniredis, so every call takes the
