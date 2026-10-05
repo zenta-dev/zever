@@ -283,6 +283,32 @@ Reproduce:
 go test -run '^$' -bench=. -benchmem -count=10 ./adapters/mailer/log/
 ```
 
+TUI closest matcher (`cmd/zever`, 2026-10-05). `closest` used to allocate a
+full `(la+1)x(lb+1)` DP matrix per candidate (21 top-level commands), and
+`damerauLevenshtein` allocated the same matrix per call. The kernel now keeps
+three rolling rows in one scratch buffer (`damerauLevenshteinScratch`) that
+`closest` sizes to the longest candidate and reuses across the whole scan;
+`damerauLevenshtein` delegates with a nil scratch. Distances, the chosen
+match, and ordering are unchanged. Medians of 10 runs, cpu=12.
+
+| Benchmark | ns/op | B/op | allocs/op |
+| --- | --- | --- | --- |
+| BenchmarkClosest before | 8,611 | 14,008 | 176 |
+| BenchmarkClosest after | 5,429 | 416 | 1 |
+| BenchmarkDamerauLevenshtein before | 597 | 832 | 9 |
+| BenchmarkDamerauLevenshtein after | 413 | 240 | 1 |
+
+The scratch rows cut `BenchmarkClosest` from 176 to 1 alloc/op (-99.4%) and
+14,008 to 416 B/op (-97.0%), and ~37% faster (8.6µs to 5.4µs); the standalone
+kernel drops 9 to 1 allocs/op (832 to 240 B/op), ns/op within noise. The
+remaining alloc is the single scratch slice per `closest` call.
+
+Reproduce:
+
+```
+go test -run '^$' -bench='BenchmarkClosest|BenchmarkDamerauLevenshtein' -benchmem -count=10 ./cmd/zever/
+```
+
 ## Commands
 
 Router and queue are fast, so they run 1s per bench; ORM runs 100
