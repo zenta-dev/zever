@@ -3,6 +3,7 @@ package db
 import (
 	"context"
 	"fmt"
+	"strconv"
 	"strings"
 	"sync/atomic"
 
@@ -282,9 +283,8 @@ func encodeDocumentMetadata(doc search.Document) ([]byte, error) {
 }
 
 // upsertOne writes one document with INSERT ... ON CONFLICT (id, idx)
-// DO UPDATE so re-indexing replaces the row. Batch callers loop it: the
-// typed builder has no EXCLUDED reference, so one shared DO UPDATE SET list
-// cannot carry per-row replacement values for a multi-row statement.
+// DO UPDATE so re-indexing replaces the row. Index (single-document) callers
+// use it; batch callers go through upsertBatch's multi-row statement.
 func (d *driver) upsertOne(ctx context.Context, op string, doc search.Document, metaJSON []byte) error {
 	err := orm.InsertInto(d.tbl).Values(
 		orm.Set(d.cID, doc.ID),
@@ -320,8 +320,8 @@ func (d *driver) Index(ctx context.Context, doc search.Document) error {
 	return d.upsertOne(ctx, "index", doc, metaJSON)
 }
 
-// IndexBatch adds or replaces all of docs, one typed upsert per document
-// (see upsertOne). An empty docs is a no-op.
+// IndexBatch adds or replaces all of docs with one multi-row upsert (see
+// upsertBatch). An empty docs is a no-op.
 func (d *driver) IndexBatch(ctx context.Context, docs []search.Document) error {
 	if err := d.checkDialect(); err != nil {
 		return err
@@ -337,15 +337,92 @@ func (d *driver) IndexBatch(ctx context.Context, docs []search.Document) error {
 		}
 	}
 
+	metas := make([][]byte, len(docs))
+
 	for i, doc := range docs {
 		metaJSON, err := encodeDocumentMetadata(doc)
 		if err != nil {
 			return fmt.Errorf("postgres: index batch: index %d: %w", i, err)
 		}
 
-		if err := d.upsertOne(ctx, "index batch", doc, metaJSON); err != nil {
-			return err
+		metas[i] = metaJSON
+	}
+
+	return d.upsertBatch(ctx, docs, metas)
+}
+
+// upsertBatch writes docs as one multi-row INSERT ... ON CONFLICT upsert.
+// Both dialects expose the proposed row as `excluded` in the DO UPDATE
+// clause, so one shared SET list carries every row's own replacement
+// values; the per-document loop in upsertOne exists only because the
+// typed builder cannot express that reference.
+func (d *driver) upsertBatch(ctx context.Context, docs []search.Document, metas [][]byte) error {
+	var sb strings.Builder
+
+	sb.WriteString(`INSERT INTO search_documents (id, idx, content, metadata) VALUES `)
+
+	if d.conn.Dialect() == "postgres" {
+		for i := range docs {
+			if i > 0 {
+				sb.WriteByte(',')
+			}
+
+			sb.WriteByte('(')
+
+			for j := 0; j < 4; j++ {
+				if j > 0 {
+					sb.WriteByte(',')
+				}
+
+				sb.WriteByte('$')
+				sb.WriteString(strconv.Itoa(i*4 + j + 1))
+			}
+
+			sb.WriteByte(')')
 		}
+	} else {
+		for i := range docs {
+			if i > 0 {
+				sb.WriteByte(',')
+			}
+
+			sb.WriteString(`(?, ?, ?, ?)`)
+		}
+	}
+
+	sb.WriteString(` ON CONFLICT(id, idx) DO UPDATE SET content = excluded.content, metadata = excluded.metadata`)
+
+	args := make([]any, 0, len(docs)*4)
+
+	for i := range docs {
+		args = append(args, docs[i].ID, docs[i].Index, docs[i].Content, metas[i])
+	}
+
+	return d.execBatch(ctx, sb.String(), args)
+}
+
+// execBatch runs one rendered write against conn, preferring a cached
+// prepared statement when the adapter implements db.Preparer -- the same
+// probe orm's execQuery uses, so repeated identical SQL text (one batch
+// shape) reuses the driver-side statement.
+func (d *driver) execBatch(ctx context.Context, query string, args []any) error {
+	if p, ok := d.conn.(coredb.Preparer); ok {
+		stmt, err := p.Prepare(ctx, query)
+		if err != nil {
+			return fmt.Errorf("postgres: index batch: %w", err)
+		}
+
+		defer func() { _ = stmt.Close() }()
+
+		if _, err := stmt.Exec(ctx, args...); err != nil {
+			return fmt.Errorf("postgres: index batch: %w", err)
+		}
+
+		return nil
+	}
+
+	if _, err := d.conn.Exec(ctx, query, args...); err != nil {
+		return fmt.Errorf("postgres: index batch: %w", err)
 	}
 
 	return nil
@@ -486,7 +563,7 @@ func (d *driver) searchPostgres(ctx context.Context, query string, filters map[s
 
 	defer func() { _ = rows.Close() }()
 
-	var hits []search.Hit
+	hits := make([]search.Hit, 0, limit)
 
 	for rows.Next() {
 		var id string
@@ -532,21 +609,31 @@ func (d *driver) searchSQLite(ctx context.Context, query string, filters map[str
 
 	where := "search_fts MATCH ?"
 
-	var filter []any
+	hasIndex := filters["index"] != ""
 
-	if index := filters["index"]; index != "" {
+	if hasIndex {
 		where += " AND d.idx = ?"
-		filter = []any{index}
 	}
 
 	hitsSQL := "SELECT d.id, d.metadata, -bm25(search_fts) FROM search_fts f" +
 		" JOIN search_documents d ON d.rowid = f.rowid WHERE " + where +
 		" ORDER BY bm25(search_fts) LIMIT ? OFFSET ?"
-	hitsArgs := append(append([]any{match}, filter...), limit, offset)
 
 	countSQL := "SELECT COUNT(*) FROM search_fts f" +
 		" JOIN search_documents d ON d.rowid = f.rowid WHERE " + where
-	countArgs := append([]any{match}, filter...)
+
+	hitsArgs := make([]any, 0, len(filters)+3)
+	hitsArgs = append(hitsArgs, match)
+
+	if hasIndex {
+		hitsArgs = append(hitsArgs, filters["index"])
+	}
+
+	// countArgs aliases hitsArgs' prefix: the limit/offset append below
+	// stays within the reserved capacity, so the shared backing array
+	// never reallocates under the count args.
+	countArgs := hitsArgs
+	hitsArgs = append(hitsArgs, limit, offset)
 
 	rows, err := d.conn.Query(ctx, hitsSQL, hitsArgs...)
 	if err != nil {
@@ -555,7 +642,7 @@ func (d *driver) searchSQLite(ctx context.Context, query string, filters map[str
 
 	defer func() { _ = rows.Close() }()
 
-	hits := make([]search.Hit, 0)
+	hits := make([]search.Hit, 0, limit)
 
 	for rows.Next() {
 		var id string
