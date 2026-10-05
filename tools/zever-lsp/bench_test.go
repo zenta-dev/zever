@@ -41,7 +41,7 @@ func BenchmarkHoverAt(b *testing.B) {
 
 	b.ReportAllocs()
 	b.ResetTimer()
-	for i := 0; i < b.N; i++ {
+	for b.Loop() {
 		if h := hoverAt(schema, file, cursor); h == nil {
 			b.Fatal("nil hover")
 		}
@@ -55,7 +55,7 @@ func BenchmarkCompletionAt(b *testing.B) {
 
 	b.ReportAllocs()
 	b.ResetTimer()
-	for i := 0; i < b.N; i++ {
+	for b.Loop() {
 		if items := completionAt(schema, file, hoverSrc, cursor); len(items) == 0 {
 			b.Fatal("no completion items")
 		}
@@ -69,7 +69,7 @@ func BenchmarkDefinitionAt(b *testing.B) {
 
 	b.ReportAllocs()
 	b.ResetTimer()
-	for i := 0; i < b.N; i++ {
+	for b.Loop() {
 		_ = definitionAt(schema, file, cursor)
 	}
 }
@@ -81,7 +81,20 @@ func BenchmarkHighlightsAt(b *testing.B) {
 
 	b.ReportAllocs()
 	b.ResetTimer()
-	for i := 0; i < b.N; i++ {
+	for b.Loop() {
 		_ = highlightsAt(file, cursor)
+	}
+}
+
+// BenchmarkValidateScalarAt measures the @validate scalar-type recovery.
+func BenchmarkValidateScalarAt(b *testing.B) {
+	const src = "entity User {\n id: string @validate(\n}\n"
+
+	b.ReportAllocs()
+	b.ResetTimer()
+	for b.Loop() {
+		if got := validateScalarAt(src, protocol.Position{Line: 1, Character: 22}); got != "string" {
+			b.Fatalf("validateScalarAt = %q", got)
+		}
 	}
 }

@@ -1,0 +1,13 @@
+package testfile
+
+import (
+	"errors"
+	"fmt"
+)
+
+func bad() {
+	_ = errors.New("no prefix")
+	_ = errors.New("[CODE] bracket")
+	_ = fmt.Errorf("pkg: %w and %w", errors.New("pkg: a"), errors.New("pkg: b"))
+	panic("boom")
+}

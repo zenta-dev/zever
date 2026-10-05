@@ -1,0 +1,17 @@
+package apperror
+
+import (
+	"errors"
+	"fmt"
+)
+
+// ErrBoom is a sentinel.
+var ErrBoom = errors.New("apperror: boom")
+
+func newCoded() error {
+	return errors.New("[CODE] something")
+}
+
+func wraps() error {
+	return fmt.Errorf("apperror: %w and %w", ErrBoom, ErrBoom)
+}

@@ -152,7 +152,7 @@ func TestChunkGroups(t *testing.T) {
 
 func TestExcludedDir(t *testing.T) {
 	t.Parallel()
-	yes := []string{".git", ".git/objects", "examples/external-sms", "examples/external-sms/go.mod", "docs/examples", "docs/examples/cache_test.go"}
+	yes := []string{".git", ".git/objects", ".worktrees", ".worktrees/zever", "examples/external-sms", "examples/external-sms/go.mod", "docs/examples", "docs/examples/cache_test.go"}
 	for _, d := range yes {
 		if !excludedDir(d) {
 			t.Errorf("excludedDir(%q) = false, want true", d)
@@ -168,7 +168,7 @@ func TestExcludedDir(t *testing.T) {
 
 func TestIsDocsPath(t *testing.T) {
 	t.Parallel()
-	docs := []string{"README.md", "core/cache/README.md", "x/y.mdx", "docs/guide.md", "CHANGELOG.md", "CITATION.cff", "LICENSE", "LICENSE-MIT", "core/db/LICENSE.md"}
+	docs := []string{"README.md", "core/cache/README.md", "x/y.mdx", "docs", "docs/guide.md", "CHANGELOG.md", "CITATION.cff", "LICENSE", "LICENSE-MIT", "core/db/LICENSE.md"}
 	for _, f := range docs {
 		if !isDocsPath(f) {
 			t.Errorf("isDocsPath(%q) = false, want true", f)

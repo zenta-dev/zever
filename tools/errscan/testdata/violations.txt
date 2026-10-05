@@ -1,0 +1,14 @@
+package violations
+
+import (
+	"errors"
+	"fmt"
+)
+
+func bad() {
+	_ = errors.New("no prefix here")
+	_ = fmt.Errorf("also no prefix %d", 1)
+	_ = errors.New("[CODE] bracketed")
+	_ = fmt.Errorf("pkg: two %w and %w", errors.New("pkg: a"), errors.New("pkg: b"))
+	panic("boom")
+}

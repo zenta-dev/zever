@@ -1,0 +1,8 @@
+package allowline
+
+import "errors"
+
+func bad() {
+	_ = errors.New("no prefix") // errscan:allow
+	_ = errors.New("another no prefix")
+}

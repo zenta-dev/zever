@@ -1,0 +1,13 @@
+package clean
+
+import (
+	"errors"
+	"fmt"
+)
+
+// ErrBad reports a bad thing.
+var ErrBad = errors.New("clean: bad thing")
+
+func wrap() error {
+	return fmt.Errorf("clean: wrap: %w", ErrBad)
+}
