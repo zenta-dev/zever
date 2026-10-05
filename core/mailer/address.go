@@ -72,8 +72,8 @@ func (a Address) Validate() error {
 		return InvalidAddressError{Field: "Address", Value: addr}
 	}
 
-	parts := strings.SplitN(addr, "@", 2)
-	local, domain := parts[0], parts[1]
+	at := strings.IndexByte(addr, '@')
+	local, domain := addr[:at], addr[at+1:]
 	if local == "" || domain == "" {
 		return InvalidAddressError{Field: "Address", Value: addr}
 	}
@@ -90,11 +90,19 @@ func (a Address) Validate() error {
 			return InvalidAddressError{Field: "Address", Value: addr}
 		}
 	}
-	labels := strings.Split(domain, ".")
-	for _, l := range labels {
-		if l == "" {
-			return InvalidAddressError{Field: "Address", Value: addr}
+	empty := true
+	for i := 0; i < len(domain); i++ {
+		if domain[i] == '.' {
+			if empty {
+				return InvalidAddressError{Field: "Address", Value: addr}
+			}
+			empty = true
+		} else {
+			empty = false
 		}
+	}
+	if empty {
+		return InvalidAddressError{Field: "Address", Value: addr}
 	}
 
 	return nil

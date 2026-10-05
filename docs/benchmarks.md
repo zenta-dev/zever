@@ -250,6 +250,39 @@ over-reserves header slack, still a single buffer allocation) and falls
 the buffer ~7 times; the encoded attachment now lives in one preallocated
 slice).
 
+Mailer log (`adapters/mailer/log`, `io.Discard`, 2026-10-05). `Send` reuses
+one `logMessage` (with its address/attachment slices) across calls under the
+existing mutex, encodes into a reused `bytes.Buffer` via `json.MarshalWrite`
+(passing the struct by pointer so `encoding/json/v2` skips its `reflect.New`
+shallow copy and its `bytes.Clone` result copy), and writes the buffer plus
+the newline byte in a single `Write`. `mailer.Address.Validate` was rewritten
+to split on `@` and scan domain labels with `strings.IndexByte` instead of
+`strings.SplitN`/`strings.Split`, dropping its per-call slices. The checker
+constructor now allocates the reusable scratch state once (288 B, up from
+48 B); the per-send path no longer allocates at all. "before" is the
+`json.Marshal` + `append(data, '\n')` path. Medians of 10 runs.
+
+| Benchmark | ns/op | B/op | allocs/op |
+| --- | --- | --- | --- |
+| BenchmarkSend before (cpu=1) | 2,034 | 1,088 | 12 |
+| BenchmarkSend after (cpu=1) | 1,462 | 0 | 0 |
+| BenchmarkSendParallel before (cpu=1) | 2,280 | 1,090 | 12 |
+| BenchmarkSendParallel after (cpu=1) | 1,599 | 0 | 0 |
+
+`Send` drops 12 allocs/op to 0 and ~1 KiB/op to 0, and is ~28% faster at
+cpu=1 (2,034 to 1,462 ns/op); the concurrent variant tracks it (2,280 to
+1,599 ns/op). The per-call work was six allocs from `Address.Validate`
+(`SplitN`+`Split` per recipient), two address slices, one attachment slice,
+and the codec's `reflect.New` + `bytes.Clone` + `append` growth. All are now
+reused or eliminated; output bytes are unchanged (verified against
+`json.Marshal` + newline).
+
+Reproduce:
+
+```
+go test -run '^$' -bench=. -benchmem -count=10 ./adapters/mailer/log/
+```
+
 ## Commands
 
 Router and queue are fast, so they run 1s per bench; ORM runs 100
@@ -302,6 +335,9 @@ Concurrent-load (`b.RunParallel`) coverage:
   (`adapters/ratelimit/memory/memory_bench_test.go`) -- 256 precomputed
   keys cycled per iteration over one shared limiter (many-keys), and one
   shared key (hot-key, lock-contention shape).
+- Mailer log: `BenchmarkSendParallel`
+  (`adapters/mailer/log/log_bench_test.go`) -- one shared checker over
+  `io.Discard`, exercising the mutex-guarded encode/write path.
 
 Adaptor-isolation coverage:
 

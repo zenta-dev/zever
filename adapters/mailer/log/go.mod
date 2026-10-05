@@ -4,7 +4,6 @@ go 1.27.0
 
 require (
 	github.com/zenta-dev/zever/core/mailer v0.5.3
-	github.com/zenta-dev/zever/shared/codec v0.5.3
 	github.com/zenta-dev/zever/shared/traceprop v0.5.3
 	go.opentelemetry.io/otel/trace v1.46.0
 )
