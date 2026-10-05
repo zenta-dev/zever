@@ -20,6 +20,7 @@ var _ eventbus.Pusher = (*bus)(nil)
 type subscription struct {
 	ch      chan eventbus.Message
 	done    chan struct{}
+	once    sync.Once
 	dropped atomic.Uint64
 }
 
@@ -121,11 +122,15 @@ func (b *bus) Publish(ctx context.Context, topic string, payload eventbus.Payloa
 		return eventbus.ErrPayloadTooLarge
 	}
 
-	base := eventbus.NewMessage(topic, payload, traceprop.Inject(ctx, headers))
-
 	b.mu.RLock()
 	subs := append([]*subscription(nil), b.topics[topic]...)
 	b.mu.RUnlock()
+
+	if len(subs) == 0 {
+		return nil
+	}
+
+	base := eventbus.NewMessage(topic, payload, traceprop.Inject(ctx, headers))
 
 	for _, sub := range subs {
 		m := base.Clone()
@@ -172,35 +177,37 @@ func (b *bus) Subscribe(ctx context.Context, topic string, handler eventbus.Hand
 
 	go b.forward(ctx, topic, sub, handler)
 
-	var once sync.Once
-
-	unsub := func() {
-		once.Do(func() {
-			b.mu.Lock()
-
-			subs := b.topics[topic]
-			for i, s := range subs {
-				if s == sub {
-					b.topics[topic] = append(subs[:i:i], subs[i+1:]...)
-					break
-				}
-			}
-
-			b.mu.Unlock()
-
-			close(sub.done)
-
-			for {
-				select {
-				case <-sub.ch:
-				default:
-					return
-				}
-			}
-		})
-	}
+	unsub := func() { sub.detach(b, topic) }
 
 	return unsub, nil
+}
+
+// detach removes the subscription from its topic, closes done, and drains the
+// delivery channel. It runs at most once: later calls are no-ops.
+func (s *subscription) detach(b *bus, topic string) {
+	s.once.Do(func() {
+		b.mu.Lock()
+
+		subs := b.topics[topic]
+		for i, cur := range subs {
+			if cur == s {
+				b.topics[topic] = append(subs[:i:i], subs[i+1:]...)
+				break
+			}
+		}
+
+		b.mu.Unlock()
+
+		close(s.done)
+
+		for {
+			select {
+			case <-s.ch:
+			default:
+				return
+			}
+		}
+	})
 }
 
 func (b *bus) forward(parent context.Context, topic string, sub *subscription, handler eventbus.Handler) {

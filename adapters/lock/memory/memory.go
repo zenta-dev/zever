@@ -123,12 +123,29 @@ func (a *adapter) TryAcquire(_ context.Context, key string, ttl time.Duration) (
 
 // Acquire blocks, retrying every retry interval, until the lock is acquired
 // or ctx is done. It returns ctx.Err() wrapped if the context lapses first.
+// The retry timer is created only after the first claim fails, so the
+// uncontended path allocates nothing for it.
 func (a *adapter) Acquire(ctx context.Context, key string, ttl time.Duration) (lock.Lock, error) {
+	l, ok, err := a.TryAcquire(ctx, key, ttl)
+	if err != nil {
+		return nil, err
+	}
+
+	if ok {
+		return l, nil
+	}
+
 	t := time.NewTimer(a.retryInterval)
 	defer t.Stop()
 
 	for {
-		l, ok, err := a.TryAcquire(ctx, key, ttl)
+		select {
+		case <-ctx.Done():
+			return nil, fmt.Errorf("lock: acquire %q: %w", key, ctx.Err())
+		case <-t.C:
+		}
+
+		l, ok, err = a.TryAcquire(ctx, key, ttl)
 		if err != nil {
 			return nil, err
 		}
@@ -138,12 +155,6 @@ func (a *adapter) Acquire(ctx context.Context, key string, ttl time.Duration) (l
 		}
 
 		t.Reset(a.retryInterval)
-
-		select {
-		case <-ctx.Done():
-			return nil, fmt.Errorf("lock: acquire %q: %w", key, ctx.Err())
-		case <-t.C:
-		}
 	}
 }
 
