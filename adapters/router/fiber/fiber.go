@@ -1,16 +1,21 @@
 package fiber
 
 import (
+	"context"
+	"errors"
 	"fmt"
+	"io"
+	"net"
 	"net/http"
 	"net/http/httptest"
 	"runtime/debug"
+	"strconv"
 	"strings"
 	"sync"
 
-	"github.com/gofiber/adaptor/v2"
 	"github.com/gofiber/fiber/v2"
 	recovermw "github.com/gofiber/fiber/v2/middleware/recover"
+	"github.com/valyala/fasthttp"
 	"github.com/valyala/fasthttp/fasthttpadaptor"
 
 	"github.com/zenta-dev/zever/adapters/log/noop"
@@ -34,7 +39,7 @@ func New(opts router.Options) (router.Router, error) {
 	app := fiber.New(fiber.Config{AppName: appName, CaseSensitive: true})
 	app.Use(recovermw.New())
 
-	return &fiberDriver{app: app, httpHandler: adaptor.FiberApp(app), routes: make(map[string]bool), logger: opts.Logger}, nil
+	return &fiberDriver{app: app, httpHandler: newHTTPHandler(app), routes: make(map[string]bool), logger: opts.Logger}, nil
 }
 
 type fiberDriver struct {
@@ -134,6 +139,97 @@ func (d *fiberDriver) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 	d.httpHandler(w, r)
 }
 
+// newHTTPHandler adapts a fiber.App to a net/http handler.
+//
+// It mirrors gofiber/adaptor.FiberApp but avoids two per-request costs the
+// generic adaptor pays unconditionally:
+//
+//   - io.ReadAll allocates a 512-byte buffer even for http.NoBody, so an empty
+//     body is detected up front and skipped.
+//   - net.ResolveTCPAddr runs the resolver machinery even for a literal
+//     ip:port RemoteAddr, so the common case is parsed directly and only
+//     non-literal addresses fall back to ResolveTCPAddr.
+//
+// Everything else (header conversion, response status/header/body write) is
+// kept identical to the adaptor so response semantics do not change.
+func newHTTPHandler(app *fiber.App) http.HandlerFunc {
+	return func(w http.ResponseWriter, r *http.Request) {
+		req := fasthttp.AcquireRequest()
+		defer fasthttp.ReleaseRequest(req)
+
+		if body := r.Body; body != nil && body != http.NoBody {
+			b, err := io.ReadAll(body)
+			if err != nil {
+				http.Error(w, http.StatusText(http.StatusInternalServerError), http.StatusInternalServerError)
+
+				return
+			}
+
+			req.Header.SetContentLength(len(b))
+			_, _ = req.BodyWriter().Write(b)
+		}
+
+		req.Header.SetMethod(r.Method)
+		req.SetRequestURI(r.RequestURI)
+		req.SetHost(r.Host)
+		for key, val := range r.Header {
+			for _, v := range val {
+				req.Header.Set(key, v)
+			}
+		}
+
+		remoteAddr, err := resolveRemoteAddr(r.RemoteAddr)
+		if err != nil {
+			http.Error(w, http.StatusText(http.StatusInternalServerError), http.StatusInternalServerError)
+
+			return
+		}
+
+		var fctx fasthttp.RequestCtx
+		fctx.Init(req, remoteAddr, nil)
+		app.Handler()(&fctx)
+
+		fctx.Response.Header.VisitAll(func(k, v []byte) { //nolint:staticcheck // All() allocates a range-over-func closure per request; VisitAll delegates to it without that cost.
+			w.Header().Add(string(k), string(v))
+		})
+		w.WriteHeader(fctx.Response.StatusCode())
+		_, _ = w.Write(fctx.Response.Body())
+	}
+}
+
+// resolveRemoteAddr turns a net/http RemoteAddr into the net.Addr fiber stores
+// on the request context. Literal ip:port addresses are parsed without the
+// resolver; anything else (hostnames, IPv6 zones, malformed ports) falls back
+// to net.ResolveTCPAddr so behavior matches the adaptor. A bare address with no
+// port gets the adaptor's ":80" default.
+func resolveRemoteAddr(addr string) (net.Addr, error) {
+	host, port, err := net.SplitHostPort(addr)
+	if err != nil {
+		var ae *net.AddrError
+		if !errors.As(err, &ae) || ae.Err != "missing port in address" {
+			return net.ResolveTCPAddr("tcp", addr)
+		}
+
+		addr = net.JoinHostPort(addr, "80")
+
+		if host, port, err = net.SplitHostPort(addr); err != nil {
+			return net.ResolveTCPAddr("tcp", addr)
+		}
+	}
+
+	if ip := net.ParseIP(host); ip != nil {
+		if p, perr := strconv.Atoi(port); perr == nil && p >= 0 && p <= 65535 {
+			if v4 := ip.To4(); v4 != nil {
+				ip = v4
+			}
+
+			return &net.TCPAddr{IP: ip, Port: p}, nil
+		}
+	}
+
+	return net.ResolveTCPAddr("tcp", addr)
+}
+
 type fiberGroup struct {
 	d      *fiberDriver
 	group  fiber.Router
@@ -219,10 +315,15 @@ func (d *fiberDriver) routerLogf(format string, args ...any) {
 
 func wrapHandler(handler http.HandlerFunc) fiber.Handler {
 	return func(c *fiber.Ctx) error {
+		// Build the params context once and hand it to serveHTTP, which attaches
+		// it to the converted request. Doing it here (rather than via a second
+		// r.WithContext inside the bridged handler) keeps a single *http.Request
+		// copy per request instead of two.
+		ctx := router.WithParams(c.Context(), c.AllParams())
 		h := http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-			handler(w, r.WithContext(router.WithParams(r.Context(), c.AllParams())))
+			handler(w, r)
 		})
-		serveHTTP(c, h)
+		serveHTTP(ctx, c, h)
 
 		return nil
 	}
@@ -253,7 +354,7 @@ func wrapMiddleware(mw func(http.Handler) http.Handler) fiber.Handler {
 				}
 			}
 		})
-		serveHTTP(c, mw(nextHandler))
+		serveHTTP(c.Context(), c, mw(nextHandler))
 		if next {
 			return c.Next()
 		}
@@ -296,8 +397,10 @@ func resetRecorder(rec *httptest.ResponseRecorder) {
 
 // serveHTTP runs h against the current fiber request and merges the recorded
 // status, headers and body back into the fiber response. The body is appended
-// (never replaced) so output from earlier chained handlers is preserved.
-func serveHTTP(c *fiber.Ctx, h http.Handler) {
+// (never replaced) so output from earlier chained handlers is preserved. ctx is
+// attached to the converted request so callers can carry params or middleware
+// values without a second *http.Request copy.
+func serveHTTP(ctx context.Context, c *fiber.Ctx, h http.Handler) {
 	var r http.Request
 	if err := fasthttpadaptor.ConvertRequest(c.Context(), &r, true); err != nil {
 		c.Status(fiber.StatusInternalServerError)
@@ -314,7 +417,7 @@ func serveHTTP(c *fiber.Ctx, h http.Handler) {
 		recorderPool.Put(rec)
 	}()
 
-	h.ServeHTTP(rec, r.WithContext(c.Context()))
+	h.ServeHTTP(rec, r.WithContext(ctx))
 
 	for k, vv := range rec.Header() {
 		for _, v := range vv {
