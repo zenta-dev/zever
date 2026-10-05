@@ -374,6 +374,43 @@ the decode dominated the scan. B/op falls ~53% (176.8 KiB to 82.9 KiB).
 Semantic note: corrupt metadata in a row that does not survive topK no longer
 fails the query (`TestEdgeQuery_corruptMetadataBelowTopK` documents this); a
 surviving row with corrupt metadata still fails.
+Config redaction + env overlay (`config`, 2026-10-05). Three changes, all
+semantics-preserving. (1) `isSensitiveKey` no longer allocates a
+`strings.ToLower` copy per key: already-lowercase ASCII keys (the common case
+for JSON-tagged option maps) match directly, mixed-case ASCII keys fold
+in place (`asciiContainsFold`/`asciiEqualFold`), and only non-ASCII keys fall
+back to `strings.ToLower`. (2) `Redact` merges the deep copy and the
+reclamation walk into a single pass (`redactCopyMap`), so values under
+sensitive keys are replaced instead of copied-then-dropped; the public
+contract (fresh copy, caller map never mutated) is unchanged.
+(3) `RedactedServices` redacts the freshly built `serviceToMap` output in
+place via `redactMap` — the maps are owned by the result, so the deep copy
+`Redact` used to perform was pure overhead. Separately, `applyEnv` used to
+call `strings.ToLower` on the head and rest of every env var (218 vars in
+the test environment, ~370 allocs/op); it now matches the head
+case-insensitively against the 34 known service names without allocation
+(`matchService`, first-byte candidate groups) and lowers the rest only on a
+match, and `findField` compares normalized field names without allocation
+(`normEqualFold`). Redaction output is byte-identical to the old
+implementation (verified by the full config suite plus an equivalence check
+over mixed-case keys, nested maps/slices, header lists, empty/nil values).
+Medians of 10 runs, cpu=12.
+
+| Benchmark | ns/op before | ns/op after | allocs/op before | allocs/op after |
+| --- | --- | --- | --- | --- |
+| BenchmarkRedactedServices | 112,600 | 74,060 | 597 | 539 |
+| BenchmarkLoadFile | 64,380 | 39,170 | 572 | 202 |
+| BenchmarkApplyEnv | 27,335 | 5,419 | 374 | 2 |
+| BenchmarkRedact | 1,783 | 1,239 | 12 | 10 |
+
+`ApplyEnv` drops 374 of its 374 allocs/op to 2 (the `os.Environ` slice and
+the one lowered field name) and is ~5x faster; `LoadFile` inherits most of
+that (572 to 202 allocs/op, ~39% faster) since the env overlay runs on every
+load. `RedactedServices` is ~34% faster; its remaining allocs/op are the
+JSON marshal/unmarshal bridge in `serviceToMap`, which stays marshal-based
+on purpose to preserve each package's json-tag semantics. `Redact` drops
+2 allocs/op (mixed-case header keys no longer allocate a lowered copy) and
+~31% ns/op from the merged pass.
 
 Reproduce:
 
@@ -381,6 +418,7 @@ Reproduce:
 go test -run '^$' -bench='BenchmarkClosest|BenchmarkDamerauLevenshtein' -benchmem -count=10 ./cmd/zever/
 go test -run '^$' -bench='BenchmarkQuery$' -benchmem -count=10 ./adapters/vectorstore/db/
 go test -run '^$' -bench=. -benchmem -count=10 ./adapters/search/db/
+go test -run '^$' -bench=. -benchmem -count=10 ./config/
 ```
 
 ## Commands
