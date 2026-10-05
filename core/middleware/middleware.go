@@ -41,7 +41,7 @@ func (r *statusRecorder) WriteHeader(status int) {
 // Write marks the header as written and forwards the bytes to the wrapped writer.
 func (r *statusRecorder) Write(b []byte) (int, error) {
 	r.wroteHeader = true
-
+	// codeql[go/reflected-xss] false positive: taint bridges request->response through fasthttp.RequestCtx in the fiber adapter; fiber reflects no request data into responses.
 	return r.ResponseWriter.Write(b)
 }
 
