@@ -84,8 +84,9 @@ enum E { a, b }`
 
 	b.ReportAllocs()
 	for b.Loop() {
-		if _, diags := Resolve([]*ast.File{file}); diags.HasErrors() {
-			b.Fatal(diags)
+		_, diags := Resolve([]*ast.File{file})
+		if !diags.HasErrors() {
+			b.Fatal("Resolve(invalid) produced no diagnostics, want best-effort errors")
 		}
 	}
 }

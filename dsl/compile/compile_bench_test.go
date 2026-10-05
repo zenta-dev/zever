@@ -82,8 +82,9 @@ func BenchmarkCompileInvalid(b *testing.B) {
 
 	b.ReportAllocs()
 	for b.Loop() {
-		if _, diags := Compile(files); diags.HasErrors() {
-			b.Fatal(diags)
+		_, diags := Compile(files)
+		if !diags.HasErrors() {
+			b.Fatal("Compile(invalid) produced no diagnostics, want best-effort errors")
 		}
 	}
 }
