@@ -40,10 +40,18 @@ func benchClient(b *testing.B) *client {
 	return &client{eval: tpl.Evaluate}
 }
 
+// benchCtx returns a context carrying the plan signal the test template's
+// is_pro condition matches, so benchmarks evaluate the real conditional
+// path instead of the SDK's missing-signal warning path.
+func benchCtx(b *testing.B) context.Context {
+	b.Helper()
+	return flag.WithEvalContext(b.Context(), flag.EvalContext{Signals: map[string]any{"plan": "pro"}})
+}
+
 // BenchmarkBool measures evaluate plus boolean coercion.
 func BenchmarkBool(b *testing.B) {
 	c := benchClient(b)
-	ctx := b.Context()
+	ctx := benchCtx(b)
 
 	b.ReportAllocs()
 	b.ResetTimer()
@@ -58,7 +66,7 @@ func BenchmarkBool(b *testing.B) {
 // BenchmarkString measures evaluate plus string lookup.
 func BenchmarkString(b *testing.B) {
 	c := benchClient(b)
-	ctx := b.Context()
+	ctx := benchCtx(b)
 
 	b.ReportAllocs()
 	b.ResetTimer()
@@ -73,7 +81,7 @@ func BenchmarkString(b *testing.B) {
 // BenchmarkInt measures evaluate plus integer parsing.
 func BenchmarkInt(b *testing.B) {
 	c := benchClient(b)
-	ctx := b.Context()
+	ctx := benchCtx(b)
 
 	b.ReportAllocs()
 	b.ResetTimer()
@@ -88,7 +96,7 @@ func BenchmarkInt(b *testing.B) {
 // BenchmarkJSON measures evaluate plus JSON decoding.
 func BenchmarkJSON(b *testing.B) {
 	c := benchClient(b)
-	ctx := b.Context()
+	ctx := benchCtx(b)
 
 	b.ReportAllocs()
 	b.ResetTimer()
