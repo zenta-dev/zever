@@ -35,6 +35,9 @@ var randRead = rand.Read
 // (SetDeadline on a live conn does not fail).
 var setDeadline = func(c net.Conn, t time.Time) error { return c.SetDeadline(t) }
 
+// crlf is the MIME line terminator, shared to avoid per-line literals.
+var crlf = []byte("\r\n")
+
 type smtpMailer struct {
 	addr    string
 	host    string
@@ -278,24 +281,38 @@ func buildMIME(msg *mailer.Mail) ([]byte, error) {
 	}
 
 	var buf bytes.Buffer
+	// Grow to the estimated final size so the buffer allocates once
+	// instead of doubling through every growth step.
+	buf.Grow(int(estimateSize(msg, len(msg.To)+len(msg.Cc))))
 	outer := multipart.NewWriter(&buf)
 	// SetBoundary only fails on invalid bytes; "zever-"+hex is always valid.
 	_ = outer.SetBoundary(outerBoundary)
 
 	buf.WriteString("MIME-Version: 1.0\r\n")
-	fmt.Fprintf(&buf, "From: %s\r\n", msg.From.String())
+	buf.WriteString("From: ")
+	buf.WriteString(msg.From.String())
+	buf.Write(crlf)
 	if len(msg.To) > 0 {
-		fmt.Fprintf(&buf, "To: %s\r\n", joinAddresses(msg.To))
+		buf.WriteString("To: ")
+		buf.WriteString(joinAddresses(msg.To))
+		buf.Write(crlf)
 	}
 	if len(msg.Cc) > 0 {
-		fmt.Fprintf(&buf, "Cc: %s\r\n", joinAddresses(msg.Cc))
+		buf.WriteString("Cc: ")
+		buf.WriteString(joinAddresses(msg.Cc))
+		buf.Write(crlf)
 	}
-	fmt.Fprintf(&buf, "Subject: %s\r\n", encodeHeader(sanitizeHeader(msg.Subject)))
-	fmt.Fprintf(&buf, "Content-Type: multipart/mixed; boundary=%q\r\n", outer.Boundary())
+	buf.WriteString("Subject: ")
+	buf.WriteString(encodeHeader(sanitizeHeader(msg.Subject)))
+	buf.Write(crlf)
+	buf.WriteString("Content-Type: multipart/mixed; boundary=\"")
+	buf.WriteString(outer.Boundary())
+	buf.WriteString("\"")
+	buf.Write(crlf)
 	buf.WriteString("\r\n")
 
 	altHeader := textproto.MIMEHeader{}
-	altHeader.Set("Content-Type", fmt.Sprintf("multipart/alternative; boundary=%q", altBoundary))
+	altHeader.Set("Content-Type", "multipart/alternative; boundary=\""+altBoundary+"\"")
 	altPart, _ := outer.CreatePart(altHeader) // Buffer-backed writer never fails.
 	alt := multipart.NewWriter(altPart)
 	// SetBoundary only fails on invalid bytes; "zever-"+hex is always valid.
@@ -327,10 +344,10 @@ func buildMIME(msg *mailer.Mail) ([]byte, error) {
 		h.Set("Content-Transfer-Encoding", "base64")
 		name := sanitizeFilename(att.Name)
 		if att.Inline && att.ContentID != "" {
-			h.Set("Content-Disposition", fmt.Sprintf(`inline; filename="%s"`, name))
+			h.Set("Content-Disposition", "inline; filename=\""+name+"\"")
 			h.Set("Content-ID", "<"+sanitizeHeader(att.ContentID)+">")
 		} else {
-			h.Set("Content-Disposition", fmt.Sprintf(`attachment; filename="%s"`, name))
+			h.Set("Content-Disposition", "attachment; filename=\""+name+"\"")
 		}
 		p, _ := outer.CreatePart(h) // Buffer-backed writer never fails.
 		// The part writer feeds a bytes.Buffer and cannot fail; writeBase64
@@ -361,13 +378,17 @@ func writeQP(w io.Writer, s string) error {
 }
 
 func writeBase64(w io.Writer, content []byte) error {
-	encoded := base64.StdEncoding.EncodeToString(content)
+	encoded := make([]byte, base64.StdEncoding.EncodedLen(len(content)))
+	base64.StdEncoding.Encode(encoded, content)
 	for i := 0; i < len(encoded); i += 76 {
 		end := i + 76
 		if end > len(encoded) {
 			end = len(encoded)
 		}
-		if _, err := io.WriteString(w, encoded[i:end]+"\r\n"); err != nil {
+		if _, err := w.Write(encoded[i:end]); err != nil {
+			return err
+		}
+		if _, err := w.Write(crlf); err != nil {
 			return err
 		}
 	}
@@ -375,11 +396,17 @@ func writeBase64(w io.Writer, content []byte) error {
 }
 
 func joinAddresses(addrs []mailer.Address) string {
-	parts := make([]string, len(addrs))
-	for i, a := range addrs {
-		parts[i] = a.String()
+	if len(addrs) == 1 {
+		return addrs[0].String()
 	}
-	return strings.Join(parts, ", ")
+	var b strings.Builder
+	for i, a := range addrs {
+		if i > 0 {
+			b.WriteString(", ")
+		}
+		b.WriteString(a.String())
+	}
+	return b.String()
 }
 
 func encodeHeader(s string) string {
