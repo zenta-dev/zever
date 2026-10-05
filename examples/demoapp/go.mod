@@ -224,7 +224,7 @@ replace github.com/zenta-dev/zever/shared/traceprop => ../../shared/traceprop
 require (
 	github.com/HugoSmits86/nativewebp v1.3.0 // indirect
 	github.com/anthonynsimon/bild v0.17.1 // indirect
-	github.com/anthropics/anthropic-sdk-go v1.76.0 // indirect
+	github.com/anthropics/anthropic-sdk-go v1.78.0 // indirect
 	github.com/bahlo/generic-list-go v0.2.0 // indirect
 	github.com/buger/jsonparser v1.1.2 // indirect
 	github.com/cespare/xxhash/v2 v2.3.0 // indirect
