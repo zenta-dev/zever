@@ -270,14 +270,35 @@ func ReadLimited(ctx context.Context, body io.Reader, limit int64) ([]byte, erro
 		limit = 0
 	}
 	lr := io.LimitReader(body, limit+1)
-	buf := make([]byte, 0, min(limit+1, maxReadChunk))
-	chunk := make([]byte, maxReadChunk)
+
+	// Read directly into the result buffer's spare capacity: no separate
+	// scratch buffer is ever allocated, and bodies up to the initial capacity
+	// cost exactly one allocation.
+	bufCap := int64(maxReadChunk)
+	if limit < int64(maxReadChunk) {
+		bufCap = limit + 1
+	}
+	buf := make([]byte, 0, bufCap)
+
 	for {
 		if err := ctx.Err(); err != nil {
 			return nil, err
 		}
-		n, rerr := lr.Read(chunk)
-		buf = append(buf, chunk[:n]...)
+
+		if len(buf) == cap(buf) {
+			grow := limit + 1
+			if c := int64(cap(buf)); c <= limit/2 {
+				grow = c * 2
+			}
+
+			nb := make([]byte, len(buf), grow)
+			copy(nb, buf)
+			buf = nb
+		}
+
+		n, rerr := lr.Read(buf[len(buf):cap(buf)])
+		buf = buf[:len(buf)+n]
+
 		if int64(len(buf)) > limit {
 			return nil, &TooLargeError{Limit: limit, Size: int64(len(buf))}
 		}
