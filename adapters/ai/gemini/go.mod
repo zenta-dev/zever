@@ -7,7 +7,7 @@ require (
 	github.com/zenta-dev/zever/shared/codec v0.5.3
 	github.com/zenta-dev/zever/shared/httpclient v0.5.3
 	go.uber.org/goleak v1.3.0
-	google.golang.org/genai v1.71.0
+	google.golang.org/genai v1.72.0
 )
 
 require (
