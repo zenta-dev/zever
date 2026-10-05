@@ -40,6 +40,7 @@ cloud.google.com/go/auth v0.19.0/go.mod h1:2Aph7BT2KnaSFOM0JDPyiYgNh6PL9vGMiP8CU
 cloud.google.com/go/auth v0.20.0/go.mod h1:942/yi/itH1SsmpyrbnTMDgGfdy2BUqIKyd0cyYLc5Q=
 cloud.google.com/go/auth v0.23.1/go.mod h1:4DhBRcqvtljQN3dJ57qtqbib5ZGCYE5f2crfiiC2EM0=
 cloud.google.com/go/auth/oauth2adapt v0.2.2/go.mod h1:wcYjgpZI9+Yu7LyYBg4pqSiaRkfEK3GQcpb7C/uyF1Q=
+cloud.google.com/go/auth/oauth2adapt v0.2.8/go.mod h1:XQ9y31RkqZCcwJWNSx2Xvric3RrU88hAYYbjDWYDL+c=
 cloud.google.com/go/automl v1.21.0 h1:brKXr4i9AMVfgbCKOYSu4rnIoz1ILIgcIAy3nerzEGc=
 cloud.google.com/go/automl v1.21.0/go.mod h1:MNbhUevuECzM3jqSOM7hmOedOdRJkm8xbbXW44SU15U=
 cloud.google.com/go/baremetalsolution v1.10.0 h1:6MaZilXzGZJ3mGqbSCdDezs9yrze6kcmBABsRUZ/aYI=
