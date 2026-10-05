@@ -1,6 +1,7 @@
 package s3
 
 import (
+	"net/http"
 	"testing"
 	"time"
 
@@ -80,6 +81,50 @@ func BenchmarkBucketPolicyDoc(b *testing.B) {
 	for b.Loop() {
 		if doc := bucketPolicyDoc(p, "bucket"); doc == "" {
 			b.Fatal("bucketPolicyDoc() returned empty document")
+		}
+	}
+}
+
+// BenchmarkEdgeSyncPolicyNoDrift measures the get+merge+compare path when the
+// live policy already matches the generated document byte-for-byte.
+func BenchmarkEdgeSyncPolicyNoDrift(b *testing.B) {
+	current := bucketPolicyDoc(*publicReadPolicyConfig().Default, "b")
+	tr := &stubTransport{do: func(r *http.Request) (*http.Response, error) {
+		return xmlResponse(r, 200, current), nil
+	}}
+	a := newBenchStubAdapter(b, publicReadPolicyConfig(), "require", tr)
+	ctx := b.Context()
+
+	b.ReportAllocs()
+	b.ResetTimer()
+
+	for b.Loop() {
+		if err := a.SyncPolicy(ctx, "b"); err != nil {
+			b.Fatalf("SyncPolicy(): %v", err)
+		}
+	}
+}
+
+// BenchmarkEdgeSyncPolicyDrift measures the drift path: get, merge, and put.
+func BenchmarkEdgeSyncPolicyDrift(b *testing.B) {
+	current := `{"Version":"2012-10-17","Statement":[{"Sid":"zever-read","Effect":"Deny",` +
+		`"Principal":{"AWS":"*"},"Action":"s3:GetObject","Resource":["arn:aws:s3:::b/*"]}]}`
+	tr := &stubTransport{do: func(r *http.Request) (*http.Response, error) {
+		if r.Method == http.MethodPut {
+			return xmlResponse(r, 200, ""), nil
+		}
+
+		return xmlResponse(r, 200, current), nil
+	}}
+	a := newBenchStubAdapter(b, publicReadPolicyConfig(), "require", tr)
+	ctx := b.Context()
+
+	b.ReportAllocs()
+	b.ResetTimer()
+
+	for b.Loop() {
+		if err := a.SyncPolicy(ctx, "b"); err != nil {
+			b.Fatalf("SyncPolicy(): %v", err)
 		}
 	}
 }

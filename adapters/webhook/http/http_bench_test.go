@@ -54,6 +54,26 @@ func BenchmarkDeliver(b *testing.B) {
 	}
 }
 
+// BenchmarkRegister measures target validation plus the registration map
+// write under the adapter mutex.
+func BenchmarkRegister(b *testing.B) {
+	w, err := New(webhook.Options{AllowPrivateTargets: true, MaxRetries: 1})
+	if err != nil {
+		b.Fatalf("New(): %v", err)
+	}
+
+	b.Cleanup(func() { _ = w.Close() })
+
+	b.ReportAllocs()
+	b.ResetTimer()
+
+	for b.Loop() {
+		if err := w.Register(b.Context(), "evt", "http://127.0.0.1:6334/hook", "bench-secret"); err != nil {
+			b.Fatalf("Register(): %v", err)
+		}
+	}
+}
+
 // BenchmarkSignAt measures the deterministic HMAC-SHA256 envelope used for
 // delivery signatures.
 func BenchmarkSignAt(b *testing.B) {

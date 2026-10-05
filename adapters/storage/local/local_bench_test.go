@@ -129,3 +129,57 @@ func BenchmarkHandlerGet(b *testing.B) {
 		}
 	}
 }
+
+// BenchmarkEdgeExists measures a stat hit on an existing object.
+func BenchmarkEdgeExists(b *testing.B) {
+	a := newBenchLocal(b)
+	ctx := b.Context()
+	benchFile(b, a, "k")
+
+	b.ReportAllocs()
+	b.ResetTimer()
+
+	for b.Loop() {
+		if _, err := a.Exists(ctx, "bkt", "k"); err != nil {
+			b.Fatalf("Exists(): %v", err)
+		}
+	}
+}
+
+// BenchmarkEdgeDelete measures removing an existing object.
+func BenchmarkEdgeDelete(b *testing.B) {
+	a := newBenchLocal(b)
+	ctx := b.Context()
+	benchFile(b, a, "k")
+
+	b.ReportAllocs()
+	b.ResetTimer()
+
+	for b.Loop() {
+		if err := a.Delete(ctx, "bkt", "k"); err != nil {
+			b.Fatalf("Delete(): %v", err)
+		}
+
+		benchFile(b, a, "k")
+	}
+}
+
+// BenchmarkEdgeMove measures renaming an object within a bucket.
+func BenchmarkEdgeMove(b *testing.B) {
+	a := newBenchLocal(b)
+	ctx := b.Context()
+	benchFile(b, a, "src")
+
+	b.ReportAllocs()
+	b.ResetTimer()
+
+	for b.Loop() {
+		if err := a.Move(ctx, "bkt", "src", "bkt", "dst"); err != nil {
+			b.Fatalf("Move(): %v", err)
+		}
+
+		if err := a.Move(ctx, "bkt", "dst", "bkt", "src"); err != nil {
+			b.Fatalf("Move back(): %v", err)
+		}
+	}
+}
