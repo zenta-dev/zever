@@ -618,45 +618,36 @@ func (d *driver) tryClaim(ctx context.Context, topic string) (queue.Message, boo
 
 // reclaimStale releases expired claims in topic back to ready with
 // attempt+1, mirroring reclaim.lua and the workflow attempt bump. The
-// sweep is one set-based UPDATE over the selected ids: the database
-// computes attempt+1 itself (orm.Add), so the N per-row round trips of
-// the read-modify-write loop collapse to a single statement. The WHERE
-// keeps the per-row lease guard: a row whose claim was settled between
-// the SELECT and the UPDATE (reclaimed, nacked, acked) no longer matches
-// owner != ” AND claimed_until <= now, so it is skipped instead of
-// double-bumped -- the same skip the old (id, owner, attempt) CAS
-// produced, since every settlement path also clears the owner or deletes
-// the row. At most batch rows release per sweep.
+// sweep is one set-based UPDATE whose IN subquery selects the batch:
+// the subquery projects the same stale-claim set the old two-statement
+// sweep read (same lease guard, same id order, same batch LIMIT), so
+// the database computes attempt+1 itself (orm.Add) and the per-row
+// round trips collapse to a single statement -- no ids slice, no
+// per-row msgRow scan, and no SELECT-to-UPDATE window. The outer
+// WHERE keeps the per-row lease guard: a row whose claim was settled
+// since the subquery ran no longer matches owner != ” AND
+// claimed_until <= now, so it is skipped instead of double-bumped --
+// the same skip the old (id, owner, attempt) CAS produced, since every
+// settlement path also clears the owner or deletes the row. At most
+// batch rows release per sweep.
 func (d *driver) reclaimStale(ctx context.Context, topic string) error {
 	now := time.Now().UTC()
 
-	rows, err := orm.From[msgRow, *msgRow](d.tbl).Where(orm.And(
+	inner := orm.From[msgRow, *msgRow](d.tbl).Where(orm.And(
 		d.cTopic.Eq(topic),
 		d.cOwner.Neq(""),
 		d.cUntil.Lte(now),
-	)).OrderBy(d.cSeq.Asc()).Limit(d.batch).All(ctx, d.conn)
-	if err != nil {
-		return fmt.Errorf("db: reclaim %q: %w", topic, err)
-	}
+	)).Columns(d.cID.Col()).OrderBy(d.cSeq.Asc()).Limit(d.batch)
 
-	if len(rows) == 0 {
-		return nil
-	}
-
-	ids := make([]string, len(rows))
-	for i, row := range rows {
-		ids[i] = row.MessageID
-	}
-
-	_, err = orm.UpdateTable(d.tbl).Where(orm.And(
+	_, err := orm.UpdateTable(d.tbl).Where(orm.And(
 		d.cTopic.Eq(topic),
 		d.cOwner.Neq(""),
 		d.cUntil.Lte(now),
-		d.cID.In(ids...),
+		d.cID.InSub(inner),
 	)).Set(
 		orm.SetExpr(d.cAttempt, orm.Add(d.cAttempt.Expr(), 1)),
 		orm.Set(d.cOwner, ""),
-		orm.Set(d.cUntil, time.Now().UTC()),
+		orm.Set(d.cUntil, now),
 	).Exec(ctx, d.conn)
 	if err != nil {
 		return fmt.Errorf("db: reclaim %q: %w", topic, err)
