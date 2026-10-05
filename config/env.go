@@ -46,7 +46,10 @@ func applyEnv(cfg *Config) error {
 		if !ok {
 			continue
 		}
-		svc := strings.ToLower(head)
+		svc, ok := matchService(head)
+		if !ok {
+			continue
+		}
 		field := strings.ToLower(rest)
 		if field == "" {
 			continue
@@ -95,6 +98,83 @@ func applyPluginEnv(cfg *Config) {
 		svc.Adapter = v
 		cfg.Plugins[name] = svc
 	}
+}
+
+// matchService reports the canonical lowercase service name for an
+// env-var head, matched case-insensitively without allocation. ok is
+// false when head names no known service. Non-ASCII heads can never
+// match the ASCII service names, so they reject on the first byte.
+func matchService(head string) (string, bool) {
+	if len(head) == 0 {
+		return "", false
+	}
+	if !isASCII(head) {
+		// Rare: a non-ASCII head whose ToLower form is ASCII (for
+		// example the Kelvin sign folding to 'k') still cannot be
+		// distinguished from its ASCII spelling, so fold the lowered
+		// form; anything still non-ASCII rejects below.
+		lower := strings.ToLower(head)
+		if !isASCII(lower) {
+			return "", false
+		}
+		head = lower
+	}
+
+	// Candidate names grouped by first letter: most env heads reject on
+	// the first byte, so the fold-compare runs at most a few times.
+	switch foldASCII(head[0]) {
+	case 'a':
+		return matchName(head, "ai", "analytics", "auth")
+	case 'b':
+		return matchName(head, "billing")
+	case 'c':
+		return matchName(head, "cache", "crypto")
+	case 'd':
+		return matchName(head, "db", "document")
+	case 'e':
+		return matchName(head, "eventbus")
+	case 'f':
+		return matchName(head, "flag")
+	case 'g':
+		return matchName(head, "geo")
+	case 'i':
+		return matchName(head, "i18n", "idempotency")
+	case 'l':
+		return matchName(head, "lock", "log")
+	case 'm':
+		return matchName(head, "mailer", "media")
+	case 'n':
+		return matchName(head, "notification")
+	case 'o':
+		return matchName(head, "observability")
+	case 'p':
+		return matchName(head, "password", "payment", "permission")
+	case 'q':
+		return matchName(head, "queue")
+	case 'r':
+		return matchName(head, "ratelimit", "router")
+	case 's':
+		return matchName(head, "scheduler", "search", "secrets", "session", "storage")
+	case 't':
+		return matchName(head, "tenant")
+	case 'v':
+		return matchName(head, "vectorstore")
+	case 'w':
+		return matchName(head, "webhook", "workflow")
+	}
+
+	return "", false
+}
+
+// matchName reports the first of names that ASCII-fold-equals head.
+func matchName(head string, names ...string) (string, bool) {
+	for _, name := range names {
+		if asciiEqualFold(head, name) {
+			return name, true
+		}
+	}
+
+	return "", false
 }
 
 // serviceRefs returns pointers to the named service's adapter and options.
@@ -180,6 +260,35 @@ func normName(s string) string {
 	return strings.ReplaceAll(strings.ToLower(s), "_", "")
 }
 
+// normEqualFold reports whether a and b are equal under normName
+// normalization (case-insensitive, "_" ignored) without allocation.
+// Non-ASCII inputs fall back to the allocating normName comparison.
+func normEqualFold(a, b string) bool {
+	if !isASCII(a) || !isASCII(b) {
+		return normName(a) == normName(b)
+	}
+
+	i, j := 0, 0
+	for i < len(a) || j < len(b) {
+		for i < len(a) && a[i] == '_' {
+			i++
+		}
+		for j < len(b) && b[j] == '_' {
+			j++
+		}
+		if i >= len(a) || j >= len(b) {
+			return i >= len(a) && j >= len(b)
+		}
+		if foldASCII(a[i]) != foldASCII(b[j]) {
+			return false
+		}
+		i++
+		j++
+	}
+
+	return true
+}
+
 // jsonFieldName reports the encoding/json key for a struct field: the tag
 // name when present, otherwise the Go field name.
 func jsonFieldName(sf reflect.StructField) string {
@@ -237,7 +346,7 @@ func findField(v reflect.Value, name string) (reflect.Value, bool) {
 			}
 			continue
 		}
-		if normName(jsonFieldName(sf)) == normName(name) {
+		if normEqualFold(jsonFieldName(sf), name) {
 			return f, true
 		}
 	}
