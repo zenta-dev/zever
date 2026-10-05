@@ -12,7 +12,7 @@ import (
 func benchRegister(b *testing.B, name string) {
 	b.Helper()
 	if err := job.Register(name, func(context.Context, string) error { return nil }); err != nil {
-		var dup *job.DuplicateJobError
+		var dup job.DuplicateJobError
 		if !errors.As(err, &dup) {
 			b.Fatalf("Register: %v", err)
 		}
