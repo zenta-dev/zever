@@ -28,12 +28,12 @@ func TestEnsureJoinTableCreatesAndIsIdempotent(t *testing.T) {
 		t.Fatalf("DB: %v", err)
 	}
 
-	if err := seed.EnsureJoinTable(ctx, database); err != nil {
-		t.Fatalf("EnsureJoinTable: %v", err)
+	if seedErr := seed.EnsureJoinTable(ctx, database); seedErr != nil {
+		t.Fatalf("EnsureJoinTable: %v", seedErr)
 	}
 
-	if err := seed.EnsureJoinTable(ctx, database); err != nil {
-		t.Fatalf("EnsureJoinTable second call: %v", err)
+	if seedErr := seed.EnsureJoinTable(ctx, database); seedErr != nil {
+		t.Fatalf("EnsureJoinTable second call: %v", seedErr)
 	}
 
 	rows, err := database.Query(ctx,
