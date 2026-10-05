@@ -480,32 +480,33 @@ const linearDedupMaxLeaves = 8
 // recursively, collecting every plain leaf, then dedups in first-appearance
 // order -- a linear scan for few leaves, a map for many.
 func flattenGroupTerms(groups []GroupTerm) []GroupTerm {
-	var out []GroupTerm
+	// len(groups) is an exact capacity hint for the common all-plain case and
+	// a lower bound otherwise (grouping constructs only expand the leaf
+	// count), so the append below allocates once instead of growing through
+	// repeated doublings.
+	out := make([]GroupTerm, 0, len(groups))
 
-	var walk func(g GroupTerm)
-
-	walk = func(g GroupTerm) {
-		switch g.Kind { //nolint:exhaustive // GroupPlain is the default leaf; the rest recurse
-		case GroupRollup, GroupCube:
-			for _, t := range g.Terms {
-				walk(t)
-			}
-		case GroupGroupingSets:
-			for _, set := range g.Sets {
-				for _, t := range set {
-					walk(t)
-				}
-			}
-		default:
-			out = append(out, g)
-		}
-	}
-
-	for _, g := range groups {
-		walk(g)
-	}
+	flattenGroupTermsWalk(groups, &out)
 
 	return dedupGroupLeaves(out)
+}
+
+// flattenGroupTermsWalk appends every plain leaf of groups, depth-first in
+// first-appearance order, to out. It is a plain recursive helper rather than
+// a capturing closure so the walk itself adds no allocation of its own.
+func flattenGroupTermsWalk(groups []GroupTerm, out *[]GroupTerm) {
+	for _, g := range groups {
+		switch g.Kind { //nolint:exhaustive // GroupPlain is the default leaf; the rest recurse
+		case GroupRollup, GroupCube:
+			flattenGroupTermsWalk(g.Terms, out)
+		case GroupGroupingSets:
+			for _, set := range g.Sets {
+				flattenGroupTermsWalk(set, out)
+			}
+		default:
+			*out = append(*out, g)
+		}
+	}
 }
 
 // sameGroupLeaf reports whether two plain leaves dedup to the same key,
