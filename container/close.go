@@ -5,7 +5,6 @@ import (
 	"errors"
 	"fmt"
 	"reflect"
-	"sync"
 	"time"
 	"unsafe"
 )
@@ -187,7 +186,12 @@ func snapshotServiceNames() []string {
 func (c *Container) Close(ctx context.Context) error {
 	var errs []error
 
-	var seen sync.Map
+	// seen is local to this Close call and only ever touched by tryClose,
+	// which runs sequentially on the calling goroutine: no concurrent access
+	// is possible, so a plain map suffices and avoids sync.Map's per-key
+	// entry allocations. It is created lazily so an all-unresolved Close
+	// allocates nothing.
+	var seen map[dedupEntry]struct{}
 
 	// keepAlive holds every deduped value for the duration of Close so the
 	// garbage collector cannot reclaim an address while its pointer is used
@@ -195,16 +199,29 @@ func (c *Container) Close(ctx context.Context) error {
 	// which would cause a false dedup hit.
 	keepAlive := make([]any, 0, 32)
 
+	// done carries one service's shutdown result. It is reused across
+	// services: a completed close drains it and its goroutine exits, so the
+	// next close can safely reuse the same buffered channel. A timed-out
+	// close abandons its goroutine still holding the channel, so a fresh one
+	// is allocated before the next close. Created lazily so an
+	// all-unresolved Close allocates nothing.
+	var done chan error
+
 	tryClose := func(service string, v any) {
 		if v == nil {
 			return
 		}
 
 		if key, ok := dedupKey(v); ok {
-			if _, loaded := seen.LoadOrStore(key, struct{}{}); loaded {
+			if seen == nil {
+				seen = make(map[dedupEntry]struct{}, 8)
+			}
+
+			if _, loaded := seen[key]; loaded {
 				return
 			}
 
+			seen[key] = struct{}{}
 			keepAlive = append(keepAlive, v)
 		}
 
@@ -219,20 +236,18 @@ func (c *Container) Close(ctx context.Context) error {
 			perCtx, cancel = context.WithTimeout(ctx, DefaultCloseTimeout)
 		}
 
-		done := make(chan error, 1)
+		if done == nil {
+			done = make(chan error, 1)
+		}
 
-		go func() {
-			defer func() {
-				if r := recover(); r != nil {
-					done <- ClosePanicError{Service: service, Panic: r}
-				}
-			}()
+		// Pass the channel by value so an abandoned goroutine from a timed-out
+		// close keeps its own channel even when done is reassigned below.
+		ch := done
 
-			done <- closeAny(perCtx, v)
-		}()
+		go closeAsync(perCtx, v, service, ch)
 
 		select {
-		case err := <-done:
+		case err := <-ch:
 			if cancel != nil {
 				cancel()
 			}
@@ -254,7 +269,10 @@ func (c *Container) Close(ctx context.Context) error {
 
 			errs = append(errs, CloseTimeoutError{Service: service, Err: perCtx.Err()})
 
-			// Don't block on done goroutine; it will finish and be GC'd.
+			// Don't block on the abandoned goroutine; it will finish and be
+			// GC'd. Give the next close a fresh channel so a late send cannot
+			// be mistaken for that close's result.
+			done = make(chan error, 1)
 		}
 	}
 
@@ -329,6 +347,20 @@ func (c *Container) Close(ctx context.Context) error {
 	_ = keepAlive
 
 	return errors.Join(errs...)
+}
+
+// closeAsync runs closeAny for one service on its own goroutine and funnels
+// the result, or a recovered panic, to done. It is a top-level function so
+// the go statement in Close allocates no closure; ctx, v, service, and done
+// are passed by value.
+func closeAsync(ctx context.Context, v any, service string, done chan<- error) {
+	defer func() {
+		if r := recover(); r != nil {
+			done <- ClosePanicError{Service: service, Panic: r}
+		}
+	}()
+
+	done <- closeAny(ctx, v)
 }
 
 // closeAny probes the resolved instance for a shutdown shape, in order:
