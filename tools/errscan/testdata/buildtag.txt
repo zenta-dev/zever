@@ -1,0 +1,9 @@
+//go:build ignore
+
+package buildtag
+
+import "errors"
+
+func bad() error {
+	return errors.New("no prefix")
+}

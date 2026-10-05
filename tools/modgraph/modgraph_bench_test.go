@@ -1,6 +1,10 @@
 package main
 
-import "testing"
+import (
+	"os"
+	"path/filepath"
+	"testing"
+)
 
 // benchSource is a representative generated file with several intra-repo
 // imports and a template string that must not count.
@@ -95,6 +99,23 @@ replace (
 	for b.Loop() {
 		if got := parseReplaces(content); len(got) != 3 {
 			b.Fatalf("parseReplaces = %v, want 3", got)
+		}
+	}
+}
+
+// BenchmarkLockstepVersion measures the CHANGELOG version-header scan.
+func BenchmarkLockstepVersion(b *testing.B) {
+	root := b.TempDir()
+	if err := os.WriteFile(filepath.Join(root, "CHANGELOG.md"),
+		[]byte("# Changelog\n\n## [Unreleased]\n\n## [v1.2.3] - 2026-01-01\n"), 0o600); err != nil {
+		b.Fatal(err)
+	}
+
+	b.ReportAllocs()
+	b.ResetTimer()
+	for b.Loop() {
+		if got := lockstepVersion(root); got != "v1.2.3" {
+			b.Fatalf("lockstepVersion = %q", got)
 		}
 	}
 }
