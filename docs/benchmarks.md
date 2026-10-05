@@ -411,6 +411,29 @@ JSON marshal/unmarshal bridge in `serviceToMap`, which stays marshal-based
 on purpose to preserve each package's json-tag semantics. `Redact` drops
 2 allocs/op (mixed-case header keys no longer allocate a lowered copy) and
 ~31% ns/op from the merged pass.
+DSL lexer (`dsl/lexer`, 2026-10-05). `scanIllegal` builds the diagnostic
+message and the ILLEGAL token literal into one stack buffer and materializes
+them as a single string (a prior change, #355, already halved this path). The
+rune → `(msg, lit)` string is a pure function, so it is now memoized in a
+per-Lexer cache (`illegalCache`, 8 entries): repeated illegal runes share one
+backing array, cutting the per-rune string alloc to zero on hits. The
+`diag.Diagnostic` alloc is unavoidable (each is retained in `Lexer.errs`).
+Other token literals -- ident, number, comment text -- are at floor: each needs
+its own `string` and cannot be avoided without `unsafe`, which the lexer does
+not use. Medians of 10 runs, `-count=10`.
+
+| Benchmark | ns/op | B/op | allocs/op |
+| --- | --- | --- | --- |
+| BenchmarkLexIllegal before (cpu=12) | 1,885,509 | 1,471,879 | 18,019 |
+| BenchmarkLexIllegal after (cpu=12) | 733,141 | 1,183,961 | 9,022 |
+| BenchmarkLexAstral before (cpu=12) | 84,848 | 75,405 | 1,015 |
+| BenchmarkLexAstral after (cpu=12) | 38,682 | 59,437 | 516 |
+
+The memoization cuts `BenchmarkLexIllegal` ~2.6x (1.89M to 733K ns/op) and
+~50% of allocs/op (18,019 to 9,022 -- the remaining 9,000 are the retained
+`Diagnostic` structs); `BenchmarkLexAstral` tracks it (1,015 to 516 allocs/op,
+~55% faster). Token output is byte-identical: same tokens, diagnostics, and
+positions (golden fixtures under `dsl/compile/testdata` unchanged).
 
 Reproduce:
 
@@ -419,6 +442,7 @@ go test -run '^$' -bench='BenchmarkClosest|BenchmarkDamerauLevenshtein' -benchme
 go test -run '^$' -bench='BenchmarkQuery$' -benchmem -count=10 ./adapters/vectorstore/db/
 go test -run '^$' -bench=. -benchmem -count=10 ./adapters/search/db/
 go test -run '^$' -bench=. -benchmem -count=10 ./config/
+go test -run '^$' -bench='BenchmarkLexIllegal|BenchmarkLexAstral' -benchmem -count=10 ./dsl/lexer/
 ```
 
 ## Commands
