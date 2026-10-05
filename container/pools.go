@@ -181,7 +181,7 @@ func (r *poolRegistry) borrow(service string, adapter db.Adapter, opts db.Option
 			knobs := e.knobs
 			r.mu.Unlock()
 			close(e.ready)
-			r.logOpen(e.backend, key, service, services, knobs)
+			r.logOpen(e.backend, key, services, knobs)
 
 			return conn, nil
 		}
@@ -204,7 +204,7 @@ func (r *poolRegistry) borrow(service string, adapter db.Adapter, opts db.Option
 			r.warn(fmt.Sprintf("container: %s (shared pool): max_conns=%d ignored, shared pool max_conns=%d",
 				service, opts.MaxConns, knobs.MaxConns))
 		}
-		r.logOpen(e.backend, key, service, services, knobs)
+		r.logOpen(e.backend, key, services, knobs)
 
 		return conn, nil
 	}
@@ -213,18 +213,17 @@ func (r *poolRegistry) borrow(service string, adapter db.Adapter, opts db.Option
 // logOpen emits one observability line per shared-pool open or join. The
 // line carries only the parsed host/dbname (postgres) or the backend
 // (sqlite): full DSNs and file paths never appear.
-func (r *poolRegistry) logOpen(backend, key, _ string, services []string, knobs db.Options) {
-	list := "[" + strings.Join(services, ",") + "]"
+func (r *poolRegistry) logOpen(backend, key string, services []string, knobs db.Options) {
 	if backend == poolPostgres {
 		preview := postgresPreview(strings.TrimPrefix(key, "postgres:"))
-		r.warn(fmt.Sprintf("container: pool shared postgres %s max_conns=%d services=%s",
-			preview, knobs.MaxConns, list))
+		r.warn(fmt.Sprintf("container: pool shared postgres %s max_conns=%d services=[%s]",
+			preview, knobs.MaxConns, strings.Join(services, ",")))
 
 		return
 	}
 
-	r.warn(fmt.Sprintf("container: pool shared sqlite max_conns=%d services=%s",
-		knobs.MaxConns, list))
+	r.warn(fmt.Sprintf("container: pool shared sqlite max_conns=%d services=[%s]",
+		knobs.MaxConns, strings.Join(services, ",")))
 }
 
 // snapshot returns resolved (non-building) pools in deterministic key order
