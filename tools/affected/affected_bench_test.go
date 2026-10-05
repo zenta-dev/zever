@@ -1,6 +1,8 @@
 package main
 
 import (
+	"os"
+	"path/filepath"
 	"slices"
 	"testing"
 )
@@ -84,6 +86,30 @@ func BenchmarkChunkGroups(b *testing.B) {
 	for b.Loop() {
 		if got := chunkGroups(mods, 8); len(got) != 8 {
 			b.Fatalf("groups = %d, want 8", len(got))
+		}
+	}
+}
+
+// BenchmarkListModules measures the go.mod discovery walk over a synthetic
+// module tree.
+func BenchmarkListModules(b *testing.B) {
+	root := b.TempDir()
+	for _, rel := range []string{"a/go.mod", "a/a.go", "b/go.mod", "b/b.go", "c/d/go.mod"} {
+		p := filepath.Join(root, filepath.FromSlash(rel))
+		if err := os.MkdirAll(filepath.Dir(p), 0o755); err != nil {
+			b.Fatal(err)
+		}
+		if err := os.WriteFile(p, []byte("module x\n"), 0o600); err != nil {
+			b.Fatal(err)
+		}
+	}
+
+	b.ReportAllocs()
+	b.ResetTimer()
+	for b.Loop() {
+		mods, err := listModules(root)
+		if err != nil || len(mods) == 0 {
+			b.Fatalf("listModules = (%v, %v)", mods, err)
 		}
 	}
 }

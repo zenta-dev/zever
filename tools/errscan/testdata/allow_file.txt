@@ -1,0 +1,10 @@
+// errscan:allow
+
+package allowfile
+
+import "errors"
+
+func bad() {
+	_ = errors.New("no prefix")
+	panic("boom")
+}
