@@ -78,7 +78,11 @@ func Preload[T any, PT ptrScanner[T], C any, PC ptrScanner[C], K comparable](
 		ids[i] = parentID((*T)(row))
 	}
 
-	var children []PC
+	// Each chunk's rows are kept as their own slice rather than concatenated
+	// into one growing slice: grouping below walks them twice, and retaining
+	// the per-chunk slices avoids the repeated reallocation that appending
+	// every chunk into a single slice would pay as chunks accumulate.
+	chunks := make([][]PC, 0, (len(ids)+inChunkSize-1)/inChunkSize)
 
 	// The id set is fanned out into inChunkSize slices so no single child
 	// query carries an unbounded placeholder list.
@@ -93,20 +97,69 @@ func Preload[T any, PT ptrScanner[T], C any, PC ptrScanner[C], K comparable](
 			return nil, fmt.Errorf("orm: Preload: children: %w", err)
 		}
 
-		children = append(children, chunkRows...)
+		chunks = append(chunks, chunkRows)
 	}
 
-	grouped := make(map[K][]*C, len(rows))
+	// groupSpan locates one key's children inside all: count is fixed by the
+	// counting pass, start advances as the filling pass runs, so every
+	// parent's children slice aliases all instead of each key allocating its
+	// own one-element backing array.
+	type groupSpan struct {
+		start int
+		count int
+	}
 
-	for _, child := range children {
-		key := childFKOf((*C)(child))
-		grouped[key] = append(grouped[key], (*C)(child))
+	grouped := make(map[K]groupSpan, len(rows))
+
+	var total int
+
+	for _, chunk := range chunks {
+		for _, child := range chunk {
+			key := childFKOf((*C)(child))
+
+			span := grouped[key]
+			span.count++
+			grouped[key] = span
+
+			total++
+		}
+	}
+
+	all := make([]*C, total)
+
+	offset := 0
+	for key, span := range grouped {
+		span.start = offset
+		grouped[key] = span
+
+		offset += span.count
+	}
+
+	for _, chunk := range chunks {
+		for _, child := range chunk {
+			key := childFKOf((*C)(child))
+
+			span := grouped[key]
+			all[span.start] = (*C)(child)
+			span.start++
+			grouped[key] = span
+		}
 	}
 
 	out := make([]ParentWithChildren[T, C], len(rows))
 	for i, row := range rows {
 		parent := (*T)(row)
-		out[i] = ParentWithChildren[T, C]{Parent: parent, Children: grouped[parentID(parent)]}
+
+		span := grouped[parentID(parent)]
+
+		var children []*C
+		if span.count > 0 {
+			// Three-index slice caps the length so a caller that appends to
+			// one parent's children can never overwrite the next parent's.
+			children = all[span.start-span.count : span.start : span.start]
+		}
+
+		out[i] = ParentWithChildren[T, C]{Parent: parent, Children: children}
 	}
 
 	return out, nil
