@@ -822,10 +822,19 @@ func supportsNullsOrdering(d dialect.Dialect) bool {
 }
 
 // quoteColumn quotes col, splitting a "table.column" qualifier if col
-// carries one.
+// carries one. The qualified form concatenates through a Builder: two
+// QuoteIdent calls plus one buffer allocation is cheaper than the two
+// intermediate strings a + b + c concatenation would build.
 func quoteColumn(d dialect.Dialect, col string) string {
 	if table, column, ok := strings.Cut(col, "."); ok {
-		return d.QuoteIdent(table) + "." + d.QuoteIdent(column)
+		var b strings.Builder
+
+		b.Grow(len(table) + len(column) + 8)
+		b.WriteString(d.QuoteIdent(table))
+		b.WriteString(".")
+		b.WriteString(d.QuoteIdent(column))
+
+		return b.String()
 	}
 
 	return d.QuoteIdent(col)
