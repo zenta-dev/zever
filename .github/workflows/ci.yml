@@ -410,7 +410,7 @@ jobs:
           failed=""
           for m in $MODULES; do
             slug=$(echo "$m" | tr / _)
-            if ! go -C "$m" test -run='^$' -bench=. -benchtime=1s -count=6 -cpu=1 -benchmem > ".bench/$slug.txt" 2>&1; then
+            if ! go -C "$m" test -run='^$' -bench=. -benchtime=1s -count=6 -cpu=1 -benchmem ./... > ".bench/$slug.txt" 2>&1; then
               echo "::error::benchmark failed: $m"
               cat ".bench/$slug.txt"
               failed="$failed $m"
