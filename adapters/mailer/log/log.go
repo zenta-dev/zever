@@ -1,7 +1,9 @@
 package log
 
 import (
+	"bytes"
 	"context"
+	"encoding/json/v2"
 	"fmt"
 	"io"
 	"os"
@@ -9,7 +11,6 @@ import (
 	"sync/atomic"
 
 	"github.com/zenta-dev/zever/core/mailer"
-	"github.com/zenta-dev/zever/shared/codec"
 	"github.com/zenta-dev/zever/shared/traceprop"
 )
 
@@ -17,7 +18,8 @@ import (
 type checker struct {
 	mu     sync.Mutex
 	w      io.Writer
-	codec  codec.Codec[logMessage]
+	buf    bytes.Buffer
+	msg    logMessage
 	closed atomic.Bool
 }
 
@@ -37,7 +39,7 @@ func NewWithWriter(opts mailer.Options, w io.Writer) (mailer.Mailer, error) {
 	if w == nil {
 		w = os.Stdout
 	}
-	return &checker{w: w, codec: codec.JSONCodec[logMessage]{}}, nil
+	return &checker{w: w}, nil
 }
 
 type logAddress struct {
@@ -70,14 +72,6 @@ type logMessage struct {
 
 func toLogAddress(a mailer.Address) logAddress {
 	return logAddress{Name: a.Name, Address: a.Address}
-}
-
-func toLogAddresses(in []mailer.Address) []logAddress {
-	out := make([]logAddress, 0, len(in))
-	for _, a := range in {
-		out = append(out, toLogAddress(a))
-	}
-	return out
 }
 
 // Send validates msg and writes one JSON line. Attachment contents are
@@ -114,39 +108,47 @@ func (c *checker) Send(ctx context.Context, msg *mailer.Mail) error {
 		}
 	}
 
-	out := logMessage{
-		From:        toLogAddress(msg.From),
-		To:          toLogAddresses(msg.To),
-		Cc:          toLogAddresses(msg.Cc),
-		Bcc:         toLogAddresses(msg.Bcc),
-		Subject:     msg.Subject,
-		Body:        msg.Body,
-		HTML:        msg.HTML,
-		Attachments: make([]logAttachment, 0, len(msg.Attachments)),
-		TraceID:     traceprop.TraceID(ctx),
+	c.mu.Lock()
+	defer c.mu.Unlock()
+	if c.closed.Load() {
+		return mailer.ErrClosed
 	}
+	m := &c.msg
+	m.From = toLogAddress(msg.From)
+	m.To = m.To[:0]
+	for _, a := range msg.To {
+		m.To = append(m.To, toLogAddress(a))
+	}
+	m.Cc = m.Cc[:0]
+	for _, a := range msg.Cc {
+		m.Cc = append(m.Cc, toLogAddress(a))
+	}
+	m.Bcc = m.Bcc[:0]
+	for _, a := range msg.Bcc {
+		m.Bcc = append(m.Bcc, toLogAddress(a))
+	}
+	m.Subject = msg.Subject
+	m.Body = msg.Body
+	m.HTML = msg.HTML
+	m.Attachments = m.Attachments[:0]
 	for _, a := range msg.Attachments {
-		out.Attachments = append(out.Attachments, logAttachment{
+		m.Attachments = append(m.Attachments, logAttachment{
 			Name:      a.Name,
 			Size:      len(a.Content),
 			Inline:    a.Inline,
 			ContentID: a.ContentID,
 		})
 	}
-
-	c.mu.Lock()
-	defer c.mu.Unlock()
-	if c.closed.Load() {
-		return mailer.ErrClosed
-	}
-	data, err := c.codec.Encode(out)
-	if err != nil {
+	m.TraceID = traceprop.TraceID(ctx)
+	c.buf.Reset()
+	// MarshalWrite emits no trailing newline; add the line terminator before
+	// the single write so the wire format matches json.Marshal plus newline.
+	if err := json.MarshalWrite(&c.buf, m, json.Deterministic(true)); err != nil {
 		return err
 	}
-	if _, err := c.w.Write(append(data, '\n')); err != nil {
-		return err
-	}
-	return nil
+	c.buf.WriteByte('\n')
+	_, err := c.w.Write(c.buf.Bytes())
+	return err
 }
 
 // Close shuts down the checker. It is idempotent and always returns nil.

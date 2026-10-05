@@ -10,7 +10,6 @@ import (
 	"testing"
 
 	"github.com/zenta-dev/zever/core/mailer"
-	"github.com/zenta-dev/zever/shared/codec"
 )
 
 func coverOptions() mailer.Options {
@@ -99,7 +98,7 @@ func TestCoverSendClosedAfterLock(t *testing.T) {
 	oldMax := runtime.GOMAXPROCS(1)
 	defer runtime.GOMAXPROCS(oldMax)
 	for range 3 {
-		c := &checker{w: io.Discard, codec: codec.JSONCodec[logMessage]{}}
+		c := &checker{w: io.Discard}
 		c.mu.Lock()
 		done := make(chan error, 1)
 		go func() {
@@ -123,29 +122,5 @@ func TestCoverToLogAddress(t *testing.T) {
 	bare := toLogAddress(mailer.Address{Address: "a@example.com"})
 	if bare.Name != "" || bare.Address != "a@example.com" {
 		t.Errorf("bare toLogAddress = %+v", bare)
-	}
-}
-
-func TestCoverToLogAddresses(t *testing.T) {
-	t.Parallel()
-	if got := toLogAddresses(nil); len(got) != 0 {
-		t.Errorf("nil input len = %d want 0", len(got))
-	}
-	if got := toLogAddresses([]mailer.Address{}); len(got) != 0 {
-		t.Errorf("empty input len = %d want 0", len(got))
-	}
-	in := []mailer.Address{
-		{Name: "A", Address: "a@example.com"},
-		{Address: "b@example.com"},
-	}
-	got := toLogAddresses(in)
-	if len(got) != 2 {
-		t.Fatalf("len = %d want 2", len(got))
-	}
-	if got[0].Name != "A" || got[0].Address != "a@example.com" {
-		t.Errorf("elem 0 = %+v", got[0])
-	}
-	if got[1].Name != "" || got[1].Address != "b@example.com" {
-		t.Errorf("elem 1 = %+v", got[1])
 	}
 }
