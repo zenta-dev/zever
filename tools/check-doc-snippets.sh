@@ -228,6 +228,9 @@ skip_file() {
   case "$1" in
     */CHANGELOG.md|CHANGELOG.md) return 0 ;;
     *docs/src/content/docs/getting-started/migration.mdx) return 0 ;;
+    # Internal agent working docs (specs/plans) may reference not-yet-existing
+    # packages by design; they are not published documentation.
+    *docs/superpowers/*) return 0 ;;
   esac
   return 1
 }
