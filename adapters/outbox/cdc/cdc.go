@@ -12,6 +12,7 @@ import (
 
 	"github.com/jackc/pglogrepl"
 	"github.com/jackc/pgx/v5/pgconn"
+
 	"github.com/zenta-dev/zever/core/db"
 	"github.com/zenta-dev/zever/core/outbox"
 	"github.com/zenta-dev/zever/shared/retry"
@@ -148,10 +149,10 @@ func (s *store) Start(ctx context.Context) error {
 		return err
 	}
 
-	if err := s.ensureSlot(ctx, conn); err != nil {
+	if slotErr := s.ensureSlot(ctx, conn); slotErr != nil {
 		_ = conn.Close(ctx)
 
-		return err
+		return slotErr
 	}
 
 	lsn, err := s.readStartLSN(ctx, conn)

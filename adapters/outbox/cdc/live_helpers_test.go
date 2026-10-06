@@ -7,6 +7,7 @@ import (
 	"testing"
 
 	"github.com/jackc/pgx/v5"
+
 	"github.com/zenta-dev/zever/core/db"
 )
 

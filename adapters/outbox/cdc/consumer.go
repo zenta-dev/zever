@@ -7,6 +7,7 @@ import (
 	"github.com/jackc/pglogrepl"
 	"github.com/jackc/pgx/v5/pgconn"
 	"github.com/jackc/pgx/v5/pgproto3"
+
 	"github.com/zenta-dev/zever/core/outbox"
 )
 
@@ -139,13 +140,14 @@ func (s *store) handleMessage(ctx context.Context, prefix string, payload []byte
 	}
 
 	for attempt := 1; ; attempt++ {
-		if err := publish(ctx, msg); err == nil {
+		pubErr := publish(ctx, msg)
+		if pubErr == nil {
 			s.processed.Add(1)
 
 			return true, nil
-		} else {
-			s.setRelayError(err)
 		}
+
+		s.setRelayError(pubErr)
 
 		if attempt >= s.maxAttempts {
 			s.failed.Add(1)

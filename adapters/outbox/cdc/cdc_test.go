@@ -181,7 +181,10 @@ func TestNewAppliesDefaults(t *testing.T) {
 		t.Fatalf("New() error = %v", err)
 	}
 
-	st := s.(*store)
+	st, ok := s.(*store)
+	if !ok {
+		t.Fatalf("New() = %T, want *store", s)
+	}
 
 	if st.prefix != DefaultPrefix {
 		t.Errorf("prefix = %q, want %q", st.prefix, DefaultPrefix)

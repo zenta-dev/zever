@@ -54,9 +54,9 @@ func TestCDCLive(t *testing.T) {
 		t.Fatalf("New() error = %v", err)
 	}
 
-	if err := s.Start(ctx); err != nil {
-		skipOnPermissionError(t, err)
-		t.Fatalf("Start() error = %v", err)
+	if startErr := s.Start(ctx); startErr != nil {
+		skipOnPermissionError(t, startErr)
+		t.Fatalf("Start() error: %v", startErr)
 	}
 
 	t.Cleanup(func() { _ = s.Close() })
