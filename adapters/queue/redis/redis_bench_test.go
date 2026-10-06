@@ -49,6 +49,72 @@ func BenchmarkRoundTrip(b *testing.B) {
 	}
 }
 
+// BenchmarkNack measures dropping a claimed message without requeue: one
+// nack.lua script round trip after a Push/Pop cycle.
+func BenchmarkNack(b *testing.B) {
+	q := newBenchQueue(b)
+	ctx := b.Context()
+	payload := queue.Payload([]byte("bench-payload"))
+
+	b.ReportAllocs()
+	b.ResetTimer()
+
+	for b.Loop() {
+		if err := q.Push(ctx, "bench", payload, nil); err != nil {
+			b.Fatalf("Push(): %v", err)
+		}
+
+		msg, err := q.Pop(ctx, "bench")
+		if err != nil {
+			b.Fatalf("Pop(): %v", err)
+		}
+
+		if err := q.Nack(ctx, msg, false); err != nil {
+			b.Fatalf("Nack(): %v", err)
+		}
+	}
+}
+
+// BenchmarkReclaimStale measures the stale-claim sweep: one reclaim.lua script
+// round trip (plus the fallback probe). Visibility is 1ns so a claimed
+// message's deadline (millisecond precision) is already at the cutoff,
+// letting each iteration reclaim exactly one message with no clock wait.
+func BenchmarkReclaimStale(b *testing.B) {
+	s := miniredis.RunT(b)
+
+	w, err := New(queue.Options{Addr: s.Addr(), VisibilityTimeout: time.Nanosecond, PollTimeout: time.Second})
+	if err != nil {
+		b.Fatalf("New(): %v", err)
+	}
+
+	a, ok := w.(*redisAdapter)
+	if !ok {
+		b.Fatalf("New() type = %T, want *redisAdapter", w)
+	}
+
+	b.Cleanup(func() { _ = a.Close() })
+
+	ctx := b.Context()
+	payload := queue.Payload([]byte("bench-payload"))
+
+	if err := a.Push(ctx, "bench", payload, nil); err != nil {
+		b.Fatalf("Push(): %v", err)
+	}
+
+	b.ReportAllocs()
+	b.ResetTimer()
+
+	for b.Loop() {
+		if _, err := a.Pop(ctx, "bench"); err != nil {
+			b.Fatalf("Pop(): %v", err)
+		}
+
+		if err := a.reclaimStale(ctx, "bench"); err != nil {
+			b.Fatalf("reclaimStale(): %v", err)
+		}
+	}
+}
+
 // BenchmarkRoundTripParallel measures concurrent Push/Pop/Ack cycles. Each
 // worker gets its own topic so an empty Pop never blocks behind another
 // worker's message.

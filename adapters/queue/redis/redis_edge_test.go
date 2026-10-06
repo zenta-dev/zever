@@ -5,8 +5,29 @@ import (
 	"testing"
 	"time"
 
+	"github.com/alicebob/miniredis/v2"
+
 	"github.com/zenta-dev/zever/core/queue"
 )
+
+// TestRegister_opensViaCoreOptions proves Register wires the redis adapter
+// into the core registry so queue.Open resolves it against a live client.
+func TestRegister_opensViaCoreOptions(t *testing.T) {
+	s := miniredis.RunT(t)
+
+	Register()
+
+	q, err := queue.Open(queue.Redis, queue.Options{Addr: s.Addr(), PollTimeout: time.Second})
+	if err != nil {
+		t.Fatalf("queue.Open(redis) = %v", err)
+	}
+
+	t.Cleanup(func() { _ = q.Close() })
+
+	if q.Name() != "redis" {
+		t.Errorf("Name() = %q, want redis", q.Name())
+	}
+}
 
 func TestBuildKey_emptyTopicAndPrefix(t *testing.T) {
 	t.Parallel()
