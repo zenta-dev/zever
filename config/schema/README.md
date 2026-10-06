@@ -2,7 +2,7 @@
 
 `zever.schema.json` is the canonical JSON Schema (draft 2020-12) describing
 the shape of `zever.yaml` / `zever.yml` / `zever.json` — every one of
-`config.Config`'s 34 battery services, their adapter enums, and their typed
+`config.Config`'s 36 battery services, their adapter enums, and their typed
 `Options` fields, hand-authored against the real Go structs and kept
 strict to match `config/decode.go`'s `DisallowUnknownFields` behavior
 (unknown services and unknown option fields are schema errors, exactly as

@@ -11,6 +11,10 @@ additionalProperties = false
 type = 'object'
 
 ['$defs'.aiOptions.properties]
+['$defs'.aiOptions.properties.allow_insecure]
+description = 'Permit an http base_url and disable TLS verification for loopback test servers. Default false.'
+type = 'boolean'
+
 ['$defs'.aiOptions.properties.api_key]
 type = 'string'
 
@@ -44,12 +48,12 @@ description = 'Default: "organization".'
 type = 'string'
 
 ['$defs'.analyticsOptions.properties.max_properties]
-minimum = 0.0
+minimum = 0
 type = 'integer'
 
 ['$defs'.analyticsOptions.properties.max_properties_bytes]
 description = 'Default: 65536 (64 KiB).'
-minimum = 0.0
+minimum = 0
 type = 'integer'
 
 ['$defs'.authOptions]
@@ -69,6 +73,10 @@ type = 'string'
 description = 'Required by the jwt adapter.'
 type = 'string'
 
+['$defs'.authOptions.properties.jwt.properties.leeway]
+'$ref' = '#/$defs/durationNs'
+description = 'Clock-skew tolerance when validating exp/nbf. Zero (default) means strict validation; negative fails Validate.'
+
 ['$defs'.authOptions.properties.jwt.properties.max_ttl]
 '$ref' = '#/$defs/durationNs'
 description = 'Zero means no cap.'
@@ -82,6 +90,10 @@ additionalProperties = false
 type = 'object'
 
 ['$defs'.authOptions.properties.oidc.properties]
+['$defs'.authOptions.properties.oidc.properties.allow_insecure]
+description = 'Permit an http:// issuer (and a private-address issuer) for testing. Default false (https and public addresses only).'
+type = 'boolean'
+
 ['$defs'.authOptions.properties.oidc.properties.client_id]
 description = 'Required by the oidc adapter.'
 type = 'string'
@@ -99,6 +111,63 @@ description = 'SessionOptions.Store is a Go-only session.Store injection (json:"
 type = 'object'
 
 ['$defs'.authOptions.properties.session.properties]
+['$defs'.breakerOptions]
+additionalProperties = false
+type = 'object'
+
+['$defs'.breakerOptions.properties]
+['$defs'.breakerOptions.properties.bucket_period]
+'$ref' = '#/$defs/durationNs'
+description = 'Rolling-window bucket width; interval becomes a multiple of it.'
+
+['$defs'.breakerOptions.properties.consecutive_failures]
+description = 'Trips the breaker after this many consecutive failures.'
+type = 'integer'
+
+['$defs'.breakerOptions.properties.enabled]
+description = 'Turns the circuit breaker on.'
+type = 'boolean'
+
+['$defs'.breakerOptions.properties.failure_ratio]
+description = 'Failure ratio in [0,1] that trips the breaker.'
+maximum = 1
+minimum = 0
+type = 'number'
+
+['$defs'.breakerOptions.properties.interval]
+'$ref' = '#/$defs/durationNs'
+description = 'Closed-state window before counts reset.'
+
+['$defs'.breakerOptions.properties.max_requests]
+description = 'Probes allowed while half-open.'
+minimum = 0
+type = 'integer'
+
+['$defs'.breakerOptions.properties.min_requests]
+description = 'Minimum request count before the failure ratio applies.'
+type = 'integer'
+
+['$defs'.breakerOptions.properties.timeout]
+'$ref' = '#/$defs/durationNs'
+description = 'Open-state duration before the breaker half-opens.'
+
+['$defs'.bulkheadOptions]
+additionalProperties = false
+type = 'object'
+
+['$defs'.bulkheadOptions.properties]
+['$defs'.bulkheadOptions.properties.max_concurrent]
+description = 'Concurrent executions admitted; <= 0 disables the bulkhead.'
+type = 'integer'
+
+['$defs'.bulkheadOptions.properties.max_queue]
+description = 'Bounds waiters; <= 0 is unbounded.'
+type = 'integer'
+
+['$defs'.bulkheadOptions.properties.max_wait]
+'$ref' = '#/$defs/durationNs'
+description = 'How long a caller waits for a slot; <= 0 waits indefinitely.'
+
 ['$defs'.cacheOptions]
 additionalProperties = false
 type = 'object'
@@ -106,7 +175,7 @@ type = 'object'
 ['$defs'.cacheOptions.properties]
 ['$defs'.cacheOptions.properties.adapter]
 description = 'Deprecated/legacy: cache.Options carries its own internal Adapter int field (0=memory,1=redis), separate from and easily confused with the outer service.adapter string. Prefer the outer adapter field; avoid setting this.'
-enum = [0.0, 1.0]
+enum = [0, 1]
 type = 'integer'
 
 ['$defs'.cacheOptions.properties.addr]
@@ -168,13 +237,36 @@ additionalProperties = false
 type = 'object'
 
 ['$defs'.cryptoOptions.properties]
+['$defs'.cryptoOptions.properties.endpoint]
+description = 'Overrides the KMS endpoint (custom KMS, tests, VPC endpoints); must include scheme and host.'
+type = 'string'
+
 ['$defs'.cryptoOptions.properties.key]
-description = 'Required. Base64-encoded 32-byte encryption key.'
+description = 'Base64-encoded 32-byte encryption key. Required for the local adapter; optional for the kms adapter when any KMS field is set.'
+type = 'string'
+
+['$defs'.cryptoOptions.properties.key_id]
+description = 'Primary KMS key identifier used for envelope encryption. Required when use_envelope is true.'
+type = 'string'
+
+['$defs'.cryptoOptions.properties.key_ids]
+description = 'Accepted KMS key identifiers for rotation; Decrypt accepts envelopes sealed under key_id or any entry here.'
+type = 'array'
+
+['$defs'.cryptoOptions.properties.key_ids.items]
+type = 'string'
+
+['$defs'.cryptoOptions.properties.region]
+description = 'KMS region (for example an AWS region).'
 type = 'string'
 
 ['$defs'.cryptoOptions.properties.sign_key]
 description = 'Base64-encoded 64-byte signing key.'
 type = 'string'
+
+['$defs'.cryptoOptions.properties.use_envelope]
+description = 'Selects KMS envelope encryption. When true, key_id is required.'
+type = 'boolean'
 
 ['$defs'.dbOptions]
 additionalProperties = false
@@ -182,7 +274,7 @@ type = 'object'
 
 ['$defs'.dbOptions.properties]
 ['$defs'.dbOptions.properties.dedicated_pool]
-description = 'Opt out of container-level pool sharing; default false shares one pool per exact DSN, true opens a private pool.'
+description = 'Opt out of container-level pool sharing; default false shares one pool per exact DSN, true opens a private pool. Ignored on db itself.'
 type = 'boolean'
 
 ['$defs'.dbOptions.properties.dsn]
@@ -196,12 +288,12 @@ type = 'string'
 '$ref' = '#/$defs/durationNs'
 
 ['$defs'.dbOptions.properties.max_conns]
-minimum = 0.0
+minimum = 0
 type = 'integer'
 
 ['$defs'.dbOptions.properties.min_conns]
 description = 'Minimum pool size (postgres) or idle-connection target (sqlite).'
-minimum = 0.0
+minimum = 0
 type = 'integer'
 
 ['$defs'.dbOptions.properties.path]
@@ -213,11 +305,15 @@ additionalProperties = false
 type = 'object'
 
 ['$defs'.documentOptions.properties]
+['$defs'.documentOptions.properties.allow_insecure]
+description = 'Permit an http endpoint for testing. Default false (https only).'
+type = 'boolean'
+
 ['$defs'.documentOptions.properties.api_key]
 type = 'string'
 
 ['$defs'.documentOptions.properties.dpi]
-minimum = 0.0
+minimum = 0
 type = 'integer'
 
 ['$defs'.documentOptions.properties.endpoint]
@@ -232,16 +328,16 @@ description = 'Default: pdftoppm.'
 type = 'string'
 
 ['$defs'.documentOptions.properties.latex_runs]
-minimum = 0.0
+minimum = 0
 type = 'integer'
 
 ['$defs'.documentOptions.properties.max_output_bytes]
-minimum = 0.0
+minimum = 0
 type = 'integer'
 
 ['$defs'.documentOptions.properties.quality]
-maximum = 100.0
-minimum = 0.0
+maximum = 100
+minimum = 0
 type = 'integer'
 
 ['$defs'.documentOptions.properties.timeout]
@@ -252,7 +348,7 @@ type = 'string'
 
 ['$defs'.durationNs]
 description = 'time.Duration serialized as an integer count of nanoseconds in JSON/YAML config files (e.g. 5s = 5000000000). Not a Go duration string -- "5s" style strings only work for environment-variable overrides, never inside zever.yaml/.yml/.json.'
-minimum = 0.0
+minimum = 0
 type = 'integer'
 
 ['$defs'.eventbusOptions]
@@ -262,7 +358,7 @@ type = 'object'
 ['$defs'.eventbusOptions.properties]
 ['$defs'.eventbusOptions.properties.buffer_size]
 description = 'Zero means adapter default (1024).'
-minimum = 0.0
+minimum = 0
 type = 'integer'
 
 ['$defs'.eventbusOptions.properties.close_timeout]
@@ -275,7 +371,7 @@ description = 'Zero means adapter default (30s).'
 
 ['$defs'.eventbusOptions.properties.max_handlers]
 description = 'Zero means adapter default (128).'
-minimum = 0.0
+minimum = 0
 type = 'integer'
 
 ['$defs'.eventbusOptions.properties.redis]
@@ -332,7 +428,7 @@ description = 'Mapbox/OSM API endpoint override.'
 type = 'string'
 
 ['$defs'.geoOptions.properties.max_response_body]
-minimum = 0.0
+minimum = 0
 type = 'integer'
 
 ['$defs'.geoOptions.properties.path]
@@ -379,7 +475,7 @@ type = 'string'
 
 ['$defs'.i18nOptions.properties.remote.properties.max_in_flight]
 description = 'Zero means adapter default (1000).'
-minimum = 0.0
+minimum = 0
 type = 'integer'
 
 ['$defs'.i18nOptions.properties.remote.properties.timeout]
@@ -397,6 +493,10 @@ type = 'boolean'
 ['$defs'.idempotencyOptions.properties.dsn]
 description = 'Postgres connection string or sqlite path for the db adapter; empty selects a private in-memory database.'
 type = 'string'
+
+['$defs'.idempotencyOptions.properties.max_entries]
+description = 'Memory adapter record-table bound before LRU eviction. Non-positive means the adapter default (1000).'
+type = 'integer'
 
 ['$defs'.idempotencyOptions.properties.redis]
 '$ref' = '#/$defs/zredisOptionsWithPrefix'
@@ -451,7 +551,7 @@ type = 'object'
 ['$defs'.logOptions.properties]
 ['$defs'.logOptions.properties.min_level]
 description = '0=debug, 1=info, 2=warn, 3=error, 4=fatal. log.Level has no custom JSON (un)marshaling, so config files must use the integer, not the string name.'
-enum = [0.0, 1.0, 2.0, 3.0, 4.0]
+enum = [0, 1, 2, 3, 4]
 type = 'integer'
 
 ['$defs'.mailerOptions]
@@ -469,15 +569,15 @@ description = 'Required; must not contain a scheme.'
 type = 'string'
 
 ['$defs'.mailerOptions.properties.max_message_size]
-minimum = 0.0
+minimum = 0
 type = 'integer'
 
 ['$defs'.mailerOptions.properties.password]
 type = 'string'
 
 ['$defs'.mailerOptions.properties.port]
-maximum = 65535.0
-minimum = 1.0
+maximum = 65535
+minimum = 1
 type = 'integer'
 
 ['$defs'.mailerOptions.properties.timeout]
@@ -517,7 +617,7 @@ type = 'string'
 
 ['$defs'.mediaOptions.properties.max_download_bytes]
 description = 'Default: 67108864 (64 MiB).'
-minimum = 0.0
+minimum = 0
 type = 'integer'
 
 ['$defs'.mediaOptions.properties.max_duration]
@@ -526,13 +626,13 @@ description = 'Zero means unlimited.'
 
 ['$defs'.mediaOptions.properties.max_pixels]
 description = 'Default: 52428800.'
-minimum = 0.0
+minimum = 0
 type = 'integer'
 
 ['$defs'.mediaOptions.properties.presign_ttl]
 '$ref' = '#/$defs/durationNs'
 description = 'Default: 1h. Must be <= 604800000000000 ns (7 days) -- exceeding it is REJECTED at Validate() time with InvalidOptionsError, not silently clamped.'
-maximum = 604800000000000.0
+maximum = 604800000000000
 type = 'integer'
 
 ['$defs'.mediaOptions.properties.region]
@@ -602,7 +702,7 @@ description = 'Collector address as host:port -- no scheme, no path.'
 type = 'string'
 
 ['$defs'.observabilityOptions.properties.headers]
-maxProperties = 32.0
+maxProperties = 32
 type = 'object'
 
 ['$defs'.observabilityOptions.properties.headers.additionalProperties]
@@ -616,14 +716,14 @@ type = 'boolean'
 type = 'string'
 
 ['$defs'.observabilityOptions.properties.sample_ratio]
-maximum = 1.0
-minimum = 0.0
+maximum = 1
+minimum = 0
 type = 'number'
 
 ['$defs'.observabilityOptions.properties.service_name]
 description = 'Required.'
-maxLength = 128.0
-minLength = 1.0
+maxLength = 128
+minLength = 1
 type = 'string'
 
 ['$defs'.observabilityOptions.properties.set_globals]
@@ -632,6 +732,75 @@ type = 'boolean'
 ['$defs'.observabilityOptions.properties.verbose]
 type = 'boolean'
 
+['$defs'.outboxOptions]
+additionalProperties = false
+type = 'object'
+
+['$defs'.outboxOptions.properties]
+['$defs'.outboxOptions.properties.batch_size]
+description = 'Messages one poll claims. Zero means the adapter default (100).'
+type = 'integer'
+
+['$defs'.outboxOptions.properties.dedicated_pool]
+description = 'Opt out of container-level pool sharing; default false shares one pool per exact DSN, true opens a private pool.'
+type = 'boolean'
+
+['$defs'.outboxOptions.properties.dsn]
+description = 'Postgres connection string or sqlite path for the db adapter; empty selects a private in-memory database.'
+type = 'string'
+
+['$defs'.outboxOptions.properties.inbox_table]
+description = 'Inbox table name. Empty means the adapter default ("inbox").'
+type = 'string'
+
+['$defs'.outboxOptions.properties.lock_seconds]
+description = 'Claim lease in seconds. Zero means the adapter default (30).'
+type = 'integer'
+
+['$defs'.outboxOptions.properties.max_attempts]
+description = 'Publish attempt cap before a message is marked failed. Zero means the adapter default (5).'
+type = 'integer'
+
+['$defs'.outboxOptions.properties.notify_channel]
+description = 'Postgres LISTEN/NOTIFY channel (cdc adapter).'
+type = 'string'
+
+['$defs'.outboxOptions.properties.poll_interval]
+'$ref' = '#/$defs/durationNs'
+description = 'Relay poll cadence. Zero means the adapter default (1s).'
+
+['$defs'.outboxOptions.properties.prefix]
+description = 'Logical-replication message prefix (cdc adapter).'
+type = 'string'
+
+['$defs'.outboxOptions.properties.publication]
+description = 'Logical-replication publication name (cdc adapter).'
+type = 'string'
+
+['$defs'.outboxOptions.properties.publisher]
+description = 'Records which transport the relay publishes through. Informational only.'
+enum = ['', 'eventbus', 'queue']
+type = 'string'
+
+['$defs'.outboxOptions.properties.retention]
+'$ref' = '#/$defs/durationNs'
+description = 'How long processed messages are kept. Zero means the adapter default (168h).'
+
+['$defs'.outboxOptions.properties.retry]
+'$ref' = '#/$defs/retryPolicy'
+
+['$defs'.outboxOptions.properties.slot]
+description = 'Logical-replication slot name (cdc adapter).'
+type = 'string'
+
+['$defs'.outboxOptions.properties.stall_readiness]
+description = 'Opts the relay into the container readiness aggregate; default false keeps readiness dependency-based.'
+type = 'boolean'
+
+['$defs'.outboxOptions.properties.table]
+description = 'Outbox table name. Empty means the adapter default ("outbox").'
+type = 'string'
+
 ['$defs'.passwordOptions]
 additionalProperties = false
 type = 'object'
@@ -639,32 +808,32 @@ type = 'object'
 ['$defs'.passwordOptions.properties]
 ['$defs'.passwordOptions.properties.key_length]
 description = 'Default: 32.'
-maximum = 128.0
-minimum = 16.0
+maximum = 128
+minimum = 16
 type = 'integer'
 
 ['$defs'.passwordOptions.properties.memory]
 description = 'Argon2id memory cost in KiB. Default: 65536 (64 MiB).'
-maximum = 1048576.0
-minimum = 8192.0
+maximum = 1048576
+minimum = 8192
 type = 'integer'
 
 ['$defs'.passwordOptions.properties.salt_length]
 description = 'Default: 16.'
-maximum = 64.0
-minimum = 8.0
+maximum = 64
+minimum = 8
 type = 'integer'
 
 ['$defs'.passwordOptions.properties.threads]
 description = 'Default: 4.'
-maximum = 16.0
-minimum = 1.0
+maximum = 16
+minimum = 1
 type = 'integer'
 
 ['$defs'.passwordOptions.properties.time]
 description = 'Argon2id iterations. Default: 3.'
-maximum = 10.0
-minimum = 1.0
+maximum = 10
+minimum = 1
 type = 'integer'
 
 ['$defs'.paymentOptions]
@@ -684,7 +853,7 @@ type = 'string'
 
 ['$defs'.paymentOptions.properties.max_webhook_bytes]
 description = 'Default: 1048576 (1 MiB).'
-minimum = 0.0
+minimum = 0
 type = 'integer'
 
 ['$defs'.paymentOptions.properties.sandbox]
@@ -717,7 +886,7 @@ type = 'object'
 type = 'array'
 
 ['$defs'.permissionOptions.properties.roles.additionalProperties.items]
-maxLength = 256.0
+maxLength = 256
 type = 'string'
 
 ['$defs'.permissionOptions.properties.rules]
@@ -733,7 +902,7 @@ type = 'object'
 
 ['$defs'.permissionRule.properties]
 ['$defs'.permissionRule.properties.Action]
-maxLength = 256.0
+maxLength = 256
 type = 'string'
 
 ['$defs'.permissionRule.properties.Effect]
@@ -749,7 +918,7 @@ type = 'string'
 type = 'boolean'
 
 ['$defs'.permissionRule.properties.Role]
-maxLength = 256.0
+maxLength = 256
 type = 'string'
 
 ['$defs'.providersCommon]
@@ -782,7 +951,7 @@ type = 'object'
 type = 'string'
 
 ['$defs'.queueOptions.properties.buffer]
-minimum = 0.0
+minimum = 0
 type = 'integer'
 
 ['$defs'.queueOptions.properties.db]
@@ -828,16 +997,20 @@ type = 'object'
 ['$defs'.ratelimitOptions.properties]
 ['$defs'.ratelimitOptions.properties.burst]
 description = 'Required.'
-exclusiveMinimum = 0.0
+exclusiveMinimum = 0
 type = 'integer'
 
 ['$defs'.ratelimitOptions.properties.idle_ttl]
 '$ref' = '#/$defs/durationNs'
 description = 'Zero means adapter default (10m).'
 
+['$defs'.ratelimitOptions.properties.max_entries]
+description = 'Memory adapter bucket-table bound before LRU eviction. Non-positive means the adapter default (1000).'
+type = 'integer'
+
 ['$defs'.ratelimitOptions.properties.rate]
 description = 'Token refill rate per second. Required.'
-exclusiveMinimum = 0.0
+exclusiveMinimum = 0
 type = 'number'
 
 ['$defs'.ratelimitOptions.properties.redis]
@@ -847,6 +1020,71 @@ type = 'number'
 '$ref' = '#/$defs/durationNs'
 description = 'Zero means adapter default (1m).'
 
+['$defs'.resilienceOptions]
+additionalProperties = false
+type = 'object'
+
+['$defs'.resilienceOptions.properties]
+['$defs'.resilienceOptions.properties.breaker]
+'$ref' = '#/$defs/breakerOptions'
+
+['$defs'.resilienceOptions.properties.bulkhead]
+'$ref' = '#/$defs/bulkheadOptions'
+
+['$defs'.resilienceOptions.properties.name]
+description = 'Base name applied to the breaker.'
+type = 'string'
+
+['$defs'.resilienceOptions.properties.redis]
+'$ref' = '#/$defs/zredisOptionsWithPrefix'
+
+['$defs'.resilienceOptions.properties.retry]
+'$ref' = '#/$defs/retryPolicy'
+
+['$defs'.resilienceOptions.properties.timeout]
+'$ref' = '#/$defs/durationNs'
+description = 'Bounds the whole operation, including retries.'
+
+['$defs'.retryPolicy]
+additionalProperties = false
+description = 'retry.Policy (shared/retry) carries NO json/yaml/toml struct tags, so it decodes by case-insensitive Go field name, not snake_case: BaseDelay / MaxDelay / Multiplier / Linear / Jitter / JitterMode / JitterMax / MaxAttempts. The lowercase keys below are those same fields matched case-insensitively; snake_case keys such as base_delay are rejected as unknown fields. OnRetry is a Go-only callback (json:"-") and is not settable from a file.'
+type = 'object'
+
+['$defs'.retryPolicy.properties]
+['$defs'.retryPolicy.properties.basedelay]
+'$ref' = '#/$defs/durationNs'
+description = 'Go field BaseDelay: delay before the first retry (attempt 1).'
+
+['$defs'.retryPolicy.properties.jitter]
+description = 'Go field Jitter: fraction of the computed delay to randomize, clamped to [0, 1].'
+maximum = 1
+minimum = 0
+type = 'number'
+
+['$defs'.retryPolicy.properties.jittermax]
+'$ref' = '#/$defs/durationNs'
+description = 'Go field JitterMax: upper bound of a flat, delay-independent jitter draw (JitterFlat only).'
+
+['$defs'.retryPolicy.properties.jittermode]
+description = 'Go field JitterMode: 0=JitterSymmetric, 1=JitterAdditive, 2=JitterFlat.'
+type = 'integer'
+
+['$defs'.retryPolicy.properties.linear]
+description = 'Go field Linear: switches from exponential to linear growth.'
+type = 'boolean'
+
+['$defs'.retryPolicy.properties.maxattempts]
+description = 'Go field MaxAttempts: total attempts including the first. Zero or negative means 1 (no retries).'
+type = 'integer'
+
+['$defs'.retryPolicy.properties.maxdelay]
+'$ref' = '#/$defs/durationNs'
+description = 'Go field MaxDelay: caps the computed delay before jitter. Zero or negative means unbounded.'
+
+['$defs'.retryPolicy.properties.multiplier]
+description = 'Go field Multiplier: scales BaseDelay per attempt. Values <= 1 disable growth. Ignored when linear is true.'
+type = 'number'
+
 ['$defs'.routerOptions]
 additionalProperties = false
 type = 'object'
@@ -854,7 +1092,7 @@ type = 'object'
 ['$defs'.routerOptions.properties]
 ['$defs'.routerOptions.properties.app_name]
 description = 'Empty defaults to "app".'
-maxLength = 64.0
+maxLength = 64
 type = 'string'
 
 ['$defs'.schedulerOptions]
@@ -867,19 +1105,23 @@ type = 'object'
 '$ref' = '#/$defs/durationNs'
 description = 'Zero means adapter default (5s).'
 
-['$defs'.schedulerOptions.properties.dsn]
-description = 'Postgres connection string or sqlite path for the postgres adapter; empty selects a private in-memory database.'
-type = 'string'
-
 ['$defs'.schedulerOptions.properties.dedicated_pool]
 description = 'Opt out of container-level pool sharing; default false shares one pool per exact DSN, true opens a private pool.'
 type = 'boolean'
+
+['$defs'.schedulerOptions.properties.dsn]
+description = 'Postgres connection string or sqlite path for the postgres adapter; empty selects a private in-memory database.'
+type = 'string'
 
 ['$defs'.searchOptions]
 additionalProperties = false
 type = 'object'
 
 ['$defs'.searchOptions.properties]
+['$defs'.searchOptions.properties.allow_insecure]
+description = 'Permit an http:// host for testing. Default false (https only).'
+type = 'boolean'
+
 ['$defs'.searchOptions.properties.api_key]
 type = 'string'
 
@@ -1080,7 +1322,7 @@ description = 'Fixed tenant ID for the single adapter; default "default".'
 type = 'string'
 
 ['$defs'.tenantOptions.properties.subdomain_regex]
-maxLength = 500.0
+maxLength = 500
 type = 'string'
 
 ['$defs'.vectorstoreOptions]
@@ -1088,6 +1330,10 @@ additionalProperties = false
 type = 'object'
 
 ['$defs'.vectorstoreOptions.properties]
+['$defs'.vectorstoreOptions.properties.allow_insecure]
+description = 'Permit an http:// URL for testing. Default false (https only).'
+type = 'boolean'
+
 ['$defs'.vectorstoreOptions.properties.api_key]
 type = 'string'
 
@@ -1097,7 +1343,7 @@ type = 'boolean'
 
 ['$defs'.vectorstoreOptions.properties.dimension]
 description = 'Default: 1536.'
-minimum = 0.0
+minimum = 0
 type = 'integer'
 
 ['$defs'.vectorstoreOptions.properties.dsn]
@@ -1122,7 +1368,7 @@ type = 'string'
 
 ['$defs'.webhookOptions.properties.max_retries]
 description = 'Zero means no retries.'
-minimum = 0.0
+minimum = 0
 type = 'integer'
 
 ['$defs'.webhookOptions.properties.queue_adapter]
@@ -1164,64 +1410,6 @@ type = 'string'
 description = 'Workflow-runs table name; empty selects the adapter default.'
 type = 'string'
 
-['$defs'.zredisConnectOptions]
-additionalProperties = false
-type = 'object'
-
-['$defs'.zredisConnectOptions.properties]
-['$defs'.zredisConnectOptions.properties.addr]
-description = 'host:port, or redis:// / rediss:// URL. Empty means localhost:6379.'
-type = 'string'
-
-['$defs'.zredisConnectOptions.properties.db]
-type = 'integer'
-
-['$defs'.zredisConnectOptions.properties.password]
-type = 'string'
-
-['$defs'.zredisConnectOptions.properties.require_tls]
-description = 'Fail fast instead of silently connecting in plaintext when TLS would not be used.'
-type = 'boolean'
-
-['$defs'.zredisConnectOptions.properties.tls]
-description = 'Enable TLS (1.2 floor) for a plain host:port address.'
-type = 'boolean'
-
-['$defs'.zredisOptions]
-additionalProperties = false
-type = 'object'
-
-['$defs'.zredisOptions.properties]
-['$defs'.zredisOptions.properties.addr]
-type = 'string'
-
-['$defs'.zredisOptions.properties.db]
-type = 'integer'
-
-['$defs'.zredisOptions.properties.max_conn_idle_time]
-'$ref' = '#/$defs/durationNs'
-
-['$defs'.zredisOptions.properties.max_conn_lifetime]
-'$ref' = '#/$defs/durationNs'
-
-['$defs'.zredisOptions.properties.min_idle_conns]
-type = 'integer'
-
-['$defs'.zredisOptions.properties.password]
-type = 'string'
-
-['$defs'.zredisOptions.properties.pool_size]
-type = 'integer'
-
-['$defs'.zredisOptions.properties.pool_timeout]
-'$ref' = '#/$defs/durationNs'
-
-['$defs'.zredisOptions.properties.require_tls]
-type = 'boolean'
-
-['$defs'.zredisOptions.properties.tls]
-type = 'boolean'
-
 ['$defs'.zredisOptionsWithPrefix]
 additionalProperties = false
 description = 'zredis.Options embedded plus a Prefix field -- used by eventbus/idempotency/ratelimit/session Redis adapters.'
@@ -1260,6 +1448,10 @@ type = 'boolean'
 
 ['$defs'.zredisOptionsWithPrefix.properties.tls]
 type = 'boolean'
+
+['$defs'.zredisOptionsWithPrefix.properties.url]
+description = 'Reserved and currently ignored; present for schema parity with zredis.Options.URL. Use addr to actually select a server.'
+type = 'string'
 
 [properties]
 [properties.ai]
@@ -1323,7 +1515,7 @@ type = 'object'
 
 [properties.crypto.properties]
 [properties.crypto.properties.adapter]
-enum = ['local']
+enum = ['local', 'kms']
 
 [properties.crypto.properties.options]
 '$ref' = '#/$defs/cryptoOptions'
@@ -1471,6 +1663,17 @@ enum = ['noop', 'stdout', 'otlp']
 [properties.observability.properties.options]
 '$ref' = '#/$defs/observabilityOptions'
 
+[properties.outbox]
+'$ref' = '#/$defs/service'
+type = 'object'
+
+[properties.outbox.properties]
+[properties.outbox.properties.adapter]
+enum = ['memory', 'db', 'cdc']
+
+[properties.outbox.properties.options]
+'$ref' = '#/$defs/outboxOptions'
+
 [properties.password]
 '$ref' = '#/$defs/service'
 type = 'object'
@@ -1525,6 +1728,17 @@ enum = ['memory', 'redis']
 
 [properties.ratelimit.properties.options]
 '$ref' = '#/$defs/ratelimitOptions'
+
+[properties.resilience]
+'$ref' = '#/$defs/service'
+type = 'object'
+
+[properties.resilience.properties]
+[properties.resilience.properties.adapter]
+enum = ['memory', 'redis']
+
+[properties.resilience.properties.options]
+'$ref' = '#/$defs/resilienceOptions'
 
 [properties.router]
 '$ref' = '#/$defs/service'
