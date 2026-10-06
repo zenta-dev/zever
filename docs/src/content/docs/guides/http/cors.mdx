@@ -54,7 +54,7 @@ handler := middleware.CORS(middleware.Options{
 
 `Options.Validate` rejects fail-open shapes: empty origin/method lists, blank entries, `*` with `AllowCredentials`, negative `MaxAge`; invalid options fail closed with `500 {"error":"internal error"}`. A wildcard `*` without credentials echoes `*` for any origin. `DefaultCORSMaxAge` (`0`) omits `Max-Age`, so browsers preflight every request.
 
-Keep `CORS` outermost so preflights skip logging and rate limiting, and call `r.Use` before `Handle`, since `stdhttp` snapshots middleware per route. CORS is HTTP-only ([chain order](../middleware/#order-the-middleware-chain)).
+Keep `CORS` outermost so preflights skip logging and rate limiting, and call `r.Use` before `Handle`, since `stdhttp` snapshots middleware per route. CORS is HTTP-only ([chain order](../middleware/#order-the-chain)).
 
 ## Troubleshooting
 
