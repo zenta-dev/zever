@@ -346,7 +346,15 @@ func (c *Container) Observability() (observability.Provider, error) {
 // database); container-level pool sharing is not wired for outbox.
 func (c *Container) Outbox() (outbox.Store, error) {
 	return c.outbox.get(func() (outbox.Store, error) {
-		return openService("outbox", c.cfg.Outbox.Adapter, outbox.ParseAdapter, outbox.Open, c.cfg.Outbox.Options)
+		opts := c.cfg.Outbox.Options
+		// Best-effort: inject the resolved observability provider so the relay
+		// emits metrics/spans. A failed or unconfigured observability service
+		// never blocks the outbox.
+		if obs, err := c.Observability(); err == nil {
+			opts.Provider = obs
+		}
+
+		return openService("outbox", c.cfg.Outbox.Adapter, outbox.ParseAdapter, outbox.Open, opts)
 	})
 }
 
