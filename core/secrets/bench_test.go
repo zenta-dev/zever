@@ -26,7 +26,7 @@ func BenchmarkOpen(b *testing.B) {
 	b.ReportAllocs()
 	b.ResetTimer()
 
-	for i := 0; i < b.N; i++ {
+	for b.Loop() {
 		if _, err := secrets.Open(a, secrets.Options{}); err != nil {
 			b.Fatalf("Open(%v) error = %v", a, err)
 		}
@@ -54,7 +54,7 @@ func BenchmarkValidateName(b *testing.B) {
 	b.ReportAllocs()
 	b.ResetTimer()
 
-	for i := 0; i < b.N; i++ {
+	for b.Loop() {
 		if err := secrets.ValidateName(name); err != nil {
 			b.Fatalf("ValidateName(%q) error = %v", name, err)
 		}
@@ -67,7 +67,7 @@ func BenchmarkValidateNameLong(b *testing.B) {
 	b.ReportAllocs()
 	b.ResetTimer()
 
-	for i := 0; i < b.N; i++ {
+	for b.Loop() {
 		if err := secrets.ValidateName(name); err != nil {
 			b.Fatalf("ValidateName(long) error = %v", err)
 		}
@@ -80,7 +80,7 @@ func BenchmarkOptionsValidate(b *testing.B) {
 	b.ReportAllocs()
 	b.ResetTimer()
 
-	for i := 0; i < b.N; i++ {
+	for b.Loop() {
 		if err := opts.Validate(); err != nil {
 			b.Fatalf("Validate() error = %v", err)
 		}

@@ -25,7 +25,7 @@ func BenchmarkOpen(b *testing.B) {
 	b.ReportAllocs()
 	b.ResetTimer()
 
-	for i := 0; i < b.N; i++ {
+	for b.Loop() {
 		if _, err := Open(a, Options{AppName: "shop"}); err != nil {
 			b.Fatalf("Open(%v) error = %v", a, err)
 		}
@@ -38,7 +38,7 @@ func BenchmarkChiPattern(b *testing.B) {
 	b.ReportAllocs()
 	b.ResetTimer()
 
-	for i := 0; i < b.N; i++ {
+	for b.Loop() {
 		if _, err := ChiPattern(pattern); err != nil {
 			b.Fatalf("ChiPattern(%q) error = %v", pattern, err)
 		}
@@ -51,7 +51,7 @@ func BenchmarkNormalizePattern(b *testing.B) {
 	b.ReportAllocs()
 	b.ResetTimer()
 
-	for i := 0; i < b.N; i++ {
+	for b.Loop() {
 		if got := NormalizePattern(pattern); got == "" {
 			b.Fatal("NormalizePattern returned empty")
 		}
@@ -64,7 +64,7 @@ func BenchmarkConvertColonSegments(b *testing.B) {
 	b.ReportAllocs()
 	b.ResetTimer()
 
-	for i := 0; i < b.N; i++ {
+	for b.Loop() {
 		if _, err := ConvertColonSegments(seg); err != nil {
 			b.Fatalf("ConvertColonSegments(%q) error = %v", seg, err)
 		}
@@ -75,7 +75,7 @@ func BenchmarkValidMethod(b *testing.B) {
 	b.ReportAllocs()
 	b.ResetTimer()
 
-	for i := 0; i < b.N; i++ {
+	for b.Loop() {
 		if !ValidMethod("get") {
 			b.Fatal("ValidMethod(get) = false")
 		}
@@ -89,7 +89,7 @@ func BenchmarkParam(b *testing.B) {
 	b.ReportAllocs()
 	b.ResetTimer()
 
-	for i := 0; i < b.N; i++ {
+	for b.Loop() {
 		if got := Param(r, "id"); got != "42" {
 			b.Fatalf("Param(id) = %q, want 42", got)
 		}
