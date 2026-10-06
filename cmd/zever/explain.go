@@ -19,11 +19,13 @@ var errExplainUsage = errors.New(
 // ExplainConfig carries every input runExplainWith needs. Screen agents
 // build it from huh forms; the flag shell (runExplain) builds it from argv.
 // OpPath is "Service.Operation" or "Module.Service.Operation". A nil Out
-// defaults to os.Stdout.
+// defaults to os.Stdout. JSON emits a machine-readable envelope instead of
+// the human summary.
 type ExplainConfig struct {
 	OpPath string
 	Files  []string
 	Out    io.Writer
+	JSON   bool
 }
 
 // runExplain compiles the given .zen files with zero backends (schema
@@ -51,7 +53,7 @@ func runExplain(args []string) error {
 		reportAutoDiscovery(paths)
 	}
 
-	return runExplainWith(ExplainConfig{OpPath: path, Files: paths})
+	return runExplainWith(ExplainConfig{OpPath: path, Files: paths, JSON: jsonMode})
 }
 
 // runExplainWith resolves cfg.Files with zero backends and prints cfg.OpPath's
@@ -83,6 +85,22 @@ func runExplainWith(cfg ExplainConfig) error {
 	op, svc, mod, found := findOperation(result.Schema.Modules, moduleName, serviceName, opName)
 	if !found {
 		return explainNotFoundError(cfg.OpPath, result.Schema.Modules)
+	}
+
+	if cfg.JSON {
+		emitSuccess("explain", map[string]any{
+			"path":       cfg.OpPath,
+			"module":     mod.Name,
+			"service":    svc.Name,
+			"operation":  op.Name,
+			"location":   op.Pos.String(),
+			"transports": explainTransports(op.Transports),
+			"auth":       explainAuth(op.Auth),
+			"permission": explainPermission(op.Permission),
+			"errors":     explainErrors(op.Errors),
+		})
+
+		return nil
 	}
 
 	printExplain(out, mod, svc, op)

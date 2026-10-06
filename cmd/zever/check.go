@@ -11,10 +11,12 @@ import (
 
 // CheckConfig carries every input runCheckWith needs. Screen agents build it
 // from huh forms; the flag shell (runCheck) builds it from argv. A nil Out
-// defaults to os.Stdout.
+// defaults to os.Stdout. JSON emits a machine-readable envelope instead of
+// the human summary.
 type CheckConfig struct {
 	Files []string
 	Out   io.Writer
+	JSON  bool
 }
 
 // printCheckUsage prints styled help for `zever check`.
@@ -64,7 +66,7 @@ func runCheck(args []string) error {
 		reportAutoDiscovery(paths)
 	}
 
-	return runCheckWith(CheckConfig{Files: paths})
+	return runCheckWith(CheckConfig{Files: paths, JSON: jsonMode})
 }
 
 // runCheckWith validates cfg.Files with zero backends and reports validity
@@ -89,6 +91,12 @@ func runCheckWith(cfg CheckConfig) error {
 		}
 
 		return fmt.Errorf("zever check: %d file(s) failed to compile", len(files))
+	}
+
+	if cfg.JSON {
+		emitSuccess("check", map[string]any{"files": cfg.Files, "valid": true})
+
+		return nil
 	}
 
 	_, _ = fmt.Fprintln(out, successMark()+" "+bold(fmt.Sprintf("%d file(s) valid", len(files))))

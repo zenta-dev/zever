@@ -49,12 +49,14 @@ Flags:`
 // CompileConfig carries every input runCompileWith needs. Screen agents
 // build it from huh forms; the flag shell (runCompile) builds it from argv.
 // A nil Out defaults to os.Stdout. An empty Backends selects every
-// registered backend.
+// registered backend. JSON emits a machine-readable envelope instead of the
+// human summary.
 type CompileConfig struct {
 	Files    []string
 	Backends string
 	OutDir   string
 	Out      io.Writer
+	JSON     bool
 }
 
 // outOrStdout resolves the effective stdout writer for a command config.
@@ -231,6 +233,7 @@ func runCompile(args []string) error { //nolint:gocyclo
 		Files:    paths,
 		Backends: fs.Lookup("backend").Value.String(),
 		OutDir:   fs.Lookup("out").Value.String(),
+		JSON:     jsonMode,
 	})
 }
 
@@ -292,8 +295,28 @@ func runCompileWith(cfg CompileConfig) error {
 
 	// Success summary.
 	total := 0
-	for _, m := range result.Outputs {
-		total += len(m)
+	outputs := make(map[string][]string, len(result.Outputs))
+	for backend, files := range result.Outputs {
+		names := make([]string, 0, len(files))
+		for name := range files {
+			names = append(names, name)
+		}
+
+		sort.Strings(names)
+		outputs[backend] = names
+		total += len(files)
+	}
+
+	if cfg.JSON {
+		emitSuccess("compile", map[string]any{
+			"files":    cfg.Files,
+			"backends": backendsSpec,
+			"outDir":   outDir,
+			"outputs":  outputs,
+			"total":    total,
+		})
+
+		return nil
 	}
 
 	msg := success("✔ compiled ") + bold(fmt.Sprintf("%d file(s)", len(files))) + dim(" → ") +
