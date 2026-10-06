@@ -1,0 +1,37 @@
+# zever — llms.txt
+
+Go multi-module monorepo (`go 1.27.0`): schema-driven scaffolding compiler
+(`.zen` DSL) plus swappable backend batteries. Workspace: `go.work` at root.
+Conventions: `AGENTS.md` (repo root).
+
+## For coding agents: start here
+
+- `AGENTS.md` — build/test/lint commands, error and test conventions.
+- `docs/src/content/docs/digging-deeper/ai.mdx` — LLM facade (`core/ai`),
+  agent loop (`core/agent`), RAG (`core/rag`).
+- `container/README.md` — service resolution (`container.New(cfg)`, lazy
+  accessors, close order).
+- `config/README.md` — layered config (`defaults < file < env`).
+- `cmd/zever/README.md` — CLI; `zever --help --agent` prints a
+  machine-readable command descriptor, `--json` selects JSON output.
+- `dsl/README.md` — `.zen` compiler pipeline and codegen backends.
+
+## Machine interfaces
+
+- MCP server: build `tools/zever-mcp`, register the binary as an MCP stdio
+  server. Tools: `zever_compile`, `zever_schema`, `zever_explain`.
+- OpenAPI: `zever compile --backend openapi` emits one document per module
+  plus a merged `openapi.json`.
+- MCP tool manifest: `zever compile --backend mcp` emits one manifest per
+  service (each RPC becomes a tool with JSON Schema input/output).
+- JSON Schema for one entity: `openapi.JSONSchemaForEntity` in
+  `dsl/backend/openapi` (feed to `agent.GenerateStructured`).
+
+## Layout
+
+- `core/<battery>` — one interface + registry (`Register`/`Open`); the
+  container is the sole resolver. `core/agent` (tool loop) and `core/rag`
+  (retrieval) compose backends and have no registry.
+- `adapters/<battery>/<name>` — one Go module per adapter, self-registering.
+- `shared/*` — dependency-free helpers. `dsl/` — compiler frontend
+  (compile-time only; runtime packages must not import it).

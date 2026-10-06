@@ -236,6 +236,7 @@ require (
 	github.com/zenta-dev/zever/adapters/db/postgres v0.5.3 // indirect
 	github.com/zenta-dev/zever/adapters/log/noop v0.5.3 // indirect
 	github.com/zenta-dev/zever/adapters/media/ffmpeg v0.5.3 // indirect
+	github.com/zenta-dev/zever/core/agent v0.5.3 // indirect
 	github.com/zenta-dev/zever/core/ai v0.5.3 // indirect
 	github.com/zenta-dev/zever/core/analytics v0.5.3 // indirect
 	github.com/zenta-dev/zever/core/cache v0.5.3 // indirect
@@ -244,6 +245,7 @@ require (
 	github.com/zenta-dev/zever/core/media v0.5.3 // indirect
 	github.com/zenta-dev/zever/core/observability v0.5.3 // indirect
 	github.com/zenta-dev/zever/core/outbox v0.5.3 // indirect
+	github.com/zenta-dev/zever/core/rag v0.5.3 // indirect
 	github.com/zenta-dev/zever/core/resilience v0.5.3 // indirect
 	github.com/zenta-dev/zever/core/scheduler v0.5.3 // indirect
 	github.com/zenta-dev/zever/core/search v0.5.3 // indirect
@@ -284,3 +286,7 @@ require (
 replace github.com/zenta-dev/zever/core/outbox => ../../core/outbox
 
 replace github.com/zenta-dev/zever/core/resilience => ../../core/resilience
+
+replace github.com/zenta-dev/zever/core/agent => ../../core/agent
+
+replace github.com/zenta-dev/zever/core/rag => ../../core/rag

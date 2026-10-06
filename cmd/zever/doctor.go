@@ -28,6 +28,8 @@ type DoctorConfig struct {
 	// error. Pass --strict for CI/pre-deploy gating, where any FAIL row
 	// should abort the pipeline via a non-zero exit code.
 	Strict bool
+	// JSON emits a machine-readable envelope instead of the human table.
+	JSON bool
 }
 
 // printDoctorUsage prints styled help for `zever doctor`.
@@ -88,7 +90,7 @@ func runDoctor(args []string) error {
 		return fmt.Errorf("zever doctor: %w", err)
 	}
 
-	return runDoctorWith(DoctorConfig{ConfigPath: *configPath, Strict: *strict})
+	return runDoctorWith(DoctorConfig{ConfigPath: *configPath, Strict: *strict, JSON: jsonMode})
 }
 
 // doctorChecksFor builds the battery check table for runDoctorWith.
@@ -184,19 +186,50 @@ func runDoctorWith(cfg DoctorConfig) error {
 	failed := false
 	okCount, failCount := 0, 0
 
+	type doctorRow struct {
+		Name  string `json:"name"`
+		OK    bool   `json:"ok"`
+		Error string `json:"error,omitempty"`
+	}
+
+	rows := make([]doctorRow, 0, len(names))
+
 	for _, name := range names {
 		if err := checks[name](); err != nil {
 			failed = true
 			failCount++
-			padded := fmt.Sprintf("%-*s", maxLen, name)
-			_, _ = fmt.Fprintf(out, "%s  %s  %v\n", cyan(padded), failMark(), err)
+			rows = append(rows, doctorRow{Name: name, Error: err.Error()})
 
 			continue
 		}
 
 		okCount++
-		padded := fmt.Sprintf("%-*s", maxLen, name)
-		_, _ = fmt.Fprintf(out, "%s  %s\n", cyan(padded), successMark())
+		rows = append(rows, doctorRow{Name: name, OK: true})
+	}
+
+	if cfg.JSON {
+		if failed && cfg.Strict {
+			return fmt.Errorf("zever doctor: %d of %d batteries failed (--strict)", failCount, len(names))
+		}
+
+		emitSuccess("doctor", map[string]any{
+			"batteries": rows,
+			"ok":        okCount,
+			"failed":    failCount,
+		})
+
+		return nil
+	}
+
+	for _, row := range rows {
+		padded := fmt.Sprintf("%-*s", maxLen, row.Name)
+		if row.OK {
+			_, _ = fmt.Fprintf(out, "%s  %s\n", cyan(padded), successMark())
+
+			continue
+		}
+
+		_, _ = fmt.Fprintf(out, "%s  %s  %s\n", cyan(padded), failMark(), row.Error)
 	}
 
 	_, _ = fmt.Fprintln(out, "")

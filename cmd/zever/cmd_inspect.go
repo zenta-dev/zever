@@ -16,7 +16,7 @@ import (
 // a file named "-h").
 func newInspectCmds() []*cobra.Command {
 	compileCmd := &cobra.Command{
-		Use:   "compile [--backend atlas,gogen,openapi,proto,protogogen,zenorm] [--out DIR] <files...>",
+		Use:   "compile [--backend atlas,gogen,mcp,openapi,proto,protogogen,zenorm] [--out DIR] <files...>",
 		Short: "Compile .zen schemas through backends",
 		Long:  "Compile .zen schema files through one or more backends, writing each backend's output under <out>/<backend>/.",
 		Example: `  zever compile schema/app.zen --backend=proto

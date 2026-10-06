@@ -17,7 +17,7 @@ var allGenerate = []string{
 var allDB = []string{"migrate", "rollback", "seed"}
 
 // backend names for compile.
-var allBackends = []string{"proto", "zenorm", "atlas", "openapi", "gogen", "protogogen"}
+var allBackends = []string{"proto", "zenorm", "atlas", "openapi", "gogen", "protogogen", "mcp"}
 
 // closest returns the candidate with smallest edit distance to input, if distance
 // is within a threshold (≤2, or ≤3 for longer strings). Case-insensitive.

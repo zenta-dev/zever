@@ -6,6 +6,7 @@ import (
 	"google.golang.org/grpc"
 
 	"github.com/zenta-dev/zever/config"
+	"github.com/zenta-dev/zever/core/agent"
 	"github.com/zenta-dev/zever/core/ai"
 	"github.com/zenta-dev/zever/core/analytics"
 	"github.com/zenta-dev/zever/core/auth"
@@ -31,6 +32,7 @@ import (
 	"github.com/zenta-dev/zever/core/payment"
 	"github.com/zenta-dev/zever/core/permission"
 	"github.com/zenta-dev/zever/core/queue"
+	"github.com/zenta-dev/zever/core/rag"
 	"github.com/zenta-dev/zever/core/ratelimit"
 	"github.com/zenta-dev/zever/core/resilience"
 	"github.com/zenta-dev/zever/core/router"
@@ -52,6 +54,7 @@ type Container struct {
 	cfg *config.Config
 
 	ai            lazy[ai.AI]
+	agent         lazy[*agent.Loop]
 	analytics     lazy[analytics.Analytics]
 	auth          lazy[auth.Auth]
 	billing       lazy[billing.Billing]
@@ -78,6 +81,7 @@ type Container struct {
 	payment       lazy[payment.Payment]
 	permission    lazy[permission.Checker]
 	queue         lazy[queue.Queue]
+	rag           lazy[*rag.Engine]
 	ratelimit     lazy[ratelimit.Limiter]
 	resilience    lazy[resilience.Manager]
 	router        lazy[router.Router]

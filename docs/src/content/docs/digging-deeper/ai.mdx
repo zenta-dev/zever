@@ -176,7 +176,9 @@ _ = engine
 ```
 
 Neither package has a `config` entry: resolve `AI()` (and `VectorStore()`)
-from the container and construct them with `New`.
+from the container and construct them with `New` — or resolve them directly
+with `c.Agent()` and `c.RAG()`, which build and cache the loop and engine over
+the shared backend instances.
 
 ## MCP for AI agents
 

@@ -5,6 +5,7 @@ go 1.27.0
 require (
 	github.com/zenta-dev/zever/adapters/db/sqlite v0.5.3
 	github.com/zenta-dev/zever/config v0.5.3
+	github.com/zenta-dev/zever/core/agent v0.5.3
 	github.com/zenta-dev/zever/core/ai v0.5.3
 	github.com/zenta-dev/zever/core/analytics v0.5.3
 	github.com/zenta-dev/zever/core/auth v0.5.3
@@ -30,6 +31,7 @@ require (
 	github.com/zenta-dev/zever/core/payment v0.5.3
 	github.com/zenta-dev/zever/core/permission v0.5.3
 	github.com/zenta-dev/zever/core/queue v0.5.3
+	github.com/zenta-dev/zever/core/rag v0.5.3
 	github.com/zenta-dev/zever/core/ratelimit v0.5.3
 	github.com/zenta-dev/zever/core/resilience v0.5.3
 	github.com/zenta-dev/zever/core/router v0.5.3
@@ -62,6 +64,7 @@ replace (
 	github.com/zenta-dev/zever/adapters/vectorstore/db => ../adapters/vectorstore/db
 	github.com/zenta-dev/zever/adapters/workflow/db => ../adapters/workflow/db
 	github.com/zenta-dev/zever/config => ../config
+	github.com/zenta-dev/zever/core/agent => ../core/agent
 	github.com/zenta-dev/zever/core/ai => ../core/ai
 	github.com/zenta-dev/zever/core/analytics => ../core/analytics
 	github.com/zenta-dev/zever/core/auth => ../core/auth
@@ -87,6 +90,7 @@ replace (
 	github.com/zenta-dev/zever/core/payment => ../core/payment
 	github.com/zenta-dev/zever/core/permission => ../core/permission
 	github.com/zenta-dev/zever/core/queue => ../core/queue
+	github.com/zenta-dev/zever/core/rag => ../core/rag
 	github.com/zenta-dev/zever/core/ratelimit => ../core/ratelimit
 	github.com/zenta-dev/zever/core/resilience => ../core/resilience
 	github.com/zenta-dev/zever/core/router => ../core/router

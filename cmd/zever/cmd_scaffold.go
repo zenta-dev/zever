@@ -52,6 +52,7 @@ db/seed entrypoints, and internal/app wiring.`,
 	cmd.Flags().String("dir", "", "output directory (default ./<name>)")
 	cmd.Flags().String("framework-version", "", "depend on a published zever version instead of a local replace directive")
 	cmd.Flags().Bool("force", false, "scaffold into a non-empty directory anyway")
+	cmd.Flags().Bool("dry-run", false, "print the scaffold plan without writing any files")
 
 	return cmd
 }
@@ -92,6 +93,7 @@ internal/app/app.go, and a stanza in zever.yaml with the chosen adapter.`,
 	cmd.Flags().String("adapter", "", "adapter pick, overriding the positional battery/adapter slash form when both agree")
 	cmd.Flags().Bool("force", false, "overwrite the zever.yaml stanza when the battery is already present")
 	cmd.Flags().String("module", "", "plugin battery's Go module path, with optional @version suffix (required for plugin batteries)")
+	cmd.Flags().Bool("dry-run", false, "print the file edits without writing them")
 
 	return cmd
 }

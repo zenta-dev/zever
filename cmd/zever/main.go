@@ -106,9 +106,26 @@ var subcommandHandlers = map[string]func([]string) error{
 }
 
 func main() {
-	if useCobra(os.Args[1:]) {
-		rootCmd.SetArgs(os.Args[1:])
+	// Strip the global --json before routing so neither Cobra nor the
+	// legacy flag sets see it; jsonMode is set as a side effect. Idempotent
+	// with the peelJSON call inside run for direct run() invocations.
+	args := peelJSON(os.Args[1:])
+
+	// Machine-readable command catalog. Always JSON on stdout, exit 0.
+	if agentHelpRequested(args) {
+		printAgentHelp(os.Stdout)
+
+		return
+	}
+
+	if useCobra(args) {
+		rootCmd.SetArgs(args)
 		if err := rootCmd.Execute(); err != nil {
+			if jsonMode {
+				emitError(invokedCommand(args), err)
+				os.Exit(exitCodeFor(err))
+			}
+
 			if colorEnabled {
 				_, _ = fmt.Fprintln(os.Stderr, red(err.Error()))
 			} else {
@@ -125,7 +142,12 @@ func main() {
 		return
 	}
 
-	if err := run(os.Args[1:]); err != nil {
+	if err := run(args); err != nil {
+		if jsonMode {
+			emitError(invokedCommand(args), err)
+			os.Exit(exitCodeFor(err))
+		}
+
 		if colorEnabled {
 			_, _ = fmt.Fprintln(os.Stderr, red(err.Error()))
 		} else {
@@ -137,8 +159,9 @@ func main() {
 }
 
 func run(args []string) error {
-	// Support global -i/--interactive before subcommand.
+	// Support global -i/--interactive and --json before subcommand.
 	args = peelInteractive(args)
+	args = peelJSON(args)
 
 	if len(args) == 0 {
 		printUsage()
@@ -372,7 +395,7 @@ func printUsage() {
 		line("extract", "Extract one module into a standalone service"),
 		"",
 		sectionInspect,
-		line("compile", "Compile .zen schemas through backends (atlas, gogen, openapi, proto, protogogen, zenorm; default: all)"),
+		line("compile", "Compile .zen schemas through backends (atlas, gogen, mcp, openapi, proto, protogogen, zenorm; default: all except mcp)"),
 		line("check", "Validate .zen schemas only — no output written"),
 		line("breaking", "Report API-breaking changes between two schema versions"),
 		line("fmt", "Format .zen schemas (gofmt-style: -l list, --write rewrite)"),

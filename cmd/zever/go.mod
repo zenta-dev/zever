@@ -8,6 +8,7 @@ require (
 	github.com/charmbracelet/x/exp/teatest/v2 v2.0.0-20260924144451-d676b019604b
 	github.com/fsnotify/fsnotify v1.10.1
 	github.com/spf13/cobra v1.10.2
+	github.com/spf13/pflag v1.0.9
 	github.com/traefik/yaegi v0.16.1
 	github.com/zenta-dev/zever/adapters/ai/anthropic v0.5.3
 	github.com/zenta-dev/zever/adapters/ai/gemini v0.5.3
@@ -250,7 +251,6 @@ require (
 	github.com/robfig/cron/v3 v3.0.1 // indirect
 	github.com/rs/zerolog v1.35.1 // indirect
 	github.com/russross/blackfriday/v2 v2.1.0 // indirect
-	github.com/spf13/pflag v1.0.9 // indirect
 	github.com/spiffe/go-spiffe/v2 v2.8.1 // indirect
 	github.com/standard-webhooks/standard-webhooks/libraries v0.0.1 // indirect
 	github.com/stripe/stripe-go/v82 v82.5.1 // indirect
@@ -263,11 +263,13 @@ require (
 	github.com/valyala/fasthttp v1.74.0 // indirect
 	github.com/xo/terminfo v0.0.0-20220910002029-abceb7e1c41e // indirect
 	github.com/zenta-dev/zever/adapters/media/ffmpeg v0.5.3 // indirect
+	github.com/zenta-dev/zever/core/agent v0.5.3 // indirect
 	github.com/zenta-dev/zever/core/billing v0.5.3 // indirect
 	github.com/zenta-dev/zever/core/job v0.5.3 // indirect
 	github.com/zenta-dev/zever/core/media v0.5.3 // indirect
 	github.com/zenta-dev/zever/core/outbox v0.5.3 // indirect
 	github.com/zenta-dev/zever/core/password v0.5.3 // indirect
+	github.com/zenta-dev/zever/core/rag v0.5.3 // indirect
 	github.com/zenta-dev/zever/core/resilience v0.5.3 // indirect
 	github.com/zenta-dev/zever/core/scheduler v0.5.3 // indirect
 	github.com/zenta-dev/zever/core/search v0.5.3 // indirect
@@ -500,3 +502,7 @@ replace github.com/zenta-dev/zever/core/authz => ../../core/authz
 replace github.com/zenta-dev/zever/core/middleware => ../../core/middleware
 
 replace github.com/zenta-dev/zever/shared/apperror => ../../shared/apperror
+
+replace github.com/zenta-dev/zever/core/agent => ../../core/agent
+
+replace github.com/zenta-dev/zever/core/rag => ../../core/rag

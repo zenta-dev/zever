@@ -109,10 +109,11 @@ type closeSnapshot struct {
 // explicit dependency ordering. Intentionally excluded (handled in Close's
 // ordered section): cache, queue (dependencies, closed last), db (its pool
 // lives in the DSN registry and closes with the registry band),
-// scheduler, job (dependents that hold a queue reference, closed first),
+// scheduler, job, agent, rag (dependents that hold backend references,
+// closed first),
 // grpcServer (separate GracefulStop handling), grpcClients (separate
 // per-conn close handling). This list must cover all remaining lazy
-// fields; currently 32 entries + 7 ordered = 39 lazy fields. When
+// fields; currently 32 entries + 9 ordered = 41 lazy fields. When
 // adding a new service, add it here unless it depends on cache/queue
 // (then add to Close's ordered section and keep excluded here). Drift is
 // pinned by TestContainer_Snapshots_CoversAllServices via reflection.
@@ -288,6 +289,14 @@ func (c *Container) Close(ctx context.Context) error {
 
 	if v, ok := c.job.getIfResolved(); ok {
 		tryClose("job", v)
+	}
+
+	if v, ok := c.agent.getIfResolved(); ok {
+		tryClose("agent", v)
+	}
+
+	if v, ok := c.rag.getIfResolved(); ok {
+		tryClose("rag", v)
 	}
 
 	snaps := c.snapshots()
