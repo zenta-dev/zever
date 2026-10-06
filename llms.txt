@@ -16,6 +16,8 @@ Conventions: `AGENTS.md` (repo root).
   machine-readable command descriptor, `--json` selects JSON output.
 - `skills/zever/SKILL.md` — Claude Code skill; regenerate from any pinned
   binary with `zever docs --skill --dir skills/zever`.
+- `docs/src/content/docs/tutorials/build-an-agent-app.mdx` — end-to-end
+  agent app walkthrough.
 - `dsl/README.md` — `.zen` compiler pipeline and codegen backends.
 
 ## Machine interfaces
