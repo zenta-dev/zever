@@ -3,6 +3,8 @@ package stdhttp
 import (
 	"reflect"
 	"testing"
+
+	"github.com/zenta-dev/zever/core/router"
 )
 
 func TestParamNames_table(t *testing.T) {
@@ -102,5 +104,24 @@ func TestHasBraceColon_table(t *testing.T) {
 		if got := hasBraceColon(tc.in); got != tc.want {
 			t.Errorf("hasBraceColon(%q) = %v, want %v", tc.in, got, tc.want)
 		}
+	}
+}
+
+// TestEdgeRegister_resolvesAdapter covers the exported Register wiring: after
+// Register the router resolves through the battery registry, and a repeated
+// Register is tolerated (the duplicate error is discarded) without changing
+// resolution.
+func TestEdgeRegister_resolvesAdapter(t *testing.T) {
+	// Serial: Register mutates the process-global battery registry.
+	Register()
+	Register()
+
+	r, err := router.Open(router.AdapterStdHTTP, router.Options{})
+	if err != nil {
+		t.Fatalf("router.Open() after Register = %v, want nil", err)
+	}
+
+	if r == nil {
+		t.Fatal("router.Open() after Register = nil, want router")
 	}
 }
