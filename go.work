@@ -64,12 +64,13 @@ use (
 	./adapters/queue/redis
 	./adapters/ratelimit/memory
 	./adapters/ratelimit/redis
+	./adapters/resilience/inproc
 	./adapters/router/fiber
 	./adapters/router/stdhttp
 	./adapters/scheduler/embedded
 	./adapters/scheduler/postgres
-	./adapters/search/meilisearch
 	./adapters/search/db
+	./adapters/search/meilisearch
 	./adapters/secrets/env
 	./adapters/secrets/vault
 	./adapters/session/cookie
@@ -85,8 +86,8 @@ use (
 	./adapters/vectorstore/qdrant
 	./adapters/webhook/http
 	./adapters/webhook/queue
-	./adapters/workflow/memory
 	./adapters/workflow/db
+	./adapters/workflow/memory
 	./cmd/zever
 	./config
 	./container
@@ -117,6 +118,7 @@ use (
 	./core/permission
 	./core/queue
 	./core/ratelimit
+	./core/resilience
 	./core/router
 	./core/scheduler
 	./core/search
@@ -128,6 +130,7 @@ use (
 	./core/webhook
 	./core/workflow
 	./dsl
+	./editors
 	./examples
 	./examples/bookings
 	./examples/demoapp
@@ -155,5 +158,4 @@ use (
 	./tools/errscan
 	./tools/modgraph
 	./tools/zever-lsp
-	./editors
 )
