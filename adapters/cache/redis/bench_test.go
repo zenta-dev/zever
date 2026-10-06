@@ -12,14 +12,48 @@ func BenchmarkSetGet(b *testing.B) {
 	val := []byte("bench-value")
 
 	b.ReportAllocs()
-	b.ResetTimer()
 
-	for i := 0; i < b.N; i++ {
+	for b.Loop() {
 		if err := c.Set(ctx, "bench", val, 0); err != nil {
 			b.Fatal(err)
 		}
 
 		if _, err := c.Get(ctx, "bench"); err != nil {
+			b.Fatal(err)
+		}
+	}
+}
+
+// BenchmarkDelete measures a Redis-backed cache Set followed by Delete
+// against an in-process miniredis server.
+func BenchmarkDelete(b *testing.B) {
+	c, _ := newLiveAdapter(b)
+	ctx := b.Context()
+	val := []byte("bench-value")
+
+	b.ReportAllocs()
+
+	for b.Loop() {
+		if err := c.Set(ctx, "bench", val, 0); err != nil {
+			b.Fatal(err)
+		}
+
+		if err := c.Delete(ctx, "bench"); err != nil {
+			b.Fatal(err)
+		}
+	}
+}
+
+// BenchmarkIncrement measures the Redis INCR counter round-trip against an
+// in-process miniredis server.
+func BenchmarkIncrement(b *testing.B) {
+	c, _ := newLiveAdapter(b)
+	ctx := b.Context()
+
+	b.ReportAllocs()
+
+	for b.Loop() {
+		if err := c.Increment(ctx, "counter"); err != nil {
 			b.Fatal(err)
 		}
 	}
@@ -37,7 +71,6 @@ func BenchmarkGetParallel(b *testing.B) {
 	}
 
 	b.ReportAllocs()
-	b.ResetTimer()
 
 	b.RunParallel(func(pb *testing.PB) {
 		for pb.Next() {

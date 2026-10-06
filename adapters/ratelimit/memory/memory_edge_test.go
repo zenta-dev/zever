@@ -59,3 +59,20 @@ func TestName(t *testing.T) {
 		t.Errorf("Name() = %q, want memory", got)
 	}
 }
+
+// TestRegisterOpensViaCoreOptions proves Register wires the adapter factory
+// into the ratelimit battery registry so ratelimit.Open resolves it.
+func TestRegisterOpensViaCoreOptions(t *testing.T) {
+	memory.Register()
+
+	l, err := ratelimit.Open(ratelimit.Memory, ratelimit.Options{Rate: 1, Burst: 1})
+	if err != nil {
+		t.Fatalf("Open = %v", err)
+	}
+
+	t.Cleanup(func() { _ = l.Close() })
+
+	if d, allowErr := l.Allow(t.Context(), "k", 1); allowErr != nil || !d.Allowed {
+		t.Fatalf("Allow = (%+v, %v), want allowed", d, allowErr)
+	}
+}
