@@ -23,12 +23,15 @@ const tsLayout = "2006-01-02T15:04:05.000000000Z07:00"
 
 // driver is a durable outbox.Store. It is safe for concurrent use.
 type driver struct {
-	conn        coredb.DB
-	table       string
-	inboxTable  string
+	conn       coredb.DB
+	table      string
+	inboxTable string
+	poll       time.Duration
+	batch      int
+	// pubMu guards publisher, which application wiring attaches after Open
+	// (see SetPublisher) while the relay goroutine reads it per message.
+	pubMu       sync.RWMutex
 	publisher   outbox.Publisher
-	poll        time.Duration
-	batch       int
 	maxAttempts int
 	retry       retryPolicy
 	retention   time.Duration
@@ -51,8 +54,9 @@ type driver struct {
 }
 
 var (
-	_ outbox.Store = (*driver)(nil)
-	_ outbox.Inbox = (*driver)(nil)
+	_ outbox.Store           = (*driver)(nil)
+	_ outbox.Inbox           = (*driver)(nil)
+	_ outbox.PublisherSetter = (*driver)(nil)
 )
 
 // retryPolicy narrows shared/retry.Policy to the one method the relay uses,
