@@ -9,6 +9,12 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Added
 
+- Saga orchestration for the `workflow` battery: `SagaStep` plus
+  `SagaRegistrar` / `SagaRunner` / `SagaInspector` interfaces in
+  `core/workflow`, with in-process (`adapters/workflow/memory`) and durable
+  (`adapters/workflow/db`) implementations featuring forward execution,
+  pivot roll-forward, reverse compensation with retry, and
+  `RecoverStuckSagas` crash recovery.
 - New `core/resilience` battery (process-local circuit breaker, bulkhead, and
   timeout/retry policy composition; default adapter `memory`) and
   `core/outbox` battery (transactional outbox/inbox; default adapter `db`,
