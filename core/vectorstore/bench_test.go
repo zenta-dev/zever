@@ -31,7 +31,7 @@ func BenchmarkOpen(b *testing.B) {
 	b.ReportAllocs()
 	b.ResetTimer()
 
-	for i := 0; i < b.N; i++ {
+	for b.Loop() {
 		if _, err := Open(a, Options{}); err != nil {
 			b.Fatalf("Open(%v) error = %v", a, err)
 		}
@@ -45,7 +45,7 @@ func BenchmarkCosineSimilarity(b *testing.B) {
 	b.ReportAllocs()
 	b.ResetTimer()
 
-	for i := 0; i < b.N; i++ {
+	for b.Loop() {
 		if CosineSimilarity(a, c) == 0 {
 			b.Fatal("CosineSimilarity returned 0 for self-similar vectors")
 		}
@@ -62,7 +62,7 @@ func BenchmarkVectorValidate(b *testing.B) {
 	b.ReportAllocs()
 	b.ResetTimer()
 
-	for i := 0; i < b.N; i++ {
+	for b.Loop() {
 		if err := vec.Validate(); err != nil {
 			b.Fatalf("Validate() error = %v", err)
 		}
@@ -75,7 +75,7 @@ func BenchmarkOptionsValidate(b *testing.B) {
 	b.ReportAllocs()
 	b.ResetTimer()
 
-	for i := 0; i < b.N; i++ {
+	for b.Loop() {
 		if err := opts.Validate(); err != nil {
 			b.Fatalf("Validate() error = %v", err)
 		}

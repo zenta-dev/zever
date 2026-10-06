@@ -24,7 +24,7 @@ func BenchmarkOpen(b *testing.B) {
 	b.ReportAllocs()
 	b.ResetTimer()
 
-	for i := 0; i < b.N; i++ {
+	for b.Loop() {
 		if _, err := resilience.Open(a, resilience.Options{}); err != nil {
 			b.Fatalf("Open(%v) error = %v", a, err)
 		}
@@ -37,7 +37,7 @@ func BenchmarkOptionsValidate(b *testing.B) {
 	b.ReportAllocs()
 	b.ResetTimer()
 
-	for i := 0; i < b.N; i++ {
+	for b.Loop() {
 		if err := opts.Validate(); err != nil {
 			b.Fatalf("Validate() error = %v", err)
 		}
@@ -51,7 +51,7 @@ func BenchmarkDo(b *testing.B) {
 	b.ReportAllocs()
 	b.ResetTimer()
 
-	for i := 0; i < b.N; i++ {
+	for b.Loop() {
 		if _, err := resilience.Do(b.Context(), g, fn); err != nil {
 			b.Fatalf("Do error = %v", err)
 		}

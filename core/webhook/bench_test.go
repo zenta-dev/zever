@@ -24,7 +24,7 @@ func BenchmarkOpen(b *testing.B) {
 	b.ReportAllocs()
 	b.ResetTimer()
 
-	for i := 0; i < b.N; i++ {
+	for b.Loop() {
 		if _, err := Open(a, Options{}); err != nil {
 			b.Fatalf("Open(%v) error = %v", a, err)
 		}
@@ -37,7 +37,7 @@ func BenchmarkOptionsValidate(b *testing.B) {
 	b.ReportAllocs()
 	b.ResetTimer()
 
-	for i := 0; i < b.N; i++ {
+	for b.Loop() {
 		if err := opts.Validate(); err != nil {
 			b.Fatalf("Validate() error = %v", err)
 		}
@@ -50,7 +50,7 @@ func BenchmarkIsPrivateIP(b *testing.B) {
 	b.ReportAllocs()
 	b.ResetTimer()
 
-	for i := 0; i < b.N; i++ {
+	for b.Loop() {
 		if !IsPrivateIP(ip) {
 			b.Fatal("IsPrivateIP(10.1.2.3) = false")
 		}
@@ -63,7 +63,7 @@ func BenchmarkValidateTargetSyntax(b *testing.B) {
 	b.ReportAllocs()
 	b.ResetTimer()
 
-	for i := 0; i < b.N; i++ {
+	for b.Loop() {
 		if err := ValidateTargetSyntax(target); err != nil {
 			b.Fatalf("ValidateTargetSyntax(%q) error = %v", target, err)
 		}
@@ -74,7 +74,7 @@ func BenchmarkNewSafeClient(b *testing.B) {
 	b.ReportAllocs()
 	b.ResetTimer()
 
-	for i := 0; i < b.N; i++ {
+	for b.Loop() {
 		if c := NewSafeClient(5, false); c == nil {
 			b.Fatal("NewSafeClient returned nil")
 		}
