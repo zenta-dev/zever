@@ -2,7 +2,9 @@
 package billingtest
 
 import (
+	"context"
 	"errors"
+	"fmt"
 	"testing"
 
 	"github.com/zenta-dev/zever/core/billing"
@@ -35,14 +37,23 @@ func Conformance(t *testing.T, factory func(t *testing.T) billing.Billing) {
 func conformanceOpenRegister(t *testing.T) {
 	t.Helper()
 
+	if err := checkOpenRegister(); err != nil {
+		t.Fatal(err)
+	}
+}
+
+// checkOpenRegister proves the open/register round-trip against the
+// shared registry. It returns a descriptive error on the first
+// contract violation so unit tests can drive every branch.
+func checkOpenRegister() error {
 	if _, err := billing.Open(billing.Adapter("conformance-missing-adapter"), billing.Options{}); !errors.Is(err, billing.ErrUnknownAdapter) {
-		t.Fatalf("Open(missing) err = %v, want ErrUnknownAdapter", err)
+		return fmt.Errorf("Open(missing) err = %w, want ErrUnknownAdapter", err)
 	}
 
 	probe := billing.Adapter("conformance-probe-billing")
 
 	if err := billing.Register(probe, nil); !errors.Is(err, billing.ErrNilFactory) {
-		t.Fatalf("Register(nil) err = %v, want ErrNilFactory", err)
+		return fmt.Errorf("Register(nil) err = %w, want ErrNilFactory", err)
 	}
 
 	stub := func(billing.Options) (billing.Billing, error) {
@@ -52,134 +63,174 @@ func conformanceOpenRegister(t *testing.T) {
 	_ = billing.Register(probe, stub)
 
 	if err := billing.Register(probe, stub); !errors.Is(err, billing.ErrDuplicate) {
-		t.Fatalf("Register(duplicate) err = %v, want ErrDuplicate", err)
+		return fmt.Errorf("Register(duplicate) err = %w, want ErrDuplicate", err)
 	}
+
+	return nil
 }
 
 func conformanceLifecycle(t *testing.T, factory func(t *testing.T) billing.Billing) {
 	t.Helper()
 
-	ctx := t.Context()
-	b := factory(t)
+	if err := checkLifecycle(t.Context(), factory(t)); err != nil {
+		t.Fatal(err)
+	}
+}
 
+// checkLifecycle proves the customer-subscription-invoice linkage. Soft
+// linkage mismatches join into one error so every violation is
+// reported; hard failures abort at the first one.
+func checkLifecycle(ctx context.Context, b billing.Billing) error {
 	cust, err := b.CreateCustomer(ctx, "Kit User", "kit@example.com", "kit-key-01")
 	if err != nil {
-		t.Fatalf("CreateCustomer() error = %v", err)
+		return fmt.Errorf("CreateCustomer() error = %w", err)
 	}
 
 	if cust.ID == "" {
-		t.Fatal("CreateCustomer() ID is empty")
+		return errors.New("CreateCustomer() ID is empty")
 	}
 
 	sub, err := b.CreateSubscription(ctx, cust.ID, "plan-kit", "kit-key-02")
 	if err != nil {
-		t.Fatalf("CreateSubscription() error = %v", err)
+		return fmt.Errorf("CreateSubscription() error = %w", err)
 	}
 
 	if sub.ID == "" {
-		t.Fatal("CreateSubscription() ID is empty")
+		return errors.New("CreateSubscription() ID is empty")
 	}
 
+	var errs []error
+
 	if sub.CustomerID != cust.ID {
-		t.Errorf("Subscription.CustomerID = %q, want %q", sub.CustomerID, cust.ID)
+		errs = append(errs, fmt.Errorf("Subscription.CustomerID = %q, want %q", sub.CustomerID, cust.ID))
 	}
 
 	if sub.PlanID != "plan-kit" {
-		t.Errorf("Subscription.PlanID = %q, want plan-kit", sub.PlanID)
+		errs = append(errs, fmt.Errorf("Subscription.PlanID = %q, want plan-kit", sub.PlanID))
 	}
 
 	inv, err := b.GetInvoice(ctx, cust.ID)
 	if err != nil {
-		t.Fatalf("GetInvoice() error = %v", err)
+		errs = append(errs, fmt.Errorf("GetInvoice() error = %w", err))
+	} else if inv.ID == "" {
+		errs = append(errs, errors.New("GetInvoice() ID is empty"))
 	}
 
-	if inv.ID == "" {
-		t.Error("GetInvoice() ID is empty")
-	}
+	return errors.Join(errs...)
 }
 
 func conformanceCancel(t *testing.T, factory func(t *testing.T) billing.Billing) {
 	t.Helper()
 
-	ctx := t.Context()
-	b := factory(t)
+	if err := checkCancel(t.Context(), factory(t)); err != nil {
+		t.Fatal(err)
+	}
+}
 
+// checkCancel proves cancel semantics, tolerating a second cancel
+// that reports ErrNotFound for backends that drop canceled records.
+func checkCancel(ctx context.Context, b billing.Billing) error {
 	cust, err := b.CreateCustomer(ctx, "Cancel User", "cancel@example.com", "")
 	if err != nil {
-		t.Fatalf("CreateCustomer() error = %v", err)
+		return fmt.Errorf("CreateCustomer() error = %w", err)
 	}
 
 	sub, err := b.CreateSubscription(ctx, cust.ID, "plan-kit", "")
 	if err != nil {
-		t.Fatalf("CreateSubscription() error = %v", err)
+		return fmt.Errorf("CreateSubscription() error = %w", err)
 	}
 
 	if err := b.CancelSubscription(ctx, sub.ID); err != nil {
-		t.Fatalf("CancelSubscription() error = %v", err)
+		return fmt.Errorf("CancelSubscription() error = %w", err)
 	}
 
 	if err := b.CancelSubscription(ctx, sub.ID); err != nil && !errors.Is(err, billing.ErrNotFound) {
-		t.Errorf("CancelSubscription(again) err = %v, want nil or ErrNotFound", err)
+		return fmt.Errorf("CancelSubscription(again) err = %w, want nil or ErrNotFound", err)
 	}
+
+	return nil
 }
 
 func conformanceNotFound(t *testing.T, factory func(t *testing.T) billing.Billing) {
 	t.Helper()
 
-	ctx := t.Context()
-	b := factory(t)
+	if err := checkNotFound(t.Context(), factory(t)); err != nil {
+		t.Fatal(err)
+	}
+}
+
+// checkNotFound proves unknown IDs surface ErrNotFound on every method.
+func checkNotFound(ctx context.Context, b billing.Billing) error {
+	var errs []error
 
 	if _, err := b.CreateSubscription(ctx, "cus_missing", "plan-kit", ""); !errors.Is(err, billing.ErrNotFound) {
-		t.Errorf("CreateSubscription(unknown customer) err = %v, want ErrNotFound", err)
+		errs = append(errs, fmt.Errorf("CreateSubscription(unknown customer) err = %w, want ErrNotFound", err))
 	}
 
 	if err := b.CancelSubscription(ctx, "sub_missing"); !errors.Is(err, billing.ErrNotFound) {
-		t.Errorf("CancelSubscription(missing) err = %v, want ErrNotFound", err)
+		errs = append(errs, fmt.Errorf("CancelSubscription(missing) err = %w, want ErrNotFound", err))
 	}
 
 	if _, err := b.GetInvoice(ctx, "cus_missing"); !errors.Is(err, billing.ErrNotFound) {
-		t.Errorf("GetInvoice(missing) err = %v, want ErrNotFound", err)
+		errs = append(errs, fmt.Errorf("GetInvoice(missing) err = %w, want ErrNotFound", err))
 	}
+
+	return errors.Join(errs...)
 }
 
 func conformanceMissingIDs(t *testing.T, factory func(t *testing.T) billing.Billing) {
 	t.Helper()
 
-	ctx := t.Context()
-	b := factory(t)
+	if err := checkMissingIDs(t.Context(), factory(t)); err != nil {
+		t.Fatal(err)
+	}
+}
+
+// checkMissingIDs proves empty IDs surface the missing-ID sentinels.
+func checkMissingIDs(ctx context.Context, b billing.Billing) error {
+	var errs []error
 
 	if _, err := b.CreateSubscription(ctx, "", "plan-kit", ""); !errors.Is(err, billing.ErrMissingCustomerID) {
-		t.Errorf("CreateSubscription(empty customer) err = %v, want ErrMissingCustomerID", err)
+		errs = append(errs, fmt.Errorf("CreateSubscription(empty customer) err = %w, want ErrMissingCustomerID", err))
 	}
 
 	cust, err := b.CreateCustomer(ctx, "Kit User", "kit@example.com", "")
 	if err != nil {
-		t.Fatalf("CreateCustomer() error = %v", err)
+		return fmt.Errorf("CreateCustomer() error = %w", err)
 	}
 
 	if _, err := b.CreateSubscription(ctx, cust.ID, "", ""); !errors.Is(err, billing.ErrMissingPlanID) {
-		t.Errorf("CreateSubscription(empty plan) err = %v, want ErrMissingPlanID", err)
+		errs = append(errs, fmt.Errorf("CreateSubscription(empty plan) err = %w, want ErrMissingPlanID", err))
 	}
 
 	if err := b.CancelSubscription(ctx, ""); !errors.Is(err, billing.ErrMissingSubscriptionID) {
-		t.Errorf("CancelSubscription(empty) err = %v, want ErrMissingSubscriptionID", err)
+		errs = append(errs, fmt.Errorf("CancelSubscription(empty) err = %w, want ErrMissingSubscriptionID", err))
 	}
 
 	if _, err := b.GetInvoice(ctx, ""); !errors.Is(err, billing.ErrMissingCustomerID) {
-		t.Errorf("GetInvoice(empty) err = %v, want ErrMissingCustomerID", err)
+		errs = append(errs, fmt.Errorf("GetInvoice(empty) err = %w, want ErrMissingCustomerID", err))
 	}
+
+	return errors.Join(errs...)
 }
 
 func conformanceClose(t *testing.T, factory func(t *testing.T) billing.Billing) {
 	t.Helper()
 
-	b := factory(t)
+	if err := checkClose(factory(t)); err != nil {
+		t.Fatal(err)
+	}
+}
 
+// checkClose proves Close is idempotent.
+func checkClose(b billing.Billing) error {
 	if err := b.Close(); err != nil {
-		t.Fatalf("Close() error = %v", err)
+		return fmt.Errorf("Close() error = %w", err)
 	}
 
 	if err := b.Close(); err != nil {
-		t.Errorf("Close() second error = %v, want nil", err)
+		return fmt.Errorf("Close() second error = %w, want nil", err)
 	}
+
+	return nil
 }
