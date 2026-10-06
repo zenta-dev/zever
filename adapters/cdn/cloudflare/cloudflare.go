@@ -24,6 +24,12 @@ func New(opts cdn.Options) (cdn.CDN, error) {
 	if err := opts.Validate(); err != nil {
 		return nil, err
 	}
+	if opts.APIToken == "" {
+		return nil, fmt.Errorf("cloudflare: option %q is required", "api_token")
+	}
+	if opts.ZoneID == "" {
+		return nil, fmt.Errorf("cloudflare: option %q is required", "zone_id")
+	}
 
 	baseURL := opts.BaseURL
 	if baseURL == "" {

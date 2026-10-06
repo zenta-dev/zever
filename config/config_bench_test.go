@@ -60,8 +60,8 @@ func BenchmarkRedactedServices(b *testing.B) {
 	b.ReportAllocs()
 	b.ResetTimer()
 	for b.Loop() {
-		if got := cfg.RedactedServices(); len(got) != 36 {
-			b.Fatalf("got %d services, want 36", len(got))
+		if got := cfg.RedactedServices(); len(got) != 37 {
+			b.Fatalf("got %d services, want 37", len(got))
 		}
 	}
 }

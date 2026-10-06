@@ -17,6 +17,7 @@ use (
 	./adapters/cache/memory
 	./adapters/cache/redis
 	./adapters/cdn/cloudflare
+	./adapters/cdn/noop
 	./adapters/crypto/kms
 	./adapters/crypto/local
 	./adapters/db/postgres

@@ -282,6 +282,28 @@ var batterySpecs = map[string]batterySpec{
 			},
 		},
 	},
+	"cdn": {
+		Package:   "cdn",
+		Interface: "CDN",
+		Imports:   []string{"context"},
+		Methods: []batteryMethod{
+			{
+				Name:    "Purge",
+				Params:  []string{"ctx context.Context", "req cdn.PurgeRequest"},
+				Results: []string{"error"},
+			},
+			{
+				Name:    "Close",
+				Params:  []string{"ctx context.Context"},
+				Results: []string{"error"},
+			},
+			{
+				Name:    "Name",
+				Params:  []string{},
+				Results: []string{"string"},
+			},
+		},
+	},
 	"crypto": {
 		Package:   "crypto",
 		Interface: "Crypto",

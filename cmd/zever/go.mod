@@ -26,6 +26,7 @@ require (
 	github.com/zenta-dev/zever/adapters/cache/memory v0.5.3
 	github.com/zenta-dev/zever/adapters/cache/redis v0.5.3
 	github.com/zenta-dev/zever/adapters/cdn/cloudflare v0.5.3
+	github.com/zenta-dev/zever/adapters/cdn/noop v0.5.3
 	github.com/zenta-dev/zever/adapters/crypto/local v0.5.3
 	github.com/zenta-dev/zever/adapters/db/postgres v0.5.3
 	github.com/zenta-dev/zever/adapters/db/sqlite v0.5.3
@@ -351,6 +352,7 @@ replace (
 	github.com/zenta-dev/zever/adapters/cache/memory => ../../adapters/cache/memory
 	github.com/zenta-dev/zever/adapters/cache/redis => ../../adapters/cache/redis
 	github.com/zenta-dev/zever/adapters/cdn/cloudflare => ../../adapters/cdn/cloudflare
+	github.com/zenta-dev/zever/adapters/cdn/noop => ../../adapters/cdn/noop
 	github.com/zenta-dev/zever/adapters/crypto/local => ../../adapters/crypto/local
 	github.com/zenta-dev/zever/adapters/db/postgres => ../../adapters/db/postgres
 	github.com/zenta-dev/zever/adapters/db/sqlite => ../../adapters/db/sqlite

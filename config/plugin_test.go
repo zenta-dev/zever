@@ -248,8 +248,8 @@ func TestPluginRedactedServices(t *testing.T) {
 		},
 	}
 	got := cfg.RedactedServices()
-	if len(got) != 37 {
-		t.Fatalf("got %d services, want 37", len(got))
+	if len(got) != 38 {
+		t.Fatalf("got %d services, want 38", len(got))
 	}
 	sc, ok := got["plugintest_redact"]
 	if !ok {
