@@ -79,6 +79,19 @@ func BenchmarkCreatePaymentParallel(b *testing.B) {
 	})
 }
 
+// BenchmarkGetPayment measures the payment fetch round-trip.
+func BenchmarkGetPayment(b *testing.B) {
+	p := benchPayment(b)
+	ctx := b.Context()
+	b.ReportAllocs()
+	b.ResetTimer()
+	for b.Loop() {
+		if _, err := p.GetPayment(ctx, "pi_bench"); err != nil {
+			b.Fatalf("GetPayment() = %v", err)
+		}
+	}
+}
+
 // BenchmarkRefund measures the refund round-trip without an idempotency store.
 func BenchmarkRefund(b *testing.B) {
 	p := benchPayment(b)

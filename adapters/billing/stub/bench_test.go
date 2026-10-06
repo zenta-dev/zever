@@ -1,10 +1,21 @@
 package stub
 
 import (
+	"fmt"
+	"sync/atomic"
 	"testing"
 
 	"github.com/zenta-dev/zever/core/billing"
 )
+
+// benchAdapterSeq yields a unique adapter key per Register call so the
+// registry benchmark never collides with an existing factory.
+var benchAdapterSeq atomic.Int64
+
+// benchFreshAdapter returns an adapter name unique to this benchmark run.
+func benchFreshAdapter() billing.Adapter {
+	return billing.Adapter(fmt.Sprintf("bench-%d", benchAdapterSeq.Add(1)))
+}
 
 // BenchmarkCreateCustomer measures in-memory customer creation.
 func BenchmarkCreateCustomer(b *testing.B) {
@@ -14,7 +25,7 @@ func BenchmarkCreateCustomer(b *testing.B) {
 	b.ReportAllocs()
 	b.ResetTimer()
 
-	for i := 0; i < b.N; i++ {
+	for b.Loop() {
 		if _, err := bl.CreateCustomer(ctx, "Ada", "ada@example.com", ""); err != nil {
 			b.Fatal(err)
 		}
@@ -35,7 +46,7 @@ func BenchmarkCreateSubscription(b *testing.B) {
 	b.ReportAllocs()
 	b.ResetTimer()
 
-	for i := 0; i < b.N; i++ {
+	for b.Loop() {
 		if _, err := bl.CreateSubscription(ctx, cus.ID, "plan-1", ""); err != nil {
 			b.Fatal(err)
 		}
@@ -59,8 +70,59 @@ func BenchmarkGetInvoice(b *testing.B) {
 	b.ReportAllocs()
 	b.ResetTimer()
 
-	for i := 0; i < b.N; i++ {
+	for b.Loop() {
 		if _, err := bl.GetInvoice(ctx, cus.ID); err != nil {
+			b.Fatal(err)
+		}
+	}
+}
+
+// BenchmarkCancelSubscription measures cancelling a pre-created subscription.
+func BenchmarkCancelSubscription(b *testing.B) {
+	ctx := b.Context()
+
+	b.ReportAllocs()
+	b.ResetTimer()
+
+	for b.Loop() {
+		bl := New()
+
+		cus, err := bl.CreateCustomer(ctx, "Ada", "ada@example.com", "")
+		if err != nil {
+			b.Fatal(err)
+		}
+
+		sub, err := bl.CreateSubscription(ctx, cus.ID, "plan-1", "")
+		if err != nil {
+			b.Fatal(err)
+		}
+
+		if err := bl.CancelSubscription(ctx, sub.ID); err != nil {
+			b.Fatal(err)
+		}
+	}
+}
+
+// BenchmarkOpen measures option validation plus construction.
+func BenchmarkOpen(b *testing.B) {
+	b.ReportAllocs()
+	b.ResetTimer()
+
+	for b.Loop() {
+		if _, err := Open(billing.Options{}); err != nil {
+			b.Fatal(err)
+		}
+	}
+}
+
+// BenchmarkRegister measures registering the stub factory into the billing
+// registry.
+func BenchmarkRegister(b *testing.B) {
+	b.ReportAllocs()
+	b.ResetTimer()
+
+	for b.Loop() {
+		if err := billing.Register(benchFreshAdapter(), Open); err != nil {
 			b.Fatal(err)
 		}
 	}

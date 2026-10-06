@@ -5,6 +5,7 @@ import (
 	"errors"
 	"net/http"
 	"net/http/httptest"
+	"strings"
 	"sync"
 	"sync/atomic"
 	"testing"
@@ -15,13 +16,14 @@ import (
 
 // fakeStore is an in-memory idempotency.Store fake for refund guard tests.
 type fakeStore struct {
-	mu       sync.Mutex
-	begin    int
-	complete int
-	forget   int
-	records  map[string][]byte
-	pending  map[string][]byte
-	failNext bool
+	mu           sync.Mutex
+	begin        int
+	complete     int
+	forget       int
+	records      map[string][]byte
+	pending      map[string][]byte
+	failNext     bool
+	failComplete bool
 }
 
 func newFakeStore() *fakeStore {
@@ -53,6 +55,9 @@ func (f *fakeStore) Complete(_ context.Context, key string, fingerprint, _ []byt
 	f.mu.Lock()
 	defer f.mu.Unlock()
 	f.complete++
+	if f.failComplete {
+		return errors.New("complete boom")
+	}
 	delete(f.pending, key)
 	f.records[key] = fingerprint
 	return nil
@@ -130,5 +135,37 @@ func TestRefundIdempotency_failureForgetsAllowsRetry(t *testing.T) {
 	}
 	if got := adjustments.Load(); got != 1 {
 		t.Fatalf("adjustments = %d, want 1", got)
+	}
+}
+
+func TestRefundIdempotency_beginErrorPropagates(t *testing.T) {
+	t.Parallel()
+	var adjustments atomic.Int64
+	var failAdjust atomic.Bool
+	store := newFakeStore()
+	store.failNext = true
+	srv := refundTestServer(t, &adjustments, &failAdjust)
+	p := openTest(t, srv, func(o *payment.Options) { o.Idempotency = store })
+	if err := p.Refund(t.Context(), "txn_full", 2500, "key-begin"); err == nil || !strings.Contains(err.Error(), "begin boom") {
+		t.Fatalf("Refund(begin error) = %v, want begin boom", err)
+	}
+	if got := adjustments.Load(); got != 0 {
+		t.Fatalf("adjustments = %d, want 0 when guard fails", got)
+	}
+}
+
+func TestRefundIdempotency_completeErrorPropagates(t *testing.T) {
+	t.Parallel()
+	var adjustments atomic.Int64
+	var failAdjust atomic.Bool
+	store := newFakeStore()
+	store.failComplete = true
+	srv := refundTestServer(t, &adjustments, &failAdjust)
+	p := openTest(t, srv, func(o *payment.Options) { o.Idempotency = store })
+	if err := p.Refund(t.Context(), "txn_full", 2500, "key-complete"); err == nil || !strings.Contains(err.Error(), "complete boom") {
+		t.Fatalf("Refund(complete error) = %v, want complete boom", err)
+	}
+	if got := adjustments.Load(); got != 1 {
+		t.Fatalf("adjustments = %d, want 1 (refund executed before Complete)", got)
 	}
 }
