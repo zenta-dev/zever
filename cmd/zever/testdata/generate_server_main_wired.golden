@@ -146,8 +146,10 @@ func run(addr, grpcAddr string) error {
 
 	r.Use(middleware.RateLimit(limiter, middleware.RemoteAddrKey))
 
-	database, err := c.DB()
-	if err != nil {
+	// Resolve the db once at boot so a broken DSN fails fast with a clear
+	// error instead of surfacing as a 503 on the first readiness probe.
+	// Readiness itself goes through the container aggregate below.
+	if _, err = c.DB(); err != nil {
 		return err
 	}
 
@@ -156,10 +158,10 @@ func run(addr, grpcAddr string) error {
 	})
 
 	r.Handle("GET", "/readyz", func(w http.ResponseWriter, req *http.Request) {
-		pingCtx, cancel := context.WithTimeout(req.Context(), readyTimeout)
+		readyCtx, cancel := context.WithTimeout(req.Context(), readyTimeout)
 		defer cancel()
 
-		if err := database.Ping(pingCtx); err != nil {
+		if err := c.Ready(readyCtx); err != nil {
 			healthServer.SetServingStatus("", healthpb.HealthCheckResponse_NOT_SERVING)
 
 			w.WriteHeader(http.StatusServiceUnavailable)

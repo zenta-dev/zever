@@ -6,6 +6,7 @@ import (
 	"time"
 
 	coredb "github.com/zenta-dev/zever/core/db"
+	"github.com/zenta-dev/zever/core/observability"
 	"github.com/zenta-dev/zever/core/outbox"
 	"github.com/zenta-dev/zever/shared/dbconn"
 	"github.com/zenta-dev/zever/shared/retry"
@@ -68,6 +69,9 @@ type Options struct {
 	Retention time.Duration `json:"retention" toml:"retention" yaml:"retention"`
 	// LockSeconds is the claim lease in seconds. Default DefaultLockSeconds.
 	LockSeconds int `json:"lock_seconds" toml:"lock_seconds" yaml:"lock_seconds"`
+	// Provider emits relay metrics and spans. Nil disables telemetry. It is
+	// Go-API-only: never decoded from configuration files.
+	Provider observability.Provider `json:"-" toml:"-" yaml:"-"`
 }
 
 // Validate checks options for consistency, joining all violations.

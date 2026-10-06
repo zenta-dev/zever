@@ -70,7 +70,7 @@ var portedCommands = []string{
 	"compile", "check", "breaking", "fmt", "doctor", "config",
 	"routes", "explain", "check-boundaries", "check:boundaries", "graph",
 	"serve", "dev", "queue:work", "schedule:run", "tinker",
-	"db", "completion", "docs",
+	"db", "outbox", "completion", "docs",
 }
 
 // portedSet is the lookup form of portedCommands.
@@ -89,6 +89,12 @@ var portedSet = func() map[string]bool {
 // keep their exact shape.
 var knownDBSubcommands = map[string]bool{
 	"migrate": true, "rollback": true, "seed": true,
+}
+
+// knownOutboxSubcommands gates Cobra routing for `zever outbox` the same way
+// knownDBSubcommands does for `zever db`.
+var knownOutboxSubcommands = map[string]bool{
+	"status": true, "dlq": true, "purge": true,
 }
 
 // globalFlagToken reports whether tok is one of the boolean global flags that
@@ -150,6 +156,24 @@ func useCobra(args []string) bool {
 			}
 
 			return knownDBSubcommands[a]
+		}
+
+		return true
+	}
+
+	if first == "outbox" {
+		// Mirror the db gate: unknown outbox subcommands keep the legacy
+		// did-you-mean behavior.
+		for _, a := range rest {
+			if globalFlagToken(a) {
+				continue
+			}
+
+			if len(a) > 0 && a[0] == '-' {
+				return true
+			}
+
+			return knownOutboxSubcommands[a]
 		}
 
 		return true
@@ -258,6 +282,8 @@ zever applications built from .zen schemas.`,
 	}
 
 	root.AddCommand(newDBCmd())
+
+	root.AddCommand(newOutboxCmd())
 
 	for _, c := range newInspectCmds() {
 		root.AddCommand(c)

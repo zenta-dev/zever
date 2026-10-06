@@ -58,6 +58,7 @@ require (
 	github.com/zenta-dev/zever/adapters/observability/noop v0.5.3
 	github.com/zenta-dev/zever/adapters/observability/otlp v0.5.3
 	github.com/zenta-dev/zever/adapters/observability/stdout v0.5.3
+	github.com/zenta-dev/zever/adapters/outbox/db v0.5.3
 	github.com/zenta-dev/zever/adapters/password/argon2 v0.5.3
 	github.com/zenta-dev/zever/adapters/payment/paddle v0.5.3
 	github.com/zenta-dev/zever/adapters/payment/stripe v0.5.3
@@ -108,6 +109,7 @@ require (
 	github.com/zenta-dev/zever/core/mailer v0.5.3
 	github.com/zenta-dev/zever/core/notification v0.5.3
 	github.com/zenta-dev/zever/core/observability v0.5.3
+	github.com/zenta-dev/zever/core/outbox v0.5.3
 	github.com/zenta-dev/zever/core/payment v0.5.3
 	github.com/zenta-dev/zever/core/permission v0.5.3
 	github.com/zenta-dev/zever/core/queue v0.5.3
@@ -267,7 +269,6 @@ require (
 	github.com/zenta-dev/zever/core/billing v0.5.3 // indirect
 	github.com/zenta-dev/zever/core/job v0.5.3 // indirect
 	github.com/zenta-dev/zever/core/media v0.5.3 // indirect
-	github.com/zenta-dev/zever/core/outbox v0.5.3 // indirect
 	github.com/zenta-dev/zever/core/password v0.5.3 // indirect
 	github.com/zenta-dev/zever/core/rag v0.5.3 // indirect
 	github.com/zenta-dev/zever/core/resilience v0.5.3 // indirect
@@ -283,6 +284,7 @@ require (
 	github.com/zenta-dev/zever/shared/httpclient v0.5.3 // indirect
 	github.com/zenta-dev/zever/shared/kvstore v0.5.3 // indirect
 	github.com/zenta-dev/zever/shared/lrucache v0.5.3 // indirect
+	github.com/zenta-dev/zever/shared/mcpclient v0.5.3 // indirect
 	github.com/zenta-dev/zever/shared/providersclient v0.5.3 // indirect
 	github.com/zenta-dev/zever/shared/providersopt v0.5.3 // indirect
 	github.com/zenta-dev/zever/shared/redisclient v0.5.3 // indirect
@@ -379,6 +381,7 @@ replace (
 	github.com/zenta-dev/zever/adapters/observability/noop => ../../adapters/observability/noop
 	github.com/zenta-dev/zever/adapters/observability/otlp => ../../adapters/observability/otlp
 	github.com/zenta-dev/zever/adapters/observability/stdout => ../../adapters/observability/stdout
+	github.com/zenta-dev/zever/adapters/outbox/db => ../../adapters/outbox/db
 	github.com/zenta-dev/zever/adapters/password/argon2 => ../../adapters/password/argon2
 	github.com/zenta-dev/zever/adapters/payment/paddle => ../../adapters/payment/paddle
 	github.com/zenta-dev/zever/adapters/payment/stripe => ../../adapters/payment/stripe
@@ -506,3 +509,5 @@ replace github.com/zenta-dev/zever/shared/apperror => ../../shared/apperror
 replace github.com/zenta-dev/zever/core/agent => ../../core/agent
 
 replace github.com/zenta-dev/zever/core/rag => ../../core/rag
+
+replace github.com/zenta-dev/zever/shared/mcpclient => ../../shared/mcpclient

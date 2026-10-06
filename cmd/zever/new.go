@@ -1236,6 +1236,8 @@ var sharedModuleDirs = []string{
 	"shared/httpclient",
 	"shared/kvstore",
 	"shared/lrucache",
+	"shared/mcpclient",
+	"shared/prompt",
 	"shared/providersclient",
 	"shared/providersopt",
 	"shared/redisclient",

@@ -1,0 +1,4 @@
+github.com/zenta-dev/zever/adapters/observability/noop v0.5.3 h1:ffEs5cqyKSVpnB5mbnMBpIBOhvG+dAOptKkVflNAiDQ=
+github.com/zenta-dev/zever/adapters/observability/noop v0.5.3/go.mod h1:sSI78o/6bhSWeCIMKyfIqvbFH0l82CPJr66efYbA2Go=
+github.com/zenta-dev/zever/core/observability v0.5.3 h1:AN4lVaNfvdoEYtVkj++J1r44jxev+kcyYyureXu3Ku4=
+github.com/zenta-dev/zever/core/observability v0.5.3/go.mod h1:yFNo9TUeqrSDwiKAIgSLGRM/SkDDp56lPZ2SrPTcsB8=

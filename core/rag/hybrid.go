@@ -26,6 +26,9 @@ type HybridOptions struct {
 	Filter map[string]string
 	// RRFK is the fusion constant; <= 0 selects DefaultRRFK.
 	RRFK int
+	// Reranker optionally rescores fused sources after filtering and before
+	// the topK cut; nil skips reranking.
+	Reranker Reranker
 }
 
 // NewHybrid builds an Engine that additionally indexes into search, enabling
@@ -111,11 +114,18 @@ func (e *Engine) retrieveHybrid(ctx context.Context, query string, topK int, opt
 		}
 	}
 
+	if opts.Reranker != nil {
+		reranked, err := opts.Reranker.Rerank(ctx, query, filtered)
+		if err != nil {
+			return nil, fmt.Errorf("rag: rerank: %w", err)
+		}
+
+		filtered = reranked
+	}
+
 	if len(filtered) > topK {
 		filtered = filtered[:topK]
 	}
-
-	e.observe(Event{Type: EventRetrieve, Query: query, Count: len(filtered)})
 
 	return filtered, nil
 }
@@ -147,8 +157,7 @@ func fuseRRF(matches []vectorstore.ScoreMatch, hits []search.Hit, k int) []Sourc
 		if !ok {
 			content, _ := meta["content"].(string)
 
-			// Copy the map so callers cannot alias store internals, and so
-			// a second backend's metadata cannot overwrite the first.
+			// Copy the map so callers cannot alias store internals.
 			copied := make(map[string]any, len(meta))
 			for k, v := range meta {
 				copied[k] = v
@@ -156,6 +165,20 @@ func fuseRRF(matches []vectorstore.ScoreMatch, hits []search.Hit, k int) []Sourc
 
 			f = &fused{content: content, meta: copied}
 			acc[id] = f
+		} else {
+			// Merge keys the first backend lacked so filters see the
+			// union; first-writer wins on conflicts.
+			for k, v := range meta {
+				if _, exists := f.meta[k]; !exists {
+					f.meta[k] = v
+				}
+			}
+
+			if f.content == "" {
+				if content, ok := meta["content"].(string); ok {
+					f.content = content
+				}
+			}
 		}
 
 		f.score += 1.0 / float64(k+rank+1)

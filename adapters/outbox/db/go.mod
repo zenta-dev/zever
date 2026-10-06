@@ -6,6 +6,7 @@ require (
 	github.com/zenta-dev/zever/adapters/db/postgres v0.5.3
 	github.com/zenta-dev/zever/adapters/db/sqlite v0.5.3
 	github.com/zenta-dev/zever/core/db v0.5.3
+	github.com/zenta-dev/zever/core/observability v0.5.3
 	github.com/zenta-dev/zever/core/outbox v0.5.3
 	github.com/zenta-dev/zever/shared/dbconn v0.5.3
 	github.com/zenta-dev/zever/shared/retry v0.5.3
@@ -45,6 +46,8 @@ replace github.com/zenta-dev/zever/adapters/db/postgres => ../../db/postgres
 replace github.com/zenta-dev/zever/adapters/db/sqlite => ../../db/sqlite
 
 replace github.com/zenta-dev/zever/core/db => ../../../core/db
+
+replace github.com/zenta-dev/zever/core/observability => ../../../core/observability
 
 replace github.com/zenta-dev/zever/core/outbox => ../../../core/outbox
 
