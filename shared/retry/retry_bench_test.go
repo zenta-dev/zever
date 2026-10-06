@@ -13,8 +13,10 @@ func BenchmarkNextDelayExponential(b *testing.B) {
 	b.ReportAllocs()
 	b.ResetTimer()
 
-	for i := range b.N {
+	i := 0
+	for b.Loop() {
 		_ = p.NextDelay(i%30 + 1)
+		i++
 	}
 }
 
@@ -25,8 +27,10 @@ func BenchmarkNextDelayLinear(b *testing.B) {
 	b.ReportAllocs()
 	b.ResetTimer()
 
-	for i := range b.N {
+	i := 0
+	for b.Loop() {
 		_ = p.NextDelay(i%30 + 1)
+		i++
 	}
 }
 
@@ -37,8 +41,10 @@ func BenchmarkNextDelayJitter(b *testing.B) {
 	b.ReportAllocs()
 	b.ResetTimer()
 
-	for i := range b.N {
+	i := 0
+	for b.Loop() {
 		_ = p.NextDelay(i%30 + 1)
+		i++
 	}
 }
 
@@ -77,6 +83,16 @@ func BenchmarkParseRetryAfterHTTPDate(b *testing.B) {
 
 	for b.Loop() {
 		_, _ = ParseRetryAfter("Wed, 21 Oct 2026 07:28:00 GMT", now)
+	}
+}
+
+// BenchmarkParseRetryAfterMs measures parsing the millisecond form.
+func BenchmarkParseRetryAfterMs(b *testing.B) {
+	b.ReportAllocs()
+	b.ResetTimer()
+
+	for b.Loop() {
+		_, _ = ParseRetryAfterMs("120000")
 	}
 }
 

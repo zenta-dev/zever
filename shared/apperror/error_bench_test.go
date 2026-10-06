@@ -34,13 +34,30 @@ func BenchmarkWrap(b *testing.B) {
 	}
 }
 
+// BenchmarkErrorAccessors measures the Code/Message/Cause accessor path.
+func BenchmarkErrorAccessors(b *testing.B) {
+	cause := errors.New("boom")
+	e := Wrap(Internal, "something broke", cause)
+
+	b.ReportAllocs()
+	b.ResetTimer()
+
+	for b.Loop() {
+		_ = e.Code()
+		_ = e.Message()
+		_ = e.Cause()
+	}
+}
+
 // BenchmarkErrorCodeString measures mapping an ErrorCode to its gRPC name.
 func BenchmarkErrorCodeString(b *testing.B) {
 	b.ReportAllocs()
 	b.ResetTimer()
 
-	for i := range b.N {
+	i := 0
+	for b.Loop() {
 		_ = benchErrorCodes[i%len(benchErrorCodes)].String()
+		i++
 	}
 }
 
@@ -49,7 +66,9 @@ func BenchmarkErrorCodeHTTPStatus(b *testing.B) {
 	b.ReportAllocs()
 	b.ResetTimer()
 
-	for i := range b.N {
+	i := 0
+	for b.Loop() {
 		_ = benchErrorCodes[i%len(benchErrorCodes)].HTTPStatus()
+		i++
 	}
 }

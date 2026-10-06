@@ -21,3 +21,16 @@ func BenchmarkNewStripeClientWithHTTPClient(b *testing.B) {
 		}
 	}
 }
+
+// BenchmarkNewStripeClient measures constructing a Stripe client with the
+// default HTTP client.
+func BenchmarkNewStripeClient(b *testing.B) {
+	b.ReportAllocs()
+	b.ResetTimer()
+
+	for b.Loop() {
+		if c := NewStripeClient("sk_test", "", time.Second); c == nil {
+			b.Fatal("NewStripeClient() = nil")
+		}
+	}
+}

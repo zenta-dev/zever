@@ -78,7 +78,56 @@ func BenchmarkTTLCacheGet(b *testing.B) {
 	b.ReportAllocs()
 	b.ResetTimer()
 
-	for i := range b.N {
+	i := 0
+	for b.Loop() {
 		_, _ = c.Get(i % 1024)
+		i++
+	}
+}
+
+// BenchmarkTTLCachePut measures inserting distinct keys under capacity.
+func BenchmarkTTLCachePut(b *testing.B) {
+	c := NewTTL[int, int](1024, time.Hour)
+
+	b.ReportAllocs()
+	b.ResetTimer()
+
+	i := 0
+	for b.Loop() {
+		c.Put(i%1024, i)
+		i++
+	}
+}
+
+// BenchmarkCacheDelete measures removing a present key.
+func BenchmarkCacheDelete(b *testing.B) {
+	c := New[int, int](1024)
+	for i := range 1024 {
+		c.Put(i, i)
+	}
+
+	b.ReportAllocs()
+	b.ResetTimer()
+
+	i := 0
+	for b.Loop() {
+		c.Delete(i % 1024)
+		i++
+	}
+}
+
+// BenchmarkCacheClear measures dropping all entries.
+func BenchmarkCacheClear(b *testing.B) {
+	c := New[int, int](1024)
+
+	b.ReportAllocs()
+	b.ResetTimer()
+
+	for b.Loop() {
+		for i := range 1024 {
+			c.Put(i, i)
+		}
+
+		c.Clear(nil)
 	}
 }

@@ -37,3 +37,23 @@ func BenchmarkCredentialsValidate(b *testing.B) {
 		}
 	}
 }
+
+// BenchmarkNewApp measures constructing the Firebase app from validated
+// credentials.
+func BenchmarkNewApp(b *testing.B) {
+	path := filepath.Join(b.TempDir(), "sa.json")
+	if err := os.WriteFile(path, []byte(`{"type":"service_account","project_id":"p"}`), 0o600); err != nil {
+		b.Fatalf("write key = %v", err)
+	}
+
+	c := Credentials{ProjectID: "p", ServiceAccount: path}
+
+	b.ReportAllocs()
+	b.ResetTimer()
+
+	for b.Loop() {
+		if _, err := NewApp(b.Context(), c); err != nil {
+			b.Fatalf("NewApp() error = %v", err)
+		}
+	}
+}

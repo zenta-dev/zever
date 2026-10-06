@@ -49,3 +49,13 @@ func BenchmarkIsLoopbackHost(b *testing.B) {
 		_ = IsLoopbackHost("127.0.0.1")
 	}
 }
+
+// BenchmarkIsLoopbackURL measures loopback URL classification.
+func BenchmarkIsLoopbackURL(b *testing.B) {
+	b.ReportAllocs()
+	b.ResetTimer()
+
+	for b.Loop() {
+		_ = IsLoopbackURL("http://127.0.0.1:8080/path")
+	}
+}
