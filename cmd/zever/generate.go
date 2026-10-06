@@ -7,6 +7,7 @@ import (
 	"io"
 	"os"
 	"path/filepath"
+	"strconv"
 	"strings"
 )
 
@@ -263,12 +264,13 @@ func printBoxedUsage(fs *flag.FlagSet, header, usage, body string, examples []us
 // overwriting an existing entrypoint. entryFile selects the entry directory
 // (SeedEntry vs WorkerEntry) and confirm is the matching prompt seam.
 // Identical to the inlined originals it replaces.
-func parseEntrypointFlags(args []string, flagName string, usage func(*flag.FlagSet), entryFile func(ProjectConfig) string, confirm func(string, string) (bool, error)) (ProjectConfig, string, bool, error) {
+func parseEntrypointFlags(args []string, flagName string, usage func(*flag.FlagSet), entryFile func(ProjectConfig) string, confirm func(string, string) (bool, error)) (ProjectConfig, string, bool, bool, error) {
 	empty := ProjectConfig{}
 
 	args = peelInteractive(args)
 	fs := flag.NewFlagSet(flagName, flag.ContinueOnError)
 	force := fs.Bool("force", false, "overwrite the entrypoint if it already exists")
+	dryRun := fs.Bool("dry-run", false, "print the planned writes without writing files")
 	// coverageProof: no local -i/--interactive flags; peelInteractive
 	// strips them before Parse and sets interactiveMode globally.
 
@@ -277,17 +279,17 @@ func parseEntrypointFlags(args []string, flagName string, usage func(*flag.FlagS
 	}
 
 	if err := fs.Parse(args); err != nil {
-		return empty, "", false, fmt.Errorf("zever generate: %w", err)
+		return empty, "", false, false, fmt.Errorf("zever generate: %w", err)
 	}
 
 	project, err := loadProjectConfig()
 	if err != nil {
-		return empty, "", false, err
+		return empty, "", false, false, err
 	}
 
 	modulePath, err := goModulePath()
 	if err != nil {
-		return empty, "", false, err
+		return empty, "", false, false, err
 	}
 
 	forceVal := *force
@@ -295,7 +297,7 @@ func parseEntrypointFlags(args []string, flagName string, usage func(*flag.FlagS
 		if _, statErr := os.Stat(filepath.Join(entryFile(project), "main.go")); statErr == nil {
 			ok, perr := confirm(fmt.Sprintf("%q already exists — overwrite?", filepath.Join(entryFile(project), "main.go")), "Yes, overwrite")
 			if perr != nil {
-				return empty, "", false, perr
+				return empty, "", false, false, perr
 			}
 
 			if ok {
@@ -304,7 +306,7 @@ func parseEntrypointFlags(args []string, flagName string, usage func(*flag.FlagS
 		}
 	}
 
-	return project, modulePath, forceVal, nil
+	return project, modulePath, forceVal, *dryRun, nil
 }
 
 // splitPositionals peels up to n leading non-flag arguments off args and
@@ -334,6 +336,8 @@ type GenerateModuleConfig struct {
 	SchemaDir string
 	Stdout    io.Writer
 	Stderr    io.Writer
+	// DryRun prints the planned write without touching the filesystem.
+	DryRun bool
 }
 
 // GenerateModule scaffolds schema/<name>/<name>.zen and returns the stub
@@ -357,12 +361,18 @@ func GenerateModule(cfg GenerateModuleConfig) (string, error) {
 		return "", fmt.Errorf("%s: %w", tag, err)
 	}
 
+	stub := fmt.Sprintf("// %s module — add entities, services, jobs here.\n", cfg.Name)
+	path := filepath.Join(dir, cfg.Name+".zen")
+
+	if cfg.DryRun {
+		printGenerateDryRun(cfg.Stdout, path)
+
+		return path, nil
+	}
+
 	if err := os.MkdirAll(dir, 0o750); err != nil {
 		return "", fmt.Errorf("%s: mkdir %q: %w", tag, dir, err)
 	}
-
-	stub := fmt.Sprintf("// %s module — add entities, services, jobs here.\n", cfg.Name)
-	path := filepath.Join(dir, cfg.Name+".zen")
 
 	if err := os.WriteFile(path, []byte(stub), 0o644); err != nil { //nolint:gosec // generated schema stub, not a secret
 		return "", fmt.Errorf("%s: write %q: %w", tag, path, err)
@@ -382,11 +392,54 @@ func GenerateModule(cfg GenerateModuleConfig) (string, error) {
 	return path, nil
 }
 
+// printGenerateDryRun prints a would-write preview for generators. A nil
+// writer silences output, matching the Generate*Config Stdout convention.
+func printGenerateDryRun(w io.Writer, path string) {
+	if w == nil {
+		return
+	}
+
+	_, _ = fmt.Fprintln(w, dim("dry run — no files written"))
+	_, _ = fmt.Fprintln(w, dim("would write ")+cyan(path))
+}
+
+// peelDryRunFlag strips --dry-run/--dry-run=<bool> from args in any
+// position, returning the filtered args and the flag value. It lets commands
+// with bare flag sets (no splitPositionals) accept --dry-run before or
+// after positionals; the registered --dry-run flag still documents it.
+func peelDryRunFlag(args []string) ([]string, bool) {
+	filtered := make([]string, 0, len(args))
+	value := false
+
+	for _, a := range args {
+		if a == "--dry-run" {
+			value = true
+			continue
+		}
+
+		if v, ok := strings.CutPrefix(a, "--dry-run="); ok {
+			if b, err := strconv.ParseBool(strings.TrimSpace(v)); err == nil {
+				value = b
+			} else {
+				value = true
+			}
+
+			continue
+		}
+
+		filtered = append(filtered, a)
+	}
+
+	return filtered, value
+}
+
 // runGenerateModule scaffolds a new module: schema/<name>/<name>.zen
 // With dir-derived module identity, the directory name is the module.
 func runGenerateModule(args []string) error {
 	args = peelInteractive(args)
+	args, moduleDryRun := peelDryRunFlag(args)
 	fs := flag.NewFlagSet("generate", flag.ContinueOnError)
+	dryRun := fs.Bool("dry-run", false, "print the planned write without writing files")
 	// coverageProof: no local -i/--interactive flags; peelInteractive
 	// strips them before Parse and sets interactiveMode globally.
 
@@ -449,6 +502,7 @@ func runGenerateModule(args []string) error {
 		SchemaDir: schemaDir,
 		Stdout:    os.Stdout,
 		Stderr:    os.Stderr,
+		DryRun:    *dryRun || moduleDryRun,
 	})
 
 	return err

@@ -50,6 +50,8 @@ type GenerateScheduleConfig struct {
 	Dispatch string
 	Stdout   io.Writer
 	Stderr   io.Writer
+	// DryRun prints the rendered declaration without touching the filesystem.
+	DryRun bool
 }
 
 // ErrScheduleMissingCron is returned when GenerateSchedule gets no cron spec.
@@ -117,7 +119,19 @@ func GenerateSchedule(cfg GenerateScheduleConfig) (string, error) {
 			tag, job.Name, len(job.Params))
 	}
 
-	if err := appendDeclBeforeClosingBrace(path, cfg.Module, renderScheduleDecl(cfg.Name, cfg.Cron, job.Name)); err != nil {
+	declText := renderScheduleDecl(cfg.Name, cfg.Cron, job.Name)
+
+	if cfg.DryRun {
+		if stdout := cfg.Stdout; stdout != nil {
+			_, _ = fmt.Fprintln(stdout, dim("dry run — no files written"))
+			_, _ = fmt.Fprintln(stdout, dim("would append to ")+cyan(path)+dim(":"))
+			_, _ = fmt.Fprintln(stdout, declText)
+		}
+
+		return path, nil
+	}
+
+	if err := appendDeclBeforeClosingBrace(path, cfg.Module, declText); err != nil {
 		return "", err
 	}
 
@@ -141,6 +155,7 @@ func runGenerateSchedule(args []string) error {
 	fs := flag.NewFlagSet("generate schedule", flag.ContinueOnError)
 	cron := fs.String("cron", "", `cron spec, e.g. "*/5 * * * *" (required)`)
 	dispatch := fs.String("dispatch", "", "name of the job this schedule dispatches (required)")
+	dryRun := fs.Bool("dry-run", false, "print the rendered declaration without writing files")
 	// coverageProof: no local -i/--interactive flags; peelInteractive
 	// strips them before Parse and sets interactiveMode globally.
 
@@ -279,6 +294,7 @@ func runGenerateSchedule(args []string) error {
 		Dispatch: *dispatch,
 		Stdout:   os.Stdout,
 		Stderr:   os.Stderr,
+		DryRun:   *dryRun,
 	})
 
 	return err
