@@ -5,6 +5,7 @@ import (
 	"errors"
 	"io"
 	"os"
+	"strconv"
 	"strings"
 )
 
@@ -24,6 +25,10 @@ const (
 // global --json flag (or ZEVER_JSON) before dispatch; handlers check it via
 // their configs. Human output is unchanged when false.
 var jsonMode bool
+
+// jsonExplicit reports whether --json/--json= appeared on the command line,
+// so an explicit --json=false wins over ZEVER_JSON.
+var jsonExplicit bool
 
 // jsonOut is the JSON envelope sink. Tests swap it to capture output.
 var jsonOut io.Writer = os.Stdout
@@ -132,26 +137,33 @@ func envJSON() bool {
 	return v == "1" || v == "true" || v == "yes"
 }
 
-// peelJSON scans args for --json (or --json=true/false), sets jsonMode, and
+// peelJSON scans args for --json (or --json=<bool>), sets jsonMode, and
 // returns the filtered args. Mirrors peelInteractive so the global flag works
-// before or after the subcommand on the legacy path.
+// before or after the subcommand on the legacy path. An explicit --json=false
+// disables JSON even when ZEVER_JSON is set.
 func peelJSON(args []string) []string {
 	filtered := make([]string, 0, len(args))
 	for _, a := range args {
 		if a == "--json" {
 			jsonMode = true
+			jsonExplicit = true
 			continue
 		}
 
-		if strings.HasPrefix(a, "--json=") {
-			jsonMode = strings.TrimPrefix(a, "--json=") != "false"
+		if v, ok := strings.CutPrefix(a, "--json="); ok {
+			if b, err := strconv.ParseBool(strings.TrimSpace(v)); err == nil {
+				jsonMode = b
+			} else {
+				jsonMode = true
+			}
+			jsonExplicit = true
 			continue
 		}
 
 		filtered = append(filtered, a)
 	}
 
-	if envJSON() {
+	if !jsonExplicit && envJSON() {
 		jsonMode = true
 	}
 
