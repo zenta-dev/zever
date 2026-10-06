@@ -132,17 +132,30 @@ Order matters: `CORS` outermost so preflights short-circuit before logging or ra
 | `RequestLogger(logger)` | one structured line per request: method, path, status, `duration_ms`, plus `request_id` when present |
 | `Recover(logger)` | recovers handler panics, logs value + stack, responds 500 `{"error":"internal error"}`; if the handler already committed, logs only |
 | `RateLimit(limiter, keyFunc)` | denies with 429 JSON + `Retry-After` (ceiled seconds); limiter errors fail open; default key `RemoteAddrKey` (client IP) |
-| `Tracing(provider)` | span per request named by path, `http.status_code` attribute, span error on 5xx, `http.request` counter by method/status |
+| `Tracing(provider)` | span per request named by path, `http.request.method`/`url.path` attributes, `http.response.status_code` set on completion, span error on 5xx; `http.request` counter tagged by `http.request.method`/`http.response.status_code` |
 | `Timeout(d)` | bounds a handler to a fixed duration; the request context carries the deadline downstream |
 | `CORS(opts)` | strict cross-origin headers: explicit allowlist echoed (never reflected), preflight `OPTIONS` answers 204 or 403, `Vary: Origin` always; invalid opts fail closed with 500 |
 | `RemoteAddrKey(req)` | key func: client IP for HTTP rate limiting |
 | `RecoverUnaryServerInterceptor(logger)` | gRPC twin of `Recover`: panic maps to `Internal` |
 | `RateLimitUnaryServerInterceptor(limiter, keyFunc)` | gRPC twin of `RateLimit`: deny maps to `ResourceExhausted`, errors fail open, key via `PeerAddrKey` |
-| `TracingUnaryServerInterceptor(provider)` | gRPC twin of `Tracing`: span per `FullMethod`, `rpc.request` counter by method/outcome |
+| `TracingUnaryServerInterceptor(provider)` | gRPC twin of `Tracing`: span per `FullMethod` carrying `rpc.system`/`rpc.service`/`rpc.method`/`rpc.grpc.status_code`; `rpc.request` counter tagged by `rpc.service`/`rpc.method`/`rpc.grpc.status_code` |
 | `TimeoutUnaryServerInterceptor(d)` | gRPC twin of `Timeout`: cuts slow handlers off at `d` |
 | `PeerAddrKey(ctx)` | key func: peer address for gRPC rate limiting |
 
 The status recorder reuses a single wrapper through the chain (no double-wrap) and exposes `Unwrap`, so `http.ResponseController` still reaches `Flush` / `Hijack` on the underlying writer.
+
+### Tracing attributes
+
+Both tracing constructors emit OpenTelemetry semantic-convention
+attribute names: `http.request.method`, `url.path`, and
+`http.response.status_code` for HTTP; `rpc.system`, `rpc.service`,
+`rpc.method`, and `rpc.grpc.status_code` for gRPC. The pre-migration
+names were **removed**, not aliased, so a query on an old attribute
+returns nothing after upgrading rather than failing loudly. `CHANGELOG.md`
+carries the migration note under `### Changed`, and
+[Cross-Service Tracing](../../digging-deeper/cross-service-tracing/) has the
+full old-to-new table — including the counter labels, whose `status` text
+value became the numeric `http.response.status_code`.
 
 ## gRPC interceptors
 
@@ -179,7 +192,7 @@ handler := middleware.Timeout(5 * time.Second)(mux)
 1. **Panics return empty 200s.** `Recover` is inside `RequestLogger`, or missing entirely. Put `CORS` outermost, `RequestLogger` next, and `Recover` innermost, closest to the mux.
 2. **429s during a Redis outage.** Check whether the limiter is actually erroring: errors fail open, so steady 429s mean real quota exhaustion, not backend failure. Raise the rate or burst, or scope keys more narrowly than `RemoteAddrKey`.
 3. **SSE / hijacked connections break.** An extra wrapper may sit between middleware and the writer. The built-in recorder exposes `Unwrap`; custom middleware must forward it too, or `http.ResponseController` cannot reach `Flush`/`Hijack`.
-4. **Traces missing for failed requests.** The provider may be `noop` in that environment. Set `observability.adapter: stdout` (or OTLP) and confirm spans are named by path with the `http.status_code` attribute.
+4. **Traces missing for failed requests.** The provider may be `noop` in that environment. Set `observability.adapter: stdout` (or OTLP) and confirm spans are named by path with the `http.response.status_code` attribute.
 5. **Timeouts do not stop work.** The handler ignores `r.Context()`. Thread the request context into every downstream call so the deadline cancels DB and RPC work.
 
 ## See also
