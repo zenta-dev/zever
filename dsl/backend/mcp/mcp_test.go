@@ -185,6 +185,46 @@ func TestGenerate(t *testing.T) {
 		t.Fatalf("ListUsers paginated = %v, want true", list["paginated"])
 	}
 
+	listInput, ok := list["inputSchema"].(map[string]any)
+	if !ok {
+		t.Fatalf("ListUsers inputSchema type = %T", list["inputSchema"])
+	}
+
+	listProps, ok := listInput["properties"].(map[string]any)
+	if !ok {
+		t.Fatalf("ListUsers properties type = %T", listInput["properties"])
+	}
+
+	for _, want := range []string{"limit", "cursor"} {
+		if _, hasProp := listProps[want].(map[string]any); !hasProp {
+			t.Fatalf("ListUsers input missing %q", want)
+		}
+	}
+
+	listOutput, ok := list["outputSchema"].(map[string]any)
+	if !ok {
+		t.Fatalf("ListUsers outputSchema type = %T", list["outputSchema"])
+	}
+
+	pageProps, ok := listOutput["properties"].(map[string]any)
+	if !ok {
+		t.Fatalf("ListUsers page properties type = %T", listOutput["properties"])
+	}
+
+	items, ok := pageProps["items"].(map[string]any)
+	if !ok {
+		t.Fatalf("ListUsers page items type = %T", pageProps["items"])
+	}
+
+	inner, ok := items["items"].(map[string]any)
+	if !ok || inner["$ref"] != "#/definitions/blog_User" {
+		t.Fatalf("ListUsers page items = %v, want $ref #/definitions/blog_User", items["items"])
+	}
+
+	if _, ok := pageProps["next_cursor"].(map[string]any); !ok {
+		t.Fatalf("ListUsers page missing next_cursor: %v", pageProps)
+	}
+
 	mergedDoc := decodeManifest(t, merged)
 	if _, ok := mergedDoc["services"].([]any); !ok {
 		t.Fatalf("merged services type = %T", mergedDoc["services"])
