@@ -223,3 +223,24 @@ func TestEdgeDuplicateAdapterError_message(t *testing.T) {
 		t.Fatalf("err = %v, want ErrDuplicateAdapter", err)
 	}
 }
+
+func TestEdgeOpen_invalidOptions(t *testing.T) {
+	t.Parallel()
+
+	opts := Options{}
+	opts.JWT.MaxTTL = -time.Second
+
+	got, err := Open(freshAdapter(), opts)
+	if !errors.Is(err, ErrInvalidOptions) {
+		t.Fatalf("Open(invalid opts) err = %v, want ErrInvalidOptions", err)
+	}
+
+	var ioe InvalidOptionsError
+	if !errors.As(err, &ioe) {
+		t.Fatalf("err %T is not InvalidOptionsError", err)
+	}
+
+	if got != nil {
+		t.Fatalf("got = %v, want nil", got)
+	}
+}
