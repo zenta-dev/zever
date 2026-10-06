@@ -170,7 +170,7 @@ func DialStdioRetry(ctx context.Context, path string, opts DialOptions, args ...
 		case <-ctx.Done():
 			timer.Stop()
 
-			return nil, nil, ctx.Err()
+			return nil, nil, fmt.Errorf("mcpclient: dial %q: %w", path, ctx.Err())
 		case <-timer.C:
 		}
 
@@ -256,13 +256,13 @@ type inbound struct {
 }
 
 // dispatchRequest answers one server-initiated request. Notifications (nil
-// ID) are acknowledged silently.
+// ID) return before the switch: hooks never run for them.
 func (c *Client) dispatchRequest(ctx context.Context, id *int64, method string, params json.RawMessage) error {
-	answer := func(result any, rpcErr *RPCError) error {
-		if id == nil {
-			return nil
-		}
+	if id == nil {
+		return nil
+	}
 
+	answer := func(result any, rpcErr *RPCError) error {
 		if rpcErr != nil {
 			return c.sendResponse(id, nil, rpcErr)
 		}

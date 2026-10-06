@@ -92,7 +92,7 @@ func (s *Server) elicit(ctx context.Context, message string, schema map[string]a
 			return zero, fmt.Errorf("zever-mcp: unknown elicitation action %q", res.Action)
 		}
 	case <-ctx.Done():
-		return zero, ctx.Err()
+		return zero, fmt.Errorf("zever-mcp: elicitation canceled: %w", ctx.Err())
 	case <-timer.C:
 		return zero, errors.New("zever-mcp: elicitation timed out")
 	}
@@ -125,7 +125,9 @@ func (s *Server) deliverResponse(raw json.RawMessage) bool {
 	s.mu.Unlock()
 
 	if !ok {
-		return false
+		// No waiter: consume anyway. Answering a stale or foreign response
+		// with method-not-found would corrupt the peer's correlation.
+		return true
 	}
 
 	// Malformed answers fail closed as cancellation.

@@ -114,7 +114,7 @@ func run(ctx context.Context, in io.Reader, out io.Writer, errw io.Writer) int {
 			if errors.Is(err, io.EOF) {
 				break
 			}
-			_ = enc.Encode(errorResponse(json.RawMessage("null"), codeParseError, "zever-mcp: parse error"))
+			respond(errorResponse(json.RawMessage("null"), codeParseError, "zever-mcp: parse error"))
 			fmt.Fprintln(errw, "zever-mcp: decode:", err)
 			cancel()
 			wg.Wait()

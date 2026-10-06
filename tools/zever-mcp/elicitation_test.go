@@ -1,7 +1,6 @@
 package main
 
 import (
-	"context"
 	"encoding/json"
 	"net"
 	"strings"
@@ -20,7 +19,7 @@ func TestGenerateApplyRoundTrip(t *testing.T) {
 	done := make(chan int, 1)
 
 	go func() {
-		done <- run(context.Background(), server, server, tDiscard{})
+		done <- run(t.Context(), server, server, tDiscard{})
 	}()
 
 	dec := json.NewDecoder(client)

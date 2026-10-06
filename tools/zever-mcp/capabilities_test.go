@@ -144,14 +144,14 @@ func TestPromptsGetUnknown(t *testing.T) {
 }
 
 // stubZever installs a fake `zever` binary on PATH that prints canned
-// output.
+// output. Output passes through an env var, never shell interpolation.
 func stubZever(t *testing.T, output string) {
 	t.Helper()
 
 	dir := t.TempDir()
 	path := filepath.Join(dir, "zever")
 
-	script := "#!/bin/sh\nprintf '%s' '" + output + "'\n"
+	script := "#!/bin/sh\nprintf '%s' \"$STUB_OUTPUT\"\n"
 	if err := os.WriteFile(path, []byte(script), 0o600); err != nil {
 		t.Fatalf("write stub: %v", err)
 	}
@@ -160,6 +160,7 @@ func stubZever(t *testing.T, output string) {
 		t.Fatalf("chmod stub: %v", err)
 	}
 
+	t.Setenv("STUB_OUTPUT", output)
 	t.Setenv("PATH", dir+string(os.PathListSeparator)+os.Getenv("PATH"))
 }
 
