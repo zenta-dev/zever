@@ -32,7 +32,7 @@ var cligCommands = []string{
 	"new", "add", "compile", "doctor", "config", "routes", "check",
 	"breaking", "fmt", "explain", "check-boundaries", "graph",
 	"generate", "extract", "serve", "dev", "queue:work",
-	"schedule:run", "tinker", "db", "completion", "docs",
+	"schedule:run", "tinker", "db", "outbox", "completion", "docs",
 }
 
 func TestCligCommandDocs(t *testing.T) {

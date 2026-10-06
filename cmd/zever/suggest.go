@@ -5,7 +5,7 @@ import "strings"
 // all known top-level subcommands (including help aliases).
 var allTopLevel = []string{
 	"new", "add", "compile", "check", "breaking", "fmt", "doctor", "config", "routes", "explain", "check-boundaries", "check:boundaries", "graph",
-	"generate", "extract", "serve", "dev", "queue:work", "schedule:run", "tinker", "db", "help",
+	"generate", "extract", "serve", "dev", "queue:work", "schedule:run", "tinker", "outbox", "db", "help",
 }
 
 // generate subcommands.

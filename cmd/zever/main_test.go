@@ -74,7 +74,7 @@ func TestSubcommandHandlers_coversEverySubcommand(t *testing.T) {
 	want := []string{
 		"new", "add", "compile", "doctor", "config", "routes", "check", "breaking", "fmt",
 		"explain", "check-boundaries", "check:boundaries", "graph", "generate", "extract",
-		"serve", "dev", "queue:work", "schedule:run", "tinker", "db",
+		"serve", "dev", "queue:work", "schedule:run", "tinker", "db", "outbox",
 	}
 	for _, name := range want {
 		t.Run(name, func(t *testing.T) {

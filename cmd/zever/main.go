@@ -103,6 +103,7 @@ var subcommandHandlers = map[string]func([]string) error{
 	"schedule:run":     runScheduleRun,
 	"tinker":           runTinker,
 	"db":               runDB,
+	"outbox":           runOutbox,
 }
 
 func main() {
@@ -219,6 +220,9 @@ func run(args []string) error {
 				return nil
 			case "db":
 				printDBUsage()
+				return nil
+			case "outbox":
+				printOutboxUsage()
 				return nil
 			case "extract":
 				printExtractUsage(flag.NewFlagSet("extract", flag.ContinueOnError))
@@ -377,6 +381,7 @@ func printUsage() {
 	sectionInspect := bold("Inspection")
 	sectionRuntime := bold("Runtime")
 	sectionDB := bold("Database")
+	sectionOps := bold("Operations")
 
 	// Columns: command (cyan, padded) + dim description.
 	line := func(name, desc string) string {
@@ -415,6 +420,9 @@ func printUsage() {
 		"",
 		sectionDB,
 		line("db", "Database commands (db migrate, db rollback, db seed)"),
+		"",
+		sectionOps,
+		line("outbox", "Inspect and repair the outbox DLQ"),
 		"",
 		bold("Examples:"),
 		dim("  ")+cmd("zever new myapp")+dim("                  # scaffold new app"),
