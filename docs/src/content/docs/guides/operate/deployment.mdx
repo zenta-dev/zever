@@ -3,9 +3,9 @@ title: Deployment
 description: Ship Zever to production with one checklist for build, config, secrets, shutdown, health, scaling, and hardening.
 ---
 
-import { Steps, Tabs, TabItem, Aside, LinkCard, CardGrid } from '@astrojs/starlight/components';
+import { Steps, Aside, LinkCard, CardGrid } from '@astrojs/starlight/components';
 
-This is the single production checklist for a tested checkout. The shape is standard Go with one extra rule: build once, configure per environment, run one container per process, and close it on SIGTERM. There is no build-time codegen. The `.zen` compiler runs explicitly (`zever compile`, `zever generate`) during development, never at container start.
+The production checklist for a tested checkout. Build once, configure per environment, run one container per process, and close it on SIGTERM. There is no build-time codegen: the `.zen` compiler runs explicitly (`zever compile`, `zever generate`) during development, never at container start.
 
 ## Build one binary
 
@@ -22,9 +22,7 @@ GOOS=linux GOARCH=amd64 go build -o myapp ./cmd/myapp   # cross-compile
 | Container image | `docker build -f examples/showcase/Dockerfile .` | Multi-stage: `golang:1.27.1-bookworm` builder (`CGO_ENABLED=0`, `-trimpath`, `-ldflags="-s -w"`), final `gcr.io/distroless/static-debian13:nonroot` with an absolute `ENTRYPOINT ["/server"]`. |
 | Compose | `DB_PASSWORD=... docker compose up --build` | Scaffolded `compose.yaml` when `zever new` picks `db=postgres` or `*=redis`. Health-gated startup. |
 
-Static builds work because sqlite is pure Go (no cgo) and the distroless static base carries CA certificates for Stripe and cloud TLS. Build the image from the repo root. The builder runs with `GOWORK=off`. The worker follows the same pattern with `./cmd/worker`. Build from a clean tree at a tag and keep the SBOM artifact.
-
-Tagged releases build static binaries and SBOMs with SLSA provenance. Verify before you deploy:
+Static builds work because sqlite is pure Go (no cgo) and the distroless static base carries CA certificates for Stripe and cloud TLS. Build from the repo root; the builder runs with `GOWORK=off`. The worker follows the same pattern with `./cmd/worker`. Build from a clean tree at a tag and keep the SBOM. Tagged releases build static binaries and SBOMs with SLSA provenance; verify before deploy:
 
 ```sh
 gh attestation verify dist/zever-linux-amd64 --repo zenta-dev/zever
@@ -60,7 +58,7 @@ DB_DSN='postgres://app:${DB_PASSWORD}@db:5432/app'
 AUTH_JWT_SECRET='prod-secret-at-least-32-bytes-long'
 ```
 
-Load with an explicit path (`config.Load("/etc/myapp/zever.yaml")`) so a wrong working directory cannot fall back to sqlite. Keep secrets in env or mounted files, and prefer [Secrets](../../security/secrets/) with Vault for payment credentials (SOC2 and PCI expect a real secrets manager). The `env` adapter cannot rotate at runtime: rotate by restarting with new values. Print only `config.RedactedServices(cfg)` at boot.
+Load with an explicit path (`config.Load("/etc/myapp/zever.yaml")`) so a wrong working directory cannot fall back to sqlite. Keep secrets in env or mounted files, and prefer [Secrets](../../security/secrets/) with Vault for payment credentials (SOC2 and PCI expect a real secrets manager). The `env` adapter cannot rotate at runtime: rotate by restarting with new values. Print only `cfg.RedactedServices()` at boot.
 
 ## Shut down in order
 
@@ -91,7 +89,7 @@ if err := c.Close(ctx); err != nil {
 
 `Close(ctx)` closes only resolved services, dependents first and `cache`/`queue` leaves last, joining failures with `errors.Join`. Panics surface as `container.ClosePanicError` and timeouts as `container.CloseTimeoutError`. Both are value types, so match them with value `errors.As` targets or the match never fires. A timeout parent also flushes buffered spans through `Shutdown(ctx)`. Order details: [Container](../../../concepts/container/).
 
-The generated server (`zever generate server`) already does this: it traps SIGINT and SIGTERM, flips gRPC health to `NOT_SERVING`, calls `GracefulStop()`, runs `httpServer.Shutdown`, then closes the container on a timeout context. Load balancers stop routing before in-flight RPCs drop.
+The generated server (`zever generate server`) does this already: it traps SIGINT and SIGTERM, flips gRPC health to `NOT_SERVING`, calls `GracefulStop()`, runs `httpServer.Shutdown`, then closes the container on a timeout context. Load balancers stop routing before in-flight RPCs drop.
 
 ## Wire health probes
 
@@ -122,7 +120,7 @@ Process-local defaults break when you add a second instance. Switch these adapte
 
 Postgres: set `max_conns` and `min_conns` (and `max_conn_lifetime`, `max_conn_idle_time`) so the summed `MaxConns` across `db`, `search`, and `vectorstore` pools stays below the server `max_connections`. TLS has a 1.2 floor when enabled, and the DSN is never logged. Use `sslmode=disable` only in ephemeral environments.
 
-Outbound gRPC: `container.GRPCClient(target, opts...)` caches one `*grpc.ClientConn` per target and closes it with the container. Credentials fail closed (`ErrNoCredentials`). Use `WithTLS` with a CA bundle in production, since `WithInsecure` is for loopback and dev only.
+Outbound gRPC: `c.GRPCClient(target, opts...)` caches one `*grpc.ClientConn` per target and closes it with the container. Credentials fail closed (`ErrNoCredentials`). Use `WithTLS` with a CA bundle in production; `WithInsecure` is for loopback and dev only.
 
 ## Harden for production
 
@@ -147,7 +145,7 @@ Outbound gRPC: `container.GRPCClient(target, opts...)` caches one `*grpc.ClientC
    ```sh
    curl -fsS http://localhost:8080/healthz
    curl -fsS http://localhost:8080/readyz
-   zever db migrate --dry-run   # expect: no pending statements
+   zever db migrate --dry-run schema/*.zen --adapter=postgres --dsn="$DB_DSN"   # expect: no DDL statements
    ```
 
 5. Confirm `/healthz` and `/readyz` return 200 (503 means a failing DB ping or non-serving gRPC health, so hold the rollout), the release checksum is recorded in migration bookkeeping (a re-run is a no-op), and traces reach the collector.
@@ -166,7 +164,7 @@ Outbound gRPC: `container.GRPCClient(target, opts...)` caches one `*grpc.ClientC
 <details>
 <summary>`Load` fails with an unknown field at deploy</summary>
 
-The file uses a pre-rename key (`maxconns`) or a typo. Rename to snake_case (`max_conns`) and check against `config/schema/zever.schema.json`.
+The file uses a pre-rename key (`maxconns`) or a typo. Rename to snake_case (`max_conns`) and check the [config reference](../../../reference/config/).
 </details>
 
 <details>
@@ -184,7 +182,7 @@ The file uses a pre-rename key (`maxconns`) or a typo. Rename to snake_case (`ma
 <details>
 <summary>Secrets appear in supervisor logs</summary>
 
-Raw options were printed at boot. Print `config.RedactedServices(cfg)` only, and audit `log.Fatal(err)` paths for echoed values.
+Raw options were printed at boot. Print `cfg.RedactedServices()` only, and audit `log.Fatal(err)` paths for echoed values.
 </details>
 
 ## Related

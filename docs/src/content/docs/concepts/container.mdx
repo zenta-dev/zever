@@ -5,7 +5,7 @@ description: How the container resolves services lazily, retries on error, share
 
 import { LinkCard, CardGrid } from '@astrojs/starlight/components';
 
-The container is the only object that knows how adapters are constructed, cached, retried, and closed. One `container.New(cfg)` per process replaces every hand-wired driver, with lazy first use and dependency-ordered close.
+The container is the only object that knows how adapters are constructed, cached, retried, and closed. One `container.New(cfg)` per process gives lazy first use and dependency-ordered close.
 
 ## The mental model
 
@@ -15,63 +15,26 @@ one per       lazy first      adapter by name      retry on error
 process       use only        from config          clear on failure
 ```
 
-There is no global state and no `init()` wiring. `New(nil)` is valid, and `Close(ctx)` never opens anything. Config picks the adapter (`<SERVICE>_ADAPTER` or `adapter:`) and the remaining keys feed typed Options: see the [Config reference](../../reference/config/#db). Display config with `config.RedactedServices`, never raw option maps.
+No globals and no `init()` wiring. `New(nil)` is valid; `Close(ctx)` never opens anything. Config picks the adapter (`<SERVICE>_ADAPTER` or `adapter:`); the remaining keys feed typed Options ([Config reference](../../reference/config/#db)). Display config with `config.RedactedServices`, never raw option maps.
 
 ## Resolve services
 
-Register the adapters you use, build the container, and call accessors:
+Register the adapters you use (`dbsqlite.Register()`), build the container with `container.New(config.Default())`, then call accessors. Each returns one cached instance and retries after a failure.
 
-```go title="main.go"
-package main
+- `DB()`: plus `Transactor()`
+- `Cache()`, `Queue()`: leaves, closed after dependents and snapshots
+- `Job()`: dispatcher over resolved `Queue`, no registry
+- `Scheduler()`: shares `Queue` via `Job()`, closed first
+- `EventBus()`: `Eventbus()` alias
+- `RateLimit()`: `Ratelimit()` alias
+- `GRPC(opts...)`: lazy `*grpc.Server`, no registry
+- `GRPCClient(target, opts...)`: gRPC client connection
+- `Router()`: `fiber` or `stdhttp` driver
+- `Log()`: outermost middleware
+- `AI()`: API key required, no keyless default
+- `Agent()`, `RAG()`: over `AI` (and `VectorStore` for `RAG`)
 
-import (
-	cachememory "github.com/zenta-dev/zever/adapters/cache/memory"
-	dbsqlite "github.com/zenta-dev/zever/adapters/db/sqlite"
-	queuememory "github.com/zenta-dev/zever/adapters/queue/memory"
-	"github.com/zenta-dev/zever/config"
-	"github.com/zenta-dev/zever/container"
-)
-
-func main() {
-	cachememory.Register() // the container wires nothing; register before resolving
-	dbsqlite.Register()
-	queuememory.Register()
-	c := container.New(config.Default())
-
-	db, err := c.DB()
-	if err != nil {
-		panic(err)
-	}
-	cache, err := c.Cache()
-	if err != nil {
-		panic(err)
-	}
-	q, err := c.Queue()
-	if err != nil {
-		panic(err)
-	}
-	_, _, _ = db, cache, q
-}
-```
-
-Each accessor returns one cached instance and retries after a failure. These accessors have notes:
-
-| Accessor | Notes |
-|---|---|
-| `DB()` | Plus a `Transactor()` helper |
-| `Cache()`, `Queue()` | Leaf dependencies, closed last |
-| `Job()` | `*job.Dispatcher` over the resolved `Queue`, no registry of its own |
-| `Scheduler()` | Shares `Queue` via `Job()`, closed first |
-| `EventBus()` | `Eventbus()` is an alias |
-| `RateLimit()` | `Ratelimit()` is an alias |
-| `GRPC(opts...)` | Lazy `*grpc.Server` singleton, no registry |
-| `GRPCClient(target, opts...)` | gRPC client connection |
-| `Router()` | `fiber` or `stdhttp` driver |
-| `Log()` | Wire the outermost middleware with this |
-| `AI()` | API key required, no keyless default |
-| `Agent()`, `RAG()` | Agent loop and retrieval engine over `AI` (and `VectorStore` for `RAG`) |
-
-The remaining accessors share the service name:
+The rest share the service name:
 
 ```text
 Analytics() Auth() Billing() Crypto() Document() Flag() Geo() I18n()
@@ -82,110 +45,58 @@ Secrets() Session() Storage() Tenant() VectorStore() Webhook() Workflow()
 
 ## Share one queue across jobs and the scheduler
 
-`Job()` builds a dispatcher over the already-resolved queue. `Scheduler()` injects that dispatcher into the scheduler options, so no redundant connections open. Resolving `Scheduler()` resolves `Job()` and `Queue()` as a side effect.
-
-```go title="main.go"
-package main
-
-import (
-	"context"
-	"errors"
-	"fmt"
-	"time"
-
-	queuememory "github.com/zenta-dev/zever/adapters/queue/memory"
-	schedembedded "github.com/zenta-dev/zever/adapters/scheduler/embedded"
-	"github.com/zenta-dev/zever/config"
-	"github.com/zenta-dev/zever/container"
-)
-
-func main() {
-	queuememory.Register()
-	schedembedded.Register()
-	c := container.New(config.Default())
-
-	if _, err := c.Job(); err != nil { // the dispatcher shares the queue
-		panic(err)
-	}
-	if _, err := c.Scheduler(); err != nil { // resolves Job() and Queue() too
-		panic(err)
-	}
-
-	ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
-	defer cancel()
-	if err := c.Close(ctx); err != nil {
-		var te container.CloseTimeoutError
-		var pe container.ClosePanicError
-		switch {
-		case errors.As(err, &te):
-			fmt.Println("per-service timeout")
-		case errors.As(err, &pe):
-			fmt.Println("adapter panicked")
-		default:
-			fmt.Println("close error:", err)
-		}
-	}
-}
-```
-
-A clean run prints nothing and exits `0`.
+`Job()` builds a dispatcher over the already-resolved queue. `Scheduler()` injects that dispatcher, so no redundant connections open. Resolving `Scheduler()` resolves `Job()` and `Queue()` as a side effect.
 
 ## Close services in order
 
-| Close group | Members | Order |
-|---|---|---|
-| Dependents | `scheduler`, `job` (hold a queue ref) | First |
-| Snapshots | Everything without explicit ordering | Middle |
-| Leaves | `cache`, `queue` | Last |
-| Independent | `grpcServer` (`GracefulStop`/`Stop`, bounded by ctx) | Alongside |
+- **Dependents** (`scheduler`, `job`, `agent`, `rag`; they hold backend refs): first.
+- **Snapshots** (everything without explicit ordering): middle.
+- **Leaves** (`cache`, `queue`): next.
+- **Shared pools** (`db` and registry pools, after every borrower), then plugin services.
+- **Independent** (`grpcServer` via `GracefulStop`, forced `Stop` when ctx ends; gRPC client connections): last.
 
-The container probes each service's shutdown shape in order: `Close(context.Context) error`, `Close() error`, `Stop() error`, `Shutdown(context.Context) error`, then no-op (for example `*job.Dispatcher`). Pick the signature for your adapter:
+The container probes each service's shutdown shape in order: `Close(context.Context) error`, `Close() error`, `Stop() error`, `Shutdown(context.Context) error`, then no-op (for example `*job.Dispatcher`).
 
-| Signature | Use for |
-|---|---|
-| `Close(ctx) error` | Pooled or network-backed services that may block (`db`, `cache`, `storage`, `lock`) |
-| `Close() error` | Lightweight handles and instant-close in-memory adapters (`auth`, `queue`, `session`, `payment`) |
-| `Stop() error` | The scheduler's cron lifecycle only |
-| `Shutdown(ctx) error` | Observability providers, so buffered spans and metrics flush |
-| none | Stateless adapters (`crypto`, `log`, `password`, `permission`, `router`) |
+- `Close(ctx) error`: pooled or blocking services (`db`, `cache`, `storage`, `lock`).
+- `Close() error`: lightweight or in-memory adapters (`auth`, `queue`, `session`, `payment`).
+- `Stop() error`: scheduler cron only.
+- `Shutdown(ctx) error`: observability providers (flush spans and metrics).
+- none: stateless adapters (`crypto`, `log`, `password`, `permission`, `router`).
 
 ## Design decisions and trade-offs
 
-- Close with a timeout parent. A 5s per-service bound applies when the parent has no deadline; otherwise the parent deadline bounds each wait. Shared instances close once (pointer-identity dedup) and failures join with `errors.Join`.
-- `CloseTimeoutError` and `ClosePanicError` have value receivers: a pointer-typed `errors.As` target never matches.
-- Error values name the service only, never values or secrets.
-- Container tests end with `goleak.VerifyTestMain`, so adapter goroutines must stop in `Close`. Keep timeout tests short (parent about 100ms, block about 500ms).
+A 5s per-service bound applies without a parent deadline; shared instances close once (pointer-identity dedup), failures join with `errors.Join`, and error values name the service only.
 
 ## Troubleshooting
 
 <details>
 <summary>An accessor errors on the first call only</summary>
 
-Cause: a transient backend failure; the cache cleared on error. Fix: retry. Investigate the adapter only if failures repeat.
+A transient failure cleared the cache. Retry; investigate only if it repeats.
 </details>
 
 <details>
 <summary>`Close` reports a timeout for one service</summary>
 
-Cause: that adapter exceeded its bound. Fix: check its `Close` or `Stop` and give the parent a deadline.
+That adapter exceeded its bound. Give the parent a deadline or fix its `Close`.
 </details>
 
 <details>
 <summary>`errors.As` for `ClosePanicError` never fires</summary>
 
-Cause: a pointer target. Fix: declare `var pe container.ClosePanicError` and pass `&pe`.
+Both close error types are values. Declare `var pe container.ClosePanicError` and pass `&pe`.
 </details>
 
 <details>
 <summary>A service seems to close twice</summary>
 
-Cause: a shared instance reached through two paths. Fix: none; dedup closes it once.
+A shared instance reached through two paths. Dedup closes it once.
 </details>
 
 <details>
 <summary>The leak checker fails after adding a service</summary>
 
-Cause: an adapter goroutine outlives `Close`. Fix: stop it in `Close`; resolve only the in-memory subset in tests.
+An adapter goroutine outlives `Close` (`go test -tags=leak ./container/`). Stop it in `Close`.
 </details>
 
 ## Related

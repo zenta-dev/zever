@@ -36,7 +36,7 @@ If a page needs two jobs, split it and link the halves.
 
 - Every snippet runs as written. Include imports (`github.com/zenta-dev/zever/...`), and show the expected output.
 - Name the file in the code block title: ` ```go title="main.go" `.
-- Verify every config key against `config/schema/zever.schema.json` and the package `options.go`. File keys are snake_case. Environment variables are `<SERVICE>_<FIELD>` with no prefix.
+- Verify every config key against the Go `Options` structs (`core/<service>/options.go` and `adapters/<service>/<adapter>/options.go`), not only `config/schema/zever.schema.json`, which lags the code. File keys are snake_case. Environment variables are `<SERVICE>_<FIELD>` with no prefix.
 - Verify every command and flag against `cmd/zever`. Never invent one.
 - Keep guide snippets minimal. Put full option lists in [Config reference](../../reference/config/) and link to the right `#service` anchor.
 - If a package `README.md` holds detail the docs lack, port it.
@@ -124,6 +124,7 @@ One-line summary.
 ## Before you open a pull request
 
 1. Run `npm run build` in `docs/` and fix any warning you introduced.
-2. Run `node scripts/check-links.mjs`. It must report zero broken targets.
-3. Run `node scripts/lint-docs.mjs`. It checks dashes, brand spelling, heading case, and description length.
-4. Add a `CHANGELOG.md` entry under `[Unreleased]` for user-facing changes.
+2. Run `node scripts/check-links.mjs dist`. It checks links and anchors in the built site and must report zero broken targets.
+3. Run `node scripts/lint-docs.mjs`. It errors on dashes, a lowercase brand name in prose, a missing or long description, and more than two callouts, and warns on title-cased headings.
+4. Run `node scripts/audit-facts.mjs`. It cross-checks config keys, container accessors, CLI commands and flags, and import paths against the code, and must end with 0 problems.
+5. Add a `CHANGELOG.md` entry under `[Unreleased]` for user-facing changes.

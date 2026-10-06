@@ -5,7 +5,7 @@ description: Bump a pre-1.0 Zever version safely, read breaking changes, and fix
 
 import { Steps, LinkCard, CardGrid } from '@astrojs/starlight/components';
 
-Zever is pre-1.0, so `0.x` releases may break, and every break ships with a documented fix. Undocumented breaks are bugs: open an issue. This page gives the contract, a repeatable bump procedure, and the known breaks.
+Zever is pre-1.0, so `0.x` releases may break, and every break ships with a documented fix. Undocumented breaks are bugs: open an issue.
 
 | Range | Guarantee |
 |---|---|
@@ -26,7 +26,7 @@ Public API changes (new exports, config struct or default changes, serialization
    go install github.com/zenta-dev/zever/cmd/zever@v0.5.3
    ```
 
-3. Run the gate: `make check` (download, fmt, vet, tidy-check, lint, test-race, vulncheck, build).
+3. Run the gate: `make check` (download, fmt, then per module vet, tidy-check, test, build, plus module-graph check, lint, vulncheck), and `make test-race` separately.
 4. Run a smoke test that resolves services:
 
    ```go title="main.go"
@@ -43,7 +43,7 @@ Public API changes (new exports, config struct or default changes, serialization
    ```
 
    Expected output: `upgrade ok: true`. Container construction is stable across bumps (`container.New(nil)` stays valid, and `Close(ctx)` closes only resolved services in dependency order), so if this breaks the changelog names the fix.
-5. Re-validate production config files. Strict decoding turns renames into loud failures, which is the desired fail-closed path before rollout. Re-check redaction (`config.RedactedServices`) and close wiring (`Close(ctx)` with a timeout parent).
+5. Re-validate production config files. Strict decoding turns renames into loud failures, which is the desired fail-closed path before rollout. Re-check redaction (`cfg.RedactedServices()`) and close wiring (`Close(ctx)` with a timeout parent).
 </Steps>
 
 Pin the CLI to the bumped version so `zever compile`, `migrate`, and `doctor` match backend behavior and the TUI does not skew from the backend.
@@ -78,11 +78,11 @@ For the multi-module import changes see [Migrate to the multi-module layout](../
 | Vulnerability scan | `make vulncheck` (`govulncheck` v1.8.0) | Known dependency CVEs. |
 | Grammars | `make generate` | Stale editor grammars. |
 
-`go test` runs with `-vet=off -count=1` (vet is a separate step). The race and coverage gate runs only on `push` to main and tags, not PRs, so run `make test-race` locally before pushing a bump. Keep timeout tests short (parent about 100ms, block about 500ms) so `goleak.VerifyTestMain` stays green.
+`go test` runs with `-vet=off -count=1` (vet is a separate step). PRs run the race detector without coverage (`test-race-fast`); the coverage run (`test-race-all`) runs only on pushes to main and tags. `make check` has no race pass, so run `make test-race` locally before pushing a bump. Keep timeout tests short (parent about 100ms, block about 500ms) so `goleak.VerifyTestMain` stays green.
 
 ## Release process (maintainers)
 
-Releases bump every version pin together (root, LSP, editors, docs; the file list is in the `.github/CONTRIBUTING.md` release checklist) and tag both `vX.Y.Z` and `tools/zever-lsp/vX.Y.Z`. `dsl` carries no release version (schema `v1` and `v2` are API versions). Add user-facing changes to `CHANGELOG.md` under `## [Unreleased]` with every PR, one logical change per commit, using Conventional Commits (`feat`, `fix`, `perf`, `refactor`, `test`, `docs`, `ci`, `build`).
+Releases bump every version pin together (the file list is in the `.github/CONTRIBUTING.md` release checklist), then `tools/tag-release.sh vX.Y.Z` creates one `<module-path>/vX.Y.Z` tag per module in dependency order (there is no root `go.mod`, so no bare tag). `dsl` carries no release version (schema `v1` and `v2` are API versions). Add user-facing changes to `CHANGELOG.md` under `## [Unreleased]` with every PR, one logical change per commit, using Conventional Commits (`feat`, `fix`, `perf`, `refactor`, `test`, `docs`, `ci`, `build`).
 
 ## Related
 

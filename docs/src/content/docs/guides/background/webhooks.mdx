@@ -1,6 +1,6 @@
 ---
 title: Webhooks
-description: Deliver signed outbound webhooks with per-target secrets over direct HTTP or the retrying job queue.
+description: Deliver signed outbound webhooks with per-target secrets over HTTP or the retrying queue.
 ---
 
 import { LinkCard, CardGrid } from '@astrojs/starlight/components';
@@ -43,26 +43,22 @@ import (
 	"context"
 	"fmt"
 
+	webhookhttp "github.com/zenta-dev/zever/adapters/webhook/http"
 	"github.com/zenta-dev/zever/config"
 	"github.com/zenta-dev/zever/container"
 )
 
 func main() {
-	c := container.New(config.Default())
-	wh, err := c.Webhook()
-	if err != nil {
-		panic(err)
-	}
+	webhookhttp.Register()
+	wh, _ := container.New(config.Default()).Webhook()
 	defer wh.Close()
 
-	ctx := context.Background()
 	target := "" // empty means skip, like RegisterDemoTargets
 	if target == "" {
 		fmt.Println("delivery skipped: no target configured")
 		return
 	}
-	_ = wh.Register(ctx, "booking.created", target, "secret")
-	fmt.Println("delivered")
+	_ = wh.Register(context.Background(), "booking.created", target, "secret")
 }
 ```
 
@@ -70,18 +66,16 @@ func main() {
 delivery skipped: no target configured
 ```
 
-With a target set and the `http` adapter, `Deliver` POSTs the signed payload to every subscriber of the event.
+With a target set and the `http` adapter, `Deliver` POSTs the signed payload to every subscriber of the event, with the signature in the `X-Hub-Signature-256` header (the `queue` adapter uses `X-Webhook-Signature` and verifies it before delivery). `Webhook()` resolves lazily, caches per container, and retries after errors; `Close() error` takes no context. See [the container](../../../concepts/container/).
 
-`Webhook()` resolves lazily, caches per container, and retries after errors. `Webhook.Close() error` takes no context. See [the container](../../../concepts/container/).
-
-The bookings example sets `adapter: queue` as above. Demo targets come from the environment only (`BOOKINGS_WEBHOOK_CREATED_TARGET` and `_SECRET`, plus the `CANCELLED` pair). `RegisterDemoTargets` skips pairs with an empty target, so delivery is quietly skipped when unconfigured and the worker runs without them.
+The bookings example sets `adapter: queue`. Demo targets come from the environment only (`BOOKINGS_WEBHOOK_CREATED_TARGET` and `_SECRET`, plus the `CANCELLED` pair). `RegisterDemoTargets` skips pairs with an empty target, so delivery is quietly skipped when unconfigured and the worker runs without them.
 
 ## Choose an adapter
 
 | Adapter | Package | Use when |
 |---|---|---|
 | `http` | `adapters/webhook/http` | Default. Direct POST with no durability. A crash mid-delivery loses the event. |
-| `queue` | `adapters/webhook/queue` | Delivery rides the [job system](../queue/) for retries and backoff. |
+| `queue` | `adapters/webhook/queue` | Delivery rides the [queue](../queue/): at-least-once, exponential redelivery backoff (500ms base, 72h cap, up to `max_retries`), then the dead-letter topic. |
 
 With `http`, N replicas mean N independent retry loops. Prefer `queue` so retries funnel through shared infrastructure, with a dead-letter topic for exhausted deliveries (`webhook.dead` in the demo). The bookings README notes the queue variant needs its queue reference wired before doctor goes green.
 
@@ -97,25 +91,19 @@ With `http`, N replicas mean N independent retry loops. Prefer `queue` so retrie
 <details>
 <summary>The webhook silently does nothing</summary>
 
-Cause: the target env var is empty, so registration was skipped by design. This is not an error path.
-
-Fix: set `BOOKINGS_WEBHOOK_CREATED_TARGET` and its secret, then restart the worker.
+The target env var is empty, so registration was skipped by design; this is not an error path. Set `BOOKINGS_WEBHOOK_CREATED_TARGET` and its secret, then restart the worker.
 </details>
 
 <details>
 <summary>Signatures verify but replays succeed</summary>
 
-Cause: the verifier checks the HMAC but not the timestamp window.
-
-Fix: enforce `replay_tolerance` on the embedded `t=` value so hour-old payloads are rejected.
+The verifier checks the HMAC but not the timestamp window. Enforce `replay_tolerance` on the embedded `t=` value so hour-old payloads are rejected.
 </details>
 
 <details>
 <summary>Queue adapter open fails</summary>
 
-Cause: `queue_adapter` is unset, or `visibility_timeout` does not exceed `timeout`.
-
-Fix: mirror the bookings `zever.yaml` shape (memory adapter, 30s visibility over a 10s timeout).
+`queue_adapter` is unset, or `visibility_timeout` does not exceed `timeout`. Mirror the bookings shape (memory adapter, 30s visibility over a 10s timeout).
 </details>
 
 ## Related

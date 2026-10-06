@@ -68,6 +68,15 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   crawlers, a web manifest, font preloading, a richer `llms.txt` with key facts,
   and `noindex` on the 404 page. The sidebar scroll position, open groups and
   per-page content scroll now persist across navigation and reloads.
+- Docs restructured around the reader's goal (Diataxis): Start, Tutorials,
+  Guides (HTTP APIs, Data and storage, Background work, Security, Operate,
+  Integrations, Extend), Concepts, and Reference, with header tabs that filter
+  the sidebar. Old URLs redirect. Prose is rewritten to lead with the answer,
+  with task-based sections and a complete per-service config reference, plus a
+  docs style guide (`contribute/writing-docs`), `lint-docs` and `check-links`
+  scripts, a quickstart, and a "How Zever works" page. `docs/errors.md`,
+  `benchmarks.md`, `production.md`, and `writing-a-plugin.md` now live on the
+  site.
 - `--dry-run` across all nine `generate` subcommands: validation and
   rendering still run, but no filesystem writes occur; append-mode
   subcommands preview the rendered declaration.

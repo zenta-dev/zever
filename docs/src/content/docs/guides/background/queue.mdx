@@ -1,6 +1,6 @@
 ---
 title: Queue
-description: Push, pop, ack, and nack durable jobs on memory, Redis, or a database table, shared by the job dispatcher and scheduler.
+description: Push, pop, ack, and nack durable jobs on memory, Redis, or a database table.
 ---
 
 import { LinkCard, CardGrid, Tabs, TabItem } from '@astrojs/starlight/components';
@@ -23,69 +23,30 @@ package main
 
 import (
 	"context"
-	"errors"
 	"fmt"
-	"time"
 
 	queuememory "github.com/zenta-dev/zever/adapters/queue/memory"
 	"github.com/zenta-dev/zever/core/queue"
 )
 
 func main() {
-	if err := run(); err != nil {
-		panic(err)
-	}
-}
-
-func run() error {
-	q, err := queuememory.New(queue.Options{
-		VisibilityTimeout: 30 * time.Second,
-		PollTimeout:       time.Second,
-		Buffer:            100,
-	})
-	if err != nil {
-		return err
-	}
-	defer func() { _ = q.Close() }()
-
+	q, _ := queuememory.New(queue.Options{})
+	defer q.Close()
 	ctx := context.Background()
-	payload := queue.NewPayload([]byte(`{"booking_id":"b_123"}`))
+
 	headers := queue.NewHeaders(map[string]string{"job_name": "SendConfirmation"})
-	if err := q.Push(ctx, "default", payload, headers); err != nil {
-		return err
-	}
+	_ = q.Push(ctx, "default", queue.NewPayload([]byte(`{"booking_id":"b_123"}`)), headers)
 
 	msg, err := q.Pop(ctx, "default")
-	if errors.Is(err, queue.ErrEmpty) {
-		fmt.Println("empty, poll again")
-		return nil
+	if err != nil { // queue.ErrEmpty when the topic is empty
+		panic(err)
 	}
-	if err != nil {
-		return err
-	}
-	fmt.Println("popped", msg.ID)
-
-	if err := q.Ack(ctx, msg); err != nil {
-		return err
-	}
-	fmt.Println("acked")
-
-	n, err := q.Length(ctx, "default")
-	if err != nil {
-		return err
-	}
-	fmt.Println("remaining", n)
-	return nil
+	_ = q.Ack(ctx, msg)
+	fmt.Println("popped and acked", msg.ID)
 }
 ```
 
-Output: a popped id, then `acked`, then `remaining 0`.
-
-## Ack or nack a message
-
-Call `Ack` on success. On a transient failure, call `Nack(ctx, msg, true)` so the message reappears after `visibility_timeout`.
-
-`Pop` on an empty topic returns `ErrEmpty`, an expected result: always handle it. `Length` and `IsEmpty` are autoscaling signals, not pop control flow. `Name()` reports the adapter for health output.
+Output: `popped and acked <id>`. `Ack` on success; on failure call `Nack(ctx, msg, true)` to requeue at once with the attempt count incremented, or `Nack(ctx, msg, false)` to drop it. A message that is never acked or nacked reappears after `visibility_timeout`. `Pop` returns `ErrEmpty` on an empty topic, which you must handle. `Length` and `IsEmpty` are autoscaling signals, not pop control flow; `Name()` reports the adapter for health output.
 
 ## Choose an adapter
 
@@ -95,13 +56,9 @@ Call `Ack` on success. On a transient failure, call `Nack(ctx, msg, true)` so th
 | `redis` | `adapters/queue/redis` | More than one worker process, or split web and worker tiers. Keyed by `prefix`. |
 | `db` | `adapters/queue/db` | Shared queue without Redis, on a postgres or sqlite table you already run. |
 
-Only `redis` and `db` let another host pop a message.
+Only `redis` and `db` let another host pop. `db` is polling, not Kafka or SQS: `Pop` polls every `poll_interval` (10ms by default, adapter-code only, not a file key), claims serialize on the topic head, and stale claims recover on a sweep. Expect low thousands of jobs per second per topic; use a separate queue database, 3 to 5 connections per worker, and `dedicated_pool: true` under load. The queue is not an event log or pub/sub bus (per-topic pop with ack, no broadcast replay); for live fan-out use the [event bus](../events/).
 
-`db` is a polling transport, not a Kafka or SQS replacement. `Pop` polls every `poll_interval`, claims serialize on the topic head, and stale claims recover on a sweep. Expect low thousands of jobs per second per topic. Use a separate queue database with 3 to 5 connections per worker (Rails Solid Queue guidance) and `dedicated_pool: true` under sustained load.
-
-The queue is not an event log or pub/sub bus: it has per-topic pop with ack tracking, no broadcast replay. For live fan-out, use the [event bus](../events/).
-
-## Configure Redis or database sharing
+## Share a queue across instances
 
 <Tabs>
   <TabItem label="Redis">
@@ -113,11 +70,6 @@ queue:
     db: 0
     prefix: bookings
 ```
-```sh
-QUEUE_ADAPTER=redis
-QUEUE_ADDR=localhost:6379
-QUEUE_VISIBILITY_TIMEOUT=30s
-```
   </TabItem>
   <TabItem label="Database">
 ```yaml title="zever.yaml"
@@ -127,57 +79,26 @@ queue:
     dsn: postgres://app:secret@db:5432/app  # postgres URL or sqlite path
     table: queue_messages
 ```
-```sh
-QUEUE_ADAPTER=db
-QUEUE_DSN=postgres://app:secret@db:5432/app
-QUEUE_TABLE=queue_messages
-```
   </TabItem>
 </Tabs>
 
-File keys are strict snake_case with integer-nanosecond durations. Env accepts `"30s"`. An empty `dsn` selects a private in-memory-style database.
+```sh
+QUEUE_ADAPTER=redis QUEUE_ADDR=localhost:6379 QUEUE_VISIBILITY_TIMEOUT=30s
+```
 
-- `visibility_timeout`: how long a popped message stays invisible before it can be reclaimed.
-- `poll_timeout`: how long `Pop` waits before returning empty.
-- `buffer`: caps buffered ready messages per topic.
-
-The container shares one pool per exact DSN across db-backed batteries (the first opener's `max_conns` wins, a differing nonzero cap warns). All keys: [queue config reference](../../../reference/config/#queue).
+File keys are strict snake_case with integer-nanosecond durations; env accepts `"30s"`. An empty `dsn` selects a private in-memory-style database. `visibility_timeout` is how long a popped message stays invisible before reclaim; `poll_timeout` is how long `Pop` waits before returning empty; `buffer` caps buffered ready messages per topic. The container shares one pool per exact DSN across db-backed batteries (first opener's `max_conns` wins; a differing nonzero cap warns). All keys: [queue config reference](../../../reference/config/#queue).
 
 ## Resolve the queue from the container
 
-```go title="main.go"
-import (
-	"github.com/zenta-dev/zever/config"
-	"github.com/zenta-dev/zever/container"
-)
-
-func openQueue() error {
-	c := container.New(config.Default())
-	q, err := c.Queue()
-	if err != nil {
-		return err
-	}
-	defer func() { _ = q.Close() }()
-	d, err := c.Job() // d.Q is the shared queue instance
-	if err != nil {
-		return err
-	}
-	_ = d
-	return nil
-}
-```
-
-`Queue()` resolves lazily and caches; on error the cache clears so the next call retries. `Job()` builds a `*job.Dispatcher` over the resolved queue, so both share one connection.
-
-`Close() error` takes no context. The queue is a leaf dependency and closes last, after scheduler and job. Container `Close(ctx)` never opens an untouched queue. See [the container](../../../concepts/container/).
+`c.Queue()` resolves lazily, caches, and retries on error; `c.Job()` builds a `*job.Dispatcher` over the same queue. `Close() error` takes no context, and the queue closes last, after scheduler and job; container `Close(ctx)` never opens an untouched queue. See [the container](../../../concepts/container/).
 
 ## Production checklist
 
-- Design for redelivery: the queue promises pop, ack, and reclaim, not exactly-once. Make handlers idempotent or guard them with `lock` or `idempotency` keys.
-- Keep `visibility_timeout` above the slowest handler. The bookings webhook block uses a 10s timeout against 30s.
-- Use a low `poll_timeout` in request-scoped pops and a higher one in workers.
-- There is no cross-topic ordering. Priority is the topic order a worker polls (`default` before `low`).
-- Keep payloads small, versioned JSON. Never log payloads that may carry PII: log ids and topic names, and display config through `config.RedactedServices`.
+- Redelivery, not exactly-once: make handlers idempotent or guard with `lock` or `idempotency` keys.
+- Keep `visibility_timeout` above the slowest handler (bookings webhook: 30s against a 10s timeout).
+- Low `poll_timeout` for request-scoped pops, higher for workers.
+- No cross-topic ordering; priority is poll order (`default` before `low`).
+- Small, versioned JSON payloads. Never log PII; log ids and topics, display config via `config.RedactedServices`.
 - Close order: scheduler and job, then snapshots, then `queue` and `cache`.
 
 ## Troubleshooting
@@ -185,33 +106,25 @@ func openQueue() error {
 <details>
 <summary>The same job runs twice within seconds</summary>
 
-Cause: `visibility_timeout` is shorter than handler runtime, so the message is reclaimed mid-run.
-
-Fix: raise it above p99 handler latency plus retry backoff, or move slow I/O behind a second dispatch.
+`visibility_timeout` is shorter than handler runtime, so the message is reclaimed mid-run. Raise it above p99 handler latency plus retry backoff, or move slow I/O behind a second dispatch.
 </details>
 
 <details>
 <summary>Pop spins hot and ErrEmpty floods the logs</summary>
 
-Cause: a tight poll loop with near-zero `poll_timeout` on an idle topic.
-
-Fix: raise `poll_timeout` (workers commonly use 1s) and back off after consecutive empties.
+A tight poll loop with near-zero `poll_timeout` on an idle topic. Raise `poll_timeout` (workers commonly use 1s) and back off after consecutive empties.
 </details>
 
 <details>
 <summary>A worker on host B never sees pushes from host A</summary>
 
-Cause: the `memory` adapter in a scaled deploy. Each process owns a private buffer.
-
-Fix: use `redis` with a shared `addr`, `db`, and `prefix` across tiers. Without Redis, use `db` on one shared database (lower throughput).
+The `memory` adapter in a scaled deploy; each process owns a private buffer. Use `redis` with a shared `addr`, `db`, and `prefix`, or `db` on one shared database (lower throughput).
 </details>
 
 <details>
 <summary>Strict file load rejects visibilitytimeout</summary>
 
-Cause: the flat pre-rename spelling. File keys are `visibility_timeout` and `poll_timeout`.
-
-Fix: rename both and use integer nanoseconds. Env still accepts `QUEUE_VISIBILITYTIMEOUT` because `_` is ignored.
+The flat pre-rename spelling. Rename to `visibility_timeout` and `poll_timeout` with integer nanoseconds. Env still accepts `QUEUE_VISIBILITYTIMEOUT` because `_` is ignored.
 </details>
 
 ## Related

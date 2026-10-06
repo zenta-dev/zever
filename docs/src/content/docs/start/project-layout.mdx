@@ -18,38 +18,30 @@ language          dsl/                  .zen compiler frontend (compile time onl
 surface           orm/ cmd/zever/       typed queries, CLI
 ```
 
-- `go.work` at the repo root resolves every workspace module locally (144 `use` entries; `examples/external-sms` and `docs/examples` stay outside by design), so `go build/test ./...` from the root works. CI runs per-module commands with `GOWORK=off`.
+- `go.work` at the repo root resolves every workspace module locally (166 `use` entries; `examples/external-sms` and `docs/examples` stay outside by design), so `go build/test ./...` from the root works. CI runs per-module commands with `GOWORK=off`.
 - Releases are lockstep: one version, with per-module tags `<path>/vX.Y.Z` made by `tools/tag-release.sh`.
-- `config/` owns decoding (`defaults < file < env`, strict snake_case keys, `RedactedServices`). `container/` owns construction, caching, retry, and close. Load errors belong to `config/`, resolution errors to `container/`.
+- `config/` owns decoding (`defaults < file < env`, strict snake_case keys, `RedactedServices`); `container/` owns construction, caching, retry, and close. Load errors belong to `config/`, resolution errors to `container/`.
+
 
 ## Package map
 
-| Path | Role | Import from runtime? |
+| Path | Role | Runtime? |
 |---|---|---|
 | `config/` | `Default()` zero-infra, strict `Load(path)`, best-effort env, `RedactedServices` | yes |
 | `container/` | `New(cfg)` (nil valid), lazy accessors, retry on error, `Close(ctx)` in dependency order | yes |
 | `core/<b>` | Battery interface plus `Register`/`Open` registry (for example `core/cache`, `core/db`) | yes (interfaces) |
-| `adapters/<b>/<a>` | One module per adapter (for example `adapters/cache/redis`) | yes (the ones you pick) |
+| `adapters/<b>/<a>` | One module per adapter (for example `adapters/cache/redis`) | yes (picked ones) |
 | `shared/*` | SDK-free helpers (`codec`, `redisclient`, `redisopt`, `s3opts`, `retry`, ...) | yes |
 | `orm/` | `NewTable` / `NewColumn` / `From`, dialect per call, fail-closed errors | yes |
 | `core/router` | `fiber` / `stdhttp` adapters over `http.HandlerFunc` | yes (interface) |
-| `middleware/` | HTTP middleware and gRPC interceptors, no registry | yes |
-| `dsl/` | `lexer -> parser -> ast -> resolver -> ir.Schema`, `compile -> backend.Generate` | no (compile time only) |
+| `core/middleware` | HTTP middleware and gRPC interceptors, no registry | yes |
+| `dsl/` | `lexer -> parser -> ast -> resolver -> ir.Schema`, `compile -> backend.Generate` | no (compile time) |
 | `cmd/zever/` | Flags-only CLI, `dev` watch, dev-only `tinker` | no (tool binary) |
 | `tools/` | `gengrammar` generator, `tag-release.sh` lockstep tagger | no |
 | `docs/` | Starlight site (npm, not Go) | no |
-| `examples/todo/`, `examples/bookings/` | Runnable skeletons with schema, server, worker, seed | reference |
+| `examples/` | Runnable skeletons with schema, server, worker, seed | reference |
 
-Service areas at a glance:
-
-| Area | Packages |
-|---|---|
-| Data | `db`, `orm`, `cache`, `search`, `vectorstore` |
-| Messaging | `queue`, `job`, `eventbus`, `webhook`, `workflow`, `scheduler` |
-| HTTP | `router`, `middleware`, `session`, `ratelimit`, `lock`, `idempotency` |
-| Security | `auth`, `authz`, `permission`, `password`, `crypto`, `secrets`, `tenant` |
-| Product | `mailer`, `notification`, `storage`, `media`, `document`, `payment`, `billing` |
-| Platform | `log`, `observability`, `analytics`, `flag`, `i18n`, `ai`, `geo` |
+Batteries under `core/`: agent, ai, analytics, auth, authz, billing, cache, crypto, db, document, eventbus, flag, geo, i18n, idempotency, job, lock, log, mailer, media, notification, observability, outbox, password, payment, permission, queue, rag, ratelimit, resilience, scheduler, search, secrets, session, storage, tenant, vectorstore, webhook, workflow. `core/middleware` and `core/router` are HTTP plumbing.
 
 ## Resolve a service from the container
 
@@ -90,9 +82,9 @@ The dialect comes per call from `conn.Dialect()`, so the same query code prints 
 - No globals and no `init()` wiring. `ctx` is the first argument of IO functions and is never stored in a struct.
 - Exported identifiers need a doc comment starting with the name. `goimports` local prefix is `github.com/zenta-dev/zever`; `depguard` denies `github.com/pkg/errors` and `io/ioutil`.
 - Do not add methods to a public service interface: it breaks every implementer. Add a new interface instead.
-- To add a service, follow the shape: interface plus `Register`/`Open` registry in `core/<b>`, one module per adapter in `adapters/<b>/<a>` with a `Register()` call, shared SDK-free code in `shared/*`, and a `README.md` with an adapter table.
+- New service shape: interface plus `Register`/`Open` registry in `core/<b>`, one module per adapter in `adapters/<b>/<a>` with a `Register()` call, shared SDK-free code in `shared/*`, and a `README.md` with an adapter table.
 - Timeouts and intervals are `time.Duration` (cookie `MaxAge` int seconds excepted); pool options use the `MaxConn*` prefix order. File-decoded Options need snake_case `json`/`toml`/`yaml` tags.
-- Tests stay deterministic: no `time.Sleep` sync, no network, no unseeded randomness. Test file suffixes (`cover`, `live`, `bench`, `internal`, `race`, `closure`) encode purpose; helpers use `stub*`, `must*`, `freshAdapter` roles.
+- Tests stay deterministic: no `time.Sleep` sync, no network, no unseeded randomness. File suffixes (`cover`, `live`, `bench`, `internal`, `race`, `closure`) encode purpose; helpers use `stub*`, `must*`, `freshAdapter`.
 - Shutdown is a deploy contract: one container per process, closed in dependency order with a timeout parent (see [Lifecycle](../../concepts/lifecycle/)).
 
 ## Troubleshooting
@@ -112,19 +104,13 @@ Cause: a public interface grew a method. Fix: revert it and add a new interface.
 <details>
 <summary>`go build ./...` passes but the docs site fails</summary>
 
-Cause: `docs/` is npm, not Go. Fix: run `npm run dev` under `docs/` with Node 18+.
+Cause: `docs/` is npm, not Go. Fix: run `npm run dev` under `docs/` with Node 22.12+.
 </details>
 
 <details>
 <summary>A new service has no adapter table</summary>
 
 Cause: scaffolding skipped the package README. Fix: add the interface, per-adapter subdirectories, registration, and a `README.md` with the adapter table.
-</details>
-
-<details>
-<summary>A test file or helper is misnamed</summary>
-
-Cause: the suffix convention was missed. Fix: rename it to match its purpose.
 </details>
 
 ## Related

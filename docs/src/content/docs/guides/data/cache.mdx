@@ -5,11 +5,11 @@ description: Cache values with a TTL, in memory or in Redis, with typed helpers 
 
 import { Tabs, TabItem, LinkCard, CardGrid } from '@astrojs/starlight/components';
 
-`cache.Cache` is one small interface for stashing slow-to-compute values with a TTL. Use it for values that are safe to reuse for a bounded time and keyed by something stable, such as a user ID or a query hash. Do not use it as a primary store: entries expire, evict under `max_entries` pressure, and vanish on restart for `memory`.
+`cache.Cache` stashes slow-to-compute values with a TTL, keyed by something stable such as a user ID or query hash. It is not a primary store: entries expire, evict under `max_entries` pressure, and vanish on restart for `memory`.
 
 ## Quick start
 
-Pick `memory` for a single process. It is the default and needs no infra. Pick `redis` when two or more instances, or separate web and worker processes, must see the same entries.
+Pick `memory` for one process (default, no infra); pick `redis` when instances or web and worker processes must share entries.
 
 <Tabs>
   <TabItem label="memory">
@@ -31,21 +31,13 @@ cache:
     min_idle_conns: 2
 ```
   </TabItem>
-  <TabItem label="env">
-```sh
-CACHE_ADAPTER=redis
-CACHE_ADDR=localhost:6379
-CACHE_SWEEP_INTERVAL=1m
-CACHE_MAX_ENTRIES=10000
-```
-  </TabItem>
 </Tabs>
 
-File durations are integer nanoseconds. Env overrides also accept Go durations such as `"1m"`. File keys are strict snake_case, so `sweepinterval` is rejected. Env matching ignores case and `_`, and unknown `CACHE_*` variables are ignored. See the [cache options](../../../reference/config/#cache) for every key.
+File durations are integer nanoseconds; env accepts Go durations such as `"1m"`. File keys are strict snake_case, so `sweepinterval` is rejected; env matching ignores case and `_` and unknown `CACHE_*` variables. See the [cache options](../../../reference/config/#cache) for every key.
 
 ## Cache a value with a TTL
 
-Resolve the cache from the container. It resolves lazily, caches the instance, and retries after an error. `container.New(nil)` is valid.
+Register the adapter, then resolve from the container, which resolves lazily, caches, and retries after an error; `container.New(nil)` is valid.
 
 ```go title="main.go"
 package main
@@ -55,11 +47,13 @@ import (
 	"fmt"
 	"time"
 
+	cachememory "github.com/zenta-dev/zever/adapters/cache/memory"
 	"github.com/zenta-dev/zever/config"
 	"github.com/zenta-dev/zever/container"
 )
 
 func main() {
+	cachememory.Register()
 	ctx := context.Background()
 	c := container.New(config.Default())
 	defer c.Close(ctx)
@@ -83,7 +77,7 @@ func main() {
 loft
 ```
 
-`Get` on a missing key returns an error that wraps `cache.ErrNotFound`. The interface also has `SetIfAbsent`, `Delete`, `Increment`, `Decrement`, and `Exists`.
+`Get` on a missing key wraps `cache.ErrNotFound`; the interface also has `SetIfAbsent`, `Delete`, `Increment`, `Decrement`, and `Exists`.
 
 ## Cache structs with typed helpers
 
@@ -106,7 +100,7 @@ card, err := typed.Get(ctx, "space:card:42")
 fmt.Println(card.Title, card.PriceCents) // Loft 12000
 ```
 
-Keys can be strings or numeric types. For check-then-set races, adapters that implement `cache.CompareAndSwapCache` offer `CompareAndDelete` and `CompareAndExtend`, which act only when the live value equals the one you expect.
+Keys can be strings or numeric types. Adapters implementing `cache.CompareAndSwapCache` add `CompareAndDelete` and `CompareAndExtend`, which act only when the live value equals the expected one.
 
 ## Choose an adapter
 
@@ -116,49 +110,39 @@ Keys can be strings or numeric types. For check-then-set races, adapters that im
 | `redis` | `adapters/cache/redis` | Shared, pool-backed, `Close(ctx)` drains the pool |
 | `db` | `adapters/cache/db` | Over `shared/kvstore`; empty `dsn` is a private in-memory sqlite, or use a postgres URL. Counters are read-modify-write and not linearizable under contention |
 
-All three serve the same interface, so you run `memory` locally and `redis` in staging with only a config change. The `db` adapter shares one pool per exact DSN unless you set `dedicated_pool: true`. See the [adapters matrix](../../../reference/adapters-matrix/).
-
-## Production checklist
-
-- Version keys when the cached type changes (`space:card:v2:42`), because typed `Get` decodes at read time and old JSON fails after a rename.
-- Keep TTLs explicit and short for user-facing reads, from a named constant.
-- Size `max_entries` and `capacity` for the working set. An unbounded local cache grows with key cardinality.
-- On Redis, set `pool_size`, `min_idle_conns`, `pool_timeout`, `max_conn_idle_time`, and `max_conn_lifetime` explicitly.
-- Never log keys or payloads that may hold secrets. Display config through `config.RedactedServices`.
-- Close order matters. `Close(ctx)` runs after scheduler and job, then snapshots, with `cache` and `queue` last. An unresolved cache never opens during shutdown.
-- Wrap errors with `%w`. `github.com/pkg/errors` is denied by `depguard`.
+All three serve one interface, so switching is config-only. The `db` adapter shares one pool per exact DSN unless `dedicated_pool: true`. Size `max_entries` (memory default 1000, sweep every 1m) for the working set, and on Redis set `pool_size`, `min_idle_conns`, `pool_timeout`, `max_conn_idle_time`, and `max_conn_lifetime` explicitly. Keep TTLs explicit and short for user-facing reads. Version keys when the cached type changes (`space:card:v2:42`): typed `Get` decodes at read time, so old JSON fails after a rename. See the [adapters matrix](../../../reference/adapters-matrix/).
 
 ## Troubleshooting
 
 <details>
 <summary>Typed `Get` returns decode errors after a deploy</summary>
 
-Cause: stale entries still hold the previous struct shape. Fix: bump the key version, redeploy, and let old keys expire, or `Delete` the old prefix once.
+Cause: stale entries hold the old struct shape. Fix: bump the key version and let old keys expire, or `Delete` the old prefix.
 </details>
 
 <details>
 <summary>Instance A writes, instance B misses</summary>
 
-Cause: `memory` in a multi-instance deploy, where each process holds a private map. Fix: set `cache.adapter: redis` with a shared `addr` on every instance and confirm the host with `RedactedServices`.
+Cause: `memory` in a multi-instance deploy. Fix: set `cache.adapter: redis` with a shared `addr` and confirm the host with `RedactedServices`.
 </details>
 
 <details>
 <summary>`Load` fails with unknown field `sweepinterval`</summary>
 
-Cause: file decoding is strict. Fix: rename it to `sweep_interval` and give integer nanoseconds. Use `"1m"` strings in env only.
+Cause: strict file decoding. Fix: rename to `sweep_interval` with integer nanoseconds; use `"1m"` strings in env only.
 </details>
 
 <details>
 <summary>Shutdown hangs or logs pool timeouts</summary>
 
-Cause: the parent context has no deadline while Redis drains, or the cache closed before workers finished. Fix: pass `context.WithTimeout` to `c.Close(ctx)` and keep the default close order.
+Cause: no close deadline while Redis drains, or the cache closed before workers finished. Fix: pass `context.WithTimeout` to `c.Close(ctx)`.
 </details>
 
 ## Related
 
 <CardGrid>
-  <LinkCard title="Redis" href="../redis/" description="Share cache, queue, and locks across instances." />
-  <LinkCard title="Queue" href="../../background/queue/" description="Durable work behind the job dispatcher." />
-  <LinkCard title="Scheduler and jobs" href="../../background/scheduler-jobs/" description="Cron ticks that warm or bust keys." />
-  <LinkCard title="Build a booking API" href="../../../tutorials/build-a-booking-api/" description="The bookings tutorial." />
+  <LinkCard title="Redis" href="../redis/" />
+  <LinkCard title="Queue" href="../../background/queue/" />
+  <LinkCard title="Scheduler and jobs" href="../../background/scheduler-jobs/" />
+  <LinkCard title="Build a booking API" href="../../../tutorials/build-a-booking-api/" />
 </CardGrid>

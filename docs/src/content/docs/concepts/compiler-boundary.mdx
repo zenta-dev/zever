@@ -1,33 +1,31 @@
 ---
 title: Compiler boundary
-description: Why runtime packages never import the DSL compiler, how the module layering enforces it, and the separate schema-module rule.
+description: Why runtime packages never import the DSL compiler, how module layering enforces it, and the separate schema-module rule.
 ---
 
 import { LinkCard, CardGrid } from '@astrojs/starlight/components';
 
-Runtime packages must never import `dsl`. The compiler turns a `.zen` schema into Go source once, and a running service imports only that generated output, the container, and adapters.
+Runtime packages must never import `dsl`. The compiler turns a `.zen` schema into Go source once; a running service imports only generated output, the container, and adapters. Linking the frontend would bloat every binary and let request-time code special-case schema logic.
 
-## The mental model
+## The compile-time pipeline
 
 ```text
 source text -> lexer -> parser -> ast -> resolver -> ir.Schema
-                                    -> compile -> backend outputs
+                                     -> compile -> backend outputs
 ```
 
-Everything on that line is compile-time only. What it produces (the typed ORM, HTTP routes, gRPC stubs) is what runtime code imports. A running service has no business linking a lexer, parser, or resolver.
+Everything on that line is compile-time only; runtime imports only its output (typed ORM, HTTP routes, gRPC stubs).
 
-| Side | Packages | Role |
-|---|---|---|
-| Compile time | `diag`, `token`, `lexer`, `ast`, `parser` | Bytes to a best-effort syntax tree (never panics, depth guard, per-declaration recovery) |
-| Compile time | `naming`, `resolver`, `ir` | Multi-pass `[]*ast.File` to `*ir.Schema` with keep-going diagnostics |
-| Compile time | `format`, `breaking`, `compile`, `backend` | Formatter, old-vs-new `Change` taxonomy, filename-sorted build, `Backend` interface |
-| Compile time | `gengrammar` via `tools/gengrammar` | Renders `editors/nvim` and `editors/vscode` grammars |
-| Runtime | `container`, `config`, `orm`, adapters | Load, resolve, query, close |
-| Tooling | `cmd/zever`, `tools/zever-lsp` | CLI and editor support (the LSP is its own module) |
+- **Compile time** `diag`, `token`, `lexer`, `ast`, `parser`: bytes to a best-effort syntax tree (never panics, depth guard, recovery).
+- **Compile time** `naming`, `resolver`, `ir`: multi-pass `[]*ast.File` to `*ir.Schema`, keep-going diagnostics.
+- **Compile time** `format`, `breaking`, `compile`, `backend`: formatter, `Change` taxonomy, filename-sorted build, `Backend` interface.
+- **Compile time** `dsl/gengrammar` via `tools/gengrammar`: renders `editors/nvim` and `editors/vscode`.
+- **Runtime** `container`, `config`, `orm`, adapters: load, resolve, query, close.
+- **Tooling** `cmd/zever`, `tools/zever-lsp`: CLI and editor support (LSP is its own module).
 
 ## Keep compile input and runtime config apart
 
-The compiler reads schema files and backend flags, never runtime config (`zever.yaml` plus env). Schema errors come from `.zen` files and `zever` flags; service errors (adapters, DSNs, secrets) come from `config.Load`. A boundary violation usually looks like runtime code reaching for resolver types instead of generated output.
+The compiler reads schema files and backend flags, never runtime config (`zever.yaml` plus env). Schema errors come from `.zen` files; service errors (adapters, DSNs, secrets) come from `config.Load`.
 
 ## Compile, then run against generated output
 
@@ -39,79 +37,48 @@ zever db migrate --dry-run --adapter=sqlite schema/todo.zen
 go run ./examples/todo/cmd/server -addr :8080
 ```
 
-`check` validates, `fmt -l` lists unformatted files, `compile` emits ORM, OpenAPI, and DDL into `generated/`, and `migrate --dry-run` previews SQL. The server imports `generated/` and resolves services through the container, with no `dsl` import:
+`check` validates; `fmt -l` lists unformatted files; `compile` emits ORM, OpenAPI, and DDL into `generated/`; `migrate --dry-run` previews SQL. The server imports `generated/` and resolves through the container, never `dsl` ([Container](../container/)).
 
-```go title="main.go"
-package main
-
-import (
-	"fmt"
-
-	dbsqlite "github.com/zenta-dev/zever/adapters/db/sqlite"
-	"github.com/zenta-dev/zever/config"
-	"github.com/zenta-dev/zever/container"
-)
-
-func main() {
-	dbsqlite.Register() // the container wires nothing; register before resolving
-	c := container.New(config.Default())
-	db, err := c.DB()
-	if err != nil {
-		panic(err)
-	}
-	fmt.Println("runtime ready:", db != nil)
-}
-```
-
-Expected output:
-
-```text
-runtime ready: true
-```
-
-Regenerate with `zever compile` and never hand-edit `generated/`. The compile-side entry points are `parser.New(file, src).ParseFile()` then `resolver.Resolve(files)`, or `compile.Compile(files, backends...)`, with `compile/testdata/app.zen` as the canonical fixture. After touching `token.Keywords` or `resolver.ScalarTypeNames`, run `make generate` (`go run ./tools/gengrammar`).
+Regenerate with `zever compile`; never hand-edit `generated/`. Entry points are `parser.New(file, src).ParseFile()` then `resolver.Resolve(files)`, or `compile.Compile(files, backends...)`; `compile/testdata/app.zen` is the canonical fixture. After touching `token.Keywords` or `resolver.ScalarTypeNames`, run `make generate` (`go run ./tools/gengrammar`).
 
 ## Do not confuse it with schema modules
 
-`zever check-boundaries` checks a different rule: cross-schema-module references, where a relation, RPC return type, or permission resource reaches from one `.zen` module directory into another. The resolver enforces that modeling rule on every compile, and `check-boundaries` is a report-only view over diagnostics `Resolve()` already produces. See [Zen syntax](../../reference/zen-syntax/) for how modules derive from directory structure.
+`zever check-boundaries` checks a different rule: cross-schema-module references, where a relation, RPC return type, or permission resource reaches across `.zen` module directories. The resolver enforces it every compile; `check-boundaries` reports the `Resolve()` diagnostics ([Zen syntax](../../reference/zen-syntax/)).
 
 ## Design decisions and trade-offs
 
-- **Size and attack surface.** A compiler frontend would pull lexer, parser, and codegen dependencies into a binary that only runs generated code.
-- **Honest layering.** If runtime could reach the resolver, request-time code would special-case schema logic instead of generating it once.
-- **Enforcement.** `dsl` is a top-level module, so Go's `internal/` visibility does not apply. An accidental import fails review. There is no separate CLI check, and the rule is identical on every machine and CI runner.
-- **Fail-closed companions.** The parser never panics, the formatter refuses lex-dirty input and stays idempotent, and fuzz tests run seed corpora as unit tests. Never log raw option maps (use `config.RedactedServices`).
+`dsl` is a top-level module, so Go's `internal/` visibility does not apply; an accidental import fails review. The parser never panics, so failures surface as diagnostics.
 
 ## Troubleshooting
 
 <details>
 <summary>`go build` fails importing `dsl`</summary>
 
-Cause: a runtime package reached into the compiler frontend. Fix: drop the import, consume `generated/` output, and resolve through `container`.
+A runtime package reached the compiler. Drop the import; use `generated/`.
 </details>
 
 <details>
 <summary>`check-boundaries` reports cross-module references</summary>
 
-Cause: a relation or RPC type reaches across `.zen` module directories. Fix: move the type or relation so each module is self-contained.
+A relation or RPC type crosses `.zen` module directories. Move it.
 </details>
 
 <details>
 <summary>`compile` prints diagnostics but writes no output</summary>
 
-Cause: the schema has resolve errors, and backends run only on success. Fix: read each diagnostic position, fix the `.zen` source, and run `zever check` first.
+Resolve errors block backends. Fix the `.zen` position; run `zever check`.
 </details>
 
 <details>
 <summary>The editor misses new keywords after a grammar change</summary>
 
-Cause: `token.Keywords` or `resolver.ScalarTypeNames` changed without regeneration. Fix: run `make generate` and commit the refreshed `editors/` files.
+`token.Keywords` or `resolver.ScalarTypeNames` changed. Run `make generate` and commit `editors/`.
 </details>
 
 <details>
 <summary>Edits in `generated/` vanish</summary>
 
-Cause: the next compile overwrites them by design. Fix: edit the `.zen` source and re-run `zever compile`.
+Compile overwrites `generated/`. Edit the `.zen` source.
 </details>
 
 ## Related

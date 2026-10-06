@@ -5,7 +5,7 @@ description: Log structured events through one interface and swap slog, zerolog,
 
 import { LinkCard, CardGrid } from '@astrojs/starlight/components';
 
-Every service logs through one interface, `log.Logger`. Swap the adapter and every line changes shape with no call-site changes: `noop` for tests, `slog` for the stdlib, `zerolog` for high-throughput JSON, `pretty` for local development. Resolve one logger per process and inject it into handlers, middleware, and workers.
+Every service logs through one interface, `log.Logger`. Swap the adapter and every line changes shape with no call-site changes: `noop` for tests, `slog` for the stdlib, `zerolog` for high-throughput JSON, `pretty` for local development. Resolve one logger per process and inject it.
 
 ## Quick start
 
@@ -18,7 +18,7 @@ log:
 LOG_ADAPTER=zerolog
 ```
 
-`Options.Validate()` accepts the zero value, and the adapter choice is validated at resolve time. The container wires nothing, so register the adapter first:
+The only option is `min_level` (minimum severity). `Options.Validate()` accepts the zero value, and the adapter choice is validated at resolve time. The container wires nothing, so register the adapter first:
 
 ```go title="main.go"
 import (
@@ -36,18 +36,14 @@ if err != nil {
 handler := middleware.RequestLogger(logger)(mux)
 ```
 
-`Logger` has no `Close`. Logging probes as a no-op in `c.Close(ctx)`. Full keys: [log config reference](../../../reference/config/#log).
+`Logger` has no `Close`; logging probes as a no-op in `c.Close(ctx)`. Full keys: [log config reference](../../../reference/config/#log).
 
 ## Write typed fields
 
 `Event` has one typed method per kind, so `slog` and `zerolog` output stays queryable instead of a flat string.
 
 ```go title="handler.go"
-logger.Info().
-    Str("user_id", userID).
-    Dur("duration", elapsed).
-    Msg("request handled")
-
+logger.Info().Str("user_id", userID).Dur("duration", elapsed).Msg("request handled")
 logger.Error().Err(err).Msg("failed to process order")
 
 if logger.Enabled(log.LevelDebug) {
@@ -55,49 +51,25 @@ if logger.Enabled(log.LevelDebug) {
 }
 ```
 
-Expected `slog` output on stderr:
-
 ```text
 level=INFO msg="request handled" user_id=u_123 duration=12ms
 ```
 
-Prefer `Str`/`Int`/`Dur` over `Any` for hot fields, because `Any` uses reflection. Reserve `Any` for dynamic payloads, and never pass request bodies, headers, or config maps through it. Check `Enabled` before building expensive events. `RequestLogger` emits one line per request (method, path, status, `duration_ms`, plus `request_id` when present) and `Recover` logs panics with value and stack, then responds 500. Emit one line per failure from the handler, with no duplicates for the same event.
+Prefer `Str`/`Int`/`Dur` over `Any` for hot fields, because `Any` uses reflection. Reserve `Any` for dynamic payloads, and never pass request bodies, headers, or config maps through it. `RequestLogger` emits one line per request (method, path, status, `duration_ms`, plus `request_id` when present); `Recover` logs panics with value and stack, then responds 500. Emit one line per failure, with no duplicates.
 
-| Method or helper | Purpose |
-|---|---|
-| `Debug()` `Info()` `Warn()` `Error()` | Level-specific event builders. |
-| `With()` | Derived context builder for attached fields. |
-| `Enabled(level)` | Whether a level will emit. |
-| `Event.Str / Int / Int64 / Float64 / Bool` | Typed fields. |
-| `Event.Dur / Time` | Duration and timestamp fields. |
-| `Event.Err / AnErr(key, err)` | Error fields. |
-| `Event.Any` | Arbitrary structured value. |
-| `Event.Msg / Send` | Emit the line. |
-| `log.ContextWithLogger(ctx, l)` / `log.FromContext(ctx, fallback)` | Carry a logger in the context. |
-| `log.Open(adapter, opts)` | Open an adapter without the container. |
-| `middleware.RequestLogger(logger)` | One line per request. |
+The API: `Logger` exposes `Debug()`, `Info()`, `Warn()`, `Error()`, `Fatal()`, `With()`, `WithContext(ctx)`, `Enabled(level)`, `Sync()`, and `Name()`. `Event` exposes `Str`, `Int`, `Int64`, `Float64`, `Bool`, `Dur`, `Time`, `Err`, `AnErr(key, err)`, `Any`, `Msg`, `Msgf(format, args...)`, and `Send`. Helpers: `log.ContextWithLogger(ctx, l)`, `log.FromContext(ctx, fallback)`, `log.Open(adapter, opts)`, and `middleware.RequestLogger(logger)`.
 
 ## Carry a logger through context
 
-```go
-ctx = log.ContextWithLogger(ctx, logger.With().Str("request_id", id).Logger())
-log.FromContext(ctx, logger).Info().Msg("still has request_id attached")
-```
-
-The context carries only the logger value, no I/O state. `FromContext` takes a fallback for contexts that carry none.
+`log.ContextWithLogger(ctx, logger)` carries only the logger value, no I/O state. `log.FromContext(ctx, fallback)` returns it, or the fallback for contexts that carry none, so `request_id` and other attached fields survive the call chain.
 
 ## Keep secrets out of logs
 
-```go
-logger.Info().Any("cfg", cfg).Send()                                // wrong: may print DSNs and keys
-logger.Info().Any("cfg", config.RedactedServices(cfg)).Send()       // right
-```
-
-The same rule covers error text: name services and fields, never values. See [Configuration](../configuration/).
+Never pass raw config or headers into `Any`, which may print DSNs and keys. Use `cfg.RedactedServices()` and fixed field names. The same rule covers error text: name services and fields, never values. See [Configuration](../configuration/).
 
 ## Production checklist
 
-- Use `slog` for stdlib-only builds, `zerolog` for high-throughput JSON, `pretty` for local shells, `noop` for tests. One process, one adapter.
+- One process, one adapter: `slog` for stdlib-only builds, `zerolog` for high-throughput JSON, `pretty` for local shells, `noop` for tests.
 - Buffered providers flush through their own `Shutdown(ctx)`, which `c.Close(ctx)` probes. Do not exit before `Close` returns or trailing lines drop.
 - Shutdown never blocks past 5s per service (or the parent deadline). Keep log I/O fast and never format unbounded payloads.
 
@@ -106,7 +78,7 @@ The same rule covers error text: name services and fields, never values. See [Co
 <details>
 <summary>No log output in tests</summary>
 
-The resolved adapter is `noop`, which is correct for hermetic tests. Assert behavior, not lines, or resolve `slog` explicitly.
+The resolved adapter is `noop`, correct for hermetic tests. Assert behavior, not lines, or resolve `slog` explicitly.
 </details>
 
 <details>
@@ -118,7 +90,7 @@ The context logger was never attached. Wrap the context with `log.ContextWithLog
 <details>
 <summary>Secrets in log files</summary>
 
-A call passes raw config or headers into `Any`. Replace it with `config.RedactedServices(cfg)` and fixed field names.
+A call passes raw config or headers into `Any`. Use `cfg.RedactedServices()` and fixed field names.
 </details>
 
 <details>

@@ -27,8 +27,10 @@ Each package follows one pattern:
 ```go
 // Package db: one small interface.
 type DB interface {
-	Query(ctx context.Context, sql string, args ...any) (Rows, error)
-	Exec(ctx context.Context, sql string, args ...any) (Result, error)
+	Query(ctx context.Context, query string, args ...any) (Rows, error)
+	Exec(ctx context.Context, query string, args ...any) (int64, error)
+	Ping(ctx context.Context) error
+	Close(ctx context.Context) error
 	Dialect() string
 }
 
@@ -75,22 +77,22 @@ Most swaps are invisible to handlers: placeholders stay `?` on both `db` drivers
 
 ## Pick from the adapter matrix
 
-An excerpt follows. The full table covers over thirty services from `ai` to `workflow`, each defaulting to its zero-infra adapter: see the [adapters matrix](../../reference/adapters-matrix/).
+An excerpt follows. The full table covers all 36 services from `ai` to `workflow`, each with a default adapter (zero-infra except `ai`): see the [adapters matrix](../../reference/adapters-matrix/).
 
 | Service | Adapters | Default |
 |---|---|---|
 | `db` | `sqlite`, `postgres` | `sqlite` |
-| `cache` | `memory`, `redis` | `memory` |
-| `queue` | `memory`, `redis` | `memory` |
-| `router` | `fiber`, `stdhttp` | driver per scaffold |
+| `cache` | `memory`, `redis`, `db` | `memory` |
+| `queue` | `memory`, `redis`, `db` | `memory` |
+| `router` | `fiber`, `stdhttp` | `stdhttp` |
 | `auth` | `jwt`, `session`, `oidc` | `jwt` |
-| `session` | `memory`, `redis` | `memory` |
+| `session` | `memory`, `redis`, `db` | `memory` |
 | `storage` | `local`, `s3`, `r2` | `local` |
-| `search` | `db`, `postgres`, `meilisearch`, `sqlite` | per scaffold |
-| `vectorstore` | `db`, `sqlite`, `pgvector`, `qdrant` | per scaffold |
+| `search` | `db`, `postgres`, `meilisearch`, `sqlite` | `db` |
+| `vectorstore` | `db`, `sqlite`, `pgvector`, `qdrant` | `db` |
 | `payment` / `billing` | `stub`, `stripe`, `paddle` | `stub` |
-| `log` | `noop`, `zerolog`, `slog`, `pretty` | per scaffold |
-| `secrets` | `env` | `env` with `ZEVER` prefix |
+| `log` | `noop`, `zerolog`, `slog`, `pretty` | `slog` |
+| `secrets` | `env`, `vault` | `env` with `ZEVER` prefix |
 
 ## Add a new adapter
 
@@ -105,7 +107,7 @@ Unexported adapter structs are named `driver` with receiver `d`; timeouts are `t
 ## Design decisions and trade-offs
 
 - **Close shape is a provider contract.** See [Container](../container/#close-services-in-order) for which signature each adapter takes.
-- **Fail closed.** Unsupported ORM features return `dialect.ErrUnsupportedByDialect` (prefixed `orm:`) instead of wrong SQL, strict config rejects typos at load, and redaction masks secrets everywhere.
+- **Fail closed.** Unsupported ORM features return `dialect.ErrUnsupportedByDialect` (prefixed `orm:`) instead of wrong SQL, strict config rejects unknown keys at load, and redaction masks secrets everywhere.
 
 ## Troubleshooting
 
@@ -116,9 +118,9 @@ Cause: an env override (`CACHE_ADAPTER`) beats the file. Fix: unset or correct t
 </details>
 
 <details>
-<summary>`Load` rejects a known adapter name</summary>
+<summary>An accessor fails with `UnknownAdapterError`</summary>
 
-Cause: a typo, or the adapter is not registered. Fix: match the matrix spelling (`postgres`, not `postgresql`).
+Cause: a typo in the adapter name (config accepts any non-empty name), or its `Register()` was never called. Fix: match the matrix spelling (`postgres`, not `postgresql`) and register the adapter module before resolving.
 </details>
 
 <details>

@@ -5,7 +5,7 @@ description: Match typed errors, map them to stable HTTP statuses, and keep secr
 
 import { LinkCard, CardGrid } from '@astrojs/starlight/components';
 
-Errors are typed values with stable codes. Handlers match the error, pick a status, and log once (see [Logging](../../operate/logging/)). There is no config block or accessor: errors come back from services you resolved, and `config.Default()` returns the same typed values as production.
+Errors are typed values with stable codes. Handlers match the error, pick a status, and log once (see [Logging](../../operate/logging/)). There is no config block or accessor: errors come from services you resolved, and `config.Default()` returns the same typed values as production.
 
 ## Quick start
 
@@ -16,10 +16,6 @@ func showUser(w http.ResponseWriter, r *http.Request) {
     user, err := findUser(r.Context(), id)
     if errors.Is(err, db.ErrNotFound) {
         writeError(w, http.StatusNotFound, "user not found")
-        return
-    }
-    if errors.Is(err, dialect.ErrUnsupportedByDialect) {
-        writeError(w, http.StatusBadRequest, "query not supported by this database")
         return
     }
     if err != nil {
@@ -33,55 +29,30 @@ func showUser(w http.ResponseWriter, r *http.Request) {
 
 ```sh
 curl -s localhost:8080/v1/users/missing -w "\n%{http_code}\n"
-curl -s localhost:8080/v1/users/42 -w "\n%{http_code}\n"
 ```
 
 ```text
 {"error":"user not found"}
 404
-{"id":"42"}
-200
 ```
 
-Log once, at the boundary. Libraries add context with `%w`; handlers choose the status. `writeJSON` and `writeError` come from [Requests and responses](../requests-responses/).
+Log once, at the boundary. Libraries add context with `%w`; handlers choose the status. `writeJSON` and `writeError` come from [Requests and responses](../requests-responses/). A helper that returns `true` lets the caller skip the generic 500. Wrap with `%w` to keep identity, ORM failures carry `orm:` and `orm/render:` prefixes, and the DSL mirrors `apperror` codes in `ir.ErrorCode`.
 
-`.zen` RPCs declare their error set (`errors: { already_exists }`), so OpenAPI and clients know the codes to expect. `breaking` treats error-set changes as API changes. Syntax: [Zen syntax](../../../reference/zen-syntax/).
+`.zen` RPCs declare their error set (`errors: { already_exists }`) so clients and OpenAPI know which codes to expect.
 
 ## Map errors to statuses
-
-Keep the mapping in one helper so handlers never invent codes inline.
 
 | Error | Status | Envelope |
 |---|---|---|
 | `db.ErrNotFound` | 404 | `{"error":"user not found"}` |
 | `dialect.ErrUnsupportedByDialect` | 400 | `{"error":"query not supported by this database"}` |
 | `already_exists` (RPC error set) | 409 | `{"error":"already exists"}` |
-| Rate-limit deny | 429 plus `Retry-After` | `{"error":"rate limited"}` |
-| Context deadline | 504 | `{"error":"deadline exceeded"}` |
+| Rate-limit deny | 429 plus `Retry-After` | `{"error":"rate limit exceeded"}` |
+| Handler timeout (`middleware.Timeout`) | 504 | `{"error":"request timed out"}` |
 | Handler panic (`middleware.Recover`) | 500 | `{"error":"internal error"}` |
 | Anything else | 500 | `{"error":"internal error"}` |
 
-```go
-func writeStatusFor(w http.ResponseWriter, err error) bool {
-    switch {
-    case errors.Is(err, db.ErrNotFound):
-        writeError(w, http.StatusNotFound, "user not found")
-        return true
-    case errors.Is(err, dialect.ErrUnsupportedByDialect):
-        writeError(w, http.StatusBadRequest, "query not supported by this database")
-        return true
-    }
-    return false
-}
-```
-
-Return `true` when handled so the caller skips the generic 500. Also in use: 400 unparsable, 422 invalid ([Validation](../validation/)). Related patterns:
-
-| Pattern | Use |
-|---|---|
-| `%w` wrapping | Add context without losing identity. |
-| `orm:` and `orm/render:` prefixes | ORM failures stay greppable and `errors.Is`-compatible. |
-| `ir.ErrorCode` table | DSL-side mirror of the `apperror` vocabulary. |
+Also in use: 400 unparsable, 422 invalid ([Validation](../validation/)).
 
 ## Handle shutdown errors
 
@@ -94,7 +65,7 @@ if errors.As(err, &pe) { /* a service panicked during Close */ }
 
 ## Keep secrets out of error text
 
-Error text names services and fields, never values. The same rule covers logs and displayed config: `zever config show` prints redacted config, and migrate screens mask `--dsn ***`. Render config only through `config.RedactedServices`. Debug detail belongs in the log line, not on the wire.
+Error text names services and fields, never values. The same rule covers logs and displayed config: `zever config show` prints redacted config. Render config only through `config.RedactedServices`.
 
 ## Troubleshooting
 
@@ -111,21 +82,15 @@ The handler writes `err.Error()` to the client. Write a stable slug and log the 
 </details>
 
 <details>
-<summary>The shutdown error is opaque</summary>
-
-You print only the first error. `Close` joins all of them: log the full value, then use `errors.As` for panic and timeout cases.
-</details>
-
-<details>
 <summary>A dialect failure looks like a bug</summary>
 
 A postgres-only feature on sqlite returns `dialect.ErrUnsupportedByDialect` by design. Match it and use a portable formulation.
 </details>
 
 <details>
-<summary>Clients cannot handle new errors</summary>
+<summary>The shutdown error is opaque</summary>
 
-The RPC error set changed silently. Declare it in `.zen`, treat changes as breaking, and update generated clients together.
+You print only the first error. `Close` joins all of them: log the full value, then use `errors.As` for panic and timeout cases.
 </details>
 
 ## Related
@@ -134,5 +99,4 @@ The RPC error set changed silently. Declare it in `.zen`, treat changes as break
   <LinkCard title="Validation" href="../validation/" description="400 vs 422 vs 409 at the boundary." />
   <LinkCard title="Middleware" href="../middleware/" description="Recover and timeout envelopes." />
   <LinkCard title="Logging" href="../../operate/logging/" description="One structured line per failure." />
-  <LinkCard title="Query builder" href="../../data/query-builder/" description="orm: prefixes and dialect gating." />
 </CardGrid>

@@ -44,12 +44,14 @@ Long runs stream deltas, tool calls, and results as events. Independent tool cal
 
 ## Serve your API as agent tools
 
-Compile the schema to an MCP manifest and run the stdio server so coding agents can call your RPCs:
+Compile the schema with the `mcp` backend. It writes one tool manifest per module (`generated/mcp/<module>/mcp.json`), a merged `generated/mcp/mcp.json`, and a runnable stdio server with handler stubs you fill in (`generated/mcp/<module>/mcpserver/main.go`):
 
 ```sh
 zever compile schema/app.zen --backend=mcp --out ./generated
-go run ./tools/zever-mcp
+go run ./generated/mcp/<module>/mcpserver
 ```
+
+Separately, `go run ./tools/zever-mcp` starts a stdio server that gives coding agents the compiler itself as tools (`zever_compile`, `zever_schema`, `zever_explain`).
 
 ## Score answers with evals
 
@@ -65,7 +67,7 @@ Pin quality with a dataset and scorers before you ship prompt changes:
 - `container.Agent()` and `container.RAG()` lazy accessors over shared backends
 - `core/agent` loops: run, stream, parallel fan-out, sub-agent tools
 - `core/rag` ingest, retrieve, hybrid retrieval, grounded answers
-- `dsl/backend/mcp` manifests plus the `tools/zever-mcp` server
+- `dsl/backend/mcp` manifests plus a generated stdio server, and `tools/zever-mcp` for compiler tools
 - `core/eval` datasets and scorers
 
 <details>

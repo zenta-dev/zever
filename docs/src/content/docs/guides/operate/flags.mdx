@@ -21,34 +21,28 @@ flag:
 ```
 
 ```go title="main.go"
-package main
-
 import (
     "context"
-    "fmt"
-
     "github.com/zenta-dev/zever/adapters/flag/static"
     "github.com/zenta-dev/zever/config"
     "github.com/zenta-dev/zever/container"
     "github.com/zenta-dev/zever/core/flag"
 )
 
-func main() {
-    static.Register() // container wires nothing
-    c := container.New(config.Default())
-    f, err := c.Flag()
-    if err != nil {
-        panic(err)
-    }
-    defer f.Close()
-
-    ctx := flag.WithEvalContext(context.Background(), flag.EvalContext{
-        RandomizationID: "user-123",
-        Signals:         map[string]any{"plan": "pro"},
-    })
-    on, err := f.Bool(ctx, "new_checkout", false)
-    fmt.Println(on, err)
+static.Register() // container wires nothing
+c := container.New(config.Default())
+f, err := c.Flag()
+if err != nil {
+    panic(err)
 }
+defer f.Close()
+
+ctx := flag.WithEvalContext(context.Background(), flag.EvalContext{
+    RandomizationID: "user-123",
+    Signals:         map[string]any{"plan": "pro"},
+})
+on, err := f.Bool(ctx, "new_checkout", false)
+fmt.Println(on, err)
 ```
 
 Expected output (empty static set, so the fallback applies):
@@ -57,7 +51,7 @@ Expected output (empty static set, so the fallback applies):
 false <nil>
 ```
 
-An empty static `path` is valid and means an empty flag set. The bookings example gates checkout with `a.Flag.Bool(ctx, "new_checkout", false)` and reports `v2` when on, else `v1`. Because the fallback is `false`, a missing key or an outage keeps serving the old checkout.
+An empty static `path` is valid and means an empty flag set. Because the fallback is `false`, a missing key or an outage keeps serving the old checkout.
 
 ## Flip flags without a deploy
 
@@ -79,18 +73,13 @@ FLAG_FIREBASE_PROJECTID=my-project
 FLAG_FIREBASE_TIMEOUT=30s
 ```
 
-`Validate` rejects only a negative `firebase.timeout`; zero means the default. See the [flag config reference](../../../reference/config/#flag).
-
-| Adapter | Package | Notes |
-|---|---|---|
-| `static` | `adapters/flag/static` | Default. File-backed, offline, optional reload. |
-| `firebase` | `adapters/flag/firebase` | Remote Config. Needs `project_id` and `service_account`. |
+`Validate` rejects only a negative `firebase.timeout`; zero means the default. Adapters are `static` (`adapters/flag/static`, the default) and `firebase` (`adapters/flag/firebase`, Remote Config; needs `project_id` and `service_account`). See the [flag config reference](../../../reference/config/#flag).
 
 ## Production checklist
 
 - `Flag.Close() error` takes no context. The container probes it during `Close(ctx)`, joins errors with `errors.Join`, and surfaces panics as `*ClosePanicError`.
 - `static` is per-process, so a file change only lands where the file lands (plus `reload` when enabled). `firebase` is the shared source of truth, so design fallbacks so every replica degrades the same way when it is unreachable.
-- Never log raw option maps (use `config.RedactedServices`). The service account is a file path, not key material, but keep it out of logs.
+- Never log raw option maps (use `cfg.RedactedServices()`). The service account is a file path, not key material, but keep it out of logs.
 
 ## Troubleshooting
 

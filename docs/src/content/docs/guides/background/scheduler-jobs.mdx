@@ -1,11 +1,11 @@
 ---
 title: Scheduler and jobs
-description: Dispatch background jobs onto the shared queue and fire them on cron schedules with per-slot dedup.
+description: Dispatch background jobs onto the shared queue and fire them on cron schedules.
 ---
 
 import { LinkCard, CardGrid } from '@astrojs/starlight/components';
 
-Use `job.Dispatcher` for deferred or retryable work (confirmation mail, push, webhook delivery). It wraps the resolved `Queue`. Use the scheduler for recurring triggers: it fires registered job names on cron specs through the dispatcher with per-slot dedup, so a slow tick does not fire twice.
+Use `job.Dispatcher` for deferred or retryable work (confirmation mail, push, webhook delivery): it wraps the resolved `Queue`. Use the scheduler for recurring triggers: it fires registered job names on cron specs through the dispatcher, with per-slot dedup across instances when a locker is set.
 
 ## Quick start
 
@@ -24,7 +24,7 @@ SCHEDULER_ADAPTER=embedded
 SCHEDULER_CLOSE_TIMEOUT=5s
 ```
 
-Only `dsn`, `dedicated_pool`, and `close_timeout` are file-settable. `Dispatcher`, `Locker`, and `Logger` are code-wired (`yaml:"-"`) and injected by the container. All keys: [scheduler config reference](../../../reference/config/#scheduler). Dispatch rides the [queue](../queue/), so its options matter too.
+Only `dsn`, `dedicated_pool`, and `close_timeout` are file-settable; `Dispatcher`, `Locker`, and `Logger` are code-wired (`yaml:"-"`) and injected by the container. Dispatch rides the [queue](../queue/), so its options matter too. All keys: [scheduler config reference](../../../reference/config/#scheduler).
 
 ## Dispatch and schedule a job
 
@@ -48,146 +48,79 @@ type ConfirmArgs struct {
 	BookingID string `json:"booking_id"`
 }
 
-type ReminderArgs struct {
-	SpaceID string `json:"space_id"`
-}
-
 func main() {
-	if err := run(); err != nil {
-		panic(err)
-	}
-}
-
-func run() error {
 	job.Reset()
 	defer job.Reset()
 	ctx := context.Background()
 
-	if err := job.Register("SendConfirmation", func(_ context.Context, a ConfirmArgs) error {
-		_ = a.BookingID
-		return nil
-	}); err != nil {
-		return err
-	}
-	if err := job.Register("SendReminder", func(_ context.Context, a ReminderArgs) error {
-		_ = a.SpaceID
-		return nil
-	}); err != nil {
-		return err
-	}
+	_ = job.Register("SendConfirmation", func(_ context.Context, a ConfirmArgs) error { return nil })
+	_ = job.Register("SendReminder", func(_ context.Context, _ map[string]string) error { return nil })
 
-	q, err := queuememory.New(queue.Options{})
-	if err != nil {
-		return err
-	}
-	defer func() { _ = q.Close() }()
+	q, _ := queuememory.New(queue.Options{})
+	defer q.Close()
 	d := &job.Dispatcher{Q: q}
 
 	_ = scheduler.Register(scheduler.Embedded, schedulerembedded.New)
-	s, err := scheduler.Open(scheduler.Embedded, scheduler.Options{Dispatcher: d})
-	if err != nil {
-		return err
-	}
-	defer func() { _ = s.Stop() }()
+	s, _ := scheduler.Open(scheduler.Embedded, scheduler.Options{Dispatcher: d})
+	defer s.Stop()
 
-	if err := d.Dispatch(ctx, "SendConfirmation", ConfirmArgs{BookingID: "b_123"}); err != nil {
-		return err
-	}
-	id, err := s.Schedule(ctx, "0 9 * * *", "SendReminder", ReminderArgs{SpaceID: "s_42"})
-	if err != nil {
-		return err
-	}
-	if err := s.Start(); err != nil {
-		return err
-	}
+	_ = d.Dispatch(ctx, "SendConfirmation", ConfirmArgs{BookingID: "b_123"})
+	id, _ := s.Schedule(ctx, "0 9 * * *", "SendReminder", map[string]string{"space_id": "s_42"})
+	_ = s.Start()
 	time.Sleep(50 * time.Millisecond)
-	return s.Remove(id)
+	_ = s.Remove(id)
 }
 ```
 
-The dispatch enqueues onto topic `default`, the schedule registers `0 9 * * *`, and `Start` begins ticks. The bookings worker registers `SendConfirmation` on `default` and `SendReminder` on `low` with concurrency 4.
+`Dispatch` pushes onto the topic named after the job's priority (`low` by default, then `medium`, `high`), the schedule registers `0 9 * * *`, and `Start` begins ticks. The bookings worker runs `job.Worker{Queues: []string{"default", "low"}, Concurrency: 4}`, which polls topics in that order.
 
-Set retry policy and priority at `job.Register` time with `WithRetryPolicy` and `WithPriority` (bookings uses `max_attempts(3)` with exponential base 30s). `job.Batch` covers batch enqueue. For singleton-style jobs, use the lock helper in `core/job/lock.go` with `UniqueBy` so a job runs on exactly one instance even though every instance is registered.
+Set retry policy and priority at `job.Register` time with `WithRetryPolicy` and `WithPriority`. The default is 25 attempts with a 5s base delay doubling per attempt (the bookings schema overrides it with `max_attempts(3)` and an exponential 30s base). `job.NewBatch` covers batch enqueue. For singleton jobs, dispatch with `job.UniqueBy(key)`; that needs a `job.UniqueLocker` (built with `job.NewUniqueLocker(cache)`) set on the dispatcher, which the container does not wire for you.
 
 ## Resolve the scheduler from the container
 
-```go title="main.go"
-import (
-	"github.com/zenta-dev/zever/config"
-	"github.com/zenta-dev/zever/container"
-)
-
-func openScheduler() error {
-	c := container.New(config.Default())
-	d, err := c.Job() // dispatcher over resolved Queue
-	if err != nil {
-		return err
-	}
-	_ = d
-	s, err := c.Scheduler() // shares Queue via Job()
-	if err != nil {
-		return err
-	}
-	defer func() { _ = s.Stop() }()
-	return nil
-}
-```
-
-`Job()` builds a `*job.Dispatcher` over the resolved `Queue` (`d.Q` is the shared instance). `Scheduler()` injects it, so resolving the scheduler resolves `Job()` and `Queue` too. Do not open a second queue for scheduled work.
-
-The scheduler has `Stop() error` instead of `Close`. The container stops it and job first, then snapshots, then `cache` and `queue`.
+`c.Job()` builds a `*job.Dispatcher` over the resolved `Queue` (`d.Q` is the shared instance); `c.Scheduler()` injects it, so resolving the scheduler resolves `Job()` and `Queue` too. Do not open a second queue for scheduled work. The scheduler has `Stop() error` instead of `Close`; the container stops it and job first, then snapshots, then `cache` and `queue`. See [the container](../../../concepts/container/).
 
 ## Choose a scheduler adapter
 
 | Adapter | Package | Use when |
 |---|---|---|
 | `embedded` | `adapters/scheduler/embedded` | In-process cron ticks. `Stop()` ends ticks. |
-| `postgres` | `adapters/scheduler/postgres` | Durable leased slots, safe for multi-instance deploys. Needs a `dsn`. |
+| `postgres` | `adapters/scheduler/postgres` | Durable leased slots, safe for multi-instance deploys. Set `dsn` to a postgres URL (empty is a private in-memory sqlite). |
 
-`job` has no adapter registry: topics are priority names. The real decision is the backing queue. `memory` keeps web, worker, and ticks in one process. `redis` lets ticks fire in one process while any worker pops the job.
-
-The `postgres` adapter borrows the shared pool for its DSN unless `dedicated_pool: true`. Under sustained load prefer a separate database.
+`job` has no adapter registry: topics are priority names, so the real decision is the backing queue. `memory` keeps web, worker, and ticks in one process; `redis` lets ticks fire in one process while any worker pops the job. The `postgres` adapter borrows the shared pool for its DSN unless `dedicated_pool: true`; under sustained load prefer a separate database.
 
 ## Production checklist
 
-- The scheduler is not a durable timeline: slots that fire while the process is down are skipped. Keep handlers idempotent, pair triggers with `lock` or `idempotency`, and consider a catch-up query on boot.
+- Not a durable timeline: slots that fire while the process is down are skipped. Keep handlers idempotent, pair triggers with `lock` or `idempotency`, and consider a catch-up query on boot.
 - Guard overlapping ticks with the unique locker, or a slow run plus a fast cadence double-fires a slot.
 - Keep job payloads small JSON: large blobs inflate every retry and queue read.
 - Set `close_timeout` explicitly instead of relying on the 5s default.
-- Never log raw option maps. Use `config.RedactedServices`.
+- Never log raw option maps; use `config.RedactedServices`.
 
 ## Troubleshooting
 
 <details>
 <summary>Reminders fire twice from two hosts</summary>
 
-Cause: two schedulers tick the same spec with no shared locker.
-
-Fix: wire one `job.UniqueLocker` (redis or db backed) into both so only the first claims each slot, or run a single scheduler replica.
+Two schedulers tick the same spec with no shared locker. Wire one cache-backed `job.UniqueLocker` (`scheduler.Options.Locker`, code only) into both, or run a single scheduler replica.
 </details>
 
 <details>
 <summary>scheduler.Open fails with dispatcher_is_required</summary>
 
-Cause: `Dispatcher` is code-only and was left nil.
-
-Fix: resolve through `c.Scheduler()`, or pass `scheduler.Options{Dispatcher: d}` in hand-wired code.
+`Dispatcher` is code-only and was left nil. Resolve through `c.Scheduler()`, or pass `scheduler.Options{Dispatcher: d}`.
 </details>
 
 <details>
 <summary>A dispatched job never runs and the worker is idle</summary>
 
-Cause: topic mismatch. `job.Register` defaults to `PriorityLow` (topic `low`) while the worker polls only `default`, or the reverse.
-
-Fix: align `job.WithPriority` and poll both `default` and `low` in order, as the bookings worker does.
+Topic mismatch: `job.Register` defaults to `PriorityLow` (topic `low`) while the worker polls only `default`, or the reverse. Align `job.WithPriority` with the worker's `Queues`, and poll `default` and `low` in order, as the bookings worker does.
 </details>
 
 <details>
 <summary>Shutdown drops a tick that already started</summary>
 
-Cause: `close_timeout` is too short, or the queue closed before the scheduler.
-
-Fix: raise `close_timeout` (nanoseconds in file, `"5s"` in env) and keep container close order so `Stop()` waits for running ticks.
+`close_timeout` is too short, or the queue closed before the scheduler. Raise it (nanoseconds in file, `"5s"` in env) and keep container close order so `Stop()` waits for running ticks.
 </details>
 
 ## Related

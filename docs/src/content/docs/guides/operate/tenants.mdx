@@ -12,30 +12,24 @@ import { LinkCard, CardGrid } from '@astrojs/starlight/components';
 `single` (the default) gives every request one hardcoded ID (`id`, default `"default"`). Stay there until a second customer exists.
 
 ```go title="main.go"
-package main
-
 import (
     "context"
-    "fmt"
-
     "github.com/zenta-dev/zever/config"
     "github.com/zenta-dev/zever/container"
 )
 
-func main() {
-    c := container.New(config.Default())
-    t, err := c.Tenant()
-    if err != nil {
-        panic(err)
-    }
-    defer t.Close()
-
-    ctx := context.Background()
-    id, err := t.Resolve(ctx, map[string]string{"tenant": ""})
-    fmt.Println(id, err)
-    scoped, err := t.Scoped(ctx, id)
-    fmt.Println(scoped != nil, err)
+c := container.New(config.Default())
+t, err := c.Tenant()
+if err != nil {
+    panic(err)
 }
+defer t.Close()
+
+ctx := context.Background()
+id, err := t.Resolve(ctx, map[string]string{"tenant": ""})
+fmt.Println(id, err)
+scoped, err := t.Scoped(ctx, id)
+fmt.Println(scoped != nil, err)
 ```
 
 Expected output:
@@ -45,11 +39,9 @@ default <nil>
 true <nil>
 ```
 
-The bookings example runs `tenant.adapter: single`. It passes `X-Tenant` through as metadata in `tenantID` and tags bookings, queue headers, and responses with the fixed ID.
-
 ## Resolve tenants from a header or subdomain
 
-Use `header` for multi-tenant SaaS APIs where a gateway or client sets a per-call header (default `X-Tenant-ID`, `DefaultHeader`). With `X-Tenant-ID: acme` metadata, `Resolve` returns `acme`. `subdomain_regex` matches a tenant out of the host when header routing does not fit.
+Use `header` for multi-tenant SaaS APIs where a gateway or client sets a per-call header (default `X-Tenant-ID`, `DefaultHeader`). With `X-Tenant-ID: acme` metadata, `Resolve` returns `acme`. The header wins; otherwise `subdomain_regex` matches the first capture group against the lowercased `Host` metadata. With neither, `Resolve` returns `tenant.ErrNotFound`. Meta keys match case-insensitively, and patterns prone to catastrophic backtracking are rejected at `Open`. Strip or overwrite the tenant header at your edge, since the adapter trusts it.
 
 ```yaml title="zever.yaml"
 tenant:
@@ -66,12 +58,7 @@ TENANT_SUBDOMAINREGEX=^([a-z0-9-]+)\.example\.com$
 TENANT_ID=default
 ```
 
-`Validate` rejects an invalid `header` key (printable ASCII, no whitespace, colon, or DEL) and any `subdomain_regex` over 500 characters (`MaxRegexLength`, a ReDoS bound). An empty `header` means the default. See the [tenant config reference](../../../reference/config/#tenant).
-
-| Adapter | Package | Notes |
-|---|---|---|
-| `single` | `tenant/single` | Default. One fixed ID, constant-time lookup. |
-| `header` | `tenant/header` | Request header plus optional subdomain regex. |
+`Validate` rejects an invalid `header` key (printable ASCII, no whitespace, colon, or DEL) and any `subdomain_regex` over 500 characters (`MaxRegexLength`, a ReDoS bound). An empty `header` means the default. Adapters are `single` (one fixed ID, constant-time lookup) and `header` (request header plus optional subdomain regex). See the [tenant config reference](../../../reference/config/#tenant).
 
 ## Production checklist
 

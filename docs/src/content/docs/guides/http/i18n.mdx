@@ -19,51 +19,47 @@ i18n:
       dir: locales
       fallback: en
 ```
-
-```yaml
-i18n:
-  adapter: remote  # production: shared catalog service
-  options:
-    remote:
-      endpoint: i18n.internal:8080
-      timeout: 30s
-```
   </TabItem>
   <TabItem label="Env">
 ```sh
 I18N_ADAPTER=remote
-I18N_ENDPOINT=i18n.internal:8080
+I18N_REMOTE_ENDPOINT=i18n.internal:8080
 ```
   </TabItem>
 </Tabs>
 
-`remote` also takes `api_key`, `max_in_flight`, and `allow_insecure`: see the [Config reference](../../../reference/config/#i18n). `DefaultTimeout` is 30s for remote fetches. The embed filesystem cannot come from YAML, so set it in code (bookings does): `cfg.I18n.Options.Embed = i18n.EmbedOptions{FS: api.LocalesFS, Dir: "locales", Fallback: "en"}`.
+Switch to `remote` for a shared catalog service: it takes `endpoint`, `api_key`, `timeout`, `max_in_flight`, and `allow_insecure` (see the [Config reference](../../../reference/config/#i18n)). `DefaultTimeout` is 30s for remote fetches. The embed filesystem cannot come from YAML, so set `Embed.FS` in code as shown below; without it the embed adapter fails with `embed fs is required`.
 
-Catalogs are JSON per locale:
+Catalogs are JSON per locale. A message is plain text or a Go `text/template` string with `{{.name}}` placeholders:
 
 ```json title="locales/en.json"
-{"welcome": "Welcome back!", "hello": "Hello, {Name}!"}
+{"welcome": "Welcome back!", "hello": "Hello, {{.name}}!"}
 ```
 
 ```json title="locales/fr.json"
-{"hello": "Bonjour, {Name}!"}
+{"hello": "Bonjour, {{.name}}!"}
 ```
 
 ```go title="main.go"
 import (
-    "github.com/zenta-dev/zever/adapters/i18n/embed"
+    "embed"
+
+    i18nembed "github.com/zenta-dev/zever/adapters/i18n/embed"
     "github.com/zenta-dev/zever/config"
     "github.com/zenta-dev/zever/container"
+    "github.com/zenta-dev/zever/core/i18n"
 )
 
-embed.Register() // the container wires nothing by itself
-c := container.New(config.Default())
-t, err := c.I18n()
-if err != nil {
-    return err
-}
+//go:embed locales/*.json
+var localesFS embed.FS
 
-msg, _ := t.Translate(ctx, "fr", "hello", map[string]string{"Name": "Ada"})
+i18nembed.Register()
+cfg := config.Default()
+cfg.I18n.Options.Embed = i18n.EmbedOptions{FS: localesFS, Dir: "locales", Fallback: "en"}
+c := container.New(cfg)
+t, _ := c.I18n()
+
+msg, _ := t.Translate(ctx, "fr", "hello", map[string]string{"name": "Ada"})
 fmt.Println(msg)
 missing, _ := t.Translate(ctx, "fr", "welcome", nil)
 fmt.Println(missing)
@@ -74,7 +70,7 @@ Bonjour, Ada!
 Welcome back!
 ```
 
-A key missing in `fr` falls back to `en`, never an empty string. `I18n()` resolves lazily and caches (a failed call retries). Shutdown needs nothing extra beyond `c.Close(ctx)`.
+A key missing in `fr` falls back to `en`; a key missing everywhere returns `i18n.KeyNotFoundError`, never an empty string. Templates use `missingkey=error`, so a missing argument fails the lookup instead of rendering silently. `I18n()` resolves lazily and caches, and `c.Close(ctx)` shuts it down.
 
 ## Resolve the locale in one place
 
@@ -94,50 +90,13 @@ func localeOf(r *http.Request, user *User) string {
 
 The lookup chain for `fr-CA` is `fr-CA`, then `fr`, then the fallback; `i18n.BaseLocale` and `i18n.LocaleChain` expose both steps. Pass structured args (`map[string]string`), not pre-formatted strings, because word order differs across languages.
 
-## Write messages
+## Use the API
 
-| Pattern | Example |
-|---|---|
-| Simple | `"welcome": "Welcome back!"` |
-| Interpolated | `"hello": "Hello, {Name}!"` |
-| Plural | `"cart.n": "{Count} item / {Count} items"` (CLDR rules per locale) |
-
-## API
-
-| Method or helper | Purpose |
-|---|---|
-| `Translate(ctx, locale, key, args)` | Message for locale and key; falls back on a miss. |
-| `i18n.Open(adapter, opts)` | Open an adapter without the container. |
-| `i18n.Register(adapter, factory)` | Add a custom adapter. |
-| `EmbedOptions{FS, Dir, Fallback}` | Compiled-in catalog: file system, directory, default locale. |
-| `RemoteOptions{Endpoint, Timeout, ...}` | Shared catalog service. |
-| `Options.Validate()` | Reject bad adapter settings at startup. |
-
-Treat catalogs as data: version them with the schema, diff them in review, and deploy them beside the binary (embed) or behind the remote endpoint.
+The interface has `Translate(ctx, locale, key, args)` and `Locales(ctx)`; `i18n.Open(adapter, opts)` and `i18n.Register(adapter, factory)` open or extend an adapter without the container. `EmbedOptions{FS, Dir, Fallback}` configures the compiled-in catalog and `RemoteOptions{Endpoint, APIKey, Timeout, MaxInFlight, AllowInsecure}` the shared service; `Options.Validate()` rejects bad settings at startup. Treat catalogs as data: version them with the schema, diff them in review, and deploy them beside the binary (embed) or behind the remote endpoint.
 
 ## Test the fallback chain
 
-Assert fallbacks, not specific copy, since translators change text without code review:
-
-```go
-tests := []struct{ locale, key, want string }{
-    {"en", "welcome", "Welcome back!"},
-    {"fr", "missing.key", "fallback English text"},
-}
-for _, tt := range tests {
-    t.Run(tt.key+tt.locale, func(t *testing.T) {
-        got, err := tr.Translate(t.Context(), tt.locale, tt.key, nil)
-        if err != nil {
-            t.Fatal(err)
-        }
-        if got != tt.want {
-            t.Errorf("got %q, want %q", got, tt.want)
-        }
-    })
-}
-```
-
-Use embed in tests: no network, no timing assertions.
+Assert fallbacks, not specific copy, since translators change text without code review. Test with embed: no network, no timing assertions. Call `Translate` with a missing key and check you get the fallback locale's text.
 
 ## Production checklist
 
@@ -163,18 +122,6 @@ Two resolution points disagree. Centralize `localeOf` and log the resolved local
 <summary>The remote catalog hangs requests</summary>
 
 The fetch ignores the request context, or no timeout is set. Pass `r.Context()` to `Translate` and keep the timeout bounded.
-</details>
-
-<details>
-<summary>Translations change without review</summary>
-
-Catalogs ship outside the binary unversioned. Commit embed catalogs beside the schema, or pin remote catalog versions per release.
-</details>
-
-<details>
-<summary>Placeholder order breaks a language</summary>
-
-Code pre-formats `"Hello " + name`. Pass `map[string]string` args and let each locale order its placeholders.
 </details>
 
 ## Related

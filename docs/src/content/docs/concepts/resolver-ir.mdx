@@ -16,40 +16,42 @@ source text → lexer → parser → ast → resolver → ir.Schema
 
 No config file drives it. Inputs are `[]*ast.File` plus a backend list, and output order is deterministic (filename-sorted).
 
-The packages (`diag`, `token`, `lexer`, `ast`, `parser`, `naming`, `resolver`, `ir`, `format`, `breaking`, `compile`, `backend`) and their roles are listed in the [compiler boundary](../compiler-boundary/#the-mental-model) table. `lexer` never panics and is fuzz-tested, `parser` recovers per declaration with a depth guard, `format` refuses lex-dirty input and is idempotent, and `ir` carries the gRPC-canonical `ErrorCode` table.
+The packages (`diag`, `token`, `lexer`, `ast`, `parser`, `naming`, `resolver`, `ir`, `format`, `breaking`, `compile`, `backend`) and their roles are listed in the [compiler boundary](../compiler-boundary/#the-compile-time-pipeline) table. `lexer` never panics and is fuzz-tested, `parser` recovers per declaration with a depth guard, `format` refuses lex-dirty input and is idempotent, and `ir` carries the gRPC-canonical `ErrorCode` table.
 
 ## Parse and resolve a schema
 
 Parse first, or run the full path:
 
 ```go
-f := parser.New("schema/app/app.zen", src).ParseFile()
+f, parseDiags := parser.New("schema/app/app.zen", src).ParseFile()
 schema, diags := resolver.Resolve([]*ast.File{f})
 ```
 
 ```go
-out, diags := compile.Compile(files, backends...)
+// files maps path to source; Result.Outputs maps backend name to files.
+res, diags := compile.Compile(files, backends...)
 ```
 
-The resolver runs four passes:
+The resolver runs ordered passes, all keep-going:
 
-1. **Collect.** Index modules, entities, enums, and services by name. Duplicates are diagnostics, not panics.
-2. **Bind types.** Resolve field and RPC types against scalars plus declared entities. Unknown names diagnose and continue.
-3. **Check relations.** Verify both sides of `has_many` / `belongs_to` agree on the foreign key.
-4. **Check RPCs.** Validate HTTP templates against params, `@validate` expressions, and the `ErrorCode` table.
+1. **Modules and symbols.** Group files into modules by directory, then index entities, enums, messages, services, jobs, schedules, and sagas by name. Duplicates are diagnostics, not panics.
+2. **Bind types.** Resolve enums, entities, and message fields against scalars plus declared types. Unknown names diagnose and continue.
+3. **Relations and indexes.** Verify both sides of `has_many` / `belongs_to` agree on the foreign key, and resolve indexes.
+4. **Services and RPCs.** Validate HTTP templates against params, `@validate` expressions, and the `ErrorCode` table.
+5. **Jobs, schedules, sagas.** Bind them to their services and jobs.
 
-`compile/testdata/app.zen` is the canonical fixture. Golden backend outputs are committed, and regeneration is explicit (`go test ./dsl/compile/ -run TestName -update`). To see the pipeline pass end to end:
+`compile/testdata/app.zen` is the canonical fixture. Golden backend outputs are committed, and regeneration is explicit (for example `go test ./dsl/backend/gogen/ -run TestGoldenFiles -update`; the gogen, atlas, proto, and zenorm tests take `-update`). To see the pipeline pass end to end:
 
 ```sh
-go test ./dsl/compile/ -run TestGogenGeneratesCommittedAppPackage -v
+go test ./dsl/backend/gogen/ -run TestGoldenFiles -v
 ```
 
 Expected output:
 
 ```text
---- PASS: TestGogenGeneratesCommittedAppPackage
+--- PASS: TestGoldenFiles (0.00s)
 PASS
-ok  github.com/zenta-dev/zever/dsl/compile
+ok  	github.com/zenta-dev/zever/dsl/backend/gogen
 ```
 
 The test parses the fixture, resolves it, runs `gogen`, and diffs against the golden package. Use `-update` only after a deliberate fixture change.
@@ -76,8 +78,8 @@ zever breaking schema-old/*.zen -- schema/*.zen
 
 | Change class | Examples | CI posture |
 |---|---|---|
-| Additive | New entity, new optional field, new RPC | Pass |
-| Breaking | Removed field, renamed RPC, changed scalar type | Fail the build |
+| Additive | New entity, new field, new RPC, new `@validate`, a field renamed with `@renamed_from` | Pass (reported as informational) |
+| Breaking | Removed entity, field, or RPC (so renaming an RPC), changed field type, optionality, params, return type, or HTTP method or path | Exit non-zero, fail the build |
 
 ## Design decisions and trade-offs
 

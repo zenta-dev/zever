@@ -12,36 +12,29 @@ import { LinkCard, CardGrid } from '@astrojs/starlight/components';
 `stdout` (the default) prints spans and metrics locally. Register the adapter, then trace an operation:
 
 ```go title="main.go"
-package main
-
 import (
     "context"
-    "fmt"
-
     "github.com/zenta-dev/zever/adapters/observability/stdout"
     "github.com/zenta-dev/zever/config"
     "github.com/zenta-dev/zever/container"
     "github.com/zenta-dev/zever/core/observability"
 )
 
-func main() {
-    stdout.Register() // container wires nothing
-    c := container.New(config.Default())
-    p, err := c.Observability()
-    if err != nil {
-        panic(err)
-    }
-    defer p.Shutdown(context.Background())
-
-    ctx := context.Background()
-    ctx, span := p.Tracer("bookings").Start(ctx, "booking.create")
-    span.SetAttributes(observability.String("space_id", "room-1"))
-    span.End()
-    fmt.Println(p.Meter("bookings").Counter(ctx, "bookings_created", 1, observability.String("tenant", "default")))
+stdout.Register() // container wires nothing
+c := container.New(config.Default())
+p, err := c.Observability()
+if err != nil {
+    panic(err)
 }
+defer p.Shutdown(context.Background())
+
+ctx, span := p.Tracer("bookings").Start(context.Background(), "booking.create")
+span.SetAttributes(observability.String("space_id", "room-1"))
+span.End()
+p.Meter("bookings").Counter(ctx, "bookings_created", 1)
 ```
 
-Expected output: span lines in human-readable form, then `<nil>`.
+Expected output: span lines in human-readable form.
 
 ## Export to a collector
 
@@ -58,21 +51,9 @@ observability:
       x-tenant: acme
 ```
 
-```sh
-OBSERVABILITY_ADAPTER=otlp
-OBSERVABILITY_SERVICENAME=bookings
-OBSERVABILITY_ENDPOINT=collector:4317
-OBSERVABILITY_SAMPLERATIO=0.1
-OBSERVABILITY_ATTRVALUELIMIT=4096
-```
+Env names follow the usual scheme: `OBSERVABILITY_ADAPTER`, `OBSERVABILITY_SERVICENAME`, `OBSERVABILITY_ENDPOINT`, `OBSERVABILITY_SAMPLERATIO`, `OBSERVABILITY_ATTRVALUELIMIT`.
 
-`Validate` requires `service_name` of 1 to 128 characters with no control characters, `endpoint` as `host:port`, `insecure` only for loopback, `cert_file` and `key_file` together, at most 32 headers, and `sample_ratio` in [0,1]. `insecure` plus an `authorization` header is rejected. Other keys: `set_globals`, `verbose`, `ca_file`. See the [observability config reference](../../../reference/config/#observability).
-
-| Adapter | Package | Use when |
-|---|---|---|
-| `noop` | `adapters/observability/noop` | Tests. Silent and fast. |
-| `stdout` | `adapters/observability/stdout` | Default. Local visibility. |
-| `otlp` | `adapters/observability/otlp` | Production collector. |
+`Validate` requires `service_name` of 1 to 128 characters with no control characters, `endpoint` as `host:port`, `insecure` only for loopback, `cert_file` and `key_file` together, at most 32 headers, and `sample_ratio` in [0,1]. `insecure` plus an `authorization` header is rejected. Other keys: `set_globals`, `verbose`, `ca_file`. Adapters are `noop` for tests, `stdout` (default) for local visibility, and `otlp` for production. See the [observability config reference](../../../reference/config/#observability).
 
 ## Bound and redact attributes
 
@@ -81,15 +62,15 @@ Keys cap at 256 bytes (`MaxKeyLen`), string values at 4096 by default (`MaxValue
 ## Production checklist
 
 - Providers declare `Shutdown(ctx)`, not `Close`. `c.Close(ctx)` probes it so buffered spans flush. Always shut down with a timeout-bearing context.
-- Set `observability.adapter: otlp` in production. The default `stdout` keeps traces on the box.
-- Never log raw option maps. Use `config.RedactedServices`.
+- Set `observability.adapter: otlp` in production; the default `stdout` keeps traces on the box.
+- Never log raw option maps. Use `cfg.RedactedServices()`.
 
 ## Troubleshooting
 
 <details>
 <summary>`service_name must be 1-128 characters`</summary>
 
-The name is empty or too long. Set a short stable name such as `bookings`. It keys every dashboard.
+The name is empty or too long. Set a short stable name such as `bookings`; it keys every dashboard.
 </details>
 
 <details>

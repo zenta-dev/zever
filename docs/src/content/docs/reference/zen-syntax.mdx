@@ -1,13 +1,13 @@
 ---
 title: .zen syntax
-description: Reference for the Zever schema language: entities, relations, services, RPCs, jobs, schedules, sagas, types, and attributes.
+description: "Reference for the Zever schema language: entities, relations, services, RPCs, jobs, schedules, sagas, types, and attributes."
 ---
 
 `.zen` files describe services once, in a proto-inspired syntax. The compiler turns the schema into database access, routing, and queue plumbing, never business logic. Format with `zever fmt`, validate with `zever check`, generate with `zever compile` (see the [CLI reference](../cli/)).
 
 ## Files and modules
 
-The module name comes from the immediate subdirectory, not the file name: `schema/app/app.zen` is module `app`. A directory such as `schema/v1/iam/` also gives the module a version (`v1`), and a warning flags RPC paths that do not start with `/v1/`.
+The module name comes from the immediate subdirectory, not the file name: `schema/app/app.zen` is module `app`. A directory such as `schema/v1/iam/` also gives the module a version (`v1`), and a warning flags RPC paths not starting with `/v1/`.
 
 Types in the same module reference each other by bare name, with no import. Cross-module references use the module path, and `zever check-boundaries` reports relations, RPC return types, and permission resources that cross modules. Sagas may reference RPCs across modules by design.
 
@@ -19,12 +19,12 @@ Types in the same module reference each other by bare name, with no import. Cros
 | `service` | `service Name { rpc ... }` | Group of RPCs. |
 | `rpc` | `rpc Name(params) -> Return { options }` | Operation with transport bindings. |
 | `enum` | `enum Name { a, b }` | Named closed set of values. |
-| `message` | `message Name { fields }` | Non-persisted payload shape. Fields only. |
+| `message` | `message Name { fields }` | Non-persisted payload shape. |
 | `job` | `job Name(params) { queue: q  retry: ... }` | Background job. |
 | `schedule` | `schedule Name { cron: "..."  dispatch: Job() }` | Cron trigger for a job. |
-| `saga` | `saga Name { step s { execute: Svc.Rpc } }` | Compensatable sequence of RPCs. |
+| `saga` | `saga Name { step s { execute: Svc.Rpc } }` | Compensatable RPC sequence. |
 
-Reserved words are `entity`, `service`, `job`, `schedule`, `rpc`, `index`, `enum`, `has_many`, `has_one`, `belongs_to`, `many_to_many`, `message`, `true`, and `false`. Type names, option labels (`http`, `auth`, `queue`, ...), HTTP verbs, `saga`, `step`, and `join_table` are contextual, not reserved. Comments start with `//`, and a comment directly above a declaration becomes its doc comment.
+Reserved words: `entity`, `service`, `job`, `schedule`, `rpc`, `index`, `enum`, `has_many`, `has_one`, `belongs_to`, `many_to_many`, `message`, `true`, `false`. Type names, option labels (`http`, `auth`, `queue`, ...), HTTP verbs, `saga`, `step`, and `join_table` are contextual, not reserved. Comments start with `//`, and a comment directly above a declaration becomes its doc comment.
 
 ## Types
 
@@ -33,10 +33,10 @@ Reserved words are `entity`, `service`, `job`, `schedule`, `rpc`, `index`, `enum
 | `uuid`, `string`, `bool`, `bytes`, `json` | Scalars. |
 | `int32`, `int64`, `float32`, `float64` | Numeric scalars. |
 | `timestamp`, `date` | Time scalars. `datetime` is an alias of `timestamp`. |
-| `enum(a, b)` | Inline enum with unique values. Use a named `enum` declaration to share one. |
+| `enum(a, b)` | Inline enum with unique values. Use a named `enum` to share one. |
 | `Name` | Reference to an entity or message. |
 
-Append `?` after the type to make a field optional: `bio: string?`.
+Append `?` to make a field optional: `bio: string?`.
 
 ## Entities
 
@@ -67,9 +67,9 @@ Declare both sides of a relation with the same `@foreign_key`.
 |---|---|---|
 | `@primary` | field | Primary key. |
 | `@unique` | field | Unique constraint. |
-| `@default(x)` | field, message field | Default. `now()` is valid only on `timestamp`. A bare `true` or `false` suits `bool`. An enum default must name a declared value. A literal must match the field's scalar family. |
-| `@validate(...)` | field, RPC param, message field | Validation rules, listed below. |
-| `@renamed_from("old")` | field | Previous column name, so `zever db migrate` emits a rename instead of a drop and add. The old name must not still be a declared field. |
+| `@default(x)` | field, message field | Default. `now()` only on `timestamp`; an enum default names a declared value; a literal must match the scalar family. `@default(true)` and `@default(false)` do not parse today because `true` and `false` are reserved words. |
+| `@validate(...)` | field, RPC param, message field | Validation rules (below). |
+| `@renamed_from("old")` | field | Previous column name, so `zever db migrate` emits a rename not a drop and add. The old name must not still be declared. |
 
 ### Validation rules
 
@@ -79,15 +79,15 @@ Declare both sides of a relation with the same `@foreign_key`.
 | `min_len`, `max_len` | `string` | Integer length. |
 | `gt`, `gte`, `lt`, `lte` | numeric scalars | Numeric literal. |
 
-Combine rules in one attribute: `@validate(min_len: 1, max_len: 100)`. `@validate` is rejected on a field or param whose type is an entity or message. Put it on that type's own fields instead.
+Combine rules: `@validate(min_len: 1, max_len: 100)`. `@validate` is rejected on a field or param whose type is an entity or message; put it on that type's fields instead.
 
-Every field of an entity or message used as an RPC parameter must carry at least one applicable `@validate` rule. Types used only as return types are exempt, and so are fields with no applicable rule (`uuid`, `bool`, `timestamp`, `date`, `bytes`, `json`, enums).
+Every field of an entity or message used as an RPC parameter must carry at least one applicable `@validate` rule. Return-only types are exempt, as are fields with no applicable rule (`uuid`, `bool`, `timestamp`, `date`, `bytes`, `json`, enums).
 
 ### Entity attributes
 
 | Attribute | Meaning |
 |---|---|
-| `@schema(name)` | Database schema for the entity. Defaults to the module name, or `public` when the module is unnamed. |
+| `@schema(name)` | Database schema. Defaults to the module name, or `public` when unnamed. |
 
 ### Relations
 
@@ -96,7 +96,7 @@ Every field of an entity or message used as an RPC parameter must carry at least
 | `has_many` | `has_many orders: Order @foreign_key(user_id)` | One to many. |
 | `has_one` | `has_one profile: Profile @foreign_key(user_id)` | One to one. |
 | `belongs_to` | `belongs_to user: User @foreign_key(user_id)` | Owning side. |
-| `many_to_many` | `many_to_many tags: Tag { join_table: post_tags }` | No `@foreign_key`. Names the join table in a block. |
+| `many_to_many` | `many_to_many tags: Tag { join_table: post_tags }` | No `@foreign_key`. Names the join table. |
 
 | Relation attribute | Values |
 |---|---|
@@ -132,13 +132,13 @@ service UserService {
 
 | Option | Value | Effect |
 |---|---|---|
-| `http:` | `GET`, `POST`, `PUT`, `PATCH`, or `DELETE`, then `"/path/{param}"` | HTTP binding. Every `{param}` needs a same-named RPC input. |
-| `auth:` | `required` or `none` | Authentication requirement. Omit for public routes. |
-| `permission:` | `check("action", resource: Entity, owner_field: field)` | Authorization check. `resource` must be an entity and `owner_field` one of its fields. |
-| `errors:` | `{ code, code("message") }` | Declared error codes from the table below. Duplicates are rejected. |
+| `http:` | `GET`, `POST`, `PUT`, `PATCH`, `DELETE`, then `"/path/{param}"` | HTTP binding. Every `{param}` needs a same-named RPC input. |
+| `auth:` | `required` or `none` | Authentication. Every RPC must declare `auth:` or `permission:`; an RPC with neither fails to resolve (secure by default), so write `auth: none` for a public route. |
+| `permission:` | `check("action", resource: Entity, owner_field: field)` | Authorization. `resource` must be an entity, `owner_field` one of its fields. |
+| `errors:` | `{ code, code("message") }` | Declared error codes (table below). Duplicates are rejected. |
 | `paginated:` | `true` or `false` | `true` emits cursor and page scaffolding from one RPC. |
 
-Every RPC gets a gRPC transport. Repeating `http:`, `auth:`, `permission:`, or `paginated:` in one RPC silently keeps the last value.
+Every RPC gets a gRPC transport. Repeating `http:`, `auth:`, `permission:`, or `paginated:` silently keeps the last value.
 
 ### Error codes
 
@@ -185,11 +185,11 @@ saga PlaceOrder {
 |---|---|---|
 | `queue:` | job | Queue name. |
 | `retry:` | job | `max_attempts(n)` with `n > 0`, and `backoff(exponential, base: <duration>)`. Exponential is the only backoff kind. |
-| `cron:` | schedule | Cron expression string. |
+| `cron:` | schedule | Cron expression. |
 | `dispatch:` | schedule | `JobName(args)` naming a declared job. |
 | `execute:` | saga step | `Service.Rpc`. Required. |
 | `compensate:` | saga step | `Service.Rpc` that undoes the step when a later step fails. |
-| `pivot:` | saga step | `true` makes failures after this step roll forward instead of compensating. At most one per saga. |
+| `pivot:` | saga step | `true` rolls failures after this step forward instead of compensating. At most one per saga. |
 
 Step names are unique within a saga. Durations use literals such as `30s`.
 
@@ -200,9 +200,9 @@ The parser never panics. Malformed input yields best-effort output plus position
 | Symptom | Cause |
 |---|---|
 | Unknown scalar type | Spelling is not in the type table. The compiler suggests the closest scalar. |
-| Unresolved relation target | The target is missing or in another module and not referenced by module path, or the two sides name different `@foreign_key` fields. |
+| Unresolved relation target | Target missing, in another module without a module path, or the two sides name different `@foreign_key` fields. |
 | HTTP param has no RPC input | A `{param}` in the `http:` path has no same-named input. |
-| Unknown attribute | Entity attributes allow only `@schema`. Field attributes allow `@primary`, `@unique`, `@validate`, `@default`, `@renamed_from`. RPC params and message fields allow `@validate` (message fields also `@default`). |
+| Unknown attribute | Entity allows only `@schema`. Fields allow `@primary`, `@unique`, `@validate`, `@default`, `@renamed_from`. RPC params and message fields allow `@validate` (message fields also `@default`). |
 
 ## Related
 

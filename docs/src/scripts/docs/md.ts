@@ -4,8 +4,21 @@ import config from 'virtual:starlight/user-config';
 type Entry = CollectionEntry<'docs'>;
 type SidebarItem = { label?: string; link?: string; items?: SidebarItem[] };
 
-/** Crudely strips MDX imports/exports and JSX tags outside fenced code. */
-export function cleanBody(body: string): string {
+const ORIGIN = 'https://zenta-dev.github.io';
+
+/** Resolves a docs link against the page's HTML URL so it works wherever the Markdown is read. */
+function absolutize(target: string, id: string): string {
+  if (/^(#|[a-z][a-z0-9+.-]*:|\/\/)/i.test(target)) return target;
+  const base = import.meta.env.BASE_URL.replace(/\/$/, '');
+  try {
+    return new URL(target, `${ORIGIN}${base}/${id}/`).href;
+  } catch {
+    return target;
+  }
+}
+
+/** Strips MDX imports/exports and JSX tags outside fenced code; makes links absolute. */
+export function cleanBody(body: string, id = ''): string {
   const out: string[] = [];
   let fence = '';
   for (const line of body.split('\n')) {
@@ -21,8 +34,21 @@ export function cleanBody(body: string): string {
       continue;
     }
     if (/^\s*import\s.+from\s+['"].+['"];?\s*$/.test(line)) continue;
+    // <LinkCard title="X" description="Y" href="Z" /> becomes a Markdown list item.
+    const card = line.match(/^\s*<LinkCard\b(.*)\/>\s*$/);
+    if (card) {
+      const attr = (n: string) => card[1].match(new RegExp(`${n}="([^"]*)"`))?.[1];
+      const t = attr('title');
+      const h = attr('href');
+      if (t && h) out.push(`- [${t}](${absolutize(h, id)})${attr('description') ? `: ${attr('description')}` : ''}`);
+      continue;
+    }
     if (/^\s*<\/?[A-Z][\w.]*(\s[^>]*)?\/?>\s*$/.test(line)) continue;
-    out.push(line.replace(/<\/?[A-Z][\w.]*(\s[^<>]*)?\/?>/g, ''));
+    out.push(
+      line
+        .replace(/<\/?[A-Z][\w.]*(\s[^<>]*)?\/?>/g, '')
+        .replace(/\]\(([^)\s]+)\)/g, (_m, t: string) => `](${absolutize(t, id)})`),
+    );
   }
   return out.join('\n').replace(/\n{3,}/g, '\n\n').trim();
 }
@@ -30,7 +56,7 @@ export function cleanBody(body: string): string {
 /** Full Markdown document for one page. */
 export function toMarkdown(entry: Entry): string {
   const { title, description } = entry.data;
-  return `# ${title}\n\n${description ? description + '\n\n' : ''}${cleanBody(entry.body ?? '')}\n`;
+  return `# ${title}\n\n${description ? description + '\n\n' : ''}${cleanBody(entry.body ?? '', entry.id)}\n`;
 }
 
 /** Absolute URL of a page's Markdown source. */

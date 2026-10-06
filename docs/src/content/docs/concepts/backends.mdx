@@ -14,34 +14,35 @@ The `backend` package holds the interface only. `compile.Compile` parses filenam
 ```go
 type Backend interface {
     Name() string
-    Generate(schema *ir.Schema) ([]File, error)
+    Generate(schema *ir.Schema) (map[string][]byte, error)
 }
 ```
 
-Backends read only `*ir.Schema`, never source, and take no config struct. Select them at the `compile.Compile` call or with `--backend`, which filters which `Generate` runs (omit it to run all).
+Backends read only `*ir.Schema`, never source, and take no config struct. Select them at the `compile.Compile` call or with `--backend`, which filters which `Generate` runs (omit it to run all except `mcp`).
 
 ## Run the backends
 
 ```sh
 zever compile --out ./generated
-zever compile --backend=atlas,gogen,openapi,proto,protogogen,zenorm --out ./generated
+zever compile --backend=atlas,gogen,mcp,openapi,proto,protogogen,zenorm --out ./generated
 ls ./generated
 ```
 
 `./generated` holds one subtree per backend. Run `zever check schema/` first: backends assume a resolved schema.
 
-## The six backends
+## The seven backends
 
 | Backend | Reads | Emits |
 |---|---|---|
 | `zenorm` | `schema.Modules[*].Entities` only | Typed table and column bindings |
-| `gogen/app` | Modules and services | Application layer (handlers, wiring) |
+| `gogen` | Modules and services | Application layer (handlers, wiring) |
 | `proto` | Modules, enums, RPCs | Protobuf descriptors |
 | `protogogen` | Modules, enums, RPCs | `zever.app.v1` protobuf and `gen/zever/app` Go |
 | `openapi` | Services and HTTP bindings | OpenAPI document |
 | `atlas` | Modules and entities | Atlas HCL migration files, one per module |
+| `mcp` | Services | MCP tool manifests (JSON Schema in and out) and a runnable stdio server with handler stubs |
 
-The canonical `app.zen` fixture exercises all six. Both entities compile under the virtual path `schema/app/app.zen` (module `app`), so the `User <-> Order` relation needs no import. Adding services never affects zenorm output.
+The canonical `app.zen` fixture exercises the first six. Both entities compile under the virtual path `schema/app/app.zen` (module `app`), so the `User <-> Order` relation needs no import. Adding services never affects zenorm output.
 
 `dsl/naming` converts names per target: `APIKey` becomes `api_key` in Postgres and SQLite table names (acronym runs stay one word). SQL always binds args and quotes identifiers; dialect gates live with the ORM.
 
@@ -53,7 +54,7 @@ Same inputs must give the same bytes on every run.
 |---|---|
 | Sort map keys before rendering | Go map order is random per run |
 | Pin timestamps (no clock reads in output) | Same inputs must give the same bytes |
-| Repo-relative `File` paths | Outputs diff cleanly across machines |
+| Repo-relative output paths | Outputs diff cleanly across machines |
 | One subtree per backend | `--backend=` filtering stays trivial |
 | No network or unseeded randomness | Hermetic codegen |
 
@@ -61,8 +62,8 @@ Same inputs must give the same bytes on every run.
 
 1. Implement `Backend` with a stable `Name()`.
 2. Read only `*ir.Schema`; never re-parse source.
-3. Emit `File` values with repo-relative paths and deterministic rendering.
-4. Add a golden test under `dsl/compile/` with committed output.
+3. Return a path-to-bytes map with repo-relative paths and deterministic rendering. Implement `ContextBackend` (`GenerateContext`) only if generation does I/O that must honor cancellation.
+4. Add a golden test in the backend's package (`dsl/backend/<name>/`) with committed output.
 
 Golden workflow: edit `.zen`, run `zever check`, run `compile`, and review the full golden diff as the executable spec of the change. Accept with `-update` only after review:
 
@@ -96,6 +97,12 @@ Cause: a misspelled `--backend=` filter. Fix: use the lowercase names `atlas`, `
 <summary>CI shows non-deterministic diffs</summary>
 
 Cause: a backend iterates a map without sorting or embeds a timestamp. Fix: sort keys and pin times.
+</details>
+
+<details>
+<summary>`protogogen` fails running `protoc-gen-go-grpc`</summary>
+
+Cause: it shells out to `go tool protoc-gen-go-grpc`, which needs a working `go.mod` and `go.sum`. Fix: run `go mod tidy` in the project, then compile again.
 </details>
 
 <details>

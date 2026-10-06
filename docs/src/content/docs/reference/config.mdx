@@ -16,8 +16,10 @@ Zever config is one block per service, shaped `{ adapter, options }`. This page 
 | Env | `<SERVICE>_<FIELD>=value`, uppercase, no prefix: `DB_MAXCONNS=20`, `AUTH_JWT_SECRET=...`. Matching ignores case and `_`, so `DB_MAX_CONNS` also works. One nesting level splits at the first `_`. `<SERVICE>_ADAPTER` sets the adapter. |
 | Env strictness | Best-effort. Unknown variables are ignored, so a noisy process environment cannot break startup. Only a value that fails to parse for a resolved field returns `InvalidOptionsError` (the value is never echoed). |
 | Durations | In files, an integer count of nanoseconds (`5s` is `5000000000`). In env, a Go duration string such as `5s` or `5m`. |
+| Options replace defaults | A non-empty `options` block in a file replaces the default options for that service wholesale: keys you leave out become zero, not their `config.Default()` value. Repeat any default you still need (for example `password` needs all five parameters, `mailer` needs `host` and `port`, `ratelimit` needs `rate` and `burst`). An empty or missing `options` keeps the defaults. Env variables overlay one field at a time and do not replace the block. |
 | Unset values | A zero value (`0`, `""`, `false`) means unset: the adapter applies its own default, shown in the Default column when known. |
 | Redaction | Raw option maps can hold secrets. Log only through `RedactedServices` or `Redact`. Error text names services and fields, never values. |
+| Plugins | A top-level `plugins` map holds third-party services as `{adapter, options}` envelopes. The envelope is strict, but the options pass through raw and the plugin validates them. Env can override only `<PLUGIN>_ADAPTER`. |
 | Exceptions | The `secrets` env adapter reads secrets with a non-empty `prefix` (default `ZEVER`, so `ZEVER_FOO` is secret `FOO`). CLI switches use `ZEVER_INTERACTIVE` and `ZEVER_NO_HINT`. |
 
 ```yaml title="zever.yaml"
@@ -34,7 +36,7 @@ log:
 DB_MAXCONNS=20 DB_MAXCONNLIFETIME=5m AUTH_JWT_SECRET=prod-secret-at-least-32-bytes-long zever serve
 ```
 
-The same schema ships as `config/schema/zever.schema.json` for editor completion and validation of `zever.yaml`, `zever.yml`, and `zever.json`.
+A JSON Schema ships as `config/schema/zever.schema.json` for editor completion of `zever.yaml`, `zever.yml`, and `zever.json`. It currently lacks the `outbox` and `resilience` services and some adapter options, so this page, built from the Go option structs, is the authority.
 
 ## Services at a glance
 
@@ -213,7 +215,7 @@ Token and identity verification. Options nest under the adapter name (`jwt`, `se
 | `jwt.leeway` | duration | `0` | Tolerates clock skew when validating exp/nbf |
 | `oidc.issuer` | string | `""` | OIDC issuer URL |
 | `oidc.client_id` | string | `""` | Relying-party client ID |
-| `oidc.timeout` | duration | `0` | Operation timeout |
+| `oidc.timeout` | duration | `30s` | Operation timeout |
 | `oidc.allow_insecure` | boolean | `false` | Permits an http:// issuer (and a private-address issuer) for testing |
 
 The `session` adapter has no file-settable options: its `session.Store` is injected from Go.
@@ -270,20 +272,19 @@ Key/value cache with TTL. `db` selects postgres or sqlite by DSN.
 | `verbose` | boolean | `false` | Enables additional diagnostic output |
 | `dsn` | string | `""` | Postgres connection string or sqlite path for the db adapter |
 | `dedicated_pool` | boolean | `false` | Opts out of container-level pool sharing |
-| `sweep_interval` | duration | `0` | Controls how often expired entries are purged |
-| `max_entries` | integer | `0` | Bounds the number of stored entries before eviction |
+| `sweep_interval` | duration | `1m` | Controls how often expired entries are purged (memory adapter) |
+| `max_entries` | integer | `1000` | Bounds the number of stored entries before eviction (memory adapter) |
 | `url` | string | `""` | Redis connection URL |
 
 Redis connection keys, documented in [Redis connection options](#redis-connection-options): `addr`, `password`, `db`, `tls`, `require_tls`, `pool_size`, `min_idle_conns`, `pool_timeout`, `max_conn_idle_time`, `max_conn_lifetime`.
 
-The legacy integer `adapter` field inside `options` is deprecated and omitted here; use the outer `adapter` string.
+The `db` adapter's table, key prefix, and TTL are set from Go, not from config. The `adapter` field inside `options` is a legacy duplicate and is omitted here; use the outer `adapter` string.
 
 ```yaml title="zever.yaml"
 cache:
   adapter: redis
   options:
     addr: localhost:6379
-    prefix: app
     require_tls: true
 ```
 
@@ -293,7 +294,7 @@ Symmetric encryption and signing. The default config ships a deterministic dev k
 
 | | |
 |---|---|
-| Adapters | `local` |
+| Adapters | `local`, `kms` |
 | Default adapter | `local` |
 | Accessor | `c.Crypto()` |
 | Guide | [Crypto and secrets guide](../../guides/security/crypto-secrets/) |
@@ -304,9 +305,11 @@ Symmetric encryption and signing. The default config ships a deterministic dev k
 | `sign_key` | string | `""` | Base64-encoded 64-byte signing key |
 | `key_id` | string | `""` | Primary KMS key identifier used for envelope encryption |
 | `key_ids` | list of strings | none | Lists accepted KMS key identifiers for rotation |
-| `region` | string | `""` | KMS region (e.g |
+| `region` | string | `""` | KMS region (for example an AWS region) |
 | `endpoint` | string | `""` | Overrides the KMS endpoint (custom KMS, tests, VPC endpoints) |
 | `use_envelope` | boolean | `false` | Selects KMS envelope encryption |
+
+The `kms` adapter fails closed from config: it needs a real KMS client injected from Go, because its dev stub is not a file option. Use `local` for file-only setups.
 
 ```yaml title="zever.yaml"
 crypto:
@@ -427,7 +430,7 @@ Feature flags from a static file or Firebase. Options nest under the adapter nam
 | `static.reload` | boolean | `false` | Enables file reloading |
 | `firebase.project_id` | string | `""` | Firebase project ID |
 | `firebase.service_account` | string | `""` | Path to the service account JSON key file |
-| `firebase.timeout` | duration | `0` | Operation timeout |
+| `firebase.timeout` | duration | `30s` | Operation timeout |
 
 ```yaml title="zever.yaml"
 flag:
@@ -484,8 +487,8 @@ Message catalogs. Options nest under the adapter name.
 | `embed.fallback` | string | `""` | Fallback locale |
 | `remote.endpoint` | string | `""` | Remote service base URL |
 | `remote.api_key` | string | `""` | Remote service credential |
-| `remote.timeout` | duration | `0` | Operation timeout |
-| `remote.max_in_flight` | integer | `0` | Caps concurrent requests |
+| `remote.timeout` | duration | `30s` | Operation timeout |
+| `remote.max_in_flight` | integer | `1000` | Caps concurrent requests |
 | `remote.allow_insecure` | boolean | `false` | Permits http:// endpoints |
 
 ```yaml title="zever.yaml"
@@ -545,7 +548,7 @@ Distributed leases with a TTL.
 | `prefix` | string | `""` | Scopes lock keys to one namespace |
 | `ttl` | duration | `30s` | Default lease lifetime |
 | `retry_interval` | duration | `50ms` | How long Acquire waits between attempts |
-| `max_entries` | integer | `0` | Bounds the number of stored leases before LRU eviction |
+| `max_entries` | integer | `1000` | Bounds the number of stored leases before LRU eviction (memory adapter) |
 
 Redis connection keys, documented in [Redis connection options](#redis-connection-options): `addr`, `password`, `db`, `tls`, `require_tls`.
 
@@ -570,7 +573,7 @@ Structured logging. Only the minimum level is configurable here.
 
 | Key | Type | Default | Description |
 |---|---|---|---|
-| `min_level` | string | none | Minimum severity emitted by the logger |
+| `min_level` | integer | `0` | Minimum severity emitted by the logger: `0` debug, `1` info, `2` warn, `3` error, `4` fatal. In a file it is an integer, not a name. |
 
 ```yaml title="zever.yaml"
 log:
@@ -662,7 +665,7 @@ SMS and push notifications. Twilio and FCM options nest under their names.
 
 | Key | Type | Default | Description |
 |---|---|---|---|
-| `timeout` | duration | `0` | Operation timeout |
+| `timeout` | duration | `30s` | Operation timeout |
 | `twilio.account_sid` | string | `""` | Twilio account SID for basic-auth and URL path |
 | `twilio.auth_token` | string | `""` | Twilio auth token for basic-auth |
 | `twilio.from_number` | string | `""` | Twilio sender phone number in E.164 format |
@@ -777,6 +780,8 @@ password:
     time: 3
     memory: 65536
     threads: 4
+    salt_length: 16
+    key_length: 32
 ```
 
 ### `payment`
@@ -861,9 +866,9 @@ Message queue with visibility timeouts.
 
 | Key | Type | Default | Description |
 |---|---|---|---|
-| `visibility_timeout` | duration | `0` | Duration a popped message remains invisible before reclaim |
-| `poll_timeout` | duration | `0` | Duration Pop waits for a message before returning empty |
-| `buffer` | integer | `0` | Maximum number of buffered ready messages per topic |
+| `visibility_timeout` | duration | `30s` | Duration a popped message remains invisible before reclaim |
+| `poll_timeout` | duration | `5s` | Duration Pop waits for a message before returning empty |
+| `buffer` | integer | `10000` (memory) | Maximum number of buffered ready messages per topic |
 | `url` | string | `""` | Redis connection URL |
 | `prefix` | string | `""` | Key prefix for Redis queue data |
 | `dsn` | string | `""` | Postgres connection string or sqlite path |
@@ -935,8 +940,8 @@ Retry, timeout, circuit breaker, and bulkhead policies.
 | `breaker.failure_ratio` | number | `0.5` | Failure ratio in [0,1] that trips the breaker |
 | `breaker.consecutive_failures` | integer | `5` | Trips the breaker after this many consecutive failures |
 | `bulkhead.max_concurrent` | integer | `100` | Number of concurrent executions admitted |
-| `bulkhead.max_queue` | integer | `100` | Bounds the number of waiters; <= 0 is unbounded |
-| `bulkhead.max_wait` | duration | `1s` | Bounds how long a caller waits for a slot; <= 0 waits indefinitely |
+| `bulkhead.max_queue` | integer | `100` | Bounds the number of waiters; 0 or less is unbounded |
+| `bulkhead.max_wait` | duration | `1s` | Bounds how long a caller waits for a slot; 0 or less waits indefinitely |
 | `redis.url` | string | `""` | Reserved and currently ignored |
 | `redis.prefix` | string | `resilience` | Key namespace for Redis resilience data |
 | `retry` | object |  | Backoff policy. Keys are listed in [Retry policy](#retry-policy). |
@@ -992,13 +997,11 @@ Cron-style scheduler. It resolves the job dispatcher, so it shares the process-w
 | `dsn` | string | `""` | Postgres connection string or sqlite path for the postgres adapter |
 | `dedicated_pool` | boolean | `false` | Opts out of container-level pool sharing |
 
-`scheduler.Options.Dispatcher` is required but is injected in code; a file can set only `close_timeout`, `dsn`, and `dedicated_pool`.
+`scheduler.Options.Dispatcher` is required and is injected in code, so a file `options` block replaces it with nil and `Load` fails with `dispatcher_is_required`. Leave `options` out of the file and set `close_timeout`, `dsn`, and `dedicated_pool` with env instead: `SCHEDULER_CLOSETIMEOUT=3s`, `SCHEDULER_DSN=...`.
 
 ```yaml title="zever.yaml"
 scheduler:
-  adapter: embedded
-  options:
-    close_timeout: 5000000000
+  adapter: postgres
 ```
 
 ### `search`
@@ -1015,7 +1018,7 @@ Full-text search. `db` is the canonical name; `postgres` and `sqlite` stay as al
 | Key | Type | Default | Description |
 |---|---|---|---|
 | `host` | string | `""` | Meilisearch URL required by meilisearch |
-| `api_key` | string | `""` | Backend API key, never logged. Never logged |
+| `api_key` | string | `""` | Backend API key. Never logged |
 | `dsn` | string | `""` | Postgres URL or sqlite path, required by postgres/sqlite |
 | `dedicated_pool` | boolean | `false` | Opts out of container-level pool sharing |
 | `allow_insecure` | boolean | `false` | Permits an http:// Host for testing |
@@ -1175,7 +1178,7 @@ Embedding storage and similarity search. `db` is canonical; `sqlite` and `pgvect
 | `dsn` | string | `""` | Sqlite path or postgres URL |
 | `dedicated_pool` | boolean | `false` | Opts out of container-level pool sharing |
 | `url` | string | `""` | Qdrant address |
-| `api_key` | string | `""` | Backend credential and is never logged. Never logged |
+| `api_key` | string | `""` | Backend credential. Never logged |
 | `dimension` | integer | `1536` | Expected embedding dimension |
 | `allow_insecure` | boolean | `false` | Permits an http:// URL for testing |
 
@@ -1201,7 +1204,7 @@ Signed webhook delivery with retries, directly over HTTP or through the queue.
 
 | Key | Type | Default | Description |
 |---|---|---|---|
-| `timeout` | duration | `0` | Per-delivery operation timeout |
+| `timeout` | duration | `10s` | Per-delivery operation timeout |
 | `max_retries` | integer | `0` | Number of delivery retries after the initial attempt |
 | `allow_private_targets` | boolean | `false` | Permits http(s) targets resolving to private addresses |
 | `queue_adapter` | string | `""` | Names the queue adapter backing the queue adapter |

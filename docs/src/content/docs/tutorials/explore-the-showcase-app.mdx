@@ -5,7 +5,7 @@ description: Tour examples/showcase, one schema using every DSL feature, served 
 
 import { LinkCard, CardGrid } from '@astrojs/starlight/components';
 
-You will run `examples/showcase`: one schema using every DSL feature, served over HTTP and gRPC from one implementation. It takes about 15 minutes. You need Go 1.27+, the `zever` CLI, and a repo clone. For a narrow end-to-end flow, see [Build a booking API](../build-a-booking-api/).
+You will run `examples/showcase`: one schema using every DSL feature, served over HTTP and gRPC from one implementation. It takes about 15 minutes. You need Go 1.27+, the `zever` CLI, and a repo clone. For a narrow flow, see [Build a booking API](../build-a-booking-api/).
 
 All commands run from `examples/showcase/` unless noted.
 
@@ -23,23 +23,23 @@ cd examples/showcase
 | Named `enum` | `OrderStatus`, `Role` |
 | Inline `enum()` | `Order.priority` |
 | Optional field and `@default` | `User.nickname`, `Order.note` |
-| `has_many` / `belongs_to` | The `User`/`Order`/`OrderItem`/`Review` graph |
+| `has_many` / `belongs_to` | the `User`/`Order`/`OrderItem`/`Review` graph |
 | `has_one` (`@unique` foreign key) | `User.profile` |
-| `many_to_many` with reciprocal `join_table` | `Product.tags` |
+| `many_to_many` + reciprocal `join_table` | `Product.tags` |
 | `index()` and `@unique` index | `Product`, `Order` |
-| `@schema` | `Order` maps to a separate `billing` schema |
+| `@schema` | `Order` to a separate `billing` schema |
 | `@renamed_from` | `Product.headline` (was `title`) |
 | `message` request, nested, and returns | `CreateOrderRequest`, `CheckoutRequest`, `OrderReceipt` |
-| Every HTTP verb, every `auth:` shape, `permission: check`, `errors:` sets, `paginated: true` | `ShopService` RPCs |
+| Every HTTP verb, `auth:` shape, `permission: check`, `errors:`, `paginated: true` | `ShopService` RPCs |
 | Job params, queues, retry shapes, `cron` and `dispatch` | 4 jobs, 2 schedules |
 
 ## Understand one implementation, two transports
 
-`cmd/server` mirrors `zever generate server`: HTTP (`:8080`) and gRPC (`:9090`) from one container, with auth enforced identically on both through the same generated `GRPCPolicies` plus `authz`. The logic lives once, in `internal/service/shop/shop_service.go` (`ShopServiceImpl`, 9 RPCs). The `/api/*` HTTP routes that need richer shapes (register/login, item-list checkout) are thin adapters over that implementation, never a second copy. `cmd/worker` mirrors `zever generate worker`: one handler per declared job and one registration per declared schedule.
+`cmd/server` mirrors `zever generate server`: HTTP (`:8080`) and gRPC (`:9090`) from one container, with auth enforced identically on both through the same generated `GRPCPolicies` plus `authz`. The logic lives once, in `internal/service/shop/shop_service.go` (`ShopServiceImpl`, 9 RPCs); the `/api/*` routes that need richer shapes are thin adapters over it, never a second copy. `cmd/worker` mirrors `zever generate worker`: one handler per job, one registration per schedule.
 
 ## Run it
 
-`AUTH_JWT_SECRET` (at least 32 bytes) is required by every entrypoint; the app fails closed (see [Configuration](../../guides/operate/configuration/)).
+`AUTH_JWT_SECRET` (32+ bytes) is required by every entrypoint; the app fails closed ([Configuration](../../guides/operate/configuration/)).
 
 ```sh
 export AUTH_JWT_SECRET=dev-only-secret-at-least-32-bytes-long
@@ -51,8 +51,8 @@ go run ./db/seed          # idempotent
 Checkpoint:
 
 ```text
-applied 8 tables to data/showcase.db
-seeded demo shop data
+OK applied 16 statement(s) via sqlite
+{"time":"...","level":"INFO","msg":"seed complete"}
 ```
 
 Serve and work in two terminals:
@@ -65,26 +65,29 @@ go run ./cmd/worker       # jobs + embedded scheduler
 Checkpoint, server then worker:
 
 ```text
-http listening on :8080
-grpc listening on :9090
+{"time":"...","level":"INFO","msg":"http server listening","addr":":8080"}
+{"time":"...","level":"INFO","msg":"grpc server listening","addr":":9090"}
 ```
 
 ```text
-registered 4 jobs
-scheduler started: 2 schedules
+{"time":"...","level":"INFO","msg":"worker started","jobs":4,"schedules":2}
 ```
 
-Prove HTTP parity with curl:
+Prove HTTP parity with curl. Every `/api/*` route except register and login needs a bearer token:
 
 ```sh
-curl -s localhost:8080/api/products | head -c 200
+curl -s -X POST localhost:8080/api/register -H 'Content-Type: application/json' \
+  -d '{"email":"you@example.com","name":"You","password":"correct horse battery staple"}'
+TOKEN=$(curl -s -X POST localhost:8080/api/login -H 'Content-Type: application/json' \
+  -d '{"email":"you@example.com","password":"correct horse battery staple"}' | jq -r .token)
+curl -s localhost:8080/api/products -H "Authorization: Bearer $TOKEN" | head -c 200
 ```
 
 ```text
-{"products":[{...}]}
+[{"id":"seed-product-gizmo","category_id":"seed-category-gadgets","sku":"GIZMO-002",...}]
 ```
 
-An unauthenticated call to a guarded RPC fails identically on `:8080` and `:9090`.
+An unauthenticated call to a guarded RPC fails identically on `:8080` (`401 missing bearer token`) and `:9090`.
 
 ## Inspect the schema without running anything
 
@@ -102,17 +105,16 @@ zever check-boundaries schema/shop/shop.zen
 Expected output shape:
 
 ```text
-# check: ok, no diagnostics
-# routes: one line per RPC with verb + path
-# graph: entity nodes with relation edges
-# explain: auth, permission, validation, error set for Checkout
+# check: OK 1 file(s) valid
+# fmt: no output when already formatted (lists files that would change; --write rewrites)
+# routes: GET /products -> shop.ShopService.ListProducts, one line per RPC
+# graph: Mermaid entity nodes with relation edges
+# explain: transports, auth, permission, and error set for Checkout
 ```
-
-`explain` on `Checkout` shows how one RPC resolves through auth, permission, validation, and its error set.
 
 ## Regenerate after a schema change
 
-`generated/` is CLI output; never hand-edit it. Run this from the repository root so the `gogen`/`protogogen` import paths resolve:
+`generated/` is CLI output; never hand-edit it. Run from the repository root so `gogen`/`protogogen` import paths resolve:
 
 ```sh
 zever compile examples/showcase/schema/shop/shop.zen \
@@ -123,15 +125,11 @@ zever compile examples/showcase/schema/shop/shop.zen \
 Checkpoint:
 
 ```text
-wrote atlas output
-wrote gogen output
-wrote openapi output
-wrote proto output
-wrote protogogen output
-wrote zenorm output
+✔ compiled 1 file(s) → examples/showcase/generated (14 outputs, backends: atlas,gogen,openapi,proto,protogogen,zenorm)
 ```
 
 Everything under `internal/app`, `internal/service`, `internal/api`, the schema, `zever.yaml`, and the tests is hand-owned and never overwritten.
+
 
 <details>
 <summary>Troubleshooting</summary>
@@ -146,6 +144,6 @@ Everything under `internal/app`, `internal/service`, `internal/api`, the schema,
 ## Next steps
 
 <CardGrid>
-  <LinkCard title="Backends" description="What each of the six backends produces from this schema." href="../../concepts/backends/" />
+  <LinkCard title="Backends" description="What each of the seven backends produces from this schema." href="../../concepts/backends/" />
   <LinkCard title="Query builder" description="The typed ORM the zenorm backend generates." href="../../guides/data/query-builder/" />
 </CardGrid>

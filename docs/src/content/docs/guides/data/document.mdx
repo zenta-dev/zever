@@ -3,18 +3,16 @@ title: Documents
 description: Render document sources to PDF, PNG, or JPG with a local, LaTeX, or remote renderer.
 ---
 
-import { Tabs, TabItem, LinkCard, CardGrid } from '@astrojs/starlight/components';
+import { LinkCard, CardGrid } from '@astrojs/starlight/components';
 
-`document.Document` turns a source into a PDF or image with one `Render` call, a typed `OutputFormat` (`pdf`, `png`, `jpg`), and a clamped `Quality`. Callers do not need to know whether a LaTeX toolchain or a remote API does the work.
+`document.Document` turns a source into a PDF or image with one `Render` call, a typed `OutputFormat` (`pdf`, `png`, `jpg`), and a `Quality` bounded to 0 to 100. Callers never learn whether LaTeX or a remote API did the work.
 
 ## Quick start
 
-- `local` (default, `adapters/document/local`) renders in your process.
-- `latex` shells out to a fixed, configured compiler. Use it for `.tex` sources.
-- `remote` sends the job to a rendering API over HTTP, so you skip installing LaTeX. It needs `endpoint` and `api_key`.
+- `local` (default, `adapters/document/local`) renders HTML in headless Chrome.
+- `latex` shells out to a fixed, configured compiler; use it for `.tex` sources.
+- `remote` sends the job to a rendering API over HTTP. It needs `endpoint` (https, or http with `allow_insecure: true`); a non-empty `api_key` is sent as a bearer token.
 
-<Tabs>
-  <TabItem label="local">
 ```yaml title="zever.yaml"
 document:
   adapter: local
@@ -25,35 +23,12 @@ document:
     max_output_bytes: 67108864
     timeout: 30000000000   # nanoseconds
 ```
-  </TabItem>
-  <TabItem label="env">
-```sh
-DOCUMENT_ADAPTER=latex
-DOCUMENT_LATEX_COMMAND=pdflatex
-DOCUMENT_LATEX_PDF_TO_PPM=pdftoppm
-DOCUMENT_LATEX_RUNS=2
-DOCUMENT_ENDPOINT=https://render.internal/v1
-DOCUMENT_API_KEY=...
-```
-  </TabItem>
-</Tabs>
 
-| Key | Rule |
-|---|---|
-| `quality` | Clamped to 0 to 100. Pass user input through and let `ClampQuality` handle it |
-| `dpi` | Must be 0 or more |
-| `max_output_bytes` | 0 or more. Caps rendered output (default 64 MiB) |
-| `timeout` | 0 or more. File values are nanoseconds, env accepts `30s` |
-| `tmp_dir` | Holds intermediate artifacts |
-| `latex_command`, `latex_pdf_to_ppm` | Config only, never interpolated from document content (defaults `pdflatex`, `pdftoppm`) |
-| `latex_runs` | Bounds compiler passes |
-| `endpoint`, `api_key` | For `remote`. `endpoint` must be an absolute URL with scheme and host |
-
-See the [document options](../../../reference/config/#document).
+`quality` must be 0 to 100 (`Validate` rejects other values; `ClampQuality` clamps user input before you pass it); `dpi`, `max_output_bytes` (default 64 MiB), and `timeout` must be 0 or more. Durations are nanoseconds, env accepts `30s`. `latex_command` and `latex_pdf_to_ppm` (defaults `pdflatex`, `pdftoppm`) are config only, never interpolated from document content. `latex_runs` bounds compiler passes. For `remote`, `endpoint` must be an absolute URL with scheme and host (`allow_insecure` permits http). See the [document options](../../../reference/config/#document).
 
 ## Render a document
 
-Register the adapter first, because the container wires nothing. `Document()` resolves lazily, caches, and retries after an error.
+Register the adapter first; the container wires nothing. `Document()` resolves lazily, caches, and retries.
 
 ```go title="main.go"
 package main
@@ -94,12 +69,12 @@ func main() {
 bytes: 1240
 ```
 
-The byte count varies by adapter and source. Check the error before you write anything to disk.
+The byte count varies by adapter and source. Check the error before writing to disk.
 
 ## Production checklist
 
 - Sources are capped at 10 MiB and output at 64 MiB by default. Raise them deliberately and with a measured reason.
-- The `latex` adapter never interpolates a caller-supplied command, so document content cannot reach a shell. Lock down `tmp_dir` permissions too.
+- The `latex` adapter never interpolates a caller-supplied command, so document content cannot reach a shell. Lock down `tmp_dir` too.
 - Bound renders with `timeout` and clean up temp artifacts on error paths.
 - `api_key` never appears in logs, and `endpoint` is validated before the first request.
 
@@ -114,7 +89,7 @@ Cause: that is the contract, with no partial files. Fix: inspect the error, do n
 <details>
 <summary>LaTeX renders fail with "command not found"</summary>
 
-Cause: `latex_command` or `latex_pdf_to_ppm` is not on `PATH` (or not an absolute path) where the process runs. Fix: install them, or use the `remote` adapter.
+Cause: `latex_command` or `latex_pdf_to_ppm` is not on `PATH` (or not an absolute path). Fix: install them, or use the `remote` adapter.
 </details>
 
 <details>
@@ -128,6 +103,5 @@ Cause: `endpoint` is not an absolute URL with scheme and host, or `timeout` is n
 <CardGrid>
   <LinkCard title="Media processing" href="../media/" description="Image and video limits." />
   <LinkCard title="Storage and media" href="../storage-media/" description="Store rendered files." />
-  <LinkCard title="Adapters matrix" href="../../../reference/adapters-matrix/" description="Every adapter by service." />
   <LinkCard title="Container" href="../../../concepts/container/" description="Lazy resolve and close order." />
 </CardGrid>

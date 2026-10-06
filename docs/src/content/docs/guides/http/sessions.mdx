@@ -5,17 +5,12 @@ description: Keep server-side sessions in memory, Redis, or a database, and send
 
 import { Tabs, TabItem, LinkCard, CardGrid } from '@astrojs/starlight/components';
 
-A session is a server-side row behind a cookie: the browser holds an opaque ID, the server holds the data. Use sessions for browser flows that need revocation (logout, password reset, privilege change). Use stateless tokens (`auth`) for APIs, mobile, and service-to-service calls.
+A session is a server-side row behind a cookie: the browser holds an opaque ID, the server holds the data. Use sessions for browser flows that need revocation (logout, password reset, privilege change), and stateless tokens (`auth`) for APIs and service-to-service calls.
 
 ## Quick start
 
 <Tabs>
   <TabItem label="YAML">
-```yaml
-session:
-  adapter: memory   # dev: no infrastructure
-```
-
 ```yaml
 session:
   adapter: redis    # production: shared across instances
@@ -27,12 +22,12 @@ session:
   <TabItem label="Env">
 ```sh
 SESSION_ADAPTER=redis
-SESSION_ADDR=redis:6379
+SESSION_REDIS_ADDR=redis:6379
 ```
   </TabItem>
 </Tabs>
 
-`config.Default()` resolves `memory`, so tests need no server. Zero TTL means `DefaultTTL` (15 minutes); `Options.Validate()` rejects negative TTLs. The schema also allows a `db` adapter. All options: [Config reference](../../../reference/config/#session).
+`config.Default()` resolves `memory` (dev needs no server). Zero TTL means `DefaultTTL` (15 minutes); `Options.Validate()` rejects negative TTLs. The `db` adapter takes `dsn` and `dedicated_pool` (shares the container pool per DSN by default); `redis` takes `redis.prefix` plus the shared Redis connection keys. All options: [Config reference](../../../reference/config/#session).
 
 Create, save, and read a session:
 
@@ -45,20 +40,12 @@ import (
     "github.com/zenta-dev/zever/core/session"
 )
 
-// At startup (the container wires nothing by itself):
-//   sessionmemory.Register() // adapters/session/memory
-//   c := container.New(config.Default())
-//   store, err := c.Session()
+// At startup: sessionmemory.Register(); c := container.New(config.Default()); store, _ := c.Session()
 
 func login(ctx context.Context, store session.Store, w http.ResponseWriter) error {
-    sess, err := store.Create(ctx, session.DefaultTTL)
-    if err != nil {
-        return err
-    }
+    sess, _ := store.Create(ctx, session.DefaultTTL)
     sess.Data["user_id"] = "u_123"
-    if err := store.Save(ctx, sess); err != nil {
-        return err
-    }
+    _ = store.Save(ctx, sess)
     cookie.Set(w, sess.ID, cookie.Options{})
     return nil
 }
@@ -74,55 +61,39 @@ func loadSession(ctx context.Context, store session.Store, r *http.Request) (ses
 
 ```sh
 curl -s -i -X POST localhost:8080/login | head -8
-curl -s localhost:8080/me --cookie "session_id=<id-from-login>"
 ```
 
 ```text
 HTTP/1.1 200 OK
 Set-Cookie: session_id=<opaque-id>; Path=/; HttpOnly; Secure; SameSite=Lax
-{"user_id":"u_123"}
 ```
 
-`Session()` resolves lazily and caches (a failed call retries). `Get` returns `session.ErrNotFound` for a missing or expired session, which are indistinguishable by design. `Session.Data` is a plain `map[string]any`. Keep it to IDs and flags, because every request loads the row. A `ttl <= 0` passed to `Create` means no expiry.
+`Session()` resolves lazily and caches. `Get` returns `session.ErrNotFound` for a missing or expired session, which are indistinguishable by design. `Session.Data` is a plain `map[string]any`; keep it to IDs and flags, because every request loads the row. A `ttl <= 0` passed to `Create` means no expiry.
 
 ## Set the session cookie
 
-`session.Store` knows nothing about HTTP. The `session/cookie` helper builds a plain `*http.Cookie` from a session ID:
-
-```go
-c := cookie.New(sess.ID, cookie.Options{})
-http.SetCookie(w, c)
-// or: cookie.Set(w, sess.ID, cookie.Options{})
-```
+`session.Store` knows nothing about HTTP. `cookie.New(sess.ID, opts)` builds a plain `*http.Cookie`; `cookie.Set(w, id, opts)` writes it.
 
 | Attribute | Default |
 |---|---|
-| Name | `cookie.DefaultName` (`session_id`); `Options.Name` overrides. |
-| Path | `cookie.DefaultPath` (`/`); `Options.Path` overrides. |
+| Name, Path | `cookie.DefaultName` (`session_id`) and `cookie.DefaultPath` (`/`); `Options.Name` and `Options.Path` override. |
 | `Domain` | Unset (host-only). A value widens the cookie to subdomains. |
-| `Prefix` | None. `cookie.PrefixHost` (`__Host-`) forces Secure, `Path=/`, no Domain. `cookie.PrefixSecure` (`__Secure-`) forces Secure. |
-| `HttpOnly` | `true`. |
-| `Secure` | `true` (HTTPS only). |
-| `SameSite` | `Lax`; use `http.SameSiteStrictMode` for high-risk apps. |
+| `Prefix` | None. `cookie.PrefixHost` (`__Host-`) forces Secure, `Path=/`, no Domain; `cookie.PrefixSecure` (`__Secure-`) forces Secure. |
+| Secure flags | `HttpOnly` and `Secure` default to `true` (HTTPS only); `SameSite` defaults to `Lax` (use `http.SameSiteStrictMode` for high-risk apps). |
 | `MaxAge` | `0`: a session cookie. Negative deletes it; positive sets `Max-Age` and `Expires`. |
 
 `Secure` and `HttpOnly` are `*bool`, so an explicit `false` (local HTTP dev) differs from unset. Rotate the session ID at privilege changes (login, password reset) to block fixation: `Delete` the old row, then `Create` a new one.
 
-## Store API
+## Use the store API
 
-| Method or helper | Purpose |
+| Method | Purpose |
 |---|---|
 | `Create(ctx, ttl)` | Mint a session; `ttl <= 0` never expires. |
 | `Get(ctx, id)` | Load by ID; `ErrNotFound` on missing or expired. |
 | `Save(ctx, sess)` | Upsert the row and touch `UpdatedAt`. |
 | `Delete(ctx, id)` | Remove the row; idempotent (use for logout). |
-| `session.NewSession(id, ttl)` | Build a session value with expiry. |
-| `Session.Clone()` | Deep copy including `Data`. |
-| `Session.Expired(now)` | Report whether the session lapsed. |
-| `session.Open(adapter, opts)` | Open an adapter without the container. |
-| `session.Register(adapter, factory)` | Add a custom adapter. |
 
-Sessions versus auth: use `auth` (`jwt`, `oidc`) for stateless tokens, `session` for revocable browser flows, and `authz` to verify via `auth` and decide via `permission`.
+Helpers: `session.NewSession(id, ttl)`, `Session.Clone()`, `Session.Expired(now)`, `session.Open(adapter, opts)`, and `session.Register(adapter, factory)`. Use `auth` (`jwt`, `oidc`) for stateless tokens, `session` for revocable browser flows, and `authz` to verify via `auth` and decide via `permission`.
 
 ## Production checklist
 
@@ -149,18 +120,6 @@ Two instances run `memory` sessions. Set `session.adapter: redis` with a shared 
 <summary>`Get` returns `ErrNotFound` right after `Create`</summary>
 
 `Save` was skipped, or the cookie holds the wrong ID. `Save` after mutating `Data`, and set the cookie from `sess.ID`.
-</details>
-
-<details>
-<summary>Logout does not stick</summary>
-
-Only the client cookie was cleared. Call `Delete` on the server too.
-</details>
-
-<details>
-<summary>Sessions never expire</summary>
-
-A non-positive TTL means no expiry. Pass an explicit duration, or zero in config to get the 15 minute default.
 </details>
 
 ## Related

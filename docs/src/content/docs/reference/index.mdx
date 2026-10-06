@@ -1,6 +1,6 @@
 ---
 title: Reference
-description: Lookup pages for the Zever CLI, configuration keys, adapters, package entry points, and the agent skill.
+description: Lookup pages for the Zever CLI, configuration keys, adapters, package entry points, errors, and benchmarks.
 ---
 
 import { CardGrid, LinkCard } from '@astrojs/starlight/components';
@@ -27,6 +27,12 @@ import FeatureCard from '../../../components/docs/mdx/FeatureCard.astro';
   </FeatureCard>
   <FeatureCard title="API index" href="/zever/reference/api-index/">
     Package entry points with the container accessor for each service.
+  </FeatureCard>
+  <FeatureCard title="Errors" href="/zever/reference/errors/">
+    The repo error conventions: message format, sentinels, wrapping, and branching.
+  </FeatureCard>
+  <FeatureCard title="Benchmarks" href="/zever/reference/benchmarks/">
+    Point-in-time hot-path numbers for router, ORM, queue, and more, with repro commands.
   </FeatureCard>
   <FeatureCard title="Agent skill" href="/zever/reference/agent-skill/">
     Install and use the Zever skill so Claude Code knows the commands and safe workflows.

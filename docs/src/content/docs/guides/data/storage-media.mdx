@@ -5,11 +5,11 @@ description: Store files behind policy-gated presigned URLs, locally or on S3 an
 
 import { Tabs, TabItem, LinkCard, CardGrid } from '@astrojs/starlight/components';
 
-`storage.Storage` hands out presigned upload and download URLs for opaque objects such as receipts, photos, and exports, and gates access with one policy. `media` is the pipeline on top: upload, probe, transform, and serve, covered in [Media processing](../media/).
+`storage.Storage` hands out presigned upload and download URLs for opaque objects such as receipts and photos, gated by one policy. `media` adds the transform and serve pipeline: [Media processing](../media/).
 
 ## Quick start
 
-Pick `local` for a single instance. It writes under `root`, needs no infra, and is the default. Pick `s3` or `r2` once more than one instance must see the same files.
+Pick `local` for a single instance: it writes under `root` and needs no infra. Pick `s3` or `r2` when instances must share files.
 
 <Tabs>
   <TabItem label="local">
@@ -20,7 +20,6 @@ storage:
     root: ./data/storage
     secret: dev-only-hmac-secret
     url_base: http://localhost:8080/files
-    public_url: http://localhost:8080/files
 ```
   </TabItem>
   <TabItem label="s3">
@@ -37,22 +36,13 @@ storage:
     url_base: https://files.example.com
 ```
   </TabItem>
-  <TabItem label="env">
-```sh
-STORAGE_ADAPTER=s3
-STORAGE_REGION=us-east-1
-STORAGE_ACCESS_KEY_ID=AKIAEXAMPLE
-STORAGE_SECRET_ACCESS_KEY=prod-secret-here
-STORAGE_URL_BASE=https://files.example.com
-```
-  </TabItem>
 </Tabs>
 
-`policy_sync` is `manual` or `auto`. `sync_fail` is `warn` or `require`. `endpoint` needs a scheme and host. `r2` needs `account_id`. The `local` adapter defaults `root` to `/tmp/storage`. Without a `secret` it uses an ephemeral key (presigned URLs break on restart), and with `ZEVER_ENV=production` or `prod` it refuses to start. See the [storage options](../../../reference/config/#storage) and [media options](../../../reference/config/#media).
+Env vars: `STORAGE_ADAPTER`, `STORAGE_REGION`, `STORAGE_ACCESS_KEY_ID`, `STORAGE_SECRET_ACCESS_KEY`, `STORAGE_URL_BASE`. `policy_sync` is `manual` or `auto`; `sync_fail` is `warn` or `require`. `endpoint` needs a scheme and host, and a custom `endpoint` also requires `url_base`. `r2` needs `account_id`. `local` defaults `root` to `/tmp/storage`; without `secret` it uses an ephemeral key (presigned URLs break on restart) and refuses to start under `ZEVER_ENV=production` or `prod`. See the [storage options](../../../reference/config/#storage) and [media options](../../../reference/config/#media).
 
 ## Mint a presigned URL
 
-Storage addresses objects by `bucket` and `key`. Resolve it with `c.Storage()` (lazy, cached, retried after an error), or open the adapter directly:
+Storage addresses objects by `bucket` and `key`. Resolve with `c.Storage()` (lazy, cached, retried) or open the adapter directly:
 
 ```go title="main.go"
 package main
@@ -69,8 +59,10 @@ import (
 func main() {
 	ctx := context.Background()
 	st, err := storagelocal.New(storage.Options{
-		Root:    "./data/storage",
-		Secret:  "dev-only-hmac-secret",
+		LocalOptions: storage.LocalOptions{
+			Root:   "./data/storage",
+			Secret: "dev-only-hmac-secret",
+		},
 		URLBase: "http://localhost:8080/files",
 	})
 	if err != nil {
@@ -91,11 +83,11 @@ func main() {
 }
 ```
 
-The `Storage` interface also has `Exists`, `Delete`, `Move` (overwrites the destination; a missing source reports `ErrNotFound`), `Name`, and `Close(ctx)`. Call the interface, not adapter internals, so the policy check always runs.
+The interface also has `Exists`, `Delete`, `Move` (overwrites the destination; a missing source reports `ErrNotFound`), `Name`, and `Close(ctx)`. Call the interface, not adapter internals, so the policy check runs.
 
 ## Gate access with a policy
 
-`policy` is a flat map. The `default` key covers unlisted buckets, and every other key is a bucket. Each bucket sets rules for `read`, `write`, `update`, and `delete`. A rule has `public`, `allow`, and `deny`, and deny wins. `*` matches any authenticated subject, and `anonymous` matches everyone.
+`policy` is a flat map: `default` covers unlisted buckets, every other key is a bucket. Each bucket sets `read`, `write`, `update`, and `delete` rules with `public`, `allow`, and `deny` (deny wins). `*` matches any authenticated subject, `anonymous` matches everyone.
 
 ```yaml title="zever.yaml"
 storage:
@@ -109,23 +101,13 @@ storage:
         write: { allow: ["owner"] }
 ```
 
-## Choose an adapter
-
-| Service | Adapter | Notes |
-|---|---|---|
-| storage | `local` | Default filesystem store, HMAC presigns via `secret` |
-| storage | `s3` | S3-compatible, shared core in `shared/s3opts` |
-| storage | `r2` | Cloudflare R2, needs `account_id` |
-| media | `local` | Default pipeline root, serves under `base_url` |
-| media | `s3` | Shared object hold, needs `bucket` plus credentials |
-
-Storage and media adapters are independent. Keeping them aligned avoids cross-store copies. See the [adapters matrix](../../../reference/adapters-matrix/).
+Storage and media adapters are independent; keep them aligned to avoid cross-store copies. See the [adapters matrix](../../../reference/adapters-matrix/).
 
 ## Production checklist
 
-- Cap everything: media `max_download_bytes` (64 MiB), `max_pixels` (about 50 MP), `max_duration` for video, and `presign_ttl` (1h default, 7-day ceiling). Details live in [Media processing](../media/).
-- Never log credentials. `access_key_id` and `secret_access_key` ride file or env, and display goes through `config.RedactedServices`.
-- Close order: both are snapshot services that close ahead of leaf `cache` and `queue`, and only resolved services close.
+- Cap media: `max_download_bytes` (64 MiB), `max_pixels` (about 50 MP), `max_duration`, `presign_ttl` (1h default, 7-day ceiling). Details: [Media processing](../media/).
+- Never log credentials: `access_key_id` and `secret_access_key` ride file or env; display goes through `config.RedactedServices`.
+- Close order: both are snapshot services, closed ahead of leaf `cache` and `queue`; only resolved services close.
 - Skip quietly at the job layer when no source file exists, rather than failing the booking flow.
 
 ## Troubleshooting
@@ -133,13 +115,13 @@ Storage and media adapters are independent. Keeping them aligned avoids cross-st
 <details>
 <summary>`presign_ttl must be >= 0 and <= 7 days`</summary>
 
-Cause: the window exceeds the 7-day ceiling, often `720h` copied from a sample. Fix: use at most `604800000000000` ns in YAML or `"168h"` in env.
+Cause: the window exceeds the 7-day ceiling, often `720h` copied from a sample. Fix: at most `604800000000000` ns in YAML or `"168h"` in env.
 </details>
 
 <details>
 <summary>S3 works locally but fails in deploy with endpoint errors</summary>
 
-Cause: `endpoint` lacks a scheme, or `region` is empty on a store that needs it. Fix: set a full URL such as `https://s3.us-east-1.amazonaws.com` and pin `region`.
+Cause: `endpoint` lacks a scheme, or `region` is empty. Fix: set a full URL like `https://s3.us-east-1.amazonaws.com` and pin `region`.
 </details>
 
 <details>
@@ -154,5 +136,4 @@ Cause: `local` with two hosts, each with a private filesystem. Fix: move both to
   <LinkCard title="Media processing" href="../media/" description="Upload, probe, and transform assets." />
   <LinkCard title="Search" href="../search/" description="Index file metadata." />
   <LinkCard title="Mailer" href="../../background/mailer/" description="Link presigned receipts in mail." />
-  <LinkCard title="Build a booking API" href="../../../tutorials/build-a-booking-api/" description="The bookings tutorial." />
 </CardGrid>

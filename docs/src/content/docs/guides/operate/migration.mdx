@@ -42,13 +42,12 @@ Releases are lockstep: one version, with per-module tags `<path>/vX.Y.Z` via `to
 
 Every other battery follows the same pattern: `core/<b>` for the interface, `adapters/<b>/<a>` for each driver. The full module list is in the [adapters matrix](../../../reference/adapters-matrix/).
 
-`tools/migrate-imports.sh` is planned and does not exist yet, so use `sed` for now:
+Run `tools/migrate-imports.sh` from a checkout of the new layout. It derives battery and adapter names from `core/*` and `adapters/*/*` and rewrites only quoted import strings, then runs `gofmt`:
 
 ```sh
-# dry run first
-grep -rn "zenta-dev/zever/auth\|zenta-dev/zever/db\|zenta-dev/zever/cache\|zenta-dev/zever/internal/dsl\|zenta-dev/zever/codec\|container/adapters" --include="*.go" . | head -30
-sed -i 's#zenta-dev/zever/auth"#zenta-dev/zever/core/auth"#; s#zenta-dev/zever/db"#zenta-dev/zever/core/db"#; s#zenta-dev/zever/cache"#zenta-dev/zever/core/cache"#; s#zenta-dev/zever/queue"#zenta-dev/zever/core/queue"#; s#zenta-dev/zever/codec#zenta-dev/zever/shared/codec#; s#zenta-dev/zever/internal/dsl#zenta-dev/zever/dsl#' $(grep -rl "zenta-dev/zever" --include="*.go" .)
-go mod tidy   # per touched module
+tools/migrate-imports.sh --root /path/to/zever --check ./myapp   # list files that would change
+tools/migrate-imports.sh --root /path/to/zever ./myapp           # rewrite in place
+go mod tidy                                                      # per touched module
 ```
 
 ## Register the adapters you use
