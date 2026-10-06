@@ -417,14 +417,14 @@ func TestGeneratedServerBuildsAndServes(t *testing.T) {
 
 	ctx := t.Context()
 	srv := exec.CommandContext(ctx, bin)
-	stdin, err := srv.StdinPipe()
-	if err != nil {
-		t.Fatalf("stdin pipe: %v", err)
+	stdin, pipeErr := srv.StdinPipe()
+	if pipeErr != nil {
+		t.Fatalf("stdin pipe: %v", pipeErr)
 	}
 
-	stdout, err := srv.StdoutPipe()
-	if err != nil {
-		t.Fatalf("stdout pipe: %v", err)
+	stdout, pipeErr := srv.StdoutPipe()
+	if pipeErr != nil {
+		t.Fatalf("stdout pipe: %v", pipeErr)
 	}
 
 	if err := srv.Start(); err != nil {

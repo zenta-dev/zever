@@ -9,8 +9,6 @@ import (
 	"go/token"
 	"sort"
 	"strings"
-
-	"github.com/zenta-dev/zever/dsl/ir"
 )
 
 // renderServerModule renders a runnable MCP stdio server (package main) for
@@ -19,7 +17,7 @@ import (
 // newline-delimited JSON-RPC 2.0 on stdin/stdout. It depends only on the
 // standard library. Handler stubs return a not-implemented error for the
 // developer to fill in.
-func renderServerModule(m *ir.Module, services []serviceManifest) ([]byte, error) {
+func renderServerModule(services []serviceManifest) ([]byte, error) {
 	manifest, err := marshalServices(services)
 	if err != nil {
 		return nil, err

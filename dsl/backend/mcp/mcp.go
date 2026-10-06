@@ -58,7 +58,7 @@ func (b *Backend) Generate(schema *ir.Schema) (map[string][]byte, error) {
 		out[moduleLabel(m)+"/mcp.json"] = content
 
 		if len(mod.Services) > 0 {
-			server, err := renderServerModule(m, mod.Services)
+			server, err := renderServerModule(mod.Services)
 			if err != nil {
 				return nil, err
 			}
