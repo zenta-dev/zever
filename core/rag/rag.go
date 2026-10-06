@@ -128,6 +128,9 @@ func (e *Engine) ingest(ctx context.Context, docs []Document) error {
 	}
 
 	if err := e.search.IndexBatch(ctx, sdocs); err != nil {
+		// Vectors are already stored: hybrid ingest is not atomic across
+		// backends. Retrying Ingest is safe (upserts are idempotent by
+		// chunk ID), so callers should retry the whole call.
 		return fmt.Errorf("rag: vectors stored but keyword index failed: %w", err)
 	}
 

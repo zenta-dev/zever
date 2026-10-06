@@ -74,15 +74,25 @@ func openService[T any, A any, O any](service string, name string, parse func(st
 
 // Agent builds a tool-calling *agent.Loop over the resolved AI backend. It has
 // no adapter registry and no config entry; the model name comes from the AI
-// options. Like Job, it shares the process-wide backend instance.
-func (c *Container) Agent() (*agent.Loop, error) {
+// options. Like Job, it shares the process-wide backend instance. Options
+// apply only on first resolution; later calls return the cached singleton.
+func (c *Container) Agent(opts ...AgentOption) (*agent.Loop, error) {
 	return c.agent.get(func() (*agent.Loop, error) {
 		a, err := c.AI()
 		if err != nil {
 			return nil, fmt.Errorf("container: agent: resolve ai: %w", err)
 		}
 
-		loop, err := agent.New(a, agent.Options{Model: c.cfg.AI.Options.Model})
+		aopts := agent.Options{Model: c.cfg.AI.Options.Model}
+		for _, opt := range opts {
+			if opt == nil {
+				continue
+			}
+
+			opt(&aopts)
+		}
+
+		loop, err := agent.New(a, aopts)
 		if err != nil {
 			return nil, fmt.Errorf("container: agent: %w", err)
 		}
@@ -396,8 +406,10 @@ func (c *Container) Queue() (queue.Queue, error) {
 
 // RAG builds a *rag.Engine over the resolved AI and VectorStore backends. It
 // has no adapter registry and no config entry. Like Job, it shares the
-// process-wide backend instances.
-func (c *Container) RAG() (*rag.Engine, error) {
+// process-wide backend instances. Options apply only on first resolution;
+// later calls return the cached singleton. WithHybridSearch additionally
+// resolves the Search backend and builds via rag.NewHybrid.
+func (c *Container) RAG(opts ...RAGOption) (*rag.Engine, error) {
 	return c.rag.get(func() (*rag.Engine, error) {
 		a, err := c.AI()
 		if err != nil {
@@ -409,7 +421,31 @@ func (c *Container) RAG() (*rag.Engine, error) {
 			return nil, fmt.Errorf("container: rag: resolve vectorstore: %w", err)
 		}
 
-		engine, err := rag.New(a, vs, rag.Options{Model: c.cfg.AI.Options.Model})
+		cfg := ragConfig{options: rag.Options{Model: c.cfg.AI.Options.Model}}
+		for _, opt := range opts {
+			if opt == nil {
+				continue
+			}
+
+			opt(&cfg)
+		}
+
+		if cfg.hybrid {
+			s, searchErr := c.Search()
+			if searchErr != nil {
+				return nil, fmt.Errorf("container: rag: resolve search: %w", searchErr)
+			}
+
+			var engine *rag.Engine
+			engine, err = rag.NewHybrid(a, vs, s, cfg.options)
+			if err != nil {
+				return nil, fmt.Errorf("container: rag: %w", err)
+			}
+
+			return engine, nil
+		}
+
+		engine, err := rag.New(a, vs, cfg.options)
 		if err != nil {
 			return nil, fmt.Errorf("container: rag: %w", err)
 		}
