@@ -38,6 +38,7 @@ replace (
 	github.com/zenta-dev/zever/adapters/workflow/memory => ../../adapters/workflow/memory
 	github.com/zenta-dev/zever/config => ../../config
 	github.com/zenta-dev/zever/container => ../../container
+	github.com/zenta-dev/zever/core/agent => ../../core/agent
 	github.com/zenta-dev/zever/core/ai => ../../core/ai
 	github.com/zenta-dev/zever/core/analytics => ../../core/analytics
 	github.com/zenta-dev/zever/core/auth => ../../core/auth
@@ -63,6 +64,7 @@ replace (
 	github.com/zenta-dev/zever/core/payment => ../../core/payment
 	github.com/zenta-dev/zever/core/permission => ../../core/permission
 	github.com/zenta-dev/zever/core/queue => ../../core/queue
+	github.com/zenta-dev/zever/core/rag => ../../core/rag
 	github.com/zenta-dev/zever/core/ratelimit => ../../core/ratelimit
 	github.com/zenta-dev/zever/core/resilience => ../../core/resilience
 	github.com/zenta-dev/zever/core/router => ../../core/router
@@ -96,6 +98,7 @@ require (
 	github.com/go-logr/stdr v1.2.2 // indirect
 	github.com/robfig/cron/v3 v3.0.1 // indirect
 	github.com/zenta-dev/zever/adapters/log/noop v0.5.3 // indirect
+	github.com/zenta-dev/zever/core/agent v0.5.3 // indirect
 	github.com/zenta-dev/zever/core/ai v0.5.3 // indirect
 	github.com/zenta-dev/zever/core/analytics v0.5.3 // indirect
 	github.com/zenta-dev/zever/core/auth v0.5.3 // indirect
@@ -121,6 +124,7 @@ require (
 	github.com/zenta-dev/zever/core/payment v0.5.3 // indirect
 	github.com/zenta-dev/zever/core/permission v0.5.3 // indirect
 	github.com/zenta-dev/zever/core/queue v0.5.3 // indirect
+	github.com/zenta-dev/zever/core/rag v0.5.3 // indirect
 	github.com/zenta-dev/zever/core/ratelimit v0.5.3 // indirect
 	github.com/zenta-dev/zever/core/resilience v0.5.3 // indirect
 	github.com/zenta-dev/zever/core/router v0.5.3 // indirect
