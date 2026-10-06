@@ -72,13 +72,20 @@ func (c *config) streamInterceptor() grpc.StreamClientInterceptor {
 	}
 }
 
-// startSpan starts a client span when an observability Provider is
+// startSpan starts a SpanKindClient span when an observability Provider is
 // configured; otherwise it returns ctx unchanged with a noopSpan. The span
 // carries the OpenTelemetry semantic-convention RPC attributes:
 // rpc.system, server.address, rpc.service, and rpc.method (see
 // observability.RPCSystem, observability.ServerAddress,
 // observability.RPCService, observability.RPCMethod). addr is the dial
 // target and may be empty when the caller has no connection.
+//
+// The kind and the attributes are passed as start options so a Tracer
+// implementing the optional observability.SpanStarter records them at span
+// creation. observability.StartSpan drops the options entirely for a Tracer
+// that does not implement SpanStarter, so the attribute set is also applied
+// explicitly on the returned span; setting the same key twice is idempotent
+// for the backends that keep both.
 func (c *config) startSpan(ctx context.Context, method, addr string) (context.Context, observability.Span) {
 	if c.observability == nil {
 		return ctx, noopSpan{}
@@ -95,7 +102,10 @@ func (c *config) startSpan(ctx context.Context, method, addr string) (context.Co
 		attrs = append(attrs, observability.String(observability.ServerAddress, addr))
 	}
 
-	ctx, span := c.observability.Tracer(scopeName).Start(ctx, method)
+	ctx, span := observability.StartSpan(ctx, c.observability.Tracer(scopeName), method,
+		observability.WithSpanKind(observability.SpanKindClient),
+		observability.WithAttributes(attrs...),
+	)
 	span.SetAttributes(attrs...)
 
 	return ctx, span
