@@ -25,6 +25,8 @@ replace github.com/zenta-dev/zever/adapters/log/noop => ../../adapters/log/noop
 
 replace github.com/zenta-dev/zever/adapters/queue/memory => ../../adapters/queue/memory
 
+replace github.com/zenta-dev/zever/shared/msgspan => ../../shared/msgspan
+
 replace github.com/zenta-dev/zever/shared/redisopt => ../../shared/redisopt
 
 replace github.com/zenta-dev/zever/shared/retry => ../../shared/retry
@@ -36,6 +38,7 @@ require (
 	github.com/go-logr/logr v1.4.4 // indirect
 	github.com/go-logr/stdr v1.2.2 // indirect
 	github.com/zenta-dev/zever/core/db v0.5.3 // indirect
+	github.com/zenta-dev/zever/core/observability v0.5.3 // indirect
 	github.com/zenta-dev/zever/shared/redisopt v0.5.3 // indirect
 	github.com/zenta-dev/zever/shared/retry v0.5.3 // indirect
 	github.com/zenta-dev/zever/shared/traceprop v0.5.3 // indirect

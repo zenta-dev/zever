@@ -203,6 +203,8 @@ replace github.com/zenta-dev/zever/shared/httpclient => ../../shared/httpclient
 
 replace github.com/zenta-dev/zever/shared/lrucache => ../../shared/lrucache
 
+replace github.com/zenta-dev/zever/shared/msgspan => ../../shared/msgspan
+replace github.com/zenta-dev/zever/shared/outboxbridge => ../../shared/outboxbridge
 replace github.com/zenta-dev/zever/shared/providersopt => ../../shared/providersopt
 
 replace github.com/zenta-dev/zever/shared/redisclient => ../../shared/redisclient
@@ -272,6 +274,8 @@ require (
 	github.com/zenta-dev/zever/shared/httpclient v0.5.3 // indirect
 	github.com/zenta-dev/zever/shared/lrucache v0.5.3 // indirect
 	github.com/zenta-dev/zever/shared/mcpclient v0.5.3 // indirect
+	github.com/zenta-dev/zever/shared/msgspan v0.5.3 // indirect
+	github.com/zenta-dev/zever/shared/outboxbridge v0.5.3 // indirect
 	github.com/zenta-dev/zever/shared/providersopt v0.5.3 // indirect
 	github.com/zenta-dev/zever/shared/redisopt v0.5.3 // indirect
 	github.com/zenta-dev/zever/shared/registry v0.5.3 // indirect

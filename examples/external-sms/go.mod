@@ -83,13 +83,16 @@ replace (
 	github.com/zenta-dev/zever/shared/grpcclient => ../../shared/grpcclient
 	github.com/zenta-dev/zever/shared/httpclient => ../../shared/httpclient
 	github.com/zenta-dev/zever/shared/lrucache => ../../shared/lrucache
-	github.com/zenta-dev/zever/shared/msgspan => ../../shared/msgspan
 	github.com/zenta-dev/zever/shared/providersopt => ../../shared/providersopt
 	github.com/zenta-dev/zever/shared/redisclient => ../../shared/redisclient
 	github.com/zenta-dev/zever/shared/redisopt => ../../shared/redisopt
 	github.com/zenta-dev/zever/shared/registry => ../../shared/registry
 	github.com/zenta-dev/zever/shared/retry => ../../shared/retry
 )
+
+replace github.com/zenta-dev/zever/shared/msgspan => ../../shared/msgspan
+
+replace github.com/zenta-dev/zever/shared/outboxbridge => ../../shared/outboxbridge
 
 replace github.com/zenta-dev/zever/shared/traceprop => ../../shared/traceprop
 
@@ -145,6 +148,7 @@ require (
 	github.com/zenta-dev/zever/shared/httpclient v0.5.3 // indirect
 	github.com/zenta-dev/zever/shared/mcpclient v0.5.3 // indirect
 	github.com/zenta-dev/zever/shared/msgspan v0.5.3 // indirect
+	github.com/zenta-dev/zever/shared/outboxbridge v0.5.3 // indirect
 	github.com/zenta-dev/zever/shared/providersopt v0.5.3 // indirect
 	github.com/zenta-dev/zever/shared/redisopt v0.5.3 // indirect
 	github.com/zenta-dev/zever/shared/retry v0.5.3 // indirect
