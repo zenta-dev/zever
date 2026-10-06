@@ -76,3 +76,18 @@ func BenchmarkResolveSubdomain(b *testing.B) {
 		}
 	}
 }
+
+// BenchmarkScoped measures deriving a tenant-scoped context.
+func BenchmarkScoped(b *testing.B) {
+	tn := newBenchHeader(b)
+	ctx := b.Context()
+
+	b.ReportAllocs()
+	b.ResetTimer()
+
+	for b.Loop() {
+		if _, err := tn.Scoped(ctx, "acme"); err != nil {
+			b.Fatalf("Scoped(): %v", err)
+		}
+	}
+}

@@ -79,6 +79,27 @@ func BenchmarkSave(b *testing.B) {
 	}
 }
 
+// BenchmarkDelete measures removing an existing session row. Delete is
+// idempotent, so the same ID is reused.
+func BenchmarkDelete(b *testing.B) {
+	s := newBenchStore(b)
+	ctx := b.Context()
+
+	sess, err := s.Create(ctx, time.Hour)
+	if err != nil {
+		b.Fatalf("Create(): %v", err)
+	}
+
+	b.ReportAllocs()
+	b.ResetTimer()
+
+	for b.Loop() {
+		if err := s.Delete(ctx, sess.ID); err != nil {
+			b.Fatalf("Delete(): %v", err)
+		}
+	}
+}
+
 // BenchmarkGetParallel measures read throughput on one hot session under
 // concurrent access, exercising the shared connection pool.
 func BenchmarkGetParallel(b *testing.B) {
