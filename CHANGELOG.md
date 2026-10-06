@@ -150,6 +150,11 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   `http.path`→`url.path`, `http.status_code`→`http.response.status_code`;
   gRPC spans now carry `rpc.system`/`rpc.service`/`rpc.method`/`rpc.grpc.status_code`;
   messaging spans use `messaging.*`. Update dashboards/queries accordingly.
+  Counter labels migrated too, under unchanged metric names: the
+  `http.request` counter is tagged by `http.request.method`/
+  `http.response.status_code` (was `method`/`status`, where `status` held
+  status *text*) and the `rpc.request` counter by
+  `rpc.service`/`rpc.method`/`rpc.grpc.status_code` (was `method`/`outcome`).
   Keys are exported as constants from `core/observability`
   (`HTTPRequestMethod`, `URLPath`, `HTTPResponseStatusCode`, `ServerAddress`,
   `RPCSystem`, `RPCService`, `RPCMethod`, `RPCGRPCStatusCode`,

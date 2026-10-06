@@ -201,29 +201,67 @@ lower it.
 
 ## Attribute migration (semconv)
 
-Span attribute names are migrating to OpenTelemetry semantic
+Span and counter attribute names now follow OpenTelemetry semantic
 conventions so that off-the-shelf dashboards and queries work against
-zever traces. This is a **breaking change** for anyone querying these
-attributes; update saved queries, dashboards, and alert rules with it.
+zever traces. The migration has **shipped** and the old names are
+**gone** — there is no alias or fallback. This was a breaking change for
+anyone querying the old attributes, so update saved queries, dashboards,
+and alert rules with it. `CHANGELOG.md` carries the note under
+`### Changed`.
 
-| Old key | New key |
+| Old name (removed) | New name |
 |---|---|
 | `http.method` | `http.request.method` |
 | `http.path` | `url.path` |
 | `http.status_code` | `http.response.status_code` |
-| gRPC full method in the span name | `rpc.system="grpc"` plus `rpc.service` and `rpc.method` |
+| gRPC full method as the span's only identity | span name still the full method, now joined by `rpc.system="grpc"`, `rpc.service`, and `rpc.method` attributes |
 | — (new) | `rpc.grpc.status_code` |
 | — (new) | `messaging.system`, `messaging.destination.name`, `messaging.operation`, `messaging.message.id`, `messaging.message.conversation_id` |
 
-The HTTP server counter keeps its `method` / `status` labels and its
-`http.request` / `rpc.request` metric names — the migration is about
-*attribute* keys, not metric names.
+Query the exported constants rather than string literals, so a future
+semconv revision is a change in the framework instead of in every query
+you wrote:
+
+```go
+import (
+    "github.com/zenta-dev/zever/core/observability"
+)
+
+// The same keys the middleware emits, as constants.
+_ = observability.HTTPRequestMethod
+_ = observability.URLPath
+_ = observability.HTTPResponseStatusCode
+_ = observability.RPCSystem
+_ = observability.RPCService
+_ = observability.RPCMethod
+_ = observability.RPCGRPCStatusCode
+```
+
+### Counters
+
+The metric **names** are unchanged — the middleware still emits
+`http.request` and `rpc.request`. The counter **labels** are not: they
+were part of the migration too, and dashboards that group on them break
+silently.
+
+| Counter | Old labels (removed) | New labels |
+|---|---|---|
+| `http.request` | `method` (string), `status` (status **text**, e.g. `OK`) | `http.request.method` (string), `http.response.status_code` (int) |
+| `rpc.request` | `method` (full gRPC method), `outcome` (`ok` / `error`) | `rpc.service`, `rpc.method`, `rpc.grpc.status_code` (int gRPC code, `0` is `OK`) |
+
+Two things to fix when you update a saved query: the `http.request`
+counter's status label carries the numeric code rather than the status
+text, so a `status="OK"` grouping becomes
+`http.response.status_code=200`; and the `rpc.request` counter has no
+`outcome` label any more, so success/failure grouping compares
+`rpc.grpc.status_code` against `0` instead of the string `"ok"`.
 
 Span naming stays path-only and method-only: never a query string or a
 raw URI, so high-cardinality and sensitive values stay out of traces.
-`url.path` is the replacement for `http.path`, not for
-`url.query` — if you find yourself wanting the query string in a span,
-that is a signal to log it separately instead.
+The path attribute moved to `url.path` — that is a rename of the old
+HTTP path attribute, not an adoption of `url.query`. If you find
+yourself wanting the query string in a span, that is a signal to log it
+separately instead.
 
 ## Troubleshooting
 
