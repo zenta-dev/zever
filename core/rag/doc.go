@@ -3,7 +3,9 @@
 //
 // It owns chunking, ingestion, retrieval and grounded generation. It does not
 // own the LLM transport, the embedding provider, or the vector backend; callers
-// pass a resolved ai.AI and vectorstore.VectorStore.
+// pass a resolved ai.AI and vectorstore.VectorStore. Engines built by
+// NewHybrid additionally index into a search backend for fused hybrid
+// retrieval, and report operation events to Options.Observe.
 //
 // Type safety: Engine plus typed Options, Document, Source and Answer. Empty
 // queries and malformed documents fail closed with sentinel errors.

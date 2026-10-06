@@ -18,6 +18,9 @@ var (
 	ErrEmptyQuery = errors.New("rag: empty query")
 	// ErrEmbeddingCount is returned when an embedder returns the wrong count.
 	ErrEmbeddingCount = errors.New("rag: embedding count mismatch")
+	// ErrNoSearch is returned by hybrid methods on engines built without a
+	// search backend.
+	ErrNoSearch = errors.New("rag: no search backend")
 )
 
 // InvalidOptionsError reports an options validation failure.

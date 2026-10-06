@@ -3,7 +3,9 @@
 // It owns the generate -> dispatch tool calls -> append tool results -> repeat
 // loop, plus structured-output generation and an optional human-in-the-loop
 // confirmation hook. It does not own the LLM transport or provider credentials;
-// callers pass a resolved ai.AI.
+// callers pass a resolved ai.AI. Runs stream progress with RunStream,
+// dispatch a step's tools concurrently with Options.MaxParallel, compose
+// agents with AsTool, and observe execution with Options.Observe.
 //
 // Type safety: Agent plus typed Options, Tool, ToolHandler and Result.
 // Unknown tools fail closed with ErrUnknownTool; exceeding MaxSteps fails with
