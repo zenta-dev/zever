@@ -20,6 +20,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   and server-initiated elicitation gating destructive applies.
 - `shared/mcpclient` growth: sampler hooks, elicitation policies, and
   reconnecting dial with backoff.
+- Nightly eval workflow (schedule + manual dispatch, never gating):
+  deterministic golden dataset with report artifact.
+- Prompt pack 2: `SchemaDesign`, `MigrationReview`, `CitationCheck` and
+  `ToolPlan` builders.
 - Agent-app tutorial (`docs/tutorials/build-an-agent-app`): end-to-end
   walkthrough from container resolution through RAG grounding, agent loops,
   MCP serving, and eval scoring.

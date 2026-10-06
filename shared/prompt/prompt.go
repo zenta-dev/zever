@@ -66,3 +66,59 @@ func errSuffix(err error) string {
 
 	return ": " + err.Error()
 }
+
+// SchemaDesign builds a prompt asking for a .zen schema for a domain
+// description, with entity/service naming guidance.
+func SchemaDesign(domain string) string {
+	return "Design a zever .zen schema for the following domain.\n" +
+		"Use `entity Name { field: type }` blocks and `service Name` blocks with `rpc` operations. " +
+		"Keep names singular PascalCase, mark primary keys, and declare relations on both sides.\n\nDomain:\n" +
+		strings.TrimSpace(domain)
+}
+
+// MigrationReview builds a prompt asking for review of a schema migration
+// plan against breaking-change rules.
+func MigrationReview(plan string) string {
+	return "Review this schema migration plan for breaking changes " +
+		"(removed fields, renamed entities, altered types, dropped services).\n" +
+		"Flag each break with its impact and suggest a compatible alternative.\n\nPlan:\n" +
+		strings.TrimSpace(plan)
+}
+
+// CitationCheck builds a prompt asking whether every factual claim in an
+// answer is supported by the cited context chunks.
+func CitationCheck(question, answer string, chunks []string) string {
+	var b strings.Builder
+
+	b.WriteString("Check that every factual claim in the answer below is supported by the cited context. " +
+		"Reply with SUPPORTED or list each unsupported claim.\n\nQuestion:\n")
+	b.WriteString(strings.TrimSpace(question))
+	b.WriteString("\n\nAnswer:\n")
+	b.WriteString(strings.TrimSpace(answer))
+
+	for i, chunk := range chunks {
+		fmt.Fprintf(&b, "\n\n[%d] %s", i+1, strings.TrimSpace(chunk))
+	}
+
+	return b.String()
+}
+
+// ToolPlan builds a prompt asking for a step-by-step tool-use plan before
+// executing, so the model commits to a strategy it can be held to. Blank
+// tool entries are skipped.
+func ToolPlan(task string, tools []string) string {
+	var b strings.Builder
+
+	b.WriteString("Plan how to accomplish the following task with the available tools. " +
+		"List each step as `tool-name: purpose`. Do not execute anything yet.\n\nTask:\n")
+	b.WriteString(strings.TrimSpace(task))
+	b.WriteString("\n\nTools:\n")
+
+	for _, tool := range tools {
+		if trimmed := strings.TrimSpace(tool); trimmed != "" {
+			b.WriteString("- " + trimmed + "\n")
+		}
+	}
+
+	return b.String()
+}

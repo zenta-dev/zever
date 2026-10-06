@@ -1,0 +1,41 @@
+name: eval
+
+# Scheduled agent-eval regression signal. The eval harness is deterministic
+# (stubbed models, golden dataset), so this workflow is informational only:
+# it never gates pull requests. Live-model evals run manually via
+# JudgeScorer with provider credentials.
+on:
+  schedule:
+    - cron: "23 4 * * 2"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: eval
+  cancel-in-progress: false
+
+jobs:
+  golden:
+    name: golden eval suite
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+      - uses: actions/setup-go@b7ad1dad31e06c5925ef5d2fc7ad053ef454303e # v7.0.0
+        with:
+          go-version-file: go.work
+          cache-dependency-path: |
+            go.work.sum
+            **/go.sum
+      - name: run golden suite
+        run: go -C core/eval test -v -count=1 -run 'TestGolden|TestRunSuite' ./... > eval-report.txt 2>&1; code=$?; cat eval-report.txt; exit $code
+      - name: upload eval report
+        if: always()
+        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
+        with:
+          name: eval-report
+          path: eval-report.txt
+          if-no-files-found: warn
+          retention-days: 30

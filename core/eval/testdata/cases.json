@@ -1,0 +1,5 @@
+[
+  {"name": "greeting", "input": "Say hi in five words.", "expected": "Hello, glad you are here."},
+  {"name": "capital", "input": "What is the capital of France?", "expected": "Paris"},
+  {"name": "sum", "input": "What is 2 + 2?", "expected": "4"}
+]
