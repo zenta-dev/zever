@@ -93,3 +93,29 @@ func BenchmarkIndexBatch(b *testing.B) {
 		}
 	}
 }
+
+// BenchmarkDelete measures the single-document delete: PK lookup plus the
+// RowsAffected check.
+func BenchmarkDelete(b *testing.B) {
+	s := newBenchSearch(b)
+	ctx := b.Context()
+
+	doc := benchDoc("bench-del")
+
+	if err := s.Index(ctx, doc); err != nil {
+		b.Fatalf("seed Index(): %v", err)
+	}
+
+	b.ReportAllocs()
+	b.ResetTimer()
+
+	for b.Loop() {
+		if err := s.Delete(ctx, doc.ID); err != nil {
+			b.Fatalf("Delete(): %v", err)
+		}
+
+		if err := s.Index(ctx, doc); err != nil {
+			b.Fatalf("reseed Index(): %v", err)
+		}
+	}
+}
