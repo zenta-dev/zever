@@ -5,6 +5,7 @@ import (
 	"bytes"
 	"context"
 	"errors"
+	"fmt"
 	"testing"
 
 	"github.com/zenta-dev/zever/core/crypto"
@@ -61,56 +62,66 @@ func conformanceOpenRegister(t *testing.T) {
 func conformanceEncryptDecrypt(t *testing.T, factory func(t *testing.T) crypto.Crypto) {
 	t.Helper()
 
-	ctx := t.Context()
-	c := factory(t)
+	if err := checkEncryptDecrypt(t.Context(), factory(t)); err != nil {
+		t.Fatal(err)
+	}
+}
 
+// checkEncryptDecrypt proves Encrypt/Decrypt round-trips with copy
+// semantics, returning an error describing the first contract violation
+// so broken adapters can be unit-tested without failing the conformance
+// run itself. A remote-key adapter reporting ErrNotSupported from
+// Encrypt passes with nil error, matching the documented KMS exemption.
+func checkEncryptDecrypt(ctx context.Context, c crypto.Crypto) error {
 	plain := []byte("conformance-plaintext-01")
 
 	sealed, err := c.Encrypt(ctx, plain)
 	if err != nil {
 		if errors.Is(err, crypto.ErrNotSupported) {
-			return
+			return nil
 		}
-		t.Fatalf("Encrypt() error = %v", err)
+		return fmt.Errorf("Encrypt() error = %w", err)
 	}
 
 	if len(sealed) == 0 {
-		t.Fatal("Encrypt() returned empty ciphertext")
+		return errors.New("Encrypt() returned empty ciphertext")
 	}
 
 	if bytes.Equal(sealed, plain) {
-		t.Error("Encrypt() returned plaintext unchanged")
+		return errors.New("Encrypt() returned plaintext unchanged")
 	}
 
 	plain[0] = 'X'
 
 	opened, err := c.Decrypt(ctx, sealed)
 	if err != nil {
-		t.Fatalf("Decrypt() error = %v", err)
+		return fmt.Errorf("Decrypt() error = %w", err)
 	}
 
 	if string(opened) != "conformance-plaintext-01" {
-		t.Fatalf("Decrypt() = %q, want original plaintext", opened)
+		return fmt.Errorf("Decrypt() = %q, want original plaintext", opened)
 	}
 
 	opened[0] = 'Y'
 
 	again, err := c.Decrypt(ctx, sealed)
 	if err != nil {
-		t.Fatalf("Decrypt() error = %v", err)
+		return fmt.Errorf("Decrypt() error = %w", err)
 	}
 
 	if string(again) != "conformance-plaintext-01" {
-		t.Errorf("Decrypt() = %q, want original (returned copy)", again)
+		return fmt.Errorf("Decrypt() = %q, want original (returned copy)", again)
 	}
 
 	if _, err := c.Decrypt(ctx, []byte("not-a-ciphertext")); err == nil {
-		t.Error("Decrypt(garbage) = nil, want error")
+		return errors.New("Decrypt(garbage) = nil, want error")
 	}
 
 	if _, err := c.Decrypt(ctx, nil); err == nil {
-		t.Error("Decrypt(nil) = nil, want error")
+		return errors.New("Decrypt(nil) = nil, want error")
 	}
+
+	return nil
 }
 
 func conformanceTamper(t *testing.T, factory func(t *testing.T) crypto.Crypto) {

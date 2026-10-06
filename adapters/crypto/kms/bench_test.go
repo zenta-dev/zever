@@ -31,7 +31,7 @@ func BenchmarkEncryptDecrypt(b *testing.B) {
 	b.ReportAllocs()
 	b.ResetTimer()
 
-	for i := 0; i < b.N; i++ {
+	for b.Loop() {
 		ct, err := c.Encrypt(ctx, plaintext)
 		if err != nil {
 			b.Fatal(err)
@@ -52,7 +52,7 @@ func BenchmarkSignVerify(b *testing.B) {
 	b.ReportAllocs()
 	b.ResetTimer()
 
-	for i := 0; i < b.N; i++ {
+	for b.Loop() {
 		sig, err := c.Sign(ctx, msg)
 		if err != nil {
 			b.Fatal(err)
@@ -78,7 +78,7 @@ func BenchmarkMacVerifyMac(b *testing.B) {
 	b.ReportAllocs()
 	b.ResetTimer()
 
-	for i := 0; i < b.N; i++ {
+	for b.Loop() {
 		mac, err := c.Mac(ctx, msg)
 		if err != nil {
 			b.Fatal(err)

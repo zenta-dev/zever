@@ -43,3 +43,19 @@ func TestCan_concurrentSafe(t *testing.T) {
 	}
 	wg.Wait()
 }
+
+func TestRegister_wiresNoopFactory(t *testing.T) {
+	noop.Register()
+
+	c, err := permission.Open(permission.Noop, permission.Options{})
+	if err != nil {
+		t.Fatalf("Open(noop) = %v, want nil", err)
+	}
+	d, err := c.Can(t.Context(), permission.Subject{ID: "u1"}, "read", permission.Resource{Type: "doc", ID: "1"})
+	if err != nil {
+		t.Fatalf("Can() = %v, want nil", err)
+	}
+	if d.Allowed || d.Reason != "implicit_deny" {
+		t.Errorf("Can() = %+v, want implicit_deny", d)
+	}
+}
