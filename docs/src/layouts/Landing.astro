@@ -1,0 +1,67 @@
+---
+import '@fontsource-variable/space-grotesk';
+import '@fontsource-variable/jetbrains-mono';
+import '../styles/landing/tokens.css';
+import '../styles/landing/base.css';
+import Nav from '../components/landing/Nav.astro';
+import Footer from '../components/landing/Footer.astro';
+import { href } from '../lib/url';
+
+interface Props { title?: string; description?: string }
+const {
+  title = 'Zever: One schema. Every backend concern.',
+  description = 'Schema-driven scaffolding compiler for Go. Describe services in .zen, compile to typed infrastructure, swap adapters with config.',
+} = Astro.props;
+---
+
+<!doctype html>
+<html lang="en" data-theme="dark">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>{title}</title>
+    <meta name="description" content={description} />
+    <meta property="og:title" content={title} />
+    <meta property="og:description" content={description} />
+    <meta property="og:type" content="website" />
+    <meta property="og:image" content={new URL(href('og.png'), Astro.site).toString()} />
+    <meta name="twitter:card" content="summary_large_image" />
+    <meta name="color-scheme" content="dark light" />
+    <link rel="icon" href={href('favicon.svg')} type="image/svg+xml" />
+    <script is:inline>
+      (function () {
+        var t = 'dark';
+        try {
+          var s = localStorage.getItem('starlight-theme');
+          if (s === 'light' || s === 'dark') t = s;
+          else if (window.matchMedia('(prefers-color-scheme: light)').matches) t = 'light';
+        } catch (e) {}
+        document.documentElement.dataset.theme = t;
+        document.documentElement.classList.add('zl-js');
+      })();
+    </script>
+  </head>
+  <body class="zl-page">
+    <a class="zl-skip" href="#main">Skip to content</a>
+    <Nav />
+    <main id="main"><slot /></main>
+    <Footer />
+    <script>
+      import { revealAll } from '../scripts/landing/motion';
+      import { initTheme } from '../scripts/landing/theme';
+      initTheme();
+      revealAll();
+    </script>
+  </body>
+</html>
+
+<style is:global>
+  html[data-theme='light'] .zl-page, html[data-theme='dark'] .zl-page { color-scheme: inherit; }
+  html[data-theme='light'] { color-scheme: light; }
+  html[data-theme='dark'] { color-scheme: dark; }
+  html { scroll-behavior: smooth; scroll-padding-top: 5rem; }
+  body.zl-page { margin: 0; }
+  .zl-skip { position: absolute; left: -9999px; top: 0.5rem; z-index: 100; background: var(--zl-accent); color: var(--zl-on-accent); padding: 0.5rem 1rem; border-radius: 8px; }
+  .zl-skip:focus { left: 0.5rem; }
+  @media (prefers-reduced-motion: reduce) { html { scroll-behavior: auto; } }
+</style>

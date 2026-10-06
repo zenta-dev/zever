@@ -1,0 +1,79 @@
+---
+import Button from './ui/Button.astro';
+import InstallPill from './ui/InstallPill.astro';
+import CompileStage from './CompileStage.astro';
+import Mesh from './Mesh.astro';
+import mascot from '../../assets/logo.svg';
+import { href } from '../../lib/url';
+import { VERSION, INSTALL } from '../../data/landing';
+
+// Word stagger: each word is an inline-block span so only transform/opacity animate.
+const lead = 'One schema. Every backend concern.'.split(' ');
+---
+
+<section class="zl-hero zl-gridbg" id="top" data-hero data-parallax-root>
+  <Mesh />
+  <div class="zl-wrap zl-hero-grid">
+    <div class="zl-hero-copy">
+      <a class="zl-hero-badge" href={href('reference/agent-skill')}>
+        <b>{VERSION}</b><span>MCP codegen &amp; agent skill</span><i aria-hidden="true">→</i>
+      </a>
+      <h1 class="zl-h1">
+        {lead.map((w, i) => <><span class="zl-w" style={`--wi:${i}`}>{w}</span>{' '}</>)}<em class="zl-w" style={`--wi:${lead.length}`}>Zero rewiring.</em>
+      </h1>
+      <p class="zl-lede">
+        Describe your services in a small <code>.zen</code> schema. Zever compiles it into typed ORM,
+        specs, migrations and routing, and wires every backend through swappable adapters. Your business logic stays yours.
+      </p>
+      <InstallPill command={INSTALL} />
+      <div class="zl-hero-cta">
+        <span class="zl-mag" data-magnetic><Button href={href('getting-started/installation')}>Get started</Button></span>
+        <Button variant="ghost" href={href('tutorials/build-a-booking-api')}>Read the tutorial</Button>
+      </div>
+    </div>
+    <div class="zl-hero-stage">
+      <span class="zl-hero-mascot" data-parallax="14"><img src={mascot.src} alt="" width="96" height="96" aria-hidden="true" /></span>
+      <CompileStage />
+    </div>
+  </div>
+</section>
+
+<script>
+  import { initHeroFx } from '../../scripts/landing/hero-fx';
+  initHeroFx();
+</script>
+
+<style>
+  .zl-hero { position: relative; overflow: hidden; isolation: isolate; display: grid; align-items: center; min-height: 40rem; min-height: calc(100svh - 3.75rem); padding-block: clamp(2.5rem, 7vw, 5rem) clamp(3rem, 7vw, 6rem); }
+  .zl-hero-grid { display: grid; gap: 3.5rem; align-items: center; grid-template-columns: minmax(0, 1.05fr) minmax(0, 1fr); }
+  .zl-hero-copy { display: flex; flex-direction: column; align-items: flex-start; gap: 1.5rem; min-width: 0; }
+  .zl-hero-badge { display: inline-flex; align-items: center; gap: 0.6rem; min-height: 2.75rem; padding: 0.3rem 0.9rem 0.3rem 0.4rem; border: 1px solid var(--zl-line-strong); border-radius: 999px; background: var(--zl-surface); font: 0.75rem/1 var(--zl-font-mono); color: var(--zl-text-2); max-width: 100%; transition: border-color 0.25s; }
+  .zl-hero-badge:hover { border-color: var(--zl-accent); }
+  .zl-hero-badge span { min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+  .zl-hero-badge b { font-weight: 500; padding: 0.4rem 0.6rem; border-radius: 999px; background: var(--zl-accent); color: var(--zl-on-accent); }
+  .zl-hero-badge i { font-style: normal; color: var(--zl-accent); }
+  .zl-h1 { margin: 0; font: 700 clamp(2.4rem, 4.7vw, 4.4rem)/1 var(--zl-font-display); letter-spacing: -0.04em; color: var(--zl-text); text-wrap: balance; overflow-wrap: break-word; max-width: 100%; }
+  /* LCP-safe: text is visible from first paint; only transform + a mild opacity dip animate. */
+  .zl-w { display: inline-block; animation: zl-word-in 0.8s var(--zl-ease) both; animation-delay: calc(var(--wi) * 70ms); }
+  @keyframes zl-word-in { from { transform: translateY(0.45em); opacity: 0.35; } }
+  .zl-hero .zl-lede code { font: 0.9em var(--zl-font-mono); color: var(--zl-accent-hi); background: none; padding: 0; }
+  .zl-hero-cta { display: flex; flex-wrap: wrap; gap: 0.75rem; }
+  .zl-mag { display: inline-flex; will-change: transform; }
+  .zl-hero-stage { position: relative; min-width: 0; padding-top: 2.5rem; }
+  .zl-hero-mascot { position: absolute; top: 0; right: 0.5rem; z-index: 3; display: block; width: 5.5rem; height: 5.5rem; will-change: transform; }
+  .zl-hero-mascot img { display: block; width: 100%; height: 100%; animation: zl-float 5s ease-in-out infinite; filter: drop-shadow(0 8px 18px var(--zl-glow)); }
+  @keyframes zl-float { 50% { transform: translateY(-6px) rotate(-3deg); } }
+  :global(.zl-page[data-theme='light']) .zl-hero .zl-lede code { color: var(--zl-accent-lo); }
+  @media (max-width: 900px) {
+    .zl-hero { min-height: 0; padding-top: 2rem; }
+    .zl-hero-grid { grid-template-columns: minmax(0, 1fr); gap: 2.5rem; }
+    .zl-hero-mascot { width: 4.5rem; height: 4.5rem; }
+  }
+  @media (max-width: 640px) {
+    .zl-hero-cta { width: 100%; }
+    .zl-hero-cta :global(.zl-btn), .zl-mag { flex: 1 1 100%; }
+    .zl-hero-cta :global(.zl-btn) { width: 100%; }
+    .zl-hero-badge span { max-width: 14rem; }
+  }
+  @media (prefers-reduced-motion: reduce) { .zl-w, .zl-hero-mascot img { animation: none; } }
+</style>

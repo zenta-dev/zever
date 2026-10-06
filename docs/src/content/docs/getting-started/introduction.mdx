@@ -1,0 +1,20 @@
+---
+title: Introduction
+description: What zever is, how the compiler and container fit together, and where to go next.
+---
+
+zever is a schema-driven scaffolding compiler for Go. Describe your domain once in `.zen`, compile it into validation, ORM, OpenAPI, and DDL, then resolve every backend through one container. It is not a web framework: your handlers and business logic stay yours, the plumbing stops being hand-wired.
+
+## How it fits together
+
+1. **Describe** entities and services in a `.zen` schema ([syntax](../../dsl/syntax-zen/)).
+2. **Compile** with `zever compile` into typed ORM, OpenAPI, and migration DDL ([backends](../../dsl/backends/)).
+3. **Wire** services through one lazy `container.Container` ([container](../../architecture/container/)).
+4. **Swap** adapters (sqlite to postgres, memory to redis) by editing config, never call sites ([adapters](../../architecture/providers-adapters/)).
+
+## Next steps
+
+- Read the [installation guide](../installation/) for Go version, setup, and first run.
+- Read [configuration](../configuration/) for layered config, env mapping, and redaction.
+- Read [Syntax (.zen)](../../dsl/syntax-zen/) for the full schema language.
+- Follow the [Booking API tutorial](../../tutorials/build-a-booking-api/).

@@ -1,0 +1,62 @@
+/* zever landing tokens. Dark default; light via [data-theme='light']. */
+.zl-page {
+  --zl-bg: #05070d;
+  --zl-bg-2: #0a0e18;
+  --zl-surface: rgba(255, 255, 255, 0.035);
+  --zl-surface-2: rgba(255, 255, 255, 0.06);
+  --zl-line: rgba(255, 255, 255, 0.09);
+  --zl-line-strong: rgba(255, 255, 255, 0.18);
+  --zl-text: #eef3fa;
+  --zl-text-2: #a4b0c3;
+  --zl-text-3: #6b778b;
+  --zl-accent: #6cbdda;
+  --zl-accent-hi: #95d7e8;
+  --zl-accent-lo: #5198c8;
+  --zl-navy: #082753;
+  --zl-warm: #eaccad;
+  --zl-glow: rgba(108, 189, 218, 0.22);
+  --zl-grid: rgba(255, 255, 255, 0.04);
+  --zl-code-bg: #080b14;
+  --zl-shadow: 0 30px 80px -30px rgba(0, 0, 0, 0.7);
+
+  --zl-font-display: 'Space Grotesk Variable', ui-sans-serif, system-ui, sans-serif;
+  --zl-font-sans: 'Space Grotesk Variable', ui-sans-serif, system-ui, sans-serif;
+  --zl-font-mono: 'JetBrains Mono Variable', ui-monospace, 'SF Mono', Menlo, monospace;
+  --zl-on-accent: #04121c;
+  --zl-grad-text: linear-gradient(95deg, #95d7e8 0%, #6cbdda 45%, #eaccad 100%);
+  --zl-btn-grad: linear-gradient(135deg, #95d7e8, #6cbdda 55%, #5198c8);
+  --zl-nav-h: 3.75rem;
+  --zl-bp-sm: 640px;
+  --zl-bp-md: 900px;
+  --zl-bp-lg: 1200px;
+
+  --zl-radius: 14px;
+  --zl-radius-sm: 8px;
+  --zl-max: 1180px;
+  --zl-gutter: clamp(1rem, 4vw, 2rem);
+  --zl-section-y: clamp(4rem, 9vw, 8rem);
+  --zl-ease: cubic-bezier(0.22, 1, 0.36, 1);
+}
+
+.zl-page[data-theme='light'] {
+  --zl-bg: #f7f9fc;
+  --zl-bg-2: #eef2f8;
+  --zl-surface: rgba(8, 39, 83, 0.035);
+  --zl-surface-2: rgba(8, 39, 83, 0.06);
+  --zl-line: rgba(8, 39, 83, 0.12);
+  --zl-line-strong: rgba(8, 39, 83, 0.24);
+  --zl-text: #0a1630;
+  --zl-text-2: #3f4e6a;
+  --zl-text-3: #6b778b;
+  --zl-accent: #2a74a3;
+  --zl-accent-hi: #3e93c6;
+  --zl-accent-lo: #1f5f8f;
+  --zl-warm: #b07a3e;
+  --zl-glow: rgba(47, 127, 176, 0.16);
+  --zl-on-accent: #ffffff;
+  --zl-grad-text: linear-gradient(95deg, #1f5f8f 0%, #2f7fb0 50%, #b07a3e 100%);
+  --zl-btn-grad: linear-gradient(135deg, #0a2a5c, #082753);
+  --zl-grid: rgba(8, 39, 83, 0.05);
+  --zl-code-bg: #0b1222;
+  --zl-shadow: 0 30px 80px -30px rgba(8, 39, 83, 0.35);
+}

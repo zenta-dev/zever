@@ -1,0 +1,45 @@
+---
+import Button from './ui/Button.astro';
+import InstallPill from './ui/InstallPill.astro';
+import Mesh from './Mesh.astro';
+import mascot from '../../assets/logo.svg';
+import { href } from '../../lib/url';
+import { INSTALL } from '../../data/landing';
+---
+
+<section class="zl-section zl-final zl-gridbg" id="get-started" data-parallax-root>
+  <Mesh scan={false} />
+  <div class="zl-wrap zl-final-in zl-reveal">
+    <span class="zl-final-mascot" data-parallax="16"><img src={mascot.src} alt="" width="160" height="160" aria-hidden="true" loading="lazy" /></span>
+    <h2 class="zl-final-h">Stop wiring. Start <em>shipping</em>.</h2>
+    <p class="zl-lede">One schema, one container, every adapter a config change away.</p>
+    <InstallPill command={INSTALL} />
+    <div class="zl-final-cta">
+      <span class="zl-mag" data-magnetic><Button href={href('getting-started/installation')}>Get started</Button></span>
+      <Button variant="ghost" href={href('tutorials/build-a-booking-api')}>Read the tutorial</Button>
+    </div>
+  </div>
+</section>
+
+<script>
+  import { initHeroFx } from '../../scripts/landing/hero-fx';
+  initHeroFx();
+</script>
+
+<style>
+  .zl-final { overflow: hidden; isolation: isolate; text-align: center; border-top: 1px solid var(--zl-line); padding-block: clamp(4.5rem, 10vw, 8rem); }
+  .zl-final-in { display: flex; flex-direction: column; align-items: center; gap: clamp(1.25rem, 3vw, 1.75rem); }
+  .zl-final-mascot { display: block; width: clamp(6rem, 16vw, 12rem); will-change: transform; }
+  .zl-final-mascot img { display: block; width: 100%; height: auto; animation: zl-fl 6s ease-in-out infinite; filter: drop-shadow(0 14px 36px var(--zl-glow)); }
+  @keyframes zl-fl { 50% { transform: translateY(-8px) rotate(2deg); } }
+  .zl-final-h { margin: 0; font: 700 clamp(2.5rem, 8.5vw, 6.5rem)/0.98 var(--zl-font-display); letter-spacing: -0.045em; text-wrap: balance; overflow-wrap: break-word; max-width: 100%; }
+  .zl-final .zl-lede { font-size: clamp(1.05rem, 2vw, 1.4rem); }
+  .zl-final-cta { display: flex; flex-wrap: wrap; gap: 0.75rem; justify-content: center; }
+  .zl-mag { display: inline-flex; will-change: transform; }
+  .zl-final .zl-final-cta :global(.zl-btn) { min-height: 3.25rem; padding-inline: 1.8rem; font-size: 1.05rem; }
+  @media (max-width: 640px) {
+    .zl-final-cta, .zl-mag { width: 100%; }
+    .zl-final-cta :global(.zl-btn) { width: 100%; }
+  }
+  @media (prefers-reduced-motion: reduce) { .zl-final-mascot img { animation: none; } }
+</style>

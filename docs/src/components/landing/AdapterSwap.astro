@@ -1,0 +1,148 @@
+---
+import Section from './ui/Section.astro';
+import { SWAP } from '../../data/landing';
+
+const first = SWAP[0];
+const firstAd = first.adapters[0];
+const lines = firstAd.config.split('\n');
+const ys = SWAP.map((_, i) => 22 + i * 30);
+---
+
+<Section
+  id="swap"
+  eyebrow="Swap, don't rewrite"
+  title="Change the config. <em>Never the handler.</em>"
+  lede="Every battery is a small interface with interchangeable adapters. Pick one in zever.yaml; your code keeps calling the same accessor."
+  grid
+>
+  <div class="zl-swap zl-reveal" data-swap>
+    <script type="application/json" id="zl-swap-data" set:html={JSON.stringify(SWAP)} />
+
+    <div class="zl-swap-controls" data-controls>
+      <div class="zl-swap-tabs" role="tablist" aria-label="Service" data-tabs>
+        {SWAP.map((s, i) => (
+          <button type="button" role="tab" id={`swap-tab-${s.id}`} data-service={s.id}
+            aria-selected={i === 0 ? 'true' : 'false'} tabindex={i === 0 ? 0 : -1}>{s.label}</button>
+        ))}
+      </div>
+      <div class="zl-swap-chips" role="radiogroup" aria-label="Adapter" data-chips></div>
+    </div>
+
+    <div class="zl-swap-grid">
+      <figure class="zl-swap-pane">
+        <figcaption><span>zever.yaml</span><span class="zl-swap-tag zl-swap-tag--changed" data-changed hidden>changed</span></figcaption>
+        <pre><code data-yaml>{lines.map((l) => <span class="zl-ln" data-g=" ">{l || ' '}</span>)}</code></pre>
+      </figure>
+
+      <figure class="zl-swap-pane zl-swap-pane--pinned">
+        <figcaption><span>handler.go</span><span class="zl-swap-tag zl-swap-tag--warm" data-pinned>this file never changes</span></figcaption>
+        <pre><code><span class="zl-ln"><i class="k">c</i> := <i class="f">container.New</i>(cfg)</span><span class="zl-ln" data-call>{first.call}</span><span class="zl-ln">{'if err != nil { return err }'}</span></code></pre>
+      </figure>
+    </div>
+
+    <figure class="zl-swap-diagram" aria-hidden="true">
+      <svg viewBox="0 0 540 170" role="presentation" data-diagram>
+        <g class="zl-d-box">
+          <rect x="8" y="55" width="110" height="60" rx="10" />
+          <text x="63" y="90" text-anchor="middle">handler</text>
+        </g>
+        <path class="zl-d-line" d="M118 85 H190" />
+        <g class="zl-d-box zl-d-box--c">
+          <rect x="190" y="35" width="130" height="100" rx="12" />
+          <text x="255" y="90" text-anchor="middle">Container</text>
+        </g>
+        {SWAP.map((s, i) => (
+          <g class:list={['zl-d-svc', i === 0 && 'is-on']} data-svc={s.id}>
+            <path class="zl-d-line" d={`M320 85 C 345 85, 345 ${ys[i] + 10}, 370 ${ys[i] + 10}`} />
+            <rect x="370" y={ys[i]} width="76" height="20" rx="6" />
+            <text x="408" y={ys[i] + 15} text-anchor="middle">{s.label}</text>
+            <text class="zl-d-ad" x="452" y={ys[i] + 15}>{i === 0 ? firstAd.id : ''}</text>
+          </g>
+        ))}
+      </svg>
+    </figure>
+
+    <p class="zl-swap-live" role="status" aria-live="polite" data-live></p>
+  </div>
+</Section>
+
+<style is:global>
+  .zl-swap-controls { display: none; }
+  .zl-js .zl-swap-controls { display: flex; flex-wrap: wrap; gap: 0.9rem 2rem; align-items: center; margin-bottom: 1.25rem; min-width: 0; }
+  .zl-swap-tabs, .zl-swap-chips {
+    position: relative; display: flex; gap: 0.35rem; max-width: 100%; min-width: 0;
+    overflow-x: auto; overscroll-behavior-x: contain; scroll-snap-type: x proximity; scrollbar-width: none;
+    -webkit-mask-image: linear-gradient(90deg, transparent, #000 var(--fl, 0px), #000 calc(100% - var(--fr, 0px)), transparent);
+    mask-image: linear-gradient(90deg, transparent, #000 var(--fl, 0px), #000 calc(100% - var(--fr, 0px)), transparent);
+  }
+  .zl-swap-tabs::-webkit-scrollbar, .zl-swap-chips::-webkit-scrollbar { display: none; }
+  .zl-swap-tabs { padding: 4px; border: 1px solid var(--zl-line); border-radius: 999px; background: var(--zl-surface); }
+  .zl-swap-chips { padding: 2px; }
+  .zl-swap-tabs button, .zl-swap-chips button {
+    position: relative; z-index: 1; flex: none; scroll-snap-align: center; min-height: 44px; min-width: 44px;
+    font: 500 0.85rem/1 var(--zl-font-mono); color: var(--zl-text-2); background: transparent; cursor: pointer;
+    border: 1px solid transparent; border-radius: 999px; padding: 0 1.05rem; transition: color 0.25s var(--zl-ease), border-color 0.25s var(--zl-ease);
+  }
+  .zl-swap-tabs button:hover, .zl-swap-chips button:hover { color: var(--zl-text); }
+  .zl-swap-tabs button[aria-selected='true'] { color: var(--zl-on-accent); }
+  .zl-swap-chips button { border-color: var(--zl-line-strong); }
+  .zl-swap-chips button[aria-checked='true'] { color: var(--zl-accent-hi); border-color: transparent; }
+  .zl-page[data-theme='light'] .zl-swap-chips button[aria-checked='true'] { color: var(--zl-accent-lo); }
+  /* Shared sliding indicator: positioned by JS with transform only. */
+  .zl-swap-ind { position: absolute; left: 0; top: 0; z-index: 0; pointer-events: none; border-radius: 999px; transform-origin: 0 0; will-change: transform; }
+  .zl-swap-tabs .zl-swap-ind { background: var(--zl-btn-grad, var(--zl-accent)); }
+  .zl-swap-chips .zl-swap-ind { background: var(--zl-glow); border: 1px solid var(--zl-accent); box-sizing: border-box; }
+  .zl-swap-tabs button:focus-visible, .zl-swap-chips button:focus-visible { outline: 2px solid var(--zl-accent-hi); outline-offset: 2px; }
+  @media (max-width: 900px) {
+    .zl-js .zl-swap-controls { flex-direction: column; align-items: stretch; gap: 0.6rem; }
+    .zl-swap-tabs, .zl-swap-chips { width: 100%; }
+  }
+
+  .zl-swap-grid { display: grid; gap: 1rem; grid-template-columns: minmax(0, 1fr); }
+  @media (min-width: 900px) { .zl-swap-grid { grid-template-columns: minmax(0, 1fr) minmax(0, 1fr); } }
+  .zl-swap-pane { margin: 0; min-width: 0; border: 1px solid var(--zl-line-strong); border-radius: var(--zl-radius); background: var(--zl-code-bg); color: #e6edf7; overflow: hidden; box-shadow: var(--zl-shadow); }
+  .zl-swap-pane--pinned { border-color: color-mix(in srgb, var(--zl-warm) 45%, transparent); }
+  .zl-swap-pane figcaption { display: flex; justify-content: space-between; align-items: center; gap: 0.5rem; flex-wrap: wrap; padding: 0.65rem 0.9rem; border-bottom: 1px solid rgba(255,255,255,0.08); font: 0.75rem/1 var(--zl-font-mono); color: #8896ab; }
+  .zl-swap-pane pre { margin: 0; padding: 1rem 0; background: transparent !important; overflow-x: auto; min-height: 9.5rem; }
+  .zl-swap-pane code { display: block; font: 0.84rem/1.75 var(--zl-font-mono); font-variant-ligatures: none; background: none; width: max-content; min-width: 100%; }
+  .zl-ln { display: block; padding: 0 1.1rem; white-space: pre-wrap; overflow-wrap: anywhere; border-left: 2px solid transparent; }
+  .zl-ln[data-g]::before { content: attr(data-g); display: inline-block; width: 2ch; margin-right: 0.5ch; color: #5d6b80; }
+  .zl-ln.is-add { background: rgba(86, 211, 140, 0.15); border-left-color: #56d38c; }
+  .zl-ln.is-add::before { color: #7ee2a8; font-weight: 700; }
+  .zl-ln.is-del { background: rgba(255, 107, 107, 0.13); border-left-color: #ff7b7b; color: #f1a6a6; text-decoration: line-through; text-decoration-color: rgba(255, 123, 123, 0.5); }
+  .zl-ln.is-del::before { color: #ff9a9a; font-weight: 700; text-decoration: none; }
+  .zl-ln i { font-style: normal; }
+  .zl-ln .k { color: #95d7e8; } .zl-ln .f { color: #eaccad; }
+  .zl-swap-tag { position: relative; padding: 0.3rem 0.55rem; border-radius: 999px; font: 500 0.68rem/1 var(--zl-font-mono); letter-spacing: 0.04em; }
+  .zl-swap-tag--warm { color: var(--zl-warm); border: 1px solid color-mix(in srgb, var(--zl-warm) 55%, transparent); background: color-mix(in srgb, var(--zl-warm) 12%, transparent); }
+  .zl-page[data-theme='light'] .zl-swap-tag--warm { color: #eaccad; }
+  .zl-swap-tag--changed { color: var(--zl-accent-hi); border: 1px solid var(--zl-accent); }
+  .zl-swap-tag--warm::after { content: ''; position: absolute; inset: -1px; border-radius: inherit; border: 1px solid var(--zl-warm); opacity: 0; pointer-events: none; }
+  .zl-swap-tag--warm.is-pulse { animation: zl-tag-pop 0.7s var(--zl-ease); }
+  .zl-swap-tag--warm.is-pulse::after { animation: zl-tag-ring 0.9s var(--zl-ease); }
+  @keyframes zl-tag-pop { 0% { transform: scale(1); } 35% { transform: scale(1.1); } 100% { transform: scale(1); } }
+  @keyframes zl-tag-ring { 0% { opacity: 0.9; transform: scale(1); } 100% { opacity: 0; transform: scale(1.6, 2.2); } }
+  @media (prefers-reduced-motion: reduce) { .zl-swap-tag--warm.is-pulse, .zl-swap-tag--warm.is-pulse::after { animation: none; } }
+
+  .zl-swap-diagram { margin: 1.5rem 0 0; }
+  .zl-swap-diagram svg { width: 100%; max-width: 640px; height: auto; display: block; margin-inline: auto; overflow: visible; }
+  .zl-swap-diagram text { transform-box: fill-box; transform-origin: center; }
+  .zl-d-box { transform-box: fill-box; transform-origin: center; }
+  .zl-d-box rect { fill: var(--zl-surface-2); stroke: var(--zl-line-strong); }
+  .zl-d-box--c rect { stroke: var(--zl-accent); fill: var(--zl-glow); }
+  .zl-swap-diagram text { fill: var(--zl-text-2); font: 500 14px var(--zl-font-mono); }
+  .zl-d-line { fill: none; stroke: var(--zl-line-strong); stroke-width: 1.5; transition: stroke 0.4s var(--zl-ease); }
+  .zl-d-svc rect { fill: var(--zl-surface); stroke: var(--zl-line); transition: fill 0.4s var(--zl-ease), stroke 0.4s var(--zl-ease); }
+  .zl-d-svc .zl-d-ad { fill: var(--zl-accent-hi); font-weight: 700; opacity: 0; transition: opacity 0.4s; }
+  .zl-d-svc.is-on rect { fill: var(--zl-glow); stroke: var(--zl-accent); filter: drop-shadow(0 0 6px var(--zl-accent)); }
+  .zl-d-svc.is-on text:not(.zl-d-ad) { fill: var(--zl-text); }
+  .zl-d-svc.is-on .zl-d-line { stroke: var(--zl-accent); }
+  .zl-d-svc.is-on .zl-d-ad { opacity: 1; }
+  .zl-page[data-theme='light'] .zl-d-svc .zl-d-ad { fill: var(--zl-accent-lo); }
+  @media (pointer: coarse) { .zl-d-svc.is-on rect { filter: none; } }
+  .zl-swap-live { position: absolute; width: 1px; height: 1px; overflow: hidden; clip-path: inset(50%); }
+</style>
+
+<script>
+  import '../../scripts/landing/adapter-swap';
+</script>

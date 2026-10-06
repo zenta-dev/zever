@@ -45,6 +45,13 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   `ContainsScorer`, LLM-judge scorer) with suite reports.
 - New `shared/prompt` module: pure-string builders for system prompts,
   grounded context, JSON repair, and tool-error feedback.
+- Rewrote the docs landing page as a standalone Astro page
+  (`docs/src/pages/index.astro`): dark-first/light themed, live schema-to-outputs
+  compile stage, hand-wired vs zever comparison, scroll-driven schema
+  walkthrough, adapter-swap playground, filterable batteries grid, container
+  lifecycle graph, terminal quickstart, agent section, reproducible
+  benchmarks, examples carousel, and FAQ. The former splash content moved to
+  `getting-started/introduction`.
 - `--dry-run` across all nine `generate` subcommands: validation and
   rendering still run, but no filesystem writes occur; append-mode
   subcommands preview the rendered declaration.
