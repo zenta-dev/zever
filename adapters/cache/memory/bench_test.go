@@ -15,14 +15,32 @@ func BenchmarkSetGet(b *testing.B) {
 	val := []byte("bench-value")
 
 	b.ReportAllocs()
-	b.ResetTimer()
 
-	for i := 0; i < b.N; i++ {
+	for b.Loop() {
 		if err := c.Set(ctx, "bench", val, 0); err != nil {
 			b.Fatal(err)
 		}
 
 		if _, err := c.Get(ctx, "bench"); err != nil {
+			b.Fatal(err)
+		}
+	}
+}
+
+// BenchmarkDelete measures a Set followed by Delete on the same key.
+func BenchmarkDelete(b *testing.B) {
+	c := stubCache(b, cache.Options{})
+	ctx := b.Context()
+	val := []byte("bench-value")
+
+	b.ReportAllocs()
+
+	for b.Loop() {
+		if err := c.Set(ctx, "bench", val, 0); err != nil {
+			b.Fatal(err)
+		}
+
+		if err := c.Delete(ctx, "bench"); err != nil {
 			b.Fatal(err)
 		}
 	}
@@ -34,9 +52,8 @@ func BenchmarkIncrement(b *testing.B) {
 	ctx := b.Context()
 
 	b.ReportAllocs()
-	b.ResetTimer()
 
-	for i := 0; i < b.N; i++ {
+	for b.Loop() {
 		if err := c.Increment(ctx, "counter"); err != nil {
 			b.Fatal(err)
 		}
@@ -54,7 +71,6 @@ func BenchmarkGetParallel(b *testing.B) {
 	}
 
 	b.ReportAllocs()
-	b.ResetTimer()
 
 	b.RunParallel(func(pb *testing.PB) {
 		for pb.Next() {
@@ -76,7 +92,6 @@ func BenchmarkSetParallel(b *testing.B) {
 	var n atomic.Int64
 
 	b.ReportAllocs()
-	b.ResetTimer()
 
 	b.RunParallel(func(pb *testing.PB) {
 		for pb.Next() {

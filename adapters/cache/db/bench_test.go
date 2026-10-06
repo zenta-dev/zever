@@ -11,14 +11,32 @@ func BenchmarkSetGet(b *testing.B) {
 	val := []byte("bench-value")
 
 	b.ReportAllocs()
-	b.ResetTimer()
 
-	for i := 0; i < b.N; i++ {
+	for b.Loop() {
 		if err := c.Set(ctx, "bench", val, 0); err != nil {
 			b.Fatal(err)
 		}
 
 		if _, err := c.Get(ctx, "bench"); err != nil {
+			b.Fatal(err)
+		}
+	}
+}
+
+// BenchmarkDelete measures a DB-backed cache Set followed by Delete.
+func BenchmarkDelete(b *testing.B) {
+	c := mustNew(b)
+	ctx := b.Context()
+	val := []byte("bench-value")
+
+	b.ReportAllocs()
+
+	for b.Loop() {
+		if err := c.Set(ctx, "bench", val, 0); err != nil {
+			b.Fatal(err)
+		}
+
+		if err := c.Delete(ctx, "bench"); err != nil {
 			b.Fatal(err)
 		}
 	}
@@ -35,9 +53,8 @@ func BenchmarkGet(b *testing.B) {
 	}
 
 	b.ReportAllocs()
-	b.ResetTimer()
 
-	for i := 0; i < b.N; i++ {
+	for b.Loop() {
 		if _, err := c.Get(ctx, "bench"); err != nil {
 			b.Fatal(err)
 		}
@@ -55,7 +72,6 @@ func BenchmarkGetParallel(b *testing.B) {
 	}
 
 	b.ReportAllocs()
-	b.ResetTimer()
 
 	b.RunParallel(func(pb *testing.PB) {
 		for pb.Next() {
