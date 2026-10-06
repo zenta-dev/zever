@@ -28,7 +28,7 @@
 **Files:** `core/outbox/options.go`, `core/outbox/outbox.go` (ScopeName), `core/outbox/go.mod`, `adapters/outbox/db/{relay.go,options.go}`, `adapters/outbox/cdc/consumer.go`, tests.
 
 - [ ] Add `Provider observability.Provider `json:"-"...`` to `core/outbox.Options`; `ScopeName="outbox"`; require+replace `core/observability`; `GOWORK=off go mod tidy`.
-- [ ] Failing test with a recording `observability.Metrics`: successful publish increments `outbox.published` + records `outbox.publish.duration_seconds`; failure increments `outbox.retried` then `outbox.failed_total`; `Status()`/poll emits `outbox.pending` and `outbox.oldest_pending.age_seconds` gauges.
+- [ ] Failing test with a recording `observability.Metrics`: successful publish increments `outbox.published` + records `outbox.publish.duration_seconds`; failure increments `outbox.retried` then `outbox.failed_total`; `Status()`/poll emits `outbox.pending` and `outbox.oldest_pending_age_seconds` gauges.
 - [ ] Emit metrics in db `deliver`/`markProcessed`/`markFailed`/`markRetry`/`Status` and cdc consumer; attrs `outbox.adapter/table/topic/outcome`; no-op when Provider nil.
 - [ ] Spans `outbox.publish`/`outbox.consume` (use B1 `StartSpan` if present; otherwise `Start`).
 - [ ] Tests: db sqlite `:memory:` + recording meter; cdc consumer seam. `go test ./...` in both adapters.

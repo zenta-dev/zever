@@ -23,9 +23,9 @@ rule is simple:
 |---|---|---|
 | HTTP inbound | `traceparent`/`tracestate`/`baggage` extracted before the server span starts | `middleware.Tracing` |
 | gRPC inbound | Same three keys read from incoming metadata before the server span starts | `middleware.TracingUnaryServerInterceptor` |
-| HTTP outbound | Context injected onto the outgoing request | `shared/httpclient` transport |
+| HTTP outbound | Context injected onto the outgoing request, when the client is built with `httpclient.WithTracing()` | `shared/httpclient` |
 | gRPC outbound | Context injected into outgoing metadata | `shared/grpcclient` interceptors |
-| Queue / outbox | Context stored in the message headers at `Record`, continued on consume | `core/outbox`, `traceprop.StartConsumeSpan` |
+| Queue / outbox | Context stored in the message headers at publish/`Record`, continued on consume | `core/outbox`, `core/job`, `traceprop.StartConsumeSpan` |
 
 Because inbound extraction happens before the span starts, the server
 span is a **child** of the caller's span rather than a new root. That one
@@ -48,20 +48,23 @@ func tracedHandler(p observability.Provider, h http.Handler) http.Handler {
 }
 ```
 
-The outbound half is automatic for clients built by `shared/httpclient`;
-every outbound request carries the caller's trace context:
+The outbound half is a transport, not a hand-written `RoundTripper`: pass
+`httpclient.WithTracing()` when you build the client and every outbound
+request carries the caller's trace context. The option is opt-in so the
+default client keeps a plain `*http.Transport`:
 
 ```go
 import (
+    "context"
     "net/http"
     "time"
 
     "github.com/zenta-dev/zever/shared/httpclient"
 )
 
-func callDownstream(url string) (*http.Response, error) {
-    c := httpclient.NewClient(5 * time.Second)
-    req, err := http.NewRequest(http.MethodGet, url, nil)
+func callDownstream(ctx context.Context, url string) (*http.Response, error) {
+    c := httpclient.NewClient(5*time.Second, httpclient.WithTracing())
+    req, err := http.NewRequestWithContext(ctx, http.MethodGet, url, nil)
     if err != nil {
         return nil, err
     }
@@ -69,10 +72,25 @@ func callDownstream(url string) (*http.Response, error) {
 }
 ```
 
-Messaging has no header channel, so `Record` stores the trace context in
-the outbox row's headers and the consumer continues the same trace. For
-send paths with no channel at all (mailer, SMS, push), read the ID for
-your logs instead of inventing protocol headers:
+Without `WithTracing()` the client sends no `traceparent`, and the
+downstream service starts a fresh root trace. Thread the handler's
+context into the request — `http.NewRequest` (no context) has no parent
+span to propagate even with the option set. `httpclient.Inject(ctx, req)`
+is exported for the case where you already hold a request and need the
+headers applied yourself.
+
+gRPC outbound injection needs no option: `shared/grpcclient` chains its
+interceptors on every connection, so the context rides along
+automatically. Client spans additionally need
+`grpcclient.WithObservability(provider)`.
+
+Messaging has a header channel too: `Record` stores the trace context in
+the outbox row's headers, and the relay hands those headers to the
+`Publisher`. Consumer paths that hold the headers continue the same
+trace with `traceprop.StartConsumeSpan` — `core/job`'s worker and the
+`eventbus` adapters already do. For send paths with no channel at all
+(mailer, SMS, push), read the ID for your logs instead of inventing
+protocol headers:
 
 ```go
 import (
@@ -269,10 +287,11 @@ separately instead.
    wired. `middleware.Tracing` must run in the handler chain (the
    generated server wires it) and must run *before* your routes, not
    around each route.
-2. Client calls start unrelated traces: the outbound client was not
-   built by `shared/httpclient` / `shared/grpcclient`, or the request
-   was made with a context that was not threaded from the handler.
-   Always derive the request context from `r.Context()`.
+2. Client calls start unrelated traces: the request was made with a
+   context that was not threaded from the handler, or an
+   `httpclient` client was built without `httpclient.WithTracing()`.
+   Always derive the request context from `r.Context()` and pass the
+   option on `httpclient.NewClient`.
 3. Baggage is empty downstream: nothing set it, or it was set after the
    outbound call rather than at the edge. Baggage propagates forward
    only from the context the outbound call used.
