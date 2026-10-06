@@ -26,6 +26,8 @@ type line struct {
 	TraceID string `json:"trace_id"`
 	SpanID  string `json:"span_id,omitempty"`
 	Name    string `json:"name"`
+	// Kind is the span kind name (server/client/...); empty spans omit it.
+	Kind string `json:"kind,omitempty"`
 	// DurationMs is int64 milliseconds on the wire, not a time.Duration — intentional.
 	DurationMs int64          `json:"duration_ms,omitempty"`
 	Attrs      map[string]any `json:"attrs,omitempty"`
@@ -65,7 +67,9 @@ type span struct {
 	name    string
 	start   time.Time
 	mu      sync.Mutex
+	kind    observability.SpanKind
 	attrs   []observability.Attr
+	links   []observability.SpanLink
 	errText string
 }
 
@@ -100,9 +104,15 @@ func (p *provider) Meter(string) observability.Metrics { return p.metrics }
 func (p *provider) Shutdown(context.Context) error { return nil }
 
 func (t *tracer) Start(ctx context.Context, name string) (context.Context, observability.Span) {
+	return t.StartSpan(ctx, name)
+}
+
+func (t *tracer) StartSpan(ctx context.Context, name string, opts ...observability.SpanStartOption) (context.Context, observability.Span) {
 	if ctx == nil {
 		ctx = context.Background()
 	}
+
+	cfg := observability.NewSpanConfig(opts...)
 
 	traceID := ""
 	if info, ok := ctx.Value(spanCtxKey{}).(spanInfo); ok {
@@ -113,10 +123,15 @@ func (t *tracer) Start(ctx context.Context, name string) (context.Context, obser
 	}
 
 	info := spanInfo{traceID: traceID, spanID: randHex(8)}
-	s := &span{sh: t.sh, info: info, name: name, start: time.Now()}
+	s := &span{sh: t.sh, info: info, name: name, start: time.Now(), kind: cfg.Kind, links: cfg.Links}
+	if len(cfg.Attrs) > 0 {
+		s.attrs = append(s.attrs, cfg.Attrs...)
+	}
 
 	return context.WithValue(ctx, spanCtxKey{}, info), s
 }
+
+var _ observability.SpanStarter = (*tracer)(nil)
 
 func (t *tracer) Shutdown(context.Context) error { return nil }
 
@@ -145,6 +160,7 @@ func (s *span) End() {
 		TraceID:    s.info.traceID,
 		SpanID:     s.info.spanID,
 		Name:       s.name,
+		Kind:       s.kind.String(),
 		DurationMs: time.Since(s.start).Milliseconds(),
 		Attrs:      flatten(attrs, s.sh.limit),
 		Error:      errText,
