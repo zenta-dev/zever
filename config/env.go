@@ -128,7 +128,7 @@ func matchService(head string) (string, bool) {
 	case 'b':
 		return matchName(head, "billing")
 	case 'c':
-		return matchName(head, "cache", "crypto")
+		return matchName(head, "cache", "cdn", "crypto")
 	case 'd':
 		return matchName(head, "db", "document")
 	case 'e':
@@ -191,6 +191,8 @@ func serviceRefs(cfg *Config, svc string) (adapter *string, opts any, ok bool) {
 		return &cfg.Billing.Adapter, &cfg.Billing.Options, true
 	case "cache":
 		return &cfg.Cache.Adapter, &cfg.Cache.Options, true
+	case "cdn":
+		return &cfg.CDN.Adapter, &cfg.CDN.Options, true
 	case "crypto":
 		return &cfg.Crypto.Adapter, &cfg.Crypto.Options, true
 	case "db":

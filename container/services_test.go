@@ -19,6 +19,7 @@ import (
 	"github.com/zenta-dev/zever/core/auth"
 	"github.com/zenta-dev/zever/core/billing"
 	"github.com/zenta-dev/zever/core/cache"
+	"github.com/zenta-dev/zever/core/cdn"
 	"github.com/zenta-dev/zever/core/crypto"
 	"github.com/zenta-dev/zever/core/db"
 	"github.com/zenta-dev/zever/core/document"
@@ -77,6 +78,7 @@ func registerFakeAdapters() {
 	_ = auth.Register(auth.JWT, newFakeAuth)
 	_ = billing.Register(billing.Stub, newFakeBilling)
 	_ = cache.Register(cache.Memory, newFakeCache)
+	_ = cdn.Register(cdn.AdapterNoop, newFakeCDN)
 	_ = crypto.Register(crypto.AdapterLocal, newFakeCrypto)
 	_ = db.Register(db.SQLite, newFakeDB)
 	_ = document.Register(document.Local, newFakeDocument)
@@ -334,6 +336,15 @@ func (f *fakeCache) Exists(_ context.Context, _ string) (bool, error) {
 	return false, nil
 }
 func (f *fakeCache) Close(_ context.Context) error { return nil }
+
+func newFakeCDN(_ cdn.Options) (cdn.CDN, error) { return &fakeCDN{}, nil }
+
+// fakeCDN implements cdn.CDN with zero values.
+type fakeCDN struct{}
+
+func (f *fakeCDN) Purge(_ context.Context, _ cdn.PurgeRequest) error { return nil }
+func (f *fakeCDN) Close(_ context.Context) error                     { return nil }
+func (f *fakeCDN) Name() string                                      { return "cloudflare" }
 
 func newFakeCrypto(_ crypto.Options) (crypto.Crypto, error) { return &fakeCrypto{}, nil }
 
@@ -880,6 +891,7 @@ func TestAccessors_resolve(t *testing.T) {
 		{"auth", func() (any, error) { return c.Auth() }},
 		{"billing", func() (any, error) { return c.Billing() }},
 		{"cache", func() (any, error) { return c.Cache() }},
+		{"cdn", func() (any, error) { return c.CDN() }},
 		{"crypto", func() (any, error) { return c.Crypto() }},
 		{"db", func() (any, error) { return c.DB() }},
 		{"document", func() (any, error) { return c.Document() }},

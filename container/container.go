@@ -12,6 +12,7 @@ import (
 	"github.com/zenta-dev/zever/core/auth"
 	"github.com/zenta-dev/zever/core/billing"
 	"github.com/zenta-dev/zever/core/cache"
+	"github.com/zenta-dev/zever/core/cdn"
 	"github.com/zenta-dev/zever/core/crypto"
 	"github.com/zenta-dev/zever/core/db"
 	"github.com/zenta-dev/zever/core/document"
@@ -59,6 +60,7 @@ type Container struct {
 	auth          lazy[auth.Auth]
 	billing       lazy[billing.Billing]
 	cache         lazy[cache.Cache]
+	cdn           lazy[cdn.CDN]
 	crypto        lazy[crypto.Crypto]
 	db            lazy[db.DB]
 	document      lazy[document.Document]

@@ -13,6 +13,7 @@ import (
 	"github.com/zenta-dev/zever/core/auth"
 	"github.com/zenta-dev/zever/core/billing"
 	"github.com/zenta-dev/zever/core/cache"
+	"github.com/zenta-dev/zever/core/cdn"
 	"github.com/zenta-dev/zever/core/crypto"
 	"github.com/zenta-dev/zever/core/db"
 	"github.com/zenta-dev/zever/core/document"
@@ -139,6 +140,13 @@ func (c *Container) Cache() (cache.Cache, error) {
 		}
 
 		return openService("cache", c.cfg.Cache.Adapter, cache.ParseAdapter, cache.Open, c.cfg.Cache.Options)
+	})
+}
+
+// CDN resolves and returns the CDN service instance.
+func (c *Container) CDN() (cdn.CDN, error) {
+	return c.cdn.get(func() (cdn.CDN, error) {
+		return openService("cdn", c.cfg.CDN.Adapter, cdn.ParseAdapter, cdn.Open, c.cfg.CDN.Options)
 	})
 }
 

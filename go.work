@@ -16,6 +16,7 @@ use (
 	./adapters/cache/db
 	./adapters/cache/memory
 	./adapters/cache/redis
+	./adapters/cdn/noop
 	./adapters/crypto/kms
 	./adapters/crypto/local
 	./adapters/db/postgres
@@ -102,6 +103,7 @@ use (
 	./core/authz
 	./core/billing
 	./core/cache
+	./core/cdn
 	./core/crypto
 	./core/db
 	./core/document

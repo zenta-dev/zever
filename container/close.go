@@ -113,7 +113,7 @@ type closeSnapshot struct {
 // closed first),
 // grpcServer (separate GracefulStop handling), grpcClients (separate
 // per-conn close handling). This list must cover all remaining lazy
-// fields; currently 32 entries + 9 ordered = 41 lazy fields. When
+// fields; currently 33 entries + 9 ordered = 42 lazy fields. When
 // adding a new service, add it here unless it depends on cache/queue
 // (then add to Close's ordered section and keep excluded here). Drift is
 // pinned by TestContainer_Snapshots_CoversAllServices via reflection.
@@ -123,6 +123,7 @@ func (c *Container) snapshots() []closeSnapshot {
 		func() closeSnapshot { v, ok := c.analytics.getIfResolved(); return closeSnapshot{v, ok} }(),
 		func() closeSnapshot { v, ok := c.auth.getIfResolved(); return closeSnapshot{v, ok} }(),
 		func() closeSnapshot { v, ok := c.billing.getIfResolved(); return closeSnapshot{v, ok} }(),
+		func() closeSnapshot { v, ok := c.cdn.getIfResolved(); return closeSnapshot{v, ok} }(),
 		func() closeSnapshot { v, ok := c.crypto.getIfResolved(); return closeSnapshot{v, ok} }(),
 		func() closeSnapshot { v, ok := c.document.getIfResolved(); return closeSnapshot{v, ok} }(),
 		func() closeSnapshot { v, ok := c.eventbus.getIfResolved(); return closeSnapshot{v, ok} }(),
@@ -159,7 +160,7 @@ func (c *Container) snapshots() []closeSnapshot {
 // including resolved values.
 func snapshotServiceNames() []string {
 	return []string{
-		"ai", "analytics", "auth", "billing", "crypto", "document",
+		"ai", "analytics", "auth", "billing", "cdn", "crypto", "document",
 		"eventbus", "flag", "geo", "i18n", "idempotency", "lock", "log", "mailer",
 		"media", "notification", "observability", "outbox", "password", "payment",
 		"permission", "ratelimit", "resilience", "router", "search", "secrets", "session", "storage",
