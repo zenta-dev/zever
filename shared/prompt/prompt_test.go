@@ -103,3 +103,51 @@ func TestToolPlan(t *testing.T) {
 		}
 	}
 }
+
+func TestDoctorTriage(t *testing.T) {
+	t.Parallel()
+
+	got := DoctorTriage("auth: FAIL bad secret")
+
+	for _, want := range []string{"doctor --json", "FAIL", "ZEVER_*"} {
+		if !strings.Contains(got, want) {
+			t.Errorf("missing %q:\n%s", want, got)
+		}
+	}
+}
+
+func TestDiagRepair(t *testing.T) {
+	t.Parallel()
+
+	got := DiagRepair("app.zen:3:13: unknown field type")
+
+	for _, want := range []string{"file:line:col", "app.zen:3:13"} {
+		if !strings.Contains(got, want) {
+			t.Errorf("missing %q:\n%s", want, got)
+		}
+	}
+}
+
+func TestOutboxTriage(t *testing.T) {
+	t.Parallel()
+
+	got := OutboxTriage("dlq: 3 messages")
+
+	for _, want := range []string{"requeue-vs-purge", "mask DSNs", "dlq: 3 messages"} {
+		if !strings.Contains(got, want) {
+			t.Errorf("missing %q:\n%s", want, got)
+		}
+	}
+}
+
+func TestExtractSplit(t *testing.T) {
+	t.Parallel()
+
+	got := ExtractSplit("declares module billing alongside shipping")
+
+	for _, want := range []string{"each module into its own file", "byte-exact", "billing alongside shipping"} {
+		if !strings.Contains(got, want) {
+			t.Errorf("missing %q:\n%s", want, got)
+		}
+	}
+}
