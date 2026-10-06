@@ -63,6 +63,38 @@ func prompts() []promptDef {
 					" using the zever_schema and zever_explain tools.", nil
 			},
 		},
+		{
+			Name:        "debug-doctor",
+			Description: "Triage doctor FAIL rows into config and env fixes.",
+			Args: []promptArg{
+				{Name: "doctor_json", Description: "Pasted `zever doctor --json` rows.", Required: true},
+			},
+			Render: func(args map[string]string) (string, error) {
+				rows, ok := args["doctor_json"]
+				if !ok || strings.TrimSpace(rows) == "" {
+					return "", fmt.Errorf("zever-mcp: prompt argument %q is required", "doctor_json")
+				}
+
+				return "Triage these `zever doctor --json` rows into config-file and " +
+					"environment fixes, marking expected secret failures as such:\n\n" + rows, nil
+			},
+		},
+		{
+			Name:        "fix-diags",
+			Description: "Turn check diagnostics into a minimal .zen edit plan.",
+			Args: []promptArg{
+				{Name: "diags", Description: "Pasted `zever check` diagnostics.", Required: true},
+			},
+			Render: func(args map[string]string) (string, error) {
+				diags, ok := args["diags"]
+				if !ok || strings.TrimSpace(diags) == "" {
+					return "", fmt.Errorf("zever-mcp: prompt argument %q is required", "diags")
+				}
+
+				return "Propose the smallest `.zen` edits resolving these diagnostics, " +
+					"quoting exact lines:\n\n" + diags, nil
+			},
+		},
 	}
 }
 

@@ -46,6 +46,45 @@ var staticResources = []resourceDef{
 			"3. zever_compile for the merged OpenAPI document.\n" +
 			"4. zever check --json to validate before compiling.\n",
 	},
+	{
+		URI:         "zever://doctor-guide",
+		Name:        "Doctor guide",
+		Description: "map doctor FAIL rows to config and env fixes",
+		MimeType:    "text/markdown",
+		Text: "# zever doctor guide\n" +
+			"\n" +
+			"Each FAIL row names a battery that failed to resolve. Fix it in " +
+			"`zever.yaml` under that battery's key, or via the matching " +
+			"`ZEVER_*` environment variable. A battery needing a secret " +
+			"(for example auth/jwt with no configured secret) fails " +
+			"expectedly: supply the secret, never invent one.\n" +
+			"Pass `--strict` to gate CI on zero FAIL rows.\n",
+	},
+	{
+		URI:         "zever://outbox-guide",
+		Name:        "Outbox guide",
+		Description: "outbox status, dlq, requeue and purge sequence",
+		MimeType:    "text/markdown",
+		Text: "# outbox guide\n" +
+			"\n" +
+			"1. `outbox status` for pending counts.\n" +
+			"2. `dlq list` for dead messages.\n" +
+			"3. Requeue transient failures, purge poison messages.\n" +
+			"Mask DSNs: never echo secrets or connection strings.\n",
+	},
+	{
+		URI:         "zever://boundary-rules",
+		Name:        "Module boundary rules",
+		Description: "cross-module reference rules and split fixes",
+		MimeType:    "text/markdown",
+		Text: "# module boundary rules\n" +
+			"\n" +
+			"Relations, RPC returns, and permission resources must not cross " +
+			"module boundaries directly: expose cross-module access through " +
+			"that module's own service. When extraction rejects a file for " +
+			"declaring several modules, move each module into its own file, " +
+			"copying declarations byte-exact (no AST reprint exists).\n",
+	},
 }
 
 // resourceList returns the resources/list payload.

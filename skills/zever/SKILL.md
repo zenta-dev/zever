@@ -14,7 +14,7 @@ Prefer machine output over human output:
 - `zever --json <command>`: JSON envelope `{ok, command, exitCode, data?, error?}` on stdout. Exit codes: 0 success, 1 runtime error, 2 flag misuse.
 - `zever --help --agent`: machine-readable command catalog (this list, as JSON).
 - `compile`, `check`, `explain`, `doctor` emit structured `data` under `--json`.
-- MCP server: build `tools/zever-mcp` and register the binary as an MCP stdio server (`zever_compile`, `zever_schema`, `zever_explain`).
+- MCP server: build `tools/zever-mcp` and register the binary as an MCP stdio server (`zever_compile`, `zever_schema`, `zever_explain`, `zever_doctor`, `zever_generate`).
 
 ## Workflows
 

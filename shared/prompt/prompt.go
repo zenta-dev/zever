@@ -122,3 +122,44 @@ func ToolPlan(task string, tools []string) string {
 
 	return b.String()
 }
+
+// DoctorTriage builds a prompt mapping `doctor --json` FAIL rows to
+// config-file and environment fixes.
+func DoctorTriage(doctorOutput string) string {
+	return "The following `zever doctor --json` output lists batteries that " +
+		"failed to resolve. For each FAIL row, name the `zever.yaml` key or " +
+		"`ZEVER_*` environment variable that fixes it, or state when the " +
+		"failure is expected (for example a battery needing a secret that " +
+		"must be supplied, never invented).\n\nDoctor output:\n" +
+		strings.TrimSpace(doctorOutput)
+}
+
+// DiagRepair builds a prompt turning `check`/`compile` diagnostics into a
+// minimal `.zen` edit plan.
+func DiagRepair(diags string) string {
+	return "The following `zever check` diagnostics carry `file:line:col` " +
+		"positions. For each diagnostic, propose the smallest `.zen` edit " +
+		"that resolves it, quoting the exact lines to change.\n\nDiagnostics:\n" +
+		strings.TrimSpace(diags)
+}
+
+// OutboxTriage builds a prompt interpreting `outbox status` plus `dlq list`
+// output into a requeue-vs-purge decision. It reminds the model to mask
+// DSNs before echoing them.
+func OutboxTriage(statusOutput string) string {
+	return "The following `outbox status` and `dlq list` output needs a " +
+		"requeue-vs-purge decision per dead message. Recommend exactly one " +
+		"action each, and mask DSNs (never echo secrets or connection " +
+		"strings).\n\nOutbox output:\n" +
+		strings.TrimSpace(statusOutput)
+}
+
+// ExtractSplit builds a prompt planning a single-module-per-file split when
+// extraction is rejected for a multi-module file.
+func ExtractSplit(extractErr string) string {
+	return "Extraction failed because one file declares several modules. " +
+		"Plan moving each module into its own file, preserving every " +
+		"declaration verbatim (no AST reprint exists, so copies must be " +
+		"byte-exact).\n\nExtraction error:\n" +
+		strings.TrimSpace(extractErr)
+}

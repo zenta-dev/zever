@@ -25,8 +25,12 @@ func TestResourcesList(t *testing.T) {
 	}
 
 	list, ok := m["resources"].([]map[string]any)
-	if !ok || len(list) == 0 {
-		t.Fatalf("resources = %v", m["resources"])
+	if !ok {
+		t.Fatalf("resources type = %T", m["resources"])
+	}
+
+	if len(list) != 5 {
+		t.Fatalf("resources = %d, want 5", len(list))
 	}
 }
 
@@ -89,8 +93,8 @@ func TestPromptsList(t *testing.T) {
 		t.Fatalf("prompts type = %T", m["prompts"])
 	}
 
-	if len(list) != 2 {
-		t.Fatalf("prompts = %d, want 2", len(list))
+	if len(list) != 4 {
+		t.Fatalf("prompts = %d, want 4", len(list))
 	}
 }
 
@@ -127,6 +131,76 @@ func TestPromptsGetMissingArg(t *testing.T) {
 
 	if resp.Error == nil {
 		t.Fatal("expected error for missing argument, got nil")
+	}
+}
+
+func TestPromptsGetDebugDoctor(t *testing.T) {
+	t.Parallel()
+
+	s := newServer()
+
+	raw, _ := json.Marshal(map[string]any{
+		"name":      "debug-doctor",
+		"arguments": map[string]string{"doctor_json": "auth: FAIL"},
+	})
+	resp := s.handle(t.Context(), rpcRequest{JSONRPC: "2.0", ID: json.RawMessage("1"), Method: "prompts/get", Params: raw})
+
+	m := mustResultMap(t, resp)
+	msgs, ok := m["messages"].([]promptMessage)
+	if !ok || len(msgs) != 1 {
+		t.Fatalf("messages = %v", m["messages"])
+	}
+
+	text, ok := msgs[0].Content.(map[string]any)["text"].(string)
+	if !ok || !strings.Contains(text, "auth: FAIL") {
+		t.Fatalf("message text = %v", msgs[0].Content)
+	}
+}
+
+func TestPromptsGetFixDiags(t *testing.T) {
+	t.Parallel()
+
+	s := newServer()
+
+	raw, _ := json.Marshal(map[string]any{
+		"name":      "fix-diags",
+		"arguments": map[string]string{"diags": "app.zen:3:13: bad"},
+	})
+	resp := s.handle(t.Context(), rpcRequest{JSONRPC: "2.0", ID: json.RawMessage("1"), Method: "prompts/get", Params: raw})
+
+	m := mustResultMap(t, resp)
+	msgs, ok := m["messages"].([]promptMessage)
+	if !ok || len(msgs) != 1 {
+		t.Fatalf("messages = %v", m["messages"])
+	}
+
+	text, ok := msgs[0].Content.(map[string]any)["text"].(string)
+	if !ok || !strings.Contains(text, "app.zen:3:13: bad") {
+		t.Fatalf("message text = %v", msgs[0].Content)
+	}
+}
+
+func TestResourcesReadDoctorGuide(t *testing.T) {
+	t.Parallel()
+
+	s := newServer()
+
+	raw, _ := json.Marshal(map[string]any{"uri": "zever://doctor-guide"})
+	resp := s.handle(t.Context(), rpcRequest{JSONRPC: "2.0", ID: json.RawMessage("1"), Method: "resources/read", Params: raw})
+
+	m := mustResultMap(t, resp)
+	contents, ok := m["contents"].([]map[string]any)
+	if !ok || len(contents) == 0 {
+		t.Fatalf("contents = %v", m["contents"])
+	}
+
+	if contents[0]["uri"] != "zever://doctor-guide" {
+		t.Fatalf("uri = %v", contents[0]["uri"])
+	}
+
+	text, ok := contents[0]["text"].(string)
+	if !ok || !strings.Contains(text, "--strict") {
+		t.Fatalf("doctor guide text = %v", contents[0]["text"])
 	}
 }
 

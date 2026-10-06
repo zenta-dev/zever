@@ -9,6 +9,9 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Added
 
+- Prompt pack 3: `DoctorTriage`, `DiagRepair`, `OutboxTriage` and
+  `ExtractSplit` builders for doctor, diagnostic, outbox, and extraction
+  workflows.
 - RAG reranking: `Reranker` interface with deterministic `TermOverlapReranker`
   default and `JudgeReranker` LLM opt-in, applied post-fusion via
   `HybridOptions.Reranker`.

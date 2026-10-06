@@ -23,7 +23,9 @@ Conventions: `AGENTS.md` (repo root).
 ## Machine interfaces
 
 - MCP server: build `tools/zever-mcp`, register the binary as an MCP stdio
-  server. Tools: `zever_compile`, `zever_schema`, `zever_explain`.
+  server. Tools: `zever_compile`, `zever_schema`, `zever_explain`,
+  `zever_doctor`, `zever_generate` (elicitation-gated). Also serves static
+  resources and prompt templates.
 - OpenAPI: `zever compile --backend openapi` emits one document per module
   plus a merged `openapi.json`.
 - MCP tool manifest: `zever compile --backend mcp` emits one manifest per
