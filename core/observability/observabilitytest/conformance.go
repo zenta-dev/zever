@@ -10,7 +10,8 @@ import (
 
 // Conformance verifies factory-built providers implement the
 // observability.Provider contract: open/register round-trip, tracer
-// spans with attributes and error recording, metrics
+// spans with attributes and error recording, the optional SpanStarter
+// interface (kind/attrs/links when implemented), metrics
 // counter/gauge/histogram, and Shutdown cleanup. Each subtest takes
 // a fresh instance from factory so cases stay isolated. Tests never
 // call time.Sleep and never touch the network.
@@ -25,6 +26,7 @@ func Conformance(t *testing.T, factory func(t *testing.T) observability.Provider
 
 	t.Run("OpenRegister", func(t *testing.T) { conformanceOpenRegister(t) })
 	t.Run("Tracing", func(t *testing.T) { conformanceTracing(t, factory) })
+	t.Run("SpanStart", func(t *testing.T) { conformanceSpanStart(t, factory) })
 	t.Run("Metrics", func(t *testing.T) { conformanceMetrics(t, factory) })
 	t.Run("Shutdown", func(t *testing.T) { conformanceShutdown(t, factory) })
 }
@@ -93,6 +95,41 @@ func conformanceTracing(t *testing.T, factory func(t *testing.T) observability.P
 	if err := tracer.Shutdown(ctx); err != nil {
 		t.Errorf("Tracer.Shutdown() error = %v, want nil", err)
 	}
+}
+
+// conformanceSpanStart exercises the optional SpanStarter interface. When
+// the provider's tracer implements it, StartSpan must accept kind, attrs,
+// and links without panicking and return non-nil ctx and span. Providers
+// without SpanStarter are exempt: the fallback path is covered by the
+// core StartSpan tests.
+func conformanceSpanStart(t *testing.T, factory func(t *testing.T) observability.Provider) {
+	t.Helper()
+
+	ctx := t.Context()
+
+	tracer := factory(t).Tracer("kit-scope")
+	if tracer == nil {
+		t.Fatal("Tracer() = nil")
+	}
+
+	ss, ok := tracer.(observability.SpanStarter)
+	if !ok {
+		return
+	}
+
+	spanCtx, span := ss.StartSpan(ctx, "kit-span",
+		observability.WithSpanKind(observability.SpanKindClient),
+		observability.WithAttributes(observability.String("k", "v")),
+		observability.WithLinks(observability.SpanLink{TraceID: "aa", SpanID: "bb"}),
+	)
+	if spanCtx == nil {
+		t.Error("StartSpan() ctx = nil")
+	}
+	if span == nil {
+		t.Error("StartSpan() span = nil")
+	}
+
+	span.End()
 }
 
 func conformanceMetrics(t *testing.T, factory func(t *testing.T) observability.Provider) {

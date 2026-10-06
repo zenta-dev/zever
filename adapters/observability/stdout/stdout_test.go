@@ -80,6 +80,27 @@ func TestSpan_end_emitsJSONLine(t *testing.T) {
 	}
 }
 
+func TestSpan_startSpanKindAttrs_emitted(t *testing.T) {
+	t.Parallel()
+
+	p, buf := openBuffered(t, nil)
+
+	_, span := observability.StartSpan(t.Context(), p.Tracer("s"), "op",
+		observability.WithSpanKind(observability.SpanKindServer),
+		observability.WithAttributes(observability.String("k", "v")),
+		observability.WithLinks(observability.SpanLink{TraceID: "aa", SpanID: "bb"}),
+	)
+	span.End()
+
+	v := decodeLine(t, buf)
+	if v["kind"] != "server" {
+		t.Errorf("kind = %v, want server", v["kind"])
+	}
+	if attrs, ok := v["attrs"].(map[string]any); !ok || attrs["k"] != "v" {
+		t.Errorf("attrs = %v, want k=v", v["attrs"])
+	}
+}
+
 func TestSpan_childInheritsTraceID(t *testing.T) {
 	t.Parallel()
 

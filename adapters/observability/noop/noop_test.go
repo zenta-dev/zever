@@ -8,10 +8,11 @@ import (
 )
 
 var (
-	_ observability.Provider = noopProvider{}
-	_ observability.Tracer   = noopTracer{}
-	_ observability.Span     = noopSpan{}
-	_ observability.Metrics  = noopMetrics{}
+	_ observability.Provider    = noopProvider{}
+	_ observability.Tracer      = noopTracer{}
+	_ observability.SpanStarter = noopTracer{}
+	_ observability.Span        = noopSpan{}
+	_ observability.Metrics     = noopMetrics{}
 )
 
 func TestNew_implementsProvider(t *testing.T) {
@@ -62,6 +63,32 @@ func TestSpan_startEnd_doesNotPanic(t *testing.T) {
 		span.RecordError(nil)
 		span.End()
 	}()
+}
+
+func TestStartSpan_retainsKindAttrsLinks(t *testing.T) {
+	t.Parallel()
+
+	tr := noopTracer{}
+
+	_, span := tr.StartSpan(t.Context(), "op",
+		observability.WithSpanKind(observability.SpanKindProducer),
+		observability.WithAttributes(observability.String("k", "v")),
+		observability.WithLinks(observability.SpanLink{TraceID: "aa", SpanID: "bb"}),
+	)
+
+	ns, ok := span.(noopSpan)
+	if !ok {
+		t.Fatalf("span type = %T, want noopSpan", span)
+	}
+	if ns.kind != observability.SpanKindProducer {
+		t.Errorf("kind = %v, want SpanKindProducer", ns.kind)
+	}
+	if len(ns.attrs) != 1 || ns.attrs[0].Key != "k" {
+		t.Errorf("attrs = %v, want one k attr", ns.attrs)
+	}
+	if len(ns.links) != 1 || ns.links[0].TraceID != "aa" {
+		t.Errorf("links = %v, want one aa link", ns.links)
+	}
 }
 
 func TestMetrics_allInstruments_nilError(t *testing.T) {

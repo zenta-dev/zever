@@ -4,6 +4,7 @@ import (
 	"context"
 	"crypto/tls"
 	"crypto/x509"
+	"encoding/hex"
 	"errors"
 	"fmt"
 	"os"
@@ -139,15 +140,78 @@ func toAttribute(key string, value observability.AttributeValue) attribute.KeyVa
 	}
 }
 
-//nolint:spancheck // Start returns the span to the caller, who owns calling End() (see otelSpan.End); this is the standard tracer.Start contract, not a leak
+// Start begins a span with the given name, returning the updated context.
 func (t *tracer) Start(ctx context.Context, name string) (context.Context, observability.Span) {
+	return t.StartSpan(ctx, name)
+}
+
+//nolint:spancheck // StartSpan returns the span to the caller, who owns calling End() (see otelSpan.End); this is the standard tracer.Start contract, not a leak
+func (t *tracer) StartSpan(ctx context.Context, name string, opts ...observability.SpanStartOption) (context.Context, observability.Span) {
 	if ctx == nil {
 		ctx = context.Background() //nolint:contextcheck // nil context treated as background for safe propagation
 	}
 
-	ctx, span := t.tracer.Start(ctx, name)
+	cfg := observability.NewSpanConfig(opts...)
+
+	startOpts := []trace.SpanStartOption{trace.WithSpanKind(toSpanKind(cfg.Kind))}
+
+	if len(cfg.Attrs) > 0 {
+		startOpts = append(startOpts, trace.WithAttributes(attrsToKeyValue(cfg.Attrs, 0)...))
+	}
+
+	for _, l := range cfg.Links {
+		if tl, ok := toSpanLink(l); ok {
+			startOpts = append(startOpts, trace.WithLinks(tl))
+		}
+	}
+
+	ctx, span := t.tracer.Start(ctx, name, startOpts...)
 
 	return ctx, &otelSpan{span: span}
+}
+
+var _ observability.SpanStarter = (*tracer)(nil)
+
+func toSpanKind(kind observability.SpanKind) trace.SpanKind {
+	switch kind {
+	case observability.SpanKindInternal:
+		return trace.SpanKindInternal
+	case observability.SpanKindServer:
+		return trace.SpanKindServer
+	case observability.SpanKindClient:
+		return trace.SpanKindClient
+	case observability.SpanKindProducer:
+		return trace.SpanKindProducer
+	case observability.SpanKindConsumer:
+		return trace.SpanKindConsumer
+	default:
+		return trace.SpanKindInternal
+	}
+}
+
+func toSpanLink(l observability.SpanLink) (trace.Link, bool) {
+	tid, err := hex.DecodeString(l.TraceID)
+	if err != nil || len(tid) != 16 {
+		return trace.Link{}, false
+	}
+
+	sid, err := hex.DecodeString(l.SpanID)
+	if err != nil || len(sid) != 8 {
+		return trace.Link{}, false
+	}
+
+	sc := trace.NewSpanContext(trace.SpanContextConfig{
+		TraceID:    trace.TraceID(tid),
+		SpanID:     trace.SpanID(sid),
+		TraceFlags: trace.FlagsSampled,
+	})
+
+	attrs := make([]attribute.KeyValue, 0, len(l.Attrs))
+	for _, a := range l.Attrs {
+		attrs = append(attrs, toAttribute(a.Key, a.Value))
+	}
+
+	return trace.Link{SpanContext: sc, Attributes: attrs}, true
 }
 
 // TracerProvider extracts a TracerProvider from the given observability.Provider.
