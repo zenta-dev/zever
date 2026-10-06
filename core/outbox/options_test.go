@@ -1,7 +1,9 @@
 package outbox_test
 
 import (
+	"encoding/json"
 	"errors"
+	"reflect"
 	"testing"
 	"time"
 
@@ -73,5 +75,39 @@ func TestDefaultAppliesAdapterDefaults(t *testing.T) {
 
 	if got.LockSeconds != outbox.DefaultLockSeconds {
 		t.Errorf("LockSeconds = %d, want %d", got.LockSeconds, outbox.DefaultLockSeconds)
+	}
+}
+
+// TestStallReadinessIsOptIn pins the default: an existing config must never
+// start gating readiness on the relay, and the flag still has to carry the
+// shared snake_case serialization keys the config layer decodes.
+func TestStallReadinessIsOptIn(t *testing.T) {
+	t.Parallel()
+
+	if outbox.Default().StallReadiness {
+		t.Error("Default().StallReadiness = true, want false")
+	}
+
+	// Options is not JSON-encodable as a whole (Retry carries a func), so the
+	// key round-trips are proved through the tags and through decoding a
+	// one-field document.
+	field, ok := reflect.TypeFor[outbox.Options]().FieldByName("StallReadiness")
+	if !ok {
+		t.Fatal("Options has no StallReadiness field")
+	}
+
+	for _, tag := range []string{"json", "toml", "yaml"} {
+		if want := "stall_readiness"; field.Tag.Get(tag) != want {
+			t.Errorf("StallReadiness %s tag = %q, want %q", tag, field.Tag.Get(tag), want)
+		}
+	}
+
+	var decoded outbox.Options
+	if err := json.Unmarshal([]byte(`{"stall_readiness":true}`), &decoded); err != nil {
+		t.Fatalf("json.Unmarshal: %v", err)
+	}
+
+	if !decoded.StallReadiness {
+		t.Error("stall_readiness did not decode, want true")
 	}
 }

@@ -68,7 +68,9 @@ Every `zever new` project ships a reference `Dockerfile` + `.dockerignore`:
 - Runs as non-root (`USER nonroot:nonroot`), exposes `8080` (HTTP)
   + `9090` (gRPC), `ENTRYPOINT ["/app/server"]`, and healthchecks
   `GET /healthz` (the same endpoint the generated server template
-  serves; `/readyz` gates on DB readiness).
+  serves; `/readyz` gates on the container readiness aggregate —
+  a DB ping plus, when `outbox.stall_readiness` is set, the
+  relay's stall flag).
 - Copies the binary + `zever.yaml` only. Secrets are never baked
   into the image — pass config at runtime via environment, e.g.
   `docker run -e DB_DSN=... app`.

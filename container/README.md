@@ -84,6 +84,31 @@ cached state clears so the next call retries.
 | webhook | `Webhook()` | |
 | workflow | `Workflow()` | |
 
+## Readiness
+
+`Ready(ctx)` is the single readiness aggregate: `nil` means the process should
+receive traffic, otherwise the reasons are joined into one error. The
+scaffolded server's `/readyz` handler and the gRPC health status both read it,
+so every transport answers from one decision.
+
+```go
+if err := c.Ready(probeCtx); err != nil {
+	w.WriteHeader(http.StatusServiceUnavailable) // errors.Is(err, container.ErrDatabaseUnavailable)
+}
+```
+
+- **db**: always checked — it must resolve and answer a ping. Bounding the
+  probe is the caller's job (the scaffold uses a 3s timeout).
+- **outbox**: checked only when `outbox.stall_readiness` is set, and then only
+  while `Status().Stalled` is true, so a relay whose messages are backing up
+  drains traffic instead of silently queueing work.
+- The outbox check is best-effort: a relay that fails to resolve is skipped,
+  never a readiness failure. Turning the flag on can therefore only ever make
+  readiness stricter for a relay that actually exists.
+
+Sentinels: `ErrDatabaseUnavailable`, `ErrRelayStalled`, both carrying typed
+`DatabaseUnavailableError` / `RelayStalledError` for classification.
+
 ## Job / Scheduler wiring
 
 `Job()` has no registry of its own. It builds a `*job.Dispatcher` over the
