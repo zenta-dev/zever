@@ -52,6 +52,8 @@ use (
 	./adapters/observability/noop
 	./adapters/observability/otlp
 	./adapters/observability/stdout
+	./adapters/outbox/db
+	./adapters/outbox/memory
 	./adapters/password/argon2
 	./adapters/payment/paddle
 	./adapters/payment/stripe
@@ -113,6 +115,7 @@ use (
 	./core/middleware
 	./core/notification
 	./core/observability
+	./core/outbox
 	./core/password
 	./core/payment
 	./core/permission
