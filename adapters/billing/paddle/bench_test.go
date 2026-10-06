@@ -27,7 +27,7 @@ func BenchmarkCreateCustomer(b *testing.B) {
 	b.ReportAllocs()
 	b.ResetTimer()
 
-	for i := 0; i < b.N; i++ {
+	for b.Loop() {
 		if _, err := bl.CreateCustomer(ctx, "Ada", "ada@example.com", ""); err != nil {
 			b.Fatal(err)
 		}
@@ -43,8 +43,25 @@ func BenchmarkCreateSubscription(b *testing.B) {
 	b.ReportAllocs()
 	b.ResetTimer()
 
-	for i := 0; i < b.N; i++ {
+	for b.Loop() {
 		if _, err := bl.CreateSubscription(ctx, "ctm_123", "pri_123", ""); err != nil {
+			b.Fatal(err)
+		}
+	}
+}
+
+// BenchmarkCancelSubscription measures a subscription-cancel round trip
+// (transaction status patch).
+func BenchmarkCancelSubscription(b *testing.B) {
+	bl, stop := benchBilling(b)
+	defer stop()
+	ctx := b.Context()
+
+	b.ReportAllocs()
+	b.ResetTimer()
+
+	for b.Loop() {
+		if err := bl.CancelSubscription(ctx, "txn_123"); err != nil {
 			b.Fatal(err)
 		}
 	}
@@ -59,7 +76,7 @@ func BenchmarkGetInvoice(b *testing.B) {
 	b.ReportAllocs()
 	b.ResetTimer()
 
-	for i := 0; i < b.N; i++ {
+	for b.Loop() {
 		if _, err := bl.GetInvoice(ctx, "ctm_123"); err != nil {
 			b.Fatal(err)
 		}

@@ -227,6 +227,49 @@ func TestEdgeNew_AddrTrailingSlash_Trimmed(t *testing.T) {
 	}
 }
 
+// TestEdgeNamespaceHeader_Sent verifies a configured namespace is forwarded on
+// every request.
+func TestEdgeNamespaceHeader_Sent(t *testing.T) {
+	t.Parallel()
+
+	got := make(chan string, 1)
+
+	srv := mustEdgeServer(t, func(w http.ResponseWriter, r *http.Request) {
+		got <- r.Header.Get("X-Vault-Namespace")
+		w.Header().Set("Content-Type", "application/json")
+		_, _ = w.Write([]byte(`{"data":{"data":{"value":"aGk="}}}`))
+	})
+	s := mustNew(t, Options{Addr: srv.URL, Token: "t", Mount: "secret", Namespace: "team-a"})
+
+	if _, err := s.Get(t.Context(), "k"); err != nil {
+		t.Fatalf("Get() err = %v", err)
+	}
+
+	if ns := <-got; ns != "team-a" {
+		t.Fatalf("X-Vault-Namespace = %q, want %q", ns, "team-a")
+	}
+}
+
+// TestEdgeList_NotFound_NoError covers the 404 metadata branch: an unmounted
+// KV path lists as empty rather than failing.
+func TestEdgeList_NotFound_NoError(t *testing.T) {
+	t.Parallel()
+
+	srv := mustEdgeServer(t, func(w http.ResponseWriter, _ *http.Request) {
+		http.Error(w, "not found", http.StatusNotFound)
+	})
+	s := mustNew(t, Options{Addr: srv.URL, Token: "t", Mount: "secret"})
+
+	keys, err := s.List(t.Context())
+	if err != nil {
+		t.Fatalf("List(404) err = %v, want nil", err)
+	}
+
+	if len(keys) != 0 {
+		t.Fatalf("List(404) = %v, want empty", keys)
+	}
+}
+
 func TestEdgeConcurrent_Access(t *testing.T) {
 	t.Parallel()
 
