@@ -354,6 +354,10 @@ func (c *Container) Observability() (observability.Provider, error) {
 // Outbox resolves and returns the outbox service instance. The db adapter
 // opens its own pool from Options.DSN (empty selects a private in-memory
 // database); container-level pool sharing is not wired for outbox.
+//
+// The relay is not started here: the transport it publishes through is resolved
+// separately, so use OutboxRelay(ctx) to attach it and start draining. This
+// accessor keeps working for Record after the relay is running.
 func (c *Container) Outbox() (outbox.Store, error) {
 	return c.outbox.get(func() (outbox.Store, error) {
 		opts := c.cfg.Outbox.Options
