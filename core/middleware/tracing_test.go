@@ -7,17 +7,24 @@ import (
 	"net/http/httptest"
 	"testing"
 
+	"go.opentelemetry.io/otel/trace"
 	"google.golang.org/grpc"
+	"google.golang.org/grpc/metadata"
 
 	"github.com/zenta-dev/zever/core/observability"
+	"github.com/zenta-dev/zever/shared/traceprop"
 )
 
 type traceSpanCtxKey struct{}
 
 type traceFakeSpan struct {
-	attrs    []observability.Attr
-	errors   []error
-	endCalls int
+	kind         observability.SpanKind
+	attrs        []observability.Attr
+	errors       []error
+	endCalls     int
+	parentTrace  trace.TraceID
+	parentSpan   trace.SpanID
+	parentRemote bool
 }
 
 func (s *traceFakeSpan) SetAttributes(attrs ...observability.Attr) {
@@ -30,12 +37,27 @@ func (s *traceFakeSpan) End()                  { s.endCalls++ }
 type traceFakeTracer struct {
 	spans []*traceFakeSpan
 	names []string
+	kinds []observability.SpanKind
 }
 
 func (t *traceFakeTracer) Start(ctx context.Context, name string) (context.Context, observability.Span) {
-	span := &traceFakeSpan{}
+	return t.StartSpan(ctx, name)
+}
+
+func (t *traceFakeTracer) StartSpan(ctx context.Context, name string, opts ...observability.SpanStartOption) (context.Context, observability.Span) {
+	cfg := observability.NewSpanConfig(opts...)
+
+	parent := trace.SpanContextFromContext(ctx)
+	span := &traceFakeSpan{
+		kind:         cfg.Kind,
+		attrs:        cfg.Attrs,
+		parentTrace:  parent.TraceID(),
+		parentSpan:   parent.SpanID(),
+		parentRemote: parent.IsRemote(),
+	}
 	t.spans = append(t.spans, span)
 	t.names = append(t.names, name)
+	t.kinds = append(t.kinds, cfg.Kind)
 
 	return context.WithValue(ctx, traceSpanCtxKey{}, span), span
 }
@@ -423,6 +445,226 @@ func TestTracingUnaryServerInterceptor_error(t *testing.T) {
 	v, ok := findTraceAttr(meter.calls[0].attrs, "outcome")
 	if !ok || v != observability.StringAttr("error") {
 		t.Fatalf("outcome tag = %v (found=%v), want error", v, ok)
+	}
+}
+
+func TestTracing_extractsInboundTraceContext(t *testing.T) {
+	t.Parallel()
+
+	provider, tracer, _ := newTraceTestProvider()
+
+	handler := Tracing(provider)(http.HandlerFunc(func(w http.ResponseWriter, _ *http.Request) {
+		w.WriteHeader(http.StatusOK)
+	}))
+
+	traceID, err := trace.TraceIDFromHex("4bf92f3577b34da6a3ce929d0e0e4736")
+	if err != nil {
+		t.Fatalf("TraceIDFromHex: %v", err)
+	}
+
+	spanID, err := trace.SpanIDFromHex("00f067aa0ba902b7")
+	if err != nil {
+		t.Fatalf("SpanIDFromHex: %v", err)
+	}
+
+	ctx := trace.ContextWithSpanContext(t.Context(), trace.NewSpanContext(trace.SpanContextConfig{
+		TraceID:    traceID,
+		SpanID:     spanID,
+		TraceFlags: trace.FlagsSampled,
+	}))
+
+	hdrs := traceprop.Inject(ctx, nil)
+
+	rec := httptest.NewRecorder()
+	req := httptest.NewRequestWithContext(t.Context(), http.MethodGet, "/widgets", nil)
+	for k, v := range hdrs {
+		req.Header.Set(k, v)
+	}
+	handler.ServeHTTP(rec, req)
+
+	if len(tracer.spans) != 1 {
+		t.Fatalf("spans = %d, want 1", len(tracer.spans))
+	}
+
+	span := tracer.spans[0]
+
+	if span.parentTrace != traceID {
+		t.Errorf("parent trace ID = %s, want %s (child of inbound span)", span.parentTrace, traceID)
+	}
+
+	if span.parentSpan != spanID {
+		t.Errorf("parent span ID = %s, want %s", span.parentSpan, spanID)
+	}
+
+	if !span.parentRemote {
+		t.Error("parent remote = false, want true (extracted context is remote)")
+	}
+
+	if span.kind != observability.SpanKindServer {
+		t.Errorf("span kind = %v, want SpanKindServer", span.kind)
+	}
+}
+
+func TestTracing_noInboundTraceStartsRoot(t *testing.T) {
+	t.Parallel()
+
+	provider, tracer, _ := newTraceTestProvider()
+
+	handler := Tracing(provider)(http.HandlerFunc(func(w http.ResponseWriter, _ *http.Request) {
+		w.WriteHeader(http.StatusOK)
+	}))
+
+	handler.ServeHTTP(httptest.NewRecorder(), httptest.NewRequestWithContext(t.Context(), http.MethodGet, "/", nil))
+
+	if len(tracer.spans) != 1 {
+		t.Fatalf("spans = %d, want 1", len(tracer.spans))
+	}
+
+	if tracer.spans[0].parentRemote {
+		t.Error("parent remote = true, want false (no inbound traceparent)")
+	}
+}
+
+func TestTracing_baggagePropagatedToHandler(t *testing.T) {
+	t.Parallel()
+
+	provider, _, _ := newTraceTestProvider()
+
+	var handlerBaggage string
+
+	handler := Tracing(provider)(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		handlerBaggage = traceprop.Baggage(r.Context(), traceprop.BaggageTenantID)
+		w.WriteHeader(http.StatusOK)
+	}))
+
+	traceID, err := trace.TraceIDFromHex("4bf92f3577b34da6a3ce929d0e0e4736")
+	if err != nil {
+		t.Fatalf("TraceIDFromHex: %v", err)
+	}
+
+	spanID, err := trace.SpanIDFromHex("00f067aa0ba902b7")
+	if err != nil {
+		t.Fatalf("SpanIDFromHex: %v", err)
+	}
+
+	ctx := trace.ContextWithSpanContext(t.Context(), trace.NewSpanContext(trace.SpanContextConfig{
+		TraceID:    traceID,
+		SpanID:     spanID,
+		TraceFlags: trace.FlagsSampled,
+	}))
+	ctx = traceprop.WithBaggage(ctx, traceprop.BaggageTenantID, "acme")
+
+	hdrs := traceprop.Inject(ctx, nil)
+
+	rec := httptest.NewRecorder()
+	req := httptest.NewRequestWithContext(t.Context(), http.MethodGet, "/", nil)
+	for k, v := range hdrs {
+		req.Header.Set(k, v)
+	}
+	handler.ServeHTTP(rec, req)
+
+	if handlerBaggage != "acme" {
+		t.Errorf("handler baggage tenant.id = %q, want %q", handlerBaggage, "acme")
+	}
+}
+
+func TestTracingUnaryServerInterceptor_extractsInboundTraceContext(t *testing.T) {
+	t.Parallel()
+
+	provider, tracer, _ := newTraceTestProvider()
+	interceptor := TracingUnaryServerInterceptor(provider)
+
+	traceID, err := trace.TraceIDFromHex("4bf92f3577b34da6a3ce929d0e0e4736")
+	if err != nil {
+		t.Fatalf("TraceIDFromHex: %v", err)
+	}
+
+	spanID, err := trace.SpanIDFromHex("00f067aa0ba902b7")
+	if err != nil {
+		t.Fatalf("SpanIDFromHex: %v", err)
+	}
+
+	ctx := metadata.NewIncomingContext(t.Context(), metadata.Pairs(
+		"traceparent", "00-4bf92f3577b34da6a3ce929d0e0e4736-00f067aa0ba902b7-01",
+	))
+	_ = traceID
+	_ = spanID
+
+	handler := func(context.Context, any) (any, error) { return "ok", nil }
+
+	_, err = interceptor(ctx, "req", &grpc.UnaryServerInfo{FullMethod: "/svc/Method"}, handler)
+	if err != nil {
+		t.Fatalf("err = %v, want nil", err)
+	}
+
+	if len(tracer.spans) != 1 {
+		t.Fatalf("spans = %d, want 1", len(tracer.spans))
+	}
+
+	span := tracer.spans[0]
+
+	if span.parentTrace != traceID {
+		t.Errorf("parent trace ID = %s, want %s", span.parentTrace, traceID)
+	}
+
+	if !span.parentRemote {
+		t.Error("parent remote = false, want true")
+	}
+
+	if span.kind != observability.SpanKindServer {
+		t.Errorf("span kind = %v, want SpanKindServer", span.kind)
+	}
+}
+
+func TestTracing_e2ePropagation(t *testing.T) {
+	t.Parallel()
+
+	provider, tracer, _ := newTraceTestProvider()
+
+	srv := httptest.NewServer(Tracing(provider)(http.HandlerFunc(func(w http.ResponseWriter, _ *http.Request) {
+		w.WriteHeader(http.StatusOK)
+	})))
+	defer srv.Close()
+
+	traceID, err := trace.TraceIDFromHex("4bf92f3577b34da6a3ce929d0e0e4736")
+	if err != nil {
+		t.Fatalf("TraceIDFromHex: %v", err)
+	}
+
+	spanID, err := trace.SpanIDFromHex("00f067aa0ba902b7")
+	if err != nil {
+		t.Fatalf("SpanIDFromHex: %v", err)
+	}
+
+	ctx := trace.ContextWithSpanContext(t.Context(), trace.NewSpanContext(trace.SpanContextConfig{
+		TraceID:    traceID,
+		SpanID:     spanID,
+		TraceFlags: trace.FlagsSampled,
+	}))
+
+	hdrs := traceprop.Inject(ctx, nil)
+
+	req, err := http.NewRequestWithContext(t.Context(), http.MethodGet, srv.URL+"/widgets", nil)
+	if err != nil {
+		t.Fatalf("NewRequest: %v", err)
+	}
+
+	for k, v := range hdrs {
+		req.Header.Set(k, v)
+	}
+
+	resp, err := http.DefaultClient.Do(req)
+	if err != nil {
+		t.Fatalf("Do: %v", err)
+	}
+	resp.Body.Close()
+
+	if len(tracer.spans) != 1 {
+		t.Fatalf("spans = %d, want 1", len(tracer.spans))
+	}
+
+	if tracer.spans[0].parentTrace != traceID {
+		t.Errorf("server span parent trace ID = %s, want %s (e2e propagation)", tracer.spans[0].parentTrace, traceID)
 	}
 }
 

@@ -1,9 +1,10 @@
-// Package traceprop propagates W3C trace context across async boundaries.
+// Package traceprop propagates W3C trace context and baggage across async
+// boundaries.
 //
 // It owns Inject (context into headers) and Extract (headers into context)
 // plus StartConsumeSpan (extract, then start a consumer child span), all over
-// the OTel W3C traceparent/tracestate propagator. It performs no IO and
-// manages no connections.
+// the OTel W3C traceparent/tracestate/baggage composite propagator. It
+// performs no IO and manages no connections.
 //
 // Type safety: plain map[string]string headers keep both core/queue.Headers
 // and core/eventbus.Headers assignable without conversions or core imports.
