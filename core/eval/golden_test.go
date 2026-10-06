@@ -2,26 +2,9 @@ package eval
 
 import (
 	"context"
-	"encoding/json"
-	"os"
 	"path/filepath"
 	"testing"
 )
-
-// LoadCases reads a golden dataset of cases from path.
-func LoadCases(path string) ([]Case, error) {
-	raw, err := os.ReadFile(path)
-	if err != nil {
-		return nil, err
-	}
-
-	var cases []Case
-	if err := json.Unmarshal(raw, &cases); err != nil {
-		return nil, err
-	}
-
-	return cases, nil
-}
 
 // TestGolden runs the committed dataset through an echo run function scored
 // by containment. It pins the dataset shape and the harness end to end;
@@ -39,8 +22,8 @@ func TestGolden(t *testing.T) {
 	}
 
 	for _, c := range cases {
-		if c.Name == "" || c.Input == "" {
-			t.Fatalf("golden case missing name/input: %+v", c)
+		if c.Name == "" || c.Input == "" || c.Expected == "" {
+			t.Fatalf("golden case missing name/input/expected: %+v", c)
 		}
 	}
 
@@ -54,6 +37,15 @@ func TestGolden(t *testing.T) {
 
 	if len(report.Results) != len(cases) {
 		t.Fatalf("results = %d, want %d", len(report.Results), len(cases))
+	}
+
+	// The echo stub scores the honesty of the harness, not quality: every
+	// result must carry the scorer's verdict for its own output.
+	for i, r := range report.Results {
+		want := ContainsScorer("echo", cases[i].Expected)
+		if r.Score != want {
+			t.Errorf("result %d score = %v, want %v", i, r.Score, want)
+		}
 	}
 }
 

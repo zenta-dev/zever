@@ -104,7 +104,8 @@ func CitationCheck(question, answer string, chunks []string) string {
 }
 
 // ToolPlan builds a prompt asking for a step-by-step tool-use plan before
-// executing, so the model commits to a strategy it can be held to.
+// executing, so the model commits to a strategy it can be held to. Blank
+// tool entries are skipped.
 func ToolPlan(task string, tools []string) string {
 	var b strings.Builder
 
@@ -114,7 +115,9 @@ func ToolPlan(task string, tools []string) string {
 	b.WriteString("\n\nTools:\n")
 
 	for _, tool := range tools {
-		b.WriteString("- " + strings.TrimSpace(tool) + "\n")
+		if trimmed := strings.TrimSpace(tool); trimmed != "" {
+			b.WriteString("- " + trimmed + "\n")
+		}
 	}
 
 	return b.String()
