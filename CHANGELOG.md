@@ -12,6 +12,14 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Agent-app tutorial (`docs/tutorials/build-an-agent-app`): end-to-end
   walkthrough from container resolution through RAG grounding, agent loops,
   MCP serving, and eval scoring.
+- Agent runtime upgrades: `Loop.RunStream` event channel over `ai.Stream`,
+  ordered parallel tool fan-out via `Options.MaxParallel` (with the
+  `ParallelToolCalls` model hint), `AsTool` sub-agent composition, and
+  `Options.Observe` execution hooks.
+- Hybrid RAG: `rag.NewHybrid` indexes into a keyword backend alongside the
+  vector store; `RetrieveHybrid` fuses both with RRF plus metadata
+  filtering, with `AnswerHybrid` grounding. `Options.Observe` reports
+  ingest/retrieve/generate events.
 - `--dry-run` across all nine `generate` subcommands: validation and
   rendering still run, but no filesystem writes occur; append-mode
   subcommands preview the rendered declaration.
