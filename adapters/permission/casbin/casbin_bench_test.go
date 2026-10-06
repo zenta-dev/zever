@@ -32,6 +32,19 @@ func BenchmarkCan(b *testing.B) {
 	}
 }
 
+// BenchmarkNew measures construction: model parse, enforcer creation, and
+// rule/role seeding.
+func BenchmarkNew(b *testing.B) {
+	b.ReportAllocs()
+	b.ResetTimer()
+
+	for b.Loop() {
+		if _, err := New(allowOpts()); err != nil {
+			b.Fatalf("New() = %v", err)
+		}
+	}
+}
+
 // BenchmarkCanParallel measures concurrent enforce calls with distinct
 // subjects (each exercises its own grouping ref count).
 func BenchmarkCanParallel(b *testing.B) {

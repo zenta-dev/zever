@@ -3,6 +3,9 @@ package oidc_test
 import (
 	"testing"
 	"time"
+
+	"github.com/zenta-dev/zever/adapters/auth/oidc"
+	"github.com/zenta-dev/zever/core/auth"
 )
 
 // BenchmarkVerify measures ID-token signature verification and claim
@@ -17,8 +20,32 @@ func BenchmarkVerify(b *testing.B) {
 	b.ReportAllocs()
 	b.ResetTimer()
 
-	for i := 0; i < b.N; i++ {
+	for b.Loop() {
 		if _, err := a.Verify(ctx, token); err != nil {
+			b.Fatal(err)
+		}
+	}
+}
+
+// BenchmarkNew measures the construction path: options validation plus OIDC
+// discovery against the hermetic provider.
+func BenchmarkNew(b *testing.B) {
+	idp := newFakeIDP(b)
+
+	opts := auth.Options{}
+	opts.OIDC.Issuer = idp.srv.URL
+	opts.OIDC.ClientID = "test-client"
+	opts.OIDC.AllowInsecure = true
+
+	b.ReportAllocs()
+	b.ResetTimer()
+
+	for b.Loop() {
+		a, err := oidc.New(opts)
+		if err != nil {
+			b.Fatal(err)
+		}
+		if err := a.Close(); err != nil {
 			b.Fatal(err)
 		}
 	}
