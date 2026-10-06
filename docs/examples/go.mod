@@ -14,6 +14,7 @@ require (
 	github.com/zenta-dev/zever/container v0.5.3
 	github.com/zenta-dev/zever/core/auth v0.5.3
 	github.com/zenta-dev/zever/core/cache v0.5.3
+	github.com/zenta-dev/zever/core/cdn v0.5.3
 	github.com/zenta-dev/zever/core/db v0.5.3
 	github.com/zenta-dev/zever/core/log v0.5.3
 	github.com/zenta-dev/zever/core/queue v0.5.3
@@ -184,6 +185,7 @@ replace (
 	github.com/zenta-dev/zever/core/authz => ../../core/authz
 	github.com/zenta-dev/zever/core/billing => ../../core/billing
 	github.com/zenta-dev/zever/core/cache => ../../core/cache
+	github.com/zenta-dev/zever/core/cdn => ../../core/cdn
 	github.com/zenta-dev/zever/core/crypto => ../../core/crypto
 	github.com/zenta-dev/zever/core/db => ../../core/db
 	github.com/zenta-dev/zever/core/document => ../../core/document
