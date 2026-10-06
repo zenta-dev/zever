@@ -135,7 +135,14 @@ is the registry path once more adapters exist.
   bridge) through the adapter constructor. The `cdc` adapter needs
   `wal_level=logical`; live tests are gated by `POSTGRES_DSN`. Consumers
   dedupe through `outbox.Inbox` (or their own idempotency key) — delivery
-  is at-least-once.
+  is at-least-once. The relay emits `outbox.*` gauges/counters/histogram
+  through the observability provider on `outbox.Options.Provider` (nil
+  disables telemetry, errors are discarded), so alert rules only work
+  with `observability.adapter: otlp`; failures land in the DLQ and are
+  repaired with `zever outbox status` → `dlq list` → `dlq requeue
+  --id/--all`, while `zever outbox purge --before 168h` trims processed
+  history without touching undelivered rows. Full metric names, alert
+  rules, and runbook: `digging-deeper/outbox-ops.mdx`.
 - gRPC clients (`shared/grpcclient`, `digging-deeper/grpc-client.mdx`):
   `container.GRPCClient(target, opts...)` caches one
   `*grpc.ClientConn` per target string and closes it with the container.
@@ -214,10 +221,30 @@ path-only span names (no query strings), propagates ctx to handlers
 (`core/observability/context.go`) bridges non-HTTP carriers.
 `spancheck` lint is on (`.golangci.yml:47`); the otlp `Start` handoff
 carries a `//nolint:spancheck` with owner-End justification
-(`otlp.go:142`). Cross-service propagation convention beyond otel
-defaults is still evolving — rely on otel globals, verify in the
-collector. Prod sets `observability.adapter: otlp` with
-`endpoint: host:port` + `service_name`; `stdout` is dev-only. See
+(`otlp.go:142`).
+
+Cross-service propagation follows one contract: extract inbound
+W3C `traceparent`/`tracestate`/`baggage` **before** the server span
+starts (`middleware.Tracing`, `TracingUnaryServerInterceptor`), inject
+the current context on every outbound call (`shared/httpclient`
+transport, `shared/grpcclient` interceptors), and continue stored
+context on the async path (`core/outbox` `Record` headers →
+`traceprop.StartConsumeSpan`). Because extraction precedes the span, a
+server span joins the caller's trace instead of starting a fresh root.
+Baggage carries three fixed keys — `tenant.id`, `user.id`,
+`correlation.id` — set once at ingress and read downstream; values are
+untrusted, short, and never secrets. Span kinds (`internal`/`server`/
+`client`/`producer`/`consumer`) ride `observability.StartSpan` via
+`WithSpanKind`, with `Tracer.Start` as the internal-span wrapper.
+Attribute keys are migrating to OTel semconv names — `http.method` →
+`http.request.method`, `http.path` → `url.path`, `http.status_code` →
+`http.response.status_code`, gRPC `rpc.*`, messaging `messaging.*` —
+so saved dashboards and alert rules on the old keys need updating.
+Verify in the collector, not by inspection: one request through two
+services must resolve to a single trace ID. Prod sets
+`observability.adapter: otlp` with `endpoint: host:port` +
+`service_name`; `stdout` is dev-only. See
+`digging-deeper/cross-service-tracing.mdx` and
 `digging-deeper/observability.mdx`.
 
 ## Gates and supply chain
@@ -280,6 +307,21 @@ gh attestation verify sbom/cmd_zever.json --repo zenta-dev/zever
   business-error successes.
 - [ ] Outbox on `db` (postgres in prod) with a `Publisher` wired through
   the adapter constructor; consumer-side inbox/idempotency keys chosen.
+- [ ] Outbox alerting armed on the `outbox.*` series (pending growth,
+  oldest-pending age over the 5m `db.DefaultStallAfter`, `failed_total`
+  increase, `relay_errors` rate, publish p99); runbook link reachable
+  from the alert — `digging-deeper/outbox-ops.mdx`.
+- [ ] `outbox.stall_readiness` decided deliberately: `true` pulls a
+  stalled replica out of rotation via `/readyz` 503 + gRPC
+  `NOT_SERVING`; off when replicas share a table and shedding traffic is
+  worse than alerting.
+- [ ] Trace propagation verified end to end: one request spanning two
+  services resolves to a single trace ID, outbound client spans are
+  children of their server span, and the three baggage keys
+  (`tenant.id`, `user.id`, `correlation.id`) are set at ingress. Saved
+  queries/dashboards updated for the semconv attribute rename
+  (`http.method` → `http.request.method`, `http.path` → `url.path`,
+  `http.status_code` → `http.response.status_code`).
 - [ ] Binary built from clean tree at a tag; SBOM artifact kept;
   `govulncheck` clean.
 
@@ -305,6 +347,16 @@ zever db migrate --dry-run   # expect: no pending statements
 - [ ] Migration bookkeeping shows the release checksum recorded; re-run
   is a no-op.
 - [ ] Traces arriving in collector; 5xx span errors triaged.
+- [ ] Trace continuity confirmed after rollout: one sampled request
+  across services shows a single trace ID with correct parent/child
+  links, and no service starts a fresh root. A two-root trace means the
+  inbound `traceparent` was not extracted — see
+  `digging-deeper/cross-service-tracing.mdx`.
+- [ ] Relay signals healthy: `outbox.pending` flat, `outbox.failed` at
+  0, `outbox.relay_errors` silent; `zever outbox status` shows
+  `stalled false`. A non-empty DLQ is triaged through
+  `digging-deeper/outbox-ops.mdx` (fix root cause, then
+  `zever outbox dlq requeue --all`), never purged blind.
 - [ ] Secret rotation drill: stage new `APP_db_password` (or
   `DB_DSN`/`AUTH_JWT_SECRET`) in the supervisor, restart one replica,
   confirm `/readyz` 200 with old value revoked; `Set`/`Delete` are
@@ -323,5 +375,7 @@ gate; re-run locally before drawing conclusions.
 - `docs/src/content/docs/getting-started/deployment.mdx` (build shapes)
 - `config/README.md`, `container/README.md`, `cmd/zever/README.md`
 - `database/migrations-seeding.mdx`, `digging-deeper/observability.mdx`,
+  `digging-deeper/cross-service-tracing.mdx`,
+  `digging-deeper/outbox-ops.mdx`,
   `digging-deeper/ratelimit.mdx`, `digging-deeper/secrets.mdx`,
   `security/crypto-secrets.mdx`

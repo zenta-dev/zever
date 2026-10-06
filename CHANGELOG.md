@@ -107,6 +107,18 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   `step` syntax, validation rules (required `execute`, unique step names,
   at most one `pivot`), and the generated `SagaCaller`/`RegisterSagas`
   output with an end-to-end wiring note.
+- New digging-deeper guides for the outbox ops and cross-service tracing
+  surfaces: `outbox-ops` (exact `outbox.*` relay metric names and
+  attributes, recommended Prometheus alert rules, the DLQ runbook around
+  `zever outbox status`/`dlq list`/`dlq requeue`/`dlq purge`/`purge`, and
+  the opt-in `outbox.stall_readiness` gate) and
+  `cross-service-tracing` (inbound extraction vs outbound injection,
+  the `tenant.id`/`user.id`/`correlation.id` baggage keys, the five span
+  kinds on `observability.StartSpan`, provider setup and collector
+  verification, plus the OTel semconv attribute migration table). Both
+  wired into the docs sidebar; `production.md`'s observability section
+  no longer calls propagation evolving, and its pre/post-deploy
+  checklists now cover relay alerts and trace continuity.
 
 ### Dependencies
 
