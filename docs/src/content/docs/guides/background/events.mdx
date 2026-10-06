@@ -1,0 +1,145 @@
+---
+title: Events and event bus
+description: Publish and subscribe to in-process events, and fan out across instances with Redis.
+---
+
+import { LinkCard, CardGrid, Tabs, TabItem } from '@astrojs/starlight/components';
+
+`eventbus.EventBus` lets producers publish and walk away while zero or more live listeners react. Use it for notify-style fan-out where no reaction is load-bearing, like a `booking.created` signal. (The bookings example delivers `booking.created` through [webhooks](../webhooks/), not this bus.) No durability and no redelivery for offline handlers, so put must-run work on the [queue](../queue/) via `job.Dispatcher`.
+
+## Quick start
+
+```yaml title="zever.yaml"
+eventbus:
+  adapter: memory
+  options:
+    buffer_size: 1024
+    max_handlers: 128
+    handler_timeout: 30000000000 # 30s, integer nanoseconds in files
+    close_timeout: 5000000000
+```
+
+```go title="main.go"
+package main
+
+import (
+	"context"
+	"fmt"
+
+	eventbusmemory "github.com/zenta-dev/zever/adapters/eventbus/memory"
+	"github.com/zenta-dev/zever/core/eventbus"
+)
+
+func main() {
+	eventbusmemory.Register()
+	bus, _ := eventbus.Open(eventbus.Memory, eventbus.Options{})
+	defer bus.Close()
+	ctx := context.Background()
+
+	ch, _ := bus.SubscribeChan(ctx, "orders", 16)
+	defer func() { _ = bus.Unsubscribe("orders", ch) }()
+
+	unsub, _ := bus.Subscribe(ctx, "orders", func(_ context.Context, msg eventbus.Message) {
+		fmt.Println("push saw", string(msg.Payload))
+	})
+	defer unsub()
+
+	_ = bus.Publish(ctx, "orders", eventbus.NewPayload([]byte("hello")), nil)
+	msg := <-ch
+	fmt.Println("pull saw", string(msg.Payload))
+}
+```
+
+Output: `push saw hello` and `pull saw hello`. Push (`Subscribe`) takes a handler and returns an unsubscribe closure; pull (`SubscribeChan`) returns a channel. Keep payloads small, versioned JSON.
+
+## Subscribe without leaking goroutines
+
+Every subscription needs an explicit exit path, or leak tests flag the stray goroutine: defer the unsubscribe closure after `Subscribe`, and `Unsubscribe` after `SubscribeChan`. Closing the bus also ends subscriptions. Topics must be non-empty and at most 256 bytes (`MaxTopicLen`). Payloads are at most 4 MiB (`MaxMessageSize`); oversize publishes fail closed. Set `OnPanic` (never validated) where a bad subscriber must not take down the publisher. Cap fan-out with `max_handlers`: unbounded subscribes from request paths leak handlers.
+
+## Fan out across instances with Redis
+
+Use `redis` when a publish on one process must reach a subscriber on another; call sites do not change.
+
+<Tabs>
+  <TabItem label="YAML">
+```yaml title="zever.yaml"
+eventbus:
+  adapter: redis
+  options:
+    buffer_size: 1024
+    redis:
+      addr: localhost:6379
+      db: 0
+      prefix: bookings
+      pool_size: 20
+      min_idle_conns: 2
+      pool_timeout: 5000000000
+```
+  </TabItem>
+  <TabItem label="Env">
+```sh
+EVENTBUS_ADAPTER=redis
+EVENTBUS_BUFFER_SIZE=1024
+EVENTBUS_HANDLER_TIMEOUT=30s
+```
+  </TabItem>
+</Tabs>
+
+Keys are strict snake_case, with Redis pooling under a nested `redis` block. Zero means the adapter default (`buffer_size` 1024, `max_handlers` 128, `handler_timeout` 30s, `close_timeout` 5s); only negative values fail. Env is best-effort: unknown variables are ignored, unparsable resolved values error. All keys: [eventbus config reference](../../../reference/config/#eventbus).
+
+| Adapter | Package | Notes |
+|---|---|---|
+| `memory` | `adapters/eventbus/memory` | Default, process-local, push plus pull, zero infra |
+| `redis` | `adapters/eventbus/redis` | Shared fan-out, prefix-keyed, pool-backed |
+
+## Resolve the bus from the container
+
+```go title="main.go"
+eventbusmemory.Register()
+bus, err := c.EventBus() // alias c.Eventbus()
+```
+
+`EventBus()` resolves lazily and caches; on error the cache clears. `Open` always returns a bus with pull support: adapters expose the `Pusher` push core and the package wraps it. `Close() error` takes no context. See [the container](../../../concepts/container/).
+
+Publishing to a topic with no subscriber is a quiet no-op.
+
+## Production checklist
+
+- Not durable: a handler offline at publish time misses the message, with no replay.
+- Backpressure drops newest: a full per-topic buffer (default 1024) drops the newest message for that subscriber only. Size `buffer_size` for burst plus handler latency.
+- Bound handler time with `handler_timeout` (default 30s); a stuck handler holds its slot and its buffer fills, causing drops.
+- Never put secrets in payloads. Redaction covers logged config, not message bodies.
+
+## Troubleshooting
+
+<details>
+<summary>A subscriber on host B never fires for publishes on host A</summary>
+
+The `memory` adapter in a multi-instance deploy; delivery is in-process. Set `eventbus.adapter` to `redis` with a shared `addr` and `prefix`, then confirm every instance resolves the same endpoint through redacted output.
+</details>
+
+<details>
+<summary>Messages vanish under load with no error</summary>
+
+The per-topic buffer is full and drop-newest backpressure engaged. Raise `buffer_size`, shorten handler work (enqueue a job for slow I/O), and look for a slow subscriber starving its channel.
+</details>
+
+<details>
+<summary>Strict load rejects buffersize or maxhandlers</summary>
+
+Flat pre-rename spellings; keys are `buffer_size`, `max_handlers`, `handler_timeout`, `close_timeout`. Rename them and use integer nanoseconds. Env still accepts compact spellings because `_` is ignored.
+</details>
+
+<details>
+<summary>A leak test fails after adding a subscription</summary>
+
+No exit path: the unsubscribe func was never called, or the `SubscribeChan` channel never reached `Unsubscribe` or bus `Close`. Defer both as above.
+</details>
+
+## Related
+
+<CardGrid>
+  <LinkCard title="Queue" href="../queue/" description="Durable delivery with ack and retry." />
+  <LinkCard title="Scheduler and jobs" href="../scheduler-jobs/" description="Deferred execution instead of fan-out." />
+  <LinkCard title="Outbox" href="../outbox/" description="Events that commit with the business row." />
+</CardGrid>

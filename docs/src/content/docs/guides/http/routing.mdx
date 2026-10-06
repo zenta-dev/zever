@@ -1,0 +1,108 @@
+---
+title: Routing
+description: Register HTTP routes on the fiber or stdhttp driver with path params, groups, and method checks.
+---
+
+import { LinkCard, CardGrid } from '@astrojs/starlight/components';
+
+`router` is a thin facade over `fiber` and `stdhttp`; handlers stay plain `http.HandlerFunc` and `router.Param` reads path params identically on both. Use it for hand-written routes or to mirror `.zen` RPC bindings; `zever routes` prints the resolved table.
+
+## Register a route
+
+Switch with `ROUTER_ADAPTER=fiber`; handler signatures do not change. Full options: [Config reference](../../../reference/config/#router).
+
+```yaml
+router:
+  adapter: stdhttp   # or: fiber
+```
+
+```go title="main.go"
+package main
+
+import (
+    "fmt"
+    "net/http"
+
+    routerstdhttp "github.com/zenta-dev/zever/adapters/router/stdhttp"
+    "github.com/zenta-dev/zever/config"
+    "github.com/zenta-dev/zever/container"
+    "github.com/zenta-dev/zever/core/router"
+)
+
+func main() {
+    routerstdhttp.Register()
+    c := container.New(config.Default())
+    r, _ := c.Router()
+
+    r.Handle("GET", "/users/{id}", func(w http.ResponseWriter, req *http.Request) {
+        fmt.Fprintf(w, "user %s", router.Param(req, "id"))
+    })
+
+    _ = http.ListenAndServe(":8080", r)
+}
+```
+
+```sh
+curl -s localhost:8080/users/42
+```
+
+```text
+user 42
+```
+
+`c.Router()` resolves lazily and caches; the router has no `Close`.
+
+## Write path patterns
+
+`fiber` accepts `:name` and `{name}`; `stdhttp` accepts only ServeMux syntax. Fiber is case-sensitive, so prefer `{name}` for both.
+
+| Pattern | fiber | stdhttp |
+|---|---|---|
+| `/users/:id` | `:id` | rejected |
+| `/users/{id}` | `:id` | `{id}` |
+| `/files/{path...}` | `*` wildcard | `{path...}` |
+| `/users/{$}` | literal | `{$}` exact |
+| `/items/:id<[0-9]+>` | passthrough | rejected |
+
+## Use the router API
+
+| Method | Purpose |
+|---|---|
+| `Handle(method, pattern, handler)` | One route. |
+| `Group(prefix, middlewares...)` | Scoped routes. |
+| `Use(middlewares...)` | Append middleware. |
+| `router.Param(req, name)` | One param. |
+| `router.ParamNames(req)` | All params. |
+| `router.WithParams(ctx, params)` | Test params. |
+| `router.ValidMethod(method)` | Method check. |
+| `router.Open(adapter, opts)` | Open without container. |
+| `router.Register(adapter, factory)` | Add custom driver. |
+
+Valid methods: GET, POST, PUT, PATCH, DELETE, HEAD, OPTIONS, CONNECT, TRACE. Invalid or duplicate routes log `[router]` and are skipped. On `stdhttp`, `Use` applies only to later registrations. See [Middleware](../middleware/).
+
+## Production checklist
+
+- Shut down `http.Server` gracefully; set `ReadHeaderTimeout`, `ReadTimeout`, `WriteTimeout`, `IdleTimeout`.
+- One driver per process; log option maps only via `config.RedactedServices`.
+
+## Troubleshooting
+
+<details>
+<summary>Route 404s on stdhttp but works on fiber</summary>
+
+You used `:id` or a regex constraint. Rewrite as `{id}`.
+</details>
+
+<details>
+<summary>`Use` middleware does not run on stdhttp</summary>
+
+It was registered after the route. Move `Use` before `Handle`.
+</details>
+
+## Related
+
+<CardGrid>
+  <LinkCard title="Middleware" href="../middleware/" description="Logging, recovery, rate limiting." />
+  <LinkCard title="Requests and responses" href="../requests-responses/" description="Params, bodies, JSON envelopes." />
+  <LinkCard title="Validation" href="../validation/" description="@validate rules and handler checks." />
+</CardGrid>

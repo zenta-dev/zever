@@ -1,0 +1,47 @@
+---
+import Breadcrumbs from './Breadcrumbs.astro';
+import PageActions from './PageActions.astro';
+import '../../styles/docs/page.css';
+
+const route = Astro.locals.starlightRoute;
+const { entry, sidebar, lastUpdated, lang } = route;
+const { title, description } = entry.data;
+
+type Item = { type: string; label: string; isCurrent?: boolean; entries?: Item[] };
+const find = (items: Item[], trail: string[]): string[] | undefined => {
+  for (const it of items) {
+    if (it.type === 'link' && it.isCurrent) return trail;
+    if (it.type === 'group' && it.entries) {
+      const r = find(it.entries, [...trail, it.label]);
+      if (r) return r;
+    }
+  }
+};
+const group = find(sidebar as unknown as Item[], [])?.[0];
+
+const words = (entry.body ?? '').replace(/```[\s\S]*?```/g, ' code ').split(/\s+/).filter(Boolean).length;
+const minutes = Math.max(1, Math.round(words / 220));
+const editUrl = entry.filePath
+  ? `https://github.com/zenta-dev/zever/edit/main/docs/${entry.filePath.replace(/^\/+/, '')}`
+  : undefined;
+---
+
+<header class="zp-head">
+  <Breadcrumbs group={group} title={title} />
+  <div class="zp-titlerow">
+    <div class="zp-titlecol">
+      <h1 id="_top">{title}</h1>
+      {description && <p class="zp-lede">{description}</p>}
+    </div>
+    <PageActions id={entry.id} />
+  </div>
+  <p class="zp-meta">
+    <span>{minutes} min read</span>
+    {lastUpdated && (
+      <span>
+        Updated <time datetime={lastUpdated.toISOString()}>{lastUpdated.toLocaleDateString(lang, { dateStyle: 'medium', timeZone: 'UTC' })}</time>
+      </span>
+    )}
+    {editUrl && <a href={editUrl} target="_blank" rel="noopener">Edit on GitHub</a>}
+  </p>
+</header>

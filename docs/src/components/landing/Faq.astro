@@ -1,0 +1,60 @@
+---
+import Section from './ui/Section.astro';
+import { FAQ } from '../../data/landing';
+
+const plain = (s: string) => s.replace(/`/g, '');
+const ld = JSON.stringify({
+  '@context': 'https://schema.org',
+  '@type': 'FAQPage',
+  mainEntity: FAQ.map((f) => ({ '@type': 'Question', name: f.q, acceptedAnswer: { '@type': 'Answer', text: plain(f.a) } })),
+}).replace(/</g, '\\u003c');
+// Render `inline code` spans in answers.
+const rich = (s: string) => s.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/`([^`]+)`/g, '<code>$1</code>');
+---
+
+<Section id="faq">
+  <div class="faq-grid">
+    <header class="faq-head zl-reveal">
+      <span class="zl-eyebrow">FAQ</span>
+      <h2 class="zl-h2">Questions, <em>answered</em>.</h2>
+      <p class="zl-lede">Short answers to what people ask before they try it.</p>
+    </header>
+    <div class="faq zl-reveal" style="--i:1">
+      {FAQ.map((f, i) => (
+        <details name="zl-faq">
+          <summary><span class="faq-n" aria-hidden="true">{String(i + 1).padStart(2, '0')}</span><span class="faq-q">{f.q}</span><i class="faq-icon" aria-hidden="true"></i></summary>
+          <div class="faq-a"><p set:html={rich(f.a)} /></div>
+        </details>
+      ))}
+    </div>
+  </div>
+  <script type="application/ld+json" set:html={ld} is:inline></script>
+</Section>
+
+<style>
+  .faq-grid { display: grid; gap: clamp(2rem, 5vw, 3.5rem); grid-template-columns: minmax(0, 1fr); width: min(100%, 52rem); margin-inline: auto; }
+  .faq-head { margin: 0; text-align: center; }
+  .faq-head :global(.zl-lede) { margin-inline: auto; }
+  .faq-head :global(.zl-eyebrow)::after { content: ''; width: 1.5rem; height: 1px; background: currentColor; }
+  .faq { min-width: 0; border-top: 1px solid var(--zl-line); interpolate-size: allow-keywords; }
+  details { border-bottom: 1px solid var(--zl-line); }
+  summary { display: flex; align-items: center; gap: 1rem; min-height: 3.5rem; padding: 1.15rem 0.25rem; cursor: pointer; list-style: none; font: 500 clamp(1.05rem, 2vw, 1.3rem)/1.3 var(--zl-font-sans); letter-spacing: -0.015em; transition: color 0.2s; }
+  summary::-webkit-details-marker { display: none; }
+  summary:hover, details[open] summary { color: var(--zl-accent-hi); }
+  :global(.zl-page[data-theme='light']) summary:hover, :global(.zl-page[data-theme='light']) details[open] summary { color: var(--zl-accent-lo); }
+  .faq-n { flex: none; font: 500 0.72rem/1 var(--zl-font-mono); color: var(--zl-text-3); letter-spacing: 0.08em; }
+  .faq-q { flex: 1; min-width: 0; text-wrap: pretty; }
+  .faq-icon { flex: none; position: relative; width: 1.1rem; height: 1.1rem; color: var(--zl-accent); transition: transform 0.4s var(--zl-ease); }
+  .faq-icon::before, .faq-icon::after { content: ''; position: absolute; left: 0; top: 50%; width: 100%; height: 1.5px; margin-top: -0.75px; background: currentColor; border-radius: 2px; transition: transform 0.4s var(--zl-ease); }
+  .faq-icon::after { transform: rotate(90deg); }
+  details[open] .faq-icon { transform: rotate(180deg); }
+  details[open] .faq-icon::before { transform: rotate(45deg); }
+  details[open] .faq-icon::after { transform: rotate(-45deg); }
+  .faq-a { padding: 0 2.25rem 1.5rem 2.25rem; color: var(--zl-text-2); max-width: 64ch; font-size: 1.02rem; line-height: 1.7; }
+  @media (max-width: 640px) { .faq-a { padding-inline: 0.25rem 0.5rem; } .faq-n { display: none; } }
+  .faq-a p { margin: 0; }
+  .faq-a :global(code) { font: 0.88em var(--zl-font-mono); background: var(--zl-surface-2); border-radius: 4px; padding: 0.1em 0.35em; color: var(--zl-text); overflow-wrap: anywhere; }
+  details::details-content { height: 0; overflow: clip; opacity: 0; transition: height 0.4s var(--zl-ease), opacity 0.3s, content-visibility 0.4s allow-discrete; }
+  details[open]::details-content { height: auto; opacity: 1; }
+  @media (prefers-reduced-motion: reduce) { details::details-content, .faq-icon, .faq-icon::before, .faq-icon::after { transition: none; } }
+</style>

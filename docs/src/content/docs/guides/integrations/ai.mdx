@@ -1,0 +1,169 @@
+---
+title: AI
+description: Generate text, stream tokens, and create embeddings with Anthropic, OpenAI, Gemini, or Ollama behind one interface.
+---
+
+import { LinkCard, CardGrid } from '@astrojs/starlight/components';
+
+`ai.AI` is one facade (`Generate`, `Stream`, `Embed`) with typed messages, tools, and usage accounting, so the provider is a config value, not an import. Pick `anthropic`, `openai`, or `gemini` by which models you want, and `ollama` for self-hosted inference. Switching later is a config change.
+
+Unlike most services, `ai` has no zero-infra default. `config.Default()` selects `anthropic` and `Validate` requires an API key (or a `base_url` plus key), so tests that touch `ai` must supply a key or point at a fake endpoint.
+
+## Quick start
+
+```yaml title="zever.yaml"
+ai:
+  adapter: anthropic
+  options:
+    api_key: sk-...
+    model: claude-opus-4
+    timeout: 30s
+```
+
+```sh
+AI_ADAPTER=openai
+AI_API_KEY=sk-...
+AI_MODEL=gpt-5
+AI_TIMEOUT=30s
+AI_BASE_URL=https://proxy.internal/v1
+```
+
+`base_url` is optional (a proxy or self-hosted gateway). It must be a valid `https` URL with scheme and host. `timeout` bounds each request, and a negative value is rejected. See the [ai config reference](../../../reference/config/#ai).
+
+```go title="main.go"
+package main
+
+import (
+	"context"
+	"fmt"
+
+	aianthropic "github.com/zenta-dev/zever/adapters/ai/anthropic"
+	"github.com/zenta-dev/zever/config"
+	"github.com/zenta-dev/zever/container"
+	"github.com/zenta-dev/zever/core/ai"
+)
+
+func main() {
+	aianthropic.Register() // container wires nothing
+	c := container.New(config.Default())
+	defer c.Close(context.Background())
+
+	backend, err := c.AI() // fails on a missing key, bad base_url, or unknown adapter
+	if err != nil {
+		fmt.Println("resolve error:", err)
+		return
+	}
+	out, err := backend.Generate(context.Background(), "", []ai.Message{
+		{Role: ai.RoleUser, Content: "Say hi in five words."},
+	}, ai.GenerateOptions{})
+	if err != nil {
+		fmt.Println("generate error:", err)
+		return
+	}
+	fmt.Println("text:", out.Content)
+	fmt.Println("tokens:", out.Usage.PromptTokens+out.Usage.CompletionTokens)
+}
+```
+
+Expected output (text varies by model):
+
+```text
+text: Hello, glad you are here.
+tokens: 24
+```
+
+For streaming, call `Stream` and range over the returned channel until the producer closes it. The channel is bounded, so a stalled consumer cannot leak a goroutine on an unbounded buffer.
+
+## Choose an adapter
+
+| Adapter | Package | Notes |
+|---|---|---|
+| `anthropic` | `adapters/ai/anthropic` | Default selection. Needs `api_key`. |
+| `openai` | `adapters/ai/openai` | Needs `api_key`. |
+| `gemini` | `adapters/ai/gemini` | Needs `api_key`. |
+| `ollama` | `adapters/ai/ollama` | Self-hosted. `base_url` bridges to its `Addr`. |
+
+`ollama.New` takes `ollama.Options` with an `Addr` field. You only write `ai:` config: with `adapter: ollama`, the container passes `base_url` through as `Addr` and carries over `model`, `timeout`, and `allow_insecure`. Non-loopback endpoints must use https and TLS is verified unless `allow_insecure: true`.
+
+## Run tool-calling agents and RAG
+
+Two batteries build on `ai` without a provider dependency. Neither has a `config` entry. Resolve `c.Agent()` and `c.RAG()` (which build and cache the loop and engine over the shared backend), or call `New` with the resolved `AI()` and `VectorStore()`.
+
+`core/agent` runs a bounded tool-calling loop: generate, dispatch tool calls, append results, repeat until the model answers or the step bound hits. Unknown tools fail closed, and handler errors go back to the model as tool turns so it can self-correct.
+
+```go title="agent.go"
+loop, err := agent.New(backend, agent.Options{
+	Model: "gpt-5",
+	Tools: []agent.Tool{{
+		Name:        "lookup_order",
+		Description: "Look up an order by ID.",
+		Parameters:  map[string]any{"type": "object"},
+		Handler: func(ctx context.Context, args map[string]any) (string, error) {
+			return "order 42", nil
+		},
+	}},
+})
+```
+
+`core/rag` composes embeddings with a `vectorstore`: ingest and embed chunks, then retrieve context and generate a grounded answer.
+
+```go title="rag.go"
+engine, err := rag.New(backend, store, rag.Options{Model: "gpt-5"})
+```
+
+## Give coding agents the compiler over MCP
+
+`tools/zever-mcp` is a stdio [Model Context Protocol](https://modelcontextprotocol.io) server that exposes the `.zen` compiler. It implements `initialize`, `tools/list`, and `tools/call` over newline-delimited JSON-RPC 2.0, with five tools. The first four are read-only; `zever_generate` writes, gated by dry-run preview plus human elicitation approval:
+
+| Tool | Purpose |
+|---|---|
+| `zever_compile` | Compile `.zen` sources and return the merged OpenAPI document. |
+| `zever_schema` | Return a JSON overview of modules, entities, services, messages, and enums. |
+| `zever_explain` | Describe a module, entity, message, service, or operation by dotted path. |
+| `zever_doctor` | Resolve every battery and report OK/FAIL rows. |
+| `zever_generate` | Scaffold via dry-run plan, then apply on elicited approval. |
+
+It also serves static reference resources and prompt templates for scaffolding, triage, and diagnostics.
+
+```sh
+go build -o zever-mcp ./tools/zever-mcp
+```
+
+```json
+{ "mcpServers": { "zever": { "command": "/path/to/zever-mcp" } } }
+```
+
+## Production checklist
+
+- Keep keys in file config or env (`AI_API_KEY`), never in code. Display config through `config.RedactedServices`. `APIKey` never appears in logs or error values.
+- Set `timeout` explicitly per deploy. Zero falls back to the adapter default, which may exceed your handler deadline.
+- Pin `model` so a provider-side default change does not move you to a model with different pricing.
+- Unsupported features fail closed with `ErrNotSupported` at the call site instead of silently dropping a tool call or stream flag.
+
+## Troubleshooting
+
+<details>
+<summary>`AI()` fails with an invalid-options error at startup</summary>
+
+The key is missing or `base_url` failed validation. Check `AI_API_KEY`, and that `AI_BASE_URL` (if used) includes the `https` scheme and a host.
+</details>
+
+<details>
+<summary>`Generate` returns `ErrNotSupported` for a call that worked on another adapter</summary>
+
+The provider has no native shape for that feature (tool-call form, streaming mode). Gate the feature per adapter or switch adapters. The facade never downgrades silently.
+</details>
+
+<details>
+<summary>Token usage looks wrong after switching providers</summary>
+
+Usage accounting follows each provider's response shape. Compare `Usage` per adapter in a test before relying on totals for billing.
+</details>
+
+## Related
+
+<CardGrid>
+  <LinkCard title="Vector store" href="../../data/vectorstore/" description="Store Embed output and run cosine search." />
+  <LinkCard title="Secrets" href="../../security/secrets/" description="Keep provider keys outside YAML." />
+  <LinkCard title="Container" href="../../../concepts/container/" description="Lazy resolve and close order." />
+</CardGrid>

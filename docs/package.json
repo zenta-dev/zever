@@ -11,8 +11,18 @@
   },
   "dependencies": {
     "@astrojs/starlight": "^0.42.0",
+    "@fontsource-variable/jetbrains-mono": "^5.3.0",
+    "@fontsource-variable/space-grotesk": "^5.3.0",
+    "@fontsource/jetbrains-mono": "^5.3.0",
+    "@fontsource/space-grotesk": "^5.3.0",
+    "@resvg/resvg-js": "^2.6.2",
     "astro": "^7.0.0",
+    "motion": "^14.0.0",
+    "satori": "^0.35.0",
     "sharp": "^0.35.5",
     "starlight-theme-black": "^0.7.1"
+  },
+  "overrides": {
+    "fflate": "^0.7.5"
   }
 }

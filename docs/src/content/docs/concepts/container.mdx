@@ -1,0 +1,109 @@
+---
+title: Container
+description: How the container resolves services lazily, retries on error, shares Job and Scheduler queues, and closes in order.
+---
+
+import { LinkCard, CardGrid } from '@astrojs/starlight/components';
+
+The container is the only object that knows how adapters are constructed, cached, retried, and closed. One `container.New(cfg)` per process gives lazy first use and dependency-ordered close.
+
+## The mental model
+
+```text
+New(cfg)  ->  accessor()  ->  registry lookup  ->  cached instance
+one per       lazy first      adapter by name      retry on error
+process       use only        from config          clear on failure
+```
+
+No globals and no `init()` wiring. `New(nil)` is valid; `Close(ctx)` never opens anything. Config picks the adapter (`<SERVICE>_ADAPTER` or `adapter:`); the remaining keys feed typed Options ([Config reference](../../reference/config/#db)). Display config with `config.RedactedServices`, never raw option maps.
+
+## Resolve services
+
+Register the adapters you use (`dbsqlite.Register()`), build the container with `container.New(config.Default())`, then call accessors. Each returns one cached instance and retries after a failure.
+
+- `DB()`: plus `Transactor()`
+- `Cache()`, `Queue()`: leaves, closed after dependents and snapshots
+- `Job()`: dispatcher over resolved `Queue`, no registry
+- `Scheduler()`: shares `Queue` via `Job()`, closed first
+- `EventBus()`: `Eventbus()` alias
+- `RateLimit()`: `Ratelimit()` alias
+- `GRPC(opts...)`: lazy `*grpc.Server`, no registry
+- `GRPCClient(target, opts...)`: gRPC client connection
+- `Router()`: `fiber` or `stdhttp` driver
+- `Log()`: outermost middleware
+- `AI()`: API key required, no keyless default
+- `Agent()`, `RAG()`: over `AI` (and `VectorStore` for `RAG`)
+
+The rest share the service name:
+
+```text
+Analytics() Auth() Billing() Crypto() Document() Flag() Geo() I18n()
+Idempotency() Lock() Mailer() Media() Notification() Observability()
+Outbox() Password() Payment() Permission() Resilience() Search()
+Secrets() Session() Storage() Tenant() VectorStore() Webhook() Workflow()
+```
+
+## Share one queue across jobs and the scheduler
+
+`Job()` builds a dispatcher over the already-resolved queue. `Scheduler()` injects that dispatcher, so no redundant connections open. Resolving `Scheduler()` resolves `Job()` and `Queue()` as a side effect.
+
+## Close services in order
+
+- **Dependents** (`scheduler`, `job`, `agent`, `rag`; they hold backend refs): first.
+- **Snapshots** (everything without explicit ordering): middle.
+- **Leaves** (`cache`, `queue`): next.
+- **Shared pools** (`db` and registry pools, after every borrower), then plugin services.
+- **Independent** (`grpcServer` via `GracefulStop`, forced `Stop` when ctx ends; gRPC client connections): last.
+
+The container probes each service's shutdown shape in order: `Close(context.Context) error`, `Close() error`, `Stop() error`, `Shutdown(context.Context) error`, then no-op (for example `*job.Dispatcher`).
+
+- `Close(ctx) error`: pooled or blocking services (`db`, `cache`, `storage`, `lock`).
+- `Close() error`: lightweight or in-memory adapters (`auth`, `queue`, `session`, `payment`).
+- `Stop() error`: scheduler cron only.
+- `Shutdown(ctx) error`: observability providers (flush spans and metrics).
+- none: stateless adapters (`crypto`, `log`, `password`, `permission`, `router`).
+
+## Design decisions and trade-offs
+
+A 5s per-service bound applies without a parent deadline; shared instances close once (pointer-identity dedup), failures join with `errors.Join`, and error values name the service only.
+
+## Troubleshooting
+
+<details>
+<summary>An accessor errors on the first call only</summary>
+
+A transient failure cleared the cache. Retry; investigate only if it repeats.
+</details>
+
+<details>
+<summary>`Close` reports a timeout for one service</summary>
+
+That adapter exceeded its bound. Give the parent a deadline or fix its `Close`.
+</details>
+
+<details>
+<summary>`errors.As` for `ClosePanicError` never fires</summary>
+
+Both close error types are values. Declare `var pe container.ClosePanicError` and pass `&pe`.
+</details>
+
+<details>
+<summary>A service seems to close twice</summary>
+
+A shared instance reached through two paths. Dedup closes it once.
+</details>
+
+<details>
+<summary>The leak checker fails after adding a service</summary>
+
+An adapter goroutine outlives `Close` (`go test -tags=leak ./container/`). Stop it in `Close`.
+</details>
+
+## Related
+
+<CardGrid>
+  <LinkCard title="Lifecycle" description="The four phases around the container." href="../lifecycle/" />
+  <LinkCard title="Providers and adapters" description="Interface, registry, and swap rules." href="../providers-adapters/" />
+  <LinkCard title="Compiler boundary" description="Why the container never links the compiler." href="../compiler-boundary/" />
+  <LinkCard title="Deployment" description="Production shutdown wiring." href="../../guides/operate/deployment/" />
+</CardGrid>

@@ -1,0 +1,107 @@
+---
+title: Documents
+description: Render document sources to PDF, PNG, or JPG with a local, LaTeX, or remote renderer.
+---
+
+import { LinkCard, CardGrid } from '@astrojs/starlight/components';
+
+`document.Document` turns a source into a PDF or image with one `Render` call, a typed `OutputFormat` (`pdf`, `png`, `jpg`), and a `Quality` bounded to 0 to 100. Callers never learn whether LaTeX or a remote API did the work.
+
+## Quick start
+
+- `local` (default, `adapters/document/local`) renders HTML in headless Chrome.
+- `latex` shells out to a fixed, configured compiler; use it for `.tex` sources.
+- `remote` sends the job to a rendering API over HTTP. It needs `endpoint` (https, or http with `allow_insecure: true`); a non-empty `api_key` is sent as a bearer token.
+
+```yaml title="zever.yaml"
+document:
+  adapter: local
+  options:
+    quality: 80
+    dpi: 150
+    tmp_dir: /tmp/zever-doc
+    max_output_bytes: 67108864
+    timeout: 30000000000   # nanoseconds
+```
+
+`quality` must be 0 to 100 (`Validate` rejects other values; `ClampQuality` clamps user input before you pass it); `dpi`, `max_output_bytes` (default 64 MiB), and `timeout` must be 0 or more. Durations are nanoseconds, env accepts `30s`. `latex_command` and `latex_pdf_to_ppm` (defaults `pdflatex`, `pdftoppm`) are config only, never interpolated from document content. `latex_runs` bounds compiler passes. For `remote`, `endpoint` must be an absolute URL with scheme and host (`allow_insecure` permits http). See the [document options](../../../reference/config/#document).
+
+## Render a document
+
+Register the adapter first; the container wires nothing. `Document()` resolves lazily, caches, and retries.
+
+```go title="main.go"
+package main
+
+import (
+	"context"
+	"fmt"
+	"os"
+
+	documentlocal "github.com/zenta-dev/zever/adapters/document/local"
+	"github.com/zenta-dev/zever/config"
+	"github.com/zenta-dev/zever/container"
+	"github.com/zenta-dev/zever/core/document"
+)
+
+func main() {
+	documentlocal.Register()
+	ctx := context.Background()
+	c := container.New(config.Default())
+	defer c.Close(ctx)
+
+	d, err := c.Document()
+	if err != nil {
+		panic(err)
+	}
+	out, err := d.Render(ctx, []byte(`hello`), document.FormatPDF)
+	if err != nil {
+		panic(err) // out is nil on error, never a partial file
+	}
+	if err := os.WriteFile("/tmp/hello.pdf", out, 0o600); err != nil {
+		panic(err)
+	}
+	fmt.Println("bytes:", len(out))
+}
+```
+
+```text
+bytes: 1240
+```
+
+The byte count varies by adapter and source. Check the error before writing to disk.
+
+## Production checklist
+
+- Sources are capped at 10 MiB and output at 64 MiB by default. Raise them deliberately and with a measured reason.
+- The `latex` adapter never interpolates a caller-supplied command, so document content cannot reach a shell. Lock down `tmp_dir` too.
+- Bound renders with `timeout` and clean up temp artifacts on error paths.
+- `api_key` never appears in logs, and `endpoint` is validated before the first request.
+
+## Troubleshooting
+
+<details>
+<summary>`Render` returns nil bytes and an error</summary>
+
+Cause: that is the contract, with no partial files. Fix: inspect the error, do not write the output, and check the source against the 10 MiB cap.
+</details>
+
+<details>
+<summary>LaTeX renders fail with "command not found"</summary>
+
+Cause: `latex_command` or `latex_pdf_to_ppm` is not on `PATH` (or not an absolute path). Fix: install them, or use the `remote` adapter.
+</details>
+
+<details>
+<summary>Remote renders fail validation before any request</summary>
+
+Cause: `endpoint` is not an absolute URL with scheme and host, or `timeout` is negative. Fix: correct the config. Nothing was sent.
+</details>
+
+## Related
+
+<CardGrid>
+  <LinkCard title="Media processing" href="../media/" description="Image and video limits." />
+  <LinkCard title="Storage and media" href="../storage-media/" description="Store rendered files." />
+  <LinkCard title="Container" href="../../../concepts/container/" description="Lazy resolve and close order." />
+</CardGrid>

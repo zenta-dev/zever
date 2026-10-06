@@ -1,0 +1,136 @@
+---
+title: Editor setup
+description: Set up the zever-lsp language server, Neovim, and VS Code for .zen files, plus the CLI inspection loop.
+---
+
+import { Tabs, TabItem, LinkCard, CardGrid } from '@astrojs/starlight/components';
+
+The `.zen` loop is CLI format and check, `zever-lsp` diagnostics, and `make generate` for grammars.
+
+## Install the language server
+
+Install with Go and `$(go env GOPATH)/bin` on `PATH` (Neovim 0.11+ or VS Code); open the workspace at its root, where the scan starts.
+
+```sh
+go install github.com/zenta-dev/zever/tools/zever-lsp@v0.5.3
+# or, from a local clone:
+go install ./tools/zever-lsp
+```
+
+The server takes no config or flags, speaks stdio LSP only, and reports its version in `initialize`'s `serverInfo`.
+
+## Connect your editor
+
+<Tabs>
+  <TabItem label="Neovim">
+Load `editors/nvim` as a runtime plugin for filetype detection and highlighting:
+
+```lua
+{
+  'zenta-dev/zever',
+  config = function(plugin)
+    vim.opt.rtp:append(plugin.dir .. '/editors/nvim')
+  end,
+}
+```
+
+LSP registration is not automatic:
+
+```lua
+vim.lsp.config('zever-lsp', {
+  cmd = { 'zever-lsp' },
+  filetypes = { 'zen' },
+  root_markers = { '.git' },
+})
+vim.lsp.enable('zever-lsp')
+```
+
+Optional format on save:
+
+```lua
+vim.api.nvim_create_autocmd('BufWritePre', {
+  pattern = '*.zen',
+  callback = function(args)
+    vim.lsp.buf.format({ bufnr = args.buf, timeout_ms = 2000 })
+  end,
+})
+```
+  </TabItem>
+  <TabItem label="VS Code">
+Install the extension from `editors/vscode` and keep `zever-lsp` on `$PATH`; it is a client only and does not bundle the server. Enable `editor.formatOnSave` for `zen`.
+  </TabItem>
+</Tabs>
+
+To verify, open a `.zen` file, add an unknown scalar, and confirm a diagnostic appears (Neovim `:lua vim.diagnostic.open_float()`, VS Code Problems), then clears when fixed.
+
+## Run the CLI loop
+
+```sh
+zever fmt --write schema/*.zen
+zever check schema/*.zen
+```
+
+| Command | Purpose |
+|---|---|
+| `zever fmt --write <files...>` | Format files in place (without `--write`, list those that would change). |
+| `zever check <files...>` | Report diagnostics. |
+| `zever compile --out ./generated <files...>` | Generate backend output. |
+| `zever check-boundaries <files...>` | Report cross-module violations (relation, RPC return type, or permission resource reaching into another module). |
+| `zever tinker` | Dev-only Go REPL against a live container. It warns on stderr, so never point it at production data. |
+
+All commands: [CLI reference](../../../reference/cli/).
+
+## Regenerate grammars
+
+After touching `token.Keywords` or `resolver.ScalarTypeNames`, run `make generate`; `tools/gengrammar` renders the `editors/nvim` and `editors/vscode` grammars, and `editors/parity_test.go` diffs them, so skipping it fails the build.
+
+## Know what the server supports
+
+| Area | Methods |
+|---|---|
+| Sync | `didOpen`, `didChange` (full), `didSave`, `didClose`, `didChangeWatchedFiles` |
+| Diagnostics | `publishDiagnostics` (debounced per file; clean files return an empty array) |
+| Symbols | `documentSymbol`, `workspace/symbol` |
+| Navigation | `definition`, `references`, `documentHighlight`, `foldingRange` |
+| Completion and hover | `completion` (triggers `@`, `:`, space), `completionItem/resolve`, `hover`, `signatureHelp` (triggers `(`, `,`) |
+| Editing | `formatting`, `rangeFormatting`, `codeAction` (unknown scalars, relation targets) |
+| Rename | `prepareRename`, `rename` (entities, fields, jobs, services, RPCs) |
+| Semantic tokens | `semanticTokens/full` |
+| Inlay hints | `inlayHint` plus resolve (implicit module, `errors:` case annotations) |
+
+The server compiles in-process with the compiler's resolver, so editor and build cannot disagree. It shares the lockstep version (`tools/zever-lsp/vX.Y.Z`).
+
+## Troubleshooting
+
+<details>
+<summary>`zever-lsp: command not found`</summary>
+
+Cause: the binary is not on `PATH`. Fix: re-run `go install`, add `$(go env GOPATH)/bin`.
+</details>
+
+<details>
+<summary>No diagnostics appear</summary>
+
+Cause: the client did not attach, or the wrong root was opened. Fix: check `:LspInfo`/Output and reopen the `initialize` root.
+</details>
+
+<details>
+<summary>Garbled responses</summary>
+
+Cause: something writes to the server's stdout. Fix: remove wrappers that merge the streams; logging goes to stderr.
+</details>
+
+<details>
+<summary>Grammars drift after a keyword change</summary>
+
+Cause: `make generate` was skipped. Fix: run it and commit the regenerated grammars.
+</details>
+
+## Related
+
+<CardGrid>
+  <LinkCard title="Zen syntax" href="../../../reference/zen-syntax/" />
+  <LinkCard title="Resolver and IR" href="../../../concepts/resolver-ir/" />
+  <LinkCard title="Backends" href="../../../concepts/backends/" />
+  <LinkCard title="CLI reference" href="../../../reference/cli/" />
+</CardGrid>

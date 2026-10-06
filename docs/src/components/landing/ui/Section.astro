@@ -1,0 +1,21 @@
+---
+interface Props { id?: string; eyebrow?: string; title?: string; lede?: string; grid?: boolean; class?: string }
+const { id, eyebrow, title, lede, grid = false, class: cls = '' } = Astro.props;
+---
+
+<section id={id} class:list={['zl-section', grid && 'zl-gridbg', cls]}>
+  <div class="zl-wrap">
+    {(eyebrow || title || lede) && (
+      <header class="zl-sec-head zl-reveal">
+        {eyebrow && <span class="zl-eyebrow">{eyebrow}</span>}
+        {title && <h2 class="zl-h2" set:html={title} />}
+        {lede && <p class="zl-lede">{lede}</p>}
+      </header>
+    )}
+    <slot />
+  </div>
+</section>
+
+<style is:global>
+  .zl-sec-head { margin-bottom: clamp(2rem, 5vw, 3.5rem); }
+</style>

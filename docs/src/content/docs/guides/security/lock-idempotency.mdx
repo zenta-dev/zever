@@ -1,0 +1,127 @@
+---
+title: Locks and idempotency
+description: Guard critical sections with distributed locks and make retried jobs and webhooks take effect once.
+---
+
+Use `lock` for mutual exclusion and `idempotency` for dedupe. `Locker` offers `TryAcquire`, blocking `Acquire` (polls every `retry_interval`, default 50ms), `Extend`, and ownership-checked `Unlock`. `Store` reserves a key with `Begin` and records the outcome with `Complete`, so retries replay the stored result.
+
+## Quick start
+
+Both default to `memory`: single process only. Register the adapters before resolving, since the container wires nothing.
+
+```go title="main.go"
+package main
+
+import (
+    "context"
+    "fmt"
+    "time"
+
+    idemmemory "github.com/zenta-dev/zever/adapters/idempotency/memory"
+    lockmemory "github.com/zenta-dev/zever/adapters/lock/memory"
+    "github.com/zenta-dev/zever/config"
+    "github.com/zenta-dev/zever/container"
+    "github.com/zenta-dev/zever/core/idempotency"
+)
+
+func main() {
+    lockmemory.Register()
+    idemmemory.Register()
+    c := container.New(config.Default())
+    lk, err := c.Lock()
+    if err != nil {
+        panic(err)
+    }
+    idem, err := c.Idempotency()
+    if err != nil {
+        panic(err)
+    }
+
+    ctx := context.Background()
+    lease, ok, err := lk.TryAcquire(ctx, "booking:room-1:2026-01-01:2026-01-03", 30*time.Second)
+    fmt.Println(ok, err)
+    if ok {
+        defer lease.Unlock(ctx)
+    }
+    out, err := idem.Begin(ctx, "booking:req-1", idempotency.BeginOptions{Fingerprint: []byte("guest|room-1")})
+    fmt.Println(out.Replay, err)
+    if !out.Replay {
+        _ = idem.Complete(ctx, "booking:req-1", []byte("guest|room-1"), []byte(`{"status":"confirmed"}`))
+    }
+}
+```
+
+```text
+true <nil>
+false <nil>
+```
+
+A second `Begin` with the same key and fingerprint prints `true <nil>` with the stored bytes.
+
+## Guard a booking path
+
+The bookings handler runs `RateLimit.Allow`, then `Idempotency.Begin` (`booking:<key>`, fingerprint `guest|space|start|end`), then `Lock.TryAcquire` on `booking:<space>:<start>:<end>` with a 30s TTL while the overlap check, charge, and insert run.
+
+| Outcome | Status |
+|---|---|
+| Replay of a finished request | Stored bytes returned. |
+| `ErrInProgress` | `409`. |
+| `ErrKeyMismatch` | `400`. |
+
+Key the lock on the contended range and the idempotency key on a stable external ID (webhook event ID, job dedupe key), never raw payload bytes. Idempotency fails closed.
+
+## Share state across replicas
+
+`memory` is invisible to other replicas, so a second instance can double-book or duplicate webhook effects. Move both to `redis`, or `idempotency` to `db`.
+
+```yaml title="zever.yaml"
+lock:
+  adapter: redis
+  options:
+    ttl: 30000000000         # 30s lease (nanoseconds in files)
+    retry_interval: 50000000 # 50ms
+    prefix: bookings:
+idempotency:
+  adapter: redis
+  options:
+    ttl: 86400000000000      # 24h reservation
+```
+
+```sh
+LOCK_ADAPTER=redis
+LOCK_TTL=30s
+LOCK_RETRYINTERVAL=50ms
+IDEMPOTENCY_ADAPTER=redis
+IDEMPOTENCY_TTL=24h
+```
+
+The lock takes Redis connection keys at the top level (`addr`, `url`, `password`, `db`, `tls`), while `idempotency` nests them under `redis:` (`redis.addr`, `redis.prefix`). Lock `Validate` is a no-op; each adapter validates its own fields. Idempotency rejects a negative `ttl` (zero means 24h) and bad Redis `addr`/`prefix`. Keys cap at 255 bytes (`MaxKeyLen`). Adapters: `adapters/lock/{memory,redis}` and `adapters/idempotency/{memory,redis,db}` (`db` via `dsn`, `dedicated_pool`). Keys: [lock](../../../reference/config/#lock), [idempotency](../../../reference/config/#idempotency).
+
+## Production checklist
+
+- `Lock.Close(ctx)` takes a context; `Store.Close()` does not. Neither releases held leases or reservations; locks expire on their TTL (default 30s), so plan expiry.
+- Fingerprints may carry PII; keep them and raw option maps out of logs (`cfg.RedactedServices()`).
+
+## Troubleshooting
+
+<details>
+<summary>`409 dates already booked` with no real overlap</summary>
+
+A prior attempt holds the lock until its 30s TTL lapses, or a crashed worker never unlocked. Wait out the TTL or scope the key tighter; always `defer Unlock`.
+</details>
+
+<details>
+<summary>`409 booking in progress` never clears</summary>
+
+A `Begin` without a matching `Complete` stays pending until the TTL. Run `Complete` on every post-reservation path, or `Forget` the key.
+</details>
+
+<details>
+<summary>`400 idempotency key mismatch`</summary>
+
+The same key arrived with a different fingerprint (key reuse across payloads). Key on a per-attempt ID (header or body `idempotency_key`), not guest plus dates.
+</details>
+
+## Related
+
+[Rate limiting](../ratelimit/) · [Webhooks](../../background/webhooks/) · [Workflows](../../background/workflows/)

@@ -1,0 +1,139 @@
+---
+title: Storage and media
+description: Store files behind policy-gated presigned URLs, locally or on S3 and R2, with a media pipeline on top.
+---
+
+import { Tabs, TabItem, LinkCard, CardGrid } from '@astrojs/starlight/components';
+
+`storage.Storage` hands out presigned upload and download URLs for opaque objects such as receipts and photos, gated by one policy. `media` adds the transform and serve pipeline: [Media processing](../media/).
+
+## Quick start
+
+Pick `local` for a single instance: it writes under `root` and needs no infra. Pick `s3` or `r2` when instances must share files.
+
+<Tabs>
+  <TabItem label="local">
+```yaml title="zever.yaml"
+storage:
+  adapter: local
+  options:
+    root: ./data/storage
+    secret: dev-only-hmac-secret
+    url_base: http://localhost:8080/files
+```
+  </TabItem>
+  <TabItem label="s3">
+```yaml title="zever.yaml"
+storage:
+  adapter: s3
+  options:
+    region: us-east-1
+    endpoint: https://s3.us-east-1.amazonaws.com
+    access_key_id: AKIAEXAMPLE
+    secret_access_key: prod-secret-here
+    policy_sync: manual
+    sync_fail: warn
+    url_base: https://files.example.com
+```
+  </TabItem>
+</Tabs>
+
+Env vars: `STORAGE_ADAPTER`, `STORAGE_REGION`, `STORAGE_ACCESS_KEY_ID`, `STORAGE_SECRET_ACCESS_KEY`, `STORAGE_URL_BASE`. `policy_sync` is `manual` or `auto`; `sync_fail` is `warn` or `require`. `endpoint` needs a scheme and host, and a custom `endpoint` also requires `url_base`. `r2` needs `account_id`. `local` defaults `root` to `/tmp/storage`; without `secret` it uses an ephemeral key (presigned URLs break on restart) and refuses to start under `ZEVER_ENV=production` or `prod`. See the [storage options](../../../reference/config/#storage) and [media options](../../../reference/config/#media).
+
+## Mint a presigned URL
+
+Storage addresses objects by `bucket` and `key`. Resolve with `c.Storage()` (lazy, cached, retried) or open the adapter directly:
+
+```go title="main.go"
+package main
+
+import (
+	"context"
+	"fmt"
+	"time"
+
+	storagelocal "github.com/zenta-dev/zever/adapters/storage/local"
+	"github.com/zenta-dev/zever/core/storage"
+)
+
+func main() {
+	ctx := context.Background()
+	st, err := storagelocal.New(storage.Options{
+		LocalOptions: storage.LocalOptions{
+			Root:   "./data/storage",
+			Secret: "dev-only-hmac-secret",
+		},
+		URLBase: "http://localhost:8080/files",
+	})
+	if err != nil {
+		panic(err)
+	}
+	defer st.Close(ctx)
+
+	up, err := st.PresignUpload(ctx, "receipts", "b_123.pdf", "application/pdf", time.Hour)
+	if err != nil {
+		panic(err)
+	}
+	fmt.Println(up.Method) // PUT or POST, per adapter
+	down, err := st.PresignDownload(ctx, "receipts", "b_123.pdf", time.Hour)
+	if err != nil {
+		panic(err)
+	}
+	fmt.Println(down.Method) // GET
+}
+```
+
+The interface also has `Exists`, `Delete`, `Move` (overwrites the destination; a missing source reports `ErrNotFound`), `Name`, and `Close(ctx)`. Call the interface, not adapter internals, so the policy check runs.
+
+## Gate access with a policy
+
+`policy` is a flat map: `default` covers unlisted buckets, every other key is a bucket. Each bucket sets `read`, `write`, `update`, and `delete` rules with `public`, `allow`, and `deny` (deny wins). `*` matches any authenticated subject, `anonymous` matches everyone.
+
+```yaml title="zever.yaml"
+storage:
+  adapter: local
+  options:
+    policy:
+      default:
+        read: { allow: ["*"] }
+      receipts:
+        read: { allow: ["owner"], deny: ["anonymous"] }
+        write: { allow: ["owner"] }
+```
+
+Storage and media adapters are independent; keep them aligned to avoid cross-store copies. See the [adapters matrix](../../../reference/adapters-matrix/).
+
+## Production checklist
+
+- Cap media: `max_download_bytes` (64 MiB), `max_pixels` (about 50 MP), `max_duration`, `presign_ttl` (1h default, 7-day ceiling). Details: [Media processing](../media/).
+- Never log credentials: `access_key_id` and `secret_access_key` ride file or env; display goes through `config.RedactedServices`.
+- Close order: both are snapshot services, closed ahead of leaf `cache` and `queue`; only resolved services close.
+- Skip quietly at the job layer when no source file exists, rather than failing the booking flow.
+
+## Troubleshooting
+
+<details>
+<summary>`presign_ttl must be >= 0 and <= 7 days`</summary>
+
+Cause: the window exceeds the 7-day ceiling, often `720h` copied from a sample. Fix: at most `604800000000000` ns in YAML or `"168h"` in env.
+</details>
+
+<details>
+<summary>S3 works locally but fails in deploy with endpoint errors</summary>
+
+Cause: `endpoint` lacks a scheme, or `region` is empty. Fix: set a full URL like `https://s3.us-east-1.amazonaws.com` and pin `region`.
+</details>
+
+<details>
+<summary>A second instance returns 404 for a fresh upload</summary>
+
+Cause: `local` with two hosts, each with a private filesystem. Fix: move both to `s3` or `r2` with a shared bucket and re-upload.
+</details>
+
+## Related
+
+<CardGrid>
+  <LinkCard title="Media processing" href="../media/" description="Upload, probe, and transform assets." />
+  <LinkCard title="Search" href="../search/" description="Index file metadata." />
+  <LinkCard title="Mailer" href="../../background/mailer/" description="Link presigned receipts in mail." />
+</CardGrid>

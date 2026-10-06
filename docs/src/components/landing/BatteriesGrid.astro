@@ -1,0 +1,172 @@
+---
+import Section from './ui/Section.astro';
+import { BATTERIES, CATEGORIES, SERVICE_COUNT, ADAPTER_COUNT } from '../../data/landing';
+import { href } from '../../lib/url';
+
+// Feature tiles are looked up by name so every battery stays reachable from the same data.
+const FEATURES: Record<string, 'orm' | 'queue' | 'auth'> = {
+  'Database & ORM': 'orm',
+  Queue: 'queue',
+  Auth: 'auth',
+};
+---
+
+<Section
+  id="batteries"
+  eyebrow="Batteries included"
+  title={`${SERVICE_COUNT} services. ${ADAPTER_COUNT} adapters. <em>One container.</em>`}
+  lede="Each battery is one small interface in core/, with adapters you register and swap by config."
+>
+  <div class="zl-bat" data-batteries>
+    <div class="zl-bat-filters" role="group" aria-label="Filter batteries by category" data-filters>
+      <button type="button" class="zl-pill" data-cat="all" aria-pressed="true">All <span>{BATTERIES.length}</span></button>
+      {CATEGORIES.map((c) => (
+        <button type="button" class="zl-pill" data-cat={c} aria-pressed="false">{c} <span>{BATTERIES.filter((b) => b.category === c).length}</span></button>
+      ))}
+    </div>
+    <p class="zl-bat-status" role="status" aria-live="polite" data-status></p>
+
+    <ul class="zl-bat-grid" data-grid>
+      {BATTERIES.map((b, i) => {
+        const feat = FEATURES[b.name];
+        return (
+          <li class:list={['zl-bat-tile', 'zl-card', 'zl-reveal', feat && 'zl-bat-tile--feat']} data-cat={b.category} data-feat={feat} style={`--i:${i % 6}`}>
+            <a href={href(b.doc)}>
+              <span class="zl-bat-cat">{b.category}</span>
+              <h3>{b.name}</h3>
+              <p>{b.blurb}</p>
+
+              {feat === 'orm' && (
+                <span class="zl-bat-viz zl-viz-orm" aria-hidden="true">
+                  <span class="zl-ln"><i class="k">users</i>, err := <i class="f">orm.From</i>(Users).</span>
+                  <span class="zl-ln">  <i class="f">Where</i>(UserName.<i class="f">Eq</i>(<i class="s">"alice"</i>)).</span>
+                  <span class="zl-ln">  <i class="f">All</i>(ctx, conn) <i class="c">// []*User</i></span>
+                </span>
+              )}
+              {feat === 'queue' && (
+                <span class="zl-bat-viz zl-viz-queue" aria-hidden="true">
+                  <span class="zl-q-end">enqueue</span>
+                  <span class="zl-q-track">
+                    <i style="--d:0s"></i><i style="--d:-0.9s"></i><i style="--d:-1.8s"></i><i style="--d:-2.7s"></i>
+                  </span>
+                  <span class="zl-q-end">worker</span>
+                </span>
+              )}
+              {feat === 'auth' && (
+                <span class="zl-bat-viz zl-viz-auth" aria-hidden="true">
+                  <span class="zl-tok zl-tok-h">eyJhbGci</span><b>.</b><span class="zl-tok zl-tok-p">eyJzdWIi</span><b>.</b><span class="zl-tok zl-tok-s">SflKxwRJ</span>
+                </span>
+              )}
+
+              <span class="zl-bat-chips">
+                {b.adapters.slice(0, 5).map((a) => <code>{a}</code>)}
+                {b.adapters.length > 5 && <code class="more">+{b.adapters.length - 5}</code>}
+              </span>
+            </a>
+          </li>
+        );
+      })}
+    </ul>
+  </div>
+</Section>
+
+<style is:global>
+  .zl-bat { container: zbat / inline-size; }
+
+  /* Filter pills: horizontal scroller with edge fade on small screens. */
+  .zl-bat-filters { display: none; }
+  .zl-js .zl-bat-filters {
+    display: flex; gap: 0.5rem; margin-bottom: 1.5rem; padding: 2px; overflow-x: auto; scrollbar-width: none;
+    scroll-snap-type: x proximity; overscroll-behavior-x: contain;
+    -webkit-mask-image: linear-gradient(90deg, transparent, #000 var(--fl, 0px), #000 calc(100% - var(--fr, 0px)), transparent);
+    mask-image: linear-gradient(90deg, transparent, #000 var(--fl, 0px), #000 calc(100% - var(--fr, 0px)), transparent);
+  }
+  .zl-js .zl-bat-filters::-webkit-scrollbar { display: none; }
+  @media (min-width: 900px) { .zl-js .zl-bat-filters { flex-wrap: wrap; overflow: visible; -webkit-mask-image: none; mask-image: none; } }
+  .zl-pill { flex: none; scroll-snap-align: center; min-height: 44px; display: inline-flex; align-items: center; font: 500 0.85rem/1 var(--zl-font-sans); color: var(--zl-text-2); background: var(--zl-surface); border: 1px solid var(--zl-line-strong); border-radius: 999px; padding: 0 1.05rem; cursor: pointer; transition: color 0.25s var(--zl-ease), background 0.25s var(--zl-ease), border-color 0.25s var(--zl-ease), transform 0.2s var(--zl-ease); }
+  .zl-pill span { font: 0.7rem var(--zl-font-mono); opacity: 0.65; margin-left: 0.4rem; }
+  .zl-pill:hover { color: var(--zl-text); border-color: var(--zl-accent); }
+  .zl-pill:active { transform: scale(0.97); }
+  .zl-pill[aria-pressed='true'] { background: var(--zl-accent); border-color: var(--zl-accent); color: var(--zl-on-accent); }
+  .zl-pill:focus-visible { outline: 2px solid var(--zl-accent-hi); outline-offset: 2px; }
+  .zl-bat-status { position: absolute; width: 1px; height: 1px; overflow: hidden; clip-path: inset(50%); margin: 0; }
+
+  /* Bento: 4 cols desktop, 2 tablet, 1 on narrow containers (compact tiles pair up from 420px). */
+  .zl-bat-grid { list-style: none; margin: 0; padding: 0; display: grid; gap: 0.9rem; grid-template-columns: minmax(0, 1fr); grid-auto-flow: dense; }
+  @container zbat (min-width: 420px) {
+    .zl-bat-grid { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+    .zl-bat-tile--feat { grid-column: span 2; }
+  }
+  @media (min-width: 900px) {
+    .zl-bat-grid { grid-template-columns: repeat(4, minmax(0, 1fr)); grid-auto-rows: minmax(9.5rem, auto); }
+    .zl-bat-tile--feat { grid-column: span 2; grid-row: span 2; }
+  }
+
+  .zl-bat-tile { position: relative; overflow: hidden; container-type: inline-size; --mx: 50%; --my: 50%; min-width: 0; }
+  .zl-bat-tile[hidden] { display: none; }
+  /* Spotlight + cursor-following gradient border. */
+  .zl-bat-tile::before { content: ''; position: absolute; inset: 0; pointer-events: none; opacity: 0; transition: opacity 0.3s; background: radial-gradient(280px circle at var(--mx) var(--my), var(--zl-glow), transparent 70%); }
+  .zl-bat-tile::after {
+    content: ''; position: absolute; inset: 0; border-radius: inherit; padding: 1px; pointer-events: none; opacity: 0; transition: opacity 0.3s;
+    background: radial-gradient(220px circle at var(--mx) var(--my), var(--zl-accent-hi), var(--zl-accent) 35%, transparent 70%);
+    -webkit-mask: linear-gradient(#000 0 0) content-box, linear-gradient(#000 0 0); -webkit-mask-composite: xor;
+    mask: linear-gradient(#000 0 0) content-box exclude, linear-gradient(#000 0 0);
+  }
+  .zl-bat-tile:hover::before, .zl-bat-tile:focus-within::before, .zl-bat-tile:hover::after, .zl-bat-tile:focus-within::after { opacity: 1; }
+  @media (pointer: coarse) { .zl-bat-tile:hover::before, .zl-bat-tile:hover::after { opacity: 0; } }
+  .zl-bat-tile--feat { background: linear-gradient(160deg, color-mix(in srgb, var(--zl-accent) 9%, var(--zl-surface)), var(--zl-surface) 60%); }
+
+  .zl-bat-tile a { position: relative; display: flex; flex-direction: column; gap: 0.5rem; height: 100%; min-height: 44px; padding: 1.25rem; border-radius: inherit; }
+  .zl-bat-tile a:focus-visible { outline: 2px solid var(--zl-accent-hi); outline-offset: -3px; }
+  .zl-bat-cat { font: 500 0.66rem/1 var(--zl-font-mono); letter-spacing: 0.12em; text-transform: uppercase; color: var(--zl-text-3); }
+  .zl-bat-tile h3 { margin: 0; font: 600 1.05rem/1.25 var(--zl-font-display); color: var(--zl-text); }
+  .zl-bat-tile--feat h3 { font-size: 1.5rem; letter-spacing: -0.02em; }
+  .zl-bat-tile p { margin: 0; color: var(--zl-text-2); font-size: 0.9rem; flex: 1; }
+  .zl-bat-chips { display: flex; flex-wrap: wrap; gap: 0.3rem; margin-top: 0.4rem; }
+  .zl-bat-chips code { font: 0.68rem/1 var(--zl-font-mono); padding: 0.3rem 0.5rem; border-radius: 6px; background: var(--zl-surface-2); color: var(--zl-text-2); border: 1px solid var(--zl-line); }
+  .zl-bat-chips code.more { color: var(--zl-accent); }
+  .zl-bat-tile:hover h3 { color: var(--zl-accent-hi); }
+  .zl-page[data-theme='light'] .zl-bat-tile:hover h3 { color: var(--zl-accent-lo); }
+
+  /* Compact tiles in a narrow cell: tighter, fewer chips. */
+  @container (max-width: 210px) {
+    .zl-bat-tile a { padding: 1rem; }
+    .zl-bat-chips code:nth-child(n + 4):not(.more) { display: none; }
+  }
+  /* Feature tiles on a single narrow column: hide the extra visual weight. */
+  @container (max-width: 300px) { .zl-bat-viz { display: none; } }
+
+  .zl-bat-tile--feat p { flex: 0 0 auto; }
+  .zl-bat-viz { display: block; margin-top: auto; padding-top: 0.5rem; border-radius: var(--zl-radius-sm); }
+  .zl-bat-viz .zl-ln { padding: 0; border: 0; white-space: pre-wrap; overflow-wrap: anywhere; }
+  .zl-viz-orm { padding: 0.75rem 0.9rem; background: var(--zl-code-bg); border: 1px solid rgba(255,255,255,0.08); color: #e6edf7; font: 0.76rem/1.7 var(--zl-font-mono); font-variant-ligatures: none; overflow: hidden; }
+  .zl-viz-orm i { font-style: normal; }
+  .zl-viz-orm .k { color: #95d7e8; } .zl-viz-orm .f { color: #eaccad; } .zl-viz-orm .s { color: #a5e3b0; } .zl-viz-orm .c { color: #6b7a90; }
+
+  .zl-viz-queue { display: flex; align-items: center; gap: 0.6rem; font: 0.68rem/1 var(--zl-font-mono); color: var(--zl-text-3); }
+  .zl-q-track { position: relative; flex: 1; height: 28px; border-radius: 999px; border: 1px dashed var(--zl-line-strong); overflow: hidden; }
+  .zl-q-track i { position: absolute; inset: 0 10px 0 0; animation: zl-q-move 3.6s linear infinite; animation-delay: var(--d, 0s); opacity: 0; }
+  .zl-q-track i::before { content: ''; position: absolute; left: 0; top: 50%; width: 10px; height: 10px; margin-top: -5px; border-radius: 50%; background: var(--zl-accent); }
+  .zl-q-track i:nth-child(even)::before { background: var(--zl-warm); }
+  @keyframes zl-q-move { 0% { transform: translateX(0); opacity: 0; } 8% { opacity: 1; } 90% { opacity: 1; } 100% { transform: translateX(100%); opacity: 0; } }
+
+  .zl-viz-auth { display: flex; align-items: center; flex-wrap: wrap; gap: 0.15rem; font: 600 0.74rem/1 var(--zl-font-mono); }
+  .zl-viz-auth b { color: var(--zl-text-3); }
+  .zl-tok { padding: 0.45rem 0.55rem; border-radius: 6px; border: 1px solid currentColor; background: color-mix(in srgb, currentColor 10%, transparent); position: relative; overflow: hidden; }
+  .zl-tok-h { color: #d97aa6; } .zl-tok-p { color: #8b7ae0; } .zl-tok-s { color: #3aa6c4; }
+  .zl-page[data-theme='light'] .zl-tok-h { color: #a8366b; } .zl-page[data-theme='light'] .zl-tok-p { color: #5a46c2; } .zl-page[data-theme='light'] .zl-tok-s { color: #1d7691; }
+  .zl-tok::after { content: ''; position: absolute; inset: 0; background: linear-gradient(100deg, transparent 30%, rgba(255,255,255,0.35) 50%, transparent 70%); transform: translateX(-120%); animation: zl-tok-shine 4s var(--zl-ease) infinite; }
+  .zl-tok-p::after { animation-delay: 0.25s; } .zl-tok-s::after { animation-delay: 0.5s; }
+  @keyframes zl-tok-shine { 0%, 55% { transform: translateX(-120%); } 85%, 100% { transform: translateX(120%); } }
+
+  @media (prefers-reduced-motion: reduce) {
+    .zl-q-track i { animation: none; opacity: 1; }
+    .zl-q-track i:nth-child(1) { transform: translateX(8%); } .zl-q-track i:nth-child(2) { transform: translateX(34%); }
+    .zl-q-track i:nth-child(3) { transform: translateX(60%); } .zl-q-track i:nth-child(4) { transform: translateX(88%); }
+    .zl-tok::after { animation: none; display: none; }
+  }
+</style>
+
+<script>
+  import '../../scripts/landing/batteries';
+</script>

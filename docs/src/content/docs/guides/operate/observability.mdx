@@ -1,0 +1,95 @@
+---
+title: Observability
+description: Emit traces and metrics from noop to stdout to an OTLP collector with one provider.
+---
+
+import { LinkCard, CardGrid } from '@astrojs/starlight/components';
+
+`observability` gives traces and metrics in every environment. One `Provider` hands out scoped `Tracer` and `Meter` handles with typed `Attr` values (`String`, `Int`, `Int64`, `Float64`, `Bool`). It never wires a global SDK behind your back: `set_globals` stays opt-in. Switching backends is a config change, not a rewrite of `Span` or `Attr` calls.
+
+## Quick start
+
+`stdout` (the default) prints spans and metrics locally. Register the adapter, then trace an operation:
+
+```go title="main.go"
+import (
+    "context"
+    "github.com/zenta-dev/zever/adapters/observability/stdout"
+    "github.com/zenta-dev/zever/config"
+    "github.com/zenta-dev/zever/container"
+    "github.com/zenta-dev/zever/core/observability"
+)
+
+stdout.Register() // container wires nothing
+c := container.New(config.Default())
+p, err := c.Observability()
+if err != nil {
+    panic(err)
+}
+defer p.Shutdown(context.Background())
+
+ctx, span := p.Tracer("bookings").Start(context.Background(), "booking.create")
+span.SetAttributes(observability.String("space_id", "room-1"))
+span.End()
+p.Meter("bookings").Counter(ctx, "bookings_created", 1)
+```
+
+Expected output: span lines in human-readable form.
+
+## Export to a collector
+
+Use `otlp` to reach a real collector. Replicas all funnel into one collector keyed by `service_name`.
+
+```yaml title="zever.yaml"
+observability:
+  adapter: otlp
+  options:
+    service_name: bookings
+    endpoint: collector:4317   # host:port, no scheme or path
+    sample_ratio: 0.1
+    headers:
+      x-tenant: acme
+```
+
+Env names follow the usual scheme: `OBSERVABILITY_ADAPTER`, `OBSERVABILITY_SERVICENAME`, `OBSERVABILITY_ENDPOINT`, `OBSERVABILITY_SAMPLERATIO`, `OBSERVABILITY_ATTRVALUELIMIT`.
+
+`Validate` requires `service_name` of 1 to 128 characters with no control characters, `endpoint` as `host:port`, `insecure` only for loopback, `cert_file` and `key_file` together, at most 32 headers, and `sample_ratio` in [0,1]. `insecure` plus an `authorization` header is rejected. Other keys: `set_globals`, `verbose`, `ca_file`. Adapters are `noop` for tests, `stdout` (default) for local visibility, and `otlp` for production. See the [observability config reference](../../../reference/config/#observability).
+
+## Bound and redact attributes
+
+Keys cap at 256 bytes (`MaxKeyLen`), string values at 4096 by default (`MaxValueLen`), and spans at 32 attributes (`MaxAttrs`). `attr_value_limit` tunes the value cap (0 means default, otherwise 256 to 16384). Sensitive keys (password, secret, token, api_key, auth, cookie, session, private_key) export as `[redacted]`, but never attach a secret to a span at all. Name spans after the operation (`queue.dispatch`), not the adapter, and keep high-cardinality values such as user IDs out of metric labels.
+
+## Production checklist
+
+- Providers declare `Shutdown(ctx)`, not `Close`. `c.Close(ctx)` probes it so buffered spans flush. Always shut down with a timeout-bearing context.
+- Set `observability.adapter: otlp` in production; the default `stdout` keeps traces on the box.
+- Never log raw option maps. Use `cfg.RedactedServices()`.
+
+## Troubleshooting
+
+<details>
+<summary>`service_name must be 1-128 characters`</summary>
+
+The name is empty or too long. Set a short stable name such as `bookings`; it keys every dashboard.
+</details>
+
+<details>
+<summary>`insecure requires a loopback endpoint`</summary>
+
+`insecure: true` points at a non-loopback collector. Use TLS, or point at localhost for local collectors only.
+</details>
+
+<details>
+<summary>Attributes are silently truncated</summary>
+
+A string over `attr_value_limit` (default 4096) or more than 32 attributes per span is cut by design. Send IDs and counts, not blobs.
+</details>
+
+## Related
+
+<CardGrid>
+  <LinkCard title="Scheduler and jobs" href="../../background/scheduler-jobs/" description="Spans around job runs." />
+  <LinkCard title="Tenants" href="../tenants/" description="Tenant as a span attribute." />
+  <LinkCard title="Cache" href="../../data/cache/" description="Cache hit counters as metrics." />
+  <LinkCard title="Cross-Service Tracing" href="../../../digging-deeper/cross-service-tracing/" description="Inbound extraction, outbound injection, baggage, semconv names." />
+</CardGrid>

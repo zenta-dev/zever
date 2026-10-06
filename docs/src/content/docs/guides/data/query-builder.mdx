@@ -1,0 +1,176 @@
+---
+title: Query builder
+description: Query sqlite and postgres with the typed ORM, including joins, transactions, pagination, and dialect checks.
+---
+
+import { LinkCard, CardGrid } from '@astrojs/starlight/components';
+
+`orm` is a generics-typed SQL builder over `db.DB` for reads and writes in handlers, workers, and seeds; drop to raw `conn.Exec` only for shapes the DSL cannot express, such as FTS5 virtual-table DDL.
+
+## Quick start
+
+Resolve `db` once; the dialect resolves per call from `conn.Dialect()`.
+
+```yaml title="zever.yaml"
+db:
+  adapter: sqlite
+  options:
+    path: app.db
+```
+
+```go title="main.go"
+c := container.New(config.Default())
+conn, err := c.DB()
+if err != nil {
+    return err
+}
+defer c.Close(ctx)
+```
+
+`config.Default()` uses sqlite, so tests need no server; postgres needs `dsn` ([db options](../../../reference/config/#db)).
+
+## Define tables and models
+
+A model implements `Scan(orm.Row) error`; `orm.From` infers the pointer-scanner type.
+
+```go title="models.go"
+import "github.com/zenta-dev/zever/orm"
+
+type User struct {
+    ID   int64
+    Name string
+}
+
+func (u *User) Scan(row orm.Row) error { return row.Scan(&u.ID, &u.Name) }
+
+var (
+    Users    = orm.NewTable[User]("users", []string{"id", "name"})
+    UserID   = orm.NewColumn[User, int64]("users", "id")
+    UserName = orm.NewColumn[User, string]("users", "name")
+)
+```
+
+`orm.NewNullableColumn` adds `IsNull`, `IsNotNull`, `SetValue`, and `SetNull`.
+
+## Select, filter, and read rows
+
+Chain `Where`, `OrderBy` (`Asc`/`Desc`), `Limit`, `Offset`, `Columns`, `Distinct`, and `DistinctOn`, then a read method.
+
+```go
+users, err := orm.From(Users).
+    Where(UserName.Eq("alice")).
+    OrderBy(UserID.Desc()).
+    Limit(10).
+    All(ctx, conn) // []*User
+```
+
+Read with `All`, `First` (plus `ok bool`), `FirstOrErr` (wraps `db.ErrNotFound`), `Count`, `Exists`, and `Stream` (`iter.Seq2`, constant memory, holds its connection until you finish).
+
+## Join, group, and compose queries
+
+Joins run over a `Relation` and return typed composite rows.
+
+```go
+rel := orm.NewRelation[User, Booking]("id", "user_id", Bookings)
+inner := orm.JoinOn(orm.From(Users), rel, orm.InnerJoin)
+left := orm.LeftJoinOn(orm.From(Users), rel)
+
+name, err := orm.NewCTEName("active_users")
+cte := orm.With(name, orm.From(Users).Where(Active.Eq(true)))
+```
+
+Joins: `JoinOn`, `LeftJoinOn`, `RightJoinOn`, `FullJoinOn`, the `JoinOn3` family, lateral variants. CTEs: `With`, `WithRecursive`, `WithJoin`, `WithGrouped`, `NewCTEName`, `CTETable`. Windows: `RowNumber`, `Rank`, `DenseRank`, `Lead`, `Lag`, `NTile`, `CountOver`, `SumOver`, `AvgOver`, `MinOver`, `MaxOver`, frame bounds. Sets: `Union`, `UnionAll`, `Intersect`, `Except`. Inspection: `Explain`, `ExplainAnalyze`. `orm.Preload(ctx, conn, parents, childFK, childBase, parentID, childFKOf)` loads children without N+1 queries and returns `[]orm.ParentWithChildren`.
+
+## Insert, update, and delete
+
+`Values` and `Set` take `orm.Set(column, value)` assignments; `Update` and `Delete` return the affected row count.
+
+```go
+err := orm.InsertInto(Users).Values(orm.Set(UserName, "alice")).Exec(ctx, conn)
+
+n, err := orm.UpdateTable(Users).Set(orm.Set(UserName, "bob")).Where(UserID.Eq(1)).Exec(ctx, conn)
+
+n, err = orm.DeleteFrom(Users).Where(UserID.Eq(1)).Exec(ctx, conn)
+```
+
+Upsert with `OnConflict(cols...).DoNothing()` or `.DoUpdate(sets...)`; merge with `orm.MergeInto(table)`; fetch affected rows in one round trip with `Returning` plus `ExecReturning` where the dialect allows.
+
+## Run transactions and retries
+
+`db.WithTx` commits on success and rolls back on error or panic (re-panicking after rollback); nesting returns `db.ErrNestedTx`. Use `orm.WithNestedTx` for savepoints and `orm.RetryTx` for serialization retries.
+
+```go
+err = db.WithTx(ctx, conn, &db.TxOptions{Isolation: db.Serializable},
+    func(ctx context.Context, tx db.Tx) error {
+        _, err := orm.UpdateTable(Users).Set(orm.Set(UserName, "bob")).Where(UserID.Eq(1)).Exec(ctx, tx)
+        return err
+    })
+
+err = orm.RetryTx(ctx, conn, orm.RetryOptions{MaxAttempts: 3}, func(ctx context.Context, tx db.Tx) error {
+    return transfer(ctx, tx)
+})
+```
+
+`RetryOptions` defaults to 3 attempts and a 10ms linear backoff; savepoint names validate as `[_A-Za-z][_A-Za-z0-9]*`.
+
+## Paginate results
+
+Offset pagination is 1-based and errors on `page < 1` or `size < 1`; keyset pagination stays correct when rows change between loads.
+
+```go
+q, err := orm.OffsetPage(orm.From(Users).OrderBy(UserID.Asc()), 2, 25) // LIMIT 25 OFFSET 25
+total, err := orm.From(Users).Count(ctx, conn)
+
+key := orm.NewCursorKey(UserID, lastSeenID)
+next := orm.NextPage(orm.From(Users).OrderBy(key.OrderTerm()).Limit(25), key)
+token, err := key.Encode()                      // opaque page token
+back, ok, err := orm.DecodeCursor(token, UserID)
+pred, err := orm.AfterTuple(cols, vals, false)  // multi-column keyset
+```
+
+The keyset predicate must mirror `OrderBy` exactly, tie-breaker included, or pages skip or duplicate rows; see `go run ./examples/pagination/cmd/app`.
+
+## Lock rows, query JSON, and search text
+
+Row locks: `ForUpdate`, `ForShare`, `ForNoKeyUpdate`, `ForKeyShare`, `ForUpdateOf`, then `NoWait` or `SkipLocked`. Store JSON in a TEXT column typed `orm.JSONText`; predicates come from `orm/json/sqlite` (nested keys, key existence, `json_each` membership, `json_type`) and a postgres twin over jsonb. Full-text search uses `orm/fts/sqlite` (`Match`, `Rank`) and a postgres twin over `tsvector`; query text is always bound, so FTS5 syntax never reaches the SQL text, and the FTS5 virtual table is created with raw DDL in a migration. Examples: `./examples/fts/cmd/app`, `./examples/json_query/cmd/app`, `./examples/recursive_cte/cmd/app`.
+
+## Handle dialect differences
+
+Features a dialect lacks fail closed with `dialect.ErrUnsupportedByDialect`, with no silent fallback: `DISTINCT ON` and strong lock modes are postgres-only, and right and full joins and recursive CTEs gate by capability.
+
+```go
+rows, err := q.All(ctx, conn)
+if errors.Is(err, dialect.ErrUnsupportedByDialect) {
+    rows, err = portableQuery.All(ctx, conn)
+}
+```
+
+All errors carry an `orm:` prefix and stay `errors.Is` compatible. Test sqlite `:memory:` first, then run the live postgres pass with `POSTGRES_DSN='postgres://user:pass@localhost:5432/test?sslmode=disable' go test ./orm/...`; pass `ctx` everywhere, display config only through `config.RedactedServices`, and let `c.Close(ctx)` close the pool.
+
+## Troubleshooting
+
+<details>
+<summary>`ErrUnsupportedByDialect` on sqlite</summary>
+
+Cause: a postgres-only feature such as `DISTINCT ON` or a strong lock mode. Fix: match with `errors.Is` and use a portable form on sqlite.
+</details>
+
+<details>
+<summary>Keyset pages skip or duplicate rows</summary>
+
+Cause: `AfterTuple` columns do not mirror `OrderBy`. Fix: keep `(price_cents ASC, id ASC)` identical in both, tie-breaker included.
+</details>
+
+<details>
+<summary>`:memory:` tests see empty tables</summary>
+
+Cause: a second pooled connection opened its own empty database. Fix: sqlite `:memory:` forces one connection; do not raise `max_conns`.
+</details>
+
+## Related
+
+<CardGrid>
+  <LinkCard title="Migrations and seeding" href="../migrations-seeding/" />
+  <LinkCard title="Errors" href="../../http/errors/" />
+  <LinkCard title="Container" href="../../../concepts/container/" />
+</CardGrid>

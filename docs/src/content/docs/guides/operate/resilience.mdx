@@ -1,0 +1,140 @@
+---
+title: Resilience
+description: Protect your process from failing dependencies with timeout, retry, circuit breaker, and bulkhead guards.
+---
+
+import { LinkCard, CardGrid } from '@astrojs/starlight/components';
+
+`resilience` stops a failing dependency from taking down your process. A `Manager` hands out named per-dependency `Guard` values, and each guard wraps every call in a fixed chain: a timeout, a bounded retry budget, a circuit that opens under sustained failure, and a bulkhead that caps concurrent calls. One guard per dependency means a slow fraud check trips its own breaker instead of exhausting server goroutines.
+
+## Quick start
+
+```go title="main.go"
+import (
+    "context"
+    "github.com/zenta-dev/zever/adapters/resilience/inproc"
+    "github.com/zenta-dev/zever/config"
+    "github.com/zenta-dev/zever/container"
+    "github.com/zenta-dev/zever/core/resilience"
+)
+
+inproc.Register() // container wires nothing
+c := container.New(config.Default())
+m, err := c.Resilience()
+if err != nil {
+    panic(err)
+}
+defer m.Close()
+
+g, err := m.Guard("payments")
+if err != nil {
+    panic(err)
+}
+v, err := resilience.Do(context.Background(), g, func(context.Context) (string, error) {
+    return "ok", nil
+})
+fmt.Println(v, err)
+```
+
+Expected output:
+
+```text
+ok <nil>
+```
+
+`Guard(name)` creates each guard lazily from the template `Options`, and the same name always returns the same guard. `resilience.Do` is the typed helper over `Guard.Execute`. `Guard.Close` and `Manager.Close` are idempotent.
+
+## Understand the policy chain
+
+Policies compose outermost to innermost as `Timeout -> Retry -> Breaker -> Bulkhead -> fn`, so the timeout bounds the whole operation including retries: 5s with 3 attempts bounds the entire call, not each attempt.
+
+Branch on sentinel errors with `errors.Is`:
+
+| Error | Meaning |
+|---|---|
+| `ErrOpenState` | Breaker open. |
+| `ErrTooManyRequests` | Half-open probe limit reached. |
+| `ErrBulkheadFull` | No slot within the wait budget. |
+| `ErrTimeout` | Overall budget exceeded. |
+| `ErrClosed` | Guard or manager closed. |
+| `ErrNoSharedState` (`adapters/resilience/redis`) | Shared breaker state missing or unreadable. |
+
+`context.Canceled` and `context.DeadlineExceeded` are excluded from breaker counts and never retried, so a client hanging up does not count against the circuit. Classify business errors that should not trip the breaker (a validation rejection) as success with `BreakerOptions.IsSuccessful`.
+
+## Configure the guards
+
+`Default()` enables every policy with bounded values (5s timeout, 3 attempts, 100 concurrent, 1s admission wait); treat it as a safe start, not a tuning endpoint. Durations in files are integer nanoseconds. Full key list: [resilience config reference](../../../reference/config/#resilience).
+
+```yaml title="zever.yaml"
+resilience:
+  adapter: memory
+  options:
+    timeout: 5000000000   # bounds the whole operation
+    breaker:
+      enabled: true
+```
+
+```sh
+RESILIENCE_ADAPTER=redis
+RESILIENCE_TIMEOUT=5s
+RESILIENCE_BREAKER_ENABLED=true
+```
+
+`retry` is an untagged `retry.Policy`, so its file keys are case-insensitive Go field names (`maxattempts`), not snake_case; set it in Go via `resilience.Default()` instead. `Validate` rejects negative timeouts and bulkhead budgets, retry jitter outside [0,1], breaker ratios outside [0,1], and a bad Redis prefix. Template options apply to every guard a manager creates, so open one manager per dependency class when thresholds differ.
+
+## Share breaker state across replicas
+
+`memory` (the default) is process-local, so each replica trips on its own view. Use `redis` when replicas calling the same dependency should trip together. Only breaker state is shared; timeout, retry, and bulkhead stay process-local.
+
+```yaml title="zever.yaml"
+resilience:
+  adapter: redis
+  options:
+    breaker:
+      enabled: true
+    redis:
+      addr: 127.0.0.1:6379
+      prefix: resilience   # default; use one per environment
+```
+
+The redis adapter pings at construction (3s budget) and fails closed when Redis is unreachable. Live redis tests are gated behind `REDIS_ADDR`. Adapters are `memory` (`adapters/resilience/inproc`, the default) and `redis` (`adapters/resilience/redis`, distributed breaker state).
+
+## Production checklist
+
+- `Manager.Close() error` takes no context. The container joins errors with `errors.Join`; panics become `*ClosePanicError`.
+- Guard names and options carry no credentials, but never log raw option maps (use `cfg.RedactedServices()`).
+- Use the `OnStateChange` hook to feed breaker transitions into [Observability](../observability/).
+
+## Troubleshooting
+
+<details>
+<summary>The breaker never opens under load</summary>
+
+`failure_ratio` and `min_requests` assume meaningful volume. Low-traffic dependencies trip on `consecutive_failures`, so lower it for fast-failing dependencies.
+</details>
+
+<details>
+<summary>Calls fail with `ErrTimeout` before the dependency's own deadline</summary>
+
+The guard timeout wraps retries. Make `timeout` exceed `Retry.BaseDelay * Retry.MaxAttempts` plus the dependency latency, or lower `Retry.MaxAttempts`.
+</details>
+
+<details>
+<summary>`ErrBulkheadFull` under burst</summary>
+
+`max_concurrent` is too low for the replica, or `max_wait` is shorter than a slot takes to free. Raise `max_concurrent` before `max_queue`, since an unbounded queue turns a burst into a latency bomb.
+</details>
+
+<details>
+<summary>The redis adapter fails to open</summary>
+
+The constructor pings Redis with a 3s budget and fails closed. Check `addr`, and use a unique prefix per environment because shared prefixes share breaker state.
+</details>
+
+## Related
+
+<CardGrid>
+  <LinkCard title="Rate limiting" href="../../security/ratelimit/" description="Request-rate caps per key." />
+  <LinkCard title="Locks and idempotency" href="../../security/lock-idempotency/" description="Guard calls inside a guard." />
+  <LinkCard title="Observability" href="../observability/" description="Breaker transitions as metrics." />
+</CardGrid>

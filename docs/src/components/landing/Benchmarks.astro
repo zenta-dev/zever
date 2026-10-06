@@ -1,0 +1,100 @@
+---
+import Section from './ui/Section.astro';
+import { STATS, VERSION } from '../../data/landing';
+import { GITHUB } from '../../lib/url';
+
+// Verified against docs/benchmarks.md and the *_bench_test.go files. Overrides data/landing.ts guesses.
+// Each module has its own go.mod, so run from the package dir with `go -C`.
+const REPRO: Record<string, string> = {
+  'faster queue reclaim sweep': "go -C adapters/queue/db test -run=NONE -bench=ReclaimStale -benchmem -count=10",
+  'fewer allocs in closest matcher': "go -C cmd/zever test -run=NONE -bench='^BenchmarkClosest$' -benchmem",
+  'allocs per mailer-log Send': "go -C adapters/mailer/log test -run=NONE -bench='^BenchmarkSend$' -benchmem",
+  'faster config env overlay': "go -C config test -run=NONE -bench=ApplyEnv -benchmem -count=10",
+};
+// Relative "after" length versus a full-width "before" bar, derived from the headline figure.
+const afterPct = (s: { value: number; suffix: string }): number =>
+  s.suffix === 'x' ? 100 / s.value : s.suffix === '%' ? 100 - s.value : 0;
+const SRC = `${GITHUB}/blob/main/docs/benchmarks.md`;
+---
+
+<Section id="benchmarks" eyebrow="Measured, not claimed" title="Numbers you can <em>re-run</em>." lede="Each figure is a before/after from a committed benchmark. Open the repro to run the exact command yourself.">
+  <div class="bm-grid">
+    {STATS.map((s, i) => {
+      const cmd = REPRO[s.label] ?? s.repro;
+      return (
+      <article class="bm zl-card zl-reveal" style={`--i:${i}`}>
+        <div class="bm-num" data-countup data-target={s.value} data-decimals={s.decimals} data-suffix={s.suffix}>{s.value.toFixed(s.decimals)}{s.suffix}</div>
+        <p class="bm-label">{s.label}</p>
+        <div class="bm-bars" role="img" aria-label={`Relative before and after: after is about ${afterPct(s).toFixed(1)} percent of before`}>
+          <div class="bm-row"><span>before</span><b class="bm-bar bm-before"></b></div>
+          <div class="bm-row"><span>after</span><b class="bm-bar bm-after" style={`--w:${Math.max(afterPct(s), 0.8)}%`}></b></div>
+        </div>
+        <details class="bm-repro">
+          <summary>repro</summary>
+          <div class="bm-cmd">
+            <pre tabindex="0"><code>{cmd}</code></pre>
+            <button type="button" class="bm-copy" data-copy={cmd} aria-label={`Copy repro command for ${s.label}`}>
+              <span class="bm-copy-t">Copy</span>
+            </button>
+          </div>
+        </details>
+      </article>
+    );})}
+  </div>
+  <p class="bm-note zl-reveal">Point-in-time micro-benchmarks ({VERSION}): compare shapes (allocs/op) and relative deltas, not raw ns. Results vary by machine and Go version. <a href={SRC} rel="noopener">Full results and methodology →</a></p>
+</Section>
+
+<script>
+  import '../../scripts/landing/countup';
+  document.querySelectorAll<HTMLButtonElement>('.bm-copy').forEach((b) => {
+    const t = b.querySelector<HTMLElement>('.bm-copy-t')!;
+    b.addEventListener('click', async () => {
+      try { await navigator.clipboard.writeText(b.dataset.copy ?? ''); } catch { return; }
+      t.textContent = 'Copied';
+      b.classList.add('is-copied');
+      setTimeout(() => { t.textContent = 'Copy'; b.classList.remove('is-copied'); }, 1600);
+    });
+  });
+</script>
+
+<style>
+  .bm-grid { display: grid; gap: 1.1rem; grid-template-columns: repeat(2, minmax(0, 1fr)); }
+  @media (max-width: 640px) { .bm-grid { grid-template-columns: minmax(0, 1fr); } }
+  .bm { container-type: inline-size; padding: clamp(1.25rem, 3vw, 2rem); display: flex; flex-direction: column; gap: 0.6rem; min-width: 0; position: relative; overflow: hidden; }
+  .bm::before { content: ''; position: absolute; inset: -40% -20% auto auto; width: 60%; aspect-ratio: 1; background: radial-gradient(closest-side, var(--zl-glow), transparent); opacity: 0.6; pointer-events: none; transition: opacity 0.4s var(--zl-ease); }
+  .bm:hover::before { opacity: 1; }
+  .bm > * { position: relative; }
+  .bm-num { font: 700 clamp(3.25rem, 11cqi, 5.5rem)/1 var(--zl-font-display); letter-spacing: -0.045em; font-variant-numeric: tabular-nums; color: var(--zl-accent-hi); }
+  @supports (-webkit-background-clip: text) or (background-clip: text) {
+    .bm-num { background: var(--zl-grad-text); -webkit-background-clip: text; background-clip: text; color: transparent; -webkit-text-fill-color: transparent; width: fit-content; max-width: 100%; }
+  }
+  .bm-label { margin: 0 0 0.4rem; color: var(--zl-text-2); font-size: 1rem; }
+
+  .bm-bars { display: grid; gap: 0.4rem; margin-bottom: 0.6rem; }
+  .bm-row { display: grid; grid-template-columns: 3.2rem minmax(0, 1fr); align-items: center; gap: 0.6rem; font: 500 0.66rem/1 var(--zl-font-mono); letter-spacing: 0.08em; text-transform: uppercase; color: var(--zl-text-3); }
+  .bm-bar { display: block; height: 6px; border-radius: 6px; transform-origin: left; }
+  .bm-before { background: var(--zl-line-strong); }
+  .bm-after { width: var(--w); background: var(--zl-btn-grad); box-shadow: 0 0 12px var(--zl-glow); }
+  :global(.zl-page[data-theme='light']) .bm-after { background: linear-gradient(90deg, var(--zl-accent-lo), var(--zl-accent-hi)); }
+  :global(.zl-js) .bm .bm-after { transform: scaleX(0); }
+  :global(.zl-js) .bm.is-in .bm-after { transform: none; transition: transform 1.2s var(--zl-ease) 0.3s; }
+  :global(.zl-js) .bm .bm-before { transform: scaleX(0); }
+  :global(.zl-js) .bm.is-in .bm-before { transform: none; transition: transform 0.9s var(--zl-ease) 0.2s; }
+  @media (prefers-reduced-motion: reduce) { :global(.zl-js) .bm .bm-bar { transform: none; } }
+
+  .bm-repro { margin-top: auto; border-top: 1px solid var(--zl-line); padding-top: 0.5rem; }
+  .bm-repro summary { cursor: pointer; font: 500 0.72rem/1 var(--zl-font-mono); letter-spacing: 0.1em; text-transform: uppercase; color: var(--zl-text-3); list-style: none; display: flex; align-items: center; gap: 0.4rem; min-height: 2.75rem; }
+  .bm-repro summary::-webkit-details-marker { display: none; }
+  .bm-repro summary::before { content: '▸'; transition: transform 0.25s var(--zl-ease); }
+  .bm-repro[open] summary::before { transform: rotate(90deg); }
+  .bm-repro summary:hover { color: var(--zl-accent); }
+  .bm-cmd { position: relative; margin-bottom: 0.3rem; }
+  .bm-cmd pre { margin: 0; padding: 0.8rem 4.6rem 0.8rem 0.9rem; background: var(--zl-code-bg); border: 1px solid var(--zl-line); border-radius: var(--zl-radius-sm); overflow-x: auto; font: 0.72rem/1.55 var(--zl-font-mono); color: #d3dcea; }
+  .bm-cmd code { font: inherit; white-space: pre-wrap; overflow-wrap: anywhere; }
+  .bm-copy { position: absolute; top: 0.3rem; right: 0.3rem; min-width: 3.5rem; min-height: 2.75rem; padding: 0 0.7rem; border-radius: 6px; border: 1px solid rgba(255,255,255,0.16); background: #0f1626; color: #d3dcea; font: 500 0.7rem/1 var(--zl-font-mono); cursor: pointer; transition: border-color 0.2s, color 0.2s; }
+  .bm-copy:hover { border-color: var(--zl-accent); color: #fff; }
+  .bm-copy.is-copied { color: #5fd49a; border-color: #5fd49a; }
+  .bm-note { margin: 1.5rem 0 0; color: var(--zl-text-3); font-size: 0.88rem; max-width: 70ch; }
+  .bm-note a { color: var(--zl-accent); display: inline-block; padding-block: 0.35rem; }
+  .bm-note a:hover { text-decoration: underline; }
+</style>

@@ -1,0 +1,190 @@
+---
+import { Code } from 'astro:components';
+import Section from './ui/Section.astro';
+import CodeWindow from './ui/CodeWindow.astro';
+
+const wired = `package main
+
+import (
+	"context"
+	"database/sql"
+	"log/slog"
+	"net/smtp"
+	"os"
+	"os/signal"
+	"strconv"
+	"syscall"
+	"time"
+
+	_ "github.com/jackc/pgx/v5/stdlib"
+	"github.com/redis/go-redis/v9"
+)
+
+func main() {
+	log := slog.New(slog.NewJSONHandler(os.Stdout, nil))
+	dsn := os.Getenv("DB_DSN")
+	if dsn == "" {
+		log.Error("DB_DSN required")
+		os.Exit(1)
+	}
+	maxConns, _ := strconv.Atoi(os.Getenv("DB_MAXCONNS"))
+	db, err := sql.Open("pgx", dsn)
+	if err != nil {
+		log.Error("db", "err", err)
+		os.Exit(1)
+	}
+	db.SetMaxOpenConns(maxConns)
+	db.SetConnMaxLifetime(30 * time.Minute)
+	rdb := redis.NewClient(&redis.Options{Addr: os.Getenv("REDIS_ADDR")})
+	q := newRedisQueue(rdb, "jobs", 30*time.Second)
+	auth := smtp.PlainAuth("", os.Getenv("SMTP_USER"),
+		os.Getenv("SMTP_PASS"), os.Getenv("SMTP_HOST"))
+	mailer := newMailer(os.Getenv("SMTP_HOST")+":587", auth)
+
+	ctx, stop := signal.NotifyContext(context.Background(),
+		os.Interrupt, syscall.SIGTERM)
+	defer stop()
+
+	go q.Work(ctx, handleJobs(db, mailer, log))
+	srv := newServer(db, rdb, q, mailer, log)
+	go srv.ListenAndServe()
+
+	<-ctx.Done()
+	sctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
+	defer cancel()
+	srv.Shutdown(sctx)
+	q.Close()
+	mailer.Close()
+	rdb.Close()
+	db.Close()
+}
+`;
+
+const zever = `cfg, _ := config.Load("")
+c := container.New(cfg)
+defer c.Close(ctx)
+
+db, _ := c.DB()
+q, _ := c.Queue()
+mail, _ := c.Mailer()
+`;
+
+const count = (s: string) => s.replace(/\n$/, '').split('\n').length;
+const from = count(wired);
+const to = count(zever);
+const saved = Math.round(((from - to) / from) * 100);
+---
+
+<Section
+  id="plumbing"
+  eyebrow="The plumbing tax"
+  title={`${from} lines of wiring. <em>${to} lines</em> with Zever.`}
+  lede="Every service wants a pool, a config path, a shutdown hook. Zever resolves them lazily from one config and closes them in dependency order."
+>
+  <div class="pt" data-plumbing data-from={from} data-to={to}>
+    <div class="pt-stage">
+      <div class="pt-badge">
+        <div class="pt-meter" role="status">
+          <span class="pt-num" data-count aria-hidden="true">{to}</span>
+          <span class="pt-cap">
+            <span class="pt-cap-main">lines of infrastructure wiring <span class="pt-was">(was {from})</span></span>
+            <span class="pt-pct"><b data-pct>{saved}</b>% less wiring</span>
+          </span>
+          <span class="pt-sr">{from} lines of hand-wired infrastructure become {to} with Zever.</span>
+        </div>
+        <div class="pt-bar" aria-hidden="true"><i></i></div>
+      </div>
+      <div class="pt-grid">
+        <div class="pt-side pt-old">
+          <CodeWindow title="main.go: hand-wired">
+            <span slot="actions" class="pt-tag">{from} lines</span>
+            <button type="button" slot="actions" class="zl-copy" data-copy aria-label="Copy hand-wired main.go"><svg viewBox="0 0 16 16" width="16" height="16" aria-hidden="true"><rect class="c-a" x="5.5" y="5.5" width="8" height="8" rx="1.5"/><path class="c-a" d="M10.5 3.5v-.5A1.5 1.5 0 0 0 9 1.5H3A1.5 1.5 0 0 0 1.5 3v6A1.5 1.5 0 0 0 3 10.5h.5"/><path class="c-b" d="M3 8.5l3.2 3.2L13 4.8"/></svg></button>
+            <span slot="actions" class="pt-sr" role="status" aria-live="polite" data-copy-status></span>
+            <Code code={wired} lang="go" theme="github-dark-default" />
+          </CodeWindow>
+        </div>
+        <div class="pt-side pt-new">
+          <div class="pt-frame">
+            <CodeWindow title="main.go: Zever">
+              <span slot="actions" class="pt-tag pt-tag-hi">{to} lines</span>
+              <button type="button" slot="actions" class="zl-copy" data-copy aria-label="Copy Zever main.go"><svg viewBox="0 0 16 16" width="16" height="16" aria-hidden="true"><rect class="c-a" x="5.5" y="5.5" width="8" height="8" rx="1.5"/><path class="c-a" d="M10.5 3.5v-.5A1.5 1.5 0 0 0 9 1.5H3A1.5 1.5 0 0 0 1.5 3v6A1.5 1.5 0 0 0 3 10.5h.5"/><path class="c-b" d="M3 8.5l3.2 3.2L13 4.8"/></svg></button>
+              <span slot="actions" class="pt-sr" role="status" aria-live="polite" data-copy-status></span>
+              <Code code={zever} lang="go" theme="github-dark-default" />
+            </CodeWindow>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+</Section>
+
+<script>
+  import { initPlumbingTax } from '../../scripts/landing/plumbing-tax';
+  initPlumbingTax();
+</script>
+
+<style is:global>
+  /* --p: 0 = hand-wired is dominant, 1 = final state (also the no-JS / reduced-motion state). */
+  .pt { --p: 1; position: relative; }
+  .pt-stage { display: grid; gap: 1.25rem; }
+  .pt-badge { display: grid; gap: 0.9rem; }
+  .pt-meter { display: flex; align-items: center; gap: 1rem; flex-wrap: wrap; }
+  .pt-num { font: 700 clamp(2.75rem, 8vw, 5rem)/1 var(--zl-font-display); letter-spacing: -0.04em; color: var(--zl-accent-hi); font-variant-numeric: tabular-nums; min-width: 2ch; }
+  .pt-cap { display: grid; gap: 0.25rem; color: var(--zl-text-2); font-size: clamp(0.85rem, 1.6vw, 0.95rem); min-width: 0; }
+  .pt-was { color: var(--zl-text-3); }
+  .pt-pct { font: 500 0.75rem/1 var(--zl-font-mono); color: var(--zl-accent); letter-spacing: 0.04em; }
+  .pt-pct b { font-weight: 700; font-variant-numeric: tabular-nums; }
+  .pt-bar { height: 4px; border-radius: 99px; background: var(--zl-line); overflow: hidden; max-width: 34rem; }
+  .pt-bar i { display: block; height: 100%; border-radius: inherit; background: var(--zl-btn-grad); transform-origin: left center; transform: scaleX(var(--p)); }
+  .pt-sr { position: absolute; width: 1px; height: 1px; margin: -1px; padding: 0; overflow: hidden; clip-path: inset(50%); white-space: nowrap; border: 0; }
+
+  .pt-grid { display: grid; grid-template-columns: minmax(0, 1fr); gap: 1.25rem; align-items: start; }
+  @media (min-width: 900px) { .pt-grid { grid-template-columns: minmax(0, 1.25fr) minmax(0, 1fr); gap: 1.75rem; } }
+  .pt-side { min-width: 0; }
+  .pt .zl-win-bar { flex-wrap: nowrap; }
+  .pt .zl-win-title { min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+  .pt-tag { flex: none; font: 0.7rem/1 var(--zl-font-mono); color: #8896ab; padding: 0.25rem 0.5rem; border: 1px solid rgba(255,255,255,0.12); border-radius: 99px; }
+  .pt-tag-hi { color: var(--zl-accent-hi); border-color: var(--zl-accent); }
+  .pt .zl-win-body { overflow: auto; overscroll-behavior: contain; max-height: min(26rem, 70svh); }
+  .pt-new .zl-win-body { max-height: none; }
+
+  /* Copy button: 32px visual, 44px hit area. */
+  .zl-copy { all: unset; box-sizing: border-box; position: relative; flex: none; display: grid; place-items: center; width: 2rem; height: 2rem; border-radius: 8px; cursor: pointer; color: #8896ab; transition: color 0.2s, background 0.2s; }
+  .zl-copy::after { content: ''; position: absolute; inset: -0.35rem; }
+  .zl-copy:hover { color: #e6edf7; background: rgba(255,255,255,0.09); }
+  .zl-copy:focus-visible { outline: 2px solid var(--zl-accent); outline-offset: 1px; }
+  .zl-copy svg { grid-area: 1 / 1; fill: none; stroke: currentColor; stroke-width: 1.5; stroke-linecap: round; stroke-linejoin: round; transition: opacity 0.2s, transform 0.2s var(--zl-ease); }
+  .zl-copy .c-b { opacity: 0; }
+  .zl-copy.is-copied { color: var(--zl-accent-hi); }
+  .zl-copy.is-copied .c-a { opacity: 0; }
+  .zl-copy.is-copied .c-b { opacity: 1; }
+  html:not(.zl-js) .zl-copy { display: none; }
+
+  .pt-old .zl-win { transform: scale(calc(1 - 0.05 * var(--p))); transform-origin: top center; opacity: calc(1 - 0.5 * var(--p)); filter: blur(calc(1.5px * var(--p))) saturate(calc(1 - 0.6 * var(--p))); transition: filter 0.4s, opacity 0.4s; will-change: transform, opacity, filter; }
+  .pt-old .zl-win-body { -webkit-mask-image: linear-gradient(#000 calc(100% - 2.5rem), transparent); mask-image: linear-gradient(#000 calc(100% - 2.5rem), transparent); }
+  .pt-old:hover .zl-win, .pt-old:focus-within .zl-win { opacity: 0.95; filter: none; }
+
+  /* Right side: glow + animated border. The border is a rotating conic layer clipped by the frame (transform only). */
+  .pt-frame { position: relative; isolation: isolate; border-radius: calc(var(--zl-radius) + 2px); padding: 2px; overflow: hidden; background: color-mix(in srgb, var(--zl-accent) calc(var(--p) * 45%), var(--zl-line-strong)); }
+  .pt-frame::before { content: ''; position: absolute; z-index: -1; left: 50%; top: 50%; width: 220%; aspect-ratio: 1; translate: -50% -50%; background: conic-gradient(from 0deg, transparent 0 55%, var(--zl-accent-hi) 72%, var(--zl-warm) 86%, transparent 100%); opacity: var(--p); }
+  .pt-new { position: relative; }
+  .pt-new::before { content: ''; position: absolute; inset: 8% 4%; z-index: -1; border-radius: 50%; background: var(--zl-glow); filter: blur(48px); opacity: var(--p); pointer-events: none; }
+  .pt-frame .zl-win { border: 0; border-radius: var(--zl-radius); box-shadow: none; }
+  .pt.is-live .pt-frame::before { animation: pt-spin 6s linear infinite; }
+  @keyframes pt-spin { to { transform: rotate(360deg); } }
+
+  /* Desktop: tall scroll track with a pinned stage (JS drives --p; without JS the track collapses to the final state). */
+  @media (min-width: 900px) and (pointer: fine) and (prefers-reduced-motion: no-preference) {
+    .zl-js .pt { min-height: 230svh; }
+    .zl-js .pt-stage { position: sticky; top: clamp(4.5rem, 12svh, 7rem); }
+    .zl-js .pt .zl-win-body { max-height: min(26rem, calc(100svh - 21rem)); }
+    .zl-js .pt-new .zl-win-body { max-height: none; }
+  }
+  @media (max-width: 640px) {
+    .pt-meter { gap: 0.6rem; }
+    .pt .zl-win-body { padding: 0.8rem; font-size: 0.78rem; }
+  }
+  @media (prefers-reduced-motion: reduce) {
+    .pt-old .zl-win, .pt-frame::before, .zl-copy, .zl-copy svg { transition: none; animation: none !important; }
+  }
+</style>

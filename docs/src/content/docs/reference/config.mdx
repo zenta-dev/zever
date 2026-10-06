@@ -1,0 +1,1252 @@
+---
+title: Config reference
+description: Every Zever config service, adapter, option key, default, and environment variable, plus the layering and strictness rules.
+---
+
+Zever config is one block per service, shaped `{ adapter, options }`. This page lists all 36 services and every option each one accepts.
+
+## Layering and rules
+
+| Rule | Behavior |
+|---|---|
+| Layers | `defaults < file < env`. Later layers win. |
+| Defaults | `config.Default()` selects zero-infrastructure adapters (memory, local, sqlite, log, noop). The only dev secret is the crypto key, which is deterministic and must never ship to production. |
+| File | `config.Load(path)` decodes `.yaml`, `.yml`, or `.json` strictly. Unknown services and unknown fields fail the load. `Load("")` probes `zever.yaml`, `zever.yml`, then `zever.json` in the working directory. Any other extension fails with `ErrUnsupportedFormat`. |
+| File keys | snake_case, for example `max_conns`. The old flat spellings (`maxconns`) are rejected as unknown fields. |
+| Env | `<SERVICE>_<FIELD>=value`, uppercase, no prefix: `DB_MAXCONNS=20`, `AUTH_JWT_SECRET=...`. Matching ignores case and `_`, so `DB_MAX_CONNS` also works. One nesting level splits at the first `_`. `<SERVICE>_ADAPTER` sets the adapter. |
+| Env strictness | Best-effort. Unknown variables are ignored, so a noisy process environment cannot break startup. Only a value that fails to parse for a resolved field returns `InvalidOptionsError` (the value is never echoed). |
+| Durations | In files, an integer count of nanoseconds (`5s` is `5000000000`). In env, a Go duration string such as `5s` or `5m`. |
+| Options replace defaults | A non-empty `options` block in a file replaces the default options for that service wholesale: keys you leave out become zero, not their `config.Default()` value. Repeat any default you still need (for example `password` needs all five parameters, `mailer` needs `host` and `port`, `ratelimit` needs `rate` and `burst`). An empty or missing `options` keeps the defaults. Env variables overlay one field at a time and do not replace the block. |
+| Unset values | A zero value (`0`, `""`, `false`) means unset: the adapter applies its own default, shown in the Default column when known. |
+| Redaction | Raw option maps can hold secrets. Log only through `RedactedServices` or `Redact`. Error text names services and fields, never values. |
+| Plugins | A top-level `plugins` map holds third-party services as `{adapter, options}` envelopes. The envelope is strict, but the options pass through raw and the plugin validates them. Env can override only `<PLUGIN>_ADAPTER`. |
+| Exceptions | The `secrets` env adapter reads secrets with a non-empty `prefix` (default `ZEVER`, so `ZEVER_FOO` is secret `FOO`). CLI switches use `ZEVER_INTERACTIVE` and `ZEVER_NO_HINT`. |
+
+```yaml title="zever.yaml"
+db:
+  adapter: postgres
+  options:
+    dsn: postgres://app:secret@db:5432/app
+    max_conns: 20
+log:
+  adapter: slog
+```
+
+```sh
+DB_MAXCONNS=20 DB_MAXCONNLIFETIME=5m AUTH_JWT_SECRET=prod-secret-at-least-32-bytes-long zever serve
+```
+
+A JSON Schema ships as `config/schema/zever.schema.json` for editor completion of `zever.yaml`, `zever.yml`, and `zever.json`. It currently lacks the `outbox` and `resilience` services and some adapter options, so this page, built from the Go option structs, is the authority.
+
+## Services at a glance
+
+| Service | Adapters | Accessor | Guide |
+|---|---|---|---|
+| [`ai`](#ai) | **anthropic**, openai, gemini, ollama | `c.AI()` | [AI](../../guides/integrations/ai/) |
+| [`analytics`](#analytics) | **log**, posthog | `c.Analytics()` | [Analytics](../../guides/integrations/analytics/) |
+| [`auth`](#auth) | **jwt**, session, oidc | `c.Auth()` | [Auth](../../guides/security/auth/) |
+| [`billing`](#billing) | **stub**, stripe, paddle | `c.Billing()` | [Billing](../../guides/integrations/billing/) |
+| [`cache`](#cache) | **memory**, redis, db | `c.Cache()` | [Cache](../../guides/data/cache/) |
+| [`crypto`](#crypto) | **local** | `c.Crypto()` | [Crypto and secrets](../../guides/security/crypto-secrets/) |
+| [`db`](#db) | **sqlite**, postgres | `c.DB()` | [Query builder](../../guides/data/query-builder/) |
+| [`document`](#document) | **local**, remote, latex | `c.Document()` | [Document](../../guides/data/document/) |
+| [`eventbus`](#eventbus) | **memory**, redis | `c.EventBus()` | [Events](../../guides/background/events/) |
+| [`flag`](#flag) | **static**, firebase | `c.Flag()` | [Feature flags](../../guides/operate/flags/) |
+| [`geo`](#geo) | google, **static**, osm | `c.Geo()` | [Geo](../../guides/integrations/geo/) |
+| [`i18n`](#i18n) | **embed**, remote | `c.I18n()` | [i18n](../../guides/http/i18n/) |
+| [`idempotency`](#idempotency) | **memory**, redis, db | `c.Idempotency()` | [Locks and idempotency](../../guides/security/lock-idempotency/) |
+| [`lock`](#lock) | **memory**, redis | `c.Lock()` | [Locks and idempotency](../../guides/security/lock-idempotency/) |
+| [`log`](#log) | noop, zerolog, **slog**, pretty | `c.Log()` | [Logging](../../guides/operate/logging/) |
+| [`mailer`](#mailer) | **log**, smtp | `c.Mailer()` | [Mailer](../../guides/background/mailer/) |
+| [`media`](#media) | **local**, s3 | `c.Media()` | [Media](../../guides/data/media/) |
+| [`notification`](#notification) | **log**, twilio, fcm | `c.Notification()` | [Notifications](../../guides/background/notifications/) |
+| [`observability`](#observability) | noop, **stdout**, otlp | `c.Observability()` | [Observability](../../guides/operate/observability/) |
+| [`outbox`](#outbox) | memory, **db**, cdc | `c.Outbox()` | [Outbox](../../guides/background/outbox/) |
+| [`password`](#password) | **argon2id** | `c.Password()` | [Password hashing](../../guides/security/password-hashing/) |
+| [`payment`](#payment) | **stub**, stripe, paddle | `c.Payment()` | [Payment](../../guides/integrations/payment/) |
+| [`permission`](#permission) | **noop**, rbac, casbin | `c.Permission()` | [Permissions](../../guides/security/authz-permissions/) |
+| [`queue`](#queue) | **memory**, redis, db | `c.Queue()` | [Queue](../../guides/background/queue/) |
+| [`ratelimit`](#ratelimit) | **memory**, redis | `c.RateLimit()` | [Ratelimit](../../guides/security/ratelimit/) |
+| [`resilience`](#resilience) | **memory**, redis | `c.Resilience()` | [Resilience](../../guides/operate/resilience/) |
+| [`router`](#router) | fiber, **stdhttp** | `c.Router()` | [Routing](../../guides/http/routing/) |
+| [`scheduler`](#scheduler) | **embedded**, postgres | `c.Scheduler()` | [Scheduler and jobs](../../guides/background/scheduler-jobs/) |
+| [`search`](#search) | **db**, postgres, meilisearch, sqlite | `c.Search()` | [Search](../../guides/data/search/) |
+| [`secrets`](#secrets) | **env**, vault | `c.Secrets()` | [Secrets](../../guides/security/secrets/) |
+| [`session`](#session) | **memory**, redis, db | `c.Session()` | [Sessions](../../guides/http/sessions/) |
+| [`storage`](#storage) | **local**, s3, r2 | `c.Storage()` | [Storage](../../guides/data/storage-media/) |
+| [`tenant`](#tenant) | **single**, header | `c.Tenant()` | [Tenants](../../guides/operate/tenants/) |
+| [`vectorstore`](#vectorstore) | **db**, sqlite, pgvector, qdrant | `c.VectorStore()` | [Vectorstore](../../guides/data/vectorstore/) |
+| [`webhook`](#webhook) | **http**, queue | `c.Webhook()` | [Webhooks](../../guides/background/webhooks/) |
+| [`workflow`](#workflow) | **memory**, db, postgres | `c.Workflow()` | [Workflows](../../guides/background/workflows/) |
+
+The bold adapter is the default. The `search`, `vectorstore`, and `workflow` services accept `db` as the canonical DB-backed name (empty DSN selects embedded sqlite, a postgres URL selects postgres). The older `postgres`, `sqlite`, and `pgvector` names stay registered as aliases.
+
+## Shared option groups
+
+### Redis connection options
+
+Services with a Redis adapter embed the same connection keys. Flat services (`cache`, `lock`, `queue`) take them directly. Services with a `redis` block (`eventbus`, `idempotency`, `ratelimit`, `resilience`, `session`) take them under `redis.`.
+
+| Key | Type | Default | Description |
+|---|---|---|---|
+| `addr` | string | `localhost:6379` | Redis address as `host:port`, or a `redis://` or `rediss://` URL. |
+| `password` | string | `""` | Redis password. Never logged. |
+| `db` | integer | `0` | Redis database index. |
+| `tls` | boolean | `false` | Enable TLS with a TLS 1.2 floor for plain addresses. Off means plaintext, including the password. |
+| `require_tls` | boolean | `false` | Fail connection setup instead of connecting in plaintext when the address would not use TLS. |
+| `pool_size` | integer | go-redis default | Base number of socket connections (10 per GOMAXPROCS when `<= 0`). |
+| `min_idle_conns` | integer | `2` | Pre-warmed idle connections. |
+| `pool_timeout` | duration | go-redis default | Wait for a pooled connection when exhausted. |
+| `max_conn_idle_time` | duration | go-redis default | Idle time before a connection may close. |
+| `max_conn_lifetime` | duration | unbounded | Maximum reuse time for a connection. |
+
+`lock` and `queue` accept only `addr`, `password`, `db`, `tls`, and `require_tls` from this group. `cache` and `queue` also accept a top-level `url` that takes precedence over `addr`. Under `redis.`, `url` is reserved and ignored.
+
+### Retry policy
+
+`outbox` and `resilience` take a `retry` block. Its keys are exported Go field names, matched case-insensitively.
+
+| Key | Type | Default | Description |
+|---|---|---|---|
+| `retry.BaseDelay` | duration | `0` | Delay before the first retry. `resilience` default is `50ms`. |
+| `retry.MaxDelay` | duration | unbounded | Cap on the computed delay, before jitter. `resilience` default is `2s`. |
+| `retry.Multiplier` | number | `0` | Per-attempt growth factor. Values `<= 1` keep the delay flat. `resilience` default is `2`. |
+| `retry.Linear` | boolean | `false` | Grow linearly (`BaseDelay * attempt`) instead of exponentially. Ignores `Multiplier`. |
+| `retry.Jitter` | number | `0` | Fraction of the delay to randomize, clamped to `[0, 1]`. `resilience` default is `0.1`. |
+| `retry.JitterMode` | integer | `0` | `0` symmetric (plus or minus), `1` additive (never shortens), `2` flat (adds up to `JitterMax`). |
+| `retry.JitterMax` | duration | `0` | Upper bound of the flat jitter draw. Used only when `JitterMode` is `2`. |
+| `retry.MaxAttempts` | integer | `1` | Total attempts including the first. `<= 0` means 1. `resilience` default is `3`. |
+
+### Pool sharing
+
+DB-backed services (`db`, `cache`, `queue`, `search`, `session`, `idempotency`, `workflow`, `scheduler`, `vectorstore`, `outbox`) share one container pool per exact DSN by default. Matching is on the trimmed DSN string, so a URL with and without a query string are different pools. SQLite shares by cleaned file path, and `:memory:` never shares.
+
+- The second service to open a DSN borrows the first pool and never closes it. The shared pool takes the first opener's pool settings, and a differing nonzero `max_conns` logs a warning without DSN content.
+- Set `dedicated_pool: true` to open a private pool. Use it with a separate database for `queue`, `workflow`, and `scheduler` under sustained load.
+- `dedicated_pool` is ignored on `db` itself, which owns the pool.
+- Env: `SEARCH_DEDICATEDPOOL=true`, `QUEUE_DSN=...`, `SESSION_DSN=...`.
+- Old binaries reject `dedicated_pool` and `dsn` under strict decoding, so remove those lines before a downgrade.
+
+```yaml title="zever.yaml"
+search:
+  adapter: db
+  options:
+    dsn: "postgres://app:secret@db:5432/app?sslmode=require"
+    dedicated_pool: false
+```
+
+## Service reference
+
+Each service lists its adapters, accessor, and every option key. Options form a union across adapters: an adapter reads only the keys it needs and ignores the rest. Keys such as `jwt.secret` are nested under `options`.
+
+### `ai`
+
+LLM completions, chat, and embeddings. Every backend needs a key, so there is no zero-infra adapter.
+
+| | |
+|---|---|
+| Adapters | `anthropic`, `openai`, `gemini`, `ollama` |
+| Default adapter | `anthropic` |
+| Accessor | `c.AI()` |
+| Guide | [AI guide](../../guides/integrations/ai/) |
+
+| Key | Type | Default | Description |
+|---|---|---|---|
+| `api_key` | string | `""` | Provider API key. Never logged |
+| `model` | string | `""` | Model identifier |
+| `base_url` | string | `""` | Provider base URL. Must be https unless `allow_insecure` is set |
+| `allow_insecure` | boolean | `false` | Permits http BaseURL and disables TLS verification for loopback test servers |
+| `timeout` | duration | `0` | Request timeout |
+
+```yaml title="zever.yaml"
+ai:
+  adapter: anthropic
+  options:
+    api_key: sk-ant-...
+    model: claude-sonnet-4-5
+    timeout: 30000000000
+```
+
+### `analytics`
+
+Event tracking, identify, and group calls.
+
+| | |
+|---|---|
+| Adapters | `log`, `posthog` |
+| Default adapter | `log` |
+| Accessor | `c.Analytics()` |
+| Guide | [Analytics guide](../../guides/integrations/analytics/) |
+
+| Key | Type | Default | Description |
+|---|---|---|---|
+| `api_key` | string | `""` | Backend write key. Never logged |
+| `endpoint` | string | `""` | Optional custom backend endpoint URL |
+| `anonymous_id` | string | `anonymous` | Fallback identity for anonymous tracking |
+| `group_type` | string | `organization` | Group type for group calls |
+| `max_properties_bytes` | integer | `65536` | Bounds the JSON-encoded properties payload size |
+| `max_properties` | integer | `0` | Bounds the number of properties per call |
+
+```yaml title="zever.yaml"
+analytics:
+  adapter: posthog
+  options:
+    api_key: phc_...
+    group_type: organization
+```
+
+### `auth`
+
+Token and identity verification. Options nest under the adapter name (`jwt`, `session`, `oidc`).
+
+| | |
+|---|---|
+| Adapters | `jwt`, `session`, `oidc` |
+| Default adapter | `jwt` |
+| Accessor | `c.Auth()` |
+| Guide | [Auth guide](../../guides/security/auth/) |
+
+| Key | Type | Default | Description |
+|---|---|---|---|
+| `jwt.secret` | string | `""` | HMAC signing secret |
+| `jwt.issuer` | string | `""` | Token issuer |
+| `jwt.audience` | string | `""` | Intended token audience |
+| `jwt.max_ttl` | duration | `0` | Caps token lifetimes |
+| `jwt.leeway` | duration | `0` | Tolerates clock skew when validating exp/nbf |
+| `oidc.issuer` | string | `""` | OIDC issuer URL |
+| `oidc.client_id` | string | `""` | Relying-party client ID |
+| `oidc.timeout` | duration | `30s` | Operation timeout |
+| `oidc.allow_insecure` | boolean | `false` | Permits an http:// issuer (and a private-address issuer) for testing |
+
+The `session` adapter has no file-settable options: its `session.Store` is injected from Go.
+
+```yaml title="zever.yaml"
+auth:
+  adapter: jwt
+  options:
+    jwt:
+      secret: change-me-to-at-least-32-bytes
+      issuer: my-app
+      max_ttl: 3600000000000
+```
+
+### `billing`
+
+Customers, subscriptions, and invoices through a billing provider.
+
+| | |
+|---|---|
+| Adapters | `stub`, `stripe`, `paddle` |
+| Default adapter | `stub` |
+| Accessor | `c.Billing()` |
+| Guide | [Billing guide](../../guides/integrations/billing/) |
+
+| Key | Type | Default | Description |
+|---|---|---|---|
+| `secret_key` | string | `""` | Provider secret key (Stripe). Never logged |
+| `api_key` | string | `""` | Provider API key (Paddle). Never logged |
+| `endpoint` | string | `""` | Optional custom provider endpoint URL |
+| `sandbox` | boolean | `false` | Selects the provider sandbox environment |
+
+```yaml title="zever.yaml"
+billing:
+  adapter: stripe
+  options:
+    secret_key: sk_live_...
+```
+
+### `cache`
+
+Key/value cache with TTL. `db` selects postgres or sqlite by DSN.
+
+| | |
+|---|---|
+| Adapters | `memory`, `redis`, `db` |
+| Default adapter | `memory` |
+| Accessor | `c.Cache()` |
+| Guide | [Cache guide](../../guides/data/cache/) |
+
+| Key | Type | Default | Description |
+|---|---|---|---|
+| `capacity` | integer | `0` | Hints at the expected number of cache entries |
+| `verbose` | boolean | `false` | Enables additional diagnostic output |
+| `dsn` | string | `""` | Postgres connection string or sqlite path for the db adapter |
+| `dedicated_pool` | boolean | `false` | Opts out of container-level pool sharing |
+| `sweep_interval` | duration | `1m` | Controls how often expired entries are purged (memory adapter) |
+| `max_entries` | integer | `1000` | Bounds the number of stored entries before eviction (memory adapter) |
+| `url` | string | `""` | Redis connection URL |
+
+Redis connection keys, documented in [Redis connection options](#redis-connection-options): `addr`, `password`, `db`, `tls`, `require_tls`, `pool_size`, `min_idle_conns`, `pool_timeout`, `max_conn_idle_time`, `max_conn_lifetime`.
+
+The `db` adapter's table, key prefix, and TTL are set from Go, not from config. The `adapter` field inside `options` is a legacy duplicate and is omitted here; use the outer `adapter` string.
+
+```yaml title="zever.yaml"
+cache:
+  adapter: redis
+  options:
+    addr: localhost:6379
+    require_tls: true
+```
+
+### `crypto`
+
+Symmetric encryption and signing. The default config ships a deterministic dev key that must never reach production.
+
+| | |
+|---|---|
+| Adapters | `local`, `kms` |
+| Default adapter | `local` |
+| Accessor | `c.Crypto()` |
+| Guide | [Crypto and secrets guide](../../guides/security/crypto-secrets/) |
+
+| Key | Type | Default | Description |
+|---|---|---|---|
+| `key` | string | `dev key (config default)` | Base64-encoded 32-byte encryption key |
+| `sign_key` | string | `""` | Base64-encoded 64-byte signing key |
+| `key_id` | string | `""` | Primary KMS key identifier used for envelope encryption |
+| `key_ids` | list of strings | none | Lists accepted KMS key identifiers for rotation |
+| `region` | string | `""` | KMS region (for example an AWS region) |
+| `endpoint` | string | `""` | Overrides the KMS endpoint (custom KMS, tests, VPC endpoints) |
+| `use_envelope` | boolean | `false` | Selects KMS envelope encryption |
+
+The `kms` adapter fails closed from config: it needs a real KMS client injected from Go, because its dev stub is not a file option. Use `local` for file-only setups.
+
+```yaml title="zever.yaml"
+crypto:
+  adapter: local
+  options:
+    key: <base64-32-bytes>
+    sign_key: <base64-64-bytes>
+```
+
+### `db`
+
+SQL connection pool. Other db-backed services borrow this pool when their DSN matches.
+
+| | |
+|---|---|
+| Adapters | `sqlite`, `postgres` |
+| Default adapter | `sqlite` |
+| Accessor | `c.DB()` |
+| Guide | [Query builder guide](../../guides/data/query-builder/) |
+
+| Key | Type | Default | Description |
+|---|---|---|---|
+| `dsn` | string | `""` | Postgres connection string |
+| `max_conns` | integer | `0` | Caps the connection pool size |
+| `min_conns` | integer | `0` | Minimum pool size for Postgres and the idle connection target for SQLite |
+| `max_conn_lifetime` | duration | `0` | Bounds how long a pooled connection may be reused |
+| `max_conn_idle_time` | duration | `0` | Bounds how long a pooled connection may stay idle |
+| `path` | string | `""` | SQLite database file path |
+| `dedicated_pool` | boolean | `false` | Opts out of container-level pool sharing |
+
+```yaml title="zever.yaml"
+db:
+  adapter: postgres
+  options:
+    dsn: postgres://app:secret@db:5432/app
+    max_conns: 20
+    max_conn_lifetime: 300000000000
+```
+
+### `document`
+
+Render documents to PDF or images locally, through a remote service, or with LaTeX.
+
+| | |
+|---|---|
+| Adapters | `local`, `remote`, `latex` |
+| Default adapter | `local` |
+| Accessor | `c.Document()` |
+| Guide | [Document guide](../../guides/data/document/) |
+
+| Key | Type | Default | Description |
+|---|---|---|---|
+| `tmp_dir` | string | `""` | Directory for intermediate render artifacts |
+| `timeout` | duration | `30s` | Bounds document render operations |
+| `quality` | integer | `80` | Controls raster output quality in the range 0-100 |
+| `dpi` | integer | `150` | Controls raster output resolution |
+| `endpoint` | string | `""` | Optional remote render endpoint URL |
+| `allow_insecure` | boolean | `false` | Permits http Endpoint for testing |
+| `api_key` | string | `""` | Remote API key. Never logged |
+| `latex_command` | string | `pdflatex` | LaTeX compiler command |
+| `latex_pdf_to_ppm` | string | `pdftoppm` | PDF-to-image converter command |
+| `max_output_bytes` | integer | `64 MiB` | Bounds the rendered output size |
+| `latex_runs` | integer | `0` | Bounds the number of LaTeX compiler passes |
+
+```yaml title="zever.yaml"
+document:
+  adapter: latex
+  options:
+    latex_command: pdflatex
+    timeout: 60000000000
+```
+
+### `eventbus`
+
+In-process or Redis publish/subscribe.
+
+| | |
+|---|---|
+| Adapters | `memory`, `redis` |
+| Default adapter | `memory` |
+| Accessor | `c.EventBus()` |
+| Guide | [Events guide](../../guides/background/events/) |
+
+| Key | Type | Default | Description |
+|---|---|---|---|
+| `buffer_size` | integer | `1024` | Per-topic buffer size |
+| `max_handlers` | integer | `128` | Maximum handler count |
+| `handler_timeout` | duration | `30s` | Per-handler delivery timeout |
+| `close_timeout` | duration | `5s` | Shutdown timeout |
+| `redis.url` | string | `""` | Reserved and currently ignored |
+| `redis.prefix` | string | `""` | Key prefix for Redis eventbus data |
+
+Redis connection keys, documented in [Redis connection options](#redis-connection-options): `redis.addr`, `redis.password`, `redis.db`, `redis.tls`, `redis.require_tls`, `redis.pool_size`, `redis.min_idle_conns`, `redis.pool_timeout`, `redis.max_conn_idle_time`, `redis.max_conn_lifetime`.
+
+```yaml title="zever.yaml"
+eventbus:
+  adapter: redis
+  options:
+    redis:
+      addr: localhost:6379
+      prefix: events
+```
+
+### `flag`
+
+Feature flags from a static file or Firebase. Options nest under the adapter name.
+
+| | |
+|---|---|
+| Adapters | `static`, `firebase` |
+| Default adapter | `static` |
+| Accessor | `c.Flag()` |
+| Guide | [Feature flags guide](../../guides/operate/flags/) |
+
+| Key | Type | Default | Description |
+|---|---|---|---|
+| `static.path` | string | `""` | Flag file path |
+| `static.reload` | boolean | `false` | Enables file reloading |
+| `firebase.project_id` | string | `""` | Firebase project ID |
+| `firebase.service_account` | string | `""` | Path to the service account JSON key file |
+| `firebase.timeout` | duration | `30s` | Operation timeout |
+
+```yaml title="zever.yaml"
+flag:
+  adapter: static
+  options:
+    static:
+      path: flags.json
+      reload: true
+```
+
+### `geo`
+
+Geocoding and reverse geocoding.
+
+| | |
+|---|---|
+| Adapters | `google`, `static`, `osm` |
+| Default adapter | `static` |
+| Accessor | `c.Geo()` |
+| Guide | [Geo guide](../../guides/integrations/geo/) |
+
+| Key | Type | Default | Description |
+|---|---|---|---|
+| `api_key` | string | `""` | Provider API key. Never logged |
+| `base_url` | string | `""` | Overrides the Google Maps API base URL |
+| `endpoint` | string | `""` | Overrides the Mapbox/OSM API endpoint |
+| `timeout` | duration | `0` | Bounds HTTP requests |
+| `path` | string | `""` | JSON file for the static adapter |
+| `max_response_body` | integer | `0` | Bounds response bodies |
+| `allow_insecure` | boolean | `false` | Permits http BaseURL/Endpoint for testing |
+| `user_agent` | string | `""` | User-Agent for OSM Nominatim |
+
+```yaml title="zever.yaml"
+geo:
+  adapter: osm
+  options:
+    user_agent: my-app/1.0 (ops@example.com)
+```
+
+### `i18n`
+
+Message catalogs. Options nest under the adapter name.
+
+| | |
+|---|---|
+| Adapters | `embed`, `remote` |
+| Default adapter | `embed` |
+| Accessor | `c.I18n()` |
+| Guide | [i18n guide](../../guides/http/i18n/) |
+
+| Key | Type | Default | Description |
+|---|---|---|---|
+| `embed.dir` | string | `""` | Catalog directory |
+| `embed.fallback` | string | `""` | Fallback locale |
+| `remote.endpoint` | string | `""` | Remote service base URL |
+| `remote.api_key` | string | `""` | Remote service credential |
+| `remote.timeout` | duration | `30s` | Operation timeout |
+| `remote.max_in_flight` | integer | `1000` | Caps concurrent requests |
+| `remote.allow_insecure` | boolean | `false` | Permits http:// endpoints |
+
+```yaml title="zever.yaml"
+i18n:
+  adapter: embed
+  options:
+    embed:
+      dir: locales
+      fallback: en
+```
+
+### `idempotency`
+
+Reserve-then-commit store that makes retried requests safe.
+
+| | |
+|---|---|
+| Adapters | `memory`, `redis`, `db` |
+| Default adapter | `memory` |
+| Accessor | `c.Idempotency()` |
+| Guide | [Locks and idempotency guide](../../guides/security/lock-idempotency/) |
+
+| Key | Type | Default | Description |
+|---|---|---|---|
+| `ttl` | duration | `24h` | Default reservation lifetime |
+| `dsn` | string | `""` | Postgres connection string or sqlite path for the db adapter |
+| `dedicated_pool` | boolean | `false` | Opts out of container-level pool sharing |
+| `redis.url` | string | `""` | Reserved and currently ignored |
+| `redis.prefix` | string | `""` | Key prefix for Redis idempotency data |
+| `max_entries` | integer | `1000` | Bounds the number of stored records in the memory adapter before least-recently-used eviction |
+
+Redis connection keys, documented in [Redis connection options](#redis-connection-options): `redis.addr`, `redis.password`, `redis.db`, `redis.tls`, `redis.require_tls`, `redis.pool_size`, `redis.min_idle_conns`, `redis.pool_timeout`, `redis.max_conn_idle_time`, `redis.max_conn_lifetime`.
+
+```yaml title="zever.yaml"
+idempotency:
+  adapter: redis
+  options:
+    ttl: 86400000000000
+    redis:
+      addr: localhost:6379
+```
+
+### `lock`
+
+Distributed leases with a TTL.
+
+| | |
+|---|---|
+| Adapters | `memory`, `redis` |
+| Default adapter | `memory` |
+| Accessor | `c.Lock()` |
+| Guide | [Locks and idempotency guide](../../guides/security/lock-idempotency/) |
+
+| Key | Type | Default | Description |
+|---|---|---|---|
+| `url` | string | `""` | Redis connection URL |
+| `prefix` | string | `""` | Scopes lock keys to one namespace |
+| `ttl` | duration | `30s` | Default lease lifetime |
+| `retry_interval` | duration | `50ms` | How long Acquire waits between attempts |
+| `max_entries` | integer | `1000` | Bounds the number of stored leases before LRU eviction (memory adapter) |
+
+Redis connection keys, documented in [Redis connection options](#redis-connection-options): `addr`, `password`, `db`, `tls`, `require_tls`.
+
+```yaml title="zever.yaml"
+lock:
+  adapter: redis
+  options:
+    addr: localhost:6379
+    ttl: 30000000000
+```
+
+### `log`
+
+Structured logging. Only the minimum level is configurable here.
+
+| | |
+|---|---|
+| Adapters | `noop`, `zerolog`, `slog`, `pretty` |
+| Default adapter | `slog` |
+| Accessor | `c.Log()` |
+| Guide | [Logging guide](../../guides/operate/logging/) |
+
+| Key | Type | Default | Description |
+|---|---|---|---|
+| `min_level` | integer | `0` | Minimum severity emitted by the logger: `0` debug, `1` info, `2` warn, `3` error, `4` fatal. In a file it is an integer, not a name. |
+
+```yaml title="zever.yaml"
+log:
+  adapter: slog
+  options:
+    min_level: 1   # 0 debug, 1 info, 2 warn, 3 error, 4 fatal
+```
+
+### `mailer`
+
+Outbound email. `host` and `port` are required by validation, so the default `log` adapter keeps a dummy `localhost:25`.
+
+| | |
+|---|---|
+| Adapters | `log`, `smtp` |
+| Default adapter | `log` |
+| Accessor | `c.Mailer()` |
+| Guide | [Mailer guide](../../guides/background/mailer/) |
+
+| Key | Type | Default | Description |
+|---|---|---|---|
+| `host` | string | `localhost (config default)` | SMTP server hostname |
+| `port` | integer | `25 (config default)` | SMTP server port (1-65535) |
+| `username` | string | `""` | SMTP auth username |
+| `password` | string | `""` | SMTP auth password |
+| `encryption` | string | `starttls` | Transport encryption mode |
+| `timeout` | duration | `30s` | Operation timeout |
+| `max_message_size` | integer | `10 MiB` | Maximum message size in bytes |
+
+```yaml title="zever.yaml"
+mailer:
+  adapter: smtp
+  options:
+    host: smtp.example.com
+    port: 587
+    username: apikey
+    password: secret
+    encryption: starttls
+```
+
+### `media`
+
+Image and video storage and derivation, locally or on S3.
+
+| | |
+|---|---|
+| Adapters | `local`, `s3` |
+| Default adapter | `local` |
+| Accessor | `c.Media()` |
+| Guide | [Media guide](../../guides/data/media/) |
+
+| Key | Type | Default | Description |
+|---|---|---|---|
+| `root` | string | `/tmp/media` | Local storage root directory |
+| `base_url` | string | `/media` | Base URL for served assets |
+| `max_download_bytes` | integer | `64 MiB` | Bounds a single download in bytes |
+| `max_pixels` | integer | `52428800` | Bounds the decoded image pixel count |
+| `derived_ttl` | duration | `10m` | Time-to-live for derived assets |
+| `presign_ttl` | duration | `1h` | Time-to-live for presigned URLs |
+| `max_duration` | duration | `0 (unlimited)` | Bounds media duration |
+| `endpoint` | string | `""` | Optional custom storage endpoint URL |
+| `region` | string | `us-east-1` | Storage region |
+| `bucket` | string | `""` | Storage bucket name |
+| `access_key_id` | string | `""` | Storage access key. Never logged |
+| `secret_access_key` | string | `""` | Storage secret key. Never logged |
+| `ffmpeg` | string | `ffmpeg` | Ffmpeg binary path |
+| `ffprobe` | string | `ffprobe` | Ffprobe binary path |
+
+```yaml title="zever.yaml"
+media:
+  adapter: s3
+  options:
+    bucket: my-media
+    region: us-east-1
+    access_key_id: AKIA...
+    secret_access_key: ...
+```
+
+### `notification`
+
+SMS and push notifications. Twilio and FCM options nest under their names.
+
+| | |
+|---|---|
+| Adapters | `log`, `twilio`, `fcm` |
+| Default adapter | `log` |
+| Accessor | `c.Notification()` |
+| Guide | [Notifications guide](../../guides/background/notifications/) |
+
+| Key | Type | Default | Description |
+|---|---|---|---|
+| `timeout` | duration | `30s` | Operation timeout |
+| `twilio.account_sid` | string | `""` | Twilio account SID for basic-auth and URL path |
+| `twilio.auth_token` | string | `""` | Twilio auth token for basic-auth |
+| `twilio.from_number` | string | `""` | Twilio sender phone number in E.164 format |
+| `fcm.project_id` | string | `""` | Firebase project ID |
+| `fcm.service_account` | string | `""` | Path to the service account JSON key file |
+
+```yaml title="zever.yaml"
+notification:
+  adapter: twilio
+  options:
+    twilio:
+      account_sid: AC...
+      auth_token: ...
+      from_number: "+15551234567"
+```
+
+### `observability`
+
+Traces and metrics, to stdout or an OTLP collector.
+
+| | |
+|---|---|
+| Adapters | `noop`, `stdout`, `otlp` |
+| Default adapter | `stdout` |
+| Accessor | `c.Observability()` |
+| Guide | [Observability guide](../../guides/operate/observability/) |
+
+| Key | Type | Default | Description |
+|---|---|---|---|
+| `endpoint` | string | `""` | Collector address as host:port |
+| `service_name` | string | `zever (config default)` | Identifies the service emitting telemetry |
+| `insecure` | boolean | `false` | Disables TLS; only allowed for loopback endpoints |
+| `set_globals` | boolean | `false` | Registers the provider as the global default |
+| `verbose` | boolean | `false` | Enables debug logging |
+| `ca_file` | string | `""` | Path to a PEM-encoded CA bundle |
+| `cert_file` | string | `""` | Path to a PEM-encoded client certificate |
+| `key_file` | string | `""` | Path to a PEM-encoded client key |
+| `headers` | map | none | Outbound request headers |
+| `sample_ratio` | number | `0` | Trace sampling probability in [0,1] |
+| `attr_value_limit` | integer | `0` | Caps string attribute values; 0 selects the default |
+
+```yaml title="zever.yaml"
+observability:
+  adapter: otlp
+  options:
+    endpoint: collector:4317
+    service_name: my-app
+    sample_ratio: 0.1
+```
+
+### `outbox`
+
+Transactional outbox and inbox with a polling relay, or postgres logical-replication capture (`cdc`).
+
+| | |
+|---|---|
+| Adapters | `memory`, `db`, `cdc` |
+| Default adapter | `db` |
+| Accessor | `c.Outbox()` |
+| Guide | [Outbox guide](../../guides/background/outbox/) |
+
+| Key | Type | Default | Description |
+|---|---|---|---|
+| `dsn` | string | `""` | Postgres connection string or sqlite path for the db adapter |
+| `table` | string | `outbox` | Outbox table name |
+| `inbox_table` | string | `inbox` | Inbox table name |
+| `publisher` | string | `""` | Records which transport the relay publishes through: "eventbus", "queue", or "" (unset) |
+| `poll_interval` | duration | `1s` | Relay poll cadence |
+| `batch_size` | integer | `100` | Caps how many messages one poll claims |
+| `max_attempts` | integer | `5` | Publish attempt cap |
+| `retention` | duration | `168h` | How long processed messages are kept |
+| `lock_seconds` | integer | `30` | Claim lease in seconds |
+| `notify_channel` | string | `""` | Postgres LISTEN/NOTIFY channel (cdc adapter) |
+| `prefix` | string | `zever_outbox` | Logical-replication message prefix (cdc adapter) |
+| `slot` | string | `zever_outbox_slot` | Logical-replication slot name (cdc adapter) |
+| `publication` | string | `zever_outbox_pub` | Logical-replication publication name (cdc adapter) |
+| `dedicated_pool` | boolean | `false` | Opts out of container-level pool sharing |
+| `retry` | object |  | Backoff policy. Keys are listed in [Retry policy](#retry-policy). |
+
+```yaml title="zever.yaml"
+outbox:
+  adapter: db
+  options:
+    dsn: postgres://app:secret@db:5432/app
+    poll_interval: 1000000000
+    publisher: eventbus
+```
+
+### `password`
+
+Argon2id password hashing. All five parameters are range-validated.
+
+| | |
+|---|---|
+| Adapters | `argon2id` |
+| Default adapter | `argon2id` |
+| Accessor | `c.Password()` |
+| Guide | [Password hashing guide](../../guides/security/password-hashing/) |
+
+| Key | Type | Default | Description |
+|---|---|---|---|
+| `time` | integer | `3` | Argon2id iteration count in the range 1-10 |
+| `memory` | integer | `65536` | Argon2id memory cost in KiB in the range 8192-1048576 |
+| `threads` | integer | `4` | Argon2id parallelism degree in the range 1-16 |
+| `salt_length` | integer | `16` | Salt length in bytes in the range 8-64 |
+| `key_length` | integer | `32` | Derived key length in bytes in the range 16-128 |
+
+```yaml title="zever.yaml"
+password:
+  adapter: argon2id
+  options:
+    time: 3
+    memory: 65536
+    threads: 4
+    salt_length: 16
+    key_length: 32
+```
+
+### `payment`
+
+Payment intents and webhooks. The `stub` adapter performs no webhook verification and holds no funds.
+
+| | |
+|---|---|
+| Adapters | `stub`, `stripe`, `paddle` |
+| Default adapter | `stub` |
+| Accessor | `c.Payment()` |
+| Guide | [Payment guide](../../guides/integrations/payment/) |
+
+| Key | Type | Default | Description |
+|---|---|---|---|
+| `secret_key` | string | `""` | Provider secret key (Stripe). Never logged |
+| `api_key` | string | `""` | Provider API key (Paddle). Never logged |
+| `endpoint` | string | `""` | Optional custom provider endpoint URL |
+| `sandbox` | boolean | `false` | Selects the provider sandbox environment |
+| `webhook_secret` | string | `""` | Webhook verification secret. Never logged |
+| `auto_approve` | boolean | `false` | Marks new payments as succeeded instead of pending |
+| `max_webhook_bytes` | integer | `1 MiB` | Bounds the webhook payload size |
+
+The refund idempotency store (`Idempotency`) is injected from Go and is not a file option.
+
+```yaml title="zever.yaml"
+payment:
+  adapter: stripe
+  options:
+    secret_key: sk_live_...
+    webhook_secret: whsec_...
+```
+
+### `permission`
+
+Authorization checks from inline rules, RBAC roles, or Casbin files.
+
+| | |
+|---|---|
+| Adapters | `noop`, `rbac`, `casbin` |
+| Default adapter | `noop` |
+| Accessor | `c.Permission()` |
+| Guide | [Permissions guide](../../guides/security/authz-permissions/) |
+
+| Key | Type | Default | Description |
+|---|---|---|---|
+| `model_path` | string | `""` | Path to the Casbin model file |
+| `policy_path` | string | `""` | Path to the Casbin policy file |
+| `roles` | map of lists | none | Subject-ID to allowed-roles allowlist gating privilege escalation: a subject may only be granted a role (asserted via Subject.Roles at check time) that appears in its list here |
+| `rules` | list of objects | `[]` | Authorization rules. See below. |
+
+**`rules` entries** use the exported Go field names verbatim (capitalized), unlike every other key.
+
+| Key | Type | Default | Description |
+|---|---|---|---|
+| `Role` | string | `""` | Role the rule applies to. |
+| `Action` | string | `""` | Action the rule applies to. |
+| `Effect` | string | `allow` | `allow` or `deny`. Empty means `allow`. |
+| `OwnedOnly` | boolean | `false` | Restrict the rule to resources owned by the subject. |
+| `OwnedAttr` | string | `""` | Resource attribute carrying the owner ID. Required when `OwnedOnly` is true. |
+
+```yaml title="zever.yaml"
+permission:
+  adapter: rbac
+  options:
+    rules:
+      - Role: admin
+        Action: "*"
+        Effect: allow
+```
+
+### `queue`
+
+Message queue with visibility timeouts.
+
+| | |
+|---|---|
+| Adapters | `memory`, `redis`, `db` |
+| Default adapter | `memory` |
+| Accessor | `c.Queue()` |
+| Guide | [Queue guide](../../guides/background/queue/) |
+
+| Key | Type | Default | Description |
+|---|---|---|---|
+| `visibility_timeout` | duration | `30s` | Duration a popped message remains invisible before reclaim |
+| `poll_timeout` | duration | `5s` | Duration Pop waits for a message before returning empty |
+| `buffer` | integer | `10000` (memory) | Maximum number of buffered ready messages per topic |
+| `url` | string | `""` | Redis connection URL |
+| `prefix` | string | `""` | Key prefix for Redis queue data |
+| `dsn` | string | `""` | Postgres connection string or sqlite path |
+| `table` | string | `""` | Queue-messages table name |
+| `dedicated_pool` | boolean | `false` | Opts out of container-level pool sharing |
+
+Redis connection keys, documented in [Redis connection options](#redis-connection-options): `addr`, `password`, `db`, `tls`, `require_tls`.
+
+```yaml title="zever.yaml"
+queue:
+  adapter: redis
+  options:
+    addr: localhost:6379
+    visibility_timeout: 30000000000
+```
+
+### `ratelimit`
+
+Token-bucket rate limiting. `rate` and `burst` are required.
+
+| | |
+|---|---|
+| Adapters | `memory`, `redis` |
+| Default adapter | `memory` |
+| Accessor | `c.RateLimit()` |
+| Guide | [Ratelimit guide](../../guides/security/ratelimit/) |
+
+| Key | Type | Default | Description |
+|---|---|---|---|
+| `rate` | number | `10 (config default)` | Token refill rate per second |
+| `burst` | integer | `20 (config default)` | Maximum bucket size |
+| `idle_ttl` | duration | `10m` | Idle entry TTL |
+| `sweep_interval` | duration | `1m` | Idle-entry sweep interval |
+| `max_entries` | integer | `1000` | Bounds the number of stored buckets in the memory adapter before least-recently-used eviction |
+| `redis.url` | string | `""` | Reserved and currently ignored |
+| `redis.prefix` | string | `""` | Key prefix for Redis ratelimit data |
+
+Redis connection keys, documented in [Redis connection options](#redis-connection-options): `redis.addr`, `redis.password`, `redis.db`, `redis.tls`, `redis.require_tls`, `redis.pool_size`, `redis.min_idle_conns`, `redis.pool_timeout`, `redis.max_conn_idle_time`, `redis.max_conn_lifetime`.
+
+```yaml title="zever.yaml"
+ratelimit:
+  adapter: memory
+  options:
+    rate: 100
+    burst: 200
+```
+
+### `resilience`
+
+Retry, timeout, circuit breaker, and bulkhead policies.
+
+| | |
+|---|---|
+| Adapters | `memory`, `redis` |
+| Default adapter | `memory` |
+| Accessor | `c.Resilience()` |
+| Guide | [Resilience guide](../../guides/operate/resilience/) |
+
+| Key | Type | Default | Description |
+|---|---|---|---|
+| `name` | string | `""` | Base name applied to the breaker |
+| `timeout` | duration | `5s` | Bounds the whole operation, including retries |
+| `breaker.enabled` | boolean | `false` | Turns the circuit breaker on |
+| `breaker.max_requests` | integer | `1` | Number of probes allowed while half-open |
+| `breaker.interval` | duration | `30s` | Closed-state window before counts reset |
+| `breaker.bucket_period` | duration | `10s` | Rolling-window bucket width; Interval becomes a multiple of it |
+| `breaker.timeout` | duration | `30s` | Open-state duration before the breaker half-opens |
+| `breaker.min_requests` | integer | `10` | Minimum request count before the failure ratio applies |
+| `breaker.failure_ratio` | number | `0.5` | Failure ratio in [0,1] that trips the breaker |
+| `breaker.consecutive_failures` | integer | `5` | Trips the breaker after this many consecutive failures |
+| `bulkhead.max_concurrent` | integer | `100` | Number of concurrent executions admitted |
+| `bulkhead.max_queue` | integer | `100` | Bounds the number of waiters; 0 or less is unbounded |
+| `bulkhead.max_wait` | duration | `1s` | Bounds how long a caller waits for a slot; 0 or less waits indefinitely |
+| `redis.url` | string | `""` | Reserved and currently ignored |
+| `redis.prefix` | string | `resilience` | Key namespace for Redis resilience data |
+| `retry` | object |  | Backoff policy. Keys are listed in [Retry policy](#retry-policy). |
+
+Redis connection keys, documented in [Redis connection options](#redis-connection-options): `redis.addr`, `redis.password`, `redis.db`, `redis.tls`, `redis.require_tls`, `redis.pool_size`, `redis.min_idle_conns`, `redis.pool_timeout`, `redis.max_conn_idle_time`, `redis.max_conn_lifetime`.
+
+```yaml title="zever.yaml"
+resilience:
+  adapter: memory
+  options:
+    timeout: 5000000000
+    breaker:
+      enabled: true
+      consecutive_failures: 5
+```
+
+### `router`
+
+HTTP router adapter.
+
+| | |
+|---|---|
+| Adapters | `fiber`, `stdhttp` |
+| Default adapter | `stdhttp` |
+| Accessor | `c.Router()` |
+| Guide | [Routing guide](../../guides/http/routing/) |
+
+| Key | Type | Default | Description |
+|---|---|---|---|
+| `app_name` | string | `app` | Application name used by adapters, defaulting to "app" when empty |
+
+```yaml title="zever.yaml"
+router:
+  adapter: fiber
+  options:
+    app_name: my-app
+```
+
+### `scheduler`
+
+Cron-style scheduler. It resolves the job dispatcher, so it shares the process-wide queue.
+
+| | |
+|---|---|
+| Adapters | `embedded`, `postgres` |
+| Default adapter | `embedded` |
+| Accessor | `c.Scheduler()` |
+| Guide | [Scheduler and jobs guide](../../guides/background/scheduler-jobs/) |
+
+| Key | Type | Default | Description |
+|---|---|---|---|
+| `close_timeout` | duration | `5s` | Bounds Stop's wait for running ticks |
+| `dsn` | string | `""` | Postgres connection string or sqlite path for the postgres adapter |
+| `dedicated_pool` | boolean | `false` | Opts out of container-level pool sharing |
+
+`scheduler.Options.Dispatcher` is required and is injected in code, so a file `options` block replaces it with nil and `Load` fails with `dispatcher_is_required`. Leave `options` out of the file and set `close_timeout`, `dsn`, and `dedicated_pool` with env instead: `SCHEDULER_CLOSETIMEOUT=3s`, `SCHEDULER_DSN=...`.
+
+```yaml title="zever.yaml"
+scheduler:
+  adapter: postgres
+```
+
+### `search`
+
+Full-text search. `db` is the canonical name; `postgres` and `sqlite` stay as aliases.
+
+| | |
+|---|---|
+| Adapters | `db`, `postgres`, `meilisearch`, `sqlite` |
+| Default adapter | `db` |
+| Accessor | `c.Search()` |
+| Guide | [Search guide](../../guides/data/search/) |
+
+| Key | Type | Default | Description |
+|---|---|---|---|
+| `host` | string | `""` | Meilisearch URL required by meilisearch |
+| `api_key` | string | `""` | Backend API key. Never logged |
+| `dsn` | string | `""` | Postgres URL or sqlite path, required by postgres/sqlite |
+| `dedicated_pool` | boolean | `false` | Opts out of container-level pool sharing |
+| `allow_insecure` | boolean | `false` | Permits an http:// Host for testing |
+
+```yaml title="zever.yaml"
+search:
+  adapter: meilisearch
+  options:
+    host: https://search.example.com
+    api_key: ...
+```
+
+### `secrets`
+
+Secret lookup from the environment or Vault. `prefix` is required.
+
+| | |
+|---|---|
+| Adapters | `env`, `vault` |
+| Default adapter | `env` |
+| Accessor | `c.Secrets()` |
+| Guide | [Secrets guide](../../guides/security/secrets/) |
+
+| Key | Type | Default | Description |
+|---|---|---|---|
+| `addr` | string | `""` | Vault server address |
+| `token` | string | `""` | Vault authentication token |
+| `token_file` | string | `""` | Reads the Vault token from a file when Token is empty |
+| `mount` | string | `""` | Vault KV mount path |
+| `namespace` | string | `""` | Vault namespace |
+| `project_id` | string | `""` | GCP project ID |
+| `prefix` | string | `ZEVER (config default)` | Scopes secret names to one namespace |
+| `region` | string | `""` | AWS region |
+
+```yaml title="zever.yaml"
+secrets:
+  adapter: vault
+  options:
+    addr: https://vault.example.com
+    token_file: /run/secrets/vault-token
+    mount: secret
+```
+
+### `session`
+
+Server-side session store.
+
+| | |
+|---|---|
+| Adapters | `memory`, `redis`, `db` |
+| Default adapter | `memory` |
+| Accessor | `c.Session()` |
+| Guide | [Sessions guide](../../guides/http/sessions/) |
+
+| Key | Type | Default | Description |
+|---|---|---|---|
+| `ttl` | duration | `15m` | Default session lifetime |
+| `dsn` | string | `""` | Postgres connection string or sqlite path for the db adapter |
+| `dedicated_pool` | boolean | `false` | Opts out of container-level pool sharing |
+| `redis.url` | string | `""` | Reserved and currently ignored |
+| `redis.prefix` | string | `""` | Key prefix for Redis session data |
+
+Redis connection keys, documented in [Redis connection options](#redis-connection-options): `redis.addr`, `redis.password`, `redis.db`, `redis.tls`, `redis.require_tls`, `redis.pool_size`, `redis.min_idle_conns`, `redis.pool_timeout`, `redis.max_conn_idle_time`, `redis.max_conn_lifetime`.
+
+```yaml title="zever.yaml"
+session:
+  adapter: redis
+  options:
+    ttl: 900000000000
+    redis:
+      addr: localhost:6379
+```
+
+### `storage`
+
+Object storage with presigned URLs and an optional access policy.
+
+| | |
+|---|---|
+| Adapters | `local`, `s3`, `r2` |
+| Default adapter | `local` |
+| Accessor | `c.Storage()` |
+| Guide | [Storage guide](../../guides/data/storage-media/) |
+
+| Key | Type | Default | Description |
+|---|---|---|---|
+| `url_base` | string | `""` | Base URL minted presigned URLs build on |
+| `root` | string | `""` | Directory objects are stored under |
+| `secret` | string | `""` | HMAC key for presigned URLs |
+| `public_url` | string | `""` | Public base URL for unsigned links |
+| `access_key_id` | string | `""` | AWS access key |
+| `secret_access_key` | string | `""` | AWS secret key |
+| `region` | string | `us-east-1` | AWS region, defaulting to us-east-1 when empty |
+| `endpoint` | string | `""` | Overrides the S3 endpoint (S3-compatible stores) |
+| `policy_sync` | string | `""` | Manual or auto for bucket-policy sync |
+| `sync_fail` | string | `""` | Warn or require on sync failure |
+| `account_id` | string | `""` | Cloudflare account ID |
+| `policy` | object |  | Typed access policy. See below. |
+
+**`policy`** is a flat map: the `Default` key is the fallback policy for unlisted buckets, and every other key is a bucket name. A nil policy means legacy private mode.
+
+| Key | Type | Default | Description |
+|---|---|---|---|
+| `policy.<bucket>.version` | string | `"0"` | Policy schema version. |
+| `policy.<bucket>.<op>.public` | boolean | `false` | Allow unsigned access. |
+| `policy.<bucket>.<op>.allow` | list of strings | `[]` | Subjects granted access (`*` matches any authenticated subject, `anonymous` matches unauthenticated callers). |
+| `policy.<bucket>.<op>.deny` | list of strings | `[]` | Subjects refused access. Deny wins over allow. |
+
+`<op>` is one of `read` (downloads), `write` (new objects), `update` (overwrites), or `delete`.
+
+```yaml title="zever.yaml"
+storage:
+  adapter: s3
+  options:
+    region: us-east-1
+    access_key_id: AKIA...
+    secret_access_key: ...
+```
+
+### `tenant`
+
+Tenant resolution from a fixed ID, a header, or a subdomain.
+
+| | |
+|---|---|
+| Adapters | `single`, `header` |
+| Default adapter | `single` |
+| Accessor | `c.Tenant()` |
+| Guide | [Tenants guide](../../guides/operate/tenants/) |
+
+| Key | Type | Default | Description |
+|---|---|---|---|
+| `header` | string | `X-Tenant-ID` | Header name carrying the tenant ID |
+| `subdomain_regex` | string | `""` | Optional subdomain matching pattern |
+| `id` | string | `default` | Fixed tenant ID for the single-tenant backend |
+
+```yaml title="zever.yaml"
+tenant:
+  adapter: header
+  options:
+    header: X-Tenant-ID
+```
+
+### `vectorstore`
+
+Embedding storage and similarity search. `db` is canonical; `sqlite` and `pgvector` stay as aliases.
+
+| | |
+|---|---|
+| Adapters | `db`, `sqlite`, `pgvector`, `qdrant` |
+| Default adapter | `db` |
+| Accessor | `c.VectorStore()` |
+| Guide | [Vectorstore guide](../../guides/data/vectorstore/) |
+
+| Key | Type | Default | Description |
+|---|---|---|---|
+| `dsn` | string | `""` | Sqlite path or postgres URL |
+| `dedicated_pool` | boolean | `false` | Opts out of container-level pool sharing |
+| `url` | string | `""` | Qdrant address |
+| `api_key` | string | `""` | Backend credential. Never logged |
+| `dimension` | integer | `1536` | Expected embedding dimension |
+| `allow_insecure` | boolean | `false` | Permits an http:// URL for testing |
+
+```yaml title="zever.yaml"
+vectorstore:
+  adapter: qdrant
+  options:
+    url: https://qdrant.example.com
+    api_key: ...
+    dimension: 1536
+```
+
+### `webhook`
+
+Signed webhook delivery with retries, directly over HTTP or through the queue.
+
+| | |
+|---|---|
+| Adapters | `http`, `queue` |
+| Default adapter | `http` |
+| Accessor | `c.Webhook()` |
+| Guide | [Webhooks guide](../../guides/background/webhooks/) |
+
+| Key | Type | Default | Description |
+|---|---|---|---|
+| `timeout` | duration | `10s` | Per-delivery operation timeout |
+| `max_retries` | integer | `0` | Number of delivery retries after the initial attempt |
+| `allow_private_targets` | boolean | `false` | Permits http(s) targets resolving to private addresses |
+| `queue_adapter` | string | `""` | Names the queue adapter backing the queue adapter |
+| `dead_letter_topic` | string | `""` | Queue topic for deliveries that exhaust retries |
+| `replay_tolerance` | duration | `5m` | Bounds how far a signature's embedded timestamp may drift from the verifier's clock before verification rejects it as expired or replayed, on top of the HMAC check itself |
+| `queue_opts` | object |  | Queue settings for the `queue` adapter. See below. |
+
+**`queue_opts`** carries the queue settings for the `queue` adapter. It accepts every [queue](#queue) option (`visibility_timeout`, `poll_timeout`, `buffer`, `addr`, `url`, `prefix`, `dsn`, `table`, `dedicated_pool`, and the Redis connection keys) under the `queue_opts.` prefix.
+
+`Logger` is injected from Go and is not a file option.
+
+```yaml title="zever.yaml"
+webhook:
+  adapter: http
+  options:
+    timeout: 10000000000
+    max_retries: 5
+```
+
+### `workflow`
+
+Durable workflow runs. An empty DSN selects sqlite, a postgres URL selects postgres.
+
+| | |
+|---|---|
+| Adapters | `memory`, `db`, `postgres` |
+| Default adapter | `memory` |
+| Accessor | `c.Workflow()` |
+| Guide | [Workflows guide](../../guides/background/workflows/) |
+
+| Key | Type | Default | Description |
+|---|---|---|---|
+| `host_port` | string | `""` | Workflow server address |
+| `namespace` | string | `""` | Workflow namespace |
+| `dsn` | string | `""` | Postgres connection string |
+| `table` | string | `""` | Workflow-runs table name |
+| `dedicated_pool` | boolean | `false` | Opts out of container-level pool sharing |
+
+```yaml title="zever.yaml"
+workflow:
+  adapter: db
+  options:
+    dsn: postgres://app:secret@db:5432/app
+    table: workflow_runs
+```

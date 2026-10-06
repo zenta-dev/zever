@@ -1,0 +1,45 @@
+---
+// Linked feature card. `icon` is an inline SVG string; description goes in the default slot.
+interface Props {
+  title: string;
+  href: string;
+  icon?: string;
+}
+const { title, href, icon } = Astro.props;
+---
+
+<a class="zd-fcard zd-spot" href={href}>
+  {icon && <span class="zd-fcard-icon" aria-hidden="true" set:html={icon} />}
+  <span class="zd-fcard-title">{title}</span>
+  <span class="zd-fcard-desc"><slot /></span>
+  <span class="zd-fcard-arrow" aria-hidden="true">&rarr;</span>
+</a>
+
+<script>
+  import '../../../scripts/docs/spotlight';
+</script>
+
+<style is:global>
+  .sl-markdown-content a.zd-fcard {
+    position: relative; display: flex; flex-direction: column; gap: 0.45rem; min-width: 0; min-height: 44px;
+    padding: 1.15rem 1.25rem 1.2rem; border: 1px solid var(--zl-line); border-radius: 14px;
+    background: var(--zl-surface); color: var(--zl-text); text-decoration: none; overflow: hidden;
+    transition: transform 0.25s var(--zl-ease), border-color 0.25s, background 0.25s;
+  }
+  .sl-markdown-content a.zd-fcard::before {
+    content: ''; position: absolute; inset: 0; pointer-events: none; opacity: 0; transition: opacity 0.25s;
+    background: radial-gradient(14rem circle at var(--mx, 50%) var(--my, 0%), var(--zl-glow), transparent 70%);
+  }
+  .sl-markdown-content a.zd-fcard:hover, .sl-markdown-content a.zd-fcard:focus-visible {
+    transform: translateY(-3px); border-color: var(--zl-accent); background: var(--zl-surface-2);
+  }
+  .sl-markdown-content a.zd-fcard:hover::before, .sl-markdown-content a.zd-fcard:focus-visible::before { opacity: 1; }
+  .zd-fcard-icon { display: grid; place-items: center; width: 2.4rem; height: 2.4rem; border-radius: 10px; color: var(--zl-accent); background: var(--zl-surface-2); border: 1px solid var(--zl-line); }
+  .zd-fcard-icon svg { width: 1.25rem; height: 1.25rem; }
+  .zd-fcard-title { font-weight: 600; font-size: 1.05rem; letter-spacing: -0.015em; }
+  .zd-fcard-desc { color: var(--zl-text-2); font-size: 0.92rem; line-height: 1.55; }
+  .zd-fcard-desc p { margin: 0 !important; }
+  .zd-fcard-arrow { position: absolute; top: 1.1rem; right: 1.1rem; color: var(--zl-text-3); transition: transform 0.25s var(--zl-ease), color 0.25s; }
+  .zd-fcard:hover .zd-fcard-arrow { transform: translateX(3px); color: var(--zl-accent); }
+  @media (prefers-reduced-motion: reduce) { .sl-markdown-content a.zd-fcard, .zd-fcard-arrow { transition: none; } .sl-markdown-content a.zd-fcard:hover { transform: none; } }
+</style>

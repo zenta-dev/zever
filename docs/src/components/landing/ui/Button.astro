@@ -1,0 +1,19 @@
+---
+interface Props { href: string; variant?: 'primary' | 'ghost'; class?: string }
+const { href, variant = 'primary', class: cls = '' } = Astro.props;
+---
+
+<a href={href} class:list={['zl-btn', `zl-btn-${variant}`, cls]}><span class="zl-btn-label"><slot /></span></a>
+
+<style is:global>
+  .zl-btn { position: relative; isolation: isolate; overflow: hidden; display: inline-flex; align-items: center; justify-content: center; gap: 0.5rem; min-height: 2.75rem; padding: 0 1.4rem; border-radius: 999px; font: 600 0.95rem/1 var(--zl-font-sans); letter-spacing: -0.01em; transition: transform 0.25s var(--zl-ease), box-shadow 0.25s, border-color 0.25s, background 0.25s; white-space: nowrap; -webkit-tap-highlight-color: transparent; }
+  .zl-btn:active { transform: scale(0.97); }
+  /* Explicit colors on every state so no ancestor/reset rule can blend text into the fill. */
+  .zl-btn-primary, .zl-btn-primary:link, .zl-btn-primary:visited { background: var(--zl-btn-grad); color: var(--zl-on-accent); box-shadow: 0 0 0 1px color-mix(in srgb, var(--zl-accent) 60%, transparent), 0 10px 34px -10px var(--zl-accent); }
+  .zl-btn-primary:hover, .zl-btn-primary:focus-visible { color: var(--zl-on-accent); transform: translateY(-2px); box-shadow: 0 0 0 1px var(--zl-accent-hi), 0 16px 44px -10px var(--zl-accent); }
+  .zl-btn-primary::after { content: ''; position: absolute; inset: 0; z-index: -1; background: linear-gradient(110deg, transparent 30%, rgba(255,255,255,0.45) 50%, transparent 70%); transform: translateX(-120%); transition: transform 0.7s var(--zl-ease); }
+  .zl-btn-primary:hover::after { transform: translateX(120%); }
+  .zl-btn-ghost, .zl-btn-ghost:link, .zl-btn-ghost:visited { border: 1px solid var(--zl-line-strong); color: var(--zl-text); background: var(--zl-surface); }
+  .zl-btn-ghost:hover, .zl-btn-ghost:focus-visible { color: var(--zl-text); border-color: var(--zl-accent); background: var(--zl-surface-2); transform: translateY(-2px); }
+  @media (prefers-reduced-motion: reduce) { .zl-btn-primary::after { display: none; } }
+</style>

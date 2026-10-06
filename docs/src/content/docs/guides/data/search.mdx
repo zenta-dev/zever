@@ -1,0 +1,129 @@
+---
+title: Search
+description: Index documents and run ranked full-text queries on sqlite, postgres, or Meilisearch.
+---
+
+import { Tabs, TabItem, LinkCard, CardGrid } from '@astrojs/starlight/components';
+
+`search.Search` indexes documents and runs ranked queries with filters and paging, so the query surface does not change when the backend does. Use it for user-typed queries over spaces, bookings, or help articles; for embeddings use the [vector store](../vectorstore/).
+
+## Quick start
+
+`db` with a sqlite path or `:memory:` is embedded FTS (default, best for tests and small corpora); a postgres URL reuses your relational database. `meilisearch` is a dedicated cluster with the best ranking and latency.
+
+<Tabs>
+  <TabItem label="sqlite">
+```yaml title="zever.yaml"
+search:
+  adapter: db
+  options:
+    dsn: ./data/search.db
+```
+  </TabItem>
+  <TabItem label="meilisearch">
+```yaml title="zever.yaml"
+search:
+  adapter: meilisearch
+  options:
+    host: http://localhost:7700
+    api_key: dev-only-key
+    allow_insecure: true   # http is local dev only; omit for https
+```
+  </TabItem>
+</Tabs>
+
+`host` is the Meilisearch URL with a scheme and host; `dsn` is a postgres URL or sqlite path. `dedicated_pool: true` opts out of pool sharing. The old `postgres` and `sqlite` names alias `db`, but new files should use `db`. Env keys follow `<SERVICE>_<FIELD>` (for example `SEARCH_DSN`). Secrets belong in files or env, never committed plaintext. See the [search options](../../../reference/config/#search).
+
+## Index and query documents
+
+The container wires no adapters, so register `db` first. Batch indexing validates every document before writing any.
+
+```go title="main.go"
+package main
+
+import (
+	"context"
+	"fmt"
+
+	searchdb "github.com/zenta-dev/zever/adapters/search/db"
+	"github.com/zenta-dev/zever/config"
+	"github.com/zenta-dev/zever/container"
+	"github.com/zenta-dev/zever/core/search"
+)
+
+func main() {
+	searchdb.Register()
+	ctx := context.Background()
+	c := container.New(config.Default())
+	defer c.Close(ctx)
+
+	s, err := c.Search()
+	if err != nil {
+		panic(err)
+	}
+	err = s.IndexBatch(ctx, []search.Document{
+		{ID: "space-1", Index: "spaces", Content: "sunny loft downtown"},
+	})
+	if err != nil {
+		panic(err)
+	}
+	res, err := s.Search(ctx, "loft", search.QueryOptions{
+		Limit:   10,
+		Filters: map[string]string{"index": "spaces"},
+	})
+	if err != nil {
+		panic(err)
+	}
+	fmt.Println("total", res.Total, res.Hits[0].ID)
+}
+```
+
+```text
+total 1 space-1
+```
+
+`Search()` resolves lazily and retries after an error; `search.Open(search.DB, opts)` opens the adapter directly. The score varies by backend. `Total` counts all matches ignoring `Limit` and `Offset`, so `len(res.Hits)` can be smaller. `Limit <= 0` defaults to 10 hits; only the `index` filter key is honored, scoping to one collection. `db` searches all indexes without it; `meilisearch` requires it and fails with `ErrIndexRequired`.
+
+## Choose an adapter
+
+| Adapter | Package | Notes |
+|---|---|---|
+| `db` | `search/db` | Default. sqlite path or `:memory:`, or a postgres URL |
+| `sqlite`, `postgres` | `search/db` | Legacy aliases of `db` |
+| `meilisearch` | `search/meilisearch` | External cluster, needs `host` (`api_key` if the server has a master key) |
+
+All serve `Index`, `IndexBatch`, `Delete`, `Search`, and `Close`. Promoting `sqlite` to `meilisearch` takes a config change and a reindex. Search closes after scheduler and job, so in-flight indexing finishes before leaf cache and queue. See the [adapters matrix](../../../reference/adapters-matrix/).
+
+## Troubleshooting
+
+<details>
+<summary>`host must be a valid url with scheme and host`</summary>
+
+Cause: `host` is a bare `localhost:7700`. Fix: use `http://localhost:7700` (or `https://`) and set `allow_insecure: true` for plain http.
+</details>
+
+<details>
+<summary>Results mix spaces with help articles</summary>
+
+Cause: `Filters["index"]` is missing or misspelled; on `db` an empty filter searches every index. Fix: always pass `map[string]string{"index": "spaces"}` and assert it in tests.
+</details>
+
+<details>
+<summary>`len(hits)` is smaller than `Total`</summary>
+
+Cause: paging works as designed. Fix: loop with `Offset` until covered, and show `Total` as the count.
+</details>
+
+<details>
+<summary>sqlite works locally but postgres fails in staging</summary>
+
+Cause: `dsn` holds a sqlite path while the target is postgres, or the role lacks index tables. Fix: use a path for sqlite and a URL for postgres, migrate index tables, then reindex.
+</details>
+
+## Related
+
+<CardGrid>
+  <LinkCard title="Vector store" href="../vectorstore/" />
+  <LinkCard title="Storage and media" href="../storage-media/" />
+  <LinkCard title="Scheduler and jobs" href="../../background/scheduler-jobs/" />
+</CardGrid>

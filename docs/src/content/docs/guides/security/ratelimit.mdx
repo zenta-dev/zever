@@ -1,0 +1,93 @@
+---
+title: Rate limiting
+description: Bound request rates per key with token buckets in memory or shared over Redis.
+---
+
+`ratelimit` bounds how fast one key (user, IP, token) can use an endpoint. `Limiter.Allow` returns a `Decision` with `Allowed`, `RetryAfter`, and `Remaining`; mapping a denial to `429` and the fail mode are your call.
+
+## Quick start
+
+The default is `memory` with `rate: 10`, `burst: 20`. `rate` (refill per second) and `burst` (bucket size) are both required, over zero, and finite.
+
+```yaml title="zever.yaml"
+ratelimit:
+  adapter: memory
+  options:
+    rate: 10
+    burst: 20
+```
+
+```go title="main.go"
+rl, err := c.RateLimit() // c.Ratelimit() is an alias
+if err != nil {
+    return err
+}
+defer rl.Close()
+for i := 0; i < 3; i++ {
+    dec, err := rl.Allow(ctx, "book:guest-1", 1)
+    fmt.Println(dec.Allowed, dec.Remaining, err)
+}
+```
+
+```text
+true 19 <nil>
+true 18 <nil>
+true 17 <nil>
+```
+
+## Limit a request path
+
+The bookings handler calls `Allow(ctx, "book:"+guest, 1)`, returns `429` when `!dec.Allowed`, and `500` on error. Charges cap at burst. Generated servers wire `middleware.RateLimit` (HTTP `429` + `Retry-After`) and a gRPC interceptor (`ResourceExhausted`) when `zever.yaml` enables it; both fail open, and `WithFailMode(FailClosed)` opts in.
+
+## Share limits across replicas
+
+Per-instance buckets multiply the effective limit (`limit x replica count`); switch to `redis` once more than one replica serves traffic.
+
+```yaml title="zever.yaml"
+ratelimit:
+  adapter: redis
+  options:
+    rate: 100
+    burst: 200
+    redis:
+      addr: 127.0.0.1:6379
+      prefix: rl:
+```
+
+```sh
+RATELIMIT_ADAPTER=redis
+RATELIMIT_RATE=100
+RATELIMIT_BURST=200
+```
+
+Use a distinct `redis.prefix` per environment. File durations are integer nanoseconds (`idle_ttl` default 10m, `sweep_interval` 1m); env accepts `"5s"`. `Validate` rejects non-positive `rate`/`burst`, negative `idle_ttl`/`sweep_interval`, and bad Redis `addr`/`prefix`. Adapters: `ratelimit/memory` (default) and `ratelimit/redis`. Keys: [reference](../../../reference/config/#ratelimit).
+
+## Production checklist
+
+- `Limiter.Close() error` takes no context; the container joins errors with `errors.Join`, and panics become `*ClosePanicError`.
+- Keys can be PII (IP, user ID); `InvalidKeyError` reports only length.
+- Never log raw option maps; use `cfg.RedactedServices()`.
+
+## Troubleshooting
+
+<details>
+<summary>The effective limit looks multiplied</summary>
+
+Replicas run `memory` buckets; move to `redis`, or divide the per-instance rate by the replica count.
+</details>
+
+<details>
+<summary>`rate must be > 0 and finite`</summary>
+
+`rate` and `burst` are required; an empty options block fails `Validate` (the bookings `zever.yaml` uses `rate: 10`, `burst: 20`).
+</details>
+
+<details>
+<summary>`InvalidKeyError` on `Allow`</summary>
+
+Keys cap at 256 bytes (`MaxKeyLen`) with no control bytes; hash or truncate long composite keys first.
+</details>
+
+## Related
+
+[Locks and idempotency](../lock-idempotency/) · [Queue](../../background/queue/) · [Observability](../../operate/observability/)

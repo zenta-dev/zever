@@ -1,0 +1,23 @@
+---
+import '../../styles/docs/page.css';
+const title = Astro.locals.starlightRoute.entry.data.title;
+const issue = `https://github.com/zenta-dev/zever/issues/new?title=${encodeURIComponent('Docs: ' + title)}&body=`;
+---
+
+<section class="zp-helpful" data-helpful data-issue={issue} aria-labelledby="zp-helpful-q">
+  <div class="zp-h-ask" data-ask>
+    <h2 id="zp-helpful-q">Was this page helpful?</h2>
+    <div class="zp-h-btns">
+      <button type="button" data-vote="yes">Yes</button>
+      <button type="button" data-vote="no">No</button>
+    </div>
+  </div>
+  <p class="zp-h-msg" data-yes hidden role="status">Thanks for the feedback!</p>
+  <p class="zp-h-msg" data-no hidden role="status">
+    Sorry about that. <a data-issue-link href={issue} target="_blank" rel="noopener">Tell us what was missing on GitHub</a>.
+  </p>
+</section>
+
+<script>
+  import '../../scripts/docs/helpful.ts';
+</script>

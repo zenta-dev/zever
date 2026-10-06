@@ -1,0 +1,41 @@
+---
+import { FOOTER_COLS, VERSION } from '../../data/landing';
+import { href, GITHUB } from '../../lib/url';
+import logo from '../../assets/logo.svg';
+---
+
+<footer class="zl-footer">
+  <div class="zl-wrap zl-foot-grid">
+    <div class="zl-foot-brand">
+      <a class="zl-nav-brand" href={href('')}><img src={logo.src} alt="" width="28" height="28" /><span>Zever</span></a>
+      <p>One schema. Every backend concern. Zero rewiring.</p>
+      <p class="zl-mono zl-foot-meta">{VERSION} · Apache-2.0 · Go 1.27+</p>
+    </div>
+    {FOOTER_COLS.map((c) => (
+      <nav aria-label={c.title}>
+        <h3>{c.title}</h3>
+        <ul>{c.links.map(([l, p]) => <li><a href={href(p)}>{l}</a></li>)}</ul>
+      </nav>
+    ))}
+  </div>
+  <div class="zl-wrap zl-foot-bar">
+    <span>© Zenta Dev</span>
+    <a href={GITHUB} rel="noopener">GitHub</a>
+    <a href={`${GITHUB}/edit/main/docs/src/pages/index.astro`} rel="noopener">Edit this page</a>
+  </div>
+</footer>
+
+<style is:global>
+  .zl-footer { border-top: 1px solid var(--zl-line); padding-top: clamp(3rem, 7vw, 4rem); background: var(--zl-bg-2); }
+  .zl-foot-grid { display: grid; grid-template-columns: 1.6fr repeat(4, minmax(0, 1fr)); gap: 2.5rem; }
+  .zl-foot-brand p { color: var(--zl-text-2); margin: 0.9rem 0 0; font-size: 0.9rem; max-width: 28ch; }
+  .zl-foot-meta { color: var(--zl-text-3) !important; font-size: 0.75rem !important; }
+  .zl-footer h3 { font: 500 0.75rem/1 var(--zl-font-mono); letter-spacing: 0.1em; text-transform: uppercase; color: var(--zl-text-3); margin: 0 0 0.75rem; }
+  .zl-footer ul { list-style: none; margin: 0; padding: 0; display: grid; gap: 0; font-size: 0.9rem; color: var(--zl-text-2); }
+  .zl-footer ul a, .zl-foot-bar a { display: inline-flex; align-items: center; min-height: 2.75rem; transition: color 0.2s; }
+  .zl-footer ul a:hover, .zl-foot-bar a:hover { color: var(--zl-text); }
+  .zl-foot-bar { display: flex; flex-wrap: wrap; align-items: center; gap: 0.25rem 1.5rem; padding-block: 1.25rem; margin-top: 2.5rem; border-top: 1px solid var(--zl-line); font-size: 0.8rem; color: var(--zl-text-3); }
+  .zl-foot-bar span { margin-right: auto; }
+  @media (max-width: 900px) { .zl-foot-grid { grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 2rem 1.5rem; } .zl-foot-brand { grid-column: 1 / -1; } }
+  @media (max-width: 640px) { .zl-footer { padding-bottom: calc(4.5rem + env(safe-area-inset-bottom)); } }
+</style>

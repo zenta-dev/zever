@@ -1,0 +1,18 @@
+---
+import Pagination from 'virtual:starlight/components/Pagination';
+import Helpful from './Helpful.astro';
+import '../../styles/docs/page.css';
+const base = import.meta.env.BASE_URL;
+---
+
+<footer class="zp-footer">
+  <Helpful />
+  <Pagination />
+  <div class="zp-foot-line">
+    <span>&copy; Zenta Dev</span>
+    <nav aria-label="Footer">
+      <a href={base}>Landing home</a>
+      <a href="https://github.com/zenta-dev/zever" target="_blank" rel="noopener">GitHub</a>
+    </nav>
+  </div>
+</footer>

@@ -1,0 +1,162 @@
+---
+title: gRPC client
+description: Dial gRPC services with round-robin balancing, retry, tracing, timeouts, and a resilience guard.
+---
+
+import { LinkCard, CardGrid } from '@astrojs/starlight/components';
+
+Use `shared/grpcclient` for outbound gRPC calls between Zever services. `New(ctx, target, opts...)` returns a `*grpc.ClientConn` with round-robin load balancing, optional per-method retry, W3C trace propagation, metadata, a per-RPC timeout, and an optional `resilience.Guard` already wired. It is a natural backing for the generated saga `SagaCaller` (see [saga](../saga/)), and `container.GRPCClient` caches one connection per target.
+
+There is no `config` entry: `grpcclient` is a helper, not a battery. Build connections in code or through the container.
+
+## Quick start
+
+```go title="main.go"
+package main
+
+import (
+	"context"
+	"fmt"
+
+	"github.com/zenta-dev/zever/shared/grpcclient"
+)
+
+func main() {
+	conn, err := grpcclient.New(context.Background(), "static:///users",
+		grpcclient.WithInsecure(),
+		grpcclient.WithStaticResolver(map[string][]string{
+			"users": {"127.0.0.1:50051", "127.0.0.2:50051"},
+		}))
+	if err != nil {
+		panic(err)
+	}
+	defer conn.Close()
+
+	fmt.Println("client created")
+}
+```
+
+```text
+client created
+```
+
+`New` performs no IO, so the connection is established lazily on the first RPC. Call generated clients over it (`pb` is your generated protobuf package):
+
+```go
+client := pb.NewUsersClient(conn)
+resp, err := client.GetUser(ctx, &pb.GetUserRequest{Id: "u-1"})
+```
+
+## Choose credentials and a target
+
+Credentials are explicit and fail closed: `New` returns `ErrNoCredentials` unless you pass `WithInsecure` or `WithTLS`, and `ErrInsecureAndTLS` when you pass both. `WithInsecure` is for development and loopback only.
+
+| Target | Resolves through |
+|---|---|
+| `dns:///host:port` | gRPC's built-in DNS resolver. Multiple addresses spread load with `round_robin`, no sidecar. |
+| `static:///name` | The `WithStaticResolver` address map. An unknown or empty name fails fast. Registered per connection, never globally. Use for in-process and test setups. |
+
+For production, use TLS. `WithTLS(TLSOptions{CertFile, KeyFile, CAFile, ServerName})` loads an optional client certificate pair (both or neither, for mTLS), a CA bundle, and a server-name override. TLS 1.2 is the floor; read or parse failures return errors, and `WithTLS` never falls back to insecure.
+
+```go title="dial.go"
+import (
+	"context"
+	"time"
+
+	"google.golang.org/grpc"
+	"google.golang.org/grpc/codes"
+
+	"github.com/zenta-dev/zever/shared/grpcclient"
+)
+
+func dial(ctx context.Context) (*grpc.ClientConn, error) {
+	return grpcclient.New(ctx, "dns:///users:443",
+		grpcclient.WithTLS(grpcclient.TLSOptions{CAFile: "/etc/ssl/ca.pem"}),
+		grpcclient.WithMetadata(map[string]string{"x-tenant": "acme"}),
+		grpcclient.WithTimeout(2*time.Second),
+		grpcclient.WithRetryPolicy(grpcclient.RetryPolicy{
+			MaxAttempts:          5, // capped at DefaultMaxAttempts (5)
+			InitialBackoff:       10 * time.Millisecond,
+			MaxBackoff:           500 * time.Millisecond,
+			BackoffMultiplier:    2,
+			RetryableStatusCodes: []codes.Code{codes.Unavailable},
+		}),
+	)
+}
+```
+
+## Retry failed calls
+
+`WithRetryPolicy` merges a per-method policy into the gRPC service config for every method. Invalid policies return an error, never a silent ignore:
+
+- `MaxAttempts` must be at least 2 and is capped at `DefaultMaxAttempts` (5, gRPC's own client limit).
+- Backoffs and `BackoffMultiplier` must be positive.
+- `RetryableStatusCodes` must not be empty. Keep it minimal (typically `UNAVAILABLE`): retrying every failure multiplies load on a struggling server. Code names are mapped to the canonical form for you.
+
+`WithServiceConfigJSON` overlays raw keys (for example a custom `loadBalancingConfig`) on the `round_robin` default.
+
+## Resolve the connection from the container
+
+```go title="main.go"
+conn, err := c.GRPCClient("static:///users", grpcclient.WithInsecure())
+```
+
+`GRPCClient(target, opts...)` caches one connection per target string: repeat calls with the same target return the same connection, and later calls with different options keep the first build. The container closes cached connections during `Close(ctx)`; otherwise the caller closes with `conn.Close()`. See [the container](../../../concepts/container/).
+
+## Know the interceptor order
+
+Every connection chains unary and stream interceptors in this order, outermost first:
+
+1. Observability span (when `WithObservability` is set), covering the whole call including guard execution.
+2. W3C trace context injection from `shared/traceprop` into outgoing metadata.
+3. `WithMetadata` keys, never overwriting keys already in the outgoing context.
+4. `WithTimeout` deadline (must be positive, or `New` errors), governing the whole call including guard retries; without it only the caller's context applies.
+5. `WithGuard`, wrapping the call in the `resilience.Guard` breaker, bulkhead, and retry composition.
+
+For streams, the guard wraps stream establishment only; messages after establishment are not guarded.
+
+## Production checklist
+
+- Use `WithTLS` with a CA bundle, never `WithInsecure`.
+- Pair `round_robin` with the `redis` resilience adapter when replicas must share one circuit per downstream dependency.
+- Metadata values can carry tenant or user context. Never log raw metadata maps, and use `config.RedactedServices` for config output.
+
+## Troubleshooting
+
+<details>
+<summary>ErrNoCredentials</summary>
+
+Neither `WithInsecure` nor `WithTLS` was passed. Pick one; credentials are explicit.
+</details>
+
+<details>
+<summary>ErrInsecureAndTLS</summary>
+
+Both options were passed; they are mutually exclusive. Remove one.
+</details>
+
+<details>
+<summary>static resolver: unknown name</summary>
+
+The target name is not in the `WithStaticResolver` map, so the channel fails fast. Add the name and its addresses.
+</details>
+
+<details>
+<summary>Calls hang past the dependency's deadline</summary>
+
+No `WithTimeout`, so only the caller's context bounds the call. Add it; it bounds the whole call including guard retries.
+</details>
+
+<details>
+<summary>Retries never trigger</summary>
+
+`RetryableStatusCodes` does not list the codes to retry. List them explicitly, for example `codes.Unavailable`.
+</details>
+
+## Related
+
+<CardGrid>
+  <LinkCard title="Resilience" href="../../operate/resilience/" description="The guard composition used by WithGuard." />
+  <LinkCard title="Observability" href="../../operate/observability/" description="Client spans and trace propagation." />
+  <LinkCard title="The container" href="../../../concepts/container/" description="GRPCClient caching and close order." />
+</CardGrid>

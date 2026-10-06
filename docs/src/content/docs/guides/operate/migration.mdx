@@ -1,0 +1,104 @@
+---
+title: Migrate to the multi-module layout
+description: Move old flat imports to core, adapters, and shared modules, and fix UnknownAdapterError.
+---
+
+import { LinkCard, CardGrid } from '@astrojs/starlight/components';
+
+Follow this page when a bump breaks imports from the old flat layout (top-level `auth/`, `db/`, `cache/`, `internal/dsl/`, `container/adapters` bundles) or when resolution fails with `UnknownAdapterError`. The new layout is a multi-module monorepo.
+
+## The new layout
+
+| Path | Role |
+|---|---|
+| `core/<b>` | Battery interface plus `Register` and `Open` registry (the container resolves). |
+| `adapters/<b>/<a>` | One Go module per adapter. `Register()` wires it into its `core` registry. |
+| `shared/*` | SDK-free helpers, one module each. |
+| `config`, `container`, `orm`, `dsl`, `cmd/zever` | Separate modules. |
+
+Releases are lockstep: one version, with per-module tags `<path>/vX.Y.Z` via `tools/tag-release.sh`. The scaffold floor is `log, router`. Add more batteries with the `zever new` picker (`--interactive`, `--batteries`, `--adapters`, `--list-batteries`) or `zever add <battery>[/<adapter>]`.
+
+## Rewrite imports
+
+| Old import (under `github.com/zenta-dev/zever/`) | New import | Notes |
+|---|---|---|
+| `auth` | `core/auth` | Interface and registry. |
+| `auth/jwt` | `adapters/auth/jwt` | `jwt.Register()` |
+| `db` | `core/db` | Interface and registry. |
+| `db/sqlite` | `adapters/db/sqlite` | `sqlite.Register()` |
+| `db/postgres` | `adapters/db/postgres` | `postgres.Register()` |
+| `cache` | `core/cache` | Interface and registry. |
+| `cache/redis` | `adapters/cache/redis` | `redis.Register()` |
+| `queue/redis` | `adapters/queue/redis` | `redis.Register()` |
+| `router/fiber` | `adapters/router/fiber` | `fiber.Register()` |
+| `password/argon2` | `adapters/password/argon2` | `argon2.Register()` |
+| `scheduler/embedded` | `adapters/scheduler/embedded` | `embedded.Register()` |
+| `codec` | `shared/codec` | Helper, no registry. |
+| `internal/redis` | `shared/redisclient` and `shared/redisopt` | Split: client vs options. |
+| `internal/retry` | `shared/retry` | Helper. |
+| `internal/endpoint` | `shared/endpoint` | Helper. |
+| `internal/dsl/...` | `dsl/...` | Compiler frontend moved. |
+| `container/adapters` (flat bundle) | Per-adapter `Register()` calls | The bundle and `RegisterAll` are deleted. |
+
+Every other battery follows the same pattern: `core/<b>` for the interface, `adapters/<b>/<a>` for each driver. The full module list is in the [adapters matrix](../../../reference/adapters-matrix/).
+
+Run `tools/migrate-imports.sh` from a checkout of the new layout. It derives battery and adapter names from `core/*` and `adapters/*/*` and rewrites only quoted import strings, then runs `gofmt`:
+
+```sh
+tools/migrate-imports.sh --root /path/to/zever --check ./myapp   # list files that would change
+tools/migrate-imports.sh --root /path/to/zever ./myapp           # rewrite in place
+go mod tidy                                                      # per touched module
+```
+
+## Register the adapters you use
+
+Add the adapter modules you resolve and call their `Register()` before `container.New`. An unregistered adapter fails resolution with `UnknownAdapterError`, hinting at the forgotten call.
+
+```go title="main.go"
+import (
+    dbsqlite "github.com/zenta-dev/zever/adapters/db/sqlite"
+    cacheredis "github.com/zenta-dev/zever/adapters/cache/redis"
+)
+
+dbsqlite.Register()
+cacheredis.Register()
+```
+
+## Use the workspace for development
+
+A committed `go.work` at the repo root covers every workspace module (`examples/external-sms` and `docs/examples` stay outside by design). `go build ./...` and `go test ./...` from the root resolve through it, and CI runs per-module standalone commands with `GOWORK=off`.
+
+```sh
+go work init ./config ./container ./orm ./dsl ./cmd/zever ./core/db ./adapters/db/sqlite
+go work use ./core/cache ./adapters/cache/redis ./shared/redisclient
+go build ./...
+```
+
+## Troubleshooting
+
+<details>
+<summary>`UnknownAdapterError` after a bump</summary>
+
+The adapter module is not required or `Register()` is not called. Run `go get` for the `adapters/<b>/<a>` module and call `Register()` before `container.New`.
+</details>
+
+<details>
+<summary>`go build` fails importing `internal/dsl`</summary>
+
+The path moved. Rewrite it to `github.com/zenta-dev/zever/dsl/...`.
+</details>
+
+<details>
+<summary>`container/adapters` import fails</summary>
+
+The flat bundles are deleted. Replace them with per-adapter `Register()` calls.
+</details>
+
+## Related
+
+<CardGrid>
+  <LinkCard title="Adapters matrix" href="../../../reference/adapters-matrix/" description="Every adapter module path and Register call." />
+  <LinkCard title="Project layout" href="../../../start/project-layout/" description="The module layout." />
+  <LinkCard title="Installation" href="../../../start/installation/" description="Toolchain and first build." />
+  <LinkCard title="Upgrade" href="../upgrade/" description="Bump procedure and known breaks." />
+</CardGrid>

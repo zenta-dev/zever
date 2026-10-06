@@ -3,12 +3,29 @@ title: CLI Reference
 description: Flags-only toolkit shell with exact CLI invocations for every command.
 ---
 
+import { CardGrid, Card } from '@astrojs/starlight/components';
+
+<CardGrid>
+  <Card title="Scaffolding" icon="rocket">
+    `zever new`, `zever add`, `zever generate`, `zever extract`. See the [command table](#reference).
+  </Card>
+  <Card title="Inspection" icon="magnifier">
+    `zever compile`, `check`, `breaking`, `fmt`, `doctor`, `config show`, `routes`, `explain`, `check-boundaries`, `graph`. See the [command table](#reference).
+  </Card>
+  <Card title="Runtime" icon="seti:server">
+    `zever serve`, `dev`, `queue:work`, `schedule:run`, `tinker`. See the [command table](#reference) and [dev and tinker rules](#dev-and-tinker-rules).
+  </Card>
+  <Card title="Database" icon="seti:db">
+    `zever db migrate`, `db rollback`, `db seed`. See the [command table](#reference).
+  </Card>
+</CardGrid>
+
 ## Purpose
 
 `zever` is a flags-only toolkit shell. Every command has an exact CLI
 invocation; run `zever --help` for the grouped command map.
 
-When to use: scaffold, inspect, run, migrate, and document a zever
+When to use: scaffold, inspect, run, migrate, and document a Zever
 project. When not to use: project code stays in Go and `.zen`; the CLI
 drives it, never hosts logic.
 
@@ -134,7 +151,7 @@ exit:0
 | `--list-batteries` | `zever new`: print the battery/default-adapter table to stdout and exit |
 | `--module PATH` | `zever new`: Go module path for the new project (default: the app name itself) |
 | `--dir PATH` | `zever new`: output directory (default `./<name>`) |
-| `--framework-version V` | `zever new`: depend on a published zever version instead of a local replace directive |
+| `--framework-version V` | `zever new`: depend on a published Zever version instead of a local replace directive |
 | `--force` | `zever new`: scaffold into a non-empty directory anyway |
 | `-h` | print flags without running |
 
@@ -166,14 +183,14 @@ Effects (three append-only edits, never overwriting hand-written code):
 - `internal/app/app.go`: splices in the adapter's named import plus its
   `Register()` call (gofmt-normalized). Either half already present is
   skipped, so re-adding the same battery is a no-op. Fails if the file
-  has no import block or no `func New` — scaffold it with
+  has no import block or no `func New`, scaffold it with
   `zever generate server` first.
 - `zever.yaml`: sets `<battery>.adapter`, preserving every other entry
   (including the entry's own options). A missing or empty file starts a
   fresh document (with the schema modeline, like `zever new`); an
   existing file keeps its header.
 
-`zever add` does not run `go mod tidy` — run it afterwards so `go.sum`
+`zever add` does not run `go mod tidy`, run it afterwards so `go.sum`
 catches up, then serve:
 
 ```sh
@@ -215,7 +232,7 @@ Metrics, alert rules, and the full runbook are in
   to stdout and restarts the server entrypoint on change. Ctrl-C stops the
   watcher and the server. Never a deployment path.
 - `zever tinker` is dev-only: every start prints
-  `WARNING: zever tinker is development-only: it evaluates arbitrary Go
+  `WARNING: Zever tinker is development-only: it evaluates arbitrary Go
   against a live container, so run it against a development database only.`
   to stderr. The REPL talks to the real container via the per-project shim
   (`project.tinker_entry`, default `cmd/tinker-shim`; scaffold with

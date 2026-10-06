@@ -1,0 +1,134 @@
+---
+import Section from './ui/Section.astro';
+import { EXAMPLES } from '../../data/landing';
+import { GITHUB } from '../../lib/url';
+---
+
+<Section id="examples" eyebrow="Examples" title="Start from <em>something real</em>." lede="Every example is a runnable app or focused snippet in the repository.">
+  <div class="car zl-reveal at-start" data-car>
+    <div class="car-frame">
+      <div class="car-scroll" tabindex="0" role="region" aria-label="Example apps, scroll horizontally or use arrow keys" data-scroller>
+        {EXAMPLES.map((e, i) => (
+          <a class="car-card zl-card" href={`${GITHUB}/tree/main/examples/${e.name}`} rel="noopener" draggable="false">
+            <span class="car-top">
+              <span class="car-tag">{e.tag}</span>
+              <span class="car-idx" aria-hidden="true">{String(i + 1).padStart(2, '0')}</span>
+            </span>
+            <h3 class="car-name">{e.name}</h3>
+            <p>{e.blurb}</p>
+            <span class="car-link">View on GitHub <span class="car-arr" aria-hidden="true">→</span></span>
+          </a>
+        ))}
+      </div>
+    </div>
+    <div class="car-ctl">
+      <div class="car-prog" aria-hidden="true"><i data-prog></i></div>
+      <button type="button" class="car-btn" data-dir="-1" aria-label="Previous examples">←</button>
+      <button type="button" class="car-btn" data-dir="1" aria-label="Next examples">→</button>
+    </div>
+  </div>
+</Section>
+
+<script>
+  document.querySelectorAll<HTMLElement>('[data-car]').forEach((root) => {
+    const sc = root.querySelector<HTMLElement>('[data-scroller]')!;
+    const prev = root.querySelector<HTMLButtonElement>('[data-dir="-1"]')!;
+    const next = root.querySelector<HTMLButtonElement>('[data-dir="1"]')!;
+    const prog = root.querySelector<HTMLElement>('[data-prog]')!;
+    const reduce = () => matchMedia('(prefers-reduced-motion: reduce)').matches;
+    const update = () => {
+      const span = sc.scrollWidth - sc.clientWidth;
+      const max = span - 2;
+      root.classList.toggle('at-start', sc.scrollLeft <= 2);
+      root.classList.toggle('at-end', sc.scrollLeft >= max);
+      prev.disabled = sc.scrollLeft <= 2;
+      next.disabled = sc.scrollLeft >= max;
+      const visible = sc.clientWidth / sc.scrollWidth;
+      const pos = span > 0 ? sc.scrollLeft / span : 0;
+      prog.style.width = `${Math.min(1, visible) * 100}%`;
+      prog.style.transform = `translateX(${pos * (1 / Math.max(visible, 0.01) - 1) * 100}%)`;
+    };
+    const step = (d: number) => {
+      const card = sc.querySelector<HTMLElement>('.car-card');
+      const w = (card?.offsetWidth ?? 300) + 16;
+      sc.scrollBy({ left: d * w, behavior: reduce() ? 'auto' : 'smooth' });
+    };
+    prev.addEventListener('click', () => step(-1));
+    next.addEventListener('click', () => step(1));
+    sc.addEventListener('scroll', update, { passive: true });
+    addEventListener('resize', update);
+    new ResizeObserver(update).observe(sc);
+
+    // Mouse drag-to-scroll (touch and pen keep native scrolling).
+    let down = false, moved = false, startX = 0, startLeft = 0;
+    sc.addEventListener('pointerdown', (e) => {
+      if (e.pointerType !== 'mouse' || e.button !== 0) return;
+      down = true; moved = false; startX = e.clientX; startLeft = sc.scrollLeft;
+    });
+    sc.addEventListener('pointermove', (e) => {
+      if (!down) return;
+      const dx = e.clientX - startX;
+      if (!moved && Math.abs(dx) > 5) {
+        moved = true;
+        root.classList.add('is-drag');
+        sc.setPointerCapture(e.pointerId);
+      }
+      if (moved) sc.scrollLeft = startLeft - dx;
+    });
+    const end = (e: PointerEvent) => {
+      if (!down) return;
+      down = false;
+      if (moved) {
+        if (sc.hasPointerCapture(e.pointerId)) sc.releasePointerCapture(e.pointerId);
+        root.classList.remove('is-drag');
+        // Snap to the nearest card after release.
+        const cards = Array.from(sc.querySelectorAll<HTMLElement>('.car-card'));
+        const target = cards.reduce((a, c) => Math.abs(c.offsetLeft - sc.scrollLeft) < Math.abs(a.offsetLeft - sc.scrollLeft) ? c : a, cards[0]);
+        sc.scrollTo({ left: target.offsetLeft - parseFloat(getComputedStyle(sc).paddingLeft), behavior: reduce() ? 'auto' : 'smooth' });
+      }
+    };
+    sc.addEventListener('pointerup', end);
+    sc.addEventListener('pointercancel', end);
+    // A drag must not activate the card link underneath.
+    sc.addEventListener('click', (e) => { if (moved) { e.preventDefault(); e.stopPropagation(); moved = false; } }, true);
+    update();
+  });
+</script>
+
+<style>
+  .car { position: relative; min-width: 0; }
+  .car-frame { position: relative; margin-inline: calc(-1 * var(--zl-gutter)); }
+  .car-frame::before, .car-frame::after { content: ''; position: absolute; top: 0; bottom: 0; width: clamp(1.5rem, 6vw, 5rem); z-index: 1; pointer-events: none; transition: opacity 0.3s; }
+  .car-frame::before { left: 0; background: linear-gradient(90deg, var(--zl-bg), transparent); }
+  .car-frame::after { right: 0; background: linear-gradient(-90deg, var(--zl-bg), transparent); }
+  .car.at-start .car-frame::before, .car.at-end .car-frame::after { opacity: 0; }
+  .car-scroll { display: flex; gap: 1rem; overflow-x: auto; scroll-snap-type: x mandatory; overscroll-behavior-x: contain; scrollbar-width: none; padding: 1rem var(--zl-gutter) 1.25rem; scroll-padding-inline: var(--zl-gutter); -webkit-overflow-scrolling: touch; cursor: grab; }
+  .car.is-drag .car-scroll { cursor: grabbing; scroll-snap-type: none; user-select: none; }
+  .car-scroll::-webkit-scrollbar { display: none; }
+  .car-scroll:focus-visible { outline: 2px solid var(--zl-accent); outline-offset: -2px; }
+
+  .car-card { container-type: inline-size; flex: 0 0 min(82vw, 360px); scroll-snap-align: start; padding: 1.5rem; display: flex; flex-direction: column; gap: 0.75rem; min-height: 17rem; position: relative; overflow: hidden; transition: transform 0.35s var(--zl-ease), border-color 0.3s, box-shadow 0.35s var(--zl-ease); }
+  .car-card::before { content: ''; position: absolute; inset: 0; background: radial-gradient(80% 60% at 100% 0, var(--zl-glow), transparent 70%); opacity: 0; transition: opacity 0.4s var(--zl-ease); pointer-events: none; }
+  .car-card:hover, .car-card:focus-visible { transform: translateY(-6px); border-color: var(--zl-accent); box-shadow: 0 24px 50px -28px var(--zl-glow); }
+  .car-card:hover::before, .car-card:focus-visible::before { opacity: 1; }
+  .car-card > * { position: relative; }
+  .car-top { display: flex; align-items: center; justify-content: space-between; gap: 0.5rem; }
+  .car-tag { font: 500 0.7rem/1 var(--zl-font-mono); letter-spacing: 0.08em; text-transform: uppercase; color: var(--zl-accent); background: var(--zl-surface-2); border: 1px solid var(--zl-line-strong); border-radius: 999px; padding: 0.4rem 0.75rem; }
+  .car-idx { font: 500 0.75rem/1 var(--zl-font-mono); color: var(--zl-text-3); }
+  .car-name { margin: 0.5rem 0 0; font: 600 clamp(1.4rem, 8cqi, 1.9rem)/1.1 var(--zl-font-display); letter-spacing: -0.02em; overflow-wrap: anywhere; }
+  .car-card p { margin: 0; color: var(--zl-text-2); font-size: 0.98rem; flex: 1; }
+  .car-link { display: inline-flex; align-items: center; gap: 0.4rem; min-height: 2.75rem; font: 0.8rem/1 var(--zl-font-mono); color: var(--zl-text-3); }
+  .car-arr { transition: transform 0.3s var(--zl-ease); }
+  .car-card:hover .car-link, .car-card:focus-visible .car-link { color: var(--zl-accent); }
+  .car-card:hover .car-arr { transform: translateX(4px); }
+
+  .car-ctl { display: flex; align-items: center; gap: 0.6rem; margin-top: 0.25rem; }
+  .car-prog { flex: 1; height: 3px; border-radius: 3px; background: var(--zl-line-strong); overflow: hidden; margin-right: 0.6rem; }
+  .car-prog i { display: block; height: 100%; width: 30%; border-radius: 3px; background: var(--zl-btn-grad); will-change: transform; }
+  :global(.zl-page[data-theme='light']) .car-prog i { background: var(--zl-accent); }
+  .car-btn { width: 2.75rem; height: 2.75rem; flex: none; border-radius: 50%; border: 1px solid var(--zl-line-strong); background: var(--zl-surface); color: var(--zl-text); font-size: 1.05rem; cursor: pointer; transition: border-color 0.25s, background 0.25s, opacity 0.25s, transform 0.25s var(--zl-ease); }
+  .car-btn:hover:not(:disabled) { border-color: var(--zl-accent); background: var(--zl-surface-2); transform: scale(1.06); }
+  .car-btn:disabled { opacity: 0.3; cursor: default; }
+  @media (pointer: coarse) { .car-scroll { cursor: auto; } }
+  @media (prefers-reduced-motion: reduce) { .car-card:hover, .car-card:focus-visible, .car-btn:hover { transform: none; } }
+</style>

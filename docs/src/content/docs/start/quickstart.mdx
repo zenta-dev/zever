@@ -1,0 +1,131 @@
+---
+title: Quickstart
+description: Go from an empty folder to a running API in five commands.
+---
+
+import { Steps, LinkCard, CardGrid } from '@astrojs/starlight/components';
+
+You will define one entity and two RPCs in a `.zen` schema, then check it, compile it, create the database, and serve it. It takes about five minutes. You need Go 1.27+ and the `zever` CLI ([installation](../installation/)).
+
+## Scaffold the project
+
+Create the project and fetch its dependencies:
+
+```sh
+zever new hello --dir ./hello --force
+cd hello
+go mod tidy
+```
+
+Expected output (abridged):
+
+```text
+✔ scaffolded "hello" into ./hello
+  wrote hello/schema/app.zen
+  wrote hello/cmd/server/main.go
+  wrote hello/zever.yaml
+```
+
+## Define the schema
+
+Replace `schema/app.zen` with a `Task` entity and a service that exposes it:
+
+```zen title="schema/app.zen"
+entity Task {
+  id: uuid @primary
+  title: string @validate(min_len: 1, max_len: 200)
+  done: bool
+  created_at: timestamp @default(now())
+}
+
+service TaskService {
+  rpc CreateTask(title: string) -> Task {
+    http: POST "/v1/tasks"
+    auth: required
+  }
+
+  rpc ListTasks() -> Task {
+    http: GET "/v1/tasks"
+    auth: required
+    paginated: true
+  }
+}
+```
+
+## Run the five commands
+
+<Steps>
+
+1. Validate the schema. This writes nothing.
+
+   ```sh
+   zever check schema/app.zen
+   ```
+
+   ```text
+   OK 1 file(s) valid
+   ```
+
+2. Compile it into a typed ORM, an OpenAPI document, and migration DDL.
+
+   ```sh
+   zever compile --backend=zenorm,atlas,openapi --out ./generated schema/app.zen
+   ```
+
+   ```text
+   ✔ compiled 1 file(s) → ./generated (4 outputs, backends: zenorm,atlas,openapi)
+   ```
+
+3. Preview the SQL without touching the database.
+
+   ```sh
+   zever db migrate --dry-run --adapter=sqlite schema/app.zen
+   ```
+
+   The output ends with:
+
+   ```text
+   dry run — no changes applied
+   1 statement(s) would be executed
+   ```
+
+4. Create the sqlite database.
+
+   ```sh
+   zever db migrate --adapter=sqlite --dsn=data/app.db schema/app.zen
+   ```
+
+   ```text
+   OK applied 1 statement(s) via sqlite
+   ```
+
+5. Serve the API. The server listens on `:8080` (HTTP) and `:9090` (gRPC); pass `-addr` to change the HTTP address.
+
+   ```sh
+   zever serve
+   ```
+
+</Steps>
+
+In a second terminal, check that the server is up. `/healthz` returns HTTP 200 with an empty body:
+
+```sh
+curl -i localhost:8080/healthz
+```
+
+```text
+HTTP/1.1 200 OK
+```
+
+## What you built
+
+One schema now drives validation, the typed ORM, the OpenAPI document, and the table DDL. The handlers behind `CreateTask` and `ListTasks` are yours to write: Zever generates the plumbing, not your business logic.
+
+## Next steps
+
+<CardGrid>
+  <LinkCard title="Build a booking API" description="A full service with auth, queue, and worker." href="../../tutorials/build-a-booking-api/" />
+  <LinkCard title="How Zever works" description="Schema, compiler, container, adapters in one page." href="../../concepts/how-zever-works/" />
+  <LinkCard title="Project layout" description="Where every package lives." href="../project-layout/" />
+  <LinkCard title="CLI reference" description="Every command and flag." href="../../reference/cli/" />
+</CardGrid>

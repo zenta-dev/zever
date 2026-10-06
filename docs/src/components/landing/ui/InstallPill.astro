@@ -1,0 +1,39 @@
+---
+interface Props { command: string; prompt?: string }
+const { command, prompt = '$' } = Astro.props;
+---
+
+<div class="zl-pill" data-copy-root>
+  <span class="zl-pill-prompt" aria-hidden="true">{prompt}</span>
+  <code class="zl-pill-cmd">{command}</code>
+  <button type="button" class="zl-pill-btn" data-copy={command} aria-label="Copy command">
+    <svg class="i-copy" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="9" y="9" width="13" height="13" rx="2"/><path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"/></svg>
+    <svg class="i-ok" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><path d="M20 6 9 17l-5-5"/></svg>
+  </button>
+  <span class="zl-sr" role="status" aria-live="polite" data-copy-status></span>
+</div>
+
+<script>
+  document.querySelectorAll<HTMLButtonElement>('[data-copy]').forEach((btn) => {
+    btn.addEventListener('click', async () => {
+      try { await navigator.clipboard.writeText(btn.dataset.copy ?? ''); } catch { return; }
+      const root = btn.closest('[data-copy-root]');
+      root?.classList.add('is-copied');
+      const s = root?.querySelector('[data-copy-status]');
+      if (s) s.textContent = 'Copied to clipboard';
+      setTimeout(() => { root?.classList.remove('is-copied'); if (s) s.textContent = ''; }, 1800);
+    });
+  });
+</script>
+
+<style is:global>
+  .zl-pill { display: inline-flex; align-items: center; gap: 0.75rem; max-width: 100%; padding: 0.35rem 0.4rem 0.35rem 1rem; border: 1px solid var(--zl-line-strong); border-radius: 999px; background: var(--zl-surface); font-family: var(--zl-font-mono); font-size: 0.85rem; }
+  .zl-pill-prompt { color: var(--zl-accent); }
+  .zl-pill-cmd { overflow-x: auto; white-space: nowrap; scrollbar-width: none; color: var(--zl-text); background: none; padding: 0; }
+  .zl-pill-btn { flex: none; display: grid; place-items: center; width: 2rem; height: 2rem; border-radius: 50%; border: 0; background: var(--zl-surface-2); color: var(--zl-text-2); cursor: pointer; transition: color 0.2s, background 0.2s; }
+  .zl-pill-btn:hover { color: var(--zl-text); background: var(--zl-line-strong); }
+  .zl-pill .i-ok { display: none; color: var(--zl-accent); }
+  .zl-pill.is-copied .i-ok { display: block; }
+  .zl-pill.is-copied .i-copy { display: none; }
+  .zl-sr { position: absolute; width: 1px; height: 1px; overflow: hidden; clip: rect(0 0 0 0); }
+</style>

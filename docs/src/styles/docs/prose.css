@@ -1,0 +1,211 @@
+@import './components.css';
+
+/* Docs prose: reading experience. Scoped to docs content, never the landing. */
+
+/* Page backdrop: faint top glow + grid, docs pages only. */
+:root:not(.zl-landing) .main-frame { position: relative; isolation: isolate; }
+:root:not(.zl-landing) .main-frame::before {
+  content: '';
+  position: absolute;
+  inset: 0 0 auto 0;
+  height: min(34rem, 70vh);
+  z-index: -1;
+  pointer-events: none;
+  background:
+    radial-gradient(60% 70% at 55% 0%, var(--zl-glow), transparent 70%),
+    linear-gradient(var(--zl-grid) 1px, transparent 1px) 0 0 / 44px 44px,
+    linear-gradient(90deg, var(--zl-grid) 1px, transparent 1px) 0 0 / 44px 44px;
+  -webkit-mask-image: linear-gradient(to bottom, #000 15%, transparent 95%);
+  mask-image: linear-gradient(to bottom, #000 15%, transparent 95%);
+  opacity: 0.8;
+}
+
+.sl-markdown-content {
+  --sl-content-gap-y: 1.25rem;
+  font-size: 1rem;
+  line-height: 1.75;
+  color: var(--zl-text-2);
+  overflow-wrap: break-word;
+}
+.sl-markdown-content :is(p, li, dd) { max-width: 72ch; }
+.sl-markdown-content strong { color: var(--zl-text); font-weight: 600; }
+
+/* Headings */
+.sl-markdown-content :is(h1, h2, h3, h4, h5, h6):not(:where(.not-content *)) {
+  font-family: var(--zl-font-display);
+  font-weight: 600;
+  letter-spacing: -0.03em;
+  color: var(--zl-text);
+  text-wrap: balance;
+  scroll-margin-top: calc(var(--sl-nav-height) + 1.25rem);
+}
+.sl-markdown-content :is(h1, h2):not(:where(.not-content *)) { font-weight: 700; }
+.sl-markdown-content .sl-heading-wrapper.level-h2 { margin-top: 3.25rem; padding-top: 1.75rem; border-top: 1px solid var(--zl-line); }
+.sl-markdown-content .sl-heading-wrapper.level-h2 > h2 { margin: 0; padding-top: 0; border: 0; }
+.sl-markdown-content .sl-heading-wrapper.level-h3 { margin-top: 2.25rem; }
+.sl-markdown-content .sl-heading-wrapper.level-h3 > h3 { margin-top: 0; }
+.sl-markdown-content .sl-heading-wrapper.level-h4 { margin-top: 1.75rem; }
+.sl-markdown-content .sl-heading-wrapper.level-h4 > h4 { margin-top: 0; }
+.sl-markdown-content .sl-heading-wrapper:first-child { margin-top: 0; padding-top: 0; border-top: 0; }
+.sl-markdown-content .sl-heading-wrapper + * { margin-top: 1rem; }
+
+/* Anchor hash icon */
+.sl-markdown-content .sl-anchor-link { color: var(--zl-text-3); transition: color 0.2s, opacity 0.2s; }
+.sl-markdown-content .sl-anchor-link:hover, .sl-markdown-content .sl-anchor-link:focus-visible { color: var(--zl-accent); }
+
+/* Links */
+.sl-markdown-content a:not(:where(.not-content *)) {
+  color: var(--zl-accent);
+  text-decoration-line: underline;
+  text-decoration-color: color-mix(in srgb, var(--zl-accent) 35%, transparent);
+  text-decoration-thickness: 1px;
+  text-underline-offset: 0.2em;
+  transition: text-underline-offset 0.2s var(--zl-ease), text-decoration-color 0.2s, color 0.2s;
+}
+.sl-markdown-content a:hover:not(:where(.not-content *)) {
+  color: var(--zl-accent-hi);
+  text-decoration-color: currentColor;
+  text-underline-offset: 0.34em;
+}
+:root[data-theme='light'] .sl-markdown-content a:hover:not(:where(.not-content *)) { color: var(--zl-accent-lo); }
+.sl-markdown-content a:focus-visible { outline: 2px solid var(--zl-accent); outline-offset: 3px; border-radius: 3px; }
+.sl-markdown-content a.sl-anchor-link { text-decoration: none; }
+
+/* Lists */
+.sl-markdown-content :is(ul, ol):not(.sl-steps):not(:where(.not-content *)) { padding-inline-start: 1.5rem; }
+.sl-markdown-content ul:not(.sl-steps):not(:where(.not-content *)) { list-style: none; }
+.sl-markdown-content ul:not(.sl-steps):not(:where(.not-content *)) > li { position: relative; }
+.sl-markdown-content ul:not(.sl-steps):not(:where(.not-content *)) > li::before {
+  content: '';
+  position: absolute;
+  inset-inline-start: -1.1rem;
+  top: 0.78em;
+  width: 0.38rem;
+  height: 0.38rem;
+  border-radius: 2px;
+  background: var(--zl-accent);
+  transform: rotate(45deg);
+  opacity: 0.85;
+}
+.sl-markdown-content ol:not(.sl-steps) > li::marker { color: var(--zl-accent); font-family: var(--zl-font-mono); font-size: 0.9em; font-weight: 600; }
+.sl-markdown-content li > :is(ul, ol) { margin-top: 0.25rem; }
+.sl-markdown-content :is(ul, ol) :is(ul, ol) { margin-bottom: 0.5rem; }
+
+/* Blockquote */
+.sl-markdown-content blockquote:not(:where(.not-content *)) {
+  position: relative;
+  margin-inline: 0;
+  padding: 0.25rem 1.1rem;
+  border-inline-start: 0;
+  color: var(--zl-text-2);
+  font-style: italic;
+}
+.sl-markdown-content blockquote:not(:where(.not-content *))::before {
+  content: '';
+  position: absolute;
+  inset-block: 0;
+  inset-inline-start: 0;
+  width: 3px;
+  border-radius: 3px;
+  background: linear-gradient(to bottom, var(--zl-accent), var(--zl-warm));
+}
+
+/* Rules + media */
+.sl-markdown-content hr:not(:where(.not-content *)) {
+  border: 0;
+  height: 1px;
+  margin-block: 2.5rem;
+  background: linear-gradient(90deg, transparent, var(--zl-line-strong), transparent);
+}
+.sl-markdown-content :is(img, picture, video):not(:where(.not-content *)) {
+  border-radius: 12px;
+  border: 1px solid var(--zl-line);
+}
+.sl-markdown-content svg:not(:where(.not-content *)) { max-width: 100%; height: auto; }
+
+/* Keycaps */
+.sl-markdown-content kbd {
+  display: inline-block;
+  min-width: 1.6em;
+  padding: 0.12em 0.5em 0.18em;
+  border: 1px solid var(--zl-line-strong);
+  border-bottom-width: 2px;
+  border-radius: 6px;
+  background: var(--zl-surface-2);
+  color: var(--zl-text);
+  font: 500 0.82em/1.3 var(--zl-font-mono);
+  text-align: center;
+  white-space: nowrap;
+}
+
+/* Inline code chips */
+.sl-markdown-content :not(pre) > code:not(:where(.not-content *)) {
+  font-family: var(--zl-font-mono);
+  font-size: 0.86em;
+  color: var(--zl-text);
+  background: var(--zl-surface-2);
+  border: 1px solid var(--zl-line);
+  border-radius: 6px;
+  padding: 0.12em 0.4em;
+  margin-block: 0;
+  overflow-wrap: anywhere;
+}
+.sl-markdown-content :is(h1, h2, h3, h4, h5, h6) :not(pre) > code:not(:where(.not-content *)) { font-size: 0.82em; letter-spacing: 0; }
+.sl-markdown-content a > code:not(:where(.not-content *)) { color: var(--zl-accent); }
+
+/* Tables */
+.sl-markdown-content table:not(:where(.not-content *)) {
+  display: block;
+  width: 100%;
+  max-width: 100%;
+  overflow-x: auto;
+  border-collapse: separate;
+  border-spacing: 0;
+  border: 1px solid var(--zl-line);
+  border-radius: 12px;
+  font-size: 0.92rem;
+  line-height: 1.55;
+  -webkit-overflow-scrolling: touch;
+}
+@media (min-width: 40rem) {
+  .sl-markdown-content table:not(:where(.not-content *)) { display: table; overflow: hidden; }
+  .sl-markdown-content thead th:not(:where(.not-content *)):first-child { border-top-left-radius: 11px; }
+  .sl-markdown-content thead th:not(:where(.not-content *)):last-child { border-top-right-radius: 11px; }
+}
+.sl-markdown-content :is(th, td):not(:where(.not-content *)) {
+  padding: 0.65rem 1rem;
+  border-bottom: 1px solid var(--zl-line);
+  vertical-align: top;
+}
+.sl-markdown-content :is(th:first-child, td:first-child):not(:where(.not-content *)) { padding-inline-start: 1rem; }
+.sl-markdown-content :is(th:last-child, td:last-child):not(:where(.not-content *)) { padding-inline-end: 1rem; }
+.sl-markdown-content thead th:not(:where(.not-content *)) {
+  position: sticky;
+  top: 0;
+  background: var(--zl-bg-2);
+  color: var(--zl-text-3);
+  font: 600 0.7rem/1.2 var(--zl-font-mono);
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  white-space: nowrap;
+}
+.sl-markdown-content tbody tr:nth-child(even) td { background: var(--zl-surface); }
+.sl-markdown-content tbody tr:last-child td { border-bottom: 0; }
+.sl-markdown-content td:not(:where(.not-content *)) { color: var(--zl-text-2); }
+.sl-markdown-content td:first-child code { white-space: nowrap; }
+.sl-markdown-content tbody tr:hover td { background: var(--zl-surface-2); }
+
+/* Definition lists */
+.sl-markdown-content dt { color: var(--zl-text); }
+
+/* Narrow screens */
+@media (max-width: 30rem) {
+  .sl-markdown-content .sl-heading-wrapper.level-h2 { margin-top: 2.5rem; padding-top: 1.35rem; }
+}
+@media print {
+  :root:not(.zl-landing) .main-frame::before { display: none; }
+}
+@media (max-width: 39.99rem) {
+  .sl-markdown-content :is(th, td):not(:where(.not-content *)) { min-width: 7.5rem; }
+  .sl-markdown-content td code:not(:where(.not-content *)) { overflow-wrap: normal; white-space: nowrap; }
+}

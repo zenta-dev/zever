@@ -1,0 +1,117 @@
+---
+title: Geo
+description: Geocode addresses, reverse geocode coordinates, and compute distances with static, OSM, or Google backends.
+---
+
+import { LinkCard, CardGrid } from '@astrojs/starlight/components';
+
+One `Geo` interface covers `Geocode`, `ReverseGeocode`, and `Distance` (meters), so callers stay fixed while the backend changes.
+
+## Quick start
+
+`static` (the default) serves a file-backed list from memory, offline and deterministic; `path` points at a JSON fixture.
+
+```yaml title="zever.yaml"
+geo:
+  adapter: static
+  options:
+    path: data/cities.json
+```
+
+```go title="main.go"
+package main
+
+import (
+    "context"
+    "fmt"
+
+    "github.com/zenta-dev/zever/adapters/geo/static"
+    "github.com/zenta-dev/zever/config"
+    "github.com/zenta-dev/zever/container"
+    "github.com/zenta-dev/zever/core/geo"
+)
+
+func main() {
+    static.Register()
+    c := container.New(config.Default())
+    g, _ := c.Geo()
+    defer g.Close()
+
+    ctx := context.Background()
+    locs, _ := g.Geocode(ctx, "Berlin")
+    fmt.Println(len(locs))
+    d, _ := g.Distance(ctx, geo.Point{Lat: 52.52, Lng: 13.40}, geo.Point{Lat: 48.85, Lng: 2.35})
+    fmt.Println(d)
+}
+```
+
+```text
+1
+877676.52...
+```
+
+The `1` assumes the fixture lists Berlin; `Distance` is haversine over a 6371 km sphere, in meters.
+
+The bookings example pins `geo.adapter: static`; its tests point `cfg.Geo.Options.Path` at `testdata/cities.json`. `ValidCoord` checks WGS84 range and finiteness before coordinates reach a provider.
+
+## Use OSM or Google in production
+
+`osm` is free OpenStreetMap geocoding when Google-grade accuracy is not needed; it requires a `user_agent` per Nominatim policy. `google` is for accuracy with an API key budget.
+
+```yaml title="zever.yaml"
+geo:
+  adapter: osm
+  options:
+    endpoint: https://nominatim.openstreetmap.org
+    user_agent: bookings-demo/1.0
+```
+
+```yaml title="zever.yaml"
+geo:
+  adapter: google
+  options:
+    api_key: your-key   # or GEO_API_KEY in env; YAML does not expand ${...}
+    base_url: https://maps.googleapis.com
+```
+
+`Validate` rejects a negative `timeout` or `max_response_body`, and any `base_url` or `endpoint` that is not `https` unless `allow_insecure`. Env vars mirror the keys. See the [geo config reference](../../../reference/config/#geo).
+
+| Adapter | Package | Notes |
+|---|---|---|
+| `static` | `adapters/geo/static` | Default. File-backed, offline, deterministic. |
+| `osm` | `adapters/geo/osm` | Requires `user_agent`. |
+| `google` | `adapters/geo/google` | Needs `api_key`. |
+
+## Production checklist
+
+- `Geo.Close() error` takes no context; the container closes resolved services in dependency order and joins errors with `errors.Join`.
+- `static` is per-process, so every replica needs the same fixture; `osm` and `google` are remote and slow, so cache or job them.
+- `api_key` is secret; never log raw option maps (use `cfg.RedactedServices()`).
+
+## Troubleshooting
+
+<details>
+<summary>`zever doctor` reports FAIL on geo</summary>
+
+Cause: zero-infra defaults read `cities.json` from the working directory, so a missing fixture fails. Fix: seed the fixture or point `path` at committed test data. It is a fixture gap, not a framework bug.
+</details>
+
+<details>
+<summary>`base_url must use https` error</summary>
+
+Cause: external adapters require `https`. Fix: set a valid `https` URL; `allow_insecure` is only for `httptest` tests.
+</details>
+
+<details>
+<summary>OSM rejects requests</summary>
+
+Cause: the `user_agent` is missing or generic. Fix: set a real app-identifying `User-Agent` per Nominatim policy, and cache results to stay inside usage limits.
+</details>
+
+## Related
+
+<CardGrid>
+  <LinkCard title="Cache" href="../../data/cache/" />
+  <LinkCard title="Rate limiting" href="../../security/ratelimit/" />
+  <LinkCard title="Observability" href="../../operate/observability/" />
+</CardGrid>

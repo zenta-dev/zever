@@ -1,0 +1,90 @@
+---
+title: CORS
+description: Allow browser calls from other origins with strict, fail-closed cross-origin headers.
+---
+
+import { LinkCard, CardGrid } from '@astrojs/starlight/components';
+
+`middleware.CORS` enforces strict cross-origin rules as HTTP middleware. Use it when browsers call your API from another origin; requests without `Origin` pass through.
+
+## Wire CORS first
+
+Zever owns no `cors` config section. Decode your app's block into `middleware.Options` (snake_case tags) and wire it outermost with `r.Use` before any `Handle`:
+
+```yaml
+cors:
+  allowed_origins: ["https://example.com"]
+  allowed_methods: ["GET", "POST", "PUT", "PATCH", "DELETE"]
+  allowed_headers: ["Content-Type", "Authorization"]
+  exposed_headers: ["X-Request-Id"]
+  allow_credentials: true
+  max_age: 10m
+```
+
+```go title="main.go"
+import (
+    "time"
+
+    "github.com/zenta-dev/zever/core/middleware"
+)
+
+handler := middleware.CORS(middleware.Options{
+    AllowedOrigins:   []string{"https://example.com"},
+    AllowedMethods:   []string{"GET", "POST", "PUT", "PATCH", "DELETE"},
+    AllowedHeaders:   []string{"Content-Type", "Authorization"},
+    ExposedHeaders:   []string{"X-Request-Id"},
+    AllowCredentials: true,
+    MaxAge:           10 * time.Minute,
+})(mux)
+```
+
+`MaxAge` is a `time.Duration`, rendered as delay-seconds (`10m` becomes `600`).
+
+## Know what CORS answers
+
+| Request | Response |
+|---|---|
+| No `Origin` | Passes through, no CORS headers. |
+| Allowed origin, simple | Handler runs; `Allow-Origin` echoes origin, `Vary: Origin`. |
+| Allowed origin, preflight match | `204` with `Allow-Origin`, `Allow-Methods`, `Allow-Headers`, `Max-Age`. |
+| Allowed origin, preflight mismatch | `403`, no `Allow-Origin`. |
+| Disallowed origin | Never reflected; simple requests pass, preflights fall through. |
+
+## Validate options
+
+`Options.Validate` rejects fail-open shapes: empty origin/method lists, blank entries, `*` with `AllowCredentials`, negative `MaxAge`; invalid options fail closed with `500 {"error":"internal error"}`. A wildcard `*` without credentials echoes `*` for any origin. `DefaultCORSMaxAge` (`0`) omits `Max-Age`, so browsers preflight every request.
+
+Keep `CORS` outermost so preflights skip logging and rate limiting, and call `r.Use` before `Handle`, since `stdhttp` snapshots middleware per route. CORS is HTTP-only ([chain order](../middleware/#order-the-chain)).
+
+## Troubleshooting
+
+<details>
+<summary>Preflights are logged or rate-limited</summary>
+
+`CORS` sits inside `RequestLogger` or `RateLimit`. Move it outermost.
+</details>
+
+<details>
+<summary>The browser blocks a valid origin</summary>
+
+Not an exact allowlist match. Add the exact origin.
+</details>
+
+<details>
+<summary>Preflight returns an unexpected 403</summary>
+
+The method or a requested header is outside the allowlist (header matching is case-insensitive). Add the missing entry.
+</details>
+
+<details>
+<summary>Every CORS request returns 500</summary>
+
+`Options` is invalid, often `*` with credentials.
+</details>
+
+## Related
+
+<CardGrid>
+  <LinkCard title="Middleware" href="../middleware/" description="Chain order." />
+  <LinkCard title="Routing" href="../routing/" description="Where the wrapped mux comes from." />
+</CardGrid>

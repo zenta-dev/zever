@@ -1,0 +1,124 @@
+---
+import Section from './ui/Section.astro';
+import CodeWindow from './ui/CodeWindow.astro';
+import { TERMINAL_STEPS } from '../../data/landing';
+import { href } from '../../lib/url';
+
+const groups = [
+  { name: 'Scaffolding', rows: ['zever new', 'zever add <battery>', 'zever generate', 'zever extract'] },
+  { name: 'Inspection', rows: ['zever compile', 'zever check', 'zever breaking', 'zever fmt', 'zever doctor', 'zever routes', 'zever explain', 'zever graph'] },
+  { name: 'Runtime', rows: ['zever serve', 'zever dev', 'zever queue:work', 'zever schedule:run', 'zever tinker'] },
+  { name: 'Database', rows: ['zever db migrate', 'zever db rollback', 'zever db seed'] },
+];
+---
+
+<Section id="terminal" eyebrow="Zero to running" title="Five commands. <em>One running server.</em>" lede="Defaults are sqlite, memory and log, so a clean machine goes from nothing to a listening server without any external service.">
+  <div class="term-grid">
+    <div data-term class="term zl-reveal">
+      <CodeWindow title="~/hello: zsh" class="term-win">
+        <button slot="actions" type="button" class="term-replay" data-replay aria-label="Replay terminal demo">Replay</button>
+        <ol class="term-dots" aria-hidden="true" data-dots>
+          {TERMINAL_STEPS.map(() => <li class="is-done"></li>)}
+        </ol>
+        <div class="term-body" data-term-body>
+          {TERMINAL_STEPS.map((s) => (
+            <div class="term-step is-shown" data-step>
+              <div class="term-line">
+                <span class="term-prompt" aria-hidden="true">$</span>
+                <span class="term-cmd" data-cmd>{s.cmd}</span><span class="term-caret" aria-hidden="true"></span>
+                <button type="button" class="term-copy" data-copy={s.cmd} aria-label={`Copy command: ${s.cmd}`}>
+                  <svg class="ic-copy" viewBox="0 0 16 16" width="14" height="14" fill="none" stroke="currentColor" stroke-width="1.5" aria-hidden="true"><rect x="5" y="5" width="8.5" height="8.5" rx="1.5"/><path d="M10.5 3.5V3A1.5 1.5 0 0 0 9 1.5H3A1.5 1.5 0 0 0 1.5 3v6A1.5 1.5 0 0 0 3 10.5h.5"/></svg>
+                  <svg class="ic-ok" viewBox="0 0 16 16" width="14" height="14" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true"><path d="m3 8.5 3.2 3.2L13 4.8"/></svg>
+                </button>
+              </div>
+              <div class="term-out is-in" data-out><span class="term-check" aria-hidden="true">✓</span><span class="term-out-t">{s.out}</span></div>
+            </div>
+          ))}
+        </div>
+        <span class="term-live" role="status" aria-live="polite" data-live></span>
+      </CodeWindow>
+    </div>
+
+    <div class="zl-reveal" style="--i:2">
+      <CodeWindow title="zever --help" class="term-help">
+        <div class="help-body">
+          <p class="help-note">Grouped command map. Every row is an exact CLI invocation, so nothing hides behind a prompt.</p>
+          <div class="help-cols">
+            {groups.map((g) => (
+              <div class="help-group">
+                <h3>{g.name}</h3>
+                <ul>{g.rows.map((r) => <li><code>{r}</code></li>)}</ul>
+              </div>
+            ))}
+          </div>
+          <p class="help-foot">Bare <code>zever</code> prints usage and exits <code>1</code>, so scripts never hang on a prompt. <a href={href('reference/cli')}>CLI reference →</a></p>
+        </div>
+      </CodeWindow>
+    </div>
+  </div>
+</Section>
+
+<script>import '../../scripts/landing/terminal';</script>
+
+<style>
+  .term-grid { display: grid; gap: 1.5rem; grid-template-columns: minmax(0, 1.15fr) minmax(0, 1fr); align-items: start; }
+  @media (max-width: 900px) { .term-grid { grid-template-columns: minmax(0, 1fr); } }
+  .term { min-width: 0; }
+  .term :global(.zl-win) { position: relative; }
+  .term :global(.zl-win-body) { position: relative; overflow-x: hidden; }
+  .term :global(.zl-win-bar) { min-height: 2.75rem; }
+  .term :global(.zl-dots i:nth-child(1)) { background: #ff5f57; }
+  .term :global(.zl-dots i:nth-child(2)) { background: #febc2e; }
+  .term :global(.zl-dots i:nth-child(3)) { background: #28c840; }
+
+  .term-dots { list-style: none; margin: 0 0 1rem; padding: 0; display: flex; gap: 0.45rem; }
+  .term-dots li { width: 1.6rem; height: 4px; border-radius: 4px; background: rgba(255,255,255,0.12); transform-origin: left; transition: background 0.35s var(--zl-ease), transform 0.35s var(--zl-ease); }
+  .term-dots li.is-active { background: var(--zl-accent); animation: tpulse 1s ease-in-out infinite; }
+  .term-dots li.is-done { background: #5fd49a; }
+  @keyframes tpulse { 50% { opacity: 0.45; } }
+
+  .term-body { display: flex; flex-direction: column; gap: 0.9rem; font-size: 0.82rem; }
+  .term-line { display: flex; align-items: flex-start; gap: 0.5rem; min-width: 0; }
+  .term-prompt { color: var(--zl-accent); flex: none; user-select: none; }
+  .term-cmd { flex: 0 1 auto; min-width: 0; white-space: pre-wrap; overflow-wrap: anywhere; color: #e6edf7; }
+  .term-caret { flex: none; display: none; width: 0.55em; height: 1.15em; margin-left: -0.3rem; background: var(--zl-accent-hi); box-shadow: 0 0 10px var(--zl-accent); }
+  .term-copy { flex: none; margin-left: auto; display: inline-grid; place-items: center; width: 2rem; height: 2rem; margin-block: -0.3rem; border-radius: 6px; border: 1px solid transparent; background: transparent; color: #8896ab; cursor: pointer; transition: color 0.2s, border-color 0.2s, background 0.2s; }
+  .term-copy:hover { color: #fff; border-color: rgba(255,255,255,0.18); background: rgba(255,255,255,0.05); }
+  .term-copy .ic-ok { display: none; color: #5fd49a; }
+  .term-copy.is-copied .ic-ok { display: block; }
+  .term-copy.is-copied .ic-copy { display: none; }
+  @media (pointer: coarse) { .term-copy { width: 2.75rem; height: 2.75rem; margin-block: -0.8rem; } }
+
+  .term-out { position: relative; display: flex; gap: 0.4rem; color: #9fb0c6; padding-left: 1.2rem; overflow-wrap: anywhere; }
+  .term-out::before { content: ''; position: absolute; inset: -2px 0 -2px 0.6rem; border-radius: 6px; background: radial-gradient(90% 100% at 0 50%, var(--zl-glow), transparent 70%); opacity: 0; pointer-events: none; }
+  .term-check { color: #5fd49a; flex: none; }
+  .term-out-t { min-width: 0; }
+  .term-replay { margin-left: auto; font: 0.72rem/1 var(--zl-font-mono); color: #8896ab; background: transparent; border: 1px solid rgba(255,255,255,0.14); border-radius: 6px; padding: 0 0.75rem; min-height: 2.75rem; cursor: pointer; display: none; }
+  :global(.zl-js) .term-replay { display: inline-block; }
+  .term-replay:hover:not(:disabled) { color: #fff; border-color: var(--zl-accent); }
+  .term-replay:disabled { opacity: 0.4; cursor: default; }
+  .term-live { position: absolute; width: 1px; height: 1px; overflow: hidden; clip-path: inset(50%); }
+
+  /* JS-driven states (only apply while typing). */
+  .term.is-typing .term-step:not(.is-shown) { visibility: hidden; }
+  .term.is-typing .term-out { opacity: 0; transform: translateY(4px); }
+  .term.is-typing .term-out.is-in { opacity: 1; transform: none; transition: opacity 0.4s var(--zl-ease), transform 0.4s var(--zl-ease); }
+  .term.is-typing .term-out.is-in::before { animation: oglow 1.2s var(--zl-ease) both; }
+  @keyframes oglow { 0% { opacity: 0; } 25% { opacity: 1; } 100% { opacity: 0; } }
+  .term-step.is-active .term-caret { display: inline-block; animation: blink 1s steps(1) infinite; }
+  .term.is-idle .term-step:last-child .term-caret { display: inline-block; animation: blink 1s steps(1) infinite; }
+  @keyframes blink { 50% { opacity: 0; } }
+  @media (prefers-reduced-motion: reduce) { .term-caret, .term-dots li { animation: none !important; } }
+
+  .help-body { font-family: var(--zl-font-mono); }
+  .help-note { margin: 0 0 1rem; color: #8896ab; font: 0.8rem/1.5 var(--zl-font-sans); }
+  .help-cols { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 1.1rem 1rem; }
+  @media (max-width: 640px) { .help-cols { grid-template-columns: minmax(0, 1fr); } }
+  .help-group h3 { margin: 0 0 0.5rem; font: 600 0.7rem/1 var(--zl-font-mono); letter-spacing: 0.12em; text-transform: uppercase; color: var(--zl-accent-hi); }
+  .help-group ul { list-style: none; margin: 0; padding: 0; display: grid; gap: 0.3rem; }
+  .help-group code { font-size: 0.76rem; color: #d3dcea; overflow-wrap: anywhere; }
+  .help-foot { margin: 1.1rem 0 0; padding-top: 0.9rem; border-top: 1px solid rgba(255,255,255,0.08); color: #8896ab; font: 0.78rem/1.55 var(--zl-font-sans); }
+  .help-foot code { color: #d3dcea; }
+  .help-foot a { color: var(--zl-accent-hi); display: inline-block; padding-block: 0.4rem; }
+  .help-foot a:hover { text-decoration: underline; }
+</style>

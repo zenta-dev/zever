@@ -1,0 +1,165 @@
+---
+title: Migrations and seeding
+description: Plan and apply schema migrations from .zen files, roll them back, and seed data deterministically.
+---
+
+import { Steps, LinkCard, CardGrid } from '@astrojs/starlight/components';
+
+Zever compiles your `.zen` schema, diffs it against the live database, and applies the missing statements, recording each in `schema_migrations` so `zever db rollback` can undo it and re-running `migrate` is a no-op.
+
+## Quick start
+
+<Steps>
+
+1. Preview the DDL without touching a database.
+
+   ```sh
+   zever db migrate --dry-run schema/app.zen
+   ```
+
+2. Apply it. The default adapter is `sqlite`.
+
+   ```sh
+   zever db migrate schema/app.zen --adapter=sqlite --dsn=data/app.db
+   ```
+
+   ```text
+   applied 4 statement(s) via sqlite
+   ```
+
+3. Seed the database.
+
+   ```sh
+   zever db seed
+   ```
+
+</Steps>
+
+With no file arguments, `migrate` discovers `.zen` files under the schema directory; `-i` prompts for files, adapter, and DSN. `--dry-run` prints the diff against a live `--dsn`, else the full bootstrap DDL.
+
+## Choose the database
+
+The CLI and the app share the same `db` settings.
+
+```yaml title="zever.yaml"
+db:
+  adapter: sqlite
+  options:
+    path: app.db
+```
+
+sqlite defaults to `app.db`; `:memory:` forces a single connection even with `max_conns`. On postgres `min_conns` is a real pool minimum, on sqlite `SetMaxIdleConns`. See the [db options](../../../reference/config/#db).
+
+## Plan, review, and apply
+
+For each declared table:
+
+| Situation | Statement |
+|---|---|
+| Table is missing | `CREATE TABLE` and `CREATE INDEX IF NOT EXISTS` |
+| Field has `@renamed_from("old")` | `RENAME COLUMN` (keeps data) |
+| Column missing live | `ALTER TABLE ADD COLUMN` |
+| Column type changed | `ALTER COLUMN TYPE` (postgres); sqlite warns and skips |
+| Nullability changed | `ALTER COLUMN SET/DROP NOT NULL` (postgres); sqlite warns and skips |
+| Declared index or `@unique` missing | `CREATE [UNIQUE] INDEX` |
+| Live index no longer declared | `DROP INDEX`, only for indexes named by Zever's convention |
+| `belongs_to` or `has_one` foreign key missing | `ADD CONSTRAINT ... FOREIGN KEY` (postgres); sqlite warns and skips |
+| Live column no longer declared | `DROP COLUMN`, only with `--drop-columns` |
+
+`--drop-columns` destroys data, so snapshot first; an unannotated rename looks like a drop plus an add, so use `@renamed_from`. Removed live unique constraints and foreign keys are reported but never dropped. Plan in code or CI with `migrate.Plan` (no side effects).
+
+```go title="migrate.go"
+import "github.com/zenta-dev/zever/orm/migrate"
+
+plan, _ := migrate.Plan(ctx, conn, desired, migrate.PlanOptions{})
+for _, stmt := range plan.Statements() { fmt.Println(stmt) }
+applied, _ := migrate.Apply(ctx, conn, plan) // transaction where the driver supports it
+fmt.Println("applied", applied)
+```
+
+`PlanOptions{DropColumns: true}` emits `DROP COLUMN`; `DetectTypeChanges: true` compares live and declared types (the CLI always enables it). `Apply` uses `db.WithTx`, so failures roll back and nesting returns `ErrNestedTx`.
+
+## Roll back a migration
+
+`zever db rollback` needs no `.zen` files; it reads `schema_migrations` and runs an inverse for the newest statements. `-n` counts statements, not runs, so undo a three-statement run with `-n 3`.
+
+```sh
+zever db rollback --adapter=sqlite --dsn=data/app.db --dry-run   # print inverses
+zever db rollback --adapter=sqlite --dsn=data/app.db -n 2
+```
+
+```text
+rolled back 2 statement(s) via the sqlite adapter
+```
+
+Rollback restores structure, not data.
+
+| Undoing | Result |
+|---|---|
+| `ADD COLUMN` | Drops the column and its values |
+| `DROP COLUMN` | Recreates the column empty |
+| `ALTER COLUMN TYPE` | Restores the type but not truncated values |
+| `RENAME COLUMN`, index changes, foreign keys | Lossless |
+| `ALTER ... NOT NULL` | Fails if a NULL was written meanwhile |
+| `CREATE TABLE` | Skipped; never dropped |
+
+Lossy statements warn before running; rows with no inverse are reported, skipped, and kept.
+
+## Seed deterministically
+
+`zever db seed` runs the seed entrypoint (`project.seed_entry`, default `db/seed`) and passes arguments through. Write seeds as Go with the ORM in one transaction, idempotent via an `OnConflict` upsert.
+
+```go title="db/seed/main.go"
+db.WithTx(ctx, conn, nil, func(ctx context.Context, tx db.Tx) error {
+    return orm.InsertInto(Users).
+        Values(orm.Set(UserName, "alice")).
+        OnConflict(UserName.Col()).DoNothing().
+        Exec(ctx, tx)
+})
+```
+
+Regenerate ORM builders after schema edits from the repo root; never hand-edit `generated/`.
+
+```sh
+zever compile examples/pagination/schema/pagination.zen --backend=zenorm --out examples/pagination/generated
+```
+
+## Troubleshooting
+
+<details>
+<summary>Plan shows unexpected DROP statements</summary>
+
+Cause: `--drop-columns` is set, or the schema lost a field. Fix: re-check the `.zen` source and keep the flag off unless intended.
+</details>
+
+<details>
+<summary>Type or nullability change ignored on sqlite</summary>
+
+Cause: sqlite has no `ALTER COLUMN`. Fix: recreate the table or migrate the data manually.
+</details>
+
+<details>
+<summary>`ErrNestedTx` during seed</summary>
+
+Cause: a seed helper opened a transaction inside `WithTx`. Fix: use one `WithTx` unit.
+</details>
+
+<details>
+<summary>Postgres integration tests are skipped</summary>
+
+Cause: the gate is `POSTGRES_DSN`. Fix: export it for the live pass; sqlite runs without it.
+</details>
+
+<details>
+<summary>Rollback does not restore data</summary>
+
+Cause: rollback reverses schema statements only. Fix: re-run `zever db seed` after rolling back.
+</details>
+
+## Related
+
+<CardGrid>
+  <LinkCard title="Query builder" href="../query-builder/" />
+  <LinkCard title="Configuration" href="../../operate/configuration/" />
+  <LinkCard title="CLI reference" href="../../../reference/cli/" />
+</CardGrid>

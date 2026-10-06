@@ -1,0 +1,148 @@
+---
+title: Cache
+description: Cache values with a TTL, in memory or in Redis, with typed helpers and compare-and-swap.
+---
+
+import { Tabs, TabItem, LinkCard, CardGrid } from '@astrojs/starlight/components';
+
+`cache.Cache` stashes slow-to-compute values with a TTL, keyed by something stable such as a user ID or query hash. It is not a primary store: entries expire, evict under `max_entries` pressure, and vanish on restart for `memory`.
+
+## Quick start
+
+Pick `memory` for one process (default, no infra); pick `redis` when instances or web and worker processes must share entries.
+
+<Tabs>
+  <TabItem label="memory">
+```yaml title="zever.yaml"
+cache:
+  adapter: memory
+  options:
+    sweep_interval: 60000000000   # nanoseconds
+    max_entries: 10000
+```
+  </TabItem>
+  <TabItem label="redis">
+```yaml title="zever.yaml"
+cache:
+  adapter: redis
+  options:
+    addr: localhost:6379
+    pool_size: 20
+    min_idle_conns: 2
+```
+  </TabItem>
+</Tabs>
+
+File durations are integer nanoseconds; env accepts Go durations such as `"1m"`. File keys are strict snake_case, so `sweepinterval` is rejected; env matching ignores case and `_` and unknown `CACHE_*` variables. See the [cache options](../../../reference/config/#cache) for every key.
+
+## Cache a value with a TTL
+
+Register the adapter, then resolve from the container, which resolves lazily, caches, and retries after an error; `container.New(nil)` is valid.
+
+```go title="main.go"
+package main
+
+import (
+	"context"
+	"fmt"
+	"time"
+
+	cachememory "github.com/zenta-dev/zever/adapters/cache/memory"
+	"github.com/zenta-dev/zever/config"
+	"github.com/zenta-dev/zever/container"
+)
+
+func main() {
+	cachememory.Register()
+	ctx := context.Background()
+	c := container.New(config.Default())
+	defer c.Close(ctx)
+
+	ch, err := c.Cache()
+	if err != nil {
+		panic(err)
+	}
+	if err := ch.Set(ctx, "space:42", []byte("loft"), 5*time.Minute); err != nil {
+		panic(err)
+	}
+	raw, err := ch.Get(ctx, "space:42")
+	if err != nil {
+		panic(err)
+	}
+	fmt.Println(string(raw))
+}
+```
+
+```text
+loft
+```
+
+`Get` on a missing key wraps `cache.ErrNotFound`; the interface also has `SetIfAbsent`, `Delete`, `Increment`, `Decrement`, and `Exists`.
+
+## Cache structs with typed helpers
+
+`cache.NewTyped` wraps any backend with a codec, so call sites skip manual JSON.
+
+```go title="typed.go"
+import (
+	"github.com/zenta-dev/zever/core/cache"
+	"github.com/zenta-dev/zever/shared/codec"
+)
+
+type SpaceCard struct {
+	Title      string `json:"title"`
+	PriceCents int64  `json:"price_cents"`
+}
+
+typed := cache.NewTyped[string, SpaceCard](ch, codec.JSONCodec[SpaceCard]{})
+err := typed.Set(ctx, "space:card:42", SpaceCard{Title: "Loft", PriceCents: 12000}, 5*time.Minute)
+card, err := typed.Get(ctx, "space:card:42")
+fmt.Println(card.Title, card.PriceCents) // Loft 12000
+```
+
+Keys can be strings or numeric types. Adapters implementing `cache.CompareAndSwapCache` add `CompareAndDelete` and `CompareAndExtend`, which act only when the live value equals the expected one.
+
+## Choose an adapter
+
+| Adapter | Package | Notes |
+|---|---|---|
+| `memory` | `adapters/cache/memory` | Default, process-local, closes instantly |
+| `redis` | `adapters/cache/redis` | Shared, pool-backed, `Close(ctx)` drains the pool |
+| `db` | `adapters/cache/db` | Over `shared/kvstore`; empty `dsn` is a private in-memory sqlite, or use a postgres URL. Counters are read-modify-write and not linearizable under contention |
+
+All three serve one interface, so switching is config-only. The `db` adapter shares one pool per exact DSN unless `dedicated_pool: true`. Size `max_entries` (memory default 1000, sweep every 1m) for the working set, and on Redis set `pool_size`, `min_idle_conns`, `pool_timeout`, `max_conn_idle_time`, and `max_conn_lifetime` explicitly. Keep TTLs explicit and short for user-facing reads. Version keys when the cached type changes (`space:card:v2:42`): typed `Get` decodes at read time, so old JSON fails after a rename. See the [adapters matrix](../../../reference/adapters-matrix/).
+
+## Troubleshooting
+
+<details>
+<summary>Typed `Get` returns decode errors after a deploy</summary>
+
+Cause: stale entries hold the old struct shape. Fix: bump the key version and let old keys expire, or `Delete` the old prefix.
+</details>
+
+<details>
+<summary>Instance A writes, instance B misses</summary>
+
+Cause: `memory` in a multi-instance deploy. Fix: set `cache.adapter: redis` with a shared `addr` and confirm the host with `RedactedServices`.
+</details>
+
+<details>
+<summary>`Load` fails with unknown field `sweepinterval`</summary>
+
+Cause: strict file decoding. Fix: rename to `sweep_interval` with integer nanoseconds; use `"1m"` strings in env only.
+</details>
+
+<details>
+<summary>Shutdown hangs or logs pool timeouts</summary>
+
+Cause: no close deadline while Redis drains, or the cache closed before workers finished. Fix: pass `context.WithTimeout` to `c.Close(ctx)`.
+</details>
+
+## Related
+
+<CardGrid>
+  <LinkCard title="Redis" href="../redis/" />
+  <LinkCard title="Queue" href="../../background/queue/" />
+  <LinkCard title="Scheduler and jobs" href="../../background/scheduler-jobs/" />
+  <LinkCard title="Build a booking API" href="../../../tutorials/build-a-booking-api/" />
+</CardGrid>
