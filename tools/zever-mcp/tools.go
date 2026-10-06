@@ -38,7 +38,7 @@ func compileSchema(ctx context.Context, in compileInput) (*compile.Result, diag.
 	files := in.Files
 	if len(files) == 0 {
 		if in.Dir == "" {
-			return nil, nil, errors.New("either dir or files is required")
+			return nil, nil, errors.New("zever-mcp: either dir or files is required")
 		}
 
 		read, err := readZenFiles(in.Dir)
@@ -73,7 +73,7 @@ func readZenFiles(dir string) (map[string]string, error) {
 	}
 
 	if len(files) == 0 {
-		return nil, fmt.Errorf("no .zen files in %s", dir)
+		return nil, fmt.Errorf("zever-mcp: no .zen files in %s", dir)
 	}
 
 	return files, nil
@@ -125,7 +125,7 @@ func compileTool() toolDef {
 
 			out := res.Outputs["openapi"]["openapi.json"]
 			if len(out) == 0 {
-				return "", errors.New("openapi backend produced no merged document")
+				return "", errors.New("zever-mcp: openapi backend produced no merged document")
 			}
 
 			return string(out), nil
@@ -255,7 +255,7 @@ func explainTool() toolDef {
 				return "", err
 			}
 			if in.Path == "" {
-				return "", errors.New("path is required")
+				return "", errors.New("zever-mcp: path is required")
 			}
 
 			res, diags, err := compileSchema(ctx, compileInput{Dir: in.Dir, Files: in.Files})
@@ -277,7 +277,7 @@ func explain(s *ir.Schema, path string) (string, error) {
 
 	mod := findModule(s, parts[0])
 	if mod == nil {
-		return "", fmt.Errorf("module %q not found", parts[0])
+		return "", fmt.Errorf("zever-mcp: module %q not found", parts[0])
 	}
 
 	switch len(parts) {
@@ -294,19 +294,19 @@ func explain(s *ir.Schema, path string) (string, error) {
 		if msg := findMessage(mod, parts[1]); msg != nil {
 			return describeMessage(msg), nil
 		}
-		return "", fmt.Errorf("%q not found in module %q", parts[1], mod.Name)
+		return "", fmt.Errorf("zever-mcp: %q not found in module %q", parts[1], mod.Name)
 	case 3:
 		svc := findService(mod, parts[1])
 		if svc == nil {
-			return "", fmt.Errorf("service %q not found in module %q", parts[1], mod.Name)
+			return "", fmt.Errorf("zever-mcp: service %q not found in module %q", parts[1], mod.Name)
 		}
 		op := findOperation(svc, parts[2])
 		if op == nil {
-			return "", fmt.Errorf("operation %q not found in service %q", parts[2], svc.Name)
+			return "", fmt.Errorf("zever-mcp: operation %q not found in service %q", parts[2], svc.Name)
 		}
 		return describeOperation(op), nil
 	default:
-		return "", fmt.Errorf("path %q is too deep", path)
+		return "", fmt.Errorf("zever-mcp: path %q is too deep", path)
 	}
 }
 
