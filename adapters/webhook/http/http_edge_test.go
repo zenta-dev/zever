@@ -253,6 +253,25 @@ func TestEdgeSignEmptyPayload(t *testing.T) {
 	}
 }
 
+// TestEdgeSignAt_emptySecret: an empty secret still yields a valid, deterministic
+// envelope (HMAC with an empty key), distinct from any non-empty secret.
+func TestEdgeSignAt_emptySecret(t *testing.T) {
+	t.Parallel()
+
+	a, b := signAt("", []byte(`{}`), 1_700_000_000), signAt("", []byte(`{}`), 1_700_000_000)
+	if a != b {
+		t.Fatalf("signAt empty secret not deterministic: %q vs %q", a, b)
+	}
+
+	if !strings.HasPrefix(a, "t=1700000000,v1=") {
+		t.Fatalf("signAt empty secret = %q, want envelope prefix", a)
+	}
+
+	if other := signAt("s", []byte(`{}`), 1_700_000_000); a == other {
+		t.Fatal("signAt empty secret must differ from non-empty secret")
+	}
+}
+
 func TestEdgeCloseIdempotent(t *testing.T) {
 	t.Parallel()
 
