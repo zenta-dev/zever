@@ -208,15 +208,15 @@ func runDoctorWith(cfg DoctorConfig) error {
 	}
 
 	if cfg.JSON {
+		if failed && cfg.Strict {
+			return fmt.Errorf("zever doctor: %d of %d batteries failed (--strict)", failCount, len(names))
+		}
+
 		emitSuccess("doctor", map[string]any{
 			"batteries": rows,
 			"ok":        okCount,
 			"failed":    failCount,
 		})
-
-		if failed && cfg.Strict {
-			return fmt.Errorf("zever doctor: %d of %d batteries failed (--strict)", failCount, len(names))
-		}
 
 		return nil
 	}

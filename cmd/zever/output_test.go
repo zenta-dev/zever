@@ -51,10 +51,8 @@ func TestInvokedCommand(t *testing.T) {
 }
 
 func TestPeelJSON(t *testing.T) {
-	t.Parallel()
-
-	old := jsonMode
-	t.Cleanup(func() { jsonMode = old })
+	oldMode, oldExplicit := jsonMode, jsonExplicit
+	t.Cleanup(func() { jsonMode, jsonExplicit = oldMode, oldExplicit })
 
 	filtered := peelJSON([]string{"compile", "--json", "a.zen"})
 	if !jsonMode {
@@ -69,22 +67,36 @@ func TestPeelJSON(t *testing.T) {
 }
 
 func TestPeelJSONEqualsForm(t *testing.T) {
-	t.Parallel()
-
-	old := jsonMode
-	t.Cleanup(func() { jsonMode = old })
+	oldMode, oldExplicit := jsonMode, jsonExplicit
+	t.Cleanup(func() { jsonMode, jsonExplicit = oldMode, oldExplicit })
 
 	jsonMode = false
+	jsonExplicit = false
 	peelJSON([]string{"--json=false"})
 
 	if jsonMode {
 		t.Fatal("jsonMode set by --json=false")
 	}
+
+	if !jsonExplicit {
+		t.Fatal("jsonExplicit not set by --json=false")
+	}
+}
+
+func TestPeelJSONEqualsTrueForm(t *testing.T) {
+	oldMode, oldExplicit := jsonMode, jsonExplicit
+	t.Cleanup(func() { jsonMode, jsonExplicit = oldMode, oldExplicit })
+
+	jsonMode = false
+	jsonExplicit = false
+	peelJSON([]string{"--json=True"})
+
+	if !jsonMode {
+		t.Fatal("jsonMode not set by --json=True")
+	}
 }
 
 func TestEmitErrorEnvelope(t *testing.T) {
-	t.Parallel()
-
 	var buf bytes.Buffer
 	old := jsonOut
 	jsonOut = &buf
@@ -103,8 +115,6 @@ func TestEmitErrorEnvelope(t *testing.T) {
 }
 
 func TestEmitSuccessEnvelope(t *testing.T) {
-	t.Parallel()
-
 	var buf bytes.Buffer
 	old := jsonOut
 	jsonOut = &buf
@@ -134,6 +144,8 @@ func TestAgentHelpRequested(t *testing.T) {
 		{"agent help", []string{"--agent", "--help"}, true},
 		{"short", []string{"-h", "--agent"}, true},
 		{"help word", []string{"help", "--agent"}, true},
+		{"subcommand help", []string{"compile", "-h", "--agent"}, false},
+		{"subcommand only", []string{"compile", "--agent"}, false},
 		{"help only", []string{"--help"}, false},
 		{"agent only", []string{"--agent"}, false},
 		{"empty", nil, false},

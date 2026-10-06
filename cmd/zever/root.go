@@ -226,7 +226,7 @@ zever applications built from .zen schemas.`,
 	root.PersistentFlags().BoolVar(&showJSON, "json", false, "machine-readable JSON envelope output (also ZEVER_JSON=1)")
 	root.PersistentFlags().BoolVar(&showV, "V", false, "print the CLI version (alias for --version)")
 
-	root.PersistentPreRun = func(_ *cobra.Command, _ []string) {
+	root.PersistentPreRun = func(cmd *cobra.Command, _ []string) {
 		if interactive || envInteractive() {
 			interactiveMode = true
 		}
@@ -235,7 +235,10 @@ zever applications built from .zen schemas.`,
 			colorEnabled = false
 		}
 
-		if showJSON || envJSON() {
+		if cmd.Root().PersistentFlags().Changed("json") {
+			jsonExplicit = true
+			jsonMode = showJSON
+		} else if envJSON() {
 			jsonMode = true
 		}
 

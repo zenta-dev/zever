@@ -14,8 +14,10 @@ import (
 // and exit-code contract. It adds no subcommand, so dispatch tables are
 // untouched.
 
-// agentHelpRequested reports whether args combine a help request with
-// --agent, e.g. `zever --help --agent`.
+// agentHelpRequested reports whether args ask for the global machine-readable
+// catalog: a help flag plus --agent with no subcommand positional. A
+// subcommand positional (e.g. `zever compile -h --agent`) falls through to
+// normal handling.
 func agentHelpRequested(args []string) bool {
 	var help, agent bool
 
@@ -25,6 +27,10 @@ func agentHelpRequested(args []string) bool {
 			help = true
 		case "--agent":
 			agent = true
+		default:
+			if len(a) > 0 && a[0] != '-' {
+				return false
+			}
 		}
 	}
 

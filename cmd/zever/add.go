@@ -1,6 +1,7 @@
 package main
 
 import (
+	"bytes"
 	"flag"
 	"fmt"
 	"go/format"
@@ -693,7 +694,9 @@ func addBatteryToProject(tag, battery, adapter string, force, dryRun bool) error
 	}
 
 	if dryRun {
-		_, _ = fmt.Fprintln(os.Stdout, dim("would write ")+cyan("zever.yaml"))
+		if len(yamlSrc) == 0 || !bytes.Equal(updatedYaml, yamlSrc) {
+			_, _ = fmt.Fprintln(os.Stdout, dim("would write ")+cyan("zever.yaml"))
+		}
 
 		return nil
 	}
@@ -774,7 +777,9 @@ func addPluginToProject(tag, plugin, adapter, modulePath, version string, force,
 	}
 
 	if dryRun {
-		_, _ = fmt.Fprintln(os.Stdout, dim("would write ")+cyan("zever.yaml"))
+		if len(yamlSrc) == 0 || !bytes.Equal(updatedYaml, yamlSrc) {
+			_, _ = fmt.Fprintln(os.Stdout, dim("would write ")+cyan("zever.yaml"))
+		}
 
 		return nil
 	}
