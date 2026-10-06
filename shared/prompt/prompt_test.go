@@ -1,0 +1,57 @@
+package prompt
+
+import (
+	"errors"
+	"strings"
+	"testing"
+)
+
+func TestSystemPrompt(t *testing.T) {
+	t.Parallel()
+
+	got := SystemPrompt("a reviewer", "Be terse.")
+
+	if !strings.Contains(got, "You are a reviewer.") {
+		t.Fatalf("missing role:\n%s", got)
+	}
+
+	if !strings.Contains(got, "Be terse.") {
+		t.Fatalf("missing instructions:\n%s", got)
+	}
+}
+
+func TestGroundContext(t *testing.T) {
+	t.Parallel()
+
+	got := GroundContext("What?", []string{"first", "second"})
+
+	for _, want := range []string{"[1] first", "[2] second", "Question: What?"} {
+		if !strings.Contains(got, want) {
+			t.Errorf("missing %q:\n%s", want, got)
+		}
+	}
+}
+
+func TestJSONRepair(t *testing.T) {
+	t.Parallel()
+
+	got := JSONRepair(`{"type":"object"}`, "{bad", errors.New("unexpected end"))
+
+	for _, want := range []string{"not valid JSON", "unexpected end", "{bad"} {
+		if !strings.Contains(got, want) {
+			t.Errorf("missing %q:\n%s", want, got)
+		}
+	}
+}
+
+func TestToolErrorFeedback(t *testing.T) {
+	t.Parallel()
+
+	got := ToolErrorFeedback("lookup", "timeout")
+
+	for _, want := range []string{`"lookup"`, "timeout"} {
+		if !strings.Contains(got, want) {
+			t.Errorf("missing %q:\n%s", want, got)
+		}
+	}
+}
