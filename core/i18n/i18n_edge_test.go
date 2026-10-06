@@ -33,3 +33,21 @@ func TestLocaleChain_whitespaceOnlyInputs_empty(t *testing.T) {
 		t.Fatalf("LocaleChain(whitespace) = %q, want empty", got)
 	}
 }
+
+func TestOpen_invalidOptions(t *testing.T) {
+	t.Parallel()
+
+	got, err := Open(freshAdapter(), Options{Remote: RemoteOptions{Timeout: -1}})
+	if !errors.Is(err, ErrInvalidOptions) {
+		t.Fatalf("Open(invalid opts) err = %v, want ErrInvalidOptions", err)
+	}
+
+	var ioe InvalidOptionsError
+	if !errors.As(err, &ioe) {
+		t.Fatalf("err %T is not InvalidOptionsError", err)
+	}
+
+	if got != nil {
+		t.Fatalf("got = %v, want nil", got)
+	}
+}

@@ -1,6 +1,7 @@
 package eventbus
 
 import (
+	"errors"
 	"strings"
 	"sync"
 	"testing"
@@ -115,5 +116,23 @@ func TestEventbusEdge_DefaultChanBuffer(t *testing.T) {
 
 	if DefaultChanBuffer != 256 {
 		t.Fatalf("DefaultChanBuffer = %d, want 256", DefaultChanBuffer)
+	}
+}
+
+func TestEventbusEdge_OpenInvalidOptions(t *testing.T) {
+	t.Parallel()
+
+	got, err := Open(freshAdapter(), Options{BufferSize: -1})
+	if !errors.Is(err, ErrInvalidOptions) {
+		t.Fatalf("Open(invalid opts) err = %v, want ErrInvalidOptions", err)
+	}
+
+	var ioe InvalidOptionsError
+	if !errors.As(err, &ioe) {
+		t.Fatalf("err %T is not InvalidOptionsError", err)
+	}
+
+	if got != nil {
+		t.Fatalf("got = %v, want nil", got)
 	}
 }

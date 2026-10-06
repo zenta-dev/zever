@@ -110,3 +110,21 @@ func TestFlagEdge_EvalContextMissing(t *testing.T) {
 		t.Fatal("EvalContextFrom = true, want false without WithEvalContext")
 	}
 }
+
+func TestFlagEdge_OpenInvalidOptions(t *testing.T) {
+	t.Parallel()
+
+	got, err := Open(freshAdapter(), Options{Firebase: FirebaseOptions{Timeout: -1}})
+	if !errors.Is(err, ErrInvalidOptions) {
+		t.Fatalf("Open(invalid opts) err = %v, want ErrInvalidOptions", err)
+	}
+
+	var ioe InvalidOptionsError
+	if !errors.As(err, &ioe) {
+		t.Fatalf("err %T is not InvalidOptionsError", err)
+	}
+
+	if got != nil {
+		t.Fatalf("got = %v, want nil", got)
+	}
+}
