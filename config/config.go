@@ -9,6 +9,7 @@ import (
 	"github.com/zenta-dev/zever/core/auth"
 	"github.com/zenta-dev/zever/core/billing"
 	"github.com/zenta-dev/zever/core/cache"
+	"github.com/zenta-dev/zever/core/cdn"
 	"github.com/zenta-dev/zever/core/crypto"
 	"github.com/zenta-dev/zever/core/db"
 	"github.com/zenta-dev/zever/core/document"
@@ -58,6 +59,7 @@ type Config struct {
 	Auth          Service[auth.Options]          `json:"auth" yaml:"auth"`
 	Billing       Service[billing.Options]       `json:"billing" yaml:"billing"`
 	Cache         Service[cache.Options]         `json:"cache" yaml:"cache"`
+	CDN           Service[cdn.Options]           `json:"cdn" yaml:"cdn"`
 	Crypto        Service[crypto.Options]        `json:"crypto" yaml:"crypto"`
 	DB            Service[db.Options]            `json:"db" yaml:"db"`
 	Document      Service[document.Options]      `json:"document" yaml:"document"`
@@ -97,11 +99,11 @@ type Config struct {
 	Plugins map[string]Service[json.RawMessage] `json:"plugins" yaml:"plugins" toml:"plugins"`
 }
 
-// knownServiceNames returns the 36 lowercase service names in sorted order.
+// knownServiceNames returns the 37 lowercase service names in sorted order.
 // It is the single source of truth for env matching and error paths.
 func knownServiceNames() []string {
 	return []string{
-		"ai", "analytics", "auth", "billing", "cache", "crypto", "db",
+		"ai", "analytics", "auth", "billing", "cache", "cdn", "crypto", "db",
 		"document", "eventbus", "flag", "geo", "i18n", "idempotency",
 		"lock", "log", "mailer", "media", "notification", "observability",
 		"outbox", "password", "payment", "permission", "queue", "ratelimit",
@@ -155,6 +157,7 @@ func (c *Config) RedactedServices() map[string]ServiceConfig {
 	put("auth", c.Auth.Adapter, c.Auth.Options)
 	put("billing", c.Billing.Adapter, c.Billing.Options)
 	put("cache", c.Cache.Adapter, c.Cache.Options)
+	put("cdn", c.CDN.Adapter, c.CDN.Options)
 	put("crypto", c.Crypto.Adapter, c.Crypto.Options)
 	put("db", c.DB.Adapter, c.DB.Options)
 	put("document", c.Document.Adapter, c.Document.Options)

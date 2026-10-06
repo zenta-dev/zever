@@ -123,6 +123,7 @@ func (c *Container) snapshots() []closeSnapshot {
 		func() closeSnapshot { v, ok := c.analytics.getIfResolved(); return closeSnapshot{v, ok} }(),
 		func() closeSnapshot { v, ok := c.auth.getIfResolved(); return closeSnapshot{v, ok} }(),
 		func() closeSnapshot { v, ok := c.billing.getIfResolved(); return closeSnapshot{v, ok} }(),
+		func() closeSnapshot { v, ok := c.cdn.getIfResolved(); return closeSnapshot{v, ok} }(),
 		func() closeSnapshot { v, ok := c.crypto.getIfResolved(); return closeSnapshot{v, ok} }(),
 		func() closeSnapshot { v, ok := c.document.getIfResolved(); return closeSnapshot{v, ok} }(),
 		func() closeSnapshot { v, ok := c.eventbus.getIfResolved(); return closeSnapshot{v, ok} }(),

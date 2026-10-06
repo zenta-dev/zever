@@ -102,6 +102,7 @@ use (
 	./core/authz
 	./core/billing
 	./core/cache
+	./core/cdn
 	./core/crypto
 	./core/db
 	./core/document
