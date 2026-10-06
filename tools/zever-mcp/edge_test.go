@@ -590,7 +590,7 @@ func TestEdge_toolListOrder(t *testing.T) {
 
 	s := mustServer(t)
 	got := s.toolList()
-	want := []string{"zever_compile", "zever_schema", "zever_explain"}
+	want := []string{"zever_compile", "zever_schema", "zever_explain", "zever_doctor", "zever_generate"}
 	if len(got) != len(want) {
 		t.Fatalf("tools = %d", len(got))
 	}

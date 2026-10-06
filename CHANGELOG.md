@@ -15,6 +15,11 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Container agent options: `Agent(WithMaxParallel(...), WithAgentObserver(...))`
   and `RAG(WithTopK(...), WithHybridSearch(), ...)`; existing no-arg calls
   unchanged.
+- Richer `tools/zever-mcp`: `zever_doctor` and `zever_generate` tools
+  (via the installed CLI), static `zever://` resources, prompt templates,
+  and server-initiated elicitation gating destructive applies.
+- `shared/mcpclient` growth: sampler hooks, elicitation policies, and
+  reconnecting dial with backoff.
 - Agent-app tutorial (`docs/tutorials/build-an-agent-app`): end-to-end
   walkthrough from container resolution through RAG grounding, agent loops,
   MCP serving, and eval scoring.
