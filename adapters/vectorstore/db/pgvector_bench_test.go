@@ -94,3 +94,43 @@ func BenchmarkQuery(b *testing.B) {
 		}
 	}
 }
+
+// BenchmarkDelete measures the single-vector delete: PK lookup plus the
+// RowsAffected check.
+func BenchmarkDelete(b *testing.B) {
+	s := newBenchStore(b)
+	ctx := b.Context()
+
+	vec := vectorstore.Vector{ID: "bench-del", Embedding: benchEmbedding()}
+
+	if err := s.Upsert(ctx, vec); err != nil {
+		b.Fatalf("seed Upsert(): %v", err)
+	}
+
+	b.ReportAllocs()
+	b.ResetTimer()
+
+	for b.Loop() {
+		if err := s.Delete(ctx, vec.ID); err != nil {
+			b.Fatalf("Delete(): %v", err)
+		}
+
+		if err := s.Upsert(ctx, vec); err != nil {
+			b.Fatalf("reseed Upsert(): %v", err)
+		}
+	}
+}
+
+// BenchmarkDecodeEmbedding measures the binary embedding codec hot path.
+func BenchmarkDecodeEmbedding(b *testing.B) {
+	blob := encodeEmbedding(benchEmbedding())
+
+	b.ReportAllocs()
+	b.ResetTimer()
+
+	for b.Loop() {
+		if _, err := decodeEmbedding(blob); err != nil {
+			b.Fatalf("decodeEmbedding(): %v", err)
+		}
+	}
+}

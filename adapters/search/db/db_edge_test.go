@@ -21,6 +21,45 @@ func TestEdgeNewFromDB_nilDB(t *testing.T) {
 	}
 }
 
+// TestEdgeDelete_success: deleting an existing document succeeds; a second
+// delete reports NotFound.
+func TestEdgeDelete_success(t *testing.T) {
+	t.Parallel()
+
+	s := mustOpenMemory(t)
+	ctx := t.Context()
+
+	mustIndex(t, s, search.Document{ID: "del", Index: "idx", Content: "ephemeral cedar"})
+
+	if err := s.Delete(ctx, "del"); err != nil {
+		t.Fatalf("Delete() err = %v, want nil", err)
+	}
+
+	if err := s.Delete(ctx, "del"); !errors.Is(err, search.ErrNotFound) {
+		t.Fatalf("Delete() second err = %v, want ErrNotFound", err)
+	}
+}
+
+// TestEdgeSearch_filterNoMatch: an index filter matching nothing returns an
+// empty result without error.
+func TestEdgeSearch_filterNoMatch(t *testing.T) {
+	t.Parallel()
+
+	s := mustOpenMemory(t)
+	ctx := t.Context()
+
+	mustIndex(t, s, search.Document{ID: "f1", Index: "docs", Content: "needle in haystack"})
+
+	res, err := s.Search(ctx, "needle", search.QueryOptions{Limit: 10, Filters: map[string]string{"index": "other"}})
+	if err != nil {
+		t.Fatalf("Search() err = %v", err)
+	}
+
+	if res.Total != 0 || len(res.Hits) != 0 {
+		t.Fatalf("Search() = %+v, want empty", res)
+	}
+}
+
 func TestEdgeNewFromDB_invalidOptions(t *testing.T) {
 	t.Parallel()
 
