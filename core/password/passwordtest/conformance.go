@@ -2,7 +2,9 @@
 package passwordtest
 
 import (
+	"context"
 	"errors"
+	"fmt"
 	"strings"
 	"testing"
 
@@ -57,111 +59,147 @@ func conformanceOpenRegister(t *testing.T) {
 func conformanceHashVerify(t *testing.T, factory func(t *testing.T) password.Hasher) {
 	t.Helper()
 
-	ctx := t.Context()
-	h := factory(t)
+	if err := checkHashVerify(t.Context(), factory(t)); err != nil {
+		t.Fatal(err)
+	}
+}
 
+// checkHashVerify proves Hash/Verify round-trips with unique salts,
+// returning an error describing the first contract violation so broken
+// adapters can be unit-tested without failing the conformance run itself.
+func checkHashVerify(ctx context.Context, h password.Hasher) error {
 	first, err := h.Hash(ctx, "conformance-password-01")
 	if err != nil {
-		t.Fatalf("Hash() error = %v", err)
+		return fmt.Errorf("Hash() error = %w", err)
 	}
 
 	if first == "" || first == "conformance-password-01" {
-		t.Fatalf("Hash() = %q, want opaque encoded hash", first)
+		return fmt.Errorf("Hash() = %q, want opaque encoded hash", first)
 	}
 
 	second, err := h.Hash(ctx, "conformance-password-01")
 	if err != nil {
-		t.Fatalf("Hash() error = %v", err)
+		return fmt.Errorf("Hash() error = %w", err)
 	}
 
 	if first == second {
-		t.Error("Hash() returned identical hashes, want unique salts")
+		return errors.New("Hash() returned identical hashes, want unique salts")
 	}
 
 	for _, hash := range []string{first, second} {
 		ok, err := h.Verify(ctx, hash, "conformance-password-01")
 		if err != nil {
-			t.Fatalf("Verify() error = %v", err)
+			return fmt.Errorf("Verify() error = %w", err)
 		}
 
 		if !ok {
-			t.Error("Verify(correct) = false, want true")
+			return errors.New("Verify(correct) = false, want true")
 		}
 	}
+
+	return nil
 }
 
 func conformanceWrongPassword(t *testing.T, factory func(t *testing.T) password.Hasher) {
 	t.Helper()
 
-	ctx := t.Context()
-	h := factory(t)
+	if err := checkWrongPassword(t.Context(), factory(t)); err != nil {
+		t.Fatal(err)
+	}
+}
 
+// checkWrongPassword proves wrong and empty passwords are rejected with
+// (false, nil), returning an error describing the first contract violation.
+func checkWrongPassword(ctx context.Context, h password.Hasher) error {
 	hash, err := h.Hash(ctx, "right-password")
 	if err != nil {
-		t.Fatalf("Hash() error = %v", err)
+		return fmt.Errorf("Hash() error = %w", err)
 	}
 
 	ok, err := h.Verify(ctx, hash, "wrong-password")
 	if err != nil {
-		t.Fatalf("Verify(wrong) error = %v, want (false, nil)", err)
+		return fmt.Errorf("Verify(wrong) error = %w, want (false, nil)", err)
 	}
 
 	if ok {
-		t.Error("Verify(wrong) = true, want false")
+		return errors.New("Verify(wrong) = true, want false")
 	}
 
 	ok, err = h.Verify(ctx, hash, "")
 	if err != nil {
-		t.Fatalf("Verify(empty) error = %v, want (false, nil)", err)
+		return fmt.Errorf("Verify(empty) error = %w, want (false, nil)", err)
 	}
 
 	if ok {
-		t.Error("Verify(empty) = true, want false")
+		return errors.New("Verify(empty) = true, want false")
 	}
+
+	return nil
 }
 
 func conformanceNeedsRehash(t *testing.T, factory func(t *testing.T) password.Hasher) {
 	t.Helper()
 
-	ctx := t.Context()
-	h := factory(t)
+	if err := checkNeedsRehash(t.Context(), factory(t)); err != nil {
+		t.Fatal(err)
+	}
+}
 
+// checkNeedsRehash proves a freshly minted hash does not need rehash,
+// returning an error describing the first contract violation.
+func checkNeedsRehash(ctx context.Context, h password.Hasher) error {
 	hash, err := h.Hash(ctx, "rehash-check")
 	if err != nil {
-		t.Fatalf("Hash() error = %v", err)
+		return fmt.Errorf("Hash() error = %w", err)
 	}
 
 	// A hash just minted with current parameters must not need rehash.
 	// Adapters without parameter tracking report false with nil error.
 	needed, err := h.NeedsRehash(ctx, hash)
 	if err != nil {
-		t.Fatalf("NeedsRehash(current) error = %v", err)
+		return fmt.Errorf("NeedsRehash(current) error = %w", err)
 	}
 
 	if needed {
-		t.Error("NeedsRehash(current) = true, want false")
+		return errors.New("NeedsRehash(current) = true, want false")
 	}
+
+	return nil
 }
 
 func conformanceInvalidHash(t *testing.T, factory func(t *testing.T) password.Hasher) {
 	t.Helper()
 
-	ctx := t.Context()
-	h := factory(t)
+	if err := checkInvalidHash(t.Context(), factory(t)); err != nil {
+		t.Fatal(err)
+	}
+}
 
+// checkInvalidHash proves malformed hashes are rejected with
+// ErrInvalidHash and overlong passwords with ErrPasswordTooLong,
+// returning an error describing the first contract violation.
+func checkInvalidHash(ctx context.Context, h password.Hasher) error {
 	for _, bad := range []string{"", "not-a-hash", "$argon2id$v=19$m=1,t=1,p=1$c2FsdA$hash"} {
 		if _, err := h.Verify(ctx, bad, "whatever"); !errors.Is(err, password.ErrInvalidHash) {
-			t.Errorf("Verify(%q) err = %v, want ErrInvalidHash", bad, err)
+			if err == nil {
+				return fmt.Errorf("Verify(%q) = nil, want ErrInvalidHash", bad)
+			}
+			return fmt.Errorf("Verify(%q) err = %w, want ErrInvalidHash", bad, err)
 		}
 
 		if _, err := h.NeedsRehash(ctx, bad); !errors.Is(err, password.ErrInvalidHash) {
-			t.Errorf("NeedsRehash(%q) err = %v, want ErrInvalidHash", bad, err)
+			if err == nil {
+				return fmt.Errorf("NeedsRehash(%q) = nil, want ErrInvalidHash", bad)
+			}
+			return fmt.Errorf("NeedsRehash(%q) err = %w, want ErrInvalidHash", bad, err)
 		}
 	}
 
 	if _, err := h.Hash(ctx, strings.Repeat("p", 1025)); err == nil {
-		t.Error("Hash(overlong) = nil, want ErrPasswordTooLong")
+		return errors.New("Hash(overlong) = nil, want ErrPasswordTooLong")
 	} else if !errors.Is(err, password.ErrPasswordTooLong) {
-		t.Errorf("Hash(overlong) err = %v, want ErrPasswordTooLong", err)
+		return fmt.Errorf("Hash(overlong) err = %w, want ErrPasswordTooLong", err)
 	}
+
+	return nil
 }
