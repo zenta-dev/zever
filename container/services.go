@@ -85,6 +85,10 @@ func (c *Container) Agent(opts ...AgentOption) (*agent.Loop, error) {
 
 		aopts := agent.Options{Model: c.cfg.AI.Options.Model}
 		for _, opt := range opts {
+			if opt == nil {
+				continue
+			}
+
 			opt(&aopts)
 		}
 
@@ -411,6 +415,10 @@ func (c *Container) RAG(opts ...RAGOption) (*rag.Engine, error) {
 
 		cfg := ragConfig{options: rag.Options{Model: c.cfg.AI.Options.Model}}
 		for _, opt := range opts {
+			if opt == nil {
+				continue
+			}
+
 			opt(&cfg)
 		}
 

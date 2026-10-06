@@ -3,6 +3,7 @@ package rag
 import (
 	"context"
 	"fmt"
+	"math"
 	"sort"
 	"strings"
 
@@ -159,7 +160,7 @@ func (j JudgeReranker) scoreOne(ctx context.Context, query string, s Source) (fl
 	}
 
 	score := out.Score
-	if score < 0 {
+	if math.IsNaN(score) || math.IsInf(score, 0) || score < 0 {
 		score = 0
 	}
 	if score > 1 {
