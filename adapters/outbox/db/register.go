@@ -23,8 +23,9 @@ func Register() {
 }
 
 // optionsFrom maps core outbox.Options onto the adapter Options. The
-// Publisher is intentionally unset: core carries only the informational
-// string selector.
+// Publisher interface is intentionally unset: core carries only the
+// informational string selector, which is carried over as Transport for the
+// messaging.system span attribute.
 func optionsFrom(o outbox.Options) Options {
 	poolOpts := dbconn.SplitDSN(o.DSN)
 	poolOpts.DedicatedPool = o.DedicatedPool
@@ -33,6 +34,7 @@ func optionsFrom(o outbox.Options) Options {
 		Options:      poolOpts,
 		Table:        o.Table,
 		InboxTable:   o.InboxTable,
+		Transport:    o.Publisher,
 		PollInterval: o.PollInterval,
 		BatchSize:    o.BatchSize,
 		MaxAttempts:  o.MaxAttempts,

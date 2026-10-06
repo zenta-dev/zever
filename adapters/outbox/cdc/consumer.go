@@ -139,7 +139,7 @@ func (s *store) handleMessage(ctx context.Context, prefix string, payload []byte
 		return false, err
 	}
 
-	spanCtx, finish := s.recorder.ConsumeSpan(ctx, msg.Topic)
+	spanCtx, finish := s.recorder.ConsumeSpan(ctx, msg.Topic, msg.ID)
 	defer finish()
 
 	for attempt := 1; ; attempt++ {

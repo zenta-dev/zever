@@ -99,13 +99,15 @@ func (f *fakeMetrics) lastGauge(name string) (float64, bool) {
 // spanCall records one ended span.
 type spanCall struct {
 	name  string
+	kind  observability.SpanKind
 	attrs []observability.Attr
 }
 
-// fakeSpan records its name and attrs on End.
+// fakeSpan records its name, kind, and attrs on End.
 type fakeSpan struct {
 	tracer *fakeTracer
 	name   string
+	kind   observability.SpanKind
 	attrs  []observability.Attr
 }
 
@@ -118,10 +120,11 @@ func (s *fakeSpan) RecordError(error) {}
 func (s *fakeSpan) End() {
 	s.tracer.mu.Lock()
 	defer s.tracer.mu.Unlock()
-	s.tracer.spans = append(s.tracer.spans, spanCall{name: s.name, attrs: s.attrs})
+	s.tracer.spans = append(s.tracer.spans, spanCall{name: s.name, kind: s.kind, attrs: s.attrs})
 }
 
-// fakeTracer records ended spans.
+// fakeTracer records ended spans. It implements observability.SpanStarter so
+// span start options reach the recorded span.
 type fakeTracer struct {
 	mu    sync.Mutex
 	spans []spanCall
@@ -129,6 +132,19 @@ type fakeTracer struct {
 
 func (t *fakeTracer) Start(ctx context.Context, name string) (context.Context, observability.Span) {
 	return ctx, &fakeSpan{tracer: t, name: name}
+}
+
+func (t *fakeTracer) StartSpan(
+	ctx context.Context,
+	name string,
+	opts ...observability.SpanStartOption,
+) (context.Context, observability.Span) {
+	cfg := observability.NewSpanConfig(opts...)
+
+	span := &fakeSpan{tracer: t, name: name, kind: cfg.Kind}
+	span.SetAttributes(cfg.Attrs...)
+
+	return ctx, span
 }
 
 func (t *fakeTracer) Shutdown(context.Context) error { return nil }
@@ -146,6 +162,114 @@ func (t *fakeTracer) spanCount(name string) int {
 	}
 
 	return n
+}
+
+func (t *fakeTracer) spanAttrs(name string) []observability.Attr {
+	t.mu.Lock()
+	defer t.mu.Unlock()
+
+	for _, s := range t.spans {
+		if s.name == name {
+			return s.attrs
+		}
+	}
+
+	return nil
+}
+
+func (t *fakeTracer) spanKind(name string) observability.SpanKind {
+	t.mu.Lock()
+	defer t.mu.Unlock()
+
+	for _, s := range t.spans {
+		if s.name == name {
+			return s.kind
+		}
+	}
+
+	return observability.SpanKindInternal
+}
+
+// attrStringValue returns the string value of key in attrs, or "".
+func attrStringValue(attrs []observability.Attr, key string) string {
+	for _, a := range attrs {
+		if a.Key == key {
+			if v, ok := a.Value.(observability.StringValue); ok {
+				return v.Value
+			}
+		}
+	}
+
+	return ""
+}
+
+// attrHasKey reports whether attrs carries key.
+func attrHasKey(attrs []observability.Attr, key string) bool {
+	for _, a := range attrs {
+		if a.Key == key {
+			return true
+		}
+	}
+
+	return false
+}
+
+// TestRelayPublishSpanMessagingAttrs checks the relay's publish span carries
+// the messaging semantic conventions for the message it just published.
+func TestRelayPublishSpanMessagingAttrs(t *testing.T) {
+	t.Parallel()
+
+	p := newFakeProvider()
+	d := mustNew(t, Options{
+		Publisher: &recordingPublisher{},
+		Transport: outbox.PublisherEventBus,
+		Provider:  p,
+	})
+
+	mustRecord(t, d, outbox.Message{ID: "msg-7", Topic: "orders", Payload: []byte("x")})
+	d.pollOnce(t.Context())
+
+	attrs := p.tracer.spanAttrs(outbox.SpanPublish)
+
+	if got := p.tracer.spanKind(outbox.SpanPublish); got != observability.SpanKindProducer {
+		t.Errorf("publish span kind = %v, want %v", got, observability.SpanKindProducer)
+	}
+
+	want := map[string]string{
+		observability.MessagingSystem:          outbox.PublisherEventBus,
+		observability.MessagingDestinationName: "orders",
+		observability.MessagingOperation:       observability.OperationPublish,
+		observability.MessagingMessageID:       "msg-7",
+	}
+
+	for key, value := range want {
+		if got := attrStringValue(attrs, key); got != value {
+			t.Errorf("span %s = %q, want %q", key, got, value)
+		}
+	}
+
+	// The relay ran over a context with no trace, so the correlation ID must
+	// be absent rather than empty.
+	if attrHasKey(attrs, observability.MessagingMessageConversationID) {
+		t.Errorf("span carries %s, want the attribute omitted", observability.MessagingMessageConversationID)
+	}
+}
+
+// TestRelayPublishSpanMessagingSystemFallsBackToAdapter checks an unset
+// transport reports the adapter name as messaging.system.
+func TestRelayPublishSpanMessagingSystemFallsBackToAdapter(t *testing.T) {
+	t.Parallel()
+
+	p := newFakeProvider()
+	d := mustNew(t, Options{Publisher: &recordingPublisher{}, Provider: p})
+
+	mustRecord(t, d, outbox.Message{ID: "msg-7", Topic: "orders", Payload: []byte("x")})
+	d.pollOnce(t.Context())
+
+	attrs := p.tracer.spanAttrs(outbox.SpanPublish)
+	if got := attrStringValue(attrs, observability.MessagingSystem); got != string(outbox.DB) {
+		t.Errorf("messaging.system = %q, want %q", got, outbox.DB)
+	}
 }
 
 // fakeProvider implements observability.Provider with recording fakes.

@@ -43,7 +43,7 @@ const (
 // postgres. Table/InboxTable default to DefaultTable/DefaultInboxTable.
 // Publisher is the transport the relay publishes through; core outbox.Options
 // carries only the informational string selector, so wiring supplies the
-// concrete Publisher here.
+// concrete Publisher here and the selector through Transport.
 //
 // Pool knobs (DSN/Path/MaxConns/MinConns/MaxConnLifetime/MaxConnIdleTime)
 // are embedded from coredb.Options so pool tuning stays in one place;
@@ -57,6 +57,12 @@ type Options struct {
 	InboxTable string `json:"inbox_table" toml:"inbox_table" yaml:"inbox_table"`
 	// Publisher receives recorded messages. Required to Start the relay.
 	Publisher outbox.Publisher `json:"-" toml:"-" yaml:"-"`
+	// Transport is the informational transport selector the relay publishes
+	// through, mirroring core outbox.Options.Publisher: outbox.PublisherEventBus,
+	// outbox.PublisherQueue, or "" (unset). It is reported as the
+	// messaging.system span attribute and falls back to the adapter name when
+	// empty. Go-API-only: never decoded from configuration files.
+	Transport string `json:"-" toml:"-" yaml:"-"`
 	// PollInterval is the relay poll cadence. Default DefaultPollInterval.
 	PollInterval time.Duration `json:"poll_interval" toml:"poll_interval" yaml:"poll_interval"`
 	// BatchSize caps how many messages one poll claims. Default DefaultBatchSize.

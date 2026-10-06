@@ -70,13 +70,15 @@ func (f *fakeMetrics) sum(name string) float64 {
 // spanCall records one ended span.
 type spanCall struct {
 	name  string
+	kind  observability.SpanKind
 	attrs []observability.Attr
 }
 
-// fakeSpan records its name and attrs on End.
+// fakeSpan records its name, kind, and attrs on End.
 type fakeSpan struct {
 	tracer *fakeTracer
 	name   string
+	kind   observability.SpanKind
 	attrs  []observability.Attr
 }
 
@@ -89,10 +91,11 @@ func (s *fakeSpan) RecordError(error) {}
 func (s *fakeSpan) End() {
 	s.tracer.mu.Lock()
 	defer s.tracer.mu.Unlock()
-	s.tracer.spans = append(s.tracer.spans, spanCall{name: s.name, attrs: s.attrs})
+	s.tracer.spans = append(s.tracer.spans, spanCall{name: s.name, kind: s.kind, attrs: s.attrs})
 }
 
-// fakeTracer records ended spans.
+// fakeTracer records ended spans. It implements observability.SpanStarter so
+// span start options reach the recorded span.
 type fakeTracer struct {
 	mu    sync.Mutex
 	spans []spanCall
@@ -100,6 +103,19 @@ type fakeTracer struct {
 
 func (t *fakeTracer) Start(ctx context.Context, name string) (context.Context, observability.Span) {
 	return ctx, &fakeSpan{tracer: t, name: name}
+}
+
+func (t *fakeTracer) StartSpan(
+	ctx context.Context,
+	name string,
+	opts ...observability.SpanStartOption,
+) (context.Context, observability.Span) {
+	cfg := observability.NewSpanConfig(opts...)
+
+	span := &fakeSpan{tracer: t, name: name, kind: cfg.Kind}
+	span.SetAttributes(cfg.Attrs...)
+
+	return ctx, span
 }
 
 func (t *fakeTracer) Shutdown(context.Context) error { return nil }
@@ -132,6 +148,19 @@ func (t *fakeTracer) spanAttrs(name string) []observability.Attr {
 	return nil
 }
 
+func (t *fakeTracer) spanKind(name string) observability.SpanKind {
+	t.mu.Lock()
+	defer t.mu.Unlock()
+
+	for _, s := range t.spans {
+		if s.name == name {
+			return s.kind
+		}
+	}
+
+	return observability.SpanKindInternal
+}
+
 // fakeProvider implements observability.Provider with recording fakes.
 type fakeProvider struct {
 	metrics *fakeMetrics
@@ -159,6 +188,17 @@ func attrStringValue(attrs []observability.Attr, key string) string {
 	return ""
 }
 
+// attrHasKey reports whether attrs carries key.
+func attrHasKey(attrs []observability.Attr, key string) bool {
+	for _, a := range attrs {
+		if a.Key == key {
+			return true
+		}
+	}
+
+	return false
+}
+
 func TestConsumeMetricsPublished(t *testing.T) {
 	t.Parallel()
 
@@ -167,7 +207,7 @@ func TestConsumeMetricsPublished(t *testing.T) {
 		prefix:      DefaultPrefix,
 		maxAttempts: 3,
 		sleep:       recordingSleep(new([]time.Duration)),
-		recorder:    outbox.NewRecorder(p, "cdc", ""),
+		recorder:    outbox.NewRecorder(p, "cdc", "", ""),
 	}
 
 	pub := &stubPublisher{}
@@ -195,6 +235,78 @@ func TestConsumeMetricsPublished(t *testing.T) {
 	}
 }
 
+// TestConsumeSpanMessagingAttrs checks the consumer's consume span carries the
+// messaging semantic conventions for the message it handled.
+func TestConsumeSpanMessagingAttrs(t *testing.T) {
+	t.Parallel()
+
+	p := newFakeProvider()
+	s := &store{
+		prefix:      DefaultPrefix,
+		maxAttempts: 3,
+		sleep:       recordingSleep(new([]time.Duration)),
+		recorder:    outbox.NewRecorder(p, "cdc", "", outbox.PublisherQueue),
+	}
+
+	pub := &stubPublisher{}
+	msg := outbox.Message{ID: "evt-9", Topic: "orders", Payload: []byte("p")}
+
+	if _, err := s.handleMessage(t.Context(), DefaultPrefix, mustPayload(t, msg), pub.Publish); err != nil {
+		t.Fatalf("handleMessage() error = %v", err)
+	}
+
+	attrs := p.tracer.spanAttrs(outbox.SpanConsume)
+
+	if got := p.tracer.spanKind(outbox.SpanConsume); got != observability.SpanKindConsumer {
+		t.Errorf("consume span kind = %v, want %v", got, observability.SpanKindConsumer)
+	}
+
+	want := map[string]string{
+		observability.MessagingSystem:          outbox.PublisherQueue,
+		observability.MessagingDestinationName: "orders",
+		observability.MessagingOperation:       observability.OperationProcess,
+		observability.MessagingMessageID:       "evt-9",
+	}
+
+	for key, value := range want {
+		if got := attrStringValue(attrs, key); got != value {
+			t.Errorf("span %s = %q, want %q", key, got, value)
+		}
+	}
+
+	// The consumer ran over a context with no trace, so the correlation ID
+	// must be absent rather than empty.
+	if attrHasKey(attrs, observability.MessagingMessageConversationID) {
+		t.Errorf("span carries %s, want the attribute omitted", observability.MessagingMessageConversationID)
+	}
+}
+
+// TestConsumeSpanMessagingSystemFallsBackToAdapter checks an unset transport
+// reports the adapter name as messaging.system.
+func TestConsumeSpanMessagingSystemFallsBackToAdapter(t *testing.T) {
+	t.Parallel()
+
+	p := newFakeProvider()
+	s := &store{
+		prefix:      DefaultPrefix,
+		maxAttempts: 3,
+		sleep:       recordingSleep(new([]time.Duration)),
+		recorder:    outbox.NewRecorder(p, "cdc", "", ""),
+	}
+
+	pub := &stubPublisher{}
+	msg := outbox.Message{ID: "evt-9", Topic: "orders", Payload: []byte("p")}
+
+	if _, err := s.handleMessage(t.Context(), DefaultPrefix, mustPayload(t, msg), pub.Publish); err != nil {
+		t.Fatalf("handleMessage() error = %v", err)
+	}
+
+	attrs := p.tracer.spanAttrs(outbox.SpanConsume)
+	if got := attrStringValue(attrs, observability.MessagingSystem); got != string(outbox.CDC) {
+		t.Errorf("messaging.system = %q, want %q", got, outbox.CDC)
+	}
+}
+
 func TestConsumeMetricsRetriedThenFailed(t *testing.T) {
 	t.Parallel()
 
@@ -205,7 +317,7 @@ func TestConsumeMetricsRetriedThenFailed(t *testing.T) {
 		maxAttempts: 2,
 		retry:       retry.Policy{BaseDelay: time.Millisecond},
 		sleep:       recordingSleep(&delays),
-		recorder:    outbox.NewRecorder(p, "cdc", ""),
+		recorder:    outbox.NewRecorder(p, "cdc", "", ""),
 	}
 
 	alwaysFail := func(context.Context, outbox.Message) error {
@@ -244,7 +356,7 @@ func TestConsumeMetricsRelayError(t *testing.T) {
 		prefix:      DefaultPrefix,
 		maxAttempts: 3,
 		sleep:       recordingSleep(new([]time.Duration)),
-		recorder:    outbox.NewRecorder(p, "cdc", ""),
+		recorder:    outbox.NewRecorder(p, "cdc", "", ""),
 	}
 
 	s.setRelayError(context.Background(), errors.New("boom"))

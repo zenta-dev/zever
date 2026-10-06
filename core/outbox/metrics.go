@@ -5,6 +5,7 @@ import (
 	"time"
 
 	"github.com/zenta-dev/zever/core/observability"
+	"github.com/zenta-dev/zever/shared/traceprop"
 )
 
 // Metric names emitted by the outbox relay. Every name carries the "outbox."
@@ -61,15 +62,19 @@ const (
 // Provider makes every method a no-op, and metric or span errors are
 // discarded so telemetry never fails the relay.
 type Recorder struct {
-	provider observability.Provider
-	adapter  string
-	table    string
+	provider  observability.Provider
+	adapter   string
+	table     string
+	transport string
 }
 
-// NewRecorder returns a Recorder bound to provider and tagged with adapter
-// and table. A nil provider yields a no-op Recorder.
-func NewRecorder(provider observability.Provider, adapter, table string) Recorder {
-	return Recorder{provider: provider, adapter: adapter, table: table}
+// NewRecorder returns a Recorder bound to provider and tagged with adapter,
+// table, and transport. A nil provider yields a no-op Recorder. transport is
+// the messaging transport selector (outbox.PublisherEventBus,
+// outbox.PublisherQueue); empty falls back to the adapter name for the
+// messaging.system span attribute.
+func NewRecorder(provider observability.Provider, adapter, table, transport string) Recorder {
+	return Recorder{provider: provider, adapter: adapter, table: table, transport: transport}
 }
 
 // Status emits the pending, failed, and oldest-pending-age gauges.
@@ -105,19 +110,25 @@ func (r Recorder) RelayError(ctx context.Context) {
 	r.counter(ctx, MetricRelayErrors, observability.String(AttrOutcome, OutcomeError))
 }
 
-// PublishSpan starts an outbox.publish span for topic and returns a
-// finisher that ends the span and records the publish duration histogram
-// with the given outcome. The finisher is a no-op when no provider is wired.
-func (r Recorder) PublishSpan(ctx context.Context, topic string) (context.Context, func(outcome string)) {
+// PublishSpan starts an outbox.publish producer span for the message with the
+// given topic and ID and returns a finisher that ends the span and records the
+// publish duration histogram with the given outcome. The span carries the
+// outbox.* attrs plus the messaging semantic-convention set: messaging.system,
+// messaging.destination.name (the topic), messaging.operation (publish),
+// messaging.message.id, and messaging.message.conversation_id when ctx holds a
+// trace. The finisher is a no-op when no provider is wired.
+func (r Recorder) PublishSpan(ctx context.Context, topic, messageID string) (context.Context, func(outcome string)) {
 	t := r.tracer()
 	if t == nil {
 		return ctx, func(string) {}
 	}
 
-	spanCtx, span := t.Start(ctx, SpanPublish)
-	span.SetAttributes(r.spanAttrs(topic)...)
-
 	start := time.Now()
+
+	spanCtx, span := observability.StartSpan(ctx, t, SpanPublish,
+		observability.WithSpanKind(observability.SpanKindProducer),
+		observability.WithAttributes(r.spanAttrs(ctx, topic, messageID, observability.OperationPublish)...),
+	)
 
 	return spanCtx, func(outcome string) {
 		span.End()
@@ -132,17 +143,21 @@ func (r Recorder) PublishSpan(ctx context.Context, topic string) (context.Contex
 	}
 }
 
-// ConsumeSpan starts an outbox.consume span for topic and returns a
-// finisher that ends the span. The finisher is a no-op when no provider is
-// wired.
-func (r Recorder) ConsumeSpan(ctx context.Context, topic string) (context.Context, func()) {
+// ConsumeSpan starts an outbox.consume consumer span for the message with the
+// given topic and ID and returns a finisher that ends the span. The span
+// carries the same outbox.* and messaging.* attributes as PublishSpan, with
+// messaging.operation set to process. The finisher is a no-op when no provider
+// is wired.
+func (r Recorder) ConsumeSpan(ctx context.Context, topic, messageID string) (context.Context, func()) {
 	t := r.tracer()
 	if t == nil {
 		return ctx, func() {}
 	}
 
-	spanCtx, span := t.Start(ctx, SpanConsume)
-	span.SetAttributes(r.spanAttrs(topic)...)
+	spanCtx, span := observability.StartSpan(ctx, t, SpanConsume,
+		observability.WithSpanKind(observability.SpanKindConsumer),
+		observability.WithAttributes(r.spanAttrs(ctx, topic, messageID, observability.OperationProcess)...),
+	)
 
 	return spanCtx, span.End
 }
@@ -187,15 +202,40 @@ func (r Recorder) attrs(extra ...observability.Attr) []observability.Attr {
 	return append(out, extra...)
 }
 
-// spanAttrs returns the span attrs: topic, adapter and, when set, table.
-func (r Recorder) spanAttrs(topic string) []observability.Attr {
-	out := []observability.Attr{
+// system returns the messaging.system value: the configured transport
+// selector when set, otherwise the adapter name.
+func (r Recorder) system() string {
+	if r.transport != "" {
+		return r.transport
+	}
+
+	return r.adapter
+}
+
+// spanAttrs returns the span attrs for one message: the outbox.* set (topic,
+// adapter, and, when set, table) followed by the messaging.* semantic
+// conventions. The conversation ID is omitted when ctx carries no valid trace,
+// so the attribute never reports an empty correlation ID.
+func (r Recorder) spanAttrs(ctx context.Context, topic, messageID, operation string) []observability.Attr {
+	out := make([]observability.Attr, 0, 8)
+	out = append(out,
 		observability.String(AttrTopic, topic),
 		observability.String(AttrAdapter, r.adapter),
-	}
+	)
 
 	if r.table != "" {
 		out = append(out, observability.String(AttrTable, r.table))
+	}
+
+	out = append(out,
+		observability.String(observability.MessagingSystem, r.system()),
+		observability.String(observability.MessagingDestinationName, topic),
+		observability.String(observability.MessagingOperation, operation),
+		observability.String(observability.MessagingMessageID, messageID),
+	)
+
+	if traceID := traceprop.TraceID(ctx); traceID != "" {
+		out = append(out, observability.String(observability.MessagingMessageConversationID, traceID))
 	}
 
 	return out

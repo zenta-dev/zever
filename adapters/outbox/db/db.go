@@ -169,7 +169,7 @@ func openFromDB(conn coredb.DB, o Options, owns bool) (outbox.Store, error) {
 		conn: conn, table: table, inboxTable: inboxTable, publisher: o.Publisher,
 		poll: poll, batch: batch, maxAttempts: maxAttempts, retry: o.Retry,
 		retention: retention, lock: time.Duration(lockSeconds) * time.Second,
-		owns: owns, recorder: outbox.NewRecorder(o.Provider, string(outbox.DB), table),
+		owns: owns, recorder: outbox.NewRecorder(o.Provider, string(outbox.DB), table, o.Transport),
 	}
 
 	if err := d.ensureSchema(ctx); err != nil {

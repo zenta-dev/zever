@@ -8,9 +8,10 @@
 // as the side effect.
 //
 // Core stays transport-agnostic: it depends only on core/db for the
-// transaction type and shared/registry plus shared/retry for wiring. It
-// never imports core/eventbus or core/queue; application wiring bridges a
-// concrete transport to the Publisher interface.
+// transaction type, core/observability for relay telemetry, and
+// shared/registry, shared/retry, and shared/traceprop for wiring. It never
+// imports core/eventbus or core/queue; application wiring bridges a concrete
+// transport to the Publisher interface.
 //
 // Adapters live one module each under adapters/outbox: db (default, durable
 // sqlite/postgres polling) and memory (dev/test). The outboxtest package
