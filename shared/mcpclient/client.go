@@ -8,6 +8,7 @@ import (
 	"os/exec"
 	"sync"
 	"sync/atomic"
+	"time"
 )
 
 // request is a JSON-RPC 2.0 request.
@@ -16,14 +17,6 @@ type request struct {
 	ID      int64  `json:"id"`
 	Method  string `json:"method"`
 	Params  any    `json:"params,omitempty"`
-}
-
-// response is a JSON-RPC 2.0 response.
-type response struct {
-	JSONRPC string          `json:"jsonrpc"`
-	ID      *int64          `json:"id"`
-	Result  json.RawMessage `json:"result,omitempty"`
-	Error   *rpcErrorWire   `json:"error,omitempty"`
 }
 
 // rpcErrorWire is the wire shape of a JSON-RPC error object.
@@ -64,16 +57,29 @@ type CallResult struct {
 // a server that stops responding blocks later calls until the transport
 // read fails; callers should bound this with timeouts or cancel between
 // calls (cancellation is honored before each read).
+//
+// Incoming server requests (sampling/create, elicitation/create) dispatch
+// to the configured hooks while a call waits. Hooks must not call Client
+// methods: the transport lock is held during dispatch.
 type Client struct {
 	enc  *json.Encoder
 	dec  *json.Decoder
 	mu   sync.Mutex
 	next atomic.Int64
+
+	onSampling Sampler
+	onElicit   ElicitPolicy
 }
 
 // New builds a Client over r and w. It performs no I/O until the first call.
-func New(r io.Reader, w io.Writer) *Client {
-	return &Client{enc: json.NewEncoder(w), dec: json.NewDecoder(r)}
+func New(r io.Reader, w io.Writer, opts ...Option) *Client {
+	c := &Client{enc: json.NewEncoder(w), dec: json.NewDecoder(r)}
+
+	for _, opt := range opts {
+		opt(c)
+	}
+
+	return c
 }
 
 // DialStdio spawns path as an MCP stdio server and returns a Client over its
@@ -106,6 +112,77 @@ func DialStdio(ctx context.Context, path string, args ...string) (*Client, *exec
 	return New(stdout, stdin), cmd, nil
 }
 
+// Dial retry bounds for DialStdioRetry.
+const (
+	// DefaultDialAttempts caps spawn attempts.
+	DefaultDialAttempts = 3
+	// DefaultDialInitialBackoff is the first retry delay, doubling each time.
+	DefaultDialInitialBackoff = 200 * time.Millisecond
+	// DefaultDialMaxBackoff caps the retry delay.
+	DefaultDialMaxBackoff = 5 * time.Second
+)
+
+// DialOptions configures DialStdioRetry.
+type DialOptions struct {
+	// Attempts caps spawn attempts; <= 0 selects DefaultDialAttempts.
+	Attempts int
+	// InitialBackoff is the first retry delay; <= 0 selects the default.
+	InitialBackoff time.Duration
+	// MaxBackoff caps the retry delay; <= 0 selects the default.
+	MaxBackoff time.Duration
+}
+
+// DialStdioRetry spawns path like DialStdio, retrying spawn failures with
+// exponential backoff. It returns the first success or a wrapped final error.
+func DialStdioRetry(ctx context.Context, path string, opts DialOptions, args ...string) (*Client, *exec.Cmd, error) {
+	attempts := opts.Attempts
+	if attempts <= 0 {
+		attempts = DefaultDialAttempts
+	}
+
+	backoff := opts.InitialBackoff
+	if backoff <= 0 {
+		backoff = DefaultDialInitialBackoff
+	}
+
+	maxBackoff := opts.MaxBackoff
+	if maxBackoff <= 0 {
+		maxBackoff = DefaultDialMaxBackoff
+	}
+
+	var err error
+
+	for attempt := 1; ; attempt++ {
+		var c *Client
+		var cmd *exec.Cmd
+
+		c, cmd, err = DialStdio(ctx, path, args...)
+		if err == nil {
+			return c, cmd, nil
+		}
+
+		if attempt >= attempts {
+			break
+		}
+
+		timer := time.NewTimer(backoff)
+		select {
+		case <-ctx.Done():
+			timer.Stop()
+
+			return nil, nil, ctx.Err()
+		case <-timer.C:
+		}
+
+		backoff *= 2
+		if backoff > maxBackoff {
+			backoff = maxBackoff
+		}
+	}
+
+	return nil, nil, fmt.Errorf("mcpclient: dial %q failed after %d attempts: %w", path, attempts, err)
+}
+
 // call sends one request and decodes the matching response.
 func (c *Client) call(ctx context.Context, method string, params, out any) error {
 	if err := ctx.Err(); err != nil {
@@ -126,37 +203,154 @@ func (c *Client) call(ctx context.Context, method string, params, out any) error
 			return err
 		}
 
-		var resp response
-		if err := c.dec.Decode(&resp); err != nil {
+		var msg inbound
+		if err := c.dec.Decode(&msg); err != nil {
 			return fmt.Errorf("mcpclient: decode %s: %w", method, err)
 		}
 
-		if resp.ID == nil {
+		if msg.Method != "" && msg.Result == nil && msg.Error == nil {
+			if err := c.dispatchRequest(ctx, msg.ID, msg.Method, msg.Params); err != nil {
+				return err
+			}
+
 			continue
 		}
 
-		if *resp.ID != id {
+		if msg.ID == nil {
+			continue
+		}
+
+		if *msg.ID != id {
 			return fmt.Errorf("mcpclient: response id mismatch: %w", ErrProtocol)
 		}
 
-		if resp.Error != nil {
-			return RPCError{Code: resp.Error.Code, Message: resp.Error.Message}
+		if msg.Error != nil {
+			return RPCError{Code: msg.Error.Code, Message: msg.Error.Message}
 		}
 
 		if out == nil {
 			return nil
 		}
 
-		if len(resp.Result) == 0 {
+		if len(msg.Result) == 0 {
 			return fmt.Errorf("mcpclient: empty %s result: %w", method, ErrProtocol)
 		}
 
-		if err := json.Unmarshal(resp.Result, out); err != nil {
+		if err := json.Unmarshal(msg.Result, out); err != nil {
 			return fmt.Errorf("mcpclient: decode %s result: %w", method, err)
 		}
 
 		return nil
 	}
+}
+
+// inbound is the wire shape of any incoming message: responses carry
+// result/error, server requests carry a method.
+type inbound struct {
+	JSONRPC string          `json:"jsonrpc"`
+	ID      *int64          `json:"id"`
+	Method  string          `json:"method,omitempty"`
+	Params  json.RawMessage `json:"params,omitempty"`
+	Result  json.RawMessage `json:"result,omitempty"`
+	Error   *rpcErrorWire   `json:"error,omitempty"`
+}
+
+// dispatchRequest answers one server-initiated request. Notifications (nil
+// ID) are acknowledged silently.
+func (c *Client) dispatchRequest(ctx context.Context, id *int64, method string, params json.RawMessage) error {
+	answer := func(result any, rpcErr *RPCError) error {
+		if id == nil {
+			return nil
+		}
+
+		if rpcErr != nil {
+			return c.sendResponse(id, nil, rpcErr)
+		}
+
+		raw, err := json.Marshal(result)
+		if err != nil {
+			return c.sendResponse(id, nil, &RPCError{Code: -32603, Message: err.Error()})
+		}
+
+		return c.sendResponse(id, raw, nil)
+	}
+
+	switch method {
+	case "sampling/create":
+		if c.onSampling == nil {
+			return answer(nil, &RPCError{Code: -32601, Message: "sampling not supported"})
+		}
+
+		var p struct {
+			Messages []map[string]any `json:"messages"`
+		}
+		rest := map[string]any{}
+
+		if len(params) > 0 {
+			var full map[string]any
+			if err := json.Unmarshal(params, &full); err != nil {
+				return answer(nil, &RPCError{Code: -32602, Message: "invalid sampling params"})
+			}
+
+			if err := json.Unmarshal(params, &p); err != nil {
+				return answer(nil, &RPCError{Code: -32602, Message: "invalid sampling params"})
+			}
+
+			rest = full
+		}
+
+		res, err := c.onSampling(ctx, SampleRequest{Messages: p.Messages, Params: rest})
+		if err != nil {
+			return answer(nil, &RPCError{Code: -32603, Message: err.Error()})
+		}
+
+		return answer(res.Content, nil)
+	case "elicitation/create":
+		var p struct {
+			Message string         `json:"message"`
+			Schema  map[string]any `json:"requestedSchema"`
+		}
+		if len(params) > 0 {
+			if err := json.Unmarshal(params, &p); err != nil {
+				return answer(nil, &RPCError{Code: -32602, Message: "invalid elicitation params"})
+			}
+		}
+
+		action := ElicitDecline
+		var content map[string]any
+
+		if c.onElicit != nil {
+			var err error
+			var acted ElicitAction
+			acted, content, err = c.onElicit(ctx, ElicitRequest{Message: p.Message, Schema: p.Schema})
+			if err != nil {
+				return answer(nil, &RPCError{Code: -32603, Message: err.Error()})
+			}
+
+			action = acted
+		}
+
+		return answer(map[string]any{"action": string(action), "content": content}, nil)
+	default:
+		return answer(nil, &RPCError{Code: -32601, Message: "method not found: " + method})
+	}
+}
+
+// sendResponse encodes one response or error for id.
+func (c *Client) sendResponse(id *int64, result json.RawMessage, rpcErr *RPCError) error {
+	msg := map[string]any{"jsonrpc": "2.0", "id": *id}
+
+	if rpcErr != nil {
+		msg["error"] = map[string]any{"code": rpcErr.Code, "message": rpcErr.Message}
+	} else {
+		msg["result"] = result
+	}
+
+	if err := c.enc.Encode(msg); err != nil {
+		return fmt.Errorf("mcpclient: encode response: %w", err)
+	}
+
+	return nil
 }
 
 // Initialize performs the MCP handshake and returns the negotiated protocol

@@ -6,6 +6,8 @@ import (
 	"errors"
 	"fmt"
 	"io"
+	"sync"
+	"sync/atomic"
 )
 
 const (
@@ -27,17 +29,41 @@ type toolDef struct {
 }
 
 // Server is the zever MCP server: a method dispatcher over a tool set.
+// Tools/call handlers run in their own goroutines so elicitation
+// round-trips keep flowing while a handler waits. Handler implementations
+// must therefore be safe for concurrent use.
 type Server struct {
 	tools map[string]toolDef
 	order []string
+
+	// mu guards sender and pending.
+	mu sync.Mutex
+	// sender delivers server-originated messages; nil outside run().
+	sender senderFunc
+	// pending correlates elicitation answers by request ID.
+	pending map[int64]chan elicitResult
+	// nextServerID issues server-originated request IDs.
+	nextServerID atomic.Int64
+	// encMu serializes outbound encodes across handler goroutines.
+	encMu sync.Mutex
+}
+
+// getSender returns the outbound sender, or nil when the server is not running.
+func (s *Server) getSender() senderFunc {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+
+	return s.sender
 }
 
 // newServer builds a Server with every zever tool registered.
 func newServer() *Server {
-	s := &Server{tools: map[string]toolDef{}}
+	s := &Server{tools: map[string]toolDef{}, pending: map[int64]chan elicitResult{}}
 	s.register(compileTool())
 	s.register(schemaTool())
 	s.register(explainTool())
+	s.register(doctorTool())
+	s.register(s.generateTool())
 	return s
 }
 
@@ -47,33 +73,91 @@ func (s *Server) register(t toolDef) {
 	s.order = append(s.order, t.Name)
 }
 
-// run reads newline-delimited JSON-RPC requests from in and writes responses to
-// out until in reaches EOF. Diagnostics go to errw.
+// run reads newline-delimited JSON-RPC messages from in and writes responses
+// to out until in reaches EOF. Client requests dispatch to handle(); client
+// answers to server-initiated elicitations route to the pending waiter.
+// Tools/call handlers each run in their own goroutine so an eliciting
+// handler never stalls the read loop. Diagnostics go to errw.
 func run(ctx context.Context, in io.Reader, out io.Writer, errw io.Writer) int {
 	s := newServer()
 	dec := json.NewDecoder(in)
 	enc := json.NewEncoder(out)
 
+	ctx, cancel := context.WithCancel(ctx)
+	defer cancel()
+
+	s.mu.Lock()
+	s.sender = func(v any) error {
+		s.encMu.Lock()
+		defer s.encMu.Unlock()
+
+		return enc.Encode(v)
+	}
+	s.mu.Unlock()
+
+	var wg sync.WaitGroup
+	failed := false
+
+	respond := func(resp rpcResponse) {
+		s.encMu.Lock()
+		defer s.encMu.Unlock()
+
+		if err := enc.Encode(resp); err != nil {
+			fmt.Fprintln(errw, "zever-mcp: encode:", err)
+			failed = true
+		}
+	}
+
 	for {
-		var req rpcRequest
-		if err := dec.Decode(&req); err != nil {
+		var raw json.RawMessage
+		if err := dec.Decode(&raw); err != nil {
 			if errors.Is(err, io.EOF) {
-				return 0
+				break
 			}
 			_ = enc.Encode(errorResponse(json.RawMessage("null"), codeParseError, "zever-mcp: parse error"))
 			fmt.Fprintln(errw, "zever-mcp: decode:", err)
+			cancel()
+			wg.Wait()
+
 			return 1
+		}
+
+		if s.deliverResponse(raw) {
+			continue
+		}
+
+		var req rpcRequest
+		if err := json.Unmarshal(raw, &req); err != nil {
+			respond(errorResponse(json.RawMessage("null"), codeInvalidRequest, "zever-mcp: malformed request"))
+			continue
 		}
 
 		if req.isNotification() {
 			continue
 		}
 
-		if err := enc.Encode(s.handle(ctx, req)); err != nil {
-			fmt.Fprintln(errw, "zever-mcp: encode:", err)
-			return 1
+		if req.Method == "tools/call" {
+			wg.Add(1)
+
+			go func() {
+				defer wg.Done()
+				respond(s.handle(ctx, req))
+			}()
+
+			continue
 		}
+
+		respond(s.handle(ctx, req))
 	}
+
+	cancel()
+	wg.Wait()
+
+	if failed {
+		return 1
+	}
+
+	return 0
 }
 
 // handle dispatches one request to a method handler.
@@ -91,6 +175,14 @@ func (s *Server) handle(ctx context.Context, req rpcRequest) rpcResponse {
 		return rpcResponse{JSONRPC: "2.0", ID: req.ID, Result: map[string]any{"tools": s.toolList()}}
 	case "tools/call":
 		return s.callTool(ctx, req)
+	case "resources/list":
+		return rpcResponse{JSONRPC: "2.0", ID: req.ID, Result: map[string]any{"resources": resourceList()}}
+	case "resources/read":
+		return readResource(req)
+	case "prompts/list":
+		return rpcResponse{JSONRPC: "2.0", ID: req.ID, Result: map[string]any{"prompts": promptList()}}
+	case "prompts/get":
+		return getPrompt(req)
 	default:
 		return errorResponse(req.ID, codeMethodNotFound, "zever-mcp: method not found: "+req.Method)
 	}
@@ -125,8 +217,12 @@ func (s *Server) initializeResponse(req rpcRequest) rpcResponse {
 
 	return rpcResponse{JSONRPC: "2.0", ID: req.ID, Result: map[string]any{
 		"protocolVersion": version,
-		"capabilities":    map[string]any{"tools": map[string]any{}},
-		"serverInfo":      map[string]any{"name": serverName, "version": serverVersion},
+		"capabilities": map[string]any{
+			"tools":     map[string]any{},
+			"resources": map[string]any{},
+			"prompts":   map[string]any{},
+		},
+		"serverInfo": map[string]any{"name": serverName, "version": serverVersion},
 	}}
 }
 
