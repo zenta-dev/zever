@@ -124,6 +124,35 @@ Expected output (stdout adapter prints spans, counter returns nil):
 
 Span lines appear on stdout in human-readable form before the `<nil>`.
 
+`Tracer.Start(ctx, name)` starts an `internal` span with no initial
+attributes — fine for work inside one service. When the span crosses a
+boundary (an HTTP request, an RPC, a published message), use
+`observability.StartSpan` with `WithSpanKind`, `WithAttributes`, or
+`WithLinks` instead:
+
+```go
+import (
+    "context"
+
+    "github.com/zenta-dev/zever/core/observability"
+)
+
+func producerSpan(ctx context.Context, t observability.Tracer, topic string) {
+    ctx, span := observability.StartSpan(ctx, t, "orders.publish",
+        observability.WithSpanKind(observability.SpanKindProducer),
+        observability.WithAttributes(observability.String(observability.MessagingDestinationName, topic)),
+    )
+    defer span.End()
+}
+```
+
+The options are passed through the optional `observability.SpanStarter`
+interface: a `Tracer` that implements it records kind, attributes, and
+links at span creation; one that does not falls back to
+`Tracer.Start` with the options ignored, so a custom adapter keeps
+working. See [Cross-Service Tracing](./cross-service-tracing.mdx) for the
+propagation contract that goes with it.
+
 ## Adapters
 
 | Adapter | Package | Notes |
@@ -163,6 +192,7 @@ Span lines appear on stdout in human-readable form before the `<nil>`.
 
 ## See also
 
+- [Cross-Service Tracing](./cross-service-tracing.mdx) - inbound extraction, outbound injection, baggage, semconv names
 - [Scheduler and Jobs](./scheduler-jobs.mdx) - spans around job runs
 - [Tenants](./tenants.mdx) - tenant as span attribute
 - [Cache](./cache.mdx) - cache hit counters as metrics

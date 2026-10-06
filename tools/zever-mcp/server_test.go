@@ -88,8 +88,8 @@ func TestToolsList(t *testing.T) {
 	if !ok {
 		t.Fatalf("tools type = %T", m["tools"])
 	}
-	if len(tools) != 3 {
-		t.Fatalf("tools = %d, want 3", len(tools))
+	if len(tools) != 5 {
+		t.Fatalf("tools = %d, want 5", len(tools))
 	}
 }
 

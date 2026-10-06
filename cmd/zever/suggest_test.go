@@ -65,7 +65,7 @@ func TestCandidateLists_complete(t *testing.T) {
 	wantTop := []string{
 		"new", "add", "compile", "check", "breaking", "fmt", "doctor", "config", "routes", "explain",
 		"check-boundaries", "check:boundaries", "graph", "generate", "extract", "serve", "dev",
-		"queue:work", "schedule:run", "tinker", "db", "help",
+		"queue:work", "schedule:run", "tinker", "outbox", "db", "help",
 	}
 	if !slices.Equal(allTopLevel, wantTop) {
 		t.Fatalf("allTopLevel = %v, want %v", allTopLevel, wantTop)

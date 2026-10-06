@@ -235,7 +235,7 @@ func TestStartSpanNilProvider(t *testing.T) {
 	cfg := &config{}
 	ctx := t.Context()
 
-	gotCtx, span := cfg.startSpan(ctx, "/svc/Method")
+	gotCtx, span := cfg.startSpan(ctx, "/svc/Method", "")
 	if gotCtx != ctx {
 		t.Error("startSpan without provider changed the context")
 	}

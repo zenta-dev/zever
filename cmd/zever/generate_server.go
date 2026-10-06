@@ -853,7 +853,9 @@ func New() (*container.Container, error) {
 // The same grpcServer also carries the standard gRPC Health Checking
 // Protocol (grpc_health_v1) and server reflection, so orchestrators and
 // grpcurl work out of the box: the overall serving status starts SERVING,
-// tracks /readyz's DB ping, and flips to NOT_SERVING before GracefulStop.
+// tracks the container readiness aggregate behind /readyz (a database ping
+// plus, when outbox.stall_readiness is set, the relay's stall flag), and
+// flips to NOT_SERVING before GracefulStop.
 const serverTemplate = `// Command server runs this project's HTTP+gRPC API.
 //
 // Scaffolded by ` + "`zever generate server`" + `. It is deliberately thin: parse
@@ -1007,8 +1009,10 @@ func run(addr, grpcAddr string) error {
 {{if .RateLimitEnabled}}
 	r.Use(middleware.RateLimit(limiter, middleware.RemoteAddrKey))
 {{end}}
-	database, err := c.DB()
-	if err != nil {
+	// Resolve the db once at boot so a broken DSN fails fast with a clear
+	// error instead of surfacing as a 503 on the first readiness probe.
+	// Readiness itself goes through the container aggregate below.
+	if _, err = c.DB(); err != nil {
 		return err
 	}
 
@@ -1017,10 +1021,10 @@ func run(addr, grpcAddr string) error {
 	})
 
 	r.Handle("GET", "/readyz", func(w http.ResponseWriter, req *http.Request) {
-		pingCtx, cancel := context.WithTimeout(req.Context(), readyTimeout)
+		readyCtx, cancel := context.WithTimeout(req.Context(), readyTimeout)
 		defer cancel()
 
-		if err := database.Ping(pingCtx); err != nil {
+		if err := c.Ready(readyCtx); err != nil {
 			healthServer.SetServingStatus("", healthpb.HealthCheckResponse_NOT_SERVING)
 
 			w.WriteHeader(http.StatusServiceUnavailable)

@@ -9,6 +9,21 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Added
 
+- RAG reranking: `Reranker` interface with deterministic `TermOverlapReranker`
+  default and `JudgeReranker` LLM opt-in, applied post-fusion via
+  `HybridOptions.Reranker`.
+- Container agent options: `Agent(WithMaxParallel(...), WithAgentObserver(...))`
+  and `RAG(WithTopK(...), WithHybridSearch(), ...)`; existing no-arg calls
+  unchanged.
+- Richer `tools/zever-mcp`: `zever_doctor` and `zever_generate` tools
+  (via the installed CLI), static `zever://` resources, prompt templates,
+  and server-initiated elicitation gating destructive applies.
+- `shared/mcpclient` growth: sampler hooks, elicitation policies, and
+  reconnecting dial with backoff.
+- Nightly eval workflow (schedule + manual dispatch, never gating):
+  deterministic golden dataset with report artifact.
+- Prompt pack 2: `SchemaDesign`, `MigrationReview`, `CitationCheck` and
+  `ToolPlan` builders.
 - Agent-app tutorial (`docs/tutorials/build-an-agent-app`): end-to-end
   walkthrough from container resolution through RAG grounding, agent loops,
   MCP serving, and eval scoring.
@@ -107,6 +122,18 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   `step` syntax, validation rules (required `execute`, unique step names,
   at most one `pivot`), and the generated `SagaCaller`/`RegisterSagas`
   output with an end-to-end wiring note.
+- New digging-deeper guides for the outbox ops and cross-service tracing
+  surfaces: `outbox-ops` (exact `outbox.*` relay metric names and
+  attributes, recommended Prometheus alert rules, the DLQ runbook around
+  `zever outbox status`/`dlq list`/`dlq requeue`/`dlq purge`/`purge`, and
+  the opt-in `outbox.stall_readiness` gate) and
+  `cross-service-tracing` (inbound extraction vs outbound injection,
+  the `tenant.id`/`user.id`/`correlation.id` baggage keys, the five span
+  kinds on `observability.StartSpan`, provider setup and collector
+  verification, plus the OTel semconv attribute migration table). Both
+  wired into the docs sidebar; `production.md`'s observability section
+  no longer calls propagation evolving, and its pre/post-deploy
+  checklists now cover relay alerts and trace continuity.
 
 ### Dependencies
 
@@ -118,6 +145,21 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Changed
 
+- **Breaking:** span and metric attribute names migrated to OpenTelemetry
+  semantic conventions: `http.method`→`http.request.method`,
+  `http.path`→`url.path`, `http.status_code`→`http.response.status_code`;
+  gRPC spans now carry `rpc.system`/`rpc.service`/`rpc.method`/`rpc.grpc.status_code`;
+  messaging spans use `messaging.*`. Update dashboards/queries accordingly.
+  Counter labels migrated too, under unchanged metric names: the
+  `http.request` counter is tagged by `http.request.method`/
+  `http.response.status_code` (was `method`/`status`, where `status` held
+  status *text*) and the `rpc.request` counter by
+  `rpc.service`/`rpc.method`/`rpc.grpc.status_code` (was `method`/`outcome`).
+  Keys are exported as constants from `core/observability`
+  (`HTTPRequestMethod`, `URLPath`, `HTTPResponseStatusCode`, `ServerAddress`,
+  `RPCSystem`, `RPCService`, `RPCMethod`, `RPCGRPCStatusCode`,
+  `MessagingSystem`, `MessagingDestinationName`, `MessagingOperation`,
+  `MessagingMessageID`, `MessagingMessageConversationID`).
 - `vectorstore/db` sqlite query now decodes row metadata lazily: only rows
   that survive the topK heap get their metadata JSON parsed (was: every
   scanned row). Corrupt metadata in a row that ranks below topK no longer

@@ -11,4 +11,8 @@
 //
 // Close shuts services down in reverse dependency order; see Close for the
 // exact ordering and timeout contract.
+//
+// Ready is the matching health contract: one aggregate the scaffolded
+// /readyz probe and the gRPC health status both read, so every transport
+// answers the same readiness decision.
 package container
