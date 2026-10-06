@@ -122,6 +122,8 @@ type GenerateEntityConfig struct {
 	Fields []EntityField
 	Stdout io.Writer
 	Stderr io.Writer
+	// DryRun prints the rendered declaration without touching the filesystem.
+	DryRun bool
 }
 
 // GenerateEntity appends the rendered entity declaration to the module's
@@ -160,7 +162,19 @@ func GenerateEntity(cfg GenerateEntityConfig) (string, error) {
 		return "", fmt.Errorf("%s: module %q already declares a %s named %q", tag, cfg.Module, kind, cfg.Name)
 	}
 
-	if err := appendDeclBeforeClosingBrace(path, cfg.Module, renderEntityDecl(cfg.Name, fields)); err != nil {
+	declText := renderEntityDecl(cfg.Name, fields)
+
+	if cfg.DryRun {
+		if stdout := cfg.Stdout; stdout != nil {
+			_, _ = fmt.Fprintln(stdout, dim("dry run — no files written"))
+			_, _ = fmt.Fprintln(stdout, dim("would append to ")+cyan(path)+dim(":"))
+			_, _ = fmt.Fprintln(stdout, declText)
+		}
+
+		return path, nil
+	}
+
+	if err := appendDeclBeforeClosingBrace(path, cfg.Module, declText); err != nil {
 		return "", err
 	}
 
@@ -188,6 +202,7 @@ func runGenerateEntity(args []string) error {
 
 	fs := flag.NewFlagSet("generate entity", flag.ContinueOnError)
 	fs.Var(&fields, "field", "a field to declare, as name:type; repeatable")
+	dryRun := fs.Bool("dry-run", false, "print the rendered declaration without writing files")
 	// coverageProof: no local -i/--interactive flags (cf. migrate.go's
 	// documented pattern). peelInteractive strips them before Parse and
 	// sets interactiveMode globally, so defining them here would only
@@ -257,6 +272,7 @@ func runGenerateEntity(args []string) error {
 		Fields: exported,
 		Stdout: os.Stdout,
 		Stderr: os.Stderr,
+		DryRun: *dryRun,
 	})
 
 	return err
