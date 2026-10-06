@@ -40,6 +40,39 @@ type GenerateSeedConfig struct {
 	Force        bool
 	Stdout       io.Writer
 	Stderr       io.Writer
+	// DryRun prints the planned writes without touching the filesystem.
+	DryRun bool
+}
+
+// generateSeedDryRun validates and renders the seed entrypoint without
+// writing anything, reporting the planned paths.
+func generateSeedDryRun(cfg GenerateSeedConfig) (GenerateSeedResult, error) {
+	const tag = "zever generate seed"
+
+	var res GenerateSeedResult
+
+	if _, err := renderGoFile(tag, "seed main.go", seedTemplate, struct{ ModulePath string }{cfg.ModulePath}); err != nil {
+		return res, err
+	}
+
+	if _, err := renderGoFile(tag, "seed stub", seedStubTemplate, struct{ GeneratedDir string }{cfg.GeneratedDir}); err != nil {
+		return res, err
+	}
+
+	res.Entrypoint = filepath.Join(cfg.SeedEntry, "main.go")
+	res.Stub = filepath.Join(seedStubRoot, "seed.go")
+
+	if stdout := cfg.Stdout; stdout != nil {
+		printGenerateDryRun(stdout, res.Entrypoint)
+
+		if _, statErr := os.Stat(filepath.Join("internal", "app", "app.go")); os.IsNotExist(statErr) {
+			_, _ = fmt.Fprintln(stdout, dim("would write ")+cyan(filepath.Join("internal", "app", "app.go")))
+		}
+
+		_, _ = fmt.Fprintln(stdout, dim("would write ")+cyan(res.Stub))
+	}
+
+	return res, nil
 }
 
 // GenerateSeedResult names everything GenerateSeed wrote.
@@ -59,6 +92,10 @@ func GenerateSeed(cfg GenerateSeedConfig) (GenerateSeedResult, error) {
 	const tag = "zever generate seed"
 
 	var res GenerateSeedResult
+
+	if cfg.DryRun {
+		return generateSeedDryRun(cfg)
+	}
 
 	appCreated, err := ensureAppPackage(tag)
 	if err != nil {
@@ -115,7 +152,7 @@ func GenerateSeed(cfg GenerateSeedConfig) (GenerateSeedResult, error) {
 }
 
 func runGenerateSeed(args []string) error {
-	project, modulePath, forceVal, err := parseEntrypointFlags(args, "generate seed", printSeedUsage,
+	project, modulePath, forceVal, dryRun, err := parseEntrypointFlags(args, "generate seed", printSeedUsage,
 		func(p ProjectConfig) string { return p.SeedEntry }, promptConfirmForSeed)
 	if err != nil {
 		return err
@@ -128,6 +165,7 @@ func runGenerateSeed(args []string) error {
 		Force:        forceVal,
 		Stdout:       os.Stdout,
 		Stderr:       os.Stderr,
+		DryRun:       dryRun,
 	})
 
 	return err

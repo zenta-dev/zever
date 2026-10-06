@@ -44,6 +44,8 @@ type GenerateJobConfig struct {
 	Queue  string
 	Stdout io.Writer
 	Stderr io.Writer
+	// DryRun prints the rendered declaration without touching the filesystem.
+	DryRun bool
 }
 
 // GenerateJob appends the rendered job declaration to the module's .zen file
@@ -80,7 +82,19 @@ func GenerateJob(cfg GenerateJobConfig) (string, error) {
 		return "", fmt.Errorf("%s: module %q already declares a %s named %q", tag, cfg.Module, kind, cfg.Name)
 	}
 
-	if err := appendDeclBeforeClosingBrace(path, cfg.Module, renderJobDecl(cfg.Name, cfg.Queue)); err != nil {
+	declText := renderJobDecl(cfg.Name, cfg.Queue)
+
+	if cfg.DryRun {
+		if stdout := cfg.Stdout; stdout != nil {
+			_, _ = fmt.Fprintln(stdout, dim("dry run — no files written"))
+			_, _ = fmt.Fprintln(stdout, dim("would append to ")+cyan(path)+dim(":"))
+			_, _ = fmt.Fprintln(stdout, declText)
+		}
+
+		return path, nil
+	}
+
+	if err := appendDeclBeforeClosingBrace(path, cfg.Module, declText); err != nil {
 		return "", err
 	}
 
@@ -103,6 +117,7 @@ func runGenerateJob(args []string) error {
 	args = peelInteractive(args)
 	fs := flag.NewFlagSet("generate job", flag.ContinueOnError)
 	queue := fs.String("queue", "default", "name of the queue the job runs on")
+	dryRun := fs.Bool("dry-run", false, "print the rendered declaration without writing files")
 	// coverageProof: no local -i/--interactive flags; peelInteractive
 	// strips them before Parse and sets interactiveMode globally.
 
@@ -192,6 +207,7 @@ func runGenerateJob(args []string) error {
 		Queue:  *queue,
 		Stdout: os.Stdout,
 		Stderr: os.Stderr,
+		DryRun: *dryRun,
 	})
 
 	return err

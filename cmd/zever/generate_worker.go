@@ -90,6 +90,8 @@ type GenerateWorkerConfig struct {
 	Force       bool
 	Stdout      io.Writer
 	Stderr      io.Writer
+	// DryRun prints the planned writes without touching the filesystem.
+	DryRun bool
 }
 
 // GenerateWorkerResult names everything GenerateWorker wrote.
@@ -108,6 +110,10 @@ func GenerateWorker(cfg GenerateWorkerConfig) (GenerateWorkerResult, error) {
 	const tag = "zever generate worker"
 
 	var res GenerateWorkerResult
+
+	if cfg.DryRun {
+		return generateWorkerDryRun(cfg)
+	}
 
 	schema, err := compileSchemaDir(tag, cfg.SchemaDir)
 	if err != nil {
@@ -162,8 +168,41 @@ func GenerateWorker(cfg GenerateWorkerConfig) (GenerateWorkerResult, error) {
 	return res, nil
 }
 
+// generateWorkerDryRun validates and renders the worker entrypoint without
+// writing anything, reporting the planned paths.
+func generateWorkerDryRun(cfg GenerateWorkerConfig) (GenerateWorkerResult, error) {
+	const tag = "zever generate worker"
+
+	var res GenerateWorkerResult
+
+	schema, err := compileSchemaDir(tag, cfg.SchemaDir)
+	if err != nil {
+		return res, err
+	}
+
+	data := buildWorkerData(cfg.ModulePath, schema)
+
+	if _, err := renderGoFile(tag, "worker main.go", workerTemplate, data); err != nil {
+		return res, err
+	}
+
+	res.Entrypoint = filepath.Join(cfg.WorkerEntry, "main.go")
+
+	if stdout := cfg.Stdout; stdout != nil {
+		printGenerateDryRun(stdout, res.Entrypoint)
+
+		if _, statErr := os.Stat(filepath.Join("internal", "app", "app.go")); os.IsNotExist(statErr) {
+			_, _ = fmt.Fprintln(stdout, dim("would write ")+cyan(filepath.Join("internal", "app", "app.go")))
+		}
+
+		_, _ = fmt.Fprintln(stdout, dim("would stub job handlers"))
+	}
+
+	return res, nil
+}
+
 func runGenerateWorker(args []string) error {
-	project, modulePath, forceVal, err := parseEntrypointFlags(args, "generate worker", printWorkerUsage,
+	project, modulePath, forceVal, dryRun, err := parseEntrypointFlags(args, "generate worker", printWorkerUsage,
 		func(p ProjectConfig) string { return p.WorkerEntry }, promptConfirmForWorker)
 	if err != nil {
 		return err
@@ -176,6 +215,7 @@ func runGenerateWorker(args []string) error {
 		Force:       forceVal,
 		Stdout:      os.Stdout,
 		Stderr:      os.Stderr,
+		DryRun:      dryRun,
 	})
 
 	return err

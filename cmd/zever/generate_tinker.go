@@ -48,6 +48,8 @@ type GenerateTinkerConfig struct {
 	Force      bool
 	Stdout     io.Writer
 	Stderr     io.Writer
+	// DryRun prints the planned write without touching the filesystem.
+	DryRun bool
 }
 
 // GenerateTinker renders the tinker shim and writes it to
@@ -82,6 +84,12 @@ func GenerateTinker(cfg GenerateTinkerConfig) (string, error) {
 		} else if !os.IsNotExist(serr) {
 			return "", fmt.Errorf("%s: stat %q: %w", tag, path, serr)
 		}
+	}
+
+	if cfg.DryRun {
+		printGenerateDryRun(cfg.Stdout, path)
+
+		return path, nil
 	}
 
 	if err := os.MkdirAll(cfg.OutDir, 0o750); err != nil {
@@ -119,6 +127,7 @@ func runGenerateTinker(args []string) error {
 	appPkg := fs.String("app", "", "import path of the project's app package (default: <module>/internal/app)")
 	dir := fs.String("dir", "", "output directory (default: the project config's tinker_entry)")
 	force := fs.Bool("force", false, "overwrite an existing shim")
+	dryRun := fs.Bool("dry-run", false, "print the planned write without writing files")
 	// coverageProof: no local -i/--interactive flags; peelInteractive
 	// strips them before Parse and sets interactiveMode globally.
 
@@ -203,6 +212,7 @@ func runGenerateTinker(args []string) error {
 		Force:      forceVal,
 		Stdout:     os.Stdout,
 		Stderr:     os.Stderr,
+		DryRun:     *dryRun,
 	})
 
 	//nolint:lll

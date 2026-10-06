@@ -134,6 +134,7 @@ export default defineConfig({
 					label: 'Reference',
 					items: [
 						{ label: 'CLI', link: 'reference/cli' },
+						{ label: 'Agent Skill', link: 'reference/agent-skill' },
 						{ label: 'Config Reference', link: 'reference/config-reference' },
 						{ label: 'Adapters Matrix', link: 'reference/adapters-matrix' },
 						{ label: 'API Index', link: 'reference/api-index' },

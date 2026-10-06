@@ -17,6 +17,7 @@ import (
 // initializer stays cycle-free).
 func newDocsCmd(root *cobra.Command) *cobra.Command {
 	var dir string
+	var skill bool
 
 	docs := &cobra.Command{
 		Use:   "docs",
@@ -24,15 +25,21 @@ func newDocsCmd(root *cobra.Command) *cobra.Command {
 		Long: `Generate man pages and markdown reference docs into a directory.
 
 Writes one man page per command plus one markdown file per command
-into the given directory.`,
-		Example: `  zever docs --dir ./man`,
-		Args:    cobra.NoArgs,
+into the given directory. With --skill, writes SKILL.md (a Claude Code
+agent skill for zever) instead.`,
+		Example: `  zever docs --dir ./man
+  zever docs --skill --dir ~/.claude/skills/zever`,
+		Args: cobra.NoArgs,
 		RunE: func(_ *cobra.Command, _ []string) error {
 			if dir == "" {
 				return errors.New("zever docs: --dir is required")
 			}
 			if err := os.MkdirAll(dir, 0o755); err != nil {
 				return fmt.Errorf("zever docs: create dir: %w", err)
+			}
+
+			if skill {
+				return writeSkillFile(dir, root)
 			}
 
 			headerDate := time.Now()
@@ -55,6 +62,7 @@ into the given directory.`,
 	}
 
 	docs.Flags().StringVar(&dir, "dir", "", "output directory for generated docs (required)")
+	docs.Flags().BoolVar(&skill, "skill", false, "write SKILL.md (Claude Code agent skill) instead of man/markdown docs")
 
 	return docs
 }

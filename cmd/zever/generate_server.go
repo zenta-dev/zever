@@ -300,6 +300,40 @@ func ensureAppPackage(tag string) (created bool, err error) {
 
 // --- generate server ---
 
+// generateServerDryRun validates and renders the server entrypoint without
+// writing anything, reporting the planned paths.
+func generateServerDryRun(cfg GenerateServerConfig) (GenerateServerResult, error) {
+	const tag = "zever generate server"
+
+	var res GenerateServerResult
+
+	data, err := loadServerData(cfg.ModulePath, cfg.OutDir, cfg.SchemaDir, cfg.SchemaFiles, cfg.RateLimitEnabled)
+	if err != nil {
+		return res, err
+	}
+
+	if _, err := renderGoFile(tag, "server main.go", serverTemplate, data); err != nil {
+		return res, err
+	}
+
+	res.Modules = len(data.Modules)
+	res.Entrypoint = filepath.Join(cfg.ServerEntry, "main.go")
+
+	if stdout := cfg.Stdout; stdout != nil {
+		printGenerateDryRun(stdout, res.Entrypoint)
+
+		if _, statErr := os.Stat(filepath.Join("internal", "app", "app.go")); os.IsNotExist(statErr) {
+			_, _ = fmt.Fprintln(stdout, dim("would write ")+cyan(filepath.Join("internal", "app", "app.go")))
+		}
+
+		if len(data.Modules) > 0 {
+			_, _ = fmt.Fprintln(stdout, dim(fmt.Sprintf("would stub services for %d module(s)", len(data.Modules))))
+		}
+	}
+
+	return res, nil
+}
+
 const serverUsageBody = `Scaffolds the HTTP+gRPC server entrypoint at <server_entry>/main.go (default
 cmd/server, override with project.server_entry in zever.yaml/.toml/.json),
 plus internal/app/app.go if the project does not have one yet. The
@@ -361,6 +395,8 @@ type GenerateServerConfig struct {
 	RateLimitEnabled bool
 	Stdout           io.Writer
 	Stderr           io.Writer
+	// DryRun prints the planned writes without touching the filesystem.
+	DryRun bool
 }
 
 // GenerateServerResult names everything GenerateServer wrote.
@@ -378,6 +414,10 @@ func GenerateServer(cfg GenerateServerConfig) (GenerateServerResult, error) {
 	const tag = "zever generate server"
 
 	var res GenerateServerResult
+
+	if cfg.DryRun {
+		return generateServerDryRun(cfg)
+	}
 
 	appCreated, err := ensureAppPackage(tag)
 	if err != nil {
@@ -441,6 +481,7 @@ func runGenerateServer(args []string) error { //nolint:gocyclo
 	fs := flag.NewFlagSet("generate server", flag.ContinueOnError)
 	force := fs.Bool("force", false, "overwrite the entrypoint if it already exists")
 	outDir := fs.String("out", "./generated", "output directory the schema was compiled into (must match `zever compile --out`)")
+	dryRun := fs.Bool("dry-run", false, "print the planned writes without writing files")
 	// coverageProof: no local -i/--interactive flags; peelInteractive
 	// strips them before Parse and sets interactiveMode globally.
 
@@ -489,6 +530,7 @@ func runGenerateServer(args []string) error { //nolint:gocyclo
 		RateLimitEnabled: rateLimitEnabled,
 		Stdout:           os.Stdout,
 		Stderr:           os.Stderr,
+		DryRun:           *dryRun,
 	})
 
 	return err
