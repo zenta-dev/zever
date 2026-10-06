@@ -56,10 +56,10 @@ func withTx(t *testing.T, d *driver, fn func(ctx context.Context, tx coredb.Tx) 
 	return coredb.WithTx(t.Context(), d.conn, nil, fn)
 }
 
-func countRows(t *testing.T, d *driver, table string) int {
+func countRows(t *testing.T, d *driver) int {
 	t.Helper()
 
-	rows, err := d.conn.Query(t.Context(), `SELECT COUNT(*) FROM `+quoteIdent(table))
+	rows, err := d.conn.Query(t.Context(), `SELECT COUNT(*) FROM `+quoteIdent(DefaultTable))
 	if err != nil {
 		t.Fatalf("count query error = %v", err)
 	}
@@ -113,7 +113,7 @@ func TestRecordIsTransactional(t *testing.T) {
 		t.Fatalf("Rollback() error = %v", err)
 	}
 
-	if n := countRows(t, d, DefaultTable); n != 0 {
+	if n := countRows(t, d); n != 0 {
 		t.Fatalf("rows = %d, want 0 after rollback", n)
 	}
 }

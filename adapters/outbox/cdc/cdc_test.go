@@ -16,7 +16,8 @@ import (
 // returns before Exec for invalid messages, so the stub only needs to satisfy
 // the interface.
 type fakeTx struct {
-	execs int
+	execs   int
+	execErr error
 }
 
 func (t *fakeTx) Query(context.Context, string, ...any) (db.Rows, error) {
@@ -26,7 +27,7 @@ func (t *fakeTx) Query(context.Context, string, ...any) (db.Rows, error) {
 func (t *fakeTx) Exec(context.Context, string, ...any) (int64, error) {
 	t.execs++
 
-	return 0, nil
+	return 0, t.execErr
 }
 
 func (t *fakeTx) Ping(context.Context) error { return nil }
