@@ -31,6 +31,22 @@ func Conformance(t *testing.T, factory func(t *testing.T) webhook.Webhook) {
 	t.Run("Close", func(t *testing.T) { conformanceClose(t, factory) })
 }
 
+// mustMatch fails the test when ok is false.
+func mustMatch(t *testing.T, ok bool, msg string, args ...any) {
+	t.Helper()
+	if !ok {
+		t.Fatalf(msg, args...)
+	}
+}
+
+// expectMatch records a test error when ok is false.
+func expectMatch(t *testing.T, ok bool, msg string, args ...any) {
+	t.Helper()
+	if !ok {
+		t.Errorf(msg, args...)
+	}
+}
+
 // ConformanceDelivery verifies live fan-out against target: Register,
 // Deliver returning nil, Unregister, then Deliver failing with
 // ErrNotFound. The caller owns target (an httptest server URL in adapter
@@ -41,21 +57,17 @@ func ConformanceDelivery(t *testing.T, w webhook.Webhook, event, target string) 
 
 	ctx := t.Context()
 
-	if err := w.Register(ctx, event, target, "kit-secret"); err != nil {
-		t.Fatalf("Register() error = %v", err)
-	}
+	regErr := w.Register(ctx, event, target, "kit-secret")
+	mustMatch(t, regErr == nil, "Register() error = %v", regErr)
 
-	if err := w.Deliver(ctx, event, []byte(`{"kit":true}`)); err != nil {
-		t.Fatalf("Deliver() error = %v", err)
-	}
+	deliverErr := w.Deliver(ctx, event, []byte(`{"kit":true}`))
+	mustMatch(t, deliverErr == nil, "Deliver() error = %v", deliverErr)
 
-	if err := w.Unregister(ctx, event, target); err != nil {
-		t.Fatalf("Unregister() error = %v", err)
-	}
+	unregErr := w.Unregister(ctx, event, target)
+	mustMatch(t, unregErr == nil, "Unregister() error = %v", unregErr)
 
-	if err := w.Deliver(ctx, event, []byte(`{}`)); !errors.Is(err, webhook.ErrNotFound) {
-		t.Fatalf("Deliver() after Unregister err = %v, want ErrNotFound", err)
-	}
+	afterErr := w.Deliver(ctx, event, []byte(`{}`))
+	mustMatch(t, errors.Is(afterErr, webhook.ErrNotFound), "Deliver() after Unregister err = %v, want ErrNotFound", afterErr)
 }
 
 func conformanceLifecycle(t *testing.T, factory func(t *testing.T) webhook.Webhook) {
@@ -67,22 +79,18 @@ func conformanceLifecycle(t *testing.T, factory func(t *testing.T) webhook.Webho
 	const event = "kit.lifecycle"
 	const target = "http://127.0.0.1/kit-hook"
 
-	if err := w.Register(ctx, event, target, "s3cret"); err != nil {
-		t.Fatalf("Register() error = %v", err)
-	}
+	regErr := w.Register(ctx, event, target, "s3cret")
+	mustMatch(t, regErr == nil, "Register() error = %v", regErr)
 
 	// Re-registering the same target replaces its secret, never duplicates.
-	if err := w.Register(ctx, event, target, "s3cret-rotated"); err != nil {
-		t.Fatalf("Register(same) error = %v", err)
-	}
+	rotErr := w.Register(ctx, event, target, "s3cret-rotated")
+	mustMatch(t, rotErr == nil, "Register(same) error = %v", rotErr)
 
-	if err := w.Unregister(ctx, event, target); err != nil {
-		t.Fatalf("Unregister() error = %v", err)
-	}
+	unregErr := w.Unregister(ctx, event, target)
+	mustMatch(t, unregErr == nil, "Unregister() error = %v", unregErr)
 
-	if err := w.Unregister(ctx, event, target); !errors.Is(err, webhook.ErrNotFound) {
-		t.Errorf("Unregister(again) err = %v, want ErrNotFound", err)
-	}
+	againErr := w.Unregister(ctx, event, target)
+	expectMatch(t, errors.Is(againErr, webhook.ErrNotFound), "Unregister(again) err = %v, want ErrNotFound", againErr)
 }
 
 func conformanceNotFound(t *testing.T, factory func(t *testing.T) webhook.Webhook) {
@@ -91,21 +99,17 @@ func conformanceNotFound(t *testing.T, factory func(t *testing.T) webhook.Webhoo
 	ctx := t.Context()
 	w := factory(t)
 
-	if err := w.Unregister(ctx, "kit.no-event", "http://127.0.0.1/none"); !errors.Is(err, webhook.ErrNotFound) {
-		t.Errorf("Unregister(missing) err = %v, want ErrNotFound", err)
-	}
+	missingUnregErr := w.Unregister(ctx, "kit.no-event", "http://127.0.0.1/none")
+	expectMatch(t, errors.Is(missingUnregErr, webhook.ErrNotFound), "Unregister(missing) err = %v, want ErrNotFound", missingUnregErr)
 
-	if err := w.Deliver(ctx, "kit.no-event", []byte(`{}`)); !errors.Is(err, webhook.ErrNotFound) {
-		t.Errorf("Deliver(missing) err = %v, want ErrNotFound", err)
-	}
+	missingDeliverErr := w.Deliver(ctx, "kit.no-event", []byte(`{}`))
+	expectMatch(t, errors.Is(missingDeliverErr, webhook.ErrNotFound), "Deliver(missing) err = %v, want ErrNotFound", missingDeliverErr)
 
-	if err := w.Register(ctx, "", "http://127.0.0.1/hook", "s"); err == nil {
-		t.Error("Register(empty event) = nil, want error")
-	}
+	emptyEventErr := w.Register(ctx, "", "http://127.0.0.1/hook", "s")
+	expectMatch(t, emptyEventErr != nil, "Register(empty event) = nil, want error")
 
-	if err := w.Register(ctx, "kit.e", "", "s"); err == nil {
-		t.Error("Register(empty target) = nil, want error")
-	}
+	emptyTargetErr := w.Register(ctx, "kit.e", "", "s")
+	expectMatch(t, emptyTargetErr != nil, "Register(empty target) = nil, want error")
 }
 
 func conformanceOpenRegister(t *testing.T, factory func(t *testing.T) webhook.Webhook) {
@@ -114,26 +118,19 @@ func conformanceOpenRegister(t *testing.T, factory func(t *testing.T) webhook.We
 	name := webhook.Adapter("kit-open-test-" + strconv.FormatUint(adapterSeq.Add(1), 10))
 	probe := factory(t)
 
-	if err := webhook.Register(name, func(webhook.Options) (webhook.Webhook, error) { return probe, nil }); err != nil {
-		t.Fatalf("Register() error = %v", err)
-	}
+	regErr := webhook.Register(name, func(webhook.Options) (webhook.Webhook, error) { return probe, nil })
+	mustMatch(t, regErr == nil, "Register() error = %v", regErr)
 
-	if err := webhook.Register(name, func(webhook.Options) (webhook.Webhook, error) { return probe, nil }); !errors.Is(err, webhook.ErrDuplicate) {
-		t.Fatalf("Register(dup) err = %v, want ErrDuplicate", err)
-	}
+	dupErr := webhook.Register(name, func(webhook.Options) (webhook.Webhook, error) { return probe, nil })
+	mustMatch(t, errors.Is(dupErr, webhook.ErrDuplicate), "Register(dup) err = %v, want ErrDuplicate", dupErr)
 
-	opened, err := webhook.Open(name, webhook.Options{})
-	if err != nil {
-		t.Fatalf("Open() error = %v", err)
-	}
+	opened, openErr := webhook.Open(name, webhook.Options{})
+	mustMatch(t, openErr == nil, "Open() error = %v", openErr)
 
-	if opened != probe {
-		t.Error("Open() did not return the registered webhook")
-	}
+	expectMatch(t, opened == probe, "Open() did not return the registered webhook")
 
-	if _, err := webhook.Open("kit-no-such-adapter", webhook.Options{}); !errors.Is(err, webhook.ErrUnknownAdapter) {
-		t.Errorf("Open(unknown) err = %v, want ErrUnknownAdapter", err)
-	}
+	_, unknownErr := webhook.Open("kit-no-such-adapter", webhook.Options{})
+	expectMatch(t, errors.Is(unknownErr, webhook.ErrUnknownAdapter), "Open(unknown) err = %v, want ErrUnknownAdapter", unknownErr)
 }
 
 func conformanceClose(t *testing.T, factory func(t *testing.T) webhook.Webhook) {
@@ -141,11 +138,9 @@ func conformanceClose(t *testing.T, factory func(t *testing.T) webhook.Webhook) 
 
 	w := factory(t)
 
-	if err := w.Close(); err != nil {
-		t.Fatalf("Close() error = %v", err)
-	}
+	closeErr := w.Close()
+	mustMatch(t, closeErr == nil, "Close() error = %v", closeErr)
 
-	if err := w.Close(); err != nil {
-		t.Errorf("Close() second error = %v, want nil", err)
-	}
+	closeAgainErr := w.Close()
+	expectMatch(t, closeAgainErr == nil, "Close() second error = %v, want nil", closeAgainErr)
 }
