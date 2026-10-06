@@ -89,7 +89,7 @@ func New(o Options) (outbox.Store, error) {
 		retry:       o.Retry,
 		maxAttempts: maxAttempts,
 		sleep:       sleepCtx,
-		recorder:    outbox.NewRecorder(o.Provider, string(outbox.CDC), ""),
+		recorder:    outbox.NewRecorder(o.Provider, string(outbox.CDC), "", o.Options.Publisher),
 	}
 
 	return s, nil
