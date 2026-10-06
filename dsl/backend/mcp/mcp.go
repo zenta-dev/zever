@@ -31,13 +31,15 @@ func (b *Backend) Generate(schema *ir.Schema) (map[string][]byte, error) {
 	}
 
 	out := make(map[string][]byte, len(schema.Modules)+1)
-	merged := mergedManifest{Name: "zever"}
+	merged := mergedManifest{Name: "zever", Services: []serviceManifest{}}
+
+	values, owners := collectEnums(schema)
 
 	for _, m := range schema.Modules {
-		mod := moduleManifest{Module: moduleLabel(m)}
+		mod := moduleManifest{Module: moduleLabel(m), Services: []serviceManifest{}}
 
 		for _, svc := range m.Services {
-			sm, err := renderService(m, svc, collectEnumValues(schema))
+			sm, err := renderService(m, svc, values, owners)
 			if err != nil {
 				return nil, err
 			}
@@ -74,17 +76,19 @@ func moduleLabel(m *ir.Module) string {
 	return m.Name
 }
 
-// collectEnumValues flattens every module's named enums into one name ->
-// values lookup spanning the whole schema, since named enums resolve
-// globally rather than per module.
-func collectEnumValues(schema *ir.Schema) map[string][]string {
-	values := make(map[string][]string)
+// collectEnums flattens every module's named enums into a values lookup and
+// an owning-module lookup spanning the whole schema, since named enums
+// resolve globally rather than per module.
+func collectEnums(schema *ir.Schema) (values map[string][]string, owners map[string]string) {
+	values = make(map[string][]string)
+	owners = make(map[string]string)
 
 	for _, m := range schema.Modules {
 		for _, e := range m.Enums {
 			values[e.Name] = e.Values
+			owners[e.Name] = moduleLabel(m)
 		}
 	}
 
-	return values
+	return values, owners
 }
