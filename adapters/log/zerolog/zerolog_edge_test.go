@@ -4,6 +4,8 @@ import (
 	"bytes"
 	"encoding/json"
 	"io"
+	"strings"
+	"sync"
 	"testing"
 
 	zl "github.com/rs/zerolog"
@@ -131,5 +133,115 @@ func TestEdge_SendEmptyMsg(t *testing.T) {
 
 	if _, ok := got["k"]; !ok {
 		t.Fatalf("field k missing: %v", got)
+	}
+}
+
+func TestEdge_NilWriterFallback(t *testing.T) {
+	t.Parallel()
+
+	if l := NewWithWriter(log.Options{MinLevel: log.LevelDebug}, nil); l == nil {
+		t.Fatal("NewWithWriter(nil) = nil, want logger")
+	}
+}
+
+func TestEdge_FilteredLevelNoOutput(t *testing.T) {
+	t.Parallel()
+
+	var buf bytes.Buffer
+
+	l := NewWithWriter(log.Options{MinLevel: log.LevelError}, &buf)
+
+	l.Debug().Msg("skip")
+	l.Info().Msg("skip")
+	l.Warn().Msg("skip")
+
+	if buf.Len() != 0 {
+		t.Fatalf("output = %q, want empty for levels below min", buf.String())
+	}
+
+	l.Error().Msg("keep")
+
+	if !strings.Contains(buf.String(), "keep") {
+		t.Errorf("output = %q, want error line kept", buf.String())
+	}
+}
+
+func TestEdge_ConcurrentEmit(t *testing.T) {
+	t.Parallel()
+
+	l := NewWithWriter(log.Options{MinLevel: log.LevelDebug}, io.Discard)
+
+	const goroutines = 32
+
+	var wg sync.WaitGroup
+
+	wg.Add(goroutines)
+
+	for i := range goroutines {
+		go func(i int) {
+			defer wg.Done()
+
+			l.Info().Int("i", i).Msg("concurrent")
+		}(i)
+	}
+
+	wg.Wait()
+}
+
+func TestEdge_DuplicateKeys(t *testing.T) {
+	t.Parallel()
+
+	var buf bytes.Buffer
+
+	l := NewWithWriter(log.Options{MinLevel: log.LevelDebug}, &buf)
+	l.Info().Str("k", "first").Str("k", "second").Msg("dup")
+
+	if got := buf.String(); !strings.Contains(got, "first") || !strings.Contains(got, "second") {
+		t.Errorf("output = %q, want both duplicate values", got)
+	}
+}
+
+func TestEdge_EnabledUnknownLevel(t *testing.T) {
+	t.Parallel()
+
+	l := NewWithWriter(log.Options{MinLevel: log.LevelWarn}, io.Discard)
+
+	if l.Enabled(log.Level(99)) {
+		t.Error("Enabled(unknown) = true, want false (unknown maps to info, below warn)")
+	}
+
+	l2 := NewWithWriter(log.Options{MinLevel: log.LevelInfo}, io.Discard)
+
+	if !l2.Enabled(log.Level(99)) {
+		t.Error("Enabled(unknown) at info min = false, want true (unknown maps to info fallback)")
+	}
+}
+
+func TestEdge_ContextLoggerNoArgs(t *testing.T) {
+	t.Parallel()
+
+	var buf bytes.Buffer
+
+	l := NewWithWriter(log.Options{MinLevel: log.LevelDebug}, &buf)
+	l.With().Logger().Info().Msg("no-args")
+
+	if !strings.Contains(buf.String(), "no-args") {
+		t.Errorf("output = %q, want no-args line", buf.String())
+	}
+}
+
+func TestEdge_WithContextBackground(t *testing.T) {
+	t.Parallel()
+
+	l := NewWithWriter(log.Options{MinLevel: log.LevelWarn}, io.Discard)
+
+	child := l.WithContext(t.Context())
+
+	if child == nil {
+		t.Fatal("WithContext(bg) = nil, want logger")
+	}
+
+	if child.Enabled(log.LevelInfo) {
+		t.Error("Enabled(info) = true, want false on background child")
 	}
 }

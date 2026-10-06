@@ -110,3 +110,55 @@ func BenchmarkParallelEmit(b *testing.B) {
 		}
 	})
 }
+
+// BenchmarkSync measures the no-op flush.
+func BenchmarkSync(b *testing.B) {
+	l := New()
+
+	b.ReportAllocs()
+
+	for b.Loop() {
+		if err := l.Sync(); err != nil {
+			b.Fatal("Sync() =", err)
+		}
+	}
+}
+
+// BenchmarkName measures the adapter name lookup.
+func BenchmarkName(b *testing.B) {
+	l := New()
+
+	b.ReportAllocs()
+
+	for b.Loop() {
+		if got := l.Name(); got != "noop" {
+			b.Fatal("Name() =", got)
+		}
+	}
+}
+
+// BenchmarkSend measures the bare Send dispatch.
+func BenchmarkSend(b *testing.B) {
+	l := New()
+
+	b.ReportAllocs()
+
+	for b.Loop() {
+		l.Info().Str("k", "v").Send()
+	}
+}
+
+// BenchmarkLevelAccessors measures acquiring an event at each level.
+func BenchmarkLevelAccessors(b *testing.B) {
+	l := New()
+
+	b.ReportAllocs()
+
+	i := 0
+	levels := []func() log.Event{l.Debug, l.Info, l.Warn, l.Error, l.Fatal}
+
+	for b.Loop() {
+		_ = levels[i%len(levels)]()
+		i++
+	}
+}

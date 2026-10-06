@@ -1,10 +1,12 @@
 package twilio
 
 import (
+	"context"
 	"io"
 	"net/http"
 	"net/http/httptest"
 	"testing"
+	"time"
 
 	twilioclient "github.com/twilio/twilio-go/client"
 )
@@ -76,4 +78,99 @@ func BenchmarkNotifyParallel(b *testing.B) {
 			}
 		}
 	})
+}
+
+// BenchmarkClose measures the idempotent close.
+func BenchmarkClose(b *testing.B) {
+	n, err := New(validOptions())
+	if err != nil {
+		b.Fatalf("New() = %v", err)
+	}
+	b.ReportAllocs()
+	b.ResetTimer()
+	for b.Loop() {
+		if err := n.Close(); err != nil {
+			b.Fatalf("Close() = %v, want nil", err)
+		}
+	}
+}
+
+// BenchmarkNew measures constructing the notifier and its HTTP client.
+func BenchmarkNew(b *testing.B) {
+	b.ReportAllocs()
+	b.ResetTimer()
+	for b.Loop() {
+		n, err := New(validOptions())
+		if err != nil {
+			b.Fatalf("New() = %v", err)
+		}
+		if n == nil {
+			b.Fatal("New() = nil")
+		}
+	}
+}
+
+// BenchmarkLimitedTransport measures the response-body limiting wrapper.
+func BenchmarkLimitedTransport(b *testing.B) {
+	lt := &limitedTransport{base: http.DefaultTransport}
+	req, err := http.NewRequestWithContext(b.Context(), http.MethodGet, "http://127.0.0.1:1/", nil)
+	if err != nil {
+		b.Fatalf("NewRequest() = %v", err)
+	}
+	b.ReportAllocs()
+	b.ResetTimer()
+	for b.Loop() {
+		resp, err := lt.RoundTrip(req)
+		if err == nil && resp != nil && resp.Body != nil {
+			resp.Body.Close()
+		}
+	}
+}
+
+// BenchmarkDeadlineTimeout measures the ctx-deadline clamp decision.
+func BenchmarkDeadlineTimeout(b *testing.B) {
+	n, err := New(validOptions())
+	if err != nil {
+		b.Fatalf("New() = %v", err)
+	}
+	defer n.Close()
+	tn, ok := n.(*twilioNotifier)
+	if !ok {
+		b.Fatalf("New() = %T, want *twilioNotifier", n)
+	}
+	ctx, cancel := context.WithDeadline(b.Context(), time.Now().Add(time.Hour))
+	defer cancel()
+	b.ReportAllocs()
+	b.ResetTimer()
+	for b.Loop() {
+		if _, clamped := tn.deadlineTimeout(ctx); !clamped {
+			b.Fatal("deadlineTimeout() = unclamped, want clamped")
+		}
+	}
+}
+
+// BenchmarkApiForCall measures acquiring the per-call API handle.
+func BenchmarkApiForCall(b *testing.B) {
+	n, err := New(validOptions())
+	if err != nil {
+		b.Fatalf("New() = %v", err)
+	}
+	defer n.Close()
+	tn, ok := n.(*twilioNotifier)
+	if !ok {
+		b.Fatalf("New() = %T, want *twilioNotifier", n)
+	}
+	ctx, cancel := context.WithDeadline(b.Context(), time.Now().Add(time.Hour))
+	defer cancel()
+	b.ReportAllocs()
+	b.ResetTimer()
+	for b.Loop() {
+		api, err := tn.apiForCall(ctx)
+		if err != nil {
+			b.Fatalf("apiForCall() = %v", err)
+		}
+		if api == nil {
+			b.Fatal("apiForCall() = nil")
+		}
+	}
 }
