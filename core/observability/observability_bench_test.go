@@ -73,8 +73,8 @@ func BenchmarkOptionsValidate(b *testing.B) {
 
 func BenchmarkNormalizeAttrs(b *testing.B) {
 	attrs := []Attr{
-		String("http.method", "GET"),
-		Int("http.status", 200),
+		String(HTTPRequestMethod, "GET"),
+		Int(HTTPResponseStatusCode, 200),
 		String("user.password", "hunter2"),
 	}
 	b.ReportAllocs()

@@ -150,6 +150,78 @@ func TestNormalizeAttrs_redact_replacesValue(t *testing.T) {
 	}
 }
 
+// TestSemconvKeys pins the exported OpenTelemetry semantic-convention
+// keys. The literal values are the contract with dashboards and saved
+// queries, so a rename here is a breaking change and must fail the build.
+func TestSemconvKeys(t *testing.T) {
+	t.Parallel()
+
+	tests := []struct {
+		name string
+		got  string
+		want string
+	}{
+		{name: "http request method", got: HTTPRequestMethod, want: "http.request.method"},
+		{name: "url path", got: URLPath, want: "url.path"},
+		{name: "http response status code", got: HTTPResponseStatusCode, want: "http.response.status_code"},
+		{name: "server address", got: ServerAddress, want: "server.address"},
+		{name: "rpc system", got: RPCSystem, want: "rpc.system"},
+		{name: "rpc service", got: RPCService, want: "rpc.service"},
+		{name: "rpc method", got: RPCMethod, want: "rpc.method"},
+		{name: "rpc grpc status code", got: RPCGRPCStatusCode, want: "rpc.grpc.status_code"},
+		{name: "messaging system", got: MessagingSystem, want: "messaging.system"},
+		{name: "messaging destination name", got: MessagingDestinationName, want: "messaging.destination.name"},
+		{name: "messaging operation", got: MessagingOperation, want: "messaging.operation"},
+		{name: "messaging message id", got: MessagingMessageID, want: "messaging.message.id"},
+		{name: "messaging message conversation id", got: MessagingMessageConversationID, want: "messaging.message.conversation_id"},
+		{name: "grpc system value", got: SystemGRPC, want: "grpc"},
+		{name: "publish operation", got: OperationPublish, want: "publish"},
+		{name: "process operation", got: OperationProcess, want: "process"},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			t.Parallel()
+
+			if tt.got != tt.want {
+				t.Errorf("key = %q, want %q", tt.got, tt.want)
+			}
+		})
+	}
+}
+
+// TestSemconvKeys_notRedacted pins that normalizeAttrs keeps every
+// semconv key verbatim: none of them may trip the secret-key heuristic
+// and be replaced with "[redacted]".
+func TestSemconvKeys_notRedacted(t *testing.T) {
+	t.Parallel()
+
+	keys := []string{
+		HTTPRequestMethod, URLPath, HTTPResponseStatusCode, ServerAddress,
+		RPCSystem, RPCService, RPCMethod, RPCGRPCStatusCode,
+		MessagingSystem, MessagingDestinationName, MessagingOperation,
+		MessagingMessageID, MessagingMessageConversationID,
+	}
+
+	for _, key := range keys {
+		t.Run(key, func(t *testing.T) {
+			t.Parallel()
+
+			got := normalizeAttrs([]Attr{String(key, "value")}, 0)
+			if len(got) != 1 {
+				t.Fatalf("len = %d, want 1", len(got))
+			}
+			sv, ok := got[0].Value.(StringValue)
+			if !ok {
+				t.Fatalf("value type = %T, want StringValue", got[0].Value)
+			}
+			if sv.Value != "value" {
+				t.Errorf("value = %q, want value (semconv key must not be redacted)", sv.Value)
+			}
+		})
+	}
+}
+
 func TestNormalizeAttrs_truncate_clipsLongStrings(t *testing.T) {
 	t.Parallel()
 

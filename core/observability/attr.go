@@ -12,6 +12,57 @@ const (
 	MaxAttrs = 32
 )
 
+// OpenTelemetry semantic-convention attribute keys used across zever
+// instrumentation. Use these constants instead of literals so a key is
+// spelled once and off-the-shelf OTel queries and dashboards match.
+//
+// Migration from the pre-semconv keys (breaking, see CHANGELOG):
+// http.method -> HTTPRequestMethod, http.path -> URLPath,
+// http.status_code -> HTTPResponseStatusCode, the gRPC full method in the
+// span name -> RPCSystem plus RPCService and RPCMethod, and messaging
+// spans carry the Messaging* keys.
+const (
+	// HTTPRequestMethod is the request method, such as "GET" or "POST".
+	HTTPRequestMethod = "http.request.method"
+	// URLPath is the request path, never the query string or raw URI.
+	URLPath = "url.path"
+	// HTTPResponseStatusCode is the numeric HTTP response status.
+	HTTPResponseStatusCode = "http.response.status_code"
+	// ServerAddress is the peer address of an outbound call.
+	ServerAddress = "server.address"
+	// RPCSystem is the RPC system; zever sets it to SystemGRPC.
+	RPCSystem = "rpc.system"
+	// RPCService is the gRPC service name, parsed from the full method.
+	RPCService = "rpc.service"
+	// RPCMethod is the gRPC method name, parsed from the full method.
+	RPCMethod = "rpc.method"
+	// RPCGRPCStatusCode is the numeric gRPC status code.
+	RPCGRPCStatusCode = "rpc.grpc.status_code"
+	// MessagingSystem is the messaging system, such as "outbox".
+	MessagingSystem = "messaging.system"
+	// MessagingDestinationName is the topic or queue a message is sent to.
+	MessagingDestinationName = "messaging.destination.name"
+	// MessagingOperation is the messaging action; see OperationPublish and
+	// OperationProcess.
+	MessagingOperation = "messaging.operation"
+	// MessagingMessageID is the identifier of a single message.
+	MessagingMessageID = "messaging.message.id"
+	// MessagingMessageConversationID is the trace ID correlating related
+	// messaging spans.
+	MessagingMessageConversationID = "messaging.message.conversation_id"
+)
+
+// SystemGRPC is the RPCSystem value for gRPC calls.
+const SystemGRPC = "grpc"
+
+// MessagingOperation values for MessagingOperation.
+const (
+	// OperationPublish marks a span that publishes a message.
+	OperationPublish = "publish"
+	// OperationProcess marks a span that processes a received message.
+	OperationProcess = "process"
+)
+
 // AttributeValue is a sealed attribute value type.
 type AttributeValue interface {
 	isAttributeValue()

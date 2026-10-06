@@ -44,7 +44,7 @@ func BenchmarkStartSpanNoop(b *testing.B) {
 	b.ResetTimer()
 
 	for b.Loop() {
-		_, span := cfg.startSpan(ctx, "/svc/Method")
+		_, span := cfg.startSpan(ctx, "/svc/Method", "")
 		span.End()
 	}
 }

@@ -9,6 +9,7 @@ import (
 
 	"go.opentelemetry.io/otel/trace"
 	"google.golang.org/grpc"
+	"google.golang.org/grpc/codes"
 	"google.golang.org/grpc/metadata"
 
 	"github.com/zenta-dev/zever/core/observability"
@@ -163,14 +164,14 @@ func TestTracing_methodAndPathAttributes(t *testing.T) {
 
 	span := tracer.spans[0]
 
-	v, ok := findTraceAttr(span.attrs, "http.method")
+	v, ok := findTraceAttr(span.attrs, observability.HTTPRequestMethod)
 	if !ok || v != observability.StringAttr("POST") {
-		t.Errorf("http.method attr = %v (found=%v), want POST", v, ok)
+		t.Errorf("%s attr = %v (found=%v), want POST", observability.HTTPRequestMethod, v, ok)
 	}
 
-	v, ok = findTraceAttr(span.attrs, "http.path")
+	v, ok = findTraceAttr(span.attrs, observability.URLPath)
 	if !ok || v != observability.StringAttr("/orders") {
-		t.Errorf("http.path attr = %v (found=%v), want /orders", v, ok)
+		t.Errorf("%s attr = %v (found=%v), want /orders", observability.URLPath, v, ok)
 	}
 
 	if span.endCalls != 1 {
@@ -203,9 +204,9 @@ func TestTracing_statusAttributeAfterHandler(t *testing.T) {
 
 			handler.ServeHTTP(httptest.NewRecorder(), httptest.NewRequestWithContext(t.Context(), http.MethodGet, "/", nil))
 
-			v, ok := findTraceAttr(tracer.spans[0].attrs, "http.status_code")
+			v, ok := findTraceAttr(tracer.spans[0].attrs, observability.HTTPResponseStatusCode)
 			if !ok || v != observability.IntAttr(tt.status) {
-				t.Fatalf("http.status_code attr = %v (found=%v), want %d", v, ok, tt.status)
+				t.Fatalf("%s attr = %v (found=%v), want %d", observability.HTTPResponseStatusCode, v, ok, tt.status)
 			}
 		})
 	}
@@ -286,14 +287,14 @@ func TestTracing_requestCounter(t *testing.T) {
 		t.Errorf("counter value = %v, want 1", call.value)
 	}
 
-	v, ok := findTraceAttr(call.attrs, "method")
+	v, ok := findTraceAttr(call.attrs, observability.HTTPRequestMethod)
 	if !ok || v != observability.StringAttr("DELETE") {
-		t.Errorf("method tag = %v (found=%v), want DELETE", v, ok)
+		t.Errorf("%s tag = %v (found=%v), want DELETE", observability.HTTPRequestMethod, v, ok)
 	}
 
-	v, ok = findTraceAttr(call.attrs, "status")
-	if !ok || v != observability.StringAttr(http.StatusText(http.StatusTeapot)) {
-		t.Errorf("status tag = %v (found=%v), want %q", v, ok, http.StatusText(http.StatusTeapot))
+	v, ok = findTraceAttr(call.attrs, observability.HTTPResponseStatusCode)
+	if !ok || v != observability.IntAttr(http.StatusTeapot) {
+		t.Errorf("%s tag = %v (found=%v), want %d", observability.HTTPResponseStatusCode, v, ok, http.StatusTeapot)
 	}
 
 	if len(call.attrs) != 2 {
@@ -408,14 +409,93 @@ func TestTracingUnaryServerInterceptor_ok(t *testing.T) {
 		t.Fatalf("counters = %v, want one rpc.request", meter.calls)
 	}
 
-	v, ok := findTraceAttr(meter.calls[0].attrs, "method")
-	if !ok || v != observability.StringAttr("/svc/Method") {
-		t.Errorf("method tag = %v (found=%v), want /svc/Method", v, ok)
+	v, ok := findTraceAttr(meter.calls[0].attrs, observability.RPCService)
+	if !ok || v != observability.StringAttr("svc") {
+		t.Errorf("%s tag = %v (found=%v), want svc", observability.RPCService, v, ok)
 	}
 
-	v, ok = findTraceAttr(meter.calls[0].attrs, "outcome")
-	if !ok || v != observability.StringAttr("ok") {
-		t.Errorf("outcome tag = %v (found=%v), want ok", v, ok)
+	v, ok = findTraceAttr(meter.calls[0].attrs, observability.RPCMethod)
+	if !ok || v != observability.StringAttr("Method") {
+		t.Errorf("%s tag = %v (found=%v), want Method", observability.RPCMethod, v, ok)
+	}
+
+	v, ok = findTraceAttr(meter.calls[0].attrs, observability.RPCGRPCStatusCode)
+	if !ok || v != observability.IntAttr(int(codes.OK)) {
+		t.Errorf("%s tag = %v (found=%v), want %d", observability.RPCGRPCStatusCode, v, ok, codes.OK)
+	}
+}
+
+// TestTracingUnaryServerInterceptor_semconvSpanAttributes pins the RPC
+// attributes on the server span: the span name stays the full method while
+// rpc.system/rpc.service/rpc.method carry the parsed pieces.
+func TestTracingUnaryServerInterceptor_semconvSpanAttributes(t *testing.T) {
+	t.Parallel()
+
+	provider, tracer, _ := newTraceTestProvider()
+	interceptor := TracingUnaryServerInterceptor(provider)
+
+	handler := func(_ context.Context, req any) (any, error) { return req, nil }
+
+	if _, err := interceptor(t.Context(), "req",
+		&grpc.UnaryServerInfo{FullMethod: "/pkg.Svc/DoThing"}, handler); err != nil {
+		t.Fatalf("err = %v, want nil", err)
+	}
+
+	if len(tracer.spans) != 1 {
+		t.Fatalf("spans = %d, want 1", len(tracer.spans))
+	}
+
+	span := tracer.spans[0]
+	if len(tracer.names) != 1 || tracer.names[0] != "/pkg.Svc/DoThing" {
+		t.Errorf("span names = %v, want [/pkg.Svc/DoThing] (full method)", tracer.names)
+	}
+
+	want := map[string]observability.AttributeValue{
+		observability.RPCSystem:         observability.StringAttr(observability.SystemGRPC),
+		observability.RPCService:        observability.StringAttr("pkg.Svc"),
+		observability.RPCMethod:         observability.StringAttr("DoThing"),
+		observability.RPCGRPCStatusCode: observability.IntAttr(int(codes.OK)),
+	}
+
+	for key, wantVal := range want {
+		got, ok := findTraceAttr(span.attrs, key)
+		if !ok || got != wantVal {
+			t.Errorf("span attr %s = %v (found=%v), want %v", key, got, ok, wantVal)
+		}
+	}
+}
+
+// TestSplitFullMethod covers the gRPC full-method parser, including the
+// malformed shapes a non-gRPC caller can hand it.
+func TestSplitFullMethod(t *testing.T) {
+	t.Parallel()
+
+	tests := []struct {
+		name        string
+		full        string
+		wantService string
+		wantMethod  string
+	}{
+		{name: "package qualified", full: "/pkg.Svc/Method", wantService: "pkg.Svc", wantMethod: "Method"},
+		{name: "bare service", full: "/Svc/Method", wantService: "Svc", wantMethod: "Method"},
+		{name: "nested service", full: "/a.b.C/Method", wantService: "a.b.C", wantMethod: "Method"},
+		{name: "empty", full: "", wantService: "", wantMethod: ""},
+		{name: "no slash", full: "Method", wantService: "", wantMethod: "Method"},
+		{name: "bare slash", full: "/", wantService: "", wantMethod: ""},
+		{name: "trailing slash", full: "/Svc/", wantService: "Svc", wantMethod: ""},
+		{name: "double slash", full: "//Svc/Method", wantService: "", wantMethod: "Svc/Method"},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			t.Parallel()
+
+			svc, method := splitFullMethod(tt.full)
+			if svc != tt.wantService || method != tt.wantMethod {
+				t.Errorf("splitFullMethod(%q) = (%q, %q), want (%q, %q)",
+					tt.full, svc, method, tt.wantService, tt.wantMethod)
+			}
+		})
 	}
 }
 
@@ -442,9 +522,14 @@ func TestTracingUnaryServerInterceptor_error(t *testing.T) {
 		t.Fatalf("span errors = %v, want [sentinel]", tracer.spans[0].errors)
 	}
 
-	v, ok := findTraceAttr(meter.calls[0].attrs, "outcome")
-	if !ok || v != observability.StringAttr("error") {
-		t.Fatalf("outcome tag = %v (found=%v), want error", v, ok)
+	v, ok := findTraceAttr(meter.calls[0].attrs, observability.RPCGRPCStatusCode)
+	if !ok || v != observability.IntAttr(int(codes.Unknown)) {
+		t.Fatalf("%s tag = %v (found=%v), want %d", observability.RPCGRPCStatusCode, v, ok, codes.Unknown)
+	}
+
+	v, ok = findTraceAttr(tracer.spans[0].attrs, observability.RPCGRPCStatusCode)
+	if !ok || v != observability.IntAttr(int(codes.Unknown)) {
+		t.Errorf("span %s attr = %v (found=%v), want %d", observability.RPCGRPCStatusCode, v, ok, codes.Unknown)
 	}
 }
 
