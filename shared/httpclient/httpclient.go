@@ -11,6 +11,8 @@ import (
 	"net"
 	"net/http"
 	"time"
+
+	"github.com/zenta-dev/zever/shared/traceprop"
 )
 
 // DefaultMaxIdleConnsPerHost is the default maximum idle connections per host
@@ -129,21 +131,9 @@ func NewClient(timeout time.Duration, opts ...Option) *http.Client {
 				clone.DialContext = SafeDialContext(cfg.allowPrivate)
 			}
 			clone.MaxIdleConnsPerHost = DefaultMaxIdleConnsPerHost
-			c := &http.Client{Timeout: timeout, Transport: clone}
-			if cfg.noRedirect {
-				c.CheckRedirect = func(_ *http.Request, _ []*http.Request) error {
-					return http.ErrUseLastResponse
-				}
-			}
-			return c
+			return newHTTPClient(timeout, clone, cfg.noRedirect)
 		}
-		c := &http.Client{Timeout: timeout, Transport: cfg.transport}
-		if cfg.noRedirect {
-			c.CheckRedirect = func(_ *http.Request, _ []*http.Request) error {
-				return http.ErrUseLastResponse
-			}
-		}
-		return c
+		return newHTTPClient(timeout, cfg.transport, cfg.noRedirect)
 	}
 	var tr *http.Transport
 	if dt, ok := http.DefaultTransport.(*http.Transport); ok && dt != nil {
@@ -167,12 +157,57 @@ func NewClient(timeout time.Duration, opts ...Option) *http.Client {
 		tr.DialContext = SafeDialContext(cfg.allowPrivate)
 	}
 	tr.MaxIdleConnsPerHost = DefaultMaxIdleConnsPerHost
-	c := &http.Client{Timeout: timeout, Transport: tr}
-	if cfg.noRedirect {
+	return newHTTPClient(timeout, tr, cfg.noRedirect)
+}
+
+// traceRoundTripper injects W3C trace context from the request context onto
+// outgoing requests. It is a no-op when the context carries no valid span, so
+// it is always safe to install.
+type traceRoundTripper struct {
+	base http.RoundTripper
+}
+
+// RoundTrip injects trace headers and delegates to the wrapped transport.
+func (t traceRoundTripper) RoundTrip(req *http.Request) (*http.Response, error) {
+	if injected := Inject(req.Context(), req); injected != req {
+		req = injected
+	}
+
+	base := t.base
+	if base == nil {
+		base = http.DefaultTransport
+	}
+
+	return base.RoundTrip(req)
+}
+
+// Inject returns a copy of req carrying the W3C trace context from ctx in its
+// headers. The original request is never mutated; when ctx holds no valid span
+// the original request is returned unchanged.
+func Inject(ctx context.Context, req *http.Request) *http.Request {
+	hdrs := traceprop.Inject(ctx, nil)
+	if len(hdrs) == 0 {
+		return req
+	}
+
+	clone := req.Clone(ctx)
+	for k, v := range hdrs {
+		clone.Header.Set(k, v)
+	}
+
+	return clone
+}
+
+// newHTTPClient builds the client with the trace-injecting transport and the
+// optional no-redirect policy, shared by every NewClient branch.
+func newHTTPClient(timeout time.Duration, rt http.RoundTripper, noRedirect bool) *http.Client {
+	c := &http.Client{Timeout: timeout, Transport: traceRoundTripper{base: rt}}
+	if noRedirect {
 		c.CheckRedirect = func(_ *http.Request, _ []*http.Request) error {
 			return http.ErrUseLastResponse
 		}
 	}
+
 	return c
 }
 

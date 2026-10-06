@@ -13,7 +13,7 @@ import (
 
 func TestNewClientTLSFloor(t *testing.T) {
 	c := NewClient(5 * time.Second)
-	tr, ok := c.Transport.(*http.Transport)
+	tr, ok := baseTransport(c).(*http.Transport)
 	if !ok {
 		t.Fatalf("Transport is %T, want *http.Transport", c.Transport)
 	}
@@ -53,9 +53,9 @@ func TestReadLimitedWithinLimit(t *testing.T) {
 
 func TestSafeDialGuardBlocksPrivate(t *testing.T) {
 	c := NewSafeClient(time.Second, false)
-	tr, ok := c.Transport.(*http.Transport)
+	tr, ok := baseTransport(c).(*http.Transport)
 	if !ok {
-		t.Fatalf("Transport is %T", c.Transport)
+		t.Fatalf("Transport is %T", baseTransport(c))
 	}
 	if tr.DialContext == nil {
 		t.Fatalf("DialContext nil")
@@ -193,7 +193,7 @@ func TestIsPrivateIPNil(t *testing.T) {
 func TestWithTransport(t *testing.T) {
 	custom := &http.Transport{MaxIdleConns: 7}
 	c := NewClient(time.Second, WithTransport(custom))
-	tr, ok := c.Transport.(*http.Transport)
+	tr, ok := baseTransport(c).(*http.Transport)
 	if !ok {
 		t.Fatalf("Transport is %T, want *http.Transport", c.Transport)
 	}
@@ -214,7 +214,7 @@ func TestWithTransportNonHTTPTransport(t *testing.T) {
 		return nil, errors.New("unused")
 	})
 	c := NewClient(time.Second, WithTransport(fake))
-	if _, ok := c.Transport.(roundTripFunc); !ok {
+	if _, ok := baseTransport(c).(roundTripFunc); !ok {
 		t.Fatalf("Transport is %T, want roundTripFunc (used directly, no clone)", c.Transport)
 	}
 }
@@ -225,7 +225,7 @@ func (f roundTripFunc) RoundTrip(r *http.Request) (*http.Response, error) { retu
 
 func TestWithInsecureSkipVerify(t *testing.T) {
 	c := NewClient(time.Second, WithInsecureSkipVerify(true))
-	tr, ok := c.Transport.(*http.Transport)
+	tr, ok := baseTransport(c).(*http.Transport)
 	if !ok {
 		t.Fatalf("Transport is %T, want *http.Transport", c.Transport)
 	}
@@ -236,7 +236,7 @@ func TestWithInsecureSkipVerify(t *testing.T) {
 
 func TestWithInsecureSkipVerifyFalse(t *testing.T) {
 	c := NewClient(time.Second, WithInsecureSkipVerify(false))
-	tr, ok := c.Transport.(*http.Transport)
+	tr, ok := baseTransport(c).(*http.Transport)
 	if !ok {
 		t.Fatalf("Transport is %T, want *http.Transport", c.Transport)
 	}
@@ -264,4 +264,14 @@ func TestTooLargeErrorMessage(t *testing.T) {
 			}
 		})
 	}
+}
+
+// baseTransport unwraps the trace-injecting transport NewClient installs so
+// tests can assert the underlying transport type.
+func baseTransport(c *http.Client) http.RoundTripper {
+	if t, ok := c.Transport.(traceRoundTripper); ok {
+		return t.base
+	}
+
+	return c.Transport
 }
