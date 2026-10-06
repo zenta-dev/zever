@@ -43,14 +43,21 @@ func callToolReq(t *testing.T, s *Server, name string, args map[string]any) rpcR
 func resultText(t *testing.T, resp rpcResponse) string {
 	t.Helper()
 
-	res, ok := resp.Result.(callToolResult)
-	if !ok {
-		t.Fatalf("result type = %T, want callToolResult", resp.Result)
-	}
+	res := toolResult(t, resp)
 	if len(res.Content) == 0 {
 		t.Fatal("no content blocks")
 	}
 	return res.Content[0].Text
+}
+
+func toolResult(t *testing.T, resp rpcResponse) callToolResult {
+	t.Helper()
+
+	res, ok := resp.Result.(callToolResult)
+	if !ok {
+		t.Fatalf("result type = %T, want callToolResult", resp.Result)
+	}
+	return res
 }
 
 func TestInitialize(t *testing.T) {
@@ -133,7 +140,7 @@ func TestCompileTool_badSchemaIsToolError(t *testing.T) {
 		t.Fatalf("bad schema should be a tool error, not rpc error: %+v", resp.Error)
 	}
 
-	res := resp.Result.(callToolResult)
+	res := toolResult(t, resp)
 	if !res.IsError {
 		t.Fatal("expected isError for a schema with diagnostics")
 	}
@@ -144,7 +151,7 @@ func TestCompileTool_missingSource(t *testing.T) {
 
 	s := newServer()
 	resp := callToolReq(t, s, "zever_compile", map[string]any{})
-	res := resp.Result.(callToolResult)
+	res := toolResult(t, resp)
 	if !res.IsError {
 		t.Fatal("expected isError when neither dir nor files is given")
 	}
@@ -200,7 +207,7 @@ func TestExplainTool_notFound(t *testing.T) {
 
 	s := newServer()
 	resp := callToolReq(t, s, "zever_explain", map[string]any{"files": testFiles(), "path": "nope.Thing"})
-	res := resp.Result.(callToolResult)
+	res := toolResult(t, resp)
 	if !res.IsError {
 		t.Fatal("expected isError for an unknown module")
 	}

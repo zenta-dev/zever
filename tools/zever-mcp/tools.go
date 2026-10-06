@@ -34,7 +34,7 @@ func decodeArgs(args map[string]any, out any) error {
 // compileSchema resolves the schema source and compiles it with the OpenAPI
 // backend. A non-nil result is returned even when diagnostics carry errors, so
 // callers can format them.
-func compileSchema(in compileInput) (*compile.Result, diag.List, error) {
+func compileSchema(ctx context.Context, in compileInput) (*compile.Result, diag.List, error) {
 	files := in.Files
 	if len(files) == 0 {
 		if in.Dir == "" {
@@ -48,7 +48,7 @@ func compileSchema(in compileInput) (*compile.Result, diag.List, error) {
 		files = read
 	}
 
-	res, diags := compile.Compile(files, openapi.New())
+	res, diags := compile.CompileContext(ctx, files, openapi.New())
 	return res, diags, nil
 }
 
@@ -109,13 +109,13 @@ func compileTool() toolDef {
 				"additionalProperties": map[string]any{"type": "string"},
 			},
 		}),
-		Handler: func(_ context.Context, args map[string]any) (string, error) {
+		Handler: func(ctx context.Context, args map[string]any) (string, error) {
 			var in compileInput
 			if err := decodeArgs(args, &in); err != nil {
 				return "", err
 			}
 
-			res, diags, err := compileSchema(in)
+			res, diags, err := compileSchema(ctx, in)
 			if err != nil {
 				return "", err
 			}
@@ -198,13 +198,13 @@ func schemaTool() toolDef {
 				"additionalProperties": map[string]any{"type": "string"},
 			},
 		}),
-		Handler: func(_ context.Context, args map[string]any) (string, error) {
+		Handler: func(ctx context.Context, args map[string]any) (string, error) {
 			var in compileInput
 			if err := decodeArgs(args, &in); err != nil {
 				return "", err
 			}
 
-			res, diags, err := compileSchema(in)
+			res, diags, err := compileSchema(ctx, in)
 			if err != nil {
 				return "", err
 			}
@@ -249,7 +249,7 @@ func explainTool() toolDef {
 				"description": "Dotted path to explain, e.g. blog.Post or blog.PostService.GetPost.",
 			},
 		}),
-		Handler: func(_ context.Context, args map[string]any) (string, error) {
+		Handler: func(ctx context.Context, args map[string]any) (string, error) {
 			var in explainInput
 			if err := decodeArgs(args, &in); err != nil {
 				return "", err
@@ -258,7 +258,7 @@ func explainTool() toolDef {
 				return "", errors.New("path is required")
 			}
 
-			res, diags, err := compileSchema(compileInput{Dir: in.Dir, Files: in.Files})
+			res, diags, err := compileSchema(ctx, compileInput{Dir: in.Dir, Files: in.Files})
 			if err != nil {
 				return "", err
 			}

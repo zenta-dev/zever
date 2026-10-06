@@ -94,3 +94,20 @@ func (e DuplicateToolError) Error() string {
 
 // Unwrap returns ErrInvalidTool.
 func (e DuplicateToolError) Unwrap() error { return ErrInvalidTool }
+
+// StructuredOutputError reports that constrained generation produced output
+// that could not be decoded into the requested type.
+type StructuredOutputError struct {
+	// Cause is the underlying decode failure.
+	Cause error
+}
+
+// Error returns a human-readable structured-output message.
+func (e StructuredOutputError) Error() string {
+	return fmt.Sprintf("%s: %v", ErrStructuredOutput, e.Cause)
+}
+
+// Unwrap returns ErrStructuredOutput joined with the decode cause.
+func (e StructuredOutputError) Unwrap() error {
+	return errors.Join(ErrStructuredOutput, e.Cause)
+}

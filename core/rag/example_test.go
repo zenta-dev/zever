@@ -53,7 +53,7 @@ func ExampleEngine() {
 		return
 	}
 
-	if err := engine.Ingest(context.Background(), []rag.Document{{ID: "d1", Content: "zever compiles schemas"}}); err != nil {
+	if ingestErr := engine.Ingest(context.Background(), []rag.Document{{ID: "d1", Content: "zever compiles schemas"}}); ingestErr != nil {
 		fmt.Println("ingest error")
 		return
 	}

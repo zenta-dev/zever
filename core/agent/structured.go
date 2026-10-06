@@ -3,7 +3,6 @@ package agent
 import (
 	"context"
 	"encoding/json"
-	"fmt"
 
 	"github.com/zenta-dev/zever/core/ai"
 )
@@ -26,8 +25,8 @@ func GenerateStructured(
 		return ai.Generation{}, InvalidOptionsError{Reason: "out is required"}
 	}
 
-	msgs := make([]ai.Message, len(messages))
-	copy(msgs, messages)
+	msgs := make([]ai.Message, 0, len(messages)+2)
+	msgs = append(msgs, messages...)
 
 	var lastErr error
 
@@ -43,11 +42,11 @@ func GenerateStructured(
 			return ai.Generation{}, err
 		}
 
-		if err := json.Unmarshal([]byte(gen.Content), out); err == nil {
+		decodeErr := json.Unmarshal([]byte(gen.Content), out)
+		if decodeErr == nil {
 			return gen, nil
-		} else {
-			lastErr = err
 		}
+		lastErr = decodeErr
 
 		msgs = append(msgs,
 			ai.Message{Role: ai.RoleAssistant, Content: gen.Content},
@@ -59,5 +58,5 @@ func GenerateStructured(
 		)
 	}
 
-	return ai.Generation{}, fmt.Errorf("%w: %s", ErrStructuredOutput, lastErr)
+	return ai.Generation{}, StructuredOutputError{Cause: lastErr}
 }

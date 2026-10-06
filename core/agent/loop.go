@@ -97,11 +97,13 @@ func (l *Loop) dispatch(ctx context.Context, call ai.ToolCall) (string, error) {
 
 	args, err := decodeArgs(call.Arguments)
 	if err != nil {
+		//nolint:nilerr // surfaced to the model as a tool turn so it can self-correct
 		return "invalid arguments: " + err.Error(), nil
 	}
 
 	out, err := tool.Handler(ctx, args)
 	if err != nil {
+		//nolint:nilerr // surfaced to the model as a tool turn so it can self-correct
 		return "error: " + err.Error(), nil
 	}
 

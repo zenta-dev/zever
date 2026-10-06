@@ -48,7 +48,7 @@ func (s *scriptedAI) Close() error { return nil }
 func echoTool(name string) Tool {
 	return Tool{
 		Name: name,
-		Handler: func(_ context.Context, args map[string]any) (string, error) {
+		Handler: func(context.Context, map[string]any) (string, error) {
 			return "ok", nil
 		},
 	}
