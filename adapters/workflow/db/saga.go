@@ -430,7 +430,7 @@ func (d *driver) runSaga(ctx context.Context, id workflow.RunID, _ string, steps
 	}
 
 	_ = d.updateSagaStatus(ctx, id, sagaStateCompensating, failed, failed,
-		fmt.Errorf("%w: %s", workflow.ErrSagaStepFailed, fmt.Errorf("step %q: %w", steps[failed].Name, stepErr)).Error())
+		fmt.Errorf("%w: %s", workflow.ErrSagaStepFailed, fmt.Sprintf("step %q: %v", steps[failed].Name, stepErr)).Error())
 	d.compensateSaga(ctx, id, steps, failed-1)
 }
 
@@ -464,7 +464,7 @@ func (d *driver) rollSagaForward(ctx context.Context, id workflow.RunID, steps [
 			return nil
 		}); rerr != nil {
 			_ = d.updateSagaStatus(ctx, id, sagaStateFailed, i, i,
-				fmt.Errorf("%w: %s", workflow.ErrSagaStepFailed, fmt.Errorf("step %q: %w", steps[i].Name, rerr)).Error())
+				fmt.Errorf("%w: %s", workflow.ErrSagaStepFailed, fmt.Sprintf("step %q: %v", steps[i].Name, rerr)).Error())
 
 			return
 		}

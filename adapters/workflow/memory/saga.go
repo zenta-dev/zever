@@ -219,7 +219,7 @@ func (a *Adapter) rollForward(ctx context.Context, r *sagaRun, from int, input a
 			a.mu.Lock()
 			r.status = workflow.SagaFailed
 			r.failedStep = i
-			r.err = fmt.Errorf("%w: %s", workflow.ErrSagaStepFailed, fmt.Errorf("step %q: %w", r.steps[i].Name, rerr)).Error()
+			r.err = fmt.Errorf("%w: %s", workflow.ErrSagaStepFailed, fmt.Sprintf("step %q: %v", r.steps[i].Name, rerr)).Error()
 			a.mu.Unlock()
 
 			return
@@ -244,7 +244,7 @@ func (a *Adapter) compensate(ctx context.Context, r *sagaRun, failed int, cause 
 	a.mu.Lock()
 	r.status = workflow.SagaCompensating
 	r.failedStep = failed
-	r.err = fmt.Errorf("%w: %s", workflow.ErrSagaStepFailed, fmt.Errorf("step %q: %w", r.steps[failed].Name, cause)).Error()
+	r.err = fmt.Errorf("%w: %s", workflow.ErrSagaStepFailed, fmt.Sprintf("step %q: %v", r.steps[failed].Name, cause)).Error()
 	a.mu.Unlock()
 
 	compFailed := false
@@ -268,7 +268,7 @@ func (a *Adapter) compensate(ctx context.Context, r *sagaRun, failed int, cause 
 			compFailed = true
 
 			a.mu.Lock()
-			r.err = fmt.Errorf("%w: step %q: %s", workflow.ErrSagaCompensationFailed, r.steps[j].Name, err).Error()
+			r.err = fmt.Errorf("%w: %s", workflow.ErrSagaCompensationFailed, fmt.Sprintf("step %q: %v", r.steps[j].Name, err)).Error()
 			a.mu.Unlock()
 		}
 
