@@ -101,7 +101,7 @@ func TestWithSafeDial_blocksPrivateByDefault(t *testing.T) {
 	t.Parallel()
 
 	c := NewClient(time.Second, WithSafeDial(false))
-	tr, ok := baseTransport(c).(*http.Transport)
+	tr, ok := c.Transport.(*http.Transport)
 	if !ok {
 		t.Fatalf("Transport is %T, want *http.Transport", c.Transport)
 	}
@@ -118,7 +118,7 @@ func TestWithSafeDial_allowPrivateTrue(t *testing.T) {
 	t.Parallel()
 
 	c := NewClient(time.Second, WithSafeDial(true))
-	tr, ok := baseTransport(c).(*http.Transport)
+	tr, ok := c.Transport.(*http.Transport)
 	if !ok {
 		t.Fatalf("Transport is %T, want *http.Transport", c.Transport)
 	}

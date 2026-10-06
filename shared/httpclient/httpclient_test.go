@@ -7,13 +7,16 @@ import (
 	"io"
 	"net"
 	"net/http"
+	"strings"
 	"testing"
 	"time"
+
+	"go.opentelemetry.io/otel/trace"
 )
 
 func TestNewClientTLSFloor(t *testing.T) {
 	c := NewClient(5 * time.Second)
-	tr, ok := baseTransport(c).(*http.Transport)
+	tr, ok := c.Transport.(*http.Transport)
 	if !ok {
 		t.Fatalf("Transport is %T, want *http.Transport", c.Transport)
 	}
@@ -53,9 +56,9 @@ func TestReadLimitedWithinLimit(t *testing.T) {
 
 func TestSafeDialGuardBlocksPrivate(t *testing.T) {
 	c := NewSafeClient(time.Second, false)
-	tr, ok := baseTransport(c).(*http.Transport)
+	tr, ok := c.Transport.(*http.Transport)
 	if !ok {
-		t.Fatalf("Transport is %T", baseTransport(c))
+		t.Fatalf("Transport is %T", c.Transport)
 	}
 	if tr.DialContext == nil {
 		t.Fatalf("DialContext nil")
@@ -193,7 +196,7 @@ func TestIsPrivateIPNil(t *testing.T) {
 func TestWithTransport(t *testing.T) {
 	custom := &http.Transport{MaxIdleConns: 7}
 	c := NewClient(time.Second, WithTransport(custom))
-	tr, ok := baseTransport(c).(*http.Transport)
+	tr, ok := c.Transport.(*http.Transport)
 	if !ok {
 		t.Fatalf("Transport is %T, want *http.Transport", c.Transport)
 	}
@@ -214,7 +217,7 @@ func TestWithTransportNonHTTPTransport(t *testing.T) {
 		return nil, errors.New("unused")
 	})
 	c := NewClient(time.Second, WithTransport(fake))
-	if _, ok := baseTransport(c).(roundTripFunc); !ok {
+	if _, ok := c.Transport.(roundTripFunc); !ok {
 		t.Fatalf("Transport is %T, want roundTripFunc (used directly, no clone)", c.Transport)
 	}
 }
@@ -225,7 +228,7 @@ func (f roundTripFunc) RoundTrip(r *http.Request) (*http.Response, error) { retu
 
 func TestWithInsecureSkipVerify(t *testing.T) {
 	c := NewClient(time.Second, WithInsecureSkipVerify(true))
-	tr, ok := baseTransport(c).(*http.Transport)
+	tr, ok := c.Transport.(*http.Transport)
 	if !ok {
 		t.Fatalf("Transport is %T, want *http.Transport", c.Transport)
 	}
@@ -236,7 +239,7 @@ func TestWithInsecureSkipVerify(t *testing.T) {
 
 func TestWithInsecureSkipVerifyFalse(t *testing.T) {
 	c := NewClient(time.Second, WithInsecureSkipVerify(false))
-	tr, ok := baseTransport(c).(*http.Transport)
+	tr, ok := c.Transport.(*http.Transport)
 	if !ok {
 		t.Fatalf("Transport is %T, want *http.Transport", c.Transport)
 	}
@@ -266,12 +269,52 @@ func TestTooLargeErrorMessage(t *testing.T) {
 	}
 }
 
-// baseTransport unwraps the trace-injecting transport NewClient installs so
-// tests can assert the underlying transport type.
-func baseTransport(c *http.Client) http.RoundTripper {
-	if t, ok := c.Transport.(traceRoundTripper); ok {
-		return t.base
+func TestWithTracingInjectsTraceparent(t *testing.T) {
+	var got http.Header
+
+	rt := traceRoundTripper{base: roundTripFunc(func(r *http.Request) (*http.Response, error) {
+		got = r.Header.Clone()
+
+		return &http.Response{StatusCode: http.StatusOK, Body: io.NopCloser(strings.NewReader("")), Header: make(http.Header), Request: r}, nil
+	})}
+
+	ctx := trace.ContextWithSpanContext(t.Context(), trace.NewSpanContext(trace.SpanContextConfig{
+		TraceID:    trace.TraceID{1},
+		SpanID:     trace.SpanID{1},
+		TraceFlags: trace.FlagsSampled,
+	}))
+	req, _ := http.NewRequestWithContext(ctx, http.MethodGet, "http://example.test", nil)
+	if _, err := rt.RoundTrip(req); err != nil {
+		t.Fatalf("RoundTrip: %v", err)
 	}
 
-	return c.Transport
+	if got.Get("traceparent") == "" {
+		t.Error("traceparent not injected")
+	}
+}
+
+func TestWithTracingOffByDefault(t *testing.T) {
+	c := NewClient(time.Second, WithTransport(roundTripFunc(func(*http.Request) (*http.Response, error) {
+		return nil, http.ErrNotSupported
+	})))
+	if _, ok := c.Transport.(traceRoundTripper); ok {
+		t.Error("transport wrapped without WithTracing")
+	}
+}
+
+func TestWithTracingOptionWraps(t *testing.T) {
+	c := NewClient(time.Second,
+		WithTransport(roundTripFunc(func(*http.Request) (*http.Response, error) { return nil, http.ErrNotSupported })),
+		WithTracing(),
+	)
+	if _, ok := c.Transport.(traceRoundTripper); !ok {
+		t.Errorf("transport is %T, want traceRoundTripper", c.Transport)
+	}
+}
+
+func TestInjectNoSpanLeavesRequest(t *testing.T) {
+	req, _ := http.NewRequestWithContext(t.Context(), http.MethodGet, "http://example.test", nil)
+	if got := Inject(t.Context(), req); got != req {
+		t.Error("Inject cloned a request with no span")
+	}
 }
