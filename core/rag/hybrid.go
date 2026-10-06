@@ -26,6 +26,9 @@ type HybridOptions struct {
 	Filter map[string]string
 	// RRFK is the fusion constant; <= 0 selects DefaultRRFK.
 	RRFK int
+	// Reranker optionally rescores fused sources after filtering and before
+	// the topK cut; nil skips reranking.
+	Reranker Reranker
 }
 
 // NewHybrid builds an Engine that additionally indexes into search, enabling
@@ -109,6 +112,15 @@ func (e *Engine) retrieveHybrid(ctx context.Context, query string, topK int, opt
 		if matchFilter(s.Metadata, opts.Filter) {
 			filtered = append(filtered, s)
 		}
+	}
+
+	if opts.Reranker != nil {
+		reranked, err := opts.Reranker.Rerank(ctx, query, filtered)
+		if err != nil {
+			return nil, err
+		}
+
+		filtered = reranked
 	}
 
 	if len(filtered) > topK {
