@@ -78,6 +78,7 @@ replace (
 	github.com/zenta-dev/zever/shared/codec => ../../shared/codec
 	github.com/zenta-dev/zever/shared/dbconn => ../../shared/dbconn
 	github.com/zenta-dev/zever/shared/endpoint => ../../shared/endpoint
+	github.com/zenta-dev/zever/shared/grpcclient => ../../shared/grpcclient
 	github.com/zenta-dev/zever/shared/httpclient => ../../shared/httpclient
 	github.com/zenta-dev/zever/shared/lrucache => ../../shared/lrucache
 	github.com/zenta-dev/zever/shared/providersopt => ../../shared/providersopt
@@ -135,6 +136,7 @@ require (
 	github.com/zenta-dev/zever/shared/codec v0.5.3 // indirect
 	github.com/zenta-dev/zever/shared/dbconn v0.5.3 // indirect
 	github.com/zenta-dev/zever/shared/endpoint v0.5.3 // indirect
+	github.com/zenta-dev/zever/shared/grpcclient v0.5.3 // indirect
 	github.com/zenta-dev/zever/shared/httpclient v0.5.3 // indirect
 	github.com/zenta-dev/zever/shared/providersopt v0.5.3 // indirect
 	github.com/zenta-dev/zever/shared/redisopt v0.5.3 // indirect

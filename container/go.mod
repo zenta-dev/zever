@@ -43,6 +43,7 @@ require (
 	github.com/zenta-dev/zever/core/webhook v0.5.3
 	github.com/zenta-dev/zever/core/workflow v0.5.3
 	github.com/zenta-dev/zever/shared/dbconn v0.5.3
+	github.com/zenta-dev/zever/shared/grpcclient v0.5.3
 	github.com/zenta-dev/zever/shared/registry v0.5.3
 	go.uber.org/goleak v1.3.0
 	google.golang.org/grpc v1.83.2
@@ -102,6 +103,7 @@ replace (
 	github.com/zenta-dev/zever/shared/codec => ../shared/codec
 	github.com/zenta-dev/zever/shared/dbconn => ../shared/dbconn
 	github.com/zenta-dev/zever/shared/endpoint => ../shared/endpoint
+	github.com/zenta-dev/zever/shared/grpcclient => ../shared/grpcclient
 	github.com/zenta-dev/zever/shared/httpclient => ../shared/httpclient
 	github.com/zenta-dev/zever/shared/kvstore => ../shared/kvstore
 	github.com/zenta-dev/zever/shared/providersopt => ../shared/providersopt

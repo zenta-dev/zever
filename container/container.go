@@ -63,6 +63,7 @@ type Container struct {
 	flag          lazy[flag.Flag]
 	geo           lazy[geo.Geo]
 	grpcServer    lazy[*grpc.Server]
+	grpcClients   lazy[grpcClientCache]
 	i18n          lazy[i18n.I18n]
 	idempotency   lazy[idempotency.Store]
 	job           lazy[*job.Dispatcher]

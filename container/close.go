@@ -7,6 +7,8 @@ import (
 	"reflect"
 	"time"
 	"unsafe"
+
+	"google.golang.org/grpc"
 )
 
 type dedupEntry struct {
@@ -108,9 +110,10 @@ type closeSnapshot struct {
 // ordered section): cache, queue (dependencies, closed last), db (its pool
 // lives in the DSN registry and closes with the registry band),
 // scheduler, job (dependents that hold a queue reference, closed first),
-// grpcServer (separate GracefulStop handling). This list must cover all
-// remaining lazy fields; currently 32 entries + 6 ordered = 38 lazy fields.
-// When adding a new service, add it here unless it depends on cache/queue
+// grpcServer (separate GracefulStop handling), grpcClients (separate
+// per-conn close handling). This list must cover all remaining lazy
+// fields; currently 32 entries + 7 ordered = 39 lazy fields. When
+// adding a new service, add it here unless it depends on cache/queue
 // (then add to Close's ordered section and keep excluded here). Drift is
 // pinned by TestContainer_Snapshots_CoversAllServices via reflection.
 func (c *Container) snapshots() []closeSnapshot {
@@ -178,6 +181,7 @@ func snapshotServiceNames() []string {
 //	db, registry pools -> (shared pools, after every borrower so no
 //	                       use-after-close; borrowers close as no-ops)
 //	grpcServer -> (independent)
+//	grpcClients -> (independent, one conn per target)
 //
 // Scheduler and job are closed first since they may hold a live reference
 // to the shared queue instance injected by Job (which Scheduler resolves
@@ -343,6 +347,24 @@ func (c *Container) Close(ctx context.Context) error {
 		case <-ctx.Done():
 			srv.Stop()
 			<-stopped
+		}
+	}
+
+	// gRPC client conns are independent of cache/queue/scheduler/job, so
+	// they close here rather than in the dependency-ordered sequence. The
+	// map is snapshotted under the cache lock so a concurrent GRPCClient
+	// build cannot race the iteration; each conn closes once via tryClose,
+	// whose pointer dedup also guards the same conn reached twice.
+	if cache, ok := c.grpcClients.getIfResolved(); ok {
+		cache.mu.Lock()
+		conns := make([]*grpc.ClientConn, 0, len(cache.conns))
+		for _, conn := range cache.conns {
+			conns = append(conns, conn)
+		}
+		cache.mu.Unlock()
+
+		for _, conn := range conns {
+			tryClose("grpc client", conn)
 		}
 	}
 

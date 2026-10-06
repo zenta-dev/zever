@@ -52,6 +52,7 @@ use (
 	./adapters/observability/noop
 	./adapters/observability/otlp
 	./adapters/observability/stdout
+	./adapters/outbox/cdc
 	./adapters/outbox/db
 	./adapters/outbox/memory
 	./adapters/password/argon2
@@ -146,6 +147,7 @@ use (
 	./shared/dbconn
 	./shared/endpoint
 	./shared/firebase
+	./shared/grpcclient
 	./shared/httpclient
 	./shared/kvstore
 	./shared/lrucache
