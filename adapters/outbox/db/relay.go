@@ -220,7 +220,7 @@ func (d *driver) deliver(ctx context.Context, c claimed) {
 		Attempts:  c.Attempts,
 	}
 
-	spanCtx, finish := d.recorder.PublishSpan(ctx, c.Topic)
+	spanCtx, finish := d.recorder.PublishSpan(ctx, c.Topic, c.ID)
 
 	err := d.publisher.Publish(spanCtx, msg)
 	now := time.Now().UTC()
