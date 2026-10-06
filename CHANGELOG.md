@@ -17,6 +17,14 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   `zever new`/`zever add` battery selection, and `zever generate adapter`.
   Adapter modules `adapters/resilience/inproc`, `adapters/outbox/memory`, and
   `adapters/outbox/db` ship as separate Go modules.
+- New `shared/grpcclient` helper module (`New(ctx, target, opts...)`:
+  round-robin load balancing, per-method retry policy, TLS/insecure
+  credentials, static resolver, resilience guard, metadata propagation) and
+  the `container.GRPCClient(target, opts...)` accessor: one cached
+  `*grpc.ClientConn` per target string, closed with the container.
+- New `adapters/outbox/cdc` adapter module (postgres logical replication via
+  `pg_logical_emit_message` + `START_REPLICATION`), registering the
+  `outbox.CDC` adapter; live tests gated by `POSTGRES_DSN`.
 
 ### Dependencies
 

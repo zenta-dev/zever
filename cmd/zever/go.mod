@@ -277,6 +277,7 @@ require (
 	github.com/zenta-dev/zever/shared/dbconn v0.5.3 // indirect
 	github.com/zenta-dev/zever/shared/endpoint v0.5.3 // indirect
 	github.com/zenta-dev/zever/shared/firebase v0.5.3 // indirect
+	github.com/zenta-dev/zever/shared/grpcclient v0.5.3 // indirect
 	github.com/zenta-dev/zever/shared/httpclient v0.5.3 // indirect
 	github.com/zenta-dev/zever/shared/kvstore v0.5.3 // indirect
 	github.com/zenta-dev/zever/shared/lrucache v0.5.3 // indirect
@@ -467,6 +468,8 @@ replace github.com/zenta-dev/zever/shared/dbconn => ../../shared/dbconn
 replace github.com/zenta-dev/zever/shared/endpoint => ../../shared/endpoint
 
 replace github.com/zenta-dev/zever/shared/firebase => ../../shared/firebase
+
+replace github.com/zenta-dev/zever/shared/grpcclient => ../../shared/grpcclient
 
 replace github.com/zenta-dev/zever/shared/httpclient => ../../shared/httpclient
 

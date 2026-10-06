@@ -60,6 +60,11 @@ scheduler shares the same `Queue` connection instead of opening a
 redundant one. Resolving `Scheduler()` therefore resolves `Job()` and,
 transitively, `Queue` as a side effect.
 
+`GRPCClient(target, opts...)` builds `*grpc.ClientConn` connections through
+the `shared/grpcclient` helper (round-robin LB, retry policy, TLS, static
+resolver) and caches one conn per target string; the conns close with the
+container.
+
 ## Runnable example
 
 ```go
@@ -99,6 +104,7 @@ exit:0 (non-nil only on per-service close failures, joined via errors.Join)
 | `middleware` | shared HTTP middleware |
 | `cmd/zever` | flags-only toolkit shell (own module) |
 | `shared/*` | SDK-free helpers (`codec`, `redisclient`, `s3opts`, `retry`, ...), one module each |
+| `shared/grpcclient` | gRPC client constructor (`New(ctx, target, opts...)`: LB, retry, TLS, static resolver); no registry, resolved via `GRPCClient(target, opts...)` |
 
 `core/<b>` holds each battery interface plus its `Register`/`Open` registry; `adapters/<b>/<a>` holds one module per adapter whose `Register()` wires it in.
 
@@ -167,6 +173,7 @@ scheduler, job        dependents holding a queue ref, first
 snapshots             everything without explicit ordering
 cache, queue          leaf dependencies, last
 grpcServer            independent GracefulStop/Stop, bounded by ctx
+grpc clients          independent, one conn per target, closed with the container
 ```
 
 Details: per-service bound is 5s only when the parent context carries no
