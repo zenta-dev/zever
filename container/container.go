@@ -26,11 +26,13 @@ import (
 	"github.com/zenta-dev/zever/core/media"
 	"github.com/zenta-dev/zever/core/notification"
 	"github.com/zenta-dev/zever/core/observability"
+	"github.com/zenta-dev/zever/core/outbox"
 	"github.com/zenta-dev/zever/core/password"
 	"github.com/zenta-dev/zever/core/payment"
 	"github.com/zenta-dev/zever/core/permission"
 	"github.com/zenta-dev/zever/core/queue"
 	"github.com/zenta-dev/zever/core/ratelimit"
+	"github.com/zenta-dev/zever/core/resilience"
 	"github.com/zenta-dev/zever/core/router"
 	"github.com/zenta-dev/zever/core/scheduler"
 	"github.com/zenta-dev/zever/core/search"
@@ -70,11 +72,13 @@ type Container struct {
 	media         lazy[media.Media]
 	notification  lazy[notification.Notifier]
 	observability lazy[observability.Provider]
+	outbox        lazy[outbox.Store]
 	password      lazy[password.Hasher]
 	payment       lazy[payment.Payment]
 	permission    lazy[permission.Checker]
 	queue         lazy[queue.Queue]
 	ratelimit     lazy[ratelimit.Limiter]
+	resilience    lazy[resilience.Manager]
 	router        lazy[router.Router]
 	scheduler     lazy[scheduler.Scheduler]
 	search        lazy[search.Search]

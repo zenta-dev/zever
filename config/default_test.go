@@ -19,6 +19,7 @@ func TestDefaultSnapshot(t *testing.T) {
 		"router": "stdhttp", "scheduler": "embedded", "search": "db", "secrets": "env",
 		"session": "memory", "storage": "local", "tenant": "single", "vectorstore": "db",
 		"webhook": "http", "workflow": "memory",
+		"outbox": "db", "resilience": "memory",
 	}
 	got := map[string]string{
 		"ai": cfg.AI.Adapter, "analytics": cfg.Analytics.Adapter, "auth": cfg.Auth.Adapter,
@@ -34,6 +35,7 @@ func TestDefaultSnapshot(t *testing.T) {
 		"session": cfg.Session.Adapter, "storage": cfg.Storage.Adapter, "tenant": cfg.Tenant.Adapter,
 		"vectorstore": cfg.VectorStore.Adapter, "webhook": cfg.Webhook.Adapter,
 		"workflow": cfg.Workflow.Adapter,
+		"outbox":   cfg.Outbox.Adapter, "resilience": cfg.Resilience.Adapter,
 	}
 	for svc, w := range want {
 		if got[svc] != w {

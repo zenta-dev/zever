@@ -146,13 +146,13 @@ func matchService(head string) (string, bool) {
 	case 'n':
 		return matchName(head, "notification")
 	case 'o':
-		return matchName(head, "observability")
+		return matchName(head, "observability", "outbox")
 	case 'p':
 		return matchName(head, "password", "payment", "permission")
 	case 'q':
 		return matchName(head, "queue")
 	case 'r':
-		return matchName(head, "ratelimit", "router")
+		return matchName(head, "ratelimit", "resilience", "router")
 	case 's':
 		return matchName(head, "scheduler", "search", "secrets", "session", "storage")
 	case 't':
@@ -219,6 +219,8 @@ func serviceRefs(cfg *Config, svc string) (adapter *string, opts any, ok bool) {
 		return &cfg.Notification.Adapter, &cfg.Notification.Options, true
 	case "observability":
 		return &cfg.Observability.Adapter, &cfg.Observability.Options, true
+	case "outbox":
+		return &cfg.Outbox.Adapter, &cfg.Outbox.Options, true
 	case "password":
 		return &cfg.Password.Adapter, &cfg.Password.Options, true
 	case "payment":
@@ -229,6 +231,8 @@ func serviceRefs(cfg *Config, svc string) (adapter *string, opts any, ok bool) {
 		return &cfg.Queue.Adapter, &cfg.Queue.Options, true
 	case "ratelimit":
 		return &cfg.RateLimit.Adapter, &cfg.RateLimit.Options, true
+	case "resilience":
+		return &cfg.Resilience.Adapter, &cfg.Resilience.Options, true
 	case "router":
 		return &cfg.Router.Adapter, &cfg.Router.Options, true
 	case "scheduler":

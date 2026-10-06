@@ -7,6 +7,17 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Added
+
+- New `core/resilience` battery (process-local circuit breaker, bulkhead, and
+  timeout/retry policy composition; default adapter `memory`) and
+  `core/outbox` battery (transactional outbox/inbox; default adapter `db`,
+  plus `memory`), wired into `config` (`resilience: memory`,
+  `outbox: db`), the `container` accessors `Resilience()` / `Outbox()`,
+  `zever new`/`zever add` battery selection, and `zever generate adapter`.
+  Adapter modules `adapters/resilience/inproc`, `adapters/outbox/memory`, and
+  `adapters/outbox/db` ship as separate Go modules.
+
 ### Dependencies
 
 - Routine dependency refresh: `anthropics/anthropic-sdk-go` 1.75.0 → 1.76.0,
