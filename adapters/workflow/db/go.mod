@@ -46,3 +46,5 @@ replace github.com/zenta-dev/zever/orm => ../../../orm
 replace github.com/zenta-dev/zever/shared/registry => ../../../shared/registry
 
 replace github.com/zenta-dev/zever/shared/dbconn => ../../../shared/dbconn
+
+replace github.com/zenta-dev/zever/shared/retry => ../../../shared/retry
