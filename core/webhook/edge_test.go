@@ -65,6 +65,33 @@ func TestValidateTargetContext_cancelledCtx(t *testing.T) {
 	}
 }
 
+func TestValidateTarget_emptyHostNoHostname(t *testing.T) {
+	t.Parallel()
+
+	// "https://:8080/hook" carries a port but no hostname: endpoint
+	// shape validation passes, so the post-parse hostname guard reports
+	// ErrInvalidTarget instead of a shape error.
+	err := ValidateTarget("https://:8080/hook")
+	if !errors.Is(err, ErrInvalidTarget) {
+		t.Fatalf("ValidateTarget(port-only host) err = %v, want ErrInvalidTarget", err)
+	}
+	if !strings.Contains(err.Error(), "has no host") {
+		t.Fatalf("ValidateTarget(port-only host) err = %q, want %q", err.Error(), "has no host")
+	}
+}
+
+func TestValidateTargetSyntax_emptyHostname(t *testing.T) {
+	t.Parallel()
+
+	err := ValidateTargetSyntax("http://:8080/hook")
+	if !errors.Is(err, ErrInvalidTarget) {
+		t.Fatalf("ValidateTargetSyntax(port-only host) err = %v, want ErrInvalidTarget", err)
+	}
+	if !strings.Contains(err.Error(), "has no host") {
+		t.Fatalf("ValidateTargetSyntax(port-only host) err = %q, want %q", err.Error(), "has no host")
+	}
+}
+
 func TestIsPrivateIP_publicLiteral(t *testing.T) {
 	t.Parallel()
 

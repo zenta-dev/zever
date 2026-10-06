@@ -38,6 +38,22 @@ func Conformance(t *testing.T, factory func(t *testing.T) notification.Notifier)
 	t.Run("Close", func(t *testing.T) { conformanceClose(t, factory, &working) })
 }
 
+// mustMatch fails the test when ok is false.
+func mustMatch(t *testing.T, ok bool, msg string, args ...any) {
+	t.Helper()
+	if !ok {
+		t.Fatalf(msg, args...)
+	}
+}
+
+// expectMatch records a test error when ok is false.
+func expectMatch(t *testing.T, ok bool, msg string, args ...any) {
+	t.Helper()
+	if !ok {
+		t.Errorf(msg, args...)
+	}
+}
+
 func conformanceHappyPath(t *testing.T, factory func(t *testing.T) notification.Notifier, working *notification.Notification) {
 	t.Helper()
 
@@ -52,13 +68,13 @@ func conformanceHappyPath(t *testing.T, factory func(t *testing.T) notification.
 		Data:    map[string]string{"k": "v"},
 	}
 
-	if err := n.Notify(ctx, &push); err == nil {
+	pushErr := n.Notify(ctx, &push)
+	if pushErr == nil {
 		*working = push
 
 		return
-	} else if !errors.Is(err, notification.ErrChannelNotSupported) {
-		t.Fatalf("Notify(push) error = %v", err)
 	}
+	mustMatch(t, errors.Is(pushErr, notification.ErrChannelNotSupported), "Notify(push) error = %v", pushErr)
 
 	sms := notification.Notification{
 		Target:  "+14155552671",
@@ -66,9 +82,8 @@ func conformanceHappyPath(t *testing.T, factory func(t *testing.T) notification.
 		Body:    "hello",
 	}
 
-	if err := n.Notify(ctx, &sms); err != nil {
-		t.Fatalf("Notify(push) unsupported, Notify(sms) error = %v", err)
-	}
+	smsErr := n.Notify(ctx, &sms)
+	mustMatch(t, smsErr == nil, "Notify(push) unsupported, Notify(sms) error = %v", smsErr)
 
 	*working = sms
 }
@@ -79,34 +94,28 @@ func conformanceValidation(t *testing.T, factory func(t *testing.T) notification
 	ctx := t.Context()
 	n := factory(t)
 
-	if err := n.Notify(ctx, nil); !errors.Is(err, notification.ErrNilNotification) {
-		t.Errorf("Notify(nil) err = %v, want ErrNilNotification", err)
-	}
+	nilErr := n.Notify(ctx, nil)
+	expectMatch(t, errors.Is(nilErr, notification.ErrNilNotification), "Notify(nil) err = %v, want ErrNilNotification", nilErr)
 
 	empty := notification.Notification{Channel: notification.ChannelPush, Body: "hi"}
-	if err := n.Notify(ctx, &empty); !errors.Is(err, notification.ErrInvalidTarget) {
-		t.Errorf("Notify(empty target) err = %v, want ErrInvalidTarget", err)
-	}
+	emptyErr := n.Notify(ctx, &empty)
+	expectMatch(t, errors.Is(emptyErr, notification.ErrInvalidTarget), "Notify(empty target) err = %v, want ErrInvalidTarget", emptyErr)
 
+	asErr := n.Notify(ctx, &empty)
 	var targetErr notification.InvalidTargetError
-	if err := n.Notify(ctx, &empty); !errors.As(err, &targetErr) {
-		t.Errorf("errors.As(err, InvalidTargetError) = false (err = %T %v)", err, err)
-	}
+	expectMatch(t, errors.As(asErr, &targetErr), "errors.As(err, InvalidTargetError) = false (err = %T %v)", asErr, asErr)
 
 	badChannel := notification.Notification{Target: "t", Channel: "pager", Body: "hi"}
-	if err := n.Notify(ctx, &badChannel); !errors.Is(err, notification.ErrInvalidChannel) {
-		t.Errorf("Notify(bad channel) err = %v, want ErrInvalidChannel", err)
-	}
+	channelErr := n.Notify(ctx, &badChannel)
+	expectMatch(t, errors.Is(channelErr, notification.ErrInvalidChannel), "Notify(bad channel) err = %v, want ErrInvalidChannel", channelErr)
 
 	badSMS := notification.Notification{Target: "not-a-number", Channel: notification.ChannelSMS, Body: "hi"}
-	if err := n.Notify(ctx, &badSMS); !errors.Is(err, notification.ErrInvalidTarget) {
-		t.Errorf("Notify(bad sms target) err = %v, want ErrInvalidTarget", err)
-	}
+	smsTargetErr := n.Notify(ctx, &badSMS)
+	expectMatch(t, errors.Is(smsTargetErr, notification.ErrInvalidTarget), "Notify(bad sms target) err = %v, want ErrInvalidTarget", smsTargetErr)
 
 	smsTitle := notification.Notification{Target: "+14155552671", Channel: notification.ChannelSMS, Title: "nope", Body: "hi"}
-	if err := n.Notify(ctx, &smsTitle); !errors.Is(err, notification.ErrInvalidNotification) {
-		t.Errorf("Notify(sms title) err = %v, want ErrInvalidNotification", err)
-	}
+	titleErr := n.Notify(ctx, &smsTitle)
+	expectMatch(t, errors.Is(titleErr, notification.ErrInvalidNotification), "Notify(sms title) err = %v, want ErrInvalidNotification", titleErr)
 }
 
 func conformanceOpenRegister(t *testing.T, factory func(t *testing.T) notification.Notifier) {
@@ -115,26 +124,19 @@ func conformanceOpenRegister(t *testing.T, factory func(t *testing.T) notificati
 	name := notification.Adapter("kit-open-test-" + strconv.FormatUint(adapterSeq.Add(1), 10))
 	probe := factory(t)
 
-	if err := notification.Register(name, func(notification.Options) (notification.Notifier, error) { return probe, nil }); err != nil {
-		t.Fatalf("Register() error = %v", err)
-	}
+	regErr := notification.Register(name, func(notification.Options) (notification.Notifier, error) { return probe, nil })
+	mustMatch(t, regErr == nil, "Register() error = %v", regErr)
 
-	if err := notification.Register(name, func(notification.Options) (notification.Notifier, error) { return probe, nil }); !errors.Is(err, notification.ErrDuplicate) {
-		t.Fatalf("Register(dup) err = %v, want ErrDuplicate", err)
-	}
+	dupErr := notification.Register(name, func(notification.Options) (notification.Notifier, error) { return probe, nil })
+	mustMatch(t, errors.Is(dupErr, notification.ErrDuplicate), "Register(dup) err = %v, want ErrDuplicate", dupErr)
 
-	opened, err := notification.Open(name, notification.Options{})
-	if err != nil {
-		t.Fatalf("Open() error = %v", err)
-	}
+	opened, openErr := notification.Open(name, notification.Options{})
+	mustMatch(t, openErr == nil, "Open() error = %v", openErr)
 
-	if opened != probe {
-		t.Error("Open() did not return the registered notifier")
-	}
+	expectMatch(t, opened == probe, "Open() did not return the registered notifier")
 
-	if _, err := notification.Open("kit-no-such-adapter", notification.Options{}); !errors.Is(err, notification.ErrUnknownAdapter) {
-		t.Errorf("Open(unknown) err = %v, want ErrUnknownAdapter", err)
-	}
+	_, unknownErr := notification.Open("kit-no-such-adapter", notification.Options{})
+	expectMatch(t, errors.Is(unknownErr, notification.ErrUnknownAdapter), "Open(unknown) err = %v, want ErrUnknownAdapter", unknownErr)
 }
 
 func conformanceClose(t *testing.T, factory func(t *testing.T) notification.Notifier, _ *notification.Notification) {
@@ -145,11 +147,9 @@ func conformanceClose(t *testing.T, factory func(t *testing.T) notification.Noti
 	// Close is idempotent. Post-close Notify gating is adapter-scoped
 	// (the log adapter rejects with ErrClosed; network adapters are
 	// stateless and stay usable), so the kit asserts Close only.
-	if err := n.Close(); err != nil {
-		t.Fatalf("Close() error = %v", err)
-	}
+	closeErr := n.Close()
+	mustMatch(t, closeErr == nil, "Close() error = %v", closeErr)
 
-	if err := n.Close(); err != nil {
-		t.Errorf("Close() second error = %v, want nil", err)
-	}
+	closeAgainErr := n.Close()
+	expectMatch(t, closeAgainErr == nil, "Close() second error = %v, want nil", closeAgainErr)
 }

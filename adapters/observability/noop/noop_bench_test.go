@@ -141,3 +141,20 @@ func BenchmarkSpanEnd(b *testing.B) {
 		span.End()
 	}
 }
+
+// BenchmarkOpen measures opening the registered noop provider.
+func BenchmarkOpen(b *testing.B) {
+	Register()
+	opts := observability.Options{ServiceName: "bench"}
+	b.ReportAllocs()
+	b.ResetTimer()
+	for b.Loop() {
+		p, err := observability.Open(observability.Noop, opts)
+		if err != nil {
+			b.Fatalf("Open(noop) = %v, want nil", err)
+		}
+		if p == nil {
+			b.Fatal("Open(noop) = nil")
+		}
+	}
+}
