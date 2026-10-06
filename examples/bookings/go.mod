@@ -159,6 +159,8 @@ replace github.com/zenta-dev/zever/core/analytics => ../../core/analytics
 
 replace github.com/zenta-dev/zever/core/cache => ../../core/cache
 
+replace github.com/zenta-dev/zever/core/cdn => ../../core/cdn
+
 replace github.com/zenta-dev/zever/core/document => ../../core/document
 
 replace github.com/zenta-dev/zever/core/eventbus => ../../core/eventbus
@@ -240,6 +242,7 @@ require (
 	github.com/zenta-dev/zever/core/ai v0.5.3 // indirect
 	github.com/zenta-dev/zever/core/analytics v0.5.3 // indirect
 	github.com/zenta-dev/zever/core/cache v0.5.3 // indirect
+	github.com/zenta-dev/zever/core/cdn v0.5.3 // indirect
 	github.com/zenta-dev/zever/core/document v0.5.3 // indirect
 	github.com/zenta-dev/zever/core/eventbus v0.5.3 // indirect
 	github.com/zenta-dev/zever/core/media v0.5.3 // indirect
