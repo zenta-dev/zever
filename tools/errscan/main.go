@@ -21,6 +21,7 @@ import (
 	"go/ast"
 	"go/parser"
 	"go/token"
+	"io"
 	"io/fs"
 	"os"
 	"path/filepath"
@@ -46,14 +47,22 @@ type violation struct {
 }
 
 func main() {
+	os.Exit(run(os.Args[1:], os.Stdout, os.Stderr))
+}
+
+// run executes the scan over the root selected by args (default "."),
+// writing violation lines to stdout and the summary or scan error to
+// stderr. The return value is the process exit code: 0 when clean, 1 on
+// violations, 2 on scan error.
+func run(args []string, stdout, stderr io.Writer) int {
 	root := "."
-	if len(os.Args) > 1 {
-		root = os.Args[1]
+	if len(args) > 0 {
+		root = args[0]
 	}
 	vs, err := scan(root)
 	if err != nil {
-		fmt.Fprintf(os.Stderr, "errscan: %v\n", err)
-		os.Exit(2)
+		fmt.Fprintf(stderr, "errscan: %v\n", err)
+		return 2
 	}
 	sort.Slice(vs, func(i, j int) bool {
 		if vs[i].path != vs[j].path {
@@ -65,12 +74,13 @@ func main() {
 		return vs[i].rule < vs[j].rule
 	})
 	for _, v := range vs {
-		fmt.Printf("%s:%d: %s: %s\n", v.path, v.line, v.rule, v.msg)
+		fmt.Fprintf(stdout, "%s:%d: %s: %s\n", v.path, v.line, v.rule, v.msg)
 	}
 	if len(vs) > 0 {
-		fmt.Fprintf(os.Stderr, "errscan: %d violation(s)\n", len(vs))
-		os.Exit(1)
+		fmt.Fprintf(stderr, "errscan: %d violation(s)\n", len(vs))
+		return 1
 	}
+	return 0
 }
 
 func scan(root string) ([]violation, error) {
