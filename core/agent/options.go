@@ -18,6 +18,12 @@ type Options struct {
 	Tools []Tool
 	// Confirm gates destructive tools; nil runs them without confirmation.
 	Confirm ConfirmFunc
+	// MaxParallel caps concurrent tool dispatches per step; <= 1 runs
+	// sequentially. Result order always matches call order.
+	MaxParallel int
+	// Observe receives execution events; nil disables observation. It must
+	// be goroutine-safe when MaxParallel exceeds 1.
+	Observe Observer
 }
 
 // withDefaults returns a copy of o with zero-valued bounds resolved.

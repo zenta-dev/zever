@@ -25,6 +25,12 @@ type Options struct {
 	ChunkOverlap int
 	// SystemPrompt, when non-empty, overrides the default grounding prompt.
 	SystemPrompt string
+	// SearchIndex names the keyword index hybrid engines read and write;
+	// empty selects DefaultSearchIndex.
+	SearchIndex string
+	// Observe receives engine events; nil disables observation. It must be
+	// goroutine-safe: methods on one Engine may run concurrently.
+	Observe Observer
 }
 
 // withDefaults returns a copy of o with unset bounds resolved.

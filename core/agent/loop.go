@@ -30,10 +30,19 @@ func (l *Loop) Run(ctx context.Context, messages []ai.Message) (Result, error) {
 			return Result{}, err
 		}
 
-		gen, err := l.client.Generate(ctx, l.opts.Model, msgs, ai.GenerateOptions{
+		l.emit(Event{Type: EventGenerate, Step: step})
+
+		genOpts := ai.GenerateOptions{
 			Tools:      specs,
 			ToolChoice: ai.ToolChoiceAuto,
-		})
+		}
+
+		if l.opts.MaxParallel > 1 {
+			parallel := true
+			genOpts.ParallelToolCalls = &parallel
+		}
+
+		gen, err := l.client.Generate(ctx, l.opts.Model, msgs, genOpts)
 		if err != nil {
 			return Result{}, err
 		}
@@ -48,32 +57,49 @@ func (l *Loop) Run(ctx context.Context, messages []ai.Message) (Result, error) {
 		})
 
 		if len(gen.ToolCalls) == 0 {
-			return Result{
+			res := Result{
 				Content:   gen.Content,
 				Messages:  msgs,
 				ToolCalls: calls,
 				Usage:     usage,
 				Steps:     step + 1,
-			}, nil
+			}
+
+			l.emit(Event{Type: EventDone, Step: step, Result: &res})
+
+			return res, nil
 		}
 
 		calls = append(calls, gen.ToolCalls...)
 
 		for _, call := range gen.ToolCalls {
-			result, err := l.dispatch(ctx, call)
-			if err != nil {
-				return Result{}, err
-			}
+			l.emit(Event{Type: EventToolCall, Step: step, ToolCall: call})
+		}
+
+		results, err := l.dispatchAll(ctx, gen.ToolCalls)
+		if err != nil {
+			return Result{}, err
+		}
+
+		for i, call := range gen.ToolCalls {
+			l.emit(Event{Type: EventToolResult, Step: step, ToolCall: call, Output: results[i]})
 
 			msgs = append(msgs, ai.Message{
 				Role:       ai.RoleTool,
-				Content:    result,
+				Content:    results[i],
 				ToolCallID: call.ID,
 			})
 		}
 	}
 
 	return Result{}, MaxStepsError{Max: l.opts.MaxSteps}
+}
+
+// emit delivers ev to the configured observer, if any.
+func (l *Loop) emit(ev Event) {
+	if l.opts.Observe != nil {
+		l.opts.Observe(ev)
+	}
 }
 
 // dispatch resolves and runs one tool call. Unknown tools and confirmation
