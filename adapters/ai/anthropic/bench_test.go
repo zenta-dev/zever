@@ -109,3 +109,12 @@ func BenchmarkRedactURLError(b *testing.B) {
 		_ = redactURLError(err)
 	}
 }
+
+// BenchmarkRegister measures the exported registry-wiring entrypoint.
+func BenchmarkRegister(b *testing.B) {
+	b.ReportAllocs()
+
+	for b.Loop() {
+		Register()
+	}
+}

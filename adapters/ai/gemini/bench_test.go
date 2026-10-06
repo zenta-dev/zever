@@ -107,3 +107,12 @@ func BenchmarkMapAndRedact(b *testing.B) {
 		_ = mapAndRedact(err, "secret")
 	}
 }
+
+// BenchmarkRegister measures the exported registry-wiring entrypoint.
+func BenchmarkRegister(b *testing.B) {
+	b.ReportAllocs()
+
+	for b.Loop() {
+		Register()
+	}
+}
