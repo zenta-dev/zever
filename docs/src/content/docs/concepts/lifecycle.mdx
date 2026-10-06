@@ -1,0 +1,161 @@
+---
+title: Lifecycle
+description: Follow one Zever process from config load to container close, and which failures belong to which phase.
+---
+
+import { LinkCard, CardGrid } from '@astrojs/starlight/components';
+
+A Zever process runs four phases: load config, build the container, resolve services on first use, and close. Knowing the phase tells you whether a failure is fail-fast, retryable, or a shutdown problem.
+
+## The four phases
+
+```text
+config.Load  ->  container.New  ->  resolve on first use  ->  Close(ctx)
+   file+env       one per          c.DB(), c.Cache()...        dependents
+                  process          retry on error              first, leaves last
+```
+
+Build one container per process: a server and a worker from the same config each own their connections. No globals or `init()` wiring take part, and `container.New(nil)` is valid.
+
+| Phase | State change | Failure shape |
+|---|---|---|
+| 1. Load config | File and env merge into one typed `Config` | Strict file error, `InvalidOptionsError`, `ErrUnsupportedFormat` |
+| 2. Build container | One `Container` owns future connections | None (`New` never dials; `nil` cfg is valid) |
+| 3a. First resolution | Adapter constructed and cached | Error returned, cache cleared, next call retries |
+| 3b. Steady serving | Cached instance reused per accessor | Per-call errors only, no rebuild |
+| 3c. Shared resolution | `Scheduler()` resolves `Job()` then `Queue()` | Side effect: one shared connection |
+| 4. Close | Resolved services shut down in order | `errors.Join` of per-service errors |
+
+## Load config once at boot
+
+Config layers as `defaults < file < env`: files are strict, env is best-effort (stray variables are ignored). Validation runs at load, so an unknown adapter or unparsable value fails in phase 1, not mid-request.
+
+```go title="boot.go"
+package main
+
+import (
+	dbsqlite "github.com/zenta-dev/zever/adapters/db/sqlite"
+	"github.com/zenta-dev/zever/config"
+	"github.com/zenta-dev/zever/container"
+)
+
+func boot() (*container.Container, error) {
+	dbsqlite.Register() // the container wires nothing; register before resolving
+	cfg, err := config.Load("zever.yaml") // "" probes zever.yaml/.yml/.json
+	if err != nil {
+		return nil, err
+	}
+	return container.New(cfg), nil
+}
+```
+
+See the [Config reference](../../reference/config/) for file and env keys.
+
+## Resolve lazily and reuse
+
+Resolve inside handlers and reuse the cached instance. On error the cache clears, so the next call retries instead of pinning a broken handle. `Job()` builds a dispatcher over the resolved `Queue`, and `Scheduler()` shares that queue rather than opening a second connection.
+
+```go title="handler.go"
+func handleList(c *container.Container) error {
+	db, err := c.DB()
+	if err != nil {
+		return err
+	}
+	_ = db
+	return nil
+}
+```
+
+## Close in order
+
+Stop the HTTP server first, then close the container, always under a timeout parent:
+
+```go title="main.go"
+package main
+
+import (
+	"context"
+	"log"
+	"net/http"
+	"time"
+
+	"github.com/zenta-dev/zever/config"
+	"github.com/zenta-dev/zever/container"
+)
+
+func main() {
+	cfg, err := config.Load("zever.yaml")
+	if err != nil {
+		log.Fatal(err)
+	}
+	c := container.New(cfg)
+
+	srv := &http.Server{Addr: ":8080", Handler: routes(c)} // routes and sigCh are yours
+	go srv.ListenAndServe()
+
+	<-sigCh // SIGINT / SIGTERM
+	ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
+	defer cancel()
+	_ = srv.Shutdown(ctx)
+	if err := c.Close(ctx); err != nil {
+		log.Fatal(err)
+	}
+}
+```
+
+`Close` never opens anything, so a failing factory on an unused service cannot fail shutdown. Dependents holding a queue reference (`scheduler`, `job`) close first, unordered snapshots next, and leaves (`cache`, `queue`) last. Each service gets a 5s bound when the parent has no deadline. Shared instances close once through pointer-identity dedup.
+
+| Close signal | Type | Meaning |
+|---|---|---|
+| Panic during close | `container.ClosePanicError` | Adapter panicked; shutdown continued |
+| Per-service timeout | `container.CloseTimeoutError` | Adapter exceeded its bound |
+| Several failures | `errors.Join` | Inspect each with `errors.As` |
+
+Both error types are value types, so declare `var pe container.ClosePanicError` and pass `&pe` to `errors.As`.
+
+## Design decisions and trade-offs
+
+- Error values name the service only, never resolved values or secrets. Display config through `config.RedactedServices`.
+- `Default()` dev secrets belong in tests; production secrets arrive through a file or env.
+- Container tests end with `goleak.VerifyTestMain`, so adapter goroutines must stop in `Close`. Keep timeout tests short (parent about 100ms, block about 500ms). `go test` runs with `-vet=off -count=1`.
+
+## Troubleshooting
+
+<details>
+<summary>The process fails at boot before serving</summary>
+
+Cause: a strict file error or an unparsable env value. Fix: read the `Load` error, which names the service and field, then fix the file key or env value.
+</details>
+
+<details>
+<summary>The first request fails but the next succeeds</summary>
+
+Cause: a transient backend error; the cache cleared. Fix: none, unless it repeats.
+</details>
+
+<details>
+<summary>Shutdown hangs</summary>
+
+Cause: `Close` got a bare context while an adapter blocks. Fix: use `context.WithTimeout` (about 10s).
+</details>
+
+<details>
+<summary>`errors.As` for close errors never matches</summary>
+
+Cause: a pointer target. Fix: declare a value variable and pass its address.
+</details>
+
+<details>
+<summary>A goroutine leak is reported after a lifecycle test</summary>
+
+Cause: a goroutine outlived `Close`. Fix: stop it in the adapter's `Close`.
+</details>
+
+## Related
+
+<CardGrid>
+  <LinkCard title="Container" description="Accessor table and close probing order." href="../container/" />
+  <LinkCard title="Providers and adapters" description="Interface and registry roles." href="../providers-adapters/" />
+  <LinkCard title="Compiler boundary" description="Why the compiler never runs here." href="../compiler-boundary/" />
+  <LinkCard title="Deployment" description="Production shutdown wiring." href="../../guides/operate/deployment/" />
+</CardGrid>

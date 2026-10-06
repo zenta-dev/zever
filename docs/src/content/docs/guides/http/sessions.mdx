@@ -1,0 +1,172 @@
+---
+title: Sessions
+description: Keep server-side sessions in memory, Redis, or a database, and send an opaque secure cookie to the browser.
+---
+
+import { Tabs, TabItem, LinkCard, CardGrid } from '@astrojs/starlight/components';
+
+A session is a server-side row behind a cookie: the browser holds an opaque ID, the server holds the data. Use sessions for browser flows that need revocation (logout, password reset, privilege change). Use stateless tokens (`auth`) for APIs, mobile, and service-to-service calls.
+
+## Quick start
+
+<Tabs>
+  <TabItem label="YAML">
+```yaml
+session:
+  adapter: memory   # dev: no infrastructure
+```
+
+```yaml
+session:
+  adapter: redis    # production: shared across instances
+  options:
+    redis:
+      addr: redis:6379
+```
+  </TabItem>
+  <TabItem label="Env">
+```sh
+SESSION_ADAPTER=redis
+SESSION_ADDR=redis:6379
+```
+  </TabItem>
+</Tabs>
+
+`config.Default()` resolves `memory`, so tests need no server. Zero TTL means `DefaultTTL` (15 minutes); `Options.Validate()` rejects negative TTLs. The schema also allows a `db` adapter. All options: [Config reference](../../../reference/config/#session).
+
+Create, save, and read a session:
+
+```go title="session.go"
+import (
+    "context"
+    "net/http"
+
+    "github.com/zenta-dev/zever/adapters/session/cookie"
+    "github.com/zenta-dev/zever/core/session"
+)
+
+// At startup (the container wires nothing by itself):
+//   sessionmemory.Register() // adapters/session/memory
+//   c := container.New(config.Default())
+//   store, err := c.Session()
+
+func login(ctx context.Context, store session.Store, w http.ResponseWriter) error {
+    sess, err := store.Create(ctx, session.DefaultTTL)
+    if err != nil {
+        return err
+    }
+    sess.Data["user_id"] = "u_123"
+    if err := store.Save(ctx, sess); err != nil {
+        return err
+    }
+    cookie.Set(w, sess.ID, cookie.Options{})
+    return nil
+}
+
+func loadSession(ctx context.Context, store session.Store, r *http.Request) (session.Session, error) {
+    c, err := r.Cookie(cookie.DefaultName)
+    if err != nil {
+        return session.Session{}, err
+    }
+    return store.Get(ctx, c.Value)
+}
+```
+
+```sh
+curl -s -i -X POST localhost:8080/login | head -8
+curl -s localhost:8080/me --cookie "session_id=<id-from-login>"
+```
+
+```text
+HTTP/1.1 200 OK
+Set-Cookie: session_id=<opaque-id>; Path=/; HttpOnly; Secure; SameSite=Lax
+{"user_id":"u_123"}
+```
+
+`Session()` resolves lazily and caches (a failed call retries). `Get` returns `session.ErrNotFound` for a missing or expired session, which are indistinguishable by design. `Session.Data` is a plain `map[string]any`. Keep it to IDs and flags, because every request loads the row. A `ttl <= 0` passed to `Create` means no expiry.
+
+## Set the session cookie
+
+`session.Store` knows nothing about HTTP. The `session/cookie` helper builds a plain `*http.Cookie` from a session ID:
+
+```go
+c := cookie.New(sess.ID, cookie.Options{})
+http.SetCookie(w, c)
+// or: cookie.Set(w, sess.ID, cookie.Options{})
+```
+
+| Attribute | Default |
+|---|---|
+| Name | `cookie.DefaultName` (`session_id`); `Options.Name` overrides. |
+| Path | `cookie.DefaultPath` (`/`); `Options.Path` overrides. |
+| `Domain` | Unset (host-only). A value widens the cookie to subdomains. |
+| `Prefix` | None. `cookie.PrefixHost` (`__Host-`) forces Secure, `Path=/`, no Domain. `cookie.PrefixSecure` (`__Secure-`) forces Secure. |
+| `HttpOnly` | `true`. |
+| `Secure` | `true` (HTTPS only). |
+| `SameSite` | `Lax`; use `http.SameSiteStrictMode` for high-risk apps. |
+| `MaxAge` | `0`: a session cookie. Negative deletes it; positive sets `Max-Age` and `Expires`. |
+
+`Secure` and `HttpOnly` are `*bool`, so an explicit `false` (local HTTP dev) differs from unset. Rotate the session ID at privilege changes (login, password reset) to block fixation: `Delete` the old row, then `Create` a new one.
+
+## Store API
+
+| Method or helper | Purpose |
+|---|---|
+| `Create(ctx, ttl)` | Mint a session; `ttl <= 0` never expires. |
+| `Get(ctx, id)` | Load by ID; `ErrNotFound` on missing or expired. |
+| `Save(ctx, sess)` | Upsert the row and touch `UpdatedAt`. |
+| `Delete(ctx, id)` | Remove the row; idempotent (use for logout). |
+| `session.NewSession(id, ttl)` | Build a session value with expiry. |
+| `Session.Clone()` | Deep copy including `Data`. |
+| `Session.Expired(now)` | Report whether the session lapsed. |
+| `session.Open(adapter, opts)` | Open an adapter without the container. |
+| `session.Register(adapter, factory)` | Add a custom adapter. |
+
+Sessions versus auth: use `auth` (`jwt`, `oidc`) for stateless tokens, `session` for revocable browser flows, and `authz` to verify via `auth` and decide via `permission`.
+
+## Production checklist
+
+- Run more than one instance only on `redis`. Memory sessions pin users to one process.
+- Stores are `Close()`-shaped and close with `c.Close(ctx)`. Shared redis clients close once.
+- Never log `Session.Data` whole. Log the ID and chosen fields.
+- Pass `r.Context()` into `Create`, `Get`, and `Save`, and set explicit TTLs (short for sensitive flows).
+
+## Troubleshooting
+
+<details>
+<summary>Login works locally but drops in production</summary>
+
+Two instances run `memory` sessions. Set `session.adapter: redis` with a shared `addr`.
+</details>
+
+<details>
+<summary>Cookies are missing on local HTTP</summary>
+
+`Secure` defaults to true and browsers drop it over HTTP. Set an explicit `false` for dev only.
+</details>
+
+<details>
+<summary>`Get` returns `ErrNotFound` right after `Create`</summary>
+
+`Save` was skipped, or the cookie holds the wrong ID. `Save` after mutating `Data`, and set the cookie from `sess.ID`.
+</details>
+
+<details>
+<summary>Logout does not stick</summary>
+
+Only the client cookie was cleared. Call `Delete` on the server too.
+</details>
+
+<details>
+<summary>Sessions never expire</summary>
+
+A non-positive TTL means no expiry. Pass an explicit duration, or zero in config to get the 15 minute default.
+</details>
+
+## Related
+
+<CardGrid>
+  <LinkCard title="Redis" href="../../data/redis/" description="Shared versus memory, and redis options." />
+  <LinkCard title="Codec" href="../codec/" description="How typed values become stored bytes." />
+  <LinkCard title="Errors" href="../errors/" description="ErrNotFound branching with errors.Is." />
+</CardGrid>

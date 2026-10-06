@@ -1,0 +1,101 @@
+---
+title: CORS
+description: Allow browser calls from other origins with strict, fail-closed cross-origin headers.
+---
+
+import { LinkCard, CardGrid } from '@astrojs/starlight/components';
+
+`middleware.CORS` enforces strict cross-origin rules as plain HTTP middleware. Use it when browsers call your API from another origin. Requests without an `Origin` header (non-browser clients) pass through untouched.
+
+## Quick start
+
+Zever owns no `cors` config section. Decode your app's own block into `middleware.Options` (snake_case tags), then wire it outermost with `r.Use` before any `Handle` call:
+
+```yaml
+cors:
+  allowed_origins: ["https://example.com"]
+  allowed_methods: ["GET", "POST", "PUT", "PATCH", "DELETE"]
+  allowed_headers: ["Content-Type", "Authorization"]
+  exposed_headers: ["X-Request-Id"]
+  allow_credentials: true
+  max_age: 10m
+```
+
+```go title="main.go"
+import (
+    "time"
+
+    "github.com/zenta-dev/zever/core/middleware"
+)
+
+handler := middleware.CORS(middleware.Options{
+    AllowedOrigins:   []string{"https://example.com"},
+    AllowedMethods:   []string{"GET", "POST", "PUT", "PATCH", "DELETE"},
+    AllowedHeaders:   []string{"Content-Type", "Authorization"},
+    ExposedHeaders:   []string{"X-Request-Id"},
+    AllowCredentials: true,
+    MaxAge:           10 * time.Minute,
+})(mux)
+```
+
+Env mapping is yours too: read vars such as `CORS_ALLOWED_ORIGINS` in `main`, split them, and pass the `Options`. `MaxAge` is a `time.Duration` and renders as delay-seconds (`10m` becomes `600`).
+
+## Know what it answers
+
+| Request | Response |
+|---|---|
+| No `Origin` header | Passes through, no CORS headers. |
+| Allowed origin, simple request | Handler runs. `Access-Control-Allow-Origin` echoes the origin, with `Vary: Origin`, plus `Access-Control-Expose-Headers` when set and `Access-Control-Allow-Credentials: true` when enabled. |
+| Allowed origin, preflight (`OPTIONS` with `Access-Control-Request-Method`), method and headers match | `204` with `Allow-Origin`, `Allow-Methods`, `Allow-Headers` (echoes the request, else the configured list), `Max-Age` when positive, and full `Vary`. |
+| Allowed origin, preflight mismatch | `403` with no `Allow-Origin`. |
+| Disallowed origin | Never reflected. Simple requests pass through without CORS headers; preflights fall through to the next handler. |
+
+## Validate options
+
+`Options.Validate` rejects fail-open shapes: empty origin or method lists, blank entries, wildcard origin `*` with `AllowCredentials`, and negative `MaxAge`. `CORS` with invalid options fails closed with `500 {"error":"internal error"}`.
+
+A wildcard without credentials echoes `*` for any origin. `DefaultCORSMaxAge` is `0`, which omits `Max-Age` and makes browsers preflight every request.
+
+## Wire it first
+
+Put `CORS` outermost so preflights skip logging and rate limiting. Call `r.Use` before any `Handle`, because `stdhttp` snapshots middleware per route at registration. CORS is HTTP-only; gRPC has no preflight. See [chain order](../middleware/#order-the-chain).
+
+## Troubleshooting
+
+<details>
+<summary>Preflights are logged or rate-limited</summary>
+
+`CORS` sits inside `RequestLogger` or `RateLimit`. Move it outermost.
+</details>
+
+<details>
+<summary>The browser blocks a valid origin</summary>
+
+The origin is not an exact allowlist match, and disallowed origins get no CORS headers. Add the exact origin.
+</details>
+
+<details>
+<summary>Preflight returns an unexpected 403</summary>
+
+The method or a requested header is outside the allowlist. Header matching is case-insensitive. Add the missing entry.
+</details>
+
+<details>
+<summary>Every CORS request returns 500</summary>
+
+`Options` is invalid, often `*` with credentials or an empty list. Fix it so `Validate` passes.
+</details>
+
+<details>
+<summary>`Use` has no effect on stdhttp</summary>
+
+It ran after the route. Move `r.Use(CORS(...))` above all `Handle` calls.
+</details>
+
+## Related
+
+<CardGrid>
+  <LinkCard title="Middleware" href="../middleware/" description="Chain order and the other constructors." />
+  <LinkCard title="Routing" href="../routing/" description="Where the wrapped mux and groups come from." />
+  <LinkCard title="Requests and responses" href="../requests-responses/" description="The shared error envelope." />
+</CardGrid>

@@ -16,7 +16,7 @@ interfaces).
 
 ## Prerequisites
 
-- [Config Reference](./config-reference/) layering: defaults, file, env.
+- [Config Reference](../config/) layering: defaults, file, env.
 - Deployment shape known: single process vs. multi-instance.
 - `container.New(cfg)` as the sole resolution path.
 
@@ -221,7 +221,7 @@ redis.Register()
 ## Production notes
 
 - `Close(ctx)` closes only resolved services, dependents first; see
-  [API Index](./api-index/) for order and close shapes.
+  [API Index](../api-index/) for order and close shapes.
 - `grpc` has a lazy `*grpc.Server` singleton accessor (`GRPC(opts...)`)
   with no registry; `EventBus()` keeps an `Eventbus()` alias and
   `RateLimit()` a `Ratelimit()` alias.
@@ -245,7 +245,7 @@ redis.Register()
 
 ## See also
 
-- [Config Reference](./config-reference/) for adapter values and env scheme
-- [API Index](./api-index/) for accessors and close order
-- [Authentication](../security/auth/) for jwt/session/oidc choice
-- [Authorization and Permissions](../security/authz-permissions/) for noop/rbac/casbin choice
+- [Config Reference](../config/) for adapter values and env scheme
+- [API Index](../api-index/) for accessors and close order
+- [Authentication](../../guides/security/auth/) for jwt/session/oidc choice
+- [Authorization and Permissions](../../guides/security/authz-permissions/) for noop/rbac/casbin choice

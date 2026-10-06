@@ -1,0 +1,114 @@
+---
+title: Backends
+description: How pluggable codegen backends turn a resolved schema into ORM bindings, protobuf, OpenAPI, and migrations.
+---
+
+import { LinkCard, CardGrid } from '@astrojs/starlight/components';
+
+Backends are the codegen extension point: the frontend resolves `*ir.Schema`, and each backend turns it into files. Use them to generate typed bindings, protobuf, OpenAPI, or migration HCL. Business logic and adapter wiring stay hand-written, because backends emit scaffolding, not behavior.
+
+## The mental model
+
+The `backend` package holds the interface only. `compile.Compile` parses filename-sorted inputs, resolves once, then calls each backend's `Generate` in order.
+
+```go
+type Backend interface {
+    Name() string
+    Generate(schema *ir.Schema) ([]File, error)
+}
+```
+
+Backends read only `*ir.Schema`, never source, and take no config struct. Select them at the `compile.Compile` call or with `--backend`, which filters which `Generate` runs (omit it to run all).
+
+## Run the backends
+
+```sh
+zever compile --out ./generated
+zever compile --backend=atlas,gogen,openapi,proto,protogogen,zenorm --out ./generated
+ls ./generated
+```
+
+`./generated` holds one subtree per backend. Run `zever check schema/` first: backends assume a resolved schema.
+
+## The six backends
+
+| Backend | Reads | Emits |
+|---|---|---|
+| `zenorm` | `schema.Modules[*].Entities` only | Typed table and column bindings |
+| `gogen/app` | Modules and services | Application layer (handlers, wiring) |
+| `proto` | Modules, enums, RPCs | Protobuf descriptors |
+| `protogogen` | Modules, enums, RPCs | `zever.app.v1` protobuf and `gen/zever/app` Go |
+| `openapi` | Services and HTTP bindings | OpenAPI document |
+| `atlas` | Modules and entities | Atlas HCL migration files, one per module |
+
+The canonical `app.zen` fixture exercises all six. Both entities compile under the virtual path `schema/app/app.zen` (module `app`), so the `User <-> Order` relation needs no import. Adding services never affects zenorm output.
+
+`dsl/naming` converts names per target: `APIKey` becomes `api_key` in Postgres and SQLite table names (acronym runs stay one word). SQL always binds args and quotes identifiers; dialect gates live with the ORM.
+
+## Keep output deterministic
+
+Same inputs must give the same bytes on every run.
+
+| Rule | Why |
+|---|---|
+| Sort map keys before rendering | Go map order is random per run |
+| Pin timestamps (no clock reads in output) | Same inputs must give the same bytes |
+| Repo-relative `File` paths | Outputs diff cleanly across machines |
+| One subtree per backend | `--backend=` filtering stays trivial |
+| No network or unseeded randomness | Hermetic codegen |
+
+## Write a backend
+
+1. Implement `Backend` with a stable `Name()`.
+2. Read only `*ir.Schema`; never re-parse source.
+3. Emit `File` values with repo-relative paths and deterministic rendering.
+4. Add a golden test under `dsl/compile/` with committed output.
+
+Golden workflow: edit `.zen`, run `zever check`, run `compile`, and review the full golden diff as the executable spec of the change. Accept with `-update` only after review:
+
+```sh
+go test ./dsl/backend/gogen/ -run TestGoldenFiles -update
+```
+
+Unrelated golden churn means a backend leaks non-determinism.
+
+## Design decisions and trade-offs
+
+- Never hand-edit `generated/`: the next compile overwrites it. Fix the `.zen` source.
+- Pin `--backend=...` in CI so a new backend cannot change outputs silently.
+- Keep backends pure: environment specifics belong in adapter options.
+
+## Troubleshooting
+
+<details>
+<summary>Generated output changed unexpectedly</summary>
+
+Cause: a schema edit or keyword change. Fix: diff against the committed goldens, then revert the schema or accept the golden with `-update` after review.
+</details>
+
+<details>
+<summary>A backend is missing from the output</summary>
+
+Cause: a misspelled `--backend=` filter. Fix: use the lowercase names `atlas`, `gogen`, `openapi`, `proto`, `protogogen`, `zenorm`.
+</details>
+
+<details>
+<summary>CI shows non-deterministic diffs</summary>
+
+Cause: a backend iterates a map without sorting or embeds a timestamp. Fix: sort keys and pin times.
+</details>
+
+<details>
+<summary>`Generate` errors on an unknown type</summary>
+
+Cause: the schema failed binding. Fix: run `zever check` first.
+</details>
+
+## Related
+
+<CardGrid>
+  <LinkCard title="Resolver and IR" description="The pipeline feeding Generate." href="../resolver-ir/" />
+  <LinkCard title="Zen syntax" description="The .zen source language." href="../../reference/zen-syntax/" />
+  <LinkCard title="Editor setup" description="Editor support while editing schemas." href="../../guides/extend/editor-setup/" />
+  <LinkCard title="CLI reference" description="compile flags." href="../../reference/cli/" />
+</CardGrid>

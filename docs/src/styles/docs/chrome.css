@@ -88,7 +88,10 @@ site-search button[data-open-modal]:focus-visible, .zv-side a:focus-visible, .zv
 
 @media (min-width: 50rem) {
   /* Tab-aware filtering: Reference tab shows only Reference; Guides hides it. Mobile keeps everything. */
-  .zv-side[data-tab='guides'] li[data-ref], .zv-side[data-tab='reference'] .zv-top > li:not([data-ref]) { display: none; }
+  .zv-side[data-tab='start'] .zv-top > li:not([data-tab-of='start']) { display: none; }
+  .zv-side[data-tab='guides'] .zv-top > li:not([data-tab-of='guides']) { display: none; }
+  .zv-side[data-tab='concepts'] .zv-top > li:not([data-tab-of='concepts']) { display: none; }
+  .zv-side[data-tab='reference'] .zv-top > li:not([data-tab-of='reference']) { display: none; }
   .sidebar-pane { top: var(--sl-nav-height); scrollbar-width: thin; scrollbar-color: var(--zl-line-strong) transparent; background: var(--sl-color-bg-sidebar); border-inline-end: 1px solid var(--zl-line); }
   .sidebar-pane::-webkit-scrollbar { width: 6px; }
   .sidebar-pane::-webkit-scrollbar-thumb { background: var(--zl-line-strong); border-radius: 6px; }

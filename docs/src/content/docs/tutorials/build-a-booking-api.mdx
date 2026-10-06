@@ -1,70 +1,53 @@
 ---
-title: 'Tutorial: Build a Booking API'
-description: A guided walkthrough of the examples/bookings app - schema, migrate, seed, serve, and hit an endpoint.
+title: Build a booking API
+description: "Run the examples/bookings app end to end: migrate, seed, serve, start the worker, and book a space over HTTP."
 ---
 
 import { Steps, Aside, LinkCard, CardGrid } from '@astrojs/starlight/components';
 
-This tutorial walks through `examples/bookings` in the repository: a
-short-term space bookings marketplace ("hosts list spaces, guests book
-them"). It exists precisely because a rich domain is the only way to
-exercise `payment`, `billing`, `geo`, `media`, `search`, and `vectorstore`
-together - a bare CRUD app cannot. By the end you will have a real HTTP API
-running locally, backed by a `.zen` schema, sqlite, and every zero-infra
-adapter `config.Default()` ships.
+You will run `examples/bookings`, a space marketplace where hosts list spaces and guests book them. It takes about 15 minutes. You need Go 1.27+, the `zever` CLI, and a repo clone. You end with a real HTTP API on sqlite and the zero-infra adapters.
 
-All commands below run from `examples/bookings/` in a clone of the repo, so
-`zever.yaml` and the local `data/` path resolve correctly.
+All commands run from `examples/bookings/` so `zever.yaml` and the relative `data/` path resolve.
 
 ```sh
 cd examples/bookings
 ```
 
-## 1. The schema
+## Read the schema
 
-The whole domain - `User`, `Space`, `Booking`, `Review` entities, the
-`BookingService` RPCs, two jobs (`SendConfirmation`, `SendReminder`), and a
-`Reminder` cron schedule - lives in one file:
+The whole domain lives in one file: the `User`, `Space`, `Booking`, and `Review` entities, the `BookingService` RPCs, two jobs (`SendConfirmation`, `SendReminder`), and a `Reminder` cron schedule.
 
 ```sh
 cat schema/bookings.zen
 ```
 
-Expected output: the entity blocks, the service RPC list, and the job plus
-schedule declarations printed to stdout. You do not need to write this
-yourself for the tutorial; it is already checked in. See
-[Syntax (.zen)](../dsl/syntax-zen/) once you are ready to extend it.
+Checkpoint: you see the entity blocks, the RPC list, and the job and schedule declarations. The file is already checked in. See [Zen syntax](../../reference/zen-syntax/) when you want to extend it.
 
-## 2. Compile and migrate
+## Migrate the database
 
-Generated code (`zenorm`, `proto`, `protogogen`, `gogen`, `openapi`,
-`atlas`) is already committed under `generated/` - never hand-edit it,
-regenerate with `zever compile` after touching the schema. What you do need
-to run is the migration, which creates the local sqlite database:
+Generated code (`zenorm`, `proto`, `protogogen`, `gogen`, `openapi`, `atlas`) is committed under `generated/`. Never hand-edit it; regenerate with `zever compile`. You only need the migration, which creates the sqlite database:
 
 ```sh
 zever db migrate --adapter=sqlite --dsn=data/bookings.db schema/bookings.zen
 ```
 
-Expected output:
+Checkpoint:
 
 ```text
 applied 4 tables to data/bookings.db
 ```
 
-The file `data/bookings.db` now exists. Run `Zever doctor --config
-zever.yaml` from this directory so the relative `data/` path resolves;
-from anywhere else the db check reports a path miss.
+If you run `zever doctor --config zever.yaml` from another directory, the db check reports a path miss, so run it from here.
 
-## 3. Seed demo data
+## Seed demo data
 
-The seed command is idempotent - safe to run more than once:
+The seed is idempotent, so you can run it more than once:
 
 ```sh
 go run ./db/seed
 ```
 
-Expected output:
+Checkpoint:
 
 ```text
 seeded host host@example.com
@@ -73,44 +56,35 @@ seeded 2 spaces
 seeded 1 confirmed booking
 ```
 
-Re-running prints the same lines without duplicating rows. This creates a
-demo host (`host@example.com`), a demo guest (`guest@example.com`), two
-spaces, and one confirmed booking.
+## Set a JWT secret and serve
 
-## 4. Set a JWT secret and serve
-
-The bookings app fails closed if `AUTH_JWT_SECRET` is missing or short -
-see [Configuration](../getting-started/configuration/) for why. Export one
-(at least 32 bytes, never commit a real one):
+The app fails closed when `AUTH_JWT_SECRET` is missing or under 32 bytes. See [Configuration](../../guides/operate/configuration/) for why. Export one (never commit a real one):
 
 ```sh
 export AUTH_JWT_SECRET=dev-only-secret-at-least-32-bytes-long
 go run ./cmd/server
 ```
 
-Expected output:
+Checkpoint (`-addr` changes the port):
 
 ```text
 listening on :8080
 ```
 
-The server listens on `:8080` by default (`-addr` flag to change it).
-
 <Aside type="caution" title="Fail-closed secret">
-If the secret is missing or under 32 bytes, the process exits with a clear
-startup error naming the field instead of serving insecurely.
+With a missing or short secret, the process exits at startup with an error naming the field instead of serving insecurely.
 </Aside>
 
-## 5. Start the worker (jobs + scheduler)
+## Start the worker
 
-In a second terminal, still exporting the same `AUTH_JWT_SECRET`:
+In a second terminal, export the same secret and start the worker (jobs plus scheduler):
 
 ```sh
 export AUTH_JWT_SECRET=dev-only-secret-at-least-32-bytes-long
 go run ./cmd/worker
 ```
 
-Expected output:
+Checkpoint:
 
 ```text
 registered SendConfirmation (queue default, concurrency 4)
@@ -118,18 +92,11 @@ registered SendReminder (queue low, concurrency 4)
 scheduler started: Reminder (0 9 * * *)
 ```
 
-This registers `SendConfirmation` (queue `default`) and `SendReminder`
-(queue `low`) at concurrency 4, and starts the embedded scheduler firing
-the `Reminder` cron (`0 9 * * *`). `SendConfirmation` sends a mail receipt
-via the `mailer/log` adapter, a guest push via `notification/log`, and
-delivers a `booking.created` webhook event to any configured target
-(skipped quietly when none is set - see the README webhook section for the
-`BOOKINGS_WEBHOOK_*` variables). `SendReminder` notifies guests of
-confirmed bookings starting within 7 days, notification only.
+`SendConfirmation` sends a mail receipt (`mailer/log`), a guest push (`notification/log`), and a `booking.created` webhook to any configured target (skipped quietly when none; the app README lists `BOOKINGS_WEBHOOK_*`). `SendReminder` notifies guests of confirmed bookings starting within 7 days.
 
-## 6. Hit the API
+## Call the API
 
-Register a guest and log in:
+Register a guest:
 
 ```sh
 curl -s -X POST localhost:8080/api/register \
@@ -137,11 +104,11 @@ curl -s -X POST localhost:8080/api/register \
   -d '{"email":"you@example.com","password":"correct horse battery staple"}'
 ```
 
-Expected output:
-
 ```text
 {"id":"01J0000000000000000000000","email":"you@example.com"}
 ```
+
+Log in. The response holds a JWT to use as a bearer token on every other route:
 
 ```sh
 curl -s -X POST localhost:8080/api/login \
@@ -149,21 +116,17 @@ curl -s -X POST localhost:8080/api/login \
   -d '{"email":"you@example.com","password":"correct horse battery staple"}'
 ```
 
-Expected output:
-
 ```text
 {"token":"eyJhbGciOi..."}
 ```
 
-Login returns a JWT. Use it as a bearer token on every other route:
+List spaces, then book one:
 
 ```sh
 TOKEN=... # from the login response
 
 curl -s localhost:8080/api/spaces -H "Authorization: Bearer $TOKEN"
 ```
-
-Expected output:
 
 ```text
 {"spaces":[{"id":"...","title":"..."},{"id":"...","title":"..."}]}
@@ -175,75 +138,48 @@ curl -s -X POST localhost:8080/api/bookings \
   -d '{"space_id":"...","start_date":"2026-01-01","end_date":"2026-01-03"}'
 ```
 
-Expected output:
-
 ```text
 {"id":"...","status":"confirmed","payment":"succeeded"}
 ```
 
-## 7. Trace one booking through the stack
+Checkpoint: the worker terminal now shows the mail receipt line, the push line, and either the webhook delivery or the quiet skip. That proves the queue handoff.
 
-A successful booking request passes through, in order:
+## Trace one booking through the stack
 
-1. `auth` - bearer JWT verified, subject attached to context.
-2. `ratelimit` - per-guest quota checked; over-quota returns 429 before
-   any state changes.
-3. `idempotency` - request key reserved; a retried POST with the same key
-   replays the first result instead of double-booking.
-4. `lock` - the space date range is held so two concurrent bookings for
-   overlapping dates cannot both confirm.
-5. `payment` - stub charge created with `auto_approve`, so the booking
-   confirms without a provider round trip.
-6. `queue` - `SendConfirmation` dispatched; the worker terminal shows the
-   mail receipt line, the push line, and either the webhook delivery or
-   the quiet skip.
+A successful booking request passes, in order, through:
 
-Watch the worker terminal after step 6: the confirmation lines prove the
-queue handoff worked end to end.
+1. `auth`: the bearer JWT is verified and the subject is attached to the context.
+2. `ratelimit`: the per-guest quota is checked; over quota returns 429 before any state changes.
+3. `idempotency`: the request key is reserved, so a retried POST with the same key replays the first result instead of double-booking.
+4. `lock`: the space date range is held so concurrent bookings for overlapping dates cannot both confirm.
+5. `payment`: a stub charge with `auto_approve` confirms the booking without a provider round trip.
+6. `queue`: `SendConfirmation` is dispatched to the worker.
 
-## 8. Doctor FAILs, explained
+## Understand the doctor failures
 
 ```sh
 zever doctor --config zever.yaml
 ```
 
-Expected output includes FAIL rows for `ai` (no API key in zero-infra
-config), `geo` (missing fixture data), and `i18n` (missing embed FS), plus
-possibly `db` if run outside `examples/bookings/` and `webhook` (queue
-variant needs its queue reference). Those are deliberate zero-infra gaps
-in the example, not framework bugs - see the app `README.md` for the exact
-list.
+Expect FAIL rows for `ai` (no API key in zero-infra config), `geo` (missing fixture data), and `i18n` (missing embed FS), plus possibly `db` if you ran it outside `examples/bookings/` and `webhook` (the queue variant needs its queue reference). These are deliberate zero-infra gaps in the example, not framework bugs. The app `README.md` lists them. Do not change framework code to fix them.
 
-<Aside type="tip" title="Leave the framework alone">
-Do not "fix" framework code for these FAIL rows.
-</Aside>
+## What you built
 
-## What you just exercised
+One HTTP request touched auth, rate limiting, idempotency, locking, payment, the ORM, the queue, and then mailer, notification, and webhook delivery through the worker.
 
-One HTTP request touched auth (JWT), rate limiting, idempotency, locking,
-payment, the ORM (via `db`), the queue, and - once the worker picks up the
-job - mailer, notification, and webhook delivery. That is the point of this
-example: a realistic flow is the only way to prove all of those adapters
-compose correctly.
+<details>
+<summary>Troubleshooting</summary>
 
-## Troubleshooting
+**The server exits immediately naming `AUTH_JWT_SECRET`.** The secret is missing or under 32 bytes. Export a longer dev-only value.
 
-**Server exits immediately naming `AUTH_JWT_SECRET`.**
-The secret is missing or under 32 bytes. Export a longer dev-only value;
-the gate is deliberate fail-closed behavior.
+**`curl` returns 401 on `/api/spaces`.** The `Authorization: Bearer $TOKEN` header is missing, or the token came from a different secret. Log in again in the terminal where you exported the secret.
 
-**`curl` returns 401 on `/api/spaces`.**
-The `Authorization: Bearer $TOKEN` header is missing or the token came
-from a different secret. Log in again in the same terminal where you
-exported the secret.
+**A booking returns 429 or a duplicate.** 429 means the rate limit bit, so wait out the window. A duplicate means you reused an idempotency key; a fresh key creates a fresh booking.
+</details>
 
-**Booking returns 429 or a duplicate.**
-429 means the rate limit bit - wait out the window. A duplicate booking
-means you reused an idempotency key; a fresh key creates a fresh booking.
-
-## Next
+## Next steps
 
 <CardGrid>
-  <LinkCard title="Explore the Showcase App" description="A schema that exercises every DSL feature in one place, served over both HTTP and gRPC." href="../explore-the-showcase-app/" />
-  <LinkCard title="Providers and Adapters" description="Why swapping payment: stub for payment: stripe in zever.yaml is the only change a real deployment needs." href="../../architecture/providers-adapters/" />
+  <LinkCard title="Explore the showcase app" description="Every DSL feature in one schema, over HTTP and gRPC." href="../explore-the-showcase-app/" />
+  <LinkCard title="Providers and adapters" description="Why swapping payment: stub for payment: stripe is the only change a real deployment needs." href="../../concepts/providers-adapters/" />
 </CardGrid>

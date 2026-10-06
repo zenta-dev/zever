@@ -1,0 +1,109 @@
+---
+title: Tenants
+description: Resolve which tenant owns a request, from single-tenant to header-based SaaS.
+---
+
+import { LinkCard, CardGrid } from '@astrojs/starlight/components';
+
+`tenant` answers "which customer owns this request" without tenant parsing in every handler. `Resolve` maps request metadata to a tenant ID, and `Scoped` carries it on the context. It resolves ownership but is not an access gate: pair it with [Authorization](../../security/authz-permissions/) for allow and deny.
+
+## Quick start
+
+`single` (the default) gives every request one hardcoded ID (`id`, default `"default"`). Stay there until a second customer exists.
+
+```go title="main.go"
+package main
+
+import (
+    "context"
+    "fmt"
+
+    "github.com/zenta-dev/zever/config"
+    "github.com/zenta-dev/zever/container"
+)
+
+func main() {
+    c := container.New(config.Default())
+    t, err := c.Tenant()
+    if err != nil {
+        panic(err)
+    }
+    defer t.Close()
+
+    ctx := context.Background()
+    id, err := t.Resolve(ctx, map[string]string{"tenant": ""})
+    fmt.Println(id, err)
+    scoped, err := t.Scoped(ctx, id)
+    fmt.Println(scoped != nil, err)
+}
+```
+
+Expected output:
+
+```text
+default <nil>
+true <nil>
+```
+
+The bookings example runs `tenant.adapter: single`. It passes `X-Tenant` through as metadata in `tenantID` and tags bookings, queue headers, and responses with the fixed ID.
+
+## Resolve tenants from a header or subdomain
+
+Use `header` for multi-tenant SaaS APIs where a gateway or client sets a per-call header (default `X-Tenant-ID`, `DefaultHeader`). With `X-Tenant-ID: acme` metadata, `Resolve` returns `acme`. `subdomain_regex` matches a tenant out of the host when header routing does not fit.
+
+```yaml title="zever.yaml"
+tenant:
+  adapter: header
+  options:
+    header: X-Tenant-ID
+    subdomain_regex: ^(?P<tenant>[a-z0-9-]+)\.example\.com$
+```
+
+```sh
+TENANT_ADAPTER=header
+TENANT_HEADER=X-Tenant-ID
+TENANT_SUBDOMAINREGEX=^([a-z0-9-]+)\.example\.com$
+TENANT_ID=default
+```
+
+`Validate` rejects an invalid `header` key (printable ASCII, no whitespace, colon, or DEL) and any `subdomain_regex` over 500 characters (`MaxRegexLength`, a ReDoS bound). An empty `header` means the default. See the [tenant config reference](../../../reference/config/#tenant).
+
+| Adapter | Package | Notes |
+|---|---|---|
+| `single` | `tenant/single` | Default. One fixed ID, constant-time lookup. |
+| `header` | `tenant/header` | Request header plus optional subdomain regex. |
+
+## Production checklist
+
+- Resolve once at the middleware edge and propagate through the `tenant/context.go` helpers. Never re-derive deeper, where an unvalidated value could slip in.
+- Fail closed on an unknown tenant. Mapping it to a default turns one typo into a cross-tenant data leak.
+- Both adapters are stateless, so replicas agree when they share config. `Tenant.Close() error` takes no context.
+- Tenant IDs are customer data. Document the header name and validation rule for API clients, since it is public contract. Never log raw option maps.
+
+## Troubleshooting
+
+<details>
+<summary>Every request lands on `default` after switching to `header`</summary>
+
+The gateway is not sending the configured header, or the app reads a different name. Confirm `TENANT_HEADER` matches what the client sends (`X-Tenant-ID` vs `X-Tenant`) and that proxies forward it.
+</details>
+
+<details>
+<summary>`header must be a valid header key`</summary>
+
+The name contains whitespace, a colon, or non-ASCII characters. Fix the name. Empty is allowed (it means the default), garbage is not.
+</details>
+
+<details>
+<summary>`subdomain_regex exceeds max length`</summary>
+
+The pattern is over 500 characters. Shorten it, or split matching into a regex plus code.
+</details>
+
+## Related
+
+<CardGrid>
+  <LinkCard title="Feature flags" href="../flags/" description="Per-tenant targeting signals." />
+  <LinkCard title="Rate limiting" href="../../security/ratelimit/" description="Per-tenant buckets." />
+  <LinkCard title="Observability" href="../observability/" description="Tenant as a span attribute." />
+</CardGrid>

@@ -1,0 +1,150 @@
+---
+title: Routing
+description: Register routes on the fiber or stdhttp driver with uniform path params, groups, and method validation.
+---
+
+import { LinkCard, CardGrid } from '@astrojs/starlight/components';
+
+The `router` package is a thin facade over two drivers (`fiber`, `stdhttp`). Handlers stay plain `http.HandlerFunc` values, and `router.Param` reads path params the same way on both. Use it for hand-written routes, or to mirror `.zen` RPC bindings; `zever routes` prints the resolved table. For the schema side, see [Zen syntax](../../../reference/zen-syntax/).
+
+## Quick start
+
+Pick a driver in config (`stdhttp` is the default and needs no extra dependency):
+
+```yaml
+router:
+  adapter: stdhttp   # or: fiber
+```
+
+Set `ROUTER_ADAPTER=fiber` to switch by environment. Handler signatures do not change. Full options: [Config reference](../../../reference/config/#router).
+
+```go title="main.go"
+package main
+
+import (
+    "fmt"
+    "net/http"
+
+    routerstdhttp "github.com/zenta-dev/zever/adapters/router/stdhttp"
+    "github.com/zenta-dev/zever/config"
+    "github.com/zenta-dev/zever/container"
+    "github.com/zenta-dev/zever/core/router"
+)
+
+func main() {
+    routerstdhttp.Register() // the container wires nothing by itself
+
+    c := container.New(config.Default())
+    r, err := c.Router()
+    if err != nil {
+        panic(err)
+    }
+
+    r.Handle("GET", "/users/{id}", func(w http.ResponseWriter, req *http.Request) {
+        fmt.Fprintf(w, "user %s", router.Param(req, "id"))
+    })
+
+    api := r.Group("/v1")
+    api.Handle("GET", "/users/{id}", func(w http.ResponseWriter, req *http.Request) {
+        fmt.Fprintf(w, "v1 user %s", router.Param(req, "id"))
+    })
+
+    _ = http.ListenAndServe(":8080", r)
+}
+```
+
+```sh
+curl -s localhost:8080/users/42
+curl -s localhost:8080/v1/users/42
+```
+
+```text
+user 42
+v1 user 42
+```
+
+`c.Router()` resolves lazily and caches the result (a failed call retries). The router has no `Close`, so `c.Close(ctx)` treats it as a no-op. See [the container](../../../concepts/container/).
+
+## Write path patterns
+
+`fiber` accepts both `:name` and `{name}`. `stdhttp` accepts only `net/http` ServeMux syntax and rejects colon and regex patterns.
+
+| Pattern | fiber | stdhttp |
+|---|---|---|
+| `/users/:id` | `:id` | rejected |
+| `/users/{id}` | `:id` | `{id}` |
+| `/files/{path...}` | `*` wildcard | `{path...}` subtree |
+| `/users/{$}` | literal | `{$}` exact match |
+| `/items/:id<[0-9]+>` | passthrough | rejected (regex constraint) |
+
+Fiber matches case-sensitively: `/Users/:id` and `/users/:id` are different routes, and duplicate detection is case-sensitive too.
+
+Use only `{name}` patterns if you want code that runs on both drivers.
+
+## Group routes and add middleware
+
+`Group(prefix, middlewares...)` scopes middleware to routes under a prefix. `Use` adds middleware router-wide (or group-wide on a `Group`). On `stdhttp`, `Use` affects only routes registered after the call, so call it before `Handle`. See [Middleware](../middleware/).
+
+| Method or helper | Purpose |
+|---|---|
+| `Handle(method, pattern, handler)` | Register one route. |
+| `Group(prefix, middlewares...)` | Scoped routes under a prefix, middleware applied in order. |
+| `Group.Group(prefix, middlewares...)` | Nested group. |
+| `Use(middlewares...)` | Append middleware router-wide or group-wide. |
+| `router.Param(req, name)` | One path param; empty string when absent. |
+| `router.ParamNames(req)` | All matched params as a copy. |
+| `router.WithParams(ctx, params)` | Seed params in tests and middleware. |
+| `router.ValidMethod(method)` | Report whether a method is in the standard set. |
+| `router.Open(adapter, opts)` | Open a driver without the container. |
+| `router.Register(adapter, factory)` | Add a custom driver. |
+
+## Methods
+
+Valid methods are GET, POST, PUT, PATCH, DELETE, HEAD, OPTIONS, CONNECT, and TRACE. An invalid or duplicate registration is skipped with a `[router] <driver>:` log line, not an error. Fiber leaves the route unregistered. `stdhttp` relies on the mux for automatic 405 responses and skips conflicting patterns.
+
+## Production checklist
+
+- Close the `http.Server` yourself with a graceful shutdown (the bookings example uses a 10s grace period).
+- Set `ReadHeaderTimeout`, `ReadTimeout`, `WriteTimeout`, and `IdleTimeout` on the server, and add `middleware.Timeout` so handler contexts carry deadlines.
+- Pick one driver per process. Never log raw option maps; use `config.RedactedServices`.
+
+## Troubleshooting
+
+<details>
+<summary>A route works on fiber but returns 404 on stdhttp</summary>
+
+You used `:id` or a regex constraint. Rewrite as `{id}` and check the constraint in the handler.
+</details>
+
+<details>
+<summary>`Use` middleware does not run on stdhttp</summary>
+
+It was registered after the route. Move `Use` before `Handle`, or attach the middleware to a `Group`.
+</details>
+
+<details>
+<summary>A duplicate route is silently missing</summary>
+
+Duplicates are skipped with a log line. Search startup logs for `[router]` and fix the method and pattern pair.
+</details>
+
+<details>
+<summary>`/Users/1` and `/users/1` behave differently</summary>
+
+Fiber is case-sensitive by design. Register both spellings or redirect.
+</details>
+
+<details>
+<summary>Params are empty in unit tests</summary>
+
+Plain `httptest` requests carry no driver context. Wrap the context with `router.WithParams` before calling the handler.
+</details>
+
+## Related
+
+<CardGrid>
+  <LinkCard title="Middleware" href="../middleware/" description="Logging, recovery, rate limiting, and tracing." />
+  <LinkCard title="Requests and responses" href="../requests-responses/" description="Params, bodies, and JSON envelopes." />
+  <LinkCard title="Validation" href="../validation/" description="@validate rules and handler checks." />
+  <LinkCard title="Configuration" href="../../operate/configuration/" description="Adapter selection and redaction." />
+</CardGrid>

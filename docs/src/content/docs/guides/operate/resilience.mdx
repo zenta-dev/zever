@@ -1,0 +1,163 @@
+---
+title: Resilience
+description: Protect your process from failing dependencies with timeout, retry, circuit breaker, and bulkhead guards.
+---
+
+import { LinkCard, CardGrid } from '@astrojs/starlight/components';
+
+`resilience` stops a failing dependency from taking down your process. A `Manager` hands out named per-dependency `Guard` values, and each guard wraps every call in a fixed chain: a timeout, a bounded retry budget, a circuit that opens under sustained failure, and a bulkhead that caps concurrent calls. The bookings payment path uses one guard per dependency (`payments`, `fraud`), so a slow fraud check trips its own breaker instead of exhausting server goroutines.
+
+## Quick start
+
+```go title="main.go"
+package main
+
+import (
+    "context"
+    "fmt"
+
+    "github.com/zenta-dev/zever/adapters/resilience/inproc"
+    "github.com/zenta-dev/zever/config"
+    "github.com/zenta-dev/zever/container"
+    "github.com/zenta-dev/zever/core/resilience"
+)
+
+func main() {
+    inproc.Register() // container wires nothing
+    c := container.New(config.Default())
+    m, err := c.Resilience()
+    if err != nil {
+        panic(err)
+    }
+    defer m.Close()
+
+    g, err := m.Guard("payments")
+    if err != nil {
+        panic(err)
+    }
+    v, err := resilience.Do(context.Background(), g, func(context.Context) (string, error) {
+        return "ok", nil
+    })
+    fmt.Println(v, err)
+}
+```
+
+Expected output:
+
+```text
+ok <nil>
+```
+
+`Guard(name)` creates each guard lazily from the template `Options`, and the same name always returns the same guard. `resilience.Do` is the typed helper over `Guard.Execute`. `Guard.Close` and `Manager.Close` are idempotent.
+
+## Understand the policy chain
+
+Policies compose outermost to innermost as `Timeout -> Retry -> Breaker -> Bulkhead -> fn`. The timeout therefore bounds the whole operation including retries: 5s with 3 attempts bounds the entire call, not each attempt.
+
+Branch on sentinel errors with `errors.Is`:
+
+| Error | Meaning |
+|---|---|
+| `ErrOpenState` | Breaker open. |
+| `ErrTooManyRequests` | Half-open probe limit reached. |
+| `ErrBulkheadFull` | No slot within the wait budget. |
+| `ErrTimeout` | Overall budget exceeded. |
+| `ErrClosed` | Guard or manager closed. |
+| `ErrNoSharedState` | Shared (redis) state missing or unreadable. |
+
+`context.Canceled` and `context.DeadlineExceeded` are excluded from breaker counts and never retried, so a client hanging up does not count against the circuit. Classify business errors that should not trip the breaker (a validation rejection) as success with `BreakerOptions.IsSuccessful`.
+
+## Configure the guards
+
+`Default()` enables every policy with bounded values (5s timeout, 3 attempts, 100 concurrent, 1s admission wait). Treat it as a safe start, not a tuning endpoint. Durations in files are integer nanoseconds.
+
+```yaml title="zever.yaml"
+resilience:
+  adapter: memory
+  options:
+    timeout: 5000000000          # bounds the whole operation
+    breaker:
+      enabled: true
+      max_requests: 1            # half-open probe allowance
+      interval: 30000000000      # closed-state counting window
+      bucket_period: 10000000000 # rolling-window bucket width
+      timeout: 30000000000       # open duration before a probe
+      min_requests: 10           # before the ratio trip applies
+      failure_ratio: 0.5         # [0,1]
+      consecutive_failures: 5
+    bulkhead:
+      max_concurrent: 100        # <= 0 disables the bulkhead
+      max_queue: 100             # <= 0 unbounded
+      max_wait: 1000000000       # <= 0 waits for ctx
+```
+
+```sh
+RESILIENCE_ADAPTER=redis
+RESILIENCE_TIMEOUT=5000000000
+RESILIENCE_BREAKER_ENABLED=true
+RESILIENCE_BULKHEAD_MAXCONCURRENT=100
+```
+
+`retry` is an untagged `retry.Policy`, so its file keys are case-insensitive Go field names (`maxattempts`), not snake_case. Set it in Go via `resilience.Default()` instead. `Validate` rejects negative timeouts and bulkhead budgets, retry jitter outside [0,1], breaker ratios outside [0,1], and a bad Redis prefix. Template options apply to every guard a manager creates, so open one manager per dependency class when thresholds differ.
+
+## Share breaker state across replicas
+
+`memory` (the default) is process-local, so each replica trips on its own view. Use `redis` when replicas calling the same dependency should trip together. Only breaker state is shared. Timeout, retry, and bulkhead stay process-local.
+
+```yaml title="zever.yaml"
+resilience:
+  adapter: redis
+  options:
+    breaker:
+      enabled: true
+    redis:
+      addr: 127.0.0.1:6379
+      prefix: resilience   # default; use one per environment
+```
+
+The redis adapter pings at construction (3s budget) and fails closed when Redis is unreachable. Live redis tests are gated behind `REDIS_ADDR`.
+
+| Adapter | Package | Notes |
+|---|---|---|
+| `memory` | `adapters/resilience/inproc` | Default. Every policy process-local. |
+| `redis` | `adapters/resilience/redis` | Distributed breaker state. |
+
+## Production checklist
+
+- `Manager.Close() error` takes no context. The container joins errors with `errors.Join`; panics become `*ClosePanicError`.
+- Guard names and options carry no credentials, but never log raw option maps (use `config.RedactedServices`).
+- Use the `OnStateChange` hook to feed breaker transitions into [Observability](../observability/).
+
+## Troubleshooting
+
+<details>
+<summary>The breaker never opens under load</summary>
+
+`failure_ratio` and `min_requests` assume meaningful volume. Low-traffic dependencies trip on `consecutive_failures`, so lower it for fast-failing dependencies.
+</details>
+
+<details>
+<summary>Calls fail with `ErrTimeout` before the dependency's own deadline</summary>
+
+The guard timeout wraps retries. Make `timeout` exceed `base_delay * attempts` plus the dependency latency, or lower `max_attempts`.
+</details>
+
+<details>
+<summary>`ErrBulkheadFull` under burst</summary>
+
+`max_concurrent` is too low for the replica, or `max_wait` is shorter than a slot takes to free. Raise `max_concurrent` before `max_queue`, since an unbounded queue turns a burst into a latency bomb.
+</details>
+
+<details>
+<summary>The redis adapter fails to open</summary>
+
+The constructor pings Redis with a 3s budget and fails closed. Check `addr`, and use a unique prefix per environment because shared prefixes share breaker state.
+</details>
+
+## Related
+
+<CardGrid>
+  <LinkCard title="Rate limiting" href="../../security/ratelimit/" description="Request-rate caps per key." />
+  <LinkCard title="Locks and idempotency" href="../../security/lock-idempotency/" description="Guard calls inside a guard." />
+  <LinkCard title="Observability" href="../observability/" description="Breaker transitions as metrics." />
+</CardGrid>

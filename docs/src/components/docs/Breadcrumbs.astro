@@ -6,7 +6,7 @@ const { group, title } = Astro.props;
 
 <nav class="zp-crumbs" aria-label="Breadcrumb">
   <ol>
-    <li><a href={import.meta.env.BASE_URL + "getting-started/introduction/"}>Docs</a></li>
+    <li><a href={import.meta.env.BASE_URL + "start/introduction/"}>Docs</a></li>
     {group && group !== title && <li><span>{group}</span></li>}
     <li><span aria-current="page">{title}</span></li>
   </ol>

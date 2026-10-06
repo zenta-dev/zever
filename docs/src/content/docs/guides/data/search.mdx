@@ -1,0 +1,177 @@
+---
+title: Search
+description: Index documents and run ranked full-text queries on sqlite, postgres, or Meilisearch.
+---
+
+import { Tabs, TabItem, LinkCard, CardGrid } from '@astrojs/starlight/components';
+
+`search.Search` gives one interface to index documents and run ranked queries with filters and paging, so your query surface does not change when the backend does. Use it for user-typed queries over spaces, bookings, or help articles. It ranks by full-text relevance. For embedding similarity, use the [vector store](../vectorstore/).
+
+## Quick start
+
+Choose a backend by what you already run.
+
+- `db` with a sqlite path or `:memory:` is embedded FTS. It is the default and best for tests and small corpora.
+- `db` with a postgres URL reuses your relational database, with no second datastore.
+- `meilisearch` is a dedicated cluster with the best ranking and latency, at the cost of another service.
+
+<Tabs>
+  <TabItem label="sqlite">
+```yaml title="zever.yaml"
+search:
+  adapter: db
+  options:
+    dsn: ./data/search.db
+```
+  </TabItem>
+  <TabItem label="postgres">
+```yaml title="zever.yaml"
+search:
+  adapter: db
+  options:
+    dsn: postgres://app:secret@db:5432/app
+```
+  </TabItem>
+  <TabItem label="meilisearch">
+```yaml title="zever.yaml"
+search:
+  adapter: meilisearch
+  options:
+    host: http://localhost:7700
+    api_key: dev-only-key
+```
+  </TabItem>
+  <TabItem label="env">
+```sh
+SEARCH_ADAPTER=meilisearch
+SEARCH_HOST=http://localhost:7700
+SEARCH_API_KEY=dev-only-key
+SEARCH_DSN=postgres://app:secret@db:5432/app
+```
+  </TabItem>
+</Tabs>
+
+`host` is the Meilisearch URL and must include a scheme and host. `dsn` is a postgres URL or sqlite path. `dedicated_pool: true` opts out of sharing one pool per exact DSN. The old `postgres` and `sqlite` names remain aliases of `db`, but new files should use `db`. File decoding is strict, and secrets belong in files or env, never committed plaintext. See the [search options](../../../reference/config/#search).
+
+## Resolve the service
+
+The container wires no adapters, so register `db` first.
+
+```go title="main.go"
+import (
+	searchdb "github.com/zenta-dev/zever/adapters/search/db"
+	"github.com/zenta-dev/zever/config"
+	"github.com/zenta-dev/zever/container"
+)
+
+searchdb.Register()
+c := container.New(config.Default())
+s, err := c.Search()
+```
+
+`Search()` resolves lazily, caches, and retries after an error. `search.Search` closes with `Close() error`, as a snapshot service with no leaf ordering.
+
+## Index and query documents
+
+Batch indexing validates every document before writing any.
+
+```go title="main.go"
+package main
+
+import (
+	"context"
+	"fmt"
+
+	searchdb "github.com/zenta-dev/zever/adapters/search/db"
+	"github.com/zenta-dev/zever/core/search"
+)
+
+func main() {
+	searchdb.Register()
+	s, err := search.Open(search.DB, search.Options{DSN: ":memory:"})
+	if err != nil {
+		panic(err)
+	}
+	defer s.Close()
+	ctx := context.Background()
+
+	err = s.IndexBatch(ctx, []search.Document{
+		{ID: "space-1", Index: "spaces", Content: "sunny loft downtown with balcony"},
+		{ID: "space-2", Index: "spaces", Content: "quiet cabin near lake, slow wifi"},
+	})
+	if err != nil {
+		panic(err)
+	}
+	res, err := s.Search(ctx, "loft downtown", search.QueryOptions{
+		Limit:   10,
+		Filters: map[string]string{"index": "spaces"},
+	})
+	if err != nil {
+		panic(err)
+	}
+	fmt.Println("total", res.Total)
+	for _, h := range res.Hits {
+		fmt.Println(h.ID, h.Score)
+	}
+}
+```
+
+```text
+total 1
+space-1 <score>
+```
+
+The score varies by backend. `Total` counts all matches regardless of `Limit` and `Offset`, so `len(res.Hits)` can be smaller. `Limit <= 0` selects the default of 10 hits. Only the `index` filter key is honored, and it scopes the query to one collection.
+
+## Choose an adapter
+
+| Adapter | Package | Notes |
+|---|---|---|
+| `db` | `search/db` | Default. sqlite path or `:memory:`, or a postgres URL |
+| `sqlite`, `postgres` | `search/db` | Legacy aliases of `db` |
+| `meilisearch` | `search/meilisearch` | External cluster, needs `host` and `api_key` |
+
+All serve `Index`, `IndexBatch`, `Delete`, `Search`, and `Close`. Promoting `sqlite` to `meilisearch` takes a config change and a reindex. See the [adapters matrix](../../../reference/adapters-matrix/).
+
+## Production checklist
+
+- Index after a save through a job, not inline in reads. Version the index schema with your `.zen` schema.
+- Use `IndexBatch` for bulk imports. Per-document `Index` in a loop costs one round trip each. The batch path uses a native bulk API, a multi-row statement, or a wrapping transaction.
+- Track document IDs at index time. Some backends cannot delete by query.
+- `Document.Validate` rejects metadata that cannot marshal to JSON, before any backend I/O.
+- Never log `api_key` or full DSNs. Display config through `config.RedactedServices`.
+- Close order: search closes after scheduler and job stop, so in-flight indexing finishes first, and before leaf cache and queue.
+
+## Troubleshooting
+
+<details>
+<summary>`host must be a valid url with scheme and host`</summary>
+
+Cause: Meilisearch `host` is a bare `localhost:7700`. Fix: use `http://localhost:7700` (or `https://`), under `search.options.host`.
+</details>
+
+<details>
+<summary>Results mix spaces with help articles</summary>
+
+Cause: `Filters["index"]` is missing or misspelled, and an empty filter searches broadly. Fix: always pass `map[string]string{"index": "spaces"}` and assert it in tests.
+</details>
+
+<details>
+<summary>`len(hits)` is smaller than `Total`</summary>
+
+Cause: paging works as designed. Fix: loop with `Offset` until covered, and show `Total` as the count.
+</details>
+
+<details>
+<summary>sqlite works locally but postgres fails in staging</summary>
+
+Cause: `dsn` still holds a sqlite path while the target is postgres, or the role lacks index tables. Fix: use a path for sqlite and a URL for postgres, migrate index tables, then reindex from source rows.
+</details>
+
+## Related
+
+<CardGrid>
+  <LinkCard title="Vector store" href="../vectorstore/" description="Semantic similarity search." />
+  <LinkCard title="Storage and media" href="../storage-media/" description="Blob metadata that feeds the index." />
+  <LinkCard title="Scheduler and jobs" href="../../background/scheduler-jobs/" description="Background reindex jobs." />
+</CardGrid>

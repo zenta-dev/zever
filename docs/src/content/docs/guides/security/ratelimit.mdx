@@ -1,0 +1,106 @@
+---
+title: Rate limiting
+description: Bound request rates per key with token buckets in memory or shared over Redis.
+---
+
+import { LinkCard, CardGrid } from '@astrojs/starlight/components';
+
+`ratelimit` bounds how fast one key (user, IP, API token) can use an endpoint. `Limiter.Allow` is a token bucket returning a `Decision` with `Allowed`, `RetryAfter`, and `Remaining`. It stays unopinionated about HTTP: mapping a denial to `429`, and choosing fail-open or fail-closed on limiter error, is your call.
+
+## Quick start
+
+`rate` (refill per second) and `burst` (bucket size) are both required, over zero, and finite. The default is `memory` with `rate: 10`, `burst: 20`.
+
+```yaml title="zever.yaml"
+ratelimit:
+  adapter: memory
+  options:
+    rate: 10
+    burst: 20
+```
+
+```go title="main.go"
+rl, err := c.RateLimit() // c.Ratelimit() is an alias
+if err != nil {
+    return err
+}
+defer rl.Close()
+for i := 0; i < 3; i++ {
+    dec, err := rl.Allow(ctx, "book:guest-1", 1)
+    fmt.Println(dec.Allowed, dec.Remaining, err)
+}
+```
+
+Expected output (with `rate: 10`, `burst: 20`; `Remaining` follows your config):
+
+```text
+true 19 <nil>
+true 18 <nil>
+true 17 <nil>
+```
+
+## Limit a request path
+
+The bookings handler calls `Allow(ctx, "book:"+guest, 1)` first, returns `429` when `!dec.Allowed`, and returns `500` when the limiter itself errors. Charges cap at burst size, so one oversized request cannot drain more than the bucket holds. Generated servers wire `middleware.RateLimit` (HTTP, `429` with `Retry-After`) and a gRPC interceptor (`ResourceExhausted`) when the schema enables it. Both fail open by default, and `WithFailMode(FailClosed)` opts in per endpoint.
+
+## Share limits across replicas
+
+Per-instance buckets multiply the effective limit (`limit x replica count`). Switch to `redis` once more than one replica serves traffic.
+
+```yaml title="zever.yaml"
+ratelimit:
+  adapter: redis
+  options:
+    rate: 100
+    burst: 200
+    redis:
+      addr: 127.0.0.1:6379
+      prefix: rl:
+```
+
+```sh
+RATELIMIT_ADAPTER=redis
+RATELIMIT_RATE=100
+RATELIMIT_BURST=200
+```
+
+Give each environment its own `redis.prefix` so staging traffic never consumes production budget. Durations in files are integer nanoseconds (`idle_ttl` default 10m, `sweep_interval` default 1m, zero selects the default); env accepts `"5s"` strings. `Validate` rejects non-positive or non-finite `rate`/`burst`, negative `idle_ttl`/`sweep_interval`, and bad Redis `addr` or `prefix`. All keys: [ratelimit config reference](../../../reference/config/#ratelimit).
+
+| Adapter | Package | Notes |
+|---|---|---|
+| `memory` | `ratelimit/memory` | Default. Process-local bucket. |
+| `redis` | `ratelimit/redis` | Shared counters across replicas. |
+
+## Production checklist
+
+- `Limiter.Close() error` takes no context. The container closes only resolved services and joins errors with `errors.Join`; panics become `*ClosePanicError`.
+- Keys can be PII (IP, user ID). `InvalidKeyError` reports only length for that reason.
+- Never log raw option maps. Use `config.RedactedServices`.
+
+## Troubleshooting
+
+<details>
+<summary>The effective limit looks multiplied</summary>
+
+Replicas run `memory` buckets. Move to `redis`, or divide the per-instance rate by the replica count as a stop gap.
+</details>
+
+<details>
+<summary>`rate must be > 0 and finite`</summary>
+
+`rate` and `burst` are required, and an empty options block fails `Validate`. Set both explicitly (the bookings `zever.yaml` uses `rate: 10`, `burst: 20`).
+</details>
+
+<details>
+<summary>`InvalidKeyError` on `Allow`</summary>
+
+Keys cap at 256 bytes (`MaxKeyLen`) with no control bytes. Hash or truncate long composite keys first.
+</details>
+
+## Related
+
+<CardGrid>
+  <LinkCard title="Locks and idempotency" href="../lock-idempotency/" description="Booking-path guards." />
+  <LinkCard title="Queue" href="../../background/queue/" description="Shed load behind a queue." />
+  <LinkCard title="Observability" href="../../operate/observability/" description="Count denials as metrics." />
+</CardGrid>

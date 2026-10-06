@@ -1,5 +1,6 @@
 ---
 import SidebarRestorePoint from '@astrojs/starlight/components/SidebarRestorePoint.astro';
+import { GROUP_TAB } from './NavRoute';
 
 type Entry = any;
 interface Props { sublist: Entry[]; nested?: boolean }
@@ -20,12 +21,20 @@ const ICONS: Record<string, string> = {
   Reference: '<path d="M4 4h12a4 4 0 0 1 4 4v12H8a4 4 0 0 1-4-4V4Z"/><path d="M8 9h8M8 13h6"/>',
   Contribute: '<path d="M20.8 4.6a5.5 5.5 0 0 0-7.8 0L12 5.7l-1-1.1a5.5 5.5 0 0 0-7.8 7.8l1 1.1L12 21l7.8-7.5 1-1.1a5.5 5.5 0 0 0 0-7.8Z"/>',
 };
+ICONS.Start = ICONS['Getting Started'];
+ICONS['HTTP APIs'] = '<circle cx="12" cy="12" r="9"/><path d="M3 12h18M12 3a14 14 0 0 1 0 18M12 3a14 14 0 0 0 0 18"/>';
+ICONS['Data and storage'] = ICONS['Database & ORM'];
+ICONS['Background work'] = '<circle cx="12" cy="12" r="9"/><path d="M12 7v5l3 2"/>';
+ICONS.Operate = '<path d="M12 15a3 3 0 1 0 0-6 3 3 0 0 0 0 6Z"/><path d="M19.4 15a1.7 1.7 0 0 0 .3 1.8l.1.1a2 2 0 1 1-2.8 2.8l-.1-.1a1.7 1.7 0 0 0-1.8-.3 1.7 1.7 0 0 0-1 1.5V21a2 2 0 1 1-4 0v-.1a1.7 1.7 0 0 0-1.1-1.5 1.7 1.7 0 0 0-1.8.3l-.1.1a2 2 0 1 1-2.8-2.8l.1-.1a1.7 1.7 0 0 0 .3-1.8 1.7 1.7 0 0 0-1.5-1H3a2 2 0 1 1 0-4h.1a1.7 1.7 0 0 0 1.5-1.1 1.7 1.7 0 0 0-.3-1.8l-.1-.1a2 2 0 1 1 2.8-2.8l.1.1a1.7 1.7 0 0 0 1.8.3H9a1.7 1.7 0 0 0 1-1.5V3a2 2 0 1 1 4 0v.1a1.7 1.7 0 0 0 1 1.5 1.7 1.7 0 0 0 1.8-.3l.1-.1a2 2 0 1 1 2.8 2.8l-.1.1a1.7 1.7 0 0 0-.3 1.8V9a1.7 1.7 0 0 0 1.5 1H21a2 2 0 1 1 0 4h-.1a1.7 1.7 0 0 0-1.5 1Z"/>';
+ICONS.Integrations = '<path d="M9 2v6M15 2v6M6 8h12v4a6 6 0 0 1-12 0V8ZM12 18v4"/>';
+ICONS.Extend = '<path d="M14.7 6.3a4 4 0 0 0-5.4 5.4L3 18v3h3l6.3-6.3a4 4 0 0 0 5.4-5.4l-2.6 2.6-2.4-.6-.6-2.4 2.6-2.6Z"/>';
+ICONS.Concepts = ICONS.Architecture;
 const FALLBACK = '<circle cx="12" cy="12" r="3"/><circle cx="12" cy="12" r="9"/>';
 ---
 
 <ul class:list={{ 'zv-list': true, 'zv-top': !nested }}>
   {sublist.map((entry) => (
-    <li data-ref={!nested && entry.label === 'Reference' ? '' : undefined}>
+    <li data-tab-of={!nested ? GROUP_TAB[entry.label] : undefined}>
       {entry.type === 'link' ? (
         <a
           href={entry.href}

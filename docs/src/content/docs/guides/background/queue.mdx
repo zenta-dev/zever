@@ -1,0 +1,223 @@
+---
+title: Queue
+description: Push, pop, ack, and nack durable jobs on memory, Redis, or a database table, shared by the job dispatcher and scheduler.
+---
+
+import { LinkCard, CardGrid, Tabs, TabItem } from '@astrojs/starlight/components';
+
+`queue.Queue` is the durable transport behind `job.Dispatcher` and the scheduler. Use it when work must outlive the request, survive a restart, retry with backoff, or fan out to workers. Messages carry UUIDv7 ids.
+
+## Quick start
+
+```yaml title="zever.yaml"
+queue:
+  adapter: memory
+  options:
+    visibility_timeout: 30000000000 # 30s, integer nanoseconds in files
+    poll_timeout: 1000000000        # 1s
+    buffer: 100
+```
+
+```go title="main.go"
+package main
+
+import (
+	"context"
+	"errors"
+	"fmt"
+	"time"
+
+	queuememory "github.com/zenta-dev/zever/adapters/queue/memory"
+	"github.com/zenta-dev/zever/core/queue"
+)
+
+func main() {
+	if err := run(); err != nil {
+		panic(err)
+	}
+}
+
+func run() error {
+	q, err := queuememory.New(queue.Options{
+		VisibilityTimeout: 30 * time.Second,
+		PollTimeout:       time.Second,
+		Buffer:            100,
+	})
+	if err != nil {
+		return err
+	}
+	defer func() { _ = q.Close() }()
+
+	ctx := context.Background()
+	payload := queue.NewPayload([]byte(`{"booking_id":"b_123"}`))
+	headers := queue.NewHeaders(map[string]string{"job_name": "SendConfirmation"})
+	if err := q.Push(ctx, "default", payload, headers); err != nil {
+		return err
+	}
+
+	msg, err := q.Pop(ctx, "default")
+	if errors.Is(err, queue.ErrEmpty) {
+		fmt.Println("empty, poll again")
+		return nil
+	}
+	if err != nil {
+		return err
+	}
+	fmt.Println("popped", msg.ID)
+
+	if err := q.Ack(ctx, msg); err != nil {
+		return err
+	}
+	fmt.Println("acked")
+
+	n, err := q.Length(ctx, "default")
+	if err != nil {
+		return err
+	}
+	fmt.Println("remaining", n)
+	return nil
+}
+```
+
+Output: a popped id, then `acked`, then `remaining 0`.
+
+## Ack or nack a message
+
+Call `Ack` on success. On a transient failure, call `Nack(ctx, msg, true)` so the message reappears after `visibility_timeout`.
+
+`Pop` on an empty topic returns `ErrEmpty`, an expected result: always handle it. `Length` and `IsEmpty` are autoscaling signals, not pop control flow. `Name()` reports the adapter for health output.
+
+## Choose an adapter
+
+| Adapter | Package | Use when |
+|---|---|---|
+| `memory` | `adapters/queue/memory` | Default. One process: tests, local dev, a single-binary worker. No infra. |
+| `redis` | `adapters/queue/redis` | More than one worker process, or split web and worker tiers. Keyed by `prefix`. |
+| `db` | `adapters/queue/db` | Shared queue without Redis, on a postgres or sqlite table you already run. |
+
+Only `redis` and `db` let another host pop a message.
+
+`db` is a polling transport, not a Kafka or SQS replacement. `Pop` polls every `poll_interval`, claims serialize on the topic head, and stale claims recover on a sweep. Expect low thousands of jobs per second per topic. Use a separate queue database with 3 to 5 connections per worker (Rails Solid Queue guidance) and `dedicated_pool: true` under sustained load.
+
+The queue is not an event log or pub/sub bus: it has per-topic pop with ack tracking, no broadcast replay. For live fan-out, use the [event bus](../events/).
+
+## Configure Redis or database sharing
+
+<Tabs>
+  <TabItem label="Redis">
+```yaml title="zever.yaml"
+queue:
+  adapter: redis
+  options:
+    addr: localhost:6379
+    db: 0
+    prefix: bookings
+```
+```sh
+QUEUE_ADAPTER=redis
+QUEUE_ADDR=localhost:6379
+QUEUE_VISIBILITY_TIMEOUT=30s
+```
+  </TabItem>
+  <TabItem label="Database">
+```yaml title="zever.yaml"
+queue:
+  adapter: db
+  options:
+    dsn: postgres://app:secret@db:5432/app  # postgres URL or sqlite path
+    table: queue_messages
+```
+```sh
+QUEUE_ADAPTER=db
+QUEUE_DSN=postgres://app:secret@db:5432/app
+QUEUE_TABLE=queue_messages
+```
+  </TabItem>
+</Tabs>
+
+File keys are strict snake_case with integer-nanosecond durations. Env accepts `"30s"`. An empty `dsn` selects a private in-memory-style database.
+
+- `visibility_timeout`: how long a popped message stays invisible before it can be reclaimed.
+- `poll_timeout`: how long `Pop` waits before returning empty.
+- `buffer`: caps buffered ready messages per topic.
+
+The container shares one pool per exact DSN across db-backed batteries (the first opener's `max_conns` wins, a differing nonzero cap warns). All keys: [queue config reference](../../../reference/config/#queue).
+
+## Resolve the queue from the container
+
+```go title="main.go"
+import (
+	"github.com/zenta-dev/zever/config"
+	"github.com/zenta-dev/zever/container"
+)
+
+func openQueue() error {
+	c := container.New(config.Default())
+	q, err := c.Queue()
+	if err != nil {
+		return err
+	}
+	defer func() { _ = q.Close() }()
+	d, err := c.Job() // d.Q is the shared queue instance
+	if err != nil {
+		return err
+	}
+	_ = d
+	return nil
+}
+```
+
+`Queue()` resolves lazily and caches; on error the cache clears so the next call retries. `Job()` builds a `*job.Dispatcher` over the resolved queue, so both share one connection.
+
+`Close() error` takes no context. The queue is a leaf dependency and closes last, after scheduler and job. Container `Close(ctx)` never opens an untouched queue. See [the container](../../../concepts/container/).
+
+## Production checklist
+
+- Design for redelivery: the queue promises pop, ack, and reclaim, not exactly-once. Make handlers idempotent or guard them with `lock` or `idempotency` keys.
+- Keep `visibility_timeout` above the slowest handler. The bookings webhook block uses a 10s timeout against 30s.
+- Use a low `poll_timeout` in request-scoped pops and a higher one in workers.
+- There is no cross-topic ordering. Priority is the topic order a worker polls (`default` before `low`).
+- Keep payloads small, versioned JSON. Never log payloads that may carry PII: log ids and topic names, and display config through `config.RedactedServices`.
+- Close order: scheduler and job, then snapshots, then `queue` and `cache`.
+
+## Troubleshooting
+
+<details>
+<summary>The same job runs twice within seconds</summary>
+
+Cause: `visibility_timeout` is shorter than handler runtime, so the message is reclaimed mid-run.
+
+Fix: raise it above p99 handler latency plus retry backoff, or move slow I/O behind a second dispatch.
+</details>
+
+<details>
+<summary>Pop spins hot and ErrEmpty floods the logs</summary>
+
+Cause: a tight poll loop with near-zero `poll_timeout` on an idle topic.
+
+Fix: raise `poll_timeout` (workers commonly use 1s) and back off after consecutive empties.
+</details>
+
+<details>
+<summary>A worker on host B never sees pushes from host A</summary>
+
+Cause: the `memory` adapter in a scaled deploy. Each process owns a private buffer.
+
+Fix: use `redis` with a shared `addr`, `db`, and `prefix` across tiers. Without Redis, use `db` on one shared database (lower throughput).
+</details>
+
+<details>
+<summary>Strict file load rejects visibilitytimeout</summary>
+
+Cause: the flat pre-rename spelling. File keys are `visibility_timeout` and `poll_timeout`.
+
+Fix: rename both and use integer nanoseconds. Env still accepts `QUEUE_VISIBILITYTIMEOUT` because `_` is ignored.
+</details>
+
+## Related
+
+<CardGrid>
+  <LinkCard title="Scheduler and jobs" href="../scheduler-jobs/" description="The dispatcher and cron layer over this transport." />
+  <LinkCard title="Events and event bus" href="../events/" description="Fan-out that does not need durability." />
+  <LinkCard title="Build a booking API" href="../../../tutorials/build-a-booking-api/" description="The bookings tutorial that uses these queues." />
+</CardGrid>

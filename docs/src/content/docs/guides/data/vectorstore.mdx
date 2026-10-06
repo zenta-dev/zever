@@ -1,0 +1,138 @@
+---
+title: Vector store
+description: Store embeddings and query the closest matches by cosine similarity on sqlite, pgvector, or Qdrant.
+---
+
+import { Tabs, TabItem, LinkCard, CardGrid } from '@astrojs/starlight/components';
+
+`vectorstore.VectorStore` offers `Upsert`, `UpsertBatch`, `Delete`, and `Query` over embeddings, ranked by cosine similarity. Pair it with `ai.Embed`: embed text, upsert the vectors, then query with a fresh embedding.
+
+## Quick start
+
+`db` serves two backends through one name. An empty `dsn` selects embedded sqlite for tests and small datasets. A postgres URL selects `pgvector`, next to your relational data. Move to `qdrant` for a purpose-built vector database at scale. Your code does not change.
+
+<Tabs>
+  <TabItem label="db">
+```yaml title="zever.yaml"
+vectorstore:
+  adapter: db
+  options:
+    dimension: 1536
+    dsn: ":memory:"
+```
+  </TabItem>
+  <TabItem label="qdrant">
+```yaml title="zever.yaml"
+vectorstore:
+  adapter: qdrant
+  options:
+    url: http://localhost:6333
+    api_key: dev-only-key
+```
+  </TabItem>
+  <TabItem label="env">
+```sh
+VECTORSTORE_ADAPTER=db
+VECTORSTORE_DSN=postgres://user:pass@localhost:5432/db
+VECTORSTORE_DIMENSION=1536
+```
+  </TabItem>
+</Tabs>
+
+`dimension` defaults to 1536 (the OpenAI `text-embedding-3-small` size). Set it to match the model that produced your vectors, because a mismatch returns nonsense silently, not an error. Negative values are rejected. `url` must include a scheme and host. `dedicated_pool: true` opts out of sharing one pool per exact DSN. The legacy `sqlite` and `pgvector` names remain aliases of `db`. See the [vectorstore options](../../../reference/config/#vectorstore).
+
+## Upsert and query vectors
+
+The container wires nothing, so register the adapter first. `VectorStore()` resolves lazily, caches, and retries after an error.
+
+```go title="main.go"
+package main
+
+import (
+	"context"
+	"fmt"
+
+	vectorstoredb "github.com/zenta-dev/zever/adapters/vectorstore/db"
+	"github.com/zenta-dev/zever/config"
+	"github.com/zenta-dev/zever/container"
+	"github.com/zenta-dev/zever/core/vectorstore"
+)
+
+func main() {
+	vectorstoredb.Register()
+	ctx := context.Background()
+	c := container.New(config.Default())
+	defer c.Close(ctx)
+
+	vs, err := c.VectorStore()
+	if err != nil {
+		panic(err)
+	}
+	err = vs.UpsertBatch(ctx, []vectorstore.Vector{
+		{ID: "doc-1", Embedding: []float32{1, 0, 0}},
+		{ID: "doc-2", Embedding: []float32{0, 1, 0}},
+	})
+	if err != nil {
+		panic(err)
+	}
+	matches, err := vs.Query(ctx, []float32{1, 0, 0}, 2)
+	if err != nil {
+		panic(err)
+	}
+	for _, m := range matches {
+		fmt.Println("match:", m.ID, m.Score)
+	}
+}
+```
+
+```text
+match: doc-1 1
+match: doc-2 0
+```
+
+The identical vector scores 1 and ranks first. The orthogonal one scores 0.
+
+## Choose an adapter
+
+| Adapter | Package | Notes |
+|---|---|---|
+| `db` | `adapters/vectorstore/db` | Default. Empty DSN is sqlite, a postgres URL is pgvector |
+| `sqlite`, `pgvector` | `adapters/vectorstore/db` | Legacy aliases of `db`; `pgvector` needs `dsn` |
+| `qdrant` | `adapters/vectorstore/qdrant` | Dedicated store; needs `url` and optionally `api_key` |
+
+See the [adapters matrix](../../../reference/adapters-matrix/).
+
+## Production checklist
+
+- `Query` ranks by cosine similarity only. For hybrid full-text plus vector ranking, combine with [search](../search/) in your application.
+- `topK <= 0` defaults to 10. Paginate explicitly for large result sets.
+- Use `UpsertBatch` for batches. Each adapter implements it natively, as a multi-row statement, or as a transaction. Looping `Upsert` costs one round trip per vector.
+- Empty embeddings are rejected before any I/O. `api_key` never appears in logs.
+
+## Troubleshooting
+
+<details>
+<summary>Query results look random</summary>
+
+Cause: `dimension` does not match the embedding model. Fix: align the config value with the model and re-upsert.
+</details>
+
+<details>
+<summary>Writes are slow at scale</summary>
+
+Cause: you loop `Upsert`. Fix: use `UpsertBatch`.
+</details>
+
+<details>
+<summary>`qdrant` fails to resolve</summary>
+
+Cause: `url` lacks a scheme or host. Fix: check `VECTORSTORE_URL` for a missing `http://` first.
+</details>
+
+## Related
+
+<CardGrid>
+  <LinkCard title="AI" href="../../integrations/ai/" description="The Embed call that produces your vectors." />
+  <LinkCard title="Search" href="../search/" description="Full-text search to combine with." />
+  <LinkCard title="Container" href="../../../concepts/container/" description="Lazy resolve and close order." />
+</CardGrid>

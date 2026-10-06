@@ -1,0 +1,143 @@
+---
+title: Locks and idempotency
+description: Guard critical sections with distributed locks and make retried jobs and webhooks take effect once.
+---
+
+import { LinkCard, CardGrid } from '@astrojs/starlight/components';
+
+Use `lock` for mutual exclusion ("only one worker runs this migration now") and `idempotency` for dedupe ("this webhook retried three times takes effect once"). They are two small, separately resolved services. `Locker` offers single-attempt `TryAcquire`, blocking `Acquire` (polls every `retry_interval`, default 50ms), `Extend`, and ownership-checked `Unlock`. `Store` reserves a key with `Begin` and records the outcome with `Complete`, so retries replay the stored result.
+
+## Quick start
+
+Both default to `memory`: single process only. Register the adapters before resolving, since the container wires nothing.
+
+```go title="main.go"
+package main
+
+import (
+    "context"
+    "fmt"
+    "time"
+
+    idemmemory "github.com/zenta-dev/zever/adapters/idempotency/memory"
+    lockmemory "github.com/zenta-dev/zever/adapters/lock/memory"
+    "github.com/zenta-dev/zever/config"
+    "github.com/zenta-dev/zever/container"
+    "github.com/zenta-dev/zever/core/idempotency"
+)
+
+func main() {
+    lockmemory.Register()
+    idemmemory.Register()
+    c := container.New(config.Default())
+    lk, err := c.Lock()
+    if err != nil {
+        panic(err)
+    }
+    idem, err := c.Idempotency()
+    if err != nil {
+        panic(err)
+    }
+
+    ctx := context.Background()
+    lease, ok, err := lk.TryAcquire(ctx, "booking:room-1:2026-01-01:2026-01-03", 30*time.Second)
+    fmt.Println(ok, err)
+    if ok {
+        defer lease.Unlock(ctx)
+    }
+    out, err := idem.Begin(ctx, "booking:req-1", idempotency.BeginOptions{Fingerprint: []byte("guest|room-1")})
+    fmt.Println(out.Replay, err)
+    if !out.Replay {
+        _ = idem.Complete(ctx, "booking:req-1", []byte("guest|room-1"), []byte(`{"status":"confirmed"}`))
+    }
+}
+```
+
+Expected output on fresh stores (the first attempt reserves):
+
+```text
+true <nil>
+false <nil>
+```
+
+A second `Begin` with the same key and fingerprint prints `true <nil>` with the stored bytes.
+
+## Guard a booking path
+
+The bookings handler runs three guards in order: `RateLimit.Allow`, then `Idempotency.Begin` with key `booking:<key>` and a `guest|space|start|end` fingerprint, then `Lock.TryAcquire` on `booking:<space>:<start>:<end>` with a 30s TTL while the overlap check, charge, and insert run.
+
+| Outcome | Status |
+|---|---|
+| Replay of a finished request | Stored bytes returned. |
+| `ErrInProgress` | `409`. |
+| `ErrKeyMismatch` | `400`. |
+
+Key the lock on the contended range and the idempotency key on a stable external ID (webhook event ID, job dedupe key), never on raw payload bytes. Idempotency fails closed on every error path, so an untrusted dedupe check never waves duplicates through.
+
+## Share state across replicas
+
+`memory` is invisible to other replicas, so double booking and duplicate webhook effects become possible with a second instance. Move both to `redis`, or `idempotency` to `db`.
+
+```yaml title="zever.yaml"
+lock:
+  adapter: redis
+  options:
+    ttl: 30000000000         # 30s lease (nanoseconds in files)
+    retry_interval: 50000000 # 50ms
+    prefix: bookings:
+idempotency:
+  adapter: redis
+  options:
+    ttl: 86400000000000      # 24h reservation
+```
+
+```sh
+LOCK_ADAPTER=redis
+LOCK_TTL=30s
+LOCK_RETRYINTERVAL=50ms
+IDEMPOTENCY_ADAPTER=redis
+IDEMPOTENCY_TTL=24h
+```
+
+Lock `Validate` is a no-op at the core level and each adapter validates its own fields. Idempotency rejects a negative `ttl` (zero means 24h) and bad Redis `addr` or `prefix`. Keys cap at 255 bytes (`MaxKeyLen`). All keys: [lock](../../../reference/config/#lock) and [idempotency](../../../reference/config/#idempotency) config reference.
+
+| Service | Adapter | Package | Notes |
+|---|---|---|---|
+| lock | `memory` | `adapters/lock/memory` | Default. Single process. |
+| lock | `redis` | `adapters/lock/redis` | Distributed leases. |
+| idempotency | `memory` | `adapters/idempotency/memory` | Default. Single process. |
+| idempotency | `redis` | `adapters/idempotency/redis` | Shared dedupe across workers. |
+| idempotency | `db` | `adapters/idempotency/db` | Durable dedupe in the database (`dsn`, `dedicated_pool`). |
+
+## Production checklist
+
+- `Lock.Close(ctx)` takes a context; `Store.Close()` does not. Neither releases caller-held leases or reservations. Held locks expire on their TTL (default 30s), so plan expiry instead of assuming shutdown cleans up.
+- Fingerprints may carry PII. Keep them out of logs, and never log raw option maps (use `config.RedactedServices`).
+
+## Troubleshooting
+
+<details>
+<summary>`409 dates already booked` with no real overlap</summary>
+
+A prior attempt still holds the lock until its 30s TTL lapses, or a crashed worker never unlocked. Wait out the TTL or scope the key tighter, and always `defer Unlock`.
+</details>
+
+<details>
+<summary>`409 booking in progress` never clears</summary>
+
+A `Begin` without a matching `Complete` (crash between the two) stays pending until the TTL. Make `Complete` run on every post-reservation path, or `Forget` the key after investigation.
+</details>
+
+<details>
+<summary>`400 idempotency key mismatch`</summary>
+
+The same key arrived with a different fingerprint, meaning key reuse across payloads. Key on a per-attempt ID (header or body `idempotency_key`), not on guest plus dates alone.
+</details>
+
+## Related
+
+<CardGrid>
+  <LinkCard title="Rate limiting" href="../ratelimit/" description="Pre-guard before reserving." />
+  <LinkCard title="Webhooks" href="../../background/webhooks/" description="Dedupe retried deliveries." />
+  <LinkCard title="Workflows" href="../../background/workflows/" description="Idempotent steps for resumed runs." />
+</CardGrid>

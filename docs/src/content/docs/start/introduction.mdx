@@ -1,0 +1,48 @@
+---
+title: Introduction
+description: What Zever is, how the compiler and container fit together, and where to go next.
+---
+
+import { Steps, CardGrid, LinkCard } from '@astrojs/starlight/components';
+import HeroBanner from '../../../components/docs/mdx/HeroBanner.astro';
+import FeatureCard from '../../../components/docs/mdx/FeatureCard.astro';
+
+<HeroBanner
+  eyebrow="Zever documentation"
+  title="One schema. Every backend concern. <em>Zero rewiring.</em>"
+  lede="Zever is a schema-driven scaffolding compiler for Go. Describe your domain once in .zen, compile it into validation, ORM, OpenAPI, and DDL, then resolve every backend through one container. It is not a web framework: your handlers and business logic stay yours, the plumbing stops being hand-wired."
+/>
+
+## Where to start
+
+<CardGrid>
+  <FeatureCard title="Quickstart" href="/zever/start/quickstart/">
+    Go from an empty folder to a running API in five commands.
+  </FeatureCard>
+  <FeatureCard title="Tutorials" href="/zever/tutorials/overview/">
+    Learn by building, from a first schema to a running Booking API.
+  </FeatureCard>
+  <FeatureCard title="Guides" href="/zever/guides/">
+    Task-focused how-tos for HTTP, data, background work, security, and operations.
+  </FeatureCard>
+  <FeatureCard title="Concepts" href="/zever/concepts/how-zever-works/">
+    One lazy container, explicit adapter registration, and a defined lifecycle.
+  </FeatureCard>
+  <FeatureCard title="Schema syntax" href="/zever/reference/zen-syntax/">
+    Entities, services, RPCs, and attributes in the `.zen` language.
+  </FeatureCard>
+  <FeatureCard title="Reference" href="/zever/reference/cli/">
+    CLI commands, configuration keys, adapter matrix, and API index.
+  </FeatureCard>
+</CardGrid>
+
+## How it fits together
+
+<Steps>
+
+1. **Describe** entities and services in a `.zen` schema ([syntax](../../reference/zen-syntax/)).
+2. **Compile** with `zever compile` into typed ORM, OpenAPI, and migration DDL ([backends](../../concepts/backends/)).
+3. **Wire** services through one lazy `container.Container` ([container](../../concepts/container/)).
+4. **Swap** adapters (sqlite to postgres, memory to redis) by editing config, never call sites ([adapters](../../concepts/providers-adapters/)).
+
+</Steps>

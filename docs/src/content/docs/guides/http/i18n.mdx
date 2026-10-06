@@ -1,0 +1,186 @@
+---
+title: Internationalization
+description: Translate user-facing strings with an embedded catalog locally and a remote catalog in production.
+---
+
+import { Tabs, TabItem, LinkCard, CardGrid } from '@astrojs/starlight/components';
+
+`i18n` resolves user-facing strings per locale. Development embeds the catalog in the binary, and production can pull from a remote service through the same interface. Use it for every visible string (confirmations, emails, error explanations), and never concatenate translated fragments: translators need full sentences with placeholders.
+
+## Quick start
+
+<Tabs>
+  <TabItem label="YAML">
+```yaml
+i18n:
+  adapter: embed   # default: compiled-in catalog
+  options:
+    embed:
+      dir: locales
+      fallback: en
+```
+
+```yaml
+i18n:
+  adapter: remote  # production: shared catalog service
+  options:
+    remote:
+      endpoint: i18n.internal:8080
+      timeout: 30s
+```
+  </TabItem>
+  <TabItem label="Env">
+```sh
+I18N_ADAPTER=remote
+I18N_ENDPOINT=i18n.internal:8080
+```
+  </TabItem>
+</Tabs>
+
+`remote` also takes `api_key`, `max_in_flight`, and `allow_insecure`: see the [Config reference](../../../reference/config/#i18n). `DefaultTimeout` is 30s for remote fetches. The embed filesystem cannot come from YAML, so set it in code (bookings does): `cfg.I18n.Options.Embed = i18n.EmbedOptions{FS: api.LocalesFS, Dir: "locales", Fallback: "en"}`.
+
+Catalogs are JSON per locale:
+
+```json title="locales/en.json"
+{"welcome": "Welcome back!", "hello": "Hello, {Name}!"}
+```
+
+```json title="locales/fr.json"
+{"hello": "Bonjour, {Name}!"}
+```
+
+```go title="main.go"
+import (
+    "github.com/zenta-dev/zever/adapters/i18n/embed"
+    "github.com/zenta-dev/zever/config"
+    "github.com/zenta-dev/zever/container"
+)
+
+embed.Register() // the container wires nothing by itself
+c := container.New(config.Default())
+t, err := c.I18n()
+if err != nil {
+    return err
+}
+
+msg, _ := t.Translate(ctx, "fr", "hello", map[string]string{"Name": "Ada"})
+fmt.Println(msg)
+missing, _ := t.Translate(ctx, "fr", "welcome", nil)
+fmt.Println(missing)
+```
+
+```text
+Bonjour, Ada!
+Welcome back!
+```
+
+A key missing in `fr` falls back to `en`, never an empty string. `I18n()` resolves lazily and caches (a failed call retries). Shutdown needs nothing extra beyond `c.Close(ctx)`.
+
+## Resolve the locale in one place
+
+Resolve in this order: user preference, then `Accept-Language`, then the configured default. Keep it in one helper or middleware so every handler reads the same value.
+
+```go
+func localeOf(r *http.Request, user *User) string {
+    if user != nil && user.Locale != "" {
+        return user.Locale
+    }
+    if h := r.Header.Get("Accept-Language"); h != "" {
+        return parsePrimary(h) // "fr-CA,fr;q=0.9" -> "fr-CA"
+    }
+    return "en"
+}
+```
+
+The lookup chain for `fr-CA` is `fr-CA`, then `fr`, then the fallback; `i18n.BaseLocale` and `i18n.LocaleChain` expose both steps. Pass structured args (`map[string]string`), not pre-formatted strings, because word order differs across languages.
+
+## Write messages
+
+| Pattern | Example |
+|---|---|
+| Simple | `"welcome": "Welcome back!"` |
+| Interpolated | `"hello": "Hello, {Name}!"` |
+| Plural | `"cart.n": "{Count} item / {Count} items"` (CLDR rules per locale) |
+
+## API
+
+| Method or helper | Purpose |
+|---|---|
+| `Translate(ctx, locale, key, args)` | Message for locale and key; falls back on a miss. |
+| `i18n.Open(adapter, opts)` | Open an adapter without the container. |
+| `i18n.Register(adapter, factory)` | Add a custom adapter. |
+| `EmbedOptions{FS, Dir, Fallback}` | Compiled-in catalog: file system, directory, default locale. |
+| `RemoteOptions{Endpoint, Timeout, ...}` | Shared catalog service. |
+| `Options.Validate()` | Reject bad adapter settings at startup. |
+
+Treat catalogs as data: version them with the schema, diff them in review, and deploy them beside the binary (embed) or behind the remote endpoint.
+
+## Test the fallback chain
+
+Assert fallbacks, not specific copy, since translators change text without code review:
+
+```go
+tests := []struct{ locale, key, want string }{
+    {"en", "welcome", "Welcome back!"},
+    {"fr", "missing.key", "fallback English text"},
+}
+for _, tt := range tests {
+    t.Run(tt.key+tt.locale, func(t *testing.T) {
+        got, err := tr.Translate(t.Context(), tt.locale, tt.key, nil)
+        if err != nil {
+            t.Fatal(err)
+        }
+        if got != tt.want {
+            t.Errorf("got %q, want %q", got, tt.want)
+        }
+    })
+}
+```
+
+Use embed in tests: no network, no timing assertions.
+
+## Production checklist
+
+- Always set `fallback` to your source locale so a missing translation degrades to readable text.
+- Pass `r.Context()` so slow remote catalogs cannot hang requests, and cache hot keys in front of `remote`.
+- Option maps can carry endpoint credentials. Display config only through `config.RedactedServices`.
+
+## Troubleshooting
+
+<details>
+<summary>Blank strings in one locale</summary>
+
+No fallback is configured, or your helper returns empty on a miss. Set `fallback` and test the chain.
+</details>
+
+<details>
+<summary>The wrong language is served</summary>
+
+Two resolution points disagree. Centralize `localeOf` and log the resolved locale at debug level.
+</details>
+
+<details>
+<summary>The remote catalog hangs requests</summary>
+
+The fetch ignores the request context, or no timeout is set. Pass `r.Context()` to `Translate` and keep the timeout bounded.
+</details>
+
+<details>
+<summary>Translations change without review</summary>
+
+Catalogs ship outside the binary unversioned. Commit embed catalogs beside the schema, or pin remote catalog versions per release.
+</details>
+
+<details>
+<summary>Placeholder order breaks a language</summary>
+
+Code pre-formats `"Hello " + name`. Pass `map[string]string` args and let each locale order its placeholders.
+</details>
+
+## Related
+
+<CardGrid>
+  <LinkCard title="Sessions" href="../sessions/" description="Store locale preference per user." />
+  <LinkCard title="Validation" href="../validation/" description="Field-named errors worth translating." />
+  <LinkCard title="Configuration" href="../../operate/configuration/" description="File and env layering for adapter choice." />
+</CardGrid>

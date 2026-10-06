@@ -1,0 +1,140 @@
+---
+title: Media processing
+description: Upload, probe, transform, and serve images and video with bounded size, pixel, and URL limits.
+---
+
+import { Tabs, TabItem, LinkCard, CardGrid } from '@astrojs/starlight/components';
+
+`media.Media` bundles the upload pipeline behind `Upload`, `Download`, `DownloadRange`, `Stat`, `Probe`, `Transform`, and `Delete`. It validates IDs, caps decode size, and probes format before you trust a file. For plain blobs and presigned URLs, see [Storage and media](../storage-media/).
+
+## Quick start
+
+`local` (default, `adapters/media/local`) writes under `root` and suits single instances and tests. `s3` (`adapters/media/s3`, needs `bucket`, `region`, and credentials) suits anything that must survive a redeploy or be shared. Transforms call the configured `ffmpeg` and `ffprobe` binaries with either adapter.
+
+<Tabs>
+  <TabItem label="local">
+```yaml title="zever.yaml"
+media:
+  adapter: local
+  options:
+    root: /var/media
+    max_download_bytes: 67108864
+    max_pixels: 50000000
+    presign_ttl: 3600000000000   # nanoseconds
+```
+  </TabItem>
+  <TabItem label="env">
+```sh
+MEDIA_ADAPTER=s3
+MEDIA_BUCKET=my-assets
+MEDIA_REGION=us-east-1
+MEDIA_ACCESS_KEY_ID=...
+MEDIA_SECRET_ACCESS_KEY=...
+MEDIA_FFMPEG=/usr/bin/ffmpeg
+MEDIA_FFPROBE=/usr/bin/ffprobe
+```
+  </TabItem>
+</Tabs>
+
+| Key | Default | Notes |
+|---|---|---|
+| `max_download_bytes` | 64 MiB | Rejects negatives |
+| `max_pixels` | 52428800 | Decode cap |
+| `derived_ttl` | 10m | |
+| `presign_ttl` | 1h | Max 7 days |
+| `max_duration` | unlimited | Zero means unlimited |
+| `region` | `us-east-1` | |
+| `ffmpeg`, `ffprobe` | `ffmpeg`, `ffprobe` | Names or absolute paths |
+
+Other keys are `root`, `base_url`, `endpoint`, `bucket`, `access_key_id`, and `secret_access_key`. File durations are integer nanoseconds, and env accepts `"1h"`. `Validate` rejects negative bounds. See the [media options](../../../reference/config/#media).
+
+## Upload and probe an asset
+
+`Upload` generates the asset ID, so use `asset.ID` (not your path) for later calls. `Media()` resolves lazily, caches, and retries after an error.
+
+```go title="main.go"
+package main
+
+import (
+	"context"
+	"fmt"
+	"os"
+
+	"github.com/zenta-dev/zever/config"
+	"github.com/zenta-dev/zever/container"
+	"github.com/zenta-dev/zever/core/media"
+)
+
+func main() {
+	ctx := context.Background()
+	c := container.New(config.Default())
+	defer c.Close(ctx)
+
+	m, err := c.Media()
+	if err != nil {
+		panic(err)
+	}
+	raw, err := os.ReadFile("testdata/avatar.png")
+	if err != nil {
+		panic(err)
+	}
+	asset, err := m.Upload(ctx, "avatar.png", raw, media.UploadOptions{ContentType: "image/png"})
+	if err != nil {
+		panic(err)
+	}
+	info, err := m.Stat(ctx, asset.ID)
+	if err != nil {
+		panic(err)
+	}
+	probe, err := m.Probe(ctx, asset.ID)
+	if err != nil {
+		panic(err)
+	}
+	fmt.Println("size:", info.Size)
+	fmt.Println("format:", probe.Format)
+}
+```
+
+```text
+size: 48210
+format: png
+```
+
+Values vary with your file. Assert on the shape: a size line, then a format line. `Transform` takes `media.TransformOps` (`Width`, `Height`, `Format`, `Quality`, `Bitrate`, `CRF`, `Offset`) and returns the new asset ID.
+
+## Production checklist
+
+- `ValidID` accepts only ASCII letters, digits, hyphens, and underscores. It rejects empty, `.`, `..`, and anything containing `..`, which blocks path traversal. Never build a storage key from a raw caller ID.
+- Decoded images are capped at `max_pixels` and downloads at `max_download_bytes`, so a crafted image cannot exhaust memory.
+- A `presign_ttl` over 7 days fails `Validate()` with `InvalidOptionsError`. It is rejected, not clamped.
+- Pin `ffmpeg` and `ffprobe` paths in config so deploys do not depend on `PATH`.
+- `access_key_id` and `secret_access_key` never appear in logs.
+
+## Troubleshooting
+
+<details>
+<summary>`Stat` or `Download` fails on an ID you just uploaded</summary>
+
+Cause: the ID failed `ValidID`, usually because you passed your own path instead of `asset.ID`. Fix: use the ID that `Upload` returned, and sanitize caller input.
+</details>
+
+<details>
+<summary>Transforms fail with "binary not found"</summary>
+
+Cause: `ffmpeg` or `ffprobe` is missing on this machine. Fix: install them or set absolute paths in config. The storage adapter does not affect this.
+</details>
+
+<details>
+<summary>Startup fails with `InvalidOptionsError` on `presign_ttl`</summary>
+
+Cause: the TTL exceeds 7 days. Fix: lower it. The limit is enforced, not clamped.
+</details>
+
+## Related
+
+<CardGrid>
+  <LinkCard title="Storage and media" href="../storage-media/" description="The blob layer underneath." />
+  <LinkCard title="Documents" href="../document/" description="Render to PDF or image." />
+  <LinkCard title="Adapters matrix" href="../../../reference/adapters-matrix/" description="Every adapter by service." />
+  <LinkCard title="Container" href="../../../concepts/container/" description="Lazy resolve and close order." />
+</CardGrid>

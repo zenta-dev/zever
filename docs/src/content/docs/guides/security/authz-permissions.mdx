@@ -1,0 +1,115 @@
+---
+title: Authorization
+description: Guard routes and RPCs with allow or deny checks using noop, RBAC, or Casbin.
+---
+
+import { LinkCard, CardGrid } from '@astrojs/starlight/components';
+
+`permission` answers what a caller may do through a pure `Can(subject, action, resource)` check that returns `allow`, `implicit_deny`, or `explicit_deny`. Identity comes from [Authentication](../auth/), and the `authz` middleware composes the two.
+
+## Quick start
+
+Choose the adapter, then resolve the checker. The default `noop` allows everything: fine for local development, never for a protected deployment.
+
+```yaml title="zever.yaml"
+permission:
+  adapter: rbac   # noop (default), rbac, casbin
+```
+
+```sh
+PERMISSION_ADAPTER=rbac
+```
+
+```go title="main.go"
+p, err := c.Permission()
+if err != nil {
+    return err // config invalid or policy files unreadable
+}
+```
+
+`rbac` does role checks without external files. `casbin` reads rules from `model_path` and `policy_path`. Full options (`rules`, `roles`, paths) are in the [permission config reference](../../../reference/config/#permission).
+
+## Guard an HTTP route or gRPC call
+
+`authz` has no container accessor. It composes the resolved `Auth()` and `Permission()` instances as `Middleware` (HTTP) and `UnaryServerInterceptor` (gRPC).
+
+```go title="guard.go"
+authn, err := c.Auth()
+if err != nil {
+    return err
+}
+checker, err := c.Permission()
+if err != nil {
+    return err
+}
+guarded := authz.Middleware(authn, checker)(handler)
+guardedUnary := authz.UnaryServerInterceptor(authn, checker)
+```
+
+Requests with a valid token and a matching grant reach the handler. Requests without a grant get a denial status. gRPC calls verify the bearer token, extract the resource id, then check `Can`; denied or errored checks fail the call before the handler runs.
+
+An error from `Can` means the permission system failed (backend unreachable, malformed policy). It is not a denial value, so treat it as a denial and never as "probably fine".
+
+gRPC resource extraction uses `ResourceIDer`. `GetId` (not `GetID`) matches the getter `protoc-gen-go` emits for an `id` field, so generated request types satisfy it with no adapter:
+
+```go
+type ResourceIDer interface {
+    GetId() string
+}
+```
+
+## Choose an adapter
+
+| Adapter | Package | Use when |
+|---|---|---|
+| `noop` | `permission/noop` | Default. Local dev, everything allowed. |
+| `rbac` | `permission/rbac` | In-memory role checks, no files. |
+| `casbin` | `permission/casbin` | Declarative model and policy files. |
+
+| Decision | Meaning |
+|---|---|
+| `allow` | Grant the action. |
+| `implicit_deny` | No rule matched. Fails closed. |
+| `explicit_deny` | A rule refused. Fails closed. |
+
+Unknown roles and missing policies fail closed. Model and policy paths reject `..` traversal and must exist at `Open`, so a bad path fails at startup.
+
+## Production checklist
+
+- Switch off `noop` before any protected deployment and audit the adapter value in the shipped config.
+- Deny by default in callers too: unknown answers and checker errors both deny.
+- Never add a method to the public `Checker` interface. Add a new, smaller interface instead.
+- Keep policy files in version control, review them like code, and sync them across instances or serve them from one source.
+
+## Troubleshooting
+
+<details>
+<summary>Everything is allowed in staging</summary>
+
+The adapter is still `noop`. Set `PERMISSION_ADAPTER=rbac` (or `casbin`) in the deployed env.
+</details>
+
+<details>
+<summary>`Open` fails on policy paths</summary>
+
+The path uses `..` or does not exist. Use a repo-relative path that exists at startup.
+</details>
+
+<details>
+<summary>Denials for valid roles</summary>
+
+The role name or resource string differs from the policy (case, prefix, plural). Compare the exact `Can` arguments with the policy file.
+</details>
+
+<details>
+<summary>`Can` errors under load</summary>
+
+The backing store is unreachable. Treat the error as a denial, alert on the error rate, and check store connectivity.
+</details>
+
+## Related
+
+<CardGrid>
+  <LinkCard title="Authentication" href="../auth/" description="Identity before checks." />
+  <LinkCard title="Adapters matrix" href="../../../reference/adapters-matrix/" description="Use-case guidance per adapter." />
+</CardGrid>

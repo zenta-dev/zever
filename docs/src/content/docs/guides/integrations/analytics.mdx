@@ -1,0 +1,111 @@
+---
+title: Analytics
+description: Track events, identify users, and group them with a log adapter in dev and PostHog in production.
+---
+
+import { LinkCard, CardGrid } from '@astrojs/starlight/components';
+
+`analytics.Analytics` keeps your `Track`, `Identify`, and `Group` calls identical whether events print to stdout or land in PostHog. Use `log` (the default, zero-infra) for development and tests, and switch to `posthog` when events must be durable. Keep calls behind this interface from day one so the swap touches config only.
+
+## Quick start
+
+```yaml title="zever.yaml"
+analytics:
+  adapter: log
+  options:
+    anonymous_id: anonymous
+    group_type: organization
+    max_properties_bytes: 65536
+    max_properties: 100
+```
+
+```sh
+ANALYTICS_ADAPTER=posthog
+ANALYTICS_API_KEY=phc_...
+ANALYTICS_ENDPOINT=https://app.posthog.com
+```
+
+`anonymous_id` (default `"anonymous"`) and `group_type` (default `"organization"`) give every call a fallback identity before real user IDs exist. `endpoint` is optional and needs scheme and host when set. `max_properties_bytes` (default 64KiB) and `max_properties` bound one call payload, and negative values are rejected. See the [analytics config reference](../../../reference/config/#analytics).
+
+```go title="main.go"
+package main
+
+import (
+	"context"
+	"fmt"
+
+	"github.com/zenta-dev/zever/config"
+	"github.com/zenta-dev/zever/container"
+)
+
+func main() {
+	c := container.New(config.Default())
+	ctx := context.Background()
+	defer c.Close(ctx)
+
+	an, err := c.Analytics()
+	if err != nil {
+		fmt.Println("resolve error:", err)
+		return
+	}
+	_ = an.Track(ctx, "signup", map[string]any{"plan": "pro"})
+	_ = an.Identify(ctx, "user-1", map[string]any{"email": "you@example.com"})
+	_ = an.Group(ctx, "user-1", "acme", nil)
+	if err := an.Close(); err != nil {
+		fmt.Println("close error:", err)
+		return
+	}
+	fmt.Println("tracked 1 event for user-1")
+}
+```
+
+Expected output with the `log` adapter:
+
+```text
+{"event":"signup","properties":{"plan":"pro"}}
+{"user":"user-1","traits":{"email":"you@example.com"}}
+{"user":"user-1","group":"acme"}
+tracked 1 event for user-1
+```
+
+## Choose an adapter
+
+| Adapter | Package | Notes |
+|---|---|---|
+| `log` | `analytics/log` | Default. Debug output with no PII redaction. Never a production fallback. |
+| `posthog` | `analytics/posthog` | Real pipeline. Needs `api_key`. |
+
+Where `posthog` mirrors the vendor event shape, field names keep the upstream spelling on purpose. Do not "fix" an oddly cased wire field.
+
+## Production checklist
+
+- `posthog` buffers events. Call `Close()` before process exit or the last batch never leaves the process.
+- A runaway properties map fails fast locally instead of being silently truncated by the backend.
+- Never log raw option maps (use `config.RedactedServices`). Hold the PostHog write key in [Secrets](../../security/secrets/).
+
+## Troubleshooting
+
+<details>
+<summary>Events vanish on shutdown</summary>
+
+You exited without `Close()`. Flush the analytics handle and the container before exit so the buffered batch is delivered.
+</details>
+
+<details>
+<summary>`Validate` rejects `endpoint`</summary>
+
+The URL must parse and include both scheme and host. Check for a missing scheme prefix first.
+</details>
+
+<details>
+<summary>Payload rejected for size</summary>
+
+You exceeded `max_properties_bytes` or `max_properties`. Trim the properties map, or raise the bound deliberately.
+</details>
+
+## Related
+
+<CardGrid>
+  <LinkCard title="Container" href="../../../concepts/container/" description="Lazy resolve and close order." />
+  <LinkCard title="Configuration" href="../../operate/configuration/" description="Layered config." />
+</CardGrid>

@@ -1,0 +1,151 @@
+---
+title: Editor setup
+description: Set up the zever-lsp language server, Neovim, and VS Code for .zen files, plus the CLI inspection loop.
+---
+
+import { Tabs, TabItem, LinkCard, CardGrid } from '@astrojs/starlight/components';
+
+The `.zen` tooling loop is: format and check from the CLI, get inline diagnostics from the `zever-lsp` language server, and keep editor grammars in sync with `make generate`. Use the LSP for daily schema editing. For one-off checks, the CLI alone is enough.
+
+## Install the language server
+
+You need a Go toolchain with `$(go env GOPATH)/bin` on `PATH`, plus Neovim 0.11+ or VS Code. Open the workspace at its root, because the scan starts at the `initialize` root.
+
+```sh
+go install github.com/zenta-dev/zever/tools/zever-lsp@v0.5.3
+# or, from a local clone:
+go install ./tools/zever-lsp
+```
+
+The server takes no config file or flags and speaks LSP over stdio only. There is no `--version` flag: the version is in the `initialize` result's `serverInfo`.
+
+## Connect your editor
+
+<Tabs>
+  <TabItem label="Neovim">
+Load `editors/nvim` as a runtime plugin for filetype detection and highlighting:
+
+```lua
+{
+  'zenta-dev/zever',
+  config = function(plugin)
+    vim.opt.rtp:append(plugin.dir .. '/editors/nvim')
+  end,
+}
+```
+
+LSP registration is not automatic. Add it:
+
+```lua
+vim.lsp.config('zever-lsp', {
+  cmd = { 'zever-lsp' },
+  filetypes = { 'zen' },
+  root_markers = { '.git' },
+})
+vim.lsp.enable('zever-lsp')
+```
+
+Optional format on save:
+
+```lua
+vim.api.nvim_create_autocmd('BufWritePre', {
+  pattern = '*.zen',
+  callback = function(args)
+    vim.lsp.buf.format({ bufnr = args.buf, timeout_ms = 2000 })
+  end,
+})
+```
+  </TabItem>
+  <TabItem label="VS Code">
+Install the extension from `editors/vscode` and keep `zever-lsp` on `$PATH`. The extension is a client only and does not bundle or install the server. Enable `editor.formatOnSave` for the `zen` language to format through the server.
+  </TabItem>
+</Tabs>
+
+To verify, open a `.zen` file, introduce an unknown scalar, and confirm a diagnostic appears (Neovim: `:lua vim.diagnostic.open_float()`; VS Code: Problems panel). Fix it and confirm it clears.
+
+## Run the CLI loop
+
+```sh
+zever fmt --write schema/
+zever check schema/
+echo exit:$?
+```
+
+```text
+fmt: normalized files listed, if any
+check: no diagnostics
+exit:0
+```
+
+| Command | Purpose |
+|---|---|
+| `zever fmt --write <dir>` | Format files in place (without `--write`, list them). |
+| `zever check <dir>` | Report diagnostics. |
+| `zever compile --out ./generated` | Generate backend output. |
+| `zever check-boundaries` | Report cross-module violations (relation, RPC return type, or permission resource reaching into another module). |
+| `zever tinker` | Dev-only Go REPL against a live container. It prints a stderr warning on every start, so never point it at production data. |
+
+All commands: [CLI reference](../../../reference/cli/).
+
+## Regenerate grammars
+
+After you touch `token.Keywords` or `resolver.ScalarTypeNames`, run:
+
+```sh
+make generate
+```
+
+`tools/gengrammar` renders the `editors/nvim` and `editors/vscode` grammar files from those tables. `editors/parity_test.go` diffs the output against the checked-in files, so skipping this step fails the build. Commit the regenerated files.
+
+## Know what the server supports
+
+| Area | Methods |
+|---|---|
+| Sync | `didOpen`, `didChange` (full), `didSave`, `didClose`, `didChangeWatchedFiles` |
+| Diagnostics | `publishDiagnostics` (debounced, per file; clean files get an empty array) |
+| Symbols | `documentSymbol`, `workspace/symbol` |
+| Navigation | `definition`, `references`, `documentHighlight`, `foldingRange` |
+| Hover and completion | `hover`; `completion` (triggers `@`, `:`, space) plus `completionItem/resolve` |
+| Signature help | `signatureHelp` (triggers `(`, `,`) |
+| Formatting | `formatting`, `rangeFormatting` |
+| Actions | `codeAction` (quick fixes for unknown scalars and relation targets) |
+| Rename | `prepareRename`, `rename` (entities, fields, jobs, services, RPCs) |
+| Semantic tokens | `semanticTokens/full` |
+| Inlay hints | `inlayHint` plus resolve (implicit module, `errors:` case annotations) |
+
+The server compiles the workspace in-process with the same resolver as the compiler, so editor and build cannot disagree. The LSP module shares the lockstep release version (`tools/zever-lsp/vX.Y.Z` tags).
+
+## Troubleshooting
+
+<details>
+<summary>`zever-lsp: command not found`</summary>
+
+The binary is not on `PATH`. Re-run `go install` and add `$(go env GOPATH)/bin` to `PATH`.
+</details>
+
+<details>
+<summary>No diagnostics appear</summary>
+
+Confirm the client attached (`:LspInfo` in Neovim, Output panel in VS Code). `didChangeWatchedFiles` rescans only from the root given at `initialize`, so open the right folder.
+</details>
+
+<details>
+<summary>Garbled responses</summary>
+
+Something writes to the server's stdout. Logging goes to stderr by design, so remove wrapper scripts or plugins that merge the streams.
+</details>
+
+<details>
+<summary>Grammars drift after a keyword change</summary>
+
+Run `make generate` and commit the regenerated `editors/nvim` and `editors/vscode` files.
+</details>
+
+## Related
+
+<CardGrid>
+  <LinkCard title="Zen syntax" href="../../../reference/zen-syntax/" description="The language the server speaks." />
+  <LinkCard title="Resolver and IR" href="../../../concepts/resolver-ir/" description="Diagnostics semantics." />
+  <LinkCard title="Backends" href="../../../concepts/backends/" description="Codegen from checked schemas." />
+  <LinkCard title="CLI reference" href="../../../reference/cli/" description="Inspection commands." />
+</CardGrid>

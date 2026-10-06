@@ -1,0 +1,111 @@
+---
+title: Authentication
+description: Issue and verify caller identity with JWT, session, or OIDC behind one interface.
+---
+
+import { Tabs, TabItem, LinkCard, CardGrid } from '@astrojs/starlight/components';
+
+`auth` answers who is calling, never what they may do. One `Issue` / `Verify` / `Revoke` surface covers three styles: stateless bearer tokens (`jwt`), cookie-backed server state (`session`), and delegated login (`oidc`). For password storage see [Password hashing](../password-hashing/), for allow/deny checks see [Authorization](../authz-permissions/).
+
+## Quick start
+
+Set a JWT secret of at least 32 bytes, then resolve the service. `Open` refuses shorter secrets, and `config.Default()` ships no production credentials, so nothing authenticates until you set one.
+
+<Tabs>
+  <TabItem label="YAML">
+```yaml title="zever.yaml"
+auth:
+  adapter: jwt
+  options:
+    jwt:
+      secret: change-me-to-at-least-32-bytes
+```
+  </TabItem>
+  <TabItem label="Env">
+```sh
+AUTH_ADAPTER=jwt
+AUTH_JWT_SECRET=prod-secret-at-least-32-bytes-long
+```
+  </TabItem>
+</Tabs>
+
+```go title="main.go"
+c := container.New(cfg)
+a, err := c.Auth()
+if err != nil {
+    return err // secret too short, or adapter unavailable
+}
+```
+
+`AUTH_JWT_SECRET` maps to `options.jwt.secret` (one nesting level splits at the first underscore). Other keys: `jwt.issuer`, `jwt.audience`, `jwt.max_ttl`, `oidc.issuer`, `oidc.client_id`, `oidc.timeout`. See the [auth config reference](../../../reference/config/#auth).
+
+## Log in and call with a bearer token
+
+Register, log in, then send the returned token on every other route (bookings tutorial shape):
+
+```sh
+curl -s -X POST localhost:8080/api/login \
+  -H 'Content-Type: application/json' \
+  -d '{"email":"you@example.com","password":"correct horse battery staple"}'
+curl -s localhost:8080/api/spaces -H "Authorization: Bearer $TOKEN"
+```
+
+Expected output: login returns `200` with a signed JWT in the `token` field; register returns `201`; calls without a valid bearer token return `401`.
+
+| Method | Role |
+|---|---|
+| `Issue` | Mint a credential after login. |
+| `Verify` | Check a presented credential on each request. |
+| `Revoke` | Invalidate a credential (session-backed adapters). |
+
+`Verify` returns the same generic failure for an invalid and an expired token. A specific message is an enumeration oracle, so log details server-side and never in the response. Token values, JWT secrets, and OIDC client material never appear in errors or logs.
+
+## Choose an adapter
+
+| Adapter | Package | Use when |
+|---|---|---|
+| `jwt` | `auth/jwt` | Default. Stateless APIs, no server-side store. |
+| `session` | `auth/session` | Browsers. Server-revocable cookie-backed state. |
+| `oidc` | `auth/oidc` | An external identity provider owns credentials. |
+
+## Production checklist
+
+- Generate the JWT secret from a CSPRNG (32+ bytes) and keep it in env or a mounted file, never source. See [Secrets](../secrets/).
+- Rotate by issuing under the new secret and accepting the old one during an overlap window.
+- Prefer `session` when you need immediate revocation (logout, ban, role drop). JWTs stay valid until expiry.
+- Rate-limit login and register. Hashing cost does not replace attempt limits, see [Rate limiting](../ratelimit/).
+- Display config only through `RedactedServices` or `Redact`, never raw option maps.
+
+## Troubleshooting
+
+<details>
+<summary>`Open` rejects the JWT secret</summary>
+
+The secret is shorter than 32 bytes (`MinSecretLen`). Set a longer `AUTH_JWT_SECRET`.
+</details>
+
+<details>
+<summary>All logins return 401 after a secret rotation</summary>
+
+Tokens signed with the old secret no longer verify. Log in again, or accept both secrets during the overlap.
+</details>
+
+<details>
+<summary>The session adapter loses logins on restart</summary>
+
+The session store is in memory by default. Point `session` at a shared store for multi-instance deployments.
+</details>
+
+<details>
+<summary>OIDC login loops</summary>
+
+The provider redirect URL and the configured callback disagree. Align the identity provider app registration with the deployed callback URL.
+</details>
+
+## Related
+
+<CardGrid>
+  <LinkCard title="Authorization" href="../authz-permissions/" description="Allow and deny checks after login." />
+  <LinkCard title="Password hashing" href="../password-hashing/" description="Store credentials with Argon2id." />
+  <LinkCard title="Crypto and secrets" href="../crypto-secrets/" description="Encryption and named secrets." />
+</CardGrid>

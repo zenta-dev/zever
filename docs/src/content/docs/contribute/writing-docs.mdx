@@ -1,0 +1,129 @@
+---
+title: Writing docs
+description: The style guide, page types, and templates for Zever documentation.
+---
+
+Write docs that get a reader to a working result fast, then let them go deeper. This page is the rulebook. Follow it when you add or edit any page.
+
+## Choose the page type first
+
+Every page has one job. Mixing jobs is the main reason docs feel long and confusing.
+
+| Type | Reader's question | Lives in | Tone |
+|---|---|---|---|
+| Tutorial | "Teach me." | `tutorials/`, `start/quickstart` | Encouraging, linear, no side trips |
+| How-to guide | "Help me do X." | `guides/` | Direct, task-first, assumes the basics |
+| Concept | "Help me understand." | `concepts/` | Explains why, no step lists |
+| Reference | "Tell me the exact fact." | `reference/` | Neutral, complete, easy to scan |
+
+If a page needs two jobs, split it and link the halves.
+
+## Voice and style
+
+- Write to the reader: second person ("you"), present tense, active voice.
+- Put the condition before the instruction: "If you use Redis, set `cache.adapter`."
+- Keep sentences short (about 20 words) and paragraphs to 4 lines or fewer.
+- Use plain words. Cut "simply", "just", "easily", "note that", and "in order to".
+- Use sentence case for headings. Make headings name the task in guides ("Cache a value with a TTL").
+- Make every H2 self-contained. It should make sense if a reader or an AI agent lands on it alone, so name the subject instead of writing "as above".
+- Use numbered lists for steps, bullets for unordered items, and tables for comparisons.
+- Put code, file names, flags, and config keys in code font. Put UI labels in bold.
+- Write link text that says where the link goes. Never write "click here".
+- Say "Zever" in prose and lowercase `zever` only in code, commands, paths, and URLs.
+- Do not use em dashes or en dashes. Use a comma, colon, period, or parentheses.
+
+## Show code that works
+
+- Every snippet runs as written. Include imports (`github.com/zenta-dev/zever/...`), and show the expected output.
+- Name the file in the code block title: ` ```go title="main.go" `.
+- Verify every config key against `config/schema/zever.schema.json` and the package `options.go`. File keys are snake_case. Environment variables are `<SERVICE>_<FIELD>` with no prefix.
+- Verify every command and flag against `cmd/zever`. Never invent one.
+- Keep guide snippets minimal. Put full option lists in [Config reference](../../reference/config/) and link to the right `#service` anchor.
+- If a package `README.md` holds detail the docs lack, port it.
+
+## Keep it short without losing facts
+
+- Lead with the answer. The first paragraph says what the thing is and when to use it, in two sentences or fewer.
+- Cut backstory, repetition, and marketing. Keep every fact, key, and failure case.
+- Move rarely needed detail into `<details>` blocks or Reference tables.
+- Use at most two callouts (`Aside`) per page. A callout that is always true belongs in the body.
+- Link instead of re-explaining. Each fact has one home.
+
+## Templates
+
+### Tutorial
+
+```md
+---
+title: Build a booking API
+description: Build and run a bookings API from an empty folder.
+---
+
+You will build X. It takes about N minutes. You need Go 1.27+ and Zever installed.
+
+## Create the project
+1. Run `zever new ...`  (then show the expected output)
+
+## Define the schema
+...
+
+## Run it
+...
+
+## What you built
+Two or three lines, then next steps (LinkCards).
+```
+
+### How-to guide (one per battery or task)
+
+```md
+---
+title: Cache
+description: Cache values with a TTL, in memory or in Redis.
+---
+
+One or two sentences: what it is and when to use it.
+
+## Quick start
+Minimal config, minimal code, expected output.
+
+## Cache a value with a TTL        <- task sections, 2 to 5 of them
+## Share the cache across instances
+## Choose an adapter                <- small table, link to the adapters matrix
+## Production checklist             <- short bullets
+## Troubleshooting                  <- symptom, cause, fix, in <details>
+## Related                          <- LinkCards
+```
+
+### Concept
+
+```md
+One-line summary.
+
+## The mental model        (diagram or table)
+## How it works
+## Design decisions and trade-offs
+## Related
+```
+
+### Reference
+
+```md
+One-line summary.
+
+## <Service or command>    <- stable anchor, identical table layout on every entry
+| Key | Type | Default | Description |
+```
+
+## Frontmatter
+
+- `title`: the page name, in sentence case and under 60 characters.
+- `description`: one sentence under 160 characters. Start guides with a verb ("Cache values with a TTL").
+- `sidebar.label`: add it only when the nav needs a shorter name.
+
+## Before you open a pull request
+
+1. Run `npm run build` in `docs/` and fix any warning you introduced.
+2. Run `node scripts/check-links.mjs`. It must report zero broken targets.
+3. Run `node scripts/lint-docs.mjs`. It checks dashes, brand spelling, heading case, and description length.
+4. Add a `CHANGELOG.md` entry under `[Unreleased]` for user-facing changes.

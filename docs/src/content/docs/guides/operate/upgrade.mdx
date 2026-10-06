@@ -1,0 +1,94 @@
+---
+title: Upgrade
+description: Bump a pre-1.0 Zever version safely, read breaking changes, and fix the common breaks.
+---
+
+import { Steps, LinkCard, CardGrid } from '@astrojs/starlight/components';
+
+Zever is pre-1.0, so `0.x` releases may break, and every break ships with a documented fix. Undocumented breaks are bugs: open an issue. This page gives the contract, a repeatable bump procedure, and the known breaks.
+
+| Range | Guarantee |
+|---|---|
+| `0.x` patch or minor | May break. Breaks are listed under `Changed` in `CHANGELOG.md` with a `**Breaking:**` prefix. |
+| `1.0+` (future) | SemVer: majors break, minors add, patches fix. |
+
+Public API changes (new exports, config struct or default changes, serialization changes) get explicit maintainer review and arrive with migration notes.
+
+## Bump a version
+
+<Steps>
+1. Read `CHANGELOG.md` (`## [Unreleased]` plus the target section) for every `**Breaking:**` line.
+2. Bump each Zever module you require, then tidy:
+
+   ```sh
+   go get github.com/zenta-dev/zever/config@v0.5.3 github.com/zenta-dev/zever/container@v0.5.3
+   go mod tidy
+   go install github.com/zenta-dev/zever/cmd/zever@v0.5.3
+   ```
+
+3. Run the gate: `make check` (download, fmt, vet, tidy-check, lint, test-race, vulncheck, build).
+4. Run a smoke test that resolves services:
+
+   ```go title="main.go"
+   c := container.New(config.Default())
+   db, err := c.DB()
+   if err != nil {
+       panic(err)
+   }
+   q, err := c.Queue()
+   if err != nil {
+       panic(err)
+   }
+   fmt.Println("upgrade ok:", db != nil && q != nil)
+   ```
+
+   Expected output: `upgrade ok: true`. Container construction is stable across bumps (`container.New(nil)` stays valid, and `Close(ctx)` closes only resolved services in dependency order), so if this breaks the changelog names the fix.
+5. Re-validate production config files. Strict decoding turns renames into loud failures, which is the desired fail-closed path before rollout. Re-check redaction (`config.RedactedServices`) and close wiring (`Close(ctx)` with a timeout parent).
+</Steps>
+
+Pin the CLI to the bumped version so `zever compile`, `migrate`, and `doctor` match backend behavior and the TUI does not skew from the backend.
+
+## Fix known breaking changes
+
+| Symptom | Cause | Fix |
+|---|---|---|
+| `Load` rejects a previously valid key | Config rename in the bump (`maxconns`, `apikey`, `secretkey`). | Rename to `max_conns`, `api_key`, `secret_key`. Env names are unaffected. See [Configuration](../configuration/) for the full rename table. |
+| `CreateCustomer` no longer compiles | `billing.Billing.CreateCustomer` gained a required idempotency key. | Pass `""` for the old non-idempotent behavior, or a real key for safe retries. |
+| `zen/migrate` import fails | The migration engine moved to `orm/migrate`. | Import `github.com/zenta-dev/zever/orm/migrate`. |
+| Custom `search` or `vectorstore` adapter fails to compile | `search.Search` and `vectorstore.VectorStore` gained batch methods (`IndexBatch`, `UpsertBatch`). | Implement them. Bundled adapters already have them. Compilation failure is the signal, not a runtime surprise. |
+| Editor highlighting misses new keywords | Grammars derive from `token.Keywords` and `resolver.ScalarTypeNames`. | Run `make generate` (`go run ./tools/gengrammar`) and commit the regenerated files. |
+
+```go
+// Before
+cust, err := b.CreateCustomer(ctx, name, email)
+// After
+cust, err := b.CreateCustomer(ctx, "Ada", "ada@example.com", "")
+```
+
+For the multi-module import changes see [Migrate to the multi-module layout](../migration/).
+
+## Know what each gate catches
+
+| Step | Command | Catches |
+|---|---|---|
+| Tidy | `go mod tidy`, `make tidy-check` | `go.mod` and `go.sum` drift. |
+| Format and vet | `make fmt`, `make vet` | Formatting and static faults. |
+| Lint | `make lint` | Style and guard regressions (`.golangci.yml`). |
+| Race tests | `make test-race` | Data races the fast gate skips. |
+| Vulnerability scan | `make vulncheck` (`govulncheck` v1.8.0) | Known dependency CVEs. |
+| Grammars | `make generate` | Stale editor grammars. |
+
+`go test` runs with `-vet=off -count=1` (vet is a separate step). The race and coverage gate runs only on `push` to main and tags, not PRs, so run `make test-race` locally before pushing a bump. Keep timeout tests short (parent about 100ms, block about 500ms) so `goleak.VerifyTestMain` stays green.
+
+## Release process (maintainers)
+
+Releases bump every version pin together (root, LSP, editors, docs; the file list is in the `.github/CONTRIBUTING.md` release checklist) and tag both `vX.Y.Z` and `tools/zever-lsp/vX.Y.Z`. `dsl` carries no release version (schema `v1` and `v2` are API versions). Add user-facing changes to `CHANGELOG.md` under `## [Unreleased]` with every PR, one logical change per commit, using Conventional Commits (`feat`, `fix`, `perf`, `refactor`, `test`, `docs`, `ci`, `build`).
+
+## Related
+
+<CardGrid>
+  <LinkCard title="Migrate to the multi-module layout" href="../migration/" description="Old flat imports to core and adapters." />
+  <LinkCard title="Deployment" href="../deployment/" description="Roll a bumped binary to production." />
+  <LinkCard title="Providers and adapters" href="../../../concepts/providers-adapters/" description="Interface stability rules." />
+  <LinkCard title="Compiler boundary" href="../../../concepts/compiler-boundary/" description="What bumps never move into runtime." />
+</CardGrid>

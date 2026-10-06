@@ -1,96 +1,89 @@
 ---
-title: 'Tutorial: Build an Agent App'
-description: Wire an agent loop, RAG grounding, and an MCP server into a working assistant.
+title: Build an agent app
+description: Wire an agent loop, RAG grounding, and an MCP server into a working support assistant.
 ---
 
-This tutorial builds a small support assistant: it answers questions grounded
-in your docs (RAG), calls tools through an agent loop, and exposes your
-schema to coding agents over MCP. By the end you will have run an agent
-loop, grounded it with retrieval, and served your API as agent tools.
+import { LinkCard, CardGrid } from '@astrojs/starlight/components';
 
-All commands run from the repository root unless noted. You need an `AI_API_KEY`
-for generation and embeddings; retrieval and the MCP server run locally.
+You will build a support assistant that answers from your docs (RAG), calls tools in an agent loop, and exposes your schema to coding agents over MCP. You need an `AI_API_KEY` for generation and embeddings; retrieval and MCP run locally. Run commands from the repository root.
 
-## 1. Resolve the backends
+## Resolve the backends
 
-Every agent app starts from the container. `Agent()` builds a tool-calling
-loop over the shared `AI` backend, and `RAG()` builds a retrieval engine
-over `AI` plus `VectorStore`:
+Every agent app starts from the container. `Agent()` builds a tool-calling loop over the shared `AI` backend, and `RAG()` builds a retrieval engine over `AI` plus `VectorStore`:
 
 ```sh
 AI_ADAPTER=openai AI_API_KEY=sk-... zever doctor --json | head -5
 ```
 
-## 2. Index your docs
+## Index your docs
 
-Ingest documents once, then retrieve top-K context per question. Chunking,
-batch embedding, and upserting are one call:
+Ingest documents once, then retrieve top-K context per question. Chunking, batch embedding, and upserting are one call:
 
 ```sh
 # Conceptually: engine.Ingest(ctx, docs) then engine.Answer(ctx, query, 5)
-# See core/rag/rag.go and the RAG section of digging-deeper/ai.
+# See core/rag/rag.go and the RAG section of the AI guide.
 ```
 
-## 3. Run the loop with tools
+## Run the loop with tools
 
-Register domain tools, then run. Unknown tools fail closed; handler errors
-return to the model as tool turns for self-correction:
+Register domain tools, then run. Unknown tools fail closed, and handler errors return to the model as tool turns so it can self-correct:
 
 ```sh
 # Conceptually: agent.New(client, agent.Options{Model: "gpt-4o", Tools: tools})
 # then loop.Run(ctx, messages). See core/agent/agent.go.
 ```
 
-## 4. Stream progress and fan out
+## Stream progress and fan out
 
-Long runs stream deltas, tool calls, and results as events. Independent
-tool calls in one step run concurrently with `MaxParallel`, preserving
-result order:
+Long runs stream deltas, tool calls, and results as events. Independent tool calls in one step run concurrently with `MaxParallel`, and results keep their order:
 
 ```sh
 # Conceptually: loop.RunStream(ctx, messages) then range over events.
 # See core/agent/stream.go.
 ```
 
-## 5. Serve your API as agent tools
+## Serve your API as agent tools
 
-Compile the schema to an MCP manifest and run the stdio server so coding
-agents can call your RPCs:
+Compile the schema to an MCP manifest and run the stdio server so coding agents can call your RPCs:
 
 ```sh
 zever compile schema/app.zen --backend=mcp --out ./generated
 go run ./tools/zever-mcp
 ```
 
-## 6. Score answers with evals
+## Score answers with evals
 
-Pin quality with a dataset and scorers before shipping prompt changes:
+Pin quality with a dataset and scorers before you ship prompt changes:
 
 ```sh
 # Conceptually: eval.RunSuite(ctx, run, cases, eval.ContainsScorer).
 # See core/eval/eval.go.
 ```
 
-## What you just exercised
+## What you built
 
-- `container.Agent()` / `container.RAG()` lazy accessors over shared backends
+- `container.Agent()` and `container.RAG()` lazy accessors over shared backends
 - `core/agent` loops: run, stream, parallel fan-out, sub-agent tools
 - `core/rag` ingest, retrieve, hybrid retrieval, grounded answers
 - `dsl/backend/mcp` manifests plus the `tools/zever-mcp` server
 - `core/eval` datasets and scorers
 
-## Troubleshooting
+<details>
+<summary>`Agent()` fails with an auth error</summary>
 
-**`Agent()` fails with an auth error.**
-Set `AI_API_KEY`; the loop needs a real backend, while retrieval-only paths
-work with any embedder.
+Cause: no API key, and the loop needs a real backend. Fix: set `AI_API_KEY`. Retrieval-only paths work with any embedder.
+</details>
 
-**Hybrid retrieval returns nothing.**
-Hybrid engines index chunks into the keyword backend on ingest: re-ingest
-after switching from `rag.New` to `rag.NewHybrid`.
+<details>
+<summary>Hybrid retrieval returns nothing</summary>
 
-## Next
+Cause: hybrid engines index chunks into the keyword backend on ingest. Fix: re-ingest after switching from `rag.New` to `rag.NewHybrid`.
+</details>
 
-- [AI](../digging-deeper/ai/) for the LLM facade, loop, and RAG reference
-- [Agent Skill](../reference/agent-skill/) for the Claude Code skill
-- [Container](../architecture/container/) for lazy resolution and close order
+## Next steps
+
+<CardGrid>
+  <LinkCard title="AI guide" description="The LLM facade, loop, and RAG." href="../../guides/integrations/ai/" />
+  <LinkCard title="Agent skill" description="The Claude Code skill." href="../../reference/agent-skill/" />
+  <LinkCard title="Container" description="Lazy resolution and close order." href="../../concepts/container/" />
+</CardGrid>

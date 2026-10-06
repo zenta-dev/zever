@@ -1,0 +1,188 @@
+---
+title: Mailer
+description: Send transactional email through a log-by-default mailer, and switch to SMTP for production.
+---
+
+import { LinkCard, CardGrid, Tabs, TabItem } from '@astrojs/starlight/components';
+
+Use `mailer.Mailer` for transactional outbound mail: receipts, cancellations, password resets. It defaults to `log`, so validated messages go to the log instead of the wire and real delivery is an explicit adapter change. It handles validated delivery only: no template rendering, no lists. Build the finished `Mail` with `NewMail`, or with a `Sender` that binds the default `From`.
+
+Stay on `log` for development and CI, and move to `smtp` for production. There is no in-between adapter. Enqueue sends as jobs so an SMTP blip retries at the job layer instead of failing the booking write.
+
+## Quick start
+
+```yaml title="zever.yaml"
+mailer:
+  adapter: log
+  options:
+    host: localhost
+    port: 25
+```
+
+`host` and `port` are required by `Validate` even for the log adapter, which never dials. The bookings default uses the dummy localhost pair for that reason.
+
+```go title="main.go"
+package main
+
+import (
+	"context"
+	"fmt"
+
+	maillog "github.com/zenta-dev/zever/adapters/mailer/log"
+	"github.com/zenta-dev/zever/core/mailer"
+)
+
+func main() {
+	if err := run(); err != nil {
+		panic(err)
+	}
+}
+
+func run() error {
+	maillog.Register()
+
+	m, err := mailer.Open(mailer.Log, mailer.Options{Host: "localhost", Port: 25})
+	if err != nil {
+		return err
+	}
+	defer func() { _ = m.Close() }()
+
+	msg := mailer.NewMail(
+		mailer.Address{Address: "bookings@example.com"},
+		[]mailer.Address{{Address: "guest@example.com"}},
+		"Booking confirmed",
+		"Space Loft, Fri to Sun. Receipt inside.",
+	)
+	if err := m.Send(context.Background(), &msg); err != nil {
+		return err
+	}
+	fmt.Println("logged, not delivered")
+	return nil
+}
+```
+
+```text
+mailer=log to=guest@example.com subject="Booking confirmed" body="Space Loft, Fri to Sun. Receipt inside."
+logged, not delivered
+```
+
+`Send` validates, writes the rendered line, and returns nil without opening a socket. Field order follows the adapter writer.
+
+## Send through SMTP
+
+<Tabs>
+  <TabItem label="YAML">
+```yaml title="zever.yaml"
+mailer:
+  adapter: smtp
+  options:
+    host: mail.example.com
+    port: 587
+    username: bookings
+    password: prod-secret-here
+    encryption: starttls
+    timeout: 30000000000
+    max_message_size: 10485760
+```
+  </TabItem>
+  <TabItem label="Env">
+```sh
+MAILER_ADAPTER=smtp
+MAILER_HOST=mail.example.com
+MAILER_PORT=587
+MAILER_USERNAME=bookings
+MAILER_PASSWORD=prod-secret-here
+MAILER_ENCRYPTION=starttls
+MAILER_TIMEOUT=30s
+```
+  </TabItem>
+</Tabs>
+
+- `encryption`: `starttls` (default when empty), `implicit`, or `none`.
+- `timeout`: zero means the 30s default. File durations are integer nanoseconds, env accepts `"30s"`.
+- `max_message_size`: zero means the 10 MiB default. Larger messages fail with `ErrMessageTooLarge`.
+
+File decoding is strict snake_case. All keys: [mailer config reference](../../../reference/config/#mailer).
+
+| Adapter | Package | Notes |
+|---|---|---|
+| `log` | `adapters/mailer/log` | Default, safe sink, writes rendered mail to the log |
+| `smtp` | `adapters/mailer/smtp` | Production delivery, honors encryption and timeout |
+
+Both serve `mailer.Mailer` with `Send` plus `Close`. Delivery errors stay `errors.Is`-compatible for job-layer retry branching.
+
+## Resolve the mailer from the container
+
+```go title="main.go"
+import (
+	maillog "github.com/zenta-dev/zever/adapters/mailer/log"
+	"github.com/zenta-dev/zever/config"
+	"github.com/zenta-dev/zever/container"
+)
+
+func openMailer() error {
+	maillog.Register()
+
+	c := container.New(config.Default())
+	m, err := c.Mailer()
+	if err != nil {
+		return err
+	}
+	defer func() { _ = m.Close() }()
+	return nil
+}
+```
+
+`Mailer()` resolves lazily and caches the instance. On error the cache clears so the next call retries. Address parsing helpers live in `core/mailer/address.go` and the attachment shape in `core/mailer/mail.go`. `Close() error` is instant, and the container probes it as a snapshot service with no leaf ordering. See [the container](../../../concepts/container/).
+
+## Production checklist
+
+- `EncryptionNone` must not carry `username` or `password`. Validation rejects that pair so credentials never cross plaintext. Use `implicit` only when the provider documents it.
+- Set `username` and `password` together. A lone value fails validation instead of half-authenticating at send time.
+- `host` must not contain a scheme: use `mail.example.com`, not `smtp://mail.example.com`. Port must be 1 to 65535.
+- Address validation rejects header injection and control characters. Parse user input through `core/mailer/address.go` before using it as `From`.
+- Keep attachments small, or link to `storage` presigned URLs instead of inlining.
+- SMTP passwords never appear in logs. Supply them by file or env, display config only through `config.RedactedServices`, and keep error text to names and reasons.
+- Retry transient failures at the job layer. Bookings `SendConfirmation` uses `max_attempts(3)` with exponential base 30s.
+
+## Troubleshooting
+
+<details>
+<summary>host must be non-empty on boot with the log adapter</summary>
+
+Cause: `host` and `port` were left zero. Validation requires both even though log never dials.
+
+Fix: set `host: localhost` and `port: 25`, matching `examples/bookings/zever.yaml`.
+</details>
+
+<details>
+<summary>username and password must be set together</summary>
+
+Cause: only one of the pair was supplied, often a password without a username.
+
+Fix: set both from the same secret source, or clear both for an anonymous relay with a non-none encryption mode.
+</details>
+
+<details>
+<summary>encryption none must not carry credentials</summary>
+
+Cause: `encryption: none` combined with SMTP auth values.
+
+Fix: switch to `starttls` or `implicit` when auth is needed, or drop the credentials when the relay needs none.
+</details>
+
+<details>
+<summary>Sends pass locally but time out in production</summary>
+
+Cause: wrong port or encryption for the provider, or blocked egress.
+
+Fix: confirm the provider tuple (commonly 587 with `starttls`, 465 with `implicit`), raise `timeout` from the 30s default, and move the send behind `job.Dispatcher` so timeouts retry with backoff.
+</details>
+
+## Related
+
+<CardGrid>
+  <LinkCard title="Notifications" href="../notifications/" description="Push and SMS alongside mail." />
+  <LinkCard title="Scheduler and jobs" href="../scheduler-jobs/" description="Retry wrapping around sends." />
+  <LinkCard title="Build a booking API" href="../../../tutorials/build-a-booking-api/" description="The bookings tutorial with SendConfirmation." />
+</CardGrid>

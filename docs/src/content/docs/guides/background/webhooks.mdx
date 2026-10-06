@@ -1,0 +1,127 @@
+---
+title: Webhooks
+description: Deliver signed outbound webhooks with per-target secrets over direct HTTP or the retrying job queue.
+---
+
+import { LinkCard, CardGrid } from '@astrojs/starlight/components';
+
+Use `webhook` for signed outbound event delivery. The interface covers `Register`, `Unregister`, and `Deliver` fan-out. Signatures use `t=<timestamp>,v1=<hex-hmac>` over `<timestamp>.<payload>`, verified with `hmac.Equal` inside a timestamp window. There is no top-level API key in `Options`: every target gets its own secret at `Register` time, so one compromised secret never exposes every integration.
+
+## Quick start
+
+```yaml title="zever.yaml"
+webhook:
+  adapter: queue
+  options:
+    timeout: 10000000000 # 10s, integer nanoseconds in files
+    max_retries: 3
+    queue_adapter: memory
+    queue_opts:
+      visibility_timeout: 30000000000 # must exceed timeout
+      poll_timeout: 1000000000
+      buffer: 100
+    dead_letter_topic: webhook.dead
+    replay_tolerance: 300000000000 # default 5m
+```
+
+```sh
+WEBHOOK_ADAPTER=queue
+WEBHOOK_MAXRETRIES=3
+WEBHOOK_REPLAYTOLERANCE=5m
+BOOKINGS_WEBHOOK_CREATED_TARGET=https://partner.example.com/hooks
+BOOKINGS_WEBHOOK_CREATED_SECRET=per-target-secret
+```
+
+Keep secrets out of the file. `Validate` rejects negative `timeout`, `max_retries`, and `replay_tolerance`. The queue adapter, not core, enforces the queue rules (adapter required, visibility exceeding timeout). All keys: [webhook config reference](../../../reference/config/#webhook).
+
+## Register a target and deliver
+
+```go title="main.go"
+package main
+
+import (
+	"context"
+	"fmt"
+
+	"github.com/zenta-dev/zever/config"
+	"github.com/zenta-dev/zever/container"
+)
+
+func main() {
+	c := container.New(config.Default())
+	wh, err := c.Webhook()
+	if err != nil {
+		panic(err)
+	}
+	defer wh.Close()
+
+	ctx := context.Background()
+	target := "" // empty means skip, like RegisterDemoTargets
+	if target == "" {
+		fmt.Println("delivery skipped: no target configured")
+		return
+	}
+	_ = wh.Register(ctx, "booking.created", target, "secret")
+	fmt.Println("delivered")
+}
+```
+
+```text
+delivery skipped: no target configured
+```
+
+With a target set and the `http` adapter, `Deliver` POSTs the signed payload to every subscriber of the event.
+
+`Webhook()` resolves lazily, caches per container, and retries after errors. `Webhook.Close() error` takes no context. See [the container](../../../concepts/container/).
+
+The bookings example sets `adapter: queue` as above. Demo targets come from the environment only (`BOOKINGS_WEBHOOK_CREATED_TARGET` and `_SECRET`, plus the `CANCELLED` pair). `RegisterDemoTargets` skips pairs with an empty target, so delivery is quietly skipped when unconfigured and the worker runs without them.
+
+## Choose an adapter
+
+| Adapter | Package | Use when |
+|---|---|---|
+| `http` | `adapters/webhook/http` | Default. Direct POST with no durability. A crash mid-delivery loses the event. |
+| `queue` | `adapters/webhook/queue` | Delivery rides the [job system](../queue/) for retries and backoff. |
+
+With `http`, N replicas mean N independent retry loops. Prefer `queue` so retries funnel through shared infrastructure, with a dead-letter topic for exhausted deliveries (`webhook.dead` in the demo). The bookings README notes the queue variant needs its queue reference wired before doctor goes green.
+
+## Production checklist
+
+- Never log per-target secrets, and never log raw option maps. Use `config.RedactedServices`.
+- Verifiers must check both the HMAC (constant-time) and the timestamp inside `replay_tolerance` (default 5m).
+- Keep `allow_private_targets` false in production to avoid SSRF into internal URLs.
+- The container closes only resolved services and joins errors via `errors.Join`.
+
+## Troubleshooting
+
+<details>
+<summary>The webhook silently does nothing</summary>
+
+Cause: the target env var is empty, so registration was skipped by design. This is not an error path.
+
+Fix: set `BOOKINGS_WEBHOOK_CREATED_TARGET` and its secret, then restart the worker.
+</details>
+
+<details>
+<summary>Signatures verify but replays succeed</summary>
+
+Cause: the verifier checks the HMAC but not the timestamp window.
+
+Fix: enforce `replay_tolerance` on the embedded `t=` value so hour-old payloads are rejected.
+</details>
+
+<details>
+<summary>Queue adapter open fails</summary>
+
+Cause: `queue_adapter` is unset, or `visibility_timeout` does not exceed `timeout`.
+
+Fix: mirror the bookings `zever.yaml` shape (memory adapter, 30s visibility over a 10s timeout).
+</details>
+
+## Related
+
+<CardGrid>
+  <LinkCard title="Queue" href="../queue/" description="Retry and backoff under delivery." />
+  <LinkCard title="Locks and idempotency" href="../../security/lock-idempotency/" description="Dedupe retried events." />
+  <LinkCard title="Scheduler and jobs" href="../scheduler-jobs/" description="Worker wiring." />
+</CardGrid>

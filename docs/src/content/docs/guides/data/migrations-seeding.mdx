@@ -1,0 +1,205 @@
+---
+title: Migrations and seeding
+description: Plan and apply schema migrations from .zen files, roll them back, and seed data deterministically.
+---
+
+import { Tabs, TabItem, Steps, LinkCard, CardGrid } from '@astrojs/starlight/components';
+
+Zever compiles your `.zen` schema, diffs it against the live database, and applies the missing statements. Each applied statement is recorded in `schema_migrations`, so `zever db rollback` can undo it and re-running `migrate` is a no-op. Review the plan before you apply it in production.
+
+## Quick start
+
+<Steps>
+
+1. Preview the DDL without touching a database.
+
+   ```sh
+   zever db migrate --dry-run schema/app.zen
+   ```
+
+2. Apply it. The default adapter is `sqlite`.
+
+   ```sh
+   zever db migrate schema/app.zen --adapter=sqlite --dsn=data/app.db
+   ```
+
+   ```text
+   applied 4 statement(s) via sqlite
+   ```
+
+   When nothing changed, `migrate` hints that the schema is already in sync.
+
+3. Seed the database.
+
+   ```sh
+   zever db seed
+   ```
+
+</Steps>
+
+With no file arguments, `migrate` discovers `.zen` files under the schema directory. Add `-i` for guided file, adapter, and DSN prompts. With `--dry-run` and a `--dsn`, it prints the diff against the live database. Without a DSN, it prints the full bootstrap DDL.
+
+## Choose the database
+
+`db` is a normal service, so the same settings drive the app and the CLI.
+
+<Tabs>
+  <TabItem label="postgres">
+```yaml title="zever.yaml"
+db:
+  adapter: postgres
+  options:
+    dsn: postgres://app:secret@db:5432/app
+    max_conns: 20
+```
+  </TabItem>
+  <TabItem label="sqlite">
+```yaml title="zever.yaml"
+db:
+  adapter: sqlite
+  options:
+    path: app.db
+```
+  </TabItem>
+  <TabItem label="env">
+```sh
+DB_ADAPTER=postgres
+DB_DSN=postgres://app:secret@db:5432/app
+```
+  </TabItem>
+</Tabs>
+
+sqlite defaults to `app.db`. `:memory:` forces a single connection even when `max_conns` is set. On postgres `min_conns` is a real pool minimum. On sqlite it maps to `SetMaxIdleConns`. See the [db options](../../../reference/config/#db).
+
+## Plan, review, and apply
+
+For each declared table, `migrate` does the following.
+
+| Situation | Statement |
+|---|---|
+| Table is missing | `CREATE TABLE` and `CREATE INDEX IF NOT EXISTS` |
+| Field has `@renamed_from("old")` | `RENAME COLUMN` (keeps data) |
+| Column missing live | `ALTER TABLE ADD COLUMN` |
+| Column type changed | `ALTER COLUMN TYPE` (postgres); sqlite warns and skips |
+| Nullability changed | `ALTER COLUMN SET/DROP NOT NULL` (postgres); sqlite warns and skips |
+| Declared index or `@unique` missing | `CREATE [UNIQUE] INDEX` |
+| Live index no longer declared | `DROP INDEX`, only for indexes named by Zever's convention |
+| `belongs_to` or `has_one` foreign key missing | `ADD CONSTRAINT ... FOREIGN KEY` (postgres); sqlite warns and skips |
+| Live column no longer declared | `DROP COLUMN`, only with `--drop-columns` |
+
+`--drop-columns` destroys data, so snapshot first. Unannotated renames look like a drop plus an add, so use `@renamed_from`. Live unique constraints and foreign keys you removed from the schema are reported but never dropped.
+
+Use the Go API to plan in code or CI. `Plan` has no side effects.
+
+```go title="migrate.go"
+import "github.com/zenta-dev/zever/orm/migrate"
+
+plan, err := migrate.Plan(ctx, conn, desired, migrate.PlanOptions{})
+if err != nil {
+    return err
+}
+for _, stmt := range plan.Statements() {
+    fmt.Println(stmt)
+}
+applied, err := migrate.Apply(ctx, conn, plan) // transaction where the driver supports it
+```
+
+`PlanOptions{DropColumns: true}` emits `DROP COLUMN`. `PlanOptions{DetectTypeChanges: true}` compares live and declared types (the CLI always enables it). Apply uses `db.WithTx` rules, so a failure rolls back and nesting returns `ErrNestedTx`.
+
+## Roll back a migration
+
+`zever db rollback` needs no `.zen` files. It reads `schema_migrations` and runs an inverse for the newest statements. `-n` counts statements, not `migrate` runs, so undo a three-statement run with `-n 3`.
+
+```sh
+zever db rollback --adapter=sqlite --dsn=data/app.db --dry-run   # print inverses
+zever db rollback --adapter=sqlite --dsn=data/app.db -n 2
+```
+
+```text
+rolled back 2 statement(s) via the sqlite adapter
+```
+
+Rollback restores structure, not data.
+
+| Undoing | Result |
+|---|---|
+| `ADD COLUMN` | Drops the column and its values |
+| `DROP COLUMN` | Recreates the column empty |
+| `ALTER COLUMN TYPE` | Restores the type but not truncated values |
+| `RENAME COLUMN`, index changes, foreign keys | Lossless |
+| `ALTER ... NOT NULL` | Fails if a NULL was written meanwhile |
+| `CREATE TABLE` | Skipped; never dropped |
+
+Lossy statements print a warning before they run. Rows with no inverse are reported, skipped, and kept.
+
+## Seed deterministically
+
+`zever db seed` runs the seed entrypoint (`project.seed_entry`, default `db/seed`) and passes any arguments through to it. Write seeds as ordinary Go with the ORM, in one transaction, and keep them idempotent with an `OnConflict` upsert so a re-run is safe.
+
+```go title="db/seed/main.go"
+err := db.WithTx(ctx, conn, nil, func(ctx context.Context, tx db.Tx) error {
+    for _, name := range []string{"alice", "bob"} {
+        err := orm.InsertInto(Users).
+            Values(orm.Set(UserName, name)).
+            OnConflict(UserName.Col()).DoNothing().
+            Exec(ctx, tx)
+        if err != nil {
+            return err
+        }
+    }
+    return nil
+})
+```
+
+Regenerate ORM builders after schema edits, from the repo root so import paths resolve. Never hand-edit `generated/`.
+
+```sh
+zever compile examples/pagination/schema/pagination.zen --backend=zenorm --out examples/pagination/generated
+```
+
+## Production checklist
+
+- Run `--dry-run` against the live DSN first, then apply in a maintenance window. A long `ALTER` on a big postgres table can hold locks.
+- Keep `--drop-columns` off unless the drop is intended, and keep a tested rollback.
+- Use a bounded context and call `c.Close(ctx)` after migrate or seed so pools drain.
+- Never log the DSN or the raw `Options` map. Display config through `config.RedactedServices`.
+
+## Troubleshooting
+
+<details>
+<summary>Plan shows unexpected DROP statements</summary>
+
+Cause: `--drop-columns` is set, or the schema lost a field. Fix: re-check the `.zen` source and keep the flag off unless intended.
+</details>
+
+<details>
+<summary>Type or nullability change ignored on sqlite</summary>
+
+Cause: sqlite has no `ALTER COLUMN`, so Zever warns and skips. Fix: recreate the table or migrate the data manually.
+</details>
+
+<details>
+<summary>`ErrNestedTx` during seed</summary>
+
+Cause: a seed helper opened a transaction inside `WithTx`. Fix: use one `WithTx` unit.
+</details>
+
+<details>
+<summary>Postgres integration tests are skipped</summary>
+
+Cause: the gate is `POSTGRES_DSN`. Fix: export it for the live pass. sqlite paths run without it.
+</details>
+
+<details>
+<summary>Rollback does not restore data</summary>
+
+Cause: rollback reverses schema statements only. Fix: re-run `zever db seed` after rolling back.
+</details>
+
+## Related
+
+<CardGrid>
+  <LinkCard title="Query builder" href="../query-builder/" description="Typed reads and writes on the migrated schema." />
+  <LinkCard title="Configuration" href="../../operate/configuration/" description="DSN handling and secret rules." />
+  <LinkCard title="CLI reference" href="../../../reference/cli/" description="Every zever command and flag." />
+</CardGrid>

@@ -1,0 +1,121 @@
+---
+title: Feature flags
+description: Gate code paths with typed flags from a static file or Firebase Remote Config.
+---
+
+import { LinkCard, CardGrid } from '@astrojs/starlight/components';
+
+`flag` is a typed on/off switch that is safe in a hot request handler. The interface exposes `Bool`, `String`, `Int`, and `JSON` lookups against per-request targeting context from `WithEvalContext`. A missing key returns your fallback with a nil error, so a flag lookup can never take the app down.
+
+## Quick start
+
+`static` (the default) loads a JSON file once and costs no network call per evaluation. Use it for tests, offline dev, and rollouts that can ship with a deploy.
+
+```yaml title="zever.yaml"
+flag:
+  adapter: static
+  options:
+    static:
+      path: data/flags.json
+      reload: false
+```
+
+```go title="main.go"
+package main
+
+import (
+    "context"
+    "fmt"
+
+    "github.com/zenta-dev/zever/adapters/flag/static"
+    "github.com/zenta-dev/zever/config"
+    "github.com/zenta-dev/zever/container"
+    "github.com/zenta-dev/zever/core/flag"
+)
+
+func main() {
+    static.Register() // container wires nothing
+    c := container.New(config.Default())
+    f, err := c.Flag()
+    if err != nil {
+        panic(err)
+    }
+    defer f.Close()
+
+    ctx := flag.WithEvalContext(context.Background(), flag.EvalContext{
+        RandomizationID: "user-123",
+        Signals:         map[string]any{"plan": "pro"},
+    })
+    on, err := f.Bool(ctx, "new_checkout", false)
+    fmt.Println(on, err)
+}
+```
+
+Expected output (empty static set, so the fallback applies):
+
+```text
+false <nil>
+```
+
+An empty static `path` is valid and means an empty flag set. The bookings example gates checkout with `a.Flag.Bool(ctx, "new_checkout", false)` and reports `v2` when on, else `v1`. Because the fallback is `false`, a missing key or an outage keeps serving the old checkout.
+
+## Flip flags without a deploy
+
+Use `firebase` when product or growth must change a flag live. It adds a real dependency and a 30s default operation timeout (`DefaultTimeout`). Durations in files are integer nanoseconds.
+
+```yaml title="zever.yaml"
+flag:
+  adapter: firebase
+  options:
+    firebase:
+      project_id: my-project
+      service_account: /run/secrets/firebase.json
+      timeout: 30000000000
+```
+
+```sh
+FLAG_ADAPTER=firebase
+FLAG_FIREBASE_PROJECTID=my-project
+FLAG_FIREBASE_TIMEOUT=30s
+```
+
+`Validate` rejects only a negative `firebase.timeout`; zero means the default. See the [flag config reference](../../../reference/config/#flag).
+
+| Adapter | Package | Notes |
+|---|---|---|
+| `static` | `adapters/flag/static` | Default. File-backed, offline, optional reload. |
+| `firebase` | `adapters/flag/firebase` | Remote Config. Needs `project_id` and `service_account`. |
+
+## Production checklist
+
+- `Flag.Close() error` takes no context. The container probes it during `Close(ctx)`, joins errors with `errors.Join`, and surfaces panics as `*ClosePanicError`.
+- `static` is per-process, so a file change only lands where the file lands (plus `reload` when enabled). `firebase` is the shared source of truth, so design fallbacks so every replica degrades the same way when it is unreachable.
+- Never log raw option maps (use `config.RedactedServices`). The service account is a file path, not key material, but keep it out of logs.
+
+## Troubleshooting
+
+<details>
+<summary>A flag always returns the fallback</summary>
+
+Check that the static file `path` resolves relative to the working directory (an empty or missing path means an empty set by design), and that the key spelling matches. A hierarchy such as `billing.checkout_v2` avoids collisions.
+</details>
+
+<details>
+<summary>Type mismatch error on an existing key</summary>
+
+The stored JSON type does not match the accessor (`String` on a bool key returns the fallback plus an error). Align the file value with the call, or read it via `JSON`.
+</details>
+
+<details>
+<summary>Firebase open fails or times out</summary>
+
+Verify `project_id`, the `service_account` JSON path, and egress to the Remote Config endpoint. Only a negative timeout fails `Validate`, so a hang is a network problem, not a config shape problem.
+</details>
+
+## Related
+
+<CardGrid>
+  <LinkCard title="Tenants" href="../tenants/" description="Per-tenant targeting signals." />
+  <LinkCard title="Observability" href="../observability/" description="A span per flag-gated branch." />
+  <LinkCard title="Rate limiting" href="../../security/ratelimit/" description="Guard flagged endpoints." />
+</CardGrid>

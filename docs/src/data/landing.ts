@@ -51,42 +51,42 @@ export type Category = 'Data' | 'Messaging' | 'Security' | 'Ops' | 'AI & Media';
 export interface Battery {
   name: string;
   blurb: string;
-  doc: string; // path under base, e.g. digging-deeper/cache
+  doc: string; // path under base, e.g. guides/data/cache
   category: Category;
   adapters: string[];
 }
 
 export const BATTERIES: Battery[] = [
-  { name: 'Database & ORM', blurb: 'Typed generics query builder, migrations, seeding.', doc: 'database/query-builder', category: 'Data', adapters: SERVICES.db },
-  { name: 'Cache', blurb: 'One interface, memory to redis.', doc: 'digging-deeper/cache', category: 'Data', adapters: SERVICES.cache },
-  { name: 'Search', blurb: 'Full-text across db, postgres, meilisearch.', doc: 'digging-deeper/search', category: 'Data', adapters: SERVICES.search },
-  { name: 'Vector store', blurb: 'Embeddings on pgvector or qdrant.', doc: 'digging-deeper/vectorstore', category: 'Data', adapters: SERVICES.vectorstore },
-  { name: 'Storage', blurb: 'Local, S3, R2 behind one API.', doc: 'digging-deeper/storage-media', category: 'Data', adapters: SERVICES.storage },
-  { name: 'Queue', blurb: 'Durable jobs with visibility timeouts.', doc: 'digging-deeper/queue', category: 'Messaging', adapters: SERVICES.queue },
-  { name: 'Scheduler & jobs', blurb: 'Cron on the same queue.', doc: 'digging-deeper/scheduler-jobs', category: 'Messaging', adapters: SERVICES.scheduler },
-  { name: 'Event bus', blurb: 'In-process or redis pub/sub.', doc: 'digging-deeper/events-eventbus', category: 'Messaging', adapters: SERVICES.eventbus },
-  { name: 'Outbox', blurb: 'Transactional events, db or CDC.', doc: 'digging-deeper/outbox', category: 'Messaging', adapters: SERVICES.outbox },
-  { name: 'Saga & workflows', blurb: 'Long-running flows with compensation.', doc: 'digging-deeper/saga', category: 'Messaging', adapters: SERVICES.workflow },
-  { name: 'Mailer', blurb: 'Log in dev, SMTP in prod.', doc: 'digging-deeper/mailer', category: 'Messaging', adapters: SERVICES.mailer },
-  { name: 'Notifications', blurb: 'SMS and push with one call.', doc: 'digging-deeper/notifications', category: 'Messaging', adapters: SERVICES.notification },
-  { name: 'Webhooks', blurb: 'Signed delivery, queued retries.', doc: 'digging-deeper/webhooks', category: 'Messaging', adapters: SERVICES.webhook },
-  { name: 'Auth', blurb: 'JWT, sessions, OIDC.', doc: 'security/auth', category: 'Security', adapters: SERVICES.auth },
-  { name: 'Permissions', blurb: 'RBAC and casbin policies.', doc: 'security/authz-permissions', category: 'Security', adapters: SERVICES.permission },
-  { name: 'Secrets', blurb: 'Env or vault, never logged.', doc: 'digging-deeper/secrets', category: 'Security', adapters: SERVICES.secrets },
-  { name: 'Password hashing', blurb: 'argon2id defaults.', doc: 'security/password-hashing', category: 'Security', adapters: SERVICES.password },
-  { name: 'Rate limit', blurb: 'Token bucket, memory or redis.', doc: 'digging-deeper/ratelimit', category: 'Security', adapters: SERVICES.ratelimit },
-  { name: 'Lock & idempotency', blurb: 'Safe retries across processes.', doc: 'digging-deeper/lock-idempotency', category: 'Security', adapters: SERVICES.lock },
-  { name: 'Observability', blurb: 'Traces and metrics via OTLP.', doc: 'digging-deeper/observability', category: 'Ops', adapters: SERVICES.observability },
-  { name: 'Logging', blurb: 'zerolog, slog, pretty.', doc: 'basics/logging', category: 'Ops', adapters: SERVICES.log },
-  { name: 'Resilience', blurb: 'Breakers and bulkheads.', doc: 'digging-deeper/resilience', category: 'Ops', adapters: SERVICES.resilience },
-  { name: 'Feature flags', blurb: 'Static or firebase.', doc: 'digging-deeper/flags', category: 'Ops', adapters: SERVICES.flag },
-  { name: 'Tenants', blurb: 'Single or header-resolved.', doc: 'digging-deeper/tenants', category: 'Ops', adapters: SERVICES.tenant },
-  { name: 'Router', blurb: 'fiber or stdlib net/http.', doc: 'basics/routing', category: 'Ops', adapters: SERVICES.router },
-  { name: 'AI', blurb: 'Anthropic, OpenAI, Gemini, Ollama.', doc: 'digging-deeper/ai', category: 'AI & Media', adapters: SERVICES.ai },
-  { name: 'Media processing', blurb: 'Local or S3-backed pipelines.', doc: 'digging-deeper/media', category: 'AI & Media', adapters: SERVICES.media },
-  { name: 'Documents', blurb: 'PDF and LaTeX rendering.', doc: 'digging-deeper/document', category: 'AI & Media', adapters: SERVICES.document },
-  { name: 'Payments & billing', blurb: 'Stripe and Paddle.', doc: 'digging-deeper/payment', category: 'AI & Media', adapters: SERVICES.payment },
-  { name: 'Geo', blurb: 'Geocoding, google or OSM.', doc: 'digging-deeper/geo', category: 'AI & Media', adapters: SERVICES.geo },
+  { name: 'Database & ORM', blurb: 'Typed generics query builder, migrations, seeding.', doc: 'guides/data/query-builder', category: 'Data', adapters: SERVICES.db },
+  { name: 'Cache', blurb: 'One interface, memory to redis.', doc: 'guides/data/cache', category: 'Data', adapters: SERVICES.cache },
+  { name: 'Search', blurb: 'Full-text across db, postgres, meilisearch.', doc: 'guides/data/search', category: 'Data', adapters: SERVICES.search },
+  { name: 'Vector store', blurb: 'Embeddings on pgvector or qdrant.', doc: 'guides/data/vectorstore', category: 'Data', adapters: SERVICES.vectorstore },
+  { name: 'Storage', blurb: 'Local, S3, R2 behind one API.', doc: 'guides/data/storage-media', category: 'Data', adapters: SERVICES.storage },
+  { name: 'Queue', blurb: 'Durable jobs with visibility timeouts.', doc: 'guides/background/queue', category: 'Messaging', adapters: SERVICES.queue },
+  { name: 'Scheduler & jobs', blurb: 'Cron on the same queue.', doc: 'guides/background/scheduler-jobs', category: 'Messaging', adapters: SERVICES.scheduler },
+  { name: 'Event bus', blurb: 'In-process or redis pub/sub.', doc: 'guides/background/events', category: 'Messaging', adapters: SERVICES.eventbus },
+  { name: 'Outbox', blurb: 'Transactional events, db or CDC.', doc: 'guides/background/outbox', category: 'Messaging', adapters: SERVICES.outbox },
+  { name: 'Saga & workflows', blurb: 'Long-running flows with compensation.', doc: 'guides/background/saga', category: 'Messaging', adapters: SERVICES.workflow },
+  { name: 'Mailer', blurb: 'Log in dev, SMTP in prod.', doc: 'guides/background/mailer', category: 'Messaging', adapters: SERVICES.mailer },
+  { name: 'Notifications', blurb: 'SMS and push with one call.', doc: 'guides/background/notifications', category: 'Messaging', adapters: SERVICES.notification },
+  { name: 'Webhooks', blurb: 'Signed delivery, queued retries.', doc: 'guides/background/webhooks', category: 'Messaging', adapters: SERVICES.webhook },
+  { name: 'Auth', blurb: 'JWT, sessions, OIDC.', doc: 'guides/security/auth', category: 'Security', adapters: SERVICES.auth },
+  { name: 'Permissions', blurb: 'RBAC and casbin policies.', doc: 'guides/security/authz-permissions', category: 'Security', adapters: SERVICES.permission },
+  { name: 'Secrets', blurb: 'Env or vault, never logged.', doc: 'guides/security/secrets', category: 'Security', adapters: SERVICES.secrets },
+  { name: 'Password hashing', blurb: 'argon2id defaults.', doc: 'guides/security/password-hashing', category: 'Security', adapters: SERVICES.password },
+  { name: 'Rate limit', blurb: 'Token bucket, memory or redis.', doc: 'guides/security/ratelimit', category: 'Security', adapters: SERVICES.ratelimit },
+  { name: 'Lock & idempotency', blurb: 'Safe retries across processes.', doc: 'guides/security/lock-idempotency', category: 'Security', adapters: SERVICES.lock },
+  { name: 'Observability', blurb: 'Traces and metrics via OTLP.', doc: 'guides/operate/observability', category: 'Ops', adapters: SERVICES.observability },
+  { name: 'Logging', blurb: 'zerolog, slog, pretty.', doc: 'guides/operate/logging', category: 'Ops', adapters: SERVICES.log },
+  { name: 'Resilience', blurb: 'Breakers and bulkheads.', doc: 'guides/operate/resilience', category: 'Ops', adapters: SERVICES.resilience },
+  { name: 'Feature flags', blurb: 'Static or firebase.', doc: 'guides/operate/flags', category: 'Ops', adapters: SERVICES.flag },
+  { name: 'Tenants', blurb: 'Single or header-resolved.', doc: 'guides/operate/tenants', category: 'Ops', adapters: SERVICES.tenant },
+  { name: 'Router', blurb: 'fiber or stdlib net/http.', doc: 'guides/http/routing', category: 'Ops', adapters: SERVICES.router },
+  { name: 'AI', blurb: 'Anthropic, OpenAI, Gemini, Ollama.', doc: 'guides/integrations/ai', category: 'AI & Media', adapters: SERVICES.ai },
+  { name: 'Media processing', blurb: 'Local or S3-backed pipelines.', doc: 'guides/data/media', category: 'AI & Media', adapters: SERVICES.media },
+  { name: 'Documents', blurb: 'PDF and LaTeX rendering.', doc: 'guides/data/document', category: 'AI & Media', adapters: SERVICES.document },
+  { name: 'Payments & billing', blurb: 'Stripe and Paddle.', doc: 'guides/integrations/payment', category: 'AI & Media', adapters: SERVICES.payment },
+  { name: 'Geo', blurb: 'Geocoding, google or OSM.', doc: 'guides/integrations/geo', category: 'AI & Media', adapters: SERVICES.geo },
 ];
 
 export const CATEGORIES: Category[] = ['Data', 'Messaging', 'Security', 'Ops', 'AI & Media'];
@@ -205,15 +205,15 @@ export const FAQ = [
 ];
 
 export const NAV = [
-  { label: 'Docs', href: 'getting-started/introduction' },
+  { label: 'Docs', href: 'start/introduction' },
   { label: 'Tutorials', href: 'tutorials/overview' },
   { label: 'Reference', href: 'reference/cli' },
   { label: 'Examples', href: 'tutorials/explore-the-showcase-app' },
 ];
 
 export const FOOTER_COLS = [
-  { title: 'Start', links: [['Installation', 'getting-started/installation'], ['Configuration', 'getting-started/configuration'], ['Directory structure', 'getting-started/directory-structure'], ['Deployment', 'getting-started/deployment']] },
-  { title: 'Learn', links: [['Booking API tutorial', 'tutorials/build-a-booking-api'], ['Schema DSL', 'dsl/syntax-zen'], ['Container', 'architecture/container'], ['Query builder', 'database/query-builder']] },
-  { title: 'Reference', links: [['CLI', 'reference/cli'], ['Config', 'reference/config-reference'], ['Adapters matrix', 'reference/adapters-matrix'], ['Agent skill', 'reference/agent-skill']] },
-  { title: 'Project', links: [['Contribute', 'contribute'], ['Upgrade', 'getting-started/upgrade']] },
+  { title: 'Start', links: [['Installation', 'start/installation'], ['Configuration', 'guides/operate/configuration'], ['Directory structure', 'start/project-layout'], ['Deployment', 'guides/operate/deployment']] },
+  { title: 'Learn', links: [['Booking API tutorial', 'tutorials/build-a-booking-api'], ['Schema DSL', 'reference/zen-syntax'], ['Container', 'concepts/container'], ['Query builder', 'guides/data/query-builder']] },
+  { title: 'Reference', links: [['CLI', 'reference/cli'], ['Config', 'reference/config'], ['Adapters matrix', 'reference/adapters-matrix'], ['Agent skill', 'reference/agent-skill']] },
+  { title: 'Project', links: [['Contribute', 'contribute'], ['Upgrade', 'guides/operate/upgrade']] },
 ];

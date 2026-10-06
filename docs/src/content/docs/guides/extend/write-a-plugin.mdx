@@ -1,0 +1,203 @@
+---
+title: Write a plugin
+description: Add a new adapter to an existing battery or ship an entirely new battery as a standalone Go module.
+---
+
+import { Steps, LinkCard, CardGrid } from '@astrojs/starlight/components';
+
+A plugin is a standalone Go module in one of two shapes: a new adapter for an existing battery (`zever-adapter-<name>`), or an entirely new battery (`zever-battery-<name>`, dogfooded end to end by `examples/sms`). Run the battery's conformance kit before you publish either shape.
+
+## Add an adapter to an existing battery
+
+A battery owns a small interface plus a `Register`/`Open` pair. The container is the only resolver, and adapter packages never self-register (no `init` wiring, no globals). Each adapter lives at `adapters/<battery>/<name>` and exposes a constructor plus a `Register()` function. See `adapters/cache/memory/register.go`.
+
+Adapters are plain strings (`type Adapter string`, such as `cache.Memory = "memory"`). `ParseAdapter` accepts any non-empty name, so a custom backend is just a new name that round-trips through file and env config. `String()` is the identity (`"unknown"` only for the empty value).
+
+This `cache` adapter lives in module `zever-adapter-foo`:
+
+```go title="foo/foo.go"
+package foo // import "example.com/zever-adapter-foo"
+
+import (
+	"context"
+	"time"
+
+	"github.com/zenta-dev/zever/core/cache"
+)
+
+// driver implements all 8 cache.Cache methods.
+type driver struct{ /* connection state */ }
+
+func (d *driver) Get(ctx context.Context, key string) ([]byte, error) { panic("implement") }
+func (d *driver) Set(ctx context.Context, key string, value []byte, ttl time.Duration) error {
+	panic("implement")
+}
+func (d *driver) SetIfAbsent(ctx context.Context, key string, value []byte, ttl time.Duration) (bool, error) {
+	panic("implement")
+}
+func (d *driver) Delete(ctx context.Context, key string) error         { panic("implement") }
+func (d *driver) Increment(ctx context.Context, key string) error      { panic("implement") }
+func (d *driver) Decrement(ctx context.Context, key string) error      { panic("implement") }
+func (d *driver) Exists(ctx context.Context, key string) (bool, error) { panic("implement") }
+func (d *driver) Close(ctx context.Context) error                      { panic("implement") }
+
+// New matches cache.Factory.
+func New(opts cache.Options) (cache.Cache, error) {
+	return &driver{}, nil
+}
+```
+
+The host (your app, not the adapter package) registers it:
+
+```go title="main.go"
+const fooAdapter = cache.Adapter("foo")
+
+if err := cache.Register(fooAdapter, foo.New); err != nil {
+	return err
+}
+c, err := cache.Open(fooAdapter, cache.Options{})
+```
+
+With the container, set `cache: {adapter: foo}` (or `CACHE_ADAPTER=foo`) and the first `container.Cache()` call resolves your factory like any core adapter.
+
+Follow these rules:
+
+- Do not add methods to a public battery interface. Propose a new capability interface instead (for example `cache.CompareAndSwapCache`).
+- Call `opts.Validate()` first in `Open`. Keep validation fail-closed and join all violations.
+- Keep errors sentinel-based, `errors.Is`-compatible, and prefixed with the battery name (`cache:`). Never put secrets or raw option maps in error text; display config via `config.RedactedServices`.
+- Take `ctx` first for I/O and never store it in a struct.
+
+## Prove parity with the conformance kit
+
+Every battery with a kit exposes `Conformance` in `core/<b>/<b>test`. Run it in your adapter's tests and link the passing run from your README:
+
+```go title="foo/foo_test.go"
+import "github.com/zenta-dev/zever/core/cache/cachetest"
+
+func TestConformance(t *testing.T) {
+	t.Parallel()
+	cachetest.Conformance(t, func(t *testing.T) cache.Cache {
+		t.Helper()
+		c, err := foo.New(cache.Options{})
+		if err != nil {
+			t.Fatal(err)
+		}
+		t.Cleanup(func() { _ = c.Close(t.Context()) })
+		return c
+	})
+}
+```
+
+Kits exist for these batteries (import `github.com/zenta-dev/zever/core/<b>/<b>test`):
+
+```text
+ai analytics auth authz billing cache crypto db document eventbus flag geo i18n
+idempotency job lock log mailer media middleware notification observability
+outbox password payment permission queue ratelimit resilience router scheduler
+search secrets session storage tenant vectorstore webhook workflow
+```
+
+## Ship an entirely new battery
+
+Mirror the core battery shape: an interface, a string `Adapter`, typed `Options` with `Validate`, a `Register`/`Open` pair over a factory registry, and sentinel errors. Copy `examples/sms/sms.go` (the `SMS` interface, `Stub` adapter, `Options{From}`, `Register`, `Open`) and add a deterministic stub backend like `examples/sms/stub` (no network).
+
+<Steps>
+
+1. Add the config entry. Plugins live under `config.Config.Plugins`, keyed by name with raw options the plugin validates itself (`map[string]Service[json.RawMessage]`, nil by default, so initialize it first):
+
+   ```go
+   cfg.Plugins = map[string]config.Service[json.RawMessage]{
+   	"sms": {
+   		Adapter: "stub",
+   		Options: json.RawMessage(`{"from":"+15550000"}`),
+   	},
+   }
+   ```
+
+2. Register a validator so `Config.Validate` covers the plugin. Plugins without one skip validation and their options stay opaque:
+
+   ```go
+   if err := config.RegisterPluginValidator("sms", func(adapter string, opts json.RawMessage) error {
+   	var o sms.Options
+   	if err := json.Unmarshal(opts, &o); err != nil {
+   		return err
+   	}
+   	return o.Validate()
+   }); err != nil {
+   	return err
+   }
+   ```
+
+3. Register a versioned build func once at startup, then resolve per container. The build receives the container's `*config.Config`:
+
+   ```go
+   if err := container.RegisterPlugin[sms.SMS]("sms", container.PluginAPIVersion, func(cfg *config.Config) (sms.SMS, error) {
+   	var opts sms.Options
+   	if err := json.Unmarshal(cfg.Plugins["sms"].Options, &opts); err != nil {
+   		return nil, err
+   	}
+   	return sms.Open(sms.Stub, opts)
+   }); err != nil {
+   	return err
+   }
+
+   c := container.New(cfg)
+   svc, err := container.Resolve[sms.SMS](c, "sms")
+   ```
+
+</Steps>
+
+Successful builds cache per `Container`, and failures retry on the next `Resolve`. A stored value of the wrong type fails `Resolve` with a type-mismatch error. Resolved plugins close with `Container.Close`. `examples/sms/app/main.go` shows the full startup-to-`Send` flow.
+
+To add a battery to a project, `zever add <battery>[/<adapter>]` scaffolds the `go.mod`, `internal/app/app.go`, and `zever.yaml` wiring for core batteries. For a plugin, pass an explicit adapter and `--module <path[@version]>` (version defaults to `v0.1.0`):
+
+```sh
+zever add sms/stub --module example.com/zever-battery-sms
+```
+
+Flags are `--adapter`, `--force`, `--module`, and `--dry-run`. Run `go mod tidy` afterwards. See the [CLI reference](../../../reference/cli/).
+
+## Register only what you choose
+
+There is no plugin manifest file. The `go.mod` requires are the component list: each chosen adapter module (such as `github.com/zenta-dev/zever/adapters/cache/redis`) appears as a `require`, so the module graph holds exactly the selected set. The generated `app.go` imports plus `Register()` calls are the manifest, emitted for the floor (`log`, `router`) plus your picks, nothing more. Check that `zever.yaml` and `app.go` list the same batteries.
+
+This mirrors the `database/sql` driver model: an adapter module registers its name, and the host decides which names exist in its binary. Import alone resolves nothing, and registration without the `go.mod` require does not build. For every adapter, light or heavy (for example `queue/memory`, `cache/redis`, `notification/fcm`), import its module, call its `Register()` before first use, and require it in `go.mod` (`zever new` emits all three). An unregistered adapter fails resolution with `UnknownAdapterError`.
+
+## Version and publish
+
+`container.PluginAPIVersion` is one integer, currently `1`, bumped only on a breaking host-side change. `RegisterPlugin` rejects any other version, empty names, nil builds, and duplicate names, so mismatches fail at registration, never at resolve time. The pre-1.0 `0.x` core may break the plugin surface with release notes. Pin scaffolds with `--framework-version`.
+
+- Publish from your own repo with independent semver tags, as a standalone module (not a lockstep tag of Zever).
+- State the targeted `PluginAPIVersion` in your README, and check that `RegisterPlugin` with a mismatched version fails before you publish.
+- Link the passing conformance run from your README.
+- Record user-facing changes in your own `CHANGELOG.md` under `## [Unreleased]`. If you touch Zever's scaffold or docs, add an entry there too.
+
+## Keep plugins out of `.zen`
+
+`.zen` schemas cannot reference plugin batteries. This is a scope boundary, not a bug: the compiler resolves only core batteries (the job `queue:` name is never validated against registered adapters), while plugins wire at runtime. Model the domain in `.zen` as usual, then wire the plugin in Go through config and the container. Syntax: [Zen syntax](../../../reference/zen-syntax/).
+
+<details>
+<summary>Why there is no schema-level plugin reference yet</summary>
+
+A proposal (`uses sms;` plus an optional `@via(sms)` field attribute) was evaluated and deferred:
+
+- **A, `uses` declaration:** the resolver records names and checks them at runtime. It touches the token table (`uses` becomes reserved), AST, parser, resolver and IR, formatter, `breaking`, grammars, LSP, and fixtures. It adds a second manifest beside `zever.yaml` and `RegisterPlugin` calls.
+- **B, plugin-shipped `.zen` fragment:** reuses existing machinery, but nothing machine-checks the fragment against the Go code, and there is no import statement.
+- **C, typed registry in the resolver:** rejected. It breaks the rule that `dsl/` never imports runtime code and adds global state.
+
+Revisit A when a real plugin needs schema-visible surface (generated validation, OpenAPI exposure, queue-payload typing). Never choose C.
+</details>
+
+<details>
+<summary>Why idempotency, lock, and ratelimit do not wrap cache</summary>
+
+None maps cleanly onto cache reads and writes. `idempotency.Store` runs a `Begin`/`Complete`/`Forget` reservation protocol, `lock.Locker` issues holder-scoped leases with ownership-checked `Extend`/`Unlock`, and `ratelimit.Limiter` does token-bucket accounting returning `Decision{Allowed, RetryAfter, Remaining}`. The reuse boundary is shared primitives (`shared/cas`, `shared/redisclient`), not shared domain interfaces.
+</details>
+
+## Related
+
+<CardGrid>
+  <LinkCard title="Providers and adapters" href="../../../concepts/providers-adapters/" description="How batteries and adapters fit together." />
+  <LinkCard title="The container" href="../../../concepts/container/" description="Lazy resolution and close order." />
+  <LinkCard title="Configuration" href="../../operate/configuration/" description="File and env layering." />
+</CardGrid>

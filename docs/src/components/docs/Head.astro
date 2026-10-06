@@ -15,7 +15,7 @@ const image = abs(`og/${id}.png`);
 type Entry = { type: string; label: string; isCurrent?: boolean; entries?: Entry[] };
 const hasCurrent = (e: Entry): boolean => (e.type === 'link' ? !!e.isCurrent : !!e.entries?.some(hasCurrent));
 const group = (route.sidebar as Entry[]).find((e) => e.type === 'group' && hasCurrent(e));
-const crumbs: Crumb[] = [{ name: NAME, url: `${SITE}/` }, { name: 'Docs', url: abs('getting-started/introduction/') }];
+const crumbs: Crumb[] = [{ name: NAME, url: `${SITE}/` }, { name: 'Docs', url: abs('start/introduction/') }];
 if (group && group.label !== title) crumbs.push({ name: group.label, url });
 crumbs.push({ name: title, url });
 ---

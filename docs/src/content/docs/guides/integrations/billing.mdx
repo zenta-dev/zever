@@ -1,0 +1,123 @@
+---
+title: Billing
+description: Manage customers, subscriptions, and invoices with a stub, Stripe, or Paddle adapter.
+---
+
+import { LinkCard, CardGrid } from '@astrojs/starlight/components';
+
+`billing.Billing` is one facade over provider APIs for customers, subscriptions, and invoices, with every amount in minor units so a float never rounds an invoice wrong. Use `billing` for the customer and subscription lifecycle and [Payments](../payment/) for the charge itself. It settles nothing: that is the provider adapter's job.
+
+## Quick start
+
+`stub` is the default. It is zero-infra, in memory, and keeps real billing calls out of your tests.
+
+```yaml title="zever.yaml"
+billing:
+  adapter: stub
+  options:
+    sandbox: true
+```
+
+```sh
+BILLING_ADAPTER=stripe
+BILLING_SECRET_KEY=sk_live_...
+BILLING_SANDBOX=true
+```
+
+Provider keys come from `shared/providersopt`: `secret_key` (Stripe), `api_key` (Paddle), `endpoint` (custom gateway, an absolute URL with scheme and host), and `sandbox` (provider test environment). See the [billing config reference](../../../reference/config/#billing).
+
+```go title="main.go"
+package main
+
+import (
+	"context"
+	"fmt"
+
+	"github.com/zenta-dev/zever/config"
+	"github.com/zenta-dev/zever/container"
+)
+
+func main() {
+	c := container.New(config.Default())
+	ctx := context.Background()
+	defer c.Close(ctx)
+
+	b, err := c.Billing()
+	if err != nil {
+		fmt.Println("resolve error:", err)
+		return
+	}
+	cust, err := b.CreateCustomer(ctx, "Ada", "ada@example.com", "key-1")
+	if err != nil {
+		fmt.Println("customer error:", err)
+		return
+	}
+	sub, err := b.CreateSubscription(ctx, cust.ID, "plan-pro", "key-2")
+	if err != nil {
+		fmt.Println("subscription error:", err)
+		return
+	}
+	inv, err := b.GetInvoice(ctx, cust.ID)
+	if err != nil {
+		fmt.Println("invoice error:", err)
+		return
+	}
+	fmt.Println("customer:", cust.ID)
+	fmt.Println("subscription:", sub.ID, string(sub.Status))
+	fmt.Println("invoice total:", inv.Total)
+	_ = b.Close()
+}
+```
+
+Expected output with `stub` (IDs are ULIDs, values vary):
+
+```text
+customer: 01J0000000000000000000000
+subscription: 01J0000000000000000000001 active
+invoice total: 0
+```
+
+## Pass minor units and idempotency keys
+
+Every amount is an `int64` in minor units (cents, not dollars). Format for display with the currency exponent helpers rather than dividing by 100, because not every currency has two decimals. Pass a stable idempotency key on each create call so retries never double-create customers or subscriptions.
+
+## Choose an adapter
+
+| Adapter | Package | Notes |
+|---|---|---|
+| `stub` | `adapters/billing/stub` | Default. In memory, ULID-identified records. |
+| `stripe` | `adapters/billing/stripe` | Real provider. Needs `secret_key`. |
+| `paddle` | `adapters/billing/paddle` | Real provider. Needs `api_key`. |
+
+## Production checklist
+
+- `billing` is not the system of record for what a customer was charged. The provider is. It gives a typed way to create and query records without per-provider HTTP.
+- `SecretKey` and `APIKey` never surface in errors or logs. Hold them in [Secrets](../../security/secrets/).
+
+## Troubleshooting
+
+<details>
+<summary>Tests hit the real provider</summary>
+
+Something overrode the adapter. Check `BILLING_ADAPTER` in the environment and the `adapter` field in `zever.yaml`. `config.Default()` alone always picks `stub`.
+</details>
+
+<details>
+<summary>`Validate` rejects `endpoint`</summary>
+
+A custom endpoint must be an absolute URL with scheme and host. Fix the URL instead of clearing the field.
+</details>
+
+<details>
+<summary>Amounts are off by a factor of 100</summary>
+
+You passed major units where minor units belong. Multiply by the currency exponent (via `ParseMinorUnits`) before calling create.
+</details>
+
+## Related
+
+<CardGrid>
+  <LinkCard title="Payments" href="../payment/" description="Charges, refunds, and webhook decoding." />
+  <LinkCard title="Secrets" href="../../security/secrets/" description="Keep provider keys outside YAML." />
+  <LinkCard title="Container" href="../../../concepts/container/" description="Lazy resolve and close order." />
+</CardGrid>

@@ -1,0 +1,168 @@
+---
+title: Configuration
+description: Layer typed defaults, a strict file, and env overrides, and keep secrets out of logs.
+---
+
+import { Tabs, TabItem, Aside, LinkCard, CardGrid } from '@astrojs/starlight/components';
+
+Zever has one config system: typed defaults, then a strict YAML or JSON file, then best-effort environment overrides. Tests run with zero setup via `config.Default()`, deploys fail fast on typos, and stray process env never breaks startup. Per-service keys live in the [config reference](../../../reference/config/).
+
+## Quick start
+
+Later layers win:
+
+```text
+defaults < file < env
+```
+
+`config.Default()` returns a working setup with zero-infra adapters (memory, local, sqlite, log, noop). `config.Load(path)` overlays a file and the process environment on top and validates at load, so an unknown adapter or unparsable value fails there, not mid-request.
+
+<Tabs>
+  <TabItem label="YAML">
+```yaml title="zever.yaml"
+db:
+  adapter: postgres
+  options:
+    dsn: postgres://app:secret@db:5432/app
+    max_conns: 20
+cache:
+  adapter: redis
+  options:
+    addr: redis:6379
+auth:
+  adapter: jwt
+  options:
+    jwt:
+      secret: prod-secret-at-least-32-bytes-long
+```
+  </TabItem>
+  <TabItem label="Env">
+```sh
+DB_ADAPTER=postgres
+DB_MAXCONNS=20
+DB_MAXCONNLIFETIME=5m
+CACHE_ADAPTER=redis
+AUTH_JWT_SECRET='prod-secret-at-least-32-bytes-long'
+RATELIMIT_RATE=100
+```
+  </TabItem>
+</Tabs>
+
+```go title="main.go"
+cfg, err := config.Load("zever.yaml")
+if err != nil {
+	log.Fatal(err)
+}
+c := container.New(cfg)
+defer c.Close(ctx)
+```
+
+`container.New(nil)` is valid for tests that never load a file. Each accessor (`c.DB()`, `c.Cache()`) resolves lazily and retries after an error. See [Container](../../../concepts/container/).
+
+## Map environment variables to keys
+
+Env names carry no prefix: `<SERVICE>_<FIELD>`, uppercased.
+
+- `_ADAPTER` switches the service adapter (`DB_ADAPTER=postgres`).
+- Matching is case-insensitive with `_` ignored, so `MAX_RETRIES` matches `MaxRetries`.
+- One nesting level splits at the first `_`, so `AUTH_JWT_SECRET` sets `Options.JWT.Secret`.
+- Durations accept `"5s"` strings in env only. Files store `time.Duration` as integer nanoseconds.
+
+## Load a file strictly
+
+File and env treat unknown input differently, on purpose:
+
+| Source | Unknown input | Why |
+|---|---|---|
+| File | Error | Typos fail at deploy time. |
+| Env | Silently ignored | Stray env (`PATH`, `HOME`, `AUTH_TOKEN`) must not break startup. |
+
+Only a value that fails to parse for a resolved field returns `InvalidOptionsError`, for example `DB_MAXCONNS=abc`.
+
+| Call | Behavior |
+|---|---|
+| `Load("")` | Probes `zever.yaml`, `zever.yml`, then `zever.json` in the cwd. First hit wins; missing files skip silently. |
+| `Load(path)` | The path must exist and decode. Any failure returns `nil` plus the error. |
+| Other extension | `ErrUnsupportedFormat` (only `.yaml`, `.yml`, `.json`). |
+| Null or empty block | Decodes to zero values. |
+
+File keys are snake_case. Old flat spellings are rejected as unknown fields. Env names are unaffected because matching ignores `_` and case.
+
+| Old key | New key |
+|---|---|
+| `apikey` | `api_key` |
+| `baseurl` | `base_url` |
+| `maxconns` / `minconns` | `max_conns` / `min_conns` |
+| `maxconnlifetime` / `maxconnidletime` | `max_conn_lifetime` / `max_conn_idle_time` |
+| `secretkey` / `webhooksecret` | `secret_key` / `webhook_secret` |
+| `poolsize` / `pooltimeout` | `pool_size` / `pool_timeout` |
+
+For editor autocomplete and inline validation use `config/schema/zever.schema.json`.
+
+## Redact config before printing
+
+Raw option maps may hold secrets as plain strings. `RedactedServices` (built on `Redact`) is the sole display path. Error text names services and fields only, and `zever config show` prints the discovered, resolved config with secrets masked.
+
+```go title="main.go"
+fmt.Println(config.RedactedServices(config.Default()))
+```
+
+Expected output (adapters named, secrets masked):
+
+```text
+db[sqlite] cache[memory] log[slog] ...
+```
+
+<Aside type="danger" title="Dev-only keys">
+`Default()` belongs in local dev and tests. Its crypto key is deterministic and public. Supply `AUTH_JWT_SECRET`, the crypto key, and provider keys from env or a mounted file in production.
+</Aside>
+
+## Know the defaults
+
+Defaults pick the zero-infra adapter per service (`db` sqlite, `cache`, `queue`, `session` memory, `storage` local, `log` slog, `observability` stdout, `payment`/`billing` stub, `secrets` env with prefix `ZEVER`). Two exceptions need keys: `ai` has no keyless backend (defaults to `anthropic` and requires an API key), and `mailer` defaults to `log` with a dummy localhost host and port because `Validate` requires them. The full table (over thirty services) is the [adapters matrix](../../../reference/adapters-matrix/).
+
+## Troubleshooting
+
+<details>
+<summary>`Load` fails with unknown field `maxconns`</summary>
+
+The file uses a pre-rename flat spelling. Rename it to `max_conns`; the table above and `CHANGELOG.md` list all renames.
+</details>
+
+<details>
+<summary>`Load("")` ignores your file</summary>
+
+The file is named outside the probe list or sits in another directory. Name it `zever.yaml`, `zever.yml`, or `zever.json` in the working directory, or pass an explicit path.
+</details>
+
+<details>
+<summary>`DB_MAXCONNS=abc` returns `InvalidOptionsError`</summary>
+
+The value fails to parse for a resolved field. Set an integer. Unset variables are ignored, bad values are not.
+</details>
+
+<details>
+<summary>`AUTH_TOKEN` does nothing</summary>
+
+Env is best-effort: the head `AUTH` is known but the remainder matches no field, so it is ignored. Set the real field (`AUTH_JWT_SECRET`).
+</details>
+
+<details>
+<summary>A secret appears in logs</summary>
+
+A raw option map was printed. Print `config.RedactedServices(cfg)` instead and audit error paths.
+</details>
+
+<details>
+<summary>`ErrUnsupportedFormat` on load</summary>
+
+The extension is not `.yaml`, `.yml`, or `.json`. Rename the file. The TOML copy in `config/schema/` is for editor tooling only.
+</details>
+
+## Related
+
+<CardGrid>
+  <LinkCard title="Deployment" href="../deployment/" description="Production checklist." />
+  <LinkCard title="Config reference" href="../../../reference/config/" description="Every service and key." />
+  <LinkCard title="Providers and adapters" href="../../../concepts/providers-adapters/" description="Adapter swap rules." />
+</CardGrid>
