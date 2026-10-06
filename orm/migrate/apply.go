@@ -73,7 +73,7 @@ func EnsureMigrationsTable(ctx context.Context, conn db.DB, dialect string) erro
   applied_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP
 );`
 	default:
-		return fmt.Errorf("orm/migrate: unsupported dialect %q", dialect)
+		return fmt.Errorf("orm/migrate: unsupported dialect %q: %w", dialect, ErrUnsupportedDialect)
 	}
 
 	if _, err := conn.Exec(ctx, stmt); err != nil {
@@ -134,7 +134,7 @@ func addMigrationTrackingColumns(ctx context.Context, conn db.DB, dialect string
 			stmt = fmt.Sprintf("ALTER TABLE %s ADD COLUMN %s %s;",
 				schemaMigrationsTable, quoteIdent(dialect, col.Name), col.Type)
 		default:
-			return fmt.Errorf("orm/migrate: unsupported dialect %q", dialect)
+			return fmt.Errorf("orm/migrate: unsupported dialect %q: %w", dialect, ErrUnsupportedDialect)
 		}
 
 		if _, err := conn.Exec(ctx, stmt); err != nil {
