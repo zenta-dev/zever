@@ -85,6 +85,8 @@ type ExtractConfig struct {
 	ModulePath string
 	// Force overwrites files that already exist in the output directory.
 	Force bool
+	// DryRun prints the extraction plan without writing any files.
+	DryRun bool
 }
 
 // extractPlan is everything planExtraction resolves before anything is
@@ -110,6 +112,7 @@ func runExtract(args []string) error {
 	outDir := fs.String("out", "", "output directory (default ./<module>-service)")
 	modulePath := fs.String("module", "", "module path for the extracted go.mod (default <this module>/<module>-service)")
 	force := fs.Bool("force", false, "overwrite files that already exist in the output directory")
+	dryRun := fs.Bool("dry-run", false, "print the extraction plan without writing any files")
 
 	fs.Usage = func() {
 		printExtractUsage(fs)
@@ -125,7 +128,7 @@ func runExtract(args []string) error {
 		return fmt.Errorf("%s: expected exactly one module name, got %d", tag, len(posArgs))
 	}
 
-	cfg := ExtractConfig{Module: posArgs[0], OutDir: *outDir, ModulePath: *modulePath, Force: *force}
+	cfg := ExtractConfig{Module: posArgs[0], OutDir: *outDir, ModulePath: *modulePath, Force: *force, DryRun: *dryRun}
 
 	project, err := loadProjectConfig()
 	if err != nil {
@@ -145,6 +148,12 @@ func runExtract(args []string) error {
 	plan, err := planExtraction(tag, cfg, schema, gomod)
 	if err != nil {
 		return err
+	}
+
+	if cfg.DryRun {
+		printExtractDryRun(plan)
+
+		return nil
 	}
 
 	return writeExtraction(tag, plan, gomod)
@@ -589,6 +598,23 @@ func printExtractSummary(plan extractPlan, written []string) {
 	if shouldShowHint() {
 		_, _ = fmt.Fprintln(os.Stderr, formatHint(hintFor("extract")))
 	}
+}
+
+// printExtractDryRun prints the extraction plan without writing anything.
+func printExtractDryRun(plan extractPlan) {
+	mod := plan.Module
+
+	_, _ = fmt.Fprintln(os.Stdout, dim("dry run — no files written"))
+	_, _ = fmt.Fprintln(os.Stdout, success("would extract ")+bold(fmt.Sprintf("module %q", mod.Name))+dim(" into ")+cyan(plan.OutDir))
+	_, _ = fmt.Fprintln(os.Stdout, "  "+dim("module path: ")+cyan(plan.ModulePath))
+	_, _ = fmt.Fprintln(os.Stdout, "  "+dim(fmt.Sprintf("%d entities, %d services, %d jobs, %d schedules", len(mod.Entities), len(mod.Services), len(mod.Jobs), len(mod.Schedules))))
+
+	for _, src := range plan.SchemaFiles {
+		_, _ = fmt.Fprintln(os.Stdout, "  "+dim("would copy ")+cyan(src))
+	}
+
+	_, _ = fmt.Fprintln(os.Stdout, "  "+dim("would write ")+cyan(filepath.Join(plan.OutDir, "go.mod")))
+	_, _ = fmt.Fprintln(os.Stdout, "  "+dim("would generate ORM + entrypoints under ")+cyan(plan.OutDir))
 }
 
 // --- go.mod reading ---

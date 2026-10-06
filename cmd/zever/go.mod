@@ -8,6 +8,7 @@ require (
 	github.com/charmbracelet/x/exp/teatest/v2 v2.0.0-20260924144451-d676b019604b
 	github.com/fsnotify/fsnotify v1.10.1
 	github.com/spf13/cobra v1.10.2
+	github.com/spf13/pflag v1.0.9
 	github.com/traefik/yaegi v0.16.1
 	github.com/zenta-dev/zever/adapters/ai/anthropic v0.5.3
 	github.com/zenta-dev/zever/adapters/ai/gemini v0.5.3
@@ -250,7 +251,6 @@ require (
 	github.com/robfig/cron/v3 v3.0.1 // indirect
 	github.com/rs/zerolog v1.35.1 // indirect
 	github.com/russross/blackfriday/v2 v2.1.0 // indirect
-	github.com/spf13/pflag v1.0.9 // indirect
 	github.com/spiffe/go-spiffe/v2 v2.8.1 // indirect
 	github.com/standard-webhooks/standard-webhooks/libraries v0.0.1 // indirect
 	github.com/stripe/stripe-go/v82 v82.5.1 // indirect
