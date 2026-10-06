@@ -75,7 +75,7 @@ func TestRetentionCleanup(t *testing.T) {
 	mustRecord(t, d, outbox.Message{ID: "old", Topic: "t"})
 	d.pollOnce(t.Context())
 
-	if n := countRows(t, d, DefaultTable); n != 1 {
+	if n := countRows(t, d); n != 1 {
 		t.Fatalf("rows = %d, want 1 processed", n)
 	}
 
@@ -88,7 +88,7 @@ func TestRetentionCleanup(t *testing.T) {
 
 	d.cleanup(t.Context())
 
-	if n := countRows(t, d, DefaultTable); n != 0 {
+	if n := countRows(t, d); n != 0 {
 		t.Fatalf("rows = %d, want 0 after retention cleanup", n)
 	}
 }

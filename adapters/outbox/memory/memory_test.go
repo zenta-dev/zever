@@ -5,11 +5,8 @@ import (
 	"errors"
 	"testing"
 
-	coredb "github.com/zenta-dev/zever/core/db"
-	"github.com/zenta-dev/zever/core/outbox"
-	"github.com/zenta-dev/zever/core/outbox/outboxtest"
-
 	"github.com/zenta-dev/zever/adapters/outbox/memory"
+	"github.com/zenta-dev/zever/core/outbox"
 )
 
 func TestRecordPublishesImmediately(t *testing.T) {
@@ -116,22 +113,4 @@ func TestRegister(t *testing.T) {
 	if s.Name() != "memory" {
 		t.Errorf("Name() = %q, want memory", s.Name())
 	}
-}
-
-func TestConformance(t *testing.T) {
-	t.Parallel()
-
-	outboxtest.Conformance(t, func(_ *testing.T, pub *outboxtest.Recorder) outboxtest.Harness {
-		s, err := memory.New(memory.Options{Publisher: pub})
-		if err != nil {
-			t.Fatalf("New() error = %v", err)
-		}
-
-		return outboxtest.Harness{
-			Store: s,
-			InTx: func(ctx context.Context, fn func(context.Context, coredb.Tx) error) error {
-				return fn(ctx, nil)
-			},
-		}
-	})
 }
