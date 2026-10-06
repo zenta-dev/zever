@@ -10,13 +10,16 @@ import (
 	"net/http/httptest"
 	"strings"
 	"sync"
+	"sync/atomic"
 	"testing"
 	"time"
 
+	"go.opentelemetry.io/otel/trace"
 	"go.uber.org/goleak"
 	"google.golang.org/genai"
 
 	"github.com/zenta-dev/zever/core/ai"
+	"github.com/zenta-dev/zever/shared/traceprop"
 )
 
 func TestOpen_APIKeyRequired(t *testing.T) {
@@ -72,6 +75,42 @@ func TestOpen_TimeoutValidation(t *testing.T) {
 	}
 }
 
+// getOK issues a GET for url and closes the response body, returning the
+// request error (if any) so tests can assert on reachability.
+func getOK(t *testing.T, c *http.Client, url string) error {
+	t.Helper()
+
+	req, err := http.NewRequestWithContext(t.Context(), http.MethodGet, url, nil)
+	if err != nil {
+		t.Fatalf("NewRequest: %v", err)
+	}
+
+	resp, err := c.Do(req)
+	if resp != nil {
+		_ = resp.Body.Close()
+	}
+
+	return err
+}
+
+// legacyTLSServer starts an HTTPS test server that negotiates at most
+// maxVersion, so a client enforcing a TLS 1.2 floor cannot complete the
+// handshake. The failure happens on version negotiation, before certificate
+// verification, so InsecureSkipVerify does not change the outcome.
+func legacyTLSServer(t *testing.T, maxVersion uint16) *httptest.Server {
+	t.Helper()
+
+	srv := httptest.NewUnstartedServer(http.HandlerFunc(func(w http.ResponseWriter, _ *http.Request) {
+		w.WriteHeader(http.StatusOK)
+	}))
+	//nolint:gosec // test-only legacy TLS range to observe the client's TLS floor.
+	srv.TLS = &tls.Config{MinVersion: tls.VersionTLS10, MaxVersion: maxVersion}
+	srv.StartTLS()
+	t.Cleanup(srv.Close)
+
+	return srv
+}
+
 func TestOpen_SuccessAndTLS(t *testing.T) {
 	t.Parallel()
 
@@ -84,19 +123,16 @@ func TestOpen_SuccessAndTLS(t *testing.T) {
 		t.Fatal("nil AI")
 	}
 
-	// Check HTTP client TLS
+	// Check HTTP client TLS. The transport is wrapped for trace injection, so
+	// the floor is asserted behaviorally: a TLS 1.1-only server is refused.
 	ad, ok := a.(*adapter)
 	if !ok {
 		t.Fatal("not adapter")
 	}
 
-	tr, ok := ad.client.ClientConfig().HTTPClient.Transport.(*http.Transport)
-	if !ok {
-		t.Fatalf("transport not *http.Transport: %T", ad.client.ClientConfig().HTTPClient.Transport)
-	}
-
-	if tr.TLSClientConfig == nil || tr.TLSClientConfig.MinVersion != tls.VersionTLS12 {
-		t.Errorf("TLS MinVersion = %v want TLS12", tr.TLSClientConfig.MinVersion)
+	legacy := legacyTLSServer(t, tls.VersionTLS11)
+	if getOK(t, ad.client.ClientConfig().HTTPClient, legacy.URL) == nil {
+		t.Error("TLS 1.1 server accepted; TLS 1.2 floor not enforced")
 	}
 
 	if ad.client.ClientConfig().HTTPClient.Timeout != time.Second {
@@ -109,23 +145,38 @@ func TestOpen_SuccessAndTLS(t *testing.T) {
 }
 
 func TestNewHTTPClient_Fallback(t *testing.T) {
-	// Force DefaultTransport not *http.Transport
+	// Mutates http.DefaultTransport: must not be parallel.
 	prev := http.DefaultTransport
 	http.DefaultTransport = &fakeTransport{}
 	defer func() { http.DefaultTransport = prev }()
 
-	c := newHTTPClient(0)
+	c := newHTTPClient(0, false)
 	if c.Transport == nil {
 		t.Fatal("nil transport")
 	}
 
-	tr, ok := c.Transport.(*http.Transport)
-	if !ok {
-		t.Fatalf("want *http.Transport got %T", c.Transport)
+	legacy := legacyTLSServer(t, tls.VersionTLS11)
+	if getOK(t, c, legacy.URL) == nil {
+		t.Error("fallback transport negotiated TLS below the 1.2 floor")
+	}
+}
+
+// TestNewHTTPClient_InsecureOptIn covers AllowInsecure threading: the opt-in
+// skips certificate verification, so a self-signed test server is reachable.
+func TestNewHTTPClient_InsecureOptIn(t *testing.T) {
+	t.Parallel()
+
+	srv := httptest.NewTLSServer(http.HandlerFunc(func(w http.ResponseWriter, _ *http.Request) {
+		w.WriteHeader(http.StatusOK)
+	}))
+	defer srv.Close()
+
+	if err := getOK(t, newHTTPClient(0, false), srv.URL); err == nil {
+		t.Error("self-signed server accepted without AllowInsecure")
 	}
 
-	if tr.TLSClientConfig == nil || tr.TLSClientConfig.MinVersion != tls.VersionTLS12 {
-		t.Errorf("fallback TLS wrong")
+	if err := getOK(t, newHTTPClient(0, true), srv.URL); err != nil {
+		t.Errorf("AllowInsecure client err = %v, want nil", err)
 	}
 }
 
@@ -135,46 +186,28 @@ func (f *fakeTransport) RoundTrip(_ *http.Request) (*http.Response, error) {
 	return nil, errors.New("fake")
 }
 
+// openWithServer builds an adapter against srv. AllowInsecure is threaded as
+// an httpclient option, so the self-signed test server is trusted without
+// poking the (trace-wrapped) transport.
 func openWithServer(t *testing.T, srv *httptest.Server) ai.AI { //nolint:unused
 	t.Helper()
+
 	a, err := New(ai.Options{APIKey: "test-key", BaseURL: srv.URL, AllowInsecure: true})
-	if err == nil {
-		ad0, ok := a.(*adapter) //nolint:forcetypeassert
-		if !ok {
-			t.Fatalf("not adapter")
-		}
-		if tr, ok := ad0.client.ClientConfig().HTTPClient.Transport.(*http.Transport); ok {
-			tr.TLSClientConfig.InsecureSkipVerify = true
-		}
-	}
 	if err != nil {
 		t.Fatalf("Open err = %v", err)
 	}
-	ad, _ := a.(*adapter) //nolint:forcetypeassert
-	if tr, ok := ad.client.ClientConfig().HTTPClient.Transport.(*http.Transport); ok {
-		if tr.TLSClientConfig == nil {
-			tr.TLSClientConfig = &tls.Config{InsecureSkipVerify: true} //nolint:gosec
-		} else {
-			tr.TLSClientConfig.InsecureSkipVerify = true
-		}
-	}
+
 	return a
 }
 
 func openWithKeyAndServer(t *testing.T, key string, srv *httptest.Server) ai.AI {
 	t.Helper()
+
 	a, err := New(ai.Options{APIKey: key, BaseURL: srv.URL, AllowInsecure: true})
 	if err != nil {
 		t.Fatalf("Open err = %v", err)
 	}
-	ad, _ := a.(*adapter) //nolint:forcetypeassert
-	if tr, ok := ad.client.ClientConfig().HTTPClient.Transport.(*http.Transport); ok {
-		if tr.TLSClientConfig == nil {
-			tr.TLSClientConfig = &tls.Config{InsecureSkipVerify: true} //nolint:gosec
-		} else {
-			tr.TLSClientConfig.InsecureSkipVerify = true
-		}
-	}
+
 	return a
 }
 
@@ -225,15 +258,6 @@ func TestGenerate_SuccessMocked(t *testing.T) {
 	defer srv.Close()
 
 	a, err := New(ai.Options{APIKey: "test-key", BaseURL: srv.URL, AllowInsecure: true})
-	if err == nil {
-		ad0, ok := a.(*adapter) //nolint:forcetypeassert
-		if !ok {
-			t.Fatalf("not adapter")
-		}
-		if tr, ok := ad0.client.ClientConfig().HTTPClient.Transport.(*http.Transport); ok {
-			tr.TLSClientConfig.InsecureSkipVerify = true
-		}
-	}
 	if err != nil {
 		t.Fatalf("Open err = %v", err)
 	}
@@ -1324,10 +1348,8 @@ func TestOpen_InsecureLocalhost(t *testing.T) {
 		t.Fatalf("Open err %v", err)
 	}
 	ad, _ := a.(*adapter) //nolint:forcetypeassert
-	if tr, ok := ad.client.ClientConfig().HTTPClient.Transport.(*http.Transport); ok {
-		if tr.TLSClientConfig.InsecureSkipVerify {
-			t.Error("insecure set without AllowInsecure opt-in")
-		}
+	if err = getOK(t, ad.client.ClientConfig().HTTPClient, srv.URL); err == nil {
+		t.Error("self-signed server accepted without AllowInsecure opt-in")
 	}
 	if cerr := a.Close(); cerr != nil {
 		t.Fatalf("Close err %v", cerr)
@@ -1337,12 +1359,6 @@ func TestOpen_InsecureLocalhost(t *testing.T) {
 	a, err = New(ai.Options{APIKey: "k", BaseURL: srv.URL, AllowInsecure: true})
 	if err != nil {
 		t.Fatalf("Open err %v", err)
-	}
-	ad, _ = a.(*adapter) //nolint:forcetypeassert
-	if tr, ok := ad.client.ClientConfig().HTTPClient.Transport.(*http.Transport); ok {
-		if !tr.TLSClientConfig.InsecureSkipVerify {
-			t.Error("insecure not set with AllowInsecure")
-		}
 	}
 	_, err = a.Generate(t.Context(), "m", []ai.Message{{Role: ai.RoleUser, Content: "hi"}}, ai.GenerateOptions{})
 	if err != nil {
@@ -1361,12 +1377,8 @@ func TestOpen_SpoofedLoopbackStaysSecure(t *testing.T) {
 		if err != nil {
 			t.Fatalf("New(%q) err %v", raw, err)
 		}
-		ad, _ := a.(*adapter) //nolint:forcetypeassert
-		if tr, ok := ad.client.ClientConfig().HTTPClient.Transport.(*http.Transport); ok {
-			if tr.TLSClientConfig.InsecureSkipVerify {
-				t.Errorf("insecure set for %q", raw)
-			}
-		}
+		// TLS verification is driven solely by AllowInsecure, so a URL that
+		// merely looks like loopback cannot turn it off.
 		if err := a.Close(); err != nil {
 			t.Fatalf("Close err %v", err)
 		}
@@ -1398,5 +1410,97 @@ func TestMapAPIError_429Empty(t *testing.T) {
 	var rle ai.RateLimitedError
 	if !errors.As(mapped, &rle) {
 		t.Errorf("429 empty not RateLimited")
+	}
+}
+
+// ctxWithGeminiTrace returns a context carrying a valid remote span.
+func ctxWithGeminiTrace(t *testing.T, traceHex string) context.Context {
+	t.Helper()
+
+	tid, err := trace.TraceIDFromHex(traceHex)
+	if err != nil {
+		t.Fatalf("TraceIDFromHex: %v", err)
+	}
+
+	sid, err := trace.SpanIDFromHex("00f067aa0ba902b7")
+	if err != nil {
+		t.Fatalf("SpanIDFromHex: %v", err)
+	}
+
+	return trace.ContextWithSpanContext(t.Context(), trace.NewSpanContext(trace.SpanContextConfig{
+		TraceID:    tid,
+		SpanID:     sid,
+		TraceFlags: trace.FlagsSampled,
+	}))
+}
+
+func TestGenerateInjectsTraceHeaders(t *testing.T) {
+	t.Parallel()
+
+	var got atomic.Value
+
+	srv := httptest.NewTLSServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		got.Store(r.Header.Get(traceprop.TraceParentHeader))
+		w.Header().Set("Content-Type", "application/json")
+		_ = json.NewEncoder(w).Encode(map[string]any{
+			"candidates": []any{
+				map[string]any{
+					"content": map[string]any{"parts": []any{map[string]any{"text": "hello"}}},
+					"role":    "model",
+				},
+			},
+		})
+	}))
+	defer srv.Close()
+
+	a, err := New(ai.Options{APIKey: "test-key", BaseURL: srv.URL, AllowInsecure: true})
+	if err != nil {
+		t.Fatalf("Open err = %v", err)
+	}
+
+	defer func() { _ = a.Close() }()
+
+	ctx := ctxWithGeminiTrace(t, "4bf92f3577b34da6a3ce929d0e0e4736")
+	if _, err := a.Generate(ctx, "models/gemini-1.5-flash", []ai.Message{{Role: ai.RoleUser, Content: "hi"}}, ai.GenerateOptions{}); err != nil {
+		t.Fatalf("Generate err = %v", err)
+	}
+
+	parent, _ := got.Load().(string)
+	if parent == "" {
+		t.Fatal("traceparent header missing")
+	}
+
+	back := traceprop.Extract(t.Context(), map[string]string{traceprop.TraceParentHeader: parent})
+	sc := trace.SpanContextFromContext(back)
+	if sc.TraceID().String() != "4bf92f3577b34da6a3ce929d0e0e4736" {
+		t.Errorf("TraceID = %s, want 4bf92f3577b34da6a3ce929d0e0e4736", sc.TraceID())
+	}
+}
+
+func TestGenerateNoSpanNoTraceHeaders(t *testing.T) {
+	t.Parallel()
+
+	var got atomic.Value
+
+	srv := httptest.NewTLSServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		got.Store(r.Header.Get(traceprop.TraceParentHeader))
+		w.Header().Set("Content-Type", "application/json")
+		_, _ = w.Write([]byte(`{"candidates":[{"content":{"parts":[{"text":"ok"}],"role":"model"}}]}`))
+	}))
+	defer srv.Close()
+
+	a, err := New(ai.Options{APIKey: "test-key", BaseURL: srv.URL, AllowInsecure: true})
+	if err != nil {
+		t.Fatalf("Open err = %v", err)
+	}
+
+	defer func() { _ = a.Close() }()
+
+	if _, err := a.Generate(t.Context(), "m", []ai.Message{{Role: ai.RoleUser, Content: "hi"}}, ai.GenerateOptions{}); err != nil {
+		t.Fatalf("Generate err = %v", err)
+	}
+
+	if parent, _ := got.Load().(string); parent != "" {
+		t.Errorf("traceparent = %q, want empty without a span", parent)
 	}
 }

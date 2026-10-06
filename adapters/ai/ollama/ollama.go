@@ -81,6 +81,7 @@ func NewWithOptions(opts Options) (ai.AI, error) {
 		if opts.AllowInsecure {
 			clientOpts = append(clientOpts, httpclient.WithInsecureSkipVerify(true))
 		}
+		clientOpts = append(clientOpts, httpclient.WithTracing())
 
 		return &adapter{
 			addr:          addr,

@@ -8,13 +8,18 @@ import (
 	"fmt"
 	"io"
 	"net/http"
+	"net/http/httptest"
 	"net/url"
 	"runtime"
 	"strings"
+	"sync/atomic"
 	"testing"
 	"time"
 
+	"go.opentelemetry.io/otel/trace"
+
 	"github.com/zenta-dev/zever/core/ai"
+	"github.com/zenta-dev/zever/shared/traceprop"
 )
 
 // fakeTransport hand-fakes the HTTP layer: no network is touched.
@@ -159,6 +164,14 @@ func TestNewWithOptions_tlsVerification(t *testing.T) {
 		t.Run(tt.name, func(t *testing.T) {
 			t.Parallel()
 
+			// The transport is wrapped for trace injection, so verification
+			// is asserted behaviorally against a self-signed test server:
+			// it is reachable only when certificate checks are skipped.
+			srv := httptest.NewTLSServer(http.HandlerFunc(func(w http.ResponseWriter, _ *http.Request) {
+				w.WriteHeader(http.StatusOK)
+			}))
+			defer srv.Close()
+
 			a, err := NewWithOptions(Options{AllowInsecure: tt.allowInsecure})
 			if err != nil {
 				t.Fatalf("NewWithOptions: %v", err)
@@ -169,17 +182,10 @@ func TestNewWithOptions_tlsVerification(t *testing.T) {
 				t.Fatalf("got %T, want *adapter", a)
 			}
 
-			tr, ok := ad.client.Transport.(*http.Transport)
-			if !ok {
-				t.Fatalf("transport = %T, want *http.Transport", ad.client.Transport)
-			}
+			err = getOK(t, ad.client, srv.URL)
 
-			if tr.TLSClientConfig == nil {
-				t.Fatal("TLSClientConfig is nil")
-			}
-
-			if tr.TLSClientConfig.InsecureSkipVerify != tt.wantSkip {
-				t.Fatalf("InsecureSkipVerify = %v, want %v", tr.TLSClientConfig.InsecureSkipVerify, tt.wantSkip)
+			if gotSkip := err == nil; gotSkip != tt.wantSkip {
+				t.Fatalf("certificate verification skipped = %v, want %v (err = %v)", gotSkip, tt.wantSkip, err)
 			}
 		})
 	}
@@ -1338,4 +1344,113 @@ func equalMaps(got any, want map[string]any) bool {
 	}
 
 	return true
+}
+
+// getOK issues a GET for url and closes the response body, returning the
+// request error (if any) so tests can assert on reachability.
+func getOK(t *testing.T, c *http.Client, url string) error {
+	t.Helper()
+
+	req, err := http.NewRequestWithContext(t.Context(), http.MethodGet, url, nil)
+	if err != nil {
+		t.Fatalf("NewRequest: %v", err)
+	}
+
+	resp, err := c.Do(req)
+	if resp != nil {
+		_ = resp.Body.Close()
+	}
+
+	return err
+}
+
+// ctxWithOllamaTrace returns a context carrying a valid remote span.
+func ctxWithOllamaTrace(t *testing.T, traceHex string) context.Context {
+	t.Helper()
+
+	tid, err := trace.TraceIDFromHex(traceHex)
+	if err != nil {
+		t.Fatalf("TraceIDFromHex: %v", err)
+	}
+
+	sid, err := trace.SpanIDFromHex("00f067aa0ba902b7")
+	if err != nil {
+		t.Fatalf("SpanIDFromHex: %v", err)
+	}
+
+	return trace.ContextWithSpanContext(t.Context(), trace.NewSpanContext(trace.SpanContextConfig{
+		TraceID:    tid,
+		SpanID:     sid,
+		TraceFlags: trace.FlagsSampled,
+	}))
+}
+
+func TestGenerateInjectsTraceHeaders(t *testing.T) {
+	t.Parallel()
+
+	var got atomic.Value
+
+	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		got.Store(r.Header.Get(traceprop.TraceParentHeader))
+		w.Header().Set("Content-Type", "application/json")
+		_ = json.NewEncoder(w).Encode(map[string]any{
+			"message":           map[string]any{"content": "hello"},
+			"done":              true,
+			"prompt_eval_count": 1,
+			"eval_count":        1,
+		})
+	}))
+	defer srv.Close()
+
+	a, err := NewWithOptions(Options{Addr: srv.URL, Model: "llama3"})
+	if err != nil {
+		t.Fatalf("NewWithOptions: %v", err)
+	}
+
+	ctx := ctxWithOllamaTrace(t, "4bf92f3577b34da6a3ce929d0e0e4736")
+	if _, err := a.Generate(ctx, "", []ai.Message{{Role: ai.RoleUser, Content: "hi"}}, ai.GenerateOptions{}); err != nil {
+		t.Fatalf("Generate: %v", err)
+	}
+
+	parent, _ := got.Load().(string)
+	if parent == "" {
+		t.Fatal("traceparent header missing")
+	}
+
+	back := traceprop.Extract(t.Context(), map[string]string{traceprop.TraceParentHeader: parent})
+	sc := trace.SpanContextFromContext(back)
+	if sc.TraceID().String() != "4bf92f3577b34da6a3ce929d0e0e4736" {
+		t.Errorf("TraceID = %s, want 4bf92f3577b34da6a3ce929d0e0e4736", sc.TraceID())
+	}
+}
+
+func TestGenerateNoSpanNoTraceHeaders(t *testing.T) {
+	t.Parallel()
+
+	var got atomic.Value
+
+	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		got.Store(r.Header.Get(traceprop.TraceParentHeader))
+		w.Header().Set("Content-Type", "application/json")
+		_ = json.NewEncoder(w).Encode(map[string]any{
+			"message":           map[string]any{"content": "hello"},
+			"done":              true,
+			"prompt_eval_count": 1,
+			"eval_count":        1,
+		})
+	}))
+	defer srv.Close()
+
+	a, err := NewWithOptions(Options{Addr: srv.URL, Model: "llama3"})
+	if err != nil {
+		t.Fatalf("NewWithOptions: %v", err)
+	}
+
+	if _, err := a.Generate(t.Context(), "", []ai.Message{{Role: ai.RoleUser, Content: "hi"}}, ai.GenerateOptions{}); err != nil {
+		t.Fatalf("Generate: %v", err)
+	}
+
+	if parent, _ := got.Load().(string); parent != "" {
+		t.Errorf("traceparent = %q, want empty without a span", parent)
+	}
 }

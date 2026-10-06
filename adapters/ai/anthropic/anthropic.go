@@ -33,7 +33,7 @@ type adapter struct {
 }
 
 func newClient(opts ai.Options) *http.Client {
-	return httpclient.NewClient(opts.Timeout)
+	return httpclient.NewClient(opts.Timeout, httpclient.WithTracing())
 }
 
 // New creates an Anthropic AI backend.

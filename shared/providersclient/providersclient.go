@@ -22,7 +22,7 @@ import (
 // payment/stripe.New call this instead of separately constructing the
 // same *stripe.BackendConfig/*stripe.Client.
 func NewStripeClient(secretKey, endpoint string, timeout time.Duration) *stripe.Client {
-	return NewStripeClientWithHTTPClient(secretKey, endpoint, httpclient.NewClient(timeout))
+	return NewStripeClientWithHTTPClient(secretKey, endpoint, httpclient.NewClient(timeout, httpclient.WithTracing()))
 }
 
 // NewStripeClientWithHTTPClient is NewStripeClient with a caller-supplied

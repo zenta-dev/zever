@@ -4,6 +4,7 @@ package anthropic
 import (
 	"context"
 	"crypto/tls"
+	"crypto/x509"
 	"encoding/json"
 	"errors"
 	"fmt"
@@ -12,13 +13,16 @@ import (
 	"net/http/httptest"
 	"net/url"
 	"strings"
+	"sync/atomic"
 	"testing"
 	"time"
 
 	"github.com/anthropics/anthropic-sdk-go"
 	"github.com/anthropics/anthropic-sdk-go/option"
+	"go.opentelemetry.io/otel/trace"
 
 	"github.com/zenta-dev/zever/core/ai"
+	"github.com/zenta-dev/zever/shared/traceprop"
 )
 
 func TestOpen_APIKeyRequired(t *testing.T) {
@@ -82,50 +86,77 @@ func TestOpen_WithBaseURL(t *testing.T) {
 	_ = srv
 }
 
+// legacyTLSServer starts an HTTPS test server that negotiates at most
+// maxVersion, so a client enforcing a TLS 1.2 floor cannot complete the
+// handshake. The failure happens on version negotiation, before certificate
+// verification, so InsecureSkipVerify does not change the outcome.
+func legacyTLSServer(t *testing.T, maxVersion uint16) *httptest.Server {
+	t.Helper()
+
+	srv := httptest.NewUnstartedServer(http.HandlerFunc(func(w http.ResponseWriter, _ *http.Request) {
+		w.WriteHeader(http.StatusOK)
+	}))
+	//nolint:gosec // test-only legacy TLS range to observe the client's TLS floor.
+	srv.TLS = &tls.Config{MinVersion: tls.VersionTLS10, MaxVersion: maxVersion}
+	srv.StartTLS()
+	t.Cleanup(srv.Close)
+
+	return srv
+}
+
+// requireTLSFloor asserts c refuses a TLS 1.1-only server. The transport is
+// wrapped for trace injection, so the TLS floor is asserted behaviorally
+// instead of by asserting a concrete transport type.
+func requireTLSFloor(t *testing.T, c *http.Client) {
+	t.Helper()
+
+	srv := legacyTLSServer(t, tls.VersionTLS11)
+
+	resp, err := c.Get(srv.URL)
+	if resp != nil {
+		_ = resp.Body.Close()
+	}
+	if err == nil {
+		t.Fatal("client negotiated TLS below the 1.2 floor")
+	}
+}
+
 func TestNewClient_TLSMinVersion(t *testing.T) {
-	// Save original transport
+	// Mutates http.DefaultTransport: must not be parallel.
 	orig := http.DefaultTransport
 	defer func() { http.DefaultTransport = orig }()
 
 	// Case 1: default nil TLSConfig should enforce TLS12
 	http.DefaultTransport = &http.Transport{TLSClientConfig: nil}
 	c := newClient(ai.Options{Timeout: 5 * time.Second})
-	tr, ok := c.Transport.(*http.Transport)
-	if !ok {
-		t.Fatalf("transport not *http.Transport")
-	}
-	if tr.TLSClientConfig == nil || tr.TLSClientConfig.MinVersion != tls.VersionTLS12 {
-		t.Fatalf("MinVersion = %v want TLS12", tr.TLSClientConfig.MinVersion)
-	}
+	requireTLSFloor(t, c)
 	if c.Timeout != 5*time.Second {
 		t.Fatalf("Timeout = %v want 5s", c.Timeout)
 	}
 
 	// Case 2: existing TLS10 should be upgraded
 	http.DefaultTransport = &http.Transport{TLSClientConfig: &tls.Config{MinVersion: tls.VersionTLS10}}
-	c2 := newClient(ai.Options{})
-	tr2 := c2.Transport.(*http.Transport)
-	if tr2.TLSClientConfig.MinVersion != tls.VersionTLS12 {
-		t.Fatalf("upgrade MinVersion = %x want TLS12", tr2.TLSClientConfig.MinVersion)
-	}
+	requireTLSFloor(t, newClient(ai.Options{}))
 
-	// Case 3: already TLS12 stays
+	// Case 3: already TLS12 stays: a TLS 1.1-only server is still refused
+	http.DefaultTransport = &http.Transport{TLSClientConfig: &tls.Config{MinVersion: tls.VersionTLS12}}
+	requireTLSFloor(t, newClient(ai.Options{}))
+
+	// Case 4: TLS13 stays TLS13, so a TLS 1.2-capped server is refused too
 	http.DefaultTransport = &http.Transport{TLSClientConfig: &tls.Config{MinVersion: tls.VersionTLS13}}
-	c3 := newClient(ai.Options{})
-	tr3 := c3.Transport.(*http.Transport)
-	if tr3.TLSClientConfig.MinVersion != tls.VersionTLS13 {
-		t.Fatalf("keep MinVersion = %x want TLS13", tr3.TLSClientConfig.MinVersion)
+	srv := legacyTLSServer(t, tls.VersionTLS12)
+	c13 := newClient(ai.Options{})
+	resp, err := c13.Get(srv.URL)
+	if resp != nil {
+		_ = resp.Body.Close()
+	}
+	if err == nil {
+		t.Fatal("TLS13 client negotiated below its floor")
 	}
 
-	// Case 4: DefaultTransport not *http.Transport (fallback)
+	// Case 5: DefaultTransport not *http.Transport (fallback)
 	http.DefaultTransport = &dummyRoundTripper{}
-	c4 := newClient(ai.Options{})
-	tr4, ok := c4.Transport.(*http.Transport)
-	if !ok || tr4.TLSClientConfig == nil || tr4.TLSClientConfig.MinVersion != tls.VersionTLS12 {
-		t.Fatalf("fallback transport bad")
-	}
-	// restore for other tests
-	http.DefaultTransport = orig
+	requireTLSFloor(t, newClient(ai.Options{}))
 }
 
 type dummyRoundTripper struct{}
@@ -1070,5 +1101,106 @@ func TestGenerate_EmptyContentToolUse(t *testing.T) {
 	}
 	if gen.Content != "" {
 		t.Fatalf("want empty, got %q", gen.Content)
+	}
+}
+
+// ctxWithAnthropicTrace returns a context carrying a valid remote span.
+func ctxWithAnthropicTrace(t *testing.T, traceHex string) context.Context {
+	t.Helper()
+
+	tid, err := trace.TraceIDFromHex(traceHex)
+	if err != nil {
+		t.Fatalf("TraceIDFromHex: %v", err)
+	}
+
+	sid, err := trace.SpanIDFromHex("00f067aa0ba902b7")
+	if err != nil {
+		t.Fatalf("SpanIDFromHex: %v", err)
+	}
+
+	return trace.ContextWithSpanContext(t.Context(), trace.NewSpanContext(trace.SpanContextConfig{
+		TraceID:    tid,
+		SpanID:     sid,
+		TraceFlags: trace.FlagsSampled,
+	}))
+}
+
+// anthropicTraceServer starts an HTTPS server serving one completion and
+// reporting the traceparent header the SDK sent, and points
+// http.DefaultTransport at a transport trusting its certificate (the adapter
+// clones DefaultTransport, so the clone inherits the pool).
+func anthropicTraceServer(t *testing.T) (url string, seen func() string) {
+	t.Helper()
+
+	var got atomic.Value
+
+	srv := httptest.NewTLSServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		got.Store(r.Header.Get(traceprop.TraceParentHeader))
+		w.Header().Set("Content-Type", "application/json")
+		_ = json.NewEncoder(w).Encode(map[string]any{
+			"content":     []any{map[string]any{"type": "text", "text": "hi"}},
+			"usage":       map[string]any{"input_tokens": 1, "output_tokens": 1},
+			"stop_reason": "end_turn",
+		})
+	}))
+	t.Cleanup(srv.Close)
+
+	pool := x509.NewCertPool()
+	pool.AddCert(srv.Certificate())
+	prev := http.DefaultTransport
+	http.DefaultTransport = &http.Transport{TLSClientConfig: &tls.Config{RootCAs: pool, MinVersion: tls.VersionTLS12}}
+	t.Cleanup(func() { http.DefaultTransport = prev })
+
+	return srv.URL, func() string {
+		v, _ := got.Load().(string)
+		return v
+	}
+}
+
+func TestGenerateInjectsTraceHeaders(t *testing.T) {
+	// Mutates http.DefaultTransport: must not be parallel.
+	endpoint, seenTraceparent := anthropicTraceServer(t)
+
+	a, err := New(ai.Options{APIKey: "k", Model: "claude-3", BaseURL: endpoint})
+	if err != nil {
+		t.Fatalf("New err = %v", err)
+	}
+
+	defer func() { _ = a.Close() }()
+
+	ctx := ctxWithAnthropicTrace(t, "4bf92f3577b34da6a3ce929d0e0e4736")
+	if _, err := a.Generate(ctx, "", []ai.Message{{Role: ai.RoleUser, Content: "hi"}}, ai.GenerateOptions{}); err != nil {
+		t.Fatalf("Generate err = %v", err)
+	}
+
+	got := seenTraceparent()
+	if got == "" {
+		t.Fatal("traceparent header missing")
+	}
+
+	back := traceprop.Extract(t.Context(), map[string]string{traceprop.TraceParentHeader: got})
+	sc := trace.SpanContextFromContext(back)
+	if sc.TraceID().String() != "4bf92f3577b34da6a3ce929d0e0e4736" {
+		t.Errorf("TraceID = %s, want 4bf92f3577b34da6a3ce929d0e0e4736", sc.TraceID())
+	}
+}
+
+func TestGenerateNoSpanNoTraceHeaders(t *testing.T) {
+	// Mutates http.DefaultTransport: must not be parallel.
+	endpoint, seenTraceparent := anthropicTraceServer(t)
+
+	a, err := New(ai.Options{APIKey: "k", Model: "claude-3", BaseURL: endpoint})
+	if err != nil {
+		t.Fatalf("New err = %v", err)
+	}
+
+	defer func() { _ = a.Close() }()
+
+	if _, err := a.Generate(t.Context(), "", []ai.Message{{Role: ai.RoleUser, Content: "hi"}}, ai.GenerateOptions{}); err != nil {
+		t.Fatalf("Generate err = %v", err)
+	}
+
+	if got := seenTraceparent(); got != "" {
+		t.Errorf("traceparent = %q, want empty without a span", got)
 	}
 }

@@ -46,7 +46,7 @@ func New(opts auth.Options) (auth.Auth, error) {
 	// dial guard, no redirects) instead of the process-wide
 	// http.DefaultClient. AllowInsecure opts a test issuer into http and
 	// private addresses; production keeps both blocked.
-	client := httpclient.NewSafeClient(timeout, opts.OIDC.AllowInsecure)
+	client := httpclient.NewSafeClient(timeout, opts.OIDC.AllowInsecure, httpclient.WithTracing())
 
 	ctx, cancel := context.WithTimeout(context.Background(), timeout)
 	defer cancel()

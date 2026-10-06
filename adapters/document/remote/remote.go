@@ -73,7 +73,7 @@ func New(o document.Options) (document.Document, error) {
 		endpoint:  normalized,
 		apiKey:    o.APIKey,
 		maxOutput: maxOutput,
-		client:    httpclient.NewClient(timeout),
+		client:    httpclient.NewClient(timeout, httpclient.WithTracing()),
 	}, nil
 }
 

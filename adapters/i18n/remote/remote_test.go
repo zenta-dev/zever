@@ -11,14 +11,21 @@ import (
 	"testing"
 	"time"
 
+	"go.opentelemetry.io/otel/trace"
+
 	"github.com/zenta-dev/zever/adapters/i18n/remote"
 	"github.com/zenta-dev/zever/core/i18n"
+	"github.com/zenta-dev/zever/shared/traceprop"
 )
 
 type stubServer struct {
 	translateHits atomic.Int64
 	localesHits   atomic.Int64
 	authSeen      atomic.Value // string
+
+	// traceParent, when set, receives the traceparent header of whichever
+	// request arrives.
+	traceParent *atomic.Value
 
 	delay           time.Duration
 	translateStatus int
@@ -32,6 +39,9 @@ func (f *stubServer) serve(t *testing.T) *httptest.Server {
 	mux.HandleFunc("/translate", func(w http.ResponseWriter, r *http.Request) {
 		f.translateHits.Add(1)
 		f.authSeen.Store(r.Header.Get("Authorization"))
+		if f.traceParent != nil {
+			f.traceParent.Store(r.Header.Get(traceprop.TraceParentHeader))
+		}
 		if f.delay > 0 {
 			select {
 			case <-time.After(f.delay):
@@ -59,8 +69,11 @@ func (f *stubServer) serve(t *testing.T) *httptest.Server {
 		w.Header().Set("Content-Type", "application/json")
 		_ = json.NewEncoder(w).Encode(map[string]any{"translations": out})
 	})
-	mux.HandleFunc("/locales", func(w http.ResponseWriter, _ *http.Request) {
+	mux.HandleFunc("/locales", func(w http.ResponseWriter, r *http.Request) {
 		f.localesHits.Add(1)
+		if f.traceParent != nil {
+			f.traceParent.Store(r.Header.Get(traceprop.TraceParentHeader))
+		}
 		w.Header().Set("Content-Type", "application/json")
 		_ = json.NewEncoder(w).Encode(map[string]any{"locales": f.locales})
 	})
@@ -406,4 +419,83 @@ func TestWaiterCtxCancel(t *testing.T) {
 		t.Fatalf("got %v want context.Canceled", err)
 	}
 	<-leaderDone
+}
+
+// ctxWithRemoteTrace returns a context carrying a valid remote span.
+func ctxWithRemoteTrace(t *testing.T, traceHex string) context.Context {
+	t.Helper()
+
+	tid, err := trace.TraceIDFromHex(traceHex)
+	if err != nil {
+		t.Fatalf("TraceIDFromHex: %v", err)
+	}
+
+	sid, err := trace.SpanIDFromHex("00f067aa0ba902b7")
+	if err != nil {
+		t.Fatalf("SpanIDFromHex: %v", err)
+	}
+
+	return trace.ContextWithSpanContext(t.Context(), trace.NewSpanContext(trace.SpanContextConfig{
+		TraceID:    tid,
+		SpanID:     sid,
+		TraceFlags: trace.FlagsSampled,
+	}))
+}
+
+func TestLocalesInjectsTraceHeaders(t *testing.T) {
+	t.Parallel()
+
+	var parent atomic.Value
+
+	f := &stubServer{locales: []string{"en"}, traceParent: &parent}
+	srv := f.serve(t)
+	defer srv.Close()
+
+	ad, err := remote.New(optsFor(srv.URL))
+	if err != nil {
+		t.Fatalf("New: %v", err)
+	}
+	defer ad.Close()
+
+	// Locales runs on the caller's context; Translate deliberately routes its
+	// single-flight fetch through a Background-rooted context.
+	ctx := ctxWithRemoteTrace(t, "4bf92f3577b34da6a3ce929d0e0e4736")
+	if _, err := ad.Locales(ctx); err != nil {
+		t.Fatalf("Locales: %v", err)
+	}
+
+	got, _ := parent.Load().(string)
+	if got == "" {
+		t.Fatal("traceparent header missing")
+	}
+
+	back := traceprop.Extract(t.Context(), map[string]string{traceprop.TraceParentHeader: got})
+	sc := trace.SpanContextFromContext(back)
+	if sc.TraceID().String() != "4bf92f3577b34da6a3ce929d0e0e4736" {
+		t.Errorf("TraceID = %s, want 4bf92f3577b34da6a3ce929d0e0e4736", sc.TraceID())
+	}
+}
+
+func TestLocalesNoSpanNoTraceHeaders(t *testing.T) {
+	t.Parallel()
+
+	var parent atomic.Value
+
+	f := &stubServer{locales: []string{"en"}, traceParent: &parent}
+	srv := f.serve(t)
+	defer srv.Close()
+
+	ad, err := remote.New(optsFor(srv.URL))
+	if err != nil {
+		t.Fatalf("New: %v", err)
+	}
+	defer ad.Close()
+
+	if _, err := ad.Locales(t.Context()); err != nil {
+		t.Fatalf("Locales: %v", err)
+	}
+
+	if got, _ := parent.Load().(string); got != "" {
+		t.Errorf("traceparent = %q, want empty without a span", got)
+	}
 }

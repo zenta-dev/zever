@@ -3,6 +3,7 @@ package remote
 
 import (
 	"bytes"
+	"context"
 	"crypto/tls"
 	"encoding/json"
 	"errors"
@@ -10,10 +11,14 @@ import (
 	"net/http"
 	"net/http/httptest"
 	"strings"
+	"sync/atomic"
 	"testing"
 	"time"
 
+	"go.opentelemetry.io/otel/trace"
+
 	"github.com/zenta-dev/zever/core/document"
+	"github.com/zenta-dev/zever/shared/traceprop"
 )
 
 func TestRenderRoundtripJSON(t *testing.T) {
@@ -720,49 +725,64 @@ func TestBearerHeaderAnonymous(t *testing.T) {
 	}
 }
 
-func TestTLSMinVersionEnforced(t *testing.T) {
-	t.Parallel()
+// withDefaultTransport points http.DefaultTransport at tr for the duration of
+// the test. It mutates a global, so the caller must not be parallel.
+func withDefaultTransport(t *testing.T, tr http.RoundTripper) {
+	t.Helper()
 
-	var gotVersion uint16
+	prev := http.DefaultTransport
+	http.DefaultTransport = tr
+	t.Cleanup(func() { http.DefaultTransport = prev })
+}
 
-	srv := httptest.NewTLSServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		gotVersion = r.TLS.Version
+// legacyTLSServer starts an HTTPS test server that negotiates at most TLS 1.1,
+// so a client enforcing a TLS 1.2 floor cannot complete the handshake. The
+// failure happens on version negotiation, before certificate verification, so
+// the server's self-signed certificate is irrelevant.
+func legacyTLSServer(t *testing.T) *httptest.Server {
+	t.Helper()
+
+	srv := httptest.NewUnstartedServer(http.HandlerFunc(func(w http.ResponseWriter, _ *http.Request) {
 		w.Header().Set("Content-Type", "application/json")
 		_ = json.NewEncoder(w).Encode(renderResponse{Data: []byte("ok")})
 	}))
-	defer srv.Close()
+	//nolint:gosec // test-only legacy TLS range to observe the client's TLS floor.
+	srv.TLS = &tls.Config{MinVersion: tls.VersionTLS10, MaxVersion: tls.VersionTLS11}
+	srv.StartTLS()
+	t.Cleanup(srv.Close)
+
+	return srv
+}
+
+// openAgainst asserts a driver pointed at srv refuses to render: the TLS 1.2
+// floor is asserted behaviorally because the driver's transport is wrapped for
+// trace injection and can no longer be inspected directly.
+func openAgainst(t *testing.T, srv *httptest.Server) document.Document {
+	t.Helper()
 
 	doc, err := New(document.Options{Endpoint: srv.URL, AllowInsecure: true})
 	if err != nil {
 		t.Fatalf("Open: %v", err)
 	}
 
-	defer func() { _ = doc.Close() }()
+	t.Cleanup(func() { _ = doc.Close() })
 
-	d, ok := doc.(*driver)
-	if !ok {
-		t.Fatalf("want *driver, got %T", doc)
+	return doc
+}
+
+func requireTLSFloor(t *testing.T, doc document.Document) {
+	t.Helper()
+
+	if _, err := doc.Render(t.Context(), []byte("<html>"), document.FormatPDF); err == nil {
+		t.Fatal("TLS 1.1 server accepted; TLS 1.2 floor not enforced")
 	}
+}
 
-	tr, ok := d.client.Transport.(*http.Transport)
-	if !ok {
-		t.Fatalf("Transport type %T", d.client.Transport)
-	}
+func TestTLSMinVersionEnforced(t *testing.T) {
+	// Mutates http.DefaultTransport: must not be parallel.
+	withDefaultTransport(t, &http.Transport{TLSClientConfig: &tls.Config{MinVersion: tls.VersionTLS10}}) //nolint:gosec // legacy floor the driver must upgrade
 
-	if tr.TLSClientConfig == nil || tr.TLSClientConfig.MinVersion != tls.VersionTLS12 {
-		t.Fatal("TLS 1.2 not enforced on remote transport")
-	}
-
-	// Trust the test server cert for the live handshake.
-	tr.TLSClientConfig.InsecureSkipVerify = true
-
-	if _, err := doc.Render(t.Context(), []byte("<html>"), document.FormatPDF); err != nil {
-		t.Fatalf("Render: %v", err)
-	}
-
-	if gotVersion < tls.VersionTLS12 {
-		t.Fatalf("negotiated TLS %x below 1.2", gotVersion)
-	}
+	requireTLSFloor(t, openAgainst(t, legacyTLSServer(t)))
 }
 
 type roundTripFunc func(*http.Request) (*http.Response, error)
@@ -770,62 +790,19 @@ type roundTripFunc func(*http.Request) (*http.Response, error)
 func (f roundTripFunc) RoundTrip(r *http.Request) (*http.Response, error) { return f(r) }
 
 func TestTransportNonStandardDefault(t *testing.T) {
-	// Forces the fallback transport (DefaultTransport is not *http.Transport).
-	prev := http.DefaultTransport
-	http.DefaultTransport = roundTripFunc(func(r *http.Request) (*http.Response, error) {
+	// Mutates http.DefaultTransport: must not be parallel.
+	withDefaultTransport(t, roundTripFunc(func(r *http.Request) (*http.Response, error) {
 		return http.DefaultClient.Transport.RoundTrip(r)
-	})
-	defer func() { http.DefaultTransport = prev }()
+	}))
 
-	doc, err := New(document.Options{Endpoint: "https://example.com"})
-	if err != nil {
-		t.Fatalf("Open: %v", err)
-	}
-
-	defer func() { _ = doc.Close() }()
-
-	d, ok := doc.(*driver)
-	if !ok {
-		t.Fatalf("want *driver, got %T", doc)
-	}
-
-	tr, ok := d.client.Transport.(*http.Transport)
-	if !ok {
-		t.Fatalf("Transport type %T", d.client.Transport)
-	}
-
-	if tr.TLSClientConfig == nil || tr.TLSClientConfig.MinVersion != tls.VersionTLS12 {
-		t.Fatal("TLS 1.2 not enforced on fallback transport")
-	}
+	requireTLSFloor(t, openAgainst(t, legacyTLSServer(t)))
 }
 
 func TestTransportUpgradesLegacyTLS(t *testing.T) {
-	// Mutates http.DefaultTransport: must NOT be parallel.
-	prev := http.DefaultTransport
-	//nolint:gosec // test-only legacy TLS version to verify the driver upgrades it to TLS 1.2.
-	http.DefaultTransport = &http.Transport{TLSClientConfig: &tls.Config{MinVersion: tls.VersionTLS10}}
-	defer func() { http.DefaultTransport = prev }()
+	// Mutates http.DefaultTransport: must not be parallel.
+	withDefaultTransport(t, &http.Transport{TLSClientConfig: &tls.Config{MinVersion: tls.VersionTLS10}}) //nolint:gosec // legacy floor the driver must upgrade
 
-	doc, err := New(document.Options{Endpoint: "https://example.com"})
-	if err != nil {
-		t.Fatalf("Open: %v", err)
-	}
-
-	defer func() { _ = doc.Close() }()
-
-	d, ok := doc.(*driver)
-	if !ok {
-		t.Fatalf("want *driver, got %T", doc)
-	}
-
-	tr, ok := d.client.Transport.(*http.Transport)
-	if !ok {
-		t.Fatalf("Transport type %T", d.client.Transport)
-	}
-
-	if tr.TLSClientConfig.MinVersion != tls.VersionTLS12 {
-		t.Fatalf("MinVersion = %x, want TLS 1.2", tr.TLSClientConfig.MinVersion)
-	}
+	requireTLSFloor(t, openAgainst(t, legacyTLSServer(t)))
 }
 
 func TestTimeoutDefaultAndCustom(t *testing.T) {
@@ -999,4 +976,95 @@ func TestCloseNil(t *testing.T) {
 	if err := doc.Close(); err != nil {
 		t.Fatalf("Close: %v", err)
 	}
+}
+
+// renderTraceServer serves one render response and reports the traceparent
+// header the driver sent.
+func renderTraceServer(t *testing.T) (url string, seen func() string) {
+	t.Helper()
+
+	var got atomic.Value
+
+	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		got.Store(r.Header.Get(traceprop.TraceParentHeader))
+		w.Header().Set("Content-Type", "application/json")
+		_ = json.NewEncoder(w).Encode(renderResponse{Data: []byte("ok")})
+	}))
+	t.Cleanup(srv.Close)
+
+	return srv.URL, func() string {
+		v, _ := got.Load().(string)
+		return v
+	}
+}
+
+func TestRenderInjectsTraceHeaders(t *testing.T) {
+	t.Parallel()
+
+	endpoint, seenTraceparent := renderTraceServer(t)
+
+	doc, err := New(document.Options{Endpoint: endpoint, AllowInsecure: true})
+	if err != nil {
+		t.Fatalf("Open: %v", err)
+	}
+
+	defer func() { _ = doc.Close() }()
+
+	ctx := ctxWithRemoteTrace(t, "4bf92f3577b34da6a3ce929d0e0e4736")
+	if _, err := doc.Render(ctx, []byte("<html>"), document.FormatPDF); err != nil {
+		t.Fatalf("Render: %v", err)
+	}
+
+	got := seenTraceparent()
+	if got == "" {
+		t.Fatal("traceparent header missing")
+	}
+
+	back := traceprop.Extract(t.Context(), map[string]string{traceprop.TraceParentHeader: got})
+	sc := trace.SpanContextFromContext(back)
+	if sc.TraceID().String() != "4bf92f3577b34da6a3ce929d0e0e4736" {
+		t.Errorf("TraceID = %s, want 4bf92f3577b34da6a3ce929d0e0e4736", sc.TraceID())
+	}
+}
+
+func TestRenderNoSpanNoTraceHeaders(t *testing.T) {
+	t.Parallel()
+
+	endpoint, seenTraceparent := renderTraceServer(t)
+
+	doc, err := New(document.Options{Endpoint: endpoint, AllowInsecure: true})
+	if err != nil {
+		t.Fatalf("Open: %v", err)
+	}
+
+	defer func() { _ = doc.Close() }()
+
+	if _, err := doc.Render(t.Context(), []byte("<html>"), document.FormatPDF); err != nil {
+		t.Fatalf("Render: %v", err)
+	}
+
+	if got := seenTraceparent(); got != "" {
+		t.Errorf("traceparent = %q, want empty without a span", got)
+	}
+}
+
+// ctxWithRemoteTrace returns a context carrying a valid remote span.
+func ctxWithRemoteTrace(t *testing.T, traceHex string) context.Context {
+	t.Helper()
+
+	tid, err := trace.TraceIDFromHex(traceHex)
+	if err != nil {
+		t.Fatalf("TraceIDFromHex: %v", err)
+	}
+
+	sid, err := trace.SpanIDFromHex("00f067aa0ba902b7")
+	if err != nil {
+		t.Fatalf("SpanIDFromHex: %v", err)
+	}
+
+	return trace.ContextWithSpanContext(t.Context(), trace.NewSpanContext(trace.SpanContextConfig{
+		TraceID:    tid,
+		SpanID:     sid,
+		TraceFlags: trace.FlagsSampled,
+	}))
 }

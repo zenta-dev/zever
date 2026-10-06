@@ -103,7 +103,7 @@ func New(opts i18n.Options) (i18n.I18n, error) {
 		maxFlight: maxFlight,
 		endpoint:  endpoint,
 		apiKey:    opts.Remote.APIKey,
-		client:    httpclient.NewClient(timeout),
+		client:    httpclient.NewClient(timeout, httpclient.WithTracing()),
 	}, nil
 }
 

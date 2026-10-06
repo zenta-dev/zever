@@ -39,15 +39,7 @@ func New(opts ai.Options) (ai.AI, error) {
 		return nil, ai.InvalidOptionsError{Reason: "api_key is required"}
 	}
 
-	httpClient := newHTTPClient(opts.Timeout)
-
-	// TLS verification is skipped only on explicit opt-in (AllowInsecure).
-	// Loopback BaseURLs no longer auto-disable verification.
-	if opts.AllowInsecure {
-		if tr, ok := httpClient.Transport.(*http.Transport); ok && tr.TLSClientConfig != nil {
-			tr.TLSClientConfig.InsecureSkipVerify = true //nolint:gosec // explicit opt-in for test servers
-		}
-	}
+	httpClient := newHTTPClient(opts.Timeout, opts.AllowInsecure)
 
 	cc := &genai.ClientConfig{
 		APIKey:     opts.APIKey,
@@ -66,8 +58,18 @@ func New(opts ai.Options) (ai.AI, error) {
 	return &adapter{client: client, apiKey: opts.APIKey}, nil
 }
 
-func newHTTPClient(timeout time.Duration) *http.Client {
-	return httpclient.NewClient(timeout)
+// newHTTPClient builds the HTTP client the Gemini SDK issues requests
+// through. Trace-context injection is always on so generated requests join the
+// caller's trace; TLS verification is skipped only on explicit opt-in
+// (allowInsecure), which is threaded as an httpclient option rather than
+// mutated onto the transport afterwards (WithTracing wraps it).
+func newHTTPClient(timeout time.Duration, allowInsecure bool) *http.Client {
+	clientOpts := []httpclient.Option{httpclient.WithTracing()}
+	if allowInsecure {
+		clientOpts = append(clientOpts, httpclient.WithInsecureSkipVerify(true))
+	}
+
+	return httpclient.NewClient(timeout, clientOpts...)
 }
 
 // Generate implements ai.AI.

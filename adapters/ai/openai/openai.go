@@ -60,10 +60,10 @@ func New(opts ai.Options) (ai.AI, error) {
 
 func newHTTPClientFromTransport(timeout time.Duration, tr *http.Transport) *http.Client {
 	if tr == nil {
-		return httpclient.NewClient(timeout)
+		return httpclient.NewClient(timeout, httpclient.WithTracing())
 	}
 
-	return httpclient.NewClient(timeout, httpclient.WithTransport(tr.Clone()))
+	return httpclient.NewClient(timeout, httpclient.WithTransport(tr.Clone()), httpclient.WithTracing())
 }
 
 //go:noinline

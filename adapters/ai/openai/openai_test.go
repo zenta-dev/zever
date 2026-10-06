@@ -4,6 +4,7 @@ package openai
 import (
 	"context"
 	"crypto/tls"
+	"crypto/x509"
 	"encoding/json"
 	"errors"
 	"fmt"
@@ -19,8 +20,10 @@ import (
 	"github.com/openai/openai-go/v3"
 	"github.com/openai/openai-go/v3/option"
 	"github.com/openai/openai-go/v3/packages/param"
+	"go.opentelemetry.io/otel/trace"
 
 	"github.com/zenta-dev/zever/core/ai"
+	"github.com/zenta-dev/zever/shared/traceprop"
 )
 
 func TestOpen_APIKeyRequired(t *testing.T) {
@@ -108,21 +111,56 @@ func TestNew_ClientHonorsConfiguredTimeout(t *testing.T) {
 	}
 }
 
+// getOK issues a GET for url and closes the response body, returning the
+// request error (if any) so tests can assert on reachability.
+func getOK(t *testing.T, c *http.Client, url string) error {
+	t.Helper()
+
+	req, err := http.NewRequestWithContext(t.Context(), http.MethodGet, url, nil)
+	if err != nil {
+		t.Fatalf("NewRequest: %v", err)
+	}
+
+	resp, err := c.Do(req)
+	if resp != nil {
+		_ = resp.Body.Close()
+	}
+
+	return err
+}
+
+// legacyTLSServer starts an HTTPS test server that negotiates at most
+// maxVersion, so a client enforcing a TLS 1.2 floor cannot complete the
+// handshake. The failure happens on version negotiation, before certificate
+// verification, so InsecureSkipVerify does not change the outcome.
+func legacyTLSServer(t *testing.T, maxVersion uint16) *httptest.Server {
+	t.Helper()
+
+	srv := httptest.NewUnstartedServer(http.HandlerFunc(func(w http.ResponseWriter, _ *http.Request) {
+		w.WriteHeader(http.StatusOK)
+	}))
+	//nolint:gosec // test-only legacy TLS range to observe the client's TLS floor.
+	srv.TLS = &tls.Config{MinVersion: tls.VersionTLS10, MaxVersion: maxVersion}
+	srv.StartTLS()
+	t.Cleanup(srv.Close)
+
+	return srv
+}
+
+// requireTLSFloor asserts c refuses a TLS 1.1-only server. The client's
+// transport is wrapped for trace injection, so the TLS 1.2 floor is asserted
+// behaviorally rather than by inspecting the concrete transport type.
+func requireTLSFloor(t *testing.T, c *http.Client) {
+	t.Helper()
+
+	if err := getOK(t, c, legacyTLSServer(t, tls.VersionTLS11).URL); err == nil {
+		t.Fatal("client negotiated TLS below the 1.2 floor")
+	}
+}
+
 func TestNewHTTPClient_CloneTLS12(t *testing.T) {
 	// Checks DefaultTransport cloning: must not be parallel due to global read.
-	c := newHTTPClient(0)
-	tr, ok := c.Transport.(*http.Transport)
-	if !ok {
-		t.Fatalf("transport %T not *http.Transport", c.Transport)
-	}
-
-	if tr.TLSClientConfig == nil {
-		t.Fatalf("TLSClientConfig nil")
-	}
-
-	if tr.TLSClientConfig.MinVersion != tls.VersionTLS12 {
-		t.Errorf("MinVersion = %v, want %v", tr.TLSClientConfig.MinVersion, tls.VersionTLS12)
-	}
+	requireTLSFloor(t, newHTTPClient(0))
 }
 
 func TestNewHTTPClient_Fallback(t *testing.T) {
@@ -131,15 +169,7 @@ func TestNewHTTPClient_Fallback(t *testing.T) {
 	http.DefaultTransport = roundTripFunc(func(_ *http.Request) (*http.Response, error) { return nil, errors.New("fallback") })
 	t.Cleanup(func() { http.DefaultTransport = prev })
 
-	c := newHTTPClient(0)
-	tr, ok := c.Transport.(*http.Transport)
-	if !ok {
-		t.Fatalf("transport %T not *http.Transport", c.Transport)
-	}
-
-	if tr.TLSClientConfig.MinVersion != tls.VersionTLS12 {
-		t.Errorf("MinVersion = %v, want %v", tr.TLSClientConfig.MinVersion, tls.VersionTLS12)
-	}
+	requireTLSFloor(t, newHTTPClient(0))
 }
 
 func TestNewHTTPClient_UpgradeLegacyTLS(t *testing.T) {
@@ -148,14 +178,7 @@ func TestNewHTTPClient_UpgradeLegacyTLS(t *testing.T) {
 	http.DefaultTransport = &http.Transport{TLSClientConfig: &tls.Config{MinVersion: tls.VersionTLS10}} //nolint:gosec
 	t.Cleanup(func() { http.DefaultTransport = prev })
 
-	c := newHTTPClient(0)
-	tr, ok := c.Transport.(*http.Transport)
-	if !ok {
-		t.Fatalf("transport %T not *http.Transport", c.Transport)
-	}
-	if tr.TLSClientConfig.MinVersion != tls.VersionTLS12 {
-		t.Errorf("MinVersion = %v, want TLS12", tr.TLSClientConfig.MinVersion)
-	}
+	requireTLSFloor(t, newHTTPClient(0))
 }
 
 type roundTripFunc func(*http.Request) (*http.Response, error)
@@ -1324,40 +1347,25 @@ func TestNewHTTPClient_NilTLSConfig(t *testing.T) {
 	prev := http.DefaultTransport
 	http.DefaultTransport = &http.Transport{TLSClientConfig: nil}
 	t.Cleanup(func() { http.DefaultTransport = prev })
-	c := newHTTPClient(0)
-	tr, ok := c.Transport.(*http.Transport)
-	if !ok {
-		t.Fatalf("transport %T", c.Transport)
-	}
-	if tr.TLSClientConfig == nil || tr.TLSClientConfig.MinVersion != tls.VersionTLS12 {
-		t.Fatalf("TLS not set correctly: %+v", tr.TLSClientConfig)
-	}
+
+	requireTLSFloor(t, newHTTPClient(0))
 }
 
 func TestNewHTTPClientFromTransport(t *testing.T) {
 	t.Parallel()
 	// nil transport
-	c := newHTTPClientFromTransport(0, nil)
-	if tr, ok := c.Transport.(*http.Transport); !ok || tr.TLSClientConfig.MinVersion != tls.VersionTLS12 {
-		t.Fatalf("nil transport not correct")
-	}
+	requireTLSFloor(t, newHTTPClientFromTransport(0, nil))
 	// nil TLSConfig
-	c = newHTTPClientFromTransport(0, &http.Transport{TLSClientConfig: nil})
-	if tr, ok := c.Transport.(*http.Transport); !ok || tr.TLSClientConfig.MinVersion != tls.VersionTLS12 {
-		t.Fatalf("nil TLSConfig not correct")
-	}
+	requireTLSFloor(t, newHTTPClientFromTransport(0, &http.Transport{TLSClientConfig: nil}))
 	// legacy TLS
-	c = newHTTPClientFromTransport(0, &http.Transport{TLSClientConfig: &tls.Config{MinVersion: tls.VersionTLS10}}) //nolint:gosec
-	if tr, ok := c.Transport.(*http.Transport); !ok || tr.TLSClientConfig.MinVersion != tls.VersionTLS12 {
-		t.Fatalf("legacy TLS not upgraded")
+	requireTLSFloor(t, newHTTPClientFromTransport(0, &http.Transport{TLSClientConfig: &tls.Config{MinVersion: tls.VersionTLS10}})) //nolint:gosec
+	// already TLS12: still refuses a TLS 1.1-only server
+	requireTLSFloor(t, newHTTPClientFromTransport(0, &http.Transport{TLSClientConfig: &tls.Config{MinVersion: tls.VersionTLS12}}))
+	// TLS13 stays TLS13, so a TLS 1.2-capped server is refused too
+	c := newHTTPClientFromTransport(0, &http.Transport{TLSClientConfig: &tls.Config{MinVersion: tls.VersionTLS13}})
+	if err := getOK(t, c, legacyTLSServer(t, tls.VersionTLS12).URL); err == nil {
+		t.Fatal("TLS13 client negotiated below its floor")
 	}
-	// already TLS12
-	c = newHTTPClientFromTransport(0, &http.Transport{TLSClientConfig: &tls.Config{MinVersion: tls.VersionTLS12}})
-	if tr, ok := c.Transport.(*http.Transport); !ok || tr.TLSClientConfig.MinVersion != tls.VersionTLS12 {
-		t.Fatalf("TLS12 not preserved")
-	}
-	// TLS13 should stay TLS13 (since we set unconditional to TLS12, it will downgrade, but we now set unconditional to TLS12, so it will be TLS12)
-	// This test ensures unconditional path is covered
 }
 
 func TestGenerate_OverflowPromptTokens(t *testing.T) {
@@ -1685,5 +1693,104 @@ func TestStream_CtxDoneDuringToolCall(t *testing.T) {
 	case <-done:
 	case <-time.After(5 * time.Second):
 		t.Fatal("stream channel did not close after cancel")
+	}
+}
+
+// ctxWithOpenAITrace returns a context carrying a valid remote span.
+func ctxWithOpenAITrace(t *testing.T, traceHex string) context.Context {
+	t.Helper()
+
+	tid, err := trace.TraceIDFromHex(traceHex)
+	if err != nil {
+		t.Fatalf("TraceIDFromHex: %v", err)
+	}
+
+	sid, err := trace.SpanIDFromHex("00f067aa0ba902b7")
+	if err != nil {
+		t.Fatalf("SpanIDFromHex: %v", err)
+	}
+
+	return trace.ContextWithSpanContext(t.Context(), trace.NewSpanContext(trace.SpanContextConfig{
+		TraceID:    tid,
+		SpanID:     sid,
+		TraceFlags: trace.FlagsSampled,
+	}))
+}
+
+// generateTraceServer starts an HTTPS server serving one completion, reports
+// the traceparent header the adapter sent, and points http.DefaultTransport at
+// a transport trusting its certificate (the adapter clones DefaultTransport,
+// so the clone inherits the pool; its own transport is wrapped for tracing
+// and cannot be poked). Plain-HTTP loopback servers are useless here: the
+// OpenAI SDK swaps in its own transport for loopback http requests.
+func generateTraceServer(t *testing.T) (url string, seen func() string) {
+	t.Helper()
+
+	var got atomic.Value
+
+	srv := httptest.NewTLSServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		got.Store(r.Header.Get(traceprop.TraceParentHeader))
+		w.Header().Set("Content-Type", "application/json")
+		_, _ = w.Write([]byte(`{"choices":[{"message":{"content":"ok"},"finish_reason":"stop"}],"usage":{"prompt_tokens":1,"completion_tokens":1}}`))
+	}))
+	t.Cleanup(srv.Close)
+
+	pool := x509.NewCertPool()
+	pool.AddCert(srv.Certificate())
+	prev := http.DefaultTransport
+	http.DefaultTransport = &http.Transport{TLSClientConfig: &tls.Config{RootCAs: pool, MinVersion: tls.VersionTLS12}}
+	t.Cleanup(func() { http.DefaultTransport = prev })
+
+	return srv.URL, func() string {
+		v, _ := got.Load().(string)
+		return v
+	}
+}
+
+func TestGenerateInjectsTraceHeaders(t *testing.T) {
+	// Mutates http.DefaultTransport: must not be parallel.
+	endpoint, seenTraceparent := generateTraceServer(t)
+
+	a, err := New(ai.Options{APIKey: "sk-test", Model: "gpt-4", BaseURL: endpoint})
+	if err != nil {
+		t.Fatalf("Open err = %v", err)
+	}
+
+	defer func() { _ = a.Close() }()
+
+	ctx := ctxWithOpenAITrace(t, "4bf92f3577b34da6a3ce929d0e0e4736")
+	if _, err := a.Generate(ctx, "", []ai.Message{{Role: ai.RoleUser, Content: "hi"}}, ai.GenerateOptions{}); err != nil {
+		t.Fatalf("Generate err = %v", err)
+	}
+
+	got := seenTraceparent()
+	if got == "" {
+		t.Fatal("traceparent header missing")
+	}
+
+	back := traceprop.Extract(t.Context(), map[string]string{traceprop.TraceParentHeader: got})
+	sc := trace.SpanContextFromContext(back)
+	if sc.TraceID().String() != "4bf92f3577b34da6a3ce929d0e0e4736" {
+		t.Errorf("TraceID = %s, want 4bf92f3577b34da6a3ce929d0e0e4736", sc.TraceID())
+	}
+}
+
+func TestGenerateNoSpanNoTraceHeaders(t *testing.T) {
+	// Mutates http.DefaultTransport: must not be parallel.
+	endpoint, seenTraceparent := generateTraceServer(t)
+
+	a, err := New(ai.Options{APIKey: "sk-test", Model: "gpt-4", BaseURL: endpoint})
+	if err != nil {
+		t.Fatalf("Open err = %v", err)
+	}
+
+	defer func() { _ = a.Close() }()
+
+	if _, err := a.Generate(t.Context(), "", []ai.Message{{Role: ai.RoleUser, Content: "hi"}}, ai.GenerateOptions{}); err != nil {
+		t.Fatalf("Generate err = %v", err)
+	}
+
+	if got := seenTraceparent(); got != "" {
+		t.Errorf("traceparent = %q, want empty without a span", got)
 	}
 }
