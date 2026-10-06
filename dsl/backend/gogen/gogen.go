@@ -100,29 +100,44 @@ func (b *Backend) Name() string {
 	return "gogen"
 }
 
-// Generate renders "<module_snake>/{types,service,router,grpc}.go" for
-// every schema.Modules entry holding at least one service. A module with no
-// services has nothing to generate: an empty Service interface and a
-// router.go/grpc.go with no handlers would compile but serve no purpose,
-// mirroring zenorm's own "skip modules with nothing to generate" rule.
+// Generate renders "<module_snake>/{types,service,router,grpc,register}.go"
+// for every schema.Modules entry holding at least one service, plus
+// "<module_snake>/saga.go" for every module holding at least one saga. A
+// module with neither has nothing to generate: an empty Service interface
+// and a router.go/grpc.go with no handlers would compile but serve no
+// purpose, mirroring zenorm's own "skip modules with nothing to generate"
+// rule. A saga-only module renders just its saga.go -- the SagaCaller seam
+// is wired by the host application, not by the service registration path.
 func (b *Backend) Generate(schema *ir.Schema) (map[string][]byte, error) {
 	out := make(map[string][]byte)
 
 	for _, m := range schema.Modules {
-		if len(m.Services) == 0 {
+		if len(m.Services) == 0 && len(m.Sagas) == 0 {
 			continue
 		}
 
 		pkg, dir := moduleNaming(m)
-		data := newModuleModel(m, pkg, b.pbImportRoot)
 
-		files, err := renderModuleFiles(pkg, dir, data)
-		if err != nil {
-			return nil, fmt.Errorf("gogen: module %s: %w", moduleLabel(m), err)
+		if len(m.Services) > 0 {
+			data := newModuleModel(m, pkg, b.pbImportRoot)
+
+			files, err := renderModuleFiles(pkg, dir, data)
+			if err != nil {
+				return nil, fmt.Errorf("gogen: module %s: %w", moduleLabel(m), err)
+			}
+
+			for path, content := range files {
+				out[path] = content
+			}
 		}
 
-		for path, content := range files {
-			out[path] = content
+		if len(m.Sagas) > 0 {
+			sagaSrc, err := renderSagaFile(pkg, m)
+			if err != nil {
+				return nil, fmt.Errorf("gogen: module %s: %w", moduleLabel(m), err)
+			}
+
+			out[dir+"/saga.go"] = sagaSrc
 		}
 	}
 

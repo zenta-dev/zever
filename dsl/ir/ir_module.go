@@ -20,6 +20,7 @@ type Module struct {
 	Services  []*Service
 	Jobs      []*Job
 	Schedules []*Schedule
+	Sagas     []*Saga
 	Enums     []*Enum
 	Pos       diag.Position // zero Position for dir-derived modules
 }

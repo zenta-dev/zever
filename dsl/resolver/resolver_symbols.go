@@ -17,12 +17,13 @@ type symbolTable struct {
 	serviceOrder  []*ast.ServiceDecl
 	jobOrder      []*ast.JobDecl
 	scheduleOrder []*ast.ScheduleDecl
+	sagaOrder     []*ast.SagaDecl
 	enumOrder     []*ast.EnumDecl
 }
 
 // resolveSymbols is Pass 0: it walks leafDecls (Pass -1's accepted
 // declarations, in source-declaration order) and builds one flat namespace
-// spanning all four declaration kinds together — an Entity and a Job
+// spanning all six declaration kinds together — an Entity and a Job
 // sharing a name collide, because they'd collide as generated identifiers
 // downstream. Names are global across modules too, by design (see the
 // package-level docs of Pass 0 in the task brief). First occurrence wins;
@@ -61,6 +62,8 @@ func resolveSymbols(leafDecls []ast.Decl) (*symbolTable, diag.List) {
 			syms.jobOrder = append(syms.jobOrder, v)
 		case *ast.ScheduleDecl:
 			syms.scheduleOrder = append(syms.scheduleOrder, v)
+		case *ast.SagaDecl:
+			syms.sagaOrder = append(syms.sagaOrder, v)
 		case *ast.EnumDecl:
 			syms.enumOrder = append(syms.enumOrder, v)
 		}
@@ -70,7 +73,7 @@ func resolveSymbols(leafDecls []ast.Decl) (*symbolTable, diag.List) {
 }
 
 // declNameAndPos extracts the declared name and its name position from one
-// of the five leaf declaration kinds. ok is false for anything else (not
+// of the six leaf declaration kinds. ok is false for anything else (not
 // expected among Pass -1's leafDecls, but handled defensively rather than
 // assumed).
 func declNameAndPos(d ast.Decl) (string, diag.Position, bool) {
@@ -84,6 +87,8 @@ func declNameAndPos(d ast.Decl) (string, diag.Position, bool) {
 	case *ast.JobDecl:
 		return v.Name, v.NamePos, true
 	case *ast.ScheduleDecl:
+		return v.Name, v.NamePos, true
+	case *ast.SagaDecl:
 		return v.Name, v.NamePos, true
 	case *ast.EnumDecl:
 		return v.Name, v.NamePos, true
