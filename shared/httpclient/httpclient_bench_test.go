@@ -52,3 +52,14 @@ func BenchmarkSafeDialContext(b *testing.B) {
 		_ = SafeDialContext(false)
 	}
 }
+
+// BenchmarkNewSafeClient measures constructing the hardened client with the
+// dial guard and no-redirect policy.
+func BenchmarkNewSafeClient(b *testing.B) {
+	b.ReportAllocs()
+	b.ResetTimer()
+
+	for b.Loop() {
+		_ = NewSafeClient(time.Second, false)
+	}
+}

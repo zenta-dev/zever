@@ -4,7 +4,9 @@ import (
 	"bytes"
 	"context"
 	"errors"
+	"net/http"
 	"testing"
+	"time"
 )
 
 // TestReadLimited_boundaries covers empty bodies, exact limits, and clamping.
@@ -61,5 +63,83 @@ func TestReadLimited_cancelledContext(t *testing.T) {
 	_, err := ReadLimited(ctx, bytes.NewReader([]byte("data")), 16)
 	if !errors.Is(err, context.Canceled) {
 		t.Fatalf("ReadLimited(cancelled) error = %v, want context.Canceled", err)
+	}
+}
+
+// TestTooLargeError_unwrapMatchesSentinel verifies errors.Is resolves to
+// ErrTooLarge through Unwrap.
+func TestTooLargeError_unwrapMatchesSentinel(t *testing.T) {
+	t.Parallel()
+
+	e := &TooLargeError{Limit: 10, Size: 11}
+	if !errors.Is(e, ErrTooLarge) {
+		t.Error("errors.Is(e, ErrTooLarge) = false")
+	}
+}
+
+// TestTooLargeError_asResolvesThroughFmtWrapping verifies a wrapped
+// TooLargeError is still discoverable via errors.As.
+func TestTooLargeError_asResolvesThroughFmtWrapping(t *testing.T) {
+	t.Parallel()
+
+	original := &TooLargeError{Limit: 10, Size: 11}
+	wrapped := errors.Join(errors.New("read failed"), original)
+
+	var target *TooLargeError
+	if !errors.As(wrapped, &target) {
+		t.Fatal("errors.As(wrapped, *TooLargeError) = false")
+	}
+
+	if target.Limit != 10 || target.Size != 11 {
+		t.Errorf("target = %+v, want Limit=10 Size=11", target)
+	}
+}
+
+// TestWithSafeDial_blocksPrivateByDefault verifies the guard refuses a
+// private address with ErrPrivateAddress.
+func TestWithSafeDial_blocksPrivateByDefault(t *testing.T) {
+	t.Parallel()
+
+	c := NewClient(time.Second, WithSafeDial(false))
+	tr, ok := c.Transport.(*http.Transport)
+	if !ok {
+		t.Fatalf("Transport is %T, want *http.Transport", c.Transport)
+	}
+
+	_, err := tr.DialContext(t.Context(), "tcp", "127.0.0.1:80")
+	if !errors.Is(err, ErrPrivateAddress) {
+		t.Fatalf("DialContext() error = %v, want ErrPrivateAddress", err)
+	}
+}
+
+// TestWithSafeDial_allowPrivateTrue verifies the guard permits private
+// addresses, so the refusal sentinel is not returned.
+func TestWithSafeDial_allowPrivateTrue(t *testing.T) {
+	t.Parallel()
+
+	c := NewClient(time.Second, WithSafeDial(true))
+	tr, ok := c.Transport.(*http.Transport)
+	if !ok {
+		t.Fatalf("Transport is %T, want *http.Transport", c.Transport)
+	}
+
+	_, err := tr.DialContext(t.Context(), "tcp", "127.0.0.1:80")
+	if errors.Is(err, ErrPrivateAddress) {
+		t.Fatal("DialContext() refused private address despite allowPrivate=true")
+	}
+}
+
+// TestWithNoRedirect_direct verifies the option installs a redirect
+// policy returning ErrUseLastResponse.
+func TestWithNoRedirect_direct(t *testing.T) {
+	t.Parallel()
+
+	c := NewClient(time.Second, WithNoRedirect())
+	if c.CheckRedirect == nil {
+		t.Fatal("CheckRedirect nil")
+	}
+
+	if err := c.CheckRedirect(nil, nil); !errors.Is(err, http.ErrUseLastResponse) {
+		t.Fatalf("CheckRedirect() = %v, want ErrUseLastResponse", err)
 	}
 }

@@ -1,6 +1,10 @@
 package registry_test
 
-import "testing"
+import (
+	"testing"
+
+	"github.com/zenta-dev/zever/shared/registry"
+)
 
 // BenchmarkLookup measures a warm registry hit.
 func BenchmarkLookup(b *testing.B) {
@@ -33,6 +37,19 @@ func BenchmarkRegisterDuplicate(b *testing.B) {
 
 	for b.Loop() {
 		_ = r.Register(adapterA, factory)
+	}
+}
+
+// BenchmarkRegister measures the first-time registration path with a fresh
+// registry per iteration, so every call exercises insertion rather than the
+// duplicate guard.
+func BenchmarkRegister(b *testing.B) {
+	b.ReportAllocs()
+	b.ResetTimer()
+
+	for b.Loop() {
+		r := registry.New[string, func() string](errNil, nil, nil)
+		_ = r.Register("adapter-a", func() string { return "a" })
 	}
 }
 
