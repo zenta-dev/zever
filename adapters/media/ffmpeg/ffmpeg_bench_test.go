@@ -1,10 +1,38 @@
 package ffmpeg
 
 import (
+	"errors"
+	"os"
+	"path/filepath"
 	"testing"
 
 	"github.com/zenta-dev/zever/core/media"
 )
+
+func benchScript(b *testing.B, body string) string {
+	b.Helper()
+
+	path := filepath.Join(b.TempDir(), "fakebin")
+
+	file, err := os.OpenFile(path, os.O_WRONLY|os.O_CREATE|os.O_TRUNC, 0o600)
+	if err != nil {
+		b.Fatalf("create script: %v", err)
+	}
+
+	if _, err := file.WriteString(body); err != nil {
+		b.Fatalf("write script: %v", err)
+	}
+
+	if err := file.Close(); err != nil {
+		b.Fatalf("close script: %v", err)
+	}
+
+	if err := os.Chmod(path, 0o755); err != nil {
+		b.Fatalf("chmod script: %v", err)
+	}
+
+	return path
+}
 
 func BenchmarkBuildArgsVideo(b *testing.B) {
 	spec := Spec{Kind: media.KindVideo, Format: "mp4", Width: 1280, Height: 720, CRF: 23}
@@ -89,6 +117,40 @@ func BenchmarkIsAudioFormat(b *testing.B) {
 	for b.Loop() {
 		if !IsAudioFormat("mp3") {
 			b.Fatal("IsAudioFormat(mp3) = false, want true")
+		}
+	}
+}
+
+func BenchmarkProbe(b *testing.B) {
+	bin := benchScript(b, "#!/bin/sh\ncat <<'EOF'\n{\"format\":{\"format_name\":\"mp3\",\"duration\":\"7.5\"},\"streams\":[{\"codec_type\":\"audio\",\"codec_name\":\"mp3\"}]}\nEOF\n")
+	b.ReportAllocs()
+	b.ResetTimer()
+	for b.Loop() {
+		if _, err := Probe(b.Context(), bin, "in.mp3"); err != nil {
+			b.Fatalf("Probe() error = %v", err)
+		}
+	}
+}
+
+func BenchmarkProbeFailure(b *testing.B) {
+	bin := benchScript(b, "#!/bin/sh\necho 'bench probe boom' >&2\nexit 1\n")
+	b.ReportAllocs()
+	b.ResetTimer()
+	for b.Loop() {
+		if _, err := Probe(b.Context(), bin, "in.mp3"); !errors.Is(err, ErrProbeFailed) {
+			b.Fatalf("Probe() error = %v, want ErrProbeFailed", err)
+		}
+	}
+}
+
+func BenchmarkRunTranscode(b *testing.B) {
+	bin := benchScript(b, "#!/bin/sh\nexit 0\n")
+	argv := BuildArgs("in.wav", "out.mp3", Spec{Kind: media.KindAudio, Format: "mp3"})
+	b.ReportAllocs()
+	b.ResetTimer()
+	for b.Loop() {
+		if err := RunTranscode(b.Context(), bin, argv); err != nil {
+			b.Fatalf("RunTranscode() error = %v", err)
 		}
 	}
 }
