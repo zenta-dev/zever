@@ -60,8 +60,10 @@ type CallResult struct {
 
 // Client speaks MCP to one server over a JSON-RPC transport. Responses are
 // matched by request ID; server notifications (messages without IDs) are
-// skipped. It is safe for concurrent use; one in-flight request at a time
-// is assumed per the stdio transport.
+// skipped. It is safe for concurrent use. Calls serialize on one mutex, so
+// a server that stops responding blocks later calls until the transport
+// read fails; callers should bound this with timeouts or cancel between
+// calls (cancellation is honored before each read).
 type Client struct {
 	enc  *json.Encoder
 	dec  *json.Decoder
@@ -87,12 +89,17 @@ func DialStdio(ctx context.Context, path string, args ...string) (*Client, *exec
 
 	stdout, err := cmd.StdoutPipe()
 	if err != nil {
+		_ = stdin.Close()
+
 		return nil, nil, fmt.Errorf("mcpclient: stdout pipe: %w", err)
 	}
 
 	cmd.Stderr = nil
 
 	if err := cmd.Start(); err != nil {
+		_ = stdin.Close()
+		_ = stdout.Close()
+
 		return nil, nil, fmt.Errorf("mcpclient: start %q: %w", path, err)
 	}
 
@@ -136,8 +143,12 @@ func (c *Client) call(ctx context.Context, method string, params, out any) error
 			return RPCError{Code: resp.Error.Code, Message: resp.Error.Message}
 		}
 
-		if out == nil || len(resp.Result) == 0 {
+		if out == nil {
 			return nil
+		}
+
+		if len(resp.Result) == 0 {
+			return fmt.Errorf("mcpclient: empty %s result: %w", method, ErrProtocol)
 		}
 
 		if err := json.Unmarshal(resp.Result, out); err != nil {

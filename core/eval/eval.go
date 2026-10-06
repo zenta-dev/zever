@@ -2,6 +2,7 @@ package eval
 
 import (
 	"context"
+	"math"
 	"strings"
 )
 
@@ -67,6 +68,20 @@ type Report struct {
 	Failed int
 }
 
+// clampScore bounds a scorer value to [0,1]; NaN scores 0 so one broken
+// scorer cannot poison the mean.
+func clampScore(score float64) float64 {
+	if math.IsNaN(score) || score < 0 {
+		return 0
+	}
+
+	if score > 1 {
+		return 1
+	}
+
+	return score
+}
+
 // RunSuite executes every case through run, scores the outputs, and returns
 // the report. A failing run records Score -1 and continues with the rest.
 func RunSuite(ctx context.Context, run RunFunc, cases []Case, scorer Scorer) Report {
@@ -93,7 +108,7 @@ func RunSuite(ctx context.Context, run RunFunc, cases []Case, scorer Scorer) Rep
 			continue
 		}
 
-		score := scorer(out, c.Expected)
+		score := clampScore(scorer(out, c.Expected))
 		report.Results = append(report.Results, Result{CaseName: c.Name, Output: out, Score: score})
 
 		sum += score

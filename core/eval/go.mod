@@ -17,4 +17,8 @@ replace github.com/zenta-dev/zever/core/agent => ../agent
 
 replace github.com/zenta-dev/zever/core/ai => ../ai
 
+replace github.com/zenta-dev/zever/shared/endpoint => ../../shared/endpoint
+
 replace github.com/zenta-dev/zever/shared/mcpclient => ../../shared/mcpclient
+
+replace github.com/zenta-dev/zever/shared/registry => ../../shared/registry

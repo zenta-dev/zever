@@ -3,6 +3,7 @@ package eval
 import (
 	"context"
 	"fmt"
+	"math"
 
 	"github.com/zenta-dev/zever/core/agent"
 	"github.com/zenta-dev/zever/core/ai"
@@ -35,7 +36,7 @@ func JudgeScorer(client ai.AI, model string) func(ctx context.Context, output, e
 		}
 
 		score := out.Score
-		if score < 0 {
+		if math.IsNaN(score) || score < 0 {
 			score = 0
 		}
 		if score > 1 {

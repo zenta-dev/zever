@@ -6,10 +6,16 @@ import (
 )
 
 // SystemPrompt builds an agent identity prompt from a role and instructions.
+// An empty role selects a generic helpful-assistant identity.
 func SystemPrompt(role, instructions string) string {
+	role = strings.TrimSpace(role)
+	if role == "" {
+		role = "a helpful assistant"
+	}
+
 	var b strings.Builder
 
-	fmt.Fprintf(&b, "You are %s.\n", strings.TrimSpace(role))
+	fmt.Fprintf(&b, "You are %s.\n", strings.TrimRight(role, "."))
 
 	if trimmed := strings.TrimSpace(instructions); trimmed != "" {
 		b.WriteString(trimmed)

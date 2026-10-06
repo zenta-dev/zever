@@ -14,7 +14,7 @@ import (
 func ToolsFromClient(ctx context.Context, c *mcpclient.Client) ([]Tool, error) {
 	defs, err := c.ListTools(ctx)
 	if err != nil {
-		return nil, err
+		return nil, fmt.Errorf("agent: list mcp tools: %w", err)
 	}
 
 	tools := make([]Tool, 0, len(defs))
