@@ -78,6 +78,12 @@ type Options struct {
 	// DedicatedPool opts out of container-level pool sharing. Default false
 	// shares one pool per exact DSN; true opens a private pool.
 	DedicatedPool bool `json:"dedicated_pool" toml:"dedicated_pool" yaml:"dedicated_pool"`
+	// StallReadiness opts the relay into the container readiness aggregate: while
+	// Status().Stalled is true, container.Ready reports the process as not ready
+	// so orchestrators stop routing traffic to an instance whose messages are
+	// backing up. Default false keeps readiness purely dependency-based; the
+	// container reads this flag, adapters ignore it.
+	StallReadiness bool `json:"stall_readiness" toml:"stall_readiness" yaml:"stall_readiness"`
 	// Provider emits relay metrics and spans. Nil disables telemetry. It is
 	// Go-API-only: never decoded from configuration files.
 	Provider observability.Provider `json:"-" toml:"-" yaml:"-"`

@@ -11,6 +11,8 @@ import (
 	"net"
 	"net/http"
 	"time"
+
+	"github.com/zenta-dev/zever/shared/traceprop"
 )
 
 // DefaultMaxIdleConnsPerHost is the default maximum idle connections per host
@@ -64,6 +66,7 @@ type config struct {
 	noRedirect     bool
 	insecureVerify bool
 	insecureSet    bool
+	tracing        bool
 }
 
 // Option configures NewClient.
@@ -107,6 +110,16 @@ func WithInsecureSkipVerify(skip bool) Option {
 	}
 }
 
+// WithTracing enables W3C trace-context injection on outgoing requests. It is
+// opt-in so the default client keeps a plain *http.Transport (callers and
+// tests assert concrete transport types); pass it for service-to-service
+// calls that should join the caller's trace.
+func WithTracing() Option {
+	return func(c *config) {
+		c.tracing = true
+	}
+}
+
 // NewClient returns an *http.Client with timeout, a TLS 1.2 floor on a clone
 // of http.DefaultTransport, and optional dial-guard and redirect policies.
 func NewClient(timeout time.Duration, opts ...Option) *http.Client {
@@ -129,21 +142,9 @@ func NewClient(timeout time.Duration, opts ...Option) *http.Client {
 				clone.DialContext = SafeDialContext(cfg.allowPrivate)
 			}
 			clone.MaxIdleConnsPerHost = DefaultMaxIdleConnsPerHost
-			c := &http.Client{Timeout: timeout, Transport: clone}
-			if cfg.noRedirect {
-				c.CheckRedirect = func(_ *http.Request, _ []*http.Request) error {
-					return http.ErrUseLastResponse
-				}
-			}
-			return c
+			return newHTTPClient(timeout, clone, cfg.noRedirect, cfg.tracing)
 		}
-		c := &http.Client{Timeout: timeout, Transport: cfg.transport}
-		if cfg.noRedirect {
-			c.CheckRedirect = func(_ *http.Request, _ []*http.Request) error {
-				return http.ErrUseLastResponse
-			}
-		}
-		return c
+		return newHTTPClient(timeout, cfg.transport, cfg.noRedirect, cfg.tracing)
 	}
 	var tr *http.Transport
 	if dt, ok := http.DefaultTransport.(*http.Transport); ok && dt != nil {
@@ -167,20 +168,74 @@ func NewClient(timeout time.Duration, opts ...Option) *http.Client {
 		tr.DialContext = SafeDialContext(cfg.allowPrivate)
 	}
 	tr.MaxIdleConnsPerHost = DefaultMaxIdleConnsPerHost
-	c := &http.Client{Timeout: timeout, Transport: tr}
-	if cfg.noRedirect {
+	return newHTTPClient(timeout, tr, cfg.noRedirect, cfg.tracing)
+}
+
+// traceRoundTripper injects W3C trace context from the request context onto
+// outgoing requests. It is a no-op when the context carries no valid span, so
+// it is always safe to install.
+type traceRoundTripper struct {
+	base http.RoundTripper
+}
+
+// RoundTrip injects trace headers and delegates to the wrapped transport.
+func (t traceRoundTripper) RoundTrip(req *http.Request) (*http.Response, error) {
+	if injected := Inject(req.Context(), req); injected != req {
+		req = injected
+	}
+
+	base := t.base
+	if base == nil {
+		base = http.DefaultTransport
+	}
+
+	return base.RoundTrip(req)
+}
+
+// Inject returns a copy of req carrying the W3C trace context from ctx in its
+// headers. The original request is never mutated; when ctx holds no valid span
+// the original request is returned unchanged.
+func Inject(ctx context.Context, req *http.Request) *http.Request {
+	hdrs := traceprop.Inject(ctx, nil)
+	if len(hdrs) == 0 {
+		return req
+	}
+
+	clone := req.Clone(ctx)
+	for k, v := range hdrs {
+		clone.Header.Set(k, v)
+	}
+
+	return clone
+}
+
+// newHTTPClient builds the client with the trace-injecting transport and the
+// optional no-redirect policy, shared by every NewClient branch.
+func newHTTPClient(timeout time.Duration, rt http.RoundTripper, noRedirect, tracing bool) *http.Client {
+	transport := rt
+	if tracing {
+		transport = traceRoundTripper{base: rt}
+	}
+
+	c := &http.Client{Timeout: timeout, Transport: transport}
+	if noRedirect {
 		c.CheckRedirect = func(_ *http.Request, _ []*http.Request) error {
 			return http.ErrUseLastResponse
 		}
 	}
+
 	return c
 }
 
 // NewSafeClient returns an *http.Client enforcing a TLS 1.2 minimum, refusing
 // private-address dials unless allowPrivate is true, never following
-// redirects, and applying timeout to the whole request.
-func NewSafeClient(timeout time.Duration, allowPrivate bool) *http.Client {
-	return NewClient(timeout, WithSafeDial(allowPrivate), WithNoRedirect())
+// redirects, and applying timeout to the whole request. Trace injection is off
+// by default; pass WithTracing to NewClient when you also want propagation.
+func NewSafeClient(timeout time.Duration, allowPrivate bool, opts ...Option) *http.Client {
+	base := make([]Option, 0, 2+len(opts))
+	base = append(base, WithSafeDial(allowPrivate), WithNoRedirect())
+
+	return NewClient(timeout, append(base, opts...)...)
 }
 
 // SafeDialContext returns a DialContext function refusing private addresses

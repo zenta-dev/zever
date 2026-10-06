@@ -55,3 +55,51 @@ func TestToolErrorFeedback(t *testing.T) {
 		}
 	}
 }
+
+func TestSchemaDesign(t *testing.T) {
+	t.Parallel()
+
+	got := SchemaDesign("a blog")
+
+	for _, want := range []string{"entity", "a blog"} {
+		if !strings.Contains(got, want) {
+			t.Errorf("missing %q:\n%s", want, got)
+		}
+	}
+}
+
+func TestMigrationReview(t *testing.T) {
+	t.Parallel()
+
+	got := MigrationReview("drop users.email")
+
+	for _, want := range []string{"breaking", "drop users.email"} {
+		if !strings.Contains(got, want) {
+			t.Errorf("missing %q:\n%s", want, got)
+		}
+	}
+}
+
+func TestCitationCheck(t *testing.T) {
+	t.Parallel()
+
+	got := CitationCheck("What?", "Paris.", []string{"Paris is nice", "other"})
+
+	for _, want := range []string{"[1] Paris is nice", "[2] other", "SUPPORTED"} {
+		if !strings.Contains(got, want) {
+			t.Errorf("missing %q:\n%s", want, got)
+		}
+	}
+}
+
+func TestToolPlan(t *testing.T) {
+	t.Parallel()
+
+	got := ToolPlan("deploy", []string{"build", "push"})
+
+	for _, want := range []string{"deploy", "- build", "- push"} {
+		if !strings.Contains(got, want) {
+			t.Errorf("missing %q:\n%s", want, got)
+		}
+	}
+}

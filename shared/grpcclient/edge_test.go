@@ -157,13 +157,17 @@ func TestNewInvalidServiceConfigJSON(t *testing.T) {
 // compile-time assertion that stubGuard satisfies resilience.Guard.
 var _ resilience.Guard = (*stubGuard)(nil)
 
-// stubSpan is a test double observability.Span recording End calls.
+// stubSpan is a test double observability.Span recording End calls and
+// attributes.
 type stubSpan struct {
 	ended int
+	attrs []observability.Attr
 }
 
-// SetAttributes is a no-op.
-func (s *stubSpan) SetAttributes(_ ...observability.Attr) {}
+// SetAttributes records the attributes.
+func (s *stubSpan) SetAttributes(attrs ...observability.Attr) {
+	s.attrs = append(s.attrs, attrs...)
+}
 
 // RecordError is a no-op.
 func (s *stubSpan) RecordError(_ error) {}

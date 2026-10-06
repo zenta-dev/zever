@@ -1,7 +1,7 @@
 # Outbox/Relay Ops + Cross-Service Trace Convention — Design Spec
 
 **Date:** 2026-10-06
-**Status:** Approved (design), implementation in progress
+**Status:** Implemented — all work shipped (metrics, zever outbox CLI, stalled-relay readiness, inbound extraction + outbound injection, baggage, semconv migration).
 **Owner:** @erhahahaa
 
 ## Problem
@@ -92,7 +92,7 @@ record the kind for assertions.
 - `core/outbox/options.go`: `Provider observability.Provider `json:"-"...``,
   `ScopeName = "outbox"`; add `core/observability` dep.
 - Emit via `Meter("outbox")`:
-  - gauges `outbox.pending`, `outbox.failed`, `outbox.oldest_pending.age_seconds`
+  - gauges `outbox.pending`, `outbox.failed`, `outbox.oldest_pending_age_seconds`
   - counters `outbox.published`, `outbox.failed_total`, `outbox.retried`,
     `outbox.relay_errors`
   - histogram `outbox.publish.duration_seconds`

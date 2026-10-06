@@ -7,8 +7,11 @@ import (
 	"io"
 	"net"
 	"net/http"
+	"strings"
 	"testing"
 	"time"
+
+	"go.opentelemetry.io/otel/trace"
 )
 
 func TestNewClientTLSFloor(t *testing.T) {
@@ -263,5 +266,59 @@ func TestTooLargeErrorMessage(t *testing.T) {
 				t.Fatalf("Error() = %q, want %q", got, tt.want)
 			}
 		})
+	}
+}
+
+func TestWithTracingInjectsTraceparent(t *testing.T) {
+	var got http.Header
+
+	rt := traceRoundTripper{base: roundTripFunc(func(r *http.Request) (*http.Response, error) {
+		got = r.Header.Clone()
+
+		return &http.Response{StatusCode: http.StatusOK, Body: io.NopCloser(strings.NewReader("")), Header: make(http.Header), Request: r}, nil
+	})}
+
+	ctx := trace.ContextWithSpanContext(t.Context(), trace.NewSpanContext(trace.SpanContextConfig{
+		TraceID:    trace.TraceID{1},
+		SpanID:     trace.SpanID{1},
+		TraceFlags: trace.FlagsSampled,
+	}))
+	req, _ := http.NewRequestWithContext(ctx, http.MethodGet, "http://example.test", nil)
+
+	resp, err := rt.RoundTrip(req)
+	if err != nil {
+		t.Fatalf("RoundTrip: %v", err)
+	}
+
+	_ = resp.Body.Close()
+
+	if got.Get("traceparent") == "" {
+		t.Error("traceparent not injected")
+	}
+}
+
+func TestWithTracingOffByDefault(t *testing.T) {
+	c := NewClient(time.Second, WithTransport(roundTripFunc(func(*http.Request) (*http.Response, error) {
+		return nil, http.ErrNotSupported
+	})))
+	if _, ok := c.Transport.(traceRoundTripper); ok {
+		t.Error("transport wrapped without WithTracing")
+	}
+}
+
+func TestWithTracingOptionWraps(t *testing.T) {
+	c := NewClient(time.Second,
+		WithTransport(roundTripFunc(func(*http.Request) (*http.Response, error) { return nil, http.ErrNotSupported })),
+		WithTracing(),
+	)
+	if _, ok := c.Transport.(traceRoundTripper); !ok {
+		t.Errorf("transport is %T, want traceRoundTripper", c.Transport)
+	}
+}
+
+func TestInjectNoSpanLeavesRequest(t *testing.T) {
+	req, _ := http.NewRequestWithContext(t.Context(), http.MethodGet, "http://example.test", nil)
+	if got := Inject(t.Context(), req); got != req {
+		t.Error("Inject cloned a request with no span")
 	}
 }

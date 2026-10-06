@@ -10,8 +10,11 @@ import (
 	"go.opentelemetry.io/otel/trace"
 
 	"google.golang.org/grpc"
+	"google.golang.org/grpc/codes"
 	"google.golang.org/grpc/metadata"
+	"google.golang.org/grpc/status"
 
+	"github.com/zenta-dev/zever/core/observability"
 	"github.com/zenta-dev/zever/core/resilience"
 	"github.com/zenta-dev/zever/shared/traceprop"
 )
@@ -241,6 +244,373 @@ func TestUnaryInterceptorNilGuard(t *testing.T) {
 
 	if err := cfg.unaryInterceptor()(t.Context(), "/svc/Method", nil, nil, nil, invoker); err != nil {
 		t.Fatalf("interceptor: %v", err)
+	}
+}
+
+// attrStringValue returns the string value of key in attrs, or "" when the
+// key is absent or not a string attribute.
+func attrStringValue(attrs []observability.Attr, key string) string {
+	for _, a := range attrs {
+		if a.Key != key {
+			continue
+		}
+		if v, ok := a.Value.(observability.StringValue); ok {
+			return v.Value
+		}
+	}
+
+	return ""
+}
+
+// attrIntValue returns the int value of key in attrs, and whether the key
+// was present as an int attribute.
+func attrIntValue(attrs []observability.Attr, key string) (int64, bool) {
+	for _, a := range attrs {
+		if a.Key != key {
+			continue
+		}
+		if v, ok := a.Value.(observability.Int64Value); ok {
+			return v.Value, true
+		}
+	}
+
+	return 0, false
+}
+
+// stubStarterTracer is a test double observability.Tracer that also
+// implements the optional observability.SpanStarter interface, recording the
+// resolved span name and start config.
+type stubStarterTracer struct {
+	spans   []*starterSpan
+	names   []string
+	configs []observability.SpanConfig
+}
+
+// Start records a span the way stubTracer does, ignoring the start options.
+// It is only reachable through a direct call; observability.StartSpan prefers
+// StartSpan when the tracer implements SpanStarter.
+func (t *stubStarterTracer) Start(_ context.Context, _ string) (context.Context, observability.Span) {
+	s := &starterSpan{}
+	t.spans = append(t.spans, s)
+	return context.Background(), s
+}
+
+// StartSpan records the span name and the resolved start config, then
+// returns a span carrying the config's initial attributes.
+func (t *stubStarterTracer) StartSpan(_ context.Context, name string, opts ...observability.SpanStartOption) (context.Context, observability.Span) {
+	cfg := observability.NewSpanConfig(opts...)
+	s := &starterSpan{cfg: cfg}
+	t.spans = append(t.spans, s)
+	t.names = append(t.names, name)
+	t.configs = append(t.configs, cfg)
+
+	return context.Background(), s
+}
+
+// Shutdown is a no-op.
+func (t *stubStarterTracer) Shutdown(_ context.Context) error { return nil }
+
+// starterProvider is a test double observability.Provider over a
+// stubStarterTracer.
+type starterProvider struct {
+	tracer *stubStarterTracer
+}
+
+// Tracer returns the stub starter tracer.
+func (p *starterProvider) Tracer(_ string) observability.Tracer { return p.tracer }
+
+// Meter returns the stub metrics.
+func (p *starterProvider) Meter(_ string) observability.Metrics { return &stubMetrics{} }
+
+// Shutdown is a no-op.
+func (p *starterProvider) Shutdown(_ context.Context) error { return nil }
+
+// starterSpan is a test double observability.Span recording its start config
+// and attributes.
+type starterSpan struct {
+	cfg   observability.SpanConfig
+	attrs []observability.Attr
+}
+
+// SetAttributes records the attributes.
+func (s *starterSpan) SetAttributes(attrs ...observability.Attr) {
+	s.attrs = append(s.attrs, attrs...)
+}
+
+// RecordError is a no-op.
+func (s *starterSpan) RecordError(_ error) {}
+
+// End is a no-op.
+func (s *starterSpan) End() {}
+
+// compile-time assertion that the starter stub satisfies SpanStarter.
+// stubTracer deliberately does not, so the fallback path stays covered.
+var _ observability.SpanStarter = (*stubStarterTracer)(nil)
+
+// assertRPCAttrs asserts the shared RPC attribute set.
+func assertRPCAttrs(t *testing.T, attrs []observability.Attr) {
+	t.Helper()
+
+	if got := attrStringValue(attrs, observability.RPCSystem); got != observability.SystemGRPC {
+		t.Errorf("%s = %q, want %q", observability.RPCSystem, got, observability.SystemGRPC)
+	}
+	if got := attrStringValue(attrs, observability.RPCService); got != "pkg.Svc" {
+		t.Errorf("%s = %q, want pkg.Svc", observability.RPCService, got)
+	}
+	if got := attrStringValue(attrs, observability.RPCMethod); got != "DoThing" {
+		t.Errorf("%s = %q, want DoThing", observability.RPCMethod, got)
+	}
+}
+
+// TestUnaryInterceptorSpanKindClient pins that the unary client span is
+// started through observability.StartSpan as SpanKindClient, with the RPC
+// attributes carried on the resolved start config when the tracer implements
+// the optional SpanStarter interface.
+func TestUnaryInterceptorSpanKindClient(t *testing.T) {
+	t.Parallel()
+
+	tr := &stubStarterTracer{}
+	cfg := &config{observability: &starterProvider{tracer: tr}}
+	invoker, _ := captureInvoker(nil)
+
+	if err := cfg.unaryInterceptor()(t.Context(), "/pkg.Svc/DoThing", nil, nil, nil, invoker); err != nil {
+		t.Fatalf("interceptor: %v", err)
+	}
+
+	if len(tr.spans) != 1 {
+		t.Fatalf("spans = %d, want 1", len(tr.spans))
+	}
+	if len(tr.configs) != 1 {
+		t.Fatalf("StartSpan calls = %d, want 1 (span must go through observability.StartSpan)", len(tr.configs))
+	}
+	if tr.names[0] != "/pkg.Svc/DoThing" {
+		t.Errorf("span name = %q, want /pkg.Svc/DoThing", tr.names[0])
+	}
+	if got := tr.configs[0].Kind; got != observability.SpanKindClient {
+		t.Errorf("span kind = %v, want %v", got, observability.SpanKindClient)
+	}
+	assertRPCAttrs(t, tr.configs[0].Attrs)
+}
+
+// TestStreamInterceptorSpanKindClient pins the same for the stream
+// interceptor.
+func TestStreamInterceptorSpanKindClient(t *testing.T) {
+	t.Parallel()
+
+	tr := &stubStarterTracer{}
+	cfg := &config{observability: &starterProvider{tracer: tr}}
+	streamer := func(context.Context, *grpc.StreamDesc, *grpc.ClientConn, string, ...grpc.CallOption) (grpc.ClientStream, error) {
+		return stubClientStream{}, nil
+	}
+
+	if _, err := cfg.streamInterceptor()(t.Context(), &grpc.StreamDesc{}, nil, "/pkg.Svc/DoThing", streamer); err != nil {
+		t.Fatalf("interceptor: %v", err)
+	}
+
+	if len(tr.spans) != 1 {
+		t.Fatalf("spans = %d, want 1", len(tr.spans))
+	}
+	if len(tr.configs) != 1 {
+		t.Fatalf("StartSpan calls = %d, want 1 (span must go through observability.StartSpan)", len(tr.configs))
+	}
+	if got := tr.configs[0].Kind; got != observability.SpanKindClient {
+		t.Errorf("span kind = %v, want %v", got, observability.SpanKindClient)
+	}
+	assertRPCAttrs(t, tr.configs[0].Attrs)
+}
+
+// TestSpanAttributesSurviveNonStarterTracer pins the fallback path: a Tracer
+// that does not implement observability.SpanStarter has its start options
+// dropped, so the interceptor must still apply the RPC attribute set
+// explicitly on the returned span.
+func TestSpanAttributesSurviveNonStarterTracer(t *testing.T) {
+	t.Parallel()
+
+	tr := &stubTracer{}
+	cfg := &config{observability: &stubProvider{tracer: tr}}
+	invoker, _ := captureInvoker(nil)
+
+	if err := cfg.unaryInterceptor()(t.Context(), "/pkg.Svc/DoThing", nil, nil, nil, invoker); err != nil {
+		t.Fatalf("interceptor: %v", err)
+	}
+
+	if len(tr.spans) != 1 {
+		t.Fatalf("spans = %d, want 1", len(tr.spans))
+	}
+	assertRPCAttrs(t, tr.spans[0].attrs)
+}
+
+// TestUnaryInterceptorSpanSemconvAttributes pins the RPC attributes on the
+// unary client span: rpc.system, server.address, rpc.service, rpc.method,
+// and rpc.grpc.status_code on failure.
+func TestUnaryInterceptorSpanSemconvAttributes(t *testing.T) {
+	t.Parallel()
+
+	tests := []struct {
+		name      string
+		err       error
+		wantCode  codes.Code
+		wantIsSet bool
+	}{
+		{name: "success omits status code"},
+		{
+			name:      "failure records status code",
+			err:       status.Error(codes.Unavailable, "down"),
+			wantCode:  codes.Unavailable,
+			wantIsSet: true,
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			t.Parallel()
+
+			tr := &stubTracer{}
+			cfg := &config{observability: &stubProvider{tracer: tr}}
+			invoker, _ := captureInvoker(tt.err)
+
+			err := cfg.unaryInterceptor()(t.Context(), "/pkg.Svc/DoThing", nil, nil, nil, invoker)
+			if !errors.Is(err, tt.err) && (err == nil) != (tt.err == nil) {
+				t.Fatalf("err = %v, want %v", err, tt.err)
+			}
+
+			if len(tr.spans) != 1 {
+				t.Fatalf("spans = %d, want 1", len(tr.spans))
+			}
+
+			attrs := tr.spans[0].attrs
+
+			if got := attrStringValue(attrs, observability.RPCSystem); got != observability.SystemGRPC {
+				t.Errorf("%s = %q, want %q", observability.RPCSystem, got, observability.SystemGRPC)
+			}
+			if got := attrStringValue(attrs, observability.RPCService); got != "pkg.Svc" {
+				t.Errorf("%s = %q, want pkg.Svc", observability.RPCService, got)
+			}
+			if got := attrStringValue(attrs, observability.RPCMethod); got != "DoThing" {
+				t.Errorf("%s = %q, want DoThing", observability.RPCMethod, got)
+			}
+
+			for _, a := range attrs {
+				if a.Key == observability.ServerAddress {
+					t.Error("server.address present without a connection, want absent")
+				}
+			}
+
+			got, ok := attrIntValue(attrs, observability.RPCGRPCStatusCode)
+			if ok != tt.wantIsSet {
+				t.Fatalf("%s present = %v, want %v", observability.RPCGRPCStatusCode, ok, tt.wantIsSet)
+			}
+			if tt.wantIsSet && got != int64(tt.wantCode) {
+				t.Errorf("%s = %d, want %d", observability.RPCGRPCStatusCode, got, tt.wantCode)
+			}
+		})
+	}
+}
+
+// TestUnaryInterceptorSpanSemconvAttributesThroughRealConn pins that
+// server.address comes from the connection's dial target.
+func TestUnaryInterceptorSpanSemconvAttributesThroughRealConn(t *testing.T) {
+	t.Parallel()
+
+	conn, err := New(t.Context(), "dns:///localhost:50051", WithInsecure())
+	if err != nil {
+		t.Fatalf("New() error = %v", err)
+	}
+	defer conn.Close()
+
+	tr := &stubTracer{}
+	cfg := &config{observability: &stubProvider{tracer: tr}}
+	invoker, _ := captureInvoker(nil)
+
+	if err := cfg.unaryInterceptor()(t.Context(), "/pkg.Svc/DoThing", nil, nil, conn, invoker); err != nil {
+		t.Fatalf("interceptor: %v", err)
+	}
+
+	if len(tr.spans) != 1 {
+		t.Fatalf("spans = %d, want 1", len(tr.spans))
+	}
+
+	if got := attrStringValue(tr.spans[0].attrs, observability.ServerAddress); got != conn.Target() {
+		t.Errorf("%s = %q, want %q", observability.ServerAddress, got, conn.Target())
+	}
+}
+
+// TestStreamInterceptorSpanSemconvAttributes pins the same attributes plus
+// rpc.grpc.status_code on the stream path.
+func TestStreamInterceptorSpanSemconvAttributes(t *testing.T) {
+	t.Parallel()
+
+	tr := &stubTracer{}
+	cfg := &config{observability: &stubProvider{tracer: tr}}
+	streamer := func(context.Context, *grpc.StreamDesc, *grpc.ClientConn, string, ...grpc.CallOption) (grpc.ClientStream, error) {
+		return nil, status.Error(codes.Internal, "boom")
+	}
+
+	if _, err := cfg.streamInterceptor()(t.Context(), &grpc.StreamDesc{}, nil, "/pkg.Svc/Stream", streamer); err == nil {
+		t.Fatal("streamer error = nil, want Internal")
+	}
+
+	if len(tr.spans) != 1 {
+		t.Fatalf("spans = %d, want 1", len(tr.spans))
+	}
+
+	attrs := tr.spans[0].attrs
+
+	if got := attrStringValue(attrs, observability.RPCService); got != "pkg.Svc" {
+		t.Errorf("%s = %q, want pkg.Svc", observability.RPCService, got)
+	}
+	if got := attrStringValue(attrs, observability.RPCMethod); got != "Stream" {
+		t.Errorf("%s = %q, want Stream", observability.RPCMethod, got)
+	}
+	for _, a := range attrs {
+		if a.Key == observability.ServerAddress {
+			t.Error("server.address present without a connection, want absent")
+		}
+	}
+	if got, ok := attrIntValue(attrs, observability.RPCGRPCStatusCode); !ok || got != int64(codes.Internal) {
+		t.Errorf("%s = (%d, %v), want (%d, true)", observability.RPCGRPCStatusCode, got, ok, codes.Internal)
+	}
+}
+
+// TestSplitFullMethod covers the gRPC full-method parser, including the
+// malformed shapes a non-gRPC caller can hand it.
+func TestSplitFullMethod(t *testing.T) {
+	t.Parallel()
+
+	tests := []struct {
+		name        string
+		full        string
+		wantService string
+		wantMethod  string
+	}{
+		{name: "package qualified", full: "/pkg.Svc/Method", wantService: "pkg.Svc", wantMethod: "Method"},
+		{name: "bare service", full: "/Svc/Method", wantService: "Svc", wantMethod: "Method"},
+		{name: "empty", full: "", wantService: "", wantMethod: ""},
+		{name: "no slash", full: "Method", wantService: "", wantMethod: "Method"},
+		{name: "bare slash", full: "/", wantService: "", wantMethod: ""},
+		{name: "trailing slash", full: "/Svc/", wantService: "Svc", wantMethod: ""},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			t.Parallel()
+
+			svc, method := splitFullMethod(tt.full)
+			if svc != tt.wantService || method != tt.wantMethod {
+				t.Errorf("splitFullMethod(%q) = (%q, %q), want (%q, %q)",
+					tt.full, svc, method, tt.wantService, tt.wantMethod)
+			}
+		})
+	}
+}
+
+// TestDialTargetNilConn pins that a nil connection yields an empty target
+// rather than panicking.
+func TestDialTargetNilConn(t *testing.T) {
+	t.Parallel()
+
+	if got := dialTarget(nil); got != "" {
+		t.Errorf("dialTarget(nil) = %q, want empty", got)
 	}
 }
 

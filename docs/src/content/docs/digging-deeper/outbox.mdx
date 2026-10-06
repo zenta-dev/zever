@@ -52,6 +52,7 @@ outbox:
     retention: 604800000000000 # processed-row retention; default 7d
     lock_seconds: 30 # claim lease while publishing
     dedicated_pool: false # true opens a private pool instead of sharing per DSN
+    stall_readiness: false # true fails container.Ready while Status().Stalled
 ```
 
 CDC variant (postgres logical replication):
@@ -101,11 +102,16 @@ func openStore() error {
 ```
 
 `Outbox()` resolves lazily and caches the store; on error the cache
-clears so the next call retries. Note the container-opened store records
-messages but cannot `Start` its relay: core `Options` carry no `Publisher`.
-Wire one through the adapter constructor (`adapters/outbox/db`
-`OpenFromDB`, `adapters/outbox/cdc` `New`, `adapters/outbox/memory` `New`)
-— see the example below.
+clears so the next call retries. It also injects the resolved
+`observability.Provider` into `Options.Provider`, so a container-opened
+store emits the relay metrics and spans described in
+[Outbox Ops](./outbox-ops.mdx) without extra wiring.
+
+Note the container-opened store records messages but cannot `Start`
+its relay: core `Options` carry no `Publisher`. Wire one through the
+adapter constructor (`adapters/outbox/db` `OpenFromDB`,
+`adapters/outbox/cdc` `New`, `adapters/outbox/memory` `New`) — see the
+example below.
 
 ## Runnable example
 
@@ -195,9 +201,15 @@ How the pieces fit:
   mutex), publishes each message through the `Publisher`, marks successes
   `processed`, and retries failures with `shared/retry` backoff. Messages
   that exhaust `max_attempts` are marked `failed` — the dead-letter queue —
-  and left for inspection. Processed rows older than `retention` are
+  and left for inspection and repair through `outbox.Admin`
+  (`List`/`Requeue`/`Purge`, plus `Deleter` on the `db` adapter), driven
+  by the `zever outbox` CLI. Processed rows older than `retention` are
   deleted. `Status()` reports `Pending`/`Processed`/`Failed` counters,
   `LastError`, and `Stalled` when the oldest pending message waits too long.
+- When an observability provider is wired (`Options.Provider`, which
+  `container.Outbox()` injects), the relay emits `outbox.*` metrics and
+  `outbox.publish`/`outbox.consume` spans — see [Outbox
+  Ops](./outbox-ops.mdx).
 - `Inbox.Process` records `eventID` in the caller's transaction and runs
   the side effect only when the ID is new (`INSERT ... ON CONFLICT DO
   NOTHING`), so at-least-once delivery still applies side effects exactly
@@ -243,7 +255,8 @@ acknowledges the LSN only after a successful publish.
   or publish error.
 3. `failed` rows accumulate: the destination rejects the payload or the
   `Publisher` errors. `max_attempts` (default 5) bounds retries; inspect
-  `last_error` on the row, fix the cause, and re-drive the row.
+  `last_error` on the row, fix the cause, and re-drive the row with
+  `zever outbox dlq requeue --id <id>`.
 4. Duplicate side effects in consumers: the consumer is not idempotent.
   Give every message a stable `ID` and dedupe through `Inbox.Process` (or
   your own idempotency key) in the same transaction as the side effect.
@@ -257,3 +270,4 @@ acknowledges the LSN only after a successful publish.
 - [Queue](./queue.mdx) - durable delivery with ack and retry for must-run work
 - [Workflows](./workflows.mdx) - durable multi-step runs
 - [Observability](./observability.mdx) - trace context injected at `Record` time
+- [Outbox Ops](./outbox-ops.mdx) - relay metrics, alerting, DLQ runbook, stalled readiness

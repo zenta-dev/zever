@@ -1,0 +1,311 @@
+---
+title: Cross-Service Tracing
+description: "W3C trace propagation, baggage keys, span kinds, and the OTel semconv attribute migration."
+---
+
+## Purpose
+
+Use this page to make one user request stay one trace across every
+service it touches. Without propagation each service starts a fresh root
+trace and a slow checkout is a pile of disconnected spans instead of one
+timeline. The convention has four parts: **extract** inbound context,
+**inject** outbound context, carry **baggage** for cross-cutting facts,
+and tag every span with a **kind** and semconv attribute names.
+
+## The propagation contract
+
+zever propagates W3C Trace Context — `traceparent` and `tracestate` —
+plus W3C Baggage. The `otlp` adapter installs the same composite
+propagator (`TraceContext` + `Baggage`) as the process global, so the
+rule is simple:
+
+| Boundary | What happens | Where |
+|---|---|---|
+| HTTP inbound | `traceparent`/`tracestate`/`baggage` extracted before the server span starts | `middleware.Tracing` |
+| gRPC inbound | Same three keys read from incoming metadata before the server span starts | `middleware.TracingUnaryServerInterceptor` |
+| HTTP outbound | Context injected onto the outgoing request, when the client is built with `httpclient.WithTracing()` | `shared/httpclient` |
+| gRPC outbound | Context injected into outgoing metadata | `shared/grpcclient` interceptors |
+| Queue / outbox | Context stored in the message headers at publish/`Record`, continued on consume | `core/outbox`, `core/job`, `traceprop.StartConsumeSpan` |
+
+Because inbound extraction happens before the span starts, the server
+span is a **child** of the caller's span rather than a new root. That one
+ordering detail is the whole difference between a connected trace and a
+forest of traces.
+
+Wiring `middleware.Tracing` in front of your router is the inbound half:
+
+```go
+import (
+    "net/http"
+
+    "github.com/zenta-dev/zever/core/middleware"
+    "github.com/zenta-dev/zever/core/observability"
+)
+
+func tracedHandler(p observability.Provider, h http.Handler) http.Handler {
+    // Recover outside Tracing so panics become 500s before logging sees them.
+    return middleware.Tracing(p)(h)
+}
+```
+
+The outbound half is a transport, not a hand-written `RoundTripper`: pass
+`httpclient.WithTracing()` when you build the client and every outbound
+request carries the caller's trace context. The option is opt-in so the
+default client keeps a plain `*http.Transport`:
+
+```go
+import (
+    "context"
+    "net/http"
+    "time"
+
+    "github.com/zenta-dev/zever/shared/httpclient"
+)
+
+func callDownstream(ctx context.Context, url string) (*http.Response, error) {
+    c := httpclient.NewClient(5*time.Second, httpclient.WithTracing())
+    req, err := http.NewRequestWithContext(ctx, http.MethodGet, url, nil)
+    if err != nil {
+        return nil, err
+    }
+    return c.Do(req)
+}
+```
+
+Without `WithTracing()` the client sends no `traceparent`, and the
+downstream service starts a fresh root trace. Thread the handler's
+context into the request — `http.NewRequest` (no context) has no parent
+span to propagate even with the option set. `httpclient.Inject(ctx, req)`
+is exported for the case where you already hold a request and need the
+headers applied yourself.
+
+gRPC outbound injection needs no option: `shared/grpcclient` chains its
+interceptors on every connection, so the context rides along
+automatically. Client spans additionally need
+`grpcclient.WithObservability(provider)`.
+
+Messaging has a header channel too: `Record` stores the trace context in
+the outbox row's headers, and the relay hands those headers to the
+`Publisher`. Consumer paths that hold the headers continue the same
+trace with `traceprop.StartConsumeSpan` — `core/job`'s worker and the
+`eventbus` adapters already do. For send paths with no channel at all
+(mailer, SMS, push), read the ID for your logs instead of inventing
+protocol headers:
+
+```go
+import (
+    "github.com/zenta-dev/zever/shared/traceprop"
+)
+
+// log.Println("sending receipt", traceprop.TraceID(ctx))
+```
+
+Inbound propagation is untrusted input: the OTel propagator validates
+`traceparent`/`tracestate`, and invalid values are a no-op rather than an
+error.
+
+## Baggage
+
+Baggage carries the small set of facts every service in a trace needs —
+which tenant, which user, which support ticket — without re-reading a
+header at each hop. Three keys are the convention; nothing else crosses
+a service boundary:
+
+| Constant | Key | Carries |
+|---|---|---|
+| `traceprop.BaggageTenantID` | `tenant.id` | Tenant identifier for row-level filtering and per-tenant quotas |
+| `traceprop.BaggageUserID` | `user.id` | Acting user identifier for audit spans |
+| `traceprop.BaggageCorrelationID` | `correlation.id` | Request/job correlation ID across async work |
+
+Set them once, at the edge where the request enters your system. Every
+downstream service then reads them with no plumbing. From the
+`shared/traceprop` package:
+
+```go
+// Set at the ingress handler, before any downstream call.
+ctx = traceprop.WithBaggage(ctx, traceprop.BaggageTenantID, tenantID)
+ctx = traceprop.WithBaggage(ctx, traceprop.BaggageUserID, userID)
+ctx = traceprop.WithBaggage(ctx, traceprop.BaggageCorrelationID, correlationID)
+
+// Read anywhere downstream; missing keys return "".
+tenant := traceprop.Baggage(ctx, traceprop.BaggageTenantID)
+```
+
+Baggage is copied, not shared: `WithBaggage` returns a new context and
+never mutates the one you passed in, and an invalid key or value leaves
+the context untouched.
+
+Treat baggage as untrusted and as a telemetry surface. Values ride every
+outbound header, so keep them short, never put a secret or a raw token
+there, and remember that any value you set is visible in every downstream
+trace. High-cardinality values belong in span attributes or logs, not in
+a header multiplied across a fleet.
+
+## Span kinds
+
+A span kind tells a trace viewer whether the span received work or
+started it — the difference between "this service was called" and "this
+service called out". `core/observability` exposes the five kinds, and
+`observability.StartSpan` is the entry point that carries them:
+
+| Kind | Use for | Typical zever span |
+|---|---|---|
+| `SpanKindServer` | An inbound request this service handles | HTTP path span, gRPC full-method span |
+| `SpanKindClient` | An outbound request this service makes | `shared/grpcclient` interceptor span |
+| `SpanKindProducer` | Publishing a message | Outbox publish, queue dispatch |
+| `SpanKindConsumer` | Processing a received message | `traceprop.StartConsumeSpan`, `cdc` consumer |
+| `SpanKindInternal` | Work inside one service, no crossing | Default when no kind is given |
+
+```go
+import (
+    "context"
+
+    "github.com/zenta-dev/zever/core/observability"
+)
+
+func publishSpan(ctx context.Context, t observability.Tracer, topic string) {
+    ctx, span := observability.StartSpan(ctx, t, "outbox.publish",
+        observability.WithSpanKind(observability.SpanKindProducer),
+        observability.WithAttributes(observability.String("messaging.destination.name", topic)),
+    )
+    defer span.End()
+}
+```
+
+`Tracer.Start(ctx, name)` still exists and is equivalent to an
+`internal` span with no attributes. Reach for `StartSpan` whenever the
+work crosses a boundary — that is the whole value of the kind. Providers
+that do not implement the optional `observability.SpanStarter` interface
+fall back to `Start`, so instrumentation never breaks an adapter.
+
+## Provider setup and verification
+
+Propagation only matters once spans actually leave the process. In
+production:
+
+```yaml
+observability:
+  adapter: otlp
+  options:
+    service_name: bookings      # keys every dashboard and alert
+    endpoint: collector:4317    # host:port, no scheme or path
+    sample_ratio: 0.1
+```
+
+Give each service a distinct `service_name` — that is how the collector
+draws the boundaries between spans in one trace. Keep `service_name`
+stable across deploys; renaming it splits a service's history in two.
+
+Verify propagation end to end, in this order:
+
+1. Start the collector and confirm it receives spans at all
+   (`stdout` proves the instrumented code runs; only `otlp` proves the
+   wire).
+2. Send one request through service A into service B. In the collector
+   UI, open the trace and confirm a **single** trace ID with A's server
+   span as the parent of B's server span. Two roots means inbound
+   extraction is not wired.
+3. Confirm an outbound call shows a client span as a child of the server
+   span that made it.
+4. Confirm baggage: read `tenant.id` in service B and check it matches
+   what the edge set.
+
+Sample early, not late: `sample_ratio: 0.1` keeps cost down while
+still leaving traces to trace. Note that a sampled trace still carries
+correct parent links for the spans that were recorded — a child whose
+parent was dropped is rendered as a new root, so a high sampling drop
+rate looks like broken propagation. Verify at `sample_ratio: 1`, then
+lower it.
+
+## Attribute migration (semconv)
+
+Span and counter attribute names now follow OpenTelemetry semantic
+conventions so that off-the-shelf dashboards and queries work against
+zever traces. The migration has **shipped** and the old names are
+**gone** — there is no alias or fallback. This was a breaking change for
+anyone querying the old attributes, so update saved queries, dashboards,
+and alert rules with it. `CHANGELOG.md` carries the note under
+`### Changed`.
+
+| Old name (removed) | New name |
+|---|---|
+| `http.method` | `http.request.method` |
+| `http.path` | `url.path` |
+| `http.status_code` | `http.response.status_code` |
+| gRPC full method as the span's only identity | span name still the full method, now joined by `rpc.system="grpc"`, `rpc.service`, and `rpc.method` attributes |
+| — (new) | `rpc.grpc.status_code` |
+| — (new) | `messaging.system`, `messaging.destination.name`, `messaging.operation`, `messaging.message.id`, `messaging.message.conversation_id` |
+
+Query the exported constants rather than string literals, so a future
+semconv revision is a change in the framework instead of in every query
+you wrote:
+
+```go
+import (
+    "github.com/zenta-dev/zever/core/observability"
+)
+
+// The same keys the middleware emits, as constants.
+_ = observability.HTTPRequestMethod
+_ = observability.URLPath
+_ = observability.HTTPResponseStatusCode
+_ = observability.RPCSystem
+_ = observability.RPCService
+_ = observability.RPCMethod
+_ = observability.RPCGRPCStatusCode
+```
+
+### Counters
+
+The metric **names** are unchanged — the middleware still emits
+`http.request` and `rpc.request`. The counter **labels** are not: they
+were part of the migration too, and dashboards that group on them break
+silently.
+
+| Counter | Old labels (removed) | New labels |
+|---|---|---|
+| `http.request` | `method` (string), `status` (status **text**, e.g. `OK`) | `http.request.method` (string), `http.response.status_code` (int) |
+| `rpc.request` | `method` (full gRPC method), `outcome` (`ok` / `error`) | `rpc.service`, `rpc.method`, `rpc.grpc.status_code` (int gRPC code, `0` is `OK`) |
+
+Two things to fix when you update a saved query: the `http.request`
+counter's status label carries the numeric code rather than the status
+text, so a `status="OK"` grouping becomes
+`http.response.status_code=200`; and the `rpc.request` counter has no
+`outcome` label any more, so success/failure grouping compares
+`rpc.grpc.status_code` against `0` instead of the string `"ok"`.
+
+Span naming stays path-only and method-only: never a query string or a
+raw URI, so high-cardinality and sensitive values stay out of traces.
+The path attribute moved to `url.path` — that is a rename of the old
+HTTP path attribute, not an adoption of `url.query`. If you find
+yourself wanting the query string in a span, that is a signal to log it
+separately instead.
+
+## Troubleshooting
+
+1. Every service shows its own root trace: inbound extraction is not
+   wired. `middleware.Tracing` must run in the handler chain (the
+   generated server wires it) and must run *before* your routes, not
+   around each route.
+2. Client calls start unrelated traces: the request was made with a
+   context that was not threaded from the handler, or an
+   `httpclient` client was built without `httpclient.WithTracing()`.
+   Always derive the request context from `r.Context()` and pass the
+   option on `httpclient.NewClient`.
+3. Baggage is empty downstream: nothing set it, or it was set after the
+   outbound call rather than at the edge. Baggage propagates forward
+   only from the context the outbound call used.
+4. `go doc` shows attribute keys you do not recognize in the collector:
+   you are on a version before the semconv migration. Check
+   `CHANGELOG.md` under `### Changed` and update queries to the new keys.
+5. Traces stop mid-service: the provider was never handed a parent
+   context, or the process was not using `otlp` so spans were dropped
+   rather than rejected. Confirm the adapter and `service_name` first.
+
+## See also
+
+- [Observability](./observability.mdx) - providers, attribute bounds, redaction
+- [Outbox Ops](./outbox-ops.mdx) - relay metrics and alerting built on these spans
+- [gRPC Client](./grpc-client.mdx) - outbound interceptors, LB, retry
+- [Outbox](./outbox.mdx) - trace context stored at `Record` time
+- [Queue](./queue.mdx) - producer/consumer spans for durable work

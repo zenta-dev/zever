@@ -1,6 +1,6 @@
 ---
 name: zever
-description: Use when scaffolding, inspecting, or running a zever Go application: scaffold apps and batteries, validate and compile .zen schemas, run servers and workers, or drive the CLI from scripts. Trigger on requests like "scaffold zever app", "add battery", "check schema", "compile schemas", or "run zever".
+description: "Use when scaffolding, inspecting, or running a zever Go application: scaffold apps and batteries, validate and compile .zen schemas, run servers and workers, or drive the CLI from scripts. Trigger on requests like \"scaffold zever app\", \"add battery\", \"check schema\", \"compile schemas\", or \"run zever\"."
 ---
 
 # zever skill
@@ -79,6 +79,10 @@ zever compile schema/app.zen --backend=mcp --out ./gen
 - `zever graph`: Print Mermaid entity-relation and module diagrams
 - `zever help`: Help about any command
 - `zever new`: Scaffold a brand new zever application
+- `zever outbox dlq`: Inspect and repair failed messages
+- `zever outbox purge`: Delete processed history
+- `zever outbox status`: Show relay counters
+- `zever outbox`: Inspect and repair the outbox dead-letter queue
 - `zever queue:work`: Run worker entrypoint (default cmd/worker)
 - `zever routes`: List HTTP routes declared by RPCs
 - `zever schedule:run`: Alias for queue:work (worker runs scheduler)

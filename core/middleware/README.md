@@ -30,7 +30,7 @@ panics from inner middleware too.
 | `RequestLogger(logger)` | One structured line per request: method, path, status, `duration_ms`, plus `request_id` when present. |
 | `Recover(logger)` | Recovers handler panics, logs value + stack, responds 500 `{"error":"internal error"}`. If the handler already committed the response, logs only (no rewrite). |
 | `RateLimit(limiter, keyFunc)` | Denies with 429 JSON + `Retry-After` (ceiled seconds). Limiter errors fail open. Default key: `RemoteAddrKey` (client IP). |
-| `Tracing(provider)` | Span per request named by path, `http.status_code` attribute, span error on 5xx, `http.request` counter tagged method/status. |
+| `Tracing(provider)` | Span per request named by path, `http.response.status_code` attribute, span error on 5xx, `http.request` counter tagged by `http.request.method`/`http.response.status_code`. |
 | `CORS(opts)` | Strict cross-origin headers: explicit allowlist echoed (never reflected), preflight `OPTIONS` answers 204 or 403, `Vary: Origin` always. Invalid opts fail closed with 500. Wire outermost via `r.Use` before any `Handle`. |
 
 The status recorder reuses a single wrapper when middleware chain (no
@@ -42,7 +42,8 @@ double-wrap) and exposes `Unwrap` so `http.ResponseController` still reaches
 Pair each HTTP middleware with its unary interceptor: `RecoverUnaryServerInterceptor`
 (panic → `Internal`), `RateLimitUnaryServerInterceptor` (deny →
 `ResourceExhausted`, errors fail open, key via `PeerAddrKey`), and
-`TracingUnaryServerInterceptor` (span per `FullMethod`, `rpc.request`
-counter tagged method/outcome). Recovery interceptors go last in the chain
+`TracingUnaryServerInterceptor` (span per `FullMethod` carrying
+`rpc.system`/`rpc.service`/`rpc.method`/`rpc.grpc.status_code`, `rpc.request`
+counter tagged by `rpc.service`/`rpc.method`/`rpc.grpc.status_code`). Recovery interceptors go last in the chain
 so other interceptors observe recovered state. CORS has no twin: it is
 HTTP-only (gRPC has no preflight concept).
