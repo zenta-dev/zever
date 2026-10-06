@@ -4,6 +4,7 @@ import (
 	"errors"
 	"time"
 
+	"github.com/zenta-dev/zever/shared/redisopt"
 	"github.com/zenta-dev/zever/shared/retry"
 )
 
@@ -40,7 +41,18 @@ const (
 	DefaultMaxQueue = 100
 	// DefaultMaxWait is the default bulkhead admission wait budget.
 	DefaultMaxWait = time.Second
+	// DefaultRedisPrefix is the default Redis key namespace for the redis adapter.
+	DefaultRedisPrefix = "resilience"
 )
+
+// RedisOptions holds connection settings for the Redis resilience adapter.
+type RedisOptions struct {
+	// Options holds the shared Redis connection and pooling settings.
+	redisopt.Options
+	// Prefix is the key namespace for Redis resilience data. Empty means
+	// DefaultRedisPrefix.
+	Prefix string `json:"prefix" toml:"prefix" yaml:"prefix"`
+}
 
 // BreakerOptions configures the circuit breaker. Enabled false disables the
 // breaker entirely. MinRequests, FailureRatio, and ConsecutiveFailures translate
@@ -94,6 +106,8 @@ type Options struct {
 	Bulkhead BulkheadOptions `json:"bulkhead" toml:"bulkhead" yaml:"bulkhead"`
 	// OnStateChange is called on every circuit-breaker state transition.
 	OnStateChange func(name string, from, to State) `json:"-" toml:"-" yaml:"-"`
+	// Redis holds Redis-specific connection configuration for the redis adapter.
+	Redis RedisOptions `json:"redis" toml:"redis" yaml:"redis"`
 }
 
 // Validate checks options for consistency, joining all violations.
@@ -156,6 +170,12 @@ func (o Options) Validate() error {
 
 	if o.Bulkhead.MaxWait < 0 {
 		errs = append(errs, InvalidOptionsError{Reason: "bulkhead max_wait must be >= 0"})
+	}
+
+	if o.Redis.Prefix != "" {
+		if err := redisopt.ValidatePrefix(o.Redis.Prefix); err != nil {
+			errs = append(errs, InvalidOptionsError{Reason: err.Error()})
+		}
 	}
 
 	return errors.Join(errs...)

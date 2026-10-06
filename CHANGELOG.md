@@ -40,6 +40,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   credentials, static resolver, resilience guard, metadata propagation) and
   the `container.GRPCClient(target, opts...)` accessor: one cached
   `*grpc.ClientConn` per target string, closed with the container.
+- New `adapters/resilience/redis` adapter module: a distributed circuit breaker whose state is shared across replicas via Redis (redsync-backed `sony/gobreaker/v2` `DistributedCircuitBreaker`); timeout/retry/bulkhead stay process-local. `core/resilience` gains `RedisOptions` (`redisopt.Options` + `Prefix`); live tests gated by `REDIS_ADDR`.
 - New `adapters/outbox/cdc` adapter module (postgres logical replication via
   `pg_logical_emit_message` + `START_REPLICATION`), registering the
   `outbox.CDC` adapter; live tests gated by `POSTGRES_DSN`.

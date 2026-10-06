@@ -175,7 +175,7 @@ redis.Register()
 | queue | redis | `github.com/zenta-dev/zever/adapters/queue/redis` | `redis.Register()` | `Queue()` |
 | ratelimit | memory | `github.com/zenta-dev/zever/adapters/ratelimit/memory` | `memory.Register()` | `RateLimit()` |
 | ratelimit | redis | `github.com/zenta-dev/zever/adapters/ratelimit/redis` | `redis.Register()` | `RateLimit()` |
-| resilience | memory | `github.com/zenta-dev/zever/adapters/resilience/inproc` | `inproc.Register()` | `Resilience()` |
+| resilience | memory, redis | `adapters/resilience/inproc` (process-local), `adapters/resilience/redis` (distributed breaker state) | `inproc.Register()`, `redis.Register()` | `Resilience()` |
 | router | fiber | `github.com/zenta-dev/zever/adapters/router/fiber` | `fiber.Register()` | `Router()` |
 | router | stdhttp | `github.com/zenta-dev/zever/adapters/router/stdhttp` | `stdhttp.Register()` | `Router()` |
 | scheduler | embedded | `github.com/zenta-dev/zever/adapters/scheduler/embedded` | `embedded.Register()` | `Scheduler()` |
