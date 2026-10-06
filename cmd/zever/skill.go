@@ -22,7 +22,7 @@ func renderSkill(root *cobra.Command) string {
 
 	b.WriteString("---\n")
 	b.WriteString("name: zever\n")
-	b.WriteString("description: Use when scaffolding, inspecting, or running a zever Go application: scaffold apps and batteries, validate and compile .zen schemas, run servers and workers, or drive the CLI from scripts. Trigger on requests like \"scaffold zever app\", \"add battery\", \"check schema\", \"compile schemas\", or \"run zever\".\n")
+	b.WriteString("description: \"Use when scaffolding, inspecting, or running a zever Go application: scaffold apps and batteries, validate and compile .zen schemas, run servers and workers, or drive the CLI from scripts. Trigger on requests like \\\"scaffold zever app\\\", \\\"add battery\\\", \\\"check schema\\\", \\\"compile schemas\\\", or \\\"run zever\\\".\"\n")
 	b.WriteString("---\n\n")
 
 	b.WriteString("# zever skill\n\n")
