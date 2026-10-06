@@ -24,7 +24,7 @@ func BenchmarkOpen(b *testing.B) {
 	b.ReportAllocs()
 	b.ResetTimer()
 
-	for i := 0; i < b.N; i++ {
+	for b.Loop() {
 		if _, err := Open(a, opts); err != nil {
 			b.Fatalf("Open(%v) error = %v", a, err)
 		}
@@ -53,7 +53,7 @@ func BenchmarkValidateKey(b *testing.B) {
 	b.ReportAllocs()
 	b.ResetTimer()
 
-	for i := 0; i < b.N; i++ {
+	for b.Loop() {
 		if err := ValidateKey(key); err != nil {
 			b.Fatalf("ValidateKey(%q) error = %v", key, err)
 		}
@@ -64,7 +64,7 @@ func BenchmarkValidateCost(b *testing.B) {
 	b.ReportAllocs()
 	b.ResetTimer()
 
-	for i := 0; i < b.N; i++ {
+	for b.Loop() {
 		if err := ValidateCost(1, 100); err != nil {
 			b.Fatalf("ValidateCost error = %v", err)
 		}
@@ -77,7 +77,7 @@ func BenchmarkOptionsValidate(b *testing.B) {
 	b.ReportAllocs()
 	b.ResetTimer()
 
-	for i := 0; i < b.N; i++ {
+	for b.Loop() {
 		if err := opts.Validate(); err != nil {
 			b.Fatalf("Validate() error = %v", err)
 		}

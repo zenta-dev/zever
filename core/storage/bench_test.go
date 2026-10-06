@@ -22,7 +22,7 @@ func BenchmarkOpen(b *testing.B) {
 	b.ReportAllocs()
 	b.ResetTimer()
 
-	for i := 0; i < b.N; i++ {
+	for b.Loop() {
 		if _, err := Open(a, Options{}); err != nil {
 			b.Fatalf("Open(%v) error = %v", a, err)
 		}
@@ -37,7 +37,7 @@ func BenchmarkPolicyAllow(b *testing.B) {
 	b.ReportAllocs()
 	b.ResetTimer()
 
-	for i := 0; i < b.N; i++ {
+	for b.Loop() {
 		if !pol.Allow(PermRead, "alice", true) {
 			b.Fatal("Allow(alice, read) = false")
 		}
@@ -50,7 +50,7 @@ func BenchmarkValidKey(b *testing.B) {
 	b.ReportAllocs()
 	b.ResetTimer()
 
-	for i := 0; i < b.N; i++ {
+	for b.Loop() {
 		if !ValidKey(key) {
 			b.Fatalf("ValidKey(%q) = false", key)
 		}
@@ -61,7 +61,7 @@ func BenchmarkValidBucket(b *testing.B) {
 	b.ReportAllocs()
 	b.ResetTimer()
 
-	for i := 0; i < b.N; i++ {
+	for b.Loop() {
 		if !ValidBucket("my-bucket.prod") {
 			b.Fatal("ValidBucket = false")
 		}
@@ -72,7 +72,7 @@ func BenchmarkPresignExpiry(b *testing.B) {
 	b.ReportAllocs()
 	b.ResetTimer()
 
-	for i := 0; i < b.N; i++ {
+	for b.Loop() {
 		if _, err := PresignExpiry(time.Hour); err != nil {
 			b.Fatalf("PresignExpiry error = %v", err)
 		}
@@ -83,7 +83,7 @@ func BenchmarkValidateBucketKey(b *testing.B) {
 	b.ReportAllocs()
 	b.ResetTimer()
 
-	for i := 0; i < b.N; i++ {
+	for b.Loop() {
 		if err := ValidateBucketKey("mybucket", "a/b.txt"); err != nil {
 			b.Fatalf("ValidateBucketKey error = %v", err)
 		}
@@ -96,7 +96,7 @@ func BenchmarkSelectUploadPerm(b *testing.B) {
 	b.ReportAllocs()
 	b.ResetTimer()
 
-	for i := 0; i < b.N; i++ {
+	for b.Loop() {
 		if perm := SelectUploadPerm(pol, true); perm != PermUpdate {
 			b.Fatalf("SelectUploadPerm = %q, want update", perm)
 		}

@@ -25,7 +25,7 @@ func BenchmarkOpen(b *testing.B) {
 	b.ReportAllocs()
 	b.ResetTimer()
 
-	for i := 0; i < b.N; i++ {
+	for b.Loop() {
 		if _, err := Open(a, opts); err != nil {
 			b.Fatalf("Open(%v) error = %v", a, err)
 		}
@@ -55,7 +55,7 @@ func BenchmarkNewMessage(b *testing.B) {
 	b.ReportAllocs()
 	b.ResetTimer()
 
-	for i := 0; i < b.N; i++ {
+	for b.Loop() {
 		msg := NewMessage("jobs", payload, headers)
 		if msg.Attempt != 1 {
 			b.Fatalf("NewMessage Attempt = %d, want 1", msg.Attempt)
@@ -69,7 +69,7 @@ func BenchmarkMessageClone(b *testing.B) {
 	b.ReportAllocs()
 	b.ResetTimer()
 
-	for i := 0; i < b.N; i++ {
+	for b.Loop() {
 		if cloned := msg.Clone(); len(cloned.Payload) != len(msg.Payload) {
 			b.Fatal("Message.Clone lost payload")
 		}
@@ -82,7 +82,7 @@ func BenchmarkParseMessageID(b *testing.B) {
 	b.ReportAllocs()
 	b.ResetTimer()
 
-	for i := 0; i < b.N; i++ {
+	for b.Loop() {
 		if _, err := ParseMessageID(id); err != nil {
 			b.Fatalf("ParseMessageID(%q) error = %v", id, err)
 		}
@@ -95,7 +95,7 @@ func BenchmarkHeadersClone(b *testing.B) {
 	b.ReportAllocs()
 	b.ResetTimer()
 
-	for i := 0; i < b.N; i++ {
+	for b.Loop() {
 		if cloned := headers.Clone(); len(cloned) != len(headers) {
 			b.Fatal("Headers.Clone lost entries")
 		}
@@ -108,7 +108,7 @@ func BenchmarkPayloadClone(b *testing.B) {
 	b.ReportAllocs()
 	b.ResetTimer()
 
-	for i := 0; i < b.N; i++ {
+	for b.Loop() {
 		if cloned := payload.Clone(); len(cloned) != len(payload) {
 			b.Fatal("Payload.Clone lost bytes")
 		}

@@ -27,7 +27,7 @@ func BenchmarkOpen(b *testing.B) {
 	b.ReportAllocs()
 	b.ResetTimer()
 
-	for i := 0; i < b.N; i++ {
+	for b.Loop() {
 		if _, err := workflow.Open(a, opts); err != nil {
 			b.Fatalf("Open(%v) error = %v", a, err)
 		}
@@ -47,7 +47,7 @@ func BenchmarkOpenShared(b *testing.B) {
 	b.ReportAllocs()
 	b.ResetTimer()
 
-	for i := 0; i < b.N; i++ {
+	for b.Loop() {
 		if _, err := workflow.OpenShared(a, nil, opts); err != nil {
 			b.Fatalf("OpenShared(%v) error = %v", a, err)
 		}
@@ -76,7 +76,7 @@ func BenchmarkOptionsValidate(b *testing.B) {
 	b.ReportAllocs()
 	b.ResetTimer()
 
-	for i := 0; i < b.N; i++ {
+	for b.Loop() {
 		if err := opts.Validate(); err != nil {
 			b.Fatalf("Validate() error = %v", err)
 		}

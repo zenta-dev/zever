@@ -24,7 +24,7 @@ func BenchmarkOpen(b *testing.B) {
 	b.ReportAllocs()
 	b.ResetTimer()
 
-	for i := 0; i < b.N; i++ {
+	for b.Loop() {
 		if _, err := Open(a, opts); err != nil {
 			b.Fatalf("Open(%v) error = %v", a, err)
 		}
@@ -53,7 +53,7 @@ func BenchmarkOptionsValidate(b *testing.B) {
 	b.ReportAllocs()
 	b.ResetTimer()
 
-	for i := 0; i < b.N; i++ {
+	for b.Loop() {
 		if err := opts.Validate(); err != nil {
 			b.Fatalf("Validate() error = %v", err)
 		}
@@ -66,7 +66,7 @@ func BenchmarkContextRoundtrip(b *testing.B) {
 	b.ReportAllocs()
 	b.ResetTimer()
 
-	for i := 0; i < b.N; i++ {
+	for b.Loop() {
 		got, ok := FromContext(ContextWithTenant(ctx, "acme"))
 		if !ok || got != "acme" {
 			b.Fatal("context roundtrip failed")
@@ -78,7 +78,7 @@ func BenchmarkValidHeaderKey(b *testing.B) {
 	b.ReportAllocs()
 	b.ResetTimer()
 
-	for i := 0; i < b.N; i++ {
+	for b.Loop() {
 		if !validHeaderKey("X-Tenant-ID") {
 			b.Fatal("validHeaderKey(X-Tenant-ID) = false")
 		}

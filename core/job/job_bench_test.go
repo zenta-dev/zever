@@ -17,7 +17,7 @@ func BenchmarkRegister(b *testing.B) {
 	noop := func(context.Context, benchArgs) error { return nil }
 	b.ReportAllocs()
 	b.ResetTimer()
-	for i := 0; i < b.N; i++ {
+	for i := 0; b.Loop(); i++ {
 		if err := Register("bench-"+strconv.Itoa(i), noop); err != nil {
 			b.Fatalf("Register err = %v", err)
 		}
