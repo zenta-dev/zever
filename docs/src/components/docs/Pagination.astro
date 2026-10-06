@@ -1,0 +1,22 @@
+---
+import '../../styles/docs/page.css';
+const { dir, pagination } = Astro.locals.starlightRoute;
+const { prev, next } = pagination;
+---
+
+{(prev || next) && (
+  <nav class="zp-pager print:hidden" aria-label="Pagination" dir={dir}>
+    {prev ? (
+      <a class="zp-card zp-prev" href={prev.href} rel="prev">
+        <span class="zp-card-label">&larr; Previous</span>
+        <span class="zp-card-title">{prev.label}</span>
+      </a>
+    ) : <span />}
+    {next && (
+      <a class="zp-card zp-next" href={next.href} rel="next">
+        <span class="zp-card-label">Next &rarr;</span>
+        <span class="zp-card-title">{next.label}</span>
+      </a>
+    )}
+  </nav>
+)}

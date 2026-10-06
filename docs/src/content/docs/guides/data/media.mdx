@@ -1,0 +1,109 @@
+---
+title: Media processing
+description: Upload, probe, transform, and serve images and video with bounded size, pixel, and URL limits.
+---
+
+import { LinkCard, CardGrid } from '@astrojs/starlight/components';
+
+`media.Media` bundles the upload pipeline behind `Upload`, `Download`, `DownloadRange`, `Stat`, `Probe`, `Transform`, and `Delete`. It validates IDs, caps decode size, and probes format. For plain blobs, see [Storage and media](../storage-media/).
+
+## Quick start
+
+`local` (default, `adapters/media/local`) writes under `root` and suits single instances and tests. `s3` (`adapters/media/s3`) needs `bucket`, `region`, and credentials. Transforms call the configured `ffmpeg` and `ffprobe` binaries.
+
+```yaml title="zever.yaml"
+media:
+  adapter: local
+  options:
+    root: /var/media
+    max_download_bytes: 67108864
+    max_pixels: 50000000
+    presign_ttl: 3600000000000   # nanoseconds
+```
+
+Defaults: `root` `/tmp/media`, `base_url` `/media`, `ffmpeg` and `ffprobe` on `PATH`, `max_download_bytes` 64 MiB, `max_pixels` 52428800, `derived_ttl` 10m, `presign_ttl` 1h (max 7 days), `max_duration` unlimited, `region` `us-east-1`. Durations are nanoseconds; env accepts `"1h"`. `Validate` rejects negative bounds. See the [media options](../../../reference/config/#media).
+
+## Upload and probe an asset
+
+`Upload` generates the asset ID, so use `asset.ID` (not your path) for later calls. Register the adapter first; the container wires nothing. `Media()` resolves lazily, caches, and retries.
+
+```go title="main.go"
+package main
+
+import (
+	"context"
+	"fmt"
+	"os"
+
+	medialocal "github.com/zenta-dev/zever/adapters/media/local"
+	"github.com/zenta-dev/zever/config"
+	"github.com/zenta-dev/zever/container"
+	"github.com/zenta-dev/zever/core/media"
+)
+
+func main() {
+	medialocal.Register()
+	ctx := context.Background()
+	c := container.New(config.Default())
+	defer c.Close(ctx)
+
+	m, err := c.Media()
+	if err != nil {
+		panic(err)
+	}
+	raw, err := os.ReadFile("testdata/avatar.png")
+	if err != nil {
+		panic(err)
+	}
+	asset, err := m.Upload(ctx, "avatar.png", raw, media.UploadOptions{ContentType: "image/png"})
+	if err != nil {
+		panic(err)
+	}
+	info, err := m.Stat(ctx, asset.ID)
+	if err != nil {
+		panic(err)
+	}
+	fmt.Println("size:", info.Size)
+}
+```
+
+```text
+size: 48210
+```
+
+Values vary with your file. `Transform` takes `media.TransformOps` (`Width`, `Height`, `Format`, `Quality`, `Bitrate`, `CRF`, `Offset`) and returns the derived asset URL plus an error.
+
+## Production checklist
+
+- `ValidID` accepts only ASCII letters, digits, hyphens, and underscores; it rejects empty, `.`, `..`, and anything containing `..`, blocking path traversal. Never build a storage key from a raw caller ID.
+- Decoded images are capped at `max_pixels` and downloads at `max_download_bytes`, so a crafted image cannot exhaust memory.
+- A `presign_ttl` over 7 days fails `Validate()` with `InvalidOptionsError`. It is rejected, not clamped.
+- Pin `ffmpeg` and `ffprobe` paths in config; `access_key_id` and `secret_access_key` never appear in logs.
+
+## Troubleshooting
+
+<details>
+<summary>`Stat` or `Download` fails on an ID you just uploaded</summary>
+
+Cause: the ID failed `ValidID`, usually your own path instead of `asset.ID`. Fix: use the ID `Upload` returned; sanitize caller input.
+</details>
+
+<details>
+<summary>Transforms fail with "binary not found"</summary>
+
+Cause: `ffmpeg` or `ffprobe` is missing. Fix: install them or set absolute paths in config. The storage adapter does not affect this.
+</details>
+
+<details>
+<summary>Startup fails with `InvalidOptionsError` on `presign_ttl`</summary>
+
+Cause: the TTL exceeds 7 days. Fix: lower it. The limit is enforced, not clamped.
+</details>
+
+## Related
+
+<CardGrid>
+  <LinkCard title="Storage and media" href="../storage-media/" description="The blob layer underneath." />
+  <LinkCard title="Documents" href="../document/" description="Render to PDF or image." />
+  <LinkCard title="Container" href="../../../concepts/container/" description="Lazy resolve and close order." />
+</CardGrid>

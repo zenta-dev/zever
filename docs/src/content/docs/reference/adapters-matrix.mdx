@@ -1,28 +1,11 @@
 ---
-title: Adapters Matrix
+title: Adapters matrix
 description: Every service, adapter, package, and container accessor in one table.
 ---
 
-## Purpose
+Each `core/<b>` package holds one interface plus a `Register`/`Open` registry, each adapter is its own Go module at `adapters/<b>/<a>`, and the container is the sole resolver. This matrix maps service to adapter module and accessor so swaps stay config-only. Prefer a new interface over adding methods, which break implementers.
 
-One interface plus `Register`/`Open` registry per `core/<b>` package, one Go module per adapter in `adapters/<b>/<a>`, container
-as sole resolver. This matrix maps service to adapter modules and
-accessors so swaps stay config-only, plus guidance on when the
-single-process default stops being enough.
-
-When to use: choose an adapter per service for an environment. When not
-to use: interface changes (new methods break implementers; prefer new
-interfaces).
-
-## Prerequisites
-
-- [Config Reference](./config-reference/) layering: defaults, file, env.
-- Deployment shape known: single process vs. multi-instance.
-- `container.New(cfg)` as the sole resolution path.
-
-## Config
-
-Swap adapters without touching Go:
+## Swap an adapter by config
 
 ```yaml
 cache:
@@ -43,7 +26,7 @@ QUEUE_ADAPTER=redis
 DB_ADAPTER=postgres
 ```
 
-## Resolve
+## Resolve through the container
 
 ```go
 c := container.New(cfg)
@@ -57,45 +40,17 @@ if err != nil {
 }
 ```
 
-`New(nil)` is valid; untouched services close cleanly without opening.
-Accessors resolve lazily and retry on the next call after an error.
-`Job()` builds over the resolved `Queue`; `Scheduler()` shares both, so
-resolving `Scheduler()` resolves `Job()` and `Queue` as a side effect.
+`New(nil)` is valid; untouched services close cleanly without opening. Accessors resolve lazily and retry on the next call after an error. `Job()` builds over the resolved `Queue`; `Scheduler()` shares both, so resolving `Scheduler()` resolves `Job()` and `Queue` as a side effect.
 
-## Runnable example
-
-Single-process dev (all defaults, no infra):
-
-```sh
-go run ./cmd/myapp
-echo exit:$?
-```
-
-Expected output:
-
-```text
-all services resolve to memory/local/sqlite/log/noop adapters
-exit:0
-```
-
-Multi-instance staging (shared state moves to redis/postgres):
+All defaults (memory/local/sqlite/log/noop) fit single-process dev. Move shared state to redis/postgres for multi-instance staging:
 
 ```sh
 DB_ADAPTER=postgres CACHE_ADAPTER=redis QUEUE_ADAPTER=redis go run ./cmd/myapp
-echo exit:$?
 ```
 
-Expected output:
+## Adapter reference
 
-```text
-db/cache/queue resolve to shared backends; instances share state
-exit:0
-```
-
-## Reference
-
-Each row is machine-editable with one adapter per row: `| service | adapter | module | register | accessor |`.
-`module` is the Go module path; `register` is the explicit `Register()` call the host makes before resolving. The container wires nothing by itself: every adapter resolves only after its `Register()` runs (`none (no registry)` marks only non-adapter rows — the `job` dispatcher, the `media/ffmpeg` binary helper, and the `session/cookie` stdlib builder).
+Each row is `| service | adapter | module | register | accessor |`. The container wires nothing: every adapter resolves only after its `Register()` runs. `none (no registry)` marks the `job` dispatcher, the `media/ffmpeg` binary helper, and the `session/cookie` stdlib builder.
 
 Install every adapter module you resolve (replace `vX.Y.Z` with the lockstep release version):
 
@@ -127,6 +82,7 @@ redis.Register()
 | cache | redis | `github.com/zenta-dev/zever/adapters/cache/redis` | `redis.Register()` | `Cache()` |
 | cache | db | `github.com/zenta-dev/zever/adapters/cache/db` | `db.Register()` | `Cache()` |
 | crypto | local | `github.com/zenta-dev/zever/adapters/crypto/local` | `local.Register()` | `Crypto()` |
+| crypto | kms | `github.com/zenta-dev/zever/adapters/crypto/kms` | `kms.Register()` | `Crypto()` |
 | db | sqlite | `github.com/zenta-dev/zever/adapters/db/sqlite` | `sqlite.Register()` | `DB()` |
 | db | postgres | `github.com/zenta-dev/zever/adapters/db/postgres` | `postgres.Register()` | `DB()` |
 | document | local | `github.com/zenta-dev/zever/adapters/document/local` | `local.Register()` | `Document()` |
@@ -143,6 +99,7 @@ redis.Register()
 | i18n | remote | `github.com/zenta-dev/zever/adapters/i18n/remote` | `remote.Register()` | `I18n()` |
 | idempotency | memory | `github.com/zenta-dev/zever/adapters/idempotency/memory` | `memory.Register()` | `Idempotency()` |
 | idempotency | redis | `github.com/zenta-dev/zever/adapters/idempotency/redis` | `redis.Register()` | `Idempotency()` |
+| idempotency | db | `github.com/zenta-dev/zever/adapters/idempotency/db` | `db.Register()` | `Idempotency()` |
 | lock | memory | `github.com/zenta-dev/zever/adapters/lock/memory` | `memory.Register()` | `Lock()` |
 | lock | redis | `github.com/zenta-dev/zever/adapters/lock/redis` | `redis.Register()` | `Lock()` |
 | log | noop | `github.com/zenta-dev/zever/adapters/log/noop` | `noop.Register()` | `Log()` |
@@ -175,7 +132,8 @@ redis.Register()
 | queue | redis | `github.com/zenta-dev/zever/adapters/queue/redis` | `redis.Register()` | `Queue()` |
 | ratelimit | memory | `github.com/zenta-dev/zever/adapters/ratelimit/memory` | `memory.Register()` | `RateLimit()` |
 | ratelimit | redis | `github.com/zenta-dev/zever/adapters/ratelimit/redis` | `redis.Register()` | `RateLimit()` |
-| resilience | memory, redis | `adapters/resilience/inproc` (process-local), `adapters/resilience/redis` (distributed breaker state) | `inproc.Register()`, `redis.Register()` | `Resilience()` |
+| resilience | memory | `github.com/zenta-dev/zever/adapters/resilience/inproc` | `inproc.Register()` | `Resilience()` |
+| resilience | redis | `github.com/zenta-dev/zever/adapters/resilience/redis` | `redis.Register()` | `Resilience()` |
 | router | fiber | `github.com/zenta-dev/zever/adapters/router/fiber` | `fiber.Register()` | `Router()` |
 | router | stdhttp | `github.com/zenta-dev/zever/adapters/router/stdhttp` | `stdhttp.Register()` | `Router()` |
 | scheduler | embedded | `github.com/zenta-dev/zever/adapters/scheduler/embedded` | `embedded.Register()` | `Scheduler()` |
@@ -185,8 +143,10 @@ redis.Register()
 | search | meilisearch | `github.com/zenta-dev/zever/adapters/search/meilisearch` | `meilisearch.Register()` | `Search()` |
 | search | sqlite | `github.com/zenta-dev/zever/adapters/search/db` | `db.Register()` | `Search()` |
 | secrets | env | `github.com/zenta-dev/zever/adapters/secrets/env` | `env.Register()` | `Secrets()` |
+| secrets | vault | `github.com/zenta-dev/zever/adapters/secrets/vault` | `vault.Register()` | `Secrets()` |
 | session | memory | `github.com/zenta-dev/zever/adapters/session/memory` | `memory.Register()` | `Session()` |
 | session | redis | `github.com/zenta-dev/zever/adapters/session/redis` | `redis.Register()` | `Session()` |
+| session | db | `github.com/zenta-dev/zever/adapters/session/db` | `db.Register()` | `Session()` |
 | session | cookie | `github.com/zenta-dev/zever/adapters/session/cookie` | `none (no registry)` | `Session()` |
 | storage | local | `github.com/zenta-dev/zever/adapters/storage/local` | `local.Register()` | `Storage()` |
 | storage | s3 | `github.com/zenta-dev/zever/adapters/storage/s3` | `s3.Register()` | `Storage()` |
@@ -204,7 +164,7 @@ redis.Register()
 | workflow | postgres | `github.com/zenta-dev/zever/adapters/workflow/db` | `db.Register()` | `Workflow()` |
 | job | - (dispatcher) | `github.com/zenta-dev/zever/core/job` | `none (no registry)` | `Job()` |
 
-### Single-process vs. multi-instance guidance
+### Single-process vs multi-instance
 
 | Group | Single process | Multi-instance |
 |---|---|---|
@@ -220,32 +180,21 @@ redis.Register()
 
 ## Production notes
 
-- `Close(ctx)` closes only resolved services, dependents first; see
-  [API Index](./api-index/) for order and close shapes.
-- `grpc` has a lazy `*grpc.Server` singleton accessor (`GRPC(opts...)`)
-  with no registry; `EventBus()` keeps an `Eventbus()` alias and
-  `RateLimit()` a `Ratelimit()` alias.
-- Do not add methods to public interfaces; prefer new interfaces so
-  external implementers keep compiling.
-- Shared redis/postgres endpoints become critical path: monitor, pool
-  (`max_conns`), and bound timeouts per service.
+- `Close(ctx)` closes only resolved services, dependents first; see [API index](../api-index/) for order and close shapes.
+- `grpc` has a lazy `*grpc.Server` singleton accessor (`GRPC(opts...)`) with no registry; `EventBus()` keeps an `Eventbus()` alias and `RateLimit()` a `Ratelimit()` alias.
+- Do not add methods to public interfaces; prefer new interfaces so external implementers keep compiling.
+- Shared redis/postgres endpoints become critical path: monitor, pool (`max_conns`), and bound timeouts per service.
 
 ## Troubleshooting
 
-- **State differs per instance**: a `memory` adapter is still in the mix
-  (cache, queue, session, lock). Move each shared-state service to `redis`.
-- **Logins lost on restart**: `session` on `memory` does not survive
-  restarts. Use a shared session store for anything beyond local dev.
-- **Jobs run twice or not at all**: workers each resolved an isolated
-  `memory` queue. Point all workers at the same shared queue (`redis`,
-  or `db` on one database).
-- **Swap did not take effect**: `_ADAPTER` env or file adapter misspelled,
-  or an old binary without the adapter compiled in. Check `config show`
-  output and rebuild.
+- **State differs per instance**: a `memory` adapter is still in the mix (cache, queue, session, lock). Move each shared-state service to `redis`.
+- **Logins lost on restart**: `session` on `memory` does not survive restarts. Use a shared session store for anything beyond local dev.
+- **Jobs run twice or not at all**: workers each resolved an isolated `memory` queue. Point all workers at the same shared queue (`redis`, or `db` on one database).
+- **Swap did not take effect**: `_ADAPTER` env or file adapter misspelled, or an old binary without the adapter compiled in. Check `config show` output and rebuild.
 
-## See also
+## Related
 
-- [Config Reference](./config-reference/) for adapter values and env scheme
-- [API Index](./api-index/) for accessors and close order
-- [Authentication](../security/auth/) for jwt/session/oidc choice
-- [Authorization and Permissions](../security/authz-permissions/) for noop/rbac/casbin choice
+- [Config reference](../config/) for adapter values and the env scheme.
+- [API index](../api-index/) for accessors and close order.
+- [Authentication](../../guides/security/auth/) for jwt/session/oidc choice.
+- [Authorization and permissions](../../guides/security/authz-permissions/) for noop/rbac/casbin choice.

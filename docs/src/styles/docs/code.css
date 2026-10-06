@@ -1,0 +1,72 @@
+/* Docs code windows: match the landing code windows (always dark). */
+.sl-markdown-content .expressive-code { margin-block: 1.5rem; }
+.expressive-code .frame { border-radius: 12px; overflow: hidden; }
+.expressive-code .frame pre {
+  border-radius: 0;
+  scrollbar-color: rgba(255, 255, 255, 0.2) transparent;
+}
+.expressive-code .frame:not(.has-title):not(.is-terminal) pre { border-radius: 12px; }
+.expressive-code .frame .header { border-top-left-radius: 12px; border-top-right-radius: 12px; }
+
+/* Wrapped lines get a hanging indent (EC sets --ecIndent per line). */
+.expressive-code pre code { tab-size: 2; }
+
+/* Window dots on titled (non-terminal) frames. */
+.expressive-code .frame.has-title:not(.is-terminal) .header {
+  padding-inline-start: 0;
+  position: relative;
+}
+.expressive-code .frame.has-title:not(.is-terminal) .header::before {
+  content: '';
+  flex: none;
+  align-self: center;
+  width: 2.9rem;
+  height: 0.5rem;
+  margin-inline: 0.9rem 0.1rem;
+  background:
+    radial-gradient(circle 0.25rem at 0.25rem 50%, #f06262 98%, transparent) 0 0 / 0.5rem 100% no-repeat,
+    radial-gradient(circle 0.25rem at 0.25rem 50%, #e5b567 98%, transparent) 1.2rem 0 / 0.5rem 100% no-repeat,
+    radial-gradient(circle 0.25rem at 0.25rem 50%, #3fb97a 98%, transparent) 2.4rem 0 / 0.5rem 100% no-repeat;
+  opacity: 0.75;
+  position: static;
+  border: 0;
+}
+.expressive-code .frame.has-title:not(.is-terminal) .header::after { display: none; }
+
+/* Filename tab */
+.expressive-code .frame .title {
+  font-family: var(--zl-font-mono);
+  font-size: 0.75rem;
+  letter-spacing: 0.01em;
+}
+.expressive-code .frame.has-title:not(.is-terminal) .title { background: transparent; border: 0; }
+.expressive-code .frame.has-title:not(.is-terminal) .title::before { display: none; }
+
+/* Terminal variant */
+.expressive-code .frame.is-terminal pre { padding-block: 0.95rem; }
+.expressive-code .frame.is-terminal:not(.has-title) .header { display: flex; }
+.expressive-code .frame.is-terminal .header .title { font-family: var(--zl-font-mono); color: #a4b0c3; }
+
+/* Copy button */
+.expressive-code .copy { inset-block-start: 0.45rem; inset-inline-end: 0.55rem; }
+.expressive-code .copy button {
+  width: 2.1rem;
+  height: 2.1rem;
+  border-radius: 8px;
+  opacity: 0.55;
+  transition: opacity 0.2s, background-color 0.2s;
+}
+.expressive-code .frame:hover .copy button, .expressive-code .copy button:focus-visible { opacity: 1; }
+.expressive-code .copy button:focus-visible { outline: 2px solid var(--zl-accent); outline-offset: 2px; }
+@media (hover: none), (pointer: coarse) {
+  .expressive-code .copy button { width: 44px; height: 44px; opacity: 0.85; }
+  .expressive-code .copy { inset-block-start: 0.3rem; inset-inline-end: 0.3rem; }
+}
+.expressive-code .frame.has-title .copy { inset-block-start: calc(var(--header-height, 2.4rem) + 0.35rem); }
+.expressive-code .frame.has-title:not(.is-terminal) .copy,
+.expressive-code .frame.is-terminal .copy { inset-block-start: calc(2.3rem + 0.35rem); }
+
+/* Text markers */
+.expressive-code .ec-line.mark, .expressive-code .ec-line.ins, .expressive-code .ec-line.del { transition: none; }
+
+@media (prefers-reduced-motion: reduce) { .expressive-code .copy button { transition: none; } }

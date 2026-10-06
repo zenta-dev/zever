@@ -1,0 +1,111 @@
+---
+title: Contribute
+description: How to contribute to Zever and preview this documentation site.
+---
+
+This page covers the docs site plus the Go contribution path end to end. The site is an Astro + Starlight project in `docs/`. The framework follows trunk-based development on `main` with Conventional Commits and a full `make check` gate.
+
+## Setup
+
+Install Go 1.27 or newer, then the pinned development tools (`golangci-lint` v2.13.2, `govulncheck`, `cyclonedx-gomod`):
+
+```sh
+make setup
+```
+
+```sh
+git clone git@github.com:zenta-dev/zever.git
+cd zever
+make download   # go mod download
+make test       # go test ./...
+```
+
+`make test-race` runs the same suite with the race detector. `make help` lists every target.
+
+## Preview the docs
+
+```sh
+cd docs
+npm install
+npm run dev
+```
+
+This serves the site with hot reload, usually at `http://localhost:4321`. `npm run build` produces the static site; `npm run preview` serves that build locally. Verify your edited page renders (headings, code blocks, tables) before opening the PR.
+
+## Development workflow
+
+Trunk-based, short-lived branches off `main`: create a branch, make small focused commits (one logical change per commit), open a PR against `main` early (draft if not ready), address review, and merge once CI passes and maintainers approve.
+
+Suggested branch names: `feat/schema-compiler`, `fix/resolver-panic`, `perf/lexer-allocations`, `docs/readme`, `refactor/container`, `test/adapters`, `ci/github-actions`.
+
+## Conventional Commits
+
+Every commit message follows Conventional Commits style:
+
+```text
+<type>: <short description>
+```
+
+```text
+feat: add schema compiler
+fix: prevent resolver panic
+perf: reduce lexer allocations
+refactor: simplify container wiring
+test: add parser regression tests
+docs: improve adapter documentation
+ci: test against Go 1.27
+build: update dependencies
+```
+
+The subject line completes "This change will ...". Keep it concise and never squash unrelated changes into one commit. User-facing changes also need a `CHANGELOG.md` entry under `## [Unreleased]` before the PR opens.
+
+## The check gate
+
+Run the full local gate before pushing:
+
+```sh
+make check
+```
+
+`make check` runs, in order: `require-tools`, `download`, `fmt` (gofmt check), `check-all` (per module: `go vet`, `go mod tidy -diff`, `go test -vet=off`, `go build`), `modgraph-check`, `lint-all` (golangci-lint per module), and `vulncheck-all`. It does not run the race detector; run `make test-race-fast` (or `make test-race` at the root) for that. Individual steps:
+
+```sh
+make fmt / make fmt-fix     # gofmt check / write in place
+make lint / make lint-fix   # golangci-lint run (config .golangci.yml)
+make vet                    # go vet ./...
+make vulncheck              # govulncheck ./...
+make tidy-check             # go mod tidy -diff
+make err-lint               # error-convention scan (tools/errscan)
+make generate               # go run ./tools/gengrammar (after touching token.Keywords or resolver.ScalarTypeNames)
+```
+
+CI runs the same per-module steps through `make check-all`. Pull requests also run `make test-race-fast` (race detector, no coverage); the race plus coverage run (`make test-race-all`) and benchmarks run only on pushes to main and tags. Run `make test-race-fast` locally before pushing, since `make check` alone skips the race detector.
+
+## Coding standards
+
+- Idiomatic Go; run `make fmt-fix` before committing.
+- Exported identifiers need doc comments starting with the name.
+- No globals, no `init()` wiring; `ctx` first arg for IO, never stored.
+- Handle errors explicitly with `%w`; `depguard` denies `github.com/pkg/errors` and `io/ioutil`.
+- Small interfaces; never add methods to public interfaces (breaks implementers), prefer a new interface.
+- Tests deterministic: no `time.Sleep` sync, no network, no unseeded randomness, no timing assertions. `t.Fatal` for setup, `t.Error` for table assertions, `t.Helper` on helpers, `t.Context()` in tests.
+- Public API changes (exports, config structs, defaults, serialization) need explicit maintainer review.
+
+## Writing conventions for docs
+
+Follow the [docs style guide](./writing-docs/): pick one page type (tutorial, guide, concept, or reference), lead with the answer, keep snippets runnable, and verify every key and command against the code.
+
+## Troubleshooting
+
+**`make lint` fails on files you did not touch.** Run `make setup` to pin `golangci-lint` v2.13.2; a newer global install applies different rules than CI.
+
+**`make tidy-check` fails.** Run `go mod tidy` in each touched module and commit the result. The repo is a multi-module monorepo (`core/<b>`, `adapters/<b>/<a>`, `shared/*`, `config`, `container`, `orm`, `dsl`, `cmd/zever`), so tidy the modules you touched; local dev resolves them through the committed `go.work` workspace at the repo root, so `go build/test ./...` runs from the root while per-module standalone commands run with `GOWORK=off` in CI.
+
+**Docs preview shows a blank page.** Re-run `npm install` inside `docs/` (not the repo root) and check the terminal for Starlight content errors naming the broken file.
+
+## Related
+
+- [Tutorials overview](../tutorials/overview/) for the example map.
+- [Build a booking API](../tutorials/build-a-booking-api/) for the main guided flow.
+- [Architecture: container](../concepts/container/) for resolve semantics.
+- [Configuration](../guides/operate/configuration/) for layered config.

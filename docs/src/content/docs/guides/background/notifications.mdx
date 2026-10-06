@@ -1,0 +1,149 @@
+---
+title: Notifications
+description: Send push and SMS through one Notifier interface, with a safe log default and FCM or Twilio.
+---
+
+import { LinkCard, CardGrid, Tabs, TabItem } from '@astrojs/starlight/components';
+
+Use `notification.Notifier` for user-directed pings that are not mail: booking reminders, check-in prompts, fraud alerts. Code calls `Notify` against the interface, so adding FCM push or Twilio SMS is a config change, not a rewrite of every sender.
+
+Stay on `log` until a real channel is wired: it writes instead of sending. Pick `twilio` for SMS and `fcm` for push, with credentials from file or env, never committed YAML. The package does not queue or schedule, so enqueue notifications as jobs for retry and backpressure and never let a channel failure fail the triggering request.
+
+## Quick start
+
+```yaml title="zever.yaml"
+notification:
+  adapter: log
+  options:
+    timeout: 30000000000 # 30s default when zero
+```
+
+```go title="main.go"
+package main
+
+import (
+	"context"
+	"fmt"
+
+	notificationlog "github.com/zenta-dev/zever/adapters/notification/log"
+	"github.com/zenta-dev/zever/core/notification"
+)
+
+func main() {
+	notificationlog.Register()
+	n, _ := notification.Open(notification.Log, notification.Options{})
+	defer n.Close()
+
+	push := notification.NewNotification("device-token-abc", notification.ChannelPush, "Reminder: check-in at 3pm")
+	push.Title = "Booking reminder"
+	push.Data = map[string]string{"booking_id": "b_123"}
+	_ = push.Validate()
+	_ = n.Notify(context.Background(), &push)
+
+	sms := notification.NewNotification("+15551234567", notification.ChannelSMS, "Code 4821")
+	_ = sms.Validate()
+	_ = n.Notify(context.Background(), &sms)
+	fmt.Println("notified push and sms via log adapter")
+}
+```
+
+Output: two JSON log lines on stdout, then `notified push and sms via log adapter`; no network is used. `notificationlog.Register()` wires the default log adapter, which writes single JSON lines to `os.Stdout`. In tests, use `NewWithWriter(opts, w)` with an `io.Writer` such as `io.Discard`.
+
+## Choose a channel and validate the target
+
+SMS targets must be E.164 (`+` plus 7 to 15 digits, starting non-zero), or `Validate` returns `InvalidTargetError` without echoing the number. SMS is body-only: `Title` and `Data` on `ChannelSMS` fail validation as push-only fields. A wrong-channel call fails closed with `InvalidNotificationError` before delivery, and an adapter that lacks a channel fails with `ChannelNotSupportedError` rather than dropping silently. All errors stay `errors.Is`-compatible.
+
+`TTL` zero means none and negative fails validation; priority zero means normal. Types: `ChannelPush`, `ChannelSMS`, and `PriorityLow`, `PriorityNormal`, `PriorityHigh`.
+
+| Adapter | Package | Notes |
+|---|---|---|
+| `log` | `adapters/notification/log` | Default, safe sink, writes instead of sending |
+| `twilio` | `adapters/notification/twilio` | SMS, E.164 targets, basic-auth by sid and token |
+| `fcm` | `adapters/notification/fcm` | Push, project plus service-account key file |
+
+## Configure Twilio or FCM
+
+The `twilio` and `fcm` blocks are nested maps under `options`, beside the top-level `timeout`.
+
+<Tabs>
+  <TabItem label="Twilio (SMS)">
+```yaml title="zever.yaml"
+notification:
+  adapter: twilio
+  options:
+    timeout: 30000000000
+    twilio:
+      account_sid: ACxxxxxxxxxxxxxxxx
+      auth_token: prod-secret-here
+      from_number: +15551234567
+```
+  </TabItem>
+  <TabItem label="FCM (push)">
+```yaml title="zever.yaml"
+notification:
+  adapter: fcm
+  options:
+    timeout: 30000000000
+    fcm:
+      project_id: bookings-prod
+      service_account: /run/secrets/fcm.json
+```
+  </TabItem>
+</Tabs>
+
+```sh
+NOTIFICATION_ADAPTER=fcm
+NOTIFICATION_TIMEOUT=30s
+```
+
+Zero `timeout` means 30s and only negative values fail validation. Supply `account_sid`, `auth_token`, and `service_account` by file or env. All keys: [notification config reference](../../../reference/config/#notification).
+
+## Resolve the notifier from the container
+
+```go title="main.go"
+n, err := c.Notification()
+```
+
+`Notification()` resolves lazily and caches; on error the cache clears. `Close() error` is instant, and the container probes it as a snapshot service. See [the container](../../../concepts/container/).
+
+## Production checklist
+
+- The log adapter echoes the target, so phone numbers and device tokens land in log output. Switch to `twilio` or `fcm` before deploy, or gate log output.
+- `InvalidTargetError` carries a reason only, never the target; log channel and reason around `Notify`, not the number or token.
+- Do not call `Notify` inline on the request path for slow channels. Dispatch a job (bookings uses `SendReminder` on queue `low`) so provider latency and retries never gate the booking write.
+- When a user has no push token or phone, skip quietly at the job layer instead of erroring the whole batch.
+- Never log raw option maps; `auth_token` and service-account paths are secrets, so display config through `config.RedactedServices`.
+
+## Troubleshooting
+
+<details>
+<summary>sms target must be E.164 on valid-looking numbers</summary>
+
+A missing `+` prefix, spaces, or dashes; the matcher wants `+` plus 7 to 15 digits starting non-zero. Normalize with an E.164 formatter before `Validate`, and reject unnormalizable input at the API boundary.
+</details>
+
+<details>
+<summary>title is push-only or data is push-only</summary>
+
+An SMS notification built with push fields copied from a push template. Set `Title` and `Data` only for `ChannelPush`, and body only for `ChannelSMS`.
+</details>
+
+<details>
+<summary>Pushes work in dev but nothing arrives in production</summary>
+
+Still on the `log` adapter, or FCM `project_id` and `service_account` point at a dev project. Set `notification.adapter` to `fcm` with the production project and key path, and confirm the file is mounted where the process reads it.
+</details>
+
+<details>
+<summary>ChannelNotSupportedError after switching adapters</summary>
+
+Code sends both push and SMS, but the new adapter serves one channel. Keep one notifier per channel or route by channel at the job layer, and cover both paths in tests with the log adapter plus validation checks.
+</details>
+
+## Related
+
+<CardGrid>
+  <LinkCard title="Mailer" href="../mailer/" description="Transactional mail next to push and SMS." />
+  <LinkCard title="Scheduler and jobs" href="../scheduler-jobs/" description="Retry wrapping around notify calls." />
+  <LinkCard title="Build a booking API" href="../../../tutorials/build-a-booking-api/" description="The bookings tutorial with SendReminder." />
+</CardGrid>
