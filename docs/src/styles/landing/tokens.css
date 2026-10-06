@@ -1,4 +1,5 @@
 /* zever landing tokens. Dark default; light via [data-theme='light']. */
+:root,
 .zl-page {
   --zl-bg: #05070d;
   --zl-bg-2: #0a0e18;
@@ -38,6 +39,7 @@
   --zl-ease: cubic-bezier(0.22, 1, 0.36, 1);
 }
 
+:root[data-theme='light'],
 .zl-page[data-theme='light'] {
   --zl-bg: #f7f9fc;
   --zl-bg-2: #eef2f8;

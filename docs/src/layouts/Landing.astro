@@ -6,11 +6,14 @@ import '../styles/landing/base.css';
 import Nav from '../components/landing/Nav.astro';
 import Footer from '../components/landing/Footer.astro';
 import { href } from '../lib/url';
+import fontUrl from '@fontsource-variable/space-grotesk/files/space-grotesk-latin-wght-normal.woff2?url';
+import { SITE, NAME, KEYWORDS, abs, landingGraph, jsonLd } from '../lib/seo';
+import { VERSION } from '../data/landing';
 
 interface Props { title?: string; description?: string }
 const {
-  title = 'Zever: One schema. Every backend concern.',
-  description = 'Schema-driven scaffolding compiler for Go. Describe services in .zen, compile to typed infrastructure, swap adapters with config.',
+  title = 'Zever: One schema. Every backend concern. Zero rewiring.',
+  description = 'Zever is a schema-driven scaffolding compiler for Go. Describe services in .zen, compile typed ORM, OpenAPI and migrations, and swap adapters (db, cache, queue, auth, storage) by config, never your business logic.',
 } = Astro.props;
 ---
 
@@ -21,13 +24,37 @@ const {
     <meta name="viewport" content="width=device-width, initial-scale=1" />
     <title>{title}</title>
     <meta name="description" content={description} />
+    <meta name="keywords" content={KEYWORDS} />
+    <meta name="author" content="Zenta Dev" />
+    <meta name="robots" content="index, follow, max-snippet:-1, max-image-preview:large, max-video-preview:-1" />
+    <link rel="canonical" href={`${SITE}/`} />
+    <link rel="sitemap" href={abs('sitemap-index.xml')} />
+    <link rel="alternate" type="text/plain" href={abs('llms.txt')} title="llms.txt" />
+    <meta property="og:site_name" content={NAME} />
+    <meta property="og:locale" content="en_US" />
+    <meta property="og:type" content="website" />
+    <meta property="og:url" content={`${SITE}/`} />
     <meta property="og:title" content={title} />
     <meta property="og:description" content={description} />
-    <meta property="og:type" content="website" />
-    <meta property="og:image" content={new URL(href('og.png'), Astro.site).toString()} />
+    <meta property="og:image" content={abs('og.png')} />
+    <meta property="og:image:type" content="image/png" />
+    <meta property="og:image:width" content="1200" />
+    <meta property="og:image:height" content="630" />
+    <meta property="og:image:alt" content="Zever: One schema. Every backend concern. Zero rewiring." />
     <meta name="twitter:card" content="summary_large_image" />
+    <meta name="twitter:title" content={title} />
+    <meta name="twitter:description" content={description} />
+    <meta name="twitter:image" content={abs('og.png')} />
+    <meta name="twitter:image:alt" content="Zever: One schema. Every backend concern. Zero rewiring." />
     <meta name="color-scheme" content="dark light" />
+    <meta name="theme-color" content="#05070d" media="(prefers-color-scheme: dark)" />
+    <meta name="theme-color" content="#f7f9fc" media="(prefers-color-scheme: light)" />
     <link rel="icon" href={href('favicon.svg')} type="image/svg+xml" />
+    <link rel="icon" href={href('icon-192.png')} type="image/png" sizes="192x192" />
+    <link rel="apple-touch-icon" href={href('apple-touch-icon.png')} />
+    <link rel="manifest" href={href('site.webmanifest')} />
+    <link rel="preload" href={fontUrl} as="font" type="font/woff2" crossorigin />
+    <script type="application/ld+json" is:inline set:html={jsonLd(landingGraph(VERSION))} />
     <script is:inline>
       (function () {
         var t = 'dark';
@@ -48,6 +75,7 @@ const {
     <Footer />
     <script>
       import { revealAll } from '../scripts/landing/motion';
+      import '../scripts/scroll-state';
       import { initTheme } from '../scripts/landing/theme';
       initTheme();
       revealAll();

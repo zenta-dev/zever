@@ -1,6 +1,5 @@
 import { defineConfig } from "astro/config";
 import starlight from "@astrojs/starlight";
-import starlightThemeBlack from "starlight-theme-black";
 import fs from "node:fs";
 
 const zenDSLGrammar = JSON.parse(
@@ -19,21 +18,96 @@ export default defineConfig({
   },
   integrations: [
     starlight({
-      title: "zever",
+      title: "Zever",
       favicon: "/favicon.svg",
       logo: {
         src: "./src/assets/logo.svg",
-        alt: "zever logo",
+        alt: "Zever logo",
       },
-      customCss: ["./src/styles/custom.css"],
-      components: {
-        Head: "./src/components/Head.astro",
-      },
-      plugins: [
-        starlightThemeBlack({
-          navLinks: [{ label: "Docs", link: "/getting-started/installation" }],
-        }),
+      customCss: [
+        "./src/styles/docs/fonts.css",
+        "./src/styles/landing/tokens.css",
+        "./src/styles/docs/theme.css",
+        "./src/styles/docs/prose.css",
+        "./src/styles/docs/code.css",
       ],
+      expressiveCode: {
+        themes: ["github-dark-default", "github-light-default"],
+        shiki: { langs: [{ ...zenDSLGrammar, name: "zen", aliases: ["Zen"] }] },
+        defaultProps: { wrap: true },
+        // Code windows stay dark in both site themes, like the landing: the light theme's
+        // CSS is scoped to a selector that never matches.
+        useStarlightDarkModeSwitch: false,
+        useDarkModeMediaQuery: false,
+        themeCssSelector: (theme) => (theme.type === "dark" ? ":root" : ":root[data-zever-code-light]"),
+        styleOverrides: {
+          borderRadius: "12px",
+          borderWidth: "1px",
+          borderColor: "var(--zl-line-strong)",
+          codeBackground: "var(--zl-code-bg)",
+          codeForeground: "#d7e0ee",
+          codeFontFamily: "var(--sl-font-system-mono)",
+          codeFontSize: "0.85rem",
+          codeLineHeight: "1.65",
+          codePaddingBlock: "0.95rem",
+          codePaddingInline: "1.1rem",
+          uiFontFamily: "var(--sl-font-system)",
+          uiFontSize: "0.78rem",
+          frames: {
+            frameBoxShadowCssValue: "var(--zl-shadow)",
+            editorBackground: "var(--zl-code-bg)",
+            editorTabBarBackground: "#0f1523",
+            editorTabBarBorderBottomColor: "rgba(255, 255, 255, 0.09)",
+            editorActiveTabBackground: "var(--zl-code-bg)",
+            editorActiveTabForeground: "#c9d3e2",
+            editorActiveTabBorderColor: "transparent",
+            editorActiveTabIndicatorTopColor: "transparent",
+            editorActiveTabIndicatorBottomColor: "#6cbdda",
+            editorActiveTabIndicatorHeight: "2px",
+            editorTabBorderRadius: "0",
+            terminalBackground: "var(--zl-code-bg)",
+            terminalTitlebarBackground: "#0f1523",
+            terminalTitlebarBorderBottomColor: "rgba(255, 255, 255, 0.09)",
+            terminalTitlebarForeground: "#a4b0c3",
+            terminalTitlebarDotsForeground: "#6b778b",
+            terminalTitlebarDotsOpacity: "0.55",
+            inlineButtonForeground: "#a4b0c3",
+            inlineButtonBackground: "#6cbdda",
+            inlineButtonBackgroundIdleOpacity: "0",
+            inlineButtonBackgroundHoverOrFocusOpacity: "0.18",
+            inlineButtonBackgroundActiveOpacity: "0.3",
+            inlineButtonBorder: "#6cbdda",
+            inlineButtonBorderOpacity: "0.5",
+            tooltipSuccessBackground: "#2ea66a",
+            tooltipSuccessForeground: "#04121c",
+          },
+          textMarkers: {
+            markBackground: "rgba(108, 189, 218, 0.16)",
+            markBorderColor: "rgba(108, 189, 218, 0.6)",
+            insBackground: "rgba(63, 185, 122, 0.18)",
+            insBorderColor: "#3fb97a",
+            delBackground: "rgba(240, 98, 98, 0.18)",
+            delBorderColor: "#f06262",
+            borderRadius: "3px",
+            lineMarkerAccentWidth: "0.15rem",
+            inlineMarkerBorderWidth: "1px",
+            inlineMarkerPadding: "0.1rem 0.25rem",
+          },
+        },
+      },
+      components: {
+        Header: "./src/components/docs/Header.astro",
+        SiteTitle: "./src/components/docs/SiteTitle.astro",
+        Search: "./src/components/docs/Search.astro",
+        ThemeSelect: "./src/components/docs/ThemeSelect.astro",
+        MobileMenuToggle: "./src/components/docs/MobileMenuToggle.astro",
+        Sidebar: "./src/components/docs/Sidebar.astro",
+        PageTitle: "./src/components/docs/PageTitle.astro",
+        TableOfContents: "./src/components/docs/TableOfContents.astro",
+        Pagination: "./src/components/docs/Pagination.astro",
+        Footer: "./src/components/docs/Footer.astro",
+        Head: "./src/components/docs/Head.astro",
+      },
       social: [{ icon: "github", label: "GitHub", href: "https://github.com/zenta-dev/zever" }],
       sidebar: [
         {
@@ -145,6 +219,7 @@ export default defineConfig({
         {
           label: "Reference",
           items: [
+            { label: "Overview", link: "reference" },
             { label: "CLI", link: "reference/cli" },
             { label: "Agent Skill", link: "reference/agent-skill" },
             { label: "Config Reference", link: "reference/config-reference" },

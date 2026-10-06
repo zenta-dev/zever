@@ -3,6 +3,8 @@ title: 'Tutorial: Build a Booking API'
 description: A guided walkthrough of the examples/bookings app - schema, migrate, seed, serve, and hit an endpoint.
 ---
 
+import { Steps, Aside, LinkCard, CardGrid } from '@astrojs/starlight/components';
+
 This tutorial walks through `examples/bookings` in the repository: a
 short-term space bookings marketplace ("hosts list spaces, guests book
 them"). It exists precisely because a rich domain is the only way to
@@ -50,7 +52,7 @@ Expected output:
 applied 4 tables to data/bookings.db
 ```
 
-The file `data/bookings.db` now exists. Run `zever doctor --config
+The file `data/bookings.db` now exists. Run `Zever doctor --config
 zever.yaml` from this directory so the relative `data/` path resolves;
 from anywhere else the db check reports a path miss.
 
@@ -92,9 +94,12 @@ Expected output:
 listening on :8080
 ```
 
-The server listens on `:8080` by default (`-addr` flag to change it). If
-the secret is missing or under 32 bytes, the process exits with a clear
+The server listens on `:8080` by default (`-addr` flag to change it).
+
+<Aside type="caution" title="Fail-closed secret">
+If the secret is missing or under 32 bytes, the process exits with a clear
 startup error naming the field instead of serving insecurely.
+</Aside>
 
 ## 5. Start the worker (jobs + scheduler)
 
@@ -207,7 +212,11 @@ config), `geo` (missing fixture data), and `i18n` (missing embed FS), plus
 possibly `db` if run outside `examples/bookings/` and `webhook` (queue
 variant needs its queue reference). Those are deliberate zero-infra gaps
 in the example, not framework bugs - see the app `README.md` for the exact
-list. Do not "fix" framework code for them.
+list.
+
+<Aside type="tip" title="Leave the framework alone">
+Do not "fix" framework code for these FAIL rows.
+</Aside>
 
 ## What you just exercised
 
@@ -234,9 +243,7 @@ means you reused an idempotency key; a fresh key creates a fresh booking.
 
 ## Next
 
-- [Explore the Showcase App](explore-the-showcase-app/) for
-  a schema that exercises every DSL feature in one place, served over both
-  HTTP and gRPC.
-- [Architecture: Providers and Adapters](../architecture/providers-adapters/)
-  to understand why swapping `payment: stub` for `payment: stripe` in
-  `zever.yaml` is the only change a real deployment needs.
+<CardGrid>
+  <LinkCard title="Explore the Showcase App" description="A schema that exercises every DSL feature in one place, served over both HTTP and gRPC." href="../explore-the-showcase-app/" />
+  <LinkCard title="Providers and Adapters" description="Why swapping payment: stub for payment: stripe in zever.yaml is the only change a real deployment needs." href="../../architecture/providers-adapters/" />
+</CardGrid>

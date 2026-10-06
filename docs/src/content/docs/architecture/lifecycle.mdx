@@ -1,17 +1,17 @@
 ---
 title: Lifecycle
-description: Request lifecycle from config load to container shutdown in a zever process.
+description: Request lifecycle from config load to container shutdown in a Zever process.
 ---
 
 ## Purpose + When to use
 
-This page traces one zever process from `config.Load` to `c.Close`: the four phases every request lives inside. Read it before writing `main.go`, before debugging startup vs request-time failures, and before reviewing shutdown code.
+This page traces one Zever process from `config.Load` to `c.Close`: the four phases every request lives inside. Read it before writing `main.go`, before debugging startup vs request-time failures, and before reviewing shutdown code.
 
 Concrete payoff: you will know which failures belong to load (fail fast), which belong to first resolution (retry), and which belong to close (join and inspect).
 
 ## Prerequisites and mental model
 
-A zever process has four phases. No globals and no `init()` wiring participate anywhere:
+A Zever process has four phases. No globals and no `init()` wiring participate anywhere:
 
 ```text
 config.Load  ->  container.New  ->  resolve on first use  ->  Close(ctx)

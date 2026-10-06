@@ -3,9 +3,11 @@ title: Configuration
 description: Layered typed config with defaults, strict files, best-effort env, and secret redaction.
 ---
 
+import { Tabs, TabItem, Aside } from '@astrojs/starlight/components';
+
 ## Purpose + When to use
 
-This page explains the only config system in zever: typed defaults, then a strict YAML or JSON file, then best-effort environment overrides. Read it before writing your first `zever.yaml`, before debugging a load failure, and before printing config anywhere near logs.
+This page explains the only config system in Zever: typed defaults, then a strict YAML or JSON file, then best-effort environment overrides. Read it before writing your first `zever.yaml`, before debugging a load failure, and before printing config anywhere near logs.
 
 Concrete payoff: local tests run with zero setup via `Default()`, deploys fail fast on typos via strict files, and stray process env never breaks startup.
 
@@ -32,36 +34,41 @@ Only a value that fails to parse for a resolved field returns `InvalidOptionsErr
 
 File form is strict snake_case YAML (or JSON). Env form carries no prefix: `<SERVICE>_<FIELD>`, uppercased.
 
-```yaml
-# zever.yaml
-db:
-  adapter: postgres
-  options:
-    dsn: postgres://app:secret@db:5432/app
-    max_conns: 20
-    min_conns: 2
-cache:
-  adapter: redis
-  options:
-    addr: redis:6379
-log:
-  adapter: slog
-auth:
-  adapter: jwt
-  options:
-    jwt:
-      secret: prod-secret-at-least-32-bytes-long
-      issuer: myapp
-```
-
-```sh
-DB_ADAPTER=postgres
-DB_MAXCONNS=20
-DB_MAXCONNLIFETIME=5m
-CACHE_ADAPTER=redis
-AUTH_JWT_SECRET='prod-secret-at-least-32-bytes-long'
-RATELIMIT_RATE=100
-```
+<Tabs>
+  <TabItem label="YAML (zever.yaml)">
+    ```yaml
+    # zever.yaml
+    db:
+      adapter: postgres
+      options:
+        dsn: postgres://app:secret@db:5432/app
+        max_conns: 20
+        min_conns: 2
+    cache:
+      adapter: redis
+      options:
+        addr: redis:6379
+    log:
+      adapter: slog
+    auth:
+      adapter: jwt
+      options:
+        jwt:
+          secret: prod-secret-at-least-32-bytes-long
+          issuer: myapp
+    ```
+  </TabItem>
+  <TabItem label="Environment">
+    ```sh
+    DB_ADAPTER=postgres
+    DB_MAXCONNS=20
+    DB_MAXCONNLIFETIME=5m
+    CACHE_ADAPTER=redis
+    AUTH_JWT_SECRET='prod-secret-at-least-32-bytes-long'
+    RATELIMIT_RATE=100
+    ```
+  </TabItem>
+</Tabs>
 
 Notes with real keys: field matching is case-insensitive with `_` ignored (`MAX_RETRIES` matches `MaxRetries`). One nesting level splits at the first `_`, so `AUTH_JWT_SECRET` sets `Options.JWT.Secret`. Durations accept `"5s"` style strings in env only; files store `time.Duration` as integer nanoseconds (see `config/schema/zever.schema.json`). `_ADAPTER` switches the service adapter (`DB_ADAPTER=postgres`).
 
@@ -190,9 +197,15 @@ Defaults pick the zero-infra adapter per service. Two exceptions need keys: `ai`
 
 ## Production notes
 
+<Aside type="danger" title="Dev-only keys">
 Supply real secrets via file or environment and keep `Default()` where it belongs: local dev and tests. The dev crypto key is deterministic and public; `AUTH_JWT_SECRET` and provider keys must come from env or a mounted file in prod.
+</Aside>
 
-Fail-closed behavior: unknown services and unknown fields in files are errors (typos fail fast); env ignores unknown variables but errors on unparsable resolved values. Store durations as integer nanoseconds in files; `"5s"` strings work only in env. Never log raw option maps: `RedactedServices` (built on `Redact`) is the sole display path, and `Close` error values name the service only. Close with a timeout parent so buffered spans flush via `Shutdown(ctx)` probing.
+<Aside type="caution" title="Redaction">
+Never log raw option maps: `RedactedServices` (built on `Redact`) is the sole display path, and `Close` error values name the service only.
+</Aside>
+
+Fail-closed behavior: unknown services and unknown fields in files are errors (typos fail fast); env ignores unknown variables but errors on unparsable resolved values. Store durations as integer nanoseconds in files; `"5s"` strings work only in env. Close with a timeout parent so buffered spans flush via `Shutdown(ctx)` probing.
 
 ## Troubleshooting
 

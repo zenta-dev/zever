@@ -3,7 +3,7 @@ title: Requests and Responses
 description: Decode JSON bodies, read params and headers, and write consistent JSON responses.
 ---
 
-zever handlers stay close to `net/http`: decode the request explicitly, run business logic, and encode a consistent JSON envelope. No magic binding, no global helpers.
+Zever handlers stay close to `net/http`: decode the request explicitly, run business logic, and encode a consistent JSON envelope. No magic binding, no global helpers.
 
 Use this pattern for hand-written routes and for custom endpoints beside generated `.zen` services (the bookings server does exactly this: generated shapes cover entities, hand-written routes in `internal/api` carry the full booking flow).
 

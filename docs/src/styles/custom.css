@@ -1,8 +1,0 @@
-/* zever docs theme tweak: keep Starlight defaults, tighten code readability. */
-:root {
-  --sl-font-system: ui-sans-serif, system-ui, sans-serif;
-}
-
-.sl-markdown-content pre {
-  line-height: 1.55;
-}

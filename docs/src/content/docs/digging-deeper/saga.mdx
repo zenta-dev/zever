@@ -6,7 +6,7 @@ description: Multi-step transactions with pivot roll-forward and reverse compens
 ## Purpose
 
 Use saga orchestration for multi-step operations that span resources you
-cannot put in one database transaction — reserve a seat, charge a card,
+cannot put in one database transaction, reserve a seat, charge a card,
 issue a ticket. Each step is a `SagaStep` with a forward `Execute` and an
 optional reverse `Compensate`. The runner executes steps in order; on
 failure it either compensates the executed steps in reverse (the default)
@@ -36,23 +36,23 @@ without saga support are unaffected. Define steps either in a top-level
 
 ## Mental model
 
-- `SagaStep{Name, Execute, Compensate, Pivot}` — one forward action plus
+- `SagaStep{Name, Execute, Compensate, Pivot}`: one forward action plus
   its optional rollback. A nil `Compensate` means the step needs no
   rollback. Step input and output must be JSON-marshalable.
-- `SagaRegistrar.RegisterSaga(name, steps)` — registers (or replaces) the
+- `SagaRegistrar.RegisterSaga(name, steps)`: registers (or replaces) the
   saga definition under `name`. Definitions are in-memory (steps are
   funcs); only run progress is durable.
-- `SagaRunner.RunSaga(ctx, name, input, workflowID)` — starts or resumes
+- `SagaRunner.RunSaga(ctx, name, input, workflowID)`: starts or resumes
   the named saga. An empty `workflowID` generates one. A `workflowID`
   matching an existing run resumes that run instead of restarting it:
   terminal runs return their ID unchanged, non-terminal runs continue
   from the persisted `current_step`.
-- `SagaInspector.SagaStatus(ctx, runID)` — point-in-time view: `Status`,
+- `SagaInspector.SagaStatus(ctx, runID)`: point-in-time view: `Status`,
   `CurrentStep`, `FailedStep`, `Err`.
 
 Pivot semantics: when a step fails, the runner checks whether any
 executed step before the failure has `Pivot=true`. If so, the saga is
-committed to completing — it retries the remaining steps forward with
+committed to completing, it retries the remaining steps forward with
 backoff and never compensates. If not, it compensates the executed steps
 in reverse order, skipping nil `Compensate` and (on the db adapter)
 steps already compensated before a crash. Compensation failures mark the
@@ -69,7 +69,7 @@ Statuses: `pending`, `running`, `completed`, `compensating`, `failed`,
 ## Declaring sagas in .zen
 
 The compiler knows a top-level `saga { ... }` declaration, so the common
-case — a saga over RPCs that already exist as `service` declarations — is
+case, a saga over RPCs that already exist as `service` declarations, is
 schema, not wiring:
 
 ```
@@ -94,7 +94,7 @@ Rules:
 - Step names must be unique within a saga, and at most one step may set
   `pivot: true`.
 - `execute`/`compensate` reference `<Service>.<RPC>` and resolve against
-  every service in the schema, so a saga may compose RPCs across modules —
+  every service in the schema, so a saga may compose RPCs across modules,
   that cross-module composition is the point of a saga.
 
 For each module that declares at least one saga, the `gogen` backend emits
@@ -222,7 +222,7 @@ func openWorkflow() error {
 
 `Workflow()` resolves lazily and caches the instance. Type-assert the
 resolved value to `workflow.SagaRegistrar` / `SagaRunner` /
-`SagaInspector` to use saga features — both the `memory` and `db`
+`SagaInspector` to use saga features, both the `memory` and `db`
 adapters implement all three.
 
 ## Runnable example
@@ -328,8 +328,8 @@ no call-site change.
   money-moving steps), so the durable backend can replay safely.
 - Crash recovery: the db adapter persists `current_step` after each
   successful step and extends a lease while running. Call
-  `RecoverStuckSagas(ctx, olderThan)` — on the db adapter, via a local
-  interface — to resume runs stuck in `running` or `compensating` whose
+  `RecoverStuckSagas(ctx, olderThan)`, on the db adapter, via a local
+  interface, to resume runs stuck in `running` or `compensating` whose
   lease expired:
 
   ```go
@@ -357,7 +357,7 @@ no call-site change.
 ## Troubleshooting
 
 1. `ErrUnknownSaga`: the saga name was never registered on this adapter
-  instance. Definitions are in-memory — every replica must register the
+  instance. Definitions are in-memory, every replica must register the
   same definitions at boot, or `RecoverStuckSagas` skips runs whose
   definition is missing.
 2. A step re-runs after a crash: the step was not idempotent. Gate

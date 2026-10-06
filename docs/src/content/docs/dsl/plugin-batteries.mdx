@@ -5,7 +5,7 @@ description: Proposal for referencing RegisterPlugin batteries from .zen schemas
 
 ## Purpose
 
-Decide how — or whether — `.zen` schemas should reference a plugin battery
+Decide how, or whether, `.zen` schemas should reference a plugin battery
 registered via `container.RegisterPlugin` / `config.Plugins` (see
 `docs/writing-a-plugin.md`). Today the answer is "they cannot": the resolver
 knows zero battery vocabulary. This page proposes the shape such a reference
@@ -13,13 +13,13 @@ could take, evaluates invasiveness against the current resolver pipeline,
 and recommends keeping the boundary for now.
 
 When to use: planning `.zen` support for a concrete plugin battery with a
-real user. When not to use: modeling core-battery domains — `entity`,
+real user. When not to use: modeling core-battery domains, `entity`,
 `service`, `job`, `schedule`, `message`, `enum` already cover those.
 
 ## Status
 
 Proposal only. No compiler change ships with it. The existing boundary
-(`.zen` cannot reference plugin batteries — a scope boundary, not a bug)
+(`.zen` cannot reference plugin batteries, a scope boundary, not a bug)
 stands until a concrete user signs off on one of the open questions below.
 
 ## Background: how batteries resolve today
@@ -28,10 +28,10 @@ stands until a concrete user signs off on one of the open questions below.
   resolver) have **no resolver vocabulary**. The only battery-adjacent
   string the compiler sees is `job`'s `queue:` name, and
   `dsl/resolver/resolver_job.go:38-41` deliberately does **not** validate it
-  against registered queue adapters — queue existence is a runtime/container
+  against registered queue adapters, queue existence is a runtime/container
   concern with no compile-time visibility.
 - `dsl/resolver/resolver_schedule.go:54` applies the same logic to
-  `dispatch:` — cross-module dispatch is allowed because enqueueing onto a
+  `dispatch:`, cross-module dispatch is allowed because enqueueing onto a
   shared queue topic is not a DB-ownership violation.
 - `dsl/resolver/boundary.go` (`CheckCrossModule`) enforces module ownership
   for relations, RPC params/returns, and permission resources. Schedules are
@@ -50,7 +50,7 @@ stands until a concrete user signs off on one of the open questions below.
 
 Consequence: any `.zen` reference to a plugin battery must either be
 **opaque to the resolver** (a name recorded, checked at runtime) or the
-resolver must learn a **plugin type registry** — a compile-time dependency
+resolver must learn a **plugin type registry**, a compile-time dependency
 on runtime code that the architecture explicitly forbids.
 
 ## Proposal A: schema-level `uses` declaration (deferred check)
@@ -92,7 +92,7 @@ code agrees by convention to honor the fragment's shape.
 
 - Pro: reuses all existing machinery (messages, params, enums) with zero
   grammar change.
-- Con: no machine-checked link between fragment and Go implementation —
+- Con: no machine-checked link between fragment and Go implementation,
   drift is silent; versioning the fragment against the plugin module is
   unsolved; dir-derived module assignment (`resolver_module.go`) makes
   "import a fragment" awkward (there is no import statement today, only
@@ -115,7 +115,7 @@ type universe. Highest cost, least reversibility.
 tests pin:
 
 1. `dsl/token/token.go`: new `USES` kind + `Keywords["uses"]` entry.
-   `uses` becomes reserved — any field/message/enum named `uses` breaks.
+   `uses` becomes reserved, any field/message/enum named `uses` breaks.
 2. `dsl/ast`: new decl node (`UsesDecl` + `File` accommodation).
 3. `dsl/parser/parser.go`: new `parseTopLevelDecl` arm, `syncTopLevel`
    trigger set, depth-guard/recovery coverage, fuzz seeds.
@@ -152,7 +152,7 @@ still requires steps 1–3 plus IR plumbing to be observable at all.
   (see the no-manifest third-party pattern). Duplicating it in `.zen` adds
   a second source of truth to keep in sync.
 - Revisit trigger: a real plugin (not the `examples/sms` dogfood) needs
-  schema-visible surface — e.g. generated request validation, OpenAPI
+  schema-visible surface, e.g. generated request validation, OpenAPI
   exposure, or queue-payload typing that cannot be expressed as
   `message` + runtime wiring. At that point implement Proposal A
   (`uses` + optional `@via`), never Proposal C.
@@ -175,7 +175,7 @@ changes.
 4. Does removing a `uses` line count as breaking under `dsl/breaking`?
    (Analogous precedent needed: removing a `queue:` target is runtime-only
    today and invisible to `breaking`.)
-5. Who generates the runtime check — `gogen` emitting `RegisterPlugin`
+5. Who generates the runtime check, `gogen` emitting `RegisterPlugin`
    calls from `Uses`, or a `zever check --plugins` flag comparing `.zen`
    `uses` against `zever.yaml`? Either is new backend/CLI surface.
 6. Confirm the revisit trigger: which upcoming plugin (if any) is expected
@@ -183,6 +183,6 @@ changes.
 
 ## See also
 
-- `docs/writing-a-plugin.md` — the `.zen` schema boundary section (status quo)
+- `docs/writing-a-plugin.md`: the `.zen` schema boundary section (status quo)
 - [Syntax](./syntax-zen/) for current top-level blocks (no `uses` today)
 - [Resolver and IR](./resolver-ir/) for the pipeline and `make generate` rule

@@ -19,7 +19,7 @@ server's goroutines.
 Stay on `memory` (the default) for a single instance: every policy is
 process-local and needs no infrastructure. Switch to `redis` the moment
 more than one replica calls the same dependency, because only the
-circuit-breaker state is meaningful to share — replicas that see the same
+circuit-breaker state is meaningful to share, replicas that see the same
 failure ratio should trip together instead of each burning its own retry
 budget. Timeout, retry, and bulkhead stay process-local in both adapters.
 
@@ -38,7 +38,7 @@ classified as success through `BreakerOptions.IsSuccessful`.
 
 File decoding is strict snake_case; durations in files are integer
 nanoseconds. `retry` is an untagged `retry.Policy`, so its file keys are
-case-insensitive Go field names (`maxattempts`), not snake_case — prefer
+case-insensitive Go field names (`maxattempts`), not snake_case, prefer
 setting it in Go via `resilience.Default()`.
 
 ```yaml
@@ -196,7 +196,7 @@ Live redis behavior is covered by tests gated behind `REDIS_ADDR`.
   guard the manager creates, so open one manager per dependency class (or
   accept that a fast local cache and a slow remote API share thresholds).
 - `Default()` enables every policy with bounded values (5s timeout, 3
-  attempts, 100 concurrent, 1s admission wait) — a safe starting point,
+  attempts, 100 concurrent, 1s admission wait), a safe starting point,
   not a tuning endpoint.
 
 ## Troubleshooting
@@ -210,7 +210,7 @@ Live redis behavior is covered by tests gated behind `REDIS_ADDR`.
    `max_attempts`.
 3. `ErrBulkheadFull` under burst: `max_concurrent` is too low for the
    replica's capacity, or `max_wait` is shorter than a slot frees up.
-   Raise `max_concurrent` before raising `max_queue` — an unbounded queue
+   Raise `max_concurrent` before raising `max_queue`, an unbounded queue
    turns a burst into a latency bomb.
 4. Redis adapter fails to open: the constructor pings Redis with a 3s
    budget and fails closed. Check `addr` and that the prefix is unique per

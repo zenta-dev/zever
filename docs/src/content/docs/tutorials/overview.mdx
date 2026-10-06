@@ -3,6 +3,8 @@ title: Tutorials Overview
 description: Runnable example apps under examples/, from single-battery demos to full showcase apps.
 ---
 
+import { Steps, Aside, LinkCard, CardGrid } from '@astrojs/starlight/components';
+
 Every battery in this framework has a runnable example under `examples/` in
 the repository, all zero-infrastructure. Most live in the `examples` module
 and run with `go test ./examples/...`. The larger apps (`showcase`, `todo`,
@@ -69,8 +71,10 @@ ok  github.com/zenta-dev/zever/examples/transactions 0.04s
 ...
 ```
 
+<Aside type="tip" title="What to look for">
 Package names and times vary by machine; the signal is `ok` on every line
 and no `FAIL` anywhere.
+</Aside>
 
 Some examples opt into a real backend via environment variables when you
 want to see the adapter swap in action, for example:
@@ -87,6 +91,8 @@ no Redis, no external service required.
 
 Each example follows the same layout so you always know where to look:
 
+<Steps>
+
 1. `schema/*.zen` (full apps only) - the domain; never hand-edit
    `generated/` next to it.
 2. `zever.yaml` - explicit zero-infra adapters; the diff against
@@ -96,6 +102,8 @@ Each example follows the same layout so you always know where to look:
    `zever generate server` / `zever generate worker`.
 5. Tests next to the code they cover - the `// Output:` comments are
    runnable claims, not prose.
+
+</Steps>
 
 ## Suggested order
 
@@ -166,8 +174,16 @@ seeded demo shop data
 ```
 
 Both seeds are idempotent: re-running prints the same lines without
-duplicating rows. Both servers require `AUTH_JWT_SECRET` of at least 32
-bytes and fail closed without it.
+duplicating rows.
+
+<Aside type="caution" title="JWT secret required">
+Both servers require `AUTH_JWT_SECRET` of at least 32 bytes and fail closed without it.
+</Aside>
+
+<CardGrid>
+  <LinkCard title="Build a Booking API" description="Guided walkthrough of the bookings flow." href="../build-a-booking-api/" />
+  <LinkCard title="Explore the Showcase App" description="A tour of DSL breadth over HTTP and gRPC." href="../explore-the-showcase-app/" />
+</CardGrid>
 
 ## Troubleshooting
 

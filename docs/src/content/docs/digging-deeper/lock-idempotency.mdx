@@ -8,7 +8,7 @@ description: Distributed mutual exclusion plus exactly-once handling for jobs an
 Use `lock` for mutual exclusion ("only one worker runs this migration
 now") and `idempotency` for dedupe ("this webhook retried three times
 takes effect once"). They look similar but are different problems, so
-zever keeps them as two small separately-resolved services. `Locker`
+Zever keeps them as two small separately-resolved services. `Locker`
 offers single-attempt `TryAcquire`, blocking `Acquire` (polls every
 `RetryInterval`, default 50ms), `Extend`, and ownership-checked `Unlock`.
 `Store` reserves a caller key with `Begin` and records the outcome with

@@ -95,7 +95,7 @@ exit:0
 ## Reference
 
 Each row is machine-editable with one adapter per row: `| service | adapter | module | register | accessor |`.
-`module` is the Go module path; `register` is the explicit `Register()` call the host makes before resolving. The container wires nothing by itself: every adapter resolves only after its `Register()` runs (`none (no registry)` marks only non-adapter rows — the `job` dispatcher, the `media/ffmpeg` binary helper, and the `session/cookie` stdlib builder).
+`module` is the Go module path; `register` is the explicit `Register()` call the host makes before resolving. The container wires nothing by itself: every adapter resolves only after its `Register()` runs (`none (no registry)` marks only non-adapter rows, the `job` dispatcher, the `media/ffmpeg` binary helper, and the `session/cookie` stdlib builder).
 
 Install every adapter module you resolve (replace `vX.Y.Z` with the lockstep release version):
 

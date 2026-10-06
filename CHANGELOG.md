@@ -52,6 +52,22 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   lifecycle graph, terminal quickstart, agent section, reproducible
   benchmarks, examples carousel, and FAQ. The former splash content moved to
   `getting-started/introduction`.
+- Docs redesign to match the landing page: custom Starlight theme replacing
+  `starlight-theme-black` (Space Grotesk and JetBrains Mono, shared color
+  tokens, dark and light), blurred header with Guides/Reference tabs and a
+  search pill, icon sidebar with active pill, scroll-spy table of contents,
+  breadcrumbs with reading time, previous/next cards, and styled callouts,
+  steps, tabs, cards and code windows. Added "Copy page" and "Open in
+  Claude/ChatGPT" page actions, a per-page `.md` route, `llms.txt` and
+  `llms-full.txt`, and a "Was this page helpful?" widget. Key pages gained
+  steps, tabs and callouts, and `zen` code blocks are now highlighted.
+- Search, AI and sharing optimization for the docs site: generated 1200x630
+  Open Graph cards (landing plus one per docs page) and app icons, canonical
+  and social meta, JSON-LD (Organization, WebSite, SoftwareApplication,
+  TechArticle, BreadcrumbList), `robots.txt` that welcomes search and AI
+  crawlers, a web manifest, font preloading, a richer `llms.txt` with key facts,
+  and `noindex` on the 404 page. The sidebar scroll position, open groups and
+  per-page content scroll now persist across navigation and reloads.
 - `--dry-run` across all nine `generate` subcommands: validation and
   rendering still run, but no filesystem writes occur; append-mode
   subcommands preview the rendered declaration.

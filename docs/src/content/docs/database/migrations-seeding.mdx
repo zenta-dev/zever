@@ -3,7 +3,7 @@ title: Migrations and Seeding
 description: Plan and apply schema migrations with rollback, then seed deterministically.
 ---
 
-zever migrations use a live-schema-diff engine in `orm/migrate`: compare the desired schema against the live database, plan the statements, then apply them. Rollbacks reverse the last batch, and seeds load deterministic data afterward.
+Zever migrations use a live-schema-diff engine in `orm/migrate`: compare the desired schema against the live database, plan the statements, then apply them. Rollbacks reverse the last batch, and seeds load deterministic data afterward.
 
 Use this flow when the `.zen` schema changes, when promoting to a new environment, and when resetting dev data. Review the plan before applying in production.
 

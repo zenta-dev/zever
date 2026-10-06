@@ -5,8 +5,8 @@ description: gRPC client connections with round-robin load balancing, retry, tra
 
 ## Purpose
 
-Use `shared/grpcclient` for outbound gRPC calls from zever services to
-other zever services. `New(ctx, target, opts...)` builds a
+Use `shared/grpcclient` for outbound gRPC calls from Zever services to
+other Zever services. `New(ctx, target, opts...)` builds a
 `*grpc.ClientConn` with the cross-cutting concerns already wired:
 client-side round-robin load balancing, an optional per-method retry
 policy, W3C trace propagation, metadata attachment, a per-RPC timeout, and
@@ -21,7 +21,7 @@ Use it for every outbound gRPC call in a multi-service deployment. The
 default service config enables `round_robin`, so a `dns:///` target with
 multiple resolved addresses spreads load across them without a sidecar.
 Use the `static:///name` scheme with `WithStaticResolver` for
-in-process or test environments where DNS is not the source of truth —
+in-process or test environments where DNS is not the source of truth,
 the resolver is registered per-connection, never globally.
 
 Credentials are explicit and fail-closed: `New` returns `ErrNoCredentials`
@@ -35,8 +35,8 @@ connections in code (or via `container.GRPCClient`).
 
 Target schemes:
 
-- `dns:///host:port` — gRPC's built-in DNS resolver.
-- `static:///name` — resolved through the `WithStaticResolver` address
+- `dns:///host:port`: gRPC's built-in DNS resolver.
+- `static:///name`: resolved through the `WithStaticResolver` address
   map; an unknown or empty name fails fast instead of dialing nothing.
 
 ```go
@@ -86,7 +86,7 @@ default.
 TLS: `WithTLS(TLSOptions{CertFile, KeyFile, CAFile, ServerName})` loads an
 optional client certificate pair (both or neither), a CA bundle for server
 verification, and a server-name override. TLS 1.2 is the floor; read or
-parse failures return errors — `WithTLS` never falls back to insecure.
+parse failures return errors, `WithTLS` never falls back to insecure.
 
 ## Resolve via container
 
@@ -111,7 +111,7 @@ func dialUsers(c *container.Container) (*grpc.ClientConn, error) {
 string: repeat calls with the same target return the same conn, distinct
 targets get distinct conns. Options apply to the build only; later calls
 with different options keep the first build. The conns close with the
-container. `grpcclient.New` performs no IO, so resolving never dials —
+container. `grpcclient.New` performs no IO, so resolving never dials,
 the connection is established lazily on the first RPC.
 
 ## Runnable example
@@ -147,7 +147,7 @@ Expected output:
 client created
 ```
 
-Call generated service clients over the returned connection — `pb` is
+Call generated service clients over the returned connection, `pb` is
 your generated protobuf package:
 
 ```go
@@ -160,15 +160,15 @@ resp, err := client.GetUser(ctx, &pb.GetUserRequest{Id: "u-1"})
 Every connection chains unary and stream client interceptors in the same
 order, outermost to innermost:
 
-1. Observability span (when `WithObservability` is set) — covers the whole
+1. Observability span (when `WithObservability` is set), covers the whole
    call, including guard execution.
 2. W3C trace context injection from `shared/traceprop` into outgoing
    metadata.
-3. `WithMetadata` keys — never overwriting keys already present in the
+3. `WithMetadata` keys, never overwriting keys already present in the
    outgoing context.
-4. `WithTimeout` deadline — governs the whole call, including guard
+4. `WithTimeout` deadline, governs the whole call, including guard
    retries.
-5. `WithGuard` execution — the `resilience.Guard` wraps the call in the
+5. `WithGuard` execution, the `resilience.Guard` wraps the call in the
    breaker/bulkhead/retry composition.
 
 For streams the guard wraps stream establishment only; messages exchanged
@@ -186,7 +186,7 @@ after establishment are not guarded.
   raw metadata maps; use `config.RedactedServices` for config output.
 - Retry budgets are client-side: `MaxAttempts` is capped at 5 to match
   gRPC's own limit. Keep `RetryableStatusCodes` minimal (typically
-  `UNAVAILABLE`) — retrying every failure multiplies load on a struggling
+  `UNAVAILABLE`), retrying every failure multiplies load on a struggling
   server.
 - `WithInsecure` is development and loopback only. Production connections
   use `WithTLS` with a CA bundle; client certificates are optional
@@ -204,7 +204,7 @@ after establishment are not guarded.
   whole call including guard retries; without it only the caller's
   context applies.
 5. Retries never trigger: `RetryableStatusCodes` must list the status
-  codes to retry (gRPC rejects mixed-case code names — the helper maps
+  codes to retry (gRPC rejects mixed-case code names, the helper maps
   them to canonical form for you).
 
 ## See also

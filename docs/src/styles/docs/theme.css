@@ -1,0 +1,60 @@
+/* Maps Starlight variables onto the shared zever tokens (landing/tokens.css). */
+:root {
+  --sl-font-system: 'Space Grotesk Variable', ui-sans-serif, system-ui, sans-serif;
+  --sl-font-system-mono: 'JetBrains Mono Variable', ui-monospace, 'SF Mono', Menlo, monospace;
+  --sl-nav-height: 3.75rem;
+  --sl-sidebar-width: 17.5rem;
+  --sl-content-width: 46rem;
+  --sl-line-height: 1.75;
+  --sl-line-height-headings: 1.15;
+  --sl-text-body: 1rem;
+  --sl-text-h1: clamp(2.1rem, 4.4vw, 3rem);
+  --sl-text-h2: clamp(1.5rem, 2.6vw, 1.9rem);
+
+  --sl-color-white: #ffffff;
+  --sl-color-black: #05070d;
+  --sl-color-gray-1: #eef3fa;
+  --sl-color-gray-2: #c9d3e2;
+  --sl-color-gray-3: #a4b0c3;
+  --sl-color-gray-4: #6b778b;
+  --sl-color-gray-5: #2a3342;
+  --sl-color-gray-6: #121826;
+  --sl-color-gray-7: #0a0e18;
+  --sl-color-accent-low: #082753;
+  --sl-color-accent: #5198c8;
+  --sl-color-accent-high: #95d7e8;
+  --sl-color-text-accent: var(--sl-color-accent-high);
+  --sl-color-bg: #05070d;
+  --sl-color-bg-nav: color-mix(in srgb, #05070d 78%, transparent);
+  --sl-color-bg-sidebar: #070a12;
+  --sl-color-bg-inline-code: rgba(255, 255, 255, 0.07);
+  --sl-color-hairline: rgba(255, 255, 255, 0.09);
+  --sl-color-hairline-light: rgba(255, 255, 255, 0.14);
+  --sl-color-hairline-shade: rgba(255, 255, 255, 0.05);
+  --sl-shadow-md: 0 20px 50px -20px rgba(0, 0, 0, 0.7);
+}
+
+:root[data-theme='light'] {
+  --sl-color-white: #0a1630;
+  --sl-color-black: #f7f9fc;
+  --sl-color-gray-1: #1b2a4a;
+  --sl-color-gray-2: #2f3f60;
+  --sl-color-gray-3: #3f4e6a;
+  --sl-color-gray-4: #6b778b;
+  --sl-color-gray-5: #c6d0e0;
+  --sl-color-gray-6: #e4eaf3;
+  --sl-color-gray-7: #eef2f8;
+  --sl-color-accent-low: #d6e6f3;
+  --sl-color-accent: #2a74a3;
+  --sl-color-accent-high: #1f5f8f;
+  --sl-color-bg: #f7f9fc;
+  --sl-color-bg-nav: color-mix(in srgb, #f7f9fc 80%, transparent);
+  --sl-color-bg-sidebar: #f1f5fa;
+  --sl-color-bg-inline-code: rgba(8, 39, 83, 0.07);
+  --sl-color-hairline: rgba(8, 39, 83, 0.12);
+  --sl-color-hairline-light: rgba(8, 39, 83, 0.18);
+  --sl-color-hairline-shade: rgba(8, 39, 83, 0.06);
+  --sl-shadow-md: 0 20px 50px -20px rgba(8, 39, 83, 0.25);
+}
+
+body { font-family: var(--sl-font-system); -webkit-font-smoothing: antialiased; }
