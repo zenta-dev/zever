@@ -27,7 +27,9 @@ replace github.com/zenta-dev/zever/shared/traceprop => ../../../shared/traceprop
 require (
 	github.com/alicebob/miniredis/v2 v2.39.0
 	github.com/redis/go-redis/v9 v9.22.0
+	github.com/zenta-dev/zever/core/observability v0.5.3
 	github.com/zenta-dev/zever/core/queue v0.5.3
+	github.com/zenta-dev/zever/shared/msgspan v0.5.3
 	github.com/zenta-dev/zever/shared/redisclient v0.5.3
 	github.com/zenta-dev/zever/shared/redisopt v0.5.3
 	github.com/zenta-dev/zever/shared/retry v0.5.3
@@ -42,3 +44,7 @@ replace github.com/zenta-dev/zever/adapters/queue/memory => ../memory
 replace github.com/zenta-dev/zever/shared/registry => ../../../shared/registry
 
 replace github.com/zenta-dev/zever/core/db => ../../../core/db
+
+replace github.com/zenta-dev/zever/shared/msgspan => ../../../shared/msgspan
+
+replace github.com/zenta-dev/zever/core/observability => ../../../core/observability

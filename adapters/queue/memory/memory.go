@@ -6,7 +6,9 @@ import (
 	"sync"
 	"time"
 
+	"github.com/zenta-dev/zever/core/observability"
 	"github.com/zenta-dev/zever/core/queue"
+	"github.com/zenta-dev/zever/shared/msgspan"
 	"github.com/zenta-dev/zever/shared/traceprop"
 )
 
@@ -20,6 +22,7 @@ type memoryAdapter struct {
 	visibilityTimeout time.Duration
 	pollTimeout       time.Duration
 	buffer            int
+	provider          observability.Provider
 	closed            bool
 }
 
@@ -45,6 +48,7 @@ func New(opts queue.Options) (queue.Queue, error) {
 		visibilityTimeout: visibilityTimeout,
 		pollTimeout:       pollTimeout,
 		buffer:            buffer,
+		provider:          opts.Provider,
 	}, nil
 }
 
@@ -60,23 +64,7 @@ func (a *memoryAdapter) Push(ctx context.Context, topic string, payload queue.Pa
 		}
 	}
 
-	msg := queue.NewMessage(topic, payload, traceprop.Inject(ctx, headers))
-
-	a.mu.Lock()
-	if a.closed {
-		a.mu.Unlock()
-		return queue.ErrClosed
-	}
-
-	t = a.mountTopicLocked(topic, t)
-	t.mu.Lock()
-	t.ready = append(t.ready, msg)
-	t.mu.Unlock()
-	a.mu.Unlock()
-
-	t.signal()
-
-	return nil
+	return a.enqueue(ctx, t, topic, payload, headers, 0)
 }
 
 func (a *memoryAdapter) PushDelayed(ctx context.Context, topic string, payload queue.Payload, headers queue.Headers, delay time.Duration) error {
@@ -95,11 +83,33 @@ func (a *memoryAdapter) PushDelayed(ctx context.Context, topic string, payload q
 		}
 	}
 
-	msg := queue.NewMessage(topic, payload, traceprop.Inject(ctx, headers))
+	return a.enqueue(ctx, t, topic, payload, headers, delay)
+}
+
+// enqueue opens the messaging producer span, builds the message, and files it
+// on the topic's ready or delayed list. A non-positive delay files it ready.
+func (a *memoryAdapter) enqueue(
+	ctx context.Context,
+	t *topicQueue,
+	topic string,
+	payload queue.Payload,
+	headers queue.Headers,
+	delay time.Duration,
+) error {
+	// The producer span opens before the message is built so the injected
+	// trace context is the producer span's: the consumer span on the other
+	// end then parents onto this push instead of onto the push's caller.
+	spanCtx, finish := msgspan.Producer(ctx, a.provider, "queue", topic, "")
+
+	msg := queue.NewMessage(topic, payload, headers)
+	msg.Headers = traceprop.Inject(spanCtx, msg.Headers)
 
 	a.mu.Lock()
 	if a.closed {
 		a.mu.Unlock()
+
+		finish(msgspan.OutcomeError)
+
 		return queue.ErrClosed
 	}
 
@@ -127,6 +137,8 @@ func (a *memoryAdapter) PushDelayed(ctx context.Context, topic string, payload q
 		default:
 		}
 	}
+
+	finish(msgspan.OutcomeOK)
 
 	return nil
 }
