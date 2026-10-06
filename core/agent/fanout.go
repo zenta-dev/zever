@@ -49,6 +49,7 @@ func (l *Loop) dispatchParallel(ctx context.Context, calls []ai.ToolCall) ([]str
 	defer cancel()
 
 	out := make([]string, len(calls))
+	dispatched := make([]bool, len(calls))
 	sem := make(chan struct{}, limit)
 	errCh := make(chan error, 1)
 
@@ -66,6 +67,8 @@ func (l *Loop) dispatchParallel(ctx context.Context, calls []ai.ToolCall) ([]str
 			case <-ctx.Done():
 				return
 			}
+
+			dispatched[i] = true
 
 			res, err := l.dispatch(ctx, call)
 			if err != nil {
@@ -89,6 +92,17 @@ func (l *Loop) dispatchParallel(ctx context.Context, calls []ai.ToolCall) ([]str
 	case err := <-errCh:
 		return nil, err
 	default:
-		return out, nil
 	}
+
+	// Calls skipped for lack of a semaphore slot never dispatched: fail the
+	// batch with the context error instead of masking cancellation behind
+	// zero outputs. Fully dispatched batches return their outputs and let
+	// the loop's own checks surface cancellation next.
+	for _, ok := range dispatched {
+		if !ok {
+			return nil, ctx.Err()
+		}
+	}
+
+	return out, nil
 }

@@ -34,8 +34,10 @@ type StreamEvent struct {
 // RunStream executes the tool-calling loop like Run but streams progress:
 // text deltas as they arrive, tool calls and results as they complete, and
 // a Done event carrying the final result. The channel is bounded and closed
-// by the producer; every send also selects ctx.Done so an abandoned consumer
-// cannot leak the producer goroutine.
+// by the producer; every send also selects ctx.Done so cancelling the context
+// releases a consumer-blocked producer. Callers must therefore cancel the
+// context (or drain to close) to guarantee no producer goroutine lingers
+// after abandoning the channel.
 func (l *Loop) RunStream(ctx context.Context, messages []ai.Message) <-chan StreamEvent {
 	ch := make(chan StreamEvent, 16)
 

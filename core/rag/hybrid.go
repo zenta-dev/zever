@@ -48,7 +48,16 @@ func NewHybrid(client ai.AI, store vectorstore.VectorStore, index search.Search,
 // RetrieveHybrid fuses vector similarity with keyword search through
 // Reciprocal Rank Fusion and returns the topK fused sources. A topK <= 0
 // selects Options.TopK. It fails on engines built without a search backend.
-func (e *Engine) RetrieveHybrid(ctx context.Context, query string, topK int, opts HybridOptions) ([]Source, error) {
+func (e *Engine) RetrieveHybrid(ctx context.Context, query string, topK int, opts HybridOptions) (sources []Source, err error) {
+	defer func() {
+		e.observe(Event{Type: EventRetrieve, Query: query, Count: len(sources), Err: err})
+	}()
+
+	return e.retrieveHybrid(ctx, query, topK, opts)
+}
+
+// retrieveHybrid implements RetrieveHybrid.
+func (e *Engine) retrieveHybrid(ctx context.Context, query string, topK int, opts HybridOptions) ([]Source, error) {
 	if e.search == nil {
 		return nil, ErrNoSearch
 	}
@@ -137,7 +146,15 @@ func fuseRRF(matches []vectorstore.ScoreMatch, hits []search.Hit, k int) []Sourc
 		f, ok := acc[id]
 		if !ok {
 			content, _ := meta["content"].(string)
-			f = &fused{content: content, meta: meta}
+
+			// Copy the map so callers cannot alias store internals, and so
+			// a second backend's metadata cannot overwrite the first.
+			copied := make(map[string]any, len(meta))
+			for k, v := range meta {
+				copied[k] = v
+			}
+
+			f = &fused{content: content, meta: copied}
 			acc[id] = f
 		}
 

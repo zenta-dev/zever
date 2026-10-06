@@ -3,6 +3,7 @@ package agent
 import (
 	"context"
 	"encoding/json"
+	"errors"
 
 	"github.com/zenta-dev/zever/core/ai"
 )
@@ -19,6 +20,10 @@ func AsTool(name, description string, sub Agent, schema map[string]any) Tool {
 		Description: description,
 		Parameters:  schema,
 		Handler: func(ctx context.Context, args map[string]any) (string, error) {
+			if sub == nil {
+				return "", errors.New("agent: nil sub-agent")
+			}
+
 			raw, err := json.Marshal(args)
 			if err != nil {
 				return "", err

@@ -27,6 +27,8 @@ func (l *Loop) Run(ctx context.Context, messages []ai.Message) (Result, error) {
 
 	for step := 0; step < l.opts.MaxSteps; step++ {
 		if err := ctx.Err(); err != nil {
+			l.emit(Event{Type: EventDone, Step: step, Err: err})
+
 			return Result{}, err
 		}
 
@@ -44,6 +46,8 @@ func (l *Loop) Run(ctx context.Context, messages []ai.Message) (Result, error) {
 
 		gen, err := l.client.Generate(ctx, l.opts.Model, msgs, genOpts)
 		if err != nil {
+			l.emit(Event{Type: EventDone, Step: step, Err: err})
+
 			return Result{}, err
 		}
 
@@ -78,6 +82,8 @@ func (l *Loop) Run(ctx context.Context, messages []ai.Message) (Result, error) {
 
 		results, err := l.dispatchAll(ctx, gen.ToolCalls)
 		if err != nil {
+			l.emit(Event{Type: EventDone, Step: step, Err: err})
+
 			return Result{}, err
 		}
 
@@ -92,7 +98,10 @@ func (l *Loop) Run(ctx context.Context, messages []ai.Message) (Result, error) {
 		}
 	}
 
-	return Result{}, MaxStepsError{Max: l.opts.MaxSteps}
+	maxErr := MaxStepsError{Max: l.opts.MaxSteps}
+	l.emit(Event{Type: EventDone, Step: l.opts.MaxSteps, Err: maxErr})
+
+	return Result{}, maxErr
 }
 
 // emit delivers ev to the configured observer, if any.

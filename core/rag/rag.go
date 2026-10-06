@@ -127,7 +127,11 @@ func (e *Engine) ingest(ctx context.Context, docs []Document) error {
 		}
 	}
 
-	return e.search.IndexBatch(ctx, sdocs)
+	if err := e.search.IndexBatch(ctx, sdocs); err != nil {
+		return fmt.Errorf("rag: vectors stored but keyword index failed: %w", err)
+	}
+
+	return nil
 }
 
 // Retrieve embeds query and returns the topK most similar stored chunks. A

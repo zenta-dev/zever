@@ -29,6 +29,9 @@ type Event struct {
 	Output string
 	// Result is the final result for done events; nil otherwise.
 	Result *Result
+	// Err is the terminal failure for failed runs; nil otherwise. It is set
+	// on Done events that end the run abnormally.
+	Err error
 }
 
 // Observer receives agent events. A nil Observer disables observation.
