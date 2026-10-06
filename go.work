@@ -68,6 +68,7 @@ use (
 	./adapters/ratelimit/memory
 	./adapters/ratelimit/redis
 	./adapters/resilience/inproc
+	./adapters/resilience/redis
 	./adapters/router/fiber
 	./adapters/router/stdhttp
 	./adapters/scheduler/embedded

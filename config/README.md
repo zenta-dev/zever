@@ -48,7 +48,7 @@ config file, overlaid by environment variables. Later layers win:
 | permission    | noop, rbac, casbin                  |
 | queue         | memory, redis, db                   |
 | ratelimit     | memory, redis                       |
-| resilience    | memory                              |
+| resilience    | memory, redis                       |
 | router        | fiber, stdhttp                      |
 | scheduler     | embedded, postgres                  |
 | search        | db, postgres, meilisearch, sqlite   |
