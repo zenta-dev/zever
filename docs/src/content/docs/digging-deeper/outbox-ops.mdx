@@ -34,6 +34,11 @@ nowhere. Scope is `outbox`.
 | `outbox.relay_errors` | counter | Relay-loop errors (`outbox.outcome="error"`) |
 | `outbox.publish.duration_seconds` | histogram | Per-publish latency, tagged with the outcome |
 
+The three gauges come from the `db` relay only. The `cdc` consumer keeps
+its counters in memory and reports them through `Status()`, so it emits
+`outbox.published`, `outbox.retried`, `outbox.failed_total`, and
+`outbox.relay_errors` but no pending/oldest-age gauge.
+
 Attributes carried on every metric and span:
 
 | Attribute | Values |
@@ -43,9 +48,16 @@ Attributes carried on every metric and span:
 | `outbox.topic` | Message topic — on `outbox.publish` / `outbox.consume` spans |
 | `outbox.outcome` | `ok` or `error` |
 
-Spans: `outbox.publish` per publish (paired with the
-`outbox.publish.duration_seconds` observation) and `outbox.consume` on
-the `cdc` consumer path.
+Spans: `outbox.publish` (kind `producer`) per publish, paired with the
+`outbox.publish.duration_seconds` observation, and `outbox.consume`
+(kind `consumer`) on the `cdc` consumer path. Both carry the OTel
+messaging semantic conventions alongside the `outbox.*` attributes:
+`messaging.system` (the configured `publisher` transport, else the
+adapter name), `messaging.destination.name` (the topic),
+`messaging.operation` (`publish` or `process`), `messaging.message.id`,
+and `messaging.message.conversation_id` when the context carries a
+trace — that last one is how a relay span joins the trace that recorded
+the message.
 
 Keep metric attributes bounded. `outbox.topic` is a code-level constant,
 but if you build topics per tenant, the label cardinality — and your
@@ -220,19 +232,25 @@ It is a stronger signal than `pending > 0` — a busy relay is healthy, a
 relay holding old rows is stuck. That 5-minute default is also why the
 SLA alert above is expressed as `> 300`.
 
-Readiness is opt-in. With `outbox.stall_readiness: true` the generated
-server's `/readyz` returns 503 and the gRPC health status flips to
-`NOT_SERVING` while `Status().Stalled` holds, which pulls the replica
-out of the load balancer instead of serving traffic it cannot fulfil
-state for:
+Readiness is opt-in. With `outbox.options.stall_readiness: true` the
+generated server's `/readyz` returns 503 and the gRPC health status
+flips to `NOT_SERVING` while `Status().Stalled` holds, which pulls the
+replica out of the load balancer instead of serving traffic it cannot
+fulfil state for:
 
 ```yaml
 outbox:
   adapter: db
-  stall_readiness: true
   options:
     dsn: postgres://app:secret@db:5432/app
+    stall_readiness: true
 ```
+
+The flag belongs under `options:` — service envelopes are strictly
+`{adapter, options}`, so a sibling `stall_readiness:` key is a decode
+error. The check itself is best-effort: a store that fails to resolve is
+skipped rather than failing readiness, so turning the flag on cannot
+make a process that never wired the outbox permanently unready.
 
 Leave it off when several replicas share one outbox table and you would
 rather alert than shed traffic — a single slow publish must not take a
@@ -289,8 +307,10 @@ func relayHealthy() error {
    process is holding the claim lease, or the publish is failing again
    on the first attempt and the row has not yet exhausted its budget.
    Re-check `zever outbox dlq list` after one retry cycle.
-4. `adapter does not support admin operations`: only the `db` adapter
-   implements the admin surface. Switch the connection, not the command.
+4. `does not support admin operations` (from `dlq list`, `dlq requeue`,
+   or `purge`) or `does not support message deletion` (from `dlq purge`):
+   only the `db` adapter implements `outbox.Admin` and `outbox.Deleter`.
+   Switch the connection, not the command.
 5. Pending grows but `outbox.published` grows too: check
    `outbox.publish.duration_seconds` p99 — you are throughput-bound,
    not stuck. Raise `batch_size` or replica count, not `max_attempts`.

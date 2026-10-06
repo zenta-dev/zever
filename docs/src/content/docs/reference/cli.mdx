@@ -21,7 +21,7 @@ go install github.com/zenta-dev/zever/cmd/zever@v0.5.3
 ```
 
 - `zever --help` prints the grouped map (Scaffolding / Inspection /
-  Runtime / Database).
+  Runtime / Database / Operations).
 
 ## Config
 
@@ -68,7 +68,7 @@ echo exit:$?
 Expected output:
 
 ```text
-grouped command map on stdout (Scaffolding / Inspection / Runtime / Database)
+grouped command map on stdout (Scaffolding / Inspection / Runtime / Database / Operations)
 completion script at /tmp/zever.bash
 one man page plus one markdown file per command under /tmp/zever-docs
 exit:0
@@ -119,6 +119,7 @@ exit:0
 | Database | `zever db migrate` |
 | Database | `zever db rollback` |
 | Database | `zever db seed` |
+| Operations | `zever outbox` (`status`, `dlq list`, `dlq requeue`, `dlq purge`, `purge`; see [Outbox Ops](../digging-deeper/outbox-ops/)) |
 | Tooling | `zever completion <bash\|zsh\|fish\|powershell>` |
 | Tooling | `zever docs --dir <dir>` |
 
@@ -181,6 +182,32 @@ go mod tidy
 zever serve
 ```
 
+### `zever outbox`
+
+Inspects and repairs the outbox dead-letter queue without starting the
+relay. Every subcommand takes `--dsn`, `--table`, and `--config`;
+without `--dsn`/`--table` the values come from `zever.yaml` (discovered
+in the working directory) plus environment overrides. `--json` gives
+machine-readable output on every one.
+
+| Command | Effect |
+|---|---|
+| `zever outbox status` | Relay counters (`pending`, `processed`, `failed`, `last_error`, `stalled`) |
+| `zever outbox dlq list [--limit N]` | Failed messages, oldest first (`0` uses the adapter default page size) |
+| `zever outbox dlq requeue --id X` | Requeue one failed message, resetting its attempt count and lock |
+| `zever outbox dlq requeue --all` | Requeue every failed message |
+| `zever outbox dlq purge --id X` | Delete one failed message by id |
+| `zever outbox purge --before 168h` | Delete processed messages older than the given duration |
+
+`--id` and `--all` on `requeue` are mutually exclusive and exactly one
+is required. `purge --before` takes a Go duration and must be
+non-negative. `dlq purge` needs an adapter that implements
+`outbox.Deleter`; only `db` does, so an unsupported adapter reports
+`does not support message deletion` rather than deleting nothing. Run
+these from a deploy box with database access, not from every replica.
+Metrics, alert rules, and the full runbook are in
+[Outbox Ops](../digging-deeper/outbox-ops/).
+
 ### Dev and tinker rules
 
 - `zever dev` is local watch-only: it prints
@@ -227,6 +254,12 @@ zever serve
   server entrypoint only. Edits outside those paths need a manual restart.
 - **Styled output garbles CI logs**: pass `--no-color` or set
   `NO_COLOR=1`; `TERM=dumb` is honored the same way.
+- **`zever outbox` reports empty counters**: the resolved `--table` does
+  not match the table the relay writes. Compare against
+  `outbox.options.table` in `zever.yaml`.
+- **`zever outbox dlq purge` says the adapter does not support deletion**:
+  only the `db` adapter implements `outbox.Deleter`. Switch the
+  connection, not the command.
 
 ## See also
 
@@ -234,3 +267,4 @@ zever serve
 - [LSP and Tooling](../dsl/lsp-tooling/) for editor-side inspection
 - [Config Reference](./config-reference/) for `config show` output
 - [Backends](../dsl/backends/) for `compile` outputs
+- [Outbox Ops](../digging-deeper/outbox-ops/) for `zever outbox` in context
