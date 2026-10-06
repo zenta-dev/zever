@@ -94,3 +94,12 @@ func BenchmarkApplyResponseFormat(b *testing.B) {
 		applyResponseFormat(&params, rf)
 	}
 }
+
+// BenchmarkRegister measures the exported registry-wiring entrypoint.
+func BenchmarkRegister(b *testing.B) {
+	b.ReportAllocs()
+
+	for b.Loop() {
+		Register()
+	}
+}

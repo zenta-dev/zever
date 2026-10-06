@@ -5,6 +5,8 @@ import (
 	"errors"
 	"sync"
 	"testing"
+
+	"github.com/zenta-dev/zever/core/password"
 )
 
 func TestHash_contextIgnored(t *testing.T) {
@@ -83,5 +85,39 @@ func TestHash_concurrentSafe(t *testing.T) {
 		if err != nil {
 			t.Errorf("worker %d = %v, want nil", w, err)
 		}
+	}
+}
+
+// TestEdgeRegister_resolvesAdapter covers the exported Register wiring: after
+// Register the hasher resolves through the battery registry with the requested
+// (reduced) cost parameters, and a repeated Register is tolerated.
+func TestEdgeRegister_resolvesAdapter(t *testing.T) {
+	// Serial: Register mutates the process-global battery registry.
+	Register()
+	Register()
+
+	h, err := password.Open(password.AdapterArgon2ID, password.Options{
+		Time:    1,
+		Memory:  8 * 1024,
+		Threads: 1,
+		SaltLen: 8,
+		KeyLen:  16,
+	})
+	if err != nil {
+		t.Fatalf("password.Open() after Register = %v, want nil", err)
+	}
+
+	hash, err := h.Hash(t.Context(), "secret")
+	if err != nil {
+		t.Fatalf("Hash() = %v, want nil", err)
+	}
+
+	ok, err := h.Verify(t.Context(), hash, "secret")
+	if err != nil {
+		t.Fatalf("Verify() = %v, want nil", err)
+	}
+
+	if !ok {
+		t.Error("Verify() = false, want true")
 	}
 }

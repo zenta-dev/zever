@@ -66,3 +66,26 @@ func TestEdgeGenerate_emptyMessages(t *testing.T) {
 		}
 	}
 }
+
+// TestEdgeRegister_resolvesAdapter covers the exported Register wiring: after
+// Register the adapter resolves through the battery registry, and a repeated
+// Register is tolerated (the duplicate error is discarded) without changing
+// resolution.
+func TestEdgeRegister_resolvesAdapter(t *testing.T) {
+	// Serial: Register mutates the process-global battery registry.
+	Register()
+	Register()
+
+	a, err := ai.Open(ai.Gemini, ai.Options{APIKey: "test-key"})
+	if err != nil {
+		t.Fatalf("ai.Open() after Register = %v, want nil", err)
+	}
+
+	if a == nil {
+		t.Fatal("ai.Open() after Register = nil, want adapter")
+	}
+
+	if err := a.Close(); err != nil {
+		t.Errorf("Close() = %v, want nil", err)
+	}
+}

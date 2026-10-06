@@ -42,3 +42,26 @@ func TestEdgeGenerate_concurrent(t *testing.T) {
 		t.Errorf("concurrent Generate: %v", err)
 	}
 }
+
+// TestEdgeRegister_resolvesAdapter covers the exported Register wiring: after
+// Register the adapter resolves through the battery registry, and a repeated
+// Register is tolerated (the duplicate error is discarded) without changing
+// resolution.
+func TestEdgeRegister_resolvesAdapter(t *testing.T) {
+	// Serial: Register mutates the process-global battery registry.
+	Register()
+	Register()
+
+	a, err := ai.Open(ai.Ollama, ai.Options{})
+	if err != nil {
+		t.Fatalf("ai.Open() after Register = %v, want nil", err)
+	}
+
+	if a == nil {
+		t.Fatal("ai.Open() after Register = nil, want adapter")
+	}
+
+	if err := a.Close(); err != nil {
+		t.Errorf("Close() = %v, want nil", err)
+	}
+}

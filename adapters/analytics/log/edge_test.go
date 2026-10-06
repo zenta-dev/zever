@@ -48,3 +48,26 @@ func TestEdgeTrack_emptyEvent(t *testing.T) {
 		t.Errorf("event = %v, want empty", entry["event"])
 	}
 }
+
+// TestEdgeRegister_resolvesAdapter covers the exported Register wiring: after
+// Register the adapter resolves through the battery registry, and a repeated
+// Register is tolerated (the duplicate error is discarded) without changing
+// resolution.
+func TestEdgeRegister_resolvesAdapter(t *testing.T) {
+	// Serial: Register mutates the process-global battery registry.
+	Register()
+	Register()
+
+	a, err := analytics.Open(analytics.Log, analytics.Options{})
+	if err != nil {
+		t.Fatalf("analytics.Open() after Register = %v, want nil", err)
+	}
+
+	if a == nil {
+		t.Fatal("analytics.Open() after Register = nil, want adapter")
+	}
+
+	if err := a.Close(); err != nil {
+		t.Errorf("Close() = %v, want nil", err)
+	}
+}

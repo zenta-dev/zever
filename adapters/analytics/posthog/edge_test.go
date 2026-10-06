@@ -1,6 +1,10 @@
 package posthog
 
-import "testing"
+import (
+	"testing"
+
+	"github.com/zenta-dev/zever/core/analytics"
+)
 
 // TestEdgeCheckEndpoint_table covers the endpoint scheme/host boundary:
 // https always allowed, http only for loopback (IPv4/IPv6/localhost), and
@@ -37,5 +41,31 @@ func TestEdgeCheckEndpoint_table(t *testing.T) {
 				t.Fatalf("checkEndpoint(%q) = %v, want nil", tc.endpoint, err)
 			}
 		})
+	}
+}
+
+// TestEdgeRegister_resolvesAdapter covers the exported Register wiring: after
+// Register the adapter resolves through the battery registry, and a repeated
+// Register is tolerated (the duplicate error is discarded) without changing
+// resolution.
+func TestEdgeRegister_resolvesAdapter(t *testing.T) {
+	// Serial: Register mutates the process-global battery registry.
+	Register()
+	Register()
+
+	a, err := analytics.Open(analytics.PostHog, analytics.Options{
+		APIKey:   "test-key",
+		Endpoint: "http://localhost:9",
+	})
+	if err != nil {
+		t.Fatalf("analytics.Open() after Register = %v, want nil", err)
+	}
+
+	if a == nil {
+		t.Fatal("analytics.Open() after Register = nil, want adapter")
+	}
+
+	if err := a.Close(); err != nil {
+		t.Errorf("Close() = %v, want nil", err)
 	}
 }

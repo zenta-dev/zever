@@ -37,3 +37,22 @@ func TestServeHTTP_concurrentSafe(t *testing.T) {
 	}
 	wg.Wait()
 }
+
+// TestEdgeRegister_resolvesAdapter covers the exported Register wiring: after
+// Register the router resolves through the battery registry, and a repeated
+// Register is tolerated (the duplicate error is discarded) without changing
+// resolution.
+func TestEdgeRegister_resolvesAdapter(t *testing.T) {
+	// Serial: Register mutates the process-global battery registry.
+	Register()
+	Register()
+
+	r, err := router.Open(router.AdapterFiber, router.Options{})
+	if err != nil {
+		t.Fatalf("router.Open() after Register = %v, want nil", err)
+	}
+
+	if r == nil {
+		t.Fatal("router.Open() after Register = nil, want router")
+	}
+}
