@@ -19,10 +19,13 @@ type run struct {
 
 // Adapter is an in-memory workflow engine for testing and development.
 type Adapter struct {
-	mu     sync.RWMutex
-	runs   map[workflow.RunID]*run
-	steps  map[string]workflow.StepFunc
-	nextID uint64
+	mu             sync.RWMutex
+	runs           map[workflow.RunID]*run
+	steps          map[string]workflow.StepFunc
+	nextID         uint64
+	sagas          map[string][]workflow.SagaStep
+	sagaRuns       map[workflow.RunID]*sagaRun
+	sagaByWorkflow map[string]workflow.RunID
 }
 
 // New creates an in-memory workflow engine.
@@ -203,6 +206,9 @@ func (a *Adapter) Close() error {
 
 	a.runs = nil
 	a.steps = nil
+	a.sagas = nil
+	a.sagaRuns = nil
+	a.sagaByWorkflow = nil
 
 	return nil
 }

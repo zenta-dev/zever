@@ -41,6 +41,18 @@ var ErrDuplicateRun = errors.New("workflow: duplicate run")
 // ErrUnknownQuery is returned for an unknown workflow query.
 var ErrUnknownQuery = errors.New("workflow: unknown query")
 
+// ErrUnknownSaga is returned for an unregistered saga name.
+var ErrUnknownSaga = errors.New("workflow: unknown saga")
+
+// ErrSagaNotFound is returned for an unknown saga run.
+var ErrSagaNotFound = errors.New("workflow: saga not found")
+
+// ErrSagaStepFailed is returned when a saga step fails.
+var ErrSagaStepFailed = errors.New("workflow: saga step failed")
+
+// ErrSagaCompensationFailed is returned when saga compensation fails.
+var ErrSagaCompensationFailed = errors.New("workflow: saga compensation failed")
+
 // DuplicateAdapterError reports a duplicate adapter registration.
 type DuplicateAdapterError struct {
 	// Adapter is the already-registered adapter.

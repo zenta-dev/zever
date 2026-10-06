@@ -132,25 +132,44 @@ func coerceInt(v any) (int64, error) {
 // driver is a DB-backed workflow.Workflow with lease-based crash recovery.
 // It is safe for concurrent use; no lock is held while a step runs.
 type driver struct {
-	conn      coredb.DB
-	tbl       orm.Table[runRow]
-	cID       orm.Column[runRow, string]
-	cStep     orm.Column[runRow, string]
-	cState    orm.Column[runRow, string]
-	cPayload  orm.Column[runRow, []byte]
-	cIdem     orm.Column[runRow, string]
-	cOwner    orm.Column[runRow, string]
-	cExpires  orm.Column[runRow, time.Time]
-	cAttempt  orm.Column[runRow, int64]
-	cCreated  orm.Column[runRow, time.Time]
-	cUpdated  orm.Column[runRow, time.Time]
-	tableName string
-	owner     string
-	leaseTTL  time.Duration
-	owns      bool
-	mu        sync.RWMutex
-	steps     map[string]workflow.StepFunc
-	nextID    atomic.Uint64
+	conn              coredb.DB
+	tbl               orm.Table[runRow]
+	cID               orm.Column[runRow, string]
+	cStep             orm.Column[runRow, string]
+	cState            orm.Column[runRow, string]
+	cPayload          orm.Column[runRow, []byte]
+	cIdem             orm.Column[runRow, string]
+	cOwner            orm.Column[runRow, string]
+	cExpires          orm.Column[runRow, time.Time]
+	cAttempt          orm.Column[runRow, int64]
+	cCreated          orm.Column[runRow, time.Time]
+	cUpdated          orm.Column[runRow, time.Time]
+	tableName         string
+	owner             string
+	leaseTTL          time.Duration
+	owns              bool
+	mu                sync.RWMutex
+	steps             map[string]workflow.StepFunc
+	sagas             map[string][]workflow.SagaStep
+	sagaTbl           orm.Table[sagaRunRow]
+	sagaRunID         orm.Column[sagaRunRow, string]
+	sagaName          orm.Column[sagaRunRow, string]
+	sagaWorkflowID    orm.Column[sagaRunRow, string]
+	sagaStatus        orm.Column[sagaRunRow, string]
+	sagaCurrentStep   orm.Column[sagaRunRow, int]
+	sagaStateCol      orm.Column[sagaRunRow, string]
+	sagaFailedStep    orm.Column[sagaRunRow, int]
+	sagaErr           orm.Column[sagaRunRow, string]
+	sagaLockedUntil   orm.Column[sagaRunRow, time.Time]
+	sagaCreatedAt     orm.Column[sagaRunRow, time.Time]
+	sagaUpdatedAt     orm.Column[sagaRunRow, time.Time]
+	sagaCompTbl       orm.Table[sagaCompensationRow]
+	sagaCompRunID     orm.Column[sagaCompensationRow, string]
+	sagaCompStepIndex orm.Column[sagaCompensationRow, int]
+	sagaCompName      orm.Column[sagaCompensationRow, string]
+	sagaCompAttempts  orm.Column[sagaCompensationRow, int]
+	sagaCompLastError orm.Column[sagaCompensationRow, string]
+	nextID            atomic.Uint64
 }
 
 var (
@@ -270,6 +289,12 @@ func openFromDB(conn coredb.DB, o Options, owns bool) (workflow.Workflow, error)
 	}
 
 	if err := d.ensureSchema(ctx); err != nil {
+		return nil, err
+	}
+
+	d.sagaTables()
+
+	if err := d.ensureSagaSchema(ctx); err != nil {
 		return nil, err
 	}
 
