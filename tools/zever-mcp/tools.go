@@ -15,8 +15,8 @@ import (
 	"github.com/zenta-dev/zever/dsl/ir"
 )
 
-// compileInput is the shared schema source accepted by every tool. Exactly one
-// of Dir or Files is required.
+// compileInput is the shared schema source accepted by every tool. Files takes
+// precedence over Dir when both are set; at least one is required.
 type compileInput struct {
 	Dir   string            `json:"dir"`
 	Files map[string]string `json:"files"`
@@ -52,7 +52,11 @@ func compileSchema(ctx context.Context, in compileInput) (*compile.Result, diag.
 	return res, diags, nil
 }
 
-// readZenFiles reads every .zen file directly under dir.
+// maxSchemaFileBytes caps the size of a single .zen file read from disk.
+const maxSchemaFileBytes = 1 << 20
+
+// readZenFiles reads every regular .zen file directly under dir. Symlinks are
+// skipped and oversized files are rejected.
 func readZenFiles(dir string) (map[string]string, error) {
 	entries, err := os.ReadDir(dir)
 	if err != nil {
@@ -61,13 +65,16 @@ func readZenFiles(dir string) (map[string]string, error) {
 
 	files := map[string]string{}
 	for _, e := range entries {
-		if e.IsDir() || !strings.HasSuffix(e.Name(), ".zen") {
+		if e.IsDir() || e.Type()&os.ModeSymlink != 0 || !strings.HasSuffix(e.Name(), ".zen") {
 			continue
 		}
 
 		b, err := os.ReadFile(filepath.Join(dir, e.Name()))
 		if err != nil {
 			return nil, err
+		}
+		if len(b) > maxSchemaFileBytes {
+			return nil, fmt.Errorf("zever-mcp: schema file %s exceeds %d bytes", e.Name(), maxSchemaFileBytes)
 		}
 		files[e.Name()] = string(b)
 	}

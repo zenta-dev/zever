@@ -5,7 +5,7 @@
 // confirmation hook. It does not own the LLM transport or provider credentials;
 // callers pass a resolved ai.AI.
 //
-// Type safety: Agent plus typed Options, Tool, ToolHandler, Result and Step.
+// Type safety: Agent plus typed Options, Tool, ToolHandler and Result.
 // Unknown tools fail closed with ErrUnknownTool; exceeding MaxSteps fails with
 // ErrMaxSteps. Unsupported features fail closed.
 //
@@ -27,7 +27,7 @@
 // execution.
 //
 // Performance: MaxSteps bounds provider calls; conversation history is the only
-// per-run allocation. Parallel tool calls follow ai.GenerateOptions.
+// per-run allocation. Tool calls within a step run sequentially.
 //
 // Concurrency: safe for concurrent use unless noted. No globals, no init wiring.
 //

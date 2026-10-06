@@ -18,7 +18,8 @@ type Options struct {
 	Model string
 	// TopK caps retrieved sources; <= 0 selects DefaultTopK.
 	TopK int
-	// ChunkSize splits documents during ingestion; <= 0 selects DefaultChunkSize.
+	// ChunkSize splits documents during ingestion; 0 selects DefaultChunkSize
+	// and a negative value is rejected by New.
 	ChunkSize int
 	// ChunkOverlap is the rune overlap between chunks; < 0 selects DefaultChunkOverlap.
 	ChunkOverlap int

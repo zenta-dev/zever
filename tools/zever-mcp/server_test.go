@@ -2,7 +2,6 @@ package main
 
 import (
 	"bytes"
-	"context"
 	"encoding/json"
 	"strings"
 	"testing"
@@ -32,7 +31,7 @@ func callToolReq(t *testing.T, s *Server, name string, args map[string]any) rpcR
 		t.Fatalf("marshal params: %v", err)
 	}
 
-	return s.handle(context.Background(), rpcRequest{
+	return s.handle(t.Context(), rpcRequest{
 		JSONRPC: "2.0",
 		ID:      json.RawMessage("1"),
 		Method:  "tools/call",
@@ -64,7 +63,7 @@ func TestInitialize(t *testing.T) {
 	t.Parallel()
 
 	s := newServer()
-	resp := s.handle(context.Background(), rpcRequest{ID: json.RawMessage("1"), Method: "initialize", Params: json.RawMessage(`{"protocolVersion":"2025-06-18"}`)})
+	resp := s.handle(t.Context(), rpcRequest{JSONRPC: "2.0", ID: json.RawMessage("1"), Method: "initialize", Params: json.RawMessage(`{"protocolVersion":"2025-06-18"}`)})
 
 	m, ok := resp.Result.(map[string]any)
 	if !ok {
@@ -79,7 +78,7 @@ func TestToolsList(t *testing.T) {
 	t.Parallel()
 
 	s := newServer()
-	resp := s.handle(context.Background(), rpcRequest{ID: json.RawMessage("1"), Method: "tools/list"})
+	resp := s.handle(t.Context(), rpcRequest{JSONRPC: "2.0", ID: json.RawMessage("1"), Method: "tools/list"})
 
 	m, ok := resp.Result.(map[string]any)
 	if !ok {
@@ -98,7 +97,7 @@ func TestUnknownMethod(t *testing.T) {
 	t.Parallel()
 
 	s := newServer()
-	resp := s.handle(context.Background(), rpcRequest{ID: json.RawMessage("1"), Method: "nope"})
+	resp := s.handle(t.Context(), rpcRequest{JSONRPC: "2.0", ID: json.RawMessage("1"), Method: "nope"})
 	if resp.Error == nil || resp.Error.Code != codeMethodNotFound {
 		t.Fatalf("error = %+v, want method not found", resp.Error)
 	}
@@ -223,7 +222,7 @@ func TestRun_stdioLoop(t *testing.T) {
 	}, "\n") + "\n"
 
 	var out, errb bytes.Buffer
-	if code := run(context.Background(), strings.NewReader(input), &out, &errb); code != 0 {
+	if code := run(t.Context(), strings.NewReader(input), &out, &errb); code != 0 {
 		t.Fatalf("run() = %d, stderr = %s", code, errb.String())
 	}
 

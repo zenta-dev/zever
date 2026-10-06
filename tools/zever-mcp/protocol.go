@@ -10,9 +10,9 @@ type rpcRequest struct {
 	Params  json.RawMessage `json:"params,omitempty"`
 }
 
-// isNotification reports whether the request is a notification (no id).
+// isNotification reports whether the request is a notification (no id member).
 func (r rpcRequest) isNotification() bool {
-	return len(r.ID) == 0 || string(r.ID) == "null"
+	return len(r.ID) == 0
 }
 
 // rpcResponse is a JSON-RPC 2.0 response.
@@ -33,6 +33,7 @@ type rpcError struct {
 // JSON-RPC 2.0 standard error codes used by this server.
 const (
 	codeParseError     = -32700
+	codeInvalidRequest = -32600
 	codeInvalidParams  = -32602
 	codeMethodNotFound = -32601
 )

@@ -60,6 +60,7 @@ func run(ctx context.Context, in io.Reader, out io.Writer, errw io.Writer) int {
 			if errors.Is(err, io.EOF) {
 				return 0
 			}
+			_ = enc.Encode(errorResponse(json.RawMessage("null"), codeParseError, "zever-mcp: parse error"))
 			fmt.Fprintln(errw, "zever-mcp: decode:", err)
 			return 1
 		}
@@ -77,9 +78,13 @@ func run(ctx context.Context, in io.Reader, out io.Writer, errw io.Writer) int {
 
 // handle dispatches one request to a method handler.
 func (s *Server) handle(ctx context.Context, req rpcRequest) rpcResponse {
+	if req.JSONRPC != "2.0" {
+		return errorResponse(req.ID, codeInvalidRequest, "zever-mcp: invalid jsonrpc version")
+	}
+
 	switch req.Method {
 	case "initialize":
-		return rpcResponse{JSONRPC: "2.0", ID: req.ID, Result: s.initializeResult(req.Params)}
+		return s.initializeResponse(req)
 	case "ping":
 		return rpcResponse{JSONRPC: "2.0", ID: req.ID, Result: map[string]any{}}
 	case "tools/list":
@@ -87,7 +92,7 @@ func (s *Server) handle(ctx context.Context, req rpcRequest) rpcResponse {
 	case "tools/call":
 		return s.callTool(ctx, req)
 	default:
-		return errorResponse(req.ID, codeMethodNotFound, "method not found: "+req.Method)
+		return errorResponse(req.ID, codeMethodNotFound, "zever-mcp: method not found: "+req.Method)
 	}
 }
 
@@ -96,21 +101,33 @@ type initializeParams struct {
 	ProtocolVersion string `json:"protocolVersion"`
 }
 
-// initializeResult negotiates the protocol version and advertises capabilities.
-func (s *Server) initializeResult(raw json.RawMessage) map[string]any {
-	var p initializeParams
-	_ = json.Unmarshal(raw, &p)
+// supportedProtocolVersions is the set of MCP versions this server implements.
+var supportedProtocolVersions = map[string]bool{
+	"2024-11-05": true,
+	"2025-06-18": true,
+}
 
-	version := p.ProtocolVersion
-	if version == "" {
-		version = defaultProtocolVersion
+// initializeResponse negotiates the protocol version and advertises
+// capabilities, falling back to the default when the client requests a version
+// this server does not implement.
+func (s *Server) initializeResponse(req rpcRequest) rpcResponse {
+	var p initializeParams
+	if len(req.Params) > 0 {
+		if err := json.Unmarshal(req.Params, &p); err != nil {
+			return errorResponse(req.ID, codeInvalidParams, "zever-mcp: invalid initialize params")
+		}
 	}
 
-	return map[string]any{
+	version := defaultProtocolVersion
+	if supportedProtocolVersions[p.ProtocolVersion] {
+		version = p.ProtocolVersion
+	}
+
+	return rpcResponse{JSONRPC: "2.0", ID: req.ID, Result: map[string]any{
 		"protocolVersion": version,
 		"capabilities":    map[string]any{"tools": map[string]any{}},
 		"serverInfo":      map[string]any{"name": serverName, "version": serverVersion},
-	}
+	}}
 }
 
 // toolList returns the MCP tools/list payload in registration order.
@@ -138,12 +155,12 @@ type callParams struct {
 func (s *Server) callTool(ctx context.Context, req rpcRequest) rpcResponse {
 	var p callParams
 	if err := json.Unmarshal(req.Params, &p); err != nil {
-		return errorResponse(req.ID, codeInvalidParams, "invalid tools/call params")
+		return errorResponse(req.ID, codeInvalidParams, "zever-mcp: invalid tools/call params")
 	}
 
 	t, ok := s.tools[p.Name]
 	if !ok {
-		return errorResponse(req.ID, codeInvalidParams, "unknown tool: "+p.Name)
+		return errorResponse(req.ID, codeInvalidParams, "zever-mcp: unknown tool: "+p.Name)
 	}
 
 	text, err := t.Handler(ctx, p.Arguments)

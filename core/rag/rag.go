@@ -37,7 +37,9 @@ func New(client ai.AI, store vectorstore.VectorStore, opts Options) (*Engine, er
 }
 
 // Ingest chunks each document, embeds every chunk in one batch, and upserts the
-// resulting vectors. Documents with empty content are skipped.
+// resulting vectors. Documents with empty content are skipped. The reserved
+// metadata keys document_id, chunk_index and content are set by the engine;
+// caller metadata with those keys is ignored.
 func (e *Engine) Ingest(ctx context.Context, docs []Document) error {
 	type item struct {
 		id     string

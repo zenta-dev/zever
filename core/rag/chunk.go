@@ -1,8 +1,9 @@
 package rag
 
 // chunkText splits text into overlapping chunks of at most size runes. It
-// returns nil for empty text and never splits a multi-byte rune. An overlap
-// that is negative or not smaller than size is clamped to half of size.
+// returns nil for empty text and never splits a multi-byte rune. A negative
+// overlap is clamped to 0; an overlap not smaller than size is clamped to half
+// of size.
 func chunkText(text string, size, overlap int) []string {
 	if text == "" {
 		return nil
