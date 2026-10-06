@@ -5,8 +5,12 @@ import (
 	"fmt"
 	"time"
 
+	"github.com/zenta-dev/zever/core/observability"
 	"github.com/zenta-dev/zever/shared/retry"
 )
+
+// ScopeName is the tracer and meter scope for outbox relay telemetry.
+const ScopeName = "outbox"
 
 const (
 	// DefaultTable is the outbox table name when Options.Table is empty.
@@ -74,6 +78,9 @@ type Options struct {
 	// DedicatedPool opts out of container-level pool sharing. Default false
 	// shares one pool per exact DSN; true opens a private pool.
 	DedicatedPool bool `json:"dedicated_pool" toml:"dedicated_pool" yaml:"dedicated_pool"`
+	// Provider emits relay metrics and spans. Nil disables telemetry. It is
+	// Go-API-only: never decoded from configuration files.
+	Provider observability.Provider `json:"-" toml:"-" yaml:"-"`
 }
 
 // Validate checks options for consistency, joining all violations.

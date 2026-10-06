@@ -228,7 +228,7 @@ func TestSetRelayErrorNilKeepsLastErrorEmpty(t *testing.T) {
 	t.Parallel()
 
 	s := &store{}
-	s.setRelayError(nil)
+	s.setRelayError(context.Background(), nil)
 
 	if st := s.Status(); st.LastError != "" {
 		t.Errorf("Status().LastError = %q, want empty", st.LastError)
@@ -241,7 +241,7 @@ func TestStatusReportsRelayErrorAndCounters(t *testing.T) {
 	s := &store{}
 	s.processed.Add(2)
 	s.failed.Add(1)
-	s.setRelayError(errors.New("boom"))
+	s.setRelayError(context.Background(), errors.New("boom"))
 
 	st := s.Status()
 
@@ -276,7 +276,7 @@ func TestStoreConcurrentUse(t *testing.T) {
 			defer wg.Done()
 
 			_ = s.Status()
-			s.setRelayError(errors.New("boom"))
+			s.setRelayError(context.Background(), errors.New("boom"))
 			s.processed.Add(1)
 			_ = quoteLiteral("slot")
 		}()

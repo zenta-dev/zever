@@ -29,14 +29,14 @@ func (s *store) loop(ctx context.Context, conn *pgconn.PgConn, done chan struct{
 		rawMsg, err := conn.ReceiveMessage(ctx)
 		if err != nil {
 			if ctx.Err() == nil {
-				s.setRelayError(err)
+				s.setRelayError(ctx, err)
 			}
 
 			return
 		}
 
 		if errMsg, ok := rawMsg.(*pgproto3.ErrorResponse); ok {
-			s.setRelayError(pgconn.ErrorResponseToPgError(errMsg))
+			s.setRelayError(ctx, pgconn.ErrorResponseToPgError(errMsg))
 
 			return
 		}
@@ -61,7 +61,7 @@ func (s *store) loop(ctx context.Context, conn *pgconn.PgConn, done chan struct{
 func (s *store) handleKeepalive(ctx context.Context, conn *pgconn.PgConn, data []byte) {
 	pkm, err := pglogrepl.ParsePrimaryKeepaliveMessage(data)
 	if err != nil {
-		s.setRelayError(err)
+		s.setRelayError(ctx, err)
 
 		return
 	}
@@ -74,7 +74,7 @@ func (s *store) handleKeepalive(ctx context.Context, conn *pgconn.PgConn, data [
 		WALWritePosition: pglogrepl.LSN(s.lastLSN.Load()),
 		ReplyRequested:   true,
 	}); err != nil {
-		s.setRelayError(err)
+		s.setRelayError(ctx, err)
 	}
 }
 
@@ -83,14 +83,14 @@ func (s *store) handleKeepalive(ctx context.Context, conn *pgconn.PgConn, data [
 func (s *store) handleXLogData(ctx context.Context, conn *pgconn.PgConn, data []byte) {
 	xld, err := pglogrepl.ParseXLogData(data)
 	if err != nil {
-		s.setRelayError(err)
+		s.setRelayError(ctx, err)
 
 		return
 	}
 
 	logicalMsg, err := pglogrepl.Parse(xld.WALData)
 	if err != nil {
-		s.setRelayError(err)
+		s.setRelayError(ctx, err)
 
 		return
 	}
@@ -102,7 +102,7 @@ func (s *store) handleXLogData(ctx context.Context, conn *pgconn.PgConn, data []
 
 	advanced, err := s.handleMessage(ctx, ldm.Prefix, ldm.Content, s.publisher.Publish)
 	if err != nil {
-		s.setRelayError(err)
+		s.setRelayError(ctx, err)
 
 		return
 	}
@@ -118,7 +118,7 @@ func (s *store) handleXLogData(ctx context.Context, conn *pgconn.PgConn, data []
 	if err := pglogrepl.SendStandbyStatusUpdate(ctx, conn, pglogrepl.StandbyStatusUpdate{
 		WALWritePosition: pglogrepl.LSN(s.lastLSN.Load()),
 	}); err != nil {
-		s.setRelayError(err)
+		s.setRelayError(ctx, err)
 	}
 }
 
@@ -139,21 +139,28 @@ func (s *store) handleMessage(ctx context.Context, prefix string, payload []byte
 		return false, err
 	}
 
+	spanCtx, finish := s.recorder.ConsumeSpan(ctx, msg.Topic)
+	defer finish()
+
 	for attempt := 1; ; attempt++ {
-		pubErr := publish(ctx, msg)
+		pubErr := publish(spanCtx, msg)
 		if pubErr == nil {
+			s.recorder.Published(ctx)
 			s.processed.Add(1)
 
 			return true, nil
 		}
 
-		s.setRelayError(pubErr)
+		s.setRelayError(ctx, pubErr)
 
 		if attempt >= s.maxAttempts {
+			s.recorder.FailedTotal(ctx)
 			s.failed.Add(1)
 
 			return false, nil
 		}
+
+		s.recorder.Retried(ctx)
 
 		if err := s.sleep(ctx, s.retry.NextDelay(attempt)); err != nil {
 			return false, err

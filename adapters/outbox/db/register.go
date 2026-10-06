@@ -39,5 +39,6 @@ func optionsFrom(o outbox.Options) Options {
 		Retry:        o.Retry,
 		Retention:    o.Retention,
 		LockSeconds:  o.LockSeconds,
+		Provider:     o.Provider,
 	}
 }
