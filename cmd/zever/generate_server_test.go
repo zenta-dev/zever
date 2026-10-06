@@ -96,6 +96,11 @@ func TestRunGenerateServer(t *testing.T) {
 		`r.Handle("GET", "/healthz",`,
 		`r.Handle("GET", "/readyz",`,
 		"database.Ping(pingCtx)",
+		"healthServer := health.NewServer()",
+		"healthpb.RegisterHealthServer(grpcServer, healthServer)",
+		"healthServer.SetServingStatus(\"\", healthpb.HealthCheckResponse_SERVING)",
+		"reflection.Register(grpcServer)",
+		"healthServer.SetServingStatus(\"\", healthpb.HealthCheckResponse_NOT_SERVING)",
 		"ReadTimeout:       readTimeout,",
 		"WriteTimeout:      writeTimeout,",
 		"IdleTimeout:       idleTimeout,",
@@ -355,6 +360,9 @@ func TestRunGenerateServerWiresRegisterModule(t *testing.T) {
 		"taskServiceImpl := appimpl.NewTaskServiceImpl()",
 		"genapp.RegisterModule(r, grpcServer, authInst, permInst, genapp.ModuleImpls{",
 		"TaskService: taskServiceImpl,",
+		"healthpb.RegisterHealthServer(grpcServer, healthServer)",
+		"reflection.Register(grpcServer)",
+		"healthServer.SetServingStatus(\"\", healthpb.HealthCheckResponse_NOT_SERVING)",
 	} {
 		if !strings.Contains(main, fragment) {
 			t.Fatalf("wired server main.go lacks %q:\n%s", fragment, main)

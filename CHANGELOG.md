@@ -9,6 +9,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Added
 
+- Generated HTTP+gRPC server entrypoint now registers the standard gRPC
+  Health Checking Protocol (`grpc_health_v1`) and server reflection, marks
+  the overall serving status SERVING on boot, ties `/readyz`'s DB ping to
+  the health status, and flips NOT_SERVING before graceful stop.
 - Saga orchestration for the `workflow` battery: `SagaStep` plus
   `SagaRegistrar` / `SagaRunner` / `SagaInspector` interfaces in
   `core/workflow`, with in-process (`adapters/workflow/memory`) and durable
