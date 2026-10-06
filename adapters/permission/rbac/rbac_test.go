@@ -242,23 +242,3 @@ func TestNew_invalidOptions_returnsError(t *testing.T) {
 		})
 	}
 }
-
-func BenchmarkCan_allow(b *testing.B) {
-	c, err := rbac.New(permission.Options{
-		Rules: []permission.Rule{{Role: "admin", Action: "read"}},
-	})
-	if err != nil {
-		b.Fatalf("New() error = %v", err)
-	}
-
-	sub := permission.Subject{ID: "u1", Roles: []string{"admin"}}
-	res := permission.Resource{Type: "doc", ID: "d1"}
-	ctx := b.Context()
-
-	b.ResetTimer()
-	for i := 0; i < b.N; i++ {
-		if _, err := c.Can(ctx, sub, "read", res); err != nil {
-			b.Fatalf("Can() error = %v", err)
-		}
-	}
-}

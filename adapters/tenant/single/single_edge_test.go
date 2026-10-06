@@ -81,3 +81,60 @@ func TestScopedConcurrent(t *testing.T) {
 
 	wg.Wait()
 }
+
+// TestEdgeClose_idempotent proves Close is safe to call repeatedly.
+func TestEdgeClose_idempotent(t *testing.T) {
+	t.Parallel()
+
+	tn, err := New(tenant.Options{})
+	if err != nil {
+		t.Fatalf("New() err = %v, want nil", err)
+	}
+
+	if err := tn.Close(); err != nil {
+		t.Fatalf("Close #1 err = %v, want nil", err)
+	}
+	if err := tn.Close(); err != nil {
+		t.Fatalf("Close #2 err = %v, want nil", err)
+	}
+}
+
+// TestEdgeScoped_emptyID proves Scoped accepts an empty tenant ID without
+// error; the fixed-ID adapter performs no validation.
+func TestEdgeScoped_emptyID(t *testing.T) {
+	t.Parallel()
+
+	tn, err := New(tenant.Options{})
+	if err != nil {
+		t.Fatalf("New() err = %v, want nil", err)
+	}
+
+	ctx, err := tn.Scoped(t.Context(), "")
+	if err != nil {
+		t.Fatalf("Scoped(\"\") err = %v, want nil", err)
+	}
+	if got, ok := tenant.FromContext(ctx); !ok || got != "" {
+		t.Fatalf("FromContext() = (%q, %v), want (%q, true)", got, ok, "")
+	}
+}
+
+// TestEdgeResolve_ignoresMeta proves Resolve returns the fixed ID regardless
+// of metadata content, including nil metadata.
+func TestEdgeResolve_ignoresMeta(t *testing.T) {
+	t.Parallel()
+
+	tn, err := New(tenant.Options{ID: "fixed"})
+	if err != nil {
+		t.Fatalf("New() err = %v, want nil", err)
+	}
+
+	for _, meta := range []map[string]string{nil, {}, {"X-Tenant-ID": "other"}} {
+		got, rerr := tn.Resolve(t.Context(), meta)
+		if rerr != nil {
+			t.Fatalf("Resolve(%v) err = %v, want nil", meta, rerr)
+		}
+		if got != "fixed" {
+			t.Fatalf("Resolve(%v) = %q, want %q", meta, got, "fixed")
+		}
+	}
+}

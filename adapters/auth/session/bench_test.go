@@ -13,7 +13,7 @@ func BenchmarkIssue(b *testing.B) {
 	b.ReportAllocs()
 	b.ResetTimer()
 
-	for i := 0; i < b.N; i++ {
+	for b.Loop() {
 		if _, err := a.Issue(ctx, "user-1", map[string]any{"role": "admin"}, time.Hour); err != nil {
 			b.Fatal(err)
 		}
@@ -34,8 +34,28 @@ func BenchmarkVerify(b *testing.B) {
 	b.ReportAllocs()
 	b.ResetTimer()
 
-	for i := 0; i < b.N; i++ {
+	for b.Loop() {
 		if _, err := a.Verify(ctx, tok.Value); err != nil {
+			b.Fatal(err)
+		}
+	}
+}
+
+// BenchmarkRevoke measures token deletion through the store.
+func BenchmarkRevoke(b *testing.B) {
+	a := newAdapter(b, newMemoryStore(b))
+	ctx := b.Context()
+
+	tok, err := a.Issue(ctx, "user-1", nil, time.Hour)
+	if err != nil {
+		b.Fatal(err)
+	}
+
+	b.ReportAllocs()
+	b.ResetTimer()
+
+	for b.Loop() {
+		if err := a.Revoke(ctx, tok.Value); err != nil {
 			b.Fatal(err)
 		}
 	}
@@ -49,7 +69,7 @@ func BenchmarkIssueVerify(b *testing.B) {
 	b.ReportAllocs()
 	b.ResetTimer()
 
-	for i := 0; i < b.N; i++ {
+	for b.Loop() {
 		tok, err := a.Issue(ctx, "user-1", nil, time.Hour)
 		if err != nil {
 			b.Fatal(err)

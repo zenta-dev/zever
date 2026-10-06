@@ -169,6 +169,43 @@ func TestEdgeGet_AfterFlush_ErrNotFound(t *testing.T) {
 	}
 }
 
+// TestEdgeSave_overExpiredRecord proves Save against an expired record
+// writes fresh under the store default TTL, ignoring any caller-provided
+// ExpiresAt.
+func TestEdgeSave_overExpiredRecord(t *testing.T) {
+	t.Parallel()
+
+	server := testServer(t)
+	ctx := t.Context()
+	st := newTestStore(t, optionsFor(t, server))
+
+	s, err := st.Create(ctx, time.Second)
+	if err != nil {
+		t.Fatalf("Create err = %v, want nil", err)
+	}
+
+	server.FastForward(2 * time.Second)
+
+	if _, getErr := st.Get(ctx, s.ID); !errors.Is(getErr, session.ErrNotFound) {
+		t.Fatalf("Get after expiry err = %v, want ErrNotFound", getErr)
+	}
+
+	before := time.Now()
+
+	if saveErr := st.Save(ctx, s); saveErr != nil {
+		t.Fatalf("Save over expired err = %v, want nil", saveErr)
+	}
+
+	got, err := st.Get(ctx, s.ID)
+	if err != nil {
+		t.Fatalf("Get after Save-over-expired err = %v, want nil", err)
+	}
+
+	if got.ExpiresAt.Sub(before) < session.DefaultTTL-time.Minute {
+		t.Fatalf("Save-over-expired ExpiresAt = %v, want ~now+%v (fresh default)", got.ExpiresAt, session.DefaultTTL)
+	}
+}
+
 func TestEdgeClose_ConcurrentIdempotent(t *testing.T) {
 	t.Parallel()
 
