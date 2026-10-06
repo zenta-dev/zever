@@ -52,6 +52,8 @@ use (
 	./adapters/observability/noop
 	./adapters/observability/otlp
 	./adapters/observability/stdout
+	./adapters/outbox/db
+	./adapters/outbox/memory
 	./adapters/password/argon2
 	./adapters/payment/paddle
 	./adapters/payment/stripe
@@ -68,8 +70,8 @@ use (
 	./adapters/router/stdhttp
 	./adapters/scheduler/embedded
 	./adapters/scheduler/postgres
-	./adapters/search/meilisearch
 	./adapters/search/db
+	./adapters/search/meilisearch
 	./adapters/secrets/env
 	./adapters/secrets/vault
 	./adapters/session/cookie
@@ -85,8 +87,8 @@ use (
 	./adapters/vectorstore/qdrant
 	./adapters/webhook/http
 	./adapters/webhook/queue
-	./adapters/workflow/memory
 	./adapters/workflow/db
+	./adapters/workflow/memory
 	./cmd/zever
 	./config
 	./container
@@ -112,6 +114,7 @@ use (
 	./core/middleware
 	./core/notification
 	./core/observability
+	./core/outbox
 	./core/password
 	./core/payment
 	./core/permission
@@ -128,6 +131,7 @@ use (
 	./core/webhook
 	./core/workflow
 	./dsl
+	./editors
 	./examples
 	./examples/bookings
 	./examples/demoapp
@@ -155,5 +159,4 @@ use (
 	./tools/errscan
 	./tools/modgraph
 	./tools/zever-lsp
-	./editors
 )
