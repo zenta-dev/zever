@@ -12,9 +12,10 @@ shapes; this file is the pre/deploy/post gate list.
 
 - `GET /healthz` always 200, no dependency checks
   (`generate_server.go:937`).
-- `GET /readyz` pings `DB()` with `readyTimeout`; 200 ready, 503 not
-  (`generate_server.go:941-952`).
-- Shutdown: `signal.NotifyContext(SIGINT, SIGTERM)` (`:855`),
+- `GET /readyz` pings `DB()` with `readyTimeout` and reflects the gRPC
+  health serving status; 200 ready, 503 not (`generate_server.go:941-952`).
+- Shutdown: `signal.NotifyContext(SIGINT, SIGTERM)` (`:855`), health
+  serving status flipped `NOT_SERVING` before
   `grpcServer.GracefulStop()` (`:1012`),
   `httpServer.Shutdown(shutdownCtx)` (`:1017`),
   container close on deferred timeout ctx (`:859-863`).
@@ -115,6 +116,35 @@ func readSecret(ctx context.Context) ([]byte, error) {
 
 `env.New(env.Options{...})` is the direct constructor; `secrets.Open`
 is the registry path once more adapters exist.
+
+## Resilience, outbox, and gRPC clients
+
+- Resilience (`core/resilience`, `digging-deeper/resilience.mdx`): the
+  default `memory` adapter keeps every policy process-local, so each
+  replica trips its own breaker. Multi-instance deploys set
+  `resilience.adapter: redis` so replicas share one circuit per dependency
+  (`RedisOptions.Prefix` namespaces the shared state; give each
+  environment its own prefix). Guard names and options carry no
+  credentials, but never log raw option maps — display path is
+  `config.RedactedServices`.
+- Outbox (`core/outbox`, `digging-deeper/outbox.mdx`): the default `db`
+  adapter is durable (sqlite dev, postgres prod) and its relay claims with
+  `FOR UPDATE SKIP LOCKED`, so any number of replicas can relay the same
+  table without double-publishing. A container-opened store records but
+  cannot `Start` its relay — wire a `Publisher` (eventbus or queue
+  bridge) through the adapter constructor. The `cdc` adapter needs
+  `wal_level=logical`; live tests are gated by `POSTGRES_DSN`. Consumers
+  dedupe through `outbox.Inbox` (or their own idempotency key) — delivery
+  is at-least-once.
+- gRPC clients (`shared/grpcclient`, `digging-deeper/grpc-client.mdx`):
+  `container.GRPCClient(target, opts...)` caches one
+  `*grpc.ClientConn` per target string and closes it with the container.
+  Credentials are explicit and fail-closed (`ErrNoCredentials`); prod
+  passes `WithTLS` with a CA bundle, `WithInsecure` is loopback/dev only.
+  The generated server registers the standard gRPC Health Checking
+  Protocol: `/readyz` reflects the serving status and the server flips
+  `NOT_SERVING` before `GracefulStop`, so load balancers stop routing
+  before in-flight RPCs are dropped.
 
 ## Rate limiting
 
@@ -245,6 +275,11 @@ gh attestation verify sbom/cmd_zever.json --repo zenta-dev/zever
   (`ComputeRollback`) and kept with the release.
 - [ ] Rate-limit `Rate`/`Burst` set for public routes; fail mode chosen
   per endpoint sensitivity.
+- [ ] Resilience on `redis` when multi-instance (shared breaker state);
+  per-dependency guard names chosen; `IsSuccessful` classifies
+  business-error successes.
+- [ ] Outbox on `db` (postgres in prod) with a `Publisher` wired through
+  the adapter constructor; consumer-side inbox/idempotency keys chosen.
 - [ ] Binary built from clean tree at a tag; SBOM artifact kept;
   `govulncheck` clean.
 
@@ -264,7 +299,9 @@ curl -fsS http://localhost:8080/readyz
 zever db migrate --dry-run   # expect: no pending statements
 ```
 
-- [ ] `/healthz` 200, `/readyz` 200 (503 = DB ping failing, hold rollout).
+- [ ] `/healthz` 200, `/readyz` 200 (503 = DB ping failing or gRPC health
+  not serving, hold rollout); health serving status flips `NOT_SERVING`
+  on shutdown before `GracefulStop`.
 - [ ] Migration bookkeeping shows the release checksum recorded; re-run
   is a no-op.
 - [ ] Traces arriving in collector; 5xx span errors triaged.
