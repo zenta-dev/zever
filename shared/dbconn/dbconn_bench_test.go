@@ -33,3 +33,13 @@ func BenchmarkSplitDSN(b *testing.B) {
 		_ = SplitDSN("postgres://user:pass@localhost:5432/zever?sslmode=disable")
 	}
 }
+
+// BenchmarkRandomOwner measures minting a unique owner identifier.
+func BenchmarkRandomOwner(b *testing.B) {
+	b.ReportAllocs()
+	b.ResetTimer()
+
+	for b.Loop() {
+		_ = RandomOwner("queue-owner")
+	}
+}

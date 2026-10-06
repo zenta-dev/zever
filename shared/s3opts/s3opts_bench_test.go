@@ -1,6 +1,16 @@
 package s3opts
 
-import "testing"
+import (
+	"testing"
+	"time"
+
+	"github.com/aws/aws-sdk-go-v2/aws"
+	"github.com/aws/aws-sdk-go-v2/config"
+	"github.com/aws/aws-sdk-go-v2/credentials"
+	"github.com/aws/aws-sdk-go-v2/service/s3"
+
+	"github.com/zenta-dev/zever/core/storage"
+)
 
 // BenchmarkEscapeKey measures segment-wise key escaping.
 func BenchmarkEscapeKey(b *testing.B) {
@@ -48,6 +58,67 @@ func BenchmarkValidate(b *testing.B) {
 	for b.Loop() {
 		if err := cfg.Validate(true, true); err != nil {
 			b.Fatalf("Validate() error = %v", err)
+		}
+	}
+}
+
+// newBenchCore builds a Core with a stub transport and the given default
+// policy for benchmarking.
+func newBenchCore(b *testing.B, def *storage.Policy) *Core {
+	b.Helper()
+
+	var store storage.PolicyStore
+	if err := store.ResolveFromConfig(&storage.PolicyConfig{Default: def}); err != nil {
+		b.Fatalf("ResolveFromConfig() error = %v", err)
+	}
+
+	cfg, err := config.LoadDefaultConfig(b.Context(),
+		config.WithRegion("us-east-1"),
+		config.WithCredentialsProvider(credentials.NewStaticCredentialsProvider("ak", "sk", "")),
+	)
+	if err != nil {
+		b.Fatalf("LoadDefaultConfig() error = %v", err)
+	}
+
+	client := s3.NewFromConfig(cfg, func(o *s3.Options) {
+		o.UsePathStyle = true
+		o.HTTPClient = &stubTransport{fn: boomStub}
+		o.Retryer = aws.NopRetryer{}
+	})
+
+	return New("test", "us-east-1", "", client, s3.NewPresignClient(client), store, nil)
+}
+
+// BenchmarkPresignUploadPublic measures the public-policy upload path, which
+// resolves a static URL without any S3 call.
+func BenchmarkPresignUploadPublic(b *testing.B) {
+	ctx := b.Context()
+	pol := &storage.Policy{Write: storage.Rule{Public: true}}
+	c := newBenchCore(b, pol)
+
+	b.ReportAllocs()
+	b.ResetTimer()
+
+	for b.Loop() {
+		if _, err := c.PresignUpload(ctx, "bkt", "media/photo.jpg", "image/jpeg", time.Minute); err != nil {
+			b.Fatalf("PresignUpload() error = %v", err)
+		}
+	}
+}
+
+// BenchmarkPresignDownloadPublic measures the public-policy download path,
+// which resolves a static URL without any S3 call.
+func BenchmarkPresignDownloadPublic(b *testing.B) {
+	ctx := b.Context()
+	pol := &storage.Policy{Read: storage.Rule{Public: true}}
+	c := newBenchCore(b, pol)
+
+	b.ReportAllocs()
+	b.ResetTimer()
+
+	for b.Loop() {
+		if _, err := c.PresignDownload(ctx, "bkt", "media/photo.jpg", time.Minute); err != nil {
+			b.Fatalf("PresignDownload() error = %v", err)
 		}
 	}
 }

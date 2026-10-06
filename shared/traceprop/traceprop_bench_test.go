@@ -73,6 +73,47 @@ func BenchmarkTraceID(b *testing.B) {
 	}
 }
 
+// BenchmarkExtractOrBackground measures extraction of an untrusted header
+// set that carries no trace context.
+func BenchmarkExtractOrBackground(b *testing.B) {
+	headers := map[string]string{"other": "v"}
+
+	b.ReportAllocs()
+	b.ResetTimer()
+
+	for b.Loop() {
+		_ = ExtractOrBackground(headers)
+	}
+}
+
+// BenchmarkContinueSpan measures continuing a remote span context.
+func BenchmarkContinueSpan(b *testing.B) {
+	headers := Inject(benchCtx(b), nil)
+	base := b.Context()
+
+	b.ReportAllocs()
+	b.ResetTimer()
+
+	for b.Loop() {
+		_, span := ContinueSpan(base, headers, "consume")
+		span.End()
+	}
+}
+
+// BenchmarkStartConsumeSpan measures starting a consumer span from headers.
+func BenchmarkStartConsumeSpan(b *testing.B) {
+	headers := Inject(benchCtx(b), nil)
+	base := b.Context()
+
+	b.ReportAllocs()
+	b.ResetTimer()
+
+	for b.Loop() {
+		_, span := StartConsumeSpan(base, headers, "consume")
+		span.End()
+	}
+}
+
 // BenchmarkInjectParallel measures injection under concurrent callers.
 func BenchmarkInjectParallel(b *testing.B) {
 	ctx := benchCtx(b)
