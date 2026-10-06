@@ -71,6 +71,7 @@ require (
 	github.com/zenta-dev/zever/shared/grpcclient v0.5.3 // indirect
 	github.com/zenta-dev/zever/shared/httpclient v0.5.3 // indirect
 	github.com/zenta-dev/zever/shared/lrucache v0.5.3 // indirect
+	github.com/zenta-dev/zever/shared/mcpclient v0.5.3 // indirect
 	github.com/zenta-dev/zever/shared/providersopt v0.5.3 // indirect
 	github.com/zenta-dev/zever/shared/redisopt v0.5.3 // indirect
 	github.com/zenta-dev/zever/shared/retry v0.5.3 // indirect
@@ -236,3 +237,5 @@ replace (
 )
 
 replace github.com/zenta-dev/zever/shared/dbconn => ../../shared/dbconn
+
+replace github.com/zenta-dev/zever/shared/mcpclient => ../../shared/mcpclient

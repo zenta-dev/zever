@@ -68,6 +68,7 @@ release-note docs.
 | `flag` | Facade (`static`, `firebase`). |
 | `observability` | Facade (`noop`, `stdout`, `otlp`); `Shutdown(ctx)` flush path. |
 | `eventbus` | Facade (`memory`, `redis`). |
+| `eval` | Dataset/scorer harness for agent and generation outputs. |
 | `workflow` | Facade (`memory`, `db`). |
 | `tenant` | Facade (`single`, `header`). |
 | `analytics` | Facade (`log`, `posthog`). |
@@ -84,6 +85,8 @@ release-note docs.
 | `apperror` | Typed error vocabulary (gRPC/HTTP mappings). |
 | `authz` | `auth`-to-`permission` bridge (HTTP middleware, gRPC interceptor). |
 | `codec` | Generic `Encoder`/`Decoder`/`Codec` + `JSONCodec`. |
+| `mcpclient` | MCP stdio client (initialize, tools/list, tools/call). |
+| `prompt` | Prompt builders (system, grounding, JSON repair, tool errors). |
 | `middleware` | HTTP middleware + gRPC interceptors. |
 | `cmd/zever` | Flags-only CLI toolkit; see `cmd/zever/README.md`. |
 | `tools/zever-mcp` | Stdio MCP server exposing the schema compiler to agents; nested module. |

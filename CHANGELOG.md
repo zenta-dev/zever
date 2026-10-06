@@ -20,6 +20,13 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   vector store; `RetrieveHybrid` fuses both with RRF plus metadata
   filtering, with `AnswerHybrid` grounding. `Options.Observe` reports
   ingest/retrieve/generate events.
+- New `shared/mcpclient` module: MCP stdio client (initialize handshake,
+  tools/list, tools/call) over any `io.Reader`/`io.Writer`, plus
+  `agent.ToolsFromClient` exposing server tools as agent tools.
+- New `core/eval` module: dataset/scorer harness (`ExactScorer`,
+  `ContainsScorer`, LLM-judge scorer) with suite reports.
+- New `shared/prompt` module: pure-string builders for system prompts,
+  grounded context, JSON repair, and tool-error feedback.
 - `--dry-run` across all nine `generate` subcommands: validation and
   rendering still run, but no filesystem writes occur; append-mode
   subcommands preview the rendered declaration.
