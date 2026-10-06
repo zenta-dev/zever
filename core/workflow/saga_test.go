@@ -86,8 +86,8 @@ func TestSagaInterfacesCompile(t *testing.T) {
 	t.Parallel()
 
 	var (
-		_ workflow.SagaRegistrar = (workflow.SagaRegistrar)(nil)
-		_ workflow.SagaRunner    = (workflow.SagaRunner)(nil)
-		_ workflow.SagaInspector = (workflow.SagaInspector)(nil)
+		_ workflow.SagaRegistrar = nil
+		_ workflow.SagaRunner    = nil
+		_ workflow.SagaInspector = nil
 	)
 }
