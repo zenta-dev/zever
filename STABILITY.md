@@ -54,8 +54,8 @@ release-note docs.
 | Package | Notes |
 |---|---|
 | `ai` | Facade (`anthropic`, `openai`, `gemini`, `ollama`); no zero-infra default. |
-| `agent` | Tool-calling loop over `ai`; no adapter registry, no `config` entry. |
-| `rag` | Retrieval-augmented generation over `ai` + `vectorstore`; no `config` entry. |
+| `agent` | Tool-calling loop over `ai`; no adapter registry, no `config` entry; `container.Agent()`. |
+| `rag` | Retrieval-augmented generation over `ai` + `vectorstore`; no `config` entry; `container.RAG()`. |
 | `billing` | Facade (`stub`, `stripe`, `paddle`). |
 | `payment` | Facade (`stub`, `stripe`, `paddle`). |
 | `storage` | Facade (`local`, `s3`, `r2`). |

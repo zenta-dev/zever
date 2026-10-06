@@ -1148,6 +1148,94 @@ func TestJob_queueFailure(t *testing.T) {
 	}
 }
 
+func TestAgent_sharesAI(t *testing.T) {
+	t.Parallel()
+
+	c := New(testConfig(t))
+	closeContainer(t, c)
+
+	if _, err := c.AI(); err != nil {
+		t.Fatalf("AI() failed: %v", err)
+	}
+
+	l, err := c.Agent()
+	if err != nil {
+		t.Fatalf("Agent() failed: %v", err)
+	}
+
+	if l == nil {
+		t.Fatal("Agent() returned nil loop")
+	}
+
+	again, err := c.Agent()
+	if err != nil {
+		t.Fatalf("second Agent() failed: %v", err)
+	}
+
+	if again != l {
+		t.Error("Agent() is not a singleton")
+	}
+}
+
+func TestAgent_aiFailure(t *testing.T) {
+	t.Parallel()
+
+	c := New(testConfig(t))
+	closeContainer(t, c)
+
+	c.cfg.AI.Adapter = "bogus-adapter"
+
+	if _, err := c.Agent(); err == nil {
+		t.Fatal("expected Agent error for bogus ai adapter, got nil")
+	}
+}
+
+func TestRAG_sharesAIVectorStore(t *testing.T) {
+	t.Parallel()
+
+	c := New(testConfig(t))
+	closeContainer(t, c)
+
+	if _, err := c.AI(); err != nil {
+		t.Fatalf("AI() failed: %v", err)
+	}
+
+	if _, err := c.VectorStore(); err != nil {
+		t.Fatalf("VectorStore() failed: %v", err)
+	}
+
+	e, err := c.RAG()
+	if err != nil {
+		t.Fatalf("RAG() failed: %v", err)
+	}
+
+	if e == nil {
+		t.Fatal("RAG() returned nil engine")
+	}
+
+	again, err := c.RAG()
+	if err != nil {
+		t.Fatalf("second RAG() failed: %v", err)
+	}
+
+	if again != e {
+		t.Error("RAG() is not a singleton")
+	}
+}
+
+func TestRAG_vectorStoreFailure(t *testing.T) {
+	t.Parallel()
+
+	c := New(testConfig(t))
+	closeContainer(t, c)
+
+	c.cfg.VectorStore.Adapter = "bogus-adapter"
+
+	if _, err := c.RAG(); err == nil {
+		t.Fatal("expected RAG error for bogus vectorstore adapter, got nil")
+	}
+}
+
 func TestScheduler_resolve(t *testing.T) {
 	t.Parallel()
 

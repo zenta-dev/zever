@@ -7,6 +7,7 @@ import (
 
 	"google.golang.org/grpc"
 
+	"github.com/zenta-dev/zever/core/agent"
 	"github.com/zenta-dev/zever/core/ai"
 	"github.com/zenta-dev/zever/core/analytics"
 	"github.com/zenta-dev/zever/core/auth"
@@ -32,6 +33,7 @@ import (
 	"github.com/zenta-dev/zever/core/payment"
 	"github.com/zenta-dev/zever/core/permission"
 	"github.com/zenta-dev/zever/core/queue"
+	"github.com/zenta-dev/zever/core/rag"
 	"github.com/zenta-dev/zever/core/ratelimit"
 	"github.com/zenta-dev/zever/core/resilience"
 	"github.com/zenta-dev/zever/core/router"
@@ -68,6 +70,25 @@ func openService[T any, A any, O any](service string, name string, parse func(st
 	}
 
 	return v, nil
+}
+
+// Agent builds a tool-calling *agent.Loop over the resolved AI backend. It has
+// no adapter registry and no config entry; the model name comes from the AI
+// options. Like Job, it shares the process-wide backend instance.
+func (c *Container) Agent() (*agent.Loop, error) {
+	return c.agent.get(func() (*agent.Loop, error) {
+		a, err := c.AI()
+		if err != nil {
+			return nil, fmt.Errorf("container: agent: resolve ai: %w", err)
+		}
+
+		loop, err := agent.New(a, agent.Options{Model: c.cfg.AI.Options.Model})
+		if err != nil {
+			return nil, fmt.Errorf("container: agent: %w", err)
+		}
+
+		return loop, nil
+	})
 }
 
 // AI resolves and returns the AI service instance.
@@ -362,6 +383,30 @@ func (c *Container) Queue() (queue.Queue, error) {
 		}
 
 		return openService("queue", c.cfg.Queue.Adapter, queue.ParseAdapter, queue.Open, c.cfg.Queue.Options)
+	})
+}
+
+// RAG builds a *rag.Engine over the resolved AI and VectorStore backends. It
+// has no adapter registry and no config entry. Like Job, it shares the
+// process-wide backend instances.
+func (c *Container) RAG() (*rag.Engine, error) {
+	return c.rag.get(func() (*rag.Engine, error) {
+		a, err := c.AI()
+		if err != nil {
+			return nil, fmt.Errorf("container: rag: resolve ai: %w", err)
+		}
+
+		vs, err := c.VectorStore()
+		if err != nil {
+			return nil, fmt.Errorf("container: rag: resolve vectorstore: %w", err)
+		}
+
+		engine, err := rag.New(a, vs, rag.Options{Model: c.cfg.AI.Options.Model})
+		if err != nil {
+			return nil, fmt.Errorf("container: rag: %w", err)
+		}
+
+		return engine, nil
 	})
 }
 
