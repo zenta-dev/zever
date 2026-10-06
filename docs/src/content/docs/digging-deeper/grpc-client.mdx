@@ -1,0 +1,214 @@
+---
+title: gRPC Client
+description: gRPC client connections with round-robin load balancing, retry, tracing, and resilience.
+---
+
+## Purpose
+
+Use `shared/grpcclient` for outbound gRPC calls from zever services to
+other zever services. `New(ctx, target, opts...)` builds a
+`*grpc.ClientConn` with the cross-cutting concerns already wired:
+client-side round-robin load balancing, an optional per-method retry
+policy, W3C trace propagation, metadata attachment, a per-RPC timeout, and
+an optional `resilience.Guard` so a failing downstream dependency is
+circuit-broken, bulkheaded, and retried in one place. The generated
+server's inter-service calls use this helper; `container.GRPCClient`
+caches one connection per target string and closes it with the container.
+
+## When to use
+
+Use it for every outbound gRPC call in a multi-service deployment. The
+default service config enables `round_robin`, so a `dns:///` target with
+multiple resolved addresses spreads load across them without a sidecar.
+Use the `static:///name` scheme with `WithStaticResolver` for
+in-process or test environments where DNS is not the source of truth —
+the resolver is registered per-connection, never globally.
+
+Credentials are explicit and fail-closed: `New` returns `ErrNoCredentials`
+unless `WithInsecure` or `WithTLS` is passed, and `ErrInsecureAndTLS` when
+both are. `WithInsecure` is for development and loopback only.
+
+## Config
+
+There is no `config` entry: `grpcclient` is a helper, not a battery. Build
+connections in code (or via `container.GRPCClient`).
+
+Target schemes:
+
+- `dns:///host:port` — gRPC's built-in DNS resolver.
+- `static:///name` — resolved through the `WithStaticResolver` address
+  map; an unknown or empty name fails fast instead of dialing nothing.
+
+```go
+import (
+    "context"
+    "time"
+
+    "github.com/zenta-dev/zever/shared/grpcclient"
+)
+
+func dial(ctx context.Context) (*grpc.ClientConn, error) {
+    return grpcclient.New(ctx, "static:///users",
+        grpcclient.WithInsecure(),
+        grpcclient.WithStaticResolver(map[string][]string{
+            "users": {"127.0.0.1:50051", "127.0.0.2:50051"},
+        }),
+        grpcclient.WithMetadata(map[string]string{"x-tenant": "acme"}),
+        grpcclient.WithTimeout(2*time.Second),
+    )
+}
+```
+
+Retry policy (merged into the gRPC service config for every method):
+
+```go
+conn, err := grpcclient.New(ctx, "dns:///users:443",
+    grpcclient.WithTLS(grpcclient.TLSOptions{CAFile: "/etc/ssl/ca.pem"}),
+    grpcclient.WithRetryPolicy(grpcclient.RetryPolicy{
+        MaxAttempts:          5, // capped at DefaultMaxAttempts (5)
+        InitialBackoff:       10 * time.Millisecond,
+        MaxBackoff:           500 * time.Millisecond,
+        BackoffMultiplier:    2,
+        RetryableStatusCodes: []codes.Code{codes.Unavailable},
+    }),
+)
+```
+
+(`codes` is `google.golang.org/grpc/codes`.)
+
+`MaxAttempts` must be at least 2 and is capped at `DefaultMaxAttempts` (5,
+gRPC's own client limit); backoffs and the multiplier must be positive;
+`RetryableStatusCodes` must not be empty. Invalid policies are rejected
+with an error, not silently ignored. `WithServiceConfigJSON` overlays raw
+keys (for example a custom `loadBalancingConfig`) on the round_robin
+default.
+
+TLS: `WithTLS(TLSOptions{CertFile, KeyFile, CAFile, ServerName})` loads an
+optional client certificate pair (both or neither), a CA bundle for server
+verification, and a server-name override. TLS 1.2 is the floor; read or
+parse failures return errors — `WithTLS` never falls back to insecure.
+
+## Resolve via container
+
+```go
+import (
+    "github.com/zenta-dev/zever/config"
+    "github.com/zenta-dev/zever/container"
+    "github.com/zenta-dev/zever/shared/grpcclient"
+)
+
+func dialUsers(c *container.Container) (*grpc.ClientConn, error) {
+    return c.GRPCClient("static:///users",
+        grpcclient.WithInsecure(),
+        grpcclient.WithStaticResolver(map[string][]string{
+            "users": {"127.0.0.1:50051"},
+        }),
+    )
+}
+```
+
+`GRPCClient(target, opts...)` caches one `*grpc.ClientConn` per target
+string: repeat calls with the same target return the same conn, distinct
+targets get distinct conns. Options apply to the build only; later calls
+with different options keep the first build. The conns close with the
+container. `grpcclient.New` performs no IO, so resolving never dials —
+the connection is established lazily on the first RPC.
+
+## Runnable example
+
+```go
+package main
+
+import (
+    "context"
+    "fmt"
+
+    "github.com/zenta-dev/zever/shared/grpcclient"
+)
+
+func main() {
+    conn, err := grpcclient.New(context.Background(), "static:///users",
+        grpcclient.WithInsecure(),
+        grpcclient.WithStaticResolver(map[string][]string{
+            "users": {"127.0.0.1:50051", "127.0.0.2:50051"},
+        }))
+    if err != nil {
+        panic(err)
+    }
+    defer conn.Close()
+
+    fmt.Println("client created")
+}
+```
+
+Expected output:
+
+```text
+client created
+```
+
+Call generated service clients over the returned connection — `pb` is
+your generated protobuf package:
+
+```go
+client := pb.NewUsersClient(conn)
+resp, err := client.GetUser(ctx, &pb.GetUserRequest{Id: "u-1"})
+```
+
+## Interceptors
+
+Every connection chains unary and stream client interceptors in the same
+order, outermost to innermost:
+
+1. Observability span (when `WithObservability` is set) — covers the whole
+   call, including guard execution.
+2. W3C trace context injection from `shared/traceprop` into outgoing
+   metadata.
+3. `WithMetadata` keys — never overwriting keys already present in the
+   outgoing context.
+4. `WithTimeout` deadline — governs the whole call, including guard
+   retries.
+5. `WithGuard` execution — the `resilience.Guard` wraps the call in the
+   breaker/bulkhead/retry composition.
+
+For streams the guard wraps stream establishment only; messages exchanged
+after establishment are not guarded.
+
+## Production notes
+
+- Close semantics: the caller closes the `*grpc.ClientConn`
+  (`conn.Close()`); the container closes cached conns during
+  `Close(ctx)`. `New` itself performs no IO.
+- Multi-instance behavior: `round_robin` spreads RPCs across the resolved
+  addresses; pair it with the `redis` resilience adapter when replicas
+  must share one circuit per downstream dependency.
+- Redaction: metadata values can carry tenant or user context. Never log
+  raw metadata maps; use `config.RedactedServices` for config output.
+- Retry budgets are client-side: `MaxAttempts` is capped at 5 to match
+  gRPC's own limit. Keep `RetryableStatusCodes` minimal (typically
+  `UNAVAILABLE`) — retrying every failure multiplies load on a struggling
+  server.
+- `WithInsecure` is development and loopback only. Production connections
+  use `WithTLS` with a CA bundle; client certificates are optional
+  (mTLS) via `CertFile`/`KeyFile`.
+
+## Troubleshooting
+
+1. `ErrNoCredentials`: neither `WithInsecure` nor `WithTLS` was passed.
+  Credentials are explicit; pick one.
+2. `ErrInsecureAndTLS`: both were passed. They are mutually exclusive.
+3. `static resolver: unknown name`: the target name is not in the
+  `WithStaticResolver` map. The channel fails fast instead of dialing
+  nothing.
+4. Calls hang past the dependency's deadline: `WithTimeout` bounds the
+  whole call including guard retries; without it only the caller's
+  context applies.
+5. Retries never trigger: `RetryableStatusCodes` must list the status
+  codes to retry (gRPC rejects mixed-case code names — the helper maps
+  them to canonical form for you).
+
+## See also
+
+- [Resilience](./resilience.mdx) - the guard composition used by `WithGuard`
+- [Observability](./observability.mdx) - client spans and trace propagation
+- [Container](../architecture/container/) - `GRPCClient` caching and close order

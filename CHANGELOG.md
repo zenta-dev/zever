@@ -49,6 +49,17 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   `pg_logical_emit_message` + `START_REPLICATION`), registering the
   `outbox.CDC` adapter; live tests gated by `POSTGRES_DSN`.
 
+### Documentation
+
+- New digging-deeper guides for the microservice-readiness capabilities:
+  `resilience` (guard composition, error classification, `memory`/`redis`
+  adapters), `outbox` (transactional outbox/inbox, polling relay, DLQ,
+  `db`/`memory`/`cdc` adapters), `grpc-client` (round-robin, retry,
+  interceptors, TLS, container caching), and `saga` (pivot roll-forward,
+  reverse compensation, `RecoverStuckSagas`, `memory`/`db` adapters);
+  all four wired into the docs sidebar, with `production.md` and the
+  deploy checklists updated.
+
 ### Dependencies
 
 - Routine dependency refresh: `anthropics/anthropic-sdk-go` 1.75.0 → 1.76.0,
