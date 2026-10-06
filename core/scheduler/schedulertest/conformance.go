@@ -5,6 +5,7 @@ package schedulertest
 import (
 	"context"
 	"errors"
+	"fmt"
 	"strconv"
 	"strings"
 	"sync"
@@ -51,6 +52,18 @@ var (
 // queue: adapters must honor opts.Dispatcher (and opts.Locker when set)
 // rather than opening their own queue, so container.Job wiring stays the
 // single queue connection.
+// errf builds a non-wrapping descriptive error with Sprintf semantics.
+// Check helpers use it (instead of fmt.Errorf with %w) for diagnostics
+// where the formatted error may be nil: %w of a nil error prints
+// "%!w(<nil>)", diverging from the historical Fatalf text, and errorlint
+// forbids %v of an error in Errorf. Failure text stays byte-identical.
+// It deliberately avoids fmt.Errorf so only real failures wrap.
+func errf(format string, args ...any) error {
+	msg := fmt.Sprintf(format, args...)
+
+	return errors.New(msg)
+}
+
 func Conformance(t *testing.T, factory func(t *testing.T, d *job.Dispatcher) scheduler.Scheduler) {
 	t.Helper()
 
@@ -141,7 +154,9 @@ func kitScheduler(t *testing.T, factory func(t *testing.T, d *job.Dispatcher) sc
 	return s, q
 }
 
-// registerJob registers a no-op job under a process-unique name.
+// registerJob registers a no-op job under a process-unique name. It needs
+// a real *testing.T and stays outside the error-returning checks: the job
+// registry has no error-return path to unit-cover.
 func registerJob(t *testing.T) string {
 	t.Helper()
 
@@ -160,13 +175,21 @@ func conformanceScheduleEntries(t *testing.T, factory func(t *testing.T, d *job.
 	s, _ := kitScheduler(t, factory)
 	name := registerJob(t)
 
-	id, err := s.Schedule(t.Context(), "0 * * * *", name, nil)
+	if err := checkScheduleEntries(t.Context(), s, name); err != nil {
+		t.Fatal(err)
+	}
+}
+
+// checkScheduleEntries proves Schedule mints a nonzero EntryID listed by
+// Entries. Job registration stays in the caller: it needs *testing.T.
+func checkScheduleEntries(ctx context.Context, s scheduler.Scheduler, jobName string) error {
+	id, err := s.Schedule(ctx, "0 * * * *", jobName, nil)
 	if err != nil {
-		t.Fatalf("Schedule() error = %v", err)
+		return fmt.Errorf("Schedule() error = %w", err)
 	}
 
 	if id == 0 {
-		t.Fatal("Schedule() returned zero EntryID")
+		return errors.New("Schedule() returned zero EntryID")
 	}
 
 	found := false
@@ -180,47 +203,58 @@ func conformanceScheduleEntries(t *testing.T, factory func(t *testing.T, d *job.
 	}
 
 	if !found {
-		t.Errorf("Entries() = %v, missing %v", s.Entries(), id)
+		return fmt.Errorf("Entries() = %v, missing %v", s.Entries(), id)
 	}
 
 	if err := s.Stop(); err != nil {
-		t.Errorf("Stop() error = %v", err)
+		return fmt.Errorf("Stop() error = %w", err)
 	}
+
+	return nil
 }
 
 func conformanceRemove(t *testing.T, factory func(t *testing.T, d *job.Dispatcher) scheduler.Scheduler) {
 	t.Helper()
 
 	s, _ := kitScheduler(t, factory)
+	name := registerJob(t)
 
+	if err := checkRemove(t.Context(), s, name); err != nil {
+		t.Fatal(err)
+	}
+}
+
+// checkRemove proves Remove(0) errors, unknown IDs are a nil no-op, and a
+// scheduled entry disappears after Remove.
+func checkRemove(ctx context.Context, s scheduler.Scheduler, jobName string) error {
 	if err := s.Remove(0); err == nil {
-		t.Error("Remove(0) = nil, want error")
+		return errors.New("Remove(0) = nil, want error")
 	}
 
 	if err := s.Remove(999999); err != nil {
-		t.Errorf("Remove(unknown) error = %v, want nil", err)
+		return fmt.Errorf("Remove(unknown) error = %w, want nil", err)
 	}
 
-	name := registerJob(t)
-
-	id, err := s.Schedule(t.Context(), "0 * * * *", name, nil)
+	id, err := s.Schedule(ctx, "0 * * * *", jobName, nil)
 	if err != nil {
-		t.Fatalf("Schedule() error = %v", err)
+		return fmt.Errorf("Schedule() error = %w", err)
 	}
 
 	if err := s.Remove(id); err != nil {
-		t.Fatalf("Remove() error = %v", err)
+		return fmt.Errorf("Remove() error = %w", err)
 	}
 
 	for _, got := range s.Entries() {
 		if got == id {
-			t.Errorf("Entries() = %v, still contains %v", s.Entries(), id)
+			return fmt.Errorf("Entries() = %v, still contains %v", s.Entries(), id)
 		}
 	}
 
 	if err := s.Stop(); err != nil {
-		t.Errorf("Stop() error = %v", err)
+		return fmt.Errorf("Stop() error = %w", err)
 	}
+
+	return nil
 }
 
 func conformanceInvalidSpec(t *testing.T, factory func(t *testing.T, d *job.Dispatcher) scheduler.Scheduler) {
@@ -228,22 +262,33 @@ func conformanceInvalidSpec(t *testing.T, factory func(t *testing.T, d *job.Disp
 
 	s, _ := kitScheduler(t, factory)
 	name := registerJob(t)
-	ctx := t.Context()
+
+	if err := checkInvalidSpec(t.Context(), s, name); err != nil {
+		t.Fatal(err)
+	}
+}
+
+// checkInvalidSpec proves malformed specs fail closed with
+// ErrInvalidSpec (errors.As InvalidSpecError) and oversize specs too.
+func checkInvalidSpec(ctx context.Context, s scheduler.Scheduler, jobName string) error {
+	var errs []error
 
 	for _, spec := range []string{"", "not-a-spec", "0 0 0 0 0 0", "99 * * * *", "@every", strings.Repeat("*", scheduler.MaxSpecLen+1)} {
-		if _, err := s.Schedule(ctx, spec, name, nil); !errors.Is(err, scheduler.ErrInvalidSpec) {
-			t.Errorf("Schedule(%q) err = %v, want ErrInvalidSpec", spec, err)
+		if _, err := s.Schedule(ctx, spec, jobName, nil); !errors.Is(err, scheduler.ErrInvalidSpec) {
+			errs = append(errs, errf("Schedule(%q) err = %v, want ErrInvalidSpec", spec, err))
 		}
 	}
 
 	var specErr scheduler.InvalidSpecError
-	if _, err := s.Schedule(ctx, "not-a-spec", name, nil); !errors.As(err, &specErr) {
-		t.Errorf("errors.As(err, InvalidSpecError) = false (err = %T %v)", err, err)
+	if _, err := s.Schedule(ctx, "not-a-spec", jobName, nil); !errors.As(err, &specErr) {
+		errs = append(errs, errf("errors.As(err, InvalidSpecError) = false (err = %T %v)", err, err))
 	}
 
 	if err := s.Stop(); err != nil {
-		t.Errorf("Stop() error = %v", err)
+		errs = append(errs, fmt.Errorf("Stop() error = %w", err))
 	}
+
+	return errors.Join(errs...)
 }
 
 func conformanceUnknownJob(t *testing.T, factory func(t *testing.T, d *job.Dispatcher) scheduler.Scheduler) {
@@ -251,40 +296,72 @@ func conformanceUnknownJob(t *testing.T, factory func(t *testing.T, d *job.Dispa
 
 	s, _ := kitScheduler(t, factory)
 
-	if _, err := s.Schedule(t.Context(), "0 * * * *", "kit-no-such-job", nil); !errors.Is(err, job.ErrUnknownJob) {
-		t.Errorf("Schedule(unknown job) err = %v, want job.ErrUnknownJob", err)
+	if err := checkUnknownJob(t.Context(), s); err != nil {
+		t.Fatal(err)
+	}
+}
+
+// checkUnknownJob proves scheduling an unregistered job reports
+// job.ErrUnknownJob.
+func checkUnknownJob(ctx context.Context, s scheduler.Scheduler) error {
+	var errs []error
+
+	if _, err := s.Schedule(ctx, "0 * * * *", "kit-no-such-job", nil); !errors.Is(err, job.ErrUnknownJob) {
+		errs = append(errs, errf("Schedule(unknown job) err = %v, want job.ErrUnknownJob", err))
 	}
 
 	if err := s.Stop(); err != nil {
-		t.Errorf("Stop() error = %v", err)
+		errs = append(errs, fmt.Errorf("Stop() error = %w", err))
 	}
+
+	return errors.Join(errs...)
 }
 
 func conformanceStartStop(t *testing.T, factory func(t *testing.T, d *job.Dispatcher) scheduler.Scheduler) {
 	t.Helper()
 
 	fresh, _ := kitScheduler(t, factory)
-	if err := fresh.Stop(); err != nil {
-		t.Errorf("Stop() without Start error = %v, want nil", err)
+	if err := checkStopFresh(fresh); err != nil {
+		t.Fatal(err)
 	}
 
 	s, _ := kitScheduler(t, factory)
+	if err := checkStartStop(s); err != nil {
+		t.Fatal(err)
+	}
+}
 
-	if err := s.Start(); err != nil {
-		t.Fatalf("Start() error = %v", err)
+// checkStopFresh proves Stop without Start stays nil.
+func checkStopFresh(s scheduler.Scheduler) error {
+	if err := s.Stop(); err != nil {
+		return fmt.Errorf("Stop() without Start error = %w, want nil", err)
 	}
 
+	return nil
+}
+
+// checkStartStop proves Start is idempotent, Stop ends ticks, and Name
+// is set.
+func checkStartStop(s scheduler.Scheduler) error {
 	if err := s.Start(); err != nil {
-		t.Errorf("Start() second error = %v, want nil", err)
+		return fmt.Errorf("Start() error = %w", err)
+	}
+
+	var errs []error
+
+	if err := s.Start(); err != nil {
+		errs = append(errs, fmt.Errorf("Start() second error = %w, want nil", err))
 	}
 
 	if err := s.Stop(); err != nil {
-		t.Errorf("Stop() error = %v", err)
+		errs = append(errs, fmt.Errorf("Stop() error = %w", err))
 	}
 
 	if got := s.Name(); got == "" {
-		t.Error("Name() is empty")
+		errs = append(errs, errors.New("Name() is empty"))
 	}
+
+	return errors.Join(errs...)
 }
 
 func conformanceFire(t *testing.T, factory func(t *testing.T, d *job.Dispatcher) scheduler.Scheduler) {
@@ -293,43 +370,52 @@ func conformanceFire(t *testing.T, factory func(t *testing.T, d *job.Dispatcher)
 	s, q := kitScheduler(t, factory)
 	name := registerJob(t)
 
-	if _, err := s.Schedule(t.Context(), "@every 1s", name, "ping"); err != nil {
-		t.Fatalf("Schedule() error = %v", err)
+	t.Cleanup(func() { _ = s.Stop() })
+
+	if err := checkFire(t.Context(), s, q, name, DefaultFireTimeout, DefaultPollInterval); err != nil {
+		t.Fatal(err)
+	}
+}
+
+// checkFire proves an @every schedule dispatches the job payload onto
+// the queue within timeout. Timeout/interval are parameters so unit
+// tests drive both the delivery and timeout branches.
+func checkFire(ctx context.Context, s scheduler.Scheduler, q queue.Queue, jobName string, timeout, interval time.Duration) error {
+	if _, err := s.Schedule(ctx, "@every 1s", jobName, "ping"); err != nil {
+		return fmt.Errorf("Schedule() error = %w", err)
 	}
 
 	if err := s.Start(); err != nil {
-		t.Fatalf("Start() error = %v", err)
+		return fmt.Errorf("Start() error = %w", err)
 	}
 
-	t.Cleanup(func() { _ = s.Stop() })
-
-	ctx, cancel := context.WithTimeout(t.Context(), DefaultFireTimeout)
+	ctx, cancel := context.WithTimeout(ctx, timeout)
 	defer cancel()
 
-	ticker := time.NewTicker(DefaultPollInterval)
+	ticker := time.NewTicker(interval)
 	defer ticker.Stop()
 
 	for {
 		msg, err := q.Pop(ctx, "low")
 		if err == nil {
-			if msg.Headers["job_name"] != name {
-				t.Fatalf("job_name = %q, want %q", msg.Headers["job_name"], name)
+			if msg.Headers["job_name"] != jobName {
+				return fmt.Errorf("job_name = %q, want %q", msg.Headers["job_name"], jobName)
 			}
 
 			if string(msg.Payload) != `"ping"` {
-				t.Fatalf("payload = %s, want %s", msg.Payload, `"ping"`)
+				return fmt.Errorf("payload = %s, want %s", msg.Payload, `"ping"`)
 			}
 
-			return
+			return nil
 		}
 
-		if !errors.Is(err, queue.ErrEmpty) {
-			t.Fatalf("Pop() error = %v", err)
+		if !errors.Is(err, queue.ErrEmpty) && !errors.Is(err, context.Canceled) && !errors.Is(err, context.DeadlineExceeded) {
+			return errf("Pop() error = %v", err)
 		}
 
 		select {
 		case <-ctx.Done():
-			t.Fatal("no scheduled dispatch within timeout")
+			return errors.New("no scheduled dispatch within timeout")
 		case <-ticker.C:
 		}
 	}
@@ -339,30 +425,44 @@ func conformanceOpenRegister(t *testing.T, factory func(t *testing.T, d *job.Dis
 	t.Helper()
 
 	s, _ := kitScheduler(t, factory)
+
+	if err := checkOpenRegister(s); err != nil {
+		t.Fatal(err)
+	}
+}
+
+// checkOpenRegister proves the production Open path returns the
+// registered scheduler, rejects duplicates, and reports unknown
+// adapters. The dispatcher for Open uses a throwaway stub queue.
+func checkOpenRegister(s scheduler.Scheduler) error {
 	name := scheduler.Adapter("kit-open-test-" + strconv.FormatUint(adapterSeq.Add(1), 10))
 
 	if err := scheduler.Register(name, func(scheduler.Options) (scheduler.Scheduler, error) { return s, nil }); err != nil {
-		t.Fatalf("Register() error = %v", err)
+		return fmt.Errorf("Register() error = %w", err)
 	}
 
 	if err := scheduler.Register(name, func(scheduler.Options) (scheduler.Scheduler, error) { return s, nil }); !errors.Is(err, scheduler.ErrDuplicate) {
-		t.Fatalf("Register(dup) err = %v, want ErrDuplicate", err)
+		return fmt.Errorf("Register(dup) err = %w, want ErrDuplicate", err)
 	}
 
 	opened, err := scheduler.Open(name, scheduler.Options{Dispatcher: &job.Dispatcher{Q: newStubQueue()}})
 	if err != nil {
-		t.Fatalf("Open() error = %v", err)
+		return fmt.Errorf("Open() error = %w", err)
 	}
 
+	var errs []error
+
 	if opened != s {
-		t.Error("Open() did not return the registered scheduler")
+		errs = append(errs, errors.New("Open() did not return the registered scheduler"))
 	}
 
 	if _, err := scheduler.Open("kit-no-such-adapter", scheduler.Options{Dispatcher: &job.Dispatcher{Q: newStubQueue()}}); !errors.Is(err, scheduler.ErrUnknownAdapter) {
-		t.Errorf("Open(unknown) err = %v, want ErrUnknownAdapter", err)
+		errs = append(errs, errf("Open(unknown) err = %v, want ErrUnknownAdapter", err))
 	}
 
 	if err := s.Stop(); err != nil {
-		t.Errorf("Stop() error = %v", err)
+		errs = append(errs, fmt.Errorf("Stop() error = %w", err))
 	}
+
+	return errors.Join(errs...)
 }

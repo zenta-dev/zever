@@ -4,6 +4,7 @@ package cachetest
 import (
 	"context"
 	"errors"
+	"fmt"
 	"testing"
 	"time"
 
@@ -20,6 +21,18 @@ const (
 	// DefaultPollInterval is the tick between expiry-poll attempts.
 	DefaultPollInterval = 5 * time.Millisecond
 )
+
+// errf builds a non-wrapping descriptive error with Sprintf semantics.
+// Check helpers use it (instead of fmt.Errorf with %w) for diagnostics
+// where the formatted error may be nil: %w of a nil error prints
+// "%!w(<nil>)", diverging from the historical Fatalf text, and errorlint
+// forbids %v of an error in Errorf. Failure text stays byte-identical.
+// It deliberately avoids fmt.Errorf so only real failures wrap.
+func errf(format string, args ...any) error {
+	msg := fmt.Sprintf(format, args...)
+
+	return errors.New(msg)
+}
 
 // Conformance verifies factory-built caches implement the cache.Cache contract:
 // Get/Set round-trip, TTL expiry, SetIfAbsent, Delete, Increment/Decrement,
@@ -47,78 +60,93 @@ func Conformance(t *testing.T, factory func(t *testing.T) cache.Cache) {
 func conformanceGetSet(t *testing.T, factory func(t *testing.T) cache.Cache) {
 	t.Helper()
 
-	ctx := t.Context()
-	c := factory(t)
+	if err := checkGetSet(t.Context(), factory(t)); err != nil {
+		t.Fatal(err)
+	}
+}
 
+// checkGetSet proves Get/Set round-trip with defensive copies both ways
+// plus overwrite. The first violation aborts; soft value mismatches join.
+func checkGetSet(ctx context.Context, c cache.Cache) error {
 	if _, err := c.Get(ctx, "missing"); !errors.Is(err, cache.ErrNotFound) {
-		t.Fatalf("Get(missing) err = %v, want ErrNotFound", err)
+		return errf("Get(missing) err = %v, want ErrNotFound", err)
 	}
 
 	var nfErr cache.NotFoundError
 	if _, err := c.Get(ctx, "missing"); !errors.As(err, &nfErr) {
-		t.Fatalf("errors.As(err, NotFoundError) = false (err = %T %v)", err, err)
+		return errf("errors.As(err, NotFoundError) = false (err = %T %v)", err, err)
 	}
 
+	var errs []error
+
 	if nfErr.Key != "missing" {
-		t.Errorf("NotFoundError.Key = %q, want missing", nfErr.Key)
+		errs = append(errs, fmt.Errorf("NotFoundError.Key = %q, want missing", nfErr.Key))
 	}
 
 	val := []byte("v1")
 	if err := c.Set(ctx, "k", val, 0); err != nil {
-		t.Fatalf("Set() error = %v", err)
+		return fmt.Errorf("Set() error = %w", err)
 	}
 
 	val[0] = 'X'
 
 	got, err := c.Get(ctx, "k")
 	if err != nil {
-		t.Fatalf("Get() error = %v", err)
+		return fmt.Errorf("Get() error = %w", err)
 	}
 
 	if string(got) != "v1" {
-		t.Fatalf("Get() = %q, want v1 (stored copy)", got)
+		return fmt.Errorf("Get() = %q, want v1 (stored copy)", got)
 	}
 
 	got[0] = 'Y'
 
 	again, err := c.Get(ctx, "k")
 	if err != nil {
-		t.Fatalf("Get() error = %v", err)
+		return fmt.Errorf("Get() error = %w", err)
 	}
 
 	if string(again) != "v1" {
-		t.Fatalf("Get() = %q, want v1 (returned copy)", again)
+		return fmt.Errorf("Get() = %q, want v1 (returned copy)", again)
 	}
 
 	if err = c.Set(ctx, "k", []byte("v2"), 0); err != nil {
-		t.Fatalf("Set() overwrite error = %v", err)
+		return fmt.Errorf("Set() overwrite error = %w", err)
 	}
 
 	got, err = c.Get(ctx, "k")
 	if err != nil {
-		t.Fatalf("Get() error = %v", err)
+		return fmt.Errorf("Get() error = %w", err)
 	}
 
 	if string(got) != "v2" {
-		t.Errorf("Get() = %q, want v2", got)
+		errs = append(errs, fmt.Errorf("Get() = %q, want v2", got))
 	}
+
+	return errors.Join(errs...)
 }
 
 func conformanceTTLExpiry(t *testing.T, factory func(t *testing.T) cache.Cache) {
 	t.Helper()
 
-	ctx := t.Context()
-	c := factory(t)
+	if err := checkTTLExpiry(t.Context(), factory(t), DefaultExpiryTimeout); err != nil {
+		t.Fatal(err)
+	}
+}
 
+// checkTTLExpiry proves a TTL entry is readable before expiry, vanishes
+// from Get and Exists after polling, and that TTL-zero entries persist.
+// Timeout/interval are parameters so unit tests drive both branches fast.
+func checkTTLExpiry(ctx context.Context, c cache.Cache, timeout time.Duration) error {
 	if err := c.Set(ctx, "k", []byte("v"), DefaultEntryTTL); err != nil {
-		t.Fatalf("Set() error = %v", err)
+		return fmt.Errorf("Set() error = %w", err)
 	}
 
 	if _, err := c.Get(ctx, "k"); err != nil {
-		t.Fatalf("Get() before expiry error = %v", err)
+		return fmt.Errorf("Get() before expiry error = %w", err)
 	}
 
-	eventually(t, "key expired from Get", func(ctx context.Context) bool {
+	if err := pollExpiry(ctx, timeout, "key expired from Get", func(ctx context.Context) bool {
 		_, err := c.Get(ctx, "k")
 		if errors.Is(err, cache.ErrNotFound) {
 			return true
@@ -127,9 +155,11 @@ func conformanceTTLExpiry(t *testing.T, factory func(t *testing.T) cache.Cache) 
 		maybeFastForward(c)
 
 		return false
-	})
+	}); err != nil {
+		return err
+	}
 
-	eventually(t, "exists false after expiry", func(ctx context.Context) bool {
+	if err := pollExpiry(ctx, timeout, "exists false after expiry", func(ctx context.Context) bool {
 		ok, _ := c.Exists(ctx, "k")
 		if !ok {
 			return true
@@ -138,47 +168,56 @@ func conformanceTTLExpiry(t *testing.T, factory func(t *testing.T) cache.Cache) 
 		maybeFastForward(c)
 
 		return false
-	})
+	}); err != nil {
+		return err
+	}
 
 	if err := c.Set(ctx, "keep", []byte("v"), 0); err != nil {
-		t.Fatalf("Set() error = %v", err)
+		return fmt.Errorf("Set() error = %w", err)
 	}
 
 	if _, err := c.Get(ctx, "keep"); err != nil {
-		t.Errorf("Get(keep) error = %v, want retained (no ttl)", err)
+		return fmt.Errorf("Get(keep) error = %w, want retained (no ttl)", err)
 	}
+
+	return nil
 }
 
 func conformanceSetIfAbsent(t *testing.T, factory func(t *testing.T) cache.Cache) {
 	t.Helper()
 
-	ctx := t.Context()
-	c := factory(t)
+	if err := checkSetIfAbsent(t.Context(), factory(t), DefaultExpiryTimeout); err != nil {
+		t.Fatal(err)
+	}
+}
 
+// checkSetIfAbsent proves first-write-wins, overwrite refusal, and that
+// an expired key is claimable again after polling.
+func checkSetIfAbsent(ctx context.Context, c cache.Cache, timeout time.Duration) error {
 	ok, err := c.SetIfAbsent(ctx, "k", []byte("v1"), 0)
 	if err != nil || !ok {
-		t.Fatalf("SetIfAbsent() = %v,%v want true,nil", ok, err)
+		return errf("SetIfAbsent() = %v,%v want true,nil", ok, err)
 	}
 
 	ok, err = c.SetIfAbsent(ctx, "k", []byte("v2"), 0)
 	if err != nil || ok {
-		t.Fatalf("SetIfAbsent() second = %v,%v want false,nil", ok, err)
+		return errf("SetIfAbsent() second = %v,%v want false,nil", ok, err)
 	}
 
 	got, err := c.Get(ctx, "k")
 	if err != nil {
-		t.Fatalf("Get() error = %v", err)
+		return fmt.Errorf("Get() error = %w", err)
 	}
 
 	if string(got) != "v1" {
-		t.Errorf("Get() = %q, want v1", got)
+		return fmt.Errorf("Get() = %q, want v1", got)
 	}
 
 	if err = c.Set(ctx, "e", []byte("old"), DefaultEntryTTL); err != nil {
-		t.Fatalf("Set() error = %v", err)
+		return fmt.Errorf("Set() error = %w", err)
 	}
 
-	eventually(t, "expired key accepted by SetIfAbsent", func(ctx context.Context) bool {
+	if pollErr := pollExpiry(ctx, timeout, "expired key accepted by SetIfAbsent", func(ctx context.Context) bool {
 		ok, _ := c.SetIfAbsent(ctx, "e", []byte("new"), 0)
 		if ok {
 			return true
@@ -187,169 +226,205 @@ func conformanceSetIfAbsent(t *testing.T, factory func(t *testing.T) cache.Cache
 		maybeFastForward(c)
 
 		return false
-	})
+	}); pollErr != nil {
+		return pollErr
+	}
 
 	got, err = c.Get(ctx, "e")
 	if err != nil {
-		t.Fatalf("Get() error = %v", err)
+		return fmt.Errorf("Get() error = %w", err)
 	}
 
 	if string(got) != "new" {
-		t.Errorf("Get() = %q, want new", got)
+		return fmt.Errorf("Get() = %q, want new", got)
 	}
+
+	return nil
 }
 
 func conformanceDelete(t *testing.T, factory func(t *testing.T) cache.Cache) {
 	t.Helper()
 
-	ctx := t.Context()
-	c := factory(t)
+	if err := checkDelete(t.Context(), factory(t)); err != nil {
+		t.Fatal(err)
+	}
+}
 
+// checkDelete proves Delete is idempotent and that deleted keys read
+// back missing. Soft mismatches join so all are reported.
+func checkDelete(ctx context.Context, c cache.Cache) error {
 	if err := c.Delete(ctx, "missing"); err != nil {
-		t.Fatalf("Delete(missing) error = %v, want nil", err)
+		return fmt.Errorf("Delete(missing) error = %w, want nil", err)
 	}
 
 	if err := c.Set(ctx, "k", []byte("v"), 0); err != nil {
-		t.Fatalf("Set() error = %v", err)
+		return fmt.Errorf("Set() error = %w", err)
 	}
 
 	if err := c.Delete(ctx, "k"); err != nil {
-		t.Fatalf("Delete() error = %v", err)
+		return fmt.Errorf("Delete() error = %w", err)
 	}
 
+	var errs []error
+
 	if _, err := c.Get(ctx, "k"); !errors.Is(err, cache.ErrNotFound) {
-		t.Errorf("errors.Is(err, ErrNotFound) = false (err = %v)", err)
+		errs = append(errs, errf("errors.Is(err, ErrNotFound) = false (err = %v)", err))
 	}
 
 	if ok, err := c.Exists(ctx, "k"); err != nil || ok {
-		t.Errorf("Exists() = %v,%v want false,nil", ok, err)
+		errs = append(errs, errf("Exists() = %v,%v want false,nil", ok, err))
 	}
 
 	if err := c.Delete(ctx, "k"); err != nil {
-		t.Errorf("Delete(again) error = %v, want nil", err)
+		errs = append(errs, fmt.Errorf("Delete(again) error = %w, want nil", err))
 	}
+
+	return errors.Join(errs...)
 }
 
 func conformanceCounters(t *testing.T, factory func(t *testing.T) cache.Cache) {
 	t.Helper()
 
-	ctx := t.Context()
-	c := factory(t)
+	if err := checkCounters(t.Context(), factory(t)); err != nil {
+		t.Fatal(err)
+	}
+}
 
+// checkCounters proves Increment from missing starts at 1, Increment and
+// Decrement compose, Decrement from missing starts at -1, numeric strings
+// increment, and non-numeric values report ErrInvalidValue with the key.
+func checkCounters(ctx context.Context, c cache.Cache) error {
 	if err := c.Increment(ctx, "n"); err != nil {
-		t.Fatalf("Increment() error = %v", err)
+		return fmt.Errorf("Increment() error = %w", err)
 	}
 
 	got, err := c.Get(ctx, "n")
 	if err != nil {
-		t.Fatalf("Get() error = %v", err)
+		return fmt.Errorf("Get() error = %w", err)
 	}
 
 	if string(got) != "1" {
-		t.Fatalf("Get() = %q, want 1", got)
+		return fmt.Errorf("Get() = %q, want 1", got)
 	}
 
 	if err = c.Increment(ctx, "n"); err != nil {
-		t.Fatalf("Increment() error = %v", err)
+		return fmt.Errorf("Increment() error = %w", err)
 	}
 
 	if err = c.Decrement(ctx, "n"); err != nil {
-		t.Fatalf("Decrement() error = %v", err)
+		return fmt.Errorf("Decrement() error = %w", err)
 	}
 
 	got, err = c.Get(ctx, "n")
 	if err != nil {
-		t.Fatalf("Get() error = %v", err)
+		return fmt.Errorf("Get() error = %w", err)
 	}
 
+	var errs []error
+
 	if string(got) != "1" {
-		t.Errorf("Get() = %q, want 1", got)
+		errs = append(errs, fmt.Errorf("Get() = %q, want 1", got))
 	}
 
 	if err = c.Decrement(ctx, "fresh"); err != nil {
-		t.Fatalf("Decrement() error = %v", err)
+		errs = append(errs, fmt.Errorf("Decrement() error = %w", err))
+		return errors.Join(errs...)
 	}
 
 	got, err = c.Get(ctx, "fresh")
 	if err != nil {
-		t.Fatalf("Get() error = %v", err)
+		errs = append(errs, fmt.Errorf("Get() error = %w", err))
+		return errors.Join(errs...)
 	}
 
 	if string(got) != "-1" {
-		t.Errorf("Get() = %q, want -1 (missing base)", got)
+		errs = append(errs, fmt.Errorf("Get() = %q, want -1 (missing base)", got))
 	}
 
 	if err = c.Set(ctx, "base", []byte("41"), 0); err != nil {
-		t.Fatalf("Set() error = %v", err)
+		errs = append(errs, fmt.Errorf("Set() error = %w", err))
+		return errors.Join(errs...)
 	}
 
 	if err = c.Increment(ctx, "base"); err != nil {
-		t.Fatalf("Increment() error = %v", err)
+		errs = append(errs, fmt.Errorf("Increment() error = %w", err))
+		return errors.Join(errs...)
 	}
 
 	got, err = c.Get(ctx, "base")
 	if err != nil {
-		t.Fatalf("Get() error = %v", err)
+		errs = append(errs, fmt.Errorf("Get() error = %w", err))
+		return errors.Join(errs...)
 	}
 
 	if string(got) != "42" {
-		t.Errorf("Get() = %q, want 42", got)
+		errs = append(errs, fmt.Errorf("Get() = %q, want 42", got))
 	}
 
 	if err = c.Set(ctx, "bad", []byte("abc"), 0); err != nil {
-		t.Fatalf("Set() error = %v", err)
+		errs = append(errs, fmt.Errorf("Set() error = %w", err))
+		return errors.Join(errs...)
 	}
 
 	err = c.Increment(ctx, "bad")
 	if err == nil {
-		t.Fatal("Increment(abc) = nil, want ErrInvalidValue")
+		errs = append(errs, errors.New("Increment(abc) = nil, want ErrInvalidValue"))
+		return errors.Join(errs...)
 	}
 
 	if !errors.Is(err, cache.ErrInvalidValue) {
-		t.Errorf("errors.Is(err, ErrInvalidValue) = false (err = %v)", err)
+		errs = append(errs, errf("errors.Is(err, ErrInvalidValue) = false (err = %v)", err))
 	}
 
 	var invErr cache.InvalidValueError
 	if !errors.As(err, &invErr) {
-		t.Fatalf("errors.As(err, InvalidValueError) = false (err = %T %v)", err, err)
+		errs = append(errs, errf("errors.As(err, InvalidValueError) = false (err = %T %v)", err, err))
+		return errors.Join(errs...)
 	}
 
 	if invErr.Key != "bad" {
-		t.Errorf("InvalidValueError.Key = %q, want bad", invErr.Key)
+		errs = append(errs, fmt.Errorf("InvalidValueError.Key = %q, want bad", invErr.Key))
 	}
+
+	return errors.Join(errs...)
 }
 
 func conformanceExists(t *testing.T, factory func(t *testing.T) cache.Cache) {
 	t.Helper()
 
-	ctx := t.Context()
-	c := factory(t)
+	if err := checkExists(t.Context(), factory(t), DefaultExpiryTimeout); err != nil {
+		t.Fatal(err)
+	}
+}
 
+// checkExists proves Exists tracks Set/Delete and flips false after TTL
+// expiry polling.
+func checkExists(ctx context.Context, c cache.Cache, timeout time.Duration) error {
 	if ok, err := c.Exists(ctx, "missing"); err != nil || ok {
-		t.Fatalf("Exists() = %v,%v want false,nil", ok, err)
+		return errf("Exists() = %v,%v want false,nil", ok, err)
 	}
 
 	if err := c.Set(ctx, "k", []byte("v"), 0); err != nil {
-		t.Fatalf("Set() error = %v", err)
+		return fmt.Errorf("Set() error = %w", err)
 	}
 
 	if ok, err := c.Exists(ctx, "k"); err != nil || !ok {
-		t.Fatalf("Exists() = %v,%v want true,nil", ok, err)
+		return errf("Exists() = %v,%v want true,nil", ok, err)
 	}
 
 	if err := c.Delete(ctx, "k"); err != nil {
-		t.Fatalf("Delete() error = %v", err)
+		return fmt.Errorf("Delete() error = %w", err)
 	}
 
 	if ok, err := c.Exists(ctx, "k"); err != nil || ok {
-		t.Fatalf("Exists() after delete = %v,%v want false,nil", ok, err)
+		return errf("Exists() after delete = %v,%v want false,nil", ok, err)
 	}
 
 	if err := c.Set(ctx, "e", []byte("v"), DefaultEntryTTL); err != nil {
-		t.Fatalf("Set() error = %v", err)
+		return fmt.Errorf("Set() error = %w", err)
 	}
 
-	eventually(t, "exists false for expired entry", func(ctx context.Context) bool {
+	return pollExpiry(ctx, timeout, "exists false for expired entry", func(ctx context.Context) bool {
 		ok, err := c.Exists(ctx, "e")
 		if err == nil && !ok {
 			return true
@@ -364,44 +439,53 @@ func conformanceExists(t *testing.T, factory func(t *testing.T) cache.Cache) {
 func conformanceClose(t *testing.T, factory func(t *testing.T) cache.Cache) {
 	t.Helper()
 
-	ctx := t.Context()
-	c := factory(t)
+	if err := checkClose(t.Context(), factory(t)); err != nil {
+		t.Fatal(err)
+	}
+}
 
+// checkClose proves Close is idempotent and every method reports
+// ErrClosed afterwards. Soft mismatches join so all are reported.
+func checkClose(ctx context.Context, c cache.Cache) error {
 	if err := c.Close(ctx); err != nil {
-		t.Fatalf("Close() error = %v", err)
+		return fmt.Errorf("Close() error = %w", err)
 	}
 
+	var errs []error
+
 	if err := c.Close(ctx); err != nil {
-		t.Errorf("Close() second error = %v, want nil", err)
+		errs = append(errs, fmt.Errorf("Close() second error = %w, want nil", err))
 	}
 
 	if _, err := c.Get(ctx, "k"); !errors.Is(err, cache.ErrClosed) {
-		t.Errorf("Get() err = %v, want ErrClosed", err)
+		errs = append(errs, errf("Get() err = %v, want ErrClosed", err))
 	}
 
 	if err := c.Set(ctx, "k", []byte("v"), 0); !errors.Is(err, cache.ErrClosed) {
-		t.Errorf("Set() err = %v, want ErrClosed", err)
+		errs = append(errs, errf("Set() err = %v, want ErrClosed", err))
 	}
 
 	if _, err := c.SetIfAbsent(ctx, "k", []byte("v"), 0); !errors.Is(err, cache.ErrClosed) {
-		t.Errorf("SetIfAbsent() err = %v, want ErrClosed", err)
+		errs = append(errs, errf("SetIfAbsent() err = %v, want ErrClosed", err))
 	}
 
 	if err := c.Delete(ctx, "k"); !errors.Is(err, cache.ErrClosed) {
-		t.Errorf("Delete() err = %v, want ErrClosed", err)
+		errs = append(errs, errf("Delete() err = %v, want ErrClosed", err))
 	}
 
 	if err := c.Increment(ctx, "k"); !errors.Is(err, cache.ErrClosed) {
-		t.Errorf("Increment() err = %v, want ErrClosed", err)
+		errs = append(errs, errf("Increment() err = %v, want ErrClosed", err))
 	}
 
 	if err := c.Decrement(ctx, "k"); !errors.Is(err, cache.ErrClosed) {
-		t.Errorf("Decrement() err = %v, want ErrClosed", err)
+		errs = append(errs, errf("Decrement() err = %v, want ErrClosed", err))
 	}
 
 	if _, err := c.Exists(ctx, "k"); !errors.Is(err, cache.ErrClosed) {
-		t.Errorf("Exists() err = %v, want ErrClosed", err)
+		errs = append(errs, errf("Exists() err = %v, want ErrClosed", err))
 	}
+
+	return errors.Join(errs...)
 }
 
 // fastForwarder is implemented by conformance factories running against
@@ -419,13 +503,13 @@ func maybeFastForward(c cache.Cache) {
 	}
 }
 
-// eventually polls cond until true or DefaultExpiryTimeout elapses. Poll
-// ticks use a ticker, never time.Sleep, and cond receives a deadline-bound
-// context so backend calls share the same deadline.
-func eventually(t *testing.T, msg string, cond func(ctx context.Context) bool) {
-	t.Helper()
-
-	ctx, cancel := context.WithTimeout(t.Context(), DefaultExpiryTimeout)
+// pollExpiry polls cond until true or timeout elapses, ticking every
+// interval. It returns a descriptive error on timeout so check helpers
+// can propagate it without touching *testing.T. (It replaces the old
+// eventually(t, ...) helper, whose timeout branch was uncoverable: a
+// *testing.T failure cannot be scripted without a real test run.)
+func pollExpiry(ctx context.Context, timeout time.Duration, msg string, cond func(ctx context.Context) bool) error {
+	ctx, cancel := context.WithTimeout(ctx, timeout)
 	defer cancel()
 
 	ticker := time.NewTicker(DefaultPollInterval)
@@ -433,12 +517,12 @@ func eventually(t *testing.T, msg string, cond func(ctx context.Context) bool) {
 
 	for {
 		if cond(ctx) {
-			return
+			return nil
 		}
 
 		select {
 		case <-ctx.Done():
-			t.Fatalf("condition not met within %v: %s", DefaultExpiryTimeout, msg)
+			return fmt.Errorf("condition not met within %v: %s", timeout, msg)
 		case <-ticker.C:
 		}
 	}

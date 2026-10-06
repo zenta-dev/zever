@@ -5,6 +5,7 @@ package sessiontest
 import (
 	"context"
 	"errors"
+	"fmt"
 	"strconv"
 	"sync/atomic"
 	"testing"
@@ -33,6 +34,18 @@ var adapterSeq atomic.Uint64
 //
 // Data values stay JSON-shaped (strings) because DB-backed stores
 // round-trip Data through JSON while memory stores keep values as-is.
+// errf builds a non-wrapping descriptive error with Sprintf semantics.
+// Check helpers use it (instead of fmt.Errorf with %w) for diagnostics
+// where the formatted error may be nil: %w of a nil error prints
+// "%!w(<nil>)", diverging from the historical Fatalf text, and errorlint
+// forbids %v of an error in Errorf. Failure text stays byte-identical.
+// It deliberately avoids fmt.Errorf so only real failures wrap.
+func errf(format string, args ...any) error {
+	msg := fmt.Sprintf(format, args...)
+
+	return errors.New(msg)
+}
+
 func Conformance(t *testing.T, factory func(t *testing.T) session.Store) {
 	t.Helper()
 
@@ -48,217 +61,285 @@ func Conformance(t *testing.T, factory func(t *testing.T) session.Store) {
 func conformanceCreateGet(t *testing.T, factory func(t *testing.T) session.Store) {
 	t.Helper()
 
-	ctx := t.Context()
-	s := factory(t)
+	if err := checkCreateGet(t.Context(), factory(t)); err != nil {
+		t.Fatal(err)
+	}
+}
 
+// checkCreateGet proves Create mints a valid ID with absolute expiry and
+// Get round-trips it, while unknown IDs report ErrNotFound.
+func checkCreateGet(ctx context.Context, s session.Store) error {
 	created, err := s.Create(ctx, time.Hour)
 	if err != nil {
-		t.Fatalf("Create() error = %v", err)
+		return fmt.Errorf("Create() error = %w", err)
 	}
 
 	if verr := session.ValidateID(created.ID); verr != nil {
-		t.Fatalf("Create() ID invalid: %v", verr)
+		return fmt.Errorf("Create() ID invalid: %w", verr)
 	}
 
 	if created.ExpiresAt.IsZero() {
-		t.Fatal("Create(hour) ExpiresAt is zero, want absolute expiry")
+		return errors.New("Create(hour) ExpiresAt is zero, want absolute expiry")
 	}
 
 	got, err := s.Get(ctx, created.ID)
 	if err != nil {
-		t.Fatalf("Get() error = %v", err)
+		return fmt.Errorf("Get() error = %w", err)
 	}
 
+	var errs []error
+
 	if got.ID != created.ID {
-		t.Errorf("Get().ID = %q, want %q", got.ID, created.ID)
+		errs = append(errs, fmt.Errorf("Get().ID = %q, want %q", got.ID, created.ID))
 	}
 
 	if _, err := s.Get(ctx, session.NewID()); !errors.Is(err, session.ErrNotFound) {
-		t.Errorf("Get(unknown) err = %v, want ErrNotFound", err)
+		errs = append(errs, errf("Get(unknown) err = %v, want ErrNotFound", err))
 	}
+
+	return errors.Join(errs...)
 }
 
 func conformanceSave(t *testing.T, factory func(t *testing.T) session.Store) {
 	t.Helper()
 
-	ctx := t.Context()
-	s := factory(t)
+	if err := checkSave(t.Context(), factory(t)); err != nil {
+		t.Fatal(err)
+	}
+}
 
+// checkSave proves Save persists Data mutations visible on the next Get.
+func checkSave(ctx context.Context, s session.Store) error {
 	created, err := s.Create(ctx, time.Hour)
 	if err != nil {
-		t.Fatalf("Create() error = %v", err)
+		return fmt.Errorf("Create() error = %w", err)
 	}
 
 	created.Data["user"] = "u123"
 
 	if serr := s.Save(ctx, created); serr != nil {
-		t.Fatalf("Save() error = %v", serr)
+		return fmt.Errorf("Save() error = %w", serr)
 	}
 
 	got, err := s.Get(ctx, created.ID)
 	if err != nil {
-		t.Fatalf("Get() error = %v", err)
+		return fmt.Errorf("Get() error = %w", err)
 	}
 
+	var errs []error
+
 	if got.Data["user"] != "u123" {
-		t.Errorf("Get().Data[user] = %v, want u123", got.Data["user"])
+		errs = append(errs, fmt.Errorf("Get().Data[user] = %v, want u123", got.Data["user"]))
 	}
 
 	if got.ID != created.ID {
-		t.Errorf("Get().ID = %q, want %q", got.ID, created.ID)
+		errs = append(errs, fmt.Errorf("Get().ID = %q, want %q", got.ID, created.ID))
 	}
+
+	return errors.Join(errs...)
 }
 
 func conformanceDelete(t *testing.T, factory func(t *testing.T) session.Store) {
 	t.Helper()
 
-	ctx := t.Context()
-	s := factory(t)
+	if err := checkDelete(t.Context(), factory(t)); err != nil {
+		t.Fatal(err)
+	}
+}
 
+// checkDelete proves Delete is idempotent (nil on missing IDs) and that
+// deleted sessions read back as ErrNotFound.
+func checkDelete(ctx context.Context, s session.Store) error {
 	if err := s.Delete(ctx, session.NewID()); err != nil {
-		t.Fatalf("Delete(missing) error = %v, want nil", err)
+		return fmt.Errorf("Delete(missing) error = %w, want nil", err)
 	}
 
 	created, err := s.Create(ctx, time.Hour)
 	if err != nil {
-		t.Fatalf("Create() error = %v", err)
+		return fmt.Errorf("Create() error = %w", err)
 	}
 
 	if err := s.Delete(ctx, created.ID); err != nil {
-		t.Fatalf("Delete() error = %v", err)
+		return fmt.Errorf("Delete() error = %w", err)
 	}
+
+	var errs []error
 
 	if _, err := s.Get(ctx, created.ID); !errors.Is(err, session.ErrNotFound) {
-		t.Errorf("Get() after Delete err = %v, want ErrNotFound", err)
+		errs = append(errs, errf("Get() after Delete err = %v, want ErrNotFound", err))
 	}
 
 	if err := s.Delete(ctx, created.ID); err != nil {
-		t.Errorf("Delete(again) error = %v, want nil", err)
+		errs = append(errs, fmt.Errorf("Delete(again) error = %w, want nil", err))
 	}
+
+	return errors.Join(errs...)
 }
 
 func conformanceTTLExpiry(t *testing.T, factory func(t *testing.T) session.Store) {
 	t.Helper()
 
-	ctx := t.Context()
-	s := factory(t)
+	if err := checkTTLExpiry(t.Context(), factory(t), DefaultEntryTTL, DefaultExpiryTimeout); err != nil {
+		t.Fatal(err)
+	}
+}
 
-	created, err := s.Create(ctx, DefaultEntryTTL)
+// checkTTLExpiry proves a short-TTL session is readable before expiry,
+// maps TTL to an absolute ExpiresAt, and disappears (ErrNotFound) after
+// polling. Polling uses timeout/interval so unit tests can drive both
+// the expiry and timeout branches quickly.
+func checkTTLExpiry(ctx context.Context, s session.Store, ttl, timeout time.Duration) error {
+	created, err := s.Create(ctx, ttl)
 	if err != nil {
-		t.Fatalf("Create() error = %v", err)
+		return fmt.Errorf("Create() error = %w", err)
 	}
 
 	// TTL maps to an absolute ExpiresAt roughly one TTL out: the store
 	// must not mint a session cookie lifetime (MaxAge int-seconds on the
 	// cookie adapter mirrors this same span) disconnected from expiry.
-	if ttl := time.Until(created.ExpiresAt); ttl <= 0 || ttl > DefaultEntryTTL+time.Minute {
-		t.Errorf("ExpiresAt = %v (in %v), want ~%v out", created.ExpiresAt, ttl, DefaultEntryTTL)
+	var errs []error
+
+	if until := time.Until(created.ExpiresAt); until <= 0 || until > ttl+time.Minute {
+		errs = append(errs, fmt.Errorf("ExpiresAt = %v (in %v), want ~%v out", created.ExpiresAt, until, ttl))
 	}
 
 	if _, err := s.Get(ctx, created.ID); err != nil {
-		t.Fatalf("Get() before expiry error = %v", err)
+		errs = append(errs, fmt.Errorf("Get() before expiry error = %w", err))
+		return errors.Join(errs...)
 	}
 
-	eventually(t, "session expired from Get", func(ctx context.Context) bool {
+	if err := pollExpiry(ctx, timeout, "session expired from Get", func(ctx context.Context) bool {
 		_, err := s.Get(ctx, created.ID)
 		return errors.Is(err, session.ErrNotFound)
-	})
+	}); err != nil {
+		errs = append(errs, err)
+	}
+
+	return errors.Join(errs...)
 }
 
 func conformanceOpenRegister(t *testing.T, factory func(t *testing.T) session.Store) {
 	t.Helper()
 
+	if err := checkOpenRegister(factory(t)); err != nil {
+		t.Fatal(err)
+	}
+}
+
+// checkOpenRegister proves the production Open path returns the
+// registered probe, rejects duplicates, and reports unknown adapters.
+func checkOpenRegister(probe session.Store) error {
 	name := session.Adapter("kit-open-test-" + strconv.FormatUint(adapterSeq.Add(1), 10))
 
 	// Register the factory-built behavior under a throwaway name through
 	// the production Open path: factory proves the backend, Open proves
 	// the wiring.
-	probe := factory(t)
-
 	if err := session.Register(name, func(session.Options) (session.Store, error) { return probe, nil }); err != nil {
-		t.Fatalf("Register() error = %v", err)
+		return fmt.Errorf("Register() error = %w", err)
 	}
 
 	if err := session.Register(name, func(session.Options) (session.Store, error) { return probe, nil }); !errors.Is(err, session.ErrDuplicate) {
-		t.Fatalf("Register(dup) err = %v, want ErrDuplicate", err)
+		return fmt.Errorf("Register(dup) err = %w, want ErrDuplicate", err)
 	}
 
 	opened, err := session.Open(name, session.Options{})
 	if err != nil {
-		t.Fatalf("Open() error = %v", err)
+		return fmt.Errorf("Open() error = %w", err)
 	}
 
+	var errs []error
+
 	if opened != probe {
-		t.Error("Open() did not return the registered store")
+		errs = append(errs, errors.New("Open() did not return the registered store"))
 	}
 
 	if _, err := session.Open("kit-no-such-adapter", session.Options{}); !errors.Is(err, session.ErrUnknownAdapter) {
-		t.Errorf("Open(unknown) err = %v, want ErrUnknownAdapter", err)
+		errs = append(errs, errf("Open(unknown) err = %v, want ErrUnknownAdapter", err))
 	}
+
+	return errors.Join(errs...)
 }
 
 func conformanceErrors(t *testing.T, factory func(t *testing.T) session.Store) {
 	t.Helper()
 
-	ctx := t.Context()
-	s := factory(t)
+	if err := checkErrors(t.Context(), factory(t)); err != nil {
+		t.Fatal(err)
+	}
+}
+
+// checkErrors proves malformed IDs fail closed with ErrInvalidID on
+// every method. Soft mismatches join so all are reported.
+func checkErrors(ctx context.Context, s session.Store) error {
+	var errs []error
 
 	if _, err := s.Get(ctx, "bogus"); !errors.Is(err, session.ErrInvalidID) {
-		t.Errorf("Get(bogus) err = %v, want ErrInvalidID", err)
+		errs = append(errs, errf("Get(bogus) err = %v, want ErrInvalidID", err))
 	}
 
 	var idErr session.InvalidIDError
 	if _, err := s.Get(ctx, "bogus"); !errors.As(err, &idErr) {
-		t.Errorf("errors.As(err, InvalidIDError) = false (err = %T %v)", err, err)
+		errs = append(errs, errf("errors.As(err, InvalidIDError) = false (err = %T %v)", err, err))
 	}
 
 	if err := s.Delete(ctx, "bogus"); !errors.Is(err, session.ErrInvalidID) {
-		t.Errorf("Delete(bogus) err = %v, want ErrInvalidID", err)
+		errs = append(errs, errf("Delete(bogus) err = %v, want ErrInvalidID", err))
 	}
 
 	if err := s.Save(ctx, session.Session{ID: "bogus"}); !errors.Is(err, session.ErrInvalidID) {
-		t.Errorf("Save(bogus) err = %v, want ErrInvalidID", err)
+		errs = append(errs, errf("Save(bogus) err = %v, want ErrInvalidID", err))
 	}
+
+	return errors.Join(errs...)
 }
 
 func conformanceClose(t *testing.T, factory func(t *testing.T) session.Store) {
 	t.Helper()
 
-	ctx := t.Context()
-	s := factory(t)
-
-	if err := s.Close(); err != nil {
-		t.Fatalf("Close() error = %v", err)
-	}
-
-	if err := s.Close(); err != nil {
-		t.Errorf("Close() second error = %v, want nil", err)
-	}
-
-	if _, err := s.Create(ctx, time.Hour); !errors.Is(err, session.ErrClosed) {
-		t.Errorf("Create() err = %v, want ErrClosed", err)
-	}
-
-	if _, err := s.Get(ctx, session.NewID()); !errors.Is(err, session.ErrClosed) {
-		t.Errorf("Get() err = %v, want ErrClosed", err)
-	}
-
-	if err := s.Save(ctx, session.Session{ID: session.NewID()}); !errors.Is(err, session.ErrClosed) {
-		t.Errorf("Save() err = %v, want ErrClosed", err)
-	}
-
-	if err := s.Delete(ctx, session.NewID()); !errors.Is(err, session.ErrClosed) {
-		t.Errorf("Delete() err = %v, want ErrClosed", err)
+	if err := checkClose(t.Context(), factory(t)); err != nil {
+		t.Fatal(err)
 	}
 }
 
-// eventually polls cond until true or DefaultExpiryTimeout elapses. Poll
-// ticks use a ticker, never time.Sleep, and cond receives a deadline-bound
-// context so backend calls share the same deadline.
-func eventually(t *testing.T, msg string, cond func(ctx context.Context) bool) {
-	t.Helper()
+// checkClose proves Close is idempotent and that every method reports
+// ErrClosed afterwards. Soft mismatches join so all are reported.
+func checkClose(ctx context.Context, s session.Store) error {
+	if err := s.Close(); err != nil {
+		return fmt.Errorf("Close() error = %w", err)
+	}
 
-	ctx, cancel := context.WithTimeout(t.Context(), DefaultExpiryTimeout)
+	var errs []error
+
+	if err := s.Close(); err != nil {
+		errs = append(errs, fmt.Errorf("Close() second error = %w, want nil", err))
+	}
+
+	if _, err := s.Create(ctx, time.Hour); !errors.Is(err, session.ErrClosed) {
+		errs = append(errs, errf("Create() err = %v, want ErrClosed", err))
+	}
+
+	if _, err := s.Get(ctx, session.NewID()); !errors.Is(err, session.ErrClosed) {
+		errs = append(errs, errf("Get() err = %v, want ErrClosed", err))
+	}
+
+	if err := s.Save(ctx, session.Session{ID: session.NewID()}); !errors.Is(err, session.ErrClosed) {
+		errs = append(errs, errf("Save() err = %v, want ErrClosed", err))
+	}
+
+	if err := s.Delete(ctx, session.NewID()); !errors.Is(err, session.ErrClosed) {
+		errs = append(errs, errf("Delete() err = %v, want ErrClosed", err))
+	}
+
+	return errors.Join(errs...)
+}
+
+// pollExpiry polls cond until true or timeout elapses, ticking every
+// interval. It returns a descriptive error on timeout so check helpers
+// can propagate it without touching *testing.T. (It replaces the old
+// eventually(t, ...) helper, whose timeout branch was uncoverable: a
+// *testing.T failure cannot be scripted without a real test run.)
+func pollExpiry(ctx context.Context, timeout time.Duration, msg string, cond func(ctx context.Context) bool) error {
+	ctx, cancel := context.WithTimeout(ctx, timeout)
 	defer cancel()
 
 	ticker := time.NewTicker(DefaultPollInterval)
@@ -266,12 +347,12 @@ func eventually(t *testing.T, msg string, cond func(ctx context.Context) bool) {
 
 	for {
 		if cond(ctx) {
-			return
+			return nil
 		}
 
 		select {
 		case <-ctx.Done():
-			t.Fatalf("condition not met within %v: %s", DefaultExpiryTimeout, msg)
+			return fmt.Errorf("condition not met within %v: %s", timeout, msg)
 		case <-ticker.C:
 		}
 	}
