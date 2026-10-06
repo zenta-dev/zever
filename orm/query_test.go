@@ -439,6 +439,9 @@ func TestEncodeArgsPassthrough(t *testing.T) {
 // TestSetQueryLoggerCapturesSelectSQLAndArgs proves the debug hook captures
 // the rendered SELECT and its bound args in execution order, and that the
 // restore func disables logging again.
+//
+// Not parallel: the query logger is process-global, so this test must not
+// run alongside other query-emitting tests.
 func TestSetQueryLoggerCapturesSelectSQLAndArgs(t *testing.T) {
 	ctx, conn := newWidgetsDB(t)
 
@@ -476,6 +479,9 @@ func TestSetQueryLoggerCapturesSelectSQLAndArgs(t *testing.T) {
 
 // TestSetQueryLoggerNilDisables proves installing a nil logger disables
 // logging without failing.
+//
+// Not parallel: the query logger is process-global, so this test must not
+// run alongside other query-emitting tests.
 func TestSetQueryLoggerNilDisables(t *testing.T) {
 	ctx, conn := newWidgetsDB(t)
 

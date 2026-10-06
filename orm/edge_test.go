@@ -154,6 +154,11 @@ func TestEdgeMergeUnsupportedDialect(t *testing.T) {
 	}
 }
 
+// TestEdgeSetQueryLoggerNilRestores proves installing then restoring a
+// logger leaves logging disabled and queries working.
+//
+// Not parallel: the query logger is process-global, so this test must not
+// run alongside other query-emitting tests.
 func TestEdgeSetQueryLoggerNilRestores(t *testing.T) {
 	restore := SetQueryLogger(func(string, []any) {})
 	restore()
