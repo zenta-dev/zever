@@ -42,6 +42,7 @@ import (
 	"github.com/zenta-dev/zever/core/analytics"
 	"github.com/zenta-dev/zever/core/auth"
 	"github.com/zenta-dev/zever/core/cache"
+	"github.com/zenta-dev/zever/core/cdn"
 	"github.com/zenta-dev/zever/core/crypto"
 	"github.com/zenta-dev/zever/core/document"
 	"github.com/zenta-dev/zever/core/eventbus"
@@ -77,6 +78,7 @@ import (
 	billingstub "github.com/zenta-dev/zever/adapters/billing/stub"
 	cachedb "github.com/zenta-dev/zever/adapters/cache/db"
 	cacheredis "github.com/zenta-dev/zever/adapters/cache/redis"
+	cdnnoop "github.com/zenta-dev/zever/adapters/cdn/noop"
 	dbpostgres "github.com/zenta-dev/zever/adapters/db/postgres"
 	dbsqlite "github.com/zenta-dev/zever/adapters/db/sqlite"
 	documentlocal "github.com/zenta-dev/zever/adapters/document/local"
@@ -123,6 +125,7 @@ func init() {
 	_ = analytics.Register(analytics.Log, analyticslog.New)
 	_ = auth.Register(auth.Session, authsession.New)
 	_ = cache.Register(cache.Memory, cachememory.New)
+	_ = cdn.Register(cdn.AdapterNoop, cdnnoop.New)
 	_ = crypto.Register(crypto.AdapterLocal, cryptolocal.New)
 	_ = document.Register(document.Remote, documentremote.New)
 	_ = document.Register(document.Latex, documentlatex.New)
@@ -172,6 +175,7 @@ func init() {
 	billingstub.Register()
 	cachedb.Register()
 	cacheredis.Register()
+	cdnnoop.Register()
 	dbpostgres.Register()
 	dbsqlite.Register()
 	documentlocal.Register()

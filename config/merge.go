@@ -8,6 +8,7 @@ import (
 	"github.com/zenta-dev/zever/core/auth"
 	"github.com/zenta-dev/zever/core/billing"
 	"github.com/zenta-dev/zever/core/cache"
+	"github.com/zenta-dev/zever/core/cdn"
 	"github.com/zenta-dev/zever/core/crypto"
 	"github.com/zenta-dev/zever/core/db"
 	"github.com/zenta-dev/zever/core/document"
@@ -137,6 +138,9 @@ var serviceMergers = map[string]func(*Config, ServiceConfig) error{
 	},
 	"cache": func(cfg *Config, sc ServiceConfig) error {
 		return mergeInto[cache.Options]("cache", &cfg.Cache.Adapter, &cfg.Cache.Options, sc)
+	},
+	"cdn": func(cfg *Config, sc ServiceConfig) error {
+		return mergeInto[cdn.Options]("cdn", &cfg.CDN.Adapter, &cfg.CDN.Options, sc)
 	},
 	"crypto": func(cfg *Config, sc ServiceConfig) error {
 		return mergeInto[crypto.Options]("crypto", &cfg.Crypto.Adapter, &cfg.Crypto.Options, sc)
