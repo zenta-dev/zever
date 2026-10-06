@@ -139,9 +139,13 @@ func (s *store) handleMessage(ctx context.Context, prefix string, payload []byte
 		return false, err
 	}
 
+	spanCtx, finish := s.recorder.ConsumeSpan(ctx, msg.Topic)
+	defer finish()
+
 	for attempt := 1; ; attempt++ {
-		pubErr := publish(ctx, msg)
+		pubErr := publish(spanCtx, msg)
 		if pubErr == nil {
+			s.recorder.Published(ctx)
 			s.processed.Add(1)
 
 			return true, nil
@@ -150,10 +154,13 @@ func (s *store) handleMessage(ctx context.Context, prefix string, payload []byte
 		s.setRelayError(pubErr)
 
 		if attempt >= s.maxAttempts {
+			s.recorder.FailedTotal(ctx)
 			s.failed.Add(1)
 
 			return false, nil
 		}
+
+		s.recorder.Retried(ctx)
 
 		if err := s.sleep(ctx, s.retry.NextDelay(attempt)); err != nil {
 			return false, err

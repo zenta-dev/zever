@@ -33,6 +33,7 @@ type store struct {
 	retry       retry.Policy
 	maxAttempts int
 	sleep       sleepFunc
+	recorder    outbox.Recorder
 
 	// lastLSN is the replication position safe to acknowledge: it only
 	// advances past messages that were published (or filtered out).
@@ -88,6 +89,7 @@ func New(o Options) (outbox.Store, error) {
 		retry:       o.Retry,
 		maxAttempts: maxAttempts,
 		sleep:       sleepCtx,
+		recorder:    outbox.NewRecorder(o.Provider, string(outbox.CDC), ""),
 	}
 
 	return s, nil
@@ -303,6 +305,7 @@ func (s *store) setRelayError(err error) {
 
 	str := err.Error()
 	s.relayErr.Store(&str)
+	s.recorder.RelayError(context.Background())
 }
 
 // encodeMessage marshals msg to its JSON wire payload.
