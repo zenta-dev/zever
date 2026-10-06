@@ -8,6 +8,8 @@ import (
 	"testing"
 	"time"
 
+	dbsqlite "github.com/zenta-dev/zever/adapters/db/sqlite"
+	coredb "github.com/zenta-dev/zever/core/db"
 	"github.com/zenta-dev/zever/core/workflow"
 	"github.com/zenta-dev/zever/orm"
 )
@@ -307,6 +309,32 @@ func TestRegisterOpensViaCoreOptions(t *testing.T) {
 		if err := closer.Close(); err != nil {
 			t.Fatalf("Close(%s) = %v", adapter, err)
 		}
+	}
+
+	// The shared factory (borrowed pool) must resolve too.
+	conn, err := dbsqlite.New(coredb.Options{Path: filepath.Join(t.TempDir(), "shared.db")})
+	if err != nil {
+		t.Fatalf("sqlite New failed: %v", err)
+	}
+
+	t.Cleanup(func() { _ = conn.Close(t.Context()) })
+
+	shared, err := workflow.OpenShared(workflow.DB, conn, workflow.Options{})
+	if err != nil {
+		t.Fatalf("OpenShared(%s) = %v", workflow.DB, err)
+	}
+
+	closer, ok := shared.(interface{ Close() error })
+	if !ok {
+		t.Fatalf("workflow %T has no Close", shared)
+	}
+
+	if err := closer.Close(); err != nil {
+		t.Fatalf("Close(shared) = %v", err)
+	}
+
+	if err := conn.Ping(t.Context()); err != nil {
+		t.Fatalf("borrowed conn closed by shared Close: %v", err)
 	}
 }
 
