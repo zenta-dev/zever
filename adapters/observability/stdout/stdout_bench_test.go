@@ -1,12 +1,15 @@
 package stdout_test
 
 import (
+	"errors"
 	"io"
 	"testing"
 
 	"github.com/zenta-dev/zever/adapters/observability/stdout"
 	"github.com/zenta-dev/zever/core/observability"
 )
+
+var errBench = errors.New("bench error")
 
 func benchAttrs() []observability.Attr {
 	return []observability.Attr{
@@ -72,5 +75,63 @@ func BenchmarkMetricsCounterVerbose(b *testing.B) {
 		if err := m.Counter(b.Context(), "c", 1, attrs...); err != nil {
 			b.Fatalf("Counter() = %v, want nil", err)
 		}
+	}
+}
+
+// BenchmarkNewWithWriter measures constructing the provider over io.Discard.
+func BenchmarkNewWithWriter(b *testing.B) {
+	opts := validOptions()
+	b.ReportAllocs()
+	b.ResetTimer()
+	for b.Loop() {
+		p, err := stdout.NewWithWriter(opts, io.Discard)
+		if err != nil {
+			b.Fatalf("NewWithWriter() = %v", err)
+		}
+		if p == nil {
+			b.Fatal("NewWithWriter() = nil")
+		}
+	}
+}
+
+// BenchmarkMetricsCounterNonVerbose measures the quiet no-op metric path.
+func BenchmarkMetricsCounterNonVerbose(b *testing.B) {
+	p := benchProvider(b, nil)
+	m := p.Meter("bench")
+	attrs := benchAttrs()
+	b.ReportAllocs()
+	b.ResetTimer()
+	for b.Loop() {
+		if err := m.Counter(b.Context(), "c", 1, attrs...); err != nil {
+			b.Fatalf("Counter() = %v, want nil", err)
+		}
+	}
+}
+
+// BenchmarkSpanRecordError measures recording an error on an open span.
+func BenchmarkSpanRecordError(b *testing.B) {
+	p := benchProvider(b, nil)
+	tr := p.Tracer("bench")
+	_, span := tr.Start(b.Context(), "op")
+	b.Cleanup(func() { span.End() })
+	b.ReportAllocs()
+	b.ResetTimer()
+	for b.Loop() {
+		span.RecordError(errBench)
+	}
+}
+
+// BenchmarkSpanEndWithError measures the span close path with an error set.
+func BenchmarkSpanEndWithError(b *testing.B) {
+	p := benchProvider(b, nil)
+	tr := p.Tracer("bench")
+	attrs := benchAttrs()
+	b.ReportAllocs()
+	b.ResetTimer()
+	for b.Loop() {
+		_, span := tr.Start(b.Context(), "op")
+		span.SetAttributes(attrs...)
+		span.RecordError(errBench)
+		span.End()
 	}
 }

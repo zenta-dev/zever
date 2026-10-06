@@ -129,3 +129,62 @@ func BenchmarkWithContext(b *testing.B) {
 		_ = l.WithContext(ctx)
 	}
 }
+
+// BenchmarkSync measures the no-op flush.
+func BenchmarkSync(b *testing.B) {
+	l := benchLogger(b)
+
+	b.ReportAllocs()
+
+	for b.Loop() {
+		if err := l.Sync(); err != nil {
+			b.Fatal("Sync() =", err)
+		}
+	}
+}
+
+// BenchmarkName measures the adapter name lookup.
+func BenchmarkName(b *testing.B) {
+	l := benchLogger(b)
+
+	b.ReportAllocs()
+
+	for b.Loop() {
+		if got := l.Name(); got != "slog" {
+			b.Fatal("Name() =", got)
+		}
+	}
+}
+
+// BenchmarkSend measures the bare Send dispatch.
+func BenchmarkSend(b *testing.B) {
+	l := benchLogger(b)
+
+	b.ReportAllocs()
+
+	for b.Loop() {
+		l.Info().Str("k", "v").Send()
+	}
+}
+
+// BenchmarkContextLogger measures materializing a child logger from a context.
+func BenchmarkContextLogger(b *testing.B) {
+	l := benchLogger(b)
+
+	b.ReportAllocs()
+
+	for b.Loop() {
+		_ = l.With().Str("service", "api").Logger()
+	}
+}
+
+// BenchmarkNew measures constructing the JSON handler and logger over stdout.
+func BenchmarkNew(b *testing.B) {
+	b.ReportAllocs()
+
+	for b.Loop() {
+		if l := New(log.Options{MinLevel: log.LevelDebug}); l == nil {
+			b.Fatal("New() = nil")
+		}
+	}
+}

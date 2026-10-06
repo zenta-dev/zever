@@ -157,3 +157,87 @@ func TestNotify_concurrentSafe(t *testing.T) {
 		t.Errorf("send calls = %d, want %d", got, workers*perWorker)
 	}
 }
+
+func TestNotify_emptyTarget_rejects(t *testing.T) {
+	t.Parallel()
+
+	n := &notifier{send: func(_ context.Context, _ *messaging.Message) (string, error) {
+		return "id", nil
+	}}
+
+	in := validPush()
+	in.Target = ""
+
+	if err := n.Notify(t.Context(), in); !errors.Is(err, notification.ErrInvalidTarget) {
+		t.Errorf("Notify(empty target) = %v, want ErrInvalidTarget", err)
+	}
+}
+
+func TestNotify_ttlBoundary_setsApnsExpiration(t *testing.T) {
+	t.Parallel()
+
+	var got *messaging.Message
+	n := &notifier{send: func(_ context.Context, m *messaging.Message) (string, error) {
+		got = m
+		return "id", nil
+	}}
+	in := validPush()
+	in.TTL = time.Nanosecond
+	if err := n.Notify(t.Context(), in); err != nil {
+		t.Fatalf("Notify() = %v, want nil", err)
+	}
+	if got.Android == nil || got.Android.TTL == nil || *got.Android.TTL != in.TTL {
+		t.Errorf("Android.TTL = %v, want %v", got.Android, in.TTL)
+	}
+	if _, ok := got.APNS.Headers["apns-expiration"]; !ok {
+		t.Errorf("APNS headers = %v, want apns-expiration set", got.APNS.Headers)
+	}
+}
+
+func TestInvalidOptions_isAndAs(t *testing.T) {
+	t.Parallel()
+
+	err := invalidOptions("bad path")
+	if err == nil {
+		t.Fatal("invalidOptions() = nil, want error")
+	}
+
+	if !errors.Is(err, notification.InvalidOptionsError{Reason: "bad path"}) {
+		t.Errorf("errors.Is(InvalidOptionsError) = false, want true")
+	}
+
+	var target notification.InvalidOptionsError
+	if !errors.As(err, &target) {
+		t.Fatalf("errors.As(InvalidOptionsError) = false, want true")
+	}
+
+	if target.Reason != "bad path" {
+		t.Errorf("Reason = %q, want bad path", target.Reason)
+	}
+}
+
+func TestNotify_highPriorityWithDataAndTTL(t *testing.T) {
+	t.Parallel()
+
+	var got *messaging.Message
+	n := &notifier{send: func(_ context.Context, m *messaging.Message) (string, error) {
+		got = m
+		return "id", nil
+	}}
+	in := validPush()
+	in.Priority = notification.PriorityHigh
+	in.TTL = 30 * time.Minute
+	in.Data = map[string]string{"order": "42"}
+	if err := n.Notify(t.Context(), in); err != nil {
+		t.Fatalf("Notify() = %v, want nil", err)
+	}
+	if got.Data["order"] != "42" {
+		t.Errorf("Data = %v, want order=42", got.Data)
+	}
+	if got.Android == nil || got.Android.Priority != "high" {
+		t.Errorf("Android = %+v, want priority high", got.Android)
+	}
+	if got.Android.TTL == nil || *got.Android.TTL != in.TTL {
+		t.Errorf("Android.TTL = %v, want %v", got.Android, in.TTL)
+	}
+}

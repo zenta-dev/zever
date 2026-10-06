@@ -7,6 +7,7 @@ import (
 	"strings"
 	"sync"
 	"testing"
+	"time"
 
 	"github.com/zenta-dev/zever/core/notification"
 )
@@ -113,5 +114,80 @@ func TestNotify_afterClose_stillSends(t *testing.T) {
 	}
 	if err := n.Notify(t.Context(), validSMS()); err != nil {
 		t.Errorf("Notify after Close = %v, want nil (Close releases nothing)", err)
+	}
+}
+
+func TestNotify_smsWithTitle_rejects(t *testing.T) {
+	t.Parallel()
+	n, err := New(validOptions())
+	if err != nil {
+		t.Fatalf("New() = %v", err)
+	}
+	defer n.Close()
+	in := validSMS()
+	in.Title = "push-only"
+	if err := n.Notify(t.Context(), in); !errors.Is(err, notification.ErrInvalidNotification) {
+		t.Errorf("Notify(sms+title) = %v, want ErrInvalidNotification", err)
+	}
+}
+
+func TestNotify_smsWithData_rejects(t *testing.T) {
+	t.Parallel()
+	n, err := New(validOptions())
+	if err != nil {
+		t.Fatalf("New() = %v", err)
+	}
+	defer n.Close()
+	in := validSMS()
+	in.Data = map[string]string{"k": "v"}
+	if err := n.Notify(t.Context(), in); !errors.Is(err, notification.ErrInvalidNotification) {
+		t.Errorf("Notify(sms+data) = %v, want ErrInvalidNotification", err)
+	}
+}
+
+func TestNotify_negativeTTL_rejects(t *testing.T) {
+	t.Parallel()
+	n, err := New(validOptions())
+	if err != nil {
+		t.Fatalf("New() = %v", err)
+	}
+	defer n.Close()
+	in := validSMS()
+	in.TTL = -time.Second
+	if err := n.Notify(t.Context(), in); !errors.Is(err, notification.ErrInvalidNotification) {
+		t.Errorf("Notify(negative ttl) = %v, want ErrInvalidNotification", err)
+	}
+}
+
+func TestNotify_unknownPriority_rejects(t *testing.T) {
+	t.Parallel()
+	n, err := New(validOptions())
+	if err != nil {
+		t.Fatalf("New() = %v", err)
+	}
+	defer n.Close()
+	in := validSMS()
+	in.Priority = notification.Priority("urgent")
+	if err := n.Notify(t.Context(), in); !errors.Is(err, notification.ErrInvalidNotification) {
+		t.Errorf("Notify(unknown priority) = %v, want ErrInvalidNotification", err)
+	}
+}
+
+func TestNotify_emptyBody_sends(t *testing.T) {
+	t.Parallel()
+	got := &capturedRequest{}
+	srv := stubTwilio(t, got, http.StatusCreated, `{"sid":"SM123"}`, 0)
+	defer srv.Close()
+	n := newTestNotifier(t, srv)
+	defer n.Close()
+	in := &notification.Notification{
+		Target:  testToNumber,
+		Channel: notification.ChannelSMS,
+	}
+	if err := n.Notify(t.Context(), in); err != nil {
+		t.Fatalf("Notify() = %v, want nil", err)
+	}
+	if got.body != "" {
+		t.Errorf("Body = %q, want empty", got.body)
 	}
 }
