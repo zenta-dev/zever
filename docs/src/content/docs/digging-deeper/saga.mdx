@@ -30,8 +30,8 @@ persisted step.
 
 Saga support is opt-in per engine: adapters that can host saga
 definitions expose the separate `SagaRegistrar` interface, so engines
-without saga support are unaffected. Registration is Go code — the `.zen`
-DSL has no saga block; define steps in your app wiring and call
+without saga support are unaffected. Define steps either in a top-level
+`.zen` `saga { ... }` declaration (see below) or directly in Go wiring with
 `RegisterSaga` on the resolved workflow adapter.
 
 ## Mental model
@@ -65,6 +65,117 @@ persisted; on the memory adapter the `executed` index guards the same way.
 
 Statuses: `pending`, `running`, `completed`, `compensating`, `failed`,
 `compensation_failed`.
+
+## Declaring sagas in .zen
+
+The compiler knows a top-level `saga { ... }` declaration, so the common
+case — a saga over RPCs that already exist as `service` declarations — is
+schema, not wiring:
+
+```
+saga CheckoutSaga {
+  step reserve {
+    execute: InventoryService.Reserve
+    compensate: InventoryService.Release
+  }
+  step charge {
+    execute: PaymentService.Charge
+    compensate: PaymentService.Refund
+    pivot: true
+  }
+}
+```
+
+Rules:
+
+- `execute` is required on every `step`; `compensate` is optional (omit it
+  when the step needs no rollback); `pivot` is optional and defaults to
+  `false`.
+- Step names must be unique within a saga, and at most one step may set
+  `pivot: true`.
+- `execute`/`compensate` reference `<Service>.<RPC>` and resolve against
+  every service in the schema, so a saga may compose RPCs across modules —
+  that cross-module composition is the point of a saga.
+
+For each module that declares at least one saga, the `gogen` backend emits
+a `<module>/saga.go` holding a `SagaCaller` interface, a `RegisterSagas`
+function, and a shared `sagaStep` helper:
+
+```go
+package app
+
+import (
+    "context"
+
+    "github.com/zenta-dev/zever/core/workflow"
+)
+
+// SagaCaller invokes an RPC on a service by name; wire it to shared/grpcclient
+// or an in-process dispatcher. in/out are JSON-marshalable.
+type SagaCaller interface {
+    Call(ctx context.Context, service, method string, in any, out any) error
+}
+
+// RegisterSagas registers every saga declared in this module.
+func RegisterSagas(reg workflow.SagaRegistrar, caller SagaCaller) {
+    reg.RegisterSaga("CheckoutSaga", []workflow.SagaStep{
+        {Name: "reserve", Execute: sagaStep("InventoryService", "Reserve", caller), Compensate: sagaStep("InventoryService", "Release", caller)},
+        {Name: "charge", Pivot: true, Execute: sagaStep("PaymentService", "Charge", caller), Compensate: sagaStep("PaymentService", "Refund", caller)},
+    })
+}
+
+// sagaStep adapts one Service.RPC reference to a workflow.StepFunc: it invokes
+// the RPC through caller and returns the JSON-marshalable response.
+func sagaStep(service, method string, caller SagaCaller) workflow.StepFunc {
+    return func(ctx context.Context, input any) (any, error) {
+        var out map[string]any
+        if err := caller.Call(ctx, service, method, input, &out); err != nil {
+            return nil, err
+        }
+        return out, nil
+    }
+}
+```
+
+`SagaCaller` is the single seam the generated file needs from the host: it
+is not called from `RegisterModule`, because the host owns saga wiring.
+Implement `Call` with `shared/grpcclient` (dial the target, marshal `in`,
+invoke `<Service>/<Method>`, unmarshal into `out`) or with an in-process
+dispatcher when the services share a process. The generated file only ever
+depends on `core/workflow`, so an in-process implementation needs no gRPC
+at all.
+
+End to end: implement `SagaCaller`, resolve the workflow engine with
+`container.Workflow()`, type-assert it to `workflow.SagaRegistrar`, and
+hand both to the generated `RegisterSagas`:
+
+```go
+import (
+    "errors"
+
+    "github.com/zenta-dev/zever/container"
+    "github.com/zenta-dev/zever/core/workflow"
+)
+
+func registerSagas(c *container.Container, caller app.SagaCaller) error {
+    wf, err := c.Workflow()
+    if err != nil {
+        return err
+    }
+
+    reg, ok := wf.(workflow.SagaRegistrar)
+    if !ok {
+        return errors.New("workflow adapter does not support sagas")
+    }
+
+    app.RegisterSagas(reg, caller)
+    return nil
+}
+```
+
+Call it once at boot after resolving the workflow engine. The generated
+`RegisterSagas` is deliberately not invoked from `RegisterModule`, so saga
+wiring stays explicit.
 
 ## Config
 

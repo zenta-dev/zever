@@ -64,6 +64,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   reverse compensation, `RecoverStuckSagas`, `memory`/`db` adapters);
   all four wired into the docs sidebar, with `production.md` and the
   deploy checklists updated.
+- `saga` guide documents the top-level `.zen` `saga { ... }` declaration:
+  `step` syntax, validation rules (required `execute`, unique step names,
+  at most one `pivot`), and the generated `SagaCaller`/`RegisterSagas`
+  output with an end-to-end wiring note.
 
 ### Dependencies
 
