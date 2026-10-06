@@ -54,33 +54,33 @@ zever compile schema/app.zen --backend=mcp --out ./gen
 ## Commands
 
 - `zever add`: Add one battery to the calling project
-- `zever bash`: Generate bash completion script
 - `zever breaking`: Report API-breaking changes between two schema versions
 - `zever check-boundaries`: Report cross-module reference violations
 - `zever check`: Validate .zen schemas without writing output
 - `zever compile`: Compile .zen schemas through backends
+- `zever completion bash`: Generate bash completion script
+- `zever completion fish`: Generate fish completion script
+- `zever completion powershell`: Generate PowerShell completion script
+- `zever completion zsh`: Generate zsh completion script
 - `zever completion`: Generate shell completion scripts
+- `zever config show`: Print the resolved config, redacted
 - `zever config`: Inspect resolved config
+- `zever db migrate`: Create tables from .zen schemas
+- `zever db rollback`: Undo the most recently applied migration statements
+- `zever db seed`: Run seed entrypoint (default db/seed)
 - `zever db`: Database commands (migrate, rollback, seed)
 - `zever dev`: Watch schemas & source; recompile and restart
 - `zever docs`: Generate man pages and markdown reference docs
 - `zever doctor`: Verify every battery resolves
 - `zever explain`: Print an operation's declaration location and summary
 - `zever extract`: Extract one module into a standalone service
-- `zever fish`: Generate fish completion script
 - `zever fmt`: Format .zen schemas
 - `zever generate`: Scaffold modules, entities, jobs, schedules, entrypoints
 - `zever graph`: Print Mermaid entity-relation and module diagrams
 - `zever help`: Help about any command
-- `zever migrate`: Create tables from .zen schemas
 - `zever new`: Scaffold a brand new zever application
-- `zever powershell`: Generate PowerShell completion script
 - `zever queue:work`: Run worker entrypoint (default cmd/worker)
-- `zever rollback`: Undo the most recently applied migration statements
 - `zever routes`: List HTTP routes declared by RPCs
 - `zever schedule:run`: Alias for queue:work (worker runs scheduler)
-- `zever seed`: Run seed entrypoint (default db/seed)
 - `zever serve`: Run server entrypoint (default cmd/server)
-- `zever show`: Print the resolved config, redacted
 - `zever tinker`: Live container REPL via tinker shim
-- `zever zsh`: Generate zsh completion script

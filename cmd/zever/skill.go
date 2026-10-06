@@ -73,17 +73,26 @@ func renderSkill(root *cobra.Command) string {
 	var walk func(cmds []*cobra.Command)
 	walk = func(cmds []*cobra.Command) {
 		for _, c := range cmds {
-			if c.Hidden || seen[c.Name()] {
+			// Skip the root itself; key by full command path so nested
+			// commands (e.g. `zever db migrate`) render correctly and
+			// same-named leaves under different parents never collide.
+			if c.Name() == "zever" {
+				walk(c.Commands())
 				continue
 			}
 
-			seen[c.Name()] = true
+			path := c.CommandPath()
+			if c.Hidden || seen[path] {
+				continue
+			}
+
+			seen[path] = true
 			short := c.Short
 			if short == "" {
 				short = "(see -h)"
 			}
 
-			names = append(names, "- `zever "+c.Name()+"`: "+short)
+			names = append(names, "- `"+path+"`: "+short)
 			walk(c.Commands())
 		}
 	}
@@ -92,7 +101,7 @@ func renderSkill(root *cobra.Command) string {
 
 	// The `help` command is auto-added by Cobra on Execute, so it is absent
 	// from a fresh tree: pin it explicitly for deterministic output.
-	if !seen["help"] {
+	if !seen["zever help"] {
 		names = append(names, "- `zever help`: Help about any command")
 		sort.Strings(names)
 	}
