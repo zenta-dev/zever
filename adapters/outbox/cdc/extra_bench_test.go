@@ -1,6 +1,7 @@
 package cdc
 
 import (
+	"context"
 	"errors"
 	"testing"
 
@@ -29,6 +30,6 @@ func BenchmarkSetRelayError(b *testing.B) {
 	b.ReportAllocs()
 
 	for b.Loop() {
-		s.setRelayError(err)
+		s.setRelayError(context.Background(), err)
 	}
 }

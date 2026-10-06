@@ -8,6 +8,7 @@ require (
 )
 
 require (
+	github.com/zenta-dev/zever/core/observability v0.5.3 // indirect
 	github.com/zenta-dev/zever/shared/registry v0.5.3 // indirect
 	github.com/zenta-dev/zever/shared/retry v0.5.3 // indirect
 )

@@ -34,6 +34,7 @@ type driver struct {
 	retention   time.Duration
 	lock        time.Duration
 	owns        bool
+	recorder    outbox.Recorder
 
 	// claimMu serializes sqlite claims: sqlite has no FOR UPDATE SKIP LOCKED,
 	// and the adapter's process-local mutex replaces it.
@@ -168,7 +169,7 @@ func openFromDB(conn coredb.DB, o Options, owns bool) (outbox.Store, error) {
 		conn: conn, table: table, inboxTable: inboxTable, publisher: o.Publisher,
 		poll: poll, batch: batch, maxAttempts: maxAttempts, retry: o.Retry,
 		retention: retention, lock: time.Duration(lockSeconds) * time.Second,
-		owns: owns,
+		owns: owns, recorder: outbox.NewRecorder(o.Provider, string(outbox.DB), table),
 	}
 
 	if err := d.ensureSchema(ctx); err != nil {

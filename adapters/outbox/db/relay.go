@@ -112,7 +112,7 @@ func (d *driver) pollOnce(ctx context.Context) {
 
 	msgs, err := d.claim(ctx)
 	if err != nil {
-		d.setRelayError(err)
+		d.setRelayError(ctx, err)
 
 		return
 	}
@@ -126,6 +126,30 @@ func (d *driver) pollOnce(ctx context.Context) {
 	}
 
 	d.cleanup(ctx)
+
+	d.emitStatusGauges(ctx)
+}
+
+// emitStatusGauges records the pending, failed, and oldest-pending-age gauges.
+// It is best-effort: query failures skip emission.
+func (d *driver) emitStatusGauges(ctx context.Context) {
+	var st outbox.Status
+
+	if err := d.countByStatus(ctx, &st); err != nil {
+		return
+	}
+
+	oldest, ok, err := d.oldestPending(ctx)
+	if err != nil {
+		return
+	}
+
+	var age time.Duration
+	if ok {
+		age = time.Since(oldest)
+	}
+
+	d.recorder.Status(ctx, st.Pending, st.Failed, age)
 }
 
 // claim atomically claims up to BatchSize pending rows, incrementing attempts
@@ -196,15 +220,21 @@ func (d *driver) deliver(ctx context.Context, c claimed) {
 		Attempts:  c.Attempts,
 	}
 
-	err := d.publisher.Publish(ctx, msg)
+	spanCtx, finish := d.recorder.PublishSpan(ctx, c.Topic)
+
+	err := d.publisher.Publish(spanCtx, msg)
 	now := time.Now().UTC()
 
 	switch {
 	case err == nil:
+		finish(outbox.OutcomeOK)
+		d.recorder.Published(ctx)
 		d.markProcessed(ctx, c.ID, now)
 	case c.Attempts >= d.maxAttempts:
+		finish(outbox.OutcomeError)
 		d.markFailed(ctx, c.ID, err)
 	default:
+		finish(outbox.OutcomeError)
 		d.markRetry(ctx, c.ID, err, now.Add(d.retry.NextDelay(c.Attempts)))
 	}
 }
@@ -217,31 +247,35 @@ func (d *driver) markProcessed(ctx context.Context, id string, now time.Time) {
 		d.ts(now), id,
 	)
 	if err != nil {
-		d.setRelayError(err)
+		d.setRelayError(ctx, err)
 	}
 }
 
 // markFailed moves a message to the DLQ: processed_at stays NULL and status
 // becomes failed, so the relay stops retrying it.
 func (d *driver) markFailed(ctx context.Context, id string, cause error) {
+	d.recorder.FailedTotal(ctx)
+
 	_, err := d.conn.Exec(ctx,
 		`UPDATE `+quoteIdent(d.table)+` SET status = 'failed', locked_until = NULL, last_error = ? `+
 			`WHERE id = ? AND status = 'pending'`,
 		cause.Error(), id,
 	)
 	if err != nil {
-		d.setRelayError(err)
+		d.setRelayError(ctx, err)
 	}
 }
 
 // markRetry records a failure and delays the next attempt by the backoff.
 func (d *driver) markRetry(ctx context.Context, id string, cause error, retryAt time.Time) {
+	d.recorder.Retried(ctx)
+
 	_, err := d.conn.Exec(ctx,
 		`UPDATE `+quoteIdent(d.table)+` SET last_error = ?, locked_until = ? WHERE id = ? AND status = 'pending'`,
 		cause.Error(), d.ts(retryAt), id,
 	)
 	if err != nil {
-		d.setRelayError(err)
+		d.setRelayError(ctx, err)
 	}
 }
 
@@ -254,14 +288,15 @@ func (d *driver) cleanup(ctx context.Context) {
 		d.ts(cutoff),
 	)
 	if err != nil {
-		d.setRelayError(err)
+		d.setRelayError(ctx, err)
 	}
 }
 
 // setRelayError records the most recent relay error for Status.
-func (d *driver) setRelayError(err error) {
+func (d *driver) setRelayError(ctx context.Context, err error) {
 	s := err.Error()
 	d.relayErr.Store(&s)
+	d.recorder.RelayError(ctx)
 }
 
 // Status reports current counters and health. It is best-effort: a query
@@ -273,15 +308,22 @@ func (d *driver) Status() outbox.Status {
 	var st outbox.Status
 
 	if err := d.countByStatus(ctx, &st); err != nil {
-		d.setRelayError(err)
+		d.setRelayError(ctx, err)
 	}
 
 	oldest, ok, err := d.oldestPending(ctx)
 	if err != nil {
-		d.setRelayError(err)
+		d.setRelayError(ctx, err)
 	}
 
-	if ok && time.Since(oldest) > DefaultStallAfter {
+	var age time.Duration
+	if ok {
+		age = time.Since(oldest)
+	}
+
+	d.recorder.Status(ctx, st.Pending, st.Failed, age)
+
+	if ok && age > DefaultStallAfter {
 		st.Stalled = true
 	}
 
