@@ -2,6 +2,7 @@ package orm
 
 import (
 	"errors"
+	"strings"
 	"sync"
 	"testing"
 
@@ -92,9 +93,12 @@ func TestUpdateSetExprRoundTrip(t *testing.T) {
 // expression assignment's bound args on a hit: the same UPDATE rendered
 // twice produces byte-identical SQL and the identical arg list -- the +1
 // literal first, then the where value.
+//
+// Not parallel: SetQueryLogger installs a process-global hook, so this test
+// must not run alongside other query-emitting tests (their queries would be
+// captured here). Captured queries are filtered to this test's UPDATE as a
+// defensive belt against any residual cross-test emission.
 func TestUpdateSetExprCacheHitArgs(t *testing.T) {
-	t.Parallel()
-
 	exec := &recordingExec{dialectName: "sqlite"}
 
 	var (
@@ -123,21 +127,34 @@ func TestUpdateSetExprCacheHitArgs(t *testing.T) {
 		t.Fatalf("second Exec: %v", err)
 	}
 
-	if len(queries) != 2 {
-		t.Fatalf("captured %d queries, want 2", len(queries))
+	// Filter to this test's own UPDATE: the logger is process-global, so
+	// queries from any concurrently running test could land in the slice.
+	var (
+		updates []string
+		updArgs [][]any
+	)
+	for i, q := range queries {
+		if strings.HasPrefix(q, `UPDATE "widgets"`) {
+			updates = append(updates, q)
+			updArgs = append(updArgs, argsList[i])
+		}
 	}
 
-	if queries[0] != queries[1] {
-		t.Fatalf("cached text differs:\n  first:  %q\n  second: %q", queries[0], queries[1])
+	if len(updates) != 2 {
+		t.Fatalf("captured %d UPDATE queries, want 2", len(updates))
+	}
+
+	if updates[0] != updates[1] {
+		t.Fatalf("cached text differs:\n  first:  %q\n  second: %q", updates[0], updates[1])
 	}
 
 	want := `UPDATE "widgets" SET "quantity" = "quantity" + ? WHERE "id" = ?`
-	if queries[0] != want {
-		t.Fatalf("query = %q, want %q", queries[0], want)
+	if updates[0] != want {
+		t.Fatalf("query = %q, want %q", updates[0], want)
 	}
 
 	wantArgs := []any{int64(1), "w1"}
-	for i, args := range argsList {
+	for i, args := range updArgs {
 		if len(args) != len(wantArgs) || args[0] != wantArgs[0] || args[1] != wantArgs[1] {
 			t.Fatalf("args[%d] = %#v, want %#v", i, args, wantArgs)
 		}

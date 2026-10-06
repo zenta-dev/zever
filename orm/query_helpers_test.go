@@ -4,6 +4,7 @@ import (
 	"context"
 	"fmt"
 	"strings"
+	"sync"
 	"testing"
 
 	"github.com/zenta-dev/zever/adapters/db/sqlite"
@@ -123,12 +124,25 @@ type loggedQuery struct {
 	args  []any
 }
 
+// queryLoggerMu serializes collectLogs install/restore: the query logger is
+// process-global, so only one test may hold it at a time. Every collectLogs
+// user must be non-parallel -- sequential tests run one at a time, before
+// parallel tests resume, which fully isolates the global hook.
+var queryLoggerMu sync.Mutex
+
 // collectLogs installs a logger recording into *out and returns a restore
-// func. Tests must restore (or set nil) so later tests start clean.
+// func. Tests must restore (or set nil) so later tests start clean. Not
+// parallel: the logger is process-global and would capture foreign queries
+// from any concurrently running test.
 func collectLogs(out *[]loggedQuery) func() {
-	return SetQueryLogger(func(query string, args []any) {
+	queryLoggerMu.Lock()
+	restore := SetQueryLogger(func(query string, args []any) {
 		*out = append(*out, loggedQuery{query: query, args: args})
 	})
+	return func() {
+		restore()
+		queryLoggerMu.Unlock()
+	}
 }
 
 // newBigWidgetsDB opens an in-memory sqlite database seeded with n widgets
