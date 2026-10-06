@@ -105,7 +105,7 @@ func TestSagaFailureCompensatesInReverse(t *testing.T) {
 		}, Compensate: func(_ context.Context, _ any) (any, error) {
 			order = append(order, "comp-a")
 
-			return nil, nil
+			return struct{}{}, nil
 		}},
 		workflow.SagaStep{Name: "b", Execute: func(_ context.Context, _ any) (any, error) {
 			order = append(order, "exec-b")
@@ -114,7 +114,7 @@ func TestSagaFailureCompensatesInReverse(t *testing.T) {
 		}, Compensate: func(_ context.Context, _ any) (any, error) {
 			order = append(order, "comp-b")
 
-			return nil, nil
+			return struct{}{}, nil
 		}},
 		workflow.SagaStep{Name: "c", Execute: func(_ context.Context, _ any) (any, error) {
 			order = append(order, "exec-c")
@@ -123,7 +123,7 @@ func TestSagaFailureCompensatesInReverse(t *testing.T) {
 		}, Compensate: func(_ context.Context, _ any) (any, error) {
 			order = append(order, "comp-c")
 
-			return nil, nil
+			return struct{}{}, nil
 		}},
 	)
 
@@ -165,7 +165,7 @@ func TestSagaPivotPreventsCompensation(t *testing.T) {
 		}, Compensate: func(_ context.Context, _ any) (any, error) {
 			order = append(order, "comp-a")
 
-			return nil, nil
+			return struct{}{}, nil
 		}},
 		workflow.SagaStep{Name: "p", Pivot: true, Execute: func(_ context.Context, _ any) (any, error) {
 			order = append(order, "exec-p")
@@ -179,7 +179,7 @@ func TestSagaPivotPreventsCompensation(t *testing.T) {
 		}, Compensate: func(_ context.Context, _ any) (any, error) {
 			order = append(order, "comp-c")
 
-			return nil, nil
+			return struct{}{}, nil
 		}},
 	)
 

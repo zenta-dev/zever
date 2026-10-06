@@ -42,7 +42,7 @@ func TestSagaStepFields(t *testing.T) {
 		return input, nil
 	})
 	comp := workflow.StepFunc(func(_ context.Context, _ any) (any, error) {
-		return nil, nil
+		return struct{}{}, nil
 	})
 
 	step := workflow.SagaStep{Name: "charge", Execute: exec, Compensate: comp, Pivot: true}

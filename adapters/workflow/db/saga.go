@@ -391,7 +391,7 @@ func (d *driver) RecoverStuckSagas(ctx context.Context, olderThan time.Duration)
 // reverse, persisting compensation failures. resumeStatus is the persisted
 // status on entry: running executes forward, compensating continues the
 // reverse rollback.
-func (d *driver) runSaga(ctx context.Context, id workflow.RunID, name string, steps []workflow.SagaStep, input any, startStep int, resumeStatus string) {
+func (d *driver) runSaga(ctx context.Context, id workflow.RunID, _ string, steps []workflow.SagaStep, input any, startStep int, resumeStatus string) {
 	if resumeStatus == sagaStateCompensating {
 		d.compensateSaga(ctx, id, steps, startStep-1)
 
@@ -430,7 +430,7 @@ func (d *driver) runSaga(ctx context.Context, id workflow.RunID, name string, st
 	}
 
 	_ = d.updateSagaStatus(ctx, id, sagaStateCompensating, failed, failed,
-		fmt.Errorf("%w: step %q: %w", workflow.ErrSagaStepFailed, steps[failed].Name, stepErr).Error())
+		fmt.Errorf("%w: %s", workflow.ErrSagaStepFailed, fmt.Errorf("step %q: %w", steps[failed].Name, stepErr)).Error())
 	d.compensateSaga(ctx, id, steps, failed-1)
 }
 
@@ -464,7 +464,7 @@ func (d *driver) rollSagaForward(ctx context.Context, id workflow.RunID, steps [
 			return nil
 		}); rerr != nil {
 			_ = d.updateSagaStatus(ctx, id, sagaStateFailed, i, i,
-				fmt.Errorf("%w: step %q: %w", workflow.ErrSagaStepFailed, steps[i].Name, rerr).Error())
+				fmt.Errorf("%w: %s", workflow.ErrSagaStepFailed, fmt.Errorf("step %q: %w", steps[i].Name, rerr)).Error())
 
 			return
 		}
