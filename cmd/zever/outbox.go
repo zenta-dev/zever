@@ -7,12 +7,10 @@ import (
 	"fmt"
 	"os"
 	"strings"
-	"sync"
 	"time"
 
 	"github.com/spf13/cobra"
 
-	outboxdb "github.com/zenta-dev/zever/adapters/outbox/db"
 	"github.com/zenta-dev/zever/config"
 	"github.com/zenta-dev/zever/core/outbox"
 )
@@ -20,20 +18,6 @@ import (
 // errOutboxUnknownSubcommand is returned when `zever outbox` is given no
 // subcommand at all.
 var errOutboxUnknownSubcommand = errors.New("zever outbox: missing subcommand (want: status, dlq, purge)")
-
-// outboxAdaptersOnce registers the db outbox adapter the CLI opens. The
-// container package owns the full registration as the composition root; the
-// CLI registers just the one adapter its commands can address so `zever
-// outbox` works without booting a container. Duplicate errors are ignored,
-// matching the container's convention.
-var outboxAdaptersOnce sync.Once
-
-// ensureZeverOutboxAdapters registers the db outbox factory.
-func ensureZeverOutboxAdapters() {
-	outboxAdaptersOnce.Do(func() {
-		outboxdb.Register()
-	})
-}
 
 // allOutbox and allOutboxDLQ back did-you-mean hints and usage text.
 var (
@@ -159,10 +143,9 @@ func resolveOutboxTarget(configPath, dsn, table string) (outboxTarget, error) {
 	return outboxTarget{DSN: opts.DSN, Table: opts.Table}, nil
 }
 
-// openOutboxStore registers the db adapter and opens a store at target.
+// openOutboxStore opens a store at target; adapters.go registers the db
+// factory at startup.
 func openOutboxStore(target outboxTarget) (outbox.Store, error) {
-	ensureZeverOutboxAdapters()
-
 	store, err := outbox.Open(outbox.DB, outbox.Options{DSN: target.DSN, Table: target.Table})
 	if err != nil {
 		return nil, fmt.Errorf("zever outbox: open db: %w", err)

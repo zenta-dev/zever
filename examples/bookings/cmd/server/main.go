@@ -62,6 +62,7 @@ func run(addr string) error {
 		}
 	}
 
+	app.Register()
 	c := container.New(cfg)
 
 	ctx, stop := signal.NotifyContext(context.Background(), os.Interrupt, syscall.SIGTERM)
