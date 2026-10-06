@@ -33,6 +33,13 @@ type Parser struct {
 	// against unbounded recursion on adversarial or generated input: see
 	// maxValueDepth in parser_attribute.go.
 	valueDepth int
+
+	// sagaDots records the positions of the ILLEGAL "." tokens the saga
+	// parser consumed as the separator in a Service.RPC reference. The
+	// lexer has no punctuation token for ".", so it emits an ILLEGAL token
+	// plus a "lex" diagnostic; consuming the token as valid syntax must
+	// also retract that spurious diagnostic (see ParseFile).
+	sagaDots []diag.Position
 }
 
 // New creates a Parser over src, reporting positions against file.
@@ -53,7 +60,10 @@ func New(file string, src []byte) *Parser {
 // The returned diag.List concatenates every lexical diagnostic (recorded by
 // the underlying lexer while tokens were pulled) followed by every
 // diagnostic recorded during parsing itself, so callers get one complete
-// list of everything wrong with the file. This is NOT true source-position
+// list of everything wrong with the file. The one exception is the lexer's
+// "illegal character" diagnostic for a "." consumed as a Service.RPC
+// separator inside a saga step: that "." is valid syntax, so its diagnostic
+// is retracted (see expectSagaDot). This is NOT true source-position
 // order — all lexer diagnostics precede all parser diagnostics regardless
 // of where each occurred in the file. Callers that need true positional
 // ordering should call the returned diag.List's Sorted method.
@@ -67,10 +77,35 @@ func (p *Parser) ParseFile() (*ast.File, diag.List) {
 	}
 
 	errs := make(diag.List, 0, len(p.errs)+len(p.lex.Errors()))
-	errs = append(errs, p.lex.Errors()...)
+
+	// The lexer records an "illegal character" diagnostic for every "."
+	// it scans (it has no punctuation token for "."); drop exactly those
+	// the saga parser consumed as a Service.RPC separator, so a valid
+	// saga schema reports no diagnostics. See expectSagaDot.
+	for _, d := range p.lex.Errors() {
+		if p.isSagaDot(d.Pos) {
+			continue
+		}
+
+		errs = append(errs, d)
+	}
+
 	errs = append(errs, p.errs...)
 
 	return file, errs
+}
+
+// isSagaDot reports whether pos is the position of a "." the saga parser
+// consumed as a Service.RPC separator (see Parser.sagaDots). The list is
+// tiny (one entry per saga step reference), so a linear scan is fine.
+func (p *Parser) isSagaDot(pos diag.Position) bool {
+	for _, dot := range p.sagaDots {
+		if dot == pos {
+			return true
+		}
+	}
+
+	return false
 }
 
 // parseTopLevelDecl dispatches on cur.Kind to the matching top-level
@@ -104,8 +139,21 @@ func (p *Parser) parseTopLevelDecl() ast.Decl {
 		if d := p.parseEnumDecl(); d != nil {
 			return d
 		}
+	case token.IDENT:
+		// "saga" is contextual, not a reserved keyword: a bare IDENT at top
+		// level can only start a saga declaration, so matching on literal
+		// text here is unambiguous and non-breaking (any other ident falls
+		// through to the parse error below).
+		if p.cur.Lit == "saga" {
+			if d := p.parseSagaDecl(); d != nil {
+				return d
+			}
+		} else {
+			p.errorf(p.cur.Pos, "expected entity, service, job, schedule, message, enum, or saga declaration, got %s %q", p.cur.Kind, p.cur.Lit)
+			p.syncTopLevel()
+		}
 	default:
-		p.errorf(p.cur.Pos, "expected entity, service, job, schedule, message, or enum declaration, got %s %q", p.cur.Kind, p.cur.Lit)
+		p.errorf(p.cur.Pos, "expected entity, service, job, schedule, message, enum, or saga declaration, got %s %q", p.cur.Kind, p.cur.Lit)
 		p.syncTopLevel()
 	}
 
@@ -227,23 +275,24 @@ func (p *Parser) errorf(pos diag.Position, format string, args ...any) {
 
 // syncTopLevel is the top-level recovery sync: it skips tokens, tracking
 // brace, paren, and bracket depth, until EOF or one of
-// ENTITY/SERVICE/JOB/SCHEDULE/MESSAGE/ENUM at depth 0. This guarantees one bad
-// top-level declaration never swallows the rest of the file: "entity Bad { !!! }"
-// is skipped as one balanced span, then the next declaration parses normally.
-// All three bracket kinds are tracked so an unbalanced span like
-// "entity Bad { [ ( !!! } entity Good { id: uuid }" still recovers to Good
-// without requiring callers to know which delimiters the bad span used.
-// Strings and comments are already handled by the lexer: a keyword inside a
-// STRING token or a "//" comment never appears as an ENTITY/etc. token, so
-// syncTopLevel cannot mis-sync on "entity" that occurs inside a literal or
-// comment.
+// ENTITY/SERVICE/JOB/SCHEDULE/MESSAGE/ENUM at depth 0 -- or a contextual
+// "saga" IDENT at depth 0, the saga declaration's own start token. This
+// guarantees one bad top-level declaration never swallows the rest of the
+// file: "entity Bad { !!! }" is skipped as one balanced span, then the next
+// declaration parses normally. All three bracket kinds are tracked so an
+// unbalanced span like "entity Bad { [ ( !!! } entity Good { id: uuid }"
+// still recovers to Good without requiring callers to know which delimiters
+// the bad span used. Strings and comments are already handled by the lexer:
+// a keyword inside a STRING token or a "//" comment never appears as an
+// ENTITY/etc. token, so syncTopLevel cannot mis-sync on "entity" that occurs
+// inside a literal or comment.
 func (p *Parser) syncTopLevel() {
 	depthBraces := 0
 	depthParens := 0
 	depthBrackets := 0
 
 	for {
-		//nolint:exhaustive // only EOF/brackets/the 7 trigger keywords affect sync state; everything else is skipped unchanged.
+		//nolint:exhaustive // only EOF/brackets/the 6 trigger keywords plus a contextual "saga" IDENT affect sync state; everything else is skipped unchanged.
 		switch p.cur.Kind {
 		case token.EOF:
 			return
@@ -267,6 +316,10 @@ func (p *Parser) syncTopLevel() {
 			}
 		case token.ENTITY, token.SERVICE, token.JOB, token.SCHEDULE, token.MESSAGE, token.ENUM:
 			if depthBraces == 0 && depthParens == 0 && depthBrackets == 0 {
+				return
+			}
+		case token.IDENT:
+			if p.cur.Lit == "saga" && depthBraces == 0 && depthParens == 0 && depthBrackets == 0 {
 				return
 			}
 		}

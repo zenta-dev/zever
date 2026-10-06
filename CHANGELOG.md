@@ -31,6 +31,11 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   (`adapters/workflow/db`) implementations featuring forward execution,
   pivot roll-forward, reverse compensation with retry, and
   `RecoverStuckSagas` crash recovery.
+- `.zen` top-level `saga { ... }` declaration: composes existing services'
+  RPCs into a workflow saga (`step` with required `execute`, optional
+  `compensate`, and at most one `pivot: true`), resolved into IR and rendered
+  by the `gogen` backend as `workflow.SagaStep` registration behind a
+  `SagaCaller` seam.
 - New `core/resilience` battery (process-local circuit breaker, bulkhead, and
   timeout/retry policy composition; default adapter `memory`) and
   `core/outbox` battery (transactional outbox/inbox; default adapter `db`,
