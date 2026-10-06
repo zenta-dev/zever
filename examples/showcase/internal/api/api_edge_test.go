@@ -103,8 +103,11 @@ func TestValidationBoundaries(t *testing.T) {
 	s := newTestSetup(t)
 	register(t, s.handler, "admin@example.com", "Admin")
 	makeAdmin(t, s, "admin@example.com")
+	register(t, s.handler, "super@example.com", "Super")
+	makeAdmin(t, s, "super@example.com")
 	register(t, s.handler, "bob@example.com", "Bob")
 	makeCategory(t, s, "cat-1", "Gadgets")
+	makeCategory(t, s, "cat-2", "Widgets")
 	admin := login(t, s.handler, "admin@example.com")
 	bob := login(t, s.handler, "bob@example.com")
 
