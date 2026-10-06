@@ -330,6 +330,164 @@ func TestEdgeReclaimMalformedPayload(t *testing.T) {
 	release()
 }
 
+// TestEdgeSignalUnknownRun reports ErrUnknownRun for a missing run.
+func TestEdgeSignalUnknownRun(t *testing.T) {
+	t.Parallel()
+
+	d := mustNew(t, Options{Owner: "owner-sig"})
+	ctx := t.Context()
+
+	if err := d.Signal(ctx, "missing", "advance", "v"); !errors.Is(err, workflow.ErrUnknownRun) {
+		t.Fatalf("Signal(unknown) = %v, want ErrUnknownRun", err)
+	}
+}
+
+// TestEdgeSignalCompletedRun reports ErrRunCompleted for a finished run.
+func TestEdgeSignalCompletedRun(t *testing.T) {
+	t.Parallel()
+
+	d := mustNew(t, Options{})
+	d.RegisterStep("greet", echoStep)
+	ctx := t.Context()
+
+	id, err := d.Start(ctx, "greet", "hi", "sig-done")
+	if err != nil {
+		t.Fatalf("Start error = %v", err)
+	}
+
+	if err := d.Signal(ctx, id, "advance", "v"); !errors.Is(err, workflow.ErrRunCompleted) {
+		t.Fatalf("Signal(completed) = %v, want ErrRunCompleted", err)
+	}
+}
+
+// TestEdgeCancelUnknownRun reports ErrUnknownRun for a missing run.
+func TestEdgeCancelUnknownRun(t *testing.T) {
+	t.Parallel()
+
+	d := mustNew(t, Options{Owner: "owner-can"})
+	ctx := t.Context()
+
+	if err := d.Cancel(ctx, "missing"); !errors.Is(err, workflow.ErrUnknownRun) {
+		t.Fatalf("Cancel(unknown) = %v, want ErrUnknownRun", err)
+	}
+}
+
+// TestEdgeCancelRunningRun removes a running run so it is no longer
+// queryable, while the still-running step finishes without resurrecting it.
+func TestEdgeCancelRunningRun(t *testing.T) {
+	t.Parallel()
+
+	d := mustNew(t, Options{Owner: "owner-can"})
+	release := mustRunningRun(t, d, "job-cancel", "cancel-live")
+	ctx := t.Context()
+
+	if err := d.Cancel(ctx, "cancel-live"); err != nil {
+		t.Fatalf("Cancel(running) = %v", err)
+	}
+
+	var out string
+	if err := d.Query(ctx, "cancel-live", "state", &out); !errors.Is(err, workflow.ErrUnknownRun) {
+		t.Fatalf("Query(cancelled) = %v, want ErrUnknownRun", err)
+	}
+
+	release()
+}
+
+// TestIsDuplicateErr_cases pins the cross-dialect uniqueness detection: any
+// message naming a unique, duplicate, or primary-key violation counts.
+func TestIsDuplicateErr_cases(t *testing.T) {
+	t.Parallel()
+
+	cases := []struct {
+		name string
+		err  error
+		want bool
+	}{
+		{name: "sqlite unique", err: errors.New("UNIQUE constraint failed: workflow_runs.workflow_id"), want: true},
+		{name: "postgres duplicate", err: errors.New("duplicate key value violates unique constraint"), want: true},
+		{name: "primary key", err: errors.New("PRIMARY KEY constraint"), want: true},
+		{name: "unrelated", err: errors.New("connection refused"), want: false},
+	}
+
+	for _, tc := range cases {
+		if got := isDuplicateErr(tc.err); got != tc.want {
+			t.Errorf("isDuplicateErr(%s) = %v, want %v", tc.name, got, tc.want)
+		}
+	}
+}
+
+// TestCoerceTime_cases proves the timestamp cell coercion accepts every
+// driver representation and fails closed on an unsupported Go type.
+func TestCoerceTime_cases(t *testing.T) {
+	t.Parallel()
+
+	now := time.Now().UTC().Truncate(time.Nanosecond)
+
+	cases := []struct {
+		name    string
+		in      any
+		want    time.Time
+		wantErr bool
+	}{
+		{name: "nil", in: nil, want: time.Time{}},
+		{name: "time", in: now, want: now},
+		{name: "string", in: now.Format(time.RFC3339Nano), want: now},
+		{name: "bytes", in: []byte(now.Format(time.RFC3339Nano)), want: now},
+		{name: "unsupported", in: 42, wantErr: true},
+	}
+
+	for _, tc := range cases {
+		got, err := coerceTime(tc.in)
+		if (err != nil) != tc.wantErr {
+			t.Errorf("coerceTime(%s) error = %v, wantErr %v", tc.name, err, tc.wantErr)
+			continue
+		}
+
+		if tc.wantErr {
+			continue
+		}
+
+		if !got.Equal(tc.want) {
+			t.Errorf("coerceTime(%s) = %v, want %v", tc.name, got, tc.want)
+		}
+	}
+}
+
+// TestCoerceInt_cases proves the integer cell coercion accepts every width and
+// fails closed on an unsupported Go type.
+func TestCoerceInt_cases(t *testing.T) {
+	t.Parallel()
+
+	cases := []struct {
+		name    string
+		in      any
+		want    int64
+		wantErr bool
+	}{
+		{name: "int64", in: int64(7), want: 7},
+		{name: "int32", in: int32(7), want: 7},
+		{name: "int", in: 7, want: 7},
+		{name: "float64", in: float64(7), want: 7},
+		{name: "unsupported", in: "7", wantErr: true},
+	}
+
+	for _, tc := range cases {
+		got, err := coerceInt(tc.in)
+		if (err != nil) != tc.wantErr {
+			t.Errorf("coerceInt(%s) error = %v, wantErr %v", tc.name, err, tc.wantErr)
+			continue
+		}
+
+		if tc.wantErr {
+			continue
+		}
+
+		if got != tc.want {
+			t.Errorf("coerceInt(%s) = %d, want %d", tc.name, got, tc.want)
+		}
+	}
+}
+
 // TestEdgeConcurrentStartDistinctIDs documents goroutine-safety: concurrent
 // Starts with distinct workflow IDs all succeed and stay queryable.
 func TestEdgeConcurrentStartDistinctIDs(t *testing.T) {

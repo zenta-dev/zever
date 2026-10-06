@@ -1,6 +1,7 @@
 package db
 
 import (
+	"errors"
 	"path/filepath"
 	"strings"
 	"sync"
@@ -238,6 +239,108 @@ func TestTryClaimContention(t *testing.T) {
 
 	if string(msgA.Payload) != "work" {
 		t.Errorf("Payload = %q, want work", msgA.Payload)
+	}
+}
+
+// TestCoerceTime_cases proves the timestamp cell coercion accepts every
+// driver representation and fails closed on an unsupported Go type.
+func TestCoerceTime_cases(t *testing.T) {
+	t.Parallel()
+
+	now := time.Now().UTC().Truncate(time.Nanosecond)
+
+	cases := []struct {
+		name    string
+		in      any
+		want    time.Time
+		wantErr bool
+	}{
+		{name: "nil", in: nil, want: time.Time{}},
+		{name: "time", in: now, want: now},
+		{name: "string", in: now.Format(time.RFC3339Nano), want: now},
+		{name: "bytes", in: []byte(now.Format(time.RFC3339Nano)), want: now},
+		{name: "unsupported", in: 42, wantErr: true},
+	}
+
+	for _, tc := range cases {
+		got, err := coerceTime(tc.in)
+		if (err != nil) != tc.wantErr {
+			t.Errorf("coerceTime(%s) error = %v, wantErr %v", tc.name, err, tc.wantErr)
+			continue
+		}
+
+		if tc.wantErr {
+			if !errors.Is(err, ErrUnsupportedType) {
+				t.Errorf("coerceTime(%s) = %v, want ErrUnsupportedType", tc.name, err)
+			}
+
+			continue
+		}
+
+		if !got.Equal(tc.want) {
+			t.Errorf("coerceTime(%s) = %v, want %v", tc.name, got, tc.want)
+		}
+	}
+}
+
+// TestCoerceInt_cases proves the integer cell coercion accepts every width and
+// fails closed on an unsupported Go type.
+func TestCoerceInt_cases(t *testing.T) {
+	t.Parallel()
+
+	cases := []struct {
+		name    string
+		in      any
+		want    int64
+		wantErr bool
+	}{
+		{name: "int64", in: int64(7), want: 7},
+		{name: "int32", in: int32(7), want: 7},
+		{name: "int", in: 7, want: 7},
+		{name: "float64", in: float64(7), want: 7},
+		{name: "unsupported", in: "7", wantErr: true},
+	}
+
+	for _, tc := range cases {
+		got, err := coerceInt(tc.in)
+		if (err != nil) != tc.wantErr {
+			t.Errorf("coerceInt(%s) error = %v, wantErr %v", tc.name, err, tc.wantErr)
+			continue
+		}
+
+		if tc.wantErr {
+			if !errors.Is(err, ErrUnsupportedType) {
+				t.Errorf("coerceInt(%s) = %v, want ErrUnsupportedType", tc.name, err)
+			}
+
+			continue
+		}
+
+		if got != tc.want {
+			t.Errorf("coerceInt(%s) = %d, want %d", tc.name, got, tc.want)
+		}
+	}
+}
+
+// TestDecodeHeaders_cases proves corrupt, empty, and null header cells decode
+// to nil rather than failing the Pop.
+func TestDecodeHeaders_cases(t *testing.T) {
+	t.Parallel()
+
+	if got := decodeHeaders(""); got != nil {
+		t.Errorf("decodeHeaders(empty) = %v, want nil", got)
+	}
+
+	if got := decodeHeaders("{not-json"); got != nil {
+		t.Errorf("decodeHeaders(corrupt) = %v, want nil", got)
+	}
+
+	if got := decodeHeaders(`null`); got != nil {
+		t.Errorf("decodeHeaders(null) = %v, want nil", got)
+	}
+
+	if got := decodeHeaders(`{"k":"v"}`); got["k"] != "v" {
+		t.Errorf("decodeHeaders(valid) = %v, want k=v", got)
 	}
 }
 

@@ -8,6 +8,7 @@ import (
 
 	dbsqlite "github.com/zenta-dev/zever/adapters/db/sqlite"
 	coredb "github.com/zenta-dev/zever/core/db"
+	"github.com/zenta-dev/zever/core/queue"
 	"github.com/zenta-dev/zever/orm"
 )
 
@@ -69,6 +70,141 @@ func restaleRows(ctx context.Context, d *driver) error {
 	).Exec(ctx, d.conn)
 
 	return err
+}
+
+// BenchmarkPush measures enqueueing one message: message mint, header
+// encoding, and the guarded INSERT with its unique-id index. The table grows
+// over the run (no drain), so the measurement includes index depth growth.
+func BenchmarkPush(b *testing.B) {
+	d := benchDriver(b)
+	ctx := b.Context()
+	payload := queue.Payload("work")
+
+	b.ReportAllocs()
+	b.ResetTimer()
+
+	for b.Loop() {
+		if err := d.Push(ctx, "jobs", payload, nil); err != nil {
+			b.Fatalf("Push failed: %v", err)
+		}
+	}
+}
+
+// BenchmarkPop measures claiming the oldest ready message: the head SELECT
+// plus the compare-and-set lease UPDATE. Each iteration enqueues one message
+// first so the queue never drains; the fixed Push is included.
+func BenchmarkPop(b *testing.B) {
+	d := benchDriver(b)
+	ctx := b.Context()
+	payload := queue.Payload("work")
+
+	b.ReportAllocs()
+	b.ResetTimer()
+
+	for b.Loop() {
+		if err := d.Push(ctx, "jobs", payload, nil); err != nil {
+			b.Fatalf("Push failed: %v", err)
+		}
+
+		msg, err := d.Pop(ctx, "jobs")
+		if err != nil {
+			b.Fatalf("Pop failed: %v", err)
+		}
+
+		if err := d.Ack(ctx, msg); err != nil {
+			b.Fatalf("Ack failed: %v", err)
+		}
+	}
+}
+
+// BenchmarkAck measures settling a claimed message with the guarded DELETE.
+// Each iteration pushes and pops one message first; the fixed Push+Pop is
+// included.
+func BenchmarkAck(b *testing.B) {
+	d := benchDriver(b)
+	ctx := b.Context()
+	payload := queue.Payload("work")
+
+	b.ReportAllocs()
+	b.ResetTimer()
+
+	for b.Loop() {
+		if err := d.Push(ctx, "jobs", payload, nil); err != nil {
+			b.Fatalf("Push failed: %v", err)
+		}
+
+		msg, err := d.Pop(ctx, "jobs")
+		if err != nil {
+			b.Fatalf("Pop failed: %v", err)
+		}
+
+		if err := d.Ack(ctx, msg); err != nil {
+			b.Fatalf("Ack failed: %v", err)
+		}
+	}
+}
+
+// BenchmarkNack measures dropping a claimed message without requeue: the
+// guarded DELETE. Each iteration pushes and pops one message first; the fixed
+// Push+Pop is included.
+func BenchmarkNack(b *testing.B) {
+	d := benchDriver(b)
+	ctx := b.Context()
+	payload := queue.Payload("work")
+
+	b.ReportAllocs()
+	b.ResetTimer()
+
+	for b.Loop() {
+		if err := d.Push(ctx, "jobs", payload, nil); err != nil {
+			b.Fatalf("Push failed: %v", err)
+		}
+
+		msg, err := d.Pop(ctx, "jobs")
+		if err != nil {
+			b.Fatalf("Pop failed: %v", err)
+		}
+
+		if err := d.Nack(ctx, msg, false); err != nil {
+			b.Fatalf("Nack failed: %v", err)
+		}
+	}
+}
+
+// BenchmarkNackRequeue measures returning a claimed message to ready with
+// attempt+1: the guarded UPDATE. Each iteration pushes and pops one message
+// first, then drains the requeued message; the fixed Push+Pop+Ack is included.
+func BenchmarkNackRequeue(b *testing.B) {
+	d := benchDriver(b)
+	ctx := b.Context()
+	payload := queue.Payload("work")
+
+	b.ReportAllocs()
+	b.ResetTimer()
+
+	for b.Loop() {
+		if err := d.Push(ctx, "jobs", payload, nil); err != nil {
+			b.Fatalf("Push failed: %v", err)
+		}
+
+		msg, err := d.Pop(ctx, "jobs")
+		if err != nil {
+			b.Fatalf("Pop failed: %v", err)
+		}
+
+		if err = d.Nack(ctx, msg, true); err != nil {
+			b.Fatalf("Nack failed: %v", err)
+		}
+
+		again, err := d.Pop(ctx, "jobs")
+		if err != nil {
+			b.Fatalf("Pop(requeued) failed: %v", err)
+		}
+
+		if err := d.Ack(ctx, again); err != nil {
+			b.Fatalf("Ack(requeued) failed: %v", err)
+		}
+	}
 }
 
 // BenchmarkReclaimStale measures the stale-claim sweep: one SELECT plus one
