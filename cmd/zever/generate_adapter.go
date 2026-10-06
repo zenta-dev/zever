@@ -1285,6 +1285,8 @@ type GenerateAdapterConfig struct {
 	Force   bool
 	Stdout  io.Writer
 	Stderr  io.Writer
+	// DryRun prints the planned writes without touching the filesystem.
+	DryRun bool
 }
 
 // GenerateAdapterResult names everything GenerateAdapter wrote.
@@ -1357,6 +1359,16 @@ func GenerateAdapter(cfg GenerateAdapterConfig) (GenerateAdapterResult, error) {
 	res.OptionsPath = optionsPath
 	res.RegisterPath = registerPath
 
+	if cfg.DryRun {
+		if stdout := cfg.Stdout; stdout != nil {
+			printGenerateDryRun(stdout, adapterPath)
+			_, _ = fmt.Fprintln(stdout, dim("would write ")+cyan(optionsPath))
+			_, _ = fmt.Fprintln(stdout, dim("would write ")+cyan(registerPath))
+		}
+
+		return res, nil
+	}
+
 	// Every file is checked before any is written, so a collision on one
 	// cannot leave a half-scaffolded package on disk.
 	if !cfg.Force {
@@ -1403,6 +1415,7 @@ func runGenerateAdapter(args []string) error {
 	fs := flag.NewFlagSet("generate adapter", flag.ContinueOnError)
 	fs.Var(&fields, "field", "an Options field to declare, as name:type; repeatable")
 	force := fs.Bool("force", false, "overwrite the adapter files if they already exist")
+	dryRun := fs.Bool("dry-run", false, "print the planned writes without writing files")
 	// coverageProof: no local -i/--interactive flags; peelInteractive
 	// strips them before Parse and sets interactiveMode globally.
 
@@ -1508,6 +1521,7 @@ func runGenerateAdapter(args []string) error {
 		Force:   *force,
 		Stdout:  os.Stdout,
 		Stderr:  os.Stderr,
+		DryRun:  *dryRun,
 	})
 
 	return err

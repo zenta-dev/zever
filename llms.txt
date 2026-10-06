@@ -14,6 +14,8 @@ Conventions: `AGENTS.md` (repo root).
 - `config/README.md` — layered config (`defaults < file < env`).
 - `cmd/zever/README.md` — CLI; `zever --help --agent` prints a
   machine-readable command descriptor, `--json` selects JSON output.
+- `skills/zever/SKILL.md` — Claude Code skill; regenerate from any pinned
+  binary with `zever docs --skill --dir skills/zever`.
 - `dsl/README.md` — `.zen` compiler pipeline and codegen backends.
 
 ## Machine interfaces

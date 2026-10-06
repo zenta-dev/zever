@@ -22,7 +22,9 @@ func (b *Backend) Name() string {
 
 // Generate renders one "<module>/mcp.json" file per schema.Modules entry,
 // each listing that module's services as MCP tools, plus one merged "mcp.json"
-// (root, no module prefix) covering every module. Tool names are namespaced
+// (root, no module prefix) covering every module. Modules with services
+// additionally get a runnable "<module>/mcpserver/main.go" MCP stdio server
+// with per-tool handler stubs. Tool names are namespaced
 // "<module>_<Service>_<Operation>" so identical service names in different
 // modules never collide.
 func (b *Backend) Generate(schema *ir.Schema) (map[string][]byte, error) {
@@ -54,6 +56,15 @@ func (b *Backend) Generate(schema *ir.Schema) (map[string][]byte, error) {
 		}
 
 		out[moduleLabel(m)+"/mcp.json"] = content
+
+		if len(mod.Services) > 0 {
+			server, err := renderServerModule(mod.Services)
+			if err != nil {
+				return nil, err
+			}
+
+			out[moduleLabel(m)+"/mcpserver/main.go"] = server
+		}
 	}
 
 	mergedContent, err := json.MarshalIndent(merged, "", "  ")
