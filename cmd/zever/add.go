@@ -1,6 +1,7 @@
 package main
 
 import (
+	"bytes"
 	"flag"
 	"fmt"
 	"go/format"
@@ -48,6 +49,7 @@ func newAddFlagSet() *flag.FlagSet {
 	fs.String("adapter", "", "adapter pick, overriding the positional battery/adapter slash form when both agree")
 	fs.Bool("force", false, "overwrite the zever.yaml stanza when the battery is already present")
 	fs.String("module", "", "plugin battery's Go module path, with optional @version suffix (required for plugin batteries)")
+	fs.Bool("dry-run", false, "print the file edits without writing them")
 
 	fs.Usage = func() {
 		_, _ = fmt.Fprintln(fs.Output(), addUsageBody)
@@ -618,8 +620,9 @@ func updateAppGoForPlugin(src, plugin, modulePath string) (string, error) {
 // calling project in the working directory: go.mod requires (+ local
 // replaces), internal/app/app.go import + Register(), and the zever.yaml
 // stanza. It runs no network commands: `go mod tidy` afterwards is the
-// caller's to run so go.sum catches up.
-func addBatteryToProject(tag, battery, adapter string, force bool) error {
+// caller's to run so go.sum catches up. With dryRun it prints the files
+// that would change instead of writing them.
+func addBatteryToProject(tag, battery, adapter string, force, dryRun bool) error {
 	sel := batterySelection{Battery: battery, Adapter: adapter}
 
 	gomod, err := os.ReadFile("go.mod")
@@ -647,7 +650,9 @@ func addBatteryToProject(tag, battery, adapter string, force bool) error {
 
 	updated := updateGoModForAdd(string(gomod), sel, version)
 	if updated != string(gomod) {
-		if werr := os.WriteFile("go.mod", []byte(updated), 0o644); werr != nil { //nolint:gosec // go.mod is not a secret
+		if dryRun {
+			_, _ = fmt.Fprintln(os.Stdout, dim("would write ")+cyan("go.mod"))
+		} else if werr := os.WriteFile("go.mod", []byte(updated), 0o644); werr != nil { //nolint:gosec // go.mod is not a secret
 			return fmt.Errorf("%s: write go.mod: %w", tag, werr)
 		}
 	}
@@ -665,7 +670,9 @@ func addBatteryToProject(tag, battery, adapter string, force bool) error {
 	}
 
 	if updatedApp != string(appSrc) {
-		if werr := os.WriteFile(appPath, []byte(updatedApp), 0o644); werr != nil { //nolint:gosec // project-owned scaffold path
+		if dryRun {
+			_, _ = fmt.Fprintln(os.Stdout, dim("would write ")+cyan(appPath))
+		} else if werr := os.WriteFile(appPath, []byte(updatedApp), 0o644); werr != nil { //nolint:gosec // project-owned scaffold path
 			return fmt.Errorf("%s: write %q: %w", tag, appPath, werr)
 		}
 	}
@@ -686,6 +693,14 @@ func addBatteryToProject(tag, battery, adapter string, force bool) error {
 		updatedYaml = append([]byte(zeverYamlSchemaModeline), updatedYaml...)
 	}
 
+	if dryRun {
+		if len(yamlSrc) == 0 || !bytes.Equal(updatedYaml, yamlSrc) {
+			_, _ = fmt.Fprintln(os.Stdout, dim("would write ")+cyan("zever.yaml"))
+		}
+
+		return nil
+	}
+
 	if err := os.WriteFile("zever.yaml", updatedYaml, 0o644); err != nil { //nolint:gosec // project config, not a secret
 		return fmt.Errorf("%s: write zever.yaml: %w", tag, err)
 	}
@@ -697,8 +712,9 @@ func addBatteryToProject(tag, battery, adapter string, force bool) error {
 // third-party plugin battery: a require of the plugin module in go.mod,
 // the RegisterPlugin/Resolve wiring comment in internal/app/app.go, and
 // the `plugins:` stanza in zever.yaml. Like the core path it runs no
-// network commands.
-func addPluginToProject(tag, plugin, adapter, modulePath, version string, force bool) error {
+// network commands. With dryRun it prints the files that would change
+// instead of writing them.
+func addPluginToProject(tag, plugin, adapter, modulePath, version string, force, dryRun bool) error {
 	gomod, err := os.ReadFile("go.mod")
 	if err != nil {
 		if os.IsNotExist(err) {
@@ -719,7 +735,9 @@ func addPluginToProject(tag, plugin, adapter, modulePath, version string, force 
 
 	updated := updateGoModForPlugin(string(gomod), modulePath, version)
 	if updated != string(gomod) {
-		if werr := os.WriteFile("go.mod", []byte(updated), 0o644); werr != nil { //nolint:gosec // go.mod is not a secret
+		if dryRun {
+			_, _ = fmt.Fprintln(os.Stdout, dim("would write ")+cyan("go.mod"))
+		} else if werr := os.WriteFile("go.mod", []byte(updated), 0o644); werr != nil { //nolint:gosec // go.mod is not a secret
 			return fmt.Errorf("%s: write go.mod: %w", tag, werr)
 		}
 	}
@@ -737,7 +755,9 @@ func addPluginToProject(tag, plugin, adapter, modulePath, version string, force 
 	}
 
 	if updatedApp != string(appSrc) {
-		if werr := os.WriteFile(appPath, []byte(updatedApp), 0o644); werr != nil { //nolint:gosec // project-owned scaffold path
+		if dryRun {
+			_, _ = fmt.Fprintln(os.Stdout, dim("would write ")+cyan(appPath))
+		} else if werr := os.WriteFile(appPath, []byte(updatedApp), 0o644); werr != nil { //nolint:gosec // project-owned scaffold path
 			return fmt.Errorf("%s: write %q: %w", tag, appPath, werr)
 		}
 	}
@@ -754,6 +774,14 @@ func addPluginToProject(tag, plugin, adapter, modulePath, version string, force 
 
 	if len(yamlSrc) == 0 {
 		updatedYaml = append([]byte(zeverYamlSchemaModeline), updatedYaml...)
+	}
+
+	if dryRun {
+		if len(yamlSrc) == 0 || !bytes.Equal(updatedYaml, yamlSrc) {
+			_, _ = fmt.Fprintln(os.Stdout, dim("would write ")+cyan("zever.yaml"))
+		}
+
+		return nil
 	}
 
 	if err := os.WriteFile("zever.yaml", updatedYaml, 0o644); err != nil { //nolint:gosec // project config, not a secret
@@ -795,6 +823,11 @@ func runAdd(args []string) error {
 	}
 
 	force := flagBool(fs, "force")
+	dryRun := flagBool(fs, "dry-run")
+
+	if dryRun {
+		_, _ = fmt.Fprintln(os.Stdout, dim("dry run — no files written"))
+	}
 
 	if isPlugin {
 		rawModule := flagString("module")
@@ -809,7 +842,7 @@ func runAdd(args []string) error {
 
 		_, _ = fmt.Fprintln(os.Stderr, formatHint(fmt.Sprintf("battery %q is not built in; wiring it as a third-party plugin via %q", battery, modulePath)))
 
-		if err := addPluginToProject(tag, battery, adapter, modulePath, version, force); err != nil {
+		if err := addPluginToProject(tag, battery, adapter, modulePath, version, force, dryRun); err != nil {
 			return err
 		}
 	} else {
@@ -817,7 +850,7 @@ func runAdd(args []string) error {
 			return fmt.Errorf("%s: --module only applies to plugin batteries (battery %q is built in)", tag, battery)
 		}
 
-		if err := addBatteryToProject(tag, battery, adapter, force); err != nil {
+		if err := addBatteryToProject(tag, battery, adapter, force, dryRun); err != nil {
 			return err
 		}
 	}

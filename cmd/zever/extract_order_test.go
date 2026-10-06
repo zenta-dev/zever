@@ -103,5 +103,6 @@ func newExtractFlagSet() *flag.FlagSet {
 	fs.String("out", "", "")
 	fs.String("module", "", "")
 	fs.Bool("force", false, "")
+	fs.Bool("dry-run", false, "")
 	return fs
 }
