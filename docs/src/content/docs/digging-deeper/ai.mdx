@@ -185,13 +185,19 @@ the shared backend instances.
 `tools/zever-mcp` is a stdio [Model Context Protocol](https://modelcontextprotocol.io)
 server that exposes the `.zen` compiler to coding agents. It implements
 `initialize`, `tools/list` and `tools/call` over newline-delimited JSON-RPC
-2.0, with three read-only tools:
+2.0, with five tools. The first three are read-only; `zever_generate`
+writes, gated by dry-run preview plus human elicitation approval:
 
 | Tool | Purpose |
 |---|---|
 | `zever_compile` | Compile `.zen` sources and return the merged OpenAPI document |
 | `zever_schema` | Return a JSON overview of modules, entities, services, messages and enums |
 | `zever_explain` | Describe a module, entity, message, service or operation by dotted path |
+| `zever_doctor` | Resolve every battery and report OK/FAIL rows |
+| `zever_generate` | Scaffold via dry-run plan, then apply on elicited approval |
+
+It also serves static reference resources and prompt templates for
+scaffolding, triage, and diagnostics.
 
 Build it and register it with your agent host:
 
