@@ -477,7 +477,8 @@ func parseAdaptersFlag(raw string) (map[string]string, error) {
 // nestedModuleDirs (the same source renderNewGoMod's replace set uses), so
 // the picker's offer list cannot drift from the scaffold's module graph.
 // The password adapter dir ("argon2") maps back to its PHC-canonical
-// adapter string ("argon2id", mirroring adapterDirName); the consolidated
+// adapter string ("argon2id", mirroring adapterDirName) and the resilience
+// "inproc" dir maps back to its "memory" adapter string; the consolidated
 // DB-backed dirs ("search/db", "vectorstore/db", "workflow/db") map back
 // to their canonical "db" adapter name, with the legacy alias names
 // ("postgres", "pgvector", "sqlite") appended so old picks still validate
@@ -499,6 +500,10 @@ func batteryAdapters() map[string][]string {
 
 		adapter := adapterDir
 		if battery == "password" && adapterDir == "argon2" {
+			adapter = defaultServiceAdapter(battery)
+		}
+
+		if battery == "resilience" && adapterDir == "inproc" {
 			adapter = defaultServiceAdapter(battery)
 		}
 
@@ -891,11 +896,13 @@ var allServiceAdapters = map[string]string{
 	"media":         "local",
 	"notification":  "log",
 	"observability": "stdout",
+	"outbox":        "db",
 	"password":      "argon2id",
 	"payment":       "stub",
 	"permission":    "noop",
 	"queue":         "memory",
 	"ratelimit":     "memory",
+	"resilience":    "memory",
 	"router":        "stdhttp",
 	"scheduler":     "embedded",
 	"search":        "db",
@@ -1257,11 +1264,13 @@ var nestedModuleDirs = []string{
 	"adapters/media/ffmpeg", "adapters/media/local", "adapters/media/s3",
 	"adapters/notification/fcm", "adapters/notification/log", "adapters/notification/twilio",
 	"adapters/observability/noop", "adapters/observability/otlp", "adapters/observability/stdout",
+	"adapters/outbox/db", "adapters/outbox/memory",
 	"adapters/password/argon2",
 	"adapters/payment/paddle", "adapters/payment/stripe", "adapters/payment/stub",
 	"adapters/permission/casbin", "adapters/permission/noop", "adapters/permission/rbac",
 	"adapters/queue/db", "adapters/queue/memory", "adapters/queue/redis",
 	"adapters/ratelimit/memory", "adapters/ratelimit/redis",
+	"adapters/resilience/inproc",
 	"adapters/router/fiber", "adapters/router/stdhttp",
 	"adapters/scheduler/embedded", "adapters/scheduler/postgres",
 	"adapters/search/meilisearch", "adapters/search/db",

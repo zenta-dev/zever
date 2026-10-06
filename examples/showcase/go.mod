@@ -268,7 +268,9 @@ require (
 	github.com/zenta-dev/zever/core/lock v0.5.3 // indirect
 	github.com/zenta-dev/zever/core/media v0.5.3 // indirect
 	github.com/zenta-dev/zever/core/observability v0.5.3 // indirect
+	github.com/zenta-dev/zever/core/outbox v0.5.3 // indirect
 	github.com/zenta-dev/zever/core/payment v0.5.3 // indirect
+	github.com/zenta-dev/zever/core/resilience v0.5.3 // indirect
 	github.com/zenta-dev/zever/core/scheduler v0.5.3 // indirect
 	github.com/zenta-dev/zever/core/search v0.5.3 // indirect
 	github.com/zenta-dev/zever/core/secrets v0.5.3 // indirect
@@ -306,3 +308,7 @@ require (
 	modernc.org/memory v1.12.1 // indirect
 	modernc.org/sqlite v1.60.1 // indirect
 )
+
+replace github.com/zenta-dev/zever/core/outbox => ../../core/outbox
+
+replace github.com/zenta-dev/zever/core/resilience => ../../core/resilience

@@ -694,6 +694,38 @@ var batterySpecs = map[string]batterySpec{
 			},
 		},
 	},
+	"outbox": {
+		Package:   "outbox",
+		Interface: "Store",
+		Imports:   []string{"context", "github.com/zenta-dev/zever/core/db"},
+		Methods: []batteryMethod{
+			{
+				Name:    "Record",
+				Params:  []string{"ctx context.Context", "tx db.Tx", "msg outbox.Message"},
+				Results: []string{"error"},
+			},
+			{
+				Name:    "Start",
+				Params:  []string{"ctx context.Context"},
+				Results: []string{"error"},
+			},
+			{
+				Name:    "Status",
+				Params:  []string{},
+				Results: []string{"outbox.Status"},
+			},
+			{
+				Name:    "Close",
+				Params:  []string{},
+				Results: []string{"error"},
+			},
+			{
+				Name:    "Name",
+				Params:  []string{},
+				Results: []string{"string"},
+			},
+		},
+	},
 	"payment": {
 		Package:   "payment",
 		Interface: "Payment",
@@ -814,6 +846,23 @@ var batterySpecs = map[string]batterySpec{
 				Name:    "Name",
 				Params:  []string{},
 				Results: []string{"string"},
+			},
+		},
+	},
+	"resilience": {
+		Package:   "resilience",
+		Interface: "Manager",
+		Imports:   []string{"context"},
+		Methods: []batteryMethod{
+			{
+				Name:    "Guard",
+				Params:  []string{"name string"},
+				Results: []string{"resilience.Guard", "error"},
+			},
+			{
+				Name:    "Close",
+				Params:  []string{},
+				Results: []string{"error"},
 			},
 		},
 	},

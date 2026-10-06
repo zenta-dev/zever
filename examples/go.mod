@@ -197,11 +197,13 @@ require (
 	github.com/zenta-dev/zever/core/media v0.5.3 // indirect
 	github.com/zenta-dev/zever/core/notification v0.5.3 // indirect
 	github.com/zenta-dev/zever/core/observability v0.5.3 // indirect
+	github.com/zenta-dev/zever/core/outbox v0.5.3 // indirect
 	github.com/zenta-dev/zever/core/password v0.5.3 // indirect
 	github.com/zenta-dev/zever/core/payment v0.5.3 // indirect
 	github.com/zenta-dev/zever/core/permission v0.5.3 // indirect
 	github.com/zenta-dev/zever/core/queue v0.5.3 // indirect
 	github.com/zenta-dev/zever/core/ratelimit v0.5.3 // indirect
+	github.com/zenta-dev/zever/core/resilience v0.5.3 // indirect
 	github.com/zenta-dev/zever/core/router v0.5.3 // indirect
 	github.com/zenta-dev/zever/core/scheduler v0.5.3 // indirect
 	github.com/zenta-dev/zever/core/search v0.5.3 // indirect
@@ -241,3 +243,7 @@ require (
 replace github.com/zenta-dev/zever/shared/dbconn => ../shared/dbconn
 
 replace github.com/zenta-dev/zever/shared/kvstore => ../shared/kvstore
+
+replace github.com/zenta-dev/zever/core/outbox => ../core/outbox
+
+replace github.com/zenta-dev/zever/core/resilience => ../core/resilience

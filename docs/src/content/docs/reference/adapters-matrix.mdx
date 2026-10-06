@@ -160,6 +160,9 @@ redis.Register()
 | observability | noop | `github.com/zenta-dev/zever/adapters/observability/noop` | `noop.Register()` | `Observability()` |
 | observability | stdout | `github.com/zenta-dev/zever/adapters/observability/stdout` | `stdout.Register()` | `Observability()` |
 | observability | otlp | `github.com/zenta-dev/zever/adapters/observability/otlp` | `otlp.Register()` | `Observability()` |
+| outbox | memory | `github.com/zenta-dev/zever/adapters/outbox/memory` | `memory.Register()` | `Outbox()` |
+| outbox | db | `github.com/zenta-dev/zever/adapters/outbox/db` | `db.Register()` | `Outbox()` |
+| outbox | cdc | `github.com/zenta-dev/zever/adapters/outbox/cdc` | `cdc.Register()` | `Outbox()` |
 | password | argon2id | `github.com/zenta-dev/zever/adapters/password/argon2` | `argon2.Register()` | `Password()` |
 | payment | stub | `github.com/zenta-dev/zever/adapters/payment/stub` | `stub.Register()` | `Payment()` |
 | payment | stripe | `github.com/zenta-dev/zever/adapters/payment/stripe` | `stripe.Register()` | `Payment()` |
@@ -172,6 +175,7 @@ redis.Register()
 | queue | redis | `github.com/zenta-dev/zever/adapters/queue/redis` | `redis.Register()` | `Queue()` |
 | ratelimit | memory | `github.com/zenta-dev/zever/adapters/ratelimit/memory` | `memory.Register()` | `RateLimit()` |
 | ratelimit | redis | `github.com/zenta-dev/zever/adapters/ratelimit/redis` | `redis.Register()` | `RateLimit()` |
+| resilience | memory | `github.com/zenta-dev/zever/adapters/resilience/inproc` | `inproc.Register()` | `Resilience()` |
 | router | fiber | `github.com/zenta-dev/zever/adapters/router/fiber` | `fiber.Register()` | `Router()` |
 | router | stdhttp | `github.com/zenta-dev/zever/adapters/router/stdhttp` | `stdhttp.Register()` | `Router()` |
 | scheduler | embedded | `github.com/zenta-dev/zever/adapters/scheduler/embedded` | `embedded.Register()` | `Scheduler()` |
