@@ -13,6 +13,7 @@ import (
 	"github.com/zenta-dev/zever/dsl/backend"
 	"github.com/zenta-dev/zever/dsl/backend/atlas"
 	"github.com/zenta-dev/zever/dsl/backend/gogen"
+	"github.com/zenta-dev/zever/dsl/backend/mcp"
 	"github.com/zenta-dev/zever/dsl/backend/openapi"
 	"github.com/zenta-dev/zever/dsl/backend/proto"
 	"github.com/zenta-dev/zever/dsl/backend/protogogen"
@@ -39,7 +40,7 @@ var (
 )
 
 //nolint:unused
-const compileUsage = `zever compile [--backend atlas,gogen,openapi,proto,protogogen,zenorm] [--out DIR] <files...>
+const compileUsage = `zever compile [--backend atlas,gogen,mcp,openapi,proto,protogogen,zenorm] [--out DIR] <files...>
 
 Compiles .zen schema files through one or more backends, writing each
 backend's output under <out>/<backend>/.
@@ -129,6 +130,7 @@ func computeBackendRoots(outDir string) backendRoots {
 var backendRegistry = map[string]func(backendRoots) backend.Backend{
 	"atlas":   func(backendRoots) backend.Backend { return atlas.New() },
 	"gogen":   func(r backendRoots) backend.Backend { return gogen.NewWithPBImportRoot(r.pbImportRoot) },
+	"mcp":     func(backendRoots) backend.Backend { return mcp.New() },
 	"openapi": func(backendRoots) backend.Backend { return openapi.New() },
 	"proto": func(r backendRoots) backend.Backend {
 		return proto.NewWithAnnotationsGoPackageRoot(r.annotationsGoPackageRoot)
@@ -146,10 +148,22 @@ func backendNames() string {
 }
 
 // defaultBackends returns the sorted backend names joined by "," for use as
-// the --backend flag default. It includes every key in backendRegistry so
-// future backends are auto-included.
+// the --backend flag default. It includes every key in backendRegistry except
+// "mcp", which stays opt-in via --backend=mcp so default compiles do not
+// gain a new output tree.
 func defaultBackends() string {
-	return strings.Join(backendNamesSlice(), ",")
+	names := backendNamesSlice()
+
+	out := names[:0]
+	for _, name := range names {
+		if name == "mcp" {
+			continue
+		}
+
+		out = append(out, name)
+	}
+
+	return strings.Join(out, ",")
 }
 
 func backendNamesSlice() []string {

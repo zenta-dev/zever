@@ -9,6 +9,16 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Added
 
+- Agent-friendly CLI: global `--json` (`ZEVER_JSON`) emitting JSON envelopes
+  with typed exit codes; structured data for `compile`, `check`, `explain`
+  and `doctor`; `--help --agent` machine-readable command catalog; `--dry-run`
+  for `new`, `add` and `extract`.
+- New `dsl/backend/mcp` codegen backend: renders each service RPC as an MCP
+  tool with JSON Schema input/output (opt-in via `compile --backend mcp`),
+  plus `openapi.JSONSchemaForEntity` for self-contained entity schemas.
+- `container.Agent()` and `container.RAG()` accessors building the agent loop
+  and RAG engine over the shared `AI` and `VectorStore` instances (no `config`
+  entry, closed first); root `llms.txt` for coding agents.
 - New `core/agent` package (bounded tool-calling loop over `core/ai` with an
   optional human-in-the-loop confirmation hook and schema-constrained
   `GenerateStructured` with decode retries). No `config` entry: build it over a
