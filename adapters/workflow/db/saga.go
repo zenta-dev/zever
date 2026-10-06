@@ -283,7 +283,15 @@ func (d *driver) RunSaga(ctx context.Context, name string, input any, workflowID
 	}
 
 	now := time.Now().UTC()
-	stateJSON := fmt.Sprintf(`{"input":%s,"results":[]}`, inputJSON)
+	statePayload := map[string]any{
+		"input":   json.RawMessage(inputJSON),
+		"results": []any{},
+	}
+	stateJSONBytes, err := json.Marshal(statePayload)
+	if err != nil {
+		return "", fmt.Errorf("postgres: run saga %q: marshal state: %w", name, err)
+	}
+	stateJSON := string(stateJSONBytes)
 
 	var id workflow.RunID
 	if workflowID != "" {
