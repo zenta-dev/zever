@@ -1348,6 +1348,11 @@ func renderNewGoMod(tag string, cfg NewConfig) ([]byte, error) {
 		// The worker entrypoint always resolves the job dispatcher types,
 		// so core/job ships with every scaffold, selected or not.
 		frameworkModulePath+"/core/job",
+		// The container always wires the agent loop and RAG engine over the
+		// resolved backends, so core/agent and core/rag ship with every
+		// scaffold, selected or not.
+		frameworkModulePath+"/core/agent",
+		frameworkModulePath+"/core/rag",
 		// Generated server entrypoints always wire authz + middleware.
 		frameworkModulePath+"/core/authz",
 		frameworkModulePath+"/core/middleware",

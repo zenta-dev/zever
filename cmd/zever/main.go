@@ -395,7 +395,7 @@ func printUsage() {
 		line("extract", "Extract one module into a standalone service"),
 		"",
 		sectionInspect,
-		line("compile", "Compile .zen schemas through backends (atlas, gogen, openapi, proto, protogogen, zenorm; default: all)"),
+		line("compile", "Compile .zen schemas through backends (atlas, gogen, mcp, openapi, proto, protogogen, zenorm; default: all except mcp)"),
 		line("check", "Validate .zen schemas only — no output written"),
 		line("breaking", "Report API-breaking changes between two schema versions"),
 		line("fmt", "Format .zen schemas (gofmt-style: -l list, --write rewrite)"),

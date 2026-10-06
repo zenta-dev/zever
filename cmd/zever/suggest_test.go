@@ -81,7 +81,7 @@ func TestCandidateLists_complete(t *testing.T) {
 		t.Fatalf("allDB = %v, want %v", allDB, wantDB)
 	}
 
-	wantBackends := []string{"proto", "zenorm", "atlas", "openapi", "gogen", "protogogen"}
+	wantBackends := []string{"proto", "zenorm", "atlas", "openapi", "gogen", "protogogen", "mcp"}
 	if !slices.Equal(allBackends, wantBackends) {
 		t.Fatalf("allBackends = %v, want %v", allBackends, wantBackends)
 	}
