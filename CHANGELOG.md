@@ -9,6 +9,12 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Added
 
+- RAG reranking: `Reranker` interface with deterministic `TermOverlapReranker`
+  default and `JudgeReranker` LLM opt-in, applied post-fusion via
+  `HybridOptions.Reranker`.
+- Container agent options: `Agent(WithMaxParallel(...), WithAgentObserver(...))`
+  and `RAG(WithTopK(...), WithHybridSearch(), ...)`; existing no-arg calls
+  unchanged.
 - Agent-app tutorial (`docs/tutorials/build-an-agent-app`): end-to-end
   walkthrough from container resolution through RAG grounding, agent loops,
   MCP serving, and eval scoring.

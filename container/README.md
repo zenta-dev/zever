@@ -110,6 +110,14 @@ loop, _ := c.Agent() // *agent.Loop over the shared AI instance
 engine, _ := c.RAG() // *rag.Engine over the shared AI + VectorStore instances
 ```
 
+Both accessors take optional functional options, applied only on first
+resolution:
+
+```go
+loop, _ := c.Agent(container.WithMaxParallel(4))
+engine, _ := c.RAG(container.WithHybridSearch(), container.WithTopK(10))
+```
+
 The model name comes from the `ai` options. Both hold references to
 snapshot-closed backends, so `Close` shuts them first (with `scheduler` and
 `job`), before any backend they wrap.
