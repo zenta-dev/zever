@@ -1,7 +1,7 @@
 // Package backend defines the single extension point every DSL code
-// generation target (proto, zenorm, atlas, gogen, openapi, and protogogen;
-// no typescript or flatbuffers backends exist) implements against the
-// resolved *ir.Schema.
+// generation target (proto, zenorm, atlas, gogen, openapi, mcp, and
+// protogogen; no typescript or flatbuffers backends exist) implements
+// against the resolved *ir.Schema.
 package backend
 
 import (

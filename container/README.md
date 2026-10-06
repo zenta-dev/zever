@@ -45,6 +45,7 @@ cached state clears so the next call retries.
 
 | Service | Accessor | Notes |
 |---|---|---|
+| agent | `Agent()` | `*agent.Loop` over resolved `AI`, closed first |
 | ai | `AI()` | |
 | analytics | `Analytics()` | |
 | auth | `Auth()` | |
@@ -70,6 +71,7 @@ cached state clears so the next call retries.
 | payment | `Payment()` | |
 | permission | `Permission()` | |
 | queue | `Queue()` | leaf dependency, closed last |
+| rag | `RAG()` | `*rag.Engine` over resolved `AI` + `VectorStore`, closed first |
 | ratelimit | `RateLimit()` (`Ratelimit()` alias) | |
 | router | `Router()` | |
 | scheduler | `Scheduler()` | shares `Queue` (via `Job()`), closed first |
@@ -97,6 +99,20 @@ d, err := c.Job() // d.Q is the shared queue instance
 into the scheduler options, so the scheduler shares the same `Queue`
 connection instead of opening a redundant one. Resolving `Scheduler()`
 therefore resolves `Job()` and, transitively, `Queue` as a side effect.
+
+## Agent / RAG wiring
+
+`Agent()` and `RAG()` follow the `Job()` pattern: no adapter registry and no
+`config` entry. They compose already-resolved backends:
+
+```go
+loop, _ := c.Agent() // *agent.Loop over the shared AI instance
+engine, _ := c.RAG() // *rag.Engine over the shared AI + VectorStore instances
+```
+
+The model name comes from the `ai` options. Both hold references to
+snapshot-closed backends, so `Close` shuts them first (with `scheduler` and
+`job`), before any backend they wrap.
 
 ## Shared pools
 

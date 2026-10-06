@@ -176,6 +176,7 @@ func newNewFlagSet() *flag.FlagSet {
 	fs.Bool("yes", false, "skip all prompts, scaffold floor+flags only")
 	fs.Bool("y", false, "alias for --yes")
 	fs.Bool("list-batteries", false, "print the battery/default-adapter table to stdout and exit")
+	fs.Bool("dry-run", false, "print the scaffold plan without writing any files")
 
 	fs.Usage = func() {
 		_, _ = fmt.Fprintf(fs.Output(), newUsage+"\n", defaultFrameworkVersion)
@@ -337,6 +338,12 @@ func runNew(args []string) error {
 		if fwErr := resolveFramework(tag, &plan, flagString("framework-version")); fwErr != nil {
 			return fwErr
 		}
+	}
+
+	if flagBool(fs, "dry-run") {
+		printNewDryRun(plan, outDir)
+
+		return nil
 	}
 
 	if targetErr := ensureTargetDir(tag, outDir, flagBool(fs, "force")); targetErr != nil {
@@ -1341,6 +1348,11 @@ func renderNewGoMod(tag string, cfg NewConfig) ([]byte, error) {
 		// The worker entrypoint always resolves the job dispatcher types,
 		// so core/job ships with every scaffold, selected or not.
 		frameworkModulePath+"/core/job",
+		// The container always wires the agent loop and RAG engine over the
+		// resolved backends, so core/agent and core/rag ship with every
+		// scaffold, selected or not.
+		frameworkModulePath+"/core/agent",
+		frameworkModulePath+"/core/rag",
 		// Generated server entrypoints always wire authz + middleware.
 		frameworkModulePath+"/core/authz",
 		frameworkModulePath+"/core/middleware",
@@ -1666,6 +1678,17 @@ runnable skeleton in one command, not to a finished app.
 `
 
 	return fmt.Sprintf(tmpl, name, backends)
+}
+
+// printNewDryRun prints the scaffold plan without writing anything.
+func printNewDryRun(cfg NewConfig, outDir string) {
+	_, _ = fmt.Fprintln(os.Stdout, dim("dry run — no files written"))
+	_, _ = fmt.Fprintln(os.Stdout, success("would scaffold ")+bold(fmt.Sprintf("%q", cfg.Name))+dim(" into ")+cyan(outDir))
+	_, _ = fmt.Fprintln(os.Stdout, "  "+dim("module path: ")+cyan(cfg.ModulePath))
+
+	if len(cfg.Batteries) > 0 {
+		_, _ = fmt.Fprintln(os.Stdout, "  "+dim("batteries: ")+cyan(strings.Join(cfg.Batteries, ", ")))
+	}
 }
 
 func printNewSummary(cfg NewConfig, written []string) {

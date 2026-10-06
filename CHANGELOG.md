@@ -9,6 +9,16 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Added
 
+- Agent-friendly CLI: global `--json` (`ZEVER_JSON`) emitting JSON envelopes
+  with typed exit codes; structured data for `compile`, `check`, `explain`
+  and `doctor`; `--help --agent` machine-readable command catalog; `--dry-run`
+  for `new`, `add` and `extract`.
+- New `dsl/backend/mcp` codegen backend: renders each service RPC as an MCP
+  tool with JSON Schema input/output (opt-in via `compile --backend mcp`),
+  plus `openapi.JSONSchemaForEntity` for self-contained entity schemas.
+- `container.Agent()` and `container.RAG()` accessors building the agent loop
+  and RAG engine over the shared `AI` and `VectorStore` instances (no `config`
+  entry, closed first); root `llms.txt` for coding agents.
 - Generated HTTP+gRPC server entrypoint now registers the standard gRPC
   Health Checking Protocol (`grpc_health_v1`) and server reflection, marks
   the overall serving status SERVING on boot, ties `/readyz`'s DB ping to

@@ -96,7 +96,7 @@ var knownDBSubcommands = map[string]bool{
 // Cobra-vs-legacy routing; Cobra itself does the real parsing.
 func globalFlagToken(tok string) bool {
 	switch tok {
-	case "-i", "--interactive", "-q", "--quiet", "--no-color", "-V", "--version":
+	case "-i", "--interactive", "-q", "--quiet", "--no-color", "--json", "-V", "--version":
 		return true
 	default:
 		return false
@@ -181,7 +181,7 @@ func printCLIVersion() {
 // (runtime errors print via main, never with a usage dump), the CLI version,
 // persistent global flags, and the ported command set.
 func newRootCmd() *cobra.Command {
-	var interactive, quiet, noColor, showV bool
+	var interactive, quiet, noColor, showV, showJSON bool
 
 	root := &cobra.Command{
 		Use:   "zever",
@@ -223,15 +223,23 @@ zever applications built from .zen schemas.`,
 	root.PersistentFlags().BoolVarP(&interactive, "interactive", "i", false, "guided prompts where supported (also ZEVER_INTERACTIVE=1)")
 	root.PersistentFlags().BoolVarP(&quiet, "quiet", "q", false, "suppress non-essential output")
 	root.PersistentFlags().Bool("no-color", false, "disable ANSI styling")
+	root.PersistentFlags().BoolVar(&showJSON, "json", false, "machine-readable JSON envelope output (also ZEVER_JSON=1)")
 	root.PersistentFlags().BoolVar(&showV, "V", false, "print the CLI version (alias for --version)")
 
-	root.PersistentPreRun = func(_ *cobra.Command, _ []string) {
+	root.PersistentPreRun = func(cmd *cobra.Command, _ []string) {
 		if interactive || envInteractive() {
 			interactiveMode = true
 		}
 
 		if noColor {
 			colorEnabled = false
+		}
+
+		if cmd.Root().PersistentFlags().Changed("json") {
+			jsonExplicit = true
+			jsonMode = showJSON
+		} else if envJSON() {
+			jsonMode = true
 		}
 
 		quietMode = quiet
