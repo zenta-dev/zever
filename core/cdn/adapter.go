@@ -6,6 +6,8 @@ type Adapter string
 const (
 	// AdapterCloudflare selects the Cloudflare CDN backend.
 	AdapterCloudflare Adapter = "cloudflare"
+	// AdapterNoop selects the no-op CDN backend, which discards purges.
+	AdapterNoop Adapter = "noop"
 )
 
 // String returns the adapter name, or "unknown" for the zero value.

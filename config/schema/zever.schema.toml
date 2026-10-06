@@ -163,6 +163,21 @@ type = 'string'
 ['$defs'.cacheOptions.properties.verbose]
 type = 'boolean'
 
+['$defs'.cdnOptions]
+additionalProperties = false
+type = 'object'
+
+['$defs'.cdnOptions.properties]
+
+['$defs'.cdnOptions.properties.api_token]
+type = 'string'
+
+['$defs'.cdnOptions.properties.base_url]
+type = 'string'
+
+['$defs'.cdnOptions.properties.zone_id]
+type = 'string'
+
 ['$defs'.cryptoOptions]
 additionalProperties = false
 type = 'object'

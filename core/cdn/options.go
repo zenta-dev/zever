@@ -16,15 +16,11 @@ type Options struct {
 	BaseURL string `json:"base_url" toml:"base_url" yaml:"base_url"`
 }
 
-// Validate checks Options fail-closed and joins all violations.
+// Validate checks Options fail-closed and joins all violations. Zero values
+// pass: config.Default must validate clean, so credential presence is
+// enforced by each adapter's New instead.
 func (o Options) Validate() error {
 	var errs []error
-	if o.APIToken == "" {
-		errs = append(errs, fmt.Errorf("cdn: option %q is required", "api_token"))
-	}
-	if o.ZoneID == "" {
-		errs = append(errs, fmt.Errorf("cdn: option %q is required", "zone_id"))
-	}
 	if o.BaseURL != "" && !strings.HasPrefix(o.BaseURL, "https://") && !strings.HasPrefix(o.BaseURL, "http://") {
 		errs = append(errs, fmt.Errorf("cdn: option %q must be a valid URL", "base_url"))
 	}

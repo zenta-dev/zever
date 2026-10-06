@@ -54,7 +54,7 @@ func Default() *Config {
 	cfg.Auth = Service[auth.Options]{Adapter: "jwt"}
 	cfg.Billing = Service[billing.Options]{Adapter: "stub"}
 	cfg.Cache = Service[cache.Options]{Adapter: "memory"}
-	cfg.CDN = Service[cdn.Options]{Adapter: "cloudflare"}
+	cfg.CDN = Service[cdn.Options]{Adapter: "noop"}
 	cfg.Crypto = Service[crypto.Options]{Adapter: "local", Options: crypto.Options{Key: crypto.DevCryptoKey}} //nolint:gosec // deterministic dev-only secret, never production
 	cfg.DB = Service[db.Options]{Adapter: "sqlite"}
 	cfg.Document = Service[document.Options]{Adapter: "local"}

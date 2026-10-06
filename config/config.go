@@ -143,7 +143,7 @@ func serviceToMap[T any](o T) map[string]any {
 // never log raw option maps directly. The returned maps are fresh copies;
 // mutating them does not affect the Config.
 func (c *Config) RedactedServices() map[string]ServiceConfig {
-	out := make(map[string]ServiceConfig, 36+len(c.Plugins))
+	out := make(map[string]ServiceConfig, 37+len(c.Plugins))
 	// The option maps below are freshly built by serviceToMap and owned
 	// by the result, so redaction runs in place: no deep copy is needed
 	// to keep the Config untouched.
