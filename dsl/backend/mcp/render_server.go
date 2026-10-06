@@ -41,14 +41,14 @@ func renderServerModule(services []serviceManifest) ([]byte, error) {
 
 	names := collectToolNames(services)
 	for _, name := range names {
-		fmt.Fprintf(&b, "func handle%s(ctx context.Context, args map[string]any) (string, error) {\n", name)
+		fmt.Fprintf(&b, "func handle%s(ctx context.Context, args map[string]any) (string, error) {\n", goIdent(name))
 		fmt.Fprintf(&b, "\treturn \"\", fmt.Errorf(\"not implemented: %s\")\n", name)
 		b.WriteString("}\n\n")
 	}
 
 	b.WriteString("var mcpHandlers = map[string]toolHandler{\n")
 	for _, name := range names {
-		fmt.Fprintf(&b, "\t%q: handle%s,\n", name, name)
+		fmt.Fprintf(&b, "\t%q: handle%s,\n", name, goIdent(name))
 	}
 	b.WriteString("}\n\n")
 
@@ -78,6 +78,19 @@ func marshalServices(services []serviceManifest) (string, error) {
 	}
 
 	return strings.TrimSpace(buf.String()), nil
+}
+
+// goIdent sanitizes s into a valid Go identifier fragment by replacing
+// every non-letter, non-digit, non-underscore rune with an underscore.
+// Tool names stay untouched (they are strings); only handler function
+// names use the sanitized form.
+func goIdent(s string) string {
+	return strings.Map(func(r rune) rune {
+		if r == '_' || r >= 'a' && r <= 'z' || r >= 'A' && r <= 'Z' || r >= '0' && r <= '9' {
+			return r
+		}
+		return '_'
+	}, s)
 }
 
 // collectToolNames returns every tool name across services in sorted order
@@ -177,7 +190,10 @@ func run(ctx context.Context, in io.Reader, out io.Writer) error {
 			if err == io.EOF {
 				return nil
 			}
-			return err
+			if err := enc.Encode(rpcResponse{JSONRPC: "2.0", Error: &rpcError{Code: -32700, Message: "parse error"}}); err != nil {
+				return err
+			}
+			continue
 		}
 
 		if len(req.ID) == 0 {
