@@ -185,6 +185,7 @@ jobs:
             **/go.sum
       - name: conformance kits (in-kit suites)
         run: |
+          go -C core/agent test -count=1 ./...
           go -C core/ai test -count=1 ./...
           go -C core/analytics test -count=1 ./...
           go -C core/auth test -count=1 ./...
@@ -208,6 +209,7 @@ jobs:
           go -C core/payment test -count=1 ./...
           go -C core/permission test -count=1 ./...
           go -C core/queue test -count=1 ./...
+          go -C core/rag test -count=1 ./...
           go -C core/ratelimit test -count=1 ./...
           go -C core/router test -count=1 ./...
           go -C core/scheduler test -count=1 ./...
@@ -331,6 +333,37 @@ jobs:
     defaults:
       run:
         working-directory: tools/zever-lsp
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+      - uses: actions/setup-go@b7ad1dad31e06c5925ef5d2fc7ad053ef454303e # v7.0.0
+        with:
+          go-version-file: go.work
+          cache-dependency-path: |
+            go.work.sum
+            **/go.sum
+      - name: Download dependencies
+        run: go mod download
+      - name: Verify go.mod is tidy
+        run: go mod tidy -diff
+      - name: go vet
+        run: go vet ./...
+      - name: go test
+        run: go test -vet=off -count=1 ./...
+      - name: go build
+        run: go build ./...
+
+  # Nested module gate: tools/zever-mcp is a separate Go module (like
+  # zever-lsp), so the root jobs above never compile or test it. Mirrors the
+  # fast gate.
+  mcp:
+    name: zever-mcp module
+    timeout-minutes: 15
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+    defaults:
+      run:
+        working-directory: tools/zever-mcp
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
       - uses: actions/setup-go@b7ad1dad31e06c5925ef5d2fc7ad053ef454303e # v7.0.0
@@ -549,7 +582,7 @@ jobs:
     timeout-minutes: 5
     if: always()
     runs-on: ubuntu-latest
-    needs: [detect, fmt, lint, test, test-race, coverage-floor, sbom, lsp, vulnerability, external-sms, doc-snippets, module-graph, conformance]
+    needs: [detect, fmt, lint, test, test-race, coverage-floor, sbom, lsp, mcp, vulnerability, external-sms, doc-snippets, module-graph, conformance]
     steps:
       - name: Aggregate results
         run: |

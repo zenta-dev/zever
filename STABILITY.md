@@ -54,6 +54,8 @@ release-note docs.
 | Package | Notes |
 |---|---|
 | `ai` | Facade (`anthropic`, `openai`, `gemini`, `ollama`); no zero-infra default. |
+| `agent` | Tool-calling loop over `ai`; no adapter registry, no `config` entry. |
+| `rag` | Retrieval-augmented generation over `ai` + `vectorstore`; no `config` entry. |
 | `billing` | Facade (`stub`, `stripe`, `paddle`). |
 | `payment` | Facade (`stub`, `stripe`, `paddle`). |
 | `storage` | Facade (`local`, `s3`, `r2`). |
@@ -84,6 +86,7 @@ release-note docs.
 | `codec` | Generic `Encoder`/`Decoder`/`Codec` + `JSONCodec`. |
 | `middleware` | HTTP middleware + gRPC interceptors. |
 | `cmd/zever` | Flags-only CLI toolkit; see `cmd/zever/README.md`. |
+| `tools/zever-mcp` | Stdio MCP server exposing the schema compiler to agents; nested module. |
 
 ## 1.0 promotion criteria
 

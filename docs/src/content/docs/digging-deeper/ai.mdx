@@ -136,6 +136,78 @@ You only ever write `ai:` config; you never construct `ollama.Options` by
 hand. Non-loopback endpoints must use https and TLS is verified unless
 `allow_insecure: true` is set.
 
+## Agents and RAG
+
+Two batteries build on `ai` without adding a provider dependency.
+
+`core/agent` runs a bounded tool-calling loop: it generates, dispatches any
+tool calls, appends the results, and repeats until the model answers or the
+step bound is hit. Unknown tools fail closed; handler errors are returned to
+the model as tool turns so it can self-correct.
+
+```go
+import (
+	"github.com/zenta-dev/zever/core/agent"
+	"github.com/zenta-dev/zever/core/ai"
+)
+
+loop, err := agent.New(backend, agent.Options{
+	Model: "gpt-5",
+	Tools: []agent.Tool{{
+		Name:        "lookup_order",
+		Description: "Look up an order by ID.",
+		Parameters:  map[string]any{"type": "object"},
+		Handler: func(ctx context.Context, args map[string]any) (string, error) {
+			return "order 42", nil
+		},
+	}},
+})
+_ = loop
+```
+
+`core/rag` composes `ai` embeddings with a `vectorstore`: ingest chunks and
+embed them, then retrieve context and generate a grounded answer.
+
+```go
+import "github.com/zenta-dev/zever/core/rag"
+
+engine, err := rag.New(backend, store, rag.Options{Model: "gpt-5"})
+_ = engine
+```
+
+Neither package has a `config` entry: resolve `AI()` (and `VectorStore()`)
+from the container and construct them with `New`.
+
+## MCP for AI agents
+
+`tools/zever-mcp` is a stdio [Model Context Protocol](https://modelcontextprotocol.io)
+server that exposes the `.zen` compiler to coding agents. It implements
+`initialize`, `tools/list` and `tools/call` over newline-delimited JSON-RPC
+2.0, with three read-only tools:
+
+| Tool | Purpose |
+|---|---|
+| `zever_compile` | Compile `.zen` sources and return the merged OpenAPI document |
+| `zever_schema` | Return a JSON overview of modules, entities, services, messages and enums |
+| `zever_explain` | Describe a module, entity, message, service or operation by dotted path |
+
+Build it and register it with your agent host:
+
+```sh
+go build -o zever-mcp ./tools/zever-mcp
+```
+
+```json
+{
+  "mcpServers": {
+    "zever": { "command": "/path/to/zever-mcp" }
+  }
+}
+```
+
+The server is stdio-only and read-only, so no network listener or token is
+required.
+
 ## Production notes
 
 - Store keys in file config or env (`AI_API_KEY`), never in code. Route any
