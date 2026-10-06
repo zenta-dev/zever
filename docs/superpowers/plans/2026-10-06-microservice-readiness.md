@@ -1,6 +1,6 @@
 # Microservice Readiness Layer — Implementation Plan
 
-> **For agentic workers:** REQUIRED SUB-SKILL: Use `subagent-driven-development` (recommended) or `executing-plans` to implement this plan task-by-task. Steps use checkbox (`- [ ]`) syntax for tracking.
+> **For agentic workers:** REQUIRED SUB-SKILL: Use `subagent-driven-development` (recommended) or `executing-plans` to implement this plan task-by-task. Steps use checkbox (`- [x]`) syntax for tracking.
 
 **Goal:** Add opt-in resilience, transactional outbox/inbox, gRPC client LB/discovery, and saga compensation to zever so the same codebase scales monolith → modular monolith → microservices.
 
@@ -54,7 +54,7 @@ wave.
 
 **Interface contract:** exactly as in spec Phase A. Package `resilience`.
 
-- [ ] **Step 1: Failing test for registry + options validation**
+- [x] **Step 1: Failing test for registry + options validation**
 
 ```go
 // core/resilience/resilience_test.go
@@ -78,7 +78,7 @@ func TestOpenUnknownAdapter(t *testing.T) {
 Run: `GOWORK=off go test ./core/resilience/ -run TestOpenUnknownAdapter`
 Expected: FAIL (package does not exist).
 
-- [ ] **Step 2: Implement `adapter.go`, `errors.go`, `options.go`, `resilience.go`**
+- [x] **Step 2: Implement `adapter.go`, `errors.go`, `options.go`, `resilience.go`**
 
 `adapter.go`: `Adapter` enum (`Memory`, `Redis`) + `ParseAdapter` (non-empty
 accepted, empty → `InvalidAdapterError`). `errors.go`: sentinels `ErrNilFactory`,
@@ -95,7 +95,7 @@ violations via `errors.Join`; defaults consts `DefaultTimeout`,
 Run: `GOWORK=off go test ./core/resilience/ -run TestOpenUnknownAdapter`
 Expected: PASS.
 
-- [ ] **Step 3: Failing test for guard behavior (closed→open→half-open)**
+- [x] **Step 3: Failing test for guard behavior (closed→open→half-open)**
 
 ```go
 // core/resilience/resilience_test.go
@@ -128,7 +128,7 @@ func TestGuardTripsAndRecovers(t *testing.T) {
 Run: `GOWORK=off go test ./core/resilience/ -run TestGuardTripsAndRecovers`
 Expected: FAIL.
 
-- [ ] **Step 4: Implement `guard.go` + `shared.go`**
+- [x] **Step 4: Implement `guard.go` + `shared.go`**
 
 `guard.go`: unexported `guard` struct holding `*gobreaker.CircuitBreaker[struct{}]`,
 `*semaphore.Weighted`, config; `Execute` applies Timeout→Retry→Breaker→Bulkhead.
@@ -143,7 +143,7 @@ Expected: FAIL.
 Run: `GOWORK=off go test ./core/resilience/ -run TestGuardTripsAndRecovers`
 Expected: PASS.
 
-- [ ] **Step 5: Failing conformance test + edge cases**
+- [x] **Step 5: Failing conformance test + edge cases**
 
 `resiliencetest/kit.go`: `RunConformance(t, factory func() resilience.Manager)`
 exercising: closed allows, breaker trips, open fails fast, half-open probe,
@@ -155,7 +155,7 @@ name error, Close idempotent.
 Run: `GOWORK=off go test ./core/resilience/...`
 Expected: FAIL then PASS after implementing.
 
-- [ ] **Step 6: Adapter `adapters/resilience/inproc`**
+- [x] **Step 6: Adapter `adapters/resilience/inproc`**
 
 `go.mod` requires `github.com/zenta-dev/zever/core/resilience`,
 `github.com/sony/gobreaker/v2 v2.4.0`, `golang.org/x/sync v0.23.0`.
@@ -168,7 +168,7 @@ func(o resilience.Options) (resilience.Manager, error) { return New(o) }) }`.
 Run: `GOWORK=off go -C adapters/resilience/inproc test ./...`
 Expected: PASS.
 
-- [ ] **Step 7: Commit + PR**
+- [x] **Step 7: Commit + PR**
 
 ```bash
 git add core/resilience adapters/resilience/inproc
@@ -193,7 +193,7 @@ Run: `tools/pr-runner.sh w1-resilience "feat(resilience): add circuit breaker, b
 
 **Interface contract:** exactly as spec Phase B.
 
-- [ ] **Step 1: Failing test for Message validation + registry**
+- [x] **Step 1: Failing test for Message validation + registry**
 
 ```go
 // core/outbox/message_test.go
@@ -207,7 +207,7 @@ func TestMessageValidate(t *testing.T) {
 ```
 Run: `GOWORK=off go test ./core/outbox/ -run TestMessageValidate` → FAIL.
 
-- [ ] **Step 2: Implement adapter/errors/options/message/outbox**
+- [x] **Step 2: Implement adapter/errors/options/message/outbox**
 
 `adapter.go`: `Adapter` (`Memory`, `DB`, `CDC`) + `ParseAdapter`.
 `errors.go`: `ErrNilFactory`, `ErrUnknownAdapter`, `ErrDuplicateAdapter`,
@@ -225,7 +225,7 @@ registry `Register`/`Open`/`Default()`.
 `PublisherFromQueue` adapters).
 Run: `GOWORK=off go test ./core/outbox/ -run TestMessageValidate` → PASS.
 
-- [ ] **Step 3: Failing test for memory adapter atomic Record + relay**
+- [x] **Step 3: Failing test for memory adapter atomic Record + relay**
 
 ```go
 // adapters/outbox/memory/memory_test.go
@@ -247,13 +247,13 @@ func TestMemoryRecordAndRelay(t *testing.T) {
 ```
 Run: `GOWORK=off go -C adapters/outbox/memory test ./...` → FAIL.
 
-- [ ] **Step 4: Implement `adapters/outbox/memory`**
+- [x] **Step 4: Implement `adapters/outbox/memory`**
 
 `memory.New` stores nothing durable; `Record` validates + publishes via
 `Publisher` immediately (dev/test). `Start` no-op, `Status` zero, `Close` nil.
 Run: PASS.
 
-- [ ] **Step 5: Failing test for db adapter transactional Record + relay**
+- [x] **Step 5: Failing test for db adapter transactional Record + relay**
 
 ```go
 // adapters/outbox/db/db_test.go
@@ -273,7 +273,7 @@ func TestRecordIsTransactional(t *testing.T) {
 ```
 Run: `GOWORK=off go -C adapters/outbox/db test ./...` → FAIL.
 
-- [ ] **Step 6: Implement `adapters/outbox/db`**
+- [x] **Step 6: Implement `adapters/outbox/db`**
 
 `db.go`: `New(Options)` opens via `shared/dbconn.SplitDSN`/`core/db.Open`;
 `OpenFromDB(conn, Options)` for `RegisterShared`; migration `CREATE TABLE IF NOT
@@ -297,7 +297,7 @@ DO NOTHING` in caller tx; if 0 rows, return `nil` (already processed).
 Run: `GOWORK=off go -C adapters/outbox/db test ./...`
 Expected: PASS (sqlite `:memory:`; live postgres test skips without `POSTGRES_DSN`).
 
-- [ ] **Step 7: Conformance kit + edge/bench/example, then commit + PR**
+- [x] **Step 7: Conformance kit + edge/bench/example, then commit + PR**
 
 `outboxtest/kit.go` runs against any `Store`: Record→publish, retry on publisher
 error, DLQ after max attempts, Inbox dedupe. Edge: nil tx → `ErrTxRequired`,
@@ -329,11 +329,11 @@ Run: `tools/pr-runner.sh w1-outbox "feat(outbox): add transactional outbox/inbox
 - Modify: `CHANGELOG.md` `## [Unreleased]`
 - Run: `make deps-sync && make tidy-check && make vet && make build`
 
-- [ ] Add go.work entries, run `go build ./...`.
-- [ ] Add config fields + wiring; `go test ./config/...`.
-- [ ] Add container accessors; `go test ./container/...`.
-- [ ] Update docs + CHANGELOG.
-- [ ] Commit + PR via `tools/pr-runner.sh w1-integration ...`.
+- [x] Add go.work entries, run `go build ./...`.
+- [x] Add config fields + wiring; `go test ./config/...`.
+- [x] Add container accessors; `go test ./container/...`.
+- [x] Update docs + CHANGELOG.
+- [x] Commit + PR via `tools/pr-runner.sh w1-integration ...`.
 
 ---
 
@@ -372,10 +372,10 @@ Run: `tools/pr-runner.sh w1-outbox "feat(outbox): add transactional outbox/inbox
 
 ## Task I2: W2 integration
 
-- [ ] Add `./adapters/outbox/cdc`, `./shared/grpcclient` to `go.work`.
-- [ ] Add `container.GRPCClient` accessor + test.
-- [ ] Add `outbox` cdc adapter to config table/docs; `deps-sync`; build.
-- [ ] Commit + PR.
+- [x] Add `./adapters/outbox/cdc`, `./shared/grpcclient` to `go.work`.
+- [x] Add `container.GRPCClient` accessor + test.
+- [x] Add `outbox` cdc adapter to config table/docs; `deps-sync`; build.
+- [x] Commit + PR.
 
 ---
 
@@ -404,16 +404,16 @@ Run: `tools/pr-runner.sh w1-outbox "feat(outbox): add transactional outbox/inbox
 
 ## Task I3: W3 integration + docs
 
-- [ ] Update `core/workflow/doc.go`, `container/README.md`, docs guides, CHANGELOG.
-- [ ] `make check`; commit + PR.
+- [x] Update `core/workflow/doc.go`, `container/README.md`, docs guides, CHANGELOG.
+- [x] `make check`; commit + PR.
 
 ---
 
-# Wave 4 (optional, deferred)
+# Wave 4 — delivered
 
 ## Task W4: `.zen` `saga {}` declaration → generated registration
 
-Deferred until W3 lands; separate spec.
+Shipped: `.zen` `saga {}` declaration (DSL + gogen) in #425; resilience redis adapter in #422.
 
 ---
 
