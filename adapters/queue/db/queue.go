@@ -12,10 +12,12 @@ import (
 	dbpostgres "github.com/zenta-dev/zever/adapters/db/postgres"
 	dbsqlite "github.com/zenta-dev/zever/adapters/db/sqlite"
 	coredb "github.com/zenta-dev/zever/core/db"
+	"github.com/zenta-dev/zever/core/observability"
 	"github.com/zenta-dev/zever/core/queue"
 	"github.com/zenta-dev/zever/orm"
 	"github.com/zenta-dev/zever/orm/dialect"
 	"github.com/zenta-dev/zever/shared/dbconn"
+	"github.com/zenta-dev/zever/shared/msgspan"
 	"github.com/zenta-dev/zever/shared/traceprop"
 )
 
@@ -152,6 +154,7 @@ type driver struct {
 	interval   time.Duration
 	batch      int
 	buffer     int
+	provider   observability.Provider
 	owns       bool
 	closed     atomic.Bool
 	lastSweep  atomic.Int64
@@ -277,7 +280,7 @@ func openFromDB(conn coredb.DB, o Options, owns bool) (queue.Queue, error) {
 		cCreated:  orm.NewColumn[msgRow, time.Time](table, "created_at"),
 		tableName: table, owner: owner, visibility: visibility,
 		poll: poll, interval: interval, batch: batch,
-		buffer: o.Buffer, owns: owns,
+		buffer: o.Buffer, provider: o.Provider, owns: owns,
 	}
 
 	if err := d.ensureSchema(ctx); err != nil {
@@ -404,6 +407,8 @@ func (d *driver) PushDelayed(ctx context.Context, topic string, payload queue.Pa
 	return d.push(ctx, topic, payload, headers, delay)
 }
 
+// push enqueues a message, claimable after delay when positive. It opens the
+// messaging producer span around the whole enqueue.
 func (d *driver) push(ctx context.Context, topic string, payload queue.Payload, headers queue.Headers, delay time.Duration) error {
 	if err := ctx.Err(); err != nil {
 		return err
@@ -431,7 +436,14 @@ func (d *driver) push(ctx context.Context, topic string, payload queue.Payload, 
 		return queue.ErrClosed
 	}
 
-	msg := queue.NewMessage(topic, payload, traceprop.Inject(ctx, headers))
+	// The producer span opens before the message is built so the injected
+	// trace context is the producer span's: the consumer span on the other
+	// end then parents onto this push instead of onto the push's caller.
+	spanCtx, finish := msgspan.Producer(ctx, d.provider, "queue", topic, "")
+
+	msg := queue.NewMessage(topic, payload, headers)
+	msg.Headers = traceprop.Inject(spanCtx, msg.Headers)
+
 	now := time.Now().UTC()
 
 	available := now
@@ -449,10 +461,14 @@ func (d *driver) push(ctx context.Context, topic string, payload queue.Payload, 
 		orm.Set(d.cOwner, ""),
 		orm.Set(d.cUntil, now),
 		orm.Set(d.cCreated, now),
-	).Exec(ctx, d.conn)
+	).Exec(spanCtx, d.conn)
 	if err != nil {
+		finish(msgspan.OutcomeError)
+
 		return fmt.Errorf("db: push %q: %w", topic, err)
 	}
+
+	finish(msgspan.OutcomeOK)
 
 	return nil
 }
