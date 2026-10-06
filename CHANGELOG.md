@@ -9,6 +9,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Added
 
+- Generated HTTP+gRPC server entrypoint now registers the standard gRPC
+  Health Checking Protocol (`grpc_health_v1`) and server reflection, marks
+  the overall serving status SERVING on boot, ties `/readyz`'s DB ping to
+  the health status, and flips NOT_SERVING before graceful stop.
 - New `core/agent` package (bounded tool-calling loop over `core/ai` with an
   optional human-in-the-loop confirmation hook and schema-constrained
   `GenerateStructured` with decode retries). No `config` entry: build it over a
