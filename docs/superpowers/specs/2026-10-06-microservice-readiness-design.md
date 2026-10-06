@@ -1,7 +1,7 @@
 # Microservice Readiness Layer — Design Spec
 
 **Date:** 2026-10-06
-**Status:** Approved (design), implementation in progress
+**Status:** Implemented — all phases (A resilience, B outbox/inbox, C gRPC client, D saga) shipped.
 **Owner:** @erhahahaa
 
 ## Problem
@@ -177,7 +177,7 @@ type SagaStatus struct { RunID RunID; Name string; CurrentStep int; Status strin
 - Stuck-run sweeper reuses existing lease recovery.
 - Per-step observability spans.
 - `adapters/workflow/memory` implements saga in-process (non-durable).
-- **D.2 (deferred):** `.zen` `saga {}` declaration → generated registration.
+- **D.2 (delivered):** `.zen` `saga {}` declaration → generated registration.
 
 ## Cross-cutting (definition of done per battery)
 
@@ -217,6 +217,20 @@ For each new `core/<b>` + adapter module:
 - Public config/container API → pre-1.0, `CHANGELOG.md`, maintainer review.
 - Live tests need `POSTGRES_DSN`; CI per-module runs with `GOWORK=off`.
 - `automerge.yml` only acts on author `erhahahaa` (confirmed authenticated).
+
+## Delivery
+
+All phases shipped via merged PRs:
+
+- #384 spec/plan/pr-runner
+- #387 Wave 1 (resilience + outbox) + integration
+- #390 Wave 2 (grpcclient + outbox cdc) + integration
+- #391 Wave 3 (saga on workflow)
+- #412 gRPC health + reflection in generated server
+- #422 resilience redis adapter (Wave 4 integration)
+- #425 `.zen` saga declaration (DSL + gogen)
+- #429 microservice readiness docs guides
+- #430 DSL saga documentation
 
 ## References
 
