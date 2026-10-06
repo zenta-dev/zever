@@ -259,7 +259,7 @@ func TestRelayMetricsRelayError(t *testing.T) {
 	p := newFakeProvider()
 	d := mustNew(t, Options{Publisher: &recordingPublisher{}, Provider: p})
 
-	d.setRelayError(errors.New("boom"))
+	d.setRelayError(context.Background(), errors.New("boom"))
 
 	if got := p.metrics.sum(outbox.MetricRelayErrors); got != 1 {
 		t.Errorf("relay_errors = %v, want 1", got)
@@ -275,7 +275,7 @@ func TestRelayMetricsNilProviderNoOp(t *testing.T) {
 	mustRecord(t, d, outbox.Message{ID: "m1", Topic: "t"})
 	d.pollOnce(t.Context())
 	d.Status()
-	d.setRelayError(errors.New("boom"))
+	d.setRelayError(context.Background(), errors.New("boom"))
 
 	if n := len(pub.messages()); n != 1 {
 		t.Fatalf("published %d, want 1", n)

@@ -87,22 +87,22 @@ func (r Recorder) Status(ctx context.Context, pending, failed int64, oldestAge t
 
 // Published emits the published counter with outcome ok.
 func (r Recorder) Published(ctx context.Context) {
-	r.counter(ctx, MetricPublished, 1, observability.String(AttrOutcome, OutcomeOK))
+	r.counter(ctx, MetricPublished, observability.String(AttrOutcome, OutcomeOK))
 }
 
 // Retried emits the retried counter with outcome error.
 func (r Recorder) Retried(ctx context.Context) {
-	r.counter(ctx, MetricRetried, 1, observability.String(AttrOutcome, OutcomeError))
+	r.counter(ctx, MetricRetried, observability.String(AttrOutcome, OutcomeError))
 }
 
 // FailedTotal emits the failed_total counter with outcome error.
 func (r Recorder) FailedTotal(ctx context.Context) {
-	r.counter(ctx, MetricFailedTotal, 1, observability.String(AttrOutcome, OutcomeError))
+	r.counter(ctx, MetricFailedTotal, observability.String(AttrOutcome, OutcomeError))
 }
 
 // RelayError emits the relay_errors counter with outcome error.
 func (r Recorder) RelayError(ctx context.Context) {
-	r.counter(ctx, MetricRelayErrors, 1, observability.String(AttrOutcome, OutcomeError))
+	r.counter(ctx, MetricRelayErrors, observability.String(AttrOutcome, OutcomeError))
 }
 
 // PublishSpan starts an outbox.publish span for topic and returns a
@@ -147,14 +147,14 @@ func (r Recorder) ConsumeSpan(ctx context.Context, topic string) (context.Contex
 	return spanCtx, span.End
 }
 
-// counter adds value to the named counter with the base attrs plus extra.
-func (r Recorder) counter(ctx context.Context, name string, value float64, extra ...observability.Attr) {
+// counter adds 1 to the named counter with the base attrs plus extra.
+func (r Recorder) counter(ctx context.Context, name string, extra ...observability.Attr) {
 	m := r.meter()
 	if m == nil {
 		return
 	}
 
-	_ = m.Counter(ctx, name, value, r.attrs(extra...)...)
+	_ = m.Counter(ctx, name, 1, r.attrs(extra...)...)
 }
 
 // meter returns the scope meter, or nil when no provider is wired.

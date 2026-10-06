@@ -112,7 +112,7 @@ func (d *driver) pollOnce(ctx context.Context) {
 
 	msgs, err := d.claim(ctx)
 	if err != nil {
-		d.setRelayError(err)
+		d.setRelayError(ctx, err)
 
 		return
 	}
@@ -247,7 +247,7 @@ func (d *driver) markProcessed(ctx context.Context, id string, now time.Time) {
 		d.ts(now), id,
 	)
 	if err != nil {
-		d.setRelayError(err)
+		d.setRelayError(ctx, err)
 	}
 }
 
@@ -262,7 +262,7 @@ func (d *driver) markFailed(ctx context.Context, id string, cause error) {
 		cause.Error(), id,
 	)
 	if err != nil {
-		d.setRelayError(err)
+		d.setRelayError(ctx, err)
 	}
 }
 
@@ -275,7 +275,7 @@ func (d *driver) markRetry(ctx context.Context, id string, cause error, retryAt 
 		cause.Error(), d.ts(retryAt), id,
 	)
 	if err != nil {
-		d.setRelayError(err)
+		d.setRelayError(ctx, err)
 	}
 }
 
@@ -288,15 +288,15 @@ func (d *driver) cleanup(ctx context.Context) {
 		d.ts(cutoff),
 	)
 	if err != nil {
-		d.setRelayError(err)
+		d.setRelayError(ctx, err)
 	}
 }
 
 // setRelayError records the most recent relay error for Status.
-func (d *driver) setRelayError(err error) {
+func (d *driver) setRelayError(ctx context.Context, err error) {
 	s := err.Error()
 	d.relayErr.Store(&s)
-	d.recorder.RelayError(context.Background())
+	d.recorder.RelayError(ctx)
 }
 
 // Status reports current counters and health. It is best-effort: a query
@@ -308,12 +308,12 @@ func (d *driver) Status() outbox.Status {
 	var st outbox.Status
 
 	if err := d.countByStatus(ctx, &st); err != nil {
-		d.setRelayError(err)
+		d.setRelayError(ctx, err)
 	}
 
 	oldest, ok, err := d.oldestPending(ctx)
 	if err != nil {
-		d.setRelayError(err)
+		d.setRelayError(ctx, err)
 	}
 
 	var age time.Duration

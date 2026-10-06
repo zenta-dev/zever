@@ -247,7 +247,7 @@ func TestConsumeMetricsRelayError(t *testing.T) {
 		recorder:    outbox.NewRecorder(p, "cdc", ""),
 	}
 
-	s.setRelayError(errors.New("boom"))
+	s.setRelayError(context.Background(), errors.New("boom"))
 
 	if got := p.metrics.sum(outbox.MetricRelayErrors); got != 1 {
 		t.Errorf("relay_errors = %v, want 1", got)
