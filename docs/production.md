@@ -213,21 +213,22 @@ dev, set DSN opens postgres for durable runs. Resolve via
 
 ## Observability
 
-OTLP gRPC adapter (`adapters/observability/otlp/otlp.go:451 `New`):
+OTLP gRPC adapter (`adapters/observability/otlp/otlp.go:516` `New`):
 sets W3C `TraceContext` + `Baggage` composite propagator globally
-(`otlp.go:43-57`); `middleware.Tracing` starts one span per request,
+(`otlp.go:44-47`); `middleware.Tracing` starts one span per request,
 path-only span names (no query strings), propagates ctx to handlers
 (`core/middleware/tracing.go`); `MapCarrier`
 (`core/observability/context.go`) bridges non-HTTP carriers.
-`spancheck` lint is on (`.golangci.yml:47`); the otlp `Start` handoff
+`spancheck` lint is on (`.golangci.yml:47`); the otlp `StartSpan` handoff
 carries a `//nolint:spancheck` with owner-End justification
-(`otlp.go:142`).
+(`otlp.go:148`).
 
 Cross-service propagation follows one contract: extract inbound
 W3C `traceparent`/`tracestate`/`baggage` **before** the server span
 starts (`middleware.Tracing`, `TracingUnaryServerInterceptor`), inject
-the current context on every outbound call (`shared/httpclient`
-transport, `shared/grpcclient` interceptors), and continue stored
+the current context on every outbound call (`shared/grpcclient`
+interceptors, and `shared/httpclient` when the client is built with
+`httpclient.WithTracing()`), and continue stored
 context on the async path (`core/outbox` `Record` headers →
 `traceprop.StartConsumeSpan`). Because extraction precedes the span, a
 server span joins the caller's trace instead of starting a fresh root.
@@ -236,10 +237,11 @@ Baggage carries three fixed keys — `tenant.id`, `user.id`,
 untrusted, short, and never secrets. Span kinds (`internal`/`server`/
 `client`/`producer`/`consumer`) ride `observability.StartSpan` via
 `WithSpanKind`, with `Tracer.Start` as the internal-span wrapper.
-Attribute keys are migrating to OTel semconv names — `http.method` →
+Attribute keys have migrated to OTel semconv names — `http.method` →
 `http.request.method`, `http.path` → `url.path`, `http.status_code` →
 `http.response.status_code`, gRPC `rpc.*`, messaging `messaging.*` —
-so saved dashboards and alert rules on the old keys need updating.
+with no alias or fallback, so saved dashboards and alert rules on the
+old keys need updating.
 Verify in the collector, not by inspection: one request through two
 services must resolve to a single trace ID. Prod sets
 `observability.adapter: otlp` with `endpoint: host:port` +
@@ -311,7 +313,7 @@ gh attestation verify sbom/cmd_zever.json --repo zenta-dev/zever
   oldest-pending age over the 5m `db.DefaultStallAfter`, `failed_total`
   increase, `relay_errors` rate, publish p99); runbook link reachable
   from the alert — `digging-deeper/outbox-ops.mdx`.
-- [ ] `outbox.stall_readiness` decided deliberately: `true` pulls a
+- [ ] `outbox.options.stall_readiness` decided deliberately: `true` pulls a
   stalled replica out of rotation via `/readyz` 503 + gRPC
   `NOT_SERVING`; off when replicas share a table and shedding traffic is
   worse than alerting.
