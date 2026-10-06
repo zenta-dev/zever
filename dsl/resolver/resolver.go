@@ -19,7 +19,7 @@ import (
 // (relations/services/jobs/schedules) — one file, one place errors live.
 var (
 	// ErrDuplicateDecl is reported when two top-level declarations (of any
-	// of the five kinds) share the same name.
+	// of the six kinds) share the same name.
 	ErrDuplicateDecl = errors.New("resolver: duplicate top-level declaration")
 	// ErrUnresolvedReference is reported when an identifier (a field type,
 	// an enum default, a relation target, ...) does not resolve to anything
@@ -117,6 +117,11 @@ func ResolveWithSchemaDir(files []*ast.File, schemaDir string) (*ir.Schema, diag
 
 	schedDiags := resolveSchedules(syms.scheduleOrder, modResult.declModule, jobsByName)
 	diags = append(diags, schedDiags...)
+
+	serviceByName := buildServiceIndex(schema.Modules)
+
+	sagaDiags := resolveSagas(syms.sagaOrder, modResult.declModule, serviceByName)
+	diags = append(diags, sagaDiags...)
 
 	// Hard opinions: validate-everything-in, secure-everything, module-boundary.
 	diags = append(diags, validateEverythingIn(schema)...)

@@ -101,6 +101,33 @@ func TestGoldenFiles(t *testing.T) {
 	}
 }
 
+// TestGoldenSagaFile compares the generated saga.go for the sagaFixture
+// against its committed golden, and proves it parses as valid Go.
+func TestGoldenSagaFile(t *testing.T) {
+	file := compileSchema(t, sagaFixture)
+
+	schema, diags := resolver.Resolve([]*ast.File{file})
+	if diags.HasErrors() {
+		t.Fatalf("resolve errors: %v", diags)
+	}
+
+	out, err := New().Generate(schema)
+	if err != nil {
+		t.Fatalf("Generate: %v", err)
+	}
+
+	got, ok := out["app/saga.go"]
+	if !ok {
+		t.Fatalf("Generate output missing app/saga.go: %v", keysOf(out))
+	}
+
+	assertGolden(t, "app/saga.go", got)
+
+	if _, err := parser.ParseFile(token.NewFileSet(), "app/saga.go", got, parser.SkipObjectResolution); err != nil {
+		t.Errorf("generated app/saga.go does not parse: %v", err)
+	}
+}
+
 func assertGolden(t *testing.T, name string, got []byte) {
 	t.Helper()
 
