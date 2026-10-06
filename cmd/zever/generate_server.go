@@ -807,6 +807,11 @@ func New() (*container.Container, error) {
 // transport, never two parallel implementations. See container.Container's
 // GRPC method doc comment for why the interceptor has to be assembled here
 // rather than inside the schema-agnostic container package itself.
+//
+// The same grpcServer also carries the standard gRPC Health Checking
+// Protocol (grpc_health_v1) and server reflection, so orchestrators and
+// grpcurl work out of the box: the overall serving status starts SERVING,
+// tracks /readyz's DB ping, and flips to NOT_SERVING before GracefulStop.
 const serverTemplate = `// Command server runs this project's HTTP+gRPC API.
 //
 // Scaffolded by ` + "`zever generate server`" + `. It is deliberately thin: parse
@@ -827,7 +832,10 @@ import (
 	"time"
 
 	"google.golang.org/grpc"
+	"google.golang.org/grpc/health"
+	healthpb "google.golang.org/grpc/health/grpc_health_v1"
 	"google.golang.org/grpc/keepalive"
+	"google.golang.org/grpc/reflection"
 
 	"github.com/zenta-dev/zever/core/authz"
 	"github.com/zenta-dev/zever/core/middleware"
@@ -942,6 +950,12 @@ func run(addr, grpcAddr string) error {
 		return err
 	}
 
+	healthServer := health.NewServer()
+	healthpb.RegisterHealthServer(grpcServer, healthServer)
+	healthServer.SetServingStatus("", healthpb.HealthCheckResponse_SERVING)
+
+	reflection.Register(grpcServer)
+
 	r, err := c.Router()
 	if err != nil {
 		return err
@@ -965,10 +979,14 @@ func run(addr, grpcAddr string) error {
 		defer cancel()
 
 		if err := database.Ping(pingCtx); err != nil {
+			healthServer.SetServingStatus("", healthpb.HealthCheckResponse_NOT_SERVING)
+
 			w.WriteHeader(http.StatusServiceUnavailable)
 
 			return
 		}
+
+		healthServer.SetServingStatus("", healthpb.HealthCheckResponse_SERVING)
 
 		w.WriteHeader(http.StatusOK)
 	})
@@ -1030,6 +1048,8 @@ func run(addr, grpcAddr string) error {
 		return err
 	case <-ctx.Done():
 		logger.Info().Msg("server shutting down")
+
+		healthServer.SetServingStatus("", healthpb.HealthCheckResponse_NOT_SERVING)
 
 		grpcServer.GracefulStop()
 
