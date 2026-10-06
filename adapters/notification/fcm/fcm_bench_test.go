@@ -57,3 +57,58 @@ func BenchmarkNotifyParallel(b *testing.B) {
 		}
 	})
 }
+
+// BenchmarkNotifyHighPriority measures the high-priority mapping path.
+func BenchmarkNotifyHighPriority(b *testing.B) {
+	n := &notifier{send: func(_ context.Context, _ *messaging.Message) (string, error) {
+		return "id", nil
+	}}
+	in := validPush()
+	in.Priority = notification.PriorityHigh
+	b.ReportAllocs()
+	b.ResetTimer()
+	for b.Loop() {
+		if err := n.Notify(b.Context(), in); err != nil {
+			b.Fatalf("Notify() = %v, want nil", err)
+		}
+	}
+}
+
+// BenchmarkNotifyWithData measures the path that copies the data map.
+func BenchmarkNotifyWithData(b *testing.B) {
+	n := &notifier{send: func(_ context.Context, _ *messaging.Message) (string, error) {
+		return "id", nil
+	}}
+	in := validPush()
+	in.Data = map[string]string{"order": "42", "sku": "abc"}
+	b.ReportAllocs()
+	b.ResetTimer()
+	for b.Loop() {
+		if err := n.Notify(b.Context(), in); err != nil {
+			b.Fatalf("Notify() = %v, want nil", err)
+		}
+	}
+}
+
+// BenchmarkClose measures the idempotent close.
+func BenchmarkClose(b *testing.B) {
+	n := &notifier{}
+	b.ReportAllocs()
+	b.ResetTimer()
+	for b.Loop() {
+		if err := n.Close(); err != nil {
+			b.Fatalf("Close() = %v, want nil", err)
+		}
+	}
+}
+
+// BenchmarkValidateServiceAccountPath measures the path guard.
+func BenchmarkValidateServiceAccountPath(b *testing.B) {
+	b.ReportAllocs()
+	b.ResetTimer()
+	for b.Loop() {
+		if err := validateServiceAccountPath("service-account.json"); err != nil {
+			b.Fatalf("validateServiceAccountPath() = %v, want nil", err)
+		}
+	}
+}

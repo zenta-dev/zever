@@ -168,3 +168,88 @@ func BenchmarkEnabled(b *testing.B) {
 		_ = l.Enabled(log.LevelInfo)
 	}
 }
+
+// BenchmarkSync measures the no-op flush.
+func BenchmarkSync(b *testing.B) {
+	l := benchLogger(b)
+
+	b.ReportAllocs()
+
+	for b.Loop() {
+		if err := l.Sync(); err != nil {
+			b.Fatal("Sync() =", err)
+		}
+	}
+}
+
+// BenchmarkName measures the adapter name lookup.
+func BenchmarkName(b *testing.B) {
+	l := benchLogger(b)
+
+	b.ReportAllocs()
+
+	for b.Loop() {
+		if got := l.Name(); got != "pretty" {
+			b.Fatal("Name() =", got)
+		}
+	}
+}
+
+// BenchmarkSend measures the bare Send dispatch.
+func BenchmarkSend(b *testing.B) {
+	l := benchLogger(b)
+
+	b.ReportAllocs()
+
+	for b.Loop() {
+		l.Info().Str("k", "v").Send()
+	}
+}
+
+// BenchmarkResolveMinLevel measures validating a configured minimum level.
+func BenchmarkResolveMinLevel(b *testing.B) {
+	levels := []log.Level{log.LevelDebug, log.LevelInfo, log.LevelWarn, log.LevelError, log.LevelFatal}
+
+	b.ReportAllocs()
+
+	i := 0
+
+	for b.Loop() {
+		_ = resolveMinLevel(levels[i%len(levels)])
+		i++
+	}
+}
+
+// BenchmarkLevelStyle measures mapping a level onto its label and color.
+func BenchmarkLevelStyle(b *testing.B) {
+	levels := []log.Level{log.LevelDebug, log.LevelInfo, log.LevelWarn, log.LevelError, log.LevelFatal}
+
+	b.ReportAllocs()
+
+	i := 0
+
+	for b.Loop() {
+		_, _ = levelStyle(levels[i%len(levels)])
+		i++
+	}
+}
+
+// BenchmarkIsCharDevice measures the writer character-device probe.
+func BenchmarkIsCharDevice(b *testing.B) {
+	b.ReportAllocs()
+
+	for b.Loop() {
+		_ = isCharDevice(io.Discard)
+	}
+}
+
+// BenchmarkNew measures constructing a logger over stdout.
+func BenchmarkNew(b *testing.B) {
+	b.ReportAllocs()
+
+	for b.Loop() {
+		if l := New(log.Options{MinLevel: log.LevelDebug}); l == nil {
+			b.Fatal("New() = nil")
+		}
+	}
+}

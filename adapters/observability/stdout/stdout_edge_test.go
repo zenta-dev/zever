@@ -2,9 +2,12 @@ package stdout_test
 
 import (
 	"encoding/json"
+	"errors"
 	"strings"
+	"sync"
 	"testing"
 
+	"github.com/zenta-dev/zever/adapters/observability/stdout"
 	"github.com/zenta-dev/zever/core/observability"
 )
 
@@ -103,5 +106,67 @@ func TestMetrics_nilContext_verboseEmits(t *testing.T) {
 	}
 	if v["name"] != "c" {
 		t.Errorf("name = %v, want c", v["name"])
+	}
+}
+
+func TestSpan_endWithErrorEmitsError(t *testing.T) {
+	t.Parallel()
+
+	p, buf := openBuffered(t, nil)
+	_, span := p.Tracer("s").Start(t.Context(), "op")
+	span.RecordError(errors.New("boom"))
+	span.End()
+
+	v := decodeLine(t, buf)
+	if v["error"] != "boom" {
+		t.Errorf("error = %v, want boom", v["error"])
+	}
+}
+
+func TestSpan_doubleEnd(t *testing.T) {
+	t.Parallel()
+
+	p, buf := openBuffered(t, nil)
+	_, span := p.Tracer("s").Start(t.Context(), "op")
+	span.End()
+	span.End()
+
+	if got := strings.Count(buf.String(), "\n"); got != 2 {
+		t.Errorf("lines = %d, want 2 (End emits unconditionally)", got)
+	}
+}
+
+func TestSpan_concurrentSetAttributes(t *testing.T) {
+	t.Parallel()
+
+	p, _ := openBuffered(t, nil)
+	_, span := p.Tracer("s").Start(t.Context(), "op")
+
+	const goroutines = 16
+
+	var wg sync.WaitGroup
+
+	wg.Add(goroutines)
+
+	for i := range goroutines {
+		go func(i int) {
+			defer wg.Done()
+			span.SetAttributes(observability.Int("i", i))
+		}(i)
+	}
+
+	wg.Wait()
+	span.End()
+}
+
+func TestNewWithWriter_nilWriter(t *testing.T) {
+	t.Parallel()
+
+	p, err := stdout.NewWithWriter(validOptions(), nil)
+	if err != nil {
+		t.Fatalf("NewWithWriter(nil) = %v, want nil", err)
+	}
+	if p == nil {
+		t.Fatal("NewWithWriter(nil) = nil, want provider")
 	}
 }

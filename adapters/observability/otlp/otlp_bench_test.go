@@ -2,6 +2,7 @@ package otlp
 
 import (
 	"context"
+	"errors"
 	"testing"
 
 	"go.opentelemetry.io/otel/metric"
@@ -10,6 +11,8 @@ import (
 
 	"github.com/zenta-dev/zever/core/observability"
 )
+
+var errBench = errors.New("bench error")
 
 func benchAttrs() []observability.Attr {
 	return []observability.Attr{
@@ -98,6 +101,105 @@ func BenchmarkMetricsCounter(b *testing.B) {
 	for b.Loop() {
 		if err := m.Counter(ctx, "c", 1, attrs...); err != nil {
 			b.Fatalf("Counter() = %v, want nil", err)
+		}
+	}
+}
+
+// BenchmarkMetricsGauge measures the gauge instrument cache-hit and Record path.
+func BenchmarkMetricsGauge(b *testing.B) {
+	m := benchMetrics(b)
+	attrs := benchAttrs()
+	ctx := b.Context()
+	b.ReportAllocs()
+	b.ResetTimer()
+	for b.Loop() {
+		if err := m.Gauge(ctx, "g", 1, attrs...); err != nil {
+			b.Fatalf("Gauge() = %v, want nil", err)
+		}
+	}
+}
+
+// BenchmarkMetricsHistogram measures the histogram instrument cache-hit and Record path.
+func BenchmarkMetricsHistogram(b *testing.B) {
+	m := benchMetrics(b)
+	attrs := benchAttrs()
+	ctx := b.Context()
+	b.ReportAllocs()
+	b.ResetTimer()
+	for b.Loop() {
+		if err := m.Histogram(ctx, "h", 1, attrs...); err != nil {
+			b.Fatalf("Histogram() = %v, want nil", err)
+		}
+	}
+}
+
+// BenchmarkSpanRecordError measures recording an error on a span.
+func BenchmarkSpanRecordError(b *testing.B) {
+	tr := benchTracer(b)
+	_, span := tr.Start(b.Context(), "op")
+	b.Cleanup(func() { span.End() })
+	b.ReportAllocs()
+	b.ResetTimer()
+	for b.Loop() {
+		span.RecordError(errBench)
+	}
+}
+
+// BenchmarkIsSensitiveKey measures the secret-key substring scan.
+func BenchmarkIsSensitiveKey(b *testing.B) {
+	keys := []string{"user", "password", "api_key", "session", "plain_key"}
+	b.ReportAllocs()
+	b.ResetTimer()
+	i := 0
+	for b.Loop() {
+		_ = isSensitiveKey(keys[i%len(keys)])
+		i++
+	}
+}
+
+// BenchmarkToAttribute measures converting a zever attribute onto an otel one.
+func BenchmarkToAttribute(b *testing.B) {
+	attrs := []observability.Attr{
+		observability.String("s", "v"),
+		observability.Int64("i", 1),
+		observability.Float64("f", 1.5),
+		observability.Bool("b", true),
+	}
+	b.ReportAllocs()
+	b.ResetTimer()
+	i := 0
+	for b.Loop() {
+		a := attrs[i%len(attrs)]
+		_ = toAttribute(a.Key, a.Value)
+		i++
+	}
+}
+
+// BenchmarkKindMismatchErrorString measures formatting a kind mismatch error.
+func BenchmarkKindMismatchErrorString(b *testing.B) {
+	err := kindMismatch("requests", kindCounter, kindGauge)
+	b.ReportAllocs()
+	b.ResetTimer()
+	for b.Loop() {
+		_ = err.Error()
+	}
+}
+
+// BenchmarkNew measures constructing the full provider against an insecure
+// loopback endpoint. Providers are intentionally not shut down: export
+// timeouts dominate the measurement and construction is the hot path.
+func BenchmarkNew(b *testing.B) {
+	opts := observability.Options{
+		ServiceName: "bench",
+		Endpoint:    "127.0.0.1:1",
+		Insecure:    true,
+		SampleRatio: 1,
+	}
+	b.ReportAllocs()
+	b.ResetTimer()
+	for b.Loop() {
+		if _, err := New(opts); err != nil {
+			b.Fatalf("New() = %v", err)
 		}
 	}
 }

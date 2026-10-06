@@ -202,3 +202,27 @@ func TestCoverNewWithWriter_customLimit_respected(t *testing.T) {
 		t.Errorf("len = %d, want %d", len(sv), 256)
 	}
 }
+
+// BenchmarkRandHex measures the crypto/rand span-id hot path.
+func BenchmarkRandHex(b *testing.B) {
+	b.ReportAllocs()
+	b.ResetTimer()
+	for b.Loop() {
+		_ = randHex(16)
+	}
+}
+
+// BenchmarkFlatten measures attribute flattening with truncation.
+func BenchmarkFlatten(b *testing.B) {
+	attrs := []observability.Attr{
+		observability.String("k", "value"),
+		observability.String("long", strings.Repeat("y", 300)),
+		observability.Int("n", 1),
+		observability.Bool("b", true),
+	}
+	b.ReportAllocs()
+	b.ResetTimer()
+	for b.Loop() {
+		_ = flatten(attrs, observability.MaxValueLen)
+	}
+}

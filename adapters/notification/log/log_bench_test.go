@@ -45,3 +45,51 @@ func BenchmarkNotifyParallel(b *testing.B) {
 		}
 	})
 }
+
+// BenchmarkClose measures the idempotent close.
+func BenchmarkClose(b *testing.B) {
+	n, err := notificationlog.NewWithWriter(notification.Options{}, io.Discard)
+	if err != nil {
+		b.Fatalf("NewWithWriter() = %v", err)
+	}
+	b.ReportAllocs()
+	b.ResetTimer()
+	for b.Loop() {
+		if err := n.Close(); err != nil {
+			b.Fatalf("Close() = %v, want nil", err)
+		}
+	}
+}
+
+// BenchmarkNewWithWriter measures constructing the checker over io.Discard.
+func BenchmarkNewWithWriter(b *testing.B) {
+	b.ReportAllocs()
+	b.ResetTimer()
+	for b.Loop() {
+		n, err := notificationlog.NewWithWriter(notification.Options{}, io.Discard)
+		if err != nil {
+			b.Fatalf("NewWithWriter() = %v", err)
+		}
+		if n == nil {
+			b.Fatal("NewWithWriter() = nil")
+		}
+	}
+}
+
+// BenchmarkNotifyWithData measures the path that serializes a data map.
+func BenchmarkNotifyWithData(b *testing.B) {
+	n, err := notificationlog.NewWithWriter(notification.Options{}, io.Discard)
+	if err != nil {
+		b.Fatalf("NewWithWriter() = %v", err)
+	}
+	defer n.Close()
+	in := validNotification()
+	in.Data = map[string]string{"order": "42", "sku": "abc"}
+	b.ReportAllocs()
+	b.ResetTimer()
+	for b.Loop() {
+		if err := n.Notify(b.Context(), in); err != nil {
+			b.Fatalf("Notify() = %v, want nil", err)
+		}
+	}
+}
