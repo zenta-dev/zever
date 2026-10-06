@@ -45,6 +45,7 @@ export default defineConfig({
 						{ label: 'Overview', link: 'tutorials/overview' },
 						{ label: 'Build a Booking API', link: 'tutorials/build-a-booking-api' },
 						{ label: 'Explore the Showcase App', link: 'tutorials/explore-the-showcase-app' },
+						{ label: 'Build an Agent App', link: 'tutorials/build-an-agent-app' },
 					],
 				},
 				{

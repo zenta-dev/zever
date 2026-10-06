@@ -9,6 +9,9 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Added
 
+- Agent-app tutorial (`docs/tutorials/build-an-agent-app`): end-to-end
+  walkthrough from container resolution through RAG grounding, agent loops,
+  MCP serving, and eval scoring.
 - `--dry-run` across all nine `generate` subcommands: validation and
   rendering still run, but no filesystem writes occur; append-mode
   subcommands preview the rendered declaration.

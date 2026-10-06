@@ -1,0 +1,96 @@
+---
+title: 'Tutorial: Build an Agent App'
+description: Wire an agent loop, RAG grounding, and an MCP server into a working assistant.
+---
+
+This tutorial builds a small support assistant: it answers questions grounded
+in your docs (RAG), calls tools through an agent loop, and exposes your
+schema to coding agents over MCP. By the end you will have run an agent
+loop, grounded it with retrieval, and served your API as agent tools.
+
+All commands run from the repository root unless noted. You need an `AI_API_KEY`
+for generation and embeddings; retrieval and the MCP server run locally.
+
+## 1. Resolve the backends
+
+Every agent app starts from the container. `Agent()` builds a tool-calling
+loop over the shared `AI` backend, and `RAG()` builds a retrieval engine
+over `AI` plus `VectorStore`:
+
+```sh
+AI_ADAPTER=openai AI_API_KEY=sk-... zever doctor --json | head -5
+```
+
+## 2. Index your docs
+
+Ingest documents once, then retrieve top-K context per question. Chunking,
+batch embedding, and upserting are one call:
+
+```sh
+# Conceptually: engine.Ingest(ctx, docs) then engine.Answer(ctx, query, 5)
+# See core/rag/rag.go and the RAG section of digging-deeper/ai.
+```
+
+## 3. Run the loop with tools
+
+Register domain tools, then run. Unknown tools fail closed; handler errors
+return to the model as tool turns for self-correction:
+
+```sh
+# Conceptually: agent.New(client, agent.Options{Model: "gpt-4o", Tools: tools})
+# then loop.Run(ctx, messages). See core/agent/agent.go.
+```
+
+## 4. Stream progress and fan out
+
+Long runs stream deltas, tool calls, and results as events. Independent
+tool calls in one step run concurrently with `MaxParallel`, preserving
+result order:
+
+```sh
+# Conceptually: loop.RunStream(ctx, messages) then range over events.
+# See core/agent/stream.go.
+```
+
+## 5. Serve your API as agent tools
+
+Compile the schema to an MCP manifest and run the stdio server so coding
+agents can call your RPCs:
+
+```sh
+zever compile schema/app.zen --backend=mcp --out ./generated
+go run ./tools/zever-mcp
+```
+
+## 6. Score answers with evals
+
+Pin quality with a dataset and scorers before shipping prompt changes:
+
+```sh
+# Conceptually: eval.RunSuite(ctx, run, cases, eval.ContainsScorer).
+# See core/eval/eval.go.
+```
+
+## What you just exercised
+
+- `container.Agent()` / `container.RAG()` lazy accessors over shared backends
+- `core/agent` loops: run, stream, parallel fan-out, sub-agent tools
+- `core/rag` ingest, retrieve, hybrid retrieval, grounded answers
+- `dsl/backend/mcp` manifests plus the `tools/zever-mcp` server
+- `core/eval` datasets and scorers
+
+## Troubleshooting
+
+**`Agent()` fails with an auth error.**
+Set `AI_API_KEY`; the loop needs a real backend, while retrieval-only paths
+work with any embedder.
+
+**Hybrid retrieval returns nothing.**
+Hybrid engines index chunks into the keyword backend on ingest: re-ingest
+after switching from `rag.New` to `rag.NewHybrid`.
+
+## Next
+
+- [AI](../digging-deeper/ai/) for the LLM facade, loop, and RAG reference
+- [Agent Skill](../reference/agent-skill/) for the Claude Code skill
+- [Container](../../architecture/container/) for lazy resolution and close order
