@@ -21,6 +21,8 @@ const (
 // String returns the canonical name of SpanKind.
 func (k SpanKind) String() string {
 	switch k {
+	case SpanKindInternal:
+		return "internal"
 	case SpanKindServer:
 		return "server"
 	case SpanKindClient:

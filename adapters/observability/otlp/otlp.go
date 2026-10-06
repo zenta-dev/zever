@@ -174,6 +174,8 @@ var _ observability.SpanStarter = (*tracer)(nil)
 
 func toSpanKind(kind observability.SpanKind) trace.SpanKind {
 	switch kind {
+	case observability.SpanKindInternal:
+		return trace.SpanKindInternal
 	case observability.SpanKindServer:
 		return trace.SpanKindServer
 	case observability.SpanKindClient:
