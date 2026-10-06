@@ -3,6 +3,8 @@ package redis
 import (
 	"sync"
 	"testing"
+
+	"github.com/zenta-dev/zever/core/ratelimit"
 )
 
 func TestRedis_costExactlyBurst_allowed(t *testing.T) {
@@ -80,5 +82,25 @@ func TestRedis_Name(t *testing.T) {
 	l := newTestLimiter(t, testOptions(t))
 	if got := l.Name(); got != "redis" {
 		t.Errorf("Name() = %q, want redis", got)
+	}
+}
+
+// TestRegisterOpensViaCoreOptions proves Register wires the adapter factory
+// into the ratelimit battery registry so ratelimit.Open resolves it.
+// Sequential by design: New threads through the shared client singleton.
+func TestRegisterOpensViaCoreOptions(t *testing.T) {
+	s := testServer(t)
+
+	Register()
+
+	l, err := ratelimit.Open(ratelimit.Redis, optionsFor(s))
+	if err != nil {
+		t.Fatalf("Open = %v", err)
+	}
+
+	t.Cleanup(func() { _ = l.Close() })
+
+	if d, allowErr := l.Allow(t.Context(), "k", 1); allowErr != nil || !d.Allowed {
+		t.Fatalf("Allow = (%+v, %v), want allowed", d, allowErr)
 	}
 }

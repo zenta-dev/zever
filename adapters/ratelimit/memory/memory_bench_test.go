@@ -16,6 +16,26 @@ func benchKeys(n int) []string {
 	return keys
 }
 
+// BenchmarkAllow measures the token-bucket decision on a single hot key.
+func BenchmarkAllow(b *testing.B) {
+	l, err := memory.New(ratelimit.Options{Rate: 1e9, Burst: 1000})
+	if err != nil {
+		b.Fatalf("New failed: %v", err)
+	}
+
+	b.Cleanup(func() { _ = l.Close() })
+
+	ctx := b.Context()
+
+	b.ReportAllocs()
+
+	for b.Loop() {
+		if _, err := l.Allow(ctx, "hot", 1); err != nil {
+			b.Fatalf("Allow failed: %v", err)
+		}
+	}
+}
+
 func BenchmarkAllowParallel(b *testing.B) {
 	l, err := memory.New(ratelimit.Options{Rate: 1000, Burst: 100})
 	if err != nil {

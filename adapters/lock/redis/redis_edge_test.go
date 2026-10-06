@@ -6,6 +6,8 @@ import (
 	"testing"
 	"time"
 
+	"github.com/alicebob/miniredis/v2"
+
 	"github.com/zenta-dev/zever/core/lock"
 )
 
@@ -140,5 +142,29 @@ func TestEdge_AcquireFreeKeyWithCancelledContext(t *testing.T) {
 
 	if held == nil {
 		t.Fatal("Acquire returned nil lock")
+	}
+}
+
+// TestEdge_RegisterOpensViaCore proves Register wires the adapter factory into
+// the lock battery registry so lock.Open resolves it.
+func TestEdge_RegisterOpensViaCore(t *testing.T) {
+	s := miniredis.RunT(t)
+
+	Register()
+
+	l, err := lock.Open(lock.Redis, lock.Options{Addr: s.Addr()})
+	if err != nil {
+		t.Fatalf("Open = %v", err)
+	}
+
+	t.Cleanup(func() { _ = l.Close(t.Context()) })
+
+	held, ok, err := l.TryAcquire(t.Context(), "k", time.Minute)
+	if err != nil || !ok {
+		t.Fatalf("TryAcquire = (%v, %v), want (true, nil)", ok, err)
+	}
+
+	if unlockErr := held.Unlock(t.Context()); unlockErr != nil {
+		t.Fatalf("Unlock = %v", unlockErr)
 	}
 }
