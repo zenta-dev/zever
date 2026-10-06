@@ -128,3 +128,46 @@ func TestFlagEdge_OpenInvalidOptions(t *testing.T) {
 		t.Fatalf("got = %v, want nil", got)
 	}
 }
+
+func TestFlagEdge_ConcurrentFlagCalls(t *testing.T) {
+	t.Parallel()
+
+	ctx := t.Context()
+	f := &stubFlag{}
+	jf := &jsonStubFlag{values: map[string]any{"app": `{"port":8080}`}}
+
+	var wg sync.WaitGroup
+
+	for range 50 {
+		wg.Add(1)
+
+		go func() {
+			defer wg.Done()
+
+			if _, err := f.Bool(ctx, "x", true); err != nil {
+				t.Errorf("Bool err = %v", err)
+
+				return
+			}
+
+			if _, err := f.String(ctx, "x", "s"); err != nil {
+				t.Errorf("String err = %v", err)
+
+				return
+			}
+
+			if _, err := f.Int(ctx, "x", 1); err != nil {
+				t.Errorf("Int err = %v", err)
+
+				return
+			}
+
+			var out jsonConfig
+			if err := jf.JSON(ctx, "app", &out, jsonConfig{}); err != nil {
+				t.Errorf("JSON err = %v", err)
+			}
+		}()
+	}
+
+	wg.Wait()
+}

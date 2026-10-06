@@ -20,6 +20,19 @@ func benchSessionAdapter(b *testing.B) Adapter {
 	return a
 }
 
+func BenchmarkRegister(b *testing.B) {
+	factory := func(Options) (Store, error) { return newStubStore(), nil }
+
+	b.ReportAllocs()
+	b.ResetTimer()
+
+	for b.Loop() {
+		if err := Register(freshAdapter(), factory); err != nil {
+			b.Fatalf("Register() error = %v", err)
+		}
+	}
+}
+
 func BenchmarkOpen(b *testing.B) {
 	a := benchSessionAdapter(b)
 
