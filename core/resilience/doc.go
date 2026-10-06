@@ -5,6 +5,11 @@
 // Timeout, then Retry, then circuit Breaker, then Bulkhead, then the function.
 // The Timeout therefore governs the whole operation including retries.
 //
+// Adapters: the memory adapter keeps every policy process-local. The redis
+// adapter (adapters/resilience/redis) shares circuit-breaker state across
+// replicas via Redis while timeout, retry, and bulkhead stay process-local,
+// because only breaker state is meaningful to share.
+//
 // Type safety: Guard, Manager, typed Options, Adapter enum, and Factory.
 // Breaker cancellation from the caller is never counted against the circuit,
 // and callers classify business errors as success through BreakerOptions.IsSuccessful.

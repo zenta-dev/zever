@@ -9,7 +9,10 @@ require (
 	golang.org/x/sync v0.23.0
 )
 
-require github.com/zenta-dev/zever/shared/registry v0.5.3 // indirect
+require (
+	github.com/zenta-dev/zever/shared/redisopt v0.5.3 // indirect
+	github.com/zenta-dev/zever/shared/registry v0.5.3 // indirect
+)
 
 replace github.com/zenta-dev/zever/core/resilience => ../../../core/resilience
 
