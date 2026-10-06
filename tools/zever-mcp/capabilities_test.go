@@ -25,8 +25,12 @@ func TestResourcesList(t *testing.T) {
 	}
 
 	list, ok := m["resources"].([]map[string]any)
-	if !ok || len(list) == 0 {
-		t.Fatalf("resources = %v", m["resources"])
+	if !ok {
+		t.Fatalf("resources type = %T", m["resources"])
+	}
+
+	if len(list) != 5 {
+		t.Fatalf("resources = %d, want 5", len(list))
 	}
 }
 
@@ -169,6 +173,11 @@ func TestPromptsGetFixDiags(t *testing.T) {
 	if !ok || len(msgs) != 1 {
 		t.Fatalf("messages = %v", m["messages"])
 	}
+
+	text, ok := msgs[0].Content.(map[string]any)["text"].(string)
+	if !ok || !strings.Contains(text, "app.zen:3:13: bad") {
+		t.Fatalf("message text = %v", msgs[0].Content)
+	}
 }
 
 func TestResourcesReadDoctorGuide(t *testing.T) {
@@ -187,6 +196,11 @@ func TestResourcesReadDoctorGuide(t *testing.T) {
 
 	if contents[0]["uri"] != "zever://doctor-guide" {
 		t.Fatalf("uri = %v", contents[0]["uri"])
+	}
+
+	text, ok := contents[0]["text"].(string)
+	if !ok || !strings.Contains(text, "--strict") {
+		t.Fatalf("doctor guide text = %v", contents[0]["text"])
 	}
 }
 
