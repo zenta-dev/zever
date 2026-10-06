@@ -11,6 +11,7 @@ import (
 	"time"
 
 	"google.golang.org/grpc"
+	"google.golang.org/grpc/connectivity"
 
 	"github.com/zenta-dev/zever/config"
 	"github.com/zenta-dev/zever/core/ai"
@@ -49,6 +50,7 @@ import (
 	"github.com/zenta-dev/zever/core/vectorstore"
 	"github.com/zenta-dev/zever/core/webhook"
 	"github.com/zenta-dev/zever/core/workflow"
+	"github.com/zenta-dev/zever/shared/grpcclient"
 )
 
 // testConfig returns Default with every default adapter name wired to a
@@ -1317,5 +1319,86 @@ func TestGRPC_singletonOptsIgnored(t *testing.T) {
 
 	if second != first {
 		t.Error("GRPC() is not a singleton: later options built a new server")
+	}
+}
+
+func TestGRPCClient_cachesPerTarget(t *testing.T) {
+	t.Parallel()
+
+	c := New(testConfig(t))
+	closeContainer(t, c)
+
+	opts := []grpcclient.Option{
+		grpcclient.WithInsecure(),
+		grpcclient.WithStaticResolver(map[string][]string{
+			"alpha": {"localhost:1"},
+			"beta":  {"localhost:2"},
+		}),
+	}
+
+	first, err := c.GRPCClient("static:///alpha", opts...)
+	if err != nil {
+		t.Fatalf("GRPCClient(alpha) failed: %v", err)
+	}
+
+	again, err := c.GRPCClient("static:///alpha", opts...)
+	if err != nil {
+		t.Fatalf("second GRPCClient(alpha) failed: %v", err)
+	}
+
+	if again != first {
+		t.Error("GRPCClient is not cached per target: same target built a new conn")
+	}
+
+	other, err := c.GRPCClient("static:///beta", opts...)
+	if err != nil {
+		t.Fatalf("GRPCClient(beta) failed: %v", err)
+	}
+
+	if other == first {
+		t.Error("GRPCClient cached across targets: distinct targets share one conn")
+	}
+}
+
+func TestGRPCClient_buildFailureNotCached(t *testing.T) {
+	t.Parallel()
+
+	c := New(testConfig(t))
+	closeContainer(t, c)
+
+	if _, err := c.GRPCClient("static:///alpha"); err == nil {
+		t.Fatal("expected error without credentials, got nil")
+	}
+
+	conn, err := c.GRPCClient("static:///alpha",
+		grpcclient.WithInsecure(),
+		grpcclient.WithStaticResolver(map[string][]string{"alpha": {"localhost:1"}}))
+	if err != nil {
+		t.Fatalf("retry after failed build failed: %v", err)
+	}
+
+	if conn == nil {
+		t.Fatal("retry returned nil conn")
+	}
+}
+
+func TestGRPCClient_closeClosesConns(t *testing.T) {
+	t.Parallel()
+
+	c := New(testConfig(t))
+
+	conn, err := c.GRPCClient("static:///alpha",
+		grpcclient.WithInsecure(),
+		grpcclient.WithStaticResolver(map[string][]string{"alpha": {"localhost:1"}}))
+	if err != nil {
+		t.Fatalf("GRPCClient failed: %v", err)
+	}
+
+	if err := c.Close(t.Context()); err != nil {
+		t.Fatalf("Close failed: %v", err)
+	}
+
+	if got := conn.GetState(); got != connectivity.Shutdown {
+		t.Errorf("conn state after Close = %v, want %v", got, connectivity.Shutdown)
 	}
 }

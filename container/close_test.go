@@ -215,7 +215,7 @@ func TestContainer_Snapshots_CoversAllServices(t *testing.T) {
 		}
 		totalLazy++
 	}
-	const orderedExclusions = 6 // cache, queue, db, scheduler, job, grpcServer
+	const orderedExclusions = 7 // cache, queue, db, scheduler, job, grpcServer, grpcClients
 	snaps := c.snapshots()
 	if got := len(snaps) + orderedExclusions; got != totalLazy {
 		t.Fatalf("snapshots drift: len(snapshots)=%d + ordered %d = %d, want %d lazy fields", len(snaps), orderedExclusions, got, totalLazy)

@@ -1,7 +1,9 @@
 package container
 
 import (
+	"context"
 	"fmt"
+	"sync"
 
 	"google.golang.org/grpc"
 
@@ -42,6 +44,7 @@ import (
 	"github.com/zenta-dev/zever/core/vectorstore"
 	"github.com/zenta-dev/zever/core/webhook"
 	"github.com/zenta-dev/zever/core/workflow"
+	"github.com/zenta-dev/zever/shared/grpcclient"
 )
 
 // openService parses a service's adapter name, then opens it with typed
@@ -181,6 +184,54 @@ func (c *Container) Geo() (geo.Geo, error) {
 func (c *Container) GRPC(opts ...grpc.ServerOption) (*grpc.Server, error) {
 	return c.grpcServer.get(func() (*grpc.Server, error) {
 		return grpc.NewServer(opts...), nil
+	})
+}
+
+// grpcClientCache holds one lazily built *grpc.ClientConn per target
+// string (see GRPCClient). The mutex makes the cache goroutine-safe; the
+// lazy wrapper gives singleflight build semantics for the cache itself.
+type grpcClientCache struct {
+	mu    sync.Mutex
+	conns map[string]*grpc.ClientConn
+}
+
+// get returns the cached conn for target, building and caching one on
+// first use. A failed build is not cached: the error returns to the caller
+// and the next call retries.
+func (c *grpcClientCache) get(target string, build func() (*grpc.ClientConn, error)) (*grpc.ClientConn, error) {
+	c.mu.Lock()
+	defer c.mu.Unlock()
+
+	if conn, ok := c.conns[target]; ok {
+		return conn, nil
+	}
+
+	conn, err := build()
+	if err != nil {
+		return nil, err
+	}
+
+	c.conns[target] = conn
+
+	return conn, nil
+}
+
+// GRPCClient resolves and returns a *grpc.ClientConn for target, built by
+// shared/grpcclient and cached per target string: repeat calls with the
+// same target return the same conn, while distinct targets get distinct
+// conns. Options apply to the build only; later calls with different
+// options keep the first build. The conns close with the container.
+// grpcclient.New performs no IO, so resolving never dials.
+func (c *Container) GRPCClient(target string, opts ...grpcclient.Option) (*grpc.ClientConn, error) {
+	cache, err := c.grpcClients.get(func() (grpcClientCache, error) {
+		return grpcClientCache{conns: make(map[string]*grpc.ClientConn)}, nil
+	})
+	if err != nil {
+		return nil, err
+	}
+
+	return cache.get(target, func() (*grpc.ClientConn, error) {
+		return grpcclient.New(context.Background(), target, opts...)
 	})
 }
 
