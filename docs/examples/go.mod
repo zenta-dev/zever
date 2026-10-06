@@ -50,10 +50,12 @@ require (
 	github.com/zenta-dev/zever/core/media v0.5.3 // indirect
 	github.com/zenta-dev/zever/core/notification v0.5.3 // indirect
 	github.com/zenta-dev/zever/core/observability v0.5.3 // indirect
+	github.com/zenta-dev/zever/core/outbox v0.5.3 // indirect
 	github.com/zenta-dev/zever/core/password v0.5.3 // indirect
 	github.com/zenta-dev/zever/core/payment v0.5.3 // indirect
 	github.com/zenta-dev/zever/core/permission v0.5.3 // indirect
 	github.com/zenta-dev/zever/core/ratelimit v0.5.3 // indirect
+	github.com/zenta-dev/zever/core/resilience v0.5.3 // indirect
 	github.com/zenta-dev/zever/core/scheduler v0.5.3 // indirect
 	github.com/zenta-dev/zever/core/search v0.5.3 // indirect
 	github.com/zenta-dev/zever/core/secrets v0.5.3 // indirect
@@ -193,11 +195,13 @@ replace (
 	github.com/zenta-dev/zever/core/middleware => ../../core/middleware
 	github.com/zenta-dev/zever/core/notification => ../../core/notification
 	github.com/zenta-dev/zever/core/observability => ../../core/observability
+	github.com/zenta-dev/zever/core/outbox => ../../core/outbox
 	github.com/zenta-dev/zever/core/password => ../../core/password
 	github.com/zenta-dev/zever/core/payment => ../../core/payment
 	github.com/zenta-dev/zever/core/permission => ../../core/permission
 	github.com/zenta-dev/zever/core/queue => ../../core/queue
 	github.com/zenta-dev/zever/core/ratelimit => ../../core/ratelimit
+	github.com/zenta-dev/zever/core/resilience => ../../core/resilience
 	github.com/zenta-dev/zever/core/router => ../../core/router
 	github.com/zenta-dev/zever/core/scheduler => ../../core/scheduler
 	github.com/zenta-dev/zever/core/search => ../../core/search

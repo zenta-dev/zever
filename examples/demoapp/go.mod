@@ -258,6 +258,8 @@ require (
 	github.com/zenta-dev/zever/adapters/db/postgres v0.5.3 // indirect
 	github.com/zenta-dev/zever/adapters/log/noop v0.5.3 // indirect
 	github.com/zenta-dev/zever/adapters/media/ffmpeg v0.5.3 // indirect
+	github.com/zenta-dev/zever/core/outbox v0.5.3 // indirect
+	github.com/zenta-dev/zever/core/resilience v0.5.3 // indirect
 	github.com/zenta-dev/zever/core/scheduler v0.5.3 // indirect
 	github.com/zenta-dev/zever/shared/codec v0.5.3 // indirect
 	github.com/zenta-dev/zever/shared/dbconn v0.5.3 // indirect
@@ -287,3 +289,7 @@ require (
 	modernc.org/memory v1.12.1 // indirect
 	modernc.org/sqlite v1.60.1 // indirect
 )
+
+replace github.com/zenta-dev/zever/core/outbox => ../../core/outbox
+
+replace github.com/zenta-dev/zever/core/resilience => ../../core/resilience
