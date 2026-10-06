@@ -145,6 +145,16 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Changed
 
+- **Breaking:** span and metric attribute names migrated to OpenTelemetry
+  semantic conventions: `http.method`→`http.request.method`,
+  `http.path`→`url.path`, `http.status_code`→`http.response.status_code`;
+  gRPC spans now carry `rpc.system`/`rpc.service`/`rpc.method`/`rpc.grpc.status_code`;
+  messaging spans use `messaging.*`. Update dashboards/queries accordingly.
+  Keys are exported as constants from `core/observability`
+  (`HTTPRequestMethod`, `URLPath`, `HTTPResponseStatusCode`, `ServerAddress`,
+  `RPCSystem`, `RPCService`, `RPCMethod`, `RPCGRPCStatusCode`,
+  `MessagingSystem`, `MessagingDestinationName`, `MessagingOperation`,
+  `MessagingMessageID`, `MessagingMessageConversationID`).
 - `vectorstore/db` sqlite query now decodes row metadata lazily: only rows
   that survive the topK heap get their metadata JSON parsed (was: every
   scanned row). Corrupt metadata in a row that ranks below topK no longer
