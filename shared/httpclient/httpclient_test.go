@@ -284,9 +284,13 @@ func TestWithTracingInjectsTraceparent(t *testing.T) {
 		TraceFlags: trace.FlagsSampled,
 	}))
 	req, _ := http.NewRequestWithContext(ctx, http.MethodGet, "http://example.test", nil)
-	if _, err := rt.RoundTrip(req); err != nil {
+
+	resp, err := rt.RoundTrip(req)
+	if err != nil {
 		t.Fatalf("RoundTrip: %v", err)
 	}
+
+	_ = resp.Body.Close()
 
 	if got.Get("traceparent") == "" {
 		t.Error("traceparent not injected")

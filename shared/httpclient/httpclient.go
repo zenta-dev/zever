@@ -212,7 +212,7 @@ func Inject(ctx context.Context, req *http.Request) *http.Request {
 // newHTTPClient builds the client with the trace-injecting transport and the
 // optional no-redirect policy, shared by every NewClient branch.
 func newHTTPClient(timeout time.Duration, rt http.RoundTripper, noRedirect, tracing bool) *http.Client {
-	var transport http.RoundTripper = rt
+	transport := rt
 	if tracing {
 		transport = traceRoundTripper{base: rt}
 	}
@@ -232,7 +232,8 @@ func newHTTPClient(timeout time.Duration, rt http.RoundTripper, noRedirect, trac
 // redirects, and applying timeout to the whole request. Trace injection is off
 // by default; pass WithTracing to NewClient when you also want propagation.
 func NewSafeClient(timeout time.Duration, allowPrivate bool, opts ...Option) *http.Client {
-	base := []Option{WithSafeDial(allowPrivate), WithNoRedirect()}
+	base := make([]Option, 0, 2+len(opts))
+	base = append(base, WithSafeDial(allowPrivate), WithNoRedirect())
 
 	return NewClient(timeout, append(base, opts...)...)
 }
