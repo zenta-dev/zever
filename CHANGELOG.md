@@ -9,6 +9,17 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Added
 
+- `--dry-run` across all nine `generate` subcommands: validation and
+  rendering still run, but no filesystem writes occur; append-mode
+  subcommands preview the rendered declaration.
+- The `mcp` codegen backend now also emits a runnable `<module>/mcpserver`
+  stdio server per service-bearing module: self-contained stdlib-only Go
+  with per-tool handler stubs, proven by a test that builds the generated
+  server and exercises it over stdio.
+- Claude Code agent skill: `zever docs --skill --dir` renders `SKILL.md`
+  from a prose template plus the live command catalog; snapshot at
+  `skills/zever/SKILL.md` pinned by tests, documented in
+  `reference/agent-skill`.
 - Agent-friendly CLI: global `--json` (`ZEVER_JSON`) emitting JSON envelopes
   with typed exit codes; structured data for `compile`, `check`, `explain`
   and `doctor`; `--help --agent` machine-readable command catalog; `--dry-run`
