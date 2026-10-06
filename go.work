@@ -94,6 +94,7 @@ use (
 	./cmd/zever
 	./config
 	./container
+	./core/agent
 	./core/ai
 	./core/analytics
 	./core/auth
@@ -121,6 +122,7 @@ use (
 	./core/payment
 	./core/permission
 	./core/queue
+	./core/rag
 	./core/ratelimit
 	./core/resilience
 	./core/router
@@ -163,4 +165,5 @@ use (
 	./tools/errscan
 	./tools/modgraph
 	./tools/zever-lsp
+	./tools/zever-mcp
 )

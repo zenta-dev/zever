@@ -13,6 +13,18 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   Health Checking Protocol (`grpc_health_v1`) and server reflection, marks
   the overall serving status SERVING on boot, ties `/readyz`'s DB ping to
   the health status, and flips NOT_SERVING before graceful stop.
+- New `core/agent` package (bounded tool-calling loop over `core/ai` with an
+  optional human-in-the-loop confirmation hook and schema-constrained
+  `GenerateStructured` with decode retries). No `config` entry: build it over a
+  resolved `ai.AI` with `agent.New`.
+- New `core/rag` package (chunk, batch-embed and upsert documents into a
+  `vectorstore`, then retrieve top-K context and generate grounded answers).
+  No `config` entry: build it over a resolved `ai.AI` and
+  `vectorstore.VectorStore` with `rag.New`.
+- New `tools/zever-mcp` module: a stdio Model Context Protocol server exposing
+  `zever_compile`, `zever_schema` and `zever_explain` so AI agents can
+  introspect and validate `.zen` schemas. Hand-rolled over newline-delimited
+  JSON-RPC 2.0 (no SDK dependency; stdio-only).
 - Saga orchestration for the `workflow` battery: `SagaStep` plus
   `SagaRegistrar` / `SagaRunner` / `SagaInspector` interfaces in
   `core/workflow`, with in-process (`adapters/workflow/memory`) and durable
