@@ -109,7 +109,7 @@ type closeSnapshot struct {
 // lives in the DSN registry and closes with the registry band),
 // scheduler, job (dependents that hold a queue reference, closed first),
 // grpcServer (separate GracefulStop handling). This list must cover all
-// remaining lazy fields; currently 30 entries + 6 ordered = 36 lazy fields.
+// remaining lazy fields; currently 32 entries + 6 ordered = 38 lazy fields.
 // When adding a new service, add it here unless it depends on cache/queue
 // (then add to Close's ordered section and keep excluded here). Drift is
 // pinned by TestContainer_Snapshots_CoversAllServices via reflection.
@@ -132,10 +132,12 @@ func (c *Container) snapshots() []closeSnapshot {
 		func() closeSnapshot { v, ok := c.media.getIfResolved(); return closeSnapshot{v, ok} }(),
 		func() closeSnapshot { v, ok := c.notification.getIfResolved(); return closeSnapshot{v, ok} }(),
 		func() closeSnapshot { v, ok := c.observability.getIfResolved(); return closeSnapshot{v, ok} }(),
+		func() closeSnapshot { v, ok := c.outbox.getIfResolved(); return closeSnapshot{v, ok} }(),
 		func() closeSnapshot { v, ok := c.password.getIfResolved(); return closeSnapshot{v, ok} }(),
 		func() closeSnapshot { v, ok := c.payment.getIfResolved(); return closeSnapshot{v, ok} }(),
 		func() closeSnapshot { v, ok := c.permission.getIfResolved(); return closeSnapshot{v, ok} }(),
 		func() closeSnapshot { v, ok := c.ratelimit.getIfResolved(); return closeSnapshot{v, ok} }(),
+		func() closeSnapshot { v, ok := c.resilience.getIfResolved(); return closeSnapshot{v, ok} }(),
 		func() closeSnapshot { v, ok := c.router.getIfResolved(); return closeSnapshot{v, ok} }(),
 		func() closeSnapshot { v, ok := c.search.getIfResolved(); return closeSnapshot{v, ok} }(),
 		func() closeSnapshot { v, ok := c.secrets.getIfResolved(); return closeSnapshot{v, ok} }(),
@@ -155,8 +157,8 @@ func snapshotServiceNames() []string {
 	return []string{
 		"ai", "analytics", "auth", "billing", "crypto", "document",
 		"eventbus", "flag", "geo", "i18n", "idempotency", "lock", "log", "mailer",
-		"media", "notification", "observability", "password", "payment",
-		"permission", "ratelimit", "router", "search", "secrets", "session", "storage",
+		"media", "notification", "observability", "outbox", "password", "payment",
+		"permission", "ratelimit", "resilience", "router", "search", "secrets", "session", "storage",
 		"tenant", "vectorstore", "webhook", "workflow",
 	}
 }

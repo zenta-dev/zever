@@ -21,11 +21,13 @@ import (
 	"github.com/zenta-dev/zever/core/media"
 	"github.com/zenta-dev/zever/core/notification"
 	"github.com/zenta-dev/zever/core/observability"
+	"github.com/zenta-dev/zever/core/outbox"
 	"github.com/zenta-dev/zever/core/password"
 	"github.com/zenta-dev/zever/core/payment"
 	"github.com/zenta-dev/zever/core/permission"
 	"github.com/zenta-dev/zever/core/queue"
 	"github.com/zenta-dev/zever/core/ratelimit"
+	"github.com/zenta-dev/zever/core/resilience"
 	"github.com/zenta-dev/zever/core/router"
 	"github.com/zenta-dev/zever/core/scheduler"
 	"github.com/zenta-dev/zever/core/search"
@@ -65,6 +67,7 @@ func Default() *Config {
 	cfg.Media = Service[media.Options]{Adapter: "local"}
 	cfg.Notification = Service[notification.Options]{Adapter: "log"}
 	cfg.Observability = Service[observability.Options]{Adapter: "stdout", Options: observability.Options{ServiceName: "zever"}}
+	cfg.Outbox = Service[outbox.Options]{Adapter: string(outbox.DB)}
 	cfg.Password = Service[password.Options]{Adapter: "argon2id", Options: password.Options{Time: password.DefaultTime, Memory: password.DefaultMemory, Threads: password.DefaultThreads, SaltLen: password.DefaultSaltLen, KeyLen: password.DefaultKeyLen}}
 	// WARNING: stub payment performs zero webhook verification (fail-closed)
 	// and holds no real funds. Test-only, never production.
@@ -72,6 +75,7 @@ func Default() *Config {
 	cfg.Permission = Service[permission.Options]{Adapter: "noop"}
 	cfg.Queue = Service[queue.Options]{Adapter: "memory"}
 	cfg.RateLimit = Service[ratelimit.Options]{Adapter: "memory", Options: ratelimit.Options{Rate: 10, Burst: 20}}
+	cfg.Resilience = Service[resilience.Options]{Adapter: string(resilience.Memory)}
 	cfg.Router = Service[router.Options]{Adapter: "stdhttp"}
 	cfg.Scheduler = Service[scheduler.Options]{Adapter: "embedded", Options: scheduler.Options{Dispatcher: &job.Dispatcher{}}}
 	cfg.Search = Service[search.Options]{Adapter: string(search.DB)}

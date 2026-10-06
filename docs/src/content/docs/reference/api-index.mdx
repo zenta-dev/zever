@@ -127,11 +127,13 @@ exit:0 (non-nil only on per-service close failures, joined via errors.Join)
 | `core/media` | `Media()` | |
 | `core/notification` | `Notification()` | |
 | `core/observability` | `Observability()` | |
+| `core/outbox` | `Outbox()` | |
 | `core/password` | `Password()` | |
 | `core/payment` | `Payment()` | |
 | `core/permission` | `Permission()` | |
 | `core/queue` | `Queue()` | leaf dependency, closed last |
 | `core/ratelimit` | `RateLimit()` (`Ratelimit()` alias) | |
+| `core/resilience` | `Resilience()` | |
 | `core/router` | `Router()` | |
 | `core/scheduler` | `Scheduler()` | shares `Queue` via `Job()`, closed first |
 | `core/search` | `Search()` | |

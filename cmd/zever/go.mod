@@ -266,7 +266,9 @@ require (
 	github.com/zenta-dev/zever/core/billing v0.5.3 // indirect
 	github.com/zenta-dev/zever/core/job v0.5.3 // indirect
 	github.com/zenta-dev/zever/core/media v0.5.3 // indirect
+	github.com/zenta-dev/zever/core/outbox v0.5.3 // indirect
 	github.com/zenta-dev/zever/core/password v0.5.3 // indirect
+	github.com/zenta-dev/zever/core/resilience v0.5.3 // indirect
 	github.com/zenta-dev/zever/core/scheduler v0.5.3 // indirect
 	github.com/zenta-dev/zever/core/search v0.5.3 // indirect
 	github.com/zenta-dev/zever/core/vectorstore v0.5.3 // indirect
@@ -423,10 +425,12 @@ replace (
 	github.com/zenta-dev/zever/core/mailer => ../../core/mailer
 	github.com/zenta-dev/zever/core/notification => ../../core/notification
 	github.com/zenta-dev/zever/core/observability => ../../core/observability
+	github.com/zenta-dev/zever/core/outbox => ../../core/outbox
 	github.com/zenta-dev/zever/core/payment => ../../core/payment
 	github.com/zenta-dev/zever/core/permission => ../../core/permission
 	github.com/zenta-dev/zever/core/queue => ../../core/queue
 	github.com/zenta-dev/zever/core/ratelimit => ../../core/ratelimit
+	github.com/zenta-dev/zever/core/resilience => ../../core/resilience
 	github.com/zenta-dev/zever/core/router => ../../core/router
 	github.com/zenta-dev/zever/core/secrets => ../../core/secrets
 	github.com/zenta-dev/zever/core/session => ../../core/session

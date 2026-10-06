@@ -23,11 +23,13 @@ import (
 	"github.com/zenta-dev/zever/core/media"
 	"github.com/zenta-dev/zever/core/notification"
 	"github.com/zenta-dev/zever/core/observability"
+	"github.com/zenta-dev/zever/core/outbox"
 	"github.com/zenta-dev/zever/core/password"
 	"github.com/zenta-dev/zever/core/payment"
 	"github.com/zenta-dev/zever/core/permission"
 	"github.com/zenta-dev/zever/core/queue"
 	"github.com/zenta-dev/zever/core/ratelimit"
+	"github.com/zenta-dev/zever/core/resilience"
 	"github.com/zenta-dev/zever/core/router"
 	"github.com/zenta-dev/zever/core/scheduler"
 	"github.com/zenta-dev/zever/core/search"
@@ -70,11 +72,13 @@ type Config struct {
 	Media         Service[media.Options]         `json:"media" yaml:"media"`
 	Notification  Service[notification.Options]  `json:"notification" yaml:"notification"`
 	Observability Service[observability.Options] `json:"observability" yaml:"observability"`
+	Outbox        Service[outbox.Options]        `json:"outbox" yaml:"outbox"`
 	Password      Service[password.Options]      `json:"password" yaml:"password"`
 	Payment       Service[payment.Options]       `json:"payment" yaml:"payment"`
 	Permission    Service[permission.Options]    `json:"permission" yaml:"permission"`
 	Queue         Service[queue.Options]         `json:"queue" yaml:"queue"`
 	RateLimit     Service[ratelimit.Options]     `json:"ratelimit" yaml:"ratelimit"`
+	Resilience    Service[resilience.Options]    `json:"resilience" yaml:"resilience"`
 	Router        Service[router.Options]        `json:"router" yaml:"router"`
 	Scheduler     Service[scheduler.Options]     `json:"scheduler" yaml:"scheduler"`
 	Search        Service[search.Options]        `json:"search" yaml:"search"`
@@ -93,16 +97,16 @@ type Config struct {
 	Plugins map[string]Service[json.RawMessage] `json:"plugins" yaml:"plugins" toml:"plugins"`
 }
 
-// knownServiceNames returns the 34 lowercase service names in sorted order.
+// knownServiceNames returns the 36 lowercase service names in sorted order.
 // It is the single source of truth for env matching and error paths.
 func knownServiceNames() []string {
 	return []string{
 		"ai", "analytics", "auth", "billing", "cache", "crypto", "db",
 		"document", "eventbus", "flag", "geo", "i18n", "idempotency",
 		"lock", "log", "mailer", "media", "notification", "observability",
-		"password", "payment", "permission", "queue", "ratelimit",
-		"router", "scheduler", "search", "secrets", "session", "storage",
-		"tenant", "vectorstore", "webhook", "workflow",
+		"outbox", "password", "payment", "permission", "queue", "ratelimit",
+		"resilience", "router", "scheduler", "search", "secrets", "session",
+		"storage", "tenant", "vectorstore", "webhook", "workflow",
 	}
 }
 
@@ -137,7 +141,7 @@ func serviceToMap[T any](o T) map[string]any {
 // never log raw option maps directly. The returned maps are fresh copies;
 // mutating them does not affect the Config.
 func (c *Config) RedactedServices() map[string]ServiceConfig {
-	out := make(map[string]ServiceConfig, 34+len(c.Plugins))
+	out := make(map[string]ServiceConfig, 36+len(c.Plugins))
 	// The option maps below are freshly built by serviceToMap and owned
 	// by the result, so redaction runs in place: no deep copy is needed
 	// to keep the Config untouched.
@@ -165,11 +169,13 @@ func (c *Config) RedactedServices() map[string]ServiceConfig {
 	put("media", c.Media.Adapter, c.Media.Options)
 	put("notification", c.Notification.Adapter, c.Notification.Options)
 	put("observability", c.Observability.Adapter, c.Observability.Options)
+	put("outbox", c.Outbox.Adapter, c.Outbox.Options)
 	put("password", c.Password.Adapter, c.Password.Options)
 	put("payment", c.Payment.Adapter, c.Payment.Options)
 	put("permission", c.Permission.Adapter, c.Permission.Options)
 	put("queue", c.Queue.Adapter, c.Queue.Options)
 	put("ratelimit", c.RateLimit.Adapter, c.RateLimit.Options)
+	put("resilience", c.Resilience.Adapter, c.Resilience.Options)
 	put("router", c.Router.Adapter, c.Router.Options)
 	put("scheduler", c.Scheduler.Adapter, c.Scheduler.Options)
 	put("search", c.Search.Adapter, c.Search.Options)

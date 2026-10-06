@@ -23,11 +23,13 @@ import (
 	"github.com/zenta-dev/zever/core/media"
 	"github.com/zenta-dev/zever/core/notification"
 	"github.com/zenta-dev/zever/core/observability"
+	"github.com/zenta-dev/zever/core/outbox"
 	"github.com/zenta-dev/zever/core/password"
 	"github.com/zenta-dev/zever/core/payment"
 	"github.com/zenta-dev/zever/core/permission"
 	"github.com/zenta-dev/zever/core/queue"
 	"github.com/zenta-dev/zever/core/ratelimit"
+	"github.com/zenta-dev/zever/core/resilience"
 	"github.com/zenta-dev/zever/core/router"
 	"github.com/zenta-dev/zever/core/scheduler"
 	"github.com/zenta-dev/zever/core/search"
@@ -57,7 +59,7 @@ func parseAsAny[T any](parse func(string) (T, error)) func(string) (any, error) 
 // preserves errors.Is/As into the original typed errors while still
 // naming the service for DX.
 //
-// Adapter names go through each package's ParseAdapter (all 34 services
+// Adapter names go through each package's ParseAdapter (all 36 services
 // provide one). Options.Validate runs everywhere it exists. Plugins with a
 // registered validator (see RegisterPluginValidator) run their hook too;
 // unregistered plugins are opaque and skip validation.
@@ -92,11 +94,13 @@ func (c *Config) Validate() error {
 	check("media", c.Media.Adapter, parseAsAny(media.ParseAdapter), c.Media.Options.Validate)
 	check("notification", c.Notification.Adapter, parseAsAny(notification.ParseAdapter), c.Notification.Options.Validate)
 	check("observability", c.Observability.Adapter, parseAsAny(observability.ParseAdapter), c.Observability.Options.Validate)
+	check("outbox", c.Outbox.Adapter, parseAsAny(outbox.ParseAdapter), c.Outbox.Options.Validate)
 	check("password", c.Password.Adapter, parseAsAny(password.ParseAdapter), c.Password.Options.Validate)
 	check("payment", c.Payment.Adapter, parseAsAny(payment.ParseAdapter), c.Payment.Options.Validate)
 	check("permission", c.Permission.Adapter, parseAsAny(permission.ParseAdapter), c.Permission.Options.Validate)
 	check("queue", c.Queue.Adapter, parseAsAny(queue.ParseAdapter), c.Queue.Options.Validate)
 	check("ratelimit", c.RateLimit.Adapter, parseAsAny(ratelimit.ParseAdapter), c.RateLimit.Options.Validate)
+	check("resilience", c.Resilience.Adapter, parseAsAny(resilience.ParseAdapter), c.Resilience.Options.Validate)
 	check("router", c.Router.Adapter, parseAsAny(router.ParseAdapter), c.Router.Options.Validate)
 	check("scheduler", c.Scheduler.Adapter, parseAsAny(scheduler.ParseAdapter), c.Scheduler.Options.Validate)
 	check("search", c.Search.Adapter, parseAsAny(search.ParseAdapter), c.Search.Options.Validate)

@@ -38,7 +38,7 @@ func BenchmarkLoadFile(b *testing.B) {
 	}
 }
 
-// BenchmarkValidate measures the fail-closed validation sweep across all 34
+// BenchmarkValidate measures the fail-closed validation sweep across all 36
 // services plus plugins.
 func BenchmarkValidate(b *testing.B) {
 	cfg := Default()
@@ -60,8 +60,8 @@ func BenchmarkRedactedServices(b *testing.B) {
 	b.ReportAllocs()
 	b.ResetTimer()
 	for b.Loop() {
-		if got := cfg.RedactedServices(); len(got) != 34 {
-			b.Fatalf("got %d services, want 34", len(got))
+		if got := cfg.RedactedServices(); len(got) != 36 {
+			b.Fatalf("got %d services, want 36", len(got))
 		}
 	}
 }

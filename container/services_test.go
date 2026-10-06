@@ -32,11 +32,13 @@ import (
 	"github.com/zenta-dev/zever/core/media"
 	"github.com/zenta-dev/zever/core/notification"
 	"github.com/zenta-dev/zever/core/observability"
+	"github.com/zenta-dev/zever/core/outbox"
 	"github.com/zenta-dev/zever/core/password"
 	"github.com/zenta-dev/zever/core/payment"
 	"github.com/zenta-dev/zever/core/permission"
 	"github.com/zenta-dev/zever/core/queue"
 	"github.com/zenta-dev/zever/core/ratelimit"
+	"github.com/zenta-dev/zever/core/resilience"
 	"github.com/zenta-dev/zever/core/router"
 	"github.com/zenta-dev/zever/core/scheduler"
 	"github.com/zenta-dev/zever/core/search"
@@ -90,11 +92,13 @@ func registerFakeAdapters() {
 	_ = notification.Register(notification.Log, newFakeNotification)
 	_ = observability.Register(observability.Noop, newFakeObservability)
 	_ = observability.Register(observability.Stdout, newFakeObservability)
+	_ = outbox.Register(outbox.DB, newFakeOutbox)
 	_ = password.Register(password.AdapterArgon2ID, newFakePassword)
 	_ = payment.Register(payment.Stub, newFakePayment)
 	_ = permission.Register(permission.Noop, newFakePermission)
 	_ = queue.Register(queue.Memory, newFakeQueue)
 	_ = ratelimit.Register(ratelimit.Memory, newFakeRateLimit)
+	_ = resilience.Register(resilience.Memory, newFakeResilience)
 	_ = router.Register(router.AdapterStdHTTP, newFakeRouter)
 	_ = scheduler.Register(scheduler.Embedded, newFakeScheduler)
 	_ = search.Register(search.DB, newFakeSearch)
@@ -558,6 +562,17 @@ func (s *fakeSpan) SetAttributes(_ ...observability.Attr) {}
 func (s *fakeSpan) RecordError(_ error)                   {}
 func (s *fakeSpan) End()                                  {}
 
+func newFakeOutbox(_ outbox.Options) (outbox.Store, error) { return &fakeOutbox{}, nil }
+
+// fakeOutbox implements outbox.Store with zero values.
+type fakeOutbox struct{}
+
+func (f *fakeOutbox) Record(_ context.Context, _ db.Tx, _ outbox.Message) error { return nil }
+func (f *fakeOutbox) Start(_ context.Context) error                             { return nil }
+func (f *fakeOutbox) Status() outbox.Status                                     { return outbox.Status{} }
+func (f *fakeOutbox) Close() error                                              { return nil }
+func (f *fakeOutbox) Name() string                                              { return "fake" }
+
 func newFakePayment(_ payment.Options) (payment.Payment, error) {
 	return &fakePayment{}, nil
 }
@@ -628,6 +643,28 @@ func (f *fakeRateLimit) Allow(_ context.Context, _ string, _ float64) (ratelimit
 func (f *fakeRateLimit) Reset(_ context.Context, _ string) error { return nil }
 func (f *fakeRateLimit) Close() error                            { return nil }
 func (f *fakeRateLimit) Name() string                            { return "fake" }
+
+func newFakeResilience(_ resilience.Options) (resilience.Manager, error) {
+	return &fakeResilience{}, nil
+}
+
+// fakeResilience implements resilience.Manager with zero values.
+type fakeResilience struct{}
+
+func (f *fakeResilience) Guard(name string) (resilience.Guard, error) {
+	return &fakeGuard{name: name}, nil
+}
+func (f *fakeResilience) Close() error { return nil }
+
+// fakeGuard implements resilience.Guard with zero values.
+type fakeGuard struct{ name string }
+
+func (g *fakeGuard) Execute(_ context.Context, _ func(context.Context) error) error {
+	return nil
+}
+func (g *fakeGuard) State() resilience.State { return resilience.StateClosed }
+func (g *fakeGuard) Name() string            { return g.name }
+func (g *fakeGuard) Close() error            { return nil }
 
 func newFakeRouter(_ router.Options) (router.Router, error) { return &fakeRouter{}, nil }
 
@@ -766,11 +803,14 @@ var (
 	_ observability.Tracer    = (*fakeTracer)(nil)
 	_ observability.Metrics   = (*fakeMetrics)(nil)
 	_ observability.Span      = (*fakeSpan)(nil)
+	_ outbox.Store            = (*fakeOutbox)(nil)
 	_ password.Hasher         = (*fakePassword)(nil)
 	_ payment.Payment         = (*fakePayment)(nil)
 	_ permission.Checker      = (*fakePermission)(nil)
 	_ queue.Queue             = (*fakeQueue)(nil)
 	_ ratelimit.Limiter       = (*fakeRateLimit)(nil)
+	_ resilience.Manager      = (*fakeResilience)(nil)
+	_ resilience.Guard        = (*fakeGuard)(nil)
 	_ router.Router           = (*fakeRouter)(nil)
 	_ router.Group            = (*fakeRouter)(nil)
 	_ scheduler.Scheduler     = (*fakeScheduler)(nil)
@@ -852,11 +892,13 @@ func TestAccessors_resolve(t *testing.T) {
 		{"media", func() (any, error) { return c.Media() }},
 		{"notification", func() (any, error) { return c.Notification() }},
 		{"observability", func() (any, error) { return c.Observability() }},
+		{"outbox", func() (any, error) { return c.Outbox() }},
 		{"password", func() (any, error) { return c.Password() }},
 		{"payment", func() (any, error) { return c.Payment() }},
 		{"permission", func() (any, error) { return c.Permission() }},
 		{"queue", func() (any, error) { return c.Queue() }},
 		{"ratelimit", func() (any, error) { return c.RateLimit() }},
+		{"resilience", func() (any, error) { return c.Resilience() }},
 		{"router", func() (any, error) { return c.Router() }},
 		{"search", func() (any, error) { return c.Search() }},
 		{"secrets", func() (any, error) { return c.Secrets() }},

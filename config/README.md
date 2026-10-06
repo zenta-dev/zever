@@ -42,11 +42,13 @@ config file, overlaid by environment variables. Later layers win:
 | media         | local, s3                           |
 | notification  | log, twilio, fcm                    |
 | observability | noop, stdout, otlp                  |
+| outbox        | memory, db, cdc                     |
 | password      | argon2id                            |
 | payment       | stub, stripe, paddle                |
 | permission    | noop, rbac, casbin                  |
 | queue         | memory, redis, db                   |
 | ratelimit     | memory, redis                       |
+| resilience    | memory                              |
 | router        | fiber, stdhttp                      |
 | scheduler     | embedded, postgres                  |
 | search        | db, postgres, meilisearch, sqlite   |

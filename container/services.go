@@ -25,11 +25,13 @@ import (
 	"github.com/zenta-dev/zever/core/media"
 	"github.com/zenta-dev/zever/core/notification"
 	"github.com/zenta-dev/zever/core/observability"
+	"github.com/zenta-dev/zever/core/outbox"
 	"github.com/zenta-dev/zever/core/password"
 	"github.com/zenta-dev/zever/core/payment"
 	"github.com/zenta-dev/zever/core/permission"
 	"github.com/zenta-dev/zever/core/queue"
 	"github.com/zenta-dev/zever/core/ratelimit"
+	"github.com/zenta-dev/zever/core/resilience"
 	"github.com/zenta-dev/zever/core/router"
 	"github.com/zenta-dev/zever/core/scheduler"
 	"github.com/zenta-dev/zever/core/search"
@@ -267,6 +269,15 @@ func (c *Container) Observability() (observability.Provider, error) {
 	})
 }
 
+// Outbox resolves and returns the outbox service instance. The db adapter
+// opens its own pool from Options.DSN (empty selects a private in-memory
+// database); container-level pool sharing is not wired for outbox.
+func (c *Container) Outbox() (outbox.Store, error) {
+	return c.outbox.get(func() (outbox.Store, error) {
+		return openService("outbox", c.cfg.Outbox.Adapter, outbox.ParseAdapter, outbox.Open, c.cfg.Outbox.Options)
+	})
+}
+
 // Password resolves and returns the password service instance.
 func (c *Container) Password() (password.Hasher, error) {
 	return c.password.get(func() (password.Hasher, error) {
@@ -313,6 +324,13 @@ func (c *Container) RateLimit() (ratelimit.Limiter, error) {
 // Ratelimit aliases RateLimit for compatibility.
 func (c *Container) Ratelimit() (ratelimit.Limiter, error) {
 	return c.RateLimit()
+}
+
+// Resilience resolves and returns the resilience service instance.
+func (c *Container) Resilience() (resilience.Manager, error) {
+	return c.resilience.get(func() (resilience.Manager, error) {
+		return openService("resilience", c.cfg.Resilience.Adapter, resilience.ParseAdapter, resilience.Open, c.cfg.Resilience.Options)
+	})
 }
 
 // Router resolves and returns the router service instance.

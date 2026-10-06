@@ -22,11 +22,13 @@ import (
 	"github.com/zenta-dev/zever/core/media"
 	"github.com/zenta-dev/zever/core/notification"
 	"github.com/zenta-dev/zever/core/observability"
+	"github.com/zenta-dev/zever/core/outbox"
 	"github.com/zenta-dev/zever/core/password"
 	"github.com/zenta-dev/zever/core/payment"
 	"github.com/zenta-dev/zever/core/permission"
 	"github.com/zenta-dev/zever/core/queue"
 	"github.com/zenta-dev/zever/core/ratelimit"
+	"github.com/zenta-dev/zever/core/resilience"
 	"github.com/zenta-dev/zever/core/router"
 	"github.com/zenta-dev/zever/core/scheduler"
 	"github.com/zenta-dev/zever/core/search"
@@ -178,6 +180,9 @@ var serviceMergers = map[string]func(*Config, ServiceConfig) error{
 	"observability": func(cfg *Config, sc ServiceConfig) error {
 		return mergeInto[observability.Options]("observability", &cfg.Observability.Adapter, &cfg.Observability.Options, sc)
 	},
+	"outbox": func(cfg *Config, sc ServiceConfig) error {
+		return mergeInto[outbox.Options]("outbox", &cfg.Outbox.Adapter, &cfg.Outbox.Options, sc)
+	},
 	"password": func(cfg *Config, sc ServiceConfig) error {
 		return mergeInto[password.Options]("password", &cfg.Password.Adapter, &cfg.Password.Options, sc)
 	},
@@ -192,6 +197,9 @@ var serviceMergers = map[string]func(*Config, ServiceConfig) error{
 	},
 	"ratelimit": func(cfg *Config, sc ServiceConfig) error {
 		return mergeInto[ratelimit.Options]("ratelimit", &cfg.RateLimit.Adapter, &cfg.RateLimit.Options, sc)
+	},
+	"resilience": func(cfg *Config, sc ServiceConfig) error {
+		return mergeInto[resilience.Options]("resilience", &cfg.Resilience.Adapter, &cfg.Resilience.Options, sc)
 	},
 	"router": func(cfg *Config, sc ServiceConfig) error {
 		return mergeInto[router.Options]("router", &cfg.Router.Adapter, &cfg.Router.Options, sc)
