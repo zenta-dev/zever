@@ -28,6 +28,7 @@ config file, overlaid by environment variables. Later layers win:
 | auth          | jwt, session, oidc                  |
 | billing       | stub, stripe, paddle                |
 | cache         | memory, redis, db                   |
+| cdn           | noop, cloudflare                    |
 | crypto        | local                               |
 | db            | sqlite, postgres                    |
 | document      | local, remote, latex                |
