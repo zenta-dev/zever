@@ -22,6 +22,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   `httpclient.WithTracing()` (opt-in W3C trace-context injection) enabled in
   document/remote, i18n/remote, auth/oidc, the ai adapters
   (anthropic/gemini/ollama/openai), and `shared/providersclient`.
+- Generated entrypoints wire the new batteries: the worker starts the outbox
+  relay via `container.OutboxRelay(ctx)`; the server resolves the resilience
+  manager and ships a `guardedGRPCClient` helper (per-dependency breaker +
+  `container.GRPCClient`).
 - Prompt pack 3: `DoctorTriage`, `DiagRepair`, `OutboxTriage` and
   `ExtractSplit` builders for doctor, diagnostic, outbox, and extraction
   workflows.
