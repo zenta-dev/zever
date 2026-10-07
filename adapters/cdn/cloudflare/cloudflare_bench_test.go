@@ -12,7 +12,7 @@ func newBenchCloudflare(b *testing.B) *cloudflareAdapter {
 	b.Helper()
 	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, _ *http.Request) {
 		w.Header().Set("Content-Type", "application/json")
-		w.WriteHeader(200)
+		w.WriteHeader(http.StatusOK)
 		_, _ = w.Write([]byte(`{"success":true,"errors":[],"messages":[]}`))
 	}))
 	b.Cleanup(srv.Close)

@@ -2,12 +2,14 @@ package cloudflare
 
 import (
 	"context"
+	"errors"
 	"fmt"
 	"sync"
 
 	"github.com/cloudflare/cloudflare-go/v7"
 	"github.com/cloudflare/cloudflare-go/v7/cache"
 	"github.com/cloudflare/cloudflare-go/v7/option"
+
 	"github.com/zenta-dev/zever/core/cdn"
 )
 
@@ -56,7 +58,7 @@ func (d *cloudflareAdapter) Purge(ctx context.Context, req cdn.PurgeRequest) err
 	}
 
 	if len(req.URLs) == 0 && len(req.Tags) == 0 && !req.All {
-		return fmt.Errorf("cdn: empty purge request")
+		return errors.New("cdn: empty purge request")
 	}
 
 	var body cache.CachePurgeParamsBodyUnion
