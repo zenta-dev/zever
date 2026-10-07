@@ -25,6 +25,9 @@ func coverMail() *mailer.Mail {
 	}
 }
 
+// TestCoverNewWithWriterNilWriterUsesStdout must not call t.Parallel: it
+// swaps the process-global os.Stdout, which parallel tests in this package
+// read, so running it in parallel is a data race under -race -shuffle=on.
 func TestCoverNewWithWriterNilWriterUsesStdout(t *testing.T) {
 	old := os.Stdout
 	r, w, pipeErr := os.Pipe()
