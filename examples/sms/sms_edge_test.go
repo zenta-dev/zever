@@ -3,14 +3,23 @@ package sms_test
 import (
 	"context"
 	"errors"
+	"fmt"
+	"sync/atomic"
 	"testing"
 
 	"github.com/zenta-dev/zever/examples/sms"
 )
 
-// edgeAdapter is a unique adapter name so this test binary's process-wide
-// registry is not disturbed by other registrations.
-const edgeAdapter = sms.Adapter("edge-test")
+// edgeAdapterSeq numbers the names newEdgeAdapter hands out.
+var edgeAdapterSeq atomic.Int64
+
+// newEdgeAdapter returns an adapter name no other registration in this test
+// binary has claimed. The process-wide registry has no unregister, so a
+// fixed name would make a second -count iteration (or the benchmark after
+// the test) fail with ErrDuplicate.
+func newEdgeAdapter() sms.Adapter {
+	return sms.Adapter(fmt.Sprintf("edge-test-%d", edgeAdapterSeq.Add(1)))
+}
 
 // edgeFactory returns a no-op SMS backend.
 func edgeFactory(sms.Options) (sms.SMS, error) { return edgeDriver{}, nil }
@@ -78,6 +87,8 @@ func TestOptionsValidate(t *testing.T) {
 func TestRegisterAndOpen(t *testing.T) {
 	t.Parallel()
 
+	edgeAdapter := newEdgeAdapter()
+
 	if err := sms.Register(edgeAdapter, edgeFactory); err != nil {
 		t.Fatalf("Register: %v", err)
 	}
@@ -129,6 +140,8 @@ func BenchmarkParseAdapter(b *testing.B) {
 
 // BenchmarkOpen measures a successful factory lookup and open.
 func BenchmarkOpen(b *testing.B) {
+	edgeAdapter := newEdgeAdapter()
+
 	if err := sms.Register(edgeAdapter, edgeFactory); err != nil {
 		b.Fatalf("Register: %v", err)
 	}
