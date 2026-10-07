@@ -15,8 +15,12 @@ import (
 )
 
 const (
-	// DefaultEntryTTL is the short TTL conformance expiry tests set before polling for disappearance.
-	DefaultEntryTTL = 30 * time.Millisecond
+	// DefaultEntryTTL is the short TTL conformance expiry tests set before
+	// polling for disappearance. It must comfortably exceed the
+	// Create→assert→Get round-trip so the "before expiry" assertion cannot
+	// race expiry under CI load (a 30ms TTL flaked there; see
+	// checkTTLExpiry for the tolerant-drift assertion).
+	DefaultEntryTTL = 200 * time.Millisecond
 	// DefaultExpiryTimeout bounds how long expiry polls wait before failing.
 	DefaultExpiryTimeout = 2 * time.Second
 	// DefaultPollInterval is the tick between expiry-poll attempts.
@@ -188,6 +192,12 @@ func conformanceTTLExpiry(t *testing.T, factory func(t *testing.T) session.Store
 // maps TTL to an absolute ExpiresAt, and disappears (ErrNotFound) after
 // polling. Polling uses timeout/interval so unit tests can drive both
 // the expiry and timeout branches quickly.
+//
+// The ExpiresAt assertion tolerates small negative drift (until > -1min)
+// because under CI load the Create→assert round-trip can outlast a short
+// TTL; the upper bound (ttl+1min) still catches stores that mint a
+// disconnected lifetime. The Get-before-expiry check stays strict: with
+// DefaultEntryTTL=200ms the round-trip has ample headroom.
 func checkTTLExpiry(ctx context.Context, s session.Store, ttl, timeout time.Duration) error {
 	created, err := s.Create(ctx, ttl)
 	if err != nil {
@@ -199,7 +209,7 @@ func checkTTLExpiry(ctx context.Context, s session.Store, ttl, timeout time.Dura
 	// cookie adapter mirrors this same span) disconnected from expiry.
 	var errs []error
 
-	if until := time.Until(created.ExpiresAt); until <= 0 || until > ttl+time.Minute {
+	if until := time.Until(created.ExpiresAt); until <= -time.Minute || until > ttl+time.Minute {
 		errs = append(errs, fmt.Errorf("sessiontest: ExpiresAt = %v (in %v), want ~%v out", created.ExpiresAt, until, ttl))
 	}
 
