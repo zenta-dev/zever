@@ -14,7 +14,7 @@ and tag every span with a **kind** and semconv attribute names.
 
 ## The propagation contract
 
-zever propagates W3C Trace Context — `traceparent` and `tracestate` —
+Zever propagates W3C Trace Context (`traceparent` and `tracestate`)
 plus W3C Baggage. The `otlp` adapter installs the same composite
 propagator (`TraceContext` + `Baggage`) as the process global, so the
 rule is simple:
@@ -74,7 +74,7 @@ func callDownstream(ctx context.Context, url string) (*http.Response, error) {
 
 Without `WithTracing()` the client sends no `traceparent`, and the
 downstream service starts a fresh root trace. Thread the handler's
-context into the request — `http.NewRequest` (no context) has no parent
+context into the request: `http.NewRequest` (no context) has no parent
 span to propagate even with the option set. `httpclient.Inject(ctx, req)`
 is exported for the case where you already hold a request and need the
 headers applied yourself.
@@ -87,7 +87,7 @@ automatically. Client spans additionally need
 Messaging has a header channel too: `Record` stores the trace context in
 the outbox row's headers, and the relay hands those headers to the
 `Publisher`. Consumer paths that hold the headers continue the same
-trace with `traceprop.StartConsumeSpan` — `core/job`'s worker and the
+trace with `traceprop.StartConsumeSpan` (`core/job`'s worker and the
 `eventbus` adapters already do. For send paths with no channel at all
 (mailer, SMS, push), read the ID for your logs instead of inventing
 protocol headers:
@@ -106,8 +106,8 @@ error.
 
 ## Baggage
 
-Baggage carries the small set of facts every service in a trace needs —
-which tenant, which user, which support ticket — without re-reading a
+Baggage carries the small set of facts every service in a trace needs
+(which tenant, which user, which support ticket) without re-reading a
 header at each hop. Three keys are the convention; nothing else crosses
 a service boundary:
 
@@ -144,11 +144,11 @@ a header multiplied across a fleet.
 ## Span kinds
 
 A span kind tells a trace viewer whether the span received work or
-started it — the difference between "this service was called" and "this
+started it: the difference between "this service was called" and "this
 service called out". `core/observability` exposes the five kinds, and
 `observability.StartSpan` is the entry point that carries them:
 
-| Kind | Use for | Typical zever span |
+| Kind | Use for | Typical Zever span |
 |---|---|---|
 | `SpanKindServer` | An inbound request this service handles | HTTP path span, gRPC full-method span |
 | `SpanKindClient` | An outbound request this service makes | `shared/grpcclient` interceptor span |
@@ -174,7 +174,7 @@ func publishSpan(ctx context.Context, t observability.Tracer, topic string) {
 
 `Tracer.Start(ctx, name)` still exists and is equivalent to an
 `internal` span with no attributes. Reach for `StartSpan` whenever the
-work crosses a boundary — that is the whole value of the kind. Providers
+work crosses a boundary: that is the whole value of the kind. Providers
 that do not implement the optional `observability.SpanStarter` interface
 fall back to `Start`, so instrumentation never breaks an adapter.
 
@@ -192,7 +192,7 @@ observability:
     sample_ratio: 0.1
 ```
 
-Give each service a distinct `service_name` — that is how the collector
+Give each service a distinct `service_name`: that is how the collector
 draws the boundaries between spans in one trace. Keep `service_name`
 stable across deploys; renaming it splits a service's history in two.
 
@@ -212,7 +212,7 @@ Verify propagation end to end, in this order:
 
 Sample early, not late: `sample_ratio: 0.1` keeps cost down while
 still leaving traces to trace. Note that a sampled trace still carries
-correct parent links for the spans that were recorded — a child whose
+correct parent links for the spans that were recorded (a child whose
 parent was dropped is rendered as a new root, so a high sampling drop
 rate looks like broken propagation. Verify at `sample_ratio: 1`, then
 lower it.
@@ -221,8 +221,8 @@ lower it.
 
 Span and counter attribute names now follow OpenTelemetry semantic
 conventions so that off-the-shelf dashboards and queries work against
-zever traces. The migration has **shipped** and the old names are
-**gone** — there is no alias or fallback. This was a breaking change for
+Zever traces. The migration has **shipped** and the old names are
+**gone** (there is no alias or fallback). This was a breaking change for
 anyone querying the old attributes, so update saved queries, dashboards,
 and alert rules with it. `CHANGELOG.md` carries the note under
 `### Changed`.
@@ -233,8 +233,8 @@ and alert rules with it. `CHANGELOG.md` carries the note under
 | `http.path` | `url.path` |
 | `http.status_code` | `http.response.status_code` |
 | gRPC full method as the span's only identity | span name still the full method, now joined by `rpc.system="grpc"`, `rpc.service`, and `rpc.method` attributes |
-| — (new) | `rpc.grpc.status_code` |
-| — (new) | `messaging.system`, `messaging.destination.name`, `messaging.operation`, `messaging.message.id`, `messaging.message.conversation_id` |
+| (new) | `rpc.grpc.status_code` |
+| (new) | `messaging.system`, `messaging.destination.name`, `messaging.operation`, `messaging.message.id`, `messaging.message.conversation_id` |
 
 Query the exported constants rather than string literals, so a future
 semconv revision is a change in the framework instead of in every query
@@ -257,7 +257,7 @@ _ = observability.RPCGRPCStatusCode
 
 ### Counters
 
-The metric **names** are unchanged — the middleware still emits
+The metric **names** are unchanged (the middleware still emits
 `http.request` and `rpc.request`. The counter **labels** are not: they
 were part of the migration too, and dashboards that group on them break
 silently.
@@ -276,7 +276,7 @@ text, so a `status="OK"` grouping becomes
 
 Span naming stays path-only and method-only: never a query string or a
 raw URI, so high-cardinality and sensitive values stay out of traces.
-The path attribute moved to `url.path` — that is a rename of the old
+The path attribute moved to `url.path` (that is a rename of the old
 HTTP path attribute, not an adoption of `url.query`. If you find
 yourself wanting the query string in a span, that is a signal to log it
 separately instead.
@@ -304,8 +304,8 @@ separately instead.
 
 ## See also
 
-- [Observability](./observability.mdx) - providers, attribute bounds, redaction
-- [Outbox Ops](./outbox-ops.mdx) - relay metrics and alerting built on these spans
-- [gRPC Client](./grpc-client.mdx) - outbound interceptors, LB, retry
-- [Outbox](./outbox.mdx) - trace context stored at `Record` time
-- [Queue](./queue.mdx) - producer/consumer spans for durable work
+- [Observability](../../guides/operate/observability/) - providers, attribute bounds, redaction
+- [Outbox Ops](../outbox-ops/) - relay metrics and alerting built on these spans
+- [gRPC Client](../../guides/background/grpc-client/) - outbound interceptors, LB, retry
+- [Outbox](../../guides/background/outbox/) - trace context stored at `Record` time
+- [Queue](../../guides/background/queue/) - producer/consumer spans for durable work
