@@ -8,7 +8,6 @@ import (
 	"sync"
 	"time"
 
-	"github.com/chromedp/cdproto/page"
 	"github.com/chromedp/chromedp"
 
 	"github.com/zenta-dev/zever/core/document"
@@ -134,19 +133,25 @@ func (d *driver) Render(ctx context.Context, source []byte, format document.Outp
 
 	uri := "data:text/html;base64," + base64.StdEncoding.EncodeToString(source)
 
-	tasks := chromedp.Tasks{chromedp.Navigate(uri), chromedp.WaitReady("body")}
+	steps := []chromedp.Action[chromedp.Void]{chromedp.Navigate(uri), chromedp.WaitReady("body")}
 
 	switch format {
 	case document.FormatPDF:
-		tasks = append(tasks, chromedp.ActionFunc(func(ctx context.Context) error {
+		steps = append(steps, chromedp.Func(func(ctx context.Context, t *chromedp.Target) error {
 			var err error
 
-			buf, _, err = page.PrintToPDF().Do(ctx)
+			buf, err = chromedp.PrintToPDF()(ctx, t)
 
 			return err
 		}))
 	case document.FormatPNG:
-		tasks = append(tasks, chromedp.FullScreenshot(&buf, 100))
+		steps = append(steps, chromedp.Func(func(ctx context.Context, t *chromedp.Target) error {
+			var err error
+
+			buf, err = chromedp.FullScreenshot(100)(ctx, t)
+
+			return err
+		}))
 	case document.FormatJPG:
 		q := int(d.quality)
 		if q <= 0 {
@@ -157,10 +162,16 @@ func (d *driver) Render(ctx context.Context, source []byte, format document.Outp
 			q = 99
 		}
 
-		tasks = append(tasks, chromedp.FullScreenshot(&buf, q))
+		steps = append(steps, chromedp.Func(func(ctx context.Context, t *chromedp.Target) error {
+			var err error
+
+			buf, err = chromedp.FullScreenshot(q)(ctx, t)
+
+			return err
+		}))
 	}
 
-	err := chromedp.Run(ctx, tasks...) //nolint:contextcheck // ctx is rooted in d.allocCtx (the persistent browser allocator) by design, not the caller's ctx directly; the caller's cancellation is bridged in above via context.AfterFunc(ctx, rCancel)
+	err := chromedp.Do(ctx, steps...) //nolint:contextcheck // ctx is rooted in d.allocCtx (the persistent browser allocator) by design, not the caller's ctx directly; the caller's cancellation is bridged in above via context.AfterFunc(ctx, rCancel)
 	if err != nil {
 		return nil, fmt.Errorf("local: render: %w", err)
 	}
