@@ -141,6 +141,20 @@ func (s *span) SetAttributes(attrs ...observability.Attr) {
 	s.attrs = append(s.attrs, attrs...)
 }
 
+// Kind returns the span kind recorded at StartSpan.
+func (s *span) Kind() observability.SpanKind {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+	return s.kind
+}
+
+// Attrs returns a copy of the span attributes recorded so far.
+func (s *span) Attrs() []observability.Attr {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+	return append([]observability.Attr(nil), s.attrs...)
+}
+
 func (s *span) RecordError(err error) {
 	if err == nil {
 		return

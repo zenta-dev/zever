@@ -111,7 +111,17 @@ func (p *provider) Shutdown(ctx context.Context) error {
 	return errors.Join(errs...)
 }
 
-type otelSpan struct{ span trace.Span }
+type otelSpan struct {
+	span  trace.Span
+	kind  observability.SpanKind
+	attrs []observability.Attr
+}
+
+// Kind returns the span kind recorded at StartSpan.
+func (s *otelSpan) Kind() observability.SpanKind { return s.kind }
+
+// Attrs returns the span attributes recorded at StartSpan.
+func (s *otelSpan) Attrs() []observability.Attr { return s.attrs }
 
 func (s *otelSpan) SetAttributes(attrs ...observability.Attr) {
 	for _, a := range normalizeAttrs(attrs, 0) {
@@ -167,7 +177,7 @@ func (t *tracer) StartSpan(ctx context.Context, name string, opts ...observabili
 
 	ctx, span := t.tracer.Start(ctx, name, startOpts...)
 
-	return ctx, &otelSpan{span: span}
+	return ctx, &otelSpan{span: span, kind: cfg.Kind, attrs: cfg.Attrs}
 }
 
 var _ observability.SpanStarter = (*tracer)(nil)

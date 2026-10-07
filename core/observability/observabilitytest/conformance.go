@@ -97,9 +97,10 @@ func conformanceTracing(t *testing.T, factory func(t *testing.T) observability.P
 	}
 }
 
-// conformanceSpanStart exercises the optional SpanStarter interface. When
-// the provider's tracer implements it, StartSpan must accept kind, attrs,
-// and links without panicking and return non-nil ctx and span. Providers
+// conformanceSpanStart exercises the optional SpanStarter interface. It uses
+// the exact B1 start shape: StartSpan(ctx, "s", WithSpanKind(Server),
+// WithAttributes(String("k", "v"))) must reach the provider with kind+attrs.
+// Spans exposing Kind()/Attrs() (noop/stdout/otlp) are asserted; providers
 // without SpanStarter are exempt: the fallback path is covered by the
 // core StartSpan tests.
 func conformanceSpanStart(t *testing.T, factory func(t *testing.T) observability.Provider) {
@@ -117,8 +118,8 @@ func conformanceSpanStart(t *testing.T, factory func(t *testing.T) observability
 		return
 	}
 
-	spanCtx, span := ss.StartSpan(ctx, "kit-span",
-		observability.WithSpanKind(observability.SpanKindClient),
+	spanCtx, span := ss.StartSpan(ctx, "s",
+		observability.WithSpanKind(observability.SpanKindServer),
 		observability.WithAttributes(observability.String("k", "v")),
 		observability.WithLinks(observability.SpanLink{TraceID: "aa", SpanID: "bb"}),
 	)
@@ -127,9 +128,33 @@ func conformanceSpanStart(t *testing.T, factory func(t *testing.T) observability
 	}
 	if span == nil {
 		t.Error("StartSpan() span = nil")
+	} else {
+		defer span.End()
 	}
 
-	span.End()
+	type kindAttrsSpan interface {
+		Kind() observability.SpanKind
+		Attrs() []observability.Attr
+	}
+	inspector, ok := span.(kindAttrsSpan)
+	if !ok {
+		t.Fatalf("StartSpan() span %T does not expose Kind()/Attrs() for assertions", span)
+	}
+	if got := inspector.Kind(); got != observability.SpanKindServer {
+		t.Errorf("Kind() = %v, want %v", got, observability.SpanKindServer)
+	}
+	found := false
+	for _, a := range inspector.Attrs() {
+		if a.Key == "k" {
+			found = true
+			if v, ok := a.Value.(observability.StringValue); !ok || v.Value != "v" {
+				t.Errorf("attr k = %v, want v", a.Value)
+			}
+		}
+	}
+	if !found {
+		t.Errorf("Attrs() missing k=v, got %v", inspector.Attrs())
+	}
 }
 
 func conformanceMetrics(t *testing.T, factory func(t *testing.T) observability.Provider) {
