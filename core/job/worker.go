@@ -12,7 +12,9 @@ import (
 
 	"github.com/zenta-dev/zever/adapters/log/noop"
 	"github.com/zenta-dev/zever/core/log"
+	"github.com/zenta-dev/zever/core/observability"
 	"github.com/zenta-dev/zever/core/queue"
+	"github.com/zenta-dev/zever/shared/msgspan"
 	"github.com/zenta-dev/zever/shared/retry"
 	"github.com/zenta-dev/zever/shared/traceprop"
 )
@@ -38,6 +40,9 @@ type Worker struct {
 	Logger log.Logger
 	// DrainTimeout bounds handler execution and graceful shutdown. Defaults to 30s when non-positive.
 	DrainTimeout time.Duration
+	// Provider emits the messaging consumer span opened around every drained
+	// message. Nil disables telemetry. Go-API-only: not decoded from files.
+	Provider observability.Provider
 }
 
 const defaultDrainTimeout = 30 * time.Second
@@ -222,13 +227,22 @@ func (w *Worker) launchHandler(ctx context.Context, msg queue.Message, topic str
 
 		detached := context.WithoutCancel(ctx)
 
-		handlerCtx, span := traceprop.StartConsumeSpan(detached, msg.Headers, "queue.consume")
-		defer span.End()
+		// Continue the producer trace carried in the queue headers, then
+		// bracket the handler with the messaging consumer span.
+		handlerCtx := traceprop.Extract(detached, msg.Headers)
+
+		handlerCtx, finish := msgspan.Consumer(handlerCtx, w.Provider, "queue", topic, msg.ID.String())
 
 		handlerCtx, cancel := context.WithTimeout(handlerCtx, w.drainTimeout())
 		defer cancel()
 
-		w.process(handlerCtx, msg, topic)
+		if err := w.process(handlerCtx, msg, topic); err != nil {
+			finish(msgspan.OutcomeError)
+
+			return
+		}
+
+		finish(msgspan.OutcomeOK)
 	}(msg, topic)
 }
 
@@ -261,7 +275,11 @@ func (w *Worker) log() log.Logger {
 	return noop.New()
 }
 
-func (w *Worker) process(ctx context.Context, msg queue.Message, topic string) {
+// process handles one message end to end: it runs the registered handler (or
+// dead-letters an unregistered one), settles the queue row, and returns the
+// handler error, nil when the message was handled or dead-lettered without a
+// handler failure.
+func (w *Worker) process(ctx context.Context, msg queue.Message, topic string) error {
 	if msg.Headers == nil {
 		msg.Headers = make(map[string]string)
 	}
@@ -276,7 +294,7 @@ func (w *Worker) process(ctx context.Context, msg queue.Message, topic string) {
 
 		w.handleDeadLetter(context.WithoutCancel(ctx), msg, batchID, jobName, UnknownJobError{Name: jobName}, attempt, isBatch)
 
-		return
+		return UnknownJobError{Name: jobName}
 	}
 
 	h := w.wrapHandler(def.handler)
@@ -288,6 +306,8 @@ func (w *Worker) process(ctx context.Context, msg queue.Message, topic string) {
 	w.log().Info().Str("job", jobName).Dur("duration", time.Since(start)).Int("attempt", attempt).Err(err).Msg("job: finished")
 
 	w.handleResult(ctx, msg, topic, jobName, def, attempt, err)
+
+	return err
 }
 
 func (w *Worker) wrapHandler(h Handler) Handler {

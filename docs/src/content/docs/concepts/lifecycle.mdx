@@ -1,0 +1,88 @@
+---
+title: Lifecycle
+description: Follow one Zever process from config load to container close, and which failures belong to which phase.
+---
+
+import { LinkCard, CardGrid } from '@astrojs/starlight/components';
+
+A Zever process runs four phases: load config, build the container, resolve services on first use, and close. Knowing the phase tells you whether a failure is fail-fast, retryable, or a shutdown problem.
+
+## The four phases
+
+```text
+config.Load  ->  container.New  ->  resolve on first use  ->  Close(ctx)
+    file+env       one per          c.DB(), c.Cache()...        dependents
+                   process          retry on error              first, leaves later
+```
+
+Build one container per process; no globals or `init()` wiring; `container.New(nil)` is valid.
+
+- **1. Load config**: file and env merge into one `Config`; failures are a strict file error, `InvalidOptionsError`, or `ErrUnsupportedFormat`.
+- **2. Build container**: one `Container` owns future connections; `New` never dials and `nil` cfg is valid.
+- **3a. First resolution**: adapter constructed and cached; on error the cache clears and the next call retries.
+- **3b. Steady serving**: cached instance reused per accessor; per-call errors only, no rebuild.
+- **3c. Shared resolution**: `Scheduler()` resolves `Job()` then `Queue()`; one shared connection.
+- **4. Close**: resolved services shut down in order; `errors.Join` of per-service errors.
+
+## Load config once at boot
+
+Config layers as `defaults < file < env`: files are strict, env is best-effort (stray variables ignored). Validation runs at load, so an empty adapter name or invalid option value fails in phase 1, not mid-request. An adapter name nobody registered passes load and fails on first resolution with `UnknownAdapterError`. `Load("")` probes `zever.yaml/.yml/.json`; see the [Config reference](../../reference/config/) for keys. `Default()` dev secrets belong in tests only.
+
+## Resolve lazily and reuse
+
+Resolve inside handlers and reuse the cached instance. On error the cache clears, so the next call retries instead of pinning a broken handle. `Job()` dispatches over the resolved `Queue`; `Scheduler()` shares it.
+
+## Close in order
+
+Stop the HTTP server first, then close the container under a timeout parent (`context.WithTimeout`, about 10s). See [Deployment](../../guides/operate/deployment/) for the full shutdown wiring.
+
+`Close` never opens anything, so an unused service cannot fail shutdown. Dependents (`scheduler`, `job`, `agent`, `rag`) close first, then leaves (`cache`, `queue`), then `db` and shared pools, and each service gets a 5s bound without a parent deadline; shared instances close once.
+
+- **Panic during close**: `container.ClosePanicError`; the adapter panicked and shutdown continued.
+- **Per-service timeout**: `container.CloseTimeoutError`; the adapter exceeded its bound.
+- **Several failures**: `errors.Join`; inspect each with `errors.As`.
+
+## Design decisions and trade-offs
+
+Error values name the service only, never secrets; display config through `config.RedactedServices`. Both close error types are values, so a pointer `errors.As` target never matches.
+
+## Troubleshooting
+
+<details>
+<summary>The process fails at boot before serving</summary>
+
+A strict file error or unparsable env value. The `Load` error names the service and field.
+</details>
+
+<details>
+<summary>The first request fails but the next succeeds</summary>
+
+A transient backend error cleared the cache. No fix needed unless it repeats.
+</details>
+
+<details>
+<summary>Shutdown hangs</summary>
+
+`Close` got a bare context while an adapter blocks. Use `context.WithTimeout` (about 10s).
+</details>
+
+<details>
+<summary>`errors.As` for close errors never matches</summary>
+
+A pointer target never matches a value type. Declare a value variable.
+</details>
+
+<details>
+<summary>A goroutine leak is reported after a lifecycle test</summary>
+
+A goroutine outlived `Close` (`go test -tags=leak ./container/`). Stop it in the adapter's `Close`.
+</details>
+
+## Related
+
+<CardGrid>
+  <LinkCard title="Container" description="Accessor table and close probing order." href="../container/" />
+  <LinkCard title="Providers and adapters" description="Interface and registry roles." href="../providers-adapters/" />
+  <LinkCard title="Compiler boundary" description="Why the compiler never runs here." href="../compiler-boundary/" />
+  <LinkCard title="Deployment" description="Production shutdown wiring." href="../../guides/operate/deployment/" />
+</CardGrid>

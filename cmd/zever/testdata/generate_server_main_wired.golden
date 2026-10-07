@@ -23,8 +23,11 @@ import (
 	"google.golang.org/grpc/keepalive"
 	"google.golang.org/grpc/reflection"
 
+	"github.com/zenta-dev/zever/container"
 	"github.com/zenta-dev/zever/core/authz"
 	"github.com/zenta-dev/zever/core/middleware"
+	"github.com/zenta-dev/zever/core/resilience"
+	"github.com/zenta-dev/zever/shared/grpcclient"
 
 	genapp "example.com/shop/generated/gogen/app"
 	"example.com/shop/internal/app"
@@ -46,6 +49,16 @@ const (
 	DefaultGRPCKeepaliveTimeout  = 20 * time.Second
 	DefaultGRPCMaxMessageBytes   = 4 << 20 // 4 MiB, grpc-go's own default made explicit.
 )
+
+// guardedGRPCClient dials target through a per-dependency circuit breaker
+// so one slow downstream cannot exhaust this process.
+func guardedGRPCClient(ctx context.Context, c *container.Container, resMgr resilience.Manager, target, dep string) (*grpc.ClientConn, error) {
+	g, err := resMgr.Guard(dep)
+	if err != nil {
+		return nil, err
+	}
+	return c.GRPCClient(target, grpcclient.WithGuard(g))
+}
 
 func main() {
 	addr := flag.String("addr", ":8080", "HTTP address to listen on")
@@ -98,6 +111,14 @@ func run(addr, grpcAddr string) error {
 		return err
 	}
 
+	resMgr, err := c.Resilience()
+	if err != nil {
+		return err
+	}
+
+	// Retained for outbound calls through guardedGRPCClient below.
+	_ = resMgr
+
 	limiter, err := c.RateLimit()
 	if err != nil {
 		return err
@@ -146,8 +167,10 @@ func run(addr, grpcAddr string) error {
 
 	r.Use(middleware.RateLimit(limiter, middleware.RemoteAddrKey))
 
-	database, err := c.DB()
-	if err != nil {
+	// Resolve the db once at boot so a broken DSN fails fast with a clear
+	// error instead of surfacing as a 503 on the first readiness probe.
+	// Readiness itself goes through the container aggregate below.
+	if _, err = c.DB(); err != nil {
 		return err
 	}
 
@@ -156,10 +179,10 @@ func run(addr, grpcAddr string) error {
 	})
 
 	r.Handle("GET", "/readyz", func(w http.ResponseWriter, req *http.Request) {
-		pingCtx, cancel := context.WithTimeout(req.Context(), readyTimeout)
+		readyCtx, cancel := context.WithTimeout(req.Context(), readyTimeout)
 		defer cancel()
 
-		if err := database.Ping(pingCtx); err != nil {
+		if err := c.Ready(readyCtx); err != nil {
 			healthServer.SetServingStatus("", healthpb.HealthCheckResponse_NOT_SERVING)
 
 			w.WriteHeader(http.StatusServiceUnavailable)

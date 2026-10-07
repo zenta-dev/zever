@@ -1,0 +1,112 @@
+---
+title: Codec
+description: Serialize typed values to bytes with composable Encoder and Decoder pairs, JSON by default.
+---
+
+import { LinkCard, CardGrid } from '@astrojs/starlight/components';
+
+`codec` turns a typed Go value into bytes and back, so `cache`, `queue`, `session`, and webhook code never hand-roll `json.Marshal`. Use it with typed wrappers over byte stores, or when defining a wire format for a new adapter. Write a custom codec only when JSON is the wrong format.
+
+## Quick start
+
+`codec` has no YAML, no env, and no container accessor (there is no `c.Codec()`). Construct it directly:
+
+```go title="main.go"
+package main
+
+import (
+    "fmt"
+
+    "github.com/zenta-dev/zever/shared/codec"
+)
+
+type MyPayload struct {
+    ID   string `json:"id"`
+    Name string `json:"name"`
+}
+
+func main() {
+    c := codec.JSONCodec[MyPayload]{}
+
+    data, _ := c.Encode(MyPayload{ID: "u_1", Name: "Ada"})
+    back, _ := c.Decode(data)
+    fmt.Printf("%s %s\n", back.ID, back.Name)
+}
+```
+
+```text
+u_1 Ada
+```
+
+`JSONCodec[V]` is the only implementation Zever ships. Its output is deterministic, so snapshots and exact-byte assertions stay stable. A codec does no I/O and holds no connections, so it is safe to share. The interfaces are `Encoder[V]` (`Encode`), `Decoder[V]` (`Decode`), and `Codec[V]` (both); `cache.NewTyped` applies a `Codec[V]` to cache `Get` and `Set`.
+
+## Store typed values in the cache
+
+Resolve the byte store from the container and pass the codec to the typed layer on top:
+
+```go
+// imports: config, container, cachememory ("github.com/zenta-dev/zever/adapters/cache/memory"),
+//   "github.com/zenta-dev/zever/core/cache", "github.com/zenta-dev/zever/shared/codec"
+cachememory.Register()
+c := container.New(config.Default())
+inner, _ := c.Cache()
+typed := cache.NewTyped[string, MyPayload](inner, codec.JSONCodec[MyPayload]{})
+
+typed.Set(ctx, "user:u_1", MyPayload{ID: "u_1", Name: "Ada"}, time.Minute)
+got, _ := typed.Get(ctx, "user:u_1")
+fmt.Println(got.Name)
+```
+
+```text
+Ada
+```
+
+Use one `Codec[V]` per stored type, shared by writer and reader. Queue and session paths follow the same shape: bytes on the wire, typed values in handlers. Resolve those with `c.Queue()` and `c.Session()`.
+
+## Write your own codec
+
+Implement `Codec[V]` for a binary, compressed, or third-party format:
+
+```go
+type gobCodec[V any] struct{}
+
+func (gobCodec[V]) Encode(v V) ([]byte, error) { /* ... */ }
+func (gobCodec[V]) Decode(data []byte) (V, error) { /* ... */ }
+
+var _ codec.Codec[MyPayload] = gobCodec[MyPayload]{}
+```
+
+Keep it symmetric: whatever `Encode` writes, `Decode` must read back, including after a version adds a field. `JSONCodec` ignores unknown fields and defaults missing ones.
+
+## Production checklist
+
+- Never log encoded bytes at info level. Log IDs and sizes.
+- Keep payloads small: IDs and flags in sessions, not full records.
+- Use `JSONCodec` for any data you snapshot or hash.
+
+## Troubleshooting
+
+<details>
+<summary>Decode fails after adding a field</summary>
+
+Added keys default fine, so the cause is a changed type. Keep JSON types stable or add a versioned wrapper type.
+</details>
+
+<details>
+<summary>Cache reads return zero values</summary>
+
+Writer and reader use different codecs. Build both sides from one `Codec[V]`.
+</details>
+
+<details>
+<summary>Snapshot tests flap</summary>
+
+Use `JSONCodec` for snapshotted data, or sort keys in `Encode`.
+</details>
+
+## Related
+
+<CardGrid>
+  <LinkCard title="Sessions" href="../sessions/" description="Server-side rows behind a cookie." />
+  <LinkCard title="Redis" href="../../data/redis/" description="The shared byte store codecs write through." />
+</CardGrid>

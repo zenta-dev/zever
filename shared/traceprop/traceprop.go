@@ -5,6 +5,7 @@ import (
 	"maps"
 
 	"go.opentelemetry.io/otel"
+	"go.opentelemetry.io/otel/baggage"
 	"go.opentelemetry.io/otel/propagation"
 	"go.opentelemetry.io/otel/trace"
 )
@@ -14,19 +15,34 @@ const (
 	TraceParentHeader = "traceparent"
 	// TraceStateHeader carries the W3C vendor-specific trace state value.
 	TraceStateHeader = "tracestate"
+	// BaggageHeader carries the W3C baggage value.
+	BaggageHeader = "baggage"
+)
+
+// Well-known baggage keys propagated across service boundaries.
+const (
+	// BaggageTenantID is the baggage key for the tenant identifier.
+	BaggageTenantID = "tenant.id"
+	// BaggageUserID is the baggage key for the user identifier.
+	BaggageUserID = "user.id"
+	// BaggageCorrelationID is the baggage key for the correlation identifier.
+	BaggageCorrelationID = "correlation.id"
 )
 
 // ScopeName identifies the tracer that starts consume spans.
 const ScopeName = "github.com/zenta-dev/zever/shared/traceprop"
 
-func propagator() propagation.TraceContext {
-	return propagation.TraceContext{}
+func propagator() propagation.TextMapPropagator {
+	return propagation.NewCompositeTextMapPropagator(
+		propagation.TraceContext{},
+		propagation.Baggage{},
+	)
 }
 
-// Inject returns a copy of headers carrying the trace context from ctx.
-// It never mutates headers: a nil or headerless input without a valid span
-// in ctx comes back unchanged (nil stays nil). When ctx holds no valid span
-// context nothing is injected.
+// Inject returns a copy of headers carrying the trace context and baggage
+// from ctx. It never mutates headers: a nil or headerless input without a
+// valid span in ctx comes back unchanged (nil stays nil). When ctx holds no
+// valid span context nothing is injected.
 func Inject(ctx context.Context, headers map[string]string) map[string]string {
 	if !trace.SpanContextFromContext(ctx).IsValid() {
 		return maps.Clone(headers)
@@ -55,6 +71,28 @@ func Extract(ctx context.Context, headers map[string]string) context.Context {
 // propagator validates traceparent/tracestate and invalid values are a no-op.
 func ExtractOrBackground(headers map[string]string) context.Context {
 	return Extract(context.Background(), headers)
+}
+
+// WithBaggage returns a context carrying the baggage key/value pair, merged
+// with any baggage already on ctx. An invalid key or value leaves ctx
+// unchanged.
+func WithBaggage(ctx context.Context, key, val string) context.Context {
+	m, err := baggage.NewMember(key, val)
+	if err != nil {
+		return ctx
+	}
+
+	b, err := baggage.FromContext(ctx).SetMember(m)
+	if err != nil {
+		return ctx
+	}
+
+	return baggage.ContextWithBaggage(ctx, b)
+}
+
+// Baggage returns the baggage value for key from ctx, or "" when absent.
+func Baggage(ctx context.Context, key string) string {
+	return baggage.FromContext(ctx).Member(key).Value()
 }
 
 // ContinueSpan extracts the remote span context from headers into ctx and

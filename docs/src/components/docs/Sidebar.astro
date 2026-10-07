@@ -1,0 +1,33 @@
+---
+import MobileMenuFooter from 'virtual:starlight/components/MobileMenuFooter';
+import SidebarPersister from '@astrojs/starlight/components/SidebarPersister.astro';
+import SidebarList from './SidebarList.astro';
+import { href, GITHUB } from '../../lib/url';
+import { NAV_TABS, tabFor } from './NavRoute';
+
+const { sidebar } = Astro.locals.starlightRoute;
+const tab = tabFor(Astro.url.pathname);
+---
+
+<button type="button" popovertarget="starlight__sidebar" popovertargetaction="hide" class="zv-menu-btn zv-sheet-close md:sl-hidden" aria-label="Close menu">
+  <span class="zv-bars" aria-hidden="true"><i></i><i></i><i></i></span>
+</button>
+
+<nav class="zv-sheet-tabs" aria-label="Documentation sections">
+  {NAV_TABS.map((t, i) => (
+    <a href={t.href} aria-current={t.id === tab ? 'page' : undefined} style={`--i:${i}`}
+       rel={'external' in t ? 'noopener' : undefined}>{t.label}</a>
+  ))}
+  <a href={href('')} style={`--i:${NAV_TABS.length}`}>Home</a>
+  <a href={GITHUB} rel="noopener" style={`--i:${NAV_TABS.length + 1}`}>GitHub</a>
+</nav>
+
+<div class="zv-side" data-tab={tab}>
+  <SidebarPersister>
+    <SidebarList sublist={sidebar} />
+  </SidebarPersister>
+</div>
+
+<div class="md:sl-hidden">
+  <MobileMenuFooter />
+</div>

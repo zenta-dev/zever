@@ -9,9 +9,91 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Added
 
+- Messaging spans with correct span kinds: new `shared/msgspan` module
+  (`Producer`/`Consumer` helpers setting `messaging.*` attributes with
+  `SpanKindProducer`/`SpanKindConsumer`), applied to eventbus publish/consume,
+  queue push, and the job dispatcher drain path.
+- Outbox relay wiring: new `shared/outboxbridge` module
+  (`QueuePublisher`/`EventBusPublisher` adapting a resolved transport to
+  `outbox.Publisher`), `core/outbox.PublisherSetter` for post-`Open`
+  attachment, and `container.OutboxRelay(ctx)` which attaches the
+  transport-selected publisher and starts the relay.
+- Trace propagation in built-in outbound HTTP clients:
+  `httpclient.WithTracing()` (opt-in W3C trace-context injection) enabled in
+  document/remote, i18n/remote, auth/oidc, the ai adapters
+  (anthropic/gemini/ollama/openai), and `shared/providersclient`.
+- Generated entrypoints wire the new batteries: the worker starts the outbox
+  relay via `container.OutboxRelay(ctx)`; the server resolves the resilience
+  manager and ships a `guardedGRPCClient` helper (per-dependency breaker +
+  `container.GRPCClient`).
+- Prompt pack 3: `DoctorTriage`, `DiagRepair`, `OutboxTriage` and
+  `ExtractSplit` builders for doctor, diagnostic, outbox, and extraction
+  workflows.
+- RAG reranking: `Reranker` interface with deterministic `TermOverlapReranker`
+  default and `JudgeReranker` LLM opt-in, applied post-fusion via
+  `HybridOptions.Reranker`.
+- Container agent options: `Agent(WithMaxParallel(...), WithAgentObserver(...))`
+  and `RAG(WithTopK(...), WithHybridSearch(), ...)`; existing no-arg calls
+  unchanged.
+- Richer `tools/zever-mcp`: `zever_doctor` and `zever_generate` tools
+  (via the installed CLI), static `zever://` resources, prompt templates,
+  and server-initiated elicitation gating destructive applies.
+- `shared/mcpclient` growth: sampler hooks, elicitation policies, and
+  reconnecting dial with backoff.
+- Nightly eval workflow (schedule + manual dispatch, never gating):
+  deterministic golden dataset with report artifact.
+- Prompt pack 2: `SchemaDesign`, `MigrationReview`, `CitationCheck` and
+  `ToolPlan` builders.
 - Agent-app tutorial (`docs/tutorials/build-an-agent-app`): end-to-end
   walkthrough from container resolution through RAG grounding, agent loops,
   MCP serving, and eval scoring.
+- Agent runtime upgrades: `Loop.RunStream` event channel over `ai.Stream`,
+  ordered parallel tool fan-out via `Options.MaxParallel` (with the
+  `ParallelToolCalls` model hint), `AsTool` sub-agent composition, and
+  `Options.Observe` execution hooks.
+- Hybrid RAG: `rag.NewHybrid` indexes into a keyword backend alongside the
+  vector store; `RetrieveHybrid` fuses both with RRF plus metadata
+  filtering, with `AnswerHybrid` grounding. `Options.Observe` reports
+  ingest/retrieve/generate events.
+- New `shared/mcpclient` module: MCP stdio client (initialize handshake,
+  tools/list, tools/call) over any `io.Reader`/`io.Writer`, plus
+  `agent.ToolsFromClient` exposing server tools as agent tools.
+- New `core/eval` module: dataset/scorer harness (`ExactScorer`,
+  `ContainsScorer`, LLM-judge scorer) with suite reports.
+- New `shared/prompt` module: pure-string builders for system prompts,
+  grounded context, JSON repair, and tool-error feedback.
+- Rewrote the docs landing page as a standalone Astro page
+  (`docs/src/pages/index.astro`): dark-first/light themed, live schema-to-outputs
+  compile stage, hand-wired vs zever comparison, scroll-driven schema
+  walkthrough, adapter-swap playground, filterable batteries grid, container
+  lifecycle graph, terminal quickstart, agent section, reproducible
+  benchmarks, examples carousel, and FAQ. The former splash content moved to
+  `getting-started/introduction`.
+- Docs redesign to match the landing page: custom Starlight theme replacing
+  `starlight-theme-black` (Space Grotesk and JetBrains Mono, shared color
+  tokens, dark and light), blurred header with Guides/Reference tabs and a
+  search pill, icon sidebar with active pill, scroll-spy table of contents,
+  breadcrumbs with reading time, previous/next cards, and styled callouts,
+  steps, tabs, cards and code windows. Added "Copy page" and "Open in
+  Claude/ChatGPT" page actions, a per-page `.md` route, `llms.txt` and
+  `llms-full.txt`, and a "Was this page helpful?" widget. Key pages gained
+  steps, tabs and callouts, and `zen` code blocks are now highlighted.
+- Search, AI and sharing optimization for the docs site: generated 1200x630
+  Open Graph cards (landing plus one per docs page) and app icons, canonical
+  and social meta, JSON-LD (Organization, WebSite, SoftwareApplication,
+  TechArticle, BreadcrumbList), `robots.txt` that welcomes search and AI
+  crawlers, a web manifest, font preloading, a richer `llms.txt` with key facts,
+  and `noindex` on the 404 page. The sidebar scroll position, open groups and
+  per-page content scroll now persist across navigation and reloads.
+- Docs restructured around the reader's goal (Diataxis): Start, Tutorials,
+  Guides (HTTP APIs, Data and storage, Background work, Security, Operate,
+  Integrations, Extend), Concepts, and Reference, with header tabs that filter
+  the sidebar. Old URLs redirect. Prose is rewritten to lead with the answer,
+  with task-based sections and a complete per-service config reference, plus a
+  docs style guide (`contribute/writing-docs`), `lint-docs` and `check-links`
+  scripts, a quickstart, and a "How Zever works" page. `docs/errors.md`,
+  `benchmarks.md`, `production.md`, and `writing-a-plugin.md` now live on the
+  site.
 - `--dry-run` across all nine `generate` subcommands: validation and
   rendering still run, but no filesystem writes occur; append-mode
   subcommands preview the rendered declaration.
@@ -92,6 +174,18 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   `step` syntax, validation rules (required `execute`, unique step names,
   at most one `pivot`), and the generated `SagaCaller`/`RegisterSagas`
   output with an end-to-end wiring note.
+- New digging-deeper guides for the outbox ops and cross-service tracing
+  surfaces: `outbox-ops` (exact `outbox.*` relay metric names and
+  attributes, recommended Prometheus alert rules, the DLQ runbook around
+  `zever outbox status`/`dlq list`/`dlq requeue`/`dlq purge`/`purge`, and
+  the opt-in `outbox.stall_readiness` gate) and
+  `cross-service-tracing` (inbound extraction vs outbound injection,
+  the `tenant.id`/`user.id`/`correlation.id` baggage keys, the five span
+  kinds on `observability.StartSpan`, provider setup and collector
+  verification, plus the OTel semconv attribute migration table). Both
+  wired into the docs sidebar; `production.md`'s observability section
+  no longer calls propagation evolving, and its pre/post-deploy
+  checklists now cover relay alerts and trace continuity.
 
 ### Dependencies
 
@@ -103,6 +197,21 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Changed
 
+- **Breaking:** span and metric attribute names migrated to OpenTelemetry
+  semantic conventions: `http.method`→`http.request.method`,
+  `http.path`→`url.path`, `http.status_code`→`http.response.status_code`;
+  gRPC spans now carry `rpc.system`/`rpc.service`/`rpc.method`/`rpc.grpc.status_code`;
+  messaging spans use `messaging.*`. Update dashboards/queries accordingly.
+  Counter labels migrated too, under unchanged metric names: the
+  `http.request` counter is tagged by `http.request.method`/
+  `http.response.status_code` (was `method`/`status`, where `status` held
+  status *text*) and the `rpc.request` counter by
+  `rpc.service`/`rpc.method`/`rpc.grpc.status_code` (was `method`/`outcome`).
+  Keys are exported as constants from `core/observability`
+  (`HTTPRequestMethod`, `URLPath`, `HTTPResponseStatusCode`, `ServerAddress`,
+  `RPCSystem`, `RPCService`, `RPCMethod`, `RPCGRPCStatusCode`,
+  `MessagingSystem`, `MessagingDestinationName`, `MessagingOperation`,
+  `MessagingMessageID`, `MessagingMessageConversationID`).
 - `vectorstore/db` sqlite query now decodes row metadata lazily: only rows
   that survive the topK heap get their metadata JSON parsed (was: every
   scanned row). Corrupt metadata in a row that ranks below topK no longer
@@ -118,12 +227,22 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   cause). Added `docs/errors.md` as the canonical error conventions guide
   and `make err-lint` (`tools/errscan`) as a forward-looking guard for the
   rules above.
+- `zever.schema.json` now covers the `outbox` and `resilience` services and
+  previously-missing option fields.
+- Corrected stale agent docs (CLAUDE.md, AGENTS.md) describing a removed TUI
+  and pointer-typed close errors.
 
 ### Fixed
 
 - `zever tinker` no longer deadlocks when the shim hangs: each `call` is bounded
   by a timeout and kills the shim on expiry, so a stuck read cannot hold the
   client mutex forever and block later calls or `Close`.
+- Example apps (bookings, showcase, todo, demoapp) failed at startup with
+  `unknown adapter: slog`; their app.go and self-wired entrypoints now register
+  every adapter configured in zever.yaml, and the CLI composition root
+  registers the 10 previously-missing adapters (crypto/kms, idempotency/db,
+  outbox/{cdc,db,memory}, resilience/{inproc,redis}, scheduler/postgres,
+  secrets/vault, session/db).
 
 ### Security
 

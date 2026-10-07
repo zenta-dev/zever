@@ -2,6 +2,9 @@ $defs:
     aiOptions:
         additionalProperties: false
         properties:
+            allow_insecure:
+                description: Permit an http base_url and disable TLS verification for loopback test servers. Default false.
+                type: boolean
             api_key:
                 type: string
             base_url:
@@ -44,6 +47,9 @@ $defs:
                     issuer:
                         description: Required by the jwt adapter.
                         type: string
+                    leeway:
+                        $ref: '#/$defs/durationNs'
+                        description: Clock-skew tolerance when validating exp/nbf. Zero (default) means strict validation; negative fails Validate.
                     max_ttl:
                         $ref: '#/$defs/durationNs'
                         description: Zero means no cap.
@@ -54,6 +60,9 @@ $defs:
             oidc:
                 additionalProperties: false
                 properties:
+                    allow_insecure:
+                        description: Permit an http:// issuer (and a private-address issuer) for testing. Default false (https and public addresses only).
+                        type: boolean
                     client_id:
                         description: Required by the oidc adapter.
                         type: string
@@ -68,6 +77,50 @@ $defs:
                 description: SessionOptions.Store is a Go-only session.Store injection (json:"-") -- there is nothing settable here from a config file.
                 properties: {}
                 type: object
+        type: object
+    breakerOptions:
+        additionalProperties: false
+        properties:
+            bucket_period:
+                $ref: '#/$defs/durationNs'
+                description: Rolling-window bucket width; interval becomes a multiple of it.
+            consecutive_failures:
+                description: Trips the breaker after this many consecutive failures.
+                type: integer
+            enabled:
+                description: Turns the circuit breaker on.
+                type: boolean
+            failure_ratio:
+                description: Failure ratio in [0,1] that trips the breaker.
+                maximum: 1
+                minimum: 0
+                type: number
+            interval:
+                $ref: '#/$defs/durationNs'
+                description: Closed-state window before counts reset.
+            max_requests:
+                description: Probes allowed while half-open.
+                minimum: 0
+                type: integer
+            min_requests:
+                description: Minimum request count before the failure ratio applies.
+                type: integer
+            timeout:
+                $ref: '#/$defs/durationNs'
+                description: Open-state duration before the breaker half-opens.
+        type: object
+    bulkheadOptions:
+        additionalProperties: false
+        properties:
+            max_concurrent:
+                description: Concurrent executions admitted; <= 0 disables the bulkhead.
+                type: integer
+            max_queue:
+                description: Bounds waiters; <= 0 is unbounded.
+                type: integer
+            max_wait:
+                $ref: '#/$defs/durationNs'
+                description: How long a caller waits for a slot; <= 0 waits indefinitely.
         type: object
     cacheOptions:
         additionalProperties: false
@@ -116,21 +169,48 @@ $defs:
             verbose:
                 type: boolean
         type: object
+    cdnOptions:
+        additionalProperties: false
+        properties:
+            api_token:
+                type: string
+            base_url:
+                type: string
+            zone_id:
+                type: string
+        type: object
     cryptoOptions:
         additionalProperties: false
         properties:
+            endpoint:
+                description: Overrides the KMS endpoint (custom KMS, tests, VPC endpoints); must include scheme and host.
+                type: string
             key:
-                description: Required. Base64-encoded 32-byte encryption key.
+                description: Base64-encoded 32-byte encryption key. Required for the local adapter; optional for the kms adapter when any KMS field is set.
+                type: string
+            key_id:
+                description: Primary KMS key identifier used for envelope encryption. Required when use_envelope is true.
+                type: string
+            key_ids:
+                description: Accepted KMS key identifiers for rotation; Decrypt accepts envelopes sealed under key_id or any entry here.
+                items:
+                    type: string
+                type: array
+            region:
+                description: KMS region (for example an AWS region).
                 type: string
             sign_key:
                 description: Base64-encoded 64-byte signing key.
                 type: string
+            use_envelope:
+                description: Selects KMS envelope encryption. When true, key_id is required.
+                type: boolean
         type: object
     dbOptions:
         additionalProperties: false
         properties:
             dedicated_pool:
-                description: Opt out of container-level pool sharing; default false shares one pool per exact DSN, true opens a private pool.
+                description: Opt out of container-level pool sharing; default false shares one pool per exact DSN, true opens a private pool. Ignored on db itself.
                 type: boolean
             dsn:
                 description: Postgres connection string.
@@ -153,6 +233,9 @@ $defs:
     documentOptions:
         additionalProperties: false
         properties:
+            allow_insecure:
+                description: Permit an http endpoint for testing. Default false (https only).
+                type: boolean
             api_key:
                 type: string
             dpi:
@@ -291,6 +374,9 @@ $defs:
             dsn:
                 description: Postgres connection string or sqlite path for the db adapter; empty selects a private in-memory database.
                 type: string
+            max_entries:
+                description: Memory adapter record-table bound before LRU eviction. Non-positive means the adapter default (1000).
+                type: integer
             redis:
                 $ref: '#/$defs/zredisOptionsWithPrefix'
             ttl:
@@ -400,7 +486,7 @@ $defs:
             presign_ttl:
                 $ref: '#/$defs/durationNs'
                 description: 'Default: 1h. Must be <= 604800000000000 ns (7 days) -- exceeding it is REJECTED at Validate() time with InvalidOptionsError, not silently clamped.'
-                maximum: 6.048e+14
+                maximum: 604800000000000
                 type: integer
             region:
                 description: 'Default: us-east-1.'
@@ -475,6 +561,61 @@ $defs:
             verbose:
                 type: boolean
         type: object
+    outboxOptions:
+        additionalProperties: false
+        properties:
+            batch_size:
+                description: Messages one poll claims. Zero means the adapter default (100).
+                type: integer
+            dedicated_pool:
+                description: Opt out of container-level pool sharing; default false shares one pool per exact DSN, true opens a private pool.
+                type: boolean
+            dsn:
+                description: Postgres connection string or sqlite path for the db adapter; empty selects a private in-memory database.
+                type: string
+            inbox_table:
+                description: Inbox table name. Empty means the adapter default ("inbox").
+                type: string
+            lock_seconds:
+                description: Claim lease in seconds. Zero means the adapter default (30).
+                type: integer
+            max_attempts:
+                description: Publish attempt cap before a message is marked failed. Zero means the adapter default (5).
+                type: integer
+            notify_channel:
+                description: Postgres LISTEN/NOTIFY channel (cdc adapter).
+                type: string
+            poll_interval:
+                $ref: '#/$defs/durationNs'
+                description: Relay poll cadence. Zero means the adapter default (1s).
+            prefix:
+                description: Logical-replication message prefix (cdc adapter).
+                type: string
+            publication:
+                description: Logical-replication publication name (cdc adapter).
+                type: string
+            publisher:
+                description: Records which transport the relay publishes through. Informational only.
+                enum:
+                    - ""
+                    - eventbus
+                    - queue
+                type: string
+            retention:
+                $ref: '#/$defs/durationNs'
+                description: How long processed messages are kept. Zero means the adapter default (168h).
+            retry:
+                $ref: '#/$defs/retryPolicy'
+            slot:
+                description: Logical-replication slot name (cdc adapter).
+                type: string
+            stall_readiness:
+                description: Opts the relay into the container readiness aggregate; default false keeps readiness dependency-based.
+                type: boolean
+            table:
+                description: Outbox table name. Empty means the adapter default ("outbox").
+                type: string
+        type: object
     passwordOptions:
         additionalProperties: false
         properties:
@@ -485,7 +626,7 @@ $defs:
                 type: integer
             memory:
                 description: 'Argon2id memory cost in KiB. Default: 65536 (64 MiB).'
-                maximum: 1.048576e+06
+                maximum: 1048576
                 minimum: 8192
                 type: integer
             salt_length:
@@ -630,6 +771,9 @@ $defs:
             idle_ttl:
                 $ref: '#/$defs/durationNs'
                 description: Zero means adapter default (10m).
+            max_entries:
+                description: Memory adapter bucket-table bound before LRU eviction. Non-positive means the adapter default (1000).
+                type: integer
             rate:
                 description: Token refill rate per second. Required.
                 exclusiveMinimum: 0
@@ -639,6 +783,55 @@ $defs:
             sweep_interval:
                 $ref: '#/$defs/durationNs'
                 description: Zero means adapter default (1m).
+        type: object
+    resilienceOptions:
+        additionalProperties: false
+        properties:
+            breaker:
+                $ref: '#/$defs/breakerOptions'
+            bulkhead:
+                $ref: '#/$defs/bulkheadOptions'
+            name:
+                description: Base name applied to the breaker.
+                type: string
+            redis:
+                $ref: '#/$defs/zredisOptionsWithPrefix'
+            retry:
+                $ref: '#/$defs/retryPolicy'
+            timeout:
+                $ref: '#/$defs/durationNs'
+                description: Bounds the whole operation, including retries.
+        type: object
+    retryPolicy:
+        additionalProperties: false
+        description: 'retry.Policy (shared/retry) carries NO json/yaml/toml struct tags, so it decodes by case-insensitive Go field name, not snake_case: BaseDelay / MaxDelay / Multiplier / Linear / Jitter / JitterMode / JitterMax / MaxAttempts. The lowercase keys below are those same fields matched case-insensitively; snake_case keys such as base_delay are rejected as unknown fields. OnRetry is a Go-only callback (json:"-") and is not settable from a file.'
+        properties:
+            basedelay:
+                $ref: '#/$defs/durationNs'
+                description: 'Go field BaseDelay: delay before the first retry (attempt 1).'
+            jitter:
+                description: 'Go field Jitter: fraction of the computed delay to randomize, clamped to [0, 1].'
+                maximum: 1
+                minimum: 0
+                type: number
+            jittermax:
+                $ref: '#/$defs/durationNs'
+                description: 'Go field JitterMax: upper bound of a flat, delay-independent jitter draw (JitterFlat only).'
+            jittermode:
+                description: 'Go field JitterMode: 0=JitterSymmetric, 1=JitterAdditive, 2=JitterFlat.'
+                type: integer
+            linear:
+                description: 'Go field Linear: switches from exponential to linear growth.'
+                type: boolean
+            maxattempts:
+                description: 'Go field MaxAttempts: total attempts including the first. Zero or negative means 1 (no retries).'
+                type: integer
+            maxdelay:
+                $ref: '#/$defs/durationNs'
+                description: 'Go field MaxDelay: caps the computed delay before jitter. Zero or negative means unbounded.'
+            multiplier:
+                description: 'Go field Multiplier: scales BaseDelay per attempt. Values <= 1 disable growth. Ignored when linear is true.'
+                type: number
         type: object
     routerOptions:
         additionalProperties: false
@@ -655,16 +848,19 @@ $defs:
             close_timeout:
                 $ref: '#/$defs/durationNs'
                 description: Zero means adapter default (5s).
-            dsn:
-                description: Postgres connection string or sqlite path for the postgres adapter; empty selects a private in-memory database.
-                type: string
             dedicated_pool:
                 description: Opt out of container-level pool sharing; default false shares one pool per exact DSN, true opens a private pool.
                 type: boolean
+            dsn:
+                description: Postgres connection string or sqlite path for the postgres adapter; empty selects a private in-memory database.
+                type: string
         type: object
     searchOptions:
         additionalProperties: false
         properties:
+            allow_insecure:
+                description: Permit an http:// host for testing. Default false (https only).
+                type: boolean
             api_key:
                 type: string
             dedicated_pool:
@@ -827,6 +1023,9 @@ $defs:
     vectorstoreOptions:
         additionalProperties: false
         properties:
+            allow_insecure:
+                description: Permit an http:// URL for testing. Default false (https only).
+                type: boolean
             api_key:
                 type: string
             dedicated_pool:
@@ -885,47 +1084,6 @@ $defs:
                 description: Workflow-runs table name; empty selects the adapter default.
                 type: string
         type: object
-    zredisConnectOptions:
-        additionalProperties: false
-        properties:
-            addr:
-                description: host:port, or redis:// / rediss:// URL. Empty means localhost:6379.
-                type: string
-            db:
-                type: integer
-            password:
-                type: string
-            require_tls:
-                description: Fail fast instead of silently connecting in plaintext when TLS would not be used.
-                type: boolean
-            tls:
-                description: Enable TLS (1.2 floor) for a plain host:port address.
-                type: boolean
-        type: object
-    zredisOptions:
-        additionalProperties: false
-        properties:
-            addr:
-                type: string
-            db:
-                type: integer
-            max_conn_idle_time:
-                $ref: '#/$defs/durationNs'
-            max_conn_lifetime:
-                $ref: '#/$defs/durationNs'
-            min_idle_conns:
-                type: integer
-            password:
-                type: string
-            pool_size:
-                type: integer
-            pool_timeout:
-                $ref: '#/$defs/durationNs'
-            require_tls:
-                type: boolean
-            tls:
-                type: boolean
-        type: object
     zredisOptionsWithPrefix:
         additionalProperties: false
         description: zredis.Options embedded plus a Prefix field -- used by eventbus/idempotency/ratelimit/session Redis adapters.
@@ -952,6 +1110,9 @@ $defs:
                 type: boolean
             tls:
                 type: boolean
+            url:
+                description: Reserved and currently ignored; present for schema parity with zredis.Options.URL. Use addr to actually select a server.
+                type: string
         type: object
 $id: https://raw.githubusercontent.com/zenta-dev/zever/main/config/schema/zever.schema.json
 $schema: https://json-schema.org/draft/2020-12/schema
@@ -1013,12 +1174,23 @@ properties:
             options:
                 $ref: '#/$defs/cacheOptions'
         type: object
+    cdn:
+        $ref: '#/$defs/service'
+        properties:
+            adapter:
+                enum:
+                    - noop
+                    - cloudflare
+            options:
+                $ref: '#/$defs/cdnOptions'
+        type: object
     crypto:
         $ref: '#/$defs/service'
         properties:
             adapter:
                 enum:
                     - local
+                    - kms
             options:
                 $ref: '#/$defs/cryptoOptions'
         type: object
@@ -1159,6 +1331,17 @@ properties:
             options:
                 $ref: '#/$defs/observabilityOptions'
         type: object
+    outbox:
+        $ref: '#/$defs/service'
+        properties:
+            adapter:
+                enum:
+                    - memory
+                    - db
+                    - cdc
+            options:
+                $ref: '#/$defs/outboxOptions'
+        type: object
     password:
         $ref: '#/$defs/service'
         properties:
@@ -1210,6 +1393,16 @@ properties:
                     - redis
             options:
                 $ref: '#/$defs/ratelimitOptions'
+        type: object
+    resilience:
+        $ref: '#/$defs/service'
+        properties:
+            adapter:
+                enum:
+                    - memory
+                    - redis
+            options:
+                $ref: '#/$defs/resilienceOptions'
         type: object
     router:
         $ref: '#/$defs/service'

@@ -22,6 +22,40 @@ type claimed struct {
 	Attempts  int
 }
 
+// SetPublisher attaches p as the relay's destination transport.
+//
+// core/outbox.Options carries only the informational selector string, so a store
+// opened through the registry has no Publisher until application wiring (in
+// practice container.OutboxRelay) hands one over. Attach before Start: a relay
+// that is already draining republishes the remaining messages to the new
+// destination, which is only correct when the two are the same transport.
+//
+// A nil Publisher is ignored rather than stored, so a wiring bug cannot turn a
+// working relay into one whose every publish panics. SetPublisher is safe for
+// concurrent use with a running relay; Start reads the publisher under the same
+// lock, so an attach that lands mid-Start is either fully observed or fully
+// missed, never half-applied.
+func (d *driver) SetPublisher(p outbox.Publisher) {
+	if p == nil {
+		return
+	}
+
+	d.pubMu.Lock()
+	defer d.pubMu.Unlock()
+
+	d.publisher = p
+}
+
+// relayPublisher returns the attached publisher, or nil when none was wired.
+// The relay holds no long-lived reference, so an attach is picked up by the
+// next deliver rather than being lost.
+func (d *driver) relayPublisher() outbox.Publisher {
+	d.pubMu.RLock()
+	defer d.pubMu.RUnlock()
+
+	return d.publisher
+}
+
 // Start launches the relay loop. It is idempotent and returns an error when
 // no Publisher is wired.
 func (d *driver) Start(ctx context.Context) error {
@@ -36,8 +70,8 @@ func (d *driver) Start(ctx context.Context) error {
 		return nil
 	}
 
-	if d.publisher == nil {
-		return fmt.Errorf("db: start: publisher is nil: %w", outbox.ErrInvalidOptions)
+	if d.relayPublisher() == nil {
+		return fmt.Errorf("db: start: no publisher attached: %w", outbox.ErrInvalidOptions)
 	}
 
 	runCtx, cancel := context.WithCancel(ctx)
@@ -112,7 +146,7 @@ func (d *driver) pollOnce(ctx context.Context) {
 
 	msgs, err := d.claim(ctx)
 	if err != nil {
-		d.setRelayError(err)
+		d.setRelayError(ctx, err)
 
 		return
 	}
@@ -126,6 +160,30 @@ func (d *driver) pollOnce(ctx context.Context) {
 	}
 
 	d.cleanup(ctx)
+
+	d.emitStatusGauges(ctx)
+}
+
+// emitStatusGauges records the pending, failed, and oldest-pending-age gauges.
+// It is best-effort: query failures skip emission.
+func (d *driver) emitStatusGauges(ctx context.Context) {
+	var st outbox.Status
+
+	if err := d.countByStatus(ctx, &st); err != nil {
+		return
+	}
+
+	oldest, ok, err := d.oldestPending(ctx)
+	if err != nil {
+		return
+	}
+
+	var age time.Duration
+	if ok {
+		age = time.Since(oldest)
+	}
+
+	d.recorder.Status(ctx, st.Pending, st.Failed, age)
 }
 
 // claim atomically claims up to BatchSize pending rows, incrementing attempts
@@ -186,6 +244,16 @@ func (d *driver) claimSQL() string {
 
 // deliver publishes one claimed row and records the outcome.
 func (d *driver) deliver(ctx context.Context, c claimed) {
+	publisher := d.relayPublisher()
+	if publisher == nil {
+		// Start refuses to run without a publisher and SetPublisher ignores
+		// nil, so this is unreachable; treat it as a retryable relay error
+		// rather than a panic if that contract ever changes.
+		d.setRelayError(ctx, errors.New("db: deliver: no publisher attached"))
+
+		return
+	}
+
 	msg := outbox.Message{
 		ID:        c.ID,
 		Topic:     c.Topic,
@@ -196,15 +264,21 @@ func (d *driver) deliver(ctx context.Context, c claimed) {
 		Attempts:  c.Attempts,
 	}
 
-	err := d.publisher.Publish(ctx, msg)
+	spanCtx, finish := d.recorder.PublishSpan(ctx, c.Topic, c.ID)
+
+	err := publisher.Publish(spanCtx, msg)
 	now := time.Now().UTC()
 
 	switch {
 	case err == nil:
+		finish(outbox.OutcomeOK)
+		d.recorder.Published(ctx)
 		d.markProcessed(ctx, c.ID, now)
 	case c.Attempts >= d.maxAttempts:
+		finish(outbox.OutcomeError)
 		d.markFailed(ctx, c.ID, err)
 	default:
+		finish(outbox.OutcomeError)
 		d.markRetry(ctx, c.ID, err, now.Add(d.retry.NextDelay(c.Attempts)))
 	}
 }
@@ -217,31 +291,35 @@ func (d *driver) markProcessed(ctx context.Context, id string, now time.Time) {
 		d.ts(now), id,
 	)
 	if err != nil {
-		d.setRelayError(err)
+		d.setRelayError(ctx, err)
 	}
 }
 
 // markFailed moves a message to the DLQ: processed_at stays NULL and status
 // becomes failed, so the relay stops retrying it.
 func (d *driver) markFailed(ctx context.Context, id string, cause error) {
+	d.recorder.FailedTotal(ctx)
+
 	_, err := d.conn.Exec(ctx,
 		`UPDATE `+quoteIdent(d.table)+` SET status = 'failed', locked_until = NULL, last_error = ? `+
 			`WHERE id = ? AND status = 'pending'`,
 		cause.Error(), id,
 	)
 	if err != nil {
-		d.setRelayError(err)
+		d.setRelayError(ctx, err)
 	}
 }
 
 // markRetry records a failure and delays the next attempt by the backoff.
 func (d *driver) markRetry(ctx context.Context, id string, cause error, retryAt time.Time) {
+	d.recorder.Retried(ctx)
+
 	_, err := d.conn.Exec(ctx,
 		`UPDATE `+quoteIdent(d.table)+` SET last_error = ?, locked_until = ? WHERE id = ? AND status = 'pending'`,
 		cause.Error(), d.ts(retryAt), id,
 	)
 	if err != nil {
-		d.setRelayError(err)
+		d.setRelayError(ctx, err)
 	}
 }
 
@@ -254,14 +332,15 @@ func (d *driver) cleanup(ctx context.Context) {
 		d.ts(cutoff),
 	)
 	if err != nil {
-		d.setRelayError(err)
+		d.setRelayError(ctx, err)
 	}
 }
 
 // setRelayError records the most recent relay error for Status.
-func (d *driver) setRelayError(err error) {
+func (d *driver) setRelayError(ctx context.Context, err error) {
 	s := err.Error()
 	d.relayErr.Store(&s)
+	d.recorder.RelayError(ctx)
 }
 
 // Status reports current counters and health. It is best-effort: a query
@@ -273,15 +352,22 @@ func (d *driver) Status() outbox.Status {
 	var st outbox.Status
 
 	if err := d.countByStatus(ctx, &st); err != nil {
-		d.setRelayError(err)
+		d.setRelayError(ctx, err)
 	}
 
 	oldest, ok, err := d.oldestPending(ctx)
 	if err != nil {
-		d.setRelayError(err)
+		d.setRelayError(ctx, err)
 	}
 
-	if ok && time.Since(oldest) > DefaultStallAfter {
+	var age time.Duration
+	if ok {
+		age = time.Since(oldest)
+	}
+
+	d.recorder.Status(ctx, st.Pending, st.Failed, age)
+
+	if ok && age > DefaultStallAfter {
 		st.Stalled = true
 	}
 

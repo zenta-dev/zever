@@ -67,6 +67,7 @@ cached state clears so the next call retries.
 | media | `Media()` | |
 | notification | `Notification()` | |
 | observability | `Observability()` | |
+| outbox | `Outbox()` plus `OutboxRelay(ctx)` helper | relay attaches the transport-selected publisher and starts |
 | password | `Password()` | |
 | payment | `Payment()` | |
 | permission | `Permission()` | |
@@ -83,6 +84,64 @@ cached state clears so the next call retries.
 | vectorstore | `VectorStore()` | |
 | webhook | `Webhook()` | |
 | workflow | `Workflow()` | |
+
+## Readiness
+
+`Ready(ctx)` is the single readiness aggregate: `nil` means the process should
+receive traffic, otherwise the reasons are joined into one error. The
+scaffolded server's `/readyz` handler and the gRPC health status both read it,
+so every transport answers from one decision.
+
+```go
+if err := c.Ready(probeCtx); err != nil {
+	w.WriteHeader(http.StatusServiceUnavailable) // errors.Is(err, container.ErrDatabaseUnavailable)
+}
+```
+
+- **db**: always checked — it must resolve and answer a ping. Bounding the
+  probe is the caller's job (the scaffold uses a 3s timeout).
+- **outbox**: checked only when `outbox.stall_readiness` is set, and then only
+  while `Status().Stalled` is true, so a relay whose messages are backing up
+  drains traffic instead of silently queueing work.
+- The outbox check is best-effort: a relay that fails to resolve is skipped,
+  never a readiness failure. Turning the flag on can therefore only ever make
+  readiness stricter for a relay that actually exists.
+
+Sentinels: `ErrDatabaseUnavailable`, `ErrRelayStalled`, both carrying typed
+`DatabaseUnavailableError` / `RelayStalledError` for classification.
+
+## Outbox relay wiring
+
+`Outbox()` resolves the store but does not start the relay: `core/outbox`
+carries only the informational selector string (`outbox.publisher`), never a
+live transport. `OutboxRelay(ctx)` is the wiring that joins the two — resolve
+the store, resolve the selected transport, attach it through
+`outbox.PublisherSetter`, then `Start`:
+
+```go
+store, err := c.OutboxRelay(ctx) // relay is draining; Record into the same store
+```
+
+- **Selector**: `outbox.publisher: eventbus` publishes through the resolved
+  `EventBus()`; `queue` and the empty default publish through the resolved
+  `Queue()`. The empty default prefers the queue, since a queued message
+  survives a subscriber restart. Anything else is rejected by
+  `outbox.Options.Validate` during resolution.
+- **One instance**: the returned store is the same cached one `Outbox()`
+  resolves and `Close` shuts down, so Record keeps writing to the table the
+  relay drains. Like `Job()`, starting the relay resolves its transport as a
+  side effect.
+- **Fail loud**: an unresolvable selected transport, a store that does not
+  implement `outbox.PublisherSetter`, or a `Start` failure is returned as an
+  error. A relay that claims messages and drops them looks healthy until the
+  events are gone, so there is no silent no-op path.
+- **Replicas are safe**: claims are atomic inside the adapter (one statement
+  takes the rows and their lease; postgres uses `FOR UPDATE SKIP LOCKED`), so
+  several replicas can poll the same table. A replica that dies mid-publish
+  releases its rows after `outbox.lock_seconds`.
+- `queue.Queue` and `eventbus.EventBus` have no routing-key argument, so
+  `Message.Key` travels as the `outbox-key` header
+  (`shared/outboxbridge`); read it back with `outboxbridge.Key(headers)`.
 
 ## Job / Scheduler wiring
 
@@ -108,6 +167,14 @@ therefore resolves `Job()` and, transitively, `Queue` as a side effect.
 ```go
 loop, _ := c.Agent() // *agent.Loop over the shared AI instance
 engine, _ := c.RAG() // *rag.Engine over the shared AI + VectorStore instances
+```
+
+Both accessors take optional functional options, applied only on first
+resolution:
+
+```go
+loop, _ := c.Agent(container.WithMaxParallel(4))
+engine, _ := c.RAG(container.WithHybridSearch(), container.WithTopK(10))
 ```
 
 The model name comes from the `ai` options. Both hold references to
@@ -188,15 +255,16 @@ Details:
   set for the duration of `Close` so an address cannot be reclaimed and
   reused mid-shutdown.
 - Failures join: `Close` returns `errors.Join` of per-service errors.
-  Panics become `*ClosePanicError`, timeouts become `*CloseTimeoutError`.
+  Panics become `ClosePanicError`, timeouts become `CloseTimeoutError` (value
+  types — `errors.As` against a pointer target never matches).
   Error values name the service only, never resolved values.
 
 ```go
 ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
 defer cancel()
 if err := c.Close(ctx); err != nil {
-	var te *container.CloseTimeoutError
-	var pe *container.ClosePanicError
+	var te container.CloseTimeoutError
+	var pe container.ClosePanicError
 	_ = te
 	_ = pe
 }
@@ -211,3 +279,13 @@ and exit. Keep timeout-test blocks short (parent deadline ~100ms, block
 ~500ms) and let the straggler finish before the test returns. Sanctioned
 exception: timeout-path tests using `ignoreCtx` stubs sleep past the
 stub's block in teardown only (never for sync) so goleak stays clean.
+
+## Outbox relay tests
+
+`OutboxRelay` tests seed the container's lazy slots with stub services
+(`mustSeed`, the same seam `TestTransactor_unsupported` uses), so they open no
+database, broker, or timer: a stub store publishes one message from `Start`,
+and a stub queue or bus records it. They close with a live context
+(`closeRelayContainer`) rather than `closeContainer`, whose `t.Context()` is
+already canceled by the time cleanups run and would report a phantom
+"close timed out".

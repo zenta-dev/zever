@@ -95,7 +95,10 @@ func TestRunGenerateServer(t *testing.T) {
 		"r.Use(middleware.Recover(logger), middleware.RequestLogger(logger), middleware.Tracing(obs))",
 		`r.Handle("GET", "/healthz",`,
 		`r.Handle("GET", "/readyz",`,
-		"database.Ping(pingCtx)",
+		// Readiness is one container decision, not a per-handler DB ping:
+		// the aggregate covers the db ping plus the opt-in outbox stall
+		// gate, so /readyz and the gRPC health status cannot drift apart.
+		"c.Ready(readyCtx)",
 		"healthServer := health.NewServer()",
 		"healthpb.RegisterHealthServer(grpcServer, healthServer)",
 		"healthServer.SetServingStatus(\"\", healthpb.HealthCheckResponse_SERVING)",
@@ -105,10 +108,21 @@ func TestRunGenerateServer(t *testing.T) {
 		"WriteTimeout:      writeTimeout,",
 		"IdleTimeout:       idleTimeout,",
 		`grpcAddr := flag.String("grpc-addr", ":9090", "gRPC address to listen on")`,
+		// Outbound calls go through the resilience manager's per-dependency guard.
+		"c.Resilience()",
+		"guardedGRPCClient",
+		"grpcclient.WithGuard(g)",
 	} {
 		if !strings.Contains(main, fragment) {
 			t.Fatalf("server main.go lacks %q:\n%s", fragment, main)
 		}
+	}
+
+	// Readiness must be the container aggregate, not a hand-rolled ping: an
+	// inline db ping in the handler is exactly the drift this replaced, since
+	// it can never learn about the outbox stall gate.
+	if strings.Contains(main, "database.Ping(") {
+		t.Fatalf("server main.go must not inline a readiness db ping:\n%s", main)
 	}
 
 	// zever's zero-infra defaults ship a real rate limit (rate 10, burst 20),
@@ -362,6 +376,9 @@ func TestRunGenerateServerWiresRegisterModule(t *testing.T) {
 		"TaskService: taskServiceImpl,",
 		"healthpb.RegisterHealthServer(grpcServer, healthServer)",
 		"reflection.Register(grpcServer)",
+		"c.Resilience()",
+		"guardedGRPCClient",
+		"c.Ready(readyCtx)",
 		"healthServer.SetServingStatus(\"\", healthpb.HealthCheckResponse_NOT_SERVING)",
 	} {
 		if !strings.Contains(main, fragment) {

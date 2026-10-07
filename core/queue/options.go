@@ -3,6 +3,7 @@ package queue
 import (
 	"time"
 
+	"github.com/zenta-dev/zever/core/observability"
 	redisopt "github.com/zenta-dev/zever/shared/redisopt"
 )
 
@@ -42,6 +43,12 @@ type Options struct {
 	PollTimeout time.Duration `json:"poll_timeout" toml:"poll_timeout" yaml:"poll_timeout"`
 	// Buffer is the maximum number of buffered ready messages per topic.
 	Buffer int `json:"buffer" toml:"buffer" yaml:"buffer"`
+
+	// Provider emits the producer span an adapter opens for every push and
+	// the consumer span the job dispatcher opens for every delivery. Nil
+	// disables telemetry. It is Go-API-only: never decoded from
+	// configuration files.
+	Provider observability.Provider `json:"-" toml:"-" yaml:"-"`
 
 	// RedisOptions holds Redis-specific connection configuration.
 	RedisOptions

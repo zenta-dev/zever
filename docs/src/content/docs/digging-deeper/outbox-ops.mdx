@@ -1,0 +1,323 @@
+---
+title: Outbox Ops
+description: "Relay metrics, Prometheus alert rules, the DLQ runbook, and stalled-relay readiness."
+---
+
+## Purpose
+
+Use this page after [Outbox](./outbox.mdx) is wired. The relay is the
+component that eventually delivers your events, and it fails quietly:
+a broker outage shows up as messages piling up, not as a crash. This
+page covers the four things an on-call engineer needs — the metric
+names the relay emits, alert rules that fire before users notice, the
+dead-letter-queue (DLQ) runbook, and the readiness gate that removes a
+stalled relay from the load balancer.
+
+## Metrics
+
+The relay emits through the `observability.Provider` on
+`outbox.Options.Provider`. Telemetry is best-effort: a nil provider
+makes every metric a no-op, and metric or span errors are discarded
+(`_ =`) so a metrics backend outage can never fail a publish. Production
+therefore needs `observability.adapter: otlp` with `service_name` and an
+`endpoint` — with `stdout` the values print locally, with `noop` they go
+nowhere. Scope is `outbox`.
+
+| Metric | Type | Meaning |
+|---|---|---|
+| `outbox.pending` | gauge | Messages awaiting publication |
+| `outbox.failed` | gauge | Messages that exhausted `max_attempts` (DLQ depth) |
+| `outbox.oldest_pending_age_seconds` | gauge | Age of the oldest pending message; `0` when nothing is pending |
+| `outbox.published` | counter | Successful publishes (`outbox.outcome="ok"`) |
+| `outbox.retried` | counter | Publish failures that will be retried (`outbox.outcome="error"`) |
+| `outbox.failed_total` | counter | Messages moved to the failed state (`outbox.outcome="error"`) |
+| `outbox.relay_errors` | counter | Relay-loop errors (`outbox.outcome="error"`) |
+| `outbox.publish.duration_seconds` | histogram | Per-publish latency, tagged with the outcome |
+
+The three gauges come from the `db` relay only. The `cdc` consumer keeps
+its counters in memory and reports them through `Status()`, so it emits
+`outbox.published`, `outbox.retried`, `outbox.failed_total`, and
+`outbox.relay_errors` but no pending/oldest-age gauge.
+
+Attributes carried on every metric and span:
+
+| Attribute | Values |
+|---|---|
+| `outbox.adapter` | `db` or `cdc` |
+| `outbox.table` | Outbox table name; `db` only, omitted when empty |
+| `outbox.topic` | Message topic — on `outbox.publish` / `outbox.consume` spans |
+| `outbox.outcome` | `ok` or `error` |
+
+Spans: `outbox.publish` (kind `producer`) per publish, paired with the
+`outbox.publish.duration_seconds` observation, and `outbox.consume`
+(kind `consumer`) on the `cdc` consumer path. Both carry the OTel
+messaging semantic conventions alongside the `outbox.*` attributes:
+`messaging.system` (the configured `publisher` transport, else the
+adapter name), `messaging.destination.name` (the topic),
+`messaging.operation` (`publish` or `process`), `messaging.message.id`,
+and `messaging.message.conversation_id` when the context carries a
+trace — that last one is how a relay span joins the trace that recorded
+the message.
+
+Keep metric attributes bounded. `outbox.topic` is a code-level constant,
+but if you build topics per tenant, the label cardinality — and your
+collector bill — grows with it.
+
+Prometheus reads the OTLP export, which renames dots to underscores:
+`outbox.publish.duration_seconds` becomes
+`outbox_publish_duration_seconds_bucket`, and the histogram needs a
+`_bucket`/`_sum`/`_count` trio plus a matching `le` label.
+
+## Recommended alerts
+
+Five rules cover the failure modes that actually page people. Tune the
+thresholds to your delivery SLA; the queries are the part that matters.
+
+Backlog growing (the relay is producing faster than it publishes, or
+publishing at all):
+
+```promql
+max by (outbox_table) (deriv(outbox_pending[15m]) > 0)
+```
+
+Oldest pending message past the delivery SLA:
+
+```promql
+max_over_time(outbox_oldest_pending_age_seconds[5m]) > 300
+```
+
+DLQ non-empty — something exhausted its retry budget:
+
+```promql
+increase(outbox_failed_total[10m]) > 0
+or
+outbox_failed > 0
+```
+
+Relay loop itself erroring (claim failures, bad DSN, dropped pool):
+
+```promql
+rate(outbox_relay_errors[5m]) > 0
+```
+
+Publish latency — a slow downstream, visible before it becomes a
+timeout:
+
+```promql
+histogram_quantile(0.99, sum by (le) (rate(outbox_publish_duration_seconds_bucket[5m]))) > 1
+```
+
+A worked rule file:
+
+```yaml
+groups:
+  - name: zever-outbox
+    rules:
+      - alert: OutboxBacklogGrowing
+        expr: max by (outbox_table) (deriv(outbox_pending[15m])) > 0
+        for: 15m
+        labels:
+          severity: warning
+        annotations:
+          summary: outbox backlog is growing
+          runbook: zever outbox status, then zever outbox dlq list
+      - alert: OutboxOldestPendingPastSLA
+        expr: max_over_time(outbox_oldest_pending_age_seconds[5m]) > 300
+        for: 5m
+        labels:
+          severity: critical
+        annotations:
+          summary: oldest pending outbox message is older than the SLA
+      - alert: OutboxDLQNotEmpty
+        expr: increase(outbox_failed_total[10m]) > 0
+        for: 10m
+        labels:
+          severity: critical
+        annotations:
+          summary: messages are landing in the outbox DLQ
+      - alert: OutboxRelayErrors
+        expr: rate(outbox_relay_errors[5m]) > 0
+        for: 5m
+        labels:
+          severity: warning
+        annotations:
+          summary: outbox relay loop is erroring
+```
+
+## DLQ runbook
+
+Messages that exhaust `max_attempts` (default 5) are marked `failed`.
+They are not deleted and not retried again — they wait for a human.
+Work the queue in this order.
+
+1. Confirm the shape of the problem.
+
+```sh
+zever outbox status
+```
+
+```
+outbox status  table=outbox
+  pending    0
+  processed  14205
+  failed     3
+  last_error  publish booking.created: dial tcp 10.0.3.17:9092: connect: connection refused
+  stalled    false
+```
+
+Add `--json` for machine-readable output. A non-zero `failed` with a
+`last_error` naming one destination is usually a single bad dependency;
+`last_error` naming several topics means the broker itself is down.
+
+2. List the dead letters, oldest first.
+
+```sh
+zever outbox dlq list --limit 20
+```
+
+```
+msg-01HZX...  booking.created  attempts=5  created=2026-10-06T09:14:02Z
+msg-01HZX...  payment.captured attempts=5  created=2026-10-06T09:14:02Z
+```
+
+3. Read `last_error` on the rows and fix the root cause before
+   re-driving anything. Requeueing into a still-broken broker just burns
+   the retry budget again — check the broker, credentials, topic
+   existence, and payload size limits. Requeue resets the row's
+   `attempts`, so budget is restored.
+
+4. Requeue. One message by id, or the whole DLQ:
+
+```sh
+zever outbox dlq requeue --id msg-01HZX...
+zever outbox dlq requeue --all
+```
+
+`--id` and `--all` are mutually exclusive and exactly one is required.
+
+5. Watch it drain, then confirm the queue is empty:
+
+```sh
+zever outbox status
+zever outbox dlq list
+```
+
+6. Drop messages you have decided not to deliver (a poison payload you
+   will never fix, an event for a decommissioned consumer). Deletion is
+   permanent and takes one id:
+
+```sh
+zever outbox dlq purge --id msg-01HZX...
+```
+
+7. Retention is separate from the DLQ. `purge` deletes *processed*
+   rows older than a cutoff, keeping the table small without touching
+   anything undelivered:
+
+```sh
+zever outbox purge --before 168h   # processed rows older than 7 days
+```
+
+Every command accepts `--dsn`, `--table`, and `--config`; without them
+the CLI discovers `zever.yaml` / `zever.yml` / `zever.json` in the working
+directory and applies environment overrides. Run one from a deploy box
+with database access, not from every replica.
+
+## Stalled relay readiness
+
+`Status().Stalled` is true when pending messages are not draining: the
+`db` adapter sets it once the oldest pending row has waited longer than
+`db.DefaultStallAfter` (5 minutes, `adapters/outbox/db/options.go:32-34`).
+It is a stronger signal than `pending > 0` — a busy relay is healthy, a
+relay holding old rows is stuck. That 5-minute default is also why the
+SLA alert above is expressed as `> 300`.
+
+Readiness is opt-in. With `outbox.options.stall_readiness: true` the
+generated server's `/readyz` returns 503 and the gRPC health status
+flips to `NOT_SERVING` while `Status().Stalled` holds, which pulls the
+replica out of the load balancer instead of serving traffic it cannot
+fulfil state for:
+
+```yaml
+outbox:
+  adapter: db
+  options:
+    dsn: postgres://app:secret@db:5432/app
+    stall_readiness: true
+```
+
+The flag belongs under `options:` — service envelopes are strictly
+`{adapter, options}`, so a sibling `stall_readiness:` key is a decode
+error. The check itself is best-effort: a store that fails to resolve is
+skipped rather than failing readiness, so turning the flag on cannot
+make a process that never wired the outbox permanently unready.
+
+Leave it off when several replicas share one outbox table and you would
+rather alert than shed traffic — a single slow publish must not take a
+healthy replica out of rotation. Watch `Stalled` through
+`outbox.oldest_pending_age_seconds` and the alerting rules above instead.
+
+The same signal is available in-process when you want to gate your own
+traffic:
+
+```go
+import (
+    "github.com/zenta-dev/zever/config"
+    "github.com/zenta-dev/zever/container"
+)
+
+func relayHealthy() error {
+    c := container.New(config.Default())
+    ob, err := c.Outbox()
+    if err != nil {
+        return err
+    }
+    if ob.Status().Stalled {
+        return errors.New("outbox relay is stalled")
+    }
+    return nil
+}
+```
+
+## Production notes
+
+- Multi-instance behavior: the `db` relay claims with `FOR UPDATE
+  SKIP LOCKED` and a `lock_seconds` lease, so every replica can relay the
+  same table. That also means a `Requeue` takes effect for whichever
+  replica polls next — requeue once, not once per replica.
+- Redaction: `last_error` is a publisher-side error string and can carry
+  broker hostnames. Treat DLQ output as sensitive; `outbox.pending`
+  gauges carry no payload.
+- Cardinality: keep topics a fixed set. A per-request topic turns
+  `outbox.publish.duration_seconds` into a cardinality incident.
+- Never delete a `pending` or `failed` row to "unstick" the relay. Fix
+  the cause, then requeue or purge deliberately.
+- The `memory` adapter emits no relay metrics worth alerting on: it
+  publishes synchronously and keeps nothing.
+
+## Troubleshooting
+
+1. No `outbox.*` metrics at all: the provider is nil or the adapter is
+   `noop`. Set `observability.adapter: otlp` (plus `service_name` and
+   `endpoint`) and confirm the store was opened with a provider.
+2. `zever outbox status` connects but reports empty counters: the
+   `--table` or `zever.yaml` `outbox.table` does not match the table the
+   relay writes. Compare against `outbox.options.table`.
+3. `dlq requeue` looks successful but the row stays `failed`: another
+   process is holding the claim lease, or the publish is failing again
+   on the first attempt and the row has not yet exhausted its budget.
+   Re-check `zever outbox dlq list` after one retry cycle.
+4. `does not support admin operations` (from `dlq list`, `dlq requeue`,
+   or `purge`) or `does not support message deletion` (from `dlq purge`):
+   only the `db` adapter implements `outbox.Admin` and `outbox.Deleter`.
+   Switch the connection, not the command.
+5. Pending grows but `outbox.published` grows too: check
+   `outbox.publish.duration_seconds` p99 — you are throughput-bound,
+   not stuck. Raise `batch_size` or replica count, not `max_attempts`.
+
+## See also
+
+- [Outbox](./outbox.mdx) - the battery itself: store, relay, `Inbox`
+- [Observability](./observability.mdx) - providers, attribute bounds, redaction
+- [Events & Event Bus](./events-eventbus.mdx) - the usual `Publisher` bridge target
+- [Resilience](./resilience.mdx) - shared circuit breakers for the relay's dependencies

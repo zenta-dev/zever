@@ -6,6 +6,7 @@ import (
 	"strings"
 
 	"github.com/zenta-dev/zever/core/ai"
+	"github.com/zenta-dev/zever/core/search"
 	"github.com/zenta-dev/zever/core/vectorstore"
 )
 
@@ -17,6 +18,7 @@ const defaultSystemPrompt = "Answer the question using only the provided context
 type Engine struct {
 	client ai.AI
 	store  vectorstore.VectorStore
+	search search.Search
 	opts   Options
 }
 
@@ -39,8 +41,17 @@ func New(client ai.AI, store vectorstore.VectorStore, opts Options) (*Engine, er
 // Ingest chunks each document, embeds every chunk in one batch, and upserts the
 // resulting vectors. Documents with empty content are skipped. The reserved
 // metadata keys document_id, chunk_index and content are set by the engine;
-// caller metadata with those keys is ignored.
+// caller metadata with those keys is ignored. Engines built by NewHybrid
+// additionally index every chunk into the keyword backend.
 func (e *Engine) Ingest(ctx context.Context, docs []Document) error {
+	err := e.ingest(ctx, docs)
+	e.observe(Event{Type: EventIngest, Count: len(docs), Err: err})
+
+	return err
+}
+
+// ingest implements Ingest.
+func (e *Engine) ingest(ctx context.Context, docs []Document) error {
 	type item struct {
 		id     string
 		meta   map[string]any
@@ -98,12 +109,45 @@ func (e *Engine) Ingest(ctx context.Context, docs []Document) error {
 		}
 	}
 
-	return e.store.UpsertBatch(ctx, vecs)
+	if err := e.store.UpsertBatch(ctx, vecs); err != nil {
+		return err
+	}
+
+	if e.search == nil {
+		return nil
+	}
+
+	sdocs := make([]search.Document, len(items))
+	for i, it := range items {
+		sdocs[i] = search.Document{
+			ID:       it.id,
+			Index:    e.searchIndex(),
+			Content:  texts[it.textID],
+			Metadata: it.meta,
+		}
+	}
+
+	if err := e.search.IndexBatch(ctx, sdocs); err != nil {
+		// Vectors are already stored: hybrid ingest is not atomic across
+		// backends. Retrying Ingest is safe (upserts are idempotent by
+		// chunk ID), so callers should retry the whole call.
+		return fmt.Errorf("rag: vectors stored but keyword index failed: %w", err)
+	}
+
+	return nil
 }
 
 // Retrieve embeds query and returns the topK most similar stored chunks. A
 // topK <= 0 selects Options.TopK.
 func (e *Engine) Retrieve(ctx context.Context, query string, topK int) ([]Source, error) {
+	sources, err := e.retrieve(ctx, query, topK)
+	e.observe(Event{Type: EventRetrieve, Query: query, Count: len(sources), Err: err})
+
+	return sources, err
+}
+
+// retrieve implements Retrieve.
+func (e *Engine) retrieve(ctx context.Context, query string, topK int) ([]Source, error) {
 	if query == "" {
 		return nil, ErrEmptyQuery
 	}
@@ -145,27 +189,53 @@ func (e *Engine) Answer(ctx context.Context, query string, topK int) (Answer, er
 		return Answer{}, err
 	}
 
-	var b strings.Builder
-	for i, s := range sources {
-		fmt.Fprintf(&b, "[%d] %s\n", i+1, s.Content)
-	}
+	return e.generate(ctx, query, sources)
+}
 
-	system := e.opts.SystemPrompt
-	if system == "" {
-		system = defaultSystemPrompt
-	}
+// generate builds the grounded prompt from sources and generates an answer.
+func (e *Engine) generate(ctx context.Context, query string, sources []Source) (Answer, error) {
+	gen, err := func() (ai.Generation, error) {
+		var b strings.Builder
+		for i, s := range sources {
+			fmt.Fprintf(&b, "[%d] %s\n", i+1, s.Content)
+		}
 
-	msgs := []ai.Message{
-		{Role: ai.RoleSystem, Content: system},
-		{Role: ai.RoleUser, Content: "Context:\n" + b.String() + "\nQuestion: " + query},
-	}
+		system := e.opts.SystemPrompt
+		if system == "" {
+			system = defaultSystemPrompt
+		}
 
-	gen, err := e.client.Generate(ctx, e.opts.Model, msgs, ai.GenerateOptions{})
+		msgs := []ai.Message{
+			{Role: ai.RoleSystem, Content: system},
+			{Role: ai.RoleUser, Content: "Context:\n" + b.String() + "\nQuestion: " + query},
+		}
+
+		return e.client.Generate(ctx, e.opts.Model, msgs, ai.GenerateOptions{})
+	}()
+
+	e.observe(Event{Type: EventGenerate, Query: query, Err: err})
+
 	if err != nil {
 		return Answer{}, err
 	}
 
 	return Answer{Text: gen.Content, Sources: sources, Usage: gen.Usage}, nil
+}
+
+// observe delivers ev to the configured observer, if any.
+func (e *Engine) observe(ev Event) {
+	if e.opts.Observe != nil {
+		e.opts.Observe(ev)
+	}
+}
+
+// searchIndex returns the keyword index name, defaulting when unset.
+func (e *Engine) searchIndex() string {
+	if e.opts.SearchIndex != "" {
+		return e.opts.SearchIndex
+	}
+
+	return DefaultSearchIndex
 }
 
 // chunkID builds a stable chunk identifier from a document ID and chunk index.

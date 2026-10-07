@@ -13,6 +13,7 @@ import (
 	"github.com/zenta-dev/zever/core/auth"
 	"github.com/zenta-dev/zever/core/billing"
 	"github.com/zenta-dev/zever/core/cache"
+	"github.com/zenta-dev/zever/core/cdn"
 	"github.com/zenta-dev/zever/core/crypto"
 	"github.com/zenta-dev/zever/core/db"
 	"github.com/zenta-dev/zever/core/document"
@@ -74,15 +75,25 @@ func openService[T any, A any, O any](service string, name string, parse func(st
 
 // Agent builds a tool-calling *agent.Loop over the resolved AI backend. It has
 // no adapter registry and no config entry; the model name comes from the AI
-// options. Like Job, it shares the process-wide backend instance.
-func (c *Container) Agent() (*agent.Loop, error) {
+// options. Like Job, it shares the process-wide backend instance. Options
+// apply only on first resolution; later calls return the cached singleton.
+func (c *Container) Agent(opts ...AgentOption) (*agent.Loop, error) {
 	return c.agent.get(func() (*agent.Loop, error) {
 		a, err := c.AI()
 		if err != nil {
 			return nil, fmt.Errorf("container: agent: resolve ai: %w", err)
 		}
 
-		loop, err := agent.New(a, agent.Options{Model: c.cfg.AI.Options.Model})
+		aopts := agent.Options{Model: c.cfg.AI.Options.Model}
+		for _, opt := range opts {
+			if opt == nil {
+				continue
+			}
+
+			opt(&aopts)
+		}
+
+		loop, err := agent.New(a, aopts)
 		if err != nil {
 			return nil, fmt.Errorf("container: agent: %w", err)
 		}
@@ -129,6 +140,13 @@ func (c *Container) Cache() (cache.Cache, error) {
 		}
 
 		return openService("cache", c.cfg.Cache.Adapter, cache.ParseAdapter, cache.Open, c.cfg.Cache.Options)
+	})
+}
+
+// CDN resolves and returns the CDN service instance.
+func (c *Container) CDN() (cdn.CDN, error) {
+	return c.cdn.get(func() (cdn.CDN, error) {
+		return openService("cdn", c.cfg.CDN.Adapter, cdn.ParseAdapter, cdn.Open, c.cfg.CDN.Options)
 	})
 }
 
@@ -344,9 +362,21 @@ func (c *Container) Observability() (observability.Provider, error) {
 // Outbox resolves and returns the outbox service instance. The db adapter
 // opens its own pool from Options.DSN (empty selects a private in-memory
 // database); container-level pool sharing is not wired for outbox.
+//
+// The relay is not started here: the transport it publishes through is resolved
+// separately, so use OutboxRelay(ctx) to attach it and start draining. This
+// accessor keeps working for Record after the relay is running.
 func (c *Container) Outbox() (outbox.Store, error) {
 	return c.outbox.get(func() (outbox.Store, error) {
-		return openService("outbox", c.cfg.Outbox.Adapter, outbox.ParseAdapter, outbox.Open, c.cfg.Outbox.Options)
+		opts := c.cfg.Outbox.Options
+		// Best-effort: inject the resolved observability provider so the relay
+		// emits metrics/spans. A failed or unconfigured observability service
+		// never blocks the outbox.
+		if obs, err := c.Observability(); err == nil {
+			opts.Provider = obs
+		}
+
+		return openService("outbox", c.cfg.Outbox.Adapter, outbox.ParseAdapter, outbox.Open, opts)
 	})
 }
 
@@ -388,8 +418,10 @@ func (c *Container) Queue() (queue.Queue, error) {
 
 // RAG builds a *rag.Engine over the resolved AI and VectorStore backends. It
 // has no adapter registry and no config entry. Like Job, it shares the
-// process-wide backend instances.
-func (c *Container) RAG() (*rag.Engine, error) {
+// process-wide backend instances. Options apply only on first resolution;
+// later calls return the cached singleton. WithHybridSearch additionally
+// resolves the Search backend and builds via rag.NewHybrid.
+func (c *Container) RAG(opts ...RAGOption) (*rag.Engine, error) {
 	return c.rag.get(func() (*rag.Engine, error) {
 		a, err := c.AI()
 		if err != nil {
@@ -401,7 +433,31 @@ func (c *Container) RAG() (*rag.Engine, error) {
 			return nil, fmt.Errorf("container: rag: resolve vectorstore: %w", err)
 		}
 
-		engine, err := rag.New(a, vs, rag.Options{Model: c.cfg.AI.Options.Model})
+		cfg := ragConfig{options: rag.Options{Model: c.cfg.AI.Options.Model}}
+		for _, opt := range opts {
+			if opt == nil {
+				continue
+			}
+
+			opt(&cfg)
+		}
+
+		if cfg.hybrid {
+			s, searchErr := c.Search()
+			if searchErr != nil {
+				return nil, fmt.Errorf("container: rag: resolve search: %w", searchErr)
+			}
+
+			var engine *rag.Engine
+			engine, err = rag.NewHybrid(a, vs, s, cfg.options)
+			if err != nil {
+				return nil, fmt.Errorf("container: rag: %w", err)
+			}
+
+			return engine, nil
+		}
+
+		engine, err := rag.New(a, vs, cfg.options)
 		if err != nil {
 			return nil, fmt.Errorf("container: rag: %w", err)
 		}

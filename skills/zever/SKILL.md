@@ -1,6 +1,6 @@
 ---
 name: zever
-description: Use when scaffolding, inspecting, or running a zever Go application: scaffold apps and batteries, validate and compile .zen schemas, run servers and workers, or drive the CLI from scripts. Trigger on requests like "scaffold zever app", "add battery", "check schema", "compile schemas", or "run zever".
+description: "Use when scaffolding, inspecting, or running a zever Go application: scaffold apps and batteries, validate and compile .zen schemas, run servers and workers, or drive the CLI from scripts. Trigger on requests like \"scaffold zever app\", \"add battery\", \"check schema\", \"compile schemas\", or \"run zever\"."
 ---
 
 # zever skill
@@ -14,7 +14,7 @@ Prefer machine output over human output:
 - `zever --json <command>`: JSON envelope `{ok, command, exitCode, data?, error?}` on stdout. Exit codes: 0 success, 1 runtime error, 2 flag misuse.
 - `zever --help --agent`: machine-readable command catalog (this list, as JSON).
 - `compile`, `check`, `explain`, `doctor` emit structured `data` under `--json`.
-- MCP server: build `tools/zever-mcp` and register the binary as an MCP stdio server (`zever_compile`, `zever_schema`, `zever_explain`).
+- MCP server: build `tools/zever-mcp` and register the binary as an MCP stdio server (`zever_compile`, `zever_schema`, `zever_explain`, `zever_doctor`, `zever_generate`).
 
 ## Workflows
 
@@ -79,6 +79,10 @@ zever compile schema/app.zen --backend=mcp --out ./gen
 - `zever graph`: Print Mermaid entity-relation and module diagrams
 - `zever help`: Help about any command
 - `zever new`: Scaffold a brand new zever application
+- `zever outbox dlq`: Inspect and repair failed messages
+- `zever outbox purge`: Delete processed history
+- `zever outbox status`: Show relay counters
+- `zever outbox`: Inspect and repair the outbox dead-letter queue
 - `zever queue:work`: Run worker entrypoint (default cmd/worker)
 - `zever routes`: List HTTP routes declared by RPCs
 - `zever schedule:run`: Alias for queue:work (worker runs scheduler)

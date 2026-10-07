@@ -1,53 +1,41 @@
 ---
-title: Tutorials Overview
-description: Runnable example apps under examples/, from single-battery demos to full showcase apps.
+title: Tutorials overview
+description: Map of the runnable example apps under examples/, from focused ORM ports to full showcase apps.
 ---
 
-Every battery in this framework has a runnable example under `examples/` in
-the repository, all zero-infrastructure. Most live in the `examples` module
-and run with `go test ./examples/...`. The larger apps (`showcase`, `todo`,
-`bookings`, plus `demoapp` and `external-sms`) are deliberately separate Go
-modules with their own `go.mod`, so they are built and tested from their own
-directory or by path (see [Running the examples](#running-the-examples)).
-Two tutorials in this section walk you through the two most complete apps
-step by step; this page is the map of everything else.
+import { Steps, Aside, LinkCard, CardGrid } from '@astrojs/starlight/components';
+
+`examples/` holds runnable, zero-infrastructure apps. Most run with `go test ./examples/...`. The larger apps (`showcase`, `todo`, `bookings`, `demoapp`, `external-sms`) are separate Go modules; build and test them by path.
+
+New to Zever? Do [Build a booking API](../build-a-booking-api/) first, then [Explore the showcase app](../explore-the-showcase-app/) for DSL breadth.
 
 ## Full apps
 
-Start here if you want to see a complete, wired application:
-
 | App | What it proves |
 |---|---|
-| `examples/bookings` | Marketplace domain: hosts list spaces, guests book them - walked through in [Build a Booking API](build-a-booking-api/). Proves `payment` stub charges, `billing`, `geo`, `media`, `search`, and `vectorstore` compose inside one realistic request flow, with worker jobs and a cron schedule on the side. |
-| `examples/showcase` | DSL depth: every schema feature in one shop schema, HTTP + gRPC parity - walked through in [Explore the Showcase App](explore-the-showcase-app/). Proves one `Service` implementation backs two transports with identical auth. |
-| `examples/demoapp` | Battery breadth: every service battery behind one HTTP API. Proves the container can resolve the full service set in one process and that adapter swaps stay config-only across all of them. |
-| `examples/todo` | Auth-gated notes app with HTTP + gRPC cross-transport parity tests. Proves JWT auth enforced identically on both transports and that parity tests catch drift between them. |
+| `examples/bookings` | Marketplace domain (hosts list spaces, guests book them); walked through in [Build a booking API](../build-a-booking-api/). `payment` stub charges, `billing`, `ratelimit`, `idempotency`, `lock`, and `queue` compose in one booking request. |
+| `examples/showcase` | DSL depth: every schema feature in one shop schema, HTTP and gRPC parity; walked through in [Explore the showcase app](../explore-the-showcase-app/). |
+| `examples/demoapp` | Battery breadth: every service battery behind one HTTP API; adapter swaps stay config-only. |
+| `examples/todo` | Auth-gated notes app with HTTP and gRPC parity tests. JWT auth is enforced identically on both transports. |
 
 ## Focused ORM ports
 
-Smaller apps, each proving one ORM feature end to end against sqlite:
+Each app proves one ORM feature end to end against sqlite.
 
 | App | What it proves |
 |---|---|
-| `examples/transactions` | `orm.WithNestedTx` savepoint-nested transfers. Proves a failed inner transfer rolls back to its savepoint without aborting the outer transaction. |
-| `examples/bulk_upsert` | Multi-row `Insert`, `OnConflict(...).DoUpdate/DoNothing`, `Returning().ExecReturning`. Proves bulk writes stay one round trip and conflicts resolve per-row as declared. |
-| `examples/pagination` | Offset paging (`Limit`/`Offset`/`Count`) and keyset paging (`AfterTuple`, cursor encode/decode). Proves stable page traversal with and without concurrent inserts shifting offsets. |
-| `examples/recursive_cte` | `orm.WithRecursive` - an org chart in one query. Proves recursive common-table expressions build reporting trees without N+1 queries. |
-| `examples/json_query` | `orm/json/sqlite` nested-key, key-exists, and array-membership filters. Proves JSON columns stay queryable with typed predicates instead of raw SQL strings. |
-| `examples/fts` | `orm/fts/sqlite` full-text `MATCH` with rank-ordered search. Proves ranked text search works on the zero-infra adapter before you reach for a dedicated engine. |
-| `examples/ormdrill` | Cursors, preload, joins, subqueries, and expressions without codegen (raw builder). Proves the untyped builder covers queries too dynamic for generated code. |
+| `examples/transactions` | `orm.WithNestedTx` savepoint-nested transfers: a failed inner transfer rolls back to its savepoint, not the outer transaction. |
+| `examples/bulk_upsert` | Multi-row `Insert`, `OnConflict(...).DoUpdate/DoNothing`, `Returning().ExecReturning`: one round trip, per-row conflict resolution. |
+| `examples/pagination` | Offset paging (`Limit`/`Offset`/`Count`) and keyset paging (`AfterTuple`, cursors): stable traversal with concurrent inserts. |
+| `examples/recursive_cte` | `orm.WithRecursive`: an org chart in one query, with no N+1. |
+| `examples/json_query` | `orm/json/sqlite` nested-key, key-exists, and array-membership filters. |
+| `examples/fts` | `orm/fts/sqlite` full-text `MATCH` with rank-ordered search. |
+| `examples/ormdrill` | Cursors, preload, joins, subqueries, and expressions without codegen (the raw builder). |
 
-## Per-battery examples
+Every service battery (`cache`, `queue`, `db`, `payment`, `ai`, `vectorstore`, and the rest in the [Config reference](../../reference/config/)) also has `ExampleXxx` tests against its zero-infra adapter, with one happy path and one error path in `// Output:` comments. Browse them in `core/<battery>/example_test.go`.
 
-Every service battery - `cache`, `queue`, `db`, `payment`, `ai`,
-`vectorstore`, and every other one listed in [Config
-Reference](../reference/config-reference/) - has at least one
-`ExampleXxx` test against its zero-infra adapter, each showing one happy
-path and one error path via `// Output:` comments. Browse them under
-`examples/<battery>/` in the repository; the test itself is the
-documentation, so `go doc` or reading the source is the fastest way in.
 
-## Running the examples
+## Run the examples
 
 ```sh
 # examples that live in the `examples` module
@@ -58,85 +46,26 @@ go test -race ./examples/...  # with the race detector
 go test ./examples/showcase/...
 go test ./examples/todo/...
 go test ./examples/bookings/...
+
+# one focused port
+go test ./examples/pagination/... -v
 ```
 
-Expected output for the in-module run:
+
+Expected output:
 
 ```text
-ok  github.com/zenta-dev/zever/examples/pagination  0.05s
-ok  github.com/zenta-dev/zever/examples/fts         0.03s
-ok  github.com/zenta-dev/zever/examples/transactions 0.04s
+ok  	github.com/zenta-dev/zever/examples/pagination/cmd/app	0.008s
+ok  	github.com/zenta-dev/zever/examples/fts/cmd/app	0.010s
+ok  	github.com/zenta-dev/zever/examples/transactions/cmd/app	0.004s
 ...
 ```
 
-Package names and times vary by machine; the signal is `ok` on every line
-and no `FAIL` anywhere.
+The signal is `ok` on every line and no `FAIL`.
 
-Some examples opt into a real backend via environment variables when you
-want to see the adapter swap in action, for example:
+The focused ports open sqlite directly, so they ignore `DB_ADAPTER`. To run the ORM against postgres, use the ORM suite: `POSTGRES_DSN='postgres://user:pass@localhost:5432/test?sslmode=disable' go test ./orm/...`. Features a dialect lacks fail closed with `dialect.ErrUnsupportedByDialect`.
 
-```sh
-DB_ADAPTER=postgres DB_DSN=postgres://user:pass@localhost:5432/test?sslmode=disable go test ./examples/...
-```
-
-Unset, every example runs against the zero-infra defaults from
-[`config.Default()`](../getting-started/configuration/) - no database,
-no Redis, no external service required.
-
-## How to read an example
-
-Each example follows the same layout so you always know where to look:
-
-1. `schema/*.zen` (full apps only) - the domain; never hand-edit
-   `generated/` next to it.
-2. `zever.yaml` - explicit zero-infra adapters; the diff against
-   `config.Default()` is the deploy surface.
-3. `db/seed` - idempotent demo data; safe to re-run.
-4. `cmd/server` and `cmd/worker` - entrypoints mirroring
-   `zever generate server` / `zever generate worker`.
-5. Tests next to the code they cover - the `// Output:` comments are
-   runnable claims, not prose.
-
-## Suggested order
-
-New to the framework: [Build a Booking API](build-a-booking-api/) first
-for the realistic single flow, then
-[Explore the Showcase App](explore-the-showcase-app/) for DSL breadth.
-After that, pick focused ORM ports by the query problem you actually have
-(pagination, FTS, JSON filters), and use [Battery breadth](#full-apps)
-`demoapp` as the adapter-swap reference.
-
-## Running one focused port
-
-Each ORM port runs standalone with zero infra:
-
-```sh
-go test ./examples/pagination/... -v
-go test ./examples/fts/... -v
-go test ./examples/transactions/... -v
-```
-
-Expected output shape:
-
-```text
-=== RUN   TestKeysetPaging
---- PASS: TestKeysetPaging (0.02s)
-ok  github.com/zenta-dev/zever/examples/pagination  0.05s
-```
-
-Test names differ per port; the signal is `PASS` plus a trailing `ok`.
-To see the adapter swap on a port that supports postgres:
-
-```sh
-DB_ADAPTER=postgres DB_DSN=postgres://user:pass@localhost:5432/test?sslmode=disable go test ./examples/pagination/...
-```
-
-Expected output is the same `ok` line - the point is the queries pass
-unchanged against a second dialect. Postgres-gated assertions fail closed
-with `dialect.ErrUnsupportedByDialect` where a feature has no mapping, so
-a skip there is a documented boundary, not a broken test.
-
-## Running the full apps
+## Set up the full apps
 
 ```sh
 cd examples/bookings
@@ -144,12 +73,9 @@ zever db migrate --adapter=sqlite --dsn=data/bookings.db schema/bookings.zen
 go run ./db/seed
 ```
 
-Expected output:
-
 ```text
-applied 4 tables to data/bookings.db
-seeded host host@example.com
-seeded guest guest@example.com
+OK applied 8 statement(s) via sqlite
+{"time":"...","level":"INFO","msg":"seed complete"}
 ```
 
 ```sh
@@ -158,35 +84,51 @@ zever db migrate --adapter=sqlite --dsn=data/showcase.db schema/shop/shop.zen
 go run ./db/seed
 ```
 
-Expected output:
-
 ```text
-applied 8 tables to data/showcase.db
-seeded demo shop data
+OK applied 16 statement(s) via sqlite
+{"time":"...","level":"INFO","msg":"seed complete"}
 ```
 
-Both seeds are idempotent: re-running prints the same lines without
-duplicating rows. Both servers require `AUTH_JWT_SECRET` of at least 32
-bytes and fail closed without it.
+<Aside type="caution" title="JWT secret required">
+Both servers require `AUTH_JWT_SECRET` of at least 32 bytes and fail closed without it. Seed and worker output is JSON log lines (the `slog` adapter).
+</Aside>
+
+## How an example is laid out
+
+<Steps>
+
+1. `schema/*.zen` (full apps only) holds the domain. Never hand-edit `generated/` next to it.
+2. `zever.yaml` lists explicit zero-infra adapters. Its diff against `config.Default()` is the deploy surface.
+3. `db/seed` holds idempotent demo data; `cmd/server` and `cmd/worker` mirror `zever generate server` / `zever generate worker`.
+4. Tests sit next to the code they cover. The `// Output:` comments are runnable claims, not prose.
+
+</Steps>
 
 ## Troubleshooting
 
-**`go test ./examples/...` fails on a clean clone.**
-Run `go mod download` first, then re-run. Every module shares one module
-cache, so a half-downloaded cache breaks all of them at once.
+<details>
+<summary>`go test ./examples/...` fails on a clean clone</summary>
 
-**A postgres-backed run fails to connect.**
-The DSN form is `postgres://user:pass@localhost:5432/test?sslmode=disable`.
-Confirm the server is up and the database exists; unset the vars to fall
-back to zero-infra sqlite.
+Cause: a half-downloaded module cache, which all modules share. Fix: run `go mod download`, then re-run.
+</details>
 
-**You edited a schema and tests drifted.**
-Regenerate with `zever compile` (see the showcase tutorial) and re-run
-`zever db migrate --dry-run` for fresh DDL. Never hand-edit `generated/`.
+<details>
+<summary>A postgres-backed run fails to connect</summary>
 
-## See also
+Cause: the server is down, the database is missing, or the DSN is wrong. Fix: confirm the server and database, or unset the vars to fall back to sqlite.
+</details>
 
-- [Build a Booking API](build-a-booking-api/) for the guided bookings flow
-- [Explore the Showcase App](explore-the-showcase-app/) for the DSL tour
-- [Configuration](../getting-started/configuration/) for layered config
-- [Container](../architecture/container/) for how examples resolve services
+<details>
+<summary>Tests drifted after a schema edit</summary>
+
+Cause: generated code is stale. Fix: regenerate with `zever compile` (see the showcase tutorial) and re-run `zever db migrate --dry-run` for fresh DDL. Never hand-edit `generated/`.
+</details>
+
+## Related
+
+<CardGrid>
+  <LinkCard title="Build a booking API" description="Guided walkthrough of the bookings flow." href="../build-a-booking-api/" />
+  <LinkCard title="Explore the showcase app" description="A tour of DSL breadth over HTTP and gRPC." href="../explore-the-showcase-app/" />
+  <LinkCard title="Configuration" description="Layered config." href="../../guides/operate/configuration/" />
+  <LinkCard title="Container" description="How examples resolve services." href="../../concepts/container/" />
+</CardGrid>

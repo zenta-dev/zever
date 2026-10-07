@@ -1,0 +1,119 @@
+---
+title: Validation
+description: Validate input with .zen rules and handler checks, and fail with precise, field-named errors.
+---
+
+import { LinkCard, CardGrid } from '@astrojs/starlight/components';
+
+Validation is `@validate` rules in `.zen` (shape/format) plus Go checks in handlers (transport/business). Both fail with field-named errors, never silent coercion; there is no config block or accessor.
+
+## Validate a request
+
+Declare shape rules in the schema ([Zen syntax](../../../reference/zen-syntax/)):
+
+```zen
+rpc CreateUser(email: string @validate(format: "email")) -> User {
+  http: POST "/v1/users"
+  errors: { already_exists }
+}
+
+// on an entity field:
+title: string @validate(min_len: 1, max_len: 200)
+```
+
+The resolver checks each expression at compile time; `zever check` reports bad rules with positions, and `@validate` reaches generated code and OpenAPI.
+
+Then parse, validate, and only then call `db`, `queue`, or payment; failed validation must never open a transaction or cause a side effect.
+
+```go title="handlers.go"
+func createUser(w http.ResponseWriter, r *http.Request) {
+    var in struct {
+        Email string `json:"email"`
+        Name  string `json:"name"`
+    }
+    if err := json.NewDecoder(r.Body).Decode(&in); err != nil {
+        writeError(w, http.StatusBadRequest, "invalid body")
+        return
+    }
+    if !strings.Contains(in.Email, "@") {
+        writeError(w, http.StatusUnprocessableEntity, "email: must be a valid address")
+        return
+    }
+    if strings.TrimSpace(in.Name) == "" {
+        writeError(w, http.StatusUnprocessableEntity, "name: required")
+        return
+    }
+    writeJSON(w, http.StatusCreated, map[string]string{"email": in.Email})
+}
+```
+
+```sh
+curl -s -X POST localhost:8080/v1/users -d '{"email":"a@example.com","name":"Ada"}'
+```
+
+```text
+{"email":"a@example.com"}
+```
+
+Invalid input answers `422`. `writeJSON`/`writeError` come from [Requests and responses](../requests-responses/).
+
+| Status | When |
+|---|---|
+| `400` | Malformed input. |
+| `422` | Well-formed but invalid. |
+| `409` | `already_exists` (RPC `errors:`). |
+
+## Split rules between schema and handler
+
+| Rule kind | Owner | Example |
+|---|---|---|
+| Shape/format | `.zen` `@validate` | `email`, `title` length |
+| Transport | Handler | JSON, headers |
+| Business state | Handler/store | Email not registered (409) |
+| Config sanity | Startup `Validate` | Options, DSN |
+
+Bookings keeps format rules on entities (`User.email`, `Space.title`) and flow rules in `internal/api`; a `core/flag` gate returns 404, `ErrConflict` maps to 409. OpenAPI covers only the schema.
+
+## Validate config at startup
+
+`config.Load(path)` decodes strictly, so unknown file fields fail fast. An unparsable env value returns `InvalidOptionsError` (e.g. `DB_MAXCONNS=abc`) naming the service and field, never the secret; unknown env vars are ignored.
+
+## Production checklist
+
+- Name the field and rule, never the rejected secret.
+- Validate before I/O: no deadline, nothing to drain on close.
+- RPC error-set changes are API changes (`breaking`).
+
+## Troubleshooting
+
+<details>
+<summary>`zever check` rejects a rule the handler accepts</summary>
+
+The schema expression has a typo or unsupported constraint; the resolver is the authority.
+</details>
+
+<details>
+<summary>Clients get 400 for business errors</summary>
+
+Return 400 only for unparsable bodies, 422 for well-formed invalid values.
+</details>
+
+<details>
+<summary>409 never fires on duplicates</summary>
+
+The RPC lacks `errors: { already_exists }`, or the handler misses the conflict.
+</details>
+
+<details>
+<summary>Boot fails on a config typo</summary>
+
+Strict decoding rejects unknown file fields. Use the snake_case key (`max_conns`, not `maxconns`).
+</details>
+
+## Related
+
+<CardGrid>
+  <LinkCard title="Errors" href="../errors/" description="Typed errors." />
+  <LinkCard title="Requests and responses" href="../requests-responses/" description="Body decoding." />
+  <LinkCard title="Routing" href="../routing/" description="Route validation." />
+</CardGrid>

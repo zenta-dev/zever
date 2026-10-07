@@ -10,7 +10,11 @@ type noopProvider struct{}
 
 type noopTracer struct{}
 
-type noopSpan struct{}
+type noopSpan struct {
+	kind  observability.SpanKind
+	attrs []observability.Attr
+	links []observability.SpanLink
+}
 
 type noopMetrics struct{}
 
@@ -38,3 +42,10 @@ func (noopMetrics) Histogram(context.Context, string, float64, ...observability.
 func (noopTracer) Start(ctx context.Context, _ string) (context.Context, observability.Span) {
 	return ctx, noopSpan{}
 }
+
+func (noopTracer) StartSpan(ctx context.Context, _ string, opts ...observability.SpanStartOption) (context.Context, observability.Span) {
+	cfg := observability.NewSpanConfig(opts...)
+	return ctx, noopSpan{kind: cfg.Kind, attrs: cfg.Attrs, links: cfg.Links}
+}
+
+var _ observability.SpanStarter = noopTracer{}

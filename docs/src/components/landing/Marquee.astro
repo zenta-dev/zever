@@ -1,0 +1,44 @@
+---
+import { SERVICES } from '../../data/landing';
+
+const chips = Object.entries(SERVICES).flatMap(([svc, adapters]) => adapters.map((a) => ({ svc, a })));
+const mid = Math.ceil(chips.length / 2);
+const rows = [chips.slice(0, mid), chips.slice(mid)];
+---
+
+<div class="zl-mq" aria-label="Supported services and adapters" role="group">
+  {rows.map((row, r) => (
+    <div class="zl-mq-row" data-dir={r === 0 ? 'fwd' : 'rev'} aria-hidden="true">
+      <div class="zl-mq-track">
+        {[0, 1].map(() => (
+          <ul class="zl-mq-list">
+            {row.map((c) => <li class="zl-mq-chip"><i>{c.svc}</i>{c.a}</li>)}
+          </ul>
+        ))}
+      </div>
+    </div>
+  ))}
+  <ul class="zl-mq-static">
+    {chips.map((c) => <li class="zl-mq-chip"><i>{c.svc}</i>{c.a}</li>)}
+  </ul>
+</div>
+
+<style>
+  .zl-mq { display: grid; gap: 0.6rem; padding-block: 1.25rem; }
+  .zl-mq-row { overflow: hidden; mask-image: linear-gradient(90deg, transparent, #000 8%, #000 92%, transparent); -webkit-mask-image: linear-gradient(90deg, transparent, #000 8%, #000 92%, transparent); }
+  .zl-mq-track { display: flex; width: max-content; animation: zl-mq 80s linear infinite; will-change: transform; }
+  .zl-mq-row[data-dir='rev'] .zl-mq-track { animation-direction: reverse; animation-duration: 95s; }
+  .zl-mq-row:hover .zl-mq-track, .zl-mq-row:focus-within .zl-mq-track, .zl-mq-row:active .zl-mq-track { animation-play-state: paused; }
+  @keyframes zl-mq { to { transform: translateX(-50%); } }
+  .zl-mq-list, .zl-mq-static { list-style: none; margin: 0; padding: 0; display: flex; flex: none; gap: 0.6rem; padding-right: 0.6rem; }
+  .zl-mq-chip { display: inline-flex; align-items: center; gap: 0.45rem; padding: 0.5rem 0.9rem; border: 1px solid var(--zl-line); border-radius: 999px; background: var(--zl-surface); font: 0.78rem/1 var(--zl-font-mono); color: var(--zl-text); white-space: nowrap; transition: border-color 0.25s, background 0.25s; }
+  .zl-mq-chip i { font-style: normal; color: var(--zl-text-3); }
+  .zl-mq-chip i::after { content: '/'; margin-left: 0.45rem; opacity: 0.6; }
+  .zl-mq-chip:hover { border-color: var(--zl-accent); background: var(--zl-surface-2); }
+  /* Static list: screen-reader only normally, visible wrapped grid for reduced motion. */
+  .zl-mq-static { position: absolute; width: 1px; height: 1px; overflow: hidden; clip: rect(0 0 0 0); padding: 0; }
+  @media (prefers-reduced-motion: reduce) {
+    .zl-mq-row { display: none; }
+    .zl-mq-static { position: static; width: auto; height: auto; overflow: visible; clip: auto; flex-wrap: wrap; justify-content: center; padding: 0; }
+  }
+</style>

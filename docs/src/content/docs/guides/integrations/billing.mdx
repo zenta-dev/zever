@@ -1,0 +1,106 @@
+---
+title: Billing
+description: Manage customers, subscriptions, and invoices with a stub, Stripe, or Paddle adapter.
+---
+
+import { LinkCard, CardGrid } from '@astrojs/starlight/components';
+
+`billing.Billing` is one facade over provider APIs for customers, subscriptions, and invoices, in minor units. Use [Payments](../payment/) for the charge.
+
+## Quick start
+
+`stub` is the default: zero-infra, in memory, safe in tests.
+
+```yaml title="zever.yaml"
+billing:
+  adapter: stub
+  options:
+    sandbox: true
+```
+
+Provider keys come from `shared/providersopt`: `secret_key` (Stripe), `api_key` (Paddle), `endpoint` (absolute URL), `sandbox`. Env vars mirror the keys. See the [billing config reference](../../../reference/config/#billing).
+
+```go title="main.go"
+package main
+
+import (
+	"context"
+	"fmt"
+
+	billingstub "github.com/zenta-dev/zever/adapters/billing/stub"
+	"github.com/zenta-dev/zever/config"
+	"github.com/zenta-dev/zever/container"
+)
+
+func main() {
+	billingstub.Register() // container wires nothing
+	c := container.New(config.Default())
+	ctx := context.Background()
+	defer c.Close(ctx)
+
+	b, err := c.Billing()
+	if err != nil {
+		panic(err)
+	}
+	cust, _ := b.CreateCustomer(ctx, "Ada", "ada@example.com", "key-1")
+	sub, _ := b.CreateSubscription(ctx, cust.ID, "plan-pro", "key-2")
+	inv, _ := b.GetInvoice(ctx, cust.ID)
+	fmt.Println("customer:", cust.ID)
+	fmt.Println("subscription:", sub.ID, string(sub.Status))
+	fmt.Println("invoice due:", inv.AmountDue)
+	_ = b.Close()
+}
+```
+
+Expected output with `stub` (IDs are `cus_`/`sub_` plus a random ULID, so they vary):
+
+```text
+customer: cus_01J0000000000000000000000
+subscription: sub_01J0000000000000000000001 active
+invoice due: 0
+```
+
+## Pass minor units and idempotency keys
+
+Amounts are `int64` minor units (cents, not dollars); format with the currency exponent helpers, since not every currency has two decimals. Pass a stable idempotency key on each create so retries never double-create.
+
+## Choose an adapter
+
+| Adapter | Package | Notes |
+|---|---|---|
+| `stub` | `adapters/billing/stub` | Default. In memory, ULID-identified records. |
+| `stripe` | `adapters/billing/stripe` | Needs `secret_key`. |
+| `paddle` | `adapters/billing/paddle` | Needs `api_key`. |
+
+## Production checklist
+
+- `billing` is not the system of record; the provider is, giving typed create/query without per-provider HTTP.
+- `SecretKey` and `APIKey` never surface in errors or logs. Hold them in [Secrets](../../security/secrets/).
+
+## Troubleshooting
+
+<details>
+<summary>Tests hit the real provider</summary>
+
+Cause: the adapter was overridden. Fix: check `BILLING_ADAPTER` and the `adapter` field; `config.Default()` picks `stub`.
+</details>
+
+<details>
+<summary>`Validate` rejects `endpoint`</summary>
+
+Cause: a custom endpoint must be an absolute URL with scheme and host. Fix: correct the URL.
+</details>
+
+<details>
+<summary>Amounts are off by a factor of 100</summary>
+
+Cause: major units passed where minor units belong. Fix: multiply by the currency exponent (`ParseMinorUnits`) before create.
+</details>
+
+## Related
+
+<CardGrid>
+  <LinkCard title="Payments" href="../payment/" />
+  <LinkCard title="Secrets" href="../../security/secrets/" />
+  <LinkCard title="Container" href="../../../concepts/container/" />
+</CardGrid>

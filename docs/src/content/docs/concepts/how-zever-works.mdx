@@ -1,0 +1,50 @@
+---
+title: How Zever works
+description: One-page overview of the path from a .zen schema through the compiler and container to swappable adapters.
+---
+
+import { LinkCard, CardGrid } from '@astrojs/starlight/components';
+
+Zever turns a `.zen` schema into typed code at compile time, then wires every backend concern through one container at run time. It generates the plumbing, never your business logic.
+
+## The mental model
+
+```text
+ compile time                              run time
+ ------------                              --------
+ schema.zen -> compiler -> generated/      config -> container -> adapters
+   (dsl)       lexer          ORM, routes,   defaults   lazy        db, cache,
+               parser         OpenAPI, DDL   < file     accessors   queue, ...
+               resolver                      < env      Close(ctx)
+               backends
+```
+
+The two halves meet at generated code only. Your running service imports generated output, `config`, `container`, and adapters. It never imports the compiler.
+
+## How the pieces fit
+
+| Stage | What happens | Read more |
+|---|---|---|
+| Schema | You describe entities, services, and RPCs in `.zen` files. | [Syntax](../../reference/zen-syntax/) |
+| Compiler | Lexer, parser, and resolver turn source into one `ir.Schema`, reporting every problem in a single run. | [Resolver and IR](../resolver-ir/) |
+| Backends | Each backend reads the IR and writes files: ORM bindings, protobuf, OpenAPI, Atlas HCL. | [Backends](../backends/) |
+| Boundary | Compiler packages are compile-time only; runtime packages never import `dsl`. | [Compiler boundary](../compiler-boundary/) |
+| Config | Strict, layered `defaults < file < env` selects an adapter per service. | [Configuration](../../guides/operate/configuration/) |
+| Container | One per process; each service resolves lazily on first use and closes in dependency order. | [Container](../container/) |
+| Adapters | Small interfaces with swappable, explicitly registered adapters. | [Providers and adapters](../providers-adapters/) |
+| Process | Load, build, resolve on first use, close. | [Lifecycle](../lifecycle/) |
+
+## Why it works this way
+
+- **Swapping is config.** Changing `sqlite` to `postgres` or `memory` to `redis` edits config, never call sites.
+- **No hidden wiring.** There are no globals and no `init()` registration: you call each adapter's `Register()` yourself.
+- **Compile-time cost, run-time speed.** Parsing and resolving happen once, ahead of time, so request-time code stays plain Go.
+
+## Related
+
+<CardGrid>
+  <LinkCard title="Quickstart" description="Run the whole path in five commands." href="../../start/quickstart/" />
+  <LinkCard title="Lifecycle" description="The four process phases." href="../lifecycle/" />
+  <LinkCard title="Container" description="Accessors and ordered close." href="../container/" />
+  <LinkCard title="Compiler boundary" description="Why runtime never imports dsl." href="../compiler-boundary/" />
+</CardGrid>

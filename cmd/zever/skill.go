@@ -22,7 +22,7 @@ func renderSkill(root *cobra.Command) string {
 
 	b.WriteString("---\n")
 	b.WriteString("name: zever\n")
-	b.WriteString("description: Use when scaffolding, inspecting, or running a zever Go application: scaffold apps and batteries, validate and compile .zen schemas, run servers and workers, or drive the CLI from scripts. Trigger on requests like \"scaffold zever app\", \"add battery\", \"check schema\", \"compile schemas\", or \"run zever\".\n")
+	b.WriteString("description: \"Use when scaffolding, inspecting, or running a zever Go application: scaffold apps and batteries, validate and compile .zen schemas, run servers and workers, or drive the CLI from scripts. Trigger on requests like \\\"scaffold zever app\\\", \\\"add battery\\\", \\\"check schema\\\", \\\"compile schemas\\\", or \\\"run zever\\\".\"\n")
 	b.WriteString("---\n\n")
 
 	b.WriteString("# zever skill\n\n")
@@ -33,7 +33,7 @@ func renderSkill(root *cobra.Command) string {
 	b.WriteString("- `zever --json <command>`: JSON envelope `{ok, command, exitCode, data?, error?}` on stdout. Exit codes: 0 success, 1 runtime error, 2 flag misuse.\n")
 	b.WriteString("- `zever --help --agent`: machine-readable command catalog (this list, as JSON).\n")
 	b.WriteString("- `compile`, `check`, `explain`, `doctor` emit structured `data` under `--json`.\n")
-	b.WriteString("- MCP server: build `tools/zever-mcp` and register the binary as an MCP stdio server (`zever_compile`, `zever_schema`, `zever_explain`).\n\n")
+	b.WriteString("- MCP server: build `tools/zever-mcp` and register the binary as an MCP stdio server (`zever_compile`, `zever_schema`, `zever_explain`, `zever_doctor`, `zever_generate`).\n\n")
 
 	b.WriteString("## Workflows\n\n")
 	b.WriteString("### Scaffold and run\n\n")

@@ -11,7 +11,8 @@
     "auth": { "$ref": "#/$defs/service", "type": "object", "properties": { "adapter": { "enum": ["jwt", "session", "oidc"] }, "options": { "$ref": "#/$defs/authOptions" } } },
     "billing": { "$ref": "#/$defs/service", "type": "object", "properties": { "adapter": { "enum": ["stub", "stripe", "paddle"] }, "options": { "$ref": "#/$defs/providersCommon" } } },
     "cache": { "$ref": "#/$defs/service", "type": "object", "properties": { "adapter": { "enum": ["memory", "redis", "db"] }, "options": { "$ref": "#/$defs/cacheOptions" } } },
-    "crypto": { "$ref": "#/$defs/service", "type": "object", "properties": { "adapter": { "enum": ["local"] }, "options": { "$ref": "#/$defs/cryptoOptions" } } },
+    "cdn": { "$ref": "#/$defs/service", "type": "object", "properties": { "adapter": { "enum": ["noop", "cloudflare"] }, "options": { "$ref": "#/$defs/cdnOptions" } } },
+    "crypto": { "$ref": "#/$defs/service", "type": "object", "properties": { "adapter": { "enum": ["local", "kms"] }, "options": { "$ref": "#/$defs/cryptoOptions" } } },
     "db": { "$ref": "#/$defs/service", "type": "object", "properties": { "adapter": { "enum": ["sqlite", "postgres"] }, "options": { "$ref": "#/$defs/dbOptions" } } },
     "document": { "$ref": "#/$defs/service", "type": "object", "properties": { "adapter": { "enum": ["local", "remote", "latex"] }, "options": { "$ref": "#/$defs/documentOptions" } } },
     "eventbus": { "$ref": "#/$defs/service", "type": "object", "properties": { "adapter": { "enum": ["memory", "redis"] }, "options": { "$ref": "#/$defs/eventbusOptions" } } },
@@ -25,11 +26,13 @@
     "media": { "$ref": "#/$defs/service", "type": "object", "properties": { "adapter": { "enum": ["local", "s3"] }, "options": { "$ref": "#/$defs/mediaOptions" } } },
     "notification": { "$ref": "#/$defs/service", "type": "object", "properties": { "adapter": { "enum": ["log", "twilio", "fcm"] }, "options": { "$ref": "#/$defs/notificationOptions" } } },
     "observability": { "$ref": "#/$defs/service", "type": "object", "properties": { "adapter": { "enum": ["noop", "stdout", "otlp"] }, "options": { "$ref": "#/$defs/observabilityOptions" } } },
+    "outbox": { "$ref": "#/$defs/service", "type": "object", "properties": { "adapter": { "enum": ["memory", "db", "cdc"] }, "options": { "$ref": "#/$defs/outboxOptions" } } },
     "password": { "$ref": "#/$defs/service", "type": "object", "properties": { "adapter": { "enum": ["argon2id"] }, "options": { "$ref": "#/$defs/passwordOptions" } } },
     "payment": { "$ref": "#/$defs/service", "type": "object", "properties": { "adapter": { "enum": ["stub", "stripe", "paddle"] }, "options": { "$ref": "#/$defs/paymentOptions" } } },
     "permission": { "$ref": "#/$defs/service", "type": "object", "properties": { "adapter": { "enum": ["noop", "rbac", "casbin"] }, "options": { "$ref": "#/$defs/permissionOptions" } } },
     "queue": { "$ref": "#/$defs/service", "type": "object", "properties": { "adapter": { "enum": ["memory", "redis", "db"] }, "options": { "$ref": "#/$defs/queueOptions" } } },
     "ratelimit": { "$ref": "#/$defs/service", "type": "object", "properties": { "adapter": { "enum": ["memory", "redis"] }, "options": { "$ref": "#/$defs/ratelimitOptions" } } },
+    "resilience": { "$ref": "#/$defs/service", "type": "object", "properties": { "adapter": { "enum": ["memory", "redis"] }, "options": { "$ref": "#/$defs/resilienceOptions" } } },
     "router": { "$ref": "#/$defs/service", "type": "object", "properties": { "adapter": { "enum": ["fiber", "stdhttp"] }, "options": { "$ref": "#/$defs/routerOptions" } } },
     "scheduler": { "$ref": "#/$defs/service", "type": "object", "properties": { "adapter": { "enum": ["embedded", "postgres"] }, "options": { "$ref": "#/$defs/schedulerOptions" } } },
     "search": { "$ref": "#/$defs/service", "type": "object", "properties": { "adapter": { "enum": ["db", "postgres", "meilisearch", "sqlite"] }, "options": { "$ref": "#/$defs/searchOptions" } } },
@@ -57,38 +60,12 @@
       "description": "time.Duration serialized as an integer count of nanoseconds in JSON/YAML config files (e.g. 5s = 5000000000). Not a Go duration string -- \"5s\" style strings only work for environment-variable overrides, never inside zever.yaml/.yml/.json."
     },
 
-    "zredisConnectOptions": {
-      "type": "object",
-      "additionalProperties": false,
-      "properties": {
-        "addr": { "type": "string", "description": "host:port, or redis:// / rediss:// URL. Empty means localhost:6379." },
-        "password": { "type": "string" },
-        "db": { "type": "integer" },
-        "tls": { "type": "boolean", "description": "Enable TLS (1.2 floor) for a plain host:port address." },
-        "require_tls": { "type": "boolean", "description": "Fail fast instead of silently connecting in plaintext when TLS would not be used." }
-      }
-    },
-    "zredisOptions": {
-      "type": "object",
-      "additionalProperties": false,
-      "properties": {
-        "addr": { "type": "string" },
-        "password": { "type": "string" },
-        "db": { "type": "integer" },
-        "tls": { "type": "boolean" },
-        "require_tls": { "type": "boolean" },
-        "pool_size": { "type": "integer" },
-        "min_idle_conns": { "type": "integer" },
-        "pool_timeout": { "$ref": "#/$defs/durationNs" },
-        "max_conn_idle_time": { "$ref": "#/$defs/durationNs" },
-        "max_conn_lifetime": { "$ref": "#/$defs/durationNs" }
-      }
-    },
     "zredisOptionsWithPrefix": {
       "type": "object",
       "additionalProperties": false,
       "description": "zredis.Options embedded plus a Prefix field -- used by eventbus/idempotency/ratelimit/session Redis adapters.",
       "properties": {
+        "url": { "type": "string", "description": "Reserved and currently ignored; present for schema parity with zredis.Options.URL. Use addr to actually select a server." },
         "addr": { "type": "string" },
         "password": { "type": "string" },
         "db": { "type": "integer" },
@@ -114,6 +91,22 @@
       }
     },
 
+    "retryPolicy": {
+      "type": "object",
+      "additionalProperties": false,
+      "description": "retry.Policy (shared/retry) carries NO json/yaml/toml struct tags, so it decodes by case-insensitive Go field name, not snake_case: BaseDelay / MaxDelay / Multiplier / Linear / Jitter / JitterMode / JitterMax / MaxAttempts. The lowercase keys below are those same fields matched case-insensitively; snake_case keys such as base_delay are rejected as unknown fields. OnRetry is a Go-only callback (json:\"-\") and is not settable from a file.",
+      "properties": {
+        "basedelay": { "$ref": "#/$defs/durationNs", "description": "Go field BaseDelay: delay before the first retry (attempt 1)." },
+        "maxdelay": { "$ref": "#/$defs/durationNs", "description": "Go field MaxDelay: caps the computed delay before jitter. Zero or negative means unbounded." },
+        "multiplier": { "type": "number", "description": "Go field Multiplier: scales BaseDelay per attempt. Values <= 1 disable growth. Ignored when linear is true." },
+        "linear": { "type": "boolean", "description": "Go field Linear: switches from exponential to linear growth." },
+        "jitter": { "type": "number", "minimum": 0, "maximum": 1, "description": "Go field Jitter: fraction of the computed delay to randomize, clamped to [0, 1]." },
+        "jittermode": { "type": "integer", "description": "Go field JitterMode: 0=JitterSymmetric, 1=JitterAdditive, 2=JitterFlat." },
+        "jittermax": { "$ref": "#/$defs/durationNs", "description": "Go field JitterMax: upper bound of a flat, delay-independent jitter draw (JitterFlat only)." },
+        "maxattempts": { "type": "integer", "description": "Go field MaxAttempts: total attempts including the first. Zero or negative means 1 (no retries)." }
+      }
+    },
+
     "aiOptions": {
       "type": "object",
       "additionalProperties": false,
@@ -121,6 +114,7 @@
         "api_key": { "type": "string" },
         "model": { "type": "string" },
         "base_url": { "type": "string", "description": "Must be a valid https URL when set." },
+        "allow_insecure": { "type": "boolean", "description": "Permit an http base_url and disable TLS verification for loopback test servers. Default false." },
         "timeout": { "$ref": "#/$defs/durationNs" }
       }
     },
@@ -147,7 +141,8 @@
             "secret": { "type": "string", "description": "HMAC signing secret, minimum 32 bytes (adapter-validated)." },
             "issuer": { "type": "string", "description": "Required by the jwt adapter." },
             "audience": { "type": "string" },
-            "max_ttl": { "$ref": "#/$defs/durationNs", "description": "Zero means no cap." }
+            "max_ttl": { "$ref": "#/$defs/durationNs", "description": "Zero means no cap." },
+            "leeway": { "$ref": "#/$defs/durationNs", "description": "Clock-skew tolerance when validating exp/nbf. Zero (default) means strict validation; negative fails Validate." }
           }
         },
         "session": {
@@ -162,7 +157,8 @@
           "properties": {
             "issuer": { "type": "string", "description": "Required by the oidc adapter." },
             "client_id": { "type": "string", "description": "Required by the oidc adapter." },
-            "timeout": { "$ref": "#/$defs/durationNs" }
+            "timeout": { "$ref": "#/$defs/durationNs" },
+            "allow_insecure": { "type": "boolean", "description": "Permit an http:// issuer (and a private-address issuer) for testing. Default false (https and public addresses only)." }
           }
         }
       }
@@ -195,12 +191,26 @@
         "dedicated_pool": { "type": "boolean", "description": "Opt out of container-level pool sharing; default false shares one pool per exact DSN, true opens a private pool." }
       }
     },
+    "cdnOptions": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "api_token": { "type": "string" },
+        "zone_id": { "type": "string" },
+        "base_url": { "type": "string" }
+      }
+    },
     "cryptoOptions": {
       "type": "object",
       "additionalProperties": false,
       "properties": {
-        "key": { "type": "string", "description": "Required. Base64-encoded 32-byte encryption key." },
-        "sign_key": { "type": "string", "description": "Base64-encoded 64-byte signing key." }
+        "key": { "type": "string", "description": "Base64-encoded 32-byte encryption key. Required for the local adapter; optional for the kms adapter when any KMS field is set." },
+        "sign_key": { "type": "string", "description": "Base64-encoded 64-byte signing key." },
+        "key_id": { "type": "string", "description": "Primary KMS key identifier used for envelope encryption. Required when use_envelope is true." },
+        "key_ids": { "type": "array", "items": { "type": "string" }, "description": "Accepted KMS key identifiers for rotation; Decrypt accepts envelopes sealed under key_id or any entry here." },
+        "region": { "type": "string", "description": "KMS region (for example an AWS region)." },
+        "endpoint": { "type": "string", "description": "Overrides the KMS endpoint (custom KMS, tests, VPC endpoints); must include scheme and host." },
+        "use_envelope": { "type": "boolean", "description": "Selects KMS envelope encryption. When true, key_id is required." }
       }
     },
     "dbOptions": {
@@ -225,6 +235,7 @@
         "quality": { "type": "integer", "minimum": 0, "maximum": 100 },
         "dpi": { "type": "integer", "minimum": 0 },
         "endpoint": { "type": "string" },
+        "allow_insecure": { "type": "boolean", "description": "Permit an http endpoint for testing. Default false (https only)." },
         "api_key": { "type": "string" },
         "latex_command": { "type": "string", "description": "Default: pdflatex." },
         "latex_pdf_to_ppm": { "type": "string", "description": "Default: pdftoppm." },
@@ -305,7 +316,8 @@
         "ttl": { "$ref": "#/$defs/durationNs", "description": "Zero means adapter default (24h)." },
         "dsn": { "type": "string", "description": "Postgres connection string or sqlite path for the db adapter; empty selects a private in-memory database." },
         "dedicated_pool": { "type": "boolean", "description": "Opt out of container-level pool sharing; default false shares one pool per exact DSN, true opens a private pool." },
-        "redis": { "$ref": "#/$defs/zredisOptionsWithPrefix" }
+        "redis": { "$ref": "#/$defs/zredisOptionsWithPrefix" },
+        "max_entries": { "type": "integer", "description": "Memory adapter record-table bound before LRU eviction. Non-positive means the adapter default (1000)." }
       }
     },
     "lockOptions": {
@@ -407,6 +419,28 @@
         "attr_value_limit": { "type": "integer", "description": "0 (default) or 256-16384." }
       }
     },
+    "outboxOptions": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "dsn": { "type": "string", "description": "Postgres connection string or sqlite path for the db adapter; empty selects a private in-memory database." },
+        "table": { "type": "string", "description": "Outbox table name. Empty means the adapter default (\"outbox\")." },
+        "inbox_table": { "type": "string", "description": "Inbox table name. Empty means the adapter default (\"inbox\")." },
+        "publisher": { "type": "string", "enum": ["", "eventbus", "queue"], "description": "Records which transport the relay publishes through. Informational only." },
+        "poll_interval": { "$ref": "#/$defs/durationNs", "description": "Relay poll cadence. Zero means the adapter default (1s)." },
+        "batch_size": { "type": "integer", "description": "Messages one poll claims. Zero means the adapter default (100)." },
+        "max_attempts": { "type": "integer", "description": "Publish attempt cap before a message is marked failed. Zero means the adapter default (5)." },
+        "retry": { "$ref": "#/$defs/retryPolicy" },
+        "retention": { "$ref": "#/$defs/durationNs", "description": "How long processed messages are kept. Zero means the adapter default (168h)." },
+        "lock_seconds": { "type": "integer", "description": "Claim lease in seconds. Zero means the adapter default (30)." },
+        "notify_channel": { "type": "string", "description": "Postgres LISTEN/NOTIFY channel (cdc adapter)." },
+        "prefix": { "type": "string", "description": "Logical-replication message prefix (cdc adapter)." },
+        "slot": { "type": "string", "description": "Logical-replication slot name (cdc adapter)." },
+        "publication": { "type": "string", "description": "Logical-replication publication name (cdc adapter)." },
+        "dedicated_pool": { "type": "boolean", "description": "Opt out of container-level pool sharing; default false shares one pool per exact DSN, true opens a private pool." },
+        "stall_readiness": { "type": "boolean", "description": "Opts the relay into the container readiness aggregate; default false keeps readiness dependency-based." }
+      }
+    },
     "passwordOptions": {
       "type": "object",
       "additionalProperties": false,
@@ -487,6 +521,42 @@
         "burst": { "type": "integer", "exclusiveMinimum": 0, "description": "Required." },
         "idle_ttl": { "$ref": "#/$defs/durationNs", "description": "Zero means adapter default (10m)." },
         "sweep_interval": { "$ref": "#/$defs/durationNs", "description": "Zero means adapter default (1m)." },
+        "redis": { "$ref": "#/$defs/zredisOptionsWithPrefix" },
+        "max_entries": { "type": "integer", "description": "Memory adapter bucket-table bound before LRU eviction. Non-positive means the adapter default (1000)." }
+      }
+    },
+    "breakerOptions": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "enabled": { "type": "boolean", "description": "Turns the circuit breaker on." },
+        "max_requests": { "type": "integer", "minimum": 0, "description": "Probes allowed while half-open." },
+        "interval": { "$ref": "#/$defs/durationNs", "description": "Closed-state window before counts reset." },
+        "bucket_period": { "$ref": "#/$defs/durationNs", "description": "Rolling-window bucket width; interval becomes a multiple of it." },
+        "timeout": { "$ref": "#/$defs/durationNs", "description": "Open-state duration before the breaker half-opens." },
+        "min_requests": { "type": "integer", "description": "Minimum request count before the failure ratio applies." },
+        "failure_ratio": { "type": "number", "minimum": 0, "maximum": 1, "description": "Failure ratio in [0,1] that trips the breaker." },
+        "consecutive_failures": { "type": "integer", "description": "Trips the breaker after this many consecutive failures." }
+      }
+    },
+    "bulkheadOptions": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "max_concurrent": { "type": "integer", "description": "Concurrent executions admitted; <= 0 disables the bulkhead." },
+        "max_queue": { "type": "integer", "description": "Bounds waiters; <= 0 is unbounded." },
+        "max_wait": { "$ref": "#/$defs/durationNs", "description": "How long a caller waits for a slot; <= 0 waits indefinitely." }
+      }
+    },
+    "resilienceOptions": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "name": { "type": "string", "description": "Base name applied to the breaker." },
+        "timeout": { "$ref": "#/$defs/durationNs", "description": "Bounds the whole operation, including retries." },
+        "retry": { "$ref": "#/$defs/retryPolicy" },
+        "breaker": { "$ref": "#/$defs/breakerOptions" },
+        "bulkhead": { "$ref": "#/$defs/bulkheadOptions" },
         "redis": { "$ref": "#/$defs/zredisOptionsWithPrefix" }
       }
     },
@@ -514,7 +584,8 @@
         "host": { "type": "string", "description": "Meilisearch URL; required by the meilisearch adapter." },
         "api_key": { "type": "string" },
         "dsn": { "type": "string", "description": "Postgres URL or sqlite path; required by postgres/sqlite adapters." },
-        "dedicated_pool": { "type": "boolean", "description": "Opt out of container-level pool sharing; default false shares one pool per exact DSN, true opens a private pool." }
+        "dedicated_pool": { "type": "boolean", "description": "Opt out of container-level pool sharing; default false shares one pool per exact DSN, true opens a private pool." },
+        "allow_insecure": { "type": "boolean", "description": "Permit an http:// host for testing. Default false (https only)." }
       }
     },
     "secretsOptions": {
@@ -600,7 +671,8 @@
         "url": { "type": "string", "description": "Qdrant address." },
         "api_key": { "type": "string" },
         "dimension": { "type": "integer", "minimum": 0, "description": "Default: 1536." },
-        "dedicated_pool": { "type": "boolean", "description": "Opt out of container-level pool sharing; default false shares one pool per exact DSN, true opens a private pool." }
+        "dedicated_pool": { "type": "boolean", "description": "Opt out of container-level pool sharing; default false shares one pool per exact DSN, true opens a private pool." },
+        "allow_insecure": { "type": "boolean", "description": "Permit an http:// URL for testing. Default false (https only)." }
       }
     },
     "webhookOptions": {

@@ -29,10 +29,14 @@ type store struct {
 	prefix      string
 	slot        string
 	publication string
+	// pubMu guards publisher, which application wiring attaches after New
+	// (see SetPublisher) while the consumer goroutine reads it per message.
+	pubMu       sync.RWMutex
 	publisher   outbox.Publisher
 	retry       retry.Policy
 	maxAttempts int
 	sleep       sleepFunc
+	recorder    outbox.Recorder
 
 	// lastLSN is the replication position safe to acknowledge: it only
 	// advances past messages that were published (or filtered out).
@@ -50,8 +54,12 @@ type store struct {
 	closed  bool
 }
 
-// compile-time check that store satisfies the outbox.Store interface.
-var _ outbox.Store = (*store)(nil)
+// compile-time check that store satisfies the outbox.Store and
+// outbox.PublisherSetter interfaces.
+var (
+	_ outbox.Store           = (*store)(nil)
+	_ outbox.PublisherSetter = (*store)(nil)
+)
 
 // New creates a CDC-backed outbox store from o. The DSN must point at a
 // PostgreSQL server with wal_level=logical. Publisher may be nil for
@@ -88,6 +96,7 @@ func New(o Options) (outbox.Store, error) {
 		retry:       o.Retry,
 		maxAttempts: maxAttempts,
 		sleep:       sleepCtx,
+		recorder:    outbox.NewRecorder(o.Provider, string(outbox.CDC), "", o.Options.Publisher),
 	}
 
 	return s, nil
@@ -125,6 +134,40 @@ func (s *store) Record(ctx context.Context, tx db.Tx, msg outbox.Message) error 
 // Name returns the adapter name.
 func (s *store) Name() string { return string(outbox.CDC) }
 
+// SetPublisher attaches p as the consumer's destination transport.
+//
+// core/outbox.Options carries only the informational selector string, so a store
+// created from configuration has no Publisher until application wiring (in
+// practice container.OutboxRelay) hands one over. Attach before Start: a
+// consumer that is already streaming republishes the in-flight WAL to the new
+// destination, which is only correct when the two are the same transport.
+//
+// A nil Publisher is ignored rather than stored, so a wiring bug cannot turn a
+// working consumer into one whose every publish panics. SetPublisher is safe
+// for concurrent use with a running consumer; Start reads the publisher under
+// the same lock, so an attach that lands mid-Start is either fully observed or
+// fully missed, never half-applied.
+func (s *store) SetPublisher(p outbox.Publisher) {
+	if p == nil {
+		return
+	}
+
+	s.pubMu.Lock()
+	defer s.pubMu.Unlock()
+
+	s.publisher = p
+}
+
+// relayPublisher returns the attached publisher, or nil when none was wired.
+// The consumer holds no long-lived reference, so an attach is picked up by the
+// next decoded message rather than being lost.
+func (s *store) relayPublisher() outbox.Publisher {
+	s.pubMu.RLock()
+	defer s.pubMu.RUnlock()
+
+	return s.publisher
+}
+
 // Start connects a replication connection, ensures the logical replication
 // slot exists, and launches the consumer loop. It is idempotent and returns
 // an error when no Publisher is wired. On ctx cancel the loop stops.
@@ -140,8 +183,8 @@ func (s *store) Start(ctx context.Context) error {
 		return nil
 	}
 
-	if s.publisher == nil {
-		return fmt.Errorf("cdc: start: publisher is nil: %w", outbox.ErrInvalidOptions)
+	if s.relayPublisher() == nil {
+		return fmt.Errorf("cdc: start: no publisher attached: %w", outbox.ErrInvalidOptions)
 	}
 
 	conn, err := s.connectReplication(ctx)
@@ -296,13 +339,14 @@ func (s *store) Status() outbox.Status {
 }
 
 // setRelayError records the most recent consumer error for Status.
-func (s *store) setRelayError(err error) {
+func (s *store) setRelayError(ctx context.Context, err error) {
 	if err == nil {
 		return
 	}
 
 	str := err.Error()
 	s.relayErr.Store(&str)
+	s.recorder.RelayError(ctx)
 }
 
 // encodeMessage marshals msg to its JSON wire payload.

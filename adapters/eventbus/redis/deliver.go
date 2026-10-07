@@ -4,10 +4,9 @@ import (
 	"context"
 
 	goredis "github.com/redis/go-redis/v9"
-	"go.opentelemetry.io/otel/attribute"
-	"go.opentelemetry.io/otel/trace"
 
 	"github.com/zenta-dev/zever/core/eventbus"
+	"github.com/zenta-dev/zever/shared/msgspan"
 	"github.com/zenta-dev/zever/shared/traceprop"
 )
 
@@ -48,9 +47,12 @@ func (a *adapter) invoke(ctx context.Context, topic string, msg eventbus.Message
 	hctx, cancel := context.WithTimeout(context.WithoutCancel(ctx), a.handlerTimeout)
 	defer cancel()
 
-	hctx, span := traceprop.StartConsumeSpan(hctx, msg.Headers, "eventbus.deliver",
-		trace.WithAttributes(attribute.String("messaging.destination.name", topic)))
-	defer span.End()
+	// Continue the producer trace carried in the headers, then bracket the
+	// handler with the messaging consumer span.
+	hctx = traceprop.Extract(hctx, msg.Headers)
+
+	hctx, finish := msgspan.Consumer(hctx, a.provider, "eventbus", topic, msg.ID.String())
+	defer finish(msgspan.OutcomeOK)
 
 	defer func() {
 		if r := recover(); r != nil && a.onPanic != nil {
