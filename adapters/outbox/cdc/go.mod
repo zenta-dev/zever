@@ -5,10 +5,10 @@ go 1.27.0
 require (
 	github.com/jackc/pglogrepl v0.0.0-20261003132456-662581bb6bb6
 	github.com/jackc/pgx/v5 v5.11.0
-	github.com/zenta-dev/zever/core/db v0.6.0
-	github.com/zenta-dev/zever/core/observability v0.6.0
-	github.com/zenta-dev/zever/core/outbox v0.6.0
-	github.com/zenta-dev/zever/shared/retry v0.6.0
+	github.com/zenta-dev/zever/core/db v0.5.3
+	github.com/zenta-dev/zever/core/observability v0.5.3
+	github.com/zenta-dev/zever/core/outbox v0.5.3
+	github.com/zenta-dev/zever/shared/retry v0.5.3
 )
 
 require (

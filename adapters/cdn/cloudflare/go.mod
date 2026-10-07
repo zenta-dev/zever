@@ -4,7 +4,7 @@ go 1.27.0
 
 require (
 	github.com/cloudflare/cloudflare-go/v7 v7.12.0
-	github.com/zenta-dev/zever/core/cdn v0.6.0
+	github.com/zenta-dev/zever/core/cdn v0.5.3
 )
 
 require (

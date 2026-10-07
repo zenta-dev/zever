@@ -3,8 +3,8 @@ module github.com/zenta-dev/zever/core/eval
 go 1.27.0
 
 require (
-	github.com/zenta-dev/zever/core/agent v0.6.0
-	github.com/zenta-dev/zever/core/ai v0.6.0
+	github.com/zenta-dev/zever/core/agent v0.5.3
+	github.com/zenta-dev/zever/core/ai v0.5.3
 )
 
 require (

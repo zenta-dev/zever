@@ -5,7 +5,7 @@ go 1.27.0
 require (
 	github.com/chromedp/cdproto v0.0.0-20260714215040-dc233986426f
 	github.com/chromedp/chromedp v0.16.0
-	github.com/zenta-dev/zever/core/document v0.6.0
+	github.com/zenta-dev/zever/core/document v0.5.3
 )
 
 require (

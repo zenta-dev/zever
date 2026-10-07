@@ -11,7 +11,7 @@ require (
 
 require (
 	github.com/rs/zerolog v1.35.1
-	github.com/zenta-dev/zever/core/log v0.6.0
+	github.com/zenta-dev/zever/core/log v0.5.3
 )
 
 replace github.com/zenta-dev/zever/core/log => ../../../core/log

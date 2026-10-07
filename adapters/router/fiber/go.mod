@@ -19,9 +19,9 @@ require (
 	github.com/gofiber/adaptor/v2 v2.2.1
 	github.com/gofiber/fiber/v2 v2.52.15
 	github.com/valyala/fasthttp v1.74.0
-	github.com/zenta-dev/zever/adapters/log/noop v0.6.0
-	github.com/zenta-dev/zever/core/log v0.6.0
-	github.com/zenta-dev/zever/core/router v0.6.0
+	github.com/zenta-dev/zever/adapters/log/noop v0.5.3
+	github.com/zenta-dev/zever/core/log v0.5.3
+	github.com/zenta-dev/zever/core/router v0.5.3
 )
 
 replace github.com/zenta-dev/zever/adapters/log/noop => ../../log/noop

@@ -4,8 +4,8 @@ go 1.27.0
 
 require (
 	firebase.google.com/go/v4 v4.22.0
-	github.com/zenta-dev/zever/core/flag v0.6.0
-	github.com/zenta-dev/zever/shared/firebase v0.6.0
+	github.com/zenta-dev/zever/core/flag v0.5.3
+	github.com/zenta-dev/zever/shared/firebase v0.5.3
 )
 
 require (

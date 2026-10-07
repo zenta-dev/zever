@@ -11,7 +11,7 @@ require (
 
 require (
 	github.com/casbin/casbin/v2 v2.135.0
-	github.com/zenta-dev/zever/core/permission v0.6.0
+	github.com/zenta-dev/zever/core/permission v0.5.3
 )
 
 replace github.com/zenta-dev/zever/core/permission => ../../../core/permission

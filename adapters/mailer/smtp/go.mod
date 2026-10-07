@@ -2,7 +2,7 @@ module github.com/zenta-dev/zever/adapters/mailer/smtp
 
 go 1.27.0
 
-require github.com/zenta-dev/zever/core/mailer v0.6.0
+require github.com/zenta-dev/zever/core/mailer v0.5.3
 
 replace github.com/zenta-dev/zever/core/mailer => ../../../core/mailer
 

@@ -4,53 +4,53 @@ go 1.27.0
 
 require (
 	github.com/google/uuid v1.6.0
-	github.com/zenta-dev/zever/adapters/ai/anthropic v0.6.0
-	github.com/zenta-dev/zever/adapters/analytics/log v0.6.0
-	github.com/zenta-dev/zever/adapters/auth/jwt v0.6.0
-	github.com/zenta-dev/zever/adapters/billing/stub v0.6.0
-	github.com/zenta-dev/zever/adapters/cache/memory v0.6.0
-	github.com/zenta-dev/zever/adapters/crypto/local v0.6.0
-	github.com/zenta-dev/zever/adapters/db/sqlite v0.6.0
-	github.com/zenta-dev/zever/adapters/document/local v0.6.0
-	github.com/zenta-dev/zever/adapters/eventbus/memory v0.6.0
-	github.com/zenta-dev/zever/adapters/flag/static v0.6.0
-	github.com/zenta-dev/zever/adapters/geo/static v0.6.0
-	github.com/zenta-dev/zever/adapters/i18n/embed v0.6.0
-	github.com/zenta-dev/zever/adapters/idempotency/memory v0.6.0
-	github.com/zenta-dev/zever/adapters/lock/memory v0.6.0
-	github.com/zenta-dev/zever/adapters/log/slog v0.6.0
-	github.com/zenta-dev/zever/adapters/mailer/log v0.6.0
-	github.com/zenta-dev/zever/adapters/media/local v0.6.0
-	github.com/zenta-dev/zever/adapters/notification/log v0.6.0
-	github.com/zenta-dev/zever/adapters/observability/stdout v0.6.0
-	github.com/zenta-dev/zever/adapters/password/argon2 v0.6.0
-	github.com/zenta-dev/zever/adapters/payment/stub v0.6.0
-	github.com/zenta-dev/zever/adapters/permission/rbac v0.6.0
-	github.com/zenta-dev/zever/adapters/queue/memory v0.6.0
-	github.com/zenta-dev/zever/adapters/ratelimit/memory v0.6.0
-	github.com/zenta-dev/zever/adapters/router/stdhttp v0.6.0
-	github.com/zenta-dev/zever/adapters/scheduler/embedded v0.6.0
-	github.com/zenta-dev/zever/adapters/search/db v0.6.0
-	github.com/zenta-dev/zever/adapters/secrets/env v0.6.0
-	github.com/zenta-dev/zever/adapters/session/memory v0.6.0
-	github.com/zenta-dev/zever/adapters/storage/local v0.6.0
-	github.com/zenta-dev/zever/adapters/tenant/single v0.6.0
-	github.com/zenta-dev/zever/adapters/vectorstore/db v0.6.0
-	github.com/zenta-dev/zever/adapters/webhook/http v0.6.0
-	github.com/zenta-dev/zever/adapters/workflow/memory v0.6.0
-	github.com/zenta-dev/zever/config v0.6.0
-	github.com/zenta-dev/zever/container v0.6.0
-	github.com/zenta-dev/zever/core/auth v0.6.0
-	github.com/zenta-dev/zever/core/authz v0.6.0
-	github.com/zenta-dev/zever/core/db v0.6.0
-	github.com/zenta-dev/zever/core/job v0.6.0
-	github.com/zenta-dev/zever/core/log v0.6.0
-	github.com/zenta-dev/zever/core/middleware v0.6.0
-	github.com/zenta-dev/zever/core/password v0.6.0
-	github.com/zenta-dev/zever/core/permission v0.6.0
-	github.com/zenta-dev/zever/core/router v0.6.0
-	github.com/zenta-dev/zever/orm v0.6.0
-	github.com/zenta-dev/zever/shared/apperror v0.6.0
+	github.com/zenta-dev/zever/adapters/ai/anthropic v0.5.3
+	github.com/zenta-dev/zever/adapters/analytics/log v0.5.3
+	github.com/zenta-dev/zever/adapters/auth/jwt v0.5.3
+	github.com/zenta-dev/zever/adapters/billing/stub v0.5.3
+	github.com/zenta-dev/zever/adapters/cache/memory v0.5.3
+	github.com/zenta-dev/zever/adapters/crypto/local v0.5.3
+	github.com/zenta-dev/zever/adapters/db/sqlite v0.5.3
+	github.com/zenta-dev/zever/adapters/document/local v0.5.3
+	github.com/zenta-dev/zever/adapters/eventbus/memory v0.5.3
+	github.com/zenta-dev/zever/adapters/flag/static v0.5.3
+	github.com/zenta-dev/zever/adapters/geo/static v0.5.3
+	github.com/zenta-dev/zever/adapters/i18n/embed v0.5.3
+	github.com/zenta-dev/zever/adapters/idempotency/memory v0.5.3
+	github.com/zenta-dev/zever/adapters/lock/memory v0.5.3
+	github.com/zenta-dev/zever/adapters/log/slog v0.5.3
+	github.com/zenta-dev/zever/adapters/mailer/log v0.5.3
+	github.com/zenta-dev/zever/adapters/media/local v0.5.3
+	github.com/zenta-dev/zever/adapters/notification/log v0.5.3
+	github.com/zenta-dev/zever/adapters/observability/stdout v0.5.3
+	github.com/zenta-dev/zever/adapters/password/argon2 v0.5.3
+	github.com/zenta-dev/zever/adapters/payment/stub v0.5.3
+	github.com/zenta-dev/zever/adapters/permission/rbac v0.5.3
+	github.com/zenta-dev/zever/adapters/queue/memory v0.5.3
+	github.com/zenta-dev/zever/adapters/ratelimit/memory v0.5.3
+	github.com/zenta-dev/zever/adapters/router/stdhttp v0.5.3
+	github.com/zenta-dev/zever/adapters/scheduler/embedded v0.5.3
+	github.com/zenta-dev/zever/adapters/search/db v0.5.3
+	github.com/zenta-dev/zever/adapters/secrets/env v0.5.3
+	github.com/zenta-dev/zever/adapters/session/memory v0.5.3
+	github.com/zenta-dev/zever/adapters/storage/local v0.5.3
+	github.com/zenta-dev/zever/adapters/tenant/single v0.5.3
+	github.com/zenta-dev/zever/adapters/vectorstore/db v0.5.3
+	github.com/zenta-dev/zever/adapters/webhook/http v0.5.3
+	github.com/zenta-dev/zever/adapters/workflow/memory v0.5.3
+	github.com/zenta-dev/zever/config v0.5.3
+	github.com/zenta-dev/zever/container v0.5.3
+	github.com/zenta-dev/zever/core/auth v0.5.3
+	github.com/zenta-dev/zever/core/authz v0.5.3
+	github.com/zenta-dev/zever/core/db v0.5.3
+	github.com/zenta-dev/zever/core/job v0.5.3
+	github.com/zenta-dev/zever/core/log v0.5.3
+	github.com/zenta-dev/zever/core/middleware v0.5.3
+	github.com/zenta-dev/zever/core/password v0.5.3
+	github.com/zenta-dev/zever/core/permission v0.5.3
+	github.com/zenta-dev/zever/core/router v0.5.3
+	github.com/zenta-dev/zever/orm v0.5.3
+	github.com/zenta-dev/zever/shared/apperror v0.5.3
 	google.golang.org/genproto/googleapis/api v0.0.0-20260819154853-08b0e4226688
 	google.golang.org/grpc v1.83.2
 	google.golang.org/protobuf v1.36.12
@@ -199,9 +199,7 @@ replace github.com/zenta-dev/zever/shared/httpclient => ../../shared/httpclient
 replace github.com/zenta-dev/zever/shared/lrucache => ../../shared/lrucache
 
 replace github.com/zenta-dev/zever/shared/msgspan => ../../shared/msgspan
-
 replace github.com/zenta-dev/zever/shared/outboxbridge => ../../shared/outboxbridge
-
 replace github.com/zenta-dev/zever/shared/providersopt => ../../shared/providersopt
 
 replace github.com/zenta-dev/zever/shared/redisclient => ../../shared/redisclient

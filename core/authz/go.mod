@@ -3,9 +3,9 @@ module github.com/zenta-dev/zever/core/authz
 go 1.27.0
 
 require (
-	github.com/zenta-dev/zever/core/auth v0.6.0
-	github.com/zenta-dev/zever/core/permission v0.6.0
-	github.com/zenta-dev/zever/shared/codec v0.6.0
+	github.com/zenta-dev/zever/core/auth v0.5.3
+	github.com/zenta-dev/zever/core/permission v0.5.3
+	github.com/zenta-dev/zever/shared/codec v0.5.3
 	google.golang.org/grpc v1.83.2
 	google.golang.org/protobuf v1.36.12
 )

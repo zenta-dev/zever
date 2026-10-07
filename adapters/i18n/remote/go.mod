@@ -3,10 +3,10 @@ module github.com/zenta-dev/zever/adapters/i18n/remote
 go 1.27.0
 
 require (
-	github.com/zenta-dev/zever/core/i18n v0.6.0
-	github.com/zenta-dev/zever/shared/codec v0.6.0
-	github.com/zenta-dev/zever/shared/httpclient v0.6.0
-	github.com/zenta-dev/zever/shared/lrucache v0.6.0
+	github.com/zenta-dev/zever/core/i18n v0.5.3
+	github.com/zenta-dev/zever/shared/codec v0.5.3
+	github.com/zenta-dev/zever/shared/httpclient v0.5.3
+	github.com/zenta-dev/zever/shared/lrucache v0.5.3
 )
 
 require (

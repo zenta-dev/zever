@@ -3,9 +3,9 @@ module github.com/zenta-dev/zever/shared/outboxbridge
 go 1.27.0
 
 require (
-	github.com/zenta-dev/zever/core/eventbus v0.6.0
-	github.com/zenta-dev/zever/core/outbox v0.6.0
-	github.com/zenta-dev/zever/core/queue v0.6.0
+	github.com/zenta-dev/zever/core/eventbus v0.5.3
+	github.com/zenta-dev/zever/core/outbox v0.5.3
+	github.com/zenta-dev/zever/core/queue v0.5.3
 )
 
 require (

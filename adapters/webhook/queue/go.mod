@@ -3,13 +3,13 @@ module github.com/zenta-dev/zever/adapters/webhook/queue
 go 1.27.0
 
 require (
-	github.com/zenta-dev/zever/adapters/log/noop v0.6.0
-	github.com/zenta-dev/zever/adapters/queue/memory v0.6.0
-	github.com/zenta-dev/zever/core/log v0.6.0
-	github.com/zenta-dev/zever/core/queue v0.6.0
-	github.com/zenta-dev/zever/core/webhook v0.6.0
-	github.com/zenta-dev/zever/shared/retry v0.6.0
-	github.com/zenta-dev/zever/shared/traceprop v0.6.0
+	github.com/zenta-dev/zever/adapters/log/noop v0.5.3
+	github.com/zenta-dev/zever/adapters/queue/memory v0.5.3
+	github.com/zenta-dev/zever/core/log v0.5.3
+	github.com/zenta-dev/zever/core/queue v0.5.3
+	github.com/zenta-dev/zever/core/webhook v0.5.3
+	github.com/zenta-dev/zever/shared/retry v0.5.3
+	github.com/zenta-dev/zever/shared/traceprop v0.5.3
 )
 
 require (

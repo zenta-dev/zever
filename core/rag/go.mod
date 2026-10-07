@@ -3,10 +3,10 @@ module github.com/zenta-dev/zever/core/rag
 go 1.27.0
 
 require (
-	github.com/zenta-dev/zever/core/agent v0.6.0
-	github.com/zenta-dev/zever/core/ai v0.6.0
-	github.com/zenta-dev/zever/core/search v0.6.0
-	github.com/zenta-dev/zever/core/vectorstore v0.6.0
+	github.com/zenta-dev/zever/core/agent v0.5.3
+	github.com/zenta-dev/zever/core/ai v0.5.3
+	github.com/zenta-dev/zever/core/search v0.5.3
+	github.com/zenta-dev/zever/core/vectorstore v0.5.3
 )
 
 require (

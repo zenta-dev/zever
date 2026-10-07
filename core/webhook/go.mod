@@ -3,12 +3,12 @@ module github.com/zenta-dev/zever/core/webhook
 go 1.27.0
 
 require (
-	github.com/zenta-dev/zever/adapters/webhook/http v0.6.0
-	github.com/zenta-dev/zever/core/log v0.6.0
-	github.com/zenta-dev/zever/core/queue v0.6.0
-	github.com/zenta-dev/zever/shared/endpoint v0.6.0
-	github.com/zenta-dev/zever/shared/httpclient v0.6.0
-	github.com/zenta-dev/zever/shared/registry v0.6.0
+	github.com/zenta-dev/zever/adapters/webhook/http v0.5.3
+	github.com/zenta-dev/zever/core/log v0.5.3
+	github.com/zenta-dev/zever/core/queue v0.5.3
+	github.com/zenta-dev/zever/shared/endpoint v0.5.3
+	github.com/zenta-dev/zever/shared/httpclient v0.5.3
+	github.com/zenta-dev/zever/shared/registry v0.5.3
 )
 
 replace (

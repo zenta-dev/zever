@@ -3,24 +3,24 @@ module github.com/zenta-dev/zever/docs-examples
 go 1.27.0
 
 require (
-	github.com/zenta-dev/zever/adapters/auth/session v0.6.0
-	github.com/zenta-dev/zever/adapters/cache/memory v0.6.0
-	github.com/zenta-dev/zever/adapters/db/sqlite v0.6.0
-	github.com/zenta-dev/zever/adapters/log/slog v0.6.0
-	github.com/zenta-dev/zever/adapters/queue/memory v0.6.0
-	github.com/zenta-dev/zever/adapters/router/stdhttp v0.6.0
-	github.com/zenta-dev/zever/adapters/session/memory v0.6.0
-	github.com/zenta-dev/zever/config v0.6.0
-	github.com/zenta-dev/zever/container v0.6.0
-	github.com/zenta-dev/zever/core/auth v0.6.0
-	github.com/zenta-dev/zever/core/cache v0.6.0
-	github.com/zenta-dev/zever/core/db v0.6.0
-	github.com/zenta-dev/zever/core/log v0.6.0
-	github.com/zenta-dev/zever/core/queue v0.6.0
-	github.com/zenta-dev/zever/core/router v0.6.0
-	github.com/zenta-dev/zever/core/session v0.6.0
-	github.com/zenta-dev/zever/shared/codec v0.6.0
-	github.com/zenta-dev/zever/shared/registry v0.6.0
+	github.com/zenta-dev/zever/adapters/auth/session v0.5.3
+	github.com/zenta-dev/zever/adapters/cache/memory v0.5.3
+	github.com/zenta-dev/zever/adapters/db/sqlite v0.5.3
+	github.com/zenta-dev/zever/adapters/log/slog v0.5.3
+	github.com/zenta-dev/zever/adapters/queue/memory v0.5.3
+	github.com/zenta-dev/zever/adapters/router/stdhttp v0.5.3
+	github.com/zenta-dev/zever/adapters/session/memory v0.5.3
+	github.com/zenta-dev/zever/config v0.5.3
+	github.com/zenta-dev/zever/container v0.5.3
+	github.com/zenta-dev/zever/core/auth v0.5.3
+	github.com/zenta-dev/zever/core/cache v0.5.3
+	github.com/zenta-dev/zever/core/db v0.5.3
+	github.com/zenta-dev/zever/core/log v0.5.3
+	github.com/zenta-dev/zever/core/queue v0.5.3
+	github.com/zenta-dev/zever/core/router v0.5.3
+	github.com/zenta-dev/zever/core/session v0.5.3
+	github.com/zenta-dev/zever/shared/codec v0.5.3
+	github.com/zenta-dev/zever/shared/registry v0.5.3
 )
 
 require (

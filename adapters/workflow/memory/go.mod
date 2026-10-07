@@ -3,8 +3,8 @@ module github.com/zenta-dev/zever/adapters/workflow/memory
 go 1.27.0
 
 require (
-	github.com/zenta-dev/zever/core/workflow v0.6.0
-	github.com/zenta-dev/zever/shared/retry v0.6.0
+	github.com/zenta-dev/zever/core/workflow v0.5.3
+	github.com/zenta-dev/zever/shared/retry v0.5.3
 )
 
 require (

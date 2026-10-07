@@ -3,12 +3,12 @@ module github.com/zenta-dev/zever/core/middleware
 go 1.27.0
 
 require (
-	github.com/zenta-dev/zever/adapters/log/noop v0.6.0
-	github.com/zenta-dev/zever/core/log v0.6.0
-	github.com/zenta-dev/zever/core/observability v0.6.0
-	github.com/zenta-dev/zever/core/ratelimit v0.6.0
-	github.com/zenta-dev/zever/shared/codec v0.6.0
-	github.com/zenta-dev/zever/shared/traceprop v0.6.0
+	github.com/zenta-dev/zever/adapters/log/noop v0.5.3
+	github.com/zenta-dev/zever/core/log v0.5.3
+	github.com/zenta-dev/zever/core/observability v0.5.3
+	github.com/zenta-dev/zever/core/ratelimit v0.5.3
+	github.com/zenta-dev/zever/shared/codec v0.5.3
+	github.com/zenta-dev/zever/shared/traceprop v0.5.3
 	go.opentelemetry.io/otel/trace v1.46.0
 	google.golang.org/grpc v1.83.2
 )

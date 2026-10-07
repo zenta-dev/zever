@@ -3,52 +3,52 @@ module github.com/zenta-dev/zever/container
 go 1.27.0
 
 require (
-	github.com/zenta-dev/zever/adapters/db/sqlite v0.6.0
-	github.com/zenta-dev/zever/config v0.6.0
-	github.com/zenta-dev/zever/core/agent v0.6.0
-	github.com/zenta-dev/zever/core/ai v0.6.0
-	github.com/zenta-dev/zever/core/analytics v0.6.0
-	github.com/zenta-dev/zever/core/auth v0.6.0
-	github.com/zenta-dev/zever/core/billing v0.6.0
-	github.com/zenta-dev/zever/core/cache v0.6.0
-	github.com/zenta-dev/zever/core/cdn v0.6.0
-	github.com/zenta-dev/zever/core/crypto v0.6.0
-	github.com/zenta-dev/zever/core/db v0.6.0
-	github.com/zenta-dev/zever/core/document v0.6.0
-	github.com/zenta-dev/zever/core/eventbus v0.6.0
-	github.com/zenta-dev/zever/core/flag v0.6.0
-	github.com/zenta-dev/zever/core/geo v0.6.0
-	github.com/zenta-dev/zever/core/i18n v0.6.0
-	github.com/zenta-dev/zever/core/idempotency v0.6.0
-	github.com/zenta-dev/zever/core/job v0.6.0
-	github.com/zenta-dev/zever/core/lock v0.6.0
-	github.com/zenta-dev/zever/core/log v0.6.0
-	github.com/zenta-dev/zever/core/mailer v0.6.0
-	github.com/zenta-dev/zever/core/media v0.6.0
-	github.com/zenta-dev/zever/core/notification v0.6.0
-	github.com/zenta-dev/zever/core/observability v0.6.0
-	github.com/zenta-dev/zever/core/outbox v0.6.0
-	github.com/zenta-dev/zever/core/password v0.6.0
-	github.com/zenta-dev/zever/core/payment v0.6.0
-	github.com/zenta-dev/zever/core/permission v0.6.0
-	github.com/zenta-dev/zever/core/queue v0.6.0
-	github.com/zenta-dev/zever/core/rag v0.6.0
-	github.com/zenta-dev/zever/core/ratelimit v0.6.0
-	github.com/zenta-dev/zever/core/resilience v0.6.0
-	github.com/zenta-dev/zever/core/router v0.6.0
-	github.com/zenta-dev/zever/core/scheduler v0.6.0
-	github.com/zenta-dev/zever/core/search v0.6.0
-	github.com/zenta-dev/zever/core/secrets v0.6.0
-	github.com/zenta-dev/zever/core/session v0.6.0
-	github.com/zenta-dev/zever/core/storage v0.6.0
-	github.com/zenta-dev/zever/core/tenant v0.6.0
-	github.com/zenta-dev/zever/core/vectorstore v0.6.0
-	github.com/zenta-dev/zever/core/webhook v0.6.0
-	github.com/zenta-dev/zever/core/workflow v0.6.0
-	github.com/zenta-dev/zever/shared/dbconn v0.6.0
-	github.com/zenta-dev/zever/shared/grpcclient v0.6.0
-	github.com/zenta-dev/zever/shared/outboxbridge v0.6.0
-	github.com/zenta-dev/zever/shared/registry v0.6.0
+	github.com/zenta-dev/zever/adapters/db/sqlite v0.5.3
+	github.com/zenta-dev/zever/config v0.5.3
+	github.com/zenta-dev/zever/core/agent v0.5.3
+	github.com/zenta-dev/zever/core/ai v0.5.3
+	github.com/zenta-dev/zever/core/analytics v0.5.3
+	github.com/zenta-dev/zever/core/auth v0.5.3
+	github.com/zenta-dev/zever/core/billing v0.5.3
+	github.com/zenta-dev/zever/core/cache v0.5.3
+	github.com/zenta-dev/zever/core/cdn v0.5.3
+	github.com/zenta-dev/zever/core/crypto v0.5.3
+	github.com/zenta-dev/zever/core/db v0.5.3
+	github.com/zenta-dev/zever/core/document v0.5.3
+	github.com/zenta-dev/zever/core/eventbus v0.5.3
+	github.com/zenta-dev/zever/core/flag v0.5.3
+	github.com/zenta-dev/zever/core/geo v0.5.3
+	github.com/zenta-dev/zever/core/i18n v0.5.3
+	github.com/zenta-dev/zever/core/idempotency v0.5.3
+	github.com/zenta-dev/zever/core/job v0.5.3
+	github.com/zenta-dev/zever/core/lock v0.5.3
+	github.com/zenta-dev/zever/core/log v0.5.3
+	github.com/zenta-dev/zever/core/mailer v0.5.3
+	github.com/zenta-dev/zever/core/media v0.5.3
+	github.com/zenta-dev/zever/core/notification v0.5.3
+	github.com/zenta-dev/zever/core/observability v0.5.3
+	github.com/zenta-dev/zever/core/outbox v0.5.3
+	github.com/zenta-dev/zever/core/password v0.5.3
+	github.com/zenta-dev/zever/core/payment v0.5.3
+	github.com/zenta-dev/zever/core/permission v0.5.3
+	github.com/zenta-dev/zever/core/queue v0.5.3
+	github.com/zenta-dev/zever/core/rag v0.5.3
+	github.com/zenta-dev/zever/core/ratelimit v0.5.3
+	github.com/zenta-dev/zever/core/resilience v0.5.3
+	github.com/zenta-dev/zever/core/router v0.5.3
+	github.com/zenta-dev/zever/core/scheduler v0.5.3
+	github.com/zenta-dev/zever/core/search v0.5.3
+	github.com/zenta-dev/zever/core/secrets v0.5.3
+	github.com/zenta-dev/zever/core/session v0.5.3
+	github.com/zenta-dev/zever/core/storage v0.5.3
+	github.com/zenta-dev/zever/core/tenant v0.5.3
+	github.com/zenta-dev/zever/core/vectorstore v0.5.3
+	github.com/zenta-dev/zever/core/webhook v0.5.3
+	github.com/zenta-dev/zever/core/workflow v0.5.3
+	github.com/zenta-dev/zever/shared/dbconn v0.5.3
+	github.com/zenta-dev/zever/shared/grpcclient v0.5.3
+	github.com/zenta-dev/zever/shared/outboxbridge v0.5.3
+	github.com/zenta-dev/zever/shared/registry v0.5.3
 	go.uber.org/goleak v1.3.0
 	google.golang.org/grpc v1.83.2
 )
@@ -169,7 +169,6 @@ replace github.com/zenta-dev/zever/adapters/webhook/http => ../adapters/webhook/
 replace github.com/zenta-dev/zever/adapters/workflow/memory => ../adapters/workflow/memory
 
 replace github.com/zenta-dev/zever/shared/msgspan => ../shared/msgspan
-
 replace github.com/zenta-dev/zever/shared/redisclient => ../shared/redisclient
 
 replace github.com/zenta-dev/zever/shared/lrucache => ../shared/lrucache

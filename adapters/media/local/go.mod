@@ -11,8 +11,8 @@ require (
 
 require (
 	github.com/anthonynsimon/bild v0.17.1
-	github.com/zenta-dev/zever/adapters/media/ffmpeg v0.6.0
-	github.com/zenta-dev/zever/core/media v0.6.0
+	github.com/zenta-dev/zever/adapters/media/ffmpeg v0.5.3
+	github.com/zenta-dev/zever/core/media v0.5.3
 )
 
 replace github.com/zenta-dev/zever/core/media => ../../../core/media
