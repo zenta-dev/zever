@@ -228,6 +228,7 @@ export default defineConfig({
             { label: "Migrations and seeding", link: "guides/data/migrations-seeding" },
             { label: "Redis", link: "guides/data/redis" },
             { label: "Cache", link: "guides/data/cache" },
+            { label: "CDN", link: "guides/data/cdn" },
             { label: "Search", link: "guides/data/search" },
             { label: "Vector store", link: "guides/data/vectorstore" },
             { label: "Storage and media", link: "guides/data/storage-media" },
