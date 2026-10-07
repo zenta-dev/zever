@@ -881,8 +881,11 @@ import (
 	"google.golang.org/grpc/keepalive"
 	"google.golang.org/grpc/reflection"
 
+	"github.com/zenta-dev/zever/container"
 	"github.com/zenta-dev/zever/core/authz"
 	"github.com/zenta-dev/zever/core/middleware"
+	"github.com/zenta-dev/zever/core/resilience"
+	"github.com/zenta-dev/zever/shared/grpcclient"
 
 	"{{.ModulePath}}/internal/app"
 {{range .Modules}}	{{.Alias}} "{{.ImportPath}}"
@@ -904,6 +907,16 @@ const (
 	DefaultGRPCKeepaliveTimeout  = 20 * time.Second
 	DefaultGRPCMaxMessageBytes   = 4 << 20 // 4 MiB, grpc-go's own default made explicit.
 )
+
+// guardedGRPCClient dials target through a per-dependency circuit breaker
+// so one slow downstream cannot exhaust this process.
+func guardedGRPCClient(ctx context.Context, c *container.Container, resMgr resilience.Manager, target, dep string) (*grpc.ClientConn, error) {
+	g, err := resMgr.Guard(dep)
+	if err != nil {
+		return nil, err
+	}
+	return c.GRPCClient(target, grpcclient.WithGuard(g))
+}
 
 func main() {
 	addr := flag.String("addr", ":8080", "HTTP address to listen on")
@@ -955,6 +968,14 @@ func run(addr, grpcAddr string) error {
 	if err != nil {
 		return err
 	}
+
+	resMgr, err := c.Resilience()
+	if err != nil {
+		return err
+	}
+
+	// Retained for outbound calls through guardedGRPCClient below.
+	_ = resMgr
 {{if .RateLimitEnabled}}
 	limiter, err := c.RateLimit()
 	if err != nil {
