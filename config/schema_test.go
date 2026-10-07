@@ -40,6 +40,8 @@ func TestSchemaMatchesConfig(t *testing.T) {
 		{
 			name: "every config option path is in the schema",
 			run: func(t *testing.T) {
+				t.Helper()
+
 				var missing []string
 				for _, p := range goLeaves {
 					if _, ok := schemaSet[strings.ToLower(p)]; !ok {
@@ -55,6 +57,8 @@ func TestSchemaMatchesConfig(t *testing.T) {
 		{
 			name: "schema service names match knownServiceNames",
 			run: func(t *testing.T) {
+				t.Helper()
+
 				want := knownServiceNames()
 				sort.Strings(want)
 				got := append([]string(nil), schemaServices...)
@@ -154,7 +158,7 @@ func walkOptionType(prefix string, typ reflect.Type, out *[]string) {
 		ft := field.Type
 		if field.Anonymous && jsonName(field) == "" {
 			base := ft
-			if base.Kind() == reflect.Ptr {
+			if base.Kind() == reflect.Pointer {
 				base = base.Elem()
 			}
 			if base.Kind() == reflect.Struct {
@@ -182,18 +186,20 @@ func walkOptionField(path string, typ reflect.Type, out *[]string) {
 	}
 
 	base := typ
-	for base.Kind() == reflect.Ptr {
+	for base.Kind() == reflect.Pointer {
 		base = base.Elem()
 	}
 
-	switch base.Kind() {
-	case reflect.Struct:
+	kind := base.Kind()
+	if kind == reflect.Struct {
 		walkOptionType(path, base, out)
-	case reflect.Interface, reflect.Func, reflect.Chan, reflect.UnsafePointer:
-		// Not decodable from a config file; no schema key.
-	default:
-		*out = append(*out, path)
+		return
 	}
+	if kind == reflect.Interface || kind == reflect.Func || kind == reflect.Chan || kind == reflect.UnsafePointer {
+		// Not decodable from a config file; no schema key.
+		return
+	}
+	*out = append(*out, path)
 }
 
 var jsonMarshalerType = reflect.TypeOf((*json.Marshaler)(nil)).Elem()
@@ -223,7 +229,8 @@ func schemaOptionLeaves(t *testing.T) ([]string, []string) {
 		t.Fatal("SchemaJSON has no properties object")
 	}
 
-	var services, leaves []string
+	services := make([]string, 0, len(props))
+	var leaves []string
 	for name, raw := range props {
 		node, ok := raw.(map[string]any)
 		if !ok {
