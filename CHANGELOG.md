@@ -240,6 +240,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Fixed
 
+- scheduler/postgres: a tick skipped because the slot load or claim failed
+  (DB error, or the fire timeout expiring before dispatch) now logs a
+  `postgres: tick skipped` warning instead of returning silently; Stop
+  cancellation is still not logged.
 - `zever tinker` no longer deadlocks when the shim hangs: each `call` is bounded
   by a timeout and kills the shim on expiry, so a stuck read cannot hold the
   client mutex forever and block later calls or `Close`.

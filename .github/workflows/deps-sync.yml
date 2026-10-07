@@ -1,0 +1,135 @@
+name: deps-sync
+
+# Reconcile every module after a Dependabot go_modules bump.
+#
+# Why: Dependabot updates go.mod/go.sum only in the directories that
+# require the bumped dependency directly, and it skips `go mod tidy` for
+# any module with local `replace` directives (it stubs them out). Modules
+# that pull the dependency in transitively through a local replace
+# (cmd/zever, examples/*, adapters wrapping shared/*) are then untidy and
+# fail CI's `go mod tidy -diff`. This job runs `make deps-sync` on the PR
+# branch and pushes the result as one extra commit.
+#
+# Security model:
+# - Trigger is `pull_request`, never `pull_request_target`: the job runs the
+#   PR's own code with a token scoped to this event, and fork PRs always get
+#   a read-only token with no secrets.
+# - Gate on the PR *author* (pull_request.user.login), not github.actor:
+#   the actor can be dependabot[bot] on a PR an attacker opened (e.g. after
+#   a `@dependabot recreate` on their fork). The head repo must also be
+#   this repo, so only branches Dependabot (or a maintainer) pushed here run.
+# - The job only proceeds when the PR changes nothing but go.mod/go.sum/
+#   go.work*, and refuses to commit anything else. `go mod tidy` resolves
+#   and downloads modules but never builds or runs their code.
+# - `contents: write` on a Dependabot-triggered run is allowed through the
+#   `permissions` key; Actions secrets are not exposed to it (only
+#   Dependabot secrets are).
+#
+# Re-running CI: pushes made with GITHUB_TOKEN do not trigger new workflow
+# runs, so the sync commit would sit without CI. Store a fine-grained PAT or
+# GitHub App token with `contents: write` on this repo as the *Dependabot*
+# secret DEPS_SYNC_TOKEN and the push will trigger CI normally. Without it
+# the job still pushes, then comments on the PR asking for a close/reopen.
+#
+# Note: once a non-Dependabot commit is on the branch, Dependabot stops
+# rebasing the PR; comment `@dependabot recreate` to start over (this job
+# then re-applies the sync).
+
+on:
+  pull_request:
+    types: [opened, synchronize, reopened]
+    paths:
+      - "**/go.mod"
+      - "**/go.sum"
+      - "go.work"
+      - "go.work.sum"
+
+permissions: {}
+
+concurrency:
+  group: deps-sync-${{ github.event.pull_request.number }}
+  cancel-in-progress: true
+
+jobs:
+  sync:
+    name: deps-sync
+    if: >-
+      github.event.pull_request.user.login == 'dependabot[bot]' &&
+      github.event.pull_request.head.repo.full_name == github.repository
+    timeout-minutes: 20
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+      pull-requests: write
+    env:
+      BASE_REF: ${{ github.event.pull_request.base.ref }}
+      HEAD_REF: ${{ github.event.pull_request.head.ref }}
+      PR_NUMBER: ${{ github.event.pull_request.number }}
+      HAS_SYNC_TOKEN: ${{ secrets.DEPS_SYNC_TOKEN != '' }}
+      GOTOOLCHAIN: local
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          ref: ${{ github.event.pull_request.head.ref }}
+          fetch-depth: 0
+          token: ${{ secrets.DEPS_SYNC_TOKEN || github.token }}
+
+      - name: Only dependency manifests changed
+        id: guard
+        run: |
+          set -euo pipefail
+          git fetch --no-tags origin "$BASE_REF"
+          changed=$(git diff --name-only "origin/$BASE_REF...HEAD")
+          printf '%s\n' "$changed"
+          other=$(printf '%s\n' "$changed" | grep -Ev '(^|/)go\.(mod|sum)$|^go\.work(\.sum)?$' || true)
+          if [ -n "$other" ]; then
+            echo "::notice::PR touches non-manifest files, leaving it to a human:"
+            printf '%s\n' "$other"
+            echo "run=false" >> "$GITHUB_OUTPUT"
+          else
+            echo "run=true" >> "$GITHUB_OUTPUT"
+          fi
+
+      - uses: actions/setup-go@b7ad1dad31e06c5925ef5d2fc7ad053ef454303e # v7.0.0
+        if: steps.guard.outputs.run == 'true'
+        with:
+          go-version-file: go.work
+          cache-dependency-path: |
+            go.work.sum
+            **/go.sum
+
+      - name: make deps-sync
+        if: steps.guard.outputs.run == 'true'
+        run: make deps-sync
+
+      - name: Commit and push
+        if: steps.guard.outputs.run == 'true'
+        id: push
+        run: |
+          set -euo pipefail
+          if [ -z "$(git status --porcelain)" ]; then
+            echo "already in sync"
+            echo "pushed=false" >> "$GITHUB_OUTPUT"
+            exit 0
+          fi
+          bad=$(git status --porcelain | awk '{print $2}' | grep -Ev '(^|/)go\.(mod|sum)$|^go\.work(\.sum)?$' || true)
+          if [ -n "$bad" ]; then
+            echo "::error::deps-sync touched unexpected files:"
+            printf '%s\n' "$bad"
+            exit 1
+          fi
+          git status --short
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add -A
+          git commit -m "build(deps): sync dependent modules (make deps-sync)"
+          git push origin "HEAD:refs/heads/$HEAD_REF"
+          echo "pushed=true" >> "$GITHUB_OUTPUT"
+
+      - name: Ask for a CI re-run
+        if: steps.push.outputs.pushed == 'true' && env.HAS_SYNC_TOKEN != 'true'
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          gh pr comment "$PR_NUMBER" --repo "$GITHUB_REPOSITORY" --body \
+            "deps-sync pushed a \`make deps-sync\` commit with GITHUB_TOKEN, which does not trigger CI. Close and reopen this PR to run CI on it (or add a DEPS_SYNC_TOKEN Dependabot secret so this happens automatically)."

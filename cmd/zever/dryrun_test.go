@@ -53,9 +53,11 @@ func TestAddFlagSetHasDryRun(t *testing.T) {
 	}
 }
 
+// TestPrintNewDryRunMentionsPlan must not call t.Parallel: captureStdout
+// swaps the process-global os.Stdout, which parallel tests read (cobra's
+// OutOrStdout evaluates os.Stdout even when SetOut was called), so running it
+// in parallel is a data race under -race -shuffle=on.
 func TestPrintNewDryRunMentionsPlan(t *testing.T) {
-	t.Parallel()
-
 	out := captureStdout(t, func() {
 		printNewDryRun(NewConfig{Name: "demo", OutDir: "./demo", ModulePath: "example.com/demo", Batteries: []string{"log", "router"}}, "./demo")
 	})

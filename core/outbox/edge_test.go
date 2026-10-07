@@ -57,7 +57,7 @@ func TestOpenEmptyAdapter(t *testing.T) {
 func TestOpenFactoryError(t *testing.T) {
 	t.Parallel()
 
-	adapter := outbox.Adapter("stub-err")
+	adapter := uniqueAdapter("stub-err")
 	sentinel := errors.New("boom")
 
 	if err := outbox.Register(adapter, func(outbox.Options) (outbox.Store, error) {
@@ -88,7 +88,7 @@ func TestOpenSharedUnknownAdapter(t *testing.T) {
 func TestOpenSharedInvalidOptions(t *testing.T) {
 	t.Parallel()
 
-	adapter := outbox.Adapter("stub-shared-opts")
+	adapter := uniqueAdapter("stub-shared-opts")
 
 	if err := outbox.RegisterShared(adapter, func(db.DB, outbox.Options) (outbox.Store, error) {
 		return &stubStore{name: "stub"}, nil
@@ -105,7 +105,7 @@ func TestOpenSharedInvalidOptions(t *testing.T) {
 func TestOpenSharedFactoryError(t *testing.T) {
 	t.Parallel()
 
-	adapter := outbox.Adapter("stub-shared-err")
+	adapter := uniqueAdapter("stub-shared-err")
 	sentinel := errors.New("boom")
 
 	if err := outbox.RegisterShared(adapter, func(db.DB, outbox.Options) (outbox.Store, error) {

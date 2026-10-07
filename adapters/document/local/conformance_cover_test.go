@@ -1,11 +1,17 @@
 package local
 
 import (
+	"fmt"
+	"sync/atomic"
 	"testing"
 
 	"github.com/zenta-dev/zever/core/document"
 	"github.com/zenta-dev/zever/core/document/documenttest"
 )
+
+// kitAdapterSeq suffixes TestOpenRegister's adapter name so every
+// invocation registers a name no earlier -count iteration has claimed.
+var kitAdapterSeq atomic.Int64
 
 // TestOpenRegister proves Register wiring plus Open round-trip. It uses a
 // test-only adapter name: registering document.Local itself would collide
@@ -14,7 +20,9 @@ import (
 func TestOpenRegister(t *testing.T) {
 	t.Parallel()
 
-	const adapter = document.Adapter("kit-document-local")
+	// A fresh name per invocation keeps the test idempotent under
+	// -count=N: the registry is process-global and has no unregister.
+	adapter := document.Adapter(fmt.Sprintf("kit-document-local-%d", kitAdapterSeq.Add(1)))
 
 	if err := document.Register(adapter, New); err != nil {
 		t.Fatalf("Register() error = %v", err)
@@ -40,7 +48,7 @@ func TestConformance(t *testing.T) {
 		t.Helper()
 
 		// Cold Chrome launch on CI runners can exceed the production
-		// default; use the same doubled budget local_test.go uses. The
+		// default; use the same tripled budget local_test.go uses. The
 		// kit asserts output shape, not speed.
 		d, err := New(document.Options{Timeout: renderTestTimeout})
 		if err != nil {

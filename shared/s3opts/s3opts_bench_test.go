@@ -93,8 +93,8 @@ func newBenchCore(b *testing.B, def *storage.Policy) *Core {
 // resolves a static URL without any S3 call.
 func BenchmarkPresignUploadPublic(b *testing.B) {
 	ctx := b.Context()
-	pol := &storage.Policy{Write: storage.Rule{Public: true}}
-	c := newBenchCore(b, pol)
+	// Public upload requires both Write and Update to be public.
+	c := newBenchCore(b, publicUploadPolicy())
 
 	b.ReportAllocs()
 	b.ResetTimer()

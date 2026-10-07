@@ -4,6 +4,7 @@ import (
 	"context"
 	"errors"
 	"strings"
+	"sync"
 	"testing"
 
 	dbsqlite "github.com/zenta-dev/zever/adapters/db/sqlite"
@@ -235,6 +236,18 @@ func TestCoverNewFromDBInvalidOptions(t *testing.T) {
 	}
 }
 
+// registerCoverSearchDialects registers the stub dialects
+// TestCoverCheckDialectSearch resolves by name. The orm dialect registry is
+// process-global with no unregister, so registration happens once per test
+// binary; later -count iterations reuse the result instead of failing with
+// "Register called twice".
+var registerCoverSearchDialects = sync.OnceValue(func() error {
+	return errors.Join(
+		dialect.Register("cover-search-noft", func() dialect.Dialect { return stubSearchDialect{} }),
+		dialect.Register("cover-search-neither", func() dialect.Dialect { return stubNeitherFT{} }),
+	)
+})
+
 // TestCoverCheckDialectSearch covers unknown, non-FT, and neither-flavor dialects.
 func TestCoverCheckDialectSearch(t *testing.T) {
 	t.Parallel()
@@ -242,15 +255,12 @@ func TestCoverCheckDialectSearch(t *testing.T) {
 	if err := d.checkDialect(); !errors.Is(err, dialect.ErrUnsupportedByDialect) {
 		t.Fatalf("checkDialect(bogus) err = %v, want unsupported", err)
 	}
-	if err := dialect.Register("cover-search-noft", func() dialect.Dialect { return stubSearchDialect{} }); err != nil {
+	if err := registerCoverSearchDialects(); err != nil {
 		t.Fatalf("dialect.Register() err = %v", err)
 	}
 	d2 := &driver{conn: &stubSearchConn{dialectName: "cover-search-noft"}}
 	if err := d2.checkDialect(); !errors.Is(err, dialect.ErrUnsupportedByDialect) {
 		t.Fatalf("checkDialect(nonft) err = %v, want unsupported", err)
-	}
-	if err := dialect.Register("cover-search-neither", func() dialect.Dialect { return stubNeitherFT{} }); err != nil {
-		t.Fatalf("dialect.Register() err = %v", err)
 	}
 	d3 := &driver{conn: &stubSearchConn{dialectName: "cover-search-neither"}}
 	if err := d3.checkDialect(); !errors.Is(err, dialect.ErrUnsupportedByDialect) {

@@ -148,7 +148,7 @@ clean: ## Remove coverage output and build artifacts
 	rm -f $(COVERAGE) $(SBOM)
 
 .PHONY: check
-check: require-tools download fmt check-all modgraph-check lint-all vulncheck-all ## Run all local CI checks (run 'make setup' first)
+check: require-tools download fmt check-all modgraph-check dependabot-check lint-all vulncheck-all ## Run all local CI checks (run 'make setup' first)
 
 # Multi-module targets: per-module loops over the committed go.work workspace.
 .PHONY: download-all
@@ -197,6 +197,10 @@ deps-sync-check: ## Verify no dependency drift remains after a bump
 	$(MAKE) tidy-check-all
 	GOWORK=off go -C docs/examples mod tidy -diff
 	GOWORK=off go -C examples/external-sms mod tidy -diff
+
+.PHONY: dependabot-check
+dependabot-check: ## Verify .github/dependabot.yml lists every module (regenerate: bash tools/gen-dependabot.sh)
+	bash tools/gen-dependabot.sh --check
 
 lint-all: ## Run golangci-lint in every module (shard via SHARD_TOTAL/SHARD_INDEX, override list via MODULES)
 	@command -v $(GOLANGCI_LINT) >/dev/null 2>&1 || { printf '%s\n' "golangci-lint not found: run 'make setup'"; exit 1; }

@@ -6,11 +6,14 @@ import (
 	"path/filepath"
 	"sync"
 	"testing"
+	"testing/synctest"
 	"time"
 
 	"github.com/robfig/cron/v3"
 
+	"github.com/zenta-dev/zever/adapters/log/noop"
 	"github.com/zenta-dev/zever/core/job"
+	"github.com/zenta-dev/zever/core/log"
 	"github.com/zenta-dev/zever/core/queue"
 	"github.com/zenta-dev/zever/core/scheduler"
 )
@@ -291,25 +294,120 @@ func findEntry(t *testing.T, d *driver, id scheduler.EntryID) cron.Entry {
 func TestFireTimeout_BoundsHungDispatch(t *testing.T) {
 	t.Parallel()
 
-	d := mustNew(t, Options{Owner: "owner-fire", FireTimeout: 50 * time.Millisecond})
+	// The fire timeout covers load+claim before dispatch. On real time a
+	// slow (-race, loaded CI) sqlite round-trip could eat the whole budget,
+	// so fire returned before ever reaching the blocking queue. In a
+	// synctest bubble the fake clock only advances once every goroutine is
+	// durably blocked -- i.e. after Push parks on ctx.Done -- so the
+	// deadline can fire only at the dispatch, whatever the DB latency.
+	synctest.Test(t, func(t *testing.T) {
+		const fireTimeout = 50 * time.Millisecond
+
+		d := mustNew(t, Options{Owner: "owner-fire", FireTimeout: fireTimeout})
+		t.Cleanup(func() { _ = d.Close() })
+
+		registerJobOnce(t, "sched-fire-timeout")
+
+		blk := newBlockingQueue()
+		d.dispatcher = &job.Dispatcher{Q: blk}
+
+		id, err := d.Schedule(t.Context(), "0 * * * *", "sched-fire-timeout", nil)
+		if err != nil {
+			t.Fatalf("Schedule failed: %v", err)
+		}
+
+		start := time.Now()
+
+		findEntry(t, d, id).Job.Run()
+
+		select {
+		case <-blk.entered:
+		default:
+			t.Fatal("fire returned without reaching the dispatcher")
+		}
+
+		select {
+		case <-blk.done:
+		default:
+			t.Fatal("fire returned but the dispatch ctx was not canceled")
+		}
+
+		if elapsed := time.Since(start); elapsed != fireTimeout {
+			t.Fatalf("fire unblocked after %v (fake clock), want exactly the %v fire timeout", elapsed, fireTimeout)
+		}
+	})
+}
+
+// warnRecorder is a log.Logger that records Warn messages; every other
+// level discards via the embedded noop logger.
+type warnRecorder struct {
+	log.Logger
+
+	mu   sync.Mutex
+	msgs []string
+}
+
+func (w *warnRecorder) Warn() log.Event { return warnEvent{Event: w.Logger.Warn(), rec: w} }
+
+func (w *warnRecorder) count() int {
+	w.mu.Lock()
+	defer w.mu.Unlock()
+
+	return len(w.msgs)
+}
+
+// warnEvent keeps itself in the chain for the field methods fire uses, so
+// Msg reaches the recorder.
+type warnEvent struct {
+	log.Event
+
+	rec *warnRecorder
+}
+
+func (e warnEvent) Str(_, _ string) log.Event { return e }
+func (e warnEvent) Err(_ error) log.Event     { return e }
+func (e warnEvent) Msg(msg string) {
+	e.rec.mu.Lock()
+	defer e.rec.mu.Unlock()
+
+	e.rec.msgs = append(e.rec.msgs, msg)
+}
+
+func TestFire_LogsLoadFailureButNotCancel(t *testing.T) {
+	t.Parallel()
+
+	rec := &warnRecorder{Logger: noop.New()}
+
+	d := mustNew(t, Options{Owner: "owner-fire-log"})
 	t.Cleanup(func() { _ = d.Close() })
 
-	registerJobOnce(t, "sched-fire-timeout")
+	d.logger = rec
 
-	blk := newBlockingQueue()
-	d.dispatcher = &job.Dispatcher{Q: blk}
+	registerJobOnce(t, "sched-fire-log")
 
-	id, err := d.Schedule(t.Context(), "0 * * * *", "sched-fire-timeout", nil)
+	id, err := d.Schedule(t.Context(), "0 * * * *", "sched-fire-log", nil)
 	if err != nil {
 		t.Fatalf("Schedule failed: %v", err)
 	}
 
-	findEntry(t, d, id).Job.Run()
+	d.mu.Lock()
+	slot := d.slots[id]
+	d.mu.Unlock()
 
-	select {
-	case <-blk.done:
-	case <-time.After(5 * time.Second):
-		t.Fatal("fire ctx was not canceled by the fire timeout")
+	canceled, cancel := context.WithCancel(t.Context())
+	cancel()
+	d.fire(canceled, slot)
+
+	if n := rec.count(); n != 0 {
+		t.Fatalf("warns after canceled fire = %d, want 0 (Stop must not log)", n)
+	}
+
+	expired, cancelExpired := context.WithDeadline(t.Context(), time.Unix(0, 0))
+	defer cancelExpired()
+	d.fire(expired, slot)
+
+	if n := rec.count(); n != 1 {
+		t.Fatalf("warns after deadline-exceeded fire = %d, want 1", n)
 	}
 }
 

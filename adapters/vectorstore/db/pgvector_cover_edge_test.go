@@ -4,6 +4,7 @@ import (
 	"context"
 	"errors"
 	"strings"
+	"sync"
 	"testing"
 
 	dbsqlite "github.com/zenta-dev/zever/adapters/db/sqlite"
@@ -122,6 +123,14 @@ func TestCoverOpenFromDB_pingFail(t *testing.T) {
 	}
 }
 
+// registerCoverNoVector registers the stub non-vector dialect once per test
+// binary: the orm dialect registry is process-global with no unregister, so
+// a second -count iteration registering it again would fail with
+// "Register called twice".
+var registerCoverNoVector = sync.OnceValue(func() error {
+	return dialect.Register("cover-novector", func() dialect.Dialect { return stubDialect{} })
+})
+
 // TestCoverCheckDialect_branches covers unknown and non-vector dialects.
 func TestCoverCheckDialect_branches(t *testing.T) {
 	t.Parallel()
@@ -129,7 +138,7 @@ func TestCoverCheckDialect_branches(t *testing.T) {
 	if err := d.checkDialect(); !errors.Is(err, dialect.ErrUnsupportedByDialect) {
 		t.Fatalf("checkDialect(bogus) err = %v, want ErrUnsupportedByDialect", err)
 	}
-	if err := dialect.Register("cover-novector", func() dialect.Dialect { return stubDialect{} }); err != nil {
+	if err := registerCoverNoVector(); err != nil {
 		t.Fatalf("dialect.Register() err = %v", err)
 	}
 	d2 := &driver{conn: &stubConn{dialectName: "cover-novector"}}
