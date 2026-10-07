@@ -51,6 +51,7 @@ cached state clears so the next call retries.
 | auth | `Auth()` | |
 | billing | `Billing()` | |
 | cache | `Cache()` | leaf dependency, closed last |
+| cdn | `CDN()` | |
 | crypto | `Crypto()` | |
 | db | `DB()` | plus `Transactor()` helper |
 | document | `Document()` | |
