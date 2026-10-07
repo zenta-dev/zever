@@ -469,7 +469,7 @@ func (n *noDeleteStore) Close() error { return n.stub.Close() }
 func TestCheckTTLExpirySuccess(t *testing.T) {
 	t.Parallel()
 
-	mustPass(t, checkTTLExpiry(t.Context(), healthyStubStore(), DefaultEntryTTL, 2*time.Second))
+	mustPass(t, checkTTLExpiry(t.Context(), healthyStubStore(), DefaultEntryTTL, DefaultExpiryTimeout))
 }
 
 func TestCheckTTLExpiryFailures(t *testing.T) {
