@@ -3,11 +3,23 @@ package outbox_test
 import (
 	"context"
 	"errors"
+	"fmt"
+	"sync/atomic"
 	"testing"
 
 	"github.com/zenta-dev/zever/core/db"
 	"github.com/zenta-dev/zever/core/outbox"
 )
+
+// adapterSeq numbers the names uniqueAdapter hands out.
+var adapterSeq atomic.Int64
+
+// uniqueAdapter returns prefix plus a per-call suffix. The adapter registry
+// is process-global with no unregister, so a fixed name would make every
+// -count iteration after the first fail with ErrDuplicateAdapter.
+func uniqueAdapter(prefix string) outbox.Adapter {
+	return outbox.Adapter(fmt.Sprintf("%s-%d", prefix, adapterSeq.Add(1)))
+}
 
 type stubStore struct {
 	name string
@@ -34,7 +46,7 @@ func TestOpenInvalidOptions(t *testing.T) {
 }
 
 func TestRegisterAndOpen(t *testing.T) {
-	adapter := outbox.Adapter("stub-open")
+	adapter := uniqueAdapter("stub-open")
 
 	if err := outbox.Register(adapter, func(outbox.Options) (outbox.Store, error) {
 		return &stubStore{name: "stub"}, nil
@@ -53,7 +65,7 @@ func TestRegisterAndOpen(t *testing.T) {
 }
 
 func TestRegisterDuplicate(t *testing.T) {
-	adapter := outbox.Adapter("stub-dup")
+	adapter := uniqueAdapter("stub-dup")
 
 	factory := func(outbox.Options) (outbox.Store, error) { return &stubStore{name: "stub"}, nil }
 
@@ -73,7 +85,7 @@ func TestRegisterNilFactory(t *testing.T) {
 }
 
 func TestRegisterSharedAndOpenShared(t *testing.T) {
-	adapter := outbox.Adapter("stub-shared")
+	adapter := uniqueAdapter("stub-shared")
 
 	if err := outbox.RegisterShared(adapter, func(db.DB, outbox.Options) (outbox.Store, error) {
 		return &stubStore{name: "shared"}, nil
