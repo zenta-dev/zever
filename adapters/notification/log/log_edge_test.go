@@ -99,8 +99,11 @@ func TestNotify_emptyDataTableOmitted(t *testing.T) {
 	}
 }
 
+// TestNewWithWriter_nilWriterDefaultsToStdout must not call t.Parallel: the
+// nil-writer default reads the process-global os.Stdout, which the capture
+// test in log_cover_test.go swaps, so running it in parallel is a data race
+// under -race -shuffle=on.
 func TestNewWithWriter_nilWriterDefaultsToStdout(t *testing.T) {
-	t.Parallel()
 	n, err := notificationlog.NewWithWriter(notification.Options{}, nil)
 	if err != nil {
 		t.Fatalf("NewWithWriter(nil) = %v, want nil", err)
