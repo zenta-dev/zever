@@ -48,7 +48,7 @@ func TestConformance(t *testing.T) {
 		t.Helper()
 
 		// Cold Chrome launch on CI runners can exceed the production
-		// default; use the same doubled budget local_test.go uses. The
+		// default; use the same tripled budget local_test.go uses. The
 		// kit asserts output shape, not speed.
 		d, err := New(document.Options{Timeout: renderTestTimeout})
 		if err != nil {
