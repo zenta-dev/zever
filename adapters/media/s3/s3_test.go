@@ -1781,9 +1781,19 @@ func TestAssetURLPresignError(t *testing.T) {
 		return 0, "", nil, errors.New("must not call")
 	}}
 	d := testDriver(t, tr)
-	ctx, cancel := context.WithCancel(t.Context())
-	cancel()
-	if _, err := d.assetURL(ctx, "k"); err == nil {
+	// Fail presigning through the credentials provider rather than a
+	// cancelled context: the SDK only observes ctx in CredentialsCache's
+	// select between the (already finished) retrieval and ctx.Done(), and Go
+	// picks a ready select case at random, so a cancelled ctx sometimes
+	// presigns successfully.
+	d.presigner = s3sdk.NewPresignClient(d.client, func(o *s3sdk.PresignOptions) {
+		o.ClientOptions = append(o.ClientOptions, func(o *s3sdk.Options) {
+			o.Credentials = aws.CredentialsProviderFunc(func(context.Context) (aws.Credentials, error) {
+				return aws.Credentials{}, errors.New("no credentials")
+			})
+		})
+	})
+	if _, err := d.assetURL(t.Context(), "k"); err == nil {
 		t.Fatal("assetURL() = nil, want presign error")
 	}
 	if calls, _, _ := tr.counts(); calls != 0 {
