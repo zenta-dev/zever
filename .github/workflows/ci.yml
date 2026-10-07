@@ -9,8 +9,12 @@ on:
 permissions:
   contents: read
 
+# A concurrency group holds at most one running + one pending run; a newer
+# queued run cancels the older pending one. Keying main pushes by commit SHA
+# gives every main commit its own group, so rapid automerges no longer drop
+# queued runs. PRs/branches keep one group per ref and cancel superseded runs.
 concurrency:
-  group: ci-${{ github.ref }}
+  group: ci-${{ github.ref == 'refs/heads/main' && github.sha || github.ref }}
   cancel-in-progress: ${{ github.ref != 'refs/heads/main' }}
 
 jobs:
@@ -436,14 +440,53 @@ jobs:
           files: ${{ steps.collect.outputs.files }}
           flags: race-group-${{ strategy.job-index }}
           fail_ci_if_error: false
-      - name: benchmarks (main/tags only)
-        if: github.event_name != 'pull_request'
+
+  # Benchmark smoke run (main/tags only), split out of test-race: the old
+  # -benchtime=1s -count=6 pass took ~33 min per group and hit the 40-min
+  # job timeout on every main push. Shared runners are too noisy for
+  # trustworthy perf numbers anyway, so this run only proves every benchmark
+  # still executes (fixed 100 iterations, one sample) and archives the raw
+  # output for ad-hoc benchstat comparison. Non-gating: continue-on-error and
+  # deliberately absent from ci-gate.needs.
+  bench:
+    name: benchmarks (non-gating)
+    timeout-minutes: 20
+    if: github.event_name != 'pull_request' && needs.detect.outputs.groups != '[]'
+    continue-on-error: true
+    runs-on: ubuntu-latest
+    needs: [detect]
+    permissions:
+      contents: read
+    strategy:
+      fail-fast: false
+      matrix:
+        group: ${{ fromJson(needs.detect.outputs.groups) }}
+    env:
+      # Same Chrome sandbox limitation as the test jobs.
+      ZEVER_CHROMEDP_NO_SANDBOX: "1"
+      MODULES: ${{ join(matrix.group, ' ') }}
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+      - uses: actions/setup-go@b7ad1dad31e06c5925ef5d2fc7ad053ef454303e # v7.0.0
+        with:
+          go-version-file: go.work
+          cache-dependency-path: |
+            go.work.sum
+            **/go.sum
+      - name: Pre-download modules (retry on transient proxy errors)
+        run: |
+          for i in 1 2 3; do
+            make -s download-all && exit 0
+            echo "download attempt $i failed; retrying"; sleep $((i * 10))
+          done
+          exit 1
+      - name: benchmarks (smoke, 100 iterations)
         run: |
           mkdir -p .bench
           failed=""
           for m in $MODULES; do
             slug=$(echo "$m" | tr / _)
-            if ! go -C "$m" test -run='^$' -bench=. -benchtime=1s -count=6 -cpu=1 -benchmem ./... > ".bench/$slug.txt" 2>&1; then
+            if ! go -C "$m" test -run='^$' -bench=. -benchtime=100x -count=1 -cpu=1 -benchmem ./... > ".bench/$slug.txt" 2>&1; then
               echo "::error::benchmark failed: $m"
               cat ".bench/$slug.txt"
               failed="$failed $m"
@@ -452,10 +495,12 @@ jobs:
           [ -z "$failed" ] || { echo "FAILED benchmark modules:$failed"; exit 1; }
           echo "benchmark runs complete"
       - name: upload benchmark results
-        if: github.event_name != 'pull_request'
-        uses: actions/upload-artifact@v7
+        if: always()
+        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
         with:
-          name: benchmarks
+          # Artifact names are immutable per run since upload-artifact v4,
+          # so each matrix group needs its own name.
+          name: benchmarks-${{ strategy.job-index }}
           path: .bench/
           if-no-files-found: warn
           retention-days: 30
@@ -465,13 +510,14 @@ jobs:
   # the floor (80; stripe measured 83.0, so 85 would ship red-on-main — see
   # tools/coverage-floor.sh header). Scoped re-run (7 modules) stays under 5
   # minutes. PRs run the race fast-gate without coverage, so this job is
-  # main/tags only and ignores affected-modules (always runs).
+  # main/tags only and ignores affected-modules (always runs). It re-runs
+  # its own scoped tests and consumes nothing from test-race, so it runs in
+  # parallel rather than waiting on it; ci-gate still requires both.
   coverage-floor:
     name: coverage-floor
     timeout-minutes: 10
     if: github.event_name != 'pull_request'
     runs-on: ubuntu-latest
-    needs: [detect, test-race]
     permissions:
       contents: read
     steps:

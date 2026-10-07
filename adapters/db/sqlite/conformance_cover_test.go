@@ -1,11 +1,17 @@
 package sqlite
 
 import (
+	"fmt"
+	"sync/atomic"
 	"testing"
 
 	"github.com/zenta-dev/zever/core/db"
 	"github.com/zenta-dev/zever/core/db/dbtest"
 )
+
+// kitAdapterSeq suffixes TestOpenRegister's adapter name so every
+// invocation registers a name no earlier -count iteration has claimed.
+var kitAdapterSeq atomic.Int64
 
 // TestOpenRegister proves Register wiring plus Open round-trip. It uses a
 // test-only adapter name: registering db.SQLite itself would collide with
@@ -14,7 +20,9 @@ import (
 func TestOpenRegister(t *testing.T) {
 	t.Parallel()
 
-	const adapter = db.Adapter("kit-db-sqlite")
+	// A fresh name per invocation keeps the test idempotent under
+	// -count=N: the registry is process-global and has no unregister.
+	adapter := db.Adapter(fmt.Sprintf("kit-db-sqlite-%d", kitAdapterSeq.Add(1)))
 
 	if err := db.Register(adapter, New); err != nil {
 		t.Fatalf("Register() error = %v", err)

@@ -218,9 +218,35 @@ func (s *stubQueue) nackCount() int {
 }
 
 func newTestAdapter(q corequeue.Queue) *adapter {
+	a := buildTestAdapter(q)
+	a.startWorkers()
+
+	return a
+}
+
+// newIdleTestAdapter is newTestAdapter with a worker pool whose goroutines
+// never run. Register still assigns events (so serving/assignmentCount
+// work), but no background consumer pops the queue or touches a.consecutive
+// concurrently with a test that drives consumeOne/handleConsumeError
+// directly -- a running worker would reset or bump the counter mid-assertion.
+// Each worker's done is pre-closed so Close returns without waiting.
+func newIdleTestAdapter(q corequeue.Queue) *adapter {
+	a := buildTestAdapter(q)
+	a.workers = make([]*worker, DefaultConsumerWorkers)
+
+	for i := range a.workers {
+		w := newWorker()
+		close(w.done)
+		a.workers[i] = w
+	}
+
+	return a
+}
+
+func buildTestAdapter(q corequeue.Queue) *adapter {
 	timeout := 5 * time.Second
 
-	a := &adapter{
+	return &adapter{
 		regs:            make(map[string]map[string]registration),
 		queue:           q,
 		timeout:         timeout,
@@ -231,10 +257,6 @@ func newTestAdapter(q corequeue.Queue) *adapter {
 		allowPrivate:    true,
 		replayTolerance: defaultReplayTolerance,
 	}
-
-	a.startWorkers()
-
-	return a
 }
 
 // serving reports whether event is currently assigned to a pool worker.
@@ -1160,7 +1182,10 @@ func TestSafeProcess_PanicAtMaxDLQ(t *testing.T) {
 func TestHandleConsumeError(t *testing.T) {
 	t.Parallel()
 
-	a := newTestAdapter(newStubQueue())
+	// Idle pool: a live worker serving "e" would pop ErrEmpty from the stub
+	// and clear a.consecutive between the assertions below.
+	a := newIdleTestAdapter(newStubQueue())
+	defer func() { _ = a.Close() }()
 
 	if err := a.Register(t.Context(), "e", "http://127.0.0.1:1/a", "s"); err != nil {
 		t.Fatalf("Register() err = %v", err)
@@ -1737,7 +1762,10 @@ func TestConsumeOne_TransportErrorKeepsEventAssigned(t *testing.T) {
 	sq := newStubQueue()
 	sq.popErr = errTestTransport
 
-	a := newTestAdapter(sq)
+	// Idle pool: a live worker serving "e" would hit the same transport
+	// error on every poll and could reach the cap (unassigning "e") before
+	// the serving assertion runs.
+	a := newIdleTestAdapter(sq)
 	defer func() { _ = a.Close() }()
 
 	if err := a.Register(t.Context(), "e", "http://127.0.0.1:1/a", "s"); err != nil {

@@ -2,6 +2,7 @@ package db
 
 import (
 	"os"
+	"path/filepath"
 	"testing"
 
 	"github.com/zenta-dev/zever/core/vectorstore"
@@ -9,7 +10,7 @@ import (
 )
 
 // TestConformance runs the shared vectorstore kit against the migrated adapter.
-// The db leg runs on :memory: with no infra; the pgvector leg keeps the
+// The db leg runs on a per-store sqlite temp file with no infra; the pgvector leg keeps the
 // legacy alias name and runs only when POSTGRES_DSN (fallback
 // PGVECTOR_TEST_DSN) names a live server. Never fake infra for conformance.
 func TestConformance(t *testing.T) {
@@ -19,7 +20,14 @@ func TestConformance(t *testing.T) {
 
 			Register()
 
-			s, err := vectorstore.Open(vectorstore.DB, vectorstore.Options{})
+			// A per-store sqlite file, not the default ":memory:": the
+			// sqlite adapter opens in-memory databases with cache=shared,
+			// so every ":memory:" connection in this test binary sees the
+			// same tables, and rows upserted by parallel tests (e.g.
+			// TestNewFromDB's "borrowed") leak into the kit's queries.
+			dsn := filepath.Join(t.TempDir(), "conformance.db")
+
+			s, err := vectorstore.Open(vectorstore.DB, vectorstore.Options{DSN: dsn})
 			if err != nil {
 				t.Fatalf("Open() error = %v", err)
 			}

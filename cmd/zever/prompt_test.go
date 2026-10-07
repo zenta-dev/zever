@@ -6,6 +6,7 @@ import (
 	"os"
 	"path/filepath"
 	"strings"
+	"sync"
 	"testing"
 	"time"
 
@@ -400,13 +401,59 @@ func (a huhTeaAdapter) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 
 func (a huhTeaAdapter) View() tea.View { return tea.NewView(a.form.View()) }
 
+// teatestTB is the testing.TB handed to teatest.NewTestModel. NewTestModel
+// starts a goroutine that blocks on signal.Notify(SIGINT) for the life of
+// the process and calls tb.Log("interrupted") when one arrives; it is never
+// stopped, even after the program exits. TestRunLaunchForwardsSignalToChild
+// sends the test binary a real SIGINT, so whenever it runs after a teatest
+// test (-shuffle, -count>1) that leaked goroutine logs on a completed test
+// and the binary panics. teatestTB drops Log/Logf once its test's cleanup
+// has started; the mutex keeps a log from racing test completion.
+type teatestTB struct {
+	*testing.T
+
+	mu   sync.RWMutex
+	done bool
+}
+
+func newTeatestTB(t *testing.T) *teatestTB {
+	t.Helper()
+
+	tb := &teatestTB{T: t}
+	t.Cleanup(func() {
+		tb.mu.Lock()
+		tb.done = true
+		tb.mu.Unlock()
+	})
+
+	return tb
+}
+
+func (tb *teatestTB) Log(args ...any) {
+	tb.mu.RLock()
+	defer tb.mu.RUnlock()
+
+	if !tb.done {
+		tb.T.Log(args...)
+	}
+}
+
+func (tb *teatestTB) Logf(format string, args ...any) {
+	tb.mu.RLock()
+	defer tb.mu.RUnlock()
+
+	if !tb.done {
+		tb.T.Logf(format, args...)
+	}
+}
+
 // driveFormTeatest runs f on teatest's virtual terminal: optionally types
 // text, feeds keys in order, quits, and waits bounded. The form mutates in
 // place, so values bound via huh.Value pointers are visible to the caller.
 func driveFormTeatest(t *testing.T, f *huh.Form, typeText string, keys ...tea.Msg) {
 	t.Helper()
 
-	tm := teatest.NewTestModel(t, huhTeaAdapter{form: f}, teatest.WithInitialTermSize(80, 24))
+	tm := teatest.NewTestModel(newTeatestTB(t), huhTeaAdapter{form: f}, teatest.WithInitialTermSize(80, 24))
 	if typeText != "" {
 		tm.Type(typeText)
 	}

@@ -1,11 +1,17 @@
 package local
 
 import (
+	"fmt"
+	"sync/atomic"
 	"testing"
 
 	"github.com/zenta-dev/zever/core/media"
 	"github.com/zenta-dev/zever/core/media/mediatest"
 )
+
+// kitAdapterSeq suffixes TestOpenRegister's adapter name so every
+// invocation registers a name no earlier -count iteration has claimed.
+var kitAdapterSeq atomic.Int64
 
 // TestOpenRegister proves Register wiring plus Open round-trip. It uses a
 // test-only adapter name: registering media.Local itself would collide with
@@ -14,7 +20,9 @@ import (
 func TestOpenRegister(t *testing.T) {
 	t.Parallel()
 
-	const adapter = media.Adapter("kit-media-local")
+	// A fresh name per invocation keeps the test idempotent under
+	// -count=N: the registry is process-global and has no unregister.
+	adapter := media.Adapter(fmt.Sprintf("kit-media-local-%d", kitAdapterSeq.Add(1)))
 
 	if err := media.Register(adapter, New); err != nil {
 		t.Fatalf("Register() error = %v", err)

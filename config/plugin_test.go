@@ -12,6 +12,13 @@ func mustRegisterPlugin(t *testing.T, name string, validate func(string, json.Ra
 	if err := RegisterPluginValidator(name, validate); err != nil {
 		t.Fatalf("RegisterPluginValidator(%q): %v", name, err)
 	}
+	// The validator registry is process-global; drop the entry when the
+	// test ends so the next -count iteration can register the same name.
+	t.Cleanup(func() {
+		pluginValidatorsMu.Lock()
+		defer pluginValidatorsMu.Unlock()
+		delete(pluginValidators, name)
+	})
 }
 
 func mustMergePlugins(t *testing.T, cfg *Config, raw map[string]ServiceConfig) {

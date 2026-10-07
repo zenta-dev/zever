@@ -11,20 +11,31 @@ import (
 	"github.com/zenta-dev/zever/core/document"
 )
 
-func hasChrome() bool {
-	for _, name := range []string{"chromium", "chromium-browser", "google-chrome", "google-chrome-stable", "headless_shell"} {
-		if _, err := exec.LookPath(name); err == nil {
-			return true
+// chromeBinaryNames is the ordered Chrome/Chromium binary lookup list shared
+// by hasChrome and the TestMain page-cache warmer.
+var chromeBinaryNames = []string{"chromium", "chromium-browser", "google-chrome", "google-chrome-stable", "headless_shell"}
+
+func chromeBinary() (string, bool) {
+	for _, name := range chromeBinaryNames {
+		if path, err := exec.LookPath(name); err == nil {
+			return path, true
 		}
 	}
 
-	return false
+	return "", false
+}
+
+func hasChrome() bool {
+	_, ok := chromeBinary()
+	return ok
 }
 
 // renderTestTimeout gives headless Chrome room to cold-launch on slow CI
-// runners (notably -race with a cold module cache). These tests assert
-// output shape, not speed; production DefaultTimeout is unchanged.
-const renderTestTimeout = 2 * document.DefaultTimeout
+// runners (notably -race with a cold module cache); TestMain pre-warms the
+// binary's page cache, but loaded runners can still need more headroom than
+// the production default. These tests assert output shape, not speed;
+// production DefaultTimeout is unchanged.
+const renderTestTimeout = 3 * document.DefaultTimeout
 
 func TestOpenDefaults(t *testing.T) {
 	t.Parallel()

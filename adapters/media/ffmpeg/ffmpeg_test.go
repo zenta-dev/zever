@@ -6,6 +6,7 @@ import (
 	"os/exec"
 	"path/filepath"
 	"strings"
+	"syscall"
 	"testing"
 	"time"
 
@@ -504,30 +505,30 @@ func TestLookPathMissing(t *testing.T) {
 	}
 }
 
-func writeScript(t *testing.T, body string) string {
-	t.Helper()
+// writeScript writes body to a fresh executable script and returns its path.
+//
+// The write happens under syscall.ForkLock (read side). Parallel tests fork
+// script stubs concurrently, and a child forked while this process still
+// holds the script's write fd inherits that fd until its own exec; exec'ing
+// the script during that window fails with ETXTBSY ("text file busy"),
+// which Probe/RunTranscode surface as ErrProbeFailed/ErrTranscodeFailed
+// (golang/go#22315). fork takes ForkLock for writing, so no child can be
+// created while the fd is open.
+func writeScript(tb testing.TB, body string) string {
+	tb.Helper()
 
-	path := filepath.Join(t.TempDir(), "fakebin")
+	path := filepath.Join(tb.TempDir(), "fakebin")
 
-	file, err := os.OpenFile(path, os.O_WRONLY|os.O_CREATE|os.O_TRUNC, 0o755)
+	syscall.ForkLock.RLock()
+	err := os.WriteFile(path, []byte(body), 0o600)
+	syscall.ForkLock.RUnlock()
+
 	if err != nil {
-		t.Fatalf("create script: %v", err)
-	}
-
-	if _, err := file.WriteString(body); err != nil {
-		t.Fatalf("write script: %v", err)
-	}
-
-	if err := file.Sync(); err != nil {
-		t.Fatalf("sync script: %v", err)
-	}
-
-	if err := file.Close(); err != nil {
-		t.Fatalf("close script: %v", err)
+		tb.Fatalf("write script: %v", err)
 	}
 
 	if err := os.Chmod(path, 0o755); err != nil {
-		t.Fatalf("chmod script: %v", err)
+		tb.Fatalf("chmod script: %v", err)
 	}
 
 	return path
