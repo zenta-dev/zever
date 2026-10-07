@@ -4,7 +4,7 @@ Pre-1.0 policy for what may break in `0.x` releases. Docs-only; no API change.
 
 See also [Versioning](.github/CONTRIBUTING.md#versioning) and
 [API Compatibility](.github/CONTRIBUTING.md#api-compatibility).
-Cross-checked against `config.Config` (`config/config.go`, 36 `Service`
+Cross-checked against `config.Config` (`config/config.go`, 37 `Service`
 fields) and `container` accessors (`container/services.go`,
 `container/README.md`).
 
@@ -38,11 +38,11 @@ fields) and `container` accessors (`container/services.go`,
 | `router` | HTTP facade (`fiber`, `stdhttp`). |
 | `cache` | Facade (`memory`, `redis`); leaf dependency, closed last. |
 | `queue` | Facade (`memory`, `redis`); leaf dependency, closed last. |
-| `session` | Facade (`memory`, `redis`). |
+| `session` | Facade (`memory`, `redis`, `db`, `cookie`). |
 | `auth` | Facade (`jwt`, `session`, `oidc`). |
-| `crypto` | Facade (`local`); dev key deterministic, never prod. |
+| `crypto` | Facade (`local`, `kms`); dev key deterministic, never prod. |
 | `password` | Facade (`argon2id`). |
-| `secrets` | Facade (`env` only); `ZEVER`-prefixed env exception. |
+| `secrets` | Facade (`env`, `vault`); `ZEVER`-prefixed env exception. |
 | `dsl` | `.zen` compiler frontend (compile-time only, no release version; schema `v1`/`v2` are API versions). |
 
 ## Extended
@@ -57,12 +57,13 @@ release-note docs.
 | `agent` | Tool-calling loop over `ai`; no adapter registry, no `config` entry; `container.Agent()`. |
 | `rag` | Retrieval-augmented generation over `ai` + `vectorstore`; no `config` entry; `container.RAG()`. |
 | `billing` | Facade (`stub`, `stripe`, `paddle`). |
+| `cdn` | Facade (`noop`, `cloudflare`). |
 | `payment` | Facade (`stub`, `stripe`, `paddle`). |
 | `storage` | Facade (`local`, `s3`, `r2`). |
 | `media` | Facade (`local`, `s3`). |
 | `document` | Facade (`local`, `remote`, `latex`). |
-| `search` | Facade (`db`, `postgres`, `meilisearch`, `sqlite`). |
-| `vectorstore` | Facade (`db`, `sqlite`, `pgvector`, `qdrant`). |
+| `search` | Facade (`db`, `postgres`, `meilisearch`). |
+| `vectorstore` | Facade (`db`, `pgvector`, `qdrant`). |
 | `notification` | Facade (`log`, `twilio`, `fcm`). |
 | `geo` | Facade (`google`, `static`, `osm`). |
 | `flag` | Facade (`static`, `firebase`). |
@@ -81,8 +82,8 @@ release-note docs.
 | `mailer` | Facade (`log`, `smtp`). |
 | `permission` | Facade (`noop`, `rbac`, `casbin`). |
 | `ratelimit` | Facade (`memory`, `redis`). |
-| `scheduler` | Facade (`embedded`); shares `Queue` via `Job()`. |
-| `webhook` | Facade (`http`, `queue`, `sqlite`). |
+| `scheduler` | Facade (`embedded`, `postgres`); shares `Queue` via `Job()`. |
+| `webhook` | Facade (`http`, `queue`). |
 | `apperror` | Typed error vocabulary (gRPC/HTTP mappings). |
 | `authz` | `auth`-to-`permission` bridge (HTTP middleware, gRPC interceptor). |
 | `codec` | Generic `Encoder`/`Decoder`/`Codec` + `JSONCodec`. |
@@ -119,7 +120,7 @@ applies unchanged.
 
 - Core breaks: still permitted with release notes; the 6-month clock has
   not started.
-- Kits: 39 conformance kit packages ship under `core/*/*test/`; 33 of
+- Kits: 40 conformance kit packages ship under `core/*/*test/`; 33 of
   them ship an in-kit `conformance_test.go` suite (all pass). CI
   (`.github/workflows/ci.yml` `conformance` job) runs 34 core module
   suites plus all 83 cross-adapter `-run Conformance` invocations
@@ -148,7 +149,7 @@ applies unchanged.
 ## Coverage note
 
 Every top-level package is classified above. `config`/`container` cover
-36 services (`ai`, `analytics`, `auth`, `billing`, `cache`, `crypto`,
+37 services (`ai`, `analytics`, `auth`, `billing`, `cache`, `cdn`, `crypto`,
 `db`, `document`, `eventbus`, `flag`, `geo`, `i18n`, `idempotency`,
 `lock`, `log`, `mailer`, `media`, `notification`, `observability`,
 `outbox`, `password`, `payment`, `permission`, `queue`, `ratelimit`,
