@@ -47,6 +47,7 @@ A JSON Schema ships as `config/schema/zever.schema.json` for editor completion o
 | [`auth`](#auth) | **jwt**, session, oidc | `c.Auth()` | [Auth](../../guides/security/auth/) |
 | [`billing`](#billing) | **stub**, stripe, paddle | `c.Billing()` | [Billing](../../guides/integrations/billing/) |
 | [`cache`](#cache) | **memory**, redis, db | `c.Cache()` | [Cache](../../guides/data/cache/) |
+| [`cdn`](#cdn) | **noop**, cloudflare | `c.CDN()` | [CDN](../../guides/data/cdn/) |
 | [`crypto`](#crypto) | **local** | `c.Crypto()` | [Crypto and secrets](../../guides/security/crypto-secrets/) |
 | [`db`](#db) | **sqlite**, postgres | `c.DB()` | [Query builder](../../guides/data/query-builder/) |
 | [`document`](#document) | **local**, remote, latex | `c.Document()` | [Document](../../guides/data/document/) |
@@ -286,6 +287,31 @@ cache:
   options:
     addr: localhost:6379
     require_tls: true
+```
+
+### `cdn`
+
+Invalidates cached content at the edge. `noop` discards purges (default); `cloudflare` calls the Cloudflare cache-purge API.
+
+| | |
+|---|---|
+| Adapters | `noop`, `cloudflare` |
+| Default adapter | `noop` |
+| Accessor | `c.CDN()` |
+| Guide | [CDN guide](../../guides/data/cdn/) |
+
+| Key | Type | Default | Description |
+|---|---|---|---|
+| `api_token` | string | `""` | Cloudflare API token (cloudflare adapter) |
+| `zone_id` | string | `""` | Cloudflare zone ID to purge (cloudflare adapter) |
+| `base_url` | string | `""` | Overrides the Cloudflare API endpoint (cloudflare adapter) |
+
+```yaml title="zever.yaml"
+cdn:
+  adapter: cloudflare
+  options:
+    api_token: CLOUDFLARE_API_TOKEN
+    zone_id: CLOUDFLARE_ZONE_ID
 ```
 
 ### `crypto`

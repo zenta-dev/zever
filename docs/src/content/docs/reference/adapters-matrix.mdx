@@ -81,6 +81,8 @@ redis.Register()
 | cache | memory | `github.com/zenta-dev/zever/adapters/cache/memory` | `memory.Register()` | `Cache()` |
 | cache | redis | `github.com/zenta-dev/zever/adapters/cache/redis` | `redis.Register()` | `Cache()` |
 | cache | db | `github.com/zenta-dev/zever/adapters/cache/db` | `db.Register()` | `Cache()` |
+| cdn | noop | `github.com/zenta-dev/zever/adapters/cdn/noop` | `noop.Register()` | `CDN()` |
+| cdn | cloudflare | `github.com/zenta-dev/zever/adapters/cdn/cloudflare` | `cloudflare.Register()` | `CDN()` |
 | crypto | local | `github.com/zenta-dev/zever/adapters/crypto/local` | `local.Register()` | `Crypto()` |
 | crypto | kms | `github.com/zenta-dev/zever/adapters/crypto/kms` | `kms.Register()` | `Crypto()` |
 | db | sqlite | `github.com/zenta-dev/zever/adapters/db/sqlite` | `sqlite.Register()` | `DB()` |
