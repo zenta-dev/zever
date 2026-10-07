@@ -25,7 +25,7 @@ source text → lexer → parser → ast → resolver → ir.Schema
 | `format` | Token-gap formatter; refuses lex-dirty input; idempotent. |
 | `breaking` | Old-vs-new schema compatibility (`Change` taxonomy). |
 | `compile` | Filename-sorted parse → resolve → `backend.Backend.Generate`. |
-| `backend` | `Backend` interface only; backends land in later phases. |
+| `backend` | `Backend`/`ContextBackend` interfaces plus the shipped backends: `atlas` (DDL/schema), `gogen` (Go server code), `mcp` (MCP server manifest), `openapi`, `proto` (protobuf messages/services), `protogogen` (generated `.pb.go`/gRPC stubs: drives `protoc-gen-go` as a library and `go tool protoc-gen-go-grpc` as a subprocess — no system protoc), `zenorm` (ORM modules). |
 | `gengrammar` | Renders `editors/nvim` and `editors/vscode` grammar files from `token.Keywords` / `resolver.ScalarTypeNames`; run via `make generate` (`tools/gengrammar`). |
 
 Entry points: `parser.New(file, src).ParseFile()` →

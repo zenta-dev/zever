@@ -29,7 +29,7 @@ config file, overlaid by environment variables. Later layers win:
 | billing       | stub, stripe, paddle                |
 | cache         | memory, redis, db                   |
 | cdn           | noop, cloudflare                    |
-| crypto        | local                               |
+| crypto        | local, kms                          |
 | db            | sqlite, postgres                    |
 | document      | local, remote, latex                |
 | eventbus      | memory, redis                       |
@@ -60,6 +60,10 @@ config file, overlaid by environment variables. Later layers win:
 | vectorstore   | db, sqlite, pgvector, qdrant        |
 | webhook       | http, queue                         |
 | workflow      | memory, db, postgres                |
+
+Two shipped adapters have no registry/config default: `session/cookie`
+and `media/ffmpeg` exist as adapter packages but are absent from the
+default adapter matrix above (and from `config.Default()`).
 
 Defaults pick the zero-infra adapter per service (ai has none — all backends
 need keys — so it defaults to `anthropic` and requires an API key via
