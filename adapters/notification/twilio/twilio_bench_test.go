@@ -138,7 +138,10 @@ func BenchmarkDeadlineTimeout(b *testing.B) {
 	if !ok {
 		b.Fatalf("New() = %T, want *twilioNotifier", n)
 	}
-	ctx, cancel := context.WithDeadline(b.Context(), time.Now().Add(time.Hour))
+	// The clamp only engages when the ctx deadline is earlier than the
+	// notifier's own timeout, so the deadline must sit inside it. Elapsed
+	// bench time only shrinks the remaining budget, so it stays clamped.
+	ctx, cancel := context.WithDeadline(b.Context(), time.Now().Add(tn.timeout/2))
 	defer cancel()
 	b.ReportAllocs()
 	b.ResetTimer()
