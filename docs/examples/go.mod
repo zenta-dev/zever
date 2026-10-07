@@ -14,7 +14,6 @@ require (
 	github.com/zenta-dev/zever/container v0.5.3
 	github.com/zenta-dev/zever/core/auth v0.5.3
 	github.com/zenta-dev/zever/core/cache v0.5.3
-	github.com/zenta-dev/zever/core/cdn v0.5.3
 	github.com/zenta-dev/zever/core/db v0.5.3
 	github.com/zenta-dev/zever/core/log v0.5.3
 	github.com/zenta-dev/zever/core/queue v0.5.3
@@ -39,6 +38,7 @@ require (
 	github.com/zenta-dev/zever/core/ai v0.5.3 // indirect
 	github.com/zenta-dev/zever/core/analytics v0.5.3 // indirect
 	github.com/zenta-dev/zever/core/billing v0.5.3 // indirect
+	github.com/zenta-dev/zever/core/cdn v0.5.3 // indirect
 	github.com/zenta-dev/zever/core/crypto v0.5.3 // indirect
 	github.com/zenta-dev/zever/core/document v0.5.3 // indirect
 	github.com/zenta-dev/zever/core/eventbus v0.5.3 // indirect
