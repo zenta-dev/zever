@@ -75,7 +75,7 @@ func TestCoverRegisterNilFactoryMessage(t *testing.T) {
 	if !errors.Is(err, ErrNilFactory) {
 		t.Fatalf("Register nil err = %v, want ErrNilFactory", err)
 	}
-	want := "mailer: nil factory for adapter " + a.String()
+	want := "mailer: mailer: nil factory for adapter " + a.String()
 	if err.Error() != want {
 		t.Fatalf("Register nil err = %q want %q", err.Error(), want)
 	}

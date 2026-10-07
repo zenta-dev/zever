@@ -70,30 +70,30 @@ func conformanceHashVerify(t *testing.T, factory func(t *testing.T) password.Has
 func checkHashVerify(ctx context.Context, h password.Hasher) error {
 	first, err := h.Hash(ctx, "conformance-password-01")
 	if err != nil {
-		return fmt.Errorf("Hash() error = %w", err)
+		return fmt.Errorf("passwordtest: Hash() error = %w", err)
 	}
 
 	if first == "" || first == "conformance-password-01" {
-		return fmt.Errorf("Hash() = %q, want opaque encoded hash", first)
+		return fmt.Errorf("passwordtest: Hash() = %q, want opaque encoded hash", first)
 	}
 
 	second, err := h.Hash(ctx, "conformance-password-01")
 	if err != nil {
-		return fmt.Errorf("Hash() error = %w", err)
+		return fmt.Errorf("passwordtest: Hash() error = %w", err)
 	}
 
 	if first == second {
-		return errors.New("Hash() returned identical hashes, want unique salts")
+		return errors.New("passwordtest: Hash() returned identical hashes, want unique salts")
 	}
 
 	for _, hash := range []string{first, second} {
 		ok, err := h.Verify(ctx, hash, "conformance-password-01")
 		if err != nil {
-			return fmt.Errorf("Verify() error = %w", err)
+			return fmt.Errorf("passwordtest: Verify() error = %w", err)
 		}
 
 		if !ok {
-			return errors.New("Verify(correct) = false, want true")
+			return errors.New("passwordtest: Verify(correct) = false, want true")
 		}
 	}
 
@@ -113,25 +113,25 @@ func conformanceWrongPassword(t *testing.T, factory func(t *testing.T) password.
 func checkWrongPassword(ctx context.Context, h password.Hasher) error {
 	hash, err := h.Hash(ctx, "right-password")
 	if err != nil {
-		return fmt.Errorf("Hash() error = %w", err)
+		return fmt.Errorf("passwordtest: Hash() error = %w", err)
 	}
 
 	ok, err := h.Verify(ctx, hash, "wrong-password")
 	if err != nil {
-		return fmt.Errorf("Verify(wrong) error = %w, want (false, nil)", err)
+		return fmt.Errorf("passwordtest: Verify(wrong) error = %w, want (false, nil)", err)
 	}
 
 	if ok {
-		return errors.New("Verify(wrong) = true, want false")
+		return errors.New("passwordtest: Verify(wrong) = true, want false")
 	}
 
 	ok, err = h.Verify(ctx, hash, "")
 	if err != nil {
-		return fmt.Errorf("Verify(empty) error = %w, want (false, nil)", err)
+		return fmt.Errorf("passwordtest: Verify(empty) error = %w, want (false, nil)", err)
 	}
 
 	if ok {
-		return errors.New("Verify(empty) = true, want false")
+		return errors.New("passwordtest: Verify(empty) = true, want false")
 	}
 
 	return nil
@@ -150,18 +150,18 @@ func conformanceNeedsRehash(t *testing.T, factory func(t *testing.T) password.Ha
 func checkNeedsRehash(ctx context.Context, h password.Hasher) error {
 	hash, err := h.Hash(ctx, "rehash-check")
 	if err != nil {
-		return fmt.Errorf("Hash() error = %w", err)
+		return fmt.Errorf("passwordtest: Hash() error = %w", err)
 	}
 
 	// A hash just minted with current parameters must not need rehash.
 	// Adapters without parameter tracking report false with nil error.
 	needed, err := h.NeedsRehash(ctx, hash)
 	if err != nil {
-		return fmt.Errorf("NeedsRehash(current) error = %w", err)
+		return fmt.Errorf("passwordtest: NeedsRehash(current) error = %w", err)
 	}
 
 	if needed {
-		return errors.New("NeedsRehash(current) = true, want false")
+		return errors.New("passwordtest: NeedsRehash(current) = true, want false")
 	}
 
 	return nil
@@ -182,23 +182,23 @@ func checkInvalidHash(ctx context.Context, h password.Hasher) error {
 	for _, bad := range []string{"", "not-a-hash", "$argon2id$v=19$m=1,t=1,p=1$c2FsdA$hash"} {
 		if _, err := h.Verify(ctx, bad, "whatever"); !errors.Is(err, password.ErrInvalidHash) {
 			if err == nil {
-				return fmt.Errorf("Verify(%q) = nil, want ErrInvalidHash", bad)
+				return fmt.Errorf("passwordtest: Verify(%q) = nil, want ErrInvalidHash", bad)
 			}
-			return fmt.Errorf("Verify(%q) err = %w, want ErrInvalidHash", bad, err)
+			return fmt.Errorf("passwordtest: Verify(%q) err = %w, want ErrInvalidHash", bad, err)
 		}
 
 		if _, err := h.NeedsRehash(ctx, bad); !errors.Is(err, password.ErrInvalidHash) {
 			if err == nil {
-				return fmt.Errorf("NeedsRehash(%q) = nil, want ErrInvalidHash", bad)
+				return fmt.Errorf("passwordtest: NeedsRehash(%q) = nil, want ErrInvalidHash", bad)
 			}
-			return fmt.Errorf("NeedsRehash(%q) err = %w, want ErrInvalidHash", bad, err)
+			return fmt.Errorf("passwordtest: NeedsRehash(%q) err = %w, want ErrInvalidHash", bad, err)
 		}
 	}
 
 	if _, err := h.Hash(ctx, strings.Repeat("p", 1025)); err == nil {
-		return errors.New("Hash(overlong) = nil, want ErrPasswordTooLong")
+		return errors.New("passwordtest: Hash(overlong) = nil, want ErrPasswordTooLong")
 	} else if !errors.Is(err, password.ErrPasswordTooLong) {
-		return fmt.Errorf("Hash(overlong) err = %w, want ErrPasswordTooLong", err)
+		return fmt.Errorf("passwordtest: Hash(overlong) err = %w, want ErrPasswordTooLong", err)
 	}
 
 	return nil
