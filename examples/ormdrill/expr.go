@@ -11,10 +11,10 @@ import (
 )
 
 // ErrProjection indicates the projection demo failed.
-var ErrProjection = errors.New("projection")
+var ErrProjection = errors.New("ormdrill: projection")
 
 // ErrNullsOrdering indicates the NULLS ordering demo failed.
-var ErrNullsOrdering = errors.New("nulls ordering")
+var ErrNullsOrdering = errors.New("ormdrill: nulls ordering")
 
 // DemoScalarExpr roots COALESCE/NULLIF/LOWER/UPPER/TRIM/LENGTH/CASE
 // expressions into WHERE predicates and counts the matches. The expression
@@ -103,7 +103,7 @@ func DemoProjection(ctx context.Context, conn db.DB) error {
 			return nil
 		})
 	if err != nil {
-		return fmt.Errorf("ormdrill: %w All: %w", ErrProjection, err)
+		return errors.Join(fmt.Errorf("ormdrill: %w All", ErrProjection), err)
 	}
 
 	fmt.Printf("  projected %d widgets", len(views))
@@ -135,7 +135,7 @@ func DemoProjection(ctx context.Context, conn db.DB) error {
 		).
 		First(ctx, conn, &firstID, &firstAmount)
 	if err != nil {
-		return fmt.Errorf("ormdrill: %w First: %w", ErrProjection, err)
+		return errors.Join(fmt.Errorf("ormdrill: %w First", ErrProjection), err)
 	}
 
 	amount := "NULL"
@@ -158,7 +158,7 @@ func DemoNullsOrdering(ctx context.Context, conn db.DB) error {
 		OrderBy(WidgetCols.Note.Asc().NullsFirst(), WidgetCols.ID.Asc()).
 		All(ctx, conn)
 	if err != nil {
-		return fmt.Errorf("ormdrill: %w first: %w", ErrNullsOrdering, err)
+		return errors.Join(fmt.Errorf("ormdrill: %w first", ErrNullsOrdering), err)
 	}
 
 	fmt.Print("  NULLS FIRST:")
@@ -173,7 +173,7 @@ func DemoNullsOrdering(ctx context.Context, conn db.DB) error {
 		OrderBy(WidgetCols.Note.Asc().NullsLast(), WidgetCols.ID.Asc()).
 		All(ctx, conn)
 	if err != nil {
-		return fmt.Errorf("ormdrill: %w last: %w", ErrNullsOrdering, err)
+		return errors.Join(fmt.Errorf("ormdrill: %w last", ErrNullsOrdering), err)
 	}
 
 	fmt.Print("  NULLS LAST: ")

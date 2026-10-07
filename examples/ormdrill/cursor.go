@@ -11,10 +11,10 @@ import (
 )
 
 // ErrKeysetPage indicates a keyset pagination query failed.
-var ErrKeysetPage = errors.New("keyset page")
+var ErrKeysetPage = errors.New("ormdrill: keyset page")
 
 // ErrOffsetPage indicates an offset pagination query failed.
-var ErrOffsetPage = errors.New("offset page")
+var ErrOffsetPage = errors.New("ormdrill: offset page")
 
 // DemoCursorPagination walks all orders with a typed CursorKey, proves the
 // Encode -> DecodeCursor round-trip (and that a token cannot be replayed
@@ -41,7 +41,7 @@ func DemoCursorPagination(ctx context.Context, conn db.DB) error {
 
 		page, err := q.All(ctx, conn)
 		if err != nil {
-			return fmt.Errorf("ormdrill: %w %d: %w", ErrKeysetPage, pageNo, err)
+			return errors.Join(fmt.Errorf("ormdrill: %w %d", ErrKeysetPage, pageNo), err)
 		}
 
 		if len(page) == 0 {
@@ -96,12 +96,12 @@ func DemoCursorPagination(ctx context.Context, conn db.DB) error {
 	// The number-based alternative: LIMIT pageSize OFFSET (page-1)*pageSize.
 	paged, err := orm.OffsetPage(orm.From(Orders).OrderBy(OrderCols.CreatedAt.Desc()), 2, pageSize)
 	if err != nil {
-		return fmt.Errorf("ormdrill: %w: %w", ErrOffsetPage, err)
+		return errors.Join(fmt.Errorf("ormdrill: %w", ErrOffsetPage), err)
 	}
 
 	rows, err := paged.All(ctx, conn)
 	if err != nil {
-		return fmt.Errorf("ormdrill: %w all: %w", ErrOffsetPage, err)
+		return errors.Join(fmt.Errorf("ormdrill: %w all", ErrOffsetPage), err)
 	}
 
 	ids := make([]string, len(rows))
