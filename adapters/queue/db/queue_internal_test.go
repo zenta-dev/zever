@@ -159,7 +159,12 @@ func TestReclaimStaleSingleSetBasedUpdate(t *testing.T) {
 	for _, q := range got {
 		switch {
 		case strings.HasPrefix(q, `UPDATE "queue_messages" SET "attempt" = ?`):
-			t.Errorf("per-row guarded UPDATE ran (old N+1 shape): %q", q)
+			// The claim CAS and nack-requeue paths share this prefix, but
+			// both also write "available_at", which the old per-row reclaim
+			// never did.
+			if !strings.Contains(q, `"available_at" = ?`) {
+				t.Errorf("per-row guarded UPDATE ran (old N+1 shape): %q", q)
+			}
 		case strings.HasPrefix(q, `UPDATE "queue_messages" SET "attempt" = "attempt" + ?`):
 			sawSetBased = true
 

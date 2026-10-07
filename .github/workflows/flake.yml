@@ -52,3 +52,71 @@ jobs:
           exit 1
       - name: go test -race -shuffle=on -count=${{ env.FLAKE_COUNT }}
         run: make test-flake
+
+  # Nightly failure tracker: when any flake shard fails, open or update a
+  # single tracking issue listing the failing shards and modules. Idempotent:
+  # an open issue titled "flake-hunt: nightly failures" is commented on when it
+  # exists, created otherwise. Uses the preinstalled gh CLI.
+  flake-tracker:
+    name: track nightly failures
+    timeout-minutes: 10
+    if: needs.flake.result == 'failure'
+    runs-on: ubuntu-latest
+    needs: [flake]
+    permissions:
+      issues: write
+    env:
+      GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+    steps:
+      - name: Collect failing shards and modules
+        id: collect
+        run: |
+          set -euo pipefail
+          repo="${{ github.repository }}"
+          run_id="${{ github.run_id }}"
+          run_url="${{ github.server_url }}/${repo}/actions/runs/${run_id}"
+          shards=""
+          modules=""
+          for id in $(gh run view "$run_id" --repo "$repo" --json jobs --jq '[.jobs[] | select(.conclusion == "failure") | .databaseId][]'); do
+            name=$(gh run view --job "$id" --repo "$repo" --json name --jq -r .name)
+            shards="${shards}- ${name}"$'\n'
+            while IFS= read -r m; do
+              [ -n "$m" ] && modules="${modules}${m}"$'\n'
+            done < <(gh run view --job "$id" --repo "$repo" --log-failed | grep -oE 'flaky/failing module: .+' | sed 's/^flaky\/failing module: //' || true)
+          done
+          {
+            echo "run_url=${run_url}"
+            echo "shards<<EOF"
+            printf '%s' "$shards"
+            echo "EOF"
+            echo "modules<<EOF"
+            printf '%s' "$modules"
+            echo "EOF"
+          } >> "$GITHUB_OUTPUT"
+      - name: Open or update tracking issue
+        run: |
+          set -euo pipefail
+          repo="${{ github.repository }}"
+          run_url="${{ steps.collect.outputs.run_url }}"
+          shards="${{ steps.collect.outputs.shards }}"
+          modules="${{ steps.collect.outputs.modules }}"
+          body="flake-hunt nightly run failed.
+
+          Run: ${run_url}
+          Date (UTC): $(date -u +%Y-%m-%d)
+
+          Failing shards:
+          ${shards:-none}
+
+          Failing modules:
+          ${modules:-none}
+
+          This issue is commented on every failed nightly run; close it once the underlying flakes are fixed."
+          existing=$(gh issue list --repo "$repo" --state open --search '"flake-hunt: nightly failures" in:title' --limit 1 --json number --jq '.[0].number // empty')
+          if [ -n "$existing" ]; then
+            echo "Commenting on existing tracking issue #${existing}"
+            gh issue comment "$existing" --repo "$repo" --body "$body"
+          else
+            echo "Creating tracking issue"
+            gh issue create --repo "$repo" --title "flake-hunt: nightly failures" --body "$body"
+          fi

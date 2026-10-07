@@ -155,7 +155,7 @@ check: require-tools download fmt check-all modgraph-check dependabot-check lint
 download-all: ## Download dependencies of every module (override list via MODULES)
 	set -e; for d in $(if $(MODULES),$(MODULES),$(SHARD_MODULES)); do (cd $$d && $(GO) mod download); done
 
-.PHONY: check-all build-all test-all test-race-all test-race-fast vet-all tidy-all tidy-check-all lint-all vulncheck-all
+.PHONY: check-all build-all test-all test-race-all test-race-fast test-race-pr vet-all tidy-all tidy-check-all lint-all vulncheck-all
 check-all: ## Run vet + tidy-check + test (-vet=off, cached) + build across all modules (shard via SHARD_TOTAL/SHARD_INDEX, override list via MODULES)
 	failed=""; for d in $(if $(MODULES),$(MODULES),$(SHARD_MODULES)); do echo "== $$d =="; if ! (cd $$d && $(GO) vet ./... && $(GO) mod tidy -diff && $(GO) test -vet=off ./... && $(GO) build ./...); then failed="$$failed $$d"; echo "::error::module failed: $$d"; fi; done; [ -z "$$failed" ] || { echo "FAILED modules:$$failed"; exit 1; }
 
@@ -164,6 +164,9 @@ test-race-all: ## Run tests with the race detector across all modules (per-modul
 
 test-race-fast: ## Run tests with the race detector, no coverage (PR gate; cached, override list via MODULES)
 	failed=""; for d in $(if $(MODULES),$(MODULES),$(SHARD_MODULES)); do echo "== $$d =="; if ! (cd $$d && $(GO) test -race -vet=off ./...); then failed="$$failed $$d"; echo "::error::module failed: $$d"; fi; done; [ -z "$$failed" ] || { echo "FAILED modules:$$failed"; exit 1; }
+
+test-race-pr: ## Run tests with the race detector, shuffled order, 2 iterations (PR order-dependence gate; seed via SHUFFLE_SEED or random, override list via MODULES)
+	failed=""; for d in $(if $(MODULES),$(MODULES),$(SHARD_MODULES)); do echo "== $$d =="; if ! (cd $$d && $(GO) test -race -vet=off -count=2 -shuffle=$(or $(SHUFFLE_SEED),on) ./...); then failed="$$failed $$d"; echo "::error::module failed: $$d"; fi; done; [ -z "$$failed" ] || { echo "FAILED modules:$$failed"; exit 1; }
 
 .PHONY: modgraph-check
 modgraph-check: ## Verify every module requires+replaces the intra-repo modules it imports (CI module-graph gate)

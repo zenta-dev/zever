@@ -16,6 +16,10 @@ type failWriter struct{}
 
 func (failWriter) Write(_ []byte) (int, error) { return 0, errors.New("write failed") }
 
+// TestCover_NewWithWriter_NilWriterDefaultsToStdout must not call t.Parallel:
+// it swaps the process-global os.Stdout, which parallel tests in this
+// package read, so running it in parallel is a data race under -race
+// -shuffle=on.
 func TestCover_NewWithWriter_NilWriterDefaultsToStdout(t *testing.T) {
 	old := os.Stdout
 	r, w, pipeErr := os.Pipe()
