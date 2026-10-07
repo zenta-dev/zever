@@ -250,8 +250,15 @@ func TestEdgeHandlerSigTamper(t *testing.T) {
 	}
 
 	q := u.Query()
+	// Replace the first hex digit with a different one: overwriting a fixed
+	// prefix (e.g. "00") is a no-op for the ~1/256 of signatures that already
+	// start with it, leaving a valid URL that answers 404 for the missing key.
 	sig := q.Get("sig")
-	q.Set("sig", "00"+sig[2:])
+	first := byte('0')
+	if sig[0] == '0' {
+		first = '1'
+	}
+	q.Set("sig", string(first)+sig[1:])
 	u.RawQuery = q.Encode()
 
 	if rec := doServe(t, a, http.MethodGet, u.RequestURI(), nil, nil); rec.Code != http.StatusForbidden {
