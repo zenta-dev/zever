@@ -312,6 +312,9 @@ func TestPretty_nonFileWriterNeverColors(t *testing.T) {
 	}
 }
 
+// TestPretty_nilWriterFallsBackToStdout must not call t.Parallel: it swaps
+// the process-global os.Stdout, which parallel tests in this package read,
+// so running it in parallel is a data race under -race -shuffle=on.
 func TestPretty_nilWriterFallsBackToStdout(t *testing.T) {
 	r, w, err := os.Pipe()
 	if err != nil {
