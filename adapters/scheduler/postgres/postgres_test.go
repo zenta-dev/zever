@@ -6,6 +6,7 @@ import (
 	"path/filepath"
 	"sync"
 	"testing"
+	"testing/synctest"
 	"time"
 
 	"github.com/robfig/cron/v3"
@@ -291,26 +292,48 @@ func findEntry(t *testing.T, d *driver, id scheduler.EntryID) cron.Entry {
 func TestFireTimeout_BoundsHungDispatch(t *testing.T) {
 	t.Parallel()
 
-	d := mustNew(t, Options{Owner: "owner-fire", FireTimeout: 50 * time.Millisecond})
-	t.Cleanup(func() { _ = d.Close() })
+	// The fire timeout covers load+claim before dispatch. On real time a
+	// slow (-race, loaded CI) sqlite round-trip could eat the whole budget,
+	// so fire returned before ever reaching the blocking queue. In a
+	// synctest bubble the fake clock only advances once every goroutine is
+	// durably blocked -- i.e. after Push parks on ctx.Done -- so the
+	// deadline can fire only at the dispatch, whatever the DB latency.
+	synctest.Test(t, func(t *testing.T) {
+		const fireTimeout = 50 * time.Millisecond
 
-	registerJobOnce(t, "sched-fire-timeout")
+		d := mustNew(t, Options{Owner: "owner-fire", FireTimeout: fireTimeout})
+		t.Cleanup(func() { _ = d.Close() })
 
-	blk := newBlockingQueue()
-	d.dispatcher = &job.Dispatcher{Q: blk}
+		registerJobOnce(t, "sched-fire-timeout")
 
-	id, err := d.Schedule(t.Context(), "0 * * * *", "sched-fire-timeout", nil)
-	if err != nil {
-		t.Fatalf("Schedule failed: %v", err)
-	}
+		blk := newBlockingQueue()
+		d.dispatcher = &job.Dispatcher{Q: blk}
 
-	findEntry(t, d, id).Job.Run()
+		id, err := d.Schedule(t.Context(), "0 * * * *", "sched-fire-timeout", nil)
+		if err != nil {
+			t.Fatalf("Schedule failed: %v", err)
+		}
 
-	select {
-	case <-blk.done:
-	case <-time.After(5 * time.Second):
-		t.Fatal("fire ctx was not canceled by the fire timeout")
-	}
+		start := time.Now()
+
+		findEntry(t, d, id).Job.Run()
+
+		select {
+		case <-blk.entered:
+		default:
+			t.Fatal("fire returned without reaching the dispatcher")
+		}
+
+		select {
+		case <-blk.done:
+		default:
+			t.Fatal("fire returned but the dispatch ctx was not canceled")
+		}
+
+		if elapsed := time.Since(start); elapsed != fireTimeout {
+			t.Fatalf("fire unblocked after %v (fake clock), want exactly the %v fire timeout", elapsed, fireTimeout)
+		}
+	})
 }
 
 func TestTickCtx_SchedulerRootedNotRequest(t *testing.T) {
