@@ -56,7 +56,7 @@ func (a *adapter) Resolve(_ context.Context, meta map[string]string) (string, er
 				} else if !strings.Contains(splitErr.Error(), "missing port") {
 					// Fragility note: relies on the "missing port" substring
 					// because net.SplitHostPort exposes no sentinel error.
-					return "", fmt.Errorf("%w: host %q: %s", ErrInvalidHost, host, splitErr)
+					return "", errors.Join(fmt.Errorf("%w: host %q", ErrInvalidHost, host), splitErr)
 				}
 			}
 
@@ -157,7 +157,7 @@ func New(o tenant.Options) (tenant.Tenant, error) {
 
 		re, err := regexp.Compile(pattern)
 		if err != nil {
-			return nil, fmt.Errorf("%w: %q: %s", ErrInvalidPattern, pattern, err)
+			return nil, errors.Join(fmt.Errorf("%w: %q", ErrInvalidPattern, pattern), err)
 		}
 
 		a.subdomainRe = re
