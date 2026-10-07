@@ -32,12 +32,14 @@ const (
 
 // guardedGRPCClient dials target through a per-dependency circuit breaker
 // so one slow downstream cannot exhaust this process.
+//
+//nolint:revive,unused,unparam // ctx mirrors the generator-emitted signature (revive/unparam: Container.GRPCClient takes no ctx to thread it in); helper retained for future outbound calls (unused: no downstream exists yet).
 func guardedGRPCClient(ctx context.Context, c *container.Container, resMgr resilience.Manager, target, dep string) (*grpc.ClientConn, error) {
 	g, err := resMgr.Guard(dep)
 	if err != nil {
 		return nil, err
 	}
-	return c.GRPCClient(target, grpcclient.WithGuard(g))
+	return c.GRPCClient(target, grpcclient.WithGuard(g)) //nolint:contextcheck // Container.GRPCClient takes no ctx; the dial runs inside the container.
 }
 
 func main() {
