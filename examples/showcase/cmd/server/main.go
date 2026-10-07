@@ -23,12 +23,15 @@ import (
 	"google.golang.org/grpc"
 	"google.golang.org/grpc/keepalive"
 
+	"github.com/zenta-dev/zever/container"
 	"github.com/zenta-dev/zever/core/authz"
 	"github.com/zenta-dev/zever/core/middleware"
+	"github.com/zenta-dev/zever/core/resilience"
 	genshop "github.com/zenta-dev/zever/examples/showcase/generated/gogen/shop"
 	"github.com/zenta-dev/zever/examples/showcase/internal/api"
 	"github.com/zenta-dev/zever/examples/showcase/internal/app"
 	shopimpl "github.com/zenta-dev/zever/examples/showcase/internal/service/shop"
+	"github.com/zenta-dev/zever/shared/grpcclient"
 )
 
 const (
@@ -46,6 +49,18 @@ const (
 	grpcKeepaliveTimeout         = 20 * time.Second
 	grpcMaxMessageBytes          = 4 << 20 // 4 MiB, grpc-go's own default made explicit.
 )
+
+// guardedGRPCClient dials target through a per-dependency circuit breaker
+// so one slow downstream cannot exhaust this process.
+//
+//nolint:revive,unused,unparam // ctx mirrors the generator-emitted signature (revive/unparam: Container.GRPCClient takes no ctx to thread it in); helper retained for future outbound calls (unused: no downstream exists yet).
+func guardedGRPCClient(ctx context.Context, c *container.Container, resMgr resilience.Manager, target, dep string) (*grpc.ClientConn, error) {
+	g, err := resMgr.Guard(dep)
+	if err != nil {
+		return nil, err
+	}
+	return c.GRPCClient(target, grpcclient.WithGuard(g)) //nolint:contextcheck // Container.GRPCClient takes no ctx; the dial runs inside the container.
+}
 
 func main() {
 	addr := flag.String("addr", ":8080", "HTTP address to listen on")
@@ -97,6 +112,14 @@ func run(addr, grpcAddr string) error {
 	if err != nil {
 		return err
 	}
+
+	resMgr, err := c.Resilience()
+	if err != nil {
+		return err
+	}
+
+	// Retained for outbound calls through guardedGRPCClient below.
+	_ = resMgr
 
 	limiter, err := c.RateLimit()
 	if err != nil {

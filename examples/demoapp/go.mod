@@ -66,6 +66,7 @@ require (
 	github.com/zenta-dev/zever/core/permission v0.5.3
 	github.com/zenta-dev/zever/core/queue v0.5.3
 	github.com/zenta-dev/zever/core/ratelimit v0.5.3
+	github.com/zenta-dev/zever/core/resilience v0.5.3
 	github.com/zenta-dev/zever/core/router v0.5.3
 	github.com/zenta-dev/zever/core/search v0.5.3
 	github.com/zenta-dev/zever/core/secrets v0.5.3
@@ -77,6 +78,7 @@ require (
 	github.com/zenta-dev/zever/core/workflow v0.5.3
 	github.com/zenta-dev/zever/orm v0.5.3
 	github.com/zenta-dev/zever/shared/apperror v0.5.3
+	github.com/zenta-dev/zever/shared/grpcclient v0.5.3
 	google.golang.org/genproto/googleapis/api v0.0.0-20260819154853-08b0e4226688
 	google.golang.org/grpc v1.83.2
 	google.golang.org/protobuf v1.36.12
@@ -205,7 +207,9 @@ replace github.com/zenta-dev/zever/shared/httpclient => ../../shared/httpclient
 replace github.com/zenta-dev/zever/shared/lrucache => ../../shared/lrucache
 
 replace github.com/zenta-dev/zever/shared/msgspan => ../../shared/msgspan
+
 replace github.com/zenta-dev/zever/shared/outboxbridge => ../../shared/outboxbridge
+
 replace github.com/zenta-dev/zever/shared/providersopt => ../../shared/providersopt
 
 replace github.com/zenta-dev/zever/shared/redisclient => ../../shared/redisclient
@@ -267,12 +271,10 @@ require (
 	github.com/zenta-dev/zever/core/cdn v0.5.3 // indirect
 	github.com/zenta-dev/zever/core/outbox v0.5.3 // indirect
 	github.com/zenta-dev/zever/core/rag v0.5.3 // indirect
-	github.com/zenta-dev/zever/core/resilience v0.5.3 // indirect
 	github.com/zenta-dev/zever/core/scheduler v0.5.3 // indirect
 	github.com/zenta-dev/zever/shared/codec v0.5.3 // indirect
 	github.com/zenta-dev/zever/shared/dbconn v0.5.3 // indirect
 	github.com/zenta-dev/zever/shared/endpoint v0.5.3 // indirect
-	github.com/zenta-dev/zever/shared/grpcclient v0.5.3 // indirect
 	github.com/zenta-dev/zever/shared/httpclient v0.5.3 // indirect
 	github.com/zenta-dev/zever/shared/lrucache v0.5.3 // indirect
 	github.com/zenta-dev/zever/shared/mcpclient v0.5.3 // indirect
