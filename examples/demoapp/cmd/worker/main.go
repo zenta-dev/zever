@@ -89,6 +89,14 @@ func run() error {
 		return err
 	}
 
+	// The outbox relay drains recorded events onto the configured transport
+	// (queue by default). Safe to run in every worker replica: claims are
+	// atomic (FOR UPDATE SKIP LOCKED), so each row publishes once and
+	// consumers stay idempotent.
+	if _, err := c.OutboxRelay(ctx); err != nil { //nolint:govet // generator-emitted relay block redeclares err; the inner err is confined to this if statement.
+		return err
+	}
+
 	sched, err := c.Scheduler()
 	if err != nil {
 		return err
