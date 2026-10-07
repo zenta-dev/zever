@@ -101,6 +101,39 @@ func TestSpan_startSpanKindAttrs_emitted(t *testing.T) {
 	}
 }
 
+func TestSpan_startSpanInspector_exposesKindAttrs(t *testing.T) {
+	t.Parallel()
+
+	p, _ := openBuffered(t, nil)
+
+	_, span := observability.StartSpan(t.Context(), p.Tracer("s"), "s",
+		observability.WithSpanKind(observability.SpanKindServer),
+		observability.WithAttributes(observability.String("k", "v")),
+	)
+	defer span.End()
+
+	type kindAttrsSpan interface {
+		Kind() observability.SpanKind
+		Attrs() []observability.Attr
+	}
+	inspector, ok := span.(kindAttrsSpan)
+	if !ok {
+		t.Fatalf("span %T does not expose Kind()/Attrs()", span)
+	}
+	if got := inspector.Kind(); got != observability.SpanKindServer {
+		t.Errorf("Kind() = %v, want %v", got, observability.SpanKindServer)
+	}
+	found := false
+	for _, a := range inspector.Attrs() {
+		if a.Key == "k" {
+			found = true
+		}
+	}
+	if !found {
+		t.Errorf("Attrs() missing k, got %v", inspector.Attrs())
+	}
+}
+
 func TestSpan_childInheritsTraceID(t *testing.T) {
 	t.Parallel()
 

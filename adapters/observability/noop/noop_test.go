@@ -91,6 +91,47 @@ func TestStartSpan_retainsKindAttrsLinks(t *testing.T) {
 	}
 }
 
+func TestStart_delegatesToStartSpan(t *testing.T) {
+	t.Parallel()
+
+	tr := noopTracer{}
+
+	ctx, span := tr.Start(t.Context(), "op")
+	if ctx == nil {
+		t.Error("Start() ctx = nil")
+	}
+	ns, ok := span.(noopSpan)
+	if !ok {
+		t.Fatalf("span type = %T, want noopSpan", span)
+	}
+	if ns.kind != observability.SpanKindInternal {
+		t.Errorf("kind = %v, want SpanKindInternal", ns.kind)
+	}
+}
+
+func TestStartSpan_serverKindAttrs_reachesProvider(t *testing.T) {
+	t.Parallel()
+
+	p := New()
+
+	_, span := observability.StartSpan(t.Context(), p.Tracer("s"), "s",
+		observability.WithSpanKind(observability.SpanKindServer),
+		observability.WithAttributes(observability.String("k", "v")),
+	)
+	defer span.End()
+
+	ns, ok := span.(noopSpan)
+	if !ok {
+		t.Fatalf("span type = %T, want noopSpan", span)
+	}
+	if ns.kind != observability.SpanKindServer {
+		t.Errorf("kind = %v, want SpanKindServer", ns.kind)
+	}
+	if len(ns.attrs) != 1 || ns.attrs[0].Key != "k" {
+		t.Errorf("attrs = %v, want one k attr", ns.attrs)
+	}
+}
+
 func TestMetrics_allInstruments_nilError(t *testing.T) {
 	t.Parallel()
 

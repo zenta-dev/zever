@@ -39,13 +39,19 @@ func (noopMetrics) Histogram(context.Context, string, float64, ...observability.
 	return nil
 }
 
-func (noopTracer) Start(ctx context.Context, _ string) (context.Context, observability.Span) {
-	return ctx, noopSpan{}
+func (noopTracer) Start(ctx context.Context, name string) (context.Context, observability.Span) {
+	return noopTracer{}.StartSpan(ctx, name)
 }
 
 func (noopTracer) StartSpan(ctx context.Context, _ string, opts ...observability.SpanStartOption) (context.Context, observability.Span) {
 	cfg := observability.NewSpanConfig(opts...)
 	return ctx, noopSpan{kind: cfg.Kind, attrs: cfg.Attrs, links: cfg.Links}
 }
+
+// Kind returns the span kind recorded at StartSpan.
+func (s noopSpan) Kind() observability.SpanKind { return s.kind }
+
+// Attrs returns the span attributes recorded at StartSpan.
+func (s noopSpan) Attrs() []observability.Attr { return s.attrs }
 
 var _ observability.SpanStarter = noopTracer{}

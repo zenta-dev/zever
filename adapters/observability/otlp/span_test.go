@@ -131,6 +131,46 @@ func TestStartSpan_invalidLinkSkipped(t *testing.T) {
 	}
 }
 
+func TestStartSpan_inspectorExposesKindAttrs(t *testing.T) {
+	t.Parallel()
+
+	sr := tracetest.NewSpanRecorder()
+	tp := sdktrace.NewTracerProvider(sdktrace.WithSpanProcessor(sr))
+	t.Cleanup(func() { _ = tp.Shutdown(t.Context()) })
+
+	tr := &tracer{tp: tp, tracer: tp.Tracer("scope")}
+
+	_, sp := tr.StartSpan(t.Context(), "s",
+		observability.WithSpanKind(observability.SpanKindServer),
+		observability.WithAttributes(observability.String("k", "v")),
+	)
+	defer sp.End()
+
+	type kindAttrsSpan interface {
+		Kind() observability.SpanKind
+		Attrs() []observability.Attr
+	}
+	inspector, ok := sp.(kindAttrsSpan)
+	if !ok {
+		t.Fatalf("span %T does not expose Kind()/Attrs()", sp)
+	}
+	if got := inspector.Kind(); got != observability.SpanKindServer {
+		t.Errorf("Kind() = %v, want %v", got, observability.SpanKindServer)
+	}
+	found := false
+	for _, a := range inspector.Attrs() {
+		if a.Key == "k" {
+			found = true
+			if v, ok := a.Value.(observability.StringValue); !ok || v.Value != "v" {
+				t.Errorf("attr k = %v, want v", a.Value)
+			}
+		}
+	}
+	if !found {
+		t.Errorf("Attrs() missing k=v, got %v", inspector.Attrs())
+	}
+}
+
 func TestStart_delegatesToStartSpan(t *testing.T) {
 	t.Parallel()
 
