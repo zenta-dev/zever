@@ -1468,7 +1468,7 @@ func runGenerateAdapter(args []string) error {
 		if len(positional) < 2 {
 			val, err := promptInputForAdapter("Adapter name (go package)", "", func(s string) error {
 				if !isPackageName(s) {
-					return fmt.Errorf("%w", ErrInvalidPackageName)
+					return ErrInvalidPackageName
 				}
 
 				return nil
@@ -1493,7 +1493,7 @@ func runGenerateAdapter(args []string) error {
 
 				key, err := promptInputForAdapter("Field name (snake_case)", "", func(s string) error {
 					if !isIdent(s) {
-						return fmt.Errorf("%w", ErrInvalidIdentifier)
+						return ErrInvalidIdentifier
 					}
 
 					return nil

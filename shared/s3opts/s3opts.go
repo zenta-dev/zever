@@ -85,7 +85,7 @@ func validateURL(value string) error {
 	}
 	u, err := url.Parse(value)
 	if err != nil {
-		return fmt.Errorf("%w: URL must be a valid URL: %w", ErrInvalidEndpoint, err)
+		return fmt.Errorf("s3opts: URL must be a valid URL: %w", errors.Join(ErrInvalidEndpoint, err))
 	}
 	if u.Scheme == "" {
 		return fmt.Errorf("%w: URL must include scheme", ErrInvalidEndpoint)
