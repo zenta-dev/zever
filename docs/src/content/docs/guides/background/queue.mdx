@@ -1,0 +1,136 @@
+---
+title: Queue
+description: Push, pop, ack, and nack durable jobs on memory, Redis, or a database table.
+---
+
+import { LinkCard, CardGrid, Tabs, TabItem } from '@astrojs/starlight/components';
+
+`queue.Queue` is the durable transport behind `job.Dispatcher` and the scheduler. Use it when work must outlive the request, survive a restart, retry with backoff, or fan out to workers. Messages carry UUIDv7 ids.
+
+## Quick start
+
+```yaml title="zever.yaml"
+queue:
+  adapter: memory
+  options:
+    visibility_timeout: 30000000000 # 30s, integer nanoseconds in files
+    poll_timeout: 1000000000        # 1s
+    buffer: 100
+```
+
+```go title="main.go"
+package main
+
+import (
+	"context"
+	"fmt"
+
+	queuememory "github.com/zenta-dev/zever/adapters/queue/memory"
+	"github.com/zenta-dev/zever/core/queue"
+)
+
+func main() {
+	q, _ := queuememory.New(queue.Options{})
+	defer q.Close()
+	ctx := context.Background()
+
+	headers := queue.NewHeaders(map[string]string{"job_name": "SendConfirmation"})
+	_ = q.Push(ctx, "default", queue.NewPayload([]byte(`{"booking_id":"b_123"}`)), headers)
+
+	msg, err := q.Pop(ctx, "default")
+	if err != nil { // queue.ErrEmpty when the topic is empty
+		panic(err)
+	}
+	_ = q.Ack(ctx, msg)
+	fmt.Println("popped and acked", msg.ID)
+}
+```
+
+Output: `popped and acked <id>`. `Ack` on success; on failure call `Nack(ctx, msg, true)` to requeue at once with the attempt count incremented, or `Nack(ctx, msg, false)` to drop it. A message that is never acked or nacked reappears after `visibility_timeout`. `Pop` returns `ErrEmpty` on an empty topic, which you must handle. `Length` and `IsEmpty` are autoscaling signals, not pop control flow; `Name()` reports the adapter for health output.
+
+## Choose an adapter
+
+| Adapter | Package | Use when |
+|---|---|---|
+| `memory` | `adapters/queue/memory` | Default. One process: tests, local dev, a single-binary worker. No infra. |
+| `redis` | `adapters/queue/redis` | More than one worker process, or split web and worker tiers. Keyed by `prefix`. |
+| `db` | `adapters/queue/db` | Shared queue without Redis, on a postgres or sqlite table you already run. |
+
+Only `redis` and `db` let another host pop. `db` is polling, not Kafka or SQS: `Pop` polls every `poll_interval` (10ms by default, adapter-code only, not a file key), claims serialize on the topic head, and stale claims recover on a sweep. Expect low thousands of jobs per second per topic; use a separate queue database, 3 to 5 connections per worker, and `dedicated_pool: true` under load. The queue is not an event log or pub/sub bus (per-topic pop with ack, no broadcast replay); for live fan-out use the [event bus](../events/).
+
+## Share a queue across instances
+
+<Tabs>
+  <TabItem label="Redis">
+```yaml title="zever.yaml"
+queue:
+  adapter: redis
+  options:
+    addr: localhost:6379
+    db: 0
+    prefix: bookings
+```
+  </TabItem>
+  <TabItem label="Database">
+```yaml title="zever.yaml"
+queue:
+  adapter: db
+  options:
+    dsn: postgres://app:secret@db:5432/app  # postgres URL or sqlite path
+    table: queue_messages
+```
+  </TabItem>
+</Tabs>
+
+```sh
+QUEUE_ADAPTER=redis QUEUE_ADDR=localhost:6379 QUEUE_VISIBILITY_TIMEOUT=30s
+```
+
+File keys are strict snake_case with integer-nanosecond durations; env accepts `"30s"`. An empty `dsn` selects a private in-memory-style database. `visibility_timeout` is how long a popped message stays invisible before reclaim; `poll_timeout` is how long `Pop` waits before returning empty; `buffer` caps buffered ready messages per topic. The container shares one pool per exact DSN across db-backed batteries (first opener's `max_conns` wins; a differing nonzero cap warns). All keys: [queue config reference](../../../reference/config/#queue).
+
+## Resolve the queue from the container
+
+`c.Queue()` resolves lazily, caches, and retries on error; `c.Job()` builds a `*job.Dispatcher` over the same queue. `Close() error` takes no context, and the queue closes last, after scheduler and job; container `Close(ctx)` never opens an untouched queue. See [the container](../../../concepts/container/).
+
+## Production checklist
+
+- Redelivery, not exactly-once: make handlers idempotent or guard with `lock` or `idempotency` keys.
+- Keep `visibility_timeout` above the slowest handler (bookings webhook: 30s against a 10s timeout).
+- Low `poll_timeout` for request-scoped pops, higher for workers.
+- No cross-topic ordering; priority is poll order (`default` before `low`).
+- Small, versioned JSON payloads. Never log PII; log ids and topics, display config via `config.RedactedServices`.
+- Close order: scheduler and job, then snapshots, then `queue` and `cache`.
+
+## Troubleshooting
+
+<details>
+<summary>The same job runs twice within seconds</summary>
+
+`visibility_timeout` is shorter than handler runtime, so the message is reclaimed mid-run. Raise it above p99 handler latency plus retry backoff, or move slow I/O behind a second dispatch.
+</details>
+
+<details>
+<summary>Pop spins hot and ErrEmpty floods the logs</summary>
+
+A tight poll loop with near-zero `poll_timeout` on an idle topic. Raise `poll_timeout` (workers commonly use 1s) and back off after consecutive empties.
+</details>
+
+<details>
+<summary>A worker on host B never sees pushes from host A</summary>
+
+The `memory` adapter in a scaled deploy; each process owns a private buffer. Use `redis` with a shared `addr`, `db`, and `prefix`, or `db` on one shared database (lower throughput).
+</details>
+
+<details>
+<summary>Strict file load rejects visibilitytimeout</summary>
+
+The flat pre-rename spelling. Rename to `visibility_timeout` and `poll_timeout` with integer nanoseconds. Env still accepts `QUEUE_VISIBILITYTIMEOUT` because `_` is ignored.
+</details>
+
+## Related
+
+<CardGrid>
+  <LinkCard title="Scheduler and jobs" href="../scheduler-jobs/" description="The dispatcher and cron layer over this transport." />
+  <LinkCard title="Events and event bus" href="../events/" description="Fan-out that does not need durability." />
+  <LinkCard title="Build a booking API" href="../../../tutorials/build-a-booking-api/" description="The bookings tutorial that uses these queues." />
+</CardGrid>

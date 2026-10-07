@@ -1,0 +1,109 @@
+---
+import Section from './ui/Section.astro';
+import Button from './ui/Button.astro';
+import { href } from '../../lib/url';
+
+const points = [
+  { h: 'Machine-readable CLI', p: 'Global --json envelopes with typed exit codes, and --help --agent prints a command catalog agents can parse.' },
+  { h: 'Preview before writing', p: '--dry-run works across all nine generate subcommands: validation and rendering run, no files are written.' },
+  { h: 'MCP codegen backend', p: 'compile --backend mcp renders each service RPC as an MCP tool and emits a runnable stdio server with handler stubs.' },
+  { h: 'An agent skill', p: 'zever docs --skill writes a SKILL.md that teaches Claude Code the commands and safe workflows.' },
+];
+---
+
+<Section id="agents" eyebrow="Built for agents" title="Your agent can <em>drive it</em>." lede="The same flags-only CLI humans use is stable enough for an agent: structured output, safe previews, and nothing that waits on a prompt.">
+  <div class="ag-grid">
+    <ul class="ag-points">
+      {points.map((x, i) => (
+        <li class="zl-card zl-reveal" style={`--i:${i}`}>
+          <h3>{x.h}</h3>
+          <p>{x.p}</p>
+        </li>
+      ))}
+      <li class="ag-cta zl-reveal" style="--i:4"><Button href={href('reference/agent-skill')}>Install the agent skill</Button></li>
+    </ul>
+
+    <div class="chat zl-card zl-reveal" style="--i:2" role="group" aria-label="Example agent session" data-chat>
+      <div class="msg msg-user" data-seq><span class="who">You</span><p>Add a Booking entity with a guest and a starts_at time.</p></div>
+      <div class="msg msg-agent" data-seq>
+        <span class="who">Agent</span>
+        <p>Previewing first with <code>--dry-run</code>.</p>
+        <pre class="cmd"><code><span class="p">$</span> zever generate entity bookings Booking \
+    --field guest:string --field starts_at:timestamp --dry-run</code></pre>
+      </div>
+      <div class="msg msg-agent" data-seq>
+        <pre class="diff" aria-label="Command output"><code><span class="ln dim">dry run: no files written</span><span class="ln dim">would append to internal/bookings/bookings.zen:</span><span class="ln add" data-ln>+ entity Booking &#123;</span><span class="ln add" data-ln>+   id: uuid @primary</span><span class="ln add" data-ln>+   guest: string</span><span class="ln add" data-ln>+   starts_at: timestamp</span><span class="ln add" data-ln>+   created_at: timestamp @default(now())</span><span class="ln add" data-ln>+ &#125;</span></code></pre>
+      </div>
+      <div class="msg msg-agent" data-seq><p>Looks right. Re-running without the flag to apply it.</p></div>
+      <div class="typing" data-typing aria-hidden="true"><i></i><i></i><i></i></div>
+    </div>
+  </div>
+</Section>
+
+<script>
+  import { onVisible, reducedMotion } from '../../scripts/landing/motion';
+  const sleep = (ms: number) => new Promise<void>((r) => setTimeout(r, ms));
+  document.querySelectorAll<HTMLElement>('[data-chat]').forEach((chat) => {
+    if (reducedMotion()) return;
+    const items = Array.from(chat.querySelectorAll<HTMLElement>('[data-seq]'));
+    const typing = chat.querySelector<HTMLElement>('[data-typing]')!;
+    // Reserve final height so nothing shifts while messages arrive.
+    chat.style.minHeight = `${chat.offsetHeight}px`;
+    chat.classList.add('is-seq');
+    items.forEach((i) => i.classList.add('is-pending'));
+    chat.querySelectorAll('[data-ln]').forEach((l) => l.classList.add('is-pending'));
+    const run = async () => {
+      for (let k = 0; k < items.length; k++) {
+        const it = items[k];
+        if (k > 0) {
+          chat.insertBefore(typing, it);
+          typing.classList.add('is-on');
+          await sleep(650);
+          typing.classList.remove('is-on');
+        } else await sleep(250);
+        it.classList.remove('is-pending');
+        const lines = it.querySelectorAll('[data-ln]');
+        for (const l of lines) { await sleep(110); l.classList.remove('is-pending'); }
+        await sleep(300);
+      }
+    };
+    onVisible(chat, () => void run(), 0.4);
+  });
+</script>
+
+<style>
+  .ag-grid { display: grid; grid-template-columns: minmax(0, 1fr) minmax(0, 1.1fr); gap: 1.5rem; align-items: start; }
+  @media (max-width: 900px) { .ag-grid { grid-template-columns: minmax(0, 1fr); } }
+  .ag-points { list-style: none; margin: 0; padding: 0; display: grid; gap: 0.8rem; }
+  .ag-points .zl-card { padding: 1.1rem 1.25rem; container-type: inline-size; }
+  .ag-points h3 { margin: 0 0 0.3rem; font: 500 1rem/1.3 var(--zl-font-sans); }
+  .ag-points p { margin: 0; color: var(--zl-text-2); font-size: 0.92rem; }
+  .ag-cta { padding-top: 0.4rem; }
+  .ag-cta :global(a) { min-height: 2.75rem; }
+  .chat { padding: 1.1rem; display: grid; gap: 1rem; background: var(--zl-bg-2); min-width: 0; }
+  .msg { display: grid; gap: 0.5rem; min-width: 0; }
+  .msg p { margin: 0; font-size: 0.95rem; color: var(--zl-text); }
+  .msg code { font-family: var(--zl-font-mono); font-size: 0.85em; color: var(--zl-accent); }
+  .who { font: 500 0.68rem/1 var(--zl-font-mono); letter-spacing: 0.12em; text-transform: uppercase; color: var(--zl-text-3); }
+  .msg-user { justify-items: end; text-align: right; }
+  .msg-user p { background: var(--zl-surface-2); border: 1px solid var(--zl-line); border-radius: 14px 14px 4px 14px; padding: 0.7rem 0.95rem; max-width: min(34ch, 100%); text-align: left; }
+  .msg-agent pre { white-space: pre-wrap; overflow-wrap: anywhere; margin: 0; padding: 0.8rem 0.95rem; border-radius: 10px; background: var(--zl-code-bg); border: 1px solid rgba(255,255,255,0.08); overflow-x: auto; font: 0.78rem/1.6 var(--zl-font-mono); color: #e6edf7; }
+  .msg-agent pre code { font: inherit; color: inherit; }
+  .ln { display: block; }
+  .ln.is-pending { opacity: 0; transform: translateX(-6px); }
+  .ln { transition: opacity 0.3s var(--zl-ease), transform 0.3s var(--zl-ease); }
+  .add { background: linear-gradient(90deg, rgba(95,212,154,0.14), transparent 80%); margin-inline: -0.95rem; padding-inline: 0.95rem; }
+  .msg { transition: opacity 0.45s var(--zl-ease), transform 0.45s var(--zl-ease); }
+  .chat.is-seq .msg.is-pending { opacity: 0; transform: translateY(10px); position: absolute; visibility: hidden; pointer-events: none; }
+  .chat { position: relative; align-content: start; }
+  .typing { display: none; width: fit-content; gap: 5px; padding: 0.7rem 0.9rem; border-radius: 14px 14px 14px 4px; background: var(--zl-surface-2); border: 1px solid var(--zl-line); }
+  .typing.is-on { display: inline-flex; }
+  .typing i { width: 6px; height: 6px; border-radius: 50%; background: var(--zl-text-3); animation: tdot 1s ease-in-out infinite; }
+  .typing i:nth-child(2) { animation-delay: 0.15s; }
+  .typing i:nth-child(3) { animation-delay: 0.3s; }
+  @keyframes tdot { 0%, 60%, 100% { transform: translateY(0); opacity: 0.4; } 30% { transform: translateY(-4px); opacity: 1; } }
+  @media (prefers-reduced-motion: reduce) { .typing i { animation: none; } }
+  .p { color: var(--zl-accent-hi); }
+  .dim { color: #6b778b; }
+  .add { color: #5fd49a; }
+</style>

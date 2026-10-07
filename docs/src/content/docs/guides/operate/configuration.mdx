@@ -1,0 +1,128 @@
+---
+title: Configuration
+description: Layer typed defaults, a strict file, and best-effort env overrides without leaking secrets.
+---
+
+import { Aside, LinkCard, CardGrid } from '@astrojs/starlight/components';
+
+Zever config layers typed defaults, a strict YAML or JSON file, and best-effort environment overrides. Per-service keys live in the [config reference](../../../reference/config/).
+
+## Quick start
+
+Later layers win: `defaults < file < env`. `config.Default()` returns zero-infra adapters (memory, local, sqlite, log, noop). `config.Load(path)` overlays a file and the process env, then validates, so an unknown adapter or unparsable value fails at load, not mid-request.
+
+```yaml title="zever.yaml"
+db:
+  adapter: postgres
+  options:
+    dsn: postgres://app:secret@db:5432/app
+    max_conns: 20
+cache:
+  adapter: redis
+  options:
+    addr: redis:6379
+auth:
+  adapter: jwt
+  options:
+    jwt:
+      secret: prod-secret-at-least-32-bytes-long
+```
+
+Load it with `config.Load("zever.yaml")`, then `container.New(cfg)`. `container.New(nil)` is valid for tests that never load a file. Accessors (`c.DB()`, `c.Cache()`) resolve lazily and retry after an error. See [Container](../../../concepts/container/).
+
+## Map environment variables to keys
+
+Env names carry no prefix: `<SERVICE>_<FIELD>`, uppercased. `_ADAPTER` switches the adapter (`DB_ADAPTER=postgres`). Matching ignores case and `_`, so `MAX_RETRIES` matches `MaxRetries`, and one nesting level splits at the first `_`, so `AUTH_JWT_SECRET` sets `Options.JWT.Secret`. Durations accept `"5s"` strings in env only; files store `time.Duration` as integer nanoseconds.
+
+## Load a file strictly
+
+| Source | Unknown input | Why |
+|---|---|---|
+| File | Error | Typos fail at deploy time. |
+| Env | Silently ignored | Stray env (`PATH`, `HOME`, `AUTH_TOKEN`) must not break startup. |
+
+Only a value that fails to parse for a resolved field returns `InvalidOptionsError`, for example `DB_MAXCONNS=abc`.
+
+| Call | Behavior |
+|---|---|
+| `Load("")` | Probes `zever.yaml`, `zever.yml`, then `zever.json` in the cwd. First hit wins; missing files skip silently. |
+| `Load(path)` | The path must exist and decode, else `nil` plus the error. |
+| Other extension | `ErrUnsupportedFormat` (only `.yaml`, `.yml`, `.json`). |
+| Null or empty block | Decodes to zero values. |
+
+File keys are snake_case; old flat spellings are rejected as unknown fields. Env names are unaffected because matching ignores `_` and case.
+
+| Old key | New key |
+|---|---|
+| `apikey` | `api_key` |
+| `baseurl` | `base_url` |
+| `maxconns` / `minconns` | `max_conns` / `min_conns` |
+| `maxconnlifetime` / `maxconnidletime` | `max_conn_lifetime` / `max_conn_idle_time` |
+| `secretkey` / `webhooksecret` | `secret_key` / `webhook_secret` |
+| `poolsize` / `pooltimeout` | `pool_size` / `pool_timeout` |
+
+`config/schema/zever.schema.json` gives editor autocomplete but can lag the Go option structs; the [config reference](../../../reference/config/) and `zever config show` are authoritative.
+
+## Redact config before printing
+
+Raw option maps may hold secrets. `(*Config).RedactedServices` (built on `Redact`) is the sole display path: error text names services and fields only, and `zever config show [--config PATH]` prints one `<service>  adapter=<x>` header per service plus its masked options.
+
+```go title="main.go"
+for name, sc := range cfg.RedactedServices() { // map[string]config.ServiceConfig
+    fmt.Println(name, sc.Adapter, sc.Options)
+}
+```
+
+<Aside type="danger" title="Dev-only keys">
+`Default()` belongs in local dev and tests: its crypto key is deterministic and public. Supply `AUTH_JWT_SECRET`, the crypto key, and provider keys from env or a mounted file in production.
+</Aside>
+
+## Know the defaults
+
+Defaults pick the zero-infra adapter per service (`db` sqlite, `cache`/`queue`/`session` memory, `storage` local, `log` slog, `observability` stdout, `payment`/`billing` stub, `secrets` env with prefix `ZEVER`). Two need keys: `ai` defaults to `anthropic` and requires an API key, and `mailer` defaults to `log` with a dummy `localhost:25`. The full table is the [adapters matrix](../../../reference/adapters-matrix/).
+
+## Troubleshooting
+
+<details>
+<summary>`Load` fails with unknown field `maxconns`</summary>
+
+A pre-rename flat spelling. Rename it to `max_conns`.
+</details>
+
+<details>
+<summary>`Load("")` ignores your file</summary>
+
+The name is outside the probe list or the file is elsewhere. Rename to `zever.yaml`, `zever.yml`, or `zever.json` in the working directory, or pass an explicit path.
+</details>
+
+<details>
+<summary>`DB_MAXCONNS=abc` returns `InvalidOptionsError`</summary>
+
+A resolved field failed to parse. Set an integer. Unset variables are ignored, bad values are not.
+</details>
+
+<details>
+<summary>`AUTH_TOKEN` does nothing</summary>
+
+Env is best-effort: `AUTH` is known but the remainder matches no field. Set `AUTH_JWT_SECRET`.
+</details>
+
+<details>
+<summary>A secret appears in logs</summary>
+
+A raw option map was printed. Print `cfg.RedactedServices()` instead.
+</details>
+
+<details>
+<summary>`ErrUnsupportedFormat` on load</summary>
+
+The extension is not `.yaml`, `.yml`, or `.json`. Rename the file; the TOML copy in `config/schema/` is editor tooling only.
+</details>
+
+## Related
+
+<CardGrid>
+  <LinkCard title="Deployment" href="../deployment/" description="Production checklist." />
+  <LinkCard title="Config reference" href="../../../reference/config/" description="Every service and key." />
+  <LinkCard title="Providers and adapters" href="../../../concepts/providers-adapters/" description="Adapter swap rules." />
+</CardGrid>

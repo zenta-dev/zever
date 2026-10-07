@@ -1,0 +1,22 @@
+---
+---
+
+<button popovertarget="starlight__sidebar" class="zv-menu-btn md:sl-hidden print:hidden">
+  <span class="zv-bars" aria-hidden="true"><i></i><i></i><i></i></span>
+  <span class="sr-only">{Astro.locals.t('menuButton.accessibleLabel')}</span>
+</button>
+
+<style is:global>
+  .zv-menu-btn { position: fixed; top: calc((var(--sl-nav-height) - 2.75rem) / 2); inset-inline-end: var(--zl-gutter); z-index: calc(var(--sl-z-index-navbar) + 1); display: grid; place-items: center; width: 2.75rem; height: 2.75rem; padding: 0; border-radius: 50%; border: 1px solid var(--zl-line); background: var(--zl-surface-2); color: var(--zl-text); cursor: pointer; -webkit-tap-highlight-color: transparent; }
+  .zv-menu-btn:focus-visible { outline: 2px solid var(--zl-accent); outline-offset: 2px; }
+  @media (min-width: 50rem) { .zv-menu-btn { display: none; } }
+  .zv-bars { position: relative; width: 18px; height: 14px; display: block; }
+  .zv-bars i { position: absolute; left: 0; right: 0; height: 2px; border-radius: 2px; background: currentColor; transition: transform 0.35s var(--zl-ease), opacity 0.2s; }
+  .zv-bars i:nth-child(1) { top: 0; } .zv-bars i:nth-child(2) { top: 6px; } .zv-bars i:nth-child(3) { top: 12px; }
+  .zv-menu-btn:has(~ :popover-open) .zv-bars i:nth-child(1) { transform: translateY(6px) rotate(45deg); }
+  .zv-menu-btn:has(~ :popover-open) .zv-bars i:nth-child(2) { opacity: 0; }
+  .zv-menu-btn:has(~ :popover-open) .zv-bars i:nth-child(3) { transform: translateY(-6px) rotate(-45deg); }
+  body:has(#starlight__sidebar:popover-open) { overflow: hidden; }
+  @media (min-width: 50rem) { body:has(#starlight__sidebar:popover-open) { overflow: auto; } }
+  @media (prefers-reduced-motion: reduce) { .zv-bars i { transition: none; } }
+</style>

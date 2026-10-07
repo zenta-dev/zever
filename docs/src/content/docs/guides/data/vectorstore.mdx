@@ -1,0 +1,121 @@
+---
+title: Vector store
+description: Store embeddings and query closest matches by cosine similarity on sqlite, pgvector, or Qdrant.
+---
+
+import { Tabs, TabItem, LinkCard, CardGrid } from '@astrojs/starlight/components';
+
+`vectorstore.VectorStore` ranks embeddings by cosine similarity. Pair it with `ai.Embed` to embed, upsert, and query.
+
+## Quick start
+
+`db` serves two backends through one name: an empty `dsn` selects embedded sqlite, a postgres URL selects pgvector. Move to `qdrant` for a purpose-built vector database at scale. Your code does not change.
+
+<Tabs>
+  <TabItem label="db">
+```yaml title="zever.yaml"
+vectorstore:
+  adapter: db
+  options:
+    dimension: 1536
+    dsn: ":memory:"
+```
+  </TabItem>
+  <TabItem label="qdrant">
+```yaml title="zever.yaml"
+vectorstore:
+  adapter: qdrant
+  options:
+    url: http://localhost:6333
+    api_key: dev-only-key
+```
+  </TabItem>
+</Tabs>
+
+Env vars: `VECTORSTORE_ADAPTER`, `VECTORSTORE_DSN`, `VECTORSTORE_DIMENSION`. `dimension` defaults to 1536 (OpenAI `text-embedding-3-small`) on pgvector and fixes the column size; Qdrant checks it only when set, and embedded sqlite learns it from the first write. A mismatched vector fails with `vectorstore.ErrDimensionMismatch`, and negatives are rejected. `url` needs a scheme and host. `dedicated_pool: true` opts out of per-DSN pool sharing. `sqlite` and `pgvector` alias `db`. See the [vectorstore options](../../../reference/config/#vectorstore).
+
+## Upsert and query vectors
+
+The container wires nothing: register the adapter first. `VectorStore()` resolves lazily, caches, and retries.
+
+```go title="main.go"
+package main
+
+import (
+	"context"
+	"fmt"
+
+	vectorstoredb "github.com/zenta-dev/zever/adapters/vectorstore/db"
+	"github.com/zenta-dev/zever/config"
+	"github.com/zenta-dev/zever/container"
+	"github.com/zenta-dev/zever/core/vectorstore"
+)
+
+func main() {
+	vectorstoredb.Register()
+	ctx := context.Background()
+	c := container.New(config.Default())
+	defer c.Close(ctx)
+
+	vs, err := c.VectorStore()
+	if err != nil {
+		panic(err)
+	}
+	err = vs.UpsertBatch(ctx, []vectorstore.Vector{
+		{ID: "doc-1", Embedding: []float32{1, 0, 0}},
+		{ID: "doc-2", Embedding: []float32{0, 1, 0}},
+	})
+	if err != nil {
+		panic(err)
+	}
+	matches, err := vs.Query(ctx, []float32{1, 0, 0}, 2)
+	if err != nil {
+		panic(err)
+	}
+	for _, m := range matches {
+		fmt.Println("match:", m.ID, m.Score)
+	}
+}
+```
+
+```text
+match: doc-1 1
+match: doc-2 0
+```
+
+## Production checklist
+
+- `Query` ranks by cosine similarity only. For hybrid ranking, combine with [search](../search/).
+- `topK <= 0` defaults to 10. Paginate explicitly for large result sets.
+- Use `UpsertBatch` for batches; looping `Upsert` costs one round trip per vector.
+- Empty embeddings are rejected before any I/O. `api_key` never appears in logs.
+
+See the [adapters matrix](../../../reference/adapters-matrix/) for `db` (legacy `sqlite`, `pgvector`) and `qdrant`.
+
+## Troubleshooting
+
+<details>
+<summary>Query results look random</summary>
+
+Cause: vectors come from a different model than the stored ones, or `dimension` was set wrong. Fix: align config with the model and re-upsert; an `ErrDimensionMismatch` error means the sizes differ.
+</details>
+
+<details>
+<summary>Writes are slow at scale</summary>
+
+Cause: you loop `Upsert`. Fix: use `UpsertBatch`.
+</details>
+
+<details>
+<summary>`qdrant` fails to resolve</summary>
+
+Cause: `url` lacks a scheme or host. Fix: check `VECTORSTORE_URL` for a missing `http://`.
+</details>
+
+## Related
+
+<CardGrid>
+  <LinkCard title="AI" href="../../integrations/ai/" description="The Embed call that produces your vectors." />
+  <LinkCard title="Search" href="../search/" description="Full-text search to combine with." />
+  <LinkCard title="Container" href="../../../concepts/container/" description="Lazy resolve and close order." />
+</CardGrid>

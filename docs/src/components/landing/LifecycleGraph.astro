@@ -1,0 +1,196 @@
+---
+import Section from './ui/Section.astro';
+
+// r = resolve order, c = close order (container/README.md "Close order").
+// Two layouts share the same data: a wide graph (>= 641px) and a stacked one for phones.
+const nodes = [
+  { id: 'scheduler', label: 'Scheduler()', vlabel: 'Scheduler()', sub: 'Stop()', r: 5, c: 1 },
+  { id: 'job', label: 'Job()', vlabel: 'Job()', sub: 'no-op', r: 4, c: 1 },
+  { id: 'queue', label: 'Queue()', vlabel: 'Queue()', sub: 'leaf', r: 3, c: 3 },
+  { id: 'snap', label: 'Auth() Session() …', vlabel: 'Auth() …', sub: 'snapshots', r: 6, c: 2 },
+  { id: 'cache', label: 'Cache()', vlabel: 'Cache()', sub: 'leaf', r: 2, c: 3 },
+  { id: 'db', label: 'DB()', vlabel: 'DB()', sub: 'shared pools', r: 1, c: 4 },
+  { id: 'grpc', label: 'GRPC()', vlabel: 'GRPC()', sub: 'GracefulStop', r: 6, c: 5 },
+];
+// from depends on to (dependent -> dependency); dashed = adapter-level pool reference.
+const edges = [
+  { id: 'scheduler-job', from: 'scheduler', to: 'job', dash: false },
+  { id: 'job-queue', from: 'job', to: 'queue', dash: false },
+  { id: 'queue-db', from: 'queue', to: 'db', dash: true },
+  { id: 'cache-db', from: 'cache', to: 'db', dash: true },
+];
+const layouts = [
+  {
+    key: 'h', vb: '-2 -2 794 254', W: 170, H: 64, fs: 14,
+    pos: { scheduler: [0, 10], job: [215, 10], queue: [430, 10], snap: [0, 170], cache: [215, 170], db: [430, 170], grpc: [620, 90] } as Record<string, number[]>,
+  },
+  {
+    key: 'v', vb: '-2 -2 304 352', W: 138, H: 60, fs: 12.5,
+    pos: { grpc: [162, 0], scheduler: [0, 0], snap: [162, 96], job: [0, 96], queue: [0, 192], db: [0, 288], cache: [162, 288] } as Record<string, number[]>,
+  },
+].map((L) => ({
+  ...L,
+  edges: edges.map((e) => {
+    const [ax, ay] = L.pos[e.from], [bx, by] = L.pos[e.to];
+    let d: string;
+    if (ay === by) {
+      d = bx > ax ? `M${ax + L.W} ${ay + L.H / 2} H${bx}` : `M${ax} ${ay + L.H / 2} H${bx + L.W}`;
+    } else {
+      d = by > ay ? `M${ax + L.W / 2} ${ay + L.H} V${by}` : `M${ax + L.W / 2} ${ay} V${by + L.H}`;
+    }
+    return { ...e, d };
+  }),
+}));
+---
+
+<Section
+  id="lifecycle"
+  eyebrow="Lifecycle"
+  title="Lazy to resolve. <em>Ordered to close.</em>"
+  lede="Services open on first accessor call and nothing sooner. Shutdown walks the dependency graph backwards, so no one uses a closed pool."
+  grid
+>
+  <div class="zl-life zl-reveal" data-life>
+    <div class="zl-life-bar">
+      <div class="zl-life-phases" role="group" aria-label="Lifecycle phase">
+        <button type="button" data-phase="resolve" aria-pressed="false">Resolve</button>
+        <button type="button" data-phase="close" aria-pressed="true">Close(ctx)</button>
+      </div>
+      <button type="button" class="zl-life-play" data-play aria-label="Replay lifecycle animation">
+        <svg viewBox="0 0 20 20" width="14" height="14" aria-hidden="true"><path d="M5 3l12 7-12 7z" fill="currentColor" /></svg>
+        <span>Replay</span>
+      </button>
+    </div>
+
+    <div class="zl-life-stage">
+      {layouts.map((L) => (
+        <svg class:list={['zl-life-svg', `zl-life-svg--${L.key}`]} viewBox={L.vb} role="img"
+          aria-label="Dependency graph of container services. Scheduler depends on Job, which depends on Queue. On close, scheduler and job close first, then snapshots, then cache and queue, then db pools, then the gRPC server.">
+          <defs>
+            <marker id={`zl-arrow-${L.key}`} viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto">
+              <path d="M0 0 L10 5 L0 10 z" class="zl-arrowhead" />
+            </marker>
+          </defs>
+          <g class="zl-edges">
+            {L.edges.map((e) => (
+              <>
+                <path class:list={['zl-e', e.dash && 'zl-e--dash']} data-edge={e.id} data-from={e.from} data-to={e.to} d={e.d} marker-end={`url(#zl-arrow-${L.key})`} />
+                <circle class="zl-dot" data-dot={e.id} r="4.5" />
+              </>
+            ))}
+          </g>
+          {nodes.map((n) => (
+            <g transform={`translate(${L.pos[n.id][0]} ${L.pos[n.id][1]})`}>
+              <g class="zl-n is-on" data-node={n.id} data-r={n.r} data-c={n.c} style={`font-size:${L.fs}px`}>
+                <rect class="zl-n-ring" width={L.W} height={L.H} rx="10" />
+                <rect class="zl-n-box" width={L.W} height={L.H} rx="10" />
+                <text class="zl-n-t" x="14" y={L.H / 2 - 2}>{L.key === 'v' ? n.vlabel : n.label}</text>
+                <text class="zl-n-s" x="14" y={L.H / 2 + 16} data-sub={n.sub}>{n.sub}</text>
+                <g class="zl-n-badge">
+                  <circle cx={L.W - 15} cy="15" r="9.5" />
+                  <text x={L.W - 15} y="19" text-anchor="middle">{n.c}</text>
+                </g>
+              </g>
+            </g>
+          ))}
+        </svg>
+      ))}
+    </div>
+
+    <div class="zl-life-scrub" data-scrub>
+      <button type="button" class="zl-life-step" data-prev aria-label="Previous step">
+        <svg viewBox="0 0 20 20" width="16" height="16" aria-hidden="true"><path d="M12.5 4l-6 6 6 6" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" /></svg>
+      </button>
+      <div class="zl-life-range">
+        <input type="range" min="0" max="12" step="1" value="12" data-range aria-label="Lifecycle step, 0 to 6 resolve, 7 to 12 close" />
+        <div class="zl-life-ticks" aria-hidden="true"><span>Resolve</span><span>Close(ctx)</span></div>
+      </div>
+      <button type="button" class="zl-life-step" data-next aria-label="Next step">
+        <svg viewBox="0 0 20 20" width="16" height="16" aria-hidden="true"><path d="M7.5 4l6 6-6 6" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" /></svg>
+      </button>
+    </div>
+
+    <p class="zl-life-line" role="status" aria-live="polite" data-line>Close order: scheduler, job, snapshots, cache and queue, db pools, gRPC.</p>
+
+    <ul class="zl-life-facts">
+      <li>Shared instances close once, by pointer identity.</li>
+      <li>Failures join with <code>errors.Join</code>; panics become <code>*ClosePanicError</code>.</li>
+      <li>Timeouts become <code>*CloseTimeoutError</code>; 5s per service unless the context has a deadline.</li>
+    </ul>
+  </div>
+</Section>
+
+<style is:global>
+  .zl-life-bar { display: flex; flex-wrap: wrap; justify-content: space-between; gap: 0.75rem; margin-bottom: 1.25rem; }
+  .zl-life-phases { display: none; padding: 4px; gap: 4px; border: 1px solid var(--zl-line); border-radius: 999px; background: var(--zl-surface); }
+  .zl-js .zl-life-phases { display: inline-flex; }
+  .zl-life-phases button, .zl-life-play, .zl-life-step { font: 500 0.85rem/1 var(--zl-font-mono); cursor: pointer; border-radius: 999px; min-height: 44px; transition: color 0.25s var(--zl-ease), background 0.25s var(--zl-ease), border-color 0.25s var(--zl-ease), transform 0.2s var(--zl-ease); }
+  .zl-life-phases button { color: var(--zl-text-2); background: transparent; border: 0; padding: 0 1.1rem; }
+  .zl-life-phases button[aria-pressed='true'] { background: var(--zl-accent); color: var(--zl-on-accent); }
+  .zl-life-play { display: none; align-items: center; gap: 0.5rem; padding: 0 1.1rem; color: var(--zl-text); background: transparent; border: 1px solid var(--zl-line-strong); }
+  .zl-js .zl-life-play { display: inline-flex; }
+  .zl-life-play:hover, .zl-life-step:hover:not(:disabled) { border-color: var(--zl-accent); color: var(--zl-accent-hi); }
+  .zl-life-play:active, .zl-life-step:active:not(:disabled) { transform: scale(0.96); }
+  .zl-life button:focus-visible { outline: 2px solid var(--zl-accent-hi); outline-offset: 2px; }
+
+  .zl-life-stage { border: 1px solid var(--zl-line); border-radius: var(--zl-radius); background: var(--zl-surface); padding: clamp(0.5rem, 2vw, 1.25rem); }
+  .zl-life-svg { display: block; width: 100%; height: auto; margin-inline: auto; overflow: visible; }
+  .zl-life-svg--v { display: none; max-width: 360px; }
+  @media (max-width: 640px) { .zl-life-svg--h { display: none; } .zl-life-svg--v { display: block; } }
+
+  .zl-n { transform-box: fill-box; transform-origin: center; }
+  .zl-n rect { transition: fill 0.4s var(--zl-ease), stroke 0.4s var(--zl-ease); }
+  .zl-n .zl-n-box { fill: var(--zl-bg-2); stroke: var(--zl-line-strong); stroke-width: 1.2; }
+  .zl-n .zl-n-ring { fill: none; stroke: var(--zl-accent); stroke-width: 2; opacity: 0; transform-box: fill-box; transform-origin: center; pointer-events: none; }
+  .zl-n text { font-family: var(--zl-font-mono); font-weight: 500; fill: var(--zl-text); transition: fill 0.4s; }
+  .zl-n .zl-n-t { font-size: 1em; }
+  .zl-n .zl-n-s { font-size: 0.8em; fill: var(--zl-text-3); }
+  .zl-n-badge circle { fill: var(--zl-surface-2); stroke: var(--zl-line-strong); transition: fill 0.3s, stroke 0.3s; }
+  .zl-n-badge text { font-size: 0.8em; fill: var(--zl-text-2); }
+  .zl-n.is-on .zl-n-box { fill: var(--zl-glow); stroke: var(--zl-accent); }
+  .zl-n.is-on .zl-n-s { fill: var(--zl-text-2); }
+  .zl-n.is-closing .zl-n-box { fill: color-mix(in srgb, var(--zl-warm) 24%, transparent); stroke: var(--zl-warm); stroke-width: 1.8; filter: drop-shadow(0 0 8px color-mix(in srgb, var(--zl-warm) 55%, transparent)); }
+  .zl-n.is-closing .zl-n-ring { stroke: var(--zl-warm); }
+  .zl-n.is-closing .zl-n-s { fill: var(--zl-warm); }
+  .zl-page[data-theme='light'] .zl-n.is-closing .zl-n-s { fill: #8a5a22; }
+  .zl-n.is-closed .zl-n-box { fill: var(--zl-surface); stroke: var(--zl-line-strong); stroke-dasharray: 5 4; }
+  .zl-n.is-closed text, .zl-n.is-off text { fill: var(--zl-text-3); }
+  .zl-n.is-closed .zl-n-t { text-decoration: line-through; text-decoration-color: color-mix(in srgb, var(--zl-text-3) 70%, transparent); }
+  .zl-n.is-off .zl-n-box { fill: var(--zl-surface); stroke: var(--zl-line); }
+  .zl-n-badge { opacity: 0; transition: opacity 0.3s; }
+  .zl-life:not([data-phase]) .zl-n-badge, .zl-life[data-badges] .zl-n-badge { opacity: 1; }
+  .zl-n.is-closing .zl-n-badge circle { fill: var(--zl-warm); stroke: var(--zl-warm); }
+  .zl-n.is-closing .zl-n-badge text { fill: #1a1208; }
+  .zl-n.is-closed .zl-n-badge circle { stroke-dasharray: 2 2; }
+
+  .zl-e { fill: none; stroke: var(--zl-line-strong); stroke-width: 1.5; transition: stroke 0.4s, opacity 0.4s; }
+  .zl-e--dash { stroke-dasharray: 3 5; opacity: 0.7; }
+  .zl-e.is-live { stroke: color-mix(in srgb, var(--zl-accent) 65%, transparent); }
+  .zl-e.is-hot { stroke: var(--zl-accent-hi); stroke-width: 2.2; }
+  .zl-e.is-off { opacity: 0.35; }
+  .zl-arrowhead { fill: var(--zl-text-3); }
+  .zl-dot { fill: var(--zl-accent-hi); opacity: 0; pointer-events: none; }
+  .zl-page[data-theme='light'] .zl-dot { fill: var(--zl-accent-lo); }
+  @media (pointer: coarse) { .zl-n.is-closing .zl-n-box { filter: none; } }
+
+  .zl-life-scrub { display: none; align-items: center; gap: 0.5rem; margin-top: 1rem; }
+  .zl-js .zl-life-scrub { display: flex; }
+  .zl-life-step { flex: none; width: 44px; display: inline-grid; place-items: center; padding: 0; color: var(--zl-text); background: transparent; border: 1px solid var(--zl-line-strong); }
+  .zl-life-step:disabled { opacity: 0.4; cursor: default; }
+  .zl-life-range { flex: 1; min-width: 0; }
+  .zl-life-range input { display: block; width: 100%; height: 44px; margin: 0; accent-color: var(--zl-accent); cursor: pointer; background: transparent; }
+  .zl-life-ticks { display: flex; font: 0.68rem/1 var(--zl-font-mono); letter-spacing: 0.08em; text-transform: uppercase; color: var(--zl-text-3); margin-top: -0.35rem; }
+  .zl-life-ticks span { flex: 1; }
+  .zl-life-ticks span:last-child { text-align: right; }
+
+  .zl-life-line { font: 0.88rem/1.5 var(--zl-font-mono); color: var(--zl-accent-hi); margin: 1rem 0 0; min-height: 3em; }
+  .zl-page[data-theme='light'] .zl-life-line { color: var(--zl-accent-lo); }
+  .zl-life-facts { margin: 1rem 0 0; padding: 0; list-style: none; display: grid; gap: 0.5rem 2rem; grid-template-columns: repeat(auto-fit, minmax(min(100%, 260px), 1fr)); color: var(--zl-text-2); font-size: 0.88rem; }
+  .zl-life-facts li { padding-left: 1rem; position: relative; }
+  .zl-life-facts li::before { content: ''; position: absolute; left: 0; top: 0.6em; width: 5px; height: 5px; border-radius: 50%; background: var(--zl-warm); }
+  .zl-life-facts code { font: 0.8rem var(--zl-font-mono); color: var(--zl-text); overflow-wrap: anywhere; }
+</style>
+
+<script>
+  import '../../scripts/landing/lifecycle';
+</script>
