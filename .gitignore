@@ -8,6 +8,7 @@
 /tools/affected/affected
 /tools/errscan/errscan
 /tools/modgraph/modgraph
+/tools/zever-mcp/zever-mcp
 __pycache__/
 *.pyc
 

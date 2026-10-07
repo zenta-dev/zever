@@ -24,7 +24,7 @@ import (
 // concurrent checkout already consumed the stock between our read and our
 // write); this sentinel just carries that outcome back out of db.WithTx's
 // fn so the HTTP handler can map it to 409 instead of 500.
-var ErrInsufficientStock = errors.New("insufficient stock")
+var ErrInsufficientStock = errors.New("api: insufficient stock")
 
 type checkoutItem struct {
 	ProductID string `json:"product_id"`

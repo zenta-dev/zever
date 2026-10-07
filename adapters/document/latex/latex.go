@@ -3,6 +3,7 @@ package latex
 import (
 	"bytes"
 	"context"
+	"errors"
 	"fmt"
 	"os"
 	"os/exec"
@@ -148,7 +149,7 @@ func (d *driver) compile(ctx context.Context, dir string, source []byte) ([]byte
 		cmd.Stderr = &stderr
 		if err := cmd.Run(); err != nil {
 			out := stderr.String()
-			return nil, fmt.Errorf("%w: %w: %q", ErrRenderFailed, err, out[:min(len(out), maxStderr)])
+			return nil, fmt.Errorf("%w: %q", errors.Join(ErrRenderFailed, err), out[:min(len(out), maxStderr)])
 		}
 	}
 
@@ -195,7 +196,7 @@ func (d *driver) convert(ctx context.Context, dir string, pdf []byte, format doc
 	//nolint:gosec // binary resolved via LookPath; no shell; numeric-only variable argv.
 	cmd := exec.CommandContext(ctx, conv, argv...)
 	if err := cmd.Run(); err != nil {
-		return nil, fmt.Errorf("%w: %w", ErrRenderFailed, err)
+		return nil, fmt.Errorf("latex: %w", errors.Join(ErrRenderFailed, err))
 	}
 
 	img, err := os.ReadFile(root + ext)

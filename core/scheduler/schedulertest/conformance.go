@@ -185,11 +185,11 @@ func conformanceScheduleEntries(t *testing.T, factory func(t *testing.T, d *job.
 func checkScheduleEntries(ctx context.Context, s scheduler.Scheduler, jobName string) error {
 	id, err := s.Schedule(ctx, "0 * * * *", jobName, nil)
 	if err != nil {
-		return fmt.Errorf("Schedule() error = %w", err)
+		return fmt.Errorf("schedulertest: Schedule() error = %w", err)
 	}
 
 	if id == 0 {
-		return errors.New("Schedule() returned zero EntryID")
+		return errors.New("schedulertest: Schedule() returned zero EntryID")
 	}
 
 	found := false
@@ -203,11 +203,11 @@ func checkScheduleEntries(ctx context.Context, s scheduler.Scheduler, jobName st
 	}
 
 	if !found {
-		return fmt.Errorf("Entries() = %v, missing %v", s.Entries(), id)
+		return fmt.Errorf("schedulertest: Entries() = %v, missing %v", s.Entries(), id)
 	}
 
 	if err := s.Stop(); err != nil {
-		return fmt.Errorf("Stop() error = %w", err)
+		return fmt.Errorf("schedulertest: Stop() error = %w", err)
 	}
 
 	return nil
@@ -228,30 +228,30 @@ func conformanceRemove(t *testing.T, factory func(t *testing.T, d *job.Dispatche
 // scheduled entry disappears after Remove.
 func checkRemove(ctx context.Context, s scheduler.Scheduler, jobName string) error {
 	if err := s.Remove(0); err == nil {
-		return errors.New("Remove(0) = nil, want error")
+		return errors.New("schedulertest: Remove(0) = nil, want error")
 	}
 
 	if err := s.Remove(999999); err != nil {
-		return fmt.Errorf("Remove(unknown) error = %w, want nil", err)
+		return fmt.Errorf("schedulertest: Remove(unknown) error = %w, want nil", err)
 	}
 
 	id, err := s.Schedule(ctx, "0 * * * *", jobName, nil)
 	if err != nil {
-		return fmt.Errorf("Schedule() error = %w", err)
+		return fmt.Errorf("schedulertest: Schedule() error = %w", err)
 	}
 
 	if err := s.Remove(id); err != nil {
-		return fmt.Errorf("Remove() error = %w", err)
+		return fmt.Errorf("schedulertest: Remove() error = %w", err)
 	}
 
 	for _, got := range s.Entries() {
 		if got == id {
-			return fmt.Errorf("Entries() = %v, still contains %v", s.Entries(), id)
+			return fmt.Errorf("schedulertest: Entries() = %v, still contains %v", s.Entries(), id)
 		}
 	}
 
 	if err := s.Stop(); err != nil {
-		return fmt.Errorf("Stop() error = %w", err)
+		return fmt.Errorf("schedulertest: Stop() error = %w", err)
 	}
 
 	return nil
@@ -285,7 +285,7 @@ func checkInvalidSpec(ctx context.Context, s scheduler.Scheduler, jobName string
 	}
 
 	if err := s.Stop(); err != nil {
-		errs = append(errs, fmt.Errorf("Stop() error = %w", err))
+		errs = append(errs, fmt.Errorf("schedulertest: Stop() error = %w", err))
 	}
 
 	return errors.Join(errs...)
@@ -311,7 +311,7 @@ func checkUnknownJob(ctx context.Context, s scheduler.Scheduler) error {
 	}
 
 	if err := s.Stop(); err != nil {
-		errs = append(errs, fmt.Errorf("Stop() error = %w", err))
+		errs = append(errs, fmt.Errorf("schedulertest: Stop() error = %w", err))
 	}
 
 	return errors.Join(errs...)
@@ -334,7 +334,7 @@ func conformanceStartStop(t *testing.T, factory func(t *testing.T, d *job.Dispat
 // checkStopFresh proves Stop without Start stays nil.
 func checkStopFresh(s scheduler.Scheduler) error {
 	if err := s.Stop(); err != nil {
-		return fmt.Errorf("Stop() without Start error = %w, want nil", err)
+		return fmt.Errorf("schedulertest: Stop() without Start error = %w, want nil", err)
 	}
 
 	return nil
@@ -344,21 +344,21 @@ func checkStopFresh(s scheduler.Scheduler) error {
 // is set.
 func checkStartStop(s scheduler.Scheduler) error {
 	if err := s.Start(); err != nil {
-		return fmt.Errorf("Start() error = %w", err)
+		return fmt.Errorf("schedulertest: Start() error = %w", err)
 	}
 
 	var errs []error
 
 	if err := s.Start(); err != nil {
-		errs = append(errs, fmt.Errorf("Start() second error = %w, want nil", err))
+		errs = append(errs, fmt.Errorf("schedulertest: Start() second error = %w, want nil", err))
 	}
 
 	if err := s.Stop(); err != nil {
-		errs = append(errs, fmt.Errorf("Stop() error = %w", err))
+		errs = append(errs, fmt.Errorf("schedulertest: Stop() error = %w", err))
 	}
 
 	if got := s.Name(); got == "" {
-		errs = append(errs, errors.New("Name() is empty"))
+		errs = append(errs, errors.New("schedulertest: Name() is empty"))
 	}
 
 	return errors.Join(errs...)
@@ -382,11 +382,11 @@ func conformanceFire(t *testing.T, factory func(t *testing.T, d *job.Dispatcher)
 // tests drive both the delivery and timeout branches.
 func checkFire(ctx context.Context, s scheduler.Scheduler, q queue.Queue, jobName string, timeout, interval time.Duration) error {
 	if _, err := s.Schedule(ctx, "@every 1s", jobName, "ping"); err != nil {
-		return fmt.Errorf("Schedule() error = %w", err)
+		return fmt.Errorf("schedulertest: Schedule() error = %w", err)
 	}
 
 	if err := s.Start(); err != nil {
-		return fmt.Errorf("Start() error = %w", err)
+		return fmt.Errorf("schedulertest: Start() error = %w", err)
 	}
 
 	ctx, cancel := context.WithTimeout(ctx, timeout)
@@ -399,11 +399,11 @@ func checkFire(ctx context.Context, s scheduler.Scheduler, q queue.Queue, jobNam
 		msg, err := q.Pop(ctx, "low")
 		if err == nil {
 			if msg.Headers["job_name"] != jobName {
-				return fmt.Errorf("job_name = %q, want %q", msg.Headers["job_name"], jobName)
+				return fmt.Errorf("schedulertest: job_name = %q, want %q", msg.Headers["job_name"], jobName)
 			}
 
 			if string(msg.Payload) != `"ping"` {
-				return fmt.Errorf("payload = %s, want %s", msg.Payload, `"ping"`)
+				return fmt.Errorf("schedulertest: payload = %s, want %s", msg.Payload, `"ping"`)
 			}
 
 			return nil
@@ -415,7 +415,7 @@ func checkFire(ctx context.Context, s scheduler.Scheduler, q queue.Queue, jobNam
 
 		select {
 		case <-ctx.Done():
-			return errors.New("no scheduled dispatch within timeout")
+			return errors.New("schedulertest: no scheduled dispatch within timeout")
 		case <-ticker.C:
 		}
 	}
@@ -438,22 +438,22 @@ func checkOpenRegister(s scheduler.Scheduler) error {
 	name := scheduler.Adapter("kit-open-test-" + strconv.FormatUint(adapterSeq.Add(1), 10))
 
 	if err := scheduler.Register(name, func(scheduler.Options) (scheduler.Scheduler, error) { return s, nil }); err != nil {
-		return fmt.Errorf("Register() error = %w", err)
+		return fmt.Errorf("schedulertest: Register() error = %w", err)
 	}
 
 	if err := scheduler.Register(name, func(scheduler.Options) (scheduler.Scheduler, error) { return s, nil }); !errors.Is(err, scheduler.ErrDuplicate) {
-		return fmt.Errorf("Register(dup) err = %w, want ErrDuplicate", err)
+		return fmt.Errorf("schedulertest: Register(dup) err = %w, want ErrDuplicate", err)
 	}
 
 	opened, err := scheduler.Open(name, scheduler.Options{Dispatcher: &job.Dispatcher{Q: newStubQueue()}})
 	if err != nil {
-		return fmt.Errorf("Open() error = %w", err)
+		return fmt.Errorf("schedulertest: Open() error = %w", err)
 	}
 
 	var errs []error
 
 	if opened != s {
-		errs = append(errs, errors.New("Open() did not return the registered scheduler"))
+		errs = append(errs, errors.New("schedulertest: Open() did not return the registered scheduler"))
 	}
 
 	if _, err := scheduler.Open("kit-no-such-adapter", scheduler.Options{Dispatcher: &job.Dispatcher{Q: newStubQueue()}}); !errors.Is(err, scheduler.ErrUnknownAdapter) {
@@ -461,7 +461,7 @@ func checkOpenRegister(s scheduler.Scheduler) error {
 	}
 
 	if err := s.Stop(); err != nil {
-		errs = append(errs, fmt.Errorf("Stop() error = %w", err))
+		errs = append(errs, fmt.Errorf("schedulertest: Stop() error = %w", err))
 	}
 
 	return errors.Join(errs...)

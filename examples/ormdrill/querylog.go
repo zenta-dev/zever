@@ -10,7 +10,7 @@ import (
 )
 
 // ErrQueryLogger indicates the query logger demo failed.
-var ErrQueryLogger = errors.New("query logger")
+var ErrQueryLogger = errors.New("ormdrill: query logger")
 
 // DemoQueryLogger installs orm.SetQueryLogger around one query and prints the
 // rendered SQL plus bound args. The hook runs synchronously on the executing
@@ -28,7 +28,7 @@ func DemoQueryLogger(ctx context.Context, conn db.DB) error {
 
 	n, err := orm.From(Orders).Where(OrderCols.AmountCents.Gt(1000)).Count(ctx, conn)
 	if err != nil {
-		return fmt.Errorf("ormdrill: %w: captured count: %w", ErrQueryLogger, err)
+		return errors.Join(fmt.Errorf("ormdrill: %w: captured count", ErrQueryLogger), err)
 	}
 
 	for _, q := range captured {

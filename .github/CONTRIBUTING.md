@@ -203,7 +203,7 @@ MAJOR.MINOR.PATCH
 
 While the project is below `v1.0.0`, treat `0.x` as a pre-1.0 phase: minor releases may contain breaking changes, and they should still be documented as such in the release notes. Releases are tagged with a `v` prefix (for example `v0.1.0`). See [STABILITY.md](../STABILITY.md) for core vs extended tiers.
 
-Nested modules (`tools/zever-lsp`) share the lockstep release version with prefixed tags (`tools/zever-lsp/v0.1.0`) and must `require` a published root version — never a committed `replace`. To iterate locally against working-tree root changes, use a temporary replace and revert it before committing:
+Nested modules (`tools/zever-lsp`) share the lockstep release version with prefixed tags (`tools/zever-lsp/v0.1.0`) and must `require` a published root version. They do commit `replace` directives for sibling intra-repo modules (e.g. `dsl`, `core/*`, `orm`, `shared/*`): the module-graph CI gate (`go run ./tools/modgraph --check`) requires every intra-repo dependency to resolve inside the workspace, and a published root version alone does not satisfy that for unpublished siblings. Keep those `replace` blocks in the committed `go.mod`; only a replace pointing at the root module itself is temporary local-iteration state and must be reverted before committing:
 
 ```bash
 cd tools/zever-lsp && go mod edit -replace github.com/zenta-dev/zever=../.. && go test ./...
@@ -224,10 +224,13 @@ releases) — everything else moves together:
   (require published root) + `go.sum` via `go mod tidy`, `tools/zever-lsp/README.md`.
 - Editors: `editors/vscode/package.json`, `editors/vscode/README.md`,
   `editors/nvim/README.md` (LSP install pins).
-- Docs: `docs/src/content/docs/getting-started/installation.mdx`,
-  `docs/src/content/docs/getting-started/upgrade.mdx`,
-  `docs/src/content/docs/dsl/lsp-tooling.mdx`.
-- Tags: run `tools/tag-release.sh vX.Y.Z` on main once the bump lands (creates one `<path>/vX.Y.Z` per module, dependency order; no bare `vX.Y.Z` — see above). Verify with `grep -rn` for the old version (excluding
+- Docs: `docs/src/content/docs/start/installation.mdx`,
+  `docs/src/content/docs/guides/operate/upgrade.mdx`,
+  `docs/src/content/docs/guides/extend/editor-setup.mdx`,
+  `docs/src/content/docs/reference/cli.mdx`.
+- Docs pins: `docs/src/data/landing.ts` (`VERSION`),
+  `tools/zever-mcp/server.go` (`serverVersion`).
+- Tags: run `tools/tag-release.sh vX.Y.Z` on main once the bump lands (creates one `<path>/vX.Y.Z` per module, dependency order; no bare `vX.Y.Z` — see above). `.github/workflows/release.yml` fires on the bare `vX.Y.Z` tag, so create and push that bare tag in addition to the per-module tags. Verify with `grep -rn` for the old version (excluding
   `CHANGELOG.md` history and third-party `go.sum` lines) before tagging.
 
 ## Commit Convention

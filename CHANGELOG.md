@@ -7,6 +7,44 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [v0.6.0] - 2026-10-07
+
+### Breaking
+
+- OTel semantic-convention attribute/metric rename: span attributes
+  (`http.method`→`http.request.method`, `http.path`→`url.path`,
+  `http.status_code`→`http.response.status_code`, plus new `rpc.*` and
+  `messaging.*` keys) and counter labels migrated under unchanged metric
+  names; update dashboards/queries accordingly.
+- `orm.Min`/`orm.Max`/`orm.MinNullable`/`orm.MaxNullable` (plus the four
+  window variants) now constrain their column value type to the new
+  `orm.Orderable` constraint — MIN/MAX over non-orderable columns is now a
+  compile error.
+- `orm.StringAgg` now constrains its column value type to `~string`.
+- `ir.Validation.Kind` and `ir.DefaultValue.Kind` are now typed
+  `ir.ValidationKind` / `ir.DefaultKind` instead of bare `string`.
+- `orm.Option[T]` now constrains `T` to the new `orm.ScanValue` constraint;
+  migrate struct/entity maybe-wrappers to the new `orm.Nullable[T]`.
+- Removed `adapters/webhook/sqlite` (`http` and `queue` remain; default
+  stays `http`).
+- Removed `adapters/search/sqlite` (folded into `adapters/search/db`).
+- Removed `adapters/vectorstore/sqlite` (folded into
+  `adapters/vectorstore/db`).
+- DB-backed adapter string unified to canonical `db` for `search`,
+  `vectorstore`, and `workflow`; legacy names (`postgres`, `sqlite`,
+  `pgvector`) stay registered as aliases.
+- DB-backed adapter directories renamed to `db` (`adapters/search/postgres`
+  → `adapters/search/db`, `adapters/vectorstore/pgvector` →
+  `adapters/vectorstore/db`, `adapters/workflow/postgres` →
+  `adapters/workflow/db`); import paths change, `Register`/`New`/`Open`
+  signatures unchanged.
+
+### Release notes
+
+- `tools/zever-mcp` backend handlers are stubs.
+- The default `payment`/`billing` `stub` adapter must be overridden in
+  production.
+
 ### Added
 
 - Messaging spans with correct span kinds: new `shared/msgspan` module
@@ -165,6 +203,16 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   `cloudflare-go/v7` client). Wired into the container (`c.CDN()`), layered
   config (`CDN_*` env vars, strict schema), and the `zever` CLI (`zever add cdn`,
   the `zever new` battery picker, and `zever generate adapter cdn`).
+- Outbox relay metrics: gauges and a histogram on the relay loop
+  (published/consumed counts, DLQ depth, poll/claim latency), exported
+  under `outbox.*` metric names.
+- `zever outbox` ops CLI group: `status` (relay health), `dlq list`,
+  `dlq requeue`, `dlq purge`, and `purge` (acked messages).
+- `outbox.stall_readiness` opt-in config plus `container.Ready` — an
+  aggregate readiness check (DB ping + relay stall) wired into `/readyz`
+  and the gRPC health service.
+- `shared/grpcclient`: client spans now start with `SpanKindClient` via
+  `observability.StartSpan`.
 
 ### Documentation
 
@@ -234,7 +282,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   and `make err-lint` (`tools/errscan`) as a forward-looking guard for the
   rules above.
 - `zever.schema.json` now covers the `outbox` and `resilience` services and
-  previously-missing option fields.
+  previously-missing option fields, with a schema drift test guarding
+  future divergence from `config.Config`.
 - Corrected stale agent docs (CLAUDE.md, AGENTS.md) describing a removed TUI
   and pointer-typed close errors.
 

@@ -10,7 +10,7 @@ import (
 )
 
 // ErrJoin3Outer indicates the outer join demo failed.
-var ErrJoin3Outer = errors.New("join3 outer")
+var ErrJoin3Outer = errors.New("ormdrill: join3 outer")
 
 // DemoJoin3OuterMixed exercises the homogeneous LeftJoinOn3 and the two mixed
 // INNER/LEFT chains, then the RIGHT/FULL three-table builders. The Option per
@@ -23,7 +23,7 @@ func DemoJoin3OuterMixed(ctx context.Context, conn db.DB) error {
 
 	lefts, err := orm.LeftJoinOn3(orm.From(Widgets), WidgetOrders, OrderShipments).All(ctx, conn)
 	if err != nil {
-		return fmt.Errorf("ormdrill: %w LeftJoinOn3: %w", ErrJoin3Outer, err)
+		return errors.Join(fmt.Errorf("ormdrill: %w LeftJoinOn3", ErrJoin3Outer), err)
 	}
 
 	bSome, cSome := 0, 0
@@ -42,7 +42,7 @@ func DemoJoin3OuterMixed(ctx context.Context, conn db.DB) error {
 
 	innerLeft, err := orm.InnerLeftJoinOn3(orm.From(Widgets), WidgetOrders, OrderShipments).All(ctx, conn)
 	if err != nil {
-		return fmt.Errorf("ormdrill: %w InnerLeftJoinOn3: %w", ErrJoin3Outer, err)
+		return errors.Join(fmt.Errorf("ormdrill: %w InnerLeftJoinOn3", ErrJoin3Outer), err)
 	}
 
 	cSome = 0
@@ -57,7 +57,7 @@ func DemoJoin3OuterMixed(ctx context.Context, conn db.DB) error {
 
 	leftInner, err := orm.LeftInnerJoinOn3(orm.From(Widgets), WidgetOrders, OrderShipments).All(ctx, conn)
 	if err != nil {
-		return fmt.Errorf("ormdrill: %w LeftInnerJoinOn3: %w", ErrJoin3Outer, err)
+		return errors.Join(fmt.Errorf("ormdrill: %w LeftInnerJoinOn3", ErrJoin3Outer), err)
 	}
 
 	bSome = 0
@@ -75,7 +75,7 @@ func DemoJoin3OuterMixed(ctx context.Context, conn db.DB) error {
 	// every dialect; a RIGHT/FULL hop is the typed gate below on old ones.
 	generic, err := orm.MixedJoinOn3(orm.From(Widgets), WidgetOrders, OrderShipments, orm.InnerJoin, orm.LeftJoin).All(ctx, conn)
 	if err != nil {
-		return fmt.Errorf("ormdrill: %w MixedJoinOn3: %w", ErrJoin3Outer, err)
+		return errors.Join(fmt.Errorf("ormdrill: %w MixedJoinOn3", ErrJoin3Outer), err)
 	}
 
 	cSome = 0

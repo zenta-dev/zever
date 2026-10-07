@@ -48,7 +48,7 @@ var factories = registry.New[Adapter, Factory](
 // Register associates an Adapter with a Factory for later use by Open.
 func Register(adapter Adapter, factory Factory) error {
 	if factory == nil {
-		return fmt.Errorf("%w for adapter %s", ErrNilFactory, adapter)
+		return fmt.Errorf("billing: %w for adapter %s", ErrNilFactory, adapter)
 	}
 
 	return factories.Register(adapter, factory)

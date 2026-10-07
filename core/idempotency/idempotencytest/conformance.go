@@ -59,13 +59,13 @@ func conformanceOpenRegister(t *testing.T) {
 // contract violation so unit tests can drive every branch.
 func checkOpenRegister() error {
 	if _, err := idempotency.Open(idempotency.Adapter("conformance-missing-adapter"), idempotency.Options{}); !errors.Is(err, idempotency.ErrUnknownAdapter) {
-		return fmt.Errorf("Open(missing) err = %w, want ErrUnknownAdapter", err)
+		return fmt.Errorf("idempotencytest: Open(missing) err = %w, want ErrUnknownAdapter", err)
 	}
 
 	probe := idempotency.Adapter("conformance-probe-idempotency")
 
 	if err := idempotency.Register(probe, nil); !errors.Is(err, idempotency.ErrNilFactory) {
-		return fmt.Errorf("Register(nil) err = %w, want ErrNilFactory", err)
+		return fmt.Errorf("idempotencytest: Register(nil) err = %w, want ErrNilFactory", err)
 	}
 
 	stub := func(idempotency.Options) (idempotency.Store, error) {
@@ -75,7 +75,7 @@ func checkOpenRegister() error {
 	_ = idempotency.Register(probe, stub)
 
 	if err := idempotency.Register(probe, stub); !errors.Is(err, idempotency.ErrDuplicate) {
-		return fmt.Errorf("Register(duplicate) err = %w, want ErrDuplicate", err)
+		return fmt.Errorf("idempotencytest: Register(duplicate) err = %w, want ErrDuplicate", err)
 	}
 
 	return nil
@@ -95,42 +95,42 @@ func conformanceExecuteReplay(t *testing.T, factory func(t *testing.T) idempoten
 func checkExecuteReplay(ctx context.Context, s idempotency.Store) error {
 	out, err := s.Begin(ctx, "exec-01", idempotency.BeginOptions{Fingerprint: []byte("req-v1")})
 	if err != nil {
-		return fmt.Errorf("Begin() error = %w", err)
+		return fmt.Errorf("idempotencytest: Begin() error = %w", err)
 	}
 
 	if out.Replay || out.Result != nil {
-		return fmt.Errorf("Begin() = %+v, want miss {false nil}", out)
+		return fmt.Errorf("idempotencytest: Begin() = %+v, want miss {false nil}", out)
 	}
 
 	result := []byte("result-v1")
 	if err = s.Complete(ctx, "exec-01", []byte("req-v1"), result); err != nil {
-		return fmt.Errorf("Complete() error = %w", err)
+		return fmt.Errorf("idempotencytest: Complete() error = %w", err)
 	}
 
 	result[0] = 'X'
 
 	replay, err := s.Begin(ctx, "exec-01", idempotency.BeginOptions{Fingerprint: []byte("req-v1")})
 	if err != nil {
-		return fmt.Errorf("Begin(replay) error = %w", err)
+		return fmt.Errorf("idempotencytest: Begin(replay) error = %w", err)
 	}
 
 	if !replay.Replay {
-		return errors.New("Begin(replay) Replay = false, want true")
+		return errors.New("idempotencytest: Begin(replay) Replay = false, want true")
 	}
 
 	if string(replay.Result) != "result-v1" {
-		return fmt.Errorf("Begin(replay) Result = %q, want stored copy", replay.Result)
+		return fmt.Errorf("idempotencytest: Begin(replay) Result = %q, want stored copy", replay.Result)
 	}
 
 	replay.Result[0] = 'Y'
 
 	again, err := s.Begin(ctx, "exec-01", idempotency.BeginOptions{Fingerprint: []byte("req-v1")})
 	if err != nil {
-		return fmt.Errorf("Begin(replay) error = %w", err)
+		return fmt.Errorf("idempotencytest: Begin(replay) error = %w", err)
 	}
 
 	if string(again.Result) != "result-v1" {
-		return fmt.Errorf("Begin(replay) Result = %q, want stored copy (returned copy)", again.Result)
+		return fmt.Errorf("idempotencytest: Begin(replay) Result = %q, want stored copy (returned copy)", again.Result)
 	}
 
 	return nil
@@ -148,7 +148,7 @@ func conformanceInProgress(t *testing.T, factory func(t *testing.T) idempotency.
 // ErrInProgress.
 func checkInProgress(ctx context.Context, s idempotency.Store) error {
 	if _, err := s.Begin(ctx, "flight-01", idempotency.BeginOptions{}); err != nil {
-		return fmt.Errorf("Begin() error = %w", err)
+		return fmt.Errorf("idempotencytest: Begin() error = %w", err)
 	}
 
 	if _, err := s.Begin(ctx, "flight-01", idempotency.BeginOptions{}); !errors.Is(err, idempotency.ErrInProgress) {
@@ -172,7 +172,7 @@ func conformanceFingerprintMismatch(t *testing.T, factory func(t *testing.T) ide
 func checkFingerprintMismatch(ctx context.Context, s idempotency.Store) error {
 	// Mismatch wins even mid-flight: fingerprint is checked first.
 	if _, err := s.Begin(ctx, "fp-01", idempotency.BeginOptions{Fingerprint: []byte("a")}); err != nil {
-		return fmt.Errorf("Begin() error = %w", err)
+		return fmt.Errorf("idempotencytest: Begin() error = %w", err)
 	}
 
 	if _, err := s.Begin(ctx, "fp-01", idempotency.BeginOptions{Fingerprint: []byte("b")}); !errors.Is(err, idempotency.ErrKeyMismatch) {
@@ -180,7 +180,7 @@ func checkFingerprintMismatch(ctx context.Context, s idempotency.Store) error {
 	}
 
 	if err := s.Complete(ctx, "fp-01", []byte("a"), []byte("done")); err != nil {
-		return fmt.Errorf("Complete() error = %w", err)
+		return fmt.Errorf("idempotencytest: Complete() error = %w", err)
 	}
 
 	if _, err := s.Begin(ctx, "fp-01", idempotency.BeginOptions{Fingerprint: []byte("b")}); !errors.Is(err, idempotency.ErrKeyMismatch) {
@@ -206,28 +206,28 @@ func conformanceForget(t *testing.T, factory func(t *testing.T) idempotency.Stor
 // reserves fresh on the next Begin.
 func checkForget(ctx context.Context, s idempotency.Store) error {
 	if err := s.Forget(ctx, "never-seen"); err != nil {
-		return fmt.Errorf("Forget(missing) error = %w, want nil", err)
+		return fmt.Errorf("idempotencytest: Forget(missing) error = %w, want nil", err)
 	}
 
 	if _, err := s.Begin(ctx, "drop-01", idempotency.BeginOptions{}); err != nil {
-		return fmt.Errorf("Begin() error = %w", err)
+		return fmt.Errorf("idempotencytest: Begin() error = %w", err)
 	}
 
 	if err := s.Forget(ctx, "drop-01"); err != nil {
-		return fmt.Errorf("Forget() error = %w", err)
+		return fmt.Errorf("idempotencytest: Forget() error = %w", err)
 	}
 
 	out, err := s.Begin(ctx, "drop-01", idempotency.BeginOptions{})
 	if err != nil {
-		return fmt.Errorf("Begin(after forget) error = %w", err)
+		return fmt.Errorf("idempotencytest: Begin(after forget) error = %w", err)
 	}
 
 	if out.Replay {
-		return errors.New("Begin(after forget) Replay = true, want false (fresh reservation)")
+		return errors.New("idempotencytest: Begin(after forget) Replay = true, want false (fresh reservation)")
 	}
 
 	if err := s.Forget(ctx, "drop-01"); err != nil {
-		return fmt.Errorf("Forget(again) error = %w, want nil", err)
+		return fmt.Errorf("idempotencytest: Forget(again) error = %w, want nil", err)
 	}
 
 	return nil
@@ -277,13 +277,13 @@ func conformanceClose(t *testing.T, factory func(t *testing.T) idempotency.Store
 // ErrClosed afterwards. Soft mismatches join so all are reported.
 func checkClose(ctx context.Context, s idempotency.Store) error {
 	if err := s.Close(); err != nil {
-		return fmt.Errorf("Close() error = %w", err)
+		return fmt.Errorf("idempotencytest: Close() error = %w", err)
 	}
 
 	var errs []error
 
 	if err := s.Close(); err != nil {
-		errs = append(errs, fmt.Errorf("Close() second error = %w, want nil", err))
+		errs = append(errs, fmt.Errorf("idempotencytest: Close() second error = %w, want nil", err))
 	}
 
 	if _, err := s.Begin(ctx, "kit-key", idempotency.BeginOptions{}); !errors.Is(err, idempotency.ErrClosed) {

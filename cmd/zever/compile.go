@@ -23,9 +23,9 @@ import (
 )
 
 // errNoInputFiles is returned when neither explicit args nor auto-discovery
-// yields a .zen file. It carries no command prefix; each command wraps it with
-// its own name so shared callers (check/fmt/routes/graph/...) report correctly.
-var errNoInputFiles = errors.New("no input .zen files given")
+// yields a .zen file. Commands wrap it with their own tag (e.g. "zever fmt:
+// %w") so shared callers (check/fmt/routes/graph/...) report correctly.
+var errNoInputFiles = errors.New("zever: no input .zen files given")
 
 // compilePromptSeams isolate huh prompts for tests.
 // Proof: default values are the production prompt functions, so reachable
