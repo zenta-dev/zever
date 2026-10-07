@@ -159,7 +159,9 @@ replace github.com/zenta-dev/zever/shared/httpclient => ../shared/httpclient
 replace github.com/zenta-dev/zever/shared/lrucache => ../shared/lrucache
 
 replace github.com/zenta-dev/zever/shared/msgspan => ../shared/msgspan
+
 replace github.com/zenta-dev/zever/shared/outboxbridge => ../shared/outboxbridge
+
 replace github.com/zenta-dev/zever/shared/providersopt => ../shared/providersopt
 
 replace github.com/zenta-dev/zever/shared/redisclient => ../shared/redisclient
