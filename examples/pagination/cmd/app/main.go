@@ -27,7 +27,7 @@ import (
 )
 
 // ErrKeysetPage indicates a keyset pagination query failed.
-var ErrKeysetPage = errors.New("keyset page")
+var ErrKeysetPage = errors.New("pagination: keyset page")
 
 const pageSize = 5
 
@@ -166,7 +166,7 @@ func keysetPagination(ctx context.Context, conn db.DB) ([][]*gen.Product, error)
 
 		page, err := q.All(ctx, conn)
 		if err != nil {
-			return nil, fmt.Errorf("pagination: %w %d: %w", ErrKeysetPage, pageNo, err)
+			return nil, errors.Join(fmt.Errorf("pagination: %w %d", ErrKeysetPage, pageNo), err)
 		}
 
 		if len(page) == 0 {

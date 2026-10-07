@@ -9,7 +9,7 @@ import (
 )
 
 // ErrWebhookRegister indicates a webhook registration failed.
-var ErrWebhookRegister = errors.New("webhook register")
+var ErrWebhookRegister = errors.New("jobs: webhook register")
 
 // Webhook events fanned out by the bookings jobs.
 const (
@@ -42,7 +42,7 @@ func RegisterDemoTargets(ctx context.Context, wh webhook.Webhook, lookup func(st
 			continue
 		}
 		if err := wh.Register(ctx, p.event, p.target, p.secret); err != nil {
-			return fmt.Errorf("jobs: %w %s: %w", ErrWebhookRegister, p.event, err)
+			return errors.Join(fmt.Errorf("jobs: %w %s", ErrWebhookRegister, p.event), err)
 		}
 	}
 	return nil

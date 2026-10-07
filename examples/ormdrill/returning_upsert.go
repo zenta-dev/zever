@@ -11,10 +11,10 @@ import (
 )
 
 // ErrMutationReturning indicates the RETURNING mutation demo failed.
-var ErrMutationReturning = errors.New("mutation returning")
+var ErrMutationReturning = errors.New("ormdrill: mutation returning")
 
 // ErrUpsertWhere indicates the partial upsert WHERE demo failed.
-var ErrUpsertWhere = errors.New("upsert where")
+var ErrUpsertWhere = errors.New("ormdrill: upsert where")
 
 // DemoMutationReturning extends the INSERT-only RETURNING story to mutations,
 // scanning the post-write rows back through Widget.Scan. Returning() with no
@@ -28,7 +28,7 @@ func DemoMutationReturning(ctx context.Context, conn db.DB) error {
 		Returning().
 		ExecReturning(ctx, conn)
 	if err != nil {
-		return fmt.Errorf("ormdrill: %w update: %w", ErrMutationReturning, err)
+		return errors.Join(fmt.Errorf("ormdrill: %w update", ErrMutationReturning), err)
 	}
 
 	if len(updated) != 1 {
@@ -51,7 +51,7 @@ func DemoMutationReturning(ctx context.Context, conn db.DB) error {
 		Returning().
 		ExecReturning(ctx, conn)
 	if err != nil {
-		return fmt.Errorf("ormdrill: %w delete: %w", ErrMutationReturning, err)
+		return errors.Join(fmt.Errorf("ormdrill: %w delete", ErrMutationReturning), err)
 	}
 
 	if len(deleted) != 1 {
@@ -84,12 +84,12 @@ func DemoUpsertWhere(ctx context.Context, conn db.DB) error {
 		`CREATE UNIQUE INDEX promotions_code_active ON promotions(code) WHERE active = 1`,
 	} {
 		if _, err := conn.Exec(ctx, stmt); err != nil {
-			return fmt.Errorf("ormdrill: %w DDL %q: %w", ErrUpsertWhere, stmt, err)
+			return errors.Join(fmt.Errorf("ormdrill: %w DDL %q", ErrUpsertWhere, stmt), err)
 		}
 	}
 
 	if _, err := conn.Exec(ctx, `INSERT INTO promotions (code, discount_pct, active) VALUES (?, ?, ?)`, "SAVE10", int64(10), int64(1)); err != nil {
-		return fmt.Errorf("ormdrill: %w: seed promotion: %w", ErrUpsertWhere, err)
+		return errors.Join(fmt.Errorf("ormdrill: %w: seed promotion", ErrUpsertWhere), err)
 	}
 
 	readDiscount := func() (int64, error) {
@@ -118,22 +118,22 @@ func DemoUpsertWhere(ctx context.Context, conn db.DB) error {
 	// Existing discount is 10, so the update predicate (10 > 1000) is false
 	// and the conflicting row keeps its value.
 	if upsertErr := upsert(PromotionCols.DiscountPct.Gt(1000)); upsertErr != nil {
-		return fmt.Errorf("ormdrill: %w (false predicate): %w", ErrUpsertWhere, upsertErr)
+		return errors.Join(fmt.Errorf("ormdrill: %w (false predicate)", ErrUpsertWhere), upsertErr)
 	}
 
 	unchanged, err := readDiscount()
 	if err != nil {
-		return fmt.Errorf("ormdrill: %w: read after false predicate: %w", ErrUpsertWhere, err)
+		return errors.Join(fmt.Errorf("ormdrill: %w: read after false predicate", ErrUpsertWhere), err)
 	}
 
 	// Existing discount is still 10, so (10 < 1000) is true: the row updates.
 	if upsertErr := upsert(PromotionCols.DiscountPct.Lt(1000)); upsertErr != nil {
-		return fmt.Errorf("ormdrill: %w (true predicate): %w", ErrUpsertWhere, upsertErr)
+		return errors.Join(fmt.Errorf("ormdrill: %w (true predicate)", ErrUpsertWhere), upsertErr)
 	}
 
 	updated, err := readDiscount()
 	if err != nil {
-		return fmt.Errorf("ormdrill: %w: read after true predicate: %w", ErrUpsertWhere, err)
+		return errors.Join(fmt.Errorf("ormdrill: %w: read after true predicate", ErrUpsertWhere), err)
 	}
 
 	fmt.Printf("  existing discount 10: predicate >1000 false -> %d; predicate <1000 true -> %d\n\n", unchanged, updated)
