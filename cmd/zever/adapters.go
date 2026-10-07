@@ -78,6 +78,7 @@ import (
 	billingstub "github.com/zenta-dev/zever/adapters/billing/stub"
 	cachedb "github.com/zenta-dev/zever/adapters/cache/db"
 	cacheredis "github.com/zenta-dev/zever/adapters/cache/redis"
+	cdncloudflare "github.com/zenta-dev/zever/adapters/cdn/cloudflare"
 	cdnnoop "github.com/zenta-dev/zever/adapters/cdn/noop"
 	dbpostgres "github.com/zenta-dev/zever/adapters/db/postgres"
 	dbsqlite "github.com/zenta-dev/zever/adapters/db/sqlite"
@@ -126,6 +127,7 @@ func init() {
 	_ = auth.Register(auth.Session, authsession.New)
 	_ = cache.Register(cache.Memory, cachememory.New)
 	_ = cdn.Register(cdn.AdapterNoop, cdnnoop.New)
+	_ = cdn.Register(cdn.AdapterCloudflare, cdncloudflare.New)
 	_ = crypto.Register(crypto.AdapterLocal, cryptolocal.New)
 	_ = document.Register(document.Remote, documentremote.New)
 	_ = document.Register(document.Latex, documentlatex.New)
@@ -175,6 +177,7 @@ func init() {
 	billingstub.Register()
 	cachedb.Register()
 	cacheredis.Register()
+	cdncloudflare.Register()
 	cdnnoop.Register()
 	dbpostgres.Register()
 	dbsqlite.Register()
