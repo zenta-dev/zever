@@ -1,0 +1,125 @@
+---
+title: CDN
+description: Purge cached content at the edge with the noop or Cloudflare adapter.
+---
+
+import { Tabs, TabItem, LinkCard, CardGrid } from '@astrojs/starlight/components';
+
+`cdn.CDN` invalidates cached content at a CDN provider's edge so visitors see fresh files immediately. The `noop` adapter discards purges (the zero-infra default); the `cloudflare` adapter calls the Cloudflare cache-purge API.
+
+## Quick start
+
+Pick `noop` for local development (default, no infra); pick `cloudflare` when files are cached at Cloudflare's edge.
+
+<Tabs>
+  <TabItem label="noop">
+```yaml title="zever.yaml"
+cdn:
+  adapter: noop
+```
+  </TabItem>
+  <TabItem label="cloudflare">
+```yaml title="zever.yaml"
+cdn:
+  adapter: cloudflare
+  options:
+    api_token: cf-api-token-here
+    zone_id: 023e105f4ecef8ad9ca31a8372d0c353
+    base_url: https://api.cloudflare.com/client/v4
+```
+  </TabItem>
+</Tabs>
+
+Env vars: `CDN_ADAPTER`, `CDN_API_TOKEN`, `CDN_ZONE_ID`. The `cloudflare` adapter requires `api_token` and `zone_id` at construction; `base_url` defaults to `https://api.cloudflare.com/client/v4`. API tokens are never logged: display goes through `config.RedactedServices`. See the [cdn options](../../../reference/config/#cdn) for every key.
+
+## Purge content
+
+Register the adapter, then resolve from the container, which resolves lazily, caches, and retries after an error; `container.New(nil)` is valid.
+
+```go title="main.go"
+package main
+
+import (
+	"context"
+
+	cdncloudflare "github.com/zenta-dev/zever/adapters/cdn/cloudflare"
+	"github.com/zenta-dev/zever/config"
+	"github.com/zenta-dev/zever/container"
+	"github.com/zenta-dev/zever/core/cdn"
+)
+
+func main() {
+	cdncloudflare.Register()
+	ctx := context.Background()
+	c := container.New(config.Default())
+	defer c.Close(ctx)
+
+	cd, err := c.CDN()
+	if err != nil {
+		panic(err)
+	}
+
+	if err := cd.Purge(ctx, cdn.PurgeRequest{
+		URLs: []string{"https://example.com/assets/app.js"},
+	}); err != nil {
+		panic(err)
+	}
+	if err := cd.Purge(ctx, cdn.PurgeRequest{
+		Tags: []string{"static", "v2"},
+	}); err != nil {
+		panic(err)
+	}
+	if err := cd.Purge(ctx, cdn.PurgeRequest{All: true}); err != nil {
+		panic(err)
+	}
+}
+```
+
+A zero `PurgeRequest` is a no-op and returns an error. `All: true` purges the entire zone. The interface also has `Close(ctx)` and `Name()`.
+
+## Options
+
+| Option | Type | Default | Description |
+|---|---|---|---|
+| `api_token` | string | `""` | Cloudflare API token. Required by the `cloudflare` adapter. Never logged |
+| `zone_id` | string | `""` | Cloudflare zone identifier. Required by the `cloudflare` adapter |
+| `base_url` | string | `https://api.cloudflare.com/client/v4` | Cloudflare API endpoint override |
+
+The `cloudflare` adapter has no retry logic: provider errors are returned to the caller. See the [cdn options](../../../reference/config/#cdn) for every key.
+
+## Choose an adapter
+
+| Adapter | Package | Notes |
+|---|---|---|
+| `noop` | `adapters/cdn/noop` | Default, discards purges, closes instantly |
+| `cloudflare` | `adapters/cdn/cloudflare` | Calls the Cloudflare cache-purge API via `cloudflare-go/v7`; no retry logic |
+
+Both serve one interface, so switching is config-only. See the [adapters matrix](../../../reference/adapters-matrix/).
+
+## Troubleshooting
+
+<details>
+<summary>`Purge` returns `cdn: empty purge request`</summary>
+
+Cause: a zero `PurgeRequest` with no URLs, tags, or `All`. Fix: set at least one field.
+</details>
+
+<details>
+<summary>`cloudflare: option "api_token" is required`</summary>
+
+Cause: the `cloudflare` adapter was selected without credentials. Fix: set `api_token` and `zone_id` in config or env (`CDN_API_TOKEN`, `CDN_ZONE_ID`).
+</details>
+
+<details>
+<summary>Purge succeeds but visitors still see stale content</summary>
+
+Cause: the URL or tag does not match what the edge cached. Fix: purge by exact URL or tag, or use `All: true` for the whole zone.
+</details>
+
+## Related
+
+<CardGrid>
+  <LinkCard title="Cache" href="../cache/" />
+  <LinkCard title="Storage and media" href="../storage-media/" />
+  <LinkCard title="Media processing" href="../media/" />
+</CardGrid>
