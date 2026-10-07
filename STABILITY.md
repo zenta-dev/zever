@@ -87,6 +87,9 @@ release-note docs.
 | `authz` | `auth`-to-`permission` bridge (HTTP middleware, gRPC interceptor). |
 | `codec` | Generic `Encoder`/`Decoder`/`Codec` + `JSONCodec`. |
 | `grpcclient` | gRPC client conns (`New(ctx, target, opts...)`); LB, retry, TLS, tracing interceptors; no registry, resolved via `GRPCClient(target, opts...)`. |
+| `httpclient` | Shared HTTP constructor (`NewClient`); opt-in W3C trace inject via `WithTracing`. |
+| `msgspan` | Messaging spans (`Producer`/`Consumer`); best-effort over `observability`. |
+| `outboxbridge` | Outbox-to-transport adapters (`QueuePublisher`/`EventBusPublisher`); called by `container.OutboxRelay`. |
 | `traceprop` | W3C TraceContext+Baggage inject/extract, fixed baggage keys, consume-span helpers. |
 | `resilience` | Facade (`memory` in `adapters/resilience/inproc`, `redis`); `Guard`/`Manager` circuit-breaker composition. |
 | `mcpclient` | MCP stdio client (initialize, tools/list, tools/call). |
