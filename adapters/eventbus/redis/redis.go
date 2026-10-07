@@ -11,6 +11,8 @@ import (
 	goredis "github.com/redis/go-redis/v9"
 
 	"github.com/zenta-dev/zever/core/eventbus"
+	"github.com/zenta-dev/zever/core/observability"
+	"github.com/zenta-dev/zever/shared/msgspan"
 	redisclient "github.com/zenta-dev/zever/shared/redisclient"
 	redisopt "github.com/zenta-dev/zever/shared/redisopt"
 	"github.com/zenta-dev/zever/shared/traceprop"
@@ -49,6 +51,7 @@ type adapter struct {
 	buffer         int
 	handlerTimeout time.Duration
 	closeTimeout   time.Duration
+	provider       observability.Provider
 	onPanic        func(string, eventbus.Message, any)
 	closed         atomic.Bool
 	mu             sync.Mutex
@@ -116,6 +119,7 @@ func newAdapter(opts eventbus.Options) (*adapter, error) {
 		buffer:         buffer,
 		handlerTimeout: handlerTimeout,
 		closeTimeout:   closeTimeout,
+		provider:       opts.Provider,
 		onPanic:        opts.OnPanic,
 		subs:           make(map[*subscription]struct{}),
 	}, nil
@@ -160,12 +164,24 @@ func (a *adapter) Publish(ctx context.Context, topic string, payload eventbus.Pa
 		return fmt.Errorf("%w: %d > %d", eventbus.ErrPayloadTooLarge, len(payload), eventbus.MaxMessageSize)
 	}
 
-	msg := eventbus.NewMessage(topic, payload, traceprop.Inject(ctx, headers))
+	if _, ok := ctx.Deadline(); !ok {
+		var cancel context.CancelFunc
+
+		ctx, cancel = context.WithTimeout(ctx, DefaultPublishTimeout)
+		defer cancel()
+	}
+
+	msg := eventbus.NewMessage(topic, payload, headers)
+
+	// One producer span per publish, opened before the envelope is built so
+	// the injected trace context is the producer span's: the delivery span
+	// then parents onto this publish instead of onto its caller.
+	spanCtx, finish := msgspan.Producer(ctx, a.provider, "eventbus", topic, msg.ID.String())
 
 	wm := wireMessage{
 		ID:      msg.ID.String(),
 		Payload: msg.Payload,
-		Headers: msg.Headers,
+		Headers: traceprop.Inject(spanCtx, msg.Headers),
 	}
 
 	// wireMessage is {string, []byte, map[string]string}: encoding/json
@@ -174,21 +190,20 @@ func (a *adapter) Publish(ctx context.Context, topic string, payload eventbus.Pa
 	b, _ := wireCodec.Encode(wm)
 
 	if len(b) > eventbus.MaxMessageSize {
+		finish(msgspan.OutcomeError)
+
 		return fmt.Errorf("%w: envelope %d > %d", eventbus.ErrPayloadTooLarge, len(b), eventbus.MaxMessageSize)
-	}
-
-	if _, ok := ctx.Deadline(); !ok {
-		var cancel context.CancelFunc
-
-		ctx, cancel = context.WithTimeout(ctx, DefaultPublishTimeout)
-		defer cancel()
 	}
 
 	// At-most-once: the subscriber count is intentionally ignored; zero
 	// subscribers means a silent drop by design.
-	if err := a.client.Publish(ctx, a.channel(topic), b).Err(); err != nil {
+	if err := a.client.Publish(spanCtx, a.channel(topic), b).Err(); err != nil {
+		finish(msgspan.OutcomeError)
+
 		return fmt.Errorf("redis: publish: %w", err)
 	}
+
+	finish(msgspan.OutcomeOK)
 
 	return nil
 }

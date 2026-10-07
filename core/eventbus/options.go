@@ -3,6 +3,7 @@ package eventbus
 import (
 	"time"
 
+	"github.com/zenta-dev/zever/core/observability"
 	redisopt "github.com/zenta-dev/zever/shared/redisopt"
 )
 
@@ -45,6 +46,10 @@ type Options struct {
 	CloseTimeout time.Duration `json:"close_timeout" toml:"close_timeout" yaml:"close_timeout"`
 	// OnPanic handles handler panics. It is never validated.
 	OnPanic func(topic string, msg Message, r any) `json:"-" toml:"-" yaml:"-"`
+	// Provider emits the producer span an adapter opens for every publish and
+	// the consumer span it opens for every delivery. Nil disables telemetry.
+	// It is Go-API-only: never decoded from configuration files.
+	Provider observability.Provider `json:"-" toml:"-" yaml:"-"`
 	// Redis holds Redis-specific connection configuration.
 	Redis RedisOptions `json:"redis" toml:"redis" yaml:"redis"`
 }

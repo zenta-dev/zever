@@ -18,7 +18,9 @@ require (
 	github.com/robfig/cron/v3 v3.0.1 // indirect
 	github.com/zenta-dev/zever/adapters/log/noop v0.5.3 // indirect
 	github.com/zenta-dev/zever/core/cache v0.5.3 // indirect
+	github.com/zenta-dev/zever/core/observability v0.5.3 // indirect
 	github.com/zenta-dev/zever/shared/codec v0.5.3 // indirect
+	github.com/zenta-dev/zever/shared/msgspan v0.5.3 // indirect
 	github.com/zenta-dev/zever/shared/redisopt v0.5.3 // indirect
 	github.com/zenta-dev/zever/shared/retry v0.5.3 // indirect
 	github.com/zenta-dev/zever/shared/traceprop v0.5.3 // indirect
@@ -35,6 +37,8 @@ replace github.com/zenta-dev/zever/core/job => ../job
 replace github.com/zenta-dev/zever/core/log => ../log
 
 replace github.com/zenta-dev/zever/core/queue => ../queue
+
+replace github.com/zenta-dev/zever/shared/msgspan => ../../shared/msgspan
 
 replace github.com/zenta-dev/zever/shared/registry => ../../shared/registry
 

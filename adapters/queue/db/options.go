@@ -6,6 +6,7 @@ import (
 	"time"
 
 	coredb "github.com/zenta-dev/zever/core/db"
+	"github.com/zenta-dev/zever/core/observability"
 	"github.com/zenta-dev/zever/shared/dbconn"
 )
 
@@ -61,6 +62,9 @@ type Options struct {
 	ReclaimBatch int `json:"reclaim_batch" toml:"reclaim_batch" yaml:"reclaim_batch"`
 	// Buffer caps buffered ready messages per topic. <= 0 is unbounded.
 	Buffer int `json:"buffer" toml:"buffer" yaml:"buffer"`
+	// Provider emits the producer span opened for every push. Nil disables
+	// telemetry. It is Go-API-only: never decoded from configuration files.
+	Provider observability.Provider `json:"-" toml:"-" yaml:"-"`
 }
 
 // Validate checks options for consistency, joining all violations.

@@ -2,6 +2,7 @@ package cdc
 
 import (
 	"context"
+	"errors"
 	"time"
 
 	"github.com/jackc/pglogrepl"
@@ -100,7 +101,17 @@ func (s *store) handleXLogData(ctx context.Context, conn *pgconn.PgConn, data []
 		return
 	}
 
-	advanced, err := s.handleMessage(ctx, ldm.Prefix, ldm.Content, s.publisher.Publish)
+	publisher := s.relayPublisher()
+	if publisher == nil {
+		// Start refuses to run without a publisher and SetPublisher ignores
+		// nil, so this is unreachable; leave the LSN unacknowledged rather than
+		// dropping the message if that contract ever changes.
+		s.setRelayError(ctx, errors.New("cdc: consume: no publisher attached"))
+
+		return
+	}
+
+	advanced, err := s.handleMessage(ctx, ldm.Prefix, ldm.Content, publisher.Publish)
 	if err != nil {
 		s.setRelayError(ctx, err)
 

@@ -23,6 +23,8 @@ require (
 
 replace github.com/zenta-dev/zever/core/db => ../../../core/db
 
+replace github.com/zenta-dev/zever/core/observability => ../../../core/observability
+
 replace github.com/zenta-dev/zever/core/outbox => ../../../core/outbox
 
 replace github.com/zenta-dev/zever/shared/registry => ../../../shared/registry

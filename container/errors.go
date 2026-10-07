@@ -30,6 +30,11 @@ var ErrDatabaseUnavailable = errors.New("container: database unavailable")
 // not draining.
 var ErrRelayStalled = errors.New("container: outbox relay stalled")
 
+// ErrPublisherSetterUnsupported reports an outbox store that cannot receive
+// its destination transport after Open, so its relay cannot be started from
+// the container.
+var ErrPublisherSetterUnsupported = errors.New("container: outbox store does not support SetPublisher")
+
 // TransactorError names a db adapter that does not support transactions.
 type TransactorError struct {
 	Actual string
@@ -115,4 +120,21 @@ func (e RelayStalledError) Error() string {
 // Unwrap returns ErrRelayStalled.
 func (e RelayStalledError) Unwrap() error {
 	return ErrRelayStalled
+}
+
+// PublisherSetterError names an outbox store that cannot be given its
+// destination transport after Open, which is what OutboxRelay needs to start
+// the relay.
+type PublisherSetterError struct {
+	Actual string
+}
+
+// Error describes the store that does not implement outbox.PublisherSetter.
+func (e PublisherSetterError) Error() string {
+	return fmt.Sprintf("container: %s does not implement outbox.PublisherSetter", e.Actual)
+}
+
+// Unwrap returns ErrPublisherSetterUnsupported.
+func (e PublisherSetterError) Unwrap() error {
+	return ErrPublisherSetterUnsupported
 }

@@ -9,7 +9,9 @@ require (
 	github.com/zenta-dev/zever/adapters/queue/memory v0.5.3
 	github.com/zenta-dev/zever/core/cache v0.5.3
 	github.com/zenta-dev/zever/core/log v0.5.3
+	github.com/zenta-dev/zever/core/observability v0.5.3
 	github.com/zenta-dev/zever/core/queue v0.5.3
+	github.com/zenta-dev/zever/shared/msgspan v0.5.3
 	github.com/zenta-dev/zever/shared/retry v0.5.3
 	github.com/zenta-dev/zever/shared/traceprop v0.5.3
 	go.opentelemetry.io/otel v1.46.0
@@ -53,3 +55,7 @@ replace github.com/zenta-dev/zever/shared/registry => ../../shared/registry
 replace github.com/zenta-dev/zever/shared/traceprop => ../../shared/traceprop
 
 replace github.com/zenta-dev/zever/core/db => ../db
+
+replace github.com/zenta-dev/zever/shared/msgspan => ../../shared/msgspan
+
+replace github.com/zenta-dev/zever/core/observability => ../observability

@@ -12,7 +12,9 @@ import (
 
 	goredis "github.com/redis/go-redis/v9"
 
+	"github.com/zenta-dev/zever/core/observability"
 	"github.com/zenta-dev/zever/core/queue"
+	"github.com/zenta-dev/zever/shared/msgspan"
 	redisclient "github.com/zenta-dev/zever/shared/redisclient"
 	redisopt "github.com/zenta-dev/zever/shared/redisopt"
 	"github.com/zenta-dev/zever/shared/retry"
@@ -93,6 +95,7 @@ type redisAdapter struct {
 	visibilityTimeout time.Duration
 	pollTimeout       time.Duration
 	buffer            int
+	provider          observability.Provider
 	lastSweep         atomic.Int64
 	closed            atomic.Bool
 }
@@ -161,6 +164,7 @@ func New(opts queue.Options) (queue.Queue, error) {
 		visibilityTimeout: visibility,
 		pollTimeout:       pollTimeout,
 		buffer:            buf,
+		provider:          opts.Provider,
 	}, nil
 }
 
@@ -172,31 +176,24 @@ func redactURL(opts queue.Options) string {
 }
 
 func (a *redisAdapter) Push(ctx context.Context, topic string, payload queue.Payload, headers queue.Headers) error {
-	if a.closed.Load() {
-		return queue.ErrClosed
-	}
-
-	if a.buffer > 0 {
-		if err := a.waitForSpace(ctx, topic); err != nil {
-			return err
-		}
-	}
-
-	msg := toWireMessage(queue.NewMessage(topic, payload, traceprop.Inject(ctx, headers)))
-
-	b, err := jsonMarshal(msg)
-	if err != nil {
-		return fmt.Errorf("queue: marshal error: %w", err)
-	}
-
-	if err := a.client.RPush(ctx, a.readyKey(topic), b).Err(); err != nil {
-		return fmt.Errorf("queue: push %q: %w", topic, err)
-	}
-
-	return nil
+	return a.push(ctx, topic, payload, headers, 0)
 }
 
+// PushDelayed enqueues a message on topic claimable after delay.
+// Non-positive delays are immediately claimable.
 func (a *redisAdapter) PushDelayed(ctx context.Context, topic string, payload queue.Payload, headers queue.Headers, delay time.Duration) error {
+	return a.push(ctx, topic, payload, headers, delay)
+}
+
+// push enqueues a message, delayed by delay when positive. It opens the
+// messaging producer span around the whole enqueue.
+func (a *redisAdapter) push(
+	ctx context.Context,
+	topic string,
+	payload queue.Payload,
+	headers queue.Headers,
+	delay time.Duration,
+) error {
 	if a.closed.Load() {
 		return queue.ErrClosed
 	}
@@ -211,27 +208,43 @@ func (a *redisAdapter) PushDelayed(ctx context.Context, topic string, payload qu
 		}
 	}
 
-	msg := toWireMessage(queue.NewMessage(topic, payload, traceprop.Inject(ctx, headers)))
+	// The producer span opens before the message is built so the injected
+	// trace context is the producer span's: the consumer span on the other
+	// end then parents onto this push instead of onto the push's caller.
+	spanCtx, finish := msgspan.Producer(ctx, a.provider, "queue", topic, "")
 
-	b, err := jsonMarshal(msg)
+	msg := queue.NewMessage(topic, payload, headers)
+	msg.Headers = traceprop.Inject(spanCtx, msg.Headers)
+
+	b, err := jsonMarshal(toWireMessage(msg))
 	if err != nil {
+		finish(msgspan.OutcomeError)
+
 		return fmt.Errorf("queue: marshal message error: %w", err)
 	}
 
 	if delay <= 0 {
-		if err := a.client.RPush(ctx, a.readyKey(topic), b).Err(); err != nil {
+		if err := a.client.RPush(spanCtx, a.readyKey(topic), b).Err(); err != nil {
+			finish(msgspan.OutcomeError)
+
 			return fmt.Errorf("queue: push %q: %w", topic, err)
 		}
+
+		finish(msgspan.OutcomeOK)
 
 		return nil
 	}
 
-	if err := a.client.ZAdd(ctx, a.delayedKey(topic), goredis.Z{
+	if err := a.client.ZAdd(spanCtx, a.delayedKey(topic), goredis.Z{
 		Score:  float64(time.Now().Add(delay).UnixMilli()),
 		Member: b,
 	}).Err(); err != nil {
+		finish(msgspan.OutcomeError)
+
 		return fmt.Errorf("queue: push %q: %w", topic, err)
 	}
+
+	finish(msgspan.OutcomeOK)
 
 	return nil
 }

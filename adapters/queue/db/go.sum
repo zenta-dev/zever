@@ -36,6 +36,8 @@ github.com/stretchr/testify v1.3.0/go.mod h1:M5WIy9Dh21IEIfnGCwXGc5bZfKNJtfHm1UV
 github.com/stretchr/testify v1.7.0/go.mod h1:6Fq8oRcR53rry900zMqJjRRixrwX3KX962/h/Wwjteg=
 github.com/stretchr/testify v1.12.1 h1:EuwCh5fleGS7H32xRwO3wRGT7DxrDhLAT6FF8MpWDWE=
 github.com/stretchr/testify v1.12.1/go.mod h1:MDEgiDPPsNp5cuIrHPPCyornHKgEVbtFUmoNlxoYthg=
+github.com/zenta-dev/zever/adapters/observability/noop v0.5.3 h1:ffEs5cqyKSVpnB5mbnMBpIBOhvG+dAOptKkVflNAiDQ=
+github.com/zenta-dev/zever/adapters/observability/noop v0.5.3/go.mod h1:sSI78o/6bhSWeCIMKyfIqvbFH0l82CPJr66efYbA2Go=
 github.com/zenta-dev/zever/adapters/queue/memory v0.5.3 h1:0mfP2Nfki1bi83W57G88NfBOPvbA+R8OSrsK4QvJjwY=
 github.com/zenta-dev/zever/adapters/queue/memory v0.5.3/go.mod h1:vnQTwik2TBD5OWlWzZppy4YzilDci+j4gi5jl+xQPzk=
 github.com/zenta-dev/zever/shared/lrucache v0.5.3 h1:pdco/0CBJWw5Q8r5LadZhNWr9JIdFcuH7wpag7fsEJs=

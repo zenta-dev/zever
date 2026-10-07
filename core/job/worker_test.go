@@ -619,7 +619,7 @@ func TestWorkerProcessUnknownJob(t *testing.T) {
 			dlAttempts = attempts
 		},
 	}
-	w.process(t.Context(), msg, "low")
+	_ = w.process(t.Context(), msg, "low")
 	if !ackCalled {
 		t.Fatal("process unknown job did not ack")
 	}
@@ -652,7 +652,7 @@ func TestWorkerProcessUnknownJobWithBatch(t *testing.T) {
 		ackFn: func(context.Context, queue.Message) error { ackCalled = true; return nil },
 	}
 	w := &Worker{Q: q, BatchStore: fb, Logger: noop.New()}
-	w.process(t.Context(), msg, "low")
+	_ = w.process(t.Context(), msg, "low")
 	if !ackCalled {
 		t.Fatal("unknown batch job ack not called")
 	}
@@ -684,7 +684,7 @@ func TestWorkerProcessKnownSuccess(t *testing.T) {
 		ackFn: func(context.Context, queue.Message) error { ackCalled = true; return nil },
 	}
 	w := &Worker{Q: q, Logger: noop.New()}
-	w.process(t.Context(), msg, "low")
+	_ = w.process(t.Context(), msg, "low")
 	if !handlerCalled {
 		t.Fatal("known success handler not called")
 	}
@@ -732,7 +732,7 @@ func TestWorkerProcessMiddlewareOrder(t *testing.T) {
 	}
 	q := &workerStubQueue{ackFn: func(context.Context, queue.Message) error { return nil }}
 	w := &Worker{Q: q, Logger: noop.New()}
-	w.process(t.Context(), msg, "low")
+	_ = w.process(t.Context(), msg, "low")
 	want := []string{"m1-before", "m2-before", "handler", "m2-after", "m1-after"}
 	if len(order) != len(want) {
 		t.Fatalf("middleware order %v want %v", order, want)
@@ -758,7 +758,7 @@ func TestWorkerProcessNilHeaders(t *testing.T) {
 	q := &workerStubQueue{ackFn: func(context.Context, queue.Message) error { return nil }}
 	w := &Worker{Q: q, Logger: noop.New()}
 	// should not panic; jobName will be "" -> unknown job path
-	w.process(t.Context(), msg, "low")
+	_ = w.process(t.Context(), msg, "low")
 	// ack should have been called via deadletter path (unknown job "")
 	// We use separate stub to verify; this just checks no panic
 }
@@ -785,7 +785,7 @@ func TestWorkerProcessPanicHandler(t *testing.T) {
 		ackFn: func(context.Context, queue.Message) error { ackCalled = true; return nil },
 	}
 	w := &Worker{Q: q, Logger: noop.New()}
-	w.process(t.Context(), msg, "low")
+	_ = w.process(t.Context(), msg, "low")
 	if !pushDelayedCalled {
 		t.Fatal("panic handler should trigger retry PushDelayed")
 	}

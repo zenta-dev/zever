@@ -47,6 +47,7 @@ require (
 	github.com/zenta-dev/zever/core/workflow v0.5.3
 	github.com/zenta-dev/zever/shared/dbconn v0.5.3
 	github.com/zenta-dev/zever/shared/grpcclient v0.5.3
+	github.com/zenta-dev/zever/shared/outboxbridge v0.5.3
 	github.com/zenta-dev/zever/shared/registry v0.5.3
 	go.uber.org/goleak v1.3.0
 	google.golang.org/grpc v1.83.2
@@ -112,6 +113,7 @@ replace (
 	github.com/zenta-dev/zever/shared/grpcclient => ../shared/grpcclient
 	github.com/zenta-dev/zever/shared/httpclient => ../shared/httpclient
 	github.com/zenta-dev/zever/shared/kvstore => ../shared/kvstore
+	github.com/zenta-dev/zever/shared/outboxbridge => ../shared/outboxbridge
 	github.com/zenta-dev/zever/shared/providersopt => ../shared/providersopt
 	github.com/zenta-dev/zever/shared/redisopt => ../shared/redisopt
 	github.com/zenta-dev/zever/shared/registry => ../shared/registry
@@ -166,6 +168,7 @@ replace github.com/zenta-dev/zever/adapters/webhook/http => ../adapters/webhook/
 
 replace github.com/zenta-dev/zever/adapters/workflow/memory => ../adapters/workflow/memory
 
+replace github.com/zenta-dev/zever/shared/msgspan => ../shared/msgspan
 replace github.com/zenta-dev/zever/shared/redisclient => ../shared/redisclient
 
 replace github.com/zenta-dev/zever/shared/lrucache => ../shared/lrucache
@@ -190,6 +193,7 @@ require (
 	github.com/zenta-dev/zever/shared/httpclient v0.5.3 // indirect
 	github.com/zenta-dev/zever/shared/lrucache v0.5.3 // indirect
 	github.com/zenta-dev/zever/shared/mcpclient v0.5.3 // indirect
+	github.com/zenta-dev/zever/shared/msgspan v0.5.3 // indirect
 	github.com/zenta-dev/zever/shared/providersopt v0.5.3 // indirect
 	github.com/zenta-dev/zever/shared/redisopt v0.5.3 // indirect
 	github.com/zenta-dev/zever/shared/retry v0.5.3 // indirect
