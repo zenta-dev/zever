@@ -4,8 +4,8 @@ go 1.27.0
 
 require (
 	github.com/sony/gobreaker/v2 v2.4.0
-	github.com/zenta-dev/zever/core/resilience v0.5.3
-	github.com/zenta-dev/zever/shared/retry v0.5.3
+	github.com/zenta-dev/zever/core/resilience v0.6.0
+	github.com/zenta-dev/zever/shared/retry v0.6.0
 	golang.org/x/sync v0.23.0
 )
 

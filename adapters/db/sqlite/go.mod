@@ -3,8 +3,8 @@ module github.com/zenta-dev/zever/adapters/db/sqlite
 go 1.27.0
 
 require (
-	github.com/zenta-dev/zever/core/db v0.5.3
-	github.com/zenta-dev/zever/shared/lrucache v0.5.3
+	github.com/zenta-dev/zever/core/db v0.6.0
+	github.com/zenta-dev/zever/shared/lrucache v0.6.0
 	modernc.org/sqlite v1.60.1
 )
 

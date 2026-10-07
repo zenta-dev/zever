@@ -3,14 +3,14 @@ module github.com/zenta-dev/zever/adapters/outbox/db
 go 1.27.0
 
 require (
-	github.com/zenta-dev/zever/adapters/db/postgres v0.5.3
-	github.com/zenta-dev/zever/adapters/db/sqlite v0.5.3
-	github.com/zenta-dev/zever/core/db v0.5.3
-	github.com/zenta-dev/zever/core/observability v0.5.3
-	github.com/zenta-dev/zever/core/outbox v0.5.3
-	github.com/zenta-dev/zever/shared/dbconn v0.5.3
-	github.com/zenta-dev/zever/shared/retry v0.5.3
-	github.com/zenta-dev/zever/shared/traceprop v0.5.3
+	github.com/zenta-dev/zever/adapters/db/postgres v0.6.0
+	github.com/zenta-dev/zever/adapters/db/sqlite v0.6.0
+	github.com/zenta-dev/zever/core/db v0.6.0
+	github.com/zenta-dev/zever/core/observability v0.6.0
+	github.com/zenta-dev/zever/core/outbox v0.6.0
+	github.com/zenta-dev/zever/shared/dbconn v0.6.0
+	github.com/zenta-dev/zever/shared/retry v0.6.0
+	github.com/zenta-dev/zever/shared/traceprop v0.6.0
 )
 
 require (

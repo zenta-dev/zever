@@ -4,8 +4,8 @@ go 1.27.0
 
 require (
 	github.com/twilio/twilio-go v1.31.2
-	github.com/zenta-dev/zever/core/notification v0.5.3
-	github.com/zenta-dev/zever/shared/httpclient v0.5.3
+	github.com/zenta-dev/zever/core/notification v0.6.0
+	github.com/zenta-dev/zever/shared/httpclient v0.6.0
 )
 
 replace github.com/zenta-dev/zever/core/notification => ../../../core/notification

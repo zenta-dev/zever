@@ -2,7 +2,7 @@ module github.com/zenta-dev/zever/adapters/payment/stub
 
 go 1.27.0
 
-require github.com/zenta-dev/zever/core/payment v0.5.3
+require github.com/zenta-dev/zever/core/payment v0.6.0
 
 require (
 	github.com/zenta-dev/zever/core/db v0.5.3 // indirect

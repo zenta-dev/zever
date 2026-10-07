@@ -8,7 +8,7 @@ require (
 )
 
 require (
-	github.com/zenta-dev/zever/core/password v0.5.3
+	github.com/zenta-dev/zever/core/password v0.6.0
 	golang.org/x/crypto v0.57.0
 )
 

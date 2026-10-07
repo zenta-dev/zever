@@ -5,13 +5,13 @@ go 1.27.0
 require (
 	github.com/alicebob/miniredis/v2 v2.39.0
 	github.com/redis/go-redis/v9 v9.22.0
-	github.com/zenta-dev/zever/core/eventbus v0.5.3
-	github.com/zenta-dev/zever/core/observability v0.5.3
-	github.com/zenta-dev/zever/shared/codec v0.5.3
-	github.com/zenta-dev/zever/shared/msgspan v0.5.3
-	github.com/zenta-dev/zever/shared/redisclient v0.5.3
-	github.com/zenta-dev/zever/shared/redisopt v0.5.3
-	github.com/zenta-dev/zever/shared/traceprop v0.5.3
+	github.com/zenta-dev/zever/core/eventbus v0.6.0
+	github.com/zenta-dev/zever/core/observability v0.6.0
+	github.com/zenta-dev/zever/shared/codec v0.6.0
+	github.com/zenta-dev/zever/shared/msgspan v0.6.0
+	github.com/zenta-dev/zever/shared/redisclient v0.6.0
+	github.com/zenta-dev/zever/shared/redisopt v0.6.0
+	github.com/zenta-dev/zever/shared/traceprop v0.6.0
 )
 
 require (

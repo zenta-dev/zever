@@ -4,7 +4,7 @@ go 1.27.0
 
 require (
 	github.com/jackc/pgx/v5 v5.11.0
-	github.com/zenta-dev/zever/core/db v0.5.3
+	github.com/zenta-dev/zever/core/db v0.6.0
 )
 
 require (

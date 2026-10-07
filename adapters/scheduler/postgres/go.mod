@@ -4,18 +4,18 @@ go 1.27.0
 
 require (
 	github.com/robfig/cron/v3 v3.0.1
-	github.com/zenta-dev/zever/adapters/db/postgres v0.5.3
-	github.com/zenta-dev/zever/adapters/db/sqlite v0.5.3
-	github.com/zenta-dev/zever/adapters/log/noop v0.5.3
-	github.com/zenta-dev/zever/adapters/queue/memory v0.5.3
-	github.com/zenta-dev/zever/core/db v0.5.3
-	github.com/zenta-dev/zever/core/job v0.5.3
-	github.com/zenta-dev/zever/core/log v0.5.3
-	github.com/zenta-dev/zever/core/queue v0.5.3
-	github.com/zenta-dev/zever/core/scheduler v0.5.3
-	github.com/zenta-dev/zever/orm v0.5.3
-	github.com/zenta-dev/zever/shared/codec v0.5.3
-	github.com/zenta-dev/zever/shared/dbconn v0.5.3
+	github.com/zenta-dev/zever/adapters/db/postgres v0.6.0
+	github.com/zenta-dev/zever/adapters/db/sqlite v0.6.0
+	github.com/zenta-dev/zever/adapters/log/noop v0.6.0
+	github.com/zenta-dev/zever/adapters/queue/memory v0.6.0
+	github.com/zenta-dev/zever/core/db v0.6.0
+	github.com/zenta-dev/zever/core/job v0.6.0
+	github.com/zenta-dev/zever/core/log v0.6.0
+	github.com/zenta-dev/zever/core/queue v0.6.0
+	github.com/zenta-dev/zever/core/scheduler v0.6.0
+	github.com/zenta-dev/zever/orm v0.6.0
+	github.com/zenta-dev/zever/shared/codec v0.6.0
+	github.com/zenta-dev/zever/shared/dbconn v0.6.0
 )
 
 require (

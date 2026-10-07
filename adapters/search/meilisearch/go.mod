@@ -12,9 +12,9 @@ require (
 
 require (
 	github.com/meilisearch/meilisearch-go v0.36.3
-	github.com/zenta-dev/zever/core/search v0.5.3
-	github.com/zenta-dev/zever/shared/codec v0.5.3
-	github.com/zenta-dev/zever/shared/lrucache v0.5.3
+	github.com/zenta-dev/zever/core/search v0.6.0
+	github.com/zenta-dev/zever/shared/codec v0.6.0
+	github.com/zenta-dev/zever/shared/lrucache v0.6.0
 )
 
 replace github.com/zenta-dev/zever/core/search => ../../../core/search

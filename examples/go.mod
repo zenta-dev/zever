@@ -3,12 +3,12 @@ module github.com/zenta-dev/zever/examples
 go 1.27.0
 
 require (
-	github.com/zenta-dev/zever/adapters/db/sqlite v0.5.3
-	github.com/zenta-dev/zever/config v0.5.3
-	github.com/zenta-dev/zever/container v0.5.3
-	github.com/zenta-dev/zever/core/db v0.5.3
-	github.com/zenta-dev/zever/orm v0.5.3
-	github.com/zenta-dev/zever/shared/registry v0.5.3
+	github.com/zenta-dev/zever/adapters/db/sqlite v0.6.0
+	github.com/zenta-dev/zever/config v0.6.0
+	github.com/zenta-dev/zever/container v0.6.0
+	github.com/zenta-dev/zever/core/db v0.6.0
+	github.com/zenta-dev/zever/orm v0.6.0
+	github.com/zenta-dev/zever/shared/registry v0.6.0
 )
 
 replace (
@@ -159,7 +159,9 @@ replace github.com/zenta-dev/zever/shared/httpclient => ../shared/httpclient
 replace github.com/zenta-dev/zever/shared/lrucache => ../shared/lrucache
 
 replace github.com/zenta-dev/zever/shared/msgspan => ../shared/msgspan
+
 replace github.com/zenta-dev/zever/shared/outboxbridge => ../shared/outboxbridge
+
 replace github.com/zenta-dev/zever/shared/providersopt => ../shared/providersopt
 
 replace github.com/zenta-dev/zever/shared/redisclient => ../shared/redisclient

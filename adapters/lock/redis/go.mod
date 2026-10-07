@@ -17,10 +17,10 @@ replace github.com/zenta-dev/zever/shared/redisopt => ../../../shared/redisopt
 require (
 	github.com/alicebob/miniredis/v2 v2.39.0
 	github.com/redis/go-redis/v9 v9.22.0
-	github.com/zenta-dev/zever/core/lock v0.5.3
-	github.com/zenta-dev/zever/shared/cas v0.5.3
-	github.com/zenta-dev/zever/shared/redisclient v0.5.3
-	github.com/zenta-dev/zever/shared/redisopt v0.5.3
+	github.com/zenta-dev/zever/core/lock v0.6.0
+	github.com/zenta-dev/zever/shared/cas v0.6.0
+	github.com/zenta-dev/zever/shared/redisclient v0.6.0
+	github.com/zenta-dev/zever/shared/redisopt v0.6.0
 )
 
 replace github.com/zenta-dev/zever/core/lock => ../../../core/lock

@@ -3,9 +3,9 @@ module github.com/example/zever-sms
 go 1.27.0
 
 require (
-	github.com/zenta-dev/zever/config v0.5.3
-	github.com/zenta-dev/zever/container v0.5.3
-	github.com/zenta-dev/zever/shared/registry v0.5.3
+	github.com/zenta-dev/zever/config v0.6.0
+	github.com/zenta-dev/zever/container v0.6.0
+	github.com/zenta-dev/zever/shared/registry v0.6.0
 )
 
 // Local-checkout replaces. Published forks drop these and require real

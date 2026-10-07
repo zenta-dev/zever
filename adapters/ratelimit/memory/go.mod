@@ -2,7 +2,7 @@ module github.com/zenta-dev/zever/adapters/ratelimit/memory
 
 go 1.27.0
 
-require github.com/zenta-dev/zever/core/ratelimit v0.5.3
+require github.com/zenta-dev/zever/core/ratelimit v0.6.0
 
 require (
 	github.com/zenta-dev/zever/shared/redisopt v0.5.3 // indirect
