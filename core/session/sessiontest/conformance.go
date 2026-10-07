@@ -18,11 +18,12 @@ const (
 	// DefaultEntryTTL is the short TTL conformance expiry tests set before
 	// polling for disappearance. It must comfortably exceed the
 	// Create→assert→Get round-trip so the "before expiry" assertion cannot
-	// race expiry under CI load (a 30ms TTL flaked there; see
-	// checkTTLExpiry for the tolerant-drift assertion).
-	DefaultEntryTTL = 200 * time.Millisecond
+	// race expiry under CI load (a 30ms TTL flaked there; see checkTTLExpiry
+	// for the tolerant-drift assertion). It matches the cache conformance
+	// kit's margin.
+	DefaultEntryTTL = 1 * time.Second
 	// DefaultExpiryTimeout bounds how long expiry polls wait before failing.
-	DefaultExpiryTimeout = 2 * time.Second
+	DefaultExpiryTimeout = 5 * time.Second
 	// DefaultPollInterval is the tick between expiry-poll attempts.
 	DefaultPollInterval = 5 * time.Millisecond
 )
@@ -197,7 +198,7 @@ func conformanceTTLExpiry(t *testing.T, factory func(t *testing.T) session.Store
 // because under CI load the Create→assert round-trip can outlast a short
 // TTL; the upper bound (ttl+1min) still catches stores that mint a
 // disconnected lifetime. The Get-before-expiry check stays strict: with
-// DefaultEntryTTL=200ms the round-trip has ample headroom.
+// DefaultEntryTTL=1s the round-trip has ample headroom.
 func checkTTLExpiry(ctx context.Context, s session.Store, ttl, timeout time.Duration) error {
 	created, err := s.Create(ctx, ttl)
 	if err != nil {
