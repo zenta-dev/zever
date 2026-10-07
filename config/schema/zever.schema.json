@@ -11,6 +11,7 @@
     "auth": { "$ref": "#/$defs/service", "type": "object", "properties": { "adapter": { "enum": ["jwt", "session", "oidc"] }, "options": { "$ref": "#/$defs/authOptions" } } },
     "billing": { "$ref": "#/$defs/service", "type": "object", "properties": { "adapter": { "enum": ["stub", "stripe", "paddle"] }, "options": { "$ref": "#/$defs/providersCommon" } } },
     "cache": { "$ref": "#/$defs/service", "type": "object", "properties": { "adapter": { "enum": ["memory", "redis", "db"] }, "options": { "$ref": "#/$defs/cacheOptions" } } },
+    "cdn": { "$ref": "#/$defs/service", "type": "object", "properties": { "adapter": { "enum": ["noop", "cloudflare"] }, "options": { "$ref": "#/$defs/cdnOptions" } } },
     "crypto": { "$ref": "#/$defs/service", "type": "object", "properties": { "adapter": { "enum": ["local", "kms"] }, "options": { "$ref": "#/$defs/cryptoOptions" } } },
     "db": { "$ref": "#/$defs/service", "type": "object", "properties": { "adapter": { "enum": ["sqlite", "postgres"] }, "options": { "$ref": "#/$defs/dbOptions" } } },
     "document": { "$ref": "#/$defs/service", "type": "object", "properties": { "adapter": { "enum": ["local", "remote", "latex"] }, "options": { "$ref": "#/$defs/documentOptions" } } },
@@ -188,6 +189,15 @@
         "max_conn_lifetime": { "$ref": "#/$defs/durationNs" },
         "dsn": { "type": "string", "description": "Postgres connection string or sqlite path for the db adapter; empty selects a private in-memory database." },
         "dedicated_pool": { "type": "boolean", "description": "Opt out of container-level pool sharing; default false shares one pool per exact DSN, true opens a private pool." }
+      }
+    },
+    "cdnOptions": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "api_token": { "type": "string" },
+        "zone_id": { "type": "string" },
+        "base_url": { "type": "string" }
       }
     },
     "cryptoOptions": {

@@ -9,6 +9,23 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Added
 
+- Messaging spans with correct span kinds: new `shared/msgspan` module
+  (`Producer`/`Consumer` helpers setting `messaging.*` attributes with
+  `SpanKindProducer`/`SpanKindConsumer`), applied to eventbus publish/consume,
+  queue push, and the job dispatcher drain path.
+- Outbox relay wiring: new `shared/outboxbridge` module
+  (`QueuePublisher`/`EventBusPublisher` adapting a resolved transport to
+  `outbox.Publisher`), `core/outbox.PublisherSetter` for post-`Open`
+  attachment, and `container.OutboxRelay(ctx)` which attaches the
+  transport-selected publisher and starts the relay.
+- Trace propagation in built-in outbound HTTP clients:
+  `httpclient.WithTracing()` (opt-in W3C trace-context injection) enabled in
+  document/remote, i18n/remote, auth/oidc, the ai adapters
+  (anthropic/gemini/ollama/openai), and `shared/providersclient`.
+- Generated entrypoints wire the new batteries: the worker starts the outbox
+  relay via `container.OutboxRelay(ctx)`; the server resolves the resilience
+  manager and ships a `guardedGRPCClient` helper (per-dependency breaker +
+  `container.GRPCClient`).
 - Prompt pack 3: `DoctorTriage`, `DiagRepair`, `OutboxTriage` and
   `ExtractSplit` builders for doctor, diagnostic, outbox, and extraction
   workflows.
@@ -45,6 +62,38 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   `ContainsScorer`, LLM-judge scorer) with suite reports.
 - New `shared/prompt` module: pure-string builders for system prompts,
   grounded context, JSON repair, and tool-error feedback.
+- Rewrote the docs landing page as a standalone Astro page
+  (`docs/src/pages/index.astro`): dark-first/light themed, live schema-to-outputs
+  compile stage, hand-wired vs zever comparison, scroll-driven schema
+  walkthrough, adapter-swap playground, filterable batteries grid, container
+  lifecycle graph, terminal quickstart, agent section, reproducible
+  benchmarks, examples carousel, and FAQ. The former splash content moved to
+  `getting-started/introduction`.
+- Docs redesign to match the landing page: custom Starlight theme replacing
+  `starlight-theme-black` (Space Grotesk and JetBrains Mono, shared color
+  tokens, dark and light), blurred header with Guides/Reference tabs and a
+  search pill, icon sidebar with active pill, scroll-spy table of contents,
+  breadcrumbs with reading time, previous/next cards, and styled callouts,
+  steps, tabs, cards and code windows. Added "Copy page" and "Open in
+  Claude/ChatGPT" page actions, a per-page `.md` route, `llms.txt` and
+  `llms-full.txt`, and a "Was this page helpful?" widget. Key pages gained
+  steps, tabs and callouts, and `zen` code blocks are now highlighted.
+- Search, AI and sharing optimization for the docs site: generated 1200x630
+  Open Graph cards (landing plus one per docs page) and app icons, canonical
+  and social meta, JSON-LD (Organization, WebSite, SoftwareApplication,
+  TechArticle, BreadcrumbList), `robots.txt` that welcomes search and AI
+  crawlers, a web manifest, font preloading, a richer `llms.txt` with key facts,
+  and `noindex` on the 404 page. The sidebar scroll position, open groups and
+  per-page content scroll now persist across navigation and reloads.
+- Docs restructured around the reader's goal (Diataxis): Start, Tutorials,
+  Guides (HTTP APIs, Data and storage, Background work, Security, Operate,
+  Integrations, Extend), Concepts, and Reference, with header tabs that filter
+  the sidebar. Old URLs redirect. Prose is rewritten to lead with the answer,
+  with task-based sections and a complete per-service config reference, plus a
+  docs style guide (`contribute/writing-docs`), `lint-docs` and `check-links`
+  scripts, a quickstart, and a "How Zever works" page. `docs/errors.md`,
+  `benchmarks.md`, `production.md`, and `writing-a-plugin.md` now live on the
+  site.
 - `--dry-run` across all nine `generate` subcommands: validation and
   rendering still run, but no filesystem writes occur; append-mode
   subcommands preview the rendered declaration.

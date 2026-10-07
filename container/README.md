@@ -67,6 +67,7 @@ cached state clears so the next call retries.
 | media | `Media()` | |
 | notification | `Notification()` | |
 | observability | `Observability()` | |
+| outbox | `Outbox()` plus `OutboxRelay(ctx)` helper | relay attaches the transport-selected publisher and starts |
 | password | `Password()` | |
 | payment | `Payment()` | |
 | permission | `Permission()` | |
@@ -108,6 +109,39 @@ if err := c.Ready(probeCtx); err != nil {
 
 Sentinels: `ErrDatabaseUnavailable`, `ErrRelayStalled`, both carrying typed
 `DatabaseUnavailableError` / `RelayStalledError` for classification.
+
+## Outbox relay wiring
+
+`Outbox()` resolves the store but does not start the relay: `core/outbox`
+carries only the informational selector string (`outbox.publisher`), never a
+live transport. `OutboxRelay(ctx)` is the wiring that joins the two — resolve
+the store, resolve the selected transport, attach it through
+`outbox.PublisherSetter`, then `Start`:
+
+```go
+store, err := c.OutboxRelay(ctx) // relay is draining; Record into the same store
+```
+
+- **Selector**: `outbox.publisher: eventbus` publishes through the resolved
+  `EventBus()`; `queue` and the empty default publish through the resolved
+  `Queue()`. The empty default prefers the queue, since a queued message
+  survives a subscriber restart. Anything else is rejected by
+  `outbox.Options.Validate` during resolution.
+- **One instance**: the returned store is the same cached one `Outbox()`
+  resolves and `Close` shuts down, so Record keeps writing to the table the
+  relay drains. Like `Job()`, starting the relay resolves its transport as a
+  side effect.
+- **Fail loud**: an unresolvable selected transport, a store that does not
+  implement `outbox.PublisherSetter`, or a `Start` failure is returned as an
+  error. A relay that claims messages and drops them looks healthy until the
+  events are gone, so there is no silent no-op path.
+- **Replicas are safe**: claims are atomic inside the adapter (one statement
+  takes the rows and their lease; postgres uses `FOR UPDATE SKIP LOCKED`), so
+  several replicas can poll the same table. A replica that dies mid-publish
+  releases its rows after `outbox.lock_seconds`.
+- `queue.Queue` and `eventbus.EventBus` have no routing-key argument, so
+  `Message.Key` travels as the `outbox-key` header
+  (`shared/outboxbridge`); read it back with `outboxbridge.Key(headers)`.
 
 ## Job / Scheduler wiring
 
@@ -245,3 +279,13 @@ and exit. Keep timeout-test blocks short (parent deadline ~100ms, block
 ~500ms) and let the straggler finish before the test returns. Sanctioned
 exception: timeout-path tests using `ignoreCtx` stubs sleep past the
 stub's block in teardown only (never for sync) so goleak stays clean.
+
+## Outbox relay tests
+
+`OutboxRelay` tests seed the container's lazy slots with stub services
+(`mustSeed`, the same seam `TestTransactor_unsupported` uses), so they open no
+database, broker, or timer: a stub store publishes one message from `Start`,
+and a stub queue or bus records it. They close with a live context
+(`closeRelayContainer`) rather than `closeContainer`, whose `t.Context()` is
+already canceled by the time cleanups run and would report a phantom
+"close timed out".

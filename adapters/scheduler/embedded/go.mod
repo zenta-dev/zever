@@ -33,6 +33,8 @@ replace github.com/zenta-dev/zever/adapters/cache/memory => ../../cache/memory
 
 replace github.com/zenta-dev/zever/core/cache => ../../../core/cache
 
+replace github.com/zenta-dev/zever/shared/msgspan => ../../../shared/msgspan
+
 replace github.com/zenta-dev/zever/shared/redisopt => ../../../shared/redisopt
 
 replace github.com/zenta-dev/zever/shared/registry => ../../../shared/registry
@@ -47,6 +49,8 @@ require (
 	github.com/go-logr/stdr v1.2.2 // indirect
 	github.com/zenta-dev/zever/core/cache v0.5.3 // indirect
 	github.com/zenta-dev/zever/core/db v0.5.3 // indirect
+	github.com/zenta-dev/zever/core/observability v0.5.3 // indirect
+	github.com/zenta-dev/zever/shared/msgspan v0.5.3 // indirect
 	github.com/zenta-dev/zever/shared/redisopt v0.5.3 // indirect
 	github.com/zenta-dev/zever/shared/registry v0.5.3 // indirect
 	github.com/zenta-dev/zever/shared/retry v0.5.3 // indirect

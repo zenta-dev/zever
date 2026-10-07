@@ -1,0 +1,160 @@
+---
+title: Installation
+description: Install Go 1.27, the Zever CLI, and the modules you need, then verify with a smoke test.
+---
+
+import { Steps, Aside, LinkCard, CardGrid } from '@astrojs/starlight/components';
+
+Install the `zever` CLI with `go install`, then add the Zever modules to your project with `go get`. A fresh install needs no config file and no database server.
+
+| Requirement | Version | Notes |
+|---|---|---|
+| Go | 1.27.0+ | `go 1.27.0` in `go.mod` |
+| Git | any recent | needed for `go get` and scaffolding |
+| Node.js | 18+ | docs site only (`docs/`), not needed for backend work |
+
+## Install the CLI and modules
+
+<Steps>
+
+1. Check your toolchain. You need `go1.27` or newer, otherwise install it from [go.dev/dl](https://go.dev/dl/).
+
+   ```sh
+   go version
+   git --version
+   ```
+
+2. Create a module and fetch the Zever modules you need.
+
+   ```sh
+   go mod init example.com/myapp
+   go get github.com/zenta-dev/zever/config@v0.5.3 github.com/zenta-dev/zever/container@v0.5.3 github.com/zenta-dev/zever/adapters/db/sqlite@v0.5.3
+   ```
+
+3. Install the CLI at the same pinned version.
+
+   ```sh
+   go install github.com/zenta-dev/zever/cmd/zever@v0.5.3
+   ```
+
+   <Aside type="tip" title="PATH">
+   `go install` writes to `$(go env GOPATH)/bin`. If `zever` is not found, add that directory to your `PATH`.
+   </Aside>
+
+4. Run `zever --help`. It prints the grouped command map (Scaffolding, Inspection, Runtime, Database, Operations).
+
+</Steps>
+
+## Verify with a smoke test
+
+Build one container from `config.Default()` and resolve the database. The default `db` adapter is `sqlite`, so the check imports that adapter and calls its `Register()`. An unregistered adapter fails with `UnknownAdapterError`.
+
+```go title="main.go"
+package main
+
+import (
+	"fmt"
+
+	"github.com/zenta-dev/zever/adapters/db/sqlite"
+	"github.com/zenta-dev/zever/config"
+	"github.com/zenta-dev/zever/container"
+)
+
+func main() {
+	sqlite.Register()
+	c := container.New(config.Default())
+	db, err := c.DB()
+	if err != nil {
+		panic(err)
+	}
+	fmt.Println("db resolved:", db != nil)
+}
+```
+
+```sh
+go build ./... && go test ./... && go run .
+```
+
+Expected output:
+
+```text
+db resolved: true
+```
+
+If that line prints, fetch, build, and default resolution all work. `container.New(nil)` is valid too and closes cleanly. When you add a config file later, see the [configuration guide](../../guides/operate/configuration/): files use snake_case keys, and env vars are `<SERVICE>_<FIELD>` with no prefix (`DB_ADAPTER`, `DB_MAXCONNS`).
+
+## Production notes
+
+- Pin the CLI to the same version as the modules so the TUI and backend behave alike.
+- Never log raw option maps. Print `config.RedactedServices(cfg)` instead.
+- `Default()` ships a deterministic dev crypto key. Never let it reach production: supply real secrets through a file or env.
+- Close every container you open (`c.Close(ctx)` with a timeout parent), even in smoke tests.
+
+## Work on Zever itself
+
+If you contribute to the Zever repository, these `make` targets exist only in a checkout of Zever, not in a scaffolded project.
+
+<details>
+<summary>Make targets and focused test commands</summary>
+
+| Target | What it does |
+|---|---|
+| `make setup` | Install the pinned lint and vuln tools (once) |
+| `make build` / `make test` | `go build ./...` / `go test ./...` |
+| `make test-race` | `go test -race ./...` (run by `make check`, not the PR fast gate) |
+| `make fmt` / `make fmt-fix` | Check / write `gofmt` formatting |
+| `make lint` / `make lint-fix` | `golangci-lint run` with `.golangci.yml` |
+| `make vet` | `go vet` (a separate CI step, since `go test` runs with `-vet=off -count=1`) |
+| `make vulncheck` | `govulncheck` scan |
+| `make tidy-check` | `go mod tidy -diff` |
+| `make generate` | `go run ./tools/gengrammar` after touching `token.Keywords` or `resolver.ScalarTypeNames` |
+| `make check` | Full local CI mirror: download, fmt, vet, tidy-check, lint, test-race, vulncheck, build |
+
+```sh
+go test ./orm/...
+go test ./container/... -run TestName -v
+go test -race ./config/...
+```
+
+</details>
+
+## Troubleshooting
+
+<details>
+<summary>`go version` reports older than 1.27</summary>
+
+Cause: a stale toolchain is first on `PATH`. Fix: install Go 1.27+ from go.dev/dl and run `go version` again.
+</details>
+
+<details>
+<summary>`go get` fails with a network or proxy error</summary>
+
+Cause: an offline sandbox or a blocked `GOPROXY`. Fix: set `GOPROXY` per your site policy, run `go mod download`, then retry `go get`.
+</details>
+
+<details>
+<summary>`make setup` fails while installing the lint tools</summary>
+
+Cause: the pinned tool download was blocked or partial. Fix: re-run `make setup`, check the binaries are on `PATH`, then run `make build`.
+</details>
+
+<details>
+<summary>`zever` is not found or prints nothing useful</summary>
+
+Cause: the CLI landed in a directory outside `PATH`. Fix: add `$(go env GOPATH)/bin` to `PATH`, or reinstall with `go install github.com/zenta-dev/zever/cmd/zever@v0.5.3`.
+</details>
+
+<details>
+<summary>The smoke test panics resolving `DB()`</summary>
+
+Cause: broken local state or edited defaults. Fix: remove any config file and env overrides so `config.Default()` applies, run `go run .`, then layer config back in.
+</details>
+
+## Related
+
+<CardGrid>
+  <LinkCard title="Quickstart" description="Go from an empty folder to a running API." href="../quickstart/" />
+  <LinkCard title="Project layout" description="Where every package lives." href="../project-layout/" />
+  <LinkCard title="Configuration" description="Layered config, env mapping, redaction." href="../../guides/operate/configuration/" />
+  <LinkCard title="Upgrade" description="Version bumps and breaking changes." href="../../guides/operate/upgrade/" />
+</CardGrid>

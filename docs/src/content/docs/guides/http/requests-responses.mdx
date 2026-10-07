@@ -1,0 +1,131 @@
+---
+title: Requests and responses
+description: Decode JSON bodies, read params and headers, paginate lists, and write consistent JSON responses.
+---
+
+import { LinkCard, CardGrid } from '@astrojs/starlight/components';
+
+Handlers stay close to `net/http`: decode the request, run your logic, encode a JSON envelope. No magic binding or config block.
+
+## Handle a request
+
+Container is for services, not I/O:
+
+```go title="main.go"
+c := container.New(config.Default())
+db, _ := c.DB()
+r, _ := c.Router()
+r.Handle("POST", "/v1/users", createUser(db))
+```
+
+```go title="handlers.go"
+func createUser(db db.DB) http.HandlerFunc {
+    return func(w http.ResponseWriter, r *http.Request) {
+        var in struct {
+            Email string `json:"email"`
+            Name  string `json:"name"`
+        }
+        if err := json.NewDecoder(r.Body).Decode(&in); err != nil {
+            writeError(w, http.StatusBadRequest, "invalid body")
+            return
+        }
+        if strings.TrimSpace(in.Email) == "" {
+            writeError(w, http.StatusUnprocessableEntity, "email: required")
+            return
+        }
+        writeJSON(w, http.StatusCreated, map[string]string{"email": in.Email})
+    }
+}
+
+func writeJSON(w http.ResponseWriter, status int, v any) {
+    w.Header().Set("Content-Type", "application/json")
+    w.WriteHeader(status)
+    _ = json.NewEncoder(w).Encode(v)
+}
+
+func writeError(w http.ResponseWriter, status int, msg string) {
+    writeJSON(w, status, map[string]string{"error": msg})
+}
+```
+
+```sh
+curl -s -X POST localhost:8080/v1/users -H 'Content-Type: application/json' -d '{"email":"a@example.com","name":"Ada"}'
+```
+
+```text
+{"email":"a@example.com"}
+```
+
+Success returns the resource (`200`/`201`); errors use `{"error": "<stable message>"}`. Set `Content-Type` before `WriteHeader`.
+
+## Read the request
+
+| Source | How |
+|---|---|
+| Path params | `router.Param(req, name)`, `router.ParamNames(req)` |
+| Query | `r.URL.Query().Get(key)` |
+| Headers | `r.Header.Get(key)` |
+| JSON body | `json.NewDecoder(r.Body).Decode(&v)` |
+| Body cap | `http.MaxBytesReader(w, r.Body, n)` |
+| Test params | `router.WithParams(ctx, params)` |
+| Cancellation | `r.Context()`, into DB, cache, queue calls |
+
+Cap public bodies (413) and pass `r.Context()` downstream for `middleware.Timeout`.
+
+## Paginate lists
+
+`.zen` RPCs flagged `paginated: true` generate cursor scaffolding; expose cursors, not offsets:
+
+```sh
+GET /v1/orders?cursor=eyJpZCI6NDJ9&limit=50
+```
+
+```go
+key := orm.NewCursorKey(UserID, lastSeenID)
+users, err := orm.NextPage(
+    orm.From(Users).OrderBy(UserID.Asc()),
+    key,
+).Limit(50).All(ctx, conn)
+```
+
+`orm.OffsetPage(q, page, size)` applies a 1-based `LIMIT`/`OFFSET` and returns `(Query, error)`. For keyset paging, `CursorKey.Encode()` and `orm.DecodeCursor(token, col)` round-trip the cursor, and `orm.AfterTuple` builds multi-column predicates.
+
+## Troubleshooting
+
+<details>
+<summary>An empty body decodes without error</summary>
+
+`r.Body` was consumed or nil. Use `httptest.NewRequest` with a `strings.Reader`.
+</details>
+
+<details>
+<summary>Params are always empty under test</summary>
+
+Plain test requests carry no driver context. Seed with `router.WithParams`.
+</details>
+
+<details>
+<summary>The client sees `Content-Type: text/plain`</summary>
+
+`WriteHeader` ran before the header. Set `Content-Type`, then status, then body.
+</details>
+
+<details>
+<summary>Huge uploads exhaust memory</summary>
+
+No `MaxBytesReader`: wrap `r.Body`, return 413.
+</details>
+
+<details>
+<summary>Deadline middleware has no effect</summary>
+
+A handler or ORM call uses `context.Background()`. Thread `r.Context()` through.
+</details>
+
+## Related
+
+<CardGrid>
+  <LinkCard title="Routing" href="../routing/" description="Register routes." />
+  <LinkCard title="Validation" href="../validation/" description="Field checks that pick 400 or 422." />
+  <LinkCard title="Middleware" href="../middleware/" description="Logging and timeouts." />
+</CardGrid>

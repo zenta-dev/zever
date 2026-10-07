@@ -25,6 +25,8 @@ require (
 	github.com/zenta-dev/zever/adapters/cache/db v0.5.3
 	github.com/zenta-dev/zever/adapters/cache/memory v0.5.3
 	github.com/zenta-dev/zever/adapters/cache/redis v0.5.3
+	github.com/zenta-dev/zever/adapters/cdn/cloudflare v0.5.3
+	github.com/zenta-dev/zever/adapters/cdn/noop v0.5.3
 	github.com/zenta-dev/zever/adapters/crypto/local v0.5.3
 	github.com/zenta-dev/zever/adapters/db/postgres v0.5.3
 	github.com/zenta-dev/zever/adapters/db/sqlite v0.5.3
@@ -96,6 +98,7 @@ require (
 	github.com/zenta-dev/zever/core/analytics v0.5.3
 	github.com/zenta-dev/zever/core/auth v0.5.3
 	github.com/zenta-dev/zever/core/cache v0.5.3
+	github.com/zenta-dev/zever/core/cdn v0.5.3
 	github.com/zenta-dev/zever/core/crypto v0.5.3
 	github.com/zenta-dev/zever/core/db v0.5.3
 	github.com/zenta-dev/zever/core/document v0.5.3
@@ -192,6 +195,7 @@ require (
 	github.com/chromedp/sysutil v1.1.0 // indirect
 	github.com/clipperhouse/displaywidth v0.11.0 // indirect
 	github.com/clipperhouse/uax29/v2 v2.7.0 // indirect
+	github.com/cloudflare/cloudflare-go/v7 v7.12.0 // indirect
 	github.com/cncf/xds/go v0.0.0-20260202195803-dba9d589def2 // indirect
 	github.com/coder/websocket v1.8.15 // indirect
 	github.com/coreos/go-oidc/v3 v3.21.0 // indirect
@@ -285,6 +289,8 @@ require (
 	github.com/zenta-dev/zever/shared/kvstore v0.5.3 // indirect
 	github.com/zenta-dev/zever/shared/lrucache v0.5.3 // indirect
 	github.com/zenta-dev/zever/shared/mcpclient v0.5.3 // indirect
+	github.com/zenta-dev/zever/shared/msgspan v0.5.3 // indirect
+	github.com/zenta-dev/zever/shared/outboxbridge v0.5.3 // indirect
 	github.com/zenta-dev/zever/shared/providersclient v0.5.3 // indirect
 	github.com/zenta-dev/zever/shared/providersopt v0.5.3 // indirect
 	github.com/zenta-dev/zever/shared/redisclient v0.5.3 // indirect
@@ -348,6 +354,8 @@ replace (
 	github.com/zenta-dev/zever/adapters/cache/db => ../../adapters/cache/db
 	github.com/zenta-dev/zever/adapters/cache/memory => ../../adapters/cache/memory
 	github.com/zenta-dev/zever/adapters/cache/redis => ../../adapters/cache/redis
+	github.com/zenta-dev/zever/adapters/cdn/cloudflare => ../../adapters/cdn/cloudflare
+	github.com/zenta-dev/zever/adapters/cdn/noop => ../../adapters/cdn/noop
 	github.com/zenta-dev/zever/adapters/crypto/local => ../../adapters/crypto/local
 	github.com/zenta-dev/zever/adapters/db/postgres => ../../adapters/db/postgres
 	github.com/zenta-dev/zever/adapters/db/sqlite => ../../adapters/db/sqlite
@@ -417,6 +425,7 @@ replace (
 	github.com/zenta-dev/zever/core/analytics => ../../core/analytics
 	github.com/zenta-dev/zever/core/auth => ../../core/auth
 	github.com/zenta-dev/zever/core/cache => ../../core/cache
+	github.com/zenta-dev/zever/core/cdn => ../../core/cdn
 	github.com/zenta-dev/zever/core/crypto => ../../core/crypto
 	github.com/zenta-dev/zever/core/db => ../../core/db
 	github.com/zenta-dev/zever/core/document => ../../core/document
@@ -482,6 +491,8 @@ replace github.com/zenta-dev/zever/shared/kvstore => ../../shared/kvstore
 
 replace github.com/zenta-dev/zever/shared/lrucache => ../../shared/lrucache
 
+replace github.com/zenta-dev/zever/shared/msgspan => ../../shared/msgspan
+replace github.com/zenta-dev/zever/shared/outboxbridge => ../../shared/outboxbridge
 replace github.com/zenta-dev/zever/shared/providersclient => ../../shared/providersclient
 
 replace github.com/zenta-dev/zever/shared/providersopt => ../../shared/providersopt

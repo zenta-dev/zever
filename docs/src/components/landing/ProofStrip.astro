@@ -1,0 +1,25 @@
+---
+import Marquee from './Marquee.astro';
+import { SERVICE_COUNT, ADAPTER_COUNT } from '../../data/landing';
+const items = ['Go 1.27+', 'Apache-2.0', `${SERVICE_COUNT} services`, `${ADAPTER_COUNT} adapters`, 'race + goleak tested', 'zero-infra defaults'];
+---
+
+<section class="zl-proof" aria-label="Project facts">
+  <ul class="zl-wrap zl-proof-facts">
+    {items.map((t) => <li>{t}</li>)}
+  </ul>
+  <Marquee />
+</section>
+
+<style>
+  .zl-proof { border-block: 1px solid var(--zl-line); background: var(--zl-bg-2); overflow: hidden; }
+  .zl-proof-facts { list-style: none; margin: 0 auto; padding: 0; display: flex; flex-wrap: wrap; justify-content: center; border-bottom: 1px solid var(--zl-line); }
+  .zl-proof-facts li { padding: 0.9rem 1.4rem; font: 0.78rem/1 var(--zl-font-mono); color: var(--zl-text-2); letter-spacing: 0.02em; white-space: nowrap; border-left: 1px solid var(--zl-line); }
+  .zl-proof-facts li:first-child { border-left: 0; }
+  @media (max-width: 640px) {
+    .zl-proof-facts { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); }
+    .zl-proof-facts li { white-space: normal; text-align: center; border-left: 0; border-top: 1px solid var(--zl-line); padding: 0.85rem 0.5rem; }
+    .zl-proof-facts li:nth-child(even) { border-left: 1px solid var(--zl-line); }
+    .zl-proof-facts li:nth-child(-n+2) { border-top: 0; }
+  }
+</style>

@@ -232,6 +232,20 @@ type = 'string'
 ['$defs'.cacheOptions.properties.verbose]
 type = 'boolean'
 
+['$defs'.cdnOptions]
+additionalProperties = false
+type = 'object'
+
+['$defs'.cdnOptions.properties]
+['$defs'.cdnOptions.properties.api_token]
+type = 'string'
+
+['$defs'.cdnOptions.properties.base_url]
+type = 'string'
+
+['$defs'.cdnOptions.properties.zone_id]
+type = 'string'
+
 ['$defs'.cryptoOptions]
 additionalProperties = false
 type = 'object'
@@ -1508,6 +1522,17 @@ enum = ['memory', 'redis', 'db']
 
 [properties.cache.properties.options]
 '$ref' = '#/$defs/cacheOptions'
+
+[properties.cdn]
+'$ref' = '#/$defs/service'
+type = 'object'
+
+[properties.cdn.properties]
+[properties.cdn.properties.adapter]
+enum = ['noop', 'cloudflare']
+
+[properties.cdn.properties.options]
+'$ref' = '#/$defs/cdnOptions'
 
 [properties.crypto]
 '$ref' = '#/$defs/service'

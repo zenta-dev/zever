@@ -1,0 +1,12 @@
+---
+import Default from '@astrojs/starlight/components/TableOfContents.astro';
+import '../../styles/docs/page.css';
+---
+
+<div class="zp-toc" data-zp-toc>
+  <Default {...Astro.props}><slot /></Default>
+</div>
+
+<script>
+  import '../../scripts/docs/toc-progress.ts';
+</script>

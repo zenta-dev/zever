@@ -1,0 +1,133 @@
+---
+title: Internationalization
+description: Translate user-facing strings with an embedded catalog locally and a remote catalog in production.
+---
+
+import { Tabs, TabItem, LinkCard, CardGrid } from '@astrojs/starlight/components';
+
+`i18n` resolves user-facing strings per locale. Development embeds the catalog in the binary, and production can pull from a remote service through the same interface. Use it for every visible string (confirmations, emails, error explanations), and never concatenate translated fragments: translators need full sentences with placeholders.
+
+## Quick start
+
+<Tabs>
+  <TabItem label="YAML">
+```yaml
+i18n:
+  adapter: embed   # default: compiled-in catalog
+  options:
+    embed:
+      dir: locales
+      fallback: en
+```
+  </TabItem>
+  <TabItem label="Env">
+```sh
+I18N_ADAPTER=remote
+I18N_REMOTE_ENDPOINT=i18n.internal:8080
+```
+  </TabItem>
+</Tabs>
+
+Switch to `remote` for a shared catalog service: it takes `endpoint`, `api_key`, `timeout`, `max_in_flight`, and `allow_insecure` (see the [Config reference](../../../reference/config/#i18n)). `DefaultTimeout` is 30s for remote fetches. The embed filesystem cannot come from YAML, so set `Embed.FS` in code as shown below; without it the embed adapter fails with `embed fs is required`.
+
+Catalogs are JSON per locale. A message is plain text or a Go `text/template` string with `{{.name}}` placeholders:
+
+```json title="locales/en.json"
+{"welcome": "Welcome back!", "hello": "Hello, {{.name}}!"}
+```
+
+```json title="locales/fr.json"
+{"hello": "Bonjour, {{.name}}!"}
+```
+
+```go title="main.go"
+import (
+    "embed"
+
+    i18nembed "github.com/zenta-dev/zever/adapters/i18n/embed"
+    "github.com/zenta-dev/zever/config"
+    "github.com/zenta-dev/zever/container"
+    "github.com/zenta-dev/zever/core/i18n"
+)
+
+//go:embed locales/*.json
+var localesFS embed.FS
+
+i18nembed.Register()
+cfg := config.Default()
+cfg.I18n.Options.Embed = i18n.EmbedOptions{FS: localesFS, Dir: "locales", Fallback: "en"}
+c := container.New(cfg)
+t, _ := c.I18n()
+
+msg, _ := t.Translate(ctx, "fr", "hello", map[string]string{"name": "Ada"})
+fmt.Println(msg)
+missing, _ := t.Translate(ctx, "fr", "welcome", nil)
+fmt.Println(missing)
+```
+
+```text
+Bonjour, Ada!
+Welcome back!
+```
+
+A key missing in `fr` falls back to `en`; a key missing everywhere returns `i18n.KeyNotFoundError`, never an empty string. Templates use `missingkey=error`, so a missing argument fails the lookup instead of rendering silently. `I18n()` resolves lazily and caches, and `c.Close(ctx)` shuts it down.
+
+## Resolve the locale in one place
+
+Resolve in this order: user preference, then `Accept-Language`, then the configured default. Keep it in one helper or middleware so every handler reads the same value.
+
+```go
+func localeOf(r *http.Request, user *User) string {
+    if user != nil && user.Locale != "" {
+        return user.Locale
+    }
+    if h := r.Header.Get("Accept-Language"); h != "" {
+        return parsePrimary(h) // "fr-CA,fr;q=0.9" -> "fr-CA"
+    }
+    return "en"
+}
+```
+
+The lookup chain for `fr-CA` is `fr-CA`, then `fr`, then the fallback; `i18n.BaseLocale` and `i18n.LocaleChain` expose both steps. Pass structured args (`map[string]string`), not pre-formatted strings, because word order differs across languages.
+
+## Use the API
+
+The interface has `Translate(ctx, locale, key, args)` and `Locales(ctx)`; `i18n.Open(adapter, opts)` and `i18n.Register(adapter, factory)` open or extend an adapter without the container. `EmbedOptions{FS, Dir, Fallback}` configures the compiled-in catalog and `RemoteOptions{Endpoint, APIKey, Timeout, MaxInFlight, AllowInsecure}` the shared service; `Options.Validate()` rejects bad settings at startup. Treat catalogs as data: version them with the schema, diff them in review, and deploy them beside the binary (embed) or behind the remote endpoint.
+
+## Test the fallback chain
+
+Assert fallbacks, not specific copy, since translators change text without code review. Test with embed: no network, no timing assertions. Call `Translate` with a missing key and check you get the fallback locale's text.
+
+## Production checklist
+
+- Always set `fallback` to your source locale so a missing translation degrades to readable text.
+- Pass `r.Context()` so slow remote catalogs cannot hang requests, and cache hot keys in front of `remote`.
+- Option maps can carry endpoint credentials. Display config only through `config.RedactedServices`.
+
+## Troubleshooting
+
+<details>
+<summary>Blank strings in one locale</summary>
+
+No fallback is configured, or your helper returns empty on a miss. Set `fallback` and test the chain.
+</details>
+
+<details>
+<summary>The wrong language is served</summary>
+
+Two resolution points disagree. Centralize `localeOf` and log the resolved locale at debug level.
+</details>
+
+<details>
+<summary>The remote catalog hangs requests</summary>
+
+The fetch ignores the request context, or no timeout is set. Pass `r.Context()` to `Translate` and keep the timeout bounded.
+</details>
+
+## Related
+
+<CardGrid>
+  <LinkCard title="Sessions" href="../sessions/" description="Store locale preference per user." />
+  <LinkCard title="Validation" href="../validation/" description="Field-named errors worth translating." />
+  <LinkCard title="Configuration" href="../../operate/configuration/" description="File and env layering for adapter choice." />
+</CardGrid>

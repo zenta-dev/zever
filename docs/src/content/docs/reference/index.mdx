@@ -1,0 +1,47 @@
+---
+title: Reference
+description: Lookup pages for the Zever CLI, configuration keys, adapters, package entry points, errors, and benchmarks.
+---
+
+import { CardGrid, LinkCard } from '@astrojs/starlight/components';
+import HeroBanner from '../../../components/docs/mdx/HeroBanner.astro';
+import FeatureCard from '../../../components/docs/mdx/FeatureCard.astro';
+
+<HeroBanner
+  eyebrow="Reference"
+  title="Look it up. <em>Then get back to building.</em>"
+  lede="Exact commands, config keys, adapters, and package entry points. These pages are for lookup. If you are learning Zever for the first time, start with the guides."
+/>
+
+## Pick a reference
+
+<CardGrid>
+  <FeatureCard title="CLI" href="/zever/reference/cli/">
+    Every command group: scaffolding, inspection, runtime, and database, with flags and exit codes.
+  </FeatureCard>
+  <FeatureCard title="Config reference" href="/zever/reference/config/">
+    Every service key, option, default, and environment variable in the layered config.
+  </FeatureCard>
+  <FeatureCard title="Adapters matrix" href="/zever/reference/adapters-matrix/">
+    Every service, adapter, package, and container accessor in one table.
+  </FeatureCard>
+  <FeatureCard title="API index" href="/zever/reference/api-index/">
+    Package entry points with the container accessor for each service.
+  </FeatureCard>
+  <FeatureCard title="Errors" href="/zever/reference/errors/">
+    The repo error conventions: message format, sentinels, wrapping, and branching.
+  </FeatureCard>
+  <FeatureCard title="Benchmarks" href="/zever/reference/benchmarks/">
+    Point-in-time hot-path numbers for router, ORM, queue, and more, with repro commands.
+  </FeatureCard>
+  <FeatureCard title="Agent skill" href="/zever/reference/agent-skill/">
+    Install and use the Zever skill so Claude Code knows the commands and safe workflows.
+  </FeatureCard>
+</CardGrid>
+
+## Looking for something else?
+
+<CardGrid>
+  <LinkCard title="New to Zever?" description="Install the toolchain and run your first build." href="/zever/start/installation/" />
+  <LinkCard title="Schema language" description="Entities, services, RPCs, and attributes in .zen." href="/zever/reference/zen-syntax/" />
+</CardGrid>

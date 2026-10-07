@@ -13,6 +13,7 @@ import (
 	"github.com/zenta-dev/zever/core/auth"
 	"github.com/zenta-dev/zever/core/billing"
 	"github.com/zenta-dev/zever/core/cache"
+	"github.com/zenta-dev/zever/core/cdn"
 	"github.com/zenta-dev/zever/core/crypto"
 	"github.com/zenta-dev/zever/core/db"
 	"github.com/zenta-dev/zever/core/document"
@@ -139,6 +140,13 @@ func (c *Container) Cache() (cache.Cache, error) {
 		}
 
 		return openService("cache", c.cfg.Cache.Adapter, cache.ParseAdapter, cache.Open, c.cfg.Cache.Options)
+	})
+}
+
+// CDN resolves and returns the CDN service instance.
+func (c *Container) CDN() (cdn.CDN, error) {
+	return c.cdn.get(func() (cdn.CDN, error) {
+		return openService("cdn", c.cfg.CDN.Adapter, cdn.ParseAdapter, cdn.Open, c.cfg.CDN.Options)
 	})
 }
 
@@ -354,6 +362,10 @@ func (c *Container) Observability() (observability.Provider, error) {
 // Outbox resolves and returns the outbox service instance. The db adapter
 // opens its own pool from Options.DSN (empty selects a private in-memory
 // database); container-level pool sharing is not wired for outbox.
+//
+// The relay is not started here: the transport it publishes through is resolved
+// separately, so use OutboxRelay(ctx) to attach it and start draining. This
+// accessor keeps working for Record after the relay is running.
 func (c *Container) Outbox() (outbox.Store, error) {
 	return c.outbox.get(func() (outbox.Store, error) {
 		opts := c.cfg.Outbox.Options

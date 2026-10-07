@@ -108,6 +108,10 @@ func TestRunGenerateServer(t *testing.T) {
 		"WriteTimeout:      writeTimeout,",
 		"IdleTimeout:       idleTimeout,",
 		`grpcAddr := flag.String("grpc-addr", ":9090", "gRPC address to listen on")`,
+		// Outbound calls go through the resilience manager's per-dependency guard.
+		"c.Resilience()",
+		"guardedGRPCClient",
+		"grpcclient.WithGuard(g)",
 	} {
 		if !strings.Contains(main, fragment) {
 			t.Fatalf("server main.go lacks %q:\n%s", fragment, main)
@@ -372,6 +376,8 @@ func TestRunGenerateServerWiresRegisterModule(t *testing.T) {
 		"TaskService: taskServiceImpl,",
 		"healthpb.RegisterHealthServer(grpcServer, healthServer)",
 		"reflection.Register(grpcServer)",
+		"c.Resilience()",
+		"guardedGRPCClient",
 		"c.Ready(readyCtx)",
 		"healthServer.SetServingStatus(\"\", healthpb.HealthCheckResponse_NOT_SERVING)",
 	} {

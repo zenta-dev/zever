@@ -1,0 +1,13 @@
+---
+import '../../styles/docs/page.css';
+interface Props { group?: string; title: string }
+const { group, title } = Astro.props;
+---
+
+<nav class="zp-crumbs" aria-label="Breadcrumb">
+  <ol>
+    <li><a href={import.meta.env.BASE_URL + "start/introduction/"}>Docs</a></li>
+    {group && group !== title && <li><span>{group}</span></li>}
+    <li><span aria-current="page">{title}</span></li>
+  </ol>
+</nav>

@@ -7,10 +7,9 @@ import (
 	"sync/atomic"
 	"time"
 
-	"go.opentelemetry.io/otel/attribute"
-	"go.opentelemetry.io/otel/trace"
-
 	"github.com/zenta-dev/zever/core/eventbus"
+	"github.com/zenta-dev/zever/core/observability"
+	"github.com/zenta-dev/zever/shared/msgspan"
 	"github.com/zenta-dev/zever/shared/traceprop"
 )
 
@@ -38,6 +37,7 @@ type bus struct {
 	buffer         int
 	handlerTimeout time.Duration
 	closeTimeout   time.Duration
+	provider       observability.Provider
 	onPanic        func(topic string, msg eventbus.Message, r any)
 }
 
@@ -83,6 +83,7 @@ func newBus(opts eventbus.Options) (*bus, error) {
 		buffer:         buffer,
 		handlerTimeout: handlerTimeout,
 		closeTimeout:   closeTimeout,
+		provider:       opts.Provider,
 		onPanic:        opts.OnPanic,
 	}, nil
 }
@@ -122,15 +123,18 @@ func (b *bus) Publish(ctx context.Context, topic string, payload eventbus.Payloa
 		return eventbus.ErrPayloadTooLarge
 	}
 
+	// One producer span per publish, started before the message is built so
+	// the injected trace context is the producer span's: a delivery span then
+	// parents onto this publish instead of onto its caller.
+	spanCtx, finish := msgspan.Producer(ctx, b.provider, "eventbus", topic, "")
+	defer finish(msgspan.OutcomeOK)
+
 	b.mu.RLock()
 	subs := append([]*subscription(nil), b.topics[topic]...)
 	b.mu.RUnlock()
 
-	if len(subs) == 0 {
-		return nil
-	}
-
-	base := eventbus.NewMessage(topic, payload, traceprop.Inject(ctx, headers))
+	base := eventbus.NewMessage(topic, payload, headers)
+	base.Headers = traceprop.Inject(spanCtx, base.Headers)
 
 	for _, sub := range subs {
 		m := base.Clone()
@@ -246,9 +250,12 @@ func (b *bus) forward(parent context.Context, topic string, sub *subscription, h
 				ctx, cancel := context.WithTimeout(context.WithoutCancel(parent), b.handlerTimeout)
 				defer cancel()
 
-				ctx, span := traceprop.StartConsumeSpan(ctx, m.Headers, "eventbus.deliver",
-					trace.WithAttributes(attribute.String("messaging.destination.name", topic)))
-				defer span.End()
+				// Continue the producer trace carried in the headers, then
+				// bracket the handler with the messaging consumer span.
+				ctx = traceprop.Extract(ctx, m.Headers)
+
+				ctx, finish := msgspan.Consumer(ctx, b.provider, "eventbus", topic, m.ID.String())
+				defer finish(msgspan.OutcomeOK)
 
 				defer func() {
 					if r := recover(); r != nil {

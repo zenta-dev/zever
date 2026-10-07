@@ -169,6 +169,16 @@ $defs:
             verbose:
                 type: boolean
         type: object
+    cdnOptions:
+        additionalProperties: false
+        properties:
+            api_token:
+                type: string
+            base_url:
+                type: string
+            zone_id:
+                type: string
+        type: object
     cryptoOptions:
         additionalProperties: false
         properties:
@@ -1163,6 +1173,16 @@ properties:
                     - db
             options:
                 $ref: '#/$defs/cacheOptions'
+        type: object
+    cdn:
+        $ref: '#/$defs/service'
+        properties:
+            adapter:
+                enum:
+                    - noop
+                    - cloudflare
+            options:
+                $ref: '#/$defs/cdnOptions'
         type: object
     crypto:
         $ref: '#/$defs/service'

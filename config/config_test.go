@@ -28,8 +28,8 @@ func seedHostileEnv(t *testing.T) {
 
 func TestKnownServiceNames(t *testing.T) {
 	names := knownServiceNames()
-	if len(names) != 36 {
-		t.Fatalf("got %d names, want 36", len(names))
+	if len(names) != 37 {
+		t.Fatalf("got %d names, want 37", len(names))
 	}
 	for i := 1; i < len(names); i++ {
 		if names[i-1] >= names[i] {
@@ -229,8 +229,8 @@ func TestLoadPrecedence(t *testing.T) {
 func TestRedactedServices(t *testing.T) {
 	cfg := Default()
 	got := cfg.RedactedServices()
-	if len(got) != 36 {
-		t.Fatalf("got %d services, want 36", len(got))
+	if len(got) != 37 {
+		t.Fatalf("got %d services, want 37", len(got))
 	}
 	cryptoSvc := got["crypto"]
 	if cryptoSvc.Adapter != "local" {

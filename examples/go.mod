@@ -84,6 +84,8 @@ replace github.com/zenta-dev/zever/core/billing => ../core/billing
 
 replace github.com/zenta-dev/zever/core/cache => ../core/cache
 
+replace github.com/zenta-dev/zever/core/cdn => ../core/cdn
+
 replace github.com/zenta-dev/zever/core/crypto => ../core/crypto
 
 replace github.com/zenta-dev/zever/core/document => ../core/document
@@ -156,6 +158,8 @@ replace github.com/zenta-dev/zever/shared/httpclient => ../shared/httpclient
 
 replace github.com/zenta-dev/zever/shared/lrucache => ../shared/lrucache
 
+replace github.com/zenta-dev/zever/shared/msgspan => ../shared/msgspan
+replace github.com/zenta-dev/zever/shared/outboxbridge => ../shared/outboxbridge
 replace github.com/zenta-dev/zever/shared/providersopt => ../shared/providersopt
 
 replace github.com/zenta-dev/zever/shared/redisclient => ../shared/redisclient
@@ -186,6 +190,7 @@ require (
 	github.com/zenta-dev/zever/core/auth v0.5.3 // indirect
 	github.com/zenta-dev/zever/core/billing v0.5.3 // indirect
 	github.com/zenta-dev/zever/core/cache v0.5.3 // indirect
+	github.com/zenta-dev/zever/core/cdn v0.5.3 // indirect
 	github.com/zenta-dev/zever/core/crypto v0.5.3 // indirect
 	github.com/zenta-dev/zever/core/document v0.5.3 // indirect
 	github.com/zenta-dev/zever/core/eventbus v0.5.3 // indirect
@@ -225,6 +230,8 @@ require (
 	github.com/zenta-dev/zever/shared/httpclient v0.5.3 // indirect
 	github.com/zenta-dev/zever/shared/lrucache v0.5.3 // indirect
 	github.com/zenta-dev/zever/shared/mcpclient v0.5.3 // indirect
+	github.com/zenta-dev/zever/shared/msgspan v0.5.3 // indirect
+	github.com/zenta-dev/zever/shared/outboxbridge v0.5.3 // indirect
 	github.com/zenta-dev/zever/shared/providersopt v0.5.3 // indirect
 	github.com/zenta-dev/zever/shared/redisopt v0.5.3 // indirect
 	github.com/zenta-dev/zever/shared/retry v0.5.3 // indirect

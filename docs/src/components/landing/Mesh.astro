@@ -1,0 +1,30 @@
+---
+// Animated gradient mesh + scan line backdrop. Place inside a positioned, isolated section.
+interface Props { scan?: boolean }
+const { scan = true } = Astro.props;
+---
+
+<div class="zl-mesh" data-mesh aria-hidden="true">
+  <i class="zl-mesh-b zl-mesh-b1"></i>
+  <i class="zl-mesh-b zl-mesh-b2"></i>
+  <i class="zl-mesh-b zl-mesh-b3"></i>
+  {scan && <span class="zl-mesh-scan"></span>}
+</div>
+
+<style is:global>
+  .zl-mesh { position: absolute; inset: 0; z-index: -1; overflow: hidden; pointer-events: none; }
+  .zl-mesh-b { position: absolute; display: block; width: min(60vmax, 46rem); aspect-ratio: 1; border-radius: 50%; filter: blur(64px); mix-blend-mode: screen; opacity: 0.32; will-change: transform; }
+  .zl-mesh-b1 { left: -12%; top: -22%; background: radial-gradient(circle, var(--zl-accent), transparent 66%); animation: zl-drift-a 26s ease-in-out infinite alternate; }
+  .zl-mesh-b2 { right: -16%; top: 0; background: radial-gradient(circle, var(--zl-accent-lo), transparent 66%); animation: zl-drift-b 32s ease-in-out infinite alternate; }
+  .zl-mesh-b3 { left: 28%; bottom: -38%; opacity: 0.2; background: radial-gradient(circle, var(--zl-warm), transparent 66%); animation: zl-drift-c 38s ease-in-out infinite alternate; }
+  .zl-page[data-theme='light'] .zl-mesh-b { mix-blend-mode: multiply; opacity: 0.16; }
+  .zl-page[data-theme='light'] .zl-mesh-b3 { opacity: 0.12; }
+  @keyframes zl-drift-a { to { transform: translate3d(14vw, 10vh, 0) scale(1.15); } }
+  @keyframes zl-drift-b { to { transform: translate3d(-12vw, 14vh, 0) scale(0.9); } }
+  @keyframes zl-drift-c { to { transform: translate3d(-10vw, -12vh, 0) scale(1.2); } }
+  .zl-mesh-scan { position: absolute; inset: 0; height: 100%; transform: translateY(-100%); opacity: 0.7; background: linear-gradient(to bottom, transparent calc(100% - 140px), color-mix(in srgb, var(--zl-accent) 14%, transparent) calc(100% - 1px), color-mix(in srgb, var(--zl-accent) 55%, transparent) 100%); animation: zl-scan 9s linear infinite; mask-image: radial-gradient(70% 60% at 50% 30%, #000, transparent 75%); }
+  @keyframes zl-scan { 0% { transform: translateY(-100%); } 70%, 100% { transform: translateY(0); opacity: 0; } }
+  .zl-mesh.is-paused * { animation-play-state: paused; }
+  @media (pointer: coarse) { .zl-mesh-b { filter: blur(44px); } }
+  @media (prefers-reduced-motion: reduce) { .zl-mesh-b, .zl-mesh-scan { animation: none !important; } .zl-mesh-scan { display: none; } }
+</style>
