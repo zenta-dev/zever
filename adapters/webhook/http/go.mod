@@ -6,7 +6,7 @@ require (
 	github.com/zenta-dev/zever/core/webhook v0.5.3
 	github.com/zenta-dev/zever/shared/retry v0.5.3
 	github.com/zenta-dev/zever/shared/traceprop v0.5.3
-	go.opentelemetry.io/otel/trace v1.46.0
+	go.opentelemetry.io/otel/trace v1.47.0
 )
 
 replace (
@@ -47,8 +47,9 @@ require (
 	github.com/zenta-dev/zever/shared/redisopt v0.5.3 // indirect
 	github.com/zenta-dev/zever/shared/registry v0.5.3 // indirect
 	go.opentelemetry.io/auto/sdk v1.2.1 // indirect
-	go.opentelemetry.io/otel v1.46.0 // indirect
-	go.opentelemetry.io/otel/metric v1.46.0 // indirect
+	go.opentelemetry.io/otel v1.47.0 // indirect
+	go.opentelemetry.io/otel/log v1.47.0 // indirect
+	go.opentelemetry.io/otel/metric v1.47.0 // indirect
 )
 
 replace github.com/zenta-dev/zever/core/db => ../../../core/db
