@@ -15,6 +15,7 @@ import (
 	"path/filepath"
 	"strconv"
 	"strings"
+	"syscall"
 	"time"
 
 	"github.com/aws/aws-sdk-go-v2/aws"
@@ -47,6 +48,18 @@ var generateID = media.GenerateID
 var (
 	mkdirTemp = os.MkdirTemp
 	writeFile = os.WriteFile
+)
+
+// execOutput and execRun are seams for deterministic exec tests.
+var (
+	//nolint:gosec // binary resolved via LookPath, argv fixed.
+	execOutput = func(ctx context.Context, name string, args ...string) ([]byte, error) {
+		return exec.CommandContext(ctx, name, args...).Output()
+	}
+	//nolint:gosec // binary resolved via LookPath, argv built from validated ops.
+	execRun = func(ctx context.Context, name string, args ...string) error {
+		return exec.CommandContext(ctx, name, args...).Run()
+	}
 )
 
 // New validates opts and returns a Media backed by S3.
@@ -432,7 +445,56 @@ func stageTemp(ext string, data []byte) (string, string, error) {
 	return dir, path, nil
 }
 
+const (
+	// defaultMaxExecAttempts bounds retries of transient text-file-busy exec failures.
+	defaultMaxExecAttempts = 5
+	// defaultExecRetryBackoff is the delay between text-file-busy retries, giving
+	// the kernel time to release the exec-in-progress lock under CI load
+	// instead of re-attempting immediately into the same busy window.
+	defaultExecRetryBackoff = 5 * time.Millisecond
+)
+
+// execTextBusyRetry runs fn, retrying transient text-file-busy (ETXTBSY)
+// fork/exec failures (golang/go#22315) up to defaultMaxExecAttempts times with
+// defaultExecRetryBackoff between attempts. A canceled ctx aborts the backoff
+// and returns ctx.Err(). The policy mirrors the ffmpeg adapter's retry; the
+// helpers are duplicated locally because the ffmpeg copies are unexported and
+// the exec styles (Output vs Run) differ.
+func execTextBusyRetry(ctx context.Context, fn func() error) error {
+	var err error
+
+	for range defaultMaxExecAttempts {
+		if err = fn(); err == nil || !isTextBusy(err) {
+			return err
+		}
+
+		if sleepErr := sleepCtx(ctx, defaultExecRetryBackoff); sleepErr != nil {
+			return sleepErr
+		}
+	}
+
+	return err
+}
+
+// isTextBusy reports whether err is a transient text-file-busy exec failure.
+func isTextBusy(err error) bool {
+	return errors.Is(err, syscall.ETXTBSY)
+}
+
+// sleepCtx waits d or until ctx is done, whichever comes first, so a
+// text-file-busy retry backoff can be cancelled mid-wait instead of
+// blocking past the caller's deadline.
+func sleepCtx(ctx context.Context, d time.Duration) error {
+	select {
+	case <-ctx.Done():
+		return ctx.Err()
+	case <-time.After(d):
+		return nil
+	}
+}
+
 // runFFProbe executes ffprobe and parses its JSON output.
+// Transient text-file-busy start failures are retried.
 func runFFProbe(ctx context.Context, bin, file string) (ffprobeOutput, error) {
 	var parsed ffprobeOutput
 
@@ -440,7 +502,15 @@ func runFFProbe(ctx context.Context, bin, file string) (ffprobeOutput, error) {
 		return parsed, fmt.Errorf("s3: %w (%s)", media.ErrToolMissing, bin)
 	}
 
-	raw, err := exec.CommandContext(ctx, bin, "-v", "quiet", "-print_format", "json", "-show_format", "-show_streams", file).Output()
+	var raw []byte
+
+	err := execTextBusyRetry(ctx, func() error {
+		var e error
+
+		raw, e = execOutput(ctx, bin, "-v", "quiet", "-print_format", "json", "-show_format", "-show_streams", file)
+
+		return e
+	})
 	if err != nil {
 		return parsed, fmt.Errorf("s3: probe: %w", media.ErrProbeFailed)
 	}
@@ -747,8 +817,9 @@ func (d *driver) transformAV(ctx context.Context, id, key, ext string, kind medi
 	out := filepath.Join(dir, "out"+outExt)
 	args = append(args, out)
 
-	//nolint:gosec // ffmpeg binary is caller-configured; argv built from validated ops.
-	if err = exec.CommandContext(ctx, d.ffmpeg, args...).Run(); err != nil {
+	if err = execTextBusyRetry(ctx, func() error {
+		return execRun(ctx, d.ffmpeg, args...)
+	}); err != nil {
 		return "", fmt.Errorf("s3: transcode: %w", media.ErrTranscodeFailed)
 	}
 

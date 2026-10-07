@@ -426,6 +426,17 @@ jobs:
       - name: go test -race (PR fast gate, no coverage)
         if: github.event_name == 'pull_request'
         run: make test-race-fast
+      # Order/iteration-dependence gate (PRs only): reruns the affected
+      # modules with shuffled test order and a second iteration so flakes that
+      # depend on shared global state or execution order fail here instead of
+      # in the nightly flake-hunt. The seed is echoed so a failure is
+      # reproducible with: go test -race -shuffle=<seed> ./...
+      - name: go test -race -shuffle -count=2 (PR order-dependence gate)
+        if: github.event_name == 'pull_request'
+        run: |
+          seed=$((RANDOM * 32768 + RANDOM))
+          echo "test-race-pr shuffle seed: $seed"
+          make test-race-pr SHUFFLE_SEED=$seed
       - name: go test -race with coverage (main/tags)
         if: github.event_name != 'pull_request'
         run: make test-race-all
