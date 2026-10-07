@@ -91,6 +91,10 @@ replace (
 	github.com/zenta-dev/zever/shared/retry => ../../shared/retry
 )
 
+replace github.com/zenta-dev/zever/shared/msgspan => ../../shared/msgspan
+
+replace github.com/zenta-dev/zever/shared/outboxbridge => ../../shared/outboxbridge
+
 replace github.com/zenta-dev/zever/shared/traceprop => ../../shared/traceprop
 
 require (
@@ -145,6 +149,8 @@ require (
 	github.com/zenta-dev/zever/shared/grpcclient v0.5.3 // indirect
 	github.com/zenta-dev/zever/shared/httpclient v0.5.3 // indirect
 	github.com/zenta-dev/zever/shared/mcpclient v0.5.3 // indirect
+	github.com/zenta-dev/zever/shared/msgspan v0.5.3 // indirect
+	github.com/zenta-dev/zever/shared/outboxbridge v0.5.3 // indirect
 	github.com/zenta-dev/zever/shared/providersopt v0.5.3 // indirect
 	github.com/zenta-dev/zever/shared/redisopt v0.5.3 // indirect
 	github.com/zenta-dev/zever/shared/retry v0.5.3 // indirect

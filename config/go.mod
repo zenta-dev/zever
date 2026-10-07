@@ -147,6 +147,8 @@ replace github.com/zenta-dev/zever/shared/redisclient => ../shared/redisclient
 
 replace github.com/zenta-dev/zever/shared/lrucache => ../shared/lrucache
 
+replace github.com/zenta-dev/zever/shared/msgspan => ../shared/msgspan
+
 replace github.com/zenta-dev/zever/shared/traceprop => ../shared/traceprop
 
 require (
@@ -157,6 +159,7 @@ require (
 	github.com/zenta-dev/zever/adapters/log/noop v0.5.3 // indirect
 	github.com/zenta-dev/zever/shared/endpoint v0.5.3 // indirect
 	github.com/zenta-dev/zever/shared/httpclient v0.5.3 // indirect
+	github.com/zenta-dev/zever/shared/msgspan v0.5.3 // indirect
 	github.com/zenta-dev/zever/shared/providersopt v0.5.3 // indirect
 	github.com/zenta-dev/zever/shared/registry v0.5.3 // indirect
 	github.com/zenta-dev/zever/shared/retry v0.5.3 // indirect

@@ -32,7 +32,9 @@ require (
 	github.com/ncruces/go-strftime v1.0.0 // indirect
 	github.com/remyoudompheng/bigfft v0.0.0-20230129092748-24d4a6f8daec // indirect
 	github.com/zenta-dev/zever/core/cache v0.5.3 // indirect
+	github.com/zenta-dev/zever/core/observability v0.5.3 // indirect
 	github.com/zenta-dev/zever/shared/lrucache v0.5.3 // indirect
+	github.com/zenta-dev/zever/shared/msgspan v0.5.3 // indirect
 	github.com/zenta-dev/zever/shared/redisopt v0.5.3 // indirect
 	github.com/zenta-dev/zever/shared/registry v0.5.3 // indirect
 	github.com/zenta-dev/zever/shared/retry v0.5.3 // indirect
@@ -75,6 +77,8 @@ replace github.com/zenta-dev/zever/shared/codec => ../../../shared/codec
 replace github.com/zenta-dev/zever/adapters/cache/memory => ../../cache/memory
 
 replace github.com/zenta-dev/zever/core/cache => ../../../core/cache
+
+replace github.com/zenta-dev/zever/shared/msgspan => ../../../shared/msgspan
 
 replace github.com/zenta-dev/zever/shared/redisopt => ../../../shared/redisopt
 

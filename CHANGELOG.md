@@ -9,6 +9,19 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Added
 
+- Messaging spans with correct span kinds: new `shared/msgspan` module
+  (`Producer`/`Consumer` helpers setting `messaging.*` attributes with
+  `SpanKindProducer`/`SpanKindConsumer`), applied to eventbus publish/consume,
+  queue push, and the job dispatcher drain path.
+- Outbox relay wiring: new `shared/outboxbridge` module
+  (`QueuePublisher`/`EventBusPublisher` adapting a resolved transport to
+  `outbox.Publisher`), `core/outbox.PublisherSetter` for post-`Open`
+  attachment, and `container.OutboxRelay(ctx)` which attaches the
+  transport-selected publisher and starts the relay.
+- Trace propagation in built-in outbound HTTP clients:
+  `httpclient.WithTracing()` (opt-in W3C trace-context injection) enabled in
+  document/remote, i18n/remote, auth/oidc, the ai adapters
+  (anthropic/gemini/ollama/openai), and `shared/providersclient`.
 - Prompt pack 3: `DoctorTriage`, `DiagRepair`, `OutboxTriage` and
   `ExtractSplit` builders for doctor, diagnostic, outbox, and extraction
   workflows.
