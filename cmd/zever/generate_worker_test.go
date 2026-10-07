@@ -52,6 +52,10 @@ func TestRunGenerateWorkerWithNoSchema(t *testing.T) {
 		t.Fatalf("encoding/json imported but unused:\n%s", main)
 	}
 
+	if !strings.Contains(main, `c.OutboxRelay(ctx)`) {
+		t.Fatalf("expected the outbox relay:\n%s", main)
+	}
+
 	readGenerated(t, filepath.Join(dir, "internal", "app", "app.go"))
 
 	assertGolden(t, "generate_worker_main_empty.golden", []byte(main))
@@ -91,6 +95,8 @@ schedule Nightly {
 		`job.Register("Sweep", jobs.HandleSweep)`,
 		`sched.Schedule(ctx, "0 0 * * *", "Sweep", json.RawMessage(` + "`{}`" + `))`,
 		`sched.Start()`,
+		// The worker drains recorded outbox events; the API server stays lean.
+		`c.OutboxRelay(ctx)`,
 		// Every declared queue, sorted and de-duplicated.
 		`Queues:      []string{"low", "shipping"}`,
 	} {

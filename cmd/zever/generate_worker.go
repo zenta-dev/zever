@@ -24,6 +24,10 @@ is what the in-process memory queue adapter requires; swapping the queue
 adapter for redis/nats in zever.yaml is what makes it distributable, with no
 code change in the generated file.
 
+The worker also starts the outbox relay (container.OutboxRelay), which drains
+recorded outbox events onto the configured transport. The API server stays
+lean and never runs the relay.
+
 Every .zen file under <schema_dir> is compiled first, so the scaffold gets one
 real job.Register call per declared job — with a payload struct built from
 that job's declared parameters — and one sched.Add call per declared schedule.
@@ -596,6 +600,14 @@ func run() error {
 
 	q, err := c.Queue()
 	if err != nil {
+		return err
+	}
+
+	// The outbox relay drains recorded events onto the configured transport
+	// (queue by default). Safe to run in every worker replica: claims are
+	// atomic (FOR UPDATE SKIP LOCKED), so each row publishes once and
+	// consumers stay idempotent.
+	if _, err := c.OutboxRelay(ctx); err != nil {
 		return err
 	}
 
