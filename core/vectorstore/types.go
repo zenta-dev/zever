@@ -2,6 +2,7 @@ package vectorstore
 
 import (
 	"encoding/json"
+	"errors"
 	"fmt"
 )
 
@@ -23,7 +24,7 @@ func (v Vector) Validate() error {
 	}
 
 	if _, err := json.Marshal(v.Metadata); err != nil {
-		return fmt.Errorf("%w: %w", ErrInvalidMetadata, err)
+		return errors.Join(fmt.Errorf("vectorstore: %w", ErrInvalidMetadata), err)
 	}
 
 	return nil

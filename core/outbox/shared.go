@@ -24,7 +24,7 @@ var sharedFactories = registry.New[Adapter, SharedFactory](
 // OpenShared.
 func RegisterShared(adapter Adapter, factory SharedFactory) error {
 	if factory == nil {
-		return fmt.Errorf("%w for adapter %s", ErrNilFactory, adapter)
+		return fmt.Errorf("outbox: %w for adapter %s", ErrNilFactory, adapter)
 	}
 
 	return sharedFactories.Register(adapter, factory)
