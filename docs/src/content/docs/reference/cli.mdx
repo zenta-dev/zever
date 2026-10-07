@@ -136,7 +136,7 @@ exit:0
 | Database | `zever db migrate` |
 | Database | `zever db rollback` |
 | Database | `zever db seed` |
-| Operations | `zever outbox` (`status`, `dlq list`, `dlq requeue`, `dlq purge`, `purge`; see [Outbox Ops](../digging-deeper/outbox-ops/)) |
+| Operations | `zever outbox` (`status`, `dlq list`, `dlq requeue`, `dlq purge`, `purge`; see [Outbox Ops](../../digging-deeper/outbox-ops/)) |
 | Tooling | `zever completion <bash\|zsh\|fish\|powershell>` |
 | Tooling | `zever docs --dir <dir>` |
 
@@ -223,7 +223,7 @@ non-negative. `dlq purge` needs an adapter that implements
 `does not support message deletion` rather than deleting nothing. Run
 these from a deploy box with database access, not from every replica.
 Metrics, alert rules, and the full runbook are in
-[Outbox Ops](../digging-deeper/outbox-ops/).
+[Outbox Ops](../../digging-deeper/outbox-ops/).
 
 ### Dev and tinker rules
 
@@ -280,8 +280,8 @@ Metrics, alert rules, and the full runbook are in
 
 ## See also
 
-- [Syntax](../dsl/syntax-zen/) for the schema files inspected commands read
-- [LSP and Tooling](../dsl/lsp-tooling/) for editor-side inspection
-- [Config Reference](./config-reference/) for `config show` output
-- [Backends](../dsl/backends/) for `compile` outputs
-- [Outbox Ops](../digging-deeper/outbox-ops/) for `zever outbox` in context
+- [Syntax](../zen-syntax/) for the schema files inspected commands read
+- [LSP and Tooling](../../guides/extend/editor-setup/) for editor-side inspection
+- [Config Reference](../config/) for `config show` output
+- [Backends](../../concepts/backends/) for `compile` outputs
+- [Outbox Ops](../../digging-deeper/outbox-ops/) for `zever outbox` in context
