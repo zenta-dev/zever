@@ -13,6 +13,7 @@ import (
 	"path/filepath"
 	"strings"
 	"sync"
+	"syscall"
 	"testing"
 	"time"
 
@@ -166,10 +167,21 @@ func gifBytes(t *testing.T) []byte {
 	return buf.Bytes()
 }
 
+// stubBin writes body to a fresh executable script and returns its path.
+//
+// The write happens under syscall.ForkLock (read side). Parallel tests fork
+// ffmpeg/ffprobe stubs concurrently, and a child forked while this process
+// still holds the script's write fd inherits that fd until its own exec;
+// exec'ing the script during that window fails with ETXTBSY ("text file
+// busy"), which the adapter flattens into ErrProbeFailed/ErrTranscodeFailed (golang/go#22315). fork takes ForkLock for writing, so no child can
+// be created while the fd is open.
 func stubBin(t *testing.T, body string) string {
 	t.Helper()
 	p := filepath.Join(t.TempDir(), "fakebin")
-	if err := os.WriteFile(p, []byte(body), 0o600); err != nil {
+	syscall.ForkLock.RLock()
+	err := os.WriteFile(p, []byte(body), 0o600)
+	syscall.ForkLock.RUnlock()
+	if err != nil {
 		t.Fatal(err)
 	}
 	if err := os.Chmod(p, 0o755); err != nil {
