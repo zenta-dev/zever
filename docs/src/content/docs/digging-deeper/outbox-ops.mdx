@@ -5,10 +5,10 @@ description: "Relay metrics, Prometheus alert rules, the DLQ runbook, and stalle
 
 ## Purpose
 
-Use this page after [Outbox](./outbox.mdx) is wired. The relay is the
+Use this page after [Outbox](../../guides/background/outbox/) is wired. The relay is the
 component that eventually delivers your events, and it fails quietly:
 a broker outage shows up as messages piling up, not as a crash. This
-page covers the four things an on-call engineer needs — the metric
+page covers the four things an on-call engineer needs: the metric
 names the relay emits, alert rules that fire before users notice, the
 dead-letter-queue (DLQ) runbook, and the readiness gate that removes a
 stalled relay from the load balancer.
@@ -20,8 +20,8 @@ The relay emits through the `observability.Provider` on
 makes every metric a no-op, and metric or span errors are discarded
 (`_ =`) so a metrics backend outage can never fail a publish. Production
 therefore needs `observability.adapter: otlp` with `service_name` and an
-`endpoint` — with `stdout` the values print locally, with `noop` they go
-nowhere. Scope is `outbox`.
+`endpoint` (with `stdout` the values print locally, with `noop` they go
+nowhere). Scope is `outbox`.
 
 | Metric | Type | Meaning |
 |---|---|---|
@@ -45,7 +45,7 @@ Attributes carried on every metric and span:
 |---|---|
 | `outbox.adapter` | `db` or `cdc` |
 | `outbox.table` | Outbox table name; `db` only, omitted when empty |
-| `outbox.topic` | Message topic — on `outbox.publish` / `outbox.consume` spans |
+| `outbox.topic` | Message topic (on `outbox.publish` / `outbox.consume` spans) |
 | `outbox.outcome` | `ok` or `error` |
 
 Spans: `outbox.publish` (kind `producer`) per publish, paired with the
@@ -56,12 +56,12 @@ messaging semantic conventions alongside the `outbox.*` attributes:
 adapter name), `messaging.destination.name` (the topic),
 `messaging.operation` (`publish` or `process`), `messaging.message.id`,
 and `messaging.message.conversation_id` when the context carries a
-trace — that last one is how a relay span joins the trace that recorded
-the message.
+trace (that last one is how a relay span joins the trace that recorded
+the message).
 
 Keep metric attributes bounded. `outbox.topic` is a code-level constant,
-but if you build topics per tenant, the label cardinality — and your
-collector bill — grows with it.
+but if you build topics per tenant, the label cardinality (and your
+collector bill) grows with it.
 
 Prometheus reads the OTLP export, which renames dots to underscores:
 `outbox.publish.duration_seconds` becomes
@@ -86,7 +86,7 @@ Oldest pending message past the delivery SLA:
 max_over_time(outbox_oldest_pending_age_seconds[5m]) > 300
 ```
 
-DLQ non-empty — something exhausted its retry budget:
+DLQ non-empty (something exhausted its retry budget):
 
 ```promql
 increase(outbox_failed_total[10m]) > 0
@@ -100,8 +100,8 @@ Relay loop itself erroring (claim failures, bad DSN, dropped pool):
 rate(outbox_relay_errors[5m]) > 0
 ```
 
-Publish latency — a slow downstream, visible before it becomes a
-timeout:
+Publish latency (a slow downstream, visible before it becomes a
+timeout):
 
 ```promql
 histogram_quantile(0.99, sum by (le) (rate(outbox_publish_duration_seconds_bucket[5m]))) > 1
@@ -147,7 +147,7 @@ groups:
 ## DLQ runbook
 
 Messages that exhaust `max_attempts` (default 5) are marked `failed`.
-They are not deleted and not retried again — they wait for a human.
+They are not deleted and not retried again (they wait for a human).
 Work the queue in this order.
 
 1. Confirm the shape of the problem.
@@ -182,8 +182,8 @@ msg-01HZX...  payment.captured attempts=5  created=2026-10-06T09:14:02Z
 
 3. Read `last_error` on the rows and fix the root cause before
    re-driving anything. Requeueing into a still-broken broker just burns
-   the retry budget again — check the broker, credentials, topic
-   existence, and payload size limits. Requeue resets the row's
+   the retry budget again (check the broker, credentials, topic
+   existence, and payload size limits). Requeue resets the row's
    `attempts`, so budget is restored.
 
 4. Requeue. One message by id, or the whole DLQ:
@@ -228,8 +228,8 @@ with database access, not from every replica.
 `Status().Stalled` is true when pending messages are not draining: the
 `db` adapter sets it once the oldest pending row has waited longer than
 `db.DefaultStallAfter` (5 minutes, `adapters/outbox/db/options.go:32-34`).
-It is a stronger signal than `pending > 0` — a busy relay is healthy, a
-relay holding old rows is stuck. That 5-minute default is also why the
+It is a stronger signal than `pending > 0` (a busy relay is healthy, a
+relay holding old rows is stuck). That 5-minute default is also why the
 SLA alert above is expressed as `> 300`.
 
 Readiness is opt-in. With `outbox.options.stall_readiness: true` the
@@ -246,15 +246,15 @@ outbox:
     stall_readiness: true
 ```
 
-The flag belongs under `options:` — service envelopes are strictly
+The flag belongs under `options:` (service envelopes are strictly
 `{adapter, options}`, so a sibling `stall_readiness:` key is a decode
-error. The check itself is best-effort: a store that fails to resolve is
+error). The check itself is best-effort: a store that fails to resolve is
 skipped rather than failing readiness, so turning the flag on cannot
 make a process that never wired the outbox permanently unready.
 
 Leave it off when several replicas share one outbox table and you would
-rather alert than shed traffic — a single slow publish must not take a
-healthy replica out of rotation. Watch `Stalled` through
+rather alert than shed traffic (a single slow publish must not take a
+healthy replica out of rotation). Watch `Stalled` through
 `outbox.oldest_pending_age_seconds` and the alerting rules above instead.
 
 The same signal is available in-process when you want to gate your own
@@ -283,8 +283,8 @@ func relayHealthy() error {
 
 - Multi-instance behavior: the `db` relay claims with `FOR UPDATE
   SKIP LOCKED` and a `lock_seconds` lease, so every replica can relay the
-  same table. That also means a `Requeue` takes effect for whichever
-  replica polls next — requeue once, not once per replica.
+   same table. That also means a `Requeue` takes effect for whichever
+   replica polls next (requeue once, not once per replica).
 - Redaction: `last_error` is a publisher-side error string and can carry
   broker hostnames. Treat DLQ output as sensitive; `outbox.pending`
   gauges carry no payload.
@@ -312,12 +312,12 @@ func relayHealthy() error {
    only the `db` adapter implements `outbox.Admin` and `outbox.Deleter`.
    Switch the connection, not the command.
 5. Pending grows but `outbox.published` grows too: check
-   `outbox.publish.duration_seconds` p99 — you are throughput-bound,
-   not stuck. Raise `batch_size` or replica count, not `max_attempts`.
+   `outbox.publish.duration_seconds` p99 (you are throughput-bound,
+   not stuck). Raise `batch_size` or replica count, not `max_attempts`.
 
 ## See also
 
-- [Outbox](./outbox.mdx) - the battery itself: store, relay, `Inbox`
-- [Observability](./observability.mdx) - providers, attribute bounds, redaction
-- [Events & Event Bus](./events-eventbus.mdx) - the usual `Publisher` bridge target
-- [Resilience](./resilience.mdx) - shared circuit breakers for the relay's dependencies
+- [Outbox](../../guides/background/outbox/) - the battery itself: store, relay, `Inbox`
+- [Observability](../../guides/operate/observability/) - providers, attribute bounds, redaction
+- [Events & Event Bus](../../guides/background/events/) - the usual `Publisher` bridge target
+- [Resilience](../../guides/operate/resilience/) - shared circuit breakers for the relay's dependencies

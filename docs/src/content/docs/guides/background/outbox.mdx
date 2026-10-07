@@ -97,7 +97,7 @@ The relay is not started here. `Start` publishes stored messages through the sam
 - Processed rows older than `retention` are deleted.
 - `Status()` reports `Pending`, `Processed`, `Failed`, `LastError`, and `Stalled` (oldest pending waits too long).
 - Any number of replicas can relay one table without double-publishing. If a replica crashes mid-publish, the row returns to pending when its `lock_seconds` lease expires.
-- When an observability provider is wired (`Options.Provider`, which `container.Outbox()` injects), the relay emits `outbox.*` metrics and `outbox.publish`/`outbox.consume` spans — see [Outbox Ops](../../../digging-deeper/outbox-ops/).
+- When an observability provider is wired (`Options.Provider`, which `container.Outbox()` injects), the relay emits `outbox.*` metrics and `outbox.publish`/`outbox.consume` spans (see [Outbox Ops](../../../digging-deeper/outbox-ops/)).
 
 ## Configure the outbox
 
