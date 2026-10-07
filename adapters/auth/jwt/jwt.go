@@ -295,7 +295,7 @@ func (a *adapter) Revoke(ctx context.Context, token string) error {
 
 	jti, _ := claims["jti"].(string)
 	if jti == "" {
-		return fmt.Errorf("jwt: revoke: %w: %w", auth.ErrInvalidToken, revocation.ErrNoJTI)
+		return fmt.Errorf("jwt: revoke: %w", errors.Join(auth.ErrInvalidToken, revocation.ErrNoJTI))
 	}
 
 	now := time.Now()

@@ -5,6 +5,7 @@ import (
 	"context"
 	"encoding/base64"
 	"encoding/json"
+	"errors"
 	"fmt"
 	"net/http"
 	"net/url"
@@ -114,7 +115,7 @@ func (d *driver) Get(ctx context.Context, name string) ([]byte, error) {
 	// returned raw.
 	decoded, err := base64.StdEncoding.DecodeString(raw)
 	if err != nil {
-		return nil, fmt.Errorf("vault: get %s: %w: %w", name, ErrInvalidBase64, err)
+		return nil, fmt.Errorf("vault: get %s: %w", name, errors.Join(ErrInvalidBase64, err))
 	}
 	return decoded, nil
 }

@@ -2,6 +2,7 @@ package header
 
 import (
 	"context"
+	"errors"
 	"fmt"
 	"net"
 	"net/textproto"
@@ -29,7 +30,7 @@ type adapter struct {
 // header upstream of this code).
 func (a *adapter) Resolve(_ context.Context, meta map[string]string) (string, error) {
 	if meta == nil {
-		return "", fmt.Errorf("%w: %w", ErrNilMeta, tenant.ErrNotFound)
+		return "", fmt.Errorf("header: %w", errors.Join(ErrNilMeta, tenant.ErrNotFound))
 	}
 
 	hdr := textproto.CanonicalMIMEHeaderKey(a.header)
@@ -55,7 +56,7 @@ func (a *adapter) Resolve(_ context.Context, meta map[string]string) (string, er
 				} else if !strings.Contains(splitErr.Error(), "missing port") {
 					// Fragility note: relies on the "missing port" substring
 					// because net.SplitHostPort exposes no sentinel error.
-					return "", fmt.Errorf("%w: host %q: %w", ErrInvalidHost, host, splitErr)
+					return "", fmt.Errorf("%w: host %q: %s", ErrInvalidHost, host, splitErr)
 				}
 			}
 
@@ -156,7 +157,7 @@ func New(o tenant.Options) (tenant.Tenant, error) {
 
 		re, err := regexp.Compile(pattern)
 		if err != nil {
-			return nil, fmt.Errorf("%w: %q: %w", ErrInvalidPattern, pattern, err)
+			return nil, fmt.Errorf("%w: %q: %s", ErrInvalidPattern, pattern, err)
 		}
 
 		a.subdomainRe = re
