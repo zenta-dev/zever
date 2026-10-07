@@ -465,6 +465,18 @@ func (d *driver) registerParsed(parsed cron.Schedule, args any, slot string) sch
 	return entry
 }
 
+// warnFire logs a skipped tick caused by a failed slot load or claim, so a
+// slow or broken DB (including one exceeding fireTimeout) is visible rather
+// than silently dropping fires. Cancellation is Stop aborting the tick and
+// is not logged.
+func (d *driver) warnFire(slot, step string, err error) {
+	if errors.Is(err, context.Canceled) {
+		return
+	}
+
+	d.logger.Warn().Str("slot", slot).Str("step", step).Err(err).Msg("postgres: tick skipped")
+}
+
 // fire claims slot and dispatches its job when the claim lands. A live
 // foreign lease means another instance owns the slot: the tick is skipped,
 // which is what makes multi-instance firing safe. The fire runs under
@@ -474,7 +486,13 @@ func (d *driver) fire(ctx context.Context, slot string) {
 	defer cancel()
 
 	row, ok, err := d.load(ctx, slot)
-	if err != nil || !ok {
+	if err != nil {
+		d.warnFire(slot, "load", err)
+
+		return
+	}
+
+	if !ok {
 		return
 	}
 
@@ -484,7 +502,13 @@ func (d *driver) fire(ctx context.Context, slot string) {
 	}
 
 	claimed, err := d.claim(ctx, slot, now)
-	if err != nil || !claimed {
+	if err != nil {
+		d.warnFire(slot, "claim", err)
+
+		return
+	}
+
+	if !claimed {
 		return
 	}
 

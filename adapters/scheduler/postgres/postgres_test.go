@@ -11,7 +11,9 @@ import (
 
 	"github.com/robfig/cron/v3"
 
+	"github.com/zenta-dev/zever/adapters/log/noop"
 	"github.com/zenta-dev/zever/core/job"
+	"github.com/zenta-dev/zever/core/log"
 	"github.com/zenta-dev/zever/core/queue"
 	"github.com/zenta-dev/zever/core/scheduler"
 )
@@ -334,6 +336,79 @@ func TestFireTimeout_BoundsHungDispatch(t *testing.T) {
 			t.Fatalf("fire unblocked after %v (fake clock), want exactly the %v fire timeout", elapsed, fireTimeout)
 		}
 	})
+}
+
+// warnRecorder is a log.Logger that records Warn messages; every other
+// level discards via the embedded noop logger.
+type warnRecorder struct {
+	log.Logger
+
+	mu   sync.Mutex
+	msgs []string
+}
+
+func (w *warnRecorder) Warn() log.Event { return warnEvent{Event: w.Logger.Warn(), rec: w} }
+
+func (w *warnRecorder) count() int {
+	w.mu.Lock()
+	defer w.mu.Unlock()
+
+	return len(w.msgs)
+}
+
+// warnEvent keeps itself in the chain for the field methods fire uses, so
+// Msg reaches the recorder.
+type warnEvent struct {
+	log.Event
+
+	rec *warnRecorder
+}
+
+func (e warnEvent) Str(_, _ string) log.Event { return e }
+func (e warnEvent) Err(_ error) log.Event     { return e }
+func (e warnEvent) Msg(msg string) {
+	e.rec.mu.Lock()
+	defer e.rec.mu.Unlock()
+
+	e.rec.msgs = append(e.rec.msgs, msg)
+}
+
+func TestFire_LogsLoadFailureButNotCancel(t *testing.T) {
+	t.Parallel()
+
+	rec := &warnRecorder{Logger: noop.New()}
+
+	d := mustNew(t, Options{Owner: "owner-fire-log"})
+	t.Cleanup(func() { _ = d.Close() })
+
+	d.logger = rec
+
+	registerJobOnce(t, "sched-fire-log")
+
+	id, err := d.Schedule(t.Context(), "0 * * * *", "sched-fire-log", nil)
+	if err != nil {
+		t.Fatalf("Schedule failed: %v", err)
+	}
+
+	d.mu.Lock()
+	slot := d.slots[id]
+	d.mu.Unlock()
+
+	canceled, cancel := context.WithCancel(t.Context())
+	cancel()
+	d.fire(canceled, slot)
+
+	if n := rec.count(); n != 0 {
+		t.Fatalf("warns after canceled fire = %d, want 0 (Stop must not log)", n)
+	}
+
+	expired, cancelExpired := context.WithDeadline(t.Context(), time.Unix(0, 0))
+	defer cancelExpired()
+	d.fire(expired, slot)
+
+	if n := rec.count(); n != 1 {
+		t.Fatalf("warns after deadline-exceeded fire = %d, want 1", n)
+	}
 }
 
 func TestTickCtx_SchedulerRootedNotRequest(t *testing.T) {
