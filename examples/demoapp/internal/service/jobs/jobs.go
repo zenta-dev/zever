@@ -17,11 +17,11 @@ import (
 )
 
 // ErrOrderNotFound indicates an order ID has no matching row.
-var ErrOrderNotFound = errors.New("order not found")
+var ErrOrderNotFound = errors.New("jobs: order not found")
 
 var (
-	errEmptyEmail   = errors.New("email is empty")
-	errEmptyOrderID = errors.New("order id is empty")
+	errEmptyEmail   = errors.New("jobs: email is empty")
+	errEmptyOrderID = errors.New("jobs: order id is empty")
 )
 
 // Deps carries the resolved services job handlers need. It keeps the global

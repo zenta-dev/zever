@@ -55,7 +55,7 @@ type GenerateScheduleConfig struct {
 }
 
 // ErrScheduleMissingCron is returned when GenerateSchedule gets no cron spec.
-var ErrScheduleMissingCron = errors.New("--cron is required")
+var ErrScheduleMissingCron = errors.New("zever: --cron is required")
 
 // ErrScheduleUsage is returned when runGenerateSchedule gets the wrong
 // positional count.
@@ -185,7 +185,7 @@ func runGenerateSchedule(args []string) error {
 				} else {
 					m, err = promptInputForSchedule("Module name", "", func(s string) error {
 						if !isIdent(s) {
-							return fmt.Errorf("%w", ErrInvalidIdentifier)
+							return ErrInvalidIdentifier
 						}
 
 						return nil
@@ -202,7 +202,7 @@ func runGenerateSchedule(args []string) error {
 			if len(positional) < 2 {
 				n, err := promptInputForSchedule("Schedule name", "", func(s string) error {
 					if !isIdent(s) {
-						return fmt.Errorf("%w", ErrInvalidIdentifier)
+						return ErrInvalidIdentifier
 					}
 
 					return nil
@@ -226,11 +226,11 @@ func runGenerateSchedule(args []string) error {
 		if isInteractiveTerminal() {
 			val, err := promptInputForSchedule("Cron spec", "*/5 * * * *", func(s string) error {
 				if strings.TrimSpace(s) == "" {
-					return fmt.Errorf("%w", ErrMustNotBeEmpty)
+					return ErrMustNotBeEmpty
 				}
 
 				if strings.ContainsAny(s, "\"\\\n") {
-					return fmt.Errorf("%w", ErrInvalidCronChars)
+					return ErrInvalidCronChars
 				}
 
 				return nil
@@ -259,7 +259,7 @@ func runGenerateSchedule(args []string) error {
 				} else {
 					val, err := promptInputForSchedule("Dispatch job name", "", func(s string) error {
 						if !isIdent(s) {
-							return fmt.Errorf("%w", ErrInvalidIdentifier)
+							return ErrInvalidIdentifier
 						}
 
 						return nil
@@ -273,7 +273,7 @@ func runGenerateSchedule(args []string) error {
 			} else {
 				val, err := promptInputForSchedule("Dispatch job name", "", func(s string) error {
 					if !isIdent(s) {
-						return fmt.Errorf("%w", ErrInvalidIdentifier)
+						return ErrInvalidIdentifier
 					}
 
 					return nil

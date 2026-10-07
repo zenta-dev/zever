@@ -77,7 +77,7 @@ func promptSelect(title string, options []string) (string, error) {
 	}
 
 	if len(options) == 0 {
-		return "", fmt.Errorf("no options for %q", title)
+		return "", fmt.Errorf("zever: no options for %q", title)
 	}
 
 	var val string
@@ -150,7 +150,7 @@ func promptMultiSelectDefault(title string, options, selected []string) ([]strin
 	}
 
 	if len(options) == 0 {
-		return nil, fmt.Errorf("no options for %q", title)
+		return nil, fmt.Errorf("zever: no options for %q", title)
 	}
 
 	vals := append([]string(nil), selected...)

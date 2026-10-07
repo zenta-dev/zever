@@ -321,7 +321,7 @@ func checkFingerprint(fp []byte) error {
 // encodePending builds a pending wire record: tag + fpLen + fingerprint.
 func encodePending(fp []byte) []byte {
 	if len(fp) > math.MaxInt-3 {
-		panic("db: encodePending size overflow")
+		panic("db: encodePending size overflow") // errscan:allow
 	}
 	size := 3 + len(fp)
 
@@ -335,11 +335,11 @@ func encodePending(fp []byte) []byte {
 // result.
 func encodeDone(fp, result []byte) []byte {
 	if len(fp) > math.MaxInt-3 {
-		panic("db: encodeDone size overflow")
+		panic("db: encodeDone size overflow") // errscan:allow
 	}
 	base := 3 + len(fp)
 	if len(result) > math.MaxInt-base {
-		panic("db: encodeDone size overflow")
+		panic("db: encodeDone size overflow") // errscan:allow
 	}
 	size := base + len(result)
 

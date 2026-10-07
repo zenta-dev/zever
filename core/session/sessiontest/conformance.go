@@ -75,7 +75,7 @@ func conformanceCreateGet(t *testing.T, factory func(t *testing.T) session.Store
 func checkCreateGet(ctx context.Context, s session.Store) error {
 	created, err := s.Create(ctx, time.Hour)
 	if err != nil {
-		return fmt.Errorf("Create() error = %w", err)
+		return fmt.Errorf("sessiontest: Create() error = %w", err)
 	}
 
 	if verr := session.ValidateID(created.ID); verr != nil {
@@ -83,18 +83,18 @@ func checkCreateGet(ctx context.Context, s session.Store) error {
 	}
 
 	if created.ExpiresAt.IsZero() {
-		return errors.New("Create(hour) ExpiresAt is zero, want absolute expiry")
+		return errors.New("sessiontest: Create(hour) ExpiresAt is zero, want absolute expiry")
 	}
 
 	got, err := s.Get(ctx, created.ID)
 	if err != nil {
-		return fmt.Errorf("Get() error = %w", err)
+		return fmt.Errorf("sessiontest: Get() error = %w", err)
 	}
 
 	var errs []error
 
 	if got.ID != created.ID {
-		errs = append(errs, fmt.Errorf("Get().ID = %q, want %q", got.ID, created.ID))
+		errs = append(errs, fmt.Errorf("sessiontest: Get().ID = %q, want %q", got.ID, created.ID))
 	}
 
 	if _, err := s.Get(ctx, session.NewID()); !errors.Is(err, session.ErrNotFound) {
@@ -116,28 +116,28 @@ func conformanceSave(t *testing.T, factory func(t *testing.T) session.Store) {
 func checkSave(ctx context.Context, s session.Store) error {
 	created, err := s.Create(ctx, time.Hour)
 	if err != nil {
-		return fmt.Errorf("Create() error = %w", err)
+		return fmt.Errorf("sessiontest: Create() error = %w", err)
 	}
 
 	created.Data["user"] = "u123"
 
 	if serr := s.Save(ctx, created); serr != nil {
-		return fmt.Errorf("Save() error = %w", serr)
+		return fmt.Errorf("sessiontest: Save() error = %w", serr)
 	}
 
 	got, err := s.Get(ctx, created.ID)
 	if err != nil {
-		return fmt.Errorf("Get() error = %w", err)
+		return fmt.Errorf("sessiontest: Get() error = %w", err)
 	}
 
 	var errs []error
 
 	if got.Data["user"] != "u123" {
-		errs = append(errs, fmt.Errorf("Get().Data[user] = %v, want u123", got.Data["user"]))
+		errs = append(errs, fmt.Errorf("sessiontest: Get().Data[user] = %v, want u123", got.Data["user"]))
 	}
 
 	if got.ID != created.ID {
-		errs = append(errs, fmt.Errorf("Get().ID = %q, want %q", got.ID, created.ID))
+		errs = append(errs, fmt.Errorf("sessiontest: Get().ID = %q, want %q", got.ID, created.ID))
 	}
 
 	return errors.Join(errs...)
@@ -155,16 +155,16 @@ func conformanceDelete(t *testing.T, factory func(t *testing.T) session.Store) {
 // deleted sessions read back as ErrNotFound.
 func checkDelete(ctx context.Context, s session.Store) error {
 	if err := s.Delete(ctx, session.NewID()); err != nil {
-		return fmt.Errorf("Delete(missing) error = %w, want nil", err)
+		return fmt.Errorf("sessiontest: Delete(missing) error = %w, want nil", err)
 	}
 
 	created, err := s.Create(ctx, time.Hour)
 	if err != nil {
-		return fmt.Errorf("Create() error = %w", err)
+		return fmt.Errorf("sessiontest: Create() error = %w", err)
 	}
 
 	if err := s.Delete(ctx, created.ID); err != nil {
-		return fmt.Errorf("Delete() error = %w", err)
+		return fmt.Errorf("sessiontest: Delete() error = %w", err)
 	}
 
 	var errs []error
@@ -174,7 +174,7 @@ func checkDelete(ctx context.Context, s session.Store) error {
 	}
 
 	if err := s.Delete(ctx, created.ID); err != nil {
-		errs = append(errs, fmt.Errorf("Delete(again) error = %w, want nil", err))
+		errs = append(errs, fmt.Errorf("sessiontest: Delete(again) error = %w, want nil", err))
 	}
 
 	return errors.Join(errs...)
@@ -201,7 +201,7 @@ func conformanceTTLExpiry(t *testing.T, factory func(t *testing.T) session.Store
 func checkTTLExpiry(ctx context.Context, s session.Store, ttl, timeout time.Duration) error {
 	created, err := s.Create(ctx, ttl)
 	if err != nil {
-		return fmt.Errorf("Create() error = %w", err)
+		return fmt.Errorf("sessiontest: Create() error = %w", err)
 	}
 
 	// TTL maps to an absolute ExpiresAt roughly one TTL out: the store
@@ -210,11 +210,11 @@ func checkTTLExpiry(ctx context.Context, s session.Store, ttl, timeout time.Dura
 	var errs []error
 
 	if until := time.Until(created.ExpiresAt); until <= -time.Minute || until > ttl+time.Minute {
-		errs = append(errs, fmt.Errorf("ExpiresAt = %v (in %v), want ~%v out", created.ExpiresAt, until, ttl))
+		errs = append(errs, fmt.Errorf("sessiontest: ExpiresAt = %v (in %v), want ~%v out", created.ExpiresAt, until, ttl))
 	}
 
 	if _, err := s.Get(ctx, created.ID); err != nil {
-		errs = append(errs, fmt.Errorf("Get() before expiry error = %w", err))
+		errs = append(errs, fmt.Errorf("sessiontest: Get() before expiry error = %w", err))
 		return errors.Join(errs...)
 	}
 
@@ -245,22 +245,22 @@ func checkOpenRegister(probe session.Store) error {
 	// the production Open path: factory proves the backend, Open proves
 	// the wiring.
 	if err := session.Register(name, func(session.Options) (session.Store, error) { return probe, nil }); err != nil {
-		return fmt.Errorf("Register() error = %w", err)
+		return fmt.Errorf("sessiontest: Register() error = %w", err)
 	}
 
 	if err := session.Register(name, func(session.Options) (session.Store, error) { return probe, nil }); !errors.Is(err, session.ErrDuplicate) {
-		return fmt.Errorf("Register(dup) err = %w, want ErrDuplicate", err)
+		return fmt.Errorf("sessiontest: Register(dup) err = %w, want ErrDuplicate", err)
 	}
 
 	opened, err := session.Open(name, session.Options{})
 	if err != nil {
-		return fmt.Errorf("Open() error = %w", err)
+		return fmt.Errorf("sessiontest: Open() error = %w", err)
 	}
 
 	var errs []error
 
 	if opened != probe {
-		errs = append(errs, errors.New("Open() did not return the registered store"))
+		errs = append(errs, errors.New("sessiontest: Open() did not return the registered store"))
 	}
 
 	if _, err := session.Open("kit-no-such-adapter", session.Options{}); !errors.Is(err, session.ErrUnknownAdapter) {
@@ -315,13 +315,13 @@ func conformanceClose(t *testing.T, factory func(t *testing.T) session.Store) {
 // ErrClosed afterwards. Soft mismatches join so all are reported.
 func checkClose(ctx context.Context, s session.Store) error {
 	if err := s.Close(); err != nil {
-		return fmt.Errorf("Close() error = %w", err)
+		return fmt.Errorf("sessiontest: Close() error = %w", err)
 	}
 
 	var errs []error
 
 	if err := s.Close(); err != nil {
-		errs = append(errs, fmt.Errorf("Close() second error = %w, want nil", err))
+		errs = append(errs, fmt.Errorf("sessiontest: Close() second error = %w, want nil", err))
 	}
 
 	if _, err := s.Create(ctx, time.Hour); !errors.Is(err, session.ErrClosed) {

@@ -162,7 +162,7 @@ func (a *adapter) deliverOne(ctx context.Context, r registration, payload []byte
 		}
 	}
 
-	return fmt.Errorf("http: delivery failed after %d attempts: %w: %w", a.maxRetries, lastErr, ErrDeliveryFailed)
+	return fmt.Errorf("http: delivery failed after %d attempts: %w", a.maxRetries, errors.Join(lastErr, ErrDeliveryFailed))
 }
 
 func (a *adapter) validateIfNeeded(ctx context.Context, target string) error {

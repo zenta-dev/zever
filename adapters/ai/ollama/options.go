@@ -66,7 +66,7 @@ func validateAddr(addr string, allowInsecure bool) error {
 		endpoint.WithRejectUserinfo(),
 		endpoint.WithRejectWhitespace(),
 	); err != nil {
-		return fmt.Errorf("%w: %s: %w", ErrInvalidAddr, addrReason(err), err)
+		return errors.Join(fmt.Errorf("%w: %s", ErrInvalidAddr, addrReason(err)), err)
 	}
 
 	return nil

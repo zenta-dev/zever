@@ -453,7 +453,7 @@ func runGenerateModule(args []string) error {
 		if isInteractiveTerminal() {
 			val, err := promptInputForGenerate("Module name", "", func(s string) error {
 				if !isIdent(s) {
-					return fmt.Errorf("%w", ErrInvalidIdentifier)
+					return ErrInvalidIdentifier
 				}
 
 				return nil
@@ -473,11 +473,11 @@ func runGenerateModule(args []string) error {
 		if isInteractiveTerminal() {
 			val, err := promptInputForGenerate("Module name", "", func(s string) error {
 				if s == "" {
-					return fmt.Errorf("%w", ErrMustNotBeEmpty)
+					return ErrMustNotBeEmpty
 				}
 
 				if !isIdent(s) {
-					return fmt.Errorf("%w", ErrInvalidIdentifier)
+					return ErrInvalidIdentifier
 				}
 
 				return nil
@@ -488,7 +488,7 @@ func runGenerateModule(args []string) error {
 
 			name = val
 		} else {
-			return fmt.Errorf("%w", ErrMustNotBeEmpty)
+			return ErrMustNotBeEmpty
 		}
 	}
 

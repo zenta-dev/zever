@@ -3,6 +3,7 @@ package qdrant
 import (
 	"context"
 	"crypto/sha256"
+	"errors"
 	"fmt"
 	"net/url"
 	"regexp"
@@ -87,7 +88,7 @@ func New(o vectorstore.Options) (vectorstore.VectorStore, error) {
 	// downgrade.
 	normalized, err := endpoint.ValidateURL(o.URL, endpoint.WithAllowInsecure(o.AllowInsecure))
 	if err != nil {
-		return nil, fmt.Errorf("qdrant: %w: %w", vectorstore.ErrInvalidOptions, err)
+		return nil, fmt.Errorf("qdrant: %w", errors.Join(vectorstore.ErrInvalidOptions, err))
 	}
 
 	host, port, useTLS := parseAddr(normalized)
@@ -184,7 +185,7 @@ func (s *Store) UpsertBatch(ctx context.Context, vecs []vectorstore.Vector) erro
 
 	for i, vec := range vecs {
 		if err := vec.Validate(); err != nil {
-			return fmt.Errorf("qdrant: upsert batch: index %d: %w: %w", i, ErrInvalidVector, err)
+			return fmt.Errorf("qdrant: upsert batch: index %d: %w", i, errors.Join(ErrInvalidVector, err))
 		}
 	}
 
