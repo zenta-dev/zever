@@ -1,6 +1,7 @@
 package local
 
 import (
+	"context"
 	"os"
 	"os/exec"
 	"testing"
@@ -24,6 +25,6 @@ func warmChromePageCache() {
 			continue
 		}
 
-		_ = exec.Command(path, "--version").Run()
+		_ = exec.CommandContext(context.Background(), path, "--version").Run()
 	}
 }
