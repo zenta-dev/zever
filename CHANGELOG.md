@@ -159,6 +159,12 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - New `adapters/outbox/cdc` adapter module (postgres logical replication via
   `pg_logical_emit_message` + `START_REPLICATION`), registering the
   `outbox.CDC` adapter; live tests gated by `POSTGRES_DSN`.
+- CDN battery: new `core/cdn` module (`CDN` interface with `Purge`/`Close`/`Name`
+  and `PurgeRequest` by URL, cache tag, or full zone), plus `adapters/cdn/noop`
+  (zero-infra default) and `adapters/cdn/cloudflare` (purge via the official
+  `cloudflare-go/v7` client). Wired into the container (`c.CDN()`), layered
+  config (`CDN_*` env vars, strict schema), and the `zever` CLI (`zever add cdn`,
+  the `zever new` battery picker, and `zever generate adapter cdn`).
 
 ### Documentation
 
