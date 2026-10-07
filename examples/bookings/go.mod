@@ -4,12 +4,14 @@ go 1.27.0
 
 require (
 	github.com/google/uuid v1.6.0
+	github.com/zenta-dev/zever/adapters/analytics/log v0.5.3
 	github.com/zenta-dev/zever/adapters/auth/jwt v0.5.3
 	github.com/zenta-dev/zever/adapters/billing/stub v0.5.3
 	github.com/zenta-dev/zever/adapters/cache/memory v0.5.3
 	github.com/zenta-dev/zever/adapters/crypto/local v0.5.3
 	github.com/zenta-dev/zever/adapters/db/sqlite v0.5.3
 	github.com/zenta-dev/zever/adapters/document/local v0.5.3
+	github.com/zenta-dev/zever/adapters/eventbus/memory v0.5.3
 	github.com/zenta-dev/zever/adapters/flag/static v0.5.3
 	github.com/zenta-dev/zever/adapters/geo/static v0.5.3
 	github.com/zenta-dev/zever/adapters/i18n/embed v0.5.3
@@ -19,6 +21,7 @@ require (
 	github.com/zenta-dev/zever/adapters/mailer/log v0.5.3
 	github.com/zenta-dev/zever/adapters/media/local v0.5.3
 	github.com/zenta-dev/zever/adapters/notification/log v0.5.3
+	github.com/zenta-dev/zever/adapters/observability/stdout v0.5.3
 	github.com/zenta-dev/zever/adapters/password/argon2 v0.5.3
 	github.com/zenta-dev/zever/adapters/payment/stub v0.5.3
 	github.com/zenta-dev/zever/adapters/permission/rbac v0.5.3
@@ -28,9 +31,12 @@ require (
 	github.com/zenta-dev/zever/adapters/scheduler/embedded v0.5.3
 	github.com/zenta-dev/zever/adapters/search/db v0.5.3
 	github.com/zenta-dev/zever/adapters/secrets/env v0.5.3
+	github.com/zenta-dev/zever/adapters/session/memory v0.5.3
+	github.com/zenta-dev/zever/adapters/storage/local v0.5.3
 	github.com/zenta-dev/zever/adapters/tenant/single v0.5.3
 	github.com/zenta-dev/zever/adapters/vectorstore/db v0.5.3
 	github.com/zenta-dev/zever/adapters/webhook/queue v0.5.3
+	github.com/zenta-dev/zever/adapters/workflow/memory v0.5.3
 	github.com/zenta-dev/zever/config v0.5.3
 	github.com/zenta-dev/zever/container v0.5.3
 	github.com/zenta-dev/zever/core/auth v0.5.3
@@ -135,6 +141,8 @@ replace github.com/zenta-dev/zever/adapters/media/ffmpeg => ../../adapters/media
 
 replace github.com/zenta-dev/zever/adapters/observability/noop => ../../adapters/observability/noop
 
+replace github.com/zenta-dev/zever/adapters/observability/stdout => ../../adapters/observability/stdout
+
 replace github.com/zenta-dev/zever/adapters/payment/stub => ../../adapters/payment/stub
 
 replace github.com/zenta-dev/zever/adapters/permission/noop => ../../adapters/permission/noop
@@ -198,7 +206,9 @@ replace github.com/zenta-dev/zever/shared/httpclient => ../../shared/httpclient
 replace github.com/zenta-dev/zever/shared/lrucache => ../../shared/lrucache
 
 replace github.com/zenta-dev/zever/shared/msgspan => ../../shared/msgspan
+
 replace github.com/zenta-dev/zever/shared/outboxbridge => ../../shared/outboxbridge
+
 replace github.com/zenta-dev/zever/shared/providersopt => ../../shared/providersopt
 
 replace github.com/zenta-dev/zever/shared/redisclient => ../../shared/redisclient

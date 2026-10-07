@@ -39,8 +39,6 @@ func newOutboxCLIFixture(t *testing.T, name string) *outboxCLIFixture {
 
 	dsn := "file:outboxtest_" + name + "?mode=memory&cache=shared"
 
-	ensureZeverOutboxAdapters()
-
 	store, err := outbox.Open(outbox.DB, outbox.Options{DSN: dsn, Table: "outbox"})
 	if err != nil {
 		t.Fatalf("open outbox store: %v", err)

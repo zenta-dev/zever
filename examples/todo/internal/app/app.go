@@ -17,8 +17,13 @@ import (
 	"github.com/zenta-dev/zever/container"
 
 	authjwt "github.com/zenta-dev/zever/adapters/auth/jwt"
+	cachememory "github.com/zenta-dev/zever/adapters/cache/memory"
 	dbsqlite "github.com/zenta-dev/zever/adapters/db/sqlite"
+	logslog "github.com/zenta-dev/zever/adapters/log/slog"
 	passwordargon2 "github.com/zenta-dev/zever/adapters/password/argon2"
+	queuememory "github.com/zenta-dev/zever/adapters/queue/memory"
+	routerstdhttp "github.com/zenta-dev/zever/adapters/router/stdhttp"
+	schedulerembedded "github.com/zenta-dev/zever/adapters/scheduler/embedded"
 )
 
 // DefaultDBPath is the sqlite file used when nothing else supplies one. It is
@@ -56,8 +61,13 @@ func New() (*container.Container, error) {
 	}
 
 	authjwt.Register()
+	cachememory.Register()
 	dbsqlite.Register()
+	logslog.Register()
 	passwordargon2.Register()
+	queuememory.Register()
+	routerstdhttp.Register()
+	schedulerembedded.Register()
 
 	return container.New(cfg), nil
 }

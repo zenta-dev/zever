@@ -80,12 +80,14 @@ import (
 	cacheredis "github.com/zenta-dev/zever/adapters/cache/redis"
 	cdncloudflare "github.com/zenta-dev/zever/adapters/cdn/cloudflare"
 	cdnnoop "github.com/zenta-dev/zever/adapters/cdn/noop"
+	cryptokms "github.com/zenta-dev/zever/adapters/crypto/kms"
 	dbpostgres "github.com/zenta-dev/zever/adapters/db/postgres"
 	dbsqlite "github.com/zenta-dev/zever/adapters/db/sqlite"
 	documentlocal "github.com/zenta-dev/zever/adapters/document/local"
 	eventbusredis "github.com/zenta-dev/zever/adapters/eventbus/redis"
 	flagfirebase "github.com/zenta-dev/zever/adapters/flag/firebase"
 	geogoogle "github.com/zenta-dev/zever/adapters/geo/google"
+	idempotencydb "github.com/zenta-dev/zever/adapters/idempotency/db"
 	idempotencyredis "github.com/zenta-dev/zever/adapters/idempotency/redis"
 	lockredis "github.com/zenta-dev/zever/adapters/lock/redis"
 	logzerolog "github.com/zenta-dev/zever/adapters/log/zerolog"
@@ -94,6 +96,9 @@ import (
 	notificationfcm "github.com/zenta-dev/zever/adapters/notification/fcm"
 	notificationtwilio "github.com/zenta-dev/zever/adapters/notification/twilio"
 	observabilityotlp "github.com/zenta-dev/zever/adapters/observability/otlp"
+	outboxcdc "github.com/zenta-dev/zever/adapters/outbox/cdc"
+	outboxdb "github.com/zenta-dev/zever/adapters/outbox/db"
+	outboxmemory "github.com/zenta-dev/zever/adapters/outbox/memory"
 	passwordargon2 "github.com/zenta-dev/zever/adapters/password/argon2"
 	paymentpaddle "github.com/zenta-dev/zever/adapters/payment/paddle"
 	paymentstripe "github.com/zenta-dev/zever/adapters/payment/stripe"
@@ -101,10 +106,15 @@ import (
 	queuedb "github.com/zenta-dev/zever/adapters/queue/db"
 	queueredis "github.com/zenta-dev/zever/adapters/queue/redis"
 	ratelimitredis "github.com/zenta-dev/zever/adapters/ratelimit/redis"
+	resilienceinproc "github.com/zenta-dev/zever/adapters/resilience/inproc"
+	resilienceredis "github.com/zenta-dev/zever/adapters/resilience/redis"
 	routerfiber "github.com/zenta-dev/zever/adapters/router/fiber"
 	schedulerembedded "github.com/zenta-dev/zever/adapters/scheduler/embedded"
+	schedulerpostgres "github.com/zenta-dev/zever/adapters/scheduler/postgres"
 	searchdb "github.com/zenta-dev/zever/adapters/search/db"
 	searchmeilisearch "github.com/zenta-dev/zever/adapters/search/meilisearch"
+	secretsvault "github.com/zenta-dev/zever/adapters/secrets/vault"
+	sessiondb "github.com/zenta-dev/zever/adapters/session/db"
 	sessionredis "github.com/zenta-dev/zever/adapters/session/redis"
 	storager2 "github.com/zenta-dev/zever/adapters/storage/r2"
 	storages3 "github.com/zenta-dev/zever/adapters/storage/s3"
@@ -210,4 +220,15 @@ func init() {
 	vectorstoredb.Register()
 	vectorstoreqdrant.Register()
 	workflowdb.Register()
+
+	cryptokms.Register()
+	idempotencydb.Register()
+	outboxcdc.Register()
+	outboxdb.Register()
+	outboxmemory.Register()
+	resilienceinproc.Register()
+	resilienceredis.Register()
+	schedulerpostgres.Register()
+	secretsvault.Register()
+	sessiondb.Register()
 }
