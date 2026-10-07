@@ -884,7 +884,6 @@ import (
 	"github.com/zenta-dev/zever/container"
 	"github.com/zenta-dev/zever/core/authz"
 	"github.com/zenta-dev/zever/core/middleware"
-	"github.com/zenta-dev/zever/core/resilience"
 	"github.com/zenta-dev/zever/shared/grpcclient"
 
 	"{{.ModulePath}}/internal/app"
@@ -910,7 +909,11 @@ const (
 
 // guardedGRPCClient dials target through a per-dependency circuit breaker
 // so one slow downstream cannot exhaust this process.
-func guardedGRPCClient(ctx context.Context, c *container.Container, resMgr resilience.Manager, target, dep string) (*grpc.ClientConn, error) {
+func guardedGRPCClient(ctx context.Context, c *container.Container, target, dep string) (*grpc.ClientConn, error) {
+	resMgr, err := c.Resilience()
+	if err != nil {
+		return nil, err
+	}
 	g, err := resMgr.Guard(dep)
 	if err != nil {
 		return nil, err
@@ -968,14 +971,6 @@ func run(addr, grpcAddr string) error {
 	if err != nil {
 		return err
 	}
-
-	resMgr, err := c.Resilience()
-	if err != nil {
-		return err
-	}
-
-	// Retained for outbound calls through guardedGRPCClient below.
-	_ = resMgr
 {{if .RateLimitEnabled}}
 	limiter, err := c.RateLimit()
 	if err != nil {
