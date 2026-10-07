@@ -47,13 +47,13 @@ func conformanceOpenRegister(t *testing.T) {
 // contract violation so unit tests can drive every branch.
 func checkOpenRegister() error {
 	if _, err := billing.Open(billing.Adapter("conformance-missing-adapter"), billing.Options{}); !errors.Is(err, billing.ErrUnknownAdapter) {
-		return fmt.Errorf("Open(missing) err = %w, want ErrUnknownAdapter", err)
+		return fmt.Errorf("billingtest: Open(missing) err = %w, want ErrUnknownAdapter", err)
 	}
 
 	probe := billing.Adapter("conformance-probe-billing")
 
 	if err := billing.Register(probe, nil); !errors.Is(err, billing.ErrNilFactory) {
-		return fmt.Errorf("Register(nil) err = %w, want ErrNilFactory", err)
+		return fmt.Errorf("billingtest: Register(nil) err = %w, want ErrNilFactory", err)
 	}
 
 	stub := func(billing.Options) (billing.Billing, error) {
@@ -63,7 +63,7 @@ func checkOpenRegister() error {
 	_ = billing.Register(probe, stub)
 
 	if err := billing.Register(probe, stub); !errors.Is(err, billing.ErrDuplicate) {
-		return fmt.Errorf("Register(duplicate) err = %w, want ErrDuplicate", err)
+		return fmt.Errorf("billingtest: Register(duplicate) err = %w, want ErrDuplicate", err)
 	}
 
 	return nil
@@ -83,37 +83,37 @@ func conformanceLifecycle(t *testing.T, factory func(t *testing.T) billing.Billi
 func checkLifecycle(ctx context.Context, b billing.Billing) error {
 	cust, err := b.CreateCustomer(ctx, "Kit User", "kit@example.com", "kit-key-01")
 	if err != nil {
-		return fmt.Errorf("CreateCustomer() error = %w", err)
+		return fmt.Errorf("billingtest: CreateCustomer() error = %w", err)
 	}
 
 	if cust.ID == "" {
-		return errors.New("CreateCustomer() ID is empty")
+		return errors.New("billingtest: CreateCustomer() ID is empty")
 	}
 
 	sub, err := b.CreateSubscription(ctx, cust.ID, "plan-kit", "kit-key-02")
 	if err != nil {
-		return fmt.Errorf("CreateSubscription() error = %w", err)
+		return fmt.Errorf("billingtest: CreateSubscription() error = %w", err)
 	}
 
 	if sub.ID == "" {
-		return errors.New("CreateSubscription() ID is empty")
+		return errors.New("billingtest: CreateSubscription() ID is empty")
 	}
 
 	var errs []error
 
 	if sub.CustomerID != cust.ID {
-		errs = append(errs, fmt.Errorf("Subscription.CustomerID = %q, want %q", sub.CustomerID, cust.ID))
+		errs = append(errs, fmt.Errorf("billingtest: Subscription.CustomerID = %q, want %q", sub.CustomerID, cust.ID))
 	}
 
 	if sub.PlanID != "plan-kit" {
-		errs = append(errs, fmt.Errorf("Subscription.PlanID = %q, want plan-kit", sub.PlanID))
+		errs = append(errs, fmt.Errorf("billingtest: Subscription.PlanID = %q, want plan-kit", sub.PlanID))
 	}
 
 	inv, err := b.GetInvoice(ctx, cust.ID)
 	if err != nil {
-		errs = append(errs, fmt.Errorf("GetInvoice() error = %w", err))
+		errs = append(errs, fmt.Errorf("billingtest: GetInvoice() error = %w", err))
 	} else if inv.ID == "" {
-		errs = append(errs, errors.New("GetInvoice() ID is empty"))
+		errs = append(errs, errors.New("billingtest: GetInvoice() ID is empty"))
 	}
 
 	return errors.Join(errs...)
@@ -132,20 +132,20 @@ func conformanceCancel(t *testing.T, factory func(t *testing.T) billing.Billing)
 func checkCancel(ctx context.Context, b billing.Billing) error {
 	cust, err := b.CreateCustomer(ctx, "Cancel User", "cancel@example.com", "")
 	if err != nil {
-		return fmt.Errorf("CreateCustomer() error = %w", err)
+		return fmt.Errorf("billingtest: CreateCustomer() error = %w", err)
 	}
 
 	sub, err := b.CreateSubscription(ctx, cust.ID, "plan-kit", "")
 	if err != nil {
-		return fmt.Errorf("CreateSubscription() error = %w", err)
+		return fmt.Errorf("billingtest: CreateSubscription() error = %w", err)
 	}
 
 	if err := b.CancelSubscription(ctx, sub.ID); err != nil {
-		return fmt.Errorf("CancelSubscription() error = %w", err)
+		return fmt.Errorf("billingtest: CancelSubscription() error = %w", err)
 	}
 
 	if err := b.CancelSubscription(ctx, sub.ID); err != nil && !errors.Is(err, billing.ErrNotFound) {
-		return fmt.Errorf("CancelSubscription(again) err = %w, want nil or ErrNotFound", err)
+		return fmt.Errorf("billingtest: CancelSubscription(again) err = %w, want nil or ErrNotFound", err)
 	}
 
 	return nil
@@ -164,15 +164,15 @@ func checkNotFound(ctx context.Context, b billing.Billing) error {
 	var errs []error
 
 	if _, err := b.CreateSubscription(ctx, "cus_missing", "plan-kit", ""); !errors.Is(err, billing.ErrNotFound) {
-		errs = append(errs, fmt.Errorf("CreateSubscription(unknown customer) err = %w, want ErrNotFound", err))
+		errs = append(errs, fmt.Errorf("billingtest: CreateSubscription(unknown customer) err = %w, want ErrNotFound", err))
 	}
 
 	if err := b.CancelSubscription(ctx, "sub_missing"); !errors.Is(err, billing.ErrNotFound) {
-		errs = append(errs, fmt.Errorf("CancelSubscription(missing) err = %w, want ErrNotFound", err))
+		errs = append(errs, fmt.Errorf("billingtest: CancelSubscription(missing) err = %w, want ErrNotFound", err))
 	}
 
 	if _, err := b.GetInvoice(ctx, "cus_missing"); !errors.Is(err, billing.ErrNotFound) {
-		errs = append(errs, fmt.Errorf("GetInvoice(missing) err = %w, want ErrNotFound", err))
+		errs = append(errs, fmt.Errorf("billingtest: GetInvoice(missing) err = %w, want ErrNotFound", err))
 	}
 
 	return errors.Join(errs...)
@@ -191,24 +191,24 @@ func checkMissingIDs(ctx context.Context, b billing.Billing) error {
 	var errs []error
 
 	if _, err := b.CreateSubscription(ctx, "", "plan-kit", ""); !errors.Is(err, billing.ErrMissingCustomerID) {
-		errs = append(errs, fmt.Errorf("CreateSubscription(empty customer) err = %w, want ErrMissingCustomerID", err))
+		errs = append(errs, fmt.Errorf("billingtest: CreateSubscription(empty customer) err = %w, want ErrMissingCustomerID", err))
 	}
 
 	cust, err := b.CreateCustomer(ctx, "Kit User", "kit@example.com", "")
 	if err != nil {
-		return fmt.Errorf("CreateCustomer() error = %w", err)
+		return fmt.Errorf("billingtest: CreateCustomer() error = %w", err)
 	}
 
 	if _, err := b.CreateSubscription(ctx, cust.ID, "", ""); !errors.Is(err, billing.ErrMissingPlanID) {
-		errs = append(errs, fmt.Errorf("CreateSubscription(empty plan) err = %w, want ErrMissingPlanID", err))
+		errs = append(errs, fmt.Errorf("billingtest: CreateSubscription(empty plan) err = %w, want ErrMissingPlanID", err))
 	}
 
 	if err := b.CancelSubscription(ctx, ""); !errors.Is(err, billing.ErrMissingSubscriptionID) {
-		errs = append(errs, fmt.Errorf("CancelSubscription(empty) err = %w, want ErrMissingSubscriptionID", err))
+		errs = append(errs, fmt.Errorf("billingtest: CancelSubscription(empty) err = %w, want ErrMissingSubscriptionID", err))
 	}
 
 	if _, err := b.GetInvoice(ctx, ""); !errors.Is(err, billing.ErrMissingCustomerID) {
-		errs = append(errs, fmt.Errorf("GetInvoice(empty) err = %w, want ErrMissingCustomerID", err))
+		errs = append(errs, fmt.Errorf("billingtest: GetInvoice(empty) err = %w, want ErrMissingCustomerID", err))
 	}
 
 	return errors.Join(errs...)
@@ -225,11 +225,11 @@ func conformanceClose(t *testing.T, factory func(t *testing.T) billing.Billing) 
 // checkClose proves Close is idempotent.
 func checkClose(b billing.Billing) error {
 	if err := b.Close(); err != nil {
-		return fmt.Errorf("Close() error = %w", err)
+		return fmt.Errorf("billingtest: Close() error = %w", err)
 	}
 
 	if err := b.Close(); err != nil {
-		return fmt.Errorf("Close() second error = %w, want nil", err)
+		return fmt.Errorf("billingtest: Close() second error = %w, want nil", err)
 	}
 
 	return nil
