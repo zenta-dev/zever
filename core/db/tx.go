@@ -86,12 +86,12 @@ func TxFromContext(ctx context.Context) (Tx, bool) {
 // do not implement Transactor fail with ErrTxUnsupported.
 func WithTx(ctx context.Context, db DB, opts *TxOptions, fn func(context.Context, Tx) error) (err error) {
 	if _, ok := TxFromContext(ctx); ok {
-		return fmt.Errorf("%w", ErrNestedTx)
+		return fmt.Errorf("db: %w", ErrNestedTx)
 	}
 
 	tr, ok := db.(Transactor)
 	if !ok {
-		return fmt.Errorf("%w by adapter %T", ErrTxUnsupported, db)
+		return fmt.Errorf("db: %w by adapter %T", ErrTxUnsupported, db)
 	}
 
 	tx, err := tr.BeginTx(ctx, opts)
@@ -102,10 +102,10 @@ func WithTx(ctx context.Context, db DB, opts *TxOptions, fn func(context.Context
 	defer func() {
 		if r := recover(); r != nil {
 			if rbErr := tx.Rollback(ctx); rbErr != nil {
-				panic(fmt.Errorf("db: panic recovered: %v (rollback also failed: %w)", r, rbErr))
+				panic(fmt.Errorf("db: panic recovered: %v (rollback also failed: %w)", r, rbErr)) // errscan:allow
 			}
 
-			panic(r)
+			panic(r) // errscan:allow
 		}
 	}()
 
