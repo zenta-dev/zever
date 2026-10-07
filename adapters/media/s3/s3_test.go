@@ -1146,6 +1146,149 @@ func TestProbeAVBadJSON(t *testing.T) {
 	}
 }
 
+// swapExecOutput replaces the execOutput seam for the duration of a test
+// and returns the previous implementation. Determinism tests swap package
+// seams, so they never run with t.Parallel.
+func swapExecOutput(t *testing.T, fn func(context.Context, string, ...string) ([]byte, error)) func(context.Context, string, ...string) ([]byte, error) {
+	t.Helper()
+	orig := execOutput
+	execOutput = fn
+	t.Cleanup(func() { execOutput = orig })
+	return orig
+}
+
+// swapExecRun replaces the execRun seam for the duration of a test and
+// returns the previous implementation.
+func swapExecRun(t *testing.T, fn func(context.Context, string, ...string) error) func(context.Context, string, ...string) error {
+	t.Helper()
+	orig := execRun
+	execRun = fn
+	t.Cleanup(func() { execRun = orig })
+	return orig
+}
+
+func TestRunFFProbeTextBusyRetry(t *testing.T) {
+	bin := stubBin(t, ffprobeStub(ffprobeFull))
+
+	var attempts int
+	var orig func(context.Context, string, ...string) ([]byte, error)
+	orig = swapExecOutput(t, func(ctx context.Context, name string, args ...string) ([]byte, error) {
+		attempts++
+		if attempts <= 2 {
+			return nil, syscall.ETXTBSY
+		}
+		return orig(ctx, name, args...)
+	})
+
+	fp, err := runFFProbe(t.Context(), bin, "in.mp4")
+	if err != nil {
+		t.Fatalf("runFFProbe() err = %v, want nil", err)
+	}
+	if attempts != 3 {
+		t.Errorf("attempts = %d, want 3", attempts)
+	}
+	if fp.Format.Duration != "1.5" {
+		t.Errorf("duration = %q, want 1.5", fp.Format.Duration)
+	}
+}
+
+func TestRunFFProbeTextBusyRetryBounded(t *testing.T) {
+	bin := stubBin(t, ffprobeStub(ffprobeFull))
+
+	var attempts int
+	swapExecOutput(t, func(context.Context, string, ...string) ([]byte, error) {
+		attempts++
+		return nil, syscall.ETXTBSY
+	})
+
+	_, err := runFFProbe(t.Context(), bin, "in.mp4")
+	if !errors.Is(err, media.ErrProbeFailed) {
+		t.Fatalf("runFFProbe() err = %v, want probe failed", err)
+	}
+	if attempts != defaultMaxExecAttempts {
+		t.Errorf("attempts = %d, want %d", attempts, defaultMaxExecAttempts)
+	}
+}
+
+func TestTransformAVTextBusyRetry(t *testing.T) {
+	var gotKey string
+	tr := &stubTransport{do: transformRouter(t, testID+".wav", []byte("fake-wav"), "audio/wav",
+		func(r *http.Request) (int, string, http.Header, error) {
+			gotKey = r.URL.EscapedPath()
+			_, _ = readBody(r)
+			return http.StatusOK, "", nil, nil
+		})}
+	d := testDriver(t, tr)
+	d.ffmpeg = stubBin(t, ffmpegCopyStub)
+
+	var attempts int
+	var orig func(context.Context, string, ...string) error
+	orig = swapExecRun(t, func(ctx context.Context, name string, args ...string) error {
+		attempts++
+		if attempts <= 2 {
+			return syscall.ETXTBSY
+		}
+		return orig(ctx, name, args...)
+	})
+
+	u, err := d.Transform(t.Context(), testID, media.TransformOps{Format: "mp3"})
+	if err != nil {
+		t.Fatalf("Transform() err = %v, want nil", err)
+	}
+	if attempts != 3 {
+		t.Errorf("attempts = %d, want 3", attempts)
+	}
+	if !strings.HasSuffix(gotKey, ".mp3") || !strings.Contains(u, testID+"-") {
+		t.Errorf("key = %q, url = %q, want derived mp3", gotKey, u)
+	}
+}
+
+func TestExecTextBusyRetryNoRetryOnOtherError(t *testing.T) {
+	attempts := 0
+	sentinel := errors.New("exec boom")
+	err := execTextBusyRetry(t.Context(), func() error {
+		attempts++
+		return sentinel
+	})
+	if !errors.Is(err, sentinel) {
+		t.Fatalf("err = %v, want sentinel", err)
+	}
+	if attempts != 1 {
+		t.Errorf("attempts = %d, want 1", attempts)
+	}
+}
+
+func TestExecTextBusyRetryBounded(t *testing.T) {
+	attempts := 0
+	err := execTextBusyRetry(t.Context(), func() error {
+		attempts++
+		return syscall.ETXTBSY
+	})
+	if !errors.Is(err, syscall.ETXTBSY) {
+		t.Fatalf("err = %v, want ETXTBSY", err)
+	}
+	if attempts != defaultMaxExecAttempts {
+		t.Errorf("attempts = %d, want %d", attempts, defaultMaxExecAttempts)
+	}
+}
+
+func TestExecTextBusyRetryCtxCancel(t *testing.T) {
+	ctx, cancel := context.WithCancel(t.Context())
+	cancel()
+
+	attempts := 0
+	err := execTextBusyRetry(ctx, func() error {
+		attempts++
+		return syscall.ETXTBSY
+	})
+	if !errors.Is(err, context.Canceled) {
+		t.Fatalf("err = %v, want context.Canceled", err)
+	}
+	if attempts != 1 {
+		t.Errorf("attempts = %d, want 1", attempts)
+	}
+}
+
 func TestProbeAVDurationExceeded(t *testing.T) {
 	t.Parallel()
 	tr := &stubTransport{do: listGetRouter(t, testID+".mp4", []byte("fake-av"), "video/mp4")}
