@@ -1,0 +1,107 @@
+---
+title: Workflows
+description: Run durable multi-step workflows that survive restarts, with start, signal, query, and cancel.
+---
+
+import { LinkCard, CardGrid } from '@astrojs/starlight/components';
+
+Use `workflow` for multi-step runs (onboarding, payouts, provisioning) that must survive a restart partway through: a crash after step 3 resumes at step 3 instead of starting over. The interface covers run lifecycle: `Start` a named workflow with JSON-marshalable input, `Signal` a running channel, `Query` state into an output value, and `Cancel` a run. This is not a cron scheduler: use the [scheduler](../scheduler-jobs/) for cron-shaped firing, `queue` plus `job` for plain background tasks, and [saga](../saga/) for multi-step operations with rollback.
+
+## Quick start
+
+```yaml title="zever.yaml"
+workflow:
+  adapter: memory
+  options:
+    namespace: bookings
+```
+
+```go title="main.go"
+package main
+
+import (
+	"context"
+	"fmt"
+
+	workflowmemory "github.com/zenta-dev/zever/adapters/workflow/memory"
+	"github.com/zenta-dev/zever/core/workflow"
+)
+
+func main() {
+	wf, _ := workflowmemory.New(workflow.Options{})
+	defer wf.Close()
+
+	// A workflow name must have a registered step, or Start fails with an unknown-step error.
+	wf.(workflow.StepRegistrar).RegisterStep("booking-confirm", func(_ context.Context, in any) (any, error) {
+		return in, nil
+	})
+
+	ctx := context.Background()
+	id, err := wf.Start(ctx, "booking-confirm", map[string]string{"booking_id": "b-1"}, "wf-b-1")
+	fmt.Println(id, err)
+	var state map[string]string
+	fmt.Println(wf.Query(ctx, id, "state", &state), state)
+}
+```
+
+```text
+wf-b-1 <nil>
+<nil> map[booking_id:b-1]
+```
+
+Register the adapter with `workflowmemory.Register()` before resolving through the container (`c.Workflow()`). The only query name is `state`; any other returns an unknown-query error. On `memory`, `Start` runs the registered step inline and finishes the run, so a later `Signal` or `Cancel` on it returns a run-completed error; those calls act on runs still in flight (`db`). Pass an empty `workflowID` to generate one (`run-N` on memory); a duplicate ID fails with a duplicate-run error. `Signal(ctx, runID, name, value)` delivers a value to a running ID. `Workflow()` resolves lazily, caches per container, and retries after errors; `Close() error` takes no context. See [the container](../../../concepts/container/).
+
+## Choose a backend
+
+| Adapter | Package | Use when |
+|---|---|---|
+| `memory` | `adapters/workflow/memory` | Default. Local dev and tests. In-process; a run holds at most 100 pending signals, then `Signal` returns `ErrPendingFull` instead of blocking. |
+| `db` | `adapters/workflow/db` | Durable DB-backed runs, lease-reclaimed steps. Set `dsn` to a postgres URL (empty is sqlite). |
+| `postgres` | `adapters/workflow/db` | Legacy alias for `db`. |
+
+`memory` state dies with the process, so two replicas each see only their own runs and a restart loses all of them; anything that must survive a crash needs `db`. Engines with host-registered steps expose them through the separate `StepRegistrar` interface (`RegisterStep`), so engines without the concept are unaffected. Step input and output must be JSON-marshalable; the output becomes queryable state, so keep payloads small and reference-backed.
+
+## Configure the workflow
+
+```sh
+WORKFLOW_ADAPTER=memory
+WORKFLOW_NAMESPACE=bookings
+WORKFLOW_HOSTPORT=127.0.0.1:7233
+WORKFLOW_DSN=postgres://app:secret@db:5432/app
+```
+
+`namespace` scopes runs; `host_port` names a workflow server address when the backend needs one. Durable keys are `dsn`, `table` (default `workflow_runs`), and `dedicated_pool`. All are optional for `memory`. `Validate` only rejects a malformed `host_port` (it must split as host:port when set); everything else passes to the adapter. A durable workflow shares the container pool for its DSN with every other battery on that DSN (first opener's `max_conns` wins); set `dedicated_pool: true` with a separate workflow database under load. All keys: [workflow config reference](../../../reference/config/#workflow).
+
+## Production checklist
+
+- Design every step idempotent now (locks plus idempotency keys for money-moving steps) so a durable backend can replay safely. Cap retries per step and route poison inputs to a dead-letter path.
+- Inputs, signals, and step results become queryable state and may cross process boundaries. Keep secrets and PII out and pass references; never log raw option maps (use `config.RedactedServices`).
+- The container closes only resolved services and joins errors via `errors.Join`; panics become `*ClosePanicError`.
+
+## Troubleshooting
+
+<details>
+<summary>ErrPendingFull on signal</summary>
+
+The memory run's pending-signal buffer (100) is full. Drain or cancel stuck runs, cap per-step retries, and send poison inputs to a dead-letter path rather than looping.
+</details>
+
+<details>
+<summary>Query fails with a marshal error</summary>
+
+On `memory`, `Start` and `Signal` store values as-is and marshal lazily at `Query` time, so a non-marshalable input surfaces there, not at start (`db` marshals the input at `Start`). Pass only JSON-marshalable values (maps, slices, structs without channels or funcs).
+</details>
+
+<details>
+<summary>Steps re-run side effects after a crash</summary>
+
+The step was not idempotent. Gate side-effecting steps behind `lock` singletons and idempotency keys, and emit an observability span per step so stalled runs are locatable.
+</details>
+
+## Related
+
+<CardGrid>
+  <LinkCard title="Saga" href="../saga/" description="Multi-step transactions with compensation." />
+  <LinkCard title="Locks and idempotency" href="../../security/lock-idempotency/" description="Make steps idempotent." />
+  <LinkCard title="Observability" href="../../operate/observability/" description="Spans per workflow step." />
+</CardGrid>

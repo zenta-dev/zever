@@ -44,6 +44,7 @@ replace (
 	github.com/zenta-dev/zever/core/auth => ../../core/auth
 	github.com/zenta-dev/zever/core/billing => ../../core/billing
 	github.com/zenta-dev/zever/core/cache => ../../core/cache
+	github.com/zenta-dev/zever/core/cdn => ../../core/cdn
 	github.com/zenta-dev/zever/core/crypto => ../../core/crypto
 	github.com/zenta-dev/zever/core/db => ../../core/db
 	github.com/zenta-dev/zever/core/document => ../../core/document
@@ -108,6 +109,7 @@ require (
 	github.com/zenta-dev/zever/core/auth v0.5.3 // indirect
 	github.com/zenta-dev/zever/core/billing v0.5.3 // indirect
 	github.com/zenta-dev/zever/core/cache v0.5.3 // indirect
+	github.com/zenta-dev/zever/core/cdn v0.5.3 // indirect
 	github.com/zenta-dev/zever/core/crypto v0.5.3 // indirect
 	github.com/zenta-dev/zever/core/db v0.5.3 // indirect
 	github.com/zenta-dev/zever/core/document v0.5.3 // indirect

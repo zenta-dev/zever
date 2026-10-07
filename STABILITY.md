@@ -4,7 +4,7 @@ Pre-1.0 policy for what may break in `0.x` releases. Docs-only; no API change.
 
 See also [Versioning](.github/CONTRIBUTING.md#versioning) and
 [API Compatibility](.github/CONTRIBUTING.md#api-compatibility).
-Cross-checked against `config.Config` (`config/config.go`, 34 `Service`
+Cross-checked against `config.Config` (`config/config.go`, 36 `Service`
 fields) and `container` accessors (`container/services.go`,
 `container/README.md`).
 
@@ -66,10 +66,11 @@ release-note docs.
 | `notification` | Facade (`log`, `twilio`, `fcm`). |
 | `geo` | Facade (`google`, `static`, `osm`). |
 | `flag` | Facade (`static`, `firebase`). |
-| `observability` | Facade (`noop`, `stdout`, `otlp`); `Shutdown(ctx)` flush path. |
+| `observability` | Facade (`noop`, `stdout`, `otlp`); `Shutdown(ctx)` flush path; span options `SpanStarter`/`SpanStartOption` (`WithSpanKind`/`WithAttributes`/`WithLinks`) plus `StartSpan`. |
+| `outbox` | Facade (`memory`, `db`, `cdc`); relay telemetry (`Recorder`, `outbox.*` metrics, `outbox.publish`/`outbox.consume` spans), `Admin`/`Deleter` ops surface, opt-in `stall_readiness`. |
 | `eventbus` | Facade (`memory`, `redis`). |
 | `eval` | Dataset/scorer harness for agent and generation outputs. |
-| `workflow` | Facade (`memory`, `db`). |
+| `workflow` | Facade (`memory`, `db`); saga types `SagaStep`/`SagaRegistrar`/`SagaRunner`/`SagaInspector` are additive optional interfaces. |
 | `tenant` | Facade (`single`, `header`). |
 | `analytics` | Facade (`log`, `posthog`). |
 | `i18n` | Facade (`embed`, `remote`). |
@@ -85,6 +86,9 @@ release-note docs.
 | `apperror` | Typed error vocabulary (gRPC/HTTP mappings). |
 | `authz` | `auth`-to-`permission` bridge (HTTP middleware, gRPC interceptor). |
 | `codec` | Generic `Encoder`/`Decoder`/`Codec` + `JSONCodec`. |
+| `grpcclient` | gRPC client conns (`New(ctx, target, opts...)`); LB, retry, TLS, tracing interceptors; no registry, resolved via `GRPCClient(target, opts...)`. |
+| `traceprop` | W3C TraceContext+Baggage inject/extract, fixed baggage keys, consume-span helpers. |
+| `resilience` | Facade (`memory` in `adapters/resilience/inproc`, `redis`); `Guard`/`Manager` circuit-breaker composition. |
 | `mcpclient` | MCP stdio client (initialize, tools/list, tools/call). |
 | `prompt` | Prompt builders (system, grounding, JSON repair, tool errors). |
 | `middleware` | HTTP middleware + gRPC interceptors. |
@@ -112,9 +116,9 @@ applies unchanged.
 
 - Core breaks: still permitted with release notes; the 6-month clock has
   not started.
-- Kits: 38 conformance kit packages ship under `core/*/*test/`; 32 of
+- Kits: 39 conformance kit packages ship under `core/*/*test/`; 33 of
   them ship an in-kit `conformance_test.go` suite (all pass). CI
-  (`.github/workflows/ci.yml` `conformance` job) runs all 32 in-kit
+  (`.github/workflows/ci.yml` `conformance` job) runs 34 core module
   suites plus all 83 cross-adapter `-run Conformance` invocations
   (representative batteries: `ai`, `analytics`, `auth`, `authz`,
   `billing`, `cache`, `crypto`, `db`, `document`, `eventbus`, `flag`,
@@ -122,6 +126,11 @@ applies unchanged.
   `media`, `middleware`, `notification`, `observability`, `password`,
   `payment`, `permission`, `queue`, `ratelimit`, `router`, `scheduler`,
   `secrets`, `session`, `storage`, `tenant`, `webhook`, `workflow`).
+- Kits not yet wired into that job: `core/outbox/outboxtest` and
+  `core/resilience/resiliencetest` ship kits and their adapters run
+  `Conformance`, but the CI job has no `outbox`/`resilience`
+  invocation, so their green runs come from the adapter packages'
+  own test jobs, not the conformance gate.
 - Scheduler: `adapters/scheduler/postgres` is a working durable/leased
   second adapter; `embedded` remains the zero-infra default.
 - External prod user: none known.
@@ -136,10 +145,11 @@ applies unchanged.
 ## Coverage note
 
 Every top-level package is classified above. `config`/`container` cover
-34 services (`ai`, `analytics`, `auth`, `billing`, `cache`, `crypto`,
+36 services (`ai`, `analytics`, `auth`, `billing`, `cache`, `crypto`,
 `db`, `document`, `eventbus`, `flag`, `geo`, `i18n`, `idempotency`,
 `lock`, `log`, `mailer`, `media`, `notification`, `observability`,
-`password`, `payment`, `permission`, `queue`, `ratelimit`, `router`,
-`scheduler`, `search`, `secrets`, `session`, `storage`, `tenant`,
-`vectorstore`, `webhook`, `workflow`); `job` rides on `Queue` and `grpc`
-is a lazy `*grpc.Server` singleton, so neither has a `config` entry.
+`outbox`, `password`, `payment`, `permission`, `queue`, `ratelimit`,
+`resilience`, `router`, `scheduler`, `search`, `secrets`, `session`,
+`storage`, `tenant`, `vectorstore`, `webhook`, `workflow`); `job` rides
+on `Queue` and `grpc` is a lazy `*grpc.Server` singleton, so neither has
+a `config` entry.

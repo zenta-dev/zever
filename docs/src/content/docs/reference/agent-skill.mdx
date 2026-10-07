@@ -1,14 +1,9 @@
 ---
-title: Agent Skill
-description: Install and use the zever Claude Code skill.
+title: Agent skill
+description: Install and use the Zever Claude Code skill.
 ---
 
-## Purpose
-
-The zever skill teaches coding agents the CLI surface: scaffolding,
-inspection, and runtime commands plus the machine interfaces (`--json`,
-`--help --agent`, MCP). Use it when an agent works in a zever project;
-humans should read the [CLI Reference](cli/) instead.
+The Zever skill teaches coding agents the CLI surface: scaffolding, inspection, and runtime commands plus the machine interfaces (`--json`, `--help --agent`, MCP). Use it when an agent works in a Zever project; humans should read the [CLI reference](../cli/) instead.
 
 ## Install
 
@@ -18,24 +13,17 @@ Generate and install the skill from any pinned `zever` binary:
 zever docs --skill --dir ~/.claude/skills/zever
 ```
 
-This writes a single `SKILL.md` (frontmatter plus workflows plus the live
-command catalog). The committed snapshot lives at `skills/zever/SKILL.md`;
-`skill_test.go` pins the generator output against it, so regenerate the
-snapshot after changing commands with `zever docs --skill --dir skills/zever`.
+This writes a single `SKILL.md` (frontmatter plus workflows plus the live command catalog). The committed snapshot lives at `skills/zever/SKILL.md`; `skill_test.go` pins the generator output against it, so regenerate the snapshot after changing commands with `zever docs --skill --dir skills/zever`.
 
 ## Contents
 
-- When-to-use trigger phrases (scaffold app, add battery, check schema,
-  compile schemas, run server).
-- Machine interfaces: `--json` envelopes, `--help --agent` catalog, and
-  the `tools/zever-mcp` MCP server.
-- Workflows: scaffold-and-run, add-a-battery, inspect-a-schema, each with
-  `--dry-run` first.
-- Safety: preview mutations, `tinker` is development-only, secrets stay out
-  of logs.
+- When-to-use trigger phrases (scaffold app, add battery, check schema, compile schemas, run server).
+- Machine interfaces: `--json` envelopes, `--help --agent` catalog, and the `tools/zever-mcp` MCP server.
+- Workflows: scaffold-and-run, add-a-battery, inspect-a-schema, each with `--dry-run` first.
+- Safety: preview mutations, `tinker` is development-only, secrets stay out of logs.
 
-## See also
+## Related
 
-- [CLI Reference](cli/) for every command invocation
-- [AI](../digging-deeper/ai/) for the LLM facade, agent loop, RAG, and MCP
-- [llms.txt](../../../llms.txt) for the agent entry-point index
+- [CLI reference](../cli/) for every command invocation.
+- [AI](../../guides/integrations/ai/) for the LLM facade, agent loop, RAG, and MCP.
+- [llms.txt](https://github.com/zenta-dev/zever/blob/main/llms.txt) for the agent entry-point index.

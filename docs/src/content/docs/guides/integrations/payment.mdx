@@ -1,0 +1,111 @@
+---
+title: Payments
+description: Create, refund, and fetch payments and verify provider webhooks with a stub, Stripe, or Paddle adapter.
+---
+
+import { LinkCard, CardGrid } from '@astrojs/starlight/components';
+
+`payment.Payment` creates, refunds, and fetches charges and decodes provider webhooks. Customers and subscriptions are [Billing](../billing/). The flow is identical across `stub`, `stripe`, and `paddle`.
+
+## Quick start
+
+`stub` (the default) moves no money or network traffic. `auto_approve: true` marks payments `succeeded` immediately, testing the success path without a webhook.
+
+```yaml title="zever.yaml"
+payment:
+  adapter: stub
+  options:
+    auto_approve: true
+    max_webhook_bytes: 1048576
+```
+
+Provider keys come from `shared/providersopt`: `secret_key` (Stripe), `api_key` (Paddle), `endpoint`, `sandbox`. Payment adds `webhook_secret` (never logged, keep in env), `auto_approve`, and `max_webhook_bytes` (default 1MiB, negative rejected). Env vars mirror the keys. See the [payment config reference](../../../reference/config/#payment).
+
+```go title="main.go"
+package main
+
+import (
+	"context"
+	"fmt"
+
+	paymentstub "github.com/zenta-dev/zever/adapters/payment/stub"
+	"github.com/zenta-dev/zever/config"
+	"github.com/zenta-dev/zever/container"
+	"github.com/zenta-dev/zever/core/payment"
+)
+
+func main() {
+	paymentstub.Register() // container wires nothing
+	cfg := config.Default()
+	cfg.Payment.Options.AutoApprove = true
+	c := container.New(cfg)
+	ctx := context.Background()
+	defer c.Close(ctx)
+
+	p, err := c.Payment()
+	if err != nil {
+		panic(err)
+	}
+	res, _ := p.CreatePayment(ctx, payment.Request{Amount: 2500, Currency: "usd"})
+	fmt.Println("payment:", res.ID, string(res.Status))
+
+	got, _ := p.GetPayment(ctx, res.ID)
+	fmt.Println("fetched:", got.ID, string(got.Status))
+	_ = p.Close()
+}
+```
+
+Expected output with `stub` and `auto_approve: true`:
+
+```text
+payment: stub_1 succeeded
+fetched: stub_1 succeeded
+```
+
+With `auto_approve: false` the same program prints `pending`; the webhook path flips it later.
+
+## Verify webhooks
+
+Decoding checks the provider signature against `webhook_secret` before touching the payload, under the `max_webhook_bytes` bound; a failure or oversized payload never reaches your handler as a trusted `Event`. Pass the raw body unmodified, plus the signature header value, to `WebhookEvent(ctx, raw, signature)`. `stub` performs no verification and holds no funds, so it is test-only.
+
+## Choose an adapter
+
+| Adapter | Package | Notes |
+|---|---|---|
+| `stub` | `adapters/payment/stub` | Default. No network, no real money. |
+| `stripe` | `adapters/payment/stripe` | Needs `secret_key`. |
+| `paddle` | `adapters/payment/paddle` | Needs `api_key`. |
+
+## Production checklist
+
+- `payment` never stores card data (provider PCI scope) and is not a ledger; it initiates and reacts.
+- `SecretKey`, `APIKey`, and `WebhookSecret` never appear in logs or errors. Hold them in [Secrets](../../security/secrets/).
+- `Refund(ctx, id, amount, key)` takes an idempotency key so a retry cannot double-refund.
+
+## Troubleshooting
+
+<details>
+<summary>Stub payments stay `pending` in tests</summary>
+
+Cause: `auto_approve` is false. Fix: set `auto_approve: true` (or `PAYMENT_AUTO_APPROVE`).
+</details>
+
+<details>
+<summary>The webhook handler never fires</summary>
+
+Cause: the signature check runs first. Fix: confirm `PAYMENT_WEBHOOK_SECRET` matches the provider and the raw body reaches `WebhookEvent` unmodified.
+</details>
+
+<details>
+<summary>`max_webhook_bytes` rejects large events</summary>
+
+Cause: a payload over the bound. Fix: raise the bound deliberately after checking the payload is legitimate.
+</details>
+
+## Related
+
+<CardGrid>
+  <LinkCard title="Billing" href="../billing/" />
+  <LinkCard title="Build a booking API" href="../../../tutorials/build-a-booking-api/" />
+  <LinkCard title="Secrets" href="../../security/secrets/" />
+</CardGrid>

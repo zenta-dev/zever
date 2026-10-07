@@ -1,0 +1,102 @@
+---
+title: Analytics
+description: Track events, identify users, and group them with a log adapter in dev and PostHog in production.
+---
+
+import { LinkCard, CardGrid } from '@astrojs/starlight/components';
+
+`analytics.Analytics` keeps `Track`, `Identify`, and `Group` identical across the `log` (default, zero-infra) and `posthog` adapters. Use `log` for dev and tests; `posthog` when events must be durable.
+
+## Quick start
+
+```yaml title="zever.yaml"
+analytics:
+  adapter: log
+  options:
+    anonymous_id: anonymous
+    group_type: organization
+    max_properties_bytes: 65536
+    max_properties: 100
+```
+
+Defaults: `anonymous_id` `"anonymous"`, `group_type` `"organization"`, `max_properties_bytes` 64KiB. `endpoint` needs scheme and host; `max_properties` bounds count; negatives are rejected. Env vars mirror the keys. See the [analytics config reference](../../../reference/config/#analytics).
+
+```go title="main.go"
+package main
+
+import (
+	"context"
+	"fmt"
+
+	analyticslog "github.com/zenta-dev/zever/adapters/analytics/log"
+	"github.com/zenta-dev/zever/config"
+	"github.com/zenta-dev/zever/container"
+)
+
+func main() {
+	analyticslog.Register() // container wires nothing
+	c := container.New(config.Default())
+	defer c.Close(context.Background())
+
+	an, err := c.Analytics()
+	if err != nil {
+		panic(err)
+	}
+	_ = an.Track(context.Background(), "signup", map[string]any{"plan": "pro"})
+	_ = an.Identify(context.Background(), "user-1", map[string]any{"email": "you@example.com"})
+	_ = an.Group(context.Background(), "user-1", "acme", nil)
+	_ = an.Close()
+	fmt.Println("tracked 1 event for user-1")
+}
+```
+
+Expected output with `log` (slog JSON lines on stdout; `time` omitted here, and `Track` falls back to `anonymous_id` when the context carries no user):
+
+```text
+{"level":"INFO","msg":"track","user_id":"anonymous","event":"signup","properties":"{\"plan\":\"pro\"}"}
+{"level":"INFO","msg":"identify","user_id":"user-1","traits":"{\"email\":\"you@example.com\"}"}
+{"level":"INFO","msg":"group","user_id":"user-1","group_id":"acme","traits":"null"}
+tracked 1 event for user-1
+```
+
+## Choose an adapter
+
+| Adapter | Package | Notes |
+|---|---|---|
+| `log` | `analytics/log` | Default. Debug output, no PII redaction. Never a production fallback. |
+| `posthog` | `analytics/posthog` | Real pipeline. Needs `api_key`. |
+
+PostHog mirrors the vendor event shape, so field names keep upstream spelling.
+
+## Production checklist
+
+- `posthog` buffers; call `Close()` before exit or the last batch never leaves.
+- A runaway properties map fails fast locally instead of being truncated.
+- Never log raw option maps (use `cfg.RedactedServices()`); keep the write key in [Secrets](../../security/secrets/).
+
+## Troubleshooting
+
+<details>
+<summary>Events vanish on shutdown</summary>
+
+Cause: exit without `Close()`. Fix: flush the handle and container before exit.
+</details>
+
+<details>
+<summary>`Validate` rejects `endpoint`</summary>
+
+Cause: the URL lacks a scheme or host. Fix: add it.
+</details>
+
+<details>
+<summary>Payload rejected for size</summary>
+
+Cause: `max_properties_bytes` or `max_properties` exceeded. Fix: trim the map or raise the bound.
+</details>
+
+## Related
+
+<CardGrid>
+  <LinkCard title="Container" href="../../../concepts/container/" />
+  <LinkCard title="Configuration" href="../../operate/configuration/" />
+</CardGrid>

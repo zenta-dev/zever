@@ -1,0 +1,40 @@
+---
+import { href } from '../../lib/url';
+---
+
+<div class="zl-sticky" data-sticky-cta inert>
+  <a class="zl-btn zl-btn-primary" href={href('start/installation')}>Get started</a>
+</div>
+
+<script>
+  const bar = document.querySelector<HTMLElement>('[data-sticky-cta]');
+  const hero = document.querySelector('[data-hero]');
+  const stops = document.querySelectorAll('.zl-final, .zl-footer');
+  if (bar && hero && 'IntersectionObserver' in window) {
+    let heroGone = false;
+    let nearEnd = false;
+    const sync = () => {
+      const show = heroGone && !nearEnd;
+      bar.classList.toggle('is-on', show);
+      if (show) bar.removeAttribute('inert'); else bar.setAttribute('inert', '');
+    };
+    new IntersectionObserver(([e]) => { heroGone = !e.isIntersecting; sync(); }).observe(hero);
+    const seen = new Set<Element>();
+    const io = new IntersectionObserver((es) => {
+      es.forEach((e) => (e.isIntersecting ? seen.add(e.target) : seen.delete(e.target)));
+      nearEnd = seen.size > 0;
+      sync();
+    });
+    stops.forEach((s) => io.observe(s));
+  }
+</script>
+
+<style is:global>
+  .zl-sticky { display: none; }
+  @media (max-width: 640px) {
+    .zl-sticky { display: block; position: fixed; z-index: 40; left: 0; right: 0; bottom: 0; padding: 0.75rem var(--zl-gutter) calc(0.75rem + env(safe-area-inset-bottom)); background: color-mix(in srgb, var(--zl-bg) 82%, transparent); backdrop-filter: blur(14px) saturate(1.4); border-top: 1px solid var(--zl-line); transform: translateY(110%); opacity: 0; visibility: hidden; transition: transform 0.4s var(--zl-ease), opacity 0.3s, visibility 0s 0.4s; }
+    .zl-sticky.is-on { transform: none; opacity: 1; visibility: visible; transition-delay: 0s; }
+    .zl-sticky .zl-btn { width: 100%; }
+  }
+  @media (prefers-reduced-motion: reduce) { .zl-sticky { transition: none !important; } }
+</style>

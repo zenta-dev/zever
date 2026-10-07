@@ -1,0 +1,24 @@
+<div class="zl-sp" aria-hidden="true"><i data-sp></i></div>
+
+<script>
+  // Fallback for browsers without scroll-driven animations.
+  if (!CSS.supports('animation-timeline: scroll()')) {
+    const bar = document.querySelector<HTMLElement>('[data-sp]');
+    const upd = () => {
+      const h = document.documentElement.scrollHeight - window.innerHeight;
+      bar?.style.setProperty('transform', `scaleX(${h > 0 ? Math.min(1, window.scrollY / h) : 0})`);
+    };
+    upd();
+    window.addEventListener('scroll', upd, { passive: true });
+  }
+</script>
+
+<style is:global>
+  .zl-sp { position: fixed; z-index: 51; left: 0; right: 0; top: 3.75rem; height: 2px; pointer-events: none; }
+  .zl-sp i { display: block; height: 100%; transform: scaleX(0); transform-origin: 0 50%; background: linear-gradient(90deg, var(--zl-accent-lo), var(--zl-accent-hi), var(--zl-warm)); }
+  @supports (animation-timeline: scroll()) {
+    .zl-sp i { animation: zl-sp linear both; animation-timeline: scroll(root block); }
+    @keyframes zl-sp { to { transform: scaleX(1); } }
+  }
+  @media (prefers-reduced-motion: reduce) { .zl-sp { display: none; } }
+</style>

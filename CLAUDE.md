@@ -28,7 +28,11 @@ make lint / lint-fix
 make vet
 make vulncheck
 make tidy-check
-make check         # full local CI mirror: download, fmt, vet, tidy-check, lint, test-race, vulncheck, build
+make deps-sync     # reconcile dep versions across all modules after a bump
+make deps-sync-check # verify no dependency drift remains after a bump
+make err-lint      # scan for error-convention violations
+make modgraph-check # verify every module requires+replaces the intra-repo modules it imports
+make check         # full local CI mirror: download, fmt, check-all (vet/tidy-check/test/build), modgraph-check, lint-all, vulncheck-all
 ```
 
 Single package / single test:
@@ -90,9 +94,11 @@ a server and a worker each build their own `Container` from the same config.
 - `Close(ctx)` only closes services actually resolved, in dependency order
   (dependents holding cache/queue refs → other snapshots → cache/queue leaves →
   grpc server). Shutdown shape is probed per service: `Close(ctx) error` →
-  `Close() error` → `Stop() error` (scheduler) → no-op. Shared instances close
+  `Close() error` → `Stop() error` (scheduler) → `Shutdown(ctx) error`
+  (observability) → no-op. Shared instances close
   once via pointer-identity dedup. Failures join via `errors.Join`; panics become
-  `*ClosePanicError`, timeouts `*CloseTimeoutError`.
+  `ClosePanicError`, timeouts `CloseTimeoutError` (value types — `errors.As`
+  against a pointer target never matches).
 - `container` tests assert `goleak.VerifyTestMain` — no goroutine may outlive
   package tests. Keep timeout-test deadlines short.
 
@@ -160,10 +166,9 @@ an earlier `zen` package; MySQL was dropped (no MySQL adapter exists in `db/`).
 
 ### CLI (`cmd/zever/`)
 
-TUI-first shell (Bubble Tea) over the whole toolchain. Bare `zever` on a TTY
-opens an interactive dashboard; every dashboard row has an exact CLI equivalent
-shown on-screen, and off-TTY (pipes/CI) it prints usage to stderr and exits `1`
-rather than hanging on a prompt.
+Flags-only CLI over the whole toolchain. Bare `zever` (TTY or not) prints
+usage to stderr and exits `1` rather than hanging on a prompt; `-i`/`--interactive`
+(and `ZEVER_INTERACTIVE`) enables huh guided prompts.
 
 Command groups: Scaffolding (`new`, `generate`, `extract`), Inspection
 (`compile`, `check`, `breaking`, `fmt`, `doctor`, `routes`, `explain`,
@@ -176,8 +181,7 @@ Command groups: Scaffolding (`new`, `generate`, `extract`), Inspection
   container via a per-project shim (`cmd/tinker-shim`, scaffolded with
   `zever generate tinker`). It always prints a stderr warning before running —
   never point it at production data.
-- All errors go to stderr; stdout stays clean for command output. Full
-  screen-to-CLI map: `cmd/zever/README.md`.
+- All errors go to stderr; stdout stays clean for command output.
 
 ## Coding standards (from CONTRIBUTING.md)
 

@@ -1,0 +1,229 @@
+---
+title: Outbox
+description: Record events in the same transaction as your data and deliver them at-least-once, with an inbox for idempotent consumers.
+---
+
+import { LinkCard, CardGrid } from '@astrojs/starlight/components';
+
+Use `outbox` to fix the dual-write hazard: a booking row and its `booking.created` event are two writes, and the row can commit while the event is lost. `Store.Record(ctx, tx, msg)` persists the message inside the caller's `db.Tx`, so both commit or neither does. A relay then publishes it at-least-once, and `Inbox` makes consumers idempotent.
+
+Use it for domain events, webhook fan-out, cache invalidation, and audit trails. Delivery is at-least-once, so pair it with `Inbox` (or your own idempotency key) on the consumer.
+
+## Record an event and consume it once
+
+One transaction, one event, one idempotent consumer side effect:
+
+```go title="main.go"
+package main
+
+import (
+	"context"
+	"fmt"
+
+	outboxdb "github.com/zenta-dev/zever/adapters/outbox/db"
+	"github.com/zenta-dev/zever/config"
+	"github.com/zenta-dev/zever/container"
+	coredb "github.com/zenta-dev/zever/core/db"
+	"github.com/zenta-dev/zever/core/outbox"
+)
+
+func main() {
+	cfg := config.Default()
+	cfg.DB.Path = ":memory:"
+	c := container.New(cfg)
+
+	conn, err := c.DB()
+	if err != nil {
+		panic(err)
+	}
+
+	ob, err := outboxdb.OpenFromDB(conn, outboxdb.Options{
+		Publisher: outbox.PublisherFunc(func(_ context.Context, msg outbox.Message) error {
+			fmt.Println("published", msg.Topic, string(msg.Payload))
+			return nil
+		}),
+	})
+	if err != nil {
+		panic(err)
+	}
+	defer ob.Close()
+
+	ctx := context.Background()
+	err = coredb.WithTx(ctx, conn, nil, func(ctx context.Context, tx coredb.Tx) error {
+		if _, err := tx.Exec(ctx, `CREATE TABLE bookings (id TEXT PRIMARY KEY)`); err != nil {
+			return err
+		}
+		if _, err := tx.Exec(ctx, `INSERT INTO bookings (id) VALUES (?)`, "b-1"); err != nil {
+			return err
+		}
+		return ob.Record(ctx, tx, outbox.Message{
+			ID:      "b-1",
+			Topic:   "booking.created",
+			Payload: []byte(`{"id":"b-1"}`),
+		})
+	})
+	fmt.Println("recorded:", err)
+
+	inbox, ok := ob.(outbox.Inbox)
+	if !ok {
+		panic("outbox store does not implement outbox.Inbox")
+	}
+	err = coredb.WithTx(ctx, conn, nil, func(ctx context.Context, tx coredb.Tx) error {
+		return inbox.Process(ctx, tx, "b-1", func(ctx context.Context, tx coredb.Tx) error {
+			fmt.Println("side effect ran")
+			return nil
+		})
+	})
+	fmt.Println("inbox:", err)
+}
+```
+
+```text
+recorded: <nil>
+side effect ran
+inbox: <nil>
+```
+
+The relay is not started here. `Start` publishes stored messages through the same `Publisher`.
+
+`Record` inserts in the caller's transaction (a nil `tx` fails with `ErrTxRequired`) and injects trace context from `ctx` into the stored headers, so the consumer continues the trace.
+
+`Inbox.Process` records `eventID` in the caller's transaction and runs the side effect only when the ID is new (`INSERT ... ON CONFLICT DO NOTHING`), so at-least-once delivery applies side effects once.
+
+## Understand relay delivery and failure
+
+- The relay claims a batch with an atomic `UPDATE ... RETURNING` (postgres adds `FOR UPDATE SKIP LOCKED`, sqlite serializes on a process-local mutex), publishes each message through the `Publisher`, marks successes `processed`, and retries failures with `shared/retry` backoff.
+- Messages that exhaust `max_attempts` are marked `failed`: that is the dead-letter queue, left for inspection and repair through `outbox.Admin` (`List`/`Requeue`/`Purge`, plus `Deleter` on the `db` adapter), driven by the `zever outbox` CLI.
+- Processed rows older than `retention` are deleted.
+- `Status()` reports `Pending`, `Processed`, `Failed`, `LastError`, and `Stalled` (oldest pending waits too long).
+- Any number of replicas can relay one table without double-publishing. If a replica crashes mid-publish, the row returns to pending when its `lock_seconds` lease expires.
+- When an observability provider is wired (`Options.Provider`, which `container.Outbox()` injects), the relay emits `outbox.*` metrics and `outbox.publish`/`outbox.consume` spans — see [Outbox Ops](../../../digging-deeper/outbox-ops/).
+
+## Configure the outbox
+
+```yaml title="zever.yaml"
+outbox:
+  adapter: db
+  options:
+    dsn: postgres://app:secret@db:5432/app # empty selects sqlite :memory:
+    table: outbox
+    inbox_table: inbox
+    publisher: eventbus # informational: eventbus | queue | ""
+    poll_interval: 1000000000 # default 1s
+    batch_size: 100
+    max_attempts: 5
+    retention: 604800000000000 # default 7d
+    lock_seconds: 30
+    dedicated_pool: false
+```
+
+```sh
+OUTBOX_ADAPTER=db
+OUTBOX_DSN=postgres://app:secret@db:5432/app
+OUTBOX_POLL_INTERVAL=1000000000
+```
+
+Keys are strict snake_case with integer-nanosecond durations. Zero means the adapter default. `Validate` rejects negative intervals or budgets, unsafe table names, and a `publisher` outside `{eventbus, queue, ""}`. All keys: [outbox config reference](../../../reference/config/#outbox).
+
+Core never imports `eventbus` or `queue`. Your wiring bridges a transport to the `Publisher` interface, and `Options.Publisher` only records which one.
+
+## Choose an adapter
+
+| Adapter | Package | Notes |
+|---|---|---|
+| `db` | `adapters/outbox/db` | Default. Durable sqlite or postgres polling relay, DLQ, retention. Also implements `Inbox`. |
+| `memory` | `adapters/outbox/memory` | Dev and tests. Publishes synchronously and keeps nothing, so a crash between `Record` and the publisher's ack loses the event. |
+| `cdc` | `adapters/outbox/cdc` | Postgres logical replication via `pg_logical_emit_message`. No polling loop. Needs `wal_level=logical`. |
+
+The cdc adapter emits inside the caller's transaction, so a rollback drops the event. Its consumer tails the WAL through a replication slot and acknowledges the LSN only after a successful publish.
+
+```yaml title="zever.yaml"
+outbox:
+  adapter: cdc
+  options:
+    dsn: postgres://app:secret@db:5432/app
+    prefix: zever_outbox          # logical-replication message prefix
+    slot: zever_outbox_slot       # replication slot
+    publication: zever_outbox_pub # pgoutput publication
+```
+
+The cdc adapter requires non-empty `dsn`, `slot`, `publication`, and `prefix`. Live cdc tests are gated behind `POSTGRES_DSN`.
+
+## Resolve the store from the container
+
+```go title="main.go"
+import (
+	"github.com/zenta-dev/zever/config"
+	"github.com/zenta-dev/zever/container"
+)
+
+func openStore() error {
+	c := container.New(config.Default())
+	ob, err := c.Outbox()
+	if err != nil {
+		return err
+	}
+	defer ob.Close()
+	return nil
+}
+```
+
+`Outbox()` resolves lazily and caches; on error the cache clears so the next call retries. It also injects the resolved `observability.Provider` into `Options.Provider`, so a container-opened store emits the relay metrics and spans described in [Outbox Ops](../../../digging-deeper/outbox-ops/) without extra wiring. The container-opened store records messages but cannot `Start` its relay, because core `Options` carry no `Publisher`. Wire one through the adapter constructor (`OpenFromDB` in `adapters/outbox/db`, `New` in `adapters/outbox/cdc` and `adapters/outbox/memory`), as above.
+
+## Production checklist
+
+- `Store.Close() error` takes no context. The container joins close errors via `errors.Join`, and panics become `*ClosePanicError`.
+- The `db` adapter shares one pool per exact DSN (first opener's `max_conns` wins). Use `dedicated_pool: true` under sustained load.
+- Payloads can carry PII: keep them small and reference-backed, and never log raw option maps (use `config.RedactedServices`).
+
+## Troubleshooting
+
+<details>
+<summary>Start fails with "publisher is nil"</summary>
+
+Cause: the store was opened through the container or registry path, which carries no `Publisher`.
+
+Fix: wire one through the adapter constructor (`OpenFromDB` or `New`) as in the example.
+</details>
+
+<details>
+<summary>Messages sit pending forever</summary>
+
+Cause: the relay is not running (`Start` never called), or `Status().Stalled` is true.
+
+Fix: call `Start`, and check `LastError` for the claim or publish error.
+</details>
+
+<details>
+<summary>Failed rows accumulate</summary>
+
+Cause: the destination rejects the payload, or the `Publisher` errors. `max_attempts` (default 5) bounds retries.
+
+Fix: inspect `last_error` on the row, fix the cause, and re-drive the row.
+</details>
+
+<details>
+<summary>Consumers apply duplicate side effects</summary>
+
+Cause: the consumer is not idempotent.
+
+Fix: give every message a stable `ID` and dedupe through `Inbox.Process` (or your own idempotency key) in the same transaction as the side effect.
+</details>
+
+<details>
+<summary>The cdc adapter fails to start</summary>
+
+Cause: the server lacks `wal_level=logical`, or the publication and slot names do not match the configured values.
+
+Fix: set `wal_level=logical` and align the names. Live tests run with `POSTGRES_DSN` set.
+</details>
+
+## Related
+
+<CardGrid>
+  <LinkCard title="Events and event bus" href="../events/" description="In-process fan-out, the usual Publisher bridge target." />
+  <LinkCard title="Queue" href="../queue/" description="Durable delivery with ack and retry for must-run work." />
+  <LinkCard title="Workflows" href="../workflows/" description="Durable multi-step runs." />
+  <LinkCard title="Observability" href="../../operate/observability/" description="Trace context injected at Record time." />
+  <LinkCard title="Outbox Ops" href="../../../digging-deeper/outbox-ops/" description="Relay metrics, alerting, DLQ runbook, stalled readiness." />
+</CardGrid>

@@ -1,0 +1,91 @@
+---
+title: Authentication
+description: Issue and verify caller identity with JWT, session, or OIDC behind one interface.
+---
+
+import { Tabs, TabItem } from '@astrojs/starlight/components';
+
+`auth` answers who is calling, never what they may do. It covers `jwt` (`auth/jwt`), `session` (`auth/session`), and `oidc` (`auth/oidc`); see [Password hashing](../password-hashing/) and [Authorization](../authz-permissions/).
+
+## Quick start
+
+Set a 32+ byte JWT secret, then resolve the service; `Open` refuses shorter secrets and `config.Default()` ships none.
+
+<Tabs>
+  <TabItem label="YAML">
+```yaml title="zever.yaml"
+auth:
+  adapter: jwt
+  options:
+    jwt:
+      secret: change-me-to-at-least-32-bytes
+```
+  </TabItem>
+  <TabItem label="env">
+```sh
+AUTH_ADAPTER=jwt
+AUTH_JWT_SECRET=prod-secret-at-least-32-bytes-long
+```
+  </TabItem>
+</Tabs>
+
+```go title="main.go"
+c := container.New(cfg)
+a, err := c.Auth()
+if err != nil {
+    return err // secret too short, or adapter unavailable
+}
+```
+
+`AUTH_JWT_SECRET` maps to `options.jwt.secret` (env splits at the first underscore). Keys: `jwt.issuer`, `jwt.audience`, `jwt.max_ttl`, `jwt.leeway`, `oidc.issuer`, `oidc.client_id`, `oidc.timeout`, `oidc.allow_insecure`. See the [auth config reference](../../../reference/config/#auth).
+
+## Log in and call with a bearer token
+
+Log in, then send the token on every other route:
+
+```sh
+curl -s -X POST localhost:8080/api/login \
+  -H 'Content-Type: application/json' \
+  -d '{"email":"you@example.com","password":"correct horse battery staple"}'
+curl -s localhost:8080/api/spaces -H "Authorization: Bearer $TOKEN"
+```
+
+Login returns `200` with a signed JWT in `token`; register `201`; missing or invalid tokens `401`. `Issue` mints, `Verify` checks per request, `Revoke` invalidates a token (`jwt` keeps revoked `jti`s in a per-process store; `session` uses its store). `Verify` returns distinct `ErrInvalidToken` and `ErrTokenExpired` errors; map both to one generic `401` so responses leak nothing. Log details server-side, never token values.
+
+## Production checklist
+
+- CSPRNG secret (32+ bytes) in env or a mounted file, never source. See [Secrets](../secrets/).
+- Rotate by accepting old and new secrets during an overlap.
+- Prefer `session` for immediate revocation across instances; JWT revocation is per-process by default, so otherwise tokens live until TTL.
+- Rate-limit login; hashing cost is not an attempt limit. See [Rate limiting](../ratelimit/).
+- Display config only via `cfg.RedactedServices()` or `config.Redact`.
+
+## Troubleshooting
+
+<details>
+<summary>`Open` rejects the JWT secret</summary>
+
+Shorter than 32 bytes (`MinSecretLen`). Set a longer `AUTH_JWT_SECRET`.
+</details>
+
+<details>
+<summary>All logins return 401 after rotation</summary>
+
+Old-secret tokens no longer verify. Log in again, or accept both during the overlap.
+</details>
+
+<details>
+<summary>The session adapter fails at startup</summary>
+
+It needs an injected `session.Store` (Go-only, not config). Wire a shared store for multiple instances.
+</details>
+
+<details>
+<summary>OIDC login loops</summary>
+
+The provider redirect URL and the callback disagree. Align the app registration with the deployed callback URL.
+</details>
+
+## Related
+
+[Authorization](../authz-permissions/) · [Password hashing](../password-hashing/) · [Crypto and secrets](../crypto-secrets/)

@@ -9,6 +9,7 @@ import (
 	"github.com/zenta-dev/zever/core/auth"
 	"github.com/zenta-dev/zever/core/billing"
 	"github.com/zenta-dev/zever/core/cache"
+	"github.com/zenta-dev/zever/core/cdn"
 	"github.com/zenta-dev/zever/core/crypto"
 	"github.com/zenta-dev/zever/core/db"
 	"github.com/zenta-dev/zever/core/document"
@@ -80,6 +81,7 @@ func (c *Config) Validate() error {
 	check("auth", c.Auth.Adapter, parseAsAny(auth.ParseAdapter), c.Auth.Options.Validate)
 	check("billing", c.Billing.Adapter, parseAsAny(billing.ParseAdapter), c.Billing.Options.Validate)
 	check("cache", c.Cache.Adapter, parseAsAny(cache.ParseAdapter), c.Cache.Options.Validate)
+	check("cdn", c.CDN.Adapter, parseAsAny(cdn.ParseAdapter), c.CDN.Options.Validate)
 	check("crypto", c.Crypto.Adapter, parseAsAny(crypto.ParseAdapter), c.Crypto.Options.Validate)
 	check("db", c.DB.Adapter, parseAsAny(db.ParseAdapter), c.DB.Options.Validate)
 	check("document", c.Document.Adapter, parseAsAny(document.ParseAdapter), c.Document.Options.Validate)

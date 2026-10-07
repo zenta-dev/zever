@@ -1,0 +1,50 @@
+---
+// Docs hero banner with a self-contained gradient mesh. Use `<em>` in title for gradient accents.
+interface Props {
+  eyebrow?: string;
+  title: string;
+  lede?: string;
+}
+const { eyebrow, title, lede } = Astro.props;
+---
+
+<section class="zdh">
+  <div class="zdh-mesh" aria-hidden="true">
+    <i class="zdh-b zdh-b1"></i>
+    <i class="zdh-b zdh-b2"></i>
+    <i class="zdh-b zdh-b3"></i>
+  </div>
+  {eyebrow && <p class="zdh-eyebrow">{eyebrow}</p>}
+  <p class="zdh-title" set:html={title} />
+  {lede && <p class="zdh-lede">{lede}</p>}
+  <div class="zdh-extra"><slot /></div>
+</section>
+
+<style is:global>
+  .sl-markdown-content .zdh {
+    position: relative; isolation: isolate; overflow: hidden;
+    margin: 0 0 2.5rem; padding: clamp(1.75rem, 5vw, 3rem) clamp(1.1rem, 4vw, 2.25rem);
+    border: 1px solid var(--zl-line); border-radius: 18px;
+    background: var(--zl-surface);
+  }
+  .zdh-mesh { position: absolute; inset: 0; z-index: -1; overflow: hidden; pointer-events: none; }
+  .zdh-b { position: absolute; display: block; width: 28rem; max-width: 90%; aspect-ratio: 1; border-radius: 50%; filter: blur(56px); mix-blend-mode: screen; opacity: 0.34; will-change: transform; }
+  .zdh-b1 { left: -14%; top: -50%; background: radial-gradient(circle, var(--zl-accent), transparent 66%); animation: zdh-a 24s ease-in-out infinite alternate; }
+  .zdh-b2 { right: -18%; top: -20%; background: radial-gradient(circle, var(--zl-accent-lo), transparent 66%); animation: zdh-b 30s ease-in-out infinite alternate; }
+  .zdh-b3 { left: 35%; bottom: -70%; opacity: 0.2; background: radial-gradient(circle, var(--zl-warm), transparent 66%); animation: zdh-a 36s ease-in-out infinite alternate-reverse; }
+  :root[data-theme='light'] .zdh-b { mix-blend-mode: multiply; opacity: 0.17; }
+  :root[data-theme='light'] .zdh-b3 { opacity: 0.12; }
+  @keyframes zdh-a { to { transform: translate3d(8rem, 3rem, 0) scale(1.15); } }
+  @keyframes zdh-b { to { transform: translate3d(-7rem, 4rem, 0) scale(0.92); } }
+  .sl-markdown-content .zdh-eyebrow { margin: 0 0 0.9rem; font: 600 0.72rem/1 var(--zl-font-mono); letter-spacing: 0.14em; text-transform: uppercase; color: var(--zl-accent); }
+  .sl-markdown-content .zdh-title { margin: 0; font-family: var(--zl-font-display); font-weight: 700; font-size: clamp(1.9rem, 6.2vw, 3rem); line-height: 1.08; letter-spacing: -0.035em; color: var(--zl-text); text-wrap: balance; }
+  .zdh-title em { font-style: normal; color: var(--zl-accent); }
+  @supports (-webkit-background-clip: text) or (background-clip: text) {
+    .zdh-title em { background: var(--zl-grad-text); -webkit-background-clip: text; background-clip: text; color: transparent; -webkit-text-fill-color: transparent; }
+  }
+  .sl-markdown-content .zdh-lede { margin: 1rem 0 0; max-width: 40rem; font-size: clamp(1rem, 2.4vw, 1.15rem); line-height: 1.6; color: var(--zl-text-2); }
+  .zdh-extra:not(:empty) { margin-top: 1.4rem; }
+  .zdh-extra > :first-child { margin-top: 0; }
+  .zdh-extra > :last-child { margin-bottom: 0; }
+  @media (prefers-reduced-motion: reduce) { .zdh-b { animation: none !important; } }
+</style>

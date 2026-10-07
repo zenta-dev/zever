@@ -255,15 +255,16 @@ Details:
   set for the duration of `Close` so an address cannot be reclaimed and
   reused mid-shutdown.
 - Failures join: `Close` returns `errors.Join` of per-service errors.
-  Panics become `*ClosePanicError`, timeouts become `*CloseTimeoutError`.
+  Panics become `ClosePanicError`, timeouts become `CloseTimeoutError` (value
+  types — `errors.As` against a pointer target never matches).
   Error values name the service only, never resolved values.
 
 ```go
 ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
 defer cancel()
 if err := c.Close(ctx); err != nil {
-	var te *container.CloseTimeoutError
-	var pe *container.ClosePanicError
+	var te container.CloseTimeoutError
+	var pe container.ClosePanicError
 	_ = te
 	_ = pe
 }

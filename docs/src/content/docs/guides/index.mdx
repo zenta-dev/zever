@@ -1,0 +1,18 @@
+---
+title: Guides
+description: Task-focused how-tos for HTTP, data, background work, security, operations, integrations, and extending Zever.
+---
+
+import { LinkCard, CardGrid } from '@astrojs/starlight/components';
+
+Each guide solves one task: configure a battery, wire it through the container, and ship it. Guides assume you know the basics from the [quickstart](../start/quickstart/). For the why, read [Concepts](../concepts/how-zever-works/); for exact keys, see the [Config reference](../reference/config/).
+
+<CardGrid>
+  <LinkCard title="HTTP APIs" description="Routing, middleware, CORS, validation, errors, codecs, sessions, and i18n." href="../guides/http/routing/" />
+  <LinkCard title="Data and storage" description="Query builder, migrations, cache, Redis, search, vector store, storage, and documents." href="../guides/data/query-builder/" />
+  <LinkCard title="Background work" description="Queue, scheduler, events, outbox, workflows, saga, webhooks, mailer, and notifications." href="../guides/background/queue/" />
+  <LinkCard title="Security" description="Auth, authorization, password hashing, crypto, secrets, rate limits, and idempotency." href="../guides/security/auth/" />
+  <LinkCard title="Operate" description="Configuration, logging, observability, resilience, flags, tenants, and deployment." href="../guides/operate/configuration/" />
+  <LinkCard title="Integrations" description="AI, analytics, billing, payments, and geo." href="../guides/integrations/ai/" />
+  <LinkCard title="Extend" description="Write a plugin battery and set up your editor." href="../guides/extend/write-a-plugin/" />
+</CardGrid>

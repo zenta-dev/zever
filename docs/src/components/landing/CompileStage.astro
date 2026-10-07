@@ -1,0 +1,88 @@
+---
+import { Code } from 'astro:components';
+import fs from 'node:fs';
+import CodeWindow from './ui/CodeWindow.astro';
+import { ZEN_SOURCE, OUTPUTS } from '../../data/landing';
+
+const zen = JSON.parse(fs.readFileSync('../editors/vscode/syntaxes/zen.tmLanguage.json', 'utf-8'));
+const xs = [12.5, 37.5, 62.5, 87.5];
+---
+
+<div class="zl-cs" data-compile-stage>
+  <div class="zl-cs-glow" aria-hidden="true"></div>
+  <CodeWindow title="schema/app.zen">
+    <div class="zl-cs-code"><Code code={ZEN_SOURCE} lang={zen} theme="github-dark-default" /></div>
+  </CodeWindow>
+
+  <div class="zl-cs-mid">
+    <svg class="zl-cs-beams" viewBox="0 0 100 40" preserveAspectRatio="none" aria-hidden="true">
+      {xs.map((x) => (
+        <path class="zl-cs-beam" d={`M50 0 C50 22, ${x} 14, ${x} 40`} vector-effect="non-scaling-stroke" />
+      ))}
+      {xs.map((x, i) => (
+        <path class="zl-cs-dot" style={`--d:${i * 0.35}s`} pathLength="100" d={`M50 0 C50 22, ${x} 14, ${x} 40`} vector-effect="non-scaling-stroke" />
+      ))}
+    </svg>
+    <div class="zl-cs-chip"><span class="zl-cs-ring" aria-hidden="true"></span><code>zever generate</code><span class="zl-cs-ok" aria-hidden="true"><svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3.5" stroke-linecap="round" stroke-linejoin="round"><path d="M20 6 9 17l-5-5" pathLength="1"/></svg></span></div>
+  </div>
+
+  <ul class="zl-cs-cards">
+    {OUTPUTS.map((o) => (
+      <li class="zl-cs-card">
+        <div class="zl-cs-tilt zl-card">
+          <strong>{o.label}</strong>
+          <code>{o.file}</code>
+          <span>{o.hint}</span>
+        </div>
+      </li>
+    ))}
+  </ul>
+</div>
+
+<script>
+  import { initCompileStage } from '../../scripts/landing/compile-stage';
+  document.querySelectorAll<HTMLElement>('[data-compile-stage]').forEach(initCompileStage);
+</script>
+
+<style>
+  .zl-cs { position: relative; min-width: 0; --gx: 50%; --gy: 40%; }
+  .zl-cs-glow { position: absolute; inset: 0; z-index: -1; pointer-events: none; opacity: 0; transition: opacity 0.4s; background: radial-gradient(22rem circle at var(--gx) var(--gy), var(--zl-glow), transparent 70%); }
+  .zl-cs.is-hot .zl-cs-glow { opacity: 1; }
+  .zl-cs-code :global(pre) { background: transparent !important; margin: 0; font: inherit; overflow: visible; }
+  .zl-cs-code :global(.line) { display: inline-block; min-width: 100%; }
+  .zl-cs-code :global(code) { display: block; }
+  .zl-cs :global(.zl-win-body) { max-height: 21rem; font-size: 0.78rem; }
+  .zl-cs-mid { position: relative; height: 4.5rem; }
+  .zl-cs-beams { position: absolute; inset: 0; width: 100%; height: 100%; overflow: visible; }
+  .zl-cs-beam { fill: none; stroke: var(--zl-accent); stroke-width: 1.5; opacity: 0.8; stroke-dasharray: 4 6; animation: zl-flow 1.4s linear infinite; }
+  @keyframes zl-flow { to { stroke-dashoffset: -20; } }
+  /* Traveling dot: a zero-length round-capped dash riding the path. */
+  .zl-cs-dot { fill: none; stroke: var(--zl-accent-hi); stroke-width: 5; stroke-linecap: round; stroke-dasharray: 0 100; filter: drop-shadow(0 0 4px var(--zl-accent)); animation: zl-travel 2.6s linear infinite; animation-delay: var(--d); }
+  @keyframes zl-travel { from { stroke-dashoffset: 0; } to { stroke-dashoffset: -100; } }
+  .zl-cs-chip { position: absolute; left: 50%; top: 0; transform: translate(-50%, -50%); z-index: 2; display: inline-flex; align-items: center; gap: 0.5rem; padding: 0.35rem 0.8rem; border-radius: 999px; border: 1px solid var(--zl-accent); background: var(--zl-bg); font: 0.72rem/1 var(--zl-font-mono); color: var(--zl-accent-hi); white-space: nowrap; box-shadow: 0 0 24px var(--zl-glow); }
+  .zl-cs-chip code { background: none; color: inherit; padding: 0; }
+  .zl-cs-ring { position: absolute; inset: 0; border-radius: inherit; border: 1px solid var(--zl-accent); opacity: 0; pointer-events: none; }
+  .zl-cs-ok { display: grid; place-items: center; width: 1.1rem; height: 1.1rem; border-radius: 50%; background: var(--zl-accent); color: var(--zl-on-accent); }
+  .zl-cs-ok path { stroke-dasharray: 1; stroke-dashoffset: 0; }
+  .zl-cs-cards { list-style: none; margin: 0; padding: 0; display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: 0.6rem; perspective: 700px; }
+  .zl-cs-card { min-width: 0; }
+  .zl-cs-tilt { display: flex; flex-direction: column; gap: 0.3rem; height: 100%; padding: 0.7rem 0.75rem; min-width: 0; transform: rotateX(var(--rx, 0deg)) rotateY(var(--ry, 0deg)); transition: transform 0.35s var(--zl-ease), border-color 0.3s; will-change: transform; }
+  .zl-cs-tilt.is-tilting { transition: transform 0.08s linear, border-color 0.3s; border-color: var(--zl-accent); }
+  .zl-cs-card strong { font: 600 0.8rem/1.2 var(--zl-font-sans); color: var(--zl-text); }
+  .zl-cs-card code { font: 0.66rem/1.3 var(--zl-font-mono); color: var(--zl-accent-hi); background: none; padding: 0; overflow-wrap: anywhere; }
+  .zl-cs-card span { font-size: 0.68rem; line-height: 1.35; color: var(--zl-text-3); }
+  :global(.zl-page[data-theme='light']) .zl-cs-card code { color: var(--zl-accent-lo); }
+  :global(.zl-page[data-theme='light']) .zl-cs-chip { color: var(--zl-accent-lo); }
+  @media (max-width: 640px) {
+    .zl-cs-cards { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+    .zl-cs-mid { height: 3rem; }
+    .zl-cs-beams { display: none; }
+    .zl-cs-chip { top: 50%; }
+  }
+  @media (prefers-reduced-motion: reduce) {
+    .zl-cs-beam { animation: none; }
+    .zl-cs-dot { display: none; }
+    .zl-cs-glow { display: none; }
+    .zl-cs-tilt { transform: none !important; }
+  }
+</style>

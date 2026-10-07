@@ -25,6 +25,7 @@ require (
 	github.com/zenta-dev/zever/adapters/cache/db v0.5.3
 	github.com/zenta-dev/zever/adapters/cache/memory v0.5.3
 	github.com/zenta-dev/zever/adapters/cache/redis v0.5.3
+	github.com/zenta-dev/zever/adapters/cdn/noop v0.5.3
 	github.com/zenta-dev/zever/adapters/crypto/local v0.5.3
 	github.com/zenta-dev/zever/adapters/db/postgres v0.5.3
 	github.com/zenta-dev/zever/adapters/db/sqlite v0.5.3
@@ -96,6 +97,7 @@ require (
 	github.com/zenta-dev/zever/core/analytics v0.5.3
 	github.com/zenta-dev/zever/core/auth v0.5.3
 	github.com/zenta-dev/zever/core/cache v0.5.3
+	github.com/zenta-dev/zever/core/cdn v0.5.3
 	github.com/zenta-dev/zever/core/crypto v0.5.3
 	github.com/zenta-dev/zever/core/db v0.5.3
 	github.com/zenta-dev/zever/core/document v0.5.3
@@ -350,6 +352,7 @@ replace (
 	github.com/zenta-dev/zever/adapters/cache/db => ../../adapters/cache/db
 	github.com/zenta-dev/zever/adapters/cache/memory => ../../adapters/cache/memory
 	github.com/zenta-dev/zever/adapters/cache/redis => ../../adapters/cache/redis
+	github.com/zenta-dev/zever/adapters/cdn/noop => ../../adapters/cdn/noop
 	github.com/zenta-dev/zever/adapters/crypto/local => ../../adapters/crypto/local
 	github.com/zenta-dev/zever/adapters/db/postgres => ../../adapters/db/postgres
 	github.com/zenta-dev/zever/adapters/db/sqlite => ../../adapters/db/sqlite
@@ -419,6 +422,7 @@ replace (
 	github.com/zenta-dev/zever/core/analytics => ../../core/analytics
 	github.com/zenta-dev/zever/core/auth => ../../core/auth
 	github.com/zenta-dev/zever/core/cache => ../../core/cache
+	github.com/zenta-dev/zever/core/cdn => ../../core/cdn
 	github.com/zenta-dev/zever/core/crypto => ../../core/crypto
 	github.com/zenta-dev/zever/core/db => ../../core/db
 	github.com/zenta-dev/zever/core/document => ../../core/document
