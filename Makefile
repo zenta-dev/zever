@@ -114,8 +114,8 @@ tidy: ## Tidy go.mod
 	$(GO) mod tidy
 
 .PHONY: tidy-check
-tidy-check: ## Verify go.mod and go.sum are tidy
-	$(GO) mod tidy -diff
+tidy-check: ## Verify go.mod/go.sum are tidy (no root module; delegates to the per-module target)
+	$(MAKE) tidy-check-all
 
 .PHONY: tidy-lsp-check
 tidy-lsp-check: ## Verify zever-lsp go.mod/go.sum are tidy

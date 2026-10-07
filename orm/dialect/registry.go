@@ -29,7 +29,7 @@ func For(name string) (Dialect, error) {
 	mu.RUnlock()
 
 	if !ok {
-		return nil, fmt.Errorf("%w %q", ErrUnknownDialect, name)
+		return nil, fmt.Errorf("%w: %q", ErrUnknownDialect, name)
 	}
 
 	return f(), nil
@@ -53,7 +53,7 @@ func Register(name string, factory func() Dialect) error {
 	defer mu.Unlock()
 
 	if _, exists := factories[name]; exists {
-		return fmt.Errorf("%w %q", ErrDuplicate, name)
+		return fmt.Errorf("%w: %q", ErrDuplicate, name)
 	}
 
 	factories[name] = factory

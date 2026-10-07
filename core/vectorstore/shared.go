@@ -26,7 +26,7 @@ var sharedFactories = registry.New[Adapter, SharedFactory](
 // by OpenShared.
 func RegisterShared(adapter Adapter, factory SharedFactory) error {
 	if factory == nil {
-		return fmt.Errorf("%w for adapter %s", ErrNilFactory, adapter)
+		return fmt.Errorf("vectorstore: %w for adapter %s", ErrNilFactory, adapter)
 	}
 
 	return sharedFactories.Register(adapter, factory)

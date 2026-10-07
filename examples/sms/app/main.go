@@ -16,7 +16,7 @@ import (
 )
 
 // ErrPluginConfig indicates a missing or malformed plugin configuration entry.
-var ErrPluginConfig = errors.New("plugin config")
+var ErrPluginConfig = errors.New("sms: plugin config")
 
 // pluginName is the cfg.Plugins key and container plugin name.
 const pluginName = "sms"

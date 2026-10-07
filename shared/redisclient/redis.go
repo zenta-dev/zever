@@ -27,7 +27,7 @@ func Close(client *goredis.Client) error {
 	}
 
 	if err := client.Close(); err != nil {
-		return fmt.Errorf("%w", errors.Join(ErrCloseClient, err))
+		return errors.Join(ErrCloseClient, err)
 	}
 	return nil
 }

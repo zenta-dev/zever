@@ -10,7 +10,7 @@ Module root: [`../../README.md`](../../README.md).
 Multi-module repo (`cmd/zever` is its own module; batteries live in `core/<b>` with the `Register`/`Open` registry, adapters in `adapters/<b>/<a>` each with `Register()`, helpers in `shared/*`), so install the CLI module at a pinned version:
 
 ```sh
-go install github.com/zenta-dev/zever/cmd/zever@v0.5.3
+go install github.com/zenta-dev/zever/cmd/zever@v0.6.0
 ```
 
 Then `zever --help` prints the grouped command map (Scaffolding /

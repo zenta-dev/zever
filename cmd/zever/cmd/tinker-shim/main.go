@@ -362,7 +362,7 @@ func dispatch(ctx context.Context, c *container.Container, req tinkerRequest) (a
 		return nil, d.Dispatch(ctx, a.Name, jobArgs)
 
 	default:
-		return nil, fmt.Errorf("unknown verb %q", req.Verb)
+		return nil, fmt.Errorf("zever: unknown verb %q", req.Verb)
 	}
 }
 

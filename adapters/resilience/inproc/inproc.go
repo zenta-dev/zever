@@ -150,10 +150,10 @@ func (g *guard) Execute(ctx context.Context, fn func(context.Context) error) err
 	err := run(ctx)
 	if parent.Err() == nil && ctx.Err() != nil {
 		if err != nil {
-			return errors.Join(fmt.Errorf("%w after %s", resilience.ErrTimeout, g.timeout), err)
+			return errors.Join(fmt.Errorf("inproc: %w after %s", resilience.ErrTimeout, g.timeout), err)
 		}
 
-		return fmt.Errorf("%w after %s", resilience.ErrTimeout, g.timeout)
+		return fmt.Errorf("inproc: %w after %s", resilience.ErrTimeout, g.timeout)
 	}
 
 	return err

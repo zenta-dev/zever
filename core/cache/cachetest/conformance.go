@@ -80,47 +80,47 @@ func checkGetSet(ctx context.Context, c cache.Cache) error {
 	var errs []error
 
 	if nfErr.Key != "missing" {
-		errs = append(errs, fmt.Errorf("NotFoundError.Key = %q, want missing", nfErr.Key))
+		errs = append(errs, fmt.Errorf("cachetest: NotFoundError.Key = %q, want missing", nfErr.Key))
 	}
 
 	val := []byte("v1")
 	if err := c.Set(ctx, "k", val, 0); err != nil {
-		return fmt.Errorf("Set() error = %w", err)
+		return fmt.Errorf("cachetest: Set() error = %w", err)
 	}
 
 	val[0] = 'X'
 
 	got, err := c.Get(ctx, "k")
 	if err != nil {
-		return fmt.Errorf("Get() error = %w", err)
+		return fmt.Errorf("cachetest: Get() error = %w", err)
 	}
 
 	if string(got) != "v1" {
-		return fmt.Errorf("Get() = %q, want v1 (stored copy)", got)
+		return fmt.Errorf("cachetest: Get() = %q, want v1 (stored copy)", got)
 	}
 
 	got[0] = 'Y'
 
 	again, err := c.Get(ctx, "k")
 	if err != nil {
-		return fmt.Errorf("Get() error = %w", err)
+		return fmt.Errorf("cachetest: Get() error = %w", err)
 	}
 
 	if string(again) != "v1" {
-		return fmt.Errorf("Get() = %q, want v1 (returned copy)", again)
+		return fmt.Errorf("cachetest: Get() = %q, want v1 (returned copy)", again)
 	}
 
 	if err = c.Set(ctx, "k", []byte("v2"), 0); err != nil {
-		return fmt.Errorf("Set() overwrite error = %w", err)
+		return fmt.Errorf("cachetest: Set() overwrite error = %w", err)
 	}
 
 	got, err = c.Get(ctx, "k")
 	if err != nil {
-		return fmt.Errorf("Get() error = %w", err)
+		return fmt.Errorf("cachetest: Get() error = %w", err)
 	}
 
 	if string(got) != "v2" {
-		errs = append(errs, fmt.Errorf("Get() = %q, want v2", got))
+		errs = append(errs, fmt.Errorf("cachetest: Get() = %q, want v2", got))
 	}
 
 	return errors.Join(errs...)
@@ -139,11 +139,11 @@ func conformanceTTLExpiry(t *testing.T, factory func(t *testing.T) cache.Cache) 
 // Timeout/interval are parameters so unit tests drive both branches fast.
 func checkTTLExpiry(ctx context.Context, c cache.Cache, timeout time.Duration) error {
 	if err := c.Set(ctx, "k", []byte("v"), DefaultEntryTTL); err != nil {
-		return fmt.Errorf("Set() error = %w", err)
+		return fmt.Errorf("cachetest: Set() error = %w", err)
 	}
 
 	if _, err := c.Get(ctx, "k"); err != nil {
-		return fmt.Errorf("Get() before expiry error = %w", err)
+		return fmt.Errorf("cachetest: Get() before expiry error = %w", err)
 	}
 
 	if err := pollExpiry(ctx, timeout, "key expired from Get", func(ctx context.Context) bool {
@@ -173,11 +173,11 @@ func checkTTLExpiry(ctx context.Context, c cache.Cache, timeout time.Duration) e
 	}
 
 	if err := c.Set(ctx, "keep", []byte("v"), 0); err != nil {
-		return fmt.Errorf("Set() error = %w", err)
+		return fmt.Errorf("cachetest: Set() error = %w", err)
 	}
 
 	if _, err := c.Get(ctx, "keep"); err != nil {
-		return fmt.Errorf("Get(keep) error = %w, want retained (no ttl)", err)
+		return fmt.Errorf("cachetest: Get(keep) error = %w, want retained (no ttl)", err)
 	}
 
 	return nil
@@ -206,15 +206,15 @@ func checkSetIfAbsent(ctx context.Context, c cache.Cache, timeout time.Duration)
 
 	got, err := c.Get(ctx, "k")
 	if err != nil {
-		return fmt.Errorf("Get() error = %w", err)
+		return fmt.Errorf("cachetest: Get() error = %w", err)
 	}
 
 	if string(got) != "v1" {
-		return fmt.Errorf("Get() = %q, want v1", got)
+		return fmt.Errorf("cachetest: Get() = %q, want v1", got)
 	}
 
 	if err = c.Set(ctx, "e", []byte("old"), DefaultEntryTTL); err != nil {
-		return fmt.Errorf("Set() error = %w", err)
+		return fmt.Errorf("cachetest: Set() error = %w", err)
 	}
 
 	if pollErr := pollExpiry(ctx, timeout, "expired key accepted by SetIfAbsent", func(ctx context.Context) bool {
@@ -232,11 +232,11 @@ func checkSetIfAbsent(ctx context.Context, c cache.Cache, timeout time.Duration)
 
 	got, err = c.Get(ctx, "e")
 	if err != nil {
-		return fmt.Errorf("Get() error = %w", err)
+		return fmt.Errorf("cachetest: Get() error = %w", err)
 	}
 
 	if string(got) != "new" {
-		return fmt.Errorf("Get() = %q, want new", got)
+		return fmt.Errorf("cachetest: Get() = %q, want new", got)
 	}
 
 	return nil
@@ -254,15 +254,15 @@ func conformanceDelete(t *testing.T, factory func(t *testing.T) cache.Cache) {
 // back missing. Soft mismatches join so all are reported.
 func checkDelete(ctx context.Context, c cache.Cache) error {
 	if err := c.Delete(ctx, "missing"); err != nil {
-		return fmt.Errorf("Delete(missing) error = %w, want nil", err)
+		return fmt.Errorf("cachetest: Delete(missing) error = %w, want nil", err)
 	}
 
 	if err := c.Set(ctx, "k", []byte("v"), 0); err != nil {
-		return fmt.Errorf("Set() error = %w", err)
+		return fmt.Errorf("cachetest: Set() error = %w", err)
 	}
 
 	if err := c.Delete(ctx, "k"); err != nil {
-		return fmt.Errorf("Delete() error = %w", err)
+		return fmt.Errorf("cachetest: Delete() error = %w", err)
 	}
 
 	var errs []error
@@ -276,7 +276,7 @@ func checkDelete(ctx context.Context, c cache.Cache) error {
 	}
 
 	if err := c.Delete(ctx, "k"); err != nil {
-		errs = append(errs, fmt.Errorf("Delete(again) error = %w, want nil", err))
+		errs = append(errs, fmt.Errorf("cachetest: Delete(again) error = %w, want nil", err))
 	}
 
 	return errors.Join(errs...)
@@ -295,80 +295,80 @@ func conformanceCounters(t *testing.T, factory func(t *testing.T) cache.Cache) {
 // increment, and non-numeric values report ErrInvalidValue with the key.
 func checkCounters(ctx context.Context, c cache.Cache) error {
 	if err := c.Increment(ctx, "n"); err != nil {
-		return fmt.Errorf("Increment() error = %w", err)
+		return fmt.Errorf("cachetest: Increment() error = %w", err)
 	}
 
 	got, err := c.Get(ctx, "n")
 	if err != nil {
-		return fmt.Errorf("Get() error = %w", err)
+		return fmt.Errorf("cachetest: Get() error = %w", err)
 	}
 
 	if string(got) != "1" {
-		return fmt.Errorf("Get() = %q, want 1", got)
+		return fmt.Errorf("cachetest: Get() = %q, want 1", got)
 	}
 
 	if err = c.Increment(ctx, "n"); err != nil {
-		return fmt.Errorf("Increment() error = %w", err)
+		return fmt.Errorf("cachetest: Increment() error = %w", err)
 	}
 
 	if err = c.Decrement(ctx, "n"); err != nil {
-		return fmt.Errorf("Decrement() error = %w", err)
+		return fmt.Errorf("cachetest: Decrement() error = %w", err)
 	}
 
 	got, err = c.Get(ctx, "n")
 	if err != nil {
-		return fmt.Errorf("Get() error = %w", err)
+		return fmt.Errorf("cachetest: Get() error = %w", err)
 	}
 
 	var errs []error
 
 	if string(got) != "1" {
-		errs = append(errs, fmt.Errorf("Get() = %q, want 1", got))
+		errs = append(errs, fmt.Errorf("cachetest: Get() = %q, want 1", got))
 	}
 
 	if err = c.Decrement(ctx, "fresh"); err != nil {
-		errs = append(errs, fmt.Errorf("Decrement() error = %w", err))
+		errs = append(errs, fmt.Errorf("cachetest: Decrement() error = %w", err))
 		return errors.Join(errs...)
 	}
 
 	got, err = c.Get(ctx, "fresh")
 	if err != nil {
-		errs = append(errs, fmt.Errorf("Get() error = %w", err))
+		errs = append(errs, fmt.Errorf("cachetest: Get() error = %w", err))
 		return errors.Join(errs...)
 	}
 
 	if string(got) != "-1" {
-		errs = append(errs, fmt.Errorf("Get() = %q, want -1 (missing base)", got))
+		errs = append(errs, fmt.Errorf("cachetest: Get() = %q, want -1 (missing base)", got))
 	}
 
 	if err = c.Set(ctx, "base", []byte("41"), 0); err != nil {
-		errs = append(errs, fmt.Errorf("Set() error = %w", err))
+		errs = append(errs, fmt.Errorf("cachetest: Set() error = %w", err))
 		return errors.Join(errs...)
 	}
 
 	if err = c.Increment(ctx, "base"); err != nil {
-		errs = append(errs, fmt.Errorf("Increment() error = %w", err))
+		errs = append(errs, fmt.Errorf("cachetest: Increment() error = %w", err))
 		return errors.Join(errs...)
 	}
 
 	got, err = c.Get(ctx, "base")
 	if err != nil {
-		errs = append(errs, fmt.Errorf("Get() error = %w", err))
+		errs = append(errs, fmt.Errorf("cachetest: Get() error = %w", err))
 		return errors.Join(errs...)
 	}
 
 	if string(got) != "42" {
-		errs = append(errs, fmt.Errorf("Get() = %q, want 42", got))
+		errs = append(errs, fmt.Errorf("cachetest: Get() = %q, want 42", got))
 	}
 
 	if err = c.Set(ctx, "bad", []byte("abc"), 0); err != nil {
-		errs = append(errs, fmt.Errorf("Set() error = %w", err))
+		errs = append(errs, fmt.Errorf("cachetest: Set() error = %w", err))
 		return errors.Join(errs...)
 	}
 
 	err = c.Increment(ctx, "bad")
 	if err == nil {
-		errs = append(errs, errors.New("Increment(abc) = nil, want ErrInvalidValue"))
+		errs = append(errs, errors.New("cachetest: Increment(abc) = nil, want ErrInvalidValue"))
 		return errors.Join(errs...)
 	}
 
@@ -383,7 +383,7 @@ func checkCounters(ctx context.Context, c cache.Cache) error {
 	}
 
 	if invErr.Key != "bad" {
-		errs = append(errs, fmt.Errorf("InvalidValueError.Key = %q, want bad", invErr.Key))
+		errs = append(errs, fmt.Errorf("cachetest: InvalidValueError.Key = %q, want bad", invErr.Key))
 	}
 
 	return errors.Join(errs...)
@@ -405,7 +405,7 @@ func checkExists(ctx context.Context, c cache.Cache, timeout time.Duration) erro
 	}
 
 	if err := c.Set(ctx, "k", []byte("v"), 0); err != nil {
-		return fmt.Errorf("Set() error = %w", err)
+		return fmt.Errorf("cachetest: Set() error = %w", err)
 	}
 
 	if ok, err := c.Exists(ctx, "k"); err != nil || !ok {
@@ -413,7 +413,7 @@ func checkExists(ctx context.Context, c cache.Cache, timeout time.Duration) erro
 	}
 
 	if err := c.Delete(ctx, "k"); err != nil {
-		return fmt.Errorf("Delete() error = %w", err)
+		return fmt.Errorf("cachetest: Delete() error = %w", err)
 	}
 
 	if ok, err := c.Exists(ctx, "k"); err != nil || ok {
@@ -421,7 +421,7 @@ func checkExists(ctx context.Context, c cache.Cache, timeout time.Duration) erro
 	}
 
 	if err := c.Set(ctx, "e", []byte("v"), DefaultEntryTTL); err != nil {
-		return fmt.Errorf("Set() error = %w", err)
+		return fmt.Errorf("cachetest: Set() error = %w", err)
 	}
 
 	return pollExpiry(ctx, timeout, "exists false for expired entry", func(ctx context.Context) bool {
@@ -448,13 +448,13 @@ func conformanceClose(t *testing.T, factory func(t *testing.T) cache.Cache) {
 // ErrClosed afterwards. Soft mismatches join so all are reported.
 func checkClose(ctx context.Context, c cache.Cache) error {
 	if err := c.Close(ctx); err != nil {
-		return fmt.Errorf("Close() error = %w", err)
+		return fmt.Errorf("cachetest: Close() error = %w", err)
 	}
 
 	var errs []error
 
 	if err := c.Close(ctx); err != nil {
-		errs = append(errs, fmt.Errorf("Close() second error = %w, want nil", err))
+		errs = append(errs, fmt.Errorf("cachetest: Close() second error = %w, want nil", err))
 	}
 
 	if _, err := c.Get(ctx, "k"); !errors.Is(err, cache.ErrClosed) {

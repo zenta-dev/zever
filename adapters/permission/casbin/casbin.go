@@ -432,7 +432,7 @@ func (c *checker) removeGroupingPolicy(g []string) (err error) {
 
 	_, err = c.e.RemoveGroupingPolicy(args...)
 	if err != nil {
-		err = fmt.Errorf("casbin: remove grouping policy %v: %w: %w", g, err, ErrPolicyUpdate)
+		err = fmt.Errorf("casbin: remove grouping policy %v: %w", g, errors.Join(err, ErrPolicyUpdate))
 	}
 
 	return err

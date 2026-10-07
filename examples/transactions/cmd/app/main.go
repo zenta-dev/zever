@@ -25,11 +25,11 @@ import (
 )
 
 // ErrInsufficientFunds indicates a wallet lacks the balance for a transfer.
-var ErrInsufficientFunds = errors.New("insufficient funds")
+var ErrInsufficientFunds = errors.New("transactions: insufficient funds")
 
 // errSimulatedFailure marks the deliberate post-write failure in the nested
 // savepoint demo.
-var errSimulatedFailure = errors.New("simulated failure")
+var errSimulatedFailure = errors.New("transactions: simulated failure")
 
 func main() {
 	ctx := context.Background()
@@ -73,7 +73,7 @@ func main() {
 	// 3. A genuinely failing top-level transfer: insufficient funds rolls
 	//    back the whole transaction, leaving every balance untouched.
 	if err := transfer(ctx, conn, "w-ada", "w-grace", 999999, "broke"); err == nil {
-		die(errors.New("expected insufficient-funds error, got nil"))
+		die(errors.New("transactions: expected insufficient-funds error, got nil"))
 	} else {
 		fmt.Printf("top-level transfer of 999999 correctly failed: %v\n", err)
 	}

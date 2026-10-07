@@ -28,13 +28,13 @@ Install the `zever` CLI with `go install`, then add the Zever modules to your pr
 
    ```sh
    go mod init example.com/myapp
-   go get github.com/zenta-dev/zever/config@v0.5.3 github.com/zenta-dev/zever/container@v0.5.3 github.com/zenta-dev/zever/adapters/db/sqlite@v0.5.3
+   go get github.com/zenta-dev/zever/config@v0.6.0 github.com/zenta-dev/zever/container@v0.6.0 github.com/zenta-dev/zever/adapters/db/sqlite@v0.6.0
    ```
 
 3. Install the CLI at the same pinned version.
 
    ```sh
-   go install github.com/zenta-dev/zever/cmd/zever@v0.5.3
+   go install github.com/zenta-dev/zever/cmd/zever@v0.6.0
    ```
 
    <Aside type="tip" title="PATH">
@@ -141,7 +141,7 @@ Cause: the pinned tool download was blocked or partial. Fix: re-run `make setup`
 <details>
 <summary>`zever` is not found or prints nothing useful</summary>
 
-Cause: the CLI landed in a directory outside `PATH`. Fix: add `$(go env GOPATH)/bin` to `PATH`, or reinstall with `go install github.com/zenta-dev/zever/cmd/zever@v0.5.3`.
+Cause: the CLI landed in a directory outside `PATH`. Fix: add `$(go env GOPATH)/bin` to `PATH`, or reinstall with `go install github.com/zenta-dev/zever/cmd/zever@v0.6.0`.
 </details>
 
 <details>

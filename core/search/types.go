@@ -2,6 +2,7 @@ package search
 
 import (
 	"encoding/json"
+	"errors"
 	"fmt"
 )
 
@@ -28,7 +29,7 @@ func (d Document) Validate() error {
 	}
 
 	if _, err := json.Marshal(d.Metadata); err != nil {
-		return fmt.Errorf("%w: %w", ErrInvalidMetadata, err)
+		return errors.Join(fmt.Errorf("search: %w", ErrInvalidMetadata), err)
 	}
 
 	return nil

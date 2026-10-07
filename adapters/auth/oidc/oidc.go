@@ -92,16 +92,16 @@ func (a *adapter) Verify(ctx context.Context, token string) (auth.Claims, error)
 	if err != nil {
 		var expired *oidc.TokenExpiredError
 		if errors.As(err, &expired) {
-			return auth.Claims{}, fmt.Errorf("oidc: verify: %w: %w", auth.ErrTokenExpired, err)
+			return auth.Claims{}, fmt.Errorf("oidc: verify: %w", errors.Join(auth.ErrTokenExpired, err))
 		}
-		return auth.Claims{}, fmt.Errorf("oidc: verify: %w: %w", auth.ErrInvalidToken, err)
+		return auth.Claims{}, fmt.Errorf("oidc: verify: %w", errors.Join(auth.ErrInvalidToken, err))
 	}
 
 	// Payload of a verified token is valid JSON; unmarshal failure here
 	// means something is deeply wrong, so reject the token.
 	var profile profileClaims
 	if err := idToken.Claims(&profile); err != nil {
-		return auth.Claims{}, fmt.Errorf("oidc: verify: claims: %w: %w", auth.ErrInvalidToken, err)
+		return auth.Claims{}, fmt.Errorf("oidc: verify: claims: %w", errors.Join(auth.ErrInvalidToken, err))
 	}
 
 	return auth.Claims{

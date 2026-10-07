@@ -132,7 +132,7 @@ func conformanceRecover(t *testing.T) {
 	mw := middleware.Recover(noop.New())
 
 	panicking := http.HandlerFunc(func(_ http.ResponseWriter, _ *http.Request) {
-		panic("kit panic")
+		panic("kit panic") // errscan:allow
 	})
 
 	rec := httptest.NewRecorder()
@@ -222,7 +222,7 @@ func conformanceRateLimit(t *testing.T) {
 	}
 
 	// Limiter failure fails open by default.
-	failing := middleware.RateLimit(&stubLimiter{err: errors.New("kit limiter down")}, middleware.RemoteAddrKey)
+	failing := middleware.RateLimit(&stubLimiter{err: errors.New("middlewaretest: kit limiter down")}, middleware.RemoteAddrKey)
 	frec := httptest.NewRecorder()
 	failing(okHandler()).ServeHTTP(frec, httptest.NewRequestWithContext(t.Context(), http.MethodGet, "/kit", nil))
 
@@ -231,7 +231,7 @@ func conformanceRateLimit(t *testing.T) {
 	}
 
 	// FailClosed rejects on limiter error instead.
-	closed := middleware.RateLimit(&stubLimiter{err: errors.New("kit limiter down")}, middleware.RemoteAddrKey, middleware.WithFailMode(middleware.FailClosed))
+	closed := middleware.RateLimit(&stubLimiter{err: errors.New("middlewaretest: kit limiter down")}, middleware.RemoteAddrKey, middleware.WithFailMode(middleware.FailClosed))
 	crec := httptest.NewRecorder()
 	closed(okHandler()).ServeHTTP(crec, httptest.NewRequestWithContext(t.Context(), http.MethodGet, "/kit", nil))
 
@@ -291,7 +291,7 @@ func conformanceChain(t *testing.T) {
 	}
 
 	panicking := cors(recovered(inner(http.HandlerFunc(func(_ http.ResponseWriter, _ *http.Request) {
-		panic("kit chain panic")
+		panic("kit chain panic") // errscan:allow
 	}))))
 	preq := httptest.NewRequestWithContext(t.Context(), http.MethodGet, "/kit", nil)
 	preq.Header.Set("Origin", "https://kit.example")

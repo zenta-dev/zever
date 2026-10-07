@@ -150,7 +150,7 @@ func runGenerateJob(args []string) error {
 				} else {
 					m, err = promptInputForJob("Module name", "", func(s string) error {
 						if !isIdent(s) {
-							return fmt.Errorf("%w", ErrInvalidIdentifier)
+							return ErrInvalidIdentifier
 						}
 
 						return nil
@@ -167,7 +167,7 @@ func runGenerateJob(args []string) error {
 			if len(positional) < 2 {
 				n, err := promptInputForJob("Job name", "", func(s string) error {
 					if !isIdent(s) {
-						return fmt.Errorf("%w", ErrInvalidIdentifier)
+						return ErrInvalidIdentifier
 					}
 
 					return nil
@@ -182,7 +182,7 @@ func runGenerateJob(args []string) error {
 			if isInteractiveTerminal() && strings.TrimSpace(*queue) == "default" {
 				if val, err := promptInputForJob("Queue", "default", func(s string) error {
 					if !isIdent(s) {
-						return fmt.Errorf("%w", ErrInvalidIdentifier)
+						return ErrInvalidIdentifier
 					}
 
 					return nil

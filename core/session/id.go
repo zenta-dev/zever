@@ -23,7 +23,7 @@ var randReader = rand.Reader
 func NewID() string {
 	var b [idBytes]byte
 	if _, err := io.ReadFull(randReader, b[:]); err != nil {
-		panic("session: crypto/rand unavailable: " + err.Error())
+		panic("session: crypto/rand unavailable: " + err.Error()) // errscan:allow
 	}
 
 	// Encode into a stack buffer and convert once: hex.EncodeToString

@@ -10,13 +10,13 @@ import (
 )
 
 // ErrPreload indicates the preload demo failed.
-var ErrPreload = errors.New("preload")
+var ErrPreload = errors.New("ormdrill: preload")
 
 // ErrRetryTx indicates the retry transaction demo failed.
-var ErrRetryTx = errors.New("retry tx")
+var ErrRetryTx = errors.New("ormdrill: retry tx")
 
 // ErrFirstOr indicates the FirstOr demo failed.
-var ErrFirstOr = errors.New("firstOr")
+var ErrFirstOr = errors.New("ormdrill: firstOr")
 
 // DemoPreload fetches every widget and attaches its orders via orm.Preload in
 // exactly two queries regardless of the row count. The query logger installed
@@ -40,7 +40,7 @@ func DemoPreload(ctx context.Context, conn db.DB) error {
 	restore()
 
 	if err != nil {
-		return fmt.Errorf("ormdrill: %w: %w", ErrPreload, err)
+		return errors.Join(fmt.Errorf("ormdrill: %w", ErrPreload), err)
 	}
 
 	if queries != 2 {
@@ -82,13 +82,13 @@ func DemoRetryTx(ctx context.Context, conn db.DB) error {
 		return insert.Exec(ctx, tx)
 	})
 	if err != nil {
-		return fmt.Errorf("ormdrill: %w: %w", ErrRetryTx, err)
+		return errors.Join(fmt.Errorf("ormdrill: %w", ErrRetryTx), err)
 	}
 
 	// The whole point of the exercise: the write survived the transaction.
 	shipment, err := orm.From(Shipments).Where(ShipmentCols.ID.Eq("s99")).FirstOrErr(ctx, conn)
 	if err != nil {
-		return fmt.Errorf("ormdrill: %w: read back retried shipment: %w", ErrRetryTx, err)
+		return errors.Join(fmt.Errorf("ormdrill: %w: read back retried shipment", ErrRetryTx), err)
 	}
 
 	fmt.Printf("  committed shipment %s for order %s (%s %s)\n", shipment.ID, shipment.OrderID, shipment.Carrier, shipment.Tracking)
@@ -107,7 +107,7 @@ func DemoFirstOrErr(ctx context.Context, conn db.DB) error {
 
 	w, err := orm.From(Widgets).Where(WidgetCols.ID.Eq("w01")).FirstOrErr(ctx, conn)
 	if err != nil {
-		return fmt.Errorf("ormdrill: %w hit: %w", ErrFirstOr, err)
+		return errors.Join(fmt.Errorf("ormdrill: %w hit", ErrFirstOr), err)
 	}
 
 	fmt.Printf("  hit: %s (%s, %d cents)\n", w.ID, w.Name, w.PriceCents)

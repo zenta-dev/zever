@@ -11,10 +11,10 @@ import (
 )
 
 // ErrInsertSelect indicates the INSERT...SELECT demo failed.
-var ErrInsertSelect = errors.New("insert select")
+var ErrInsertSelect = errors.New("ormdrill: insert select")
 
 // ErrCreateArchive indicates the archive table creation failed.
-var ErrCreateArchive = errors.New("create widgets_archive")
+var ErrCreateArchive = errors.New("ormdrill: create widgets_archive")
 
 // reportGate prints a capability-gate result and fails if the error was not
 // the expected typed rejection.
@@ -39,7 +39,7 @@ func DemoInsertSelectDistinct(ctx context.Context, conn db.DB) error {
 	fmt.Println("== Round 5: INSERT ... SELECT + Query.Distinct")
 
 	if _, err := conn.Exec(ctx, `CREATE TABLE widgets_archive (id text, name text, price_cents integer, created_at text, note text)`); err != nil {
-		return fmt.Errorf("ormdrill: %w: %w", ErrCreateArchive, err)
+		return errors.Join(fmt.Errorf("ormdrill: %w", ErrCreateArchive), err)
 	}
 
 	if err := orm.InsertInto(WidgetsArchive).
@@ -52,7 +52,7 @@ func DemoInsertSelectDistinct(ctx context.Context, conn db.DB) error {
 		).
 		Select(orm.From(Widgets).Where(WidgetCols.PriceCents.Gt(700))).
 		Exec(ctx, conn); err != nil {
-		return fmt.Errorf("ormdrill: %w: %w", ErrInsertSelect, err)
+		return errors.Join(fmt.Errorf("ormdrill: %w", ErrInsertSelect), err)
 	}
 
 	// A deliberate exact duplicate so DISTINCT has something to remove.

@@ -57,13 +57,13 @@ func conformanceOpenRegister(t *testing.T) {
 // contract violation so unit tests can drive every branch.
 func checkOpenRegister() error {
 	if _, err := flag.Open(flag.Adapter("conformance-missing-adapter"), flag.Options{}); !errors.Is(err, flag.ErrUnknownAdapter) {
-		return fmt.Errorf("Open(missing) err = %w, want ErrUnknownAdapter", err)
+		return fmt.Errorf("flagtest: Open(missing) err = %w, want ErrUnknownAdapter", err)
 	}
 
 	probe := flag.Adapter("conformance-probe-flag")
 
 	if err := flag.Register(probe, nil); !errors.Is(err, flag.ErrNilFactory) {
-		return fmt.Errorf("Register(nil) err = %w, want ErrNilFactory", err)
+		return fmt.Errorf("flagtest: Register(nil) err = %w, want ErrNilFactory", err)
 	}
 
 	stub := func(flag.Options) (flag.Flag, error) {
@@ -73,7 +73,7 @@ func checkOpenRegister() error {
 	_ = flag.Register(probe, stub)
 
 	if err := flag.Register(probe, stub); !errors.Is(err, flag.ErrDuplicate) {
-		return fmt.Errorf("Register(duplicate) err = %w, want ErrDuplicate", err)
+		return fmt.Errorf("flagtest: Register(duplicate) err = %w, want ErrDuplicate", err)
 	}
 
 	return nil
@@ -171,11 +171,11 @@ func conformanceClose(t *testing.T, factory func(t *testing.T) flag.Flag) {
 // checkClose proves Close is idempotent: first and second calls return nil.
 func checkClose(f flag.Flag) error {
 	if err := f.Close(); err != nil {
-		return fmt.Errorf("Close() error = %w", err)
+		return fmt.Errorf("flagtest: Close() error = %w", err)
 	}
 
 	if err := f.Close(); err != nil {
-		return fmt.Errorf("Close() second error = %w, want nil", err)
+		return fmt.Errorf("flagtest: Close() second error = %w, want nil", err)
 	}
 
 	return nil

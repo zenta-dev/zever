@@ -88,7 +88,7 @@ func conformanceTracing(t *testing.T, factory func(t *testing.T) observability.P
 			observability.Float64("f", 1.5),
 			observability.Bool("b", true),
 		)
-		span.RecordError(errors.New("kit-error"))
+		span.RecordError(errors.New("observabilitytest: kit-error"))
 		span.End()
 	}()
 

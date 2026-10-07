@@ -158,11 +158,11 @@ func (s *osmGeo) Geocode(ctx context.Context, address string) ([]geo.Location, e
 	for _, r := range results {
 		lat, err := strconv.ParseFloat(r.Lat, 64)
 		if err != nil {
-			return nil, fmt.Errorf("osm: invalid coordinate %q: %w: %w", r.Lat, err, geo.ErrNotFound)
+			return nil, fmt.Errorf("osm: invalid coordinate %q: %w", r.Lat, errors.Join(err, geo.ErrNotFound))
 		}
 		lon, err := strconv.ParseFloat(r.Lon, 64)
 		if err != nil {
-			return nil, fmt.Errorf("osm: invalid coordinate %q: %w: %w", r.Lon, err, geo.ErrNotFound)
+			return nil, fmt.Errorf("osm: invalid coordinate %q: %w", r.Lon, errors.Join(err, geo.ErrNotFound))
 		}
 		if !geo.ValidCoord(lat, lon) {
 			return nil, fmt.Errorf("osm: invalid coordinate (%.6f,%.6f): %w", lat, lon, geo.ErrInvalidCoordinate)

@@ -80,45 +80,45 @@ func checkEncryptDecrypt(ctx context.Context, c crypto.Crypto) error {
 		if errors.Is(err, crypto.ErrNotSupported) {
 			return nil
 		}
-		return fmt.Errorf("Encrypt() error = %w", err)
+		return fmt.Errorf("cryptotest: Encrypt() error = %w", err)
 	}
 
 	if len(sealed) == 0 {
-		return errors.New("Encrypt() returned empty ciphertext")
+		return errors.New("cryptotest: Encrypt() returned empty ciphertext")
 	}
 
 	if bytes.Equal(sealed, plain) {
-		return errors.New("Encrypt() returned plaintext unchanged")
+		return errors.New("cryptotest: Encrypt() returned plaintext unchanged")
 	}
 
 	plain[0] = 'X'
 
 	opened, err := c.Decrypt(ctx, sealed)
 	if err != nil {
-		return fmt.Errorf("Decrypt() error = %w", err)
+		return fmt.Errorf("cryptotest: Decrypt() error = %w", err)
 	}
 
 	if string(opened) != "conformance-plaintext-01" {
-		return fmt.Errorf("Decrypt() = %q, want original plaintext", opened)
+		return fmt.Errorf("cryptotest: Decrypt() = %q, want original plaintext", opened)
 	}
 
 	opened[0] = 'Y'
 
 	again, err := c.Decrypt(ctx, sealed)
 	if err != nil {
-		return fmt.Errorf("Decrypt() error = %w", err)
+		return fmt.Errorf("cryptotest: Decrypt() error = %w", err)
 	}
 
 	if string(again) != "conformance-plaintext-01" {
-		return fmt.Errorf("Decrypt() = %q, want original (returned copy)", again)
+		return fmt.Errorf("cryptotest: Decrypt() = %q, want original (returned copy)", again)
 	}
 
 	if _, err := c.Decrypt(ctx, []byte("not-a-ciphertext")); err == nil {
-		return errors.New("Decrypt(garbage) = nil, want error")
+		return errors.New("cryptotest: Decrypt(garbage) = nil, want error")
 	}
 
 	if _, err := c.Decrypt(ctx, nil); err == nil {
-		return errors.New("Decrypt(nil) = nil, want error")
+		return errors.New("cryptotest: Decrypt(nil) = nil, want error")
 	}
 
 	return nil

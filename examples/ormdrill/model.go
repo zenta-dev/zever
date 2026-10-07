@@ -25,19 +25,19 @@ import (
 )
 
 // ErrOpenShop indicates the drill database failed to open.
-var ErrOpenShop = errors.New("open shop db")
+var ErrOpenShop = errors.New("ormdrill: open shop db")
 
 // ErrCreateTable indicates a drill DDL statement failed.
-var ErrCreateTable = errors.New("create shop table")
+var ErrCreateTable = errors.New("ormdrill: create shop table")
 
 // ErrInsertWidget indicates a widget seed insert failed.
-var ErrInsertWidget = errors.New("insert widget")
+var ErrInsertWidget = errors.New("ormdrill: insert widget")
 
 // ErrInsertOrder indicates an order seed insert failed.
-var ErrInsertOrder = errors.New("insert order")
+var ErrInsertOrder = errors.New("ormdrill: insert order")
 
 // ErrInsertShipment indicates a shipment seed insert failed.
-var ErrInsertShipment = errors.New("insert shipment")
+var ErrInsertShipment = errors.New("ormdrill: insert shipment")
 
 // Widgets is the hand-wired widgets table, mirroring zenorm codegen output.
 var Widgets = orm.NewTable[Widget]("widgets", []string{"id", "name", "price_cents", "created_at", "note"})
@@ -205,7 +205,7 @@ func OpenShop(ctx context.Context) (db.DB, error) {
 	//nolint:contextcheck // sqlite.New takes no ctx; OpenShop threads ctx through every Exec below.
 	conn, err := sqlite.New(db.Options{Path: ":memory:"})
 	if err != nil {
-		return nil, fmt.Errorf("ormdrill: %w: %w", ErrOpenShop, err)
+		return nil, errors.Join(fmt.Errorf("ormdrill: %w", ErrOpenShop), err)
 	}
 
 	for _, stmt := range []string{
@@ -216,7 +216,7 @@ func OpenShop(ctx context.Context) (db.DB, error) {
 		if _, err := conn.Exec(ctx, stmt); err != nil {
 			_ = conn.Close(ctx)
 
-			return nil, fmt.Errorf("ormdrill: %w: %w", ErrCreateTable, err)
+			return nil, errors.Join(fmt.Errorf("ormdrill: %w", ErrCreateTable), err)
 		}
 	}
 
@@ -251,7 +251,7 @@ func SeedShop(ctx context.Context, conn db.DB) error {
 		}
 
 		if err := orm.InsertInto(Widgets).Values(assignments...).Exec(ctx, conn); err != nil {
-			return fmt.Errorf("ormdrill: %w w%02d: %w", ErrInsertWidget, i, err)
+			return errors.Join(fmt.Errorf("ormdrill: %w w%02d", ErrInsertWidget, i), err)
 		}
 	}
 
@@ -266,7 +266,7 @@ func SeedShop(ctx context.Context, conn db.DB) error {
 		)
 
 		if err := insert.Exec(ctx, conn); err != nil {
-			return fmt.Errorf("ormdrill: %w o%02d: %w", ErrInsertOrder, i, err)
+			return errors.Join(fmt.Errorf("ormdrill: %w o%02d", ErrInsertOrder, i), err)
 		}
 	}
 
@@ -279,7 +279,7 @@ func SeedShop(ctx context.Context, conn db.DB) error {
 		)
 
 		if err := insert.Exec(ctx, conn); err != nil {
-			return fmt.Errorf("ormdrill: %w s%02d: %w", ErrInsertShipment, i, err)
+			return errors.Join(fmt.Errorf("ormdrill: %w s%02d", ErrInsertShipment, i), err)
 		}
 	}
 

@@ -48,13 +48,13 @@ func conformanceOpenRegister(t *testing.T) {
 // contract violation so unit tests can drive every branch.
 func checkOpenRegister() error {
 	if _, err := payment.Open(payment.Adapter("conformance-missing-adapter"), payment.Options{}); !errors.Is(err, payment.ErrUnknownAdapter) {
-		return fmt.Errorf("Open(missing) err = %w, want ErrUnknownAdapter", err)
+		return fmt.Errorf("paymenttest: Open(missing) err = %w, want ErrUnknownAdapter", err)
 	}
 
 	probe := payment.Adapter("conformance-probe-payment")
 
 	if err := payment.Register(probe, nil); !errors.Is(err, payment.ErrNilFactory) {
-		return fmt.Errorf("Register(nil) err = %w, want ErrNilFactory", err)
+		return fmt.Errorf("paymenttest: Register(nil) err = %w, want ErrNilFactory", err)
 	}
 
 	stub := func(payment.Options) (payment.Payment, error) {
@@ -64,7 +64,7 @@ func checkOpenRegister() error {
 	_ = payment.Register(probe, stub)
 
 	if err := payment.Register(probe, stub); !errors.Is(err, payment.ErrDuplicate) {
-		return fmt.Errorf("Register(duplicate) err = %w, want ErrDuplicate", err)
+		return fmt.Errorf("paymenttest: Register(duplicate) err = %w, want ErrDuplicate", err)
 	}
 
 	return nil
@@ -83,28 +83,28 @@ func conformanceCreateGet(t *testing.T, factory func(t *testing.T) payment.Payme
 func checkCreateGet(ctx context.Context, p payment.Payment) error {
 	res, err := p.CreatePayment(ctx, payment.Request{Amount: 2500, Currency: "usd", Method: payment.MethodCard})
 	if err != nil {
-		return fmt.Errorf("CreatePayment() error = %w", err)
+		return fmt.Errorf("paymenttest: CreatePayment() error = %w", err)
 	}
 
 	if res.ID == "" {
-		return errors.New("CreatePayment() ID is empty")
+		return errors.New("paymenttest: CreatePayment() ID is empty")
 	}
 
 	if res.Amount != 2500 || res.Currency != "usd" {
-		return fmt.Errorf("CreatePayment() = %+v, want amount 2500 usd echoed", res)
+		return fmt.Errorf("paymenttest: CreatePayment() = %+v, want amount 2500 usd echoed", res)
 	}
 
 	got, err := p.GetPayment(ctx, res.ID)
 	if err != nil {
-		return fmt.Errorf("GetPayment() error = %w", err)
+		return fmt.Errorf("paymenttest: GetPayment() error = %w", err)
 	}
 
 	if got.ID != res.ID {
-		return fmt.Errorf("GetPayment() ID = %q, want %q", got.ID, res.ID)
+		return fmt.Errorf("paymenttest: GetPayment() ID = %q, want %q", got.ID, res.ID)
 	}
 
 	if _, err := p.GetPayment(ctx, "pay_missing"); !errors.Is(err, payment.ErrNotFound) {
-		return fmt.Errorf("GetPayment(missing) err = %w, want ErrNotFound", err)
+		return fmt.Errorf("paymenttest: GetPayment(missing) err = %w, want ErrNotFound", err)
 	}
 
 	return nil
@@ -124,19 +124,19 @@ func checkInvalidRequest(ctx context.Context, p payment.Payment) error {
 	var errs []error
 
 	if _, err := p.CreatePayment(ctx, payment.Request{Amount: 0, Currency: "usd"}); !errors.Is(err, payment.ErrInvalidAmount) {
-		errs = append(errs, fmt.Errorf("CreatePayment(zero) err = %w, want ErrInvalidAmount", err))
+		errs = append(errs, fmt.Errorf("paymenttest: CreatePayment(zero) err = %w, want ErrInvalidAmount", err))
 	}
 
 	if _, err := p.CreatePayment(ctx, payment.Request{Amount: -5, Currency: "usd"}); !errors.Is(err, payment.ErrInvalidAmount) {
-		errs = append(errs, fmt.Errorf("CreatePayment(negative) err = %w, want ErrInvalidAmount", err))
+		errs = append(errs, fmt.Errorf("paymenttest: CreatePayment(negative) err = %w, want ErrInvalidAmount", err))
 	}
 
 	if _, err := p.CreatePayment(ctx, payment.Request{Amount: 100, Currency: ""}); !errors.Is(err, payment.ErrMissingCurrency) {
-		errs = append(errs, fmt.Errorf("CreatePayment(no currency) err = %w, want ErrMissingCurrency", err))
+		errs = append(errs, fmt.Errorf("paymenttest: CreatePayment(no currency) err = %w, want ErrMissingCurrency", err))
 	}
 
 	if _, err := p.CreatePayment(ctx, payment.Request{Amount: 100, Currency: "usd", Method: "bottle-caps"}); !errors.Is(err, payment.ErrUnsupportedMethod) {
-		errs = append(errs, fmt.Errorf("CreatePayment(bad method) err = %w, want ErrUnsupportedMethod", err))
+		errs = append(errs, fmt.Errorf("paymenttest: CreatePayment(bad method) err = %w, want ErrUnsupportedMethod", err))
 	}
 
 	return errors.Join(errs...)
@@ -155,33 +155,33 @@ func conformanceRefund(t *testing.T, factory func(t *testing.T) payment.Payment)
 func checkRefund(ctx context.Context, p payment.Payment) error {
 	res, err := p.CreatePayment(ctx, payment.Request{Amount: 1000, Currency: "usd"})
 	if err != nil {
-		return fmt.Errorf("CreatePayment() error = %w", err)
+		return fmt.Errorf("paymenttest: CreatePayment() error = %w", err)
 	}
 
 	if err = p.Refund(ctx, res.ID, 400, "kit-refund-01"); err != nil {
-		return fmt.Errorf("Refund(partial) error = %w", err)
+		return fmt.Errorf("paymenttest: Refund(partial) error = %w", err)
 	}
 
 	got, err := p.GetPayment(ctx, res.ID)
 	if err != nil {
-		return fmt.Errorf("GetPayment() error = %w", err)
+		return fmt.Errorf("paymenttest: GetPayment() error = %w", err)
 	}
 
 	if got.Status != payment.PaymentPartiallyRefunded {
-		return fmt.Errorf("Status = %q, want partially_refunded after partial refund", got.Status) //nolint:staticcheck // kit output mirrors the Status field name.
+		return fmt.Errorf("paymenttest: Status = %q, want partially_refunded after partial refund", got.Status) //nolint:staticcheck // kit output mirrors the Status field name.
 	}
 
 	if err = p.Refund(ctx, res.ID, 600, "kit-refund-02"); err != nil {
-		return fmt.Errorf("Refund(rest) error = %w", err)
+		return fmt.Errorf("paymenttest: Refund(rest) error = %w", err)
 	}
 
 	got, err = p.GetPayment(ctx, res.ID)
 	if err != nil {
-		return fmt.Errorf("GetPayment() error = %w", err)
+		return fmt.Errorf("paymenttest: GetPayment() error = %w", err)
 	}
 
 	if got.Status != payment.PaymentRefunded {
-		return fmt.Errorf("Status = %q, want refunded after full refund", got.Status) //nolint:staticcheck // kit output mirrors the Status field name.
+		return fmt.Errorf("paymenttest: Status = %q, want refunded after full refund", got.Status) //nolint:staticcheck // kit output mirrors the Status field name.
 	}
 
 	return nil
@@ -201,27 +201,27 @@ func conformanceRefundMismatch(t *testing.T, factory func(t *testing.T) payment.
 func checkRefundMismatch(ctx context.Context, p payment.Payment) error {
 	res, err := p.CreatePayment(ctx, payment.Request{Amount: 1000, Currency: "usd"})
 	if err != nil {
-		return fmt.Errorf("CreatePayment() error = %w", err)
+		return fmt.Errorf("paymenttest: CreatePayment() error = %w", err)
 	}
 
 	var errs []error
 
 	if err := p.Refund(ctx, res.ID, 0, ""); !errors.Is(err, payment.ErrInvalidAmount) {
-		errs = append(errs, fmt.Errorf("Refund(zero) err = %w, want ErrInvalidAmount", err))
+		errs = append(errs, fmt.Errorf("paymenttest: Refund(zero) err = %w, want ErrInvalidAmount", err))
 	}
 
 	if err := p.Refund(ctx, res.ID, 2000, ""); !errors.Is(err, payment.ErrAmountMismatch) {
-		errs = append(errs, fmt.Errorf("Refund(over total) err = %w, want ErrAmountMismatch", err))
+		errs = append(errs, fmt.Errorf("paymenttest: Refund(over total) err = %w, want ErrAmountMismatch", err))
 	}
 
 	if err := p.Refund(ctx, "pay_missing", 100, ""); !errors.Is(err, payment.ErrNotFound) {
-		errs = append(errs, fmt.Errorf("Refund(missing) err = %w, want ErrNotFound", err))
+		errs = append(errs, fmt.Errorf("paymenttest: Refund(missing) err = %w, want ErrNotFound", err))
 	}
 
 	if err := p.Refund(ctx, "", 100, ""); err == nil {
-		errs = append(errs, errors.New("Refund(empty id) = nil, want error"))
+		errs = append(errs, errors.New("paymenttest: Refund(empty id) = nil, want error"))
 	} else if !errors.Is(err, payment.ErrNotFound) && !errors.Is(err, payment.ErrMissingPaymentID) {
-		errs = append(errs, fmt.Errorf("Refund(empty id) err = %w, want ErrNotFound or ErrMissingPaymentID", err))
+		errs = append(errs, fmt.Errorf("paymenttest: Refund(empty id) err = %w, want ErrNotFound or ErrMissingPaymentID", err))
 	}
 
 	return errors.Join(errs...)
@@ -240,7 +240,7 @@ func conformanceWebhook(t *testing.T, factory func(t *testing.T) payment.Payment
 // webhook fails closed.
 func checkWebhook(ctx context.Context, p payment.Payment) error {
 	if _, err := p.WebhookEvent(ctx, []byte(`{"type":"x"}`), "sig"); !errors.Is(err, payment.ErrInvalidSignature) {
-		return fmt.Errorf("WebhookEvent(stub) err = %w, want ErrInvalidSignature", err)
+		return fmt.Errorf("paymenttest: WebhookEvent(stub) err = %w, want ErrInvalidSignature", err)
 	}
 
 	return nil
@@ -257,11 +257,11 @@ func conformanceClose(t *testing.T, factory func(t *testing.T) payment.Payment) 
 // checkClose proves Close is idempotent.
 func checkClose(p payment.Payment) error {
 	if err := p.Close(); err != nil {
-		return fmt.Errorf("Close() error = %w", err)
+		return fmt.Errorf("paymenttest: Close() error = %w", err)
 	}
 
 	if err := p.Close(); err != nil {
-		return fmt.Errorf("Close() second error = %w, want nil", err)
+		return fmt.Errorf("paymenttest: Close() second error = %w, want nil", err)
 	}
 
 	return nil

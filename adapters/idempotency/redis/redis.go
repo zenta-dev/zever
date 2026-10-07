@@ -274,7 +274,7 @@ func ttlModeVal(ttl time.Duration) (string, int64) {
 // encodePending builds a pending wire record: tag + fpLen + fingerprint.
 func encodePending(fp []byte) []byte {
 	if len(fp) > math.MaxInt-3 {
-		panic("redis: encodePending size overflow")
+		panic("redis: encodePending size overflow") // errscan:allow
 	}
 	size := 3 + len(fp)
 
@@ -288,11 +288,11 @@ func encodePending(fp []byte) []byte {
 // result.
 func encodeDone(fp, result []byte) []byte {
 	if len(fp) > math.MaxInt-3 {
-		panic("redis: encodeDone size overflow")
+		panic("redis: encodeDone size overflow") // errscan:allow
 	}
 	base := 3 + len(fp)
 	if len(result) > math.MaxInt-base {
-		panic("redis: encodeDone size overflow")
+		panic("redis: encodeDone size overflow") // errscan:allow
 	}
 	size := base + len(result)
 

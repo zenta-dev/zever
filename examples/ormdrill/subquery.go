@@ -10,10 +10,10 @@ import (
 )
 
 // ErrSubquery indicates the subquery predicate demo failed.
-var ErrSubquery = errors.New("subquery")
+var ErrSubquery = errors.New("ormdrill: subquery")
 
 // ErrTupleIn indicates the tuple IN demo failed.
-var ErrTupleIn = errors.New("tuple In")
+var ErrTupleIn = errors.New("ormdrill: tuple In")
 
 // DemoSubqueryPredicates exercises the column-subquery surface:
 // InSub/NotInSub membership, EXISTS/NOT EXISTS (the former correlated
@@ -27,35 +27,35 @@ func DemoSubqueryPredicates(ctx context.Context, conn db.DB) error {
 		orm.From(Orders).Columns(OrderCols.WidgetID.Col()),
 	)).Count(ctx, conn)
 	if err != nil {
-		return fmt.Errorf("ormdrill: %w InSub: %w", ErrSubquery, err)
+		return errors.Join(fmt.Errorf("ormdrill: %w InSub", ErrSubquery), err)
 	}
 
 	withoutOrders, err := orm.From(Widgets).Where(WidgetCols.ID.NotInSub(
 		orm.From(Orders).Columns(OrderCols.WidgetID.Col()),
 	)).Count(ctx, conn)
 	if err != nil {
-		return fmt.Errorf("ormdrill: %w NotInSub: %w", ErrSubquery, err)
+		return errors.Join(fmt.Errorf("ormdrill: %w NotInSub", ErrSubquery), err)
 	}
 
 	shipped, err := orm.From(Orders).Where(orm.Exists[Order](
 		orm.From(Shipments).Where(ShipmentCols.OrderID.EqOuter(orm.Outer(OrderCols.ID))),
 	)).Count(ctx, conn)
 	if err != nil {
-		return fmt.Errorf("ormdrill: %w exists subquery: %w", ErrSubquery, err)
+		return errors.Join(fmt.Errorf("ormdrill: %w exists subquery", ErrSubquery), err)
 	}
 
 	missing, err := orm.From(Widgets).Where(orm.NotExists[Widget](
 		orm.From(Orders).Where(OrderCols.WidgetID.EqOuter(orm.Outer(WidgetCols.ID))),
 	)).Count(ctx, conn)
 	if err != nil {
-		return fmt.Errorf("ormdrill: %w NotExists: %w", ErrSubquery, err)
+		return errors.Join(fmt.Errorf("ormdrill: %w NotExists", ErrSubquery), err)
 	}
 
 	refAmount, err := orm.From(Orders).Where(OrderCols.AmountCents.EqScalar(
 		orm.From(Orders).Where(OrderCols.ID.Eq("o01")).Columns(OrderCols.AmountCents.Col()),
 	)).Count(ctx, conn)
 	if err != nil {
-		return fmt.Errorf("ormdrill: %w EqScalar: %w", ErrSubquery, err)
+		return errors.Join(fmt.Errorf("ormdrill: %w EqScalar", ErrSubquery), err)
 	}
 
 	fmt.Printf("  widgets with orders (InSub)        = %d\n", withOrders)
@@ -80,7 +80,7 @@ func DemoCorrelatedOuterInJoin(ctx context.Context, conn db.DB) error {
 		OrderBy(WidgetCols.ID.Asc()).
 		All(ctx, conn)
 	if err != nil {
-		return fmt.Errorf("ormdrill: %w correlated join: %w", ErrSubquery, err)
+		return errors.Join(fmt.Errorf("ormdrill: %w correlated join", ErrSubquery), err)
 	}
 
 	seen := make(map[string]bool, len(rows))
@@ -106,7 +106,7 @@ func DemoTupleIn(ctx context.Context, conn db.DB) error {
 		),
 	).Count(ctx, conn)
 	if err != nil {
-		return fmt.Errorf("ormdrill: %w: %w", ErrTupleIn, err)
+		return errors.Join(fmt.Errorf("ormdrill: %w", ErrTupleIn), err)
 	}
 
 	fmt.Printf("  (widget_id, amount_cents) matching o01's pair = %d\n\n", live)

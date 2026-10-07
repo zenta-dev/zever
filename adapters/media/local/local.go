@@ -3,6 +3,7 @@ package local
 import (
 	"bytes"
 	"context"
+	"errors"
 	"fmt"
 	"image"
 	_ "image/gif" // register GIF decoder
@@ -288,7 +289,7 @@ func (a *adapter) Probe(ctx context.Context, id string) (media.Probe, error) {
 	_ = f.Close()
 
 	if err != nil {
-		return media.Probe{}, fmt.Errorf("local: probe: %w: %w", err, media.ErrProbeFailed)
+		return media.Probe{}, fmt.Errorf("local: probe: %w", errors.Join(err, media.ErrProbeFailed))
 	}
 
 	return media.Probe{
@@ -449,7 +450,7 @@ func (a *adapter) avTransform(ctx context.Context, src, id string, kind media.Me
 	})
 
 	if err := ffmpeg.RunTranscode(ctx, ffmpegPath, args); err != nil {
-		return "", fmt.Errorf("local: transcode: %w: %w", err, media.ErrTranscodeFailed)
+		return "", fmt.Errorf("local: transcode: %w", errors.Join(err, media.ErrTranscodeFailed))
 	}
 
 	return a.baseURL + "/" + filepath.Base(a.derivedDir) + "/" + outName, nil
@@ -464,7 +465,7 @@ func (a *adapter) probeAV(ctx context.Context, src string) (media.Probe, error) 
 
 	res, err := ffmpeg.Probe(ctx, ffprobePath, src)
 	if err != nil {
-		return media.Probe{}, fmt.Errorf("local: probe: %w: %w", err, media.ErrProbeFailed)
+		return media.Probe{}, fmt.Errorf("local: probe: %w", errors.Join(err, media.ErrProbeFailed))
 	}
 
 	probe := res.ToProbe()

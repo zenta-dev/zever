@@ -106,12 +106,12 @@ func mapGenerateError(err error) error {
 	if errors.As(err, &apiErr) {
 		switch apiErr.StatusCode {
 		case http.StatusUnauthorized, http.StatusForbidden:
-			return fmt.Errorf("anthropic: generate: %w: %w", ai.ErrAuth, err)
+			return fmt.Errorf("anthropic: generate: %w", errors.Join(ai.ErrAuth, err))
 		case http.StatusTooManyRequests:
 			retryAfter := parseRetryAfter(apiErr.Response)
 			return fmt.Errorf("anthropic: generate: %w", ai.RateLimitedError{RetryAfter: retryAfter})
 		case http.StatusBadRequest:
-			return fmt.Errorf("anthropic: generate: %w: %w", ai.ErrInvalidRequest, err)
+			return fmt.Errorf("anthropic: generate: %w", errors.Join(ai.ErrInvalidRequest, err))
 		}
 	}
 	// also handle url.Error without status?

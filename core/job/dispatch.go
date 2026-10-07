@@ -98,7 +98,7 @@ func (d *Dispatcher) Dispatch(
 
 	if o.uniqueBy != "" {
 		if d.UniqueLocker == nil {
-			return fmt.Errorf("%w for job %q", ErrUniqueLockerNil, jobName)
+			return fmt.Errorf("job: %w for job %q", ErrUniqueLockerNil, jobName)
 		}
 
 		uid = uniqueID(jobName, o.uniqueBy)

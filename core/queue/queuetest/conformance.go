@@ -80,7 +80,7 @@ func checkFIFO(ctx context.Context, q queue.Queue) error {
 		}
 
 		if err := q.Push(ctx, topic, queue.Payload(p), headers); err != nil {
-			return fmt.Errorf("Push(%q) error = %w", p, err)
+			return fmt.Errorf("queuetest: Push(%q) error = %w", p, err)
 		}
 	}
 
@@ -89,35 +89,35 @@ func checkFIFO(ctx context.Context, q queue.Queue) error {
 	for i, want := range payloads {
 		msg, err := q.Pop(ctx, topic)
 		if err != nil {
-			return fmt.Errorf("Pop(%d) error = %w", i, err)
+			return fmt.Errorf("queuetest: Pop(%d) error = %w", i, err)
 		}
 
 		var errs []error
 
 		if msg.Topic != topic {
-			errs = append(errs, fmt.Errorf("Pop(%d) Topic = %q, want %q", i, msg.Topic, topic))
+			errs = append(errs, fmt.Errorf("queuetest: Pop(%d) Topic = %q, want %q", i, msg.Topic, topic))
 		}
 
 		if string(msg.Payload) != want {
-			errs = append(errs, fmt.Errorf("Pop(%d) Payload = %q, want %q", i, msg.Payload, want))
+			errs = append(errs, fmt.Errorf("queuetest: Pop(%d) Payload = %q, want %q", i, msg.Payload, want))
 		}
 
 		if msg.Attempt != 1 {
-			errs = append(errs, fmt.Errorf("Pop(%d) Attempt = %d, want 1", i, msg.Attempt))
+			errs = append(errs, fmt.Errorf("queuetest: Pop(%d) Attempt = %d, want 1", i, msg.Attempt))
 		}
 
 		if msg.ID == (queue.MessageID{}) {
-			errs = append(errs, fmt.Errorf("Pop(%d) ID is zero", i))
+			errs = append(errs, fmt.Errorf("queuetest: Pop(%d) ID is zero", i))
 		}
 
 		if seen[msg.ID] {
-			errs = append(errs, fmt.Errorf("Pop(%d) ID %v duplicated", i, msg.ID))
+			errs = append(errs, fmt.Errorf("queuetest: Pop(%d) ID %v duplicated", i, msg.ID))
 		}
 
 		seen[msg.ID] = true
 
 		if i == 1 && msg.Headers["k"] != "v" {
-			errs = append(errs, fmt.Errorf("Pop(1) Headers[k] = %q, want v", msg.Headers["k"]))
+			errs = append(errs, fmt.Errorf("queuetest: Pop(1) Headers[k] = %q, want v", msg.Headers["k"]))
 		}
 
 		if err := errors.Join(errs...); err != nil {
@@ -125,7 +125,7 @@ func checkFIFO(ctx context.Context, q queue.Queue) error {
 		}
 
 		if err := q.Ack(ctx, msg); err != nil {
-			return fmt.Errorf("Ack(%d) error = %w", i, err)
+			return fmt.Errorf("queuetest: Ack(%d) error = %w", i, err)
 		}
 	}
 
@@ -161,12 +161,12 @@ func checkEmpty(ctx context.Context, q queue.Queue) error {
 	const topic = "empty"
 
 	if err := q.Push(ctx, topic, queue.Payload("only"), nil); err != nil {
-		return fmt.Errorf("Push() error = %w", err)
+		return fmt.Errorf("queuetest: Push() error = %w", err)
 	}
 
 	msg, err := q.Pop(ctx, topic)
 	if err != nil {
-		return fmt.Errorf("Pop() error = %w", err)
+		return fmt.Errorf("queuetest: Pop() error = %w", err)
 	}
 
 	// The message is inflight now, so the topic holds no ready message: the
@@ -182,18 +182,18 @@ func checkEmpty(ctx context.Context, q queue.Queue) error {
 	}
 
 	if emptyErr.Topic != topic {
-		return fmt.Errorf("EmptyError.Topic = %q, want %q", emptyErr.Topic, topic)
+		return fmt.Errorf("queuetest: EmptyError.Topic = %q, want %q", emptyErr.Topic, topic)
 	}
 
 	if err := q.Ack(ctx, msg); err != nil {
-		return fmt.Errorf("Ack() error = %w", err)
+		return fmt.Errorf("queuetest: Ack() error = %w", err)
 	}
 
 	cancelled, cancel := context.WithCancel(ctx)
 	cancel()
 
 	if _, err := q.Pop(cancelled, topic); err == nil {
-		return errors.New("Pop(cancelled ctx) = nil, want error")
+		return errors.New("queuetest: Pop(cancelled ctx) = nil, want error")
 	}
 
 	return nil
@@ -221,11 +221,11 @@ func checkLengthIsEmpty(ctx context.Context, q queue.Queue) error {
 	}
 
 	if err := q.Push(ctx, topic, queue.Payload("a"), nil); err != nil {
-		return fmt.Errorf("Push() error = %w", err)
+		return fmt.Errorf("queuetest: Push() error = %w", err)
 	}
 
 	if err := q.Push(ctx, topic, queue.Payload("b"), nil); err != nil {
-		return fmt.Errorf("Push() error = %w", err)
+		return fmt.Errorf("queuetest: Push() error = %w", err)
 	}
 
 	if n, err := q.Length(ctx, topic); err != nil || n != 2 {
@@ -238,7 +238,7 @@ func checkLengthIsEmpty(ctx context.Context, q queue.Queue) error {
 
 	msg, err := q.Pop(ctx, topic)
 	if err != nil {
-		return fmt.Errorf("Pop() error = %w", err)
+		return fmt.Errorf("queuetest: Pop() error = %w", err)
 	}
 
 	var errs []error
@@ -249,7 +249,7 @@ func checkLengthIsEmpty(ctx context.Context, q queue.Queue) error {
 	}
 
 	if err := q.Ack(ctx, msg); err != nil {
-		errs = append(errs, fmt.Errorf("Ack() error = %w", err))
+		errs = append(errs, fmt.Errorf("queuetest: Ack() error = %w", err))
 		return errors.Join(errs...)
 	}
 
@@ -274,23 +274,23 @@ func checkAck(ctx context.Context, q queue.Queue) error {
 	const topic = "ack"
 
 	if err := q.Push(ctx, topic, queue.Payload("work"), nil); err != nil {
-		return fmt.Errorf("Push() error = %w", err)
+		return fmt.Errorf("queuetest: Push() error = %w", err)
 	}
 
 	msg, err := q.Pop(ctx, topic)
 	if err != nil {
-		return fmt.Errorf("Pop() error = %w", err)
+		return fmt.Errorf("queuetest: Pop() error = %w", err)
 	}
 
 	if err := q.Ack(ctx, msg); err != nil {
-		return fmt.Errorf("Ack() error = %w", err)
+		return fmt.Errorf("queuetest: Ack() error = %w", err)
 	}
 
 	var errs []error
 
 	// Ack is idempotent: acknowledging twice stays nil.
 	if err := q.Ack(ctx, msg); err != nil {
-		errs = append(errs, fmt.Errorf("Ack(again) error = %w, want nil", err))
+		errs = append(errs, fmt.Errorf("queuetest: Ack(again) error = %w, want nil", err))
 	}
 
 	if _, err := q.Pop(ctx, topic); !errors.Is(err, queue.ErrEmpty) {
@@ -322,12 +322,12 @@ func checkNackRequeue(ctx context.Context, q queue.Queue) error {
 	const topic = "nack-requeue"
 
 	if err := q.Push(ctx, topic, queue.Payload("work"), queue.Headers{"k": "v"}); err != nil {
-		return fmt.Errorf("Push() error = %w", err)
+		return fmt.Errorf("queuetest: Push() error = %w", err)
 	}
 
 	first, err := q.Pop(ctx, topic)
 	if err != nil {
-		return fmt.Errorf("Pop() error = %w", err)
+		return fmt.Errorf("queuetest: Pop() error = %w", err)
 	}
 
 	// Mutate the popped copy: redelivery must observe the stored message,
@@ -336,26 +336,26 @@ func checkNackRequeue(ctx context.Context, q queue.Queue) error {
 	first.Headers["k"] = "mutated"
 
 	if nerr := q.Nack(ctx, first, true); nerr != nil {
-		return fmt.Errorf("Nack(requeue) error = %w", nerr)
+		return fmt.Errorf("queuetest: Nack(requeue) error = %w", nerr)
 	}
 
 	second, err := q.Pop(ctx, topic)
 	if err != nil {
-		return fmt.Errorf("Pop(redelivered) error = %w", err)
+		return fmt.Errorf("queuetest: Pop(redelivered) error = %w", err)
 	}
 
 	var errs []error
 
 	if string(second.Payload) != "work" {
-		errs = append(errs, fmt.Errorf("redelivered Payload = %q, want work (stored copy)", second.Payload))
+		errs = append(errs, fmt.Errorf("queuetest: redelivered Payload = %q, want work (stored copy)", second.Payload))
 	}
 
 	if second.Headers["k"] != "v" {
-		errs = append(errs, fmt.Errorf("redelivered Headers[k] = %q, want v (stored copy)", second.Headers["k"]))
+		errs = append(errs, fmt.Errorf("queuetest: redelivered Headers[k] = %q, want v (stored copy)", second.Headers["k"]))
 	}
 
 	if second.Attempt <= first.Attempt {
-		errs = append(errs, fmt.Errorf("redelivered Attempt = %d, want > %d", second.Attempt, first.Attempt))
+		errs = append(errs, fmt.Errorf("queuetest: redelivered Attempt = %d, want > %d", second.Attempt, first.Attempt))
 	}
 
 	if err := errors.Join(errs...); err != nil {
@@ -363,7 +363,7 @@ func checkNackRequeue(ctx context.Context, q queue.Queue) error {
 	}
 
 	if err := q.Ack(ctx, second); err != nil {
-		return fmt.Errorf("Ack() error = %w", err)
+		return fmt.Errorf("queuetest: Ack() error = %w", err)
 	}
 
 	if _, err := q.Pop(ctx, topic); !errors.Is(err, queue.ErrEmpty) {
@@ -387,16 +387,16 @@ func checkNackDrop(ctx context.Context, q queue.Queue) error {
 	const topic = "nack-drop"
 
 	if err := q.Push(ctx, topic, queue.Payload("work"), nil); err != nil {
-		return fmt.Errorf("Push() error = %w", err)
+		return fmt.Errorf("queuetest: Push() error = %w", err)
 	}
 
 	msg, err := q.Pop(ctx, topic)
 	if err != nil {
-		return fmt.Errorf("Pop() error = %w", err)
+		return fmt.Errorf("queuetest: Pop() error = %w", err)
 	}
 
 	if err := q.Nack(ctx, msg, false); err != nil {
-		return fmt.Errorf("Nack(drop) error = %w", err)
+		return fmt.Errorf("queuetest: Nack(drop) error = %w", err)
 	}
 
 	var errs []error
@@ -432,24 +432,24 @@ func checkDelayed(ctx context.Context, q queue.Queue, delay, timeout time.Durati
 
 	// Non-positive delays are immediately available.
 	if err := q.PushDelayed(ctx, topic, queue.Payload("now"), nil, 0); err != nil {
-		return fmt.Errorf("PushDelayed(0) error = %w", err)
+		return fmt.Errorf("queuetest: PushDelayed(0) error = %w", err)
 	}
 
 	msg, err := q.Pop(ctx, topic)
 	if err != nil {
-		return fmt.Errorf("Pop(immediate) error = %w", err)
+		return fmt.Errorf("queuetest: Pop(immediate) error = %w", err)
 	}
 
 	if string(msg.Payload) != "now" {
-		return fmt.Errorf("Pop(immediate) Payload = %q, want now", msg.Payload)
+		return fmt.Errorf("queuetest: Pop(immediate) Payload = %q, want now", msg.Payload)
 	}
 
 	if err := q.Ack(ctx, msg); err != nil {
-		return fmt.Errorf("Ack() error = %w", err)
+		return fmt.Errorf("queuetest: Ack() error = %w", err)
 	}
 
 	if err := q.PushDelayed(ctx, topic, queue.Payload("later"), nil, delay); err != nil {
-		return fmt.Errorf("PushDelayed() error = %w", err)
+		return fmt.Errorf("queuetest: PushDelayed() error = %w", err)
 	}
 
 	// The delayed message must not be ready yet.
@@ -464,7 +464,7 @@ func checkDelayed(ctx context.Context, q queue.Queue, delay, timeout time.Durati
 		}
 
 		if string(got.Payload) != "later" {
-			return fmt.Errorf("Pop(delayed) Payload = %q, want later", got.Payload)
+			return fmt.Errorf("queuetest: Pop(delayed) Payload = %q, want later", got.Payload)
 		}
 
 		return nil
@@ -482,41 +482,41 @@ func conformanceTopicsIsolated(t *testing.T, factory func(t *testing.T) queue.Qu
 // checkTopicsIsolated proves pushes to different topics never cross.
 func checkTopicsIsolated(ctx context.Context, q queue.Queue) error {
 	if err := q.Push(ctx, "topic-a", queue.Payload("a"), nil); err != nil {
-		return fmt.Errorf("Push(a) error = %w", err)
+		return fmt.Errorf("queuetest: Push(a) error = %w", err)
 	}
 
 	if err := q.Push(ctx, "topic-b", queue.Payload("b"), nil); err != nil {
-		return fmt.Errorf("Push(b) error = %w", err)
+		return fmt.Errorf("queuetest: Push(b) error = %w", err)
 	}
 
 	msgB, err := q.Pop(ctx, "topic-b")
 	if err != nil {
-		return fmt.Errorf("Pop(b) error = %w", err)
+		return fmt.Errorf("queuetest: Pop(b) error = %w", err)
 	}
 
 	var errs []error
 
 	if string(msgB.Payload) != "b" {
-		errs = append(errs, fmt.Errorf("Pop(b) Payload = %q, want b", msgB.Payload))
+		errs = append(errs, fmt.Errorf("queuetest: Pop(b) Payload = %q, want b", msgB.Payload))
 	}
 
 	msgA, err := q.Pop(ctx, "topic-a")
 	if err != nil {
-		errs = append(errs, fmt.Errorf("Pop(a) error = %w", err))
+		errs = append(errs, fmt.Errorf("queuetest: Pop(a) error = %w", err))
 		return errors.Join(errs...)
 	}
 
 	if string(msgA.Payload) != "a" {
-		errs = append(errs, fmt.Errorf("Pop(a) Payload = %q, want a", msgA.Payload))
+		errs = append(errs, fmt.Errorf("queuetest: Pop(a) Payload = %q, want a", msgA.Payload))
 	}
 
 	if err := q.Ack(ctx, msgA); err != nil {
-		errs = append(errs, fmt.Errorf("Ack(a) error = %w", err))
+		errs = append(errs, fmt.Errorf("queuetest: Ack(a) error = %w", err))
 		return errors.Join(errs...)
 	}
 
 	if err := q.Ack(ctx, msgB); err != nil {
-		errs = append(errs, fmt.Errorf("Ack(b) error = %w", err))
+		errs = append(errs, fmt.Errorf("queuetest: Ack(b) error = %w", err))
 		return errors.Join(errs...)
 	}
 
@@ -545,16 +545,16 @@ func checkClose(ctx context.Context, q queue.Queue) error {
 	var errs []error
 
 	if q.Name() == "" {
-		errs = append(errs, errors.New("Name() is empty, want adapter name"))
+		errs = append(errs, errors.New("queuetest: Name() is empty, want adapter name"))
 	}
 
 	if err := q.Close(); err != nil {
-		errs = append(errs, fmt.Errorf("Close() error = %w", err))
+		errs = append(errs, fmt.Errorf("queuetest: Close() error = %w", err))
 		return errors.Join(errs...)
 	}
 
 	if err := q.Close(); err != nil {
-		errs = append(errs, fmt.Errorf("Close() second error = %w, want nil", err))
+		errs = append(errs, fmt.Errorf("queuetest: Close() second error = %w, want nil", err))
 	}
 
 	if err := q.Push(ctx, "closed", queue.Payload("x"), nil); !errors.Is(err, queue.ErrClosed) {

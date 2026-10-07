@@ -320,7 +320,7 @@ func (r ProbeResult) ToProbe() media.Probe {
 func LookPath(name string) (string, error) {
 	path, err := exec.LookPath(name)
 	if err != nil {
-		return "", fmt.Errorf("ffmpeg: tool %q: %w: %w", name, ErrToolMissing, err)
+		return "", fmt.Errorf("ffmpeg: tool %q: %w", name, errors.Join(ErrToolMissing, err))
 	}
 
 	return path, nil
@@ -358,10 +358,10 @@ func Probe(ctx context.Context, ffprobe, path string) (ProbeResult, error) {
 
 	if err != nil {
 		if isToolMissing(err) {
-			return res, fmt.Errorf("ffmpeg: tool %q: %w: %w", ffprobe, ErrToolMissing, err)
+			return res, fmt.Errorf("ffmpeg: tool %q: %w", ffprobe, errors.Join(ErrToolMissing, err))
 		}
 
-		return res, fmt.Errorf("%w (%w): %q", ErrProbeFailed, err, errSnippet(&stderr))
+		return res, fmt.Errorf("%w: %q", errors.Join(ErrProbeFailed, err), errSnippet(&stderr))
 	}
 
 	data, _ := io.ReadAll(io.LimitReader(stdout, maxProbeOutput+1))
@@ -375,12 +375,12 @@ func Probe(ctx context.Context, ffprobe, path string) (ProbeResult, error) {
 	}
 
 	if waitErr := cmd.Wait(); waitErr != nil {
-		return res, fmt.Errorf("%w (%w): %q", ErrProbeFailed, waitErr, errSnippet(&stderr))
+		return res, fmt.Errorf("%w: %q", errors.Join(ErrProbeFailed, waitErr), errSnippet(&stderr))
 	}
 
 	res, err = probeCodec.Decode(data)
 	if err != nil {
-		return res, fmt.Errorf("%w (%w): %q", ErrProbeFailed, err, errSnippet(&stderr))
+		return res, fmt.Errorf("%w: %q", errors.Join(ErrProbeFailed, err), errSnippet(&stderr))
 	}
 
 	return res, nil
@@ -411,10 +411,10 @@ func RunTranscode(ctx context.Context, ffmpegBin string, argv []string) error {
 
 	if err != nil {
 		if isToolMissing(err) {
-			return fmt.Errorf("ffmpeg: tool %q: %w: %w", ffmpegBin, ErrToolMissing, err)
+			return fmt.Errorf("ffmpeg: tool %q: %w", ffmpegBin, errors.Join(ErrToolMissing, err))
 		}
 
-		return fmt.Errorf("%w (%w): %q", ErrTranscodeFailed, err, errSnippet(&stderr))
+		return fmt.Errorf("%w: %q", errors.Join(ErrTranscodeFailed, err), errSnippet(&stderr))
 	}
 
 	return nil

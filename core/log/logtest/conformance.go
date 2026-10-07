@@ -78,8 +78,8 @@ func conformanceEmitLevels(t *testing.T, factory func(t *testing.T) log.Logger) 
 			Bool("b", true).
 			Dur("d", time.Second).
 			Time("t", time.Now()).
-			Err(errors.New("kit-error")).
-			AnErr("custom", errors.New("kit-custom")).
+			Err(errors.New("logtest: kit-error")).
+			AnErr("custom", errors.New("logtest: kit-custom")).
 			Any("any", map[string]int{"n": 1}).
 			Msg("kit message")
 	}

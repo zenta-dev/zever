@@ -10,10 +10,10 @@ import (
 )
 
 // ErrJoin3 indicates the three-way join demo failed.
-var ErrJoin3 = errors.New("join3")
+var ErrJoin3 = errors.New("ormdrill: join3")
 
 // ErrJoinedUpdate indicates the joined update demo failed.
-var ErrJoinedUpdate = errors.New("joined update")
+var ErrJoinedUpdate = errors.New("ormdrill: joined update")
 
 // DemoJoinOn3 runs one INNER three-way join -- widgets -> orders ->
 // shipments -- through orm.JoinOn3, filtering on the right tables with
@@ -30,7 +30,7 @@ func DemoJoinOn3(ctx context.Context, conn db.DB) error {
 		OrderByRight(OrderCols.ID.Asc()).
 		All(ctx, conn)
 	if err != nil {
-		return fmt.Errorf("ormdrill: %w: %w", ErrJoin3, err)
+		return errors.Join(fmt.Errorf("ormdrill: %w", ErrJoin3), err)
 	}
 
 	for _, r := range rows {
@@ -83,7 +83,7 @@ func DemoJoinedUpdate(ctx context.Context, conn db.DB) error {
 		Set(orm.Set(WidgetCols.PriceCents, 1299)).
 		Exec(ctx, conn)
 	if err != nil {
-		return fmt.Errorf("ormdrill: %w: %w", ErrJoinedUpdate, err)
+		return errors.Join(fmt.Errorf("ormdrill: %w", ErrJoinedUpdate), err)
 	}
 
 	if n != 5 {

@@ -312,7 +312,7 @@ func renderNestedEnum(name string, ft ir.FieldType) (string, error) {
 
 		if prior, ok := seen[valueName]; ok {
 			return "", fmt.Errorf(
-				"enum value name %q generated from both %q and %q collide in enum %s",
+				"proto: enum value name %q generated from both %q and %q collide in enum %s",
 				valueName, prior, v, typeName)
 		}
 

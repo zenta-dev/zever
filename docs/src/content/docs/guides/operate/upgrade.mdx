@@ -21,9 +21,9 @@ Public API changes (new exports, config struct or default changes, serialization
 2. Bump each Zever module you require, then tidy:
 
    ```sh
-   go get github.com/zenta-dev/zever/config@v0.5.3 github.com/zenta-dev/zever/container@v0.5.3
+   go get github.com/zenta-dev/zever/config@v0.6.0 github.com/zenta-dev/zever/container@v0.6.0
    go mod tidy
-   go install github.com/zenta-dev/zever/cmd/zever@v0.5.3
+   go install github.com/zenta-dev/zever/cmd/zever@v0.6.0
    ```
 
 3. Run the gate: `make check` (download, fmt, then per module vet, tidy-check, test, build, plus module-graph check, lint, vulncheck), and `make test-race` separately.
