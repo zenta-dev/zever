@@ -227,12 +227,22 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   cause). Added `docs/errors.md` as the canonical error conventions guide
   and `make err-lint` (`tools/errscan`) as a forward-looking guard for the
   rules above.
+- `zever.schema.json` now covers the `outbox` and `resilience` services and
+  previously-missing option fields.
+- Corrected stale agent docs (CLAUDE.md, AGENTS.md) describing a removed TUI
+  and pointer-typed close errors.
 
 ### Fixed
 
 - `zever tinker` no longer deadlocks when the shim hangs: each `call` is bounded
   by a timeout and kills the shim on expiry, so a stuck read cannot hold the
   client mutex forever and block later calls or `Close`.
+- Example apps (bookings, showcase, todo, demoapp) failed at startup with
+  `unknown adapter: slog`; their app.go and self-wired entrypoints now register
+  every adapter configured in zever.yaml, and the CLI composition root
+  registers the 10 previously-missing adapters (crypto/kms, idempotency/db,
+  outbox/{cdc,db,memory}, resilience/{inproc,redis}, scheduler/postgres,
+  secrets/vault, session/db).
 
 ### Security
 

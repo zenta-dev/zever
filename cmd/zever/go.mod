@@ -27,6 +27,7 @@ require (
 	github.com/zenta-dev/zever/adapters/cache/redis v0.5.3
 	github.com/zenta-dev/zever/adapters/cdn/cloudflare v0.5.3
 	github.com/zenta-dev/zever/adapters/cdn/noop v0.5.3
+	github.com/zenta-dev/zever/adapters/crypto/kms v0.5.3
 	github.com/zenta-dev/zever/adapters/crypto/local v0.5.3
 	github.com/zenta-dev/zever/adapters/db/postgres v0.5.3
 	github.com/zenta-dev/zever/adapters/db/sqlite v0.5.3
@@ -42,6 +43,7 @@ require (
 	github.com/zenta-dev/zever/adapters/geo/static v0.5.3
 	github.com/zenta-dev/zever/adapters/i18n/embed v0.5.3
 	github.com/zenta-dev/zever/adapters/i18n/remote v0.5.3
+	github.com/zenta-dev/zever/adapters/idempotency/db v0.5.3
 	github.com/zenta-dev/zever/adapters/idempotency/memory v0.5.3
 	github.com/zenta-dev/zever/adapters/idempotency/redis v0.5.3
 	github.com/zenta-dev/zever/adapters/lock/memory v0.5.3
@@ -60,7 +62,9 @@ require (
 	github.com/zenta-dev/zever/adapters/observability/noop v0.5.3
 	github.com/zenta-dev/zever/adapters/observability/otlp v0.5.3
 	github.com/zenta-dev/zever/adapters/observability/stdout v0.5.3
+	github.com/zenta-dev/zever/adapters/outbox/cdc v0.5.3
 	github.com/zenta-dev/zever/adapters/outbox/db v0.5.3
+	github.com/zenta-dev/zever/adapters/outbox/memory v0.5.3
 	github.com/zenta-dev/zever/adapters/password/argon2 v0.5.3
 	github.com/zenta-dev/zever/adapters/payment/paddle v0.5.3
 	github.com/zenta-dev/zever/adapters/payment/stripe v0.5.3
@@ -73,12 +77,17 @@ require (
 	github.com/zenta-dev/zever/adapters/queue/redis v0.5.3
 	github.com/zenta-dev/zever/adapters/ratelimit/memory v0.5.3
 	github.com/zenta-dev/zever/adapters/ratelimit/redis v0.5.3
+	github.com/zenta-dev/zever/adapters/resilience/inproc v0.5.3
+	github.com/zenta-dev/zever/adapters/resilience/redis v0.5.3
 	github.com/zenta-dev/zever/adapters/router/fiber v0.5.3
 	github.com/zenta-dev/zever/adapters/router/stdhttp v0.5.3
 	github.com/zenta-dev/zever/adapters/scheduler/embedded v0.5.3
+	github.com/zenta-dev/zever/adapters/scheduler/postgres v0.5.3
 	github.com/zenta-dev/zever/adapters/search/db v0.5.3
 	github.com/zenta-dev/zever/adapters/search/meilisearch v0.5.3
 	github.com/zenta-dev/zever/adapters/secrets/env v0.5.3
+	github.com/zenta-dev/zever/adapters/secrets/vault v0.5.3
+	github.com/zenta-dev/zever/adapters/session/db v0.5.3
 	github.com/zenta-dev/zever/adapters/session/memory v0.5.3
 	github.com/zenta-dev/zever/adapters/session/redis v0.5.3
 	github.com/zenta-dev/zever/adapters/storage/local v0.5.3
@@ -210,6 +219,7 @@ require (
 	github.com/go-json-experiment/json v0.0.0-20260623181947-01eb4420fa68 // indirect
 	github.com/go-logr/logr v1.4.4 // indirect
 	github.com/go-logr/stdr v1.2.2 // indirect
+	github.com/go-redsync/redsync/v4 v4.13.0 // indirect
 	github.com/gobwas/httphead v0.1.0 // indirect
 	github.com/gobwas/pool v0.2.1 // indirect
 	github.com/gobwas/ws v1.4.0 // indirect
@@ -226,10 +236,14 @@ require (
 	github.com/googleapis/gax-go/v2 v2.26.2 // indirect
 	github.com/gorilla/websocket v1.5.3 // indirect
 	github.com/grpc-ecosystem/grpc-gateway/v2 v2.30.0 // indirect
+	github.com/hashicorp/errwrap v1.1.0 // indirect
 	github.com/hashicorp/go-cleanhttp v0.5.2 // indirect
+	github.com/hashicorp/go-multierror v1.1.1 // indirect
 	github.com/hashicorp/golang-lru/v2 v2.0.7 // indirect
 	github.com/inconshreveable/mousetrap v1.1.0 // indirect
 	github.com/invopop/jsonschema v0.14.0 // indirect
+	github.com/jackc/pgio v1.0.0 // indirect
+	github.com/jackc/pglogrepl v0.0.0-20261003132456-662581bb6bb6 // indirect
 	github.com/jackc/pgpassfile v1.0.0 // indirect
 	github.com/jackc/pgservicefile v0.0.0-20240606120523-5a60cdf6a761 // indirect
 	github.com/jackc/pgx/v5 v5.11.0 // indirect
@@ -257,6 +271,8 @@ require (
 	github.com/robfig/cron/v3 v3.0.1 // indirect
 	github.com/rs/zerolog v1.35.1 // indirect
 	github.com/russross/blackfriday/v2 v2.1.0 // indirect
+	github.com/sony/gobreaker/v2 v2.4.0 // indirect
+	github.com/sony/gobreaker/v2/redis v0.0.0-20260207092134-fed8e9eb35f9 // indirect
 	github.com/spiffe/go-spiffe/v2 v2.8.1 // indirect
 	github.com/standard-webhooks/standard-webhooks/libraries v0.0.1 // indirect
 	github.com/stripe/stripe-go/v82 v82.5.1 // indirect
@@ -522,3 +538,21 @@ replace github.com/zenta-dev/zever/core/agent => ../../core/agent
 replace github.com/zenta-dev/zever/core/rag => ../../core/rag
 
 replace github.com/zenta-dev/zever/shared/mcpclient => ../../shared/mcpclient
+
+replace github.com/zenta-dev/zever/adapters/crypto/kms => ../../adapters/crypto/kms
+
+replace github.com/zenta-dev/zever/adapters/idempotency/db => ../../adapters/idempotency/db
+
+replace github.com/zenta-dev/zever/adapters/outbox/cdc => ../../adapters/outbox/cdc
+
+replace github.com/zenta-dev/zever/adapters/outbox/memory => ../../adapters/outbox/memory
+
+replace github.com/zenta-dev/zever/adapters/resilience/inproc => ../../adapters/resilience/inproc
+
+replace github.com/zenta-dev/zever/adapters/resilience/redis => ../../adapters/resilience/redis
+
+replace github.com/zenta-dev/zever/adapters/scheduler/postgres => ../../adapters/scheduler/postgres
+
+replace github.com/zenta-dev/zever/adapters/secrets/vault => ../../adapters/secrets/vault
+
+replace github.com/zenta-dev/zever/adapters/session/db => ../../adapters/session/db
