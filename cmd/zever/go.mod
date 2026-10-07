@@ -199,9 +199,8 @@ require (
 	github.com/charmbracelet/x/term v0.2.2 // indirect
 	github.com/charmbracelet/x/termios v0.1.1 // indirect
 	github.com/charmbracelet/x/windows v0.2.2 // indirect
-	github.com/chromedp/cdproto v0.0.0-20260714215040-dc233986426f // indirect
+	github.com/chromedp/cdproto v0.157.6 // indirect
 	github.com/chromedp/chromedp v0.16.0 // indirect
-	github.com/chromedp/sysutil v1.1.0 // indirect
 	github.com/clipperhouse/displaywidth v0.11.0 // indirect
 	github.com/clipperhouse/uax29/v2 v2.7.0 // indirect
 	github.com/cloudflare/cloudflare-go/v7 v7.12.0 // indirect
@@ -508,7 +507,9 @@ replace github.com/zenta-dev/zever/shared/kvstore => ../../shared/kvstore
 replace github.com/zenta-dev/zever/shared/lrucache => ../../shared/lrucache
 
 replace github.com/zenta-dev/zever/shared/msgspan => ../../shared/msgspan
+
 replace github.com/zenta-dev/zever/shared/outboxbridge => ../../shared/outboxbridge
+
 replace github.com/zenta-dev/zever/shared/providersclient => ../../shared/providersclient
 
 replace github.com/zenta-dev/zever/shared/providersopt => ../../shared/providersopt
