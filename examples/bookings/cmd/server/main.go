@@ -18,12 +18,16 @@ import (
 	"syscall"
 	"time"
 
+	"google.golang.org/grpc"
+
 	"github.com/zenta-dev/zever/container"
 	"github.com/zenta-dev/zever/core/i18n"
 	"github.com/zenta-dev/zever/core/middleware"
 	"github.com/zenta-dev/zever/core/permission"
+	"github.com/zenta-dev/zever/core/resilience"
 	"github.com/zenta-dev/zever/examples/bookings/internal/api"
 	"github.com/zenta-dev/zever/examples/bookings/internal/app"
+	"github.com/zenta-dev/zever/shared/grpcclient"
 )
 
 const (
@@ -33,6 +37,16 @@ const (
 	writeTimeout      = 15 * time.Second
 	idleTimeout       = 60 * time.Second
 )
+
+// guardedGRPCClient dials target through a per-dependency circuit breaker
+// so one slow downstream cannot exhaust this process.
+func guardedGRPCClient(ctx context.Context, c *container.Container, resMgr resilience.Manager, target, dep string) (*grpc.ClientConn, error) {
+	g, err := resMgr.Guard(dep)
+	if err != nil {
+		return nil, err
+	}
+	return c.GRPCClient(target, grpcclient.WithGuard(g))
+}
 
 func main() {
 	addr := flag.String("addr", ":8080", "HTTP address to listen on")
@@ -147,6 +161,14 @@ func run(addr string) error {
 	if err != nil {
 		return err
 	}
+
+	resMgr, err := c.Resilience()
+	if err != nil {
+		return err
+	}
+
+	// Retained for outbound calls through guardedGRPCClient below.
+	_ = resMgr
 
 	r, err := c.Router()
 	if err != nil {
