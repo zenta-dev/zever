@@ -88,3 +88,5 @@ zever compile schema/app.zen --backend=mcp --out ./gen
 - `zever schedule:run`: Alias for queue:work (worker runs scheduler)
 - `zever serve`: Run server entrypoint (default cmd/server)
 - `zever tinker`: Live container REPL via tinker shim
+- `zever uninstall`: Remove the zever and zever-lsp binaries
+- `zever upgrade`: Upgrade the zever binary to the latest release

@@ -423,6 +423,8 @@ func printUsage() {
 		"",
 		sectionOps,
 		line("outbox", "Inspect and repair the outbox DLQ"),
+		line("uninstall", "Remove the zever and zever-lsp binaries"),
+		line("upgrade", "Upgrade the zever binary to the latest release"),
 		"",
 		bold("Examples:"),
 		dim("  ")+cmd("zever new myapp")+dim("                  # scaffold new app"),

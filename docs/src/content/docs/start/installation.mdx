@@ -5,45 +5,65 @@ description: Install Go 1.27, the Zever CLI, and the modules you need, then veri
 
 import { Steps, Aside, LinkCard, CardGrid } from '@astrojs/starlight/components';
 
-Install the `zever` CLI with `go install`, then add the Zever modules to your project with `go get`. A fresh install needs no config file and no database server.
+Install the `zever` CLI with the one-line installer, then add the Zever modules to your project with `go get`. A fresh install needs no config file and no database server.
 
 | Requirement | Version | Notes |
 |---|---|---|
-| Go | 1.27.0+ | `go 1.27.0` in `go.mod` |
+| Go | 1.27.0+ | `go 1.27.0` in `go.mod`; required but not installed by the script |
 | Git | any recent | needed for `go get` and scaffolding |
 | Node.js | 18+ | docs site only (`docs/`), not needed for backend work |
 
-## Install the CLI and modules
+## Install the CLI with the one-line installer
 
 <Steps>
 
-1. Check your toolchain. You need `go1.27` or newer, otherwise install it from [go.dev/dl](https://go.dev/dl/).
+1. Check your toolchain. The installer does not install Go: you need `go1.27` or newer, otherwise install it from [go.dev/dl](https://go.dev/dl/).
 
    ```sh
    go version
    git --version
    ```
 
-2. Create a module and fetch the Zever modules you need.
+2. Install `zever` plus the matching `zever-lsp` with the pinned installer (never `main`).
 
    ```sh
-   go mod init example.com/myapp
-   go get github.com/zenta-dev/zever/config@v0.6.1 github.com/zenta-dev/zever/container@v0.6.1 github.com/zenta-dev/zever/adapters/db/sqlite@v0.6.1
+   curl -fsSL https://raw.githubusercontent.com/zenta-dev/zever/v0.6.1/install.sh | sh
    ```
 
-3. Install the CLI at the same pinned version.
+   Windows (PowerShell):
 
-   ```sh
-   go install github.com/zenta-dev/zever/cmd/zever@v0.6.1
+   ```powershell
+   irm https://raw.githubusercontent.com/zenta-dev/zever/v0.6.1/install.ps1 | iex
    ```
 
    <Aside type="tip" title="PATH">
-   `go install` writes to `$(go env GOPATH)/bin`. If `zever` is not found, add that directory to your `PATH`.
+   The installer puts both binaries in `~/.local/bin`. If `zever` is not found, add that directory to your `PATH`.
    </Aside>
 
-4. Run `zever --help`. It prints the grouped command map (Scaffolding, Inspection, Runtime, Database, Operations).
+   <Aside type="caution" title="Windows execution policy">
+   If PowerShell blocks the script, download it first, then run `Unblock-File install.ps1` or invoke it with `powershell -ExecutionPolicy Bypass -File install.ps1`.
+   </Aside>
+
+3. Run `zever --help`. It prints the grouped command map (Scaffolding, Inspection, Runtime, Database, Operations).
 
 </Steps>
+
+<Aside type="note" title="Re-running the installer upgrades in place">
+If `zever` already exists, `install.sh` upgrades it in place: older installs ask for confirmation, re-running the same version skips, and downgrading from a newer install asks for confirmation. Non-interactive shells need `--yes`. `zever-lsp` is always matched to the CLI version (it has no version flag).
+</Aside>
+
+## Add the modules to your project
+
+Create a module and fetch the Zever modules you need at the same pinned version.
+
+```sh
+go mod init example.com/myapp
+go get github.com/zenta-dev/zever/config@v0.6.1 github.com/zenta-dev/zever/container@v0.6.1 github.com/zenta-dev/zever/adapters/db/sqlite@v0.6.1
+```
+
+<Aside type="caution" title="No `go install` for zever modules">
+`go install <module>@version` does NOT work for zever modules because the repo commits `replace` directives. Use the installer above or a prebuilt release binary instead.
+</Aside>
 
 ## Verify with a smoke test
 
@@ -82,6 +102,24 @@ db resolved: true
 ```
 
 If that line prints, fetch, build, and default resolution all work. `container.New(nil)` is valid too and closes cleanly. When you add a config file later, see the [configuration guide](../../guides/operate/configuration/): files use snake_case keys, and env vars are `<SERVICE>_<FIELD>` with no prefix (`DB_ADAPTER`, `DB_MAXCONNS`).
+
+## Upgrade
+
+Re-run the pinned installer, or self-update from the CLI itself:
+
+```sh
+zever upgrade
+```
+
+Use `zever upgrade --check` to see whether a newer release exists without installing it, and `zever upgrade --version vX.Y.Z` to pin the target instead of latest.
+
+## Uninstall
+
+```sh
+zever uninstall
+```
+
+It removes both the `zever` and `zever-lsp` binaries. Pass `--keep-lsp` to leave the language server behind, or `--dry-run` to preview what would be removed.
 
 ## Production notes
 
@@ -141,7 +179,13 @@ Cause: the pinned tool download was blocked or partial. Fix: re-run `make setup`
 <details>
 <summary>`zever` is not found or prints nothing useful</summary>
 
-Cause: the CLI landed in a directory outside `PATH`. Fix: add `$(go env GOPATH)/bin` to `PATH`, or reinstall with `go install github.com/zenta-dev/zever/cmd/zever@v0.6.1`.
+Cause: the binaries landed in a directory outside `PATH`. Fix: add `~/.local/bin` to `PATH`, or re-run `curl -fsSL https://raw.githubusercontent.com/zenta-dev/zever/v0.6.1/install.sh | sh`.
+</details>
+
+<details>
+<summary>`go install ...@version` fails with a replace-directive error</summary>
+
+Cause: expected — the repo commits `replace` directives, so `go install <module>@version` does not work for zever modules. Fix: use the installer above or a prebuilt release binary instead.
 </details>
 
 <details>
