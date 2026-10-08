@@ -14,7 +14,13 @@ Editor support for the [zever](https://github.com/zenta-dev/zever) schema DSL: `
 
 ## Prerequisite: the `zever-lsp` binary
 
-This extension is a **client only**. It does not bundle or auto-install the language server. Build and install it from a local clone of the `zever` repository:
+This extension is a **client only**. It does not bundle or auto-install the language server. The recommended path is the pinned one-line installer, which provides `zever-lsp` on `PATH` alongside the CLI:
+
+```bash
+curl -fsSL https://raw.githubusercontent.com/zenta-dev/zever/v0.6.1/install.sh | sh
+```
+
+Alternatively, build and install it from a local clone of the `zever` repository:
 
 ```bash
 git clone https://github.com/zenta-dev/zever.git
@@ -25,7 +31,7 @@ go install ./tools/zever-lsp
 Without a local clone, install the published release instead:
 
 ```bash
-go install github.com/zenta-dev/zever/tools/zever-lsp@v0.6.0
+go install github.com/zenta-dev/zever/tools/zever-lsp@v0.6.1
 ```
 
 Make sure the resulting binary is on your `$PATH` (`go install` puts it in `$(go env GOPATH)/bin` by default). If `zever-lsp` cannot be found when the extension activates, you'll see an error notification with this same instruction.

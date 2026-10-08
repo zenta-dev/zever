@@ -7,11 +7,34 @@ Module root: [`../../README.md`](../../README.md).
 
 ## Install
 
-Multi-module repo (`cmd/zever` is its own module; batteries live in `core/<b>` with the `Register`/`Open` registry, adapters in `adapters/<b>/<a>` each with `Register()`, helpers in `shared/*`), so install the CLI module at a pinned version:
+Recommended path: the pinned one-line installer. It installs the `zever`
+CLI plus the matching `zever-lsp` into `~/.local/bin` (Go 1.27+ is required
+but not installed by the script). Re-running it upgrades an existing install
+in place (older asks to confirm, same version skips, newer asks to confirm a
+downgrade; non-TTY shells need `--yes`):
 
 ```sh
-go install github.com/zenta-dev/zever/cmd/zever@v0.6.0
+curl -fsSL https://raw.githubusercontent.com/zenta-dev/zever/v0.6.1/install.sh | sh
 ```
+
+Windows (PowerShell):
+
+```powershell
+irm https://raw.githubusercontent.com/zenta-dev/zever/v0.6.1/install.ps1 | iex
+```
+
+If PowerShell blocks the script, download it first, then run
+`Unblock-File install.ps1` or invoke it with
+`powershell -ExecutionPolicy Bypass -File install.ps1`.
+
+Do not use `go install github.com/zenta-dev/zever/cmd/zever@version`: the
+repo commits `replace` directives, so `go install <module>@version` does not
+work for zever modules. Use the installer above or a prebuilt release binary
+instead.
+
+After install, `zever upgrade` self-updates (`--check` to preview,
+`--version` to pin a target) and `zever uninstall` removes both binaries
+(`--keep-lsp`, `--dry-run`).
 
 Then `zever --help` prints the grouped command map (Scaffolding /
 Inspection / Runtime / Database).

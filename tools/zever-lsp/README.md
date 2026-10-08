@@ -7,12 +7,28 @@ edits to any LSP-capable editor over stdio.
 
 ## Install
 
+Recommended path: the pinned one-line installer. It installs the `zever`
+CLI plus the matching `zever-lsp` into `~/.local/bin` (Go 1.27+ is required
+but not installed by the script). `zever-lsp` is always matched to the CLI
+version — it has no version flag of its own:
+
 ```sh
-go install github.com/zenta-dev/zever/tools/zever-lsp@v0.6.0
+curl -fsSL https://raw.githubusercontent.com/zenta-dev/zever/v0.6.1/install.sh | sh
 ```
 
-Make sure the resulting binary directory (`$(go env GOPATH)/bin` by default)
-is on your `PATH`, then point your editor at the `zever-lsp` binary.
+Windows (PowerShell):
+
+```powershell
+irm https://raw.githubusercontent.com/zenta-dev/zever/v0.6.1/install.ps1 | iex
+```
+
+Do not use `go install github.com/zenta-dev/zever/tools/zever-lsp@version`:
+the repo commits `replace` directives, so `go install <module>@version` does
+not work for zever modules. Use the installer above or a prebuilt release
+binary instead.
+
+Make sure `~/.local/bin` is on your `PATH`, then point your editor at the
+`zever-lsp` binary.
 
 ## Capabilities
 
@@ -69,7 +85,7 @@ the protocol stream.
 ## Troubleshooting
 
 - `zever-lsp: command not found` — the binary is not on `PATH`. Re-run the
-  `go install` line above and check `$(go env GOPATH)/bin` is on `PATH`.
+  installer above and check `~/.local/bin` is on `PATH`.
 - No diagnostics / nothing happens — open a `.zen` file and confirm the
   client attached (`:LspInfo` in Neovim, Output > zever-lsp in VS Code);
   `DidChangeWatchedFiles` only rescans the workspace root from `initialize`,
@@ -78,7 +94,7 @@ the protocol stream.
   to stderr by design; check for wrapper scripts or editor plugins that
   merge the streams.
 - There is no `--version` (or any) CLI flag: the server speaks LSP over
-   stdio only. The version (`0.6.0` in `server.go`) is reported in the
+   stdio only. The version (`0.6.1` in `server.go`) is reported in the
   `initialize` result's `serverInfo`.
 
 ## The DSL itself

@@ -129,8 +129,15 @@ vim.api.nvim_create_autocmd('BufWritePre', {
 })
 ```
 
-**Prerequisite**: the `zever-lsp` binary must be on `$PATH`. It's built
-from a sibling package in this repo:
+**Prerequisite**: the `zever-lsp` binary must be on `$PATH`. The
+recommended path is the pinned one-line installer, which provides
+`zever-lsp` alongside the CLI:
+
+```bash
+curl -fsSL https://raw.githubusercontent.com/zenta-dev/zever/v0.6.1/install.sh | sh
+```
+
+Otherwise it's built from a sibling package in this repo:
 
 ```bash
 go install ./tools/zever-lsp
@@ -142,7 +149,7 @@ module.
 Without a local clone, install the published release instead:
 
 ```bash
-go install github.com/zenta-dev/zever/tools/zever-lsp@v0.6.0
+go install github.com/zenta-dev/zever/tools/zever-lsp@v0.6.1
 ```
 
 ## Verifying it worked
