@@ -230,7 +230,8 @@ releases) — everything else moves together:
   `docs/src/content/docs/reference/cli.mdx`.
 - Docs pins: `docs/src/data/landing.ts` (`VERSION`),
   `tools/zever-mcp/server.go` (`serverVersion`).
-- Tags: run `tools/tag-release.sh vX.Y.Z` on main once the bump lands (creates one `<path>/vX.Y.Z` per module, dependency order; no bare `vX.Y.Z` — see above). `.github/workflows/release.yml` fires on the bare `vX.Y.Z` tag, so create and push that bare tag in addition to the per-module tags. Verify with `grep -rn` for the old version (excluding
+- Intra-repo module versions: after cutting `CHANGELOG.md`, run `go run ./tools/modgraph` to bump direct intra-repo requires/replaces to `vX.Y.Z`. Restore transitive `replace` entries where needed so per-module `go mod tidy` resolves the untagged version offline, then run `make deps-sync`; verify with `make modgraph-check` and `make deps-sync-check` before tagging.
+- Tags: run `tools/tag-release.sh vX.Y.Z` from a clean checkout of main once the bump lands (the tagger skips nested worktrees, harness checkouts, and vendored copies; it creates one `<path>/vX.Y.Z` per module, dependency order; no bare `vX.Y.Z` — see above). `.github/workflows/release.yml` fires on the bare `vX.Y.Z` tag, so create and push that bare tag in addition to the per-module tags. Verify with `grep -rn` for the old version (excluding
   `CHANGELOG.md` history and third-party `go.sum` lines) before tagging.
 
 ## Commit Convention
