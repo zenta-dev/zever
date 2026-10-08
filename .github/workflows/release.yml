@@ -18,14 +18,17 @@ permissions:
   contents: write # attach dist/* + sbom/*.json to the tag release
   id-token: write # OIDC minting for actions/attest-build-provenance
   attestations: write # write SLSA provenance for binaries + SBOMs
+  actions: write # upload (binaries/sbom) and download (publish) release artifacts
 
 jobs:
-  release:
-    name: build, attest, attach
-    # 10 static binaries plus per-module SBOMs need well over an hour on a
-    # cold runner; keep headroom so the SBOM step cannot be cancelled.
-    timeout-minutes: 120
+  binaries:
+    name: build ${{ matrix.arch }}
+    timeout-minutes: 30
     runs-on: ubuntu-latest
+    strategy:
+      fail-fast: true
+      matrix:
+        arch: [amd64, arm64]
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
       - uses: actions/setup-go@b7ad1dad31e06c5925ef5d2fc7ad053ef454303e # v7.0.0
@@ -35,50 +38,84 @@ jobs:
             go.work.sum
             **/go.sum
       - name: Build static binaries (zever CLI + showcase + MCP + LSP)
+        env:
+          GOARCH: ${{ matrix.arch }}
         run: |
           mkdir -p dist
           # Builder flags mirror examples/showcase/Dockerfile
-          # (golang:1.27.1-bookworm, CGO_ENABLED=0, -trimpath,
-          # -ldflags="-s -w"). The Dockerfile builds with GOWORK=off because
-          # its build context carries only the showcase module plus replace
-          # targets; here the full checkout is present (cmd/zever and
-          # examples/showcase are both in go.work), so the workspace stays on.
-          # Entrypoints: cmd/zever/main.go (zever CLI),
-          # examples/showcase/cmd/server/main.go,
-          # examples/showcase/cmd/worker/main.go, ./tools/zever-mcp
-          # (zever MCP server), and ./tools/zever-lsp (zever language
-          # server). No cmd/worker exists at the repo root; the worker
-          # ships with the showcase module.
-          for arch in amd64 arm64; do
-            CGO_ENABLED=0 GOOS=linux GOARCH="$arch" go build -trimpath -ldflags="-s -w" -o "dist/zever-linux-$arch" ./cmd/zever
-            CGO_ENABLED=0 GOOS=linux GOARCH="$arch" go build -trimpath -ldflags="-s -w" -o "dist/showcase-server-linux-$arch" ./examples/showcase/cmd/server
-            CGO_ENABLED=0 GOOS=linux GOARCH="$arch" go build -trimpath -ldflags="-s -w" -o "dist/showcase-worker-linux-$arch" ./examples/showcase/cmd/worker
-            CGO_ENABLED=0 GOOS=linux GOARCH="$arch" go build -trimpath -ldflags="-s -w" -o "dist/zever-mcp-linux-$arch" ./tools/zever-mcp
-            CGO_ENABLED=0 GOOS=linux GOARCH="$arch" go build -trimpath -ldflags="-s -w" -o "dist/zever-lsp-linux-$arch" ./tools/zever-lsp
-          done
+          # (CGO_ENABLED=0, -trimpath, -ldflags="-s -w"). The workspace stays
+          # on (full checkout; cmd/zever and examples/showcase are in go.work).
+          # No cmd/worker exists at the repo root; the worker ships with the
+          # showcase module.
+          CGO_ENABLED=0 GOOS=linux go build -trimpath -ldflags="-s -w" -o "dist/zever-linux-$GOARCH" ./cmd/zever
+          CGO_ENABLED=0 GOOS=linux go build -trimpath -ldflags="-s -w" -o "dist/showcase-server-linux-$GOARCH" ./examples/showcase/cmd/server
+          CGO_ENABLED=0 GOOS=linux go build -trimpath -ldflags="-s -w" -o "dist/showcase-worker-linux-$GOARCH" ./examples/showcase/cmd/worker
+          CGO_ENABLED=0 GOOS=linux go build -trimpath -ldflags="-s -w" -o "dist/zever-mcp-linux-$GOARCH" ./tools/zever-mcp
+          CGO_ENABLED=0 GOOS=linux go build -trimpath -ldflags="-s -w" -o "dist/zever-lsp-linux-$GOARCH" ./tools/zever-lsp
+      - uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
+        with:
+          name: dist-${{ matrix.arch }}
+          path: dist/*
+          if-no-files-found: error
+
+  sbom:
+    name: sbom shard ${{ matrix.shard }}
+    timeout-minutes: 30
+    runs-on: ubuntu-latest
+    strategy:
+      fail-fast: true
+      matrix:
+        shard: [0, 1, 2, 3, 4, 5, 6, 7]
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+      - uses: actions/setup-go@b7ad1dad31e06c5925ef5d2fc7ad053ef454303e # v7.0.0
+        with:
+          go-version-file: go.work
+          cache-dependency-path: |
+            go.work.sum
+            **/go.sum
       - uses: actions/cache@55cc8345863c7cc4c66a329aec7e433d2d1c52a9 # v6.1.0
         with:
           path: ~/go/bin
           key: ${{ runner.os }}-gobin-cyclonedx-gomod-v1.12.0
       - name: Install tools
         run: make setup-cyclonedx-gomod
-      - name: Generate SBOMs (all workspace modules)
-        run: make sbom
+      - name: Generate SBOMs (shard ${{ matrix.shard }} of 8)
+        run: make sbom SHARD_TOTAL=8 SHARD_INDEX=${{ matrix.shard }}
+      - uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
+        with:
+          name: sbom-${{ matrix.shard }}
+          path: sbom/*.json
+          if-no-files-found: error
+
+  publish:
+    name: attest, attach
+    needs: [binaries, sbom]
+    timeout-minutes: 30
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/download-artifact@9000827ccba6bdab643e8b6fd33ac0654aef8333 # v8.0.2
+        with:
+          pattern: dist-*
+          path: dist
+          merge-multiple: true
+      - uses: actions/download-artifact@9000827ccba6bdab643e8b6fd33ac0654aef8333 # v8.0.2
+        with:
+          pattern: sbom-*
+          path: sbom
+          merge-multiple: true
       # SLSA build provenance over the release binaries. OIDC-minted
-      # attestations only exist on GitHub-hosted runs (no local
-      # reproduction); verify a downloaded binary with:
-      # gh attestation verify dist/zever-linux-amd64 --repo zenta-dev/zever
+      # attestations only exist on GitHub-hosted runs (no local reproduction).
       - uses: actions/attest-build-provenance@4d101475d8b20a2381f78447822ac1eab6504dd8 # v4.2.2
         with:
           subject-path: dist/*
-      # Same provenance over the generated SBOMs; verify with:
-      # gh attestation verify sbom/cmd_zever.json --repo zenta-dev/zever
       - uses: actions/attest-build-provenance@4d101475d8b20a2381f78447822ac1eab6504dd8 # v4.2.2
         with:
           subject-path: sbom/*.json
       - name: Attach artifacts to GitHub release
         env:
           GH_TOKEN: ${{ github.token }}
+          GH_REPO: ${{ github.repository }}
         run: |
           if gh release view "${{ github.ref_name }}" >/dev/null 2>&1; then
             gh release upload "${{ github.ref_name }}" dist/* sbom/*.json --clobber
