@@ -1,6 +1,12 @@
 # Release artifacts: static binaries + SBOMs, SLSA-attested, attached to the GitHub release.
 #
 # Trigger: version tags only (`v*`, same shape as the ci.yml tag filter).
+# Shape: `binaries` fans out over an explicit GOOS/GOARCH triple matrix
+# (linux/amd64, linux/arm64, darwin/amd64, darwin/arm64, windows/amd64),
+# emitting `dist/<name>-<goos>-<goarch>[.exe]` (.exe only on windows);
+# `sbom` shards over 8 shards via `make sbom`; `publish` merges both,
+# writes `dist/SHA256SUMS.txt` (covered by the `dist/*` attestation and
+# upload globs), SLSA-attests, and attaches everything to the GitHub release.
 # Local reproduction is partial: `go build` and `make sbom` run anywhere,
 # but actions/attest-build-provenance mints OIDC-backed provenance only on
 # GitHub-hosted runs, so attestation cannot be produced locally.
@@ -8,6 +14,8 @@
 # Verify a downloaded artifact with:
 #   gh attestation verify dist/zever-linux-amd64 --repo zenta-dev/zever
 #   gh attestation verify sbom/cmd_zever.json --repo zenta-dev/zever
+# Verify checksums with:
+#   sha256sum -c dist/SHA256SUMS.txt
 name: release
 
 on:
@@ -22,13 +30,23 @@ permissions:
 
 jobs:
   binaries:
-    name: build ${{ matrix.arch }}
+    name: build ${{ matrix.goos }}-${{ matrix.goarch }}
     timeout-minutes: 30
     runs-on: ubuntu-latest
     strategy:
       fail-fast: true
       matrix:
-        arch: [amd64, arm64]
+        include:
+          - goos: linux
+            goarch: amd64
+          - goos: linux
+            goarch: arm64
+          - goos: darwin
+            goarch: amd64
+          - goos: darwin
+            goarch: arm64
+          - goos: windows
+            goarch: amd64
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
       - uses: actions/setup-go@b7ad1dad31e06c5925ef5d2fc7ad053ef454303e # v7.0.0
@@ -39,22 +57,27 @@ jobs:
             **/go.sum
       - name: Build static binaries (zever CLI + showcase + MCP + LSP)
         env:
-          GOARCH: ${{ matrix.arch }}
+          GOOS: ${{ matrix.goos }}
+          GOARCH: ${{ matrix.goarch }}
         run: |
           mkdir -p dist
           # Builder flags mirror examples/showcase/Dockerfile
           # (CGO_ENABLED=0, -trimpath, -ldflags="-s -w"). The workspace stays
           # on (full checkout; cmd/zever and examples/showcase are in go.work).
           # No cmd/worker exists at the repo root; the worker ships with the
-          # showcase module.
-          CGO_ENABLED=0 GOOS=linux go build -trimpath -ldflags="-s -w" -o "dist/zever-linux-$GOARCH" ./cmd/zever
-          CGO_ENABLED=0 GOOS=linux go build -trimpath -ldflags="-s -w" -o "dist/showcase-server-linux-$GOARCH" ./examples/showcase/cmd/server
-          CGO_ENABLED=0 GOOS=linux go build -trimpath -ldflags="-s -w" -o "dist/showcase-worker-linux-$GOARCH" ./examples/showcase/cmd/worker
-          CGO_ENABLED=0 GOOS=linux go build -trimpath -ldflags="-s -w" -o "dist/zever-mcp-linux-$GOARCH" ./tools/zever-mcp
-          CGO_ENABLED=0 GOOS=linux go build -trimpath -ldflags="-s -w" -o "dist/zever-lsp-linux-$GOARCH" ./tools/zever-lsp
+          # showcase module. Windows binaries get a .exe suffix; all other
+          # platforms have no suffix, so linux names stay byte-identical to
+          # the previous `dist/<name>-linux-<arch>` shape.
+          EXT=""
+          if [ "$GOOS" = "windows" ]; then EXT=".exe"; fi
+          CGO_ENABLED=0 go build -trimpath -ldflags="-s -w" -o "dist/zever-$GOOS-$GOARCH$EXT" ./cmd/zever
+          CGO_ENABLED=0 go build -trimpath -ldflags="-s -w" -o "dist/showcase-server-$GOOS-$GOARCH$EXT" ./examples/showcase/cmd/server
+          CGO_ENABLED=0 go build -trimpath -ldflags="-s -w" -o "dist/showcase-worker-$GOOS-$GOARCH$EXT" ./examples/showcase/cmd/worker
+          CGO_ENABLED=0 go build -trimpath -ldflags="-s -w" -o "dist/zever-mcp-$GOOS-$GOARCH$EXT" ./tools/zever-mcp
+          CGO_ENABLED=0 go build -trimpath -ldflags="-s -w" -o "dist/zever-lsp-$GOOS-$GOARCH$EXT" ./tools/zever-lsp
       - uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
         with:
-          name: dist-${{ matrix.arch }}
+          name: dist-${{ matrix.goos }}-${{ matrix.goarch }}
           path: dist/*
           if-no-files-found: error
 
@@ -104,6 +127,9 @@ jobs:
           pattern: sbom-*
           path: sbom
           merge-multiple: true
+      - name: Generate SHA256SUMS.txt
+        run: |
+          (cd dist && sha256sum -- * > SHA256SUMS.txt)
       # SLSA build provenance over the release binaries. OIDC-minted
       # attestations only exist on GitHub-hosted runs (no local reproduction).
       - uses: actions/attest-build-provenance@4d101475d8b20a2381f78447822ac1eab6504dd8 # v4.2.2
