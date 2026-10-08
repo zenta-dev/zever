@@ -7,6 +7,16 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [v0.6.1] - 2026-10-08
+
+### Changed
+
+- Release binaries now ship for linux/darwin/windows × amd64/arm64
+  (`.exe` on Windows; existing linux asset names unchanged).
+- New `dist/SHA256SUMS.txt` published with every release.
+- SBOM generation sharded across parallel jobs.
+- Apache-2.0 license stamped on own modules in SBOMs.
+
 ## [v0.6.0] - 2026-10-08
 
 ### Breaking
