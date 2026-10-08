@@ -137,6 +137,8 @@ exit:0
 | Database | `zever db rollback` |
 | Database | `zever db seed` |
 | Operations | `zever outbox` (`status`, `dlq list`, `dlq requeue`, `dlq purge`, `purge`; see [Outbox Ops](../../digging-deeper/outbox-ops/)) |
+| Operations | `zever uninstall` (remove the `zever` and `zever-lsp` binaries; `--dry-run`, `--keep-lsp`, `--yes`/`--force`) |
+| Operations | `zever upgrade` (upgrade the `zever` binary to the latest release; `--version`, `--check`, `--dry-run`, `--yes`/`--force`) |
 | Tooling | `zever completion <bash\|zsh\|fish\|powershell>` |
 | Tooling | `zever docs --dir <dir>` |
 
@@ -224,6 +226,52 @@ non-negative. `dlq purge` needs an adapter that implements
 these from a deploy box with database access, not from every replica.
 Metrics, alert rules, and the full runbook are in
 [Outbox Ops](../../digging-deeper/outbox-ops/).
+
+### `zever uninstall`
+
+Removes the running `zever` binary (resolved via `os.Executable()`,
+symlinks followed) plus every `zever-lsp` binary found on `PATH`.
+Binaries only: projects, caches, profiles, and config are never touched.
+
+```sh
+zever uninstall --dry-run        # print the removal plan, delete nothing
+zever uninstall --yes            # confirm without prompting
+zever uninstall --keep-lsp --yes # leave zever-lsp in place
+```
+
+Without `--yes`/`--force`, a terminal gets a `[y/N]` prompt defaulting
+to No; without a terminal the command fails and prints the exact
+`zever uninstall --yes` re-run. On Windows the running binary cannot
+delete itself, so self-delete becomes a printed `del "<path>"` step
+while `zever-lsp` removals stay automatic. `--json` emits the
+machine-readable envelope instead of the human plan.
+
+### `zever upgrade`
+
+Upgrades the running `zever` binary to the latest stable release (or
+`--version X` for an explicit target). The current version is the
+compiled `cliVersion`; the default target comes from
+`api.github.com/repos/zenta-dev/zever/releases/latest`.
+
+```sh
+zever upgrade --check              # print the available version, exit 0
+zever upgrade --dry-run            # print the upgrade plan, download nothing
+zever upgrade --yes                # confirm without prompting
+zever upgrade --version v0.7.0 --yes
+```
+
+Versions compare with `golang.org/x/mod/semver`: an already-current
+target prints `already current` and exits 0, and a target older than
+the installed binary refuses the downgrade unless `--version`
+requested it explicitly. The `runtime.GOOS`/`runtime.GOARCH` asset
+(`.exe` suffixed on Windows) plus `SHA256SUMS.txt` downloads from the
+release, the asset is verified with `crypto/sha256`, and any mismatch
+or network error aborts before anything is replaced. POSIX installs
+atomically (temp file in the binary directory, `chmod +x`, rename over
+the running binary); Windows stages `zever.new.exe` beside the binary
+and spawns a detached `cmd /C` helper that moves it into place after
+our PID exits — restart the shell to complete. Confirmation follows
+the same TTY rules as `uninstall`; `--json` emits the envelope.
 
 ### Dev and tinker rules
 
