@@ -137,10 +137,15 @@ vet-lsp: ## Run go vet on zever-lsp module
 vulncheck: ## Scan for known vulnerabilities
 	$(GOVULNCHECK) ./...
 
+# Own modules live in subdirs without a LICENSE file, so cyclonedx-gomod cannot detect them; stamp the root LICENSE.
+SBOM_OWN_PREFIX ?= github.com/zenta-dev/zever
+SBOM_OWN_LICENSE ?= Apache-2.0
+
 .PHONY: sbom
 sbom: ## Generate a CycloneDX SBOM per module under sbom/ (override list via MODULES)
 	@command -v $(CYCLONEDX_GOMOD) >/dev/null 2>&1 || { printf '%s\n' "cyclonedx-gomod not found: run 'make setup'"; exit 1; }
-	mkdir -p sbom; set -e; root="$$PWD"; for d in $(if $(MODULES),$(MODULES),$(SHARD_MODULES)); do echo "== $$d =="; slug=$$(echo "$$d" | sed 's|^\./||; s|/|_|g'); (cd $$d && $(CYCLONEDX_GOMOD) mod -licenses -std -json -output "$$root/sbom/$$slug.json" .); done
+	@command -v jq >/dev/null 2>&1 || { printf '%s\n' "jq not found: install jq to stamp own-module licenses"; exit 1; }
+	mkdir -p sbom; set -e; root="$$PWD"; for d in $(if $(MODULES),$(MODULES),$(SHARD_MODULES)); do echo "== $$d =="; slug=$$(echo "$$d" | sed 's|^\./||; s|/|_|g'); (cd $$d && GOWORK=off $(CYCLONEDX_GOMOD) mod -licenses -std -json -output "$$root/sbom/$$slug.json" . 2>&1 | grep -v "no licenses detected.*github.com/zenta-dev/zever" || true); jq --arg p "$(SBOM_OWN_PREFIX)" --arg l "$(SBOM_OWN_LICENSE)" '(.metadata.component, .components[]?) |= (if (.name | startswith($$p)) and ((.licenses // []) | length) == 0 then .licenses = [{license: {id: $$l}}] else . end)' "$$root/sbom/$$slug.json" > "$$root/sbom/$$slug.json.tmp" && mv "$$root/sbom/$$slug.json.tmp" "$$root/sbom/$$slug.json"; done
 
 .PHONY: clean
 clean: ## Remove coverage output and build artifacts
