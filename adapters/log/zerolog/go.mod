@@ -5,13 +5,13 @@ go 1.27.0
 require (
 	github.com/mattn/go-colorable v0.1.14 // indirect
 	github.com/mattn/go-isatty v0.0.24 // indirect
-	github.com/zenta-dev/zever/shared/registry v0.6.0 // indirect
+	github.com/zenta-dev/zever/shared/registry v0.6.1 // indirect
 	golang.org/x/sys v0.48.0 // indirect
 )
 
 require (
 	github.com/rs/zerolog v1.35.1
-	github.com/zenta-dev/zever/core/log v0.6.0
+	github.com/zenta-dev/zever/core/log v0.6.1
 )
 
 replace github.com/zenta-dev/zever/core/log => ../../../core/log

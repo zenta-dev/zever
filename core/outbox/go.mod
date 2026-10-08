@@ -3,11 +3,11 @@ module github.com/zenta-dev/zever/core/outbox
 go 1.27.0
 
 require (
-	github.com/zenta-dev/zever/core/db v0.6.0
-	github.com/zenta-dev/zever/core/observability v0.6.0
-	github.com/zenta-dev/zever/shared/registry v0.6.0
-	github.com/zenta-dev/zever/shared/retry v0.6.0
-	github.com/zenta-dev/zever/shared/traceprop v0.6.0
+	github.com/zenta-dev/zever/core/db v0.6.1
+	github.com/zenta-dev/zever/core/observability v0.6.1
+	github.com/zenta-dev/zever/shared/registry v0.6.1
+	github.com/zenta-dev/zever/shared/retry v0.6.1
+	github.com/zenta-dev/zever/shared/traceprop v0.6.1
 	go.opentelemetry.io/otel/trace v1.47.0
 )
 
