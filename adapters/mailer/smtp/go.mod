@@ -2,7 +2,7 @@ module github.com/zenta-dev/zever/adapters/mailer/smtp
 
 go 1.27.0
 
-require github.com/zenta-dev/zever/core/mailer v0.6.0
+require github.com/zenta-dev/zever/core/mailer v0.6.1
 
 replace github.com/zenta-dev/zever/core/mailer => ../../../core/mailer
 
@@ -14,4 +14,4 @@ replace github.com/zenta-dev/zever/shared/registry => ../../../shared/registry
 
 replace github.com/zenta-dev/zever/shared/traceprop => ../../../shared/traceprop
 
-require github.com/zenta-dev/zever/shared/registry v0.6.0 // indirect
+require github.com/zenta-dev/zever/shared/registry v0.6.1 // indirect

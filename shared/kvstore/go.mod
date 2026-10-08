@@ -3,9 +3,9 @@ module github.com/zenta-dev/zever/shared/kvstore
 go 1.27.0
 
 require (
-	github.com/zenta-dev/zever/adapters/db/sqlite v0.6.0
-	github.com/zenta-dev/zever/core/db v0.6.0
-	github.com/zenta-dev/zever/orm v0.6.0
+	github.com/zenta-dev/zever/adapters/db/sqlite v0.6.1
+	github.com/zenta-dev/zever/core/db v0.6.1
+	github.com/zenta-dev/zever/orm v0.6.1
 )
 
 require (
@@ -17,9 +17,9 @@ require (
 	github.com/mattn/go-isatty v0.0.24 // indirect
 	github.com/ncruces/go-strftime v1.0.0 // indirect
 	github.com/remyoudompheng/bigfft v0.0.0-20230129092748-24d4a6f8daec // indirect
-	github.com/zenta-dev/zever/shared/lrucache v0.6.0 // indirect
-	github.com/zenta-dev/zever/shared/registry v0.6.0 // indirect
-	github.com/zenta-dev/zever/shared/retry v0.6.0 // indirect
+	github.com/zenta-dev/zever/shared/lrucache v0.6.1 // indirect
+	github.com/zenta-dev/zever/shared/registry v0.6.1 // indirect
+	github.com/zenta-dev/zever/shared/retry v0.6.1 // indirect
 	golang.org/x/sys v0.48.0 // indirect
 	golang.org/x/text v0.42.0 // indirect
 	modernc.org/libc v1.77.1 // indirect
