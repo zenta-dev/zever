@@ -1,7 +1,8 @@
 #!/usr/bin/env bash
 # Tag every Go module in the repo for a release.
-# Usage: tools/tag-release.sh [--dry-run|--check] v0.5.0
-# Creates one tag per go.mod found via find: every module is tagged
+# Usage: tools/tag-release.sh [--dry-run|--check] v0.6.0
+# Creates one tag per tracked go.mod found via find, excluding nested
+# worktrees, harness checkouts, and vendored copies: every module is tagged
 # `<reldir>/<version>` where <reldir> is the module dir relative to the
 # repo root (e.g. adapters/cache/redis/v0.5.0). There is no root module anymore,
 # so no bare `<version>` tag is created.
@@ -43,7 +44,7 @@ skipped=0
 pass1=()
 pass2=()
 pass3=()
-for f in $(find . -type f -name go.mod -not -path "./.git/*" -not -path "./.worktrees/*" | sort); do
+for f in $(find . -type f -name go.mod -not -path "./.git/*" -not -path "./.worktrees/*" -not -path "./.claude/*" -not -path "*/node_modules/*" | sort); do
   d=$(dirname "$f")
   # Strip leading ./ for pass matching; root "." falls through to the
   # tag step, which skips it (no root module).
