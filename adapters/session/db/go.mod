@@ -3,13 +3,13 @@ module github.com/zenta-dev/zever/adapters/session/db
 go 1.27.0
 
 require (
-	github.com/zenta-dev/zever/adapters/db/postgres v0.5.3
-	github.com/zenta-dev/zever/adapters/db/sqlite v0.5.3
-	github.com/zenta-dev/zever/core/db v0.5.3
-	github.com/zenta-dev/zever/core/session v0.5.3
-	github.com/zenta-dev/zever/shared/codec v0.5.3
-	github.com/zenta-dev/zever/shared/dbconn v0.5.3
-	github.com/zenta-dev/zever/shared/kvstore v0.5.3
+	github.com/zenta-dev/zever/adapters/db/postgres v0.6.0
+	github.com/zenta-dev/zever/adapters/db/sqlite v0.6.0
+	github.com/zenta-dev/zever/core/db v0.6.0
+	github.com/zenta-dev/zever/core/session v0.6.0
+	github.com/zenta-dev/zever/shared/codec v0.6.0
+	github.com/zenta-dev/zever/shared/dbconn v0.6.0
+	github.com/zenta-dev/zever/shared/kvstore v0.6.0
 )
 
 require (
@@ -22,11 +22,11 @@ require (
 	github.com/mattn/go-isatty v0.0.24 // indirect
 	github.com/ncruces/go-strftime v1.0.0 // indirect
 	github.com/remyoudompheng/bigfft v0.0.0-20230129092748-24d4a6f8daec // indirect
-	github.com/zenta-dev/zever/orm v0.5.3 // indirect
-	github.com/zenta-dev/zever/shared/lrucache v0.5.3 // indirect
-	github.com/zenta-dev/zever/shared/redisopt v0.5.3 // indirect
-	github.com/zenta-dev/zever/shared/registry v0.5.3 // indirect
-	github.com/zenta-dev/zever/shared/retry v0.5.3 // indirect
+	github.com/zenta-dev/zever/orm v0.6.0 // indirect
+	github.com/zenta-dev/zever/shared/lrucache v0.6.0 // indirect
+	github.com/zenta-dev/zever/shared/redisopt v0.6.0 // indirect
+	github.com/zenta-dev/zever/shared/registry v0.6.0 // indirect
+	github.com/zenta-dev/zever/shared/retry v0.6.0 // indirect
 	golang.org/x/sync v0.23.0 // indirect
 	golang.org/x/sys v0.48.0 // indirect
 	golang.org/x/text v0.42.0 // indirect
@@ -49,3 +49,15 @@ replace github.com/zenta-dev/zever/shared/codec => ../../../shared/codec
 replace github.com/zenta-dev/zever/shared/dbconn => ../../../shared/dbconn
 
 replace github.com/zenta-dev/zever/shared/kvstore => ../../../shared/kvstore
+
+replace github.com/zenta-dev/zever/orm => ../../../orm
+
+replace github.com/zenta-dev/zever/shared/lrucache => ../../../shared/lrucache
+
+replace github.com/zenta-dev/zever/shared/redisopt => ../../../shared/redisopt
+
+replace github.com/zenta-dev/zever/shared/registry => ../../../shared/registry
+
+replace github.com/zenta-dev/zever/shared/retry => ../../../shared/retry
+
+replace github.com/zenta-dev/zever/adapters/session/memory => ../memory

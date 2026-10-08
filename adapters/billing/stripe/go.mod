@@ -4,18 +4,18 @@ go 1.27.0
 
 require (
 	github.com/stripe/stripe-go/v82 v82.5.1
-	github.com/zenta-dev/zever/core/billing v0.5.3
-	github.com/zenta-dev/zever/shared/providersclient v0.5.3
+	github.com/zenta-dev/zever/core/billing v0.6.0
+	github.com/zenta-dev/zever/shared/providersclient v0.6.0
 )
 
 require (
 	github.com/cespare/xxhash/v2 v2.3.0 // indirect
 	github.com/go-logr/logr v1.4.4 // indirect
 	github.com/go-logr/stdr v1.2.2 // indirect
-	github.com/zenta-dev/zever/shared/httpclient v0.5.3 // indirect
-	github.com/zenta-dev/zever/shared/providersopt v0.5.3 // indirect
-	github.com/zenta-dev/zever/shared/registry v0.5.3 // indirect
-	github.com/zenta-dev/zever/shared/traceprop v0.5.3 // indirect
+	github.com/zenta-dev/zever/shared/httpclient v0.6.0 // indirect
+	github.com/zenta-dev/zever/shared/providersopt v0.6.0 // indirect
+	github.com/zenta-dev/zever/shared/registry v0.6.0 // indirect
+	github.com/zenta-dev/zever/shared/traceprop v0.6.0 // indirect
 	go.opentelemetry.io/auto/sdk v1.2.1 // indirect
 	go.opentelemetry.io/otel v1.47.0 // indirect
 	go.opentelemetry.io/otel/log v1.47.0 // indirect
@@ -34,3 +34,5 @@ replace github.com/zenta-dev/zever/core/billing => ../../../core/billing
 replace github.com/zenta-dev/zever/shared/registry => ../../../shared/registry
 
 replace github.com/zenta-dev/zever/shared/traceprop => ../../../shared/traceprop
+
+replace github.com/zenta-dev/zever/adapters/billing/stub => ../stub
