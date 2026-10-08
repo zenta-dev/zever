@@ -4,8 +4,8 @@ go 1.27.0
 
 require (
 	github.com/twilio/twilio-go v1.31.2
-	github.com/zenta-dev/zever/core/notification v0.5.3
-	github.com/zenta-dev/zever/shared/httpclient v0.5.3
+	github.com/zenta-dev/zever/core/notification v0.6.0
+	github.com/zenta-dev/zever/shared/httpclient v0.6.0
 )
 
 replace github.com/zenta-dev/zever/core/notification => ../../../core/notification
@@ -27,8 +27,8 @@ require (
 	github.com/golang-jwt/jwt/v5 v5.3.1 // indirect
 	github.com/golang/mock v1.6.0 // indirect
 	github.com/pkg/errors v0.9.1 // indirect
-	github.com/zenta-dev/zever/shared/registry v0.5.3 // indirect
-	github.com/zenta-dev/zever/shared/traceprop v0.5.3 // indirect
+	github.com/zenta-dev/zever/shared/registry v0.6.0 // indirect
+	github.com/zenta-dev/zever/shared/traceprop v0.6.0 // indirect
 	go.opentelemetry.io/auto/sdk v1.2.1 // indirect
 	go.opentelemetry.io/otel v1.47.0 // indirect
 	go.opentelemetry.io/otel/log v1.47.0 // indirect
