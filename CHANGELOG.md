@@ -7,6 +7,17 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Added
+
+- `zever uninstall`: remove the `zever` and `zever-lsp` binaries from
+  `PATH` (binaries only; `--dry-run`, `--keep-lsp`, `--yes`/`--force`,
+  `--json`, TTY `[y/N]` confirmation with non-TTY re-run hint).
+- `zever upgrade`: upgrade the `zever` binary to the latest stable
+  GitHub release or an explicit `--version` (SemVer compare via
+  `golang.org/x/mod/semver`, `--check`/`--dry-run`, SHA256-verified
+  `GOOS`/`GOARCH` asset, atomic POSIX install, staged Windows
+  install, same confirmation rules as `uninstall`).
+
 ## [v0.6.0] - 2026-10-08
 
 ### Breaking
