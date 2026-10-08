@@ -32,7 +32,7 @@ jobs:
           cache-dependency-path: |
             go.work.sum
             **/go.sum
-      - name: Build static binaries (zever CLI + showcase server/worker)
+      - name: Build static binaries (zever CLI + showcase + MCP + LSP)
         run: |
           mkdir -p dist
           # Builder flags mirror examples/showcase/Dockerfile
@@ -43,12 +43,16 @@ jobs:
           # examples/showcase are both in go.work), so the workspace stays on.
           # Entrypoints: cmd/zever/main.go (zever CLI),
           # examples/showcase/cmd/server/main.go,
-          # examples/showcase/cmd/worker/main.go. No cmd/worker exists at the
-          # repo root; the worker ships with the showcase module.
+          # examples/showcase/cmd/worker/main.go, ./tools/zever-mcp
+          # (zever MCP server), and ./tools/zever-lsp (zever language
+          # server). No cmd/worker exists at the repo root; the worker
+          # ships with the showcase module.
           for arch in amd64 arm64; do
             CGO_ENABLED=0 GOOS=linux GOARCH="$arch" go build -trimpath -ldflags="-s -w" -o "dist/zever-linux-$arch" ./cmd/zever
             CGO_ENABLED=0 GOOS=linux GOARCH="$arch" go build -trimpath -ldflags="-s -w" -o "dist/showcase-server-linux-$arch" ./examples/showcase/cmd/server
             CGO_ENABLED=0 GOOS=linux GOARCH="$arch" go build -trimpath -ldflags="-s -w" -o "dist/showcase-worker-linux-$arch" ./examples/showcase/cmd/worker
+            CGO_ENABLED=0 GOOS=linux GOARCH="$arch" go build -trimpath -ldflags="-s -w" -o "dist/zever-mcp-linux-$arch" ./tools/zever-mcp
+            CGO_ENABLED=0 GOOS=linux GOARCH="$arch" go build -trimpath -ldflags="-s -w" -o "dist/zever-lsp-linux-$arch" ./tools/zever-lsp
           done
       - uses: actions/cache@55cc8345863c7cc4c66a329aec7e433d2d1c52a9 # v6.1.0
         with:
