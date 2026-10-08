@@ -170,3 +170,9 @@ require (
 	go.opentelemetry.io/otel/metric v1.47.0 // indirect
 	go.opentelemetry.io/otel/trace v1.47.0 // indirect
 )
+
+replace github.com/zenta-dev/zever/adapters/billing/stub => ../adapters/billing/stub
+
+replace github.com/zenta-dev/zever/adapters/password/argon2 => ../adapters/password/argon2
+
+replace github.com/zenta-dev/zever/adapters/scheduler/embedded => ../adapters/scheduler/embedded

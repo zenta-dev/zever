@@ -74,3 +74,5 @@ replace github.com/zenta-dev/zever/shared/retry => ../../../shared/retry
 replace github.com/zenta-dev/zever/adapters/observability/noop => ../../observability/noop
 
 replace github.com/zenta-dev/zever/adapters/queue/memory => ../memory
+
+replace github.com/zenta-dev/zever/dsl => ../../../dsl

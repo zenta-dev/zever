@@ -38,3 +38,5 @@ replace (
 )
 
 replace github.com/zenta-dev/zever/adapters/db/postgres => ../../adapters/db/postgres
+
+replace github.com/zenta-dev/zever/dsl => ../../dsl
