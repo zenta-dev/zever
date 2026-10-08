@@ -58,3 +58,5 @@ replace github.com/zenta-dev/zever/shared/registry => ../../../shared/registry
 replace github.com/zenta-dev/zever/shared/retry => ../../../shared/retry
 
 replace github.com/zenta-dev/zever/adapters/idempotency/memory => ../memory
+
+replace github.com/zenta-dev/zever/dsl => ../../../dsl

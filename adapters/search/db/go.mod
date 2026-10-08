@@ -56,3 +56,5 @@ replace github.com/zenta-dev/zever/shared/endpoint => ../../../shared/endpoint
 replace github.com/zenta-dev/zever/shared/lrucache => ../../../shared/lrucache
 
 replace github.com/zenta-dev/zever/shared/retry => ../../../shared/retry
+
+replace github.com/zenta-dev/zever/dsl => ../../../dsl

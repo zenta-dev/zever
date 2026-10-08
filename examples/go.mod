@@ -269,3 +269,9 @@ replace github.com/zenta-dev/zever/core/agent => ../core/agent
 replace github.com/zenta-dev/zever/core/rag => ../core/rag
 
 replace github.com/zenta-dev/zever/shared/mcpclient => ../shared/mcpclient
+
+replace github.com/zenta-dev/zever/adapters/billing/stub => ../adapters/billing/stub
+
+replace github.com/zenta-dev/zever/adapters/password/argon2 => ../adapters/password/argon2
+
+replace github.com/zenta-dev/zever/adapters/scheduler/embedded => ../adapters/scheduler/embedded

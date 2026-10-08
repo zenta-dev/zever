@@ -176,3 +176,9 @@ replace github.com/zenta-dev/zever/adapters/search/db => ../../adapters/search/d
 replace github.com/zenta-dev/zever/shared/mcpclient => ../../shared/mcpclient
 
 replace github.com/zenta-dev/zever/adapters/db/sqlite => ../../adapters/db/sqlite
+
+replace github.com/zenta-dev/zever/adapters/billing/stub => ../../adapters/billing/stub
+
+replace github.com/zenta-dev/zever/adapters/password/argon2 => ../../adapters/password/argon2
+
+replace github.com/zenta-dev/zever/adapters/scheduler/embedded => ../../adapters/scheduler/embedded

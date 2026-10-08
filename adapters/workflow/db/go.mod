@@ -52,3 +52,5 @@ replace github.com/zenta-dev/zever/shared/retry => ../../../shared/retry
 replace github.com/zenta-dev/zever/shared/lrucache => ../../../shared/lrucache
 
 replace github.com/zenta-dev/zever/adapters/workflow/memory => ../memory
+
+replace github.com/zenta-dev/zever/dsl => ../../../dsl

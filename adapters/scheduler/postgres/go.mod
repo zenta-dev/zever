@@ -98,3 +98,5 @@ replace github.com/zenta-dev/zever/shared/lrucache => ../../../shared/lrucache
 replace github.com/zenta-dev/zever/adapters/observability/noop => ../../observability/noop
 
 replace github.com/zenta-dev/zever/adapters/scheduler/embedded => ../embedded
+
+replace github.com/zenta-dev/zever/dsl => ../../../dsl
