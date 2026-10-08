@@ -1,6 +1,6 @@
 /** Single source of truth for landing content. Counts are derived, never hard-coded. */
 
-export const VERSION = 'v0.6.0';
+export const VERSION = 'v0.6.1';
 export const INSTALL = 'go install github.com/zenta-dev/zever/cmd/zever@latest';
 
 /** Adapter matrix mirrors config/README.md. */
