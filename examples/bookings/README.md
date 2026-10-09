@@ -18,7 +18,7 @@ no handlers yet.
 
 1. Migrate: `zever db migrate --adapter=sqlite --dsn=data/bookings.db schema/bookings.zen`
 2. Seed: coming in a later PR.
-3. Serve: coming in a later PR (`zever serve --config zever.yaml`).
+3. Serve: coming in a later PR (`zever serve`).
 4. Worker: coming in a later PR (queue `default`/`low` consumers for
    SendConfirmation/SendReminder + embedded scheduler for Reminder cron).
 

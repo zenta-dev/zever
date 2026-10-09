@@ -9,10 +9,10 @@ The `.zen` loop is CLI format and check, `zever-lsp` diagnostics, and `make gene
 
 ## Install the language server
 
-Install with Go and `$(go env GOPATH)/bin` on `PATH` (Neovim 0.11+ or VS Code); open the workspace at its root, where the scan starts.
+The [one-line installer](../../../start/installation/) installs `zever-lsp` next to `zever` (Neovim 0.11+ or VS Code); open the workspace at its root, where the scan starts.
 
 ```sh
-go install github.com/zenta-dev/zever/tools/zever-lsp@v0.6.1
+curl -fsSL https://raw.githubusercontent.com/zenta-dev/zever/v0.6.1/install.sh | sh
 # or, from a local clone:
 go install ./tools/zever-lsp
 ```

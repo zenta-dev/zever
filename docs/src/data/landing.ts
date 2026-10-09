@@ -1,7 +1,8 @@
 /** Single source of truth for landing content. Counts are derived, never hard-coded. */
 
 export const VERSION = 'v0.6.1';
-export const INSTALL = 'go install github.com/zenta-dev/zever/cmd/zever@latest';
+export const INSTALL_WIN = `irm https://raw.githubusercontent.com/zenta-dev/zever/${VERSION}/install.ps1 | iex`;
+export const INSTALL = `curl -fsSL https://raw.githubusercontent.com/zenta-dev/zever/${VERSION}/install.sh | sh`;
 
 /** Adapter matrix mirrors config/README.md. */
 export const SERVICES: Record<string, string[]> = {
@@ -166,11 +167,11 @@ export const OUTPUTS = [
 ] as const;
 
 export const TERMINAL_STEPS = [
-  { cmd: 'go install github.com/zenta-dev/zever/cmd/zever@latest', out: 'installed zever ' + VERSION },
+  { cmd: 'curl -fsSL https://raw.githubusercontent.com/zenta-dev/zever/' + VERSION + '/install.sh | sh', out: 'installed zever ' + VERSION },
   { cmd: 'zever new hello --dir ./hello && cd hello', out: 'scaffolded hello/ (sqlite, memory, log defaults)' },
   { cmd: 'zever check schema/app.zen', out: 'ok: 1 entity, 1 service, 2 rpcs' },
-  { cmd: 'zever generate', out: 'wrote orm, openapi, ddl, routes' },
-  { cmd: 'zever db migrate && zever serve', out: 'listening on :8080' },
+  { cmd: 'zever compile --backend=zenorm,atlas,openapi --out ./generated schema/app.zen', out: 'compiled 1 file(s) → ./generated' },
+  { cmd: 'zever db migrate --adapter=sqlite --dsn=data/app.db schema/app.zen', out: 'applied 1 statement(s) via sqlite' },
 ];
 
 export const EXAMPLES = [

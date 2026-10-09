@@ -13,7 +13,7 @@ CYCLONEDX_GOMOD_VERSION ?= v1.12.0
 COVERAGE ?= coverage.out
 SBOM ?= sbom.json
 
-# Every workspace module (144 uses in the committed go.work workspace
+# Every workspace module (174 uses in the committed go.work workspace
 # at root), so every *-all target loops per-module with fail-fast `set -e`.
 # examples/external-sms and docs/examples stay outside `go.work` by design
 # (third-party/consumer proofs); verify them standalone with: GOWORK=off go -C examples/external-sms test ./...
@@ -61,7 +61,7 @@ build-release: ## Build stripped release binary (smaller: -s -w -trimpath)
 	$(GO) build -trimpath -ldflags="-s -w" -o bin/zever ./cmd/zever
 
 .PHONY: generate
-generate: ## Regenerate editor grammar files from internal/dsl/gengrammar
+generate: ## Regenerate editor grammar files from dsl/gengrammar
 	$(GO) run ./tools/gengrammar
 
 .PHONY: fmt

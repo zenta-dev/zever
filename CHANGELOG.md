@@ -9,6 +9,9 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Added
 
+- `install.sh` / `install.ps1`: one-line installers that download the release
+  binaries (`zever`, `zever-lsp`), verify `SHA256SUMS.txt`, and add them to
+  `PATH` (`--version`, `--prefix`, `--yes`, `--force`, `--dry-run`).
 - `zever uninstall`: remove the `zever` and `zever-lsp` binaries from
   `PATH` (binaries only; `--dry-run`, `--keep-lsp`, `--yes`/`--force`,
   `--json`, TTY `[y/N]` confirmation with non-TTY re-run hint).
