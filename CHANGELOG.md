@@ -20,6 +20,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Added
 
+- `install.sh` / `install.ps1`: richer output (plan summary, numbered steps,
+  download progress, checksum details, next steps), uniform `--dry-run`
+  rendering, actionable hints on failure, and new `--quiet` / `--no-color`
+  (`-Quiet` / `-NoColor`) flags; honours `NO_COLOR`.
 - `install.sh` / `install.ps1`: one-line installers that download the release
   binaries (`zever`, `zever-lsp`), verify `SHA256SUMS.txt`, and add them to
   `PATH` (`--version`, `--prefix`, `--yes`, `--force`, `--dry-run`).
