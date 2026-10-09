@@ -1,6 +1,6 @@
 module github.com/zenta-dev/zever/adapters/observability/otlp
 
-go 1.27.0
+go 1.27.2
 
 require (
 	github.com/cenkalti/backoff/v5 v5.0.3 // indirect

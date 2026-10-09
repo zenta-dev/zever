@@ -1,6 +1,6 @@
 module github.com/zenta-dev/zever/adapters/ai/openai
 
-go 1.27.0
+go 1.27.2
 
 require (
 	github.com/openai/openai-go/v3 v3.71.1

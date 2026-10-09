@@ -7,6 +7,12 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Security
+
+- Bump the Go toolchain pin from `go 1.27.0` to `go 1.27.2` in `go.work`
+  and every module's `go.mod` (fixes stdlib `net/http` / HTTP/2
+  advisories `GO-2026-6603`…`GO-2026-6617`).
+
 ### Added
 
 - `install.sh` / `install.ps1`: one-line installers that download the release

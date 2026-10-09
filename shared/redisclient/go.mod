@@ -1,6 +1,6 @@
 module github.com/zenta-dev/zever/shared/redisclient
 
-go 1.27.0
+go 1.27.2
 
 require (
 	github.com/redis/go-redis/v9 v9.22.0

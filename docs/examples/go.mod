@@ -1,6 +1,6 @@
 module github.com/zenta-dev/zever/docs-examples
 
-go 1.27.0
+go 1.27.2
 
 require (
 	github.com/zenta-dev/zever/adapters/auth/session v0.6.1

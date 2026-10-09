@@ -1,6 +1,6 @@
 module github.com/zenta-dev/zever/adapters/flag/firebase
 
-go 1.27.0
+go 1.27.2
 
 require (
 	firebase.google.com/go/v4 v4.22.0

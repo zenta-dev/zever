@@ -1,6 +1,6 @@
 module github.com/example/zever-sms
 
-go 1.27.0
+go 1.27.2
 
 require (
 	github.com/zenta-dev/zever/config v0.6.1

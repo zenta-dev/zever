@@ -1,6 +1,6 @@
 module github.com/zenta-dev/zever/adapters/workflow/db
 
-go 1.27.0
+go 1.27.2
 
 require (
 	github.com/zenta-dev/zever/adapters/db/postgres v0.6.1

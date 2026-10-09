@@ -1,6 +1,6 @@
 module github.com/zenta-dev/zever/core/document
 
-go 1.27.0
+go 1.27.2
 
 require (
 	github.com/zenta-dev/zever/shared/endpoint v0.6.1

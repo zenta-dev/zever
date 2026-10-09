@@ -1,6 +1,6 @@
 module github.com/zenta-dev/zever/adapters/log/zerolog
 
-go 1.27.0
+go 1.27.2
 
 require (
 	github.com/mattn/go-colorable v0.1.14 // indirect

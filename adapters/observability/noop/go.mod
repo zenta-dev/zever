@@ -1,6 +1,6 @@
 module github.com/zenta-dev/zever/adapters/observability/noop
 
-go 1.27.0
+go 1.27.2
 
 require github.com/zenta-dev/zever/core/observability v0.6.1
 

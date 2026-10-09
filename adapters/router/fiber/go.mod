@@ -1,6 +1,6 @@
 module github.com/zenta-dev/zever/adapters/router/fiber
 
-go 1.27.0
+go 1.27.2
 
 require (
 	github.com/clipperhouse/uax29/v2 v2.7.0 // indirect

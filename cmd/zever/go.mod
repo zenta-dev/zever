@@ -1,6 +1,6 @@
 module github.com/zenta-dev/zever/cmd/zever
 
-go 1.27.0
+go 1.27.2
 
 require (
 	charm.land/bubbletea/v2 v2.0.10
