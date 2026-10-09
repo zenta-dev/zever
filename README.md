@@ -36,13 +36,13 @@ Linux, macOS, or Windows (Git Bash). Installs `zever` and `zever-lsp` to
 `~/.local/bin` (no sudo), verifies SHA-256 checksums, and adds it to your `PATH`:
 
 ```bash
-curl -fsSL https://raw.githubusercontent.com/zenta-dev/zever/v0.6.1/install.sh | sh
+curl -fsSL https://raw.githubusercontent.com/zenta-dev/zever/main/install.sh | sh
 ```
 
 Windows (PowerShell):
 
 ```powershell
-irm https://raw.githubusercontent.com/zenta-dev/zever/v0.6.1/install.ps1 | iex
+irm https://raw.githubusercontent.com/zenta-dev/zever/main/install.ps1 | iex
 ```
 
 Prefer to read the script first? Download it and run `sh install.sh --dry-run`.

@@ -134,7 +134,7 @@ recommended path is the pinned one-line installer, which provides
 `zever-lsp` alongside the CLI:
 
 ```bash
-curl -fsSL https://raw.githubusercontent.com/zenta-dev/zever/v0.6.1/install.sh | sh
+curl -fsSL https://raw.githubusercontent.com/zenta-dev/zever/main/install.sh | sh
 ```
 
 Otherwise it's built from a sibling package in this repo:
@@ -149,7 +149,7 @@ module.
 Without a local clone, install the published release instead:
 
 ```bash
-curl -fsSL https://raw.githubusercontent.com/zenta-dev/zever/v0.6.1/install.sh | sh
+curl -fsSL https://raw.githubusercontent.com/zenta-dev/zever/main/install.sh | sh
 ```
 
 ## Verifying it worked
