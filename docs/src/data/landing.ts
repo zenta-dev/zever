@@ -1,8 +1,11 @@
 /** Single source of truth for landing content. Counts are derived, never hard-coded. */
 
 export const VERSION = 'v0.6.1';
-export const INSTALL_WIN = `irm https://raw.githubusercontent.com/zenta-dev/zever/${VERSION}/install.ps1 | iex`;
-export const INSTALL = `curl -fsSL https://raw.githubusercontent.com/zenta-dev/zever/${VERSION}/install.sh | sh`;
+// Installer scripts only exist on main (they postdate the v0.6.1 tag),
+// so fetch them from main; they still install pinned VERSION binaries.
+export const INSTALL_REF = 'main';
+export const INSTALL_WIN = `irm https://raw.githubusercontent.com/zenta-dev/zever/${INSTALL_REF}/install.ps1 | iex`;
+export const INSTALL = `curl -fsSL https://raw.githubusercontent.com/zenta-dev/zever/${INSTALL_REF}/install.sh | sh`;
 
 /** Adapter matrix mirrors config/README.md. */
 export const SERVICES: Record<string, string[]> = {
@@ -167,7 +170,7 @@ export const OUTPUTS = [
 ] as const;
 
 export const TERMINAL_STEPS = [
-  { cmd: 'curl -fsSL https://raw.githubusercontent.com/zenta-dev/zever/' + VERSION + '/install.sh | sh', out: 'installed zever ' + VERSION },
+  { cmd: 'curl -fsSL https://raw.githubusercontent.com/zenta-dev/zever/' + INSTALL_REF + '/install.sh | sh', out: 'installed zever ' + VERSION },
   { cmd: 'zever new hello --dir ./hello && cd hello', out: 'scaffolded hello/ (sqlite, memory, log defaults)' },
   { cmd: 'zever check schema/app.zen', out: 'ok: 1 entity, 1 service, 2 rpcs' },
   { cmd: 'zever compile --backend=zenorm,atlas,openapi --out ./generated schema/app.zen', out: 'compiled 1 file(s) → ./generated' },

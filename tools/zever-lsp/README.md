@@ -13,13 +13,13 @@ but not installed by the script). `zever-lsp` is always matched to the CLI
 version — it has no version flag of its own:
 
 ```sh
-curl -fsSL https://raw.githubusercontent.com/zenta-dev/zever/v0.6.1/install.sh | sh
+curl -fsSL https://raw.githubusercontent.com/zenta-dev/zever/main/install.sh | sh
 ```
 
 Windows (PowerShell):
 
 ```powershell
-irm https://raw.githubusercontent.com/zenta-dev/zever/v0.6.1/install.ps1 | iex
+irm https://raw.githubusercontent.com/zenta-dev/zever/main/install.ps1 | iex
 ```
 
 Do not use `go install github.com/zenta-dev/zever/tools/zever-lsp@version`:
