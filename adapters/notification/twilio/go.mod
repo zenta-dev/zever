@@ -1,6 +1,6 @@
 module github.com/zenta-dev/zever/adapters/notification/twilio
 
-go 1.27.0
+go 1.27.2
 
 require (
 	github.com/twilio/twilio-go v1.31.2

@@ -3,9 +3,35 @@ title: Quickstart
 description: Go from an empty folder to a running API in five commands.
 ---
 
-import { Steps, LinkCard, CardGrid } from '@astrojs/starlight/components';
+import { Steps, Tabs, TabItem, Aside, LinkCard, CardGrid } from '@astrojs/starlight/components';
 
-You will define one entity and two RPCs in a `.zen` schema, then check it, compile it, create the database, and serve it. It takes about five minutes. You need Go 1.27+ and the `zever` CLI ([installation](../installation/)).
+You will define one entity and two RPCs in a `.zen` schema, then check it, compile it, create the database, and serve it. It takes about five minutes. You need Go 1.27+ and the `zever` CLI ([installation](../installation/)):
+
+<Tabs syncKey="os">
+<TabItem label="Linux">
+
+```sh
+curl -fsSL https://raw.githubusercontent.com/zenta-dev/zever/v0.6.1/install.sh | sh
+```
+
+</TabItem>
+<TabItem label="macOS">
+
+```sh
+curl -fsSL https://raw.githubusercontent.com/zenta-dev/zever/v0.6.1/install.sh | sh
+```
+
+</TabItem>
+<TabItem label="Windows">
+
+```powershell
+irm https://raw.githubusercontent.com/zenta-dev/zever/v0.6.1/install.ps1 | iex
+```
+
+</TabItem>
+</Tabs>
+
+Then check it with `zever --version`.
 
 ## Scaffold the project
 
@@ -104,6 +130,10 @@ service TaskService {
    ```sh
    zever serve
    ```
+
+   <Aside type="caution">
+   A freshly scaffolded project only wires the `log` and `router` batteries, but the generated server also resolves `auth`, `permission` and `observability`. Until you add and configure them (`zever add auth`, `zever add permission`, plus `AUTH_JWT_SECRET`), `zever serve` exits with `unknown adapter: jwt (forgotten import?)`. To see a complete running server right away, run [`examples/todo`](https://github.com/zenta-dev/zever/tree/main/examples/todo) instead.
+   </Aside>
 
 </Steps>
 

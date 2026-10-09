@@ -1,6 +1,6 @@
 module github.com/zenta-dev/zever/adapters/outbox/cdc
 
-go 1.27.0
+go 1.27.2
 
 require (
 	github.com/jackc/pglogrepl v0.0.0-20261003132456-662581bb6bb6

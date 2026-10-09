@@ -1,6 +1,6 @@
 module github.com/zenta-dev/zever/shared/traceprop
 
-go 1.27.0
+go 1.27.2
 
 require (
 	go.opentelemetry.io/otel v1.47.0

@@ -1,6 +1,6 @@
 module github.com/zenta-dev/zever/adapters/ai/gemini
 
-go 1.27.0
+go 1.27.2
 
 require (
 	github.com/zenta-dev/zever/core/ai v0.6.1
@@ -33,7 +33,7 @@ require (
 	go.opentelemetry.io/otel/metric v1.47.0 // indirect
 	go.opentelemetry.io/otel/trace v1.47.0 // indirect
 	golang.org/x/crypto v0.57.0 // indirect
-	golang.org/x/net v0.58.0 // indirect
+	golang.org/x/net v0.60.0 // indirect
 	golang.org/x/sys v0.48.0 // indirect
 	golang.org/x/text v0.42.0 // indirect
 	google.golang.org/api v0.298.0 // indirect

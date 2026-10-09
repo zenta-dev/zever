@@ -94,8 +94,10 @@ func New(opts ratelimit.Options) (ratelimit.Limiter, error) {
 // expiry measures time since last activity, not last success.
 //
 // The bucket table is striped: existing-key calls take only their stripe
-// lock. New-key calls briefly take admitMu to reserve a slot under the
-// global MaxEntries bound, never while holding a stripe lock.
+// lock. New-key calls serialize on admitMu across reserve-and-insert so at
+// most one reservation is ever in flight; otherwise a burst of concurrent
+// reservations is invisible to eviction and the MaxEntries bound can be
+// overshot. Lock order is always admitMu before stripe locks.
 func (s *store) Allow(ctx context.Context, key string, tokens float64) (ratelimit.Decision, error) {
 	if err := ctx.Err(); err != nil {
 		return ratelimit.Decision{}, err
@@ -130,23 +132,19 @@ func (s *store) Allow(ctx context.Context, key string, tokens float64) (ratelimi
 	b, ok := st.buckets[key]
 	if !ok {
 		st.mu.Unlock()
-		s.admit(now)
-		st.mu.Lock()
 
-		if s.closed.Load() {
-			s.total.Add(-1)
-			st.mu.Unlock()
-			return ratelimit.Decision{}, ratelimit.ErrClosed
+		var err error
+		var fresh bool
+
+		b, fresh, err = s.admitAndInsert(st, key, now)
+		if err != nil {
+			return ratelimit.Decision{}, err
 		}
 
-		if b, ok = st.buckets[key]; !ok {
-			b = &bucket{tokens: s.burst, last: now}
-			st.buckets[key] = b
-		} else {
-			// A concurrent caller inserted this key while we reserved
-			// a slot; release the reservation.
-			s.total.Add(-1)
-		}
+		// admitAndInsert returns with the stripe locked. A fresh bucket
+		// skips the idle-expiry path below; a duplicate-found bucket
+		// keeps the same check it always had.
+		ok = !fresh
 	}
 
 	if ok && now.Sub(b.last) > s.idle {
@@ -257,11 +255,18 @@ func (s *store) stripeFor(key string) *stripe {
 	return &s.stripes[fnv64a(key)&(DefaultStripeCount-1)]
 }
 
-// admit reserves a slot in the table, evicting the soonest-expired or
-// least-recently-used bucket across all stripes when the table is full,
-// so the global MaxEntries bound holds. Caller must not hold a stripe
-// lock; admitMu serializes admissions.
-func (s *store) admit(now time.Time) {
+// admitAndInsert reserves a slot under the global MaxEntries bound and
+// inserts the bucket for key, returning with st locked, the bucket set,
+// and fresh reporting whether this call created it (false when a
+// concurrent caller won the race and their bucket is reused).
+// The whole reserve-and-insert holds admitMu so no second reservation can
+// go in flight: eviction always sees every prior insert, which keeps the
+// bound strict under concurrency. A duplicate insert by a concurrent caller
+// releases the reservation instead.
+//
+// Lock order is admitMu before stripe locks (Close follows the same order),
+// so this cannot deadlock against eviction or the background sweeper.
+func (s *store) admitAndInsert(st *stripe, key string, now time.Time) (*bucket, bool, error) {
 	s.admitMu.Lock()
 	defer s.admitMu.Unlock()
 
@@ -270,6 +275,26 @@ func (s *store) admit(now time.Time) {
 	}
 
 	s.total.Add(1)
+
+	st.mu.Lock()
+
+	if s.closed.Load() {
+		s.total.Add(-1)
+		st.mu.Unlock()
+		return nil, false, ratelimit.ErrClosed
+	}
+
+	if b, ok := st.buckets[key]; ok {
+		// A concurrent caller inserted this key while it was missing;
+		// release the reservation and use their bucket.
+		s.total.Add(-1)
+		return b, false, nil
+	}
+
+	b := &bucket{tokens: s.burst, last: now}
+	st.buckets[key] = b
+
+	return b, true, nil
 }
 
 // evictOneLocked makes room for one new bucket when the table is full.

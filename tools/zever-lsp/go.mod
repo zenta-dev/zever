@@ -1,6 +1,6 @@
 module github.com/zenta-dev/zever/tools/zever-lsp
 
-go 1.27.0
+go 1.27.2
 
 require (
 	github.com/zenta-dev/zever/dsl v0.6.1

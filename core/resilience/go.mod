@@ -1,6 +1,6 @@
 module github.com/zenta-dev/zever/core/resilience
 
-go 1.27.0
+go 1.27.2
 
 require (
 	github.com/zenta-dev/zever/shared/redisopt v0.6.1

@@ -1,6 +1,6 @@
 module github.com/zenta-dev/zever/shared/outboxbridge
 
-go 1.27.0
+go 1.27.2
 
 require (
 	github.com/zenta-dev/zever/core/eventbus v0.6.1

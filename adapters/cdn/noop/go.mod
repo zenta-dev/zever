@@ -1,6 +1,6 @@
 module github.com/zenta-dev/zever/adapters/cdn/noop
 
-go 1.27.0
+go 1.27.2
 
 require github.com/zenta-dev/zever/core/cdn v0.6.1
 

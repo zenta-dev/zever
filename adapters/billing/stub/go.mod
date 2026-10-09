@@ -1,6 +1,6 @@
 module github.com/zenta-dev/zever/adapters/billing/stub
 
-go 1.27.0
+go 1.27.2
 
 require (
 	github.com/oklog/ulid/v2 v2.1.2

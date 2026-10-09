@@ -1,6 +1,6 @@
 module github.com/zenta-dev/zever/adapters/billing/stripe
 
-go 1.27.0
+go 1.27.2
 
 require (
 	github.com/stripe/stripe-go/v82 v82.5.1

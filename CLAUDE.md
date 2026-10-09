@@ -21,7 +21,7 @@ make setup        # install pinned golangci-lint, govulncheck, cyclonedx-gomod (
 make build         # go build ./...
 make test          # go test ./...
 make test-race     # go test -race ./...
-make bench         # go test -bench=. -benchmem ./...
+make bench         # per-module go test -bench=. -benchmem
 make cover         # coverage.out + total
 make fmt / fmt-fix # gofmt check / apply
 make lint / lint-fix
@@ -32,7 +32,7 @@ make deps-sync     # reconcile dep versions across all modules after a bump
 make deps-sync-check # verify no dependency drift remains after a bump
 make err-lint      # scan for error-convention violations
 make modgraph-check # verify every module requires+replaces the intra-repo modules it imports
-make check         # full local CI mirror: download, fmt, check-all (vet/tidy-check/test/build), modgraph-check, lint-all, vulncheck-all
+make check         # full local CI mirror: require-tools, download, fmt, check-all (vet/tidy-check/test/build), modgraph-check, dependabot-check, lint-all, vulncheck-all
 ```
 
 Single package / single test:
@@ -170,10 +170,13 @@ Flags-only CLI over the whole toolchain. Bare `zever` (TTY or not) prints
 usage to stderr and exits `1` rather than hanging on a prompt; `-i`/`--interactive`
 (and `ZEVER_INTERACTIVE`) enables huh guided prompts.
 
-Command groups: Scaffolding (`new`, `generate`, `extract`), Inspection
-(`compile`, `check`, `breaking`, `fmt`, `doctor`, `routes`, `explain`,
-`check-boundaries`, `graph`), Runtime (`serve`, `dev`, `queue:work`,
-`schedule:run`, `tinker`), Database (`db migrate`, `db rollback`, `db seed`).
+Command groups: Scaffolding (`new`, `add`, `generate`, `extract`), Inspection
+(`compile`, `check`, `breaking`, `fmt`, `doctor`, `config show`, `routes`,
+`explain`, `check-boundaries`, `graph`), Runtime (`serve`, `dev`,
+`queue:work`, `schedule:run`, `tinker`), Database (`db migrate`,
+`db rollback`, `db seed`), Operations (`outbox`, `upgrade`, `uninstall`),
+plus `completion` and `docs`. Global flags: `-i`, `-q`, `--no-color`,
+`--json`, `-V`.
 
 - `zever dev` is local watch-mode only (restarts the server entrypoint on
   schema/source change).

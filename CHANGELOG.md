@@ -7,8 +7,22 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Security
+
+- Bump the Go toolchain pin from `go 1.27.0` to `go 1.27.2` in `go.work`
+  and every module's `go.mod` (fixes stdlib `net/http` / HTTP/2
+  advisories `GO-2026-6603`…`GO-2026-6617`).
+- Bump `golang.org/x/net` from `v0.58.0`/`v0.59.0` to `v0.60.0` across all
+  modules that require it (same advisory family, `x/net` HTTP/2 surface).
+- Bump the pinned `golangci-lint` from `v2.13.2` to `v2.14.0` (the old
+  linter cannot read `go1.27.2` export data); the CI binary cache is now
+  keyed on `go.work` so future toolchain bumps rebuild it.
+
 ### Added
 
+- `install.sh` / `install.ps1`: one-line installers that download the release
+  binaries (`zever`, `zever-lsp`), verify `SHA256SUMS.txt`, and add them to
+  `PATH` (`--version`, `--prefix`, `--yes`, `--force`, `--dry-run`).
 - `zever uninstall`: remove the `zever` and `zever-lsp` binaries from
   `PATH` (binaries only; `--dry-run`, `--keep-lsp`, `--yes`/`--force`,
   `--json`, TTY `[y/N]` confirmation with non-TTY re-run hint).
@@ -17,6 +31,12 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   `golang.org/x/mod/semver`, `--check`/`--dry-run`, SHA256-verified
   `GOOS`/`GOARCH` asset, atomic POSIX install, staged Windows
   install, same confirmation rules as `uninstall`).
+
+### Fixed
+
+- `adapters/ratelimit/memory`: hold the admission lock across slot
+  reservation and bucket insert so concurrent new-key bursts can no
+  longer overshoot the `MaxEntries` bound.
 
 ## [v0.6.1] - 2026-10-08
 

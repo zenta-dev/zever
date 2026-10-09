@@ -1,6 +1,6 @@
 module github.com/zenta-dev/zever/shared/httpclient
 
-go 1.27.0
+go 1.27.2
 
 require (
 	github.com/zenta-dev/zever/shared/traceprop v0.6.1

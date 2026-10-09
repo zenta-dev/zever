@@ -3,7 +3,7 @@ title: Introduction
 description: What Zever is, how the compiler and container fit together, and where to go next.
 ---
 
-import { Steps, CardGrid, LinkCard } from '@astrojs/starlight/components';
+import { Steps, Tabs, TabItem, CardGrid, LinkCard } from '@astrojs/starlight/components';
 import HeroBanner from '../../../components/docs/mdx/HeroBanner.astro';
 import FeatureCard from '../../../components/docs/mdx/FeatureCard.astro';
 
@@ -12,6 +12,36 @@ import FeatureCard from '../../../components/docs/mdx/FeatureCard.astro';
   title="One schema. Every backend concern. <em>Zero rewiring.</em>"
   lede="Zever is a schema-driven scaffolding compiler for Go. Describe your domain once in .zen, compile it into validation, ORM, OpenAPI, and DDL, then resolve every backend through one container. Not a web framework: your handlers and business logic stay yours."
 />
+
+## Install
+
+One command installs the `zever` CLI and `zever-lsp` (no sudo, SHA-256 verified):
+
+<Tabs syncKey="os">
+<TabItem label="Linux">
+
+```sh
+curl -fsSL https://raw.githubusercontent.com/zenta-dev/zever/v0.6.1/install.sh | sh
+```
+
+</TabItem>
+<TabItem label="macOS">
+
+```sh
+curl -fsSL https://raw.githubusercontent.com/zenta-dev/zever/v0.6.1/install.sh | sh
+```
+
+</TabItem>
+<TabItem label="Windows">
+
+```powershell
+irm https://raw.githubusercontent.com/zenta-dev/zever/v0.6.1/install.ps1 | iex
+```
+
+</TabItem>
+</Tabs>
+
+Options, upgrade and uninstall are on the [installation page](../installation/).
 
 ## Where to start
 
