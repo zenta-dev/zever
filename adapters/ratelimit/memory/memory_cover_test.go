@@ -539,3 +539,56 @@ func TestCoverMaxEntriesBoundHeldUnderConcurrency(t *testing.T) {
 		t.Fatalf("live buckets = %d, want 8", got)
 	}
 }
+
+// TestCoverMaxEntriesBoundStrictUnderContention hammers a tiny table with
+// far more concurrent distinct keys than MaxEntries. Reservations used to
+// be invisible to eviction while in flight, so a burst of concurrent
+// admissions could overshoot the bound before their inserts landed.
+func TestCoverMaxEntriesBoundStrictUnderContention(t *testing.T) {
+	t.Parallel()
+
+	l, err := New(ratelimit.Options{Rate: 1000, Burst: 1000, MaxEntries: 2})
+	if err != nil {
+		t.Fatalf("New failed: %v", err)
+	}
+
+	s, ok := l.(*store)
+	if !ok {
+		t.Fatalf("New returned %T, want *store", l)
+	}
+
+	t.Cleanup(func() { _ = l.Close() })
+
+	const (
+		goroutines = 64
+		keysPer    = 64
+	)
+
+	var wg sync.WaitGroup
+
+	for g := 0; g < goroutines; g++ {
+		wg.Add(1)
+
+		go func(g int) {
+			defer wg.Done()
+
+			for i := 0; i < keysPer; i++ {
+				key := fmt.Sprintf("g%d-k%d", g, i)
+				if _, err := l.Allow(t.Context(), key, 1); err != nil {
+					t.Errorf("Allow(%s) failed: %v", key, err)
+					return
+				}
+			}
+		}(g)
+	}
+
+	wg.Wait()
+
+	if got := s.total.Load(); got > 2 {
+		t.Fatalf("total = %d, want <= 2 (MaxEntries bound)", got)
+	}
+
+	if got := countBuckets(s); got > 2 {
+		t.Fatalf("live buckets = %d, want <= 2", got)
+	}
+}

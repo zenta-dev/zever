@@ -32,6 +32,12 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   `GOOS`/`GOARCH` asset, atomic POSIX install, staged Windows
   install, same confirmation rules as `uninstall`).
 
+### Fixed
+
+- `adapters/ratelimit/memory`: hold the admission lock across slot
+  reservation and bucket insert so concurrent new-key bursts can no
+  longer overshoot the `MaxEntries` bound.
+
 ## [v0.6.1] - 2026-10-08
 
 ### Changed
