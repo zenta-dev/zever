@@ -752,8 +752,8 @@ func resolveFramework(tag string, plan *NewConfig, frameworkVersion string) erro
 		return fmt.Errorf("%s: %w", tag, err)
 	}
 
-	if _, err := os.Stat(filepath.Join(abs, "go.mod")); err != nil {
-		if _, werr := os.Stat(filepath.Join(abs, "go.work")); werr != nil {
+	if _, err := os.Stat(filepath.Join(abs, "go.mod")); err != nil { //nolint:gosec // fwDir is an explicit user flag; read-only checkout probe, no write or serve
+		if _, werr := os.Stat(filepath.Join(abs, "go.work")); werr != nil { //nolint:gosec // fwDir is an explicit user flag; read-only checkout probe, no write or serve
 			return fmt.Errorf("%s: %q does not look like a zever checkout (no go.mod or go.work): %w", tag, fwDir, err)
 		}
 	}
