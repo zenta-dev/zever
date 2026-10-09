@@ -201,7 +201,7 @@ make setup
 Other targets (coverage, benchmarks, SBOM, `deps-sync`, `modgraph-check`, ...) are
 listed by `make help`.
 
-`make setup` installs `golangci-lint` v2.13.2, `govulncheck` v1.8.0, and
+`make setup` installs `golangci-lint` v2.14.0, `govulncheck` v1.8.0, and
 `cyclonedx-gomod` v1.12.0. `make check` mirrors the CI pipeline and is meant to
 be run before pushing. CodeQL and dependency review run only on GitHub.
 

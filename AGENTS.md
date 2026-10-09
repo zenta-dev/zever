@@ -5,7 +5,7 @@ Go multi-module monorepo (`go 1.27.2`). Schema-driven scaffolding compiler (`.ze
 ## Commands
 
 ```sh
-make setup      # once: pinned golangci-lint v2.13.2, govulncheck v1.8.0, cyclonedx-gomod v1.12.0
+make setup      # once: pinned golangci-lint v2.14.0, govulncheck v1.8.0, cyclonedx-gomod v1.12.0
 make build      # go build ./...
 make test       # go test ./...
 make test-race  # go test -race ./... (local `make check` runs this; CI PR fast-gate does NOT)

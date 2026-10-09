@@ -99,7 +99,7 @@ jobs:
       - uses: actions/cache@55cc8345863c7cc4c66a329aec7e433d2d1c52a9 # v6.1.0
         with:
           path: ~/go/bin
-          key: ${{ runner.os }}-gobin-golangci-lint-v2.13.2-${{ hashFiles('go.work') }}
+          key: ${{ runner.os }}-gobin-golangci-lint-v2.14.0-${{ hashFiles('go.work') }}
       - name: Install golangci-lint
         run: command -v golangci-lint >/dev/null || make setup-golangci-lint
       - name: golangci-lint (all modules)

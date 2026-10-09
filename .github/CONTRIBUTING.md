@@ -71,10 +71,10 @@ make err-lint   # error-convention violations (see docs/errors.md)
 
 After touching `token.Keywords` or `resolver.ScalarTypeNames`, run `make generate` to refresh the editor grammar files.
 
-`golangci-lint` is the project's primary linter. Its configuration lives in `.golangci.yml`. Run it before pushing; CI runs it in the `lint` job. `make setup` installs the pinned version (currently v2.13.2); to install it manually:
+`golangci-lint` is the project's primary linter. Its configuration lives in `.golangci.yml`. Run it before pushing; CI runs it in the `lint` job. `make setup` installs the pinned version (currently v2.14.0); to install it manually:
 
 ```bash
-go install github.com/golangci/golangci-lint/v2/cmd/golangci-lint@v2.13.2
+go install github.com/golangci/golangci-lint/v2/cmd/golangci-lint@v2.14.0
 ```
 
 ## Development Workflow
