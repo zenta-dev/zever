@@ -14,13 +14,13 @@ in place (older asks to confirm, same version skips, newer asks to confirm a
 downgrade; non-TTY shells need `--yes`):
 
 ```sh
-curl -fsSL https://raw.githubusercontent.com/zenta-dev/zever/v0.6.1/install.sh | sh
+curl -fsSL https://raw.githubusercontent.com/zenta-dev/zever/main/install.sh | sh
 ```
 
 Windows (PowerShell):
 
 ```powershell
-irm https://raw.githubusercontent.com/zenta-dev/zever/v0.6.1/install.ps1 | iex
+irm https://raw.githubusercontent.com/zenta-dev/zever/main/install.ps1 | iex
 ```
 
 If PowerShell blocks the script, download it first, then run
