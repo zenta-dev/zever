@@ -12,6 +12,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Bump the Go toolchain pin from `go 1.27.0` to `go 1.27.2` in `go.work`
   and every module's `go.mod` (fixes stdlib `net/http` / HTTP/2
   advisories `GO-2026-6603`…`GO-2026-6617`).
+- Bump `golang.org/x/net` from `v0.58.0`/`v0.59.0` to `v0.60.0` across all
+  modules that require it (same advisory family, `x/net` HTTP/2 surface).
 
 ### Added
 
