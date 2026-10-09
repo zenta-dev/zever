@@ -3,7 +3,7 @@ title: Installation
 description: Install Go 1.27, the Zever CLI, and the modules you need, then verify with a smoke test.
 ---
 
-import { Steps, Aside, LinkCard, CardGrid } from '@astrojs/starlight/components';
+import { Steps, Tabs, TabItem, Aside, LinkCard, CardGrid } from '@astrojs/starlight/components';
 
 Install the `zever` CLI with the one-line installer, then add the Zever modules to your project with `go get`. A fresh install needs no config file and no database server.
 
@@ -26,15 +26,29 @@ Install the `zever` CLI with the one-line installer, then add the Zever modules 
 
 2. Install `zever` plus the matching `zever-lsp` with the pinned installer (never `main`).
 
+   <Tabs syncKey="os">
+   <TabItem label="Linux">
+
    ```sh
    curl -fsSL https://raw.githubusercontent.com/zenta-dev/zever/v0.6.1/install.sh | sh
    ```
 
-   Windows (PowerShell):
+   </TabItem>
+   <TabItem label="macOS">
+
+   ```sh
+   curl -fsSL https://raw.githubusercontent.com/zenta-dev/zever/v0.6.1/install.sh | sh
+   ```
+
+   </TabItem>
+   <TabItem label="Windows">
 
    ```powershell
    irm https://raw.githubusercontent.com/zenta-dev/zever/v0.6.1/install.ps1 | iex
    ```
+
+   </TabItem>
+   </Tabs>
 
    <Aside type="tip" title="PATH">
    The installer puts both binaries in `~/.local/bin`. If `zever` is not found, add that directory to your `PATH`.

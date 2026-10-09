@@ -1,19 +1,45 @@
 ---
-interface Props { command: string; prompt?: string }
-const { command, prompt = '$' } = Astro.props;
+interface Props { command: string; winCommand?: string; prompt?: string }
+const { command, winCommand, prompt = '$' } = Astro.props;
 ---
 
+<div class="zl-pillbox">
+{winCommand && (
+  <div class="zl-pill-tabs" role="tablist" aria-label="Operating system" data-os-tabs data-unix={command} data-win={winCommand}>
+    <button type="button" role="tab" aria-selected="true" data-os="unix">Linux</button>
+    <button type="button" role="tab" aria-selected="false" data-os="unix">macOS</button>
+    <button type="button" role="tab" aria-selected="false" data-os="win">Windows</button>
+  </div>
+)}
 <div class="zl-pill" data-copy-root>
-  <span class="zl-pill-prompt" aria-hidden="true">{prompt}</span>
-  <code class="zl-pill-cmd">{command}</code>
+  <span class="zl-pill-prompt" aria-hidden="true">{winCommand ? '' : prompt}</span>
+  <code class="zl-pill-cmd" data-pill-cmd>{command}</code>
   <button type="button" class="zl-pill-btn" data-copy={command} aria-label="Copy command">
     <svg class="i-copy" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="9" y="9" width="13" height="13" rx="2"/><path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"/></svg>
     <svg class="i-ok" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><path d="M20 6 9 17l-5-5"/></svg>
   </button>
   <span class="zl-sr" role="status" aria-live="polite" data-copy-status></span>
 </div>
+</div>
 
 <script>
+  document.querySelectorAll<HTMLElement>('[data-os-tabs]').forEach((tabs) => {
+    const box = tabs.closest('.zl-pillbox');
+    const cmd = box?.querySelector<HTMLElement>('[data-pill-cmd]');
+    const copy = box?.querySelector<HTMLButtonElement>('[data-copy]');
+    const btns = Array.from(tabs.querySelectorAll<HTMLButtonElement>('button'));
+    const select = (btn: HTMLButtonElement) => {
+      btns.forEach((b) => b.setAttribute('aria-selected', String(b === btn)));
+      const text = (btn.dataset.os === 'win' ? tabs.dataset.win : tabs.dataset.unix) ?? '';
+      if (cmd) cmd.textContent = text;
+      if (copy) copy.dataset.copy = text;
+    };
+    btns.forEach((b) => b.addEventListener('click', () => select(b)));
+    const plat = navigator.platform + ' ' + navigator.userAgent;
+    const guess = /Win/i.test(plat) ? 'Windows' : /Mac/i.test(plat) ? 'macOS' : null;
+    const hit = btns.find((b) => b.textContent === guess);
+    if (hit) select(hit);
+  });
   document.querySelectorAll<HTMLButtonElement>('[data-copy]').forEach((btn) => {
     btn.addEventListener('click', async () => {
       try { await navigator.clipboard.writeText(btn.dataset.copy ?? ''); } catch { return; }
@@ -27,6 +53,9 @@ const { command, prompt = '$' } = Astro.props;
 </script>
 
 <style is:global>
+  .zl-pill-tabs { display: flex; gap: 0.25rem; margin-bottom: 0.5rem; font-family: var(--zl-font-mono); font-size: 0.75rem; }
+  .zl-pill-tabs button { padding: 0.2rem 0.65rem; border: 1px solid transparent; border-radius: 999px; background: none; color: var(--zl-text-2); cursor: pointer; }
+  .zl-pill-tabs button[aria-selected='true'] { color: var(--zl-text); border-color: var(--zl-line-strong); background: var(--zl-surface-2); }
   .zl-pill { display: inline-flex; align-items: center; gap: 0.75rem; max-width: 100%; padding: 0.35rem 0.4rem 0.35rem 1rem; border: 1px solid var(--zl-line-strong); border-radius: 999px; background: var(--zl-surface); font-family: var(--zl-font-mono); font-size: 0.85rem; }
   .zl-pill-prompt { color: var(--zl-accent); }
   .zl-pill-cmd { overflow-x: auto; white-space: nowrap; scrollbar-width: none; color: var(--zl-text); background: none; padding: 0; }

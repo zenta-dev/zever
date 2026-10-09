@@ -1,6 +1,6 @@
 module github.com/zenta-dev/zever/adapters/media/local
 
-go 1.27.0
+go 1.27.2
 
 require (
 	github.com/HugoSmits86/nativewebp v1.3.0 // indirect

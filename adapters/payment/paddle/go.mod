@@ -1,6 +1,6 @@
 module github.com/zenta-dev/zever/adapters/payment/paddle
 
-go 1.27.0
+go 1.27.2
 
 require (
 	github.com/cespare/xxhash/v2 v2.3.0 // indirect

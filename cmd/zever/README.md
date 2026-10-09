@@ -37,13 +37,18 @@ After install, `zever upgrade` self-updates (`--check` to preview,
 (`--keep-lsp`, `--dry-run`).
 
 Then `zever --help` prints the grouped command map (Scaffolding /
-Inspection / Runtime / Database).
+Inspection / Runtime / Database / Operations).
 
 ## Global flags and exit codes
 
 - `--quiet`: suppress hints/tips on stderr; errors still print.
 - `--no-color`: disable styled output (also honored via `NO_COLOR` /
   `TERM=dumb` ambient env).
+- `--json`: machine-readable JSON envelope output (also `ZEVER_JSON=1`).
+- `-i`, `--interactive`: guided prompts where supported (also
+  `ZEVER_INTERACTIVE=1`).
+- `-V`: print the CLI version (alias for `--version`).
+- `--help --agent`: agent-friendly command map.
 - Exit codes: `0` success, `1` runtime error, `2` flag misuse
   (bad flags print the error to stderr with no usage dump).
 - `--help` output goes to stdout; errors and bare-invocation usage go

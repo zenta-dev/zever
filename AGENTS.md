@@ -1,11 +1,11 @@
 # AGENTS.md
 
-Go multi-module monorepo (`go 1.27.0`). Schema-driven scaffolding compiler (`.zen` DSL) + swappable backend adapters. Layers: `core/<b>` = battery interface + registry (`core/<b>.Register/Open`, container resolves); `adapters/<b>/<a>` = one Go module per adapter with `Register()` wiring itself into its `core` registry; `shared/*` = SDK-free helpers (codec, redisclient, s3opts, retry); plus `config|container|orm|dsl|cmd/zever` modules. Dev workflow via `go.work` (144 uses, committed at root). Lockstep releases: one version, per-module tags `<path>/vX.Y.Z` via `tools/tag-release.sh`. Scaffold floor = `log, router` (`generate_server.go` coreBatteries); `zever new` battery picker adds more; `zever add` is wired (`cmd/zever/add.go`).
+Go multi-module monorepo (`go 1.27.2`). Schema-driven scaffolding compiler (`.zen` DSL) + swappable backend adapters. Layers: `core/<b>` = battery interface + registry (`core/<b>.Register/Open`, container resolves); `adapters/<b>/<a>` = one Go module per adapter with `Register()` wiring itself into its `core` registry; `shared/*` = SDK-free helpers (codec, redisclient, s3opts, retry); plus `config|container|orm|dsl|cmd/zever` modules. Dev workflow via `go.work` (174 uses, committed at root). Lockstep releases: one version, per-module tags `<path>/vX.Y.Z` via `tools/tag-release.sh`. Scaffold floor = `log, router` (`generate_server.go` coreBatteries); `zever new` battery picker adds more; `zever add` is wired (`cmd/zever/add.go`).
 
 ## Commands
 
 ```sh
-make setup      # once: pinned golangci-lint v2.13.2, govulncheck v1.8.0, cyclonedx-gomod v1.12.0
+make setup      # once: pinned golangci-lint v2.14.0, govulncheck v1.8.0, cyclonedx-gomod v1.12.0
 make build      # go build ./...
 make test       # go test ./...
 make test-race  # go test -race ./... (local `make check` runs this; CI PR fast-gate does NOT)

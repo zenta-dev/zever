@@ -7,7 +7,7 @@ Conventions: `AGENTS.md` (repo root).
 ## For coding agents: start here
 
 - `AGENTS.md` — build/test/lint commands, error and test conventions.
-- `docs/src/content/docs/digging-deeper/ai.mdx` — LLM facade (`core/ai`),
+- `docs/src/content/docs/guides/integrations/ai.mdx` — LLM facade (`core/ai`),
   agent loop (`core/agent`), RAG (`core/rag`).
 - `container/README.md` — service resolution (`container.New(cfg)`, lazy
   accessors, close order).

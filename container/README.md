@@ -59,6 +59,7 @@ cached state clears so the next call retries.
 | flag | `Flag()` | |
 | geo | `Geo()` | |
 | grpc | `GRPC(opts...)` | lazy `*grpc.Server` singleton, no registry |
+| grpc client | `GRPCClient(target, opts...)` | returns a `*grpc.ClientConn` for the target |
 | i18n | `I18n()` | |
 | idempotency | `Idempotency()` | |
 | job | `Job()` | `*job.Dispatcher` over resolved `Queue` |
@@ -75,6 +76,7 @@ cached state clears so the next call retries.
 | queue | `Queue()` | leaf dependency, closed last |
 | rag | `RAG()` | `*rag.Engine` over resolved `AI` + `VectorStore`, closed first |
 | ratelimit | `RateLimit()` (`Ratelimit()` alias) | |
+| resilience | `Resilience()` | `resilience.Manager` |
 | router | `Router()` | |
 | scheduler | `Scheduler()` | shares `Queue` (via `Job()`), closed first |
 | search | `Search()` | |

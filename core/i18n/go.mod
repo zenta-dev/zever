@@ -1,6 +1,6 @@
 module github.com/zenta-dev/zever/core/i18n
 
-go 1.27.0
+go 1.27.2
 
 require (
 	github.com/zenta-dev/zever/adapters/i18n/embed v0.6.1

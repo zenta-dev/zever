@@ -1,6 +1,6 @@
 module github.com/zenta-dev/zever/shared/s3opts
 
-go 1.27.0
+go 1.27.2
 
 require (
 	github.com/aws/aws-sdk-go-v2 v1.47.1

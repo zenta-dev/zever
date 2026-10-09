@@ -4,7 +4,7 @@ import InstallPill from './ui/InstallPill.astro';
 import Mesh from './Mesh.astro';
 import mascot from '../../assets/logo.svg';
 import { href } from '../../lib/url';
-import { INSTALL } from '../../data/landing';
+import { INSTALL, INSTALL_WIN } from '../../data/landing';
 ---
 
 <section class="zl-section zl-final zl-gridbg" id="get-started" data-parallax-root>
@@ -13,7 +13,7 @@ import { INSTALL } from '../../data/landing';
     <span class="zl-final-mascot" data-parallax="16"><img src={mascot.src} alt="" width="160" height="160" aria-hidden="true" loading="lazy" /></span>
     <h2 class="zl-final-h">Stop wiring. Start <em>shipping</em>.</h2>
     <p class="zl-lede">One schema, one container, every adapter a config change away.</p>
-    <InstallPill command={INSTALL} />
+    <InstallPill command={INSTALL} winCommand={INSTALL_WIN} />
     <div class="zl-final-cta">
       <span class="zl-mag" data-magnetic><Button href={href('start/installation')}>Get started</Button></span>
       <Button variant="ghost" href={href('tutorials/build-a-booking-api')}>Read the tutorial</Button>

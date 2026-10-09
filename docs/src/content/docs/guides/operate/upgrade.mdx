@@ -23,10 +23,11 @@ Public API changes (new exports, config struct or default changes, serialization
    ```sh
    go get github.com/zenta-dev/zever/config@v0.6.1 github.com/zenta-dev/zever/container@v0.6.1
    go mod tidy
-   go install github.com/zenta-dev/zever/cmd/zever@v0.6.1
    ```
 
-3. Run the gate: `make check` (download, fmt, then per module vet, tidy-check, test, build, plus module-graph check, lint, vulncheck), and `make test-race` separately.
+   Then upgrade the CLI itself with `zever upgrade` (or re-run the [installer](../../../start/installation/)).
+
+3. Run the gate: `make check` (download, fmt, then per module vet, tidy-check, test, build, plus module-graph check, dependabot check, lint, vulncheck), and `make test-race` separately.
 4. Run a smoke test that resolves services:
 
    ```go title="main.go"

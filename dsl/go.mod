@@ -1,6 +1,6 @@
 module github.com/zenta-dev/zever/dsl
 
-go 1.27.0
+go 1.27.2
 
 require (
 	github.com/bufbuild/protocompile v0.14.1

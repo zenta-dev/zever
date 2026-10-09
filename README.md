@@ -13,22 +13,61 @@ One framework. Every backend concern. Zero rewiring.
 [![golangci-lint](https://img.shields.io/badge/golangci--lint-enabled-brightgreen)](.golangci.yml)
 [![License](https://img.shields.io/badge/license-Apache--2.0-blue)](LICENSE)
 
-## Overview
+## Why zever
 
-**zever** is a schema-driven scaffolding compiler for Go, built around a custom
-DSL with proto-inspired syntax. You describe your services in schema files and
-zever compiles that schema into the backend infrastructure your app needs:
-database access, caching, queues, routing, and other cross-cutting concerns. It
-deliberately stops there: it does not generate or dictate your business logic,
-only the plumbing that logic runs on top of.
+Every Go backend re-solves the same plumbing: database access, caching, queues,
+routing, auth, config. **zever** lets you describe your services once in a small
+schema file (`.zen`, proto-inspired) and compiles that into the infrastructure
+around them. It never generates or dictates your business logic, only the
+plumbing that logic runs on.
 
-In one line: define a service's shape once, and zever compiles it into the
-database, cache, and routing infrastructure around it, while staying completely
-out of the way of the actual business logic you write on top.
+- **Schema in, plumbing out.** One `.zen` file drives validation, a typed ORM,
+  OpenAPI, migrations, and routes.
+- **Swap infrastructure with config.** Every backend concern (db, cache, queue,
+  auth, storage, ...) is a small interface with swappable adapters. Moving from
+  sqlite to Postgres, or memory to Redis, is a config change.
+- **Runs with zero infrastructure.** Defaults are sqlite, in-memory and local
+  adapters, so you can start without Docker or external services.
+- **Your logic stays yours.** No generated business code to fight or regenerate over.
 
-## Quickstart (schema -> running API)
+## Install
 
-Define one entity and two RPCs in `schema/app.zen`:
+Linux, macOS, or Windows (Git Bash). Installs `zever` and `zever-lsp` to
+`~/.local/bin` (no sudo), verifies SHA-256 checksums, and adds it to your `PATH`:
+
+```bash
+curl -fsSL https://raw.githubusercontent.com/zenta-dev/zever/v0.6.1/install.sh | sh
+```
+
+Windows (PowerShell):
+
+```powershell
+irm https://raw.githubusercontent.com/zenta-dev/zever/v0.6.1/install.ps1 | iex
+```
+
+Prefer to read the script first? Download it and run `sh install.sh --dry-run`.
+Other flags: `--version vX.Y.Z`, `--prefix DIR`, `--yes`, `--force`. Then check it works:
+
+```bash
+zever --version
+zever upgrade      # later: move to the latest release
+zever uninstall    # remove the binaries
+```
+
+More options (release binaries, Windows, uninstall):
+[Installation guide](https://zenta-dev.github.io/zever/start/installation/).
+You need Go 1.27+ to build the apps zever scaffolds.
+
+## Quickstart: schema to database in 2 minutes
+
+Scaffold a project:
+
+```bash
+zever new hello --dir ./hello --force
+cd hello
+```
+
+Replace `schema/app.zen` with one entity and two RPCs:
 
 ```zen
 entity Task {
@@ -52,22 +91,41 @@ service TaskService {
 }
 ```
 
-Scaffold, validate, generate, preview DDL, migrate, serve:
+Validate it, generate code, preview the SQL, then create the database:
 
 ```bash
-zever new hello --dir ./hello --force
-cd hello
 zever check schema/app.zen
 zever compile --backend=zenorm,atlas,openapi --out ./generated schema/app.zen
 zever db migrate --dry-run --adapter=sqlite schema/app.zen
 zever db migrate --adapter=sqlite --dsn=data/app.db schema/app.zen
-zever serve
 ```
 
-Newcomer clone first: `examples/showcase` (DSL-depth shop app with a
-production `Dockerfile`; see `examples/showcase/README.md`). `examples/todo`
-is the smaller auth-gated notes app (`schema/todo.zen`,
-`zever.yaml`, `cmd/server`, `internal/app`).
+You now have a typed ORM, an OpenAPI document, and a sqlite database with a
+`tasks` table, all derived from that one schema.
+
+**See a full running server.** `examples/todo` is a small auth-gated notes API
+(HTTP on `:8080`, gRPC on `:9090`):
+
+```bash
+git clone https://github.com/zenta-dev/zever && cd zever/examples/todo
+export AUTH_JWT_SECRET='replace-with-at-least-32-random-bytes'
+zever db migrate --adapter=sqlite --dsn=data/app.db schema/todo.zen
+go run ./cmd/server -addr :8080
+```
+
+In another terminal: `curl -i localhost:8080/healthz` returns `200 OK`. The
+generated `hello` project is a bare starting point: `zever serve` needs the
+auth and permission batteries wired first (see the [booking tutorial](https://zenta-dev.github.io/zever/tutorials/build-a-booking-api/)).
+
+## Where next
+
+| I want to... | Go to |
+| --- | --- |
+| Follow the full tutorial | [Quickstart](https://zenta-dev.github.io/zever/start/quickstart/) and [Build a booking API](https://zenta-dev.github.io/zever/tutorials/build-a-booking-api/) |
+| Understand how it fits together | [How zever works](https://zenta-dev.github.io/zever/concepts/how-zever-works/) |
+| Browse every command | [CLI reference](https://zenta-dev.github.io/zever/reference/cli/) |
+| See a bigger app | [`examples/showcase`](examples/showcase/README.md) (shop app with Dockerfile) |
+| Get editor support | [LSP and editor extensions](https://zenta-dev.github.io/zever/guides/extend/editor-setup/) |
 
 ## Adapters
 
@@ -114,7 +172,9 @@ notes. See [CONTRIBUTING](.github/CONTRIBUTING.md) for versioning details.
 
 - Go 1.27 or newer (`go 1.27.0` in each module's `go.mod`; `go.work` wires local dev).
 
-## Installation
+## Using zever packages as a library
+
+Each battery is its own Go module, so you depend only on what you use:
 
 ```bash
 go get github.com/zenta-dev/zever/core/cache
@@ -132,27 +192,16 @@ make setup
 | Target | Description |
 | --- | --- |
 | `make build` | Build all packages |
-| `make test` | Run tests |
-| `make test-race` | Run tests with the race detector |
-| `make test-lsp` | Run zever-lsp module tests |
-| `make bench` | Run benchmarks |
-| `make cover` | Run tests with coverage and print the total |
-| `make cover-html` | Open the HTML coverage report |
-| `make fmt` | Check formatting (fails on unformatted files) |
+| `make test` / `make test-race` | Run tests (optionally with the race detector) |
 | `make fmt-fix` | Format all files in place |
 | `make lint` | Run `golangci-lint` |
-| `make lint-fix` | Run `golangci-lint` with auto-fix |
-| `make vet` | Run `go vet` |
-| `make vet-lsp` | Run `go vet` on zever-lsp module |
-| `make vulncheck` | Scan dependencies for known vulnerabilities |
-| `make sbom` | Generate a CycloneDX SBOM (`sbom.json`) |
-| `make tidy-check` | Verify `go.mod` and `go.sum` are tidy |
-| `make tidy-lsp-check` | Verify zever-lsp `go.mod`/`go.sum` are tidy |
-| `make download` | Download module dependencies |
-| `make clean` | Remove generated artifacts |
+| `make generate` | Regenerate editor grammar files after DSL keyword/scalar changes |
 | `make check` | Run all local CI checks |
 
-`make setup` installs `golangci-lint` v2.13.2, `govulncheck` v1.8.0, and
+Other targets (coverage, benchmarks, SBOM, `deps-sync`, `modgraph-check`, ...) are
+listed by `make help`.
+
+`make setup` installs `golangci-lint` v2.14.0, `govulncheck` v1.8.0, and
 `cyclonedx-gomod` v1.12.0. `make check` mirrors the CI pipeline and is meant to
 be run before pushing. CodeQL and dependency review run only on GitHub.
 

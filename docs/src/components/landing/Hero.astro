@@ -5,7 +5,7 @@ import CompileStage from './CompileStage.astro';
 import Mesh from './Mesh.astro';
 import mascot from '../../assets/logo.svg';
 import { href } from '../../lib/url';
-import { VERSION, INSTALL } from '../../data/landing';
+import { VERSION, INSTALL, INSTALL_WIN } from '../../data/landing';
 
 // Word stagger: each word is an inline-block span so only transform/opacity animate.
 const lead = 'One schema. Every backend concern.'.split(' ');
@@ -25,7 +25,7 @@ const lead = 'One schema. Every backend concern.'.split(' ');
         Describe your services in a small <code>.zen</code> schema. Zever compiles it into typed ORM,
         specs, migrations and routing, and wires every backend through swappable adapters. Your business logic stays yours.
       </p>
-      <InstallPill command={INSTALL} />
+      <InstallPill command={INSTALL} winCommand={INSTALL_WIN} />
       <div class="zl-hero-cta">
         <span class="zl-mag" data-magnetic><Button href={href('start/installation')}>Get started</Button></span>
         <Button variant="ghost" href={href('tutorials/build-a-booking-api')}>Read the tutorial</Button>

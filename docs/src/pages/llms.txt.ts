@@ -1,6 +1,7 @@
 import type { APIRoute } from 'astro';
 import { groupedDocs, mdUrl } from '../scripts/docs/md';
 import { abs } from '../lib/seo';
+import { INSTALL, INSTALL_WIN } from '../data/landing';
 
 export const GET: APIRoute = async ({ site }) => {
   const groups = await groupedDocs();
@@ -12,7 +13,7 @@ export const GET: APIRoute = async ({ site }) => {
     'Key facts:',
     '',
     '- Language and version: Go 1.27+. License: Apache-2.0. Repository: https://github.com/zenta-dev/zever',
-    '- Install: `go install github.com/zenta-dev/zever/cmd/zever@latest`',
+    `- Install: \`${INSTALL}\` (Linux, macOS); Windows PowerShell: \`${INSTALL_WIN}\``,
     '- Input: `.zen` schema files. Output: typed ORM, OpenAPI, migration DDL, routing glue. Business logic is never generated.',
     '- Every backend (db, cache, queue, auth, storage, mail, search and more) is a small interface with swappable adapters, resolved lazily through one container. Switching adapters is a config change.',
     '- Zero-infrastructure defaults (sqlite, memory, local, log) so a clean machine builds and tests with no external services.',

@@ -1,6 +1,6 @@
 module github.com/zenta-dev/zever/adapters/scheduler/postgres
 
-go 1.27.0
+go 1.27.2
 
 require (
 	github.com/robfig/cron/v3 v3.0.1

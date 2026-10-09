@@ -31,10 +31,10 @@ drives it, never hosts logic.
 
 ## Prerequisites
 
-- Install the `cmd/zever` module (multi-module repo: `core/<b>` = battery interface + `Register`/`Open` registry, `adapters/<b>/<a>` = one module per adapter with `Register()`, `shared/*` = SDK-free helpers):
+- Install the CLI with the one-line installer (`go install` does not work: the repo commits `replace` directives). See [Installation](../../start/installation/):
 
 ```sh
-go install github.com/zenta-dev/zever/cmd/zever@v0.6.1
+curl -fsSL https://raw.githubusercontent.com/zenta-dev/zever/v0.6.1/install.sh | sh
 ```
 
 - `zever --help` prints the grouped map (Scaffolding / Inspection /
@@ -47,7 +47,14 @@ Global flags apply to every command:
 ```sh
 zever --quiet <command>     # suppress hints/tips on stderr; errors still print
 zever --no-color <command>  # disable styled output
+zever --json <command>      # machine-readable JSON envelope (also ZEVER_JSON=1)
+zever -V                    # print the CLI version (alias for --version)
 ```
+
+`zever --help --agent` prints the command map in an agent-friendly form.
+Most commands that write files or touch the database (`new`, `add`,
+`extract`, `generate *`, `db migrate`, `db rollback`, `upgrade`,
+`uninstall`) accept `--dry-run` to preview without applying.
 
 `--no-color` is also honored via ambient `NO_COLOR` / `TERM=dumb`. Guided
 prompts for one-shot commands: `-i` / `--interactive` (before or after the
@@ -146,6 +153,9 @@ exit:0
 |---|---|
 | `--quiet` | suppress hints/tips on stderr |
 | `--no-color` | disable styled output |
+| `--json` | machine-readable JSON envelope output (also `ZEVER_JSON=1`) |
+| `-V` | print the CLI version (alias for `--version`) |
+| `--dry-run` | preview file edits / SQL / removals without applying (where supported) |
 | `-i`, `--interactive` | guided `huh` prompts for one-shot commands |
 | `--batteries a,b` | `zever new`: extra batteries to scaffold beyond the floor (skips the battery prompt) |
 | `--adapters b=a,...` | `zever new`: per-battery adapter overrides (implies the battery, skips its adapter prompt) |
@@ -159,14 +169,17 @@ exit:0
 
 ### `zever add`
 
-{/* NOTE: extend this section when --adapter/--force/plugin flags land (separate CLI task owns them). */}
-
 Adds one core battery to an existing project. Synopsis (exactly one
 positional, no prompting):
 
 ```sh
-zever add <battery>[/<adapter>]
+zever add <battery>[/<adapter>] [--adapter NAME] [--force] [--module PATH[@VERSION]] [--dry-run]
 ```
+
+`--adapter` overrides the slash form, `--force` overwrites an existing
+`zever.yaml` stanza, `--module` names a plugin battery's Go module
+(required for plugin batteries), and `--dry-run` prints the edits
+without writing them.
 
 The adapter may be omitted (`zever add cache` selects
 `config.Default()`'s own pick, e.g. `memory`) or pinned explicitly

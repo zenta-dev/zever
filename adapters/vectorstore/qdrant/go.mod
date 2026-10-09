@@ -1,11 +1,11 @@
 module github.com/zenta-dev/zever/adapters/vectorstore/qdrant
 
-go 1.27.0
+go 1.27.2
 
 require (
 	github.com/zenta-dev/zever/core/db v0.6.1 // indirect
 	github.com/zenta-dev/zever/shared/registry v0.6.1 // indirect
-	golang.org/x/net v0.58.0 // indirect
+	golang.org/x/net v0.60.0 // indirect
 	golang.org/x/sys v0.48.0 // indirect
 	golang.org/x/text v0.42.0 // indirect
 	google.golang.org/genproto/googleapis/rpc v0.0.0-20260819154853-08b0e4226688 // indirect

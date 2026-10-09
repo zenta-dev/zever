@@ -18,7 +18,7 @@ language          dsl/                  .zen compiler frontend (compile time onl
 surface           orm/ cmd/zever/       typed queries, CLI
 ```
 
-- `go.work` at the repo root resolves every workspace module locally (166 `use` entries; `examples/external-sms` and `docs/examples` stay outside by design), so `go build/test ./...` from the root works. CI runs per-module commands with `GOWORK=off`.
+- `go.work` at the repo root resolves every workspace module locally (174 `use` entries; `examples/external-sms` and `docs/examples` stay outside by design), so `go build/test ./...` from the root works. CI runs per-module commands with `GOWORK=off`.
 - Releases are lockstep: one version, with per-module tags `<path>/vX.Y.Z` made by `tools/tag-release.sh`.
 - `config/` owns decoding (`defaults < file < env`, strict snake_case keys, `RedactedServices`); `container/` owns construction, caching, retry, and close. Load errors belong to `config/`, resolution errors to `container/`.
 
@@ -37,11 +37,11 @@ surface           orm/ cmd/zever/       typed queries, CLI
 | `core/middleware` | HTTP middleware and gRPC interceptors, no registry | yes |
 | `dsl/` | `lexer -> parser -> ast -> resolver -> ir.Schema`, `compile -> backend.Generate` | no (compile time) |
 | `cmd/zever/` | Flags-only CLI, `dev` watch, dev-only `tinker` | no (tool binary) |
-| `tools/` | `gengrammar` generator, `tag-release.sh` lockstep tagger | no |
+| `tools/` | Dev tooling modules (`gengrammar`, `modgraph`, `errscan`, `affected`, `zever-lsp`, `zever-mcp`) plus scripts such as the `tag-release.sh` lockstep tagger | no |
 | `docs/` | Starlight site (npm, not Go) | no |
 | `examples/` | Runnable skeletons with schema, server, worker, seed | reference |
 
-Batteries under `core/`: agent, ai, analytics, auth, authz, billing, cache, crypto, db, document, eventbus, flag, geo, i18n, idempotency, job, lock, log, mailer, media, notification, observability, outbox, password, payment, permission, queue, rag, ratelimit, resilience, scheduler, search, secrets, session, storage, tenant, vectorstore, webhook, workflow. `core/middleware` and `core/router` are HTTP plumbing.
+Batteries under `core/`: agent, ai, analytics, auth, authz, billing, cache, crypto, db, document, eval, eventbus, flag, geo, i18n, idempotency, job, lock, log, mailer, media, notification, observability, outbox, password, payment, permission, queue, rag, ratelimit, resilience, scheduler, search, secrets, session, storage, tenant, vectorstore, webhook, workflow. `core/middleware` and `core/router` are HTTP plumbing.
 
 ## Resolve a service from the container
 

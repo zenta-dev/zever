@@ -1,6 +1,6 @@
 module github.com/zenta-dev/zever/adapters/permission/casbin
 
-go 1.27.0
+go 1.27.2
 
 require (
 	github.com/bmatcuk/doublestar/v4 v4.6.1 // indirect

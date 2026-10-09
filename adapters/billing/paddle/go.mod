@@ -1,6 +1,6 @@
 module github.com/zenta-dev/zever/adapters/billing/paddle
 
-go 1.27.0
+go 1.27.2
 
 require (
 	github.com/PaddleHQ/paddle-go-sdk/v5 v5.2.0

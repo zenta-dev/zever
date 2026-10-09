@@ -21,7 +21,7 @@ Thanks for contributing to zever. This guide explains how to set up the project,
 
 Required:
 
-- Go 1.27 or newer (this project uses `go 1.27.0` in each module's `go.mod`)
+- Go 1.27 or newer (this project uses `go 1.27.2` in each module's `go.mod`)
 
 Install the pinned development tools (`golangci-lint`, `govulncheck`, and `cyclonedx-gomod`):
 
@@ -66,12 +66,15 @@ make fmt-fix  # format all files in place
 make vet        # go vet ./...
 make lint       # golangci-lint run ./...
 make vulncheck  # govulncheck ./...
+make err-lint   # error-convention violations (see docs/errors.md)
 ```
 
-`golangci-lint` is the project's primary linter. Its configuration lives in `.golangci.yml`. Run it before pushing; CI runs it in the `lint` job. `make setup` installs the pinned version (currently v2.13.2); to install it manually:
+After touching `token.Keywords` or `resolver.ScalarTypeNames`, run `make generate` to refresh the editor grammar files.
+
+`golangci-lint` is the project's primary linter. Its configuration lives in `.golangci.yml`. Run it before pushing; CI runs it in the `lint` job. `make setup` installs the pinned version (currently v2.14.0); to install it manually:
 
 ```bash
-go install github.com/golangci/golangci-lint/v2/cmd/golangci-lint@v2.13.2
+go install github.com/golangci/golangci-lint/v2/cmd/golangci-lint@v2.14.0
 ```
 
 ## Development Workflow
@@ -203,12 +206,7 @@ MAJOR.MINOR.PATCH
 
 While the project is below `v1.0.0`, treat `0.x` as a pre-1.0 phase: minor releases may contain breaking changes, and they should still be documented as such in the release notes. Releases are tagged with a `v` prefix (for example `v0.1.0`). See [STABILITY.md](../STABILITY.md) for core vs extended tiers.
 
-Nested modules (`tools/zever-lsp`) share the lockstep release version with prefixed tags (`tools/zever-lsp/v0.1.0`) and must `require` a published root version. They do commit `replace` directives for sibling intra-repo modules (e.g. `dsl`, `core/*`, `orm`, `shared/*`): the module-graph CI gate (`go run ./tools/modgraph --check`) requires every intra-repo dependency to resolve inside the workspace, and a published root version alone does not satisfy that for unpublished siblings. Keep those `replace` blocks in the committed `go.mod`; only a replace pointing at the root module itself is temporary local-iteration state and must be reverted before committing:
-
-```bash
-cd tools/zever-lsp && go mod edit -replace github.com/zenta-dev/zever=../.. && go test ./...
-git checkout -- tools/zever-lsp/go.mod tools/zever-lsp/go.sum
-```
+Every module (there is no root `go.mod`) shares the lockstep release version with prefixed tags (`tools/zever-lsp/vX.Y.Z`, `adapters/cache/redis/vX.Y.Z`, ...). Modules commit `replace` directives for sibling intra-repo modules (e.g. `dsl`, `core/*`, `orm`, `shared/*`): the module-graph CI gate (`go run ./tools/modgraph --check`, or `make modgraph-check`) requires every intra-repo dependency to resolve inside the workspace, and a published version alone does not satisfy that for unpublished siblings. Keep those `replace` blocks in the committed `go.mod`. This is also why `go install <module>@version` does not work for the CLI; users install release binaries with `install.sh` / `install.ps1`.
 
 ## Release checklist (lockstep per-module tags)
 
@@ -217,18 +215,20 @@ release-version constant (schema `v1`/`v2` segments are API versions, not
 releases) — everything else moves together:
 
 - `CHANGELOG.md`: cut `## [Unreleased]` to `## [vX.Y.Z] - YYYY-MM-DD`.
-- Root pins: `CITATION.cff`, `cmd/zever/new.go` (`defaultFrameworkVersion`)
+- Installers: `install.sh` (`ZEVER_VERSION_DEFAULT`, header and usage text) and
+  `install.ps1` (`$Version` default and help text).
+- Root pins: `README.md` (installer URLs), `CITATION.cff`, `cmd/zever/new.go` (`defaultFrameworkVersion`)
   plus `cmd/zever/new_test.go`, `cmd/zever/main.go` (`cliVersion`),
   `cmd/zever/README.md`.
 - LSP: `tools/zever-lsp/server.go` (`serverVersion`), `tools/zever-lsp/go.mod`
-  (require published root) + `go.sum` via `go mod tidy`, `tools/zever-lsp/README.md`.
+  intra-repo requires + `go.sum` via `go mod tidy`, `tools/zever-lsp/README.md`.
 - Editors: `editors/vscode/package.json`, `editors/vscode/README.md`,
   `editors/nvim/README.md` (LSP install pins).
 - Docs: `docs/src/content/docs/start/installation.mdx`,
   `docs/src/content/docs/guides/operate/upgrade.mdx`,
   `docs/src/content/docs/guides/extend/editor-setup.mdx`,
   `docs/src/content/docs/reference/cli.mdx`.
-- Docs pins: `docs/src/data/landing.ts` (`VERSION`),
+- Docs pins: `docs/src/data/landing.ts` (`VERSION`, used in the installer command),
   `tools/zever-mcp/server.go` (`serverVersion`).
 - Intra-repo module versions: after cutting `CHANGELOG.md`, run `go run ./tools/modgraph` to bump direct intra-repo requires/replaces to `vX.Y.Z`. Restore transitive `replace` entries where needed so per-module `go mod tidy` resolves the untagged version offline, then run `make deps-sync`; verify with `make modgraph-check` and `make deps-sync-check` before tagging.
 - Tags: run `tools/tag-release.sh vX.Y.Z` from a clean checkout of main once the bump lands (the tagger skips nested worktrees, harness checkouts, and vendored copies; it creates one `<path>/vX.Y.Z` per module, dependency order; no bare `vX.Y.Z` — see above). `.github/workflows/release.yml` fires on the bare `vX.Y.Z` tag, so create and push that bare tag in addition to the per-module tags. Verify with `grep -rn` for the old version (excluding

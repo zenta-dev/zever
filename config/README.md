@@ -7,7 +7,9 @@ config file, overlaid by environment variables. Later layers win:
 ## Precedence
 
 1. **Default** — `Default()` returns zero-infrastructure adapters (memory,
-   local, sqlite, log, noop, ...) so tests run without manual setup. The
+   local, sqlite, log, noop, ...; a few batteries default to the `db`
+   adapter instead, e.g. `outbox`, `search`, `vectorstore`) so tests run
+   without manual setup. The
    only dev secret is the crypto key, which `Validate` requires; it is
    deterministic and must never ship to production.
 2. **File** — `Load(path)` decodes YAML or JSON strictly. Unknown services
