@@ -16,6 +16,8 @@
 #   with -Yes instead of blocking on Read-Host.
 # - Errors go to stderr. No sudo/elevation. No package managers.
 # - Re-runs are idempotent.
+# - All UI goes to stderr. Colour only on a VT-capable, non-redirected stderr,
+#   never when NO_COLOR is set or -NoColor is passed.
 [CmdletBinding()]
 param(
   [string]$Version = "v0.6.1",
@@ -23,6 +25,8 @@ param(
   [switch]$Yes,
   [switch]$Force,
   [Alias("WhatIf")][switch]$DryRun,
+  [switch]$Quiet,
+  [switch]$NoColor,
   [switch]$Help
 )
 
@@ -33,28 +37,77 @@ $ZeverRepo = "zenta-dev/zever"
 $GoMinMajor = 1
 $GoMinMinor = 27
 $GoDlUrl = "https://go.dev/dl/"
+$StepN = 0
+$StepTotal = 5
+$Stopwatch = [Diagnostics.Stopwatch]::StartNew()
 
-function Write-Err([string]$Msg) {
-  [Console]::Error.WriteLine("install.ps1: error: $Msg")
+# --- UI ------------------------------------------------------------------------
+$useColor = $false
+if (-not $NoColor -and -not $env:NO_COLOR -and $env:TERM -ne "dumb") {
+  $errRedirected = $false
+  try { $errRedirected = [Console]::IsErrorRedirected } catch { $errRedirected = $true }
+  $vt = ($PSVersionTable.PSVersion.Major -ge 7) -or $env:WT_SESSION -or ($env:ConEmuANSI -eq "ON") -or $env:TERM
+  if ((-not $errRedirected -and $vt) -or $env:FORCE_COLOR) { $useColor = $true }
 }
-function Write-Inf([string]$Msg) {
-  [Console]::Error.WriteLine("install.ps1: $Msg")
+if ($useColor) {
+  $esc = [char]27
+  $cReset = "$esc[0m"; $cBold = "$esc[1m"; $cDim = "$esc[2m"
+  $cRed = "$esc[31m"; $cGreen = "$esc[32m"; $cYellow = "$esc[33m"; $cCyan = "$esc[36m"
+} else {
+  $cReset = ""; $cBold = ""; $cDim = ""; $cRed = ""; $cGreen = ""; $cYellow = ""; $cCyan = ""
 }
-function Write-WarnMsg([string]$Msg) {
-  [Console]::Error.WriteLine("install.ps1: warning: $Msg")
+$utf8 = $false
+try { $utf8 = ($PSVersionTable.PSVersion.Major -ge 7) -or ([Console]::OutputEncoding.CodePage -eq 65001) } catch { $utf8 = $false }
+if ($utf8) {
+  $sOk = [string][char]0x2713; $sFail = [string][char]0x2717; $sStep = [string][char]0x2192
+  $sDot = [string][char]0x2022; $sWould = [string][char]0x25CB; $sArrow = [string][char]0x2192
+} else {
+  $sOk = "ok"; $sFail = "x"; $sStep = ">"; $sDot = "-"; $sWould = "o"; $sArrow = "->"
 }
+
+function Say([string]$Msg) {
+  if (-not $Quiet) { [Console]::Error.WriteLine($Msg) }
+}
+function Write-Inf([string]$Msg) { Say "  $cDim$sDot$cReset $Msg" }
+function Write-Ok([string]$Msg) { Say "  $cGreen$sOk$cReset $Msg" }
+function Write-Would([string]$Msg) { Say "  $cDim$sWould would $Msg$cReset" }
+function Write-Kv([string]$Key, [string]$Val) { Say ("  {0}{1,-10}{2} {3}" -f $cDim, $Key, $cReset, $Val) }
+function Write-Hint([string]$Msg) { [Console]::Error.WriteLine("  ${cDim}hint:$cReset $Msg") }
+function Write-WarnMsg([string]$Msg) { [Console]::Error.WriteLine("$cYellow! warning:$cReset $Msg") }
+function Write-Err([string]$Msg) { [Console]::Error.WriteLine("$cRed$sFail error:$cReset $Msg") }
+function Write-Step([string]$Msg) {
+  $script:StepN++
+  Say ""
+  Say "$cBold$cCyan$sStep [$($script:StepN)/$StepTotal]$cReset $cBold$Msg$cReset"
+}
+# Stop-Install MSG [HINT] [CODE]: report a failure with an optional next step.
+function Stop-Install([string]$Msg, [string]$HintMsg = "", [int]$Code = 1) {
+  Write-Err $Msg
+  if ($HintMsg) { Write-Hint $HintMsg }
+  exit $Code
+}
+
+function Format-Size([long]$Bytes) {
+  if ($Bytes -ge 1MB) { return ("{0:N1} MB" -f ($Bytes / 1MB)) }
+  if ($Bytes -ge 1KB) { return ("{0:N0} KB" -f ($Bytes / 1KB)) }
+  return "$Bytes B"
+}
+
 function Show-Usage {
   @"
-Usage: install.ps1 [-Version vX.Y.Z] [-Prefix DIR] [-Yes] [-Force] [-DryRun] [-Help]
-
 Install the zever CLI and zever-lsp from GitHub releases.
+
+Usage: install.ps1 [-Version vX.Y.Z] [-Prefix DIR] [-Yes] [-Force] [-DryRun]
+                   [-Quiet] [-NoColor] [-Help]
 
   -Version  version to install (default: v0.6.1)
   -Prefix   install prefix, binaries go to DIR\bin (default: `$HOME\.local)
   -Yes      accept upgrade/downgrade prompts without asking
   -Force    re-install even when the target version is already installed
             (implies -Yes and overwrites existing binaries)
-  -DryRun   print every action without executing it (also via -WhatIf)
+  -DryRun   show every action without executing it (also via -WhatIf)
+  -Quiet    only print warnings and errors
+  -NoColor  disable colour output (also honours `$env:NO_COLOR)
   -Help     print this help and exit
 
 Examples:
@@ -109,10 +162,9 @@ function Read-Yes([string]$Prompt) {
   $redirected = $false
   try { $redirected = [Console]::IsInputRedirected } catch { $redirected = $true }
   if ($redirected -or -not [Environment]::UserInteractive) {
-    Write-Err "non-interactive shell: re-run with -Yes: $(Rerun-Command)"
-    exit 1
+    Stop-Install "non-interactive shell: confirmation required" "re-run with -Yes: $(Rerun-Command)"
   }
-  $ans = Read-Host $Prompt
+  $ans = Read-Host "$cBold${cCyan}?$cReset $Prompt"
   return ($ans -match '^[Yy]')
 }
 
@@ -126,13 +178,16 @@ if (-not (Test-VersionShape $Version)) {
 }
 $BinDir = Join-Path $Prefix "bin"
 
+Say ""
+Say "${cBold}zever installer$cReset $cDim$Version$cReset"
+if ($DryRun) { Say "${cYellow}dry run$cReset $cDim- nothing will be changed$cReset" }
+
 # --- arch: only windows-amd64 ships for now ----------------------------------
 $arch = [System.Runtime.InteropServices.RuntimeInformation]::OSArchitecture.ToString()
 switch ($arch) {
   "X64" { $goarch = "amd64" }
   default {
-    Write-Err "unsupported architecture: $arch (windows-amd64 only for now)"
-    exit 1
+    Stop-Install "unsupported architecture: $arch" "windows-amd64 only for now"
   }
 }
 $ZeverAsset = "zever-windows-$goarch.exe"
@@ -140,160 +195,207 @@ $LspAsset = "zever-lsp-windows-$goarch.exe"
 $ZeverExe = Join-Path $BinDir "zever.exe"
 $LspExe = Join-Path $BinDir "zever-lsp.exe"
 $BaseUrl = "https://github.com/$ZeverRepo/releases/download/$Version"
+$ReleaseHint = "check that release $Version exists: https://github.com/$ZeverRepo/releases"
 
 # --- prereq: go >= 1.27 --------------------------------------------------------
 $goCmd = Get-Command go -ErrorAction SilentlyContinue
 if (-not $goCmd) {
-  Write-Err "need go >= $GoMinMajor.$GoMinMinor (see $GoDlUrl)"
-  exit 1
+  Stop-Install "go not found (need go >= $GoMinMajor.$GoMinMinor)" "install Go from $GoDlUrl, then re-run"
 }
 $goOut = (& go version) -join " "
-if ($goOut -match 'go(\d+)\.(\d+)') {
+$goVer = ""
+if ($goOut -match 'go(\d+)\.(\d+)(\.\d+)?') {
   $maj = [int]$Matches[1]; $min = [int]$Matches[2]
+  $goVer = "$maj.$min" + $(if ($Matches[3]) { $Matches[3] } else { "" })
   if (($maj -lt $GoMinMajor) -or (($maj -eq $GoMinMajor) -and ($min -lt $GoMinMinor))) {
-    Write-Err "go $maj.$min is too old (need go >= $GoMinMajor.$GoMinMinor, see $GoDlUrl)"
-    exit 1
+    Stop-Install "go $maj.$min is too old (need go >= $GoMinMajor.$GoMinMinor)" "upgrade Go from $GoDlUrl, then re-run"
   }
 } else {
-  Write-Err "could not parse go version from '$goOut' (need go >= $GoMinMajor.$GoMinMinor from $GoDlUrl)"
-  exit 1
+  Stop-Install "could not parse go version from '$goOut'" "need go >= $GoMinMajor.$GoMinMinor from $GoDlUrl"
 }
 
 function Download-File([string]$Url, [string]$Dest) {
-  if ($DryRun) {
-    Write-Output "dry-run: download $Url -> $Dest"
-    return
+  # Windows PowerShell 5.1 renders the progress bar ~10x slower than the
+  # transfer itself, so only show it on PowerShell 7+ with an interactive host.
+  $prev = $ProgressPreference
+  if (($PSVersionTable.PSVersion.Major -lt 7) -or $Quiet -or [Console]::IsErrorRedirected) {
+    $ProgressPreference = "SilentlyContinue"
   }
-  Invoke-WebRequest -Uri $Url -OutFile $Dest -UseBasicParsing
+  try {
+    Invoke-WebRequest -Uri $Url -OutFile $Dest -UseBasicParsing
+  } finally {
+    $ProgressPreference = $prev
+  }
 }
 
 # --- upgrade gate (BEFORE downloading anything) --------------------------------
 $Existing = Get-Command zever -ErrorAction SilentlyContinue
 if ($Existing) { $ExistingPath = $Existing.Source } else { $ExistingPath = "" }
 
-if ($ExistingPath -ne "" -and ($ExistingPath -ne $ZeverExe)) {
-  Write-WarnMsg "existing zever at $ExistingPath takes precedence over $ZeverExe per PATH order"
-  Write-WarnMsg "this install writes $ZeverExe; fix your PATH if 'zever' still resolves elsewhere"
-}
-
+$Have = ""
+$Action = "fresh install"
+$Gate = "fresh"
 if ($ExistingPath -ne "") {
   $Have = Get-InstalledVersion $ExistingPath
   if ($Have -eq "") {
-    Write-Inf "found existing zever at $ExistingPath but could not parse 'zever -V' output"
-    if ($DryRun) {
-      Write-Output "dry-run: would prompt to replace unparseable install at $ExistingPath"
-    } elseif (-not (Read-Yes "Replace existing zever at $ExistingPath with $Version? [y/N]")) {
-      Write-Inf "aborted by user"
-      exit 1
-    }
+    $Action = "replace unrecognized install"; $Gate = "unparseable"
   } else {
     $cmp = Compare-SemVer $Have $Version
     if (($cmp -eq 0) -and (-not $Force)) {
       $binOk = (Test-Path $ZeverExe) -and ((Get-Item $ZeverExe).Length -gt 0)
       $lspOk = (Test-Path $LspExe) -and ((Get-Item $LspExe).Length -gt 0)
-      if ($binOk -and $lspOk) {
-        Write-Inf "zever $Version is already installed and up to date at $ZeverExe"
-        exit 0
-      }
-      Write-WarnMsg "zever $Version reports installed but $ZeverExe or $LspExe is missing/empty; reinstalling"
+      if ($binOk -and $lspOk) { $Action = "already up to date"; $Gate = "uptodate" }
+      else { $Action = "repair (binaries missing or empty)"; $Gate = "repair" }
     } elseif ($cmp -eq 0) {
-      Write-Inf "-Force: reinstalling zever $Version over identical install"
+      $Action = "reinstall (-Force)"; $Gate = "force"
     } elseif ($cmp -lt 0) {
-      if ($DryRun) {
-        Write-Output "dry-run: would prompt: Upgrade zever $Have -> $Version? [y/N] (assuming yes)"
-      } elseif (-not (Read-Yes "Upgrade zever $Have -> $Version? [y/N]")) {
-        Write-Inf "aborted by user"
-        exit 1
-      }
+      $Action = "upgrade $Have $sArrow $Version"; $Gate = "upgrade"
     } else {
-      Write-WarnMsg "installed zever $Have is NEWER than target $Version"
-      if ($DryRun) {
-        Write-Output "dry-run: would prompt: Downgrade zever $Have -> $Version? [y/N] (assuming yes)"
-      } elseif (-not (Read-Yes "Downgrade zever $Have -> $Version? [y/N]")) {
-        Write-Inf "aborted by user"
-        exit 1
-      }
+      $Action = "downgrade $Have $sArrow $Version"; $Gate = "downgrade"
     }
   }
-} else {
-  Write-Inf "no existing zever found: fresh install of $Version"
+}
+
+Say ""
+Say "${cBold}Plan$cReset"
+Write-Kv "version" $Version
+Write-Kv "platform" "windows-$goarch"
+Write-Kv "install to" $BinDir
+Write-Kv "go" "$goVer $cDim(>= $GoMinMajor.$GoMinMinor required)$cReset"
+if ($ExistingPath -ne "") {
+  $haveSuffix = if ($Have -ne "") { " ($Have)" } else { "" }
+  Write-Kv "existing" "$ExistingPath$haveSuffix"
+}
+Write-Kv "action" "$cBold$Action$cReset"
+
+if ($ExistingPath -ne "" -and ($ExistingPath -ne $ZeverExe)) {
+  Write-WarnMsg "existing zever at $ExistingPath takes precedence over $ZeverExe per PATH order"
+  Write-Hint "this install writes $ZeverExe; fix your PATH if 'zever' still resolves elsewhere"
+}
+
+switch ($Gate) {
+  "uptodate" {
+    Say ""
+    Write-Ok "zever $Version is already installed and up to date at $ZeverExe"
+    Write-Hint "use -Force to reinstall"
+    exit 0
+  }
+  "repair" {
+    Write-WarnMsg "zever $Version reports installed but $ZeverExe or $LspExe is missing/empty; reinstalling"
+  }
+  "unparseable" {
+    if ($DryRun) {
+      Write-Would "prompt to replace unparseable install at $ExistingPath"
+    } elseif (-not (Read-Yes "Replace existing zever at $ExistingPath with $Version? [y/N]")) {
+      Stop-Install "aborted by user"
+    }
+  }
+  "upgrade" {
+    if ($DryRun) {
+      Write-Would "prompt: Upgrade zever $Have $sArrow $Version? (assuming yes)"
+    } elseif (-not (Read-Yes "Upgrade zever $Have $sArrow $Version? [y/N]")) {
+      Stop-Install "aborted by user"
+    }
+  }
+  "downgrade" {
+    Write-WarnMsg "installed zever $Have is NEWER than target $Version"
+    if ($DryRun) {
+      Write-Would "prompt: Downgrade zever $Have $sArrow $Version? (assuming yes)"
+    } elseif (-not (Read-Yes "Downgrade zever $Have $sArrow $Version? [y/N]")) {
+      Stop-Install "aborted by user"
+    }
+  }
 }
 
 # --- download + verify + install -----------------------------------------------
-if ($DryRun) {
-  Write-Output "dry-run: mkdir $BinDir"
-  Write-Output "dry-run: download $BaseUrl/SHA256SUMS.txt -> <tmp>\SHA256SUMS.txt"
-  Write-Output "dry-run: download $BaseUrl/$ZeverAsset -> $ZeverExe"
-  Write-Output "dry-run: download $BaseUrl/$LspAsset -> $LspExe"
-  Write-Output "dry-run: verify SHA256 of both binaries against SHA256SUMS.txt"
-  Write-Output "dry-run: run gh attestation verify (only if gh exists)"
-} else {
-  New-Item -ItemType Directory -Force -Path $BinDir | Out-Null
-  $tmp = Join-Path ([IO.Path]::GetTempPath()) ("zever-install-" + [IO.Path]::GetRandomFileName())
-  New-Item -ItemType Directory -Force -Path $tmp | Out-Null
-  try {
-    Write-Inf "downloading SHA256SUMS.txt for $Version"
+$tmp = $null
+try {
+  if (-not $DryRun) {
+    New-Item -ItemType Directory -Force -Path $BinDir | Out-Null
+    $tmp = Join-Path ([IO.Path]::GetTempPath()) ("zever-install-" + [IO.Path]::GetRandomFileName())
+    New-Item -ItemType Directory -Force -Path $tmp | Out-Null
+  }
+
+  Write-Step "Fetching checksums"
+  $sums = ""
+  if ($DryRun) {
+    Write-Would "download $BaseUrl/SHA256SUMS.txt"
+  } else {
     try {
       Download-File "$BaseUrl/SHA256SUMS.txt" (Join-Path $tmp "SHA256SUMS.txt")
     } catch {
-      Write-Err "could not download $BaseUrl/SHA256SUMS.txt (release $Version may predate checksum files)"
-      exit 1
+      Stop-Install "could not download $BaseUrl/SHA256SUMS.txt" "$ReleaseHint (older releases may predate checksum files)"
     }
     $sums = Get-Content (Join-Path $tmp "SHA256SUMS.txt") -Raw
-    foreach ($pair in @(@($ZeverAsset, $ZeverExe), @($LspAsset, $LspExe))) {
-      $asset = $pair[0]; $dest = $pair[1]
-      $tmpFile = Join-Path $tmp $asset
-      Write-Inf "downloading $asset"
-      try {
-        Download-File "$BaseUrl/$asset" $tmpFile
-      } catch {
-        Write-Err "could not download $BaseUrl/$asset"
-        exit 1
-      }
-      if (-not (Test-Path $tmpFile) -or (Get-Item $tmpFile).Length -eq 0) {
-        Write-Err "downloaded $asset is empty"
-        exit 1
-      }
-      $want = $null
-      foreach ($line in ($sums -split "`r?`n")) {
-        $t = $line.Trim() -split '\s+'
-        $base = $t[-1].Split('/')[-1]
-        if (($t.Count -ge 2) -and ($base -eq $asset)) { $want = $t[0]; break }
-      }
-      if (-not $want) {
-        Write-Err "no checksum entry for $asset in SHA256SUMS.txt"
-        exit 1
-      }
-      $got = (Get-FileHash -Algorithm SHA256 -Path $tmpFile).Hash.ToLower()
-      if ($got -ne $want.ToLower()) {
-        Write-Err "SHA256 mismatch for $asset (want $want, got $got)"
-        exit 1
-      }
-      Move-Item -Force $tmpFile $dest
-      if ((Get-Item $dest).Length -eq 0) {
-        Write-Err "installed $dest is empty"
-        exit 1
-      }
-    }
-    Write-Inf "installed $ZeverExe and $LspExe"
-    $gh = Get-Command gh -ErrorAction SilentlyContinue
-    if ($gh) {
-      try { & gh attestation verify $ZeverExe --repo $ZeverRepo } catch {
-        Write-WarnMsg "gh attestation verify failed for $ZeverExe"
-      }
-      try { & gh attestation verify $LspExe --repo $ZeverRepo } catch {
-        Write-WarnMsg "gh attestation verify failed for $LspExe"
-      }
-    }
-  } finally {
-    Remove-Item -Recurse -Force $tmp -ErrorAction SilentlyContinue
+    Write-Ok "SHA256SUMS.txt for $Version"
   }
+
+  foreach ($item in @(
+      @{ Asset = $ZeverAsset; Dest = $ZeverExe; Label = "zever" },
+      @{ Asset = $LspAsset; Dest = $LspExe; Label = "zever-lsp" })) {
+    $asset = $item.Asset; $dest = $item.Dest
+    Write-Step "Installing $($item.Label)"
+    if ($DryRun) {
+      Write-Would "download $BaseUrl/$asset"
+      Write-Would "verify SHA256 against SHA256SUMS.txt"
+      Write-Would "install to $dest"
+      continue
+    }
+    $tmpFile = Join-Path $tmp $asset
+    Write-Inf "downloading $asset"
+    try {
+      Download-File "$BaseUrl/$asset" $tmpFile
+    } catch {
+      Stop-Install "could not download $BaseUrl/$asset" $ReleaseHint
+    }
+    if (-not (Test-Path $tmpFile) -or (Get-Item $tmpFile).Length -eq 0) {
+      Stop-Install "downloaded $asset is empty"
+    }
+    $size = Format-Size (Get-Item $tmpFile).Length
+    $want = $null
+    foreach ($line in ($sums -split "`r?`n")) {
+      $t = $line.Trim() -split '\s+'
+      $base = $t[-1].Split('/')[-1]
+      if (($t.Count -ge 2) -and ($base -eq $asset)) { $want = $t[0]; break }
+    }
+    if (-not $want) {
+      Stop-Install "no checksum entry for $asset in SHA256SUMS.txt"
+    }
+    $got = (Get-FileHash -Algorithm SHA256 -Path $tmpFile).Hash.ToLower()
+    if ($got -ne $want.ToLower()) {
+      Stop-Install "SHA256 mismatch for $asset (want $want, got $got)" "do NOT use this binary; retry, and report it if it persists"
+    }
+    Write-Ok "verified $asset $cDim($size, sha256 $($got.Substring(0, 12))...)$cReset"
+    Move-Item -Force $tmpFile $dest
+    if ((Get-Item $dest).Length -eq 0) {
+      Stop-Install "installed $dest is empty"
+    }
+    Write-Ok "installed $dest"
+  }
+
+  if ($DryRun) {
+    Write-Would "run gh attestation verify (only if gh exists)"
+  } elseif (Get-Command gh -ErrorAction SilentlyContinue) {
+    Write-Inf "verifying build provenance with gh"
+    foreach ($bin in @($ZeverExe, $LspExe)) {
+      $attested = $false
+      try {
+        & gh attestation verify $bin --repo $ZeverRepo *> $null
+        $attested = ($LASTEXITCODE -eq 0)
+      } catch { $attested = $false }
+      if ($attested) { Write-Ok "attestation verified for $(Split-Path $bin -Leaf)" }
+      else { Write-WarnMsg "gh attestation verify failed for $bin" }
+    }
+  }
+} finally {
+  if ($tmp) { Remove-Item -Recurse -Force $tmp -ErrorAction SilentlyContinue }
 }
 
 # --- PATH: user-level, idempotent + current session ----------------------------
-$needPath = $false
+Write-Step "Configuring PATH"
+$pathChanged = $false
 if ($DryRun) {
-  Write-Output "dry-run: add $BinDir to User PATH idempotently + current session"
+  Write-Would "add $BinDir to User PATH idempotently + current session"
 } else {
   $userPath = [Environment]::GetEnvironmentVariable("Path", "User")
   if (-not $userPath) { $userPath = "" }
@@ -303,11 +405,12 @@ if ($DryRun) {
     if ($p.TrimEnd('\') -ieq $BinDir.TrimEnd('\')) { $found = $true; break }
   }
   if ($found) {
-    Write-Inf "$BinDir is already on User PATH"
+    Write-Ok "$BinDir is already on User PATH"
   } else {
     $newPath = if ($userPath -eq "") { $BinDir } else { "$userPath;$BinDir" }
     [Environment]::SetEnvironmentVariable("Path", $newPath, "User")
-    Write-Inf "added $BinDir to User PATH"
+    $pathChanged = $true
+    Write-Ok "added $BinDir to User PATH"
   }
   if (($env:Path -split ';' | Where-Object { $_ -ne '' } | ForEach-Object { $_.TrimEnd('\') }) -notcontains $BinDir.TrimEnd('\')) {
     $env:Path = "$env:Path;$BinDir"
@@ -315,25 +418,39 @@ if ($DryRun) {
 }
 
 # --- smoke test -----------------------------------------------------------------
+Write-Step "Smoke test"
 if ($DryRun) {
-  Write-Output "dry-run: & `"$ZeverExe`" --help (must exit 0), report PASS/FAIL"
+  Write-Would "run `"$ZeverExe`" --help (must exit 0) and -V, report PASS/FAIL"
 } else {
-  $smokeDir = Join-Path ([IO.Path]::GetTempPath()) ("zever-smoke-" + [IO.Path]::GetRandomFileName())
-  try {
-    & $ZeverExe --help >$null 2>&1
-    if ($LASTEXITCODE -ne 0) {
-      Write-Err "smoke test FAIL: 'zever --help' exited $LASTEXITCODE"
-      exit 1
-    }
-    $haveV = Get-InstalledVersion $ZeverExe
-    if (($haveV -ne "") -and ($haveV -ne $Version)) {
-      Write-WarnMsg "'zever -V' reports $haveV, expected $Version"
-    }
-    Write-Inf "smoke test PASS"
-  } finally {
-    Remove-Item -Recurse -Force $smokeDir -ErrorAction SilentlyContinue
+  & $ZeverExe --help >$null 2>&1
+  if ($LASTEXITCODE -ne 0) {
+    Stop-Install "smoke test failed: 'zever --help' exited $LASTEXITCODE" "binaries are installed at $ZeverExe; run 'zever doctor' to diagnose"
+  }
+  Write-Ok "zever --help"
+  $haveV = Get-InstalledVersion $ZeverExe
+  if (($haveV -ne "") -and ($haveV -ne $Version)) {
+    Write-WarnMsg "'zever -V' reports $haveV, expected $Version"
+  } elseif ($haveV -ne "") {
+    Write-Ok "zever -V $cDim($haveV)$cReset"
   }
 }
 
-Write-Inf "installed zever $Version to $ZeverExe and $LspExe"
-Write-Output "export PATH: $BinDir (already added to User PATH for future sessions)"
+# --- done ------------------------------------------------------------------------
+Say ""
+if ($DryRun) {
+  Say "$cBold$cYellow$sWould Dry run complete$cReset $cDim- zever $Version was not installed$cReset"
+  exit 0
+}
+$secs = [int]$Stopwatch.Elapsed.TotalSeconds
+Say "$cBold$cGreen$sOk zever $Version installed$cReset ${cDim}in ${secs}s$cReset"
+Say ""
+Write-Kv "zever" $ZeverExe
+Write-Kv "zever-lsp" $LspExe
+Say ""
+Say "${cBold}Next steps$cReset"
+if ($pathChanged) {
+  Say "  ${cDim}$sDot$cReset User PATH updated; this session is ready, ${cDim}open a new terminal for others$cReset"
+}
+Say "  ${cDim}1.$cReset ${cCyan}zever -V$cReset              ${cDim}check the install$cReset"
+Say "  ${cDim}2.$cReset ${cCyan}zever new myapp$cReset       ${cDim}scaffold a project$cReset"
+Say "  ${cDim}$sDot$cReset ${cCyan}zever upgrade$cReset / ${cCyan}zever uninstall$cReset  ${cDim}manage this install later$cReset"
