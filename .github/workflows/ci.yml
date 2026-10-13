@@ -143,6 +143,20 @@ jobs:
       - name: vet + tidy + test + build (all modules)
         run: make check-all
 
+  # Installer fail-closed gate: install.sh / install.ps1 verification,
+  # escape hatch, and attestation hints. Offline: stubbed PATH + fixture
+  # release, no GitHub releases access needed.
+  installer:
+    name: installer (fail-closed)
+    timeout-minutes: 10
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+      - name: Installer tests
+        run: sh tools/installer-test.sh
+
   # Module-graph drift gate: every module's go.mod must require+replace
   # each intra-repo module it directly imports, computed by tools/modgraph
   # (Go ignores replaces in dependency go.mods). --check exits 1 with a
