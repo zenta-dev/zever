@@ -182,7 +182,7 @@ test-race-pr: ## Run tests with the race detector, shuffled order, 2 iterations 
 	failed=""; for d in $(if $(MODULES),$(MODULES),$(SHARD_MODULES)); do echo "== $$d =="; if ! (cd $$d && $(GO) test -race -vet=off -count=2 -shuffle=$(or $(SHUFFLE_SEED),on) ./...); then failed="$$failed $$d"; echo "::error::module failed: $$d"; fi; done; [ -z "$$failed" ] || { echo "FAILED modules:$$failed"; exit 1; }
 
 .PHONY: modgraph-check
-modgraph-check: ## Verify every module requires+replaces the intra-repo modules it imports (CI module-graph gate)
+modgraph-check: ## Verify every module requires+replaces the intra-repo modules it imports, and every go.mod follows the release tag path rule (CI module-graph gate)
 	$(GO) run ./tools/modgraph --check
 
 .PHONY: test-flake
