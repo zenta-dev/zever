@@ -9,6 +9,25 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Breaking
 
+- `fix(httpclient)!: block private addresses for remote adapters by default`:
+  outbound HTTP clients in the `ai` (`anthropic`, `openai`, `gemini`,
+  `ollama`), `document/remote`, `geo` (`google`, `osm`), `i18n/remote`,
+  and `notification/twilio` adapters now dial only globally routable
+  addresses and never follow redirects. Loopback, private, link-local
+  (including the `169.254.169.254` cloud metadata address), carrier-grade
+  NAT, multicast, reserved, and documentation ranges are refused with
+  `httpclient.ErrPrivateAddress`; every resolved address is checked from a
+  single lookup and the validated IP is dialed directly, closing the
+  DNS-rebinding check-to-dial window. Operators pointing an adapter at a
+  local Ollama/sidecar must now set `allow_private: true` (new option on
+  `ai`, `document`, `geo`, and `i18n.remote` options), which logs a line
+  at startup. `allow_insecure` no longer disables TLS verification: the
+  new `insecure_skip_verify: true` option (on `ai` and `ollama` options)
+  is required for self-signed test servers and logs a warning at open.
+  The `webhook` and `oidc` adapters already enforced this posture and are
+  unchanged. New `shared/httpclient` seams: `LookupFunc`,
+  `SafeDialContextWithLookup`, and the `WithLookup` option for pinning DNS
+  in tests and split-horizon environments.
 - `fix(server)!: gRPC reflection off by default`: the generated server
   entrypoint (`zever generate server`) no longer registers the gRPC
   reflection service unconditionally. Reflection exposes every service

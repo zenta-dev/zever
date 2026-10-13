@@ -20,7 +20,7 @@ func TestEdgeGenerate_concurrent(t *testing.T) {
 	}))
 	t.Cleanup(srv.Close)
 
-	a, err := New(ai.Options{APIKey: "sk-test", Model: "gpt-4", BaseURL: srv.URL})
+	a, err := New(ai.Options{APIKey: "sk-test", Model: "gpt-4", BaseURL: srv.URL, AllowPrivate: true})
 	if err != nil {
 		t.Fatalf("New: %v", err)
 	}
@@ -64,7 +64,7 @@ func TestEdgeGenerate_emptyMessages(t *testing.T) {
 	}))
 	t.Cleanup(srv.Close)
 
-	a, err := New(ai.Options{APIKey: "sk-test", Model: "gpt-4", BaseURL: srv.URL})
+	a, err := New(ai.Options{APIKey: "sk-test", Model: "gpt-4", BaseURL: srv.URL, AllowPrivate: true})
 	if err != nil {
 		t.Fatalf("New: %v", err)
 	}

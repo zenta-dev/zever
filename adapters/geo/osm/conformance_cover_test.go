@@ -30,6 +30,7 @@ func TestOSMConformance(t *testing.T) {
 			UserAgent:     "kit-conformance",
 			Endpoint:      srv.URL,
 			AllowInsecure: true,
+			AllowPrivate:  true,
 		})
 		if err != nil {
 			t.Fatalf("New() error = %v", err)

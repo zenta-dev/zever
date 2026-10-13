@@ -5,7 +5,6 @@ package httpclient
 import (
 	"context"
 	"crypto/tls"
-	"errors"
 	"fmt"
 	"io"
 	"net"
@@ -23,38 +22,8 @@ const DefaultMaxIdleConnsPerHost = 32
 // between chunks so cancellation aborts promptly.
 const maxReadChunk = 32 << 10
 
-// ErrTooLarge is returned (via TooLargeError) when ReadLimited exceeds limit.
-var ErrTooLarge = errors.New("httpclient: response body too large")
-
-// ErrPrivateAddress is returned when SafeDialContext resolves a private
-// address and allowPrivate is false.
-var ErrPrivateAddress = errors.New("httpclient: refusing to dial private address")
-
-// ErrNoAddresses is returned when SafeDialContext has no addresses to dial.
-var ErrNoAddresses = errors.New("httpclient: no addresses to dial")
-
-// TooLargeError reports a body exceeding a byte limit.
-type TooLargeError struct {
-	// Limit is the maximum allowed bytes.
-	Limit int64
-	// Size is the bytes observed (capped at Limit+1).
-	Size int64
-}
-
-// Error returns a human-readable description of the limit breach.
-func (e *TooLargeError) Error() string {
-	return fmt.Sprintf("httpclient: response body too large: %d bytes exceeds limit %d", e.Size, e.Limit)
-}
-
-// Is reports whether target is ErrTooLarge.
-func (e *TooLargeError) Is(target error) bool {
-	return target == ErrTooLarge
-}
-
-// Unwrap exposes ErrTooLarge for errors.Is and errors.As.
-func (e *TooLargeError) Unwrap() error {
-	return ErrTooLarge
-}
+// ErrTooLarge, ErrPrivateAddress, ErrNoAddresses, and TooLargeError live in
+// errors.go.
 
 // config holds NewClient options.
 type config struct {
@@ -63,11 +32,17 @@ type config struct {
 	safeDial       bool
 	safeDialSet    bool
 	allowPrivate   bool
+	lookup         LookupFunc
 	noRedirect     bool
 	insecureVerify bool
 	insecureSet    bool
 	tracing        bool
 }
+
+// LookupFunc resolves host to addresses. LookupFunc is a seam for pinning
+// DNS in tests (stub resolver) or split-horizon environments; a nil
+// LookupFunc means the system resolver.
+type LookupFunc func(ctx context.Context, host string) ([]net.IPAddr, error)
 
 // Option configures NewClient.
 type Option func(*config)
@@ -83,12 +58,23 @@ func WithTransport(rt http.RoundTripper) Option {
 }
 
 // WithSafeDial installs a DialContext refusing private addresses unless
-// allowPrivate is true. WithSafeDial has no effect with WithTransport.
+// allowPrivate is true. With a non-*http.Transport value WithSafeDial has
+// no effect (the transport is used directly, see WithTransport).
 func WithSafeDial(allowPrivate bool) Option {
 	return func(c *config) {
 		c.safeDial = true
 		c.safeDialSet = true
 		c.allowPrivate = allowPrivate
+	}
+}
+
+// WithLookup sets the resolver the safe dial guard uses. A nil LookupFunc
+// means the system resolver. WithLookup only takes effect with WithSafeDial
+// on a cloned *http.Transport; it has no effect with a non-*http.Transport
+// value (see WithTransport).
+func WithLookup(lookup LookupFunc) Option {
+	return func(c *config) {
+		c.lookup = lookup
 	}
 }
 
@@ -101,8 +87,10 @@ func WithNoRedirect() Option {
 }
 
 // WithInsecureSkipVerify sets InsecureSkipVerify on the cloned transport TLS
-// config. WithInsecureSkipVerify is for loopback test servers only and has no
-// effect with WithTransport.
+// config. WithInsecureSkipVerify is an explicit opt-in for self-signed test
+// servers only; it has no effect with a non-*http.Transport value (see
+// WithTransport). Callers must gate it behind their own insecure_skip_verify
+// option and log a warning when enabled.
 func WithInsecureSkipVerify(skip bool) Option {
 	return func(c *config) {
 		c.insecureVerify = skip
@@ -139,7 +127,7 @@ func NewClient(timeout time.Duration, opts ...Option) *http.Client {
 				clone.TLSClientConfig.InsecureSkipVerify = cfg.insecureVerify
 			}
 			if cfg.safeDialSet {
-				clone.DialContext = SafeDialContext(cfg.allowPrivate)
+				clone.DialContext = SafeDialContextWithLookup(cfg.allowPrivate, cfg.lookup)
 			}
 			clone.MaxIdleConnsPerHost = DefaultMaxIdleConnsPerHost
 			return newHTTPClient(timeout, clone, cfg.noRedirect, cfg.tracing)
@@ -165,7 +153,7 @@ func NewClient(timeout time.Duration, opts ...Option) *http.Client {
 		tr.TLSClientConfig.InsecureSkipVerify = cfg.insecureVerify
 	}
 	if cfg.safeDialSet {
-		tr.DialContext = SafeDialContext(cfg.allowPrivate)
+		tr.DialContext = SafeDialContextWithLookup(cfg.allowPrivate, cfg.lookup)
 	}
 	tr.MaxIdleConnsPerHost = DefaultMaxIdleConnsPerHost
 	return newHTTPClient(timeout, tr, cfg.noRedirect, cfg.tracing)
@@ -239,27 +227,34 @@ func NewSafeClient(timeout time.Duration, allowPrivate bool, opts ...Option) *ht
 }
 
 // SafeDialContext returns a DialContext function refusing private addresses
-// unless allowPrivate is true. SafeDialContext resolves names, checks every
-// returned address, then dials a validated IP directly so a second lookup
-// cannot return a different (private) address between check and dial.
+// unless allowPrivate is true. SafeDialContext resolves names with the
+// system resolver, checks every returned address, then dials a validated IP
+// directly so a second lookup cannot return a different (private) address
+// between check and dial.
 func SafeDialContext(allowPrivate bool) func(ctx context.Context, network, addr string) (net.Conn, error) {
+	return SafeDialContextWithLookup(allowPrivate, nil)
+}
+
+// SafeDialContextWithLookup is SafeDialContext with an injectable resolver:
+// a nil lookup means the system resolver, a non-nil one (stub resolvers in
+// tests, pinned resolvers in split-horizon environments) replaces it.
+func SafeDialContextWithLookup(allowPrivate bool, lookup LookupFunc) func(ctx context.Context, network, addr string) (net.Conn, error) {
+	return safeDialContext(allowPrivate, lookup, nil)
+}
+
+// safeDialContext builds the guard. A nil lookup means the system resolver;
+// a nil dial means a fresh net.Dialer per address (tests inject a stub to
+// assert the dial target without touching the network).
+func safeDialContext(allowPrivate bool, lookup LookupFunc, dial func(ctx context.Context, network, addr string) (net.Conn, error)) func(ctx context.Context, network, addr string) (net.Conn, error) {
 	return func(ctx context.Context, network, addr string) (net.Conn, error) {
 		host, port, err := net.SplitHostPort(addr)
 		if err != nil {
 			host = addr
 			port = ""
 		}
-		var ips []net.IP
-		if ip := net.ParseIP(host); ip != nil {
-			ips = []net.IP{ip}
-		} else {
-			addrs, lookupErr := net.DefaultResolver.LookupIPAddr(ctx, host)
-			if lookupErr != nil {
-				return nil, fmt.Errorf("httpclient: host lookup failed for %q: %w", host, lookupErr)
-			}
-			for _, a := range addrs {
-				ips = append(ips, a.IP)
-			}
+		ips, err := resolveIPs(ctx, host, lookup)
+		if err != nil {
+			return nil, err
 		}
 		if !allowPrivate {
 			for _, ip := range ips {
@@ -270,14 +265,23 @@ func SafeDialContext(allowPrivate bool) func(ctx context.Context, network, addr 
 		}
 		// Dial a validated IP rather than the original hostname: re-resolving
 		// here would allow a DNS-rebinding TOCTOU between the check and dial.
-		var dialer net.Dialer
+		dialAddr := func(ip net.IP) string {
+			if port != "" {
+				return net.JoinHostPort(ip.String(), port)
+			}
+			return ip.String()
+		}
 		var lastErr error
 		for _, ip := range ips {
-			target := addr
-			if port != "" {
-				target = net.JoinHostPort(ip.String(), port)
+			target := dialAddr(ip)
+			var conn net.Conn
+			var dialErr error
+			if dial != nil {
+				conn, dialErr = dial(ctx, network, target)
+			} else {
+				var d net.Dialer
+				conn, dialErr = d.DialContext(ctx, network, target)
 			}
-			conn, dialErr := dialer.DialContext(ctx, network, target)
 			if dialErr == nil {
 				return conn, nil
 			}
@@ -290,28 +294,79 @@ func SafeDialContext(allowPrivate bool) func(ctx context.Context, network, addr 
 	}
 }
 
-// IsPrivateIP reports whether ip is loopback, unspecified, link-local, or
-// private (10/8, 172.16/12, 192.168/16, fc00::/7). IsPrivateIP returns false
-// for nil.
+// resolveIPs returns the dial candidates for host: the literal when host
+// parses as an IP, otherwise a single resolver round-trip. The caller dials
+// from the returned slice without resolving again.
+func resolveIPs(ctx context.Context, host string, lookup LookupFunc) ([]net.IP, error) {
+	if ip := net.ParseIP(host); ip != nil {
+		return []net.IP{ip}, nil
+	}
+	if lookup == nil {
+		lookup = net.DefaultResolver.LookupIPAddr
+	}
+	addrs, lookupErr := lookup(ctx, host)
+	if lookupErr != nil {
+		return nil, fmt.Errorf("httpclient: host lookup failed for %q: %w", host, lookupErr)
+	}
+	ips := make([]net.IP, 0, len(addrs))
+	for _, a := range addrs {
+		ips = append(ips, a.IP)
+	}
+	return ips, nil
+}
+
+// IsPrivateIP reports whether ip must never be dialed from an outbound
+// adapter without an explicit allow_private opt-in: loopback, unspecified,
+// link-local (including the 169.254.169.254 cloud metadata address),
+// multicast, carrier-grade NAT (100.64.0.0/10), IANA special-purpose
+// (192.0.0.0/24), benchmarking (198.18.0.0/15), current-network (0.0.0.0/8),
+// reserved (240.0.0.0/4), documentation (192.0.2.0/24, 198.51.100.0/24,
+// 203.0.113.0/24, 2001:db8::/32), RFC 1918 (10/8, 172.16/12, 192.168/16),
+// and IPv6 unique-local (fc00::/7). IsPrivateIP returns false for nil and
+// for globally routable addresses. IPv4-mapped IPv6 addresses classify by
+// their embedded IPv4 address.
 func IsPrivateIP(ip net.IP) bool {
 	if ip == nil {
 		return false
 	}
-	if ip.IsLoopback() || ip.IsUnspecified() || ip.IsLinkLocalUnicast() || ip.IsLinkLocalMulticast() {
+	if ip.IsLoopback() || ip.IsUnspecified() || ip.IsLinkLocalUnicast() || ip.IsLinkLocalMulticast() || ip.IsMulticast() {
 		return true
 	}
 	if ip4 := ip.To4(); ip4 != nil {
 		switch {
+		case ip4[0] == 0:
+			return true
 		case ip4[0] == 10:
+			return true
+		case ip4[0] == 100 && ip4[1] >= 64 && ip4[1] <= 127:
+			return true
+		case ip4[0] == 127:
+			return true
+		case ip4[0] == 169 && ip4[1] == 254:
 			return true
 		case ip4[0] == 172 && ip4[1] >= 16 && ip4[1] <= 31:
 			return true
+		case ip4[0] == 192 && ip4[1] == 0 && ip4[2] == 0:
+			return true
+		case ip4[0] == 192 && ip4[1] == 0 && ip4[2] == 2:
+			return true
 		case ip4[0] == 192 && ip4[1] == 168:
+			return true
+		case ip4[0] == 198 && ip4[1] >= 18 && ip4[1] <= 19:
+			return true
+		case ip4[0] == 198 && ip4[1] == 51 && ip4[2] == 100:
+			return true
+		case ip4[0] == 203 && ip4[1] == 0 && ip4[2] == 113:
+			return true
+		case ip4[0] >= 224:
 			return true
 		}
 		return false
 	}
 	if len(ip) == net.IPv6len && ip[0]&0xfe == 0xfc {
+		return true
+	}
+	if len(ip) == net.IPv6len && ip[0] == 0x20 && ip[1] == 0x01 && ip[2] == 0x0d && ip[3] == 0xb8 {
 		return true
 	}
 	return false

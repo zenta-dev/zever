@@ -147,19 +147,19 @@ func TestNewWithOptions_tlsVerification(t *testing.T) {
 	t.Parallel()
 
 	tests := []struct {
-		name          string
-		allowInsecure bool
-		wantSkip      bool
+		name               string
+		insecureSkipVerify bool
+		wantSkip           bool
 	}{
-		{name: "default verifies", allowInsecure: false, wantSkip: false},
-		{name: "AllowInsecure skips", allowInsecure: true, wantSkip: true},
+		{name: "default verifies", insecureSkipVerify: false, wantSkip: false},
+		{name: "InsecureSkipVerify skips", insecureSkipVerify: true, wantSkip: true},
 	}
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 			t.Parallel()
 
-			a, err := NewWithOptions(Options{AllowInsecure: tt.allowInsecure})
+			a, err := NewWithOptions(Options{InsecureSkipVerify: tt.insecureSkipVerify})
 			if err != nil {
 				t.Fatalf("NewWithOptions: %v", err)
 			}
@@ -190,7 +190,7 @@ func TestNewWithOptions_tlsVerification_injectedTransport(t *testing.T) {
 
 	tr := &http.Transport{}
 
-	a, err := NewWithOptions(Options{Transport: tr, AllowInsecure: true})
+	a, err := NewWithOptions(Options{Transport: tr, InsecureSkipVerify: true})
 	if err != nil {
 		t.Fatalf("NewWithOptions: %v", err)
 	}

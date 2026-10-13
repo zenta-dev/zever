@@ -20,7 +20,7 @@ func TestEdgeRender_concurrent(t *testing.T) {
 	}))
 	t.Cleanup(srv.Close)
 
-	d, err := New(document.Options{Endpoint: srv.URL, AllowInsecure: true})
+	d, err := New(document.Options{Endpoint: srv.URL, AllowInsecure: true, AllowPrivate: true})
 	if err != nil {
 		t.Fatalf("New: %v", err)
 	}
@@ -62,7 +62,7 @@ func TestEdgeRender_nilSource(t *testing.T) {
 	}))
 	t.Cleanup(srv.Close)
 
-	d, err := New(document.Options{Endpoint: srv.URL, AllowInsecure: true})
+	d, err := New(document.Options{Endpoint: srv.URL, AllowInsecure: true, AllowPrivate: true})
 	if err != nil {
 		t.Fatalf("New: %v", err)
 	}

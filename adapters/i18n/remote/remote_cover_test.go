@@ -50,7 +50,7 @@ func flightPresent(a *adapter, key string) bool {
 // below poke a.cache/a.flights/a.order directly.
 func newTestAdapter(t *testing.T, endpoint string) *adapter {
 	t.Helper()
-	ii, err := New(i18n.Options{Remote: i18n.RemoteOptions{Endpoint: endpoint, AllowInsecure: true}})
+	ii, err := New(i18n.Options{Remote: i18n.RemoteOptions{Endpoint: endpoint, AllowInsecure: true, AllowPrivate: true}})
 	if err != nil {
 		t.Fatalf("New: %v", err)
 	}

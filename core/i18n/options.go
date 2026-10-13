@@ -33,6 +33,11 @@ type RemoteOptions struct {
 	MaxInFlight int `json:"max_in_flight" toml:"max_in_flight" yaml:"max_in_flight"`
 	// AllowInsecure permits http:// endpoints. Default false (https only).
 	AllowInsecure bool `json:"allow_insecure" toml:"allow_insecure" yaml:"allow_insecure"`
+	// AllowPrivate permits dialing private, loopback, and link-local
+	// addresses (required for a local catalog sidecar Endpoint). Default
+	// false: only globally routable addresses are dialed, redirects are
+	// never followed, and the adapter logs a line at open when enabled.
+	AllowPrivate bool `json:"allow_private" toml:"allow_private" yaml:"allow_private"`
 }
 
 // Options configures backend construction.

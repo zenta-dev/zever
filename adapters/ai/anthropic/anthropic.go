@@ -4,6 +4,7 @@ import (
 	"context"
 	"errors"
 	"fmt"
+	"log/slog"
 	"math"
 	"net/http"
 	"net/url"
@@ -33,7 +34,11 @@ type adapter struct {
 }
 
 func newClient(opts ai.Options) *http.Client {
-	return httpclient.NewClient(opts.Timeout)
+	clientOpts := []httpclient.Option{}
+	if opts.InsecureSkipVerify {
+		clientOpts = append(clientOpts, httpclient.WithInsecureSkipVerify(true))
+	}
+	return httpclient.NewSafeClient(opts.Timeout, opts.AllowPrivate, clientOpts...)
 }
 
 // New creates an Anthropic AI backend.
@@ -43,6 +48,12 @@ func New(opts ai.Options) (ai.AI, error) {
 	}
 	if err := opts.Validate(); err != nil {
 		return nil, fmt.Errorf("ai: open anthropic: %w", err)
+	}
+	if opts.AllowPrivate {
+		slog.Default().Info("anthropic: allow_private enabled: private, loopback, and link-local addresses can be dialed")
+	}
+	if opts.InsecureSkipVerify {
+		slog.Default().Warn("anthropic: insecure_skip_verify enabled: TLS certificate verification is off; use only for testing")
 	}
 	clientOpts := []option.RequestOption{
 		option.WithAPIKey(opts.APIKey),

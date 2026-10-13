@@ -3,13 +3,19 @@ $defs:
         additionalProperties: false
         properties:
             allow_insecure:
-                description: Permit an http base_url and disable TLS verification for loopback test servers. Default false.
+                description: Permit an http base_url for testing. Default false (https only).
+                type: boolean
+            allow_private:
+                description: Permit dialing private, loopback, and link-local addresses. Default false.
                 type: boolean
             api_key:
                 type: string
             base_url:
                 description: Must be a valid https URL when set.
                 type: string
+            insecure_skip_verify:
+                description: Disable TLS certificate verification for self-signed test servers. Default false.
+                type: boolean
             model:
                 type: string
             timeout:
@@ -239,6 +245,9 @@ $defs:
             allow_insecure:
                 description: Permit an http endpoint for testing. Default false (https only).
                 type: boolean
+            allow_private:
+                description: Permit dialing private, loopback, and link-local addresses. Default false.
+                type: boolean
             api_key:
                 type: string
             dpi:
@@ -319,6 +328,9 @@ $defs:
         properties:
             allow_insecure:
                 type: boolean
+            allow_private:
+                description: Permit dialing private, loopback, and link-local addresses. Default false.
+                type: boolean
             api_key:
                 type: string
             base_url:
@@ -355,6 +367,9 @@ $defs:
                 additionalProperties: false
                 properties:
                     allow_insecure:
+                        type: boolean
+                    allow_private:
+                        description: Permit dialing private, loopback, and link-local addresses. Default false.
                         type: boolean
                     api_key:
                         type: string

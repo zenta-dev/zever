@@ -54,7 +54,7 @@ func TestNew_InvalidBaseURL(t *testing.T) {
 }
 
 func TestNew_WithBaseURL_AllowInsecure(t *testing.T) {
-	g, err := New(geo.Options{APIKey: "fake", BaseURL: "http://example.com", AllowInsecure: true})
+	g, err := New(geo.Options{APIKey: "fake", BaseURL: "http://example.com", AllowInsecure: true, AllowPrivate: true})
 	if err != nil {
 		t.Fatalf("unexpected error: %v", err)
 	}
@@ -134,7 +134,7 @@ func newTestServer(t *testing.T, body string, code int) *httptest.Server {
 
 func newGeoWithServer(t *testing.T, srv *httptest.Server) geo.Geo {
 	t.Helper()
-	g, err := New(geo.Options{APIKey: "fake-key", BaseURL: srv.URL, AllowInsecure: true})
+	g, err := New(geo.Options{APIKey: "fake-key", BaseURL: srv.URL, AllowInsecure: true, AllowPrivate: true})
 	if err != nil {
 		t.Fatalf("New failed: %v", err)
 	}
@@ -423,7 +423,7 @@ func TestGeocode_HTTPError(t *testing.T) {
 		http.Error(w, "internal", http.StatusInternalServerError)
 	}))
 	defer srv.Close()
-	g, err := New(geo.Options{APIKey: "fake", BaseURL: srv.URL, AllowInsecure: true})
+	g, err := New(geo.Options{APIKey: "fake", BaseURL: srv.URL, AllowInsecure: true, AllowPrivate: true})
 	if err != nil {
 		t.Fatalf("New failed: %v", err)
 	}

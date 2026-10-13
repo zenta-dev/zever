@@ -14,6 +14,7 @@ import (
 	twilioclient "github.com/twilio/twilio-go/client"
 
 	"github.com/zenta-dev/zever/core/notification"
+	"github.com/zenta-dev/zever/shared/httpclient"
 )
 
 const (
@@ -81,10 +82,9 @@ func newTestNotifier(t *testing.T, srv *httptest.Server) notification.Notifier {
 	if !ok || bc.HTTPClient == nil {
 		t.Fatalf("notifier client is %T, want *twilioclient.Client with HTTPClient", tn.client.Client)
 	}
-	prev := bc.HTTPClient.Transport
-	if prev == nil {
-		prev = http.DefaultTransport
-	}
+	// Tests redirect traffic at a loopback httptest server, so the wrapped
+	// transport opts into private dials; production keeps the strict guard.
+	prev := httpclient.NewSafeClient(bc.HTTPClient.Timeout, true).Transport
 	bc.HTTPClient.Transport = &rewriteTransport{base: srv.URL, rt: prev}
 	return n
 }

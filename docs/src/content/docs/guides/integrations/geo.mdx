@@ -74,7 +74,7 @@ geo:
     base_url: https://maps.googleapis.com
 ```
 
-`Validate` rejects a negative `timeout` or `max_response_body`, and any `base_url` or `endpoint` that is not `https` unless `allow_insecure`. Env vars mirror the keys. See the [geo config reference](../../../reference/config/#geo).
+`Validate` rejects a negative `timeout` or `max_response_body`, and any `base_url` or `endpoint` that is not `https` unless `allow_insecure`. Outbound requests dial only globally routable addresses and never follow redirects; a local tile/mock endpoint needs `allow_private: true`, which logs a line at startup. Env vars mirror the keys. See the [geo config reference](../../../reference/config/#geo).
 
 | Adapter | Package | Notes |
 |---|---|---|

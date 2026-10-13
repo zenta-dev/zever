@@ -28,7 +28,7 @@ I18N_REMOTE_ENDPOINT=i18n.internal:8080
   </TabItem>
 </Tabs>
 
-Switch to `remote` for a shared catalog service: it takes `endpoint`, `api_key`, `timeout`, `max_in_flight`, and `allow_insecure` (see the [Config reference](../../../reference/config/#i18n)). `DefaultTimeout` is 30s for remote fetches. The embed filesystem cannot come from YAML, so set `Embed.FS` in code as shown below; without it the embed adapter fails with `embed fs is required`.
+Switch to `remote` for a shared catalog service: it takes `endpoint`, `api_key`, `timeout`, `max_in_flight`, `allow_insecure`, and `allow_private` (see the [Config reference](../../../reference/config/#i18n)). Outbound requests dial only globally routable addresses and never follow redirects; a local catalog sidecar needs `allow_private: true`, which logs a line at startup. `DefaultTimeout` is 30s for remote fetches. The embed filesystem cannot come from YAML, so set `Embed.FS` in code as shown below; without it the embed adapter fails with `embed fs is required`.
 
 Catalogs are JSON per locale. A message is plain text or a Go `text/template` string with `{{.name}}` placeholders:
 
