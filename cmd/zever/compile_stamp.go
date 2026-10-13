@@ -65,11 +65,16 @@ func stampGeneratedFile(backend, path string, content []byte, hash string) []byt
 
 	line := generatedStampLine(backend, hash)
 
-	stamped := make([]byte, 0, len(line)+1+len(content))
-	stamped = append(stamped, []byte(line+"\n")...)
-	stamped = append(stamped, content...)
+	// Assembled via bytes.Buffer rather than a pre-sized make: summing
+	// attacker-influenced lengths for an allocation size is an integer
+	// overflow hazard (CodeQL), and the two writes below stay linear
+	// anyway.
+	var stamped bytes.Buffer
 
-	return stamped
+	stamped.WriteString(line + "\n")
+	stamped.Write(content)
+
+	return stamped.Bytes()
 }
 
 // stampGeneratedJSON embeds the provenance block into a JSON generated file
