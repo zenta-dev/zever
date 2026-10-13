@@ -745,7 +745,11 @@ func (q Query[T, PT]) FirstOrErr(ctx context.Context, exec db.DB) (PT, error) {
 }
 
 // Count runs `SELECT COUNT(*)` for q's table/filter, ignoring order/limit/
-// offset (meaningless for a count).
+// offset (meaningless for a count). When the filter holds a value-list IN
+// larger than the dialect's parameter budget, Count fans out into one
+// statement per IN chunk (see planInChunks) and returns the summed total;
+// order/limit/offset need no fail-closed gate here because they never
+// shape a count.
 func (q Query[T, PT]) Count(ctx context.Context, exec db.DB) (int64, error) {
 	if q.lock != LockNone || q.nowait || q.skipLocked {
 		return 0, fmt.Errorf("orm: Query.Count: %w", ErrLockingNotSelect)
@@ -756,7 +760,30 @@ func (q Query[T, PT]) Count(ctx context.Context, exec db.DB) (int64, error) {
 		return 0, err
 	}
 
-	query, args, err := render.Count(d, q.table.Name(), toRenderNode[T](q.where.Render()))
+	plans, err := planInChunks(q.where.n, dialect.MaxParams(d))
+	if err != nil {
+		return 0, fmt.Errorf("orm: Query.Count: %w", err)
+	}
+
+	var total int64
+
+	for _, p := range plans {
+		n, err := countWhere(ctx, exec, d, q.table.Name(), toRenderNode[T](p))
+		if err != nil {
+			return 0, err
+		}
+
+		total += n
+	}
+
+	return total, nil
+}
+
+// countWhere runs one `SELECT COUNT(*)` for table/filter and returns its
+// total. It is Count's per-chunk body: Count fans out across the slice
+// planInChunks returns and sums the per-chunk totals here.
+func countWhere(ctx context.Context, exec db.DB, d dialect.Dialect, table string, where render.Node) (int64, error) {
+	query, args, err := render.Count(d, table, where)
 	if err != nil {
 		return 0, fmt.Errorf("orm: Query.Count: %w", err)
 	}
