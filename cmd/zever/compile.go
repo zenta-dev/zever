@@ -420,7 +420,7 @@ func reportCompileCheck(cfg CompileConfig, out io.Writer, backendsSpec, outDir s
 
 func printCompileUsage(fs *flag.FlagSet) {
 	header := title("zever compile") + dim(" — schema → generated")
-	flags := dim(" [--backend " + defaultBackends() + "] [--out DIR]")
+	flags := dim(" [--backend " + defaultBackends() + "] [--out DIR] [--check]")
 	usage := bold("Usage:") + "  " + cmd("zever compile") + flags + "  " + cyan("<files...>")
 	body := joinLines(
 		header,
