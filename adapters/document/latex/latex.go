@@ -9,6 +9,8 @@ import (
 	"os/exec"
 	"path/filepath"
 	"strconv"
+	"strings"
+	"syscall"
 	"time"
 
 	"github.com/zenta-dev/zever/core/document"
@@ -18,6 +20,10 @@ const (
 	jobName   = "doc"
 	maxRuns   = 5
 	maxStderr = 4096
+	// ioWaitDelay bounds how long Wait lingers for child I/O pipes after the
+	// process (or its whole group, via Cancel) is gone, so a pipe-holding
+	// grandchild cannot stall Render after a kill.
+	ioWaitDelay = 5 * time.Second
 )
 
 var _ document.Document = (*driver)(nil)
@@ -138,12 +144,19 @@ func (d *driver) compile(ctx context.Context, dir string, source []byte) ([]byte
 	// of what the host's texmf.cnf otherwise allows: source is caller-supplied
 	// LaTeX (e.g. an invoice/report template with interpolated data), and this
 	// package's generated documents have no legitimate need for shell-escape-
-	// dependent packages (minted, epstopdf, svg, ...).
+	// dependent packages (minted, epstopdf, svg, ...). sandboxEnv scrubs the
+	// child environment (no parent secrets, HOME redirected into the render
+	// dir) and pins kpathsea to paranoid openout_any=p (blocks \openout writes
+	// outside the render tree) and openin_any=p (blocks \input outside the
+	// render tree on TeX Live releases that still honor it: as of TeX Live
+	// 2026, openin_any is a documented no-op upstream, see texmf.cnf).
 	argv := []string{"-interaction=nonstopmode", "-halt-on-error", "-no-shell-escape", "-jobname=" + jobName}
 	for i := 0; i < d.runs; i++ {
 		//nolint:gosec // binary from validated config resolved at Open; no shell; fixed argv.
 		cmd := exec.CommandContext(ctx, d.command, argv...)
 		cmd.Dir = dir
+		cmd.Env = sandboxEnv(dir)
+		withGroupKill(cmd)
 		cmd.Stdin = bytes.NewReader(source)
 		var stderr bytes.Buffer
 		cmd.Stderr = &stderr
@@ -159,6 +172,39 @@ func (d *driver) compile(ctx context.Context, dir string, source []byte) ([]byte
 	}
 
 	return pdf, nil
+}
+
+// sandboxEnv builds the minimal environment for a child process: PATH (so
+// TeX can run its helper binaries), HOME redirected to the render directory
+// (so ~-relative paths resolve inside the sandbox), and any operator-set
+// TEXMF* variables (system font/package trees). openin_any=p requests
+// paranoid \input handling (a no-op on TeX Live >= 2026, which still protects
+// older releases), and openout_any=p restricts \openout writes to the render
+// tree. Every other inherited variable (credentials, proxy settings,
+// XAUTHORITY, ...) is dropped.
+func sandboxEnv(dir string) []string {
+	env := []string{"HOME=" + dir, "openin_any=p", "openout_any=p"}
+	if path := os.Getenv("PATH"); path != "" {
+		env = append(env, "PATH="+path)
+	}
+	for _, kv := range os.Environ() {
+		if strings.HasPrefix(kv, "TEXMF") {
+			env = append(env, kv)
+		}
+	}
+	return env
+}
+
+// withGroupKill arranges for ctx cancellation to SIGKILL the child's whole
+// process group: TeX may spawn helpers (kpsewhich, mktexfmt), and killing
+// only the direct child would let a pipe-holding grandchild keep Render
+// blocked in Wait long after the deadline.
+func withGroupKill(cmd *exec.Cmd) {
+	cmd.SysProcAttr = &syscall.SysProcAttr{Setpgid: true}
+	cmd.Cancel = func() error {
+		return syscall.Kill(-cmd.Process.Pid, syscall.SIGKILL)
+	}
+	cmd.WaitDelay = ioWaitDelay
 }
 
 func (d *driver) cap(b []byte) ([]byte, error) {
@@ -195,6 +241,8 @@ func (d *driver) convert(ctx context.Context, dir string, pdf []byte, format doc
 
 	//nolint:gosec // binary resolved via LookPath; no shell; numeric-only variable argv.
 	cmd := exec.CommandContext(ctx, conv, argv...)
+	cmd.Env = sandboxEnv(dir)
+	withGroupKill(cmd)
 	if err := cmd.Run(); err != nil {
 		return nil, fmt.Errorf("latex: %w", errors.Join(ErrRenderFailed, err))
 	}
