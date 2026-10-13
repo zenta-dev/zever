@@ -51,6 +51,17 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   `closeAsync` goroutine is deliberately left running because the service
   ignored its context; the timeout is also reported via the container
   logger (when resolved) with the service name and cause.
+- `feat(config): redact by type tag, not only key name`: the redactor now
+  consults the new `config.Secret` string type and the `zever:"secret"`
+  struct tag via a reflection pass over typed options, so oddly named
+  secret fields (e.g. `access_key_id`, which the key-name denylist misses)
+  are redacted too. The denylist stays as defense-in-depth. String values
+  holding URL userinfo under any other key (e.g. a DSN under
+  `database_url`) are scrubbed to `scheme://[REDACTED]@host...` instead of
+  leaking credentials. YAML/JSON/env decode of `Secret` is unchanged and
+  strict decoding stays strict. Known secret option fields across
+  `core/*/options.go` (API keys, tokens, passwords, webhook secrets, HMAC/
+  signing keys, AWS key pairs, crypto keys) are tagged.
 
 ### Fixed
 

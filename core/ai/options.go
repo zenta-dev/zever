@@ -9,7 +9,7 @@ import (
 
 // Options configures the AI backend.
 type Options struct {
-	APIKey  string `json:"api_key" toml:"api_key" yaml:"api_key"`
+	APIKey  string `json:"api_key" toml:"api_key" yaml:"api_key" zever:"secret"`
 	Model   string `json:"model" toml:"model" yaml:"model"`
 	BaseURL string `json:"base_url" toml:"base_url" yaml:"base_url"`
 	// AllowInsecure permits http BaseURL and disables TLS verification for

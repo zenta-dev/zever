@@ -35,9 +35,9 @@ const PaddleProductionBaseURL = "https://api.paddle.com"
 // and Sandbox selects the provider's sandbox/test environment.
 type Common struct {
 	// SecretKey holds the provider secret key (Stripe). It is never logged.
-	SecretKey string `json:"secret_key" toml:"secret_key" yaml:"secret_key"`
+	SecretKey string `json:"secret_key" toml:"secret_key" yaml:"secret_key" zever:"secret"`
 	// APIKey holds the provider API key (Paddle). It is never logged.
-	APIKey string `json:"api_key" toml:"api_key" yaml:"api_key"`
+	APIKey string `json:"api_key" toml:"api_key" yaml:"api_key" zever:"secret"`
 	// Endpoint holds the optional custom provider endpoint URL.
 	Endpoint string `json:"endpoint" toml:"endpoint" yaml:"endpoint"`
 	// Sandbox selects the provider sandbox environment.

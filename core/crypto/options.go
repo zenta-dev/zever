@@ -19,9 +19,9 @@ type Options struct {
 	// optional: envelope encryption uses data keys from KMS, and Key (when
 	// present) only backs MAC computation. When any KMS field is set
 	// (KeyID, KeyIDs, Region, Endpoint, UseEnvelope), Key may be empty.
-	Key string `json:"key" toml:"key" yaml:"key"`
+	Key string `json:"key" toml:"key" yaml:"key" zever:"secret"`
 	// SignKey is the base64-encoded 64-byte signing key.
-	SignKey string `json:"sign_key" toml:"sign_key" yaml:"sign_key"`
+	SignKey string `json:"sign_key" toml:"sign_key" yaml:"sign_key" zever:"secret"`
 	// KeyID is the primary KMS key identifier used for envelope encryption.
 	KeyID string `json:"key_id" toml:"key_id" yaml:"key_id"`
 	// KeyIDs lists accepted KMS key identifiers for rotation. Encrypt uses

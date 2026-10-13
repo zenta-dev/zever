@@ -54,9 +54,9 @@ type Options struct {
 	// Bucket is the storage bucket name.
 	Bucket string `json:"bucket" toml:"bucket" yaml:"bucket"`
 	// AccessKeyID holds the storage access key. It is never logged.
-	AccessKeyID string `json:"access_key_id" toml:"access_key_id" yaml:"access_key_id"`
+	AccessKeyID string `json:"access_key_id" toml:"access_key_id" yaml:"access_key_id" zever:"secret"`
 	// SecretAccessKey holds the storage secret key. It is never logged.
-	SecretAccessKey string `json:"secret_access_key" toml:"secret_access_key" yaml:"secret_access_key"`
+	SecretAccessKey string `json:"secret_access_key" toml:"secret_access_key" yaml:"secret_access_key" zever:"secret"`
 	// FFmpeg is the ffmpeg binary path.
 	FFmpeg string `json:"ffmpeg" toml:"ffmpeg" yaml:"ffmpeg"`
 	// FFProbe is the ffprobe binary path.

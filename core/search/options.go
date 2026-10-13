@@ -11,7 +11,7 @@ type Options struct {
 	// Host holds the Meilisearch URL required by meilisearch.
 	Host string `json:"host" toml:"host" yaml:"host"`
 	// APIKey holds the backend API key, never logged.
-	APIKey string `json:"api_key" toml:"api_key" yaml:"api_key"`
+	APIKey string `json:"api_key" toml:"api_key" yaml:"api_key" zever:"secret"`
 	// DSN holds the postgres URL or sqlite path, required by postgres/sqlite.
 	DSN string `json:"dsn" toml:"dsn" yaml:"dsn"`
 	// DedicatedPool opts out of container-level pool sharing. Default false

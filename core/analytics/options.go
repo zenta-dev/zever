@@ -17,7 +17,7 @@ const (
 // Options configures analytics backend selection and limits.
 type Options struct {
 	// APIKey holds the backend write key. It is never logged.
-	APIKey string `json:"api_key" toml:"api_key" yaml:"api_key"`
+	APIKey string `json:"api_key" toml:"api_key" yaml:"api_key" zever:"secret"`
 	// Endpoint holds the optional custom backend endpoint URL.
 	Endpoint string `json:"endpoint" toml:"endpoint" yaml:"endpoint"`
 	// AnonymousID holds the fallback identity for anonymous tracking.

@@ -26,7 +26,7 @@ type RemoteOptions struct {
 	// Endpoint is the remote service base URL. Empty means unconfigured.
 	Endpoint string `json:"endpoint" toml:"endpoint" yaml:"endpoint"`
 	// APIKey is the remote service credential.
-	APIKey string `json:"api_key" toml:"api_key" yaml:"api_key"`
+	APIKey string `json:"api_key" toml:"api_key" yaml:"api_key" zever:"secret"`
 	// Timeout is the operation timeout. Zero means the default.
 	Timeout time.Duration `json:"timeout" toml:"timeout" yaml:"timeout"`
 	// MaxInFlight caps concurrent requests. Zero means adapter default (1000).
