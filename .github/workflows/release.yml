@@ -75,7 +75,7 @@ jobs:
           CGO_ENABLED=0 go build -trimpath -ldflags="-s -w" -o "dist/showcase-worker-$GOOS-$GOARCH$EXT" ./examples/showcase/cmd/worker
           CGO_ENABLED=0 go build -trimpath -ldflags="-s -w" -o "dist/zever-mcp-$GOOS-$GOARCH$EXT" ./tools/zever-mcp
           CGO_ENABLED=0 go build -trimpath -ldflags="-s -w" -o "dist/zever-lsp-$GOOS-$GOARCH$EXT" ./tools/zever-lsp
-      - uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
+      - uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
         with:
           name: dist-${{ matrix.goos }}-${{ matrix.goarch }}
           path: dist/*
@@ -105,7 +105,7 @@ jobs:
         run: make setup-cyclonedx-gomod
       - name: Generate SBOMs (shard ${{ matrix.shard }} of 8)
         run: make sbom SHARD_TOTAL=8 SHARD_INDEX=${{ matrix.shard }}
-      - uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
+      - uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
         with:
           name: sbom-${{ matrix.shard }}
           path: sbom/*.json
