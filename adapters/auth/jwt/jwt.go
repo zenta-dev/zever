@@ -4,6 +4,26 @@
 // registered claims (sub, iss, aud, exp, iat, jti). Custom keys colliding
 // with a registered claim name are rejected at Issue time.
 //
+// Key rotation: configure auth.JWTKey entries plus ActiveKID (empty
+// ActiveKID signs with Keys[0]). Issued tokens carry the signing key ID in
+// the "kid" header; verification selects the key by "kid" and falls back
+// to the legacy Secret for kid-less tokens. Keep retired keys listed until
+// every token signed with them has expired. Unknown kids fail closed.
+// Rotation is HMAC-only: asymmetric algorithms (EdDSA, RS256) are
+// deliberately unsupported, and the keyfunc rejects any token whose alg
+// header is not exactly "HS256" (plus jwt.WithValidMethods), blocking
+// none/RS256-confusion attacks.
+//
+// Time claims: exp is required and nbf, when present, is enforced; both
+// honor the configured leeway for clock skew (zero default means strict;
+// operators with skewed fleets typically set ~30s).
+//
+// Revocation: the default in-process memory store is per-process —
+// revocations are lost on restart and invisible to other instances.
+// Multi-instance deployments must inject a shared revocation.Store
+// (core/auth/revocation/redis, or a custom implementation) via
+// auth.JWTOptions.RevocationStore.
+//
 // Security notes:
 //   - HS256 only: the keyfunc rejects any token whose alg header is not
 //     exactly "HS256", and the parser is additionally constrained with
@@ -53,11 +73,20 @@ var registeredKeys = map[string]struct{}{
 var _ auth.Auth = (*adapter)(nil)
 
 type adapter struct {
-	secret   []byte
-	issuer   string
-	audience string
-	maxTTL   time.Duration
-	leeway   time.Duration
+	// legacy is the kid-less HMAC secret from opts.JWT.Secret, nil when
+	// rotation keys alone are configured. It verifies pre-rotation
+	// tokens; new tokens always carry a kid when keys exist.
+	legacy []byte
+	// keys maps kid to a private copy of that key's HMAC secret.
+	keys map[string][]byte
+	// activeKID and active select the signing key. activeKID is empty
+	// (and active is the legacy secret) when no Keys are configured.
+	activeKID string
+	active    []byte
+	issuer    string
+	audience  string
+	maxTTL    time.Duration
+	leeway    time.Duration
 
 	// parserOpts and revokeOpts are computed once at construction: the
 	// adapter's validation configuration is immutable after New, and
@@ -73,31 +102,56 @@ type adapter struct {
 // New builds an HS256 JWT Auth from opts.
 //
 // opts is validated with auth.Options.Validate first (wrapped as "jwt: %w").
-// The JWT secret is required and must be at least auth.MinSecretLen bytes,
-// else a *auth.InvalidOptionsError is returned.
+// At least one of the legacy JWT secret or a Keys entry is required: an
+// empty secret with no keys (or a short secret) returns a
+// *auth.InvalidOptionsError. With Keys configured, ActiveKID selects the
+// signing key and defaults to Keys[0] when empty.
 func New(opts auth.Options) (auth.Auth, error) {
 	if err := opts.Validate(); err != nil {
 		return nil, fmt.Errorf("jwt: %w", err)
 	}
 	secret := opts.JWT.Secret
-	if secret == "" {
+	if secret == "" && len(opts.JWT.Keys) == 0 {
 		return nil, auth.InvalidOptionsError{Reason: "jwt secret is required"}
 	}
-	if len([]byte(secret)) < auth.MinSecretLen {
+	if secret != "" && len([]byte(secret)) < auth.MinSecretLen {
 		return nil, auth.InvalidOptionsError{
 			Reason: fmt.Sprintf("jwt secret must be at least %d bytes", auth.MinSecretLen),
 		}
 	}
 
+	keys := make(map[string][]byte, len(opts.JWT.Keys))
+	for _, k := range opts.JWT.Keys {
+		keys[k.KID] = append([]byte(nil), []byte(k.Secret)...)
+	}
+	var legacy, active []byte
+	var activeKID string
+	if secret != "" {
+		legacy = append([]byte(nil), []byte(secret)...)
+		active = legacy
+	}
+	if len(keys) > 0 {
+		activeKID = opts.JWT.ActiveKID
+		if activeKID == "" {
+			activeKID = opts.JWT.Keys[0].KID
+		}
+		active = keys[activeKID]
+	}
+
 	store := opts.JWT.RevocationStore
 	if store == nil {
 		// memory.New with zero Options performs no I/O and cannot fail:
-		// the store allocates no external resources.
+		// the store allocates no external resources. It is per-process:
+		// multi-instance deployments must inject a shared
+		// revocation.Store (see the package doc).
 		store, _ = revocationmemory.New(revocationmemory.Options{})
 	}
 
 	a := &adapter{
-		secret:     append([]byte(nil), []byte(secret)...),
+		legacy:     legacy,
+		keys:       keys,
+		activeKID:  activeKID,
+		active:     active,
 		issuer:     opts.JWT.Issuer,
 		audience:   opts.JWT.Audience,
 		maxTTL:     opts.JWT.MaxTTL,
@@ -112,12 +166,25 @@ func New(opts auth.Options) (auth.Auth, error) {
 	return a, nil
 }
 
-// keyfunc enforces HS256 with an exact, case-sensitive alg comparison.
+// keyfunc enforces HS256 with an exact, case-sensitive alg comparison,
+// then selects the HMAC secret by the token's kid header: known kids use
+// their rotation key, kid-less tokens fall back to the legacy secret, and
+// unknown kids (or kid-less tokens with no legacy secret) fail closed.
 func (a *adapter) keyfunc(t *jwtv5.Token) (any, error) {
 	if t.Method.Alg() != "HS256" {
 		return nil, fmt.Errorf("jwt: unexpected signing method %q", t.Method.Alg())
 	}
-	return a.secret, nil
+	if kid, _ := t.Header["kid"].(string); kid != "" {
+		secret, ok := a.keys[kid]
+		if !ok {
+			return nil, fmt.Errorf("jwt: unknown key id %q: %w", kid, auth.ErrInvalidToken)
+		}
+		return secret, nil
+	}
+	if a.legacy == nil {
+		return nil, fmt.Errorf("jwt: token carries no key id: %w", auth.ErrInvalidToken)
+	}
+	return a.legacy, nil
 }
 
 func (a *adapter) parserOptions() []jwtv5.ParserOption {
@@ -188,8 +255,14 @@ func (a *adapter) Issue(_ context.Context, subject string, custom map[string]any
 
 	// HMAC-SHA256 over a validated []byte secret. Custom claims must be
 	// JSON-serializable; unserializable values fail here instead of
-	// minting an empty token.
-	raw, err := jwtv5.NewWithClaims(jwtv5.SigningMethodHS256, claims).SignedString(a.secret)
+	// minting an empty token. The token carries the active key's kid
+	// header when rotation keys are configured; legacy (single-secret)
+	// tokens stay kid-less.
+	token := jwtv5.NewWithClaims(jwtv5.SigningMethodHS256, claims)
+	if a.activeKID != "" {
+		token.Header["kid"] = a.activeKID
+	}
+	raw, err := token.SignedString(a.active)
 	if err != nil {
 		return auth.Token{}, fmt.Errorf("jwt: issue: signing failed: %w", errors.Join(auth.ErrInvalidToken, err))
 	}
@@ -310,11 +383,15 @@ func (a *adapter) Revoke(ctx context.Context, token string) error {
 	return nil
 }
 
-// Close releases the revocation store's resources and zeroes the HMAC
-// secret copy so key material does not linger after shutdown. Idempotent:
-// signing and verification fail closed once closed.
+// Close releases the revocation store's resources and zeroes every HMAC
+// secret copy (legacy plus rotation keys) so key material does not linger
+// after shutdown. Idempotent: signing and verification fail closed once
+// closed.
 func (a *adapter) Close() error {
 	a.closed.Store(true)
-	clear(a.secret)
+	clear(a.legacy)
+	for _, secret := range a.keys {
+		clear(secret)
+	}
 	return a.revocation.Close()
 }

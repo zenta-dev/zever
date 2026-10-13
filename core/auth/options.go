@@ -17,10 +17,31 @@ const (
 	MinSecretLen = 32
 )
 
+// JWTKey is one rotatable HMAC signing key in JWTOptions.Keys.
+type JWTKey struct {
+	// KID is the key ID sent as the token "kid" header. Required,
+	// unique within Keys.
+	KID string `json:"kid" toml:"kid" yaml:"kid"`
+	// Secret is the HMAC signing secret. Must be at least MinSecretLen
+	// bytes (adapter-validated).
+	Secret string `json:"secret" toml:"secret" yaml:"secret" zever:"secret"`
+}
+
 // JWTOptions configures the JWT adapter.
 type JWTOptions struct {
 	// Secret is the HMAC signing secret. Must be at least MinSecretLen bytes (adapter-validated).
 	Secret string `json:"secret" toml:"secret" yaml:"secret" zever:"secret"`
+	// Keys holds rotatable HMAC signing keys by key ID. Tokens are
+	// signed with the ActiveKID key (or Keys[0] when ActiveKID is empty)
+	// and carry its ID in the "kid" header; verification selects the key
+	// by "kid" and falls back to Secret for kid-less (legacy) tokens.
+	// Old keys must stay listed until every token signed with them has
+	// expired, otherwise those tokens fail closed as invalid.
+	Keys []JWTKey `json:"keys" toml:"keys" yaml:"keys"`
+	// ActiveKID selects the signing key within Keys. Empty defaults to
+	// Keys[0]. Must match a Keys entry when set; setting it with no Keys
+	// fails Validate.
+	ActiveKID string `json:"active_kid" toml:"active_kid" yaml:"active_kid"`
 	// Issuer is the token issuer. Required (adapter-validated).
 	Issuer string `json:"issuer" toml:"issuer" yaml:"issuer"`
 	// Audience is the intended token audience.
@@ -32,8 +53,41 @@ type JWTOptions struct {
 	// accept tokens up to Leeway past expiry. Negative fails Validate.
 	Leeway time.Duration `json:"leeway" toml:"leeway" yaml:"leeway"`
 	// RevocationStore tracks revoked token jtis. Nil means the adapter
-	// builds an in-process memory store with its own defaults.
+	// builds an in-process memory store with its own defaults. The memory
+	// store is per-process: revocations are lost on restart and invisible
+	// to other instances, so multi-instance deployments must inject a
+	// shared store (core/auth/revocation/redis, or a custom revocation.Store).
 	RevocationStore revocation.Store `json:"-" toml:"-" yaml:"-"`
+}
+
+// validateJWTKeys checks the rotatable Keys/ActiveKID pair for structural
+// consistency. Secret length and presence are adapter-validated (the legacy
+// Secret-only path must keep working), but key entries are new surface and
+// fail fast here: empty kids, duplicate kids, and an ActiveKID with no
+// matching entry are all rejected.
+func validateJWTKeys(j JWTOptions) error {
+	if j.ActiveKID != "" && len(j.Keys) == 0 {
+		return InvalidOptionsError{Reason: "jwt_active_kid set with no jwt_keys"}
+	}
+	seen := make(map[string]struct{}, len(j.Keys))
+	for _, k := range j.Keys {
+		if k.KID == "" {
+			return InvalidOptionsError{Reason: "jwt_keys entry must have a kid"}
+		}
+		if _, dup := seen[k.KID]; dup {
+			return InvalidOptionsError{Reason: "jwt_keys has duplicate kid"}
+		}
+		seen[k.KID] = struct{}{}
+		if len([]byte(k.Secret)) < MinSecretLen {
+			return InvalidOptionsError{Reason: "jwt_keys entry secret must be long enough"}
+		}
+	}
+	if j.ActiveKID != "" {
+		if _, ok := seen[j.ActiveKID]; !ok {
+			return InvalidOptionsError{Reason: "jwt_active_kid matches no jwt_keys entry"}
+		}
+	}
+	return nil
 }
 
 // SessionOptions configures the session-backed adapter.
@@ -76,6 +130,9 @@ func (o Options) Validate() error {
 	}
 	if o.JWT.Leeway < 0 {
 		return InvalidOptionsError{Reason: "jwt_leeway must be >= 0"}
+	}
+	if err := validateJWTKeys(o.JWT); err != nil {
+		return err
 	}
 	if o.OIDC.Timeout < 0 {
 		return InvalidOptionsError{Reason: "oidc_timeout must be >= 0"}

@@ -211,7 +211,9 @@ Token and identity verification. Options nest under the adapter name (`jwt`, `se
 
 | Key | Type | Default | Description |
 |---|---|---|---|
-| `jwt.secret` | string | `""` | HMAC signing secret |
+| `jwt.secret` | string | `""` | HMAC signing secret; also verifies kid-less (legacy) tokens |
+| `jwt.keys` | array | `[]` | Rotatable `{kid, secret}` keys; signed tokens carry the `kid` header |
+| `jwt.active_kid` | string | `""` | Signing key ID within `keys`; empty defaults to the first entry |
 | `jwt.issuer` | string | `""` | Token issuer |
 | `jwt.audience` | string | `""` | Intended token audience |
 | `jwt.max_ttl` | duration | `0` | Caps token lifetimes |

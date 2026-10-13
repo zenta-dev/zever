@@ -95,9 +95,16 @@ func TestClose_ThenIssueFails(t *testing.T) {
 	if !ok {
 		t.Fatalf("New() type = %T, want *adapter", a)
 	}
-	for i, b := range inner.secret {
+	for i, b := range inner.legacy {
 		if b != 0 {
-			t.Fatalf("secret[%d] = %#02x after Close, want zeroed", i, b)
+			t.Fatalf("legacy[%d] = %#02x after Close, want zeroed", i, b)
+		}
+	}
+	for kid, secret := range inner.keys {
+		for i, b := range secret {
+			if b != 0 {
+				t.Fatalf("keys[%q][%d] = %#02x after Close, want zeroed", kid, i, b)
+			}
 		}
 	}
 
