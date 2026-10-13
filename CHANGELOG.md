@@ -7,6 +7,14 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Fixed
+
+- `shared/registry`: `New` no longer returns nil errors for unknown,
+  duplicate, or nil factories when hooks are nil: a nil `errNil` falls back to
+  the exported `ErrNilFactory` sentinel, and nil `duplicate`/`unknown` hooks
+  fall back to errors wrapping the exported `ErrDuplicate`/`ErrUnknown`
+  sentinels. All three sentinels are now exported for `errors.Is` checks.
+
 ### Security
 
 - Bump the Go toolchain pin from `go 1.27.0` to `go 1.27.2` in `go.work`
