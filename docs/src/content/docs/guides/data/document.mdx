@@ -75,6 +75,7 @@ The byte count varies by adapter and source. Check the error before writing to d
 
 - Sources are capped at 10 MiB and output at 64 MiB by default. Raise them deliberately and with a measured reason.
 - The `latex` adapter never interpolates a caller-supplied command, so document content cannot reach a shell. Lock down `tmp_dir` too.
+- LaTeX rendering is hardened by default: every render runs in a fresh temp dir as `cwd`, with `-no-shell-escape` and a minimal environment (only `PATH`, `HOME`, and `TEXMF*` are passed; all other parent variables, including credentials, are dropped). `openout_any=p` blocks `\openout` writes outside the render tree and `openin_any=p` restricts `\input` on TeX Live releases that still honor it. Note that since TeX Live 2026, `openin_any` is a documented no-op upstream (kpathsea `kpse_in_name_ok` always returns true), so `\input{/etc/passwd}` cannot be blocked by the engine on current TeX Live — treat LaTeX sources as trusted input and apply the same scrutiny you would give HTML or script content. On timeout the whole process group is killed, so a hung render cannot leak processes or pipes.
 - Bound renders with `timeout` and clean up temp artifacts on error paths.
 - `api_key` never appears in logs, and `endpoint` is validated before the first request.
 

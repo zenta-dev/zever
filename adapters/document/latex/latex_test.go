@@ -4,9 +4,12 @@ import (
 	"bytes"
 	"context"
 	"errors"
+	"fmt"
 	"os"
 	"os/exec"
 	"path/filepath"
+	"regexp"
+	"strconv"
 	"strings"
 	"sync"
 	"testing"
@@ -17,14 +20,40 @@ import (
 
 const (
 	fakeTexOK      = "#!/bin/sh\nprintf '%%PDF-1.4 fake\\n' > doc.pdf\nexit 0\n"
-	fakeTexCount   = "#!/bin/sh\nprintf '%%PDF-1.4 fake\\n' > doc.pdf\necho x >> \"$RUNSLOG\"\nexit 0\n"
 	fakeTexFail    = "#!/bin/sh\necho 'font error: missing package' >&2\nexit 1\n"
 	fakeTexSilent  = "#!/bin/sh\nexit 0\n"
+	fakeTexHang    = "#!/bin/sh\nsleep 30\n"
 	fakePPMOK      = "#!/bin/sh\nroot=\"\"\nfor a in \"$@\"; do root=\"$a\"; done\nprintf '\\211PNG\\r\\n\\032\\n fake' > \"$root.png\"\nprintf '\\377\\330\\377 fake' > \"$root.jpg\"\nexit 0\n"
 	fakePPMFail    = "#!/bin/sh\necho 'converter boom' >&2\nexit 1\n"
 	fakePPMNowrite = "#!/bin/sh\nexit 0\n"
-	fakeTexArgs    = "#!/bin/sh\nprintf '%%PDF-1.4 fake\\n' > doc.pdf\necho \"$@\" >> \"$ARGSLOG\"\nexit 0\n"
+	fakePPMBig     = "#!/bin/sh\nroot=\"\"\nfor a in \"$@\"; do root=\"$a\"; done\nhead -c 100000 /dev/zero > \"$root.png\"\nexit 0\n"
 )
+
+// fakeTexCount returns a stub compiler that records one line per pass to log
+// (baked into the script: the child no longer inherits parent env vars).
+func fakeTexCount(log string) string {
+	return fmt.Sprintf("#!/bin/sh\nprintf '%%PDF-1.4 fake\\n' > doc.pdf\necho x >> %q\nexit 0\n", log)
+}
+
+// fakeTexArgs returns a stub compiler that records argv to log (baked into
+// the script: the child no longer inherits parent env vars).
+func fakeTexArgs(log string) string {
+	return fmt.Sprintf("#!/bin/sh\nprintf '%%PDF-1.4 fake\\n' > doc.pdf\necho \"$@\" >> %q\nexit 0\n", log)
+}
+
+// fakeTexDump returns a stub compiler that records cwd, argv, and the full
+// child environment to log so tests can assert the sandbox allowlist.
+func fakeTexDump(log string) string {
+	return fmt.Sprintf(`#!/bin/sh
+printf '%%PDF-1.4 fake\n' > doc.pdf
+{
+  echo "cwd=$(pwd)"
+  echo "args=$*"
+  env | sort
+} > %q
+exit 0
+`, log)
+}
 
 func stubBin(tb testing.TB, name, body string) {
 	tb.Helper()
@@ -156,9 +185,8 @@ func TestRenderPDF(t *testing.T) {
 }
 
 func TestRunsHonored(t *testing.T) {
-	stubBin(t, "pdflatex-count", fakeTexCount)
 	runsLog := filepath.Join(t.TempDir(), "runs.log")
-	t.Setenv("RUNSLOG", runsLog)
+	stubBin(t, "pdflatex-count", fakeTexCount(runsLog))
 
 	count := func() int {
 		b, err := os.ReadFile(runsLog)
@@ -186,9 +214,8 @@ func TestRunsHonored(t *testing.T) {
 }
 
 func TestCompileArgsIncludeNoShellEscape(t *testing.T) {
-	stubBin(t, "pdflatex-args", fakeTexArgs)
 	argsLog := filepath.Join(t.TempDir(), "args.log")
-	t.Setenv("ARGSLOG", argsLog)
+	stubBin(t, "pdflatex-args", fakeTexArgs(argsLog))
 
 	d := mustOpen(t, document.Options{LatexCommand: "pdflatex-args"})
 	if _, err := d.Render(t.Context(), []byte("src"), document.FormatPDF); err != nil {
@@ -201,6 +228,147 @@ func TestCompileArgsIncludeNoShellEscape(t *testing.T) {
 	}
 	if !strings.Contains(string(b), "-no-shell-escape") {
 		t.Fatalf("compile argv = %q, want it to contain -no-shell-escape", string(b))
+	}
+}
+
+func TestCompileSandboxEnv(t *testing.T) {
+	dumpLog := filepath.Join(t.TempDir(), "sandbox.log")
+	stubBin(t, "pdflatex-dump", fakeTexDump(dumpLog))
+
+	t.Setenv("HOME", filepath.Join(t.TempDir(), "parent-home"))
+	t.Setenv("ZEVER_LATEX_TEST_SECRET", "topsecret-value-xyz")
+	t.Setenv("ZEVER_LATEX_TEST_LEAK", "leaked-value-xyz")
+
+	d := mustOpen(t, document.Options{LatexCommand: "pdflatex-dump"})
+	if _, err := d.Render(t.Context(), []byte("src"), document.FormatPDF); err != nil {
+		t.Fatalf("Render() err = %v", err)
+	}
+
+	b, err := os.ReadFile(dumpLog)
+	if err != nil {
+		t.Fatal(err)
+	}
+	dump := string(b)
+
+	for _, tc := range []struct{ name, want string }{
+		{"-no-shell-escape flag", "-no-shell-escape"},
+		{"paranoid openin_any", "openin_any=p"},
+		{"paranoid openout_any", "openout_any=p"},
+		{"PATH allowlist", "PATH="},
+	} {
+		if !strings.Contains(dump, tc.want) {
+			t.Errorf("child sandbox missing %s; dump:\n%s", tc.name, dump)
+		}
+	}
+
+	for _, leak := range []string{"ZEVER_LATEX_TEST_SECRET", "topsecret-value-xyz", "ZEVER_LATEX_TEST_LEAK", "leaked-value-xyz", "parent-home"} {
+		if strings.Contains(dump, leak) {
+			t.Errorf("child sandbox leaks %q; dump:\n%s", leak, dump)
+		}
+	}
+
+	cwd := ""
+	home := ""
+	for _, line := range strings.Split(dump, "\n") {
+		if strings.HasPrefix(line, "cwd=") {
+			cwd = strings.TrimPrefix(line, "cwd=")
+		}
+		if strings.HasPrefix(line, "HOME=") {
+			home = strings.TrimPrefix(line, "HOME=")
+		}
+	}
+	if cwd == "" {
+		t.Fatalf("dump lacks cwd; dump:\n%s", dump)
+	}
+	if !strings.HasPrefix(cwd, filepath.Join(os.TempDir(), "latex-")) {
+		t.Errorf("cwd = %q, want render temp dir %q", cwd, filepath.Join(os.TempDir(), "latex-"))
+	}
+	if home != cwd {
+		t.Errorf("HOME = %q, want render dir %q", home, cwd)
+	}
+}
+
+func TestRenderTimeout(t *testing.T) {
+	stubBin(t, "pdflatex-hang", fakeTexHang)
+
+	d := mustOpen(t, document.Options{LatexCommand: "pdflatex-hang", Timeout: 200 * time.Millisecond})
+	_, err := d.Render(t.Context(), []byte("src"), document.FormatPDF)
+	if !errors.Is(err, ErrRenderFailed) {
+		t.Fatalf("Render() err = %v, want ErrRenderFailed", err)
+	}
+	if !strings.Contains(err.Error(), "signal: killed") {
+		t.Errorf("Render() err = %v, want signal: killed", err)
+	}
+}
+
+// texLiveVersion extracts the TeX Live year from `pdflatex --version`, or
+// skips the test when the binary is absent or unrecognizable.
+func texLiveVersion(tb testing.TB) int {
+	tb.Helper()
+
+	//nolint:gosec // fixed argv; read-only --version probe for the feature-skip check.
+	out, err := exec.CommandContext(tb.Context(), document.DefaultLatexCommand, "--version").Output()
+	if err != nil {
+		tb.Skipf("%s --version: %v", document.DefaultLatexCommand, err)
+	}
+	m := regexp.MustCompile(`TeX Live (\d{4})`).FindSubmatch(out)
+	if m == nil {
+		tb.Skipf("unrecognized %s --version output: %q", document.DefaultLatexCommand, out)
+	}
+	year, err := strconv.Atoi(string(m[1]))
+	if err != nil {
+		tb.Fatalf("parse TeX Live year from %q: %v", out, err)
+	}
+	return year
+}
+
+func TestE2EParanoidInput(t *testing.T) {
+	t.Parallel()
+	if _, err := exec.LookPath(document.DefaultLatexCommand); err != nil {
+		t.Skip("pdflatex not installed")
+	}
+	// TeX Live >= 2026 declares openin_any a no-op (kpse_in_name_ok always
+	// returns true), so absolute \input cannot be restricted there; the
+	// openin_any=p env still protects older TeX Live releases.
+	if year := texLiveVersion(t); year >= 2026 {
+		t.Skipf("pdflatex is TeX Live %d, where openin_any is a no-op upstream", year)
+	}
+
+	source := []byte(`\documentclass{article}\begin{document}\input{/etc/hostname}\end{document}`)
+	d := mustOpen(t, document.Options{Timeout: 2 * time.Minute})
+	_, err := d.Render(t.Context(), source, document.FormatPDF)
+	if !errors.Is(err, ErrRenderFailed) {
+		t.Fatalf("Render() err = %v, want ErrRenderFailed for blocked absolute input", err)
+	}
+}
+
+func TestE2EWriteRestricted(t *testing.T) {
+	t.Parallel()
+	if _, err := exec.LookPath(document.DefaultLatexCommand); err != nil {
+		t.Skip("pdflatex not installed")
+	}
+
+	leak := filepath.Join(t.TempDir(), "leak.tex")
+	source := []byte("\\documentclass{article}\\begin{document}\\newwrite\\w\\immediate\\openout\\w=" + leak + "\\immediate\\write\\w{hi}\\immediate\\closeout\\w\nx\n\\end{document}")
+	d := mustOpen(t, document.Options{Timeout: 2 * time.Minute})
+	_, err := d.Render(t.Context(), source, document.FormatPDF)
+	if !errors.Is(err, ErrRenderFailed) {
+		t.Fatalf("Render() err = %v, want ErrRenderFailed for blocked openout", err)
+	}
+	if _, statErr := os.Stat(leak); !os.IsNotExist(statErr) {
+		t.Errorf("openout wrote %s despite openout_any=p", leak)
+	}
+}
+
+func TestOversizedPNGOutput(t *testing.T) {
+	stubBin(t, "pdflatex", fakeTexOK)
+	stubBin(t, "pdftoppm-big", fakePPMBig)
+
+	d := mustOpen(t, document.Options{LatexPDFToPPM: "pdftoppm-big", MaxOutputBytes: 100})
+	_, err := d.Render(t.Context(), []byte("src"), document.FormatPNG)
+	var sle document.SizeLimitError
+	if !errors.As(err, &sle) {
+		t.Fatalf("Render() err = %v, want SizeLimitError", err)
 	}
 }
 

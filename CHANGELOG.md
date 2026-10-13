@@ -17,6 +17,14 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Fixed
 
+- `fix(document/latex): restrict file access and scrub environment`: LaTeX
+  renders run in a per-render temp dir as `cwd` with `-no-shell-escape` and
+  a minimal env allowlist (`PATH`, `HOME`, `TEXMF*` only — no inherited
+  parent secrets), pin `openout_any=p` (blocks `\openout` outside the render
+  tree) and `openin_any=p` (restricts `\input` on TeX Live releases that
+  honor it; a documented no-op upstream since TeX Live 2026), kill the
+  whole process group on timeout so grandchildren cannot hold pipes open,
+  and enforce the output size cap on converter output as well.
 - `gogen`: generated `writeGogenJSON` now checks the `json.Marshal` error
   (previously discarded with `_ =`) and answers a bare 500 via the request
   logger instead of writing a response body after the header; generated
