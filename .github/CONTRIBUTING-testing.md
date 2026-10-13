@@ -3,7 +3,7 @@
 Rules that keep tests deterministic and flake-free. Flaky tests erode trust
 in the suite and in CI; these rules prevent the classes of flakes we have
 already fixed so they do not come back. For the error-path and boundary
-checklist used when auditing a module, see [`edge-cases.md`](edge-cases.md).
+checklist used when auditing a module, see [`edge-cases.md`](../docs/edge-cases.md).
 
 ## Determinism
 

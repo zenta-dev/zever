@@ -275,6 +275,7 @@ export default defineConfig({
             { label: "Deployment", link: "guides/operate/deployment" },
             { label: "Upgrade", link: "guides/operate/upgrade" },
             { label: "Migration", link: "guides/operate/migration" },
+            { label: "Test your app", link: "guides/operate/testing-your-app" },
           ],
         },
         {

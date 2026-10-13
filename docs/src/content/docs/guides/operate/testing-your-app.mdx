@@ -1,0 +1,231 @@
+---
+title: Test your app
+description: Test a Zever app with in-memory adapters, httptest routes, per-test sqlite files, conformance kits, and leak checks.
+---
+
+import { Aside, LinkCard, CardGrid } from '@astrojs/starlight/components';
+
+Zever apps test without Docker, network, or shared state. `config.Default()` picks zero-infra adapters (memory, sqlite, local, log, noop), the container resolves them lazily, and every test below runs offline and deterministic. Patterns here mirror the runnable samples in `docs/examples/testing_test.go` and the todo example's `internal/api/api_test.go`.
+
+## Open a container per test
+
+Register the adapters under test, open a container from `config.Default()`, and close it in `t.Cleanup`. Closing only shuts down services the test actually resolved, in dependency order.
+
+```go
+import (
+	"testing"
+
+	cachememory "github.com/zenta-dev/zever/adapters/cache/memory"
+	"github.com/zenta-dev/zever/config"
+	"github.com/zenta-dev/zever/container"
+)
+
+func TestCacheRoundTrip(t *testing.T) {
+	cachememory.Register()
+
+	c := container.New(config.Default())
+	t.Cleanup(func() { _ = c.Close(t.Context()) })
+
+	ch, err := c.Cache()
+	if err != nil {
+		t.Fatalf("Cache: %v", err)
+	}
+	ctx := t.Context()
+	if err := ch.Set(ctx, "k", []byte("v"), 0); err != nil {
+		t.Fatalf("Set: %v", err)
+	}
+	got, err := ch.Get(ctx, "k")
+	if err != nil {
+		t.Fatalf("Get: %v", err)
+	}
+	if string(got) != "v" {
+		t.Fatalf("Get = %q, want %q", got, "v")
+	}
+}
+```
+
+<Aside type="caution">
+`config.Default()` embeds a deterministic dev crypto key for tests. Never ship defaults to production; see the [configuration guide](./configuration/).
+</Aside>
+
+## Hit routes with httptest
+
+Build the router the same way production does, register routes, and serve requests in-process. No port, no network.
+
+```go
+import (
+	"fmt"
+	"io"
+	"net/http"
+	"net/http/httptest"
+	"testing"
+
+	slogadapter "github.com/zenta-dev/zever/adapters/log/slog"
+	routerstdhttp "github.com/zenta-dev/zever/adapters/router/stdhttp"
+	"github.com/zenta-dev/zever/core/log"
+	"github.com/zenta-dev/zever/core/router"
+)
+
+func TestGetUser(t *testing.T) {
+	logger := slogadapter.NewWithWriter(log.Options{}, io.Discard)
+	r, err := routerstdhttp.New(router.Options{AppName: "test", Logger: logger})
+	if err != nil {
+		t.Fatalf("New: %v", err)
+	}
+
+	r.Handle("GET", "/users/{id}", func(w http.ResponseWriter, req *http.Request) {
+		fmt.Fprintf(w, "user %s", router.Param(req, "id"))
+	})
+
+	rec := httptest.NewRecorder()
+	r.ServeHTTP(rec, httptest.NewRequest(http.MethodGet, "/users/42", nil))
+	if rec.Body.String() != "user 42" {
+		t.Fatalf("body = %q, want %q", rec.Body.String(), "user 42")
+	}
+}
+```
+
+Send authenticated requests with `httptest.NewRequestWithContext(t.Context(), ...)` and set the `Authorization` header, exactly like the todo example's `do` helper does.
+
+## Give each test its own sqlite file
+
+`:memory:` sqlite is per-connection unless the DSN opts into shared cache, so neither behavior is safe to rely on across tests. Point `DB.Options.Path` at a file under `t.TempDir()` so parallel runs, `-shuffle=on`, and `-count=N` stay isolated.
+
+```go
+import (
+	"path/filepath"
+	"testing"
+
+	dbsqlite "github.com/zenta-dev/zever/adapters/db/sqlite"
+	"github.com/zenta-dev/zever/core/db"
+)
+
+func TestDBRoundTrip(t *testing.T) {
+	conn, err := dbsqlite.New(db.Options{Path: filepath.Join(t.TempDir(), "test.db")})
+	if err != nil {
+		t.Fatalf("New: %v", err)
+	}
+	t.Cleanup(func() { _ = conn.Close(t.Context()) })
+
+	ctx := t.Context()
+	if _, err := conn.Exec(ctx, "CREATE TABLE users (id INTEGER PRIMARY KEY, name TEXT)"); err != nil {
+		t.Fatalf("create: %v", err)
+	}
+	if _, err := conn.Exec(ctx, "INSERT INTO users (name) VALUES (?)", "ada"); err != nil {
+		t.Fatalf("insert: %v", err)
+	}
+	rows, err := conn.Query(ctx, "SELECT name FROM users")
+	if err != nil {
+		t.Fatalf("query: %v", err)
+	}
+	defer func() { _ = rows.Close() }()
+	for rows.Next() {
+		var name string
+		if err := rows.Scan(&name); err != nil {
+			t.Fatalf("scan: %v", err)
+		}
+		if name != "ada" {
+			t.Fatalf("name = %q, want %q", name, "ada")
+		}
+	}
+}
+```
+
+The sqlite adapter rewrites `?` placeholders per dialect, so the same test body runs against postgres in the adapter's own cover tests.
+
+## Run the conformance kits for custom adapters
+
+Writing your own adapter? Don't hand-roll contract tests. Each battery ships a conformance kit (`dbtest`, `outboxtest`, `cachetest`, `authtest`, ...) that proves backend parity: round-trips, error wrapping, transactions, retry, DLQ, dedupe.
+
+```go
+import (
+	"context"
+	"testing"
+
+	"github.com/zenta-dev/zever/adapters/outbox/memory"
+	coredb "github.com/zenta-dev/zever/core/db"
+	"github.com/zenta-dev/zever/core/outbox/outboxtest"
+)
+
+func TestConformance(t *testing.T) {
+	t.Parallel()
+
+	outboxtest.Conformance(t, func(_ *testing.T, pub *outboxtest.Recorder) outboxtest.Harness {
+		s, err := memory.New(memory.Options{Publisher: pub})
+		if err != nil {
+			t.Fatalf("New() error = %v", err)
+		}
+		return outboxtest.Harness{
+			Store: s,
+			InTx: func(ctx context.Context, fn func(context.Context, coredb.Tx) error) error {
+				return fn(ctx, nil)
+			},
+		}
+	})
+}
+```
+
+The database kit has the same shape:
+
+```go
+import (
+	"path/filepath"
+	"testing"
+
+	dbsqlite "github.com/zenta-dev/zever/adapters/db/sqlite"
+	"github.com/zenta-dev/zever/core/db"
+	"github.com/zenta-dev/zever/core/db/dbtest"
+)
+
+func TestDBConformance(t *testing.T) {
+	t.Parallel()
+
+	dbtest.Conformance(t, func(t *testing.T) db.DB {
+		conn, err := dbsqlite.New(db.Options{Path: filepath.Join(t.TempDir(), "kit.db")})
+		if err != nil {
+			t.Fatalf("New: %v", err)
+		}
+		t.Cleanup(func() { _ = conn.Close(t.Context()) })
+		return conn
+	})
+}
+```
+
+<Aside type="tip">
+Never register a fixed adapter name in tests. Registries are process-global with no unregister, so a second `-count=N` iteration collides with the first. Open via the constructor directly (as above), or mint a unique name per invocation.
+</Aside>
+
+## Keep time deterministic
+
+No `time.Sleep` for synchronization, no timing assertions, no unseeded randomness, no network. Instead:
+
+- Wait on channels, `sync` primitives, or a `waitFor` polling helper that asserts a condition with a deadline.
+- Prefer `testing/synctest` bubbles for timeout and deadline assertions: the bubble's fake clock makes "wait, then assert" instant and deterministic.
+- Inject clocks into code under test (a `Now func() time.Time` field or a small clock interface) so expiry and retry tests set time explicitly.
+
+## Catch goroutine leaks
+
+Services that spawn background work (queue promoter, scheduler cron) must drain on `Close`. `goleak.VerifyTestMain` in a `TestMain` fails the package when a test leaks a goroutine:
+
+```go
+import (
+	"testing"
+
+	"go.uber.org/goleak"
+)
+
+func TestMain(m *testing.M) {
+	goleak.VerifyTestMain(m)
+}
+```
+
+The container's own leak tests live behind the `leak` tag (`go test -tags=leak ./container/`) so the default suite stays fast; filter only process-lifetime third-party init workers you don't own. Keep timeout tests short (roughly 100ms parent, 500ms block) and assert on observable behavior, never on elapsed wall-clock time.
+
+## Contributor rules
+
+Writing tests for Zever itself? The contributor testing rules (determinism, process-global state, stdout capture, per-test DB files, `synctest`, fork/exec races, reproducing flakes) live in `.github/CONTRIBUTING-testing.md` in the repo root.
+
+<CardGrid>
+  <LinkCard title="Configuration" description="Defaults, files, env overrides, and secret handling." href="../operate/configuration/" />
+  <LinkCard title="Observability" description="Logs, traces, and metrics in tests and prod." href="../operate/observability/" />
+</CardGrid>
