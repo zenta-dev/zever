@@ -27,7 +27,7 @@ func BenchmarkClosest(b *testing.B) {
 	b.ReportAllocs()
 	b.ResetTimer()
 	for i := 0; i < b.N; i++ {
-		if got := closest("compil", allTopLevel); got != "compile" {
+		if got := closest("compil", allTopLevel()); got != "compile" {
 			b.Fatalf("closest = %q, want compile", got)
 		}
 	}

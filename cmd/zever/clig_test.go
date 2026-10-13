@@ -106,7 +106,7 @@ func TestCligHelpRegression(t *testing.T) {
 
 func TestCligUnknownCommand(t *testing.T) {
 	// closest("compil") must resolve to "compile" via the shared helper.
-	if got := closest("compil", allTopLevel); got != "compile" {
+	if got := closest("compil", allTopLevel()); got != "compile" {
 		t.Errorf("closest(%q) = %q, want %q", "compil", got, "compile")
 	}
 

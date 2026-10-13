@@ -235,7 +235,10 @@ zever applications built from .zen schemas.`,
 			printUsage()
 
 			if shouldShowHint() {
-				if s := closest(args[0], allTopLevel); s != "" {
+				// Derive from cmd's own tree (not the rootCmd global):
+				// this closure runs inside newRootCmd, which initializes
+				// that global — referencing it here would be an init cycle.
+				if s := closest(args[0], topLevelNames(cmd.Root())); s != "" {
 					_, _ = fmt.Fprintln(os.Stderr, formatHint(fmt.Sprintf("did you mean %q?", s)))
 				}
 			}
@@ -293,6 +296,11 @@ zever applications built from .zen schemas.`,
 	root.AddCommand(newDocsCmd(root))
 	root.AddCommand(newUninstallCmd())
 	root.AddCommand(newUpgradeCmd())
+
+	// Unify the `zever --help` header with the unknown-command usage
+	// header (printUsage, main.go): both paths start with usageHeader
+	// (suggest.go). Subcommand help keeps the default template.
+	root.SetHelpTemplate(usageHeader + "\n\n" + root.HelpTemplate())
 
 	return root
 }
