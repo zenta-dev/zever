@@ -196,6 +196,11 @@ func newCompileFlagSet() *flag.FlagSet {
 
 func runCompile(args []string) error { //nolint:gocyclo
 	args = peelInteractive(args)
+
+	if err := rejectUnknownFlags("compile", args, []string{"backend", "out"}); err != nil {
+		return err
+	}
+
 	fs := newCompileFlagSet()
 
 	posArgs, err := flexibleParse(fs, args)
@@ -300,7 +305,16 @@ func runCompileWith(cfg CompileConfig) error {
 			_, _ = fmt.Fprintln(os.Stderr, formatHint("fix diagnostics above, then re-run compile"))
 		}
 
-		return fmt.Errorf("zever compile: %d file(s) failed to compile", len(files))
+		err := fmt.Errorf("zever compile: %d file(s) failed to compile", len(files))
+		if cfg.JSON {
+			return emitFailure("compile", map[string]any{
+				"files":    cfg.Files,
+				"backends": backendsSpec,
+				"outDir":   outDir,
+			}, jsonDiagnostics(diags), err)
+		}
+
+		return err
 	}
 
 	if err := writeOutputs(outDir, result.Outputs); err != nil {

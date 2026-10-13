@@ -77,8 +77,8 @@ func printAgentHelp(w io.Writer) {
 			{Code: ExitUsage, Meaning: "flag misuse"},
 		},
 		JSONMode: "pass --json (or ZEVER_JSON=1) for a JSON envelope on stdout; " +
-			"compile, check, explain and doctor emit structured data, other " +
-			"commands emit JSON error envelopes",
+			"compile, check, explain, doctor, routes, config show, graph, breaking and check-boundaries " +
+			"emit structured data, other commands emit JSON error envelopes",
 	}
 
 	_ = json.NewEncoder(w).Encode(catalog)

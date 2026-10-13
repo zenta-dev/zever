@@ -3,6 +3,7 @@ package main
 import (
 	"fmt"
 	"io"
+	"strings"
 
 	"github.com/zenta-dev/zever/dsl/compile"
 	"github.com/zenta-dev/zever/dsl/ir"
@@ -10,10 +11,12 @@ import (
 
 // GraphConfig carries every input runGraphWith needs. Screen agents build it
 // from huh forms; the flag shell (runGraph) builds it from argv. A nil Out
-// defaults to os.Stdout.
+// defaults to os.Stdout. JSON emits a machine-readable envelope instead of
+// the human Mermaid blocks.
 type GraphConfig struct {
 	Files []string
 	Out   io.Writer
+	JSON  bool
 }
 
 // rootModuleLabel is the display name used for the implicit (unnamed) module
@@ -33,6 +36,10 @@ const rootModuleLabel = "root"
 // resolver always returns a partially-resolved schema), but a compile error
 // still makes the command exit non-zero, like `zever routes`.
 func runGraph(args []string) error {
+	if err := rejectUnknownFlags("graph", args, nil); err != nil {
+		return err
+	}
+
 	paths, err := resolveInputFiles(args)
 	if err != nil {
 		return fmt.Errorf("zever graph: %w", err)
@@ -42,13 +49,15 @@ func runGraph(args []string) error {
 		reportAutoDiscovery(paths)
 	}
 
-	return runGraphWith(GraphConfig{Files: paths})
+	return runGraphWith(GraphConfig{Files: paths, JSON: jsonMode})
 }
 
 // runGraphWith resolves cfg.Files with zero backends (one shared resolved
 // schema) and prints one fenced Mermaid entity-relation block per module
-// plus one module-to-module block to cfg.Out. Diagrams print best-effort
-// even on compile errors, which still yield a non-nil return.
+// plus one module-to-module block to cfg.Out. With cfg.JSON it emits a
+// machine-readable envelope instead and cfg.Out stays untouched. Diagrams
+// print best-effort even on compile errors, which still yield a non-nil
+// return.
 func runGraphWith(cfg GraphConfig) error {
 	out := outOrStdout(cfg.Out)
 
@@ -63,15 +72,43 @@ func runGraphWith(cfg GraphConfig) error {
 		printDiagnostics(diags)
 	}
 
+	var sb strings.Builder
+
 	for _, m := range result.Schema.Modules {
-		printEntityGraph(out, m)
+		printEntityGraph(&sb, m)
 	}
 
-	printModuleGraph(out, result.Schema)
+	printModuleGraph(&sb, result.Schema)
 
 	if diags.HasErrors() {
-		return fmt.Errorf("zever graph: %d file(s) failed to compile", len(files))
+		err := fmt.Errorf("zever graph: %d file(s) failed to compile", len(files))
+		if cfg.JSON {
+			return emitFailure("graph", map[string]any{"files": cfg.Files}, jsonDiagnostics(diags), err)
+		}
+
+		// Best-effort: the resolver always returns a partially-resolved
+		// schema, so the diagram still prints before the non-zero return.
+		_, _ = io.WriteString(out, sb.String())
+
+		return err
 	}
+
+	if cfg.JSON {
+		modules := make([]string, 0, len(result.Schema.Modules))
+		for _, m := range result.Schema.Modules {
+			modules = append(modules, moduleLabel(m))
+		}
+
+		emitSuccess("graph", map[string]any{
+			"files":   cfg.Files,
+			"mermaid": sb.String(),
+			"modules": modules,
+		})
+
+		return nil
+	}
+
+	_, _ = io.WriteString(out, sb.String())
 
 	return nil
 }

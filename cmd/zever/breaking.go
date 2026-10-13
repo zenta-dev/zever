@@ -60,11 +60,25 @@ Flags:`
 
 // BreakingConfig carries every input runBreakingWith needs. Screen agents
 // build it from huh forms; the flag shell (runBreaking) splits argv on the
-// literal "--" separator. A nil Out defaults to os.Stdout.
+// literal "--" separator. A nil Out defaults to os.Stdout. JSON emits a
+// machine-readable envelope instead of the human change list.
 type BreakingConfig struct {
 	OldFiles []string
 	NewFiles []string
 	Out      io.Writer
+	JSON     bool
+}
+
+// breakingEntry is one JSON-serializable change for the breaking envelope.
+type breakingEntry struct {
+	// Kind is the change category (e.g. "operation_removed").
+	Kind string `json:"kind"`
+	// Breaking reports whether the change breaks API compatibility.
+	Breaking bool `json:"breaking"`
+	// Message is the human-readable change description.
+	Message string `json:"message"`
+	// Position is the "file:line:col" source location in the new schema.
+	Position string `json:"position"`
 }
 
 // printBreakingUsage prints styled help for `zever breaking`.
@@ -118,15 +132,22 @@ func runBreaking(args []string) error {
 		return errNoSeparator
 	}
 
+	if err := rejectUnknownFlags("breaking", args, nil); err != nil {
+		return err
+	}
+
 	return runBreakingWith(BreakingConfig{
 		OldFiles: args[:sepIdx],
 		NewFiles: args[sepIdx+1:],
+		JSON:     jsonMode,
 	})
 }
 
 // runBreakingWith compiles the old and new file sets separately (one shared
 // resolved schema each) and reports every breaking.Change between them to
-// cfg.Out. It returns a non-nil error iff a breaking change is found.
+// cfg.Out. With cfg.JSON it emits a machine-readable envelope instead and
+// cfg.Out stays untouched. It returns a non-nil error iff a breaking change
+// is found.
 func runBreakingWith(cfg BreakingConfig) error {
 	out := outOrStdout(cfg.Out)
 
@@ -154,37 +175,84 @@ func runBreakingWith(cfg BreakingConfig) error {
 	if oldDiags.HasErrors() {
 		printDiagnostics(oldDiags)
 
-		return fmt.Errorf("zever breaking: old schema (%d file(s)) failed to compile", len(oldFiles))
+		err := fmt.Errorf("zever breaking: old schema (%d file(s)) failed to compile", len(oldFiles))
+		if cfg.JSON {
+			return emitFailure("breaking", breakingFilesData(cfg), jsonDiagnostics(oldDiags), err)
+		}
+
+		return err
 	}
 
 	newResult, newDiags := compile.Compile(newFiles)
 	if newDiags.HasErrors() {
 		printDiagnostics(newDiags)
 
-		return fmt.Errorf("zever breaking: new schema (%d file(s)) failed to compile", len(newFiles))
+		err := fmt.Errorf("zever breaking: new schema (%d file(s)) failed to compile", len(newFiles))
+		if cfg.JSON {
+			return emitFailure("breaking", breakingFilesData(cfg), jsonDiagnostics(newDiags), err)
+		}
+
+		return err
 	}
 
 	changes := breaking.Compare(oldResult.Schema, newResult.Schema)
 
 	if len(changes) == 0 {
+		if cfg.JSON {
+			emitSuccess("breaking", map[string]any{"changes": []breakingEntry{}, "breaking": 0})
+
+			return nil
+		}
+
 		_, _ = fmt.Fprintln(out, successMark()+" "+bold("no differences found"))
 
 		return nil
 	}
 
-	printBreakingChanges(out, changes)
+	entries := make([]breakingEntry, 0, len(changes))
+	for _, c := range changes {
+		entries = append(entries, breakingEntry{
+			Kind:     string(c.Kind),
+			Breaking: c.Breaking,
+			Message:  c.Message,
+			Position: c.Pos.String(),
+		})
+	}
 
 	if breaking.HasBreaking(changes) {
 		if shouldShowHint() {
 			_, _ = fmt.Fprintln(os.Stderr, formatHint("breaking changes found; bump the API version or revert them"))
 		}
 
-		return fmt.Errorf("zever breaking: %d breaking change(s) found", countBreaking(changes))
+		err := fmt.Errorf("zever breaking: %d breaking change(s) found", countBreaking(changes))
+		if cfg.JSON {
+			return emitFailure("breaking", map[string]any{"changes": entries, "breaking": countBreaking(changes)}, nil, err)
+		}
+
+		printBreakingChanges(out, changes)
+
+		return err
 	}
 
+	if cfg.JSON {
+		emitSuccess("breaking", map[string]any{"changes": entries, "breaking": 0})
+
+		return nil
+	}
+
+	printBreakingChanges(out, changes)
 	_, _ = fmt.Fprintln(out, successMark()+" "+bold("no breaking changes")+dim(fmt.Sprintf(" (%d informational)", len(changes))))
 
 	return nil
+}
+
+// breakingFilesData returns the minimal envelope payload for failures that
+// happen before both schemas compile.
+func breakingFilesData(cfg BreakingConfig) map[string]any {
+	return map[string]any{
+		"old_files": cfg.OldFiles,
+		"new_files": cfg.NewFiles,
+	}
 }
 
 // printBreakingChanges writes every change to out, breaking changes in
