@@ -527,7 +527,7 @@ func TestUnwrapTinkerValue(t *testing.T) {
 	type str struct{ S string }
 
 	// A pointer to a non-interface (a struct) is a real value, not yaegi's
-	// *interface{} wrapper: returned untouched.
+	// *any wrapper: returned untouched.
 	v := reflect.ValueOf(&str{S: "x"})
 	if got := unwrapTinkerValue(v); got != v {
 		t.Fatal("pointer to struct must be returned untouched")
@@ -539,7 +539,7 @@ func TestUnwrapTinkerValue(t *testing.T) {
 		t.Fatal("nil interface must be returned as-is")
 	}
 
-	// A populated *interface{} unwraps to the concrete value.
+	// A populated *any unwraps to the concrete value.
 	x := any("concrete")
 	if got := formatTinkerValue(reflect.ValueOf(&x)); got != "concrete" {
 		t.Fatalf("unwrapped value = %q, want concrete", got)

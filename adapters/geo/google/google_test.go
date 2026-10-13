@@ -152,18 +152,18 @@ func TestGeocode_ZeroResults(t *testing.T) {
 }
 
 func TestGeocode_OK(t *testing.T) {
-	resp := map[string]interface{}{
-		"results": []map[string]interface{}{
+	resp := map[string]any{
+		"results": []map[string]any{
 			{
 				"formatted_address": "1600 Amphitheatre Parkway, Mountain View, CA 94043, USA",
-				"geometry": map[string]interface{}{
-					"location": map[string]interface{}{"lat": 37.4224764, "lng": -122.0842499},
+				"geometry": map[string]any{
+					"location": map[string]any{"lat": 37.4224764, "lng": -122.0842499},
 				},
 			},
 			{
 				"formatted_address": "Second result",
-				"geometry": map[string]interface{}{
-					"location": map[string]interface{}{"lat": 37.5, "lng": -122.0},
+				"geometry": map[string]any{
+					"location": map[string]any{"lat": 37.5, "lng": -122.0},
 				},
 			},
 		},
@@ -238,11 +238,11 @@ func TestReverseGeocode_ZeroResults(t *testing.T) {
 }
 
 func TestReverseGeocode_OK(t *testing.T) {
-	resp := map[string]interface{}{
-		"results": []map[string]interface{}{
+	resp := map[string]any{
+		"results": []map[string]any{
 			{
 				"formatted_address": "1600 Amphitheatre Parkway, Mountain View, CA",
-				"address_components": []map[string]interface{}{
+				"address_components": []map[string]any{
 					{"long_name": "1600", "short_name": "1600", "types": []string{"street_number"}},
 					{"long_name": "Mountain View", "short_name": "Mountain View", "types": []string{"locality", "political"}},
 				},
@@ -286,11 +286,11 @@ func TestReverseGeocode_ClientError(t *testing.T) {
 
 func TestReverseGeocode_EmptyTypes(t *testing.T) {
 	// Ensure branch where ac.Types empty does not panic and is skipped
-	resp := map[string]interface{}{
-		"results": []map[string]interface{}{
+	resp := map[string]any{
+		"results": []map[string]any{
 			{
 				"formatted_address": "Somewhere",
-				"address_components": []map[string]interface{}{
+				"address_components": []map[string]any{
 					{"long_name": "Foo", "short_name": "Foo", "types": []string{}},
 					{"long_name": "Bar", "short_name": "Bar", "types": []string{"country"}},
 				},
@@ -350,10 +350,10 @@ func TestDistance_NoResults_EmptyElements(t *testing.T) {
 }
 
 func TestDistance_StatusNotOK(t *testing.T) {
-	resp := map[string]interface{}{
+	resp := map[string]any{
 		"status": "OK",
-		"rows": []map[string]interface{}{
-			{"elements": []map[string]interface{}{
+		"rows": []map[string]any{
+			{"elements": []map[string]any{
 				{"status": "ZERO_RESULTS"},
 			}},
 		},
@@ -368,16 +368,16 @@ func TestDistance_StatusNotOK(t *testing.T) {
 }
 
 func TestDistance_OK(t *testing.T) {
-	resp := map[string]interface{}{
+	resp := map[string]any{
 		"status":                "OK",
 		"destination_addresses": []string{"3150 Commonwealth Ave W, Singapore 129580"},
 		"origin_addresses":      []string{"105 Cecil St, Singapore 069534"},
-		"rows": []map[string]interface{}{
-			{"elements": []map[string]interface{}{
+		"rows": []map[string]any{
+			{"elements": []map[string]any{
 				{
 					"status":   "OK",
-					"distance": map[string]interface{}{"text": "12.5 km", "value": 12535},
-					"duration": map[string]interface{}{"text": "18 mins", "value": 1083},
+					"distance": map[string]any{"text": "12.5 km", "value": 12535},
+					"duration": map[string]any{"text": "18 mins", "value": 1083},
 				},
 			}},
 		},

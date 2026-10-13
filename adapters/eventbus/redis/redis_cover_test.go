@@ -21,7 +21,7 @@ func TestRedactAddr(t *testing.T) {
 		addr string
 		want string
 	}{
-		{"userinfo masked", "redis://user:hunter2@myhost:6379", "redis://user:xxxxx@myhost:6379"}, //nolint:gosec // fixture credential for redact unit test.
+		{"userinfo masked", "redis://user:hunter2@myhost:6379", "redis://user:xxxxx@myhost:6379"}, // fixture credential for redact unit test.
 		{"plain hostport raw", "localhost:6379", "localhost:6379"},
 		{"unparsable raw", "127.0.0.1:1", "127.0.0.1:1"},
 		{"whitespace trimmed", "  localhost:6379  ", "localhost:6379"},
@@ -54,7 +54,7 @@ func TestPublish_canceledContext(t *testing.T) {
 
 func deadPortAdapter() *adapter {
 	return &adapter{
-		client:         goredis.NewClient(&goredis.Options{Addr: "127.0.0.1:1"}), //nolint:gosec // dead-port fixture, no credential.
+		client:         goredis.NewClient(&goredis.Options{Addr: "127.0.0.1:1"}), // dead-port fixture, no credential.
 		prefix:         "eventbus",
 		handlerTimeout: time.Second,
 		closeTimeout:   time.Second,
@@ -205,13 +205,13 @@ func TestDecodeMessage(t *testing.T) {
 		t.Errorf("bad JSON err = %v, want redis: decode wrap", err)
 	}
 
-	badID, _ := json.Marshal(wireMessage{ID: "not-a-uuid"}) //nolint:errcheck // fixture marshal cannot fail.
+	badID, _ := json.Marshal(wireMessage{ID: "not-a-uuid"}) // fixture marshal cannot fail.
 	if _, err := decodeMessage(topic, badID); !errors.Is(err, eventbus.ErrInvalidMessageID) {
 		t.Errorf("bad UUID err = %v, want ErrInvalidMessageID", err)
 	}
 
 	want := eventbus.NewMessage(topic, eventbus.NewPayload([]byte("hi")), eventbus.NewHeaders(map[string]string{"k": "v"}))
-	raw, _ := json.Marshal(wireMessage{ID: want.ID.String(), Payload: want.Payload, Headers: want.Headers}) //nolint:errcheck // fixture marshal cannot fail.
+	raw, _ := json.Marshal(wireMessage{ID: want.ID.String(), Payload: want.Payload, Headers: want.Headers}) // fixture marshal cannot fail.
 
 	msg, err := decodeMessage(topic, raw)
 	if err != nil {

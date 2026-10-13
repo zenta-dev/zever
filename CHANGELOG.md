@@ -132,6 +132,26 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   The older "45–55 allocs/op adaptor cost" note is corrected: the
   `newHTTPHandler` rework cut the isolated adaptor to 35; 45–55 still
   brackets the full serve path.
+- `feat: SIGHUP reload for log level, flags, rate limits`: new
+  `container.ReloadableLogger`, `container.ReloadableFlag`, and
+  `container.ReloadableLimiter` front their battery behind an atomic swap,
+  and `container.WatchSIGHUP` runs a reload closure on every SIGHUP until
+  its context ends. The generated server (`zever generate server`) wires
+  it: SIGHUP re-reads the config file and swaps the log level and the rate
+  limiter (old instances released after the swap); a failed re-open keeps
+  the old instance and only warns. Flag clients held directly swap the same
+  way; the `static` flag adapter also re-reads its file per evaluation when
+  `reload: true`. Everything else stays restart-only — adapters, DSNs,
+  credentials, TLS material, and listen addresses need a process restart
+  (see the new "Reload" section in `config/README.md`).
+- `feat(cli): zever upgrade --project`: the binary upgrader gains a project
+  mode that bumps every `github.com/zenta-dev/zever/*` require without a
+  matching `replace` directive in the current project's `go.mod` to the
+  target version (`--version`, default latest stable), runs `go mod tidy`,
+  and prints the `**Breaking:**` CHANGELOG entries between the installed
+  and target versions (fetched once, cached under the user cache dir).
+  `--dry-run` prints the plan without writing, fetching, or tidying;
+  `--check` prints the available version only.
 - `feat(auth/jwt): kid-based key rotation and nbf validation`: `JWTOptions`
   gains `keys: [{kid, secret}]` plus `active_kid` (empty defaults to the
   first entry; validated for unique kids, secret length, and a matching
@@ -153,6 +173,17 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   fail the gate unless `## [Unreleased]` carries a `**Breaking:**` line.
   The gate already caught two real breaks on adoption (`auth.JWTOptions` /
   `auth.Options` comparability, documented above).
+- `feat(config): fail fast on unknown adapters with did-you-mean`: new
+  `config.ValidateAdapters(registered)` checks every service's adapter
+  against the process's registrations and joins `UnknownAdapterError`s
+  carrying a "did you mean %q?" hint (sourced from `config.closest`). Every
+  `core/<battery>` gains `RegisteredAdapters()` over its factory registry
+  (new `registry.Names`/`SortedNames` seams), the container gains
+  `RegisteredAdapters(service)` plus `(c).ValidateAdapters()`, and
+  `zever doctor` — CLI and generated-server `--doctor` alike — reports an
+  `adapters` row before resolving, turning a forgotten import or typo into
+  one actionable error. `ParseAdapter` stays permissive for custom adapters;
+  typed `Adapter` constants are unchanged.
 - `docs: test your zever app guide`: new `guides/operate/testing-your-app`
   page — per-test container from `config.Default()` with `t.Cleanup` close,
   httptest routes, per-test sqlite files under `t.TempDir()`, the `dbtest`
@@ -346,6 +377,27 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   the second was skipped. The `unsafe` import is gone, and the 33-entry
   `snapshots()` copy-paste collapsed into a generic `snap` helper over a
   method-value table.
+- `chore(lint): wrapcheck evaluation, errscan missing-%w, nolintlint, any`:
+  `wrapcheck` was trial-enabled over `container` and `core/cache` (9 and 7
+  hits, all registry `Register`/`Lookup` passthroughs, `Close`-probe returns,
+  and test helpers): enabling it would relitigate the registry-passthrough
+  convention in every battery, so it stays off and the existing
+  `.golangci.yml` comment records why. `tools/errscan` gains a `missing-%w`
+  rule flagging `fmt.Errorf` without `%w` that still takes a bare `err`
+  argument (conservative: `err.Error()` and other names are out of scope);
+  the repo scans clean.   `nolintlint` is now enabled so stale suppressions
+  fail the build, and the 123 unused directives it reported (mostly
+  `nolint:gosec` on `os.ReadFile`/`os.WriteFile` already covered by the
+  `std-error-handling` exclusion preset, plus stale `unparam`/`dupl`/
+  `nilerr`/`unused`/`revive`/`tparallel`/`exhaustive`/`forcetypeassert`/
+  `errcheck`/`contextcheck`/`staticcheck`/`nilnil`/`spancheck`) are removed.
+  One survivor needed care: `adapters/media/local` `MkdirAll` tripped gosec
+  G703 taint analysis once its directive was lifted (the sink is safe —
+  `filepath.Ext` yields no separators), so it now carries a gosec-native
+  `#nosec G703` pin like the one in `tools/errscan`, which both linters
+  accept stably. Remaining `interface{}` spellings outside
+  generated protobuf code become `any` (the `twilio` test fake keeps
+  `interface{}` to match the upstream `twilioclient.BaseClient` signature).
 
 ### Added
 

@@ -147,7 +147,7 @@ func checkGeneratedOutputs(outDir string, outputs map[string]map[string][]byte) 
 		for _, name := range names {
 			dest := filepath.Join(outDir, backend, name)
 
-			disk, err := os.ReadFile(dest) //nolint:gosec // CLI --out tree entries derived from backend output names
+			disk, err := os.ReadFile(dest)
 			if err != nil {
 				drift = append(drift, filepath.Join(backend, name)+" (missing)")
 

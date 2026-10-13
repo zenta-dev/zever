@@ -63,7 +63,7 @@ func TestCompileCheckDetectsDrift(t *testing.T) {
 
 	// Simulate a stale commit: hand-edit one generated file.
 	stale := filepath.Join(outDir, "atlas", "schema.hcl")
-	data, readErr := os.ReadFile(stale) //nolint:gosec // test fixture path
+	data, readErr := os.ReadFile(stale)
 	if readErr != nil {
 		t.Fatalf("read %q: %v", stale, readErr)
 	}
@@ -93,7 +93,7 @@ func TestCompileCheckDetectsDrift(t *testing.T) {
 	}
 
 	// --check must never repair the tree: the stale edit stays put.
-	after, err := os.ReadFile(stale) //nolint:gosec // test fixture path
+	after, err := os.ReadFile(stale)
 	if err != nil {
 		t.Fatalf("read %q: %v", stale, err)
 	}
@@ -137,7 +137,7 @@ func TestCompileCheckDetectsExtraFile(t *testing.T) {
 	schemaPath, outDir := compileCheckFixture(t, "atlas")
 
 	extra := filepath.Join(outDir, "atlas", "stale.hcl")
-	if err := os.WriteFile(extra, []byte("// stale\n"), 0o600); err != nil { //nolint:gosec // test temp dir
+	if err := os.WriteFile(extra, []byte("// stale\n"), 0o600); err != nil {
 		t.Fatalf("write extra %q: %v", extra, err)
 	}
 
@@ -202,7 +202,7 @@ func TestCompileCheckJSONEmitsEnvelope(t *testing.T) {
 	}
 
 	stale := filepath.Join(outDir, "atlas", "schema.hcl")
-	data, err := os.ReadFile(stale) //nolint:gosec // test fixture path
+	data, err := os.ReadFile(stale)
 	if err != nil {
 		t.Fatalf("read %q: %v", stale, err)
 	}

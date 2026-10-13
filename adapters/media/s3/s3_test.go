@@ -459,7 +459,7 @@ func TestUploadPutError(t *testing.T) {
 	}
 }
 
-//nolint:tparallel // serial: mutates generateID seam.
+// serial: mutates generateID seam.
 func TestUploadGenerateIDError(t *testing.T) {
 	old := generateID
 	generateID = func() (string, error) { return "", errors.New("entropy boom") }
@@ -1341,7 +1341,7 @@ func TestProbeTempMkdirError(t *testing.T) {
 	}
 }
 
-//nolint:tparallel // serial: mutates writeFile seam.
+// serial: mutates writeFile seam.
 func TestProbeTempWriteError(t *testing.T) {
 	old := writeFile
 	writeFile = func(string, []byte, os.FileMode) error { return errors.New("write boom") }
@@ -1904,7 +1904,7 @@ func TestTransformAVGateBadDuration(t *testing.T) {
 	}
 }
 
-//nolint:tparallel // serial: mutates mkdirTemp seam.
+// serial: mutates mkdirTemp seam.
 func TestTransformTempError(t *testing.T) {
 	old := mkdirTemp
 	mkdirTemp = func(string, string) (string, error) { return "", errors.New("temp boom") }

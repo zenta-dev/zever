@@ -481,7 +481,7 @@ func loadFiles(paths []string) (map[string]string, error) {
 	files := make(map[string]string, len(paths))
 
 	for _, path := range paths {
-		data, err := os.ReadFile(path) //nolint:gosec // CLI positional args are developer-supplied file paths
+		data, err := os.ReadFile(path) // CLI positional args are developer-supplied file paths
 		if err != nil {
 			return nil, fmt.Errorf("read %q: %w", path, err)
 		}

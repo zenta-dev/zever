@@ -132,7 +132,7 @@ type fakeBatchStore struct {
 	getTotal              int
 }
 
-func (f *fakeBatchStore) Create(_ context.Context, id string, total int) error { //nolint:revive // interface requires named params
+func (f *fakeBatchStore) Create(_ context.Context, id string, total int) error {
 	_ = id
 	_ = total
 	f.mu.Lock()
@@ -166,7 +166,7 @@ func (f *fakeBatchStore) IncrementFailed(_ context.Context, id string) error {
 	return nil
 }
 
-func (f *fakeBatchStore) IncrementFailedBy(_ context.Context, id string, n int) error { //nolint:revive
+func (f *fakeBatchStore) IncrementFailedBy(_ context.Context, id string, n int) error {
 	_ = n
 	f.mu.Lock()
 	f.incrementFailedBy++
@@ -178,7 +178,7 @@ func (f *fakeBatchStore) IncrementFailedBy(_ context.Context, id string, n int) 
 	return nil
 }
 
-func (f *fakeBatchStore) Get(_ context.Context, id string) (int, int, int, error) { //nolint:revive
+func (f *fakeBatchStore) Get(_ context.Context, id string) (int, int, int, error) {
 	_ = id
 	f.mu.Lock()
 	f.getCalls++

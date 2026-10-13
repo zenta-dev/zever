@@ -320,7 +320,7 @@ func TestOuterRefNodeShape(t *testing.T) {
 	for _, o := range ops {
 		var p Predicate[widgetOrder]
 
-		switch o.name { //nolint:dupl // one call per op, each one line
+		switch o.name { // one call per op, each one line
 		case "EqOuter":
 			p = orderWidgetID.EqOuter(Outer(widgetID))
 		case "NeqOuter":

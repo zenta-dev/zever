@@ -78,13 +78,9 @@ type Field struct {
 type RelationKind int
 
 const (
-	//nolint:revive
 	HasMany RelationKind = iota
-	//nolint:revive
 	HasOne
-	//nolint:revive
 	BelongsTo
-	//nolint:revive
 	ManyToMany
 )
 

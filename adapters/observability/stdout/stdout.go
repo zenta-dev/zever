@@ -271,7 +271,7 @@ func randHex(n int) string {
 		binary.LittleEndian.PutUint64(fallback[8:], seq)
 	} else {
 		for i := range fallback {
-			fallback[i] ^= byte((seq >> (uint(i) % 8 * 8)) & 0xff) //nolint:gosec // intentional truncation: only low 8 bits seed the fallback id
+			fallback[i] ^= byte((seq >> (uint(i) % 8 * 8)) & 0xff) // intentional truncation: only low 8 bits seed the fallback id
 		}
 	}
 
