@@ -198,12 +198,15 @@ func renderHandler(b *strings.Builder, svcName string, op opModel, imports map[s
 	if op.Paginated {
 		imports[importStrconv] = true
 
-		b.WriteString("\t\tvar cursor string\n")
+		b.WriteString("\t\tvar cursor Cursor\n")
 		b.WriteString("\t\tvar limit int32\n\n")
-		b.WriteString("\t\tcursor = r.URL.Query().Get(\"cursor\")\n")
+		b.WriteString("\t\tcursor = Cursor(r.URL.Query().Get(\"cursor\"))\n")
 		b.WriteString("\t\tif raw := r.URL.Query().Get(\"limit\"); raw != \"\" {\n")
 		b.WriteString("\t\t\tv, err := strconv.ParseInt(raw, 10, 32)\n")
 		b.WriteString("\t\t\tif err != nil {\n")
+		b.WriteString("\t\t\t\twriteGogenError(w, r, apperror.New(apperror.InvalidArgument, \"invalid parameter \\\"limit\\\"\"))\n")
+		b.WriteString("\t\t\t\treturn\n\t\t\t}\n\n")
+		b.WriteString("\t\t\tif v < 0 || v > int64(MaxPageLimit) {\n")
 		b.WriteString("\t\t\t\twriteGogenError(w, r, apperror.New(apperror.InvalidArgument, \"invalid parameter \\\"limit\\\"\"))\n")
 		b.WriteString("\t\t\t\treturn\n\t\t\t}\n\n")
 		b.WriteString("\t\t\tlimit = int32(v)\n\t\t}\n\n")
