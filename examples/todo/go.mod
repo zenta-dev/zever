@@ -18,6 +18,7 @@ require (
 	github.com/zenta-dev/zever/adapters/i18n/embed v0.6.1
 	github.com/zenta-dev/zever/adapters/idempotency/memory v0.6.1
 	github.com/zenta-dev/zever/adapters/lock/memory v0.6.1
+	github.com/zenta-dev/zever/adapters/log/noop v0.6.1
 	github.com/zenta-dev/zever/adapters/log/slog v0.6.1
 	github.com/zenta-dev/zever/adapters/mailer/log v0.6.1
 	github.com/zenta-dev/zever/adapters/media/local v0.6.1
@@ -43,6 +44,7 @@ require (
 	github.com/zenta-dev/zever/core/auth v0.6.1
 	github.com/zenta-dev/zever/core/authz v0.6.1
 	github.com/zenta-dev/zever/core/db v0.6.1
+	github.com/zenta-dev/zever/core/document v0.6.1
 	github.com/zenta-dev/zever/core/job v0.6.1
 	github.com/zenta-dev/zever/core/log v0.6.1
 	github.com/zenta-dev/zever/core/middleware v0.6.1
@@ -269,7 +271,6 @@ require (
 	github.com/tidwall/pretty v1.2.1 // indirect
 	github.com/tidwall/sjson v1.2.5 // indirect
 	github.com/zenta-dev/zever/adapters/db/postgres v0.6.1 // indirect
-	github.com/zenta-dev/zever/adapters/log/noop v0.6.1 // indirect
 	github.com/zenta-dev/zever/adapters/media/ffmpeg v0.6.1 // indirect
 	github.com/zenta-dev/zever/core/agent v0.6.1 // indirect
 	github.com/zenta-dev/zever/core/ai v0.6.1 // indirect
@@ -278,7 +279,6 @@ require (
 	github.com/zenta-dev/zever/core/cache v0.6.1 // indirect
 	github.com/zenta-dev/zever/core/cdn v0.6.1 // indirect
 	github.com/zenta-dev/zever/core/crypto v0.6.1 // indirect
-	github.com/zenta-dev/zever/core/document v0.6.1 // indirect
 	github.com/zenta-dev/zever/core/eventbus v0.6.1 // indirect
 	github.com/zenta-dev/zever/core/flag v0.6.1 // indirect
 	github.com/zenta-dev/zever/core/geo v0.6.1 // indirect

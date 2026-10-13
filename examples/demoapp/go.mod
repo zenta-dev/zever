@@ -18,6 +18,7 @@ require (
 	github.com/zenta-dev/zever/adapters/i18n/embed v0.6.1
 	github.com/zenta-dev/zever/adapters/idempotency/memory v0.6.1
 	github.com/zenta-dev/zever/adapters/lock/memory v0.6.1
+	github.com/zenta-dev/zever/adapters/log/noop v0.6.1
 	github.com/zenta-dev/zever/adapters/log/slog v0.6.1
 	github.com/zenta-dev/zever/adapters/mailer/log v0.6.1
 	github.com/zenta-dev/zever/adapters/media/local v0.6.1
@@ -261,7 +262,6 @@ require (
 	github.com/tidwall/pretty v1.2.1 // indirect
 	github.com/tidwall/sjson v1.2.5 // indirect
 	github.com/zenta-dev/zever/adapters/db/postgres v0.6.1 // indirect
-	github.com/zenta-dev/zever/adapters/log/noop v0.6.1 // indirect
 	github.com/zenta-dev/zever/adapters/media/ffmpeg v0.6.1 // indirect
 	github.com/zenta-dev/zever/core/agent v0.6.1 // indirect
 	github.com/zenta-dev/zever/core/cdn v0.6.1 // indirect
