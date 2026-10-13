@@ -2,6 +2,7 @@ package container
 
 import (
 	"errors"
+	"runtime"
 	"sync"
 	"sync/atomic"
 	"testing"
@@ -193,6 +194,156 @@ func TestLazy_WaiterBecomesRetryLeader(t *testing.T) {
 	}
 	if !l.resolved() {
 		t.Fatal("resolved is false after waiter retry succeeded")
+	}
+}
+
+func TestLazy_PanicReleasesWaiters(t *testing.T) {
+	const panicVal = "boom"
+	//nolint:unparam // get requires (T, error); panic path is nil by design
+	build := func() (int, error) {
+		panic(panicVal)
+	}
+
+	const n = 8
+	var l lazy[int]
+	start := make(chan struct{})
+	errs := make([]error, n)
+	var wg sync.WaitGroup
+	for i := 0; i < n; i++ {
+		wg.Add(1)
+		go func() {
+			defer wg.Done()
+			<-start
+			_, err := l.get(build)
+			errs[i] = err
+		}()
+	}
+	close(start)
+	wg.Wait()
+
+	for i, err := range errs {
+		var buildErr BuildPanicError
+		if !errors.As(err, &buildErr) {
+			t.Fatalf("waiter %d: got %T (%v), want BuildPanicError", i, err, err)
+		}
+		if buildErr.Value != panicVal {
+			t.Errorf("waiter %d: panic value = %v, want %v", i, buildErr.Value, panicVal)
+		}
+		if len(buildErr.Stack) == 0 {
+			t.Errorf("waiter %d: stack is empty", i)
+		}
+	}
+	if l.resolved() {
+		t.Fatal("resolved is true after panic")
+	}
+}
+
+func TestLazy_PanicRetriesAndSucceeds(t *testing.T) {
+	var l lazy[int]
+	var calls atomic.Int32
+	fail := errors.New("build failed")
+	//nolint:unparam // get requires (T, error); mixed panic/error path is nil by design
+	build := func() (int, error) {
+		switch calls.Add(1) {
+		case 1:
+			panic("first build panics")
+		case 2:
+			return 0, fail
+		default:
+			return 42, nil
+		}
+	}
+
+	_, err := l.get(build)
+	var buildErr BuildPanicError
+	if !errors.As(err, &buildErr) {
+		t.Fatalf("first get: got %T (%v), want BuildPanicError", err, err)
+	}
+	if l.resolved() {
+		t.Fatal("resolved is true after panic")
+	}
+
+	_, err = l.get(build)
+	if !errors.Is(err, fail) {
+		t.Fatalf("second get: got %v, want build failure", err)
+	}
+
+	v, err := l.get(build)
+	if err != nil {
+		t.Fatalf("third get: unexpected error: %v", err)
+	}
+	if v != 42 {
+		t.Fatalf("third get: got %d, want 42", v)
+	}
+	if calls.Load() != 3 {
+		t.Fatalf("build ran %d times, want 3 (panic and error not cached)", calls.Load())
+	}
+	if !l.resolved() {
+		t.Fatal("resolved is false after success")
+	}
+	if _, err := l.get(build); err != nil {
+		t.Fatalf("cached get: unexpected error: %v", err)
+	}
+	if calls.Load() != 3 {
+		t.Fatalf("build ran %d times after success, want 3", calls.Load())
+	}
+}
+
+func TestLazy_GoexitReleasesWaiters(t *testing.T) {
+	var l lazy[int]
+	var calls atomic.Int32
+	var goexited atomic.Bool
+	//nolint:unparam // get requires (T, error); Goexit path is nil by design
+	build := func() (int, error) {
+		if calls.Add(1) == 1 {
+			goexited.Store(true)
+			runtime.Goexit()
+		}
+		return 5, nil
+	}
+
+	// The first caller Goexits, so its get never returns and it sends no
+	// result; the remaining n-1 callers must be released and succeed.
+	const n = 4
+	start := make(chan struct{})
+	results := make(chan int, n)
+	errsCh := make(chan error, n)
+	var wg sync.WaitGroup
+	for i := 0; i < n; i++ {
+		wg.Add(1)
+		go func() {
+			defer wg.Done()
+			<-start
+			v, err := l.get(build)
+			results <- v
+			errsCh <- err
+		}()
+	}
+	close(start)
+	wg.Wait()
+	close(results)
+	close(errsCh)
+
+	if !goexited.Load() {
+		t.Fatal("first build did not Goexit")
+	}
+	if calls.Load() != 2 {
+		t.Fatalf("build ran %d times, want 2 (Goexit not cached, one retry)", calls.Load())
+	}
+	if got := len(results); got != n-1 {
+		t.Fatalf("got %d results, want %d (Goexiter sends none)", got, n-1)
+	}
+	for v := range results {
+		var buildErr BuildPanicError
+		if errors.As(<-errsCh, &buildErr) {
+			t.Errorf("Goexit produced BuildPanicError %v, want plain retry", buildErr)
+		}
+		if v != 5 {
+			t.Errorf("waiter got %d, want 5", v)
+		}
+	}
+	for err := range errsCh {
+		t.Errorf("unexpected error: %v", err)
 	}
 }
 
