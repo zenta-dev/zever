@@ -81,7 +81,11 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   scaffolded `zever new` dev config writes `allow_dev_key: true` plus the
   dev key with a comment, and `zever doctor` flags the dev key in
   non-dev environments. Test fixtures must set `allow_dev_key` or
-  `ZEVER_ENV` explicitly when resolving crypto from `config.Default()`.
+   `ZEVER_ENV` explicitly when resolving crypto from `config.Default()`.
+- **Breaking:** `auth.JWTOptions` and `auth.Options` are no longer
+  comparable: the new `Keys []JWTKey` field (kid-based rotation) makes `==`
+  on these structs — and on `config.Service[auth.Options]` — a compile
+  error. Compare field-by-field instead.
 
 ### Added
 
@@ -97,6 +101,30 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   must update `cursor string` parameters (and `string` cursor variables) to
   `Cursor`, converting from protobuf `next_cursor` strings where they cross
   the boundary.
+- `feat(orm): auto-chunk large IN lists`: a value-list `IN` larger than
+  the resolved dialect's per-statement parameter budget now fans out into
+  one statement per chunk for plain unordered unbounded `SELECT`s (rows
+  concatenated) and for `Count`/`Exists` (summed/ORed), instead of failing
+  in the driver with "too many SQL variables". Budgets come from the new
+  `dialect.ParamLimitDialect` interface (`MaxParams`, with a conservative
+  999 fallback): Postgres 65535 (wire-protocol uint16 ceiling), SQLite 999
+  before 3.32.0 and 32766 after (version-gated via the existing
+  `NewWithVersion` detection). Fan-out fails closed with the new
+  `ErrInListTooLarge` sentinel when the query carries `ORDER BY`/`LIMIT`/
+  `OFFSET`, a row lock or `TABLESAMPLE` (not reconstructible across
+  statements), or when the oversized `IN` sits under `OR`/`NOT` or is a
+  `NOT IN`. `Preload` sizes its child-`IN` chunks against the same budget
+  (minus the child query's own arguments), so old-SQLite backends get
+  fitting statements instead of driver errors; the 1000 default stands on
+  modern backends.
+- `docs: recommend stdhttp as the default router`: the routing guide now
+  recommends `stdhttp` (already the `zever new` default) with measured
+  numbers, and the benchmarks page gains a 2026-10-14 re-measurement:
+  fiber `ServeHTTP` costs ~46 allocs/op (isolated adaptor wrapping ~35,
+  concurrent ~55) against ~17 for a `stdhttp` param route (~10 static).
+  The older "45–55 allocs/op adaptor cost" note is corrected: the
+   `newHTTPHandler` rework cut the isolated adaptor to 35; 45–55 still
+   brackets the full serve path.
 - `feat(auth/jwt): kid-based key rotation and nbf validation`: `JWTOptions`
   gains `keys: [{kid, secret}]` plus `active_kid` (empty defaults to the
   first entry; validated for unique kids, secret length, and a matching
@@ -110,6 +138,14 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   tokens are rejected. Docs now state the default memory revocation store
   is per-process and point multi-instance deployments at the shared
   `revocation/redis` store.
+- `ci: apidiff gate for Core-tier modules`: new `tools/apidiff` module plus
+  `make apidiff` and a CI `apidiff` job compare the exported API of
+  `config`, `container`, `core/{auth,cache,crypto,db,password,queue,router,
+  secrets,session}`, `dsl`, and `orm` against each module's latest
+  `<dir>/vX.Y.Z` tag via `golang.org/x/exp/apidiff`. Incompatible changes
+  fail the gate unless `## [Unreleased]` carries a `**Breaking:**` line.
+  The gate already caught two real breaks on adoption (`auth.JWTOptions` /
+  `auth.Options` comparability, documented above).
 - `docs: test your zever app guide`: new `guides/operate/testing-your-app`
   page — per-test container from `config.Default()` with `t.Cleanup` close,
   httptest routes, per-test sqlite files under `t.TempDir()`, the `dbtest`
@@ -262,6 +298,16 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Changed
 
+- `perf(orm): LRU shape cache`: the render-shape cache evicts only the
+  least-recently-used entry on overflow instead of dropping the whole map,
+  so hot shapes survive churn. It is striped 16 ways over
+  `shared/lrucache` (one bounded LRU per stripe, 256 entries total):
+  LRU `Get` rewrites recency and needs exclusive access, so a single
+  instance would serialize every parallel hit where the old `RWMutex` map
+  allowed concurrent reads. Hit-path cost is unchanged (128 B/op,
+  1 alloc/op sequential; 155 B/op, 3 allocs/op parallel on the bench
+  machine, within noise of the map). New tests pin single-entry eviction,
+  concurrent access under `-race`, and the capacity bound.
 - `docs: hygiene pass`: recount confirms 37 configured services
   (`knownServiceNames()` in `config/config.go`) against 42 container
   accessor rows — the five extra rows (`agent`, `grpc`, `grpcclient`,
