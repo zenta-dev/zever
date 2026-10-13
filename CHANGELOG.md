@@ -363,6 +363,20 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   accept stably. Remaining `interface{}` spellings outside
   generated protobuf code become `any` (the `twilio` test fake keeps
   `interface{}` to match the upstream `twilioclient.BaseClient` signature).
+- `chore(modules): tag-path gate, shared/* verdict, versioning doc, mysql
+  status`: `modgraph --check` (hence `make modgraph-check`) now also
+  verifies every `go.mod` module path follows the `tools/tag-release.sh`
+  rule (tag `<suffix>/vX.Y.Z`), allowlisting the two deliberate
+  consumer-proof exceptions (`docs/examples` dashed path,
+  `examples/external-sms` under another org); clean over all 177 modules.
+  Import scan of all 22 `shared/*` packages shows every one has importers
+  in at least two areas or sits on a public API seam (`mcpclient` in
+  `core/agent` signatures, `outboxbridge` as the documented hand-wiring
+  seam, `prompt` unused in-repo), so nothing moves under `internal/`.
+  New `start/versioning` docs page pins the lockstep release model and
+  replace-less consumer rules; `orm/README` no longer claims mysql support
+  was dropped and states the real split (query builder sqlite/postgres
+  only; atlas DDL + `orm/migrate` live-diff cover mysql).
 
 ### Added
 
