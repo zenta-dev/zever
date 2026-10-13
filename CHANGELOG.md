@@ -29,6 +29,13 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Fixed
 
+- `fix(orm): escape single quotes in sqlite JSON path key literals`:
+  `sqlitePathLiteral` now doubles embedded `'` in the rendered `$`-rooted
+  path body before wrapping it in the SQL string literal, so a json key
+  containing a quote (e.g. `a'b`) can no longer terminate the literal
+  early; previously such a key produced malformed SQL, and a `''`
+  sequence inside the key was silently truncated to `'`. The postgres
+  `pgArrayEscape` path was already correct (quotes doubled).
 - `fix(document/latex): restrict file access and scrub environment`: LaTeX
   renders run in a per-render temp dir as `cwd` with `-no-shell-escape` and
   a minimal env allowlist (`PATH`, `HOME`, `TEXMF*` only — no inherited
