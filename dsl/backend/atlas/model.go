@@ -14,7 +14,7 @@ import (
 // The pluralization is deliberately naive and is wrong for irregular
 // English nouns ("Person" becomes "persons", "Child" becomes "childs").
 // This is a known, documented limitation, decided once in
-// internal/dsl/naming rather than reinvented per backend.
+// dsl/naming rather than reinvented per backend.
 func TableName(e *ir.Entity) string {
 	return naming.PluralizeNaive(naming.SnakeCase(e.Name))
 }

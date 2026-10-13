@@ -431,7 +431,7 @@ func TestPermissionCheckCompilesToPolicyLiteral(t *testing.T) {
 // Authorize call wrapping its HTTP handler, and no entry in GRPCPolicies().
 // TestOperationWithNeitherAuthNorPermissionGetsNoPolicy builds its schema
 // directly against ir types, bypassing resolver.Resolve: the v-next
-// secure-everything opinion (internal/dsl/resolver/resolver_opinions.go)
+// secure-everything opinion (dsl/resolver/resolver_opinions.go)
 // now hard-rejects any operation declaring neither Auth nor Permission at
 // compile time, so a real .zen source can no longer reach this shape.
 // gogen's own Generate contract is still "no Auth/Permission on the IR ->

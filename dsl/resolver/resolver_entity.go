@@ -24,7 +24,7 @@ var scalarTypes = map[string]ir.ScalarType{
 // rather than the scalarTypes table.
 //
 // This is the single source of truth for the DSL's scalar type names; it is
-// exported so codegen tooling (see internal/dsl/gengrammar) can derive
+// exported so codegen tooling (see dsl/gengrammar) can derive
 // editor grammars from it instead of duplicating the list.
 func ScalarTypeNames() []string {
 	names := make([]string, 0, len(scalarTypes))

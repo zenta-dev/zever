@@ -171,6 +171,9 @@ notes. See [CONTRIBUTING](.github/CONTRIBUTING.md) for versioning details.
 ## Requirements
 
 - Go 1.27 or newer (`go 1.27.0` in each module's `go.mod`; `go.work` wires local dev).
+  Generic methods (e.g. `orm`'s `Column[T, V].EqOuter[U any]`) require Go 1.27+;
+  older toolchains fail to build. Only the latest toolchain is supported —
+  see the Go version policy in [STABILITY.md](STABILITY.md#go-version-policy).
 
 ## Using zever packages as a library
 

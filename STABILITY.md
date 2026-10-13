@@ -5,7 +5,9 @@ Pre-1.0 policy for what may break in `0.x` releases. Docs-only; no API change.
 See also [Versioning](.github/CONTRIBUTING.md#versioning) and
 [API Compatibility](.github/CONTRIBUTING.md#api-compatibility).
 Cross-checked against `config.Config` (`config/config.go`, 37 `Service`
-fields) and `container` accessors (`container/services.go`,
+fields; the list is `knownServiceNames()` in `config/config.go` and the
+`config/README.md` service table is pinned to it by
+`config/readme_test.go`) and `container` accessors (`container/services.go`,
 `container/README.md`).
 
 ## Policy
@@ -41,7 +43,7 @@ fields) and `container` accessors (`container/services.go`,
 | `session` | Facade (`memory`, `redis`, `db`, `cookie`). |
 | `auth` | Facade (`jwt`, `session`, `oidc`). |
 | `crypto` | Facade (`local`, `kms`); dev key deterministic, never prod. |
-| `password` | Facade (`argon2id`). |
+| `password` | Facade (adapter string `argon2id`, package `adapters/password/argon2`). |
 | `secrets` | Facade (`env`, `vault`); `ZEVER`-prefixed env exception. |
 | `dsl` | `.zen` compiler frontend (compile-time only, no release version; schema `v1`/`v2` are API versions). |
 
@@ -99,6 +101,30 @@ release-note docs.
 | `cmd/zever` | Flags-only CLI toolkit; see `cmd/zever/README.md`. |
 | `tools/zever-mcp` | Stdio MCP server exposing the schema compiler to agents; nested module. |
 
+## Go version policy
+
+Only the latest Go toolchain is supported (`go 1.27.2` today, pinned in
+`go.work` and every module's `go.mod`; CI tests that version). New language
+features may be used as soon as the floor moves — including generic methods
+such as `orm`'s `Column[T, V].EqOuter[U any]` (`orm/column.go`), which
+require Go 1.27+ and fail on older toolchains. A toolchain bump updates
+`go.work`, every `go.mod`, and the README/CONTRIBUTING requirement notes
+together (see the release checklist in `.github/CONTRIBUTING.md`).
+
+## Deprecation policy
+
+Removing or breaking an exported identifier takes at least one minor
+release of warning:
+
+1. Mark it `// Deprecated:` with the replacement and the removal target,
+   keep it working, and note it in `CHANGELOG.md`.
+2. Remove it no earlier than the next minor after the deprecation shipped
+   (pre-1.0: the next `0.y`; post-1.0 Core: the next major, per SemVer).
+
+Pre-1.0 Extended packages are exempt (they break freely with release
+notes); pre-1.0 Core follows the window on a best-effort basis and always
+with release notes.
+
 ## 1.0 promotion criteria
 
 Core graduates from "toward 1.0 promise" to the 1.0 compatibility promise
@@ -114,7 +140,8 @@ applies unchanged.
   `adapters/queue/redis`).
 - **External production user:** at least one application outside this
   repo runs a tagged release in production and its deployment is
-  referenced from `docs/production.md`.
+  referenced from the production deployment checklist
+  (`docs/src/content/docs/guides/operate/deployment.mdx`).
 
 ## Current standing (honest)
 
@@ -156,4 +183,8 @@ Every top-level package is classified above. `config`/`container` cover
 `resilience`, `router`, `scheduler`, `search`, `secrets`, `session`,
 `storage`, `tenant`, `vectorstore`, `webhook`, `workflow`); `job` rides
 on `Queue` and `grpc` is a lazy `*grpc.Server` singleton, so neither has
-a `config` entry.
+a `config` entry. The `container/README.md` accessor table therefore has
+42 rows for these 37 services: the five extra rows (`agent`, `grpc`,
+`grpcclient`, `job`, `rag`) resolve over other services and take no
+`config` section. If the counts disagree, the code (`knownServiceNames()`,
+`container/services.go`) wins over this note.

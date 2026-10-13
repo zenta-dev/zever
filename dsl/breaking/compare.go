@@ -1,6 +1,6 @@
 // Package breaking compares two resolved .zen schemas and classifies every
 // difference as breaking or non-breaking for API consumers, buf-breaking
-// style. It depends only on internal/dsl/ir and internal/dsl/diag -- no LSP,
+// style. It depends only on dsl/ir and dsl/diag -- no LSP,
 // no CLI, no backend -- so it can be driven from `zever breaking` or from
 // any other caller with two compiled schemas to hand.
 //
@@ -403,7 +403,7 @@ func compareOperations(svcName string, oldOps, newOps []*ir.Operation) []Change 
 	return changes
 }
 
-// --- name-keyed lookups, mirroring the pattern already used throughout internal/dsl/resolver ---
+// --- name-keyed lookups, mirroring the pattern already used throughout dsl/resolver ---
 
 func entitiesByName(m *ir.Module) map[string]*ir.Entity {
 	out := map[string]*ir.Entity{}

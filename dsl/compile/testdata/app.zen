@@ -1,28 +1,12 @@
-// Source schema for the committed gogen/app and gen/zever/app packages.
+// Canonical end-to-end fixture: two entities with a relation declared on
+// BOTH sides (User has_many orders / Order belongs_to user) plus two
+// services, one with a paginated operation. The two types reference each
+// other by bare in-package name, with no import between them and therefore
+// no Go import cycle.
 //
-// Regenerate gogen/app with:
-//   go test ./internal/dsl/compile/ -run TestGogenGeneratesCommittedAppPackage -update
-// Regenerate gen/zever/app with:
-//   go test ./internal/dsl/compile/ -run TestProtogogenGeneratesCommittedAppPackage -update
-//
-// Both entities are compiled here under the virtual path "schema/app/app.zen"
-// (see appSchemaPath's callers in internal/dsl/compile), so the resolver
-// derives the module name "app" from the immediate subdirectory -- the same
-// dir-derived rule every other schema in this repo uses. That is what makes
-// the relation declared on BOTH sides (User has_many orders / Order
-// belongs_to user) expressible at all: the two types reference each other by
-// bare in-package name, with no import between them and therefore no Go
-// import cycle. The repository's own `go build ./...` type-checks the result
-// for real.
-//
-// The dir-derived module is named "app" (rather than "" / implicit) so the
-// proto/protogogen backends -- which hardcode the implicit module to the
-// fixed "zever.v1"/"gen/zeverv1" namespace already used by protogogen's own
-// fixture.zen (see internal/dsl/backend/protogogen/testdata/fixture.zen and
-// its committed gen/zeverv1 output) -- generate this schema's real protobuf
-// messages into a separate, non-colliding "zever.app.v1"/"gen/zever/app"
-// namespace instead (see gen/zever/app), which gogen/app's generated code
-// imports.
+// Exercised by the backend BenchmarkGenerateAppFixture tests
+// (dsl/backend/{atlas,gogen,openapi,proto}) and dsl/compile's own bench;
+// keep it compiling under `go test ./dsl/...` when editing.
 entity User {
   id: uuid @primary
   email: string @unique
@@ -39,11 +23,9 @@ entity Order {
   belongs_to user: User @foreign_key(user_id)
 }
 
-// UserService/OrderService exist so gogen/app (see
-// internal/dsl/backend/gogen and its committed-package integration test)
-// has a real service to generate the application layer from, sharing this
-// same schema. Adding services here does not affect the zenorm output: the
-// zenorm backend only reads schema.Modules[*].Entities.
+// UserService/OrderService give the gogen backend a real service layer to
+// generate from. Adding services here does not affect the zenorm output:
+// the zenorm backend only reads schema.Modules[*].Entities.
 service UserService {
   rpc GetUser(id: uuid) -> User {
     http: GET "/v1/users/{id}"
@@ -68,9 +50,7 @@ service OrderService {
     auth: required
   }
 
-  // ListOrders exists so gogen/app has a real paginated operation to
-  // generate the application layer from (see internal/dsl/backend/gogen's
-  // `paginated: true` support), sharing this same schema.
+  // ListOrders exercises the gogen backend's `paginated: true` support.
   rpc ListOrders(user_id: uuid) -> Order {
     http: GET "/v1/orders"
     auth: required

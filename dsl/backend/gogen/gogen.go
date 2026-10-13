@@ -63,7 +63,7 @@ type Backend struct {
 	// packages are imported from: "<pbImportRoot>/<module>" for a named
 	// module, or bare "<pbImportRoot>" for the implicit unnamed module.
 	// This matches protogogen's actual "paths=source_relative" output
-	// layout (see internal/dsl/backend/protogogen/request.go's
+	// layout (see dsl/backend/protogogen/request.go's
 	// codeGeneratorParameter) everywhere, including outside this repo, so
 	// it is the only formula this backend applies -- both New() and
 	// NewWithPBImportRoot use it, differing only in which root they start
