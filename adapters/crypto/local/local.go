@@ -12,7 +12,6 @@ import (
 	"encoding/base64"
 	"errors"
 	"fmt"
-	"os"
 	"sync/atomic"
 
 	"github.com/zenta-dev/zever/core/crypto"
@@ -35,10 +34,12 @@ func New(opts crypto.Options) (crypto.Crypto, error) {
 		return nil, fmt.Errorf("local: %w", errors.Join(err, crypto.ErrInvalidKey))
 	}
 
-	// Fail closed in production: the deterministic dev/test key must never
-	// protect real data. Set ZEVER_CRYPTO_REQUIRE_REAL_KEY to reject it.
-	if crypto.IsDevCryptoKey(opts.Key) && os.Getenv("ZEVER_CRYPTO_REQUIRE_REAL_KEY") != "" {
-		return nil, fmt.Errorf("local: %w: refusing the deterministic dev key; set a real crypto key", crypto.ErrInvalidKey)
+	// Fail closed: the deterministic dev/test key is public and must never
+	// protect real data. It is accepted only when explicitly allowed via
+	// Options.AllowDevKey or a dev ZEVER_ENV (see crypto.DevKeyAllowed);
+	// otherwise Open fails with a typed DevKeyError carrying the fix hint.
+	if crypto.IsDevCryptoKey(opts.Key) && !crypto.DevKeyAllowed(opts) {
+		return nil, fmt.Errorf("local: %w", crypto.DevKeyError{})
 	}
 
 	// Validate guarantees base64 success and correct lengths.

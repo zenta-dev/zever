@@ -1,6 +1,7 @@
 package main
 
 import (
+	"bytes"
 	"flag"
 	"fmt"
 	"os"
@@ -11,6 +12,7 @@ import (
 	"go.yaml.in/yaml/v3"
 
 	"github.com/zenta-dev/zever/config"
+	"github.com/zenta-dev/zever/core/crypto"
 	"github.com/zenta-dev/zever/dsl/ir"
 )
 
@@ -1052,7 +1054,16 @@ const zeverYamlSchemaModeline = "# yaml-language-server: $schema=./zever.schema.
 func renderZeverYaml(cfg NewConfig) ([]byte, error) {
 	batteries := make(map[string]batteryYAML, len(cfg.Batteries))
 	for _, sel := range cfg.batterySelections() {
-		batteries[sel.Battery] = batteryYAML{Adapter: sel.Adapter}
+		entry := batteryYAML{Adapter: sel.Adapter}
+		if sel.Battery == "crypto" {
+			// config merge replaces the whole options map, so the dev key
+			// must be written explicitly alongside the allow flag.
+			entry.Options = map[string]any{
+				"key":           crypto.DevCryptoKey,
+				"allow_dev_key": true,
+			}
+		}
+		batteries[sel.Battery] = entry
 	}
 
 	data, err := yaml.Marshal(batteries)
@@ -1060,7 +1071,27 @@ func renderZeverYaml(cfg NewConfig) ([]byte, error) {
 		return nil, fmt.Errorf("zever new: marshal zever.yaml: %w", err)
 	}
 
+	if _, ok := batteries["crypto"]; ok {
+		data = injectCryptoDevKeyComment(data)
+	}
+
 	return data, nil
+}
+
+// cryptoDevKeyComment explains the scaffolded crypto key + allow_dev_key
+// option: the dev key is public, so the comment must tell the developer to
+// replace both with a real key in production.
+const cryptoDevKeyComment = "# crypto: key is the public deterministic dev key and allow_dev_key=true permits it,\n# both for local development only. In production remove allow_dev_key and set a real key.\n"
+
+// injectCryptoDevKeyComment prepends cryptoDevKeyComment to the top-level
+// crypto: block yaml.Marshal emits (map keys sort, so the block starts at
+// column 0 with "crypto:\n").
+func injectCryptoDevKeyComment(data []byte) []byte {
+	const marker = "crypto:\n"
+	if !bytes.Contains(data, []byte(marker)) {
+		return data
+	}
+	return bytes.Replace(data, []byte(marker), append([]byte(cryptoDevKeyComment), marker...), 1)
 }
 
 // ensureTargetDir refuses to scaffold into a non-empty existing directory

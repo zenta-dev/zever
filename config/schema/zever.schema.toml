@@ -251,6 +251,10 @@ additionalProperties = false
 type = 'object'
 
 ['$defs'.cryptoOptions.properties]
+['$defs'.cryptoOptions.properties.allow_dev_key]
+description = 'Permits the deterministic public dev key for local development. When false (default), the local adapter rejects that key unless ZEVER_ENV is dev, test, or development.'
+type = 'boolean'
+
 ['$defs'.cryptoOptions.properties.endpoint]
 description = 'Overrides the KMS endpoint (custom KMS, tests, VPC endpoints); must include scheme and host.'
 type = 'string'

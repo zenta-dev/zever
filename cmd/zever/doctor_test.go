@@ -193,6 +193,51 @@ func TestRunDoctorNotStrictIgnoresBatteryFailure(t *testing.T) {
 
 var errFakeBatteryFailure = errors.New("fake battery failure")
 
+func TestRunDoctorFlagsDevKeyInNonDevEnv(t *testing.T) {
+	t.Setenv("ZEVER_ENV", "")
+
+	var out bytes.Buffer
+	if err := runDoctorWith(DoctorConfig{Out: &out}); err != nil {
+		t.Fatalf("runDoctorWith: %v", err)
+	}
+
+	line, ok := doctorLine(out.String(), "crypto")
+	if !ok {
+		t.Fatalf("output missing crypto row:\n%s", out.String())
+	}
+	if !strings.Contains(line, "dev key") {
+		t.Errorf("crypto row %q does not flag the dev key", line)
+	}
+}
+
+func TestRunDoctorDevKeyAllowedInDevEnv(t *testing.T) {
+	t.Setenv("ZEVER_ENV", "test")
+
+	var out bytes.Buffer
+	if err := runDoctorWith(DoctorConfig{Out: &out}); err != nil {
+		t.Fatalf("runDoctorWith: %v", err)
+	}
+
+	line, ok := doctorLine(out.String(), "crypto")
+	if !ok {
+		t.Fatalf("output missing crypto row:\n%s", out.String())
+	}
+	if strings.Contains(line, "FAIL") {
+		t.Errorf("crypto row %q not OK in dev env", line)
+	}
+}
+
+// doctorLine returns the output line whose first field is the battery name.
+func doctorLine(out, name string) (string, bool) {
+	for line := range strings.Lines(out) {
+		fields := strings.Fields(line)
+		if len(fields) > 0 && fields[0] == name {
+			return line, true
+		}
+	}
+	return "", false
+}
+
 func TestRunDoctorWithAllOK(t *testing.T) {
 	prev := doctorChecksFor
 	t.Cleanup(func() { doctorChecksFor = prev })

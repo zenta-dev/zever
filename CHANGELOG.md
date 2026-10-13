@@ -18,6 +18,22 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   `gh attestation verify <binary> --repo zenta-dev/zever` command. New
   offline test harness: `sh tools/installer-test.sh` (also wired into
   `make check` and CI).
+- `fix(crypto)!: reject the public dev key unless explicitly allowed`:
+- `fix(crypto)!: reject the public dev key unless explicitly allowed`: the
+  local crypto adapter now fails `Open` with a typed `DevKeyError`
+  (sentinel `ErrDevKey`, with a fix hint) when the deterministic public
+  dev key is supplied without an explicit allow. The dev key is accepted
+  only when `crypto.options.allow_dev_key: true` is set in the config file
+  or `ZEVER_ENV` is `dev`, `test`, or `development`; every other
+  environment (including an unset `ZEVER_ENV`) must supply a real key.
+  This removes the old opt-out `ZEVER_CRYPTO_REQUIRE_REAL_KEY` escape
+  hatch: the dev key is now rejected by default instead of accepted by
+  default, so a production deploy that forgets to configure crypto fails
+  closed instead of silently running with a publicly known key. The
+  scaffolded `zever new` dev config writes `allow_dev_key: true` plus the
+  dev key with a comment, and `zever doctor` flags the dev key in
+  non-dev environments. Test fixtures must set `allow_dev_key` or
+  `ZEVER_ENV` explicitly when resolving crypto from `config.Default()`.
 
 ### Added
 
