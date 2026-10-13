@@ -26,6 +26,17 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   linter cannot read `go1.27.2` export data); the CI binary cache is now
   keyed on `go.work` so future toolchain bumps rebuild it.
 
+### Changed
+
+- `refactor(container): identity-based close dedup without unsafe`: `Close`
+  now dedupes services by the value's own reference identity (pointer, chan,
+  map, func, slice via `reflect.Value.Pointer`) instead of searching struct
+  fields for the first non-nil pointer. Two distinct services whose structs
+  embed the same pointer (e.g. a shared logger) both close now; previously
+  the second was skipped. The `unsafe` import is gone, and the 33-entry
+  `snapshots()` copy-paste collapsed into a generic `snap` helper over a
+  method-value table.
+
 ### Added
 
 - `install.sh` / `install.ps1`: richer output (plan summary, numbered steps,
