@@ -34,6 +34,31 @@ As a pre-1.0 project, security fixes are backported to the latest release. If yo
 | latest  | :white_check_mark: |
 | older   | :x:                |
 
+## Supply Chain
+
+Dependencies are scanned with `govulncheck` on every PR and on a daily
+schedule (`.github/workflows/ci.yml` `vulnerability` job,
+`.github/workflows/vulncheck.yml`). Reachable vulnerabilities fail the gate;
+accepted risk is recorded in `.github/govulncheck-allowlist.json` with a
+reason and an expiry date, and expired entries fail closed so every
+acceptance is re-triaged. Import-only (unreachable) findings are reported
+but never block.
+
+Every CI build publishes a CycloneDX SBOM per module and attests the SBOMs
+and release binaries with SLSA build provenance
+(`actions/attest-build-provenance`). Verify a release artifact before
+running it:
+
+```sh
+gh attestation verify dist/zever-linux-amd64 --repo zenta-dev/zever
+gh attestation verify sbom/cmd_zever.json --repo zenta-dev/zever
+```
+
+The installer (`install.sh`, `install.ps1`) verifies the SHA-256 checksum
+before installing and runs `gh attestation verify` automatically when `gh`
+is present; without checksum tooling it aborts unless explicitly told not
+to (`--insecure-skip-verify` / `ZEVER_INSTALL_INSECURE=1`).
+
 ## Responsible Disclosure
 
 We ask that you:

@@ -561,9 +561,10 @@ jobs:
   vulnerability:
     name: govulncheck
     timeout-minutes: 30
-    # New advisories must not turn unrelated PRs red: on PRs the result is
-    # informational (still visible); main/schedule stay blocking.
-    continue-on-error: ${{ github.event_name == 'pull_request' }}
+    # Blocking on PRs and main: reachable vulnerabilities fail the gate.
+    # Accepted risk lives in .github/govulncheck-allowlist.json with a
+    # reason and an expiry date; expired entries fail closed. Unreachable
+    # (import-only) findings are reported but never block.
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
