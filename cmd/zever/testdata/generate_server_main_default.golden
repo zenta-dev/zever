@@ -10,6 +10,7 @@ import (
 	"context"
 	"crypto/tls"
 	"crypto/x509"
+	"encoding/json"
 	"errors"
 	"flag"
 	"fmt"
@@ -17,6 +18,7 @@ import (
 	"net/http"
 	"os"
 	"os/signal"
+	"sort"
 	"strings"
 	"syscall"
 	"time"
@@ -140,11 +142,204 @@ func isLoopbackAddr(addr string) bool {
 	return ip != nil && ip.IsLoopback()
 }
 
+// doctorEnabled returns the batteries enabled in the project's zever.yaml
+// (top-level keys, minus the "project" table), or nil when no project config
+// is found -- nil means check every known battery. It parses with the
+// standard library only: JSON decodes directly, and YAML -- which the
+// scaffold writes as one top-level "battery:" key per line at column zero --
+// scans for those keys. An unreadable file fails open to nil (check
+// everything) rather than silently skipping a battery.
+func doctorEnabled() map[string]bool {
+	for _, name := range []string{"zever.yaml", "zever.yml", "zever.json"} {
+		data, err := os.ReadFile(name)
+		if err != nil {
+			continue
+		}
+
+		if strings.HasSuffix(name, ".json") {
+			var doc map[string]json.RawMessage
+			if err := json.Unmarshal(data, &doc); err != nil {
+				return nil
+			}
+
+			delete(doc, "project")
+
+			out := make(map[string]bool, len(doc))
+			for k := range doc {
+				out[k] = true
+			}
+
+			return out
+		}
+
+		out := map[string]bool{}
+
+		for _, line := range strings.Split(string(data), "\n") {
+			if line == "" || line[0] == ' ' || line[0] == '\t' || line[0] == '#' {
+				continue
+			}
+
+			i := strings.IndexByte(line, ':')
+			if i <= 0 {
+				continue
+			}
+
+			key := strings.TrimSpace(line[:i])
+			if key == "" || key == "project" || !isDoctorBatteryKey(key) {
+				continue
+			}
+
+			out[key] = true
+		}
+
+		return out
+	}
+
+	return nil
+}
+
+// isDoctorBatteryKey reports whether s looks like a battery name in
+// zever.yaml: lowercase letters, digits and underscores only.
+func isDoctorBatteryKey(s string) bool {
+	if s == "" {
+		return false
+	}
+
+	for _, r := range s {
+		if r >= 'a' && r <= 'z' || r >= '0' && r <= '9' || r == '_' {
+			continue
+		}
+
+		return false
+	}
+
+	return true
+}
+
+// runDoctor resolves every enabled battery through this binary's real
+// container and registrations, prints one JSON document
+// ({"ok": bool, "batteries": [{"name", "ok", "error"}]}) to stdout, and
+// returns a non-nil error (exit 1) when any battery fails. It is the target
+// `zever doctor` execs inside a project (`go run <entry> --doctor`);
+// the CLI falls back to its own registry only when no built server is
+// available.
+func runDoctor() error {
+	cfg, err := app.Config()
+	if err != nil {
+		_ = json.NewEncoder(os.Stdout).Encode(map[string]any{
+			"ok": false,
+			"batteries": []any{
+				map[string]any{"name": "config", "ok": false, "error": err.Error()},
+			},
+		})
+
+		return err
+	}
+
+	c, err := app.New()
+	if err != nil {
+		return err
+	}
+
+	defer func() {
+		closeCtx, cancel := context.WithTimeout(context.Background(), shutdownGrace)
+		defer cancel()
+
+		_ = c.Close(closeCtx)
+	}()
+
+	checks := map[string]func() error{
+		"config":        cfg.Validate,
+		"ai":            func() error { _, err := c.AI(); return err },
+		"analytics":     func() error { _, err := c.Analytics(); return err },
+		"auth":          func() error { _, err := c.Auth(); return err },
+		"billing":       func() error { _, err := c.Billing(); return err },
+		"cache":         func() error { _, err := c.Cache(); return err },
+		"crypto":        func() error { _, err := c.Crypto(); return err },
+		"db":            func() error { _, err := c.DB(); return err },
+		"document":      func() error { _, err := c.Document(); return err },
+		"eventbus":      func() error { _, err := c.EventBus(); return err },
+		"flag":          func() error { _, err := c.Flag(); return err },
+		"geo":           func() error { _, err := c.Geo(); return err },
+		"i18n":          func() error { _, err := c.I18n(); return err },
+		"idempotency":   func() error { _, err := c.Idempotency(); return err },
+		"job":           func() error { _, err := c.Job(); return err },
+		"log":           func() error { _, err := c.Log(); return err },
+		"mailer":        func() error { _, err := c.Mailer(); return err },
+		"media":         func() error { _, err := c.Media(); return err },
+		"notification":  func() error { _, err := c.Notification(); return err },
+		"observability": func() error { _, err := c.Observability(); return err },
+		"password":      func() error { _, err := c.Password(); return err },
+		"payment":       func() error { _, err := c.Payment(); return err },
+		"permission":    func() error { _, err := c.Permission(); return err },
+		"queue":         func() error { _, err := c.Queue(); return err },
+		"ratelimit":     func() error { _, err := c.RateLimit(); return err },
+		"router":        func() error { _, err := c.Router(); return err },
+		"scheduler":     func() error { _, err := c.Scheduler(); return err },
+		"search":        func() error { _, err := c.Search(); return err },
+		"session":       func() error { _, err := c.Session(); return err },
+		"storage":       func() error { _, err := c.Storage(); return err },
+		"tenant":        func() error { _, err := c.Tenant(); return err },
+		"vectorstore":   func() error { _, err := c.VectorStore(); return err },
+		"webhook":       func() error { _, err := c.Webhook(); return err },
+		"workflow":      func() error { _, err := c.Workflow(); return err },
+	}
+
+	enabled := doctorEnabled()
+
+	names := make([]string, 0, len(checks))
+	for name := range checks {
+		if name == "config" || enabled == nil || enabled[name] {
+			names = append(names, name)
+		}
+	}
+
+	sort.Strings(names)
+
+	rows := make([]any, 0, len(names))
+	ok := true
+
+	for _, name := range names {
+		row := map[string]any{"name": name, "ok": true}
+
+		if err := checks[name](); err != nil {
+			ok = false
+			row["ok"] = false
+			row["error"] = err.Error()
+		}
+
+		rows = append(rows, row)
+	}
+
+	if err := json.NewEncoder(os.Stdout).Encode(map[string]any{"ok": ok, "batteries": rows}); err != nil {
+		return fmt.Errorf("server: encode doctor report: %w", err)
+	}
+
+	if !ok {
+		return errors.New("server: one or more batteries failed to resolve (see --doctor output)")
+	}
+
+	return nil
+}
+
 func main() {
 	addr := flag.String("addr", ":8080", "HTTP address to listen on")
 	grpcAddr := flag.String("grpc-addr", ":9090", "gRPC address to listen on")
+	doctorOnly := flag.Bool("doctor", false, "resolve every enabled battery, print the JSON report, and exit without serving")
 
 	flag.Parse()
+
+	if *doctorOnly {
+		if err := runDoctor(); err != nil {
+			// The log battery is not necessarily available this early, so the
+			// last-resort failure path writes to stderr directly.
+			_, _ = os.Stderr.WriteString("server: " + err.Error() + "\n")
+
+			os.Exit(1)
+		}
+
+		return
+	}
 
 	if err := run(*addr, *grpcAddr); err != nil {
 		// The log battery is not necessarily available this early, so the
