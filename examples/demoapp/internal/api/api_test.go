@@ -77,6 +77,7 @@ func newTestSetup(t *testing.T) testSetup {
 	tmp := t.TempDir()
 
 	cfg := config.Default()
+	cfg.Crypto.Options.AllowDevKey = true
 	cfg.DB.Options.Path = filepath.Join(tmp, "test.db")
 	cfg.Auth.Options.JWT.Secret = testJWTSecret
 	cfg.I18n.Options.Embed = i18n.EmbedOptions{FS: locales.FS, Dir: ".", Fallback: "en"}

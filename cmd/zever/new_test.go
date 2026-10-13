@@ -12,6 +12,7 @@ import (
 	"go.yaml.in/yaml/v3"
 
 	"github.com/zenta-dev/zever/config"
+	"github.com/zenta-dev/zever/core/crypto"
 )
 
 // Shared fixture helpers (withWorkingDir, readFile, readGenerated,
@@ -750,6 +751,53 @@ func TestRenderZeverYamlGolden(t *testing.T) {
 	}
 
 	assertGolden(t, "zever_yaml", data)
+}
+
+// TestRenderZeverYamlCryptoAllowDevKey proves a scaffolded crypto battery
+// ships allow_dev_key: true plus an explanatory comment, so a generated
+// project resolves the dev key out of the box while the comment tells the
+// developer to remove it for production.
+func TestRenderZeverYamlCryptoAllowDevKey(t *testing.T) {
+	cfg := NewConfig{Batteries: []string{"crypto", "log"}}
+
+	data, err := renderZeverYaml(cfg)
+	if err != nil {
+		t.Fatalf("renderZeverYaml: %v", err)
+	}
+
+	var doc map[string]any
+	if unmarshalErr := yaml.Unmarshal(data, &doc); unmarshalErr != nil {
+		t.Fatalf("parse yaml: %v", unmarshalErr)
+	}
+	cryptoSvc, ok := doc["crypto"].(map[string]any)
+	if !ok {
+		t.Fatalf("crypto entry missing or wrong shape: %v", doc["crypto"])
+	}
+	options, ok := cryptoSvc["options"].(map[string]any)
+	if !ok {
+		t.Fatalf("crypto options missing: %v", cryptoSvc)
+	}
+	if options["allow_dev_key"] != true {
+		t.Errorf("crypto options = %v, want allow_dev_key: true", options)
+	}
+
+	if !strings.Contains(string(data), "#") || !strings.Contains(string(data), "production") {
+		t.Errorf("zever.yaml lacks the dev-key comment:\n%s", data)
+	}
+
+	// The emitted file must load through the strict config loader with the
+	// dev key explicitly allowed.
+	cfgPath := writeInspectFixture(t, t.TempDir(), "zever.yaml", string(data))
+	loaded, err := config.Load(cfgPath)
+	if err != nil {
+		t.Fatalf("config.Load of rendered yaml: %v", err)
+	}
+	if !loaded.Crypto.Options.AllowDevKey {
+		t.Error("loaded crypto options: AllowDevKey = false, want true")
+	}
+	if !crypto.IsDevCryptoKey(loaded.Crypto.Options.Key) {
+		t.Errorf("loaded crypto key = %q, want the dev key", loaded.Crypto.Options.Key)
+	}
 }
 
 // TestRenderNewGoModGolden pins the exact bytes of a version-pinned go.mod

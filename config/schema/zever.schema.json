@@ -204,6 +204,7 @@
       "type": "object",
       "additionalProperties": false,
       "properties": {
+        "allow_dev_key": { "type": "boolean", "description": "Permits the deterministic public dev key for local development. When false (default), the local adapter rejects that key unless ZEVER_ENV is dev, test, or development." },
         "key": { "type": "string", "description": "Base64-encoded 32-byte encryption key. Required for the local adapter; optional for the kms adapter when any KMS field is set." },
         "sign_key": { "type": "string", "description": "Base64-encoded 64-byte signing key." },
         "key_id": { "type": "string", "description": "Primary KMS key identifier used for envelope encryption. Required when use_envelope is true." },

@@ -6,6 +6,7 @@ import (
 	"crypto/rand"
 	"encoding/base64"
 	"errors"
+	"strings"
 	"sync"
 	"testing"
 
@@ -63,22 +64,53 @@ func TestNew_Valid(t *testing.T) {
 	}
 }
 
-func TestNew_DevKeyRejectedWhenRequired(t *testing.T) {
+func TestNew_DevKeyRules(t *testing.T) {
 	const devKey = "MDEyMzQ1Njc4OTAxMjM0NTY3ODkwMTIzNDU2Nzg5MDE="
 
-	if _, err := New(crypto.Options{Key: devKey}); err != nil {
-		t.Fatalf("New(dev key) without env = %v, want nil", err)
+	t.Run("rejected without allow or dev env", func(t *testing.T) {
+		t.Setenv("ZEVER_ENV", "")
+		_, err := New(crypto.Options{Key: devKey})
+		if !errors.Is(err, crypto.ErrDevKey) {
+			t.Fatalf("New(dev key) err = %v, want ErrDevKey", err)
+		}
+		var dke crypto.DevKeyError
+		if !errors.As(err, &dke) {
+			t.Fatalf("err type = %T, want DevKeyError", err)
+		}
+		if !strings.Contains(err.Error(), "allow_dev_key") {
+			t.Errorf("error %q lacks fix hint", err)
+		}
+	})
+
+	t.Run("allowed via option", func(t *testing.T) {
+		t.Setenv("ZEVER_ENV", "")
+		if _, err := New(crypto.Options{Key: devKey, AllowDevKey: true}); err != nil {
+			t.Fatalf("New(dev key, allow_dev_key) err = %v, want nil", err)
+		}
+	})
+
+	for _, env := range []string{"dev", "test", "development"} {
+		t.Run("allowed via ZEVER_ENV="+env, func(t *testing.T) {
+			t.Setenv("ZEVER_ENV", env)
+			if _, err := New(crypto.Options{Key: devKey}); err != nil {
+				t.Fatalf("New(dev key) with ZEVER_ENV=%s err = %v, want nil", env, err)
+			}
+		})
 	}
 
-	t.Setenv("ZEVER_CRYPTO_REQUIRE_REAL_KEY", "1")
-	_, err := New(crypto.Options{Key: devKey})
-	if !errors.Is(err, crypto.ErrInvalidKey) {
-		t.Fatalf("New(dev key) with env = %v, want ErrInvalidKey", err)
-	}
+	t.Run("rejected via ZEVER_ENV=production", func(t *testing.T) {
+		t.Setenv("ZEVER_ENV", "production")
+		if _, err := New(crypto.Options{Key: devKey}); !errors.Is(err, crypto.ErrDevKey) {
+			t.Fatalf("New(dev key) with ZEVER_ENV=production err = %v, want ErrDevKey", err)
+		}
+	})
 
-	if _, err := New(crypto.Options{Key: genAESKey(t)}); err != nil {
-		t.Fatalf("New(real key) with env = %v, want nil", err)
-	}
+	t.Run("real key unaffected", func(t *testing.T) {
+		t.Setenv("ZEVER_ENV", "")
+		if _, err := New(crypto.Options{Key: genAESKey(t)}); err != nil {
+			t.Fatalf("New(real key) err = %v, want nil", err)
+		}
+	})
 }
 
 func TestEncryptDecrypt_RoundTrip(t *testing.T) {

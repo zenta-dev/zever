@@ -33,6 +33,12 @@ type Options struct {
 	Endpoint string `json:"endpoint" toml:"endpoint" yaml:"endpoint"`
 	// UseEnvelope selects KMS envelope encryption. When true, KeyID is required.
 	UseEnvelope bool `json:"use_envelope" toml:"use_envelope" yaml:"use_envelope"`
+	// AllowDevKey permits the deterministic public dev/test key
+	// (DevCryptoKey) for local development. When false (the default), the
+	// local adapter rejects that key unless ZEVER_ENV is dev, test, or
+	// development (see crypto.DevKeyAllowed). Production must leave this
+	// unset and supply a real Key.
+	AllowDevKey bool `json:"allow_dev_key" toml:"allow_dev_key" yaml:"allow_dev_key"`
 }
 
 // Validate checks options for consistency, joining all violations.

@@ -217,6 +217,11 @@ never echoed.
 them (crypto key). They are public and must never reach production:
 supply real secrets via file or environment.
 
+The crypto dev key is rejected by the local adapter unless explicitly
+allowed: set `crypto.options.allow_dev_key: true` in the config file, or
+run with `ZEVER_ENV=dev|test|development`. Anything else must supply a
+real key (`crypto.options.key`).
+
 ## Discovery
 
 `Load("")` probes `zever.yaml`, `zever.yml`, then `zever.json` in the
