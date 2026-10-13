@@ -2,9 +2,28 @@ package main
 
 import (
 	"errors"
+	"os"
+	"path/filepath"
 	"reflect"
 	"testing"
 )
+
+// writeServePreflight creates the minimal files preflightServe requires:
+// go.mod, go.sum and the entrypoint dir with a stub main. Entries defaults
+// to defaultServerEntry when empty.
+func writeServePreflight(t *testing.T, dir string, entries ...string) {
+	t.Helper()
+
+	entry := defaultServerEntry
+	if len(entries) > 0 && entries[0] != "" {
+		entry = entries[0]
+	}
+	writeZeverFixture(t, dir, "go.mod", "module example.com/svc\n\ngo 1.27.2\n")
+	writeZeverFixture(t, dir, "go.sum", "dummy\n")
+	writeZeverFixture(t, dir, filepath.Join(entry, "main.go"), "package main\nfunc main(){}\n")
+	// Ensure the file mode path exists even when helpers change.
+	_ = os.MkdirAll(filepath.Join(dir, entry), 0o750)
+}
 
 // launchCall records one stubbed execLaunch invocation.
 type launchCall struct {
@@ -50,7 +69,9 @@ func assertOneLaunch(t *testing.T, calls *[]launchCall, entry string, args []str
 }
 
 func TestRunServeUsesDefaultServerEntry(t *testing.T) {
-	t.Chdir(t.TempDir())
+	dir := t.TempDir()
+	writeServePreflight(t, dir, defaultServerEntry)
+	t.Chdir(dir)
 
 	calls := stubLaunch(t, nil)
 
@@ -64,6 +85,7 @@ func TestRunServeUsesDefaultServerEntry(t *testing.T) {
 func TestRunServeUsesConfiguredServerEntry(t *testing.T) {
 	dir := t.TempDir()
 	writeZeverFixture(t, dir, "zever.yaml", "project:\n  server_entry: cmd/api\n")
+	writeServePreflight(t, dir, "cmd/api")
 	t.Chdir(dir)
 
 	calls := stubLaunch(t, nil)
@@ -76,7 +98,9 @@ func TestRunServeUsesConfiguredServerEntry(t *testing.T) {
 }
 
 func TestRunServePropagatesLaunchError(t *testing.T) {
-	t.Chdir(t.TempDir())
+	dir := t.TempDir()
+	writeServePreflight(t, dir)
+	t.Chdir(dir)
 
 	want := errors.New("boom")
 	_ = stubLaunch(t, want)

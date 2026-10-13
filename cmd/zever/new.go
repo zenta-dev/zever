@@ -2,12 +2,15 @@ package main
 
 import (
 	"bytes"
+	"context"
 	"flag"
 	"fmt"
 	"os"
+	"os/exec"
 	"path/filepath"
 	"sort"
 	"strings"
+	"time"
 
 	"go.yaml.in/yaml/v3"
 
@@ -18,6 +21,7 @@ import (
 
 const newUsage = `zever new <name> [--module PATH] [--dir PATH] [--framework-version V] [--force]
                      [--interactive] [--batteries a,b] [--adapters b1=a1,b2=a2] [-y|--yes] [--list-batteries]
+                     [--no-tidy] [--dry-run]
 
 Scaffolds a brand new, buildable zever application from scratch: a fresh
 go.mod, a starter schema/app.zen (one User entity), cmd/server + cmd/worker +
@@ -61,9 +65,13 @@ const (
 	// needs so that "go tool protoc-gen-go-grpc" works out of the box.
 	grpcGoToolModulePath = "google.golang.org/grpc/cmd/protoc-gen-go-grpc"
 
+	// grpcGoToolVersion pins the tool dependency (matching dsl/go.mod) so
+	// `go mod tidy` resolves offline from the module cache.
+	grpcGoToolVersion = "v1.6.2"
+
 	// defaultGoVersion is used when no go directive can be read from the
 	// framework checkout or an existing project.
-	defaultGoVersion = "1.27"
+	defaultGoVersion = "1.27.2"
 
 	// FrameworkVersion is the published framework version a new project
 	// depends on by default and `zever add` pins new requirements to. It
@@ -179,6 +187,7 @@ func newNewFlagSet() *flag.FlagSet {
 	fs.Bool("y", false, "alias for --yes")
 	fs.Bool("list-batteries", false, "print the battery/default-adapter table to stdout and exit")
 	fs.Bool("dry-run", false, "print the scaffold plan without writing any files")
+	fs.Bool("no-tidy", false, "skip running 'go mod tidy' after scaffolding")
 
 	fs.Usage = func() {
 		_, _ = fmt.Fprintf(fs.Output(), newUsage+"\n", defaultFrameworkVersion)
@@ -357,7 +366,41 @@ func runNew(args []string) error {
 		return err
 	}
 
+	if !flagBool(fs, "no-tidy") && !plan.ExistingProject {
+		if tidyErr := runGoModTidyFunc(tag, outDir); tidyErr != nil {
+			return tidyErr
+		}
+	}
+
 	printNewSummary(plan, written)
+
+	return nil
+}
+
+// DefaultTidyTimeout bounds `go mod tidy` after scaffolding.
+const DefaultTidyTimeout = 2 * time.Minute
+
+// runGoModTidyFunc is a seam so tests stub the toolchain.
+var runGoModTidyFunc = runGoModTidy
+
+// runGoModTidy runs `go mod tidy` in dir, returning an actionable error on
+// failure instead of raw go output.
+func runGoModTidy(tag, dir string) error {
+	goBin, err := exec.LookPath("go")
+	if err != nil {
+		return fmt.Errorf("%s: go toolchain not found on PATH, run `go mod tidy` in %q manually: %w", tag, dir, err)
+	}
+
+	ctx, cancel := context.WithTimeout(context.Background(), DefaultTidyTimeout)
+	defer cancel()
+
+	cmd := exec.CommandContext(ctx, goBin, "mod", "tidy")
+	cmd.Dir = dir
+
+	out, err := cmd.CombinedOutput()
+	if err != nil {
+		return fmt.Errorf("%s: go mod tidy in %q failed, run `go mod tidy` in %q manually: %w: %s", tag, dir, dir, err, strings.TrimSpace(string(out)))
+	}
 
 	return nil
 }
@@ -942,11 +985,19 @@ func defaultServiceAdapter(name string) string {
 	return ""
 }
 
+// scaffoldBootBatteries are the zero-infra batteries every generated
+// server entrypoint unconditionally resolves (see serverTemplate's
+// c.Auth/c.Permission/c.Observability/c.DB/c.Router/c.Log calls plus the
+// default-on c.RateLimit wiring). `zever new` always includes them so
+// /healthz and /readyz pass out of the box; `zever generate server`'s
+// floor (coreBatteries) stays minimal for existing projects.
+var scaffoldBootBatteries = []string{"auth", "db", "observability", "permission", "ratelimit"}
+
 // batteriesFor merges coreBatteries with optional (developer-picked)
 // batteries, adding "cache" whenever cacheAdapter is a real override --
 // explicit intent to use caching even when "cache" wasn't itself picked.
 func batteriesFor(optional []string, cacheAdapter string) []string {
-	batteries := mergeBatteries(coreBatteries, optional)
+	batteries := mergeBatteries(mergeBatteries(coreBatteries, scaffoldBootBatteries), optional)
 
 	if cacheAdapter != "" {
 		batteries = mergeBatteries(batteries, []string{"cache"})
@@ -1051,6 +1102,13 @@ const zeverYamlSchemaModeline = "# yaml-language-server: $schema=./zever.schema.
 // the scaffolded project itself. loadProjectConfig assumes the defaults
 // below for a missing table, which is exactly the layout writeNewProject
 // scaffolds, so nothing is lost.
+// devAuthSecret is the deterministic dev-only JWT secret scaffolded into
+// zever.yaml so `zever serve` boots without extra env. Public, never prod.
+const devAuthSecret = "zever-dev-only-not-a-secret-0123456789ab" //nolint:gosec // deterministic dev-only secret, never production
+
+// devAuthIssuer is the scaffolded JWT issuer for local development.
+const devAuthIssuer = "dev"
+
 func renderZeverYaml(cfg NewConfig) ([]byte, error) {
 	batteries := make(map[string]batteryYAML, len(cfg.Batteries))
 	for _, sel := range cfg.batterySelections() {
@@ -1061,6 +1119,16 @@ func renderZeverYaml(cfg NewConfig) ([]byte, error) {
 			entry.Options = map[string]any{
 				"key":           crypto.DevCryptoKey,
 				"allow_dev_key": true,
+			}
+		}
+		if sel.Battery == "auth" && sel.Adapter == "jwt" {
+			// jwt Open requires a 32+ byte secret; scaffold a public
+			// dev-only one so the server boots with no extra env.
+			entry.Options = map[string]any{
+				"jwt": map[string]any{
+					"secret": devAuthSecret,
+					"issuer": devAuthIssuer,
+				},
 			}
 		}
 		batteries[sel.Battery] = entry
@@ -1417,7 +1485,7 @@ func renderNewGoMod(tag string, cfg NewConfig) ([]byte, error) {
 		// full module graph (container requires every core module for its
 		// wiring). Version-less replaces keep those commands offline
 		// without widening the project's requirements.
-		rest := make([]string, 0, len(nestedModuleDirs)+len(sharedModuleDirs))
+		rest := make([]string, 0, len(nestedModuleDirs)+len(sharedModuleDirs)+1)
 		for _, dir := range nestedModuleDirs {
 			if path := frameworkModulePath + "/" + dir; !seen[path] {
 				rest = append(rest, path)
@@ -1427,6 +1495,11 @@ func renderNewGoMod(tag string, cfg NewConfig) ([]byte, error) {
 		for _, dir := range sharedModuleDirs {
 			rest = append(rest, frameworkModulePath+"/"+dir)
 		}
+
+		// orm is a transitive framework module (container requires it) with
+		// no adapter dir of its own; without a replace `go mod tidy`
+		// fetches it from the proxy even against a local checkout.
+		rest = append(rest, frameworkModulePath+"/orm")
 
 		for battery := range allServiceAdapters {
 			if path := coreModulePath(battery); !seen[path] {
@@ -1460,9 +1533,14 @@ func renderNewGoMod(tag string, cfg NewConfig) ([]byte, error) {
 		_, _ = fmt.Fprintf(&b, "require %s %s\n", path, cfg.FrameworkVersion)
 	}
 
+	// Pin the tool dependency version (matching dsl/go.mod) so `go mod tidy`
+	// resolves offline from the module cache instead of querying the proxy
+	// for the latest version providing the tool package.
+	_, _ = fmt.Fprintf(&b, "require %s %s\n", grpcGoToolModulePath, grpcGoToolVersion)
+
 	_, _ = fmt.Fprintf(&b, "\n// protogogen's grpc codegen shells out to this pinned tool dependency\n"+
 		"// (\"go tool protoc-gen-go-grpc\") instead of requiring a protoc-gen-go-grpc\n"+
-		"// binary on PATH; `go mod tidy` resolves its version and go.sum entries\n"+
+		"// binary on PATH; `go mod tidy` resolves its go.sum entries\n"+
 		"// automatically.\ntool %s\n",
 		grpcGoToolModulePath)
 
@@ -1668,8 +1746,8 @@ everything else is resolved from a ` + backtick + `container.Container` + backti
 ## Quickstart
 
 ` + "```bash" + `
-go mod tidy
-
+# ` + "`go mod tidy`" + ` already ran during ` + "`zever new`" + ` (pass --no-tidy to skip);
+# re-run it only after editing go.mod.
 # turn schema/app.zen into a query builder (generated/zenorm/orm/gen/app), a
 # Protobuf service definition (generated/proto) and SQL DDL
 zever compile --backend=%[2]s schema/app.zen
@@ -1746,10 +1824,9 @@ func printNewSummary(cfg NewConfig, written []string) {
 	next := joinLines(
 		bold("Next steps:"),
 		"  "+dim("1.")+"  "+cmd("cd "+cfg.OutDir),
-		"  "+dim("2.")+"  "+cmd("go mod tidy"),
-		"  "+dim("3.")+"  "+cmd("zever compile --backend="+quickstartBackends(cfg)+" schema/app.zen"),
-		"  "+dim("4.")+"  "+cmd("zever db migrate --adapter=sqlite --dsn=data/app.db schema/app.zen"),
-		"  "+dim("5.")+"  "+cmd("zever serve"),
+		"  "+dim("2.")+"  "+cmd("zever compile --backend="+quickstartBackends(cfg)+" schema/app.zen"),
+		"  "+dim("3.")+"  "+cmd("zever db migrate --adapter=sqlite --dsn=data/app.db schema/app.zen"),
+		"  "+dim("4.")+"  "+cmd("zever serve"),
 	)
 
 	_, _ = fmt.Fprintln(os.Stdout, "")

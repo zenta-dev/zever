@@ -148,6 +148,16 @@ func TestRunNewScaffoldsAndBuilds(t *testing.T) {
 		"require github.com/zenta-dev/zever/core/router ",
 		"require github.com/zenta-dev/zever/adapters/log/slog ",
 		"require github.com/zenta-dev/zever/adapters/router/stdhttp ",
+		"require github.com/zenta-dev/zever/core/auth ",
+		"require github.com/zenta-dev/zever/adapters/auth/jwt ",
+		"require github.com/zenta-dev/zever/core/permission ",
+		"require github.com/zenta-dev/zever/adapters/permission/noop ",
+		"require github.com/zenta-dev/zever/core/observability ",
+		"require github.com/zenta-dev/zever/adapters/observability/stdout ",
+		"require github.com/zenta-dev/zever/core/db ",
+		"require github.com/zenta-dev/zever/adapters/db/sqlite ",
+		"require github.com/zenta-dev/zever/core/ratelimit ",
+		"require github.com/zenta-dev/zever/adapters/ratelimit/memory ",
 	} {
 		if !strings.Contains(gomod, fragment) {
 			t.Fatalf("go.mod lacks %q:\n%s", fragment, gomod)
@@ -384,13 +394,16 @@ func TestRunNewScaffoldsMinimalZeverYaml(t *testing.T) {
 		t.Fatalf("parse zever.yaml: %v", err)
 	}
 
-	if len(doc) != len(coreBatteries) {
-		t.Fatalf("zever.yaml lists %d services, want exactly the %d core ones: %v", len(doc), len(coreBatteries), doc)
+	// Default scaffold is floor plus boot-required batteries so the
+	// generated server resolves out of the box (P3-2).
+	want := mergeBatteries(coreBatteries, scaffoldBootBatteries)
+	if len(doc) != len(want) {
+		t.Fatalf("zever.yaml lists %d services, want %d boot ones: %v", len(doc), len(want), doc)
 	}
 
-	for _, b := range coreBatteries {
+	for _, b := range want {
 		if _, ok := doc[b]; !ok {
-			t.Errorf("zever.yaml missing core service %q", b)
+			t.Errorf("zever.yaml missing boot service %q", b)
 		}
 	}
 
@@ -1134,8 +1147,9 @@ func TestRunNewFlagOnlyMatchesFloorGolden(t *testing.T) {
 		t.Fatalf("parse zever.yaml: %v", err)
 	}
 
-	if len(doc) != len(coreBatteries) {
-		t.Fatalf("zever.yaml lists %d services, want exactly the %d core ones: %v", len(doc), len(coreBatteries), doc)
+	want := mergeBatteries(coreBatteries, scaffoldBootBatteries)
+	if len(doc) != len(want) {
+		t.Fatalf("zever.yaml lists %d services, want %d boot ones: %v", len(doc), len(want), doc)
 	}
 }
 
@@ -1188,8 +1202,9 @@ func TestRunNewYesSkipsPicker(t *testing.T) {
 		t.Fatalf("parse zever.yaml: %v", err)
 	}
 
-	if len(doc) != len(coreBatteries) {
-		t.Fatalf("-y scaffolded %d services, want exactly the %d floor ones: %v", len(doc), len(coreBatteries), doc)
+	want := mergeBatteries(coreBatteries, scaffoldBootBatteries)
+	if len(doc) != len(want) {
+		t.Fatalf("-y scaffolded %d services, want %d boot ones: %v", len(doc), len(want), doc)
 	}
 }
 
