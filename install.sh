@@ -3,7 +3,7 @@
 #
 # Usage:
 #   sh install.sh [--version vX.Y.Z] [--prefix DIR] [--yes] [--force] [--dry-run]
-#                 [--quiet] [--no-color] [--help]
+#                 [--quiet] [--no-color] [--insecure-skip-verify] [--help]
 #
 # One-liner:
 #   curl --proto '=https' --tlsv1.2 -sSf -L \
@@ -37,6 +37,7 @@ FORCE=0
 DRY_RUN=0
 QUIET=0
 NO_COLOR_FLAG=0
+INSECURE_SKIP_VERIFY=0
 TMPD=""
 START_TS="$(date +%s 2>/dev/null || echo 0)"
 STEP_N=0
@@ -140,6 +141,9 @@ Options:
   --dry-run     show every action without executing it
   --quiet, -q   only print warnings, errors, and the PATH snippet
   --no-color    disable colour output (also honours \$NO_COLOR and TERM=dumb)
+  --insecure-skip-verify
+                skip SHA256 checksum verification (UNSAFE: installs unverified
+                binaries; also via \$ZEVER_INSTALL_INSECURE=1)
   --help, -h    print this help and exit
 
 Environment:
@@ -147,6 +151,8 @@ Environment:
   ZEVER_PREFIX   same as --prefix
   NO_COLOR       disable colour output
   FORCE_COLOR    force colour output even when stderr is not a terminal
+  ZEVER_INSTALL_INSECURE=1
+                same as --insecure-skip-verify (skip checksum verification)
 
 Examples:
   sh install.sh
@@ -320,6 +326,10 @@ while [ $# -gt 0 ]; do
             NO_COLOR_FLAG=1
             shift
             ;;
+        --insecure-skip-verify)
+            INSECURE_SKIP_VERIFY=1
+            shift
+            ;;
         --help|-h)
             usage
             exit 0
@@ -340,6 +350,11 @@ while [ $# -gt 0 ]; do
 done
 ui_init
 [ $# -eq 0 ] || usage_err "unexpected argument: $1"
+
+# Escape hatch: ZEVER_INSTALL_INSECURE=1 equals --insecure-skip-verify.
+if [ "${ZEVER_INSTALL_INSECURE:-}" = "1" ]; then
+    INSECURE_SKIP_VERIFY=1
+fi
 
 VERSION="$(normalize_version "$VERSION")"
 valid_version "$VERSION" || { err "invalid version: $VERSION (want vX.Y.Z)"; exit 2; }
@@ -412,8 +427,17 @@ case "$_GO_MAJOR.$_GO_MINOR" in
     *[!0-9.]*|"".*|.*""|*.*.*) die_hint "could not parse go version from '${_GO_VER_STR}'" "need go >= ${GO_MIN_MAJOR}.${GO_MIN_MINOR} from ${GO_DL_URL}" ;;
 esac
 if [ "$(num_cmp "$_GO_MAJOR" "$GO_MIN_MAJOR")" -lt 0 ] || \
-   { [ "$(num_cmp "$_GO_MAJOR" "$GO_MIN_MAJOR")" -eq 0 ] && [ "$(num_cmp "$_GO_MINOR" "$GO_MIN_MINOR")" -lt 0 ]; }; then
+    { [ "$(num_cmp "$_GO_MAJOR" "$GO_MIN_MAJOR")" -eq 0 ] && [ "$(num_cmp "$_GO_MINOR" "$GO_MIN_MINOR")" -lt 0 ]; }; then
     die_hint "go ${_GO_VER} is too old (need go >= ${GO_MIN_MAJOR}.${GO_MIN_MINOR})" "upgrade Go from ${GO_DL_URL}, then re-run"
+fi
+
+# Fail closed: checksum verification is mandatory. Without a sha256 tool the
+# installer refuses to run (even --dry-run) unless the user explicitly opts
+# out via --insecure-skip-verify / ZEVER_INSTALL_INSECURE=1.
+if [ "$INSECURE_SKIP_VERIFY" -eq 0 ] && \
+    ! command -v sha256sum >/dev/null 2>&1 && ! command -v shasum >/dev/null 2>&1; then
+    die_hint "no sha256sum or shasum found; refusing to install without checksum verification" \
+        "install a sha256 tool and re-run, or pass --insecure-skip-verify (or set ZEVER_INSTALL_INSECURE=1) to proceed unverified"
 fi
 
 download_file() {
@@ -589,8 +613,11 @@ install_asset() {
         [ -n "${_want:-}" ] || die "no checksum entry for ${_asset} in SHA256SUMS.txt"
         [ "$_want" = "$_got" ] || die_hint "SHA256 mismatch for ${_asset} (want ${_want}, got ${_got})" "do NOT use this binary; retry, and report it if it persists"
         ok "verified ${_asset} ${C_DIM}(${_size}, sha256 $(printf '%s' "$_got" | cut -c1-12)...)${C_RESET}"
+    elif [ "$INSECURE_SKIP_VERIFY" -eq 1 ]; then
+        warn "skipping SHA256 verification of ${_asset} (--insecure-skip-verify); binary is unverified"
     else
-        warn "no sha256sum or shasum found; skipping SHA256 verification of ${_asset}"
+        die_hint "cannot verify ${_asset}: no sha256sum or shasum found" \
+            "pass --insecure-skip-verify (or set ZEVER_INSTALL_INSECURE=1) to proceed unverified"
     fi
     chmod +x "$TMPD/${_asset}"
     mv -f "$TMPD/${_asset}" "$_dest"
@@ -611,6 +638,10 @@ elif command -v gh >/dev/null 2>&1; then
         else
             warn "gh attestation verify failed for ${_bin}"
         fi
+    done
+else
+    for _bin in "$TARGET_BIN" "$TARGET_LSP"; do
+        hint "gh not found; verify manually: gh attestation verify ${_bin} --repo ${ZEVER_REPO}"
     done
 fi
 

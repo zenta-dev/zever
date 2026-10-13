@@ -66,6 +66,10 @@ Install the `zever` CLI with the one-line installer, then add the Zever modules 
 If `zever` already exists, `install.sh` upgrades it in place: older installs ask for confirmation, re-running the same version skips, and downgrading from a newer install asks for confirmation. Non-interactive shells need `--yes`. Output is colourised on a terminal; pass `--quiet` (`-Quiet` on Windows) for errors only, or `--no-color` (`-NoColor`) / set `NO_COLOR` to disable colour. `zever-lsp` is always matched to the CLI version (it has no version flag).
 </Aside>
 
+<Aside type="caution" title="Checksum verification is mandatory">
+Every binary is verified against the release's `SHA256SUMS.txt` before installation. If no SHA-256 tool (`sha256sum`/`shasum`) is available, or hashing fails, the installer aborts instead of installing unverified binaries. To proceed unverified (unsafe), pass `--insecure-skip-verify` (`-InsecureSkipVerify` on Windows) or set `ZEVER_INSTALL_INSECURE=1`. When `gh` is not installed, the installer prints the manual provenance check: `gh attestation verify <binary> --repo zenta-dev/zever`.
+</Aside>
+
 ## Add the modules to your project
 
 Create a module and fetch the Zever modules you need at the same pinned version.

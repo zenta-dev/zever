@@ -27,6 +27,7 @@ param(
   [Alias("WhatIf")][switch]$DryRun,
   [switch]$Quiet,
   [switch]$NoColor,
+  [switch]$InsecureSkipVerify,
   [switch]$Help
 )
 
@@ -108,6 +109,9 @@ Usage: install.ps1 [-Version vX.Y.Z] [-Prefix DIR] [-Yes] [-Force] [-DryRun]
   -DryRun   show every action without executing it (also via -WhatIf)
   -Quiet    only print warnings and errors
   -NoColor  disable colour output (also honours `$env:NO_COLOR)
+  -InsecureSkipVerify
+            skip SHA256 checksum verification (UNSAFE: installs unverified
+            binaries; also via `$env:ZEVER_INSTALL_INSECURE=1)
   -Help     print this help and exit
 
 Examples:
@@ -170,6 +174,9 @@ function Read-Yes([string]$Prompt) {
 
 if ($Help) { Show-Usage; exit 0 }
 if ($Force) { $Yes = $true }
+
+# Escape hatch: $env:ZEVER_INSTALL_INSECURE=1 equals -InsecureSkipVerify.
+if ($env:ZEVER_INSTALL_INSECURE -eq "1") { $InsecureSkipVerify = $true }
 
 if (-not $Version.StartsWith("v")) { $Version = "v$Version" }
 if (-not (Test-VersionShape $Version)) {
@@ -361,11 +368,20 @@ try {
     if (-not $want) {
       Stop-Install "no checksum entry for $asset in SHA256SUMS.txt"
     }
-    $got = (Get-FileHash -Algorithm SHA256 -Path $tmpFile).Hash.ToLower()
-    if ($got -ne $want.ToLower()) {
-      Stop-Install "SHA256 mismatch for $asset (want $want, got $got)" "do NOT use this binary; retry, and report it if it persists"
+    if ($InsecureSkipVerify) {
+      Write-WarnMsg "skipping SHA256 verification of $asset (-InsecureSkipVerify); binary is unverified"
+    } else {
+      $got = $null
+      try {
+        $got = (Get-FileHash -Algorithm SHA256 -Path $tmpFile).Hash.ToLower()
+      } catch {
+        Stop-Install "could not hash $asset : $_" "pass -InsecureSkipVerify to proceed unverified"
+      }
+      if ($got -ne $want.ToLower()) {
+        Stop-Install "SHA256 mismatch for $asset (want $want, got $got)" "do NOT use this binary; retry, and report it if it persists"
+      }
+      Write-Ok "verified $asset $cDim($size, sha256 $($got.Substring(0, 12))...)$cReset"
     }
-    Write-Ok "verified $asset $cDim($size, sha256 $($got.Substring(0, 12))...)$cReset"
     Move-Item -Force $tmpFile $dest
     if ((Get-Item $dest).Length -eq 0) {
       Stop-Install "installed $dest is empty"
@@ -385,6 +401,10 @@ try {
       } catch { $attested = $false }
       if ($attested) { Write-Ok "attestation verified for $(Split-Path $bin -Leaf)" }
       else { Write-WarnMsg "gh attestation verify failed for $bin" }
+    }
+  } else {
+    foreach ($bin in @($ZeverExe, $LspExe)) {
+      Write-Hint "gh not found; verify manually: gh attestation verify $bin --repo $ZeverRepo"
     }
   }
 } finally {
