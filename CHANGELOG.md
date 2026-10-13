@@ -68,6 +68,15 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   linter cannot read `go1.27.2` export data); the CI binary cache is now
   keyed on `go.work` so future toolchain bumps rebuild it.
 
+### Tests
+
+- `test(orm): fuzz JSON path key escaping`: native Go fuzz targets
+  `FuzzSQLiteJSONPathKey` and `FuzzPostgresJSONPathKey` prove
+  `sqlitePathLiteral` and `pgPathArray` never emit an unescaped
+  string-literal terminator for arbitrary json path keys (quotes,
+  backslashes, NUL, unicode, `}`/`,`/`{`), with seed corpus under
+  `orm/render/testdata/fuzz`.
+
 ### Changed
 
 - `refactor(container): identity-based close dedup without unsafe`: `Close`
