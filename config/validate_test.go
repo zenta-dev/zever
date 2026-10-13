@@ -83,6 +83,56 @@ func TestValidateWrapsTypedErrors(t *testing.T) {
 	}
 }
 
+func TestValidateRateLimitBadTrustedProxy(t *testing.T) {
+	t.Parallel()
+	cfg := Default()
+	cfg.RateLimit.Options.TrustedProxies = []string{"not-a-cidr"}
+	err := cfg.Validate()
+	if err == nil {
+		t.Fatal("want error for malformed trusted_proxies entry")
+	}
+	if !strings.Contains(err.Error(), "ratelimit") {
+		t.Fatalf("missing service name: %v", err)
+	}
+	if !strings.Contains(err.Error(), "trusted_proxies") {
+		t.Fatalf("missing field name: %v", err)
+	}
+}
+
+func TestValidateRateLimitGoodTrustedProxies(t *testing.T) {
+	t.Parallel()
+	cfg := Default()
+	cfg.RateLimit.Options.TrustedProxies = []string{"10.0.0.0/8", "2001:db8::/32"}
+	if err := cfg.Validate(); err != nil {
+		t.Fatalf("valid trusted_proxies must validate: %v", err)
+	}
+}
+func TestLoadRateLimitTrustedProxies(t *testing.T) {
+	t.Parallel()
+	p := writeFile(t, t.TempDir(), "zever.yaml",
+		"ratelimit:\n  adapter: memory\n  options:\n    rate: 10\n    burst: 20\n    trusted_proxies:\n      - 10.0.0.0/8\n      - 2001:db8::/32\n")
+	cfg, err := Load(p)
+	if err != nil {
+		t.Fatalf("Load: %v", err)
+	}
+	if len(cfg.RateLimit.Options.TrustedProxies) != 2 {
+		t.Fatalf("TrustedProxies = %v, want 2 entries", cfg.RateLimit.Options.TrustedProxies)
+	}
+}
+
+func TestLoadRateLimitBadTrustedProxy(t *testing.T) {
+	t.Parallel()
+	p := writeFile(t, t.TempDir(), "zever.yaml",
+		"ratelimit:\n  adapter: memory\n  options:\n    rate: 10\n    burst: 20\n    trusted_proxies:\n      - not-a-cidr\n")
+	_, err := Load(p)
+	if err == nil {
+		t.Fatal("want error for malformed trusted_proxies entry")
+	}
+	if !strings.Contains(err.Error(), "trusted_proxies") {
+		t.Fatalf("error = %q, want it to name trusted_proxies", err)
+	}
+}
+
 func TestValidateRouterTLSUnpaired(t *testing.T) {
 	t.Parallel()
 	cfg := Default()

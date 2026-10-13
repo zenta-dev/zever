@@ -5,7 +5,9 @@ import (
 	"math"
 	"net"
 	"net/http"
+	"net/netip"
 	"strconv"
+	"strings"
 
 	"google.golang.org/grpc"
 	"google.golang.org/grpc/codes"
@@ -25,6 +27,77 @@ func RemoteAddrKey(r *http.Request) string {
 	}
 
 	return host
+}
+
+// ClientIPKey returns a rate-limit key func that trusts X-Forwarded-For
+// only behind trusted proxies. The peer address (RemoteAddr host part) is
+// the anchor: when it is not inside one of trusted, or when it does not
+// parse as an IP, the result is RemoteAddrKey(r) and any X-Forwarded-For
+// header is ignored, so a spoofed header from an untrusted client can
+// never select another client's bucket. When the peer is trusted, the
+// result is the rightmost X-Forwarded-For entry outside every trusted
+// prefix (entries parse left to right; empty and malformed entries are
+// skipped); when every entry is trusted, the leftmost entry is the
+// client. With no header, or no parsable entry, the result is the peer.
+// A nil or empty trusted behaves exactly like RemoteAddrKey.
+func ClientIPKey(trusted []netip.Prefix) func(*http.Request) string {
+	return func(r *http.Request) string {
+		peerHost := RemoteAddrKey(r)
+		peer, err := parseIPHost(peerHost)
+		if err != nil {
+			return peerHost
+		}
+		if !containsPrefix(trusted, peer) {
+			return peerHost
+		}
+
+		var addrs []netip.Addr
+		for _, raw := range strings.Split(r.Header.Get("X-Forwarded-For"), ",") {
+			addr, err := parseIPHost(strings.TrimSpace(raw))
+			if err != nil {
+				continue
+			}
+			addrs = append(addrs, addr)
+		}
+		if len(addrs) == 0 {
+			return peerHost
+		}
+
+		for i := len(addrs) - 1; i >= 0; i-- {
+			if !containsPrefix(trusted, addrs[i]) {
+				return addrs[i].String()
+			}
+		}
+
+		return addrs[0].String()
+	}
+}
+
+// parseIPHost parses s as an IP address, tolerating bracketed IPv6
+// literals (SplitHostPort already strips them from RemoteAddr, but
+// defensive callers may pass them through).
+func parseIPHost(s string) (netip.Addr, error) {
+	if addr, err := netip.ParseAddr(s); err == nil {
+		return addr.Unmap(), nil
+	}
+
+	addr, err := netip.ParseAddr(strings.Trim(s, "[]"))
+	if err != nil {
+		return addr, err
+	}
+
+	return addr.Unmap(), nil
+}
+
+// containsPrefix reports whether addr is inside any of prefixes.
+func containsPrefix(prefixes []netip.Prefix, addr netip.Addr) bool {
+	for _, p := range prefixes {
+		if p.Contains(addr) {
+			return true
+		}
+	}
+
+	return false
 }
 
 // PeerAddrKey is RemoteAddrKey's gRPC counterpart, deriving the caller's IP

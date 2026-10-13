@@ -8,7 +8,6 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ## [Unreleased]
 
 ### Breaking
-
 - `fix(httpclient)!: block private addresses for remote adapters by default`:
   outbound HTTP clients in the `ai` (`anthropic`, `openai`, `gemini`,
   `ollama`), `document/remote`, `geo` (`google`, `osm`), `i18n/remote`,
@@ -66,6 +65,19 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Added
 
+- `feat(middleware): trusted-proxy aware rate limit key`: new
+  `middleware.ClientIPKey(trusted []netip.Prefix)` derives the HTTP
+  rate-limit key from `X-Forwarded-For` only when the direct peer is
+  inside a trusted proxy CIDR (rightmost untrusted entry wins; every
+  entry trusted falls back to the leftmost; empty and malformed entries
+  are skipped). With no trusted proxies, or an untrusted peer, the key
+  stays `RemoteAddrKey`, so a spoofed header from an untrusted client
+  can never select another client's bucket. The `ratelimit` battery
+  gains a `trusted_proxies` option (CIDRs or bare IPs, validated at
+  config load with an error naming the bad entry; schema files updated),
+  and the generated server (`zever generate server`) parses it at boot
+  via the new `ratelimit.ParseTrustedProxies` and selects `ClientIPKey`
+  when set, keeping `RemoteAddrKey` otherwise.
 - `docs: test your zever app guide`: new `guides/operate/testing-your-app`
   page — per-test container from `config.Default()` with `t.Cleanup` close,
   httptest routes, per-test sqlite files under `t.TempDir()`, the `dbtest`

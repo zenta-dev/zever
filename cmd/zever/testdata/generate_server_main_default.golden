@@ -30,6 +30,7 @@ import (
 	"github.com/zenta-dev/zever/container"
 	"github.com/zenta-dev/zever/core/authz"
 	"github.com/zenta-dev/zever/core/middleware"
+	"github.com/zenta-dev/zever/core/ratelimit"
 	"github.com/zenta-dev/zever/shared/grpcclient"
 
 	"example.com/shop/internal/app"
@@ -208,6 +209,20 @@ func run(addr, grpcAddr string) error {
 	if err != nil {
 		return err
 	}
+	// The rate-limit key trusts X-Forwarded-For only behind configured
+	// trusted proxies (ratelimit.trusted_proxies in zever.yaml): with none
+	// configured the key stays the direct peer address, so a spoofed
+	// header from an untrusted client can never select another client's
+	// bucket. Entries are validated at config load; a hand-built Config
+	// that bypasses validation still fails fast here with the parse error.
+	rateLimitKey := middleware.RemoteAddrKey
+	if cfg, cfgErr := app.Config(); cfgErr == nil && len(cfg.RateLimit.Options.TrustedProxies) > 0 {
+		trustedProxies, trustedErr := ratelimit.ParseTrustedProxies(cfg.RateLimit.Options.TrustedProxies)
+		if trustedErr != nil {
+			return trustedErr
+		}
+		rateLimitKey = middleware.ClientIPKey(trustedProxies)
+	}
 
 	// One interceptor, attached once below, must cover every service this
 	// process registers on grpcServer -- so every generated module
@@ -262,7 +277,7 @@ func run(addr, grpcAddr string) error {
 
 	r.Use(middleware.Recover(logger), middleware.RequestLogger(logger), middleware.Tracing(obs), middleware.SecurityHeaders(securityHeadersOpts))
 
-	r.Use(middleware.RateLimit(limiter, middleware.RemoteAddrKey))
+	r.Use(middleware.RateLimit(limiter, rateLimitKey))
 
 	// Resolve the db once at boot so a broken DSN fails fast with a clear
 	// error instead of surfacing as a 503 on the first readiness probe.

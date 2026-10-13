@@ -1,7 +1,10 @@
 package ratelimit
 
 import (
+	"fmt"
 	"math"
+	"net/netip"
+	"strings"
 	"time"
 
 	redisopt "github.com/zenta-dev/zever/shared/redisopt"
@@ -45,6 +48,43 @@ type Options struct {
 	MaxEntries int `json:"max_entries" toml:"max_entries" yaml:"max_entries"`
 	// Redis holds Redis-specific connection configuration.
 	Redis RedisOptions `json:"redis" toml:"redis" yaml:"redis"`
+	// TrustedProxies lists the CIDRs (for example "10.0.0.0/8") or bare
+	// IPs (for example "10.0.0.1", meaning /32 or /128) of proxies whose
+	// X-Forwarded-For entries may be trusted for client-IP derivation.
+	// Empty means no proxy is trusted and X-Forwarded-For is ignored.
+	TrustedProxies []string `json:"trusted_proxies" toml:"trusted_proxies" yaml:"trusted_proxies"`
+}
+
+// ParseTrustedProxies parses proxies into CIDR prefixes, in order. Each
+// entry must be a CIDR (for example "10.0.0.0/8") or a bare IP (for
+// example "10.0.0.1", treated as a single-host /32 or /128 prefix).
+// Surrounding whitespace is ignored. An empty input returns nil with no
+// error. Failures return an InvalidOptionsError naming the bad entry, so
+// generated servers can fail fast at boot with an actionable message.
+func ParseTrustedProxies(proxies []string) ([]netip.Prefix, error) {
+	prefixes := make([]netip.Prefix, 0, len(proxies))
+	for i, raw := range proxies {
+		s := strings.TrimSpace(raw)
+		if p, err := netip.ParsePrefix(s); err == nil {
+			prefixes = append(prefixes, p.Masked())
+
+			continue
+		}
+		if addr, err := netip.ParseAddr(s); err == nil {
+			addr = addr.Unmap()
+			bits := 128
+			if addr.Is4() {
+				bits = 32
+			}
+			prefixes = append(prefixes, netip.PrefixFrom(addr, bits))
+
+			continue
+		}
+
+		return nil, InvalidOptionsError{Reason: fmt.Sprintf("trusted_proxies entry %d is not a valid CIDR or IP: %q", i, s)}
+	}
+
+	return prefixes, nil
 }
 
 // Validate checks options for consistency, joining all violations.
@@ -71,6 +111,10 @@ func (o Options) Validate() error {
 
 	if err := redisopt.ValidatePrefix(o.Redis.Prefix); err != nil {
 		return InvalidOptionsError{Reason: err.Error()}
+	}
+
+	if _, err := ParseTrustedProxies(o.TrustedProxies); err != nil {
+		return err
 	}
 
 	return nil

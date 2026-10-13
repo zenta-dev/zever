@@ -528,7 +528,8 @@
         "idle_ttl": { "$ref": "#/$defs/durationNs", "description": "Zero means adapter default (10m)." },
         "sweep_interval": { "$ref": "#/$defs/durationNs", "description": "Zero means adapter default (1m)." },
         "redis": { "$ref": "#/$defs/zredisOptionsWithPrefix" },
-        "max_entries": { "type": "integer", "description": "Memory adapter bucket-table bound before LRU eviction. Non-positive means the adapter default (1000)." }
+        "max_entries": { "type": "integer", "description": "Memory adapter bucket-table bound before LRU eviction. Non-positive means the adapter default (1000)." },
+        "trusted_proxies": { "type": "array", "items": { "type": "string" }, "description": "CIDRs (for example \"10.0.0.0/8\") or bare IPs of proxies whose X-Forwarded-For entries may be trusted for rate-limit client-IP derivation. Empty (default) ignores X-Forwarded-For." }
       }
     },
     "breakerOptions": {

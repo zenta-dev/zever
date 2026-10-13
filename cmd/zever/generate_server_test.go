@@ -651,10 +651,45 @@ func TestRunGenerateServerWiresRateLimitWhenConfigured(t *testing.T) {
 	for _, fragment := range []string{
 		"limiter, err := c.RateLimit()",
 		"middleware.RateLimitUnaryServerInterceptor(limiter, middleware.PeerAddrKey)",
-		"r.Use(middleware.RateLimit(limiter, middleware.RemoteAddrKey))",
+		"r.Use(middleware.RateLimit(limiter, rateLimitKey))",
 	} {
 		if !strings.Contains(main, fragment) {
 			t.Fatalf("server main.go lacks %q with a configured rate limit:\n%s", fragment, main)
+		}
+	}
+}
+
+// TestRunGenerateServerWiresTrustedProxies proves the generated server
+// derives its rate-limit key from X-Forwarded-For only behind configured
+// trusted proxies: the template must parse
+// cfg.RateLimit.Options.TrustedProxies at boot via
+// ratelimit.ParseTrustedProxies and select middleware.ClientIPKey,
+// falling back to middleware.RemoteAddrKey otherwise.
+func TestRunGenerateServerWiresTrustedProxies(t *testing.T) {
+	dir := t.TempDir()
+	withWorkingDir(t, dir)
+	writeGoMod(t, dir, "example.com/shop")
+
+	const cfg = "ratelimit:\n  adapter: memory\n  options:\n    rate: 100\n    burst: 20\n    trusted_proxies:\n      - 10.0.0.0/8\n"
+
+	if err := os.WriteFile(filepath.Join(dir, "zever.yaml"), []byte(cfg), 0o600); err != nil {
+		t.Fatalf("write zever.yaml: %v", err)
+	}
+
+	if err := runGenerateServer(nil); err != nil {
+		t.Fatalf("runGenerateServer: %v", err)
+	}
+
+	main := readGenerated(t, filepath.Join(dir, "cmd", "server", "main.go"))
+
+	for _, fragment := range []string{
+		"ratelimit.ParseTrustedProxies(cfg.RateLimit.Options.TrustedProxies)",
+		"middleware.ClientIPKey(trustedProxies)",
+		"middleware.RemoteAddrKey",
+		`"github.com/zenta-dev/zever/core/ratelimit"`,
+	} {
+		if !strings.Contains(main, fragment) {
+			t.Fatalf("server main.go lacks %q with trusted_proxies configured:\n%s", fragment, main)
 		}
 	}
 }

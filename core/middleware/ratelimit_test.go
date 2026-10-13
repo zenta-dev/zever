@@ -6,6 +6,7 @@ import (
 	"net"
 	"net/http"
 	"net/http/httptest"
+	"net/netip"
 	"testing"
 	"time"
 
@@ -208,6 +209,141 @@ func TestRemoteAddrKey(t *testing.T) {
 			r.RemoteAddr = tt.remoteAddr
 			if got := RemoteAddrKey(r); got != tt.want {
 				t.Fatalf("RemoteAddrKey(%q) = %q, want %q", tt.remoteAddr, got, tt.want)
+			}
+		})
+	}
+}
+
+func TestClientIPKey(t *testing.T) {
+	t.Parallel()
+
+	mustPrefix := func(t *testing.T, s string) []netip.Prefix {
+		t.Helper()
+
+		p, err := netip.ParsePrefix(s)
+		if err != nil {
+			t.Fatalf("ParsePrefix(%q): %v", s, err)
+		}
+
+		return []netip.Prefix{p}
+	}
+
+	mustPrefixes := func(t *testing.T, ss ...string) []netip.Prefix {
+		t.Helper()
+
+		var out = make([]netip.Prefix, 0, len(ss))
+		for _, s := range ss {
+			out = append(out, mustPrefix(t, s)...)
+		}
+
+		return out
+	}
+
+	newReq := func(t *testing.T, remoteAddr, xff string) *http.Request {
+		t.Helper()
+
+		r := httptest.NewRequestWithContext(t.Context(), http.MethodGet, "/", nil)
+		r.RemoteAddr = remoteAddr
+		if xff != "" {
+			r.Header.Set("X-Forwarded-For", xff)
+		}
+
+		return r
+	}
+
+	tests := []struct {
+		name       string
+		trusted    []netip.Prefix
+		remoteAddr string
+		xff        string
+		want       string
+	}{
+		{
+			name:       "no trusted proxies ignores XFF",
+			trusted:    nil,
+			remoteAddr: "10.0.0.9:5555",
+			xff:        "1.2.3.4",
+			want:       "10.0.0.9",
+		},
+		{
+			name:       "untrusted peer ignores spoofed XFF",
+			trusted:    mustPrefixes(t, "10.0.0.0/8"),
+			remoteAddr: "192.168.1.7:5555",
+			xff:        "1.2.3.4, 5.6.7.8",
+			want:       "192.168.1.7",
+		},
+		{
+			name:       "trusted peer uses rightmost untrusted entry",
+			trusted:    mustPrefixes(t, "10.0.0.0/8"),
+			remoteAddr: "10.0.0.1:5555",
+			xff:        "1.2.3.4, 10.0.0.2",
+			want:       "1.2.3.4",
+		},
+		{
+			name:       "all XFF trusted falls back to leftmost",
+			trusted:    mustPrefixes(t, "10.0.0.0/8"),
+			remoteAddr: "10.0.0.1:5555",
+			xff:        "10.0.0.5, 10.0.0.6",
+			want:       "10.0.0.5",
+		},
+		{
+			name:       "no XFF returns peer",
+			trusted:    mustPrefixes(t, "10.0.0.0/8"),
+			remoteAddr: "10.0.0.1:5555",
+			xff:        "",
+			want:       "10.0.0.1",
+		},
+		{
+			name:       "malformed entries skipped",
+			trusted:    mustPrefixes(t, "10.0.0.0/8"),
+			remoteAddr: "10.0.0.1:5555",
+			xff:        "junk, 1.2.3.4, also-bad",
+			want:       "1.2.3.4",
+		},
+		{
+			name:       "all malformed falls back to peer",
+			trusted:    mustPrefixes(t, "10.0.0.0/8"),
+			remoteAddr: "10.0.0.1:5555",
+			xff:        "junk, unknown",
+			want:       "10.0.0.1",
+		},
+		{
+			name:       "ipv6 trusted proxy and client",
+			trusted:    mustPrefixes(t, "2001:db8::/32"),
+			remoteAddr: "[2001:db8::1]:443",
+			xff:        "2001:db8::99, 2001:db8::2",
+			want:       "2001:db8::99",
+		},
+		{
+			name:       "ipv6 untrusted peer ignores XFF",
+			trusted:    mustPrefixes(t, "2001:db8::/32"),
+			remoteAddr: "[2001:db9::1]:443",
+			xff:        "2001:db8::99",
+			want:       "2001:db9::1",
+		},
+		{
+			name:       "unparsable peer falls back to raw",
+			trusted:    mustPrefixes(t, "10.0.0.0/8"),
+			remoteAddr: "not-an-addr",
+			xff:        "1.2.3.4",
+			want:       "not-an-addr",
+		},
+		{
+			name:       "direct client behind two trusted proxies",
+			trusted:    mustPrefixes(t, "10.0.0.0/8", "172.16.0.0/12"),
+			remoteAddr: "172.16.0.9:5555",
+			xff:        "203.0.113.7, 10.0.0.3",
+			want:       "203.0.113.7",
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			t.Parallel()
+
+			key := ClientIPKey(tt.trusted)
+			if got := key(newReq(t, tt.remoteAddr, tt.xff)); got != tt.want {
+				t.Errorf("ClientIPKey(%q, XFF %q) = %q, want %q", tt.remoteAddr, tt.xff, got, tt.want)
 			}
 		})
 	}

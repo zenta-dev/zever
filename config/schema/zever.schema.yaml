@@ -801,6 +801,11 @@ $defs:
             sweep_interval:
                 $ref: '#/$defs/durationNs'
                 description: Zero means adapter default (1m).
+            trusted_proxies:
+                description: CIDRs (for example "10.0.0.0/8") or bare IPs of proxies whose X-Forwarded-For entries may be trusted for rate-limit client-IP derivation. Empty (default) ignores X-Forwarded-For.
+                items:
+                    type: string
+                type: array
         type: object
     resilienceOptions:
         additionalProperties: false
