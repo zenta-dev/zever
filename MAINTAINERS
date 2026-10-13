@@ -1,0 +1,11 @@
+# Maintainers
+
+zever is maintained by the `@zenta-dev` org team. There is no separate
+maintainer roster: anyone in the org with merge rights is a maintainer.
+
+- Day-to-day review happens on PRs; public API changes need an explicit
+  maintainer review (see [GOVERNANCE.md](GOVERNANCE.md#decisions)).
+- Security reports go through GitHub Security Advisories, not personal
+  inboxes (see [.github/SECURITY.md](.github/SECURITY.md)).
+- To become a maintainer: sustained, reviewed contributions over several
+  releases, nominated by an existing maintainer.

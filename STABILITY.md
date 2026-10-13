@@ -101,6 +101,30 @@ release-note docs.
 | `cmd/zever` | Flags-only CLI toolkit; see `cmd/zever/README.md`. |
 | `tools/zever-mcp` | Stdio MCP server exposing the schema compiler to agents; nested module. |
 
+## Go version policy
+
+Only the latest Go toolchain is supported (`go 1.27.2` today, pinned in
+`go.work` and every module's `go.mod`; CI tests that version). New language
+features may be used as soon as the floor moves — including generic methods
+such as `orm`'s `Column[T, V].EqOuter[U any]` (`orm/column.go`), which
+require Go 1.27+ and fail on older toolchains. A toolchain bump updates
+`go.work`, every `go.mod`, and the README/CONTRIBUTING requirement notes
+together (see the release checklist in `.github/CONTRIBUTING.md`).
+
+## Deprecation policy
+
+Removing or breaking an exported identifier takes at least one minor
+release of warning:
+
+1. Mark it `// Deprecated:` with the replacement and the removal target,
+   keep it working, and note it in `CHANGELOG.md`.
+2. Remove it no earlier than the next minor after the deprecation shipped
+   (pre-1.0: the next `0.y`; post-1.0 Core: the next major, per SemVer).
+
+Pre-1.0 Extended packages are exempt (they break freely with release
+notes); pre-1.0 Core follows the window on a best-effort basis and always
+with release notes.
+
 ## 1.0 promotion criteria
 
 Core graduates from "toward 1.0 promise" to the 1.0 compatibility promise

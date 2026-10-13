@@ -184,6 +184,13 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   `session/cookie` + `media/ffmpeg` matrix rows, `argon2id` vs `argon2`,
   `resilience` memory vs inproc, and the `.zen` reference
   (`reference/zen-syntax.mdx`) were verified already correct.
+- `docs: governance files`: new `GOVERNANCE.md` (roles, decisions,
+  releases, policy index), `MAINTAINERS`, and `ROADMAP.md` with the 1.0
+  criteria checklist (mirrors `STABILITY.md`, all three unchecked).
+  `STABILITY.md` gains the Go version policy (latest toolchain only) and
+  the deprecation window policy (≥1 minor with `// Deprecated:`); README
+  notes generic methods need Go 1.27+. `.github/SECURITY.md` already
+  records the backport decision (latest release only) — no change.
 - `refactor(container): identity-based close dedup without unsafe`: `Close`
   now dedupes services by the value's own reference identity (pointer, chan,
   map, func, slice via `reflect.Value.Pointer`) instead of searching struct
