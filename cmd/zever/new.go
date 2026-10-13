@@ -20,8 +20,8 @@ import (
 )
 
 const newUsage = `zever new <name> [--module PATH] [--dir PATH] [--framework-version V] [--force]
-                     [--interactive] [--batteries a,b] [--adapters b1=a1,b2=a2] [-y|--yes] [--list-batteries]
-                     [--no-tidy] [--dry-run]
+                     [--interactive] [--batteries a,b] [--adapters b1=a1,b2=a2] [--profile minimal|api|full]
+                     [-y|--yes] [--list-batteries] [--no-tidy] [--dry-run]
 
 Scaffolds a brand new, buildable zever application from scratch: a fresh
 go.mod, a starter schema/app.zen (one User entity), cmd/server + cmd/worker +
@@ -52,6 +52,11 @@ then one adapter Select per picked non-floor battery. Every prompt answer
 has a flag: --batteries skips the battery prompt, --adapters b=a skips
 that battery's adapter prompt, and -y/--yes skips the whole wizard.
 --list-batteries prints the battery/default-adapter table and exits.
+
+Start-small profiles (--profile): minimal scaffolds the bootable floor set
+only; api adds cache, queue, session, password, scheduler, outbox,
+idempotency and lock; full wires every known battery. Explicit --batteries
+add to the preset, --adapters override its picks.
 
 Flags:`
 
@@ -183,6 +188,7 @@ func newNewFlagSet() *flag.FlagSet {
 	fs.Bool("i", false, "alias for --interactive")
 	fs.String("batteries", "", "comma-separated extra batteries to scaffold (e.g. --batteries db,cache)")
 	fs.String("adapters", "", "comma-separated battery=adapter pairs (e.g. --adapters db=postgres,router=fiber)")
+	fs.String("profile", "", "scaffold profile: minimal (bootable floor only), api (+cache/queue/session/password/scheduler/outbox/idempotency/lock), or full (every battery)")
 	fs.Bool("yes", false, "skip all prompts, scaffold floor+flags only")
 	fs.Bool("y", false, "alias for --yes")
 	fs.Bool("list-batteries", false, "print the battery/default-adapter table to stdout and exit")
@@ -255,9 +261,23 @@ func runNew(args []string) error {
 	// Flag-parity inputs: --batteries selects extra batteries, --adapters
 	// overrides per-battery adapters (and implies its batteries, the same
 	// way a cache override already implies "cache" in batteriesFor).
+	// --profile selects a start-small preset (minimal/api/full); explicit
+	// --batteries add to the preset.
 	optional, err := parseBatteriesFlag(flagString("batteries"))
 	if err != nil {
 		return err
+	}
+
+	profileBase, err := profileBatteries(flagString("profile"))
+	if err != nil {
+		return err
+	}
+
+	if flagString("profile") != "" || flagString("batteries") != "" {
+		// A preset or an explicit list answers the battery prompt: merge
+		// them into a non-nil preselection so the picker (if active) skips
+		// straight to per-battery adapter prompts.
+		optional = mergeBatteries(optional, profileBase)
 	}
 
 	overrides, err := parseAdaptersFlag(flagString("adapters"))
@@ -654,6 +674,12 @@ func printBatteryTable() {
 
 		_, _ = fmt.Fprintf(os.Stdout, "%s %s%s\n", name, defaultServiceAdapter(name), marker)
 	}
+
+	_, _ = fmt.Fprintln(os.Stdout, "")
+	_, _ = fmt.Fprintln(os.Stdout, "PROFILE BATTERIES")
+	_, _ = fmt.Fprintln(os.Stdout, "minimal (bootable floor only)")
+	_, _ = fmt.Fprintln(os.Stdout, "api "+strings.Join(apiProfileBatteries, ","))
+	_, _ = fmt.Fprintln(os.Stdout, "full (every battery)")
 }
 
 // pickBatteriesFunc and pickAdapterFunc are seams so tests drive the picker
@@ -992,6 +1018,56 @@ func defaultServiceAdapter(name string) string {
 // /healthz and /readyz pass out of the box; `zever generate server`'s
 // floor (coreBatteries) stays minimal for existing projects.
 var scaffoldBootBatteries = []string{"auth", "db", "observability", "permission", "ratelimit"}
+
+// apiProfileBatteries are the extras the "api" start-small profile adds on
+// top of the boot set: the batteries a JSON API with background jobs needs,
+// all on zero-infra default adapters (memory/embedded/db) so the scaffold
+// still boots offline. Sorted; profileBatteries clones it.
+var apiProfileBatteries = []string{
+	"cache",
+	"idempotency",
+	"lock",
+	"outbox",
+	"password",
+	"queue",
+	"scheduler",
+	"session",
+}
+
+// profileBatteries resolves a --profile name to its extra batteries (on top
+// of the floor+boot set batteriesFor always includes). "" means no profile
+// was passed (nil extras, no behavior change); "minimal" is the boot set
+// alone; "api" adds apiProfileBatteries; "full" covers every known service.
+// Unknown names fail closed listing the choices. Results are sorted and
+// freshly allocated, safe for callers to merge and sort further.
+func profileBatteries(profile string) ([]string, error) {
+	switch profile {
+	case "":
+		return nil, nil
+	case "minimal":
+		return []string{}, nil
+	case "api":
+		return append([]string(nil), apiProfileBatteries...), nil
+	case "full":
+		boot := map[string]bool{}
+		for _, b := range batteriesFor(nil, "") {
+			boot[b] = true
+		}
+
+		extras := make([]string, 0, len(allServiceAdapters))
+		for battery := range allServiceAdapters {
+			if !boot[battery] {
+				extras = append(extras, battery)
+			}
+		}
+
+		sort.Strings(extras)
+
+		return extras, nil
+	default:
+		return nil, fmt.Errorf("zever new: unknown --profile %q (choices: minimal, api, full)", profile)
+	}
+}
 
 // batteriesFor merges coreBatteries with optional (developer-picked)
 // batteries, adding "cache" whenever cacheAdapter is a real override --

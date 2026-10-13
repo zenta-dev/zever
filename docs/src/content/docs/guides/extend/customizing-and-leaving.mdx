@@ -25,6 +25,23 @@ Every file under `generated/` starts with a provenance header recording the rele
 
 `.json` specs (`openapi.json`, `mcp.json`) cannot carry a comment without breaking parsers, so they embed the same provenance in a top-level `x-zever-generated` block (`version`, `backend`, `schema`) instead. The `zever/annotations.proto` companion copy is vendored wire-stable API and is never stamped.
 
+## Start small: batteries you actually need
+
+`zever new --profile` picks the adapter set so a prototype never pays for batteries it doesn't use. Explicit `--batteries` add to the preset; `--adapters` override its picks.
+
+| Profile | Batteries | `go list -deps` packages |
+|---|---|---|
+| `minimal` | Bootable floor only: `log`, `router`, `auth`, `db`, `observability`, `permission`, `ratelimit` | 450 |
+| `api` | Minimal plus `cache`, `queue`, `session`, `password`, `scheduler`, `outbox`, `idempotency`, `lock` | 492 |
+| `full` | Every known battery | 649 |
+
+Counts are `go list -deps ./...` package counts (including stdlib and test dependencies) for a freshly scaffolded Go 1.27 project at v0.6.1, measured 2026-10-13. Direct `require` lines: 22 / 38 / 82. Grow with `zever add <battery>` instead of starting full: each addition is three append-only edits (`go.mod`, `internal/app/app.go`, `zever.yaml`) that never overwrite hand-written code.
+
+```sh
+zever new hello --profile api --dir ./hello
+zever new hello --profile minimal --batteries db --adapters db=postgres
+```
+
 ## Drift gate: `zever compile --check`
 
 Teams that commit `generated/` (like `examples/todo`) keep it honest with `--check`: compile in memory, compare against the tree, exit 1 naming every `missing`, `differs`, or `extra` file. It writes nothing.

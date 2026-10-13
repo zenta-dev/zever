@@ -52,6 +52,8 @@ Expected output (abridged):
   wrote hello/zever.yaml
 ```
 
+Start small with `--profile minimal` (bootable floor only), `--profile api` (adds cache, queue, session, password, scheduler, and reliability batteries), or `--profile full` (every battery). See [Customizing and leaving zever](../extend/customizing-and-leaving/) for the "batteries you actually need" table with measured dependency footprints.
+
 ## Define the schema
 
 Replace `schema/app.zen` with a `Task` entity and a service that exposes it:

@@ -53,6 +53,7 @@ db/seed entrypoints, and internal/app wiring.`,
 	cmd.Flags().String("framework-version", "", "depend on a published zever version instead of a local replace directive")
 	cmd.Flags().Bool("force", false, "scaffold into a non-empty directory anyway")
 	cmd.Flags().Bool("dry-run", false, "print the scaffold plan without writing any files")
+	cmd.Flags().String("profile", "", "scaffold profile: minimal (bootable floor only), api, or full (every battery)")
 
 	return cmd
 }

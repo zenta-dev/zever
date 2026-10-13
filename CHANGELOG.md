@@ -77,6 +77,14 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   standalone `orm`/`core/*` use, custom backends, generated-vs-owned, and
   the eject path. `make compile-check` (wired into `make check`) plus a
   CI `drift` job enforce it over `examples/todo`.
+- `feat(cli): start-small profiles`: `zever new --profile
+  minimal|api|full` scaffolds a preset adapter set — `minimal` is the
+  bootable floor only, `api` adds cache/queue/session/password/scheduler/
+  outbox/idempotency/lock, `full` wires every known battery. Explicit
+  `--batteries` add to the preset and `--adapters` override its picks;
+  `--list-batteries` prints the presets too. Measured footprints
+  (`go list -deps ./...` packages, stdlib included): minimal 450, api
+  492, full 649; direct requires 22/38/82.
 - `feat(auth/jwt): kid-based key rotation and nbf validation`: `JWTOptions`
   gains `keys: [{kid, secret}]` plus `active_kid` (empty defaults to the
   first entry; validated for unique kids, secret length, and a matching
