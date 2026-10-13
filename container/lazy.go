@@ -1,6 +1,7 @@
 package container
 
 import (
+	"runtime/debug"
 	"sync"
 	"sync/atomic"
 )
@@ -83,32 +84,53 @@ func (l *lazy[T]) get(fn func() (T, error)) (T, error) {
 	l.wait = make(chan struct{})
 	l.mu.Unlock()
 
-	// Leader runs fn outside mu so waiters can park instead of serializing
-	// behind the build.
-	v, err := fn()
+	return l.leaderBuild(fn)
+}
 
-	l.mu.Lock()
+// leaderBuild runs fn outside mu so waiters can park instead of serializing
+// behind the build. Whether fn returns normally, panics, or calls
+// runtime.Goexit, the deferred cleanup always resets l.wait, releases mu, and
+// closes the wait channel, so parked waiters never wedge.
+//
+// The defer distinguishes the three exits: a recovered panic becomes a
+// BuildPanicError; returned is set only when fn returns normally, so a
+// Goexit — which runs defers but skips the rest of the body — releases the
+// waiters and leaves the build uncached (recover returns nil for Goexit, so
+// no panic error is recorded) instead of caching a zero value as success.
+func (l *lazy[T]) leaderBuild(fn func() (T, error)) (v T, err error) {
+	returned := false
 
-	if err == nil {
-		l.val = v
-		l.err = nil
-		l.done = true
-		// Publish while still holding mu so the val write is ordered
-		// before this Store; any later Load observing true synchronizes
-		// with it. Monotonic: never store false.
-		l.ready.Store(true)
-	} else {
-		var zero T
+	defer func() {
+		if r := recover(); r != nil {
+			err = BuildPanicError{Value: r, Stack: debug.Stack()}
+		}
 
-		l.val = zero
-		l.err = err
-	}
+		l.mu.Lock()
 
-	ch := l.wait
-	l.wait = nil
-	l.mu.Unlock()
+		if returned && err == nil {
+			l.val = v
+			l.err = nil
+			l.done = true
+			// Publish while still holding mu so the val write is ordered
+			// before this Store; any later Load observing true synchronizes
+			// with it. Monotonic: never store false.
+			l.ready.Store(true)
+		} else {
+			var zero T
 
-	close(ch)
+			l.val = zero
+			l.err = err
+		}
+
+		ch := l.wait
+		l.wait = nil
+		l.mu.Unlock()
+
+		close(ch)
+	}()
+
+	v, err = fn()
+	returned = true
 
 	return v, err
 }

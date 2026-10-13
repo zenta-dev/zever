@@ -12,6 +12,7 @@ var (
 	_ error = TransactorError{}
 	_ error = CloseTimeoutError{}
 	_ error = ClosePanicError{}
+	_ error = BuildPanicError{}
 )
 
 func TestSentinels_ContainerPrefix(t *testing.T) {
@@ -22,6 +23,7 @@ func TestSentinels_ContainerPrefix(t *testing.T) {
 		{"transactor unsupported", ErrTransactorUnsupported},
 		{"close timeout", ErrCloseTimeout},
 		{"close panic", ErrClosePanic},
+		{"build panic", ErrBuildPanic},
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
@@ -115,5 +117,30 @@ func TestClosePanicError(t *testing.T) {
 	}
 	if as.Service != "cache" || as.Panic != "boom" {
 		t.Fatalf("errors.As = %+v, want {cache boom}", as)
+	}
+}
+
+func TestBuildPanicError(t *testing.T) {
+	err := BuildPanicError{Value: "boom", Stack: []byte("stack")}
+
+	if !strings.Contains(err.Error(), "boom") {
+		t.Fatalf("Error() = %q, want it to carry the panic value", err.Error())
+	}
+	if u := err.Unwrap(); !errors.Is(u, ErrBuildPanic) {
+		t.Fatalf("Unwrap() = %v, want %v", u, ErrBuildPanic)
+	}
+	if !errors.Is(err, ErrBuildPanic) {
+		t.Fatal("errors.Is(err, ErrBuildPanic) is false")
+	}
+	if errors.Is(err, ErrClosePanic) {
+		t.Fatal("errors.Is matches an unrelated sentinel")
+	}
+
+	var as BuildPanicError
+	if !errors.As(err, &as) {
+		t.Fatal("errors.As failed to match BuildPanicError")
+	}
+	if as.Value != "boom" || string(as.Stack) != "stack" {
+		t.Fatalf("errors.As = %+v, want {boom stack}", as)
 	}
 }

@@ -38,6 +38,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Fixed
 
+- fix(container): a panicking service builder no longer wedges concurrent
+  callers; returns BuildPanicError.
 - Point all one-line installer URLs at `main` instead of the `v0.6.1`
   tag: `install.sh`/`install.ps1` were added after `v0.6.1` was cut, so
   the tag-pinned raw URLs returned 404. The scripts still install
