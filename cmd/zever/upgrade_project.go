@@ -188,7 +188,7 @@ func projectChangelogURL(tag string) string {
 func loadCachedOrFetch(ctx context.Context, fetch func(context.Context, string) ([]byte, error), cacheDir, tag string) []byte {
 	if cacheDir != "" {
 		path := filepath.Join(cacheDir, "zever-changelog-"+tag+".md")
-		if data, err := os.ReadFile(path); err == nil { //nolint:gosec // cache file we wrote ourselves
+		if data, err := os.ReadFile(path); err == nil { // cache file we wrote ourselves
 			return data
 		}
 
@@ -213,7 +213,7 @@ func loadCachedOrFetch(ctx context.Context, fetch func(context.Context, string) 
 
 // tidyProjectGoMod runs `go mod tidy` in dir.
 func tidyProjectGoMod(ctx context.Context, dir string) error {
-	cmd := exec.CommandContext(ctx, "go", "mod", "tidy") //nolint:gosec // fixed argv, dir is the developer's project root
+	cmd := exec.CommandContext(ctx, "go", "mod", "tidy") // fixed argv, dir is the developer's project root
 	cmd.Dir = dir
 
 	if out, err := cmd.CombinedOutput(); err != nil {
@@ -235,7 +235,7 @@ func runUpgradeProjectWith(ctx context.Context, opts projectUpgradeOptions) erro
 		dir = "."
 	}
 
-	data, err := os.ReadFile(filepath.Join(dir, "go.mod")) //nolint:gosec // developer project file
+	data, err := os.ReadFile(filepath.Join(dir, "go.mod")) // developer project file
 	if err != nil {
 		if os.IsNotExist(err) {
 			return ErrUpgradeProjectNoGoMod
