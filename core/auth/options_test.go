@@ -54,6 +54,50 @@ func TestOptions_positive_valid(t *testing.T) {
 	}
 }
 
+func TestOptions_jwt_keys(t *testing.T) {
+	t.Parallel()
+
+	const longA = "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"
+	const longB = "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb"
+
+	cases := []struct {
+		name    string
+		jwt     JWTOptions
+		wantErr bool
+	}{
+		{"no keys valid", JWTOptions{}, false},
+		{"single key valid", JWTOptions{Keys: []JWTKey{{KID: "k1", Secret: longA}}}, false},
+		{"active kid valid", JWTOptions{
+			Keys:      []JWTKey{{KID: "k1", Secret: longA}, {KID: "k2", Secret: longB}},
+			ActiveKID: "k2",
+		}, false},
+		{"empty kid invalid", JWTOptions{Keys: []JWTKey{{KID: "", Secret: longA}}}, true},
+		{"short secret invalid", JWTOptions{Keys: []JWTKey{{KID: "k1", Secret: "short"}}}, true},
+		{"duplicate kid invalid", JWTOptions{Keys: []JWTKey{
+			{KID: "k1", Secret: longA},
+			{KID: "k1", Secret: longB},
+		}}, true},
+		{"unknown active kid invalid", JWTOptions{
+			Keys:      []JWTKey{{KID: "k1", Secret: longA}},
+			ActiveKID: "nope",
+		}, true},
+		{"active kid without keys invalid", JWTOptions{ActiveKID: "k1"}, true},
+	}
+	for _, tc := range cases {
+		t.Run(tc.name, func(t *testing.T) {
+			t.Parallel()
+
+			err := Options{JWT: tc.jwt}.Validate()
+			if tc.wantErr && !errors.Is(err, ErrInvalidOptions) {
+				t.Fatalf("Validate() err = %v, want ErrInvalidOptions", err)
+			}
+			if !tc.wantErr && err != nil {
+				t.Fatalf("Validate() err = %v, want nil", err)
+			}
+		})
+	}
+}
+
 func TestOptions_oidc_issuer_scheme(t *testing.T) {
 	t.Parallel()
 

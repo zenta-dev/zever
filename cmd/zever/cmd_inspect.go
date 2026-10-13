@@ -104,8 +104,8 @@ func newInspectCmds() []*cobra.Command {
 
 	doctorCmd := &cobra.Command{
 		Use:   "doctor [--config PATH] [--strict]",
-		Short: "Verify every battery resolves",
-		Long:  "Verify batteries by resolving every service from config and reporting OK/FAIL per battery.",
+		Short: "Verify enabled project batteries resolve",
+		Long:  "Verify the project's enabled batteries by resolving every service from config and reporting OK/FAIL per battery.",
 		Example: `  zever doctor
   zever doctor --config zever.yaml
   zever doctor -i`,

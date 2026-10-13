@@ -48,11 +48,28 @@ $defs:
             jwt:
                 additionalProperties: false
                 properties:
+                    active_kid:
+                        description: Signing key ID within keys; empty defaults to the first entry. Must match a keys entry when set.
+                        type: string
                     audience:
                         type: string
                     issuer:
                         description: Required by the jwt adapter.
                         type: string
+                    keys:
+                        description: Rotatable HMAC signing keys by key ID; tokens are signed with the active_kid key (or the first entry) and carry its kid header.
+                        items:
+                            additionalProperties: false
+                            properties:
+                                kid:
+                                    type: string
+                                secret:
+                                    type: string
+                            required:
+                                - kid
+                                - secret
+                            type: object
+                        type: array
                     leeway:
                         $ref: '#/$defs/durationNs'
                         description: Clock-skew tolerance when validating exp/nbf. Zero (default) means strict validation; negative fails Validate.

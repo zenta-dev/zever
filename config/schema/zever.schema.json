@@ -141,6 +141,8 @@
           "additionalProperties": false,
           "properties": {
             "secret": { "type": "string", "description": "HMAC signing secret, minimum 32 bytes (adapter-validated)." },
+            "keys": { "type": "array", "items": { "type": "object", "additionalProperties": false, "properties": { "kid": { "type": "string" }, "secret": { "type": "string" } }, "required": ["kid", "secret"] }, "description": "Rotatable HMAC signing keys by key ID; tokens are signed with the active_kid key (or the first entry) and carry its kid header." },
+            "active_kid": { "type": "string", "description": "Signing key ID within keys; empty defaults to the first entry. Must match a keys entry when set." },
             "issuer": { "type": "string", "description": "Required by the jwt adapter." },
             "audience": { "type": "string" },
             "max_ttl": { "$ref": "#/$defs/durationNs", "description": "Zero means no cap." },

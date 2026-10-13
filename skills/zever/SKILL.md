@@ -71,7 +71,7 @@ zever compile schema/app.zen --backend=mcp --out ./gen
 - `zever db`: Database commands (migrate, rollback, seed)
 - `zever dev`: Watch schemas & source; recompile and restart
 - `zever docs`: Generate man pages and markdown reference docs
-- `zever doctor`: Verify every battery resolves
+- `zever doctor`: Verify enabled project batteries resolve
 - `zever explain`: Print an operation's declaration location and summary
 - `zever extract`: Extract one module into a standalone service
 - `zever fmt`: Format .zen schemas

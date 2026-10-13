@@ -78,6 +78,19 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   and the generated server (`zever generate server`) parses it at boot
   via the new `ratelimit.ParseTrustedProxies` and selects `ClientIPKey`
   when set, keeping `RemoteAddrKey` otherwise.
+- `feat(auth/jwt): kid-based key rotation and nbf validation`: `JWTOptions`
+  gains `keys: [{kid, secret}]` plus `active_kid` (empty defaults to the
+  first entry; validated for unique kids, secret length, and a matching
+  active ID). Tokens are signed with the active key and carry its `kid`
+  header; verification selects the key by `kid`, falls back to the legacy
+  `secret` for kid-less tokens, and rejects unknown kids fail-closed. The
+  legacy single-secret path is unchanged and kid-less. `nbf` (when present)
+  and `exp` are both enforced with the existing `leeway` tolerance (default
+  `0`, strict; ~30s is typical for skewed fleets). HS256-only stands:
+  asymmetric algorithms stay unsupported by design and `none`/foreign-alg
+  tokens are rejected. Docs now state the default memory revocation store
+  is per-process and point multi-instance deployments at the shared
+  `revocation/redis` store.
 - `docs: test your zever app guide`: new `guides/operate/testing-your-app`
   page — per-test container from `config.Default()` with `t.Cleanup` close,
   httptest routes, per-test sqlite files under `t.TempDir()`, the `dbtest`
@@ -138,6 +151,16 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Fixed
 
+- `fix(cli): project-aware doctor`: `zever doctor` now checks only the
+  services enabled in the project config (top-level batteries in
+  `zever.yaml`/`.yml`/`.json`, same discovery as `serve`; falls back to
+  checking all batteries with a note when no project config is found).
+  The generated server gains a `--doctor` mode that resolves every enabled
+  service via its real container and registrations and prints JSON; the CLI
+  execs `go run <entry> --doctor` when the project has a server entrypoint
+  and falls back to its CLI registry with a note otherwise. Human `doctor`
+  now exits 1 on failures (previously 0); flag misuse exits 2; `--json`
+  keeps the shared envelope.
 - `fix(cli): consistent --json envelope across inspection commands`:
   `routes`, `config show`, and `graph` now honor the global `--json` flag
   (previously `routes --json` printed no JSON at all and the other two
