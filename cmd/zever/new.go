@@ -1286,6 +1286,18 @@ func writeNewProject(tag string, cfg NewConfig) ([]string, error) {
 		return nil, writeErr
 	}
 
+	cliPin := cfg.FrameworkVersion
+	if cliPin == "" || cliPin == pseudoVersionZero {
+		// Local checkouts have no published version to install from; CI
+		// installs the latest release instead.
+		cliPin = "latest"
+	}
+
+	if writeErr := write(filepath.Join(".github", "workflows", "ci.yml"),
+		[]byte(renderCIGitHubWorkflow(cfg.GoVersion, cliPin, quickstartBackends(cfg)))); writeErr != nil {
+		return nil, writeErr
+	}
+
 	if compose := renderNewCompose(cfg.batterySelections()); compose != "" {
 		if writeErr := write("compose.yaml", []byte(compose)); writeErr != nil {
 			return nil, writeErr
@@ -1628,6 +1640,52 @@ USER nonroot:nonroot
 ENTRYPOINT ["/app/server"]
 HEALTHCHECK --interval=30s --timeout=3s --start-period=5s --retries=3 CMD ["/usr/bin/wget", "--no-verbose", "--tries=1", "--spider", "http://127.0.0.1:8080/healthz"]
 `, goVersion)
+}
+
+// renderCIGitHubWorkflow returns the scaffolded project's CI workflow: it
+// installs the pinned zever CLI, regenerates derived code from the schema,
+// gates drift with `zever compile --check` (proving compile is
+// deterministic on regenerating projects, and gating committed-output drift
+// for teams that check in generated/), then builds and tests. cliPin is the
+// `go install ...@version` pin (see writeNewProject: "latest" for local
+// checkouts, the release tag otherwise); backends is the --backend value
+// for both compile invocations.
+func renderCIGitHubWorkflow(goVersion, cliPin, backends string) string {
+	if goVersion == "" {
+		goVersion = defaultGoVersion
+	}
+
+	return fmt.Sprintf(`# Scaffolded by `+"`zever new`"+`. Regenerate derived code, gate drift, build and test.
+#
+# The regenerate step keeps fresh clones green when generated/ is gitignored
+# (the default). Teams that commit generated/ instead (see
+# "Customizing and leaving zever" in the docs) can drop the regenerate step:
+# `+"`zever compile --check`"+` alone then fails the build on drift.
+name: ci
+
+on:
+  push:
+  pull_request:
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-go@v5
+        with:
+          go-version: '%s'
+      - name: Install zever CLI
+        run: go install github.com/zenta-dev/zever/cmd/zever@%s
+      - name: Regenerate from schema
+        run: zever compile --backend=%s --out ./generated schema/*.zen
+      - name: Drift gate (committed generated/ must match the schema)
+        run: zever compile --check --backend=%s --out ./generated schema/*.zen
+      - name: Build
+        run: go build ./...
+      - name: Test
+        run: go test ./...
+`, goVersion, cliPin, backends, backends)
 }
 
 // renderNewCompose returns compose.yaml for a scaffolded project, or ""

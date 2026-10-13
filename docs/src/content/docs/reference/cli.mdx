@@ -131,7 +131,7 @@ exit:0
 | Scaffold | `zever generate` |
 | Scaffold | `zever generate tinker` |
 | Scaffold | `zever extract` |
-| Inspect | `zever compile` |
+| Inspect | `zever compile` (`--check` gates drift: exit 1 when committed output differs) |
 | Inspect | `zever check` |
 | Inspect | `zever breaking` |
 | Inspect | `zever fmt` |
@@ -164,6 +164,7 @@ exit:0
 | `--dry-run` | preview file edits / SQL / removals without applying (where supported) |
 | `-i`, `--interactive` | guided `huh` prompts for one-shot commands |
 | `--batteries a,b` | `zever new`: extra batteries to scaffold beyond the floor (skips the battery prompt) |
+| `--check` | `zever compile`: verify committed output matches a fresh compile, write nothing (exit 1 on drift) |
 | `--adapters b=a,...` | `zever new`: per-battery adapter overrides (implies the battery, skips its adapter prompt) |
 | `-y`, `--yes` | `zever new`: skip all prompts, scaffold floor plus flags only |
 | `--list-batteries` | `zever new`: print the battery/default-adapter table to stdout and exit |

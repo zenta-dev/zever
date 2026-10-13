@@ -66,6 +66,17 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Added
 
+- `feat(cli): eject and drift tooling`: `zever compile` stamps every
+  generated file with a provenance header (backend, CLI version, schema
+  sha256; `.json` specs embed an `x-zever-generated` block instead of a
+  comment so parsers keep working), and the new `zever compile --check`
+  flag exits 1 naming `missing`/`differs`/`extra` files when committed
+  output no longer matches the schema — the CI drift gate. `zever new`
+  scaffolds `.github/workflows/ci.yml` (regenerate, `--check`, build,
+  test), and the new "Customizing and leaving zever" docs page covers
+  standalone `orm`/`core/*` use, custom backends, generated-vs-owned, and
+  the eject path. `make compile-check` (wired into `make check`) plus a
+  CI `drift` job enforce it over `examples/todo`.
 - `feat(auth/jwt): kid-based key rotation and nbf validation`: `JWTOptions`
   gains `keys: [{kid, secret}]` plus `active_kid` (empty defaults to the
   first entry; validated for unique kids, secret length, and a matching

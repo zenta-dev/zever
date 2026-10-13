@@ -157,6 +157,27 @@ jobs:
       - name: Installer tests
         run: sh tools/installer-test.sh
 
+  # Generated-code drift gate: examples/todo commits its generated/ tree,
+  # so `zever compile --check` must report it up to date (also `make
+  # compile-check`, wired into `make check`). Regenerate with `zever
+  # compile` from examples/todo when the schema changes.
+  drift:
+    name: generated-code drift
+    timeout-minutes: 10
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+      - uses: actions/setup-go@b7ad1dad31e06c5925ef5d2fc7ad053ef454303e # v7.0.0
+        with:
+          go-version-file: go.work
+          cache-dependency-path: |
+            go.work.sum
+            **/go.sum
+      - name: Check committed generated code matches the schema
+        run: make compile-check
+
   # Module-graph drift gate: every module's go.mod must require+replace
   # each intra-repo module it directly imports, computed by tools/modgraph
   # (Go ignores replaces in dependency go.mods). --check exits 1 with a
