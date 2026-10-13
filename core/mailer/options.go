@@ -33,7 +33,7 @@ type Options struct {
 	// Username is the SMTP auth username.
 	Username string `json:"username" toml:"username" yaml:"username"`
 	// Password is the SMTP auth password.
-	Password string `json:"password" toml:"password" yaml:"password"`
+	Password string `json:"password" toml:"password" yaml:"password" zever:"secret"`
 	// Encryption is the transport encryption mode. Empty means STARTTLS.
 	Encryption Encryption `json:"encryption" toml:"encryption" yaml:"encryption"`
 	// Timeout is the operation timeout. Zero means the default.

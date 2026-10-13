@@ -1,11 +1,23 @@
 package config
 
 import (
+	"net/url"
+	"reflect"
 	"strings"
 )
 
 // RedactedValue replaces secret values in redacted option maps.
 const RedactedValue = "[REDACTED]"
+
+// Secret is a string option type whose values are always redacted from
+// displayed configuration, regardless of the field's key name. Option
+// structs that cannot import config (core batteries) mark secret fields
+// with the zever:"secret" struct tag instead; the redactor consults both.
+type Secret string
+
+// secretType identifies config.Secret fields during the redactor's
+// reflection pass over typed options structs.
+var secretType = reflect.TypeOf(Secret(""))
 
 // foldASCII lowercases one ASCII byte, passing every other byte through
 // unchanged so callers can gate on isASCII before folding.
@@ -144,7 +156,8 @@ func isSensitiveKeyLower(lower string) bool {
 // redactMap replaces secret values in m in place, recursing into nested
 // maps and slices. Empty strings are left alone so unset fields are not
 // confused with set-but-hidden secrets. Non-string secrets are still
-// redacted.
+// redacted. String values under non-sensitive keys that carry URL userinfo
+// (for example a DSN under "database_url") have the credentials scrubbed.
 func redactMap(m map[string]any) {
 	for k, v := range m {
 		if isSensitiveKey(k) {
@@ -163,6 +176,10 @@ func redactMap(m map[string]any) {
 		}
 
 		switch val := v.(type) {
+		case string:
+			if scrubbed := scrubURLUserinfo(val); scrubbed != val {
+				m[k] = scrubbed
+			}
 		case map[string]any:
 			redactMap(val)
 		case []map[string]any:
@@ -266,6 +283,8 @@ func redactCopyValue(v any, sensitive bool) any {
 	}
 
 	switch val := v.(type) {
+	case string:
+		return scrubURLUserinfo(val)
 	case map[string]any:
 		return redactCopyMap(val)
 	case []map[string]any:
@@ -291,4 +310,125 @@ func redactCopyValue(v any, sensitive bool) any {
 	default:
 		return v
 	}
+}
+
+// redactSecretFields redacts values in m whose corresponding field in the
+// typed options struct opts is marked secret, either by the zever:"secret"
+// struct tag or by the config.Secret type. Key-name denylisting already ran
+// in redactMap; this pass catches oddly named secret fields the denylist
+// cannot know about. Anonymous (embedded) struct fields are recursed into
+// the same map, matching the JSON flattening serviceToMap applies; named
+// struct fields recurse into their nested map.
+func redactSecretFields(opts any, m map[string]any) {
+	t := reflect.TypeOf(opts)
+	for t != nil && t.Kind() == reflect.Pointer {
+		t = t.Elem()
+	}
+	if t == nil || t.Kind() != reflect.Struct {
+		return
+	}
+
+	markSecretFields(t, m)
+}
+
+// markSecretFields walks struct type t, redacting secret-marked fields in
+// m. Set values collapse to RedactedValue while empty strings and nil stay
+// untouched, so unset fields are not confused with set-but-hidden secrets.
+func markSecretFields(t reflect.Type, m map[string]any) {
+	for i := 0; i < t.NumField(); i++ {
+		f := t.Field(i)
+
+		if f.Anonymous {
+			ft := f.Type
+			for ft.Kind() == reflect.Pointer {
+				ft = ft.Elem()
+			}
+			if ft.Kind() == reflect.Struct {
+				markSecretFields(ft, m)
+			}
+			continue
+		}
+
+		key, _, _ := strings.Cut(f.Tag.Get("json"), ",")
+		if key == "" || key == "-" {
+			continue
+		}
+
+		ft := f.Type
+		for ft.Kind() == reflect.Pointer {
+			ft = ft.Elem()
+		}
+		if ft.Kind() == reflect.Struct {
+			if nested, ok := m[key].(map[string]any); ok {
+				markSecretFields(ft, nested)
+			}
+			continue
+		}
+
+		if f.Tag.Get("zever") != "secret" && f.Type != secretType {
+			continue
+		}
+
+		if v, ok := m[key]; ok {
+			switch val := v.(type) {
+			case string:
+				if val != "" {
+					m[key] = RedactedValue
+				}
+			default:
+				if v != nil {
+					m[key] = RedactedValue
+				}
+			}
+		}
+	}
+}
+
+// scrubURLUserinfo replaces the userinfo in s with RedactedValue when s
+// is an absolute URL carrying credentials (for example
+// "postgres://user:pass@host/db" becomes "postgres://[REDACTED]@host/db").
+// The host, path, query, and fragment stay visible for debugging. Values
+// without a scheme, host, or userinfo are returned unchanged.
+func scrubURLUserinfo(s string) string {
+	u, err := url.Parse(s)
+	if err == nil && u.Scheme != "" && u.Host != "" && u.User != nil {
+		var b strings.Builder
+		b.WriteString(u.Scheme)
+		b.WriteString("://")
+		b.WriteString(RedactedValue)
+		b.WriteString("@")
+		b.WriteString(u.Host)
+		if p := u.EscapedPath(); p != "" {
+			b.WriteString(p)
+		}
+		if u.RawQuery != "" {
+			b.WriteString("?")
+			b.WriteString(u.RawQuery)
+		}
+		if u.Fragment != "" {
+			b.WriteString("#")
+			b.WriteString(u.EscapedFragment())
+		}
+
+		return b.String()
+	}
+
+	// Fallback for inputs url.Parse rejects (for example a MySQL DSN with
+	// a func-style host): scrub at the first "@" that follows "://"
+	// and precedes any "/", which marks the end of the authority.
+	scheme := strings.Index(s, "://")
+	if scheme < 0 {
+		return s
+	}
+
+	rest := s[scheme+3:]
+	at := strings.Index(rest, "@")
+	if at < 0 {
+		return s
+	}
+	if slash := strings.Index(rest, "/"); slash >= 0 && slash < at {
+		return s
+	}
+
+	return s[:scheme+3] + RedactedValue + rest[at:]
 }

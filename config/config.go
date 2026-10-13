@@ -150,6 +150,7 @@ func (c *Config) RedactedServices() map[string]ServiceConfig {
 	put := func(name, adapter string, opts any) {
 		m := serviceToMap(opts)
 		redactMap(m)
+		redactSecretFields(opts, m)
 		out[name] = ServiceConfig{Adapter: adapter, Options: m}
 	}
 	put("ai", c.AI.Adapter, c.AI.Options)

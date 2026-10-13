@@ -9,7 +9,7 @@ import (
 // Options carries the settings for a CDN backend.
 type Options struct {
 	// APIToken authenticates against the provider API.
-	APIToken string `json:"api_token" toml:"api_token" yaml:"api_token"`
+	APIToken string `json:"api_token" toml:"api_token" yaml:"api_token" zever:"secret"`
 	// ZoneID identifies the zone or distribution to purge.
 	ZoneID string `json:"zone_id" toml:"zone_id" yaml:"zone_id"`
 	// BaseURL overrides the provider API endpoint.

@@ -20,7 +20,7 @@ const (
 // JWTOptions configures the JWT adapter.
 type JWTOptions struct {
 	// Secret is the HMAC signing secret. Must be at least MinSecretLen bytes (adapter-validated).
-	Secret string `json:"secret" toml:"secret" yaml:"secret"`
+	Secret string `json:"secret" toml:"secret" yaml:"secret" zever:"secret"`
 	// Issuer is the token issuer. Required (adapter-validated).
 	Issuer string `json:"issuer" toml:"issuer" yaml:"issuer"`
 	// Audience is the intended token audience.

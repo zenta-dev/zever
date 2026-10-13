@@ -25,7 +25,7 @@ type Options struct {
 	// URL holds the Qdrant address.
 	URL string `json:"url" toml:"url" yaml:"url"`
 	// APIKey holds the backend credential and is never logged.
-	APIKey string `json:"api_key" toml:"api_key" yaml:"api_key"`
+	APIKey string `json:"api_key" toml:"api_key" yaml:"api_key" zever:"secret"`
 	// Dimension holds the expected embedding dimension.
 	Dimension int `json:"dimension" toml:"dimension" yaml:"dimension"`
 	// AllowInsecure permits an http:// URL for testing. Default false (https only).

@@ -10,7 +10,7 @@ import (
 // Options holds typed configuration for geo adapters.
 type Options struct {
 	// APIKey is the provider API key. Never logged.
-	APIKey string `json:"api_key" toml:"api_key" yaml:"api_key"`
+	APIKey string `json:"api_key" toml:"api_key" yaml:"api_key" zever:"secret"`
 	// BaseURL overrides the Google Maps API base URL.
 	BaseURL string `json:"base_url" toml:"base_url" yaml:"base_url"`
 	// Endpoint overrides the Mapbox/OSM API endpoint.
