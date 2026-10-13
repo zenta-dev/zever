@@ -3,6 +3,7 @@ package container
 import (
 	"context"
 	"errors"
+	"fmt"
 	"reflect"
 	"strings"
 	"sync"
@@ -14,6 +15,7 @@ import (
 	"github.com/zenta-dev/zever/core/cache"
 	"github.com/zenta-dev/zever/core/cdn"
 	"github.com/zenta-dev/zever/core/db"
+	"github.com/zenta-dev/zever/core/log"
 	"github.com/zenta-dev/zever/core/observability"
 	"github.com/zenta-dev/zever/core/queue"
 	"github.com/zenta-dev/zever/core/scheduler"
@@ -735,6 +737,146 @@ func TestContainer_Close_TimeoutError(t *testing.T) {
 	// Wait for the ignored-ctx goroutine to finish its block so no
 	// goroutine leaks past the test (goleak): poll the completion event
 	// instead of sleeping past the 500ms block.
+	waitForCloseCalls(t, slow, 2*time.Second)
+}
+
+// recordingLogger captures emitted messages so tests can assert the
+// container reported an abandoned close goroutine through its logger.
+type recordingLogger struct {
+	mu   sync.Mutex
+	msgs []string
+}
+
+func (r *recordingLogger) warn(msg string) {
+	r.mu.Lock()
+	r.msgs = append(r.msgs, msg)
+	r.mu.Unlock()
+}
+
+func (r *recordingLogger) warnings() []string {
+	r.mu.Lock()
+	defer r.mu.Unlock()
+	return append([]string(nil), r.msgs...)
+}
+
+func (r *recordingLogger) Debug() log.Event                         { return &recordingEvent{r} }
+func (r *recordingLogger) Info() log.Event                          { return &recordingEvent{r} }
+func (r *recordingLogger) Warn() log.Event                          { return &recordingEvent{r} }
+func (r *recordingLogger) Error() log.Event                         { return &recordingEvent{r} }
+func (r *recordingLogger) Fatal() log.Event                         { return &recordingEvent{r} }
+func (r *recordingLogger) With() log.Context                        { return &recordingContext{r} }
+func (r *recordingLogger) WithContext(_ context.Context) log.Logger { return r }
+func (r *recordingLogger) Enabled(_ log.Level) bool                 { return true }
+func (r *recordingLogger) Sync() error                              { return nil }
+func (r *recordingLogger) Name() string                             { return "recording" }
+
+type recordingEvent struct{ r *recordingLogger }
+
+func (e *recordingEvent) Str(_, _ string) log.Event               { return e }
+func (e *recordingEvent) Int(_ string, _ int) log.Event           { return e }
+func (e *recordingEvent) Int64(_ string, _ int64) log.Event       { return e }
+func (e *recordingEvent) Float64(_ string, _ float64) log.Event   { return e }
+func (e *recordingEvent) Bool(_ string, _ bool) log.Event         { return e }
+func (e *recordingEvent) Dur(_ string, _ time.Duration) log.Event { return e }
+func (e *recordingEvent) Time(_ string, _ time.Time) log.Event    { return e }
+func (e *recordingEvent) Err(_ error) log.Event                   { return e }
+func (e *recordingEvent) AnErr(_ string, _ error) log.Event       { return e }
+func (e *recordingEvent) Any(_ string, _ any) log.Event           { return e }
+func (e *recordingEvent) Msg(msg string)                          { e.r.warn(msg) }
+func (e *recordingEvent) Msgf(format string, args ...any)         { e.r.warn(fmt.Sprintf(format, args...)) }
+func (e *recordingEvent) Send()                                   {}
+
+type recordingContext struct{ r *recordingLogger }
+
+func (c *recordingContext) Str(_, _ string) log.Context               { return c }
+func (c *recordingContext) Int(_ string, _ int) log.Context           { return c }
+func (c *recordingContext) Int64(_ string, _ int64) log.Context       { return c }
+func (c *recordingContext) Float64(_ string, _ float64) log.Context   { return c }
+func (c *recordingContext) Bool(_ string, _ bool) log.Context         { return c }
+func (c *recordingContext) Dur(_ string, _ time.Duration) log.Context { return c }
+func (c *recordingContext) Time(_ string, _ time.Time) log.Context    { return c }
+func (c *recordingContext) Err(_ error) log.Context                   { return c }
+func (c *recordingContext) AnErr(_ string, _ error) log.Context       { return c }
+func (c *recordingContext) Any(_ string, _ any) log.Context           { return c }
+func (c *recordingContext) Logger() log.Logger                        { return c.r }
+
+// TestContainer_Close_TimeoutError_Abandoned is the P1-5 test: a service
+// whose Close ignores ctx times out, the closeAsync goroutine is abandoned,
+// and the resulting CloseTimeoutError reports Abandoned=true with the
+// service name; the container logger is warned about the abandoned goroutine.
+func TestContainer_Close_TimeoutError_Abandoned(t *testing.T) {
+	c := New(config.Default())
+	slow := &fakeCtx{name: "slow", block: 500 * time.Millisecond, ignoreCtx: true}
+	c.db.val = slow
+	c.db.done = true
+	c.db.ready.Store(true)
+
+	rec := &recordingLogger{}
+	c.log.val = rec
+	c.log.done = true
+	c.log.ready.Store(true)
+
+	ctx, cancel := context.WithTimeout(t.Context(), 100*time.Millisecond)
+	defer cancel()
+	err := c.Close(ctx)
+	if err == nil {
+		t.Fatal("expected timeout error, got nil")
+	}
+	var timeoutErr CloseTimeoutError
+	if !errors.As(err, &timeoutErr) {
+		t.Fatalf("want CloseTimeoutError, got %T: %v", err, err)
+	}
+	if !timeoutErr.Abandoned {
+		t.Fatal("Abandoned = false, want true when the closeAsync goroutine is abandoned on timeout")
+	}
+	if timeoutErr.Service != "db" {
+		t.Fatalf("Service = %q, want db", timeoutErr.Service)
+	}
+
+	// The warn is emitted synchronously on Close's goroutine before it
+	// returns, so by now the recording logger must hold exactly one warning
+	// naming the abandoned service.
+	msgs := rec.warnings()
+	if len(msgs) != 1 {
+		t.Fatalf("warnings = %v, want exactly one", msgs)
+	}
+	if !strings.Contains(msgs[0], "db") {
+		t.Fatalf("warning %q should name the abandoned service", msgs[0])
+	}
+
+	// Wait for the ignored-ctx goroutine to finish its block so no
+	// goroutine leaks past the test (goleak): poll the completion event
+	// instead of sleeping past the 500ms block.
+	waitForCloseCalls(t, slow, 3*time.Second)
+}
+
+// TestContainer_Close_TimeoutError_AbandonedNoLogger pins that a timed-out
+// close still reports Abandoned=true when no logger is resolved: the warn
+// is best-effort and must never block or panic Close.
+func TestContainer_Close_TimeoutError_AbandonedNoLogger(t *testing.T) {
+	c := New(config.Default())
+	slow := &fakeCtx{name: "slow-nolog", block: 500 * time.Millisecond, ignoreCtx: true}
+	c.db.val = slow
+	c.db.done = true
+	c.db.ready.Store(true)
+
+	ctx, cancel := context.WithTimeout(t.Context(), 100*time.Millisecond)
+	defer cancel()
+	err := c.Close(ctx)
+	if err == nil {
+		t.Fatal("expected timeout error, got nil")
+	}
+	var timeoutErr CloseTimeoutError
+	if !errors.As(err, &timeoutErr) {
+		t.Fatalf("want CloseTimeoutError, got %T: %v", err, err)
+	}
+	if !timeoutErr.Abandoned {
+		t.Fatal("Abandoned = false, want true even without a resolved logger")
+	}
+	if timeoutErr.Service != "db" {
+		t.Fatalf("Service = %q, want db", timeoutErr.Service)
+	}
+
 	waitForCloseCalls(t, slow, 2*time.Second)
 }
 

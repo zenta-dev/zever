@@ -7,6 +7,14 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Added
+
+- `feat(container): report abandoned closers on timeout`: `CloseTimeoutError`
+  gains an `Abandoned` flag (value type kept) set when a timed-out
+  `closeAsync` goroutine is deliberately left running because the service
+  ignored its context; the timeout is also reported via the container
+  logger (when resolved) with the service name and cause.
+
 ### Fixed
 
 - `gogen`: generated `writeGogenJSON` now checks the `json.Marshal` error
