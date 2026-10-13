@@ -9,7 +9,7 @@ type LocalOptions struct {
 	// Root is the directory objects are stored under.
 	Root string `json:"root" toml:"root" yaml:"root"`
 	// Secret is the HMAC key for presigned URLs.
-	Secret string `json:"secret" toml:"secret" yaml:"secret"`
+	Secret string `json:"secret" toml:"secret" yaml:"secret" zever:"secret"`
 	// PublicURL is the public base URL for unsigned links.
 	PublicURL string `json:"public_url" toml:"public_url" yaml:"public_url"`
 }
@@ -17,9 +17,9 @@ type LocalOptions struct {
 // S3Options configures the Amazon S3 backend.
 type S3Options struct {
 	// AccessKeyID is the AWS access key.
-	AccessKeyID string `json:"access_key_id" toml:"access_key_id" yaml:"access_key_id"`
+	AccessKeyID string `json:"access_key_id" toml:"access_key_id" yaml:"access_key_id" zever:"secret"`
 	// SecretAccessKey is the AWS secret key.
-	SecretAccessKey string `json:"secret_access_key" toml:"secret_access_key" yaml:"secret_access_key"`
+	SecretAccessKey string `json:"secret_access_key" toml:"secret_access_key" yaml:"secret_access_key" zever:"secret"`
 	// Region is the AWS region, defaulting to us-east-1 when empty.
 	Region string `json:"region" toml:"region" yaml:"region"`
 	// Endpoint overrides the S3 endpoint (S3-compatible stores).

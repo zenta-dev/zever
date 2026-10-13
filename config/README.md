@@ -211,6 +211,14 @@ Raw option maps may hold secrets in plain strings. Never log them directly.
 or debugging output. Error text names services and fields only — values are
 never echoed.
 
+Redaction is key-name based (a denylist of secret-looking key names) plus
+type based: option fields tagged `zever:"secret"` in `core/*/options.go`,
+or typed `config.Secret`, are always redacted regardless of key name —
+the denylist cannot catch oddly named fields such as `access_key_id`.
+String values holding URL userinfo under any other key (for example a DSN
+under `database_url`) are scrubbed to `scheme://[REDACTED]@host...`;
+denylisted keys still redact the whole value.
+
 ## Dev-secret warning
 
 `Default()` ships deterministic dev-only secrets where `Validate` requires

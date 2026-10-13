@@ -39,7 +39,7 @@ type Options struct {
 	// AllowInsecure permits http Endpoint for testing. Default false (https only).
 	AllowInsecure bool `json:"allow_insecure" toml:"allow_insecure" yaml:"allow_insecure"`
 	// APIKey holds the remote API key. It is never logged.
-	APIKey string `json:"api_key" toml:"api_key" yaml:"api_key"`
+	APIKey string `json:"api_key" toml:"api_key" yaml:"api_key" zever:"secret"`
 	// LatexCommand holds the LaTeX compiler command.
 	LatexCommand string `json:"latex_command" toml:"latex_command" yaml:"latex_command"`
 	// LatexPDFToPPM holds the PDF-to-image converter command.

@@ -26,7 +26,7 @@ const (
 type Options struct {
 	providersopt.Common
 	// WebhookSecret holds the webhook verification secret. It is never logged.
-	WebhookSecret string `json:"webhook_secret" toml:"webhook_secret" yaml:"webhook_secret"`
+	WebhookSecret string `json:"webhook_secret" toml:"webhook_secret" yaml:"webhook_secret" zever:"secret"`
 	// AutoApprove marks new payments as succeeded instead of pending.
 	AutoApprove bool `json:"auto_approve" toml:"auto_approve" yaml:"auto_approve"`
 	// MaxWebhookBytes bounds the webhook payload size.

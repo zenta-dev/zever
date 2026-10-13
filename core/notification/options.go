@@ -12,7 +12,7 @@ type TwilioOptions struct {
 	// AccountSID is the Twilio account SID for basic-auth and URL path.
 	AccountSID string `json:"account_sid" toml:"account_sid" yaml:"account_sid"`
 	// AuthToken is the Twilio auth token for basic-auth.
-	AuthToken string `json:"auth_token" toml:"auth_token" yaml:"auth_token"`
+	AuthToken string `json:"auth_token" toml:"auth_token" yaml:"auth_token" zever:"secret"`
 	// FromNumber is the Twilio sender phone number in E.164 format.
 	FromNumber string `json:"from_number" toml:"from_number" yaml:"from_number"`
 }

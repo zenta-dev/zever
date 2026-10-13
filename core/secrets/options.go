@@ -6,7 +6,7 @@ type Options struct {
 	// Addr is the Vault server address.
 	Addr string `json:"addr" toml:"addr" yaml:"addr"`
 	// Token is the Vault authentication token.
-	Token string `json:"token" toml:"token" yaml:"token"`
+	Token string `json:"token" toml:"token" yaml:"token" zever:"secret"`
 	// TokenFile reads the Vault token from a file when Token is empty.
 	TokenFile string `json:"token_file" toml:"token_file" yaml:"token_file"`
 	// Mount is the Vault KV mount path.
