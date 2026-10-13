@@ -253,7 +253,16 @@ func run(addr, grpcAddr string) error {
 		return err
 	}
 
-	r.Use(middleware.Recover(logger), middleware.RequestLogger(logger), middleware.Tracing(obs))
+	// Baseline response security headers ship innermost, so they land
+	// before any handler WriteHeader (error responses included). HSTS
+	// switches on only with TLS: emitting it on plaintext would pin
+	// browsers to HTTPS the server cannot speak.
+	securityHeadersOpts := middleware.SecurityHeadersOptions{}
+	if serverTLS != nil {
+		securityHeadersOpts.HSTSMaxAge = middleware.DefaultHSTSMaxAge
+	}
+
+	r.Use(middleware.Recover(logger), middleware.RequestLogger(logger), middleware.Tracing(obs), middleware.SecurityHeaders(securityHeadersOpts))
 
 	r.Use(middleware.RateLimit(limiter, middleware.RemoteAddrKey))
 
