@@ -31,10 +31,8 @@ func renderSagaFile(pkg string, m *ir.Module) ([]byte, error) {
 	b.WriteString(generatedHeader)
 	fmt.Fprintf(&b, "// Package %s holds the generated saga registration for the %s module.\n", pkg, pkg)
 	fmt.Fprintf(&b, "package %s\n\n", pkg)
-	b.WriteString("import (\n")
-	b.WriteString("\t\"context\"\n\n")
-	fmt.Fprintf(&b, "\t%q\n", pkgWorkflow)
-	b.WriteString(")\n\n")
+	writeGroupedImportBlock(&b, map[string]bool{importContext: true, pkgWorkflow: true}, nil)
+	b.WriteString("\n")
 	b.WriteString(body.String())
 
 	formatted, err := formatSource(b.String())

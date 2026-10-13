@@ -11,9 +11,8 @@ import (
 	"google.golang.org/grpc/status"
 
 	"github.com/zenta-dev/zever/core/authz"
-	"github.com/zenta-dev/zever/shared/apperror"
-
 	pb "github.com/zenta-dev/zever/examples/bookings/generated/protogogen"
+	"github.com/zenta-dev/zever/shared/apperror"
 )
 
 // BookingServiceGRPCServer adapts a BookingService implementation to the real pb.BookingServiceServer

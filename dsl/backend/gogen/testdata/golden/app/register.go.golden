@@ -9,9 +9,7 @@ import (
 
 	"github.com/zenta-dev/zever/core/auth"
 	"github.com/zenta-dev/zever/core/permission"
-
 	"github.com/zenta-dev/zever/core/router"
-
 	pb "github.com/zenta-dev/zever/gen"
 )
 

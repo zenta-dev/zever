@@ -6,19 +6,23 @@ package app
 import (
 	"encoding/json"
 	"errors"
-	"github.com/zenta-dev/zever/core/auth"
-	"github.com/zenta-dev/zever/core/authz"
-	"github.com/zenta-dev/zever/core/permission"
-	"github.com/zenta-dev/zever/shared/apperror"
-	"google.golang.org/protobuf/encoding/protojson"
-	"google.golang.org/protobuf/proto"
 	"io"
 	"net/http"
 
+	"google.golang.org/protobuf/encoding/protojson"
+	"google.golang.org/protobuf/proto"
+
+	"github.com/zenta-dev/zever/adapters/log/noop"
+	"github.com/zenta-dev/zever/core/auth"
+	"github.com/zenta-dev/zever/core/authz"
+	"github.com/zenta-dev/zever/core/document"
+	"github.com/zenta-dev/zever/core/log"
+	"github.com/zenta-dev/zever/core/permission"
 	"github.com/zenta-dev/zever/core/router"
+	"github.com/zenta-dev/zever/shared/apperror"
 )
 
-const maxRequestBodyBytes = 10 << 20 // 10MB, matches document/local.maxSourceBytes
+const maxRequestBodyBytes = document.DefaultMaxSourceBytes
 
 // handleBookingServiceCreateSpace handles POST /spaces, calling BookingService.CreateSpace.
 func handleBookingServiceCreateSpace(svc BookingService) http.HandlerFunc {
@@ -36,32 +40,32 @@ func handleBookingServiceCreateSpace(svc BookingService) http.HandlerFunc {
 				msg = "request body too large"
 			}
 
-			writeGogenError(w, apperror.New(apperror.InvalidArgument, msg))
+			writeGogenError(w, r, apperror.New(apperror.InvalidArgument, msg))
 			return
 		}
 
 		if err := protojson.Unmarshal(body, req); err != nil {
-			writeGogenError(w, apperror.New(apperror.InvalidArgument, "invalid JSON body"))
+			writeGogenError(w, r, apperror.New(apperror.InvalidArgument, "invalid JSON body"))
 			return
 		}
 
 		if req.Title == "" {
-			writeGogenError(w, apperror.New(apperror.InvalidArgument, "missing required field \"title\""))
+			writeGogenError(w, r, apperror.New(apperror.InvalidArgument, "missing required field \"title\""))
 			return
 		}
 
 		if req.Description == "" {
-			writeGogenError(w, apperror.New(apperror.InvalidArgument, "missing required field \"description\""))
+			writeGogenError(w, r, apperror.New(apperror.InvalidArgument, "missing required field \"description\""))
 			return
 		}
 
 		resp, err := svc.CreateSpace(ctx, req)
 		if err != nil {
-			writeGogenError(w, err)
+			writeGogenError(w, r, err)
 			return
 		}
 
-		writeGogenProtoJSON(w, http.StatusOK, resp)
+		writeGogenProtoJSON(w, r, http.StatusOK, resp)
 	}
 }
 
@@ -74,11 +78,11 @@ func handleBookingServiceListSpaces(svc BookingService) http.HandlerFunc {
 
 		resp, err := svc.ListSpaces(ctx, req)
 		if err != nil {
-			writeGogenError(w, err)
+			writeGogenError(w, r, err)
 			return
 		}
 
-		writeGogenProtoJSON(w, http.StatusOK, resp)
+		writeGogenProtoJSON(w, r, http.StatusOK, resp)
 	}
 }
 
@@ -92,7 +96,7 @@ func handleBookingServiceGetSpace(svc BookingService) http.HandlerFunc {
 		{
 			raw := router.Param(r, "id")
 			if raw == "" {
-				writeGogenError(w, apperror.New(apperror.InvalidArgument, "missing required parameter \"id\""))
+				writeGogenError(w, r, apperror.New(apperror.InvalidArgument, "missing required parameter \"id\""))
 				return
 			}
 
@@ -102,11 +106,11 @@ func handleBookingServiceGetSpace(svc BookingService) http.HandlerFunc {
 
 		resp, err := svc.GetSpace(ctx, req)
 		if err != nil {
-			writeGogenError(w, err)
+			writeGogenError(w, r, err)
 			return
 		}
 
-		writeGogenProtoJSON(w, http.StatusOK, resp)
+		writeGogenProtoJSON(w, r, http.StatusOK, resp)
 	}
 }
 
@@ -126,37 +130,37 @@ func handleBookingServiceCreateBooking(svc BookingService) http.HandlerFunc {
 				msg = "request body too large"
 			}
 
-			writeGogenError(w, apperror.New(apperror.InvalidArgument, msg))
+			writeGogenError(w, r, apperror.New(apperror.InvalidArgument, msg))
 			return
 		}
 
 		if err := protojson.Unmarshal(body, req); err != nil {
-			writeGogenError(w, apperror.New(apperror.InvalidArgument, "invalid JSON body"))
+			writeGogenError(w, r, apperror.New(apperror.InvalidArgument, "invalid JSON body"))
 			return
 		}
 
 		if req.SpaceId == "" {
-			writeGogenError(w, apperror.New(apperror.InvalidArgument, "missing required field \"space_id\""))
+			writeGogenError(w, r, apperror.New(apperror.InvalidArgument, "missing required field \"space_id\""))
 			return
 		}
 
 		if req.StartDate == "" {
-			writeGogenError(w, apperror.New(apperror.InvalidArgument, "missing required field \"start_date\""))
+			writeGogenError(w, r, apperror.New(apperror.InvalidArgument, "missing required field \"start_date\""))
 			return
 		}
 
 		if req.EndDate == "" {
-			writeGogenError(w, apperror.New(apperror.InvalidArgument, "missing required field \"end_date\""))
+			writeGogenError(w, r, apperror.New(apperror.InvalidArgument, "missing required field \"end_date\""))
 			return
 		}
 
 		resp, err := svc.CreateBooking(ctx, req)
 		if err != nil {
-			writeGogenError(w, err)
+			writeGogenError(w, r, err)
 			return
 		}
 
-		writeGogenProtoJSON(w, http.StatusOK, resp)
+		writeGogenProtoJSON(w, r, http.StatusOK, resp)
 	}
 }
 
@@ -170,7 +174,7 @@ func handleBookingServiceCancelBooking(svc BookingService) http.HandlerFunc {
 		{
 			raw := router.Param(r, "id")
 			if raw == "" {
-				writeGogenError(w, apperror.New(apperror.InvalidArgument, "missing required parameter \"id\""))
+				writeGogenError(w, r, apperror.New(apperror.InvalidArgument, "missing required parameter \"id\""))
 				return
 			}
 
@@ -180,11 +184,11 @@ func handleBookingServiceCancelBooking(svc BookingService) http.HandlerFunc {
 
 		resp, err := svc.CancelBooking(ctx, req)
 		if err != nil {
-			writeGogenError(w, err)
+			writeGogenError(w, r, err)
 			return
 		}
 
-		writeGogenProtoJSON(w, http.StatusOK, resp)
+		writeGogenProtoJSON(w, r, http.StatusOK, resp)
 	}
 }
 
@@ -204,32 +208,32 @@ func handleBookingServiceAddReview(svc BookingService) http.HandlerFunc {
 				msg = "request body too large"
 			}
 
-			writeGogenError(w, apperror.New(apperror.InvalidArgument, msg))
+			writeGogenError(w, r, apperror.New(apperror.InvalidArgument, msg))
 			return
 		}
 
 		if err := protojson.Unmarshal(body, req); err != nil {
-			writeGogenError(w, apperror.New(apperror.InvalidArgument, "invalid JSON body"))
+			writeGogenError(w, r, apperror.New(apperror.InvalidArgument, "invalid JSON body"))
 			return
 		}
 
 		if req.SpaceId == "" {
-			writeGogenError(w, apperror.New(apperror.InvalidArgument, "missing required field \"space_id\""))
+			writeGogenError(w, r, apperror.New(apperror.InvalidArgument, "missing required field \"space_id\""))
 			return
 		}
 
 		if req.Body == "" {
-			writeGogenError(w, apperror.New(apperror.InvalidArgument, "missing required field \"body\""))
+			writeGogenError(w, r, apperror.New(apperror.InvalidArgument, "missing required field \"body\""))
 			return
 		}
 
 		resp, err := svc.AddReview(ctx, req)
 		if err != nil {
-			writeGogenError(w, err)
+			writeGogenError(w, r, err)
 			return
 		}
 
-		writeGogenProtoJSON(w, http.StatusOK, resp)
+		writeGogenProtoJSON(w, r, http.StatusOK, resp)
 	}
 }
 
@@ -249,21 +253,33 @@ func RegisterBookingServiceRoutes(r router.Router, svc BookingService, a auth.Au
 
 // writeGogenJSON writes v as a plain (non-protobuf) JSON response body with
 // the given status -- used only for the generic error shape below, since an
-// *apperror.Error is not a protobuf message.
-func writeGogenJSON(w http.ResponseWriter, status int, v any) {
+// *apperror.Error is not a protobuf message. The body is encoded before the
+// header is written: a marshal failure (v holds an unmarshalable value) is
+// logged via the request logger and answered with a bare 500 -- once a
+// header is sent no error body can still follow it, and the client must
+// not see the requested status for a response that could not be encoded.
+func writeGogenJSON(w http.ResponseWriter, r *http.Request, status int, v any) {
+	body, err := json.Marshal(v)
+	if err != nil {
+		log.FromContext(r.Context(), noop.New()).Error().Err(err).Msg("encode json response")
+		w.Header().Set("Content-Type", "application/json")
+		w.WriteHeader(http.StatusInternalServerError)
+		return
+	}
+
 	w.Header().Set("Content-Type", "application/json")
 	w.WriteHeader(status)
-	_ = json.NewEncoder(w).Encode(v)
+	_, _ = w.Write(body)
 }
 
 // writeGogenProtoJSON writes msg -- a real protobuf message -- as a
 // protojson-encoded response body with the given status. protojson is
 // protobuf's canonical JSON mapping: field names render in lowerCamelCase
 // (e.g. "userId"), not this backend's earlier plain-struct casing.
-func writeGogenProtoJSON(w http.ResponseWriter, status int, msg proto.Message) {
+func writeGogenProtoJSON(w http.ResponseWriter, r *http.Request, status int, msg proto.Message) {
 	body, err := protojson.Marshal(msg)
 	if err != nil {
-		writeGogenJSON(w, http.StatusInternalServerError, map[string]string{"error": "internal error"})
+		writeGogenJSON(w, r, http.StatusInternalServerError, map[string]string{"error": "internal error"})
 		return
 	}
 
@@ -274,12 +290,12 @@ func writeGogenProtoJSON(w http.ResponseWriter, status int, msg proto.Message) {
 
 // writeGogenError maps err to an HTTP status: an *apperror.Error maps via
 // its Code.HTTPStatus(); any other error maps to 500.
-func writeGogenError(w http.ResponseWriter, err error) {
+func writeGogenError(w http.ResponseWriter, r *http.Request, err error) {
 	var appErr *apperror.Error
 	if errors.As(err, &appErr) {
-		writeGogenJSON(w, appErr.Code().HTTPStatus(), map[string]string{"error": appErr.Message()})
+		writeGogenJSON(w, r, appErr.Code().HTTPStatus(), map[string]string{"error": appErr.Message()})
 		return
 	}
 
-	writeGogenJSON(w, http.StatusInternalServerError, map[string]string{"error": "internal error"})
+	writeGogenJSON(w, r, http.StatusInternalServerError, map[string]string{"error": "internal error"})
 }

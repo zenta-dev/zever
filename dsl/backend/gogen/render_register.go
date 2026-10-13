@@ -36,17 +36,15 @@ func renderRegister(pkg string, data moduleModel) string {
 	fmt.Fprintf(&b, "// Package %s holds the generated per-module registration aggregator for\n", pkg)
 	fmt.Fprintf(&b, "// the %s module.\n", pkg)
 	fmt.Fprintf(&b, "package %s\n\n", pkg)
-	b.WriteString("import (\n")
-	fmt.Fprintf(&b, "\t%q\n\n", pkgGRPC)
 
+	imports := map[string]bool{pkgGRPC: true, pkgRouter: true, data.PBImportPath: true}
 	if withAuthz {
-		fmt.Fprintf(&b, "\t%q\n", pkgAuth)
-		fmt.Fprintf(&b, "\t%q\n\n", pkgPermission)
+		imports[pkgAuth] = true
+		imports[pkgPermission] = true
 	}
 
-	fmt.Fprintf(&b, "\t%q\n\n", pkgRouter)
-	fmt.Fprintf(&b, "\t%s %q\n", data.PBAlias, data.PBImportPath)
-	b.WriteString(")\n\n")
+	writeGroupedImportBlock(&b, imports, map[string]string{data.PBImportPath: data.PBAlias})
+	b.WriteString("\n")
 	b.WriteString(body.String())
 
 	return b.String()

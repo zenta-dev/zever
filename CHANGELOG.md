@@ -9,6 +9,13 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Fixed
 
+- `gogen`: generated `writeGogenJSON` now checks the `json.Marshal` error
+  (previously discarded with `_ =`) and answers a bare 500 via the request
+  logger instead of writing a response body after the header; generated
+  import blocks are grouped goimports-style (std / third-party / zever-local);
+  the per-file 10MB request cap is now the document battery's
+  `DefaultMaxSourceBytes` constant; golden output is covered by a
+  compile test (`go vet` in a temp module) and goldens/examples regenerated.
 - `shared/registry`: `New` no longer returns nil errors for unknown,
   duplicate, or nil factories when hooks are nil: a nil `errNil` falls back to
   the exported `ErrNilFactory` sentinel, and nil `duplicate`/`unknown` hooks

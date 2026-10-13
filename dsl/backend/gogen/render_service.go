@@ -54,9 +54,8 @@ func renderService(pkg string, data moduleModel) string {
 	b.WriteString(generatedHeader)
 	fmt.Fprintf(&b, "// Package %s holds the generated service interfaces for the %s module.\n", pkg, pkg)
 	fmt.Fprintf(&b, "package %s\n\n", pkg)
-	b.WriteString("import (\n")
-	fmt.Fprintf(&b, "\t%q\n", importContext)
-	b.WriteString(")\n\n")
+	writeGroupedImportBlock(&b, map[string]bool{importContext: true}, nil)
+	b.WriteString("\n")
 	b.WriteString(body.String())
 
 	return b.String()

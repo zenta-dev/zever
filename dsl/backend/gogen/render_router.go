@@ -27,7 +27,11 @@ import (
 // "UserID") -- there is no attempt here to preserve the old casing via
 // custom protojson.MarshalOptions field-name overrides.
 func renderRouter(pkg string, data moduleModel) string {
-	imports := map[string]bool{importHTTP: true, importJSON: true, importErrors: true, importIO: true, pkgProtoJSON: true, pkgProto: true}
+	imports := map[string]bool{
+		importHTTP: true, importJSON: true, importErrors: true, importIO: true,
+		pkgProtoJSON: true, pkgProto: true, pkgLog: true, pkgNoop: true, pkgDocument: true,
+		pkgApperror: true, pkgRouter: true,
+	}
 
 	withAuthz := needsAuthzImports(data)
 	if withAuthz {
@@ -63,15 +67,12 @@ func renderRouter(pkg string, data moduleModel) string {
 	b.WriteString(generatedHeader)
 	fmt.Fprintf(&b, "// Package %s holds the generated HTTP routing for the %s module.\n", pkg, pkg)
 	fmt.Fprintf(&b, "package %s\n\n", pkg)
-	writeSortedImportBlock(&b, imports)
-	fmt.Fprintf(&b, "\t%q\n\n", pkgApperror)
-	fmt.Fprintf(&b, "\t%q\n", pkgRouter)
-
 	if needsPBImport(data) {
-		fmt.Fprintf(&b, "\t%s %q\n", data.PBAlias, data.PBImportPath)
+		imports[data.PBImportPath] = true
 	}
 
-	b.WriteString(")\n\n")
+	writeGroupedImportBlock(&b, imports, map[string]string{data.PBImportPath: data.PBAlias})
+	b.WriteString("\n")
 	b.WriteString(maxRequestBodyBytesConst)
 	b.WriteString(body.String())
 	b.WriteString(routerHelpers)
@@ -101,19 +102,76 @@ func needsPBImport(data moduleModel) bool {
 	return false
 }
 
-func writeSortedImportBlock(b *strings.Builder, imports map[string]bool) {
-	paths := make([]string, 0, len(imports))
+// importLocalPrefix is the goimports local-prefixes entry this repo's
+// .golangci.yml configures: every zever module is "local" for import
+// grouping, everything else with a domain in its first path segment is
+// third-party.
+const importLocalPrefix = "github.com/zenta-dev/zever/"
+
+// isLocalImport reports whether path is a zever module (goimports' local
+// group), e.g. "github.com/zenta-dev/zever/core/router".
+func isLocalImport(path string) bool {
+	return strings.HasPrefix(path, importLocalPrefix)
+}
+
+// isStdImport reports whether path belongs to the standard library: its
+// first path segment carries no dot, the same heuristic goimports itself
+// applies (e.g. "net/http" is std, "github.com/google/uuid" is not).
+func isStdImport(path string) bool {
+	first, _, _ := strings.Cut(path, "/")
+
+	return !strings.Contains(first, ".")
+}
+
+// writeGroupedImportBlock writes b's import block in goimports' three-group
+// shape (see .golangci.yml's goimports local-prefixes): standard library,
+// blank line, third-party, blank line, zever-local. Each group is sorted by
+// import path; an import whose path is a key in aliased renders as
+// "alias path". Empty groups are omitted, so a file needing only std
+// imports gets a single group with no blank lines.
+func writeGroupedImportBlock(b *strings.Builder, imports map[string]bool, aliased map[string]string) {
+	var std, third, local []string
+
 	for p := range imports {
-		paths = append(paths, p)
+		switch {
+		case isLocalImport(p):
+			local = append(local, p)
+		case isStdImport(p):
+			std = append(std, p)
+		default:
+			third = append(third, p)
+		}
 	}
 
-	sort.Strings(paths)
+	sort.Strings(std)
+	sort.Strings(third)
+	sort.Strings(local)
+
+	groups := make([][]string, 0, 3)
+
+	for _, group := range [][]string{std, third, local} {
+		if len(group) > 0 {
+			groups = append(groups, group)
+		}
+	}
 
 	b.WriteString("import (\n")
 
-	for _, p := range paths {
-		fmt.Fprintf(b, "\t%q\n", p)
+	for i, group := range groups {
+		if i > 0 {
+			b.WriteString("\n")
+		}
+
+		for _, p := range group {
+			if alias, ok := aliased[p]; ok {
+				fmt.Fprintf(b, "\t%s %q\n", alias, p)
+			} else {
+				fmt.Fprintf(b, "\t%q\n", p)
+			}
+		}
 	}
+
+	b.WriteString(")\n")
 }
 
 // renderHandler renders one operation's http.HandlerFunc factory.
@@ -146,7 +204,7 @@ func renderHandler(b *strings.Builder, svcName string, op opModel, imports map[s
 		b.WriteString("\t\tif raw := r.URL.Query().Get(\"limit\"); raw != \"\" {\n")
 		b.WriteString("\t\t\tv, err := strconv.ParseInt(raw, 10, 32)\n")
 		b.WriteString("\t\t\tif err != nil {\n")
-		b.WriteString("\t\t\t\twriteGogenError(w, apperror.New(apperror.InvalidArgument, \"invalid parameter \\\"limit\\\"\"))\n")
+		b.WriteString("\t\t\t\twriteGogenError(w, r, apperror.New(apperror.InvalidArgument, \"invalid parameter \\\"limit\\\"\"))\n")
 		b.WriteString("\t\t\t\treturn\n\t\t\t}\n\n")
 		b.WriteString("\t\t\tlimit = int32(v)\n\t\t}\n\n")
 	}
@@ -168,16 +226,16 @@ func renderHandler(b *strings.Builder, svcName string, op opModel, imports map[s
 			b.WriteString("\t\t\tvar maxErr *http.MaxBytesError\n")
 			b.WriteString("\t\t\tif errors.As(err, &maxErr) {\n")
 			b.WriteString("\t\t\t\tmsg = \"request body too large\"\n\t\t\t}\n\n")
-			b.WriteString("\t\t\twriteGogenError(w, apperror.New(apperror.InvalidArgument, msg))\n")
+			b.WriteString("\t\t\twriteGogenError(w, r, apperror.New(apperror.InvalidArgument, msg))\n")
 			b.WriteString("\t\t\treturn\n\t\t}\n\n")
 			b.WriteString("\t\tif err := protojson.Unmarshal(body, req); err != nil {\n")
-			b.WriteString("\t\t\twriteGogenError(w, apperror.New(apperror.InvalidArgument, \"invalid JSON body\"))\n")
+			b.WriteString("\t\t\twriteGogenError(w, r, apperror.New(apperror.InvalidArgument, \"invalid JSON body\"))\n")
 			b.WriteString("\t\t\treturn\n\t\t}\n\n")
 
 			for _, p := range otherP {
 				if !p.IsRef && isStringScalar(p.Scalar) {
 					fmt.Fprintf(b, "\t\tif req.%s == \"\" {\n", p.GoName)
-					fmt.Fprintf(b, "\t\t\twriteGogenError(w, apperror.New(apperror.InvalidArgument, %q))\n",
+					fmt.Fprintf(b, "\t\t\twriteGogenError(w, r, apperror.New(apperror.InvalidArgument, %q))\n",
 						fmt.Sprintf("missing required field %q", p.Name))
 					b.WriteString("\t\t\treturn\n\t\t}\n\n")
 				}
@@ -191,7 +249,7 @@ func renderHandler(b *strings.Builder, svcName string, op opModel, imports map[s
 
 	if opNeedsValidate(op) {
 		fmt.Fprintf(b, "\t\tif err := validate%sRequest(req); err != nil {\n", op.Name)
-		b.WriteString("\t\t\twriteGogenError(w, err)\n\t\t\treturn\n\t\t}\n\n")
+		b.WriteString("\t\t\twriteGogenError(w, r, err)\n\t\t\treturn\n\t\t}\n\n")
 	}
 
 	if op.Paginated {
@@ -200,8 +258,8 @@ func renderHandler(b *strings.Builder, svcName string, op opModel, imports map[s
 		fmt.Fprintf(b, "\t\tresp, err := svc.%s(ctx, req)\n", op.Name)
 	}
 
-	b.WriteString("\t\tif err != nil {\n\t\t\twriteGogenError(w, err)\n\t\t\treturn\n\t\t}\n\n")
-	b.WriteString("\t\twriteGogenProtoJSON(w, http.StatusOK, resp)\n")
+	b.WriteString("\t\tif err != nil {\n\t\t\twriteGogenError(w, r, err)\n\t\t\treturn\n\t\t}\n\n")
+	b.WriteString("\t\twriteGogenProtoJSON(w, r, http.StatusOK, resp)\n")
 	b.WriteString("\t}\n}\n\n")
 }
 
@@ -227,7 +285,7 @@ func emitEnumParamBind(b *strings.Builder, dst string, p paramModel, invalid str
 	}
 
 	b.WriteString("\t\tdefault:\n")
-	fmt.Fprintf(b, "\t\t\twriteGogenError(w, apperror.New(apperror.InvalidArgument, %q))\n", invalid)
+	fmt.Fprintf(b, "\t\t\twriteGogenError(w, r, apperror.New(apperror.InvalidArgument, %q))\n", invalid)
 	b.WriteString("\t\t\treturn\n\t\t}\n\n")
 }
 
@@ -252,7 +310,7 @@ func emitParamBind(b *strings.Builder, dst string, p paramModel, rawExpr string,
 	b.WriteString("\t\t{\n")
 	fmt.Fprintf(b, "\t\traw := %s\n", rawExpr)
 	b.WriteString("\t\tif raw == \"\" {\n")
-	fmt.Fprintf(b, "\t\t\twriteGogenError(w, apperror.New(apperror.InvalidArgument, %q))\n", missing)
+	fmt.Fprintf(b, "\t\t\twriteGogenError(w, r, apperror.New(apperror.InvalidArgument, %q))\n", missing)
 	b.WriteString("\t\t\treturn\n\t\t}\n\n")
 
 	switch p.Scalar {
@@ -317,7 +375,7 @@ func emitParamBind(b *strings.Builder, dst string, p paramModel, rawExpr string,
 
 func writeParseErrCheck(b *strings.Builder, invalidMsg string) {
 	b.WriteString("\t\tif err != nil {\n")
-	fmt.Fprintf(b, "\t\t\twriteGogenError(w, apperror.New(apperror.InvalidArgument, %q))\n", invalidMsg)
+	fmt.Fprintf(b, "\t\t\twriteGogenError(w, r, apperror.New(apperror.InvalidArgument, %q))\n", invalidMsg)
 	b.WriteString("\t\t\treturn\n\t\t}\n")
 }
 
@@ -326,7 +384,7 @@ func writeParseErrCheck(b *strings.Builder, invalidMsg string) {
 // (see the TJSON case in emitParamBind, which needs the structpb.Struct
 // value populated in place rather than returned from a helper call).
 func writeParseErrCheckBody(b *strings.Builder, invalidMsg string) {
-	fmt.Fprintf(b, "\t\t\twriteGogenError(w, apperror.New(apperror.InvalidArgument, %q))\n", invalidMsg)
+	fmt.Fprintf(b, "\t\t\twriteGogenError(w, r, apperror.New(apperror.InvalidArgument, %q))\n", invalidMsg)
 	b.WriteString("\t\t\treturn\n\t\t}\n\n")
 }
 
@@ -400,31 +458,43 @@ func resourceIDFromRequestExpr(op opModel) string {
 // handler in this file enforces via http.MaxBytesReader before buffering a
 // request body with io.ReadAll -- without it, an unbounded body is read
 // fully into memory before any validation runs, a memory-exhaustion vector
-// for any client (or attacker) willing to send a large enough request. 10MB
-// matches this module's own precedent for a request-size limit
-// (document/local.maxSourceBytes), reused here for consistency.
-const maxRequestBodyBytesConst = "const maxRequestBodyBytes = 10 << 20 // 10MB, matches document/local.maxSourceBytes\n\n"
+// for any client (or attacker) willing to send a large enough request. The
+// limit is the document battery's own DefaultMaxSourceBytes, referenced
+// rather than duplicated so the two can never drift apart.
+const maxRequestBodyBytesConst = "const maxRequestBodyBytes = document.DefaultMaxSourceBytes\n\n"
 
 // routerHelpers are the shared JSON/error-writing helpers every generated
 // handler in this file calls; emitted once per router.go regardless of how
 // many services/operations it holds.
 const routerHelpers = `// writeGogenJSON writes v as a plain (non-protobuf) JSON response body with
 // the given status -- used only for the generic error shape below, since an
-// *apperror.Error is not a protobuf message.
-func writeGogenJSON(w http.ResponseWriter, status int, v any) {
+// *apperror.Error is not a protobuf message. The body is encoded before the
+// header is written: a marshal failure (v holds an unmarshalable value) is
+// logged via the request logger and answered with a bare 500 -- once a
+// header is sent no error body can still follow it, and the client must
+// not see the requested status for a response that could not be encoded.
+func writeGogenJSON(w http.ResponseWriter, r *http.Request, status int, v any) {
+	body, err := json.Marshal(v)
+	if err != nil {
+		log.FromContext(r.Context(), noop.New()).Error().Err(err).Msg("encode json response")
+		w.Header().Set("Content-Type", "application/json")
+		w.WriteHeader(http.StatusInternalServerError)
+		return
+	}
+
 	w.Header().Set("Content-Type", "application/json")
 	w.WriteHeader(status)
-	_ = json.NewEncoder(w).Encode(v)
+	_, _ = w.Write(body)
 }
 
 // writeGogenProtoJSON writes msg -- a real protobuf message -- as a
 // protojson-encoded response body with the given status. protojson is
 // protobuf's canonical JSON mapping: field names render in lowerCamelCase
 // (e.g. "userId"), not this backend's earlier plain-struct casing.
-func writeGogenProtoJSON(w http.ResponseWriter, status int, msg proto.Message) {
+func writeGogenProtoJSON(w http.ResponseWriter, r *http.Request, status int, msg proto.Message) {
 	body, err := protojson.Marshal(msg)
 	if err != nil {
-		writeGogenJSON(w, http.StatusInternalServerError, map[string]string{"error": "internal error"})
+		writeGogenJSON(w, r, http.StatusInternalServerError, map[string]string{"error": "internal error"})
 		return
 	}
 
@@ -435,13 +505,13 @@ func writeGogenProtoJSON(w http.ResponseWriter, status int, msg proto.Message) {
 
 // writeGogenError maps err to an HTTP status: an *apperror.Error maps via
 // its Code.HTTPStatus(); any other error maps to 500.
-func writeGogenError(w http.ResponseWriter, err error) {
+func writeGogenError(w http.ResponseWriter, r *http.Request, err error) {
 	var appErr *apperror.Error
 	if errors.As(err, &appErr) {
-		writeGogenJSON(w, appErr.Code().HTTPStatus(), map[string]string{"error": appErr.Message()})
+		writeGogenJSON(w, r, appErr.Code().HTTPStatus(), map[string]string{"error": appErr.Message()})
 		return
 	}
 
-	writeGogenJSON(w, http.StatusInternalServerError, map[string]string{"error": "internal error"})
+	writeGogenJSON(w, r, http.StatusInternalServerError, map[string]string{"error": "internal error"})
 }
 `
