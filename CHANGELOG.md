@@ -46,6 +46,19 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Added
 
+- `feat(server): TLS/mTLS options for generated server`: the router
+  battery gains `tls_cert`, `tls_key`, and `tls_client_ca` options
+  (file paths; `ROUTER_TLS_CERT` and friends in env; schema files
+  updated). The generated server (`zever generate server`) builds one
+  shared `tls.Config` from them (TLS 1.2 floor) and serves both
+  listeners from it: gRPC via `credentials.NewTLS`, HTTP via
+  `ListenAndServeTLS`, with `tls_client_ca` turning on mutual TLS
+  (`RequireAndVerifyClientCert`) on both. Unpaired paths fail
+  `config.Validate` fail-closed; the server fails fast with a fix hint
+  when key material cannot be loaded. Serving plaintext on a
+  non-loopback address logs one warning per listener at startup;
+  plaintext loopback stays quiet as the local-dev default. See
+  "Terminate TLS" in the deployment guide.
 - `feat(container): report abandoned closers on timeout`: `CloseTimeoutError`
   gains an `Abandoned` flag (value type kept) set when a timed-out
   `closeAsync` goroutine is deliberately left running because the service

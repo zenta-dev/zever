@@ -100,6 +100,58 @@ func TestOptions_Validate(t *testing.T) {
 			opts:    Options{AppName: "café-日本語-app_01"},
 			wantErr: false,
 		},
+		{
+			name:    "tls cert without key fails",
+			opts:    Options{TLSCertFile: "server.crt"},
+			wantErr: true,
+			check: func(t *testing.T, err error) {
+				t.Helper()
+				if !errors.Is(err, ErrInvalidOptions) {
+					t.Fatalf("err = %v, want ErrInvalidOptions", err)
+				}
+				if !strings.Contains(err.Error(), "tls_key") {
+					t.Fatalf("err = %q, want tls_key pair reason", err.Error())
+				}
+			},
+		},
+		{
+			name:    "tls key without cert fails",
+			opts:    Options{TLSKeyFile: "server.key"},
+			wantErr: true,
+			check: func(t *testing.T, err error) {
+				t.Helper()
+				if !errors.Is(err, ErrInvalidOptions) {
+					t.Fatalf("err = %v, want ErrInvalidOptions", err)
+				}
+				if !strings.Contains(err.Error(), "tls_cert") {
+					t.Fatalf("err = %q, want tls_cert pair reason", err.Error())
+				}
+			},
+		},
+		{
+			name:    "tls client ca without server pair fails",
+			opts:    Options{TLSClientCAFile: "client-ca.crt"},
+			wantErr: true,
+			check: func(t *testing.T, err error) {
+				t.Helper()
+				if !errors.Is(err, ErrInvalidOptions) {
+					t.Fatalf("err = %v, want ErrInvalidOptions", err)
+				}
+				if !strings.Contains(err.Error(), "tls_client_ca") {
+					t.Fatalf("err = %q, want tls_client_ca pair reason", err.Error())
+				}
+			},
+		},
+		{
+			name:    "tls cert plus key passes",
+			opts:    Options{TLSCertFile: "server.crt", TLSKeyFile: "server.key"},
+			wantErr: false,
+		},
+		{
+			name:    "tls mtls triple passes",
+			opts:    Options{TLSCertFile: "server.crt", TLSKeyFile: "server.key", TLSClientCAFile: "client-ca.crt"},
+			wantErr: false,
+		},
 	}
 	for _, tc := range cases {
 		tc := tc
