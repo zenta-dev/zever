@@ -66,6 +66,14 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Added
 
+- `docs: test your zever app guide`: new `guides/operate/testing-your-app`
+  page — per-test container from `config.Default()` with `t.Cleanup` close,
+  httptest routes, per-test sqlite files under `t.TempDir()`, the `dbtest`
+  and `outboxtest` conformance kits for custom adapters, deterministic-clock
+  and goleak tips. Guide patterns compile and run as
+  `docs/examples/testing_test.go`; the todo example gains a small
+  `boundary_test.go`. Contributor-only `docs/testing.md` moves to
+  `.github/CONTRIBUTING-testing.md` (linked from CONTRIBUTING).
 - `docs: CSRF guidance for cookie sessions`: the sessions guide gains a
   "Defend cookie sessions against CSRF" section — why `SameSite=Lax`
   alone is not enough, the `__Host-` prefix, no-state-on-`GET`,

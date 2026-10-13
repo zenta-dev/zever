@@ -16,6 +16,7 @@ require (
 	github.com/zenta-dev/zever/core/cache v0.6.1
 	github.com/zenta-dev/zever/core/db v0.6.1
 	github.com/zenta-dev/zever/core/log v0.6.1
+	github.com/zenta-dev/zever/core/outbox v0.6.1
 	github.com/zenta-dev/zever/core/queue v0.6.1
 	github.com/zenta-dev/zever/core/router v0.6.1
 	github.com/zenta-dev/zever/core/session v0.6.1
@@ -52,7 +53,6 @@ require (
 	github.com/zenta-dev/zever/core/media v0.6.1 // indirect
 	github.com/zenta-dev/zever/core/notification v0.6.1 // indirect
 	github.com/zenta-dev/zever/core/observability v0.6.1 // indirect
-	github.com/zenta-dev/zever/core/outbox v0.6.1 // indirect
 	github.com/zenta-dev/zever/core/password v0.6.1 // indirect
 	github.com/zenta-dev/zever/core/payment v0.6.1 // indirect
 	github.com/zenta-dev/zever/core/permission v0.6.1 // indirect

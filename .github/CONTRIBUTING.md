@@ -148,7 +148,7 @@ Write idiomatic Go. When in doubt, follow [Effective Go](https://go.dev/doc/effe
 
 ## Testing Standards
 
-Tests are required for new functionality, and bug fixes must normally include a regression test that fails before the fix and passes after.
+Tests are required for new functionality, and bug fixes must normally include a regression test that fails before the fix and passes after. The flake-prevention rules (determinism, process-global state, per-test DB files, `synctest`, fork/exec races) live in [CONTRIBUTING-testing.md](./CONTRIBUTING-testing.md).
 
 Write tests that cover, where relevant:
 
