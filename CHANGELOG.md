@@ -271,7 +271,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   rule flagging `fmt.Errorf` without `%w` that still takes a bare `err`
   argument (conservative: `err.Error()` and other names are out of scope);
   the repo scans clean.   `nolintlint` is now enabled so stale suppressions
-  fail the build, and the 122 unused directives it reported (mostly
+  fail the build, and the 123 unused directives it reported (mostly
   `nolint:gosec` on `os.ReadFile`/`os.WriteFile` already covered by the
   `std-error-handling` exclusion preset, plus stale `unparam`/`dupl`/
   `nilerr`/`unused`/`revive`/`tparallel`/`exhaustive`/`forcetypeassert`/
