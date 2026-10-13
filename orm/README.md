@@ -2,8 +2,9 @@
 
 Generics-typed SQL query builder over `db.DB`, with a shared render core
 and capability-gated dialects (`sqlite`, `postgres`). Ported from the
-`zen` package and renamed; mysql support was dropped (no mysql adapter in
-`db/`).
+`zen` package and renamed; the query builder has no mysql rendering and
+there is no bundled mysql driver in `db/` (see Dialects below for where
+mysql is and is not supported).
 
 ## Model
 
@@ -57,6 +58,17 @@ silent fallback. Placeholder and quoting rules plus capability gates live
 in `orm/dialect`; SQL text lives in `orm/render` (shared, args always
 bound, identifiers always quoted). All errors carry the `orm:` prefix
 (`orm/render:`, `orm/dialect:`) and remain `errors.Is`-compatible.
+
+MySQL status: the query builder above does not render mysql, and `db/`
+ships no mysql driver — but the migration stack does support it.
+`dsl/backend/atlas` renders bootstrap DDL for `"mysql"`, and
+`orm/migrate` live-diffs a compiled schema against a MySQL database via
+`information_schema` introspection (`orm/migrate/mysql.go`: backtick
+quoting, `MODIFY COLUMN`, `DROP INDEX ... ON <table>`, MySQL-typed
+`schema_migrations` bookkeeping). Point any `db.DB` whose `Dialect()`
+returns `"mysql"` at `migrate.Plan`/`Apply`; unsupported shapes fail
+closed with typed errors, and the remaining gaps (enum value-list
+changes, column defaults) are documented in `orm/migrate/doc.go`.
 
 ## Testing
 
