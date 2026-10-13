@@ -5,11 +5,11 @@ go 1.27.2
 require (
 	github.com/clipperhouse/uax29/v2 v2.7.0 // indirect
 	github.com/google/uuid v1.6.0 // indirect
-	github.com/klauspost/compress v1.20.0 // indirect
+	github.com/klauspost/compress v1.20.1 // indirect
 	github.com/mattn/go-colorable v0.1.14 // indirect
 	github.com/mattn/go-isatty v0.0.24 // indirect
 	github.com/mattn/go-runewidth v0.0.27 // indirect
-	github.com/molecule-man/go-brrr v1.0.1 // indirect
+	github.com/molecule-man/go-brrr v1.1.1 // indirect
 	github.com/valyala/bytebufferpool v1.0.0 // indirect
 	github.com/zenta-dev/zever/shared/registry v0.6.1 // indirect
 	golang.org/x/sys v0.48.0 // indirect
@@ -18,7 +18,7 @@ require (
 require (
 	github.com/gofiber/adaptor/v2 v2.2.1
 	github.com/gofiber/fiber/v2 v2.52.15
-	github.com/valyala/fasthttp v1.74.0
+	github.com/valyala/fasthttp v1.75.0
 	github.com/zenta-dev/zever/adapters/log/noop v0.6.1
 	github.com/zenta-dev/zever/core/log v0.6.1
 	github.com/zenta-dev/zever/core/router v0.6.1
