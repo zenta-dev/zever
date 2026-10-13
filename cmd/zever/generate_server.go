@@ -945,8 +945,10 @@ import (
 
 	"github.com/zenta-dev/zever/container"
 	"github.com/zenta-dev/zever/core/authz"
+	"github.com/zenta-dev/zever/core/log"
 	"github.com/zenta-dev/zever/core/middleware"
-	"github.com/zenta-dev/zever/shared/grpcclient"
+{{if .RateLimitEnabled}}	"github.com/zenta-dev/zever/core/ratelimit"
+{{end}}	"github.com/zenta-dev/zever/shared/grpcclient"
 
 	"{{.ModulePath}}/internal/app"
 {{range .Modules}}	{{.Alias}} "{{.ImportPath}}"
@@ -1287,6 +1289,16 @@ func run(addr, grpcAddr string) error {
 		return err
 	}
 
+	// Process configuration is restart-only, except the SIGHUP-reloadable
+	// batteries: SIGHUP re-reads the config file and atomically swaps the
+	// log level and (below) the rate limiter. Adapters, DSNs, credentials,
+	// TLS material, and listen addresses need a process restart. Flag
+	// clients held directly can swap the same way with
+	// container.ReloadableFlag; the static flag adapter additionally
+	// re-reads its file per evaluation when ` + "`reload: true`" + `.
+	reloadableLogger := container.NewReloadableLogger(logger)
+	logger = reloadableLogger
+
 	serverTLS, err := loadServerTLS()
 	if err != nil {
 		return err
@@ -1334,7 +1346,59 @@ func run(addr, grpcAddr string) error {
 	if len(trustedProxies) > 0 {
 		rateLimitKey = middleware.ClientIPKey(trustedProxies)
 	}
+
+	reloadableLimiter := container.NewReloadableLimiter(limiter)
+	limiter = reloadableLimiter
 {{end}}
+	// SIGHUP reloads the log level{{if .RateLimitEnabled}} and the rate limiter{{end}}
+	// from the config file via atomic swap; a failed re-open keeps the old
+	// instance and only warns. The watcher exits with ctx.
+	container.WatchSIGHUP(ctx, func(context.Context) {
+		cfg, err := app.Config()
+		if err != nil {
+			logger.Warn().Msgf("SIGHUP reload skipped: %v", err)
+
+			return
+		}
+
+		nextLogAdapter, err := log.ParseAdapter(cfg.Log.Adapter)
+		if err != nil {
+			logger.Warn().Msgf("SIGHUP reload skipped: log: %v", err)
+
+			return
+		}
+
+		nextLog, err := log.Open(nextLogAdapter, cfg.Log.Options)
+		if err != nil {
+			logger.Warn().Msgf("SIGHUP reload skipped: log: %v", err)
+
+			return
+		}
+
+		if oldLog, swapped := reloadableLogger.Swap(nextLog); swapped {
+			_ = oldLog.Sync()
+		}
+{{if .RateLimitEnabled}}
+		nextLimiterAdapter, err := ratelimit.ParseAdapter(cfg.RateLimit.Adapter)
+		if err != nil {
+			logger.Warn().Msgf("SIGHUP reload skipped: ratelimit: %v", err)
+
+			return
+		}
+
+		nextLimiter, err := ratelimit.Open(nextLimiterAdapter, cfg.RateLimit.Options)
+		if err != nil {
+			logger.Warn().Msgf("SIGHUP reload skipped: ratelimit: %v", err)
+
+			return
+		}
+
+		if old, swapped := reloadableLimiter.Swap(nextLimiter); swapped {
+			_ = old.Close()
+		}
+{{end}}
+		logger.Info().Msg("reloaded SIGHUP-reloadable config")
+	})
 	// One interceptor, attached once below, must cover every service this
 	// process registers on grpcServer -- so every generated module
 	// package's own GRPCPolicies() is merged into one map here first.

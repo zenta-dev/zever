@@ -128,7 +128,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   `NOT IN`. `Preload` sizes its child-`IN` chunks against the same budget
   (minus the child query's own arguments), so old-SQLite backends get
   fitting statements instead of driver errors; the 1000 default stands on
-  modern backends.
+   modern backends.
 - `docs: recommend stdhttp as the default router`: the routing guide now
   recommends `stdhttp` (already the `zever new` default) with measured
   numbers, and the benchmarks page gains a 2026-10-14 re-measurement:
@@ -137,6 +137,26 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   The older "45–55 allocs/op adaptor cost" note is corrected: the
   `newHTTPHandler` rework cut the isolated adaptor to 35; 45–55 still
   brackets the full serve path.
+- `feat: SIGHUP reload for log level, flags, rate limits`: new
+  `container.ReloadableLogger`, `container.ReloadableFlag`, and
+  `container.ReloadableLimiter` front their battery behind an atomic swap,
+  and `container.WatchSIGHUP` runs a reload closure on every SIGHUP until
+  its context ends. The generated server (`zever generate server`) wires
+  it: SIGHUP re-reads the config file and swaps the log level and the rate
+  limiter (old instances released after the swap); a failed re-open keeps
+  the old instance and only warns. Flag clients held directly swap the same
+  way; the `static` flag adapter also re-reads its file per evaluation when
+  `reload: true`. Everything else stays restart-only — adapters, DSNs,
+  credentials, TLS material, and listen addresses need a process restart
+  (see the new "Reload" section in `config/README.md`).
+- `feat(cli): zever upgrade --project`: the binary upgrader gains a project
+  mode that bumps every `github.com/zenta-dev/zever/*` require without a
+  matching `replace` directive in the current project's `go.mod` to the
+  target version (`--version`, default latest stable), runs `go mod tidy`,
+  and prints the `**Breaking:**` CHANGELOG entries between the installed
+  and target versions (fetched once, cached under the user cache dir).
+  `--dry-run` prints the plan without writing, fetching, or tidying;
+  `--check` prints the available version only.
 - `feat(auth/jwt): kid-based key rotation and nbf validation`: `JWTOptions`
   gains `keys: [{kid, secret}]` plus `active_kid` (empty defaults to the
   first entry; validated for unique kids, secret length, and a matching
