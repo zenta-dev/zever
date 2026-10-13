@@ -495,27 +495,27 @@ func TestClosureLoadServerDataBranches(t *testing.T) {
 	withWorkingDir(t, dir)
 
 	// No inputs: zero modules, no error.
-	data, err := loadServerData("example.com/app", "./generated", "schema", nil, false)
+	data, err := loadServerData("example.com/app", "./generated", "schema", nil, false, false)
 	if err != nil || len(data.Modules) != 0 {
 		t.Fatalf("empty = %v, %v", data.Modules, err)
 	}
 
 	// Explicit missing file.
-	if _, loadErr := loadServerData("example.com/app", "./generated", "schema", []string{"nope.zen"}, false); loadErr == nil {
+	if _, loadErr := loadServerData("example.com/app", "./generated", "schema", []string{"nope.zen"}, false, false); loadErr == nil {
 		t.Fatal("want load error")
 	}
 
 	// Compile error.
 	writeZeverFixture(t, dir, "bad.zen", "entity {\n")
 
-	if _, loadErr := loadServerData("example.com/app", "./generated", "schema", []string{"bad.zen"}, false); loadErr == nil {
+	if _, loadErr := loadServerData("example.com/app", "./generated", "schema", []string{"bad.zen"}, false, false); loadErr == nil {
 		t.Fatal("want compile error")
 	}
 
 	// Module without services is skipped.
 	writeZeverFixture(t, dir, "plain.zen", "entity Thing {\nid: uuid @primary\n}\n")
 
-	data, err = loadServerData("example.com/app", "./generated", "schema", []string{"plain.zen"}, false)
+	data, err = loadServerData("example.com/app", "./generated", "schema", []string{"plain.zen"}, false, false)
 	if err != nil || len(data.Modules) != 0 {
 		t.Fatalf("no-service = %v, %v", data.Modules, err)
 	}

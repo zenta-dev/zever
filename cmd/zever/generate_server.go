@@ -11,6 +11,7 @@ import (
 	"os"
 	"path/filepath"
 	"sort"
+	"strconv"
 	"strings"
 	"text/template"
 
@@ -307,7 +308,7 @@ func generateServerDryRun(cfg GenerateServerConfig) (GenerateServerResult, error
 
 	var res GenerateServerResult
 
-	data, err := loadServerData(cfg.ModulePath, cfg.OutDir, cfg.SchemaDir, cfg.SchemaFiles, cfg.RateLimitEnabled)
+	data, err := loadServerData(cfg.ModulePath, cfg.OutDir, cfg.SchemaDir, cfg.SchemaFiles, cfg.RateLimitEnabled, cfg.ReflectionEnabled)
 	if err != nil {
 		return res, err
 	}
@@ -393,8 +394,11 @@ type GenerateServerConfig struct {
 	SchemaFiles      []string
 	Force            bool
 	RateLimitEnabled bool
-	Stdout           io.Writer
-	Stderr           io.Writer
+	// ReflectionEnabled gates the gRPC reflection wiring (see
+	// reflectionEnabled); callers obtain it from the environment, not flags.
+	ReflectionEnabled bool
+	Stdout            io.Writer
+	Stderr            io.Writer
 	// DryRun prints the planned writes without touching the filesystem.
 	DryRun bool
 }
@@ -426,7 +430,7 @@ func GenerateServer(cfg GenerateServerConfig) (GenerateServerResult, error) {
 
 	res.AppCreated = appCreated
 
-	data, err := loadServerData(cfg.ModulePath, cfg.OutDir, cfg.SchemaDir, cfg.SchemaFiles, cfg.RateLimitEnabled)
+	data, err := loadServerData(cfg.ModulePath, cfg.OutDir, cfg.SchemaDir, cfg.SchemaFiles, cfg.RateLimitEnabled, cfg.ReflectionEnabled)
 	if err != nil {
 		return res, err
 	}
@@ -505,6 +509,7 @@ func runGenerateServer(args []string) error { //nolint:gocyclo
 	}
 
 	rateLimitEnabled := rateLimitConfigured()
+	reflectionEnabled := reflectionEnabled()
 
 	forceVal := *force
 	if !forceVal && isInteractiveTerminal() {
@@ -521,16 +526,17 @@ func runGenerateServer(args []string) error { //nolint:gocyclo
 	}
 
 	_, err = GenerateServer(GenerateServerConfig{
-		ModulePath:       modulePath,
-		OutDir:           *outDir,
-		SchemaDir:        project.SchemaDir,
-		ServerEntry:      project.ServerEntry,
-		SchemaFiles:      posArgs,
-		Force:            forceVal,
-		RateLimitEnabled: rateLimitEnabled,
-		Stdout:           os.Stdout,
-		Stderr:           os.Stderr,
-		DryRun:           *dryRun,
+		ModulePath:        modulePath,
+		OutDir:            *outDir,
+		SchemaDir:         project.SchemaDir,
+		ServerEntry:       project.ServerEntry,
+		SchemaFiles:       posArgs,
+		Force:             forceVal,
+		RateLimitEnabled:  rateLimitEnabled,
+		ReflectionEnabled: reflectionEnabled,
+		Stdout:            os.Stdout,
+		Stderr:            os.Stderr,
+		DryRun:            *dryRun,
 	})
 
 	return err
@@ -584,6 +590,45 @@ type serverData struct {
 	// -- see rateLimitConfigured's doc comment for why this can't simply be
 	// "always resolve c.RateLimit()".
 	RateLimitEnabled bool
+	// Reflection is true when gRPC server reflection should be wired into
+	// the generated server: off by default (reflection exposes every service
+	// schema to any network client), on only via GRPC_REFLECTION=true or a
+	// dev ZEVER_ENV -- see reflectionEnabled.
+	Reflection bool
+}
+
+// devEnvs are the ZEVER_ENV values that mark a non-production environment,
+// mirroring core/crypto's own devKeyEnvs.
+var devEnvs = []string{"dev", "test", "development"}
+
+// devEnv reports whether ZEVER_ENV marks a non-production environment
+// (case-insensitive). Every other value -- including production and an
+// unset or empty ZEVER_ENV -- is non-dev.
+func devEnv() bool {
+	env := strings.ToLower(strings.TrimSpace(os.Getenv("ZEVER_ENV")))
+
+	for _, e := range devEnvs {
+		if env == e {
+			return true
+		}
+	}
+
+	return false
+}
+
+// reflectionEnabled reports whether the generated server should register
+// gRPC server reflection. Secure-by-default: off unless the operator sets
+// GRPC_REFLECTION=true (an explicit false always wins, even in dev) or the
+// process runs in a dev ZEVER_ENV, where reflection is a genuine local
+// convenience (grpcurl against the dev server).
+func reflectionEnabled() bool {
+	if v, ok := os.LookupEnv("GRPC_REFLECTION"); ok {
+		if b, err := strconv.ParseBool(strings.TrimSpace(v)); err == nil {
+			return b
+		}
+	}
+
+	return devEnv()
 }
 
 // rateLimitConfigured reports whether the calling project has configured a
@@ -649,8 +694,8 @@ func lowerFirst(s string) string {
 // zero-Modules serverData rather than an error: `zever generate server` is
 // also how a brand-new project scaffolds its entrypoint before any schema
 // exists.
-func loadServerData(modulePath, outDir, schemaDir string, posArgs []string, rateLimitEnabled bool) (serverData, error) {
-	data := serverData{ModulePath: modulePath, RateLimitEnabled: rateLimitEnabled}
+func loadServerData(modulePath, outDir, schemaDir string, posArgs []string, rateLimitEnabled, reflectionEnabled bool) (serverData, error) {
+	data := serverData{ModulePath: modulePath, RateLimitEnabled: rateLimitEnabled, Reflection: reflectionEnabled}
 
 	paths, err := resolveInputFiles(posArgs)
 	if err != nil {
@@ -851,11 +896,14 @@ func New() (*container.Container, error) {
 // rather than inside the schema-agnostic container package itself.
 //
 // The same grpcServer also carries the standard gRPC Health Checking
-// Protocol (grpc_health_v1) and server reflection, so orchestrators and
-// grpcurl work out of the box: the overall serving status starts SERVING,
-// tracks the container readiness aggregate behind /readyz (a database ping
-// plus, when outbox.stall_readiness is set, the relay's stall flag), and
-// flips to NOT_SERVING before GracefulStop.
+// Protocol (grpc_health_v1), so orchestrators work out of the box: the
+// overall serving status starts SERVING, tracks the container readiness
+// aggregate behind /readyz (a database ping plus, when
+// outbox.stall_readiness is set, the relay's stall flag), and flips to
+// NOT_SERVING before GracefulStop. Server reflection is wired only when
+// the project opts in (GRPC_REFLECTION=true or a dev ZEVER_ENV -- see
+// reflectionEnabled): it exposes every service schema to any client that
+// can reach the port, so it stays off by default.
 const serverTemplate = `// Command server runs this project's HTTP+gRPC API.
 //
 // Scaffolded by ` + "`zever generate server`" + `. It is deliberately thin: parse
@@ -879,7 +927,8 @@ import (
 	"google.golang.org/grpc/health"
 	healthpb "google.golang.org/grpc/health/grpc_health_v1"
 	"google.golang.org/grpc/keepalive"
-	"google.golang.org/grpc/reflection"
+{{if .Reflection}}	"google.golang.org/grpc/reflection"
+{{end}}
 
 	"github.com/zenta-dev/zever/container"
 	"github.com/zenta-dev/zever/core/authz"
@@ -1013,8 +1062,9 @@ func run(addr, grpcAddr string) error {
 	healthServer := health.NewServer()
 	healthpb.RegisterHealthServer(grpcServer, healthServer)
 	healthServer.SetServingStatus("", healthpb.HealthCheckResponse_SERVING)
-
+{{if .Reflection}}
 	reflection.Register(grpcServer)
+{{end}}
 
 	r, err := c.Router()
 	if err != nil {
