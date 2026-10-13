@@ -66,6 +66,13 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Added
 
+- `docs: CSRF guidance for cookie sessions`: the sessions guide gains a
+  "Defend cookie sessions against CSRF" section — why `SameSite=Lax`
+  alone is not enough, the `__Host-` prefix, no-state-on-`GET`,
+  `Origin`/`Referer` verification with a same-origin code sketch, when
+  to add a synchronizer token, and when to prefer `Authorization`-header
+  tokens instead. Deliberately docs-only: no speculative CSRF middleware
+  ships with this change.
 - `feat(middleware): SecurityHeaders for generated server`: new
   `middleware.SecurityHeaders(opts)` sets baseline response security
   headers on every HTTP response (error responses included): always
