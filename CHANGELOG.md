@@ -169,6 +169,17 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   and target versions (fetched once, cached under the user cache dir).
    `--dry-run` prints the plan without writing, fetching, or tidying;
    `--check` prints the available version only.
+- `perf(cli): cold-start measurement and startup budget`: in-process
+  `--help` is now benchmarked (`BenchmarkHelpStartup`: ~99µs/op, 69KB/op,
+  625 allocs/op on 2026-10-14 hardware) and capped by a deterministic
+  allocation threshold (`TestHelpStartupAllocs`, 1500 allocs) next to the
+  existing 200ms wall-clock budget. Release-style binary measured at
+  309 MB / ~60–90 ms warm start, dominated by binary load and transitive
+  deps (sqlite, TUI, FIPS tables) rather than Cobra dispatch; numbers and
+  repro commands live under "Cold start & binary size" in the benchmarks
+  reference. A `zever build --adapters=a,b` slim-CLI flag is deferred as
+  a follow-up (registration/doctor/scaffold would all need build-tagged
+  variants for little saving while sqlite+TUI stay linked).
 - `feat(auth/jwt): kid-based key rotation and nbf validation`: `JWTOptions`
   gains `keys: [{kid, secret}]` plus `active_kid` (empty defaults to the
   first entry; validated for unique kids, secret length, and a matching
