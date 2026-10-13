@@ -257,14 +257,14 @@ type opModel struct {
 	// Auth/Permission are copied directly from ir.Operation so the
 	// renderers can translate them into a compile-time authz.Policy
 	// literal (see policyVarName/needsPolicy in render_grpc.go). gogen
-	// itself may depend on internal/dsl/ir (it is the generator, not the
+	// itself may depend on dsl/ir (it is the generator, not the
 	// generated output) -- the generated Go source these fields feed never
 	// references ir at all, only the runtime authz.Policy struct.
 	Auth       *ir.AuthPolicy
 	Permission *ir.PermissionCheck
 	// SingleRefParam is true when op has exactly one param and it is a ref
 	// (Params[0].IsRef) -- mirrors proto backend's singleRefParam exactly
-	// (internal/dsl/backend/proto/render_service.go): when true, RequestType
+	// (dsl/backend/proto/render_service.go): when true, RequestType
 	// IS that ref'd type's own message directly (proto skips synthesizing a
 	// "<Op>Request" wrapper around it), so every renderer that addresses a
 	// ref param's fields must do so directly on req ("req.<Field>"), never

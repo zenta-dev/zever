@@ -383,7 +383,7 @@ func spacingEdits(src []byte, lines []Line, tokens []token.Token) []Edit {
 
 // CanonicalGap returns the whitespace that belongs between two tokens on
 // one line. Every rule is derived from the schemas this repo ships
-// (examples/todo/schema/todo.zen, internal/dsl/compile/testdata/app.zen):
+// (examples/todo/schema/todo.zen, dsl/compile/testdata/app.zen):
 //
 //	id: uuid @primary                              -> ":" hugs left, "@" hugs right
 //	@validate(min_len: 1, max_len: 200)            -> "," hugs left, no padding in "()"

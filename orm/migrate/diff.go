@@ -363,7 +363,7 @@ func introspectPostgresColumns(
 // introspectSQLiteColumns uses PRAGMA table_info(<table>). SQLite's PRAGMA
 // statements don't support bind parameters for the table name in all
 // driver versions, so the (already-validated) identifier is quoted and
-// interpolated directly, matching how internal/dsl/backend/atlas quotes
+// interpolated directly, matching how dsl/backend/atlas quotes
 // identifiers for CREATE TABLE.
 func introspectSQLiteColumns(ctx context.Context, conn db.DB, table string) ([]liveColumn, error) {
 	if err := validateIdent(table); err != nil {

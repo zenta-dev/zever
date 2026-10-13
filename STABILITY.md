@@ -5,7 +5,9 @@ Pre-1.0 policy for what may break in `0.x` releases. Docs-only; no API change.
 See also [Versioning](.github/CONTRIBUTING.md#versioning) and
 [API Compatibility](.github/CONTRIBUTING.md#api-compatibility).
 Cross-checked against `config.Config` (`config/config.go`, 37 `Service`
-fields) and `container` accessors (`container/services.go`,
+fields; the list is `knownServiceNames()` in `config/config.go` and the
+`config/README.md` service table is pinned to it by
+`config/readme_test.go`) and `container` accessors (`container/services.go`,
 `container/README.md`).
 
 ## Policy
@@ -41,7 +43,7 @@ fields) and `container` accessors (`container/services.go`,
 | `session` | Facade (`memory`, `redis`, `db`, `cookie`). |
 | `auth` | Facade (`jwt`, `session`, `oidc`). |
 | `crypto` | Facade (`local`, `kms`); dev key deterministic, never prod. |
-| `password` | Facade (`argon2id`). |
+| `password` | Facade (adapter string `argon2id`, package `adapters/password/argon2`). |
 | `secrets` | Facade (`env`, `vault`); `ZEVER`-prefixed env exception. |
 | `dsl` | `.zen` compiler frontend (compile-time only, no release version; schema `v1`/`v2` are API versions). |
 
@@ -114,7 +116,8 @@ applies unchanged.
   `adapters/queue/redis`).
 - **External production user:** at least one application outside this
   repo runs a tagged release in production and its deployment is
-  referenced from `docs/production.md`.
+  referenced from the production deployment checklist
+  (`docs/src/content/docs/guides/operate/deployment.mdx`).
 
 ## Current standing (honest)
 
@@ -156,4 +159,8 @@ Every top-level package is classified above. `config`/`container` cover
 `resilience`, `router`, `scheduler`, `search`, `secrets`, `session`,
 `storage`, `tenant`, `vectorstore`, `webhook`, `workflow`); `job` rides
 on `Queue` and `grpc` is a lazy `*grpc.Server` singleton, so neither has
-a `config` entry.
+a `config` entry. The `container/README.md` accessor table therefore has
+42 rows for these 37 services: the five extra rows (`agent`, `grpc`,
+`grpcclient`, `job`, `rag`) resolve over other services and take no
+`config` section. If the counts disagree, the code (`knownServiceNames()`,
+`container/services.go`) wins over this note.

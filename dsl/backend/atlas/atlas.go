@@ -6,7 +6,7 @@
 // The HCL is hand-emitted as text rather than produced through the
 // ariga.io/atlas Go API. This backend only ever needs to write Atlas's
 // well-documented, stable input file format, never to call into Atlas's
-// engine, so it stays dependency-free like the rest of internal/dsl.
+// engine, so it stays dependency-free like the rest of dsl.
 //
 // This package also exposes a deliberately simpler sibling renderer
 // (render_ddl.go) that turns the same IR into plain "CREATE TABLE IF NOT

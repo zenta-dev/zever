@@ -12,11 +12,11 @@ import (
 // WHY THESE ARE STANDALONE, NOT WIRED INTO Plan's AUTOMATIC DIFF: Plan's diff
 // is driven entirely by the resolved *ir.Schema/*ir.Entity/*ir.Field the
 // compiler hands it. As of this package's introduction, the .zen DSL's
-// grammar, lexer, parser, and resolver (internal/dsl/{lexer,parser,resolver})
+// grammar, lexer, parser, and resolver (dsl/{lexer,parser,resolver})
 // carry no annotation at all marking a field or entity as full-text-search
 // enabled -- there is no "@fts" field attribute, no "fts(...)" entity block,
 // nothing in ir.Field or ir.Entity a diff pass could key off of. Grepping
-// internal/dsl/ir and internal/dsl/parser for "fts"/"fulltext"/"search"
+// dsl/ir and dsl/parser for "fts"/"fulltext"/"search"
 // confirms this: the only "search" in this module is the unrelated
 // search/db package (tsvector/ts_rank), which this migration engine
 // does not touch.

@@ -52,7 +52,7 @@ func versionPathDrift(schema *ir.Schema) diag.List {
 }
 
 // findHTTPTransport returns the HTTPTransport among transports, if any.
-// Mirrors internal/dsl/backend/openapi/render_path.go's helper of the same
+// Mirrors dsl/backend/openapi/render_path.go's helper of the same
 // name/shape -- kept as a small, separate copy rather than an import, since
 // resolver must not depend on any backend package.
 func findHTTPTransport(transports []ir.Transport) (ir.HTTPTransport, bool) {

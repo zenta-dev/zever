@@ -168,6 +168,22 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Changed
 
+- `docs: hygiene pass`: recount confirms 37 configured services
+  (`knownServiceNames()` in `config/config.go`) against 42 container
+  accessor rows — the five extra rows (`agent`, `grpc`, `grpcclient`,
+  `job`, `rag`) resolve over other services and take no `config`
+  section; `STABILITY.md` and `container/README.md` now say so instead
+  of implying drift. The stale `dsl/compile/testdata/app.zen` header
+  (non-existent `internal/dsl/compile` paths, test names, and committed
+  packages) now describes the fixture's real consumers, and stale
+  `internal/dsl/` path comments across `dsl/`, `cmd/zever`, `orm/migrate`,
+  `tools/gengrammar`, and the generated `editors/` grammar are fixed.
+  New `config/readme_test.go` pins the `config/README.md` adapter table
+  to the `Config` struct (row per known service, default adapter listed).
+  The `docs/{production,errors,writing-a-plugin}.md` redirect stubs, the
+  `session/cookie` + `media/ffmpeg` matrix rows, `argon2id` vs `argon2`,
+  `resilience` memory vs inproc, and the `.zen` reference
+  (`reference/zen-syntax.mdx`) were verified already correct.
 - `refactor(container): identity-based close dedup without unsafe`: `Close`
   now dedupes services by the value's own reference identity (pointer, chan,
   map, func, slice via `reflect.Value.Pointer`) instead of searching struct

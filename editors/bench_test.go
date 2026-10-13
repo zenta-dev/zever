@@ -286,7 +286,7 @@ func BenchmarkGeneratedMatchesCheckedIn(b *testing.B) {
 			}
 
 			if string(got) != string(want) {
-				b.Fatalf("%s is out of date with internal/dsl/gengrammar", path)
+				b.Fatalf("%s is out of date with dsl/gengrammar", path)
 			}
 		}
 	}
