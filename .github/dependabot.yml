@@ -176,6 +176,7 @@ updates:
       - "/shared/s3opts"
       - "/shared/traceprop"
       - "/tools/affected"
+      - "/tools/apidiff"
       - "/tools/errscan"
       - "/tools/modgraph"
       - "/tools/zever-lsp"
