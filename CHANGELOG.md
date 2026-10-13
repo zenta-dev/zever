@@ -169,6 +169,14 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   and target versions (fetched once, cached under the user cache dir).
    `--dry-run` prints the plan without writing, fetching, or tidying;
    `--check` prints the available version only.
+- `ci: non-gating benchmark trend for orm and container`: new
+  `.github/workflows/bench.yml` runs `bench-orm` and `bench-container`
+  jobs plus a best-effort `benchstat` compare on PRs touching either
+  module, pushes to main, and weekly. Every job sets
+  `continue-on-error: true` and the workflow stays out of required
+  checks, so benchmark noise never gates a merge; results upload as
+  artifacts (90-day retention). A syntax test pins the job names and the
+  non-gating flag.
 - `feat(container): pool mismatch diagnostics in doctor`: shared-pool
   `MaxConns` mismatches (borrower cap ignored in favor of the first
   opener's) are now recorded, not just warned on stderr: new
