@@ -84,6 +84,58 @@ Set-Cookie: session_id=<opaque-id>; Path=/; HttpOnly; Secure; SameSite=Lax
 
 `Secure` and `HttpOnly` are `*bool`, so an explicit `false` (local HTTP dev) differs from unset. Rotate the session ID at privilege changes (login, password reset) to block fixation: `Delete` the old row, then `Create` a new one.
 
+## Defend cookie sessions against CSRF
+
+The browser attaches `session_id` to every request automatically, including a cross-site `POST` from an attacker's form or `fetch`. `SameSite=Lax` (the default) stops most of it — modern browsers withhold the cookie on cross-site subrequests — but it does not cover everything: top-level `GET` navigations still carry the cookie, older browsers ignore `SameSite` entirely, a sibling subdomain can attack when `Domain` is widened, and any flow that needs `SameSite=None` opts out of the protection. Layer accordingly:
+
+1. Keep the `Lax` default; choose `http.SameSiteStrictMode` for high-risk apps (it also blocks top-level login links, so weigh the UX cost).
+2. Set `Prefix` to `cookie.PrefixHost` (`__Host-`) for single-host apps: the browser then refuses the cookie unless it is `Secure`, `Path=/`, and host-only.
+3. Never change state on `GET`. CSRF needs an ambient-credential state change; a `GET` that only reads has nothing to steal.
+4. Verify `Origin` (falling back to `Referer`) on every state-changing handler against an explicit allowlist, and answer `403` on missing or untrusted values. Same-origin browser requests always send one of the two; a cross-site form cannot forge `Origin`.
+5. When `SameSite=None` is required or subdomains are hostile, add a synchronizer token: mint a random per-session value, render it into forms (or expose it to your frontend over an authenticated endpoint), and require it back in a header or field, comparing with `subtle.ConstantTimeCompare`. There is deliberately no framework CSRF middleware today — the check is ~20 lines your app owns, not a speculative battery.
+6. For pure APIs, prefer `Authorization`-header tokens (`auth` `jwt`/`oidc`) over cookies: no ambient credentials means no CSRF surface at all.
+
+```go title="csrf.go"
+import (
+    "crypto/subtle"
+    "net/http"
+    "strings"
+)
+
+// allowOrigin reports whether origin is this app's own site. Compare
+// against an explicit allowlist, never against the request Host: the
+// Host header is attacker-controlled on most deployments.
+func allowOrigin(origin string) bool {
+    return origin == "https://app.example.com"
+}
+
+func requireSameOrigin(next http.Handler) http.Handler {
+    return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+        if origin := r.Header.Get("Origin"); origin != "" {
+            if !allowOrigin(origin) {
+                http.Error(w, "forbidden", http.StatusForbidden)
+                return
+            }
+        } else if referer := r.Header.Get("Referer"); referer != "" {
+            if !strings.HasPrefix(referer, "https://app.example.com/") {
+                http.Error(w, "forbidden", http.StatusForbidden)
+                return
+            }
+        } else {
+            // No Origin and no Referer: a browser same-origin POST always
+            // sends one of them, so fail closed rather than assume safe.
+            http.Error(w, "forbidden", http.StatusForbidden)
+            return
+        }
+        next.ServeHTTP(w, r)
+    })
+}
+
+func checkToken(submitted, expected string) bool {
+    return subtle.ConstantTimeCompare([]byte(submitted), []byte(expected)) == 1
+}
+```
+
 ## Use the store API
 
 | Method | Purpose |
