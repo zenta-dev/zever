@@ -9,6 +9,15 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Breaking
 
+- `fix(server)!: gRPC reflection off by default`: the generated server
+  entrypoint (`zever generate server`) no longer registers the gRPC
+  reflection service unconditionally. Reflection exposes every service
+  schema to any client that can reach the port, so it now wires only
+  when the operator sets `GRPC_REFLECTION=true` or the process runs in a
+  dev environment (`ZEVER_ENV=dev|test|development`); an explicit
+  `GRPC_REFLECTION=false` always wins. Existing projects that relied on
+  grpcurl/reflection keep working by setting `GRPC_REFLECTION=true` in
+  their environment or re-scaffolding with `--force`.
 - `fix(installer)!: fail when checksum cannot be verified`: `install.sh` and
   `install.ps1` now abort when no SHA-256 tool is available (or hashing fails)
   instead of skipping checksum verification with a warning. Opt out
