@@ -565,7 +565,10 @@
       "type": "object",
       "additionalProperties": false,
       "properties": {
-        "app_name": { "type": "string", "maxLength": 64, "description": "Empty defaults to \"app\"." }
+        "app_name": { "type": "string", "maxLength": 64, "description": "Empty defaults to \"app\"." },
+        "tls_cert": { "type": "string", "description": "Path to the PEM-encoded TLS certificate the generated server presents on its HTTP and gRPC listeners. Empty disables TLS (plaintext). Must be paired with tls_key." },
+        "tls_key": { "type": "string", "description": "Path to the PEM-encoded TLS private key matching tls_cert. Empty disables TLS (plaintext). Must be paired with tls_cert." },
+        "tls_client_ca": { "type": "string", "description": "Path to a PEM-encoded CA bundle used to verify client certificates (mutual TLS). Empty disables client verification. Requires the tls_cert/tls_key pair." }
       }
     },
     "schedulerOptions": {

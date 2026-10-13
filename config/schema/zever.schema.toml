@@ -1113,6 +1113,18 @@ description = 'Empty defaults to "app".'
 maxLength = 64
 type = 'string'
 
+['$defs'.routerOptions.properties.tls_cert]
+description = 'Path to the PEM-encoded TLS certificate the generated server presents on its HTTP and gRPC listeners. Empty disables TLS (plaintext). Must be paired with tls_key.'
+type = 'string'
+
+['$defs'.routerOptions.properties.tls_key]
+description = 'Path to the PEM-encoded TLS private key matching tls_cert. Empty disables TLS (plaintext). Must be paired with tls_cert.'
+type = 'string'
+
+['$defs'.routerOptions.properties.tls_client_ca]
+description = 'Path to a PEM-encoded CA bundle used to verify client certificates (mutual TLS). Empty disables client verification. Requires the tls_cert/tls_key pair.'
+type = 'string'
+
 ['$defs'.schedulerOptions]
 additionalProperties = false
 description = 'scheduler.Options.Dispatcher is required by Validate() but is a *job.Dispatcher (json:"-") that can only be wired in code, never from a config file -- dsn, dedicated_pool and close_timeout are the only fields a file can actually set.'

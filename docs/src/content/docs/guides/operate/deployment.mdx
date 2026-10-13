@@ -105,6 +105,44 @@ readinessProbe:
   httpGet: {path: /readyz, port: 8080}
 ```
 
+## Terminate TLS at the generated server
+
+The generated server (`zever generate server`) serves TLS on both
+listeners from one shared configuration when the `router` battery
+carries certificate paths. The floor is TLS 1.2; without these options
+both listeners stay plaintext.
+
+```yaml title="/etc/myapp/zever.yaml"
+router:
+  adapter: stdhttp
+  options:
+    tls_cert: /etc/myapp/tls/server.crt
+    tls_key: /etc/myapp/tls/server.key
+    # tls_client_ca enables mutual TLS: clients must present a
+    # certificate signed by this CA on both HTTP and gRPC.
+    tls_client_ca: /etc/myapp/tls/client-ca.crt
+```
+
+```sh
+ROUTER_TLS_CERT=/etc/myapp/tls/server.crt
+ROUTER_TLS_KEY=/etc/myapp/tls/server.key
+ROUTER_TLS_CLIENT_CA=/etc/myapp/tls/client-ca.crt   # mTLS only
+```
+
+Rules:
+
+- `tls_cert` and `tls_key` must be set together. `config.Validate`
+  rejects an unpaired path fail-closed at load, and the server fails
+  fast with a fix hint when key material cannot be read or parsed.
+- `tls_client_ca` without the pair is rejected: a client CA with no
+  server identity serves nothing to verify against.
+- Serving plaintext on a non-loopback address logs one warning per
+  listener at startup. Plaintext loopback stays quiet as the
+  local-dev default; terminate at the load balancer instead when you
+  prefer TLS off the box, and keep the warning as your reminder.
+- Keep key files out of the image: mount them (secret volume, tmpfs)
+  and restrict permissions (`0600`, owned by the service user).
+
 ## Scale across replicas
 
 Process-local defaults break when you add a second instance. Switch these adapters before scaling out:
