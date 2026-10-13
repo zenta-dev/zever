@@ -74,6 +74,11 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 - fix(container): a panicking service builder no longer wedges concurrent
   callers; returns BuildPanicError.
+- refactor(container): service builders now receive a builder-facing root
+  context (detached `context.WithoutCancel` with container-lifetime
+  cancellation) instead of `context.Background()`, so cancellation and
+  tracing propagate into service construction; `Close` cancels it.
+  `zever launch` uses a signal context for `exec.CommandContext`.
 - Point all one-line installer URLs at `main` instead of the `v0.6.1`
   tag: `install.sh`/`install.ps1` were added after `v0.6.1` was cut, so
   the tag-pinned raw URLs returned 404. The scripts still install

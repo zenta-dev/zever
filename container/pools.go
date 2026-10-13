@@ -311,7 +311,6 @@ func openShared[T any](c *Container, service, adapter string, dbAdapters []strin
 		return zero, true, err
 	}
 
-	//nolint:contextcheck // single ctx-free bridge by design: lazy accessors resolve with no caller ctx and adapter constructors take none (frozen public shapes), so there is no context to propagate — the same intentionally ctx-free boundary as the teardown callback in adapters/eventbus/redis/redis.go and the shared singleflight fetch in adapters/i18n/remote/remote.go. Pool opens use bounded internal timeouts instead of a caller ctx.
 	v, err := fromDB(conn)
 	if err != nil {
 		return zero, true, fmt.Errorf("container: %s (shared pool): %w", service, err)

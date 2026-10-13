@@ -213,7 +213,7 @@ func TestContainer_Snapshots_CoversAllServices(t *testing.T) {
 	totalLazy := 0
 	for i := 0; i < typ.NumField(); i++ {
 		name := typ.Field(i).Name
-		if name == "cfg" || name == "pluginsMu" || name == "plugins" || name == "pools" {
+		if name == "cfg" || name == "pluginsMu" || name == "plugins" || name == "pools" || name == "rootCtx" || name == "cancelRoot" {
 			continue
 		}
 		totalLazy++
