@@ -530,7 +530,8 @@
         "idle_ttl": { "$ref": "#/$defs/durationNs", "description": "Zero means adapter default (10m)." },
         "sweep_interval": { "$ref": "#/$defs/durationNs", "description": "Zero means adapter default (1m)." },
         "redis": { "$ref": "#/$defs/zredisOptionsWithPrefix" },
-        "max_entries": { "type": "integer", "description": "Memory adapter bucket-table bound before LRU eviction. Non-positive means the adapter default (1000)." }
+        "max_entries": { "type": "integer", "description": "Memory adapter bucket-table bound before LRU eviction. Non-positive means the adapter default (1000)." },
+        "trusted_proxies": { "type": "array", "items": { "type": "string" }, "description": "CIDRs (or bare IPs) of proxies whose X-Forwarded-For headers are honored for rate-limit keys. Empty means keys always derive from the peer address." }
       }
     },
     "breakerOptions": {

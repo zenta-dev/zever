@@ -31,6 +31,7 @@ func TestSentinels_messages_prefixed(t *testing.T) {
 		{"webhook too large", ErrWebhookTooLarge},
 		{"missing webhook secret", ErrMissingWebhookSecret},
 		{"invalid signature", ErrInvalidSignature},
+		{"duplicate event", ErrDuplicateEvent},
 		{"amount mismatch", ErrAmountMismatch},
 	}
 	for _, tc := range cases {
@@ -222,5 +223,31 @@ func TestSizeLimitError_message_unwrap(t *testing.T) {
 	var target SizeLimitError
 	if !errors.As(fmtWrap(err), &target) {
 		t.Errorf("errors.As failed for %T", err)
+	}
+}
+
+func TestDuplicateEventError_message_unwrap(t *testing.T) {
+	t.Parallel()
+
+	err := DuplicateEventError{EventID: "evt_123"}
+	if got := err.Error(); !strings.Contains(got, ErrDuplicateEvent.Error()) {
+		t.Errorf("Error() = %q, want contain %q", got, ErrDuplicateEvent.Error())
+	}
+
+	if !strings.Contains(err.Error(), "evt_123") {
+		t.Errorf("Error() = %q, want contain event id", err.Error())
+	}
+
+	if !errors.Is(err, ErrDuplicateEvent) {
+		t.Errorf("errors.Is(%v, ErrDuplicateEvent) = false, want true", err)
+	}
+
+	var target DuplicateEventError
+	if !errors.As(fmtWrap(err), &target) {
+		t.Errorf("errors.As failed for %T", err)
+	}
+
+	if target.EventID != "evt_123" {
+		t.Errorf("carried event id = %q, want evt_123", target.EventID)
 	}
 }

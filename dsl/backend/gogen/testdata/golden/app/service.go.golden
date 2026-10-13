@@ -7,6 +7,28 @@ import (
 	"context"
 )
 
+// Cursor is an opaque pagination cursor. Handlers pass the client's
+// cursor query parameter through as-is; never construct one by hand and
+// never parse one -- only the service implementation that minted it may
+// interpret it.
+type Cursor string
+
+// Pagination limit bounds for every paginated operation in this module.
+const (
+	// DefaultPageLimit applies when the client sends no limit.
+	DefaultPageLimit int32 = 20
+	// MaxPageLimit caps the client-supplied limit; larger values are
+	// rejected by the generated handler before reaching the service.
+	MaxPageLimit int32 = 100
+)
+
+// Page is one page of paginated results: the items of this page plus the
+// opaque cursor fetching the next one (empty when the page is last).
+type Page[T any] struct {
+	Items      []T
+	NextCursor Cursor
+}
+
 // TaskService is the business-logic extension point generated for the TaskService service
 // declared in the zen schema.
 //
@@ -18,6 +40,6 @@ import (
 type TaskService interface {
 	CreateTask(ctx context.Context, req *CreateTaskInput) (*Task, error)
 	GetTask(ctx context.Context, req *GetTaskRequest) (*Task, error)
-	ListTasks(ctx context.Context, req *ListTasksRequest, cursor string, limit int32) (*ListTasksResponse, error)
+	ListTasks(ctx context.Context, req *ListTasksRequest, cursor Cursor, limit int32) (*ListTasksResponse, error)
 	DeleteTask(ctx context.Context, req *DeleteTaskRequest) (*Task, error)
 }
