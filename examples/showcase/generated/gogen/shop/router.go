@@ -32,13 +32,18 @@ func handleShopServiceListProducts(svc ShopService) http.HandlerFunc {
 
 		req := &ListProductsRequest{}
 
-		var cursor string
+		var cursor Cursor
 		var limit int32
 
-		cursor = r.URL.Query().Get("cursor")
+		cursor = Cursor(r.URL.Query().Get("cursor"))
 		if raw := r.URL.Query().Get("limit"); raw != "" {
 			v, err := strconv.ParseInt(raw, 10, 32)
 			if err != nil {
+				writeGogenError(w, r, apperror.New(apperror.InvalidArgument, "invalid parameter \"limit\""))
+				return
+			}
+
+			if v < 0 || v > int64(MaxPageLimit) {
 				writeGogenError(w, r, apperror.New(apperror.InvalidArgument, "invalid parameter \"limit\""))
 				return
 			}
@@ -350,13 +355,18 @@ func handleShopServiceListOrders(svc ShopService) http.HandlerFunc {
 
 		req := &ListOrdersRequest{}
 
-		var cursor string
+		var cursor Cursor
 		var limit int32
 
-		cursor = r.URL.Query().Get("cursor")
+		cursor = Cursor(r.URL.Query().Get("cursor"))
 		if raw := r.URL.Query().Get("limit"); raw != "" {
 			v, err := strconv.ParseInt(raw, 10, 32)
 			if err != nil {
+				writeGogenError(w, r, apperror.New(apperror.InvalidArgument, "invalid parameter \"limit\""))
+				return
+			}
+
+			if v < 0 || v > int64(MaxPageLimit) {
 				writeGogenError(w, r, apperror.New(apperror.InvalidArgument, "invalid parameter \"limit\""))
 				return
 			}

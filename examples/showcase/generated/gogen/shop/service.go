@@ -7,6 +7,28 @@ import (
 	"context"
 )
 
+// Cursor is an opaque pagination cursor. Handlers pass the client's
+// cursor query parameter through as-is; never construct one by hand and
+// never parse one -- only the service implementation that minted it may
+// interpret it.
+type Cursor string
+
+// Pagination limit bounds for every paginated operation in this module.
+const (
+	// DefaultPageLimit applies when the client sends no limit.
+	DefaultPageLimit int32 = 20
+	// MaxPageLimit caps the client-supplied limit; larger values are
+	// rejected by the generated handler before reaching the service.
+	MaxPageLimit int32 = 100
+)
+
+// Page is one page of paginated results: the items of this page plus the
+// opaque cursor fetching the next one (empty when the page is last).
+type Page[T any] struct {
+	Items      []T
+	NextCursor Cursor
+}
+
 // ShopService is the business-logic extension point generated for the ShopService service
 // declared in the zen schema.
 //
@@ -16,7 +38,7 @@ import (
 // NewShopServiceGRPCServer (grpc.go) for gRPC -- both wire the identical
 // implementation to both transports.
 type ShopService interface {
-	ListProducts(ctx context.Context, req *ListProductsRequest, cursor string, limit int32) (*ListProductsResponse, error)
+	ListProducts(ctx context.Context, req *ListProductsRequest, cursor Cursor, limit int32) (*ListProductsResponse, error)
 	GetProduct(ctx context.Context, req *GetProductRequest) (*Product, error)
 	CreateProduct(ctx context.Context, req *CreateProductRequest) (*Product, error)
 	UpdateProduct(ctx context.Context, req *UpdateProductRequest) (*Product, error)
@@ -24,5 +46,5 @@ type ShopService interface {
 	DeleteProduct(ctx context.Context, req *DeleteProductRequest) (*Product, error)
 	Checkout(ctx context.Context, req *CheckoutRequest) (*OrderReceipt, error)
 	GetOrder(ctx context.Context, req *GetOrderRequest) (*Order, error)
-	ListOrders(ctx context.Context, req *ListOrdersRequest, cursor string, limit int32) (*ListOrdersResponse, error)
+	ListOrders(ctx context.Context, req *ListOrdersRequest, cursor Cursor, limit int32) (*ListOrdersResponse, error)
 }
