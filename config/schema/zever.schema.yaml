@@ -241,6 +241,9 @@ $defs:
             dsn:
                 description: Postgres connection string.
                 type: string
+            lock_timeout:
+                $ref: '#/$defs/durationNs'
+                description: Postgres SET LOCAL lock_timeout per migration statement applied by orm/migrate; zero disables.
             max_conn_idle_time:
                 $ref: '#/$defs/durationNs'
             max_conn_lifetime:
@@ -255,6 +258,9 @@ $defs:
             path:
                 description: SQLite database file path.
                 type: string
+            statement_timeout:
+                $ref: '#/$defs/durationNs'
+                description: Postgres SET LOCAL statement_timeout per migration statement applied by orm/migrate; zero disables.
         type: object
     documentOptions:
         additionalProperties: false

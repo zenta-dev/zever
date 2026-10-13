@@ -228,7 +228,9 @@
         "max_conn_lifetime": { "$ref": "#/$defs/durationNs" },
         "max_conn_idle_time": { "$ref": "#/$defs/durationNs" },
         "path": { "type": "string", "description": "SQLite database file path." },
-        "dedicated_pool": { "type": "boolean", "description": "Opt out of container-level pool sharing; default false shares one pool per exact DSN, true opens a private pool. Ignored on db itself." }
+        "dedicated_pool": { "type": "boolean", "description": "Opt out of container-level pool sharing; default false shares one pool per exact DSN, true opens a private pool. Ignored on db itself." },
+        "lock_timeout": { "$ref": "#/$defs/durationNs", "description": "Postgres SET LOCAL lock_timeout per migration statement applied by orm/migrate; zero disables." },
+        "statement_timeout": { "$ref": "#/$defs/durationNs", "description": "Postgres SET LOCAL statement_timeout per migration statement applied by orm/migrate; zero disables." }
       }
     },
     "documentOptions": {

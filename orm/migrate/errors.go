@@ -9,3 +9,7 @@ import "errors"
 // DDL rendering here nor bootstrap support. See doc.go for the full policy
 // statement.
 var ErrUnsupportedDialect = errors.New("orm/migrate: dialect not supported for live schema diffing (postgres, sqlite, and mysql only)")
+
+// ErrInvalidTimeout is returned by Plan when PlanOptions carries a negative
+// lock_timeout or statement_timeout.
+var ErrInvalidTimeout = errors.New("orm/migrate: timeout must not be negative")

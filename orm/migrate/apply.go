@@ -5,6 +5,8 @@ import (
 	"crypto/sha256"
 	"errors"
 	"fmt"
+	"strings"
+	"time"
 
 	"github.com/zenta-dev/zever/core/db"
 	"github.com/zenta-dev/zever/dsl/backend/atlas"
@@ -213,7 +215,7 @@ func Apply(ctx context.Context, exec db.DB, plan *MigrationPlan) (int, error) {
 		return 0, err
 	}
 
-	return applyMigrationPlan(ctx, exec, plan.statements)
+	return applyMigrationPlan(ctx, exec, plan.statements, plan.LockTimeout, plan.StatementTimeout)
 }
 
 // supportsTransactionalDDL reports whether dialect can run a DDL statement
@@ -239,6 +241,10 @@ func supportsTransactionalDDL(dialect string) bool {
 // applyMigrationPlan executes each statement in order, skipping any whose
 // checksum is already recorded in schema_migrations, and recording every
 // newly-applied statement's checksum. Returns the count actually executed.
+// lock and stmtTimeout bound each postgres statement via SET LOCAL inside
+// its own transaction (see applyStatementInTx); zero disables each. A
+// postgres CREATE INDEX CONCURRENTLY build always runs outside any
+// transaction (postgres forbids it inside one), with no timeouts applied.
 //
 // On a dialect with transactional DDL (Postgres, SQLite), each statement's
 // exec and its recordMigration bookkeeping insert are wrapped in one
@@ -256,7 +262,7 @@ func supportsTransactionalDDL(dialect string) bool {
 // MySQL statements (and any exec that does not implement db.Transactor --
 // e.g. a minimal test double) keep the previous unwrapped behavior: exec
 // then record as two separate calls, with no transaction around either.
-func applyMigrationPlan(ctx context.Context, conn db.DB, stmts []plannedStatement) (int, error) {
+func applyMigrationPlan(ctx context.Context, conn db.DB, stmts []plannedStatement, lock, stmtTimeout time.Duration) (int, error) {
 	applied := 0
 
 	_, canTx := conn.(db.Transactor)
@@ -274,8 +280,8 @@ func applyMigrationPlan(ctx context.Context, conn db.DB, stmts []plannedStatemen
 			continue
 		}
 
-		if useTx {
-			if err := applyStatementInTx(ctx, conn, stmt, sum); err != nil {
+		if useTx && !isConcurrentIndexBuild(stmt.SQL) {
+			if err := applyStatementInTx(ctx, conn, stmt, sum, lock, stmtTimeout); err != nil {
 				return applied, err
 			}
 		} else {
@@ -288,6 +294,34 @@ func applyMigrationPlan(ctx context.Context, conn db.DB, stmts []plannedStatemen
 	}
 
 	return applied, nil
+}
+
+// isConcurrentIndexBuild reports whether a statement is a postgres CREATE
+// INDEX CONCURRENTLY build, which postgres forbids inside a transaction
+// block -- Apply runs such statements outside any transaction for exactly
+// that reason (and therefore without SET LOCAL timeouts either).
+func isConcurrentIndexBuild(stmt string) bool {
+	upper := strings.ToUpper(stmt)
+	return strings.Contains(upper, "CREATE") && strings.Contains(upper, "INDEX") &&
+		strings.Contains(upper, "CONCURRENTLY")
+}
+
+// timeoutStatements renders the SET LOCAL statements bounding one applied
+// statement's lock wait and run time on postgres. Empty timeouts (zero)
+// render nothing; Apply calls this only for postgres statements running
+// inside a transaction, since SET LOCAL is transaction-scoped.
+func timeoutStatements(lock, stmt time.Duration) []string {
+	var out []string
+
+	if lock > 0 {
+		out = append(out, fmt.Sprintf("SET LOCAL lock_timeout = '%dms';", lock.Milliseconds()))
+	}
+
+	if stmt > 0 {
+		out = append(out, fmt.Sprintf("SET LOCAL statement_timeout = '%dms';", stmt.Milliseconds()))
+	}
+
+	return out
 }
 
 // dialectOf reports conn's dialect, tolerating a minimal test double that
@@ -305,8 +339,20 @@ func dialectOf(conn db.DB) string {
 // atomically: db.WithTx commits only if both succeed, and rolls back
 // (undoing the DDL too, on a dialect where that is transactional) if either
 // fails.
-func applyStatementInTx(ctx context.Context, conn db.DB, stmt plannedStatement, sum string) error {
+//
+// On postgres, non-zero lock/statement timeouts are applied first via SET
+// LOCAL inside the same transaction, so each statement is bounded without
+// changing any session or database default.
+func applyStatementInTx(ctx context.Context, conn db.DB, stmt plannedStatement, sum string, lock, stmtTimeout time.Duration) error {
 	err := db.WithTx(ctx, conn, nil, func(txCtx context.Context, tx db.Tx) error {
+		if tx.Dialect() == atlas.DialectPostgres {
+			for _, setLocal := range timeoutStatements(lock, stmtTimeout) {
+				if _, err := tx.Exec(txCtx, setLocal); err != nil {
+					return fmt.Errorf("orm/migrate: exec lock timeout: %w", err)
+				}
+			}
+		}
+
 		if _, err := tx.Exec(txCtx, stmt.SQL); err != nil {
 			return fmt.Errorf("orm/migrate: exec %q: %w", firstLine(stmt.SQL), err)
 		}

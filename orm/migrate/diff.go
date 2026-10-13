@@ -5,6 +5,7 @@ import (
 	"fmt"
 	"regexp"
 	"sort"
+	"time"
 
 	"github.com/zenta-dev/zever/core/db"
 	"github.com/zenta-dev/zever/dsl/backend/atlas"
@@ -144,6 +145,18 @@ func statementTexts(stmts []plannedStatement) []string {
 	return out
 }
 
+// DefaultLockTimeout is the recommended PlanOptions.LockTimeout for
+// `zever db migrate` runs against postgres: long enough for ordinary DDL,
+// short enough that a statement stuck behind a production lock fails fast
+// instead of queueing behind it. See PlanOptions.
+const DefaultLockTimeout = 10 * time.Second
+
+// DefaultStatementTimeout is the recommended PlanOptions.StatementTimeout
+// for `zever db migrate` runs against postgres: long enough for ordinary
+// DDL, short enough that a runaway statement is cancelled by the server.
+// See PlanOptions.
+const DefaultStatementTimeout = 30 * time.Second
+
 // PlanOptions carries the caller-selected diffing behaviors into Plan, so
 // adding a new one does not mean adding another positional bool everywhere.
 type PlanOptions struct {
@@ -154,6 +167,19 @@ type PlanOptions struct {
 	// declared one. On postgres a mismatch emits ALTER COLUMN TYPE; on
 	// sqlite it emits a warning and nothing else.
 	DetectTypeChanges bool
+	// LockTimeout caps how long one applied statement may wait for a lock
+	// on postgres, via SET LOCAL lock_timeout inside the statement's own
+	// transaction. Zero disables it. Negative fails Plan.
+	LockTimeout time.Duration
+	// StatementTimeout caps how long one applied statement may run on
+	// postgres, via SET LOCAL statement_timeout inside the statement's own
+	// transaction. Zero disables it. Negative fails Plan.
+	StatementTimeout time.Duration
+	// ConcurrentIndexes renders postgres index builds as CREATE INDEX
+	// CONCURRENTLY, which does not block writes. Postgres-only; other
+	// dialects render plain CREATE INDEX. Each concurrent build runs outside
+	// any transaction, since postgres forbids CONCURRENTLY inside one.
+	ConcurrentIndexes bool
 }
 
 // MigrationPlan is the result of Plan: the ordered DDL statements that would
@@ -173,6 +199,13 @@ type MigrationPlan struct {
 	// prefixed however it likes -- these strings carry no prefix of their
 	// own.
 	Warnings []string
+	// LockTimeout and StatementTimeout are PlanOptions' timeouts, carried so
+	// Apply can SET LOCAL them around each statement on postgres. Zero
+	// disables each.
+	LockTimeout time.Duration
+	// StatementTimeout is PlanOptions' per-statement run cap, carried for
+	// Apply the same way LockTimeout is.
+	StatementTimeout time.Duration
 
 	statements []plannedStatement
 }
@@ -203,6 +236,14 @@ func Plan(ctx context.Context, exec db.DB, schema *ir.Schema, opts PlanOptions) 
 		return nil, fmt.Errorf("orm/migrate: dialect %q: %w", dialect, ErrUnsupportedDialect)
 	}
 
+	if opts.LockTimeout < 0 {
+		return nil, fmt.Errorf("orm/migrate: negative lock_timeout %v: %w", opts.LockTimeout, ErrInvalidTimeout)
+	}
+
+	if opts.StatementTimeout < 0 {
+		return nil, fmt.Errorf("orm/migrate: negative statement_timeout %v: %w", opts.StatementTimeout, ErrInvalidTimeout)
+	}
+
 	w := &warnings{}
 
 	stmts, err := computeMigrationPlan(ctx, exec, dialect, schema, opts, w)
@@ -210,7 +251,13 @@ func Plan(ctx context.Context, exec db.DB, schema *ir.Schema, opts PlanOptions) 
 		return nil, err
 	}
 
-	return &MigrationPlan{Dialect: dialect, Warnings: w.messages(), statements: stmts}, nil
+	return &MigrationPlan{
+		Dialect:          dialect,
+		Warnings:         w.messages(),
+		LockTimeout:      opts.LockTimeout,
+		StatementTimeout: opts.StatementTimeout,
+		statements:       stmts,
+	}, nil
 }
 
 // warnings collects non-fatal diffing messages produced while computing a
@@ -743,7 +790,7 @@ func computeMigrationPlan(
 	var stmts []plannedStatement
 
 	if len(missing.Modules) > 0 {
-		createStmts, err := atlas.RenderSchemaDDL(dialect, missing)
+		createStmts, err := atlas.RenderSchemaDDLWithOptions(dialect, missing, atlas.DDLOptions{ConcurrentIndexes: opts.ConcurrentIndexes})
 		if err != nil {
 			return nil, err
 		}
@@ -848,7 +895,7 @@ func alterStatementsFor(
 		}
 	}
 
-	idxStmts, err := indexStatementsFor(ctx, conn, dialect, e, state, w)
+	idxStmts, err := indexStatementsFor(ctx, conn, dialect, e, state, w, opts.ConcurrentIndexes)
 	if err != nil {
 		return nil, err
 	}

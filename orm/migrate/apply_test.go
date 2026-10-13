@@ -537,7 +537,7 @@ func TestApplyStatementInTx(t *testing.T) {
 		}
 		conn := &txFakeDB{fakeDB: inner}
 
-		if err := applyStatementInTx(ctx, conn, stmt, "abc"); err != nil {
+		if err := applyStatementInTx(ctx, conn, stmt, "abc", 0, 0); err != nil {
 			t.Fatalf("applyStatementInTx: %v", err)
 		}
 
@@ -557,7 +557,7 @@ func TestApplyStatementInTx(t *testing.T) {
 		}
 		conn := &txFakeDB{fakeDB: inner}
 
-		if err := applyStatementInTx(ctx, conn, stmt, "abc"); err == nil {
+		if err := applyStatementInTx(ctx, conn, stmt, "abc", 0, 0); err == nil {
 			t.Fatal("applyStatementInTx: want error, got nil")
 		}
 
@@ -581,7 +581,7 @@ func TestApplyStatementInTx(t *testing.T) {
 		}
 		conn := &txFakeDB{fakeDB: inner}
 
-		if err := applyStatementInTx(ctx, conn, stmt, "abc"); err == nil {
+		if err := applyStatementInTx(ctx, conn, stmt, "abc", 0, 0); err == nil {
 			t.Fatal("applyStatementInTx: want record error, got nil")
 		}
 	})
@@ -592,7 +592,7 @@ func TestApplyStatementInTx(t *testing.T) {
 		inner := &fakeDB{dialect: atlas.DialectSQLite}
 		conn := &txFakeDB{fakeDB: inner, beginErr: errors.New("boom")}
 
-		if err := applyStatementInTx(ctx, conn, stmt, "abc"); err == nil {
+		if err := applyStatementInTx(ctx, conn, stmt, "abc", 0, 0); err == nil {
 			t.Fatal("applyStatementInTx: want begin error, got nil")
 		}
 	})
@@ -624,7 +624,7 @@ func TestApplyMigrationPlan_skipsApplied(t *testing.T) {
 	n, err := applyMigrationPlan(ctx, conn, []plannedStatement{{
 		SQL:  "ALTER TABLE \"users\" ADD COLUMN \"note\" TEXT;",
 		Meta: migrationMeta{Kind: kindAddColumn},
-	}})
+	}}, 0, 0)
 	if err != nil {
 		t.Fatalf("applyMigrationPlan: %v", err)
 	}

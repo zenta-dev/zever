@@ -326,6 +326,10 @@ type = 'boolean'
 description = 'Postgres connection string.'
 type = 'string'
 
+['$defs'.dbOptions.properties.lock_timeout]
+'$ref' = '#/$defs/durationNs'
+description = 'Postgres SET LOCAL lock_timeout per migration statement applied by orm/migrate; zero disables.'
+
 ['$defs'.dbOptions.properties.max_conn_idle_time]
 '$ref' = '#/$defs/durationNs'
 
@@ -344,6 +348,10 @@ type = 'integer'
 ['$defs'.dbOptions.properties.path]
 description = 'SQLite database file path.'
 type = 'string'
+
+['$defs'.dbOptions.properties.statement_timeout]
+'$ref' = '#/$defs/durationNs'
+description = 'Postgres SET LOCAL statement_timeout per migration statement applied by orm/migrate; zero disables.'
 
 ['$defs'.documentOptions]
 additionalProperties = false

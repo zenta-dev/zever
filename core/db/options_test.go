@@ -23,12 +23,14 @@ func TestOptionsValidate(t *testing.T) {
 		{
 			name: "happy full",
 			opts: Options{
-				DSN:             "postgres://localhost/db",
-				MaxConns:        10,
-				MinConns:        2,
-				MaxConnLifetime: time.Hour,
-				MaxConnIdleTime: time.Minute,
-				Path:            "/tmp/test.db",
+				DSN:              "postgres://localhost/db",
+				MaxConns:         10,
+				MinConns:         2,
+				MaxConnLifetime:  time.Hour,
+				MaxConnIdleTime:  time.Minute,
+				Path:             "/tmp/test.db",
+				LockTimeout:      10 * time.Second,
+				StatementTimeout: 30 * time.Second,
 			},
 			wantErr: false,
 		},
@@ -68,6 +70,28 @@ func TestOptionsValidate(t *testing.T) {
 		{
 			name:    "negative idle time",
 			opts:    Options{MaxConnIdleTime: -time.Second},
+			wantErr: true,
+			check: func(t *testing.T, err error) {
+				t.Helper()
+				if !errors.Is(err, ErrInvalidOptions) {
+					t.Errorf("does not unwrap to ErrInvalidOptions: %v", err)
+				}
+			},
+		},
+		{
+			name:    "negative lock timeout",
+			opts:    Options{LockTimeout: -time.Second},
+			wantErr: true,
+			check: func(t *testing.T, err error) {
+				t.Helper()
+				if !errors.Is(err, ErrInvalidOptions) {
+					t.Errorf("does not unwrap to ErrInvalidOptions: %v", err)
+				}
+			},
+		},
+		{
+			name:    "negative statement timeout",
+			opts:    Options{StatementTimeout: -time.Second},
 			wantErr: true,
 			check: func(t *testing.T, err error) {
 				t.Helper()

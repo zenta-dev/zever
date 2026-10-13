@@ -111,8 +111,29 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   fiber `ServeHTTP` costs ~46 allocs/op (isolated adaptor wrapping ~35,
   concurrent ~55) against ~17 for a `stdhttp` param route (~10 static).
   The older "45–55 allocs/op adaptor cost" note is corrected: the
-  `newHTTPHandler` rework cut the isolated adaptor to 35; 45–55 still
-  brackets the full serve path.
+   `newHTTPHandler` rework cut the isolated adaptor to 35; 45–55 still
+   brackets the full serve path.
+- `feat(db): migration lint and lock timeouts`: `zever db migrate --lint`
+  lints the planned DDL before anything runs and fails on error-severity
+  findings: `DROP TABLE`/`DROP COLUMN` (`drop_table`, `drop_column`),
+  `ADD COLUMN ... NOT NULL` without a `DEFAULT`
+  (`not_null_without_default`), and column type rewrites (`type_rewrite`)
+  fail the run, while a postgres `CREATE INDEX` without `CONCURRENTLY`
+  (`non_concurrent_index`) only warns. One rule is waived per statement with a
+  `-- zever:allow:<code>` comment (bare `-- zever:allow` waives all); the
+  pure `orm/migrate.LintStatements`/`LintPlan` helpers back it, with golden
+  DDL fixtures under `orm/migrate/testdata`. New
+  `--lock-timeout`/`--statement-timeout` flags (falling back to
+  `db.options` `lock_timeout`/`statement_timeout` from the config file or
+  `DB_*` env) bound every applied postgres statement via `SET LOCAL`
+  inside its own transaction; `PlanOptions` carries them (`DefaultLockTimeout`
+  10s, `DefaultStatementTimeout` 30s; negative fails `Plan` with
+  `ErrInvalidTimeout`). `--concurrent-indexes` builds postgres indexes as
+  `CREATE INDEX CONCURRENTLY` (each build outside a transaction, since
+  postgres forbids it inside one), via `PlanOptions.ConcurrentIndexes`
+  and `atlas.DDLOptions`/`RenderSchemaDDLWithOptions`. Docs gain
+   expand/contract, batched-backfill, concurrent-index, and timeout sections
+   in the migrations guide.
 - `feat(auth/jwt): kid-based key rotation and nbf validation`: `JWTOptions`
   gains `keys: [{kid, secret}]` plus `active_kid` (empty defaults to the
   first entry; validated for unique kids, secret length, and a matching
