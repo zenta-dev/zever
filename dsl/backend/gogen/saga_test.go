@@ -65,11 +65,56 @@ func TestGenerateSagaFile(t *testing.T) {
 	src := string(got)
 
 	for _, want := range []string{
-		"func RegisterSagas(reg workflow.SagaRegistrar, caller SagaCaller)",
-		`reg.RegisterSaga("CheckoutSaga", []workflow.SagaStep{`,
-		`{Name: "reserve", Execute: sagaStep("InventoryService", "Reserve", caller), Compensate: sagaStep("InventoryService", "Release", caller)}`,
-		`{Name: "charge", Pivot: true, Execute: sagaStep("PaymentService", "Charge", caller), Compensate: sagaStep("PaymentService", "Refund", caller)}`,
-		"func sagaStep(service, method string, caller SagaCaller) workflow.StepFunc",
+		"func RegisterSagas(reg workflow.TypedSagaRegistrar, caller SagaCaller)",
+		`reg.RegisterTypedSaga("CheckoutSaga", []workflow.TypedStep{`,
+		`workflow.NewTypedStep("reserve", checkoutSagaReserveExecute(caller), checkoutSagaReserveCompensate(caller), false)`,
+		`workflow.NewTypedStep("charge", checkoutSagaChargeExecute(caller), checkoutSagaChargeCompensate(caller), true)`,
+		"func checkoutSagaReserveExecute(caller SagaCaller) workflow.StepFuncOf[CheckoutSagaReserveInput, CheckoutSagaReserveOutput]",
+		"type CheckoutSagaReserveInput struct",
+	} {
+		if !strings.Contains(src, want) {
+			t.Errorf("generated saga.go missing %q\n--- got ---\n%s", want, src)
+		}
+	}
+
+	if _, err := parser.ParseFile(token.NewFileSet(), "app/saga.go", got, parser.SkipObjectResolution); err != nil {
+		t.Errorf("generated saga.go does not parse: %v", err)
+	}
+}
+
+// TestGenerateSagaFileIsTyped proves the generated saga.go carries
+// per-step typed input/output structs over the shared SagaCaller seam and
+// never falls back to untyped payloads: no "any" and no "map[string]any".
+func TestGenerateSagaFileIsTyped(t *testing.T) {
+	t.Parallel()
+
+	schema := mustResolve(t, sagaFixture)
+
+	out, err := New().Generate(schema)
+	if err != nil {
+		t.Fatalf("Generate: %v", err)
+	}
+
+	got, ok := out["app/saga.go"]
+	if !ok {
+		t.Fatalf("Generate missing app/saga.go; keys = %v", keysOf(out))
+	}
+
+	src := string(got)
+
+	for _, banned := range []string{"map[string]any", "input any", "in any", "(any, error)"} {
+		if strings.Contains(src, banned) {
+			t.Errorf("generated saga.go must not contain %q\n--- got ---\n%s", banned, src)
+		}
+	}
+
+	for _, want := range []string{
+		"CheckoutSagaReserveInput",
+		"CheckoutSagaReserveOutput",
+		"CheckoutSagaChargeInput",
+		"CheckoutSagaChargeOutput",
+		"workflow.TypedSagaRegistrar",
+		"workflow.TypedStep",
 	} {
 		if !strings.Contains(src, want) {
 			t.Errorf("generated saga.go missing %q\n--- got ---\n%s", want, src)
