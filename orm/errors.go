@@ -53,6 +53,14 @@ var ErrCTEClauseEmptyColumns = errors.New("orm: SEARCH/CYCLE require at least on
 // which is invalid on every dialect, so it fails closed before rendering.
 var ErrProjectionEmpty = errors.New("orm: projected query requires at least one projection")
 
+// ErrInListTooLarge is returned when a value-list IN exceeds the resolved
+// dialect's per-statement parameter budget in a shape the ORM cannot split
+// safely: an oversized IN under OR/NOT (per-chunk fan-out would intersect
+// wrongly), a NOT IN of any polarity, or a fan-out that would need
+// ORDER BY/LIMIT/OFFSET/locking/tablesample semantics across statements.
+// Narrow the id set or drop the modifier. Callers test with errors.Is.
+var ErrInListTooLarge = errors.New("orm: IN list exceeds the dialect parameter budget for this query shape")
+
 // ErrRetryable marks an error as a transient transaction failure worth
 // retrying the WHOLE transaction over. RetryTx treats it (directly or
 // wrapped anywhere in the error chain) as retryable, as does IsRetryable;

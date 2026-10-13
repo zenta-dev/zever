@@ -5,6 +5,7 @@ import (
 	"fmt"
 
 	"github.com/zenta-dev/zever/core/db"
+	"github.com/zenta-dev/zever/orm/dialect"
 )
 
 // ParentWithChildren is the result of Preload: one parent T with all of its
@@ -20,11 +21,12 @@ type ParentWithChildren[T any, C any] struct {
 // inChunkSize caps how many parent ids go into a single generated `childFK
 // IN (...)` query. Without a cap, a very large parent set would produce one
 // SQL statement with as many bound placeholders as ids, risking driver/DB
-// placeholder limits (Postgres ~65535 params, SQLite ~999-32766 depending on
-// build flags) or a degenerate query plan. 1000 is
-// conservative across both dialects at once: Preload has no per-call
-// dialect context to branch on, so it picks one constant safe everywhere
-// rather than guessing the backend.
+// placeholder limits (Postgres 65535 params, SQLite 999 before 3.32.0 and
+// 32766 after) or a degenerate query plan. 1000 is conservative across
+// both dialects at once -- and Preload caps it further per call against
+// the resolved dialect's own budget (minus the child query's other bound
+// arguments), so an old-SQLite backend with a 999 budget still gets
+// fitting statements instead of a driver error.
 const inChunkSize = 1000
 
 // Preload loads every parent matched by parents and attaches its children in
@@ -78,16 +80,26 @@ func Preload[T any, PT ptrScanner[T], C any, PC ptrScanner[C], K comparable](
 		ids[i] = parentID((*T)(row))
 	}
 
+	// Size the child-IN chunks against the resolved dialect's parameter
+	// budget (minus the child query's own non-IN arguments), so the
+	// generated statements always fit: the 1000 default stands on modern
+	// backends, while an old-SQLite 999 budget transparently shrinks the
+	// chunks instead of failing in the driver.
+	chunkSize, err := preloadChunkSize(childBase, exec)
+	if err != nil {
+		return nil, err
+	}
+
 	// Each chunk's rows are kept as their own slice rather than concatenated
 	// into one growing slice: grouping below walks them twice, and retaining
 	// the per-chunk slices avoids the repeated reallocation that appending
 	// every chunk into a single slice would pay as chunks accumulate.
-	chunks := make([][]PC, 0, (len(ids)+inChunkSize-1)/inChunkSize)
+	chunks := make([][]PC, 0, (len(ids)+chunkSize-1)/chunkSize)
 
-	// The id set is fanned out into inChunkSize slices so no single child
+	// The id set is fanned out into chunkSize slices so no single child
 	// query carries an unbounded placeholder list.
-	for start := 0; start < len(ids); start += inChunkSize {
-		end := start + inChunkSize
+	for start := 0; start < len(ids); start += chunkSize {
+		end := start + chunkSize
 		if end > len(ids) {
 			end = len(ids)
 		}
@@ -163,4 +175,37 @@ func Preload[T any, PT ptrScanner[T], C any, PC ptrScanner[C], K comparable](
 	}
 
 	return out, nil
+}
+
+// preloadChunkSize returns the child-IN chunk size for one Preload call:
+// inChunkSize capped by the resolved dialect's parameter budget minus the
+// child query's own non-IN bound arguments (its filter/order/limit tail),
+// so every generated child statement fits. A budget the child's own
+// arguments already fill fails closed with ErrInListTooLarge.
+func preloadChunkSize[C any, PC ptrScanner[C]](childBase Query[C, PC], exec db.DB) (int, error) {
+	d, err := resolveDialect(exec)
+	if err != nil {
+		return 0, err
+	}
+
+	reserved := countNodeArgs(childBase.where.n)
+	if childBase.limit > 0 {
+		reserved++
+	}
+
+	if childBase.offset > 0 {
+		reserved++
+	}
+
+	chunkSize := inChunkSize
+
+	if room := dialect.MaxParams(d) - reserved; room < chunkSize {
+		chunkSize = room
+	}
+
+	if chunkSize < 1 {
+		return 0, fmt.Errorf("orm: Preload: %w", ErrInListTooLarge)
+	}
+
+	return chunkSize, nil
 }

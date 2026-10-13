@@ -86,7 +86,7 @@ saga CheckoutSaga {
 
 `execute` is required per `step`; `compensate` and `pivot` are optional (`pivot` defaults to `false`). Step names are unique within a saga, and at most one step may set `pivot: true`. Both `execute` and `compensate` reference `<Service>.<RPC>` and resolve against every service in the schema, so a saga may compose RPCs across modules.
 
-For each module with a saga, the `gogen` backend emits `<module>/saga.go` with a `SagaCaller` interface, `RegisterSagas`, and a `sagaStep` helper:
+For each module with a saga, the `gogen` backend emits `<module>/saga.go` with per-step typed input/output structs, a `SagaCaller` interface, and `RegisterSagas`:
 
 ```go title="app/saga.go"
 package app
@@ -97,27 +97,40 @@ import (
 	"github.com/zenta-dev/zever/core/workflow"
 )
 
-// SagaCaller invokes an RPC by service name; wire it to shared/grpcclient or an
-// in-process dispatcher. in/out are JSON-marshalable.
+// CheckoutSagaReserveInput is the typed input for saga "CheckoutSaga" step "reserve".
+type CheckoutSagaReserveInput struct {
+	ItemId string `json:"item_id"`
+}
+
+// CheckoutSagaReserveOutput is the typed output for saga "CheckoutSaga" step "reserve".
+type CheckoutSagaReserveOutput struct {
+	Id string `json:"id"`
+}
+
+// SagaCaller invokes the saga steps declared in this module; wire it to
+// shared/grpcclient or an in-process dispatcher. One method per step keeps
+// every call typed: no untyped payloads cross this seam.
 type SagaCaller interface {
-	Call(ctx context.Context, service, method string, in any, out any) error
+	CheckoutSagaReserve(ctx context.Context, in CheckoutSagaReserveInput, out *CheckoutSagaReserveOutput) error
+	CheckoutSagaReserveCompensate(ctx context.Context, in CheckoutSagaReserveCompensateInput, out *CheckoutSagaReserveCompensateOutput) error
+	CheckoutSagaCharge(ctx context.Context, in CheckoutSagaChargeInput, out *CheckoutSagaChargeOutput) error
+	CheckoutSagaChargeCompensate(ctx context.Context, in CheckoutSagaChargeCompensateInput, out *CheckoutSagaChargeCompensateOutput) error
 }
 
 // RegisterSagas registers every saga declared in this module.
-func RegisterSagas(reg workflow.SagaRegistrar, caller SagaCaller) {
-	reg.RegisterSaga("CheckoutSaga", []workflow.SagaStep{
-		{Name: "reserve", Execute: sagaStep("InventoryService", "Reserve", caller), Compensate: sagaStep("InventoryService", "Release", caller)},
-		{Name: "charge", Pivot: true, Execute: sagaStep("PaymentService", "Charge", caller), Compensate: sagaStep("PaymentService", "Refund", caller)},
+func RegisterSagas(reg workflow.TypedSagaRegistrar, caller SagaCaller) {
+	reg.RegisterTypedSaga("CheckoutSaga", []workflow.TypedStep{
+		workflow.NewTypedStep("reserve", checkoutSagaReserveExecute(caller), checkoutSagaReserveCompensate(caller), false),
+		workflow.NewTypedStep("charge", checkoutSagaChargeExecute(caller), checkoutSagaChargeCompensate(caller), true),
 	})
 }
 
-// sagaStep adapts one Service.RPC reference to a workflow.StepFunc by calling
-// caller.Call and returning the JSON-marshalable response.
+// checkoutSagaReserveExecute adapts SagaCaller.CheckoutSagaReserve to a typed workflow step function.
 ```
 
 ## Wire generated sagas at boot
 
-`SagaCaller` is the one seam the host supplies; `RegisterSagas` is deliberately not called from `RegisterModule`, so wiring stays explicit. Implement `Call` with [`shared/grpcclient`](../grpc-client/) (dial, marshal `in`, invoke `<Service>/<Method>`, unmarshal into `out`) or an in-process dispatcher, which needs no gRPC because the generated file depends only on `core/workflow`. Resolve `c.Workflow()`, type-assert it to `workflow.SagaRegistrar`, and call `app.RegisterSagas(reg, caller)` once at boot.
+`SagaCaller` is the one seam the host supplies; `RegisterSagas` is deliberately not called from `RegisterModule`, so wiring stays explicit. Implement one method per step with [`shared/grpcclient`](../grpc-client/) (dial, marshal `in`, invoke `<Service>/<Method>`, unmarshal into `out`) or an in-process dispatcher, which needs no gRPC because the generated file depends only on `core/workflow`. Resolve `c.Workflow()`, type-assert it to `workflow.TypedSagaRegistrar` (both `memory` and `db` implement it alongside `SagaRegistrar`), and call `app.RegisterSagas(reg, caller)` once at boot. Step inputs/outputs convert across step boundaries with encoding/json inside `workflow.NewTypedStep`, so keep every generated struct JSON-marshalable.
 
 ## Recover crashed runs
 
