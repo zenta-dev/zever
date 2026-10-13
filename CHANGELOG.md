@@ -89,6 +89,46 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Added
 
+- `feat(payment): dedupe webhook events by id`: the stripe and paddle
+  adapters accept the existing optional `payment.Options.Idempotency`
+  store for webhook replay protection (previously refund-only). After
+  signature verification, the provider event id (Stripe event `id`,
+  Paddle `event_id`, now surfaced as `payment.Event.ID`) is reserved
+  with a payload-fingerprint guard and a 24h TTL
+  (`DefaultWebhookIdempotencyTTL`); a repeat delivery fails with the new
+  typed `DuplicateEventError` (sentinel `ErrDuplicateEvent`) instead of
+  re-executing downstream work, and a same-id/different-payload delivery
+  trips the store fingerprint mismatch fail-closed. No store (or an
+  event without an id) keeps the old process-every-delivery behavior.
+  `container.Payment()` reuses the resolved `c.Idempotency()` service
+  best-effort when no explicit store is configured; an unresolvable
+  idempotency service never blocks payment resolution.
+- `feat(middleware): trusted-proxy aware rate limit key`: new
+  `middleware.ClientIPKey(trusted []netip.Prefix)` honors
+  `X-Forwarded-For` only when the peer is trusted, keying on the
+  rightmost untrusted entry (spoofed headers from untrusted peers are
+  ignored; all-trusted chains fall back to the leftmost client).
+  `ratelimit.Options` gains `trusted_proxies` (CIDRs or bare IPs,
+  validated by `ratelimit.ParseTrustedProxies`, mirrored as
+  `middleware.ParseTrustedProxies` and in the config JSON schema); the
+  generated server builds the key from it and keeps `RemoteAddrKey`
+  when none are configured. `RemoteAddrKey` itself is unchanged.
+- `feat(orm): auto-chunk large IN lists`: a value-list `IN` larger than
+  the resolved dialect's per-statement parameter budget now fans out into
+  one statement per chunk for plain unordered unbounded `SELECT`s (rows
+  concatenated) and for `Count`/`Exists` (summed/ORed), instead of failing
+  in the driver with "too many SQL variables". Budgets come from the new
+  `dialect.ParamLimitDialect` interface (`MaxParams`, with a conservative
+  999 fallback): Postgres 65535 (wire-protocol uint16 ceiling), SQLite 999
+  before 3.32.0 and 32766 after (version-gated via the existing
+  `NewWithVersion` detection). Fan-out fails closed with the new
+  `ErrInListTooLarge` sentinel when the query carries `ORDER BY`/`LIMIT`/
+  `OFFSET`, a row lock or `TABLESAMPLE` (not reconstructible across
+  statements), or when the oversized `IN` sits under `OR`/`NOT` or is a
+  `NOT IN`. `Preload` sizes its child-`IN` chunks against the same budget
+  (minus the child query's own arguments), so old-SQLite backends get
+  fitting statements instead of driver errors; the 1000 default stands on
+   modern backends.
 - `docs: recommend stdhttp as the default router`: the routing guide now
   recommends `stdhttp` (already the `zever new` default) with measured
   numbers, and the benchmarks page gains a 2026-10-14 re-measurement:

@@ -387,10 +387,20 @@ func (c *Container) Password() (password.Hasher, error) {
 	})
 }
 
-// Payment resolves and returns the payment service instance.
+// Payment resolves and returns the payment service instance. When no
+// explicit idempotency store is configured on the payment options, the
+// resolved idempotency service is reused for webhook replay dedupe; an
+// unresolvable idempotency service never blocks payment resolution.
 func (c *Container) Payment() (payment.Payment, error) {
 	return c.payment.getCtx(c.rootCtx, func(_ context.Context) (payment.Payment, error) {
-		return openService("payment", c.cfg.Payment.Adapter, payment.ParseAdapter, payment.Open, c.cfg.Payment.Options)
+		opts := c.cfg.Payment.Options
+		if opts.Idempotency == nil {
+			if store, err := c.Idempotency(); err == nil {
+				opts.Idempotency = store
+			}
+		}
+
+		return openService("payment", c.cfg.Payment.Adapter, payment.ParseAdapter, payment.Open, opts)
 	})
 }
 

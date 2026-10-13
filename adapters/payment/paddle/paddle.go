@@ -319,7 +319,43 @@ func (d *driver) refund(ctx context.Context, id string, amount int64) error {
 	return nil
 }
 
+// webhookFingerprint binds a dedupe record to the exact payload delivered.
+func webhookFingerprint(raw []byte) []byte {
+	sum := sha256.Sum256(raw)
+
+	return sum[:]
+}
+
+// dedupeWebhookEvent reserves event id in store and marks it seen. A second
+// delivery of the same id returns DuplicateEventError; a delivery with the
+// same id but a different payload trips the store's fingerprint mismatch.
+func dedupeWebhookEvent(ctx context.Context, store idempotency.Store, key, eventID string, fingerprint []byte) error {
+	if store == nil || eventID == "" {
+		return nil
+	}
+
+	outcome, err := store.Begin(ctx, key, idempotency.BeginOptions{Fingerprint: fingerprint, TTL: payment.DefaultWebhookIdempotencyTTL})
+	if err != nil {
+		return err
+	}
+
+	if outcome.Replay {
+		return payment.DuplicateEventError{EventID: eventID}
+	}
+
+	if err := store.Complete(ctx, key, fingerprint, []byte{1}); err != nil {
+		_ = store.Forget(ctx, key)
+
+		return err
+	}
+
+	return nil
+}
+
 // WebhookEvent decodes and verifies a raw Paddle webhook payload.
+// When an idempotency store is configured, the provider event id is
+// reserved before returning: a repeat delivery fails with
+// payment.ErrDuplicateEvent instead of re-executing downstream work.
 func (d *driver) WebhookEvent(ctx context.Context, raw []byte, signature string) (payment.Event, error) {
 	if len(raw) > d.maxWebhookBytes {
 		return payment.Event{}, fmt.Errorf("paddle: webhook: %w", payment.SizeLimitError{Size: len(raw), Limit: d.maxWebhookBytes})
@@ -342,6 +378,7 @@ func (d *driver) WebhookEvent(ctx context.Context, raw []byte, signature string)
 	}
 
 	var envelope struct {
+		EventID   string `json:"event_id"`
 		EventType string `json:"event_type"`
 		Data      struct {
 			ID           string `json:"id"`
@@ -367,7 +404,8 @@ func (d *driver) WebhookEvent(ctx context.Context, raw []byte, signature string)
 		}
 	}
 
-	return payment.Event{
+	ev := payment.Event{
+		ID:   envelope.EventID,
 		Type: payment.EventType(envelope.EventType),
 		Object: payment.Result{
 			ID:       envelope.Data.ID,
@@ -375,7 +413,13 @@ func (d *driver) WebhookEvent(ctx context.Context, raw []byte, signature string)
 			Amount:   amount,
 			Currency: envelope.Data.CurrencyCode,
 		},
-	}, nil
+	}
+
+	if err := dedupeWebhookEvent(ctx, d.idempotency, "paddle:webhook:"+envelope.EventID, envelope.EventID, webhookFingerprint(raw)); err != nil {
+		return payment.Event{}, fmt.Errorf("paddle: webhook: %w", err)
+	}
+
+	return ev, nil
 }
 
 // Close releases backend resources.
