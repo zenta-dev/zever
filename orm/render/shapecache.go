@@ -1,12 +1,13 @@
 package render
 
 import (
+	"hash/fnv"
 	"strconv"
 	"strings"
-	"sync"
 	"sync/atomic"
 
 	"github.com/zenta-dev/zever/orm/dialect"
+	"github.com/zenta-dev/zever/shared/lrucache"
 )
 
 // shapeCacheCapacity bounds the render-shape cache. Key cardinality is the
@@ -14,6 +15,16 @@ import (
 // dozens to low hundreds: one per generated finder/list/mutation method),
 // so 256 leaves ample headroom while keeping the map small.
 const shapeCacheCapacity = 256
+
+// shapeCacheShards stripes the render-shape cache so concurrent query
+// rendering does not serialize on one lock. A Get on an LRU cache rewrites
+// recency order and therefore needs exclusive access (unlike a plain map
+// read under RWMutex), so a single LRU instance would turn every parallel
+// cache hit into a lock handoff. Striping by key hash recovers parallelism
+// across distinct shapes; a hot single shape still serializes on its stripe,
+// exactly as it would on one global lock. It is a power of two so the
+// shard index is a mask, not a division.
+const shapeCacheShards = 16
 
 // shapeCache memoizes rendered SQL TEXT keyed by a structural fingerprint
 // of a query "shape" -- dialect, table, columns, the predicate tree's
@@ -24,23 +35,45 @@ const shapeCacheCapacity = 256
 // the legacy orm/engine/shapecache.go idea into orm/render; the byte-
 // identical contract is enforced by shapecache_test.go.
 //
-// It is a fixed-capacity map guarded by a read/write mutex: when an insert
-// would exceed capacity the map is cleared and the new entry inserted. That
-// keeps the cache bounded under pathological shape churn while staying simple
-// and deterministic for tests (reads vastly outnumber writes in practice).
+// It is a fixed-capacity striped LRU: when an insert would exceed a shard's
+// share of the capacity only that shard's least-recently-used entry is
+// evicted, so hot shapes survive churn that a clear-all policy would drop.
+// Reads vastly outnumber writes in practice, and distinct shapes spread
+// over the stripes, so the per-stripe exclusive lock rarely contends.
 var (
-	shapeCacheMu     sync.RWMutex
-	shapeCacheMap    = make(map[string]string, shapeCacheCapacity)
+	shapeCache       = newShapeCache()
 	shapeCacheHits   atomic.Int64
 	shapeCacheMisses atomic.Int64
 )
 
+// newShapeCache builds the striped shape cache. It runs as a package-var
+// initializer (not init wiring): one bounded LRU per stripe, each holding
+// an equal share of shapeCacheCapacity.
+func newShapeCache() [shapeCacheShards]*lrucache.Cache[string, string] {
+	var shards [shapeCacheShards]*lrucache.Cache[string, string]
+
+	for i := range shards {
+		shards[i] = lrucache.New[string, string](shapeCacheCapacity / shapeCacheShards)
+	}
+
+	return shards
+}
+
+// shapeCacheShard maps a shape key to its stripe with FNV-1a, the same
+// non-cryptographic hash the rate-limiter striping uses for short keys.
+func shapeCacheShard(key string) *lrucache.Cache[string, string] {
+	h := fnv.New32a()
+	_, _ = h.Write([]byte(key))
+
+	return shapeCache[h.Sum32()&(shapeCacheShards-1)]
+}
+
 // resetShapeCache empties the cache and zeroes the hit/miss counters, for
 // tests to exercise the cache deterministically.
 func resetShapeCache() {
-	shapeCacheMu.Lock()
-	shapeCacheMap = make(map[string]string, shapeCacheCapacity)
-	shapeCacheMu.Unlock()
+	for _, shard := range shapeCache {
+		shard.Clear(nil)
+	}
 
 	shapeCacheHits.Store(0)
 	shapeCacheMisses.Store(0)
@@ -48,16 +81,17 @@ func resetShapeCache() {
 
 // shapeCacheLen reports the number of cached entries, for tests.
 func shapeCacheLen() int {
-	shapeCacheMu.RLock()
-	defer shapeCacheMu.RUnlock()
+	total := 0
 
-	return len(shapeCacheMap)
+	for _, shard := range shapeCache {
+		total += shard.Len()
+	}
+
+	return total
 }
 
 func shapeCacheGet(key string) (string, bool) {
-	shapeCacheMu.RLock()
-	q, ok := shapeCacheMap[key]
-	shapeCacheMu.RUnlock()
+	q, ok := shapeCacheShard(key).Get(key)
 
 	if ok {
 		shapeCacheHits.Add(1)
@@ -69,13 +103,7 @@ func shapeCacheGet(key string) (string, bool) {
 }
 
 func shapeCachePut(key, query string) {
-	shapeCacheMu.Lock()
-	if len(shapeCacheMap) >= shapeCacheCapacity {
-		shapeCacheMap = make(map[string]string, shapeCacheCapacity)
-	}
-
-	shapeCacheMap[key] = query
-	shapeCacheMu.Unlock()
+	shapeCacheShard(key).Put(key, query)
 }
 
 // fsep separates fingerprint fields. It is not a character SQL identifiers
