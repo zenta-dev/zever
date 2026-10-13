@@ -52,6 +52,12 @@ zever -V                    # print the CLI version (alias for --version)
 ```
 
 `zever --help --agent` prints the command map in an agent-friendly form.
+Structured `--json` `data` is emitted by the inspection commands
+(`compile`, `check`, `explain`, `doctor`, `routes`, `config show`,
+`graph`, `breaking`, `check-boundaries`) plus `outbox`, `upgrade`, and
+`uninstall`; every other command emits a JSON error envelope on failure.
+`doctor --json` reports `ok:false` with a nonzero exit when any battery
+fails.
 Most commands that write files or touch the database (`new`, `add`,
 `extract`, `generate *`, `db migrate`, `db rollback`, `upgrade`,
 `uninstall`) accept `--dry-run` to preview without applying.

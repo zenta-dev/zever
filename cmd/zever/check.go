@@ -57,6 +57,10 @@ func runCheck(args []string) error {
 		return nil
 	}
 
+	if err := rejectUnknownFlags("check", args, nil); err != nil {
+		return err
+	}
+
 	paths, err := resolveInputFiles(args)
 	if err != nil {
 		return fmt.Errorf("zever check: %w", err)
@@ -90,7 +94,12 @@ func runCheckWith(cfg CheckConfig) error {
 			_, _ = fmt.Fprintln(os.Stderr, formatHint("fix diagnostics above, then re-run check"))
 		}
 
-		return fmt.Errorf("zever check: %d file(s) failed to compile", len(files))
+		err := fmt.Errorf("zever check: %d file(s) failed to compile", len(files))
+		if cfg.JSON {
+			return emitFailure("check", map[string]any{"files": cfg.Files, "valid": false}, jsonDiagnostics(diags), err)
+		}
+
+		return err
 	}
 
 	if cfg.JSON {

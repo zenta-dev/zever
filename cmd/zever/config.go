@@ -18,10 +18,12 @@ var errConfigUnknownSubcommand = errors.New("zever config: missing subcommand (w
 // build it from huh forms; the flag shell (runConfigShow) builds it from
 // argv. An empty ConfigPath runs config.Load(""), which discovers
 // zever.yaml/.yml/.json in the working directory and applies env overrides.
-// A nil Out defaults to os.Stdout.
+// A nil Out defaults to os.Stdout. JSON emits a machine-readable envelope
+// instead of the human adapter list.
 type ConfigConfig struct {
 	ConfigPath string
 	Out        io.Writer
+	JSON       bool
 }
 
 // runConfig dispatches the two-word `zever config <subcommand>` family.
@@ -86,11 +88,15 @@ func runConfigShow(args []string) error {
 	configPath := fs.String("config", "", "optional config file path (default: discover zever.yaml/.yml/.json + env)")
 	fs.Usage = func() { printConfigUsage(fs) }
 
+	if err := rejectUnknownFlags("config show", args, []string{"config"}); err != nil {
+		return err
+	}
+
 	if err := fs.Parse(args); err != nil {
 		return fmt.Errorf("zever config: %w", err)
 	}
 
-	return runConfigShowWith(ConfigConfig{ConfigPath: *configPath})
+	return runConfigShowWith(ConfigConfig{ConfigPath: *configPath, JSON: jsonMode})
 }
 
 // runConfigShowWith resolves cfg through config.Load(cfg.ConfigPath) --
@@ -111,6 +117,12 @@ func runConfigShowWith(cfg ConfigConfig) error {
 	}
 
 	services := resolved.RedactedServices()
+
+	if cfg.JSON {
+		emitSuccess("config show", map[string]any{"services": services})
+
+		return nil
+	}
 
 	names := make([]string, 0, len(services))
 	for name := range services {

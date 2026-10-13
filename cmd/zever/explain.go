@@ -44,6 +44,10 @@ func runExplain(args []string) error {
 
 	path := args[0]
 
+	if err := rejectUnknownFlags("explain", args[1:], nil); err != nil {
+		return err
+	}
+
 	paths, err := resolveInputFiles(args[1:])
 	if err != nil {
 		return fmt.Errorf("zever explain: %w", err)
@@ -74,7 +78,12 @@ func runExplainWith(cfg ExplainConfig) error {
 	}
 
 	if diags.HasErrors() {
-		return fmt.Errorf("zever explain: %d file(s) failed to compile", len(files))
+		compileErr := fmt.Errorf("zever explain: %d file(s) failed to compile", len(files))
+		if cfg.JSON {
+			return emitFailure("explain", map[string]any{"path": cfg.OpPath, "files": cfg.Files}, jsonDiagnostics(diags), compileErr)
+		}
+
+		return compileErr
 	}
 
 	moduleName, serviceName, opName, err := parseExplainPath(cfg.OpPath)

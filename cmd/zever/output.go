@@ -43,6 +43,11 @@ type Envelope struct {
 	ExitCode int `json:"exitCode"`
 	// Data carries command-specific structured output on success.
 	Data any `json:"data,omitempty"`
+	// Diagnostics carries machine-readable compiler diagnostics (also
+	// printed to stderr). Present on failure envelopes and omitted on
+	// clean runs; stderr keeps the human-readable form in both modes so
+	// stdout stays a single JSON document.
+	Diagnostics []JSONDiagnostic `json:"diagnostics,omitempty"`
 	// Error carries the failure message on error.
 	Error string `json:"error,omitempty"`
 	// Hint carries a human-readable recovery hint on error.
