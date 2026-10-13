@@ -118,6 +118,9 @@ const (
 	pkgAuthz      = "github.com/zenta-dev/zever/core/authz"
 	pkgAuth       = "github.com/zenta-dev/zever/core/auth"
 	pkgPermission = "github.com/zenta-dev/zever/core/permission"
+	pkgLog        = "github.com/zenta-dev/zever/core/log"
+	pkgNoop       = "github.com/zenta-dev/zever/adapters/log/noop"
+	pkgDocument   = "github.com/zenta-dev/zever/core/document"
 )
 
 // paramModel is one operation parameter, resolved once for every renderer.

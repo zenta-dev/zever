@@ -6,20 +6,24 @@ package shop
 import (
 	"encoding/json"
 	"errors"
-	"github.com/zenta-dev/zever/core/auth"
-	"github.com/zenta-dev/zever/core/authz"
-	"github.com/zenta-dev/zever/core/permission"
-	"github.com/zenta-dev/zever/shared/apperror"
-	"google.golang.org/protobuf/encoding/protojson"
-	"google.golang.org/protobuf/proto"
 	"io"
 	"net/http"
 	"strconv"
 
+	"google.golang.org/protobuf/encoding/protojson"
+	"google.golang.org/protobuf/proto"
+
+	"github.com/zenta-dev/zever/adapters/log/noop"
+	"github.com/zenta-dev/zever/core/auth"
+	"github.com/zenta-dev/zever/core/authz"
+	"github.com/zenta-dev/zever/core/document"
+	"github.com/zenta-dev/zever/core/log"
+	"github.com/zenta-dev/zever/core/permission"
 	"github.com/zenta-dev/zever/core/router"
+	"github.com/zenta-dev/zever/shared/apperror"
 )
 
-const maxRequestBodyBytes = 10 << 20 // 10MB, matches document/local.maxSourceBytes
+const maxRequestBodyBytes = document.DefaultMaxSourceBytes
 
 // handleShopServiceListProducts handles GET /products, calling ShopService.ListProducts.
 func handleShopServiceListProducts(svc ShopService) http.HandlerFunc {
@@ -35,7 +39,7 @@ func handleShopServiceListProducts(svc ShopService) http.HandlerFunc {
 		if raw := r.URL.Query().Get("limit"); raw != "" {
 			v, err := strconv.ParseInt(raw, 10, 32)
 			if err != nil {
-				writeGogenError(w, apperror.New(apperror.InvalidArgument, "invalid parameter \"limit\""))
+				writeGogenError(w, r, apperror.New(apperror.InvalidArgument, "invalid parameter \"limit\""))
 				return
 			}
 
@@ -45,7 +49,7 @@ func handleShopServiceListProducts(svc ShopService) http.HandlerFunc {
 		{
 			raw := r.URL.Query().Get("category_id")
 			if raw == "" {
-				writeGogenError(w, apperror.New(apperror.InvalidArgument, "missing required parameter \"category_id\""))
+				writeGogenError(w, r, apperror.New(apperror.InvalidArgument, "missing required parameter \"category_id\""))
 				return
 			}
 
@@ -55,11 +59,11 @@ func handleShopServiceListProducts(svc ShopService) http.HandlerFunc {
 
 		resp, err := svc.ListProducts(ctx, req, cursor, limit)
 		if err != nil {
-			writeGogenError(w, err)
+			writeGogenError(w, r, err)
 			return
 		}
 
-		writeGogenProtoJSON(w, http.StatusOK, resp)
+		writeGogenProtoJSON(w, r, http.StatusOK, resp)
 	}
 }
 
@@ -73,7 +77,7 @@ func handleShopServiceGetProduct(svc ShopService) http.HandlerFunc {
 		{
 			raw := router.Param(r, "id")
 			if raw == "" {
-				writeGogenError(w, apperror.New(apperror.InvalidArgument, "missing required parameter \"id\""))
+				writeGogenError(w, r, apperror.New(apperror.InvalidArgument, "missing required parameter \"id\""))
 				return
 			}
 
@@ -83,11 +87,11 @@ func handleShopServiceGetProduct(svc ShopService) http.HandlerFunc {
 
 		resp, err := svc.GetProduct(ctx, req)
 		if err != nil {
-			writeGogenError(w, err)
+			writeGogenError(w, r, err)
 			return
 		}
 
-		writeGogenProtoJSON(w, http.StatusOK, resp)
+		writeGogenProtoJSON(w, r, http.StatusOK, resp)
 	}
 }
 
@@ -107,32 +111,32 @@ func handleShopServiceCreateProduct(svc ShopService) http.HandlerFunc {
 				msg = "request body too large"
 			}
 
-			writeGogenError(w, apperror.New(apperror.InvalidArgument, msg))
+			writeGogenError(w, r, apperror.New(apperror.InvalidArgument, msg))
 			return
 		}
 
 		if err := protojson.Unmarshal(body, req); err != nil {
-			writeGogenError(w, apperror.New(apperror.InvalidArgument, "invalid JSON body"))
+			writeGogenError(w, r, apperror.New(apperror.InvalidArgument, "invalid JSON body"))
 			return
 		}
 
 		if req.Name == "" {
-			writeGogenError(w, apperror.New(apperror.InvalidArgument, "missing required field \"name\""))
+			writeGogenError(w, r, apperror.New(apperror.InvalidArgument, "missing required field \"name\""))
 			return
 		}
 
 		if err := validateCreateProductRequest(req); err != nil {
-			writeGogenError(w, err)
+			writeGogenError(w, r, err)
 			return
 		}
 
 		resp, err := svc.CreateProduct(ctx, req)
 		if err != nil {
-			writeGogenError(w, err)
+			writeGogenError(w, r, err)
 			return
 		}
 
-		writeGogenProtoJSON(w, http.StatusOK, resp)
+		writeGogenProtoJSON(w, r, http.StatusOK, resp)
 	}
 }
 
@@ -152,24 +156,24 @@ func handleShopServiceUpdateProduct(svc ShopService) http.HandlerFunc {
 				msg = "request body too large"
 			}
 
-			writeGogenError(w, apperror.New(apperror.InvalidArgument, msg))
+			writeGogenError(w, r, apperror.New(apperror.InvalidArgument, msg))
 			return
 		}
 
 		if err := protojson.Unmarshal(body, req); err != nil {
-			writeGogenError(w, apperror.New(apperror.InvalidArgument, "invalid JSON body"))
+			writeGogenError(w, r, apperror.New(apperror.InvalidArgument, "invalid JSON body"))
 			return
 		}
 
 		if req.Name == "" {
-			writeGogenError(w, apperror.New(apperror.InvalidArgument, "missing required field \"name\""))
+			writeGogenError(w, r, apperror.New(apperror.InvalidArgument, "missing required field \"name\""))
 			return
 		}
 
 		{
 			raw := router.Param(r, "id")
 			if raw == "" {
-				writeGogenError(w, apperror.New(apperror.InvalidArgument, "missing required parameter \"id\""))
+				writeGogenError(w, r, apperror.New(apperror.InvalidArgument, "missing required parameter \"id\""))
 				return
 			}
 
@@ -178,17 +182,17 @@ func handleShopServiceUpdateProduct(svc ShopService) http.HandlerFunc {
 		}
 
 		if err := validateUpdateProductRequest(req); err != nil {
-			writeGogenError(w, err)
+			writeGogenError(w, r, err)
 			return
 		}
 
 		resp, err := svc.UpdateProduct(ctx, req)
 		if err != nil {
-			writeGogenError(w, err)
+			writeGogenError(w, r, err)
 			return
 		}
 
-		writeGogenProtoJSON(w, http.StatusOK, resp)
+		writeGogenProtoJSON(w, r, http.StatusOK, resp)
 	}
 }
 
@@ -208,19 +212,19 @@ func handleShopServicePatchProduct(svc ShopService) http.HandlerFunc {
 				msg = "request body too large"
 			}
 
-			writeGogenError(w, apperror.New(apperror.InvalidArgument, msg))
+			writeGogenError(w, r, apperror.New(apperror.InvalidArgument, msg))
 			return
 		}
 
 		if err := protojson.Unmarshal(body, req); err != nil {
-			writeGogenError(w, apperror.New(apperror.InvalidArgument, "invalid JSON body"))
+			writeGogenError(w, r, apperror.New(apperror.InvalidArgument, "invalid JSON body"))
 			return
 		}
 
 		{
 			raw := router.Param(r, "id")
 			if raw == "" {
-				writeGogenError(w, apperror.New(apperror.InvalidArgument, "missing required parameter \"id\""))
+				writeGogenError(w, r, apperror.New(apperror.InvalidArgument, "missing required parameter \"id\""))
 				return
 			}
 
@@ -229,17 +233,17 @@ func handleShopServicePatchProduct(svc ShopService) http.HandlerFunc {
 		}
 
 		if err := validatePatchProductRequest(req); err != nil {
-			writeGogenError(w, err)
+			writeGogenError(w, r, err)
 			return
 		}
 
 		resp, err := svc.PatchProduct(ctx, req)
 		if err != nil {
-			writeGogenError(w, err)
+			writeGogenError(w, r, err)
 			return
 		}
 
-		writeGogenProtoJSON(w, http.StatusOK, resp)
+		writeGogenProtoJSON(w, r, http.StatusOK, resp)
 	}
 }
 
@@ -253,7 +257,7 @@ func handleShopServiceDeleteProduct(svc ShopService) http.HandlerFunc {
 		{
 			raw := router.Param(r, "id")
 			if raw == "" {
-				writeGogenError(w, apperror.New(apperror.InvalidArgument, "missing required parameter \"id\""))
+				writeGogenError(w, r, apperror.New(apperror.InvalidArgument, "missing required parameter \"id\""))
 				return
 			}
 
@@ -263,11 +267,11 @@ func handleShopServiceDeleteProduct(svc ShopService) http.HandlerFunc {
 
 		resp, err := svc.DeleteProduct(ctx, req)
 		if err != nil {
-			writeGogenError(w, err)
+			writeGogenError(w, r, err)
 			return
 		}
 
-		writeGogenProtoJSON(w, http.StatusOK, resp)
+		writeGogenProtoJSON(w, r, http.StatusOK, resp)
 	}
 }
 
@@ -287,27 +291,27 @@ func handleShopServiceCheckout(svc ShopService) http.HandlerFunc {
 				msg = "request body too large"
 			}
 
-			writeGogenError(w, apperror.New(apperror.InvalidArgument, msg))
+			writeGogenError(w, r, apperror.New(apperror.InvalidArgument, msg))
 			return
 		}
 
 		if err := protojson.Unmarshal(body, req); err != nil {
-			writeGogenError(w, apperror.New(apperror.InvalidArgument, "invalid JSON body"))
+			writeGogenError(w, r, apperror.New(apperror.InvalidArgument, "invalid JSON body"))
 			return
 		}
 
 		if err := validateCheckoutRequest(req); err != nil {
-			writeGogenError(w, err)
+			writeGogenError(w, r, err)
 			return
 		}
 
 		resp, err := svc.Checkout(ctx, req)
 		if err != nil {
-			writeGogenError(w, err)
+			writeGogenError(w, r, err)
 			return
 		}
 
-		writeGogenProtoJSON(w, http.StatusOK, resp)
+		writeGogenProtoJSON(w, r, http.StatusOK, resp)
 	}
 }
 
@@ -321,7 +325,7 @@ func handleShopServiceGetOrder(svc ShopService) http.HandlerFunc {
 		{
 			raw := router.Param(r, "id")
 			if raw == "" {
-				writeGogenError(w, apperror.New(apperror.InvalidArgument, "missing required parameter \"id\""))
+				writeGogenError(w, r, apperror.New(apperror.InvalidArgument, "missing required parameter \"id\""))
 				return
 			}
 
@@ -331,11 +335,11 @@ func handleShopServiceGetOrder(svc ShopService) http.HandlerFunc {
 
 		resp, err := svc.GetOrder(ctx, req)
 		if err != nil {
-			writeGogenError(w, err)
+			writeGogenError(w, r, err)
 			return
 		}
 
-		writeGogenProtoJSON(w, http.StatusOK, resp)
+		writeGogenProtoJSON(w, r, http.StatusOK, resp)
 	}
 }
 
@@ -353,7 +357,7 @@ func handleShopServiceListOrders(svc ShopService) http.HandlerFunc {
 		if raw := r.URL.Query().Get("limit"); raw != "" {
 			v, err := strconv.ParseInt(raw, 10, 32)
 			if err != nil {
-				writeGogenError(w, apperror.New(apperror.InvalidArgument, "invalid parameter \"limit\""))
+				writeGogenError(w, r, apperror.New(apperror.InvalidArgument, "invalid parameter \"limit\""))
 				return
 			}
 
@@ -363,7 +367,7 @@ func handleShopServiceListOrders(svc ShopService) http.HandlerFunc {
 		{
 			raw := r.URL.Query().Get("user_id")
 			if raw == "" {
-				writeGogenError(w, apperror.New(apperror.InvalidArgument, "missing required parameter \"user_id\""))
+				writeGogenError(w, r, apperror.New(apperror.InvalidArgument, "missing required parameter \"user_id\""))
 				return
 			}
 
@@ -373,11 +377,11 @@ func handleShopServiceListOrders(svc ShopService) http.HandlerFunc {
 
 		resp, err := svc.ListOrders(ctx, req, cursor, limit)
 		if err != nil {
-			writeGogenError(w, err)
+			writeGogenError(w, r, err)
 			return
 		}
 
-		writeGogenProtoJSON(w, http.StatusOK, resp)
+		writeGogenProtoJSON(w, r, http.StatusOK, resp)
 	}
 }
 
@@ -400,21 +404,33 @@ func RegisterShopServiceRoutes(r router.Router, svc ShopService, a auth.Auth, p 
 
 // writeGogenJSON writes v as a plain (non-protobuf) JSON response body with
 // the given status -- used only for the generic error shape below, since an
-// *apperror.Error is not a protobuf message.
-func writeGogenJSON(w http.ResponseWriter, status int, v any) {
+// *apperror.Error is not a protobuf message. The body is encoded before the
+// header is written: a marshal failure (v holds an unmarshalable value) is
+// logged via the request logger and answered with a bare 500 -- once a
+// header is sent no error body can still follow it, and the client must
+// not see the requested status for a response that could not be encoded.
+func writeGogenJSON(w http.ResponseWriter, r *http.Request, status int, v any) {
+	body, err := json.Marshal(v)
+	if err != nil {
+		log.FromContext(r.Context(), noop.New()).Error().Err(err).Msg("encode json response")
+		w.Header().Set("Content-Type", "application/json")
+		w.WriteHeader(http.StatusInternalServerError)
+		return
+	}
+
 	w.Header().Set("Content-Type", "application/json")
 	w.WriteHeader(status)
-	_ = json.NewEncoder(w).Encode(v)
+	_, _ = w.Write(body)
 }
 
 // writeGogenProtoJSON writes msg -- a real protobuf message -- as a
 // protojson-encoded response body with the given status. protojson is
 // protobuf's canonical JSON mapping: field names render in lowerCamelCase
 // (e.g. "userId"), not this backend's earlier plain-struct casing.
-func writeGogenProtoJSON(w http.ResponseWriter, status int, msg proto.Message) {
+func writeGogenProtoJSON(w http.ResponseWriter, r *http.Request, status int, msg proto.Message) {
 	body, err := protojson.Marshal(msg)
 	if err != nil {
-		writeGogenJSON(w, http.StatusInternalServerError, map[string]string{"error": "internal error"})
+		writeGogenJSON(w, r, http.StatusInternalServerError, map[string]string{"error": "internal error"})
 		return
 	}
 
@@ -425,12 +441,12 @@ func writeGogenProtoJSON(w http.ResponseWriter, status int, msg proto.Message) {
 
 // writeGogenError maps err to an HTTP status: an *apperror.Error maps via
 // its Code.HTTPStatus(); any other error maps to 500.
-func writeGogenError(w http.ResponseWriter, err error) {
+func writeGogenError(w http.ResponseWriter, r *http.Request, err error) {
 	var appErr *apperror.Error
 	if errors.As(err, &appErr) {
-		writeGogenJSON(w, appErr.Code().HTTPStatus(), map[string]string{"error": appErr.Message()})
+		writeGogenJSON(w, r, appErr.Code().HTTPStatus(), map[string]string{"error": appErr.Message()})
 		return
 	}
 
-	writeGogenJSON(w, http.StatusInternalServerError, map[string]string{"error": "internal error"})
+	writeGogenJSON(w, r, http.StatusInternalServerError, map[string]string{"error": "internal error"})
 }

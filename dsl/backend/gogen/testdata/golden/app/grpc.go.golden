@@ -6,16 +6,14 @@ package app
 import (
 	"context"
 	"errors"
-
 	"net/mail"
 
 	"google.golang.org/grpc/codes"
 	"google.golang.org/grpc/status"
 
 	"github.com/zenta-dev/zever/core/authz"
-	"github.com/zenta-dev/zever/shared/apperror"
-
 	pb "github.com/zenta-dev/zever/gen"
+	"github.com/zenta-dev/zever/shared/apperror"
 )
 
 // TaskServiceGRPCServer adapts a TaskService implementation to the real pb.TaskServiceServer

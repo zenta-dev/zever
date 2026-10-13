@@ -2,7 +2,6 @@ package gogen
 
 import (
 	"fmt"
-	"sort"
 	"strings"
 )
 
@@ -57,36 +56,19 @@ func renderGRPC(pkg string, data moduleModel) string {
 	b.WriteString(generatedHeader)
 	fmt.Fprintf(&b, "// Package %s holds the generated gRPC server wiring for the %s module.\n", pkg, pkg)
 	fmt.Fprintf(&b, "package %s\n\n", pkg)
-	b.WriteString("import (\n")
-	fmt.Fprintf(&b, "\t%q\n", importContext)
-	fmt.Fprintf(&b, "\t%q\n\n", importErrors)
 
-	if len(validateImports) > 0 {
-		paths := make([]string, 0, len(validateImports))
-		for imp := range validateImports {
-			paths = append(paths, imp)
-		}
-
-		sort.Strings(paths)
-
-		for _, imp := range paths {
-			fmt.Fprintf(&b, "\t%q\n", imp)
-		}
-
-		b.WriteString("\n")
+	imports := map[string]bool{importContext: true, importErrors: true, pkgGRPCCodes: true, pkgGRPCStat: true, pkgApperror: true}
+	for imp := range validateImports {
+		imports[imp] = true
 	}
-
-	fmt.Fprintf(&b, "\t%q\n", pkgGRPCCodes)
-	fmt.Fprintf(&b, "\t%q\n\n", pkgGRPCStat)
-	fmt.Fprintf(&b, "\t%q\n", pkgApperror)
 
 	if anyPolicy {
-		fmt.Fprintf(&b, "\t%q\n", pkgAuthz)
+		imports[pkgAuthz] = true
 	}
 
+	imports[data.PBImportPath] = true
+	writeGroupedImportBlock(&b, imports, map[string]string{data.PBImportPath: data.PBAlias})
 	b.WriteString("\n")
-	fmt.Fprintf(&b, "\t%s %q\n", data.PBAlias, data.PBImportPath)
-	b.WriteString(")\n\n")
 	b.WriteString(body.String())
 	b.WriteString(grpcHelpers)
 
