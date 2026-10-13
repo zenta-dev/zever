@@ -33,7 +33,7 @@ func TestRemoteStatusIs(t *testing.T) {
 	}))
 	t.Cleanup(srv.Close)
 
-	a, err := New(i18n.Options{Remote: i18n.RemoteOptions{Endpoint: srv.URL, AllowInsecure: true}})
+	a, err := New(i18n.Options{Remote: i18n.RemoteOptions{Endpoint: srv.URL, AllowInsecure: true, AllowPrivate: true}})
 	if err != nil {
 		t.Fatalf("New() error = %v", err)
 	}

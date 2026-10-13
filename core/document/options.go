@@ -38,6 +38,11 @@ type Options struct {
 	Endpoint string `json:"endpoint" toml:"endpoint" yaml:"endpoint"`
 	// AllowInsecure permits http Endpoint for testing. Default false (https only).
 	AllowInsecure bool `json:"allow_insecure" toml:"allow_insecure" yaml:"allow_insecure"`
+	// AllowPrivate permits dialing private, loopback, and link-local
+	// addresses (required for a local rendering sidecar Endpoint). Default
+	// false: only globally routable addresses are dialed, redirects are
+	// never followed, and the adapter logs a line at open when enabled.
+	AllowPrivate bool `json:"allow_private" toml:"allow_private" yaml:"allow_private"`
 	// APIKey holds the remote API key. It is never logged.
 	APIKey string `json:"api_key" toml:"api_key" yaml:"api_key" zever:"secret"`
 	// LatexCommand holds the LaTeX compiler command.

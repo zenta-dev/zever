@@ -114,7 +114,9 @@
         "api_key": { "type": "string" },
         "model": { "type": "string" },
         "base_url": { "type": "string", "description": "Must be a valid https URL when set." },
-        "allow_insecure": { "type": "boolean", "description": "Permit an http base_url and disable TLS verification for loopback test servers. Default false." },
+        "allow_insecure": { "type": "boolean", "description": "Permit an http base_url for testing. Default false (https only)." },
+        "allow_private": { "type": "boolean", "description": "Permit dialing private, loopback, and link-local addresses. Default false." },
+        "insecure_skip_verify": { "type": "boolean", "description": "Disable TLS certificate verification for self-signed test servers. Default false." },
         "timeout": { "$ref": "#/$defs/durationNs" }
       }
     },
@@ -237,6 +239,7 @@
         "dpi": { "type": "integer", "minimum": 0 },
         "endpoint": { "type": "string" },
         "allow_insecure": { "type": "boolean", "description": "Permit an http endpoint for testing. Default false (https only)." },
+        "allow_private": { "type": "boolean", "description": "Permit dialing private, loopback, and link-local addresses. Default false." },
         "api_key": { "type": "string" },
         "latex_command": { "type": "string", "description": "Default: pdflatex." },
         "latex_pdf_to_ppm": { "type": "string", "description": "Default: pdftoppm." },
@@ -284,6 +287,7 @@
         "path": { "type": "string", "description": "JSON file for the static adapter." },
         "max_response_body": { "type": "integer", "minimum": 0 },
         "allow_insecure": { "type": "boolean" },
+        "allow_private": { "type": "boolean", "description": "Permit dialing private, loopback, and link-local addresses. Default false." },
         "user_agent": { "type": "string", "description": "Required for the osm adapter." }
       }
     },
@@ -305,7 +309,8 @@
             "api_key": { "type": "string" },
             "timeout": { "$ref": "#/$defs/durationNs" },
             "max_in_flight": { "type": "integer", "minimum": 0, "description": "Zero means adapter default (1000)." },
-            "allow_insecure": { "type": "boolean" }
+            "allow_insecure": { "type": "boolean" },
+            "allow_private": { "type": "boolean", "description": "Permit dialing private, loopback, and link-local addresses. Default false." }
           }
         }
       }

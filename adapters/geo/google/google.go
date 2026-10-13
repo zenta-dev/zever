@@ -4,6 +4,7 @@ import (
 	"context"
 	"errors"
 	"fmt"
+	"log/slog"
 
 	gmaps "googlemaps.github.io/maps"
 
@@ -33,7 +34,11 @@ func New(opts geo.Options) (geo.Geo, error) {
 	var clientOpts []gmaps.ClientOption
 
 	clientOpts = append(clientOpts, gmaps.WithAPIKey(opts.APIKey))
-	clientOpts = append(clientOpts, gmaps.WithHTTPClient(httpclient.NewClient(opts.Timeout)))
+	clientOpts = append(clientOpts, gmaps.WithHTTPClient(httpclient.NewSafeClient(opts.Timeout, opts.AllowPrivate)))
+
+	if opts.AllowPrivate {
+		slog.Default().Info("google: allow_private enabled: private, loopback, and link-local addresses can be dialed")
+	}
 
 	if opts.BaseURL != "" {
 		clientOpts = append(clientOpts, gmaps.WithBaseURL(opts.BaseURL))

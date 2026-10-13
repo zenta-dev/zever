@@ -56,7 +56,7 @@ func benchGeo(b *testing.B) *osmGeo {
 	}))
 	b.Cleanup(srv.Close)
 
-	g, err := New(geo.Options{Endpoint: srv.URL, UserAgent: "bench/1.0", AllowInsecure: true})
+	g, err := New(geo.Options{Endpoint: srv.URL, UserAgent: "bench/1.0", AllowInsecure: true, AllowPrivate: true})
 	if err != nil {
 		b.Fatalf("New() error = %v", err)
 	}

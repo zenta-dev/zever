@@ -78,11 +78,15 @@ func New(opts notification.Options) (notification.Notifier, error) {
 	if timeout == 0 {
 		timeout = notification.DefaultTimeout
 	}
+	// The Twilio API host is fixed and public: the dial guard stays strict
+	// (private addresses refused) and redirects are never followed.
+	safe := httpclient.NewSafeClient(timeout, false)
 	base := &twilioclient.Client{
 		Credentials: twilioclient.NewCredentials(tw.AccountSID, tw.AuthToken),
 		HTTPClient: &http.Client{
-			Timeout:   timeout,
-			Transport: &limitedTransport{base: httpclient.NewClient(timeout).Transport},
+			Timeout:       timeout,
+			Transport:     &limitedTransport{base: safe.Transport},
+			CheckRedirect: safe.CheckRedirect,
 		},
 	}
 	base.SetAccountSid(tw.AccountSID)

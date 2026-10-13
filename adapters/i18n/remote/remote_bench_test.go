@@ -56,7 +56,7 @@ func benchRemote(b *testing.B) i18n.I18n {
 	srv := httptest.NewServer(mux)
 	b.Cleanup(srv.Close)
 
-	ad, err := remote.New(i18n.Options{Remote: i18n.RemoteOptions{Endpoint: srv.URL, AllowInsecure: true}})
+	ad, err := remote.New(i18n.Options{Remote: i18n.RemoteOptions{Endpoint: srv.URL, AllowInsecure: true, AllowPrivate: true}})
 	if err != nil {
 		b.Fatalf("New() error = %v", err)
 	}

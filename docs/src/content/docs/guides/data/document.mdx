@@ -11,7 +11,7 @@ import { LinkCard, CardGrid } from '@astrojs/starlight/components';
 
 - `local` (default, `adapters/document/local`) renders HTML in headless Chrome.
 - `latex` shells out to a fixed, configured compiler; use it for `.tex` sources.
-- `remote` sends the job to a rendering API over HTTP. It needs `endpoint` (https, or http with `allow_insecure: true`); a non-empty `api_key` is sent as a bearer token.
+- `remote` sends the job to a rendering API over HTTP. It needs `endpoint` (https, or http with `allow_insecure: true`); a non-empty `api_key` is sent as a bearer token. Outbound requests dial only globally routable addresses and never follow redirects; a local rendering sidecar needs `allow_private: true`, which logs a line at startup.
 
 ```yaml title="zever.yaml"
 document:

@@ -4,6 +4,7 @@ import (
 	"context"
 	"errors"
 	"fmt"
+	"log/slog"
 	"net/http"
 	"strings"
 	"time"
@@ -39,14 +40,13 @@ func New(opts ai.Options) (ai.AI, error) {
 		return nil, ai.InvalidOptionsError{Reason: "api_key is required"}
 	}
 
-	httpClient := newHTTPClient(opts.Timeout)
+	httpClient := newHTTPClient(opts.Timeout, opts.AllowPrivate, opts.InsecureSkipVerify)
 
-	// TLS verification is skipped only on explicit opt-in (AllowInsecure).
-	// Loopback BaseURLs no longer auto-disable verification.
-	if opts.AllowInsecure {
-		if tr, ok := httpClient.Transport.(*http.Transport); ok && tr.TLSClientConfig != nil {
-			tr.TLSClientConfig.InsecureSkipVerify = true //nolint:gosec // explicit opt-in for test servers
-		}
+	if opts.AllowPrivate {
+		slog.Default().Info("gemini: allow_private enabled: private, loopback, and link-local addresses can be dialed")
+	}
+	if opts.InsecureSkipVerify {
+		slog.Default().Warn("gemini: insecure_skip_verify enabled: TLS certificate verification is off; use only for testing")
 	}
 
 	cc := &genai.ClientConfig{
@@ -66,8 +66,12 @@ func New(opts ai.Options) (ai.AI, error) {
 	return &adapter{client: client, apiKey: opts.APIKey}, nil
 }
 
-func newHTTPClient(timeout time.Duration) *http.Client {
-	return httpclient.NewClient(timeout)
+func newHTTPClient(timeout time.Duration, allowPrivate, insecureSkipVerify bool) *http.Client {
+	clientOpts := []httpclient.Option{}
+	if insecureSkipVerify {
+		clientOpts = append(clientOpts, httpclient.WithInsecureSkipVerify(true))
+	}
+	return httpclient.NewSafeClient(timeout, allowPrivate, clientOpts...)
 }
 
 // Generate implements ai.AI.

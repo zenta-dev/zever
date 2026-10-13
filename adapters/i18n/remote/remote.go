@@ -8,6 +8,7 @@ import (
 	"errors"
 	"fmt"
 	"io"
+	"log/slog"
 	"net/http"
 	"sort"
 	"strings"
@@ -94,6 +95,9 @@ func New(opts i18n.Options) (i18n.I18n, error) {
 	if maxFlight <= 0 {
 		maxFlight = maxInFlightDef
 	}
+	if opts.Remote.AllowPrivate {
+		slog.Default().Info("remote: allow_private enabled: private, loopback, and link-local addresses can be dialed")
+	}
 	return &adapter{
 		quit:      make(chan struct{}),
 		cache:     lrucache.NewTTL[string, cacheValue](maxCacheEntries, posTTL),
@@ -103,7 +107,7 @@ func New(opts i18n.Options) (i18n.I18n, error) {
 		maxFlight: maxFlight,
 		endpoint:  endpoint,
 		apiKey:    opts.Remote.APIKey,
-		client:    httpclient.NewClient(timeout),
+		client:    httpclient.NewSafeClient(timeout, opts.Remote.AllowPrivate),
 	}, nil
 }
 

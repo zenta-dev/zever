@@ -5,6 +5,7 @@ import (
 	"context"
 	"errors"
 	"fmt"
+	"log/slog"
 	"math"
 	"net/http"
 	"net/url"
@@ -76,10 +77,14 @@ func New(opts geo.Options) (geo.Geo, error) {
 		timeout = defaultTimeout
 	}
 
+	if opts.AllowPrivate {
+		slog.Default().Info("osm: allow_private enabled: private, loopback, and link-local addresses can be dialed")
+	}
+
 	return &osmGeo{
 		endpoint:    endpoint,
 		baseURL:     u,
-		client:      httpclient.NewClient(timeout),
+		client:      httpclient.NewSafeClient(timeout, opts.AllowPrivate),
 		userAgent:   opts.UserAgent,
 		maxBody:     maxBody,
 		minInterval: defaultMinRequestInterval,
