@@ -29,6 +29,13 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Fixed
 
+- `fix(orm): escape single quotes in sqlite JSON path key literals`:
+  `sqlitePathLiteral` now doubles embedded `'` in the rendered `$`-rooted
+  path body before wrapping it in the SQL string literal, so a json key
+  containing a quote (e.g. `a'b`) can no longer terminate the literal
+  early; previously such a key produced malformed SQL, and a `''`
+  sequence inside the key was silently truncated to `'`. The postgres
+  `pgArrayEscape` path was already correct (quotes doubled).
 - `fix(document/latex): restrict file access and scrub environment`: LaTeX
   renders run in a per-render temp dir as `cwd` with `-no-shell-escape` and
   a minimal env allowlist (`PATH`, `HOME`, `TEXMF*` only — no inherited
@@ -60,6 +67,15 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Bump the pinned `golangci-lint` from `v2.13.2` to `v2.14.0` (the old
   linter cannot read `go1.27.2` export data); the CI binary cache is now
   keyed on `go.work` so future toolchain bumps rebuild it.
+
+### Tests
+
+- `test(orm): fuzz JSON path key escaping`: native Go fuzz targets
+  `FuzzSQLiteJSONPathKey` and `FuzzPostgresJSONPathKey` prove
+  `sqlitePathLiteral` and `pgPathArray` never emit an unescaped
+  string-literal terminator for arbitrary json path keys (quotes,
+  backslashes, NUL, unicode, `}`/`,`/`{`), with seed corpus under
+  `orm/render/testdata/fuzz`.
 
 ### Changed
 
