@@ -189,6 +189,7 @@ export default defineConfig({
             { label: "Quickstart", link: "start/quickstart" },
             { label: "Installation", link: "start/installation" },
             { label: "Project layout", link: "start/project-layout" },
+            { label: "Versioning", link: "start/versioning" },
           ],
         },
         {
