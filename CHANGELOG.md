@@ -82,6 +82,14 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   (minus the child query's own arguments), so old-SQLite backends get
   fitting statements instead of driver errors; the 1000 default stands on
   modern backends.
+- `docs: recommend stdhttp as the default router`: the routing guide now
+  recommends `stdhttp` (already the `zever new` default) with measured
+  numbers, and the benchmarks page gains a 2026-10-14 re-measurement:
+  fiber `ServeHTTP` costs ~46 allocs/op (isolated adaptor wrapping ~35,
+  concurrent ~55) against ~17 for a `stdhttp` param route (~10 static).
+  The older "45–55 allocs/op adaptor cost" note is corrected: the
+  `newHTTPHandler` rework cut the isolated adaptor to 35; 45–55 still
+  brackets the full serve path.
 - `feat(auth/jwt): kid-based key rotation and nbf validation`: `JWTOptions`
   gains `keys: [{kid, secret}]` plus `active_kid` (empty defaults to the
   first entry; validated for unique kids, secret length, and a matching

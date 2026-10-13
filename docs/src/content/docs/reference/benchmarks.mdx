@@ -37,6 +37,31 @@ Router (`adapters/router/fiber`, sequential vs concurrent `ServeHTTP`). `ServeHT
 
 The pool removes the recorder's struct/map/buffer allocations from the hot path: `ServeHTTP` drops 5 allocs/op and ~576 B/op. `BenchmarkServeHTTPAdaptor` shows the adaptor wrapping alone costs ~45 allocs/op (the pooled recorder is 3 of them).
 
+### Router re-measurement (2026-10-14) and stdhttp default
+
+Re-ran the fiber benches on the same machine class after the `newHTTPHandler` rework (which mirrors `gofiber/adaptor.FiberApp` while skipping its unconditional body buffering and `RemoteAddr` resolution), plus the `stdhttp` benches for comparison. Medians of 3 runs, `-benchtime 1s`:
+
+| Benchmark | ns/op (cpu=1) | B/op | allocs/op |
+| --- | --- | --- | --- |
+| fiber `BenchmarkServeHTTP` | ~5,300 | ~4,700 | 46 |
+| fiber `BenchmarkServeHTTPAdaptor` (no-op handler) | ~3,700 | ~4,080 | 35 |
+| fiber `BenchmarkServeHTTPParallel` | ~8,200 / ~4,800 (cpu=4) | ~9,800 | 55 |
+| stdhttp `BenchmarkServeHTTPParam` | ~1,900 / ~1,500 (cpu=4) | 2,072 | 17 |
+| stdhttp `BenchmarkServeHTTPStatic` | ~1,100 / ~970 (cpu=4) | 1,010 | 10 |
+| stdhttp `BenchmarkServeHTTPParallel` | ~4,100 / ~3,100 (cpu=4) | ~7,190 | 26 |
+
+Takeaways:
+
+- `stdhttp` is the recommended default router (and the `zever new` scaffold default): the param path costs 17 allocs/op against fiber's 46 (~2.7x fewer), and is ~3x faster per request on this machine. The gap is the `fasthttpadaptor` net/http conversion plus header/status/body merge-back, which every fiber request pays regardless of handler logic.
+- The older "45–55 allocs/op adaptor cost" note above is stale for the isolated adaptor: it now measures 35 allocs/op. The 45–55 range still brackets the full fiber `ServeHTTP` (46) through concurrent (55) paths.
+
+Reproduce:
+
+```sh
+go test -run=NONE -bench='BenchmarkServeHTTP$|BenchmarkServeHTTPAdaptor|BenchmarkServeHTTPParallel' -benchtime=1s -cpu=1,4 -benchmem ./adapters/router/fiber/
+go test -run=NONE -bench='BenchmarkServeHTTPParam|BenchmarkServeHTTPStatic|BenchmarkServeHTTPParallel' -benchtime=1s -cpu=1,4 -benchmem ./adapters/router/stdhttp/
+```
+
 ORM render (`orm`, sqlite `:memory:`). `escapeLike` and `flattenGroupTerms` were hoisted to a package-level replacer / a lazy dedup (linear scan for few leaves, map for many). "before" is the per-call `strings.NewReplacer` / always-map path.
 
 | Benchmark | ns/op | B/op | allocs/op |
