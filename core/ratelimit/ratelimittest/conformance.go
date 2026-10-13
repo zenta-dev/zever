@@ -118,7 +118,7 @@ func checkAllowDeny(ctx context.Context, l ratelimit.Limiter) error {
 	}
 
 	if denied.Remaining < 0 {
-		return fmt.Errorf("ratelimittest: Remaining = %v, want >= 0", denied.Remaining) //nolint:staticcheck // kit output mirrors the Remaining field name.
+		return fmt.Errorf("ratelimittest: Remaining = %v, want >= 0", denied.Remaining) // kit output mirrors the Remaining field name.
 	}
 
 	// A different key gets its own bucket.

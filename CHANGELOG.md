@@ -100,7 +100,31 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   proto shape are unchanged, so this is not wire-breaking; Go implementers
   must update `cursor string` parameters (and `string` cursor variables) to
   `Cursor`, converting from protobuf `next_cursor` strings where they cross
-  the boundary.
+   the boundary.
+- `feat(payment): dedupe webhook events by id`: the stripe and paddle
+  adapters accept the existing optional `payment.Options.Idempotency`
+  store for webhook replay protection (previously refund-only). After
+  signature verification, the provider event id (Stripe event `id`,
+  Paddle `event_id`, now surfaced as `payment.Event.ID`) is reserved
+  with a payload-fingerprint guard and a 24h TTL
+  (`DefaultWebhookIdempotencyTTL`); a repeat delivery fails with the new
+  typed `DuplicateEventError` (sentinel `ErrDuplicateEvent`) instead of
+  re-executing downstream work, and a same-id/different-payload delivery
+  trips the store fingerprint mismatch fail-closed. No store (or an
+  event without an id) keeps the old process-every-delivery behavior.
+  `container.Payment()` reuses the resolved `c.Idempotency()` service
+  best-effort when no explicit store is configured; an unresolvable
+  idempotency service never blocks payment resolution.
+- `feat(middleware): trusted-proxy aware rate limit key`: new
+  `middleware.ClientIPKey(trusted []netip.Prefix)` honors
+  `X-Forwarded-For` only when the peer is trusted, keying on the
+  rightmost untrusted entry (spoofed headers from untrusted peers are
+  ignored; all-trusted chains fall back to the leftmost client).
+  `ratelimit.Options` gains `trusted_proxies` (CIDRs or bare IPs,
+  validated by `ratelimit.ParseTrustedProxies`, mirrored as
+  `middleware.ParseTrustedProxies` and in the config JSON schema); the
+  generated server builds the key from it and keeps `RemoteAddrKey`
+   when none are configured. `RemoteAddrKey` itself is unchanged.
 - `feat(orm): auto-chunk large IN lists`: a value-list `IN` larger than
   the resolved dialect's per-statement parameter budget now fans out into
   one statement per chunk for plain unordered unbounded `SELECT`s (rows
@@ -166,6 +190,17 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   fail the gate unless `## [Unreleased]` carries a `**Breaking:**` line.
   The gate already caught two real breaks on adoption (`auth.JWTOptions` /
   `auth.Options` comparability, documented above).
+- `feat(config): fail fast on unknown adapters with did-you-mean`: new
+  `config.ValidateAdapters(registered)` checks every service's adapter
+  against the process's registrations and joins `UnknownAdapterError`s
+  carrying a "did you mean %q?" hint (sourced from `config.closest`). Every
+  `core/<battery>` gains `RegisteredAdapters()` over its factory registry
+  (new `registry.Names`/`SortedNames` seams), the container gains
+  `RegisteredAdapters(service)` plus `(c).ValidateAdapters()`, and
+  `zever doctor` — CLI and generated-server `--doctor` alike — reports an
+  `adapters` row before resolving, turning a forgotten import or typo into
+  one actionable error. `ParseAdapter` stays permissive for custom adapters;
+  typed `Adapter` constants are unchanged.
 - `docs: test your zever app guide`: new `guides/operate/testing-your-app`
   page — per-test container from `config.Default()` with `t.Cleanup` close,
   httptest routes, per-test sqlite files under `t.TempDir()`, the `dbtest`
@@ -359,6 +394,27 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   the second was skipped. The `unsafe` import is gone, and the 33-entry
   `snapshots()` copy-paste collapsed into a generic `snap` helper over a
   method-value table.
+- `chore(lint): wrapcheck evaluation, errscan missing-%w, nolintlint, any`:
+  `wrapcheck` was trial-enabled over `container` and `core/cache` (9 and 7
+  hits, all registry `Register`/`Lookup` passthroughs, `Close`-probe returns,
+  and test helpers): enabling it would relitigate the registry-passthrough
+  convention in every battery, so it stays off and the existing
+  `.golangci.yml` comment records why. `tools/errscan` gains a `missing-%w`
+  rule flagging `fmt.Errorf` without `%w` that still takes a bare `err`
+  argument (conservative: `err.Error()` and other names are out of scope);
+  the repo scans clean.   `nolintlint` is now enabled so stale suppressions
+  fail the build, and the 123 unused directives it reported (mostly
+  `nolint:gosec` on `os.ReadFile`/`os.WriteFile` already covered by the
+  `std-error-handling` exclusion preset, plus stale `unparam`/`dupl`/
+  `nilerr`/`unused`/`revive`/`tparallel`/`exhaustive`/`forcetypeassert`/
+  `errcheck`/`contextcheck`/`staticcheck`/`nilnil`/`spancheck`) are removed.
+  One survivor needed care: `adapters/media/local` `MkdirAll` tripped gosec
+  G703 taint analysis once its directive was lifted (the sink is safe —
+  `filepath.Ext` yields no separators), so it now carries a gosec-native
+  `#nosec G703` pin like the one in `tools/errscan`, which both linters
+  accept stably. Remaining `interface{}` spellings outside
+  generated protobuf code become `any` (the `twilio` test fake keeps
+  `interface{}` to match the upstream `twilioclient.BaseClient` signature).
 
 ### Added
 

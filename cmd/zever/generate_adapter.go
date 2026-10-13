@@ -15,8 +15,6 @@ import (
 //
 // The wording is deliberately blunt about the ceiling: this command writes
 // boilerplate, not an integration.
-//
-//nolint:unused
 var adapterUsageBody = `Scaffolds <battery>/<name>/{<name>.go,options.go}: a compiling stub adapter
 for an existing zever battery interface, wired up the way every hand-written
 adapter in this repo is — one method per interface method plus an exported
@@ -53,8 +51,6 @@ Flags:`
 
 // coverageSeam: prompt indirection for tests. Proof: huh requires a real TTY;
 // var seams keep behavior identical while enabling success/error coverage.
-//
-//nolint:dupl
 var (
 	promptSelectForAdapter  = promptSelect
 	promptInputForAdapter   = promptInput
@@ -1325,7 +1321,7 @@ type GenerateAdapterResult struct {
 // half-scaffolded package behind. It performs no flag parsing and no
 // prompting.
 //
-//nolint:unparam // result kept for callers/tests; user output goes to cfg Stdout/Stderr writers.
+// result kept for callers/tests; user output goes to cfg Stdout/Stderr writers.
 func GenerateAdapter(cfg GenerateAdapterConfig) (GenerateAdapterResult, error) {
 	const tag = "zever generate adapter"
 

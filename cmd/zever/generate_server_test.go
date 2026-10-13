@@ -57,7 +57,7 @@ func validateGoSyntax(t *testing.T, filename string, content []byte) {
 func readGenerated(t *testing.T, path string) string {
 	t.Helper()
 
-	data, err := os.ReadFile(path) //nolint:gosec // test fixture path
+	data, err := os.ReadFile(path) // test fixture path
 	if err != nil {
 		t.Fatalf("expected a scaffold at %q: %v", path, err)
 	}
@@ -659,7 +659,10 @@ func TestRunGenerateServerWiresRateLimitWhenConfigured(t *testing.T) {
 		"limiter, err := c.RateLimit()",
 		"reloadableLimiter := container.NewReloadableLimiter(limiter)",
 		"middleware.RateLimitUnaryServerInterceptor(limiter, middleware.PeerAddrKey)",
-		"r.Use(middleware.RateLimit(limiter, middleware.RemoteAddrKey))",
+		"middleware.ParseTrustedProxies(serverCfg.RateLimit.Options.TrustedProxies)",
+		"rateLimitKey := middleware.RemoteAddrKey",
+		"rateLimitKey = middleware.ClientIPKey(trustedProxies)",
+		"r.Use(middleware.RateLimit(limiter, rateLimitKey))",
 	} {
 		if !strings.Contains(main, fragment) {
 			t.Fatalf("server main.go lacks %q with a configured rate limit:\n%s", fragment, main)

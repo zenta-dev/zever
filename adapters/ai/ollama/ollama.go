@@ -108,7 +108,7 @@ func NewWithOptions(opts Options) (ai.AI, error) {
 				tr.TLSClientConfig = &tls.Config{}
 			}
 
-			tr.TLSClientConfig.InsecureSkipVerify = true //nolint:gosec // explicit opt-in for test servers
+			tr.TLSClientConfig.InsecureSkipVerify = true // explicit opt-in for test servers
 		}
 	}
 

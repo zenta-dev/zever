@@ -22,8 +22,6 @@ project's internal/app across the module boundary.`
 
 // coverageSeam: prompt indirection for tests. Proof: huh requires a real TTY;
 // var seams keep behavior identical while enabling success/error coverage.
-//
-//nolint:dupl
 var (
 	promptInputForTinkerGen   = promptInput
 	promptConfirmForTinkerGen = promptConfirm

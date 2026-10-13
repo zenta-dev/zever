@@ -8,7 +8,6 @@ import "github.com/zenta-dev/zever/dsl/diag"
 type ScalarType int
 
 const (
-	//nolint:revive
 	TUUID ScalarType = iota
 	TString
 	TInt32
@@ -43,7 +42,6 @@ type FieldType struct {
 type ErrorCode int
 
 const (
-	//nolint:revive
 	ECancelled ErrorCode = iota + 1
 	EUnknown
 	EInvalidArgument

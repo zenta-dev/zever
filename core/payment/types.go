@@ -66,6 +66,10 @@ type Result struct {
 
 // Event represents an incoming webhook event.
 type Event struct {
+	// ID is the provider-assigned event identifier (Stripe event id,
+	// Paddle event_id). Empty when the provider sent none; adapters skip
+	// replay dedupe for such events.
+	ID string
 	// Type is the provider-defined webhook event type.
 	Type EventType
 	// Object is the payment the webhook event describes.

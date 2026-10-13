@@ -351,7 +351,7 @@ after you've started implementing a service is always safe. Requires the
 schema to have already been compiled with the gogen backend (zever compile
 --backend gogen) into the same --out directory.`
 
-func printServerUsage(fs *flag.FlagSet) { //nolint:dupl
+func printServerUsage(fs *flag.FlagSet) {
 	header := title("zever generate server") + dim(" — scaffold HTTP server")
 	usage := bold("Usage:") + "  " + cmd("zever generate server") + dim(" [--force] [--out DIR] [files...]") + dim("  •  -i/--interactive for guided prompts")
 
@@ -1168,6 +1168,7 @@ func runDoctor() error {
 
 	checks := map[string]func() error{
 		"config":        cfg.Validate,
+		"adapters":      c.ValidateAdapters,
 		"ai":            func() error { _, err := c.AI(); return err },
 		"analytics":     func() error { _, err := c.Analytics(); return err },
 		"auth":          func() error { _, err := c.Auth(); return err },
@@ -1207,7 +1208,7 @@ func runDoctor() error {
 
 	names := make([]string, 0, len(checks))
 	for name := range checks {
-		if name == "config" || enabled == nil || enabled[name] {
+		if name == "config" || name == "adapters" || enabled == nil || enabled[name] {
 			names = append(names, name)
 		}
 	}
@@ -1331,6 +1332,21 @@ func run(addr, grpcAddr string) error {
 	if err != nil {
 		return err
 	}
+	serverCfg, err := app.Config()
+	if err != nil {
+		return err
+	}
+	trustedProxies, err := middleware.ParseTrustedProxies(serverCfg.RateLimit.Options.TrustedProxies)
+	if err != nil {
+		return err
+	}
+	// Without trusted proxies the key stays the peer address: honoring
+	// X-Forwarded-For from an untrusted peer would let any client pick
+	// its own rate-limit bucket.
+	rateLimitKey := middleware.RemoteAddrKey
+	if len(trustedProxies) > 0 {
+		rateLimitKey = middleware.ClientIPKey(trustedProxies)
+	}
 
 	reloadableLimiter := container.NewReloadableLimiter(limiter)
 	limiter = reloadableLimiter
@@ -1445,7 +1461,7 @@ func run(addr, grpcAddr string) error {
 
 	r.Use(middleware.Recover(logger), middleware.RequestLogger(logger), middleware.Tracing(obs), middleware.SecurityHeaders(securityHeadersOpts))
 {{if .RateLimitEnabled}}
-	r.Use(middleware.RateLimit(limiter, middleware.RemoteAddrKey))
+	r.Use(middleware.RateLimit(limiter, rateLimitKey))
 {{end}}
 	// Resolve the db once at boot so a broken DSN fails fast with a clear
 	// error instead of surfacing as a 503 on the first readiness probe.

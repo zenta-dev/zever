@@ -47,7 +47,7 @@ func New(opts geo.Options) (geo.Geo, error) {
 		}
 	}
 
-	data, err := os.ReadFile(cleaned) //nolint:gosec // G304: path is configuration value, not user input
+	data, err := os.ReadFile(cleaned) // G304: path is configuration value, not user input
 	if err != nil {
 		return nil, fmt.Errorf("static: read cities: %w", err)
 	}

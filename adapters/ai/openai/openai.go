@@ -1,4 +1,3 @@
-//nolint:dupl
 package openai
 
 import (
@@ -341,8 +340,6 @@ func (a *adapter) Stream(ctx context.Context, model string, messages []ai.Messag
 func (a *adapter) Close() error {
 	return nil
 }
-
-//nolint:dupl
 
 func buildMessages(messages []ai.Message) []openai.ChatCompletionMessageParamUnion {
 	msgs := make([]openai.ChatCompletionMessageParamUnion, len(messages))

@@ -15,8 +15,6 @@ with an empty parameter list; add parameters by editing the .zen file.`
 
 // coverageSeam: prompt indirection for tests. Proof: huh requires a real TTY;
 // var seams keep behavior identical while enabling success/error coverage.
-//
-//nolint:dupl
 var (
 	promptSelectForJob = promptSelect
 	promptInputForJob  = promptInput

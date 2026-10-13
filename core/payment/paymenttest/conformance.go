@@ -168,7 +168,7 @@ func checkRefund(ctx context.Context, p payment.Payment) error {
 	}
 
 	if got.Status != payment.PaymentPartiallyRefunded {
-		return fmt.Errorf("paymenttest: Status = %q, want partially_refunded after partial refund", got.Status) //nolint:staticcheck // kit output mirrors the Status field name.
+		return fmt.Errorf("paymenttest: Status = %q, want partially_refunded after partial refund", got.Status) // kit output mirrors the Status field name.
 	}
 
 	if err = p.Refund(ctx, res.ID, 600, "kit-refund-02"); err != nil {
@@ -181,7 +181,7 @@ func checkRefund(ctx context.Context, p payment.Payment) error {
 	}
 
 	if got.Status != payment.PaymentRefunded {
-		return fmt.Errorf("paymenttest: Status = %q, want refunded after full refund", got.Status) //nolint:staticcheck // kit output mirrors the Status field name.
+		return fmt.Errorf("paymenttest: Status = %q, want refunded after full refund", got.Status) // kit output mirrors the Status field name.
 	}
 
 	return nil

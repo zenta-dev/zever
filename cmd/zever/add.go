@@ -659,7 +659,7 @@ func addBatteryToProject(tag, battery, adapter string, force, dryRun bool) error
 
 	appPath := filepath.Join("internal", "app", "app.go")
 
-	appSrc, err := os.ReadFile(appPath) //nolint:gosec // project-owned scaffold path
+	appSrc, err := os.ReadFile(appPath) // project-owned scaffold path
 	if err != nil {
 		return fmt.Errorf("%s: read %q: %w (scaffold it with `zever generate server` first)", tag, appPath, err)
 	}
@@ -744,7 +744,7 @@ func addPluginToProject(tag, plugin, adapter, modulePath, version string, force,
 
 	appPath := filepath.Join("internal", "app", "app.go")
 
-	appSrc, err := os.ReadFile(appPath) //nolint:gosec // project-owned scaffold path
+	appSrc, err := os.ReadFile(appPath) // project-owned scaffold path
 	if err != nil {
 		return fmt.Errorf("%s: read %q: %w (scaffold it with `zever generate server` first)", tag, appPath, err)
 	}

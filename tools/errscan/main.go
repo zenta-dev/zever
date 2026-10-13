@@ -9,6 +9,10 @@
 //     (outside shared/apperror, which emits "[CODE]" messages).
 //   - double-%w: two or more "%w" verbs in a single fmt.Errorf format
 //     string; use errors.Join to combine a sentinel with a cause.
+//   - missing-%w: fmt.Errorf with no "%w" verb that still takes an `err`
+//     identifier as an argument; wrap the cause with %w (or join it)
+//     instead of formatting it with %v/%s. Conservative: only a bare
+//     `err` identifier counts, not err.Error() calls or other names.
 //   - panic: panic(...) outside dsl/backend/gogen/render_validate.go and
 //     _test.go files.
 //
@@ -241,4 +245,20 @@ func checkCall(call *ast.CallExpr, isErrorf, isTest, isApperror bool, add func(s
 	if isErrorf && strings.Count(val, "%w") >= 2 {
 		add("double-%w", line, "fmt.Errorf %q wraps multiple errors; use errors.Join", val)
 	}
+	if isErrorf && !strings.Contains(val, "%w") && hasErrArg(call) {
+		add("missing-%w", line, "fmt.Errorf %q passes err without %%w; wrap with %%w or use errors.Join", val)
+	}
+}
+
+// hasErrArg reports whether any argument after the format string is a bare
+// `err` identifier. Method calls like err.Error() and other names are
+// deliberately out of scope: only the canonical name is cheap to pin
+// without type information.
+func hasErrArg(call *ast.CallExpr) bool {
+	for _, arg := range call.Args[1:] {
+		if ident, ok := arg.(*ast.Ident); ok && ident.Name == "err" {
+			return true
+		}
+	}
+	return false
 }

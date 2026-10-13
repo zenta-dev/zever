@@ -37,7 +37,7 @@ func readZenModule(tag, module string) (path string, src []byte, file *ast.File,
 
 	candidates := []string{moduleZenPath(module), filepath.Join("internal", module, module+".zen")}
 	for _, p := range candidates {
-		data, rerr := os.ReadFile(p) //nolint:gosec // path is derived from a developer-supplied module name
+		data, rerr := os.ReadFile(p) // path is derived from a developer-supplied module name
 		if rerr != nil {
 			continue
 		}
@@ -111,7 +111,7 @@ func declNameTaken(file *ast.File, name string) (kind string, taken bool) {
 // Module identity is dir-derived (no module { } wrapper in the source), so
 // this simply appends decl at EOF.
 func appendDeclBeforeClosingBrace(path, _, decl string) error {
-	src, err := os.ReadFile(path) //nolint:gosec // path is derived from a developer-supplied module name
+	src, err := os.ReadFile(path) // path is derived from a developer-supplied module name
 	if err != nil {
 		return fmt.Errorf("zever: read %q: %w", path, err)
 	}
@@ -167,7 +167,7 @@ func writeAtomically(path string, content []byte) error {
 	tmpPath := tmp.Name()
 
 	defer func() {
-		_ = os.Remove(tmpPath) //nolint:gosec // os.CreateTemp's own name, inside path's directory
+		_ = os.Remove(tmpPath) // os.CreateTemp's own name, inside path's directory
 	}()
 
 	if _, err := tmp.Write(content); err != nil {
@@ -180,11 +180,11 @@ func writeAtomically(path string, content []byte) error {
 		return fmt.Errorf("zever: close %q: %w", tmpPath, err)
 	}
 
-	if err := os.Chmod(tmpPath, 0o644); err != nil { //nolint:gosec // a schema file, not a secret
+	if err := os.Chmod(tmpPath, 0o644); err != nil { // a schema file, not a secret
 		return fmt.Errorf("zever: chmod %q: %w", tmpPath, err)
 	}
 
-	if err := os.Rename(tmpPath, path); err != nil { //nolint:gosec // os.CreateTemp's own name, renamed onto the file it was created beside
+	if err := os.Rename(tmpPath, path); err != nil { // os.CreateTemp's own name, renamed onto the file it was created beside
 		return fmt.Errorf("zever: rename %q -> %q: %w", tmpPath, path, err)
 	}
 

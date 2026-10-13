@@ -120,7 +120,7 @@ func discoverProjectFile() (string, error) {
 }
 
 func decodeProjectFile(path string) (ProjectConfig, error) {
-	data, err := os.ReadFile(path) //nolint:gosec // path is a developer-supplied config location, not user input
+	data, err := os.ReadFile(path) // path is a developer-supplied config location, not user input
 	if err != nil {
 		return ProjectConfig{}, fmt.Errorf("zever: read %q: %w", path, err)
 	}

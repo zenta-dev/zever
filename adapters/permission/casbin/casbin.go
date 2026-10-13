@@ -425,7 +425,7 @@ func (c *checker) removeGroupingPolicy(g []string) (err error) {
 		}
 	}()
 
-	args := make([]interface{}, len(g))
+	args := make([]any, len(g))
 	for i, v := range g {
 		args[i] = v
 	}

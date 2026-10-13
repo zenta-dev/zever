@@ -1011,7 +1011,7 @@ func TestOwnerFieldAt_guards_pinSkips(t *testing.T) {
 
 	// cursorOn lands on the label; the identifier itself starts past it.
 	cursor := cursorOn(t, renameFieldOwnerSrc, 2, "owner_field: email")
-	cursor.Character += uint32(len("owner_field: ")) //nolint:gosec // test fixture
+	cursor.Character += uint32(len("owner_field: ")) // test fixture
 
 	entityName, ref, ok = ownerFieldAt(parsed["d.zen"], cursor)
 	if !ok || ref.Name != "email" || entityName != "User" {

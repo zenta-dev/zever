@@ -81,7 +81,6 @@ const (
 
 // String returns the string representation of a Kind.
 // Unknown kinds default to "ILLEGAL".
-// nolint:gocyclo
 func (k Kind) String() string {
 	switch k {
 	case EOF:

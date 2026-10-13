@@ -123,6 +123,14 @@ var factories = registry.New[Adapter, Factory](
 	func(adapter Adapter) error { return UnknownAdapterError{Adapter: adapter} },
 )
 
+// RegisteredAdapters returns the sorted names of adapters with a factory
+// registered via Register. The registry is the source of truth for adapter
+// validation (see config.ValidateAdapters and container.RegisteredAdapters);
+// ParseAdapter stays permissive for custom adapters and is not consulted.
+func RegisteredAdapters() []string {
+	return registry.SortedNames(factories)
+}
+
 // Register associates an Adapter with a Factory for later use by Open.
 func Register(adapter Adapter, factory Factory) error {
 	if factory == nil {

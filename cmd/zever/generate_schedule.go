@@ -23,8 +23,6 @@ file (the resolver checks dispatch arity against the job's parameter list).`
 
 // coverageSeam: prompt indirection for tests. Proof: huh requires a real TTY;
 // var seams keep behavior identical while enabling success/error coverage.
-//
-//nolint:dupl
 var (
 	promptSelectForSchedule = promptSelect
 	promptInputForSchedule  = promptInput
