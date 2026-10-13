@@ -2,8 +2,57 @@ package main
 
 import (
 	"flag"
+	"fmt"
 	"strings"
 )
+
+// rejectUnknownFlags reports the first flag-like token in args that is not
+// one of known (bare names, without dashes; "name=value" matches "name").
+// Commands without their own flags pass nil and reject every flag-like
+// token. The "--" separator ends the scan, and -h/--help/help always pass
+// through so each command's own help handling keeps working. A close miss
+// names the intended flag, mirroring the backend suggestion in
+// resolveBackends.
+func rejectUnknownFlags(command string, args []string, known []string) error {
+	allowed := make(map[string]bool, len(known))
+	prefixed := make([]string, 0, len(known))
+
+	for _, k := range known {
+		allowed[k] = true
+		prefixed = append(prefixed, "--"+k)
+	}
+
+	for _, a := range args {
+		if a == "--" {
+			break
+		}
+
+		if a == "-h" || a == "--help" || a == "help" {
+			continue
+		}
+
+		if len(a) < 2 || a[0] != '-' {
+			continue
+		}
+
+		name := strings.TrimLeft(a, "-")
+		if i := strings.IndexByte(name, '='); i >= 0 {
+			name = name[:i]
+		}
+
+		if allowed[name] {
+			continue
+		}
+
+		if s := closest("--"+name, prefixed); s != "" {
+			return fmt.Errorf("zever %s: unknown flag %q (did you mean %q?)", command, a, s)
+		}
+
+		return fmt.Errorf("zever %s: unknown flag %q", command, a)
+	}
+
+	return nil
+}
 
 // flexibleParse allows flags and positionals in any order.
 //

@@ -11,10 +11,12 @@ import (
 
 // BoundariesConfig carries every input runCheckBoundariesWith needs. Screen
 // agents build it from huh forms; the flag shell (runCheckBoundaries)
-// builds it from argv. A nil Out defaults to os.Stdout.
+// builds it from argv. A nil Out defaults to os.Stdout. JSON emits a
+// machine-readable envelope instead of the human violation list.
 type BoundariesConfig struct {
 	Files []string
 	Out   io.Writer
+	JSON  bool
 }
 
 // runCheckBoundaries compiles the given .zen files with zero backends and
@@ -26,6 +28,10 @@ type BoundariesConfig struct {
 // Every diagnostic is printed first, unconditionally, so syntax/resolve errors
 // are never hidden behind the boundary-specific section that follows.
 func runCheckBoundaries(args []string) error {
+	if err := rejectUnknownFlags("check-boundaries", args, nil); err != nil {
+		return err
+	}
+
 	paths, err := resolveInputFiles(args)
 	if err != nil {
 		return fmt.Errorf("zever check-boundaries: %w", err)
@@ -35,7 +41,7 @@ func runCheckBoundaries(args []string) error {
 		reportAutoDiscovery(paths)
 	}
 
-	return runCheckBoundariesWith(BoundariesConfig{Files: paths})
+	return runCheckBoundariesWith(BoundariesConfig{Files: paths, JSON: jsonMode})
 }
 
 // runCheckBoundariesWith resolves cfg.Files (one shared resolved schema)
@@ -50,7 +56,7 @@ func runCheckBoundariesWith(cfg BoundariesConfig) error {
 	}
 
 	schemaDir := defaultSchemaDir
-	if pc, err := loadProjectConfig(); err == nil {
+	if pc, projectErr := loadProjectConfig(); projectErr == nil {
 		schemaDir = pc.SchemaDir
 	}
 
@@ -64,22 +70,32 @@ func runCheckBoundariesWith(cfg BoundariesConfig) error {
 	// so this command never drifts from compile-time enforcement.
 	boundaryDiags := resolver.CheckCrossModule(result.Schema)
 	violations := 0
+	messages := []string{}
 
 	for _, d := range boundaryDiags.Sorted() {
 		// Proof: CheckCrossModule (dsl/resolver/boundary.go) only
 		// ever appends diag.Wrap(..., ErrCrossModule, ...); it never returns
 		// other sentinels, so no errors.Is filter is needed and every
 		// element here is a violation by construction.
-		if violations == 0 {
+		if violations == 0 && !cfg.JSON {
 			_, _ = fmt.Fprintln(out, bold("cross-module boundary violations:"))
 		}
 
 		violations++
+		messages = append(messages, d.Pos.String()+" "+d.Msg)
 
-		_, _ = fmt.Fprintf(out, "  %s  %s\n", red("✗"), dim(d.Pos.String())+" "+d.Msg)
+		if !cfg.JSON {
+			_, _ = fmt.Fprintf(out, "  %s  %s\n", red("✗"), dim(d.Pos.String())+" "+d.Msg)
+		}
 	}
 
 	if violations == 0 {
+		if cfg.JSON {
+			emitSuccess("check-boundaries", map[string]any{"files": cfg.Files, "violations": 0})
+
+			return nil
+		}
+
 		_, _ = fmt.Fprintln(out, success("✓ ")+" "+dim("zever check-boundaries: no cross-module violations"))
 		if shouldShowHint() {
 			_, _ = fmt.Fprintln(os.Stderr, formatHint("all modules respect boundaries — nice!"))
@@ -88,5 +104,14 @@ func runCheckBoundariesWith(cfg BoundariesConfig) error {
 		return nil
 	}
 
-	return fmt.Errorf("zever check-boundaries: %d cross-module violation(s)", violations)
+	err = fmt.Errorf("zever check-boundaries: %d cross-module violation(s)", violations)
+	if cfg.JSON {
+		return emitFailure("check-boundaries", map[string]any{
+			"files":      cfg.Files,
+			"violations": violations,
+			"messages":   messages,
+		}, nil, err)
+	}
+
+	return err
 }

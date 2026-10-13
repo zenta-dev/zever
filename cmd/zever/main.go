@@ -125,7 +125,12 @@ func main() {
 		rootCmd.SetArgs(args)
 		if err := rootCmd.Execute(); err != nil {
 			if jsonMode {
-				emitError(invokedCommand(args), err)
+				// Handlers that already wrote their failure envelope
+				// (errJSONEmitted) only set the exit code here.
+				if !errors.Is(err, errJSONEmitted) {
+					emitError(invokedCommand(args), err)
+				}
+
 				os.Exit(exitCodeFor(err))
 			}
 
@@ -147,7 +152,12 @@ func main() {
 
 	if err := run(args); err != nil {
 		if jsonMode {
-			emitError(invokedCommand(args), err)
+			// See the Cobra path above: already-emitted envelopes only
+			// set the exit code.
+			if !errors.Is(err, errJSONEmitted) {
+				emitError(invokedCommand(args), err)
+			}
+
 			os.Exit(exitCodeFor(err))
 		}
 

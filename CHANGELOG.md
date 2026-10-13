@@ -126,6 +126,20 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Fixed
 
+- `fix(cli): consistent --json envelope across inspection commands`:
+  `routes`, `config show`, and `graph` now honor the global `--json` flag
+  (previously `routes --json` printed no JSON at all and the other two
+  ignored the flag), and `breaking` and `check-boundaries` gained `--json`
+  too. All of them share one envelope helper (`{ok, command, exitCode,
+  data, diagnostics, error}` on stdout only; human-readable diagnostics
+  and hints stay on stderr): failure envelopes now carry the compiler
+  diagnostics that used to print to stderr only, and unknown flags are
+  rejected with a did-you-mean suggestion instead of being mistaken for
+  file paths. `doctor --json` reports `ok:false` with a nonzero exit code
+  when any battery fails (previously `ok:true`/exit 0 despite FAIL rows);
+  the human `doctor` output and its battery checks are unchanged.
+  `check`, `compile`, and `explain` already emitted the envelope and keep
+  byte-compatible success output.
 - `fix(cli): zever new yields a bootable app`: `zever new` now scaffolds
   every battery the generated server unconditionally resolves (auth/jwt
   with a dev-only secret, permission/noop, observability/stdout, db/sqlite,

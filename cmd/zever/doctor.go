@@ -86,6 +86,10 @@ func runDoctor(args []string) error {
 	strict := fs.Bool("strict", false, "exit non-zero if any battery fails (for CI/pre-deploy gating)")
 	fs.Usage = func() { printDoctorUsage(fs) }
 
+	if err := rejectUnknownFlags("doctor", args, []string{"config", "strict"}); err != nil {
+		return err
+	}
+
 	if err := fs.Parse(args); err != nil {
 		return fmt.Errorf("zever doctor: %w", err)
 	}
@@ -208,15 +212,28 @@ func runDoctorWith(cfg DoctorConfig) error {
 	}
 
 	if cfg.JSON {
-		if failed && cfg.Strict {
-			return fmt.Errorf("zever doctor: %d of %d batteries failed (--strict)", failCount, len(names))
-		}
-
-		emitSuccess("doctor", map[string]any{
+		data := map[string]any{
 			"batteries": rows,
 			"ok":        okCount,
 			"failed":    failCount,
-		})
+		}
+
+		if failed {
+			// A failing battery is a command failure in JSON mode even
+			// without --strict: emit one failure envelope (ok:false) and
+			// return its already-emitted error so the process exits
+			// nonzero without main writing a second envelope. The
+			// human path below keeps its legacy contract (nil without
+			// --strict); check logic itself is untouched.
+			msg := fmt.Errorf("zever doctor: %d of %d batteries failed", failCount, len(names))
+			if cfg.Strict {
+				msg = fmt.Errorf("zever doctor: %d of %d batteries failed (--strict)", failCount, len(names))
+			}
+
+			return emitFailure("doctor", data, nil, msg)
+		}
+
+		emitSuccess("doctor", data)
 
 		return nil
 	}
