@@ -1319,6 +1319,21 @@ func run(addr, grpcAddr string) error {
 	if err != nil {
 		return err
 	}
+	serverCfg, err := app.Config()
+	if err != nil {
+		return err
+	}
+	trustedProxies, err := middleware.ParseTrustedProxies(serverCfg.RateLimit.Options.TrustedProxies)
+	if err != nil {
+		return err
+	}
+	// Without trusted proxies the key stays the peer address: honoring
+	// X-Forwarded-For from an untrusted peer would let any client pick
+	// its own rate-limit bucket.
+	rateLimitKey := middleware.RemoteAddrKey
+	if len(trustedProxies) > 0 {
+		rateLimitKey = middleware.ClientIPKey(trustedProxies)
+	}
 {{end}}
 	// One interceptor, attached once below, must cover every service this
 	// process registers on grpcServer -- so every generated module
@@ -1381,7 +1396,7 @@ func run(addr, grpcAddr string) error {
 
 	r.Use(middleware.Recover(logger), middleware.RequestLogger(logger), middleware.Tracing(obs), middleware.SecurityHeaders(securityHeadersOpts))
 {{if .RateLimitEnabled}}
-	r.Use(middleware.RateLimit(limiter, middleware.RemoteAddrKey))
+	r.Use(middleware.RateLimit(limiter, rateLimitKey))
 {{end}}
 	// Resolve the db once at boot so a broken DSN fails fast with a clear
 	// error instead of surfacing as a 503 on the first readiness probe.

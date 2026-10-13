@@ -80,6 +80,16 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   `container.Payment()` reuses the resolved `c.Idempotency()` service
   best-effort when no explicit store is configured; an unresolvable
   idempotency service never blocks payment resolution.
+- `feat(middleware): trusted-proxy aware rate limit key`: new
+  `middleware.ClientIPKey(trusted []netip.Prefix)` honors
+  `X-Forwarded-For` only when the peer is trusted, keying on the
+  rightmost untrusted entry (spoofed headers from untrusted peers are
+  ignored; all-trusted chains fall back to the leftmost client).
+  `ratelimit.Options` gains `trusted_proxies` (CIDRs or bare IPs,
+  validated by `ratelimit.ParseTrustedProxies`, mirrored as
+  `middleware.ParseTrustedProxies` and in the config JSON schema); the
+  generated server builds the key from it and keeps `RemoteAddrKey`
+  when none are configured. `RemoteAddrKey` itself is unchanged.
 - `feat(auth/jwt): kid-based key rotation and nbf validation`: `JWTOptions`
   gains `keys: [{kid, secret}]` plus `active_kid` (empty defaults to the
   first entry; validated for unique kids, secret length, and a matching

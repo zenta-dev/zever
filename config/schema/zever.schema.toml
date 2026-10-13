@@ -1077,6 +1077,13 @@ type = 'number'
 '$ref' = '#/$defs/durationNs'
 description = 'Zero means adapter default (1m).'
 
+['$defs'.ratelimitOptions.properties.trusted_proxies]
+description = 'CIDRs (or bare IPs) of proxies whose X-Forwarded-For headers are honored for rate-limit keys. Empty means keys always derive from the peer address.'
+type = 'array'
+
+['$defs'.ratelimitOptions.properties.trusted_proxies.items]
+type = 'string'
+
 ['$defs'.resilienceOptions]
 additionalProperties = false
 type = 'object'
