@@ -66,6 +66,19 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Added
 
+- `feat(middleware): SecurityHeaders for generated server`: new
+  `middleware.SecurityHeaders(opts)` sets baseline response security
+  headers on every HTTP response (error responses included): always
+  `X-Content-Type-Options: nosniff`, a locked-down `Permissions-Policy`,
+  and `Referrer-Policy` (all defaulted, all overridable);
+  `X-Frame-Options` defaults to `SAMEORIGIN` and `Content-Security-Policy`
+  is opt-in (setting a CSP omits the frame header so `frame-ancestors`
+  owns framing). `Strict-Transport-Security` is emitted only for a
+  positive `HSTSMaxAge` (`DefaultHSTSMaxAge` is one year with
+  `includeSubDomains`); invalid options fail closed with the fixed 500
+  envelope. The generated server wires it innermost and passes
+  `DefaultHSTSMaxAge` only when TLS is configured, so plaintext dev
+  servers never emit HSTS.
 - `feat(server): TLS/mTLS options for generated server`: the router
   battery gains `tls_cert`, `tls_key`, and `tls_client_ca` options
   (file paths; `ROUTER_TLS_CERT` and friends in env; schema files

@@ -93,7 +93,12 @@ func TestRunGenerateServer(t *testing.T) {
 		"grpc.KeepaliveParams(keepalive.ServerParameters{",
 		"grpc.MaxRecvMsgSize(DefaultGRPCMaxMessageBytes)",
 		"grpc.MaxSendMsgSize(DefaultGRPCMaxMessageBytes)",
-		"r.Use(middleware.Recover(logger), middleware.RequestLogger(logger), middleware.Tracing(obs))",
+		"r.Use(middleware.Recover(logger), middleware.RequestLogger(logger), middleware.Tracing(obs), middleware.SecurityHeaders(securityHeadersOpts))",
+		// Baseline response security headers ship in the generated
+		// server, with HSTS switched on only when TLS is configured.
+		"middleware.SecurityHeaders(securityHeadersOpts)",
+		"middleware.SecurityHeadersOptions{}",
+		"middleware.DefaultHSTSMaxAge",
 		`r.Handle("GET", "/healthz",`,
 		`r.Handle("GET", "/readyz",`,
 		// Readiness is one container decision, not a per-handler DB ping:
