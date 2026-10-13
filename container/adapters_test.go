@@ -32,8 +32,12 @@ func TestRegisteredAdaptersCoversConfigServices(t *testing.T) {
 
 func TestValidateAdaptersFailsFastWithSuggestion(t *testing.T) {
 	// Register one probe adapter globally (tolerate duplicates across
-	// -count=N reruns in one process); the name stays one edit from
-	// "memory" so the suggestion is deterministic.
+	// -count=N reruns in one process). Other tests in this package
+	// register real adapters into the same global registries (see
+	// close_test.go), and shuffle order is random, so the asserted input
+	// must be one edit from the probe yet two from any real name: with
+	// input "memmorry", "memmory" (d=1) always beats "memory" (d=2) and
+	// the input itself is never registered.
 	probe := cache.Adapter("memmory")
 	if err := cache.Register(probe, func(cache.Options) (cache.Cache, error) {
 		return nil, errors.New("container: probe adapter never opens")
@@ -48,11 +52,11 @@ func TestValidateAdaptersFailsFastWithSuggestion(t *testing.T) {
 	}
 
 	cfg := config.Default()
-	cfg.Cache.Adapter = "memory"
+	cfg.Cache.Adapter = "memmorry"
 	c := New(cfg)
 	err := c.ValidateAdapters()
 	if err == nil {
-		t.Fatal("ValidateAdapters with unregistered memory adapter = nil, want error")
+		t.Fatal("ValidateAdapters with unregistered memmorry adapter = nil, want error")
 	}
 	if !errors.Is(err, config.ErrUnknownAdapter) {
 		t.Fatalf("errors.Is(%v, config.ErrUnknownAdapter) = false, want true", err)
