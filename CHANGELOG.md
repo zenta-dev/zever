@@ -231,6 +231,16 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Changed
 
+- `perf(orm): LRU shape cache`: the render-shape cache evicts only the
+  least-recently-used entry on overflow instead of dropping the whole map,
+  so hot shapes survive churn. It is striped 16 ways over
+  `shared/lrucache` (one bounded LRU per stripe, 256 entries total):
+  LRU `Get` rewrites recency and needs exclusive access, so a single
+  instance would serialize every parallel hit where the old `RWMutex` map
+  allowed concurrent reads. Hit-path cost is unchanged (128 B/op,
+  1 alloc/op sequential; 155 B/op, 3 allocs/op parallel on the bench
+  machine, within noise of the map). New tests pin single-entry eviction,
+  concurrent access under `-race`, and the capacity bound.
 - `docs: hygiene pass`: recount confirms 37 configured services
   (`knownServiceNames()` in `config/config.go`) against 42 container
   accessor rows — the five extra rows (`agent`, `grpc`, `grpcclient`,

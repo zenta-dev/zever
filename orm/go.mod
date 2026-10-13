@@ -8,6 +8,7 @@ require (
 	github.com/zenta-dev/zever/adapters/db/sqlite v0.6.1
 	github.com/zenta-dev/zever/core/db v0.6.1
 	github.com/zenta-dev/zever/dsl v0.6.1
+	github.com/zenta-dev/zever/shared/lrucache v0.6.1
 	github.com/zenta-dev/zever/shared/retry v0.6.1
 )
 
@@ -21,7 +22,6 @@ require (
 	github.com/ncruces/go-strftime v1.0.0 // indirect
 	github.com/remyoudompheng/bigfft v0.0.0-20230129092748-24d4a6f8daec // indirect
 	github.com/robfig/cron/v3 v3.0.1 // indirect
-	github.com/zenta-dev/zever/shared/lrucache v0.6.1 // indirect
 	github.com/zenta-dev/zever/shared/registry v0.6.1 // indirect
 	golang.org/x/sync v0.23.0 // indirect
 	golang.org/x/sys v0.48.0 // indirect
