@@ -15,8 +15,9 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   and `notification/twilio` adapters now dial only globally routable
   addresses and never follow redirects. Loopback, private, link-local
   (including the `169.254.169.254` cloud metadata address), carrier-grade
-  NAT, multicast, reserved, and documentation ranges are refused with
-  `httpclient.ErrPrivateAddress`; every resolved address is checked from a
+  NAT, multicast, reserved, and other non-routable ranges are refused with
+  `httpclient.ErrPrivateAddress` (documentation ranges stay dialable: they
+  are unroutable and serve as public examples); every resolved address is checked from a
   single lookup and the validated IP is dialed directly, closing the
   DNS-rebinding check-to-dial window. Operators pointing an adapter at a
   local Ollama/sidecar must now set `allow_private: true` (new option on

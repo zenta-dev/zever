@@ -320,10 +320,12 @@ func resolveIPs(ctx context.Context, host string, lookup LookupFunc) ([]net.IP, 
 // link-local (including the 169.254.169.254 cloud metadata address),
 // multicast, carrier-grade NAT (100.64.0.0/10), IANA special-purpose
 // (192.0.0.0/24), benchmarking (198.18.0.0/15), current-network (0.0.0.0/8),
-// reserved (240.0.0.0/4), documentation (192.0.2.0/24, 198.51.100.0/24,
-// 203.0.113.0/24, 2001:db8::/32), RFC 1918 (10/8, 172.16/12, 192.168/16),
-// and IPv6 unique-local (fc00::/7). IsPrivateIP returns false for nil and
-// for globally routable addresses. IPv4-mapped IPv6 addresses classify by
+// reserved (240.0.0.0/4), RFC 1918 (10/8, 172.16/12, 192.168/16), and IPv6
+// unique-local (fc00::/7). Documentation ranges (192.0.2.0/24,
+// 198.51.100.0/24, 203.0.113.0/24, 2001:db8::/32) stay dialable: they are
+// unroutable so they cannot reach internal services, and the ecosystem
+// uses them as public examples. IsPrivateIP returns false for nil and for
+// globally routable addresses. IPv4-mapped IPv6 addresses classify by
 // their embedded IPv4 address.
 func IsPrivateIP(ip net.IP) bool {
 	if ip == nil {
@@ -348,15 +350,9 @@ func IsPrivateIP(ip net.IP) bool {
 			return true
 		case ip4[0] == 192 && ip4[1] == 0 && ip4[2] == 0:
 			return true
-		case ip4[0] == 192 && ip4[1] == 0 && ip4[2] == 2:
-			return true
 		case ip4[0] == 192 && ip4[1] == 168:
 			return true
 		case ip4[0] == 198 && ip4[1] >= 18 && ip4[1] <= 19:
-			return true
-		case ip4[0] == 198 && ip4[1] == 51 && ip4[2] == 100:
-			return true
-		case ip4[0] == 203 && ip4[1] == 0 && ip4[2] == 113:
 			return true
 		case ip4[0] >= 224:
 			return true
@@ -364,9 +360,6 @@ func IsPrivateIP(ip net.IP) bool {
 		return false
 	}
 	if len(ip) == net.IPv6len && ip[0]&0xfe == 0xfc {
-		return true
-	}
-	if len(ip) == net.IPv6len && ip[0] == 0x20 && ip[1] == 0x01 && ip[2] == 0x0d && ip[3] == 0xb8 {
 		return true
 	}
 	return false
