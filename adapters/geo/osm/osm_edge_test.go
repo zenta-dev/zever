@@ -18,7 +18,7 @@ func edgeGeo(t *testing.T, handler http.HandlerFunc) *osmGeo {
 	srv := httptest.NewServer(handler)
 	t.Cleanup(srv.Close)
 
-	g, err := New(geo.Options{Endpoint: srv.URL, UserAgent: "edge/1.0", AllowInsecure: true})
+	g, err := New(geo.Options{Endpoint: srv.URL, UserAgent: "edge/1.0", AllowInsecure: true, AllowPrivate: true})
 	if err != nil {
 		t.Fatalf("New() error = %v", err)
 	}

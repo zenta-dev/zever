@@ -5,6 +5,7 @@ import (
 	"context"
 	"errors"
 	"fmt"
+	"log/slog"
 	"math"
 	"net/http"
 	"strings"
@@ -38,9 +39,16 @@ func New(opts ai.Options) (ai.AI, error) {
 		return nil, ai.InvalidOptionsError{Reason: "api_key is required"}
 	}
 
+	if opts.AllowPrivate {
+		slog.Default().Info("openai: allow_private enabled: private, loopback, and link-local addresses can be dialed")
+	}
+	if opts.InsecureSkipVerify {
+		slog.Default().Warn("openai: insecure_skip_verify enabled: TLS certificate verification is off; use only for testing")
+	}
+
 	clientOpts := []option.RequestOption{
 		option.WithAPIKey(opts.APIKey),
-		option.WithHTTPClient(newHTTPClient(opts.Timeout)),
+		option.WithHTTPClient(newHTTPClient(opts.Timeout, opts.AllowPrivate, opts.InsecureSkipVerify)),
 	}
 
 	if opts.BaseURL != "" {
@@ -58,21 +66,28 @@ func New(opts ai.Options) (ai.AI, error) {
 	}, nil
 }
 
-func newHTTPClientFromTransport(timeout time.Duration, tr *http.Transport) *http.Client {
-	if tr == nil {
-		return httpclient.NewClient(timeout)
+func newHTTPClientFromTransport(timeout time.Duration, allowPrivate, insecureSkipVerify bool, tr *http.Transport) *http.Client {
+	clientOpts := []httpclient.Option{
+		httpclient.WithSafeDial(allowPrivate),
+		httpclient.WithNoRedirect(),
+	}
+	if tr != nil {
+		clientOpts = append(clientOpts, httpclient.WithTransport(tr.Clone()))
+	}
+	if insecureSkipVerify {
+		clientOpts = append(clientOpts, httpclient.WithInsecureSkipVerify(true))
 	}
 
-	return httpclient.NewClient(timeout, httpclient.WithTransport(tr.Clone()))
+	return httpclient.NewClient(timeout, clientOpts...)
 }
 
 //go:noinline
-func newHTTPClientImpl(timeout time.Duration) *http.Client {
+func newHTTPClientImpl(timeout time.Duration, allowPrivate, insecureSkipVerify bool) *http.Client {
 	if tr, ok := http.DefaultTransport.(*http.Transport); ok {
-		return newHTTPClientFromTransport(timeout, tr)
+		return newHTTPClientFromTransport(timeout, allowPrivate, insecureSkipVerify, tr)
 	}
 
-	return newHTTPClientFromTransport(timeout, nil)
+	return newHTTPClientFromTransport(timeout, allowPrivate, insecureSkipVerify, nil)
 }
 
 // newHTTPClient builds the HTTP client the OpenAI SDK issues requests

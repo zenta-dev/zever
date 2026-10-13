@@ -8,6 +8,7 @@ import (
 	"errors"
 	"fmt"
 	"io"
+	"log/slog"
 	"net/http"
 	"net/url"
 	"strings"
@@ -46,10 +47,12 @@ type adapter struct {
 // is left nil -- callers needing it use NewWithOptions directly.
 func New(opts ai.Options) (ai.AI, error) {
 	return NewWithOptions(Options{
-		Addr:          opts.BaseURL,
-		Model:         opts.Model,
-		Timeout:       opts.Timeout,
-		AllowInsecure: opts.AllowInsecure,
+		Addr:               opts.BaseURL,
+		Model:              opts.Model,
+		Timeout:            opts.Timeout,
+		AllowInsecure:      opts.AllowInsecure,
+		AllowPrivate:       opts.AllowPrivate,
+		InsecureSkipVerify: opts.InsecureSkipVerify,
 	})
 }
 
@@ -76,21 +79,30 @@ func NewWithOptions(opts Options) (ai.AI, error) {
 	transport := opts.Transport
 	if transport == nil {
 		// TLS verification is skipped only on explicit opt-in
-		// (AllowInsecure); the default client always verifies.
+		// (InsecureSkipVerify); the default client always verifies, dials
+		// only globally routable addresses unless AllowPrivate opts in,
+		// and never follows redirects.
 		clientOpts := []httpclient.Option{}
-		if opts.AllowInsecure {
+		if opts.InsecureSkipVerify {
 			clientOpts = append(clientOpts, httpclient.WithInsecureSkipVerify(true))
+		}
+
+		if opts.AllowPrivate {
+			slog.Default().Info("ollama: allow_private enabled: private, loopback, and link-local addresses can be dialed")
+		}
+		if opts.InsecureSkipVerify {
+			slog.Default().Warn("ollama: insecure_skip_verify enabled: TLS certificate verification is off; use only for testing")
 		}
 
 		return &adapter{
 			addr:          addr,
 			defaultModel:  opts.Model,
 			allowInsecure: opts.AllowInsecure,
-			client:        httpclient.NewClient(timeout, clientOpts...),
+			client:        httpclient.NewSafeClient(timeout, opts.AllowPrivate, clientOpts...),
 		}, nil
 	}
 
-	if opts.AllowInsecure {
+	if opts.InsecureSkipVerify {
 		if tr, ok := transport.(*http.Transport); ok {
 			if tr.TLSClientConfig == nil {
 				tr.TLSClientConfig = &tls.Config{}

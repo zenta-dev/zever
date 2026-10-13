@@ -22,7 +22,7 @@ func BenchmarkRender(b *testing.B) {
 	}))
 	b.Cleanup(srv.Close)
 
-	doc, err := New(document.Options{Endpoint: srv.URL, AllowInsecure: true})
+	doc, err := New(document.Options{Endpoint: srv.URL, AllowInsecure: true, AllowPrivate: true})
 	if err != nil {
 		b.Fatal(err)
 	}
@@ -48,7 +48,7 @@ func BenchmarkRenderJSON(b *testing.B) {
 	}))
 	b.Cleanup(srv.Close)
 
-	doc, err := New(document.Options{Endpoint: srv.URL, AllowInsecure: true})
+	doc, err := New(document.Options{Endpoint: srv.URL, AllowInsecure: true, AllowPrivate: true})
 	if err != nil {
 		b.Fatal(err)
 	}

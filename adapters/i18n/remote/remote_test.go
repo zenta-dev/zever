@@ -68,7 +68,7 @@ func (f *stubServer) serve(t *testing.T) *httptest.Server {
 }
 
 func optsFor(url string) i18n.Options {
-	return i18n.Options{Remote: i18n.RemoteOptions{Endpoint: url, AllowInsecure: true}}
+	return i18n.Options{Remote: i18n.RemoteOptions{Endpoint: url, AllowInsecure: true, AllowPrivate: true}}
 }
 
 // eventually polls cond until it holds or timeout elapses, failing the
@@ -320,7 +320,7 @@ func TestNewBadOptions(t *testing.T) {
 	} {
 		t.Run(name, func(t *testing.T) {
 			t.Parallel()
-			o := i18n.Options{Remote: i18n.RemoteOptions{AllowInsecure: true}}
+			o := i18n.Options{Remote: i18n.RemoteOptions{AllowInsecure: true, AllowPrivate: true}}
 			mut(&o)
 			if name == "http blocked" {
 				o.Remote.AllowInsecure = false

@@ -156,7 +156,9 @@ LLM completions, chat, and embeddings. Every backend needs a key, so there is no
 | `api_key` | string | `""` | Provider API key. Never logged |
 | `model` | string | `""` | Model identifier |
 | `base_url` | string | `""` | Provider base URL. Must be https unless `allow_insecure` is set |
-| `allow_insecure` | boolean | `false` | Permits http BaseURL and disables TLS verification for loopback test servers |
+| `allow_insecure` | boolean | `false` | Permits http BaseURL for testing |
+| `allow_private` | boolean | `false` | Permits dialing private, loopback, and link-local addresses (local sidecars). Logs a line at startup |
+| `insecure_skip_verify` | boolean | `false` | Disables TLS certificate verification for self-signed test servers. Logs a warning at startup |
 | `timeout` | duration | `0` | Request timeout |
 
 ```yaml title="zever.yaml"
@@ -395,6 +397,7 @@ Render documents to PDF or images locally, through a remote service, or with LaT
 | `dpi` | integer | `150` | Controls raster output resolution |
 | `endpoint` | string | `""` | Optional remote render endpoint URL |
 | `allow_insecure` | boolean | `false` | Permits http Endpoint for testing |
+| `allow_private` | boolean | `false` | Permits dialing private, loopback, and link-local addresses (local sidecars). Logs a line at startup |
 | `api_key` | string | `""` | Remote API key. Never logged |
 | `latex_command` | string | `pdflatex` | LaTeX compiler command |
 | `latex_pdf_to_ppm` | string | `pdftoppm` | PDF-to-image converter command |
@@ -488,6 +491,7 @@ Geocoding and reverse geocoding.
 | `path` | string | `""` | JSON file for the static adapter |
 | `max_response_body` | integer | `0` | Bounds response bodies |
 | `allow_insecure` | boolean | `false` | Permits http BaseURL/Endpoint for testing |
+| `allow_private` | boolean | `false` | Permits dialing private, loopback, and link-local addresses (local sidecars). Logs a line at startup |
 | `user_agent` | string | `""` | User-Agent for OSM Nominatim |
 
 ```yaml title="zever.yaml"
@@ -517,6 +521,7 @@ Message catalogs. Options nest under the adapter name.
 | `remote.timeout` | duration | `30s` | Operation timeout |
 | `remote.max_in_flight` | integer | `1000` | Caps concurrent requests |
 | `remote.allow_insecure` | boolean | `false` | Permits http:// endpoints |
+| `remote.allow_private` | boolean | `false` | Permits dialing private, loopback, and link-local addresses (local sidecars). Logs a line at startup |
 
 ```yaml title="zever.yaml"
 i18n:

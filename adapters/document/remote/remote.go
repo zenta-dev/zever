@@ -6,6 +6,7 @@ import (
 	"errors"
 	"fmt"
 	"io"
+	"log/slog"
 	"mime"
 	"net/http"
 	"strings"
@@ -69,11 +70,15 @@ func New(o document.Options) (document.Document, error) {
 		maxOutput = document.DefaultMaxOutputBytes
 	}
 
+	if o.AllowPrivate {
+		slog.Default().Info("remote: allow_private enabled: private, loopback, and link-local addresses can be dialed")
+	}
+
 	return &driver{
 		endpoint:  normalized,
 		apiKey:    o.APIKey,
 		maxOutput: maxOutput,
-		client:    httpclient.NewClient(timeout),
+		client:    httpclient.NewSafeClient(timeout, o.AllowPrivate),
 	}, nil
 }
 

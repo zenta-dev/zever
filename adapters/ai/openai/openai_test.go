@@ -76,7 +76,7 @@ func TestNewHTTPClient_HonorsTimeout(t *testing.T) {
 
 	const want = 7 * time.Second
 
-	c := newHTTPClient(want)
+	c := newHTTPClient(want, false, false)
 	if c.Timeout != want {
 		t.Fatalf("newHTTPClient(%v).Timeout = %v, want %v", want, c.Timeout, want)
 	}
@@ -90,10 +90,10 @@ func TestNew_ClientHonorsConfiguredTimeout(t *testing.T) {
 
 	var gotTimeout time.Duration
 
-	newHTTPClient = func(d time.Duration) *http.Client {
+	newHTTPClient = func(d time.Duration, allowPrivate, insecureSkipVerify bool) *http.Client {
 		gotTimeout = d
 
-		return orig(d)
+		return orig(d, allowPrivate, insecureSkipVerify)
 	}
 	defer func() { newHTTPClient = orig }()
 
@@ -110,7 +110,7 @@ func TestNew_ClientHonorsConfiguredTimeout(t *testing.T) {
 
 func TestNewHTTPClient_CloneTLS12(t *testing.T) {
 	// Checks DefaultTransport cloning: must not be parallel due to global read.
-	c := newHTTPClient(0)
+	c := newHTTPClient(0, false, false)
 	tr, ok := c.Transport.(*http.Transport)
 	if !ok {
 		t.Fatalf("transport %T not *http.Transport", c.Transport)
@@ -131,7 +131,7 @@ func TestNewHTTPClient_Fallback(t *testing.T) {
 	http.DefaultTransport = roundTripFunc(func(_ *http.Request) (*http.Response, error) { return nil, errors.New("fallback") })
 	t.Cleanup(func() { http.DefaultTransport = prev })
 
-	c := newHTTPClient(0)
+	c := newHTTPClient(0, false, false)
 	tr, ok := c.Transport.(*http.Transport)
 	if !ok {
 		t.Fatalf("transport %T not *http.Transport", c.Transport)
@@ -148,7 +148,7 @@ func TestNewHTTPClient_UpgradeLegacyTLS(t *testing.T) {
 	http.DefaultTransport = &http.Transport{TLSClientConfig: &tls.Config{MinVersion: tls.VersionTLS10}} //nolint:gosec
 	t.Cleanup(func() { http.DefaultTransport = prev })
 
-	c := newHTTPClient(0)
+	c := newHTTPClient(0, false, false)
 	tr, ok := c.Transport.(*http.Transport)
 	if !ok {
 		t.Fatalf("transport %T not *http.Transport", c.Transport)
@@ -171,7 +171,7 @@ func TestGenerate_ModelRequired(t *testing.T) {
 	}))
 	defer srv.Close()
 
-	a, err := New(ai.Options{APIKey: "sk-test", BaseURL: srv.URL})
+	a, err := New(ai.Options{APIKey: "sk-test", BaseURL: srv.URL, AllowPrivate: true})
 	if err != nil {
 		t.Fatalf("Open err = %v", err)
 	}
@@ -192,7 +192,7 @@ func TestGenerate_ToolsAndResponseFormatConflict(t *testing.T) {
 	}))
 	defer srv.Close()
 
-	a, err := New(ai.Options{APIKey: "sk-test", Model: "gpt-4", BaseURL: srv.URL})
+	a, err := New(ai.Options{APIKey: "sk-test", Model: "gpt-4", BaseURL: srv.URL, AllowPrivate: true})
 	if err != nil {
 		t.Fatalf("Open err = %v", err)
 	}
@@ -220,7 +220,7 @@ func TestGenerate_RoundtripSimple(t *testing.T) {
 	}))
 	defer srv.Close()
 
-	a, err := New(ai.Options{APIKey: "sk-test", Model: "gpt-4", BaseURL: srv.URL})
+	a, err := New(ai.Options{APIKey: "sk-test", Model: "gpt-4", BaseURL: srv.URL, AllowPrivate: true})
 	if err != nil {
 		t.Fatalf("Open err = %v", err)
 	}
@@ -275,7 +275,7 @@ func TestGenerate_ModelOverride(t *testing.T) {
 	}))
 	defer srv.Close()
 
-	a, err := New(ai.Options{APIKey: "sk-test", Model: "gpt-4", BaseURL: srv.URL})
+	a, err := New(ai.Options{APIKey: "sk-test", Model: "gpt-4", BaseURL: srv.URL, AllowPrivate: true})
 	if err != nil {
 		t.Fatalf("Open err = %v", err)
 	}
@@ -304,7 +304,7 @@ func TestGenerate_WithTools(t *testing.T) {
 	}))
 	defer srv.Close()
 
-	a, err := New(ai.Options{APIKey: "sk-test", Model: "gpt-4", BaseURL: srv.URL})
+	a, err := New(ai.Options{APIKey: "sk-test", Model: "gpt-4", BaseURL: srv.URL, AllowPrivate: true})
 	if err != nil {
 		t.Fatalf("Open err = %v", err)
 	}
@@ -348,7 +348,7 @@ func TestGenerate_ToolChoiceRequiredAndNone(t *testing.T) {
 			}))
 			defer srv.Close()
 
-			a, err := New(ai.Options{APIKey: "sk-test", Model: "gpt-4", BaseURL: srv.URL})
+			a, err := New(ai.Options{APIKey: "sk-test", Model: "gpt-4", BaseURL: srv.URL, AllowPrivate: true})
 			if err != nil {
 				t.Fatalf("Open err = %v", err)
 			}
@@ -382,7 +382,7 @@ func TestGenerate_ToolChoiceNamed(t *testing.T) {
 	}))
 	defer srv.Close()
 
-	a, err := New(ai.Options{APIKey: "sk-test", Model: "gpt-4", BaseURL: srv.URL})
+	a, err := New(ai.Options{APIKey: "sk-test", Model: "gpt-4", BaseURL: srv.URL, AllowPrivate: true})
 	if err != nil {
 		t.Fatalf("Open err = %v", err)
 	}
@@ -420,7 +420,7 @@ func TestGenerate_ToolChoiceFallback(t *testing.T) {
 	}))
 	defer srv.Close()
 
-	a, err := New(ai.Options{APIKey: "sk-test", Model: "gpt-4", BaseURL: srv.URL})
+	a, err := New(ai.Options{APIKey: "sk-test", Model: "gpt-4", BaseURL: srv.URL, AllowPrivate: true})
 	if err != nil {
 		t.Fatalf("Open err = %v", err)
 	}
@@ -452,7 +452,7 @@ func TestGenerate_ResponseFormatJSONObject(t *testing.T) {
 	}))
 	defer srv.Close()
 
-	a, err := New(ai.Options{APIKey: "sk-test", Model: "gpt-4", BaseURL: srv.URL})
+	a, err := New(ai.Options{APIKey: "sk-test", Model: "gpt-4", BaseURL: srv.URL, AllowPrivate: true})
 	if err != nil {
 		t.Fatalf("Open err = %v", err)
 	}
@@ -488,7 +488,7 @@ func TestGenerate_ResponseFormatJSONSchema(t *testing.T) {
 	}))
 	defer srv.Close()
 
-	a, err := New(ai.Options{APIKey: "sk-test", Model: "gpt-4", BaseURL: srv.URL})
+	a, err := New(ai.Options{APIKey: "sk-test", Model: "gpt-4", BaseURL: srv.URL, AllowPrivate: true})
 	if err != nil {
 		t.Fatalf("Open err = %v", err)
 	}
@@ -531,7 +531,7 @@ func TestGenerate_ResponseFormatMapFallback(t *testing.T) {
 	}))
 	defer srv.Close()
 
-	a, err := New(ai.Options{APIKey: "sk-test", Model: "gpt-4", BaseURL: srv.URL})
+	a, err := New(ai.Options{APIKey: "sk-test", Model: "gpt-4", BaseURL: srv.URL, AllowPrivate: true})
 	if err != nil {
 		t.Fatalf("Open err = %v", err)
 	}
@@ -566,7 +566,7 @@ func TestGenerate_ParallelToolCalls(t *testing.T) {
 	}))
 	defer srv.Close()
 
-	a, err := New(ai.Options{APIKey: "sk-test", Model: "gpt-4", BaseURL: srv.URL})
+	a, err := New(ai.Options{APIKey: "sk-test", Model: "gpt-4", BaseURL: srv.URL, AllowPrivate: true})
 	if err != nil {
 		t.Fatalf("Open err = %v", err)
 	}
@@ -608,7 +608,7 @@ func TestGenerate_MessageRoles(t *testing.T) {
 	}))
 	defer srv.Close()
 
-	a, err := New(ai.Options{APIKey: "sk-test", Model: "gpt-4", BaseURL: srv.URL})
+	a, err := New(ai.Options{APIKey: "sk-test", Model: "gpt-4", BaseURL: srv.URL, AllowPrivate: true})
 	if err != nil {
 		t.Fatalf("Open err = %v", err)
 	}
@@ -641,7 +641,7 @@ func TestGenerate_NoChoices(t *testing.T) {
 	}))
 	defer srv.Close()
 
-	a, err := New(ai.Options{APIKey: "sk-test", Model: "gpt-4", BaseURL: srv.URL})
+	a, err := New(ai.Options{APIKey: "sk-test", Model: "gpt-4", BaseURL: srv.URL, AllowPrivate: true})
 	if err != nil {
 		t.Fatalf("Open err = %v", err)
 	}
@@ -696,7 +696,7 @@ func TestGenerate_ErrorMapping(t *testing.T) {
 			}))
 			defer srv.Close()
 
-			a, err := New(ai.Options{APIKey: "sk-test", Model: "gpt-4", BaseURL: srv.URL})
+			a, err := New(ai.Options{APIKey: "sk-test", Model: "gpt-4", BaseURL: srv.URL, AllowPrivate: true})
 			if err != nil {
 				t.Fatalf("Open err = %v", err)
 			}
@@ -729,7 +729,7 @@ func TestGenerate_Redaction(t *testing.T) {
 	defer srv.Close()
 
 	secret := "sk-super-secret-123"
-	a, err := New(ai.Options{APIKey: secret, Model: "gpt-4", BaseURL: srv.URL})
+	a, err := New(ai.Options{APIKey: secret, Model: "gpt-4", BaseURL: srv.URL, AllowPrivate: true})
 	if err != nil {
 		t.Fatalf("Open err = %v", err)
 	}
@@ -758,7 +758,7 @@ func TestEmbed_Dimensions(t *testing.T) {
 	}))
 	defer srv.Close()
 
-	a, err := New(ai.Options{APIKey: "sk-test", Model: "text-embedding-3-small", BaseURL: srv.URL})
+	a, err := New(ai.Options{APIKey: "sk-test", Model: "text-embedding-3-small", BaseURL: srv.URL, AllowPrivate: true})
 	if err != nil {
 		t.Fatalf("Open err = %v", err)
 	}
@@ -791,7 +791,7 @@ func TestEmbed_NoDimensions(t *testing.T) {
 	}))
 	defer srv.Close()
 
-	a, err := New(ai.Options{APIKey: "sk-test", Model: "emb", BaseURL: srv.URL})
+	a, err := New(ai.Options{APIKey: "sk-test", Model: "emb", BaseURL: srv.URL, AllowPrivate: true})
 	if err != nil {
 		t.Fatalf("Open err = %v", err)
 	}
@@ -816,7 +816,7 @@ func TestEmbed_ModelRequired(t *testing.T) {
 	}))
 	defer srv.Close()
 
-	a, err := New(ai.Options{APIKey: "sk-test", BaseURL: srv.URL})
+	a, err := New(ai.Options{APIKey: "sk-test", BaseURL: srv.URL, AllowPrivate: true})
 	if err != nil {
 		t.Fatalf("Open err = %v", err)
 	}
@@ -838,7 +838,7 @@ func TestEmbed_ErrorMapping(t *testing.T) {
 	}))
 	defer srv.Close()
 
-	a, err := New(ai.Options{APIKey: "sk-test", Model: "emb", BaseURL: srv.URL})
+	a, err := New(ai.Options{APIKey: "sk-test", Model: "emb", BaseURL: srv.URL, AllowPrivate: true})
 	if err != nil {
 		t.Fatalf("Open err = %v", err)
 	}
@@ -862,7 +862,7 @@ func TestStream_Ordering(t *testing.T) {
 	}))
 	defer srv.Close()
 
-	a, err := New(ai.Options{APIKey: "sk-test", Model: "gpt-4", BaseURL: srv.URL})
+	a, err := New(ai.Options{APIKey: "sk-test", Model: "gpt-4", BaseURL: srv.URL, AllowPrivate: true})
 	if err != nil {
 		t.Fatalf("Open err = %v", err)
 	}
@@ -918,7 +918,7 @@ func TestStream_ToolCalls(t *testing.T) {
 	}))
 	defer srv.Close()
 
-	a, err := New(ai.Options{APIKey: "sk-test", Model: "gpt-4", BaseURL: srv.URL})
+	a, err := New(ai.Options{APIKey: "sk-test", Model: "gpt-4", BaseURL: srv.URL, AllowPrivate: true})
 	if err != nil {
 		t.Fatalf("Open err = %v", err)
 	}
@@ -1043,7 +1043,7 @@ func TestStream_ErrorMapping(t *testing.T) {
 	}))
 	defer srv.Close()
 
-	a, err := New(ai.Options{APIKey: "sk-test", Model: "gpt-4", BaseURL: srv.URL})
+	a, err := New(ai.Options{APIKey: "sk-test", Model: "gpt-4", BaseURL: srv.URL, AllowPrivate: true})
 	if err != nil {
 		t.Fatalf("Open err = %v", err)
 	}
@@ -1074,7 +1074,7 @@ func TestStream_ModelRequired(t *testing.T) {
 	srv := httptest.NewServer(http.HandlerFunc(func(_ http.ResponseWriter, _ *http.Request) {}))
 	defer srv.Close()
 
-	a, err := New(ai.Options{APIKey: "sk-test", BaseURL: srv.URL})
+	a, err := New(ai.Options{APIKey: "sk-test", BaseURL: srv.URL, AllowPrivate: true})
 	if err != nil {
 		t.Fatalf("Open err = %v", err)
 	}
@@ -1092,7 +1092,7 @@ func TestStream_ToolsConflict(t *testing.T) {
 	srv := httptest.NewServer(http.HandlerFunc(func(_ http.ResponseWriter, _ *http.Request) {}))
 	defer srv.Close()
 
-	a, err := New(ai.Options{APIKey: "sk-test", Model: "gpt-4", BaseURL: srv.URL})
+	a, err := New(ai.Options{APIKey: "sk-test", Model: "gpt-4", BaseURL: srv.URL, AllowPrivate: true})
 	if err != nil {
 		t.Fatalf("Open err = %v", err)
 	}
@@ -1121,7 +1121,7 @@ func TestStream_WithResponseFormatAndParallel(t *testing.T) {
 	}))
 	defer srv.Close()
 
-	a, err := New(ai.Options{APIKey: "sk-test", Model: "gpt-4", BaseURL: srv.URL})
+	a, err := New(ai.Options{APIKey: "sk-test", Model: "gpt-4", BaseURL: srv.URL, AllowPrivate: true})
 	if err != nil {
 		t.Fatalf("Open err = %v", err)
 	}
@@ -1324,7 +1324,7 @@ func TestNewHTTPClient_NilTLSConfig(t *testing.T) {
 	prev := http.DefaultTransport
 	http.DefaultTransport = &http.Transport{TLSClientConfig: nil}
 	t.Cleanup(func() { http.DefaultTransport = prev })
-	c := newHTTPClient(0)
+	c := newHTTPClient(0, false, false)
 	tr, ok := c.Transport.(*http.Transport)
 	if !ok {
 		t.Fatalf("transport %T", c.Transport)
@@ -1337,22 +1337,22 @@ func TestNewHTTPClient_NilTLSConfig(t *testing.T) {
 func TestNewHTTPClientFromTransport(t *testing.T) {
 	t.Parallel()
 	// nil transport
-	c := newHTTPClientFromTransport(0, nil)
+	c := newHTTPClientFromTransport(0, false, false, nil)
 	if tr, ok := c.Transport.(*http.Transport); !ok || tr.TLSClientConfig.MinVersion != tls.VersionTLS12 {
 		t.Fatalf("nil transport not correct")
 	}
 	// nil TLSConfig
-	c = newHTTPClientFromTransport(0, &http.Transport{TLSClientConfig: nil})
+	c = newHTTPClientFromTransport(0, false, false, &http.Transport{TLSClientConfig: nil})
 	if tr, ok := c.Transport.(*http.Transport); !ok || tr.TLSClientConfig.MinVersion != tls.VersionTLS12 {
 		t.Fatalf("nil TLSConfig not correct")
 	}
 	// legacy TLS
-	c = newHTTPClientFromTransport(0, &http.Transport{TLSClientConfig: &tls.Config{MinVersion: tls.VersionTLS10}}) //nolint:gosec
+	c = newHTTPClientFromTransport(0, false, false, &http.Transport{TLSClientConfig: &tls.Config{MinVersion: tls.VersionTLS10}}) //nolint:gosec
 	if tr, ok := c.Transport.(*http.Transport); !ok || tr.TLSClientConfig.MinVersion != tls.VersionTLS12 {
 		t.Fatalf("legacy TLS not upgraded")
 	}
 	// already TLS12
-	c = newHTTPClientFromTransport(0, &http.Transport{TLSClientConfig: &tls.Config{MinVersion: tls.VersionTLS12}})
+	c = newHTTPClientFromTransport(0, false, false, &http.Transport{TLSClientConfig: &tls.Config{MinVersion: tls.VersionTLS12}})
 	if tr, ok := c.Transport.(*http.Transport); !ok || tr.TLSClientConfig.MinVersion != tls.VersionTLS12 {
 		t.Fatalf("TLS12 not preserved")
 	}
@@ -1367,7 +1367,7 @@ func TestGenerate_OverflowPromptTokens(t *testing.T) {
 		_, _ = w.Write([]byte(`{"choices":[{"message":{"content":"ok"},"finish_reason":"stop"}],"usage":{"prompt_tokens":5000000000,"completion_tokens":1}}`))
 	}))
 	defer srv.Close()
-	a, err := New(ai.Options{APIKey: "sk-test", Model: "gpt-4", BaseURL: srv.URL})
+	a, err := New(ai.Options{APIKey: "sk-test", Model: "gpt-4", BaseURL: srv.URL, AllowPrivate: true})
 	if err != nil {
 		t.Fatalf("Open err = %v", err)
 	}
@@ -1385,7 +1385,7 @@ func TestGenerate_OverflowCompletionTokens(t *testing.T) {
 		_, _ = w.Write([]byte(`{"choices":[{"message":{"content":"ok"},"finish_reason":"stop"}],"usage":{"prompt_tokens":1,"completion_tokens":5000000000}}`))
 	}))
 	defer srv.Close()
-	a, err := New(ai.Options{APIKey: "sk-test", Model: "gpt-4", BaseURL: srv.URL})
+	a, err := New(ai.Options{APIKey: "sk-test", Model: "gpt-4", BaseURL: srv.URL, AllowPrivate: true})
 	if err != nil {
 		t.Fatalf("Open err = %v", err)
 	}
@@ -1399,7 +1399,7 @@ func TestGenerate_OverflowCompletionTokens(t *testing.T) {
 func TestGenerate_NilResponse(t *testing.T) {
 	// Mutates global newHTTPClient: must not be parallel.
 	orig := newHTTPClient
-	newHTTPClient = func(time.Duration) *http.Client {
+	newHTTPClient = func(time.Duration, bool, bool) *http.Client {
 		return &http.Client{Transport: roundTripFunc(func(_ *http.Request) (*http.Response, error) {
 			return nil, nil
 		})}
@@ -1435,7 +1435,7 @@ func TestStream_AllOptions(t *testing.T) {
 		_, _ = fmt.Fprint(w, "data: [DONE]\n\n")
 	}))
 	defer srv.Close()
-	a, err := New(ai.Options{APIKey: "sk-test", Model: "gpt-4", BaseURL: srv.URL})
+	a, err := New(ai.Options{APIKey: "sk-test", Model: "gpt-4", BaseURL: srv.URL, AllowPrivate: true})
 	if err != nil {
 		t.Fatalf("Open err = %v", err)
 	}
@@ -1471,7 +1471,7 @@ func TestStream_EmptyChoicesContinue(t *testing.T) {
 		_, _ = fmt.Fprint(w, "data: [DONE]\n\n")
 	}))
 	defer srv.Close()
-	a, err := New(ai.Options{APIKey: "sk-test", Model: "gpt-4", BaseURL: srv.URL})
+	a, err := New(ai.Options{APIKey: "sk-test", Model: "gpt-4", BaseURL: srv.URL, AllowPrivate: true})
 	if err != nil {
 		t.Fatalf("Open err = %v", err)
 	}
@@ -1501,7 +1501,7 @@ func TestStream_EmptyToolCallSkipped(t *testing.T) {
 		_, _ = fmt.Fprint(w, "data: [DONE]\n\n")
 	}))
 	defer srv.Close()
-	a, err := New(ai.Options{APIKey: "sk-test", Model: "gpt-4", BaseURL: srv.URL})
+	a, err := New(ai.Options{APIKey: "sk-test", Model: "gpt-4", BaseURL: srv.URL, AllowPrivate: true})
 	if err != nil {
 		t.Fatalf("Open err = %v", err)
 	}
@@ -1536,7 +1536,7 @@ func TestStream_ContextCancel(t *testing.T) {
 		_, _ = fmt.Fprint(w, "data: [DONE]\n\n")
 	}))
 	defer srv.Close()
-	a, err := New(ai.Options{APIKey: "sk-test", Model: "gpt-4", BaseURL: srv.URL})
+	a, err := New(ai.Options{APIKey: "sk-test", Model: "gpt-4", BaseURL: srv.URL, AllowPrivate: true})
 	if err != nil {
 		t.Fatalf("Open err = %v", err)
 	}
@@ -1621,7 +1621,7 @@ func TestStream_CtxDoneDuringDelta(t *testing.T) {
 		}
 	}))
 	defer srv.Close()
-	a, err := New(ai.Options{APIKey: "sk-test", Model: "gpt-4", BaseURL: srv.URL})
+	a, err := New(ai.Options{APIKey: "sk-test", Model: "gpt-4", BaseURL: srv.URL, AllowPrivate: true})
 	if err != nil {
 		t.Fatalf("Open err = %v", err)
 	}
@@ -1661,7 +1661,7 @@ func TestStream_CtxDoneDuringToolCall(t *testing.T) {
 		}
 	}))
 	defer srv.Close()
-	a, err := New(ai.Options{APIKey: "sk-test", Model: "gpt-4", BaseURL: srv.URL})
+	a, err := New(ai.Options{APIKey: "sk-test", Model: "gpt-4", BaseURL: srv.URL, AllowPrivate: true})
 	if err != nil {
 		t.Fatalf("Open err = %v", err)
 	}

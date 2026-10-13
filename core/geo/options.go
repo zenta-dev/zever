@@ -23,6 +23,11 @@ type Options struct {
 	MaxResponseBody int `json:"max_response_body" toml:"max_response_body" yaml:"max_response_body"`
 	// AllowInsecure permits http BaseURL/Endpoint for testing.
 	AllowInsecure bool `json:"allow_insecure" toml:"allow_insecure" yaml:"allow_insecure"`
+	// AllowPrivate permits dialing private, loopback, and link-local
+	// addresses (required for a local tile/mock Endpoint). Default false:
+	// only globally routable addresses are dialed, redirects are never
+	// followed, and the adapter logs a line at open when enabled.
+	AllowPrivate bool `json:"allow_private" toml:"allow_private" yaml:"allow_private"`
 	// UserAgent is the User-Agent for OSM Nominatim. Required for OSM.
 	UserAgent string `json:"user_agent" toml:"user_agent" yaml:"user_agent"`
 }

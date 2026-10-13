@@ -56,7 +56,7 @@ func benchGeo(b *testing.B) geo.Geo {
 	}))
 	b.Cleanup(srv.Close)
 
-	g, err := New(geo.Options{APIKey: "fake-key", BaseURL: srv.URL, AllowInsecure: true})
+	g, err := New(geo.Options{APIKey: "fake-key", BaseURL: srv.URL, AllowInsecure: true, AllowPrivate: true})
 	if err != nil {
 		b.Fatalf("New() error = %v", err)
 	}

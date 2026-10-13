@@ -23,11 +23,22 @@ type Options struct {
 	Model string `json:"model" toml:"model" yaml:"model"`
 	// Timeout bounds each HTTP exchange. Non-positive means DefaultTimeout.
 	Timeout time.Duration `json:"timeout" toml:"timeout" yaml:"timeout"`
-	// AllowInsecure permits a plain-http Addr for non-loopback hosts and
-	// disables TLS certificate verification. Default false: https required
-	// for non-loopback hosts, verification always on. Loopback http (the
-	// DefaultAddr host) is always permitted for local development.
+	// AllowInsecure permits a plain-http Addr for non-loopback hosts.
+	// Default false: https required for non-loopback hosts. Loopback http
+	// (the DefaultAddr host) is always permitted for local development.
+	// AllowInsecure no longer disables TLS verification; set
+	// InsecureSkipVerify explicitly for self-signed test servers.
 	AllowInsecure bool `json:"allow_insecure" toml:"allow_insecure" yaml:"allow_insecure"`
+	// AllowPrivate permits dialing private, loopback, and link-local
+	// addresses. Default false, so the loopback DefaultAddr needs an
+	// explicit opt-in: only globally routable addresses are dialed,
+	// redirects are never followed, and the adapter logs a line at open
+	// when enabled.
+	AllowPrivate bool `json:"allow_private" toml:"allow_private" yaml:"allow_private"`
+	// InsecureSkipVerify disables TLS certificate verification for
+	// self-signed test servers. Default false: verification always on.
+	// Enable only for testing; the adapter logs a warning at open.
+	InsecureSkipVerify bool `json:"insecure_skip_verify" toml:"insecure_skip_verify" yaml:"insecure_skip_verify"`
 	// Transport overrides the HTTP round tripper. Nil means http.DefaultTransport.
 	// Tests use a hand-fake transport; production leaves it nil.
 	Transport http.RoundTripper `json:"-" toml:"-" yaml:"-"`

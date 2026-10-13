@@ -77,7 +77,7 @@ func TestNew_Defaults(t *testing.T) {
 	}
 
 	// http with AllowInsecure
-	g2, err := New(geo.Options{Endpoint: "http://example.com", UserAgent: "test-app/1.0", AllowInsecure: true})
+	g2, err := New(geo.Options{Endpoint: "http://example.com", UserAgent: "test-app/1.0", AllowInsecure: true, AllowPrivate: true})
 	if err != nil {
 		t.Fatalf("http AllowInsecure: %v", err)
 	}
@@ -191,7 +191,7 @@ func TestGeocode_OK(t *testing.T) {
 	}))
 	defer srv.Close()
 
-	g, err := New(geo.Options{Endpoint: srv.URL, UserAgent: "myapp/1.0", AllowInsecure: true})
+	g, err := New(geo.Options{Endpoint: srv.URL, UserAgent: "myapp/1.0", AllowInsecure: true, AllowPrivate: true})
 	if err != nil {
 		t.Fatalf("New: %v", err)
 	}
@@ -235,7 +235,7 @@ func TestGeocode_EmptyResults(t *testing.T) {
 		fmt.Fprint(w, `[]`)
 	}))
 	defer srv.Close()
-	g, _ := New(geo.Options{Endpoint: srv.URL, UserAgent: "app/1.0", AllowInsecure: true})
+	g, _ := New(geo.Options{Endpoint: srv.URL, UserAgent: "app/1.0", AllowInsecure: true, AllowPrivate: true})
 	_, err := g.Geocode(t.Context(), "nowhere")
 	if !errors.Is(err, geo.ErrNotFound) {
 		t.Fatalf("expected ErrNotFound, got %v", err)
@@ -249,7 +249,7 @@ func TestGeocode_InvalidLatString(t *testing.T) {
 		fmt.Fprint(w, `[{"place_id":1,"lat":"bad","lon":"-74","display_name":"X","address":{}}]`)
 	}))
 	defer srv.Close()
-	g, _ := New(geo.Options{Endpoint: srv.URL, UserAgent: "app/1.0", AllowInsecure: true})
+	g, _ := New(geo.Options{Endpoint: srv.URL, UserAgent: "app/1.0", AllowInsecure: true, AllowPrivate: true})
 	_, err := g.Geocode(t.Context(), "bad")
 	if !errors.Is(err, geo.ErrNotFound) {
 		t.Fatalf("expected ErrNotFound for invalid lat, got %v", err)
@@ -263,7 +263,7 @@ func TestGeocode_InvalidLonString(t *testing.T) {
 		fmt.Fprint(w, `[{"place_id":1,"lat":"40.7","lon":"bad","display_name":"X","address":{}}]`)
 	}))
 	defer srv.Close()
-	g, _ := New(geo.Options{Endpoint: srv.URL, UserAgent: "app/1.0", AllowInsecure: true})
+	g, _ := New(geo.Options{Endpoint: srv.URL, UserAgent: "app/1.0", AllowInsecure: true, AllowPrivate: true})
 	_, err := g.Geocode(t.Context(), "bad")
 	if !errors.Is(err, geo.ErrNotFound) {
 		t.Fatalf("expected ErrNotFound for invalid lon, got %v", err)
@@ -278,7 +278,7 @@ func TestGeocode_InvalidCoordinate(t *testing.T) {
 		fmt.Fprint(w, `[{"place_id":1,"lat":"200","lon":"0","display_name":"X","address":{}}]`)
 	}))
 	defer srv.Close()
-	g, _ := New(geo.Options{Endpoint: srv.URL, UserAgent: "app/1.0", AllowInsecure: true})
+	g, _ := New(geo.Options{Endpoint: srv.URL, UserAgent: "app/1.0", AllowInsecure: true, AllowPrivate: true})
 	_, err := g.Geocode(t.Context(), "bad")
 	if !errors.Is(err, geo.ErrInvalidCoordinate) {
 		t.Fatalf("expected ErrInvalidCoordinate, got %v", err)
@@ -292,7 +292,7 @@ func TestGeocode_DecodeError(t *testing.T) {
 		fmt.Fprint(w, `not json`)
 	}))
 	defer srv.Close()
-	g, _ := New(geo.Options{Endpoint: srv.URL, UserAgent: "app/1.0", AllowInsecure: true})
+	g, _ := New(geo.Options{Endpoint: srv.URL, UserAgent: "app/1.0", AllowInsecure: true, AllowPrivate: true})
 	_, err := g.Geocode(t.Context(), "x")
 	if err == nil || !strings.Contains(err.Error(), "decode") {
 		t.Fatalf("expected decode error, got %v", err)
@@ -306,7 +306,7 @@ func TestGeocode_StatusNon200(t *testing.T) {
 		fmt.Fprint(w, "internal error")
 	}))
 	defer srv.Close()
-	g, _ := New(geo.Options{Endpoint: srv.URL, UserAgent: "app/1.0", AllowInsecure: true})
+	g, _ := New(geo.Options{Endpoint: srv.URL, UserAgent: "app/1.0", AllowInsecure: true, AllowPrivate: true})
 	_, err := g.Geocode(t.Context(), "x")
 	if err == nil || !strings.Contains(err.Error(), "status 500") {
 		t.Fatalf("expected status 500, got %v", err)
@@ -324,7 +324,7 @@ func TestGeocode_StatusTruncate(t *testing.T) {
 		fmt.Fprint(w, large)
 	}))
 	defer srv.Close()
-	g, _ := New(geo.Options{Endpoint: srv.URL, UserAgent: "app/1.0", AllowInsecure: true})
+	g, _ := New(geo.Options{Endpoint: srv.URL, UserAgent: "app/1.0", AllowInsecure: true, AllowPrivate: true})
 	_, err := g.Geocode(t.Context(), "x")
 	if err == nil {
 		t.Fatalf("expected error")
@@ -348,7 +348,7 @@ func TestGeocode_BodyTooLarge(t *testing.T) {
 		fmt.Fprint(w, large)
 	}))
 	defer srv.Close()
-	g, _ := New(geo.Options{Endpoint: srv.URL, UserAgent: "app/1.0", AllowInsecure: true, MaxResponseBody: 1 << 20})
+	g, _ := New(geo.Options{Endpoint: srv.URL, UserAgent: "app/1.0", AllowInsecure: true, AllowPrivate: true, MaxResponseBody: 1 << 20})
 	_, err := g.Geocode(t.Context(), "x")
 	if !errors.Is(err, geo.ErrTooLarge) {
 		t.Fatalf("expected ErrTooLarge, got %v", err)
@@ -371,7 +371,7 @@ func TestGeocode_ContextCancellation(t *testing.T) {
 		fmt.Fprint(w, `[]`)
 	}))
 	defer srv.Close()
-	g, _ := New(geo.Options{Endpoint: srv.URL, UserAgent: "app/1.0", AllowInsecure: true})
+	g, _ := New(geo.Options{Endpoint: srv.URL, UserAgent: "app/1.0", AllowInsecure: true, AllowPrivate: true})
 	ctx, cancel := context.WithCancel(t.Context())
 	cancel()
 	_, err := g.Geocode(ctx, "x")
@@ -391,7 +391,7 @@ func TestGeocode_BodyTooLarge_CustomLimit(t *testing.T) {
 		fmt.Fprint(w, strings.Repeat("b", 100))
 	}))
 	defer srv.Close()
-	g, _ := New(geo.Options{Endpoint: srv.URL, UserAgent: "app/1.0", AllowInsecure: true, MaxResponseBody: 10})
+	g, _ := New(geo.Options{Endpoint: srv.URL, UserAgent: "app/1.0", AllowInsecure: true, AllowPrivate: true, MaxResponseBody: 10})
 	_, err := g.Geocode(t.Context(), "x")
 	if !errors.Is(err, geo.ErrTooLarge) {
 		t.Fatalf("expected ErrTooLarge, got %v", err)
@@ -415,7 +415,7 @@ func TestReverse_OK_SingleObject(t *testing.T) {
 		fmt.Fprint(w, `{"place_id":1,"lat":"40.7","lon":"-74","display_name":"New York","address":{"city":"NYC","country":"USA"}}`)
 	}))
 	defer srv.Close()
-	g, _ := New(geo.Options{Endpoint: srv.URL, UserAgent: "app/1.0", AllowInsecure: true})
+	g, _ := New(geo.Options{Endpoint: srv.URL, UserAgent: "app/1.0", AllowInsecure: true, AllowPrivate: true})
 	addrs, err := g.ReverseGeocode(t.Context(), 40.7, -74)
 	if err != nil {
 		t.Fatalf("ReverseGeocode: %v", err)
@@ -438,7 +438,7 @@ func TestReverse_OK_Array(t *testing.T) {
 		fmt.Fprint(w, `[{"place_id":1,"lat":"40.7","lon":"-74","display_name":"New York","address":{"city":"NYC"}}]`)
 	}))
 	defer srv.Close()
-	g, _ := New(geo.Options{Endpoint: srv.URL, UserAgent: "app/1.0", AllowInsecure: true})
+	g, _ := New(geo.Options{Endpoint: srv.URL, UserAgent: "app/1.0", AllowInsecure: true, AllowPrivate: true})
 	addrs, err := g.ReverseGeocode(t.Context(), 40.7, -74)
 	if err != nil {
 		t.Fatalf("Reverse: %v", err)
@@ -455,7 +455,7 @@ func TestReverse_ArrayMultiple(t *testing.T) {
 		fmt.Fprint(w, `[{"place_id":1,"display_name":"A","address":{"city":"A"}},{"place_id":2,"display_name":"B","address":{"city":"B"}}]`)
 	}))
 	defer srv.Close()
-	g, _ := New(geo.Options{Endpoint: srv.URL, UserAgent: "app/1.0", AllowInsecure: true})
+	g, _ := New(geo.Options{Endpoint: srv.URL, UserAgent: "app/1.0", AllowInsecure: true, AllowPrivate: true})
 	addrs, err := g.ReverseGeocode(t.Context(), 0, 0)
 	if err != nil {
 		t.Fatalf("Reverse: %v", err)
@@ -472,7 +472,7 @@ func TestReverse_Empty_Slice(t *testing.T) {
 		fmt.Fprint(w, `[]`)
 	}))
 	defer srv.Close()
-	g, _ := New(geo.Options{Endpoint: srv.URL, UserAgent: "app/1.0", AllowInsecure: true})
+	g, _ := New(geo.Options{Endpoint: srv.URL, UserAgent: "app/1.0", AllowInsecure: true, AllowPrivate: true})
 	_, err := g.ReverseGeocode(t.Context(), 0, 0)
 	if !errors.Is(err, geo.ErrNotFound) {
 		t.Fatalf("expected ErrNotFound, got %v", err)
@@ -486,7 +486,7 @@ func TestReverse_Empty_ObjectNoDisplayName(t *testing.T) {
 		fmt.Fprint(w, `{"place_id":1,"lat":"0","lon":"0","display_name":"","address":{}}`)
 	}))
 	defer srv.Close()
-	g, _ := New(geo.Options{Endpoint: srv.URL, UserAgent: "app/1.0", AllowInsecure: true})
+	g, _ := New(geo.Options{Endpoint: srv.URL, UserAgent: "app/1.0", AllowInsecure: true, AllowPrivate: true})
 	_, err := g.ReverseGeocode(t.Context(), 0, 0)
 	if !errors.Is(err, geo.ErrNotFound) {
 		t.Fatalf("expected ErrNotFound, got %v", err)
@@ -500,7 +500,7 @@ func TestReverse_ArrayFilteredEmpty(t *testing.T) {
 		fmt.Fprint(w, `[{"place_id":1,"display_name":"","address":{}}]`)
 	}))
 	defer srv.Close()
-	g, _ := New(geo.Options{Endpoint: srv.URL, UserAgent: "app/1.0", AllowInsecure: true})
+	g, _ := New(geo.Options{Endpoint: srv.URL, UserAgent: "app/1.0", AllowInsecure: true, AllowPrivate: true})
 	_, err := g.ReverseGeocode(t.Context(), 0, 0)
 	if !errors.Is(err, geo.ErrNotFound) {
 		t.Fatalf("expected ErrNotFound for filtered empty, got %v", err)
@@ -528,7 +528,7 @@ func TestReverse_DecodeError(t *testing.T) {
 		fmt.Fprint(w, `not json at all`)
 	}))
 	defer srv.Close()
-	g, _ := New(geo.Options{Endpoint: srv.URL, UserAgent: "app/1.0", AllowInsecure: true})
+	g, _ := New(geo.Options{Endpoint: srv.URL, UserAgent: "app/1.0", AllowInsecure: true, AllowPrivate: true})
 	_, err := g.ReverseGeocode(t.Context(), 0, 0)
 	if err == nil || !strings.Contains(err.Error(), "decode") {
 		t.Fatalf("expected decode error, got %v", err)
@@ -542,7 +542,7 @@ func TestReverse_EmptyBody(t *testing.T) {
 		fmt.Fprint(w, ` `)
 	}))
 	defer srv.Close()
-	g, _ := New(geo.Options{Endpoint: srv.URL, UserAgent: "app/1.0", AllowInsecure: true})
+	g, _ := New(geo.Options{Endpoint: srv.URL, UserAgent: "app/1.0", AllowInsecure: true, AllowPrivate: true})
 	_, err := g.ReverseGeocode(t.Context(), 0, 0)
 	if !errors.Is(err, geo.ErrNotFound) {
 		t.Fatalf("expected ErrNotFound for empty body, got %v", err)
@@ -556,7 +556,7 @@ func TestReverse_BracesEmpty(t *testing.T) {
 		fmt.Fprint(w, `{}`)
 	}))
 	defer srv.Close()
-	g, _ := New(geo.Options{Endpoint: srv.URL, UserAgent: "app/1.0", AllowInsecure: true})
+	g, _ := New(geo.Options{Endpoint: srv.URL, UserAgent: "app/1.0", AllowInsecure: true, AllowPrivate: true})
 	_, err := g.ReverseGeocode(t.Context(), 0, 0)
 	if !errors.Is(err, geo.ErrNotFound) {
 		t.Fatalf("expected ErrNotFound for {}, got %v", err)
@@ -570,7 +570,7 @@ func TestReverse_StatusNon200(t *testing.T) {
 		fmt.Fprint(w, "not found")
 	}))
 	defer srv.Close()
-	g, _ := New(geo.Options{Endpoint: srv.URL, UserAgent: "app/1.0", AllowInsecure: true})
+	g, _ := New(geo.Options{Endpoint: srv.URL, UserAgent: "app/1.0", AllowInsecure: true, AllowPrivate: true})
 	_, err := g.ReverseGeocode(t.Context(), 0, 0)
 	if err == nil || !strings.Contains(err.Error(), "status 404") {
 		t.Fatalf("expected status 404, got %v", err)
@@ -583,7 +583,7 @@ func TestReverse_BodyTooLarge(t *testing.T) {
 		fmt.Fprint(w, strings.Repeat("z", 2<<20))
 	}))
 	defer srv.Close()
-	g, _ := New(geo.Options{Endpoint: srv.URL, UserAgent: "app/1.0", AllowInsecure: true})
+	g, _ := New(geo.Options{Endpoint: srv.URL, UserAgent: "app/1.0", AllowInsecure: true, AllowPrivate: true})
 	_, err := g.ReverseGeocode(t.Context(), 0, 0)
 	if !errors.Is(err, geo.ErrTooLarge) {
 		t.Fatalf("expected ErrTooLarge, got %v", err)
@@ -598,7 +598,7 @@ func TestReverse_NilAddressMap(t *testing.T) {
 		fmt.Fprint(w, `{"place_id":1,"lat":"0","lon":"0","display_name":"Some Place"}`)
 	}))
 	defer srv.Close()
-	g, _ := New(geo.Options{Endpoint: srv.URL, UserAgent: "app/1.0", AllowInsecure: true})
+	g, _ := New(geo.Options{Endpoint: srv.URL, UserAgent: "app/1.0", AllowInsecure: true, AllowPrivate: true})
 	addrs, err := g.ReverseGeocode(t.Context(), 0, 0)
 	if err != nil {
 		t.Fatalf("Reverse: %v", err)
@@ -854,7 +854,7 @@ func TestGeocode_UserAgentRequiredOnDo(t *testing.T) {
 		fmt.Fprint(w, `[]`)
 	}))
 	defer srv.Close()
-	g, _ := New(geo.Options{Endpoint: srv.URL, UserAgent: "app/1.0", AllowInsecure: true})
+	g, _ := New(geo.Options{Endpoint: srv.URL, UserAgent: "app/1.0", AllowInsecure: true, AllowPrivate: true})
 	ctx, cancel := context.WithCancel(t.Context())
 	cancel()
 	_, err := g.Geocode(ctx, "x")
@@ -878,7 +878,7 @@ func TestGeocode_LimitQuery(t *testing.T) {
 		fmt.Fprint(w, `[{"lat":"1","lon":"1","display_name":"A","address":{}}]`)
 	}))
 	defer srv.Close()
-	g, _ := New(geo.Options{Endpoint: srv.URL, UserAgent: "app/1.0", AllowInsecure: true})
+	g, _ := New(geo.Options{Endpoint: srv.URL, UserAgent: "app/1.0", AllowInsecure: true, AllowPrivate: true})
 	_, err := g.Geocode(t.Context(), "a & b")
 	if err != nil {
 		t.Fatalf("Geocode special: %v", err)
@@ -938,7 +938,7 @@ func TestReverse_Array_NilAddress(t *testing.T) {
 		fmt.Fprint(w, `[{"place_id":1,"display_name":"A"},{"place_id":2,"display_name":"B","address":{"city":"B"}}]`)
 	}))
 	defer srv.Close()
-	g, _ := New(geo.Options{Endpoint: srv.URL, UserAgent: "app/1.0", AllowInsecure: true})
+	g, _ := New(geo.Options{Endpoint: srv.URL, UserAgent: "app/1.0", AllowInsecure: true, AllowPrivate: true})
 	addrs, err := g.ReverseGeocode(t.Context(), 0, 0)
 	if err != nil {
 		t.Fatalf("Reverse: %v", err)
@@ -968,7 +968,7 @@ func TestReverse_Array_FilteredWithAddress(t *testing.T) {
 		fmt.Fprint(w, `[{"place_id":1,"display_name":"","address":{"city":"X"}},{"place_id":2,"display_name":"Y","address":{}}]`)
 	}))
 	defer srv.Close()
-	g, _ := New(geo.Options{Endpoint: srv.URL, UserAgent: "app/1.0", AllowInsecure: true})
+	g, _ := New(geo.Options{Endpoint: srv.URL, UserAgent: "app/1.0", AllowInsecure: true, AllowPrivate: true})
 	addrs, err := g.ReverseGeocode(t.Context(), 0, 0)
 	if err != nil {
 		t.Fatalf("Reverse: %v", err)
@@ -985,7 +985,7 @@ func TestReverse_NullArray(t *testing.T) {
 		fmt.Fprint(w, `null`)
 	}))
 	defer srv.Close()
-	g, _ := New(geo.Options{Endpoint: srv.URL, UserAgent: "app/1.0", AllowInsecure: true})
+	g, _ := New(geo.Options{Endpoint: srv.URL, UserAgent: "app/1.0", AllowInsecure: true, AllowPrivate: true})
 	_, err := g.ReverseGeocode(t.Context(), 0, 0)
 	if !errors.Is(err, geo.ErrNotFound) {
 		t.Fatalf("expected ErrNotFound for null, got %v", err)
@@ -1008,7 +1008,7 @@ func TestPace_SpacesOutRequests(t *testing.T) {
 	}))
 	defer srv.Close()
 
-	g, err := New(geo.Options{Endpoint: srv.URL, UserAgent: "app/1.0", AllowInsecure: true})
+	g, err := New(geo.Options{Endpoint: srv.URL, UserAgent: "app/1.0", AllowInsecure: true, AllowPrivate: true})
 	if err != nil {
 		t.Fatalf("New: %v", err)
 	}
@@ -1053,7 +1053,7 @@ func TestPace_ContextCanceledDuringWait(t *testing.T) {
 	}))
 	defer srv.Close()
 
-	g, err := New(geo.Options{Endpoint: srv.URL, UserAgent: "app/1.0", AllowInsecure: true})
+	g, err := New(geo.Options{Endpoint: srv.URL, UserAgent: "app/1.0", AllowInsecure: true, AllowPrivate: true})
 	if err != nil {
 		t.Fatalf("New: %v", err)
 	}
