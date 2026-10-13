@@ -153,6 +153,14 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   the exported `ErrNilFactory` sentinel, and nil `duplicate`/`unknown` hooks
   fall back to errors wrapping the exported `ErrDuplicate`/`ErrUnknown`
   sentinels. All three sentinels are now exported for `errors.Is` checks.
+- `fix(cli): derive command list from Cobra tree`: the did-you-mean
+  suggestion list is no longer hand-maintained — it derives from the Cobra
+  command tree (names plus aliases, sorted), so `docs` and `completion` are
+  suggested and every future command is covered without a second list to
+  update. The deliberate `check-boundaries`/`check:boundaries` alias pair
+  keeps working. The unknown-command usage text now lists `docs` and
+  `completion`, and `zever --help` shares the same `zever — zever toolkit`
+  header as the unknown-command usage.
 
 ### Security
 

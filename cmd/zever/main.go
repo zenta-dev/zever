@@ -74,8 +74,10 @@ func peelInteractive(args []string) []string {
 
 // subcommandHandlers is the dispatch table: top-level subcommand name →
 // handler. Handler bodies (runNew, runCompile, …) are implemented by parallel
-// agents; this table names each one exactly. Keep in sync with allTopLevel
-// (suggest.go) minus the "help" alias, which run handles inline.
+// agents; this table names each one exactly. It covers the legacy-routed
+// subset (ported commands run via Cobra instead); suggestions derive from
+// the Cobra tree (allTopLevel, suggest.go), and "help" is handled inline
+// below, never via this table.
 //
 // Separator standard: single words bare (`check`, `graph`); multi-word
 // single commands hyphenated (`check-boundaries`, alias `check:boundaries`);
@@ -272,7 +274,7 @@ func run(args []string) error {
 		printUsage()
 
 		if shouldShowHint() {
-			if s := closest(sub, allTopLevel); s != "" {
+			if s := closest(sub, allTopLevel()); s != "" {
 				_, _ = fmt.Fprintln(os.Stderr, formatHint(fmt.Sprintf("did you mean %q?", s)))
 			} else {
 				_, _ = fmt.Fprintln(os.Stderr, formatHint("run 'zever --help' for usage"))
@@ -422,6 +424,8 @@ func printUsage() {
 		line("db", "Database commands (db migrate, db rollback, db seed)"),
 		"",
 		sectionOps,
+		line("completion", "Generate shell completion scripts"),
+		line("docs", "Generate man pages and markdown reference docs"),
 		line("outbox", "Inspect and repair the outbox DLQ"),
 		line("uninstall", "Remove the zever and zever-lsp binaries"),
 		line("upgrade", "Upgrade the zever binary to the latest release"),
