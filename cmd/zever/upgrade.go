@@ -87,7 +87,7 @@ type upgradeOptions struct {
 func newUpgradeCmd() *cobra.Command {
 	var target string
 
-	var check, dryRun, yes, force bool
+	var check, dryRun, yes, force, project bool
 
 	cmd := &cobra.Command{
 		Use:   "upgrade",
@@ -97,13 +97,38 @@ func newUpgradeCmd() *cobra.Command {
 
 The release asset matching runtime.GOOS/runtime.GOARCH plus SHA256SUMS.txt
 is downloaded from the GitHub release, verified with crypto/sha256, and
-installed atomically over the running binary.`,
+installed atomically over the running binary.
+
+With --project, the current project's go.mod is upgraded instead: every
+github.com/zenta-dev/zever/* require without a matching replace directive
+is bumped to the target version, ` + "`go mod tidy`" + ` runs, and breaking
+changes between the versions print from the cached release notes.`,
 		Example: `  zever upgrade --check
   zever upgrade --dry-run
   zever upgrade --yes
-  zever upgrade --version v0.7.0 --yes`,
+  zever upgrade --version v0.7.0 --yes
+  zever upgrade --project --dry-run
+  zever upgrade --project --version v0.7.0`,
 		Args: cobra.NoArgs,
 		RunE: func(cmd *cobra.Command, _ []string) error {
+			if project {
+				cacheDir, _ := os.UserCacheDir()
+
+				if cacheDir != "" {
+					cacheDir += "/zever"
+				}
+
+				return runUpgradeProjectWith(context.Background(), projectUpgradeOptions{
+					dir:      ".",
+					target:   target,
+					check:    check,
+					dryRun:   dryRun,
+					json:     jsonMode,
+					out:      cmd.OutOrStdout(),
+					cacheDir: cacheDir,
+				})
+			}
+
 			return runUpgradeWith(context.Background(), upgradeOptions{
 				target: target,
 				check:  check,
@@ -121,6 +146,7 @@ installed atomically over the running binary.`,
 	cmd.Flags().BoolVar(&dryRun, "dry-run", false, "print the upgrade plan without downloading anything")
 	cmd.Flags().BoolVarP(&yes, "yes", "y", false, "confirm without prompting (non-interactive)")
 	cmd.Flags().BoolVar(&force, "force", false, "alias for --yes")
+	cmd.Flags().BoolVar(&project, "project", false, "upgrade the current project's go.mod instead of the binary")
 
 	return cmd
 }
