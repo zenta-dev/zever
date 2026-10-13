@@ -12,20 +12,20 @@ func TestClosest(t *testing.T) {
 		candidates []string
 		want       string
 	}{
-		{"exact", "compile", allTopLevel, "compile"},
-		{"one deletion", "compil", allTopLevel, "compile"},
-		{"one insertion", "compilee", allTopLevel, "compile"},
-		{"transposition", "comiple", allTopLevel, "compile"},
-		{"case insensitive", "COMPILE", allTopLevel, "compile"},
-		{"mixed case typo", "Generat", allTopLevel, "generate"},
-		{"colon command typo", "queue:wrk", allTopLevel, "queue:work"},
-		{"hyphenated", "check-boundarie", allTopLevel, "check-boundaries"},
-		{"empty input", "", allTopLevel, ""},
+		{"exact", "compile", allTopLevel(), "compile"},
+		{"one deletion", "compil", allTopLevel(), "compile"},
+		{"one insertion", "compilee", allTopLevel(), "compile"},
+		{"transposition", "comiple", allTopLevel(), "compile"},
+		{"case insensitive", "COMPILE", allTopLevel(), "compile"},
+		{"mixed case typo", "Generat", allTopLevel(), "generate"},
+		{"colon command typo", "queue:wrk", allTopLevel(), "queue:work"},
+		{"hyphenated", "check-boundarie", allTopLevel(), "check-boundaries"},
+		{"empty input", "", allTopLevel(), ""},
 		{"no candidates", "compile", nil, ""},
 		{"empty candidates", "compile", []string{}, ""},
-		{"short input no near match", "zz", allTopLevel, ""},
-		{"short input exact still wins", "db", allTopLevel, "db"},
-		{"far input", "zzzqqqxxx", allTopLevel, ""},
+		{"short input no near match", "zz", allTopLevel(), ""},
+		{"short input exact still wins", "db", allTopLevel(), "db"},
+		{"far input", "zzzqqqxxx", allTopLevel(), ""},
 		{"generate sub typo", "entit", allGenerate, "entity"},
 		{"db sub typo", "migrat", allDB, "migrate"},
 		{"backend typo", "proo", allBackends, "proto"},
@@ -62,13 +62,18 @@ func TestDamerauLevenshtein(t *testing.T) {
 }
 
 func TestCandidateLists_complete(t *testing.T) {
-	wantTop := []string{
-		"new", "add", "compile", "check", "breaking", "fmt", "doctor", "config", "routes", "explain",
-		"check-boundaries", "check:boundaries", "graph", "generate", "extract", "serve", "dev",
-		"queue:work", "schedule:run", "tinker", "outbox", "db", "uninstall", "upgrade", "help",
+	// allTopLevel() derives from the Cobra tree (suggest.go): the shared
+	// global and a fresh tree must agree, which fails if the global is
+	// mutated or if a hand list is reintroduced. The deliberate
+	// check-boundaries/check:boundaries alias pair must survive.
+	if got, want := allTopLevel(), topLevelNames(newRootCmd()); !slices.Equal(got, want) {
+		t.Fatalf("allTopLevel() = %v, fresh tree = %v, want identical", got, want)
 	}
-	if !slices.Equal(allTopLevel, wantTop) {
-		t.Fatalf("allTopLevel = %v, want %v", allTopLevel, wantTop)
+
+	for _, want := range []string{"docs", "completion", "check-boundaries", "check:boundaries", "help"} {
+		if !slices.Contains(allTopLevel(), want) {
+			t.Errorf("allTopLevel() missing %q", want)
+		}
 	}
 
 	wantGen := []string{"module", "entity", "job", "schedule", "server", "worker", "seed", "tinker", "adapter"}
@@ -96,7 +101,7 @@ func TestClosestPrefixBonus(t *testing.T) {
 	}{
 		{"prefix bonus hit still far", "gen", []string{"generate"}, ""},
 		{"prefix bonus selects", "prot", []string{"proto", "zenorm"}, "proto"},
-		{"short prefix rejected", "ge", allTopLevel, ""},
+		{"short prefix rejected", "ge", allTopLevel(), ""},
 	} {
 		t.Run(tc.name, func(t *testing.T) {
 			if got := closest(tc.input, tc.candidates); got != tc.want {

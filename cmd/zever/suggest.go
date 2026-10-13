@@ -1,11 +1,50 @@
 package main
 
-import "strings"
+import (
+	"sort"
+	"strings"
 
-// all known top-level subcommands (including help aliases).
-var allTopLevel = []string{
-	"new", "add", "compile", "check", "breaking", "fmt", "doctor", "config", "routes", "explain", "check-boundaries", "check:boundaries", "graph",
-	"generate", "extract", "serve", "dev", "queue:work", "schedule:run", "tinker", "outbox", "db", "uninstall", "upgrade", "help",
+	"github.com/spf13/cobra"
+)
+
+// usageHeader is the shared first line of the top-level help. printUsage
+// (unknown-command path, main.go) renders it styled; newRootCmd (root.go)
+// prepends it plain to the Cobra help template so `zever --help` and the
+// unknown-command usage share the same header.
+const usageHeader = "zever — zever toolkit"
+
+// allTopLevel returns every suggestible top-level name derived from the
+// Cobra tree: each subcommand name plus each alias (including the deliberate
+// check-boundaries/check:boundaries pair) plus help. Sorted for
+// determinism; no hand-maintained list to drift.
+func allTopLevel() []string {
+	return topLevelNames(rootCmd)
+}
+
+// topLevelNames collects the suggestible names from root's subcommand
+// tree. It takes the tree explicitly so tests can pass a fresh tree
+// instead of the shared rootCmd global.
+func topLevelNames(root *cobra.Command) []string {
+	seen := make(map[string]bool)
+	var out []string
+	add := func(n string) {
+		if n == "" || seen[n] {
+			return
+		}
+		seen[n] = true
+		out = append(out, n)
+	}
+	for _, c := range root.Commands() {
+		add(c.Name())
+		for _, a := range c.Aliases {
+			add(a)
+		}
+	}
+	// Cobra's default help command only materializes on Execute, so pin
+	// the name for fresh trees.
+	add("help")
+	sort.Strings(out)
+	return out
 }
 
 // generate subcommands.
