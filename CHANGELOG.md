@@ -169,6 +169,16 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   and target versions (fetched once, cached under the user cache dir).
    `--dry-run` prints the plan without writing, fetching, or tidying;
    `--check` prints the available version only.
+- `feat(container): pool mismatch diagnostics in doctor`: shared-pool
+  `MaxConns` mismatches (borrower cap ignored in favor of the first
+  opener's) are now recorded, not just warned on stderr: new
+  `Container.PoolMismatches()` (borrow order) and `Container.PoolStatus()`
+  (backend, borrowers, effective cap), both DSN-free. `zever doctor`
+  prints them as `pool:` warnings with the `dedicated_pool: true` fix
+  hint (plus `pool_warnings` in `--json`); warnings never fail the
+  command. Container README gains `dedicated_pool` guidance for
+  queue/workflow/scheduler (share while idle-to-light, split on backlog;
+  a pool warning naming one of the three is the signal).
 - `perf(cli): cold-start measurement and startup budget`: in-process
   `--help` is now benchmarked (`BenchmarkHelpStartup`: ~99µs/op, 69KB/op,
   625 allocs/op on 2026-10-14 hardware) and capped by a deterministic

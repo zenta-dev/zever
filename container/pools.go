@@ -115,6 +115,25 @@ type poolEntry struct {
 	ready    chan struct{}
 }
 
+// PoolMismatch records one borrower whose nonzero MaxConns differed from the
+// shared pool's: the borrower's cap was ignored in favor of the first
+// opener's. It carries no DSN or path content, only the service name and
+// the two caps, so it is safe to surface in diagnostics output.
+type PoolMismatch struct {
+	Service string
+	Want    int
+	Have    int
+}
+
+// PoolInfo describes one resolved shared pool for diagnostics: its backend,
+// the services borrowing it, and the effective MaxConns (the first opener's
+// knobs). It carries no DSN or path content.
+type PoolInfo struct {
+	Backend  string
+	Services []string
+	MaxConns int
+}
+
 // poolSnapshot names one resolved pool for Close without ever including DSN
 // or path content.
 type poolSnapshot struct {
@@ -129,6 +148,10 @@ type poolSnapshot struct {
 type poolRegistry struct {
 	mu    sync.Mutex
 	pools map[string]*poolEntry
+	// mismatchLog records every MaxConns mismatch warn in borrow order, so
+	// diagnostics (doctor) can surface them after the fact. It carries no
+	// DSN content (see PoolMismatch).
+	mismatchLog []PoolMismatch
 	// open builds a fresh pool. Production resolves via the db registry so
 	// the container wires no adapters itself; tests inject a fake.
 	open func(adapter db.Adapter, opts db.Options) (db.DB, error)
@@ -200,8 +223,12 @@ func (r *poolRegistry) borrow(service string, adapter db.Adapter, opts db.Option
 		}
 		conn, knobs := e.conn, e.knobs
 		services := append([]string(nil), e.services...)
+		mismatch := opts.MaxConns != 0 && opts.MaxConns != knobs.MaxConns
 		r.mu.Unlock()
-		if opts.MaxConns != 0 && opts.MaxConns != knobs.MaxConns {
+		if mismatch {
+			r.mu.Lock()
+			r.mismatchLog = append(r.mismatchLog, PoolMismatch{Service: service, Want: opts.MaxConns, Have: knobs.MaxConns})
+			r.mu.Unlock()
 			r.warn(fmt.Sprintf("container: %s (shared pool): max_conns=%d ignored, shared pool max_conns=%d",
 				service, opts.MaxConns, knobs.MaxConns))
 		}
@@ -251,6 +278,68 @@ func (r *poolRegistry) snapshot() []poolSnapshot {
 	}
 
 	return out
+}
+
+// mismatches returns every recorded MaxConns mismatch in borrow order.
+// The result is a copy: callers may retain it without holding the lock.
+func (r *poolRegistry) mismatches() []PoolMismatch {
+	r.mu.Lock()
+	defer r.mu.Unlock()
+
+	return append([]PoolMismatch(nil), r.mismatchLog...)
+}
+
+// status describes every resolved (non-building) pool in deterministic key
+// order for diagnostics. It carries no DSN or path content: only the
+// backend, borrowing services, and effective cap.
+func (r *poolRegistry) status() []PoolInfo {
+	r.mu.Lock()
+	defer r.mu.Unlock()
+
+	keys := make([]string, 0, len(r.pools))
+	for k, e := range r.pools {
+		if !e.building {
+			keys = append(keys, k)
+		}
+	}
+	sort.Strings(keys)
+
+	out := make([]PoolInfo, 0, len(keys))
+	for _, k := range keys {
+		e := r.pools[k]
+		out = append(out, PoolInfo{
+			Backend:  e.backend,
+			Services: append([]string(nil), e.services...),
+			MaxConns: e.knobs.MaxConns,
+		})
+	}
+
+	return out
+}
+
+// String renders m as one diagnostics line naming the borrower, the
+// ignored cap, and the effective shared cap, with the dedicated_pool fix
+// hint. It carries no DSN content.
+func (m PoolMismatch) String() string {
+	return fmt.Sprintf("pool: %s wants max_conns=%d but shares pool max_conns=%d (first opener wins) — set dedicated_pool: true to isolate",
+		m.Service, m.Want, m.Have)
+}
+
+// PoolMismatches returns every shared-pool MaxConns mismatch recorded so
+// far, in borrow order. A mismatch means the borrower's nonzero MaxConns
+// was ignored in favor of the first opener's: the pool runs with one cap
+// for all borrowers. Call after resolving services; an empty result means
+// no borrower disagreed. The result is a copy safe to retain.
+func (c *Container) PoolMismatches() []PoolMismatch {
+	return c.pools.mismatches()
+}
+
+// PoolStatus describes every resolved shared pool in deterministic order
+// for diagnostics: backend, borrowing services, and effective MaxConns. It
+// carries no DSN or path content. Pools resolve lazily, so call after
+// resolving services.
+func (c *Container) PoolStatus() []PoolInfo {
+	return c.pools.status()
 }
 
 // containsService reports whether services already names service.
