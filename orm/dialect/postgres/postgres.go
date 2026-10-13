@@ -40,6 +40,10 @@ func (Dialect) QuoteIdent(s string) string {
 	return `"` + strings.ReplaceAll(s, `"`, `""`) + `"`
 }
 
+// MaxParams reports the per-statement bind-parameter budget for Postgres:
+// 65535, the wire protocol's uint16 parameter ceiling.
+func (Dialect) MaxParams() int { return 65535 }
+
 // SupportsCTE reports that Postgres supports common table expressions.
 func (Dialect) SupportsCTE() bool { return true }
 

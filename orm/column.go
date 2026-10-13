@@ -91,12 +91,15 @@ func (c Column[T, V]) outerCmp[U any](op Op, outer OuterRef[U, V]) Predicate[T] 
 // through a plain typed loop -- never reflect.
 //
 // In is a pure AST builder -- it has no query-executor context to chunk
-// against, so a very large vs produces a single IN (...) with as many bound
-// placeholders as len(vs), risking driver/DB placeholder limits (Postgres
-// ~65535 params, SQLite ~999-32766 depending on build flags) or a
-// degenerate query plan. Callers with a very large id set should chunk it
-// themselves before calling In repeatedly across multiple queries and
-// combining the results.
+// against, so it always records the full list. At execution time a
+// value-list IN larger than the resolved dialect's per-statement parameter
+// budget (Postgres 65535, SQLite 999 before 3.32.0 and 32766 after) fans
+// out into one statement per chunk for plain unordered unbounded SELECTs
+// (and Count/Exists, which sum/OR across chunks); see planInChunks for the
+// exact rule. Fan-out fails closed with ErrInListTooLarge when the query
+// carries ORDER BY/LIMIT/OFFSET, a row lock or TABLESAMPLE (their
+// semantics cannot be reconstructed across statements), or when the IN
+// sits under OR/NOT or is a NOT IN.
 func (c Column[T, V]) In(vs ...V) Predicate[T] {
 	out := make([]any, len(vs))
 	for i, v := range vs {

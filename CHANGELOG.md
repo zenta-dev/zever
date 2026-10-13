@@ -66,6 +66,22 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Added
 
+- `feat(orm): auto-chunk large IN lists`: a value-list `IN` larger than
+  the resolved dialect's per-statement parameter budget now fans out into
+  one statement per chunk for plain unordered unbounded `SELECT`s (rows
+  concatenated) and for `Count`/`Exists` (summed/ORed), instead of failing
+  in the driver with "too many SQL variables". Budgets come from the new
+  `dialect.ParamLimitDialect` interface (`MaxParams`, with a conservative
+  999 fallback): Postgres 65535 (wire-protocol uint16 ceiling), SQLite 999
+  before 3.32.0 and 32766 after (version-gated via the existing
+  `NewWithVersion` detection). Fan-out fails closed with the new
+  `ErrInListTooLarge` sentinel when the query carries `ORDER BY`/`LIMIT`/
+  `OFFSET`, a row lock or `TABLESAMPLE` (not reconstructible across
+  statements), or when the oversized `IN` sits under `OR`/`NOT` or is a
+  `NOT IN`. `Preload` sizes its child-`IN` chunks against the same budget
+  (minus the child query's own arguments), so old-SQLite backends get
+  fitting statements instead of driver errors; the 1000 default stands on
+  modern backends.
 - `feat(auth/jwt): kid-based key rotation and nbf validation`: `JWTOptions`
   gains `keys: [{kid, secret}]` plus `active_kid` (empty defaults to the
   first entry; validated for unique kids, secret length, and a matching
