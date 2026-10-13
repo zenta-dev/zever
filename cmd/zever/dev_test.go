@@ -373,7 +373,7 @@ service UserService {
 func readZeverLifecycle(t *testing.T, path string) []string {
 	t.Helper()
 
-	data, err := os.ReadFile(path) //nolint:gosec // test-controlled path
+	data, err := os.ReadFile(path) // test-controlled path
 	if err != nil {
 		if os.IsNotExist(err) {
 			return nil

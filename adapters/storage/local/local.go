@@ -940,7 +940,7 @@ func (a *localAdapter) put(w http.ResponseWriter, r *http.Request, full string, 
 	if declaredType != "" {
 		metaTmp = writeMetaTemp(dir, declaredType, mode)
 
-		defer func() { _ = os.Remove(metaTmp) }() //nolint:gosec // metaTmp from CreateTemp
+		defer func() { _ = os.Remove(metaTmp) }() // metaTmp from CreateTemp
 	}
 
 	if !strings.HasPrefix(tmpName, a.trustedPrefix()) {
@@ -970,7 +970,7 @@ func (a *localAdapter) put(w http.ResponseWriter, r *http.Request, full string, 
 			return
 		}
 
-		if err := os.Rename(metaTmp, metaDst); err != nil { //nolint:gosec // metaTmp from CreateTemp
+		if err := os.Rename(metaTmp, metaDst); err != nil { // metaTmp from CreateTemp
 			if a.lexicallyContained(full) {
 				if !strings.HasPrefix(full, a.trustedPrefix()) {
 					http.Error(w, "internal error", http.StatusInternalServerError)
@@ -1018,7 +1018,7 @@ func (a *localAdapter) get(w http.ResponseWriter, full string) {
 		return
 	}
 
-	f, err := os.Open(full) //nolint:gosec // internal path validated by resolve/lexicallyContained
+	f, err := os.Open(full) // internal path validated by resolve/lexicallyContained
 	if err != nil {
 		if os.IsNotExist(err) {
 			http.Error(w, "not found", http.StatusNotFound)
@@ -1044,7 +1044,7 @@ func contentTypeFor(full string) string {
 		return "application/octet-stream"
 	}
 
-	f, err := os.Open(sidecar) //nolint:gosec // internal path validated by caller
+	f, err := os.Open(sidecar) // internal path validated by caller
 	if err == nil {
 		defer func() { _ = f.Close() }()
 

@@ -131,7 +131,7 @@ func (a *adapter) Upload(_ context.Context, path string, data []byte, opts media
 
 	dest := filepath.Join(a.root, id+ext)
 
-	if err := os.MkdirAll(filepath.Dir(dest), 0o750); err != nil { //nolint:gosec // dest is confined to root via hex id
+	if err := os.MkdirAll(filepath.Dir(dest), 0o750); err != nil { // #nosec G703 -- dest is confined to root via hex id; filepath.Ext yields no separators
 		return media.Asset{}, fmt.Errorf("local: mkdir: %w", err)
 	}
 
@@ -163,7 +163,7 @@ func (a *adapter) Download(_ context.Context, id string) ([]byte, error) {
 		maxVal = media.DefaultMaxDownloadBytes
 	}
 
-	f, err := os.Open(src) //nolint:gosec // path validated via findFile/ValidHexID
+	f, err := os.Open(src) // path validated via findFile/ValidHexID
 	if err != nil {
 		return nil, fmt.Errorf("local: open: %w", err)
 	}
@@ -196,7 +196,7 @@ func (a *adapter) DownloadRange(_ context.Context, id string, offset, length int
 		return nil, err
 	}
 
-	data, err := os.ReadFile(src) //nolint:gosec // path validated via findFile/ValidHexID
+	data, err := os.ReadFile(src) // path validated via findFile/ValidHexID
 	if err != nil {
 		return nil, fmt.Errorf("local: read: %w", err)
 	}
@@ -280,7 +280,7 @@ func (a *adapter) Probe(ctx context.Context, id string) (media.Probe, error) {
 		return a.probeAV(ctx, src)
 	}
 
-	f, err := os.Open(src) //nolint:gosec // path validated via findFile/ValidHexID
+	f, err := os.Open(src) // path validated via findFile/ValidHexID
 	if err != nil {
 		return media.Probe{}, fmt.Errorf("local: open: %w", err)
 	}
@@ -491,7 +491,7 @@ func (a *adapter) loadImage(src string) (image.Image, error) {
 		maxBytes = media.DefaultMaxDownloadBytes
 	}
 
-	f, err := os.Open(src) //nolint:gosec // path validated via findFile/ValidHexID
+	f, err := os.Open(src) // path validated via findFile/ValidHexID
 	if err != nil {
 		return nil, fmt.Errorf("local: open: %w", err)
 	}

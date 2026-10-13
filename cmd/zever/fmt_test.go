@@ -26,7 +26,7 @@ func TestRunFmtCheckOnlyListsWithoutWriting(t *testing.T) {
 		t.Fatalf("expected the file path to be listed on stdout")
 	}
 
-	content, err := os.ReadFile(path) //nolint:gosec // test fixture path
+	content, err := os.ReadFile(path) // test fixture path
 	if err != nil {
 		t.Fatalf("read %q: %v", path, err)
 	}
@@ -63,7 +63,7 @@ func TestRunFmtWriteRewritesInPlace(t *testing.T) {
 		t.Fatalf("runFmt --write: %v", err)
 	}
 
-	content, err := os.ReadFile(path) //nolint:gosec // test fixture path
+	content, err := os.ReadFile(path) // test fixture path
 	if err != nil {
 		t.Fatalf("read %q: %v", path, err)
 	}
@@ -77,7 +77,7 @@ func TestRunFmtWriteRewritesInPlace(t *testing.T) {
 		t.Fatalf("second runFmt --write: %v", rewriteErr)
 	}
 
-	second, err := os.ReadFile(path) //nolint:gosec // test fixture path
+	second, err := os.ReadFile(path) // test fixture path
 	if err != nil {
 		t.Fatalf("read %q: %v", path, err)
 	}
@@ -100,7 +100,7 @@ func TestRunFmtShortWriteFlag(t *testing.T) {
 		t.Fatalf("runFmt -w: %v", err)
 	}
 
-	content, err := os.ReadFile(path) //nolint:gosec // test fixture path
+	content, err := os.ReadFile(path) // test fixture path
 	if err != nil {
 		t.Fatalf("read %q: %v", path, err)
 	}

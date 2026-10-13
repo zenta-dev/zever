@@ -86,7 +86,7 @@ func TestRunGenerateTinkerWritesShim(t *testing.T) {
 
 	path := filepath.Join(defaultTinkerEntry, "main.go")
 
-	src, err := os.ReadFile(path) //nolint:gosec // test-controlled path
+	src, err := os.ReadFile(path) // test-controlled path
 	if err != nil {
 		t.Fatalf("read generated shim: %v", err)
 	}
@@ -116,7 +116,7 @@ func TestRunGenerateTinkerRespectsFlags(t *testing.T) {
 		t.Fatalf("runGenerateTinker: %v", err)
 	}
 
-	src, rerr := os.ReadFile(filepath.Join("tools", "shim", "main.go")) //nolint:gosec // test-controlled path
+	src, rerr := os.ReadFile(filepath.Join("tools", "shim", "main.go")) // test-controlled path
 	if rerr != nil {
 		t.Fatalf("read generated shim: %v", rerr)
 	}

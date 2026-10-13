@@ -81,7 +81,7 @@ lint-fix: ## Run golangci-lint with auto-fix
 	$(GOLANGCI_LINT) run --fix ./...
 
 .PHONY: err-lint
-err-lint: ## Scan for error-convention violations (unprefixed messages, bracket prefixes, double %w, stray panics)
+err-lint: ## Scan for error-convention violations (unprefixed messages, bracket prefixes, double/missing %w, stray panics)
 	$(GO) -C tools/errscan run . "$(CURDIR)"
 
 .PHONY: test

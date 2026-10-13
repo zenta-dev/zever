@@ -339,7 +339,7 @@ func tinkerEval(i *interp.Interpreter, src string) (reflect.Value, error) {
 // that parse fails, and the retry path re-wraps the source in a main function
 // but never sets the parser's inFunc flag — so yaegi compiles the line as a
 // file declaring main rather than as an expression, and Eval hands back an
-// unpopulated *interface{} instead of the call's result.
+// unpopulated *any instead of the call's result.
 //
 // Parenthesising the literal makes the first token a '(' , which takes the
 // ordinary statement path and returns the real value. Only sources that are
@@ -375,7 +375,7 @@ func isTinkerIdentRune(b byte) bool {
 }
 
 // unwrapTinkerValue normalizes an Eval result. yaegi hands back the result of
-// an interpreted function call as a *interface{} pointing at the real value,
+// an interpreted function call as a *any pointing at the real value,
 // which is an implementation detail neither the REPL nor its tests should
 // have to see.
 func unwrapTinkerValue(v reflect.Value) reflect.Value {
@@ -443,7 +443,7 @@ func startTinkerShim(target string, passthrough io.Writer) (*tinkerClient, error
 	// a shim that ignores its stdin closing is still torn down.
 	ctx, cancel := context.WithCancel(context.Background())
 
-	cmd := exec.CommandContext(ctx, "go", "run", pkg) //nolint:gosec // target is a developer-supplied package path
+	cmd := exec.CommandContext(ctx, "go", "run", pkg) // target is a developer-supplied package path
 	cmd.Stderr = os.Stderr
 
 	stdin, err := cmd.StdinPipe()

@@ -604,7 +604,7 @@ func spawnUpgradeHelperWindows(ctx context.Context, staged, exePath string) erro
 		strconv.Itoa(pid) + `" >NUL && (timeout /t 1 /nobreak >NUL & goto wait)` +
 		"\nmove /Y " + fmt.Sprintf("%q %q", staged, exePath)
 
-	cmd := exec.CommandContext(ctx, "cmd", "/C", script) //nolint:gosec // staged/exePath derive from the running binary path, never remote input.
+	cmd := exec.CommandContext(ctx, "cmd", "/C", script) // staged/exePath derive from the running binary path, never remote input.
 
 	if err := cmd.Start(); err != nil {
 		return fmt.Errorf("zever upgrade: spawn Windows helper: %w", err)
