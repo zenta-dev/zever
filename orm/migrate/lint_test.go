@@ -137,23 +137,26 @@ func splitGoldenStatements(t *testing.T, raw string) []string {
 
 	var cur strings.Builder
 
-	for _, line := range strings.Split(raw, "\n") {
-		trimmed := strings.TrimSpace(line)
-		if trimmed == "" || strings.HasPrefix(trimmed, "--") && !strings.Contains(trimmed, ";") {
-			if strings.Contains(line, "zever:allow") {
-				cur.WriteString(line + "\n")
-			}
-
-			continue
+	flush := func() {
+		if strings.TrimSpace(cur.String()) != "" {
+			out = append(out, cur.String())
 		}
 
+		cur.Reset()
+	}
+
+	for _, line := range strings.Split(raw, "\n") {
 		cur.WriteString(line + "\n")
 
-		if strings.Contains(line, ";") {
-			out = append(out, cur.String())
-			cur.Reset()
+		// A statement ends at the first `;` outside a comment line;
+		// comment lines (including `-- zever:allow` pragmas) attach to
+		// the statement that follows them.
+		if strings.Contains(line, ";") && !strings.HasPrefix(strings.TrimSpace(line), "--") {
+			flush()
 		}
 	}
+
+	flush()
 
 	return out
 }
