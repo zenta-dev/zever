@@ -117,6 +117,13 @@ func TestRunGenerateServer(t *testing.T) {
 		"c.Resilience()",
 		"guardedGRPCClient",
 		"grpcclient.WithGuard(g)",
+		// SIGHUP reloads the log level and the rate limiter via atomic
+		// swap; everything else in the config file is restart-only.
+		"container.NewReloadableLogger",
+		"container.NewReloadableLimiter",
+		"container.WatchSIGHUP",
+		"SIGHUP reload skipped",
+		"reloaded SIGHUP-reloadable config",
 	} {
 		if !strings.Contains(main, fragment) {
 			t.Fatalf("server main.go lacks %q:\n%s", fragment, main)
@@ -650,6 +657,7 @@ func TestRunGenerateServerWiresRateLimitWhenConfigured(t *testing.T) {
 
 	for _, fragment := range []string{
 		"limiter, err := c.RateLimit()",
+		"reloadableLimiter := container.NewReloadableLimiter(limiter)",
 		"middleware.RateLimitUnaryServerInterceptor(limiter, middleware.PeerAddrKey)",
 		"r.Use(middleware.RateLimit(limiter, middleware.RemoteAddrKey))",
 	} {

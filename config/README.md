@@ -237,6 +237,26 @@ working directory; first hit wins, absent files skip silently. An explicit
 path must exist and decode — any failure returns `nil` plus the error, as
 does any merge, env, or validation failure.
 
+## Reload: restart-only, except SIGHUP
+
+Configuration is restart-only: editing the file (or the environment) has no
+effect on a running process. The generated server (`zever generate server`)
+watches for SIGHUP and re-reads the config file, but only three batteries
+swap atomically via `container` reloadables — everything else keeps its
+boot-time value until the process restarts:
+
+| Battery | SIGHUP behavior |
+|---|---|
+| `log` (`min_level`) | Swapped: the new level applies to subsequent events. |
+| `ratelimit` (`rate`, `burst`, …) | Swapped: the old limiter is closed after the swap. |
+| `flag` | Swapped when the process holds the client through `container.ReloadableFlag`. The `static` adapter additionally re-reads its file per evaluation when `reload: true` (last-good on failure), with no signal needed. |
+
+Deliberately NOT reloaded (restart required): service adapters, DSNs and
+pool knobs, credentials and secrets, TLS material, listen addresses, and
+every other battery. If reloading anything else looks tempting, restart
+instead — a half-reloaded process (new credentials against old pools) is
+worse than a brief restart.
+
 ## Editor autocomplete and validation
 
 `config/schema/` has a JSON Schema for `zever.yaml`/`.yml`/`.json` (plus a

@@ -97,6 +97,18 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   The older "45–55 allocs/op adaptor cost" note is corrected: the
   `newHTTPHandler` rework cut the isolated adaptor to 35; 45–55 still
   brackets the full serve path.
+- `feat: SIGHUP reload for log level, flags, rate limits`: new
+  `container.ReloadableLogger`, `container.ReloadableFlag`, and
+  `container.ReloadableLimiter` front their battery behind an atomic swap,
+  and `container.WatchSIGHUP` runs a reload closure on every SIGHUP until
+  its context ends. The generated server (`zever generate server`) wires
+  it: SIGHUP re-reads the config file and swaps the log level and the rate
+  limiter (old instances released after the swap); a failed re-open keeps
+  the old instance and only warns. Flag clients held directly swap the same
+  way; the `static` flag adapter also re-reads its file per evaluation when
+  `reload: true`. Everything else stays restart-only — adapters, DSNs,
+  credentials, TLS material, and listen addresses need a process restart
+  (see the new "Reload" section in `config/README.md`).
 - `feat(cli): zever upgrade --project`: the binary upgrader gains a project
   mode that bumps every `github.com/zenta-dev/zever/*` require without a
   matching `replace` directive in the current project's `go.mod` to the
