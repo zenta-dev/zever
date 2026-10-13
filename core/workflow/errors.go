@@ -53,6 +53,10 @@ var ErrSagaStepFailed = errors.New("workflow: saga step failed")
 // ErrSagaCompensationFailed is returned when saga compensation fails.
 var ErrSagaCompensationFailed = errors.New("workflow: saga compensation failed")
 
+// ErrTypedStepConvert is returned when a typed saga step's input cannot be
+// converted across the typed-to-untyped bridge (see NewTypedStep).
+var ErrTypedStepConvert = errors.New("workflow: convert typed saga step value")
+
 // DuplicateAdapterError reports a duplicate adapter registration.
 type DuplicateAdapterError struct {
 	// Adapter is the already-registered adapter.

@@ -229,6 +229,13 @@ func (d *driver) RegisterSaga(name string, steps []workflow.SagaStep) {
 	d.sagas[name] = steps
 }
 
+// RegisterTypedSaga registers a typed saga definition under name, converting
+// each step to the engine's untyped shape. It satisfies
+// workflow.TypedSagaRegistrar without changing the run path.
+func (d *driver) RegisterTypedSaga(name string, steps []workflow.TypedStep) {
+	d.RegisterSaga(name, workflow.TypedStepsToSagaSteps(steps))
+}
+
 // sagaSteps returns the saga definition registered under name.
 func (d *driver) sagaSteps(name string) ([]workflow.SagaStep, bool) {
 	d.mu.RLock()
@@ -698,7 +705,8 @@ func sagaStatusTerminal(status string) bool {
 }
 
 var (
-	_ workflow.SagaRegistrar = (*driver)(nil)
-	_ workflow.SagaRunner    = (*driver)(nil)
-	_ workflow.SagaInspector = (*driver)(nil)
+	_ workflow.SagaRegistrar      = (*driver)(nil)
+	_ workflow.TypedSagaRegistrar = (*driver)(nil)
+	_ workflow.SagaRunner         = (*driver)(nil)
+	_ workflow.SagaInspector      = (*driver)(nil)
 )
