@@ -45,7 +45,7 @@ func TestClosure3ServerLoadFiles(t *testing.T) {
 
 	t.Cleanup(func() { _ = os.Chmod(locked, 0o600) })
 
-	if _, err := loadServerData("example.com/app", "./generated", "schema", []string{locked}, false); err == nil {
+	if _, err := loadServerData("example.com/app", "./generated", "schema", []string{locked}, false, false); err == nil {
 		t.Fatal("want load error")
 	}
 
@@ -54,7 +54,7 @@ func TestClosure3ServerLoadFiles(t *testing.T) {
 	// Auto-discovery path: no explicit files, schema dir has content.
 	writeZeverFixture(t, dir, filepath.Join("schema", "ok.zen"), "entity A {\n\tid: uuid @primary\n}\n")
 
-	if _, err := loadServerData("example.com/app", "./generated", "schema", nil, false); err != nil {
+	if _, err := loadServerData("example.com/app", "./generated", "schema", nil, false, false); err != nil {
 		t.Fatalf("discovery: %v", err)
 	}
 }

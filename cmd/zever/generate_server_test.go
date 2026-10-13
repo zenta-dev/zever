@@ -102,7 +102,6 @@ func TestRunGenerateServer(t *testing.T) {
 		"healthServer := health.NewServer()",
 		"healthpb.RegisterHealthServer(grpcServer, healthServer)",
 		"healthServer.SetServingStatus(\"\", healthpb.HealthCheckResponse_SERVING)",
-		"reflection.Register(grpcServer)",
 		"healthServer.SetServingStatus(\"\", healthpb.HealthCheckResponse_NOT_SERVING)",
 		"ReadTimeout:       readTimeout,",
 		"WriteTimeout:      writeTimeout,",
@@ -131,6 +130,17 @@ func TestRunGenerateServer(t *testing.T) {
 	for _, wanted := range []string{"c.RateLimit()", "middleware.RateLimit", "RateLimitUnaryServerInterceptor"} {
 		if !strings.Contains(main, wanted) {
 			t.Fatalf("server main.go must wire rate limiting under zever defaults, lacks %q:\n%s", wanted, main)
+		}
+	}
+
+	// Reflection is off by default (secure-by-default): the generated server
+	// must neither register the reflection service nor import the package.
+	for _, unwanted := range []string{
+		"reflection.Register(grpcServer)",
+		`"google.golang.org/grpc/reflection"`,
+	} {
+		if strings.Contains(main, unwanted) {
+			t.Fatalf("server main.go must not contain %q by default:\n%s", unwanted, main)
 		}
 	}
 
@@ -167,6 +177,100 @@ func TestRunGenerateServer(t *testing.T) {
 
 	assertGolden(t, "generate_server_main_default.golden", []byte(main))
 	assertGolden(t, "generate_server_app.golden", []byte(app))
+}
+
+// TestRunGenerateServerReflectionEnabledByEnv proves the explicit opt-in:
+// GRPC_REFLECTION=true wires the reflection service into the generated
+// server, import included.
+func TestRunGenerateServerReflectionEnabledByEnv(t *testing.T) {
+	dir := t.TempDir()
+	withWorkingDir(t, dir)
+	writeGoMod(t, dir, "example.com/shop")
+	t.Setenv("GRPC_REFLECTION", "true")
+	t.Setenv("ZEVER_ENV", "production")
+
+	if err := runGenerateServer(nil); err != nil {
+		t.Fatalf("runGenerateServer: %v", err)
+	}
+
+	main := readGenerated(t, filepath.Join(dir, "cmd", "server", "main.go"))
+
+	for _, fragment := range []string{
+		`"google.golang.org/grpc/reflection"`,
+		"reflection.Register(grpcServer)",
+	} {
+		if !strings.Contains(main, fragment) {
+			t.Fatalf("server main.go lacks %q with GRPC_REFLECTION=true:\n%s", fragment, main)
+		}
+	}
+}
+
+// TestRunGenerateServerReflectionDisabledByExplicitEnv proves an explicit
+// GRPC_REFLECTION=false wins over a dev ZEVER_ENV: the operator's explicit
+// choice is never overridden.
+func TestRunGenerateServerReflectionDisabledByExplicitEnv(t *testing.T) {
+	dir := t.TempDir()
+	withWorkingDir(t, dir)
+	writeGoMod(t, dir, "example.com/shop")
+	t.Setenv("GRPC_REFLECTION", "false")
+	t.Setenv("ZEVER_ENV", "dev")
+
+	if err := runGenerateServer(nil); err != nil {
+		t.Fatalf("runGenerateServer: %v", err)
+	}
+
+	main := readGenerated(t, filepath.Join(dir, "cmd", "server", "main.go"))
+
+	if strings.Contains(main, "reflection.Register(grpcServer)") {
+		t.Fatalf("server main.go must not register reflection with GRPC_REFLECTION=false:\n%s", main)
+	}
+}
+
+// TestRunGenerateServerReflectionEnabledInDevMode proves the dev convenience:
+// a dev ZEVER_ENV (dev/test/development, case-insensitive) wires reflection
+// even with no GRPC_REFLECTION set, so grpcurl keeps working locally.
+func TestRunGenerateServerReflectionEnabledInDevMode(t *testing.T) {
+	tests := []string{"dev", "test", "development", "DEV", "Test"}
+
+	for _, env := range tests {
+		t.Run(env, func(t *testing.T) {
+			dir := t.TempDir()
+			withWorkingDir(t, dir)
+			writeGoMod(t, dir, "example.com/shop")
+			t.Setenv("GRPC_REFLECTION", "")
+			t.Setenv("ZEVER_ENV", env)
+
+			if err := runGenerateServer(nil); err != nil {
+				t.Fatalf("runGenerateServer: %v", err)
+			}
+
+			main := readGenerated(t, filepath.Join(dir, "cmd", "server", "main.go"))
+
+			if !strings.Contains(main, "reflection.Register(grpcServer)") {
+				t.Fatalf("server main.go must register reflection with ZEVER_ENV=%s:\n%s", env, main)
+			}
+		})
+	}
+}
+
+// TestRunGenerateServerReflectionOffInProdEnv proves a production ZEVER_ENV
+// with GRPC_REFLECTION unset stays off.
+func TestRunGenerateServerReflectionOffInProdEnv(t *testing.T) {
+	dir := t.TempDir()
+	withWorkingDir(t, dir)
+	writeGoMod(t, dir, "example.com/shop")
+	t.Setenv("GRPC_REFLECTION", "")
+	t.Setenv("ZEVER_ENV", "production")
+
+	if err := runGenerateServer(nil); err != nil {
+		t.Fatalf("runGenerateServer: %v", err)
+	}
+
+	main := readGenerated(t, filepath.Join(dir, "cmd", "server", "main.go"))
+
+	if strings.Contains(main, "reflection.Register(grpcServer)") {
+		t.Fatalf("server main.go must not register reflection with ZEVER_ENV=production:\n%s", main)
+	}
 }
 
 func TestRunGenerateServerRefusesToClobberWithoutForce(t *testing.T) {
@@ -375,7 +479,6 @@ func TestRunGenerateServerWiresRegisterModule(t *testing.T) {
 		"genapp.RegisterModule(r, grpcServer, authInst, permInst, genapp.ModuleImpls{",
 		"TaskService: taskServiceImpl,",
 		"healthpb.RegisterHealthServer(grpcServer, healthServer)",
-		"reflection.Register(grpcServer)",
 		"c.Resilience()",
 		"guardedGRPCClient",
 		"c.Ready(readyCtx)",
