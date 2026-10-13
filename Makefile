@@ -84,6 +84,10 @@ lint-fix: ## Run golangci-lint with auto-fix
 err-lint: ## Scan for error-convention violations (unprefixed messages, bracket prefixes, double %w, stray panics)
 	$(GO) -C tools/errscan run . "$(CURDIR)"
 
+.PHONY: apidiff
+apidiff: ## Check Core-tier public API against last release tags (fails on undocumented breaking changes)
+	$(GO) run ./tools/apidiff
+
 .PHONY: test
 test: ## Run tests
 	$(GO) test ./...

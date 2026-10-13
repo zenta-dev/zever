@@ -603,6 +603,31 @@ jobs:
       - name: govulncheck
         run: make vulncheck-all
 
+  # API compatibility gate: Core-tier modules (config, container,
+  # core/{auth,cache,crypto,db,password,queue,router,secrets,session}, dsl,
+  # orm) are diffed against their latest <dir>/vX.Y.Z tag with
+  # golang.org/x/exp/apidiff (make apidiff). Incompatible changes fail
+  # unless CHANGELOG.md ## [Unreleased] carries a **Breaking:** line.
+  # fetch-depth 0 is required: the default shallow checkout has no tags.
+  apidiff:
+    name: apidiff
+    timeout-minutes: 20
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          fetch-depth: 0
+      - uses: actions/setup-go@b7ad1dad31e06c5925ef5d2fc7ad053ef454303e # v7.0.0
+        with:
+          go-version-file: go.work
+          cache-dependency-path: |
+            go.work.sum
+            **/go.sum
+      - name: API compatibility against last tags
+        run: make apidiff
+
   sbom:
     name: sbom
     timeout-minutes: 20
@@ -674,7 +699,7 @@ jobs:
     timeout-minutes: 5
     if: always()
     runs-on: ubuntu-latest
-    needs: [detect, fmt, lint, test, test-race, coverage-floor, sbom, lsp, mcp, vulnerability, external-sms, doc-snippets, module-graph, conformance]
+    needs: [detect, fmt, lint, test, test-race, coverage-floor, sbom, lsp, mcp, vulnerability, external-sms, doc-snippets, module-graph, conformance, apidiff]
     steps:
       - name: Aggregate results
         run: |

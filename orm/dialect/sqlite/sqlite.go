@@ -45,6 +45,18 @@ func (Dialect) QuoteIdent(s string) string {
 	return `"` + strings.ReplaceAll(s, `"`, `""`) + `"`
 }
 
+// MaxParams reports the default per-statement bind-parameter budget for
+// this SQLite library version: 999 before 3.32.0, 32766 after (see the
+// dialect package's ParamLimitDialect for why the default, not a
+// compile-time override, is the portable assumption).
+func (d Dialect) MaxParams() int {
+	if d.version.atLeast(3, 32, 0) {
+		return 32766
+	}
+
+	return 999
+}
+
 // SupportsCTE reports that SQLite supports common table expressions.
 func (Dialect) SupportsCTE() bool { return true }
 

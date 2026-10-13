@@ -61,6 +61,13 @@ func (a *Adapter) RegisterSaga(name string, steps []workflow.SagaStep) {
 	a.sagas[name] = steps
 }
 
+// RegisterTypedSaga registers a typed saga definition under name, converting
+// each step to the engine's untyped shape. It satisfies
+// workflow.TypedSagaRegistrar without changing the run path.
+func (a *Adapter) RegisterTypedSaga(name string, steps []workflow.TypedStep) {
+	a.RegisterSaga(name, workflow.TypedStepsToSagaSteps(steps))
+}
+
 // RunSaga starts or resumes the named saga. An unknown name fails with
 // ErrUnknownSaga. A workflowID matching an existing run returns that run's
 // ID without re-executing completed steps (idempotent resume).
@@ -287,7 +294,8 @@ func (a *Adapter) compensate(ctx context.Context, r *sagaRun, failed int, cause 
 }
 
 var (
-	_ workflow.SagaRegistrar = (*Adapter)(nil)
-	_ workflow.SagaRunner    = (*Adapter)(nil)
-	_ workflow.SagaInspector = (*Adapter)(nil)
+	_ workflow.SagaRegistrar      = (*Adapter)(nil)
+	_ workflow.TypedSagaRegistrar = (*Adapter)(nil)
+	_ workflow.SagaRunner         = (*Adapter)(nil)
+	_ workflow.SagaInspector      = (*Adapter)(nil)
 )
