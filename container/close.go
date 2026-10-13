@@ -159,6 +159,11 @@ func (c *Container) Close(ctx context.Context) error {
 	// which would cause a false dedup hit.
 	keepAlive := make([]any, 0, 32)
 
+	// Container lifetime is over: cancel the builder-facing root context so
+	// any in-flight or future build winds down instead of running against a
+	// closing container.
+	c.cancelRoot()
+
 	// done carries one service's shutdown result. It is reused across
 	// services: a completed close drains it and its goroutine exits, so the
 	// next close can safely reuse the same buffered channel. A timed-out

@@ -1,6 +1,7 @@
 package container
 
 import (
+	"context"
 	"sync"
 
 	"google.golang.org/grpc"
@@ -97,6 +98,15 @@ type Container struct {
 	webhook       lazy[webhook.Webhook]
 	workflow      lazy[workflow.Workflow]
 
+	// rootCtx is the builder-facing context every lazy accessor passes when
+	// resolving without a caller ctx. It is detached from any caller
+	// (WithoutCancel over Background: no inherited cancellation, no
+	// deadline) but carries container-lifetime cancellation: Close cancels
+	// it so in-flight and future builds wind down with the container.
+	//nolint:containedctx // container-lifetime root: detached from callers by design, canceled in Close, never derived from request ctx
+	rootCtx    context.Context
+	cancelRoot context.CancelFunc
+
 	// pools maps shareable DSNs to one shared db.DB pool per key (see
 	// pools.go). Borrowers resolve through it on exact-DSN matches.
 	pools *poolRegistry
@@ -114,5 +124,7 @@ func New(cfg *config.Config) *Container {
 		cfg = config.Default()
 	}
 
-	return &Container{cfg: cfg, pools: newPoolRegistry()}
+	root, cancel := context.WithCancel(context.WithoutCancel(context.Background()))
+
+	return &Container{cfg: cfg, rootCtx: root, cancelRoot: cancel, pools: newPoolRegistry()}
 }
