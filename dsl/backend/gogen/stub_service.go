@@ -50,8 +50,8 @@ func GenerateServiceStub(pkg, genAlias, genImportPath string, svc *ir.Service) (
 		body.WriteString("\n")
 
 		if op.Paginated {
-			fmt.Fprintf(&body, "func (s *%s) %s(ctx context.Context, req *%s.%s, cursor string, limit int32) (*%s.%s, error) {\n",
-				implName, op.Name, genAlias, op.RequestType, genAlias, op.ReturnType)
+			fmt.Fprintf(&body, "func (s *%s) %s(ctx context.Context, req *%s.%s, cursor %s.Cursor, limit int32) (*%s.%s, error) {\n",
+				implName, op.Name, genAlias, op.RequestType, genAlias, genAlias, op.ReturnType)
 		} else {
 			fmt.Fprintf(&body, "func (s *%s) %s(ctx context.Context, req *%s.%s) (*%s.%s, error) {\n",
 				implName, op.Name, genAlias, op.RequestType, genAlias, op.ReturnType)

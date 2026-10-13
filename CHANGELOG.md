@@ -85,6 +85,18 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Added
 
+- `feat(gogen): typed pagination`: `paginated: true` operations now generate
+  an opaque `Cursor` string type, a generic `Page[T]` (`Items` plus
+  `NextCursor`), and `DefaultPageLimit` (20) / `MaxPageLimit` (100) bounds in
+  `service.go`. Service signatures take `cursor Cursor` instead of `cursor
+  string`; the generated router handler passes the cursor query parameter
+  through untouched and rejects a negative limit or one above `MaxPageLimit`
+  as `InvalidArgument` before the service runs (zero still means "service
+  default"). The HTTP wire (cursor/limit query parameters) and the gRPC
+  proto shape are unchanged, so this is not wire-breaking; Go implementers
+  must update `cursor string` parameters (and `string` cursor variables) to
+  `Cursor`, converting from protobuf `next_cursor` strings where they cross
+  the boundary.
 - `feat(auth/jwt): kid-based key rotation and nbf validation`: `JWTOptions`
   gains `keys: [{kid, secret}]` plus `active_kid` (empty defaults to the
   first entry; validated for unique kids, secret length, and a matching
