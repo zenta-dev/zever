@@ -9,7 +9,9 @@ Covered samples: cache open/get/set (memory), db open (sqlite), auth
 issue/verify (session adapter over a memory store), queue push/pop (memory),
 minimal serve wiring (stdhttp router plus slog logger, handler only, no
 network listen), plugin register plus resolve (container plugin with a stub
-battery).
+battery), and the testing-guide patterns (`testing_test.go`: container from
+`config.Default()` with `t.Cleanup` close, per-test sqlite file, db and
+outbox conformance kits, in-process httptest route).
 
 Run from the repo root:
 
