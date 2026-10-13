@@ -110,6 +110,17 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   fail the gate unless `## [Unreleased]` carries a `**Breaking:**` line.
   The gate already caught two real breaks on adoption (`auth.JWTOptions` /
   `auth.Options` comparability, documented above).
+- `feat(config): fail fast on unknown adapters with did-you-mean`: new
+  `config.ValidateAdapters(registered)` checks every service's adapter
+  against the process's registrations and joins `UnknownAdapterError`s
+  carrying a "did you mean %q?" hint (sourced from `config.closest`). Every
+  `core/<battery>` gains `RegisteredAdapters()` over its factory registry
+  (new `registry.Names`/`SortedNames` seams), the container gains
+  `RegisteredAdapters(service)` plus `(c).ValidateAdapters()`, and
+  `zever doctor` — CLI and generated-server `--doctor` alike — reports an
+  `adapters` row before resolving, turning a forgotten import or typo into
+  one actionable error. `ParseAdapter` stays permissive for custom adapters;
+  typed `Adapter` constants are unchanged.
 - `docs: test your zever app guide`: new `guides/operate/testing-your-app`
   page — per-test container from `config.Default()` with `t.Cleanup` close,
   httptest routes, per-test sqlite files under `t.TempDir()`, the `dbtest`

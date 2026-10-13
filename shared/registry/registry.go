@@ -5,6 +5,7 @@ package registry
 import (
 	"fmt"
 	"reflect"
+	"sort"
 	"sync"
 )
 
@@ -90,6 +91,36 @@ func (r *Registry[A, F]) Lookup(adapter A) (F, error) {
 	}
 
 	return factory, nil
+}
+
+// Names returns every registered adapter key, in no particular order.
+// Callers that display names sort them first (see SortedNames).
+func (r *Registry[A, F]) Names() []A {
+	r.mu.RLock()
+	defer r.mu.RUnlock()
+
+	names := make([]A, 0, len(r.factories))
+	for a := range r.factories {
+		names = append(names, a)
+	}
+
+	return names
+}
+
+// SortedNames returns the String names of every registered adapter, sorted
+// ascending. Adapter validation display paths use it so "did you mean" hints
+// and unknown-adapter listings are deterministic.
+func SortedNames[A interface {
+	comparable
+	fmt.Stringer
+}, F any](r *Registry[A, F]) []string {
+	names := r.Names()
+	out := make([]string, 0, len(names))
+	for _, a := range names {
+		out = append(out, a.String())
+	}
+	sort.Strings(out)
+	return out
 }
 
 // isNilFactory reports whether factory is nil. F is typically a func type,

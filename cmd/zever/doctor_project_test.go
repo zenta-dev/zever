@@ -19,6 +19,11 @@ const doctorTwoBatteryFixture = "log:\n  adapter: slog\nrouter:\n  adapter: stdh
 // Open, never at Validate, so config.Load succeeds and the row FAILs).
 const doctorFailingBatteryFixture = "auth:\n  adapter: jwt\n"
 
+// doctorTypoBatteryFixture enables one battery with a misspelled adapter:
+// ParseAdapter stays permissive so config validation passes, but the
+// adapters row fails fast with a did-you-mean hint (P4-1).
+const doctorTypoBatteryFixture = "cache:\n  adapter: memmory\n"
+
 // doctorEnabledRows returns the battery names in doctor's human output by
 // first-field match, so "ai" never collides with prose like "batteries".
 func doctorEnabledRows(t *testing.T, out string) []string {
@@ -42,7 +47,7 @@ func doctorEnabledRows(t *testing.T, out string) []string {
 
 // TestDoctorOnlyChecksEnabledBatteries is the P3-3 core contract: a fixture
 // project enabling two services gets exactly those rows (plus the config
-// validation row), never the other 30+ batteries.
+// validation and adapters rows), never the other 30+ batteries.
 func TestDoctorOnlyChecksEnabledBatteries(t *testing.T) {
 	dir := t.TempDir()
 	cfgPath := writeInspectFixture(t, dir, "zever.yaml", doctorTwoBatteryFixture)
@@ -54,7 +59,7 @@ func TestDoctorOnlyChecksEnabledBatteries(t *testing.T) {
 
 	names := doctorEnabledRows(t, out.String())
 
-	want := map[string]bool{"config": true, "log": true, "router": true}
+	want := map[string]bool{"config": true, "adapters": true, "log": true, "router": true}
 	if len(names) != len(want) {
 		t.Fatalf("checked batteries = %v, want exactly %v\noutput:\n%s", names, want, out.String())
 	}
@@ -94,6 +99,30 @@ func TestDoctorHumanFailsOnBatteryFailure(t *testing.T) {
 
 	if _, ok := doctorLine(out.String(), "db"); ok {
 		t.Fatalf("output checks db, which the fixture does not enable:\n%s", out.String())
+	}
+}
+
+// TestDoctorAdaptersRowSuggestsOnTypo pins the P4-1 fail-fast: a misspelled
+// adapter fails the adapters row with a did-you-mean hint naming the
+// registered adapter, instead of surfacing only as a resolve error.
+func TestDoctorAdaptersRowSuggestsOnTypo(t *testing.T) {
+	dir := t.TempDir()
+	cfgPath := writeInspectFixture(t, dir, "zever.yaml", doctorTypoBatteryFixture)
+
+	var out bytes.Buffer
+	if err := runDoctorWith(DoctorConfig{ConfigPath: cfgPath, Out: &out}); err == nil {
+		t.Fatal("runDoctorWith typo adapter: got nil error, want non-nil")
+	}
+
+	line, ok := doctorLine(out.String(), "adapters")
+	if !ok {
+		t.Fatalf("output missing adapters row:\n%s", out.String())
+	}
+	if !strings.Contains(line, "FAIL") {
+		t.Fatalf("adapters row %q does not FAIL", line)
+	}
+	if !strings.Contains(out.String(), `did you mean "memory"`) {
+		t.Fatalf("output lacks did-you-mean hint:\n%s", out.String())
 	}
 }
 
@@ -219,13 +248,13 @@ func TestDoctorServerFallbackWithNote(t *testing.T) {
 	}
 
 	names := doctorEnabledRows(t, out.String())
-	if len(names) != 3 {
-		t.Fatalf("checked batteries = %v, want exactly config/log/router:\n%s", names, out.String())
+	if len(names) != 4 {
+		t.Fatalf("checked batteries = %v, want exactly adapters/config/log/router:\n%s", names, out.String())
 	}
 }
 
 // TestDoctorJSONProjectEnvelope keeps the P3-4 envelope over the new scope:
-// two enabled batteries yield three data rows (config + 2) and ok:true.
+// two enabled batteries yield four data rows (config + adapters + 2) and ok:true.
 func TestDoctorJSONProjectEnvelope(t *testing.T) {
 	jbuf := mustJSONMode(t)
 
@@ -249,8 +278,8 @@ func TestDoctorJSONProjectEnvelope(t *testing.T) {
 	data := envelopeData(t, env)
 
 	rows, ok := data["batteries"].([]any)
-	if !ok || len(rows) != 3 {
-		t.Fatalf("data.batteries has %d rows, want 3 (config/log/router): %v", len(rows), data["batteries"])
+	if !ok || len(rows) != 4 {
+		t.Fatalf("data.batteries has %d rows, want 4 (adapters/config/log/router): %v", len(rows), data["batteries"])
 	}
 
 	for _, r := range rows {
@@ -260,7 +289,7 @@ func TestDoctorJSONProjectEnvelope(t *testing.T) {
 		}
 
 		name, _ := row["name"].(string)
-		if name != "config" && name != "log" && name != "router" {
+		if name != "config" && name != "adapters" && name != "log" && name != "router" {
 			t.Fatalf("battery row %q not in the enabled set", name)
 		}
 	}

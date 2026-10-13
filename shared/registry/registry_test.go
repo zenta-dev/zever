@@ -3,6 +3,7 @@ package registry_test
 import (
 	"errors"
 	"fmt"
+	"slices"
 	"sync"
 	"testing"
 
@@ -15,6 +16,13 @@ const (
 	adapterA adapter = iota
 	adapterB
 )
+
+// namedAdapter is a string adapter key with a String method, mirroring the
+// core/<battery> Adapter types.
+type namedAdapter string
+
+// String returns the adapter name.
+func (a namedAdapter) String() string { return string(a) }
 
 type factory func() string
 
@@ -113,6 +121,50 @@ func TestLookupUnknown(t *testing.T) {
 
 	if !errors.Is(err, errUnknown) {
 		t.Fatalf("unknown error does not unwrap to sentinel: %v", err)
+	}
+}
+
+func TestNamesListsRegistered(t *testing.T) {
+	t.Parallel()
+
+	r := newTestRegistry()
+
+	if got := r.Names(); len(got) != 0 {
+		t.Fatalf("Names on empty registry = %v, want empty", got)
+	}
+
+	if err := r.Register(adapterA, func() string { return "a" }); err != nil {
+		t.Fatal(err)
+	}
+	if err := r.Register(adapterB, func() string { return "b" }); err != nil {
+		t.Fatal(err)
+	}
+
+	got := r.Names()
+	if len(got) != 2 || !slices.Contains(got, adapterA) || !slices.Contains(got, adapterB) {
+		t.Fatalf("Names = %v, want both registered adapters", got)
+	}
+}
+
+func TestSortedNamesAreSortedStrings(t *testing.T) {
+	t.Parallel()
+
+	r := registry.New[namedAdapter, factory](
+		errNil,
+		func(namedAdapter) error { return &dupError{Adapter: adapterA} },
+		func(namedAdapter) error { return &unknownError{Adapter: adapterA} },
+	)
+
+	for _, name := range []namedAdapter{"redis", "memory", "db"} {
+		if err := r.Register(name, func() string { return string(name) }); err != nil {
+			t.Fatal(err)
+		}
+	}
+
+	got := registry.SortedNames(r)
+	want := []string{"db", "memory", "redis"}
+	if !slices.Equal(got, want) {
+		t.Fatalf("SortedNames = %v, want %v", got, want)
 	}
 }
 
