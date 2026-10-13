@@ -3,12 +3,13 @@ module github.com/zenta-dev/zever/adapters/document/local
 go 1.27.2
 
 require (
-	github.com/chromedp/chromedp v0.19.1
+	github.com/chromedp/chromedp v0.20.1
 	github.com/zenta-dev/zever/core/document v0.6.1
 )
 
 require (
-	github.com/chromedp/cdproto v0.157.6 // indirect
+	github.com/chromedp/cdproto v0.157.8 // indirect
+	github.com/go-json-experiment/json v0.0.0-20260213210345-44df1a37e875 // indirect
 	github.com/zenta-dev/zever/shared/endpoint v0.6.1 // indirect
 	github.com/zenta-dev/zever/shared/registry v0.6.1 // indirect
 )
