@@ -340,7 +340,7 @@ func Probe(ctx context.Context, ffprobe, path string) (ProbeResult, error) {
 	var err error
 
 	for range maxExecAttempts {
-		cmd = exec.CommandContext(ctx, ffprobe, "-v", "error", "-show_format", "-show_streams", "-of", "json", path) //nolint:gosec // binary resolved via LookPath, argv fixed.
+		cmd = exec.CommandContext(ctx, ffprobe, "-v", "error", "-show_format", "-show_streams", "-of", "json", path) // binary resolved via LookPath, argv fixed.
 		cmd.Stderr = &stderr
 		stdout, _ = cmd.StdoutPipe()
 		err = cmd.Start()
@@ -394,7 +394,7 @@ func RunTranscode(ctx context.Context, ffmpegBin string, argv []string) error {
 	var err error
 
 	for range maxExecAttempts {
-		cmd := exec.CommandContext(ctx, ffmpegBin, argv...) //nolint:gosec // binary resolved via LookPath, argv fixed.
+		cmd := exec.CommandContext(ctx, ffmpegBin, argv...) // binary resolved via LookPath, argv fixed.
 		cmd.Stderr = &stderr
 		err = cmd.Run()
 

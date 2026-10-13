@@ -417,7 +417,7 @@ func (s *Server) CodeAction(ctx context.Context, params *protocol.CodeActionPara
 
 	actions := codeActionsAt(schema, file, params.TextDocument.URI, params)
 	if len(actions) == 0 {
-		return nil, nil //nolint:nilnil // LSP encodes "no code actions" as a null result
+		return nil, nil // LSP encodes "no code actions" as a null result
 	}
 
 	return actions, nil

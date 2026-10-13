@@ -23,8 +23,8 @@ func lspPosition(p diag.Position) protocol.Position {
 	}
 
 	return protocol.Position{
-		Line:      uint32(line), //nolint:gosec // clamped non-negative above
-		Character: uint32(col),  //nolint:gosec // clamped non-negative above
+		Line:      uint32(line), // clamped non-negative above
+		Character: uint32(col),  // clamped non-negative above
 	}
 }
 

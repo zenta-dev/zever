@@ -133,7 +133,7 @@ func convertScan[T ScanValue](src any) (T, error) {
 			return zero, fmt.Errorf("orm: cannot scan int64 %d into int32: out of range", n)
 		}
 
-		return any(int32(n)).(T), nil //nolint:forcetypeassert,gosec // guarded by the outer type switch; range checked above
+		return any(int32(n)).(T), nil //nolint:forcetypeassert // guarded by the outer type switch; range checked above
 	case float64:
 		f, err := scanFloat64(src)
 		if err != nil {

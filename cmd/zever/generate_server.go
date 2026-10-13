@@ -351,7 +351,7 @@ after you've started implementing a service is always safe. Requires the
 schema to have already been compiled with the gogen backend (zever compile
 --backend gogen) into the same --out directory.`
 
-func printServerUsage(fs *flag.FlagSet) { //nolint:dupl
+func printServerUsage(fs *flag.FlagSet) {
 	header := title("zever generate server") + dim(" — scaffold HTTP server")
 	usage := bold("Usage:") + "  " + cmd("zever generate server") + dim(" [--force] [--out DIR] [files...]") + dim("  •  -i/--interactive for guided prompts")
 

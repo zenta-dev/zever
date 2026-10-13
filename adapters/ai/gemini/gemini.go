@@ -157,7 +157,7 @@ func (a *adapter) Stream(ctx context.Context, model string, messages []ai.Messag
 					}
 
 					if p.FunctionCall != nil {
-						args, _ := funcArgsCodec.Encode(p.FunctionCall.Args) //nolint:errcheck
+						args, _ := funcArgsCodec.Encode(p.FunctionCall.Args)
 
 						select {
 						case ch <- ai.StreamChunk{

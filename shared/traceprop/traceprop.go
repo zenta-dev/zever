@@ -100,8 +100,6 @@ func Baggage(ctx context.Context, key string) string {
 // StartConsumeSpan in one call for consume paths that already hold a
 // caller context. Callers must end the returned span (defer span.End()).
 // Extra opts append after the default SpanKindConsumer.
-//
-//nolint:spancheck // ContinueSpan returns the span to the caller, who owns calling End() (documented above); this is the standard tracer.Start contract, not a leak
 func ContinueSpan(
 	ctx context.Context,
 	headers map[string]string,

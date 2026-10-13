@@ -121,7 +121,7 @@ func (w *Workspace) Rescan() {
 			return nil //nolint:nilerr // skip unreadable files: WalkDirFunc nil means keep walking
 		}
 
-		abs, _ := filepath.Abs(path) //nolint:errcheck // path is absolute: joined from the absolute root, so Abs cannot fail
+		abs, _ := filepath.Abs(path) // path is absolute: joined from the absolute root, so Abs cannot fail
 
 		found[abs] = string(content)
 
@@ -362,7 +362,7 @@ func uriToPath(raw string) (string, bool) {
 		return u.FsPath(), true
 	}
 
-	abs, _ := filepath.Abs(raw) //nolint:errcheck // best-effort mapping for non-conforming clients; Abs only fails when getwd does
+	abs, _ := filepath.Abs(raw) // best-effort mapping for non-conforming clients; Abs only fails when getwd does
 
 	return abs, true
 }
@@ -380,7 +380,7 @@ func pathToURI(path string) uri.URI {
 		}
 	}
 
-	abs, _ := filepath.Abs(path) //nolint:errcheck // best-effort mapping; Abs only fails when getwd does
+	abs, _ := filepath.Abs(path) // best-effort mapping; Abs only fails when getwd does
 
 	return uri.File(abs)
 }

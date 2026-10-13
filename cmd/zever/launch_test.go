@@ -93,7 +93,7 @@ func TestRunLaunchForwardsSignalToChild(t *testing.T) {
 		t.Fatal("runLaunch did not return after the child was signalled")
 	}
 
-	got, err := os.ReadFile(sentinelPath) //nolint:gosec // test-controlled path
+	got, err := os.ReadFile(sentinelPath) // test-controlled path
 	if err != nil {
 		t.Fatalf("child never wrote the sentinel (signal not forwarded): %v", err)
 	}
