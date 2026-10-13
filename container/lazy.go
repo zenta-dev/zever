@@ -40,7 +40,7 @@ type lazy[T any] struct {
 }
 
 // sealed marks lazy as package-private.
-func (l *lazy[T]) sealed() {} //nolint:unused // seal marker
+func (l *lazy[T]) sealed() {}
 
 // get returns the cached value, invoking fn once to build it. The builder
 // receives a live Background context: callers of get have no ctx to pass.

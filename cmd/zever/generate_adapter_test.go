@@ -350,7 +350,7 @@ func TestRunGenerateAdapterCollisionIsAllOrNothing(t *testing.T) {
 func mustRead(t *testing.T, path string) string {
 	t.Helper()
 
-	data, err := os.ReadFile(path) //nolint:gosec // test fixture path
+	data, err := os.ReadFile(path) // test fixture path
 	if err != nil {
 		t.Fatalf("read %s: %v", path, err)
 	}

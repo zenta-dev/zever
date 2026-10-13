@@ -239,7 +239,7 @@ func (d *driver) convert(ctx context.Context, dir string, pdf []byte, format doc
 		ext = ".jpg"
 	}
 
-	//nolint:gosec // binary resolved via LookPath; no shell; numeric-only variable argv.
+	// binary resolved via LookPath; no shell; numeric-only variable argv.
 	cmd := exec.CommandContext(ctx, conv, argv...)
 	cmd.Env = sandboxEnv(dir)
 	withGroupKill(cmd)

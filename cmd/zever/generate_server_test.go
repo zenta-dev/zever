@@ -57,7 +57,7 @@ func validateGoSyntax(t *testing.T, filename string, content []byte) {
 func readGenerated(t *testing.T, path string) string {
 	t.Helper()
 
-	data, err := os.ReadFile(path) //nolint:gosec // test fixture path
+	data, err := os.ReadFile(path) // test fixture path
 	if err != nil {
 		t.Fatalf("expected a scaffold at %q: %v", path, err)
 	}

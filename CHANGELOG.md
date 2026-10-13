@@ -331,6 +331,27 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   the second was skipped. The `unsafe` import is gone, and the 33-entry
   `snapshots()` copy-paste collapsed into a generic `snap` helper over a
   method-value table.
+- `chore(lint): wrapcheck evaluation, errscan missing-%w, nolintlint, any`:
+  `wrapcheck` was trial-enabled over `container` and `core/cache` (9 and 7
+  hits, all registry `Register`/`Lookup` passthroughs, `Close`-probe returns,
+  and test helpers): enabling it would relitigate the registry-passthrough
+  convention in every battery, so it stays off and the existing
+  `.golangci.yml` comment records why. `tools/errscan` gains a `missing-%w`
+  rule flagging `fmt.Errorf` without `%w` that still takes a bare `err`
+  argument (conservative: `err.Error()` and other names are out of scope);
+  the repo scans clean.   `nolintlint` is now enabled so stale suppressions
+  fail the build, and the 123 unused directives it reported (mostly
+  `nolint:gosec` on `os.ReadFile`/`os.WriteFile` already covered by the
+  `std-error-handling` exclusion preset, plus stale `unparam`/`dupl`/
+  `nilerr`/`unused`/`revive`/`tparallel`/`exhaustive`/`forcetypeassert`/
+  `errcheck`/`contextcheck`/`staticcheck`/`nilnil`/`spancheck`) are removed.
+  One survivor needed care: `adapters/media/local` `MkdirAll` tripped gosec
+  G703 taint analysis once its directive was lifted (the sink is safe —
+  `filepath.Ext` yields no separators), so it now carries a gosec-native
+  `#nosec G703` pin like the one in `tools/errscan`, which both linters
+  accept stably. Remaining `interface{}` spellings outside
+  generated protobuf code become `any` (the `twilio` test fake keeps
+  `interface{}` to match the upstream `twilioclient.BaseClient` signature).
 
 ### Added
 

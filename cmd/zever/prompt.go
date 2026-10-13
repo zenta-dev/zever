@@ -124,8 +124,6 @@ func promptConfirm(title string, affirmative string) (bool, error) {
 
 // hasInteractiveFlag checks if args contains -i/--interactive (for
 // per-command FlagSet alias).
-//
-//nolint:unused
 func hasInteractiveFlag(args []string) bool {
 	for _, a := range args {
 		if a == "-i" || a == "--interactive" {

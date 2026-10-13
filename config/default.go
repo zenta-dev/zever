@@ -55,7 +55,7 @@ func Default() *Config {
 	cfg.Billing = Service[billing.Options]{Adapter: "stub"}
 	cfg.Cache = Service[cache.Options]{Adapter: "memory"}
 	cfg.CDN = Service[cdn.Options]{Adapter: "noop"}
-	cfg.Crypto = Service[crypto.Options]{Adapter: "local", Options: crypto.Options{Key: crypto.DevCryptoKey}} //nolint:gosec // deterministic dev-only secret, never production
+	cfg.Crypto = Service[crypto.Options]{Adapter: "local", Options: crypto.Options{Key: crypto.DevCryptoKey}} // deterministic dev-only secret, never production
 	cfg.DB = Service[db.Options]{Adapter: "sqlite"}
 	cfg.Document = Service[document.Options]{Adapter: "local"}
 	cfg.EventBus = Service[eventbus.Options]{Adapter: "memory"}

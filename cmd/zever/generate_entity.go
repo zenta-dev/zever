@@ -129,7 +129,7 @@ type GenerateEntityConfig struct {
 // GenerateEntity appends the rendered entity declaration to the module's
 // .zen file and returns the file path. It performs no flag parsing.
 //
-//nolint:unparam // path result kept for callers/tests; user output goes to cfg Stdout/Stderr writers.
+// path result kept for callers/tests; user output goes to cfg Stdout/Stderr writers.
 func GenerateEntity(cfg GenerateEntityConfig) (string, error) {
 	const tag = "zever generate entity"
 

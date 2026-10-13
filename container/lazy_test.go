@@ -203,7 +203,6 @@ func TestLazy_WaiterBecomesRetryLeader(t *testing.T) {
 
 func TestLazy_PanicReleasesWaiters(t *testing.T) {
 	const panicVal = "boom"
-	//nolint:unparam // get requires (T, error); panic path is nil by design
 	build := func() (int, error) {
 		panic(panicVal)
 	}
@@ -246,7 +245,6 @@ func TestLazy_PanicRetriesAndSucceeds(t *testing.T) {
 	var l lazy[int]
 	var calls atomic.Int32
 	fail := errors.New("build failed")
-	//nolint:unparam // get requires (T, error); mixed panic/error path is nil by design
 	build := func() (int, error) {
 		switch calls.Add(1) {
 		case 1:

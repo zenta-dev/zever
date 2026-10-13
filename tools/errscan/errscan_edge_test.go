@@ -190,6 +190,30 @@ func TestCheckFileCallShapes(t *testing.T) {
 			want: nil,
 		},
 		{
+			name: "err argument without w verb is flagged",
+			src:  "package p\n\nimport \"fmt\"\n\nfunc f(err error) error {\n\treturn fmt.Errorf(\"p: failed: %v\", err)\n}\n",
+			want: []vkey{
+				{path: "pkg/shapes.go", line: 6, rule: "missing-%w"},
+			},
+		},
+		{
+			name: "bare Errorf ident with err argument is flagged",
+			src:  "package p\n\nfunc Errorf(f string, a ...any) error { return nil }\n\nfunc f(err error) {\n\t_ = Errorf(\"p: failed: %v\", err)\n}\n",
+			want: []vkey{
+				{path: "pkg/shapes.go", line: 6, rule: "missing-%w"},
+			},
+		},
+		{
+			name: "non-err arguments without w verb are clean",
+			src:  "package p\n\nimport \"fmt\"\n\nfunc f(n int) error {\n\treturn fmt.Errorf(\"p: failed %d\", n)\n}\n",
+			want: nil,
+		},
+		{
+			name: "err method call without w verb is skipped",
+			src:  "package p\n\nimport \"fmt\"\n\nfunc f(err error) error {\n\treturn fmt.Errorf(\"p: failed %s\", err.Error())\n}\n",
+			want: nil,
+		},
+		{
 			name: "no arguments is skipped",
 			src:  "package p\n\nimport \"errors\"\n\nfunc f() {\n\t_ = errors.New()\n}\n",
 			want: nil,

@@ -91,7 +91,7 @@ func preflightServe(entry string) error {
 		if os.IsNotExist(err) {
 			return fmt.Errorf("%s: internal/app/app.go not found, run `zever generate server` to scaffold it", tag)
 		}
-		return nil //nolint:nilerr // intentional best-effort skip on transient read error
+		return nil // intentional best-effort skip on transient read error
 	}
 
 	for _, battery := range services {
@@ -126,7 +126,7 @@ func discoverServeConfig() string {
 
 // serveYamlBatteries lists top-level service keys in the project config.
 func serveYamlBatteries(path string) ([]string, error) {
-	data, err := os.ReadFile(path) //nolint:gosec // developer project config
+	data, err := os.ReadFile(path) // developer project config
 	if err != nil {
 		return nil, err
 	}

@@ -224,7 +224,7 @@ func TestRunAddMatchesPinnedVersion(t *testing.T) {
 
 	gomodPath := filepath.Join(dir, "go.mod")
 
-	data, err := os.ReadFile(gomodPath) //nolint:gosec // test fixture path
+	data, err := os.ReadFile(gomodPath) // test fixture path
 	if err != nil {
 		t.Fatalf("read go.mod: %v", err)
 	}

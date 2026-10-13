@@ -52,11 +52,11 @@ var (
 
 // execOutput and execRun are seams for deterministic exec tests.
 var (
-	//nolint:gosec // binary resolved via LookPath, argv fixed.
+	// binary resolved via LookPath, argv fixed.
 	execOutput = func(ctx context.Context, name string, args ...string) ([]byte, error) {
 		return exec.CommandContext(ctx, name, args...).Output()
 	}
-	//nolint:gosec // binary resolved via LookPath, argv built from validated ops.
+	// binary resolved via LookPath, argv built from validated ops.
 	execRun = func(ctx context.Context, name string, args ...string) error {
 		return exec.CommandContext(ctx, name, args...).Run()
 	}
@@ -823,7 +823,7 @@ func (d *driver) transformAV(ctx context.Context, id, key, ext string, kind medi
 		return "", fmt.Errorf("s3: transcode: %w", media.ErrTranscodeFailed)
 	}
 
-	//nolint:gosec // out is staged under os.MkdirTemp by this function.
+	// out is staged under os.MkdirTemp by this function.
 	outData, err := os.ReadFile(out)
 	if err != nil {
 		return "", fmt.Errorf("s3: read: %w", err)
