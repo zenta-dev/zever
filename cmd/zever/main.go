@@ -416,7 +416,7 @@ func printUsage() {
 		line("check", "Validate .zen schemas only — no output written"),
 		line("breaking", "Report API-breaking changes between two schema versions"),
 		line("fmt", "Format .zen schemas (gofmt-style: -l list, --write rewrite)"),
-		line("doctor", "Resolve every battery from config and report "+successMark()+"/"+failMark()),
+		line("doctor", "Resolve enabled project batteries and report "+successMark()+"/"+failMark()),
 		line("config show", "Print the resolved config, redacted"),
 		line("routes", "List HTTP routes declared by RPCs"),
 		line("explain", "Print an operation's declaration location and summary"),

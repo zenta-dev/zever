@@ -7,6 +7,7 @@ import (
 	"io"
 	"os"
 	"sort"
+	"strings"
 	"time"
 
 	"github.com/zenta-dev/zever/config"
@@ -21,12 +22,9 @@ import (
 type DoctorConfig struct {
 	ConfigPath string
 	Out        io.Writer
-	// Strict makes runDoctorWith return a non-nil error when any battery
-	// fails, instead of always returning nil. Off by default because
-	// config.Default() legitimately fails some batteries (e.g. auth/jwt
-	// with no configured secret) -- that is expected, not a command
-	// error. Pass --strict for CI/pre-deploy gating, where any FAIL row
-	// should abort the pipeline via a non-zero exit code.
+	// Strict is retained for flag compatibility: since P3-3 any failing
+	// battery returns a non-nil error (exit 1) with or without it, so
+	// `zever doctor` gates CI/pre-deploy pipelines by default.
 	Strict bool
 	// JSON emits a machine-readable envelope instead of the human table.
 	JSON bool
@@ -34,13 +32,23 @@ type DoctorConfig struct {
 
 // printDoctorUsage prints styled help for `zever doctor`.
 func printDoctorUsage(fs *flag.FlagSet) {
-	header := title("zever doctor") + dim(" — verify batteries")
+	header := title("zever doctor") + dim(" — verify project batteries")
 	usage := bold("Usage:") + "  " + cmd("zever doctor") + dim(" [--config PATH] [--strict]") + dim("  •  -i for guided prompts")
 
 	body := joinLines(
 		header,
 		"",
 		usage,
+		"",
+		"Only the services enabled in the project config are checked: the",
+		"top-level batteries in zever.yaml/.yml/.json (same discovery as",
+		"config.Load and serve). In a project with a server entrypoint the",
+		"checks run inside the built server ("+cmd("go run <entry> --doctor")+")",
+		"against its real container and registrations; otherwise they run in",
+		"the CLI with a note. Without a project config every battery is",
+		"checked, also with a note.",
+		"",
+		"Exit codes: 0 all OK, 1 failures, 2 flag misuse.",
 		"",
 		bold("Flags:"),
 	)
@@ -53,7 +61,7 @@ func printDoctorUsage(fs *flag.FlagSet) {
 	fs.PrintDefaults()
 	_, _ = fmt.Fprintln(fs.Output(), "")
 	_, _ = fmt.Fprintln(fs.Output(), dim("Examples:"))
-	_, _ = fmt.Fprintln(fs.Output(), dim("  ")+cmd("zever doctor")+dim("  # verify all batteries against defaults"))
+	_, _ = fmt.Fprintln(fs.Output(), dim("  ")+cmd("zever doctor")+dim("  # verify enabled project batteries"))
 	_, _ = fmt.Fprintln(fs.Output(), dim("  ")+cmd("zever doctor --config zever.yaml"))
 	_, _ = fmt.Fprintln(fs.Output(), dim("  ")+cmd("zever doctor -i")+dim("  # guided mode"))
 
@@ -63,12 +71,15 @@ func printDoctorUsage(fs *flag.FlagSet) {
 }
 
 // runDoctor builds a Container from config.Load(path) (which discovers
-// zever.yaml/.yml/.json and applies env when --config is absent) and attempts
-// to resolve every battery, printing
+// zever.yaml/.yml/.json and applies env when --config is absent) and checks
+// only the project's enabled batteries (see doctorScope), printing
 // "<battery>: OK" or "<battery>: FAIL: <err>" for each. Every Container
 // accessor here follows the same (T, error) shape, so a FAIL for a battery
 // that needs security material it can't safely invent (e.g. auth/jwt with no
 // configured secret) is expected, not a bug in this command.
+//
+// Exit codes: nil (0) when every checked battery resolves, a non-nil error
+// (exit 1) when any fails, and a flagUsageError (exit 2) on flag misuse.
 func runDoctor(args []string) error {
 	if hasHelpFlag(args) {
 		fs := flag.NewFlagSet("doctor", flag.ContinueOnError)
@@ -83,15 +94,15 @@ func runDoctor(args []string) error {
 	args = peelInteractive(args)
 	fs := flag.NewFlagSet("doctor", flag.ContinueOnError)
 	configPath := fs.String("config", "", "optional config file path (default: discover zever.yaml/.yml/.json + env)")
-	strict := fs.Bool("strict", false, "exit non-zero if any battery fails (for CI/pre-deploy gating)")
+	strict := fs.Bool("strict", false, "accepted for compatibility; failures now always exit non-zero")
 	fs.Usage = func() { printDoctorUsage(fs) }
 
 	if err := rejectUnknownFlags("doctor", args, []string{"config", "strict"}); err != nil {
-		return err
+		return &flagUsageError{err: err}
 	}
 
 	if err := fs.Parse(args); err != nil {
-		return fmt.Errorf("zever doctor: %w", err)
+		return &flagUsageError{err: fmt.Errorf("zever doctor: %w", err)}
 	}
 
 	return runDoctorWith(DoctorConfig{ConfigPath: *configPath, Strict: *strict, JSON: jsonMode})
@@ -141,21 +152,163 @@ var doctorChecksFor = func(c *container.Container, resolved *config.Config) map[
 	}
 }
 
-// runDoctorWith resolves every battery from config.Load(cfg.ConfigPath) --
-// config.Load("") discovers zever.yaml/.yml/.json in the working directory
-// and applies env overrides, matching how the container resolves config --
-// and reports one OK/FAIL line per battery to cfg.Out. It validates the
-// config first and reports the result as a "config" row, then resolves each
-// battery against the same Container. By default it always returns nil: a
-// FAIL row is an expected outcome (e.g. a battery needing a secret), not a
-// command error; only a config that cannot be loaded is an error. Pass
-// cfg.Strict to make any FAIL row return a non-nil error instead, for
-// CI/pre-deploy gating on exit code.
+// doctorRow is one battery's check result, human and JSON alike.
+type doctorRow struct {
+	Name  string `json:"name"`
+	OK    bool   `json:"ok"`
+	Error string `json:"error,omitempty"`
+}
+
+// doctorScope is the resolved check plan: which batteries to check, where the
+// checks run, and the note explaining the choice to the operator.
+type doctorScope struct {
+	// enabled lists the project's enabled batteries by name. Nil means no
+	// project config was found, so every known battery is checked.
+	enabled map[string]bool
+	// source names where the checks run: "cli", or "server:<entry>".
+	source string
+	// serverEntry is the project server entrypoint to exec (--doctor mode),
+	// or "" when no built server is available.
+	serverEntry string
+	// note explains the scope/source choice; empty when unremarkable.
+	note string
+}
+
+// resolveDoctorScope locates the project the same way serve does:
+// discoverServeConfig probes zever.yaml/.yml/.json in the working directory
+// (first match wins), and serveYamlBatteries reads its top-level service
+// keys — exactly the batteries `zever new` wrote, since the scaffold emits
+// one stanza per enabled battery and nothing else. An explicit --config path
+// pins the file instead of discovery. With no file at all every battery is
+// checked and the note says so.
+func resolveDoctorScope(configPath string) doctorScope {
+	path := configPath
+	if path == "" {
+		path = discoverServeConfig()
+	}
+
+	if path == "" {
+		return doctorScope{source: "cli", note: "no project config found (zever.yaml/.yml/.json) — checking all batteries"}
+	}
+
+	keys, err := serveYamlBatteries(path)
+	if err != nil {
+		return doctorScope{source: "cli", note: fmt.Sprintf("could not read batteries from %s — checking all batteries", path)}
+	}
+
+	enabled := make(map[string]bool, len(keys))
+	for _, k := range keys {
+		enabled[k] = true
+	}
+
+	scope := doctorScope{enabled: enabled, source: "cli"}
+
+	entry := defaultServerEntry
+	if pc, err := loadProjectConfig(); err == nil && strings.TrimSpace(pc.ServerEntry) != "" {
+		entry = pc.ServerEntry
+	}
+
+	if fi, err := os.Stat(entry); err == nil && fi.IsDir() {
+		scope.serverEntry = entry
+	} else {
+		scope.note = fmt.Sprintf("no built server entrypoint %q — checked via CLI registry", entry)
+	}
+
+	return scope
+}
+
+// localDoctorRows resolves the scope's enabled batteries against the CLI
+// process's own container (whose adapters.go registers every adapter), in
+// deterministic name order. The "config" row always runs.
+func localDoctorRows(c *container.Container, resolved *config.Config, enabled map[string]bool) []doctorRow {
+	checks := doctorChecksFor(c, resolved)
+
+	names := make([]string, 0, len(checks))
+	for name := range checks {
+		if name == "config" || enabled == nil || enabled[name] {
+			names = append(names, name)
+		}
+	}
+
+	sort.Strings(names)
+
+	rows := make([]doctorRow, 0, len(names))
+	for _, name := range names {
+		if err := checks[name](); err != nil {
+			rows = append(rows, doctorRow{Name: name, Error: err.Error()})
+
+			continue
+		}
+
+		rows = append(rows, doctorRow{Name: name, OK: true})
+	}
+
+	return rows
+}
+
+// serverDoctorRows converts a built server's --doctor report into doctor
+// rows: the config validation row always runs locally (the server only
+// reports batteries), and server rows outside the enabled set are dropped.
+func serverDoctorRows(resolved *config.Config, rep serverDoctorReport, enabled map[string]bool) []doctorRow {
+	rows := make([]doctorRow, 0, len(rep.Batteries)+1)
+	if err := resolved.Validate(); err != nil {
+		rows = append(rows, doctorRow{Name: "config", Error: err.Error()})
+	} else {
+		rows = append(rows, doctorRow{Name: "config", OK: true})
+	}
+
+	names := make([]string, 0, len(rep.Batteries))
+	byName := make(map[string]serverDoctorBattery, len(rep.Batteries))
+
+	for _, b := range rep.Batteries {
+		if _, seen := byName[b.Name]; seen {
+			continue
+		}
+
+		byName[b.Name] = b
+
+		if enabled == nil || enabled[b.Name] {
+			names = append(names, b.Name)
+		}
+	}
+
+	sort.Strings(names)
+
+	for _, name := range names {
+		b := byName[name]
+		rows = append(rows, doctorRow(b))
+	}
+
+	return rows
+}
+
+// shortDoctorErr keeps one line of err for the fallback note.
+func shortDoctorErr(err error) string {
+	msg := err.Error()
+	if i := strings.IndexByte(msg, '\n'); i >= 0 {
+		msg = msg[:i]
+	}
+
+	return msg
+}
+
+// runDoctorWith resolves the configured batteries and reports one OK/FAIL
+// line per battery to cfg.Out. It validates the config first and reports the
+// result as a "config" row, then resolves each enabled battery. A config
+// that cannot be loaded is an error; any failing battery is also an error
+// (exit 1), so `zever doctor` gates CI/pre-deploy pipelines by default.
 //
 // No secrets ever reach cfg.Out: only battery resolution errors are
 // printed, and those never echo secret values (see config.Redact, the sole
 // display path for secret-bearing values, which doctor does not use).
 func runDoctorWith(cfg DoctorConfig) error {
+	return runDoctorWithContext(context.Background(), cfg)
+}
+
+// runDoctorWithContext is runDoctorWith with a caller context, which governs
+// the built-server `--doctor` exec (see runServerDoctor). Tests pass
+// t.Context(); the flag shell has no caller context and uses Background.
+func runDoctorWithContext(ctx context.Context, cfg DoctorConfig) error {
 	out := outOrStdout(cfg.Out)
 
 	resolved, err := config.Load(cfg.ConfigPath)
@@ -165,70 +318,56 @@ func runDoctorWith(cfg DoctorConfig) error {
 
 	c := container.New(resolved)
 	defer func() {
-		ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
+		closeCtx, cancel := context.WithTimeout(context.WithoutCancel(ctx), 5*time.Second)
 		defer cancel()
-		_ = c.Close(ctx)
+		_ = c.Close(closeCtx)
 	}()
 
-	checks := doctorChecksFor(c, resolved)
+	scope := resolveDoctorScope(cfg.ConfigPath)
 
-	names := make([]string, 0, len(checks))
-	for name := range checks {
-		names = append(names, name)
-	}
-
-	sort.Strings(names)
-
-	// Styled table with padded battery column.
-	maxLen := 0
-	for _, n := range names {
-		if len(n) > maxLen {
-			maxLen = len(n)
+	var rows []doctorRow
+	if scope.serverEntry != "" {
+		if rep, rerr := runServerDoctor(ctx, scope.serverEntry); rerr == nil {
+			rows = serverDoctorRows(resolved, rep, scope.enabled)
+			scope.source = "server:" + scope.serverEntry
+			scope.note = fmt.Sprintf("checked via built server entrypoint %s --doctor (real container + registrations)", scope.serverEntry)
+		} else {
+			rows = localDoctorRows(c, resolved, scope.enabled)
+			scope.note = fmt.Sprintf("built server unavailable (%s) — checked via CLI registry", shortDoctorErr(rerr))
 		}
+	} else {
+		rows = localDoctorRows(c, resolved, scope.enabled)
 	}
 
 	failed := false
 	okCount, failCount := 0, 0
 
-	type doctorRow struct {
-		Name  string `json:"name"`
-		OK    bool   `json:"ok"`
-		Error string `json:"error,omitempty"`
-	}
-
-	rows := make([]doctorRow, 0, len(names))
-
-	for _, name := range names {
-		if err := checks[name](); err != nil {
+	for _, row := range rows {
+		if row.OK {
+			okCount++
+		} else {
 			failed = true
 			failCount++
-			rows = append(rows, doctorRow{Name: name, Error: err.Error()})
-
-			continue
 		}
+	}
 
-		okCount++
-		rows = append(rows, doctorRow{Name: name, OK: true})
+	data := map[string]any{
+		"batteries": rows,
+		"ok":        okCount,
+		"failed":    failCount,
+		"source":    scope.source,
+	}
+	if scope.note != "" {
+		data["note"] = scope.note
 	}
 
 	if cfg.JSON {
-		data := map[string]any{
-			"batteries": rows,
-			"ok":        okCount,
-			"failed":    failCount,
-		}
-
 		if failed {
-			// A failing battery is a command failure in JSON mode even
-			// without --strict: emit one failure envelope (ok:false) and
-			// return its already-emitted error so the process exits
-			// nonzero without main writing a second envelope. The
-			// human path below keeps its legacy contract (nil without
-			// --strict); check logic itself is untouched.
-			msg := fmt.Errorf("zever doctor: %d of %d batteries failed", failCount, len(names))
-			if cfg.Strict {
-				msg = fmt.Errorf("zever doctor: %d of %d batteries failed (--strict)", failCount, len(names))
-			}
+			// A failing battery is a command failure in JSON mode: emit
+			// one failure envelope (ok:false) and return its
+			// already-emitted error so the process exits nonzero without
+			// main writing a second envelope.
+			msg := fmt.Errorf("zever doctor: %d of %d batteries failed", failCount, len(rows))
 
 			return emitFailure("doctor", data, nil, msg)
 		}
@@ -236,6 +375,18 @@ func runDoctorWith(cfg DoctorConfig) error {
 		emitSuccess("doctor", data)
 
 		return nil
+	}
+
+	if scope.note != "" {
+		_, _ = fmt.Fprintln(out, dim("note: ")+scope.note)
+	}
+
+	// Styled table with padded battery column.
+	maxLen := 0
+	for _, row := range rows {
+		if len(row.Name) > maxLen {
+			maxLen = len(row.Name)
+		}
 	}
 
 	for _, row := range rows {
@@ -256,17 +407,15 @@ func runDoctorWith(cfg DoctorConfig) error {
 		_, _ = fmt.Fprintln(out, dim("Summary: ")+summary)
 		_, _ = fmt.Fprintln(os.Stderr, formatHint("some batteries failed — check config or ZEVER_* env"))
 		_, _ = fmt.Fprintln(os.Stderr, dim("zever doctor: one or more batteries failed to resolve (see above)"))
-	} else {
-		summary := success(fmt.Sprintf("All %d batteries OK", okCount))
-		_, _ = fmt.Fprintln(out, summary+" "+dim("✓"))
 
-		if shouldShowHint() {
-			_, _ = fmt.Fprintln(os.Stderr, formatHint(hintFor("compile")))
-		}
+		return fmt.Errorf("zever doctor: %d of %d batteries failed", failCount, len(rows))
 	}
 
-	if failed && cfg.Strict {
-		return fmt.Errorf("zever doctor: %d of %d batteries failed (--strict)", failCount, len(names))
+	summary := success(fmt.Sprintf("All %d batteries OK", okCount))
+	_, _ = fmt.Fprintln(out, summary+" "+dim("✓"))
+
+	if shouldShowHint() {
+		_, _ = fmt.Fprintln(os.Stderr, formatHint(hintFor("compile")))
 	}
 
 	return nil
