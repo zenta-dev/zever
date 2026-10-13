@@ -43,6 +43,11 @@ the adapters they selected.
 Each service resolves on first use and caches the result. On error the
 cached state clears so the next call retries.
 
+37 rows below are the configured services (same set as `config/README.md`
+and `knownServiceNames()` in `config/config.go`); `agent`, `grpc`,
+`grpcclient`, `job`, and `rag` resolve over other services and take no
+`config` section.
+
 | Service | Accessor | Notes |
 |---|---|---|
 | agent | `Agent()` | `*agent.Loop` over resolved `AI`, closed first |

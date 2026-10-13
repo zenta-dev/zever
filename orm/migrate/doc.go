@@ -22,7 +22,7 @@
 // "sqlite", and "mysql" (the atlas backend's own
 // DialectPostgres/DialectSQLite/DialectMySQL constant values, which this
 // package intentionally does not redeclare -- a caller already has them from
-// internal/dsl/backend/atlas, the same package this package depends on for
+// dsl/backend/atlas, the same package this package depends on for
 // DDL rendering and identifier quoting).
 //
 // Any other dialect is refused up front: Plan and ComputeRollback both

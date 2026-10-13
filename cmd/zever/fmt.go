@@ -45,7 +45,7 @@ func printFmtUsage(fs *flag.FlagSet) {
 	}
 }
 
-// runFmt formats each .zen file argument via internal/dsl/format.Format.
+// runFmt formats each .zen file argument via dsl/format.Format.
 // Default (check-only) mode lists files that would change and returns a
 // non-nil error if any would, without writing anything -- mirroring
 // `make fmt` / `gofmt -l`. --write (-w) rewrites files in place, mirroring
@@ -158,7 +158,7 @@ func fmtOneFile(path string, write bool) (bool, error) {
 
 	out, err := format.Format(src)
 	// Proof: format.Format's only error return is format.ErrDirty (see
-	// internal/dsl/format/format.go: Format returns ErrDirty when Edits
+	// dsl/format/format.go: Format returns ErrDirty when Edits
 	// fails, nil otherwise), so every error here is a syntax error by
 	// construction; no generic-error branch is reachable.
 	if err != nil {

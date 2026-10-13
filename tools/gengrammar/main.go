@@ -1,7 +1,7 @@
 // Command gengrammar regenerates the editor grammar files
 // (editors/nvim/syntax/zen.vim and editors/vscode/syntaxes/zen.tmLanguage.json)
 // from the DSL compiler's own keyword and scalar-type tables. It is a thin
-// wrapper around internal/dsl/gengrammar.Files; all the actual generation
+// wrapper around dsl/gengrammar.Files; all the actual generation
 // logic lives there so editors/parity_test.go can call it directly instead
 // of shelling out.
 //

@@ -66,7 +66,7 @@ func runCheckBoundariesWith(cfg BoundariesConfig) error {
 	violations := 0
 
 	for _, d := range boundaryDiags.Sorted() {
-		// Proof: CheckCrossModule (internal/dsl/resolver/boundary.go) only
+		// Proof: CheckCrossModule (dsl/resolver/boundary.go) only
 		// ever appends diag.Wrap(..., ErrCrossModule, ...); it never returns
 		// other sentinels, so no errors.Is filter is needed and every
 		// element here is a violation by construction.
