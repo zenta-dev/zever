@@ -14,16 +14,20 @@ import (
 // TestRunDoctorDoesNotPanic asserts doctor runs cleanly against
 // config.Default(): some batteries (e.g. auth/jwt with no configured
 // secret) are expected to legitimately FAIL, which is correct behavior, not
-// a bug in this command.
-func TestRunDoctorDoesNotPanic(t *testing.T) {
-	if err := runDoctor(nil); err != nil {
-		t.Fatalf("runDoctor: %v", err)
-	}
+// a bug in this command. The error itself carries the exit-1 contract (see
+// TestDoctorHumanFailsOnBatteryFailure); here only the absence of a panic
+// matters.
+func TestRunDoctorDoesNotPanic(_ *testing.T) {
+	_ = runDoctor(nil)
 }
 
 func TestRunDoctorInteractiveFlag(t *testing.T) {
 	prev := interactiveMode
 	t.Cleanup(func() { interactiveMode = prev })
+
+	dir := t.TempDir()
+	writeInspectFixture(t, dir, "zever.yaml", doctorTwoBatteryFixture)
+	t.Chdir(dir)
 
 	if err := runDoctor([]string{"-i"}); err != nil {
 		t.Fatalf("runDoctor -i: %v", err)
@@ -58,14 +62,17 @@ func TestRunDoctorMissingConfigFile(t *testing.T) {
 }
 
 func TestRunDoctorWithCoreListsBatteries(t *testing.T) {
+	dir := t.TempDir()
+	cfgPath := writeInspectFixture(t, dir, "zever.yaml", "log:\n  adapter: slog\nrouter:\n  adapter: stdhttp\ndb:\n  adapter: sqlite\npassword:\n  adapter: argon2id\nqueue:\n  adapter: memory\nworkflow:\n  adapter: memory\n")
+
 	var out bytes.Buffer
-	if err := runDoctorWith(DoctorConfig{Out: &out}); err != nil {
+	if err := runDoctorWith(DoctorConfig{ConfigPath: cfgPath, Out: &out}); err != nil {
 		t.Fatalf("runDoctorWith: %v", err)
 	}
 
 	got := out.String()
-	for _, want := range []string{"config", "ai", "db", "password", "queue", "workflow"} {
-		if !strings.Contains(got, want) {
+	for _, want := range []string{"config", "db", "password", "queue", "workflow"} {
+		if _, ok := doctorLine(got, want); !ok {
 			t.Fatalf("output missing battery %q:\n%s", want, got)
 		}
 	}
@@ -145,6 +152,10 @@ func TestRunDoctorInteractiveLongForm(t *testing.T) {
 	prev := interactiveMode
 	t.Cleanup(func() { interactiveMode = prev })
 
+	dir := t.TempDir()
+	writeInspectFixture(t, dir, "zever.yaml", doctorTwoBatteryFixture)
+	t.Chdir(dir)
+
 	if err := runDoctor([]string{"--interactive"}); err != nil {
 		t.Fatalf("runDoctor --interactive: %v", err)
 	}
@@ -153,10 +164,9 @@ func TestRunDoctorInteractiveLongForm(t *testing.T) {
 	}
 }
 
-// TestRunDoctorStrictFailsOnBatteryFailure covers --strict: unlike the
-// default (always nil -- a FAIL row is an expected outcome, see
-// TestRunDoctorDoesNotPanic), --strict must surface a non-nil error so
-// `zever doctor --strict` can gate a CI/pre-deploy pipeline on exit code.
+// TestRunDoctorStrictFailsOnBatteryFailure covers --strict: a failing
+// battery surfaces a non-nil error so `zever doctor --strict` (and plain
+// `zever doctor`, since P3-3) gates a CI/pre-deploy pipeline on exit code.
 func TestRunDoctorStrictFailsOnBatteryFailure(t *testing.T) {
 	prev := doctorChecksFor
 	t.Cleanup(func() { doctorChecksFor = prev })
@@ -173,9 +183,9 @@ func TestRunDoctorStrictFailsOnBatteryFailure(t *testing.T) {
 	}
 }
 
-// TestRunDoctorNotStrictIgnoresBatteryFailure pins the default: a failing
-// battery never fails the command unless --strict is passed.
-func TestRunDoctorNotStrictIgnoresBatteryFailure(t *testing.T) {
+// TestRunDoctorHumanFailsWithoutStrict pins the P3-3 exit-code fix: a
+// failing battery fails the command even without --strict (exit 1).
+func TestRunDoctorHumanFailsWithoutStrict(t *testing.T) {
 	prev := doctorChecksFor
 	t.Cleanup(func() { doctorChecksFor = prev })
 	doctorChecksFor = func(_ *container.Container, _ *config.Config) map[string]func() error {
@@ -186,8 +196,8 @@ func TestRunDoctorNotStrictIgnoresBatteryFailure(t *testing.T) {
 	}
 
 	var out bytes.Buffer
-	if err := runDoctorWith(DoctorConfig{Out: &out}); err != nil {
-		t.Fatalf("runDoctorWith Strict=false with a failing battery: %v, want nil", err)
+	if err := runDoctorWith(DoctorConfig{Out: &out}); err == nil {
+		t.Fatal("runDoctorWith Strict=false with a failing battery: got nil error, want non-nil for exit 1")
 	}
 }
 
@@ -197,8 +207,10 @@ func TestRunDoctorFlagsDevKeyInNonDevEnv(t *testing.T) {
 	t.Setenv("ZEVER_ENV", "")
 
 	var out bytes.Buffer
-	if err := runDoctorWith(DoctorConfig{Out: &out}); err != nil {
-		t.Fatalf("runDoctorWith: %v", err)
+	// Defaults fail other batteries too (auth/jwt has no secret), so the
+	// command errors; the assertion is the crypto row flagging the dev key.
+	if err := runDoctorWith(DoctorConfig{Out: &out}); err == nil {
+		t.Fatal("runDoctorWith defaults: got nil error, want non-nil")
 	}
 
 	line, ok := doctorLine(out.String(), "crypto")
@@ -214,8 +226,10 @@ func TestRunDoctorDevKeyAllowedInDevEnv(t *testing.T) {
 	t.Setenv("ZEVER_ENV", "test")
 
 	var out bytes.Buffer
-	if err := runDoctorWith(DoctorConfig{Out: &out}); err != nil {
-		t.Fatalf("runDoctorWith: %v", err)
+	// Other default batteries still fail (auth/jwt has no secret), so the
+	// command errors; the assertion is the crypto row passing in dev env.
+	if err := runDoctorWith(DoctorConfig{Out: &out}); err == nil {
+		t.Fatal("runDoctorWith defaults: got nil error, want non-nil")
 	}
 
 	line, ok := doctorLine(out.String(), "crypto")

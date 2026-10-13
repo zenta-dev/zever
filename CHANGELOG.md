@@ -126,6 +126,16 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Fixed
 
+- `fix(cli): project-aware doctor`: `zever doctor` now checks only the
+  services enabled in the project config (top-level batteries in
+  `zever.yaml`/`.yml`/`.json`, same discovery as `serve`; falls back to
+  checking all batteries with a note when no project config is found).
+  The generated server gains a `--doctor` mode that resolves every enabled
+  service via its real container and registrations and prints JSON; the CLI
+  execs `go run <entry> --doctor` when the project has a server entrypoint
+  and falls back to its CLI registry with a note otherwise. Human `doctor`
+  now exits 1 on failures (previously 0); flag misuse exits 2; `--json`
+  keeps the shared envelope.
 - `fix(cli): consistent --json envelope across inspection commands`:
   `routes`, `config show`, and `graph` now honor the global `--json` flag
   (previously `routes --json` printed no JSON at all and the other two
