@@ -66,6 +66,20 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Added
 
+- `feat(payment): dedupe webhook events by id`: the stripe and paddle
+  adapters accept the existing optional `payment.Options.Idempotency`
+  store for webhook replay protection (previously refund-only). After
+  signature verification, the provider event id (Stripe event `id`,
+  Paddle `event_id`, now surfaced as `payment.Event.ID`) is reserved
+  with a payload-fingerprint guard and a 24h TTL
+  (`DefaultWebhookIdempotencyTTL`); a repeat delivery fails with the new
+  typed `DuplicateEventError` (sentinel `ErrDuplicateEvent`) instead of
+  re-executing downstream work, and a same-id/different-payload delivery
+  trips the store fingerprint mismatch fail-closed. No store (or an
+  event without an id) keeps the old process-every-delivery behavior.
+  `container.Payment()` reuses the resolved `c.Idempotency()` service
+  best-effort when no explicit store is configured; an unresolvable
+  idempotency service never blocks payment resolution.
 - `feat(auth/jwt): kid-based key rotation and nbf validation`: `JWTOptions`
   gains `keys: [{kid, secret}]` plus `active_kid` (empty defaults to the
   first entry; validated for unique kids, secret length, and a matching
