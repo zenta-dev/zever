@@ -7,6 +7,18 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Breaking
+
+- `fix(installer)!: fail when checksum cannot be verified`: `install.sh` and
+  `install.ps1` now abort when no SHA-256 tool is available (or hashing fails)
+  instead of skipping checksum verification with a warning. Opt out
+  explicitly with `--insecure-skip-verify` / `-InsecureSkipVerify` or
+  `ZEVER_INSTALL_INSECURE=1` to install unverified binaries. When `gh` is not
+  installed, both installers now print the manual
+  `gh attestation verify <binary> --repo zenta-dev/zever` command. New
+  offline test harness: `sh tools/installer-test.sh` (also wired into
+  `make check` and CI).
+
 ### Added
 
 - `feat(container): report abandoned closers on timeout`: `CloseTimeoutError`

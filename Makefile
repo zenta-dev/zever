@@ -88,6 +88,10 @@ err-lint: ## Scan for error-convention violations (unprefixed messages, bracket 
 test: ## Run tests
 	$(GO) test ./...
 
+.PHONY: installer-test
+installer-test: ## Run installer fail-closed tests (offline, stubbed PATH)
+	sh tools/installer-test.sh
+
 .PHONY: test-race
 test-race: ## Run tests with the race detector
 	$(GO) test -race ./...
@@ -153,7 +157,7 @@ clean: ## Remove coverage output and build artifacts
 	rm -f $(COVERAGE) $(SBOM)
 
 .PHONY: check
-check: require-tools download fmt check-all modgraph-check dependabot-check lint-all vulncheck-all ## Run all local CI checks (run 'make setup' first)
+check: require-tools download fmt check-all modgraph-check dependabot-check lint-all vulncheck-all installer-test ## Run all local CI checks (run 'make setup' first)
 
 # Multi-module targets: per-module loops over the committed go.work workspace.
 .PHONY: download-all
