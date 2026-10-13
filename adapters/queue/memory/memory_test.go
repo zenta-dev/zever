@@ -444,10 +444,11 @@ func TestMemory_VisibilityTimeout_reclaim(t *testing.T) {
 	}
 	// Backdate the heap entry too (keeping the deadline mismatch the test
 	// covers): the heap top must already be expired for the reclaim to run
-	// synchronously inside Pop instead of after a wall-clock sleep.
-	for _, e := range tq.visHeap {
-		if e.id == msg.ID {
-			e.deadline = time.Now().Add(-5 * time.Millisecond)
+	// synchronously inside Pop instead of after a wall-clock sleep. The
+	// heap holds entries by value, so assign through the index.
+	for i := range tq.visHeap {
+		if tq.visHeap[i].id == msg.ID {
+			tq.visHeap[i].deadline = time.Now().Add(-5 * time.Millisecond)
 		}
 	}
 	tq.mu.Unlock()
@@ -1016,8 +1017,8 @@ func TestMemory_VisibilityHeap(t *testing.T) {
 func testHeap(t *testing.T) {
 	t.Helper()
 	h := visibilityHeap{}
-	h.Push(&visibilityEntry{deadline: time.Now().Add(10 * time.Millisecond)})
-	h.Push(&visibilityEntry{deadline: time.Now().Add(5 * time.Millisecond)})
+	h.Push(visibilityEntry{deadline: time.Now().Add(10 * time.Millisecond)})
+	h.Push(visibilityEntry{deadline: time.Now().Add(5 * time.Millisecond)})
 	if h.Len() != 2 {
 		t.Fatalf("heap Len %d want 2", h.Len())
 	}

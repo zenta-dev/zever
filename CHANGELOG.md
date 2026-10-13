@@ -169,6 +169,18 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   and target versions (fetched once, cached under the user cache dir).
    `--dry-run` prints the plan without writing, fetching, or tidying;
    `--check` prints the available version only.
+- `perf(queue/memory): cut round-trip allocs 16 to 11 per op`: three hot-path
+  fixes from a `-benchmem`/`memprofile` pass over the cache/queue adapters.
+  Push no longer builds its 50ms backpressure timer before checking capacity
+  (fast path returns first); Pop builds its poll timer lazily on the first
+  miss instead of per call (timeout now measured from first miss — same or
+  more generous, never a spurious Empty); the visibility heap stores entries
+  by value instead of pointers (one fewer heap alloc per Pop). Measured
+  `BenchmarkMemoryRoundTripParallel` 16→11 allocs/op, 2059→1826 B/op.
+  Deliberately deferred (documented follow-ups): per-iteration topic
+  sweep-then-recreate churn, `msgspan`/`traceprop` per-Push span costs,
+  `Message.Clone` payload/header copies, and cache-memory allocs which sit
+  inside `shared/lrucache`, not the adapter.
 - `ci: non-gating benchmark trend for orm and container`: new
   `.github/workflows/bench.yml` runs `bench-orm` and `bench-container`
   jobs plus a best-effort `benchstat` compare on PRs touching either
