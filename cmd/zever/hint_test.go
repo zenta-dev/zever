@@ -48,7 +48,7 @@ func TestHintFor(t *testing.T) {
 		cmd  string
 		want string
 	}{
-		{"new", "new", "next: cd <app> && zever compile schema/app.zen && zever serve"},
+		{"new", "new", "next: cd <app> && zever compile --backend=zenorm,proto,atlas schema/app.zen && zever db migrate --adapter=sqlite --dsn=data/app.db schema/app.zen && zever serve"},
 		{"generate module", "generate module", "next: zever generate entity <module> <Name> --field title:string"},
 		{"generate entity", "generate entity", "next: zever compile to validate schema"},
 		{"generate job", "generate job", `next: zever generate schedule <module> <Name> --cron "*/5 * * * *" --dispatch <Job>`},

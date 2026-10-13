@@ -114,8 +114,10 @@ go run ./cmd/server -addr :8080
 ```
 
 In another terminal: `curl -i localhost:8080/healthz` returns `200 OK`. The
-generated `hello` project is a bare starting point: `zever serve` needs the
-auth and permission batteries wired first (see the [booking tutorial](https://zenta-dev.github.io/zever/tutorials/build-a-booking-api/)).
+generated `hello` project boots out of the box with zero-infra adapters:
+`cd hello && zever compile --backend=zenorm,proto,atlas schema/app.zen &&
+zever db migrate --adapter=sqlite --dsn=data/app.db schema/app.zen &&
+zever serve`, then `curl -i localhost:8080/healthz` returns `200 OK`.
 
 ## Where next
 
