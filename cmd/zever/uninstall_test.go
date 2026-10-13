@@ -385,8 +385,8 @@ func TestRunUninstallJSONDryRun(t *testing.T) {
 }
 
 func TestUninstallUpgradeWiring(t *testing.T) {
-	t.Parallel()
-
+	// Sequential: agentCommands reads the shared rootCmd global and
+	// cobra.Command.Commands sorts in place, which races under t.Parallel.
 	if !useCobra([]string{"uninstall"}) {
 		t.Error("useCobra(uninstall) = false, want true")
 	}
