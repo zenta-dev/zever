@@ -54,13 +54,21 @@ func (e TransactorError) Unwrap() error {
 }
 
 // CloseTimeoutError reports a service whose Close exceeded its deadline.
+// Abandoned is true when the timed-out close goroutine was deliberately left
+// running because the service ignored its context: the goroutine owns no
+// container state and finishes once its Close returns.
 type CloseTimeoutError struct {
-	Service string
-	Err     error
+	Service   string
+	Abandoned bool
+	Err       error
 }
 
-// Error describes which service timed out and why.
+// Error describes which service timed out and why, noting the abandoned
+// goroutine when set.
 func (e CloseTimeoutError) Error() string {
+	if e.Abandoned {
+		return fmt.Sprintf("container: close %s timed out, abandoning goroutine: %v", e.Service, e.Err)
+	}
 	return fmt.Sprintf("container: close %s timed out: %v", e.Service, e.Err)
 }
 

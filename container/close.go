@@ -227,7 +227,9 @@ func (c *Container) Close(ctx context.Context) error {
 				cancel()
 			}
 
-			errs = append(errs, CloseTimeoutError{Service: service, Err: perCtx.Err()})
+			errs = append(errs, CloseTimeoutError{Service: service, Abandoned: true, Err: perCtx.Err()})
+
+			c.logAbandonedCloser(service, perCtx.Err())
 
 			// Don't block on the abandoned goroutine; it will finish and be
 			// GC'd. Give the next close a fresh channel so a late send cannot
@@ -333,6 +335,22 @@ func (c *Container) Close(ctx context.Context) error {
 	_ = keepAlive
 
 	return errors.Join(errs...)
+}
+
+// logAbandonedCloser reports a timed-out close whose goroutine was
+// abandoned via the container logger when one is resolved. The warn is
+// best-effort: an unresolved logger skips it, and logging must never block
+// or fail Close.
+func (c *Container) logAbandonedCloser(service string, cause error) {
+	lg, ok := c.log.getIfResolved()
+	if !ok {
+		return
+	}
+
+	lg.Warn().
+		Str("service", service).
+		AnErr("error", cause).
+		Msgf("container: close %s timed out, abandoning goroutine", service)
 }
 
 // closeAsync runs closeAny for one service on its own goroutine and funnels
