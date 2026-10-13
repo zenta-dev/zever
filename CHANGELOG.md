@@ -81,7 +81,11 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   scaffolded `zever new` dev config writes `allow_dev_key: true` plus the
   dev key with a comment, and `zever doctor` flags the dev key in
   non-dev environments. Test fixtures must set `allow_dev_key` or
-  `ZEVER_ENV` explicitly when resolving crypto from `config.Default()`.
+   `ZEVER_ENV` explicitly when resolving crypto from `config.Default()`.
+- **Breaking:** `auth.JWTOptions` and `auth.Options` are no longer
+  comparable: the new `Keys []JWTKey` field (kid-based rotation) makes `==`
+  on these structs — and on `config.Service[auth.Options]` — a compile
+  error. Compare field-by-field instead.
 
 ### Added
 
@@ -98,6 +102,14 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   tokens are rejected. Docs now state the default memory revocation store
   is per-process and point multi-instance deployments at the shared
   `revocation/redis` store.
+- `ci: apidiff gate for Core-tier modules`: new `tools/apidiff` module plus
+  `make apidiff` and a CI `apidiff` job compare the exported API of
+  `config`, `container`, `core/{auth,cache,crypto,db,password,queue,router,
+  secrets,session}`, `dsl`, and `orm` against each module's latest
+  `<dir>/vX.Y.Z` tag via `golang.org/x/exp/apidiff`. Incompatible changes
+  fail the gate unless `## [Unreleased]` carries a `**Breaking:**` line.
+  The gate already caught two real breaks on adoption (`auth.JWTOptions` /
+  `auth.Options` comparability, documented above).
 - `docs: test your zever app guide`: new `guides/operate/testing-your-app`
   page — per-test container from `config.Default()` with `t.Cleanup` close,
   httptest routes, per-test sqlite files under `t.TempDir()`, the `dbtest`
