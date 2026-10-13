@@ -39,7 +39,7 @@ jobs:
         with:
           go-version-file: go.work
       - name: Run orm benchmarks
-        run: go test -run=NONE -bench=. -benchmem -benchtime=1000000x -count=6 ./orm/... 2>&1 | tee bench-orm.txt
+        run: go test -run=NONE -bench=. -benchmem -benchtime=1s -count=6 ./orm/... 2>&1 | tee bench-orm.txt
       - name: Upload orm results
         uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
         with:
@@ -57,7 +57,7 @@ jobs:
         with:
           go-version-file: go.work
       - name: Run container benchmarks
-        run: go test -run=NONE -bench=. -benchmem -benchtime=1000000x -count=6 ./container/... 2>&1 | tee bench-container.txt
+        run: go test -run=NONE -bench=. -benchmem -benchtime=1s -count=6 ./container/... 2>&1 | tee bench-container.txt
       - name: Upload container results
         uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
         with:
@@ -87,5 +87,5 @@ jobs:
           git fetch origin ${{ github.base_ref }} --depth=1 || true
           git stash -u || true
           git checkout -q origin/${{ github.base_ref }} -- orm container 2>/dev/null || true
-          go test -run=NONE -bench=. -benchmem -benchtime=1000000x -count=6 ./orm/... 2>&1 | tee bench-base.txt || true
+          go test -run=NONE -bench=. -benchmem -benchtime=1s -count=6 ./orm/... 2>&1 | tee bench-base.txt || true
           benchstat bench-base.txt bench-orm.txt bench-container.txt || true
