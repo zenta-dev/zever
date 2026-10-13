@@ -334,6 +334,7 @@ Symmetric encryption and signing. The default config ships a deterministic dev k
 | `region` | string | `""` | KMS region (for example an AWS region) |
 | `endpoint` | string | `""` | Overrides the KMS endpoint (custom KMS, tests, VPC endpoints) |
 | `use_envelope` | boolean | `false` | Selects KMS envelope encryption |
+| `allow_dev_key` | boolean | `false` | Permits the deterministic public dev key for local development; when false, the local adapter rejects that key unless `ZEVER_ENV` is `dev`, `test`, or `development` |
 
 The `kms` adapter fails closed from config: it needs a real KMS client injected from Go, because its dev stub is not a file option. Use `local` for file-only setups.
 

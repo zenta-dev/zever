@@ -58,6 +58,7 @@ func benchSetup(b *testing.B) http.Handler {
 
 	tmp := b.TempDir()
 	cfg := config.Default()
+	cfg.Crypto.Options.AllowDevKey = true
 	cfg.DB.Options.Path = filepath.Join(tmp, "bench.db")
 	cfg.Auth.Options.JWT.Secret = testJWTSecret
 	cfg.I18n.Options.Embed = i18n.EmbedOptions{FS: locales.FS, Dir: ".", Fallback: "en"}

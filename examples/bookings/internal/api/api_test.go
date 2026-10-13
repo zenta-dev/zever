@@ -65,6 +65,7 @@ func newTestSetup(t *testing.T) testSetup {
 	tenantsingle.Register()
 
 	cfg := config.Default()
+	cfg.Crypto.Options.AllowDevKey = true
 	cfg.DB.Options.Path = filepath.Join(t.TempDir(), "test.db")
 	cfg.Auth.Options.JWT.Secret = testJWTSecret
 	cfg.Geo.Options.Path = filepath.Join("testdata", "cities.json")

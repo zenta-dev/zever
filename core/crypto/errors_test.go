@@ -23,6 +23,7 @@ func TestErrors_sentinels_prefix(t *testing.T) {
 		{name: "unknown_adapter", err: crypto.ErrUnknownAdapter},
 		{name: "invalid_adapter", err: crypto.ErrInvalidAdapter},
 		{name: "invalid_options", err: crypto.ErrInvalidOptions},
+		{name: "dev_key", err: crypto.ErrDevKey},
 	}
 	for _, tc := range cases {
 		tc := tc
@@ -49,6 +50,7 @@ func TestErrors_unwrap_carries_sentinel(t *testing.T) {
 		{name: "unknown", err: crypto.UnknownAdapterError{Adapter: crypto.AdapterLocal}, want: crypto.ErrUnknownAdapter},
 		{name: "invalid_adapter", err: crypto.InvalidAdapterError{Adapter: "x"}, want: crypto.ErrInvalidAdapter},
 		{name: "invalid_options", err: crypto.InvalidOptionsError{Reason: "x"}, want: crypto.ErrInvalidOptions},
+		{name: "dev_key", err: crypto.DevKeyError{}, want: crypto.ErrDevKey},
 	}
 	for _, tc := range cases {
 		tc := tc
@@ -123,6 +125,20 @@ func TestErrors_typed_As(t *testing.T) {
 		}
 		if !errors.Is(ioe, crypto.ErrInvalidOptions) {
 			t.Fatalf("Is ErrInvalidOptions = false")
+		}
+	})
+	t.Run("dev_key", func(t *testing.T) {
+		t.Parallel()
+		e := crypto.DevKeyError{}
+		var dke crypto.DevKeyError
+		if !errors.As(e, &dke) {
+			t.Fatalf("err type = %T, want *DevKeyError", e)
+		}
+		if !strings.Contains(e.Error(), "allow_dev_key") {
+			t.Fatalf("Error() = %q, want fix hint", e.Error())
+		}
+		if !errors.Is(e, crypto.ErrDevKey) {
+			t.Fatalf("Is ErrDevKey = false")
 		}
 	})
 }

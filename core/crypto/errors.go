@@ -24,6 +24,9 @@ var (
 	ErrInvalidAdapter = errors.New("crypto: invalid adapter")
 	// ErrInvalidOptions is returned for invalid crypto options.
 	ErrInvalidOptions = errors.New("crypto: invalid options")
+	// ErrDevKey is returned when the deterministic public dev key is used
+	// without an explicit allow (Options.AllowDevKey or a dev ZEVER_ENV).
+	ErrDevKey = errors.New("crypto: dev key not allowed")
 )
 
 // ErrDuplicate aliases ErrDuplicateAdapter for compatibility.
@@ -87,3 +90,17 @@ func (e InvalidOptionsError) Error() string {
 
 // Unwrap returns ErrInvalidOptions.
 func (e InvalidOptionsError) Unwrap() error { return ErrInvalidOptions }
+
+// DevKeyError reports a rejected deterministic dev key: the public
+// DevCryptoKey was supplied without an explicit allow. The message carries
+// the fix hint; branch with errors.Is(err, ErrDevKey) or errors.As for
+// the typed form.
+type DevKeyError struct{}
+
+// Error returns the rejection message with the fix hint.
+func (e DevKeyError) Error() string {
+	return "crypto: refusing the deterministic public dev key: set a real crypto key, or set allow_dev_key: true or ZEVER_ENV=dev|test|development for local development"
+}
+
+// Unwrap returns ErrDevKey.
+func (e DevKeyError) Unwrap() error { return ErrDevKey }

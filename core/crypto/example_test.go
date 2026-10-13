@@ -15,7 +15,8 @@ func ExampleOpen() {
 	}
 
 	enc, err := crypto.Open(crypto.AdapterLocal, crypto.Options{
-		Key: "MDEyMzQ1Njc4OTAxMjM0NTY3ODkwMTIzNDU2Nzg5MDE=",
+		Key:         "MDEyMzQ1Njc4OTAxMjM0NTY3ODkwMTIzNDU2Nzg5MDE=",
+		AllowDevKey: true,
 	})
 	if err != nil {
 		return
