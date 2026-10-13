@@ -6,19 +6,24 @@ import (
 	"fmt"
 	"reflect"
 	"time"
-	"unsafe"
 
 	"google.golang.org/grpc"
 )
 
 type dedupEntry struct {
-	ptr unsafe.Pointer
+	ptr uintptr
 	typ reflect.Type
 }
 
 // DefaultCloseTimeout bounds per-service shutdown without a parent deadline.
 const DefaultCloseTimeout = 5 * time.Second
 
+// dedupKey reports the identity key for v, or false when v cannot dedupe.
+// Only the service value's own reference identity dedupes: pointer, chan,
+// map, func, and slice kinds key on reflect.Value.Pointer. Struct values
+// never dedupe — two structs embedding the same pointer are distinct
+// resources and each must close, so keying on an embedded pointer would
+// wrongly skip the second service.
 func dedupKey(v any) (dedupEntry, bool) {
 	if v == nil {
 		return dedupEntry{}, false
@@ -28,81 +33,28 @@ func dedupKey(v any) (dedupEntry, bool) {
 
 	//nolint:exhaustive // only reference kinds are deduplicable; default covers the rest
 	switch rv.Kind() {
-	case reflect.Chan, reflect.Func, reflect.Map, reflect.Pointer, reflect.Slice, reflect.UnsafePointer:
+	case reflect.Chan, reflect.Func, reflect.Map, reflect.Pointer, reflect.Slice:
 		if rv.IsNil() {
 			return dedupEntry{}, false
 		}
 
-		//nolint:gosec // pointer identity for dedup, keepAlive prevents reuse
-		return dedupEntry{ptr: unsafe.Pointer(rv.Pointer()), typ: rv.Type()}, true
-	case reflect.Struct:
-		// Struct value services are not reference types: two copies of the same
-		// struct with identical pointer fields share the underlying resource but
-		// have distinct interface values. Best-effort dedup: if struct wraps a
-		// non-nil reference field (pointer, interface holding pointer, slice/map/chan
-		// wrapping shared state, or nested struct containing one), dedup on that
-		// pointer to avoid double-close of the shared resource. Otherwise not
-		// deduplicable; caller must ensure Close is idempotent.
-		if ptr, typ, ok := findPointerInValue(rv); ok {
-			//nolint:gosec // pointer identity for struct-wrapped resource
-			return dedupEntry{ptr: ptr, typ: typ}, true
-		}
-
-		return dedupEntry{}, false
+		return dedupEntry{ptr: rv.Pointer(), typ: rv.Type()}, true
 	default:
 		return dedupEntry{}, false
 	}
 }
 
-// findPointerInValue walks a struct value (and nested structs/interfaces) to find the
-// first non-nil reference pointer for dedup. It handles pointer, interface (holding
-// pointer/struct), and nested struct cases so that struct-value services that wrap
-// a shared resource via an interface or nested struct are still deduped.
-func findPointerInValue(rv reflect.Value) (unsafe.Pointer, reflect.Type, bool) {
-	for i := 0; i < rv.NumField(); i++ {
-		f := rv.Field(i)
-		switch f.Kind() { //nolint:exhaustive // remaining kinds are non-deduplicable scalars
-		case reflect.Pointer, reflect.Chan, reflect.Map, reflect.Func, reflect.Slice, reflect.UnsafePointer:
-			if f.IsNil() {
-				continue
-			}
-			//nolint:gosec // pointer identity for dedup
-			return unsafe.Pointer(f.Pointer()), f.Type(), true
-		case reflect.Interface:
-			if f.IsNil() {
-				continue
-			}
-
-			elem := f.Elem()
-			switch elem.Kind() { //nolint:exhaustive // remaining kinds are non-deduplicable scalars
-			case reflect.Pointer, reflect.Chan, reflect.Map, reflect.Func, reflect.Slice, reflect.UnsafePointer:
-				if elem.IsNil() {
-					continue
-				}
-				//nolint:gosec // pointer identity for interface-wrapped resource
-				return unsafe.Pointer(elem.Pointer()), elem.Type(), true
-			case reflect.Struct:
-				if ptr, typ, ok := findPointerInValue(elem); ok {
-					return ptr, typ, true
-				}
-			default:
-				// non-pointer interface payloads cannot be deduped
-			}
-		case reflect.Struct:
-			if ptr, typ, ok := findPointerInValue(f); ok {
-				return ptr, typ, true
-			}
-		default:
-			// non-pointer kinds cannot be deduped
-		}
-	}
-
-	return nil, nil, false
-}
-
 type closeSnapshot struct {
 	v  any
 	ok bool
+}
+
+// snap resolves one lazy service into a closeSnapshot. It is generic so each
+// lazy field's distinct instantiation can be listed in the snapshots table
+// without a per-field closure.
+func snap[T any](get func() (T, bool)) closeSnapshot {
+	v, ok := get()
+	return closeSnapshot{v, ok}
 }
 
 // snapshots returns close snapshots for every lazy service that has no
@@ -119,39 +71,39 @@ type closeSnapshot struct {
 // pinned by TestContainer_Snapshots_CoversAllServices via reflection.
 func (c *Container) snapshots() []closeSnapshot {
 	return []closeSnapshot{
-		func() closeSnapshot { v, ok := c.ai.getIfResolved(); return closeSnapshot{v, ok} }(),
-		func() closeSnapshot { v, ok := c.analytics.getIfResolved(); return closeSnapshot{v, ok} }(),
-		func() closeSnapshot { v, ok := c.auth.getIfResolved(); return closeSnapshot{v, ok} }(),
-		func() closeSnapshot { v, ok := c.billing.getIfResolved(); return closeSnapshot{v, ok} }(),
-		func() closeSnapshot { v, ok := c.cdn.getIfResolved(); return closeSnapshot{v, ok} }(),
-		func() closeSnapshot { v, ok := c.crypto.getIfResolved(); return closeSnapshot{v, ok} }(),
-		func() closeSnapshot { v, ok := c.document.getIfResolved(); return closeSnapshot{v, ok} }(),
-		func() closeSnapshot { v, ok := c.eventbus.getIfResolved(); return closeSnapshot{v, ok} }(),
-		func() closeSnapshot { v, ok := c.flag.getIfResolved(); return closeSnapshot{v, ok} }(),
-		func() closeSnapshot { v, ok := c.geo.getIfResolved(); return closeSnapshot{v, ok} }(),
-		func() closeSnapshot { v, ok := c.i18n.getIfResolved(); return closeSnapshot{v, ok} }(),
-		func() closeSnapshot { v, ok := c.idempotency.getIfResolved(); return closeSnapshot{v, ok} }(),
-		func() closeSnapshot { v, ok := c.lock.getIfResolved(); return closeSnapshot{v, ok} }(),
-		func() closeSnapshot { v, ok := c.log.getIfResolved(); return closeSnapshot{v, ok} }(),
-		func() closeSnapshot { v, ok := c.mailer.getIfResolved(); return closeSnapshot{v, ok} }(),
-		func() closeSnapshot { v, ok := c.media.getIfResolved(); return closeSnapshot{v, ok} }(),
-		func() closeSnapshot { v, ok := c.notification.getIfResolved(); return closeSnapshot{v, ok} }(),
-		func() closeSnapshot { v, ok := c.observability.getIfResolved(); return closeSnapshot{v, ok} }(),
-		func() closeSnapshot { v, ok := c.outbox.getIfResolved(); return closeSnapshot{v, ok} }(),
-		func() closeSnapshot { v, ok := c.password.getIfResolved(); return closeSnapshot{v, ok} }(),
-		func() closeSnapshot { v, ok := c.payment.getIfResolved(); return closeSnapshot{v, ok} }(),
-		func() closeSnapshot { v, ok := c.permission.getIfResolved(); return closeSnapshot{v, ok} }(),
-		func() closeSnapshot { v, ok := c.ratelimit.getIfResolved(); return closeSnapshot{v, ok} }(),
-		func() closeSnapshot { v, ok := c.resilience.getIfResolved(); return closeSnapshot{v, ok} }(),
-		func() closeSnapshot { v, ok := c.router.getIfResolved(); return closeSnapshot{v, ok} }(),
-		func() closeSnapshot { v, ok := c.search.getIfResolved(); return closeSnapshot{v, ok} }(),
-		func() closeSnapshot { v, ok := c.secrets.getIfResolved(); return closeSnapshot{v, ok} }(),
-		func() closeSnapshot { v, ok := c.session.getIfResolved(); return closeSnapshot{v, ok} }(),
-		func() closeSnapshot { v, ok := c.storage.getIfResolved(); return closeSnapshot{v, ok} }(),
-		func() closeSnapshot { v, ok := c.tenant.getIfResolved(); return closeSnapshot{v, ok} }(),
-		func() closeSnapshot { v, ok := c.vectorstore.getIfResolved(); return closeSnapshot{v, ok} }(),
-		func() closeSnapshot { v, ok := c.webhook.getIfResolved(); return closeSnapshot{v, ok} }(),
-		func() closeSnapshot { v, ok := c.workflow.getIfResolved(); return closeSnapshot{v, ok} }(),
+		snap(c.ai.getIfResolved),
+		snap(c.analytics.getIfResolved),
+		snap(c.auth.getIfResolved),
+		snap(c.billing.getIfResolved),
+		snap(c.cdn.getIfResolved),
+		snap(c.crypto.getIfResolved),
+		snap(c.document.getIfResolved),
+		snap(c.eventbus.getIfResolved),
+		snap(c.flag.getIfResolved),
+		snap(c.geo.getIfResolved),
+		snap(c.i18n.getIfResolved),
+		snap(c.idempotency.getIfResolved),
+		snap(c.lock.getIfResolved),
+		snap(c.log.getIfResolved),
+		snap(c.mailer.getIfResolved),
+		snap(c.media.getIfResolved),
+		snap(c.notification.getIfResolved),
+		snap(c.observability.getIfResolved),
+		snap(c.outbox.getIfResolved),
+		snap(c.password.getIfResolved),
+		snap(c.payment.getIfResolved),
+		snap(c.permission.getIfResolved),
+		snap(c.ratelimit.getIfResolved),
+		snap(c.resilience.getIfResolved),
+		snap(c.router.getIfResolved),
+		snap(c.search.getIfResolved),
+		snap(c.secrets.getIfResolved),
+		snap(c.session.getIfResolved),
+		snap(c.storage.getIfResolved),
+		snap(c.tenant.getIfResolved),
+		snap(c.vectorstore.getIfResolved),
+		snap(c.webhook.getIfResolved),
+		snap(c.workflow.getIfResolved),
 	}
 }
 

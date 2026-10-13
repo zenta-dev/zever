@@ -12,6 +12,7 @@ import (
 
 	"github.com/zenta-dev/zever/config"
 	"github.com/zenta-dev/zever/core/cache"
+	"github.com/zenta-dev/zever/core/cdn"
 	"github.com/zenta-dev/zever/core/db"
 	"github.com/zenta-dev/zever/core/observability"
 	"github.com/zenta-dev/zever/core/queue"
@@ -220,8 +221,24 @@ func TestContainer_Snapshots_CoversAllServices(t *testing.T) {
 	if got := len(snaps) + orderedExclusions; got != totalLazy {
 		t.Fatalf("snapshots drift: len(snapshots)=%d + ordered %d = %d, want %d lazy fields", len(snaps), orderedExclusions, got, totalLazy)
 	}
-	if got := len(snapshotServiceNames()); got != len(snaps) {
-		t.Fatalf("service names drift: names=%d snapshots=%d", got, len(snaps))
+	names := snapshotServiceNames()
+	if len(names) != len(snaps) {
+		t.Fatalf("service names drift: names=%d snapshots=%d", len(names), len(snaps))
+	}
+	seen := make(map[string]struct{}, len(names))
+	for _, n := range names {
+		if n == "" {
+			t.Fatal("empty service name in snapshotServiceNames")
+		}
+		if _, dup := seen[n]; dup {
+			t.Fatalf("duplicate service name %q in snapshotServiceNames", n)
+		}
+		seen[n] = struct{}{}
+	}
+	for i, s := range snaps {
+		if s.ok {
+			t.Fatalf("fresh container: snapshot %d (%s) must be unresolved", i, names[i])
+		}
 	}
 }
 
@@ -393,57 +410,6 @@ func TestContainer_Close_DedupKeyKinds(t *testing.T) {
 	}
 }
 
-func TestContainer_Close_FindPointerFields(t *testing.T) {
-	type mixed struct {
-		N   int
-		S   string
-		Nil *fakeCtx
-		Ch  chan struct{}
-		M   map[string]string
-		Sl  []byte
-		Fn  func()
-		P   *fakeCtx
-	}
-	v := mixed{Ch: make(chan struct{}), M: map[string]string{}, Sl: []byte{1}, Fn: func() {}, P: &fakeCtx{}}
-	if _, _, ok := findPointerInValue(reflect.ValueOf(v)); !ok {
-		t.Fatal("mixed struct should dedup")
-	}
-	type ifaceNonPtr struct {
-		I any
-	}
-	if _, _, ok := findPointerInValue(reflect.ValueOf(ifaceNonPtr{I: 42})); ok {
-		t.Fatal("interface holding int should not dedup")
-	}
-	var nilIface ifaceNonPtr
-	if _, _, ok := findPointerInValue(reflect.ValueOf(nilIface)); ok {
-		t.Fatal("nil interface field should not dedup")
-	}
-	type nestedMiss struct {
-		In ifaceNonPtr
-		N  int
-	}
-	if _, _, ok := findPointerInValue(reflect.ValueOf(nestedMiss{})); ok {
-		t.Fatal("nested miss should not dedup")
-	}
-	type structIface struct {
-		I any
-	}
-	if _, _, ok := findPointerInValue(reflect.ValueOf(structIface{I: struct{ N int }{N: 1}})); ok {
-		t.Fatal("interface holding plain struct should not dedup")
-	}
-	var nilPtr *fakeCtx
-	if _, _, ok := findPointerInValue(reflect.ValueOf(structIface{I: nilPtr})); ok {
-		t.Fatal("interface holding nil pointer should not dedup")
-	}
-	type wrap struct {
-		P *fakeCtx
-	}
-	sharedIface := &fakeCtx{}
-	if _, _, ok := findPointerInValue(reflect.ValueOf(structIface{I: wrap{P: sharedIface}})); !ok {
-		t.Fatal("interface holding pointer-wrapping struct should dedup")
-	}
-}
-
 func TestContainer_Close_NilValueSkipped(t *testing.T) {
 	c := New(config.Default())
 	c.db.val = nil
@@ -476,54 +442,84 @@ func TestContainer_Close_DedupSharedPointer(t *testing.T) {
 	}
 }
 
-func TestContainer_Close_DedupStructWrappers(t *testing.T) {
-	shared := &fakeCtx{name: "shared"}
-	type wrapper struct {
-		P *fakeCtx
+// sharedEmbedResource stands in for a shared logger: one pointer embedded by
+// two distinct service structs.
+type sharedEmbedResource struct{}
+
+// embedCDN is a struct-value service embedding a shared pointer. It implements
+// cdn.CDN with value receivers so the container stores the struct value
+// itself, not a pointer to it.
+type embedCDN struct {
+	shared *sharedEmbedResource
+	calls  *atomic.Int32
+}
+
+func (s embedCDN) Purge(context.Context, cdn.PurgeRequest) error { return nil }
+func (s embedCDN) Name() string                                  { return "embed" }
+func (s embedCDN) Close(context.Context) error {
+	s.calls.Add(1)
+	return nil
+}
+
+// embedI18n is a second struct-value service type embedding the same shared
+// pointer, implementing i18n.I18n.
+type embedI18n struct {
+	shared *sharedEmbedResource
+	calls  *atomic.Int32
+}
+
+func (s embedI18n) Translate(context.Context, string, string, map[string]string) (string, error) {
+	return "", nil
+}
+func (s embedI18n) Locales(context.Context) ([]string, error) { return nil, nil }
+func (s embedI18n) Close() error {
+	s.calls.Add(1)
+	return nil
+}
+
+// TestContainer_Close_DedupSharedEmbeddedPointer is the P1-3 regression test.
+// Two distinct services whose struct values embed the same pointer must both
+// close: deduping on the embedded pointer would skip the second service.
+func TestContainer_Close_DedupSharedEmbeddedPointer(t *testing.T) {
+	c := New(config.Default())
+	shared := &sharedEmbedResource{}
+	var callsA, callsB atomic.Int32
+	c.cdn.val = embedCDN{shared: shared, calls: &callsA}
+	c.cdn.done = true
+	c.cdn.ready.Store(true)
+	c.i18n.val = embedI18n{shared: shared, calls: &callsB}
+	c.i18n.done = true
+	c.i18n.ready.Store(true)
+
+	ctx, cancel := context.WithTimeout(t.Context(), 5*time.Second)
+	defer cancel()
+	if err := c.Close(ctx); err != nil {
+		t.Fatalf("Close: %v", err)
 	}
-	w1 := wrapper{P: shared}
-	w2 := wrapper{P: shared}
-	k1, ok1 := dedupKey(w1)
-	k2, ok2 := dedupKey(w2)
-	if !ok1 || !ok2 {
-		t.Fatalf("dedupKey should be ok for struct wrappers: %v %v", ok1, ok2)
+	if got := callsA.Load(); got != 1 {
+		t.Fatalf("service A closed %d times, want 1", got)
 	}
-	if k1 != k2 {
-		t.Fatalf("dedupKey mismatch for same pointer wrappers: %v vs %v", k1, k2)
-	}
-	kp1, _ := dedupKey(shared)
-	kp2, _ := dedupKey(shared)
-	if kp1 != kp2 {
-		t.Fatal("pointer dedup mismatch")
+	if got := callsB.Load(); got != 1 {
+		t.Fatalf("service B closed %d times, want 1 (shared embedded pointer must not dedup distinct services)", got)
 	}
 }
 
-func TestContainer_Close_DedupInterfaceAndNested(t *testing.T) {
-	shared := &fakeCtx{name: "shared-iface"}
-	type wrapperIface struct {
-		I any
+// TestContainer_Close_DedupStructValuesNeverDedup pins the P1-3 fix: struct
+// values never dedupe, even when they embed the same pointer. Only the
+// service value's own reference identity dedupes.
+func TestContainer_Close_DedupStructValuesNeverDedup(t *testing.T) {
+	shared := &sharedEmbedResource{}
+	if _, ok := dedupKey(embedCDN{shared: shared}); ok {
+		t.Fatal("struct value service must not dedupe, even embedding a pointer")
 	}
-	w1 := wrapperIface{I: shared}
-	w2 := wrapperIface{I: shared}
-	k1, ok1 := dedupKey(w1)
-	k2, ok2 := dedupKey(w2)
-	if !ok1 || !ok2 {
-		t.Fatalf("dedupKey iface wrapper should be ok: %v %v", ok1, ok2)
+	if _, ok := dedupKey(embedI18n{shared: shared}); ok {
+		t.Fatal("second struct value type must not dedupe either")
 	}
-	if k1 != k2 {
-		t.Fatalf("dedupKey mismatch for interface wrappers: %v vs %v", k1, k2)
+	type plain struct {
+		N int
 	}
-	type inner struct{ P *fakeCtx }
-	type outer struct{ In inner }
-	o1 := outer{In: inner{P: shared}}
-	o2 := outer{In: inner{P: shared}}
-	k3, ok3 := dedupKey(o1)
-	k4, ok4 := dedupKey(o2)
-	if !ok3 || !ok4 {
-		t.Fatalf("dedupKey nested struct should be ok: %v %v", ok3, ok4)
-	}
-	if k3 != k4 {
-		t.Fatalf("dedupKey mismatch for nested struct wrappers: %v vs %v", k3, k4)
+	if _, ok := dedupKey(plain{N: 1}); ok {
+		t.Fatal("plain struct must not dedupe")
 	}
 }
 
