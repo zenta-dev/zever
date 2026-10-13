@@ -1,6 +1,7 @@
 package container
 
 import (
+	"context"
 	"runtime/debug"
 	"sync"
 	"sync/atomic"
@@ -41,8 +42,16 @@ type lazy[T any] struct {
 // sealed marks lazy as package-private.
 func (l *lazy[T]) sealed() {} //nolint:unused // seal marker
 
-// get returns the cached value, invoking fn once to build it.
+// get returns the cached value, invoking fn once to build it. The builder
+// receives a live Background context: callers of get have no ctx to pass.
 func (l *lazy[T]) get(fn func() (T, error)) (T, error) {
+	return l.getCtx(context.Background(), func(context.Context) (T, error) { return fn() })
+}
+
+// getCtx returns the cached value, invoking fn with ctx once to build it.
+// The builder receives the caller's context so cancellation, deadlines, and
+// trace values propagate into construction. ctx must be non-nil.
+func (l *lazy[T]) getCtx(ctx context.Context, fn func(context.Context) (T, error)) (T, error) {
 	// Fast path: ready is monotonic, so observing true means val is fully
 	// published and immutable; no mutex needed.
 	if l.ready.Load() {
@@ -84,7 +93,7 @@ func (l *lazy[T]) get(fn func() (T, error)) (T, error) {
 	l.wait = make(chan struct{})
 	l.mu.Unlock()
 
-	return l.leaderBuild(fn)
+	return l.leaderBuild(ctx, fn)
 }
 
 // leaderBuild runs fn outside mu so waiters can park instead of serializing
@@ -97,7 +106,7 @@ func (l *lazy[T]) get(fn func() (T, error)) (T, error) {
 // Goexit — which runs defers but skips the rest of the body — releases the
 // waiters and leaves the build uncached (recover returns nil for Goexit, so
 // no panic error is recorded) instead of caching a zero value as success.
-func (l *lazy[T]) leaderBuild(fn func() (T, error)) (v T, err error) {
+func (l *lazy[T]) leaderBuild(ctx context.Context, fn func(context.Context) (T, error)) (v T, err error) {
 	returned := false
 
 	defer func() {
@@ -129,7 +138,7 @@ func (l *lazy[T]) leaderBuild(fn func() (T, error)) (v T, err error) {
 		close(ch)
 	}()
 
-	v, err = fn()
+	v, err = fn(ctx)
 	returned = true
 
 	return v, err

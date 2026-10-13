@@ -140,7 +140,7 @@ func devLoop(ctx context.Context, project ProjectConfig, args []string, out io.W
 	// CommandContext child kills it outright, and dev's whole contract is that
 	// a shutdown goes through the graceful SIGTERM path in devChild.stop, which
 	// the deferred stop below and every restart both run.
-	child, err := devStartChild(cfg.ServerEntry, cfg.Args, out) //nolint:contextcheck // see above
+	child, err := devStartChild(cfg.ServerEntry, cfg.Args, out)
 	if err != nil {
 		return err
 	}
@@ -196,7 +196,7 @@ func devLoop(ctx context.Context, project ProjectConfig, args []string, out io.W
 		case <-debounce.C:
 			// Same reasoning as the initial launch above: signal-driven, not
 			// ctx-driven, child lifetime.
-			child = devRebuildWithGrace(project, args, out, child, cfg.StopGrace) //nolint:contextcheck // see above
+			child = devRebuildWithGrace(project, args, out, child, cfg.StopGrace)
 		}
 	}
 }
@@ -273,7 +273,7 @@ type devChild struct {
 func startDevChild(entryDir string, args []string, out io.Writer) (*devChild, error) {
 	_, _ = fmt.Fprintf(out, "%s: %s %s...\n", cyan(devTag), dim("starting"), cyan(entryDir))
 
-	cmd, err := startLaunch(entryDir, args)
+	cmd, err := startLaunch(context.Background(), entryDir, args)
 	if err != nil {
 		return nil, err
 	}

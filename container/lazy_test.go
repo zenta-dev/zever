@@ -1,12 +1,16 @@
 package container
 
 import (
+	"context"
 	"errors"
 	"runtime"
+	"strings"
 	"sync"
 	"sync/atomic"
 	"testing"
 	"time"
+
+	"github.com/zenta-dev/zever/shared/grpcclient"
 )
 
 // eventually polls cond until true or timeout, failing the test on expiry.
@@ -451,5 +455,72 @@ func TestLazy_WaiterDoneBranch(t *testing.T) {
 		l.mu.Unlock()
 		close(ch)
 		<-finished
+	}
+}
+
+// TestGetCtx_PropagatesValueIntoBuilder pins that a caller's context values
+// reach the builder function, so cancellation and tracing propagate into
+// service construction instead of being dropped.
+func TestGetCtx_PropagatesValueIntoBuilder(t *testing.T) {
+	var l lazy[string]
+
+	type ctxKey string
+	const key ctxKey = "k"
+
+	ctx := context.WithValue(context.Background(), key, "trace-id-123")
+
+	var seen string
+	v, err := l.getCtx(ctx, func(bctx context.Context) (string, error) {
+		seen, _ = bctx.Value(key).(string)
+		return "ok", nil
+	})
+	if err != nil {
+		t.Fatalf("getCtx: unexpected error: %v", err)
+	}
+	if v != "ok" {
+		t.Fatalf("getCtx = %q, want %q", v, "ok")
+	}
+	if seen != "trace-id-123" {
+		t.Fatalf("builder saw ctx value %q, want %q", seen, "trace-id-123")
+	}
+}
+
+// TestContainer_RootCtxDetachedUntilClose pins that the container's
+// builder-facing root context is detached (no caller cancellation, no
+// deadline) during the container's lifetime and is canceled by Close.
+func TestContainer_RootCtxDetachedUntilClose(t *testing.T) {
+	c := New(nil)
+
+	if err := c.rootCtx.Err(); err != nil {
+		t.Fatalf("rootCtx canceled before Close: %v", err)
+	}
+	if _, hasDeadline := c.rootCtx.Deadline(); hasDeadline {
+		t.Fatal("rootCtx carries a deadline, want detached")
+	}
+
+	if err := c.Close(t.Context()); err != nil {
+		t.Fatalf("Close: %v", err)
+	}
+
+	if err := c.rootCtx.Err(); err == nil {
+		t.Fatal("rootCtx not canceled after Close")
+	}
+}
+
+// TestGRPCClient_BuildSeesRootCtx pins that the root context reaches the
+// grpcclient builder: a canceled root ctx makes the build fail inside
+// grpcclient.New, proving the ctx is threaded into service construction.
+func TestGRPCClient_BuildSeesRootCtx(t *testing.T) {
+	c := New(nil)
+	t.Cleanup(func() { _ = c.Close(t.Context()) })
+
+	c.cancelRoot()
+
+	_, err := c.GRPCClient("passthrough://localhost:1", grpcclient.WithInsecure())
+	if err == nil {
+		t.Fatal("GRPCClient succeeded with canceled root ctx, want error")
+	}
+	if !strings.Contains(err.Error(), "grpcclient: context") {
+		t.Fatalf("GRPCClient error %q does not mention grpcclient: context", err)
 	}
 }

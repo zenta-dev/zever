@@ -105,17 +105,21 @@ func descShort(name string) string {
 // and stderr wired straight through to the parent process, forwarding
 // SIGINT/SIGTERM to the child so its own graceful-shutdown path runs.
 func runLaunch(entryDir string, passthroughArgs []string) error {
+	ctx, cancel := context.WithCancel(context.Background())
+	defer cancel()
+
 	sigCh := make(chan os.Signal, 1)
 	signal.Notify(sigCh, os.Interrupt, syscall.SIGTERM)
 
 	defer signal.Stop(sigCh)
 
-	cmd, err := startLaunch(entryDir, passthroughArgs)
+	cmd, err := startLaunch(ctx, entryDir, passthroughArgs)
 	if err != nil {
 		return err
 	}
 
 	var signalled atomic.Bool
+	var forwarded atomic.Int32
 
 	done := make(chan struct{})
 	defer close(done)
@@ -126,8 +130,16 @@ func runLaunch(entryDir string, passthroughArgs []string) error {
 			select {
 			case sig := <-sigCh:
 				signalled.Store(true)
+				forwarded.Add(1)
 
 				forwardSignal(cmd, sig)
+
+				// The first signal is forwarded for graceful shutdown; a
+				// second one cancels the launch context so exec reaps
+				// `go run` even if the child ignores signals.
+				if forwarded.Load() >= 2 {
+					cancel()
+				}
 			case <-done:
 				return
 			}
@@ -160,12 +172,13 @@ func runLaunch(entryDir string, passthroughArgs []string) error {
 // launcher command uses, and whose behaviour must not change) is layered on top
 // of it. Callers of startLaunch own the child: they must eventually Wait on it,
 // and they install their own signal handling — startLaunch installs none.
-func startLaunch(entryDir string, passthroughArgs []string) (*exec.Cmd, error) {
-	// A never-cancelled context: the child's lifetime is governed by forwarded
-	// signals, not by a deadline. entryDir comes from the developer's own zever
-	// config, not from untrusted input.
+func startLaunch(ctx context.Context, entryDir string, passthroughArgs []string) (*exec.Cmd, error) {
+	// The child's lifetime is governed by forwarded signals, not by a
+	// deadline: runLaunch cancels ctx on a repeated signal to reap `go run`
+	// when the child ignores the first. entryDir comes from the developer's
+	// own zever config, not from untrusted input.
 	//nolint:gosec // see above
-	cmd := exec.CommandContext(context.Background(), "go", buildGoRunArgs(entryDir, passthroughArgs)...)
+	cmd := exec.CommandContext(ctx, "go", buildGoRunArgs(entryDir, passthroughArgs)...)
 	cmd.Stdin, cmd.Stdout, cmd.Stderr = os.Stdin, os.Stdout, os.Stderr
 
 	isolateProcessGroup(cmd)

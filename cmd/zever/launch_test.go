@@ -1,6 +1,7 @@
 package main
 
 import (
+	"context"
 	"os"
 	"os/exec"
 	"os/signal"
@@ -204,7 +205,7 @@ func TestDescShort(t *testing.T) {
 func TestStartLaunchReportsMissingTool(t *testing.T) {
 	t.Setenv("PATH", "")
 
-	if _, err := startLaunch("cmd/server", nil); err == nil {
+	if _, err := startLaunch(context.Background(), "cmd/server", nil); err == nil {
 		t.Fatal("expected a launch error without go on PATH, got nil")
 	}
 }
