@@ -5,7 +5,9 @@ import (
 	"math"
 	"net"
 	"net/http"
+	"net/netip"
 	"strconv"
+	"strings"
 
 	"google.golang.org/grpc"
 	"google.golang.org/grpc/codes"
@@ -25,6 +27,138 @@ func RemoteAddrKey(r *http.Request) string {
 	}
 
 	return host
+}
+
+// ParseTrustedProxies parses trusted-proxy CIDRs (or bare IPs) for
+// ClientIPKey. It is ratelimit.ParseTrustedProxies under the middleware
+// import path so generated servers need only the middleware package.
+func ParseTrustedProxies(entries []string) ([]netip.Prefix, error) {
+	prefixes, err := ratelimit.ParseTrustedProxies(entries)
+	if err != nil {
+		return nil, err
+	}
+
+	return prefixes, nil
+}
+
+// ClientIPKey returns an HTTP rate-limit key func that honors
+// X-Forwarded-For only from trusted peers. When the peer address falls
+// inside trusted, the key is the rightmost untrusted X-Forwarded-For
+// entry (a spoofed left entry planted behind a trusted proxy cannot
+// shadow the address the proxy appended); when every entry is trusted,
+// the leftmost (original client) wins. A peer outside trusted, a missing
+// or fully malformed header, or an empty trust list falls back to
+// RemoteAddrKey, which is also what a nil trust list yields on every
+// request.
+func ClientIPKey(trusted []netip.Prefix) func(*http.Request) string {
+	return func(r *http.Request) string {
+		if !addrInPrefixes(remoteHost(r.RemoteAddr), trusted) {
+			return RemoteAddrKey(r)
+		}
+
+		if client, ok := rightmostUntrusted(r.Header.Get("X-Forwarded-For"), trusted); ok {
+			return client
+		}
+
+		return RemoteAddrKey(r)
+	}
+}
+
+// remoteHost strips the port from addr, falling back to addr itself.
+func remoteHost(addr string) string {
+	host, _, err := net.SplitHostPort(addr)
+	if err != nil {
+		return addr
+	}
+
+	return host
+}
+
+// normalizeAddr parses s as an IP for prefix matching: brackets, port,
+// and zone are stripped and IPv4-mapped IPv6 is unmapped so it matches
+// IPv4 prefixes. ok is false for anything unparsable.
+func normalizeAddr(s string) (addr netip.Addr, ok bool) {
+	s = strings.TrimSpace(s)
+	if s == "" {
+		return netip.Addr{}, false
+	}
+
+	if parsed, err := netip.ParseAddr(strings.Trim(s, "[]")); err == nil {
+		return parsed.Unmap().WithZone(""), true
+	}
+
+	if host, _, err := net.SplitHostPort(s); err == nil {
+		if parsed, err := netip.ParseAddr(strings.Trim(host, "[]")); err == nil {
+			return parsed.Unmap().WithZone(""), true
+		}
+	}
+
+	return netip.Addr{}, false
+}
+
+// addrInPrefixes reports whether host parses to an IP inside any prefix.
+func addrInPrefixes(host string, trusted []netip.Prefix) bool {
+	addr, ok := normalizeAddr(host)
+	if !ok {
+		return false
+	}
+
+	for _, prefix := range trusted {
+		if prefix.Contains(addr) {
+			return true
+		}
+	}
+
+	return false
+}
+
+// rightmostUntrusted scans an X-Forwarded-For header right-to-left for the
+// first entry outside trusted. Malformed entries are skipped. When every
+// valid entry is trusted, the leftmost (original client) is returned.
+// ok is false when no entry parses at all.
+func rightmostUntrusted(header string, trusted []netip.Prefix) (client string, ok bool) {
+	if strings.TrimSpace(header) == "" {
+		return "", false
+	}
+
+	var first string
+
+	for _, entry := range strings.Split(header, ",") {
+		entry = strings.TrimSpace(entry)
+
+		addr, valid := normalizeAddr(entry)
+		if !valid {
+			continue
+		}
+
+		if first == "" {
+			first = addr.String()
+		}
+
+		if !prefixContains(trusted, addr) {
+			client, ok = addr.String(), true
+		}
+	}
+
+	// Entries were scanned left-to-right, so client now holds the
+	// rightmost untrusted one; fall back to the original client when all
+	// entries are trusted.
+	if !ok && first != "" {
+		return first, true
+	}
+
+	return client, ok
+}
+
+// prefixContains reports whether addr falls inside any prefix.
+func prefixContains(trusted []netip.Prefix, addr netip.Addr) bool {
+	for _, prefix := range trusted {
+		if prefix.Contains(addr) {
+			return true
+		}
+	}
+
+	return false
 }
 
 // PeerAddrKey is RemoteAddrKey's gRPC counterpart, deriving the caller's IP

@@ -503,6 +503,7 @@ func TestStripe_WebhookEvent_table(t *testing.T) {
 				}
 
 				want := payment.Event{
+					ID:     "evt_test_1",
 					Type:   "payment_intent.succeeded",
 					Object: payment.Result{ID: "pi_123", Status: payment.PaymentSucceeded, Amount: 2000, Currency: "usd"},
 				}
@@ -545,6 +546,7 @@ func TestStripe_WebhookEvent_table(t *testing.T) {
 				}
 
 				want := payment.Event{
+					ID:     "evt_test_1",
 					Type:   "charge.refunded",
 					Object: payment.Result{ID: "pi_456", Status: payment.PaymentSucceeded, Amount: 500, Currency: "usd"},
 				}
@@ -566,6 +568,7 @@ func TestStripe_WebhookEvent_table(t *testing.T) {
 				}
 
 				want := payment.Event{
+					ID:     "evt_test_1",
 					Type:   "charge.refunded",
 					Object: payment.Result{ID: "ch_789", Status: payment.PaymentSucceeded, Amount: 200, Currency: "usd"},
 				}
@@ -586,7 +589,7 @@ func TestStripe_WebhookEvent_table(t *testing.T) {
 					t.Fatalf("WebhookEvent() err = %v", err)
 				}
 
-				want := payment.Event{Type: "customer.created"}
+				want := payment.Event{ID: "evt_test_1", Type: "customer.created"}
 				if got != want {
 					t.Fatalf("WebhookEvent() = %+v, want %+v", got, want)
 				}

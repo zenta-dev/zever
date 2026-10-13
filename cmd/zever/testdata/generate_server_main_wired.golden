@@ -31,7 +31,9 @@ import (
 
 	"github.com/zenta-dev/zever/container"
 	"github.com/zenta-dev/zever/core/authz"
+	"github.com/zenta-dev/zever/core/log"
 	"github.com/zenta-dev/zever/core/middleware"
+	"github.com/zenta-dev/zever/core/ratelimit"
 	"github.com/zenta-dev/zever/shared/grpcclient"
 
 	genapp "example.com/shop/generated/gogen/app"
@@ -252,6 +254,7 @@ func runDoctor() error {
 
 	checks := map[string]func() error{
 		"config":        cfg.Validate,
+		"adapters":      c.ValidateAdapters,
 		"ai":            func() error { _, err := c.AI(); return err },
 		"analytics":     func() error { _, err := c.Analytics(); return err },
 		"auth":          func() error { _, err := c.Auth(); return err },
@@ -291,7 +294,7 @@ func runDoctor() error {
 
 	names := make([]string, 0, len(checks))
 	for name := range checks {
-		if name == "config" || enabled == nil || enabled[name] {
+		if name == "config" || name == "adapters" || enabled == nil || enabled[name] {
 			names = append(names, name)
 		}
 	}
@@ -373,6 +376,16 @@ func run(addr, grpcAddr string) error {
 		return err
 	}
 
+	// Process configuration is restart-only, except the SIGHUP-reloadable
+	// batteries: SIGHUP re-reads the config file and atomically swaps the
+	// log level and (below) the rate limiter. Adapters, DSNs, credentials,
+	// TLS material, and listen addresses need a process restart. Flag
+	// clients held directly can swap the same way with
+	// container.ReloadableFlag; the static flag adapter additionally
+	// re-reads its file per evaluation when `reload: true`.
+	reloadableLogger := container.NewReloadableLogger(logger)
+	logger = reloadableLogger
+
 	serverTLS, err := loadServerTLS()
 	if err != nil {
 		return err
@@ -405,7 +418,74 @@ func run(addr, grpcAddr string) error {
 	if err != nil {
 		return err
 	}
+	serverCfg, err := app.Config()
+	if err != nil {
+		return err
+	}
+	trustedProxies, err := middleware.ParseTrustedProxies(serverCfg.RateLimit.Options.TrustedProxies)
+	if err != nil {
+		return err
+	}
+	// Without trusted proxies the key stays the peer address: honoring
+	// X-Forwarded-For from an untrusted peer would let any client pick
+	// its own rate-limit bucket.
+	rateLimitKey := middleware.RemoteAddrKey
+	if len(trustedProxies) > 0 {
+		rateLimitKey = middleware.ClientIPKey(trustedProxies)
+	}
 
+	reloadableLimiter := container.NewReloadableLimiter(limiter)
+	limiter = reloadableLimiter
+
+	// SIGHUP reloads the log level and the rate limiter
+	// from the config file via atomic swap; a failed re-open keeps the old
+	// instance and only warns. The watcher exits with ctx.
+	container.WatchSIGHUP(ctx, func(context.Context) {
+		cfg, err := app.Config()
+		if err != nil {
+			logger.Warn().Msgf("SIGHUP reload skipped: %v", err)
+
+			return
+		}
+
+		nextLogAdapter, err := log.ParseAdapter(cfg.Log.Adapter)
+		if err != nil {
+			logger.Warn().Msgf("SIGHUP reload skipped: log: %v", err)
+
+			return
+		}
+
+		nextLog, err := log.Open(nextLogAdapter, cfg.Log.Options)
+		if err != nil {
+			logger.Warn().Msgf("SIGHUP reload skipped: log: %v", err)
+
+			return
+		}
+
+		if oldLog, swapped := reloadableLogger.Swap(nextLog); swapped {
+			_ = oldLog.Sync()
+		}
+
+		nextLimiterAdapter, err := ratelimit.ParseAdapter(cfg.RateLimit.Adapter)
+		if err != nil {
+			logger.Warn().Msgf("SIGHUP reload skipped: ratelimit: %v", err)
+
+			return
+		}
+
+		nextLimiter, err := ratelimit.Open(nextLimiterAdapter, cfg.RateLimit.Options)
+		if err != nil {
+			logger.Warn().Msgf("SIGHUP reload skipped: ratelimit: %v", err)
+
+			return
+		}
+
+		if old, swapped := reloadableLimiter.Swap(nextLimiter); swapped {
+			_ = old.Close()
+		}
+
+		logger.Info().Msg("reloaded SIGHUP-reloadable config")
+	})
 	// One interceptor, attached once below, must cover every service this
 	// process registers on grpcServer -- so every generated module
 	// package's own GRPCPolicies() is merged into one map here first.
@@ -459,7 +539,7 @@ func run(addr, grpcAddr string) error {
 
 	r.Use(middleware.Recover(logger), middleware.RequestLogger(logger), middleware.Tracing(obs), middleware.SecurityHeaders(securityHeadersOpts))
 
-	r.Use(middleware.RateLimit(limiter, middleware.RemoteAddrKey))
+	r.Use(middleware.RateLimit(limiter, rateLimitKey))
 
 	// Resolve the db once at boot so a broken DSN fails fast with a clear
 	// error instead of surfacing as a 503 on the first readiness probe.

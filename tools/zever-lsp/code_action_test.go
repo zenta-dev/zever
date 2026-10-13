@@ -171,12 +171,12 @@ func TestFixUnknownScalarType_typo_suggestsNearestValid(t *testing.T) {
 	}
 
 	wantStartCol := strings.Index(strings.Split(src, "\n")[2], "sting")
-	if int(edit.Range.Start.Character) != wantStartCol { //nolint:gosec // small test fixture
+	if int(edit.Range.Start.Character) != wantStartCol { // small test fixture
 		t.Errorf("Range.Start.Character = %d, want %d", edit.Range.Start.Character, wantStartCol)
 	}
 
 	wantEndCol := wantStartCol + len("sting")
-	if int(edit.Range.End.Character) != wantEndCol { //nolint:gosec // small test fixture
+	if int(edit.Range.End.Character) != wantEndCol { // small test fixture
 		t.Errorf("Range.End.Character = %d, want %d", edit.Range.End.Character, wantEndCol)
 	}
 }
@@ -296,7 +296,7 @@ func TestFixUnresolvedRelationTarget_typo_suggestsNearestEntity(t *testing.T) {
 	}
 
 	wantStartCol := strings.Index(strings.Split(bSrc, "\n")[3], "Usr")
-	if int(edits[0].Range.Start.Character) != wantStartCol { //nolint:gosec // small test fixture
+	if int(edits[0].Range.Start.Character) != wantStartCol { // small test fixture
 		t.Errorf("Range.Start.Character = %d, want %d", edits[0].Range.Start.Character, wantStartCol)
 	}
 }

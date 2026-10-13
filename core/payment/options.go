@@ -18,6 +18,11 @@ const (
 	DefaultHTTPTimeout = providersopt.DefaultHTTPTimeout
 	// DefaultRefundIdempotencyTTL bounds refund idempotency reservations.
 	DefaultRefundIdempotencyTTL = 24 * time.Hour
+	// DefaultWebhookIdempotencyTTL bounds webhook replay-dedupe records.
+	// 24 hours comfortably exceeds both providers' signature tolerances
+	// (minutes) while staying bounded; adapters apply it to every
+	// provider-event-id reservation.
+	DefaultWebhookIdempotencyTTL = 24 * time.Hour
 )
 
 // Options configures payment backend selection and limits. SecretKey/

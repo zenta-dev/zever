@@ -11,6 +11,9 @@ var ErrUnknownService = errors.New("config: unknown service")
 // ErrUnknownField reports a field name that a service's options do not define.
 var ErrUnknownField = errors.New("config: unknown field")
 
+// ErrUnknownAdapter reports an adapter name with no registered factory.
+var ErrUnknownAdapter = errors.New("config: unknown adapter")
+
 // ErrUnsupportedFormat reports a config file extension this package cannot decode.
 var ErrUnsupportedFormat = errors.New("config: unsupported format")
 
@@ -74,6 +77,34 @@ func (e *UnknownFieldError) Error() string {
 // Unwrap exposes ErrUnknownField for errors.Is.
 func (e *UnknownFieldError) Unwrap() error {
 	return ErrUnknownField
+}
+
+// UnknownAdapterError names a configured adapter with no registered
+// factory in the process.
+type UnknownAdapterError struct {
+	// Service is the service the unknown adapter was configured on.
+	Service string
+	// Adapter is the unrecognized adapter name.
+	Adapter string
+	// Suggestion is the closest registered adapter name, if any is close
+	// enough to be worth suggesting (see closest in suggest.go). Empty
+	// when nothing is close, or when nothing is registered at all.
+	Suggestion string
+}
+
+// Error describes the unrecognized adapter and its service, with a "did you
+// mean %q?" hint when Suggestion is set.
+func (e *UnknownAdapterError) Error() string {
+	if e.Suggestion != "" {
+		return fmt.Sprintf("config: unknown adapter %q for service %q (did you mean %q?)", e.Adapter, e.Service, e.Suggestion)
+	}
+
+	return fmt.Sprintf("config: unknown adapter %q for service %q", e.Adapter, e.Service)
+}
+
+// Unwrap exposes ErrUnknownAdapter for errors.Is.
+func (e *UnknownAdapterError) Unwrap() error {
+	return ErrUnknownAdapter
 }
 
 // DecodeError carries the underlying failure from decoding a service's options.

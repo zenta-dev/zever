@@ -118,7 +118,7 @@ func New(o vectorstore.Options) (vectorstore.VectorStore, error) {
 		cancel()
 
 		if err != nil {
-			_ = client.Close() //nolint:gosec // G104: best-effort cleanup; ignore close error
+			_ = client.Close() // G104: best-effort cleanup; ignore close error
 
 			return nil, err
 		}
@@ -353,7 +353,7 @@ func (s *Store) Query(ctx context.Context, embedding []float32, topK int) ([]vec
 // Close releases the underlying Qdrant client.
 // Close is best-effort and always reports success.
 func (s *Store) Close() error {
-	_ = s.client.Close() //nolint:gosec // G104: client close is best-effort
+	_ = s.client.Close() // G104: client close is best-effort
 
 	return nil
 }

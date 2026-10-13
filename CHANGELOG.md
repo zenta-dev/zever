@@ -89,6 +89,30 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Added
 
+- `feat(payment): dedupe webhook events by id`: the stripe and paddle
+  adapters accept the existing optional `payment.Options.Idempotency`
+  store for webhook replay protection (previously refund-only). After
+  signature verification, the provider event id (Stripe event `id`,
+  Paddle `event_id`, now surfaced as `payment.Event.ID`) is reserved
+  with a payload-fingerprint guard and a 24h TTL
+  (`DefaultWebhookIdempotencyTTL`); a repeat delivery fails with the new
+  typed `DuplicateEventError` (sentinel `ErrDuplicateEvent`) instead of
+  re-executing downstream work, and a same-id/different-payload delivery
+  trips the store fingerprint mismatch fail-closed. No store (or an
+  event without an id) keeps the old process-every-delivery behavior.
+  `container.Payment()` reuses the resolved `c.Idempotency()` service
+  best-effort when no explicit store is configured; an unresolvable
+  idempotency service never blocks payment resolution.
+- `feat(middleware): trusted-proxy aware rate limit key`: new
+  `middleware.ClientIPKey(trusted []netip.Prefix)` honors
+  `X-Forwarded-For` only when the peer is trusted, keying on the
+  rightmost untrusted entry (spoofed headers from untrusted peers are
+  ignored; all-trusted chains fall back to the leftmost client).
+  `ratelimit.Options` gains `trusted_proxies` (CIDRs or bare IPs,
+  validated by `ratelimit.ParseTrustedProxies`, mirrored as
+  `middleware.ParseTrustedProxies` and in the config JSON schema); the
+  generated server builds the key from it and keeps `RemoteAddrKey`
+  when none are configured. `RemoteAddrKey` itself is unchanged.
 - `feat(orm): auto-chunk large IN lists`: a value-list `IN` larger than
   the resolved dialect's per-statement parameter budget now fans out into
   one statement per chunk for plain unordered unbounded `SELECT`s (rows
@@ -104,7 +128,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   `NOT IN`. `Preload` sizes its child-`IN` chunks against the same budget
   (minus the child query's own arguments), so old-SQLite backends get
   fitting statements instead of driver errors; the 1000 default stands on
-  modern backends.
+   modern backends.
 - `docs: recommend stdhttp as the default router`: the routing guide now
   recommends `stdhttp` (already the `zever new` default) with measured
   numbers, and the benchmarks page gains a 2026-10-14 re-measurement:
@@ -134,6 +158,26 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   and `atlas.DDLOptions`/`RenderSchemaDDLWithOptions`. Docs gain
    expand/contract, batched-backfill, concurrent-index, and timeout sections
    in the migrations guide.
+- `feat: SIGHUP reload for log level, flags, rate limits`: new
+  `container.ReloadableLogger`, `container.ReloadableFlag`, and
+  `container.ReloadableLimiter` front their battery behind an atomic swap,
+  and `container.WatchSIGHUP` runs a reload closure on every SIGHUP until
+  its context ends. The generated server (`zever generate server`) wires
+  it: SIGHUP re-reads the config file and swaps the log level and the rate
+  limiter (old instances released after the swap); a failed re-open keeps
+  the old instance and only warns. Flag clients held directly swap the same
+  way; the `static` flag adapter also re-reads its file per evaluation when
+  `reload: true`. Everything else stays restart-only — adapters, DSNs,
+  credentials, TLS material, and listen addresses need a process restart
+  (see the new "Reload" section in `config/README.md`).
+- `feat(cli): zever upgrade --project`: the binary upgrader gains a project
+  mode that bumps every `github.com/zenta-dev/zever/*` require without a
+  matching `replace` directive in the current project's `go.mod` to the
+  target version (`--version`, default latest stable), runs `go mod tidy`,
+  and prints the `**Breaking:**` CHANGELOG entries between the installed
+  and target versions (fetched once, cached under the user cache dir).
+   `--dry-run` prints the plan without writing, fetching, or tidying;
+   `--check` prints the available version only.
 - `feat(auth/jwt): kid-based key rotation and nbf validation`: `JWTOptions`
   gains `keys: [{kid, secret}]` plus `active_kid` (empty defaults to the
   first entry; validated for unique kids, secret length, and a matching
@@ -155,6 +199,17 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   fail the gate unless `## [Unreleased]` carries a `**Breaking:**` line.
   The gate already caught two real breaks on adoption (`auth.JWTOptions` /
   `auth.Options` comparability, documented above).
+- `feat(config): fail fast on unknown adapters with did-you-mean`: new
+  `config.ValidateAdapters(registered)` checks every service's adapter
+  against the process's registrations and joins `UnknownAdapterError`s
+  carrying a "did you mean %q?" hint (sourced from `config.closest`). Every
+  `core/<battery>` gains `RegisteredAdapters()` over its factory registry
+  (new `registry.Names`/`SortedNames` seams), the container gains
+  `RegisteredAdapters(service)` plus `(c).ValidateAdapters()`, and
+  `zever doctor` — CLI and generated-server `--doctor` alike — reports an
+  `adapters` row before resolving, turning a forgotten import or typo into
+  one actionable error. `ParseAdapter` stays permissive for custom adapters;
+  typed `Adapter` constants are unchanged.
 - `docs: test your zever app guide`: new `guides/operate/testing-your-app`
   page — per-test container from `config.Default()` with `t.Cleanup` close,
   httptest routes, per-test sqlite files under `t.TempDir()`, the `dbtest`
@@ -348,6 +403,27 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   the second was skipped. The `unsafe` import is gone, and the 33-entry
   `snapshots()` copy-paste collapsed into a generic `snap` helper over a
   method-value table.
+- `chore(lint): wrapcheck evaluation, errscan missing-%w, nolintlint, any`:
+  `wrapcheck` was trial-enabled over `container` and `core/cache` (9 and 7
+  hits, all registry `Register`/`Lookup` passthroughs, `Close`-probe returns,
+  and test helpers): enabling it would relitigate the registry-passthrough
+  convention in every battery, so it stays off and the existing
+  `.golangci.yml` comment records why. `tools/errscan` gains a `missing-%w`
+  rule flagging `fmt.Errorf` without `%w` that still takes a bare `err`
+  argument (conservative: `err.Error()` and other names are out of scope);
+  the repo scans clean.   `nolintlint` is now enabled so stale suppressions
+  fail the build, and the 123 unused directives it reported (mostly
+  `nolint:gosec` on `os.ReadFile`/`os.WriteFile` already covered by the
+  `std-error-handling` exclusion preset, plus stale `unparam`/`dupl`/
+  `nilerr`/`unused`/`revive`/`tparallel`/`exhaustive`/`forcetypeassert`/
+  `errcheck`/`contextcheck`/`staticcheck`/`nilnil`/`spancheck`) are removed.
+  One survivor needed care: `adapters/media/local` `MkdirAll` tripped gosec
+  G703 taint analysis once its directive was lifted (the sink is safe —
+  `filepath.Ext` yields no separators), so it now carries a gosec-native
+  `#nosec G703` pin like the one in `tools/errscan`, which both linters
+  accept stably. Remaining `interface{}` spellings outside
+  generated protobuf code become `any` (the `twilio` test fake keeps
+  `interface{}` to match the upstream `twilioclient.BaseClient` signature).
 
 ### Added
 

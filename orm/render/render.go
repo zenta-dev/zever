@@ -481,7 +481,7 @@ func validateSelectModifiers(d dialect.Dialect, mods SelectModifiers) error {
 
 	// A lock modifier with no lock mode, or an unknown lock mode, must never
 	// be silently dropped.
-	switch mods.Lock { //nolint:exhaustive // the default branch rejects unknown modes
+	switch mods.Lock { // the default branch rejects unknown modes
 	case LockNone:
 		if mods.NoWait || mods.SkipLocked {
 			return errors.New("orm/render: NOWAIT/SKIP LOCKED require a row lock (FOR UPDATE/FOR SHARE)")

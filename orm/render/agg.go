@@ -32,7 +32,7 @@ const (
 )
 
 func (f AggFunc) name() string {
-	switch f { //nolint:exhaustive // the default guards unknown func values
+	switch f { // the default guards unknown func values
 	case AggCount:
 		return "COUNT"
 	case AggSum:

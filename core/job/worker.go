@@ -173,7 +173,7 @@ func (w *Worker) runLoop(ctx context.Context, sem chan struct{}, inflight *sync.
 func (w *Worker) sweepBatches(ctx context.Context) {
 	detached := context.WithoutCancel(ctx)
 
-	sweepCtx, cancel := context.WithTimeout(detached, DefaultSweepTimeout) //nolint:contextcheck // detached timeout for sweep
+	sweepCtx, cancel := context.WithTimeout(detached, DefaultSweepTimeout) // detached timeout for sweep
 	defer cancel()
 
 	settleDueBatches(sweepCtx)

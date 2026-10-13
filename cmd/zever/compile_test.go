@@ -122,7 +122,7 @@ func TestRunCompileProtoBackend(t *testing.T) {
 		t.Fatalf("expected %q to exist: %v", protoFile, err)
 	}
 
-	content, err := os.ReadFile(protoFile) //nolint:gosec // test fixture path
+	content, err := os.ReadFile(protoFile) // test fixture path
 	if err != nil {
 		t.Fatalf("read %q: %v", protoFile, err)
 	}
@@ -356,7 +356,7 @@ func TestRunCompileOpenAPIBackend(t *testing.T) {
 		filepath.Join(outDir, "openapi", "default", "openapi.json"),
 		filepath.Join(outDir, "openapi", "openapi.json"),
 	} {
-		content, err := os.ReadFile(rel) //nolint:gosec // test fixture path
+		content, err := os.ReadFile(rel) // test fixture path
 		if err != nil {
 			t.Fatalf("read %q: %v", rel, err)
 		}
@@ -399,7 +399,7 @@ func TestRunCompileZenormBackend(t *testing.T) {
 
 	appFile := filepath.Join(outDir, "zenorm", "orm", "gen", "app", "app.go")
 
-	content, err := os.ReadFile(appFile) //nolint:gosec // test fixture path
+	content, err := os.ReadFile(appFile) // test fixture path
 	if err != nil {
 		t.Fatalf("read %q: %v", appFile, err)
 	}

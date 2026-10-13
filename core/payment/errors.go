@@ -47,6 +47,11 @@ var ErrMissingWebhookSecret = errors.New("payment: missing webhook secret")
 // ErrInvalidSignature is returned for an invalid webhook signature.
 var ErrInvalidSignature = errors.New("payment: invalid signature")
 
+// ErrDuplicateEvent is returned when a webhook event with an already-seen
+// provider event id is delivered again. Callers should treat it as
+// already-processed and acknowledge the delivery without re-executing.
+var ErrDuplicateEvent = errors.New("payment: duplicate webhook event")
+
 // ErrAmountMismatch is returned when a payment amount does not match the expected amount.
 var ErrAmountMismatch = errors.New("payment: amount mismatch")
 
@@ -165,6 +170,22 @@ func (e AmountMismatchError) Error() string {
 // Unwrap returns ErrAmountMismatch.
 func (e AmountMismatchError) Unwrap() error {
 	return ErrAmountMismatch
+}
+
+// DuplicateEventError reports delivery of an already-processed webhook event.
+type DuplicateEventError struct {
+	// EventID is the provider-assigned id of the repeated event.
+	EventID string
+}
+
+// Error returns a human-readable duplicate-event message.
+func (e DuplicateEventError) Error() string {
+	return fmt.Sprintf("%s: %q", ErrDuplicateEvent, e.EventID)
+}
+
+// Unwrap returns ErrDuplicateEvent.
+func (e DuplicateEventError) Unwrap() error {
+	return ErrDuplicateEvent
 }
 
 // SizeLimitError reports a webhook payload exceeding the size limit.

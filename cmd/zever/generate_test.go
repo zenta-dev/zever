@@ -46,7 +46,7 @@ func assertGolden(t *testing.T, name string, got []byte) {
 		t.Logf("updated golden file: %s", path)
 	}
 
-	want, err := os.ReadFile(path) //nolint:gosec // test-controlled golden path
+	want, err := os.ReadFile(path) // test-controlled golden path
 	if err != nil {
 		t.Fatalf("read golden file %s: %v (run with -update-golden to create it)", path, err)
 	}
@@ -74,7 +74,7 @@ func TestRunGenerateModuleGo(t *testing.T) {
 
 	stubPath := filepath.Join(dir, "schema", "widgets", "widgets.zen")
 
-	content, err := os.ReadFile(stubPath) //nolint:gosec // test fixture path
+	content, err := os.ReadFile(stubPath) // test fixture path
 	if err != nil {
 		t.Fatalf("expected stub at %q: %v", stubPath, err)
 	}

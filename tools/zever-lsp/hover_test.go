@@ -165,7 +165,7 @@ func TestHoverRelationTargetCapsFieldList(t *testing.T) {
 	for i, line := range lines {
 		if idx := strings.Index(line, ": Wide"); idx >= 0 {
 			cursor = protocol.Position{
-				Line:      uint32(i),               //nolint:gosec // test fixture
+				Line:      uint32(i),               // test fixture
 				Character: uint32(idx + len(": ")), //nolint:gosec // test fixture
 			}
 
@@ -405,7 +405,7 @@ func TestHoverOnRelationTargetWithoutFields(t *testing.T) {
 	for i, line := range lines {
 		if idx := strings.Index(line, ": Empty"); idx >= 0 {
 			cursor = protocol.Position{
-				Line:      uint32(i),               //nolint:gosec // test fixture
+				Line:      uint32(i),               // test fixture
 				Character: uint32(idx + len(": ")), //nolint:gosec // test fixture
 			}
 

@@ -151,7 +151,7 @@ func runFmtWith(cfg FmtConfig) error {
 // fmtOneFile formats a single file, optionally writing the result back. It
 // reports whether the file's formatted output differs from what's on disk.
 func fmtOneFile(path string, write bool) (bool, error) {
-	src, err := os.ReadFile(path) //nolint:gosec // CLI positional args are developer-supplied file paths
+	src, err := os.ReadFile(path) // CLI positional args are developer-supplied file paths
 	if err != nil {
 		return false, fmt.Errorf("zever fmt: read %q: %w", path, err)
 	}

@@ -480,6 +480,6 @@ func fieldValue(fld reflect.Value) any {
 		return nil
 	}
 
-	//nolint:gosec // reading an unexported field of an adapter we own
+	// reading an unexported field of an adapter we own
 	return reflect.NewAt(fld.Type(), unsafe.Pointer(fld.UnsafeAddr())).Elem().Interface()
 }

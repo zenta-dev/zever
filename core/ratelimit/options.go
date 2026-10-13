@@ -45,6 +45,11 @@ type Options struct {
 	MaxEntries int `json:"max_entries" toml:"max_entries" yaml:"max_entries"`
 	// Redis holds Redis-specific connection configuration.
 	Redis RedisOptions `json:"redis" toml:"redis" yaml:"redis"`
+	// TrustedProxies lists CIDRs (or bare IPs) of proxies whose
+	// X-Forwarded-For headers are honored for rate-limit keys. Empty
+	// means no proxy is trusted and keys always derive from the peer
+	// address. See ParseTrustedProxies.
+	TrustedProxies []string `json:"trusted_proxies" toml:"trusted_proxies" yaml:"trusted_proxies"`
 }
 
 // Validate checks options for consistency, joining all violations.
@@ -71,6 +76,10 @@ func (o Options) Validate() error {
 
 	if err := redisopt.ValidatePrefix(o.Redis.Prefix); err != nil {
 		return InvalidOptionsError{Reason: err.Error()}
+	}
+
+	if _, err := ParseTrustedProxies(o.TrustedProxies); err != nil {
+		return err
 	}
 
 	return nil

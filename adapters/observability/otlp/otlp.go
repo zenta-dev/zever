@@ -158,7 +158,7 @@ func (t *tracer) Start(ctx context.Context, name string) (context.Context, obser
 //nolint:spancheck // StartSpan returns the span to the caller, who owns calling End() (see otelSpan.End); this is the standard tracer.Start contract, not a leak
 func (t *tracer) StartSpan(ctx context.Context, name string, opts ...observability.SpanStartOption) (context.Context, observability.Span) {
 	if ctx == nil {
-		ctx = context.Background() //nolint:contextcheck // nil context treated as background for safe propagation
+		ctx = context.Background() // nil context treated as background for safe propagation
 	}
 
 	cfg := observability.NewSpanConfig(opts...)

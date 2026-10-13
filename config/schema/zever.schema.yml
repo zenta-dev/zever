@@ -824,6 +824,13 @@ $defs:
             sweep_interval:
                 $ref: '#/$defs/durationNs'
                 description: Zero means adapter default (1m).
+            trusted_proxies:
+                description: CIDRs (or bare IPs) of proxies whose X-Forwarded-For
+                    headers are honored for rate-limit keys. Empty means keys always
+                    derive from the peer address.
+                items:
+                    type: string
+                type: array
         type: object
     resilienceOptions:
         additionalProperties: false

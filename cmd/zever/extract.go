@@ -37,7 +37,6 @@ Not automated, exactly as with ` + "`zever generate server`" + ` and
 handler bodies. Those land as stub comments for you to fill in. Extraction
 also writes no go.sum -- run ` + "`go mod tidy`" + ` in the output directory.`
 
-//nolint:dupl
 func printExtractUsage(fs *flag.FlagSet) {
 	header := title("zever extract") + dim(" — module → standalone service")
 	//nolint:lll
@@ -385,7 +384,7 @@ func copySchemaFiles(tag string, plan extractPlan) ([]string, error) {
 	written := make([]string, 0, len(plan.SchemaFiles))
 
 	for _, src := range plan.SchemaFiles {
-		data, err := os.ReadFile(src) //nolint:gosec // path came from the compiled schema's own positions
+		data, err := os.ReadFile(src) // path came from the compiled schema's own positions
 		if err != nil {
 			return nil, fmt.Errorf("%s: read %q: %w", tag, src, err)
 		}

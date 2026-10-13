@@ -139,7 +139,7 @@ func openWithServer(t *testing.T, srv *httptest.Server) ai.AI { //nolint:unused
 	t.Helper()
 	a, err := New(ai.Options{APIKey: "test-key", BaseURL: srv.URL, AllowInsecure: true, AllowPrivate: true, InsecureSkipVerify: true})
 	if err == nil {
-		ad0, ok := a.(*adapter) //nolint:forcetypeassert
+		ad0, ok := a.(*adapter)
 		if !ok {
 			t.Fatalf("not adapter")
 		}
@@ -150,7 +150,7 @@ func openWithServer(t *testing.T, srv *httptest.Server) ai.AI { //nolint:unused
 	if err != nil {
 		t.Fatalf("Open err = %v", err)
 	}
-	ad, _ := a.(*adapter) //nolint:forcetypeassert
+	ad, _ := a.(*adapter)
 	if tr, ok := ad.client.ClientConfig().HTTPClient.Transport.(*http.Transport); ok {
 		if tr.TLSClientConfig == nil {
 			tr.TLSClientConfig = &tls.Config{InsecureSkipVerify: true} //nolint:gosec
@@ -167,7 +167,7 @@ func openWithKeyAndServer(t *testing.T, key string, srv *httptest.Server) ai.AI 
 	if err != nil {
 		t.Fatalf("Open err = %v", err)
 	}
-	ad, _ := a.(*adapter) //nolint:forcetypeassert
+	ad, _ := a.(*adapter)
 	if tr, ok := ad.client.ClientConfig().HTTPClient.Transport.(*http.Transport); ok {
 		if tr.TLSClientConfig == nil {
 			tr.TLSClientConfig = &tls.Config{InsecureSkipVerify: true} //nolint:gosec
@@ -226,7 +226,7 @@ func TestGenerate_SuccessMocked(t *testing.T) {
 
 	a, err := New(ai.Options{APIKey: "test-key", BaseURL: srv.URL, AllowInsecure: true, AllowPrivate: true, InsecureSkipVerify: true})
 	if err == nil {
-		ad0, ok := a.(*adapter) //nolint:forcetypeassert
+		ad0, ok := a.(*adapter)
 		if !ok {
 			t.Fatalf("not adapter")
 		}
@@ -1323,7 +1323,7 @@ func TestOpen_InsecureLocalhost(t *testing.T) {
 	if err != nil {
 		t.Fatalf("Open err %v", err)
 	}
-	ad, _ := a.(*adapter) //nolint:forcetypeassert
+	ad, _ := a.(*adapter)
 	if tr, ok := ad.client.ClientConfig().HTTPClient.Transport.(*http.Transport); ok {
 		if tr.TLSClientConfig.InsecureSkipVerify {
 			t.Error("insecure set without InsecureSkipVerify opt-in")
@@ -1338,7 +1338,7 @@ func TestOpen_InsecureLocalhost(t *testing.T) {
 	if err != nil {
 		t.Fatalf("Open err %v", err)
 	}
-	ad, _ = a.(*adapter) //nolint:forcetypeassert
+	ad, _ = a.(*adapter)
 	if tr, ok := ad.client.ClientConfig().HTTPClient.Transport.(*http.Transport); ok {
 		if tr.TLSClientConfig.InsecureSkipVerify {
 			t.Error("insecure set with only AllowInsecure; want InsecureSkipVerify")
@@ -1353,7 +1353,7 @@ func TestOpen_InsecureLocalhost(t *testing.T) {
 	if err != nil {
 		t.Fatalf("Open err %v", err)
 	}
-	ad, _ = a.(*adapter) //nolint:forcetypeassert
+	ad, _ = a.(*adapter)
 	if tr, ok := ad.client.ClientConfig().HTTPClient.Transport.(*http.Transport); ok {
 		if !tr.TLSClientConfig.InsecureSkipVerify {
 			t.Error("insecure not set with InsecureSkipVerify")
@@ -1376,7 +1376,7 @@ func TestOpen_SpoofedLoopbackStaysSecure(t *testing.T) {
 		if err != nil {
 			t.Fatalf("New(%q) err %v", raw, err)
 		}
-		ad, _ := a.(*adapter) //nolint:forcetypeassert
+		ad, _ := a.(*adapter)
 		if tr, ok := ad.client.ClientConfig().HTTPClient.Transport.(*http.Transport); ok {
 			if tr.TLSClientConfig.InsecureSkipVerify {
 				t.Errorf("insecure set for %q", raw)
