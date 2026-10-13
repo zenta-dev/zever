@@ -16,6 +16,9 @@ var ErrCloseTimeout = errors.New("container: close timed out")
 // ErrClosePanic reports a service whose Close panicked.
 var ErrClosePanic = errors.New("container: close panicked")
 
+// ErrBuildPanic reports a service builder that panicked.
+var ErrBuildPanic = errors.New("container: build panicked")
+
 // ErrPluginVersionMismatch indicates a plugin version does not match.
 var ErrPluginVersionMismatch = errors.New("container: plugin version mismatch")
 
@@ -83,6 +86,25 @@ func (e ClosePanicError) Error() string {
 // Unwrap returns ErrClosePanic.
 func (e ClosePanicError) Unwrap() error {
 	return ErrClosePanic
+}
+
+// BuildPanicError reports a service builder that panicked inside lazy.get.
+// It carries the recovered panic value and a stack trace captured at the
+// recovery point. The panic is not cached: the next get retries the build.
+type BuildPanicError struct {
+	Service string
+	Value   any
+	Stack   []byte
+}
+
+// Error describes the panicked builder and the recovered value.
+func (e BuildPanicError) Error() string {
+	return fmt.Sprintf("container: build panicked: %v", e.Value)
+}
+
+// Unwrap returns ErrBuildPanic.
+func (e BuildPanicError) Unwrap() error {
+	return ErrBuildPanic
 }
 
 // DatabaseUnavailableError reports a database that could not be resolved or
