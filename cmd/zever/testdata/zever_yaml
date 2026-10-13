@@ -1,5 +1,9 @@
 auth:
     adapter: jwt
+    options:
+        jwt:
+            issuer: dev
+            secret: zever-dev-only-not-a-secret-0123456789ab
 cache:
     adapter: memory
 db:

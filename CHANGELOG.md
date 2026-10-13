@@ -126,6 +126,16 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Fixed
 
+- `fix(cli): zever new yields a bootable app`: `zever new` now scaffolds
+  every battery the generated server unconditionally resolves (auth/jwt
+  with a dev-only secret, permission/noop, observability/stdout, db/sqlite,
+  ratelimit/memory plus the log/router floor) so `/healthz` and `/readyz`
+  pass out of the box; runs `go mod tidy` automatically (`--no-tidy` to
+  skip) with an actionable error on failure; pins the `protoc-gen-go-grpc`
+  tool version and adds local replaces for `orm` so tidy works offline
+  against a framework checkout; bumps the scaffold `go` directive to
+  `1.27.2`; and `zever serve` pre-flights missing `go.sum` and unregistered
+  adapters with a one-line fix instead of raw `go` output.
 - `fix(orm): escape single quotes in sqlite JSON path key literals`:
   `sqlitePathLiteral` now doubles embedded `'` in the rendered `$`-rooted
   path body before wrapping it in the SQL string literal, so a json key
