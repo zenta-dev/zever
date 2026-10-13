@@ -67,8 +67,8 @@ func TestMigrateLintPassesCleanPlan(t *testing.T) {
 }
 
 func TestEnforceMigrateLintWarnOnlyPasses(t *testing.T) {
-	t.Parallel()
-
+	// No t.Parallel: captureZeverStdout swaps os.Stdout process-wide (see
+	// AGENTS.md: never capture os.Stdout under t.Parallel).
 	output := captureZeverStdout(t, func() {
 		err := enforceMigrateLint("postgres", []string{
 			`CREATE INDEX IF NOT EXISTS "users_nick_idx" ON "public"."users" ("nick");`,
@@ -84,8 +84,8 @@ func TestEnforceMigrateLintWarnOnlyPasses(t *testing.T) {
 }
 
 func TestEnforceMigrateLintWaivedErrorPasses(t *testing.T) {
-	t.Parallel()
-
+	// No t.Parallel: captureZeverStdout swaps os.Stdout process-wide (see
+	// AGENTS.md: never capture os.Stdout under t.Parallel).
 	output := captureZeverStdout(t, func() {
 		err := enforceMigrateLint("postgres", []string{
 			"-- zever:allow:drop_column\n" + `ALTER TABLE "public"."users" DROP COLUMN IF EXISTS "email";`,
