@@ -1,8 +1,9 @@
 // Package middleware provides HTTP handling with swappable resolved backends.
 //
 // It ships recovery, structured access logging, rate limiting, timeouts,
-// CORS, and tracing as HTTP plus unary-gRPC pairs with matching semantics
-// (CORS is HTTP-only: gRPC has no preflight concept). It does not
+// CORS, security headers, and tracing as HTTP plus unary-gRPC pairs with
+// matching semantics (CORS and security headers are HTTP-only: gRPC has
+// no preflight or header concept). It does not
 // own an adapter registry or config section, it wraps already-resolved
 // instances.
 //
@@ -12,8 +13,9 @@
 // closed with fixed error envelopes.
 //
 // DX: plain constructors over resolved instances instead of a registry:
-// RequestLogger, Recover, RateLimit, Timeout, Tracing, and CORS plus their
-// UnaryServerInterceptor counterparts (except CORS, which is HTTP-only),
+// RequestLogger, Recover, RateLimit, Timeout, Tracing, CORS, and
+// SecurityHeaders plus their UnaryServerInterceptor counterparts (except
+// CORS and SecurityHeaders, which are HTTP-only),
 // with RemoteAddrKey and PeerAddrKey for keying. No adapter name to parse
 // and no middleware section in config files.
 // See config/README.md.
