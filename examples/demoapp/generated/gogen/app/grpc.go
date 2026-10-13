@@ -11,9 +11,8 @@ import (
 	"google.golang.org/grpc/status"
 
 	"github.com/zenta-dev/zever/core/authz"
-	"github.com/zenta-dev/zever/shared/apperror"
-
 	pb "github.com/zenta-dev/zever/examples/demoapp/generated/protogogen"
+	"github.com/zenta-dev/zever/shared/apperror"
 )
 
 // UserServiceGRPCServer adapts a UserService implementation to the real pb.UserServiceServer

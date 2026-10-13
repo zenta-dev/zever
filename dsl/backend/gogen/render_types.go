@@ -100,9 +100,8 @@ func renderTypes(pkg string, data moduleModel) string {
 	b.WriteString("// request/response types onto the real protobuf message types protogogen\n")
 	fmt.Fprintf(&b, "// generates for the %s module's services.\n", pkg)
 	fmt.Fprintf(&b, "package %s\n\n", pkg)
-	b.WriteString("import (\n")
-	fmt.Fprintf(&b, "\t%s %q\n", data.PBAlias, data.PBImportPath)
-	b.WriteString(")\n\n")
+	writeGroupedImportBlock(&b, map[string]bool{data.PBImportPath: true}, map[string]string{data.PBImportPath: data.PBAlias})
+	b.WriteString("\n")
 	b.WriteString(body.String())
 
 	return b.String()
