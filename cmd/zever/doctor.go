@@ -116,6 +116,7 @@ func runDoctor(args []string) error {
 var doctorChecksFor = func(c *container.Container, resolved *config.Config) map[string]func() error {
 	return map[string]func() error{
 		"config":        resolved.Validate,
+		"adapters":      c.ValidateAdapters,
 		"ai":            func() error { _, err := c.AI(); return err },
 		"analytics":     func() error { _, err := c.Analytics(); return err },
 		"auth":          func() error { _, err := c.Auth(); return err },
@@ -225,7 +226,7 @@ func localDoctorRows(c *container.Container, resolved *config.Config, enabled ma
 
 	names := make([]string, 0, len(checks))
 	for name := range checks {
-		if name == "config" || enabled == nil || enabled[name] {
+		if name == "config" || name == "adapters" || enabled == nil || enabled[name] {
 			names = append(names, name)
 		}
 	}

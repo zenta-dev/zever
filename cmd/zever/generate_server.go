@@ -1168,6 +1168,7 @@ func runDoctor() error {
 
 	checks := map[string]func() error{
 		"config":        cfg.Validate,
+		"adapters":      c.ValidateAdapters,
 		"ai":            func() error { _, err := c.AI(); return err },
 		"analytics":     func() error { _, err := c.Analytics(); return err },
 		"auth":          func() error { _, err := c.Auth(); return err },
@@ -1207,7 +1208,7 @@ func runDoctor() error {
 
 	names := make([]string, 0, len(checks))
 	for name := range checks {
-		if name == "config" || enabled == nil || enabled[name] {
+		if name == "config" || name == "adapters" || enabled == nil || enabled[name] {
 			names = append(names, name)
 		}
 	}
