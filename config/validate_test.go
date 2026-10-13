@@ -82,3 +82,30 @@ func TestValidateWrapsTypedErrors(t *testing.T) {
 		t.Fatalf("missing service name: %v", err)
 	}
 }
+
+func TestValidateRouterTLSUnpaired(t *testing.T) {
+	t.Parallel()
+	cfg := Default()
+	cfg.Router.Options.TLSCertFile = "server.crt"
+	err := cfg.Validate()
+	if err == nil {
+		t.Fatal("want error for tls_cert without tls_key")
+	}
+	if !strings.Contains(err.Error(), "router") {
+		t.Fatalf("missing service name: %v", err)
+	}
+	if !strings.Contains(err.Error(), "tls_key") {
+		t.Fatalf("missing pair reason: %v", err)
+	}
+}
+
+func TestValidateRouterTLSPaired(t *testing.T) {
+	t.Parallel()
+	cfg := Default()
+	cfg.Router.Options.TLSCertFile = "server.crt"
+	cfg.Router.Options.TLSKeyFile = "server.key"
+	cfg.Router.Options.TLSClientCAFile = "client-ca.crt"
+	if err := cfg.Validate(); err != nil {
+		t.Fatalf("paired TLS must validate: %v", err)
+	}
+}

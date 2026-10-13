@@ -904,6 +904,12 @@ func New() (*container.Container, error) {
 // the project opts in (GRPC_REFLECTION=true or a dev ZEVER_ENV -- see
 // reflectionEnabled): it exposes every service schema to any client that
 // can reach the port, so it stays off by default.
+//
+// TLS is runtime-configured, not a generation flag: when the router
+// battery carries tls_cert/tls_key, both listeners serve TLS from one
+// shared tls.Config (TLS 1.2 floor; tls_client_ca adds mutual TLS), and
+// when they stay plaintext on a non-loopback address the server warns at
+// startup -- see loadServerTLS and isLoopbackAddr.
 const serverTemplate = `// Command server runs this project's HTTP+gRPC API.
 //
 // Scaffolded by ` + "`zever generate server`" + `. It is deliberately thin: parse
@@ -914,16 +920,21 @@ package main
 
 import (
 	"context"
+	"crypto/tls"
+	"crypto/x509"
 	"errors"
 	"flag"
+	"fmt"
 	"net"
 	"net/http"
 	"os"
 	"os/signal"
+	"strings"
 	"syscall"
 	"time"
 
 	"google.golang.org/grpc"
+	"google.golang.org/grpc/credentials"
 	"google.golang.org/grpc/health"
 	healthpb "google.golang.org/grpc/health/grpc_health_v1"
 	"google.golang.org/grpc/keepalive"
@@ -970,6 +981,81 @@ func guardedGRPCClient(ctx context.Context, c *container.Container, target, dep 
 	return c.GRPCClient(target, grpcclient.WithGuard(g))
 }
 
+// loadServerTLS builds the shared TLS configuration for the HTTP and gRPC
+// listeners from the router battery's tls_cert/tls_key/tls_client_ca
+// options (the zever.yaml ` + "`router:`" + ` section, or ROUTER_TLS_CERT and
+// friends in env). It returns nil when no TLS paths are set: both listeners
+// stay plaintext. The floor is TLS 1.2; tls_client_ca turns on mutual TLS
+// by requiring and verifying client certificates on both listeners.
+func loadServerTLS() (*tls.Config, error) {
+	cfg, err := app.Config()
+	if err != nil {
+		return nil, err
+	}
+
+	certFile := cfg.Router.Options.TLSCertFile
+	keyFile := cfg.Router.Options.TLSKeyFile
+	clientCAFile := cfg.Router.Options.TLSClientCAFile
+
+	if certFile == "" && keyFile == "" && clientCAFile == "" {
+		return nil, nil
+	}
+
+	// config.Validate pairs these fail-closed at load, but a hand-built
+	// Config can still reach here: fail with the fix, not a PEM error.
+	if certFile == "" || keyFile == "" {
+		return nil, fmt.Errorf("server: tls_cert and tls_key must be set together")
+	}
+
+	cert, err := tls.LoadX509KeyPair(certFile, keyFile)
+	if err != nil {
+		return nil, fmt.Errorf("server: load TLS key pair: %w", err)
+	}
+
+	tlsCfg := &tls.Config{
+		MinVersion:   tls.VersionTLS12,
+		Certificates: []tls.Certificate{cert},
+	}
+
+	if clientCAFile != "" {
+		pem, err := os.ReadFile(clientCAFile)
+		if err != nil {
+			return nil, fmt.Errorf("server: read TLS client CA: %w", err)
+		}
+
+		pool := x509.NewCertPool()
+		if !pool.AppendCertsFromPEM(pem) {
+			return nil, fmt.Errorf("server: no valid certificates in TLS client CA file")
+		}
+
+		tlsCfg.ClientCAs = pool
+		tlsCfg.ClientAuth = tls.RequireAndVerifyClientCert
+	}
+
+	return tlsCfg, nil
+}
+
+// isLoopbackAddr reports whether addr binds loopback only: only those
+// listeners skip the plaintext warning. Empty and wildcard hosts bind
+// every interface, and an unparsable address fails closed to warning.
+func isLoopbackAddr(addr string) bool {
+	host, _, err := net.SplitHostPort(addr)
+	if err != nil {
+		return false
+	}
+
+	switch strings.ToLower(strings.Trim(host, "[]")) {
+	case "", "0.0.0.0", "::":
+		return false
+	case "localhost":
+		return true
+	}
+
+	ip := net.ParseIP(strings.Trim(host, "[]"))
+
+	return ip != nil && ip.IsLoopback()
+}
+
 func main() {
 	addr := flag.String("addr", ":8080", "HTTP address to listen on")
 	grpcAddr := flag.String("grpc-addr", ":9090", "gRPC address to listen on")
@@ -1006,6 +1092,19 @@ func run(addr, grpcAddr string) error {
 		return err
 	}
 
+	serverTLS, err := loadServerTLS()
+	if err != nil {
+		return err
+	}
+
+	if serverTLS == nil {
+		for _, a := range []string{addr, grpcAddr} {
+			if !isLoopbackAddr(a) {
+				logger.Warn().Str("addr", a).Msg("serving plaintext without TLS on a non-loopback address; set router tls_cert and tls_key")
+			}
+		}
+	}
+
 	authInst, err := c.Auth()
 	if err != nil {
 		return err
@@ -1040,7 +1139,7 @@ func run(addr, grpcAddr string) error {
 	// GRPCPolicies()/RegisterModule for every declared module automatically,
 	// e.g.: zever generate server schema/*.zen
 {{end}}
-	grpcServer, err := c.GRPC(
+	grpcOpts := []grpc.ServerOption{
 		grpc.ChainUnaryInterceptor(
 			middleware.RecoverUnaryServerInterceptor(logger),
 			middleware.TracingUnaryServerInterceptor(obs),
@@ -1054,7 +1153,12 @@ func run(addr, grpcAddr string) error {
 		}),
 		grpc.MaxRecvMsgSize(DefaultGRPCMaxMessageBytes),
 		grpc.MaxSendMsgSize(DefaultGRPCMaxMessageBytes),
-	)
+	}
+	if serverTLS != nil {
+		grpcOpts = append(grpcOpts, grpc.Creds(credentials.NewTLS(serverTLS)))
+	}
+
+	grpcServer, err := c.GRPC(grpcOpts...)
 	if err != nil {
 		return err
 	}
@@ -1120,6 +1224,7 @@ func run(addr, grpcAddr string) error {
 		ReadTimeout:       readTimeout,
 		WriteTimeout:      writeTimeout,
 		IdleTimeout:       idleTimeout,
+		TLSConfig:         serverTLS,
 	}
 
 	errs := make(chan error, 2)
@@ -1127,8 +1232,16 @@ func run(addr, grpcAddr string) error {
 	go func() {
 		logger.Info().Str("addr", addr).Msg("http server listening")
 
-		if err := httpServer.ListenAndServe(); err != nil && !errors.Is(err, http.ErrServerClosed) {
-			errs <- err
+		var serveErr error
+		if serverTLS != nil {
+			// Certificates come from TLSConfig; the filename arguments
+			// stay empty so key material is never re-read from disk here.
+			serveErr = httpServer.ListenAndServeTLS("", "")
+		} else {
+			serveErr = httpServer.ListenAndServe()
+		}
+		if serveErr != nil && !errors.Is(serveErr, http.ErrServerClosed) {
+			errs <- serveErr
 
 			return
 		}

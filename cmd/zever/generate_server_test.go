@@ -4,6 +4,7 @@ import (
 	"go/format"
 	"go/parser"
 	"go/token"
+	"net"
 	"os"
 	"path/filepath"
 	"strings"
@@ -270,6 +271,88 @@ func TestRunGenerateServerReflectionOffInProdEnv(t *testing.T) {
 
 	if strings.Contains(main, "reflection.Register(grpcServer)") {
 		t.Fatalf("server main.go must not register reflection with ZEVER_ENV=production:\n%s", main)
+	}
+}
+
+// TestRunGenerateServerTLSWiring proves the generated server serves TLS
+// from the router battery's tls_cert/tls_key/tls_client_ca options: gRPC
+// credentials plus HTTPS on one shared tls.Config (TLS 1.2 floor, mTLS
+// client verification when a client CA is set), with a startup warning
+// when both listeners stay plaintext on a non-loopback address.
+func TestRunGenerateServerTLSWiring(t *testing.T) {
+	dir := t.TempDir()
+	withWorkingDir(t, dir)
+	writeGoMod(t, dir, "example.com/shop")
+
+	if err := runGenerateServer(nil); err != nil {
+		t.Fatalf("runGenerateServer: %v", err)
+	}
+
+	main := readGenerated(t, filepath.Join(dir, "cmd", "server", "main.go"))
+
+	for _, fragment := range []string{
+		`"crypto/tls"`,
+		`"crypto/x509"`,
+		`"google.golang.org/grpc/credentials"`,
+		"Router.Options.TLSCertFile",
+		"Router.Options.TLSKeyFile",
+		"Router.Options.TLSClientCAFile",
+		"tls.LoadX509KeyPair",
+		"tls.VersionTLS12",
+		"tls.RequireAndVerifyClientCert",
+		"credentials.NewTLS",
+		"grpc.Creds(",
+		"ListenAndServeTLS",
+		"plaintext",
+		"isLoopbackAddr",
+	} {
+		if !strings.Contains(main, fragment) {
+			t.Fatalf("server main.go lacks TLS wiring %q:\n%s", fragment, main)
+		}
+	}
+}
+
+// TestIsLoopbackAddrCases pins the classification rule the generated
+// server's isLoopbackAddr embeds (replicated with net directly: the
+// template is text, not an import): loopback hosts and only those skip
+// the plaintext warning, while wildcard, empty, and unparsable hosts
+// always warn.
+func TestIsLoopbackAddrCases(t *testing.T) {
+	t.Parallel()
+
+	isLoopbackAddr := func(addr string) bool {
+		host, _, err := net.SplitHostPort(addr)
+		if err != nil {
+			return false
+		}
+		switch strings.ToLower(strings.Trim(host, "[]")) {
+		case "", "0.0.0.0", "::":
+			return false
+		case "localhost":
+			return true
+		}
+		ip := net.ParseIP(strings.Trim(host, "[]"))
+		return ip != nil && ip.IsLoopback()
+	}
+
+	tests := []struct {
+		addr string
+		want bool
+	}{
+		{"127.0.0.1:8080", true},
+		{"[::1]:9090", true},
+		{"localhost:8080", true},
+		{":8080", false},
+		{"0.0.0.0:8080", false},
+		{"[::]:8080", false},
+		{"192.168.1.10:8080", false},
+		{"example.com:443", false},
+		{"not-an-addr", false},
+	}
+	for _, tc := range tests {
+		if got := isLoopbackAddr(tc.addr); got != tc.want {
+			t.Errorf("isLoopbackAddr(%q) = %v, want %v", tc.addr, got, tc.want)
+		}
 	}
 }
 

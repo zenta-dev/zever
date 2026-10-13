@@ -843,6 +843,15 @@ $defs:
                 description: Empty defaults to "app".
                 maxLength: 64
                 type: string
+            tls_cert:
+                description: Path to the PEM-encoded TLS certificate the generated server presents on its HTTP and gRPC listeners. Empty disables TLS (plaintext). Must be paired with tls_key.
+                type: string
+            tls_key:
+                description: Path to the PEM-encoded TLS private key matching tls_cert. Empty disables TLS (plaintext). Must be paired with tls_cert.
+                type: string
+            tls_client_ca:
+                description: Path to a PEM-encoded CA bundle used to verify client certificates (mutual TLS). Empty disables client verification. Requires the tls_cert/tls_key pair.
+                type: string
         type: object
     schedulerOptions:
         additionalProperties: false
