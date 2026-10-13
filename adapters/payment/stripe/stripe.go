@@ -170,8 +170,44 @@ func (d *driver) GetPayment(ctx context.Context, id string) (payment.Result, err
 	}, nil
 }
 
+// webhookFingerprint binds a dedupe record to the exact payload delivered.
+func webhookFingerprint(raw []byte) []byte {
+	sum := sha256.Sum256(raw)
+
+	return sum[:]
+}
+
+// dedupeWebhookEvent reserves event id in store and marks it seen. A second
+// delivery of the same id returns DuplicateEventError; a delivery with the
+// same id but a different payload trips the store's fingerprint mismatch.
+func dedupeWebhookEvent(ctx context.Context, store idempotency.Store, key, eventID string, fingerprint []byte) error {
+	if store == nil || eventID == "" {
+		return nil
+	}
+
+	outcome, err := store.Begin(ctx, key, idempotency.BeginOptions{Fingerprint: fingerprint, TTL: payment.DefaultWebhookIdempotencyTTL})
+	if err != nil {
+		return err
+	}
+
+	if outcome.Replay {
+		return payment.DuplicateEventError{EventID: eventID}
+	}
+
+	if err := store.Complete(ctx, key, fingerprint, []byte{1}); err != nil {
+		_ = store.Forget(ctx, key)
+
+		return err
+	}
+
+	return nil
+}
+
 // WebhookEvent verifies signature then decodes a Stripe webhook payload.
-func (d *driver) WebhookEvent(_ context.Context, raw []byte, signature string) (payment.Event, error) {
+// When an idempotency store is configured, the provider event id is
+// reserved before returning: a repeat delivery fails with
+// payment.ErrDuplicateEvent instead of re-executing downstream work.
+func (d *driver) WebhookEvent(ctx context.Context, raw []byte, signature string) (payment.Event, error) {
 	if d.maxWebhookBytes <= 0 {
 		return payment.Event{}, fmt.Errorf("stripe: webhook: invalid max size %d", d.maxWebhookBytes)
 	}
@@ -190,7 +226,7 @@ func (d *driver) WebhookEvent(_ context.Context, raw []byte, signature string) (
 		return payment.Event{}, fmt.Errorf("stripe: webhook: %w", err)
 	}
 
-	ev := payment.Event{Type: payment.EventType(string(event.Type))}
+	ev := payment.Event{ID: event.ID, Type: payment.EventType(string(event.Type))}
 
 	switch {
 	case strings.HasPrefix(string(event.Type), "payment_intent."):
@@ -230,6 +266,10 @@ func (d *driver) WebhookEvent(_ context.Context, raw []byte, signature string) (
 			Amount:   refunded,
 			Currency: string(ch.Currency),
 		}
+	}
+
+	if err := dedupeWebhookEvent(ctx, d.idempotency, "stripe:webhook:"+event.ID, event.ID, webhookFingerprint(raw)); err != nil {
+		return payment.Event{}, fmt.Errorf("stripe: webhook: %w", err)
 	}
 
 	return ev, nil

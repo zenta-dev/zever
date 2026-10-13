@@ -302,6 +302,40 @@ func TestDecodeOptions_dbHappy(t *testing.T) {
 	}
 }
 
+func TestDecodeOptions_ratelimitTrustedProxies(t *testing.T) {
+	t.Parallel()
+
+	got, err := decodeOptions[ratelimit.Options]("ratelimit", map[string]any{
+		"rate":            10.0,
+		"burst":           20,
+		"trusted_proxies": []any{"10.0.0.0/8", "2001:db8::1"},
+	})
+	if err != nil {
+		t.Fatalf("decodeOptions() error = %v", err)
+	}
+
+	if len(got.TrustedProxies) != 2 || got.TrustedProxies[0] != "10.0.0.0/8" || got.TrustedProxies[1] != "2001:db8::1" {
+		t.Errorf("decodeOptions() TrustedProxies = %v, want [10.0.0.0/8 2001:db8::1]", got.TrustedProxies)
+	}
+
+	if err := got.Validate(); err != nil {
+		t.Errorf("Validate() error = %v, want nil", err)
+	}
+
+	bad, badErr := decodeOptions[ratelimit.Options]("ratelimit", map[string]any{
+		"rate":            10.0,
+		"burst":           20,
+		"trusted_proxies": []any{"bogus"},
+	})
+	if badErr != nil {
+		t.Fatalf("decodeOptions() error = %v", badErr)
+	}
+
+	if err := bad.Validate(); !errors.Is(err, ratelimit.ErrInvalidOptions) {
+		t.Errorf("Validate() error = %v, want ErrInvalidOptions", err)
+	}
+}
+
 func TestDecodeOptions_dedicatedPool(t *testing.T) {
 	t.Parallel()
 	dbOpts, err := decodeOptions[db.Options]("db", map[string]any{"dedicated_pool": true})
