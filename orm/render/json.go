@@ -434,18 +434,12 @@ func pgArrayEscape(s string) string {
 
 // sqlitePathLiteral renders a sqlite json1 path as a SQL string literal:
 // '$'-rooted, `.key` for simple keys, `$."key"` (double-quoted) for keys
-// with special characters, `[N]` for array indexes. Returns the quoted
-// literal including surrounding single quotes.
+// with special characters, `[N]` for array indexes. Embedded `'` in the
+// body is doubled, so a key containing a quote can never terminate the
+// enclosing literal early. Returns the quoted literal including
+// surrounding single quotes.
 func sqlitePathLiteral(steps []JSONStep) string {
-	var b strings.Builder
-
-	b.WriteByte('\'')
-
-	b.WriteString(sqlitePathBody(steps))
-
-	b.WriteByte('\'')
-
-	return b.String()
+	return "'" + strings.ReplaceAll(sqlitePathBody(steps), "'", "''") + "'"
 }
 
 // sqlitePathArg renders sqlite json path steps as a `, '<path>'` argument
