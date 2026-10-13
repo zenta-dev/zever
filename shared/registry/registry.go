@@ -3,6 +3,7 @@
 package registry
 
 import (
+	"fmt"
 	"reflect"
 	"sync"
 )
@@ -22,9 +23,26 @@ type Registry[A comparable, F any] struct {
 
 // New returns an empty Registry that reports errNil on nil factories,
 // duplicate(adapter) on repeated Register, and unknown(adapter) on Lookup
-// misses. Any hook may be nil, in which case that path returns nil lookup
-// semantics are preserved but no custom error is produced.
+// misses. A nil hook falls back to a package default: ErrNilFactory when
+// errNil is nil, and errors wrapping ErrDuplicate or ErrUnknown for the
+// other two, so no path ever returns nil silently.
 func New[A comparable, F any](errNil error, duplicate func(A) error, unknown func(A) error) *Registry[A, F] {
+	if errNil == nil {
+		errNil = ErrNilFactory
+	}
+
+	if duplicate == nil {
+		duplicate = func(a A) error {
+			return fmt.Errorf("registry: duplicate adapter %v: %w", a, ErrDuplicate)
+		}
+	}
+
+	if unknown == nil {
+		unknown = func(a A) error {
+			return fmt.Errorf("registry: unknown adapter %v: %w", a, ErrUnknown)
+		}
+	}
+
 	return &Registry[A, F]{
 		factories: make(map[A]F),
 		errNil:    errNil,

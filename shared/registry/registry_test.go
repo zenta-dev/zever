@@ -150,12 +150,29 @@ func TestNilHooks(t *testing.T) {
 		t.Fatalf("Register failed: %v", err)
 	}
 
-	if err := r.Register(adapterA, func() string { return "b" }); err != nil {
-		t.Fatalf("duplicate with nil hook must return nil, got %v", err)
+	err := r.Register(adapterA, func() string { return "b" })
+	if err == nil {
+		t.Fatal("duplicate with nil hook must return an error, got nil")
 	}
 
-	if _, err := r.Lookup(adapterB); err != nil {
-		t.Fatalf("unknown with nil hook must return nil, got %v", err)
+	if !errors.Is(err, registry.ErrDuplicate) {
+		t.Fatalf("duplicate error does not unwrap to ErrDuplicate: %v", err)
+	}
+
+	if _, err := r.Lookup(adapterB); err == nil {
+		t.Fatal("unknown with nil hook must return an error, got nil")
+	} else if !errors.Is(err, registry.ErrUnknown) {
+		t.Fatalf("unknown error does not wrap ErrUnknown: %v", err)
+	}
+}
+
+func TestNilErrNilFactory(t *testing.T) {
+	t.Parallel()
+
+	r := registry.New[adapter, factory](nil, nil, nil)
+
+	if err := r.Register(adapterA, nil); !errors.Is(err, registry.ErrNilFactory) {
+		t.Fatalf("Register(nil) = %v, want error wrapping %v", err, registry.ErrNilFactory)
 	}
 }
 
