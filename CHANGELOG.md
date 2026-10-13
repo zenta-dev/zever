@@ -9,6 +9,25 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Breaking
 
+- `feat(gogen)!: typed saga steps`: the `gogen` backend's `<module>/saga.go`
+  **Breaking:** no longer emits the untyped `SagaCaller.Call(ctx, service,
+  method, in any, out any)`, the `sagaStep` helper, or `map[string]any`
+  payloads. It now generates per-step typed input/output structs (one pair
+  per step role, e.g. `CheckoutSagaReserveInput/Output`, with plain
+  standard-library field types), a `SagaCaller` interface with one typed
+  method per step, and `RegisterSagas(reg workflow.TypedSagaRegistrar,
+  caller SagaCaller)` registering `workflow.TypedStep` values built by
+  `workflow.NewTypedStep` / `NewTypedStepWithoutCompensate` over
+  `workflow.StepFuncOf[In, Out]`. The new `core/workflow` surface is purely
+  additive (`StepFuncOf`, `TypedStep`, `TypedSagaRegistrar`,
+  `TypedStepsToSagaSteps`, `ErrTypedStepConvert`); the existing
+  `SagaRegistrar`/`SagaStep`/`StepFunc` interfaces are unchanged and both
+  `memory` and `db` workflow adapters now also satisfy
+  `TypedSagaRegistrar`. Hosts must regenerate saga output (`-update`
+  goldens) and reimplement the caller seam with the new per-step methods;
+  values still cross step boundaries via encoding/json, so every generated
+  struct stays JSON-marshalable.
+
 - `fix(httpclient)!: block private addresses for remote adapters by default`:
   outbound HTTP clients in the `ai` (`anthropic`, `openai`, `gemini`,
   `ollama`), `document/remote`, `geo` (`google`, `osm`), `i18n/remote`,
