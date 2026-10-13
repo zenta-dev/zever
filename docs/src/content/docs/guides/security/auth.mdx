@@ -37,7 +37,28 @@ if err != nil {
 }
 ```
 
-`AUTH_JWT_SECRET` maps to `options.jwt.secret` (env splits at the first underscore). Keys: `jwt.issuer`, `jwt.audience`, `jwt.max_ttl`, `jwt.leeway`, `oidc.issuer`, `oidc.client_id`, `oidc.timeout`, `oidc.allow_insecure`. See the [auth config reference](../../../reference/config/#auth).
+`AUTH_JWT_SECRET` maps to `options.jwt.secret` (env splits at the first underscore). Keys: `jwt.issuer`, `jwt.audience`, `jwt.max_ttl`, `jwt.leeway`, `jwt.keys`, `jwt.active_kid`, `oidc.issuer`, `oidc.client_id`, `oidc.timeout`, `oidc.allow_insecure`. See the [auth config reference](../../../reference/config/#auth).
+
+## Key rotation
+
+List every accepted key with a `kid` and point `active_kid` at the signer. New tokens carry the `kid` header; verification selects the key by `kid` and still accepts kid-less tokens signed with the legacy `secret`, so old clients keep working through the overlap. Unknown kids fail closed. Keep a retired key listed until every token signed with it has expired, then remove it. Only HS256 is supported — there is no asymmetric (`EdDSA`/`RS256`) mode, and `alg: none` tokens are rejected.
+
+```yaml title="zever.yaml"
+auth:
+  adapter: jwt
+  options:
+    jwt:
+      secret: previous-secret-at-least-32-bytes-long
+      keys:
+        - kid: "2026-09"
+          secret: previous-secret-at-least-32-bytes-long
+        - kid: "2026-10"
+          secret: new-secret-at-least-32-bytes-long-here
+      active_kid: "2026-10"
+      leeway: 30000000000 # ~30s of clock-skew tolerance for exp/nbf
+```
+
+Tokens carrying a future `nbf` (not-before) claim are rejected; `exp` is always required. Both honor `leeway`, which defaults to `0` (strict).
 
 ## Log in and call with a bearer token
 
@@ -55,8 +76,8 @@ Login returns `200` with a signed JWT in `token`; register `201`; missing or inv
 ## Production checklist
 
 - CSPRNG secret (32+ bytes) in env or a mounted file, never source. See [Secrets](../secrets/).
-- Rotate by accepting old and new secrets during an overlap.
-- Prefer `session` for immediate revocation across instances; JWT revocation is per-process by default, so otherwise tokens live until TTL.
+- Rotate with overlap: add the new key to `jwt.keys`, flip `jwt.active_kid`, and only remove the old key after its tokens have expired.
+- Prefer `session` for immediate revocation across instances; JWT revocation is per-process by default (the memory store dies with the process and is invisible to other instances), so multi-instance deployments must inject the shared `revocation/redis` store via `auth.JWTOptions.RevocationStore` — otherwise revoked tokens stay valid on sibling instances until TTL.
 - Rate-limit login; hashing cost is not an attempt limit. See [Rate limiting](../ratelimit/).
 - Display config only via `cfg.RedactedServices()` or `config.Redact`.
 
@@ -71,7 +92,7 @@ Shorter than 32 bytes (`MinSecretLen`). Set a longer `AUTH_JWT_SECRET`.
 <details>
 <summary>All logins return 401 after rotation</summary>
 
-Old-secret tokens no longer verify. Log in again, or accept both during the overlap.
+Old-secret tokens no longer verify: either the retired `kid` was removed from `jwt.keys` before its tokens expired, or `active_kid` points at a key ID with no matching entry. Restore the old key (or fix `active_kid`), or log in again for a fresh token.
 </details>
 
 <details>

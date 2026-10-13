@@ -66,6 +66,19 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Added
 
+- `feat(auth/jwt): kid-based key rotation and nbf validation`: `JWTOptions`
+  gains `keys: [{kid, secret}]` plus `active_kid` (empty defaults to the
+  first entry; validated for unique kids, secret length, and a matching
+  active ID). Tokens are signed with the active key and carry its `kid`
+  header; verification selects the key by `kid`, falls back to the legacy
+  `secret` for kid-less tokens, and rejects unknown kids fail-closed. The
+  legacy single-secret path is unchanged and kid-less. `nbf` (when present)
+  and `exp` are both enforced with the existing `leeway` tolerance (default
+  `0`, strict; ~30s is typical for skewed fleets). HS256-only stands:
+  asymmetric algorithms stay unsupported by design and `none`/foreign-alg
+  tokens are rejected. Docs now state the default memory revocation store
+  is per-process and point multi-instance deployments at the shared
+  `revocation/redis` store.
 - `docs: test your zever app guide`: new `guides/operate/testing-your-app`
   page — per-test container from `config.Default()` with `t.Cleanup` close,
   httptest routes, per-test sqlite files under `t.TempDir()`, the `dbtest`

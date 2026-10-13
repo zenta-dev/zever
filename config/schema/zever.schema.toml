@@ -74,11 +74,30 @@ additionalProperties = false
 type = 'object'
 
 ['$defs'.authOptions.properties.jwt.properties]
+['$defs'.authOptions.properties.jwt.properties.active_kid]
+description = 'Signing key ID within keys; empty defaults to the first entry. Must match a keys entry when set.'
+type = 'string'
+
 ['$defs'.authOptions.properties.jwt.properties.audience]
 type = 'string'
 
 ['$defs'.authOptions.properties.jwt.properties.issuer]
 description = 'Required by the jwt adapter.'
+type = 'string'
+
+['$defs'.authOptions.properties.jwt.properties.keys]
+description = 'Rotatable HMAC signing keys by key ID; tokens are signed with the active_kid key (or the first entry) and carry its kid header.'
+type = 'array'
+
+['$defs'.authOptions.properties.jwt.properties.keys.items]
+additionalProperties = false
+type = 'object'
+required = ['kid', 'secret']
+
+['$defs'.authOptions.properties.jwt.properties.keys.items.properties.kid]
+type = 'string'
+
+['$defs'.authOptions.properties.jwt.properties.keys.items.properties.secret]
 type = 'string'
 
 ['$defs'.authOptions.properties.jwt.properties.leeway]
