@@ -3,7 +3,7 @@ module github.com/zenta-dev/zever/adapters/ai/anthropic
 go 1.27.2
 
 require (
-	github.com/anthropics/anthropic-sdk-go v1.78.0
+	github.com/anthropics/anthropic-sdk-go v1.80.0
 	github.com/zenta-dev/zever/core/ai v0.6.1
 	github.com/zenta-dev/zever/shared/codec v0.6.1
 	github.com/zenta-dev/zever/shared/httpclient v0.6.1

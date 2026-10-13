@@ -18,6 +18,7 @@ require (
 	github.com/zenta-dev/zever/adapters/i18n/embed v0.6.1
 	github.com/zenta-dev/zever/adapters/idempotency/memory v0.6.1
 	github.com/zenta-dev/zever/adapters/lock/memory v0.6.1
+	github.com/zenta-dev/zever/adapters/log/noop v0.6.1
 	github.com/zenta-dev/zever/adapters/log/slog v0.6.1
 	github.com/zenta-dev/zever/adapters/mailer/log v0.6.1
 	github.com/zenta-dev/zever/adapters/media/local v0.6.1
@@ -233,7 +234,7 @@ replace github.com/zenta-dev/zever/shared/traceprop => ../../shared/traceprop
 require (
 	github.com/HugoSmits86/nativewebp v1.3.0 // indirect
 	github.com/anthonynsimon/bild v0.17.1 // indirect
-	github.com/anthropics/anthropic-sdk-go v1.78.0 // indirect
+	github.com/anthropics/anthropic-sdk-go v1.80.0 // indirect
 	github.com/bahlo/generic-list-go v0.2.0 // indirect
 	github.com/buger/jsonparser v1.1.2 // indirect
 	github.com/cespare/xxhash/v2 v2.3.0 // indirect
@@ -261,7 +262,6 @@ require (
 	github.com/tidwall/pretty v1.2.1 // indirect
 	github.com/tidwall/sjson v1.2.5 // indirect
 	github.com/zenta-dev/zever/adapters/db/postgres v0.6.1 // indirect
-	github.com/zenta-dev/zever/adapters/log/noop v0.6.1 // indirect
 	github.com/zenta-dev/zever/adapters/media/ffmpeg v0.6.1 // indirect
 	github.com/zenta-dev/zever/core/agent v0.6.1 // indirect
 	github.com/zenta-dev/zever/core/cdn v0.6.1 // indirect
