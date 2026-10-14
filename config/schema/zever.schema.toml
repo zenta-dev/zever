@@ -376,6 +376,9 @@ type = 'integer'
 ['$defs'.documentOptions.properties.endpoint]
 type = 'string'
 
+['$defs'.documentOptions.properties.latex_allow_unsafe_source]
+type = 'boolean'
+
 ['$defs'.documentOptions.properties.latex_command]
 description = 'Default: pdflatex.'
 type = 'string'
@@ -387,6 +390,11 @@ type = 'string'
 ['$defs'.documentOptions.properties.latex_runs]
 minimum = 0
 type = 'integer'
+
+['$defs'.documentOptions.properties.latex_sandbox]
+description = 'Default: auto.'
+enum = ['', 'auto', 'required', 'off']
+type = 'string'
 
 ['$defs'.documentOptions.properties.max_output_bytes]
 minimum = 0

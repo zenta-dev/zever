@@ -548,6 +548,17 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   (`64:ff9b::/96`, `64:ff9b:1::/48`), 6to4 (`2002::/16`) and IPv4-compatible
   (`::/96`) addresses by their embedded IPv4 address, and treats Teredo
   (`2001::/32`) and site-local (`fec0::/10`) as private.
+- `fix(document)`: **Breaking:** the `latex` adapter now defends against
+  local file reads on TeX Live >= 2026 (where `openin_any` is a no-op). New
+  `latex_sandbox` option (`auto` default, `required`, `off`) runs TeX inside
+  bubblewrap (no network, read-only system trees, only the render dir
+  writable); `required` fails at open when bwrap is unavailable, `auto` logs
+  one warning and falls back. A source pre-scan now rejects `\input`,
+  `\include`, `\openin`, `\openout` etc. with absolute, `..`, `~` or piped
+  paths, `\write18`, and shell-escape packages with `ErrUnsafeSource`;
+  `latex_allow_unsafe_source: true` restores the old behavior. Output and
+  stderr are size-capped before buffering, and process-group kill is split
+  into build-tagged files so the module compiles on Windows.
 - Bump the Go toolchain pin from `go 1.27.0` to `go 1.27.2` in `go.work`
   and every module's `go.mod` (fixes stdlib `net/http` / HTTP/2
   advisories `GO-2026-6603`…`GO-2026-6617`).

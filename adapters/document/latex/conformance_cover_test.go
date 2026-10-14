@@ -62,7 +62,7 @@ func TestConformance(t *testing.T) {
 	documenttest.Conformance(t, func(t *testing.T) document.Document {
 		t.Helper()
 
-		d, err := New(document.Options{})
+		d, err := New(document.Options{LatexSandbox: document.LatexSandboxOff})
 		if err != nil {
 			t.Fatalf("New() error = %v", err)
 		}
