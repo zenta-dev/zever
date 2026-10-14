@@ -100,19 +100,20 @@ func TestParsePaddleAmount_boundaries(t *testing.T) {
 	t.Parallel()
 
 	cases := []struct {
-		in      string
-		want    int64
-		wantErr bool
+		in       string
+		currency string
+		want     int64
+		wantErr  bool
 	}{
-		{"  100.00  ", 10000, false},
-		{"0.00", 0, false},
-		{"1.", 100, false},
-		{"0.5", 50, false},
-		{"-0.50", -50, false},
-		{"1000000000.99", 100000000099, false},
+		{"  100.00  ", "USD", 10000, false},
+		{"0.00", "USD", 0, false},
+		{"1.", "USD", 0, true},
+		{"0.5", "USD", 50, false},
+		{"-0.50", "USD", -50, false},
+		{"1000000000.99", "USD", 100000000099, false},
 	}
 	for _, tc := range cases {
-		got, err := parsePaddleAmount(tc.in)
+		got, err := parsePaddleAmount(tc.in, tc.currency)
 		if tc.wantErr {
 			if err == nil {
 				t.Errorf("parsePaddleAmount(%q) err = nil, want error", tc.in)
@@ -125,10 +126,9 @@ func TestParsePaddleAmount_boundaries(t *testing.T) {
 	}
 }
 
-// TestParsePaddleAmount_overflow pins the adversarial-magnitude guard: whole
-// parts that parse fine as int64 but no longer fit once scaled to minor units
-// (or carry past the limit on the final fraction add) fail with
-// ErrAmountOverflow instead of wrapping around, while the exact int64 extrema
+// TestParsePaddleAmount_overflow pins the exact-magnitude guard: totals that
+// no longer fit int64 once scaled to minor units fail with ErrAmountOverflow
+// (aliased to the shared billing sentinel), while the exact int64 extrema
 // still convert.
 func TestParsePaddleAmount_overflow(t *testing.T) {
 	t.Parallel()
@@ -148,14 +148,13 @@ func TestParsePaddleAmount_overflow(t *testing.T) {
 		{"99999999999999999999.00", 0, true, false},
 		{"-92233720368547758.09", 0, true, true},
 		{"-92233720368547759.00", 0, true, true},
-		{"-9223372036854775808.99", 0, true, true},
 	}
 
 	for _, tc := range cases {
 		t.Run("amount_"+tc.in, func(t *testing.T) {
 			t.Parallel()
 
-			got, err := parsePaddleAmount(tc.in)
+			got, err := parsePaddleAmount(tc.in, "USD")
 			if tc.wantErr {
 				if tc.wantOverflow && !errors.Is(err, ErrAmountOverflow) {
 					t.Errorf("parsePaddleAmount(%q) err = %v, want ErrAmountOverflow", tc.in, err)

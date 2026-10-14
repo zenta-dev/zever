@@ -5,7 +5,6 @@ import (
 	"context"
 	"crypto/sha256"
 	"fmt"
-	"math"
 	"net/http"
 	"strconv"
 	"strings"
@@ -13,6 +12,7 @@ import (
 
 	"github.com/PaddleHQ/paddle-go-sdk/v5"
 
+	"github.com/zenta-dev/zever/core/billing"
 	"github.com/zenta-dev/zever/core/idempotency"
 	"github.com/zenta-dev/zever/core/payment"
 	"github.com/zenta-dev/zever/shared/httpclient"
@@ -163,7 +163,7 @@ func fromTransaction(txn *paddle.Transaction) (payment.Result, error) {
 	var total int64
 
 	if s := txn.Details.Totals.Total; s != "" {
-		parsed, err := parsePaddleAmount(s)
+		parsed, err := parsePaddleAmount(s, string(txn.CurrencyCode))
 		if err != nil {
 			return payment.Result{}, fmt.Errorf("paddle: parse total: %w", err)
 		}
@@ -179,75 +179,18 @@ func fromTransaction(txn *paddle.Transaction) (payment.Result, error) {
 	}, nil
 }
 
-// minorUnitsPerMajor scales a Paddle whole-unit total to minor units.
-const minorUnitsPerMajor = 100
-
-// parsePaddleAmount converts a Paddle decimal total to minor units, truncating
-// toward zero without rounding (extra fractional digits are dropped).
-func parsePaddleAmount(s string) (int64, error) {
+// parsePaddleAmount converts a Paddle decimal major-unit total to minor units
+// using the shared billing.ParseMinorUnits contract: whole units scale by the
+// currency exponent, excess precision rounds half away from zero, and
+// unrepresentable magnitudes fail with billing.ErrAmountOverflow. An empty
+// string means the provider sent no total and maps to zero.
+func parsePaddleAmount(s, currency string) (int64, error) {
 	s = strings.TrimSpace(s)
 	if s == "" {
 		return 0, nil
 	}
 
-	if !strings.Contains(s, ".") {
-		v, err := strconv.ParseInt(s, 10, 64)
-		if err != nil {
-			return 0, err
-		}
-
-		return v, nil
-	}
-
-	parts := strings.SplitN(s, ".", 2)
-	intPartStr := parts[0]
-	fracStr := parts[1]
-
-	var intPart int64
-
-	if intPartStr != "" && intPartStr != "-" {
-		v, err := strconv.ParseInt(intPartStr, 10, 64)
-		if err != nil {
-			return 0, err
-		}
-
-		intPart = v
-	}
-
-	if len(fracStr) > 2 {
-		fracStr = fracStr[:2]
-	} else if len(fracStr) < 2 {
-		fracStr += strings.Repeat("0", 2-len(fracStr))
-	}
-
-	fracVal, err := strconv.ParseInt(fracStr, 10, 64)
-	if err != nil {
-		return 0, err
-	}
-
-	if intPart < 0 || strings.HasPrefix(intPartStr, "-") {
-		if intPart < math.MinInt64/minorUnitsPerMajor {
-			return 0, ErrAmountOverflow
-		}
-
-		scaled := intPart * minorUnitsPerMajor
-		if scaled < math.MinInt64+fracVal {
-			return 0, ErrAmountOverflow
-		}
-
-		return scaled - fracVal, nil
-	}
-
-	if intPart > math.MaxInt64/minorUnitsPerMajor {
-		return 0, ErrAmountOverflow
-	}
-
-	scaled := intPart * minorUnitsPerMajor
-	if scaled > math.MaxInt64-fracVal {
-		return 0, ErrAmountOverflow
-	}
-
-	return scaled + fracVal, nil
+	return billing.ParseMinorUnits(s, currency)
 }
 
 // Refund refunds amount (in minor units) against a Paddle transaction.
@@ -295,7 +238,7 @@ func (d *driver) refund(ctx context.Context, id string, amount int64) error {
 		return fmt.Errorf("paddle: refund: get transaction: %w", err)
 	}
 
-	total, err := parsePaddleAmount(txn.Details.Totals.Total)
+	total, err := parsePaddleAmount(txn.Details.Totals.Total, string(txn.CurrencyCode))
 	if err != nil {
 		return fmt.Errorf("paddle: refund: parse total: %w", err)
 	}
@@ -314,7 +257,7 @@ func (d *driver) refund(ctx context.Context, id string, amount int64) error {
 	case amount == total:
 		req.Type = paddle.PtrTo(paddle.AdjustmentTypeFull)
 	case len(txn.Details.LineItems) == 1:
-		itemTotal, err := parsePaddleAmount(txn.Details.LineItems[0].Totals.Total)
+		itemTotal, err := parsePaddleAmount(txn.Details.LineItems[0].Totals.Total, string(txn.CurrencyCode))
 		if err != nil {
 			return fmt.Errorf("paddle: refund: parse line item total: %w", err)
 		}
@@ -324,7 +267,7 @@ func (d *driver) refund(ctx context.Context, id string, amount int64) error {
 		}
 
 		req.Type = paddle.PtrTo(paddle.AdjustmentTypePartial)
-		amt := strconv.FormatInt(amount, 10)
+		amt := billing.FormatMinorUnits(amount, string(txn.CurrencyCode))
 		req.Items = []paddle.AdjustmentItemCreate{{
 			ItemID: txn.Details.LineItems[0].ID,
 			Type:   paddle.AdjustmentItemCreateTypePartial,
@@ -420,7 +363,7 @@ func (d *driver) WebhookEvent(ctx context.Context, raw []byte, signature string)
 
 	var amount int64
 	if s := envelope.Data.Details.Totals.Total; s != "" {
-		amount, err = parsePaddleAmount(s)
+		amount, err = parsePaddleAmount(s, envelope.Data.CurrencyCode)
 		if err != nil {
 			return payment.Event{}, fmt.Errorf("paddle: webhook: parse total: %w", err)
 		}

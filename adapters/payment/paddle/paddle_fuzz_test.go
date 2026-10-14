@@ -57,37 +57,34 @@ func FuzzParsePaddleAmount(f *testing.F) {
 	f.Fuzz(func(t *testing.T, s string) {
 		t.Parallel()
 
-		_, _ = parsePaddleAmount(s)
+		_, _ = parsePaddleAmount(s, "USD")
 	})
 }
 
-// TestParsePaddleAmountKnown pins the decimal-to-minor-units contract. The
-// no-dot branch passes values through verbatim ("10" is ten minor units,
-// matching the pinned TestParsePaddleAmount/amount_10 case): whole-unit
-// totals from Paddle always carry decimals in practice, and whether a bare
-// "2500" means major or minor units is a documented follow-up, not changed
-// here.
+// TestParsePaddleAmountKnown pins the decimal-to-minor-units contract.
+// Totals are major-unit decimals: bare whole units scale x100 ("10" is a
+// thousand minor units). The grammar is strict: a present point requires
+// digits on both sides.
 func TestParsePaddleAmountKnown(t *testing.T) {
 	t.Parallel()
 
 	cases := map[string]int64{
 		"":      0,
 		"0":     0,
-		"10":    10,
+		"10":    1000,
 		"10.00": 1000,
 		"7.5":   750,
-		".5":    50,
 		"-3.5":  -350,
 	}
 
 	for in, want := range cases {
-		if got, err := parsePaddleAmount(in); err != nil || got != want {
+		if got, err := parsePaddleAmount(in, "USD"); err != nil || got != want {
 			t.Errorf("parsePaddleAmount(%q) = (%d, %v), want (%d, nil)", in, got, err, want)
 		}
 	}
 
-	for _, bad := range []string{"abc", "1e3", "10.0.0"} {
-		if got, err := parsePaddleAmount(bad); err == nil {
+	for _, bad := range []string{"abc", "1e3", "10.0.0", ".5", "1."} {
+		if got, err := parsePaddleAmount(bad, "USD"); err == nil {
 			t.Errorf("parsePaddleAmount(%q) = %d, want error", bad, got)
 		}
 	}

@@ -9,6 +9,28 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Breaking
 
+- `fix(payment)!: all adapters use minor units (cents)`: every `Amount`
+  field across `core/payment` (`Request`, `Result`) and `core/billing`
+  (`Invoice`) is now uniformly minor units, and every adapter honors it.
+  The Paddle payment adapter parses decimal totals via the shared
+  `billing.ParseMinorUnits` contract (whole units scale by the currency
+  exponent, so bare `"10"` is 1000 minor units; excess precision rounds
+  half away from zero; unrepresentable magnitudes fail with the shared
+  `billing.ErrAmountOverflow` sentinel, aliased as Paddle
+  `ErrAmountOverflow`), and partial-refund adjustment amounts now encode
+  back as major-unit decimals via the new `billing.FormatMinorUnits`
+  (1000 minor units sends `"10.00"`, not `"1000"`). The Paddle billing
+  adapter applies the same parse (bare totals such as `"4200"` now read as
+  420000 minor units). Stripe and stub adapters already passed native int64
+  minor units through and are unchanged apart from pinning tests.
+  **Breaking:** Paddle totals without decimals change value (`"2500"` was
+  2500 minor units, now 250000); truncation becomes half-away-from-zero
+  rounding (`"99.999"` was 9999, now 10000); the Paddle amount grammar is
+  strict (a present point requires digits on both sides, so `".99"` and
+  `"1."` now error); `billing.ParseMinorUnits` overflow is exact rather
+  than conservative (`"9223372036854775807"` JPY now converts instead of
+  overflowing).
+
 - `feat(gogen)!: typed saga steps`: the `gogen` backend's `<module>/saga.go`
   **Breaking:** no longer emits the untyped `SagaCaller.Call(ctx, service,
   method, in any, out any)`, the `sagaStep` helper, or `map[string]any`

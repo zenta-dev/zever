@@ -1,6 +1,10 @@
 package paddle
 
-import "errors"
+import (
+	"errors"
+
+	"github.com/zenta-dev/zever/core/billing"
+)
 
 // ErrMissingAPIKey is returned when the Paddle API key is empty.
 var ErrMissingAPIKey = errors.New("paddle: api key is required")
@@ -12,6 +16,6 @@ var ErrMissingPriceID = errors.New("paddle: meta price_id is required")
 var ErrMultiItemPartial = errors.New("paddle: partial refund requires a single line item")
 
 // ErrAmountOverflow is returned when a Paddle decimal total exceeds the int64
-// minor-units range once scaled (the whole part no longer fits after the x100
-// shift, or the final add/subtract of the fraction carries past the limit).
-var ErrAmountOverflow = errors.New("paddle: amount overflows int64 minor units")
+// minor-units range once scaled. It aliases billing.ErrAmountOverflow: all
+// adapters share one overflow sentinel for the uniform minor-units contract.
+var ErrAmountOverflow = billing.ErrAmountOverflow

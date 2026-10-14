@@ -81,8 +81,8 @@ func TestEdgeParseMinorUnits_zero(t *testing.T) {
 func TestEdgeParseMinorUnits_int64Boundaries(t *testing.T) {
 	t.Parallel()
 
-	// The overflow guard is conservative: whole must stay <= MaxInt64-1 even
-	// for zero-exponent currencies.
+	// The overflow guard is exact: the largest representable whole still
+	// converts, even for zero-exponent currencies.
 	got, err := ParseMinorUnits("9223372036854775806", "jpy")
 	if err != nil {
 		t.Fatalf("ParseMinorUnits(MaxInt64-1, jpy) err = %v", err)
@@ -91,10 +91,18 @@ func TestEdgeParseMinorUnits_int64Boundaries(t *testing.T) {
 		t.Fatalf("ParseMinorUnits(MaxInt64-1, jpy) = %d, want MaxInt64-1", got)
 	}
 
-	// MaxInt64 itself trips the guard.
-	_, err = ParseMinorUnits("9223372036854775807", "jpy")
-	if !errors.Is(err, ErrAmountOverflow) {
-		t.Fatalf("ParseMinorUnits(MaxInt64, jpy) err = %v, want ErrAmountOverflow", err)
+	got, err = ParseMinorUnits("9223372036854775807", "jpy")
+	if err != nil {
+		t.Fatalf("ParseMinorUnits(MaxInt64, jpy) err = %v", err)
+	}
+	if got != 9223372036854775807 {
+		t.Fatalf("ParseMinorUnits(MaxInt64, jpy) = %d, want MaxInt64", got)
+	}
+
+	// One past the limit trips the guard.
+	_, err = ParseMinorUnits("9223372036854775808", "jpy")
+	if !errors.Is(err, ErrMalformedAmount) && !errors.Is(err, ErrAmountOverflow) {
+		t.Fatalf("ParseMinorUnits(2^63, jpy) err = %v, want a range error", err)
 	}
 }
 

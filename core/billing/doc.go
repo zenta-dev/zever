@@ -6,6 +6,9 @@
 //
 // It owns the Billing facade plus minor-unit amount parsing and currency
 // exponents. It settles no real charges; provider adapters own transport.
+// ParseMinorUnits converts provider major-unit decimals to minor units and
+// FormatMinorUnits encodes them back; every Amount field across billing and
+// payment is minor units.
 //
 // Type safety: Billing plus typed Options plus Adapter enum plus Factory.
 // Customer, Subscription, Invoice, SubscriptionStatus and InvoiceStatus are

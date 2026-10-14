@@ -33,8 +33,8 @@ func benchServer(b *testing.B) *httptest.Server {
 		benchWriteJSON(w, txnPayload("txn_bench", "ready", "USD", "100.00", nil))
 	})
 	mux.HandleFunc("/transactions/", func(w http.ResponseWriter, _ *http.Request) {
-		benchWriteJSON(w, txnPayload("txn_full", "paid", "USD", "2500", []map[string]any{
-			{"id": "txnitm_1", "totals": map[string]any{"total": "2500"}},
+		benchWriteJSON(w, txnPayload("txn_full", "paid", "USD", "25.00", []map[string]any{
+			{"id": "txnitm_1", "totals": map[string]any{"total": "25.00"}},
 		}))
 	})
 	mux.HandleFunc("/adjustments", func(w http.ResponseWriter, _ *http.Request) {
@@ -139,7 +139,7 @@ func BenchmarkParsePaddleAmount(b *testing.B) {
 	b.ReportAllocs()
 	b.ResetTimer()
 	for b.Loop() {
-		if _, err := parsePaddleAmount("100.00"); err != nil {
+		if _, err := parsePaddleAmount("100.00", "USD"); err != nil {
 			b.Fatalf("parsePaddleAmount() = %v", err)
 		}
 	}
