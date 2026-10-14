@@ -89,6 +89,18 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Added
 
+- `feat(cli): slim adapter-scoped builds`: the new `zever build`
+  command compiles a slim CLI registering only `--adapters=a,b`
+  (bare batteries select every known adapter, `battery/adapter` pins
+  one; empty builds the full CLI). Unselected adapter packages leave
+  the binary via a `go build -overlay` of the central registration
+  list, so no build-tagged source variants are committed. Unknown
+  names fail listing the choices, `--dry-run` prints the plan, and
+  `--json` emits `{out, sizeBytes, adapters}`. A `log,router` floor
+  build measures 63 MB against the 310 MB full CLI with warm `--help`
+  at ~27 ms vs ~40 ms. The `doctor` adapters meta-check is now scoped
+  to the project's enabled batteries (nil scope still checks all),
+  so a slim binary passes its own `doctor` for its project.
 - `feat(cli): eject and drift tooling`: `zever compile` stamps every
   generated file with a provenance header (backend, CLI version, schema
   sha256; `.json` specs embed an `x-zever-generated` block instead of a
