@@ -311,19 +311,19 @@ func TestMemory_CoverTopicPromoteAndReclaim(t *testing.T) {
 	tq3.inflight = map[queue.MessageID]inflight{}
 	tq3.visHeap = visibilityHeap{}
 	id := queue.NewMessage("cover-id", nil, nil).ID
-	tq3.visHeap = append(tq3.visHeap, &visibilityEntry{id: id, deadline: time.Now().Add(-time.Second)})
+	tq3.visHeap = append(tq3.visHeap, visibilityEntry{id: id, deadline: time.Now().Add(-time.Second)})
 	tq3.reclaimFromHeap(time.Now())
 	// cover deadline mismatch branch
 	msg := queue.NewMessage("t", queue.Payload([]byte("x")), nil)
 	tq3.inflight[id] = inflight{msg: msg, deadline: time.Now().Add(-2 * time.Second)}
-	tq3.visHeap = visibilityHeap{&visibilityEntry{id: id, deadline: time.Now().Add(-time.Second)}}
+	tq3.visHeap = visibilityHeap{visibilityEntry{id: id, deadline: time.Now().Add(-time.Second)}}
 	tq3.reclaimFromHeap(time.Now().Add(time.Second))
 	// cover heap.Push requeue else branch (216)
 	tq3 = newTopicQueue()
 	id2 := queue.NewMessage("cover-id", nil, nil).ID
 	future := time.Now().Add(time.Hour)
 	tq3.inflight[id2] = inflight{msg: msg, deadline: future}
-	tq3.visHeap = visibilityHeap{&visibilityEntry{id: id2, deadline: future}}
+	tq3.visHeap = visibilityHeap{visibilityEntry{id: id2, deadline: future}}
 	tq3.reclaimFromHeap(time.Now())
 	if tq3.visHeap.Len() != 1 {
 		t.Errorf("visHeap len = %d, want 1 (requeued)", tq3.visHeap.Len())
@@ -424,7 +424,7 @@ func TestMemory_CoverVisibilityReclaimAndFallback(t *testing.T) {
 	t.Parallel()
 	tq := newTopicQueue()
 	// cover reclaimFromMap heap non-empty false (226)
-	tq.visHeap = append(tq.visHeap, &visibilityEntry{id: queue.NewMessage("cover-id", nil, nil).ID, deadline: time.Now()})
+	tq.visHeap = append(tq.visHeap, visibilityEntry{id: queue.NewMessage("cover-id", nil, nil).ID, deadline: time.Now()})
 	tq.inflight[queue.NewMessage("cover-id", nil, nil).ID] = inflight{msg: queue.NewMessage("t", nil, nil), deadline: time.Now()}
 	if got := tq.reclaimFromMap(time.Now()); got {
 		t.Errorf("reclaimFromMap with heap not empty = true, want false")
@@ -433,7 +433,7 @@ func TestMemory_CoverVisibilityReclaimAndFallback(t *testing.T) {
 	id := queue.NewMessage("cover-id", nil, nil).ID
 	msg := queue.NewMessage("t", queue.Payload([]byte("x")), nil)
 	tq2.inflight[id] = inflight{msg: msg, deadline: time.Now().Add(-time.Second)}
-	tq2.visHeap = append(tq2.visHeap, &visibilityEntry{id: id, deadline: time.Now().Add(-time.Second)})
+	tq2.visHeap = append(tq2.visHeap, visibilityEntry{id: id, deadline: time.Now().Add(-time.Second)})
 	tq2.reclaimExpired(time.Second)
 	// cover signalSpace default when full
 	tq3 := newTopicQueue()
@@ -497,7 +497,7 @@ func TestMemory_CoverReclaimHeapPushBack(t *testing.T) {
 	msg := queue.NewMessage("t", queue.Payload([]byte("x")), nil)
 	future := time.Now().Truncate(time.Millisecond)
 	tq.inflight[id] = inflight{msg: msg, deadline: future}
-	tq.visHeap = append(tq.visHeap, &visibilityEntry{id: id, deadline: future})
+	tq.visHeap = append(tq.visHeap, visibilityEntry{id: id, deadline: future})
 	reclaimed := tq.reclaimFromHeap(future)
 	if reclaimed {
 		t.Errorf("reclaimFromHeap at exact deadline = true, want false")

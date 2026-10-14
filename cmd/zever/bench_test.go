@@ -33,6 +33,22 @@ func BenchmarkClosest(b *testing.B) {
 	}
 }
 
+// BenchmarkHelpStartup measures in-process `--help` execution: the CLI
+// cold-start path (root construction + Cobra execute + template render).
+func BenchmarkHelpStartup(b *testing.B) {
+	b.ReportAllocs()
+	b.ResetTimer()
+	for i := 0; i < b.N; i++ {
+		root := newRootCmd()
+		root.SetArgs([]string{"--help"})
+		root.SetOut(io.Discard)
+		root.SetErr(io.Discard)
+		if err := root.Execute(); err != nil {
+			b.Fatalf("root --help Execute: %v", err)
+		}
+	}
+}
+
 // BenchmarkRunFmtWith measures the check-only schema formatting path over an
 // already-canonical .zen file (parse + render, no write).
 func BenchmarkRunFmtWith(b *testing.B) {

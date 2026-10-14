@@ -166,7 +166,7 @@ func (t *topicQueue) reclaimFromHeap(now time.Time) bool {
 		}
 
 		raw := heap.Pop(&t.visHeap)
-		entry, ok := raw.(*visibilityEntry)
+		entry, ok := raw.(visibilityEntry)
 		if !ok {
 			continue
 		}
@@ -246,7 +246,7 @@ func (t *topicQueue) tryPopReady(vis time.Duration) (queue.Message, bool) {
 		deadline: deadline,
 	}
 
-	heap.Push(&t.visHeap, &visibilityEntry{id: msg.ID, deadline: deadline})
+	heap.Push(&t.visHeap, visibilityEntry{id: msg.ID, deadline: deadline})
 
 	return msg.Clone(), true
 }

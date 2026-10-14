@@ -48,6 +48,10 @@ func printDoctorUsage(fs *flag.FlagSet) {
 		"the CLI with a note. Without a project config every battery is",
 		"checked, also with a note.",
 		"",
+		"Shared-pool MaxConns mismatches (a borrower capped differently",
+		"from the first opener) print as pool warnings with the",
+		"dedicated_pool fix hint; they never fail the command.",
+		"",
 		"Exit codes: 0 all OK, 1 failures, 2 flag misuse.",
 		"",
 		bold("Flags:"),
@@ -327,6 +331,7 @@ func runDoctorWithContext(ctx context.Context, cfg DoctorConfig) error {
 	scope := resolveDoctorScope(cfg.ConfigPath)
 
 	var rows []doctorRow
+	local := false
 	if scope.serverEntry != "" {
 		if rep, rerr := runServerDoctor(ctx, scope.serverEntry); rerr == nil {
 			rows = serverDoctorRows(resolved, rep, scope.enabled)
@@ -334,10 +339,25 @@ func runDoctorWithContext(ctx context.Context, cfg DoctorConfig) error {
 			scope.note = fmt.Sprintf("checked via built server entrypoint %s --doctor (real container + registrations)", scope.serverEntry)
 		} else {
 			rows = localDoctorRows(c, resolved, scope.enabled)
+			local = true
 			scope.note = fmt.Sprintf("built server unavailable (%s) — checked via CLI registry", shortDoctorErr(rerr))
 		}
 	} else {
 		rows = localDoctorRows(c, resolved, scope.enabled)
+		local = true
+	}
+
+	// poolWarnings surfaces shared-pool MaxConns mismatches recorded while
+	// resolving the batteries above (see container.PoolMismatches): a
+	// borrower whose cap differs from the first opener's is silently
+	// capped today, so doctor repeats the warning with the dedicated_pool
+	// fix hint. Only the local path resolves through c; a built server
+	// reports its own pools via its --doctor output.
+	var poolWarnings []string
+	if local {
+		for _, m := range c.PoolMismatches() {
+			poolWarnings = append(poolWarnings, m.String())
+		}
 	}
 
 	failed := false
@@ -361,6 +381,9 @@ func runDoctorWithContext(ctx context.Context, cfg DoctorConfig) error {
 	if scope.note != "" {
 		data["note"] = scope.note
 	}
+	if len(poolWarnings) > 0 {
+		data["pool_warnings"] = poolWarnings
+	}
 
 	if cfg.JSON {
 		if failed {
@@ -380,6 +403,9 @@ func runDoctorWithContext(ctx context.Context, cfg DoctorConfig) error {
 
 	if scope.note != "" {
 		_, _ = fmt.Fprintln(out, dim("note: ")+scope.note)
+	}
+	for _, w := range poolWarnings {
+		_, _ = fmt.Fprintln(out, dim("note: ")+w)
 	}
 
 	// Styled table with padded battery column.

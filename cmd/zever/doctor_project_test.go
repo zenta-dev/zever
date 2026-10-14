@@ -295,6 +295,68 @@ func TestDoctorJSONProjectEnvelope(t *testing.T) {
 	}
 }
 
+// TestDoctorSurfacesPoolMismatch proves the P5-5 diagnostics path: cache
+// (db-backed, same sqlite file) resolves before db alphabetically and opens
+// the shared pool with the default cap; db's explicit max_conns then
+// mismatches, and doctor prints the pool warning with the dedicated_pool
+// hint without failing the command.
+func TestDoctorSurfacesPoolMismatch(t *testing.T) {
+	dir := t.TempDir()
+	file := filepath.Join(dir, "shared.db")
+	fixture := "cache:\n  adapter: db\n  options:\n    dsn: " + file + "\ndb:\n  adapter: sqlite\n  options:\n    path: " + file + "\n    max_conns: 5\n"
+	cfgPath := writeInspectFixture(t, dir, "zever.yaml", fixture)
+
+	var out bytes.Buffer
+	if err := runDoctorWith(DoctorConfig{ConfigPath: cfgPath, Out: &out}); err != nil {
+		t.Fatalf("runDoctorWith shared-pool fixture: %v", err)
+	}
+
+	got := out.String()
+	if !strings.Contains(got, "pool: db wants max_conns=5") {
+		t.Fatalf("output lacks the pool mismatch warning:\n%s", got)
+	}
+
+	if !strings.Contains(got, "dedicated_pool") {
+		t.Fatalf("pool warning lacks the fix hint:\n%s", got)
+	}
+
+	if strings.Contains(got, "shared.db") {
+		t.Fatalf("pool warning leaks the path:\n%s", got)
+	}
+}
+
+// TestDoctorJSONCarriesPoolWarnings proves the same mismatch reaches the
+// JSON envelope as data.pool_warnings while the command still exits 0.
+func TestDoctorJSONCarriesPoolWarnings(t *testing.T) {
+	jbuf := mustJSONMode(t)
+
+	dir := t.TempDir()
+	file := filepath.Join(dir, "shared.db")
+	fixture := "cache:\n  adapter: db\n  options:\n    dsn: " + file + "\ndb:\n  adapter: sqlite\n  options:\n    path: " + file + "\n    max_conns: 5\n"
+	cfgPath := writeInspectFixture(t, dir, "zever.yaml", fixture)
+
+	var human bytes.Buffer
+	if err := runDoctorWith(DoctorConfig{ConfigPath: cfgPath, Out: &human, JSON: true}); err != nil {
+		t.Fatalf("runDoctorWith JSON shared-pool fixture: %v", err)
+	}
+
+	env := mustDecodeEnvelope(t, jbuf)
+	if !env.OK || env.Command != "doctor" || env.ExitCode != ExitOK {
+		t.Fatalf("envelope = %+v, want ok doctor envelope (warnings never fail)", env)
+	}
+
+	data := envelopeData(t, env)
+	warns, ok := data["pool_warnings"].([]any)
+	if !ok || len(warns) != 1 {
+		t.Fatalf("data.pool_warnings = %v, want 1 warning", data["pool_warnings"])
+	}
+
+	line, _ := warns[0].(string)
+	if !strings.Contains(line, "dedicated_pool") {
+		t.Fatalf("pool warning = %q, want the fix hint", line)
+	}
+}
+
 // TestDecodeServerDoctorReport pins the server --doctor JSON contract the CLI
 // parses, including malformed output failing closed.
 func TestDecodeServerDoctorReport(t *testing.T) {

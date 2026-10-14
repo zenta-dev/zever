@@ -215,7 +215,12 @@ search:
 - Single cap: the shared pool is built with the **first opener's** pool
   knobs; later borrowers' pool knobs are ignored (their table names,
   prefixes, TTLs still apply). A nonzero `MaxConns` differing from the
-  pool's warns on stderr naming the service, never the DSN.
+  pool's warns on stderr naming the service, never the DSN. Every
+  mismatch is also recorded: `Container.PoolMismatches()` returns them in
+  borrow order and `Container.PoolStatus()` describes each shared pool
+  (backend, borrowers, effective cap) with no DSN content. `zever doctor`
+  prints both as `pool:` warnings (plus `pool_warnings` in `--json`)
+  with the `dedicated_pool` fix hint; warnings never fail the command.
 - Borrowers keep `owns=false`: their `Close` stays a no-op and the
   registry closes each pool once, after every borrower.
 - Observability follows the redaction rule: log lines carry only the
@@ -223,7 +228,14 @@ search:
   errors are prefixed `container: <service> (shared pool): ...`.
 - Escape hatch: queue, workflow, and scheduler under sustained load should
   run with `dedicated_pool: true` and, for full isolation, a **separate
-  database** (distinct DSN), per the Solid Queue guidance.
+  database** (distinct DSN), per the Solid Queue guidance. Rule of thumb:
+  share the pool while the three are idle-to-light (one pool, one cap to
+  tune); split to `dedicated_pool: true` when any one of them sustains
+  backlog — a long-polling queue worker, a workflow with parallel fan-out,
+  or a scheduler with sub-minute cadences can starve the others under a
+  single cap, and pool-wait latency shows up as queue `Pop`/`Ack`
+  slowness, not as an error. A `zever doctor` pool warning naming one of
+  these three is the signal to split that service first.
 - WAL stays opt-in for shared sqlite files
   (`?_pragma=journal_mode(WAL)`); sharing does not change journal mode.
 

@@ -169,6 +169,71 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   and target versions (fetched once, cached under the user cache dir).
    `--dry-run` prints the plan without writing, fetching, or tidying;
    `--check` prints the available version only.
+- `feat(breaking): index, relation, enum, job, schedule, saga, default
+  detection`: the schema comparator now covers the extended structural
+  set. Enum removal and value removal are breaking (pure additions and
+  reorders are not); removing an index is informational while adding a
+  unique one is breaking; relation removal or shape change is breaking;
+  adding a field default is informational but removing or changing one is
+  breaking; job removal or param change is breaking (queue/retry retunes
+  are not); schedule removal is breaking (cron/dispatch retunes are not);
+  saga removal or any step change is breaking. `zever breaking` picks the
+  new kinds up with no command changes (it renders kinds generically).
+- `test(mcp): backend coverage 74% to 93%`: message returns, inline
+  enums, `TJSON` fields, ref-typed fields, unknown-enum and empty-ref
+  fail-closed paths, the full scalar table, and server-embed round-trip
+  are now covered, clearing the P5-7 90% bar.
+- `test(fuzz): gogen router input, webhook verifiers, config env parse`:
+  new fuzz targets prove no-panic (plus invariant) behavior for import
+  classification, route-param extraction, and the resource-ID expression
+  picker (`dsl/backend/gogen`); Stripe/Paddle `WebhookEvent` signature
+  paths and Paddle amount parsing; and the config env overlay's
+  reflection path including its no-secret-in-errors scrubbing. Each ran a
+  10–20s burst clean (0.5–1.4M execs); failure seeds stay as regression
+  corpus under `testdata/fuzz`. Follow-up noted, not changed: whole-unit
+  Paddle totals (`"10"`) pass through verbatim as minor units while
+  `"10.00"` scales — pinned by existing tests, needs maintainer call.
+- `perf(queue/memory): cut round-trip allocs 16 to 11 per op`: three hot-path
+  fixes from a `-benchmem`/`memprofile` pass over the cache/queue adapters.
+  Push no longer builds its 50ms backpressure timer before checking capacity
+  (fast path returns first); Pop builds its poll timer lazily on the first
+  miss instead of per call (timeout now measured from first miss — same or
+  more generous, never a spurious Empty); the visibility heap stores entries
+  by value instead of pointers (one fewer heap alloc per Pop). Measured
+  `BenchmarkMemoryRoundTripParallel` 16→11 allocs/op, 2059→1826 B/op.
+  Deliberately deferred (documented follow-ups): per-iteration topic
+  sweep-then-recreate churn, `msgspan`/`traceprop` per-Push span costs,
+  `Message.Clone` payload/header copies, and cache-memory allocs which sit
+  inside `shared/lrucache`, not the adapter.
+- `ci: non-gating benchmark trend for orm and container`: new
+  `.github/workflows/bench.yml` runs `bench-orm` and `bench-container`
+  jobs plus a best-effort `benchstat` compare on PRs touching either
+  module, pushes to main, and weekly. Every job sets
+  `continue-on-error: true` and the workflow stays out of required
+  checks, so benchmark noise never gates a merge; results upload as
+  artifacts (90-day retention). A syntax test pins the job names and the
+  non-gating flag.
+- `feat(container): pool mismatch diagnostics in doctor`: shared-pool
+  `MaxConns` mismatches (borrower cap ignored in favor of the first
+  opener's) are now recorded, not just warned on stderr: new
+  `Container.PoolMismatches()` (borrow order) and `Container.PoolStatus()`
+  (backend, borrowers, effective cap), both DSN-free. `zever doctor`
+  prints them as `pool:` warnings with the `dedicated_pool: true` fix
+  hint (plus `pool_warnings` in `--json`); warnings never fail the
+  command. Container README gains `dedicated_pool` guidance for
+  queue/workflow/scheduler (share while idle-to-light, split on backlog;
+  a pool warning naming one of the three is the signal).
+- `perf(cli): cold-start measurement and startup budget`: in-process
+  `--help` is now benchmarked (`BenchmarkHelpStartup`: ~99µs/op, 69KB/op,
+  625 allocs/op on 2026-10-14 hardware) and capped by a deterministic
+  allocation threshold (`TestHelpStartupAllocs`, 1500 allocs) next to the
+  existing 200ms wall-clock budget. Release-style binary measured at
+  309 MB / ~60–90 ms warm start, dominated by binary load and transitive
+  deps (sqlite, TUI, FIPS tables) rather than Cobra dispatch; numbers and
+  repro commands live under "Cold start & binary size" in the benchmarks
+  reference. A `zever build --adapters=a,b` slim-CLI flag is deferred as
+  a follow-up (registration/doctor/scaffold would all need build-tagged
+  variants for little saving while sqlite+TUI stay linked).
 - `feat(auth/jwt): kid-based key rotation and nbf validation`: `JWTOptions`
   gains `keys: [{kid, secret}]` plus `active_kid` (empty defaults to the
   first entry; validated for unique kids, secret length, and a matching
