@@ -16,11 +16,12 @@ import (
 // a file named "-h").
 func newInspectCmds() []*cobra.Command {
 	compileCmd := &cobra.Command{
-		Use:   "compile [--backend atlas,gogen,mcp,openapi,proto,protogogen,zenorm] [--out DIR] <files...>",
+		Use:   "compile [--backend atlas,gogen,mcp,openapi,proto,protogogen,zenorm] [--out DIR] [--check] <files...>",
 		Short: "Compile .zen schemas through backends",
 		Long:  "Compile .zen schema files through one or more backends, writing each backend's output under <out>/<backend>/.",
 		Example: `  zever compile schema/app.zen --backend=proto
   zever compile --backend=zenorm,proto,atlas,openapi schema/*.zen --out ./generated
+  zever compile --check --out ./generated schema/*.zen
   zever compile -i`,
 		DisableFlagParsing: true,
 		RunE: func(cmd *cobra.Command, args []string) error {
@@ -41,6 +42,7 @@ func newInspectCmds() []*cobra.Command {
 	// for execution.
 	compileCmd.Flags().String("backend", defaultBackends(), "comma-separated list of backends to run (available: "+backendNames()+")")
 	compileCmd.Flags().String("out", "./generated", "output directory for generated files")
+	compileCmd.Flags().Bool("check", false, "verify committed output matches a fresh compile (exit 1 on drift, write nothing)")
 
 	checkCmd := &cobra.Command{
 		Use:   "check <files...>",

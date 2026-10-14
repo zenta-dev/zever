@@ -82,7 +82,13 @@ Inspection / Runtime / Database / Operations).
   never prompts and scaffolds the floor set (`log`+`router`) plus whatever
   `--batteries a,b` and `--adapters b=a` select; `-y` / `--yes` skips all
    prompts, `--list-batteries` prints the battery/default-adapter table and
-   exits.
+   exits. `--profile minimal|api|full` scaffolds a start-small preset
+  (explicit `--batteries` add to it).
+- **`zever compile --check`**: verifies the committed `generated/` tree
+  matches a fresh compile (exit `1` naming `missing`/`differs`/`extra`
+  files, writes nothing) — the CI drift gate for projects that commit
+  generated output. Every scaffolded `.github/workflows/ci.yml`
+  regenerates from the schema and then runs `--check`.
 - `zever new --module PATH`: Go module path for the new project (default:
   the app name itself).
 - `zever new --dir PATH`: output directory (default `./<name>`).

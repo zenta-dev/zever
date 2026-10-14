@@ -89,6 +89,25 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Added
 
+- `feat(cli): eject and drift tooling`: `zever compile` stamps every
+  generated file with a provenance header (backend, CLI version, schema
+  sha256; `.json` specs embed an `x-zever-generated` block instead of a
+  comment so parsers keep working), and the new `zever compile --check`
+  flag exits 1 naming `missing`/`differs`/`extra` files when committed
+  output no longer matches the schema — the CI drift gate. `zever new`
+  scaffolds `.github/workflows/ci.yml` (regenerate, `--check`, build,
+  test), and the new "Customizing and leaving zever" docs page covers
+  standalone `orm`/`core/*` use, custom backends, generated-vs-owned, and
+  the eject path. `make compile-check` (wired into `make check`) plus a
+  CI `drift` job enforce it over `examples/todo`.
+- `feat(cli): start-small profiles`: `zever new --profile
+  minimal|api|full` scaffolds a preset adapter set — `minimal` is the
+  bootable floor only, `api` adds cache/queue/session/password/scheduler/
+  outbox/idempotency/lock, `full` wires every known battery. Explicit
+  `--batteries` add to the preset and `--adapters` override its picks;
+  `--list-batteries` prints the presets too. Measured footprints
+  (`go list -deps ./...` packages, stdlib included): minimal 450, api
+  492, full 649; direct requires 22/38/82.
 - `feat(gogen): typed pagination`: `paginated: true` operations now generate
   an opaque `Cursor` string type, a generic `Page[T]` (`Items` plus
   `NextCursor`), and `DefaultPageLimit` (20) / `MaxPageLimit` (100) bounds in
@@ -123,8 +142,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   `ratelimit.Options` gains `trusted_proxies` (CIDRs or bare IPs,
   validated by `ratelimit.ParseTrustedProxies`, mirrored as
   `middleware.ParseTrustedProxies` and in the config JSON schema); the
-  generated server builds the key from it and keeps `RemoteAddrKey`
-   when none are configured. `RemoteAddrKey` itself is unchanged.
+   generated server builds the key from it and keeps `RemoteAddrKey`
+    when none are configured. `RemoteAddrKey` itself is unchanged.
 - `feat(orm): auto-chunk large IN lists`: a value-list `IN` larger than
   the resolved dialect's per-statement parameter budget now fans out into
   one statement per chunk for plain unordered unbounded `SELECT`s (rows
@@ -140,7 +159,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   `NOT IN`. `Preload` sizes its child-`IN` chunks against the same budget
   (minus the child query's own arguments), so old-SQLite backends get
   fitting statements instead of driver errors; the 1000 default stands on
-   modern backends.
+  modern backends.
 - `docs: recommend stdhttp as the default router`: the routing guide now
   recommends `stdhttp` (already the `zever new` default) with measured
   numbers, and the benchmarks page gains a 2026-10-14 re-measurement:
