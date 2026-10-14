@@ -16,6 +16,9 @@ type Options struct {
 	// AllowInsecure permits a plain-http Vault Addr for test setups.
 	// Default false (https only).
 	AllowInsecure bool `json:"allow_insecure" toml:"allow_insecure" yaml:"allow_insecure"`
+	// AllowInsecureTokenFilePerms permits a Vault TokenFile readable
+	// beyond its owner. Default false (0600 or stricter required).
+	AllowInsecureTokenFilePerms bool `json:"allow_insecure_token_file_perms" toml:"allow_insecure_token_file_perms" yaml:"allow_insecure_token_file_perms"`
 	// ProjectID is the GCP project ID.
 	ProjectID string `json:"project_id" toml:"project_id" yaml:"project_id"`
 	// Prefix scopes secret names to one namespace.

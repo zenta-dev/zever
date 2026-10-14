@@ -43,10 +43,13 @@ func New(opts Options) (secrets.Secrets, error) {
 	if opts.AllowInsecure {
 		slog.Default().Warn("vault: allow_insecure enabled: token is sent over plain http; test setups only")
 	}
+	if strings.TrimSpace(opts.Token) == "" && opts.AllowInsecureTokenFilePerms && tokenFilePermsInsecure(opts.TokenFile) {
+		slog.Default().Warn("vault: allow_insecure_token_file_perms enabled: token file is readable by other users; restrict it to 0600")
+	}
 	return &driver{
 		baseURL:   strings.TrimRight(strings.TrimSpace(opts.Addr), "/"),
 		token:     token,
-		mount:     strings.Trim(strings.TrimSpace(opts.Mount), "/"),
+		mount:     escapeMount(opts.Mount),
 		namespace: strings.TrimSpace(opts.Namespace),
 		client:    newHTTPClient(),
 	}, nil
@@ -88,6 +91,19 @@ func (d *driver) request(ctx context.Context, method, path string, body any) (*h
 		req.Header.Set("Content-Type", "application/json")
 	}
 	return req, nil
+}
+
+// escapeMount encodes each slash-separated mount segment for safe
+// interpolation into the request path. Separators survive so nested mounts
+// keep working; reserved characters (% ? # and friends) are encoded so a
+// crafted mount cannot shift path segments. Validate rejects empty and dot
+// segments up front, so the join never produces ambiguous paths.
+func escapeMount(mount string) string {
+	segs := strings.Split(strings.Trim(strings.TrimSpace(mount), "/"), "/")
+	for i, s := range segs {
+		segs[i] = url.PathEscape(s)
+	}
+	return strings.Join(segs, "/")
 }
 
 func (d *driver) dataPath(name string) string {
