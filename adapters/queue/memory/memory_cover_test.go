@@ -318,7 +318,7 @@ func TestMemory_CoverTopicPromoteAndReclaim(t *testing.T) {
 	tq3.inflight[id] = inflight{msg: msg, deadline: time.Now().Add(-2 * time.Second)}
 	tq3.visHeap = visibilityHeap{visibilityEntry{id: id, deadline: time.Now().Add(-time.Second)}}
 	tq3.reclaimFromHeap(time.Now().Add(time.Second))
-	// cover heap.Push requeue else branch (216)
+	// cover heap push-back requeue else branch (216)
 	tq3 = newTopicQueue()
 	id2 := queue.NewMessage("cover-id", nil, nil).ID
 	future := time.Now().Add(time.Hour)

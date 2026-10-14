@@ -374,6 +374,21 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   strict decoding stays strict. Known secret option fields across
   `core/*/options.go` (API keys, tokens, passwords, webhook secrets, HMAC/
   signing keys, AWS key pairs, crypto keys) are tagged.
+- `perf(queue/memory): cut round-trip allocs 12 to 1 per op`: the P5-8
+  follow-up pass over the documented leftovers. Drained topics are retained
+  instead of sweep-deleted and recreated per message (channels and maps
+  reused; the sweep still deletes promoter topics so their quit channel
+  closes, and now resets the retained heap/ready window since every leftover
+  heap entry references a gone inflight id); the ready list pops via a head
+  index instead of reslicing past the front (which shrank capacity and forced
+  the next Push to reallocate); the visibility heap is hand-rolled instead of
+  `container/heap` (whose `any` Push/Pop boxed one entry per Pop). Measured
+  `BenchmarkMemoryRoundTrip` 12→1 allocs/op, 1984→16 B/op (parallel
+  10/11→1). Deliberately deferred: `Message.Clone`'s payload copy (the last
+  alloc, pinned by `TestMemory_CloneIsolation`), `msgspan` wired-provider
+  spans (18 allocs/op when telemetry is wired, 0 on the default nil-provider
+  path), `traceprop` inject/extract (nil-path 0), and `shared/lrucache`
+  (0 allocs/op steady-state on every bench).
 
 ### Fixed
 
@@ -446,6 +461,14 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   keeps working. The unknown-command usage text now lists `docs` and
   `completion`, and `zever --help` shares the same `zever — zever toolkit`
   header as the unknown-command usage.
+- `fix(cmd/zever): parallel-safe agent catalog tests`: `agentCommands`,
+  `agentGlobalFlags`, and `printAgentHelp` gain `*On` variants taking the
+  Cobra tree explicitly (mirroring `topLevelNames`), and
+  `TestPrintAgentHelp`/`TestUninstallUpgradeWiring` run `t.Parallel`
+  against fresh per-test trees. `cobra.Command.Commands` sorts the tree's
+  children in place, so parallel reads of the shared `rootCmd` global race
+  (reproduced with a throwaway parallel test under `-race`); production
+  output is unchanged.
 
 ### Security
 

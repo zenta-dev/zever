@@ -1017,21 +1017,19 @@ func TestMemory_VisibilityHeap(t *testing.T) {
 func testHeap(t *testing.T) {
 	t.Helper()
 	h := visibilityHeap{}
-	h.Push(visibilityEntry{deadline: time.Now().Add(10 * time.Millisecond)})
-	h.Push(visibilityEntry{deadline: time.Now().Add(5 * time.Millisecond)})
+	h.push(visibilityEntry{deadline: time.Now().Add(10 * time.Millisecond)})
+	h.push(visibilityEntry{deadline: time.Now().Add(5 * time.Millisecond)})
 	if h.Len() != 2 {
 		t.Fatalf("heap Len %d want 2", h.Len())
 	}
-	if !h.Less(1, 0) {
-		t.Fatalf("Less(1, 0) = false, want true")
+	if got := h.pop(); got.deadline.After(time.Now().Add(6 * time.Millisecond)) {
+		t.Fatalf("pop deadline %v want the earlier entry", got.deadline)
 	}
-	h.Swap(0, 1)
-	if h[0].deadline.After(h[1].deadline) {
-		t.Fatalf("Swap failed")
+	if h.Len() != 1 {
+		t.Fatalf("heap Len %d want 1", h.Len())
 	}
-	v := h.Pop()
-	if v == nil {
-		t.Fatalf("Pop nil")
+	if got := h.peek(); got.deadline.Before(time.Now()) {
+		t.Fatalf("peek deadline %v want the later entry", got.deadline)
 	}
 }
 

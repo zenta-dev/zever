@@ -163,10 +163,13 @@ func TestAgentHelpRequested(t *testing.T) {
 }
 
 func TestPrintAgentHelp(t *testing.T) {
-	// Sequential: agentCommands reads the shared rootCmd global and
-	// cobra.Command.Commands sorts in place, which races under t.Parallel.
+	t.Parallel()
+
+	// Fresh tree per test: agentCommandsOn reads via cobra.Command.Commands,
+	// which sorts the tree's children in place and races on the shared
+	// rootCmd global under t.Parallel.
 	var buf bytes.Buffer
-	printAgentHelp(&buf)
+	printAgentHelpOn(&buf, newRootCmd())
 
 	var catalog struct {
 		Commands []struct {
