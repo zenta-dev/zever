@@ -9,7 +9,36 @@ import (
 	"path/filepath"
 	"strings"
 	"testing"
+
+	"github.com/zenta-dev/zever/core/crypto"
 )
+
+// TestDevEnvTable proves devEnv trims and case-folds ZEVER_ENV and agrees
+// with core/crypto.DevKeyAllowed on the same input.
+func TestDevEnvTable(t *testing.T) {
+	cases := []struct {
+		v    string
+		want bool
+	}{
+		{" Dev ", true},
+		{"DEVELOPMENT", true},
+		{"test\n", true},
+		{"prod", false},
+		{"", false},
+	}
+	for _, c := range cases {
+		v, want := c.v, c.want
+		t.Setenv("ZEVER_ENV", v)
+
+		if got := devEnv(); got != want {
+			t.Errorf("devEnv() with ZEVER_ENV=%q = %v, want %v", v, got, want)
+		}
+
+		if got := crypto.DevKeyAllowed(crypto.Options{}); got != want {
+			t.Errorf("DevKeyAllowed with ZEVER_ENV=%q = %v, want %v", v, got, want)
+		}
+	}
+}
 
 // --- shared scaffolding test helpers (server, worker and seed) ---
 //
