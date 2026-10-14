@@ -457,6 +457,22 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Bump the pinned `golangci-lint` from `v2.13.2` to `v2.14.0` (the old
   linter cannot read `go1.27.2` export data); the CI binary cache is now
   keyed on `go.work` so future toolchain bumps rebuild it.
+- `fix(security): P2-11 audit follow-ups`: the vault secrets adapter now
+  requires an `https` Addr (the token travels in `X-Vault-Token`, so plain
+  http sends it in cleartext); test setups opt into plain http explicitly
+  with `allow_insecure: true`, which logs a warning at open. Round-trips
+  use a client with a TLS 1.2 floor. The kms crypto adapter propagates
+  Key/SignKey base64 decode errors as `ErrInvalidKey` instead of deriving
+  keys from empty material, and `Sign`/`Verify` fail with `ErrKeyNotFound`
+  on a missing or malformed private key instead of panicking. The ffmpeg
+  media toolkit emits `--` before output paths (and at the exec boundary),
+  rejects flag-looking inputs/outputs before exec, allowlists probe inputs
+  via `ValidatePath` (`media.KindForExt`), bounds runs with
+  `DefaultProbeTimeout`/`DefaultTranscodeTimeout` when the caller sets no
+  deadline, and checks successful outputs against
+  `DefaultMaxOutputBytes`. `core/session` gains a `Rotate` helper for
+  post-login ID rotation (fixation defense) with no `Store` interface
+  change.
 
 ### Tests
 
