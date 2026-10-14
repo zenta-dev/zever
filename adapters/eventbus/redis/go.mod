@@ -3,7 +3,7 @@ module github.com/zenta-dev/zever/adapters/eventbus/redis
 go 1.27.2
 
 require (
-	github.com/alicebob/miniredis/v2 v2.39.0
+	github.com/alicebob/miniredis/v2 v2.40.0
 	github.com/redis/go-redis/v9 v9.23.0
 	github.com/zenta-dev/zever/core/eventbus v0.6.1
 	github.com/zenta-dev/zever/core/observability v0.6.1
