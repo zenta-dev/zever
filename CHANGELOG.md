@@ -7,6 +7,22 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Fixed
+
+- `fix(cli): resolve the CLI version from ldflags, build info, or VERSION`:
+  `zever -V`, `zever new` pins, and generated-file stamps no longer rely on a
+  hardcoded constant that lagged the release tags. The version now comes from
+  `-ldflags "-X main.cliVersion=..."` (release workflow and `make
+  build-release`), then the `go install module@vX.Y.Z` build info, then
+  `cmd/zever/VERSION` (now `0.7.0`), which `tools/tag-release.sh` requires to
+  match before tagging. `make version-check` (part of `make check`) fails when
+  that file is lower than the newest `cmd/zever/v*` tag.
+- `fix(cli): zever compile --check ignores the stamped CLI version`: a zever
+  upgrade alone no longer reports every generated file as drifted. Files that
+  differ only in the stamp version pass with a note (`stampVersionOnly` in
+  `--json`); the new `--strict` flag fails on them. Schema hash and content
+  changes still fail.
+
 ### Breaking
 
 - `fix(payment)!: normalize Paddle whole-unit amounts to minor units`:

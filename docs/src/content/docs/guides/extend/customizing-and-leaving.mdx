@@ -54,6 +54,8 @@ zever compile --check --backend=zenorm,openapi,atlas --out ./generated schema/*.
 zever compile: generated output differs in 2 file(s) (atlas/schema.hcl (differs), zenorm/orm/gen/app/app.go (missing)); run 'zever compile' and commit the result
 ```
 
+Each generated file carries a provenance stamp naming the zever release that wrote it and the schema hash. `--check` ignores the release version in that stamp, so upgrading the CLI does not make every committed file look drifted: the schema hash and every other byte still compare exactly. When files differ only in the stamped version, `--check` passes and prints a note (the `--json` envelope lists them under `stampVersionOnly`); run `zever compile` to refresh the stamps, or add `--strict` to make that case fail too.
+
 Every scaffolded project's CI (`.github/workflows/ci.yml`) regenerates from the schema and then runs `--check`, proving the compile is deterministic; if you commit `generated/`, drop the regenerate step and `--check` alone fails the build on drift. The repo's own `make compile-check` (part of `make check`) runs the same gate over `examples/todo`.
 
 <Aside type="tip">

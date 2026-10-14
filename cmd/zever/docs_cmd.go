@@ -47,7 +47,7 @@ agent skill for zever) instead.`,
 				Title:   "ZEVER",
 				Section: "1",
 				Date:    &headerDate,
-				Source:  "zever v" + cliVersion,
+				Source:  "zever v" + buildVersion,
 				Manual:  "zever manual",
 			}
 			if err := doc.GenManTree(root, header, dir); err != nil {

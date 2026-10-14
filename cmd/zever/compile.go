@@ -61,6 +61,9 @@ type CompileConfig struct {
 	Out      io.Writer
 	JSON     bool
 	Check    bool
+	// Strict makes --check also fail when committed files differ only in the
+	// CLI-version field of their generated stamp.
+	Strict bool
 }
 
 // outOrStdout resolves the effective stdout writer for a command config.
@@ -187,7 +190,8 @@ func newCompileFlagSet() *flag.FlagSet {
 	fs := flag.NewFlagSet("compile", flag.ContinueOnError)
 	fs.String("backend", defaultBackends(), "comma-separated list of backends to run (available: "+backendNames()+")")
 	fs.String("out", "./generated", "output directory for generated files")
-	fs.Bool("check", false, "verify committed output matches a fresh compile (exit 1 on drift, write nothing)")
+	fs.Bool("check", false, "verify committed output matches a fresh compile (exit 1 on drift, write nothing); a differing zever version in the stamp alone is only a note")
+	fs.Bool("strict", false, "with --check, also fail when files differ only in the stamped zever version")
 	// coverageProof: no local -i/--interactive flags; peelInteractive
 	// strips them before Parse and sets interactiveMode globally.
 
@@ -201,7 +205,7 @@ func newCompileFlagSet() *flag.FlagSet {
 func runCompile(args []string) error { //nolint:gocyclo
 	args = peelInteractive(args)
 
-	if err := rejectUnknownFlags("compile", args, []string{"backend", "out", "check"}); err != nil {
+	if err := rejectUnknownFlags("compile", args, []string{"backend", "out", "check", "strict"}); err != nil {
 		return err
 	}
 
@@ -258,6 +262,7 @@ func runCompile(args []string) error { //nolint:gocyclo
 		OutDir:   fs.Lookup("out").Value.String(),
 		JSON:     jsonMode,
 		Check:    flagBool(fs, "check"),
+		Strict:   flagBool(fs, "strict"),
 	})
 }
 
@@ -380,7 +385,14 @@ func runCompileWith(cfg CompileConfig) error {
 // CLI), or reports the tree up to date. It backs `zever compile --check`,
 // the CI drift gate for projects that commit their generated output.
 func reportCompileCheck(cfg CompileConfig, out io.Writer, backendsSpec, outDir string, stamped map[string]map[string][]byte, outputs map[string][]string, total int) error {
-	drift := checkGeneratedOutputs(outDir, stamped)
+	drift, stampOnly := checkGeneratedOutputs(outDir, stamped)
+
+	if len(drift) == 0 && len(stampOnly) > 0 && cfg.Strict {
+		drift = stampOnly
+		for i, d := range drift {
+			drift[i] = d + " (stamp version)"
+		}
+	}
 
 	if len(drift) > 0 {
 		err := fmt.Errorf("zever compile: generated output differs in %d file(s) (%s); run 'zever compile' and commit the result",
@@ -406,6 +418,9 @@ func reportCompileCheck(cfg CompileConfig, out io.Writer, backendsSpec, outDir s
 			"check":    true,
 			"outputs":  outputs,
 			"total":    total,
+			// stampVersionOnly lists files that differ only in the stamped
+			// zever version (non-failing unless --strict).
+			"stampVersionOnly": stampOnly,
 		})
 
 		return nil
@@ -415,12 +430,17 @@ func reportCompileCheck(cfg CompileConfig, out io.Writer, backendsSpec, outDir s
 		cyan(outDir) + dim(fmt.Sprintf(" (backends: %s)", backendsSpec))
 	_, _ = fmt.Fprintln(out, msg)
 
+	if len(stampOnly) > 0 {
+		_, _ = fmt.Fprintln(out, dim(fmt.Sprintf("note: %d file(s) stamped by a different zever version than v%s (%s); content and schema hash match. Run 'zever compile' to refresh the stamp, or pass --strict to fail on this.",
+			len(stampOnly), buildVersion, strings.Join(stampOnly, ", "))))
+	}
+
 	return nil
 }
 
 func printCompileUsage(fs *flag.FlagSet) {
 	header := title("zever compile") + dim(" — schema → generated")
-	flags := dim(" [--backend " + defaultBackends() + "] [--out DIR] [--check]")
+	flags := dim(" [--backend " + defaultBackends() + "] [--out DIR] [--check [--strict]]")
 	usage := bold("Usage:") + "  " + cmd("zever compile") + flags + "  " + cyan("<files...>")
 	body := joinLines(
 		header,

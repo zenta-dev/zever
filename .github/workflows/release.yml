@@ -70,7 +70,7 @@ jobs:
           # the previous `dist/<name>-linux-<arch>` shape.
           EXT=""
           if [ "$GOOS" = "windows" ]; then EXT=".exe"; fi
-          CGO_ENABLED=0 go build -trimpath -ldflags="-s -w" -o "dist/zever-$GOOS-$GOARCH$EXT" ./cmd/zever
+          CGO_ENABLED=0 go build -trimpath -ldflags="-s -w -X main.cliVersion=${GITHUB_REF_NAME#v}" -o "dist/zever-$GOOS-$GOARCH$EXT" ./cmd/zever
           CGO_ENABLED=0 go build -trimpath -ldflags="-s -w" -o "dist/showcase-server-$GOOS-$GOARCH$EXT" ./examples/showcase/cmd/server
           CGO_ENABLED=0 go build -trimpath -ldflags="-s -w" -o "dist/showcase-worker-$GOOS-$GOARCH$EXT" ./examples/showcase/cmd/worker
           CGO_ENABLED=0 go build -trimpath -ldflags="-s -w" -o "dist/zever-mcp-$GOOS-$GOARCH$EXT" ./tools/zever-mcp
