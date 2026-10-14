@@ -77,7 +77,7 @@ func refundTestServer(t *testing.T, adjustments *atomic.Int64, failAdjust *atomi
 	t.Helper()
 	mux := http.NewServeMux()
 	mux.HandleFunc("/transactions/", func(w http.ResponseWriter, _ *http.Request) {
-		writeJSON(t, w, txnPayload("txn_full", "paid", "USD", "2500", []map[string]any{{"id": "txnitm_1", "totals": map[string]any{"total": "2500"}}}))
+		writeJSON(t, w, txnPayload("txn_full", "paid", "USD", "25.00", []map[string]any{{"id": "txnitm_1", "totals": map[string]any{"total": "25.00"}}}))
 	})
 	mux.HandleFunc("/adjustments", func(w http.ResponseWriter, _ *http.Request) {
 		if failAdjust.Load() {
