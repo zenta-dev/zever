@@ -3,7 +3,6 @@ package paddle
 import (
 	"context"
 	"fmt"
-	"strconv"
 	"strings"
 
 	"github.com/PaddleHQ/paddle-go-sdk/v5"
@@ -182,19 +181,10 @@ func parsePaddleTotal(s string, currency string) (int64, error) {
 		return 0, billing.ErrEmptyAmount
 	}
 
-	// Paddle totals are decimal strings (e.g. "10.00" or "1000").
-	// If a decimal point is present, parse via ParseMinorUnits to apply
-	// currency exponent correctly; otherwise treat as minor units integer.
-	if strings.Contains(s, ".") {
-		return billing.ParseMinorUnits(s, currency)
-	}
-
-	v, err := strconv.ParseInt(s, 10, 64)
-	if err != nil {
-		return 0, fmt.Errorf("%w: %q", billing.ErrMalformedAmount, s)
-	}
-
-	return v, nil
+	// Paddle totals are major-unit decimal strings (e.g. "10.00" or "10"):
+	// the shared ParseMinorUnits contract scales whole units by the currency
+	// exponent, so every amount lands in minor units.
+	return billing.ParseMinorUnits(s, currency)
 }
 
 func (d *driver) Close() error {
