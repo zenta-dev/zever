@@ -61,7 +61,7 @@ func (g *TaskServiceGRPCServer) ListTasks(ctx context.Context, req *ListTasksReq
 	// fields (Phase 2 does not extend proto request-message synthesis for
 	// pagination) -- a gRPC caller always gets the first page today; an HTTP
 	// caller gets full cursor/limit support via query parameters, see router.go.
-	resp, err := g.svc.ListTasks(ctx, req, "", 0)
+	resp, err := g.svc.ListTasks(ctx, req, Cursor(""), 0)
 	if err != nil {
 		return nil, gogenGRPCError(err)
 	}

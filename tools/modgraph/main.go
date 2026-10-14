@@ -78,10 +78,11 @@ func defaultRoot() string {
 }
 
 // runCheck prints the drift listing and returns 1 when any module lacks
-// entries, 0 when clean.
+// entries or breaks the tag path rule, 0 when clean.
 func runCheck(root string, mods map[string]string, stdout *os.File) int {
 	drift := checkModules(root, mods)
-	if len(drift) == 0 {
+	tagged := tagPathDrift(mods)
+	if len(drift) == 0 && len(tagged) == 0 {
 		fmt.Fprintf(stdout, "modules: %d; module-graph clean\n", len(mods))
 		return 0
 	}
@@ -95,7 +96,21 @@ func runCheck(root string, mods map[string]string, stdout *os.File) int {
 			fmt.Fprintf(stdout, "%s: missing replace: %s\n", moddir, joinAll(missing.Replace))
 		}
 	}
+	for _, moddir := range sortedTagKeys(tagged) {
+		fmt.Fprintf(stdout, "%s: tag path rule broken: module %s, want %s%s\n",
+			moddir, tagged[moddir], zeverPrefix, moddir)
+	}
 	return 1
+}
+
+// sortedTagKeys returns the sorted module dirs with tag path drift.
+func sortedTagKeys(d map[string]string) []string {
+	out := make([]string, 0, len(d))
+	for k := range d {
+		out = append(out, k)
+	}
+	sort.Strings(out)
+	return out
 }
 
 // runFix adds missing require+replace pairs per module via `go mod edit`.

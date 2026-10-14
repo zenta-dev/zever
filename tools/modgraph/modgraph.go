@@ -35,6 +35,45 @@ type drift struct {
 	Replace []string
 }
 
+// tagPathExceptions lists module dirs whose module path deliberately
+// breaks the tag rule: out-of-tree consumer proofs kept outside go.work.
+// docs/examples uses a dashed path so it resolves like a published module,
+// and examples/external-sms lives under another org entirely.
+var tagPathExceptions = map[string]string{
+	"docs/examples":         "github.com/zenta-dev/zever/docs-examples",
+	"examples/external-sms": "github.com/example/zever-sms",
+}
+
+// tagPathDrift returns moddir -> actual module path for every module whose
+// path cannot produce its release tag via the tools/tag-release.sh rule
+// (tag `<module-path-suffix>/vX.Y.Z`). Conformity means the module path is
+// exactly zeverPrefix plus the repo-relative dir; the root dir (no root
+// module: the script tags nothing there) and the tagPathExceptions are
+// skipped.
+func tagPathDrift(mods map[string]string) map[string]string {
+	dirs := make([]string, 0, len(mods))
+	byDir := make(map[string]string, len(mods))
+	for path, dir := range mods {
+		dirs = append(dirs, dir)
+		byDir[dir] = path
+	}
+	sort.Strings(dirs)
+	out := make(map[string]string)
+	for _, dir := range dirs {
+		path := byDir[dir]
+		if dir == "." {
+			continue
+		}
+		if want, ok := tagPathExceptions[dir]; ok && path == want {
+			continue
+		}
+		if path != zeverPrefix+dir {
+			out[dir] = path
+		}
+	}
+	return out
+}
+
 // scanImports returns the set of intra-repo import paths declared by real
 // import statements in src. Only parser ImportSpecs count, so paths inside
 // raw-string templates, string constants, and comments never count, while

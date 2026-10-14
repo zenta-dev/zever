@@ -386,7 +386,7 @@ func TestListOrders(t *testing.T) {
 		t.Fatalf("first page cursor empty, want next page")
 	}
 
-	second, err := s.svc.ListOrders(owner, &genshop.ListOrdersRequest{UserId: "user-1"}, first.NextCursor, 1)
+	second, err := s.svc.ListOrders(owner, &genshop.ListOrdersRequest{UserId: "user-1"}, genshop.Cursor(first.NextCursor), 1)
 	if err != nil {
 		t.Fatalf("second page: %v", err)
 	}

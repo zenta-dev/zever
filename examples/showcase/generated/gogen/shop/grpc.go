@@ -38,7 +38,7 @@ func (g *ShopServiceGRPCServer) ListProducts(ctx context.Context, req *ListProdu
 	// fields (Phase 2 does not extend proto request-message synthesis for
 	// pagination) -- a gRPC caller always gets the first page today; an HTTP
 	// caller gets full cursor/limit support via query parameters, see router.go.
-	resp, err := g.svc.ListProducts(ctx, req, "", 0)
+	resp, err := g.svc.ListProducts(ctx, req, Cursor(""), 0)
 	if err != nil {
 		return nil, gogenGRPCError(err)
 	}
@@ -130,7 +130,7 @@ func (g *ShopServiceGRPCServer) ListOrders(ctx context.Context, req *ListOrdersR
 	// fields (Phase 2 does not extend proto request-message synthesis for
 	// pagination) -- a gRPC caller always gets the first page today; an HTTP
 	// caller gets full cursor/limit support via query parameters, see router.go.
-	resp, err := g.svc.ListOrders(ctx, req, "", 0)
+	resp, err := g.svc.ListOrders(ctx, req, Cursor(""), 0)
 	if err != nil {
 		return nil, gogenGRPCError(err)
 	}

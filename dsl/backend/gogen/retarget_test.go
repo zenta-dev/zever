@@ -150,7 +150,7 @@ func TestPaginatedServiceTakesCursorLimit(t *testing.T) {
 	out := generateGolden(t)
 
 	if !strings.Contains(string(out["app/service.go"]),
-		"ListTasks(ctx context.Context, req *ListTasksRequest, cursor string, limit int32) (*ListTasksResponse, error)") {
+		"ListTasks(ctx context.Context, req *ListTasksRequest, cursor Cursor, limit int32) (*ListTasksResponse, error)") {
 		t.Fatalf("service.go missing paginated ListTasks shape:\n%s", out["app/service.go"])
 	}
 }

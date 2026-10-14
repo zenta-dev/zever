@@ -229,7 +229,7 @@ func renderGRPCServer(b *strings.Builder, svc serviceModel, pbAlias string) {
 			b.WriteString("\t// fields (Phase 2 does not extend proto request-message synthesis for\n")
 			b.WriteString("\t// pagination) -- a gRPC caller always gets the first page today; an HTTP\n")
 			b.WriteString("\t// caller gets full cursor/limit support via query parameters, see router.go.\n")
-			fmt.Fprintf(b, "\tresp, err := g.svc.%s(ctx, req, \"\", 0)\n", op.Name)
+			fmt.Fprintf(b, "\tresp, err := g.svc.%s(ctx, req, Cursor(\"\"), 0)\n", op.Name)
 		} else {
 			fmt.Fprintf(b, "\tresp, err := g.svc.%s(ctx, req)\n", op.Name)
 		}

@@ -201,22 +201,47 @@ func TestGenerateHandlesPaginatedOperation(t *testing.T) {
 
 	service := string(out["app/service.go"])
 
-	if !strings.Contains(service, "ListTasks(ctx context.Context, req *ListTasksRequest, cursor string, limit int32) (*ListTasksResponse, error)") {
-		t.Fatalf("service.go ListTasks signature not using cursor/limit params and *ListTasksResponse:\n%s", service)
+	if !strings.Contains(service, "ListTasks(ctx context.Context, req *ListTasksRequest, cursor Cursor, limit int32) (*ListTasksResponse, error)") {
+		t.Fatalf("service.go ListTasks signature not using Cursor/limit params and *ListTasksResponse:\n%s", service)
+	}
+
+	for _, want := range []string{
+		"type Cursor string",
+		"type Page[T any] struct",
+		"DefaultPageLimit",
+		"MaxPageLimit",
+	} {
+		if !strings.Contains(service, want) {
+			t.Errorf("service.go missing paginated helper %q:\n%s", want, service)
+		}
 	}
 
 	router := string(out["app/router.go"])
 
-	if !strings.Contains(router, `cursor = r.URL.Query().Get("cursor")`) {
-		t.Fatalf("router.go missing cursor query-param binding:\n%s", router)
+	if !strings.Contains(router, `cursor = Cursor(r.URL.Query().Get("cursor"))`) {
+		t.Fatalf("router.go missing opaque cursor query-param binding:\n%s", router)
 	}
 
 	if !strings.Contains(router, `r.URL.Query().Get("limit")`) {
 		t.Fatalf("router.go missing limit query-param binding:\n%s", router)
 	}
 
+	if !strings.Contains(router, "v < 0 || v > int64(MaxPageLimit)") {
+		t.Fatalf("router.go missing limit bounds validation:\n%s", router)
+	}
+
 	if !strings.Contains(router, "svc.ListTasks(ctx, req, cursor, limit)") {
 		t.Fatalf("router.go handler must call ListTasks with cursor/limit:\n%s", router)
+	}
+
+	for _, want := range []string{
+		"var cursor Cursor",
+		`Cursor(r.URL.Query().Get("cursor"))`,
+		"MaxPageLimit",
+	} {
+		if !strings.Contains(router, want) {
+			t.Errorf("router.go missing paginated binding %q:\n%s", want, router)
+		}
 	}
 }
 
@@ -940,7 +965,7 @@ func TestGenerateServiceStubPaginatedSignature(t *testing.T) {
 
 	s := string(got)
 
-	if !strings.Contains(s, "func (s *TaskServiceImpl) ListTasks(ctx context.Context, req *genapp.ListTasksRequest, cursor string, limit int32) (*genapp.ListTasksResponse, error) {") {
+	if !strings.Contains(s, "func (s *TaskServiceImpl) ListTasks(ctx context.Context, req *genapp.ListTasksRequest, cursor genapp.Cursor, limit int32) (*genapp.ListTasksResponse, error) {") {
 		t.Fatalf("expected paginated stub signature, got:\n%s", s)
 	}
 }

@@ -89,6 +89,18 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Added
 
+- `feat(gogen): typed pagination`: `paginated: true` operations now generate
+  an opaque `Cursor` string type, a generic `Page[T]` (`Items` plus
+  `NextCursor`), and `DefaultPageLimit` (20) / `MaxPageLimit` (100) bounds in
+  `service.go`. Service signatures take `cursor Cursor` instead of `cursor
+  string`; the generated router handler passes the cursor query parameter
+  through untouched and rejects a negative limit or one above `MaxPageLimit`
+  as `InvalidArgument` before the service runs (zero still means "service
+  default"). The HTTP wire (cursor/limit query parameters) and the gRPC
+  proto shape are unchanged, so this is not wire-breaking; Go implementers
+  must update `cursor string` parameters (and `string` cursor variables) to
+  `Cursor`, converting from protobuf `next_cursor` strings where they cross
+   the boundary.
 - `feat(payment): dedupe webhook events by id`: the stripe and paddle
   adapters accept the existing optional `payment.Options.Idempotency`
   store for webhook replay protection (previously refund-only). After
@@ -112,7 +124,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   validated by `ratelimit.ParseTrustedProxies`, mirrored as
   `middleware.ParseTrustedProxies` and in the config JSON schema); the
   generated server builds the key from it and keeps `RemoteAddrKey`
-  when none are configured. `RemoteAddrKey` itself is unchanged.
+   when none are configured. `RemoteAddrKey` itself is unchanged.
 - `feat(orm): auto-chunk large IN lists`: a value-list `IN` larger than
   the resolved dialect's per-statement parameter budget now fans out into
   one statement per chunk for plain unordered unbounded `SELECT`s (rows
@@ -424,6 +436,20 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   accept stably. Remaining `interface{}` spellings outside
   generated protobuf code become `any` (the `twilio` test fake keeps
   `interface{}` to match the upstream `twilioclient.BaseClient` signature).
+- `chore(modules): tag-path gate, shared/* verdict, versioning doc, mysql
+  status`: `modgraph --check` (hence `make modgraph-check`) now also
+  verifies every `go.mod` module path follows the `tools/tag-release.sh`
+  rule (tag `<suffix>/vX.Y.Z`), allowlisting the two deliberate
+  consumer-proof exceptions (`docs/examples` dashed path,
+  `examples/external-sms` under another org); clean over all 177 modules.
+  Import scan of all 22 `shared/*` packages shows every one has importers
+  in at least two areas or sits on a public API seam (`mcpclient` in
+  `core/agent` signatures, `outboxbridge` as the documented hand-wiring
+  seam, `prompt` unused in-repo), so nothing moves under `internal/`.
+  New `start/versioning` docs page pins the lockstep release model and
+  replace-less consumer rules; `orm/README` no longer claims mysql support
+  was dropped and states the real split (query builder sqlite/postgres
+  only; atlas DDL + `orm/migrate` live-diff cover mysql).
 
 ### Added
 
