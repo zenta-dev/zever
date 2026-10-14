@@ -218,7 +218,7 @@ releases) — everything else moves together:
 - Installers: `install.sh` (`ZEVER_VERSION_DEFAULT`, header and usage text) and
   `install.ps1` (`$Version` default and help text).
 - Root pins: `README.md` (installer URLs), `CITATION.cff`, `cmd/zever/new.go` (`defaultFrameworkVersion`)
-  plus `cmd/zever/new_test.go`, `cmd/zever/main.go` (`cliVersion`),
+  plus `cmd/zever/new_test.go`, `cmd/zever/VERSION` (CLI fallback version; `tools/tag-release.sh` refuses to tag until it matches, and `make version-check` fails when it lags the newest tag; release builds also inject it via `-ldflags -X main.cliVersion`),
   `cmd/zever/README.md`.
 - LSP: `tools/zever-lsp/server.go` (`serverVersion`), `tools/zever-lsp/go.mod`
   intra-repo requires + `go.sum` via `go mod tidy`, `tools/zever-lsp/README.md`.

@@ -41,11 +41,6 @@ var isStdinTerminal = func() bool {
 // with the handler agents.
 var interactiveMode bool
 
-// cliVersion is the CLI release version printed by -V/--version.
-// It tracks the framework release version; bump with every release
-// (see .github/CONTRIBUTING.md release checklist).
-const cliVersion = "0.6.1"
-
 // envInteractive returns true if ZEVER_INTERACTIVE=1/true/yes (case-insensitive).
 func envInteractive() bool {
 	v := strings.ToLower(strings.TrimSpace(os.Getenv("ZEVER_INTERACTIVE")))
@@ -186,7 +181,7 @@ func run(args []string) error {
 	sub, rest := args[0], args[1:]
 
 	if sub == "-V" || sub == "--version" {
-		_, _ = fmt.Fprintln(os.Stdout, "zever v"+cliVersion)
+		_, _ = fmt.Fprintln(os.Stdout, "zever v"+buildVersion)
 		return nil
 	}
 

@@ -184,7 +184,7 @@ func runUpgradeWith(ctx context.Context, opts upgradeOptions) error {
 
 	current := opts.current
 	if current == "" {
-		current = cliVersion
+		current = buildVersion
 	}
 
 	fetch := opts.fetch

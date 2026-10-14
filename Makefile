@@ -58,7 +58,7 @@ build: ## Build all packages
 	$(GO) build ./...
 
 build-release: ## Build stripped release binary (smaller: -s -w -trimpath)
-	$(GO) build -trimpath -ldflags="-s -w" -o bin/zever ./cmd/zever
+	$(GO) build -trimpath -ldflags="-s -w -X main.cliVersion=$$(tr -d '[:space:]' < cmd/zever/VERSION)" -o bin/zever ./cmd/zever
 
 .PHONY: generate
 generate: ## Regenerate editor grammar files from dsl/gengrammar
@@ -95,6 +95,10 @@ test: ## Run tests
 .PHONY: installer-test
 installer-test: ## Run installer fail-closed tests (offline, stubbed PATH)
 	sh tools/installer-test.sh
+
+.PHONY: version-check
+version-check: ## Fail if cmd/zever/VERSION is lower than the newest cmd/zever/v* tag (skips without tags)
+	sh tools/check-version.sh
 
 .PHONY: compile-check
 compile-check: ## Verify committed generated code matches the schema (zever compile --check over examples)
@@ -165,7 +169,7 @@ clean: ## Remove coverage output and build artifacts
 	rm -f $(COVERAGE) $(SBOM)
 
 .PHONY: check
-check: require-tools download fmt check-all modgraph-check dependabot-check lint-all vulncheck-all installer-test compile-check ## Run all local CI checks (run 'make setup' first)
+check: require-tools download fmt check-all modgraph-check dependabot-check lint-all vulncheck-all installer-test compile-check version-check ## Run all local CI checks (run 'make setup' first)
 
 # Multi-module targets: per-module loops over the committed go.work workspace.
 .PHONY: download-all

@@ -41,6 +41,20 @@ esac
 created=0
 skipped=0
 
+# cmd/zever/VERSION is the CLI's fallback version (see cmd/zever/version.go).
+# It must be committed before tagging so the tag carries it; update it here
+# and stop so the change can be committed, then re-run.
+version_file="cmd/zever/VERSION"
+if [ -f "$version_file" ] && [ "$(tr -d '[:space:]' <"$version_file")" != "${ver#v}" ]; then
+  if [ "$dry_run" -eq 1 ]; then
+    echo "would update $version_file to ${ver#v} (commit it before tagging)"
+  else
+    printf '%s\n' "${ver#v}" >"$version_file"
+    echo "updated $version_file to ${ver#v}; commit it, then re-run $0 $ver" >&2
+    exit 1
+  fi
+fi
+
 pass1=()
 pass2=()
 pass3=()
