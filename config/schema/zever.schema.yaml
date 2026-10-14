@@ -278,6 +278,8 @@ $defs:
                 type: integer
             endpoint:
                 type: string
+            latex_allow_unsafe_source:
+                type: boolean
             latex_command:
                 description: 'Default: pdflatex.'
                 type: string
@@ -287,6 +289,14 @@ $defs:
             latex_runs:
                 minimum: 0
                 type: integer
+            latex_sandbox:
+                description: 'Default: auto.'
+                enum:
+                    - ""
+                    - auto
+                    - required
+                    - "off"
+                type: string
             max_output_bytes:
                 minimum: 0
                 type: integer

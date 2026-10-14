@@ -405,6 +405,8 @@ Render documents to PDF or images locally, through a remote service, or with LaT
 | `latex_pdf_to_ppm` | string | `pdftoppm` | PDF-to-image converter command |
 | `max_output_bytes` | integer | `64 MiB` | Bounds the rendered output size |
 | `latex_runs` | integer | `0` | Bounds the number of LaTeX compiler passes |
+| `latex_sandbox` | string | `auto` | OS sandbox (bubblewrap) for LaTeX: `auto`, `required`, or `off` |
+| `latex_allow_unsafe_source` | boolean | `false` | Disables the LaTeX source pre-scan (absolute or `..` file paths, shell-escape packages). Trusted sources only |
 
 ```yaml title="zever.yaml"
 document:

@@ -248,7 +248,9 @@
         "latex_command": { "type": "string", "description": "Default: pdflatex." },
         "latex_pdf_to_ppm": { "type": "string", "description": "Default: pdftoppm." },
         "max_output_bytes": { "type": "integer", "minimum": 0 },
-        "latex_runs": { "type": "integer", "minimum": 0 }
+        "latex_runs": { "type": "integer", "minimum": 0 },
+        "latex_sandbox": { "type": "string", "enum": ["", "auto", "required", "off"], "description": "Default: auto." },
+        "latex_allow_unsafe_source": { "type": "boolean" }
       }
     },
     "eventbusOptions": {
