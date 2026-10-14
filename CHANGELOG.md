@@ -520,6 +520,14 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Security
 
+- `fix(httpclient)`: **Breaking:** clients built with `WithSafeDial` /
+  `NewSafeClient` no longer honor `HTTP_PROXY`/`HTTPS_PROXY` (the dial guard
+  only saw the proxy address, so private targets were reachable through a
+  proxy); pass the new `WithAllowProxy()` option to opt back in with a
+  trusted proxy. `IsPrivateIP` now also classifies NAT64
+  (`64:ff9b::/96`, `64:ff9b:1::/48`), 6to4 (`2002::/16`) and IPv4-compatible
+  (`::/96`) addresses by their embedded IPv4 address, and treats Teredo
+  (`2001::/32`) and site-local (`fec0::/10`) as private.
 - Bump the Go toolchain pin from `go 1.27.0` to `go 1.27.2` in `go.work`
   and every module's `go.mod` (fixes stdlib `net/http` / HTTP/2
   advisories `GO-2026-6603`…`GO-2026-6617`).
