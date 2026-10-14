@@ -1234,6 +1234,10 @@ type = 'string'
 description = 'Permit a plain-http Addr for testing. Default false (https only).'
 type = 'boolean'
 
+['$defs'.secretsOptions.properties.allow_insecure_token_file_perms]
+description = 'Permit a TokenFile readable beyond its owner. Default false (0600 or stricter required).'
+type = 'boolean'
+
 ['$defs'.secretsOptions.properties.mount]
 description = 'Vault KV mount path.'
 type = 'string'

@@ -8,12 +8,13 @@ import (
 func Register() {
 	_ = secrets.Register(secrets.AdapterVault, func(o secrets.Options) (secrets.Secrets, error) {
 		return New(Options{
-			Addr:          o.Addr,
-			Token:         o.Token,
-			TokenFile:     o.TokenFile,
-			Mount:         o.Mount,
-			Namespace:     o.Namespace,
-			AllowInsecure: o.AllowInsecure,
+			Addr:                        o.Addr,
+			Token:                       o.Token,
+			TokenFile:                   o.TokenFile,
+			Mount:                       o.Mount,
+			Namespace:                   o.Namespace,
+			AllowInsecure:               o.AllowInsecure,
+			AllowInsecureTokenFilePerms: o.AllowInsecureTokenFilePerms,
 		})
 	})
 }
