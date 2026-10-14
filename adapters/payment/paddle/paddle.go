@@ -436,11 +436,47 @@ func dedupeWebhookEvent(ctx context.Context, store idempotency.Store, key, event
 	return nil
 }
 
-// WebhookEvent decodes and verifies a raw Paddle webhook payload.
-// When an idempotency store is configured, the provider event id is
-// reserved before returning: a repeat delivery fails with
-// payment.ErrDuplicateEvent instead of re-executing downstream work.
+// WebhookEvent verifies signature then decodes a webhook payload.
+//
+// When an idempotency store is configured the provider event id is marked
+// seen BEFORE this method returns, so the dedupe is at-most-once: if the
+// caller's processing fails afterwards, the provider retry is rejected with
+// payment.ErrDuplicateEvent and the event is lost. Events with an empty id are
+// never deduped. Prefer HandleWebhook (payment.WebhookHandling), which commits
+// only after the handler succeeds and rejects empty ids with
+// payment.ErrMissingEventID.
 func (d *driver) WebhookEvent(ctx context.Context, raw []byte, signature string) (payment.Event, error) {
+	ev, err := d.decodeWebhook(ctx, raw, signature)
+	if err != nil {
+		return payment.Event{}, err
+	}
+
+	if err := dedupeWebhookEvent(ctx, d.idempotency, "paddle:webhook:"+ev.ID, ev.ID, webhookFingerprint(raw)); err != nil {
+		return payment.Event{}, fmt.Errorf("paddle: webhook: %w", err)
+	}
+
+	return ev, nil
+}
+
+// HandleWebhook verifies and decodes raw, then runs handler under a replay
+// reservation that is committed only when handler returns nil. See
+// payment.WebhookHandling for the full contract.
+func (d *driver) HandleWebhook(ctx context.Context, raw []byte, signature string, handler payment.WebhookHandler) error {
+	ev, err := d.decodeWebhook(ctx, raw, signature)
+	if err != nil {
+		return err
+	}
+
+	if err := payment.ProcessWebhookOnce(ctx, d.idempotency, "paddle:webhook:"+ev.ID, ev, webhookFingerprint(raw), handler); err != nil {
+		return fmt.Errorf("paddle: webhook: %w", err)
+	}
+
+	return nil
+}
+
+// decodeWebhook verifies the signature and decodes the payload without
+// touching the idempotency store.
+func (d *driver) decodeWebhook(ctx context.Context, raw []byte, signature string) (payment.Event, error) {
 	if len(raw) > d.maxWebhookBytes {
 		return payment.Event{}, fmt.Errorf("paddle: webhook: %w", payment.SizeLimitError{Size: len(raw), Limit: d.maxWebhookBytes})
 	}
@@ -497,10 +533,6 @@ func (d *driver) WebhookEvent(ctx context.Context, raw []byte, signature string)
 			Amount:   amount,
 			Currency: envelope.Data.CurrencyCode,
 		},
-	}
-
-	if err := dedupeWebhookEvent(ctx, d.idempotency, "paddle:webhook:"+envelope.EventID, envelope.EventID, webhookFingerprint(raw)); err != nil {
-		return payment.Event{}, fmt.Errorf("paddle: webhook: %w", err)
 	}
 
 	return ev, nil
