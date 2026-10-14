@@ -179,6 +179,7 @@ updates:
       - "/tools/apidiff"
       - "/tools/errscan"
       - "/tools/modgraph"
+      - "/tools/vulngate"
       - "/tools/zever-lsp"
       - "/tools/zever-mcp"
     schedule:

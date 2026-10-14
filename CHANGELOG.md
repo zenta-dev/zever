@@ -306,6 +306,17 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   `adapters` row before resolving, turning a forgotten import or typo into
   one actionable error. `ParseAdapter` stays permissive for custom adapters;
   typed `Adapter` constants are unchanged.
+- `ci: blocking govulncheck with expiring allowlist`: the `vulnerability` CI
+  job no longer runs `continue-on-error` on PRs — reachable vulnerabilities
+  fail the gate via the new `tools/vulngate` module (`make vulncheck-all`
+  scans every module and filters `govulncheck -json` findings).
+  `.github/govulncheck-allowlist.json` records accepted risk with a reason
+  and an expiry date; expired entries fail closed. `automerge.yml`
+  (`pull_request_target`) was reviewed: it never checks out PR code and only
+  reads PR metadata, so no fix was needed. `.github/SECURITY.md` gains a
+  supply-chain section (SBOM + attestation verify commands, installer
+  verification); the latest-only backport policy already stated there and in
+  `GOVERNANCE.md` stands unchanged.
 - `docs: test your zever app guide`: new `guides/operate/testing-your-app`
   page — per-test container from `config.Default()` with `t.Cleanup` close,
   httptest routes, per-test sqlite files under `t.TempDir()`, the `dbtest`
