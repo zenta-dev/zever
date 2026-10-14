@@ -401,6 +401,22 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   spans (18 allocs/op when telemetry is wired, 0 on the default nil-provider
   path), `traceprop` inject/extract (nil-path 0), and `shared/lrucache`
   (0 allocs/op steady-state on every bench).
+- `perf(alloc): P5-8 leftover dispositions, bench-first (i5-11400H,
+  `-benchmem -count=3`)`: `traceprop BenchmarkInject` holds at 400 B/op,
+  3 allocs/op — memprofile attributes the third alloc to OTel-internal
+  `TraceContext.Inject` (string builder plus a `[][]byte` literal), and a
+  direct-propagator variant measured byte-identical, so the composite call
+  stays and the floor is pinned by upstream OTel. `msgspan` wired Producer
+  holds at ~1822 B/op, 18 allocs/op with a stub tracer (roughly two thirds
+  in the stub recorder/`SetAttributes` appends, the rest option closures,
+  attribute slice, span name, and `traceprop.TraceID`); the default
+  nil-provider path stays 0 B/op, 0 allocs/op and is now guarded by
+  `TestProducerNilPathZeroAllocs`. `BenchmarkMemoryRoundTrip` remainder is
+  the single `Message.Clone` payload copy, now documented on `Clone` as
+  isolation-pinned (the Pop clone keeps consumer mutations off the inflight
+  copy). `shared/lrucache` re-verified at 0 allocs/op steady-state on
+  Get/Put/GetOrCompute. No benchmark deltas by design: only regression
+  guards, no behavior change.
 
 ### Fixed
 

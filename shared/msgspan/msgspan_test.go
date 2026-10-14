@@ -355,6 +355,24 @@ func TestFinisherRecordsOutcome(t *testing.T) {
 	}
 }
 
+// TestProducerNilPathZeroAllocs pins the untraced fast path: with no
+// provider wired, Producer must stay allocation-free on every publish.
+func TestProducerNilPathZeroAllocs(t *testing.T) {
+	// No t.Parallel: testing.AllocsPerRun cannot run inside a parallel test.
+	var p observability.Provider
+
+	if n := testing.AllocsPerRun(100, func() {
+		spanCtx, finish := Producer(context.Background(), p, "queue", "low", "msg-7")
+		if spanCtx == nil {
+			t.Error("Producer() ctx = nil")
+		}
+
+		finish(OutcomeOK)
+	}); n != 0 {
+		t.Errorf("Producer(nil provider) allocs = %v, want 0", n)
+	}
+}
+
 // TestNoopFallbacks covers every unusable input: a nil provider, a provider
 // whose tracer is nil, and a tracer whose span is nil. Telemetry must never
 // break the publish or delivery around it.

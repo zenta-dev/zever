@@ -89,7 +89,10 @@ func NewMessage(
 	}
 }
 
-// Clone returns a deep copy of m with cloned payload and headers.
+// Clone returns a deep copy of m with cloned payload and headers. The payload
+// copy costs one allocation per Clone by design: the memory queue hands out
+// clones on Pop so a consumer mutating the message cannot corrupt the inflight
+// copy it may later Nack back, which pins this alloc on every round trip.
 func (m Message) Clone() Message {
 	m.Payload = m.Payload.Clone()
 	m.Headers = m.Headers.Clone()
