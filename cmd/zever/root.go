@@ -70,7 +70,7 @@ var portedCommands = []string{
 	"compile", "check", "breaking", "fmt", "doctor", "config",
 	"routes", "explain", "check-boundaries", "check:boundaries", "graph",
 	"serve", "dev", "queue:work", "schedule:run", "tinker",
-	"db", "outbox", "completion", "docs", "uninstall", "upgrade",
+	"db", "outbox", "completion", "docs", "uninstall", "upgrade", "build",
 }
 
 // portedSet is the lookup form of portedCommands.
@@ -296,6 +296,7 @@ zever applications built from .zen schemas.`,
 	root.AddCommand(newDocsCmd(root))
 	root.AddCommand(newUninstallCmd())
 	root.AddCommand(newUpgradeCmd())
+	root.AddCommand(newBuildCmd())
 
 	// Unify the `zever --help` header with the unknown-command usage
 	// header (printUsage, main.go): both paths start with usageHeader

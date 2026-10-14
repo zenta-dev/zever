@@ -55,6 +55,7 @@ zever compile schema/app.zen --backend=mcp --out ./gen
 
 - `zever add`: Add one battery to the calling project
 - `zever breaking`: Report API-breaking changes between two schema versions
+- `zever build`: Build a slim CLI with only the adapters you need
 - `zever check-boundaries`: Report cross-module reference violations
 - `zever check`: Validate .zen schemas without writing output
 - `zever compile`: Compile .zen schemas through backends

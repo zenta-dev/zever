@@ -106,6 +106,7 @@ var subcommandHandlers = map[string]func([]string) error{
 	"tinker":           runTinker,
 	"db":               runDB,
 	"outbox":           runOutbox,
+	"build":            runBuild,
 }
 
 func main() {
@@ -232,6 +233,9 @@ func run(args []string) error {
 				return nil
 			case "db":
 				printDBUsage()
+				return nil
+			case "build":
+				printBuildUsage(newBuildFlagSet())
 				return nil
 			case "outbox":
 				printOutboxUsage()
@@ -436,6 +440,7 @@ func printUsage() {
 		sectionOps,
 		line("completion", "Generate shell completion scripts"),
 		line("docs", "Generate man pages and markdown reference docs"),
+		line("build", "Build a slim CLI with only the adapters you need"),
 		line("outbox", "Inspect and repair the outbox DLQ"),
 		line("uninstall", "Remove the zever and zever-lsp binaries"),
 		line("upgrade", "Upgrade the zever binary to the latest release"),

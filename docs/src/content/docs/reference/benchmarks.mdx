@@ -330,4 +330,17 @@ Release-style build (`go build ./cmd/zever`, Go 1.27.2, linux/amd64): **309 MB**
 
 Repro: `go build -o /tmp/zever ./cmd/zever && ls -lh /tmp/zever`, `GODEBUG=inittrace=1 /tmp/zever --help 2>&1 | grep '^init ' | wc -l`, `go tool nm -size /tmp/zever | awk 'NF==4 {m[$4]+=$2} END {for (p in m) printf "%d %s\n", m[p], p}' | sort -rn | head`.
 
-A `zever build --adapters=a,b` slim-CLI flag (or per-adapter build tags) is deliberately deferred: it would split `adapters.go` registration, the doctor battery table, and scaffold templates into build-tagged variants with a combinatorial test matrix, for a saving concentrated in dependencies the CLI cannot drop anyway (sqlite/TUI stay). Revisit if the binary passes 500 MB or a headless-server profile needs it — the `TestHelpStartupAllocs` budget above is the tripwire.
+## Slim CLI (`zever build --adapters`, 2026-10-14)
+
+`zever build --adapters=a,b` compiles a slim CLI registering only the selected adapters (bare battery = every known adapter for it, `battery/adapter` = one pin; empty = full CLI). Unselected adapter packages leave the binary via a `go build -overlay` of the central registration list (`cmd/zever/adapters.go`), so no build-tagged source variants are committed — explicit list filtering, not tags. Unknown names fail listing the choices. The `doctor` adapters meta-check is scoped to the project's enabled batteries, so a slim binary passes its own `doctor` for its project (smoke-check with `<out> doctor`).
+
+Measured on this machine (Go 1.27.2, linux/amd64, warm page cache, medians of 5 `--help` process spawns per session; wall time varies with load, so ranges across two sessions):
+
+| Binary | Size | Warm `--help` |
+| --- | --- | --- |
+| Full CLI (`go build ./cmd/zever`) | 309.7 MB | ~40–56 ms |
+| Slim floor (`--adapters=log,router`: 4 log + 2 router adapters) | 63.3 MB | ~27–38 ms |
+
+The floor build is ~80% smaller (~5x) and ~32% faster to start; the saving is the excluded adapters' transitive dependencies (pgx, go-redis, fasthttp, otel, cloud SDKs). In-process `--help` (`BenchmarkHelpStartup`, ~99 µs/op) is unchanged — the delta is binary mapping and package init, not dispatch.
+
+Repro: `go build -o /tmp/zever-full ./cmd/zever && /tmp/zever-full build --adapters=log,router --out /tmp/zever-slim && ls -lh /tmp/zever-full /tmp/zever-slim`, then `printf 'log:\n  adapter: slog\nrouter:\n  adapter: stdhttp\n' > /tmp/slimdemo/zever.yaml && /tmp/zever-slim doctor --config /tmp/slimdemo/zever.yaml` (exit 0, all OK).

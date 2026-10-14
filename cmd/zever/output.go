@@ -129,6 +129,8 @@ func breadcrumbsFor(command string) []string {
 		return []string{"zever generate", "zever compile"}
 	case "add":
 		return []string{"zever compile", "zever doctor"}
+	case "build":
+		return []string{"zever doctor"}
 	case "extract":
 		return []string{"zever compile", "zever check"}
 	default:
