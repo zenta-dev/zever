@@ -62,10 +62,6 @@ func (r *Registry[A, F]) Register(adapter A, factory F) error {
 	defer r.mu.Unlock()
 
 	if _, dup := r.factories[adapter]; dup {
-		if r.duplicate == nil {
-			return nil
-		}
-
 		return r.duplicate(adapter)
 	}
 
@@ -83,10 +79,6 @@ func (r *Registry[A, F]) Lookup(adapter A) (F, error) {
 
 	if !ok {
 		var zero F
-		if r.unknown == nil {
-			return zero, nil
-		}
-
 		return zero, r.unknown(adapter)
 	}
 
