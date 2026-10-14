@@ -1,0 +1,29 @@
+---
+title: Versioning
+description: One lockstep version across every Zever module, per-module tags, and replace-less consumption.
+---
+
+Zever ships ~177 Go modules (one per battery interface, adapter, helper, and tool) under a single lockstep version. There is no umbrella module and no root `go.mod`: you require only the modules you use, all pinned to the same version.
+
+## One version, per-module tags
+
+Every release tags each module as `<path>/vX.Y.Z` (for example `container/v0.6.1`, `adapters/db/sqlite/v0.6.1`), cut by `tools/tag-release.sh`. Releases are lockstep: all modules share the version, so a bump means moving every Zever require together. `make modgraph-check` enforces the rule behind the tags — each `go.mod` module path must equal `github.com/zenta-dev/zever/<reldir>` — with two deliberate exceptions for the out-of-tree consumer proofs (`docs/examples`, `examples/external-sms`), which keep their own module paths.
+
+Pre-1.0, any `0.x` minor or patch may break; every break is listed in `CHANGELOG.md` with a `**Breaking:**` prefix. See [Upgrade](../guides/operate/upgrade/) for the bump procedure.
+
+## Consume without replaces
+
+Published per-module tags resolve through the Go module proxy, so consumer projects need no `replace` directives:
+
+```sh
+go get github.com/zenta-dev/zever/config@v0.6.1 github.com/zenta-dev/zever/container@v0.6.1
+go mod tidy
+```
+
+Rules for a healthy consumer `go.mod`:
+
+- Keep every `github.com/zenta-dev/zever/*` require on the same version; mixed versions are untested and unsupported.
+- `go mod tidy` must succeed with no `replace` pointing at a local checkout (`zever new` writes plain requires against the published modules; local replaces appear only when scaffolding from inside a framework checkout — see [Installation](./installation/)).
+- `go install <module>@version` does not work for Zever modules because the repo commits `replace` directives for its own workspace; install the CLI via the installer or a release binary instead.
+
+`zever new` scaffolds a project that already follows these rules. Bumps move every require together — see [Upgrade](../guides/operate/upgrade/).
