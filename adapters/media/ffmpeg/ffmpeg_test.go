@@ -146,7 +146,7 @@ func TestBuildArgsMP4Default(t *testing.T) {
 	t.Parallel()
 
 	got := BuildArgs("in.mov", "out.mp4", Spec{Kind: media.KindVideo, Format: "mp4"})
-	want := []string{"-y", "-i", "in.mov", "-crf", "23", "-c:v", "libx264", "-preset", "veryfast", "-pix_fmt", "yuv420p", "out.mp4"}
+	want := []string{"-y", "-i", "in.mov", "-crf", "23", "-c:v", "libx264", "-preset", "veryfast", "-pix_fmt", "yuv420p", "--", "out.mp4"}
 
 	if !equalArgs(got, want) {
 		t.Errorf("BuildArgs = %q, want %q", got, want)
@@ -158,7 +158,7 @@ func TestBuildArgsFormatNormalization(t *testing.T) {
 
 	for _, format := range []string{"MP4", ".mp4", " Mp4 "} {
 		got := BuildArgs("in.mov", "out.mp4", Spec{Kind: media.KindVideo, Format: format})
-		want := []string{"-y", "-i", "in.mov", "-crf", "23", "-c:v", "libx264", "-preset", "veryfast", "-pix_fmt", "yuv420p", "out.mp4"}
+		want := []string{"-y", "-i", "in.mov", "-crf", "23", "-c:v", "libx264", "-preset", "veryfast", "-pix_fmt", "yuv420p", "--", "out.mp4"}
 
 		if !equalArgs(got, want) {
 			t.Errorf("BuildArgs(%q) = %q, want %q", format, got, want)
@@ -170,7 +170,7 @@ func TestBuildArgsScaleBitrateCRF(t *testing.T) {
 	t.Parallel()
 
 	got := BuildArgs("in.mov", "out.mp4", Spec{Kind: media.KindVideo, Format: "mp4", Width: 641, Height: 481, Bitrate: 500, CRF: 18})
-	want := []string{"-y", "-i", "in.mov", "-vf", "scale=640:480", "-b:a", "500k", "-crf", "18", "-c:v", "libx264", "-preset", "veryfast", "-pix_fmt", "yuv420p", "out.mp4"}
+	want := []string{"-y", "-i", "in.mov", "-vf", "scale=640:480", "-b:a", "500k", "-crf", "18", "-c:v", "libx264", "-preset", "veryfast", "-pix_fmt", "yuv420p", "--", "out.mp4"}
 
 	if !equalArgs(got, want) {
 		t.Errorf("BuildArgs = %q, want %q", got, want)
@@ -181,14 +181,14 @@ func TestBuildArgsScaleAspect(t *testing.T) {
 	t.Parallel()
 
 	got := BuildArgs("in.mov", "out.mp4", Spec{Kind: media.KindVideo, Format: "mp4", Width: 320})
-	want := []string{"-y", "-i", "in.mov", "-vf", "scale=320:-2", "-crf", "23", "-c:v", "libx264", "-preset", "veryfast", "-pix_fmt", "yuv420p", "out.mp4"}
+	want := []string{"-y", "-i", "in.mov", "-vf", "scale=320:-2", "-crf", "23", "-c:v", "libx264", "-preset", "veryfast", "-pix_fmt", "yuv420p", "--", "out.mp4"}
 
 	if !equalArgs(got, want) {
 		t.Errorf("BuildArgs = %q, want %q", got, want)
 	}
 
 	got = BuildArgs("in.mov", "out.mp4", Spec{Kind: media.KindVideo, Format: "mp4", Height: 240})
-	want = []string{"-y", "-i", "in.mov", "-vf", "scale=-2:240", "-crf", "23", "-c:v", "libx264", "-preset", "veryfast", "-pix_fmt", "yuv420p", "out.mp4"}
+	want = []string{"-y", "-i", "in.mov", "-vf", "scale=-2:240", "-crf", "23", "-c:v", "libx264", "-preset", "veryfast", "-pix_fmt", "yuv420p", "--", "out.mp4"}
 
 	if !equalArgs(got, want) {
 		t.Errorf("BuildArgs = %q, want %q", got, want)
@@ -199,7 +199,7 @@ func TestBuildArgsWebM(t *testing.T) {
 	t.Parallel()
 
 	got := BuildArgs("in.mov", "out.webm", Spec{Kind: media.KindVideo, Format: "webm"})
-	want := []string{"-y", "-i", "in.mov", "-crf", "23", "-c:v", "libvpx-vp9", "-b:v", "0", "out.webm"}
+	want := []string{"-y", "-i", "in.mov", "-crf", "23", "-c:v", "libvpx-vp9", "-b:v", "0", "--", "out.webm"}
 
 	if !equalArgs(got, want) {
 		t.Errorf("BuildArgs = %q, want %q", got, want)
@@ -210,7 +210,7 @@ func TestBuildArgsMP3(t *testing.T) {
 	t.Parallel()
 
 	got := BuildArgs("in.wav", "out.mp3", Spec{Kind: media.KindAudio, Format: "mp3", Bitrate: 192})
-	want := []string{"-y", "-i", "in.wav", "-b:a", "192k", "-c:a", "libmp3lame", "out.mp3"}
+	want := []string{"-y", "-i", "in.wav", "-b:a", "192k", "-c:a", "libmp3lame", "--", "out.mp3"}
 
 	if !equalArgs(got, want) {
 		t.Errorf("BuildArgs = %q, want %q", got, want)
@@ -221,7 +221,7 @@ func TestBuildArgsWAV(t *testing.T) {
 	t.Parallel()
 
 	got := BuildArgs("in.wav", "out.wav", Spec{Kind: media.KindAudio, Format: "wav"})
-	want := []string{"-y", "-i", "in.wav", "-c:a", "pcm_s16le", "out.wav"}
+	want := []string{"-y", "-i", "in.wav", "-c:a", "pcm_s16le", "--", "out.wav"}
 
 	if !equalArgs(got, want) {
 		t.Errorf("BuildArgs = %q, want %q", got, want)
@@ -232,14 +232,14 @@ func TestBuildArgsUnknownFormat(t *testing.T) {
 	t.Parallel()
 
 	got := BuildArgs("in.mov", "out.mkv", Spec{Kind: media.KindVideo, Format: "mkv"})
-	want := []string{"-y", "-i", "in.mov", "-crf", "23", "out.mkv"}
+	want := []string{"-y", "-i", "in.mov", "-crf", "23", "--", "out.mkv"}
 
 	if !equalArgs(got, want) {
 		t.Errorf("BuildArgs = %q, want %q", got, want)
 	}
 
 	got = BuildArgs("in.wav", "out.wav", Spec{Kind: media.KindAudio, Format: ""})
-	want = []string{"-y", "-i", "in.wav", "-c:a", "pcm_s16le", "out.wav"}
+	want = []string{"-y", "-i", "in.wav", "-c:a", "pcm_s16le", "--", "out.wav"}
 
 	if !equalArgs(got, want) {
 		t.Errorf("BuildArgs empty format fallback = %q, want %q", got, want)
@@ -250,7 +250,7 @@ func TestBuildArgsThumbnail(t *testing.T) {
 	t.Parallel()
 
 	got := BuildArgs("v.mp4", "t.jpg", Spec{Kind: media.KindVideo, Format: "jpg", Offset: 5 * time.Second, Quality: 90})
-	want := []string{"-y", "-ss", "5.000", "-i", "v.mp4", "-frames:v", "1", "-q:v", "5", "t.jpg"}
+	want := []string{"-y", "-ss", "5.000", "-i", "v.mp4", "-frames:v", "1", "-q:v", "5", "--", "t.jpg"}
 
 	if !equalArgs(got, want) {
 		t.Errorf("BuildArgs = %q, want %q", got, want)
@@ -261,7 +261,7 @@ func TestBuildArgsThumbnailDefaults(t *testing.T) {
 	t.Parallel()
 
 	got := BuildArgs("v.mp4", "t.jpg", Spec{Kind: media.KindVideo, Format: "jpg"})
-	want := []string{"-y", "-ss", "0.000", "-i", "v.mp4", "-frames:v", "1", "-q:v", "8", "t.jpg"}
+	want := []string{"-y", "-ss", "0.000", "-i", "v.mp4", "-frames:v", "1", "-q:v", "8", "--", "t.jpg"}
 
 	if !equalArgs(got, want) {
 		t.Errorf("BuildArgs = %q, want %q", got, want)
@@ -272,7 +272,7 @@ func TestBuildArgsThumbnailScaleClamp(t *testing.T) {
 	t.Parallel()
 
 	got := BuildArgs("v.mp4", "t.png", Spec{Kind: media.KindVideo, Format: "png", Width: 321, Offset: 1500 * time.Millisecond, Quality: 200})
-	want := []string{"-y", "-ss", "1.500", "-i", "v.mp4", "-frames:v", "1", "-vf", "scale=320:-2", "-q:v", "2", "t.png"}
+	want := []string{"-y", "-ss", "1.500", "-i", "v.mp4", "-frames:v", "1", "-vf", "scale=320:-2", "-q:v", "2", "--", "t.png"}
 
 	if !equalArgs(got, want) {
 		t.Errorf("BuildArgs = %q, want %q", got, want)
@@ -283,7 +283,7 @@ func TestBuildArgsThumbnailFromOutExt(t *testing.T) {
 	t.Parallel()
 
 	got := BuildArgs("v.mp4", "t.jpg", Spec{Kind: media.KindVideo})
-	want := []string{"-y", "-ss", "0.000", "-i", "v.mp4", "-frames:v", "1", "-q:v", "8", "t.jpg"}
+	want := []string{"-y", "-ss", "0.000", "-i", "v.mp4", "-frames:v", "1", "-q:v", "8", "--", "t.jpg"}
 
 	if !equalArgs(got, want) {
 		t.Errorf("BuildArgs = %q, want %q", got, want)
@@ -294,7 +294,7 @@ func TestBuildArgsAudioKindImageFormatNotThumbnail(t *testing.T) {
 	t.Parallel()
 
 	got := BuildArgs("a.mp3", "t.jpg", Spec{Kind: media.KindAudio, Format: "jpg"})
-	want := []string{"-y", "-i", "a.mp3", "t.jpg"}
+	want := []string{"-y", "-i", "a.mp3", "--", "t.jpg"}
 
 	if !equalArgs(got, want) {
 		t.Errorf("BuildArgs = %q, want %q", got, want)
