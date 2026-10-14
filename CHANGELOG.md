@@ -9,6 +9,11 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Fixed
 
+- `fix(build): exclude agent harness checkouts from the module list`:
+  `ALL_MODULES` in `Makefile` now skips `./.claude/*`. Harness checkouts
+  under `.claude/worktrees/` each contain full module trees; without the
+  exclusion the list ballooned past `ARG_MAX`, `printf` failed, and every
+  `*-all` loop silently tested nothing (false green `make check`).
 - `fix(cli): resolve the CLI version from ldflags, build info, or VERSION`:
   `zever -V`, `zever new` pins, and generated-file stamps no longer rely on a
   hardcoded constant that lagged the release tags. The version now comes from
