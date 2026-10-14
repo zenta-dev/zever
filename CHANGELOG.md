@@ -461,6 +461,14 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   keeps working. The unknown-command usage text now lists `docs` and
   `completion`, and `zever --help` shares the same `zever — zever toolkit`
   header as the unknown-command usage.
+- `fix(cmd/zever): parallel-safe agent catalog tests`: `agentCommands`,
+  `agentGlobalFlags`, and `printAgentHelp` gain `*On` variants taking the
+  Cobra tree explicitly (mirroring `topLevelNames`), and
+  `TestPrintAgentHelp`/`TestUninstallUpgradeWiring` run `t.Parallel`
+  against fresh per-test trees. `cobra.Command.Commands` sorts the tree's
+  children in place, so parallel reads of the shared `rootCmd` global race
+  (reproduced with a throwaway parallel test under `-race`); production
+  output is unchanged.
 
 ### Security
 

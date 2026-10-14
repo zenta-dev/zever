@@ -5,6 +5,7 @@ import (
 	"io"
 	"sort"
 
+	"github.com/spf13/cobra"
 	"github.com/spf13/pflag"
 )
 
@@ -68,9 +69,16 @@ type agentCatalog struct {
 
 // printAgentHelp writes the command catalog as JSON to w.
 func printAgentHelp(w io.Writer) {
+	printAgentHelpOn(w, rootCmd)
+}
+
+// printAgentHelpOn writes the command catalog for root as JSON to w. It takes
+// the tree explicitly so tests can pass a fresh tree instead of the shared
+// rootCmd global (see agentCommandsOn).
+func printAgentHelpOn(w io.Writer, root *cobra.Command) {
 	catalog := agentCatalog{
-		Commands:    agentCommands(),
-		GlobalFlags: agentGlobalFlags(),
+		Commands:    agentCommandsOn(root),
+		GlobalFlags: agentGlobalFlagsOn(root),
 		ExitCodes: []exitCodeSpec{
 			{Code: ExitOK, Meaning: "success"},
 			{Code: ExitError, Meaning: "runtime error"},
@@ -84,9 +92,12 @@ func printAgentHelp(w io.Writer) {
 	_ = json.NewEncoder(w).Encode(catalog)
 }
 
-// agentCommands lists every Cobra subcommand sorted by name.
-func agentCommands() []commandSpec {
-	cmds := rootCmd.Commands()
+// agentCommandsOn lists every subcommand of root sorted by name. It takes the
+// tree explicitly so tests can pass a fresh tree: cobra.Command.Commands
+// sorts the tree's children in place, so concurrent reads of the shared
+// rootCmd global race; per-test trees keep parallel tests safe.
+func agentCommandsOn(root *cobra.Command) []commandSpec {
+	cmds := root.Commands()
 
 	out := make([]commandSpec, 0, len(cmds))
 	for _, c := range cmds {
@@ -98,11 +109,12 @@ func agentCommands() []commandSpec {
 	return out
 }
 
-// agentGlobalFlags lists the persistent global flags sorted by name.
-func agentGlobalFlags() []flagSpec {
+// agentGlobalFlagsOn lists the persistent global flags of root sorted by
+// name. It takes the tree explicitly for the same reason as agentCommandsOn.
+func agentGlobalFlagsOn(root *cobra.Command) []flagSpec {
 	var out []flagSpec
 
-	rootCmd.PersistentFlags().VisitAll(func(f *pflag.Flag) {
+	root.PersistentFlags().VisitAll(func(f *pflag.Flag) {
 		out = append(out, flagSpec{
 			Name:      f.Name,
 			Shorthand: f.Shorthand,
