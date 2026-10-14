@@ -271,10 +271,10 @@ func TestCoverPlanErrors(t *testing.T) {
 	dbPath := filepath.Join(dir, "migrate.db")
 	result := poisonedCompileResult(t, dir)
 
-	if err := dryRunDiff("sqlite", dbPath, result, migrate.PlanOptions{}); err == nil {
+	if err := dryRunDiff("sqlite", dbPath, result, migrate.PlanOptions{}, false); err == nil {
 		t.Fatal("expected a dry-run plan error, got nil")
 	}
-	if err := applyDiff("sqlite", dbPath, result.Schema, migrate.PlanOptions{}); err == nil {
+	if err := applyDiff("sqlite", dbPath, result.Schema, migrate.PlanOptions{}, false); err == nil {
 		t.Fatal("expected an apply plan error, got nil")
 	}
 }

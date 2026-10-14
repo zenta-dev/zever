@@ -536,7 +536,7 @@ func TestRunDBMigrateSQLiteTypeChangeWarns(t *testing.T) {
 func TestResolveMigrateConfig(t *testing.T) {
 	t.Parallel()
 
-	cfg := resolveMigrateConfig("sqlite", "app.db", []string{"a.zen"}, true, true)
+	cfg := resolveMigrateConfig("sqlite", "app.db", []string{"a.zen"}, true, true, MigrateSafetyOptions{})
 
 	if cfg.Adapter != "sqlite" || cfg.DSN != "app.db" || !cfg.DryRun || !cfg.DropColumns || len(cfg.Files) != 1 {
 		t.Fatalf("unexpected config: %+v", cfg)
@@ -587,7 +587,7 @@ func TestDryRunDiffOpenFailure(t *testing.T) {
 
 	result := &compile.Result{Schema: nil, Outputs: map[string]map[string][]byte{}}
 
-	if err := dryRunDiff("oracle", "x", result, migrate.PlanOptions{}); err == nil {
+	if err := dryRunDiff("oracle", "x", result, migrate.PlanOptions{}, false); err == nil {
 		t.Fatal("expected an open error, got nil")
 	}
 }

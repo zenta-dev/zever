@@ -26,6 +26,18 @@ const (
 	DialectMySQL    = "mysql"
 )
 
+// DDLOptions carries caller-selected rendering behaviors into
+// RenderSchemaDDLWithOptions, so adding a new one does not mean adding
+// another positional bool everywhere.
+type DDLOptions struct {
+	// ConcurrentIndexes renders postgres index builds as CREATE INDEX
+	// CONCURRENTLY, which does not block writes for the build's duration.
+	// It is postgres-only: other dialects render plain CREATE INDEX. A
+	// concurrent build cannot run inside a transaction block, so callers
+	// must execute each such statement in its own transaction (or none).
+	ConcurrentIndexes bool
+}
+
 // RenderSchemaDDL renders every module of a resolved schema into an
 // ordered list of idempotent DDL statements for the named dialect
 // ("postgres", "sqlite", or "mysql"), safe to execute in sequence against
@@ -39,6 +51,13 @@ const (
 // See the file comment: this is a create-only bootstrap, not full
 // migration support.
 func RenderSchemaDDL(dialect string, schema *ir.Schema) ([]string, error) {
+	return RenderSchemaDDLWithOptions(dialect, schema, DDLOptions{})
+}
+
+// RenderSchemaDDLWithOptions renders like RenderSchemaDDL, applying opts:
+// with ConcurrentIndexes, postgres index builds use CREATE INDEX
+// CONCURRENTLY (other dialects are unaffected).
+func RenderSchemaDDLWithOptions(dialect string, schema *ir.Schema, opts DDLOptions) ([]string, error) {
 	if err := checkDialect(dialect); err != nil {
 		return nil, err
 	}
@@ -73,7 +92,7 @@ func RenderSchemaDDL(dialect string, schema *ir.Schema) ([]string, error) {
 		}
 
 		for _, e := range ordered {
-			stmts = append(stmts, renderCreateIndexes(dialect, e)...)
+			stmts = append(stmts, renderCreateIndexesWithOptions(dialect, e, opts)...)
 		}
 	}
 
@@ -214,11 +233,12 @@ func renderMySQLForeignKeyConstraint(quote func(string) string, fk foreignKey) s
 	return clause
 }
 
-// renderCreateIndexes renders the entity's declared index(...) blocks as
-// CREATE INDEX / CREATE UNIQUE INDEX statements. Single-field @unique
-// columns are not repeated here: renderColumnDDL already emits them as
-// inline UNIQUE column constraints.
-func renderCreateIndexes(dialect string, e *ir.Entity) []string {
+// renderCreateIndexesWithOptions renders the entity's declared index(...)
+// blocks as CREATE INDEX / CREATE UNIQUE INDEX statements. Single-field
+// @unique columns are not repeated here: renderColumnDDL already emits them
+// as inline UNIQUE column constraints. With opts.ConcurrentIndexes on
+// postgres the builds use CREATE INDEX CONCURRENTLY (see DDLOptions).
+func renderCreateIndexesWithOptions(dialect string, e *ir.Entity, opts DDLOptions) []string {
 	specs := declaredIndexes(e)
 	out := make([]string, 0, len(specs))
 	quote := identQuote(dialect)
@@ -234,6 +254,13 @@ func renderCreateIndexes(dialect string, e *ir.Entity) []string {
 			unique = "UNIQUE "
 		}
 
+		// CREATE INDEX CONCURRENTLY cannot run inside a transaction block,
+		// which is exactly why it does not block writes; it is postgres-only.
+		concurrently := ""
+		if opts.ConcurrentIndexes && dialect == DialectPostgres {
+			concurrently = "CONCURRENTLY "
+		}
+
 		// Postgres and SQLite support CREATE INDEX IF NOT EXISTS; MySQL does
 		// not (that is MariaDB), so MySQL gets the bare CREATE INDEX form.
 		// The live-diff migration engine only emits a CREATE INDEX after
@@ -245,8 +272,8 @@ func renderCreateIndexes(dialect string, e *ir.Entity) []string {
 			ifNotExists = ""
 		}
 
-		out = append(out, fmt.Sprintf("CREATE %sINDEX %s%s ON %s (%s);",
-			unique, ifNotExists, quote(spec.Name), qualifiedTable(dialect, e), strings.Join(columns, ", ")))
+		out = append(out, fmt.Sprintf("CREATE %sINDEX %s%s%s ON %s (%s);",
+			unique, concurrently, ifNotExists, quote(spec.Name), qualifiedTable(dialect, e), strings.Join(columns, ", ")))
 	}
 
 	return out
