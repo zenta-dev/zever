@@ -116,15 +116,30 @@ func NewWithClient(opts Options, client Client) (crypto.Crypto, error) {
 
 	var signPriv ed25519.PrivateKey
 	if opts.SignKey != "" {
-		signBytes, _ := base64.StdEncoding.DecodeString(opts.SignKey)
+		signBytes, err := base64.StdEncoding.DecodeString(opts.SignKey)
+		if err != nil {
+			return nil, fmt.Errorf("kms: sign_key must be valid base64: %w", errors.Join(err, crypto.ErrInvalidKey))
+		}
+		if len(signBytes) != ed25519.PrivateKeySize {
+			return nil, fmt.Errorf("kms: %w: sign_key must decode to 64 bytes", crypto.ErrInvalidKey)
+		}
 		signPriv = ed25519.PrivateKey(signBytes)
 	}
 
 	var macKey []byte
 	hasMac := false
 	if opts.Key != "" {
-		key, _ := base64.StdEncoding.DecodeString(opts.Key)
-		macKey, _ = hkdf.Key(sha256.New, key, nil, "zever/kms/mac", 32)
+		key, err := base64.StdEncoding.DecodeString(opts.Key)
+		if err != nil {
+			return nil, fmt.Errorf("kms: key must be valid base64: %w", errors.Join(err, crypto.ErrInvalidKey))
+		}
+		if len(key) != 32 {
+			return nil, fmt.Errorf("kms: %w: key must decode to 32 bytes", crypto.ErrInvalidKey)
+		}
+		macKey, err = hkdf.Key(sha256.New, key, nil, "zever/kms/mac", 32)
+		if err != nil {
+			return nil, fmt.Errorf("kms: derive mac key: %w", errors.Join(err, crypto.ErrInvalidKey))
+		}
 		hasMac = true
 	}
 
@@ -257,9 +272,10 @@ func (d *driver) Decrypt(ctx context.Context, ciphertext []byte) ([]byte, error)
 	return plaintext, nil
 }
 
-// Sign returns the Ed25519 signature for message. It requires SignKey.
+// Sign returns the Ed25519 signature for message. It requires SignKey;
+// a missing or malformed key fails with ErrKeyNotFound instead of panicking.
 func (d *driver) Sign(_ context.Context, message []byte) ([]byte, error) {
-	if d.signPriv == nil {
+	if len(d.signPriv) != ed25519.PrivateKeySize {
 		return nil, crypto.ErrKeyNotFound
 	}
 
@@ -268,7 +284,7 @@ func (d *driver) Sign(_ context.Context, message []byte) ([]byte, error) {
 
 // Verify reports whether signature is valid for message. It requires SignKey.
 func (d *driver) Verify(_ context.Context, message, signature []byte) (bool, error) {
-	if d.signPriv == nil {
+	if len(d.signPriv) != ed25519.PrivateKeySize {
 		return false, crypto.ErrKeyNotFound
 	}
 

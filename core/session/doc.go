@@ -4,6 +4,11 @@
 //
 // Type safety: Store plus typed Options plus Adapter enum plus Factory. Session plus NewSession plus Clone plus Expired are typed; zero TTL means DefaultTTL of 15 minutes. Unsupported features fail closed.
 //
+// Login rotation: call Rotate after authentication succeeds and switch the
+// client to the fresh ID, so a pre-login ID can never become authenticated
+// (session fixation). Rotate is a free helper over Store: no interface
+// change, all backends support it.
+//
 // DX: Open with Open, custom backends with Register. Options are typed with zero-infra defaults for tests. Config file plus env SESSION_<FIELD> (no prefix, e.g. SESSION_ADAPTER). See config/README.md.
 //
 // Container: container.New(cfg) then c.Session(). Lazy per-service singleton, retry on error. See container/README.md.

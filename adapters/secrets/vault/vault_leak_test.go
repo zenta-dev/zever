@@ -13,7 +13,7 @@ func mustLeakServer(t *testing.T, token string) (*httptest.Server, Options) {
 		http.Error(w, "boom", http.StatusInternalServerError)
 	}))
 	t.Cleanup(srv.Close)
-	return srv, Options{Addr: srv.URL, Token: token, Mount: "secret"}
+	return srv, Options{Addr: srv.URL, AllowInsecure: true, Token: token, Mount: "secret"}
 }
 
 // TestErrors_NeverLeakTokenOrValue ensures Vault failure paths include only

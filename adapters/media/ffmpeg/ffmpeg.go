@@ -36,6 +36,17 @@ const (
 	// the kernel time to release the exec-in-progress lock under CI load
 	// instead of re-attempting immediately into the same busy window.
 	execRetryBackoff = 5 * time.Millisecond
+	// DefaultProbeTimeout bounds ffprobe runs when the caller's context
+	// carries no deadline. Callers with their own deadline keep it.
+	DefaultProbeTimeout = 30 * time.Second
+	// DefaultTranscodeTimeout bounds ffmpeg runs when the caller's context
+	// carries no deadline. A hostile input must not run forever on the
+	// operator's default path; pass an explicit deadline for longer jobs.
+	DefaultTranscodeTimeout = 10 * time.Minute
+	// DefaultMaxOutputBytes caps the transcode output file size checked
+	// after a successful run. Operators serving untrusted uploads should
+	// additionally enforce directory quotas at the filesystem level.
+	DefaultMaxOutputBytes = 1 << 30
 )
 
 // Spec describes an ffmpeg transcode or thumbnail extraction.
@@ -113,7 +124,7 @@ func buildThumbnailArgs(in, out string, s Spec) []string {
 		argv = append(argv, "-vf", scaleFilter(s.Width, s.Height))
 	}
 
-	return append(argv, "-q:v", jpegQ(s.Quality), out)
+	return append(argv, "-q:v", jpegQ(s.Quality), "--", out)
 }
 
 func buildAVArgs(in, out string, s Spec, format string) []string {
@@ -135,7 +146,12 @@ func buildAVArgs(in, out string, s Spec, format string) []string {
 		argv = append(argv, "-crf", strconv.Itoa(crf))
 	}
 
-	return append(argv, append(codecArgs(format), out)...)
+	// The output is always preceded by `--` so a leading-dash name cannot
+	// parse as a flag. The input follows `-i` literally and needs no
+	// separator; leading-dash inputs are rejected by ValidatePath at the
+	// Probe/RunTranscode entry points instead.
+	argv = append(argv, codecArgs(format)...)
+	return append(argv, "--", out)
 }
 
 func codecArgs(format string) []string {
@@ -201,6 +217,84 @@ func jpegQ(quality int) string {
 
 func normalizeFormat(f string) string {
 	return strings.TrimPrefix(strings.ToLower(strings.TrimSpace(f)), ".")
+}
+
+// ValidatePath checks p for safe use as an ffmpeg/ffprobe path: it must be
+// non-empty, must not start with `-` (which would parse as a flag), and
+// must carry a known media extension (see media.KindForExt). Pass untrusted
+// upload names through this before Probe or a transcode argv; RunTranscode
+// cannot allowlist inputs itself because legitimate filter inputs (e.g.
+// lavfi `sine=...`) carry no extension.
+func ValidatePath(p string) error {
+	if strings.TrimSpace(p) == "" {
+		return fmt.Errorf("%w: path is required", ErrInvalidPath)
+	}
+	if strings.HasPrefix(p, "-") {
+		return fmt.Errorf("%w: path must not start with '-'", ErrInvalidPath)
+	}
+	if _, ok := media.KindForExt(normalizeFormat(filepath.Ext(p))); !ok {
+		return fmt.Errorf("%w: unknown extension in %q", ErrInvalidPath, p)
+	}
+	return nil
+}
+
+// withDefaultTimeout wraps ctx with d when the caller set no deadline, so a
+// runaway binary cannot outlive the operator's intent on the default path.
+// Callers with their own deadline or timeout keep it untouched.
+func withDefaultTimeout(ctx context.Context, d time.Duration) (context.Context, context.CancelFunc) {
+	if _, ok := ctx.Deadline(); ok {
+		return ctx, func() {}
+	}
+	return context.WithTimeout(ctx, d)
+}
+
+// validateTranscodeArgs fails closed on flag-looking inputs/outputs without
+// spawning the binary. The input is the element after the first `-i` when
+// present; the output is the final element. Extension allowlisting stays
+// with the caller (see ValidatePath): filter inputs carry no extension.
+func validateTranscodeArgs(argv []string) error {
+	if len(argv) == 0 {
+		return fmt.Errorf("%w: empty argv", ErrTranscodeFailed)
+	}
+	for i, a := range argv {
+		if a == "-i" && i+1 < len(argv) && strings.HasPrefix(argv[i+1], "-") && argv[i+1] != "--" {
+			return fmt.Errorf("%w: input must not start with '-'", ErrInvalidPath)
+		}
+	}
+	if out := argv[len(argv)-1]; strings.HasPrefix(out, "-") {
+		return fmt.Errorf("%w: output must not start with '-'", ErrInvalidPath)
+	}
+	return nil
+}
+
+// withOutputSeparator returns an argv copy with `--` inserted before the
+// final (output) element, unless already present. Vectors built by BuildArgs
+// carry the separator; hand-built vectors gain it here.
+func withOutputSeparator(argv []string) []string {
+	if len(argv) >= 2 && argv[len(argv)-2] == "--" {
+		return argv
+	}
+	out := make([]string, 0, len(argv)+1)
+	out = append(out, argv[:len(argv)-1]...)
+	return append(out, "--", argv[len(argv)-1])
+}
+
+// checkOutputSize enforces limit on the transcode output file (the final
+// argv element). Missing files are skipped: stub binaries and non-file
+// outputs create none. Oversized outputs fail with ErrOutputTooLarge.
+func checkOutputSize(argv []string, limit int64) error {
+	if len(argv) == 0 {
+		return nil
+	}
+	out := argv[len(argv)-1]
+	if out == "" || out == "--" {
+		return nil
+	}
+	st, err := os.Stat(out)
+	if err == nil && st.Size() > limit {
+		return fmt.Errorf("%w: %q exceeds %d bytes", ErrOutputTooLarge, out, limit)
+	}
+	return nil
 }
 
 // ProbeStream describes one ffprobe stream.
@@ -327,9 +421,18 @@ func LookPath(name string) (string, error) {
 }
 
 // Probe runs ffprobe and parses its JSON output. Stdout is capped at 1 MiB.
-// Transient text-file-busy start failures are retried.
+// Transient text-file-busy start failures are retried. The path is
+// validated (see ValidatePath) and passed after `--`; when the caller's
+// context carries no deadline, DefaultProbeTimeout applies.
 func Probe(ctx context.Context, ffprobe, path string) (ProbeResult, error) {
 	var res ProbeResult
+
+	if err := ValidatePath(path); err != nil {
+		return res, err
+	}
+
+	ctx, cancel := withDefaultTimeout(ctx, DefaultProbeTimeout)
+	defer cancel()
 
 	var stderr bytes.Buffer
 
@@ -340,7 +443,7 @@ func Probe(ctx context.Context, ffprobe, path string) (ProbeResult, error) {
 	var err error
 
 	for range maxExecAttempts {
-		cmd = exec.CommandContext(ctx, ffprobe, "-v", "error", "-show_format", "-show_streams", "-of", "json", path) // binary resolved via LookPath, argv fixed.
+		cmd = exec.CommandContext(ctx, ffprobe, "-v", "error", "-show_format", "-show_streams", "-of", "json", "--", path) // binary resolved via LookPath, argv fixed.
 		cmd.Stderr = &stderr
 		stdout, _ = cmd.StdoutPipe()
 		err = cmd.Start()
@@ -387,8 +490,22 @@ func Probe(ctx context.Context, ffprobe, path string) (ProbeResult, error) {
 }
 
 // RunTranscode runs ffmpeg with the argv vector compiled by BuildArgs.
-// Transient text-file-busy start failures are retried.
+// Transient text-file-busy start failures are retried. Flag-looking
+// inputs/outputs are rejected before exec, `--` is ensured before the
+// output, a successful run is checked against DefaultMaxOutputBytes, and
+// DefaultTranscodeTimeout applies when the caller's context carries no
+// deadline. Callers must allowlist untrusted inputs via ValidatePath:
+// filter inputs (e.g. lavfi) carry no extension, so RunTranscode cannot do
+// it from the argv alone.
 func RunTranscode(ctx context.Context, ffmpegBin string, argv []string) error {
+	if err := validateTranscodeArgs(argv); err != nil {
+		return err
+	}
+	argv = withOutputSeparator(argv)
+
+	ctx, cancel := withDefaultTimeout(ctx, DefaultTranscodeTimeout)
+	defer cancel()
+
 	var stderr bytes.Buffer
 
 	var err error
@@ -415,6 +532,10 @@ func RunTranscode(ctx context.Context, ffmpegBin string, argv []string) error {
 		}
 
 		return fmt.Errorf("%w: %q", errors.Join(ErrTranscodeFailed, err), errSnippet(&stderr))
+	}
+
+	if err := checkOutputSize(argv, DefaultMaxOutputBytes); err != nil {
+		return err
 	}
 
 	return nil
