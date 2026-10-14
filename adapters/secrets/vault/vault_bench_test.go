@@ -17,7 +17,7 @@ func newBenchSecrets(b *testing.B) secrets.Secrets {
 	srv := httptest.NewServer(stub.handler())
 	b.Cleanup(srv.Close)
 
-	s, err := New(Options{Addr: srv.URL, Token: "bench-token", Mount: "secret"})
+	s, err := New(Options{Addr: srv.URL, AllowInsecure: true, Token: "bench-token", Mount: "secret"})
 	if err != nil {
 		b.Fatalf("New(): %v", err)
 	}
@@ -85,7 +85,7 @@ func BenchmarkDelete(b *testing.B) {
 	}))
 	b.Cleanup(srv.Close)
 
-	s, err := New(Options{Addr: srv.URL, Token: "bench-token", Mount: "secret"})
+	s, err := New(Options{Addr: srv.URL, AllowInsecure: true, Token: "bench-token", Mount: "secret"})
 	if err != nil {
 		b.Fatalf("New(): %v", err)
 	}

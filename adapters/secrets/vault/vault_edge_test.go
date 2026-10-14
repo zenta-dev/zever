@@ -31,7 +31,7 @@ func TestEdgeGet_MissingValueField_ErrNotFound(t *testing.T) {
 		w.Header().Set("Content-Type", "application/json")
 		_, _ = w.Write([]byte(`{"data":{"data":{"other":"x"}}}`))
 	})
-	s := mustNew(t, Options{Addr: srv.URL, Token: "t", Mount: "secret"})
+	s := mustNew(t, Options{Addr: srv.URL, AllowInsecure: true, Token: "t", Mount: "secret"})
 
 	if _, err := s.Get(t.Context(), "k"); !errors.Is(err, secrets.ErrNotFound) {
 		t.Fatalf("Get(missing value field) err = %v, want ErrNotFound", err)
@@ -45,7 +45,7 @@ func TestEdgeGet_MalformedJSON_DecodeError(t *testing.T) {
 		w.Header().Set("Content-Type", "application/json")
 		_, _ = w.Write([]byte(`{not json`))
 	})
-	s := mustNew(t, Options{Addr: srv.URL, Token: "t", Mount: "secret"})
+	s := mustNew(t, Options{Addr: srv.URL, AllowInsecure: true, Token: "t", Mount: "secret"})
 
 	_, err := s.Get(t.Context(), "k")
 	if err == nil || !strings.Contains(err.Error(), "decode") {
@@ -57,7 +57,7 @@ func TestEdgeDelete_Missing_ErrNotFound(t *testing.T) {
 	t.Parallel()
 
 	srv := mustStubServer(t, "tok", "secret")
-	s := mustNew(t, Options{Addr: srv.URL, Token: "tok", Mount: "secret"})
+	s := mustNew(t, Options{Addr: srv.URL, AllowInsecure: true, Token: "tok", Mount: "secret"})
 
 	if err := s.Delete(t.Context(), "absent"); !errors.Is(err, secrets.ErrNotFound) {
 		t.Fatalf("Delete(missing) err = %v, want ErrNotFound", err)
@@ -70,7 +70,7 @@ func TestEdgeUnexpectedStatus_Error(t *testing.T) {
 	srv := mustEdgeServer(t, func(w http.ResponseWriter, _ *http.Request) {
 		http.Error(w, "boom", http.StatusInternalServerError)
 	})
-	s := mustNew(t, Options{Addr: srv.URL, Token: "t", Mount: "secret"})
+	s := mustNew(t, Options{Addr: srv.URL, AllowInsecure: true, Token: "t", Mount: "secret"})
 	ctx := t.Context()
 
 	cases := []struct {
@@ -104,7 +104,7 @@ func TestEdgeList_MalformedJSON_DecodeError(t *testing.T) {
 		w.Header().Set("Content-Type", "application/json")
 		_, _ = w.Write([]byte(`nope`))
 	})
-	s := mustNew(t, Options{Addr: srv.URL, Token: "t", Mount: "secret"})
+	s := mustNew(t, Options{Addr: srv.URL, AllowInsecure: true, Token: "t", Mount: "secret"})
 
 	_, err := s.List(t.Context())
 	if err == nil || !strings.Contains(err.Error(), "decode") {
@@ -116,7 +116,7 @@ func TestEdgeList_Empty_NoError(t *testing.T) {
 	t.Parallel()
 
 	srv := mustStubServer(t, "t", "secret")
-	s := mustNew(t, Options{Addr: srv.URL, Token: "t", Mount: "secret"})
+	s := mustNew(t, Options{Addr: srv.URL, AllowInsecure: true, Token: "t", Mount: "secret"})
 
 	keys, err := s.List(t.Context())
 	if err != nil {
@@ -131,7 +131,7 @@ func TestEdgeSet_EmptyValue_RoundTrip(t *testing.T) {
 	t.Parallel()
 
 	srv := mustStubServer(t, "t", "secret")
-	s := mustNew(t, Options{Addr: srv.URL, Token: "t", Mount: "secret"})
+	s := mustNew(t, Options{Addr: srv.URL, AllowInsecure: true, Token: "t", Mount: "secret"})
 	ctx := t.Context()
 
 	if err := s.Set(ctx, "empty", []byte{}); err != nil {
@@ -151,7 +151,7 @@ func TestEdgeSet_LargeValue_RoundTrip(t *testing.T) {
 	t.Parallel()
 
 	srv := mustStubServer(t, "t", "secret")
-	s := mustNew(t, Options{Addr: srv.URL, Token: "t", Mount: "secret"})
+	s := mustNew(t, Options{Addr: srv.URL, AllowInsecure: true, Token: "t", Mount: "secret"})
 	ctx := t.Context()
 
 	value := bytes.Repeat([]byte("z"), 1<<20)
@@ -172,7 +172,7 @@ func TestEdgeName_Boundary_RoundTrip(t *testing.T) {
 	t.Parallel()
 
 	srv := mustStubServer(t, "t", "secret")
-	s := mustNew(t, Options{Addr: srv.URL, Token: "t", Mount: "secret"})
+	s := mustNew(t, Options{Addr: srv.URL, AllowInsecure: true, Token: "t", Mount: "secret"})
 	ctx := t.Context()
 
 	name := strings.Repeat("a", 512)
@@ -196,7 +196,7 @@ func TestEdgeTransportError_Propagates(t *testing.T) {
 	addr := srv.URL
 	srv.Close()
 
-	s := mustNew(t, Options{Addr: addr, Token: "t", Mount: "secret"})
+	s := mustNew(t, Options{Addr: addr, AllowInsecure: true, Token: "t", Mount: "secret"})
 	ctx := t.Context()
 
 	cases := []struct {
@@ -220,7 +220,7 @@ func TestEdgeNew_AddrTrailingSlash_Trimmed(t *testing.T) {
 	t.Parallel()
 
 	srv := mustStubServer(t, "t", "secret")
-	s := mustNew(t, Options{Addr: srv.URL + "/", Token: "t", Mount: "secret"})
+	s := mustNew(t, Options{Addr: srv.URL + "/", AllowInsecure: true, Token: "t", Mount: "secret"})
 
 	if err := s.Set(t.Context(), "k", []byte("v")); err != nil {
 		t.Fatalf("Set with trailing-slash addr err = %v", err)
@@ -239,7 +239,7 @@ func TestEdgeNamespaceHeader_Sent(t *testing.T) {
 		w.Header().Set("Content-Type", "application/json")
 		_, _ = w.Write([]byte(`{"data":{"data":{"value":"aGk="}}}`))
 	})
-	s := mustNew(t, Options{Addr: srv.URL, Token: "t", Mount: "secret", Namespace: "team-a"})
+	s := mustNew(t, Options{Addr: srv.URL, AllowInsecure: true, Token: "t", Mount: "secret", Namespace: "team-a"})
 
 	if _, err := s.Get(t.Context(), "k"); err != nil {
 		t.Fatalf("Get() err = %v", err)
@@ -258,7 +258,7 @@ func TestEdgeList_NotFound_NoError(t *testing.T) {
 	srv := mustEdgeServer(t, func(w http.ResponseWriter, _ *http.Request) {
 		http.Error(w, "not found", http.StatusNotFound)
 	})
-	s := mustNew(t, Options{Addr: srv.URL, Token: "t", Mount: "secret"})
+	s := mustNew(t, Options{Addr: srv.URL, AllowInsecure: true, Token: "t", Mount: "secret"})
 
 	keys, err := s.List(t.Context())
 	if err != nil {
@@ -274,7 +274,7 @@ func TestEdgeConcurrent_Access(t *testing.T) {
 	t.Parallel()
 
 	srv := mustStubServer(t, "t", "secret")
-	s := mustNew(t, Options{Addr: srv.URL, Token: "t", Mount: "secret"})
+	s := mustNew(t, Options{Addr: srv.URL, AllowInsecure: true, Token: "t", Mount: "secret"})
 	ctx := t.Context()
 
 	var wg sync.WaitGroup

@@ -3,10 +3,12 @@ package vault
 import (
 	"bytes"
 	"context"
+	"crypto/tls"
 	"encoding/base64"
 	"encoding/json"
 	"errors"
 	"fmt"
+	"log/slog"
 	"net/http"
 	"net/url"
 	"strings"
@@ -28,6 +30,8 @@ type driver struct {
 }
 
 // New creates a Vault KVv2 secrets adapter from validated Options.
+// A plain-http Addr is rejected by Validate unless AllowInsecure is set;
+// opting in logs a warning since the token travels in cleartext.
 func New(opts Options) (secrets.Secrets, error) {
 	if err := opts.Validate(); err != nil {
 		return nil, err
@@ -36,13 +40,29 @@ func New(opts Options) (secrets.Secrets, error) {
 	if err != nil {
 		return nil, err
 	}
+	if opts.AllowInsecure {
+		slog.Default().Warn("vault: allow_insecure enabled: token is sent over plain http; test setups only")
+	}
 	return &driver{
 		baseURL:   strings.TrimRight(strings.TrimSpace(opts.Addr), "/"),
 		token:     token,
 		mount:     strings.Trim(strings.TrimSpace(opts.Mount), "/"),
 		namespace: strings.TrimSpace(opts.Namespace),
-		client:    &http.Client{Timeout: DefaultHTTPTimeout},
+		client:    newHTTPClient(),
 	}, nil
+}
+
+// newHTTPClient returns an HTTP client with bounded round-trips and a
+// TLS 1.2 floor, cloned from the default transport so proxy and
+// connection-pool behavior stay unchanged.
+func newHTTPClient() *http.Client {
+	transport, ok := http.DefaultTransport.(*http.Transport)
+	if !ok {
+		return &http.Client{Timeout: DefaultHTTPTimeout}
+	}
+	clone := transport.Clone()
+	clone.TLSClientConfig = &tls.Config{MinVersion: tls.VersionTLS12}
+	return &http.Client{Timeout: DefaultHTTPTimeout, Transport: clone}
 }
 
 func (d *driver) request(ctx context.Context, method, path string, body any) (*http.Request, error) {

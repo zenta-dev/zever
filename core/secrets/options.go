@@ -13,6 +13,9 @@ type Options struct {
 	Mount string `json:"mount" toml:"mount" yaml:"mount"`
 	// Namespace is the Vault namespace.
 	Namespace string `json:"namespace" toml:"namespace" yaml:"namespace"`
+	// AllowInsecure permits a plain-http Vault Addr for test setups.
+	// Default false (https only).
+	AllowInsecure bool `json:"allow_insecure" toml:"allow_insecure" yaml:"allow_insecure"`
 	// ProjectID is the GCP project ID.
 	ProjectID string `json:"project_id" toml:"project_id" yaml:"project_id"`
 	// Prefix scopes secret names to one namespace.

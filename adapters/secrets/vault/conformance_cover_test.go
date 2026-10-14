@@ -16,7 +16,7 @@ func TestVaultConformance(t *testing.T) {
 		t.Helper()
 
 		srv := mustStubServer(t, "test-token", "conformance")
-		s := mustNew(t, Options{Addr: srv.URL, Token: "test-token", Mount: "conformance"})
+		s := mustNew(t, Options{Addr: srv.URL, AllowInsecure: true, Token: "test-token", Mount: "conformance"})
 
 		t.Cleanup(func() { _ = s.Close(t.Context()) })
 

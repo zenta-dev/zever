@@ -19,6 +19,11 @@ type Options struct {
 	Mount string `json:"mount" toml:"mount" yaml:"mount"`
 	// Namespace is the Vault namespace.
 	Namespace string `json:"namespace" toml:"namespace" yaml:"namespace"`
+	// AllowInsecure permits a plain-http Addr for test setups (httptest
+	// servers speak http only). Default false: Addr must use https, since
+	// the token travels in the X-Vault-Token header and plain http sends
+	// it in cleartext. Enabling this logs a warning at open.
+	AllowInsecure bool `json:"allow_insecure" toml:"allow_insecure" yaml:"allow_insecure"`
 }
 
 // Validate checks Options for consistency, joining all violations.
@@ -29,8 +34,13 @@ func (o Options) Validate() error {
 		errs = append(errs, errors.New("vault: addr is required"))
 	} else {
 		u, err := url.Parse(o.Addr)
-		if err != nil || u.Scheme == "" {
+		switch {
+		case err != nil || u.Scheme == "":
 			errs = append(errs, errors.New("vault: addr must include scheme"))
+		case u.Scheme != "https" && u.Scheme != "http":
+			errs = append(errs, errors.New("vault: addr scheme must be https or http"))
+		case u.Scheme == "http" && !o.AllowInsecure:
+			errs = append(errs, errors.New("vault: addr must use https (set allow_insecure for plain http test setups)"))
 		}
 		if err == nil && u.Host == "" {
 			errs = append(errs, errors.New("vault: addr must include host"))
