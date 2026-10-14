@@ -100,6 +100,17 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Added
 
+- `fix(payment): at-least-once webhook handling`: `WebhookEvent` on the
+  `stripe` and `paddle` adapters records the event id as seen before the
+  caller processes it (at-most-once), so a failing handler loses the event
+  on the provider retry, and events with an empty id are never deduped. New
+  optional interface `payment.WebhookHandling` (`HandleWebhook(ctx, raw,
+  signature, handler)`) runs the handler under the reservation, commits only
+  on success, and releases the key on handler error or panic so retries are
+  accepted; an empty event id is rejected with `payment.ErrMissingEventID`.
+  `payment.ProcessWebhookOnce` is the shared helper. `WebhookEvent` behavior
+  is unchanged and now documented as at-most-once.
+
 - `feat(cli): slim adapter-scoped builds`: the new `zever build`
   command compiles a slim CLI registering only `--adapters=a,b`
   (bare batteries select every known adapter, `battery/adapter` pins
