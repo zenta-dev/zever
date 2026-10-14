@@ -64,6 +64,16 @@ fetched: stub_1 succeeded
 
 With `auto_approve: false` the same program prints `pending`; the webhook path flips it later.
 
+## Amount semantics
+
+Every amount in `payment.Request`, `payment.Result`, and `payment.Event` is an `int64` in minor units (cents), regardless of adapter.
+
+- `stripe` reports native minor-unit integers, so values pass through untouched.
+- `paddle` reports decimal strings in major units (e.g. `"10.00"`). The adapter normalizes them to minor units: `"10"` and `"10.00"` both become `1000`, `"10.99"` becomes `1099`.
+- Sub-cent precision (more than two decimal places) rounds half away from zero, symmetrically for positive and negative totals: `"10.005"` becomes `1001`, `"-10.005"` becomes `-1001`.
+- Totals that no longer fit `int64` once scaled fail with `ErrAmountOverflow` instead of wrapping.
+- The reverse direction agrees: partial-refund adjustment amounts are formatted back to major-unit decimals (`1000` is sent as `"10.00"`).
+
 ## Verify webhooks
 
 Decoding checks the provider signature against `webhook_secret` before touching the payload, under the `max_webhook_bytes` bound; a failure or oversized payload never reaches your handler as a trusted `Event`. Pass the raw body unmodified, plus the signature header value, to `WebhookEvent(ctx, raw, signature)`. `stub` performs no verification and holds no funds, so it is test-only.

@@ -62,18 +62,15 @@ func FuzzParsePaddleAmount(f *testing.F) {
 }
 
 // TestParsePaddleAmountKnown pins the decimal-to-minor-units contract. The
-// no-dot branch passes values through verbatim ("10" is ten minor units,
-// matching the pinned TestParsePaddleAmount/amount_10 case): whole-unit
-// totals from Paddle always carry decimals in practice, and whether a bare
-// "2500" means major or minor units is a documented follow-up, not changed
-// here.
+// no-dot branch scales whole units to minor units ("10" is one thousand
+// minor units); sub-cent precision rounds half away from zero.
 func TestParsePaddleAmountKnown(t *testing.T) {
 	t.Parallel()
 
 	cases := map[string]int64{
 		"":      0,
 		"0":     0,
-		"10":    10,
+		"10":    1000,
 		"10.00": 1000,
 		"7.5":   750,
 		".5":    50,
