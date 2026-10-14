@@ -939,6 +939,9 @@ $defs:
             allow_insecure:
                 description: Permit a plain-http Addr for testing. Default false (https only).
                 type: boolean
+            allow_insecure_token_file_perms:
+                description: Permit a TokenFile readable beyond its owner. Default false (0600 or stricter required).
+                type: boolean
             mount:
                 description: Vault KV mount path.
                 type: string

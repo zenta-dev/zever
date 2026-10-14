@@ -24,6 +24,12 @@ type Options struct {
 	// the token travels in the X-Vault-Token header and plain http sends
 	// it in cleartext. Enabling this logs a warning at open.
 	AllowInsecure bool `json:"allow_insecure" toml:"allow_insecure" yaml:"allow_insecure"`
+	// AllowInsecureTokenFilePerms permits a TokenFile readable beyond its
+	// owner (any group/other permission bit, i.e. broader than 0600).
+	// Default false: such a file fails closed, since any local user could
+	// steal the token. Restrict the file to 0600 instead; enabling this
+	// logs a warning at open.
+	AllowInsecureTokenFilePerms bool `json:"allow_insecure_token_file_perms" toml:"allow_insecure_token_file_perms" yaml:"allow_insecure_token_file_perms"`
 }
 
 // Validate checks Options for consistency, joining all violations.
@@ -53,6 +59,16 @@ func (o Options) Validate() error {
 	if strings.Contains(o.Mount, " ") || strings.Contains(o.Mount, "..") {
 		errs = append(errs, errors.New("vault: mount must not contain spaces or dot-dot"))
 	}
+	if trimmed := strings.Trim(strings.TrimSpace(o.Mount), "/"); trimmed != "" {
+		for _, seg := range strings.Split(trimmed, "/") {
+			switch seg {
+			case "":
+				errs = append(errs, errors.New("vault: mount must not contain empty segments"))
+			case ".", "..":
+				errs = append(errs, errors.New("vault: mount must not contain dot segments"))
+			}
+		}
+	}
 
 	token := strings.TrimSpace(o.Token)
 	if token == "" && strings.TrimSpace(o.TokenFile) != "" {
@@ -61,6 +77,9 @@ func (o Options) Validate() error {
 			errs = append(errs, errors.New("vault: token_file unreadable"))
 		} else if strings.TrimSpace(string(b)) == "" {
 			errs = append(errs, errors.New("vault: token_file must not be empty"))
+		}
+		if err := o.checkTokenFilePerms(); err != nil {
+			errs = append(errs, err)
 		}
 	}
 	if token == "" && strings.TrimSpace(o.TokenFile) == "" {
@@ -75,6 +94,9 @@ func (o Options) resolveToken() (string, error) {
 	if strings.TrimSpace(o.Token) != "" {
 		return strings.TrimSpace(o.Token), nil
 	}
+	if err := o.checkTokenFilePerms(); err != nil {
+		return "", err
+	}
 	b, err := os.ReadFile(o.TokenFile)
 	if err != nil {
 		return "", errors.New("vault: token_file unreadable")
@@ -84,4 +106,31 @@ func (o Options) resolveToken() (string, error) {
 		return "", errors.New("vault: token_file must not be empty")
 	}
 	return tok, nil
+}
+
+// checkTokenFilePerms rejects a TokenFile readable beyond its owner (any
+// group/other permission bit, i.e. broader than 0600) unless
+// AllowInsecureTokenFilePerms opts out. A missing file is left to the
+// caller's readability check; only an observable insecure mode fails.
+func (o Options) checkTokenFilePerms() error {
+	if o.AllowInsecureTokenFilePerms {
+		return nil
+	}
+	if fi, statErr := os.Stat(o.TokenFile); statErr == nil && fi.Mode().Perm()&0o077 != 0 {
+		return errors.Join(
+			ErrInsecureTokenFilePerms,
+			errors.New("vault: set allow_insecure_token_file_perms to permit broader access"),
+		)
+	}
+	return nil
+}
+
+// tokenFilePermsInsecure reports whether path exists with group/other
+// permission bits set. It backs the opt-out warning at open.
+func tokenFilePermsInsecure(path string) bool {
+	fi, err := os.Stat(path)
+	if err != nil {
+		return false
+	}
+	return fi.Mode().Perm()&0o077 != 0
 }

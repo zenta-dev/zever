@@ -1080,6 +1080,7 @@ Secret lookup from the environment or Vault. `prefix` is required.
 |---|---|---|---|
 | `addr` | string | `""` | Vault server address |
 | `allow_insecure` | boolean | `false` | Permit a plain-http Addr for testing (https only by default) |
+| `allow_insecure_token_file_perms` | boolean | `false` | Permit a TokenFile readable beyond its owner (0600 or stricter by default) |
 | `token` | string | `""` | Vault authentication token |
 | `token_file` | string | `""` | Reads the Vault token from a file when Token is empty |
 | `mount` | string | `""` | Vault KV mount path |

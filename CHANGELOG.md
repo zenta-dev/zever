@@ -508,6 +508,17 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   `DefaultMaxOutputBytes`. `core/session` gains a `Rotate` helper for
   post-login ID rotation (fixation defense) with no `Store` interface
   change.
+- `fix(security): P2-11b vault token-file permissions`: a `token_file`
+  readable beyond its owner (any group/other permission bit, i.e. broader
+  than `0600`) now fails closed with `ErrInsecureTokenFilePerms` at both
+  validation and token resolution. Restrict the file to `0600`, or opt out
+  explicitly with `allow_insecure_token_file_perms: true` (logs a warning
+  at open when the file is actually permissive).
+- `fix(security): P2-11c vault mount escaping`: the KV mount path is now
+  escaped per slash-separated segment before interpolation into request
+  URLs, so reserved characters (`?`, `#`, `%`, …) cannot shift path
+  segments; empty and dot segments are rejected at validation. Nested
+  mounts (`team/secret`) keep working.
 
 ### Tests
 
