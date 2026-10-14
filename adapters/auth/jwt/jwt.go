@@ -1,5 +1,8 @@
 // Package jwt provides an HS256 JWT authentication adapter.
 //
+// HS256 only; asymmetric algorithms (EdDSA, RS256) are not supported.
+// Deployments that need them must supply a custom auth.Auth adapter.
+//
 // Custom claims are merged at the top level of the token alongside the
 // registered claims (sub, iss, aud, exp, iat, jti). Custom keys colliding
 // with a registered claim name are rejected at Issue time.
@@ -22,7 +25,9 @@
 // revocations are lost on restart and invisible to other instances.
 // Multi-instance deployments must inject a shared revocation.Store
 // (core/auth/revocation/redis, or a custom implementation) via
-// auth.JWTOptions.RevocationStore.
+// auth.JWTOptions.RevocationStore. New logs a one-time slog WARN when the
+// default store is used, and the adapter exposes the same text through
+// WarningReporter.
 //
 // Security notes:
 //   - HS256 only: the keyfunc rejects any token whose alg header is not
@@ -50,6 +55,7 @@ import (
 	"errors"
 	"fmt"
 	"io"
+	"log/slog"
 	"sync/atomic"
 	"time"
 
@@ -96,7 +102,29 @@ type adapter struct {
 	revokeOpts []jwtv5.ParserOption
 
 	revocation revocation.Store
+	warnings   []string
 	closed     atomic.Bool
+}
+
+// memoryRevocationWarning is logged once per adapter, and returned by
+// Warnings, when the default in-memory revocation store is in use.
+const memoryRevocationWarning = "jwt: using the default in-memory revocation store: " +
+	"revocations are per-process and lost on restart; " +
+	"inject a shared store (core/auth/revocation/redis or a custom revocation.Store) " +
+	"via auth.JWTOptions.RevocationStore for multi-instance or durable revocation"
+
+// WarningReporter is implemented by the adapter returned from New. It
+// lets doctor-style checks surface configuration hazards that are not
+// errors, such as the per-process default revocation store.
+type WarningReporter interface {
+	// Warnings returns a copy of the startup warnings; empty when none.
+	Warnings() []string
+}
+
+// Warnings returns a copy of the adapter's startup warnings. It is safe
+// for concurrent use.
+func (a *adapter) Warnings() []string {
+	return append([]string(nil), a.warnings...)
 }
 
 // New builds an HS256 JWT Auth from opts.
@@ -139,7 +167,10 @@ func New(opts auth.Options) (auth.Auth, error) {
 	}
 
 	store := opts.JWT.RevocationStore
+	var warnings []string
 	if store == nil {
+		warnings = append(warnings, memoryRevocationWarning)
+		slog.Warn(memoryRevocationWarning)
 		// memory.New with zero Options performs no I/O and cannot fail:
 		// the store allocates no external resources. It is per-process:
 		// multi-instance deployments must inject a shared
@@ -157,6 +188,7 @@ func New(opts auth.Options) (auth.Auth, error) {
 		maxTTL:     opts.JWT.MaxTTL,
 		leeway:     opts.JWT.Leeway,
 		revocation: store,
+		warnings:   warnings,
 	}
 	a.parserOpts = a.parserOptions()
 	a.revokeOpts = []jwtv5.ParserOption{
