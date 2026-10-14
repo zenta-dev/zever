@@ -16,7 +16,7 @@ replace github.com/zenta-dev/zever/shared/redisclient => ../../../shared/rediscl
 replace github.com/zenta-dev/zever/shared/redisopt => ../../../shared/redisopt
 
 require (
-	github.com/alicebob/miniredis/v2 v2.39.0
+	github.com/alicebob/miniredis/v2 v2.40.0
 	github.com/redis/go-redis/v9 v9.23.0
 	github.com/zenta-dev/zever/core/idempotency v0.6.1
 	github.com/zenta-dev/zever/shared/redisclient v0.6.1
