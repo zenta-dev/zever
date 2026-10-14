@@ -481,6 +481,15 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   children in place, so parallel reads of the shared `rootCmd` global race
   (reproduced with a throwaway parallel test under `-race`); production
   output is unchanged.
+- `fix(payment/paddle): reject decimal totals that overflow int64 minor
+  units`: `parsePaddleAmount` now returns the new `ErrAmountOverflow`
+  sentinel when the whole part no longer fits after the x100 scale shift or
+  the final fraction add/subtract carries past the limit (e.g.
+  `"9223372036854775807.99"` previously wrapped silently to a negative
+  amount, which could invert refund `amount > total` checks); the exact
+  `math.MaxInt64`/`math.MinInt64` totals still convert, and out-of-range
+  whole parts that `strconv.ParseInt` already rejects are unchanged. Stripe
+  needs no equivalent: it carries amounts as native int64, never decimals.
 
 ### Security
 

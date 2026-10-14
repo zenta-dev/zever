@@ -1,6 +1,8 @@
 package paddle
 
 import (
+	"errors"
+	"math"
 	"net/http"
 	"net/http/httptest"
 	"testing"
@@ -120,6 +122,56 @@ func TestParsePaddleAmount_boundaries(t *testing.T) {
 		if err != nil || got != tc.want {
 			t.Errorf("parsePaddleAmount(%q) = (%d, %v), want %d", tc.in, got, err, tc.want)
 		}
+	}
+}
+
+// TestParsePaddleAmount_overflow pins the adversarial-magnitude guard: whole
+// parts that parse fine as int64 but no longer fit once scaled to minor units
+// (or carry past the limit on the final fraction add) fail with
+// ErrAmountOverflow instead of wrapping around, while the exact int64 extrema
+// still convert.
+func TestParsePaddleAmount_overflow(t *testing.T) {
+	t.Parallel()
+
+	cases := []struct {
+		in           string
+		want         int64
+		wantErr      bool
+		wantOverflow bool
+	}{
+		{"92233720368547758.07", math.MaxInt64, false, false},
+		{"-92233720368547758.08", math.MinInt64, false, false},
+		{"-0.99", -99, false, false},
+		{"92233720368547758.08", 0, true, true},
+		{"92233720368547759.00", 0, true, true},
+		{"9223372036854775807.99", 0, true, true},
+		{"99999999999999999999.00", 0, true, false},
+		{"-92233720368547758.09", 0, true, true},
+		{"-92233720368547759.00", 0, true, true},
+		{"-9223372036854775808.99", 0, true, true},
+	}
+
+	for _, tc := range cases {
+		t.Run("amount_"+tc.in, func(t *testing.T) {
+			t.Parallel()
+
+			got, err := parsePaddleAmount(tc.in)
+			if tc.wantErr {
+				if tc.wantOverflow && !errors.Is(err, ErrAmountOverflow) {
+					t.Errorf("parsePaddleAmount(%q) err = %v, want ErrAmountOverflow", tc.in, err)
+				}
+
+				if err == nil {
+					t.Errorf("parsePaddleAmount(%q) err = nil, want error", tc.in)
+				}
+
+				return
+			}
+
+			if err != nil || got != tc.want {
+				t.Errorf("parsePaddleAmount(%q) = (%d, %v), want %d", tc.in, got, err, tc.want)
+			}
+		})
 	}
 }
 
