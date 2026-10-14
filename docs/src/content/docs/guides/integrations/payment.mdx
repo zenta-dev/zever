@@ -21,7 +21,7 @@ payment:
 
 Provider keys come from `shared/providersopt`: `secret_key` (Stripe), `api_key` (Paddle), `endpoint`, `sandbox`. Payment adds `webhook_secret` (never logged, keep in env), `auto_approve`, and `max_webhook_bytes` (default 1MiB, negative rejected). Env vars mirror the keys. See the [payment config reference](../../../reference/config/#payment).
 
-```go title="main.go"
+```go title="main.go" check
 package main
 
 import (

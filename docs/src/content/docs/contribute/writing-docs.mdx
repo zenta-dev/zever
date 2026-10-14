@@ -36,6 +36,7 @@ If a page needs two jobs, split it and link the halves.
 
 - Every snippet runs as written. Include imports (`github.com/zenta-dev/zever/...`), and show the expected output.
 - Name the file in the code block title: ` ```go title="main.go" `.
+- Mark every complete `package main` snippet with the word `check` in the info string: ` ```go title="main.go" check `. CI (`tools/check-doc-snippets.sh`) compiles and vets each marked block in a temporary module that joins the repo workspace, so a renamed field or removed function fails the build. Unmarked blocks are fragments: CI only checks that their `github.com/zenta-dev/zever/...` imports resolve and that each `pkg.Symbol` exists. Run `tools/check-doc-snippets.sh` locally before you push.
 - Verify every config key against the Go `Options` structs (`core/<service>/options.go` and `adapters/<service>/<adapter>/options.go`), not only `config/schema/zever.schema.json`, which lags the code. File keys are snake_case. Environment variables are `<SERVICE>_<FIELD>` with no prefix.
 - Verify every command and flag against `cmd/zever`. Never invent one.
 - Keep guide snippets minimal. Put full option lists in [Config reference](../../reference/config/) and link to the right `#service` anchor.

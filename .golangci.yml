@@ -63,63 +63,11 @@ linters:
   # (~145) report ~160 hits in total. Most are deliberate pass-throughs of
   # adapter/interface errors (Close/Stop/Shutdown probes, registry
   # Register, ctx.Err) that callers match with errors.Is/As and that
-  # already carry the adapter's own message prefix. Wrapping them all
-  # would add stutter without information. The repo's error conventions
-  # (message prefixes, no double %w, no stray panics) are enforced by
-  # `make err-lint` (tools/errscan) instead; see docs/src/content/docs/reference/errors.mdx.
-  settings:
-    gofmt:
-      simplify: true
-    goimports:
-      local-prefixes:
-        - github.com/zenta-dev/zever
-
-linters:
-  default: standard
-  enable:
-    - bidichk
-    - bodyclose
-    - containedctx
-    - contextcheck
-    - depguard
-    - dogsled
-    - dupl
-    - errname
-    - errorlint
-    - exhaustive
-    - forcetypeassert
-    - gocritic
-    - godot
-    - gosec
-    - makezero
-    - misspell
-    - nakedret
-    - nilerr
-    - nilnil
-    - noctx
-    - nolintlint
-    - perfsprint
-    - prealloc
-    - predeclared
-    - recvcheck
-    - revive
-    - rowserrcheck
-    - spancheck
-    - sqlclosecheck
-    - testifylint
-    - usetesting
-    - thelper
-    - tparallel
-    - unconvert
-    - unparam
-    - usestdlibvars
-    - wastedassign
-    - whitespace
-    - zerologlint
-  # wrapcheck is intentionally not enabled: it would fail CI on hundreds of
-  # pre-existing cross-package error returns. The repo's error conventions
-  # (message prefixes, no double %w, no stray panics) are enforced by
-  # `make err-lint` (tools/errscan) instead — see docs/errors.md.
+  # already carry the adapter's own message prefix; wrapping them all adds
+  # stutter without information. The repo's error conventions (message
+  # prefixes, no double %w, no stray panics) are enforced by
+  # `make err-lint` (tools/errscan) instead; see
+  # docs/src/content/docs/reference/errors.mdx.
   settings:
     depguard:
       rules:

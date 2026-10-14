@@ -27,7 +27,7 @@ Defaults: `root` `/tmp/media`, `base_url` `/media`, `ffmpeg` and `ffprobe` on `P
 
 `Upload` generates the asset ID, so use `asset.ID` (not your path) for later calls. Register the adapter first; the container wires nothing. `Media()` resolves lazily, caches, and retries.
 
-```go title="main.go"
+```go title="main.go" check
 package main
 
 import (

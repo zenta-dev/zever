@@ -27,6 +27,17 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   differ only in the stamp version pass with a note (`stampVersionOnly` in
   `--json`); the new `--strict` flag fails on them. Schema hash and content
   changes still fail.
+### Changed
+
+- `chore: repo hygiene and docs checks`: `tools/check-doc-snippets.sh` now
+  compiles and vets Go doc snippets marked ` ```go ... check ` (complete
+  `package main` programs) in a temporary workspace module, and one stale
+  outbox snippet it caught was fixed. The tracked `tools/modgraph/modgraph`
+  and `tools/affected/affected` binaries were removed and built tool binaries
+  are git-ignored. `docs/.../zen-syntax.mdx` gained enum, message, and grammar
+  sections, and a test in `dsl/gengrammar` fails when the page omits a keyword,
+  scalar type, attribute, or block label. The `.golangci.yml` wrapcheck note
+  now records measured numbers.
 
 ### Breaking
 
