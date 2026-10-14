@@ -28,6 +28,7 @@ func TestOptions_Validate_violations_table(t *testing.T) {
 		{"negative dpi", Options{DPI: -1}, []string{"dpi"}},
 		{"negative output bytes", Options{MaxOutputBytes: -1}, []string{"max_output_bytes"}},
 		{"negative runs", Options{LatexRuns: -1}, []string{"latex_runs"}},
+		{"bad sandbox", Options{LatexSandbox: "maybe"}, []string{"latex_sandbox"}},
 		{"no scheme", Options{Endpoint: "example.com/render"}, []string{"scheme"}},
 		{"no host", Options{Endpoint: "https:///path"}, []string{"host"}},
 		{"garbage", Options{Endpoint: "http://[::1"}, []string{"valid url"}},

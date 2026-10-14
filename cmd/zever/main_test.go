@@ -143,8 +143,8 @@ func TestRun_versionFlag_printsVersionToStdout(t *testing.T) {
 				t.Fatalf("run(%v) = %v, want nil", args, err)
 			}
 		})
-		if !strings.Contains(out, "zever v"+cliVersion) {
-			t.Fatalf("run(%v) stdout = %q, want %q", args, out, "zever v"+cliVersion)
+		if !strings.Contains(out, "zever v"+buildVersion) {
+			t.Fatalf("run(%v) stdout = %q, want %q", args, out, "zever v"+buildVersion)
 		}
 	}
 

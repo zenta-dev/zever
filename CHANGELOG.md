@@ -7,6 +7,22 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Fixed
+
+- `fix(cli): resolve the CLI version from ldflags, build info, or VERSION`:
+  `zever -V`, `zever new` pins, and generated-file stamps no longer rely on a
+  hardcoded constant that lagged the release tags. The version now comes from
+  `-ldflags "-X main.cliVersion=..."` (release workflow and `make
+  build-release`), then the `go install module@vX.Y.Z` build info, then
+  `cmd/zever/VERSION` (now `0.7.0`), which `tools/tag-release.sh` requires to
+  match before tagging. `make version-check` (part of `make check`) fails when
+  that file is lower than the newest `cmd/zever/v*` tag.
+- `fix(cli): zever compile --check ignores the stamped CLI version`: a zever
+  upgrade alone no longer reports every generated file as drifted. Files that
+  differ only in the stamp version pass with a note (`stampVersionOnly` in
+  `--json`); the new `--strict` flag fails on them. Schema hash and content
+  changes still fail.
+
 ### Breaking
 
 - `fix(payment)!: normalize Paddle whole-unit amounts to minor units`:
@@ -548,12 +564,23 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   (`64:ff9b::/96`, `64:ff9b:1::/48`), 6to4 (`2002::/16`) and IPv4-compatible
   (`::/96`) addresses by their embedded IPv4 address, and treats Teredo
   (`2001::/32`) and site-local (`fec0::/10`) as private.
+- `fix(document)`: **Breaking:** the `latex` adapter now defends against
+  local file reads on TeX Live >= 2026 (where `openin_any` is a no-op). New
+  `latex_sandbox` option (`auto` default, `required`, `off`) runs TeX inside
+  bubblewrap (no network, read-only system trees, only the render dir
+  writable); `required` fails at open when bwrap is unavailable, `auto` logs
+  one warning and falls back. A source pre-scan now rejects `\input`,
+  `\include`, `\openin`, `\openout` etc. with absolute, `..`, `~` or piped
+  paths, `\write18`, and shell-escape packages with `ErrUnsafeSource`;
+  `latex_allow_unsafe_source: true` restores the old behavior. Output and
+  stderr are size-capped before buffering, and process-group kill is split
 - `middleware.ClientIPKey` now reads every `X-Forwarded-For` header line
   (not just the first) before picking the rightmost untrusted entry, so a
   trusted proxy that appends a separate header line can no longer be
   shadowed by a client-supplied first line. `ParseTrustedProxies` also
   unmaps IPv4-mapped IPv6 prefixes (`::ffff:10.0.0.0/104` becomes
   `10.0.0.0/8`) so trusted ranges match in either form.
+  into build-tagged files so the module compiles on Windows.
 - Bump the Go toolchain pin from `go 1.27.0` to `go 1.27.2` in `go.work`
   and every module's `go.mod` (fixes stdlib `net/http` / HTTP/2
   advisories `GO-2026-6603`…`GO-2026-6617`).

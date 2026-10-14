@@ -198,7 +198,7 @@ func versionRequested(cmd *cobra.Command) bool {
 // printCLIVersion prints the CLI version to stdout (stdout stays clean:
 // version output never goes to stderr).
 func printCLIVersion() {
-	_, _ = fmt.Fprintln(os.Stdout, "zever v"+cliVersion)
+	_, _ = fmt.Fprintln(os.Stdout, "zever v"+buildVersion)
 }
 
 // newRootCmd builds the Cobra root: usage metadata, silenced usage/errors
@@ -212,7 +212,7 @@ func newRootCmd() *cobra.Command {
 		Short: "Zever application toolkit",
 		Long: `Zever application toolkit: scaffold, inspect, run, and migrate
 zever applications built from .zen schemas.`,
-		Version:            cliVersion,
+		Version:            buildVersion,
 		SilenceUsage:       true,
 		SilenceErrors:      true,
 		DisableSuggestions: true,

@@ -144,6 +144,7 @@ rejected as unknown fields. Migration:
 | `maxpropertiesbytes` / `maxproperties` | `max_properties_bytes` / `max_properties` |
 | `tmpdir` / `maxoutputbytes` | `tmp_dir` / `max_output_bytes` |
 | `latexcommand` / `latexpdftoppm` / `latexruns` | `latex_command` / `latex_pdf_to_ppm` / `latex_runs` |
+| `latexsandbox` / `latexallowunsafesource` | `latex_sandbox` / `latex_allow_unsafe_source` |
 | `buffersize` / `maxhandlers` | `buffer_size` / `max_handlers` |
 | `handlertimeout` / `closetimeout` | `handler_timeout` / `close_timeout` |
 | `projectid` / `serviceaccount` | `project_id` / `service_account` |

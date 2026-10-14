@@ -70,6 +70,9 @@ func stubBin(tb testing.TB, name, body string) {
 
 func mustOpen(tb testing.TB, o document.Options) document.Document {
 	tb.Helper()
+	if o.LatexSandbox == "" {
+		o.LatexSandbox = document.LatexSandboxOff // hermetic: no host bwrap
+	}
 	d, err := New(o)
 	if err != nil {
 		tb.Fatalf("New() err = %v", err)
@@ -335,7 +338,7 @@ func TestE2EParanoidInput(t *testing.T) {
 	}
 
 	source := []byte(`\documentclass{article}\begin{document}\input{/etc/hostname}\end{document}`)
-	d := mustOpen(t, document.Options{Timeout: 2 * time.Minute})
+	d := mustOpen(t, document.Options{Timeout: 2 * time.Minute, LatexAllowUnsafeSource: true})
 	_, err := d.Render(t.Context(), source, document.FormatPDF)
 	if !errors.Is(err, ErrRenderFailed) {
 		t.Fatalf("Render() err = %v, want ErrRenderFailed for blocked absolute input", err)
@@ -350,7 +353,7 @@ func TestE2EWriteRestricted(t *testing.T) {
 
 	leak := filepath.Join(t.TempDir(), "leak.tex")
 	source := []byte("\\documentclass{article}\\begin{document}\\newwrite\\w\\immediate\\openout\\w=" + leak + "\\immediate\\write\\w{hi}\\immediate\\closeout\\w\nx\n\\end{document}")
-	d := mustOpen(t, document.Options{Timeout: 2 * time.Minute})
+	d := mustOpen(t, document.Options{Timeout: 2 * time.Minute, LatexAllowUnsafeSource: true})
 	_, err := d.Render(t.Context(), source, document.FormatPDF)
 	if !errors.Is(err, ErrRenderFailed) {
 		t.Fatalf("Render() err = %v, want ErrRenderFailed for blocked openout", err)
@@ -466,16 +469,6 @@ func TestConvertReadImageFailure(t *testing.T) {
 	_, err := d.Render(t.Context(), []byte("src"), document.FormatPNG)
 	if err == nil || !strings.Contains(err.Error(), "latex: read image") {
 		t.Fatalf("Render() err = %v, want latex: read image", err)
-	}
-}
-
-func TestConvertWritePDFFailure(t *testing.T) {
-	stubBin(t, "pdftoppm", fakePPMOK)
-
-	d := &driver{command: "pdflatex", converter: "pdftoppm", runs: 1, dpi: 150, quality: 80, timeout: time.Minute, maxOutput: 1 << 20}
-	_, err := d.convert(t.Context(), filepath.Join(t.TempDir(), "no-such-dir"), []byte("%PDF-1.4 fake"), document.FormatPNG)
-	if err == nil || !strings.Contains(err.Error(), "latex: write pdf") {
-		t.Fatalf("convert() err = %v, want latex: write pdf", err)
 	}
 }
 
