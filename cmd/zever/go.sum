@@ -347,8 +347,8 @@ github.com/pmezard/go-difflib v1.0.0/go.mod h1:iKH77koFhYxTK1pcRnkKkqfTogsbg7gZN
 github.com/posthog/posthog-go v1.34.0 h1:vHVkrnFw4Bz34UFriZPEqfolpzfLEq39AlOcLeea6io=
 github.com/posthog/posthog-go v1.34.0/go.mod h1:rN0C9Urenhytgo3KQ/QVorGkyGfpouquDTSs2Ujzr+g=
 github.com/prometheus/client_model v0.0.0-20190812154241-14fe0d1b01d4/go.mod h1:xMI15A0UPsDsEKsMN9yxemIoYk6Tm2C1GtYGdfGttqA=
-github.com/qdrant/go-client v1.19.3 h1:UOXzRabqlc95dAyQGzSTH/M4BjCixXVSTCBAzRi2MyE=
-github.com/qdrant/go-client v1.19.3/go.mod h1:ZorGclWceflis4Ddp3EIPhYJTgyAqlNmcl1hoW5iCUE=
+github.com/qdrant/go-client v1.19.4 h1:joG93CGJ+ZyIXLCFHQR6YME+jBgUvd0PchrWYThV5Bw=
+github.com/qdrant/go-client v1.19.4/go.mod h1:ZorGclWceflis4Ddp3EIPhYJTgyAqlNmcl1hoW5iCUE=
 github.com/redis/go-redis/v9 v9.23.0 h1:/TTVdJa8BRNsybwwGGnmiYktHNlUXtbOQxlWpHBPL3s=
 github.com/redis/go-redis/v9 v9.23.0/go.mod h1:EWP2UUk+XDaI1s5nQB5mablZN6vccXlmBQTyfnF87D0=
 github.com/redis/rueidis v1.0.19 h1:s65oWtotzlIFN8eMPhyYwxlwLR1lUdhza2KtWprKYSo=

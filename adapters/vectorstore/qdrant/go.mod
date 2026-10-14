@@ -14,7 +14,7 @@ require (
 )
 
 require (
-	github.com/qdrant/go-client v1.19.3
+	github.com/qdrant/go-client v1.19.4
 	github.com/zenta-dev/zever/core/vectorstore v0.6.1
 	github.com/zenta-dev/zever/shared/endpoint v0.6.1
 )
