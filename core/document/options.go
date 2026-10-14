@@ -53,7 +53,25 @@ type Options struct {
 	MaxOutputBytes int64 `json:"max_output_bytes" toml:"max_output_bytes" yaml:"max_output_bytes"`
 	// LatexRuns bounds the number of LaTeX compiler passes.
 	LatexRuns int `json:"latex_runs" toml:"latex_runs" yaml:"latex_runs"`
+	// LatexSandbox selects OS-level sandboxing (bubblewrap) for the LaTeX
+	// toolchain: "auto" (default, use it when available), "required" (fail
+	// when unavailable) or "off".
+	LatexSandbox string `json:"latex_sandbox" toml:"latex_sandbox" yaml:"latex_sandbox"`
+	// LatexAllowUnsafeSource disables the LaTeX source pre-scan that rejects
+	// absolute or parent-relative file paths and shell-escape packages.
+	// Default false. Only enable for fully trusted sources.
+	LatexAllowUnsafeSource bool `json:"latex_allow_unsafe_source" toml:"latex_allow_unsafe_source" yaml:"latex_allow_unsafe_source"`
 }
+
+// LatexSandbox modes accepted by Options.LatexSandbox.
+const (
+	// LatexSandboxAuto uses bubblewrap when available and warns otherwise.
+	LatexSandboxAuto = "auto"
+	// LatexSandboxRequired fails when no OS sandbox is available.
+	LatexSandboxRequired = "required"
+	// LatexSandboxOff never uses an OS sandbox.
+	LatexSandboxOff = "off"
+)
 
 // Validate checks options for consistency, joining all violations.
 func (o Options) Validate() error {
@@ -77,6 +95,12 @@ func (o Options) Validate() error {
 
 	if o.LatexRuns < 0 {
 		errs = append(errs, InvalidOptionsError{Reason: "latex_runs must be >= 0"})
+	}
+
+	switch o.LatexSandbox {
+	case "", LatexSandboxAuto, LatexSandboxRequired, LatexSandboxOff:
+	default:
+		errs = append(errs, InvalidOptionsError{Reason: "latex_sandbox must be auto, required, or off"})
 	}
 
 	if o.Endpoint != "" {
