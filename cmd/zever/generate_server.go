@@ -1339,10 +1339,15 @@ func run(addr, grpcAddr string) error {
 
 	reloadableLimiter := container.NewReloadableLimiter(limiter)
 	limiter = reloadableLimiter
+	// The container closes the original limiter at shutdown; this closes
+	// only the limiters a SIGHUP reload swapped in, each exactly once.
+	defer func() { _ = reloadableLimiter.Close() }()
 {{end}}
 	// SIGHUP reloads the log level{{if .RateLimitEnabled}} and the rate limiter{{end}}
-	// from the config file via atomic swap; a failed re-open keeps the old
-	// instance and only warns. The watcher exits with ctx.
+	// from the config file. Every new instance is opened first and swapped
+	// in together only if all succeed; any failure keeps the old state
+	// untouched and only warns. A replaced limiter is closed after its
+	// in-flight calls drain. The watcher exits with ctx.
 	container.WatchSIGHUP(ctx, func(context.Context) {
 		cfg, err := app.Config()
 		if err != nil {
@@ -1351,42 +1356,34 @@ func run(addr, grpcAddr string) error {
 			return
 		}
 
-		nextLogAdapter, err := log.ParseAdapter(cfg.Log.Adapter)
+		err = container.ApplyReload(
+			reloadableLogger,
+			func() (log.Logger, error) {
+				adapter, err := log.ParseAdapter(cfg.Log.Adapter)
+				if err != nil {
+					return nil, err
+				}
+
+				return log.Open(adapter, cfg.Log.Options)
+			},
+{{if .RateLimitEnabled}}			reloadableLimiter,
+			func() (ratelimit.Limiter, error) {
+				adapter, err := ratelimit.ParseAdapter(cfg.RateLimit.Adapter)
+				if err != nil {
+					return nil, err
+				}
+
+				return ratelimit.Open(adapter, cfg.RateLimit.Options)
+			},
+{{else}}			nil,
+			nil,
+{{end}}		)
 		if err != nil {
-			logger.Warn().Msgf("SIGHUP reload skipped: log: %v", err)
+			logger.Warn().Msgf("SIGHUP reload skipped: %v", err)
 
 			return
 		}
 
-		nextLog, err := log.Open(nextLogAdapter, cfg.Log.Options)
-		if err != nil {
-			logger.Warn().Msgf("SIGHUP reload skipped: log: %v", err)
-
-			return
-		}
-
-		if oldLog, swapped := reloadableLogger.Swap(nextLog); swapped {
-			_ = oldLog.Sync()
-		}
-{{if .RateLimitEnabled}}
-		nextLimiterAdapter, err := ratelimit.ParseAdapter(cfg.RateLimit.Adapter)
-		if err != nil {
-			logger.Warn().Msgf("SIGHUP reload skipped: ratelimit: %v", err)
-
-			return
-		}
-
-		nextLimiter, err := ratelimit.Open(nextLimiterAdapter, cfg.RateLimit.Options)
-		if err != nil {
-			logger.Warn().Msgf("SIGHUP reload skipped: ratelimit: %v", err)
-
-			return
-		}
-
-		if old, swapped := reloadableLimiter.Swap(nextLimiter); swapped {
-			_ = old.Close()
-		}
-{{end}}
 		logger.Info().Msg("reloaded SIGHUP-reloadable config")
 	})
 	// One interceptor, attached once below, must cover every service this
