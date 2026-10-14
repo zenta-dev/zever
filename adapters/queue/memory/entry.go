@@ -16,13 +16,13 @@ type visibilityEntry struct {
 	deadline time.Time
 }
 
-type visibilityHeap []*visibilityEntry //nolint:recvcheck // heap.Interface requires mixed receivers
+type visibilityHeap []visibilityEntry //nolint:recvcheck // heap.Interface requires mixed receivers
 
 func (h visibilityHeap) Len() int           { return len(h) }
 func (h visibilityHeap) Less(i, j int) bool { return h[i].deadline.Before(h[j].deadline) }
 func (h visibilityHeap) Swap(i, j int)      { h[i], h[j] = h[j], h[i] }
 func (h *visibilityHeap) Push(x any) {
-	if e, ok := x.(*visibilityEntry); ok {
+	if e, ok := x.(visibilityEntry); ok {
 		*h = append(*h, e)
 	}
 }

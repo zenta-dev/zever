@@ -481,3 +481,99 @@ func TestContainer_SharedPool_SQLiteFile(t *testing.T) {
 	defer cancel()
 	must("Close", c.Close(closeCtx))
 }
+
+// TestPoolRegistry_MismatchesRecorded proves the MaxConns mismatch warn is
+// also recorded for diagnostics: doctor surfaces it after the fact without
+// re-resolving. The record carries caps but no DSN.
+func TestPoolRegistry_MismatchesRecorded(t *testing.T) {
+	t.Parallel()
+
+	//nolint:gosec // fixture DSN with a fake password, never dialed
+	const dsn = "postgres://app:s3cret@db:5432/app"
+	sink := &warnSink{}
+	r, _ := stubRegistry(func(_ db.Adapter, _ db.Options) (db.DB, error) {
+		return &stubPool{}, nil
+	}, sink)
+
+	mustBorrow(t, r, "db", db.Options{DSN: dsn, MaxConns: 25}, "postgres:"+dsn, poolPostgres)
+	mustBorrow(t, r, "queue", db.Options{DSN: dsn, MaxConns: 10}, "postgres:"+dsn, poolPostgres)
+	mustBorrow(t, r, "search", db.Options{DSN: dsn}, "postgres:"+dsn, poolPostgres)
+
+	got := r.mismatches()
+	if len(got) != 1 {
+		t.Fatalf("mismatches = %v, want 1", got)
+	}
+
+	if got[0].Service != "queue" || got[0].Want != 10 || got[0].Have != 25 {
+		t.Errorf("mismatch = %+v, want {queue 10 25}", got[0])
+	}
+
+	if s := got[0].String(); !strings.Contains(s, "queue") || !strings.Contains(s, "dedicated_pool") {
+		t.Errorf("mismatch line = %q, want service and fix hint", s)
+	}
+
+	if s := got[0].String(); strings.Contains(s, "s3cret") || strings.Contains(s, dsn) {
+		t.Errorf("mismatch line leaks DSN: %q", s)
+	}
+}
+
+// TestContainer_PoolStatusAndMismatches proves the exported diagnostics over
+// a real shared sqlite pool: PoolStatus lists the pool with its borrowers
+// and effective cap, PoolMismatches is empty when caps agree.
+func TestContainer_PoolStatusAndMismatches(t *testing.T) {
+	dbsqlite.Register()
+	_ = queue.RegisterShared(queue.DB, func(_ db.DB, _ queue.Options) (queue.Queue, error) {
+		return &fakeQueue{}, nil
+	})
+
+	file := filepath.Join(t.TempDir(), "status.db")
+	cfg := config.Default()
+	cfg.DB.Adapter = "sqlite"
+	cfg.DB.Options = db.Options{Path: file, MaxConns: 5}
+	cfg.Queue.Adapter = "db"
+	cfg.Queue.Options = queue.Options{DBOptions: queue.DBOptions{DSN: file}}
+
+	c := New(cfg)
+	var opens atomic.Int32
+	c.pools.open = func(_ db.Adapter, opts db.Options) (db.DB, error) {
+		opens.Add(1)
+
+		return dbsqlite.New(opts)
+	}
+	var warns warnSink
+	c.pools.warn = warns.warn
+	t.Cleanup(func() {
+		closeCtx, cancel := context.WithTimeout(t.Context(), 10*time.Second)
+		defer cancel()
+		_ = c.Close(closeCtx)
+	})
+
+	if _, err := c.DB(); err != nil {
+		t.Fatalf("DB: %v", err)
+	}
+
+	if _, err := c.Queue(); err != nil {
+		t.Fatalf("Queue: %v", err)
+	}
+
+	status := c.PoolStatus()
+	if len(status) != 1 {
+		t.Fatalf("PoolStatus entries = %d, want 1", len(status))
+	}
+
+	if status[0].Backend != poolSQLite {
+		t.Errorf("PoolStatus backend = %q, want sqlite", status[0].Backend)
+	}
+
+	if len(status[0].Services) != 2 || status[0].Services[0] != "db" || status[0].Services[1] != "queue" {
+		t.Errorf("PoolStatus services = %v, want [db queue]", status[0].Services)
+	}
+
+	if status[0].MaxConns != 5 {
+		t.Errorf("PoolStatus maxconns = %d, want 5", status[0].MaxConns)
+	}
+
+	if got := c.PoolMismatches(); len(got) != 0 {
+		t.Errorf("PoolMismatches = %v, want empty when caps agree", got)
+	}
+}

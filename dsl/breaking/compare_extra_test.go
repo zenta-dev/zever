@@ -64,7 +64,14 @@ func TestCompareModuleRemovedIsBreaking(t *testing.T) {
 			KindFieldRenamed, KindFieldTypeChanged, KindFieldOptionalityChanged,
 			KindMessageRemoved, KindMessageAdded, KindServiceRemoved, KindServiceAdded,
 			KindOperationRemoved, KindOperationAdded, KindOperationParamsChanged,
-			KindOperationReturnsChanged, KindOperationHTTPChanged, KindValidateAdded:
+			KindOperationReturnsChanged, KindOperationHTTPChanged, KindValidateAdded,
+			KindEnumRemoved, KindEnumAdded, KindEnumValuesChanged,
+			KindIndexRemoved, KindIndexAdded,
+			KindRelationRemoved, KindRelationAdded, KindRelationChanged,
+			KindFieldDefaultChanged,
+			KindJobRemoved, KindJobAdded, KindJobParamsChanged, KindJobConfigChanged,
+			KindScheduleRemoved, KindScheduleAdded, KindScheduleChanged,
+			KindSagaRemoved, KindSagaAdded, KindSagaStepsChanged:
 			// Other change kinds are not relevant to this test.
 		}
 	}

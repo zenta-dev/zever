@@ -319,6 +319,14 @@ func (a *memoryAdapter) waitForSpace(ctx context.Context, t *topicQueue) error {
 }
 
 func (a *memoryAdapter) waitForCapacity(ctx context.Context, t *topicQueue, count func() int) error {
+	// Fast path first: creating the poll timer before checking capacity
+	// burns one timer alloc per Push even when space is available (the
+	// common case). The timer only matters once the queue is observed
+	// full, so build it lazily with identical wait semantics.
+	if count() < a.buffer {
+		return nil
+	}
+
 	poll := time.NewTimer(50 * time.Millisecond)
 	defer poll.Stop()
 
@@ -372,9 +380,17 @@ func (a *memoryAdapter) getTopic(name string) *topicQueue {
 }
 
 func (a *memoryAdapter) popWithTopic(ctx context.Context, topic string, t *topicQueue) (queue.Message, error) {
-	pollTimer := time.NewTimer(a.pollTimeout)
-
-	defer pollTimer.Stop()
+	// The poll timer is built lazily on the first miss: allocating it up
+	// front burns one timer per Pop even when a message is immediately
+	// ready. The timeout is then measured from the first miss rather than
+	// Pop entry; the shift is sub-microsecond fast-path work and only ever
+	// extends the wait, never shortens it, so no spurious Empty appears.
+	var pollTimer *time.Timer
+	defer func() {
+		if pollTimer != nil {
+			pollTimer.Stop()
+		}
+	}()
 
 	for {
 		t.reclaimExpired(a.visibilityTimeout)
@@ -383,6 +399,10 @@ func (a *memoryAdapter) popWithTopic(ctx context.Context, topic string, t *topic
 			t.signalSpace()
 
 			return msg, nil
+		}
+
+		if pollTimer == nil {
+			pollTimer = time.NewTimer(a.pollTimeout)
 		}
 
 		t.mu.Lock()

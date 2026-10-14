@@ -316,4 +316,18 @@ Render-coverage (ORM):
 - `BenchmarkEscapeLike` (`orm/column_bench_test.go`).
 - `BenchmarkFlattenGroupTermsFew` / `...Rollup` / `...Many` (`orm/render/agg_bench_test.go`).
 
+Startup-coverage (CLI):
+
+- `BenchmarkHelpStartup` (`cmd/zever/bench_test.go`), budget `TestHelpStartupBudget` (200ms) + `TestHelpStartupAllocs` (1500 allocs) in `cmd/zever/cli_perf_test.go`.
+
 Benchmarks use `b.Context()`; helpers assert `t.Helper` where applicable.
+
+## Cold start & binary size (2026-10-14)
+
+Release-style build (`go build ./cmd/zever`, Go 1.27.2, linux/amd64): **309 MB** on disk. Process cold start (`--help` to exit): **~420 ms first run** (page cache cold), **~60–90 ms warm**; in-process `--help` (`BenchmarkHelpStartup`) is **~99 µs/op, 69 KB/op, 625 allocs/op** — binary load and package `init` dominate, not Cobra dispatch. `GODEBUG=inittrace=1` shows ~700 init functions but negligible init clock time; the bulk of wall time before `main` is mapping the binary.
+
+`go tool nm -size` top contributors by symbol size: third-party adapter/UI dependencies (`github.com/...` group, ~60 MB: charm UI stack, sqlite driver via `modernc.org/...`), Go FIPS crypto tables (~33 MB `crypto/internal/fips140/drbg`), and codegen/grpc (`google.golang.org/...`, `go/types`). The CLI already links only the zero-infra adapter set (`cmd/zever/adapters.go`: memory/log/noop/stdhttp); the weight is transitive (embedded sqlite, TUI, telemetry), not registered adapters.
+
+Repro: `go build -o /tmp/zever ./cmd/zever && ls -lh /tmp/zever`, `GODEBUG=inittrace=1 /tmp/zever --help 2>&1 | grep '^init ' | wc -l`, `go tool nm -size /tmp/zever | awk 'NF==4 {m[$4]+=$2} END {for (p in m) printf "%d %s\n", m[p], p}' | sort -rn | head`.
+
+A `zever build --adapters=a,b` slim-CLI flag (or per-adapter build tags) is deliberately deferred: it would split `adapters.go` registration, the doctor battery table, and scaffold templates into build-tagged variants with a combinatorial test matrix, for a saving concentrated in dependencies the CLI cannot drop anyway (sqlite/TUI stay). Revisit if the binary passes 500 MB or a headless-server profile needs it — the `TestHelpStartupAllocs` budget above is the tripwire.
