@@ -574,6 +574,12 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   paths, `\write18`, and shell-escape packages with `ErrUnsafeSource`;
   `latex_allow_unsafe_source: true` restores the old behavior. Output and
   stderr are size-capped before buffering, and process-group kill is split
+- `middleware.ClientIPKey` now reads every `X-Forwarded-For` header line
+  (not just the first) before picking the rightmost untrusted entry, so a
+  trusted proxy that appends a separate header line can no longer be
+  shadowed by a client-supplied first line. `ParseTrustedProxies` also
+  unmaps IPv4-mapped IPv6 prefixes (`::ffff:10.0.0.0/104` becomes
+  `10.0.0.0/8`) so trusted ranges match in either form.
   into build-tagged files so the module compiles on Windows.
 - Bump the Go toolchain pin from `go 1.27.0` to `go 1.27.2` in `go.work`
   and every module's `go.mod` (fixes stdlib `net/http` / HTTP/2
