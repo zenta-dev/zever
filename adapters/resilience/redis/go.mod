@@ -10,7 +10,7 @@ require (
 	github.com/zenta-dev/zever/shared/redisclient v0.6.1
 	github.com/zenta-dev/zever/shared/redisopt v0.6.1
 	github.com/zenta-dev/zever/shared/retry v0.6.1
-	golang.org/x/sync v0.23.0
+	golang.org/x/sync v0.24.0
 )
 
 require (
