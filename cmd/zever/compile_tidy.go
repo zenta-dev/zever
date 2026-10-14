@@ -19,7 +19,7 @@ var frameworkImportRe = regexp.MustCompile(`(?m)^\s*(?:import\s+)?(?:[\w.]+\s+)?
 // paths declared in the go.mod at path. It is a deliberately small line
 // parser (no x/mod dependency): enough for require lines and blocks.
 func goModRequires(path string) (string, map[string]bool, error) {
-	f, err := os.Open(path) //nolint:gosec // project go.mod, read-only
+	f, err := os.Open(path)
 	if err != nil {
 		return "", nil, err
 	}
