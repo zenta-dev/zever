@@ -51,13 +51,16 @@ Flags:`
 // build it from huh forms; the flag shell (runCompile) builds it from argv.
 // A nil Out defaults to os.Stdout. An empty Backends selects every
 // registered backend. JSON emits a machine-readable envelope instead of the
-// human summary.
+// human summary. Check verifies the committed tree instead of writing:
+// exit 1 with the drifted files listed when outDir differs from a fresh
+// compile (see checkGeneratedOutputs), success otherwise.
 type CompileConfig struct {
 	Files    []string
 	Backends string
 	OutDir   string
 	Out      io.Writer
 	JSON     bool
+	Check    bool
 }
 
 // outOrStdout resolves the effective stdout writer for a command config.
@@ -184,6 +187,7 @@ func newCompileFlagSet() *flag.FlagSet {
 	fs := flag.NewFlagSet("compile", flag.ContinueOnError)
 	fs.String("backend", defaultBackends(), "comma-separated list of backends to run (available: "+backendNames()+")")
 	fs.String("out", "./generated", "output directory for generated files")
+	fs.Bool("check", false, "verify committed output matches a fresh compile (exit 1 on drift, write nothing)")
 	// coverageProof: no local -i/--interactive flags; peelInteractive
 	// strips them before Parse and sets interactiveMode globally.
 
@@ -197,7 +201,7 @@ func newCompileFlagSet() *flag.FlagSet {
 func runCompile(args []string) error { //nolint:gocyclo
 	args = peelInteractive(args)
 
-	if err := rejectUnknownFlags("compile", args, []string{"backend", "out"}); err != nil {
+	if err := rejectUnknownFlags("compile", args, []string{"backend", "out", "check"}); err != nil {
 		return err
 	}
 
@@ -253,6 +257,7 @@ func runCompile(args []string) error { //nolint:gocyclo
 		Backends: fs.Lookup("backend").Value.String(),
 		OutDir:   fs.Lookup("out").Value.String(),
 		JSON:     jsonMode,
+		Check:    flagBool(fs, "check"),
 	})
 }
 
@@ -317,22 +322,31 @@ func runCompileWith(cfg CompileConfig) error {
 		return err
 	}
 
-	if err := writeOutputs(outDir, result.Outputs); err != nil {
-		return err
-	}
+	// Stamp every output with the schema provenance (version+hash) before it
+	// touches disk, so committed files record which release and schema
+	// revision produced them.
+	stamped := stampGeneratedOutputs(files, result.Outputs)
 
 	// Success summary.
 	total := 0
-	outputs := make(map[string][]string, len(result.Outputs))
-	for backend, files := range result.Outputs {
-		names := make([]string, 0, len(files))
-		for name := range files {
+	outputs := make(map[string][]string, len(stamped))
+	for backend, backendFiles := range stamped {
+		names := make([]string, 0, len(backendFiles))
+		for name := range backendFiles {
 			names = append(names, name)
 		}
 
 		sort.Strings(names)
 		outputs[backend] = names
-		total += len(files)
+		total += len(backendFiles)
+	}
+
+	if cfg.Check {
+		return reportCompileCheck(cfg, out, backendsSpec, outDir, stamped, outputs, total)
+	}
+
+	if err := writeOutputs(outDir, stamped); err != nil {
+		return err
 	}
 
 	if cfg.JSON {
@@ -360,9 +374,53 @@ func runCompileWith(cfg CompileConfig) error {
 	return nil
 }
 
+// reportCompileCheck compares stamped fresh-compile outputs against the
+// committed tree under outDir without writing anything: it returns a
+// drift error naming every missing/differing/extra file (exit 1 at the
+// CLI), or reports the tree up to date. It backs `zever compile --check`,
+// the CI drift gate for projects that commit their generated output.
+func reportCompileCheck(cfg CompileConfig, out io.Writer, backendsSpec, outDir string, stamped map[string]map[string][]byte, outputs map[string][]string, total int) error {
+	drift := checkGeneratedOutputs(outDir, stamped)
+
+	if len(drift) > 0 {
+		err := fmt.Errorf("zever compile: generated output differs in %d file(s) (%s); run 'zever compile' and commit the result",
+			len(drift), strings.Join(drift, ", "))
+		if cfg.JSON {
+			return emitFailure("compile", map[string]any{
+				"files":    cfg.Files,
+				"backends": backendsSpec,
+				"outDir":   outDir,
+				"check":    true,
+				"drift":    drift,
+			}, nil, err)
+		}
+
+		return err
+	}
+
+	if cfg.JSON {
+		emitSuccess("compile", map[string]any{
+			"files":    cfg.Files,
+			"backends": backendsSpec,
+			"outDir":   outDir,
+			"check":    true,
+			"outputs":  outputs,
+			"total":    total,
+		})
+
+		return nil
+	}
+
+	msg := success("✔ generated output is up to date ") + bold(fmt.Sprintf("%d file(s)", total)) + dim(" in ") +
+		cyan(outDir) + dim(fmt.Sprintf(" (backends: %s)", backendsSpec))
+	_, _ = fmt.Fprintln(out, msg)
+
+	return nil
+}
+
 func printCompileUsage(fs *flag.FlagSet) {
 	header := title("zever compile") + dim(" — schema → generated")
-	flags := dim(" [--backend " + defaultBackends() + "] [--out DIR]")
+	flags := dim(" [--backend " + defaultBackends() + "] [--out DIR] [--check]")
 	usage := bold("Usage:") + "  " + cmd("zever compile") + flags + "  " + cyan("<files...>")
 	body := joinLines(
 		header,
@@ -378,6 +436,7 @@ func printCompileUsage(fs *flag.FlagSet) {
 	_, _ = fmt.Fprintln(fs.Output(), dim("Examples:"))
 	_, _ = fmt.Fprintln(fs.Output(), dim("  ")+cmd("zever compile schema/app.zen --backend=proto"))
 	_, _ = fmt.Fprintln(fs.Output(), dim("  ")+cmd("zever compile --backend=zenorm,proto,atlas,openapi schema/*.zen --out ./generated"))
+	_, _ = fmt.Fprintln(fs.Output(), dim("  ")+cmd("zever compile --check --out ./generated schema/*.zen")+dim("  # CI drift gate: exit 1 when committed output differs"))
 	_, _ = fmt.Fprintln(fs.Output(), dim("  ")+cmd("zever compile -i")+dim("  # guided: select files & backends"))
 
 	if shouldShowHint() {

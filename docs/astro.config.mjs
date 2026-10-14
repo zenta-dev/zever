@@ -293,6 +293,7 @@ export default defineConfig({
           label: "Extend",
           items: [
             { label: "Write a plugin", link: "guides/extend/write-a-plugin" },
+            { label: "Customizing and leaving", link: "guides/extend/customizing-and-leaving" },
             { label: "Editor setup", link: "guides/extend/editor-setup" },
           ],
         },
