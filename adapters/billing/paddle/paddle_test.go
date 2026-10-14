@@ -127,7 +127,7 @@ func flowMux(tb testing.TB) *http.ServeMux {
 				"id": "txn_123", "status": "ready", "customer_id": "ctm_123",
 				"currency_code": "USD", "collection_mode": "automatic",
 				"items":   []map[string]any{{"quantity": 1}},
-				"details": map[string]any{"totals": map[string]any{"total": "1999"}},
+				"details": map[string]any{"totals": map[string]any{"total": "19.99"}},
 			}})
 		case http.MethodGet:
 			if got := r.URL.Query().Get("customer_id"); got != "ctm_123" {
@@ -150,7 +150,7 @@ func flowMux(tb testing.TB) *http.ServeMux {
 				"data": []map[string]any{{
 					"id": "txn_inv1", "status": "billed", "customer_id": "ctm_123",
 					"currency_code": "USD",
-					"details":       map[string]any{"totals": map[string]any{"total": "4200"}},
+					"details":       map[string]any{"totals": map[string]any{"total": "42.00"}},
 				}},
 				"meta": map[string]any{"pagination": map[string]any{"per_page": 1}},
 			})
@@ -477,7 +477,11 @@ func TestParsePaddleTotal_table(t *testing.T) {
 	}{
 		{"empty", "", "USD", 0, billing.ErrEmptyAmount},
 		{"dotted", "10.00", "usd", 1000, nil},
-		{"minor", "1000", "USD", 1000, nil},
+		{"whole scales", "1000", "USD", 100000, nil},
+		{"half away", "10.005", "USD", 1001, nil},
+		{"negative", "-3.25", "USD", -325, nil},
+		{"jpy whole", "100", "JPY", 100, nil},
+		{"overflow", "92233720368547759", "USD", 0, billing.ErrAmountOverflow},
 		{"garbage", "not-a-number", "USD", 0, billing.ErrMalformedAmount},
 	} {
 		t.Run(tc.name, func(t *testing.T) {

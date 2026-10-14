@@ -25,6 +25,24 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Breaking
 
+- `fix(payment)!: all adapters use minor units (cents)`: every `Amount`
+  field across `core/payment` (`Request`, `Result`) and `core/billing`
+  (`Invoice`) is now uniformly minor units, extending the Paddle payment
+  normalization above to every other money path. The Paddle billing adapter
+  parses totals via the shared `billing.ParseMinorUnits` contract (whole
+  units scale by the currency exponent, so bare `"4200"` reads as 420000
+  minor units; excess precision rounds half away from zero; unrepresentable
+  magnitudes fail with `billing.ErrAmountOverflow`). New
+  `billing.FormatMinorUnits` encodes minor units back to major-unit
+  decimals with a tested round-trip. `billing.ParseMinorUnits` overflow is
+  now exact rather than conservative (representable extrema convert).
+  Stripe and stub payment/billing adapters already passed native int64
+  minor units through and are unchanged apart from pinning
+  normalize/round-trip/refund-symmetry tests.
+  **Breaking:** Paddle billing totals without decimals change value
+  (`"4200"` was 4200 minor units, now 420000); truncation becomes
+  half-away-from-zero rounding there too.
+
 - `fix(payment)!: normalize Paddle whole-unit amounts to minor units`:
   **Breaking:** the `paddle` adapter now scales whole-unit decimal totals to
   minor units (`"10"` parses to `1000`, matching `"10.00"`), where it
@@ -33,8 +51,9 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   `"-10.005"` becomes `-1001`) instead of truncating, and partial-refund
   adjustment amounts are formatted back to major-unit decimals (`1000` is
   sent as `"10.00"`) so both directions agree. Totals that overflow `int64`
-  once scaled still fail with `ErrAmountOverflow`. The `stripe` adapter is
-  unchanged (native minor-unit integers).
+   once scaled still fail with `ErrAmountOverflow`. The `stripe` adapter is
+   unchanged (native minor-unit integers).
+
 
 - `feat(gogen)!: typed saga steps`: the `gogen` backend's `<module>/saga.go`
   **Breaking:** no longer emits the untyped `SagaCaller.Call(ctx, service,

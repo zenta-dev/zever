@@ -62,7 +62,7 @@ func TestParseMinorUnits_errors_table(t *testing.T) {
 		{"trailing dot", "5.", "usd", ErrMalformedAmount},
 		{"alpha", "abc", "usd", ErrMalformedAmount},
 		{"double dot", "1.2.3", "usd", ErrMalformedAmount},
-		{"overflow whole", "92233720368547758", "usd", ErrAmountOverflow},
+		{"overflow whole", "92233720368547759", "usd", ErrAmountOverflow},
 	}
 	for _, tc := range cases {
 		t.Run(tc.name, func(t *testing.T) {
