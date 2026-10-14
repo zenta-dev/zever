@@ -37,6 +37,7 @@ type config struct {
 	insecureVerify bool
 	insecureSet    bool
 	tracing        bool
+	allowProxy     bool
 }
 
 // LookupFunc resolves host to addresses. LookupFunc is a seam for pinning
@@ -75,6 +76,18 @@ func WithSafeDial(allowPrivate bool) Option {
 func WithLookup(lookup LookupFunc) Option {
 	return func(c *config) {
 		c.lookup = lookup
+	}
+}
+
+// WithAllowProxy keeps the transport's environment proxy resolution
+// (HTTP_PROXY/HTTPS_PROXY) when WithSafeDial is installed. By default the
+// safe dial guard clears Transport.Proxy: with a proxy the dialer sees only
+// the proxy address, so the target-address guard would be bypassed and
+// private targets become reachable through the proxy. Use WithAllowProxy
+// only when the proxy is trusted and enforces its own egress policy.
+func WithAllowProxy() Option {
+	return func(c *config) {
+		c.allowProxy = true
 	}
 }
 
@@ -128,6 +141,9 @@ func NewClient(timeout time.Duration, opts ...Option) *http.Client {
 			}
 			if cfg.safeDialSet {
 				clone.DialContext = SafeDialContextWithLookup(cfg.allowPrivate, cfg.lookup)
+				if !cfg.allowProxy {
+					clone.Proxy = nil
+				}
 			}
 			clone.MaxIdleConnsPerHost = DefaultMaxIdleConnsPerHost
 			return newHTTPClient(timeout, clone, cfg.noRedirect, cfg.tracing)
@@ -154,6 +170,9 @@ func NewClient(timeout time.Duration, opts ...Option) *http.Client {
 	}
 	if cfg.safeDialSet {
 		tr.DialContext = SafeDialContextWithLookup(cfg.allowPrivate, cfg.lookup)
+		if !cfg.allowProxy {
+			tr.Proxy = nil
+		}
 	}
 	tr.MaxIdleConnsPerHost = DefaultMaxIdleConnsPerHost
 	return newHTTPClient(timeout, tr, cfg.noRedirect, cfg.tracing)
@@ -326,7 +345,10 @@ func resolveIPs(ctx context.Context, host string, lookup LookupFunc) ([]net.IP, 
 // unroutable so they cannot reach internal services, and the ecosystem
 // uses them as public examples. IsPrivateIP returns false for nil and for
 // globally routable addresses. IPv4-mapped IPv6 addresses classify by
-// their embedded IPv4 address.
+// their embedded IPv4 address, as do the IPv6 transition forms NAT64
+// (64:ff9b::/96, 64:ff9b:1::/48), 6to4 (2002::/16) and IPv4-compatible
+// (::/96). Teredo (2001::/32) and deprecated site-local (fec0::/10) are
+// always private.
 func IsPrivateIP(ip net.IP) bool {
 	if ip == nil {
 		return false
@@ -359,10 +381,46 @@ func IsPrivateIP(ip net.IP) bool {
 		}
 		return false
 	}
-	if len(ip) == net.IPv6len && ip[0]&0xfe == 0xfc {
+	if len(ip) != net.IPv6len {
+		return false
+	}
+	if ip[0]&0xfe == 0xfc { // fc00::/7 unique-local
 		return true
 	}
+	if ip[0] == 0xfe && ip[1]&0xc0 == 0xc0 { // fec0::/10 site-local
+		return true
+	}
+	if ip[0] == 0x20 && ip[1] == 0x01 && ip[2] == 0 && ip[3] == 0 { // 2001::/32 Teredo
+		return true
+	}
+	if v4 := embeddedIPv4(ip); v4 != nil {
+		return IsPrivateIP(v4)
+	}
 	return false
+}
+
+// embeddedIPv4 extracts the IPv4 address carried by an IPv6 transition
+// address (NAT64, 6to4, IPv4-compatible) or returns nil.
+func embeddedIPv4(ip net.IP) net.IP {
+	allZero := func(b []byte) bool {
+		for _, x := range b {
+			if x != 0 {
+				return false
+			}
+		}
+		return true
+	}
+	switch {
+	case ip[0] == 0x00 && ip[1] == 0x64 && ip[2] == 0xff && ip[3] == 0x9b && allZero(ip[4:12]):
+		return net.IPv4(ip[12], ip[13], ip[14], ip[15]) // 64:ff9b::/96
+	case ip[0] == 0x00 && ip[1] == 0x64 && ip[2] == 0xff && ip[3] == 0x9b && ip[4] == 0x00 && ip[5] == 0x01:
+		return net.IPv4(ip[12], ip[13], ip[14], ip[15]) // 64:ff9b:1::/48 (RFC 8215, /96 suffix)
+	case ip[0] == 0x20 && ip[1] == 0x02:
+		return net.IPv4(ip[2], ip[3], ip[4], ip[5]) // 2002::/16
+	case allZero(ip[:12]):
+		return net.IPv4(ip[12], ip[13], ip[14], ip[15]) // ::/96
+	}
+	return nil
 }
 
 // ReadLimited reads body up to limit bytes. ReadLimited returns the bytes when
