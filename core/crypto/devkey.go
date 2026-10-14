@@ -23,20 +23,26 @@ func IsDevCryptoKey(key string) bool {
 // deployment where the deterministic dev key is acceptable.
 var devKeyEnvs = []string{"dev", "test", "development"}
 
-// DevKeyAllowed reports whether the deterministic dev key may protect
-// data: either explicitly via opts.AllowDevKey or implicitly via
-// ZEVER_ENV ∈ {dev, test, development} (case-insensitive). Every other
-// environment — including production and an unset ZEVER_ENV — must
-// supply a real key.
-func DevKeyAllowed(opts Options) bool {
-	if opts.AllowDevKey {
-		return true
-	}
-	env := strings.ToLower(os.Getenv("ZEVER_ENV"))
+// IsDevEnv reports whether value, a ZEVER_ENV setting, names a
+// non-production environment: dev, test or development, after trimming
+// surrounding whitespace and ignoring case. Every other value, including
+// production and the empty string, is non-dev. It is the single shared
+// definition used by DevKeyAllowed and the zever CLI.
+func IsDevEnv(value string) bool {
+	env := strings.ToLower(strings.TrimSpace(value))
 	for _, e := range devKeyEnvs {
 		if env == e {
 			return true
 		}
 	}
 	return false
+}
+
+// DevKeyAllowed reports whether the deterministic dev key may protect
+// data: either explicitly via opts.AllowDevKey or implicitly via
+// ZEVER_ENV ∈ {dev, test, development} (trimmed, case-insensitive; see
+// IsDevEnv). Every other environment — including production and an unset
+// ZEVER_ENV — must supply a real key.
+func DevKeyAllowed(opts Options) bool {
+	return opts.AllowDevKey || IsDevEnv(os.Getenv("ZEVER_ENV"))
 }

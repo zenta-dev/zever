@@ -431,6 +431,15 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Fixed
 
+- `fix(auth,crypto): warn on in-memory JWT revocation; shared dev-env check`:
+  the `jwt` adapter now logs a one-time `slog` WARN (and exposes it via
+  `jwt.WarningReporter.Warnings()`) when the default per-process revocation
+  store is in use, pointing at `revocation/redis`. Docs and package comment
+  state "HS256 only; asymmetric via custom adapter". New
+  `crypto.IsDevEnv(value)` trims and case-folds `ZEVER_ENV` against
+  dev/test/development; `crypto.DevKeyAllowed` and the CLI's `devEnv` both
+  use it, so a padded value like `" Dev "` is no longer treated as
+  non-dev by the dev-key gate.
 - `fix(cli): project-aware doctor`: `zever doctor` now checks only the
   services enabled in the project config (top-level batteries in
   `zever.yaml`/`.yml`/`.json`, same discovery as `serve`; falls back to
