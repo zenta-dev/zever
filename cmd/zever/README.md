@@ -47,8 +47,8 @@ Inspection / Runtime / Database / Operations).
 - `--json`: machine-readable JSON envelope output (also `ZEVER_JSON=1`).
   Structured `data` is emitted by the inspection commands (`compile`,
   `check`, `explain`, `doctor`, `routes`, `config show`, `graph`,
-  `breaking`, `check-boundaries`) plus `outbox`, `upgrade`, and
-  `uninstall`; every other command emits a JSON error envelope on
+  `breaking`, `check-boundaries`) plus `outbox`, `upgrade`,
+  `uninstall`, and `build`; every other command emits a JSON error envelope on
   failure. `doctor --json` reports `ok:false` with a nonzero exit when
   any battery fails.
 - `-i`, `--interactive`: guided prompts where supported (also

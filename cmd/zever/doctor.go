@@ -157,6 +157,32 @@ var doctorChecksFor = func(c *container.Container, resolved *config.Config) map[
 	}
 }
 
+// scopedValidateAdapters validates the resolved config against the
+// process's registrations, skipping batteries the project does not enable:
+// a slim `zever build --adapters=...` binary registers only its subset, so
+// validating excluded batteries would fail a binary that is correct for its
+// project. A nil enabled set (no project config found) keeps the strict
+// all-battery check. Enabled-but-unregistered batteries still fail closed.
+func scopedValidateAdapters(resolved *config.Config, enabled map[string]bool, registered func(service string) []string) error {
+	if enabled == nil {
+		return resolved.ValidateAdapters(registered)
+	}
+
+	services := resolved.RedactedServices()
+
+	return resolved.ValidateAdapters(func(service string) []string {
+		if !enabled[service] {
+			if sc, ok := services[service]; ok {
+				return []string{sc.Adapter}
+			}
+
+			return nil
+		}
+
+		return registered(service)
+	})
+}
+
 // doctorRow is one battery's check result, human and JSON alike.
 type doctorRow struct {
 	Name  string `json:"name"`
@@ -223,10 +249,17 @@ func resolveDoctorScope(configPath string) doctorScope {
 }
 
 // localDoctorRows resolves the scope's enabled batteries against the CLI
-// process's own container (whose adapters.go registers every adapter), in
-// deterministic name order. The "config" row always runs.
+// process's own container and registrations (a slim `zever build` binary
+// registers only its adapter subset; the adapters meta-check is scoped to
+// the enabled set so it stays green there). In deterministic name order.
+// The "config" row always runs.
 func localDoctorRows(c *container.Container, resolved *config.Config, enabled map[string]bool) []doctorRow {
 	checks := doctorChecksFor(c, resolved)
+	if _, ok := checks["adapters"]; ok {
+		checks["adapters"] = func() error {
+			return scopedValidateAdapters(resolved, enabled, container.RegisteredAdapters)
+		}
+	}
 
 	names := make([]string, 0, len(checks))
 	for name := range checks {
