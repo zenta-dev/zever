@@ -11,25 +11,33 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 - `fix(payment)!: all adapters use minor units (cents)`: every `Amount`
   field across `core/payment` (`Request`, `Result`) and `core/billing`
-  (`Invoice`) is now uniformly minor units, and every adapter honors it.
-  The Paddle payment adapter parses decimal totals via the shared
-  `billing.ParseMinorUnits` contract (whole units scale by the currency
-  exponent, so bare `"10"` is 1000 minor units; excess precision rounds
-  half away from zero; unrepresentable magnitudes fail with the shared
-  `billing.ErrAmountOverflow` sentinel, aliased as Paddle
-  `ErrAmountOverflow`), and partial-refund adjustment amounts now encode
-  back as major-unit decimals via the new `billing.FormatMinorUnits`
-  (1000 minor units sends `"10.00"`, not `"1000"`). The Paddle billing
-  adapter applies the same parse (bare totals such as `"4200"` now read as
-  420000 minor units). Stripe and stub adapters already passed native int64
-  minor units through and are unchanged apart from pinning tests.
-  **Breaking:** Paddle totals without decimals change value (`"2500"` was
-  2500 minor units, now 250000); truncation becomes half-away-from-zero
-  rounding (`"99.999"` was 9999, now 10000); the Paddle amount grammar is
-  strict (a present point requires digits on both sides, so `".99"` and
-  `"1."` now error); `billing.ParseMinorUnits` overflow is exact rather
-  than conservative (`"9223372036854775807"` JPY now converts instead of
-  overflowing).
+  (`Invoice`) is now uniformly minor units, extending the Paddle payment
+  normalization above to every other money path. The Paddle billing adapter
+  parses totals via the shared `billing.ParseMinorUnits` contract (whole
+  units scale by the currency exponent, so bare `"4200"` reads as 420000
+  minor units; excess precision rounds half away from zero; unrepresentable
+  magnitudes fail with `billing.ErrAmountOverflow`). New
+  `billing.FormatMinorUnits` encodes minor units back to major-unit
+  decimals with a tested round-trip. `billing.ParseMinorUnits` overflow is
+  now exact rather than conservative (representable extrema convert).
+  Stripe and stub payment/billing adapters already passed native int64
+  minor units through and are unchanged apart from pinning
+  normalize/round-trip/refund-symmetry tests.
+  **Breaking:** Paddle billing totals without decimals change value
+  (`"4200"` was 4200 minor units, now 420000); truncation becomes
+  half-away-from-zero rounding there too.
+
+- `fix(payment)!: normalize Paddle whole-unit amounts to minor units`:
+  **Breaking:** the `paddle` adapter now scales whole-unit decimal totals to
+  minor units (`"10"` parses to `1000`, matching `"10.00"`), where it
+  previously passed them through verbatim (`"10"` parsed to `10`). Sub-cent
+  precision now rounds half away from zero (`"10.005"` becomes `1001`,
+  `"-10.005"` becomes `-1001`) instead of truncating, and partial-refund
+  adjustment amounts are formatted back to major-unit decimals (`1000` is
+  sent as `"10.00"`) so both directions agree. Totals that overflow `int64`
+   once scaled still fail with `ErrAmountOverflow`. The `stripe` adapter is
+   unchanged (native minor-unit integers).
+
 
 - `feat(gogen)!: typed saga steps`: the `gogen` backend's `<module>/saga.go`
   **Breaking:** no longer emits the untyped `SagaCaller.Call(ctx, service,
@@ -110,6 +118,17 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   error. Compare field-by-field instead.
 
 ### Added
+
+- `fix(payment): at-least-once webhook handling`: `WebhookEvent` on the
+  `stripe` and `paddle` adapters records the event id as seen before the
+  caller processes it (at-most-once), so a failing handler loses the event
+  on the provider retry, and events with an empty id are never deduped. New
+  optional interface `payment.WebhookHandling` (`HandleWebhook(ctx, raw,
+  signature, handler)`) runs the handler under the reservation, commits only
+  on success, and releases the key on handler error or panic so retries are
+  accepted; an empty event id is rejected with `payment.ErrMissingEventID`.
+  `payment.ProcessWebhookOnce` is the shared helper. `WebhookEvent` behavior
+  is unchanged and now documented as at-most-once.
 
 - `feat(cli): slim adapter-scoped builds`: the new `zever build`
   command compiles a slim CLI registering only `--adapters=a,b`
@@ -442,6 +461,15 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Fixed
 
+- `fix(auth,crypto): warn on in-memory JWT revocation; shared dev-env check`:
+  the `jwt` adapter now logs a one-time `slog` WARN (and exposes it via
+  `jwt.WarningReporter.Warnings()`) when the default per-process revocation
+  store is in use, pointing at `revocation/redis`. Docs and package comment
+  state "HS256 only; asymmetric via custom adapter". New
+  `crypto.IsDevEnv(value)` trims and case-folds `ZEVER_ENV` against
+  dev/test/development; `crypto.DevKeyAllowed` and the CLI's `devEnv` both
+  use it, so a padded value like `" Dev "` is no longer treated as
+  non-dev by the dev-key gate.
 - `fix(cli): project-aware doctor`: `zever doctor` now checks only the
   services enabled in the project config (top-level batteries in
   `zever.yaml`/`.yml`/`.json`, same discovery as `serve`; falls back to
@@ -531,6 +559,25 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Security
 
+- `fix(httpclient)`: **Breaking:** clients built with `WithSafeDial` /
+  `NewSafeClient` no longer honor `HTTP_PROXY`/`HTTPS_PROXY` (the dial guard
+  only saw the proxy address, so private targets were reachable through a
+  proxy); pass the new `WithAllowProxy()` option to opt back in with a
+  trusted proxy. `IsPrivateIP` now also classifies NAT64
+  (`64:ff9b::/96`, `64:ff9b:1::/48`), 6to4 (`2002::/16`) and IPv4-compatible
+  (`::/96`) addresses by their embedded IPv4 address, and treats Teredo
+  (`2001::/32`) and site-local (`fec0::/10`) as private.
+- `fix(document)`: **Breaking:** the `latex` adapter now defends against
+  local file reads on TeX Live >= 2026 (where `openin_any` is a no-op). New
+  `latex_sandbox` option (`auto` default, `required`, `off`) runs TeX inside
+  bubblewrap (no network, read-only system trees, only the render dir
+  writable); `required` fails at open when bwrap is unavailable, `auto` logs
+  one warning and falls back. A source pre-scan now rejects `\input`,
+  `\include`, `\openin`, `\openout` etc. with absolute, `..`, `~` or piped
+  paths, `\write18`, and shell-escape packages with `ErrUnsafeSource`;
+  `latex_allow_unsafe_source: true` restores the old behavior. Output and
+  stderr are size-capped before buffering, and process-group kill is split
+  into build-tagged files so the module compiles on Windows.
 - Bump the Go toolchain pin from `go 1.27.0` to `go 1.27.2` in `go.work`
   and every module's `go.mod` (fixes stdlib `net/http` / HTTP/2
   advisories `GO-2026-6603`…`GO-2026-6617`).

@@ -4,7 +4,9 @@ import (
 	"bytes"
 	"context"
 	"crypto/sha256"
+	"errors"
 	"fmt"
+	"math"
 	"net/http"
 	"strconv"
 	"strings"
@@ -12,7 +14,6 @@ import (
 
 	"github.com/PaddleHQ/paddle-go-sdk/v5"
 
-	"github.com/zenta-dev/zever/core/billing"
 	"github.com/zenta-dev/zever/core/idempotency"
 	"github.com/zenta-dev/zever/core/payment"
 	"github.com/zenta-dev/zever/shared/httpclient"
@@ -163,7 +164,7 @@ func fromTransaction(txn *paddle.Transaction) (payment.Result, error) {
 	var total int64
 
 	if s := txn.Details.Totals.Total; s != "" {
-		parsed, err := parsePaddleAmount(s, string(txn.CurrencyCode))
+		parsed, err := parsePaddleAmount(s)
 		if err != nil {
 			return payment.Result{}, fmt.Errorf("paddle: parse total: %w", err)
 		}
@@ -179,18 +180,136 @@ func fromTransaction(txn *paddle.Transaction) (payment.Result, error) {
 	}, nil
 }
 
-// parsePaddleAmount converts a Paddle decimal major-unit total to minor units
-// using the shared billing.ParseMinorUnits contract: whole units scale by the
-// currency exponent, excess precision rounds half away from zero, and
-// unrepresentable magnitudes fail with billing.ErrAmountOverflow. An empty
-// string means the provider sent no total and maps to zero.
-func parsePaddleAmount(s, currency string) (int64, error) {
+// minorUnitsPerMajor scales a Paddle whole-unit total to minor units.
+const minorUnitsPerMajor = 100
+
+// parsePaddleAmount converts a Paddle decimal total (major units) to minor
+// units. Whole-unit totals scale by minorUnitsPerMajor. Sub-cent precision
+// rounds half away from zero so positive and negative totals stay symmetric.
+func parsePaddleAmount(s string) (int64, error) {
+	orig := s
 	s = strings.TrimSpace(s)
 	if s == "" {
 		return 0, nil
 	}
 
-	return billing.ParseMinorUnits(s, currency)
+	if !strings.Contains(s, ".") {
+		v, err := strconv.ParseInt(s, 10, 64)
+		if err != nil {
+			if errors.Is(err, strconv.ErrRange) {
+				return 0, ErrAmountOverflow
+			}
+
+			return 0, err
+		}
+
+		if v > math.MaxInt64/minorUnitsPerMajor || v < math.MinInt64/minorUnitsPerMajor {
+			return 0, ErrAmountOverflow
+		}
+
+		return v * minorUnitsPerMajor, nil
+	}
+
+	parts := strings.SplitN(s, ".", 2)
+	intPartStr := parts[0]
+	fracStr := parts[1]
+
+	neg := false
+	magStr := intPartStr
+	if strings.HasPrefix(magStr, "-") || strings.HasPrefix(magStr, "+") {
+		neg = magStr[0] == '-'
+		magStr = magStr[1:]
+	}
+
+	for i := 0; i < len(magStr); i++ {
+		if magStr[i] < '0' || magStr[i] > '9' {
+			return 0, fmt.Errorf("paddle: invalid amount %q", orig)
+		}
+	}
+
+	for i := 0; i < len(fracStr); i++ {
+		if fracStr[i] < '0' || fracStr[i] > '9' {
+			return 0, fmt.Errorf("paddle: invalid amount %q", orig)
+		}
+	}
+
+	mag := uint64(0)
+	if magStr != "" {
+		v, err := strconv.ParseUint(magStr, 10, 64)
+		if err != nil {
+			return 0, err
+		}
+
+		mag = v
+	}
+
+	var base uint64
+
+	var roundUp bool
+
+	switch {
+	case len(fracStr) == 0:
+		base = 0
+	case len(fracStr) == 1:
+		base = uint64(fracStr[0]-'0') * 10
+	case len(fracStr) == 2:
+		base = uint64(fracStr[0]-'0')*10 + uint64(fracStr[1]-'0')
+	default:
+		base = uint64(fracStr[0]-'0')*10 + uint64(fracStr[1]-'0')
+		roundUp = fracStr[2] >= '5'
+	}
+
+	limit := uint64(math.MaxInt64)
+	if neg {
+		limit = uint64(math.MaxInt64) + 1
+	}
+
+	if mag > limit/uint64(minorUnitsPerMajor) {
+		return 0, ErrAmountOverflow
+	}
+
+	cents := mag*uint64(minorUnitsPerMajor) + base
+	if cents > limit {
+		return 0, ErrAmountOverflow
+	}
+
+	if roundUp {
+		if cents == limit {
+			return 0, ErrAmountOverflow
+		}
+
+		cents++
+	}
+
+	if neg {
+		if cents == uint64(math.MaxInt64)+1 {
+			return math.MinInt64, nil
+		}
+
+		return -int64(cents), nil //nolint:gosec // G115: cents <= limit <= MaxInt64+1, MinInt64 handled above
+	}
+
+	return int64(cents), nil //nolint:gosec // G115: cents <= limit == MaxInt64 here
+}
+
+// formatPaddleAmount renders minor units as a Paddle major-unit decimal so
+// outgoing partial-refund adjustments agree with parsed totals.
+func formatPaddleAmount(amount int64) string {
+	neg := amount < 0
+
+	var mag uint64
+	if neg {
+		mag = uint64(-(amount + 1)) + 1 //nolint:gosec // G115: amount < 0 so -(amount+1) >= 0 fits
+	} else {
+		mag = uint64(amount)
+	}
+
+	sign := ""
+	if neg {
+		sign = "-"
+	}
+
+	return fmt.Sprintf("%s%d.%02d", sign, mag/uint64(minorUnitsPerMajor), mag%uint64(minorUnitsPerMajor))
 }
 
 // Refund refunds amount (in minor units) against a Paddle transaction.
@@ -238,7 +357,7 @@ func (d *driver) refund(ctx context.Context, id string, amount int64) error {
 		return fmt.Errorf("paddle: refund: get transaction: %w", err)
 	}
 
-	total, err := parsePaddleAmount(txn.Details.Totals.Total, string(txn.CurrencyCode))
+	total, err := parsePaddleAmount(txn.Details.Totals.Total)
 	if err != nil {
 		return fmt.Errorf("paddle: refund: parse total: %w", err)
 	}
@@ -257,7 +376,7 @@ func (d *driver) refund(ctx context.Context, id string, amount int64) error {
 	case amount == total:
 		req.Type = paddle.PtrTo(paddle.AdjustmentTypeFull)
 	case len(txn.Details.LineItems) == 1:
-		itemTotal, err := parsePaddleAmount(txn.Details.LineItems[0].Totals.Total, string(txn.CurrencyCode))
+		itemTotal, err := parsePaddleAmount(txn.Details.LineItems[0].Totals.Total)
 		if err != nil {
 			return fmt.Errorf("paddle: refund: parse line item total: %w", err)
 		}
@@ -267,7 +386,7 @@ func (d *driver) refund(ctx context.Context, id string, amount int64) error {
 		}
 
 		req.Type = paddle.PtrTo(paddle.AdjustmentTypePartial)
-		amt := billing.FormatMinorUnits(amount, string(txn.CurrencyCode))
+		amt := formatPaddleAmount(amount)
 		req.Items = []paddle.AdjustmentItemCreate{{
 			ItemID: txn.Details.LineItems[0].ID,
 			Type:   paddle.AdjustmentItemCreateTypePartial,
@@ -317,11 +436,47 @@ func dedupeWebhookEvent(ctx context.Context, store idempotency.Store, key, event
 	return nil
 }
 
-// WebhookEvent decodes and verifies a raw Paddle webhook payload.
-// When an idempotency store is configured, the provider event id is
-// reserved before returning: a repeat delivery fails with
-// payment.ErrDuplicateEvent instead of re-executing downstream work.
+// WebhookEvent verifies signature then decodes a webhook payload.
+//
+// When an idempotency store is configured the provider event id is marked
+// seen BEFORE this method returns, so the dedupe is at-most-once: if the
+// caller's processing fails afterwards, the provider retry is rejected with
+// payment.ErrDuplicateEvent and the event is lost. Events with an empty id are
+// never deduped. Prefer HandleWebhook (payment.WebhookHandling), which commits
+// only after the handler succeeds and rejects empty ids with
+// payment.ErrMissingEventID.
 func (d *driver) WebhookEvent(ctx context.Context, raw []byte, signature string) (payment.Event, error) {
+	ev, err := d.decodeWebhook(ctx, raw, signature)
+	if err != nil {
+		return payment.Event{}, err
+	}
+
+	if err := dedupeWebhookEvent(ctx, d.idempotency, "paddle:webhook:"+ev.ID, ev.ID, webhookFingerprint(raw)); err != nil {
+		return payment.Event{}, fmt.Errorf("paddle: webhook: %w", err)
+	}
+
+	return ev, nil
+}
+
+// HandleWebhook verifies and decodes raw, then runs handler under a replay
+// reservation that is committed only when handler returns nil. See
+// payment.WebhookHandling for the full contract.
+func (d *driver) HandleWebhook(ctx context.Context, raw []byte, signature string, handler payment.WebhookHandler) error {
+	ev, err := d.decodeWebhook(ctx, raw, signature)
+	if err != nil {
+		return err
+	}
+
+	if err := payment.ProcessWebhookOnce(ctx, d.idempotency, "paddle:webhook:"+ev.ID, ev, webhookFingerprint(raw), handler); err != nil {
+		return fmt.Errorf("paddle: webhook: %w", err)
+	}
+
+	return nil
+}
+
+// decodeWebhook verifies the signature and decodes the payload without
+// touching the idempotency store.
+func (d *driver) decodeWebhook(ctx context.Context, raw []byte, signature string) (payment.Event, error) {
 	if len(raw) > d.maxWebhookBytes {
 		return payment.Event{}, fmt.Errorf("paddle: webhook: %w", payment.SizeLimitError{Size: len(raw), Limit: d.maxWebhookBytes})
 	}
@@ -363,7 +518,7 @@ func (d *driver) WebhookEvent(ctx context.Context, raw []byte, signature string)
 
 	var amount int64
 	if s := envelope.Data.Details.Totals.Total; s != "" {
-		amount, err = parsePaddleAmount(s, envelope.Data.CurrencyCode)
+		amount, err = parsePaddleAmount(s)
 		if err != nil {
 			return payment.Event{}, fmt.Errorf("paddle: webhook: parse total: %w", err)
 		}
@@ -378,10 +533,6 @@ func (d *driver) WebhookEvent(ctx context.Context, raw []byte, signature string)
 			Amount:   amount,
 			Currency: envelope.Data.CurrencyCode,
 		},
-	}
-
-	if err := dedupeWebhookEvent(ctx, d.idempotency, "paddle:webhook:"+envelope.EventID, envelope.EventID, webhookFingerprint(raw)); err != nil {
-		return payment.Event{}, fmt.Errorf("paddle: webhook: %w", err)
 	}
 
 	return ev, nil

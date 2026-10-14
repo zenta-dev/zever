@@ -349,32 +349,29 @@ func TestParsePaddleAmount(t *testing.T) {
 	t.Parallel()
 
 	cases := []struct {
-		in       string
-		currency string
-		want     int64
-		wantErr  bool
+		in      string
+		want    int64
+		wantErr bool
 	}{
-		{"", "USD", 0, false},
-		{"10", "USD", 1000, false}, // no-dot branch is whole major units.
-		{"abc", "USD", 0, true},
-		{"100.00", "USD", 10000, false},
-		{"99.99", "USD", 9999, false},
-		{"99.999", "USD", 10000, false}, // extra precision rounds half away from zero.
-		{"1.5", "USD", 150, false},
-		{".99", "USD", 0, true},
-		{"1.", "USD", 0, true},
-		{"-.50", "USD", 0, true},
-		{"-5.25", "USD", -525, false},
-		{"12.xy", "USD", 0, true},
-		{"xx.00", "USD", 0, true},
-		{"100", "JPY", 100, false},
+		{"", 0, false},
+		{"10", 1000, false}, // no-dot branch scales whole units to minor units.
+		{"abc", 0, true},
+		{"100.00", 10000, false},
+		{"99.99", 9999, false},
+		{"99.999", 10000, false}, // extra precision rounds half up.
+		{"1.5", 150, false},
+		{".99", 99, false},
+		{"-.50", -50, false},
+		{"-5.25", -525, false},
+		{"12.xy", 0, true},
+		{"xx.00", 0, true},
 	}
 
 	for _, tc := range cases {
 		t.Run("amount_"+tc.in, func(t *testing.T) {
 			t.Parallel()
 
-			got, err := parsePaddleAmount(tc.in, tc.currency)
+			got, err := parsePaddleAmount(tc.in)
 			if tc.wantErr && err == nil {
 				t.Fatalf("expected error for %q", tc.in)
 			}

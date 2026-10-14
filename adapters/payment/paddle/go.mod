@@ -26,14 +26,11 @@ replace github.com/zenta-dev/zever/shared/providersopt => ../../../shared/provid
 
 require (
 	github.com/PaddleHQ/paddle-go-sdk/v5 v5.2.0
-	github.com/zenta-dev/zever/core/billing v0.6.1
 	github.com/zenta-dev/zever/core/idempotency v0.6.1
 	github.com/zenta-dev/zever/core/payment v0.6.1
 	github.com/zenta-dev/zever/shared/httpclient v0.6.1
 	github.com/zenta-dev/zever/shared/providersopt v0.6.1
 )
-
-replace github.com/zenta-dev/zever/core/billing => ../../../core/billing
 
 replace github.com/zenta-dev/zever/core/idempotency => ../../../core/idempotency
 

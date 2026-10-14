@@ -16,6 +16,7 @@ import (
 	"text/template"
 
 	"github.com/zenta-dev/zever/config"
+	"github.com/zenta-dev/zever/core/crypto"
 	"github.com/zenta-dev/zever/dsl/backend/gogen"
 	"github.com/zenta-dev/zever/dsl/compile"
 	"github.com/zenta-dev/zever/dsl/ir"
@@ -597,23 +598,11 @@ type serverData struct {
 	Reflection bool
 }
 
-// devEnvs are the ZEVER_ENV values that mark a non-production environment,
-// mirroring core/crypto's own devKeyEnvs.
-var devEnvs = []string{"dev", "test", "development"}
-
 // devEnv reports whether ZEVER_ENV marks a non-production environment
-// (case-insensitive). Every other value -- including production and an
-// unset or empty ZEVER_ENV -- is non-dev.
+// (trimmed, case-insensitive) via the shared crypto.IsDevEnv. Every other
+// value -- including production and an unset or empty ZEVER_ENV -- is non-dev.
 func devEnv() bool {
-	env := strings.ToLower(strings.TrimSpace(os.Getenv("ZEVER_ENV")))
-
-	for _, e := range devEnvs {
-		if env == e {
-			return true
-		}
-	}
-
-	return false
+	return crypto.IsDevEnv(os.Getenv("ZEVER_ENV"))
 }
 
 // reflectionEnabled reports whether the generated server should register

@@ -139,7 +139,7 @@ func BenchmarkParsePaddleAmount(b *testing.B) {
 	b.ReportAllocs()
 	b.ResetTimer()
 	for b.Loop() {
-		if _, err := parsePaddleAmount("100.00", "USD"); err != nil {
+		if _, err := parsePaddleAmount("100.00"); err != nil {
 			b.Fatalf("parsePaddleAmount() = %v", err)
 		}
 	}
