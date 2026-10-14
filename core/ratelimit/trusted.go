@@ -22,7 +22,7 @@ func ParseTrustedProxies(entries []string) ([]netip.Prefix, error) {
 		}
 
 		if prefix, err := netip.ParsePrefix(entry); err == nil {
-			out = append(out, prefix.Masked())
+			out = append(out, unmapPrefix(prefix).Masked())
 
 			continue
 		}
@@ -42,4 +42,16 @@ func ParseTrustedProxies(entries []string) ([]netip.Prefix, error) {
 	}
 
 	return out, nil
+}
+
+// unmapPrefix rewrites an IPv4-mapped IPv6 prefix (::ffff:a.b.c.d/n with
+// n >= 96) to its plain IPv4 form so it matches unmapped client addresses.
+// Other prefixes, including zoned ones, are returned with the zone dropped.
+func unmapPrefix(p netip.Prefix) netip.Prefix {
+	addr := p.Addr().WithZone("")
+	if addr.Is4In6() && p.Bits() >= 96 {
+		return netip.PrefixFrom(addr.Unmap(), p.Bits()-96)
+	}
+
+	return netip.PrefixFrom(addr, p.Bits())
 }

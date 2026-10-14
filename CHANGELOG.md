@@ -548,6 +548,12 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   (`64:ff9b::/96`, `64:ff9b:1::/48`), 6to4 (`2002::/16`) and IPv4-compatible
   (`::/96`) addresses by their embedded IPv4 address, and treats Teredo
   (`2001::/32`) and site-local (`fec0::/10`) as private.
+- `middleware.ClientIPKey` now reads every `X-Forwarded-For` header line
+  (not just the first) before picking the rightmost untrusted entry, so a
+  trusted proxy that appends a separate header line can no longer be
+  shadowed by a client-supplied first line. `ParseTrustedProxies` also
+  unmaps IPv4-mapped IPv6 prefixes (`::ffff:10.0.0.0/104` becomes
+  `10.0.0.0/8`) so trusted ranges match in either form.
 - Bump the Go toolchain pin from `go 1.27.0` to `go 1.27.2` in `go.work`
   and every module's `go.mod` (fixes stdlib `net/http` / HTTP/2
   advisories `GO-2026-6603`…`GO-2026-6617`).

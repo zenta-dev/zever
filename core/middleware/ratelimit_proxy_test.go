@@ -117,3 +117,59 @@ func TestParseTrustedProxies(t *testing.T) {
 		})
 	}
 }
+
+// multiHeaderRequest builds a request with one X-Forwarded-For line per value.
+func multiHeaderRequest(t *testing.T, remoteAddr string, lines ...string) *http.Request {
+	t.Helper()
+
+	r := httptest.NewRequestWithContext(t.Context(), http.MethodGet, "/", nil)
+	r.RemoteAddr = remoteAddr
+
+	for _, l := range lines {
+		r.Header.Add("X-Forwarded-For", l)
+	}
+
+	return r
+}
+
+func TestClientIPKey_multipleHeaderLines(t *testing.T) {
+	trusted := mustPrefixes(t, "10.0.0.0/8", "::ffff:192.168.0.0/112")
+
+	tests := []struct {
+		name       string
+		remoteAddr string
+		lines      []string
+		want       string
+	}{
+		{"proxy-appended line wins over spoofed first line", "10.0.0.2:1", []string{"6.6.6.6", "8.8.8.8"}, "8.8.8.8"},
+		{"spoofed leading entry with trailing trusted entry", "10.0.0.2:1", []string{"6.6.6.6", "8.8.8.8, 10.0.0.1"}, "8.8.8.8"},
+		{"trusted last line skipped", "10.0.0.2:1", []string{"6.6.6.6", "8.8.8.8", "10.0.0.1"}, "8.8.8.8"},
+		{"untrusted peer ignores every line", "203.0.113.9:1", []string{"6.6.6.6", "8.8.8.8"}, "203.0.113.9"},
+		{"ipv4-mapped trusted cidr matches ipv4 entry", "192.168.0.5:1", []string{"6.6.6.6", "8.8.8.8, 192.168.0.9"}, "8.8.8.8"},
+		{"ipv4-mapped peer matches ipv4 cidr", "[::ffff:10.0.0.2]:1", []string{"6.6.6.6", "8.8.8.8"}, "8.8.8.8"},
+		{"ipv6 client across lines", "10.0.0.2:1", []string{"6.6.6.6", "2001:db8::5"}, "2001:db8::5"},
+		{"malformed lines fall back to peer", "10.0.0.2:1", []string{"garbage", "!!!"}, "10.0.0.2"},
+		{"empty lines fall back to peer", "10.0.0.2:1", []string{"", " "}, "10.0.0.2"},
+		{"malformed last line skipped", "10.0.0.2:1", []string{"6.6.6.6, 8.8.8.8", "garbage"}, "8.8.8.8"},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			got := ClientIPKey(trusted)(multiHeaderRequest(t, tt.remoteAddr, tt.lines...))
+			if got != tt.want {
+				t.Fatalf("ClientIPKey() = %q, want %q", got, tt.want)
+			}
+		})
+	}
+}
+
+func TestParseTrustedProxies_unmapsIPv4Mapped(t *testing.T) {
+	got := mustPrefixes(t, "::ffff:10.0.0.0/104", "::ffff:1.2.3.4")
+
+	want := []string{"10.0.0.0/8", "1.2.3.4/32"}
+	for i, p := range got {
+		if p.String() != want[i] {
+			t.Fatalf("prefix[%d] = %s, want %s", i, p, want[i])
+		}
+	}
+}

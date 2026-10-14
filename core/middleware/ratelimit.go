@@ -56,7 +56,7 @@ func ClientIPKey(trusted []netip.Prefix) func(*http.Request) string {
 			return RemoteAddrKey(r)
 		}
 
-		if client, ok := rightmostUntrusted(r.Header.Get("X-Forwarded-For"), trusted); ok {
+		if client, ok := rightmostUntrusted(strings.Join(r.Header.Values("X-Forwarded-For"), ","), trusted); ok {
 			return client
 		}
 
