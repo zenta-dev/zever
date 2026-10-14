@@ -9,6 +9,10 @@
 /tools/errscan/errscan
 /tools/modgraph/modgraph
 /tools/zever-mcp/zever-mcp
+/tools/apidiff/apidiff
+/tools/gengrammar/gengrammar
+/tools/vulngate/vulngate
+/tools/zever-lsp/zever-lsp
 __pycache__/
 *.pyc
 
