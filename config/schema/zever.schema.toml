@@ -1230,6 +1230,10 @@ type = 'object'
 description = 'Vault server address.'
 type = 'string'
 
+['$defs'.secretsOptions.properties.allow_insecure]
+description = 'Permit a plain-http Addr for testing. Default false (https only).'
+type = 'boolean'
+
 ['$defs'.secretsOptions.properties.mount]
 description = 'Vault KV mount path.'
 type = 'string'

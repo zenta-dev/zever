@@ -38,70 +38,70 @@ func conformanceBuildArgs(t *testing.T) {
 			in:   "in.mov",
 			out:  "out.mp4",
 			spec: Spec{Kind: media.KindVideo, Format: "mp4"},
-			want: []string{"-y", "-i", "in.mov", "-crf", "23", "-c:v", "libx264", "-preset", "veryfast", "-pix_fmt", "yuv420p", "out.mp4"},
+			want: []string{"-y", "-i", "in.mov", "-crf", "23", "-c:v", "libx264", "-preset", "veryfast", "-pix_fmt", "yuv420p", "--", "out.mp4"},
 		},
 		{
 			name: "video webm",
 			in:   "in.mov",
 			out:  "out.webm",
 			spec: Spec{Kind: media.KindVideo, Format: "webm"},
-			want: []string{"-y", "-i", "in.mov", "-crf", "23", "-c:v", "libvpx-vp9", "-b:v", "0", "out.webm"},
+			want: []string{"-y", "-i", "in.mov", "-crf", "23", "-c:v", "libvpx-vp9", "-b:v", "0", "--", "out.webm"},
 		},
 		{
 			name: "video scale bitrate crf",
 			in:   "in.mov",
 			out:  "out.mp4",
 			spec: Spec{Kind: media.KindVideo, Format: "mp4", Width: 641, Height: 481, Bitrate: 500, CRF: 18},
-			want: []string{"-y", "-i", "in.mov", "-vf", "scale=640:480", "-b:a", "500k", "-crf", "18", "-c:v", "libx264", "-preset", "veryfast", "-pix_fmt", "yuv420p", "out.mp4"},
+			want: []string{"-y", "-i", "in.mov", "-vf", "scale=640:480", "-b:a", "500k", "-crf", "18", "-c:v", "libx264", "-preset", "veryfast", "-pix_fmt", "yuv420p", "--", "out.mp4"},
 		},
 		{
 			name: "audio mp3 bitrate",
 			in:   "in.wav",
 			out:  "out.mp3",
 			spec: Spec{Kind: media.KindAudio, Format: "mp3", Bitrate: 192},
-			want: []string{"-y", "-i", "in.wav", "-b:a", "192k", "-c:a", "libmp3lame", "out.mp3"},
+			want: []string{"-y", "-i", "in.wav", "-b:a", "192k", "-c:a", "libmp3lame", "--", "out.mp3"},
 		},
 		{
 			name: "audio wav default",
 			in:   "in.wav",
 			out:  "out.wav",
 			spec: Spec{Kind: media.KindAudio, Format: "wav"},
-			want: []string{"-y", "-i", "in.wav", "-c:a", "pcm_s16le", "out.wav"},
+			want: []string{"-y", "-i", "in.wav", "-c:a", "pcm_s16le", "--", "out.wav"},
 		},
 		{
 			name: "thumbnail offset quality scale",
 			in:   "v.mp4",
 			out:  "t.jpg",
 			spec: Spec{Kind: media.KindVideo, Format: "jpg", Offset: 5 * time.Second, Quality: 90, Width: 321},
-			want: []string{"-y", "-ss", "5.000", "-i", "v.mp4", "-frames:v", "1", "-vf", "scale=320:-2", "-q:v", "5", "t.jpg"},
+			want: []string{"-y", "-ss", "5.000", "-i", "v.mp4", "-frames:v", "1", "-vf", "scale=320:-2", "-q:v", "5", "--", "t.jpg"},
 		},
 		{
 			name: "thumbnail from out ext",
 			in:   "v.mp4",
 			out:  "t.png",
 			spec: Spec{Kind: media.KindVideo},
-			want: []string{"-y", "-ss", "0.000", "-i", "v.mp4", "-frames:v", "1", "-q:v", "8", "t.png"},
+			want: []string{"-y", "-ss", "0.000", "-i", "v.mp4", "-frames:v", "1", "-q:v", "8", "--", "t.png"},
 		},
 		{
 			name: "unknown format no codec args",
 			in:   "in.mov",
 			out:  "out.mkv",
 			spec: Spec{Kind: media.KindVideo, Format: "mkv"},
-			want: []string{"-y", "-i", "in.mov", "-crf", "23", "out.mkv"},
+			want: []string{"-y", "-i", "in.mov", "-crf", "23", "--", "out.mkv"},
 		},
 		{
 			name: "audio kind image ext passthrough",
 			in:   "a.mp3",
 			out:  "t.jpg",
 			spec: Spec{Kind: media.KindAudio, Format: "jpg"},
-			want: []string{"-y", "-i", "a.mp3", "t.jpg"},
+			want: []string{"-y", "-i", "a.mp3", "--", "t.jpg"},
 		},
 		{
 			name: "empty paths still valid",
 			in:   "",
 			out:  "",
 			spec: Spec{},
-			want: []string{"-y", "-i", "", ""},
+			want: []string{"-y", "-i", "", "--", ""},
 		},
 	}
 
@@ -120,7 +120,7 @@ func conformanceBuildArgs(t *testing.T) {
 	t.Run("format normalization", func(t *testing.T) {
 		t.Parallel()
 
-		want := []string{"-y", "-i", "in.mov", "-crf", "23", "-c:v", "libx264", "-preset", "veryfast", "-pix_fmt", "yuv420p", "out.mp4"}
+		want := []string{"-y", "-i", "in.mov", "-crf", "23", "-c:v", "libx264", "-preset", "veryfast", "-pix_fmt", "yuv420p", "--", "out.mp4"}
 
 		for _, format := range []string{"MP4", ".mp4", " Mp4 "} {
 			if got := BuildArgs("in.mov", "out.mp4", Spec{Kind: media.KindVideo, Format: format}); !equalArgs(got, want) {

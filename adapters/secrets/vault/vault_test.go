@@ -131,7 +131,7 @@ func mustNew(t *testing.T, opts Options) secrets.Secrets {
 
 func TestRoundTrip_GetSetDeleteList(t *testing.T) {
 	srv := mustStubServer(t, "test-token", "secret")
-	s := mustNew(t, Options{Addr: srv.URL, Token: "test-token", Mount: "secret"})
+	s := mustNew(t, Options{Addr: srv.URL, AllowInsecure: true, Token: "test-token", Mount: "secret"})
 	ctx := t.Context()
 
 	if err := s.Set(ctx, "alpha", []byte("hello")); err != nil {
@@ -177,7 +177,7 @@ func TestGet_RawValue_ErrInvalidBase64(t *testing.T) {
 	}))
 	t.Cleanup(srv.Close)
 
-	s := mustNew(t, Options{Addr: srv.URL, Token: "t", Mount: "secret"})
+	s := mustNew(t, Options{Addr: srv.URL, AllowInsecure: true, Token: "t", Mount: "secret"})
 	if _, err := s.Get(t.Context(), "raw"); !errors.Is(err, ErrInvalidBase64) {
 		t.Fatalf("err = %v, want ErrInvalidBase64", err)
 	}
@@ -185,7 +185,7 @@ func TestGet_RawValue_ErrInvalidBase64(t *testing.T) {
 
 func TestGet_Missing_ErrNotFound(t *testing.T) {
 	srv := mustStubServer(t, "test-token", "secret")
-	s := mustNew(t, Options{Addr: srv.URL, Token: "test-token", Mount: "secret"})
+	s := mustNew(t, Options{Addr: srv.URL, AllowInsecure: true, Token: "test-token", Mount: "secret"})
 	if _, err := s.Get(t.Context(), "does-not-exist"); !errors.Is(err, secrets.ErrNotFound) {
 		t.Fatalf("err = %v, want ErrNotFound", err)
 	}
@@ -198,7 +198,7 @@ func TestTokenFile_Read(t *testing.T) {
 	if err := os.WriteFile(path, []byte("file-token\n"), 0o600); err != nil {
 		t.Fatalf("WriteFile: %v", err)
 	}
-	s := mustNew(t, Options{Addr: srv.URL, TokenFile: path, Mount: "secret"})
+	s := mustNew(t, Options{Addr: srv.URL, AllowInsecure: true, TokenFile: path, Mount: "secret"})
 	if err := s.Set(t.Context(), "k", []byte("v")); err != nil {
 		t.Fatalf("Set with token file: %v", err)
 	}
@@ -213,7 +213,7 @@ func TestTokenFile_Read(t *testing.T) {
 
 func TestInvalidName_Rejected(t *testing.T) {
 	t.Parallel()
-	s := mustNew(t, Options{Addr: "http://127.0.0.1:1", Token: "t", Mount: "secret"})
+	s := mustNew(t, Options{Addr: "http://127.0.0.1:1", AllowInsecure: true, Token: "t", Mount: "secret"})
 	ctx := t.Context()
 	for _, name := range []string{"", "a/b", "a..b", "a b", "a!b"} {
 		if _, err := s.Get(ctx, name); !errors.Is(err, secrets.ErrInvalidKey) {
@@ -237,9 +237,9 @@ func TestNew_Validate_FailsClosed(t *testing.T) {
 		{"empty", Options{}},
 		{"no addr", Options{Token: "t", Mount: "secret"}},
 		{"bad addr", Options{Addr: "://bad", Token: "t", Mount: "secret"}},
-		{"no mount", Options{Addr: "http://127.0.0.1:8200", Token: "t"}},
-		{"no token", Options{Addr: "http://127.0.0.1:8200", Mount: "secret"}},
-		{"bad token file", Options{Addr: "http://127.0.0.1:8200", Mount: "secret", TokenFile: "/does/not/exist"}},
+		{"no mount", Options{Addr: "http://127.0.0.1:8200", AllowInsecure: true, Token: "t"}},
+		{"no token", Options{Addr: "http://127.0.0.1:8200", AllowInsecure: true, Mount: "secret"}},
+		{"bad token file", Options{Addr: "http://127.0.0.1:8200", AllowInsecure: true, Mount: "secret", TokenFile: "/does/not/exist"}},
 	}
 	for _, tc := range cases {
 		t.Run(tc.name, func(t *testing.T) {
@@ -253,7 +253,7 @@ func TestNew_Validate_FailsClosed(t *testing.T) {
 
 func TestClose_NilError(t *testing.T) {
 	t.Parallel()
-	s := mustNew(t, Options{Addr: "http://127.0.0.1:1", Token: "t", Mount: "secret"})
+	s := mustNew(t, Options{Addr: "http://127.0.0.1:1", AllowInsecure: true, Token: "t", Mount: "secret"})
 	if err := s.Close(t.Context()); err != nil {
 		t.Fatalf("Close: %v", err)
 	}

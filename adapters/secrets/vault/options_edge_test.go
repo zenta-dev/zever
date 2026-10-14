@@ -23,10 +23,10 @@ func TestEdgeValidate_rejectsMalformedFields(t *testing.T) {
 		opts Options
 		want string
 	}{
-		{"addr missing host", Options{Addr: "http://", Token: "t", Mount: "secret"}, "addr must include host"},
-		{"mount with spaces", Options{Addr: "http://127.0.0.1:8200", Token: "t", Mount: "my mount"}, "mount must not contain"},
-		{"mount with dot-dot", Options{Addr: "http://127.0.0.1:8200", Token: "t", Mount: "a..b"}, "mount must not contain"},
-		{"token file empty", Options{Addr: "http://127.0.0.1:8200", Mount: "secret", TokenFile: emptyFile}, "token_file must not be empty"},
+		{"addr missing host", Options{Addr: "http://", AllowInsecure: true, Token: "t", Mount: "secret"}, "addr must include host"},
+		{"mount with spaces", Options{Addr: "http://127.0.0.1:8200", AllowInsecure: true, Token: "t", Mount: "my mount"}, "mount must not contain"},
+		{"mount with dot-dot", Options{Addr: "http://127.0.0.1:8200", AllowInsecure: true, Token: "t", Mount: "a..b"}, "mount must not contain"},
+		{"token file empty", Options{Addr: "http://127.0.0.1:8200", AllowInsecure: true, Mount: "secret", TokenFile: emptyFile}, "token_file must not be empty"},
 	}
 
 	for _, tc := range cases {
@@ -46,11 +46,11 @@ func TestEdgeValidate_rejectsMalformedFields(t *testing.T) {
 func TestEdgeValidate_validOptions(t *testing.T) {
 	t.Parallel()
 
-	if err := (Options{Addr: "http://127.0.0.1:8200", Token: "t", Mount: "secret"}).Validate(); err != nil {
+	if err := (Options{Addr: "http://127.0.0.1:8200", AllowInsecure: true, Token: "t", Mount: "secret"}).Validate(); err != nil {
 		t.Fatalf("Validate() = %v, want nil", err)
 	}
 
-	if err := (Options{Addr: "http://127.0.0.1:8200", Token: "t", Mount: "  "}).Validate(); err == nil {
+	if err := (Options{Addr: "http://127.0.0.1:8200", AllowInsecure: true, Token: "t", Mount: "  "}).Validate(); err == nil {
 		t.Fatal("Validate(blank mount) = nil, want error")
 	}
 }

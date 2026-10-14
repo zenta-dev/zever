@@ -607,6 +607,7 @@
       "additionalProperties": false,
       "properties": {
         "addr": { "type": "string", "description": "Vault server address." },
+        "allow_insecure": { "type": "boolean", "description": "Permit a plain-http Addr for testing. Default false (https only)." },
         "token": { "type": "string", "description": "Vault authentication token." },
         "token_file": { "type": "string", "description": "Reads the Vault token from a file when token is empty." },
         "mount": { "type": "string", "description": "Vault KV mount path." },
