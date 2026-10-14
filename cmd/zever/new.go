@@ -870,7 +870,7 @@ func detectFrameworkCheckout() (string, error) {
 // modulePathOf reads the module path out of the go.mod at path, returning ""
 // if the file does not exist or declares none.
 func modulePathOf(path string) string {
-	data, err := os.ReadFile(path) // walking parent directories looking for a go.mod is the point
+	data, err := os.ReadFile(path) //nolint:gosec // walking parent directories looking for a go.mod is the point
 	if err != nil {
 		return ""
 	}
@@ -922,7 +922,7 @@ func detectGoVersion(frameworkDir string) string {
 // project's toolchain version when scaffolding into a cwd that already has a
 // go.mod (so we don't invent a version).
 func goVersionOf(path string) string {
-	data, err := os.ReadFile(path) // path is cwd go.mod, not user input
+	data, err := os.ReadFile(path) //nolint:gosec // path is cwd go.mod, not user input
 	if err != nil {
 		return ""
 	}
