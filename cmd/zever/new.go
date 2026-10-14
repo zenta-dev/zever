@@ -78,20 +78,21 @@ const (
 	// framework checkout or an existing project.
 	defaultGoVersion = "1.27.2"
 
+	// pseudoVersionZero is the placeholder version a require line carries
+	// when the real resolution comes from a local replace directive.
+	pseudoVersionZero = "v0.0.0-00010101000000-000000000000"
+)
+
+var (
 	// FrameworkVersion is the published framework version a new project
 	// depends on by default and `zever add` pins new requirements to. It
-	// tracks the CLI release version (see cliVersion in main.go); bump with
-	// every release.
-	FrameworkVersion = "v" + cliVersion
+	// tracks the CLI release version (see buildVersion in version.go).
+	FrameworkVersion = "v" + buildVersion
 
 	// defaultFrameworkVersion is the published zever version a new project
 	// depends on by default when neither --framework-version is given nor
 	// a framework checkout is detected.
 	defaultFrameworkVersion = FrameworkVersion
-
-	// pseudoVersionZero is the placeholder version a require line carries
-	// when the real resolution comes from a local replace directive.
-	pseudoVersionZero = "v0.0.0-00010101000000-000000000000"
 )
 
 // NewConfig is the pure input to writeNewProject: everything the scaffold

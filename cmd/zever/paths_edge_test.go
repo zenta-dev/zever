@@ -56,8 +56,8 @@ func TestVersionRequested_flags(t *testing.T) {
 // TestPrintCLIVersion_stdout pins that version output goes to stdout.
 func TestPrintCLIVersion_stdout(t *testing.T) {
 	out := captureStdout(t, printCLIVersion)
-	if !strings.Contains(out, "zever v"+cliVersion) {
-		t.Fatalf("stdout = %q, want %q", out, "zever v"+cliVersion)
+	if !strings.Contains(out, "zever v"+buildVersion) {
+		t.Fatalf("stdout = %q, want %q", out, "zever v"+buildVersion)
 	}
 }
 
@@ -74,8 +74,8 @@ func TestNewRootCmd_VFlagPrintsVersion(t *testing.T) {
 			t.Fatalf("Execute(--V): %v", err)
 		}
 	})
-	if !strings.Contains(out, "zever v"+cliVersion) {
-		t.Fatalf("stdout = %q, want %q", out, "zever v"+cliVersion)
+	if !strings.Contains(out, "zever v"+buildVersion) {
+		t.Fatalf("stdout = %q, want %q", out, "zever v"+buildVersion)
 	}
 }
 
