@@ -6,7 +6,7 @@ require (
 	github.com/sony/gobreaker/v2 v2.4.0
 	github.com/zenta-dev/zever/core/resilience v0.6.1
 	github.com/zenta-dev/zever/shared/retry v0.6.1
-	golang.org/x/sync v0.23.0
+	golang.org/x/sync v0.24.0
 )
 
 require (
