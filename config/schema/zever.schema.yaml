@@ -936,6 +936,9 @@ $defs:
             addr:
                 description: Vault server address.
                 type: string
+            allow_insecure:
+                description: Permit a plain-http Addr for testing. Default false (https only).
+                type: boolean
             mount:
                 description: Vault KV mount path.
                 type: string
