@@ -20,7 +20,7 @@ func TestGetProductNilRequest(t *testing.T) {
 func TestListProductsInvalidCursor(t *testing.T) {
 	s := newTestSetup(t)
 
-	for _, cursor := range []genshop.Cursor{"abc", "-1", "1.5"} {
+	for _, cursor := range []string{"abc", "-1", "1.5"} {
 		if _, err := s.svc.ListProducts(t.Context(), nil, cursor, 10); codeOf(t, err) != apperror.InvalidArgument {
 			t.Fatalf("ListProducts(cursor=%q) = %v, want InvalidArgument", cursor, err)
 		}

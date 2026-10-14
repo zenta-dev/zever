@@ -67,7 +67,7 @@ var _ genshop.ShopService = (*ShopServiceImpl)(nil)
 
 // ListProducts returns products newest first, optionally filtered by
 // category, paginated with an opaque offset cursor.
-func (s *ShopServiceImpl) ListProducts(ctx context.Context, req *genshop.ListProductsRequest, cursor genshop.Cursor, limit int32) (*genshop.ListProductsResponse, error) {
+func (s *ShopServiceImpl) ListProducts(ctx context.Context, req *genshop.ListProductsRequest, cursor string, limit int32) (*genshop.ListProductsResponse, error) {
 	offset, err := parseCursor(cursor)
 	if err != nil {
 		return nil, err
@@ -301,7 +301,7 @@ func (s *ShopServiceImpl) GetOrder(ctx context.Context, req *genshop.GetOrderReq
 // ListOrders returns the caller's orders newest first, paginated like
 // ListProducts. The scope always comes from the caller identity, never
 // from the request body.
-func (s *ShopServiceImpl) ListOrders(ctx context.Context, _ *genshop.ListOrdersRequest, cursor genshop.Cursor, limit int32) (*genshop.ListOrdersResponse, error) {
+func (s *ShopServiceImpl) ListOrders(ctx context.Context, _ *genshop.ListOrdersRequest, cursor string, limit int32) (*genshop.ListOrdersResponse, error) {
 	sub, ok := callerSubject(ctx)
 	if !ok {
 		return nil, apperror.New(apperror.Unauthenticated, "unauthenticated")
@@ -372,11 +372,11 @@ func pageLimit(limit int32) int {
 }
 
 // parseCursor decodes an opaque offset cursor; empty means the first page.
-func parseCursor(cursor genshop.Cursor) (int, error) {
+func parseCursor(cursor string) (int, error) {
 	if cursor == "" {
 		return 0, nil
 	}
-	n, err := strconv.Atoi(string(cursor))
+	n, err := strconv.Atoi(cursor)
 	if err != nil || n < 0 {
 		return 0, apperror.New(apperror.InvalidArgument, "invalid cursor")
 	}

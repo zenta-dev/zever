@@ -326,6 +326,7 @@ func TestGeneratePaginatedOperation(t *testing.T) {
 			http: GET "/v1/tasks"
 			paginated: true
 			auth: required
+			auth: required
 		}
 
 		rpc GetTask(id: uuid) -> Task {
@@ -1064,4 +1065,52 @@ func keys(m map[string][]byte) []string {
 	sort.Strings(out)
 
 	return out
+}
+
+// TestGeneratePaginatedRequestCarriesCursorAndLimit proves a paginated rpc's
+// request message exposes cursor and limit fields (numbered after the
+// declared params), including when the rpc takes a single message param,
+// which must then be wrapped rather than used directly.
+func TestGeneratePaginatedRequestCarriesCursorAndLimit(t *testing.T) {
+	src := `entity Task {
+		id: uuid @primary
+		title: string
+	}
+
+	message Filter {
+		q: string @validate(min_len: 1)
+	}
+
+	service TaskService {
+		rpc ListTasks(user_id: uuid) -> Task {
+			http: GET "/v1/tasks"
+			paginated: true
+			auth: required
+		}
+
+		rpc SearchTasks(f: Filter) -> Task {
+			http: POST "/v1/tasks/search"
+			paginated: true
+			auth: required
+		}
+	}`
+
+	out, err := New().Generate(compileSchema(t, src))
+	if err != nil {
+		t.Fatalf("Generate: %v", err)
+	}
+
+	rendered := string(out["schema.proto"])
+
+	for _, want := range []string{
+		"message ListTasksRequest {\n  string user_id = 1;\n  string cursor = 2;\n  int32 limit = 3;\n}",
+		"message SearchTasksRequest {\n  Filter f = 1;\n  string cursor = 2;\n  int32 limit = 3;\n}",
+		"rpc SearchTasks(SearchTasksRequest) returns (SearchTasksResponse)",
+	} {
+		if !strings.Contains(rendered, want) {
+			t.Errorf("proto missing %q:\n%s", want, rendered)
+		}
+	}
+
+	validateProto(t, "schema.proto", out["schema.proto"])
 }
