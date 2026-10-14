@@ -4,12 +4,12 @@ go 1.27.2
 
 require (
 	github.com/zenta-dev/zever/shared/registry v0.6.1 // indirect
-	golang.org/x/sys v0.48.0 // indirect
+	golang.org/x/sys v0.49.0 // indirect
 )
 
 require (
 	github.com/zenta-dev/zever/core/password v0.6.1
-	golang.org/x/crypto v0.57.0
+	golang.org/x/crypto v0.58.0
 )
 
 replace github.com/zenta-dev/zever/core/password => ../../../core/password
