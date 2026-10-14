@@ -28,6 +28,16 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   `--json`); the new `--strict` flag fails on them. Schema hash and content
   changes still fail.
 
+### CI
+
+- `ci(apidiff)`: the `apidiff` gate is now module-scoped. A `**Breaking:**`
+  entry in `## [Unreleased]` only covers a module it names in backticks
+  (module path, directory, package path or short name), a Core-tier module
+  with no baseline tag now fails unless listed in
+  `.github/apidiff-baseline-allowlist.json` with an expiry, and
+  `tools/tag-release.sh --verify vX.Y.Z` checks that every module tag exists
+  locally or on origin. See `API Compatibility` in `.github/CONTRIBUTING.md`.
+
 ### Breaking
 
 - `fix(payment)!: all adapters use minor units (cents)`: every `Amount`

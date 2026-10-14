@@ -1,6 +1,6 @@
 #!/usr/bin/env bash
 # Tag every Go module in the repo for a release.
-# Usage: tools/tag-release.sh [--dry-run|--check] v0.6.0
+# Usage: tools/tag-release.sh [--dry-run|--check|--verify] v0.6.0
 # Creates one tag per tracked go.mod found via find, excluding nested
 # worktrees, harness checkouts, and vendored copies: every module is tagged
 # `<reldir>/<version>` where <reldir> is the module dir relative to the
@@ -11,22 +11,27 @@
 # dsl and cmd/*, (3) adapters/* and everything else (examples, tools, docs).
 # Within each pass, modules go alphabetically by go.mod path.
 # With --dry-run (alias --check), list tags in order without creating them.
+# With --verify, create nothing: confirm every module's tag exists locally or
+# on origin (remote tag listing; skipped when no origin is configured) and
+# exit 1 listing the missing ones. Used by the release docs.
 # Prints a `git push --tags` hint at the end; never pushes.
 set -euo pipefail
 
 dry_run=0
+verify=0
 if [ "$#" -eq 2 ]; then
   case "$1" in
     --dry-run|--check) dry_run=1; shift ;;
+    --verify) verify=1; shift ;;
     *)
-      echo "usage: $0 [--dry-run|--check] <version>  (e.g. $0 v0.5.0)" >&2
+      echo "usage: $0 [--dry-run|--check|--verify] <version>  (e.g. $0 v0.5.0)" >&2
       exit 1
       ;;
   esac
 fi
 
 if [ "$#" -ne 1 ]; then
-  echo "usage: $0 [--dry-run|--check] <version>  (e.g. $0 v0.5.0)" >&2
+  echo "usage: $0 [--dry-run|--check|--verify] <version>  (e.g. $0 v0.5.0)" >&2
   exit 1
 fi
 ver="$1"
@@ -40,6 +45,11 @@ esac
 
 created=0
 skipped=0
+missing=0
+remote_tags=""
+if [ "$verify" -eq 1 ] && git remote get-url origin >/dev/null 2>&1; then
+  remote_tags=$(git ls-remote --tags origin 2>/dev/null | sed 's#.*refs/tags/##; s#\^{}$##' || true)
+fi
 
 # cmd/zever/VERSION is the CLI's fallback version (see cmd/zever/version.go).
 # It must be committed before tagging so the tag carries it; update it here
@@ -83,7 +93,16 @@ tag_one() {
   else
     tag="${mod#github.com/zenta-dev/zever/}/$ver"
   fi
-  if git rev-parse "$tag" >/dev/null 2>&1; then
+  if [ "$verify" -eq 1 ]; then
+    if git rev-parse -q --verify "refs/tags/$tag" >/dev/null 2>&1; then
+      skipped=$((skipped + 1))
+    elif printf '%s\n' "$remote_tags" | grep -qxF "$tag"; then
+      skipped=$((skipped + 1))
+    else
+      echo "missing tag: $tag"
+      missing=$((missing + 1))
+    fi
+  elif git rev-parse "$tag" >/dev/null 2>&1; then
     echo "exists, skipping: $tag"
     skipped=$((skipped + 1))
   elif [ "$dry_run" -eq 1 ]; then
@@ -105,6 +124,15 @@ done
 for f in "${pass3[@]}"; do
   tag_one "$f"
 done
+
+if [ "$verify" -eq 1 ]; then
+  if [ "$missing" -gt 0 ]; then
+    echo "verify failed: $missing module tag(s) missing for $ver ($skipped present)." >&2
+    exit 1
+  fi
+  echo "verify ok: all $skipped module tag(s) for $ver exist."
+  exit 0
+fi
 
 if [ "$dry_run" -eq 1 ]; then
   echo "would create $created tag(s), $skipped existing (dry run: nothing created)."
