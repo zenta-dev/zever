@@ -1,7 +1,6 @@
 package memory
 
 import (
-	"container/heap"
 	"sort"
 	"sync"
 	"time"
@@ -12,6 +11,7 @@ import (
 type topicQueue struct {
 	mu         sync.Mutex
 	ready      []queue.Message
+	head       int
 	delayed    []delayedEntry
 	inflight   map[queue.MessageID]inflight
 	visHeap    visibilityHeap
@@ -35,6 +35,11 @@ func newTopicQueue() *topicQueue {
 		done:      make(chan struct{}),
 	}
 }
+
+// readyLen returns the number of deliverable messages. Pops advance head
+// instead of reslicing, so length is the tail past head. Callers must hold
+// t.mu.
+func (t *topicQueue) readyLen() int { return len(t.ready) - t.head }
 
 func (t *topicQueue) waitForPromote(timer *time.Timer, wait time.Duration) {
 	timer.Stop()
@@ -159,17 +164,13 @@ func (t *topicQueue) startPromoterLocked() {
 func (t *topicQueue) reclaimFromHeap(now time.Time) bool {
 	reclaimed := false
 
-	for t.visHeap.Len() > 0 {
-		top := t.visHeap[0]
+	for len(t.visHeap) > 0 {
+		top := t.visHeap.peek()
 		if now.Before(top.deadline) {
 			break
 		}
 
-		raw := heap.Pop(&t.visHeap)
-		entry, ok := raw.(visibilityEntry)
-		if !ok {
-			continue
-		}
+		entry := t.visHeap.pop()
 
 		inf, ok := t.inflight[entry.id]
 		if !ok {
@@ -191,7 +192,7 @@ func (t *topicQueue) reclaimFromHeap(now time.Time) bool {
 
 			reclaimed = true
 		} else {
-			heap.Push(&t.visHeap, entry)
+			t.visHeap.push(entry)
 
 			break
 		}
@@ -201,7 +202,7 @@ func (t *topicQueue) reclaimFromHeap(now time.Time) bool {
 }
 
 func (t *topicQueue) reclaimFromMap(now time.Time) bool {
-	if t.visHeap.Len() != 0 || len(t.inflight) == 0 {
+	if len(t.visHeap) != 0 || len(t.inflight) == 0 {
 		return false
 	}
 
@@ -234,19 +235,33 @@ func (t *topicQueue) tryPopReady(vis time.Duration) (queue.Message, bool) {
 	t.mu.Lock()
 	defer t.mu.Unlock()
 
-	if len(t.ready) == 0 {
+	if t.head >= len(t.ready) {
 		return queue.Message{}, false
 	}
 
-	msg := t.ready[0]
-	t.ready = t.ready[1:]
+	msg := t.ready[t.head]
+	t.ready[t.head] = queue.Message{}
+	t.head++
+
+	// Reuse the backing array instead of reslicing past the front: t.ready[1:]
+	// shrinks capacity on every pop, forcing the next Push to reallocate.
+	// Reset when drained; compact once the dead prefix dominates.
+	if t.head == len(t.ready) {
+		t.ready = t.ready[:0]
+		t.head = 0
+	} else if t.head > 64 && t.head*2 >= len(t.ready) {
+		n := copy(t.ready, t.ready[t.head:])
+		t.ready = t.ready[:n]
+		t.head = 0
+	}
+
 	deadline := time.Now().Add(vis)
 	t.inflight[msg.ID] = inflight{
 		msg:      msg,
 		deadline: deadline,
 	}
 
-	heap.Push(&t.visHeap, visibilityEntry{id: msg.ID, deadline: deadline})
+	t.visHeap.push(visibilityEntry{id: msg.ID, deadline: deadline})
 
 	return msg.Clone(), true
 }

@@ -226,7 +226,7 @@ func (a *memoryAdapter) Length(_ context.Context, topic string) (int64, error) {
 	}
 
 	t.mu.Lock()
-	n := int64(len(t.ready))
+	n := int64(t.readyLen())
 	t.mu.Unlock()
 
 	a.sweepTopic(topic, t)
@@ -296,12 +296,22 @@ func (a *memoryAdapter) sweepTopic(name string, t *topicQueue) {
 	a.mu.Lock()
 	if a.topics[name] == t {
 		t.mu.Lock()
-		if len(t.ready) == 0 && len(t.delayed) == 0 && len(t.inflight) == 0 && t.penders == 0 {
-			if t.promoterOn {
-				t.quitOnce.Do(func() { close(t.quit) })
-			}
-
+		empty := t.head >= len(t.ready) && len(t.delayed) == 0 && len(t.inflight) == 0 && t.penders == 0
+		if empty && t.promoterOn {
+			t.quitOnce.Do(func() { close(t.quit) })
 			delete(a.topics, name)
+		} else if empty {
+			// Retain drained topics: deleting and recreating the topic
+			// (channels, map) on every drain costs ~7 allocs per message on
+			// single-message flows. A retained idle topic holds only channels
+			// and empty containers, bounded by distinct topic names. Every
+			// heap entry references a gone inflight id (inflight is empty),
+			// so each would only be skipped on the next reclaim: drop them
+			// instead of carrying stale deadlines, and reset the ready
+			// window so no dead prefix lingers.
+			t.visHeap = t.visHeap[:0]
+			t.ready = t.ready[:0]
+			t.head = 0
 		}
 		t.mu.Unlock()
 	}
@@ -311,7 +321,7 @@ func (a *memoryAdapter) sweepTopic(name string, t *topicQueue) {
 func (a *memoryAdapter) waitForSpace(ctx context.Context, t *topicQueue) error {
 	return a.waitForCapacity(ctx, t, func() int {
 		t.mu.Lock()
-		n := len(t.ready)
+		n := t.readyLen()
 		t.mu.Unlock()
 
 		return n

@@ -385,8 +385,12 @@ func TestRunUninstallJSONDryRun(t *testing.T) {
 }
 
 func TestUninstallUpgradeWiring(t *testing.T) {
-	// Sequential: agentCommands reads the shared rootCmd global and
-	// cobra.Command.Commands sorts in place, which races under t.Parallel.
+	t.Parallel()
+
+	// Fresh tree per test: agentCommandsOn reads via cobra.Command.Commands,
+	// which sorts the tree's children in place and races on the shared
+	// rootCmd global under t.Parallel. useCobra itself only scans args
+	// against a static set and is parallel-safe.
 	if !useCobra([]string{"uninstall"}) {
 		t.Error("useCobra(uninstall) = false, want true")
 	}
@@ -396,7 +400,7 @@ func TestUninstallUpgradeWiring(t *testing.T) {
 	}
 
 	seen := map[string]bool{}
-	for _, c := range agentCommands() {
+	for _, c := range agentCommandsOn(newRootCmd()) {
 		seen[c.Name] = true
 	}
 
