@@ -5,6 +5,7 @@ import (
 	"context"
 	"crypto/sha256"
 	"fmt"
+	"math"
 	"net/http"
 	"strconv"
 	"strings"
@@ -178,6 +179,9 @@ func fromTransaction(txn *paddle.Transaction) (payment.Result, error) {
 	}, nil
 }
 
+// minorUnitsPerMajor scales a Paddle whole-unit total to minor units.
+const minorUnitsPerMajor = 100
+
 // parsePaddleAmount converts a Paddle decimal total to minor units, truncating
 // toward zero without rounding (extra fractional digits are dropped).
 func parsePaddleAmount(s string) (int64, error) {
@@ -222,10 +226,28 @@ func parsePaddleAmount(s string) (int64, error) {
 	}
 
 	if intPart < 0 || strings.HasPrefix(intPartStr, "-") {
-		return intPart*100 - fracVal, nil
+		if intPart < math.MinInt64/minorUnitsPerMajor {
+			return 0, ErrAmountOverflow
+		}
+
+		scaled := intPart * minorUnitsPerMajor
+		if scaled < math.MinInt64+fracVal {
+			return 0, ErrAmountOverflow
+		}
+
+		return scaled - fracVal, nil
 	}
 
-	return intPart*100 + fracVal, nil
+	if intPart > math.MaxInt64/minorUnitsPerMajor {
+		return 0, ErrAmountOverflow
+	}
+
+	scaled := intPart * minorUnitsPerMajor
+	if scaled > math.MaxInt64-fracVal {
+		return 0, ErrAmountOverflow
+	}
+
+	return scaled + fracVal, nil
 }
 
 // Refund refunds amount (in minor units) against a Paddle transaction.

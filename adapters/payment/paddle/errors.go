@@ -10,3 +10,8 @@ var ErrMissingPriceID = errors.New("paddle: meta price_id is required")
 
 // ErrMultiItemPartial is returned when a partial refund targets multiple line items.
 var ErrMultiItemPartial = errors.New("paddle: partial refund requires a single line item")
+
+// ErrAmountOverflow is returned when a Paddle decimal total exceeds the int64
+// minor-units range once scaled (the whole part no longer fits after the x100
+// shift, or the final add/subtract of the fraction carries past the limit).
+var ErrAmountOverflow = errors.New("paddle: amount overflows int64 minor units")
