@@ -1,9 +1,10 @@
 name: vulncheck
 
 # Scheduled govulncheck. The vulnerability database changes independently of
-# the code, so a PR-only gate turns unrelated PRs red whenever an advisory
-# lands. ci.yml keeps an informational PR run; this workflow is the blocking
-# drift detector and opens an issue when it fails.
+# the code; ci.yml runs the same scan as a blocking PR gate (reachable
+# findings fail unless allowlisted in .github/govulncheck-allowlist.json),
+# and this workflow is the drift detector for main: it opens an issue when a
+# newly published advisory affects the workspace outside any PR.
 
 on:
   schedule:

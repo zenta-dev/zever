@@ -226,9 +226,9 @@ lint-all: ## Run golangci-lint in every module (shard via SHARD_TOTAL/SHARD_INDE
 	@command -v $(GOLANGCI_LINT) >/dev/null 2>&1 || { printf '%s\n' "golangci-lint not found: run 'make setup'"; exit 1; }
 	failed=""; for d in $(if $(MODULES),$(MODULES),$(SHARD_MODULES)); do echo "== $$d =="; if ! (cd $$d && $(GOLANGCI_LINT) run ./...); then failed="$$failed $$d"; echo "::error::module failed: $$d"; fi; done; [ -z "$$failed" ] || { echo "FAILED modules:$$failed"; exit 1; }
 
-vulncheck-all: ## Scan every module for known vulnerabilities (override list via MODULES)
+vulncheck-all: ## Scan every module; reachable vulns fail unless allowlisted with an unexpired entry (override list via MODULES)
 	@command -v $(GOVULNCHECK) >/dev/null 2>&1 || { printf '%s\n' "govulncheck not found: run 'make setup'"; exit 1; }
-	failed=""; for d in $(if $(MODULES),$(MODULES),$(SHARD_MODULES)); do echo "== $$d =="; if ! (cd $$d && $(GOVULNCHECK) ./...); then failed="$$failed $$d"; echo "::error::module failed: $$d"; fi; done; [ -z "$$failed" ] || { echo "FAILED modules:$$failed"; exit 1; }
+	$(GO) run ./tools/vulngate --govulncheck "$(GOVULNCHECK)" $(if $(MODULES),$(MODULES),$(SHARD_MODULES))
 
 .PHONY: docs-dev docs-build docs-preview
 docs-dev: ## Run docs dev server

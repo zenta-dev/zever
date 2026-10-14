@@ -176,4 +176,5 @@ use (
 	./tools/modgraph
 	./tools/zever-lsp
 	./tools/zever-mcp
+	./tools/vulngate
 )
