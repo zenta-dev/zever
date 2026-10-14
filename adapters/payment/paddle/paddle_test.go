@@ -235,7 +235,7 @@ func TestCreatePaymentMismatch(t *testing.T) {
 
 	mux := http.NewServeMux()
 	mux.HandleFunc("/transactions", func(w http.ResponseWriter, _ *http.Request) {
-		writeJSON(t, w, txnPayload("txn_mis1", "ready", "USD", "2500", nil))
+		writeJSON(t, w, txnPayload("txn_mis1", "ready", "USD", "25.00", nil))
 	})
 	srv := httptest.NewServer(mux)
 	defer srv.Close()
@@ -300,7 +300,7 @@ func TestGetPayment(t *testing.T) {
 	mux.HandleFunc("/transactions/", func(w http.ResponseWriter, r *http.Request) {
 		switch id := strings.TrimPrefix(r.URL.Path, "/transactions/"); id {
 		case "txn_pay1":
-			writeJSON(t, w, txnPayload("txn_pay1", "paid", "USD", "2500", nil))
+			writeJSON(t, w, txnPayload("txn_pay1", "paid", "USD", "25.00", nil))
 		case "txn_empty":
 			writeJSON(t, w, txnPayload("txn_empty", "paid", "EUR", "", nil))
 		case "txn_garbage":
@@ -354,11 +354,11 @@ func TestParsePaddleAmount(t *testing.T) {
 		wantErr bool
 	}{
 		{"", 0, false},
-		{"10", 10, false}, // no-dot branch passes minor units through verbatim.
+		{"10", 1000, false}, // no-dot branch scales whole units to minor units.
 		{"abc", 0, true},
 		{"100.00", 10000, false},
 		{"99.99", 9999, false},
-		{"99.999", 9999, false}, // extra precision truncates toward zero.
+		{"99.999", 10000, false}, // extra precision rounds half up.
 		{"1.5", 150, false},
 		{".99", 99, false},
 		{"-.50", -50, false},
@@ -393,19 +393,19 @@ func TestRefund(t *testing.T) {
 	var adjustFail bool
 
 	items := map[string][]map[string]any{
-		"txn_full":    {{"id": "txnitm_1", "totals": map[string]any{"total": "2500"}}},
-		"txn_partial": {{"id": "txnitm_1", "totals": map[string]any{"total": "2500"}}},
+		"txn_full":    {{"id": "txnitm_1", "totals": map[string]any{"total": "25.00"}}},
+		"txn_partial": {{"id": "txnitm_1", "totals": map[string]any{"total": "25.00"}}},
 		"txn_multi": {
-			{"id": "txnitm_1", "totals": map[string]any{"total": "1500"}},
-			{"id": "txnitm_2", "totals": map[string]any{"total": "1000"}},
+			{"id": "txnitm_1", "totals": map[string]any{"total": "15.00"}},
+			{"id": "txnitm_2", "totals": map[string]any{"total": "10.00"}},
 		},
-		"txn_badtotal": {{"id": "txnitm_1", "totals": map[string]any{"total": "2500"}}},
+		"txn_badtotal": {{"id": "txnitm_1", "totals": map[string]any{"total": "25.00"}}},
 		"txn_baditem":  {{"id": "txnitm_1", "totals": map[string]any{"total": "garbage"}}},
-		"txn_small":    {{"id": "txnitm_1", "totals": map[string]any{"total": "500"}}},
+		"txn_small":    {{"id": "txnitm_1", "totals": map[string]any{"total": "5.00"}}},
 	}
 	totals := map[string]string{
-		"txn_full": "2500", "txn_partial": "2500", "txn_multi": "2500",
-		"txn_badtotal": "garbage", "txn_baditem": "2500", "txn_small": "2500",
+		"txn_full": "25.00", "txn_partial": "25.00", "txn_multi": "25.00",
+		"txn_badtotal": "garbage", "txn_baditem": "25.00", "txn_small": "25.00",
 	}
 
 	mux := http.NewServeMux()
@@ -477,7 +477,7 @@ func TestRefund(t *testing.T) {
 	}
 
 	mu.Lock()
-	if atype != "partial" || itemID != "txnitm_1" || itemType != "partial" || itemAmount != "1000" {
+	if atype != "partial" || itemID != "txnitm_1" || itemType != "partial" || itemAmount != "10.00" {
 		mu.Unlock()
 		t.Fatalf("unexpected partial adjustment: %q %q %q %q", atype, itemID, itemType, itemAmount)
 	}
@@ -624,7 +624,7 @@ func TestConcurrentGet(t *testing.T) {
 
 	mux := http.NewServeMux()
 	mux.HandleFunc("/transactions/", func(w http.ResponseWriter, r *http.Request) {
-		writeJSON(t, w, txnPayload(strings.TrimPrefix(r.URL.Path, "/transactions/"), "paid", "USD", "2500", nil))
+		writeJSON(t, w, txnPayload(strings.TrimPrefix(r.URL.Path, "/transactions/"), "paid", "USD", "25.00", nil))
 	})
 	srv := httptest.NewServer(mux)
 	defer srv.Close()

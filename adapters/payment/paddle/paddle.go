@@ -4,6 +4,7 @@ import (
 	"bytes"
 	"context"
 	"crypto/sha256"
+	"errors"
 	"fmt"
 	"math"
 	"net/http"
@@ -182,9 +183,11 @@ func fromTransaction(txn *paddle.Transaction) (payment.Result, error) {
 // minorUnitsPerMajor scales a Paddle whole-unit total to minor units.
 const minorUnitsPerMajor = 100
 
-// parsePaddleAmount converts a Paddle decimal total to minor units, truncating
-// toward zero without rounding (extra fractional digits are dropped).
+// parsePaddleAmount converts a Paddle decimal total (major units) to minor
+// units. Whole-unit totals scale by minorUnitsPerMajor. Sub-cent precision
+// rounds half away from zero so positive and negative totals stay symmetric.
 func parsePaddleAmount(s string) (int64, error) {
+	orig := s
 	s = strings.TrimSpace(s)
 	if s == "" {
 		return 0, nil
@@ -193,61 +196,120 @@ func parsePaddleAmount(s string) (int64, error) {
 	if !strings.Contains(s, ".") {
 		v, err := strconv.ParseInt(s, 10, 64)
 		if err != nil {
+			if errors.Is(err, strconv.ErrRange) {
+				return 0, ErrAmountOverflow
+			}
+
 			return 0, err
 		}
 
-		return v, nil
+		if v > math.MaxInt64/minorUnitsPerMajor || v < math.MinInt64/minorUnitsPerMajor {
+			return 0, ErrAmountOverflow
+		}
+
+		return v * minorUnitsPerMajor, nil
 	}
 
 	parts := strings.SplitN(s, ".", 2)
 	intPartStr := parts[0]
 	fracStr := parts[1]
 
-	var intPart int64
+	neg := false
+	magStr := intPartStr
+	if strings.HasPrefix(magStr, "-") || strings.HasPrefix(magStr, "+") {
+		neg = magStr[0] == '-'
+		magStr = magStr[1:]
+	}
 
-	if intPartStr != "" && intPartStr != "-" {
-		v, err := strconv.ParseInt(intPartStr, 10, 64)
+	for i := 0; i < len(magStr); i++ {
+		if magStr[i] < '0' || magStr[i] > '9' {
+			return 0, fmt.Errorf("paddle: invalid amount %q", orig)
+		}
+	}
+
+	for i := 0; i < len(fracStr); i++ {
+		if fracStr[i] < '0' || fracStr[i] > '9' {
+			return 0, fmt.Errorf("paddle: invalid amount %q", orig)
+		}
+	}
+
+	mag := uint64(0)
+	if magStr != "" {
+		v, err := strconv.ParseUint(magStr, 10, 64)
 		if err != nil {
 			return 0, err
 		}
 
-		intPart = v
+		mag = v
 	}
 
-	if len(fracStr) > 2 {
-		fracStr = fracStr[:2]
-	} else if len(fracStr) < 2 {
-		fracStr += strings.Repeat("0", 2-len(fracStr))
+	var base uint64
+
+	var roundUp bool
+
+	switch {
+	case len(fracStr) == 0:
+		base = 0
+	case len(fracStr) == 1:
+		base = uint64(fracStr[0]-'0') * 10
+	case len(fracStr) == 2:
+		base = uint64(fracStr[0]-'0')*10 + uint64(fracStr[1]-'0')
+	default:
+		base = uint64(fracStr[0]-'0')*10 + uint64(fracStr[1]-'0')
+		roundUp = fracStr[2] >= '5'
 	}
 
-	fracVal, err := strconv.ParseInt(fracStr, 10, 64)
-	if err != nil {
-		return 0, err
+	limit := uint64(math.MaxInt64)
+	if neg {
+		limit = uint64(math.MaxInt64) + 1
 	}
 
-	if intPart < 0 || strings.HasPrefix(intPartStr, "-") {
-		if intPart < math.MinInt64/minorUnitsPerMajor {
-			return 0, ErrAmountOverflow
-		}
-
-		scaled := intPart * minorUnitsPerMajor
-		if scaled < math.MinInt64+fracVal {
-			return 0, ErrAmountOverflow
-		}
-
-		return scaled - fracVal, nil
-	}
-
-	if intPart > math.MaxInt64/minorUnitsPerMajor {
+	if mag > limit/uint64(minorUnitsPerMajor) {
 		return 0, ErrAmountOverflow
 	}
 
-	scaled := intPart * minorUnitsPerMajor
-	if scaled > math.MaxInt64-fracVal {
+	cents := mag*uint64(minorUnitsPerMajor) + base
+	if cents > limit {
 		return 0, ErrAmountOverflow
 	}
 
-	return scaled + fracVal, nil
+	if roundUp {
+		if cents == limit {
+			return 0, ErrAmountOverflow
+		}
+
+		cents++
+	}
+
+	if neg {
+		if cents == uint64(math.MaxInt64)+1 {
+			return math.MinInt64, nil
+		}
+
+		return -int64(cents), nil //nolint:gosec // G115: cents <= limit <= MaxInt64+1, MinInt64 handled above
+	}
+
+	return int64(cents), nil //nolint:gosec // G115: cents <= limit == MaxInt64 here
+}
+
+// formatPaddleAmount renders minor units as a Paddle major-unit decimal so
+// outgoing partial-refund adjustments agree with parsed totals.
+func formatPaddleAmount(amount int64) string {
+	neg := amount < 0
+
+	var mag uint64
+	if neg {
+		mag = uint64(-(amount + 1)) + 1 //nolint:gosec // G115: amount < 0 so -(amount+1) >= 0 fits
+	} else {
+		mag = uint64(amount)
+	}
+
+	sign := ""
+	if neg {
+		sign = "-"
+	}
+
+	return fmt.Sprintf("%s%d.%02d", sign, mag/uint64(minorUnitsPerMajor), mag%uint64(minorUnitsPerMajor))
 }
 
 // Refund refunds amount (in minor units) against a Paddle transaction.
@@ -324,7 +386,7 @@ func (d *driver) refund(ctx context.Context, id string, amount int64) error {
 		}
 
 		req.Type = paddle.PtrTo(paddle.AdjustmentTypePartial)
-		amt := strconv.FormatInt(amount, 10)
+		amt := formatPaddleAmount(amount)
 		req.Items = []paddle.AdjustmentItemCreate{{
 			ItemID: txn.Details.LineItems[0].ID,
 			Type:   paddle.AdjustmentItemCreateTypePartial,

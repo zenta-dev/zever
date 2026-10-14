@@ -9,6 +9,17 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Breaking
 
+- `fix(payment)!: normalize Paddle whole-unit amounts to minor units`:
+  **Breaking:** the `paddle` adapter now scales whole-unit decimal totals to
+  minor units (`"10"` parses to `1000`, matching `"10.00"`), where it
+  previously passed them through verbatim (`"10"` parsed to `10`). Sub-cent
+  precision now rounds half away from zero (`"10.005"` becomes `1001`,
+  `"-10.005"` becomes `-1001`) instead of truncating, and partial-refund
+  adjustment amounts are formatted back to major-unit decimals (`1000` is
+  sent as `"10.00"`) so both directions agree. Totals that overflow `int64`
+  once scaled still fail with `ErrAmountOverflow`. The `stripe` adapter is
+  unchanged (native minor-unit integers).
+
 - `feat(gogen)!: typed saga steps`: the `gogen` backend's `<module>/saga.go`
   **Breaking:** no longer emits the untyped `SagaCaller.Call(ctx, service,
   method, in any, out any)`, the `sagaStep` helper, or `map[string]any`

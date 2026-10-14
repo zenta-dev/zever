@@ -175,6 +175,113 @@ func TestParsePaddleAmount_overflow(t *testing.T) {
 	}
 }
 
+// TestParsePaddleAmount_normalized pins whole-unit to minor-unit scaling,
+// round-half-away-from-zero on sub-cent precision, negative symmetry, and
+// whole-unit int64 boundaries.
+func TestParsePaddleAmount_normalized(t *testing.T) {
+	t.Parallel()
+
+	cases := []struct {
+		in   string
+		want int64
+	}{
+		{"10", 1000},
+		{"0", 0},
+		{"-10", -1000},
+		{"10.00", 1000},
+		{"10.99", 1099},
+		{"5.25", 525},
+		{"-5.25", -525},
+		{"10.004", 1000},
+		{"10.005", 1001},
+		{"10.995", 1100},
+		{"-10.005", -1001},
+		{"-10.004", -1000},
+		{"0.005", 1},
+		{"-0.005", -1},
+		{"-99.999", -10000},
+		{"92233720368547758", 9223372036854775800},
+		{"-92233720368547758", -9223372036854775800},
+	}
+	for _, tc := range cases {
+		t.Run("amount_"+tc.in, func(t *testing.T) {
+			t.Parallel()
+
+			got, err := parsePaddleAmount(tc.in)
+			if err != nil || got != tc.want {
+				t.Errorf("parsePaddleAmount(%q) = (%d, %v), want %d", tc.in, got, err, tc.want)
+			}
+		})
+	}
+}
+
+// TestParsePaddleAmount_wholeUnitOverflow pins that whole-unit totals that
+// fit as int64 but no longer fit once scaled fail with ErrAmountOverflow,
+// while garbage input fails with a plain error.
+func TestParsePaddleAmount_wholeUnitOverflow(t *testing.T) {
+	t.Parallel()
+
+	for _, in := range []string{"92233720368547759", "-92233720368547759", "9223372036854775807", "-9223372036854775808", "99999999999999999999"} {
+		t.Run("amount_"+in, func(t *testing.T) {
+			t.Parallel()
+
+			if _, err := parsePaddleAmount(in); !errors.Is(err, ErrAmountOverflow) {
+				t.Errorf("parsePaddleAmount(%q) err = %v, want ErrAmountOverflow", in, err)
+			}
+		})
+	}
+
+	for _, in := range []string{"abc", "1e3", "10.0.0", "12.xy", "--10", "10..00"} {
+		t.Run("garbage_"+in, func(t *testing.T) {
+			t.Parallel()
+
+			if _, err := parsePaddleAmount(in); err == nil {
+				t.Errorf("parsePaddleAmount(%q) err = nil, want error", in)
+			}
+		})
+	}
+}
+
+// TestFormatPaddleAmount pins the outgoing direction: minor units render as
+// major-unit decimals so refund adjustments agree with parsed totals.
+func TestFormatPaddleAmount(t *testing.T) {
+	t.Parallel()
+
+	cases := map[int64]string{
+		0:             "0.00",
+		1:             "0.01",
+		50:            "0.50",
+		1000:          "10.00",
+		1099:          "10.99",
+		-525:          "-5.25",
+		math.MaxInt64: "92233720368547758.07",
+		math.MinInt64: "-92233720368547758.08",
+	}
+
+	for in, want := range cases {
+		if got := formatPaddleAmount(in); got != want {
+			t.Errorf("formatPaddleAmount(%d) = %q, want %q", in, got, want)
+		}
+	}
+}
+
+// TestPaddleAmountRoundTrip pins that two-decimal totals survive a
+// parse/format round trip.
+func TestPaddleAmountRoundTrip(t *testing.T) {
+	t.Parallel()
+
+	for _, s := range []string{"25.00", "10.99", "0.01", "-5.25", "1000000000.99"} {
+		minor, err := parsePaddleAmount(s)
+		if err != nil {
+			t.Fatalf("parsePaddleAmount(%q) = %v", s, err)
+		}
+
+		if back, err := parsePaddleAmount(formatPaddleAmount(minor)); err != nil || back != minor {
+			t.Errorf("round trip(%q): parse(format(%d)) = (%d, %v), want (%d, nil)", s, minor, back, err, minor)
+		}
+	}
+}
+
 func TestClose_idempotent(t *testing.T) {
 	t.Parallel()
 
