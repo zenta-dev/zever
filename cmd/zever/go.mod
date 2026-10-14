@@ -3,7 +3,7 @@ module github.com/zenta-dev/zever/cmd/zever
 go 1.27.2
 
 require (
-	charm.land/bubbletea/v2 v2.0.10
+	charm.land/bubbletea/v2 v2.1.0
 	charm.land/huh/v2 v2.0.3
 	github.com/charmbracelet/x/exp/teatest/v2 v2.0.0-20260924144451-d676b019604b
 	github.com/fsnotify/fsnotify v1.10.1
@@ -192,8 +192,8 @@ require (
 	github.com/cenkalti/backoff/v5 v5.0.3 // indirect
 	github.com/cespare/xxhash/v2 v2.3.0 // indirect
 	github.com/charmbracelet/colorprofile v0.4.3 // indirect
-	github.com/charmbracelet/ultraviolet v0.0.0-20260811164956-006e29f97886 // indirect
-	github.com/charmbracelet/x/ansi v0.11.8 // indirect
+	github.com/charmbracelet/ultraviolet v0.0.0-20261008173134-6b8d4baf91b4 // indirect
+	github.com/charmbracelet/x/ansi v0.11.9 // indirect
 	github.com/charmbracelet/x/exp/golden v0.0.0-20251109135125-8916d276318f // indirect
 	github.com/charmbracelet/x/exp/ordered v0.1.0 // indirect
 	github.com/charmbracelet/x/exp/strings v0.0.0-20240722160745-212f7b056ed0 // indirect
@@ -249,7 +249,7 @@ require (
 	github.com/lucasb-eyer/go-colorful v1.4.1 // indirect
 	github.com/mattn/go-colorable v0.1.14 // indirect
 	github.com/mattn/go-isatty v0.0.24 // indirect
-	github.com/mattn/go-runewidth v0.0.27 // indirect
+	github.com/mattn/go-runewidth v0.0.30 // indirect
 	github.com/meilisearch/meilisearch-go v0.36.3 // indirect
 	github.com/mitchellh/hashstructure/v2 v2.0.2 // indirect
 	github.com/molecule-man/go-brrr v1.1.1 // indirect
@@ -280,7 +280,7 @@ require (
 	github.com/twilio/twilio-go v1.31.2 // indirect
 	github.com/valyala/bytebufferpool v1.0.0 // indirect
 	github.com/valyala/fasthttp v1.75.0 // indirect
-	github.com/xo/terminfo v0.0.0-20220910002029-abceb7e1c41e // indirect
+	github.com/xo/terminfo v1.0.0 // indirect
 	github.com/zenta-dev/zever/adapters/media/ffmpeg v0.6.1 // indirect
 	github.com/zenta-dev/zever/core/agent v0.6.1 // indirect
 	github.com/zenta-dev/zever/core/billing v0.6.1 // indirect
