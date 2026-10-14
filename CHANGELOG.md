@@ -554,6 +554,16 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - `refactor(registry): drop dead nil-hook branches`: `registry.New` already
   defaults every hook, so the unreachable nil checks in `Register`/`Lookup`
   are gone (no behavior change).
+- `fix(cli,container): CLI polish and scaffold orm requirement`: `zever new`
+  now requires the `orm` module in the scaffolded `go.mod` (the zenorm
+  output imports it); `zever compile` runs `go mod tidy` (or prints a hint
+  with `--no-tidy`) when generated code imports framework modules `go.mod`
+  lacks; an unknown subcommand prints the error and did-you-mean hint first
+  instead of dumping usage; `db migrate --lint` prints error findings as
+  `error:` on stderr (warnings stay warnings), `-h/--help` exits 0 without
+  `flag: help requested`, and `--dry-run` help now states that it connects
+  read-only when `--dsn` is given; the informational `container: pool shared`
+  line is shown only when `ZEVER_DEBUG` is set.
 - `fix(auth,crypto): warn on in-memory JWT revocation; shared dev-env check`:
   the `jwt` adapter now logs a one-time `slog` WARN (and exposes it via
   `jwt.WarningReporter.Warnings()`) when the default per-process revocation

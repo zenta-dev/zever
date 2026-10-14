@@ -64,6 +64,11 @@ type CompileConfig struct {
 	// Strict makes --check also fail when committed files differ only in the
 	// CLI-version field of their generated stamp.
 	Strict bool
+	// Tidy reconciles go.mod with the generated code's framework imports
+	// after writing (the CLI sets it; library callers opt in). NoTidy turns
+	// the automatic `go mod tidy` into a printed hint.
+	Tidy   bool
+	NoTidy bool
 }
 
 // outOrStdout resolves the effective stdout writer for a command config.
@@ -192,6 +197,7 @@ func newCompileFlagSet() *flag.FlagSet {
 	fs.String("out", "./generated", "output directory for generated files")
 	fs.Bool("check", false, "verify committed output matches a fresh compile (exit 1 on drift, write nothing); a differing zever version in the stamp alone is only a note")
 	fs.Bool("strict", false, "with --check, also fail when files differ only in the stamped zever version")
+	fs.Bool("no-tidy", false, "do not run 'go mod tidy' when generated code imports modules go.mod lacks (print a hint instead)")
 	// coverageProof: no local -i/--interactive flags; peelInteractive
 	// strips them before Parse and sets interactiveMode globally.
 
@@ -205,7 +211,7 @@ func newCompileFlagSet() *flag.FlagSet {
 func runCompile(args []string) error { //nolint:gocyclo
 	args = peelInteractive(args)
 
-	if err := rejectUnknownFlags("compile", args, []string{"backend", "out", "check", "strict"}); err != nil {
+	if err := rejectUnknownFlags("compile", args, []string{"backend", "out", "check", "strict", "no-tidy"}); err != nil {
 		return err
 	}
 
@@ -263,6 +269,8 @@ func runCompile(args []string) error { //nolint:gocyclo
 		JSON:     jsonMode,
 		Check:    flagBool(fs, "check"),
 		Strict:   flagBool(fs, "strict"),
+		Tidy:     true,
+		NoTidy:   flagBool(fs, "no-tidy"),
 	})
 }
 
@@ -352,6 +360,12 @@ func runCompileWith(cfg CompileConfig) error {
 
 	if err := writeOutputs(outDir, stamped); err != nil {
 		return err
+	}
+
+	if cfg.Tidy {
+		if err := ensureGeneratedDeps(".", outDir, stamped, cfg.NoTidy, os.Stderr); err != nil {
+			return err
+		}
 	}
 
 	if cfg.JSON {

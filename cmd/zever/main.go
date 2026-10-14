@@ -120,6 +120,11 @@ func main() {
 	if useCobra(args) {
 		rootCmd.SetArgs(args)
 		if err := rootCmd.Execute(); err != nil {
+			if errors.Is(err, flag.ErrHelp) {
+				// -h/--help already printed usage: success, no noise.
+				return
+			}
+
 			if jsonMode {
 				// Handlers that already wrote their failure envelope
 				// (errJSONEmitted) only set the exit code here.
@@ -147,6 +152,11 @@ func main() {
 	}
 
 	if err := run(args); err != nil {
+		if errors.Is(err, flag.ErrHelp) {
+			// -h/--help already printed usage: success, no noise.
+			return
+		}
+
 		if jsonMode {
 			// See the Cobra path above: already-emitted envelopes only
 			// set the exit code.
@@ -280,17 +290,20 @@ func run(args []string) error {
 		printUsage()
 		return nil
 	default:
-		printUsage()
+		// Error first, then the hint, and no full usage dump: the caller
+		// (main) prints the returned error to stderr, so the hint is
+		// embedded in the message to keep the order error -> hint.
+		msg := fmt.Sprintf("zever: unknown subcommand %q", sub)
 
 		if shouldShowHint() {
 			if s := closest(sub, allTopLevel()); s != "" {
-				_, _ = fmt.Fprintln(os.Stderr, formatHint(fmt.Sprintf("did you mean %q?", s)))
+				msg += "\n" + formatHint(fmt.Sprintf("did you mean %q?", s))
 			} else {
-				_, _ = fmt.Fprintln(os.Stderr, formatHint("run 'zever --help' for usage"))
+				msg += "\n" + formatHint("run 'zever --help' for usage")
 			}
 		}
 
-		return fmt.Errorf("zever: unknown subcommand %q", sub)
+		return errors.New(msg)
 	}
 }
 

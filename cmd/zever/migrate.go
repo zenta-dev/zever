@@ -228,7 +228,7 @@ func printMigrateUsage(fs *flag.FlagSet) {
 func runDBMigrate(args []string) error {
 	args = peelInteractive(args)
 	fs := flag.NewFlagSet("db migrate", flag.ContinueOnError)
-	dryRun := fs.Bool("dry-run", false, "print the generated Atlas HCL and DDL to stdout without connecting to a database")
+	dryRun := fs.Bool("dry-run", false, "print the generated Atlas HCL and DDL to stdout without executing anything; with --dsn it connects read-only to introspect live tables and diff against them, without --dsn it renders the full bootstrap DDL fully offline")
 	adapter := fs.String("adapter", "sqlite", "db adapter to migrate against (sqlite, postgres, or mysql)")
 	dsn := fs.String("dsn", "", "connection string: a file path for sqlite, a libpq DSN for postgres, a go-sql-driver DSN for mysql")
 	dropColumns := fs.Bool("drop-columns", false,
@@ -444,6 +444,14 @@ func enforceMigrateLint(dialect string, stmts []string) error {
 	findings := migrate.LintStatements(dialect, stmts)
 
 	for _, f := range findings {
+		if f.Severity == migrate.LintError {
+			// Error findings fail the command, so they go to stderr with an
+			// error: prefix. Warnings stay warnings on stdout.
+			_, _ = fmt.Fprintf(os.Stderr, "zever db migrate: error: lint [%s]: %s\n", f.Code, f.Message)
+
+			continue
+		}
+
 		warnMigrate("lint %s [%s]: %s", f.Severity, f.Code, f.Message)
 	}
 
@@ -471,6 +479,10 @@ func enforceMigrateLint(dialect string, stmts []string) error {
 func dryRunDiff(adapter, dsn string, result *compile.Result, planOpts migrate.PlanOptions, lint bool) error {
 	conn, err := openZeverDB(adapter, dsn)
 	if err != nil {
+		if shouldShowHint() {
+			_, _ = fmt.Fprintln(os.Stderr, formatHint("--dry-run with --dsn connects read-only to diff against live tables; omit --dsn to render the bootstrap DDL offline"))
+		}
+
 		return err
 	}
 

@@ -133,8 +133,16 @@ func TestCligUnknownCommand(t *testing.T) {
 			if !strings.Contains(runErr.Error(), tc.wantErrSub) {
 				t.Errorf("%v: error %q missing %q", tc.args, runErr.Error(), tc.wantErrSub)
 			}
-			if tc.wantStderr != "" && !strings.Contains(stderr, tc.wantStderr) {
-				t.Errorf("%v: stderr missing suggestion %q (stderr=%q)", tc.args, tc.wantStderr, stderr)
+			// The error comes first and carries the hint; the full usage
+			// is no longer dumped ahead of it.
+			if tc.wantStderr != "" && !strings.Contains(runErr.Error(), tc.wantStderr) {
+				t.Errorf("%v: error missing suggestion %q (err=%q)", tc.args, tc.wantStderr, runErr.Error())
+			}
+			if !strings.HasPrefix(runErr.Error(), "zever: unknown subcommand") {
+				t.Errorf("%v: error must lead with the message, got %q", tc.args, runErr.Error())
+			}
+			if strings.Contains(stderr, "Usage") {
+				t.Errorf("%v: usage must not be dumped, stderr=%q", tc.args, stderr)
 			}
 		})
 	}
