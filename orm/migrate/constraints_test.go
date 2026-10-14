@@ -95,7 +95,7 @@ func TestCreateIndexSQL(t *testing.T) {
 				table = "`orders`"
 			}
 
-			got, err := createIndexSQL(tt.dialect, table, name, cols, tt.unique)
+			got, err := createIndexSQL(tt.dialect, table, name, cols, tt.unique, false)
 			if tt.wantErr {
 				if err == nil {
 					t.Fatal("createIndexSQL: want error, got nil")
@@ -114,7 +114,7 @@ func TestCreateIndexSQL(t *testing.T) {
 		})
 	}
 
-	if _, err := createIndexSQL(atlas.DialectPostgres, "t", "good_idx", []string{"bad col!"}, false); err == nil {
+	if _, err := createIndexSQL(atlas.DialectPostgres, "t", "good_idx", []string{"bad col!"}, false, false); err == nil {
 		t.Fatal("createIndexSQL bad column: want error, got nil")
 	}
 }
@@ -143,7 +143,7 @@ func TestRenderCreateAndDropIndex(t *testing.T) {
 	e := &ir.Entity{Name: "Order", Schema: "public"}
 	spec := atlas.IndexSpec{Name: "orders_user_id_idx", Columns: []string{"user_id"}}
 
-	created, err := renderCreateIndex(atlas.DialectSQLite, e, spec)
+	created, err := renderCreateIndex(atlas.DialectSQLite, e, spec, false)
 	if err != nil {
 		t.Fatalf("renderCreateIndex: %v", err)
 	}
@@ -152,7 +152,7 @@ func TestRenderCreateAndDropIndex(t *testing.T) {
 		t.Fatalf("meta = %+v", created.Meta)
 	}
 
-	if _, renderErr := renderCreateIndex("oracle", e, spec); renderErr == nil {
+	if _, renderErr := renderCreateIndex("oracle", e, spec, false); renderErr == nil {
 		t.Fatal("renderCreateIndex(oracle): want error, got nil")
 	}
 
@@ -425,7 +425,7 @@ func TestRenderIndexErrors(t *testing.T) {
 
 	e := &ir.Entity{Name: "Order", Schema: "public"}
 
-	if _, err := renderCreateIndex(atlas.DialectSQLite, e, atlas.IndexSpec{Name: "bad!", Columns: []string{"a"}}); err == nil {
+	if _, err := renderCreateIndex(atlas.DialectSQLite, e, atlas.IndexSpec{Name: "bad!", Columns: []string{"a"}}, false); err == nil {
 		t.Fatal("renderCreateIndex bad name: want error, got nil")
 	}
 
@@ -622,7 +622,7 @@ func TestIndexDiffDirect(t *testing.T) {
 			},
 		}
 
-		if _, err := d.createDeclaredIndexes(atlas.DialectSQLite, e); err == nil {
+		if _, err := d.createDeclaredIndexes(atlas.DialectSQLite, e, false); err == nil {
 			t.Fatal("createDeclaredIndexes bad name: want error, got nil")
 		}
 	})
@@ -638,7 +638,7 @@ func TestIndexDiffDirect(t *testing.T) {
 			},
 		}
 
-		stmts, err := d.createDeclaredIndexes(atlas.DialectSQLite, e)
+		stmts, err := d.createDeclaredIndexes(atlas.DialectSQLite, e, false)
 		if err != nil || len(stmts) != 1 {
 			t.Fatalf("stmts = %+v, err = %v", stmts, err)
 		}
@@ -653,7 +653,7 @@ func TestIndexDiffDirect(t *testing.T) {
 		}}
 		d := newIndexDiff(ue, nil)
 
-		stmts, err := d.createUniqueFieldIndexes(atlas.DialectSQLite, ue)
+		stmts, err := d.createUniqueFieldIndexes(atlas.DialectSQLite, ue, false)
 		if err != nil || len(stmts) != 1 {
 			t.Fatalf("stmts = %+v, err = %v", stmts, err)
 		}
@@ -667,7 +667,7 @@ func TestIndexDiffDirect(t *testing.T) {
 		}}
 		d := newIndexDiff(ue, nil)
 
-		if _, err := d.createUniqueFieldIndexes("oracle", ue); err == nil {
+		if _, err := d.createUniqueFieldIndexes("oracle", ue, false); err == nil {
 			t.Fatal("createUniqueFieldIndexes(oracle): want error, got nil")
 		}
 	})

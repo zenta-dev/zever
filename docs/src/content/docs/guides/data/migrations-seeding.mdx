@@ -79,6 +79,70 @@ fmt.Println("applied", applied)
 
 `PlanOptions{DropColumns: true}` emits `DROP COLUMN`; `DetectTypeChanges: true` compares live and declared types (the CLI always enables it). `Apply` uses `db.WithTx`, so failures roll back and nesting returns `ErrNestedTx`.
 
+## Write safe migrations
+
+On a production database with live traffic, the dangerous part of a migration is rarely the DDL spelling: it is locks, rewrites, and destroyed data. Prefer expand/contract over in-place change.
+
+| Instead of | Do this |
+|---|---|
+| `DROP COLUMN` / `DROP TABLE` | Expand: add the replacement, dual-write, backfill, move reads, then drop. |
+| `ADD COLUMN ... NOT NULL` without a default | Add the column nullable, backfill existing rows, then `SET NOT NULL`. |
+| `ALTER COLUMN TYPE` | Add a new column of the new type, backfill, swap reads, drop the old column. |
+| Plain `CREATE INDEX` on postgres | `CREATE INDEX CONCURRENTLY` (see below). |
+
+`zever db migrate --lint` checks the plan for these shapes before anything runs and fails on error-severity findings. Waive one rule on one statement with a `-- zever:allow:<code>` comment, or every rule with a bare `-- zever:allow`:
+
+```sql
+-- zever:allow:drop_column
+ALTER TABLE "public"."users" DROP COLUMN IF EXISTS "legacy_flag";
+```
+
+| Rule code | Severity | Flags |
+|---|---|---|
+| `drop_table`, `drop_column` | error | `DROP TABLE`, `DROP COLUMN` |
+| `not_null_without_default` | error | `ADD COLUMN ... NOT NULL` with no `DEFAULT` |
+| `type_rewrite` | error | `ALTER COLUMN ... TYPE`, `MODIFY COLUMN` |
+| `non_concurrent_index` | warning | postgres `CREATE INDEX` without `CONCURRENTLY` |
+
+```sh
+zever db migrate --lint --dry-run schema/*.zen --adapter=postgres --dsn='postgres://localhost/db?sslmode=disable'
+```
+
+## Backfill in batches
+
+A backfill (`UPDATE ... WHERE new_col IS NULL`) on a large table holds locks and bloats the table if done in one statement. Backfill in small batches with pauses between them, ideally from a job rather than inside the migration itself: migrate the schema first (new column nullable), run the batched backfill, then apply a second migration that adds the `NOT NULL` constraint once no nulls remain. Verify with `SELECT count(*) ... WHERE new_col IS NULL` returning zero before the second step.
+
+## Build indexes without blocking writes
+
+A plain `CREATE INDEX` on postgres blocks writes to the table for the whole build. Pass `--concurrent-indexes` to build every new index as `CREATE INDEX CONCURRENTLY` instead:
+
+```sh
+zever db migrate schema/app.zen --adapter=postgres --dsn='postgres://localhost/db?sslmode=disable' --concurrent-indexes
+```
+
+Concurrent builds run outside any transaction (postgres forbids `CONCURRENTLY` inside one), so each index build commits independently: a failure leaves earlier statements applied and the failed build to retry. `CREATE INDEX CONCURRENTLY` is postgres-only; other dialects render a plain `CREATE INDEX`. In code, set `migrate.PlanOptions{ConcurrentIndexes: true}` or `atlas.DDLOptions{ConcurrentIndexes: true}` for bootstrap rendering.
+
+## Bound statement time with lock timeouts
+
+Every applied statement on postgres runs inside its own transaction, and `lock_timeout`/`statement_timeout` bound it via `SET LOCAL` without changing any session or database default:
+
+```sh
+zever db migrate schema/app.zen --adapter=postgres --dsn='...' --lock-timeout=10s --statement-timeout=30s
+```
+
+Unset flags fall back to `db.options` from the config file (`DB_LOCK_TIMEOUT` / `DB_STATEMENT_TIMEOUT` in the environment):
+
+```yaml title="zever.yaml"
+db:
+  adapter: postgres
+  options:
+    dsn: postgres://app:secret@db:5432/app
+    lock_timeout: 10000000000 # 10s in nanoseconds; duration strings only work as env vars
+    statement_timeout: 30000000000 # 30s in nanoseconds
+```
+
+In code, set `migrate.PlanOptions{LockTimeout: 10 * time.Second, StatementTimeout: 30 * time.Second}`; the plan carries them into `Apply`. Zero disables each; negative fails `Plan` with `ErrInvalidTimeout`. A concurrent index build skips them (it runs outside a transaction, where `SET LOCAL` has no scope).
+
 ## Roll back a migration
 
 `zever db rollback` needs no `.zen` files; it reads `schema_migrations` and runs an inverse for the newest statements. `-n` counts statements, not runs, so undo a three-statement run with `-n 3`.

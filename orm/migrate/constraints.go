@@ -129,7 +129,12 @@ var createIndexPattern = regexp.MustCompile(`^CREATE (UNIQUE )?INDEX (IF NOT EXI
 // it -- the caller has already confirmed the index is absent live, and the
 // plan's checksum dedup in schema_migrations makes a re-run a no-op either
 // way.
-func createIndexSQL(dialect, table, name string, columns []string, unique bool) (string, error) {
+//
+// With concurrent on postgres the build uses CREATE INDEX CONCURRENTLY,
+// which does not block writes but cannot run inside a transaction block --
+// Apply executes such statements outside any transaction for exactly that
+// reason.
+func createIndexSQL(dialect, table, name string, columns []string, unique, concurrent bool) (string, error) {
 	if err := validateIdent(name); err != nil {
 		return "", err
 	}
@@ -154,9 +159,14 @@ func createIndexSQL(dialect, table, name string, columns []string, unique bool) 
 		ifNotExists = ""
 	}
 
+	concurrently := ""
+	if concurrent && dialect == atlas.DialectPostgres {
+		concurrently = "CONCURRENTLY "
+	}
+
 	// identifier is schema-introspected, not user input
-	return fmt.Sprintf("CREATE %sINDEX %s%s ON %s (%s);",
-		uniqueKW, ifNotExists, quoteIdent(dialect, name), table, strings.Join(cols, ", ")), nil
+	return fmt.Sprintf("CREATE %sINDEX %s%s%s ON %s (%s);",
+		uniqueKW, concurrently, ifNotExists, quoteIdent(dialect, name), table, strings.Join(cols, ", ")), nil
 }
 
 // qualifiedIndexName returns an index's identifier, schema-qualified for
@@ -172,14 +182,15 @@ func qualifiedIndexName(dialect string, e *ir.Entity, name string) string {
 }
 
 // renderCreateIndex renders one CREATE INDEX/CREATE UNIQUE INDEX statement
-// for a declared index missing from a live table.
-func renderCreateIndex(dialect string, e *ir.Entity, spec atlas.IndexSpec) (plannedStatement, error) {
+// for a declared index missing from a live table. With concurrent on
+// postgres the build uses CREATE INDEX CONCURRENTLY (see createIndexSQL).
+func renderCreateIndex(dialect string, e *ir.Entity, spec atlas.IndexSpec, concurrent bool) (plannedStatement, error) {
 	table, err := atlas.QualifiedTableName(dialect, e)
 	if err != nil {
 		return plannedStatement{}, err
 	}
 
-	sql, err := createIndexSQL(dialect, table, spec.Name, spec.Columns, spec.Unique)
+	sql, err := createIndexSQL(dialect, table, spec.Name, spec.Columns, spec.Unique, concurrent)
 	if err != nil {
 		return plannedStatement{}, err
 	}
@@ -218,7 +229,7 @@ func renderDropIndex(dialect string, e *ir.Entity, live liveIndex) (plannedState
 		sql = fmt.Sprintf("DROP INDEX IF EXISTS %s;", qualified)
 	}
 
-	priorSQL, err := createIndexSQL(dialect, table, live.Name, live.Columns, live.Unique)
+	priorSQL, err := createIndexSQL(dialect, table, live.Name, live.Columns, live.Unique, false)
 	if err != nil {
 		return plannedStatement{}, err
 	}
@@ -459,7 +470,7 @@ func introspectSQLiteIndexColumns(ctx context.Context, conn db.DB, indexName str
 // index(...) blocks and @unique fields. See this file's doc comment for the
 // exact add/drop rules per category.
 func indexStatementsFor(
-	ctx context.Context, conn db.DB, dialect string, e *ir.Entity, state *liveSchemaState, w *warnings,
+	ctx context.Context, conn db.DB, dialect string, e *ir.Entity, state *liveSchemaState, w *warnings, concurrent bool,
 ) ([]plannedStatement, error) {
 	liveIdx, err := introspectIndexes(ctx, conn, dialect, e, state)
 	if err != nil {
@@ -470,14 +481,14 @@ func indexStatementsFor(
 
 	var stmts []plannedStatement
 
-	created, err := diff.createDeclaredIndexes(dialect, e)
+	created, err := diff.createDeclaredIndexes(dialect, e, concurrent)
 	if err != nil {
 		return nil, err
 	}
 
 	stmts = append(stmts, created...)
 
-	createdUnique, err := diff.createUniqueFieldIndexes(dialect, e)
+	createdUnique, err := diff.createUniqueFieldIndexes(dialect, e, concurrent)
 	if err != nil {
 		return nil, err
 	}
@@ -553,7 +564,7 @@ func newIndexDiff(e *ir.Entity, liveIdx []liveIndex) *indexDiff {
 
 // createDeclaredIndexes returns CREATE INDEX/CREATE UNIQUE INDEX for every
 // declared index(...) block missing live.
-func (d *indexDiff) createDeclaredIndexes(dialect string, e *ir.Entity) ([]plannedStatement, error) {
+func (d *indexDiff) createDeclaredIndexes(dialect string, e *ir.Entity, concurrent bool) ([]plannedStatement, error) {
 	var names []string
 
 	for name := range d.declaredByName {
@@ -567,7 +578,7 @@ func (d *indexDiff) createDeclaredIndexes(dialect string, e *ir.Entity) ([]plann
 	stmts := make([]plannedStatement, 0, len(names))
 
 	for _, name := range names {
-		stmt, err := renderCreateIndex(dialect, e, d.declaredByName[name])
+		stmt, err := renderCreateIndex(dialect, e, d.declaredByName[name], concurrent)
 		if err != nil {
 			return nil, err
 		}
@@ -581,7 +592,7 @@ func (d *indexDiff) createDeclaredIndexes(dialect string, e *ir.Entity) ([]plann
 // createUniqueFieldIndexes returns CREATE UNIQUE INDEX for every @unique
 // field not already enforced by some live single-column unique index,
 // regardless of that index's own name.
-func (d *indexDiff) createUniqueFieldIndexes(dialect string, e *ir.Entity) ([]plannedStatement, error) {
+func (d *indexDiff) createUniqueFieldIndexes(dialect string, e *ir.Entity, concurrent bool) ([]plannedStatement, error) {
 	var stmts []plannedStatement
 
 	for _, f := range e.Fields {
@@ -591,7 +602,7 @@ func (d *indexDiff) createUniqueFieldIndexes(dialect string, e *ir.Entity) ([]pl
 
 		spec := atlas.IndexSpec{Name: uniqueIndexName(d.table, f.Name), Columns: []string{f.Name}, Unique: true}
 
-		stmt, err := renderCreateIndex(dialect, e, spec)
+		stmt, err := renderCreateIndex(dialect, e, spec, concurrent)
 		if err != nil {
 			return nil, err
 		}

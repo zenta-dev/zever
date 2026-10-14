@@ -9,9 +9,11 @@ import (
 	"sort"
 	"strings"
 	"sync"
+	"time"
 
 	dbpostgres "github.com/zenta-dev/zever/adapters/db/postgres"
 	dbsqlite "github.com/zenta-dev/zever/adapters/db/sqlite"
+	"github.com/zenta-dev/zever/config"
 	"github.com/zenta-dev/zever/core/db"
 	"github.com/zenta-dev/zever/dsl/backend/atlas"
 	"github.com/zenta-dev/zever/dsl/compile"
@@ -103,6 +105,26 @@ LIMITATIONS — this is NOT full Atlas migration support:
   * rollback ("zever db rollback") inverts recorded statements only,
     best-effort and lossy for some kinds -- it is not a down-migration system
 
+SAFETY — writing a safe migration is an expand/contract exercise, and
+--lint checks the plan for the known-unsafe shapes before anything runs:
+
+  * DROP COLUMN / DROP TABLE (error): destroys data. Expand first (add the
+    replacement, dual-write, backfill, move reads), then drop.
+  * ADD COLUMN ... NOT NULL without DEFAULT (error): fails on non-empty
+    tables. Add as nullable, backfill, then SET NOT NULL.
+  * ALTER COLUMN TYPE (error): rewrites the table. Add the new column,
+    backfill, swap reads, drop the old one.
+  * CREATE INDEX without CONCURRENTLY on postgres (warning): blocks writes.
+    Pass --concurrent-indexes to build without blocking (each build runs
+    outside a transaction, since postgres forbids CONCURRENTLY inside one).
+
+--lock-timeout/--statement-timeout bound every applied statement on
+postgres via SET LOCAL inside the statement's own transaction (e.g.
+--lock-timeout=10s --statement-timeout=30s); unset flags fall back to
+db.options lock_timeout/statement_timeout from the config file. Waive one
+rule on one statement with a '-- zever:allow:<code>' comment, or every rule
+with a bare '-- zever:allow'.
+
 Driving the real Atlas engine for full diff-based migrations is deferred.`
 
 var migrateAdapters = []string{"sqlite", "postgres", "mysql"}
@@ -136,6 +158,33 @@ type MigrateConfig struct {
 	// DropColumns enables emitting DROP COLUMN for undeclared live columns.
 	// Destructive: the dropped data is unrecoverable.
 	DropColumns bool
+	// Lint gates the run on the migration safety linter: error-severity
+	// findings (drops, NOT NULL without default, type rewrites) fail the
+	// run before anything is applied.
+	Lint bool
+	// LockTimeout caps how long one applied statement may wait for a lock
+	// on postgres, via SET LOCAL inside the statement's own transaction.
+	LockTimeout time.Duration
+	// StatementTimeout caps how long one applied statement may run on
+	// postgres, via SET LOCAL inside the statement's own transaction.
+	StatementTimeout time.Duration
+	// ConcurrentIndexes builds postgres indexes with CREATE INDEX
+	// CONCURRENTLY (no write block; each build runs outside a transaction).
+	ConcurrentIndexes bool
+}
+
+// MigrateSafetyOptions groups the safety-related migrate settings, so adding
+// a new one does not mean adding another positional bool to
+// resolveMigrateConfig.
+type MigrateSafetyOptions struct {
+	// Lint gates the run on the migration safety linter.
+	Lint bool
+	// LockTimeout caps one statement's lock wait on postgres (SET LOCAL).
+	LockTimeout time.Duration
+	// StatementTimeout caps one statement's run time on postgres (SET LOCAL).
+	StatementTimeout time.Duration
+	// ConcurrentIndexes builds postgres indexes without blocking writes.
+	ConcurrentIndexes bool
 }
 
 // coverageSeam: prompt indirection for tests. Proof: huh requires a real TTY;
@@ -147,10 +196,20 @@ var (
 	promptMultiSelectForMigrate = promptMultiSelect
 )
 
+// resolveMigrateSafetyOptions builds a MigrateSafetyOptions from parsed flag
+// values without side effects.
+func resolveMigrateSafetyOptions(lint bool, lock, stmt time.Duration, concurrent bool) MigrateSafetyOptions {
+	return MigrateSafetyOptions{Lint: lint, LockTimeout: lock, StatementTimeout: stmt, ConcurrentIndexes: concurrent}
+}
+
 // resolveMigrateConfig builds a MigrateConfig from parsed flag values without
 // side effects.
-func resolveMigrateConfig(adapter, dsn string, files []string, dryRun, dropColumns bool) MigrateConfig {
-	return MigrateConfig{Adapter: adapter, DSN: dsn, Files: files, DryRun: dryRun, DropColumns: dropColumns}
+func resolveMigrateConfig(adapter, dsn string, files []string, dryRun, dropColumns bool, safety MigrateSafetyOptions) MigrateConfig {
+	return MigrateConfig{
+		Adapter: adapter, DSN: dsn, Files: files, DryRun: dryRun, DropColumns: dropColumns,
+		Lint: safety.Lint, LockTimeout: safety.LockTimeout, StatementTimeout: safety.StatementTimeout,
+		ConcurrentIndexes: safety.ConcurrentIndexes,
+	}
 }
 
 func printMigrateUsage(fs *flag.FlagSet) {
@@ -160,6 +219,8 @@ func printMigrateUsage(fs *flag.FlagSet) {
 	printBoxedUsage(fs, header, usage, migrateHelp, []usageExample{
 		{command: "zever db migrate schema/app.zen --adapter=sqlite --dsn=data/app.db"},
 		{command: "zever db migrate --dry-run schema/*.zen --adapter=postgres --dsn='postgres://localhost/db?sslmode=disable'"},
+		{command: "zever db migrate --lint --dry-run schema/*.zen --adapter=postgres --dsn='postgres://localhost/db?sslmode=disable'"},
+		{command: "zever db migrate schema/app.zen --adapter=postgres --dsn='postgres://localhost/db?sslmode=disable' --concurrent-indexes --lock-timeout=10s --statement-timeout=30s"},
 		{command: "zever db migrate -i", comment: "  # guided: select files, adapter & DSN"},
 	}, "use --dry-run to preview DDL without executing")
 }
@@ -172,6 +233,14 @@ func runDBMigrate(args []string) error {
 	dsn := fs.String("dsn", "", "connection string: a file path for sqlite, a libpq DSN for postgres, a go-sql-driver DSN for mysql")
 	dropColumns := fs.Bool("drop-columns", false,
 		"DESTRUCTIVE: emit ALTER TABLE DROP COLUMN for live columns no longer declared in the schema (their data is lost)")
+	lint := fs.Bool("lint", false,
+		"lint the planned DDL for unsafe patterns (drops, NOT NULL without default, non-concurrent index, type rewrite); error findings fail the run before anything is applied")
+	lockTimeout := fs.Duration("lock-timeout", 0,
+		"postgres SET LOCAL lock_timeout per statement (e.g. 10s); zero disables; falls back to db.options.lock_timeout from the config file")
+	statementTimeout := fs.Duration("statement-timeout", 0,
+		"postgres SET LOCAL statement_timeout per statement (e.g. 30s); zero disables; falls back to db.options.statement_timeout from the config file")
+	concurrentIndexes := fs.Bool("concurrent-indexes", false,
+		"build postgres indexes with CREATE INDEX CONCURRENTLY (no write block; each build runs outside a transaction)")
 	// coverageProof: no local -i/--interactive flags (cf. db.go's removed arm).
 	// runDBMigrate peels -i/--interactive via peelInteractive before Parse, so
 	// the FlagSet can never see them; interactiveMode is already set globally
@@ -263,7 +332,14 @@ func runDBMigrate(args []string) error {
 		return fmt.Errorf("zever db migrate: %w", err)
 	}
 
-	cfg := resolveMigrateConfig(*adapter, *dsn, nil, *dryRun, *dropColumns)
+	cfg := resolveMigrateConfig(*adapter, *dsn, nil, *dryRun, *dropColumns,
+		resolveMigrateSafetyOptions(*lint, *lockTimeout, *statementTimeout, *concurrentIndexes))
+
+	// Config-file fallback for timeouts the flags left unset: db.options
+	// lock_timeout/statement_timeout (file or DB_* env) become the plan's
+	// timeouts. Best-effort: no config file, or an unloadable one, keeps the
+	// flag values (zero disables).
+	applyConfigTimeoutFallback(&cfg)
 
 	result, diags := compile.Compile(files, atlas.New())
 
@@ -290,16 +366,28 @@ func runDBMigrate(args []string) error {
 
 	// Type-change detection is always on: on postgres it emits the ALTER,
 	// on sqlite it only ever warns, so neither needs its own opt-in.
-	planOpts := migrate.PlanOptions{DropColumns: cfg.DropColumns, DetectTypeChanges: true}
+	planOpts := migrate.PlanOptions{
+		DropColumns:       cfg.DropColumns,
+		DetectTypeChanges: true,
+		LockTimeout:       cfg.LockTimeout,
+		StatementTimeout:  cfg.StatementTimeout,
+		ConcurrentIndexes: cfg.ConcurrentIndexes,
+	}
 
 	if cfg.DryRun {
 		if trimmedDSN == "" {
 			// No database to introspect: fall back to the full bootstrap
 			// render, exactly as before diffing existed. This path never
 			// touches orm/migrate at all.
-			stmts, err := atlas.RenderSchemaDDL(dialect, result.Schema)
+			stmts, err := atlas.RenderSchemaDDLWithOptions(dialect, result.Schema, atlas.DDLOptions{ConcurrentIndexes: cfg.ConcurrentIndexes})
 			if err != nil {
 				return fmt.Errorf("zever db migrate: %w", err)
+			}
+
+			if cfg.Lint {
+				if err := enforceMigrateLint(dialect, stmts); err != nil {
+					return err
+				}
 			}
 
 			printDryRun(result.Outputs["atlas"], stmts)
@@ -307,10 +395,10 @@ func runDBMigrate(args []string) error {
 			return nil
 		}
 
-		return dryRunDiff(cfg.Adapter, trimmedDSN, result, planOpts)
+		return dryRunDiff(cfg.Adapter, trimmedDSN, result, planOpts, cfg.Lint)
 	}
 
-	return applyDiff(cfg.Adapter, cfg.DSN, result.Schema, planOpts)
+	return applyDiff(cfg.Adapter, cfg.DSN, result.Schema, planOpts, cfg.Lint)
 }
 
 // flagWasSet reports whether a flag was explicitly set on the FlagSet.
@@ -326,10 +414,61 @@ func flagWasSet(fs *flag.FlagSet, name string) bool {
 	return found
 }
 
+// applyConfigTimeoutFallback fills timeouts the flags left unset from the
+// config file's db.options (file or DB_* env), best-effort: no config file,
+// or an unloadable one, keeps the flag values (zero disables).
+func applyConfigTimeoutFallback(cfg *MigrateConfig) {
+	if cfg.LockTimeout != 0 && cfg.StatementTimeout != 0 {
+		return
+	}
+
+	fileCfg, loadErr := config.Load("")
+	if loadErr != nil || fileCfg == nil {
+		return
+	}
+
+	if cfg.LockTimeout == 0 {
+		cfg.LockTimeout = fileCfg.DB.Options.LockTimeout
+	}
+
+	if cfg.StatementTimeout == 0 {
+		cfg.StatementTimeout = fileCfg.DB.Options.StatementTimeout
+	}
+}
+
+// enforceMigrateLint lints stmts for the named dialect, prints every finding
+// to stdout, and fails when any finding has error severity. A statement
+// carrying a '-- zever:allow:<code>' pragma waives that rule (see
+// orm/migrate's linter).
+func enforceMigrateLint(dialect string, stmts []string) error {
+	findings := migrate.LintStatements(dialect, stmts)
+
+	for _, f := range findings {
+		warnMigrate("lint %s [%s]: %s", f.Severity, f.Code, f.Message)
+	}
+
+	var codes []string
+
+	for _, f := range findings {
+		if f.Severity == migrate.LintError {
+			codes = append(codes, f.Code)
+		}
+	}
+
+	if len(codes) > 0 {
+		sort.Strings(codes)
+
+		return fmt.Errorf("zever db migrate: --lint failed: %s (waive with '-- zever:allow:<code>')", strings.Join(codes, ", "))
+	}
+
+	return nil
+}
+
 // dryRunDiff opens a read-only connection to introspect the live database,
 // asks orm/migrate.Plan for the same statement plan applyDiff would apply,
-// and prints it without executing or recording anything.
-func dryRunDiff(adapter, dsn string, result *compile.Result, planOpts migrate.PlanOptions) error {
+// and prints it without executing or recording anything. With lint, error
+// findings fail the run before anything is printed as executable.
+func dryRunDiff(adapter, dsn string, result *compile.Result, planOpts migrate.PlanOptions, lint bool) error {
 	conn, err := openZeverDB(adapter, dsn)
 	if err != nil {
 		return err
@@ -350,6 +489,12 @@ func dryRunDiff(adapter, dsn string, result *compile.Result, planOpts migrate.Pl
 		warnMigrate("%s", w)
 	}
 
+	if lint {
+		if lintErr := enforceMigrateLint(plan.Dialect, plan.Statements()); lintErr != nil {
+			return lintErr
+		}
+	}
+
 	printDryRun(result.Outputs["atlas"], plan.Statements())
 
 	return nil
@@ -358,8 +503,9 @@ func dryRunDiff(adapter, dsn string, result *compile.Result, planOpts migrate.Pl
 // applyDiff opens the named db adapter, computes the migration plan against
 // live database state via orm/migrate.Plan, and applies it via
 // orm/migrate.Apply, which ensures the schema_migrations bookkeeping table
-// exists and records each newly-applied statement's checksum.
-func applyDiff(adapter, dsn string, schema *ir.Schema, planOpts migrate.PlanOptions) error {
+// exists and records each newly-applied statement's checksum. With lint,
+// error findings abort the run before anything is applied.
+func applyDiff(adapter, dsn string, schema *ir.Schema, planOpts migrate.PlanOptions, lint bool) error {
 	conn, err := openZeverDB(adapter, dsn)
 	if err != nil {
 		if shouldShowHint() {
@@ -382,6 +528,12 @@ func applyDiff(adapter, dsn string, schema *ir.Schema, planOpts migrate.PlanOpti
 
 	for _, w := range plan.Warnings {
 		warnMigrate("%s", w)
+	}
+
+	if lint {
+		if lintErr := enforceMigrateLint(plan.Dialect, plan.Statements()); lintErr != nil {
+			return lintErr
+		}
 	}
 
 	applied, err := migrate.Apply(ctx, conn, plan)

@@ -32,6 +32,14 @@ type Options struct {
 	// direct adapter construction ignores it, and the db service itself
 	// ignores it (it owns the pool borrowers share).
 	DedicatedPool bool `json:"dedicated_pool" toml:"dedicated_pool" yaml:"dedicated_pool"`
+	// LockTimeout caps how long one migration statement may wait for a lock
+	// on postgres, applied via SET LOCAL lock_timeout inside the
+	// statement's own transaction by orm/migrate. Zero disables it.
+	LockTimeout time.Duration `json:"lock_timeout" toml:"lock_timeout" yaml:"lock_timeout"`
+	// StatementTimeout caps how long one migration statement may run on
+	// postgres, applied via SET LOCAL statement_timeout inside the
+	// statement's own transaction by orm/migrate. Zero disables it.
+	StatementTimeout time.Duration `json:"statement_timeout" toml:"statement_timeout" yaml:"statement_timeout"`
 }
 
 // Validate checks options for consistency, joining all violations.
@@ -54,6 +62,14 @@ func (o Options) Validate() error {
 
 	if o.MaxConnIdleTime < 0 {
 		errs = append(errs, InvalidOptionsError{Reason: "max_conn_idle_time must not be negative"})
+	}
+
+	if o.LockTimeout < 0 {
+		errs = append(errs, InvalidOptionsError{Reason: "lock_timeout must not be negative"})
+	}
+
+	if o.StatementTimeout < 0 {
+		errs = append(errs, InvalidOptionsError{Reason: "statement_timeout must not be negative"})
 	}
 
 	return errors.Join(errs...)
