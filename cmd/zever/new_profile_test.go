@@ -74,12 +74,22 @@ func TestProfileBatteriesOrdered(t *testing.T) {
 
 	fullSet := batteriesFor(full, "")
 
-	if len(fullSet) != len(allServiceAdapters) {
-		t.Fatalf("full resolves to %d batteries, want all %d services", len(fullSet), len(allServiceAdapters))
+	// Services with no zero-infra adapter (they need an API key, a dataset
+	// or an embedded FS supplied from code) would scaffold a config that
+	// fails `zever doctor`, so the full profile leaves them for `zever add`.
+	needInputs := map[string]bool{"ai": true, "geo": true, "i18n": true}
+
+	if want := len(allServiceAdapters) - len(needInputs); len(fullSet) != want {
+		t.Fatalf("full resolves to %d batteries, want %d (all services but %v)", len(fullSet), want, needInputs)
 	}
 
 	for battery := range allServiceAdapters {
-		if !batteryPicked(fullSet, battery) {
+		picked := batteryPicked(fullSet, battery)
+		if needInputs[battery] && picked {
+			t.Errorf("full profile wires %q, which cannot resolve from zever.yaml alone", battery)
+		}
+
+		if !needInputs[battery] && !picked {
 			t.Errorf("full profile missing service %q", battery)
 		}
 	}
