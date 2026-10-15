@@ -125,6 +125,22 @@ Pre-1.0 Extended packages are exempt (they break freely with release
 notes); pre-1.0 Core follows the window on a best-effort basis and always
 with release notes.
 
+### Kid-less JWT tokens
+
+Current behavior (`adapters/auth/jwt`): with only `jwt.secret` configured,
+tokens are issued and verified without a `kid` header. With `jwt.keys`
+configured, new tokens carry the active `kid`, and kid-less tokens are still
+verified against the legacy `jwt.secret` when it is set; with no legacy
+secret they are rejected. Unknown kids always fail closed.
+
+Timeline: kid-less verification is **not deprecated** today and has no
+removal date. It exists so tokens issued before a rotation setup keep
+working until they expire. If it is ever deprecated, it follows the policy
+above: a `// Deprecated:` marker and a `CHANGELOG.md` note in one minor,
+and removal no earlier than the next minor (pre-1.0), with a `**Breaking:**`
+entry. Until then, to retire kid-less acceptance early, remove
+`jwt.secret` once every kid-less token has expired (bounded by `jwt.max_ttl` when set).
+
 ## API compatibility gate
 
 `make apidiff` (CI job `apidiff`) diffs each Core-tier module against its
