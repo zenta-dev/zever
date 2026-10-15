@@ -1,6 +1,9 @@
 package orm
 
-import "fmt"
+import (
+	"fmt"
+	"reflect"
+)
 
 // planInChunks splits where so every statement it describes stays within
 // the dialect's per-statement bind-parameter budget. It returns one Node
@@ -35,7 +38,103 @@ func planInChunks(where Node, budget int) ([]Node, error) {
 		return nil, fmt.Errorf("orm: planInChunks: %w", ErrInListTooLarge)
 	}
 
+	// Drop repeated values from every chunkable IN before splitting. A
+	// value that straddles two chunks would otherwise match the same row in
+	// both statements and Stream/All would yield it twice (Count would
+	// double count it). For a pure IN on one column, equal values match
+	// exactly the same rows, so removing later duplicates never changes the
+	// logical row set; and distinct chunks of distinct values are disjoint.
+	where = dedupeChunkableIns(where, true)
+	if countNodeArgs(where) <= budget {
+		return []Node{where}, nil
+	}
+
 	return splitWhere(where, budget)
+}
+
+// dedupeChunkableIns returns where with repeated values removed
+// (order-preserving, first occurrence wins) from every value-list IN in
+// positive AND-top-level polarity. Nodes off that path (NOT IN, COr/CNot
+// subtrees) are left untouched, and the input tree is never mutated.
+// Values that are not hashable (for example []byte) are always kept, since
+// they cannot be compared safely as map keys. Values of different dynamic
+// types (int 1 vs int64 1 vs "1") are treated as distinct, which is
+// conservative: it can only leave a duplicate in, never drop a needed one.
+func dedupeChunkableIns(n Node, chunkable bool) Node {
+	switch {
+	case n.Kind == NIn && n.Op == In && chunkable:
+		vs, ok := n.Value.([]any)
+		if !ok {
+			return n
+		}
+
+		n.Value = dedupeValues(vs)
+
+		return n
+	case n.Kind == NCompound:
+		children := make([]Node, len(n.Children))
+		for i := range n.Children {
+			children[i] = dedupeChunkableIns(n.Children[i], chunkable && n.Compound == CAnd)
+		}
+
+		n.Children = children
+
+		return n
+	default:
+		return n
+	}
+}
+
+// dedupeValues returns vs without repeated hashable values, preserving
+// order. It returns vs itself when nothing was removed.
+func dedupeValues(vs []any) []any {
+	seen := make(map[any]struct{}, len(vs))
+	out := make([]any, 0, len(vs))
+
+	for _, v := range vs {
+		if !isHashable(v) {
+			out = append(out, v)
+
+			continue
+		}
+
+		if _, dup := seen[v]; dup {
+			continue
+		}
+
+		seen[v] = struct{}{}
+
+		out = append(out, v)
+	}
+
+	if len(out) == len(vs) {
+		return vs
+	}
+
+	return out
+}
+
+// isHashable reports whether v can be used as a map key without panicking.
+func isHashable(v any) bool {
+	if v == nil {
+		return true
+	}
+
+	return reflect.TypeOf(v).Comparable() && !hasUnhashableIface(v)
+}
+
+// hasUnhashableIface guards the corner where a comparable struct or array
+// type holds an interface field with an unhashable dynamic value.
+func hasUnhashableIface(v any) (bad bool) {
+	defer func() {
+		if recover() != nil {
+			bad = true
+		}
+	}()
+
+	_ = map[any]struct{}{v: {}}
+
+	return false
 }
 
 // splitWhere fans out where's largest chunkable value-list IN and recurses

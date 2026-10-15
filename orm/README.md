@@ -59,6 +59,14 @@ in `orm/dialect`; SQL text lives in `orm/render` (shared, args always
 bound, identifiers always quoted). All errors carry the `orm:` prefix
 (`orm/render:`, `orm/dialect:`) and remain `errors.Is`-compatible.
 
+Large `IN` lists: a value-list `IN` over the dialect's parameter budget is
+split into several statements for plain `All`/`Stream`/`Count`/`Exists`
+(repeated values are removed first so no row is returned twice). Those
+statements are **not snapshot-consistent** — concurrent writes between
+chunks can be missed or seen partially — unless you pass a transaction.
+`ORDER BY`/`LIMIT`/`OFFSET`/locks, `NOT IN` and `IN` under `OR`/`NOT` fail
+closed with `ErrInListTooLarge`.
+
 MySQL status: the query builder above does not render mysql, and `db/`
 ships no mysql driver — but the migration stack does support it.
 `dsl/backend/atlas` renders bootstrap DDL for `"mysql"`, and

@@ -75,9 +75,20 @@ func Preload[T any, PT ptrScanner[T], C any, PC ptrScanner[C], K comparable](
 		return nil, nil
 	}
 
-	ids := make([]K, len(rows))
-	for i, row := range rows {
-		ids[i] = parentID((*T)(row))
+	// Distinct parent keys only: a key repeated across two child-IN chunks
+	// would fetch (and later group) the same children twice.
+	ids := make([]K, 0, len(rows))
+	seenIDs := make(map[K]struct{}, len(rows))
+
+	for _, row := range rows {
+		id := parentID((*T)(row))
+		if _, dup := seenIDs[id]; dup {
+			continue
+		}
+
+		seenIDs[id] = struct{}{}
+
+		ids = append(ids, id)
 	}
 
 	// Size the child-IN chunks against the resolved dialect's parameter

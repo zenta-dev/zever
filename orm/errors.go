@@ -59,6 +59,8 @@ var ErrProjectionEmpty = errors.New("orm: projected query requires at least one 
 // wrongly), a NOT IN of any polarity, or a fan-out that would need
 // ORDER BY/LIMIT/OFFSET/locking/tablesample semantics across statements.
 // Narrow the id set or drop the modifier. Callers test with errors.Is.
+// Reads that do fan out run multiple statements and are not
+// snapshot-consistent unless the caller passes a transaction.
 var ErrInListTooLarge = errors.New("orm: IN list exceeds the dialect parameter budget for this query shape")
 
 // ErrRetryable marks an error as a transient transaction failure worth
