@@ -9,6 +9,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Fixed
 
+- `docs(auth): drop duplicated alg-none sentence from the JWT guide`: the
+  guide states HS256-only once and no longer repeats the `alg: none` rejection
+  note. No code or behavior change; asymmetric algorithms stay unsupported by
+  design.
 - `fix(build): exclude agent harness checkouts from the module list`:
   `ALL_MODULES` in `Makefile` now skips `./.claude/*`. Harness checkouts
   under `.claude/worktrees/` each contain full module trees; without the
