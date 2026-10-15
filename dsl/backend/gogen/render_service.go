@@ -41,7 +41,7 @@ func renderService(pkg string, data moduleModel) string {
 
 		for _, op := range svc.Operations {
 			if op.Paginated {
-				fmt.Fprintf(&body, "\t%s(ctx context.Context, req *%s, cursor Cursor, limit int32) (*%s, error)\n",
+				fmt.Fprintf(&body, "\t%s(ctx context.Context, req *%s, cursor string, limit int32) (*%s, error)\n",
 					op.Name, op.RequestType, op.ReturnType)
 
 				continue
@@ -58,7 +58,12 @@ func renderService(pkg string, data moduleModel) string {
 	b.WriteString(generatedHeader)
 	fmt.Fprintf(&b, "// Package %s holds the generated service interfaces for the %s module.\n", pkg, pkg)
 	fmt.Fprintf(&b, "package %s\n\n", pkg)
-	writeGroupedImportBlock(&b, map[string]bool{importContext: true}, nil)
+	imports := map[string]bool{importContext: true}
+	if needsPagination(data) {
+		imports[pkgApperror] = true
+	}
+
+	writeGroupedImportBlock(&b, imports, nil)
 	b.WriteString("\n")
 	b.WriteString(body.String())
 
@@ -66,7 +71,7 @@ func renderService(pkg string, data moduleModel) string {
 }
 
 // needsPagination reports whether any operation in data is paginated, i.e.
-// whether the Cursor/Page/limit helpers below must be emitted.
+// whether the limit helper below must be emitted.
 func needsPagination(data moduleModel) bool {
 	for _, svc := range data.Services {
 		for _, op := range svc.Operations {
@@ -79,36 +84,45 @@ func needsPagination(data moduleModel) bool {
 	return false
 }
 
-// paginationPrelude declares the shared pagination vocabulary every
-// paginated Service method uses, emitted once per service.go when at least
-// one operation is paginated. Cursor is an opaque string: handlers pass it
-// through untouched and implementations must treat it as an opaque token,
-// never parse it. Page is the typed in-memory shape of one page for
-// consumers that prefer it over the protobuf response message. Limits are
-// validated by the generated router handler (see render_router.go): zero
-// means "client said nothing, service default applies"; a negative limit or
-// one above MaxPageLimit is rejected as InvalidArgument before the service
-// is ever called.
-const paginationPrelude = `// Cursor is an opaque pagination cursor. Handlers pass the client's
-// cursor query parameter through as-is; never construct one by hand and
-// never parse one -- only the service implementation that minted it may
-// interpret it.
-type Cursor string
-
-// Pagination limit bounds for every paginated operation in this module.
+// paginationPrelude declares the shared pagination bounds helper every
+// paginated Service method relies on, emitted once per service.go when at
+// least one operation is paginated. The cursor is a plain string: handlers
+// pass it through untouched and implementations must treat it as an opaque
+// token, never parse it. Everything emitted here is unexported so it can
+// never collide with a user-declared message or entity name (those are
+// PascalCase exported aliases in types.go); a former exported Cursor type
+// and a generic Page[T] were removed for that reason (Page[T] was unused by
+// any signature: responses are the protobuf <Op>Response messages).
+//
+// normalizePageLimit is the single bounds policy, called by BOTH the HTTP
+// router and the gRPC adapter so the transports cannot drift: zero (client
+// said nothing) becomes defaultPageLimit, a value above maxPageLimit is
+// clamped to it, and a negative value is rejected as InvalidArgument before
+// the service is ever called.
+const paginationPrelude = `// Pagination limit bounds for every paginated operation in this module.
 const (
-	// DefaultPageLimit applies when the client sends no limit.
-	DefaultPageLimit int32 = 20
-	// MaxPageLimit caps the client-supplied limit; larger values are
-	// rejected by the generated handler before reaching the service.
-	MaxPageLimit int32 = 100
+	// defaultPageLimit applies when the client sends no limit.
+	defaultPageLimit int32 = 20
+	// maxPageLimit caps the client-supplied limit; larger values are
+	// clamped to it.
+	maxPageLimit int32 = 100
 )
 
-// Page is one page of paginated results: the items of this page plus the
-// opaque cursor fetching the next one (empty when the page is last).
-type Page[T any] struct {
-	Items []T
-	NextCursor Cursor
+// normalizePageLimit applies the module's pagination bounds to a
+// client-supplied limit, shared by the HTTP and gRPC transports: zero
+// becomes defaultPageLimit, values above maxPageLimit are clamped, and a
+// negative value is an InvalidArgument error.
+func normalizePageLimit(limit int32) (int32, error) {
+	switch {
+	case limit < 0:
+		return 0, apperror.New(apperror.InvalidArgument, "invalid parameter \"limit\"")
+	case limit == 0:
+		return defaultPageLimit, nil
+	case limit > maxPageLimit:
+		return maxPageLimit, nil
+	default:
+		return limit, nil
+	}
 }
 
 `

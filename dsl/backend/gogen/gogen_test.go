@@ -201,15 +201,14 @@ func TestGenerateHandlesPaginatedOperation(t *testing.T) {
 
 	service := string(out["app/service.go"])
 
-	if !strings.Contains(service, "ListTasks(ctx context.Context, req *ListTasksRequest, cursor Cursor, limit int32) (*ListTasksResponse, error)") {
+	if !strings.Contains(service, "ListTasks(ctx context.Context, req *ListTasksRequest, cursor string, limit int32) (*ListTasksResponse, error)") {
 		t.Fatalf("service.go ListTasks signature not using Cursor/limit params and *ListTasksResponse:\n%s", service)
 	}
 
 	for _, want := range []string{
-		"type Cursor string",
-		"type Page[T any] struct",
-		"DefaultPageLimit",
-		"MaxPageLimit",
+		"func normalizePageLimit(limit int32) (int32, error)",
+		"defaultPageLimit",
+		"maxPageLimit",
 	} {
 		if !strings.Contains(service, want) {
 			t.Errorf("service.go missing paginated helper %q:\n%s", want, service)
@@ -218,7 +217,7 @@ func TestGenerateHandlesPaginatedOperation(t *testing.T) {
 
 	router := string(out["app/router.go"])
 
-	if !strings.Contains(router, `cursor = Cursor(r.URL.Query().Get("cursor"))`) {
+	if !strings.Contains(router, `cursor = r.URL.Query().Get("cursor")`) {
 		t.Fatalf("router.go missing opaque cursor query-param binding:\n%s", router)
 	}
 
@@ -226,7 +225,7 @@ func TestGenerateHandlesPaginatedOperation(t *testing.T) {
 		t.Fatalf("router.go missing limit query-param binding:\n%s", router)
 	}
 
-	if !strings.Contains(router, "v < 0 || v > int64(MaxPageLimit)") {
+	if !strings.Contains(router, "normalizePageLimit(limit)") {
 		t.Fatalf("router.go missing limit bounds validation:\n%s", router)
 	}
 
@@ -235,9 +234,9 @@ func TestGenerateHandlesPaginatedOperation(t *testing.T) {
 	}
 
 	for _, want := range []string{
-		"var cursor Cursor",
-		`Cursor(r.URL.Query().Get("cursor"))`,
-		"MaxPageLimit",
+		"var cursor string",
+		`cursor = r.URL.Query().Get("cursor")`,
+		"normalizePageLimit(limit)",
 	} {
 		if !strings.Contains(router, want) {
 			t.Errorf("router.go missing paginated binding %q:\n%s", want, router)
@@ -965,7 +964,45 @@ func TestGenerateServiceStubPaginatedSignature(t *testing.T) {
 
 	s := string(got)
 
-	if !strings.Contains(s, "func (s *TaskServiceImpl) ListTasks(ctx context.Context, req *genapp.ListTasksRequest, cursor genapp.Cursor, limit int32) (*genapp.ListTasksResponse, error) {") {
+	if !strings.Contains(s, "func (s *TaskServiceImpl) ListTasks(ctx context.Context, req *genapp.ListTasksRequest, cursor string, limit int32) (*genapp.ListTasksResponse, error) {") {
 		t.Fatalf("expected paginated stub signature, got:\n%s", s)
+	}
+}
+
+// TestGenerateGRPCPaginatedReadsCursorAndLimitFromRequest proves the gRPC
+// adapter forwards the request message's cursor/limit to the service through
+// the same normalizePageLimit bounds the HTTP router applies, instead of
+// always calling with an empty cursor and limit 0.
+func TestGenerateGRPCPaginatedReadsCursorAndLimitFromRequest(t *testing.T) {
+	file := compileSchema(t, paginatedFixture)
+
+	schema, diags := resolver.Resolve([]*ast.File{file})
+	if diags.HasErrors() {
+		t.Fatalf("resolve errors: %v", diags)
+	}
+
+	out, err := New().Generate(schema)
+	if err != nil {
+		t.Fatalf("Generate: %v", err)
+	}
+
+	grpc := string(out["app/grpc.go"])
+
+	for _, want := range []string{
+		"normalizePageLimit(req.GetLimit())",
+		"g.svc.ListTasks(ctx, req, req.GetCursor(), limit)",
+	} {
+		if !strings.Contains(grpc, want) {
+			t.Errorf("grpc.go missing %q:\n%s", want, grpc)
+		}
+	}
+
+	if strings.Contains(grpc, "NOTE: protogogen") || strings.Contains(grpc, `Cursor("")`) {
+		t.Errorf("grpc.go still drops cursor/limit:\n%s", grpc)
+	}
+
+	service := string(out["app/service.go"])
+	if strings.Contains(service, "type Cursor") || strings.Contains(service, "type Page[") {
+		t.Errorf("service.go must not declare collision-prone Cursor/Page types:\n%s", service)
 	}
 }

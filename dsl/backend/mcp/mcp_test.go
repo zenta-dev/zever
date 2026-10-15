@@ -35,7 +35,7 @@ service UserService {
 		auth: required
 	}
 
-	rpc ListUsers(limit: int32) -> User {
+	rpc ListUsers(status: int32) -> User {
 		http: GET "/v1/users"
 		auth: required
 		paginated: true

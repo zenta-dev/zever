@@ -119,7 +119,13 @@ func (*GetTaskRequest) ProtoReflect() protoreflect.Message { return nil }
 
 type ListTasksRequest struct {
 	UserId string
+	Cursor string
+	Limit  int32
 }
+
+func (r *ListTasksRequest) GetCursor() string { return r.Cursor }
+
+func (r *ListTasksRequest) GetLimit() int32 { return r.Limit }
 
 func (*ListTasksRequest) ProtoReflect() protoreflect.Message { return nil }
 

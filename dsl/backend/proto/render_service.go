@@ -55,8 +55,12 @@ func renderService(w *strings.Builder, s *ir.Service, ctx *fileCtx) error {
 // "<RPCName>Request" wrapper around it would, in the common case where the
 // author names their message exactly that way (e.g. `rpc SignUp(req:
 // SignUpRequest)`), collide by name with the very message being wrapped.
+//
+// A paginated operation never qualifies: its request must carry the cursor
+// and limit fields, which cannot be added to the author's own message, so it
+// always gets the synthesized wrapper.
 func singleRefParam(r *ir.Operation) *ir.TypeRef {
-	if len(r.Params) != 1 {
+	if r.Paginated || len(r.Params) != 1 {
 		return nil
 	}
 
@@ -97,6 +101,11 @@ func renderRequestMessage(w *strings.Builder, s *ir.Service, r *ir.Operation, ct
 
 			enums = append(enums, enumSrc)
 		}
+	}
+
+	if r.Paginated {
+		fmt.Fprintf(w, "  string cursor = %d;\n", len(r.Params)+1)
+		fmt.Fprintf(w, "  int32 limit = %d;\n", len(r.Params)+2)
 	}
 
 	for i, enumSrc := range enums {

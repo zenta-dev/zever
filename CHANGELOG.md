@@ -48,6 +48,21 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   (`"4200"` was 4200 minor units, now 420000); truncation becomes
   half-away-from-zero rounding there too.
 
+- `fix(gogen,proto)!: wire pagination through gRPC and drop collision-prone helpers`:
+  **Breaking:** a `paginated: true` RPC's synthesized request message now
+  carries `string cursor` and `int32 limit` (numbered after the declared
+  params), so gRPC clients can paginate; an RPC whose sole param is a
+  message/entity is now wrapped in `<Op>Request` like any other paginated
+  RPC, and declaring a param named `cursor` or `limit` on a paginated RPC
+  is a resolver error. In generated Go, the service method now takes
+  `cursor string, limit int32` (was `Cursor`), the gRPC adapter forwards
+  the request's cursor and limit instead of always passing `Cursor("")`
+  and `0`, and one generated `normalizePageLimit` applies identical
+  bounds on both transports (zero becomes 20, above 100 is clamped
+  rather than rejected over HTTP, negative is `InvalidArgument`). The
+  exported `Cursor` type, the unused generic `Page[T]` and the exported
+  `DefaultPageLimit`/`MaxPageLimit` were removed (now unexported) so they
+  cannot collide with user-declared messages or entities.
 - `fix(payment)!: normalize Paddle whole-unit amounts to minor units`:
   **Breaking:** the `paddle` adapter now scales whole-unit decimal totals to
   minor units (`"10"` parses to `1000`, matching `"10.00"`), where it
