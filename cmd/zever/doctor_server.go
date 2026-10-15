@@ -52,20 +52,29 @@ var runServerDoctor = func(ctx context.Context, entry string) (serverDoctorRepor
 
 	cmd.Stdout, cmd.Stderr = &stdout, &stderr
 
-	if err := cmd.Run(); err != nil {
-		detail := strings.TrimSpace(stderr.String())
-		if i := strings.IndexByte(detail, '\n'); i >= 0 {
-			detail = detail[:i]
-		}
+	runErr := cmd.Run()
 
-		if detail == "" {
-			detail = "no output"
-		}
+	return interpretServerDoctor(runErr, stdout.Bytes(), stderr.String())
+}
 
-		return serverDoctorReport{}, fmt.Errorf("zever doctor: server --doctor: %w: %s", err, detail)
+// interpretServerDoctor turns one server --doctor execution into a report. A
+// server that finds a failing battery prints its JSON report and exits
+// non-zero by design, so a decodable report wins over runErr; only when no
+// report was printed is the run a failure, described by the last stderr line
+// (the actual error, not a leading log warning).
+func interpretServerDoctor(runErr error, stdout []byte, stderr string) (serverDoctorReport, error) {
+	if rep, decErr := decodeServerDoctorReport(stdout); decErr == nil && len(rep.Batteries) > 0 {
+		return rep, nil
+	} else if runErr == nil {
+		return serverDoctorReport{}, decErr
 	}
 
-	return decodeServerDoctorReport(stdout.Bytes())
+	detail := "no output"
+	if lines := strings.Split(strings.TrimSpace(stderr), "\n"); lines[len(lines)-1] != "" {
+		detail = strings.TrimSpace(lines[len(lines)-1])
+	}
+
+	return serverDoctorReport{}, fmt.Errorf("zever doctor: server --doctor: %w: %s", runErr, detail)
 }
 
 // decodeServerDoctorReport parses one built server's --doctor JSON document,
