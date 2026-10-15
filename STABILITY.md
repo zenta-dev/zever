@@ -141,6 +141,21 @@ and removal no earlier than the next minor (pre-1.0), with a `**Breaking:**`
 entry. Until then, to retire kid-less acceptance early, remove
 `jwt.secret` once every kid-less token has expired (bounded by `jwt.max_ttl` when set).
 
+## Known issue: v0.7.0 sibling pins are stale (use v0.7.1)
+
+The v0.7.0 module tags are immutable (they are cached by the Go module
+proxy), and their `go.mod` files still require sibling zever modules at
+v0.6.1, so a project built from v0.7.0 modules resolves those siblings at
+v0.6.1 and can fail to compile (for example `undefined: registry.SortedNames`).
+v0.7.1 ships the same work plus everything merged afterwards, with every
+intra-repo `require` pinned at v0.7.1. Depend on v0.7.1 and do not use
+v0.7.0. `zever new` at v0.7.1 pins every framework module explicitly, so
+scaffolded projects are unaffected; existing projects should run
+`zever upgrade --project --version v0.7.1`. From v0.7.1 on, the release
+tooling (`make release-prep`, `tools/check-version.sh`, and the gate in
+`tools/tag-release.sh`) refuses to tag unless every intra-repo `require`
+equals the release version.
+
 ## API compatibility gate
 
 `make apidiff` (CI job `apidiff`) diffs each Core-tier module against its

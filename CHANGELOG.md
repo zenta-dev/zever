@@ -130,6 +130,18 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Changed
 
+- `build(release): v0.7.1 replaces v0.7.0`: the v0.7.0 module tags carry
+  `go.mod` files that still require sibling zever modules at v0.6.1 and are
+  immutable once cached by the Go module proxy. v0.7.1 contains the same work
+  plus everything merged afterwards, with every intra-repo `require` pinned at
+  v0.7.1; use v0.7.1 and do not depend on v0.7.0 (see `STABILITY.md`). New
+  `make release-prep VERSION=vX.Y.Z` (`tools/release-prep.sh`) sets
+  `cmd/zever/VERSION`, every pin in `tools/release-pins.txt` (installers,
+  `CITATION.cff`, docs, LSP/MCP server versions, VS Code extension) and every
+  intra-repo `go.mod` require (`tools/modgraph --set-pins`) in one pass.
+  `tools/check-version.sh`, `make modgraph-check` (`--check-pins`) and
+  `tools/tag-release.sh` (all modes) now fail when any of them drifts from
+  `cmd/zever/VERSION`.
 - `docs(stability): document the kid-less JWT token timeline`: `STABILITY.md`
   states the current behavior (kid-less tokens verify against the legacy
   `jwt.secret`), that it is not deprecated and has no removal date, and how

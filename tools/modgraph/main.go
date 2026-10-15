@@ -5,7 +5,11 @@
 // `go mod tidy` drops requires nothing imports, so a transitive closure
 // here would fight tidy forever.
 //
-// Usage: modgraph [--check] [--version=vX.Y.Z] [--root DIR]
+// Usage: modgraph [--check | --check-pins | --set-pins] [--version=vX.Y.Z] [--root DIR]
+//
+// --check-pins and --set-pins operate on the version of every intra-repo
+// require (default: cmd/zever/VERSION), so published modules never pin
+// siblings at a stale release.
 package main
 
 import (
@@ -32,6 +36,8 @@ func run(ctx context.Context, args []string, stdout, stderr *os.File) int {
 	fs.SetOutput(stderr)
 	check := fs.Bool("check", false, "report drift without changing files (exit 1 when drifted)")
 	version := fs.String("version", "", "version for new requires (default: first ## [vX.Y.Z] in CHANGELOG.md)")
+	checkPins := fs.Bool("check-pins", false, "fail when any intra-repo require differs from the release version (cmd/zever/VERSION or -version)")
+	setPins := fs.Bool("set-pins", false, "rewrite every intra-repo require to the release version (cmd/zever/VERSION or -version)")
 	rootFlag := fs.String("root", "", "repo root (default: source tree root)")
 	if err := fs.Parse(args); err != nil {
 		return 2
@@ -51,6 +57,9 @@ func run(ctx context.Context, args []string, stdout, stderr *os.File) int {
 	if err != nil {
 		fmt.Fprintf(stderr, "modgraph: list modules: %v\n", err)
 		return 1
+	}
+	if *checkPins || *setPins {
+		return runPins(root, mods, *version, *setPins, stdout, stderr)
 	}
 	if *check {
 		return runCheck(root, mods, stdout)
