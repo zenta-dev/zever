@@ -1,7 +1,6 @@
 package container
 
 import (
-	"context"
 	"runtime/debug"
 	"sync"
 	"sync/atomic"
@@ -12,9 +11,14 @@ import (
 // lazy is sealed to this package via the unexported sealed marker, so
 // external packages can neither instantiate nor embed it.
 //
-// A failed build is not cached: the stored value resets to zero and the
-// next get retries. Concurrent callers share a single in-flight execution
-// (singleflight) instead of each invoking fn.
+// A failed build is not cached: the stored value resets to zero and a later
+// get retries. Concurrent callers share a single in-flight execution
+// (singleflight) instead of each invoking fn, and callers parked on a flight
+// receive that flight's own result, value or error (a panic arrives as a
+// BuildPanicError). Only a call that starts after the flight settled retries,
+// so a deterministically failing builder runs once per flight, not once per
+// waiter. A flight abandoned by runtime.Goexit has no result to share, so its
+// waiters retry.
 //
 // ready is an atomic publication flag layered over the mutex-guarded state.
 // The leader stores ready=true while still holding mu, after writing val;
@@ -32,26 +36,32 @@ import (
 type lazy[T any] struct {
 	mu  sync.Mutex
 	val T
-	err error
 	// done guards success under mu; ready publishes it lock-free.
 	done  bool
 	ready atomic.Bool
-	wait  chan struct{}
+	// cur is the in-flight build, nil when none is running.
+	cur *flight[T]
+	// parked counts callers that joined a flight as waiters (test hook).
+	parked int
+}
+
+// flight is one build execution. val, err and settled are written by the
+// leader before done is closed, so waiters read them after <-done without
+// further locking.
+type flight[T any] struct {
+	done    chan struct{}
+	val     T
+	err     error
+	settled bool // false when the leader exited via runtime.Goexit
 }
 
 // sealed marks lazy as package-private.
 func (l *lazy[T]) sealed() {}
 
-// get returns the cached value, invoking fn once to build it. The builder
-// receives a live Background context: callers of get have no ctx to pass.
+// get returns the cached value, invoking fn once to build it. Builders carry
+// no caller context: lazy accessors have none to pass, and builders that need
+// one use Container.rootCtx.
 func (l *lazy[T]) get(fn func() (T, error)) (T, error) {
-	return l.getCtx(context.Background(), func(context.Context) (T, error) { return fn() })
-}
-
-// getCtx returns the cached value, invoking fn with ctx once to build it.
-// The builder receives the caller's context so cancellation, deadlines, and
-// trace values propagate into construction. ctx must be non-nil.
-func (l *lazy[T]) getCtx(ctx context.Context, fn func(context.Context) (T, error)) (T, error) {
 	// Fast path: ready is monotonic, so observing true means val is fully
 	// published and immutable; no mutex needed.
 	if l.ready.Load() {
@@ -60,65 +70,64 @@ func (l *lazy[T]) getCtx(ctx context.Context, fn func(context.Context) (T, error
 
 	l.mu.Lock()
 
-	if l.done {
-		v, e := l.val, l.err
-		l.mu.Unlock()
-
-		return v, e
-	}
-
-	// Singleflight wait loop: waiters re-check after each wake. A waiter
-	// that wakes with no retry in flight falls through and becomes the
-	// retry leader itself, so waiters never wedge when a retry also fails.
-	for l.wait != nil {
-		ch := l.wait
-		l.mu.Unlock()
-
-		<-ch
-
-		if l.ready.Load() {
-			return l.val, nil
-		}
-
-		l.mu.Lock()
-
+	for {
 		if l.done {
-			v, e := l.val, l.err
+			v := l.val
 			l.mu.Unlock()
 
-			return v, e
+			return v, nil
 		}
+
+		f := l.cur
+		if f == nil {
+			break
+		}
+
+		l.parked++
+		l.mu.Unlock()
+
+		<-f.done
+
+		if f.settled {
+			return f.val, f.err
+		}
+
+		// Leader Goexited: nothing to share, contend to lead a retry.
+		l.mu.Lock()
 	}
 
-	l.wait = make(chan struct{})
+	f := &flight[T]{done: make(chan struct{})}
+	l.cur = f
 	l.mu.Unlock()
 
-	return l.leaderBuild(ctx, fn)
+	return l.leaderBuild(f, fn)
 }
 
 // leaderBuild runs fn outside mu so waiters can park instead of serializing
 // behind the build. Whether fn returns normally, panics, or calls
-// runtime.Goexit, the deferred cleanup always resets l.wait, releases mu, and
-// closes the wait channel, so parked waiters never wedge.
+// runtime.Goexit, the deferred cleanup always clears l.cur, releases mu, and
+// closes f.done, so parked waiters never wedge.
 //
 // The defer distinguishes the three exits: a recovered panic becomes a
 // BuildPanicError; returned is set only when fn returns normally, so a
 // Goexit — which runs defers but skips the rest of the body — releases the
-// waiters and leaves the build uncached (recover returns nil for Goexit, so
-// no panic error is recorded) instead of caching a zero value as success.
-func (l *lazy[T]) leaderBuild(ctx context.Context, fn func(context.Context) (T, error)) (v T, err error) {
+// waiters unsettled and leaves the build uncached (recover returns nil for
+// Goexit, so no panic error is recorded) instead of caching a zero value.
+func (l *lazy[T]) leaderBuild(f *flight[T], fn func() (T, error)) (v T, err error) {
 	returned := false
 
 	defer func() {
+		panicked := false
+
 		if r := recover(); r != nil {
 			err = BuildPanicError{Value: r, Stack: debug.Stack()}
+			panicked = true
 		}
 
 		l.mu.Lock()
 
 		if returned && err == nil {
 			l.val = v
-			l.err = nil
 			l.done = true
 			// Publish while still holding mu so the val write is ordered
 			// before this Store; any later Load observing true synchronizes
@@ -127,18 +136,17 @@ func (l *lazy[T]) leaderBuild(ctx context.Context, fn func(context.Context) (T, 
 		} else {
 			var zero T
 
-			l.val = zero
-			l.err = err
+			v = zero
 		}
 
-		ch := l.wait
-		l.wait = nil
+		f.val, f.err, f.settled = v, err, returned || panicked
+		l.cur = nil
 		l.mu.Unlock()
 
-		close(ch)
+		close(f.done)
 	}()
 
-	v, err = fn(ctx)
+	v, err = fn()
 	returned = true
 
 	return v, err

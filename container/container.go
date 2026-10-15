@@ -98,11 +98,14 @@ type Container struct {
 	webhook       lazy[webhook.Webhook]
 	workflow      lazy[workflow.Workflow]
 
-	// rootCtx is the builder-facing context every lazy accessor passes when
-	// resolving without a caller ctx. It is detached from any caller
-	// (WithoutCancel over Background: no inherited cancellation, no
-	// deadline) but carries container-lifetime cancellation: Close cancels
-	// it so in-flight and future builds wind down with the container.
+	// rootCtx is the context for work a lazy build starts that outlives the
+	// build call (e.g. the gRPC client connection). Builders run on whichever
+	// goroutine first resolves a service, so they deliberately do not see that
+	// caller's cancellation, deadline, or values: a canceled first request
+	// must not poison a process-wide singleton. rootCtx is detached from any
+	// caller (WithoutCancel over Background: no inherited cancellation, no
+	// deadline, no values) but is canceled by Close so such work winds down
+	// with the container.
 	//nolint:containedctx // container-lifetime root: detached from callers by design, canceled in Close, never derived from request ctx
 	rootCtx    context.Context
 	cancelRoot context.CancelFunc
